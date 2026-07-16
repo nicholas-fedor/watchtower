@@ -84,11 +84,19 @@ func Test_computeTokenExpiry(t *testing.T) {
 			want: truncatedToSeconds.Add(defaultTokenTTL),
 		},
 		{
-			name: "falls back to issued_at when expires_in is zero",
+			name: "uses issued_at with default TTL when expires_in is zero",
 			args: &types.TokenResponse{
 				IssuedAt: now.Truncate(time.Second).Format(time.RFC3339),
 			},
 			want: truncatedToSeconds.Add(defaultTokenTTL),
+		},
+		{
+			name: "uses issued_at with expires_in when both are provided",
+			args: &types.TokenResponse{
+				ExpiresIn: 3600,
+				IssuedAt:  now.Add(-10 * time.Minute).Truncate(time.Second).Format(time.RFC3339),
+			},
+			want: now.Add(-10 * time.Minute).Truncate(time.Second).Add(3600 * time.Second),
 		},
 		{
 			name: "falls back to default TTL when both are missing",

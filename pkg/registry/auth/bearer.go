@@ -31,7 +31,7 @@ var (
 )
 
 // Default token TTL when the registry does not provide expires_in.
-const defaultTokenTTL = 5 * time.Minute
+const defaultTokenTTL = 60 * time.Second
 
 // Cache configuration constants.
 const (
@@ -401,8 +401,9 @@ func readBearerTokenWithExpiry(body io.Reader, imageName string) (string, time.T
 
 // computeTokenExpiry calculates the absolute expiry time from a token response.
 //
-// It uses the registry-provided expires_in when available, falls back to parsing
-// issued_at, and finally defaults to defaultTokenTTL.
+// It prefers the registry-provided expires_in combined with issued_at when both
+// are available. It falls back to current time when issued_at is absent or invalid,
+// and finally defaults to defaultTokenTTL.
 //
 // Parameters:
 //   - tokenResponse: Parsed token response from the registry.
@@ -412,22 +413,26 @@ func readBearerTokenWithExpiry(body io.Reader, imageName string) (string, time.T
 func computeTokenExpiry(tokenResponse *types.TokenResponse) time.Time {
 	now := time.Now()
 
-	if tokenResponse.ExpiresIn > 0 {
-		return now.Add(time.Duration(tokenResponse.ExpiresIn) * time.Second)
-	}
-
 	if tokenResponse.IssuedAt != "" {
 		issuedAt, parseErr := time.Parse(
 			time.RFC3339,
 			tokenResponse.IssuedAt,
 		)
 		if parseErr == nil {
+			if tokenResponse.ExpiresIn > 0 {
+				return issuedAt.Add(time.Duration(tokenResponse.ExpiresIn) * time.Second)
+			}
+
 			return issuedAt.Add(defaultTokenTTL)
 		}
 
 		logrus.WithError(parseErr).
 			WithField("issued_at", tokenResponse.IssuedAt).
-			Debug("Failed to parse issued_at - using default TTL")
+			Debug("Failed to parse issued_at - using current time as base")
+	}
+
+	if tokenResponse.ExpiresIn > 0 {
+		return now.Add(time.Duration(tokenResponse.ExpiresIn) * time.Second)
 	}
 
 	return now.Add(defaultTokenTTL)
