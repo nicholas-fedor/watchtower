@@ -113,6 +113,41 @@ func TestEncodedConfigCredentials_FileStoreNoUsername(t *testing.T) {
 	assert.Empty(t, credentials)
 }
 
+// TestEncodedConfigCredentials_FileStoreUsernameOnly tests that EncodedConfigCredentials
+// returns empty string and nil error when the Docker config file's auth entry has
+// a username but no password.
+func TestEncodedConfigCredentials_FileStoreUsernameOnly(t *testing.T) {
+	tempDir, err := os.MkdirTemp("", "watchtower-test-docker-config")
+	require.NoError(t, err)
+
+	defer os.RemoveAll(tempDir)
+
+	configContent, err := json.Marshal(map[string]any{
+		"auths": map[string]any{
+			"ghcr.io": map[string]string{
+				"serveraddress": "ghcr.io",
+				"username":      "testuser",
+			},
+		},
+	})
+	require.NoError(t, err)
+
+	configPath := filepath.Join(tempDir, "config.json")
+	writeErr := os.WriteFile(configPath, configContent, 0o600)
+	require.NoError(t, writeErr)
+
+	t.Setenv("DOCKER_CONFIG", tempDir)
+	t.Setenv("HOME", tempDir)
+	dockerCliConfig.SetDir(tempDir)
+
+	normalizedRef, parseErr := reference.ParseNormalizedNamed("ghcr.io/test/image:latest")
+	require.NoError(t, parseErr)
+
+	credentials, err := EncodedConfigCredentials(normalizedRef.String())
+	require.NoError(t, err)
+	assert.Empty(t, credentials)
+}
+
 // TestEncodedConfigCredentials_FileStoreValidCredentials tests the happy path
 // where the Docker config file contains valid username and password.
 func TestEncodedConfigCredentials_FileStoreValidCredentials(t *testing.T) {

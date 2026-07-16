@@ -157,7 +157,9 @@ func EncodedConfigCredentials(imageRef string) (string, error) {
 
 	// Return empty string if no credentials are found or if the store returned
 	// an AuthConfig with no username/password (e.g. native store miss or empty entry).
-	if credentials == (dockerConfig.AuthConfig{}) || credentials.Username == "" {
+	if credentials == (dockerConfig.AuthConfig{}) ||
+		credentials.Username == "" ||
+		credentials.Password == "" {
 		logrus.WithFields(fields).WithFields(logrus.Fields{
 			"server":      server,
 			"config_file": configFile.Filename,
