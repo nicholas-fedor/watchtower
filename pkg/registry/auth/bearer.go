@@ -323,28 +323,43 @@ func newBearerRequest(ctx context.Context, authURL *url.URL, imageName string) (
 
 // addBasicAuth adds Basic authentication to the request if credentials are provided.
 //
+// It only attaches credentials for HTTPS requests or when the insecure-registry
+// opt-in is explicitly enabled to prevent plaintext credential transmission.
+//
 // Parameters:
 //   - request: HTTP request to modify.
 //   - imageName: Image name for logging context.
 //   - registryAuth: Base64-encoded auth string.
 func addBasicAuth(request *http.Request, imageName, registryAuth string) {
-	if registryAuth != "" {
-		logrus.WithFields(logrus.Fields{
-			"image": imageName,
-		}).Debug("Found credentials")
-
-		if logrus.GetLevel() == logrus.TraceLevel {
-			logrus.WithFields(logrus.Fields{
-				"image": imageName,
-			}).Trace("Using credentials")
-		}
-
-		request.Header.Add("Authorization", "Basic "+registryAuth)
-	} else {
+	if registryAuth == "" {
 		logrus.WithFields(logrus.Fields{
 			"image": imageName,
 		}).Debug("No credentials found")
+
+		return
 	}
+
+	if request.URL.Scheme != "https" && !viper.GetBool("WATCHTOWER_REGISTRY_TLS_SKIP") {
+		logrus.WithFields(logrus.Fields{
+			"image":  imageName,
+			"scheme": request.URL.Scheme,
+			"host":   request.URL.Host,
+		}).Debug("Skipping Basic auth for non-HTTPS request without TLS skip opt-in")
+
+		return
+	}
+
+	logrus.WithFields(logrus.Fields{
+		"image": imageName,
+	}).Debug("Found credentials")
+
+	if logrus.GetLevel() == logrus.TraceLevel {
+		logrus.WithFields(logrus.Fields{
+			"image": imageName,
+		}).Trace("Using credentials")
+	}
+
+	request.Header.Add("Authorization", "Basic "+registryAuth)
 }
 
 // readBearerTokenWithExpiry reads and parses a bearer token with its expiry time.

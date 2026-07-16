@@ -11,6 +11,7 @@ import (
 
 	"github.com/distribution/reference"
 	"github.com/maypok86/otter/v2"
+	"github.com/spf13/viper"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
@@ -193,26 +194,50 @@ func Test_addBasicAuth(t *testing.T) {
 		request      *http.Request
 		imageName    string
 		registryAuth string
+		tlsSkip      bool
 		wantHeader   string
 	}{
 		{
-			name:         "adds basic auth header when credentials provided",
-			request:      mustNewRequest(t, "http://example.com"),
+			name:         "adds basic auth header for HTTPS when credentials provided",
+			request:      mustNewRequest(t, "https://example.com"),
 			imageName:    "test/image",
 			registryAuth: "dGVzdHVzZXI6dGVzdHBhc3M=",
+			tlsSkip:      false,
 			wantHeader:   "Basic dGVzdHVzZXI6dGVzdHBhc3M=",
 		},
 		{
 			name:         "does not add header when no credentials",
-			request:      mustNewRequest(t, "http://example.com"),
+			request:      mustNewRequest(t, "https://example.com"),
 			imageName:    "test/image",
 			registryAuth: "",
+			tlsSkip:      false,
 			wantHeader:   "",
+		},
+		{
+			name:         "does not add header for HTTP without TLS skip",
+			request:      mustNewRequest(t, "http://example.com"),
+			imageName:    "test/image",
+			registryAuth: "dGVzdHVzZXI6dGVzdHBhc3M=",
+			tlsSkip:      false,
+			wantHeader:   "",
+		},
+		{
+			name:         "adds basic auth header for HTTP with TLS skip",
+			request:      mustNewRequest(t, "http://example.com"),
+			imageName:    "test/image",
+			registryAuth: "dGVzdHVzZXI6dGVzdHBhc3M=",
+			tlsSkip:      true,
+			wantHeader:   "Basic dGVzdHVzZXI6dGVzdHBhc3M=",
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			originalTLSSkip := viper.GetBool("WATCHTOWER_REGISTRY_TLS_SKIP")
+
+			viper.Set("WATCHTOWER_REGISTRY_TLS_SKIP", tt.tlsSkip)
+			defer viper.Set("WATCHTOWER_REGISTRY_TLS_SKIP", originalTLSSkip)
+
 			addBasicAuth(tt.request, tt.imageName, tt.registryAuth)
 			assert.Equal(t, tt.wantHeader, tt.request.Header.Get("Authorization"))
 		})
