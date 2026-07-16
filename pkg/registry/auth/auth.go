@@ -367,6 +367,7 @@ func handleBearerAuth(
 	authURL, err := GetAuthURL(
 		strings.ToLower(wwwAuthHeader),
 		normalizedRef,
+		registryAuth,
 	)
 	if err != nil {
 		logrus.WithError(err).WithFields(fields).

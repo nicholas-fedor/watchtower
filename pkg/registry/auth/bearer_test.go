@@ -408,20 +408,22 @@ func TestGetAuthURL(t *testing.T) {
 	imageRef, _ := reference.ParseNormalizedNamed("ghcr.io/user/repo:latest")
 
 	tests := []struct {
-		name      string
-		challenge string
-		imageRef  reference.Named
-		wantErr   bool
-		wantHost  string
-		wantQuery string
+		name         string
+		challenge    string
+		imageRef     reference.Named
+		registryAuth string
+		wantErr      bool
+		wantHost     string
+		wantQuery    string
 	}{
 		{
-			name:      "valid challenge constructs auth URL",
-			challenge: `bearer realm="https://ghcr.io/token",service="ghcr.io",scope="repository:user/repo:pull"`,
-			imageRef:  imageRef,
-			wantErr:   false,
-			wantHost:  "ghcr.io",
-			wantQuery: "scope=repository%3Auser%2Frepo%3Apull&service=ghcr.io",
+			name:         "valid challenge constructs auth URL",
+			challenge:    `bearer realm="https://ghcr.io/token",service="ghcr.io",scope="repository:user/repo:pull"`,
+			imageRef:     imageRef,
+			registryAuth: "",
+			wantErr:      false,
+			wantHost:     "ghcr.io",
+			wantQuery:    "scope=repository%3Auser%2Frepo%3Apull&service=ghcr.io",
 		},
 		{
 			name:      "missing realm returns error",
@@ -447,11 +449,27 @@ func TestGetAuthURL(t *testing.T) {
 			imageRef:  imageRef,
 			wantErr:   true,
 		},
+		{
+			name:         "http realm without registry auth is allowed",
+			challenge:    `bearer realm="http://insecure-registry.local/token",service="insecure-registry.local"`,
+			imageRef:     imageRef,
+			registryAuth: "",
+			wantErr:      false,
+			wantHost:     "insecure-registry.local",
+			wantQuery:    "scope=repository%3Auser%2Frepo%3Apull&service=insecure-registry.local",
+		},
+		{
+			name:         "http realm with registry auth is rejected without TLS skip",
+			challenge:    `bearer realm="http://insecure-registry.local/token",service="insecure-registry.local"`,
+			imageRef:     imageRef,
+			registryAuth: "dGVzdA==",
+			wantErr:      true,
+		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got, err := GetAuthURL(tt.challenge, tt.imageRef)
+			got, err := GetAuthURL(tt.challenge, tt.imageRef, tt.registryAuth)
 			if tt.wantErr {
 				assert.Error(t, err)
 

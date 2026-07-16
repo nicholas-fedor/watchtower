@@ -115,7 +115,7 @@ func BenchmarkGetAuthURL(b *testing.B) {
 	ref, _ := reference.ParseNormalizedNamed("ghcr.io/user/repo:latest")
 
 	for b.Loop() {
-		_, _ = GetAuthURL(challenge, ref)
+		_, _ = GetAuthURL(challenge, ref, "")
 	}
 }
 

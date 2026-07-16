@@ -1097,7 +1097,7 @@ var _ = ginkgo.Describe("the auth module", func() {
 					RawQuery: "scope=repository%3Anicholas-fedor%2Fwatchtower%3Apull&service=ghcr.io",
 				}
 
-				URL, err := auth.GetAuthURL(challenge, imageRef)
+				URL, err := auth.GetAuthURL(challenge, imageRef, "")
 				gomega.Expect(err).NotTo(gomega.HaveOccurred())
 				gomega.Expect(URL).To(gomega.Equal(expected))
 			},
@@ -1108,7 +1108,7 @@ var _ = ginkgo.Describe("the auth module", func() {
 				challenge := `bearer service="ghcr.io"`
 				imageRef, err := reference.ParseNormalizedNamed("nicholas-fedor/watchtower")
 				gomega.Expect(err).NotTo(gomega.HaveOccurred())
-				URL, err := auth.GetAuthURL(challenge, imageRef)
+				URL, err := auth.GetAuthURL(challenge, imageRef, "")
 				gomega.Expect(err).To(gomega.HaveOccurred())
 				gomega.Expect(URL).To(gomega.BeNil())
 			})
@@ -1119,7 +1119,7 @@ var _ = ginkgo.Describe("the auth module", func() {
 			imageRef, err := reference.ParseNormalizedNamed("registry.example.com/test/image:latest")
 			gomega.Expect(err).NotTo(gomega.HaveOccurred())
 
-			URL, err := auth.GetAuthURL(challenge, imageRef)
+			URL, err := auth.GetAuthURL(challenge, imageRef, "")
 
 			gomega.Expect(err).NotTo(gomega.HaveOccurred())
 			gomega.Expect(URL.String()).
@@ -1131,7 +1131,7 @@ var _ = ginkgo.Describe("the auth module", func() {
 			imageRef, err := reference.ParseNormalizedNamed("registry.example.com/test/image:latest")
 			gomega.Expect(err).NotTo(gomega.HaveOccurred())
 
-			URL, err := auth.GetAuthURL(challenge, imageRef)
+			URL, err := auth.GetAuthURL(challenge, imageRef, "")
 
 			gomega.Expect(err).NotTo(gomega.HaveOccurred())
 			gomega.Expect(URL.String()).
@@ -1143,7 +1143,7 @@ var _ = ginkgo.Describe("the auth module", func() {
 			imageRef, err := reference.ParseNormalizedNamed("localhost:5000/test/image:latest")
 			gomega.Expect(err).NotTo(gomega.HaveOccurred())
 
-			URL, err := auth.GetAuthURL(challenge, imageRef)
+			URL, err := auth.GetAuthURL(challenge, imageRef, "")
 
 			gomega.Expect(err).NotTo(gomega.HaveOccurred())
 			gomega.Expect(URL.String()).
@@ -1155,7 +1155,7 @@ var _ = ginkgo.Describe("the auth module", func() {
 			imageRef, err := reference.ParseNormalizedNamed("registry.example.com/test/image:latest")
 			gomega.Expect(err).NotTo(gomega.HaveOccurred())
 
-			URL, err := auth.GetAuthURL(challenge, imageRef)
+			URL, err := auth.GetAuthURL(challenge, imageRef, "")
 
 			gomega.Expect(err).NotTo(gomega.HaveOccurred())
 			gomega.Expect(URL.String()).
@@ -1167,7 +1167,7 @@ var _ = ginkgo.Describe("the auth module", func() {
 			imageRef, err := reference.ParseNormalizedNamed("registry.example.com/test/image:latest")
 			gomega.Expect(err).NotTo(gomega.HaveOccurred())
 
-			URL, err := auth.GetAuthURL(challenge, imageRef)
+			URL, err := auth.GetAuthURL(challenge, imageRef, "")
 
 			gomega.Expect(err).To(gomega.HaveOccurred())
 			gomega.Expect(URL).To(gomega.BeNil())
@@ -1208,7 +1208,7 @@ var _ = ginkgo.Describe("the auth module", func() {
 			input := `bearer realm="https://ghcr.io/token",service="ghcr.io",scope="repository:user/image:pull",`
 			imageRef, err := reference.ParseNormalizedNamed("nicholas-fedor/watchtower")
 			gomega.Expect(err).NotTo(gomega.HaveOccurred())
-			res, err := auth.GetAuthURL(input, imageRef)
+			res, err := auth.GetAuthURL(input, imageRef, "")
 			gomega.Expect(err).NotTo(gomega.HaveOccurred())
 			gomega.Expect(res).NotTo(gomega.BeNil())
 		})
@@ -1219,7 +1219,7 @@ var _ = ginkgo.Describe("the auth module", func() {
 			input := `bearer realm="https://ghcr.io/token",service="ghcr.io",scope="repository:user/image:pull",valuelesskey`
 			imageRef, err := reference.ParseNormalizedNamed("nicholas-fedor/watchtower")
 			gomega.Expect(err).NotTo(gomega.HaveOccurred())
-			res, err := auth.GetAuthURL(input, imageRef)
+			res, err := auth.GetAuthURL(input, imageRef, "")
 			gomega.Expect(err).NotTo(gomega.HaveOccurred())
 			gomega.Expect(res).NotTo(gomega.BeNil())
 		})
@@ -1485,7 +1485,7 @@ func getScopeFromImageAuthURL(imageName string) string {
 
 	challenge := `bearer realm="https://dummy.host/token",service="dummy.host"`
 
-	URL, err := auth.GetAuthURL(challenge, normalizedRef)
+	URL, err := auth.GetAuthURL(challenge, normalizedRef, "")
 	if err != nil {
 		return "" // Return empty string on auth URL failure
 	}

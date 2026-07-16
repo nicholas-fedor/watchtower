@@ -173,7 +173,7 @@ func FuzzGetAuthURL(f *testing.F) {
 
 	f.Fuzz(func(_ *testing.T, challenge string) {
 		// Call GetAuthURL because we don't care about the result, only that it doesn't panic
-		_, _ = GetAuthURL(challenge, imageRef)
+		_, _ = GetAuthURL(challenge, imageRef, "")
 	})
 }
 

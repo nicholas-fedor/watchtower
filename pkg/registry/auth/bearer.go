@@ -15,6 +15,7 @@ import (
 	"github.com/maypok86/otter/v2"
 	"github.com/maypok86/otter/v2/stats"
 	"github.com/sirupsen/logrus"
+	"github.com/spf13/viper"
 
 	"github.com/nicholas-fedor/watchtower/pkg/types"
 )
@@ -119,7 +120,11 @@ func GetBearerToken(
 	logrus.WithFields(fields).Debug("Fetching bearer token from challenge")
 
 	// Construct the auth URL from the challenge details.
-	authURL, err := GetAuthURL(challenge, imageRef)
+	authURL, err := GetAuthURL(
+		challenge,
+		imageRef,
+		registryAuth,
+	)
 	if err != nil {
 		return "", fmt.Errorf("%w: %w", errFailedConstructBearerAuthURL, err)
 	}
@@ -530,11 +535,12 @@ func buildAuthQuery(authURL *url.URL, values challengeValues, imageRef reference
 // Parameters:
 //   - challenge: Challenge string from the registry.
 //   - imageRef: Normalized image reference.
+//   - registryAuth: Base64-encoded auth string, empty if not provided.
 //
 // Returns:
 //   - *url.URL: Constructed auth URL if successful.
 //   - error: Non-nil if parsing fails, nil on success.
-func GetAuthURL(challenge string, imageRef reference.Named) (*url.URL, error) {
+func GetAuthURL(challenge string, imageRef reference.Named, registryAuth string) (*url.URL, error) {
 	values := parseChallenge(challenge)
 
 	values.service = resolveService(
@@ -583,6 +589,18 @@ func GetAuthURL(challenge string, imageRef reference.Named) (*url.URL, error) {
 			"scheme": authURL.Scheme,
 			"host":   authURL.Host,
 		}).Debug("Invalid realm URL (missing host or unsupported scheme)")
+
+		return nil, fmt.Errorf("%w: %s", errInvalidRealmURL, values.realm)
+	}
+
+	// Reject HTTP realms when Basic authentication is attached unless the
+	// insecure-registry opt-in explicitly allows plaintext token endpoints.
+	if authURL.Scheme == "http" && registryAuth != "" && !viper.GetBool("WATCHTOWER_REGISTRY_TLS_SKIP") {
+		logrus.WithFields(logrus.Fields{
+			"image":  imageRef.Name(),
+			"realm":  values.realm,
+			"scheme": authURL.Scheme,
+		}).Debug("Invalid realm URL (HTTP realm with Basic auth requires TLS skip opt-in)")
 
 		return nil, fmt.Errorf("%w: %s", errInvalidRealmURL, values.realm)
 	}
