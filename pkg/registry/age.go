@@ -704,10 +704,11 @@ func selectPlatformCandidate(
 		}
 
 		if len(variantCandidates) == 0 {
-			// No candidates match the requested variant. Fall through to ambiguity check.
 			logrus.WithFields(fields).
 				WithField("target_variant", targetVariant).
-				Debug("No platform entries match requested variant, checking ambiguity")
+				Debug("No platform entries match requested variant")
+
+			return "", errNoPlatformMatch
 		}
 
 		if len(variantCandidates) > 1 {
