@@ -14,6 +14,7 @@ import (
 	"net/http"
 	"net/url"
 	"strings"
+	"sync"
 
 	"github.com/distribution/reference"
 	"github.com/sirupsen/logrus"
@@ -36,6 +37,8 @@ var (
 	errMissingImageInfo = errors.New("container image info missing")
 	// errInvalidRegistryResponse indicates the registry's HEAD response lacks a digest or is malformed.
 	errInvalidRegistryResponse = errors.New("registry responded with invalid HEAD request")
+	// ErrManifestNotFound indicates the registry returned 404 for the manifest request.
+	ErrManifestNotFound = errors.New("manifest not found")
 	// errFailedGetToken indicates a failure to obtain an authentication token from the registry.
 	errFailedGetToken = errors.New("failed to get token")
 	// errFailedBuildManifestURL indicates a failure to construct the manifest URL for the registry.
@@ -45,6 +48,47 @@ var (
 	// errFailedExecuteRequest indicates a failure to execute an HTTP request to the registry.
 	errFailedExecuteRequest = errors.New("failed to execute request")
 )
+
+// localOnlyImageCache records image name+ID pairs previously confirmed as local-only
+// (domain-less Config.Image with a registry 404). Subsequent checks skip remote
+// probes, avoiding Docker Hub rate-limit pressure that can starve concurrent
+// staleness checks for other containers in the same update cycle.
+//
+// Keyed by "imageName|imageID". Entries live for process lifetime; a rebuild
+// (new image ID) forces a fresh probe.
+var localOnlyImageCache sync.Map
+
+// localOnlyCacheKey builds a cache key for a container's image identity.
+func localOnlyCacheKey(container types.Container) string {
+	if !container.HasImageInfo() {
+		return container.ImageName() + "|"
+	}
+
+	return container.ImageName() + "|" + container.ImageInfo().ID
+}
+
+// rememberLocalOnlyImage records that the container's image was confirmed local-only.
+func rememberLocalOnlyImage(container types.Container) {
+	localOnlyImageCache.Store(localOnlyCacheKey(container), true)
+}
+
+// isCachedLocalOnlyImage reports whether the container's image was previously
+// confirmed local-only for this process.
+func isCachedLocalOnlyImage(container types.Container) bool {
+	_, ok := localOnlyImageCache.Load(localOnlyCacheKey(container))
+
+	return ok
+}
+
+// ClearLocalOnlyImageCache removes all cached local-only image entries.
+// Intended for tests.
+func ClearLocalOnlyImageCache() {
+	localOnlyImageCache.Range(func(key, _ any) bool {
+		localOnlyImageCache.Delete(key)
+
+		return true
+	})
+}
 
 // NormalizeDigest standardizes a digest string for consistent comparison.
 //
@@ -107,6 +151,43 @@ func CompareDigest(
 	return match, err
 }
 
+// isLocalImageNotFound reports whether the digest fetch failed because the
+// registry returned 404 for a manifest request and the container's image name
+// does not explicitly specify a registry domain. That pattern indicates a
+// locally built image that has never been pushed, so there is no remote
+// manifest to compare against.
+//
+// Parameters:
+//   - container: Container whose image name is inspected.
+//   - err: Error returned from digest fetch.
+//
+// Returns:
+//   - bool: True if the image should be treated as local-only, false otherwise.
+func isLocalImageNotFound(container types.Container, err error) bool {
+	if !errors.Is(err, ErrManifestNotFound) {
+		return false
+	}
+
+	if !container.HasImageInfo() ||
+		container.ContainerInfo() == nil ||
+		container.ContainerInfo().Config == nil {
+		return false
+	}
+
+	// Evaluate only the repository name so tags/digests (e.g. my-app:1.0) do not
+	// make a domain-less image look registry-qualified via "." in a semver tag.
+	originalImage := container.ContainerInfo().Config.Image
+	namePart, _, _ := strings.Cut(originalImage, "@")
+
+	if i := strings.LastIndex(namePart, ":"); i >= 0 {
+		if j := strings.LastIndex(namePart, "/"); j < i {
+			namePart = namePart[:i]
+		}
+	}
+
+	return !strings.ContainsAny(namePart, "./")
+}
+
 // CompareDigestWithRemote checks whether a container's current image digest matches
 // the latest from its registry and returns the remote digest used for comparison.
 //
@@ -154,11 +235,21 @@ func CompareDigestWithRemote(
 	// We check container.ImageInfo().RepoDigests rather than inspecting via the
 	// Docker daemon because:
 	// 1. The container was already populated with image info during initialization
-	// 2. For locally built images, RepoDigests is always empty
+	// 2. For locally built images, RepoDigests are either empty or registry-less
 	// 3. This avoids an extra Docker daemon call
 	if len(container.ImageInfo().RepoDigests) == 0 {
 		logrus.WithFields(fields).
 			Debug("Image with no registry reference detected (empty RepoDigests) - skipping digest comparison")
+
+		return true, "", nil
+	}
+
+	// Skip registry probes for images previously confirmed local-only (same name+ID).
+	// This prevents repeated Docker Hub 404 traffic that can rate-limit concurrent
+	// checks for other containers in the same update session.
+	if isCachedLocalOnlyImage(container) {
+		logrus.WithFields(fields).
+			Debug("Cached local-only image - skipping digest comparison")
 
 		return true, "", nil
 	}
@@ -172,6 +263,16 @@ func CompareDigestWithRemote(
 		endpoints...,
 	)
 	if err != nil {
+		// Domain-less image names that 404 are local-only builds; treat as up-to-date
+		// with no error so callers skip the pull without logging a warning.
+		if isLocalImageNotFound(container, err) {
+			rememberLocalOnlyImage(container)
+			logrus.WithFields(fields).
+				Debug("Image not found in registry - treating as local image")
+
+			return true, "", nil
+		}
+
 		return false, "", err
 	}
 
@@ -707,7 +808,8 @@ func HandleManifestResponse(
 				Debug("Response status not successful")
 
 			return "", "", false, fmt.Errorf(
-				"%w: status %s",
+				"%w: %w: status %s",
+				ErrManifestNotFound,
 				errInvalidRegistryResponse,
 				resp.Status,
 			)

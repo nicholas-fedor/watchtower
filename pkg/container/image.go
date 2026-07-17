@@ -121,6 +121,12 @@ func (c imageClient) IsContainerStale(
 			return false, sourceContainer.ImageID(), "", err
 		}
 
+		if errors.Is(err, ErrPullImageNotFound) {
+			clog.WithError(err).Debug("Image not found in any registry - treating as up-to-date")
+
+			return false, sourceContainer.ImageID(), "", nil
+		}
+
 		clog.WithError(err).Debug("Failed to pull image")
 
 		return false, sourceContainer.ImageID(), "", err
@@ -381,7 +387,7 @@ func (c imageClient) PullImage(
 		clog.Debug("Authentication credentials loaded")
 	}
 
-	// Skip the pull if the digest matches the current image.
+	// Skip the pull if the digest matches the current image (or local-only).
 	if c.shouldSkipPull(ctx, sourceContainer, opts.RegistryAuth, warnOnHeadFailed, fields) {
 		return nil
 	}
@@ -548,6 +554,7 @@ func (c imageClient) shouldSkipPull(
 	endpoints := c.buildMirrorEndpoints(mirrorInfo)
 
 	// Compare current and remote digests, trying each endpoint.
+	// Local-only images are handled inside CompareDigest (match=true, err=nil).
 	match, err := digest.CompareDigest(ctx, sourceContainer, registryAuth, endpoints...)
 	if err != nil {
 		clog.WithFields(logrus.Fields{
@@ -560,7 +567,7 @@ func (c imageClient) shouldSkipPull(
 
 	switch {
 	case err != nil:
-		// Digest retrieval failed; log based on warning strategy and proceed with pull.
+		// Digest retrieval failed. Log based on warning strategy and proceed with pull.
 		headLevel := logrus.DebugLevel
 		if warn {
 			headLevel = logrus.WarnLevel
@@ -571,12 +578,12 @@ func (c imageClient) shouldSkipPull(
 
 		return false
 	case match:
-		// Digests match; no pull needed.
+		// Digests match (or local-only image treated as up-to-date). No pull needed.
 		clog.Debug("Digest match, skipping pull")
 
 		return true
 	default:
-		// Digests differ; proceed with pull.
+		// Digests differ. Proceed with pull.
 		clog.Debug("Digest mismatch, proceeding with pull")
 
 		return false

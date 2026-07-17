@@ -116,11 +116,6 @@ func SetupAndStartAPI(ctx context.Context, opts config.Options) error {
 		return fmt.Errorf("route registration failed: %w", err)
 	}
 
-	if opts.SkipSelfUpdate {
-		logrus.WithField("notify", "no").
-			Warn("Skipping self-update to prevent port conflict: Watchtower container has host-bound ports")
-	}
-
 	tlsCertPath, tlsKeyPath := opts.TLSCertPath, opts.TLSKeyPath
 
 	if (tlsCertPath == "") != (tlsKeyPath == "") {

@@ -140,7 +140,7 @@ func RunUpgradesOnSchedule(
 		if skipSelfUpdateForPorts {
 			skipWatchtowerSelfUpdate = true
 
-			logrus.Debug("Skipping self-update to prevent port conflict")
+			logrus.Debug("Published ports detected - self-update skipped.")
 		}
 
 		// Skip update if this is a Watchtower parent container (from self-update chain)
