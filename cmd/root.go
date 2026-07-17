@@ -768,7 +768,7 @@ func runMain(cfg types.RunConfig) int {
 			Filter:                       filter,                       // Container filter determining which containers are targeted
 			Cleanup:                      params.Cleanup,               // Remove old images after container updates
 			NoRestart:                    noRestart,                    // Prevent containers from being restarted after updates
-			ReviveStopped:                reviveStopped,                // Start stopped containers after update if true
+			ReviveStopped:                params.ReviveStopped,         // Start stopped containers after update if true
 			MonitorOnly:                  params.MonitorOnly,           // Monitor containers without performing updates
 			LifecycleHooks:               lifecycleHooks,               // Enable pre- and post-update lifecycle hook commands
 			RollingRestart:               rollingRestart,               // Update containers sequentially rather than all at once
