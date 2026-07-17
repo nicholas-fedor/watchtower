@@ -466,8 +466,9 @@ func Update(
 	if err != nil {
 		logrus.WithError(err).Debug("Parallel staleness checks completed with error")
 
+		// Surface context cancellation from parallel workers as the final Update error.
 		if errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded) {
-			return progress.Report(), cleanupImageInfos, fmt.Errorf("update canceled: %w", ctx.Err())
+			return progress.Report(), cleanupImageInfos, fmt.Errorf("update canceled: %w", err)
 		}
 	}
 

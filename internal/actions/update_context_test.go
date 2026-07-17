@@ -2,6 +2,7 @@ package actions_test
 
 import (
 	"context"
+	"errors"
 	"strings"
 	"testing"
 	"testing/synctest"
@@ -31,7 +32,7 @@ var _ = ginkgo.Describe("the update action", func() {
 			)
 
 			gomega.Expect(err).To(gomega.HaveOccurred())
-			gomega.Expect(err.Error()).To(gomega.ContainSubstring("update canceled"))
+			gomega.Expect(errors.Is(err, context.Canceled)).To(gomega.BeTrue())
 			gomega.Expect(report).To(gomega.BeNil())
 			gomega.Expect(cleanupImageInfos).To(gomega.BeEmpty())
 		})
@@ -50,7 +51,7 @@ var _ = ginkgo.Describe("the update action", func() {
 			// Context cancellation from IsContainerStale is propagated as the
 			// final Update error rather than being swallowed.
 			gomega.Expect(err).To(gomega.HaveOccurred())
-			gomega.Expect(err.Error()).To(gomega.ContainSubstring("update canceled"))
+			gomega.Expect(errors.Is(err, context.Canceled)).To(gomega.BeTrue())
 			// Workers returning context.Canceled do not add partial results to progress.
 			gomega.Expect(report.Skipped()).To(gomega.BeEmpty())
 			gomega.Expect(cleanupImageInfos).To(gomega.BeEmpty())
@@ -696,10 +697,8 @@ func TestUpdateAction_ParallelStalenessCheckCancellationPropagation(t *testing.T
 			t.Fatal("expected error when context is canceled during parallel staleness checks")
 		}
 
-		if !strings.Contains(err.Error(), "update canceled") &&
-			!strings.Contains(err.Error(), "context canceled") &&
-			!strings.Contains(err.Error(), "context") {
-			t.Fatalf("expected context-related error, got: %s", err.Error())
+		if !errors.Is(err, context.Canceled) {
+			t.Fatalf("expected context canceled error, got: %s", err.Error())
 		}
 	})
 }
