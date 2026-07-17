@@ -734,7 +734,7 @@ func (n *shoutrrrTypeNotifier) sendEntries(entries []*logrus.Entry, report types
 
 	if msg == "" {
 		if err != nil {
-			LocalLog.WithError(err).Fatal("Notification template error")
+			LocalLog.WithError(err).Error("Notification template error")
 		} else if len(n.Urls) > 1 {
 			LocalLog.Info("Skipping notification due to empty message")
 		}
