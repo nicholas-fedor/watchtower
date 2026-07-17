@@ -10,6 +10,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- Restructure registry auth and add bearer token caching by @nicholas-fedor in [#1951](https://github.com/nicholas-fedor/watchtower/pull/1951)
 - Expand and reorganize http-api and metrics, improve logging, and restructure documentation by @nicholas-fedor in [#1939](https://github.com/nicholas-fedor/watchtower/pull/1939)
 - Update star history chart by @nicholas-fedor in [#1907](https://github.com/nicholas-fedor/watchtower/pull/1907)
 
