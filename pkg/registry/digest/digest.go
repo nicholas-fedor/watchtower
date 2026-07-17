@@ -174,9 +174,18 @@ func isLocalImageNotFound(container types.Container, err error) bool {
 		return false
 	}
 
+	// Evaluate only the repository name so tags/digests (e.g. my-app:1.0) do not
+	// make a domain-less image look registry-qualified via "." in a semver tag.
 	originalImage := container.ContainerInfo().Config.Image
+	namePart, _, _ := strings.Cut(originalImage, "@")
 
-	return !strings.ContainsAny(originalImage, "./")
+	if i := strings.LastIndex(namePart, ":"); i >= 0 {
+		if j := strings.LastIndex(namePart, "/"); j < i {
+			namePart = namePart[:i]
+		}
+	}
+
+	return !strings.ContainsAny(namePart, "./")
 }
 
 // CompareDigestWithRemote checks whether a container's current image digest matches

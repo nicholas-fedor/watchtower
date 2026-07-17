@@ -910,15 +910,21 @@ func runMain(cfg types.RunConfig) int {
 		logrus.Debug("Disabled update-on-start due to cleanup of old Watchtower containers")
 	}
 
-	// Configure and start the HTTP API, handling any startup errors.
+	// Determine whether self-update should be skipped because the running
+	// Watchtower container has published host ports. Docker cannot rebind
+	// an occupied port during container replacement. Ephemeral self-updates
+	// are exempt, because they remove the old container before creating the new
+	// one, so no port conflict occurs.
 	//
-	// Determine if self-update should be skipped due to host-bound port conflicts.
-	// Ephemeral self-updates are exempt because they remove the old container before
-	// creating the new one, avoiding port conflicts.
-	// This flag is passed to the API so the warning is emitted near the HTTP server startup message.
+	// Perform this check here rather than inside SetupAndStartAPI so the
+	// warning always appears, even when no HTTP API endpoints are enabled
+	// and SetupAndStartAPI returns early.
 	skipSelfUpdate := currentWatchtowerContainer != nil &&
 		currentWatchtowerContainer.HasExposedPorts() &&
 		!ephemeralSelfUpdate
+	if skipSelfUpdate {
+		logrus.Warn("Published port detected - self-updates disabled.")
+	}
 
 	err = api.SetupAndStartAPI(
 		ctx,

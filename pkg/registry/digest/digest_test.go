@@ -294,6 +294,17 @@ func TestIsLocalImageNotFound(t *testing.T) {
 		assert.True(t, isLocalImageNotFound(mc, err))
 	})
 
+	t.Run("true for domain-less image with version tag containing dots", func(t *testing.T) {
+		mc := mockTypes.NewMockContainer(t)
+		mc.On("HasImageInfo").Return(true)
+		mc.On("ContainerInfo").Return(&dockerContainer.InspectResponse{
+			Config: &dockerContainer.Config{Image: "my-app:1.0"},
+		})
+
+		err := fmt.Errorf("%w: status 404 Not Found", ErrManifestNotFound)
+		assert.True(t, isLocalImageNotFound(mc, err))
+	})
+
 	t.Run("false for domain-ful Config.Image", func(t *testing.T) {
 		mc := mockTypes.NewMockContainer(t)
 		mc.On("HasImageInfo").Return(true)
