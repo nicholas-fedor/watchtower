@@ -550,6 +550,7 @@ func TestUpdateOnStartTriggersImmediateUpdate(t *testing.T) {
 		nil,
 		false, // startupMessageSent
 		false, // ephemeralSelfUpdate
+		false, // reviveStopped
 	)
 
 	// Should not return an error (context cancellation is expected)
@@ -640,6 +641,7 @@ func TestUpdateOnStartIntegratesWithCronScheduling(t *testing.T) {
 			nil,
 			false, // startupMessageSent
 			false, // ephemeralSelfUpdate
+			false, // reviveStopped
 		)
 
 		// Should not return an error (context cancellation is expected)
@@ -734,6 +736,7 @@ func TestUpdateOnStartLockingBehavior(t *testing.T) {
 			nil,
 			false, // startupMessageSent
 			false, // ephemeralSelfUpdate
+			false, // reviveStopped
 		)
 
 		// Should not return an error
@@ -809,6 +812,7 @@ func TestUpdateOnStartSelfUpdateScenario(t *testing.T) {
 			nil,
 			false, // startupMessageSent
 			false, // ephemeralSelfUpdate
+			false, // reviveStopped
 		)
 
 		// Should not return an error
@@ -897,6 +901,7 @@ func TestUpdateOnStartMultiInstanceScenario(t *testing.T) {
 				nil,
 				false, // startupMessageSent
 				false, // ephemeralSelfUpdate
+				false, // reviveStopped
 			)
 			assert.NoError(t, err)
 			completed.Add(1)
@@ -930,6 +935,7 @@ func TestUpdateOnStartMultiInstanceScenario(t *testing.T) {
 				nil,
 				false, // startupMessageSent
 				false, // ephemeralSelfUpdate
+				false, // reviveStopped
 			)
 			assert.NoError(t, err)
 			completed.Add(1)
@@ -1130,6 +1136,7 @@ func TestRunUpgradesOnSchedule_ShutdownWaitsForRunningUpdate(t *testing.T) {
 				nil,
 				false, // startupMessageSent
 				false, // ephemeralSelfUpdate
+				false, // reviveStopped
 			)
 			assert.NoError(t, err)
 
@@ -1293,6 +1300,7 @@ func TestEphemeralSelfUpdateExercisesTruePath(t *testing.T) {
 		nil,
 		false, // startupMessageSent
 		true,  // ephemeralSelfUpdate
+		false, // reviveStopped
 	)
 
 	require.NoError(t, err)
@@ -1820,4 +1828,38 @@ func TestHTTPAPIEndpointsEnabled(t *testing.T) {
 	assert.False(t, httpAPIEndpointsEnabled(types.RunConfig{}))
 	assert.True(t, httpAPIEndpointsEnabled(types.RunConfig{EnableHealthAPI: true}))
 	assert.True(t, httpAPIEndpointsEnabled(types.RunConfig{EnableUpdateAPI: true}))
+}
+
+func TestRootCommand_ReviveStoppedFlagParsing(t *testing.T) {
+	tests := []struct {
+		name     string
+		args     []string
+		expected bool
+	}{
+		{
+			name:     "revive-stopped enabled",
+			args:     []string{"--revive-stopped"},
+			expected: true,
+		},
+		{
+			name:     "revive-stopped default",
+			args:     []string{},
+			expected: false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			cmd := NewRootCommand()
+			flags.RegisterSystemFlags(cmd)
+			cmd.SetArgs(tt.args)
+
+			err := cmd.ParseFlags(tt.args)
+			require.NoError(t, err)
+
+			value, err := cmd.PersistentFlags().GetBool("revive-stopped")
+			require.NoError(t, err)
+			assert.Equal(t, tt.expected, value)
+		})
+	}
 }
