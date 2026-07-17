@@ -906,13 +906,13 @@ func TestRunUpgradesOnSchedule_EphemeralSelfUpdateWithExposedPorts(t *testing.T)
 		"",  // scope
 		nil, // no notifier
 		"v1.0.0",
-		false, // monitorOnly
-		false, // updateOnStart
-		false, // skipFirstRun
-		nil,   // currentWatchtowerContainer
-		false, // startupMessageSent
-		false, // ephemeralSelfUpdate
-		false, // reviveStopped
+		false,              // monitorOnly
+		true,               // updateOnStart - triggers immediate update
+		false,              // skipFirstRun
+		containerWithPorts, // currentWatchtowerContainer with exposed ports
+		false,              // startupMessageSent
+		true,               // ephemeralSelfUpdate - bypasses port-conflict guard
+		false,              // reviveStopped
 	)
 	require.NoError(t, err)
 
