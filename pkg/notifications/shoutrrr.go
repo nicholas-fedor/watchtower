@@ -670,20 +670,10 @@ func (n *shoutrrrTypeNotifier) Fire(entry *logrus.Entry) error {
 // Returns:
 //   - bool: True if sent successfully, false if canceled.
 func (n *shoutrrrTypeNotifier) sendWithCancellation(msg string) bool {
-	sendCh := make(chan []error, 1)
+	errs := n.Router.Send(msg, n.params)
+	processSendErrors(n, errs)
 
-	go func() {
-		sendCh <- n.Router.Send(msg, n.params)
-	}()
-
-	select {
-	case errs := <-sendCh:
-		processSendErrors(n, errs)
-
-		return true
-	case <-n.ctx.Done():
-		return false
-	}
+	return true
 }
 
 // buildMessage constructs a notification message from data.
@@ -756,14 +746,11 @@ func (n *shoutrrrTypeNotifier) sendEntries(entries []*logrus.Entry, report types
 		Debug("Preparing to send entries")
 
 	if msg == "" {
-		// Log in go func in case we entered from Fire to avoid stalling
-		go func() { // Avoid blocking if called from Fire.
-			if err != nil {
-				LocalLog.WithError(err).Fatal("Notification template error")
-			} else if len(n.Urls) > 1 {
-				LocalLog.Info("Skipping notification due to empty message")
-			}
-		}()
+		if err != nil {
+			LocalLog.WithError(err).Fatal("Notification template error")
+		} else if len(n.Urls) > 1 {
+			LocalLog.Info("Skipping notification due to empty message")
+		}
 
 		LocalLog.Debug("Message empty, skipping send")
 
