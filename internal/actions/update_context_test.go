@@ -47,12 +47,12 @@ var _ = ginkgo.Describe("the update action", func() {
 				types.UpdateParams{Cleanup: true, CPUCopyMode: "auto"},
 			)
 
-			// Update continues but marks containers as skipped due to staleness check failure
-			gomega.Expect(err).NotTo(gomega.HaveOccurred())
-			gomega.Expect(report).NotTo(gomega.BeNil())
-			gomega.Expect(report.Skipped()).
-				To(gomega.HaveLen(3))
-				// All containers skipped due to error
+			// Context cancellation from IsContainerStale is propagated as the
+			// final Update error rather than being swallowed.
+			gomega.Expect(err).To(gomega.HaveOccurred())
+			gomega.Expect(err.Error()).To(gomega.ContainSubstring("update canceled"))
+			// Workers returning context.Canceled do not add partial results to progress.
+			gomega.Expect(report.Skipped()).To(gomega.BeEmpty())
 			gomega.Expect(cleanupImageInfos).To(gomega.BeEmpty())
 		})
 
@@ -653,6 +653,55 @@ func TestUpdateAction_ContextEdgeCases(t *testing.T) {
 			})
 		})
 	}
+}
+
+// TestUpdateAction_ParallelStalenessCheckCancellationPropagation tests that context
+// cancellation during parallel staleness checks is propagated as the final Update
+// error rather than being swallowed by workers.
+func TestUpdateAction_ParallelStalenessCheckCancellationPropagation(t *testing.T) {
+	synctest.Test(t, func(t *testing.T) {
+		testData := getCommonTestData()
+		testData.Staleness = map[string]bool{
+			"test-container-01": true,
+			"test-container-02": true,
+			"test-container-03": true,
+		}
+		testData.SimulatedLatency = 10 * time.Millisecond
+
+		ctx, cancel := context.WithCancel(context.Background())
+		client := mockActions.CreateMockClientWithContext(ctx, testData, false, false)
+
+		done := make(chan struct{})
+
+		var err error
+
+		go func() {
+			defer close(done)
+
+			_, _, err = actions.Update(
+				ctx,
+				client,
+				types.UpdateParams{Cleanup: true, CPUCopyMode: "auto"},
+			)
+		}()
+
+		synctest.Wait()
+		cancel()
+
+		<-done
+
+		synctest.Wait()
+
+		if err == nil {
+			t.Fatal("expected error when context is canceled during parallel staleness checks")
+		}
+
+		if !strings.Contains(err.Error(), "update canceled") &&
+			!strings.Contains(err.Error(), "context canceled") &&
+			!strings.Contains(err.Error(), "context") {
+			t.Fatalf("expected context-related error, got: %s", err.Error())
+		}
+	})
 }
 
 // TestEarlyCancellationStopContainers tests that context cancellation is properly handled

@@ -334,6 +334,10 @@ func Update(
 					sourceContainer,
 					config,
 				)
+
+				if checkErr != nil && (errors.Is(checkErr, context.Canceled) || errors.Is(checkErr, context.DeadlineExceeded)) {
+					return fmt.Errorf("staleness check canceled: %w", checkErr)
+				}
 			}
 
 			// Determine if the container should be updated based on staleness and config.
@@ -356,6 +360,12 @@ func Update(
 							"image_name":     sourceContainer.ImageName(),
 							"image_id":       sourceContainer.ImageID().ShortID(),
 						}).Debug("Failed to verify container configuration")
+				}
+
+				if verifyErr != nil &&
+					(errors.Is(verifyErr, context.Canceled) ||
+						errors.Is(verifyErr, context.DeadlineExceeded)) {
+					return fmt.Errorf("configuration verification canceled: %w", verifyErr)
 				}
 			}
 
@@ -461,9 +471,11 @@ func Update(
 		}
 	}
 
-	staleCheckFailed = parallelStaleCheckFailed
-	watchtowerPullFailed = parallelWatchtowerPullFailed
-	staleCount = parallelStaleCount
+	// Accumulate parallel results with pre-parallel sequential counts so failures
+	// from pinned-image parsing and other pre-filter checks are preserved.
+	staleCheckFailed += parallelStaleCheckFailed
+	watchtowerPullFailed = watchtowerPullFailed || parallelWatchtowerPullFailed
+	staleCount += parallelStaleCount
 
 	// Log the summary of staleness checks, including total, stale, and failed counts.
 	logrus.WithFields(
