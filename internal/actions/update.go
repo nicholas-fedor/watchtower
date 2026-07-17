@@ -303,7 +303,7 @@ func Update(
 			// Check for context cancellation to enable faster shutdown during long update cycles.
 			select {
 			case <-ctx.Done():
-				return nil
+				return ctx.Err()
 			default:
 			}
 
@@ -455,6 +455,10 @@ func Update(
 	err = checkGroup.Wait()
 	if err != nil {
 		logrus.WithError(err).Debug("Parallel staleness checks completed with error")
+
+		if errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded) {
+			return progress.Report(), cleanupImageInfos, fmt.Errorf("update canceled: %w", ctx.Err())
+		}
 	}
 
 	staleCheckFailed = parallelStaleCheckFailed
