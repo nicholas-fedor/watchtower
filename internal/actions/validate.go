@@ -46,7 +46,8 @@ func ValidateRollingRestartDependencies(ctx context.Context, client container.Cl
 	// Check each container for links.
 	for _, c := range containers {
 		// If a container has any links, then return an error.
-		if links := c.Links(useComposeDependsOn); len(links) > 0 {
+		links := c.Links(useComposeDependsOn)
+		if len(links) > 0 {
 			logrus.WithFields(logrus.Fields{
 				"container": c.Name(),
 				"links":     links,

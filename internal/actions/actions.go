@@ -3,7 +3,6 @@ package actions
 import (
 	"context"
 	"strings"
-	"sync"
 	"time"
 
 	"github.com/sirupsen/logrus"
@@ -137,7 +136,8 @@ func RunUpdatesWithNotifications(
 		updateConfig,
 	)
 	// Process update result, return metric on failure
-	if metric := handleUpdateResult(result, err, params.Notifier); metric != nil {
+	metric := handleUpdateResult(result, err, params.Notifier)
+	if metric != nil {
 		if params.EventBroadcaster != nil {
 			errMsg := "unknown error"
 			if err != nil {
@@ -250,7 +250,7 @@ func (emptyReport) All() []types.ContainerReport       { return nil }
 // Parameters:
 //   - result: The report from the update operation.
 //   - err: Any error encountered during the update.
-//   - notifier: The notification system for sending error alerts; may be nil.
+//   - notifier: The notification system for sending error alerts. It may be nil.
 //
 // Returns:
 //   - *metrics.Metric: A zero metric if an error occurred or result is nil, nil otherwise.
@@ -649,17 +649,8 @@ func sendNotifications(
 		// Check if notifications should be split by container
 		if notificationSplitByContainer {
 			sendSplitNotifications(notifier, notificationReport, result, cleanedImages)
-		} else {
-			// Send grouped notification asynchronously with proper synchronization
-			var waitGroup sync.WaitGroup
-
-			waitGroup.Go(func() {
-				if notifier.ShouldSendNotification(result) {
-					notifier.SendNotification(result)
-				}
-			})
-
-			waitGroup.Wait()
+		} else if notifier.ShouldSendNotification(result) {
+			notifier.SendNotification(result)
 		}
 	}
 }
@@ -893,7 +884,8 @@ func sendSplitNotifications(
 
 			var cdPassed bool
 
-			if cs, ok := report.(*session.ContainerStatus); ok {
+			cs, ok := report.(*session.ContainerStatus)
+			if ok {
 				cdAge = cs.CooldownAge()
 				cdDelay = cs.CooldownDelay()
 				cdPassed = cs.CooldownPassed()

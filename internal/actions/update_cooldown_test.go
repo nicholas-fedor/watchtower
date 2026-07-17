@@ -176,7 +176,7 @@ var _ = ginkgo.Describe("the update action cooldown", func() {
 
 	ginkgo.When("CooldownDelay is set and image is older than cooldown", func() {
 		ginkgo.It("should proceed with the update normally", func() {
-			// Image was created 2 days ago; cooldown is 1 hour.
+			// Image was created 2 days ago. Cooldown is 1 hour.
 			registryServer = ghttp.NewServer()
 			registryServer.AppendHandlers(mockRegistryHandlers(time.Now().Add(-48 * time.Hour))...)
 
@@ -296,7 +296,7 @@ var _ = ginkgo.Describe("the update action cooldown", func() {
 
 	ginkgo.When("image creation time is in the future (clock skew)", func() {
 		ginkgo.It("should proceed with the update to avoid indefinite deferral", func() {
-			// Image was created 1 hour in the future; cooldown is 1 hour.
+			// Image was created 1 hour in the future. Cooldown is 1 hour.
 			// This simulates clock skew between host and registry.
 			registryServer = ghttp.NewServer()
 			registryServer.AppendHandlers(mockRegistryHandlers(time.Now().Add(1 * time.Hour))...)
