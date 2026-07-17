@@ -562,7 +562,7 @@ func TestBuildManifestURLForAge(t *testing.T) {
 		gotURL, gotHost, _, err := buildManifestURLForAge(container, "")
 		require.NoError(t, err)
 
-		assert.Equal(t, "lscr.io", gotHost)
+		assert.Equal(t, "ghcr.io", gotHost)
 		assert.Contains(t, gotURL, "ghcr.io")
 		assert.Contains(t, gotURL, "/v2/owner/image/manifests/tag")
 	})
@@ -1328,7 +1328,7 @@ func TestSelectPlatformCandidate_VariantFiltering(t *testing.T) {
 		assert.Equal(t, "sha256:digestv8variant002", digest)
 	})
 
-	t.Run("no matching variant falls back to ambiguity error", func(t *testing.T) {
+	t.Run("no matching variant returns no platform match", func(t *testing.T) {
 		t.Parallel()
 
 		_, err := selectPlatformCandidate(
@@ -1339,7 +1339,7 @@ func TestSelectPlatformCandidate_VariantFiltering(t *testing.T) {
 			logrus.Fields{"test": "variant_filter_no_match"},
 		)
 		require.Error(t, err)
-		assert.ErrorIs(t, err, errAmbiguousPlatformMatch)
+		assert.ErrorIs(t, err, errNoPlatformMatch)
 	})
 
 	t.Run("empty variant returns ambiguity error for multiple variants", func(t *testing.T) {

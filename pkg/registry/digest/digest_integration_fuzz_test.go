@@ -34,7 +34,7 @@ func FuzzExtractHeadDigest(f *testing.F) {
 
 		resp.Header.Set(digest.ContentDigestHeader, headerValue)
 
-		// Call extractHeadDigest; we don't care about the result, just that it doesn't panic
+		// Call extractHeadDigest because we don't care about the result, only that it doesn't panic
 		_, _ = digest.ExtractHeadDigest(resp)
 	})
 }
@@ -59,7 +59,7 @@ func FuzzExtractGetDigest(f *testing.F) {
 		resp.Header.Set("Content-Type", "application/json")
 		defer resp.Body.Close()
 
-		// Call ExtractGetDigest; we don't care about the result, just that it doesn't panic
+		// Call ExtractGetDigest because we don't care about the result, only that it doesn't panic
 		_, _ = digest.ExtractGetDigest(resp)
 	})
 }
@@ -76,7 +76,7 @@ func FuzzNormalizeDigest(f *testing.F) {
 	f.Add("sha256:abc!@#$%^&*()")
 
 	f.Fuzz(func(_ *testing.T, input string) {
-		// Call NormalizeDigest; we don't care about the result, just that it doesn't panic
+		// Call NormalizeDigest because we don't care about the result, only that it doesn't panic
 		_ = digest.NormalizeDigest(input)
 	})
 }
@@ -111,7 +111,7 @@ func FuzzDigestsMatch(f *testing.F) {
 		var localDigests []string
 		// Ignore unmarshal errors to test robustness with malformed JSON
 		json.Unmarshal([]byte(localJSON), &localDigests)
-		// Call DigestsMatch; we don't care about the result, just that it doesn't panic
+		// Call DigestsMatch because we don't care about the result, only that it doesn't panic
 		digest.DigestsMatch(localDigests, remote)
 	})
 }
@@ -143,7 +143,7 @@ func FuzzBuildManifestURL(f *testing.F) {
 		// Ensure WATCHTOWER_REGISTRY_TLS_SKIP is set to false for https scheme
 		t.Setenv("WATCHTOWER_REGISTRY_TLS_SKIP", "false")
 
-		// Call buildManifestURL; we don't care about the result, just that it doesn't panic
+		// Call buildManifestURL because we don't care about the result, only that it doesn't panic
 		_, _, _, _ = digest.BuildManifestURL(mockContainer, hostOverride)
 	})
 }
@@ -218,7 +218,7 @@ func FuzzHandleManifestResponse(f *testing.F) {
 				}
 			}
 
-			// Call HandleManifestResponse; we don't care about the result, just that it doesn't panic
+			// Call HandleManifestResponse because we don't care about the result, only that it doesn't panic
 			_, _, _, _ = digest.HandleManifestResponse(
 				resp,
 				method,

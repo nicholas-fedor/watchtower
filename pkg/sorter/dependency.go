@@ -25,9 +25,9 @@ type DependencySorter struct{}
 //     updated after their dependencies).
 //
 // The sorting ensures that:
-// - Dependent containers are updated after their dependencies
-// - Watchtower containers are processed last to maintain monitoring capability
-// - Circular dependencies are detected and reported as errors
+//   - Dependent containers are updated after their dependencies
+//   - Watchtower containers are processed last to maintain monitoring capability
+//   - Circular dependencies are detected and reported as errors
 //
 // Time Complexity: O(V + E) where V is containers and E is dependency links
 // Space Complexity: O(V + E) for graph structures
@@ -110,11 +110,11 @@ func (ds DependencySorter) Sort(containers []types.Container, useComposeDependsO
 // Space Complexity: O(V + E) for maps and adjacency lists
 //
 // Edge Cases:
-// - Empty container list: returns empty list
-// - Single container: returns that container
-// - Circular dependencies: detected and reported with cycle path
-// - Containers with no dependencies: processed first
-// - Missing dependency targets: ignored (only considers existing containers)
+//   - Empty container list: returns empty list
+//   - Single container: returns that container
+//   - Circular dependencies: detected and reported with cycle path
+//   - Containers with no dependencies: processed first
+//   - Missing dependency targets: ignored (only considers existing containers)
 //
 // Parameters:
 //   - containers: List to sort. Should not be nil.
@@ -135,9 +135,9 @@ func sortByDependencies(containers []types.Container, useComposeDependsOn bool) 
 
 	// Phase 3: Process the queue using Kahn's algorithm
 	// While there are containers with no remaining dependencies:
-	// - Remove a container from queue and add it to sorted result
-	// - For each container that depends on it, decrement their indegree
-	// - If a dependent's indegree becomes 0, add it to queue
+	//   - Remove a container from queue and add it to sorted result
+	//   - For each container that depends on it, decrement their indegree
+	//   - If a dependent's indegree becomes 0, add it to queue
 	sorted := make([]types.Container, 0, len(containers))
 	for len(queue) > 0 {
 		// Dequeue the next container with no dependencies
@@ -179,9 +179,9 @@ func sortByDependencies(containers []types.Container, useComposeDependsOn bool) 
 // buildDependencyGraph constructs the dependency graph data structures for topological sorting.
 //
 // This function builds three key data structures:
-// - containerMap: Maps normalized container identifiers to container objects for O(1) lookup
-// - indegree: Tracks number of incoming dependencies for each container (nodes with indegree 0 have no dependencies)
-// - adjacency: Lists containers that depend on each container (outgoing edges)
+//   - containerMap: Maps normalized container identifiers to container objects for O(1) lookup
+//   - indegree: Tracks number of incoming dependencies for each container (nodes with indegree 0 have no dependencies)
+//   - adjacency: Lists containers that depend on each container (outgoing edges)
 //
 // Normalization ensures consistent handling of Docker Compose service names vs container names.
 // Container links from c.Links() are already normalized.
@@ -623,8 +623,8 @@ func detectAndReportCycle(
 // findCyclePath performs DFS to find a cycle path starting from the given node.
 //
 // This function implements cycle detection using Depth-First Search with three states:
-// - visited: nodes that have been fully explored (no cycles through them)
-// - visiting: nodes currently in the recursion stack (potential cycle)
+//   - visited: nodes that have been fully explored (no cycles through them)
+//   - visiting: nodes currently in the recursion stack (potential cycle)
 //
 // When a node is encountered that is already in 'visiting' state, a cycle is detected.
 // The path from the current node back to the start of the cycle is returned.

@@ -133,7 +133,7 @@ func FetchImageCreationTime(
 	client := auth.NewAuthClient()
 
 	// Obtain an authentication token and challenge host for the registry.
-	token, challengeHost, redirected, redirectHost, err := auth.GetToken(
+	result, err := auth.GetToken(
 		ctx,
 		container,
 		registryAuth,
@@ -148,6 +148,11 @@ func FetchImageCreationTime(
 		return time.Time{},
 			fmt.Errorf("%w: %w", errFetchManifestFailed, err)
 	}
+
+	token := result.Token
+	challengeHost := result.ChallengeHost
+	redirected := result.Redirected
+	redirectHost := result.RedirectHost
 
 	// Build the initial manifest URL to get the original host.
 	manifestURL, originalHost, parsedURL, err := buildManifestURLForAge(
@@ -295,8 +300,8 @@ func buildManifestURLForAge(
 	originalHost := parsedURL.Host
 
 	// Handle lscr.io → ghcr.io host swap.
-	if parsedURL.Host == "lscr.io" {
-		parsedURL.Host = "ghcr.io"
+	if parsedURL.Host == auth.LSCRRegistryDomain {
+		parsedURL.Host = auth.GitHubRegistryDomain
 		manifestURLStr = parsedURL.String()
 	}
 
@@ -336,7 +341,7 @@ func retryManifestRequest(
 	manifestURL, token, challengeHost, originalHost string,
 	fields logrus.Fields,
 ) ([]byte, string, string, error) {
-	// Use the provided originalHost for fallback; if empty, derive from parsedURL.
+	// Use the provided originalHost for fallback. If empty, derive from parsedURL.
 	if originalHost == "" {
 		originalHost = parsedURL.Host
 	}
@@ -346,7 +351,6 @@ func retryManifestRequest(
 	}
 
 	// Build list of hosts to try: primary (current), then challenge, then original.
-	// This mirrors the retry chain in digest.go's HandleManifestResponse.
 	type hostCandidate struct {
 		host string
 		name string
@@ -567,7 +571,8 @@ func fetchManifestForAge(
 	effectiveMediaType := index.MediaType
 	if effectiveMediaType == "" {
 		// Extract the media type from Content-Type, ignoring parameters like charset.
-		if idx := strings.Index(contentType, ";"); idx != -1 {
+		idx := strings.Index(contentType, ";")
+		if idx != -1 {
 			contentType = strings.TrimSpace(contentType[:idx])
 		}
 
@@ -654,7 +659,8 @@ func selectPlatformCandidate(
 	for _, entry := range index.Manifests {
 		// Skip attestation manifests.
 		if entry.Annotations != nil {
-			if refType, ok := entry.Annotations["vnd.docker.reference.type"]; ok && refType == "attestation-manifest" {
+			refType, ok := entry.Annotations["vnd.docker.reference.type"]
+			if ok && refType == "attestation-manifest" {
 				continue
 			}
 		}
@@ -698,14 +704,15 @@ func selectPlatformCandidate(
 		}
 
 		if len(variantCandidates) == 0 {
-			// No candidates match the requested variant; fall through to ambiguity check.
 			logrus.WithFields(fields).
 				WithField("target_variant", targetVariant).
-				Debug("No platform entries match requested variant, checking ambiguity")
+				Debug("No platform entries match requested variant")
+
+			return "", errNoPlatformMatch
 		}
 
 		if len(variantCandidates) > 1 {
-			// Multiple entries with the same variant - return the first one.
+			// Multiple entries with the same variant. Return the first one.
 			selectedDigest := variantCandidates[0].digest
 
 			logrus.WithFields(fields).
@@ -1229,7 +1236,8 @@ func fetchConfigBlob(
 		// Copy Authorization header for same-origin redirects.
 		if resolvedURL.Scheme == resp.Request.URL.Scheme &&
 			resolvedURL.Host == resp.Request.URL.Host {
-			if auth := resp.Request.Header.Get("Authorization"); auth != "" {
+			auth := resp.Request.Header.Get("Authorization")
+			if auth != "" {
 				redirectReq.Header.Set("Authorization", auth)
 			}
 		}
@@ -1293,14 +1301,13 @@ func buildManifestURLForContainer(container types.Container, scheme string) (str
 			)
 	}
 
-	host := reference.Domain(normalizedTaggedRef)
+	host, err := auth.GetRegistryAddress(container.ImageName())
+	if err != nil {
+		return "", fmt.Errorf("failed to get registry address for %s: %w", container.ImageName(), err)
+	}
+
 	img := reference.Path(normalizedTaggedRef)
 	tag := normalizedTaggedRef.Tag()
-
-	// Map Docker Hub's default domain.
-	if host == "docker.io" {
-		host = "index.docker.io"
-	}
 
 	parsedManifestURL := url.URL{
 		Scheme: scheme,

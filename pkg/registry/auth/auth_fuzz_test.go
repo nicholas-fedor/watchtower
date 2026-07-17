@@ -1,4 +1,4 @@
-package auth_test
+package auth
 
 import (
 	"bytes"
@@ -9,81 +9,10 @@ import (
 	"testing"
 
 	"github.com/distribution/reference"
+	"github.com/sirupsen/logrus"
 
-	"github.com/nicholas-fedor/watchtower/pkg/registry/auth"
 	"github.com/nicholas-fedor/watchtower/pkg/types"
 )
-
-// FuzzProcessChallenge fuzzes the processChallenge function to test for crashes or unexpected behavior
-// with malformed authentication challenge strings. It ensures robust parsing of WWW-Authenticate headers
-// for Bearer authentication, covering valid challenges, malformed headers, missing fields, and edge cases.
-func FuzzProcessChallenge(f *testing.F) {
-	// Seed with valid challenge headers
-	f.Add(
-		`bearer realm="https://ghcr.io/token",service="ghcr.io",scope="repository:test/image:pull"`,
-		"ghcr.io/test/image",
-	)
-	f.Add(
-		`bearer realm="https://registry.example.com/token",service="registry.example.com",scope="repository:user/repo:pull"`,
-		"registry.example.com/user/repo",
-	)
-	f.Add(
-		`bearer realm="https://auth.docker.io/token",service="registry.docker.io",scope="repository:library/alpine:pull"`,
-		"alpine",
-	)
-
-	// Seed with malformed headers - missing fields
-	f.Add(`bearer realm="https://ghcr.io/token"`, "ghcr.io/test/image") // Missing service
-	f.Add(`bearer service="ghcr.io"`, "ghcr.io/test/image")             // Missing realm
-	f.Add(
-		`bearer scope="repository:test/image:pull"`,
-		"ghcr.io/test/image",
-	) // Missing realm and service
-
-	// Seed with empty or invalid headers
-	f.Add(``, "ghcr.io/test/image")                   // Empty header
-	f.Add(`basic realm="test"`, "ghcr.io/test/image") // Wrong auth type
-	f.Add(`bearer`, "ghcr.io/test/image")             // Just bearer
-	f.Add(`bearer realm=""`, "ghcr.io/test/image")    // Empty realm
-	f.Add(`bearer service=""`, "ghcr.io/test/image")  // Empty service
-
-	// Seed with malformed syntax
-	f.Add(
-		`bearer realm="https://ghcr.io/token",service="ghcr.io",scope="repository:test/image:pull",`,
-		"ghcr.io/test/image",
-	) // Trailing comma
-	f.Add(
-		`bearer realm="https://ghcr.io/token" service="ghcr.io"`,
-		"ghcr.io/test/image",
-	) // Wrong separator
-	f.Add(
-		`bearer realm="https://ghcr.io/token",service="ghcr.io",invalidkey`,
-		"ghcr.io/test/image",
-	) // Valueless key
-	f.Add(
-		`bearer realm="https://ghcr.io/token",service="ghcr.io",scope=`,
-		"ghcr.io/test/image",
-	) // Empty scope
-
-	// Seed with edge cases
-	f.Add(
-		`BEARER realm="https://ghcr.io/token",service="ghcr.io",scope="repository:test/image:pull"`,
-		"ghcr.io/test/image",
-	) // Uppercase
-	f.Add(
-		`bearer realm="https://ghcr.io/token",service="ghcr.io",scope="repository:test/image:pull",extra="value"`,
-		"ghcr.io/test/image",
-	) // Extra fields
-	f.Add(
-		`bearer realm="http://localhost:5000/token",service="localhost:5000",scope="repository:test/image:pull"`,
-		"localhost:5000/test/image",
-	) // Local registry
-
-	f.Fuzz(func(_ *testing.T, wwwAuthHeader, image string) {
-		// Call ProcessChallenge; we don't care about the result, just that it doesn't panic
-		_, _, _, _ = auth.ProcessChallenge(wwwAuthHeader, image)
-	})
-}
 
 // mockClient is a mock implementation of the Client interface for fuzz testing.
 type mockClient struct {
@@ -97,10 +26,10 @@ func (m *mockClient) Do(_ *http.Request) (*http.Response, error) {
 	}, nil
 }
 
-// FuzzGetBearerHeader fuzzes the JSON unmarshaling in GetBearerHeader to ensure robust parsing
+// FuzzGetBearerToken fuzzes the JSON unmarshaling in GetBearerToken to ensure robust parsing
 // of token responses from registries. It tests various JSON inputs including valid responses,
 // malformed JSON, missing fields, and edge cases to prevent crashes or unexpected behavior.
-func FuzzGetBearerHeader(f *testing.F) {
+func FuzzGetBearerToken(f *testing.F) {
 	// Seed with valid JSON responses
 	f.Add([]byte(`{"token":"eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9"}`))
 	f.Add([]byte(`{"token":""}`))
@@ -131,12 +60,15 @@ func FuzzGetBearerHeader(f *testing.F) {
 	)
 
 	f.Fuzz(func(t *testing.T, jsonData []byte) {
+		initTokenCache()
+		tokenCache.InvalidateAll()
+
 		// Attempt to unmarshal the JSON data into a TokenResponse struct
 		var tokenResponse types.TokenResponse
 
 		_ = json.Unmarshal(jsonData, &tokenResponse)
 
-		// Call GetBearerHeader with a mock client that returns the fuzzed JSON data as the response body
+		// Call GetBearerToken with a mock client that returns the fuzzed JSON data as the response body
 		// to exercise the auth package logic
 		ctx := context.Background()
 
@@ -148,7 +80,7 @@ func FuzzGetBearerHeader(f *testing.F) {
 		challenge := `bearer realm="https://test.com/token",service="test.com"`
 		registryAuth := ""
 		client := &mockClient{body: jsonData}
-		_, _ = auth.GetBearerHeader(ctx, challenge, imageRef, registryAuth, client)
+		_, _ = GetBearerToken(ctx, challenge, imageRef, registryAuth, client)
 	})
 }
 
@@ -179,8 +111,8 @@ func FuzzTransformAuth(f *testing.F) {
 		"eyJ1c2VybmFtZSI6bnVsbCwgcGFzc3dvcmQiOiJwYXNzIn0=",
 	) // {"username":null, "password":"pass"}
 	f.Fuzz(func(_ *testing.T, input string) {
-		// Call TransformAuth; we don't care about the result, just that it doesn't panic
-		auth.TransformAuth(input)
+		// Call TransformAuth because we don't care about the result, only that it doesn't panic
+		TransformAuth(input)
 	})
 }
 
@@ -243,7 +175,73 @@ func FuzzGetAuthURL(f *testing.F) {
 	) // Local registry
 
 	f.Fuzz(func(_ *testing.T, challenge string) {
-		// Call GetAuthURL; we don't care about the result, just that it doesn't panic
-		_, _ = auth.GetAuthURL(challenge, imageRef)
+		// Call GetAuthURL because we don't care about the result, only that it doesn't panic
+		_, _ = GetAuthURL(challenge, imageRef, "")
+	})
+}
+
+// FuzzComputeTokenExpiry fuzzes the computeTokenExpiry function to test for
+// panics or unexpected behavior with various TokenResponse inputs.
+func FuzzComputeTokenExpiry(f *testing.F) {
+	f.Add([]byte(`{"expires_in":3600}`))
+	f.Add([]byte(`{"expires_in":0}`))
+	f.Add([]byte(`{"expires_in":-1}`))
+	f.Add([]byte(`{"issued_at":"2024-01-01T00:00:00Z"}`))
+	f.Add([]byte(`{"issued_at":"not-a-date"}`))
+	f.Add([]byte(`{}`))
+	f.Add([]byte(`null`))
+	f.Add([]byte(``))
+
+	f.Fuzz(func(_ *testing.T, jsonData []byte) {
+		var tokenResponse types.TokenResponse
+
+		_ = json.Unmarshal(jsonData, &tokenResponse)
+
+		_ = computeTokenExpiry(&tokenResponse)
+	})
+}
+
+// FuzzReadBearerTokenWithExpiry fuzzes the readBearerTokenWithExpiry function
+// to test for panics or unexpected behavior with various JSON inputs.
+func FuzzReadBearerTokenWithExpiry(f *testing.F) {
+	f.Add([]byte(`{"token":"test","expires_in":3600}`))
+	f.Add([]byte(`{"token":""}`))
+	f.Add([]byte(`{"token":null}`))
+	f.Add([]byte(`{}`))
+	f.Add([]byte(`[]`))
+	f.Add([]byte(`invalid`))
+	f.Add([]byte(``))
+
+	f.Fuzz(func(_ *testing.T, jsonData []byte) {
+		_, _, _ = readBearerTokenWithExpiry(bytes.NewReader(jsonData), "test/image")
+	})
+}
+
+// FuzzParseChallenge fuzzes the parseChallenge function to test for panics
+// with various challenge header inputs.
+func FuzzParseChallenge(f *testing.F) {
+	f.Add(`bearer realm="https://ghcr.io/token",service="ghcr.io"`)
+	f.Add(`BEARER realm="https://ghcr.io/token"`)
+	f.Add(``)
+	f.Add(`bearer`)
+	f.Add(`bearer realm=""`)
+	f.Add(`basic realm="test"`)
+
+	f.Fuzz(func(_ *testing.T, header string) {
+		_ = parseChallenge(header)
+	})
+}
+
+// FuzzExtractChallengeHost fuzzes the extractChallengeHost function to test
+// for panics with various realm URL inputs.
+func FuzzExtractChallengeHost(f *testing.F) {
+	f.Add("https://ghcr.io/token")
+	f.Add("http://localhost:5000/token")
+	f.Add("ghcr.io/token")
+	f.Add("")
+	f.Add("https://registry.example.com:5000/token")
+
+	f.Fuzz(func(_ *testing.T, realm string) {
+		_ = extractChallengeHost(realm, logrus.Fields{})
 	})
 }

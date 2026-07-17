@@ -167,7 +167,7 @@ func manifestURLPath(imagePath, specifier string) string {
 // the digest becomes the manifest path specifier. The registry host is derived from the
 // image reference itself.
 //
-// The function does not support host overrides; callers that need to target registry mirrors
+// The function does not support host overrides. Callers that need to target registry mirrors
 // apply overrides after obtaining the canonical URL (see digest.BuildManifestURL).
 //
 // Parameters:
@@ -192,11 +192,13 @@ func BuildManifestURL(container types.Container, scheme string) (string, error) 
 		return "", err
 	}
 
-	if tagged, ok := normalizedRef.(reference.NamedTagged); ok {
+	tagged, ok := normalizedRef.(reference.NamedTagged)
+	if ok {
 		return buildTaggedManifestURL(fields, tagged, scheme)
 	}
 
-	if digested, ok := normalizedRef.(reference.Digested); ok {
+	digested, ok := normalizedRef.(reference.Digested)
+	if ok {
 		return buildDigestedManifestURL(fields, digested, scheme)
 	}
 
