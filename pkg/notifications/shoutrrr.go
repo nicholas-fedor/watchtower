@@ -359,11 +359,7 @@ func sendNotifications(notifier *shoutrrrTypeNotifier) {
 				"notification_type": shoutrrrType,
 			}).Trace("Calling Router.Send with message")
 
-			if !notifier.sendWithCancellation(msg) {
-				LocalLog.Debug("Context canceled during message send")
-
-				return
-			}
+			notifier.send(msg)
 		case <-notifier.stop:
 			// Shutdown mode: drain all remaining messages from the channel
 			LocalLog.Debug("Shutdown signal received, draining remaining messages without delay")
@@ -398,11 +394,7 @@ func sendNotifications(notifier *shoutrrrTypeNotifier) {
 						"notification_type": shoutrrrType,
 					}).Trace("Calling Router.Send with message during shutdown")
 
-					if !notifier.sendWithCancellation(msg) {
-						LocalLog.Debug("Context canceled during shutdown message send")
-
-						return
-					}
+					notifier.send(msg)
 				default:
 					// Channel is empty, all messages drained
 					LocalLog.Debug("All remaining messages drained during shutdown")
@@ -662,18 +654,13 @@ func (n *shoutrrrTypeNotifier) Fire(entry *logrus.Entry) error {
 	return nil
 }
 
-// sendWithCancellation sends a message with context cancellation support.
+// send sends a message via the notification router.
 //
 // Parameters:
 //   - msg: Message to send.
-//
-// Returns:
-//   - bool: True if sent successfully, false if canceled.
-func (n *shoutrrrTypeNotifier) sendWithCancellation(msg string) bool {
+func (n *shoutrrrTypeNotifier) send(msg string) {
 	errs := n.Router.Send(msg, n.params)
 	processSendErrors(n, errs)
-
-	return true
 }
 
 // buildMessage constructs a notification message from data.

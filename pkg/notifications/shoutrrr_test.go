@@ -1219,7 +1219,7 @@ func TestShutdownGracePeriodConstant(t *testing.T) {
 
 // TestCloseDoesNotHangWithBlockingRouter verifies that Close() completes without hanging
 // when the router is blocked. This tests that the context cancellation properly unblocks
-// the sendWithCancellation call.
+// the send call.
 func TestCloseDoesNotHangWithBlockingRouter(t *testing.T) {
 	synctest.Test(t, func(t *testing.T) {
 		// Set up logging
