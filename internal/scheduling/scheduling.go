@@ -78,6 +78,7 @@ func WaitForRunningUpdate(ctx context.Context, lock chan bool) {
 //   - currentWatchtowerContainer: The current Watchtower container for parent checking.
 //   - startupMessageSent: Whether the startup message was already sent (e.g., by the HTTP API in blocking mode).
 //   - ephemeralSelfUpdate: Whether the self-update uses ephemeral mode (removes old container before creating new one).
+//   - reviveStopped: Whether to start stopped containers after update.
 //
 // Returns:
 //   - error: An error if scheduling fails (e.g., invalid cron spec), nil on successful shutdown.
@@ -101,6 +102,7 @@ func RunUpgradesOnSchedule(
 	currentWatchtowerContainer types.Container,
 	startupMessageSent bool,
 	ephemeralSelfUpdate bool,
+	reviveStopped bool,
 ) error {
 	// Initialize lock if not provided, ensuring single-update concurrency.
 	if lock == nil {
@@ -184,6 +186,7 @@ func RunUpgradesOnSchedule(
 			RunOnce:        false,
 			MonitorOnly:    monitorOnly,
 			SkipSelfUpdate: skipWatchtowerSelfUpdate,
+			ReviveStopped:  reviveStopped,
 		}
 
 		metric := runUpdatesWithNotifications(ctx, filter, params)

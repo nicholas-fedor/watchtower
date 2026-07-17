@@ -673,6 +673,7 @@ func TestIntegration_APIAndScheduling_ConcurrentWithUnblockHTTPAPI(t *testing.T)
 		nil,
 		true,
 		false,
+		false, // reviveStopped
 	)
 	require.NoError(t, err, "RunUpgradesOnSchedule should run concurrently after SetupAndStartAPI returns")
 }

@@ -144,6 +144,7 @@ func TestRunUpgradesOnSchedule_EmptySchedule(t *testing.T) {
 		nil,   // currentWatchtowerContainer
 		false, // startupMessageSent
 		false, // ephemeralSelfUpdate
+		false, // reviveStopped
 	)
 	// Should complete without error when context times out (clean cancellation)
 	if err != nil {
@@ -193,6 +194,7 @@ func TestRunUpgradesOnSchedule_StartupMessageSuppressed(t *testing.T) {
 		nil,   // currentWatchtowerContainer
 		true,  // startupMessageSent - suppress the startup message
 		false, // ephemeralSelfUpdate
+		false, // reviveStopped
 	)
 	// Should complete without error when context times out (clean cancellation)
 	if err != nil {
@@ -246,6 +248,7 @@ func TestRunUpgradesOnSchedule_UpdateOnStart(t *testing.T) {
 		nil,   // currentWatchtowerContainer
 		false, // startupMessageSent
 		false, // ephemeralSelfUpdate
+		false, // reviveStopped
 	)
 	if err != nil {
 		t.Errorf("expected no error, got %v", err)
@@ -305,6 +308,7 @@ func TestRunUpgradesOnSchedule_InvalidCronSpec(t *testing.T) {
 		nil,   // currentWatchtowerContainer
 		false, // startupMessageSent
 		false, // ephemeralSelfUpdate
+		false, // reviveStopped
 	)
 	if err == nil {
 		t.Error("expected error")
@@ -385,10 +389,11 @@ func TestRunUpgradesOnSchedule_QuotedScheduleSpec(t *testing.T) {
 				"v1.0.0",
 				false, // monitorOnly
 				false, // updateOnStart
-				false, // skipFirstRun
+				true,  // skipFirstRun - should skip Watchtower self-update on first run
 				nil,   // currentWatchtowerContainer
 				false, // startupMessageSent
 				false, // ephemeralSelfUpdate
+				false, // reviveStopped
 			)
 
 			if tt.expectError {
@@ -440,6 +445,7 @@ func TestRunUpgradesOnSchedule_ContextCancellation(t *testing.T) {
 		nil,   // currentWatchtowerContainer
 		false, // startupMessageSent
 		false, // ephemeralSelfUpdate
+		false, // reviveStopped
 	)
 	if err != nil {
 		t.Errorf("expected no error, got %v", err)
@@ -505,6 +511,7 @@ func TestRunUpgradesOnSchedule_MonitorOnlyParameter(t *testing.T) {
 				nil,            // currentWatchtowerContainer
 				false,          // startupMessageSent
 				false,          // ephemeralSelfUpdate
+				false,          // reviveStopped
 			)
 			if err != nil {
 				t.Errorf("expected no error, got %v", err)
@@ -639,6 +646,7 @@ func TestRunUpgradesOnSchedule_CronWithSeconds(t *testing.T) {
 		nil,   // currentWatchtowerContainer
 		false, // startupMessageSent
 		false, // ephemeralSelfUpdate
+		false, // reviveStopped
 	)
 	// Should complete without error when context times out (clean cancellation)
 	if err != nil {
@@ -694,6 +702,7 @@ func TestRunUpgradesOnSchedule_SkipFirstRun_True(t *testing.T) {
 		nil,   // currentWatchtowerContainer
 		false, // startupMessageSent
 		false, // ephemeralSelfUpdate
+		false, // reviveStopped
 	)
 	// Should complete without error when context times out (clean cancellation)
 	if err != nil {
@@ -761,6 +770,7 @@ func TestRunUpgradesOnSchedule_WatchtowerParent_Skipping(t *testing.T) {
 		parentContainer, // currentWatchtowerContainer - should skip updates
 		false,           // startupMessageSent
 		false,           // ephemeralSelfUpdate
+		false,           // reviveStopped
 	)
 	// Should complete without error when context times out (clean cancellation)
 	if err != nil {
@@ -821,6 +831,7 @@ func TestRunUpgradesOnSchedule_ScheduledRuns_Execution(t *testing.T) {
 		nil,   // currentWatchtowerContainer
 		false, // startupMessageSent
 		false, // ephemeralSelfUpdate
+		false, // reviveStopped
 	)
 	// Should complete without error when context times out (clean cancellation)
 	if err != nil {
@@ -886,7 +897,7 @@ func TestRunUpgradesOnSchedule_EphemeralSelfUpdateWithExposedPorts(t *testing.T)
 		cmd,
 		filters.NoFilter,
 		"test filter",
-		nil,   // lock (auto-created)
+		nil,   // no lock
 		false, // cleanup
 		"",    // empty schedule
 		writeStartupMessage,
@@ -895,12 +906,13 @@ func TestRunUpgradesOnSchedule_EphemeralSelfUpdateWithExposedPorts(t *testing.T)
 		"",  // scope
 		nil, // no notifier
 		"v1.0.0",
-		false,              // monitorOnly
-		true,               // updateOnStart - triggers immediate update
-		false,              // skipFirstRun
-		containerWithPorts, // currentWatchtowerContainer with exposed ports
-		false,              // startupMessageSent
-		true,               // ephemeralSelfUpdate - bypasses port-conflict guard
+		false, // monitorOnly
+		false, // updateOnStart
+		false, // skipFirstRun
+		nil,   // currentWatchtowerContainer
+		false, // startupMessageSent
+		false, // ephemeralSelfUpdate
+		false, // reviveStopped
 	)
 	require.NoError(t, err)
 
@@ -964,6 +976,7 @@ func TestRunUpgradesOnSchedule_PortConflictGuard_SkipsSelfUpdate(t *testing.T) {
 		containerWithPorts, // currentWatchtowerContainer with exposed ports
 		false,              // startupMessageSent
 		false,              // ephemeralSelfUpdate - port-conflict guard is active
+		false,              // reviveStopped
 	)
 	require.NoError(t, err)
 
@@ -1042,6 +1055,7 @@ func TestRunUpgradesOnSchedule_NoExposedPorts_AllowsSelfUpdate(t *testing.T) {
 				containerNoPorts, // currentWatchtowerContainer without exposed ports
 				false,            // startupMessageSent
 				tt.ephemeralSelfUpdate,
+				false, // reviveStopped
 			)
 			require.NoError(t, err)
 
@@ -1050,6 +1064,78 @@ func TestRunUpgradesOnSchedule_NoExposedPorts_AllowsSelfUpdate(t *testing.T) {
 			assert.False(t, capturedParams.SkipSelfUpdate,
 				"self-update should NOT be skipped when container has no exposed ports",
 			)
+		})
+	}
+}
+
+// TestRunUpgradesOnSchedule_ReviveStoppedPropagation verifies that RunUpgradesOnSchedule
+// passes the ReviveStopped flag through UpdateParams to the update function.
+func TestRunUpgradesOnSchedule_ReviveStoppedPropagation(t *testing.T) {
+	tests := []struct {
+		name           string
+		reviveStopped  bool
+		expectSelected bool
+	}{
+		{
+			name:           "reviveStopped=true",
+			reviveStopped:  true,
+			expectSelected: true,
+		},
+		{
+			name:           "reviveStopped=false",
+			reviveStopped:  false,
+			expectSelected: false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			cmd := &cobra.Command{}
+			client := mockActions.CreateMockClient(&mockActions.TestData{}, false, false)
+
+			ctx := t.Context()
+
+			var capturedParams types.UpdateParams
+
+			runUpdatesWithNotifications := func(_ context.Context, _ types.Filter, params types.UpdateParams) *metrics.Metric {
+				capturedParams = params
+
+				return &metrics.Metric{Scanned: 1, Updated: 0, Failed: 0}
+			}
+
+			writeStartupMessage := func(*cobra.Command, time.Time, string, string, container.Client, types.Notifier, string, *bool) {}
+
+			cmd.PersistentFlags().Bool("update-on-start", true, "")
+
+			timeoutCtx, timeoutCancel := context.WithTimeout(ctx, 10*time.Millisecond)
+			defer timeoutCancel()
+
+			err := scheduling.RunUpgradesOnSchedule(
+				timeoutCtx,
+				cmd,
+				filters.NoFilter,
+				"test filter",
+				nil,   // lock (auto-created)
+				false, // cleanup
+				"",    // empty schedule
+				writeStartupMessage,
+				runUpdatesWithNotifications,
+				client,
+				"",  // scope
+				nil, // no notifier
+				"v1.0.0",
+				false,            // monitorOnly
+				true,             // updateOnStart - triggers immediate update
+				false,            // skipFirstRun
+				nil,              // currentWatchtowerContainer
+				false,            // startupMessageSent
+				false,            // ephemeralSelfUpdate
+				tt.reviveStopped, // reviveStopped
+			)
+			require.NoError(t, err)
+
+			assert.Equal(t, tt.expectSelected, capturedParams.ReviveStopped,
+				"ReviveStopped should be %v in UpdateParams", tt.expectSelected)
 		})
 	}
 }

@@ -1018,6 +1018,7 @@ func runMain(cfg types.RunConfig) int {
 		currentWatchtowerContainer,
 		startupMessageSent,
 		ephemeralSelfUpdate,
+		reviveStopped,
 	)
 	if err != nil {
 		logNotify("Scheduled upgrades failed", err)
