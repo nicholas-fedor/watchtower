@@ -10,6 +10,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- Parallelize staleness checks with bounded concurrency by @nicholas-fedor in [#1958](https://github.com/nicholas-fedor/watchtower/pull/1958)
 - Restructure registry auth and add bearer token caching by @nicholas-fedor in [#1951](https://github.com/nicholas-fedor/watchtower/pull/1951)
 - Expand and reorganize http-api and metrics, improve logging, and restructure documentation by @nicholas-fedor in [#1939](https://github.com/nicholas-fedor/watchtower/pull/1939)
 - Update star history chart by @nicholas-fedor in [#1907](https://github.com/nicholas-fedor/watchtower/pull/1907)
@@ -64,6 +65,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Handle local-only images and clarify self-update skip messages by @nicholas-fedor in [#1960](https://github.com/nicholas-fedor/watchtower/pull/1960)
 - Derive bearer service from realm by @llc1123 in [#1895](https://github.com/nicholas-fedor/watchtower/pull/1895)
 
 ### New Contributors
