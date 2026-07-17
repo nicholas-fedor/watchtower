@@ -659,8 +659,17 @@ func (n *shoutrrrTypeNotifier) Fire(entry *logrus.Entry) error {
 // Parameters:
 //   - msg: Message to send.
 func (n *shoutrrrTypeNotifier) send(msg string) {
-	errs := n.Router.Send(msg, n.params)
-	processSendErrors(n, errs)
+	sendCh := make(chan []error, 1)
+	go func() {
+		sendCh <- n.Router.Send(msg, n.params)
+	}()
+
+	select {
+	case errs := <-sendCh:
+		processSendErrors(n, errs)
+	case <-n.ctx.Done():
+		LocalLog.WithError(n.ctx.Err()).Debug("Notification send canceled")
+	}
 }
 
 // buildMessage constructs a notification message from data.
