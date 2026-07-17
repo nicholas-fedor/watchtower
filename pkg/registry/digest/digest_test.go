@@ -17,6 +17,7 @@ import (
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 
+	dockerContainer "github.com/moby/moby/api/types/container"
 	dockerImage "github.com/moby/moby/api/types/image"
 
 	mockAuth "github.com/nicholas-fedor/watchtower/pkg/registry/auth/mocks"
@@ -204,6 +205,175 @@ func TestCompareDigestWithRemote(t *testing.T) {
 	require.NoError(t, err)
 	assert.False(t, match)
 	assert.Equal(t, "sha256:"+remoteHash, remoteDigest)
+}
+
+// TestCompareDigestWithRemote_LocalOnly404 is a regression test for locally built
+// images (e.g. atlas-badgerdb) that have non-empty registry-less RepoDigests.
+// A HEAD 404 must be treated as up-to-date with no error so callers skip the pull
+// without logging "Digest retrieval failed, falling back to full pull".
+func TestCompareDigestWithRemote_LocalOnly404(t *testing.T) {
+	ClearLocalOnlyImageCache()
+	t.Cleanup(ClearLocalOnlyImageCache)
+
+	viper.Set("WATCHTOWER_REGISTRY_TLS_SKIP", true)
+	t.Cleanup(func() {
+		viper.Set("WATCHTOWER_REGISTRY_TLS_SKIP", false)
+	})
+
+	mc := mockTypes.NewMockContainer(t)
+	mc.On("Name").Return("atlas-badgerdb-1")
+	mc.On("ImageName").Return("atlas-badgerdb:latest")
+	mc.On("HasImageInfo").Return(true)
+	mc.On("ImageInfo").Return(&dockerImage.InspectResponse{
+		RepoDigests: []string{
+			"atlas-badgerdb@sha256:80f07677bee57274a48929d0688bf0cfabe5e83f06f2f152dab4076445d6ab35",
+		},
+	})
+	mc.On("ContainerInfo").Return(&dockerContainer.InspectResponse{
+		Config: &dockerContainer.Config{
+			Image: "atlas-badgerdb",
+		},
+	})
+
+	var headManifestCalls int
+
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		// Auth probe may GET /v2/; only manifest GET would indicate unwanted fallback.
+		if r.Method == http.MethodGet && strings.Contains(r.URL.Path, "/manifests/") {
+			t.Errorf("unexpected GET to %s; local-only 404 must not fall back to GET", r.URL.Path)
+			w.WriteHeader(http.StatusNotFound)
+
+			return
+		}
+
+		if r.Method == http.MethodHead && strings.Contains(r.URL.Path, "/manifests/") {
+			headManifestCalls++
+
+			w.WriteHeader(http.StatusNotFound)
+
+			return
+		}
+
+		// Unauthenticated registry probe.
+		if r.Method == http.MethodGet && (r.URL.Path == "/v2/" || r.URL.Path == "/v2") {
+			w.WriteHeader(http.StatusOK)
+
+			return
+		}
+
+		w.WriteHeader(http.StatusOK)
+	}))
+	defer server.Close()
+
+	parts := strings.SplitN(server.URL, "://", 2)
+	host := parts[len(parts)-1]
+
+	match, remoteDigest, err := CompareDigestWithRemote(
+		context.Background(),
+		mc,
+		"",
+		host,
+	)
+	require.NoError(t, err)
+	assert.True(t, match)
+	assert.Empty(t, remoteDigest)
+	assert.GreaterOrEqual(t, headManifestCalls, 1)
+}
+
+// TestIsLocalImageNotFound verifies domain-less Config.Image + ErrManifestNotFound
+// identity matching (a prior dual-sentinel bug broke errors.Is).
+func TestIsLocalImageNotFound(t *testing.T) {
+	t.Run("true for domain-less Config.Image with wrapped ErrManifestNotFound", func(t *testing.T) {
+		mc := mockTypes.NewMockContainer(t)
+		mc.On("HasImageInfo").Return(true)
+		mc.On("ContainerInfo").Return(&dockerContainer.InspectResponse{
+			Config: &dockerContainer.Config{Image: "atlas-badgerdb"},
+		})
+
+		err := fmt.Errorf("%w: %w: status 404 Not Found", ErrManifestNotFound, errInvalidRegistryResponse)
+		assert.True(t, isLocalImageNotFound(mc, err))
+	})
+
+	t.Run("false for domain-ful Config.Image", func(t *testing.T) {
+		mc := mockTypes.NewMockContainer(t)
+		mc.On("HasImageInfo").Return(true)
+		mc.On("ContainerInfo").Return(&dockerContainer.InspectResponse{
+			Config: &dockerContainer.Config{Image: "registry.example.com/app:latest"},
+		})
+
+		err := fmt.Errorf("%w: status 404 Not Found", ErrManifestNotFound)
+		assert.False(t, isLocalImageNotFound(mc, err))
+	})
+
+	t.Run("false for non-manifest errors", func(t *testing.T) {
+		mc := mockTypes.NewMockContainer(t)
+		err := fmt.Errorf("%w: status 500", errInvalidRegistryResponse)
+		assert.False(t, isLocalImageNotFound(mc, err))
+	})
+}
+
+// TestLocalOnlyImageCache ensures a confirmed local-only image skips subsequent
+// registry probes for the same image name+ID.
+func TestLocalOnlyImageCache(t *testing.T) {
+	ClearLocalOnlyImageCache()
+	t.Cleanup(ClearLocalOnlyImageCache)
+
+	viper.Set("WATCHTOWER_REGISTRY_TLS_SKIP", true)
+	t.Cleanup(func() {
+		viper.Set("WATCHTOWER_REGISTRY_TLS_SKIP", false)
+	})
+
+	const imageID = "sha256:80f07677bee57274a48929d0688bf0cfabe5e83f06f2f152dab4076445d6ab35"
+
+	mc := mockTypes.NewMockContainer(t)
+	mc.On("Name").Return("atlas-badgerdb-1")
+	mc.On("ImageName").Return("atlas-badgerdb:latest")
+	mc.On("HasImageInfo").Return(true)
+	mc.On("ImageInfo").Return(&dockerImage.InspectResponse{
+		ID: imageID,
+		RepoDigests: []string{
+			"atlas-badgerdb@sha256:80f07677bee57274a48929d0688bf0cfabe5e83f06f2f152dab4076445d6ab35",
+		},
+	})
+	mc.On("ContainerInfo").Return(&dockerContainer.InspectResponse{
+		Config: &dockerContainer.Config{Image: "atlas-badgerdb"},
+	})
+
+	var headManifestCalls int
+
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Method == http.MethodHead && strings.Contains(r.URL.Path, "/manifests/") {
+			headManifestCalls++
+
+			w.WriteHeader(http.StatusNotFound)
+
+			return
+		}
+
+		if r.Method == http.MethodGet && (r.URL.Path == "/v2/" || r.URL.Path == "/v2") {
+			w.WriteHeader(http.StatusOK)
+
+			return
+		}
+
+		w.WriteHeader(http.StatusOK)
+	}))
+	defer server.Close()
+
+	parts := strings.SplitN(server.URL, "://", 2)
+	host := parts[len(parts)-1]
+
+	// First call: probe registry, cache local-only.
+	match, _, err := CompareDigestWithRemote(context.Background(), mc, "", host)
+	require.NoError(t, err)
+	assert.True(t, match)
+	assert.Equal(t, 1, headManifestCalls)
+
+	// Second call: cache hit, no additional HEAD.
+	match, _, err = CompareDigestWithRemote(context.Background(), mc, "", host)
+	require.NoError(t, err)
+	assert.True(t, match)
+	assert.Equal(t, 1, headManifestCalls, "cached local-only image must not re-probe registry")
 }
 
 func TestCompareDigest(t *testing.T) {

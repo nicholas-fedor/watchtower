@@ -141,14 +141,14 @@ var _ = ginkgo.Describe("the client", func() {
 			mockServer.AppendHandlers(
 				ghttp.CombineHandlers(
 					ghttp.VerifyRequest("POST", gomega.MatchRegexp("/images/create")),
-					ghttp.RespondWith(http.StatusNotFound, `{"message":"manifest for nonexistent:latest not found"}`),
+					ghttp.RespondWith(http.StatusNotFound, `{"message":"manifest for registry.example.com/nonexistent:latest not found"}`),
 				),
 			)
 
 			i := newImageClient(mockClient)
 			pullContainer := MockContainer(
-				WithImageName("nonexistent:latest"),
-				WithRepoDigests([]string{"nonexistent@sha256:def"}),
+				WithImageName("registry.example.com/nonexistent:latest"),
+				WithRepoDigests([]string{"registry.example.com/nonexistent@sha256:def"}),
 			)
 
 			resetLogrus, logbuf := captureLogrus(logrus.DebugLevel)
@@ -174,8 +174,8 @@ var _ = ginkgo.Describe("the client", func() {
 
 			i := newImageClient(mockClient)
 			pullContainer := MockContainer(
-				WithImageName("app:latest"),
-				WithRepoDigests([]string{"app@sha256:ghi"}),
+				WithImageName("registry.example.com/app:latest"),
+				WithRepoDigests([]string{"registry.example.com/app@sha256:ghi"}),
 			)
 
 			resetLogrus, logbuf := captureLogrus(logrus.DebugLevel)
@@ -685,6 +685,57 @@ var _ = ginkgo.Describe("the client", func() {
 				gomega.Expect(stale).To(gomega.BeTrue())
 				gomega.Expect(string(latestID)).To(gomega.Equal(newImageID))
 				gomega.Expect(latestDigest).To(gomega.Equal(newDigest))
+			})
+		})
+		ginkgo.When("the image is not found in any registry", func() {
+			ginkgo.It("should treat the container as up-to-date without error", func() {
+				currentImageID := "sha256:" + util.GenerateRandomSHA256()
+				container := MockContainer(
+					WithImageName("atlas-badgerdb:latest"),
+					WithRepoDigests([]string{"atlas-badgerdb@sha256:80f07677bee57274a48929d0688bf0cfabe5e83f06f2f152dab4076445d6ab35"}),
+					func(container *dockerContainer.InspectResponse, image *dockerImage.InspectResponse) {
+						container.Image = currentImageID
+						image.ID = currentImageID
+					},
+				)
+
+				// Domain-less Config.Image + registry 404 is handled inside CompareDigest
+				// as match=true; PullImage skips without ImagePull. HasNewImage still runs
+				// and inspects the local image by name.
+				mockServer.AllowUnhandledRequests = true
+				mockServer.AppendHandlers(
+					ghttp.CombineHandlers(
+						ghttp.VerifyRequest("GET", gomega.MatchRegexp(`/images/.+/json`)),
+						ghttp.RespondWithJSONEncoded(http.StatusOK, dockerImage.InspectResponse{
+							ID: currentImageID,
+							RepoDigests: []string{
+								"atlas-badgerdb@sha256:80f07677bee57274a48929d0688bf0cfabe5e83f06f2f152dab4076445d6ab35",
+							},
+						}),
+					),
+				)
+
+				c := &client{api: mockClient}
+
+				resetLogrus, logbuf := captureLogrus(logrus.DebugLevel)
+				defer resetLogrus()
+
+				stale, latestID, latestDigest, err := c.IsContainerStale(
+					context.Background(),
+					container,
+					types.UpdateParams{},
+				)
+				gomega.Expect(err).To(gomega.Succeed())
+				gomega.Expect(stale).To(gomega.BeFalse())
+				gomega.Expect(latestID).To(gomega.Equal(types.ImageID(currentImageID)))
+				gomega.Expect(latestDigest).To(gomega.Equal(
+					"sha256:80f07677bee57274a48929d0688bf0cfabe5e83f06f2f152dab4076445d6ab35",
+				))
+				gomega.Eventually(logbuf).Should(gbytes.Say(`Digest match, skipping pull`))
+
+				for _, req := range mockServer.ReceivedRequests() {
+					gomega.Expect(req.URL.Path).ToNot(gomega.ContainSubstring("/images/create"))
+				}
 			})
 		})
 	})

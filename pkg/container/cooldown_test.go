@@ -271,9 +271,11 @@ var _ = ginkgo.Describe("PullImage cooldown gate", func() {
 			)
 
 			i := newImageClient(mockClient)
+			// Use an explicit registry host so local-only 404 handling does not apply.
+			// Digest failure must fall through to the cooldown gate.
 			c := MockContainer(
-				WithImageName("test:latest"),
-				WithRepoDigests([]string{"test@sha256:12345"}),
+				WithImageName("registry.example.com/test:latest"),
+				WithRepoDigests([]string{"registry.example.com/test@sha256:12345"}),
 			)
 
 			err := i.PullImage(context.Background(), c, WarnAuto, types.UpdateParams{
