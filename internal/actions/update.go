@@ -7,10 +7,12 @@ import (
 	"slices"
 	"sort"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/distribution/reference"
 	"github.com/sirupsen/logrus"
+	"golang.org/x/sync/errgroup"
 
 	cerrdefs "github.com/containerd/errdefs"
 	dockerContainer "github.com/moby/moby/api/types/container"
@@ -143,9 +145,9 @@ func Update(
 	// Create a progress tracker for reporting scanned, updated, and skipped containers.
 	progress := &session.Progress{}
 	// Track the number of stale containers for logging.
-	staleCount := 0
+	var staleCount int
 	// Track if Watchtower self-update pull failed to add safeguard delay.
-	watchtowerPullFailed := false
+	var watchtowerPullFailed bool
 
 	// Run pre-check lifecycle hooks if enabled to validate the environment before updates.
 	if config.LifecycleHooks {
@@ -215,6 +217,14 @@ func Update(
 	// Track containers that fail staleness checks for reporting.
 	staleCheckFailed := 0
 
+	// Prepare containers for staleness checks, skipping already-processed ones.
+	type checkTask struct {
+		index     int
+		container types.Container
+	}
+
+	var checkTasks []checkTask
+
 	// Iterate through containers to check staleness and prepare for updates or restarts.
 	for i, sourceContainer := range filteredContainers {
 		// Check for context cancellation to enable faster shutdown during long update cycles.
@@ -225,22 +235,25 @@ func Update(
 		}
 
 		// Skip containers already processed (e.g., skipped due to circular dependencies).
-		if _, exists := (*progress)[sourceContainer.ID()]; exists {
+		_, exists := (*progress)[sourceContainer.ID()]
+		if exists {
 			continue
 		}
 
 		// Set up logging fields for the current container.
-		fields := logrus.Fields{
-			"container": sourceContainer.Name(),
-			"image":     sourceContainer.ImageName(),
-		}
-		clog := logrus.WithFields(fields)
+		clog := logrus.WithFields(
+			logrus.Fields{
+				"container": sourceContainer.Name(),
+				"image":     sourceContainer.ImageName(),
+			},
+		)
 
 		// Check if the container uses a pinned (digest-based) image to skip updates.
-		isPinned, err := isPinned(sourceContainer, progress, config)
+		isPinnedVal, err := isPinned(sourceContainer, progress, config)
 		if err != nil {
 			// Log and skip containers with unparsable image references, marking as skipped.
 			clog.WithError(err).Debug("Failed to check pinned image - skipping container")
+
 			progress.AddSkipped(
 				sourceContainer,
 				fmt.Errorf("%w: %w", errParseImageReference, err),
@@ -252,137 +265,218 @@ func Update(
 			continue
 		}
 
-		if isPinned {
+		if isPinnedVal {
 			// Skip staleness checks for pinned images and mark as scanned.
 			clog.Debug("Skipping staleness check for pinned image")
 
 			continue
 		}
 
-		// Determine if the container is stale and needs updating.
-		// If the container is Watchtower and SkipSelfUpdate is enabled, skip the update
-		// by setting stale to false and using the current image. Otherwise, check staleness.
-		var (
-			stale       bool
-			newestImage types.ImageID
-		)
+		checkTasks = append(checkTasks, checkTask{
+			index:     i,
+			container: sourceContainer,
+		})
+	}
 
-		if sourceContainer.IsWatchtower() && config.SkipSelfUpdate {
-			stale = false
-			newestImage = sourceContainer.ImageID()
-		} else {
-			stale, newestImage, _, err = client.IsContainerStale(
-				ctx,
-				sourceContainer,
-				config,
-			)
-		}
+	// Check for context cancellation before launching parallel staleness checks.
+	select {
+	case <-ctx.Done():
+		return progress.Report(), cleanupImageInfos, ctx.Err()
+	default:
+	}
 
-		// Determine if the container should be updated based on staleness and config.
-		shouldUpdate := shouldUpdateContainer(
-			sourceContainer,
-			stale,
-			config,
-		)
+	// Parallelize staleness checks with bounded concurrency.
+	const maxConcurrentChecks = 20
 
-		// Log when skipping Watchtower self-update in run-once mode
-		if stale && sourceContainer.IsWatchtower() && config.RunOnce {
-			clog.Info("Skipping Watchtower self-update in run-once mode")
-		}
+	var checkGroup errgroup.Group
+	checkGroup.SetLimit(maxConcurrentChecks)
 
-		// Track old image ID before update for cleanup notifications.
-		if shouldUpdate {
-			if c, ok := filteredContainers[i].(*container.Container); ok {
-				c.SetOldImageID(sourceContainer.ImageID())
-			}
-		}
+	var (
+		resultMu                     sync.Mutex
+		parallelStaleCheckFailed     int
+		parallelWatchtowerPullFailed bool
+		parallelStaleCount           int
+	)
 
-		// Verify the container's configuration if it's slated for update to
-		// ensure recreation is possible.
-		if err == nil && shouldUpdate {
-			err = sourceContainer.VerifyConfiguration()
-			if err != nil {
-				// Log configuration verification failure with detailed context.
-				logrus.WithError(err).WithFields(
-					logrus.Fields{
-						"container_name": sourceContainer.Name(),
-						"container_id":   sourceContainer.ID().ShortID(),
-						"image_name":     sourceContainer.ImageName(),
-						"image_id":       sourceContainer.ImageID().ShortID(),
-					}).Debug("Failed to verify container configuration")
-			}
-		}
-
-		// Handle staleness check results, logging skips or adding to the progress report.
-		if err != nil {
-			// Skip containers with staleness check errors, marking them as skipped.
-			clog.WithError(err).Debug("Cannot update container - skipping")
-
-			stale = false
-
-			if !errors.Is(err, container.ErrImageCooldown) {
-				staleCheckFailed++
+	for _, task := range checkTasks {
+		checkGroup.Go(func() error {
+			// Check for context cancellation to enable faster shutdown during long update cycles.
+			select {
+			case <-ctx.Done():
+				return ctx.Err()
+			default:
 			}
 
-			progress.AddSkipped(sourceContainer, err, config)
-
-			// Restore rich cooldown metadata for reports/notifications (preserves the
-			// structured CooldownAge/Delay/Remaining/Passed fields that the removed
-			// high-level block used to populate via SetCooldownInfo). The rich
-			// *container.CooldownError carries the details.
-			if cooldownErr, ok := errors.AsType[*container.CooldownError](err); ok {
-				progress.SetCooldownInfo(
-					sourceContainer.ID(),
-					cooldownErr.Age,
-					cooldownErr.Delay,
-					cooldownErr.Remaining,
-					cooldownErr.EligibleAt,
-					cooldownErr.Passed,
-				)
-			} else if errors.Is(err, container.ErrImageCooldown) {
-				// Fallback for plain sentinel (keeps basic deferral visible)
-				progress.SetCooldownInfo(sourceContainer.ID(), "", "", "", time.Time{}, false)
-			}
-
-			// Track if Watchtower self-update pull failed for safeguard.
-			// Only set to true if we actually attempted a self-update
-			// (i.e., SkipSelfUpdate is false) and the error is a real
-			// failure, not a cooldown deferral.
-			if sourceContainer.IsWatchtower() &&
-				!config.SkipSelfUpdate &&
-				!errors.Is(err, container.ErrImageCooldown) {
-				watchtowerPullFailed = true
-			}
-		} else {
-			// For fresh containers, set newestImage to current image ID for proper categorization.
-			// (Cooldown decision and any layer pull now happen inside pkg/container/image.go
-			// IsOutsideCooldown + guarded PullImage, after digest staleness and before layers.)
-			if !stale {
-				newestImage = sourceContainer.ImageID()
-			}
-
-			// Log successful staleness check and add to scanned containers.
-			clog.WithFields(
+			sourceContainer := task.container
+			clog := logrus.WithFields(
 				logrus.Fields{
-					"stale":        stale,
-					"newest_image": newestImage,
-				}).Debug("Checked container staleness")
-			progress.AddScanned(
-				sourceContainer,
-				newestImage,
-				config,
+					"container": sourceContainer.Name(),
+					"image":     sourceContainer.ImageName(),
+				},
 			)
-		}
 
-		// Update the container's stale status for dependency sorting.
-		// Only mark as stale if the container should actually be updated.
-		filteredContainers[i].SetStale(stale && shouldUpdate)
+			var (
+				stale       bool
+				newestImage types.ImageID
+				checkErr    error
+				verifyErr   error
+			)
 
-		// Increment stale count for logging summary.
-		if stale {
-			staleCount++
+			// Determine if the container is stale and needs updating.
+			// If the container is Watchtower and SkipSelfUpdate is enabled, skip the update
+			// by setting stale to false and using the current image. Otherwise, check staleness.
+			if sourceContainer.IsWatchtower() && config.SkipSelfUpdate {
+				stale = false
+				newestImage = sourceContainer.ImageID()
+			} else {
+				stale, newestImage, _, checkErr = client.IsContainerStale(
+					ctx,
+					sourceContainer,
+					config,
+				)
+
+				if checkErr != nil && (errors.Is(checkErr, context.Canceled) || errors.Is(checkErr, context.DeadlineExceeded)) {
+					return fmt.Errorf("staleness check canceled: %w", checkErr)
+				}
+			}
+
+			// Determine if the container should be updated based on staleness and config.
+			shouldUpdate := shouldUpdateContainer(sourceContainer, stale, config)
+
+			// Log when skipping Watchtower self-update in run-once mode.
+			if stale && sourceContainer.IsWatchtower() && config.RunOnce {
+				clog.Info("Skipping Watchtower self-update in run-once mode")
+			}
+
+			// Verify the container's configuration if it's slated for update to
+			// ensure recreation is possible.
+			if checkErr == nil && shouldUpdate {
+				verifyErr = sourceContainer.VerifyConfiguration()
+				if verifyErr != nil {
+					logrus.WithError(verifyErr).WithFields(
+						logrus.Fields{
+							"container_name": sourceContainer.Name(),
+							"container_id":   sourceContainer.ID().ShortID(),
+							"image_name":     sourceContainer.ImageName(),
+							"image_id":       sourceContainer.ImageID().ShortID(),
+						}).Debug("Failed to verify container configuration")
+				}
+
+				if verifyErr != nil &&
+					(errors.Is(verifyErr, context.Canceled) ||
+						errors.Is(verifyErr, context.DeadlineExceeded)) {
+					return fmt.Errorf("configuration verification canceled: %w", verifyErr)
+				}
+			}
+
+			resultMu.Lock()
+			defer resultMu.Unlock()
+
+			// Handle staleness check results, logging skips or adding to the progress report.
+			switch {
+			case checkErr != nil:
+				// Skip containers with staleness check errors, marking them as skipped.
+				if !errors.Is(checkErr, container.ErrImageCooldown) {
+					parallelStaleCheckFailed++
+				}
+
+				progress.AddSkipped(sourceContainer, checkErr, config)
+
+				// Restore rich cooldown metadata for reports/notifications (preserves the
+				// structured CooldownAge/Delay/Remaining/Passed fields that the removed
+				// high-level block used to populate via SetCooldownInfo). The rich
+				// *container.CooldownError carries the details.
+				cooldownErr, ok := errors.AsType[*container.CooldownError](checkErr)
+				if ok {
+					progress.SetCooldownInfo(
+						sourceContainer.ID(),
+						cooldownErr.Age,
+						cooldownErr.Delay,
+						cooldownErr.Remaining,
+						cooldownErr.EligibleAt,
+						cooldownErr.Passed,
+					)
+				} else if errors.Is(checkErr, container.ErrImageCooldown) {
+					// Fallback for plain sentinel (keeps basic deferral visible)
+					progress.SetCooldownInfo(sourceContainer.ID(), "", "", "", time.Time{}, false)
+				}
+
+				// Track if Watchtower self-update pull failed for safeguard.
+				// Only set to true if we actually attempted a self-update
+				// (i.e., SkipSelfUpdate is false) and the error is a real
+				// failure, not a cooldown deferral.
+				if sourceContainer.IsWatchtower() &&
+					!config.SkipSelfUpdate &&
+					!errors.Is(checkErr, container.ErrImageCooldown) {
+					parallelWatchtowerPullFailed = true
+				}
+			case verifyErr != nil:
+				parallelStaleCheckFailed++
+
+				progress.AddSkipped(sourceContainer, verifyErr, config)
+
+				if sourceContainer.IsWatchtower() &&
+					!config.SkipSelfUpdate &&
+					!errors.Is(verifyErr, container.ErrImageCooldown) {
+					parallelWatchtowerPullFailed = true
+				}
+			default:
+				// For fresh containers, set newestImage to current image ID for proper categorization.
+				// (Cooldown decision and any layer pull now happen inside pkg/container/image.go
+				// IsOutsideCooldown + guarded PullImage, after digest staleness and before layers.)
+				if !stale {
+					newestImage = sourceContainer.ImageID()
+				}
+
+				// Log successful staleness check and add to scanned containers.
+				clog.WithFields(
+					logrus.Fields{
+						"stale":        stale,
+						"newest_image": newestImage,
+					}).Debug("Checked container staleness")
+				progress.AddScanned(
+					sourceContainer,
+					newestImage,
+					config,
+				)
+			}
+
+			// Track old image ID before update for cleanup notifications.
+			if shouldUpdate {
+				c, ok := filteredContainers[task.index].(*container.Container)
+				if ok {
+					c.SetOldImageID(sourceContainer.ImageID())
+				}
+			}
+
+			// Update the container's stale status for dependency sorting.
+			// Only mark as stale if the container should actually be updated.
+			filteredContainers[task.index].SetStale(stale && shouldUpdate && checkErr == nil && verifyErr == nil)
+
+			// Increment stale count for logging summary.
+			if stale {
+				parallelStaleCount++
+			}
+
+			return nil
+		})
+	}
+
+	err = checkGroup.Wait()
+	if err != nil {
+		logrus.WithError(err).Debug("Parallel staleness checks completed with error")
+
+		// Surface context cancellation from parallel workers as the final Update error.
+		if errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded) {
+			return progress.Report(), cleanupImageInfos, fmt.Errorf("update canceled: %w", err)
 		}
 	}
+
+	// Accumulate parallel results with pre-parallel sequential counts so failures
+	// from pinned-image parsing and other pre-filter checks are preserved.
+	staleCheckFailed += parallelStaleCheckFailed
+	watchtowerPullFailed = watchtowerPullFailed || parallelWatchtowerPullFailed
+	staleCount += parallelStaleCount
 
 	// Log the summary of staleness checks, including total, stale, and failed counts.
 	logrus.WithFields(
@@ -401,7 +495,8 @@ func Update(
 	// Propagate stale status to allContainers since they are different instances.
 	for _, c := range filteredContainers {
 		if c.IsStale() {
-			if ac, ok := containerByID[c.ID()]; ok {
+			ac, ok := containerByID[c.ID()]
+			if ok {
 				ac.SetStale(true)
 			}
 		}
@@ -414,13 +509,15 @@ func Update(
 	)
 	if err != nil {
 		if errors.Is(err, sorter.ErrCircularReference) {
-			if circularErr, ok := errors.AsType[sorter.CircularReferenceError](err); ok {
+			circularErr, ok := errors.AsType[sorter.CircularReferenceError](err)
+			if ok {
 				circularName := circularErr.ContainerName
 				// Find the container and mark as skipped.
 				for _, c := range filteredContainers {
 					if c.Name() == circularName {
 						// Only add if not already skipped (e.g., from initial cycle detection)
-						if _, exists := (*progress)[c.ID()]; !exists {
+						_, exists := (*progress)[c.ID()]
+						if !exists {
 							progress.AddSkipped(
 								c,
 								errCircularDependency,
@@ -638,7 +735,8 @@ func UpdateImplicitRestart(
 		// Also index by bare name for better exact matching in mixed scenarios
 		bareName := c.Name()
 		if bareName != "" && bareName != resolvedID {
-			if _, exists := restartByIdentifier[bareName]; !exists {
+			_, exists := restartByIdentifier[bareName]
+			if !exists {
 				restartByIdentifier[bareName] = c.ToRestart()
 			}
 		}
@@ -666,12 +764,13 @@ func UpdateImplicitRestart(
 					"to_restart":           c.ToRestart(),
 				}).Debug("Checking links for container")
 
-			if link := linkedIdentifierMarkedForRestart(
+			link := linkedIdentifierMarkedForRestart(
 				links,
 				restartByIdentifier,
 				c,
 				allContainers,
-			); link != "" {
+			)
+			if link != "" {
 				logrus.WithFields(
 					logrus.Fields{
 						"container":  c.Name(),
@@ -679,7 +778,8 @@ func UpdateImplicitRestart(
 					}).Debug("Marked container as linked to restarting")
 				containers[i].SetLinkedToRestarting(true)
 
-				if allContainer, ok := byID[c.ID()]; ok {
+				allContainer, ok := byID[c.ID()]
+				if ok {
 					allContainer.SetLinkedToRestarting(true)
 					resolved := container.ResolveContainerIdentifier(allContainer)
 					restartByIdentifier[resolved] = true
@@ -804,7 +904,8 @@ func linkedIdentifierMarkedForRestart(
 	knownProjects := map[string]bool{}
 
 	for _, c := range allContainers {
-		if p := getProject(c); p != "" {
+		p := getProject(c)
+		if p != "" {
 			knownProjects[p] = true
 		}
 	}
@@ -968,7 +1069,7 @@ func linkedIdentifierMarkedForRestart(
 				}
 			}
 
-			// No same-project service match found; take the first candidate
+			// No same-project service match found. Take the first candidate
 			// after sorting for deterministic behavior.
 			sort.Strings(serviceCandidates)
 			chosen := serviceCandidates[0]
@@ -998,8 +1099,10 @@ func linkedIdentifierMarkedForRestart(
 // Returns:
 //   - string: Project name, or "" if none can be determined.
 func getProject(c types.Container) string {
-	if monitoredContainer, ok := c.(*container.Container); ok {
-		if info := monitoredContainer.ContainerInfo(); info != nil && info.Config != nil {
+	monitoredContainer, ok := c.(*container.Container)
+	if ok {
+		info := monitoredContainer.ContainerInfo()
+		if info != nil && info.Config != nil {
 			project := compose.GetProjectName(info.Config.Labels)
 			if project != "" {
 				return project
@@ -1008,7 +1111,9 @@ func getProject(c types.Container) string {
 	}
 	// Fallback to parsing from container name
 	containerName := c.Name()
-	if idx := strings.Index(containerName, "-"); idx > 0 {
+
+	idx := strings.Index(containerName, "-")
+	if idx > 0 {
 		return containerName[:idx]
 	}
 
@@ -1137,7 +1242,7 @@ func isPinned(
 		return true, nil
 	}
 
-	// Non-pinned names must still be parseable; retry with fallback when needed.
+	// Non-pinned names must still be parseable. Retry with fallback when needed.
 	err := parseReference(imageName, configImage, fallbackImage, cont)
 	if err != nil {
 		if imageName != fallbackImage {
@@ -1292,7 +1397,8 @@ func performRollingRestart(
 			} else {
 				// Set the new container ID in progress
 				if progress != nil {
-					if status, exists := (*progress)[c.ID()]; exists {
+					status, exists := (*progress)[c.ID()]
+					if exists {
 						status.SetNewContainerID(newContainerID)
 						// Mark as restarted if not stale (not updated)
 						if !c.IsStale() {
@@ -1621,7 +1727,8 @@ func restartContainersInSortedOrder(
 			} else {
 				// Set the new container ID in progress
 				if progress != nil {
-					if status, exists := (*progress)[c.ID()]; exists {
+					status, exists := (*progress)[c.ID()]
+					if exists {
 						status.SetNewContainerID(newContainerID)
 						// Mark as restarted if not stale (not updated)
 						if !c.IsStale() {
@@ -1744,8 +1851,8 @@ func restartStaleContainer(
 		// Opt-in ephemeral self-update: use a short-lived orchestrator container
 		// to perform the transition atomically. The orchestrator handles stopping
 		// the old container, creating and starting the new one, and cleanup.
-		// EphemeralSelfUpdate returns immediately after starting the orchestrator;
-		// the orchestrator completes the replacement asynchronously. The current
+		// EphemeralSelfUpdate returns immediately after starting the orchestrator.
+		// The orchestrator completes the replacement asynchronously. The current
 		// Watchtower process will be stopped by the orchestrator shortly after.
 		if config.EphemeralSelfUpdate {
 			logrus.WithFields(fields).
@@ -1815,7 +1922,8 @@ func restartStaleContainer(
 
 	// For Watchtower self-updates, accumulate container ID chain in labels.
 	if sourceContainer.IsWatchtower() {
-		if c, ok := sourceContainer.(*container.Container); ok {
+		c, ok := sourceContainer.(*container.Container)
+		if ok {
 			containerInfo := c.ContainerInfo()
 			if containerInfo != nil && containerInfo.Config != nil {
 				existingChain, _ := c.GetContainerChain()

@@ -1950,7 +1950,8 @@ var _ = ginkgo.Describe("stopContainersInReversedOrder", func() {
 
 			for _, entry := range logHook.entries {
 				if entry.message == "Skipped container stop due to context cancellation" {
-					if containerName, ok := entry.fields["container"]; ok {
+					containerName, ok := entry.fields["container"]
+					if ok {
 						loggedNames[containerName.(string)] = true
 					}
 
@@ -2417,7 +2418,8 @@ var _ = ginkgo.Describe("performRollingRestart", func() {
 
 			for _, entry := range logHook.entries {
 				if entry.message == "Skipped container restart due to context cancellation" {
-					if containerName, ok := entry.fields["container"]; ok {
+					containerName, ok := entry.fields["container"]
+					if ok {
 						loggedNames[containerName.(string)] = true
 					}
 
@@ -2949,7 +2951,7 @@ var _ = ginkgo.Describe("isPinned", func() {
 	)
 
 	ginkgo.It("detects pin before parse fallback can replace the image name", func() {
-		// ImageName is a valid digest pin; even if parse were flaky, pin must win.
+		// ImageName is a valid digest pin. Even if parse were flaky, pin must win.
 		cont := mockActions.CreateMockContainer(
 			"pinned-id",
 			"/pinned-name",

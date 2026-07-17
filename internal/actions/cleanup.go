@@ -487,8 +487,8 @@ func getChainedContainers(
 	// Filter containers that are in the chain, present on the host, and not the effective current.
 	// Chained containers are parent containers that must be removed regardless of scope.
 	for _, c := range allContainers {
-		if _, exists := containerChainMap[string(c.ID())]; exists &&
-			c.ID() != effectiveCurrent.ID() {
+		_, exists := containerChainMap[string(c.ID())]
+		if exists && c.ID() != effectiveCurrent.ID() {
 			chainedContainers = append(chainedContainers, c)
 		}
 	}

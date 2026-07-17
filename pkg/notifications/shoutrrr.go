@@ -359,11 +359,7 @@ func sendNotifications(notifier *shoutrrrTypeNotifier) {
 				"notification_type": shoutrrrType,
 			}).Trace("Calling Router.Send with message")
 
-			if !notifier.sendWithCancellation(msg) {
-				LocalLog.Debug("Context canceled during message send")
-
-				return
-			}
+			notifier.send(msg)
 		case <-notifier.stop:
 			// Shutdown mode: drain all remaining messages from the channel
 			LocalLog.Debug("Shutdown signal received, draining remaining messages without delay")
@@ -398,11 +394,7 @@ func sendNotifications(notifier *shoutrrrTypeNotifier) {
 						"notification_type": shoutrrrType,
 					}).Trace("Calling Router.Send with message during shutdown")
 
-					if !notifier.sendWithCancellation(msg) {
-						LocalLog.Debug("Context canceled during shutdown message send")
-
-						return
-					}
+					notifier.send(msg)
 				default:
 					// Channel is empty, all messages drained
 					LocalLog.Debug("All remaining messages drained during shutdown")
@@ -662,16 +654,12 @@ func (n *shoutrrrTypeNotifier) Fire(entry *logrus.Entry) error {
 	return nil
 }
 
-// sendWithCancellation sends a message with context cancellation support.
+// send sends a message via the notification router.
 //
 // Parameters:
 //   - msg: Message to send.
-//
-// Returns:
-//   - bool: True if sent successfully, false if canceled.
-func (n *shoutrrrTypeNotifier) sendWithCancellation(msg string) bool {
+func (n *shoutrrrTypeNotifier) send(msg string) {
 	sendCh := make(chan []error, 1)
-
 	go func() {
 		sendCh <- n.Router.Send(msg, n.params)
 	}()
@@ -679,10 +667,8 @@ func (n *shoutrrrTypeNotifier) sendWithCancellation(msg string) bool {
 	select {
 	case errs := <-sendCh:
 		processSendErrors(n, errs)
-
-		return true
 	case <-n.ctx.Done():
-		return false
+		LocalLog.WithError(n.ctx.Err()).Debug("Notification send canceled")
 	}
 }
 
@@ -756,14 +742,11 @@ func (n *shoutrrrTypeNotifier) sendEntries(entries []*logrus.Entry, report types
 		Debug("Preparing to send entries")
 
 	if msg == "" {
-		// Log in go func in case we entered from Fire to avoid stalling
-		go func() { // Avoid blocking if called from Fire.
-			if err != nil {
-				LocalLog.WithError(err).Fatal("Notification template error")
-			} else if len(n.Urls) > 1 {
-				LocalLog.Info("Skipping notification due to empty message")
-			}
-		}()
+		if err != nil {
+			LocalLog.WithError(err).Error("Notification template error")
+		} else if len(n.Urls) > 1 {
+			LocalLog.Info("Skipping notification due to empty message")
+		}
 
 		LocalLog.Debug("Message empty, skipping send")
 

@@ -146,7 +146,7 @@ func EphemeralSelfUpdate(
 	logrus.Info("Starting new Watchtower container")
 
 	// Log that the orchestrator has been started. The orchestrator ID identifies
-	// the ephemeral container that will perform the replacement; the actual new
+	// the ephemeral container that will perform the replacement. The actual new
 	// container's ID is determined by the orchestrator and emitted in its own
 	// "Started new container" log entry.
 	logrus.WithFields(logrus.Fields{
@@ -469,8 +469,8 @@ func stopAndRemoveOldContainer(
 		if cerrdefs.IsNotFound(err) {
 			clog.Debug("Old container already removed")
 
-			// Container was already removed during the stop attempt;
-			// skip removal and proceed to creating the new one.
+			// Container was already removed during the stop attempt.
+			// Skip removal and proceed to creating the new one.
 			skipRemoval = true
 		} else {
 			// StopContainer failed for a reason other than NotFound.
@@ -488,10 +488,10 @@ func stopAndRemoveOldContainer(
 			}
 
 			if !freshContainer.IsRunning() {
-				// Container stopped despite the error; proceed with removal.
+				// Container stopped despite the error. Proceed with removal.
 				clog.Debug("Old container is not running after stop attempt - proceeding with removal")
 			} else {
-				// Container is still running and StopContainer failed — this is fatal.
+				// Container is still running and StopContainer failed. This is fatal.
 				clog.WithError(err).Error("Failed to stop old container")
 
 				return false, fmt.Errorf("%w: %w", errOrchestratorStopFailed, err)
@@ -592,7 +592,7 @@ func ensureContainerRunning(
 	ctr, err := client.GetContainer(ctx, containerID)
 	if err != nil {
 		clog.WithError(err).Error("Failed to inspect new container")
-		clog.Warn("Cannot verify new container is running. Old container was removed; manual recovery requires recreating the container.")
+		clog.Warn("Cannot verify new container is running. Old container was removed. Manual recovery requires recreating the container.")
 
 		return fmt.Errorf("%w: %w", errOrchestratorInspectFailed, err)
 	}
@@ -603,7 +603,7 @@ func ensureContainerRunning(
 		return nil
 	}
 
-	// Container was created but not started; start it explicitly.
+	// Container was created but not started. Start it explicitly.
 	clog.Debug("New container was created but not started, starting it now")
 
 	err = client.StartContainerByID(ctx, containerID)
@@ -618,13 +618,13 @@ func ensureContainerRunning(
 	ctr, err = client.GetContainer(ctx, containerID)
 	if err != nil {
 		clog.WithError(err).Error("Failed to inspect new container after start")
-		clog.Warn("Cannot verify new container is running. Old container was removed; manual recovery requires recreating the container.")
+		clog.Warn("Cannot verify new container is running. Old container was removed. Manual recovery requires recreating the container.")
 
 		return fmt.Errorf("%w: %w", errOrchestratorInspectFailed, err)
 	}
 
 	if !ctr.IsRunning() {
-		clog.Error("New container is not running after explicit start. Old container was removed; manual recovery requires recreating the container.")
+		clog.Error("New container is not running after explicit start. Old container was removed. Manual recovery requires recreating the container.")
 
 		return fmt.Errorf("%w: %s", errNewContainerNotRunning, containerID.ShortID())
 	}
