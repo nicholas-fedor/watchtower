@@ -25,11 +25,17 @@ import (
 	"github.com/nicholas-fedor/watchtower/pkg/types"
 )
 
-// defaultPullFailureDelay defines the default delay duration for failed Watchtower self-update pulls.
-const defaultPullFailureDelay = 5 * time.Minute
+const (
+	// defaultPullFailureDelay defines the default delay duration for failed Watchtower self-update pulls.
+	defaultPullFailureDelay = 5 * time.Minute
 
-// defaultHealthCheckTimeout defines the default timeout for waiting for container health checks.
-const defaultHealthCheckTimeout = 5 * time.Minute
+	// defaultHealthCheckTimeout defines the default timeout for waiting for container health checks.
+	defaultHealthCheckTimeout = 5 * time.Minute
+
+	// defaultRestartPolicyTimeout defines the fallback timeout for restart policy
+	// updates when config.Timeout is non-positive.
+	defaultRestartPolicyTimeout = 30 * time.Second
+)
 
 // Update scans and updates containers based on parameters.
 //
@@ -86,7 +92,14 @@ func Update(
 					logrus.WithField("container", c.Name()).
 						Debug("Current container is an old Watchtower container, stopping self")
 
-					client.SetNoRestartPolicy(ctx, c)
+					setNoRestartCtx, setNoRestartCancel := context.WithTimeout(
+						context.Background(),
+						restartPolicyTimeout(config.Timeout),
+					)
+					defer setNoRestartCancel()
+
+					//nolint:contextcheck // Using bounded context to survive caller cancellation
+					client.SetNoRestartPolicy(setNoRestartCtx, c)
 
 					return nil, nil, errOldSelfDetected
 				}
@@ -1807,22 +1820,11 @@ func restartStaleContainer(
 	// Create a detached context to survive parent context cancellation.
 	// This ensures container cleanup and update operations complete even if the
 	// parent context is canceled during the restart process.
-	// If config.Timeout <= 0, use a non-deadline context; otherwise, apply the timeout.
-	var (
-		detachedCtx    context.Context
-		cancelDetached context.CancelFunc
+	// A finite fallback is applied when config.Timeout is non-positive.
+	detachedCtx, cancelDetached := context.WithTimeout(
+		context.Background(),
+		restartPolicyTimeout(config.Timeout),
 	)
-
-	if config.Timeout <= 0 {
-		detachedCtx, cancelDetached = context.WithCancel(
-			context.Background(),
-		)
-	} else {
-		detachedCtx, cancelDetached = context.WithTimeout(
-			context.Background(),
-			config.Timeout,
-		)
-	}
 
 	defer cancelDetached()
 
@@ -2050,4 +2052,15 @@ func deriveScopeFromCurrentContainer(
 		Debug("Current container not found in list")
 
 	return "", false
+}
+
+// restartPolicyTimeout returns the timeout to use for restart policy operations.
+// If the provided timeout is positive, it is returned as-is.
+// Otherwise, a finite fallback is used to prevent indefinite blocking.
+func restartPolicyTimeout(timeout time.Duration) time.Duration {
+	if timeout > 0 {
+		return timeout
+	}
+
+	return defaultRestartPolicyTimeout
 }
