@@ -249,7 +249,7 @@ func (c *Container) GetLifecycleGID() (int, bool) {
 //
 // Returns:
 //   - bool: True if enabled, false otherwise.
-//   - bool: True if label is set, false if absent/invalid.
+//   - bool: True if label is set and valid, false if absent or invalid.
 func (c *Container) Enabled() (bool, bool) {
 	clog := logrus.WithField("container", c.Name())
 	rawBool, ok := c.getLabelValue(enableLabel)

@@ -446,12 +446,11 @@ func FilterByDisabledLabels(labels map[string]string, baseFilter types.Filter) t
 
 // FilterByEnableLabel applies the boolean --label-enable filter.
 //
-// When enable is true, only containers whose enable label parses as true are
-// included. When enable is false, containers whose enable label parses as false
-// are excluded.
-// Absent or invalid label values follow the Enabled() defaults:
-//   - Absent is treated as not-set
-//   - Invalid text is treated as false
+// When enable is true, only containers whose enable label is present with a
+// value that parses as true are included. When enable is false, containers
+// whose enable label is present with a value that parses as false are excluded.
+// Absent labels and invalid values are both treated as unset, matching
+// Enabled() returning ok=false.
 //
 // Parameters:
 //   - enable: require the enable label when true, exclude false values when false.
