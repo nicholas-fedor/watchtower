@@ -104,43 +104,55 @@ func FuzzMatchesImageName(f *testing.F) {
 }
 
 func FuzzFilterByEnabledLabels(f *testing.F) {
-	f.Add("app", "nginx:latest", "com.example.enabled=true")
-	f.Add("web", "redis:alpine", "com.example.env=prod")
-	f.Add("db", "postgres:15", "")
+	f.Add("app", "nginx:latest", "com.example.enabled=true", "com.example.enabled=true")
+	f.Add("web", "redis:alpine", "com.example.env=prod", "")
+	f.Add("db", "postgres:15", "com.example.env=prod", "com.example.env=staging")
+	f.Add("app", "nginx:latest", "", "com.example.enabled=true")
 
-	f.Fuzz(func(t *testing.T, containerName, imageName, labelPair string) {
-		labels, err := parseLabelPairs([]string{labelPair})
+	f.Fuzz(func(t *testing.T, containerName, imageName, filterLabelPair, containerLabelPair string) {
+		filterLabels, err := parseLabelPairs([]string{filterLabelPair})
 		if err != nil {
 			return
 		}
 
-		if len(labels) == 0 {
+		if len(filterLabels) == 0 {
 			return
 		}
 
-		c := newFuzzableContainer(containerName, imageName, true, "", false, labels)
-		filter := FilterByEnabledLabels(labels, NoFilter)
+		containerLabels, err := parseLabelPairs([]string{containerLabelPair})
+		if err != nil {
+			return
+		}
+
+		c := newFuzzableContainer(containerName, imageName, true, "", false, containerLabels)
+		filter := FilterByEnabledLabels(filterLabels, NoFilter)
 		_ = filter(c)
 	})
 }
 
 func FuzzFilterByDisabledLabels(f *testing.F) {
-	f.Add("app", "nginx:latest", "com.example.disabled=true")
-	f.Add("web", "redis:alpine", "com.example.env=prod")
-	f.Add("db", "postgres:15", "")
+	f.Add("app", "nginx:latest", "com.example.disabled=true", "com.example.disabled=true")
+	f.Add("web", "redis:alpine", "com.example.env=prod", "")
+	f.Add("db", "postgres:15", "com.example.env=prod", "com.example.env=staging")
+	f.Add("app", "nginx:latest", "", "com.example.disabled=true")
 
-	f.Fuzz(func(t *testing.T, containerName, imageName, labelPair string) {
-		labels, err := parseLabelPairs([]string{labelPair})
+	f.Fuzz(func(t *testing.T, containerName, imageName, filterLabelPair, containerLabelPair string) {
+		filterLabels, err := parseLabelPairs([]string{filterLabelPair})
 		if err != nil {
 			return
 		}
 
-		if len(labels) == 0 {
+		if len(filterLabels) == 0 {
 			return
 		}
 
-		c := newFuzzableContainer(containerName, imageName, true, "", false, labels)
-		filter := FilterByDisabledLabels(labels, NoFilter)
+		containerLabels, err := parseLabelPairs([]string{containerLabelPair})
+		if err != nil {
+			return
+		}
+
+		c := newFuzzableContainer(containerName, imageName, true, "", false, containerLabels)
+		filter := FilterByDisabledLabels(filterLabels, NoFilter)
 		_ = filter(c)
 	})
 }
