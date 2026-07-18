@@ -15,7 +15,6 @@ import (
 	"golang.org/x/sync/errgroup"
 
 	cerrdefs "github.com/containerd/errdefs"
-	dockerContainer "github.com/moby/moby/api/types/container"
 
 	"github.com/nicholas-fedor/watchtower/pkg/compose"
 	"github.com/nicholas-fedor/watchtower/pkg/container"
@@ -87,17 +86,7 @@ func Update(
 					logrus.WithField("container", c.Name()).
 						Debug("Current container is an old Watchtower container, stopping self")
 
-					updateConfig := dockerContainer.UpdateConfig{
-						RestartPolicy: dockerContainer.RestartPolicy{
-							Name: "no",
-						},
-					}
-
-					err := client.UpdateContainer(ctx, c, updateConfig)
-					if err != nil {
-						logrus.WithError(err).
-							Warn("Failed to update restart policy to 'no' for old Watchtower container")
-					}
+					client.SetNoRestartPolicy(ctx, c)
 
 					return nil, nil, errOldSelfDetected
 				}
@@ -2030,25 +2019,8 @@ func restartStaleContainer(
 		logrus.WithFields(fields).
 			Debug("Updating restart policy for old Watchtower container")
 
-		// Create configuration update
-		updateConfig := dockerContainer.UpdateConfig{
-			RestartPolicy: dockerContainer.RestartPolicy{
-				Name: "no",
-			},
-		}
-		// Update the renamed Watchtower container's restart policy.
-		//
 		//nolint:contextcheck // Using detached context intentionally to survive parent cancellation
-		err := client.UpdateContainer(
-			detachedCtx,
-			sourceContainer,
-			updateConfig,
-		)
-		if err != nil {
-			logrus.WithError(err).
-				WithFields(fields).
-				Warn("Failed to update restart policy for old Watchtower container")
-		}
+		client.SetNoRestartPolicy(detachedCtx, sourceContainer)
 	}
 
 	return newContainerID, renamed, nil

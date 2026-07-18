@@ -995,6 +995,52 @@ func (_c *MockClient_RenameContainer_Call) RunAndReturn(run func(ctx context.Con
 	return _c
 }
 
+// SetNoRestartPolicy provides a mock function for the type MockClient
+func (_mock *MockClient) SetNoRestartPolicy(ctx context.Context, container types.Container) {
+	_mock.Called(ctx, container)
+	return
+}
+
+// MockClient_SetNoRestartPolicy_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'SetNoRestartPolicy'
+type MockClient_SetNoRestartPolicy_Call struct {
+	*mock.Call
+}
+
+// SetNoRestartPolicy is a helper method to define mock.On call
+//   - ctx context.Context
+//   - container types.Container
+func (_e *MockClient_Expecter) SetNoRestartPolicy(ctx any, container any) *MockClient_SetNoRestartPolicy_Call {
+	return &MockClient_SetNoRestartPolicy_Call{Call: _e.mock.On("SetNoRestartPolicy", ctx, container)}
+}
+
+func (_c *MockClient_SetNoRestartPolicy_Call) Run(run func(ctx context.Context, container types.Container)) *MockClient_SetNoRestartPolicy_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		var arg0 context.Context
+		if args[0] != nil {
+			arg0 = args[0].(context.Context)
+		}
+		var arg1 types.Container
+		if args[1] != nil {
+			arg1 = args[1].(types.Container)
+		}
+		run(
+			arg0,
+			arg1,
+		)
+	})
+	return _c
+}
+
+func (_c *MockClient_SetNoRestartPolicy_Call) Return() *MockClient_SetNoRestartPolicy_Call {
+	_c.Call.Return()
+	return _c
+}
+
+func (_c *MockClient_SetNoRestartPolicy_Call) RunAndReturn(run func(ctx context.Context, container types.Container)) *MockClient_SetNoRestartPolicy_Call {
+	_c.Run(run)
+	return _c
+}
+
 // StartContainer provides a mock function for the type MockClient
 func (_mock *MockClient) StartContainer(ctx context.Context, container types.Container) (types.ContainerID, error) {
 	ret := _mock.Called(ctx, container)

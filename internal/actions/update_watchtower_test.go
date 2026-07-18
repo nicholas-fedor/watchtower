@@ -62,8 +62,8 @@ var _ = ginkgo.Describe("Watchtower container handling", func() {
 				To(gomega.Equal(int32(0)), "RemoveImageByID should not be called during Update")
 			gomega.Expect(client.TestData.RenameContainerCount.Load()).
 				To(gomega.Equal(int32(1)), "RenameContainer should be called once")
-			gomega.Expect(client.TestData.UpdateContainerCount.Load()).
-				To(gomega.Equal(int32(1)), "UpdateContainer should be called once for old Watchtower")
+			gomega.Expect(client.TestData.SetNoRestartPolicyCount.Load()).
+				To(gomega.Equal(int32(1)), "SetNoRestartPolicy should be called once for old Watchtower")
 			gomega.Expect(client.TestData.StopContainerCount.Load()).
 				To(gomega.Equal(int32(0)), "StopContainer should not be called for old Watchtower (handled by cleanup logic)")
 			gomega.Expect(client.TestData.IsContainerStaleCount.Load()).

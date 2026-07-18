@@ -327,7 +327,7 @@ var _ = ginkgo.Describe("executeUpdate", func() {
 		gomega.Expect(client.TestData.StartContainerCount.Load()).To(gomega.Equal(int32(0)))
 	})
 
-	ginkgo.It("should call UpdateContainer for Watchtower restart policy changes", func() {
+	ginkgo.It("should call SetNoRestartPolicy for Watchtower restart policy changes", func() {
 		client := mockActions.CreateMockClient(
 			&mockActions.TestData{
 				Containers: []types.Container{
@@ -362,7 +362,7 @@ var _ = ginkgo.Describe("executeUpdate", func() {
 		gomega.Expect(err).NotTo(gomega.HaveOccurred())
 		gomega.Expect(report).NotTo(gomega.BeNil())
 		gomega.Expect(cleanupInfos).NotTo(gomega.BeNil())
-		gomega.Expect(client.TestData.UpdateContainerCount.Load()).To(gomega.Equal(int32(1)))
+		gomega.Expect(client.TestData.SetNoRestartPolicyCount.Load()).To(gomega.Equal(int32(1)))
 	})
 })
 
@@ -1438,10 +1438,21 @@ var _ = ginkgo.Describe("DetachedContext", func() {
 				gomega.Expect(renamed).To(gomega.BeTrue())
 				gomega.Expect(newID).NotTo(gomega.BeEmpty())
 
-				// Verify UpdateContainer was called (this uses the detached context).
+				// Verify SetNoRestartPolicy was called (this uses the detached context).
 				// The detached context is used for updating the restart policy of the
 				// renamed Watchtower container.
-				gomega.Expect(client.TestData.UpdateContainerCount.Load()).To(gomega.Equal(int32(1)))
+				gomega.Expect(client.TestData.SetNoRestartPolicyCount.Load()).To(gomega.Equal(int32(1)))
+
+				if tc.expectDeadline {
+					deadline, hasDeadline := client.TestData.SetNoRestartPolicyCtx.Deadline()
+					gomega.Expect(hasDeadline).To(gomega.BeTrue())
+
+					expectedDeadline := time.Now().Add(tc.timeout)
+					gomega.Expect(deadline).To(gomega.BeTemporally("~", expectedDeadline, time.Second))
+				} else {
+					_, hasDeadline := client.TestData.SetNoRestartPolicyCtx.Deadline()
+					gomega.Expect(hasDeadline).To(gomega.BeFalse())
+				}
 			})
 		}
 	})
@@ -1648,10 +1659,11 @@ var _ = ginkgo.Describe("DetachedContext", func() {
 			gomega.Expect(renamed).To(gomega.BeTrue())
 			gomega.Expect(newID).NotTo(gomega.BeEmpty())
 
-			// Verify that both StartContainer and UpdateContainer were called.
-			// UpdateContainer uses the detached context for the restart policy update.
+			// Verify that both StartContainer and SetNoRestartPolicy were called.
+			// SetNoRestartPolicy uses the detached context for the restart policy update.
 			gomega.Expect(client.TestData.StartContainerCount.Load()).To(gomega.Equal(int32(1)))
-			gomega.Expect(client.TestData.UpdateContainerCount.Load()).To(gomega.Equal(int32(1)))
+			gomega.Expect(client.TestData.SetNoRestartPolicyCount.Load()).To(gomega.Equal(int32(1)))
+			gomega.Expect(client.TestData.SetNoRestartPolicyCtx).NotTo(gomega.Equal(context.Background()))
 		})
 	})
 })

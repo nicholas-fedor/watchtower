@@ -34,6 +34,7 @@ type TestData struct {
 	StartContainerCount          atomic.Int32                          // Number of times StartContainer was called.
 	CreateContainerCount         atomic.Int32                          // Number of times CreateContainer was called.
 	UpdateContainerCount         atomic.Int32                          // Number of times UpdateContainer was called.
+	SetNoRestartPolicyCount      atomic.Int32                          // Number of times SetNoRestartPolicy was called.
 	IsContainerStaleCount        atomic.Int32                          // Number of times IsContainerStale was called.
 	WaitForContainerHealthyCount atomic.Int32                          // Number of times WaitForContainerHealthy was called.
 	ListContainersCount          atomic.Int32                          // Number of times ListContainers was called.
@@ -57,6 +58,8 @@ type TestData struct {
 	SimulatedLatency             time.Duration                         // Simulated latency for operations (default 0 for fast tests, set for context cancellation tests).
 	LastContainerChain           string                                // Last container chain passed to CreateEphemeralOrchestrator.
 	LastUpdateConfig             *dockerContainer.UpdateConfig         // Last UpdateContainer config received.
+	SetNoRestartPolicyContainer  types.Container                        // Last container passed to SetNoRestartPolicy.
+	SetNoRestartPolicyCtx        context.Context                        // Last context passed to SetNoRestartPolicy.
 }
 
 // TriedToRemoveImage checks if RemoveImageByID has been invoked.
@@ -279,6 +282,14 @@ func (client MockClient) UpdateContainer(ctx context.Context, _ types.Container,
 	}
 
 	return client.TestData.UpdateContainerError
+}
+
+// SetNoRestartPolicy simulates setting a container's restart policy to "no".
+// It increments the SetNoRestartPolicyCount and records the container and context for test assertions.
+func (client MockClient) SetNoRestartPolicy(ctx context.Context, container types.Container) {
+	client.TestData.SetNoRestartPolicyCount.Add(1)
+	client.TestData.SetNoRestartPolicyContainer = container
+	client.TestData.SetNoRestartPolicyCtx = ctx
 }
 
 // RemoveImageByID increments the count of image removal attempts in TestData.
