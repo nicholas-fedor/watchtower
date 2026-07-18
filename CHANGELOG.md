@@ -75,6 +75,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Removed
 
+- Remove yaml array recommendation and restructure notifications documentation by @nicholas-fedor in [#1967](https://github.com/nicholas-fedor/watchtower/pull/1967)
 - Remove unsupported go report card by @nicholas-fedor in [#1963](https://github.com/nicholas-fedor/watchtower/pull/1963)
 
 ### New Contributors
