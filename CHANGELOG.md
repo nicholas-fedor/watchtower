@@ -8,6 +8,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- Add and consolidate restart-policy updates by @nicholas-fedor in [#1965](https://github.com/nicholas-fedor/watchtower/pull/1965)
+
 ### Changed
 
 - Parallelize staleness checks with bounded concurrency by @nicholas-fedor in [#1958](https://github.com/nicholas-fedor/watchtower/pull/1958)
