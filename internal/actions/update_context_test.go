@@ -158,9 +158,9 @@ var _ = ginkgo.Describe("the update action", func() {
 			)
 
 			gomega.Expect(err).To(gomega.HaveOccurred())
-			gomega.Expect(client.TestData.UpdateContainerCount.Load()).To(gomega.Equal(int32(1)))
-			gomega.Expect(client.TestData.LastUpdateConfig).NotTo(gomega.BeNil())
-			gomega.Expect(client.TestData.LastUpdateConfig.RestartPolicy.Name).To(gomega.BeEquivalentTo("no"))
+			gomega.Expect(client.TestData.SetNoRestartPolicyCount.Load()).To(gomega.Equal(int32(1)))
+			gomega.Expect(client.TestData.SetNoRestartPolicyContainer).NotTo(gomega.BeNil())
+			gomega.Expect(client.TestData.SetNoRestartPolicyContainer.ID()).To(gomega.Equal(types.ContainerID("old-container-id")))
 		})
 
 		ginkgo.It("should proceed normally when current container is not old", func() {

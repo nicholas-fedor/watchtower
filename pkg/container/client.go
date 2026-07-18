@@ -306,6 +306,18 @@ type Client interface {
 	//   - error: Non-nil if update fails, nil on success.
 	UpdateContainer(ctx context.Context, container types.Container, config dockerContainer.UpdateConfig) error
 
+	// SetNoRestartPolicy updates the restart policy of a container to "no" to prevent
+	// restart loops after fatal startup failures.
+	//
+	// It is a convenience wrapper around UpdateContainer that constructs the restart
+	// policy configuration and logs a warning if the update fails, ensuring the
+	// failure does not block the exit path.
+	//
+	// Parameters:
+	//   - ctx: Context for cancellation and timeout control.
+	//   - container: Container whose restart policy should be updated.
+	SetNoRestartPolicy(ctx context.Context, container types.Container)
+
 	// RemoveContainer removes a container from the Docker host.
 	//
 	// Parameters:
@@ -843,6 +855,39 @@ func (c *client) UpdateContainer(
 	clog.Debug("Container configuration updated")
 
 	return nil
+}
+
+// SetNoRestartPolicy updates the restart policy of a container to "no" to prevent
+// restart loops after fatal startup failures.
+//
+// It is a convenience wrapper around UpdateContainer that constructs the restart
+// policy configuration and logs a warning if the update fails, ensuring the
+// failure does not block the exit path.
+//
+// Parameters:
+//   - ctx: Context for cancellation and timeout control.
+//   - container: Container whose restart policy should be updated.
+func (c *client) SetNoRestartPolicy(ctx context.Context, container types.Container) {
+	if container == nil {
+		return
+	}
+
+	clog := logrus.WithField("container_id", container.ID())
+
+	clog.Debug("Setting restart policy to 'no'")
+
+	_, err := c.api.ContainerUpdate(
+		ctx,
+		string(container.ID()),
+		dockerClient.ContainerUpdateOptions{
+			RestartPolicy: &dockerContainer.RestartPolicy{
+				Name: "no",
+			},
+		},
+	)
+	if err != nil {
+		clog.WithError(err).Warn("Failed to set restart policy to 'no'")
+	}
 }
 
 // RemoveContainer removes a container from the Docker host.

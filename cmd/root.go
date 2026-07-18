@@ -14,8 +14,6 @@ import (
 	"github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
 
-	dockerContainer "github.com/moby/moby/api/types/container"
-
 	"github.com/nicholas-fedor/watchtower/internal/actions"
 	"github.com/nicholas-fedor/watchtower/internal/api"
 	"github.com/nicholas-fedor/watchtower/internal/api/config"
@@ -30,6 +28,24 @@ import (
 	"github.com/nicholas-fedor/watchtower/pkg/filters"
 	"github.com/nicholas-fedor/watchtower/pkg/notifications"
 	"github.com/nicholas-fedor/watchtower/pkg/types"
+)
+
+const (
+	// restartPolicyTimeout is the maximum duration allowed for restart-policy
+	// update operations.
+	//
+	// It bounds the Docker API call that sets the current Watchtower
+	// container's restart policy to "no", so a slow or unresponsive
+	// daemon cannot delay shutdown paths.
+	restartPolicyTimeout = 5 * time.Second
+
+	// containerLookupTimeout is the maximum duration allowed for current
+	// container ID lookups.
+	//
+	// It bounds the Docker API / hostname / mountinfo detection sequence,
+	// so startup cannot hang indefinitely if the daemon or container runtime
+	// metadata is unreachable.
+	containerLookupTimeout = 5 * time.Second
 )
 
 var (
@@ -242,6 +258,11 @@ var (
 	rootCmd = NewRootCommand()
 )
 
+// errInvalidAPIHost indicates http-api-host is neither empty nor a valid IP.
+var errInvalidAPIHost = errors.New(
+	"invalid http-api-host: must be empty or a valid IP address (IPv4 or IPv6)",
+)
+
 // init registers command-line flags for the root command during package initialization.
 //
 // It invokes functions from the flags package to set default values and register flags for Docker configuration
@@ -430,16 +451,37 @@ func preRun(cmd *cobra.Command, _ []string) {
 	// Check for orchestrator mode early — this is an internal mode where Watchtower
 	// runs as a one-shot orchestrator for self-update. It reads environment variables
 	// to determine the old container ID, new image, and original container name.
-	if isOrchestrator, _ := flagsSet.GetBool("self-update-orchestrator"); isOrchestrator {
+	isOrchestrator, _ := flagsSet.GetBool("self-update-orchestrator")
+	if isOrchestrator {
 		logrus.Info("Running in ephemeral self-update orchestrator mode")
 
 		actions.RunOrchestrator(context.Background(), client)
 
-		// Defensive: RunOrchestrator should always call os.Exit, but if it ever
+		// RunOrchestrator should always call os.Exit, but if it ever
 		// returns unexpectedly, ensure the process terminates to prevent the
 		// preRun flow from continuing into the main Watchtower loop.
+		//
+		// Resolve the current Watchtower container directly here, before the
+		// general lookup later in preRun, so the restart policy update targets
+		// the actual container instead of a nil reference.
+		currentWatchtowerContainer = resolveCurrentWatchtowerContainerForFallback(
+			context.Background(),
+			client,
+		)
+
+		setNoRestartPolicyCtx, cancel := context.WithTimeout(
+			context.Background(),
+			restartPolicyTimeout,
+		)
+		defer cancel()
+
+		client.SetNoRestartPolicy(
+			setNoRestartPolicyCtx,
+			currentWatchtowerContainer,
+		)
+
 		logrus.WithField("flag", "self-update-orchestrator").
-			Fatal("RunOrchestrator returned unexpectedly; exiting to prevent unintended execution")
+			Fatal("RunOrchestrator returned unexpectedly. Exiting to prevent unintended execution")
 	}
 
 	// Warn about potential redundancy in flag combinations that could result in no action.
@@ -452,7 +494,6 @@ func preRun(cmd *cobra.Command, _ []string) {
 
 	// Create a timeout-bound context for Docker API lookups to prevent hanging indefinitely.
 	// This ensures the container ID lookup fails fast if the Docker API is unresponsive.
-	const containerLookupTimeout = 5 * time.Second
 
 	ctx, cancel := context.WithTimeout(context.Background(), containerLookupTimeout)
 	defer cancel()
@@ -489,31 +530,14 @@ func preRun(cmd *cobra.Command, _ []string) {
 			"Detected invalid restart of old Watchtower container, stopping Watchtower container now",
 		)
 
-		if currentWatchtowerContainer != nil {
-			updateConfig := dockerContainer.UpdateConfig{
-				RestartPolicy: dockerContainer.RestartPolicy{
-					Name: "no",
-				},
-			}
+		ctx, cancel := context.WithTimeout(
+			context.Background(),
+			containerLookupTimeout,
+		)
+		defer cancel()
 
-			ctx, cancel := context.WithTimeout(
-				context.Background(),
-				containerLookupTimeout,
-			)
-			defer cancel()
-
-			err := client.UpdateContainer(
-				ctx,
-				currentWatchtowerContainer,
-				updateConfig,
-			)
-			if err != nil {
-				logrus.WithError(err).
-					Warn("Failed to update restart policy to 'no' for old Watchtower container")
-			} else {
-				logrus.Debug("Updated restart policy to 'no' for old Watchtower container")
-			}
-		}
+		// Update current Watchtower container's restart policy to "no" to prevent unwanted restarts
+		client.SetNoRestartPolicy(ctx, currentWatchtowerContainer)
 
 		logrus.Exit(0)
 	}
@@ -551,7 +575,8 @@ func run(command *cobra.Command, args []string) {
 		)
 	}
 
-	// Determine the effective operational scope, prioritizing explicit scope over scope derived from the container's label.
+	// Determine the effective operational scope, prioritizing explicit scope
+	// over scope derived from the container's label.
 	// This ensures scope persistence during self-updates.
 	var err error
 
@@ -733,6 +758,17 @@ func runMain(cfg types.RunConfig) int {
 
 	// Validate flag compatibility to prevent conflicting operational modes.
 	if rollingRestart && monitorOnly {
+		setNoRestartPolicyCtx, cancel := context.WithTimeout(
+			context.Background(),
+			restartPolicyTimeout,
+		)
+		defer cancel()
+
+		client.SetNoRestartPolicy(
+			setNoRestartPolicyCtx,
+			currentWatchtowerContainer,
+		)
+
 		logrus.WithFields(logrus.Fields{
 			"rolling_restart": rollingRestart,
 			"monitor_only":    monitorOnly,
@@ -797,15 +833,32 @@ func runMain(cfg types.RunConfig) int {
 	// enabling graceful shutdown of the API, scheduler, and validation operations.
 	// The stop function is returned but not needed as the context automatically
 	// handles cleanup when the program exits.
-	ctx, stop := createSignalContext(context.Background(), os.Interrupt, syscall.SIGTERM)
+	ctx, stop := createSignalContext(
+		context.Background(),
+		os.Interrupt,
+		syscall.SIGTERM,
+	)
 	defer stop()
 
 	// If rolling restarts are enabled, validate that the containers being monitored for
 	// updates do not have linked dependencies.
 	if rollingRestart {
-		err := actions.ValidateRollingRestartDependencies(ctx, client, cfg.Filter, useComposeDependsOn)
+		err := actions.ValidateRollingRestartDependencies(
+			ctx,
+			client,
+			cfg.Filter, useComposeDependsOn,
+		)
 		if err != nil {
 			logNotify("Rolling restart compatibility validation failed", err)
+
+			// Update current Watchtower container's restart policy to "no" to prevent unwanted restarts
+			setNoRestartPolicyCtx, cancel := context.WithTimeout(
+				context.Background(),
+				restartPolicyTimeout,
+			)
+			defer cancel()
+
+			client.SetNoRestartPolicy(setNoRestartPolicyCtx, currentWatchtowerContainer)
 
 			return 1 // Exit immediately after logging failure
 		}
@@ -841,23 +894,13 @@ func runMain(cfg types.RunConfig) int {
 		notifier.Close()
 
 		// Update current Watchtower container's restart policy to "no" to prevent unwanted restarts
-		if currentWatchtowerContainer == nil {
-			logrus.Warn("Current container not available for restart policy update")
-		} else {
-			updateConfig := dockerContainer.UpdateConfig{
-				RestartPolicy: dockerContainer.RestartPolicy{
-					Name: "no",
-				},
-			}
+		setNoRestartPolicyCtx, cancel := context.WithTimeout(
+			context.Background(),
+			restartPolicyTimeout,
+		)
+		defer cancel()
 
-			err := client.UpdateContainer(ctx, currentWatchtowerContainer, updateConfig)
-			if err != nil {
-				logrus.WithError(err).
-					Warn("Failed to update restart policy to 'no' for current container")
-			} else {
-				logrus.Debug("Updated current container restart policy to 'no'")
-			}
-		}
+		client.SetNoRestartPolicy(setNoRestartPolicyCtx, currentWatchtowerContainer)
 
 		return 0 // Exit after successful execution
 	}
@@ -992,6 +1035,15 @@ func runMain(cfg types.RunConfig) int {
 	if err != nil {
 		logNotify("API setup failed", err)
 
+		// Update current Watchtower container's restart policy to "no" to prevent unwanted restarts
+		setNoRestartPolicyCtx, cancel := context.WithTimeout(
+			context.Background(),
+			restartPolicyTimeout,
+		)
+		defer cancel()
+
+		client.SetNoRestartPolicy(setNoRestartPolicyCtx, currentWatchtowerContainer)
+
 		return 1 // Exit while indicating failure.
 	}
 
@@ -1022,6 +1074,15 @@ func runMain(cfg types.RunConfig) int {
 	)
 	if err != nil {
 		logNotify("Scheduled upgrades failed", err)
+
+		// Update current Watchtower container's restart policy to "no" to prevent unwanted restarts
+		setNoRestartPolicyCtx, cancel := context.WithTimeout(
+			context.Background(),
+			restartPolicyTimeout,
+		)
+		defer cancel()
+
+		client.SetNoRestartPolicy(setNoRestartPolicyCtx, currentWatchtowerContainer)
 
 		return 1 // Exit while indicating failure.
 	}
@@ -1058,10 +1119,31 @@ func awaitDockerClient() {
 	sleepFunc(1 * time.Second)
 }
 
-// errInvalidAPIHost indicates http-api-host is neither empty nor a valid IP.
-var errInvalidAPIHost = errors.New(
-	"invalid http-api-host: must be empty or a valid IP address (IPv4 or IPv6)",
-)
+// resolveCurrentWatchtowerContainerForFallback resolves the current Watchtower container
+// for use in the orchestrator fallback path.
+//
+// It attempts to detect the current container ID and retrieve the container object,
+// returning nil if any step fails.
+//
+// Parameters:
+//   - ctx: Context for cancellation and timeouts.
+//   - c: Container client for Docker API operations.
+//
+// Returns:
+//   - types.Container: The resolved Watchtower container, or nil if detection fails.
+func resolveCurrentWatchtowerContainerForFallback(ctx context.Context, c container.Client) types.Container {
+	lookupCtx, cancel := context.WithTimeout(ctx, containerLookupTimeout)
+	defer cancel()
+
+	containerID, err := container.GetCurrentContainerID(lookupCtx, c)
+	if err == nil && containerID != "" {
+		resolvedContainer, _ := c.GetCurrentWatchtowerContainer(lookupCtx, containerID)
+
+		return resolvedContainer
+	}
+
+	return nil
+}
 
 // validateAPIHost ensures http-api-host is empty (all interfaces) or a valid IP.
 //

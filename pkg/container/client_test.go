@@ -2282,3 +2282,74 @@ var _ = ginkgo.Describe("isDaemonConnectionError", func() {
 			true),
 	)
 })
+
+var _ = ginkgo.Describe("SetNoRestartPolicy", func() {
+	var (
+		mockServer *ghttp.Server
+		docker     *dockerClient.Client
+	)
+
+	ginkgo.BeforeEach(func() {
+		mockServer = ghttp.NewServer()
+
+		var err error
+
+		docker, err = dockerClient.New(
+			dockerClient.WithHost(mockServer.URL()),
+			dockerClient.WithHTTPClient(mockServer.HTTPTestServer.Client()),
+		)
+		gomega.Expect(err).NotTo(gomega.HaveOccurred())
+		mockServer.AppendHandlers(APIVersionPingHandler())
+	})
+
+	ginkgo.AfterEach(func() {
+		mockServer.Close()
+	})
+
+	ginkgo.When("the container is nil", func() {
+		ginkgo.It("should short-circuit without calling ContainerUpdate", func() {
+			c := &client{}
+
+			c.SetNoRestartPolicy(context.Background(), nil)
+		})
+	})
+
+	ginkgo.When("the container is non-nil and update succeeds", func() {
+		ginkgo.It("should send restart policy Name=no to the Docker API", func() {
+			cid := "watchtower-container-id"
+			mockedContainer := MockContainer(
+				WithID(cid),
+			)
+
+			mockServer.AppendHandlers(
+				ContainerUpdateHandler(cid, http.StatusOK, true),
+			)
+
+			c := &client{api: docker}
+
+			c.SetNoRestartPolicy(context.Background(), mockedContainer)
+		})
+	})
+
+	ginkgo.When("the container update fails", func() {
+		ginkgo.It("should log a warning and not return an error", func() {
+			resetLogrus, logbuf := captureLogrus(logrus.WarnLevel)
+			defer resetLogrus()
+
+			cid := "watchtower-container-id"
+			mockedContainer := MockContainer(
+				WithID(cid),
+			)
+
+			mockServer.AppendHandlers(
+				ContainerUpdateHandler(cid, http.StatusInternalServerError, false),
+			)
+
+			c := &client{api: docker}
+
+			c.SetNoRestartPolicy(context.Background(), mockedContainer)
+
+			gomega.Expect(logbuf).To(gbytes.Say("Failed to set restart policy to 'no'"))
+		})
+	})
+})

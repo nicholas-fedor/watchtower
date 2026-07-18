@@ -327,7 +327,7 @@ var _ = ginkgo.Describe("executeUpdate", func() {
 		gomega.Expect(client.TestData.StartContainerCount.Load()).To(gomega.Equal(int32(0)))
 	})
 
-	ginkgo.It("should call UpdateContainer for Watchtower restart policy changes", func() {
+	ginkgo.It("should call SetNoRestartPolicy for Watchtower restart policy changes", func() {
 		client := mockActions.CreateMockClient(
 			&mockActions.TestData{
 				Containers: []types.Container{
@@ -362,7 +362,7 @@ var _ = ginkgo.Describe("executeUpdate", func() {
 		gomega.Expect(err).NotTo(gomega.HaveOccurred())
 		gomega.Expect(report).NotTo(gomega.BeNil())
 		gomega.Expect(cleanupInfos).NotTo(gomega.BeNil())
-		gomega.Expect(client.TestData.UpdateContainerCount.Load()).To(gomega.Equal(int32(1)))
+		gomega.Expect(client.TestData.SetNoRestartPolicyCount.Load()).To(gomega.Equal(int32(1)))
 	})
 })
 
@@ -1355,36 +1355,40 @@ type stopContainersTestCase struct {
 
 // TestDetachedContextDeadline tests the detached context creation logic in restartStaleContainer.
 // These tests verify that the detached context is created correctly based on the Timeout config value:
-// - When Timeout > 0: context has a deadline
-// - When Timeout <= 0: context has no deadline.
+// - When Timeout > 0: context has a deadline derived from Timeout
+// - When Timeout <= 0: context has a fallback deadline to prevent indefinite blocking.
 var _ = ginkgo.Describe("DetachedContext", func() {
 	// TestDetachedContextDeadlineCase represents a test case for detached context deadline behavior.
 	type TestDetachedContextDeadlineCase struct {
-		name           string
-		timeout        time.Duration
-		expectDeadline bool
-		description    string
+		name            string
+		timeout         time.Duration
+		expectDeadline  bool
+		expectedTimeout time.Duration
+		description     string
 	}
 
 	ginkgo.Describe("restartStaleContainer detached context deadline", func() {
 		testCases := []TestDetachedContextDeadlineCase{
 			{
-				name:           "positive timeout creates context with deadline",
-				timeout:        30 * time.Second,
-				expectDeadline: true,
-				description:    "When Timeout > 0, the detached context should have a deadline set",
+				name:            "positive timeout creates context with deadline",
+				timeout:         30 * time.Second,
+				expectDeadline:  true,
+				expectedTimeout: 30 * time.Second,
+				description:     "When Timeout > 0, the detached context should have a deadline set",
 			},
 			{
-				name:           "zero timeout creates context without deadline",
-				timeout:        0,
-				expectDeadline: false,
-				description:    "When Timeout is zero, the detached context should not have a deadline",
+				name:            "zero timeout creates context with fallback deadline",
+				timeout:         0,
+				expectDeadline:  true,
+				expectedTimeout: defaultRestartPolicyTimeout,
+				description:     "When Timeout is zero, the detached context should use the fallback deadline",
 			},
 			{
-				name:           "negative timeout creates context without deadline",
-				timeout:        -1 * time.Second,
-				expectDeadline: false,
-				description:    "When Timeout is negative, the detached context should not have a deadline",
+				name:            "negative timeout creates context with fallback deadline",
+				timeout:         -1 * time.Second,
+				expectDeadline:  true,
+				expectedTimeout: defaultRestartPolicyTimeout,
+				description:     "When Timeout is negative, the detached context should use the fallback deadline",
 			},
 		}
 
@@ -1438,10 +1442,21 @@ var _ = ginkgo.Describe("DetachedContext", func() {
 				gomega.Expect(renamed).To(gomega.BeTrue())
 				gomega.Expect(newID).NotTo(gomega.BeEmpty())
 
-				// Verify UpdateContainer was called (this uses the detached context).
+				// Verify SetNoRestartPolicy was called (this uses the detached context).
 				// The detached context is used for updating the restart policy of the
 				// renamed Watchtower container.
-				gomega.Expect(client.TestData.UpdateContainerCount.Load()).To(gomega.Equal(int32(1)))
+				gomega.Expect(client.TestData.SetNoRestartPolicyCount.Load()).To(gomega.Equal(int32(1)))
+
+				if tc.expectDeadline {
+					deadline, hasDeadline := client.TestData.SetNoRestartPolicyCtx.Deadline()
+					gomega.Expect(hasDeadline).To(gomega.BeTrue())
+
+					expectedDeadline := time.Now().Add(tc.expectedTimeout)
+					gomega.Expect(deadline).To(gomega.BeTemporally("~", expectedDeadline, time.Second))
+				} else {
+					_, hasDeadline := client.TestData.SetNoRestartPolicyCtx.Deadline()
+					gomega.Expect(hasDeadline).To(gomega.BeFalse())
+				}
 			})
 		}
 	})
@@ -1481,7 +1496,7 @@ var _ = ginkgo.Describe("DetachedContext", func() {
 			)
 
 			params := types.UpdateParams{
-				Timeout: 0, // No deadline on detached context
+				Timeout: 0, // Fallback deadline applied to detached context
 				RunOnce: false,
 			}
 
@@ -1570,7 +1585,7 @@ var _ = ginkgo.Describe("DetachedContext", func() {
 			)
 
 			params := types.UpdateParams{
-				Timeout: 0, // No deadline on detached context
+				Timeout: 0, // Fallback deadline applied to detached context
 				RunOnce: false,
 			}
 
@@ -1627,7 +1642,7 @@ var _ = ginkgo.Describe("DetachedContext", func() {
 				false,
 			)
 
-			// Use a timeout of 0 to create a detached context without deadline.
+			// Use a timeout of 0 to create a detached context with the fallback deadline.
 			params := types.UpdateParams{
 				Timeout: 0,
 				RunOnce: false,
@@ -1648,10 +1663,11 @@ var _ = ginkgo.Describe("DetachedContext", func() {
 			gomega.Expect(renamed).To(gomega.BeTrue())
 			gomega.Expect(newID).NotTo(gomega.BeEmpty())
 
-			// Verify that both StartContainer and UpdateContainer were called.
-			// UpdateContainer uses the detached context for the restart policy update.
+			// Verify that both StartContainer and SetNoRestartPolicy were called.
+			// SetNoRestartPolicy uses the detached context for the restart policy update.
 			gomega.Expect(client.TestData.StartContainerCount.Load()).To(gomega.Equal(int32(1)))
-			gomega.Expect(client.TestData.UpdateContainerCount.Load()).To(gomega.Equal(int32(1)))
+			gomega.Expect(client.TestData.SetNoRestartPolicyCount.Load()).To(gomega.Equal(int32(1)))
+			gomega.Expect(client.TestData.SetNoRestartPolicyCtx).NotTo(gomega.Equal(context.Background()))
 		})
 	})
 })

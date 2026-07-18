@@ -2,6 +2,7 @@ package container
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"net/http"
 	"sync/atomic"
@@ -533,6 +534,48 @@ func APIVersionPingHandler() http.HandlerFunc {
 	return ghttp.CombineHandlers(
 		ghttp.VerifyRequest("HEAD", "/_ping"),
 		ghttp.RespondWith(http.StatusOK, nil),
+	)
+}
+
+// ContainerUpdateHandler returns a handler that responds to the Docker API's
+// POST /containers/{id}/update endpoint. It optionally verifies that the request
+// body contains a restart policy with Name set to "no" when verifyRestartPolicy
+// is true.
+//
+// Parameters:
+//   - containerID: The container ID for the update endpoint.
+//   - status: HTTP status code to return (204 for success, 500 for error).
+//   - verifyRestartPolicy: When true, the handler verifies the request body
+//     contains RestartPolicy.Name == "no".
+//
+// Returns:
+//   - http.HandlerFunc: Handler for the container update endpoint.
+func ContainerUpdateHandler(
+	containerID string,
+	status int,
+	verifyRestartPolicy bool,
+) http.HandlerFunc {
+	return ghttp.CombineHandlers(
+		ghttp.VerifyRequest("POST", gomega.HaveSuffix(fmt.Sprintf("containers/%s/update", containerID))),
+		func(w http.ResponseWriter, r *http.Request) {
+			if verifyRestartPolicy {
+				var body map[string]any
+
+				err := json.NewDecoder(r.Body).Decode(&body)
+				if err != nil {
+					gomega.Expect(err).NotTo(gomega.HaveOccurred())
+				}
+
+				restartPolicy, ok := body["RestartPolicy"].(map[string]any)
+				gomega.Expect(ok).To(gomega.BeTrue(), "RestartPolicy should be present in update body")
+
+				name, ok := restartPolicy["Name"].(string)
+				gomega.Expect(ok).To(gomega.BeTrue(), "RestartPolicy.Name should be a string")
+				gomega.Expect(name).To(gomega.Equal("no"), "RestartPolicy.Name should be 'no'")
+			}
+
+			ghttp.RespondWith(status, nil)(w, r)
+		},
 	)
 }
 

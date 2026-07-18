@@ -1863,3 +1863,123 @@ func TestRootCommand_ReviveStoppedFlagParsing(t *testing.T) {
 		})
 	}
 }
+
+func TestResolveCurrentWatchtowerContainerForFallback(t *testing.T) {
+	t.Run("successful resolution", func(t *testing.T) {
+		originalReadMountinfoFunc := container.ReadMountinfoFunc
+		originalReadCgroupFunc := container.ReadCgroupFunc
+		container.ReadMountinfoFunc = func(string) ([]byte, error) {
+			return nil, errors.New("mock mountinfo error")
+		}
+		container.ReadCgroupFunc = func(string) ([]byte, error) {
+			return nil, errors.New("mock cgroup error")
+		}
+
+		defer func() {
+			container.ReadMountinfoFunc = originalReadMountinfoFunc
+			container.ReadCgroupFunc = originalReadCgroupFunc
+		}()
+
+		t.Setenv("HOSTNAME", "test-hostname")
+
+		mockCnt := mockTypes.NewMockContainer(t)
+		mockClient := mockContainer.NewMockClient(t)
+
+		mockClient.EXPECT().ListContainers(mock.Anything).Return([]types.Container{mockCnt}, nil).Once()
+		mockCnt.EXPECT().ContainerInfo().Return(&dockerContainer.InspectResponse{
+			Config: &dockerContainer.Config{Hostname: "test-hostname"},
+		}).Once()
+		mockCnt.EXPECT().ID().Return(types.ContainerID("test-id")).Once()
+		mockCnt.EXPECT().IsWatchtower().Return(false).Once()
+		mockClient.EXPECT().GetCurrentWatchtowerContainer(mock.Anything, types.ContainerID("test-id")).Return(mockCnt, nil).Once()
+
+		result := resolveCurrentWatchtowerContainerForFallback(context.Background(), mockClient)
+
+		assert.Equal(t, mockCnt, result)
+	})
+
+	t.Run("GetCurrentContainerID returns error", func(t *testing.T) {
+		originalReadMountinfoFunc := container.ReadMountinfoFunc
+		originalReadCgroupFunc := container.ReadCgroupFunc
+		container.ReadMountinfoFunc = func(string) ([]byte, error) {
+			return nil, errors.New("mock mountinfo error")
+		}
+		container.ReadCgroupFunc = func(string) ([]byte, error) {
+			return nil, errors.New("mock cgroup error")
+		}
+
+		defer func() {
+			container.ReadMountinfoFunc = originalReadMountinfoFunc
+			container.ReadCgroupFunc = originalReadCgroupFunc
+		}()
+
+		t.Setenv("HOSTNAME", "test-hostname")
+
+		mockClient := mockContainer.NewMockClient(t)
+
+		mockClient.EXPECT().ListContainers(mock.Anything).Return(nil, errors.New("list failed")).Once()
+
+		result := resolveCurrentWatchtowerContainerForFallback(context.Background(), mockClient)
+
+		assert.Nil(t, result)
+	})
+
+	t.Run("GetCurrentContainerID returns empty string", func(t *testing.T) {
+		originalReadMountinfoFunc := container.ReadMountinfoFunc
+		originalReadCgroupFunc := container.ReadCgroupFunc
+		container.ReadMountinfoFunc = func(string) ([]byte, error) {
+			return nil, errors.New("mock mountinfo error")
+		}
+		container.ReadCgroupFunc = func(string) ([]byte, error) {
+			return nil, errors.New("mock cgroup error")
+		}
+
+		defer func() {
+			container.ReadMountinfoFunc = originalReadMountinfoFunc
+			container.ReadCgroupFunc = originalReadCgroupFunc
+		}()
+
+		t.Setenv("HOSTNAME", "test-hostname")
+
+		mockClient := mockContainer.NewMockClient(t)
+
+		mockClient.EXPECT().ListContainers(mock.Anything).Return([]types.Container{}, nil).Once()
+
+		result := resolveCurrentWatchtowerContainerForFallback(context.Background(), mockClient)
+
+		assert.Nil(t, result)
+	})
+
+	t.Run("GetCurrentWatchtowerContainer returns nil", func(t *testing.T) {
+		originalReadMountinfoFunc := container.ReadMountinfoFunc
+		originalReadCgroupFunc := container.ReadCgroupFunc
+		container.ReadMountinfoFunc = func(string) ([]byte, error) {
+			return nil, errors.New("mock mountinfo error")
+		}
+		container.ReadCgroupFunc = func(string) ([]byte, error) {
+			return nil, errors.New("mock cgroup error")
+		}
+
+		defer func() {
+			container.ReadMountinfoFunc = originalReadMountinfoFunc
+			container.ReadCgroupFunc = originalReadCgroupFunc
+		}()
+
+		t.Setenv("HOSTNAME", "test-hostname")
+
+		mockCnt := mockTypes.NewMockContainer(t)
+		mockClient := mockContainer.NewMockClient(t)
+
+		mockClient.EXPECT().ListContainers(mock.Anything).Return([]types.Container{mockCnt}, nil).Once()
+		mockCnt.EXPECT().ContainerInfo().Return(&dockerContainer.InspectResponse{
+			Config: &dockerContainer.Config{Hostname: "test-hostname"},
+		}).Once()
+		mockCnt.EXPECT().ID().Return(types.ContainerID("test-id")).Once()
+		mockCnt.EXPECT().IsWatchtower().Return(false).Once()
+		mockClient.EXPECT().GetCurrentWatchtowerContainer(mock.Anything, types.ContainerID("test-id")).Return(nil, nil).Once()
+
+		result := resolveCurrentWatchtowerContainerForFallback(context.Background(), mockClient)
+
+		assert.Nil(t, result)
+	})
+}
