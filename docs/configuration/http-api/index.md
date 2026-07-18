@@ -109,7 +109,7 @@ Valid names (case-insensitive):
 !!! Note "Flag and environment value usage"
     - The CLI flag can be specified multiple times.
     - Defining the environment variable multiple times will not work (only the last value is used).
-    - For environment variables, use a single comma- or space-separated value, or a YAML array.
+    - For environment variables use comma or space-separated values.
 
 ## HTTP API Rate Limit
 

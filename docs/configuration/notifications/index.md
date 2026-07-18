@@ -25,7 +25,6 @@ Configures the notification service URL(s).
 
     - Use comma-separated URLs: `--notification-url="discord://xxx,telegram://yyy"`
     - Specify the flag multiple times: `--notification-url=discord://xxx --notification-url=telegram://yyy`
-    - Use YAML arrays in Docker Compose (recommended)
 
     See [Configuring Multiple Notification URLs](../../notifications/introduction/index.md#using_multiple_notification_services) for detailed examples.
 
@@ -33,8 +32,7 @@ Configures the notification service URL(s).
     The CLI flag can be called multiple times as CLI arguments; however, defining the environment variable multiple times will NOT work and only the last value will be used.
 
     This is because CLI flags use a StringArray type that supports multiple invocations,  while environment variables are simple key-value pairs that get overwritten when defined multiple times.
-
-    For environment variables, use comma-separated values or YAML arrays instead.
+    For environment variables, use comma-separated or space-separated values.
 
 ## Notification Split by Container
 
