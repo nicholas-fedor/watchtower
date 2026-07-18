@@ -419,21 +419,77 @@ Image name patterns match against the full `name:tag` string. Use `.*` to match 
 
 Exclude all containers starting with a prefix:
 
-```bash
-docker run -d -e WATCHTOWER_DISABLE_CONTAINERS="web-.*" nickfedor/watchtower
-```
+<!-- markdownlint-disable -->
+=== "Docker Compose"
+    ```yaml
+    services:
+        watchtower:
+            image: nickfedor/watchtower:latest
+            environment:
+                - WATCHTOWER_DISABLE_CONTAINERS=web-.*
+            volumes:
+                - /var/run/docker.sock:/var/run/docker.sock
+    ```
+=== "Docker CLI (Env Vars)"
+    ```bash
+    docker run -d \
+        -e WATCHTOWER_DISABLE_CONTAINERS="web-.*" \
+        nickfedor/watchtower
+    ```
+=== "Docker CLI (Flags)"
+    ```bash
+    docker run -d \
+        nickfedor/watchtower \
+        --disable-containers "web-.*"
+    ```
+<!-- markdownlint-restore -->
 
 Include only containers matching specific patterns:
 
-```bash
-docker run -d nickfedor/watchtower "db-.*" "cache-.*"
-```
+<!-- markdownlint-disable -->
+=== "Docker Compose"
+    ```yaml
+    services:
+        watchtower:
+            image: nickfedor/watchtower:latest
+            command: ["nickfedor/watchtower", "db-.*", "cache-.*"]
+            volumes:
+                - /var/run/docker.sock:/var/run/docker.sock
+    ```
+=== "Docker CLI"
+    ```bash
+    docker run -d \
+        nickfedor/watchtower \
+        "db-.*" "cache-.*"
+    ```
+<!-- markdownlint-restore -->
 
 Monitor only containers using nginx or redis images with any tag:
 
-```bash
-docker run -d -e WATCHTOWER_MONITOR_IMAGE_NAMES="nginx:.*,redis:.*" nickfedor/watchtower
-```
+<!-- markdownlint-disable -->
+=== "Docker Compose"
+    ```yaml
+    services:
+        watchtower:
+            image: nickfedor/watchtower:latest
+            environment:
+                - WATCHTOWER_MONITOR_IMAGE_NAMES=nginx:.*,redis:.*
+            volumes:
+                - /var/run/docker.sock:/var/run/docker.sock
+    ```
+=== "Docker CLI (Env Vars)"
+    ```bash
+    docker run -d \
+        -e WATCHTOWER_MONITOR_IMAGE_NAMES="nginx:.*,redis:.*" \
+        nickfedor/watchtower
+    ```
+=== "Docker CLI (Flags)"
+    ```bash
+    docker run -d \
+        nickfedor/watchtower \
+        --monitor-image-names "nginx:.*,redis:.*"
+    ```
+<!-- markdownlint-restore -->
 
 ## Label Precedence
 
@@ -488,81 +544,188 @@ This applies to the [`monitor-only`](../../configuration/update-behavior/index.m
 
 Run one instance for production containers and another for development:
 
-```yaml
-services:
-    watchtower-prod:
-        image: nickfedor/watchtower:latest
-        command: --scope production --interval 300
-        labels:
-            - "com.centurylinklabs.watchtower.scope=production"
-        volumes:
-            - /var/run/docker.sock:/var/run/docker.sock
+<!-- markdownlint-disable -->
+=== "Docker Compose"
+    ```yaml
+    services:
+        watchtower-prod:
+            image: nickfedor/watchtower:latest
+            command: --scope production --interval 300
+            labels:
+                - "com.centurylinklabs.watchtower.scope=production"
+            volumes:
+                - /var/run/docker.sock:/var/run/docker.sock
 
-    watchtower-dev:
-        image: nickfedor/watchtower:latest
-        command: --scope development --interval 30
-        labels:
-            - "com.centurylinklabs.watchtower.scope=development"
-        volumes:
-            - /var/run/docker.sock:/var/run/docker.sock
-```
+        watchtower-dev:
+            image: nickfedor/watchtower:latest
+            command: --scope development --interval 30
+            labels:
+                - "com.centurylinklabs.watchtower.scope=development"
+            volumes:
+                - /var/run/docker.sock:/var/run/docker.sock
+    ```
+=== "Docker CLI"
+    ```bash
+    docker run -d \
+        --name watchtower-production \
+        -v /var/run/docker.sock:/var/run/docker.sock \
+        nickfedor/watchtower \
+        --scope production --interval 300
+
+    docker run -d \
+        --name watchtower-development \
+        -v /var/run/docker.sock:/var/run/docker.sock \
+        nickfedor/watchtower \
+        --scope development --interval 30
+    ```
+<!-- markdownlint-restore -->
 
 ### Exclude System Containers
 
 Exclude Watchtower itself and other infrastructure containers:
 
-```bash
-docker run -d \
-    -e WATCHTOWER_DISABLE_CONTAINERS="watchtower,traefik,portainer" \
-    nickfedor/watchtower
-```
+<!-- markdownlint-disable -->
+=== "Docker Compose"
+    ```yaml
+    services:
+        watchtower:
+            image: nickfedor/watchtower:latest
+            environment:
+                - WATCHTOWER_DISABLE_CONTAINERS=watchtower,traefik,portainer
+            volumes:
+                - /var/run/docker.sock:/var/run/docker.sock
+    ```
+=== "Docker CLI (Env Vars)"
+    ```bash
+    docker run -d \
+        -e WATCHTOWER_DISABLE_CONTAINERS="watchtower,traefik,portainer" \
+        nickfedor/watchtower
+    ```
+=== "Docker CLI (Flags)"
+    ```bash
+    docker run -d \
+        nickfedor/watchtower \
+        --disable-containers "watchtower,traefik,portainer"
+    ```
+<!-- markdownlint-restore -->
 
 ### Exclude Containers by Label
 
 Exclude containers managed by third-party orchestrators using arbitrary labels:
 
-```bash
-docker run -d \
-    -e WATCHTOWER_DISABLE_CONTAINERS_BY_LABEL="managed-by=external" \
-    nickfedor/watchtower
-```
+<!-- markdownlint-disable -->
+=== "Docker Compose"
+    ```yaml
+    services:
+        watchtower:
+            image: nickfedor/watchtower:latest
+            environment:
+                - WATCHTOWER_DISABLE_CONTAINERS_BY_LABEL=managed-by=external
+            volumes:
+                - /var/run/docker.sock:/var/run/docker.sock
+    ```
+=== "Docker CLI (Env Vars)"
+    ```bash
+    docker run -d \
+        -e WATCHTOWER_DISABLE_CONTAINERS_BY_LABEL="managed-by=external" \
+        nickfedor/watchtower
+    ```
+=== "Docker CLI (Flags)"
+    ```bash
+    docker run -d \
+        nickfedor/watchtower \
+        --disable-containers-by-label "managed-by=external"
+    ```
+<!-- markdownlint-restore -->
 
 ### Monitor Containers by Label
 
 Only monitor containers with specific labels:
 
-```bash
-docker run -d \
-    -e WATCHTOWER_ENABLE_CONTAINERS_BY_LABEL="env=prod,team=platform" \
-    nickfedor/watchtower
-```
+<!-- markdownlint-disable -->
+=== "Docker Compose"
+    ```yaml
+    services:
+        watchtower:
+            image: nickfedor/watchtower:latest
+            environment:
+                - WATCHTOWER_ENABLE_CONTAINERS_BY_LABEL=env=prod,team=platform
+            volumes:
+                - /var/run/docker.sock:/var/run/docker.sock
+    ```
+=== "Docker CLI (Env Vars)"
+    ```bash
+    docker run -d \
+        -e WATCHTOWER_ENABLE_CONTAINERS_BY_LABEL="env=prod,team=platform" \
+        nickfedor/watchtower
+    ```
+=== "Docker CLI (Flags)"
+    ```bash
+    docker run -d \
+        nickfedor/watchtower \
+        --enable-containers-by-label "env=prod,team=platform"
+    ```
+<!-- markdownlint-restore -->
 
 ### Monitor Only Specific Image Registries
 
 Monitor only images from your private registry:
 
-```bash
-docker run -d \
-    -e WATCHTOWER_MONITOR_IMAGE_NAMES="registry.example.com/.*" \
-    nickfedor/watchtower
-```
+<!-- markdownlint-disable -->
+=== "Docker Compose"
+    ```yaml
+    services:
+        watchtower:
+            image: nickfedor/watchtower:latest
+            environment:
+                - WATCHTOWER_MONITOR_IMAGE_NAMES=registry.example.com/.*
+            volumes:
+                - /var/run/docker.sock:/var/run/docker.sock
+    ```
+=== "Docker CLI (Env Vars)"
+    ```bash
+    docker run -d \
+        -e WATCHTOWER_MONITOR_IMAGE_NAMES="registry.example.com/.*" \
+        nickfedor/watchtower
+    ```
+=== "Docker CLI (Flags)"
+    ```bash
+    docker run -d \
+        nickfedor/watchtower \
+        --monitor-image-names "registry.example.com/.*"
+    ```
+<!-- markdownlint-restore -->
 
 ### Selective Monitoring with Enable Label
 
 Use [label enable](../../configuration/container-selection/index.md#enable_label_filter) to explicitly opt containers into monitoring:
 
-```bash
-# Start Watchtower with label filtering
-docker run -d \
-    -e WATCHTOWER_LABEL_ENABLE=true \
-    nickfedor/watchtower
-```
+<!-- markdownlint-disable -->
+=== "Docker Compose"
+    ```yaml
+    services:
+        watchtower:
+            image: nickfedor/watchtower:latest
+            environment:
+                - WATCHTOWER_LABEL_ENABLE=true
+            volumes:
+                - /var/run/docker.sock:/var/run/docker.sock
 
-```yaml
-# Only this container will be monitored
-services:
-    myapp:
-        image: myapp:latest
-        labels:
-            - "com.centurylinklabs.watchtower.enable=true"
-```
+        myapp:
+            image: myapp:latest
+            labels:
+                - "com.centurylinklabs.watchtower.enable=true"
+    ```
+=== "Docker CLI"
+    ```bash
+    # Start Watchtower with label filtering
+    docker run -d \
+        -e WATCHTOWER_LABEL_ENABLE=true \
+        nickfedor/watchtower
+
+    # Only this container will be monitored
+    docker run -d \
+        --label com.centurylinklabs.watchtower.enable=true \
+        myapp:latest
+    ```
+<!-- markdownlint-restore -->
