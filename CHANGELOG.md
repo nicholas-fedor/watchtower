@@ -10,6 +10,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Add label-based container enable and disable filtering by @nicholas-fedor in [#1969](https://github.com/nicholas-fedor/watchtower/pull/1969)
 - Add and consolidate restart-policy updates by @nicholas-fedor in [#1965](https://github.com/nicholas-fedor/watchtower/pull/1965)
 
 ### Changed
