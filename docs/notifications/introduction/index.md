@@ -29,11 +29,6 @@ Watchtower supports using multiple Shoutrrr URLs to send notifications to multip
         This is the recommended method for providing Shoutrrr URLs, as they typically contain security-sensitive values.
 
         ```text
-        # Watchtower Notification URLs
-        # Path: ./secrets/notification_urls.txt
-        # Only place one URL per line
-        # ---
-
         discord://token@webhookid
         telegram://token@telegram?chats=@channel
         ```
