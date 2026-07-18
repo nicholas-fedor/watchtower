@@ -160,6 +160,20 @@ func RegisterSystemFlags(rootCmd *cobra.Command) {
 		),
 		"Comma-separated list of image names to explicitly exclude from monitoring.")
 
+	flags.StringSlice(
+		"enable-containers-by-label",
+		filterEmptyStrings(
+			regexp.MustCompile(",").Split(envString("WATCHTOWER_ENABLE_CONTAINERS_BY_LABEL"), -1),
+		),
+		"Comma-separated list of key=value label pairs to restrict monitoring to matching containers.")
+
+	flags.StringSlice(
+		"disable-containers-by-label",
+		filterEmptyStrings(
+			regexp.MustCompile(",").Split(envString("WATCHTOWER_DISABLE_CONTAINERS_BY_LABEL"), -1),
+		),
+		"Comma-separated list of key=value label pairs to exclude matching containers from monitoring.")
+
 	flags.StringP(
 		"log-format",
 		"l",

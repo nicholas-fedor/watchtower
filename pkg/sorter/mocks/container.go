@@ -80,6 +80,15 @@ func (c *SimpleContainer) Enabled() (bool, bool)                   { return true
 func (c *SimpleContainer) IsMonitorOnly(_ types.UpdateParams) bool { return false }
 
 func (c *SimpleContainer) Scope() (string, bool) { return "", false }
+func (c *SimpleContainer) GetLabel(key string) (string, bool) {
+	if c.ContainerInfoField != nil && c.ContainerInfoField.Config != nil && c.ContainerInfoField.Config.Labels != nil {
+		val, ok := c.ContainerInfoField.Config.Labels[key]
+
+		return val, ok
+	}
+
+	return "", false
+}
 func (c *SimpleContainer) ToRestart() bool       { return false }
 
 func (c *SimpleContainer) StopSignal() string {

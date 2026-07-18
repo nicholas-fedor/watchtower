@@ -92,3 +92,24 @@ func (_m *FilterableContainer) ImageName() string {
 
 	return result0
 }
+
+// GetLabel provides a mock function with given fields: key.
+func (_m *FilterableContainer) GetLabel(key string) (string, bool) {
+	ret := _m.Called(key)
+
+	var result0 string
+	if rf, ok := ret.Get(0).(func(string) string); ok {
+		result0 = rf(key)
+	} else {
+		result0 = ret.Get(0).(string)
+	}
+
+	var result1 bool
+	if rf, ok := ret.Get(1).(func(string) bool); ok {
+		result1 = rf(key)
+	} else {
+		result1 = ret.Get(1).(bool)
+	}
+
+	return result0, result1
+}

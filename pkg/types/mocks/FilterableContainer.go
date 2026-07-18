@@ -88,6 +88,66 @@ func (_c *MockFilterableContainer_Enabled_Call) RunAndReturn(run func() (bool, b
 	return _c
 }
 
+// GetLabel provides a mock function for the type MockFilterableContainer
+func (_mock *MockFilterableContainer) GetLabel(key string) (string, bool) {
+	ret := _mock.Called(key)
+
+	if len(ret) == 0 {
+		panic("no return value specified for GetLabel")
+	}
+
+	var r0 string
+	var r1 bool
+	if returnFunc, ok := ret.Get(0).(func(string) (string, bool)); ok {
+		return returnFunc(key)
+	}
+	if returnFunc, ok := ret.Get(0).(func(string) string); ok {
+		r0 = returnFunc(key)
+	} else {
+		r0 = ret.Get(0).(string)
+	}
+	if returnFunc, ok := ret.Get(1).(func(string) bool); ok {
+		r1 = returnFunc(key)
+	} else {
+		r1 = ret.Get(1).(bool)
+	}
+	return r0, r1
+}
+
+// MockFilterableContainer_GetLabel_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'GetLabel'
+type MockFilterableContainer_GetLabel_Call struct {
+	*mock.Call
+}
+
+// GetLabel is a helper method to define mock.On call
+//   - key string
+func (_e *MockFilterableContainer_Expecter) GetLabel(key any) *MockFilterableContainer_GetLabel_Call {
+	return &MockFilterableContainer_GetLabel_Call{Call: _e.mock.On("GetLabel", key)}
+}
+
+func (_c *MockFilterableContainer_GetLabel_Call) Run(run func(key string)) *MockFilterableContainer_GetLabel_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		var arg0 string
+		if args[0] != nil {
+			arg0 = args[0].(string)
+		}
+		run(
+			arg0,
+		)
+	})
+	return _c
+}
+
+func (_c *MockFilterableContainer_GetLabel_Call) Return(s string, b bool) *MockFilterableContainer_GetLabel_Call {
+	_c.Call.Return(s, b)
+	return _c
+}
+
+func (_c *MockFilterableContainer_GetLabel_Call) RunAndReturn(run func(key string) (string, bool)) *MockFilterableContainer_GetLabel_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // ImageName provides a mock function for the type MockFilterableContainer
 func (_mock *MockFilterableContainer) ImageName() string {
 	ret := _mock.Called()

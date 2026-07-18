@@ -67,6 +67,34 @@ Environment Variable: WATCHTOWER_DISABLE_CONTAINERS
 !!! Note
     Regex patterns are supported. See [Regex Pattern Matching](../../getting-started/container-selection/index.md#regex_pattern_matching) for details.
 
+## Enable Containers by Label
+
+Restricts monitoring to containers that have at least one of the specified label key-value pairs.
+
+```text
+            Argument: --enable-containers-by-label
+Environment Variable: WATCHTOWER_ENABLE_CONTAINERS_BY_LABEL
+                Type: Comma-separated list of key=value pairs
+             Default: None
+```
+
+!!! Note
+    Values containing commas are not supported. Use individual `key=value` pairs separated by commas.
+
+## Disable Containers by Label
+
+Excludes containers that have any of the specified label key-value pairs from monitoring.
+
+```text
+            Argument: --disable-containers-by-label
+Environment Variable: WATCHTOWER_DISABLE_CONTAINERS_BY_LABEL
+                Type: Comma-separated list of key=value pairs
+             Default: None
+```
+
+!!! Note
+    Values containing commas are not supported. Use individual `key=value` pairs separated by commas.
+
 ## Monitor Specific Images
 
 Restricts monitoring to containers whose image name matches one of the supplied image name patterns, even if other selection criteria would include them.

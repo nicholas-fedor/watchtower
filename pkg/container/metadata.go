@@ -280,6 +280,21 @@ func (c *Container) Enabled() (bool, bool) {
 	return parsedBool, true
 }
 
+// GetLabel retrieves the value of an arbitrary container label.
+//
+// It returns the label value and true if the label is present, or an empty
+// string and false if the label is absent.
+//
+// Parameters:
+//   - label: Docker label key to look up.
+//
+// Returns:
+//   - string: Label value if present.
+//   - bool: True if label exists, false otherwise.
+func (c *Container) GetLabel(label string) (string, bool) {
+	return c.getLabelValue(label)
+}
+
 // IsMonitorOnly determines if the container is monitor-only.
 //
 // It uses UpdateParams.MonitorOnly and label precedence.
