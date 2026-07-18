@@ -2,226 +2,226 @@
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
     <url>
          <loc>https://watchtower.nickfedor.com/dev/</loc>
-         <lastmod>2026-07-14</lastmod>
+         <lastmod>2026-07-18</lastmod>
     </url>
     <url>
          <loc>https://watchtower.nickfedor.com/dev/advanced-features/ephemeral-self-updates/</loc>
-         <lastmod>2026-07-14</lastmod>
+         <lastmod>2026-07-18</lastmod>
     </url>
     <url>
          <loc>https://watchtower.nickfedor.com/dev/advanced-features/image-cooldown/</loc>
-         <lastmod>2026-07-14</lastmod>
+         <lastmod>2026-07-18</lastmod>
     </url>
     <url>
          <loc>https://watchtower.nickfedor.com/dev/advanced-features/lifecycle-hooks/</loc>
-         <lastmod>2026-07-14</lastmod>
+         <lastmod>2026-07-18</lastmod>
     </url>
     <url>
          <loc>https://watchtower.nickfedor.com/dev/advanced-features/linked-containers/</loc>
-         <lastmod>2026-07-14</lastmod>
+         <lastmod>2026-07-18</lastmod>
     </url>
     <url>
          <loc>https://watchtower.nickfedor.com/dev/advanced-features/private-registries/</loc>
-         <lastmod>2026-07-14</lastmod>
+         <lastmod>2026-07-18</lastmod>
     </url>
     <url>
          <loc>https://watchtower.nickfedor.com/dev/advanced-features/registry-mirrors/</loc>
-         <lastmod>2026-07-14</lastmod>
+         <lastmod>2026-07-18</lastmod>
     </url>
     <url>
          <loc>https://watchtower.nickfedor.com/dev/advanced-features/remote-hosts/</loc>
-         <lastmod>2026-07-14</lastmod>
+         <lastmod>2026-07-18</lastmod>
     </url>
     <url>
          <loc>https://watchtower.nickfedor.com/dev/advanced-features/running-multiple-instances/</loc>
-         <lastmod>2026-07-14</lastmod>
+         <lastmod>2026-07-18</lastmod>
     </url>
     <url>
          <loc>https://watchtower.nickfedor.com/dev/advanced-features/secure-connections/</loc>
-         <lastmod>2026-07-14</lastmod>
+         <lastmod>2026-07-18</lastmod>
     </url>
     <url>
          <loc>https://watchtower.nickfedor.com/dev/advanced-features/stop-signals/</loc>
-         <lastmod>2026-07-14</lastmod>
+         <lastmod>2026-07-18</lastmod>
     </url>
     <url>
          <loc>https://watchtower.nickfedor.com/dev/configuration/container-selection/</loc>
-         <lastmod>2026-07-14</lastmod>
+         <lastmod>2026-07-18</lastmod>
     </url>
     <url>
          <loc>https://watchtower.nickfedor.com/dev/configuration/docker-connection/</loc>
-         <lastmod>2026-07-14</lastmod>
+         <lastmod>2026-07-18</lastmod>
     </url>
     <url>
          <loc>https://watchtower.nickfedor.com/dev/configuration/http-api/</loc>
-         <lastmod>2026-07-14</lastmod>
+         <lastmod>2026-07-18</lastmod>
     </url>
     <url>
          <loc>https://watchtower.nickfedor.com/dev/configuration/image-cooldown/</loc>
-         <lastmod>2026-07-14</lastmod>
+         <lastmod>2026-07-18</lastmod>
     </url>
     <url>
          <loc>https://watchtower.nickfedor.com/dev/configuration/introduction/</loc>
-         <lastmod>2026-07-14</lastmod>
+         <lastmod>2026-07-18</lastmod>
     </url>
     <url>
          <loc>https://watchtower.nickfedor.com/dev/configuration/lifecycle-hooks/</loc>
-         <lastmod>2026-07-14</lastmod>
+         <lastmod>2026-07-18</lastmod>
     </url>
     <url>
          <loc>https://watchtower.nickfedor.com/dev/configuration/logging-and-output/</loc>
-         <lastmod>2026-07-14</lastmod>
+         <lastmod>2026-07-18</lastmod>
     </url>
     <url>
          <loc>https://watchtower.nickfedor.com/dev/configuration/notifications/</loc>
-         <lastmod>2026-07-14</lastmod>
+         <lastmod>2026-07-18</lastmod>
     </url>
     <url>
          <loc>https://watchtower.nickfedor.com/dev/configuration/registry-and-authentication/</loc>
-         <lastmod>2026-07-14</lastmod>
+         <lastmod>2026-07-18</lastmod>
     </url>
     <url>
          <loc>https://watchtower.nickfedor.com/dev/configuration/scheduling/</loc>
-         <lastmod>2026-07-14</lastmod>
+         <lastmod>2026-07-18</lastmod>
     </url>
     <url>
          <loc>https://watchtower.nickfedor.com/dev/configuration/update-behavior/</loc>
-         <lastmod>2026-07-14</lastmod>
+         <lastmod>2026-07-18</lastmod>
     </url>
     <url>
          <loc>https://watchtower.nickfedor.com/dev/getting-started/container-selection/</loc>
-         <lastmod>2026-07-14</lastmod>
+         <lastmod>2026-07-18</lastmod>
     </url>
     <url>
          <loc>https://watchtower.nickfedor.com/dev/getting-started/docker-secrets/</loc>
-         <lastmod>2026-07-14</lastmod>
+         <lastmod>2026-07-18</lastmod>
     </url>
     <url>
          <loc>https://watchtower.nickfedor.com/dev/getting-started/installation/</loc>
-         <lastmod>2026-07-14</lastmod>
+         <lastmod>2026-07-18</lastmod>
     </url>
     <url>
          <loc>https://watchtower.nickfedor.com/dev/getting-started/introduction/</loc>
-         <lastmod>2026-07-14</lastmod>
+         <lastmod>2026-07-18</lastmod>
     </url>
     <url>
          <loc>https://watchtower.nickfedor.com/dev/getting-started/updating-watchtower/</loc>
-         <lastmod>2026-07-14</lastmod>
+         <lastmod>2026-07-18</lastmod>
     </url>
     <url>
          <loc>https://watchtower.nickfedor.com/dev/getting-started/usage/</loc>
-         <lastmod>2026-07-14</lastmod>
+         <lastmod>2026-07-18</lastmod>
     </url>
     <url>
          <loc>https://watchtower.nickfedor.com/dev/http-api/configuration/authentication/</loc>
-         <lastmod>2026-07-14</lastmod>
+         <lastmod>2026-07-18</lastmod>
     </url>
     <url>
          <loc>https://watchtower.nickfedor.com/dev/http-api/configuration/host-and-port/</loc>
-         <lastmod>2026-07-14</lastmod>
+         <lastmod>2026-07-18</lastmod>
     </url>
     <url>
          <loc>https://watchtower.nickfedor.com/dev/http-api/configuration/tls/</loc>
-         <lastmod>2026-07-14</lastmod>
+         <lastmod>2026-07-18</lastmod>
     </url>
     <url>
          <loc>https://watchtower.nickfedor.com/dev/http-api/endpoints/check/</loc>
-         <lastmod>2026-07-14</lastmod>
+         <lastmod>2026-07-18</lastmod>
     </url>
     <url>
          <loc>https://watchtower.nickfedor.com/dev/http-api/endpoints/config/</loc>
-         <lastmod>2026-07-14</lastmod>
+         <lastmod>2026-07-18</lastmod>
     </url>
     <url>
          <loc>https://watchtower.nickfedor.com/dev/http-api/endpoints/container-details/</loc>
-         <lastmod>2026-07-14</lastmod>
+         <lastmod>2026-07-18</lastmod>
     </url>
     <url>
          <loc>https://watchtower.nickfedor.com/dev/http-api/endpoints/containers/</loc>
-         <lastmod>2026-07-14</lastmod>
+         <lastmod>2026-07-18</lastmod>
     </url>
     <url>
          <loc>https://watchtower.nickfedor.com/dev/http-api/endpoints/events/</loc>
-         <lastmod>2026-07-14</lastmod>
+         <lastmod>2026-07-18</lastmod>
     </url>
     <url>
          <loc>https://watchtower.nickfedor.com/dev/http-api/endpoints/health/</loc>
-         <lastmod>2026-07-14</lastmod>
+         <lastmod>2026-07-18</lastmod>
     </url>
     <url>
          <loc>https://watchtower.nickfedor.com/dev/http-api/endpoints/history/</loc>
-         <lastmod>2026-07-14</lastmod>
+         <lastmod>2026-07-18</lastmod>
     </url>
     <url>
          <loc>https://watchtower.nickfedor.com/dev/http-api/endpoints/images/</loc>
-         <lastmod>2026-07-14</lastmod>
+         <lastmod>2026-07-18</lastmod>
     </url>
     <url>
          <loc>https://watchtower.nickfedor.com/dev/http-api/endpoints/metrics/</loc>
-         <lastmod>2026-07-14</lastmod>
+         <lastmod>2026-07-18</lastmod>
     </url>
     <url>
          <loc>https://watchtower.nickfedor.com/dev/http-api/endpoints/status/</loc>
-         <lastmod>2026-07-14</lastmod>
+         <lastmod>2026-07-18</lastmod>
     </url>
     <url>
          <loc>https://watchtower.nickfedor.com/dev/http-api/endpoints/swagger/</loc>
-         <lastmod>2026-07-14</lastmod>
+         <lastmod>2026-07-18</lastmod>
     </url>
     <url>
          <loc>https://watchtower.nickfedor.com/dev/http-api/endpoints/update/</loc>
-         <lastmod>2026-07-14</lastmod>
+         <lastmod>2026-07-18</lastmod>
     </url>
     <url>
          <loc>https://watchtower.nickfedor.com/dev/http-api/overview/</loc>
-         <lastmod>2026-07-14</lastmod>
+         <lastmod>2026-07-18</lastmod>
     </url>
     <url>
          <loc>https://watchtower.nickfedor.com/dev/notifications/deprecations/deprecation-notice/</loc>
-         <lastmod>2026-07-14</lastmod>
+         <lastmod>2026-07-18</lastmod>
     </url>
     <url>
          <loc>https://watchtower.nickfedor.com/dev/notifications/deprecations/email/</loc>
-         <lastmod>2026-07-14</lastmod>
+         <lastmod>2026-07-18</lastmod>
     </url>
     <url>
          <loc>https://watchtower.nickfedor.com/dev/notifications/deprecations/gotify/</loc>
-         <lastmod>2026-07-14</lastmod>
+         <lastmod>2026-07-18</lastmod>
     </url>
     <url>
          <loc>https://watchtower.nickfedor.com/dev/notifications/deprecations/migration-tool/</loc>
-         <lastmod>2026-07-14</lastmod>
+         <lastmod>2026-07-18</lastmod>
     </url>
     <url>
          <loc>https://watchtower.nickfedor.com/dev/notifications/deprecations/slack/</loc>
-         <lastmod>2026-07-14</lastmod>
+         <lastmod>2026-07-18</lastmod>
     </url>
     <url>
          <loc>https://watchtower.nickfedor.com/dev/notifications/deprecations/teams/</loc>
-         <lastmod>2026-07-14</lastmod>
+         <lastmod>2026-07-18</lastmod>
     </url>
     <url>
          <loc>https://watchtower.nickfedor.com/dev/notifications/general-settings/</loc>
-         <lastmod>2026-07-14</lastmod>
+         <lastmod>2026-07-18</lastmod>
     </url>
     <url>
          <loc>https://watchtower.nickfedor.com/dev/notifications/guides/signal/</loc>
-         <lastmod>2026-07-14</lastmod>
+         <lastmod>2026-07-18</lastmod>
     </url>
     <url>
          <loc>https://watchtower.nickfedor.com/dev/notifications/introduction/</loc>
-         <lastmod>2026-07-14</lastmod>
+         <lastmod>2026-07-18</lastmod>
     </url>
     <url>
          <loc>https://watchtower.nickfedor.com/dev/notifications/template-preview/</loc>
-         <lastmod>2026-07-14</lastmod>
+         <lastmod>2026-07-18</lastmod>
     </url>
     <url>
          <loc>https://watchtower.nickfedor.com/dev/notifications/templates/</loc>
-         <lastmod>2026-07-14</lastmod>
+         <lastmod>2026-07-18</lastmod>
     </url>
     <url>
          <loc>https://watchtower.nickfedor.com/dev/quickstart/</loc>
-         <lastmod>2026-07-14</lastmod>
+         <lastmod>2026-07-18</lastmod>
     </url>
 </urlset>
