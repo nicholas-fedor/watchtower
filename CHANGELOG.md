@@ -69,6 +69,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Handle local-only images and clarify self-update skip messages by @nicholas-fedor in [#1960](https://github.com/nicholas-fedor/watchtower/pull/1960)
 - Derive bearer service from realm by @llc1123 in [#1895](https://github.com/nicholas-fedor/watchtower/pull/1895)
 
+### Removed
+
+- Remove unsupported go report card by @nicholas-fedor in [#1963](https://github.com/nicholas-fedor/watchtower/pull/1963)
+
 ### New Contributors
 
 - @llc1123 made their first contribution in [#1895](https://github.com/nicholas-fedor/watchtower/pull/1895)
