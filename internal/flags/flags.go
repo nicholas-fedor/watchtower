@@ -47,6 +47,8 @@ var (
 	errReplaceSliceFailed = errors.New("failed to replace slice value in flag")
 	// errReadFileFailed indicates a failure to read a file's contents for secrets.
 	errReadFileFailed = errors.New("failed to read secret file")
+	// errInvalidSecretURL indicates an invalid URL was found in a secret file.
+	errInvalidSecretURL = errors.New("invalid notification URL in secret file")
 	// errSetFlagFailed indicates a failure to set a flag's value during configuration.
 	errSetFlagFailed = errors.New("failed to set flag value")
 	// errInvalidFlagName indicates an invalid flag name was provided for modification.
@@ -1222,9 +1224,15 @@ func getSecretFromFile(flags *pflag.FlagSet, secret string) error {
 				scanner := bufio.NewScanner(file)
 				for scanner.Scan() {
 					line := strings.TrimSpace(scanner.Text())
-					if line != "" {
-						values = append(values, line)
+					if line == "" || strings.HasPrefix(line, "#") {
+						continue
 					}
+
+					if secret == "notification-url" && !strings.Contains(line, "://") {
+						return fmt.Errorf("%w: %s in %s", errInvalidSecretURL, line, value)
+					}
+
+					values = append(values, line)
 				}
 
 				err = scanner.Err()

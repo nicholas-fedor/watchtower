@@ -338,19 +338,19 @@ func TestGetSecretsFromFiles(t *testing.T) {
 		{
 			name: "slice with file",
 			files: []struct{ path, content string }{
-				{"urls.txt", "\nentry2\n\nentry3"},
+				{"urls.txt", "\ndiscord://entry2\n\ntelegram://entry3"},
 			},
 			flagName: "notification-url",
-			expected: "[entry1,entry2,entry3]",
-			args:     []string{"--notification-url", "entry1", "--notification-url", "urls.txt"},
+			expected: "[discord://entry1,discord://entry2,telegram://entry3]",
+			args:     []string{"--notification-url", "discord://entry1", "--notification-url", "urls.txt"},
 		},
 		{
 			name: "empty lines",
 			files: []struct{ path, content string }{
-				{"urls.txt", "entry1\n\nentry2\n  \nentry3"},
+				{"urls.txt", "discord://entry1\n\ntelegram://entry2\n  \nslack://entry3"},
 			},
 			flagName: "notification-url",
-			expected: "[entry1,entry2,entry3]",
+			expected: "[discord://entry1,telegram://entry2,slack://entry3]",
 			args:     []string{"--notification-url", "urls.txt"},
 		},
 		{
@@ -368,10 +368,10 @@ func TestGetSecretsFromFiles(t *testing.T) {
 		{
 			name: "special chars",
 			files: []struct{ path, content string }{
-				{"urls.txt", "smtp://user:pass@host:port\nslack://token@channel\n!@#$%^&*()"},
+				{"urls.txt", "smtp://user:pass@host:port?key=!@#$%^&*()\nslack://token@channel"},
 			},
 			flagName: "notification-url",
-			expected: "[smtp://user:pass@host:port,slack://token@channel,!@#$%^&*()]",
+			expected: "[smtp://user:pass@host:port?key=!@#$%^&*(),slack://token@channel]",
 			args:     []string{"--notification-url", "urls.txt"},
 		},
 		{
@@ -385,17 +385,17 @@ func TestGetSecretsFromFiles(t *testing.T) {
 		{
 			name: "mixed values",
 			files: []struct{ path, content string }{
-				{"urls.txt", "fileentry1\nfileentry2"},
+				{"urls.txt", "discord://fileentry1\ntelegram://fileentry2"},
 			},
 			flagName: "notification-url",
-			expected: "[direct1,fileentry1,fileentry2,direct2]",
+			expected: "[discord://direct1,discord://fileentry1,telegram://fileentry2,discord://direct2]",
 			args: []string{
 				"--notification-url",
-				"direct1",
+				"discord://direct1",
 				"--notification-url",
 				"urls.txt",
 				"--notification-url",
-				"direct2",
+				"discord://direct2",
 			},
 		},
 	}
@@ -778,6 +778,62 @@ func TestGetSecretFromFile_OpenError(t *testing.T) {
 	assert.Contains(t, err.Error(), "failed to open secret file")
 }
 
+// TestGetSecretFromFile_SkipCommentsAndEmptyLines verifies that comment and empty
+// lines are skipped when reading notification URLs from a secret file.
+func TestGetSecretFromFile_SkipCommentsAndEmptyLines(t *testing.T) {
+	cmd := new(cobra.Command)
+
+	SetDefaults()
+	RegisterNotificationFlags(cmd)
+
+	file, err := os.CreateTemp(t.TempDir(), "watchtower-")
+	require.NoError(t, err)
+	_, err = file.WriteString(
+		"# This is a comment\n" +
+			"discord://token@webhookid\n" +
+			"\n" +
+			"  # indented comment\n" +
+			"telegram://token@telegram?chats=@channel\n" +
+			"# another comment\n",
+	)
+	require.NoError(t, err)
+	require.NoError(t, file.Close())
+
+	err = cmd.ParseFlags([]string{"--notification-url", file.Name()})
+	require.NoError(t, err)
+
+	err = getSecretFromFile(cmd.PersistentFlags(), "notification-url")
+	require.NoError(t, err)
+
+	urls, err := cmd.PersistentFlags().GetStringArray("notification-url")
+	require.NoError(t, err)
+
+	assert.Equal(t, []string{"discord://token@webhookid", "telegram://token@telegram?chats=@channel"}, urls)
+}
+
+// TestGetSecretFromFile_InvalidSecretURL verifies that non-URL lines in a secret
+// file are rejected with errInvalidSecretURL.
+func TestGetSecretFromFile_InvalidSecretURL(t *testing.T) {
+	cmd := new(cobra.Command)
+
+	SetDefaults()
+	RegisterNotificationFlags(cmd)
+
+	file, err := os.CreateTemp(t.TempDir(), "watchtower-")
+	require.NoError(t, err)
+	_, err = file.WriteString("discord://token@webhookid\nnot-a-url\n")
+	require.NoError(t, err)
+	require.NoError(t, file.Close())
+
+	err = cmd.ParseFlags([]string{"--notification-url", file.Name()})
+	require.NoError(t, err)
+
+	err = getSecretFromFile(cmd.PersistentFlags(), "notification-url")
+	require.Error(t, err)
+	require.ErrorIs(t, err, errInvalidSecretURL)
+	assert.Contains(t, err.Error(), "not-a-url")
+}
+
 func TestReadFlags_Errors(t *testing.T) {
 	originalExit := logrus.StandardLogger().ExitFunc
 
@@ -822,7 +878,7 @@ func TestGetSecretFromFile_SliceReplaceError(t *testing.T) {
 	// Use a real file to ensure slice processing
 	file, err := os.CreateTemp(t.TempDir(), "watchtower-")
 	require.NoError(t, err)
-	_, err = file.WriteString("entry1\nentry2")
+	_, err = file.WriteString("discord://entry1\ntelegram://entry2")
 	require.NoError(t, err)
 
 	fileName := file.Name()
