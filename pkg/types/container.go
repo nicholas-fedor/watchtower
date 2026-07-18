@@ -25,6 +25,7 @@ type Container interface {
 	IsMonitorOnly(params UpdateParams) bool           // Monitor-only check.
 	Scope() (string, bool)                            // Scope value and presence.
 	Links(useComposeDependsOn bool) []string          // Dependency links.
+	GetLabel(key string) (string, bool)               // Arbitrary label value lookup.
 	ToRestart() bool                                  // Needs restart check.
 	IsWatchtower() bool                               // Watchtower instance check.
 	StopSignal() string                               // Custom stop signal.

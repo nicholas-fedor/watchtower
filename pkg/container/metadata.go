@@ -249,7 +249,7 @@ func (c *Container) GetLifecycleGID() (int, bool) {
 //
 // Returns:
 //   - bool: True if enabled, false otherwise.
-//   - bool: True if label is set, false if absent/invalid.
+//   - bool: True if label is set and valid, false if absent or invalid.
 func (c *Container) Enabled() (bool, bool) {
 	clog := logrus.WithField("container", c.Name())
 	rawBool, ok := c.getLabelValue(enableLabel)
@@ -278,6 +278,21 @@ func (c *Container) Enabled() (bool, bool) {
 	}).Debug("Retrieved enable status")
 
 	return parsedBool, true
+}
+
+// GetLabel retrieves the value of an arbitrary container label.
+//
+// It returns the label value and true if the label is present, or an empty
+// string and false if the label is absent.
+//
+// Parameters:
+//   - label: Docker label key to look up.
+//
+// Returns:
+//   - string: Label value if present.
+//   - bool: True if label exists, false otherwise.
+func (c *Container) GetLabel(label string) (string, bool) {
+	return c.getLabelValue(label)
 }
 
 // IsMonitorOnly determines if the container is monitor-only.

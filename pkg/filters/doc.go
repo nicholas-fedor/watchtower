@@ -7,7 +7,10 @@
 //
 // Usage example:
 //
-//	filter, desc := filters.BuildFilter(names, disableNames, monitoredImageNamePatterns, skippedImageNamePatterns, true, "scope")
+//	filter, desc, err := filters.BuildFilter(names, disableNames, monitoredImageNamePatterns, skippedImageNamePatterns, enabledLabels, disabledLabels, true, "scope")
+//	if err != nil {
+//		return err
+//	}
 //	containers, _ := client.ListContainers(filter)
 //	logrus.Info(desc)
 //

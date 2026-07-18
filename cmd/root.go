@@ -128,6 +128,22 @@ var (
 	// environment variable, providing a way to blacklist specific image patterns.
 	skippedImageNamePatterns []string
 
+	// enabledContainersByLabel is a slice of "key=value" label pairs that
+	// restricts which containers are monitored.
+	//
+	// When set, only containers matching at least one pair are monitored.
+	// It is populated in preRun from the --enable-containers-by-label flag or the
+	// WATCHTOWER_ENABLE_CONTAINERS_BY_LABEL environment variable.
+	enabledContainersByLabel []string
+
+	// disabledContainersByLabel is a slice of "key=value" label pairs for
+	// containers to exclude from monitoring.
+	//
+	// Matching containers are not monitored. It is populated in preRun from the
+	// --disable-containers-by-label flag or the WATCHTOWER_DISABLE_CONTAINERS_BY_LABEL
+	// environment variable, providing a way to blacklist containers by label.
+	disabledContainersByLabel []string
+
 	// notifier is the notification system instance responsible for sending update status messages to configured channels.
 	//
 	// It is initialized in preRun with notification types specified via flags (e.g., --notifications), supporting
@@ -368,6 +384,12 @@ func preRun(cmd *cobra.Command, _ []string) {
 		skippedImageNamePatterns[i] = strings.TrimSpace(skippedImageNamePatterns[i])
 	}
 
+	// Set label key-value pairs that restrict which containers are monitored.
+	enabledContainersByLabel, _ = flagsSet.GetStringSlice("enable-containers-by-label")
+
+	// Set label key-value pairs for containers to skip during monitoring.
+	disabledContainersByLabel, _ = flagsSet.GetStringSlice("disable-containers-by-label")
+
 	// Enable/disable execution of scripts before or after updates.
 	lifecycleHooks, _ = flagsSet.GetBool("enable-lifecycle-hooks")
 
@@ -586,14 +608,29 @@ func run(command *cobra.Command, args []string) {
 	}
 
 	// Build the filter and its description based on normalized names, exclusions, and label settings.
-	filter, filterDesc := filters.BuildFilter(
+	filter, filterDesc, err := filters.BuildFilter(
 		normalizedContainerNames,
 		disableContainers,
 		monitoredImageNamePatterns,
 		skippedImageNamePatterns,
+		enabledContainersByLabel,
+		disabledContainersByLabel,
 		enableLabel,
 		scope,
 	)
+	if err != nil {
+		if currentWatchtowerContainer != nil {
+			setNoRestartPolicyCtx, cancel := context.WithTimeout(
+				context.Background(),
+				restartPolicyTimeout,
+			)
+			defer cancel()
+
+			client.SetNoRestartPolicy(setNoRestartPolicyCtx, currentWatchtowerContainer)
+		}
+
+		logrus.WithError(err).Fatal("Failed to build container filter")
+	}
 
 	// Get flags controlling execution mode.
 	runOnce, _ := command.PersistentFlags().GetBool("run-once")
@@ -737,7 +774,7 @@ func run(command *cobra.Command, args []string) {
 	// Execute core logic and exit with the returned status code (0 for success, 1 for failure).
 	if exitCode := runMain(cfg); exitCode != 0 {
 		logrus.WithField("exit_code", exitCode).Debug("Exiting with non-zero status")
-		os.Exit(exitCode)
+		logrus.Exit(exitCode)
 	}
 }
 
