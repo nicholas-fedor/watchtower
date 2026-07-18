@@ -233,6 +233,10 @@ Use the [enable containers by label](../../configuration/container-selection/ind
     ```
 <!-- markdownlint-restore -->
 
+An empty value (`key=`) matches any container where the label key exists, regardless of its value.
+
+For example, `WATCHTOWER_ENABLE_CONTAINERS_BY_LABEL=env=` enables any container with the `env` label set to any value.
+
 ### Disable Containers by Label
 
 Use the [disable containers by label](../../configuration/container-selection/index.md#disable_containers_by_label) option to exclude containers that have any of the specified label pairs.
@@ -264,6 +268,9 @@ Use the [disable containers by label](../../configuration/container-selection/in
 
 !!! Note
     Values containing commas are not supported. Use individual `key=value` pairs separated by commas.
+
+!!! Note
+    A label entry with an empty value (`key=`) performs a presence check: the label must exist on the container with any value. A non-empty value requires an exact match.
 
 ## Image Name Filtering
 

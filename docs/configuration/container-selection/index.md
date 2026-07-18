@@ -79,7 +79,12 @@ Environment Variable: WATCHTOWER_ENABLE_CONTAINERS_BY_LABEL
 ```
 
 !!! Note
-    Values containing commas are not supported. Use individual `key=value` pairs separated by commas.
+    Values containing commas are not supported.
+    Use individual `key=value` pairs separated by commas.
+
+!!! Note
+    A label entry with an empty value (`key=`) performs a presence check: the label must exist on the container with any value.
+    A non-empty value requires an exact match.
 
 ## Disable Containers by Label
 
@@ -94,6 +99,9 @@ Environment Variable: WATCHTOWER_DISABLE_CONTAINERS_BY_LABEL
 
 !!! Note
     Values containing commas are not supported. Use individual `key=value` pairs separated by commas.
+
+!!! Note
+    A label entry with an empty value (`key=`) performs a presence check: the label must exist on the container with any value. A non-empty value requires an exact match.
 
 ## Monitor Specific Images
 
