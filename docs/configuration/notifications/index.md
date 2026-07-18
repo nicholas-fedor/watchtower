@@ -14,7 +14,7 @@ Configures the notification service URL(s).
 ```text
              Argument: --notification-url
  Environment Variable: WATCHTOWER_NOTIFICATION_URL
-                  Type: String (comma-separated or multiple flags)
+                   Type: String (comma-separated or space-separated)
                Default: None
 ```
 
