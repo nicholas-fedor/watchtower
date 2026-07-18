@@ -20,80 +20,66 @@ The [`NOTIFICATION URL`](../../configuration/notifications/index.md#notification
 
 ### Using Multiple Notification Services
 
-Watchtower supports sending notifications to multiple services simultaneously.
-The preferred method is to use multiple Shoutrrr URL's.
-
-For most Watchtower deployments via Docker Compose, this is best achieved via using either a comma-separated list or YAML array for the [`WATCHTOWER_NOTIFICATION_URL`](../../configuration/notifications/index.md#notification_url) environment variable.
-When running Watchtower via the Docker CLI, the [`--notification-url`](../../configuration/notifications/index.md#notification_url) CLI flag can be used multiple times, or use a comma-separated list.
-
-!!! Note "Environment Variable Format"
-    - `WATCHTOWER_NOTIFICATION_URL` supports comma-separated and space-separated values.
-    - Commas within URLs (e.g., in query parameters) are preserved.
-    - For Docker Compose, the YAML array syntax is the recommended approach.
-
-=== "Docker CLI"
-
-    === "Environment Variable"
-
-        ```bash
-        docker run -d \
-        --name watchtower \
-        -v /var/run/docker.sock:/var/run/docker.sock \
-        -e WATCHTOWER_NOTIFICATION_URL="discord://token@webhookid,telegram://token@telegram?chats=@channel" \
-        nickfedor/watchtower
-        ```
-
-    === "Flags"
-
-        ```bash
-        docker run -d \
-        --name watchtower \
-        -v /var/run/docker.sock:/var/run/docker.sock \
-        nickfedor/watchtower \
-        --notification-url "discord://token@webhookid" \
-        --notification-url "telegram://token@telegram?chats=@channel"
-        ```
+Watchtower supports using multiple Shoutrrr URLs to send notifications to multiple notification services.
 
 === "Docker Compose"
 
-    === "YAML Array"
+    === "Docker Secrets"
+
+        This is the recommended method for providing Shoutrrr URLs, as they typically contain security-sensitive values.
+
+        ```text
+        discord://token@webhookid
+        telegram://token@telegram?chats=@channel
+        ```
 
         ```yaml
+        secrets:
+            notification_urls:
+                file: ./secrets/notification_urls.txt
+
         services:
-        watchtower:
-            image: nickfedor/watchtower:latest
-            environment:
-            WATCHTOWER_NOTIFICATION_URL:
-                - "discord://token@webhookid"
-                - "telegram://token@telegram?chats=@channel"
-            volumes:
-            - /var/run/docker.sock:/var/run/docker.sock
+            watchtower:
+                image: nickfedor/watchtower:latest
+                volumes:
+                    - /var/run/docker.sock:/var/run/docker.sock
+                secrets:
+                    - notification_urls
+                environment:
+                    - WATCHTOWER_NOTIFICATION_URL=/run/secrets/notification_urls
+                restart: unless-stopped
         ```
 
     === "Single-line"
 
+        Comma or space-separated lists can also be provided to the [`WATCHTOWER_NOTIFICATION_URL`](../../configuration/notifications/index.md#notification_url) environment variable.
+
         ```yaml
         services:
-          watchtower:
-            image: nickfedor/watchtower:latest
-            environment:
-              WATCHTOWER_NOTIFICATION_URL: "discord://token@webhookid,telegram://token@telegram?chats=@channel"
-            volumes:
-              - /var/run/docker.sock:/var/run/docker.sock
+            watchtower:
+                image: nickfedor/watchtower:latest
+                environment:
+                    WATCHTOWER_NOTIFICATION_URL: "discord://token@webhookid,telegram://token@telegram?chats=@channel"
+                volumes:
+                    - /var/run/docker.sock:/var/run/docker.sock
+                restart: unless-stopped
         ```
 
     === "Multi-line"
 
+        Comma or space-separated lists can also be provided to the [`WATCHTOWER_NOTIFICATION_URL`](../../configuration/notifications/index.md#notification_url) environment variable.
+
         ```yaml
         services:
-        watchtower:
-            image: nickfedor/watchtower:latest
-            environment:
-            WATCHTOWER_NOTIFICATION_URL: >
-                discord://token@webhookid,
-                telegram://token@telegram?chats=@channel
-            volumes:
-            - /var/run/docker.sock:/var/run/docker.sock
+            watchtower:
+                image: nickfedor/watchtower:latest
+                environment:
+                    WATCHTOWER_NOTIFICATION_URL: >
+                        discord://token@webhookid,
+                        telegram://token@telegram?chats=@channel
+                volumes:
+                    - /var/run/docker.sock:/var/run/docker.sock
+                restart: unless-stopped
         ```
 
     !!! Warning "Do NOT define the variable multiple times"
@@ -107,12 +93,39 @@ When running Watchtower via the Docker CLI, the [`--notification-url`](../../con
         - WATCHTOWER_NOTIFICATION_URL=telegram://xxx
         ```
 
+=== "Docker CLI"
+
+    === "Environment Variable"
+
+        When using the Docker CLI, the [`--notification-url`](../../configuration/notifications/index.md#notification_url) environment variable can accept a comma or space-separated list.
+
+        ```bash
+        docker run -d \
+            --name watchtower \
+            -v /var/run/docker.sock:/var/run/docker.sock \
+            -e WATCHTOWER_NOTIFICATION_URL="discord://token@webhookid,telegram://token@telegram?chats=@channel" \
+            nickfedor/watchtower
+        ```
+
+    === "Flags"
+
+        When using the Docker CLI, the [`--notification-url`](../../configuration/notifications/index.md#notification_url) CLI flag can be used multiple times.
+
+        ```bash
+        docker run -d \
+            --name watchtower \
+            -v /var/run/docker.sock:/var/run/docker.sock \
+            nickfedor/watchtower \
+            --notification-url "discord://token@webhookid" \
+            --notification-url "telegram://token@telegram?chats=@channel"
+        ```
+
 !!! Note "CLI Flags vs Environment Variables"
     The CLI flag can be called multiple times as CLI arguments; however, defining the environment variable multiple times will NOT work and only the last value will be used.
 
     This is because CLI flags use a StringArray type that supports multiple invocations,  while environment variables are simple key-value pairs that get overwritten when defined multiple times.
 
-    For environment variables, use comma-separated values or YAML arrays instead.
+    For environment variables, use comma-separated or space-separated values.
 
 #### Verifying Multiple Notifications
 
