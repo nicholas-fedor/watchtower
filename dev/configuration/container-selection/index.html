@@ -952,6 +952,28 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#enable_containers_by_label" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Enable Containers by Label
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#disable_containers_by_label" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Disable Containers by Label
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#monitor_specific_images" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -2795,6 +2817,28 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#enable_containers_by_label" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Enable Containers by Label
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#disable_containers_by_label" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Disable Containers by Label
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#monitor_specific_images" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -2919,12 +2963,44 @@ Without <code>--label-enable</code>, containers with this label set to <code>fal
 <p class="admonition-title">Note</p>
 <p>Regex patterns are supported. See <a href="../../getting-started/container-selection/#regex_pattern_matching">Regex Pattern Matching</a> for details.</p>
 </div>
+<h2 id="enable_containers_by_label">Enable Containers by Label<a class="headerlink" href="#enable_containers_by_label" title="Permanent link">&para;</a></h2>
+<p>Restricts monitoring to containers that have at least one of the specified label key-value pairs.</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a>            Argument: --enable-containers-by-label
+<a id="__codelineno-5-2" name="__codelineno-5-2" href="#__codelineno-5-2"></a>Environment Variable: WATCHTOWER_ENABLE_CONTAINERS_BY_LABEL
+<a id="__codelineno-5-3" name="__codelineno-5-3" href="#__codelineno-5-3"></a>                Type: Comma-separated list of key=value pairs
+<a id="__codelineno-5-4" name="__codelineno-5-4" href="#__codelineno-5-4"></a>             Default: None
+</code></pre></div>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>Values containing commas are not supported.
+Use individual <code>key=value</code> pairs separated by commas.</p>
+</div>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>A label entry with an empty value (<code>key=</code>) performs a presence check: the label must exist on the container with any value.
+A non-empty value requires an exact match.</p>
+</div>
+<h2 id="disable_containers_by_label">Disable Containers by Label<a class="headerlink" href="#disable_containers_by_label" title="Permanent link">&para;</a></h2>
+<p>Excludes containers that have any of the specified label key-value pairs from monitoring.</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-6-1" name="__codelineno-6-1" href="#__codelineno-6-1"></a>            Argument: --disable-containers-by-label
+<a id="__codelineno-6-2" name="__codelineno-6-2" href="#__codelineno-6-2"></a>Environment Variable: WATCHTOWER_DISABLE_CONTAINERS_BY_LABEL
+<a id="__codelineno-6-3" name="__codelineno-6-3" href="#__codelineno-6-3"></a>                Type: Comma-separated list of key=value pairs
+<a id="__codelineno-6-4" name="__codelineno-6-4" href="#__codelineno-6-4"></a>             Default: None
+</code></pre></div>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>Values containing commas are not supported. Use individual <code>key=value</code> pairs separated by commas.</p>
+</div>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>A label entry with an empty value (<code>key=</code>) performs a presence check: the label must exist on the container with any value. A non-empty value requires an exact match.</p>
+</div>
 <h2 id="monitor_specific_images">Monitor Specific Images<a class="headerlink" href="#monitor_specific_images" title="Permanent link">&para;</a></h2>
 <p>Restricts monitoring to containers whose image name matches one of the supplied image name patterns, even if other selection criteria would include them.</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a>            Argument: --monitor-image-names
-<a id="__codelineno-5-2" name="__codelineno-5-2" href="#__codelineno-5-2"></a>Environment Variable: WATCHTOWER_MONITOR_IMAGE_NAMES
-<a id="__codelineno-5-3" name="__codelineno-5-3" href="#__codelineno-5-3"></a>                Type: Comma or space-separated string list
-<a id="__codelineno-5-4" name="__codelineno-5-4" href="#__codelineno-5-4"></a>             Default: None
+<div class="highlight"><pre><span></span><code><a id="__codelineno-7-1" name="__codelineno-7-1" href="#__codelineno-7-1"></a>            Argument: --monitor-image-names
+<a id="__codelineno-7-2" name="__codelineno-7-2" href="#__codelineno-7-2"></a>Environment Variable: WATCHTOWER_MONITOR_IMAGE_NAMES
+<a id="__codelineno-7-3" name="__codelineno-7-3" href="#__codelineno-7-3"></a>                Type: Comma or space-separated string list
+<a id="__codelineno-7-4" name="__codelineno-7-4" href="#__codelineno-7-4"></a>             Default: None
 </code></pre></div>
 <div class="admonition note">
 <p class="admonition-title">Note</p>
@@ -2935,10 +3011,10 @@ for details.</p>
 </div>
 <h2 id="skip_specific_images">Skip Specific Images<a class="headerlink" href="#skip_specific_images" title="Permanent link">&para;</a></h2>
 <p>Excludes containers by image name pattern from monitoring, even if they have the enable label set to <code>true</code>.</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-6-1" name="__codelineno-6-1" href="#__codelineno-6-1"></a>            Argument: --skip-image-names
-<a id="__codelineno-6-2" name="__codelineno-6-2" href="#__codelineno-6-2"></a>Environment Variable: WATCHTOWER_SKIP_IMAGE_NAMES
-<a id="__codelineno-6-3" name="__codelineno-6-3" href="#__codelineno-6-3"></a>                Type: Comma or space-separated string list
-<a id="__codelineno-6-4" name="__codelineno-6-4" href="#__codelineno-6-4"></a>             Default: None
+<div class="highlight"><pre><span></span><code><a id="__codelineno-8-1" name="__codelineno-8-1" href="#__codelineno-8-1"></a>            Argument: --skip-image-names
+<a id="__codelineno-8-2" name="__codelineno-8-2" href="#__codelineno-8-2"></a>Environment Variable: WATCHTOWER_SKIP_IMAGE_NAMES
+<a id="__codelineno-8-3" name="__codelineno-8-3" href="#__codelineno-8-3"></a>                Type: Comma or space-separated string list
+<a id="__codelineno-8-4" name="__codelineno-8-4" href="#__codelineno-8-4"></a>             Default: None
 </code></pre></div>
 <div class="admonition note">
 <p class="admonition-title">Note</p>
@@ -2949,10 +3025,10 @@ for details.</p>
 </div>
 <h2 id="scope_filter">Scope Filter<a class="headerlink" href="#scope_filter" title="Permanent link">&para;</a></h2>
 <p>Monitors containers with a <code>com.centurylinklabs.watchtower.scope</code> label matching the specified value, enabling multiple Watchtower instances.</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-7-1" name="__codelineno-7-1" href="#__codelineno-7-1"></a>            Argument: --scope
-<a id="__codelineno-7-2" name="__codelineno-7-2" href="#__codelineno-7-2"></a>Environment Variable: WATCHTOWER_SCOPE
-<a id="__codelineno-7-3" name="__codelineno-7-3" href="#__codelineno-7-3"></a>                Type: String
-<a id="__codelineno-7-4" name="__codelineno-7-4" href="#__codelineno-7-4"></a>             Default: None
+<div class="highlight"><pre><span></span><code><a id="__codelineno-9-1" name="__codelineno-9-1" href="#__codelineno-9-1"></a>            Argument: --scope
+<a id="__codelineno-9-2" name="__codelineno-9-2" href="#__codelineno-9-2"></a>Environment Variable: WATCHTOWER_SCOPE
+<a id="__codelineno-9-3" name="__codelineno-9-3" href="#__codelineno-9-3"></a>                Type: String
+<a id="__codelineno-9-4" name="__codelineno-9-4" href="#__codelineno-9-4"></a>             Default: None
 </code></pre></div>
 <div class="admonition note">
 <p class="admonition-title">Note</p>
@@ -2964,17 +3040,17 @@ Mismatched labels may prevent detection, leaving resources running.</p>
 </div>
 <h2 id="label_precedence">Label Precedence<a class="headerlink" href="#label_precedence" title="Permanent link">&para;</a></h2>
 <p>Allows container labels (e.g., <code>com.centurylinklabs.watchtower.monitor-only</code>, <code>com.centurylinklabs.watchtower.no-pull</code>) to override corresponding flags.</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-8-1" name="__codelineno-8-1" href="#__codelineno-8-1"></a>            Argument: --label-take-precedence
-<a id="__codelineno-8-2" name="__codelineno-8-2" href="#__codelineno-8-2"></a>Environment Variable: WATCHTOWER_LABEL_TAKE_PRECEDENCE
-<a id="__codelineno-8-3" name="__codelineno-8-3" href="#__codelineno-8-3"></a>                Type: Boolean
-<a id="__codelineno-8-4" name="__codelineno-8-4" href="#__codelineno-8-4"></a>             Default: false
+<div class="highlight"><pre><span></span><code><a id="__codelineno-10-1" name="__codelineno-10-1" href="#__codelineno-10-1"></a>            Argument: --label-take-precedence
+<a id="__codelineno-10-2" name="__codelineno-10-2" href="#__codelineno-10-2"></a>Environment Variable: WATCHTOWER_LABEL_TAKE_PRECEDENCE
+<a id="__codelineno-10-3" name="__codelineno-10-3" href="#__codelineno-10-3"></a>                Type: Boolean
+<a id="__codelineno-10-4" name="__codelineno-10-4" href="#__codelineno-10-4"></a>             Default: false
 </code></pre></div>
 <h2 id="use_docker_compose_depends-on">Use Docker Compose Depends-On<a class="headerlink" href="#use_docker_compose_depends-on" title="Permanent link">&para;</a></h2>
 <p>Enables or disables processing of the Docker Compose <a href="https://docs.docker.com/reference/compose-file/services/#depends_on" rel="noopener noreferrer" target="_blank"><code>depends_on</code></a> configuration for determining container update order.</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-9-1" name="__codelineno-9-1" href="#__codelineno-9-1"></a>            Argument: --use-compose-depends-on
-<a id="__codelineno-9-2" name="__codelineno-9-2" href="#__codelineno-9-2"></a>Environment Variable: WATCHTOWER_USE_COMPOSE_DEPENDS_ON
-<a id="__codelineno-9-3" name="__codelineno-9-3" href="#__codelineno-9-3"></a>                Type: Boolean
-<a id="__codelineno-9-4" name="__codelineno-9-4" href="#__codelineno-9-4"></a>             Default: true
+<div class="highlight"><pre><span></span><code><a id="__codelineno-11-1" name="__codelineno-11-1" href="#__codelineno-11-1"></a>            Argument: --use-compose-depends-on
+<a id="__codelineno-11-2" name="__codelineno-11-2" href="#__codelineno-11-2"></a>Environment Variable: WATCHTOWER_USE_COMPOSE_DEPENDS_ON
+<a id="__codelineno-11-3" name="__codelineno-11-3" href="#__codelineno-11-3"></a>                Type: Boolean
+<a id="__codelineno-11-4" name="__codelineno-11-4" href="#__codelineno-11-4"></a>             Default: true
 </code></pre></div>
 <ul>
 <li>By default, Watchtower automatically detects and respects Docker Compose service dependencies.</li>
@@ -3012,7 +3088,7 @@ When <a href="../update-behavior/#rolling_restart"><code>rolling-restart</code><
     <span class="md-icon" title="Last update">
       <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M21 13.1c-.1 0-.3.1-.4.2l-1 1 2.1 2.1 1-1c.2-.2.2-.6 0-.8l-1.3-1.3c-.1-.1-.2-.2-.4-.2m-1.9 1.8-6.1 6V23h2.1l6.1-6.1zM12.5 7v5.2l4 2.4-1 1L11 13V7zM11 21.9c-5.1-.5-9-4.8-9-9.9C2 6.5 6.5 2 12 2c5.3 0 9.6 4.1 10 9.3-.3-.1-.6-.2-1-.2s-.7.1-1 .2C19.6 7.2 16.2 4 12 4c-4.4 0-8 3.6-8 8 0 4.1 3.1 7.5 7.1 7.9l-.1.2z"/></svg>
     </span>
-    <span class="git-revision-date-localized-plugin git-revision-date-localized-plugin-timeago" title="July 14, 2026 14:36:11 UTC"><span class="timeago" datetime="2026-07-14T14:36:11+00:00" locale="en"></span></span><span class="git-revision-date-localized-plugin git-revision-date-localized-plugin-iso_date" title="July 14, 2026 14:36:11 UTC">2026-07-14</span>
+    <span class="git-revision-date-localized-plugin git-revision-date-localized-plugin-timeago" title="July 18, 2026 23:08:33 UTC"><span class="timeago" datetime="2026-07-18T23:08:33+00:00" locale="en"></span></span><span class="git-revision-date-localized-plugin git-revision-date-localized-plugin-iso_date" title="July 18, 2026 23:08:33 UTC">2026-07-18</span>
   </span>
 
     
