@@ -760,46 +760,64 @@ func TestBuildFilterEnableLabel(t *testing.T) {
 	require.NoError(t, err)
 	assert.Contains(t, desc, "with label")
 	assert.Contains(t, desc, `com.centurylinklabs.watchtower.enable`)
-	assert.Contains(t, desc, "without label")
-	assert.Contains(t, desc, `com.centurylinklabs.watchtower.enable="false"`)
 
+	// Container without enable label: excluded because enableLabel requires it.
 	container := new(mockContainer.FilterableContainer)
 	container.On("IsWatchtower").Return(false).Maybe()
 	container.On("Enabled").Return(false, false).Maybe()
-	container.On("Scope").Return("", false).Maybe() // No scope set, defaults to "none"
-	container.On("GetLabel", enableLabelKey).Return("", false).Maybe()
-	container.On("Name").Return("/test").Maybe()
-	assert.False(t, filter(container))
-	container.AssertExpectations(t)
-
-	container = new(mockContainer.FilterableContainer)
-	container.On("IsWatchtower").Return(false).Maybe()
-	container.On("Name").Return("Invalid").Maybe()
-	container.On("Enabled").Return(true, true).Maybe()
-	container.On("Scope").Return("", false).Maybe() // No scope set, defaults to "none"
-	container.On("GetLabel", enableLabelKey).Return("", false).Maybe()
-	container.On("Name").Return("/test").Maybe()
-	assert.False(t, filter(container))
-	container.AssertExpectations(t)
-
-	container = new(mockContainer.FilterableContainer)
-	container.On("IsWatchtower").Return(false).Maybe()
+	container.On("Scope").Return("", false).Maybe()
 	container.On("Name").Return("test").Maybe()
-	container.On("Enabled").Return(true, true).Maybe()
-	container.On("Scope").Return("", false).Maybe() // No scope set, defaults to "none"
-	container.On("GetLabel", enableLabelKey).Return("", false).Maybe()
-	container.On("Name").Return("/test").Maybe()
 	assert.False(t, filter(container))
 	container.AssertExpectations(t)
 
+	// Container with enable=false: excluded by boolean parsing.
+	container = new(mockContainer.FilterableContainer)
+	container.On("IsWatchtower").Return(false).Maybe()
+	container.On("Enabled").Return(false, true).Maybe()
+	container.On("Scope").Return("", false).Maybe()
+	container.On("Name").Return("test").Maybe()
+	assert.False(t, filter(container))
+	container.AssertExpectations(t)
+
+	// Container with enable=true: included.
 	container = new(mockContainer.FilterableContainer)
 	container.On("IsWatchtower").Return(false).Once()
 	container.On("Enabled").Return(true, true).Maybe()
 	container.On("Scope").Return("", false).Once()
-	container.On("GetLabel", enableLabelKey).Return("true", true).Times(2)
 	container.On("Name").Return("test").Maybe()
 	result := filter(container)
 	assert.True(t, result)
+	container.AssertExpectations(t)
+}
+
+// TestBuildFilterEnableLabelPreservesUserCriteria verifies that user-provided
+// enabled label criteria for the enable-label key are not silently overwritten
+// by the boolean enableLabel flag. Both filters apply independently.
+func TestBuildFilterEnableLabelPreservesUserCriteria(t *testing.T) {
+	t.Parallel()
+
+	// User requests only containers with enable=false, while enableLabel=true
+	// requires enable=true. These conflict, so a container with enable=true
+	// must be excluded by the user's exact-match criterion.
+	filter, _, err := BuildFilter(
+		[]string{"test"},
+		[]string{},
+		nil,
+		nil,
+		[]string{enableLabelKey + "=false"},
+		nil,
+		true,
+		"",
+	)
+	require.NoError(t, err)
+
+	container := new(mockContainer.FilterableContainer)
+	container.On("IsWatchtower").Return(false).Maybe()
+	container.On("Enabled").Return(true, true).Maybe()
+	container.On("GetLabel", enableLabelKey).Return("true", true).Once()
+	container.On("Scope").Return("", false).Maybe()
+	container.On("Name").Return("test").Maybe()
+	assert.False(t, filter(container))
 	container.AssertExpectations(t)
 }
 
@@ -876,10 +894,9 @@ func TestBuildFilterDisableContainer(t *testing.T) {
 	container = new(mockContainer.FilterableContainer)
 	container.On("IsWatchtower").Return(false).Maybe()
 	container.On("Enabled").Return(false, true).Maybe()
-	container.On("Scope").Return("", false).Maybe() // No scope set, defaults to "none"
-	container.On("GetLabel", enableLabelKey).Return("", false).Maybe()
+	container.On("Scope").Return("", false).Maybe()
 	container.On("Name").Return("/test").Maybe()
-	assert.True(t, filter(container))
+	assert.False(t, filter(container))
 	container.AssertExpectations(t)
 }
 

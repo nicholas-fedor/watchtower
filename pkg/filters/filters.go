@@ -444,6 +444,36 @@ func FilterByDisabledLabels(labels map[string]string, baseFilter types.Filter) t
 	}
 }
 
+// FilterByEnableLabel applies the boolean --label-enable filter.
+//
+// When enable is true, only containers whose enable label parses as true are
+// included. When enable is false, containers whose enable label parses as false
+// are excluded.
+// Absent or invalid label values follow the Enabled() defaults:
+//   - Absent is treated as not-set
+//   - Invalid text is treated as false
+//
+// Parameters:
+//   - enable: require the enable label when true, exclude false values when false.
+//   - baseFilter: base filter to chain.
+//
+// Returns:
+//   - types.Filter: filter function applying enable-label semantics and baseFilter.
+func FilterByEnableLabel(enable bool, baseFilter types.Filter) types.Filter {
+	return func(c types.FilterableContainer) bool {
+		enabled, ok := c.Enabled()
+		if ok && !enabled {
+			return false
+		}
+
+		if !ok && enable {
+			return false
+		}
+
+		return baseFilter(c)
+	}
+}
+
 // FilterByScope selects containers in a specific scope.
 //
 // Parameters:
@@ -607,12 +637,6 @@ func BuildFilter(
 		return nil, "", err
 	}
 
-	if enableLabel {
-		enabledLabelMap[enableLabelKey] = ""
-	}
-
-	disabledLabelMap[enableLabelKey] = "false"
-
 	clog := logrus.WithFields(logrus.Fields{
 		"names":                      normalizedNames,
 		"disableNames":               normalizedDisableNames,
@@ -633,6 +657,7 @@ func BuildFilter(
 	filter = FilterBySkippedImageNamePatterns(skippedImageNamePatterns, filter)
 	filter = FilterByEnabledLabels(enabledLabelMap, filter)
 	filter = FilterByDisabledLabels(disabledLabelMap, filter)
+	filter = FilterByEnableLabel(enableLabel, filter)
 
 	// Add name-based filter description.
 	if len(normalizedNames) > 0 {
@@ -690,6 +715,12 @@ func BuildFilter(
 		}
 
 		stringBuilder.WriteString(`", `)
+	}
+
+	if enableLabel {
+		stringBuilder.WriteString("with label ")
+		stringBuilder.WriteString(enableLabelKey)
+		stringBuilder.WriteString(`, `)
 	}
 
 	if len(enabledLabelMap) > 0 {
