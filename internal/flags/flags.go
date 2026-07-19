@@ -1228,8 +1228,17 @@ func getSecretFromFile(flags *pflag.FlagSet, secret string) error {
 						continue
 					}
 
-					if secret == "notification-url" && !strings.Contains(line, "://") {
-						return fmt.Errorf("%w: %s in %s", errInvalidSecretURL, line, value)
+					if secret == "notification-url" {
+						if !strings.Contains(line, "://") {
+							return errInvalidSecretURL
+						}
+
+						parsedURL, err := url.Parse(line)
+						if err != nil ||
+							parsedURL.Scheme == "" ||
+							(parsedURL.Opaque == "" && parsedURL.Host == "" && parsedURL.Path == "") {
+							return errInvalidSecretURL
+						}
 					}
 
 					values = append(values, line)
