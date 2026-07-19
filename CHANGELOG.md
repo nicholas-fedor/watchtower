@@ -22,6 +22,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Chores
 
+- Update module github.com/gofiber/schema to v1.8.3 by @renovate[bot] in [#1973](https://github.com/nicholas-fedor/watchtower/pull/1973)
 - Update nicholas-fedor/go-proxy-pull-action action to v1.1.26 by @renovate[bot] in [#1955](https://github.com/nicholas-fedor/watchtower/pull/1955)
 - Update module github.com/docker/cli to v29.6.2+incompatible by @renovate[bot] in [#1953](https://github.com/nicholas-fedor/watchtower/pull/1953)
 - Update github/codeql-action action to v4.37.1 by @renovate[bot] in [#1952](https://github.com/nicholas-fedor/watchtower/pull/1952)
