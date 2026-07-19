@@ -811,8 +811,9 @@ func TestGetSecretFromFile_SkipCommentsAndEmptyLines(t *testing.T) {
 	assert.Equal(t, []string{"discord://token@webhookid", "telegram://token@telegram?chats=@channel"}, urls)
 }
 
-// TestGetSecretFromFile_InvalidSecretURL verifies that non-URL lines in a secret
-// file are rejected with errInvalidSecretURL.
+// TestGetSecretFromFile_InvalidSecretURL verifies that non-URL lines and
+// parameterless non-logger/mock URLs in a secret file are rejected with
+// errInvalidSecretURL.
 func TestGetSecretFromFile_InvalidSecretURL(t *testing.T) {
 	cmd := new(cobra.Command)
 
@@ -836,6 +837,36 @@ func TestGetSecretFromFile_InvalidSecretURL(t *testing.T) {
 	err = getSecretFromFile(cmd.PersistentFlags(), "notification-url")
 	require.Error(t, err)
 	require.ErrorIs(t, err, errInvalidSecretURL)
+}
+
+// TestGetSecretFromFile_ParameterlessLoggerAndMockURLs verifies that
+// parameterless logger:// and mock:// URLs are accepted in a secret file.
+func TestGetSecretFromFile_ParameterlessLoggerAndMockURLs(t *testing.T) {
+	cmd := new(cobra.Command)
+
+	SetDefaults()
+	RegisterNotificationFlags(cmd)
+
+	file, err := os.CreateTemp(t.TempDir(), "watchtower-")
+	require.NoError(t, err)
+	_, err = file.WriteString(
+		"logger://\n" +
+			"mock://\n" +
+			"discord://token@webhookid\n",
+	)
+	require.NoError(t, err)
+	require.NoError(t, file.Close())
+
+	err = cmd.ParseFlags([]string{"--notification-url", file.Name()})
+	require.NoError(t, err)
+
+	err = getSecretFromFile(cmd.PersistentFlags(), "notification-url")
+	require.NoError(t, err)
+
+	urls, err := cmd.PersistentFlags().GetStringArray("notification-url")
+	require.NoError(t, err)
+
+	assert.Equal(t, []string{"logger://", "mock://", "discord://token@webhookid"}, urls)
 }
 
 func TestReadFlags_Errors(t *testing.T) {

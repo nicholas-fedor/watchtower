@@ -1234,10 +1234,14 @@ func getSecretFromFile(flags *pflag.FlagSet, secret string) error {
 						}
 
 						parsedURL, err := url.Parse(line)
-						if err != nil ||
-							parsedURL.Scheme == "" ||
-							(parsedURL.Opaque == "" && parsedURL.Host == "" && parsedURL.Path == "") {
+						if err != nil || parsedURL.Scheme == "" {
 							return errInvalidSecretURL
+						}
+
+						if parsedURL.Opaque == "" && parsedURL.Host == "" && parsedURL.Path == "" {
+							if parsedURL.Scheme != "logger" && parsedURL.Scheme != "mock" {
+								return errInvalidSecretURL
+							}
 						}
 					}
 
