@@ -8,6 +8,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Chores
+
+- Update nicholas-fedor/go-proxy-pull-action action to v1.1.29 by @renovate[bot] in [#1993](https://github.com/nicholas-fedor/watchtower/pull/1993)
+
+## [1.20.0] - 2026-07-21
+
 ### Added
 
 - Add label-based container enable and disable filtering by @nicholas-fedor in [#1969](https://github.com/nicholas-fedor/watchtower/pull/1969)
@@ -22,6 +28,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Chores
 
+- Update module github.com/nicholas-fedor/shoutrrr to v0.16.2 by @renovate[bot] in [#1991](https://github.com/nicholas-fedor/watchtower/pull/1991)
 - Update github/codeql-action action to v4.37.2 by @renovate[bot] in [#1989](https://github.com/nicholas-fedor/watchtower/pull/1989)
 - Update actions/setup-python action to v7 by @renovate[bot] in [#1978](https://github.com/nicholas-fedor/watchtower/pull/1978)
 - Update module github.com/prometheus/client_golang to v1.24.0 by @renovate[bot] in [#1986](https://github.com/nicholas-fedor/watchtower/pull/1986)
@@ -3296,7 +3303,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## Compare Releases
 
-- [unreleased](https://github.com/nicholas-fedor/watchtower/compare/v1.19.0...HEAD)
+- [unreleased](https://github.com/nicholas-fedor/watchtower/compare/v1.20.0...HEAD)
+- [1.20.0](https://github.com/nicholas-fedor/watchtower/compare/v1.19.0...v1.20.0)
 - [1.19.0](https://github.com/nicholas-fedor/watchtower/compare/v1.18.1...v1.19.0)
 - [1.18.1](https://github.com/nicholas-fedor/watchtower/compare/v1.18.0...v1.18.1)
 - [1.18.0](https://github.com/nicholas-fedor/watchtower/compare/v1.17.2...v1.18.0)
