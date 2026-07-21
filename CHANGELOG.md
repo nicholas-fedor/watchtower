@@ -22,6 +22,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Chores
 
+- Update nicholas-fedor/go-proxy-pull-action action to v1.1.28 by @renovate[bot] in [#1985](https://github.com/nicholas-fedor/watchtower/pull/1985)
 - Update module github.com/klauspost/compress to v1.19.1 by @renovate[bot] in [#1983](https://github.com/nicholas-fedor/watchtower/pull/1983)
 - Update module github.com/go-logr/logr to v1.4.4 by @renovate[bot] in [#1982](https://github.com/nicholas-fedor/watchtower/pull/1982)
 - Update go-openapi packages by @renovate[bot] in [#1980](https://github.com/nicholas-fedor/watchtower/pull/1980)
