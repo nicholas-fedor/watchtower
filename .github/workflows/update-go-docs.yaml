@@ -19,7 +19,7 @@ jobs:
           egress-policy: audit
 
       - name: Run pkg.go.dev Update
-        uses: nicholas-fedor/go-proxy-pull-action@45197e0e7fb9e8fc8c97166d67a9a4a64ee900b3 # v1.1.27
+        uses: nicholas-fedor/go-proxy-pull-action@e18e868e8e095bfdb15dcc45e90545838a02fd60 # v1.1.28
         with:
           goproxy: https://proxy.golang.org
           import_path: github.com/nicholas-fedor/watchtower
