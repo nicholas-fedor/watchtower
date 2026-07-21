@@ -22,6 +22,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Chores
 
+- Update go-openapi packages by @renovate[bot] in [#1980](https://github.com/nicholas-fedor/watchtower/pull/1980)
+- Update actions/checkout action to v7.0.1 by @renovate[bot] in [#1979](https://github.com/nicholas-fedor/watchtower/pull/1979)
 - Update nicholas-fedor/go-proxy-pull-action action to v1.1.27 by @renovate[bot] in [#1977](https://github.com/nicholas-fedor/watchtower/pull/1977)
 - Update go-openapi packages to v0.27.1 by @renovate[bot] in [#1975](https://github.com/nicholas-fedor/watchtower/pull/1975)
 - Update module github.com/gofiber/schema to v1.8.3 by @renovate[bot] in [#1973](https://github.com/nicholas-fedor/watchtower/pull/1973)
