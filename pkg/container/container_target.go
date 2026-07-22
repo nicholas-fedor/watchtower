@@ -97,7 +97,26 @@ func StartTargetContainer(
 			WithField("new_id", createdContainerID).
 			Debug("Failed to start new container")
 
-		return createdContainerID, fmt.Errorf("%w: %w", errStartContainerFailed, err)
+		// Remove the unstarted container so retries are not blocked by name
+		// conflicts and orphaned created containers do not accumulate.
+		cleanupCtx, cancel := context.WithTimeout(
+			context.WithoutCancel(ctx),
+			cleanupTimeout,
+		)
+		defer cancel()
+
+		_, rmErr := api.ContainerRemove(
+			cleanupCtx,
+			string(createdContainerID),
+			dockerClient.ContainerRemoveOptions{Force: true},
+		)
+		if rmErr != nil {
+			clog.WithError(rmErr).
+				WithField("new_id", createdContainerID).
+				Warn("Failed to clean up container after start error")
+		}
+
+		return "", fmt.Errorf("%w: %w", errStartContainerFailed, err)
 	}
 
 	// Log detailed start message
@@ -160,7 +179,11 @@ func CreateTargetContainer(
 	handleCPUSettings(hostConfig, cpuCopyMode, isPodman, clog)
 
 	// Log network details for debugging, including MAC address validation.
-	isHostNetwork := sourceContainer.ContainerInfo().HostConfig.NetworkMode.IsHost()
+	isHostNetwork := false
+	if info := sourceContainer.ContainerInfo(); info != nil && info.HostConfig != nil {
+		isHostNetwork = info.HostConfig.NetworkMode.IsHost()
+	}
+
 	debugLogMacAddress(
 		networkConfig,
 		sourceContainer.ID(),

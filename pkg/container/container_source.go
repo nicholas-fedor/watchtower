@@ -343,7 +343,8 @@ func StopAndRemoveSourceContainer(
 
 	// Check if the container has AutoRemove enabled in its HostConfig, which automatically removes
 	// the container after stopping, eliminating the need for an explicit removal call.
-	if sourceContainer.ContainerInfo().HostConfig.AutoRemove {
+	info := sourceContainer.ContainerInfo()
+	if info != nil && info.HostConfig != nil && info.HostConfig.AutoRemove {
 		// Log that the container is skipped due to AutoRemove configuration.
 		clog.Debug("Skipping container removal due to AutoRemove configuration")
 
@@ -448,7 +449,11 @@ func getNetworkConfig(
 		return config
 	}
 
-	networkMode := containerInfo.HostConfig.NetworkMode
+	var networkMode dockerContainer.NetworkMode
+	if containerInfo.HostConfig != nil {
+		networkMode = containerInfo.HostConfig.NetworkMode
+	}
+
 	isHostNetwork := string(networkMode) == "host"
 	clog.WithFields(logrus.Fields{
 		"network_mode": networkMode,

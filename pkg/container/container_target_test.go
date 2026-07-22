@@ -240,14 +240,26 @@ var _ = ginkgo.Describe("Target Container Operations", func() {
 			client.startFunc = func(_ context.Context, _ string, _ dockerClient.ContainerStartOptions) (dockerClient.ContainerStartResult, error) {
 				return dockerClient.ContainerStartResult{}, startErr
 			}
+
+			var removedID string
+
+			client.removeFunc = func(_ context.Context, id string, _ dockerClient.ContainerRemoveOptions) (dockerClient.ContainerRemoveResult, error) {
+				removedID = id
+
+				client.removeFuncCalled.Store(true)
+
+				return dockerClient.ContainerRemoveResult{}, nil
+			}
 			newID, err := StartTargetContainer(
 				context.Background(), client, mockCont, networkConfig,
 				true, "1.44", flags.DockerAPIMinVersion, false, "auto", false,
 			)
-			gomega.Expect(newID).To(gomega.Equal(types.ContainerID("new_container_id")))
+			gomega.Expect(newID).To(gomega.BeEmpty())
 			gomega.Expect(err).To(gomega.HaveOccurred())
 			gomega.Expect(err.Error()).To(gomega.ContainSubstring("start failed"))
 			gomega.Expect(logOutput.String()).To(gomega.ContainSubstring("Failed to start new container"))
+			gomega.Expect(client.removeFuncCalled.Load()).To(gomega.BeTrue())
+			gomega.Expect(removedID).To(gomega.Equal("new_container_id"))
 		})
 
 		ginkgo.It("should handle ContainerCreate Conflict error", func() {
@@ -289,7 +301,7 @@ var _ = ginkgo.Describe("Target Container Operations", func() {
 				context.Background(), client, mockCont, networkConfig,
 				true, "1.44", flags.DockerAPIMinVersion, false, "auto", false,
 			)
-			gomega.Expect(newID).To(gomega.Equal(types.ContainerID("new_container_id")))
+			gomega.Expect(newID).To(gomega.BeEmpty())
 			gomega.Expect(err).To(gomega.HaveOccurred())
 			gomega.Expect(err.Error()).To(gomega.ContainSubstring("failed to start container"))
 			gomega.Expect(cerrdefs.IsConflict(err)).To(gomega.BeTrue(),
@@ -297,6 +309,7 @@ var _ = ginkgo.Describe("Target Container Operations", func() {
 			gomega.Expect(errors.Is(err, cerrdefs.ErrConflict)).To(gomega.BeTrue(),
 				"wrapped error should be detectable via errors.Is")
 			gomega.Expect(logOutput.String()).To(gomega.ContainSubstring("Failed to start new container"))
+			gomega.Expect(client.removeFuncCalled.Load()).To(gomega.BeTrue())
 		})
 
 		ginkgo.It("should handle ContainerStart NotFound error", func() {
@@ -307,9 +320,10 @@ var _ = ginkgo.Describe("Target Container Operations", func() {
 				context.Background(), client, mockCont, networkConfig,
 				true, "1.44", flags.DockerAPIMinVersion, false, "auto", false,
 			)
-			gomega.Expect(newID).To(gomega.Equal(types.ContainerID("new_container_id")))
+			gomega.Expect(newID).To(gomega.BeEmpty())
 			gomega.Expect(err).To(gomega.HaveOccurred())
 			gomega.Expect(err.Error()).To(gomega.ContainSubstring("failed to start container"))
+			gomega.Expect(client.removeFuncCalled.Load()).To(gomega.BeTrue())
 		})
 
 		ginkgo.It("should log successful container start", func() {
