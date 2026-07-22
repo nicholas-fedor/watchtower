@@ -34,6 +34,11 @@ type Operations interface {
 		containerID string,
 		options dockerClient.ContainerStartOptions,
 	) (dockerClient.ContainerStartResult, error)
+	ContainerInspect(
+		ctx context.Context,
+		containerID string,
+		options dockerClient.ContainerInspectOptions,
+	) (dockerClient.ContainerInspectResult, error)
 	ContainerRemove(
 		ctx context.Context,
 		containerID string,

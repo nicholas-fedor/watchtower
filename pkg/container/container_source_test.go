@@ -783,6 +783,47 @@ var _ = ginkgo.Describe("StopAndRemoveSourceContainer", func() {
 		})
 	})
 
+	ginkgo.When("container HostConfig is nil", func() {
+		ginkgo.It("should stop and remove without panicking", func() {
+			container := MockContainer(
+				WithContainerState(dockerContainer.State{Running: true}),
+				func(c *dockerContainer.InspectResponse, _ *dockerImage.InspectResponse) {
+					c.HostConfig = nil
+				},
+			)
+			cid := container.ContainerInfo().ID
+
+			mockServer.AppendHandlers(
+				ghttp.CombineHandlers(
+					ghttp.VerifyRequest(
+						"POST",
+						gomega.HaveSuffix(fmt.Sprintf("containers/%s/stop", cid)),
+					),
+					ghttp.RespondWith(http.StatusNoContent, nil),
+				),
+				ghttp.CombineHandlers(
+					ghttp.VerifyRequest(
+						"DELETE",
+						gomega.MatchRegexp(fmt.Sprintf("^/v[0-9.]+/containers/%s$", cid)),
+					),
+					ghttp.RespondWith(http.StatusNoContent, nil),
+				),
+			)
+
+			err := StopAndRemoveSourceContainer(
+				context.Background(),
+				docker,
+				container,
+				10*time.Second,
+				true,
+			)
+			gomega.Expect(err).ToNot(gomega.HaveOccurred())
+			// Stop + DELETE (nil HostConfig is not AutoRemove).
+			// ReceivedRequests includes the initial API version ping.
+			gomega.Expect(mockServer.ReceivedRequests()).To(gomega.HaveLen(3))
+		})
+	})
+
 	ginkgo.When("container is not running", func() {
 		ginkgo.It("should skip stop and remove successfully", func() {
 			container := MockContainer(

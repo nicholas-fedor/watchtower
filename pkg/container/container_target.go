@@ -97,7 +97,13 @@ func StartTargetContainer(
 			WithField("new_id", createdContainerID).
 			Debug("Failed to start new container")
 
-		return createdContainerID, fmt.Errorf("%w: %w", errStartContainerFailed, err)
+		// Start failures from cancellation or transport errors can leave the
+		// container state ambiguous. Inspect first and force-remove only when
+		// the container is still stopped so a late-started instance is kept.
+
+		cleanupFailedStartContainer(ctx, api, clog, createdContainerID)
+
+		return "", fmt.Errorf("%w: %w", errStartContainerFailed, err)
 	}
 
 	// Log detailed start message
@@ -109,6 +115,60 @@ func StartTargetContainer(
 	clog.WithField("new_id", createdContainerID.ShortID()).Info(message)
 
 	return createdContainerID, nil
+}
+
+// cleanupFailedStartContainer inspects a container that failed to start and
+// force-removes it only when it is still stopped. Cancellation or transport
+// failures can leave state ambiguous. A late-started container is left alone.
+//
+// Parameters:
+//   - parentCtx: Parent context; deadlines are detached so cleanup can finish.
+//   - api: Interface for container operations.
+//   - clog: Logger with container context fields.
+//   - containerID: ID of the container created before the start failure.
+func cleanupFailedStartContainer(
+	parentCtx context.Context,
+	api Operations,
+	clog *logrus.Entry,
+	containerID types.ContainerID,
+) {
+	cleanupCtx, cancel := context.WithTimeout(
+		context.WithoutCancel(parentCtx),
+		cleanupTimeout,
+	)
+	defer cancel()
+
+	inspectResult, inspectErr := api.ContainerInspect(
+		cleanupCtx,
+		string(containerID),
+		dockerClient.ContainerInspectOptions{},
+	)
+	if inspectErr != nil {
+		clog.WithError(inspectErr).
+			WithField("new_id", containerID).
+			Debug("Failed to inspect container after start error")
+
+		return
+	}
+
+	state := inspectResult.Container.State
+	if state != nil && state.Running {
+		clog.WithField("new_id", containerID).
+			Debug("Skipped cleanup of running container after start error")
+
+		return
+	}
+
+	_, rmErr := api.ContainerRemove(
+		cleanupCtx,
+		string(containerID),
+		dockerClient.ContainerRemoveOptions{Force: true},
+	)
+	if rmErr != nil {
+		clog.WithError(rmErr).
+			WithField("new_id", containerID).
+			Debug("Failed to clean up container after start error")
+	}
 }
 
 // CreateTargetContainer creates a new container based on the source container's
@@ -160,7 +220,11 @@ func CreateTargetContainer(
 	handleCPUSettings(hostConfig, cpuCopyMode, isPodman, clog)
 
 	// Log network details for debugging, including MAC address validation.
-	isHostNetwork := sourceContainer.ContainerInfo().HostConfig.NetworkMode.IsHost()
+	isHostNetwork := false
+	if info := sourceContainer.ContainerInfo(); info != nil && info.HostConfig != nil {
+		isHostNetwork = info.HostConfig.NetworkMode.IsHost()
+	}
+
 	debugLogMacAddress(
 		networkConfig,
 		sourceContainer.ID(),
