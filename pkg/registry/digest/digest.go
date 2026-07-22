@@ -152,10 +152,12 @@ func CompareDigest(
 }
 
 // isLocalImageNotFound reports whether the digest fetch failed because the
-// registry returned 404 for a manifest request and the container's image name
-// does not explicitly specify a registry domain. That pattern indicates a
-// locally built image that has never been pushed, so there is no remote
-// manifest to compare against.
+// registry returned 404 for a manifest request and the container's image looks
+// local-only: domain-less Config.Image and no registry-qualified RepoDigests.
+//
+// Official Hub short names (for example nginx) often store Config.Image without
+// a domain but still have docker.io/... RepoDigests. Those must not be cached as
+// local-only after a transient 404, or updates are skipped for the process life.
 //
 // Parameters:
 //   - container: Container whose image name is inspected.
@@ -185,7 +187,43 @@ func isLocalImageNotFound(container types.Container, err error) bool {
 		}
 	}
 
-	return !strings.ContainsAny(namePart, "./")
+	if strings.ContainsAny(namePart, "./") {
+		return false
+	}
+
+	// Registry-qualified digests mean the image was pulled from a remote source;
+	// a 404 is a probe failure, not proof the image is local-only. Official Hub
+	// short names often keep a domain-less Config.Image while RepoDigests still
+	// records docker.io/library/... .
+	for _, digestRef := range container.ImageInfo().RepoDigests {
+		repoPart, _, _ := strings.Cut(digestRef, "@")
+		if repoPartHasRegistryHost(repoPart) {
+			return false
+		}
+	}
+
+	return true
+}
+
+// repoPartHasRegistryHost reports whether a RepoDigest repository path includes
+// a registry host (hostname with a dot, or host:port).
+func repoPartHasRegistryHost(repoPart string) bool {
+	// Strip optional scheme leftovers; RepoDigests are host/path form.
+	hostOrName, remainder, hasSlash := strings.Cut(repoPart, "/")
+	if !hasSlash {
+		// Bare name (e.g. "nginx") has no host segment.
+		return false
+	}
+
+	// host:port/path or registry.example.com/path
+	if strings.Contains(hostOrName, ":") || strings.Contains(hostOrName, ".") {
+		return true
+	}
+
+	// Remainder unused; keep signature clear for future extension.
+	_ = remainder
+
+	return false
 }
 
 // CompareDigestWithRemote checks whether a container's current image digest matches

@@ -690,6 +690,40 @@ func TestFilterByImageMalformed(t *testing.T) {
 	container.AssertExpectations(t)
 }
 
+func TestMatchImageAndTagHostPortRegistry(t *testing.T) {
+	t.Parallel()
+
+	// host:port must not be treated as image:tag; different tags must not match.
+	assert.False(t, matchImageAndTag("localhost:5000/nginx:alpine", "localhost:5000/nginx:latest"))
+	assert.True(t, matchImageAndTag("localhost:5000/nginx:alpine", "localhost:5000/nginx:alpine"))
+	assert.True(t, matchImageAndTag("localhost:5000/nginx:alpine", "localhost:5000/nginx"))
+	assert.False(t, matchImageAndTag("my.reg:443/a/b:1", "my.reg:443/a/b:2"))
+	assert.True(t, matchImageAndTag("my.reg:443/a/b:1", "my.reg:443/a/b:1"))
+
+	// Standard image:tag matching still works.
+	assert.False(t, matchImageAndTag("nginx:latest", "nginx:develop"))
+	assert.True(t, matchImageAndTag("nginx:latest", "nginx:latest"))
+	assert.True(t, matchImageAndTag("nginx:latest", "nginx"))
+}
+
+func TestFilterByImageHostPortRegistry(t *testing.T) {
+	t.Parallel()
+
+	filterTagged := FilterByImage([]string{"localhost:5000/app:v2"}, NoFilter)
+
+	container := new(mockContainer.FilterableContainer)
+	container.On("ImageName").Return("localhost:5000/app:v1")
+	container.On("Name").Return("/app")
+	assert.False(t, filterTagged(container))
+	container.AssertExpectations(t)
+
+	container = new(mockContainer.FilterableContainer)
+	container.On("ImageName").Return("localhost:5000/app:v2")
+	container.On("Name").Return("/app")
+	assert.True(t, filterTagged(container))
+	container.AssertExpectations(t)
+}
+
 func TestBuildFilter(t *testing.T) {
 	t.Parallel()
 

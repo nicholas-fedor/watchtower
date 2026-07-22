@@ -286,6 +286,11 @@ func TestIsLocalImageNotFound(t *testing.T) {
 	t.Run("true for domain-less Config.Image with wrapped ErrManifestNotFound", func(t *testing.T) {
 		mc := mockTypes.NewMockContainer(t)
 		mc.On("HasImageInfo").Return(true)
+		mc.On("ImageInfo").Return(&dockerImage.InspectResponse{
+			RepoDigests: []string{
+				"atlas-badgerdb@sha256:80f07677bee57274a48929d0688bf0cfabe5e83f06f2f152dab4076445d6ab35",
+			},
+		})
 		mc.On("ContainerInfo").Return(&dockerContainer.InspectResponse{
 			Config: &dockerContainer.Config{Image: "atlas-badgerdb"},
 		})
@@ -297,6 +302,11 @@ func TestIsLocalImageNotFound(t *testing.T) {
 	t.Run("true for domain-less image with version tag containing dots", func(t *testing.T) {
 		mc := mockTypes.NewMockContainer(t)
 		mc.On("HasImageInfo").Return(true)
+		mc.On("ImageInfo").Return(&dockerImage.InspectResponse{
+			RepoDigests: []string{
+				"my-app@sha256:80f07677bee57274a48929d0688bf0cfabe5e83f06f2f152dab4076445d6ab35",
+			},
+		})
 		mc.On("ContainerInfo").Return(&dockerContainer.InspectResponse{
 			Config: &dockerContainer.Config{Image: "my-app:1.0"},
 		})
@@ -310,6 +320,25 @@ func TestIsLocalImageNotFound(t *testing.T) {
 		mc.On("HasImageInfo").Return(true)
 		mc.On("ContainerInfo").Return(&dockerContainer.InspectResponse{
 			Config: &dockerContainer.Config{Image: "registry.example.com/app:latest"},
+		})
+
+		err := fmt.Errorf("%w: status 404 Not Found", ErrManifestNotFound)
+		assert.False(t, isLocalImageNotFound(mc, err))
+	})
+
+	t.Run("false for Hub short name with registry-qualified RepoDigests", func(t *testing.T) {
+		// Official images often keep Config.Image as "nginx" while RepoDigests
+		// records docker.io/library/nginx@sha256:.... A transient 404 must not
+		// mark them local-only for the process lifetime.
+		mc := mockTypes.NewMockContainer(t)
+		mc.On("HasImageInfo").Return(true)
+		mc.On("ImageInfo").Return(&dockerImage.InspectResponse{
+			RepoDigests: []string{
+				"docker.io/library/nginx@sha256:80f07677bee57274a48929d0688bf0cfabe5e83f06f2f152dab4076445d6ab35",
+			},
+		})
+		mc.On("ContainerInfo").Return(&dockerContainer.InspectResponse{
+			Config: &dockerContainer.Config{Image: "nginx:latest"},
 		})
 
 		err := fmt.Errorf("%w: status 404 Not Found", ErrManifestNotFound)
