@@ -1217,15 +1217,17 @@ func TestValidateRollingRestartDependenciesAcceptsCancelableContext(t *testing.T
 
 	// Test with timeout context
 	t.Run("timeout context is propagated to client", func(t *testing.T) {
-		ctx, cancel := context.WithTimeout(context.Background(), time.Millisecond)
+		// Use a short but non-trivial timeout; Windows timer resolution can
+		// delay sub-15ms deadlines, so wait by polling rather than a fixed sleep.
+		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Millisecond)
 		defer cancel()
 
-		// Wait for context to timeout; sleep long enough for the deadline
-		// to pass reliably across all platforms, including Windows where
-		// timer resolution can delay very short timeouts.
-		time.Sleep(time.Millisecond * 10)
+		deadline := time.Now().Add(500 * time.Millisecond)
+		for ctx.Err() == nil {
+			require.True(t, time.Now().Before(deadline), "context deadline should expire within wait window")
+			time.Sleep(5 * time.Millisecond)
+		}
 
-		// Verify context has expired before proceeding
 		require.ErrorIs(t, ctx.Err(), context.DeadlineExceeded)
 
 		// Mock expects ListContainers to be called with timed out context
