@@ -10,7 +10,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Chores
 
+- Update github/codeql-action action to v4.37.3 by @renovate[bot] in [#1995](https://github.com/nicholas-fedor/watchtower/pull/1995)
 - Update nicholas-fedor/go-proxy-pull-action action to v1.1.29 by @renovate[bot] in [#1993](https://github.com/nicholas-fedor/watchtower/pull/1993)
+
+### Fixed
+
+- Use application context for async update execution by @nicholas-fedor in [#1997](https://github.com/nicholas-fedor/watchtower/pull/1997)
 
 ## [1.20.0] - 2026-07-21
 
