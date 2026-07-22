@@ -399,10 +399,12 @@ func WithDevices(devices []dockerContainer.DeviceMapping) MockContainerUpdate {
 type MockClient struct {
 	createFunc        func(context.Context, *dockerContainer.Config, *dockerContainer.HostConfig, *dockerNetwork.NetworkingConfig, *ocispec.Platform, string) (dockerClient.ContainerCreateResult, error)
 	startFunc         func(context.Context, string, dockerClient.ContainerStartOptions) (dockerClient.ContainerStartResult, error)
+	inspectFunc       func(context.Context, string, dockerClient.ContainerInspectOptions) (dockerClient.ContainerInspectResult, error)
 	removeFunc        func(context.Context, string, dockerClient.ContainerRemoveOptions) (dockerClient.ContainerRemoveResult, error)
 	connectFunc       func(context.Context, string, string, *dockerNetwork.EndpointSettings) (dockerClient.NetworkConnectResult, error)
 	renameFunc        func(context.Context, string, string) (dockerClient.ContainerRenameResult, error)
 	removeFuncCalled  atomic.Bool
+	inspectFuncCalled atomic.Bool
 	createFuncCalled  atomic.Bool
 	startFuncCalled   atomic.Bool
 	connectFuncCalled atomic.Bool
@@ -456,6 +458,39 @@ func (m *MockClient) ContainerStart(
 	}
 
 	return dockerClient.ContainerStartResult{}, nil
+}
+
+// ContainerInspect mocks inspection of a container.
+//
+// Parameters:
+//   - ctx: Context for the operation.
+//   - containerID: ID of the container to inspect.
+//   - options: Inspect options.
+//
+// Returns:
+//   - dockerClient.ContainerInspectResult: Mocked inspect result.
+//   - error: Error if the mock inspect function is set to fail, nil otherwise.
+func (m *MockClient) ContainerInspect(
+	ctx context.Context,
+	containerID string,
+	options dockerClient.ContainerInspectOptions,
+) (dockerClient.ContainerInspectResult, error) {
+	m.inspectFuncCalled.Store(true)
+
+	if m.inspectFunc != nil {
+		return m.inspectFunc(ctx, containerID, options)
+	}
+
+	// Default: created but not running (typical after a start failure).
+	return dockerClient.ContainerInspectResult{
+		Container: dockerContainer.InspectResponse{
+			ID: containerID,
+			State: &dockerContainer.State{
+				Status:  "created",
+				Running: false,
+			},
+		},
+	}, nil
 }
 
 // ContainerRemove mocks the removal of a container.

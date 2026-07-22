@@ -818,6 +818,9 @@ var _ = ginkgo.Describe("StopAndRemoveSourceContainer", func() {
 				true,
 			)
 			gomega.Expect(err).ToNot(gomega.HaveOccurred())
+			// Stop + DELETE (nil HostConfig is not AutoRemove).
+			// ReceivedRequests includes the initial API version ping.
+			gomega.Expect(mockServer.ReceivedRequests()).To(gomega.HaveLen(3))
 		})
 	})
 
