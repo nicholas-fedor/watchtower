@@ -1385,7 +1385,7 @@ var _ = ginkgo.Describe("the auth module", func() {
 			gomega.Expect(result).To(gomega.Equal(inputAuth))
 		})
 
-		ginkgo.It("should handle missing username field", func() {
+		ginkgo.It("should transform password-only credentials to Basic auth", func() {
 			creds := struct {
 				Password string `json:"password"`
 			}{
@@ -1395,7 +1395,9 @@ var _ = ginkgo.Describe("the auth module", func() {
 			inputAuth := base64.StdEncoding.EncodeToString(jsonData)
 
 			result := auth.TransformAuth(inputAuth)
-			gomega.Expect(result).To(gomega.Equal(inputAuth))
+			decoded, err := base64.StdEncoding.DecodeString(result)
+			gomega.Expect(err).NotTo(gomega.HaveOccurred())
+			gomega.Expect(string(decoded)).To(gomega.Equal(":testpass"))
 		})
 	})
 

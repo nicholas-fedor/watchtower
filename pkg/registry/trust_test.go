@@ -115,8 +115,8 @@ func TestEncodedConfigCredentials_FileStoreNoUsername(t *testing.T) {
 }
 
 // TestEncodedConfigCredentials_FileStoreUsernameOnly tests that EncodedConfigCredentials
-// returns empty string and nil error when the Docker config file's auth entry has
-// a username but no password.
+// returns empty string when the Docker config auth entry has a username but no
+// password or identity token (not usable for registry auth).
 func TestEncodedConfigCredentials_FileStoreUsernameOnly(t *testing.T) {
 	tempDir, err := os.MkdirTemp("", "watchtower-test-docker-config")
 	require.NoError(t, err)
@@ -147,6 +147,72 @@ func TestEncodedConfigCredentials_FileStoreUsernameOnly(t *testing.T) {
 	credentials, err := EncodedConfigCredentials(normalizedRef.String())
 	require.NoError(t, err)
 	assert.Empty(t, credentials)
+}
+
+// TestEncodedConfigCredentials_IdentityToken accepts ECR-style identity tokens
+// without username/password.
+func TestEncodedConfigCredentials_IdentityToken(t *testing.T) {
+	tempDir, err := os.MkdirTemp("", "watchtower-test-docker-config")
+	require.NoError(t, err)
+
+	defer os.RemoveAll(tempDir)
+
+	configContent, err := json.Marshal(map[string]any{
+		"auths": map[string]any{
+			"123456789012.dkr.ecr.us-east-1.amazonaws.com": map[string]string{
+				"identitytoken": "eyJlY3ItdG9rZW4iOiJ0ZXN0In0=",
+			},
+		},
+	})
+	require.NoError(t, err)
+
+	configPath := filepath.Join(tempDir, "config.json")
+	require.NoError(t, os.WriteFile(configPath, configContent, 0o600))
+
+	t.Setenv("DOCKER_CONFIG", tempDir)
+	t.Setenv("HOME", tempDir)
+	dockerCliConfig.SetDir(tempDir)
+
+	credentials, err := EncodedConfigCredentials(
+		"123456789012.dkr.ecr.us-east-1.amazonaws.com/app:latest",
+	)
+	require.NoError(t, err)
+	assert.NotEmpty(t, credentials)
+
+	authConfig := decodeEncodedAuth(t, credentials)
+	assert.Equal(t, "eyJlY3ItdG9rZW4iOiJ0ZXN0In0=", authConfig["identitytoken"])
+}
+
+// TestEncodedConfigCredentials_PasswordOnly accepts password-as-token entries
+// with an empty username (common for GHCR PATs stored in config).
+func TestEncodedConfigCredentials_PasswordOnly(t *testing.T) {
+	tempDir, err := os.MkdirTemp("", "watchtower-test-docker-config")
+	require.NoError(t, err)
+
+	defer os.RemoveAll(tempDir)
+
+	configContent, err := json.Marshal(map[string]any{
+		"auths": map[string]any{
+			"ghcr.io": map[string]string{
+				"password": "ghp_only_token",
+			},
+		},
+	})
+	require.NoError(t, err)
+
+	configPath := filepath.Join(tempDir, "config.json")
+	require.NoError(t, os.WriteFile(configPath, configContent, 0o600))
+
+	t.Setenv("DOCKER_CONFIG", tempDir)
+	t.Setenv("HOME", tempDir)
+	dockerCliConfig.SetDir(tempDir)
+
+	credentials, err := EncodedConfigCredentials("ghcr.io/org/app:latest")
+	require.NoError(t, err)
+	assert.NotEmpty(t, credentials)
+
+	authConfig := decodeEncodedAuth(t, credentials)
+	assert.Equal(t, "ghp_only_token", authConfig["password"])
 }
 
 // TestEncodedConfigCredentials_FileStoreValidCredentials tests the happy path
@@ -287,10 +353,10 @@ func TestEncodedConfigCredentials_MultipleRegistries(t *testing.T) {
 	}
 }
 
-// TestEncodedAuth_EnvVarsOverrideConfig verifies that EncodedAuth returns env
-// credentials when REPO_USER/REPO_PASS are set, even if a config file with
-// different credentials is present.
-func TestEncodedAuth_EnvVarsOverrideConfig(t *testing.T) {
+// TestEncodedAuth_ConfigPreferredOverEnv verifies that EncodedAuth returns
+// Docker config credentials for a registry when both config and REPO_USER/REPO_PASS
+// are set, so env credentials are not sent to every registry.
+func TestEncodedAuth_ConfigPreferredOverEnv(t *testing.T) {
 	writeTestDockerConfig(t, map[string]map[string]string{
 		"ghcr.io": {
 			"username": "cfg-user",
@@ -304,6 +370,30 @@ func TestEncodedAuth_EnvVarsOverrideConfig(t *testing.T) {
 	t.Setenv("REPO_PASS", "env-pass")
 
 	credentials, err := EncodedAuth("ghcr.io/test/image:latest")
+	require.NoError(t, err)
+	assert.NotEmpty(t, credentials)
+
+	authConfig := decodeEncodedAuth(t, credentials)
+	assert.Equal(t, "cfg-user", authConfig["username"])
+	assert.Equal(t, "cfg-pass", authConfig["password"])
+}
+
+// TestEncodedAuth_EnvUsedWhenConfigHasNoRegistryEntry verifies REPO_USER/REPO_PASS
+// still apply when the Docker config has no credentials for the image's registry.
+func TestEncodedAuth_EnvUsedWhenConfigHasNoRegistryEntry(t *testing.T) {
+	writeTestDockerConfig(t, map[string]map[string]string{
+		"ghcr.io": {
+			"username": "cfg-user",
+			"password": "cfg-pass",
+		},
+	})
+
+	defer os.Unsetenv("DOCKER_CONFIG")
+
+	t.Setenv("REPO_USER", "env-user")
+	t.Setenv("REPO_PASS", "env-pass")
+
+	credentials, err := EncodedAuth("quay.io/org/app:latest")
 	require.NoError(t, err)
 	assert.NotEmpty(t, credentials)
 
