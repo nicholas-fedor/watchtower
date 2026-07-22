@@ -1461,6 +1461,107 @@ var _ = ginkgo.Describe("DetachedContext", func() {
 		}
 	})
 
+	ginkgo.Describe("Watchtower self-update create failure recovery", func() {
+		ginkgo.It("renames the source back to the original name when create fails", func() {
+			client := mockActions.CreateMockClient(
+				&mockActions.TestData{
+					Containers: []types.Container{
+						mockActions.CreateMockContainerWithConfig(
+							"watchtower-source-id",
+							"/watchtower",
+							"watchtower:latest",
+							true,
+							false,
+							time.Now(),
+							&dockerContainer.Config{
+								Labels: map[string]string{
+									"com.centurylinklabs.watchtower": "true",
+								},
+							}),
+					},
+					Staleness: map[string]bool{
+						"watchtower": true,
+					},
+					CreateContainerError: errors.New("simulated create failure"),
+				},
+				false,
+				false,
+			)
+
+			params := types.UpdateParams{
+				Timeout: 0,
+				RunOnce: false,
+			}
+
+			testContainer := client.TestData.Containers[0]
+			_, renamed, err := restartStaleContainer(
+				context.Background(),
+				testContainer,
+				client,
+				params,
+			)
+
+			gomega.Expect(err).To(gomega.HaveOccurred())
+			gomega.Expect(err.Error()).To(gomega.ContainSubstring("failed to create container"))
+			gomega.Expect(renamed).To(gomega.BeFalse(), "name should be restored after create failure")
+			gomega.Expect(client.TestData.RenameContainerCount.Load()).To(gomega.Equal(int32(2)))
+			gomega.Expect(client.TestData.RenameTargets).To(gomega.HaveLen(2))
+			gomega.Expect(client.TestData.RenameTargets[1]).To(gomega.Equal("watchtower"))
+			gomega.Expect(client.TestData.StartContainerCount.Load()).To(gomega.Equal(int32(0)))
+		})
+	})
+
+	ginkgo.Describe("Watchtower self-update start failure cleanup", func() {
+		ginkgo.It("removes the newly created container, not the renamed source", func() {
+			client := mockActions.CreateMockClient(
+				&mockActions.TestData{
+					Containers: []types.Container{
+						mockActions.CreateMockContainerWithConfig(
+							"watchtower-source-id",
+							"/watchtower",
+							"watchtower:latest",
+							true,
+							false,
+							time.Now(),
+							&dockerContainer.Config{
+								Labels: map[string]string{
+									"com.centurylinklabs.watchtower": "true",
+								},
+							}),
+					},
+					Staleness: map[string]bool{
+						"watchtower": true,
+					},
+					StartContainerError: errors.New("simulated start failure"),
+				},
+				false,
+				false,
+			)
+
+			params := types.UpdateParams{
+				Timeout: 0,
+				RunOnce: false,
+			}
+
+			testContainer := client.TestData.Containers[0]
+			_, renamed, err := restartStaleContainer(
+				context.Background(),
+				testContainer,
+				client,
+				params,
+			)
+
+			gomega.Expect(err).To(gomega.HaveOccurred())
+			gomega.Expect(err.Error()).To(gomega.ContainSubstring("failed to start container"))
+			gomega.Expect(renamed).To(gomega.BeTrue())
+			gomega.Expect(client.TestData.CreateContainerCount.Load()).To(gomega.Equal(int32(1)))
+			gomega.Expect(client.TestData.LastCreatedContainerID).ToNot(gomega.BeEmpty())
+			gomega.Expect(client.TestData.StopAndRemoveContainerCount.Load()).To(gomega.Equal(int32(1)))
+			gomega.Expect(client.TestData.LastStopAndRemoveID).To(gomega.Equal(client.TestData.LastCreatedContainerID))
+			gomega.Expect(client.TestData.LastStopAndRemoveID).ToNot(gomega.Equal(testContainer.ID()))
+		})
+	})
+
 	ginkgo.Describe("restartStaleContainer detached context survival", func() {
 		ginkgo.It("cleanup operations complete when parent context is canceled during execution", func() {
 			// Create a parent context that we will cancel while restartStaleContainer is running.
@@ -2100,6 +2201,70 @@ var _ = ginkgo.Describe("stopContainersInReversedOrder", func() {
 			gomega.Expect(client.TestData.StopOrder[1]).To(gomega.Equal("container-1"))
 			gomega.Expect(client.TestData.StopOrder[2]).To(gomega.Equal("container-0"))
 		})
+	})
+})
+
+var _ = ginkgo.Describe("restartContainersInSortedOrder cancel recovery", func() {
+	ginkgo.It("still recreates containers that were already stopped when parent ctx is canceled", func() {
+		containers := make([]types.Container, 3)
+
+		for i := range 3 {
+			c := mockActions.CreateMockContainerWithConfig(
+				fmt.Sprintf("container-%d", i),
+				fmt.Sprintf("/container-%d", i),
+				fmt.Sprintf("image-%d:latest", i),
+				true,
+				false,
+				time.Now(),
+				&dockerContainer.Config{
+					Labels:       map[string]string{},
+					ExposedPorts: dockerNetwork.PortSet{},
+				},
+			)
+			c.SetStale(true)
+			containers[i] = c
+		}
+
+		client := mockActions.CreateMockClient(
+			&mockActions.TestData{
+				Containers: containers,
+				Staleness: map[string]bool{
+					"container-0": true,
+					"container-1": true,
+					"container-2": true,
+				},
+			},
+			false,
+			false,
+		)
+
+		// Pretend the stop phase already removed all three.
+		stoppedImages := []types.RemovedImageInfo{
+			{ContainerID: containers[0].ID(), ImageID: containers[0].ImageID(), ImageName: containers[0].ImageName(), ContainerName: containers[0].Name()},
+			{ContainerID: containers[1].ID(), ImageID: containers[1].ImageID(), ImageName: containers[1].ImageName(), ContainerName: containers[1].Name()},
+			{ContainerID: containers[2].ID(), ImageID: containers[2].ImageID(), ImageName: containers[2].ImageName(), ContainerName: containers[2].Name()},
+		}
+
+		ctx, cancel := context.WithCancel(context.Background())
+		cancel()
+
+		progress := session.Progress{}
+
+		var cleanup []types.RemovedImageInfo
+
+		failed := restartContainersInSortedOrder(
+			ctx,
+			containers,
+			client,
+			types.UpdateParams{Timeout: 0},
+			stoppedImages,
+			&cleanup,
+			&progress,
+		)
+
+		gomega.Expect(failed).To(gomega.BeEmpty(), "stopped containers must still be recreated after cancel")
+		gomega.Expect(client.TestData.CreateContainerCount.Load()).To(gomega.Equal(int32(3)))
+		gomega.Expect(client.TestData.StartContainerCount.Load()).To(gomega.Equal(int32(3)))
 	})
 })
 
@@ -2995,5 +3160,20 @@ var _ = ginkgo.Describe("isPinned", func() {
 		gomega.Expect(err).To(gomega.HaveOccurred())
 		gomega.Expect(pinned).To(gomega.BeFalse())
 		gomega.Expect(progress).To(gomega.BeEmpty())
+	})
+
+	ginkgo.It("does not panic when ContainerInfo Config is nil", func() {
+		cont := mockTypes.NewMockContainer(ginkgo.GinkgoT())
+		cont.On("Name").Return("/nil-config")
+		cont.On("ImageName").Return("nginx:latest")
+		cont.On("ContainerInfo").Return(&dockerContainer.InspectResponse{
+			Config: nil,
+		})
+
+		progress := session.Progress{}
+
+		pinned, err := isPinned(cont, &progress, types.UpdateParams{})
+		gomega.Expect(err).NotTo(gomega.HaveOccurred())
+		gomega.Expect(pinned).To(gomega.BeFalse())
 	})
 })
