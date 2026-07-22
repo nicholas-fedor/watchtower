@@ -10,6 +10,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Clean up failed recreates and nil host config by @nicholas-fedor in [#2004](https://github.com/nicholas-fedor/watchtower/pull/2004)
+- Prefer config auth and accept identity tokens by @nicholas-fedor in [#2002](https://github.com/nicholas-fedor/watchtower/pull/2002)
 - Tighten image filter matching and local-only detection by @nicholas-fedor in [#2003](https://github.com/nicholas-fedor/watchtower/pull/2003)
 - Restore correct restart order for named network dependencies by @nicholas-fedor in [#2000](https://github.com/nicholas-fedor/watchtower/pull/2000)
 
