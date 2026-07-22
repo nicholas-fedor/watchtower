@@ -279,9 +279,10 @@ func buildDependencyGraph(
 // buildLinkMatchIndexes builds the identifier list and alias→canonical map used when
 // resolving dependency links against graph nodes.
 //
-// Each canonical ResolveContainerIdentifier is always included. Bare container names are
-// registered as aliases only when they uniquely identify one container in the set, so
-// ambiguous names (two containers sharing a name) do not create non-deterministic edges.
+// Each canonical ResolveContainerIdentifier is always included and never overwritten.
+// Bare container names are registered as aliases only when they uniquely identify one
+// container and do not collide with another container's canonical key, so ambiguous
+// names do not create non-deterministic edges.
 //
 // Parameters:
 //   - containerMap: Canonical identifier → container map from graph construction.
@@ -296,34 +297,49 @@ func buildLinkMatchIndexes(
 	const aliasCapacityFactor = 2
 
 	aliasToCanonical := make(map[string]string, len(containerMap)*aliasCapacityFactor)
-	// Track bare names claimed by more than one container so they stay unmatched.
-	ambiguousBareNames := make(map[string]bool)
+
+	// Canonical ResolveContainerIdentifier keys always map to themselves and must never
+	// be removed or overwritten by bare-name alias cleanup.
+	for identifier := range containerMap {
+		aliasToCanonical[identifier] = identifier
+	}
+
+	// bareOwners collects distinct canonical owners for each bare container name.
+	// A bare name becomes an alias only when exactly one owner claims it and the name
+	// does not collide with a different container's canonical graph key.
+	bareOwners := make(map[string]map[string]struct{})
 
 	for identifier, c := range containerMap {
-		aliasToCanonical[identifier] = identifier
-
 		bareName := util.NormalizeContainerName(c.Name())
 		if bareName == "" || bareName == identifier {
 			continue
 		}
 
-		if existing, exists := aliasToCanonical[bareName]; exists && existing != identifier {
-			ambiguousBareNames[bareName] = true
-
+		// Never use a bare name that is already another container's canonical key.
+		if _, isCanonicalKey := containerMap[bareName]; isCanonicalKey {
 			continue
 		}
 
-		if ambiguousBareNames[bareName] {
-			continue
+		owners, ok := bareOwners[bareName]
+		if !ok {
+			owners = make(map[string]struct{})
+			bareOwners[bareName] = owners
 		}
 
-		aliasToCanonical[bareName] = identifier
+		owners[identifier] = struct{}{}
 	}
 
-	for bareName := range ambiguousBareNames {
-		delete(aliasToCanonical, bareName)
-		logrus.WithField("bare_name", bareName).
-			Debug("Skipped ambiguous bare container name alias for dependency matching")
+	for bareName, owners := range bareOwners {
+		if len(owners) != 1 {
+			logrus.WithField("bare_name", bareName).
+				Debug("Skipped ambiguous bare container name alias for dependency matching")
+
+			continue
+		}
+
+		for owner := range owners {
+			aliasToCanonical[bareName] = owner
+		}
 	}
 
 	matchIdentifiers := make([]string, 0, len(aliasToCanonical))

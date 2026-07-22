@@ -2000,6 +2000,26 @@ var _ = ginkgo.Describe("buildLinkMatchIndexes", func() {
 		gomega.Expect(aliasToCanonical["project1-service"]).To(gomega.Equal("project1-service"))
 		gomega.Expect(aliasToCanonical["project2-service"]).To(gomega.Equal("project2-service"))
 	})
+
+	ginkgo.It("should preserve canonical self-mapping when bare name equals another canonical key", func() {
+		// Container A is keyed by "shared"; container B's bare name is also "shared".
+		// B must not overwrite or delete A's canonical self-mapping.
+		canonicalOwner := mockTypes.NewMockContainer(ginkgo.GinkgoT())
+		canonicalOwner.EXPECT().Name().Return("shared").Maybe()
+
+		bareClaimant := mockTypes.NewMockContainer(ginkgo.GinkgoT())
+		bareClaimant.EXPECT().Name().Return("shared").Maybe()
+
+		containerMap := map[string]types.Container{
+			"shared":          canonicalOwner,
+			"project-service": bareClaimant,
+		}
+
+		ids, aliasToCanonical := buildLinkMatchIndexes(containerMap)
+		gomega.Expect(aliasToCanonical["shared"]).To(gomega.Equal("shared"))
+		gomega.Expect(aliasToCanonical["project-service"]).To(gomega.Equal("project-service"))
+		gomega.Expect(ids).To(gomega.ConsistOf("shared", "project-service"))
+	})
 })
 
 var _ = ginkgo.Describe("resolveLinkToCanonicalKeys", func() {
