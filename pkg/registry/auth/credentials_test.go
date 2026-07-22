@@ -1,9 +1,13 @@
 package auth
 
 import (
+	"encoding/base64"
+	"encoding/json"
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestTransformAuth(t *testing.T) {
@@ -38,9 +42,9 @@ func TestTransformAuth(t *testing.T) {
 			want:         "eyJ1c2VybmFtZSI6InVzZXIifQ==",
 		},
 		{
-			name:         "valid base64 JSON with only password returns original",
+			name:         "valid base64 JSON with only password becomes Basic auth",
 			registryAuth: "eyJwYXNzd29yZCI6InBhc3MifQ==",
-			want:         "eyJwYXNzd29yZCI6InBhc3MifQ==",
+			want:         "OnBhc3M=", // ":pass"
 		},
 		{
 			name:         "valid base64 empty JSON object returns original",
@@ -65,4 +69,52 @@ func TestTransformAuth(t *testing.T) {
 			assert.Equal(t, tt.want, got)
 		})
 	}
+}
+
+func TestTransformAuthURLEncodedJSONCredentials(t *testing.T) {
+	// Password '?' (0x3f) yields URL-safe '-' in the JSON blob when URL-encoded,
+	// which StdEncoding alone cannot decode.
+	creds := map[string]string{
+		"username": "u",
+		"password": strings.Repeat("?", 8),
+	}
+	buf, err := json.Marshal(creds)
+	require.NoError(t, err)
+
+	urlEncoded := base64.URLEncoding.EncodeToString(buf)
+	_, stdErr := base64.StdEncoding.DecodeString(urlEncoded)
+	require.Error(t, stdErr, "fixture must fail StdEncoding so the URL path is exercised")
+
+	got := TransformAuth(urlEncoded)
+	decoded, err := base64.StdEncoding.DecodeString(got)
+	require.NoError(t, err)
+	assert.Equal(t, "u:"+strings.Repeat("?", 8), string(decoded))
+}
+
+func TestTransformAuthIdentityToken(t *testing.T) {
+	creds := map[string]string{
+		"identitytoken": "ecr-session-token",
+	}
+	buf, err := json.Marshal(creds)
+	require.NoError(t, err)
+
+	encoded := base64.StdEncoding.EncodeToString(buf)
+	got := TransformAuth(encoded)
+	decoded, err := base64.StdEncoding.DecodeString(got)
+	require.NoError(t, err)
+	assert.Equal(t, ":ecr-session-token", string(decoded))
+}
+
+func TestTransformAuthPasswordOnly(t *testing.T) {
+	creds := map[string]string{
+		"password": "ghcr-pat-token",
+	}
+	buf, err := json.Marshal(creds)
+	require.NoError(t, err)
+
+	encoded := base64.StdEncoding.EncodeToString(buf)
+	got := TransformAuth(encoded)
+	decoded, err := base64.StdEncoding.DecodeString(got)
+	require.NoError(t, err)
+	assert.Equal(t, ":ghcr-pat-token", string(decoded))
 }

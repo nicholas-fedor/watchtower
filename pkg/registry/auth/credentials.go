@@ -27,7 +27,13 @@ func TransformAuth(registryAuth string) string {
 		return ""
 	}
 
+	// EncodeCredentials uses URLEncoding; accept StdEncoding as well for
+	// compatibility with credentials produced outside Watchtower.
 	b, err := base64.StdEncoding.DecodeString(registryAuth)
+	if err != nil {
+		b, err = base64.URLEncoding.DecodeString(registryAuth)
+	}
+
 	if err != nil {
 		logrus.WithError(err).
 			Debug("Failed to decode base64 registry auth - returning original input")
@@ -45,18 +51,23 @@ func TransformAuth(registryAuth string) string {
 		return registryAuth
 	}
 
-	if credentials.Username != "" && credentials.Password != "" {
-		basicAuth := fmt.Appendf(
-			nil,
-			"%s:%s",
-			credentials.Username,
-			credentials.Password,
-		)
+	username := credentials.Username
+	password := credentials.Password
 
-		registryAuth = base64.StdEncoding.EncodeToString(basicAuth)
-
-		logrus.Debug("Transformed registry credentials to Basic auth format")
+	// Identity tokens from credential helpers are presented as the password in
+	// HTTP Basic auth when exchanging for a registry bearer token.
+	if password == "" && credentials.IdentityToken != "" {
+		password = credentials.IdentityToken
 	}
+
+	if password == "" {
+		return registryAuth
+	}
+
+	basicAuth := fmt.Appendf(nil, "%s:%s", username, password)
+	registryAuth = base64.StdEncoding.EncodeToString(basicAuth)
+
+	logrus.Debug("Transformed registry credentials to Basic auth format")
 
 	return registryAuth
 }

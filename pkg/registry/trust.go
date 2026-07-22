@@ -33,10 +33,13 @@ var (
 
 // EncodedAuth attempts to retrieve encoded authentication credentials for a given image name.
 //
-// It checks environment variables first, then falls back to the Docker config file if needed.
+// Per-image Docker config credentials are preferred when present so REPO_USER/REPO_PASS
+// are not sent to every registry. Environment credentials are used when the config has
+// no entry for the image's registry (or config lookup fails), preserving the common
+// single-registry REPO_USER/REPO_PASS deployment.
 //
 // Parameters:
-//   - ref: Image reference string (e.g., "docker.io/library/alpine").
+//   - imageName: Image reference string (e.g., "docker.io/library/alpine").
 //
 // Returns:
 //   - string: Base64-encoded credentials string if successful, empty if none found.
@@ -49,22 +52,38 @@ func EncodedAuth(imageName string) (string, error) {
 
 	logrus.WithFields(fields).Debug("Attempting to retrieve auth credentials")
 
-	// Try environment variables first.
+	configCredentials, configErr := EncodedConfigCredentials(imageName)
+	if configErr == nil && configCredentials != "" {
+		logrus.WithFields(fields).Debug("Successfully retrieved encoded auth credentials from config")
+
+		return configCredentials, nil
+	}
+
+	if configErr != nil {
+		logrus.WithError(configErr).
+			WithFields(fields).
+			Debug("Config auth not available, trying environment")
+	} else {
+		logrus.WithFields(fields).
+			Debug("No config credentials for registry, trying environment")
+	}
+
 	credentials, err := EncodedEnvAuth()
 	if err != nil {
-		// Fallback to config file if env vars are unavailable.
-		logrus.WithError(err).
-			WithFields(fields).
-			Debug("Environment auth not available, trying config file")
+		// Prefer surfacing a config load/address error when env is also unset.
+		if configErr != nil {
+			return "", configErr
+		}
 
-		credentials, err = EncodedConfigCredentials(imageName)
+		// No config entry and no env: empty credentials is success (anonymous pull).
+		return "", nil
 	}
 
-	if err == nil && credentials != "" {
-		logrus.WithFields(fields).Debug("Successfully retrieved encoded auth credentials")
+	if credentials != "" {
+		logrus.WithFields(fields).Debug("Successfully retrieved encoded auth credentials from environment")
 	}
 
-	return credentials, err
+	return credentials, nil
 }
 
 // EncodedEnvAuth checks for REPO_USER and REPO_PASS environment variables and encodes them.
@@ -90,11 +109,11 @@ func EncodedEnvAuth() (string, error) {
 			"username": username,
 		}).Debug("Loaded auth credentials from environment")
 
-		// Log sensitive password only in trace mode.
+		// Trace only non-sensitive presence indicators; never log REPO_PASS.
 		if logrus.GetLevel() == logrus.TraceLevel {
 			logrus.WithFields(logrus.Fields{
-				"username": username,
-				"password": password,
+				"username":     username,
+				"has_password": true,
 			}).Trace("Using environment credentials")
 		}
 
@@ -155,11 +174,9 @@ func EncodedConfigCredentials(imageRef string) (string, error) {
 	credStore := CredentialsStore(*configFile)
 	credentials, _ := credStore.Get(server)
 
-	// Return empty string if no credentials are found or if the store returned
-	// an AuthConfig with no username/password (e.g. native store miss or empty entry).
-	if credentials == (dockerConfig.AuthConfig{}) ||
-		credentials.Username == "" ||
-		credentials.Password == "" {
+	// Accept username+password, password-only tokens, or identity tokens from
+	// credential helpers (ECR and similar). Empty AuthConfig is a miss.
+	if !hasUsableRegistryCredentials(credentials) {
 		logrus.WithFields(fields).WithFields(logrus.Fields{
 			"server":      server,
 			"config_file": configFile.Filename,
@@ -168,24 +185,50 @@ func EncodedConfigCredentials(imageRef string) (string, error) {
 		return "", nil
 	}
 
-	// Log successful credential retrieval, hiding password unless in trace mode.
+	// Log successful credential retrieval with non-sensitive presence flags only.
 	logrus.WithFields(fields).WithFields(logrus.Fields{
-		"username":    credentials.Username,
-		"server":      server,
-		"config_file": configFile.Filename,
+		"username":         credentials.Username,
+		"has_password":     credentials.Password != "",
+		"has_identity_tok": credentials.IdentityToken != "",
+		"server":           server,
+		"config_file":      configFile.Filename,
 	}).Debug("Loaded auth credentials from config")
 
-	// Log password only in trace mode
+	// Trace only non-sensitive presence indicators; never log password or tokens.
 	if logrus.GetLevel() == logrus.TraceLevel {
 		logrus.WithFields(fields).WithFields(logrus.Fields{
-			"username": credentials.Username,
-			"password": credentials.Password,
-			"server":   server,
+			"username":         credentials.Username,
+			"has_password":     credentials.Password != "",
+			"has_identity_tok": credentials.IdentityToken != "",
+			"server":           server,
 		}).Trace("Using config credentials")
 	}
 
-	// Encode and return the auth config.
+	// Encode and return the auth config (includes IdentityToken when set).
 	return EncodeCredentials(credentials)
+}
+
+// hasUsableRegistryCredentials reports whether AuthConfig carries material the
+// Docker daemon or registry HTTP clients can authenticate with.
+//
+// IdentityToken and Password are supported end to end via EncodeCredentials and
+// TransformAuth (Basic auth). RegistryToken-only entries are not accepted until
+// a Bearer-auth path is implemented for them.
+func hasUsableRegistryCredentials(credentials dockerConfig.AuthConfig) bool {
+	if credentials == (dockerConfig.AuthConfig{}) {
+		return false
+	}
+
+	if credentials.IdentityToken != "" {
+		return true
+	}
+
+	// Password-only entries are used for PAT-style tokens (for example GHCR).
+	if credentials.Password != "" {
+		return true
+	}
+
+	return false
 }
 
 // CredentialsStore returns a new credentials store based on the configuration file settings.
