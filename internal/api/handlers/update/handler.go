@@ -272,6 +272,10 @@ func (h *Handler) applyTimeout(c fiber.Ctx) context.Context {
 
 // handleAsync processes an asynchronous update request by spawning a
 // goroutine and returning 202 Accepted.
+//
+// updateCtx is used only for deadline projection inside executeUpdateAsync;
+// the goroutine does not run under the request context, which is canceled
+// when this handler returns.
 func (h *Handler) handleAsync(c fiber.Ctx, images, containers []string, lockToken bool, updateCtx context.Context) error {
 	logrus.WithField("notify", "no").Info("Handling async update request - spawning async update")
 
@@ -319,7 +323,12 @@ func (h *Handler) handleSync(c fiber.Ctx, images, containers []string, lockToken
 
 // executeUpdateAsync runs the update function in a goroutine, ensuring the
 // lock is released when done.
-func (h *Handler) executeUpdateAsync(ctx context.Context, images, containers []string, lockToken bool) {
+//
+// The execution context is always derived from the handler's application-lifetime
+// context so the update survives request completion and Fiber timeout-middleware
+// cancellation. Any deadline on updateCtx (route timeout middleware and optional
+// ?timeout=) is projected onto that context without inheriting request cancellation.
+func (h *Handler) executeUpdateAsync(updateCtx context.Context, images, containers []string, lockToken bool) {
 	defer func() {
 		if rec := recover(); rec != nil {
 			logrus.WithField("panic", rec).WithField("notify", "no").Error("Update goroutine panicked")
@@ -328,12 +337,35 @@ func (h *Handler) executeUpdateAsync(ctx context.Context, images, containers []s
 		h.releaseLock(lockToken)
 	}()
 
+	ctx, cancel := h.contextForAsync(updateCtx)
+	defer cancel()
+
 	startTime := time.Now()
 
 	h.fn(ctx, images, containers)
 
 	duration := time.Since(startTime)
 	logrus.WithField("duration", duration).WithField("notify", "no").Debug("Handler (async): update function completed")
+}
+
+// contextForAsync returns a context rooted at h.ctx for background update work.
+//
+// If updateCtx has a deadline, it is applied so middleware and per-request
+// timeouts still bound the async update. Request cancellation on updateCtx is
+// intentionally not propagated.
+//
+// Parameters:
+//   - updateCtx: Request-scoped context used only for deadline projection.
+//
+// Returns:
+//   - context.Context: Context for the async update function.
+//   - context.CancelFunc: Cancel function; always non-nil and safe to defer.
+func (h *Handler) contextForAsync(updateCtx context.Context) (context.Context, context.CancelFunc) {
+	if deadline, ok := updateCtx.Deadline(); ok {
+		return context.WithDeadline(h.ctx, deadline)
+	}
+
+	return h.ctx, func() {}
 }
 
 // executeUpdate runs the update function and returns the metric along with

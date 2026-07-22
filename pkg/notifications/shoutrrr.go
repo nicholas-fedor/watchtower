@@ -170,8 +170,8 @@ func createNotifier(
 		logger = log.New(logrus.StandardLogger().WriterLevel(logrus.TraceLevel), "Shoutrrr: ", 0)
 	}
 
-	// Initialize sender.
-	router, err := shoutrrr.NewSender(logger, urls...)
+	// Initialize sender with default options.
+	router, err := shoutrrr.NewSenderWithOptions(logger, shoutrrrTypes.SenderOptions{}, urls...)
 	if err != nil {
 		LocalLog.WithError(err).Fatal("Failed to initialize Shoutrrr notifications")
 	}
