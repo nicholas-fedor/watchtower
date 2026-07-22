@@ -6,6 +6,7 @@ import (
 	"regexp"
 	"strings"
 
+	"github.com/distribution/reference"
 	"github.com/sirupsen/logrus"
 
 	"github.com/nicholas-fedor/watchtower/pkg/types"
@@ -574,6 +575,12 @@ func matchesName(containerName, pattern string) bool {
 
 // matchImageAndTag checks if a container's image matches a target image, including optional tag.
 //
+// Image references are parsed with distribution/reference so host:port registries
+// (for example localhost:5000/nginx:alpine) are not split on the port colon.
+// When the target omits a tag, any tag on the container image is accepted.
+// When the target includes a tag, both name and tag must match. Digest-only
+// references compare the familiar name without requiring a matching tag.
+//
 // Parameters:
 //   - containerImage: The container's image name (e.g., "registry:develop").
 //   - targetImage: The target image name or image:tag to match (e.g., "registry").
@@ -581,18 +588,41 @@ func matchesName(containerName, pattern string) bool {
 // Returns:
 //   - bool: True if the image (and tag, if specified) matches, false otherwise.
 func matchImageAndTag(containerImage, targetImage string) bool {
-	containerParts := strings.Split(containerImage, ":") // Split into name and tag.
-	targetParts := strings.Split(targetImage, ":")       // Split target into name and tag.
-
-	if containerParts[0] != targetParts[0] { // Compare image names.
-		return false // Image names don't match.
+	containerRef, err := reference.ParseAnyReference(containerImage)
+	if err != nil {
+		return false
 	}
 
-	if len(targetParts) > 1 && len(containerParts) > 1 { // Both have tags.
-		return containerParts[1] == targetParts[1] // Compare tags.
+	targetRef, err := reference.ParseAnyReference(targetImage)
+	if err != nil {
+		return false
 	}
 
-	return true // No tag in target or container, name match sufficient.
+	containerNamed, ok := containerRef.(reference.Named)
+	if !ok {
+		return false
+	}
+
+	targetNamed, ok := targetRef.(reference.Named)
+	if !ok {
+		return false
+	}
+
+	if reference.FamiliarName(containerNamed) != reference.FamiliarName(targetNamed) {
+		return false
+	}
+
+	targetTagged, targetHasTag := targetRef.(reference.NamedTagged)
+	if !targetHasTag {
+		return true
+	}
+
+	containerTagged, containerHasTag := containerRef.(reference.NamedTagged)
+	if !containerHasTag {
+		return false
+	}
+
+	return containerTagged.Tag() == targetTagged.Tag()
 }
 
 // BuildFilter constructs a composite filter for containers.
