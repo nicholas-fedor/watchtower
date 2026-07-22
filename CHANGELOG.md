@@ -10,6 +10,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Chores
 
+- Update module github.com/prometheus/common to v0.70.1 by @renovate[bot] in [#1998](https://github.com/nicholas-fedor/watchtower/pull/1998)
 - Update github/codeql-action action to v4.37.3 by @renovate[bot] in [#1995](https://github.com/nicholas-fedor/watchtower/pull/1995)
 - Update nicholas-fedor/go-proxy-pull-action action to v1.1.29 by @renovate[bot] in [#1993](https://github.com/nicholas-fedor/watchtower/pull/1993)
 
