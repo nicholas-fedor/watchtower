@@ -10,6 +10,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Tighten image filter matching and local-only detection by @nicholas-fedor in [#2003](https://github.com/nicholas-fedor/watchtower/pull/2003)
 - Restore correct restart order for named network dependencies by @nicholas-fedor in [#2000](https://github.com/nicholas-fedor/watchtower/pull/2000)
 
 ## [1.20.1] - 2026-07-22
