@@ -44,6 +44,8 @@ var (
 	errOrchestratorStartFailed = errors.New("failed to start new container")
 	// errOrchestratorInspectFailed indicates a failure to inspect a container during orchestration.
 	errOrchestratorInspectFailed = errors.New("failed to inspect container during orchestration")
+	// errOrchestratorRenameFailed indicates a failure to rename the old container before handoff.
+	errOrchestratorRenameFailed = errors.New("failed to rename old container for handoff")
 	// errNewContainerNotRunning indicates the new container is not running after start.
 	errNewContainerNotRunning = errors.New("new container is not running after start")
 )
@@ -179,15 +181,14 @@ func EphemeralSelfUpdate(
 // The orchestrator follows a deterministic state machine:
 //  1. VALIDATE: Read and validate environment variables
 //  2. INSPECT: Get the old container's full configuration
-//  3. STOP OLD: Stop the old Watchtower container
+//  3. RENAME OLD: Free the original name while keeping the process running
 //  4. CREATE NEW: Create a new container from the new image with the same config
 //  5. START NEW: Start the new Watchtower container
 //  6. VERIFY: Confirm the new container is running
-//  7. CLEANUP OLD: Remove the old container
+//  7. CLEANUP OLD: Stop and remove the renamed predecessor
 //
-// If the new container fails to start or is not running, the old container is
-// preserved for manual recovery. Automatic rollback is not supported because
-// client.StartContainer creates a new container rather than restarting the old one.
+// If create/start/verify fails after rename, the original name is restored on the
+// old container so a running Watchtower remains addressable.
 //
 // Parameters:
 //   - ctx: Context for cancellation and timeouts.
@@ -282,14 +283,16 @@ func readOrchestratorEnv() (string, string, string, string, error) {
 // orchestrateSelfUpdate performs the container replacement sequence for a
 // Watchtower self-update.
 //
-// It follows a deterministic state machine that inspects the old container,
-// stops and removes it, creates and starts a new container from the updated
-// image, and verifies the new container is running before returning.
+// Sequence:
+//  1. Inspect the old container and propagate the chain label.
+//  2. Pin Config.Image to newImage for create.
+//  3. Rename the old container off the original name (process keeps running).
+//  4. Create and start the new container under the original name.
+//  5. Verify the new container is running.
+//  6. Stop and remove the renamed old container.
 //
-// If the new container fails to start or is not running after the update,
-// manual recovery is required because the old container has already been
-// removed. Automatic rollback is not supported since the new container
-// replaces the old one rather than renaming it.
+// On create/start/verify failure after rename, the original name is restored on
+// the old container so a running Watchtower remains addressable.
 //
 // Parameters:
 //   - ctx: Context for cancellation and timeouts.
@@ -327,18 +330,12 @@ func orchestrateSelfUpdate(
 		return err
 	}
 
-	// Stop and remove the old container to free its name.
-	skipRemoval, err := stopAndRemoveOldContainer(
-		ctx,
-		client,
-		clog,
-		oldContainer,
-	)
+	pinContainerCreateImage(oldContainer, newImage, clog)
+
+	renamed, err := renameOldContainerForHandoff(ctx, client, clog, oldContainer, originalName)
 	if err != nil {
 		return err
 	}
-
-	_ = skipRemoval // Removal is skipped only when StopContainer returns NotFound.
 
 	newContainerID, err := createAndStartNewContainer(
 		ctx,
@@ -347,13 +344,30 @@ func orchestrateSelfUpdate(
 		oldContainer,
 	)
 	if err != nil {
+		if renamed {
+			restoreOldContainerName(ctx, client, clog, oldContainer, originalName)
+		}
+
 		return err
 	}
 
 	// Verify the new container is running, starting it explicitly if needed.
 	err = ensureContainerRunning(ctx, client, clog, newContainerID)
 	if err != nil {
+		cleanupFailedNewContainer(ctx, client, clog, newContainerID)
+
+		if renamed {
+			restoreOldContainerName(ctx, client, clog, oldContainer, originalName)
+		}
+
 		return err
+	}
+
+	// New instance is healthy; stop and remove the renamed predecessor.
+	_, stopErr := stopAndRemoveOldContainer(ctx, client, clog, oldContainer)
+	if stopErr != nil {
+		clog.WithError(stopErr).
+			Warn("New Watchtower is running but cleanup of the old container failed")
 	}
 
 	// Emit the actual new container ID at Info level so notification templates
@@ -363,6 +377,124 @@ func orchestrateSelfUpdate(
 		Info("Started new container")
 
 	return nil
+}
+
+// pinContainerCreateImage sets Config.Image on a concrete container.Container so
+// GetCreateConfig uses newImage for the replacement instance.
+func pinContainerCreateImage(oldContainer types.Container, newImage string, clog *logrus.Entry) {
+	if newImage == "" {
+		return
+	}
+
+	c, ok := oldContainer.(*container.Container)
+	if !ok {
+		clog.Debug("Old container is not a concrete Container; cannot pin create image")
+
+		return
+	}
+
+	info := c.ContainerInfo()
+	if info == nil || info.Config == nil {
+		return
+	}
+
+	info.Config.Image = newImage
+	clog.WithField("pinned_image", newImage).Debug("Pinned create image for ephemeral self-update")
+}
+
+// renameOldContainerForHandoff renames the old container off its original name so
+// StartContainer can claim that name. The process keeps running under the new name.
+//
+// Returns:
+//   - renamed: True when a rename was performed (caller must restore on failure).
+//   - error: Non-nil if rename fails.
+func renameOldContainerForHandoff(
+	ctx context.Context,
+	client container.Client,
+	clog *logrus.Entry,
+	oldContainer types.Container,
+	originalName string,
+) (bool, error) {
+	if container.IsOldContainer(oldContainer.Name()) {
+		clog.Debug("Old container already has a watchtower-old name; skipping rename")
+
+		return false, nil
+	}
+
+	targetName := types.WatchtowerOldPrefix + oldContainer.ID().ShortID()
+	clog.WithField("target_name", targetName).Debug("Renaming old Watchtower container to free original name")
+
+	err := client.RenameContainer(ctx, oldContainer, targetName)
+	if err != nil {
+		clog.WithError(err).Error("Failed to rename old container before handoff")
+
+		return false, fmt.Errorf("%w: %w", errOrchestratorRenameFailed, err)
+	}
+
+	clog.WithFields(logrus.Fields{
+		"original_name": originalName,
+		"target_name":   targetName,
+	}).Debug("Renamed old Watchtower container for handoff")
+
+	return true, nil
+}
+
+// restoreOldContainerName renames the old container back to originalName after a
+// failed create/start so operators keep a named running instance.
+func restoreOldContainerName(
+	ctx context.Context,
+	client container.Client,
+	clog *logrus.Entry,
+	oldContainer types.Container,
+	originalName string,
+) {
+	if originalName == "" {
+		return
+	}
+
+	clog.WithField("original_name", originalName).
+		Warn("Restoring old Watchtower container name after handoff failure")
+
+	err := client.RenameContainer(ctx, oldContainer, originalName)
+	if err != nil {
+		clog.WithError(err).
+			WithField("original_name", originalName).
+			Error("Failed to restore old Watchtower container name; manual intervention required")
+
+		return
+	}
+
+	clog.WithField("original_name", originalName).
+		Info("Restored old Watchtower container name after handoff failure")
+}
+
+// cleanupFailedNewContainer best-effort removes a new container that failed
+// verification so the original name can be restored on the old instance.
+func cleanupFailedNewContainer(
+	ctx context.Context,
+	client container.Client,
+	clog *logrus.Entry,
+	newContainerID types.ContainerID,
+) {
+	if newContainerID == "" {
+		return
+	}
+
+	failedNew, err := client.GetContainer(ctx, newContainerID)
+	if err != nil {
+		clog.WithError(err).
+			WithField("new_id", newContainerID.ShortID()).
+			Debug("Failed to inspect failed new container for cleanup")
+
+		return
+	}
+
+	cleanupErr := client.StopAndRemoveContainer(ctx, failedNew, orchestratorStopTimeout)
+	if cleanupErr != nil {
+		clog.WithError(cleanupErr).
+			WithField("new_id", newContainerID.ShortID()).
+			Debug("Failed to remove failed new container after verify error")
+	}
 }
 
 // inspectOldContainer retrieves the old container's configuration and propagates
@@ -559,7 +691,6 @@ func createAndStartNewContainer(
 	)
 	if err != nil {
 		clog.WithError(err).Error("Failed to create and start new container")
-		clog.Warn("Rollback unavailable: the old container has been removed. Manual intervention required.")
 
 		return "", fmt.Errorf("%w: %w", errOrchestratorCreateFailed, err)
 	}
@@ -592,7 +723,6 @@ func ensureContainerRunning(
 	ctr, err := client.GetContainer(ctx, containerID)
 	if err != nil {
 		clog.WithError(err).Error("Failed to inspect new container")
-		clog.Warn("Cannot verify new container is running. Old container was removed. Manual recovery requires recreating the container.")
 
 		return fmt.Errorf("%w: %w", errOrchestratorInspectFailed, err)
 	}
@@ -609,7 +739,6 @@ func ensureContainerRunning(
 	err = client.StartContainerByID(ctx, containerID)
 	if err != nil {
 		clog.WithError(err).Error("Failed to start new container")
-		clog.Warn("Rollback unavailable: the old container has been removed. Manual intervention required.")
 
 		return fmt.Errorf("%w: %w", errOrchestratorStartFailed, err)
 	}
@@ -618,13 +747,12 @@ func ensureContainerRunning(
 	ctr, err = client.GetContainer(ctx, containerID)
 	if err != nil {
 		clog.WithError(err).Error("Failed to inspect new container after start")
-		clog.Warn("Cannot verify new container is running. Old container was removed. Manual recovery requires recreating the container.")
 
 		return fmt.Errorf("%w: %w", errOrchestratorInspectFailed, err)
 	}
 
 	if !ctr.IsRunning() {
-		clog.Error("New container is not running after explicit start. Old container was removed. Manual recovery requires recreating the container.")
+		clog.Error("New container is not running after explicit start")
 
 		return fmt.Errorf("%w: %s", errNewContainerNotRunning, containerID.ShortID())
 	}

@@ -1198,7 +1198,12 @@ func isPinned(
 
 	// Get initial image name and configuration.
 	imageName := cont.ImageName()
-	configImage := cont.ContainerInfo().Config.Image
+
+	var configImage string
+	if info := cont.ContainerInfo(); info != nil && info.Config != nil {
+		configImage = info.Config.Image
+	}
+
 	fallbackImage := getFallbackImage(cont)
 
 	// Check if ImageName is invalid and fall back to Config.Image or a derived name.
@@ -1662,33 +1667,6 @@ func restartContainersInSortedOrder(
 	for i := range containers {
 		c := containers[i]
 
-		// Check for context cancellation to avoid additional work when context is canceled.
-		// First, log and track the current container, then iterate remaining containers.
-		if ctx.Err() != nil {
-			// Handle the current container that was not processed due to cancellation.
-			logrus.WithFields(
-				logrus.Fields{
-					"container":    c.Name(),
-					"image":        c.ImageName(),
-					"container_id": c.ID().ShortID(),
-				}).Info("Skipped container restart due to context cancellation")
-			failed[c.ID()] = fmt.Errorf("restart skipped: %w", ctx.Err())
-
-			// Handle remaining containers that were not processed due to cancellation.
-			for j := i + 1; j < len(containers); j++ {
-				skipped := containers[j]
-				logrus.WithFields(
-					logrus.Fields{
-						"container":    skipped.Name(),
-						"image":        skipped.ImageName(),
-						"container_id": skipped.ID().ShortID(),
-					}).Info("Skipped container restart due to context cancellation")
-				failed[skipped.ID()] = fmt.Errorf("restart skipped: %w", ctx.Err())
-			}
-
-			return failed
-		}
-
 		if !c.ToRestart() {
 			continue
 		}
@@ -1713,6 +1691,28 @@ func restartContainersInSortedOrder(
 		if c.IsWatchtower() && config.CurrentContainerID != "" &&
 			c.ID() != config.CurrentContainerID {
 			continue
+		}
+
+		// Parent cancellation must not strand containers already removed in the
+		// stop phase. restartStaleContainer uses a detached context for create/start,
+		// so continue recreating stopped (and self-update) instances. Containers that
+		// were never stopped can be skipped safely.
+		if ctx.Err() != nil && !c.IsWatchtower() && !wasStopped {
+			logrus.WithFields(
+				logrus.Fields{
+					"container":    c.Name(),
+					"image":        c.ImageName(),
+					"container_id": c.ID().ShortID(),
+				}).Info("Skipped container restart due to context cancellation")
+			failed[c.ID()] = fmt.Errorf("restart skipped: %w", ctx.Err())
+
+			continue
+		}
+
+		if ctx.Err() != nil && (c.IsWatchtower() || wasStopped) {
+			logrus.WithFields(fields).
+				WithField("container_id", c.ID().ShortID()).
+				Info("Parent context canceled; continuing restart of stopped container")
 		}
 
 		// Restart Watchtower containers regardless of stoppedImages, as they are renamed.
@@ -1833,7 +1833,10 @@ func restartStaleContainer(
 		"image":     sourceContainer.ImageName(),
 	}
 
-	var renamed bool
+	var (
+		renamed                bool
+		originalWatchtowerName string
+	)
 
 	// Rename Watchtower containers regardless of NoRestart flag,
 	// but skip in run-once mode as there's no need to avoid conflicts
@@ -1876,6 +1879,7 @@ func restartStaleContainer(
 
 			renamed = true
 		} else {
+			originalWatchtowerName = sourceContainer.Name()
 			newName := targetOldName
 
 			err := client.RenameContainer(
@@ -1946,6 +1950,29 @@ func restartStaleContainer(
 			WithError(err).
 			Debug("Failed to create container")
 
+		// Restore the original name so the running instance is not left only as
+		// watchtower-old-* with the canonical name free and unused.
+		if renamed && originalWatchtowerName != "" && sourceContainer.IsWatchtower() {
+			//nolint:contextcheck // Using detached context intentionally to survive parent cancellation
+			renameBackErr := client.RenameContainer(
+				detachedCtx,
+				sourceContainer,
+				originalWatchtowerName,
+			)
+			if renameBackErr != nil {
+				logrus.WithError(renameBackErr).
+					WithFields(fields).
+					WithField("original_name", originalWatchtowerName).
+					Debug("Failed to rename Watchtower container back after create failure")
+			} else {
+				renamed = false
+
+				logrus.WithFields(fields).
+					WithField("original_name", originalWatchtowerName).
+					Debug("Restored Watchtower container name after create failure")
+			}
+		}
+
 		return "",
 			renamed,
 			fmt.Errorf(
@@ -1969,22 +1996,34 @@ func restartStaleContainer(
 				WithError(err).
 				Debug("Failed to start container")
 
-			// If there's an error and the container is an old Watchtower container,
-			// then stop and remove it.
+				// On start failure after a Watchtower rename, remove only the newly
+			// created container. The renamed source still holds the running process
+			// and must remain so the host keeps a Watchtower instance.
 			if renamed && sourceContainer.IsWatchtower() {
 				logrus.WithFields(fields).
+					WithField("new_id", newContainerID.ShortID()).
 					Debug("Cleaning up failed Watchtower container")
 
 				//nolint:contextcheck // Using detached context intentionally to survive parent cancellation
-				cleanupErr := client.StopAndRemoveContainer(
-					detachedCtx,
-					sourceContainer,
-					config.Timeout,
-				)
-				if cleanupErr != nil {
-					logrus.WithError(cleanupErr).
+				failedNew, getErr := client.GetContainer(detachedCtx, newContainerID)
+				if getErr != nil {
+					logrus.WithError(getErr).
 						WithFields(fields).
-						Debug("Failed to stop failed Watchtower container")
+						WithField("new_id", newContainerID.ShortID()).
+						Debug("Failed to inspect failed Watchtower container for cleanup")
+				} else {
+					//nolint:contextcheck // Using detached context intentionally to survive parent cancellation
+					cleanupErr := client.StopAndRemoveContainer(
+						detachedCtx,
+						failedNew,
+						config.Timeout,
+					)
+					if cleanupErr != nil {
+						logrus.WithError(cleanupErr).
+							WithFields(fields).
+							WithField("new_id", newContainerID.ShortID()).
+							Debug("Failed to stop failed Watchtower container")
+					}
 				}
 			}
 
