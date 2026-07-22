@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/gofiber/fiber/v3"
+	"github.com/gofiber/fiber/v3/middleware/timeout"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
@@ -527,6 +528,132 @@ func Test_executeUpdateAsync(t *testing.T) {
 	}
 }
 
+func Test_contextForAsync(t *testing.T) {
+	t.Run("without deadline uses handler context", func(t *testing.T) {
+		type ctxKey struct{}
+
+		handlerCtx := context.WithValue(context.Background(), ctxKey{}, "handler")
+		h := New(func(_ context.Context, _, _ []string) *metrics.Metric {
+			return &metrics.Metric{}
+		}, nil, handlerCtx)
+
+		ctx, cancel := h.contextForAsync(context.Background())
+		defer cancel()
+
+		assert.Equal(t, handlerCtx, ctx)
+		_, ok := ctx.Deadline()
+		assert.False(t, ok)
+	})
+
+	t.Run("projects deadline without inheriting cancellation", func(t *testing.T) {
+		handlerCtx := context.Background()
+		h := New(func(_ context.Context, _, _ []string) *metrics.Metric {
+			return &metrics.Metric{}
+		}, nil, handlerCtx)
+
+		deadline := time.Now().Add(3 * time.Minute).Truncate(time.Millisecond)
+		updateCtx, cancelUpdate := context.WithDeadline(context.Background(), deadline)
+		cancelUpdate()
+
+		require.ErrorIs(t, updateCtx.Err(), context.Canceled)
+
+		ctx, cancel := h.contextForAsync(updateCtx)
+		defer cancel()
+
+		select {
+		case <-ctx.Done():
+			t.Fatal("async context must not be canceled when updateCtx is canceled")
+		default:
+		}
+
+		gotDeadline, ok := ctx.Deadline()
+		require.True(t, ok)
+		assert.WithinDuration(t, deadline, gotDeadline, time.Millisecond)
+	})
+
+	t.Run("cancels when handler context is canceled", func(t *testing.T) {
+		handlerCtx, handlerCancel := context.WithCancel(context.Background())
+		h := New(func(_ context.Context, _, _ []string) *metrics.Metric {
+			return &metrics.Metric{}
+		}, nil, handlerCtx)
+
+		deadline := time.Now().Add(time.Minute)
+
+		updateCtx, cancelUpdate := context.WithDeadline(context.Background(), deadline)
+		defer cancelUpdate()
+
+		ctx, cancel := h.contextForAsync(updateCtx)
+		defer cancel()
+
+		handlerCancel()
+
+		require.Eventually(t, func() bool {
+			return ctx.Err() != nil
+		}, time.Second, time.Millisecond, "async context should cancel with handler context")
+	})
+}
+
+func Test_executeUpdateAsync_ignoresRequestContextCancellation(t *testing.T) {
+	lock := make(chan bool, 1)
+	lock <- true
+
+	handlerCtx := context.Background()
+	started := make(chan context.Context, 1)
+	release := make(chan struct{})
+
+	h := New(func(ctx context.Context, _, _ []string) *metrics.Metric {
+		started <- ctx
+
+		<-release
+
+		return &metrics.Metric{}
+	}, lock, handlerCtx)
+
+	deadline := time.Now().Add(2 * time.Minute)
+	updateCtx, cancelUpdate := context.WithDeadline(context.Background(), deadline)
+	cancelUpdate()
+
+	token := <-lock
+
+	done := make(chan struct{})
+	go func() {
+		defer close(done)
+
+		h.executeUpdateAsync(updateCtx, nil, nil, token)
+	}()
+
+	var observedCtx context.Context
+	select {
+	case observedCtx = <-started:
+	case <-time.After(2 * time.Second):
+		t.Fatal("update function was not started")
+	}
+
+	select {
+	case <-observedCtx.Done():
+		t.Fatal("async update must not observe a canceled context from the request")
+	default:
+	}
+
+	gotDeadline, ok := observedCtx.Deadline()
+	require.True(t, ok)
+	assert.WithinDuration(t, deadline, gotDeadline, time.Millisecond)
+
+	close(release)
+
+	select {
+	case <-done:
+	case <-time.After(2 * time.Second):
+		t.Fatal("executeUpdateAsync did not finish")
+	}
+
+	select {
+	case <-lock:
+	default:
+		t.Error("lock was not released")
+	}
+}
+
 func Test_releaseLock(t *testing.T) {
 	lock := make(chan bool, 1)
 	h := New(func(_ context.Context, _, _ []string) *metrics.Metric {
@@ -638,6 +765,129 @@ func Test_handleAsync(t *testing.T) {
 	defer resp.Body.Close()
 
 	assert.Equal(t, http.StatusAccepted, resp.StatusCode)
+
+	require.Eventually(t, func() bool {
+		select {
+		case <-lock:
+			return true
+		default:
+			return false
+		}
+	}, 2*time.Second, 10*time.Millisecond, "lock should be released after async update")
+}
+
+func Test_handleAsync_survivesRequestContextCancellation(t *testing.T) {
+	lock := make(chan bool, 1)
+	lock <- true
+
+	started := make(chan context.Context, 1)
+	release := make(chan struct{})
+
+	h := NewWithTimeout(func(ctx context.Context, _, _ []string) *metrics.Metric {
+		started <- ctx
+
+		<-release
+
+		return &metrics.Metric{}
+	}, lock, 5*time.Minute)
+
+	app := fiber.New(fiber.Config{})
+	app.Post("/v1/update", h.Handle)
+
+	reqCtx, cancel := context.WithCancel(t.Context())
+	req := httptest.NewRequestWithContext(reqCtx, http.MethodPost, "/v1/update?async=true", nil)
+
+	resp, err := app.Test(req)
+	require.NoError(t, err)
+
+	defer resp.Body.Close()
+
+	assert.Equal(t, http.StatusAccepted, resp.StatusCode)
+
+	var observedCtx context.Context
+	select {
+	case observedCtx = <-started:
+	case <-time.After(2 * time.Second):
+		t.Fatal("update function was not started")
+	}
+
+	// Cancel the request-scoped context after the response was sent while the
+	// async update is still in progress.
+	cancel()
+	time.Sleep(20 * time.Millisecond)
+
+	select {
+	case <-observedCtx.Done():
+		t.Fatal("async update observed canceled context; it must not use the request context")
+	default:
+	}
+
+	close(release)
+
+	require.Eventually(t, func() bool {
+		select {
+		case <-lock:
+			return true
+		default:
+			return false
+		}
+	}, 2*time.Second, 10*time.Millisecond, "lock should be released after async update")
+}
+
+func Test_handleAsync_survivesTimeoutMiddlewareCancellation(t *testing.T) {
+	lock := make(chan bool, 1)
+	lock <- true
+
+	started := make(chan context.Context, 1)
+	release := make(chan struct{})
+
+	routeTimeout := 5 * time.Minute
+	h := NewWithTimeout(func(ctx context.Context, _, _ []string) *metrics.Metric {
+		started <- ctx
+
+		<-release
+
+		return &metrics.Metric{}
+	}, lock, routeTimeout)
+
+	app := fiber.New(fiber.Config{})
+	// Match production wiring: timeout middleware cancels c.Context() when the
+	// handler returns after sending 202.
+	app.Post("/v1/update", timeout.New(h.Handle, timeout.Config{
+		Timeout: routeTimeout,
+	}))
+
+	before := time.Now()
+	req := httptest.NewRequestWithContext(t.Context(), http.MethodPost, "/v1/update?async=true", nil)
+
+	resp, err := app.Test(req)
+	require.NoError(t, err)
+
+	defer resp.Body.Close()
+
+	assert.Equal(t, http.StatusAccepted, resp.StatusCode)
+
+	var observedCtx context.Context
+	select {
+	case observedCtx = <-started:
+	case <-time.After(2 * time.Second):
+		t.Fatal("update function was not started")
+	}
+
+	// Middleware cancel runs when the handler returns; allow it to propagate.
+	time.Sleep(20 * time.Millisecond)
+
+	select {
+	case <-observedCtx.Done():
+		t.Fatal("async update must survive Fiber timeout middleware cancellation after 202")
+	default:
+	}
+
+	deadline, ok := observedCtx.Deadline()
+	require.True(t, ok, "async update should retain the route timeout deadline")
+	assert.WithinDuration(t, before.Add(routeTimeout), deadline, 5*time.Second)
+
+	close(release)
 
 	require.Eventually(t, func() bool {
 		select {
@@ -771,12 +1021,17 @@ func TestHandler_Handle_TimeoutOverride(t *testing.T) {
 		lock := make(chan bool, 1)
 		lock <- true
 
+		started := make(chan context.Context, 1)
+
 		h := NewWithTimeout(func(ctx context.Context, _, _ []string) *metrics.Metric {
+			started <- ctx
+
 			return &metrics.Metric{}
 		}, lock, 5*time.Minute)
 		app := fiber.New(fiber.Config{})
 		app.Post("/v1/update", h.Handle)
 
+		before := time.Now()
 		req := httptest.NewRequestWithContext(t.Context(), http.MethodPost, "/v1/update?async=true&timeout=2m", nil)
 		resp, err := app.Test(req)
 		require.NoError(t, err)
@@ -784,6 +1039,26 @@ func TestHandler_Handle_TimeoutOverride(t *testing.T) {
 		defer resp.Body.Close()
 
 		assert.Equal(t, http.StatusAccepted, resp.StatusCode)
+
+		var observedCtx context.Context
+		select {
+		case observedCtx = <-started:
+		case <-time.After(2 * time.Second):
+			t.Fatal("update function was not started")
+		}
+
+		deadline, ok := observedCtx.Deadline()
+		require.True(t, ok)
+		assert.WithinDuration(t, before.Add(2*time.Minute), deadline, 5*time.Second)
+
+		require.Eventually(t, func() bool {
+			select {
+			case <-lock:
+				return true
+			default:
+				return false
+			}
+		}, 2*time.Second, 10*time.Millisecond)
 	})
 
 	t.Run("invalid timeout is ignored", func(t *testing.T) {
