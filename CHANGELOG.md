@@ -8,6 +8,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- Restore correct restart order for named network dependencies by @nicholas-fedor in [#2000](https://github.com/nicholas-fedor/watchtower/pull/2000)
+
+## [1.20.1] - 2026-07-22
+
 ### Chores
 
 - Update module github.com/prometheus/common to v0.70.1 by @renovate[bot] in [#1998](https://github.com/nicholas-fedor/watchtower/pull/1998)
@@ -3309,7 +3315,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## Compare Releases
 
-- [unreleased](https://github.com/nicholas-fedor/watchtower/compare/v1.20.0...HEAD)
+- [unreleased](https://github.com/nicholas-fedor/watchtower/compare/v1.20.1...HEAD)
+- [1.20.1](https://github.com/nicholas-fedor/watchtower/compare/v1.20.0...v1.20.1)
 - [1.20.0](https://github.com/nicholas-fedor/watchtower/compare/v1.19.0...v1.20.0)
 - [1.19.0](https://github.com/nicholas-fedor/watchtower/compare/v1.18.1...v1.19.0)
 - [1.18.1](https://github.com/nicholas-fedor/watchtower/compare/v1.18.0...v1.18.1)
