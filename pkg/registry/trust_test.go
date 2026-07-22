@@ -5,13 +5,17 @@ import (
 	"encoding/json"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/distribution/reference"
+	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
 	dockerCliConfig "github.com/docker/cli/cli/config"
+
+	"github.com/nicholas-fedor/watchtower/pkg/registry/auth"
 )
 
 // TestEncodedEnvAuth_ReturnsCredentialsWhenSet verifies that EncodedEnvAuth
@@ -150,17 +154,19 @@ func TestEncodedConfigCredentials_FileStoreUsernameOnly(t *testing.T) {
 }
 
 // TestEncodedConfigCredentials_IdentityToken accepts ECR-style identity tokens
-// without username/password.
+// without username/password and transforms them to HTTP Basic for bearer exchange.
 func TestEncodedConfigCredentials_IdentityToken(t *testing.T) {
 	tempDir, err := os.MkdirTemp("", "watchtower-test-docker-config")
 	require.NoError(t, err)
 
 	defer os.RemoveAll(tempDir)
 
+	const identityToken = "eyJlY3ItdG9rZW4iOiJ0ZXN0In0="
+
 	configContent, err := json.Marshal(map[string]any{
 		"auths": map[string]any{
 			"123456789012.dkr.ecr.us-east-1.amazonaws.com": map[string]string{
-				"identitytoken": "eyJlY3ItdG9rZW4iOiJ0ZXN0In0=",
+				"identitytoken": identityToken,
 			},
 		},
 	})
@@ -180,7 +186,47 @@ func TestEncodedConfigCredentials_IdentityToken(t *testing.T) {
 	assert.NotEmpty(t, credentials)
 
 	authConfig := decodeEncodedAuth(t, credentials)
-	assert.Equal(t, "eyJlY3ItdG9rZW4iOiJ0ZXN0In0=", authConfig["identitytoken"])
+	assert.Equal(t, identityToken, authConfig["identitytoken"])
+
+	// End-to-end: TransformAuth must produce Basic credentials for the
+	// Authorization header used when exchanging for a registry bearer token.
+	basicEncoded := auth.TransformAuth(credentials)
+	basicDecoded, decodeErr := base64.StdEncoding.DecodeString(basicEncoded)
+	require.NoError(t, decodeErr)
+	assert.Equal(t, ":"+identityToken, string(basicDecoded))
+
+	authHeader := "Basic " + basicEncoded
+	assert.True(t, strings.HasPrefix(authHeader, "Basic "))
+	assert.NotContains(t, authHeader, "Bearer ")
+}
+
+// TestEncodedConfigCredentials_RegistryTokenOnlyRejected ensures registrytoken-only
+// entries are not treated as usable until a Bearer-auth path exists for them.
+func TestEncodedConfigCredentials_RegistryTokenOnlyRejected(t *testing.T) {
+	tempDir, err := os.MkdirTemp("", "watchtower-test-docker-config")
+	require.NoError(t, err)
+
+	defer os.RemoveAll(tempDir)
+
+	configContent, err := json.Marshal(map[string]any{
+		"auths": map[string]any{
+			"ghcr.io": map[string]string{
+				"registrytoken": "bearer-only-token",
+			},
+		},
+	})
+	require.NoError(t, err)
+
+	configPath := filepath.Join(tempDir, "config.json")
+	require.NoError(t, os.WriteFile(configPath, configContent, 0o600))
+
+	t.Setenv("DOCKER_CONFIG", tempDir)
+	t.Setenv("HOME", tempDir)
+	dockerCliConfig.SetDir(tempDir)
+
+	credentials, err := EncodedConfigCredentials("ghcr.io/org/app:latest")
+	require.NoError(t, err)
+	assert.Empty(t, credentials)
 }
 
 // TestEncodedConfigCredentials_PasswordOnly accepts password-as-token entries
@@ -531,6 +577,84 @@ func TestEncodedAuth_EnvPartiallySetWithUnconfiguredRegistry(t *testing.T) {
 	credentials, err := EncodedAuth("ghcr.io/test/image:latest")
 	require.NoError(t, err)
 	assert.Empty(t, credentials)
+}
+
+// TestEncodedAuth_TraceLogsOmitSecrets verifies that trace-level credential logs
+// never include password or token material from config or environment sources.
+func TestEncodedAuth_TraceLogsOmitSecrets(t *testing.T) {
+	const (
+		secretPass  = "super-secret-repo-pass"
+		secretToken = "super-secret-identity-token"
+	)
+
+	var logBuf strings.Builder
+
+	origOut := logrus.StandardLogger().Out
+	origLevel := logrus.GetLevel()
+
+	logrus.SetOutput(&logBuf)
+	logrus.SetLevel(logrus.TraceLevel)
+
+	t.Cleanup(func() {
+		logrus.SetOutput(origOut)
+		logrus.SetLevel(origLevel)
+	})
+
+	t.Run("environment credentials", func(t *testing.T) {
+		logBuf.Reset()
+
+		t.Setenv("REPO_USER", "env-user")
+		t.Setenv("REPO_PASS", secretPass)
+
+		_, err := EncodedEnvAuth()
+		require.NoError(t, err)
+		assert.NotContains(t, logBuf.String(), secretPass)
+	})
+
+	t.Run("config credentials", func(t *testing.T) {
+		logBuf.Reset()
+
+		writeTestDockerConfig(t, map[string]map[string]string{
+			"ghcr.io": {
+				"username": "cfg-user",
+				"password": secretPass,
+			},
+		})
+
+		t.Setenv("REPO_USER", "")
+		t.Setenv("REPO_PASS", "")
+
+		_, err := EncodedConfigCredentials("ghcr.io/org/app:latest")
+		require.NoError(t, err)
+		assert.NotContains(t, logBuf.String(), secretPass)
+	})
+
+	t.Run("identity token credentials", func(t *testing.T) {
+		logBuf.Reset()
+
+		tempDir, err := os.MkdirTemp("", "watchtower-test-docker-config")
+		require.NoError(t, err)
+
+		defer os.RemoveAll(tempDir)
+
+		configContent, err := json.Marshal(map[string]any{
+			"auths": map[string]any{
+				"ghcr.io": map[string]string{
+					"identitytoken": secretToken,
+				},
+			},
+		})
+		require.NoError(t, err)
+		require.NoError(t, os.WriteFile(filepath.Join(tempDir, "config.json"), configContent, 0o600))
+
+		t.Setenv("DOCKER_CONFIG", tempDir)
+		t.Setenv("HOME", tempDir)
+		dockerCliConfig.SetDir(tempDir)
+
+		_, err = EncodedConfigCredentials("ghcr.io/org/app:latest")
+		require.NoError(t, err)
+		assert.NotContains(t, logBuf.String(), secretToken)
+	})
 }
 
 // TestEncodedConfigCredentials_InvalidImageRef verifies that EncodedConfigCredentials

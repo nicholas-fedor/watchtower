@@ -109,11 +109,11 @@ func EncodedEnvAuth() (string, error) {
 			"username": username,
 		}).Debug("Loaded auth credentials from environment")
 
-		// Log sensitive password only in trace mode.
+		// Trace only non-sensitive presence indicators; never log REPO_PASS.
 		if logrus.GetLevel() == logrus.TraceLevel {
 			logrus.WithFields(logrus.Fields{
-				"username": username,
-				"password": password,
+				"username":     username,
+				"has_password": true,
 			}).Trace("Using environment credentials")
 		}
 
@@ -185,7 +185,7 @@ func EncodedConfigCredentials(imageRef string) (string, error) {
 		return "", nil
 	}
 
-	// Log successful credential retrieval, hiding secrets unless in trace mode.
+	// Log successful credential retrieval with non-sensitive presence flags only.
 	logrus.WithFields(fields).WithFields(logrus.Fields{
 		"username":         credentials.Username,
 		"has_password":     credentials.Password != "",
@@ -194,11 +194,13 @@ func EncodedConfigCredentials(imageRef string) (string, error) {
 		"config_file":      configFile.Filename,
 	}).Debug("Loaded auth credentials from config")
 
+	// Trace only non-sensitive presence indicators; never log password or tokens.
 	if logrus.GetLevel() == logrus.TraceLevel {
 		logrus.WithFields(fields).WithFields(logrus.Fields{
-			"username": credentials.Username,
-			"password": credentials.Password,
-			"server":   server,
+			"username":         credentials.Username,
+			"has_password":     credentials.Password != "",
+			"has_identity_tok": credentials.IdentityToken != "",
+			"server":           server,
 		}).Trace("Using config credentials")
 	}
 
@@ -208,16 +210,16 @@ func EncodedConfigCredentials(imageRef string) (string, error) {
 
 // hasUsableRegistryCredentials reports whether AuthConfig carries material the
 // Docker daemon or registry HTTP clients can authenticate with.
+//
+// IdentityToken and Password are supported end to end via EncodeCredentials and
+// TransformAuth (Basic auth). RegistryToken-only entries are not accepted until
+// a Bearer-auth path is implemented for them.
 func hasUsableRegistryCredentials(credentials dockerConfig.AuthConfig) bool {
 	if credentials == (dockerConfig.AuthConfig{}) {
 		return false
 	}
 
 	if credentials.IdentityToken != "" {
-		return true
-	}
-
-	if credentials.RegistryToken != "" {
 		return true
 	}
 
