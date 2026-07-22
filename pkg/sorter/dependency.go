@@ -179,32 +179,31 @@ func sortByDependencies(containers []types.Container, useComposeDependsOn bool) 
 // buildDependencyGraph constructs the dependency graph data structures for topological sorting.
 //
 // This function builds three key data structures:
-//   - containerMap: Maps normalized container identifiers to container objects for O(1) lookup
+//   - containerMap: Maps canonical normalized identifiers to container objects for O(1) lookup
 //   - indegree: Tracks number of incoming dependencies for each container (nodes with indegree 0 have no dependencies)
-//   - adjacency: Lists containers that depend on each container (outgoing edges)
+//   - adjacency: Lists containers that depend on each container (outgoing edges; keys are canonical)
 //
-// Normalization ensures consistent handling of Docker Compose service names vs container names.
-// Container links from c.Links() are already normalized.
+// Graph nodes are always keyed by ResolveContainerIdentifier (project-service, service, or name).
+// Links from c.Links() may use Watchtower depends-on container names, Compose service names,
+// Docker links, or network_mode targets (including explicit container_name values). Those
+// strings often differ from the canonical graph key when Compose labels are present.
 //
 // Link Matching Strategy:
-// The function attempts multiple matching strategies in order of specificity:
-//  1. Exact match - direct key lookup in containerMap
-//  2. Prefix match for replicas - matches Docker Compose replica suffixes (e.g., "db" matches "db-1", "db-2")
-//  3. Service-only match - strips project prefix from identifiers (e.g., "postgresql-postgres" -> "postgres")
-//     to handle cases where watchtower labels specify only the service name without project context
-//
-// To prevent incorrect matches with similarly named containers (e.g., "db" matching "dbase" or "db-backup"),
-// the prefix matching only succeeds when the suffix after "-" is a positive integer. This ensures that
-// "watchtower-test-database" does NOT match "watchtower-test-database2", which would incorrectly
-// create a dependency relationship.
+// Matching uses FindMatchingIdentifiers against the canonical keys plus unique bare Name()
+// aliases, then maps every hit back to a canonical key before recording edges. Strategies:
+//  1. Exact match on canonical identifier or bare container name
+//  2. Prefix match for Docker Compose replica suffixes (e.g., "db" matches "db-1", "db-2")
+//  3. Service-only match via ExtractServiceName on both sides (e.g., "abs-wireguard" matches
+//     "media-abs-wireguard"), only when exactly one candidate is unambiguous
 //
 // Parameters:
 //   - containers: List of containers to build graph for.
+//   - useComposeDependsOn: Whether Links() should include Compose depends_on labels.
 //
 // Returns:
-//   - map[string]types.Container: Container lookup map
+//   - map[string]types.Container: Container lookup map (canonical keys only)
 //   - map[string]int: Indegree count for each container
-//   - map[string][]string: Adjacency list (container -> dependents)
+//   - map[string][]string: Adjacency list (canonical dependency -> dependents)
 //   - map[types.Container]string: Reverse map from container to normalized identifier
 //   - error: IdentifierCollisionError if duplicate identifiers detected, nil otherwise
 func buildDependencyGraph(
@@ -244,146 +243,139 @@ func buildDependencyGraph(
 		normalizedMap[dupContainers[0]] = identifier
 	}
 
-	// Build the graph by processing container links (dependencies)
-	// For each container, increment its indegree for each link it has to an existing container
-	// Add reverse edges in adjacency list: link target -> dependent container
+	// Lookup identifiers for link resolution: canonical keys plus unique bare names.
+	// Docs specify Watchtower depends-on and network_mode targets use container names,
+	// while Compose depends_on uses service names; aliases bridge those forms to the
+	// canonical project-service graph keys without inventing extra Kahn nodes.
+	matchIdentifiers, aliasToCanonical := buildLinkMatchIndexes(containerMap)
+
+	// Build the graph by processing container links (dependencies).
+	// Edges always use canonical identifiers so Kahn's algorithm can traverse them.
 	for _, c := range containers {
 		normalizedIdentifier := normalizedMap[c]
 		// c.Links() already returns normalized container names
 		for _, normalizedLink := range c.Links(useComposeDependsOn) {
-			// Try exact match first
-			if _, exists := containerMap[normalizedLink]; exists {
-				if normalizedLink == normalizedIdentifier {
-					// Self-reference detected: the container's Links() include itself.
-					// This can occur when:
-					//   - A container is linked to a service name that resolves to itself
-					//   - Docker Compose service dependencies create circular references
-					//   - Manual labeling creates self-referential dependencies
-					//
-					// While container.Links() filters most self-references, this guard prevents
-					// edge cases from corrupting the dependency graph. Skipping the increment
-					// ensures the container is treated as having no dependencies (indegree 0),
-					// preventing a circular dependency error for what is essentially a no-op.
-					continue
-				}
-				// This container depends on the linked container, so increment its indegree
-				indegree[normalizedIdentifier]++
-				// The linked container has this container as a dependent
-				adjacency[normalizedLink] = append(adjacency[normalizedLink], normalizedIdentifier)
-
-				continue
-			}
-
-			// 2. Try prefix match for Docker Compose replica suffixes only (e.g., "db" -> "db-1", "db-2")
-			// Only match if the suffix after "-" is a positive integer (Compose-style replica numbering).
-			// This strict matching prevents incorrectly treating "database2" as a replica of "database",
-			// or "db-backup" as a replica of "db". Only numeric suffixes like "-1", "-2" are considered
-			// valid replica indicators, which is consistent with Docker Compose's replica naming convention.
-			var matchedKeys []string
-
-			for key := range containerMap {
-				if strings.HasPrefix(key, normalizedLink+"-") {
-					// Extract the suffix after the link name and "-"
-					suffix := key[len(normalizedLink)+1:]
-					// Only match if the suffix is a positive integer (replica number).
-					// This ensures we don't match "watchtower-test-database" when looking for "watchtower-test-database2",
-					// or create false dependencies between similarly named but distinct services.
-					if IsPositiveInteger(suffix) {
-						matchedKeys = append(matchedKeys, key)
-					}
-				}
-			}
-
-			// Sort matched keys for deterministic dependency ordering
-			// This ensures that when multiple replicas match (e.g., "db-1", "db-2"),
-			// the dependencies are added in a consistent, predictable order.
-			sort.Strings(matchedKeys)
+			matchedKeys := resolveLinkToCanonicalKeys(
+				normalizedLink,
+				matchIdentifiers,
+				aliasToCanonical,
+			)
 
 			for _, key := range matchedKeys {
 				if key == normalizedIdentifier {
-					// Self-reference via prefix match: the container matched itself as a replica.
-					// This can happen when a container name follows the replica pattern
-					// (e.g., "myapp-1" linking to "myapp" would incorrectly match itself).
-					//
-					// This check prevents a container from creating a dependency on itself
-					// through the prefix matching logic. Without this guard, a container
-					// named "app-1" with a link to "app" would increment its own indegree,
-					// potentially causing incorrect dependency calculations or cycles.
-					//
-					// Note: While container.Links() should filter self-references upstream,
-					// this defensive check ensures robustness against edge cases.
+					// Self-reference: skip so the container stays indegree 0 for this link.
 					continue
 				}
-				// This container depends on the linked container, so increment its indegree
+
 				indegree[normalizedIdentifier]++
-				// The linked container has this container as a dependent
 				adjacency[key] = append(adjacency[key], normalizedIdentifier)
-			}
-
-			// If we found replica matches, skip service-only matching
-			if len(matchedKeys) > 0 {
-				continue
-			}
-
-			// 3. Try matching by service name only (strip project prefix from containerMap keys)
-			// This handles the case where watchtower labels specify only the service name
-			// (e.g., "postgres") but the containerMap key includes the project prefix
-			// (e.g., "postgresql-postgres").
-			//
-			// IMPORTANT: Only match if there's exactly ONE container with this service name
-			// to avoid ambiguous cross-project dependencies. If multiple containers from
-			// different projects have the same service name, we should NOT match any of them.
-			var serviceMatchKeys []string
-
-			for key := range containerMap {
-				serviceName := ExtractServiceName(key)
-				if serviceName == normalizedLink {
-					serviceMatchKeys = append(serviceMatchKeys, key)
-				}
-			}
-
-			// Only apply service-only matching if there's exactly ONE unambiguous match
-			if len(serviceMatchKeys) == 1 {
-				serviceMatchKey := serviceMatchKeys[0]
-
-				if serviceMatchKey == normalizedIdentifier {
-					// Self-reference via service name match.
-					// This prevents a container from creating a dependency on itself
-					// when its service name matches the link.
-					continue
-				}
-
-				// Log the service-only match for debugging
-				logrus.WithFields(logrus.Fields{
-					"link":              normalizedLink,
-					"matched_key":       serviceMatchKey,
-					"dependent":         normalizedIdentifier,
-					"match_type":        "service_only",
-					"extracted_service": ExtractServiceName(serviceMatchKey),
-				}).Debug("Matched dependency via service name fallback")
-
-				// This container depends on the linked container, so increment its indegree
-				indegree[normalizedIdentifier]++
-				// The linked container has this container as a dependent
-				adjacency[serviceMatchKey] = append(
-					adjacency[serviceMatchKey],
-					normalizedIdentifier,
-				)
-			} else if len(serviceMatchKeys) > 1 {
-				// Multiple matches found - this is ambiguous (e.g., same service name in different projects)
-				// Log this situation for debugging but don't create any dependencies
-				logrus.WithFields(logrus.Fields{
-					"link":         normalizedLink,
-					"matched_keys": serviceMatchKeys,
-					"dependent":    normalizedIdentifier,
-					"match_count":  len(serviceMatchKeys),
-					"match_type":   "service_only_ambiguous",
-				}).Debug("Skipped ambiguous service name match (multiple containers with same service name)")
 			}
 		}
 	}
 
 	return containerMap, indegree, adjacency, normalizedMap, nil
+}
+
+// buildLinkMatchIndexes builds the identifier list and alias→canonical map used when
+// resolving dependency links against graph nodes.
+//
+// Each canonical ResolveContainerIdentifier is always included. Bare container names are
+// registered as aliases only when they uniquely identify one container in the set, so
+// ambiguous names (two containers sharing a name) do not create non-deterministic edges.
+//
+// Parameters:
+//   - containerMap: Canonical identifier → container map from graph construction.
+//
+// Returns:
+//   - []string: Identifiers passed to FindMatchingIdentifiers (canonical keys and unique bare names).
+//   - map[string]string: Maps every matchable identifier to its canonical graph key.
+func buildLinkMatchIndexes(
+	containerMap map[string]types.Container,
+) ([]string, map[string]string) {
+	// Capacity covers one canonical key plus one optional bare-name alias per container.
+	const aliasCapacityFactor = 2
+
+	aliasToCanonical := make(map[string]string, len(containerMap)*aliasCapacityFactor)
+	// Track bare names claimed by more than one container so they stay unmatched.
+	ambiguousBareNames := make(map[string]bool)
+
+	for identifier, c := range containerMap {
+		aliasToCanonical[identifier] = identifier
+
+		bareName := util.NormalizeContainerName(c.Name())
+		if bareName == "" || bareName == identifier {
+			continue
+		}
+
+		if existing, exists := aliasToCanonical[bareName]; exists && existing != identifier {
+			ambiguousBareNames[bareName] = true
+
+			continue
+		}
+
+		if ambiguousBareNames[bareName] {
+			continue
+		}
+
+		aliasToCanonical[bareName] = identifier
+	}
+
+	for bareName := range ambiguousBareNames {
+		delete(aliasToCanonical, bareName)
+		logrus.WithField("bare_name", bareName).
+			Debug("Skipped ambiguous bare container name alias for dependency matching")
+	}
+
+	matchIdentifiers := make([]string, 0, len(aliasToCanonical))
+	for id := range aliasToCanonical {
+		matchIdentifiers = append(matchIdentifiers, id)
+	}
+
+	sort.Strings(matchIdentifiers)
+
+	return matchIdentifiers, aliasToCanonical
+}
+
+// resolveLinkToCanonicalKeys resolves a single dependency link to sorted unique canonical
+// graph keys using FindMatchingIdentifiers and the alias index.
+//
+// Parameters:
+//   - link: Normalized link from Container.Links().
+//   - matchIdentifiers: Identifiers available for matching (canonical + unique bare names).
+//   - aliasToCanonical: Maps match hits to canonical graph keys.
+//
+// Returns:
+//   - []string: Sorted unique canonical identifiers the link refers to (empty if none).
+func resolveLinkToCanonicalKeys(
+	link string,
+	matchIdentifiers []string,
+	aliasToCanonical map[string]string,
+) []string {
+	if link == "" {
+		return nil
+	}
+
+	matches := FindMatchingIdentifiers(link, matchIdentifiers)
+	if len(matches) == 0 {
+		return nil
+	}
+
+	seen := make(map[string]bool, len(matches))
+	canonicalKeys := make([]string, 0, len(matches))
+
+	for _, match := range matches {
+		canonical, ok := aliasToCanonical[match]
+		if !ok || canonical == "" || seen[canonical] {
+			continue
+		}
+
+		seen[canonical] = true
+		canonicalKeys = append(canonicalKeys, canonical)
+	}
+
+	sort.Strings(canonicalKeys)
+
+	return canonicalKeys
 }
 
 // IsPositiveInteger checks if a string represents a positive integer (1 or greater).
@@ -451,16 +443,17 @@ func ExtractServiceName(identifier string) string {
 }
 
 // FindMatchingIdentifiers returns the identifiers from the given list that match
-// the provided link. It applies the same three matching strategies used in
-// buildDependencyGraph:
+// the provided link. It applies the same strategies used when building the
+// dependency graph:
 //
 //  1. Exact match.
 //  2. Replica prefix match: the identifier starts with "<link>-" and the suffix
 //     after the hyphen is a positive integer (Docker Compose replica numbering).
-//  3. Service-only match using ExtractServiceName. This strategy only succeeds
-//     when exactly one candidate matches; multiple matches (e.g. the same
-//     service name in different projects) are treated as ambiguous and return
-//     no results.
+//  3. Service-only / project-qualified match: ExtractServiceName equality on both
+//     sides, or identifier ends with "-"+link (full service name under a project
+//     prefix). This strategy only succeeds when exactly one candidate matches;
+//     multiple matches (e.g. the same service name in different projects) are
+//     treated as ambiguous and return no results.
 //
 // Parameters:
 //   - link: Dependency link to resolve (typically from Container.Links()).
@@ -508,14 +501,20 @@ func FindMatchingIdentifiers(link string, identifiers []string) []string {
 		return matches
 	}
 
-	// 3. Service-only match using ExtractServiceName.
-	// Only accepted when exactly one candidate matches the service name.
+	// 3. Service-only / project-qualified match.
+	// Accept when exactly one candidate matches via either:
+	//   - ExtractServiceName equality on both sides (handles project-service keys
+	//     when the link is a bare service name, including multi-segment names
+	//     once both sides reduce to the same trailing segment), or
+	//   - the identifier ends with "-"+link (link is the full service name under
+	//     a project prefix, e.g. link "abs-wireguard" → "media-abs-wireguard").
 	// Multiple matches are ambiguous (different projects) and are discarded.
 	var serviceMatches []string
 
 	normalizedLink := ExtractServiceName(link)
 	for id := range idSet {
-		if ExtractServiceName(id) == normalizedLink {
+		if ExtractServiceName(id) == normalizedLink ||
+			(link != "" && strings.HasSuffix(id, "-"+link)) {
 			serviceMatches = append(serviceMatches, id)
 		}
 	}

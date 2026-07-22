@@ -1863,6 +1863,41 @@ func indexOf(names []string, target string) int {
 	return -1
 }
 
+// mockLinkedContainer builds a mock with Compose labels and fixed Links() output.
+// useComposeLinks selects Links(true) vs Links(false) for the useComposeDependsOn path.
+func mockLinkedContainer(
+	name, id, project, service string,
+	links []string,
+	useComposeLinks bool,
+) *mockTypes.MockContainer {
+	c := mockTypes.NewMockContainer(ginkgo.GinkgoT())
+	c.EXPECT().Name().Return(name).Maybe()
+	c.EXPECT().ID().Return(types.ContainerID(id)).Maybe()
+	c.EXPECT().IsWatchtower().Return(false).Maybe()
+
+	if useComposeLinks {
+		c.EXPECT().Links(true).Return(links).Maybe()
+	} else {
+		c.EXPECT().Links(false).Return(links).Maybe()
+	}
+
+	labels := map[string]string{}
+	if project != "" {
+		labels["com.docker.compose.project"] = project
+	}
+
+	if service != "" {
+		labels["com.docker.compose.service"] = service
+	}
+
+	c.EXPECT().ContainerInfo().Return(&dockerContainer.InspectResponse{
+		Name:   "/" + name,
+		Config: &dockerContainer.Config{Labels: labels},
+	}).Maybe()
+
+	return c
+}
+
 var _ = ginkgo.Describe("FindMatchingIdentifiers", func() {
 	ginkgo.It("should return exact match when present", func() {
 		identifiers := []string{"project-db", "other-db"}
@@ -1900,5 +1935,296 @@ var _ = ginkgo.Describe("FindMatchingIdentifiers", func() {
 
 		matches = FindMatchingIdentifiers("db", []string{})
 		gomega.Expect(matches).To(gomega.BeEmpty())
+	})
+
+	ginkgo.It("should match multi-segment service link against project-service identifier", func() {
+		identifiers := []string{"myproject-net-proxy", "myproject-web"}
+		matches := FindMatchingIdentifiers("net-proxy", identifiers)
+		gomega.Expect(matches).To(gomega.Equal([]string{"myproject-net-proxy"}))
+	})
+
+	ginkgo.It("should match multi-segment service link when only the project-service key exists", func() {
+		identifiers := []string{"myproject-net-proxy"}
+		matches := FindMatchingIdentifiers("net-proxy", identifiers)
+		gomega.Expect(matches).To(gomega.Equal([]string{"myproject-net-proxy"}))
+	})
+
+	ginkgo.It("should match trailing service segment via ExtractServiceName", func() {
+		matches := FindMatchingIdentifiers("proxy", []string{"myproject-net-proxy"})
+		gomega.Expect(matches).To(gomega.Equal([]string{"myproject-net-proxy"}))
+	})
+
+	ginkgo.It("should reject ambiguous multi-project service matches", func() {
+		matches := FindMatchingIdentifiers("db", []string{"project1-db", "project2-db"})
+		gomega.Expect(matches).To(gomega.BeEmpty())
+	})
+})
+
+var _ = ginkgo.Describe("buildLinkMatchIndexes", func() {
+	ginkgo.It("should map unique bare names to canonical identifiers", func() {
+		dep := mockLinkedContainer("net-proxy", "id-proxy", "myproject", "net-proxy", nil, true)
+		app := mockLinkedContainer("web-app", "id-web", "myproject", "web", nil, true)
+
+		containerMap := map[string]types.Container{
+			"myproject-net-proxy": dep,
+			"myproject-web":       app,
+		}
+
+		ids, aliasToCanonical := buildLinkMatchIndexes(containerMap)
+		gomega.Expect(aliasToCanonical["myproject-net-proxy"]).To(gomega.Equal("myproject-net-proxy"))
+		gomega.Expect(aliasToCanonical["net-proxy"]).To(gomega.Equal("myproject-net-proxy"))
+		gomega.Expect(aliasToCanonical["web-app"]).To(gomega.Equal("myproject-web"))
+		gomega.Expect(ids).To(gomega.ContainElements(
+			"myproject-net-proxy",
+			"myproject-web",
+			"net-proxy",
+			"web-app",
+		))
+	})
+
+	ginkgo.It("should omit bare name alias when it collides across containers", func() {
+		c1 := mockTypes.NewMockContainer(ginkgo.GinkgoT())
+		c1.EXPECT().Name().Return("shared").Maybe()
+
+		c2 := mockTypes.NewMockContainer(ginkgo.GinkgoT())
+		c2.EXPECT().Name().Return("shared").Maybe()
+
+		containerMap := map[string]types.Container{
+			"project1-service": c1,
+			"project2-service": c2,
+		}
+
+		_, aliasToCanonical := buildLinkMatchIndexes(containerMap)
+		_, hasBare := aliasToCanonical["shared"]
+		gomega.Expect(hasBare).To(gomega.BeFalse())
+		gomega.Expect(aliasToCanonical["project1-service"]).To(gomega.Equal("project1-service"))
+		gomega.Expect(aliasToCanonical["project2-service"]).To(gomega.Equal("project2-service"))
+	})
+})
+
+var _ = ginkgo.Describe("resolveLinkToCanonicalKeys", func() {
+	ginkgo.It("should resolve bare multi-segment container name to project-service key", func() {
+		ids := []string{"myproject-net-proxy", "myproject-web", "net-proxy", "web-app"}
+		alias := map[string]string{
+			"myproject-net-proxy": "myproject-net-proxy",
+			"myproject-web":       "myproject-web",
+			"net-proxy":           "myproject-net-proxy",
+			"web-app":             "myproject-web",
+		}
+
+		keys := resolveLinkToCanonicalKeys("net-proxy", ids, alias)
+		gomega.Expect(keys).To(gomega.Equal([]string{"myproject-net-proxy"}))
+	})
+
+	ginkgo.It("should resolve project-service suffix match without bare-name alias", func() {
+		ids := []string{"myproject-net-proxy"}
+		alias := map[string]string{"myproject-net-proxy": "myproject-net-proxy"}
+
+		keys := resolveLinkToCanonicalKeys("net-proxy", ids, alias)
+		gomega.Expect(keys).To(gomega.Equal([]string{"myproject-net-proxy"}))
+	})
+
+	ginkgo.It("should return nil for empty or unmatched links", func() {
+		ids := []string{"myproject-db"}
+		alias := map[string]string{"myproject-db": "myproject-db"}
+
+		gomega.Expect(resolveLinkToCanonicalKeys("", ids, alias)).To(gomega.BeNil())
+		gomega.Expect(resolveLinkToCanonicalKeys("missing", ids, alias)).To(gomega.BeNil())
+	})
+
+	ginkgo.It("should dedupe when bare alias and canonical both match", func() {
+		ids := []string{"myproject-db", "db"}
+		alias := map[string]string{
+			"myproject-db": "myproject-db",
+			"db":           "myproject-db",
+		}
+
+		keys := resolveLinkToCanonicalKeys("db", ids, alias)
+		gomega.Expect(keys).To(gomega.Equal([]string{"myproject-db"}))
+	})
+})
+
+var _ = ginkgo.Describe("dependency link form permutations", func() {
+	// Links() values from Watchtower depends-on, Compose depends_on, Docker links,
+	// and network_mode must resolve against ResolveContainerIdentifier graph keys.
+	ginkgo.DescribeTable(
+		"sorts dependency before dependent for each link form",
+		func(depName, depProject, depService, dependentName, dependentProject, dependentService string, links []string, useCompose bool) {
+			dep := mockLinkedContainer(depName, "id-dep", depProject, depService, nil, useCompose)
+			dependent := mockLinkedContainer(
+				dependentName,
+				"id-dependent",
+				dependentProject,
+				dependentService,
+				links,
+				useCompose,
+			)
+
+			containers := []types.Container{dependent, dep}
+			err := DependencySorter{}.Sort(containers, useCompose)
+			gomega.Expect(err).ToNot(gomega.HaveOccurred())
+			gomega.Expect(containers[0].Name()).To(gomega.Equal(depName),
+				"dependency must sort before dependent")
+			gomega.Expect(containers[1].Name()).To(gomega.Equal(dependentName))
+		},
+		ginkgo.Entry(
+			"Watchtower depends-on bare container_name against project-service key",
+			"net-proxy", "myproject", "net-proxy",
+			"web-app", "myproject", "web",
+			[]string{"net-proxy"}, true,
+		),
+		ginkgo.Entry(
+			"Watchtower depends-on bare name without Compose labels",
+			"database", "", "",
+			"web", "", "",
+			[]string{"database"}, true,
+		),
+		ginkgo.Entry(
+			"Watchtower depends-on with useComposeDependsOn false",
+			"postgres", "stack", "postgres",
+			"api", "stack", "api",
+			[]string{"postgres"}, false,
+		),
+		ginkgo.Entry(
+			"Compose depends_on project-qualified service link",
+			"myproject-database", "myproject", "database",
+			"myproject-web", "myproject", "web",
+			[]string{"myproject-database"}, true,
+		),
+		ginkgo.Entry(
+			"Compose depends_on bare service name against project-service key",
+			"myproject-database", "myproject", "database",
+			"myproject-web", "myproject", "web",
+			[]string{"database"}, true,
+		),
+		ginkgo.Entry(
+			"Compose depends_on multi-segment service under project prefix",
+			"myproject-net-proxy", "myproject", "net-proxy",
+			"myproject-web", "myproject", "web",
+			[]string{"net-proxy"}, true,
+		),
+		ginkgo.Entry(
+			"network_mode HostConfig bare container name",
+			"vpn", "stack", "vpn",
+			"client", "stack", "client",
+			[]string{"vpn"}, true,
+		),
+		ginkgo.Entry(
+			"network_mode with useComposeDependsOn false",
+			"vpn", "stack", "vpn",
+			"client", "stack", "client",
+			[]string{"vpn"}, false,
+		),
+		ginkgo.Entry(
+			"legacy Docker link bare container name",
+			"db", "", "",
+			"app", "", "",
+			[]string{"db"}, true,
+		),
+		ginkgo.Entry(
+			"cross-project Watchtower depends-on by container name",
+			"app1-database", "app1", "database",
+			"app2-web", "app2", "web",
+			[]string{"app1-database"}, true,
+		),
+		ginkgo.Entry(
+			"Compose service name without container_name override",
+			"stack-cache", "stack", "cache",
+			"stack-worker", "stack", "worker",
+			[]string{"cache"}, true,
+		),
+		ginkgo.Entry(
+			"normalized bare service name after Links processing",
+			"redis", "cache", "redis",
+			"app", "cache", "app",
+			[]string{"redis"}, true,
+		),
+	)
+
+	ginkgo.It("should order multiple dependents after a shared network provider", func() {
+		vpn := mockLinkedContainer("vpn", "id-vpn", "stack", "vpn", nil, true)
+		clientA := mockLinkedContainer("client-a", "id-a", "stack", "client-a", []string{"vpn"}, true)
+		clientB := mockLinkedContainer("client-b", "id-b", "stack", "client-b", []string{"vpn"}, true)
+
+		containers := []types.Container{clientA, clientB, vpn}
+		err := DependencySorter{}.Sort(containers, true)
+		gomega.Expect(err).ToNot(gomega.HaveOccurred())
+		gomega.Expect(containers[0].Name()).To(gomega.Equal("vpn"))
+		names := []string{containers[1].Name(), containers[2].Name()}
+		gomega.Expect(names).To(gomega.ConsistOf("client-a", "client-b"))
+	})
+
+	ginkgo.It("should order when dependent has multiple dependencies", func() {
+		db := mockLinkedContainer("db", "id-db", "app", "db", nil, true)
+		cache := mockLinkedContainer("cache", "id-cache", "app", "cache", nil, true)
+		web := mockLinkedContainer("web", "id-web", "app", "web", []string{"db", "cache"}, true)
+
+		containers := []types.Container{web, db, cache}
+		err := DependencySorter{}.Sort(containers, true)
+		gomega.Expect(err).ToNot(gomega.HaveOccurred())
+		gomega.Expect(containers[2].Name()).To(gomega.Equal("web"))
+
+		ordered := []string{containers[0].Name(), containers[1].Name(), containers[2].Name()}
+		assertOrderBefore(ordered, "db", "web")
+		assertOrderBefore(ordered, "cache", "web")
+	})
+
+	ginkgo.It("should match Compose replica identifiers from a service link", func() {
+		db1 := mockLinkedContainer("myproject-db-1", "id-db1", "myproject", "db", nil, true)
+		db2 := mockLinkedContainer("myproject-db-2", "id-db2", "myproject", "db", nil, true)
+		app := mockLinkedContainer("myproject-app", "id-app", "myproject", "app", []string{"myproject-db"}, true)
+
+		containers := []types.Container{app, db1, db2}
+		err := DependencySorter{}.Sort(containers, true)
+		gomega.Expect(err).ToNot(gomega.HaveOccurred())
+		gomega.Expect(containers[2].Name()).To(gomega.Equal("myproject-app"))
+		gomega.Expect([]string{containers[0].Name(), containers[1].Name()}).
+			To(gomega.ConsistOf("myproject-db-1", "myproject-db-2"))
+	})
+
+	ginkgo.It("should not create edges for ambiguous same service name across projects", func() {
+		db1 := mockLinkedContainer("project1-db", "id-1", "project1", "db", nil, true)
+		db2 := mockLinkedContainer("project2-db", "id-2", "project2", "db", nil, true)
+		app := mockLinkedContainer("project3-app", "id-3", "project3", "app", []string{"db"}, true)
+
+		containers := []types.Container{app, db1, db2}
+		err := DependencySorter{}.Sort(containers, true)
+		gomega.Expect(err).ToNot(gomega.HaveOccurred())
+
+		names := []string{containers[0].Name(), containers[1].Name(), containers[2].Name()}
+		gomega.Expect(names).To(gomega.ConsistOf("project1-db", "project2-db", "project3-app"))
+	})
+
+	ginkgo.It("should ignore missing dependency targets without failing sort", func() {
+		app := mockLinkedContainer("app", "id-app", "myproject", "app", []string{"missing-dep"}, true)
+		standalone := mockLinkedContainer("other", "id-other", "myproject", "other", nil, true)
+
+		containers := []types.Container{app, standalone}
+		err := DependencySorter{}.Sort(containers, true)
+		gomega.Expect(err).ToNot(gomega.HaveOccurred())
+		gomega.Expect([]string{containers[0].Name(), containers[1].Name()}).
+			To(gomega.ConsistOf("app", "other"))
+	})
+
+	ginkgo.It("should keep Watchtower last when linked non-Watchtower containers sort first", func() {
+		db := mockLinkedContainer("db", "id-db", "myproject", "db", nil, true)
+		web := mockLinkedContainer("web", "id-web", "myproject", "web", []string{"db"}, true)
+
+		wt := mockTypes.NewMockContainer(ginkgo.GinkgoT())
+		wt.EXPECT().Name().Return("watchtower").Maybe()
+		wt.EXPECT().ID().Return(types.ContainerID("id-wt")).Maybe()
+		wt.EXPECT().IsWatchtower().Return(true).Maybe()
+		wt.EXPECT().Links(true).Return(nil).Maybe()
+		wt.EXPECT().ContainerInfo().Return(&dockerContainer.InspectResponse{
+			Name:   "/watchtower",
+			Config: &dockerContainer.Config{Labels: map[string]string{}},
+		}).Maybe()
+
+		containers := []types.Container{wt, web, db}
+		err := DependencySorter{}.Sort(containers, true)
+		gomega.Expect(err).ToNot(gomega.HaveOccurred())
+		gomega.Expect(containers[0].Name()).To(gomega.Equal("db"))
+		gomega.Expect(containers[1].Name()).To(gomega.Equal("web"))
+		gomega.Expect(containers[2].Name()).To(gomega.Equal("watchtower"))
 	})
 })

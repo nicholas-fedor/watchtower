@@ -2101,6 +2101,81 @@ var _ = ginkgo.Describe("the update action", func() {
 					To(gomega.Equal("container:download-stack-vpn-1"))
 			},
 		)
+
+		// Explicit container_name with Compose project/service labels and
+		// depends-on / network_mode targeting the peer by container name.
+		// Sort must put the network provider first so restart creates it before
+		// the dependent joins its namespace.
+		ginkgo.It(
+			"should stop and start container_name network_mode peers in dependency order",
+			func() {
+				vpn := mockActions.CreateMockContainerWithConfig(
+					"net-proxy",
+					"/net-proxy",
+					"vpn:latest",
+					true,
+					false,
+					time.Now().AddDate(0, 0, -1),
+					&dockerContainer.Config{
+						Labels: map[string]string{
+							"com.docker.compose.project":            "myproject",
+							"com.docker.compose.service":            "net-proxy",
+							"com.centurylinklabs.watchtower.enable": "true",
+						},
+						ExposedPorts: dockerNetwork.PortSet{},
+					},
+				)
+
+				web := mockActions.CreateMockContainerWithConfig(
+					"web-app",
+					"/web-app",
+					"nginx:latest",
+					true,
+					false,
+					time.Now(),
+					&dockerContainer.Config{
+						Labels: map[string]string{
+							"com.docker.compose.project":                "myproject",
+							"com.docker.compose.service":                "web",
+							"com.centurylinklabs.watchtower.enable":     "true",
+							"com.centurylinklabs.watchtower.depends-on": "net-proxy",
+						},
+						ExposedPorts: dockerNetwork.PortSet{},
+					},
+				)
+				web.ContainerInfo().HostConfig.NetworkMode = "container:net-proxy"
+
+				client := mockActions.CreateMockClient(
+					&mockActions.TestData{
+						Containers: []types.Container{web, vpn},
+						Staleness: map[string]bool{
+							"web-app":   false,
+							"net-proxy": true,
+						},
+						StopOrder:   []string{},
+						CreateOrder: []string{},
+						StartOrder:  []string{},
+					},
+					false,
+					false,
+				)
+
+				report, _, err := actions.Update(
+					context.Background(),
+					client,
+					types.UpdateParams{Cleanup: true, CPUCopyMode: "auto"},
+				)
+				gomega.Expect(err).NotTo(gomega.HaveOccurred())
+				gomega.Expect(report.Updated()).To(gomega.HaveLen(1))
+				gomega.Expect(web.ToRestart()).To(gomega.BeTrue())
+
+				// Dependent first on stop; network provider first on create/start.
+				gomega.Expect(client.TestData.StopOrder).
+					To(gomega.Equal([]string{"web-app", "net-proxy"}))
+				gomega.Expect(client.TestData.CreateOrder).
+					To(gomega.Equal([]string{"net-proxy", "web-app"}))
+			},
+		)
 	})
 
 	ginkgo.When("handling cross-project dependencies", func() {
