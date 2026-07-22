@@ -189,12 +189,13 @@ func sortByDependencies(containers []types.Container, useComposeDependsOn bool) 
 // strings often differ from the canonical graph key when Compose labels are present.
 //
 // Link Matching Strategy:
-// Matching uses FindMatchingIdentifiers against the canonical keys plus unique bare Name()
-// aliases, then maps every hit back to a canonical key before recording edges. Strategies:
+// Matching uses findMatchingIdentifiersInSet against the canonical keys plus unique bare
+// Name() aliases, then maps every hit back to a canonical key before recording edges.
+// Strategies:
 //  1. Exact match on canonical identifier or bare container name
 //  2. Prefix match for Docker Compose replica suffixes (e.g., "db" matches "db-1", "db-2")
-//  3. Service-only match via ExtractServiceName on both sides (e.g., "abs-wireguard" matches
-//     "media-abs-wireguard"), only when exactly one candidate is unambiguous
+//  3. Project-qualified suffix match (id ends with "-"+link) for multi-segment links, or
+//     ExtractServiceName equality only for unhyphenated bare service names
 //
 // Parameters:
 //   - containers: List of containers to build graph for.
@@ -247,7 +248,8 @@ func buildDependencyGraph(
 	// Docs specify Watchtower depends-on and network_mode targets use container names,
 	// while Compose depends_on uses service names; aliases bridge those forms to the
 	// canonical project-service graph keys without inventing extra Kahn nodes.
-	matchIdentifiers, aliasToCanonical := buildLinkMatchIndexes(containerMap)
+	// The identifier set is built once and reused for every link in this graph.
+	matchIDSet, aliasToCanonical := buildLinkMatchIndexes(containerMap)
 
 	// Build the graph by processing container links (dependencies).
 	// Edges always use canonical identifiers so Kahn's algorithm can traverse them.
@@ -257,7 +259,7 @@ func buildDependencyGraph(
 		for _, normalizedLink := range c.Links(useComposeDependsOn) {
 			matchedKeys := resolveLinkToCanonicalKeys(
 				normalizedLink,
-				matchIdentifiers,
+				matchIDSet,
 				aliasToCanonical,
 			)
 
@@ -276,7 +278,7 @@ func buildDependencyGraph(
 	return containerMap, indegree, adjacency, normalizedMap, nil
 }
 
-// buildLinkMatchIndexes builds the identifier list and alias→canonical map used when
+// buildLinkMatchIndexes builds the identifier set and alias→canonical map used when
 // resolving dependency links against graph nodes.
 //
 // Each canonical ResolveContainerIdentifier is always included and never overwritten.
@@ -288,11 +290,11 @@ func buildDependencyGraph(
 //   - containerMap: Canonical identifier → container map from graph construction.
 //
 // Returns:
-//   - []string: Identifiers passed to FindMatchingIdentifiers (canonical keys and unique bare names).
+//   - map[string]bool: Precomputed set of matchable identifiers (canonical keys and unique bare names).
 //   - map[string]string: Maps every matchable identifier to its canonical graph key.
 func buildLinkMatchIndexes(
 	containerMap map[string]types.Container,
-) ([]string, map[string]string) {
+) (map[string]bool, map[string]string) {
 	// Capacity covers one canonical key plus one optional bare-name alias per container.
 	const aliasCapacityFactor = 2
 
@@ -342,36 +344,34 @@ func buildLinkMatchIndexes(
 		}
 	}
 
-	matchIdentifiers := make([]string, 0, len(aliasToCanonical))
+	matchIDSet := make(map[string]bool, len(aliasToCanonical))
 	for id := range aliasToCanonical {
-		matchIdentifiers = append(matchIdentifiers, id)
+		matchIDSet[id] = true
 	}
 
-	sort.Strings(matchIdentifiers)
-
-	return matchIdentifiers, aliasToCanonical
+	return matchIDSet, aliasToCanonical
 }
 
 // resolveLinkToCanonicalKeys resolves a single dependency link to sorted unique canonical
-// graph keys using FindMatchingIdentifiers and the alias index.
+// graph keys using the precomputed identifier set and alias index.
 //
 // Parameters:
 //   - link: Normalized link from Container.Links().
-//   - matchIdentifiers: Identifiers available for matching (canonical + unique bare names).
+//   - matchIDSet: Precomputed set of matchable identifiers (canonical + unique bare names).
 //   - aliasToCanonical: Maps match hits to canonical graph keys.
 //
 // Returns:
 //   - []string: Sorted unique canonical identifiers the link refers to (empty if none).
 func resolveLinkToCanonicalKeys(
 	link string,
-	matchIdentifiers []string,
+	matchIDSet map[string]bool,
 	aliasToCanonical map[string]string,
 ) []string {
 	if link == "" {
 		return nil
 	}
 
-	matches := FindMatchingIdentifiers(link, matchIdentifiers)
+	matches := findMatchingIdentifiersInSet(link, matchIDSet)
 	if len(matches) == 0 {
 		return nil
 	}
@@ -465,11 +465,11 @@ func ExtractServiceName(identifier string) string {
 //  1. Exact match.
 //  2. Replica prefix match: the identifier starts with "<link>-" and the suffix
 //     after the hyphen is a positive integer (Docker Compose replica numbering).
-//  3. Service-only / project-qualified match: ExtractServiceName equality on both
-//     sides, or identifier ends with "-"+link (full service name under a project
-//     prefix). This strategy only succeeds when exactly one candidate matches;
-//     multiple matches (e.g. the same service name in different projects) are
-//     treated as ambiguous and return no results.
+//  3. Project-qualified suffix match (identifier ends with "-"+link), and for
+//     unhyphenated links only, ExtractServiceName equality on both sides.
+//     This strategy only succeeds when exactly one candidate matches; multiple
+//     matches (e.g. the same service name in different projects) are treated as
+//     ambiguous and return no results.
 //
 // Parameters:
 //   - link: Dependency link to resolve (typically from Container.Links()).
@@ -483,10 +483,26 @@ func FindMatchingIdentifiers(link string, identifiers []string) []string {
 		return nil
 	}
 
-	// Build a temporary lookup for efficiency
 	idSet := make(map[string]bool, len(identifiers))
 	for _, id := range identifiers {
 		idSet[id] = true
+	}
+
+	return findMatchingIdentifiersInSet(link, idSet)
+}
+
+// findMatchingIdentifiersInSet returns identifiers from a precomputed set that match
+// the provided link. See FindMatchingIdentifiers for matching strategy details.
+//
+// Parameters:
+//   - link: Dependency link to resolve.
+//   - idSet: Precomputed set of known container identifiers.
+//
+// Returns:
+//   - []string: Matching identifiers, or nil/empty when none or ambiguous.
+func findMatchingIdentifiersInSet(link string, idSet map[string]bool) []string {
+	if link == "" || len(idSet) == 0 {
+		return nil
 	}
 
 	var matches []string
@@ -501,11 +517,11 @@ func FindMatchingIdentifiers(link string, identifiers []string) []string {
 	// 2. Replica prefix match (only if suffix is positive integer)
 	var replicaMatches []string
 
-	for id := range idSet {
-		if strings.HasPrefix(id, link+"-") {
-			suffix := id[len(link)+1:]
+	for identifier := range idSet {
+		if strings.HasPrefix(identifier, link+"-") {
+			suffix := identifier[len(link)+1:]
 			if IsPositiveInteger(suffix) {
-				replicaMatches = append(replicaMatches, id)
+				replicaMatches = append(replicaMatches, identifier)
 			}
 		}
 	}
@@ -517,21 +533,24 @@ func FindMatchingIdentifiers(link string, identifiers []string) []string {
 		return matches
 	}
 
-	// 3. Service-only / project-qualified match.
-	// Accept when exactly one candidate matches via either:
-	//   - ExtractServiceName equality on both sides (handles project-service keys
-	//     when the link is a bare service name, including multi-segment names
-	//     once both sides reduce to the same trailing segment), or
-	//   - the identifier ends with "-"+link (link is the full service name under
-	//     a project prefix, e.g. link "abs-wireguard" → "media-abs-wireguard").
-	// Multiple matches are ambiguous (different projects) and are discarded.
+	// 3. Project-qualified / service-only match (exactly one unambiguous candidate).
+	// Multi-segment links (containing "-") only use the precise "-"+link suffix so
+	// trailing-token ExtractServiceName equality cannot select an unrelated peer
+	// (e.g. link "net-proxy" must not match "myproject-other-proxy").
+	// Unhyphenated bare service names may still match via ExtractServiceName
+	// (e.g. link "db" → "myproject-db").
 	var serviceMatches []string
 
-	normalizedLink := ExtractServiceName(link)
-	for id := range idSet {
-		if ExtractServiceName(id) == normalizedLink ||
-			(link != "" && strings.HasSuffix(id, "-"+link)) {
-			serviceMatches = append(serviceMatches, id)
+	linkHasHyphen := strings.Contains(link, "-")
+	for identifier := range idSet {
+		if strings.HasSuffix(identifier, "-"+link) {
+			serviceMatches = append(serviceMatches, identifier)
+
+			continue
+		}
+
+		if !linkHasHyphen && ExtractServiceName(identifier) == link {
+			serviceMatches = append(serviceMatches, identifier)
 		}
 	}
 

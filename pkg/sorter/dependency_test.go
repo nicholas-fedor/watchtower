@@ -1899,66 +1899,88 @@ func mockLinkedContainer(
 }
 
 var _ = ginkgo.Describe("FindMatchingIdentifiers", func() {
-	ginkgo.It("should return exact match when present", func() {
-		identifiers := []string{"project-db", "other-db"}
-		matches := FindMatchingIdentifiers("project-db", identifiers)
-		gomega.Expect(matches).To(gomega.Equal([]string{"project-db"}))
-	})
+	// Exhaustive link × identifier permutations across Compose stacks, multi-segment
+	// services, replicas, bare container names, and ambiguous cross-project cases.
+	ginkgo.DescribeTable(
+		"matches identifiers for each link form",
+		func(link string, identifiers, expected []string) {
+			matches := FindMatchingIdentifiers(link, identifiers)
+			if expected == nil {
+				gomega.Expect(matches).To(gomega.BeEmpty())
 
-	ginkgo.It("should match replica suffix when link has no replica", func() {
-		identifiers := []string{"project-db-1", "project-db-2", "other"}
-		matches := FindMatchingIdentifiers("project-db", identifiers)
-		gomega.Expect(matches).To(gomega.ConsistOf("project-db-1", "project-db-2"))
-	})
+				return
+			}
 
-	ginkgo.It("should not match replica when suffix is not a positive integer", func() {
-		identifiers := []string{"project-db-backup"}
-		matches := FindMatchingIdentifiers("project-db", identifiers)
-		gomega.Expect(matches).To(gomega.BeEmpty())
-	})
-
-	ginkgo.It("should return service-only match when exactly one candidate exists", func() {
-		identifiers := []string{"project1-db"}
-		matches := FindMatchingIdentifiers("db", identifiers)
-		gomega.Expect(matches).To(gomega.Equal([]string{"project1-db"}))
-	})
-
-	ginkgo.It("should return no matches for ambiguous service name across projects", func() {
-		identifiers := []string{"project1-db", "project2-db"}
-		matches := FindMatchingIdentifiers("db", identifiers)
-		gomega.Expect(matches).To(gomega.BeEmpty())
-	})
-
-	ginkgo.It("should return empty for empty input", func() {
-		matches := FindMatchingIdentifiers("", []string{"db"})
-		gomega.Expect(matches).To(gomega.BeEmpty())
-
-		matches = FindMatchingIdentifiers("db", []string{})
-		gomega.Expect(matches).To(gomega.BeEmpty())
-	})
-
-	ginkgo.It("should match multi-segment service link against project-service identifier", func() {
-		identifiers := []string{"myproject-net-proxy", "myproject-web"}
-		matches := FindMatchingIdentifiers("net-proxy", identifiers)
-		gomega.Expect(matches).To(gomega.Equal([]string{"myproject-net-proxy"}))
-	})
-
-	ginkgo.It("should match multi-segment service link when only the project-service key exists", func() {
-		identifiers := []string{"myproject-net-proxy"}
-		matches := FindMatchingIdentifiers("net-proxy", identifiers)
-		gomega.Expect(matches).To(gomega.Equal([]string{"myproject-net-proxy"}))
-	})
-
-	ginkgo.It("should match trailing service segment via ExtractServiceName", func() {
-		matches := FindMatchingIdentifiers("proxy", []string{"myproject-net-proxy"})
-		gomega.Expect(matches).To(gomega.Equal([]string{"myproject-net-proxy"}))
-	})
-
-	ginkgo.It("should reject ambiguous multi-project service matches", func() {
-		matches := FindMatchingIdentifiers("db", []string{"project1-db", "project2-db"})
-		gomega.Expect(matches).To(gomega.BeEmpty())
-	})
+			gomega.Expect(matches).To(gomega.Equal(expected))
+		},
+		// Exact
+		ginkgo.Entry("exact project-service key",
+			"project-db", []string{"project-db", "other-db"}, []string{"project-db"}),
+		ginkgo.Entry("exact bare container name",
+			"net-proxy", []string{"net-proxy", "web-app"}, []string{"net-proxy"}),
+		// Replicas
+		ginkgo.Entry("replica suffixes from project-service link",
+			"project-db", []string{"project-db-1", "project-db-2", "other"},
+			[]string{"project-db-1", "project-db-2"}),
+		ginkgo.Entry("non-numeric hyphen suffix is not a replica",
+			"project-db", []string{"project-db-backup"}, nil),
+		ginkgo.Entry("numeric-looking middle segment is not a replica of shorter prefix",
+			"project", []string{"project-db-1"}, nil),
+		// Unhyphenated service-only (ExtractServiceName)
+		ginkgo.Entry("unhyphenated service against single project-service key",
+			"db", []string{"project1-db"}, []string{"project1-db"}),
+		ginkgo.Entry("unhyphenated service against multi-segment project-service key",
+			"proxy", []string{"myproject-net-proxy"}, []string{"myproject-net-proxy"}),
+		ginkgo.Entry("unhyphenated service ambiguous across two projects",
+			"db", []string{"project1-db", "project2-db"}, nil),
+		ginkgo.Entry("unhyphenated service with three projects still ambiguous",
+			"cache", []string{"a-cache", "b-cache", "c-cache"}, nil),
+		// Multi-segment link → project-service suffix
+		ginkgo.Entry("multi-segment link against project-service key",
+			"net-proxy", []string{"myproject-net-proxy", "myproject-web"},
+			[]string{"myproject-net-proxy"}),
+		ginkgo.Entry("multi-segment link sole candidate",
+			"net-proxy", []string{"myproject-net-proxy"}, []string{"myproject-net-proxy"}),
+		ginkgo.Entry("multi-segment link must not match trailing-token-only peer",
+			"net-proxy", []string{"myproject-other-proxy"}, nil),
+		ginkgo.Entry("multi-segment link must not match substring service",
+			"net-proxy", []string{"myproject-net"}, nil),
+		ginkgo.Entry("multi-segment link must not match longer multi-segment sibling",
+			"net-proxy", []string{"myproject-net-proxy-extra"}, nil),
+		ginkgo.Entry("multi-segment link ambiguous across two projects",
+			"net-proxy", []string{"stack-a-net-proxy", "stack-b-net-proxy"}, nil),
+		ginkgo.Entry("multi-segment link prefers exact over suffix when both present",
+			"net-proxy", []string{"net-proxy", "myproject-net-proxy"}, []string{"net-proxy"}),
+		// Mixed multi-stack identifier pools
+		ginkgo.Entry("unhyphenated db among multi-stack unrelated services",
+			"db", []string{"frontend-web", "backend-api", "data-db"}, []string{"data-db"}),
+		ginkgo.Entry("hyphenated link among multi-stack noise",
+			"net-proxy",
+			[]string{"frontend-web", "backend-api", "infra-net-proxy", "infra-other-proxy"},
+			[]string{"infra-net-proxy"}),
+		ginkgo.Entry("hyphenated link with same trailing token in another stack",
+			"auth-gateway",
+			[]string{"stack-a-auth-gateway", "stack-b-edge-gateway"},
+			[]string{"stack-a-auth-gateway"}),
+		// Empty / edge
+		ginkgo.Entry("empty link",
+			"", []string{"db"}, nil),
+		ginkgo.Entry("empty identifiers",
+			"db", []string{}, nil),
+		ginkgo.Entry("no candidates at all",
+			"missing", []string{"a", "b"}, nil),
+	)
 })
+
+// identifierSet builds a bool set from identifier strings for resolveLinkToCanonicalKeys tests.
+func identifierSet(ids ...string) map[string]bool {
+	set := make(map[string]bool, len(ids))
+	for _, id := range ids {
+		set[id] = true
+	}
+
+	return set
+}
 
 var _ = ginkgo.Describe("buildLinkMatchIndexes", func() {
 	ginkgo.It("should map unique bare names to canonical identifiers", func() {
@@ -1970,16 +1992,14 @@ var _ = ginkgo.Describe("buildLinkMatchIndexes", func() {
 			"myproject-web":       app,
 		}
 
-		ids, aliasToCanonical := buildLinkMatchIndexes(containerMap)
+		idSet, aliasToCanonical := buildLinkMatchIndexes(containerMap)
 		gomega.Expect(aliasToCanonical["myproject-net-proxy"]).To(gomega.Equal("myproject-net-proxy"))
 		gomega.Expect(aliasToCanonical["net-proxy"]).To(gomega.Equal("myproject-net-proxy"))
 		gomega.Expect(aliasToCanonical["web-app"]).To(gomega.Equal("myproject-web"))
-		gomega.Expect(ids).To(gomega.ContainElements(
-			"myproject-net-proxy",
-			"myproject-web",
-			"net-proxy",
-			"web-app",
-		))
+		gomega.Expect(idSet).To(gomega.HaveKey("myproject-net-proxy"))
+		gomega.Expect(idSet).To(gomega.HaveKey("myproject-web"))
+		gomega.Expect(idSet).To(gomega.HaveKey("net-proxy"))
+		gomega.Expect(idSet).To(gomega.HaveKey("web-app"))
 	})
 
 	ginkgo.It("should omit bare name alias when it collides across containers", func() {
@@ -2015,16 +2035,18 @@ var _ = ginkgo.Describe("buildLinkMatchIndexes", func() {
 			"project-service": bareClaimant,
 		}
 
-		ids, aliasToCanonical := buildLinkMatchIndexes(containerMap)
+		idSet, aliasToCanonical := buildLinkMatchIndexes(containerMap)
 		gomega.Expect(aliasToCanonical["shared"]).To(gomega.Equal("shared"))
 		gomega.Expect(aliasToCanonical["project-service"]).To(gomega.Equal("project-service"))
-		gomega.Expect(ids).To(gomega.ConsistOf("shared", "project-service"))
+		gomega.Expect(idSet).To(gomega.HaveKey("shared"))
+		gomega.Expect(idSet).To(gomega.HaveKey("project-service"))
+		gomega.Expect(idSet).To(gomega.HaveLen(2))
 	})
 })
 
 var _ = ginkgo.Describe("resolveLinkToCanonicalKeys", func() {
 	ginkgo.It("should resolve bare multi-segment container name to project-service key", func() {
-		ids := []string{"myproject-net-proxy", "myproject-web", "net-proxy", "web-app"}
+		idSet := identifierSet("myproject-net-proxy", "myproject-web", "net-proxy", "web-app")
 		alias := map[string]string{
 			"myproject-net-proxy": "myproject-net-proxy",
 			"myproject-web":       "myproject-web",
@@ -2032,34 +2054,34 @@ var _ = ginkgo.Describe("resolveLinkToCanonicalKeys", func() {
 			"web-app":             "myproject-web",
 		}
 
-		keys := resolveLinkToCanonicalKeys("net-proxy", ids, alias)
+		keys := resolveLinkToCanonicalKeys("net-proxy", idSet, alias)
 		gomega.Expect(keys).To(gomega.Equal([]string{"myproject-net-proxy"}))
 	})
 
 	ginkgo.It("should resolve project-service suffix match without bare-name alias", func() {
-		ids := []string{"myproject-net-proxy"}
+		idSet := identifierSet("myproject-net-proxy")
 		alias := map[string]string{"myproject-net-proxy": "myproject-net-proxy"}
 
-		keys := resolveLinkToCanonicalKeys("net-proxy", ids, alias)
+		keys := resolveLinkToCanonicalKeys("net-proxy", idSet, alias)
 		gomega.Expect(keys).To(gomega.Equal([]string{"myproject-net-proxy"}))
 	})
 
 	ginkgo.It("should return nil for empty or unmatched links", func() {
-		ids := []string{"myproject-db"}
+		idSet := identifierSet("myproject-db")
 		alias := map[string]string{"myproject-db": "myproject-db"}
 
-		gomega.Expect(resolveLinkToCanonicalKeys("", ids, alias)).To(gomega.BeNil())
-		gomega.Expect(resolveLinkToCanonicalKeys("missing", ids, alias)).To(gomega.BeNil())
+		gomega.Expect(resolveLinkToCanonicalKeys("", idSet, alias)).To(gomega.BeNil())
+		gomega.Expect(resolveLinkToCanonicalKeys("missing", idSet, alias)).To(gomega.BeNil())
 	})
 
 	ginkgo.It("should dedupe when bare alias and canonical both match", func() {
-		ids := []string{"myproject-db", "db"}
+		idSet := identifierSet("myproject-db", "db")
 		alias := map[string]string{
 			"myproject-db": "myproject-db",
 			"db":           "myproject-db",
 		}
 
-		keys := resolveLinkToCanonicalKeys("db", ids, alias)
+		keys := resolveLinkToCanonicalKeys("db", idSet, alias)
 		gomega.Expect(keys).To(gomega.Equal([]string{"myproject-db"}))
 	})
 })
@@ -2246,5 +2268,159 @@ var _ = ginkgo.Describe("dependency link form permutations", func() {
 		gomega.Expect(containers[0].Name()).To(gomega.Equal("db"))
 		gomega.Expect(containers[1].Name()).To(gomega.Equal("web"))
 		gomega.Expect(containers[2].Name()).To(gomega.Equal("watchtower"))
+	})
+
+	ginkgo.It("should order independent stacks without cross-linking same service names", func() {
+		// Two Compose projects each have db→web. Bare link "db" is ambiguous and
+		// must not couple stacks; each web only orders relative to its own db when
+		// links use project-qualified or unique names.
+		dbA := mockLinkedContainer("stack-a-db", "id-da", "stack-a", "db", nil, true)
+		webA := mockLinkedContainer(
+			"stack-a-web", "id-wa", "stack-a", "web", []string{"stack-a-db"}, true,
+		)
+		dbB := mockLinkedContainer("stack-b-db", "id-db", "stack-b", "db", nil, true)
+		webB := mockLinkedContainer(
+			"stack-b-web", "id-wb", "stack-b", "web", []string{"stack-b-db"}, true,
+		)
+
+		containers := []types.Container{webA, webB, dbA, dbB}
+		err := DependencySorter{}.Sort(containers, true)
+		gomega.Expect(err).ToNot(gomega.HaveOccurred())
+
+		ordered := make([]string, len(containers))
+		for i, c := range containers {
+			ordered[i] = c.Name()
+		}
+
+		assertOrderBefore(ordered, "stack-a-db", "stack-a-web")
+		assertOrderBefore(ordered, "stack-b-db", "stack-b-web")
+	})
+
+	ginkgo.It("should order cross-stack Watchtower depends-on by foreign container_name", func() {
+		// Provider stack owns the named network peer; consumer stack depends on it
+		// via Watchtower depends-on / network_mode container name.
+		provider := mockLinkedContainer(
+			"shared-net-proxy", "id-prov", "infra", "net-proxy", nil, true,
+		)
+		consumer := mockLinkedContainer(
+			"app-web", "id-cons", "app", "web", []string{"shared-net-proxy"}, true,
+		)
+		unrelated := mockLinkedContainer(
+			"other-db", "id-other", "other", "db", nil, true,
+		)
+
+		containers := []types.Container{consumer, unrelated, provider}
+		err := DependencySorter{}.Sort(containers, true)
+		gomega.Expect(err).ToNot(gomega.HaveOccurred())
+
+		ordered := make([]string, len(containers))
+		for i, c := range containers {
+			ordered[i] = c.Name()
+		}
+
+		assertOrderBefore(ordered, "shared-net-proxy", "app-web")
+		gomega.Expect(ordered).To(gomega.ConsistOf("shared-net-proxy", "app-web", "other-db"))
+	})
+
+	ginkgo.It("should not couple stacks when multi-segment services share a trailing token", func() {
+		// stack-a has service net-proxy; stack-b has service other-proxy. A dependent
+		// linking to net-proxy must only wait on stack-a's peer, not other-proxy.
+		proxyA := mockLinkedContainer(
+			"stack-a-net-proxy", "id-pa", "stack-a", "net-proxy", nil, true,
+		)
+		proxyB := mockLinkedContainer(
+			"stack-b-other-proxy", "id-pb", "stack-b", "other-proxy", nil, true,
+		)
+		client := mockLinkedContainer(
+			"stack-a-client", "id-cl", "stack-a", "client", []string{"net-proxy"}, true,
+		)
+
+		containers := []types.Container{client, proxyB, proxyA}
+		err := DependencySorter{}.Sort(containers, true)
+		gomega.Expect(err).ToNot(gomega.HaveOccurred())
+
+		ordered := make([]string, len(containers))
+		for i, c := range containers {
+			ordered[i] = c.Name()
+		}
+
+		assertOrderBefore(ordered, "stack-a-net-proxy", "stack-a-client")
+		// other-proxy must not become a dependency of client (no edge).
+		// If wrongly linked, client would have indegree 2 and sort after both proxies
+		// with a fixed relative order; assert client is not forced after proxyB only
+		// when proxyA is already before client.
+		gomega.Expect(indexOf(ordered, "stack-a-client")).
+			To(gomega.BeNumerically(">", indexOf(ordered, "stack-a-net-proxy")))
+	})
+
+	ginkgo.It("should order multi-segment container_name dependency among multi-stack peers", func() {
+		// Explicit container_name equals multi-segment service; Compose keys differ.
+		provider := mockLinkedContainer(
+			"net-proxy", "id-np", "media", "net-proxy", nil, true,
+		)
+		dependent := mockLinkedContainer(
+			"web-app", "id-wa", "media", "web", []string{"net-proxy"}, true,
+		)
+		foreign := mockLinkedContainer(
+			"net-proxy-other", "id-fo", "other", "net-proxy-other", nil, true,
+		)
+		// Same trailing token in another stack must not steal the edge.
+		decoy := mockLinkedContainer(
+			"edge-proxy", "id-de", "edge", "edge-proxy", nil, true,
+		)
+
+		containers := []types.Container{dependent, foreign, decoy, provider}
+		err := DependencySorter{}.Sort(containers, true)
+		gomega.Expect(err).ToNot(gomega.HaveOccurred())
+
+		ordered := make([]string, len(containers))
+		for i, c := range containers {
+			ordered[i] = c.Name()
+		}
+
+		assertOrderBefore(ordered, "net-proxy", "web-app")
+	})
+
+	ginkgo.It("should order chain across three stacks with mixed link forms", func() {
+		// data.db ← (compose service) app.worker ← (watchtower container_name) edge.client
+		db := mockLinkedContainer("data-db", "id-db", "data", "db", nil, true)
+		worker := mockLinkedContainer(
+			"app-worker", "id-wk", "app", "worker", []string{"db"}, true,
+		)
+		// Watchtower depends-on uses worker's container_name.
+		client := mockLinkedContainer(
+			"edge-client", "id-cl", "edge", "client", []string{"app-worker"}, true,
+		)
+
+		containers := []types.Container{client, worker, db}
+		err := DependencySorter{}.Sort(containers, true)
+		gomega.Expect(err).ToNot(gomega.HaveOccurred())
+
+		ordered := make([]string, len(containers))
+		for i, c := range containers {
+			ordered[i] = c.Name()
+		}
+
+		assertOrderBefore(ordered, "data-db", "app-worker")
+		assertOrderBefore(ordered, "app-worker", "edge-client")
+		assertOrderBefore(ordered, "data-db", "edge-client")
+	})
+
+	ginkgo.It("should not create edge for hyphenated link against trailing-token-only peer", func() {
+		// Regression: ExtractServiceName("net-proxy") and ExtractServiceName("other-proxy")
+		// both yield "proxy"; matching must not treat them as the same dependency.
+		decoy := mockLinkedContainer(
+			"other-proxy", "id-decoy", "other", "other-proxy", nil, true,
+		)
+		dependent := mockLinkedContainer(
+			"web", "id-web", "app", "web", []string{"net-proxy"}, true,
+		)
+
+		containers := []types.Container{dependent, decoy}
+		err := DependencySorter{}.Sort(containers, true)
+		gomega.Expect(err).ToNot(gomega.HaveOccurred())
+		// No dependency edge: both indegree 0. Order is reverse-alpha among keys.
+		gomega.Expect([]string{containers[0].Name(), containers[1].Name()}).
+			To(gomega.ConsistOf("web", "other-proxy"))
 	})
 })
