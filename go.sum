@@ -87,8 +87,8 @@ github.com/gofiber/fiber/v3 v3.4.0 h1:F0aND4vwZF7dR7cbvSwFQQEpBU902XHKWxrLsFBkVq
 github.com/gofiber/fiber/v3 v3.4.0/go.mod h1:nAhJfdxUIJJph2tPWPmqWf8QDIN2iiqQiQf3lENZpdk=
 github.com/gofiber/schema v1.8.3 h1:06ZedxIYjngzc0095PYy7uWnFnbRflWFpikvZH61fDc=
 github.com/gofiber/schema v1.8.3/go.mod h1:jWnnZdhcW1mHyV+VnfRxKJDPNcepJsTZ9RIWxrr32Ng=
-github.com/gofiber/utils/v2 v2.3.0 h1:+bjMBw2CXwjAYZO9F04Hnfz7UR03TkupQB8W5h6dvwo=
-github.com/gofiber/utils/v2 v2.3.0/go.mod h1:I+RTsgMUdzFuifVc3LOEkfh32wQW9BfRl7l5RYjamW4=
+github.com/gofiber/utils/v2 v2.4.0 h1:XtjvKe1dELqmGceK1/ySHMvY1HpQXpAAc1A8LwzXv3w=
+github.com/gofiber/utils/v2 v2.4.0/go.mod h1:I+RTsgMUdzFuifVc3LOEkfh32wQW9BfRl7l5RYjamW4=
 github.com/google/go-cmp v0.7.0 h1:wk8382ETsv4JYUZwIsn6YpYiWiBsYLSJiTsyBybVuN8=
 github.com/google/go-cmp v0.7.0/go.mod h1:pXiqmnSA92OHEEa9HXL2W4E7lf9JzCmGVUdgjX3N/iU=
 github.com/google/pprof v0.0.0-20260709232956-b9395ee17fa0 h1:du0WGc8xSKq/++e0cglxhS/mXVqsR7+c7jLEi5Vqduw=
