@@ -10,6 +10,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Chores
 
+- Update module github.com/mattn/go-isatty to v0.0.24 by @renovate[bot] in [#2013](https://github.com/nicholas-fedor/watchtower/pull/2013)
+- Update module github.com/gofiber/utils/v2 to v2.3.0 by @renovate[bot] in [#2010](https://github.com/nicholas-fedor/watchtower/pull/2010)
 - Update nicholas-fedor/go-proxy-pull-action action to v1.1.30 by @renovate[bot] in [#2009](https://github.com/nicholas-fedor/watchtower/pull/2009)
 
 ### Fixed
