@@ -10,6 +10,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Chores
 
+- Update nicholas-fedor/go-proxy-pull-action action to v1.1.31 by @renovate[bot] in [#2019](https://github.com/nicholas-fedor/watchtower/pull/2019)
+- Update module github.com/gofiber/utils/v2 to v2.4.0 by @renovate[bot] in [#2017](https://github.com/nicholas-fedor/watchtower/pull/2017)
 - Update ossf/scorecard-action action to v2.4.4 by @renovate[bot] in [#2016](https://github.com/nicholas-fedor/watchtower/pull/2016)
 - Update docker/login-action action to v4.5.0 by @renovate[bot] in [#2014](https://github.com/nicholas-fedor/watchtower/pull/2014)
 - Update module github.com/mattn/go-isatty to v0.0.24 by @renovate[bot] in [#2013](https://github.com/nicholas-fedor/watchtower/pull/2013)
