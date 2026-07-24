@@ -10,6 +10,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Chores
 
+- Update module github.com/prometheus/client_golang to v1.24.1 by @renovate[bot] in [#2022](https://github.com/nicholas-fedor/watchtower/pull/2022)
 - Update nicholas-fedor/go-proxy-pull-action action to v1.1.31 by @renovate[bot] in [#2019](https://github.com/nicholas-fedor/watchtower/pull/2019)
 - Update module github.com/gofiber/utils/v2 to v2.4.0 by @renovate[bot] in [#2017](https://github.com/nicholas-fedor/watchtower/pull/2017)
 - Update ossf/scorecard-action action to v2.4.4 by @renovate[bot] in [#2016](https://github.com/nicholas-fedor/watchtower/pull/2016)
