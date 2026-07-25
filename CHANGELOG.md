@@ -10,6 +10,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Chores
 
+- Update module github.com/docker/go-connections to v0.8.0 by @renovate[bot] in [#2033](https://github.com/nicholas-fedor/watchtower/pull/2033)
 - Update nicholas-fedor/go-proxy-pull-action action to v1.1.32 by @renovate[bot] in [#2027](https://github.com/nicholas-fedor/watchtower/pull/2027)
 - Update docker/login-action action to v4.5.1 by @renovate[bot] in [#2026](https://github.com/nicholas-fedor/watchtower/pull/2026)
 - Update module github.com/prometheus/client_golang to v1.24.1 by @renovate[bot] in [#2022](https://github.com/nicholas-fedor/watchtower/pull/2022)
