@@ -145,6 +145,7 @@ func TestRunUpgradesOnSchedule_EmptySchedule(t *testing.T) {
 		false, // startupMessageSent
 		false, // ephemeralSelfUpdate
 		false, // reviveStopped
+		false, // useComposeDependsOn
 	)
 	// Should complete without error when context times out (clean cancellation)
 	if err != nil {
@@ -195,6 +196,7 @@ func TestRunUpgradesOnSchedule_StartupMessageSuppressed(t *testing.T) {
 		true,  // startupMessageSent - suppress the startup message
 		false, // ephemeralSelfUpdate
 		false, // reviveStopped
+		false, // useComposeDependsOn
 	)
 	// Should complete without error when context times out (clean cancellation)
 	if err != nil {
@@ -249,6 +251,7 @@ func TestRunUpgradesOnSchedule_UpdateOnStart(t *testing.T) {
 		false, // startupMessageSent
 		false, // ephemeralSelfUpdate
 		false, // reviveStopped
+		false, // useComposeDependsOn
 	)
 	if err != nil {
 		t.Errorf("expected no error, got %v", err)
@@ -309,6 +312,7 @@ func TestRunUpgradesOnSchedule_InvalidCronSpec(t *testing.T) {
 		false, // startupMessageSent
 		false, // ephemeralSelfUpdate
 		false, // reviveStopped
+		false, // useComposeDependsOn
 	)
 	if err == nil {
 		t.Error("expected error")
@@ -394,6 +398,7 @@ func TestRunUpgradesOnSchedule_QuotedScheduleSpec(t *testing.T) {
 				false, // startupMessageSent
 				false, // ephemeralSelfUpdate
 				false, // reviveStopped
+				false, // useComposeDependsOn
 			)
 
 			if tt.expectError {
@@ -446,6 +451,7 @@ func TestRunUpgradesOnSchedule_ContextCancellation(t *testing.T) {
 		false, // startupMessageSent
 		false, // ephemeralSelfUpdate
 		false, // reviveStopped
+		false, // useComposeDependsOn
 	)
 	if err != nil {
 		t.Errorf("expected no error, got %v", err)
@@ -512,6 +518,7 @@ func TestRunUpgradesOnSchedule_MonitorOnlyParameter(t *testing.T) {
 				false,          // startupMessageSent
 				false,          // ephemeralSelfUpdate
 				false,          // reviveStopped
+				false,          // useComposeDependsOn
 			)
 			if err != nil {
 				t.Errorf("expected no error, got %v", err)
@@ -647,6 +654,7 @@ func TestRunUpgradesOnSchedule_CronWithSeconds(t *testing.T) {
 		false, // startupMessageSent
 		false, // ephemeralSelfUpdate
 		false, // reviveStopped
+		false, // useComposeDependsOn
 	)
 	// Should complete without error when context times out (clean cancellation)
 	if err != nil {
@@ -703,6 +711,7 @@ func TestRunUpgradesOnSchedule_SkipFirstRun_True(t *testing.T) {
 		false, // startupMessageSent
 		false, // ephemeralSelfUpdate
 		false, // reviveStopped
+		false, // useComposeDependsOn
 	)
 	// Should complete without error when context times out (clean cancellation)
 	if err != nil {
@@ -771,6 +780,7 @@ func TestRunUpgradesOnSchedule_WatchtowerParent_Skipping(t *testing.T) {
 		false,           // startupMessageSent
 		false,           // ephemeralSelfUpdate
 		false,           // reviveStopped
+		false,           // useComposeDependsOn
 	)
 	// Should complete without error when context times out (clean cancellation)
 	if err != nil {
@@ -832,6 +842,7 @@ func TestRunUpgradesOnSchedule_ScheduledRuns_Execution(t *testing.T) {
 		false, // startupMessageSent
 		false, // ephemeralSelfUpdate
 		false, // reviveStopped
+		false, // useComposeDependsOn
 	)
 	// Should complete without error when context times out (clean cancellation)
 	if err != nil {
@@ -913,6 +924,7 @@ func TestRunUpgradesOnSchedule_EphemeralSelfUpdateWithExposedPorts(t *testing.T)
 		false,              // startupMessageSent
 		true,               // ephemeralSelfUpdate - bypasses port-conflict guard
 		false,              // reviveStopped
+		false,              // useComposeDependsOn
 	)
 	require.NoError(t, err)
 
@@ -977,6 +989,7 @@ func TestRunUpgradesOnSchedule_PortConflictGuard_SkipsSelfUpdate(t *testing.T) {
 		false,              // startupMessageSent
 		false,              // ephemeralSelfUpdate - port-conflict guard is active
 		false,              // reviveStopped
+		false,              // useComposeDependsOn
 	)
 	require.NoError(t, err)
 
@@ -1056,6 +1069,7 @@ func TestRunUpgradesOnSchedule_NoExposedPorts_AllowsSelfUpdate(t *testing.T) {
 				false,            // startupMessageSent
 				tt.ephemeralSelfUpdate,
 				false, // reviveStopped
+				false, // useComposeDependsOn
 			)
 			require.NoError(t, err)
 
@@ -1131,11 +1145,88 @@ func TestRunUpgradesOnSchedule_ReviveStoppedPropagation(t *testing.T) {
 				false,            // startupMessageSent
 				false,            // ephemeralSelfUpdate
 				tt.reviveStopped, // reviveStopped
+				false,            // useComposeDependsOn
 			)
 			require.NoError(t, err)
 
 			assert.Equal(t, tt.expectSelected, capturedParams.ReviveStopped,
 				"ReviveStopped should be %v in UpdateParams", tt.expectSelected)
+		})
+	}
+}
+
+// TestRunUpgradesOnSchedule_UseComposeDependsOnPropagation verifies that
+// RunUpgradesOnSchedule passes UseComposeDependsOn through UpdateParams so
+// scheduled cycles honor Compose depends_on the same way as --run-once.
+func TestRunUpgradesOnSchedule_UseComposeDependsOnPropagation(t *testing.T) {
+	tests := []struct {
+		name                string
+		useComposeDependsOn bool
+		expectSelected      bool
+	}{
+		{
+			name:                "useComposeDependsOn=true",
+			useComposeDependsOn: true,
+			expectSelected:      true,
+		},
+		{
+			name:                "useComposeDependsOn=false",
+			useComposeDependsOn: false,
+			expectSelected:      false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			cmd := &cobra.Command{}
+			client := mockActions.CreateMockClient(&mockActions.TestData{}, false, false)
+
+			ctx := t.Context()
+
+			var capturedParams types.UpdateParams
+
+			runUpdatesWithNotifications := func(_ context.Context, _ types.Filter, params types.UpdateParams) *metrics.Metric {
+				capturedParams = params
+
+				return &metrics.Metric{Scanned: 1, Updated: 0, Failed: 0}
+			}
+
+			writeStartupMessage := func(*cobra.Command, time.Time, string, string, container.Client, types.Notifier, string, *bool) {}
+
+			cmd.PersistentFlags().Bool("update-on-start", true, "")
+
+			timeoutCtx, timeoutCancel := context.WithTimeout(ctx, 10*time.Millisecond)
+			defer timeoutCancel()
+
+			err := scheduling.RunUpgradesOnSchedule(
+				timeoutCtx,
+				cmd,
+				filters.NoFilter,
+				"test filter",
+				nil,   // lock (auto-created)
+				false, // cleanup
+				"",    // empty schedule
+				writeStartupMessage,
+				runUpdatesWithNotifications,
+				client,
+				"",  // scope
+				nil, // no notifier
+				"v1.0.0",
+				false,                  // monitorOnly
+				true,                   // updateOnStart - triggers immediate update
+				false,                  // skipFirstRun
+				nil,                    // currentWatchtowerContainer
+				false,                  // startupMessageSent
+				false,                  // ephemeralSelfUpdate
+				false,                  // reviveStopped
+				tt.useComposeDependsOn, // useComposeDependsOn
+			)
+			require.NoError(t, err)
+
+			assert.Equal(t, tt.expectSelected, capturedParams.UseComposeDependsOn,
+				"UseComposeDependsOn should be %v in UpdateParams", tt.expectSelected)
+			assert.False(t, capturedParams.RunOnce,
+				"scheduled updates must keep RunOnce=false")
 		})
 	}
 }

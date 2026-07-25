@@ -1108,6 +1108,7 @@ func runMain(cfg types.RunConfig) int {
 		startupMessageSent,
 		ephemeralSelfUpdate,
 		reviveStopped,
+		useComposeDependsOn,
 	)
 	if err != nil {
 		logNotify("Scheduled upgrades failed", err)
