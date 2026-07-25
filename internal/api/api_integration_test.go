@@ -674,6 +674,7 @@ func TestIntegration_APIAndScheduling_ConcurrentWithUnblockHTTPAPI(t *testing.T)
 		true,
 		false,
 		false, // reviveStopped
+		false, // useComposeDependsOn
 	)
 	require.NoError(t, err, "RunUpgradesOnSchedule should run concurrently after SetupAndStartAPI returns")
 }

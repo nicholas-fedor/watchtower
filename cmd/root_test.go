@@ -551,6 +551,7 @@ func TestUpdateOnStartTriggersImmediateUpdate(t *testing.T) {
 		false, // startupMessageSent
 		false, // ephemeralSelfUpdate
 		false, // reviveStopped
+		false, // useComposeDependsOn
 	)
 
 	// Should not return an error (context cancellation is expected)
@@ -642,6 +643,7 @@ func TestUpdateOnStartIntegratesWithCronScheduling(t *testing.T) {
 			false, // startupMessageSent
 			false, // ephemeralSelfUpdate
 			false, // reviveStopped
+			false, // useComposeDependsOn
 		)
 
 		// Should not return an error (context cancellation is expected)
@@ -737,6 +739,7 @@ func TestUpdateOnStartLockingBehavior(t *testing.T) {
 			false, // startupMessageSent
 			false, // ephemeralSelfUpdate
 			false, // reviveStopped
+			false, // useComposeDependsOn
 		)
 
 		// Should not return an error
@@ -813,6 +816,7 @@ func TestUpdateOnStartSelfUpdateScenario(t *testing.T) {
 			false, // startupMessageSent
 			false, // ephemeralSelfUpdate
 			false, // reviveStopped
+			false, // useComposeDependsOn
 		)
 
 		// Should not return an error
@@ -902,6 +906,7 @@ func TestUpdateOnStartMultiInstanceScenario(t *testing.T) {
 				false, // startupMessageSent
 				false, // ephemeralSelfUpdate
 				false, // reviveStopped
+				false, // useComposeDependsOn
 			)
 			assert.NoError(t, err)
 			completed.Add(1)
@@ -936,6 +941,7 @@ func TestUpdateOnStartMultiInstanceScenario(t *testing.T) {
 				false, // startupMessageSent
 				false, // ephemeralSelfUpdate
 				false, // reviveStopped
+				false, // useComposeDependsOn
 			)
 			assert.NoError(t, err)
 			completed.Add(1)
@@ -1137,6 +1143,7 @@ func TestRunUpgradesOnSchedule_ShutdownWaitsForRunningUpdate(t *testing.T) {
 				false, // startupMessageSent
 				false, // ephemeralSelfUpdate
 				false, // reviveStopped
+				false, // useComposeDependsOn
 			)
 			assert.NoError(t, err)
 
@@ -1303,6 +1310,7 @@ func TestEphemeralSelfUpdateExercisesTruePath(t *testing.T) {
 		false, // startupMessageSent
 		true,  // ephemeralSelfUpdate
 		false, // reviveStopped
+		false, // useComposeDependsOn
 	)
 
 	require.NoError(t, err)
