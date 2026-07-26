@@ -7,6 +7,7 @@ import (
 	"regexp"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
@@ -126,6 +127,15 @@ func TestApplyEnvToFlags_DoesNotMarkChanged(t *testing.T) {
 	port, err := flagSet.GetString("http-api-port")
 	require.NoError(t, err)
 	assert.Equal(t, "9090", port)
+
+	timeout, err := flagSet.GetDuration("stop-timeout")
+	require.NoError(t, err)
+	assert.Equal(t, 45*time.Second, timeout, "bare-second WATCHTOWER_TIMEOUT must bridge to stop-timeout")
+
+	urls, err := flagSet.GetStringArray("notification-url")
+	require.NoError(t, err)
+	assert.Equal(t, []string{"slack://hook", "discord://token"}, urls,
+		"space-separated WATCHTOWER_NOTIFICATION_URL must bridge to two entries")
 
 	// CLI still marks Changed and wins over env.
 	t.Setenv("WATCHTOWER_HTTP_API_HOST", "10.0.0.1")
