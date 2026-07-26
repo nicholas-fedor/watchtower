@@ -103,7 +103,7 @@ func Specs() []spec.FlagSpec {
 			EnvKeys:    []string{"WATCHTOWER_NOTIFICATIONS"},
 			ListParse:  spec.ListCommaOrSpace,
 			Deprecated: "Use --notification-url with the appropriate Shoutrrr URL scheme instead.",
-			Help:       "Notification types to send [legacy types (email, slack, msteams, gotify).",
+			Help:       "Notification types to send [legacy types (email, slack, msteams, gotify)].",
 		},
 		{
 			Name:       "notification-email-from",
