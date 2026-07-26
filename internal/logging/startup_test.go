@@ -104,9 +104,12 @@ var _ = ginkgo.Describe("WriteStartupMessage", func() {
 })
 
 var _ = ginkgo.Describe("SetupStartupLogger", func() {
-	ginkgo.It("should return a log entry when notifier is nil", func() {
+	ginkgo.It("should return a standard logger entry when notifier is nil", func() {
+		// Suppression is handled by WriteStartupMessage's early return; this helper
+		// always builds a StandardLogger entry (not notifications.LocalLog).
 		logger := logging.SetupStartupLogger(nil)
 		gomega.Expect(logger).NotTo(gomega.BeNil())
+		gomega.Expect(logger.Logger).To(gomega.Equal(logrus.StandardLogger()))
 	})
 })
 
