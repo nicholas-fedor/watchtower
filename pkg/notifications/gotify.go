@@ -59,14 +59,14 @@ func newGotifyNotifier(legacy notifyConfig.Legacy) types.ConvertibleNotifier {
 	skipVerify := legacy.GotifyTLSSkipVerify
 
 	clog := logrus.WithFields(logrus.Fields{
-		"url":         apiURL,
+		"url":         redactServiceURL(apiURL),
 		"skip_verify": skipVerify,
 	})
 	clog.Debug("Initializing Gotify notifier")
 
-	// Log token only at trace level for security.
 	if logrus.IsLevelEnabled(logrus.TraceLevel) {
-		clog.WithField("token", token).Trace("Gotify notifier token loaded")
+		clog.WithField("token_length", len(token)).
+			Trace("Gotify notifier token loaded")
 	}
 
 	return &gotifyTypeNotifier{
@@ -155,7 +155,7 @@ func (n *gotifyTypeNotifier) GetURL(_ *cobra.Command) (string, error) {
 	clog.Debug("Generating Gotify service URL")
 
 	if logrus.IsLevelEnabled(logrus.TraceLevel) {
-		clog.WithField("url", n.gotifyURL).
+		clog.WithField("url", redactServiceURL(n.gotifyURL)).
 			Trace("Gotify API URL loaded")
 	}
 
@@ -180,9 +180,8 @@ func (n *gotifyTypeNotifier) GetURL(_ *cobra.Command) (string, error) {
 	clog.WithField("disable_tls", apiURL.Scheme == "http").
 		Debug("Generated Gotify service URL")
 
-	// Service URL embeds the app token; log only at trace.
 	if logrus.IsLevelEnabled(logrus.TraceLevel) {
-		clog.WithField("service_url", urlStr).
+		clog.WithField("service_url", redactServiceURL(urlStr)).
 			Trace("Generated Gotify service URL")
 	}
 

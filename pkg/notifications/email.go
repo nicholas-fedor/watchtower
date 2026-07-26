@@ -174,7 +174,8 @@ func (e *emailTypeNotifier) GetURL(_ *cobra.Command) (string, error) {
 	}).Debug("Generated SMTP URL")
 
 	if logrus.IsLevelEnabled(logrus.TraceLevel) {
-		clog.WithField("url", url).Trace("Generated SMTP URL")
+		clog.WithField("url", redactServiceURL(url)).
+			Trace("Generated SMTP URL")
 	}
 
 	return url, nil

@@ -57,7 +57,7 @@ type msTeamsTypeNotifier struct {
 //nolint:godox
 func newMsTeamsNotifier(legacy notifyConfig.Legacy) types.ConvertibleNotifier {
 	webHookURL := legacy.MSTeamsHook
-	clog := logrus.WithField("url", webHookURL)
+	clog := logrus.WithField("url", redactServiceURL(webHookURL))
 
 	if len(webHookURL) == 0 {
 		clog.Fatal(
@@ -84,7 +84,7 @@ func (n *msTeamsTypeNotifier) GetURL(_ *cobra.Command) (string, error) {
 	clog.Debug("Generating Microsoft Teams service URL")
 
 	if logrus.IsLevelEnabled(logrus.TraceLevel) {
-		clog.WithField("url", n.webHookURL).
+		clog.WithField("url", redactServiceURL(n.webHookURL)).
 			Trace("Microsoft Teams webhook URL loaded")
 	}
 
@@ -108,7 +108,7 @@ func (n *msTeamsTypeNotifier) GetURL(_ *cobra.Command) (string, error) {
 
 	urlStr := config.GetURL().String()
 	if logrus.IsLevelEnabled(logrus.TraceLevel) {
-		clog.WithField("service_url", urlStr).
+		clog.WithField("service_url", redactServiceURL(urlStr)).
 			Trace("Generated Microsoft Teams service URL")
 	} else {
 		clog.Debug("Generated Microsoft Teams service URL")

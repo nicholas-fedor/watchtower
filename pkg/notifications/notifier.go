@@ -79,9 +79,9 @@ func NewNotifier(cfg notifyConfig.Notify) types.Notifier {
 		"legacy":      legacyTemplate,
 	}).Debug("Creating notifier with configuration")
 
-	// Notification URLs often embed tokens. Log them only at trace (see email.go / gotify.go).
 	if logrus.IsLevelEnabled(logrus.TraceLevel) {
-		clog.WithField("urls", urls).Trace("Notifier Shoutrrr URLs loaded")
+		clog.WithField("urls", redactServiceURLs(urls)).
+			Trace("Notifier Shoutrrr URLs loaded")
 	}
 
 	return createNotifier(
@@ -326,13 +326,13 @@ func appendLegacyURLs(
 
 		clog.WithFields(logrus.Fields{
 			"type": notificationType,
-			"url":  shoutrrrURL,
+			"url":  redactServiceURL(shoutrrrURL),
 		}).Trace("Created Shoutrrr URL from legacy notifier")
 	}
 
 	clog.WithFields(logrus.Fields{
-		"urls":  urls,
-		"delay": legacyDelay,
+		"url_count": len(urls),
+		"delay":     legacyDelay,
 	}).Debug("Completed legacy URL appending")
 
 	return urls, legacyDelay

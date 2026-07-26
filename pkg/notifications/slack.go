@@ -98,7 +98,7 @@ func (s *slackTypeNotifier) GetURL(_ *cobra.Command) (string, error) {
 	clog.Debug("Generating Slack service URL")
 
 	if logrus.IsLevelEnabled(logrus.TraceLevel) {
-		clog.WithField("hook_url", s.HookURL).
+		clog.WithField("hook_url", redactServiceURL(s.HookURL)).
 			Trace("Slack hook URL loaded")
 	}
 
@@ -125,7 +125,7 @@ func (s *slackTypeNotifier) GetURL(_ *cobra.Command) (string, error) {
 
 		urlStr := conf.GetURL().String()
 		if logrus.IsLevelEnabled(logrus.TraceLevel) {
-			clog.WithField("service_url", urlStr).
+			clog.WithField("service_url", redactServiceURL(urlStr)).
 				Trace("Generated Discord service URL")
 		} else {
 			clog.Debug("Generated Discord service URL")
@@ -160,7 +160,7 @@ func (s *slackTypeNotifier) GetURL(_ *cobra.Command) (string, error) {
 
 	urlStr := conf.GetURL().String()
 	if logrus.IsLevelEnabled(logrus.TraceLevel) {
-		clog.WithField("service_url", urlStr).
+		clog.WithField("service_url", redactServiceURL(urlStr)).
 			Trace("Generated Slack service URL")
 	} else {
 		clog.Debug("Generated Slack service URL")
