@@ -136,10 +136,11 @@ func TestClientOptionsMapsClientAndCompat(t *testing.T) {
 			ReviveStopped:     true,
 			RemoveVolumes:     true,
 			WarnOnHeadFailure: "always",
+			CPUCopyMode:       "full",
 		},
 		Compatibility: compatibility.Compatibility{
 			DisableMemorySwappiness: true,
-			CPUCopyMode:             "full",
+			CPUCopyMode:             "auto",
 		},
 	}
 
@@ -149,6 +150,11 @@ func TestClientOptionsMapsClientAndCompat(t *testing.T) {
 	assert.True(t, opts.ReviveStopped)
 	assert.True(t, opts.RemoveVolumes)
 	assert.True(t, opts.DisableMemorySwappiness)
-	assert.Equal(t, "full", opts.CPUCopyMode)
+	// Compatibility wins over Client when both are non-empty (matches UpdateParams).
+	assert.Equal(t, "auto", opts.CPUCopyMode)
 	assert.Equal(t, "always", string(opts.WarnOnHeadFailed))
+
+	// Client is used when Compatibility is empty.
+	cfg.Compatibility.CPUCopyMode = ""
+	assert.Equal(t, "full", cfg.ClientOptions().CPUCopyMode)
 }
