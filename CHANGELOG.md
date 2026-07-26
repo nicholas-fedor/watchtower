@@ -10,6 +10,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- Update badges by @nicholas-fedor in [#2037](https://github.com/nicholas-fedor/watchtower/pull/2037)
 - Centralize watchtower configuration management by @nicholas-fedor in [#2035](https://github.com/nicholas-fedor/watchtower/pull/2035)
 
 ### Chores
