@@ -19,8 +19,9 @@
 //   - ProcessFlagAliases / GetSecretsFromFiles: Pre-load transforms (porcelain, interval→schedule, secrets).
 //   - EnvConfig: Maps Docker client flags into DOCKER_* process environment variables.
 //
-// Domains that expose FlagSpec use static pflag defaults and BindAll (flag > env >
-// default). Remaining domains still register with env-baked defaults until converted.
+// Every domain exposes FlagSpec with static pflag defaults. BindAll and Load
+// resolve values as flag > env > default; ApplyEnvToFlags bridges env onto unset
+// flags for pre-load helpers without baking env into registration defaults.
 //
 // Usage example:
 //
