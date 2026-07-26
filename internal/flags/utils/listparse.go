@@ -132,7 +132,8 @@ func SplitNotificationValues(value string) []string {
 	for _, urlStr := range result {
 		_, err := url.Parse(urlStr)
 		if err != nil {
-			logrus.Warnf("Invalid notification URL '%s': %v", urlStr, err)
+			// Do not log urlStr; notification URLs often embed tokens.
+			logrus.WithError(err).Warn("Invalid notification URL in list")
 		}
 
 		final = append(final, urlStr)
