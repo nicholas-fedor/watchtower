@@ -49,17 +49,28 @@ func BindAll(vip *viper.Viper, flagSet *pflag.FlagSet, specs []spec.FlagSpec) er
 			return fmt.Errorf("bind flag %s: %w", flagSpec.Name, err)
 		}
 
+		// Bind all non-presence env aliases in one call so earlier EnvKeys keep precedence.
+		// Presence-only keys (NO_COLOR) are applied via ApplyEnvToFlags only.
+		envAliases := make([]string, 0, len(flagSpec.EnvKeys))
 		for _, envKey := range flagSpec.EnvKeys {
-			// Presence-only keys (NO_COLOR) are applied via ApplyEnvToFlags and must
-			// not BindEnv, or Viper would re-parse values like "0"/"false" as false.
 			if IsPresenceEnvKey(envKey) {
 				continue
 			}
 
-			err = vip.BindEnv(flagSpec.Name, envKey)
-			if err != nil {
-				return fmt.Errorf("bind env %s -> %s: %w", flagSpec.Name, envKey, err)
-			}
+			envAliases = append(envAliases, envKey)
+		}
+
+		if len(envAliases) == 0 {
+			continue
+		}
+
+		bindArgs := make([]string, 0, 1+len(envAliases))
+		bindArgs = append(bindArgs, flagSpec.Name)
+		bindArgs = append(bindArgs, envAliases...)
+
+		err = vip.BindEnv(bindArgs...)
+		if err != nil {
+			return fmt.Errorf("bind env %s -> %v: %w", flagSpec.Name, envAliases, err)
 		}
 	}
 
