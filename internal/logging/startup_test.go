@@ -104,8 +104,8 @@ var _ = ginkgo.Describe("WriteStartupMessage", func() {
 })
 
 var _ = ginkgo.Describe("SetupStartupLogger", func() {
-	ginkgo.It("should return local log when startup messages are suppressed", func() {
-		logger := logging.SetupStartupLogger(true, nil)
+	ginkgo.It("should return a log entry when notifier is nil", func() {
+		logger := logging.SetupStartupLogger(nil)
 		gomega.Expect(logger).NotTo(gomega.BeNil())
 	})
 })

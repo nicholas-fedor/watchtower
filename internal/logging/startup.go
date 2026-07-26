@@ -10,7 +10,6 @@ import (
 
 	"github.com/nicholas-fedor/watchtower/internal/util"
 	"github.com/nicholas-fedor/watchtower/pkg/container"
-	"github.com/nicholas-fedor/watchtower/pkg/notifications"
 	"github.com/nicholas-fedor/watchtower/pkg/types"
 )
 
@@ -51,13 +50,13 @@ type StartupParams struct {
 // Parameters:
 //   - params: Resolved startup messaging inputs from config.Load (no CLI flag reads).
 func WriteStartupMessage(params StartupParams) {
-	// If startup messages are suppressed, skip all logging.
+	// If startup messages are suppressed, skip all logging and notifier batching.
 	if params.NoStartupMessage {
 		return
 	}
 
-	// Configure the logger based on whether startup messages should be suppressed.
-	startupLog := SetupStartupLogger(params.NoStartupMessage, params.Notifier)
+	// Batch startup lines through the notifier when present (suppression already returned).
+	startupLog := SetupStartupLogger(params.Notifier)
 
 	var apiVersion string
 	if params.Client != nil {
@@ -104,22 +103,18 @@ func WriteStartupMessage(params StartupParams) {
 	}
 }
 
-// SetupStartupLogger configures the logger for startup messages based on message suppression settings.
+// SetupStartupLogger configures a log entry for startup messages and starts notifier batching.
 //
-// It uses a local log entry if messages are suppressed (--no-startup-message), otherwise batches messages
-// via the notifier for consolidated delivery, ensuring flexibility in how startup info is presented.
+// Callers that suppress startup messages must return before invoking this helper.
+// When notifier is non-nil, StartNotification batches subsequent startup lines for
+// a single SendNotification.
 //
 // Parameters:
-//   - noStartupMessage: A boolean indicating whether startup messages should be logged locally only.
-//   - notifier: The notification system instance for batching messages.
+//   - notifier: The notification system instance for batching messages, or nil.
 //
 // Returns:
 //   - *logrus.Entry: A configured log entry for writing startup messages.
-func SetupStartupLogger(noStartupMessage bool, notifier types.Notifier) *logrus.Entry {
-	if noStartupMessage {
-		return notifications.LocalLog
-	}
-
+func SetupStartupLogger(notifier types.Notifier) *logrus.Entry {
 	log := logrus.NewEntry(logrus.StandardLogger())
 
 	if notifier != nil {
