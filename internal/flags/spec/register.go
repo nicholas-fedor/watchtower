@@ -10,17 +10,20 @@ import (
 	"github.com/nicholas-fedor/watchtower/internal/flags/utils"
 )
 
-// ErrUnsupportedFlagKind indicates a FlagSpec kind is not supported.
+// ErrUnsupportedFlagKind indicates a FlagSpec kind is not supported for registration.
 var ErrUnsupportedFlagKind = errors.New("unsupported flag kind")
 
 // Register registers pflags from FlagSpec rows using static defaults only.
 //
+// Environment values are not baked into pflag defaults; ApplyEnvToFlags and
+// Viper bind resolve env after parse.
+//
 // Parameters:
-//   - flagSet: Target flag set.
-//   - specs: Domain flag specifications.
+//   - flagSet: Target flag set that receives the registered flags.
+//   - specs: Domain flag specifications to register in order.
 //
 // Returns:
-//   - error: Non-nil when registration fails.
+//   - error: Non-nil when a kind is unsupported or a flag cannot be marked hidden.
 func Register(flagSet *pflag.FlagSet, specs []FlagSpec) error {
 	for _, flagSpec := range specs {
 		err := registerOne(flagSet, flagSpec)
@@ -32,11 +35,11 @@ func Register(flagSet *pflag.FlagSet, specs []FlagSpec) error {
 	return nil
 }
 
-// MustRegister registers FlagSpec rows and panics on failure.
+// MustRegister registers FlagSpec rows and panics when registration fails.
 //
 // Parameters:
-//   - flagSet: Target flag set.
-//   - specs: Domain flag specifications.
+//   - flagSet: Target flag set that receives the registered flags.
+//   - specs: Domain flag specifications to register in order.
 func MustRegister(flagSet *pflag.FlagSet, specs []FlagSpec) {
 	err := Register(flagSet, specs)
 	if err != nil {
@@ -44,58 +47,30 @@ func MustRegister(flagSet *pflag.FlagSet, specs []FlagSpec) {
 	}
 }
 
+// registerOne registers a single FlagSpec onto flagSet.
+//
+// It dispatches by kind, then applies deprecation and hidden metadata when set.
+//
+// Parameters:
+//   - flagSet: Target flag set.
+//   - flagSpec: Flag specification to register.
+//
+// Returns:
+//   - error: Non-nil when the kind is unsupported or MarkHidden fails.
 func registerOne(flagSet *pflag.FlagSet, flagSpec FlagSpec) error {
 	switch flagSpec.Kind {
 	case KindBool:
-		def, _ := flagSpec.Default.(bool)
-		if flagSpec.Shorthand != "" {
-			flagSet.BoolP(flagSpec.Name, flagSpec.Shorthand, def, flagSpec.Help)
-		} else {
-			flagSet.Bool(flagSpec.Name, def, flagSpec.Help)
-		}
+		registerBool(flagSet, flagSpec)
 	case KindString:
-		def, _ := flagSpec.Default.(string)
-		if flagSpec.Shorthand != "" {
-			flagSet.StringP(flagSpec.Name, flagSpec.Shorthand, def, flagSpec.Help)
-		} else {
-			flagSet.String(flagSpec.Name, def, flagSpec.Help)
-		}
+		registerString(flagSet, flagSpec)
 	case KindInt:
-		def, _ := flagSpec.Default.(int)
-		if flagSpec.Shorthand != "" {
-			flagSet.IntP(flagSpec.Name, flagSpec.Shorthand, def, flagSpec.Help)
-		} else {
-			flagSet.Int(flagSpec.Name, def, flagSpec.Help)
-		}
+		registerInt(flagSet, flagSpec)
 	case KindDuration:
-		def, _ := flagSpec.Default.(time.Duration)
-		if flagSpec.Shorthand != "" {
-			flagSet.DurationP(flagSpec.Name, flagSpec.Shorthand, def, flagSpec.Help)
-		} else {
-			flagSet.Duration(flagSpec.Name, def, flagSpec.Help)
-		}
+		registerDuration(flagSet, flagSpec)
 	case KindStringSlice:
-		def, _ := flagSpec.Default.([]string)
-		if def == nil {
-			def = []string{}
-		}
-
-		if flagSpec.Shorthand != "" {
-			flagSet.StringSliceP(flagSpec.Name, flagSpec.Shorthand, def, flagSpec.Help)
-		} else {
-			flagSet.StringSlice(flagSpec.Name, def, flagSpec.Help)
-		}
+		registerStringSlice(flagSet, flagSpec)
 	case KindStringArray:
-		def, _ := flagSpec.Default.([]string)
-		if def == nil {
-			def = []string{}
-		}
-
-		if flagSpec.Shorthand != "" {
-			flagSet.StringArrayP(flagSpec.Name, flagSpec.Shorthand, def, flagSpec.Help)
-		} else {
-			flagSet.StringArray(flagSpec.Name, def, flagSpec.Help)
-		}
+		registerStringArray(flagSet, flagSpec)
 	default:
 		return fmt.Errorf("%w: %s", ErrUnsupportedFlagKind, flagSpec.Name)
 	}
@@ -112,4 +87,123 @@ func registerOne(flagSet *pflag.FlagSet, flagSpec FlagSpec) error {
 	}
 
 	return nil
+}
+
+// stringSliceDefault returns def, or an empty non-nil slice when def is nil.
+//
+// Parameters:
+//   - def: Slice default from FlagSpec, which may be nil.
+//
+// Returns:
+//   - []string: A non-nil slice suitable for pflag StringSlice/StringArray defaults.
+func stringSliceDefault(def []string) []string {
+	if def == nil {
+		return []string{}
+	}
+
+	return def
+}
+
+// registerBool registers a boolean flag from flagSpec.
+//
+// Parameters:
+//   - flagSet: Target flag set.
+//   - flagSpec: Boolean flag specification (Default must be bool).
+func registerBool(flagSet *pflag.FlagSet, flagSpec FlagSpec) {
+	def, _ := flagSpec.Default.(bool)
+	if flagSpec.Shorthand != "" {
+		flagSet.BoolP(flagSpec.Name, flagSpec.Shorthand, def, flagSpec.Help)
+
+		return
+	}
+
+	flagSet.Bool(flagSpec.Name, def, flagSpec.Help)
+}
+
+// registerString registers a string flag from flagSpec.
+//
+// Parameters:
+//   - flagSet: Target flag set.
+//   - flagSpec: String flag specification (Default must be string).
+func registerString(flagSet *pflag.FlagSet, flagSpec FlagSpec) {
+	def, _ := flagSpec.Default.(string)
+	if flagSpec.Shorthand != "" {
+		flagSet.StringP(flagSpec.Name, flagSpec.Shorthand, def, flagSpec.Help)
+
+		return
+	}
+
+	flagSet.String(flagSpec.Name, def, flagSpec.Help)
+}
+
+// registerInt registers an int flag from flagSpec.
+//
+// Parameters:
+//   - flagSet: Target flag set.
+//   - flagSpec: Int flag specification (Default must be int).
+func registerInt(flagSet *pflag.FlagSet, flagSpec FlagSpec) {
+	def, _ := flagSpec.Default.(int)
+	if flagSpec.Shorthand != "" {
+		flagSet.IntP(flagSpec.Name, flagSpec.Shorthand, def, flagSpec.Help)
+
+		return
+	}
+
+	flagSet.Int(flagSpec.Name, def, flagSpec.Help)
+}
+
+// registerDuration registers a duration flag from flagSpec.
+//
+// Parameters:
+//   - flagSet: Target flag set.
+//   - flagSpec: Duration flag specification (Default must be time.Duration).
+func registerDuration(flagSet *pflag.FlagSet, flagSpec FlagSpec) {
+	def, _ := flagSpec.Default.(time.Duration)
+	if flagSpec.Shorthand != "" {
+		flagSet.DurationP(flagSpec.Name, flagSpec.Shorthand, def, flagSpec.Help)
+
+		return
+	}
+
+	flagSet.Duration(flagSpec.Name, def, flagSpec.Help)
+}
+
+// registerStringSlice registers a string-slice flag from flagSpec.
+//
+// A nil Default becomes an empty non-nil slice so pflag receives a stable default.
+//
+// Parameters:
+//   - flagSet: Target flag set.
+//   - flagSpec: String-slice flag specification (Default must be []string or nil).
+func registerStringSlice(flagSet *pflag.FlagSet, flagSpec FlagSpec) {
+	def, _ := flagSpec.Default.([]string)
+	def = stringSliceDefault(def)
+
+	if flagSpec.Shorthand != "" {
+		flagSet.StringSliceP(flagSpec.Name, flagSpec.Shorthand, def, flagSpec.Help)
+
+		return
+	}
+
+	flagSet.StringSlice(flagSpec.Name, def, flagSpec.Help)
+}
+
+// registerStringArray registers a string-array flag from flagSpec.
+//
+// A nil Default becomes an empty non-nil slice so pflag receives a stable default.
+//
+// Parameters:
+//   - flagSet: Target flag set.
+//   - flagSpec: String-array flag specification (Default must be []string or nil).
+func registerStringArray(flagSet *pflag.FlagSet, flagSpec FlagSpec) {
+	def, _ := flagSpec.Default.([]string)
+	def = stringSliceDefault(def)
+
+	if flagSpec.Shorthand != "" {
+		flagSet.StringArrayP(flagSpec.Name, flagSpec.Shorthand, def, flagSpec.Help)
+
+		return
+	}
+
+	flagSet.StringArray(flagSpec.Name, def, flagSpec.Help)
 }
