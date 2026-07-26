@@ -16,20 +16,13 @@ import (
 // StartupParams holds resolved process values for startup messaging.
 //
 // Callers must populate these from config.Load output. Do not read CLI flags here.
+// Schedule and mode fields live on the embedded ScheduleInfo (single source of truth).
 type StartupParams struct {
+	// ScheduleInfo holds run-once, update-on-start, HTTP API, and next-run schedule values.
+	ScheduleInfo
+
 	// NoStartupMessage suppresses all startup logs and notifications when true.
 	NoStartupMessage bool
-	// RunOnce indicates a single update run then exit.
-	RunOnce bool
-	// UpdateOnStart is the effective update-on-start value for this invocation.
-	// When nil, update-on-start messaging is omitted (treated as false).
-	UpdateOnStart *bool
-	// HTTPAPIUpdate is true when the HTTP update API endpoint is enabled.
-	HTTPAPIUpdate bool
-	// HTTPAPIPeriodicPolls is true when scheduled polls run alongside the HTTP API.
-	HTTPAPIPeriodicPolls bool
-	// Sched is the time of the first scheduled run, or zero if none.
-	Sched time.Time
 	// Filtering is a human-readable description of the container filter.
 	Filtering string
 	// Scope is the operational scope name, or empty when unset.
@@ -82,13 +75,7 @@ func WriteStartupMessage(params StartupParams) {
 	}
 
 	// Log scheduling or run mode information based on configuration.
-	LogScheduleInfo(startupLog, ScheduleInfo{
-		RunOnce:              params.RunOnce,
-		UpdateOnStart:        params.UpdateOnStart,
-		HTTPAPIUpdate:        params.HTTPAPIUpdate,
-		HTTPAPIPeriodicPolls: params.HTTPAPIPeriodicPolls,
-		Sched:                params.Sched,
-	})
+	LogScheduleInfo(startupLog, params.ScheduleInfo)
 
 	// Send batched notifications if not suppressed, ensuring startup info reaches users.
 	if params.Notifier != nil {

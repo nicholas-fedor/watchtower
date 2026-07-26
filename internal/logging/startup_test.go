@@ -37,10 +37,10 @@ var _ = ginkgo.Describe("WriteStartupMessage", func() {
 
 	ginkgo.It("should log startup information with no notifier", func() {
 		logging.WriteStartupMessage(logging.StartupParams{
-			HTTPAPIUpdate: true,
-			Filtering:     "Watching all containers",
-			Client:        client,
-			Version:       "v1.0.0",
+			ScheduleInfo: logging.ScheduleInfo{HTTPAPIUpdate: true},
+			Filtering:    "Watching all containers",
+			Client:       client,
+			Version:      "v1.0.0",
 		})
 
 		output := buffer.String()
@@ -64,7 +64,7 @@ var _ = ginkgo.Describe("WriteStartupMessage", func() {
 		func() {
 			logging.WriteStartupMessage(logging.StartupParams{
 				NoStartupMessage: true,
-				HTTPAPIUpdate:    true,
+				ScheduleInfo:     logging.ScheduleInfo{HTTPAPIUpdate: true},
 				Filtering:        "Watching all containers",
 				Client:           client,
 				Version:          "v1.0.0",
