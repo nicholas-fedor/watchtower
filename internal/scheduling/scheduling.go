@@ -202,6 +202,12 @@ func RunUpgradesOnSchedule(ctx context.Context, deps ScheduleDeps) error {
 
 		params.Filter = updateFilter
 
+		if deps.RunUpdate == nil {
+			logrus.Debug("Update skipped: RunUpdate hook is not configured")
+
+			return
+		}
+
 		metric := deps.RunUpdate(ctx, updateFilter, params)
 		if metric != nil {
 			metrics.Default().RegisterScan(metric)
