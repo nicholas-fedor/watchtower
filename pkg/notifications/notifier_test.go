@@ -123,7 +123,7 @@ var _ = ginkgo.Describe("notifications", func() {
 			ginkgo.It(
 				"should use the specified legacy delay and ignore the specified delay",
 				func() {
-					delay := notifications.GetDelay(0, 7*time.Second)
+					delay := notifications.GetDelay(5, 7*time.Second)
 					gomega.Expect(delay).To(gomega.Equal(7 * time.Second))
 				},
 			)
