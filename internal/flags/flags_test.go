@@ -68,6 +68,37 @@ func TestApplyEnvToFlags_EmptyBoolEnvDoesNotEnable(t *testing.T) {
 	assert.True(t, noColor, "NO_COLOR presence (empty value) must enable no-color")
 }
 
+// TestApplyEnvToFlags_NOColorPresenceAlwaysEnables verifies NO_COLOR uses
+// presence semantics (including 0/false) and a static false default.
+func TestApplyEnvToFlags_NOColorPresenceAlwaysEnables(t *testing.T) {
+	for _, tc := range []struct {
+		name  string
+		value string
+	}{
+		{name: "empty", value: ""},
+		{name: "zero", value: "0"},
+		{name: "false", value: "false"},
+		{name: "true", value: "true"},
+		{name: "one", value: "1"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Setenv("NO_COLOR", tc.value)
+
+			cmd := newTestCommand()
+			// Static default must be false before env apply.
+			defaultNoColor, err := cmd.PersistentFlags().GetBool("no-color")
+			require.NoError(t, err)
+			assert.False(t, defaultNoColor)
+
+			parseWithEnv(t, cmd)
+
+			noColor, err := cmd.PersistentFlags().GetBool("no-color")
+			require.NoError(t, err)
+			assert.True(t, noColor, "NO_COLOR=%q must enable no-color", tc.value)
+		})
+	}
+}
+
 // TestApplyEnvToFlags_DoesNotMarkChanged ensures env bridging leaves pflag.Changed false
 // so API *Changed fields only reflect CLI overrides.
 func TestApplyEnvToFlags_DoesNotMarkChanged(t *testing.T) {

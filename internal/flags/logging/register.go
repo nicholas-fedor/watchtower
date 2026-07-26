@@ -2,8 +2,6 @@
 package logging
 
 import (
-	"os"
-
 	"github.com/spf13/cobra"
 
 	"github.com/nicholas-fedor/watchtower/internal/flags/spec"
@@ -11,14 +9,14 @@ import (
 
 // Specs returns logging domain flag metadata with static defaults.
 //
-// NO_COLOR is applied at registration time per https://no-color.org/ (presence of
-// the variable, not WATCHTOWER_* naming).
+// NO_COLOR is listed in EnvKeys so ApplyEnvToFlags can apply presence-based
+// semantics (https://no-color.org/). The pflag default stays false; env is not
+// baked into registration-time defaults. BindAll skips BindEnv for NO_COLOR so
+// Viper does not re-parse "0"/"false" as false after presence apply.
 //
 // Returns:
 //   - []spec.FlagSpec: Logging flag specifications.
 func Specs() []spec.FlagSpec {
-	_, noColorSet := os.LookupEnv("NO_COLOR")
-
 	return []spec.FlagSpec{
 		{
 			Name:      "log-format",
@@ -53,7 +51,7 @@ func Specs() []spec.FlagSpec {
 		{
 			Name:    "no-color",
 			Kind:    spec.KindBool,
-			Default: noColorSet,
+			Default: false,
 			EnvKeys: []string{"NO_COLOR"},
 			Help:    "Disable ANSI color escape codes in log output",
 		},
