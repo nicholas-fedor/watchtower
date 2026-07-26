@@ -62,12 +62,8 @@ func NewNotifier(cfg notifyConfig.Notify) types.Notifier {
 
 	// Start from configured Shoutrrr URLs, then append any legacy type URLs.
 	urls := append([]string(nil), cfg.URLs...)
-	urls, delay := appendLegacyURLs(urls, cfg.LegacyTypes, cfg.Legacy)
-
-	// Prefer legacy delay when set; otherwise use the configured delay in seconds.
-	if delay == 0 && cfg.DelaySeconds > 0 {
-		delay = time.Duration(cfg.DelaySeconds) * time.Second
-	}
+	urls, legacyDelay := appendLegacyURLs(urls, cfg.LegacyTypes, cfg.Legacy)
+	delay := GetDelay(cfg.DelaySeconds, legacyDelay)
 
 	// Use report template when enabled, otherwise use legacy template.
 	legacyTemplate := !cfg.Report
@@ -356,11 +352,7 @@ func AppendLegacyUrls(urls []string, cmd *cobra.Command) ([]string, time.Duratio
 
 	urls, legacyDelay := appendLegacyURLs(urls, cfg.LegacyTypes, cfg.Legacy)
 
-	if legacyDelay == 0 && cfg.DelaySeconds > 0 {
-		return urls, time.Duration(cfg.DelaySeconds) * time.Second
-	}
-
-	return urls, legacyDelay
+	return urls, GetDelay(cfg.DelaySeconds, legacyDelay)
 }
 
 // GetDelay selects the notification delay from a legacy value or configured seconds.
