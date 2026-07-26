@@ -69,7 +69,8 @@ func runNotifyUpgrade(cmd *cobra.Command, args []string) {
 //     Non-critical failures (e.g., file removal after timeout) are logged but do not result in an error return.
 func runNotifyUpgradeE(cmd *cobra.Command, _ []string) error {
 	// Process flag aliases and expand secrets before resolving configuration.
-	flagSet := cmd.Flags()
+	// Use PersistentFlags so env/alias bridging matches config.Load's bind source.
+	flagSet := cmd.PersistentFlags()
 
 	err := flags.ApplyEnvToFlags(flagSet, flags.AllSpecs())
 	if err != nil {
