@@ -12,14 +12,14 @@ import (
 func registerConfigRoute(app *fiber.App, auth fiber.Handler, opts apiconfig.Options) {
 	handler := config.New(func(_ context.Context) (config.ConfigData, error) {
 		return config.ConfigData{
-			MonitorOnly:       opts.MonitorOnly,
-			Cleanup:           opts.Cleanup,
-			NoPull:            opts.NoPull,
-			NoRestart:         opts.NoRestart,
-			RollingRestart:    opts.RollingRestart,
+			MonitorOnly:       opts.BaseParams.MonitorOnly,
+			Cleanup:           opts.BaseParams.Cleanup,
+			NoPull:            opts.BaseParams.NoPull,
+			NoRestart:         opts.BaseParams.NoRestart,
+			RollingRestart:    opts.BaseParams.RollingRestart,
 			IncludeStopped:    opts.IncludeStopped,
 			IncludeRestarting: opts.IncludeRestarting,
-			LifecycleHooks:    opts.LifecycleHooks,
+			LifecycleHooks:    opts.BaseParams.LifecycleHooks,
 			LabelEnable:       opts.LabelEnable,
 			FilterDesc:        opts.FilterDesc,
 			Scope:             opts.Scope,

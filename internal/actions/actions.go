@@ -34,33 +34,23 @@ const (
 	ContainerRemainsRunningMessage = "Container remains running (monitor-only mode)"
 )
 
-// RunUpdatesWithNotificationsParams holds the parameters for RunUpdatesWithNotifications.
+// RunUpdatesWithNotificationsParams holds runtime dependencies and update policy.
+//
+// Update carries the full types.UpdateParams snapshot from config.UpdateParams
+// (or an equivalent complete construction).
 type RunUpdatesWithNotificationsParams struct {
-	Client                       container.Client    // Docker client for container operations
-	Notifier                     types.Notifier      // Notification system for sending update status messages
-	NotificationSplitByContainer bool                // Enable separate notifications for each updated container
-	NotificationReport           bool                // Enable report-based notifications
-	Filter                       types.Filter        // Container filter determining which containers are targeted
-	Cleanup                      bool                // Remove old images after container updates
-	NoRestart                    bool                // Prevent containers from being restarted after updates
-	ReviveStopped                bool                // Start stopped containers after update if true.
-	MonitorOnly                  bool                // Monitor containers without performing updates
-	LifecycleHooks               bool                // Enable pre- and post-update lifecycle hook commands
-	RollingRestart               bool                // Update containers sequentially rather than all at once
-	LabelPrecedence              bool                // Give container label settings priority over global flags
-	NoPull                       bool                // Skip pulling new images from registry during updates
-	Timeout                      time.Duration       // Maximum duration for container stop operations
-	LifecycleUID                 int                 // Default UID to run lifecycle hooks as
-	LifecycleGID                 int                 // Default GID to run lifecycle hooks as
-	CPUCopyMode                  string              // CPU settings handling when recreating containers
-	PullFailureDelay             time.Duration       // Delay after failed Watchtower self-update pulls
-	RunOnce                      bool                // Perform one-time update and exit
-	CurrentContainerID           types.ContainerID   // ID of the current Watchtower container for self-update logic
-	UseComposeDependsOn          bool                // Enable Docker Compose depends_on label processing
-	SkipSelfUpdate               bool                // Skip Watchtower self-update
-	EphemeralSelfUpdate          bool                // Use ephemeral container for self-update if true
-	CooldownDelay                time.Duration       // Minimum time since image creation before allowing updates.
-	EventBroadcaster             *events.Broadcaster // Broadcaster for SSE event streaming
+	// Client is the Docker client for container operations.
+	Client container.Client
+	// Notifier sends update status messages to configured channels.
+	Notifier types.Notifier
+	// NotificationSplitByContainer enables a separate notification per updated container.
+	NotificationSplitByContainer bool
+	// NotificationReport enables report-based notification templates.
+	NotificationReport bool
+	// EventBroadcaster publishes SSE events during the update session.
+	EventBroadcaster *events.Broadcaster
+	// Update is the complete update policy for this invocation (filter, cleanup, timeouts, etc.).
+	Update types.UpdateParams
 }
 
 // RunUpdatesWithNotifications performs container updates and sends notifications about the results.
@@ -80,32 +70,10 @@ func RunUpdatesWithNotifications(
 ) *metrics.Metric {
 	logrus.Debug("Starting RunUpdatesWithNotifications")
 
-	// Initiate notification batching
+	// Initiate notification batching.
 	startNotifications(params.Notifier, params.NotificationSplitByContainer)
 
-	// Configure update parameters based on provided flags
-	updateConfig := types.UpdateParams{
-		Filter:              params.Filter,              // Container filter determining which containers are targeted
-		Cleanup:             params.Cleanup,             // Remove old images after container updates
-		NoRestart:           params.NoRestart,           // Prevent containers from being restarted after updates
-		MonitorOnly:         params.MonitorOnly,         // Monitor containers without performing updates
-		LifecycleHooks:      params.LifecycleHooks,      // Enable pre- and post-update lifecycle hook commands
-		RollingRestart:      params.RollingRestart,      // Update containers sequentially rather than all at once
-		LabelPrecedence:     params.LabelPrecedence,     // Give container label settings priority over global flags
-		NoPull:              params.NoPull,              // Skip pulling new images from registry during updates
-		Timeout:             params.Timeout,             // Maximum duration for container stop operations
-		PullFailureDelay:    params.PullFailureDelay,    // Delay after failed Watchtower self-update pulls
-		LifecycleUID:        params.LifecycleUID,        // Default UID to run lifecycle hooks as
-		LifecycleGID:        params.LifecycleGID,        // Default GID to run lifecycle hooks as
-		CPUCopyMode:         params.CPUCopyMode,         // CPU settings handling when recreating containers
-		RunOnce:             params.RunOnce,             // Perform one-time update and exit
-		CurrentContainerID:  params.CurrentContainerID,  // ID of the current Watchtower container for self-update logic
-		UseComposeDependsOn: params.UseComposeDependsOn, // Enable Docker Compose depends_on label processing
-		SkipSelfUpdate:      params.SkipSelfUpdate,      // Skip Watchtower self-update
-		EphemeralSelfUpdate: params.EphemeralSelfUpdate, // Use ephemeral container for self-update if true
-		CooldownDelay:       params.CooldownDelay,       // Minimum time since image creation before allowing updates
-		ReviveStopped:       params.ReviveStopped,       // Start stopped containers after update if true
-	}
+	updateConfig := params.Update
 
 	// Publish redacted policy flags only to avoid UpdateParams leaking internal IDs.
 	if params.EventBroadcaster != nil {
@@ -156,11 +124,11 @@ func RunUpdatesWithNotifications(
 		return metric
 	}
 
-	// Perform image cleanup if enabled
+	// Perform image cleanup if enabled.
 	cleanedImages := performImageCleanup(
 		ctx,
 		params.Client,
-		params.Cleanup,
+		updateConfig.Cleanup,
 		cleanupImageInfosPtr,
 	)
 

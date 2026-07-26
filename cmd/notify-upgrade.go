@@ -12,6 +12,7 @@ import (
 	"github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
 
+	appconfig "github.com/nicholas-fedor/watchtower/internal/config"
 	"github.com/nicholas-fedor/watchtower/internal/flags"
 	"github.com/nicholas-fedor/watchtower/pkg/notifications"
 )
@@ -67,12 +68,23 @@ func runNotifyUpgrade(cmd *cobra.Command, args []string) {
 //     completes successfully, including cleanup, indicating the notification upgrade process ran without fatal issues.
 //     Non-critical failures (e.g., file removal after timeout) are logged but do not result in an error return.
 func runNotifyUpgradeE(cmd *cobra.Command, _ []string) error {
-	// Process flag aliases to normalize inputs from environment variables or shorthand flags, ensuring consistent configuration.
-	f := cmd.Flags()
-	flags.ProcessFlagAliases(f)
+	// Process flag aliases and expand secrets before resolving configuration.
+	flagSet := cmd.Flags()
 
-	// Initialize the notifier with flag-derived settings, extracting legacy notification configurations into shoutrrr URLs.
-	notifier := notifications.NewNotifier(cmd)
+	err := flags.ApplyEnvToFlags(flagSet, flags.AllSpecs())
+	if err != nil {
+		return fmt.Errorf("apply environment configuration: %w", err)
+	}
+
+	flags.ProcessFlagAliases(flagSet)
+	flags.GetSecretsFromFiles(cmd)
+
+	cfg, loadErr := appconfig.Load(cmd, nil)
+	if loadErr != nil {
+		return fmt.Errorf("load configuration: %w", loadErr)
+	}
+
+	notifier := notifications.NewNotifier(cfg.Notify)
 	urls := notifier.GetURLs()
 
 	// Log the identified notification types (e.g., "email, slack") to inform the user of what configurations are being upgraded.

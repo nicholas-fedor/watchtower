@@ -9,6 +9,7 @@ import (
 	"github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
 
+	notifyConfig "github.com/nicholas-fedor/watchtower/internal/config/notify"
 	"github.com/nicholas-fedor/watchtower/pkg/types"
 )
 
@@ -50,10 +51,10 @@ type emailTypeNotifier struct {
 	delay                  time.Duration   // Delay for batching notifications.
 }
 
-// newEmailNotifier creates an email notifier from command-line flags.
+// newEmailNotifier creates an email notifier from resolved legacy settings.
 //
 // Parameters:
-//   - c: Cobra command with flags.
+//   - legacy: Deprecated email SMTP settings (from process config or flags).
 //
 // Returns:
 //   - types.ConvertibleNotifier: New email notifier instance.
@@ -64,17 +65,15 @@ type emailTypeNotifier struct {
 // TODO: Remove newEmailNotifier for the v2 release.
 //
 //nolint:godox
-func newEmailNotifier(c *cobra.Command) types.ConvertibleNotifier {
-	flags := c.Flags()
-
-	from, _ := flags.GetString("notification-email-from")
-	to, _ := flags.GetString("notification-email-to") //nolint:varnamelen
-	server, _ := flags.GetString("notification-email-server")
-	user, _ := flags.GetString("notification-email-server-user")
-	password, _ := flags.GetString("notification-email-server-password")
-	port, _ := flags.GetInt("notification-email-server-port")
-	tlsSkipVerify, _ := flags.GetBool("notification-email-server-tls-skip-verify")
-	delay, _ := flags.GetInt("notification-email-delay")
+func newEmailNotifier(legacy notifyConfig.Legacy) types.ConvertibleNotifier {
+	from := legacy.EmailFrom
+	to := legacy.EmailTo //nolint:varnamelen
+	server := legacy.EmailServer
+	user := legacy.EmailUser
+	password := legacy.EmailPassword
+	port := legacy.EmailPort
+	tlsSkipVerify := legacy.EmailTLSSkipVerify
+	delay := legacy.EmailDelay
 
 	clog := logrus.WithFields(logrus.Fields{
 		"from":          from,

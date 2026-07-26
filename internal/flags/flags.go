@@ -4,34 +4,32 @@ import (
 	"bufio"
 	"errors"
 	"fmt"
-	"math"
 	"net/url"
 	"os"
-	"regexp"
-	"strconv"
 	"strings"
-	"time"
 
 	"github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
 	"github.com/spf13/viper"
+
+	"github.com/nicholas-fedor/watchtower/internal/flags/api"
+	"github.com/nicholas-fedor/watchtower/internal/flags/client"
+	"github.com/nicholas-fedor/watchtower/internal/flags/compat"
+	"github.com/nicholas-fedor/watchtower/internal/flags/docker"
+	"github.com/nicholas-fedor/watchtower/internal/flags/filter"
+	"github.com/nicholas-fedor/watchtower/internal/flags/lifecycle"
+	"github.com/nicholas-fedor/watchtower/internal/flags/logging"
+	"github.com/nicholas-fedor/watchtower/internal/flags/mode"
+	"github.com/nicholas-fedor/watchtower/internal/flags/notify"
+	"github.com/nicholas-fedor/watchtower/internal/flags/registry"
+	"github.com/nicholas-fedor/watchtower/internal/flags/schedule"
+	"github.com/nicholas-fedor/watchtower/internal/flags/update"
+	"github.com/nicholas-fedor/watchtower/internal/flags/utils"
 )
 
 // DockerAPIMinVersion sets the minimum Docker API version supported by Watchtower.
 const DockerAPIMinVersion string = "1.24"
-
-// defaultPollIntervalSeconds sets the default polling interval (24 hours).
-const defaultPollIntervalSeconds = 86400 // 24 * 60 * 60 seconds
-
-// defaultStopTimeoutSeconds sets the default container stop timeout (30 seconds).
-const defaultStopTimeoutSeconds = 30
-
-// defaultEmailServerPort sets the default SMTP port (25).
-const defaultEmailServerPort = 25
-
-// defaultAPIRateLimitPerMinute sets the default HTTP API rate limit (60 requests per minute per IP).
-const defaultAPIRateLimitPerMinute = 60
 
 // Errors for flag and environment configuration.
 var (
@@ -59,914 +57,59 @@ var (
 
 // RegisterDockerFlags adds Docker API client flags to the root command.
 //
+// Prefer RegisterAll when registering the full flag set.
+//
 // Parameters:
 //   - rootCmd: Root Cobra command.
 func RegisterDockerFlags(rootCmd *cobra.Command) {
-	flags := rootCmd.PersistentFlags()
-	flags.StringP("host", "H", envString("DOCKER_HOST"), "daemon socket to connect to")
-	flags.BoolP("tlsverify", "v", envBool("DOCKER_TLS_VERIFY"), "use TLS and verify the remote")
-	flags.StringP(
-		"api-version",
-		"a",
-		strings.Trim(envString("DOCKER_API_VERSION"), "\""),
-		"api version to use by docker client (omit for autonegotiation)",
-	)
-	flags.StringP("cert-path", "", envString("DOCKER_CERT_PATH"), "Path to TLS certificates")
+	docker.Register(rootCmd)
 }
 
-// RegisterSystemFlags adds Watchtower flow control flags to the root command.
+// RegisterSystemFlags registers non-Docker, non-notification domain flags.
+//
+// Prefer RegisterAll. Kept for tests that call domain groups separately.
 //
 // Parameters:
 //   - rootCmd: Root Cobra command.
 func RegisterSystemFlags(rootCmd *cobra.Command) {
-	flags := rootCmd.PersistentFlags()
-	flags.IntP(
-		"interval",
-		"i",
-		envInt("WATCHTOWER_POLL_INTERVAL"),
-		"Poll interval (in seconds)")
-
-	flags.StringP(
-		"schedule",
-		"s",
-		envString("WATCHTOWER_SCHEDULE"),
-		"The cron expression which defines when to update")
-
-	flags.DurationP(
-		"stop-timeout",
-		"t",
-		envDuration("WATCHTOWER_TIMEOUT"),
-		"Timeout before a container is forcefully stopped (e.g., 30s, 1m, 5m)")
-
-	flags.StringP(
-		"cooldown-delay",
-		"",
-		envString("WATCHTOWER_COOLDOWN_DELAY"),
-		"Minimum time since image creation before allowing updates. Supports h, m, s, d (days), w (weeks), M (months) (e.g., 24h, 3d, 1w, 1M)")
-
-	flags.BoolP(
-		"no-pull",
-		"",
-		envBool("WATCHTOWER_NO_PULL"),
-		"Do not pull any new images")
-
-	flags.BoolP(
-		"no-restart",
-		"",
-		envBool("WATCHTOWER_NO_RESTART"),
-		"Do not restart any containers")
-
-	flags.BoolP(
-		"no-startup-message",
-		"",
-		envBool("WATCHTOWER_NO_STARTUP_MESSAGE"),
-		"Prevents watchtower from sending a startup message")
-
-	flags.BoolP(
-		"cleanup",
-		"c",
-		envBool("WATCHTOWER_CLEANUP"),
-		"Remove previously used images after updating")
-
-	flags.BoolP(
-		"remove-volumes",
-		"",
-		envBool("WATCHTOWER_REMOVE_VOLUMES"),
-		"Remove attached volumes before updating")
-
-	flags.BoolP(
-		"label-enable",
-		"e",
-		envBool("WATCHTOWER_LABEL_ENABLE"),
-		"Watch containers where the com.centurylinklabs.watchtower.enable label is true")
-
-	flags.StringSliceP(
-		"disable-containers",
-		"x",
-		filterEmptyStrings(
-			regexp.MustCompile("[, ]+").Split(envString("WATCHTOWER_DISABLE_CONTAINERS"), -1),
-		),
-		"Comma-separated list of containers to explicitly exclude from watching.")
-
-	flags.StringSlice(
-		"monitor-image-names",
-		filterEmptyStrings(
-			regexp.MustCompile("[, ]+").Split(envString("WATCHTOWER_MONITOR_IMAGE_NAMES"), -1),
-		),
-		"Comma-separated list of image names to monitor.")
-
-	flags.StringSlice(
-		"skip-image-names",
-		filterEmptyStrings(
-			regexp.MustCompile("[, ]+").Split(envString("WATCHTOWER_SKIP_IMAGE_NAMES"), -1),
-		),
-		"Comma-separated list of image names to explicitly exclude from monitoring.")
-
-	flags.StringSlice(
-		"enable-containers-by-label",
-		filterEmptyStrings(
-			regexp.MustCompile(",").Split(envString("WATCHTOWER_ENABLE_CONTAINERS_BY_LABEL"), -1),
-		),
-		"Comma-separated list of key=value label pairs to restrict monitoring to matching containers.")
-
-	flags.StringSlice(
-		"disable-containers-by-label",
-		filterEmptyStrings(
-			regexp.MustCompile(",").Split(envString("WATCHTOWER_DISABLE_CONTAINERS_BY_LABEL"), -1),
-		),
-		"Comma-separated list of key=value label pairs to exclude matching containers from monitoring.")
-
-	flags.StringP(
-		"log-format",
-		"l",
-		viper.GetString("WATCHTOWER_LOG_FORMAT"),
-		"Sets what logging format to use for console output. Possible values: Auto, LogFmt, Pretty, JSON",
-	)
-
-	flags.BoolP(
-		"debug",
-		"d",
-		envBool("WATCHTOWER_DEBUG"),
-		"Enable debug mode with verbose logging")
-
-	flags.BoolP(
-		"trace",
-		"",
-		envBool("WATCHTOWER_TRACE"),
-		"Enable trace mode with very verbose logging - caution, exposes credentials")
-
-	flags.BoolP(
-		"monitor-only",
-		"m",
-		envBool("WATCHTOWER_MONITOR_ONLY"),
-		"Will only monitor for new images, not update the containers")
-
-	flags.BoolP(
-		"run-once",
-		"R",
-		envBool("WATCHTOWER_RUN_ONCE"),
-		"Run once now and exit")
-
-	flags.BoolP(
-		"update-on-start",
-		"",
-		envBool("WATCHTOWER_UPDATE_ON_START"),
-		"Perform an update check on startup, then continue with periodic updates")
-
-	flags.BoolP(
-		"include-restarting",
-		"",
-		envBool("WATCHTOWER_INCLUDE_RESTARTING"),
-		"Will also include restarting containers")
-
-	flags.BoolP(
-		"include-stopped",
-		"S",
-		envBool("WATCHTOWER_INCLUDE_STOPPED"),
-		"Will also include created and exited containers")
-
-	flags.BoolP(
-		"revive-stopped",
-		"",
-		envBool("WATCHTOWER_REVIVE_STOPPED"),
-		"Will also start stopped containers that were updated, if include-stopped is active")
-
-	flags.BoolP(
-		"enable-lifecycle-hooks",
-		"",
-		envBool("WATCHTOWER_LIFECYCLE_HOOKS"),
-		"Enable the execution of commands triggered by pre- and post-update lifecycle hooks")
-
-	flags.BoolP(
-		"rolling-restart",
-		"",
-		envBool("WATCHTOWER_ROLLING_RESTART"),
-		"Restart containers one at a time")
-
-	flags.StringSliceP(
-		"http-api-endpoints",
-		"",
-		filterEmptyStrings(
-			regexp.MustCompile("[, ]+").Split(envString("WATCHTOWER_HTTP_API_ENDPOINTS"), -1),
-		),
-		"HTTP API endpoints to enable (health, update, metrics, containers, check, history, images, config, events, swagger), or \"all\". Comma- or space-separated. Empty disables the HTTP API.")
-
-	//nolint:godox
-	// TODO: Remove legacy HTTP API enable flags below for the v2 release.
-	// They are kept for backwards compatibility but are deprecated.
-	// Use http-api-endpoints instead.
-
-	flags.BoolP(
-		"http-api-update",
-		"",
-		envBool("WATCHTOWER_HTTP_API_UPDATE"),
-		"Runs Watchtower in HTTP API mode, so that image updates must be triggered by a request")
-	flags.BoolP(
-		"http-api-metrics",
-		"",
-		envBool("WATCHTOWER_HTTP_API_METRICS"),
-		"Runs Watchtower with the Prometheus metrics API enabled")
-	flags.BoolP(
-		"http-api-containers",
-		"",
-		envBool("WATCHTOWER_HTTP_API_CONTAINERS"),
-		"Runs Watchtower with the read-only containers API enabled, exposing each watched container's current image digest")
-
-	//nolint:godox
-	// TODO: Remove just before v2 Release.
-	// Mark legacy HTTP API enable flags as deprecated.
-	// These flags are still functional but will be removed in the v2 release.
-	// Users should migrate to use the http-api-endpoints configuration option instead.
-	markFlagDeprecated(flags, "http-api-update", "Use the http-api-endpoints configuration option instead.")
-	markFlagDeprecated(flags, "http-api-metrics", "Use the http-api-endpoints configuration option instead.")
-	markFlagDeprecated(flags, "http-api-containers", "Use the http-api-endpoints configuration option instead.")
-
-	flags.StringP(
-		"http-api-host",
-		"",
-		envString("WATCHTOWER_HTTP_API_HOST"),
-		"Host to bind the HTTP API to (default: empty, binds to all interfaces; allows empty or valid IP address)",
-	)
-
-	flags.StringP(
-		"http-api-port",
-		"",
-		envString("WATCHTOWER_HTTP_API_PORT"),
-		"Port to bind the HTTP API to (default: 8080)")
-
-	flags.StringP(
-		"http-api-token",
-		"",
-		envString("WATCHTOWER_HTTP_API_TOKEN"),
-		"Sets an authentication token for HTTP API requests (required when any non-health endpoint is enabled)")
-
-	flags.StringP(
-		"http-api-events-token",
-		"",
-		envString("WATCHTOWER_HTTP_API_EVENTS_TOKEN"),
-		"Sets an authentication token for the events SSE endpoint. Required when the events endpoint is enabled. Supports Bearer header and query parameter access_token (for browser EventSource)")
-
-	flags.BoolP(
-		"http-api-periodic-polls",
-		"",
-		envBool("WATCHTOWER_HTTP_API_PERIODIC_POLLS"),
-		"Also run periodic updates (specified with --interval and --schedule) if HTTP API is enabled",
-	)
-
-	flags.IntP(
-		"http-api-rate-limit",
-		"",
-		envInt("WATCHTOWER_HTTP_API_RATE_LIMIT"),
-		"Maximum authentication requests per minute per IP address for the HTTP API (default: 60)",
-	)
-
-	flags.StringP(
-		"http-api-tls-cert",
-		"",
-		envString("WATCHTOWER_HTTP_API_TLS_CERT"),
-		"Path to TLS certificate file for the HTTP API")
-
-	flags.StringP(
-		"http-api-tls-key",
-		"",
-		envString("WATCHTOWER_HTTP_API_TLS_KEY"),
-		"Path to TLS key file for the HTTP API")
-
-	flags.StringSliceP(
-		"http-api-trusted-proxies",
-		"",
-		filterEmptyStrings(
-			regexp.MustCompile("[, ]+").Split(envString("WATCHTOWER_HTTP_API_TRUSTED_PROXIES"), -1),
-		),
-		"Comma-separated list of trusted proxy IP addresses or CIDR ranges for reverse proxy support (e.g. 10.0.0.0/8,172.16.0.0/12). When set, enables proxy header processing for client IP and scheme detection",
-	)
-
-	flags.StringP(
-		"http-api-proxy-header",
-		"",
-		envString("WATCHTOWER_HTTP_API_PROXY_HEADER"),
-		"Header to use for real client IP when behind a reverse proxy (default: X-Forwarded-For). Only used when http-api-trusted-proxies is set")
-
-	flags.StringSliceP(
-		"http-api-cors-origins",
-		"",
-		filterEmptyStrings(
-			regexp.MustCompile("[, ]+").Split(envString("WATCHTOWER_HTTP_API_CORS_ORIGINS"), -1),
-		),
-		"Comma-separated list of allowed CORS origins for cross-origin requests (e.g. https://app.example.com). If unset, CORS is disabled and only same-origin requests are allowed.")
-
-	flags.DurationP(
-		"http-api-check-timeout",
-		"",
-		envDuration("WATCHTOWER_HTTP_API_CHECK_TIMEOUT"),
-		"Maximum duration for the /v1/check API endpoint (e.g. 30s, 2m, 5m). Default: 5m",
-	)
-
-	flags.DurationP(
-		"http-api-update-timeout",
-		"",
-		envDuration("WATCHTOWER_HTTP_API_UPDATE_TIMEOUT"),
-		"Maximum duration for the /v1/update API endpoint (e.g. 1m, 10m, 30m). Default: 10m",
-	)
-
-	// https://no-color.org/
-	flags.BoolP(
-		"no-color",
-		"",
-		viper.IsSet("NO_COLOR"),
-		"Disable ANSI color escape codes in log output")
-
-	flags.StringP(
-		"scope",
-		"",
-		envString("WATCHTOWER_SCOPE"),
-		"Defines a monitoring scope for the Watchtower instance.")
-
-	flags.StringP(
-		"porcelain",
-		"P",
-		envString("WATCHTOWER_PORCELAIN"),
-		`Write session results to stdout using a stable versioned format. Supported values: "v1"`)
-
-	flags.String(
-		"log-level",
-		envString("WATCHTOWER_LOG_LEVEL"),
-		"The maximum log level that will be written to STDERR. Possible values: panic, fatal, error, warn, info, debug or trace",
-	)
-
-	flags.BoolP(
-		"health-check",
-		"",
-		false,
-		"Do health check and exit")
-
-	flags.BoolP(
-		"label-take-precedence",
-		"",
-		envBool("WATCHTOWER_LABEL_TAKE_PRECEDENCE"),
-		"Label applied to containers take precedence over arguments")
-
-	flags.BoolP(
-		"use-compose-depends-on",
-		"",
-		envBool("WATCHTOWER_USE_COMPOSE_DEPENDS_ON"),
-		"Include Docker Compose depends_on label when determining container update order")
-
-	flags.BoolP(
-		"disable-memory-swappiness",
-		"",
-		envBool("WATCHTOWER_DISABLE_MEMORY_SWAPPINESS"),
-		"Label used for setting memory swappiness as nil when recreating the container, used for compatibility with podman",
-	)
-
-	flags.StringP(
-		"cpu-copy-mode",
-		"",
-		envString("WATCHTOWER_CPU_COPY_MODE"),
-		"CPU copy mode for container recreation, used for compatibility with Podman. Options: auto, full, none",
-	)
-
-	flags.BoolP(
-		"ephemeral-self-update",
-		"",
-		envBool("WATCHTOWER_EPHEMERAL_SELF_UPDATE"),
-		"Use an ephemeral container to orchestrate Watchtower self-updates (experimental)",
-	)
-
-	flags.Bool(
-		"self-update-orchestrator",
-		false,
-		"Internal: Run as ephemeral orchestrator for self-update (not for direct use)",
-	)
-	// Hide the orchestrator flag from help output since it's internal.
-	err := flags.MarkHidden("self-update-orchestrator")
-	if err != nil {
-		logrus.WithError(err).Debug("Failed to hide self-update-orchestrator flag")
-	}
-
-	flags.IntP(
-		"lifecycle-uid",
-		"",
-		envInt("WATCHTOWER_LIFECYCLE_UID"),
-		"Default UID to run lifecycle hooks as (can be overridden by container labels)",
-	)
-
-	flags.IntP(
-		"lifecycle-gid",
-		"",
-		envInt("WATCHTOWER_LIFECYCLE_GID"),
-		"Default GID to run lifecycle hooks as (can be overridden by container labels)",
-	)
-
-	flags.Bool(
-		"registry-tls-skip",
-		envBool("WATCHTOWER_REGISTRY_TLS_SKIP"),
-		"Disable TLS verification for registry connections; allows HTTP or insecure TLS registries (use with caution)",
-	)
-	viper.MustBindEnv("WATCHTOWER_REGISTRY_TLS_SKIP")
-
-	flags.String(
-		"registry-tls-min-version",
-		envString("WATCHTOWER_REGISTRY_TLS_MIN_VERSION"),
-		"Minimum TLS version for registry connections (e.g., TLS1.0, TLS1.1, TLS1.2, TLS1.3); default is TLS1.2",
-	)
-	viper.MustBindEnv("WATCHTOWER_REGISTRY_TLS_MIN_VERSION")
+	client.Register(rootCmd)
+	schedule.Register(rootCmd)
+	mode.Register(rootCmd)
+	update.Register(rootCmd)
+	lifecycle.Register(rootCmd)
+	filter.Register(rootCmd)
+	registry.Register(rootCmd)
+	compat.Register(rootCmd)
+	api.Register(rootCmd)
+	logging.Register(rootCmd)
 }
 
 // RegisterNotificationFlags adds notification flags to the root command.
 //
+// Prefer RegisterAll when registering the full flag set.
+//
 // Parameters:
 //   - rootCmd: Root Cobra command.
 func RegisterNotificationFlags(rootCmd *cobra.Command) {
-	flags := rootCmd.PersistentFlags()
-
-	flags.StringArray(
-		"notification-url",
-		filterEmptyStrings(splitNotificationValues(envString("WATCHTOWER_NOTIFICATION_URL"))),
-		"The shoutrrr URL to send notifications to",
-	)
-
-	flags.String(
-		"notifications-level",
-		envString("WATCHTOWER_NOTIFICATIONS_LEVEL"),
-		"The log level used for sending notifications. Possible values: panic, fatal, error, warn, info or debug",
-	)
-
-	flags.IntP(
-		"notifications-delay",
-		"",
-		envInt("WATCHTOWER_NOTIFICATIONS_DELAY"),
-		"Delay before sending notifications, expressed in seconds")
-
-	flags.StringP(
-		"notifications-hostname",
-		"",
-		envString("WATCHTOWER_NOTIFICATIONS_HOSTNAME"),
-		"Custom hostname for notification titles")
-
-	flags.String(
-		"notification-template",
-		envString("WATCHTOWER_NOTIFICATION_TEMPLATE"),
-		"The shoutrrr text/template for the messages")
-
-	flags.String(
-		"notification-template-file",
-		envString("WATCHTOWER_NOTIFICATION_TEMPLATE_FILE"),
-		"Path to a file containing the Shoutrrr text/template for the messages")
-
-	flags.Bool("notification-report",
-		envBool("WATCHTOWER_NOTIFICATION_REPORT"),
-		"Use the session report as the notification template data")
-
-	flags.StringP(
-		"notification-title-tag",
-		"",
-		envString("WATCHTOWER_NOTIFICATION_TITLE_TAG"),
-		"Title prefix tag for notifications")
-
-	flags.Bool("notification-skip-title",
-		envBool("WATCHTOWER_NOTIFICATION_SKIP_TITLE"),
-		"Do not pass the title param to notifications")
-
-	flags.String(
-		"warn-on-head-failure",
-		envString("WATCHTOWER_WARN_ON_HEAD_FAILURE"),
-		"When to warn about HEAD pull requests failing. Possible values: always, auto or never")
-
-	flags.Bool(
-		"notification-log-stdout",
-		envBool("WATCHTOWER_NOTIFICATION_LOG_STDOUT"),
-		"Write notification logs to stdout instead of logging (to stderr)")
-
-	flags.BoolP(
-		"notification-split-by-container",
-		"",
-		envBool("WATCHTOWER_NOTIFICATION_SPLIT_BY_CONTAINER"),
-		"Send separate notifications for each updated container instead of grouping them")
-
-	//nolint:godox
-	// TODO: Remove legacy notification flags below for the v2 release.
-	// They are kept for backwards compatibility but are deprecated.
-	// Use --notification-url instead.
-
-	flags.StringSliceP(
-		"notifications",
-		"n",
-		filterEmptyStrings(
-			regexp.MustCompile("[, ]+").Split(envString("WATCHTOWER_NOTIFICATIONS"), -1),
-		),
-		"Notification types to send [legacy types (email, slack, msteams, gotify).",
-	)
-
-	flags.StringP(
-		"notification-email-from",
-		"",
-		envString("WATCHTOWER_NOTIFICATION_EMAIL_FROM"),
-		"Address to send notification emails from")
-
-	flags.StringP(
-		"notification-email-to",
-		"",
-		envString("WATCHTOWER_NOTIFICATION_EMAIL_TO"),
-		"Address to send notification emails to")
-
-	flags.IntP(
-		"notification-email-delay",
-		"",
-		envInt("WATCHTOWER_NOTIFICATION_EMAIL_DELAY"),
-		"Delay before sending notifications, expressed in seconds")
-
-	flags.StringP(
-		"notification-email-server",
-		"",
-		envString("WATCHTOWER_NOTIFICATION_EMAIL_SERVER"),
-		"SMTP server to send notification emails through")
-
-	flags.IntP(
-		"notification-email-server-port",
-		"",
-		envInt("WATCHTOWER_NOTIFICATION_EMAIL_SERVER_PORT"),
-		"SMTP server port to send notification emails through")
-
-	flags.BoolP(
-		"notification-email-server-tls-skip-verify",
-		"",
-		envBool("WATCHTOWER_NOTIFICATION_EMAIL_SERVER_TLS_SKIP_VERIFY"),
-		"Controls whether watchtower verifies the SMTP server's certificate chain and host name. Should only be used for testing.",
-	)
-
-	flags.StringP(
-		"notification-email-server-user",
-		"",
-		envString("WATCHTOWER_NOTIFICATION_EMAIL_SERVER_USER"),
-		"SMTP server user for sending notifications")
-
-	flags.StringP(
-		"notification-email-server-password",
-		"",
-		envString("WATCHTOWER_NOTIFICATION_EMAIL_SERVER_PASSWORD"),
-		"SMTP server password for sending notifications")
-
-	flags.StringP(
-		"notification-email-subjecttag",
-		"",
-		envString("WATCHTOWER_NOTIFICATION_EMAIL_SUBJECTTAG"),
-		"Subject prefix tag for notifications via mail")
-
-	flags.StringP(
-		"notification-slack-hook-url",
-		"",
-		envString("WATCHTOWER_NOTIFICATION_SLACK_HOOK_URL"),
-		"The Slack Hook URL to send notifications to")
-
-	flags.StringP(
-		"notification-slack-identifier",
-		"",
-		envString("WATCHTOWER_NOTIFICATION_SLACK_IDENTIFIER"),
-		"A string which will be used to identify the messages coming from this watchtower instance")
-
-	flags.StringP(
-		"notification-slack-channel",
-		"",
-		envString("WATCHTOWER_NOTIFICATION_SLACK_CHANNEL"),
-		"A string which overrides the webhook's default channel. Example: #my-custom-channel")
-
-	flags.StringP(
-		"notification-slack-icon-emoji",
-		"",
-		envString("WATCHTOWER_NOTIFICATION_SLACK_ICON_EMOJI"),
-		"An emoji code string to use in place of the default icon")
-
-	flags.StringP(
-		"notification-slack-icon-url",
-		"",
-		envString("WATCHTOWER_NOTIFICATION_SLACK_ICON_URL"),
-		"An icon image URL string to use in place of the default icon")
-
-	flags.StringP(
-		"notification-msteams-hook",
-		"",
-		envString("WATCHTOWER_NOTIFICATION_MSTEAMS_HOOK_URL"),
-		"The MSTeams WebHook URL to send notifications to")
-
-	flags.StringP(
-		"notification-gotify-url",
-		"",
-		envString("WATCHTOWER_NOTIFICATION_GOTIFY_URL"),
-		"The Gotify URL to send notifications to")
-
-	flags.StringP(
-		"notification-gotify-token",
-		"",
-		envString("WATCHTOWER_NOTIFICATION_GOTIFY_TOKEN"),
-		"The Gotify Application required to query the Gotify API")
-
-	flags.BoolP(
-		"notification-gotify-tls-skip-verify",
-		"",
-		envBool("WATCHTOWER_NOTIFICATION_GOTIFY_TLS_SKIP_VERIFY"),
-		"Controls whether watchtower verifies the Gotify server's certificate chain and host name. Should only be used for testing.",
-	)
-
-	//nolint:godox
-	// TODO: Remove just before v2 Release.
-	// Mark legacy notification flags as deprecated.
-	// These flags are still functional but will be removed in the v2 release.
-	// Users should migrate to --notification-url instead.
-	markFlagDeprecated(flags, "notification-email-from", "Use --notification-url with an smtp:// URL.")
-	markFlagDeprecated(flags, "notification-email-to", "Use --notification-url with an smtp:// URL.")
-	markFlagDeprecated(flags, "notification-email-delay", "Use --notifications-delay instead.")
-	markFlagDeprecated(flags, "notification-email-server", "Use --notification-url with an smtp:// URL.")
-	markFlagDeprecated(flags, "notification-email-server-port", "Use --notification-url with an smtp:// URL.")
-	markFlagDeprecated(flags, "notification-email-server-tls-skip-verify", "Use --notification-url with an smtp:// URL.")
-	markFlagDeprecated(flags, "notification-email-server-user", "Use --notification-url with an smtp:// URL.")
-	markFlagDeprecated(flags, "notification-email-server-password", "Use --notification-url with an smtp:// URL.")
-	markFlagDeprecated(flags, "notification-email-subjecttag", "Use --notification-title-tag instead.")
-	markFlagDeprecated(flags, "notification-slack-hook-url", "Use --notification-url with a slack:// or discord:// URL.")
-	markFlagDeprecated(flags, "notification-slack-identifier", "Use --notification-url with a slack:// or discord:// URL.")
-	markFlagDeprecated(flags, "notification-slack-channel", "Use --notification-url with a slack:// or discord:// URL.")
-	markFlagDeprecated(flags, "notification-slack-icon-emoji", "Use --notification-url with a slack:// or discord:// URL.")
-	markFlagDeprecated(flags, "notification-slack-icon-url", "Use --notification-url with a slack:// or discord:// URL.")
-	markFlagDeprecated(flags, "notification-msteams-hook", "Use --notification-url with a teams:// URL.")
-	markFlagDeprecated(flags, "notification-gotify-url", "Use --notification-url with a gotify:// URL.")
-	markFlagDeprecated(flags, "notification-gotify-token", "Use --notification-url with a gotify:// URL.")
-	markFlagDeprecated(flags, "notification-gotify-tls-skip-verify", "Use --notification-url with a gotify:// URL.")
-	markFlagDeprecated(flags, "notifications", "Use --notification-url with the appropriate Shoutrrr URL scheme instead.")
+	notify.Register(rootCmd)
 }
 
-// markFlagDeprecated marks a pflag as deprecated with a migration hint.
-//
-// Parameters:
-//   - flags: Flag set containing the flag.
-//   - name: Flag name.
-//   - hint: Migration hint message.
-//
-// TODO: Remove markFlagDeprecated and all legacy flags in the v2 release.
-//
-//nolint:godox
-func markFlagDeprecated(flags *pflag.FlagSet, name, hint string) {
-	if f := flags.Lookup(name); f != nil {
-		f.Deprecated = hint
-		f.Hidden = false // Keep visible so users see the hint in --help
-	}
+// filterEmptyStrings is a package-local alias for utils.FilterEmptyStrings (tests).
+func filterEmptyStrings(values []string) []string {
+	return utils.FilterEmptyStrings(values)
 }
 
-// Parameters:
-//   - key: Environment variable key.
-//
-// Returns:
-//   - string: Value or empty if unset.
-func envString(key string) string {
-	viper.MustBindEnv(key)
-
-	return viper.GetString(key)
-}
-
-// envInt fetches an integer from an environment variable.
-//
-// Parameters:
-//   - key: Environment variable key.
-//
-// Returns:
-//   - int: Value or 0 if unset.
-func envInt(key string) int {
-	viper.MustBindEnv(key)
-
-	return viper.GetInt(key)
-}
-
-// envBool fetches a boolean from an environment variable.
-//
-// Parameters:
-//   - key: Environment variable key.
-//
-// Returns:
-//   - bool: Value or false if unset.
-func envBool(key string) bool {
-	viper.MustBindEnv(key)
-
-	return viper.GetBool(key)
-}
-
-// envDuration fetches a duration from an environment variable.
-//
-// Bare values without a time unit are treated as seconds.
-//
-// Parameters:
-//   - key: Environment variable key.
-//
-// Returns:
-//   - time.Duration: Value or 0 if unset.
-func envDuration(key string) time.Duration {
-	viper.MustBindEnv(key)
-
-	// Check the raw env var so bare numbers are treated as seconds before
-	// viper/cast turns them into nanoseconds.
-	if raw := os.Getenv(key); raw != "" {
-		trimmed := strings.TrimSpace(raw)
-		if isPureNumeric(trimmed) {
-			val, err := strconv.ParseFloat(trimmed, 64)
-			if err == nil {
-				nanos := val * float64(time.Second)
-
-				if nanos > float64(math.MaxInt64) {
-					return time.Duration(math.MaxInt64)
-				}
-
-				if nanos < float64(math.MinInt64) {
-					return time.Duration(math.MinInt64)
-				}
-
-				return time.Duration(nanos)
-			}
-		}
-	}
-
-	return viper.GetDuration(key)
-}
-
-// isPureNumeric reports whether str is a bare number (integer or float,
-// possibly signed) with no duration unit characters.
+// isPureNumeric reports whether str is a bare number (tests and env duration helpers).
 func isPureNumeric(str string) bool {
-	if str == "" {
-		return false
-	}
-
-	sawDigit := false
-	sawDot := false
-
-	for i, char := range str {
-		switch {
-		case char >= '0' && char <= '9':
-			sawDigit = true
-		case char == '.':
-			if sawDot {
-				return false
-			}
-
-			sawDot = true
-		case char == '-' || char == '+':
-			if i != 0 {
-				return false
-			}
-		default:
-			return false
-		}
-	}
-
-	return sawDigit
+	return utils.IsPureNumeric(str)
 }
 
-// filterEmptyStrings removes empty or whitespace-only strings from a slice.
+// SetDefaults enables automatic environment lookup on the global Viper instance.
 //
-// Parameters:
-//   - ss: Slice of strings.
-//
-// Returns:
-//   - []string: Filtered slice without empty or whitespace-only strings.
-func filterEmptyStrings(ss []string) []string {
-	var res []string
-
-	for _, s := range ss {
-		if strings.TrimSpace(s) != "" {
-			res = append(res, s)
-		}
-	}
-
-	return res
-}
-
-// splitNotificationValues parses a string containing notification URLs separated by commas or spaces.
-//
-// Parameters:
-//   - value: A string containing one or more notification URLs separated by commas or spaces.
-//
-// Returns:
-//   - []string: A slice of parsed notification URLs. Invalid URLs are included in the result but logged as warnings.
-func splitNotificationValues(value string) []string {
-	// Define delimiter types to track how parts were separated (comma or space)
-	type delimiterType int
-
-	const (
-		delimiterComma delimiterType = iota
-		delimiterSpace
-	)
-
-	// Struct to hold a part and its delimiter type
-	type splitPart struct {
-		text      string
-		delimiter delimiterType
-	}
-
-	// Manual scanner to split on commas and spaces, tracking delimiter types
-	// Prepare variables for the manual scanning process
-	var (
-		parts   []splitPart
-		current strings.Builder
-	)
-
-	lastDelimiter := delimiterSpace // Default for first part
-
-	// Scan the input string character by character to identify delimiters and build parts
-	for _, char := range value {
-		switch char {
-		case ',':
-			// Encountered comma: finalize current part and set delimiter to comma
-			if current.Len() > 0 {
-				parts = append(parts, splitPart{text: current.String(), delimiter: lastDelimiter})
-				current.Reset()
-			}
-
-			lastDelimiter = delimiterComma
-		case ' ':
-			// Encountered space: finalize current part and set delimiter to space
-			// Note: consecutive spaces are handled by trimming later
-			if current.Len() > 0 {
-				parts = append(parts, splitPart{text: current.String(), delimiter: lastDelimiter})
-				current.Reset()
-			}
-
-			lastDelimiter = delimiterSpace
-		default:
-			// Append non-delimiter character to current part
-			current.WriteRune(char)
-		}
-	}
-
-	// Add the last part if any
-	if current.Len() > 0 {
-		parts = append(parts, splitPart{text: current.String(), delimiter: lastDelimiter})
-	}
-
-	// Process parts: trim spaces and handle recombination
-	// Initialize result slice to hold processed parts
-	var result []string
-
-	// Iterate through each split part to trim whitespace and apply recombination logic
-	for _, part := range parts {
-		part.text = strings.TrimSpace(part.text)
-		if part.text == "" {
-			continue
-		}
-
-		// Recombination logic: only for comma delimiters
-		// Conditionally recombine comma-delimited parts that don't contain '://'
-		// (indicating not a complete URL) with the previous part
-		if part.delimiter == delimiterComma && len(result) > 0 &&
-			!strings.Contains(part.text, "://") {
-			result[len(result)-1] = result[len(result)-1] + "," + part.text
-		} else {
-			result = append(result, part.text)
-		}
-	}
-
-	// Validate URLs and log warnings for invalid ones
-	// Prepare final result slice with capacity for all results
-	final := make([]string, 0, len(result))
-	// Validate each URL string using net/url.Parse
-	for _, urlStr := range result {
-		_, err := url.Parse(urlStr)
-		if err != nil {
-			logrus.Warnf("Invalid notification URL '%s': %v", urlStr, err)
-		}
-
-		final = append(final, urlStr)
-	}
-
-	return final
-}
-
-// SetDefaults sets default environment variable values.
-//
-// It configures fallback values for unset flags.
-//
-//nolint:godox
+// Flag static defaults and process Load bind live on FlagSpec rows. This remains
+// for tests and helpers that still touch the global Viper (for example EnvDuration).
 func SetDefaults() {
 	viper.AutomaticEnv()
-	viper.SetDefault("DOCKER_HOST", "unix:///var/run/docker.sock")
-	viper.SetDefault("WATCHTOWER_POLL_INTERVAL", defaultPollIntervalSeconds)
-	viper.SetDefault("WATCHTOWER_TIMEOUT", time.Second*defaultStopTimeoutSeconds)
-	viper.SetDefault("WATCHTOWER_COOLDOWN_DELAY", "")
-	viper.SetDefault("WATCHTOWER_HTTP_API_HOST", "")
-	viper.SetDefault("WATCHTOWER_HTTP_API_PORT", "8080")
-	viper.SetDefault("WATCHTOWER_HTTP_API_RATE_LIMIT", defaultAPIRateLimitPerMinute)
-	// TODO: Remove just before v2 Release.
-	viper.SetDefault("WATCHTOWER_NOTIFICATIONS", []string{})
-	viper.SetDefault("WATCHTOWER_NOTIFICATIONS_LEVEL", "info")
-	// TODO: Remove just before v2 Release.
-	viper.SetDefault("WATCHTOWER_NOTIFICATION_EMAIL_SERVER_PORT", defaultEmailServerPort)
-	// TODO: Remove just before v2 Release.
-	viper.SetDefault("WATCHTOWER_NOTIFICATION_EMAIL_SUBJECTTAG", "")
-	// TODO: Remove just before v2 Release.
-	viper.SetDefault("WATCHTOWER_NOTIFICATION_SLACK_IDENTIFIER", "watchtower")
-	// TODO: Remove just before v2 Release.
-	viper.SetDefault("WATCHTOWER_LOG_LEVEL", "info")
-	viper.SetDefault("WATCHTOWER_LOG_FORMAT", "auto")
-	viper.SetDefault("WATCHTOWER_DISABLE_MEMORY_SWAPPINESS", false)
-	viper.SetDefault("WATCHTOWER_CPU_COPY_MODE", "auto")
-	viper.SetDefault("WATCHTOWER_USE_COMPOSE_DEPENDS_ON", true)
-	viper.SetDefault("WATCHTOWER_REGISTRY_TLS_SKIP", false)
-	viper.SetDefault("WATCHTOWER_REGISTRY_TLS_MIN_VERSION", "TLS1.2")
 }
 
 // EnvConfig sets Docker environment variables from flags.
@@ -977,45 +120,27 @@ func SetDefaults() {
 // Returns:
 //   - error: Non-nil if flag retrieval fails, nil on success.
 func EnvConfig(cmd *cobra.Command) error {
-	flags := cmd.PersistentFlags()
+	flagSet := cmd.PersistentFlags()
 
-	// Fetch Docker flags.
-	host, err := flags.GetString("host")
+	// Resolve Docker settings via Viper (flag > env > static default) after BindAll.
+	vip := viper.New()
+
+	err := BindAll(vip, flagSet, docker.Specs())
 	if err != nil {
-		logrus.WithError(err).WithField("flag", "host").Debug("Failed to get host flag")
-
-		return fmt.Errorf("%w: %w", errSetFlagFailed, err)
+		return fmt.Errorf("bind docker flags: %w", err)
 	}
 
-	tls, err := flags.GetBool("tlsverify")
-	if err != nil {
-		logrus.WithError(err).WithField("flag", "tlsverify").Debug("Failed to get tlsverify flag")
+	host := vip.GetString("host")
+	tls := vip.GetBool("tlsverify")
+	version := strings.Trim(vip.GetString("api-version"), "\"")
+	certPath := vip.GetString("cert-path")
 
-		return fmt.Errorf("%w: %w", errSetFlagFailed, err)
-	}
-
-	version, err := flags.GetString("api-version")
-	if err != nil {
-		logrus.WithError(err).
-			WithField("flag", "api-version").
-			Debug("Failed to get api-version flag")
-
-		return fmt.Errorf("%w: %w", errSetFlagFailed, err)
-	}
-
-	certPath, err := flags.GetString("cert-path")
-	if err != nil {
-		logrus.WithError(err).WithField("flag", "cert-path").Debug("Failed to get cert-path flag")
-
-		return fmt.Errorf("%w: %w", errSetFlagFailed, err)
-	}
-
-	// Convert tcp:// to https:// when TLS is enabled
+	// Convert tcp:// to https:// when TLS is enabled.
 	if tls && strings.HasPrefix(host, "tcp://") {
 		host = strings.Replace(host, "tcp://", "https://", 1)
 	}
 
-	// Warn about mismatched TLS settings
+	// Warn about mismatched TLS settings.
 	if tls {
 		if strings.HasPrefix(host, "http://") {
 			logrus.Warn(
@@ -1057,58 +182,6 @@ func EnvConfig(cmd *cobra.Command) error {
 	}).Debug("Configured Docker environment variables")
 
 	return nil
-}
-
-// ReadFlags retrieves key operational flags.
-//
-// Parameters:
-//   - cmd: Cobra command with flags.
-//
-// Returns:
-//   - bool: Cleanup setting.
-//   - bool: No-restart setting.
-//   - bool: Monitor-only setting.
-//   - time.Duration: Stop timeout.
-func ReadFlags(cmd *cobra.Command) (bool, bool, bool, time.Duration) {
-	flags := cmd.PersistentFlags()
-
-	// Fetch flags, fatal on error.
-	cleanup, err := flags.GetBool("cleanup")
-	if err != nil {
-		logrus.WithField("flag", "cleanup").
-			WithError(err).
-			Fatal("Failed to get cleanup flag")
-	}
-
-	noRestart, err := flags.GetBool("no-restart")
-	if err != nil {
-		logrus.WithField("flag", "no-restart").
-			WithError(err).
-			Fatal("Failed to get no-restart flag")
-	}
-
-	monitorOnly, err := flags.GetBool("monitor-only")
-	if err != nil {
-		logrus.WithField("flag", "monitor-only").
-			WithError(err).
-			Fatal("Failed to get monitor-only flag")
-	}
-
-	timeout, err := flags.GetDuration("stop-timeout")
-	if err != nil {
-		logrus.WithField("flag", "stop-timeout").
-			WithError(err).
-			Fatal("Failed to get stop-timeout flag")
-	}
-
-	logrus.WithFields(logrus.Fields{
-		"cleanup":      cleanup,
-		"no_restart":   noRestart,
-		"monitor_only": monitorOnly,
-		"timeout":      timeout,
-	}).Debug("Retrieved operational flags")
-
-	return cleanup, noRestart, monitorOnly, timeout
 }
 
 // setEnvOptStr sets an environment variable if needed.
@@ -1322,11 +395,21 @@ func isFilePath(path string) bool {
 	return !errors.Is(err, os.ErrNotExist)
 }
 
-// ProcessFlagAliases syncs flag values based on aliases.
+// ProcessFlagAliases applies environment values then syncs flag aliases.
+//
+// It bridges env onto unset flags, then applies porcelain mode, interval versus
+// schedule conflicts, and debug/trace log-level forcing. Call after Cobra parse
+// and before SetupLogging / secrets expansion / config.Load.
 //
 // Parameters:
-//   - flags: Flag set.
+//   - flags: Parsed persistent flag set.
 func ProcessFlagAliases(flags *pflag.FlagSet) {
+	// Ensure env-sourced values are visible to alias logic via flag Gets.
+	err := ApplyEnvToFlags(flags, AllSpecs())
+	if err != nil {
+		logrus.WithError(err).Fatal("Failed to apply environment configuration")
+	}
+
 	// Handle porcelain mode.
 	porcelain, err := flags.GetString("porcelain")
 	if err != nil {
@@ -1361,7 +444,7 @@ func ProcessFlagAliases(flags *pflag.FlagSet) {
 		scheduleChanged = true
 	}
 
-	if val, _ := flags.GetInt("interval"); val != defaultPollIntervalSeconds {
+	if val, _ := flags.GetInt("interval"); val != schedule.DefaultPollIntervalSeconds {
 		intervalChanged = true
 	}
 

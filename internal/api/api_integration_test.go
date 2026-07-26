@@ -13,7 +13,6 @@ import (
 
 	"github.com/gofiber/fiber/v3"
 	"github.com/sirupsen/logrus"
-	"github.com/spf13/cobra"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
@@ -651,31 +650,31 @@ func TestIntegration_APIAndScheduling_ConcurrentWithUnblockHTTPAPI(t *testing.T)
 	schedCtx, schedCancel := context.WithTimeout(context.Background(), 500*time.Millisecond)
 	defer schedCancel()
 
-	err := scheduling.RunUpgradesOnSchedule(
-		schedCtx,
-		&cobra.Command{},
-		func(_ types.FilterableContainer) bool { return true },
-		"test filter",
-		make(chan bool, 1),
-		false,
-		"@every 1h",
-		logging.WriteStartupMessage,
-		func(_ context.Context, _ types.Filter, _ types.UpdateParams) *metrics.Metric {
+	err := scheduling.RunUpgradesOnSchedule(schedCtx, scheduling.ScheduleDeps{
+		Filter:              func(_ types.FilterableContainer) bool { return true },
+		FilterDesc:          "test filter",
+		Lock:                make(chan bool, 1),
+		ScheduleSpec:        "@every 1h",
+		WriteStartupMessage: logging.WriteStartupMessage,
+		RunUpdate: func(_ context.Context, _ types.Filter, _ types.UpdateParams) *metrics.Metric {
 			return &metrics.Metric{}
 		},
-		nil,
-		"",
-		nil,
-		"",
-		false,
-		false,
-		false,
-		nil,
-		true,
-		false,
-		false, // reviveStopped
-		false, // useComposeDependsOn
-	)
+		Client:                     nil,
+		Scope:                      "",
+		Notifier:                   nil,
+		MetaVersion:                "",
+		UpdateOnStart:              false,
+		SkipFirstRun:               false,
+		CurrentWatchtowerContainer: nil,
+		StartupMessageSent:         true,
+		BaseParams: types.UpdateParams{
+			Cleanup:             false,
+			MonitorOnly:         false,
+			EphemeralSelfUpdate: false,
+			ReviveStopped:       false,
+			UseComposeDependsOn: false,
+		},
+	})
 	require.NoError(t, err, "RunUpgradesOnSchedule should run concurrently after SetupAndStartAPI returns")
 }
 
@@ -689,13 +688,15 @@ func TestIntegration_UpdateHonorsReviveStoppedAndComposeDependsOn(t *testing.T) 
 	app := api.New(testLogger(), 60, api.ProxyConfig{}, api.CORSConfig{}, false)
 
 	opts := config.Options{
-		Token:               "test-token",
-		EnableUpdateAPI:     true,
-		UnblockHTTPAPI:      true,
-		ReviveStopped:       true,
-		UseComposeDependsOn: true,
-		Client:              makeListContainersMock(t),
-		Filter:              makeFilter(t),
+		Token:           "test-token",
+		EnableUpdateAPI: true,
+		UnblockHTTPAPI:  true,
+		BaseParams: types.UpdateParams{
+			ReviveStopped:       true,
+			UseComposeDependsOn: true,
+		},
+		Client: makeListContainersMock(t),
+		Filter: makeFilter(t),
 		RunUpdatesWithNotifications: func(_ context.Context, _ types.Filter, params types.UpdateParams) *metrics.Metric {
 			captured = params
 

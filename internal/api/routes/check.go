@@ -24,12 +24,7 @@ func registerCheckRoute(app *fiber.App, auth fiber.Handler, opts config.Options)
 
 	handler := check.New(
 		func(ctx context.Context, images, names []string) ([]check.ContainerCheck, error) {
-			params := types.UpdateParams{
-				MonitorOnly:     opts.MonitorOnly,
-				NoPull:          opts.NoPull,
-				LabelPrecedence: opts.LabelPrecedence,
-				CooldownDelay:   opts.CooldownDelay,
-			}
+			params := config.BuildUpdateParams(opts)
 
 			imageFilter := opts.FilterByImage(images, opts.Filter)
 			containerFilter := update.ContainerFilter(names)

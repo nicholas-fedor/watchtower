@@ -84,17 +84,20 @@ func TestBuildUpdateParams(t *testing.T) {
 	t.Parallel()
 
 	opts := Options{
-		Cleanup:             true,
-		NoRestart:           true,
-		ReviveStopped:       true,
-		MonitorOnly:         true,
-		NoPull:              true,
-		LifecycleHooks:      true,
-		RollingRestart:      true,
-		LabelPrecedence:     true,
-		UseComposeDependsOn: true,
-		SkipSelfUpdate:      true,
-		CooldownDelay:       24 * time.Hour,
+		BaseParams: types.UpdateParams{
+			Cleanup:             true,
+			NoRestart:           true,
+			ReviveStopped:       true,
+			MonitorOnly:         true,
+			NoPull:              true,
+			LifecycleHooks:      true,
+			RollingRestart:      true,
+			LabelPrecedence:     true,
+			UseComposeDependsOn: true,
+			SkipSelfUpdate:      true,
+			CooldownDelay:       24 * time.Hour,
+			RunOnce:             true, // must be cleared for HTTP path
+		},
 	}
 
 	params := BuildUpdateParams(opts)

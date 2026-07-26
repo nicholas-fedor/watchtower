@@ -8,8 +8,6 @@ import (
 	"testing/synctest"
 	"time"
 
-	"github.com/spf13/cobra"
-	"github.com/spf13/pflag"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
@@ -17,6 +15,7 @@ import (
 	dockerNetwork "github.com/moby/moby/api/types/network"
 
 	mockActions "github.com/nicholas-fedor/watchtower/internal/actions/mocks"
+	"github.com/nicholas-fedor/watchtower/internal/logging"
 	"github.com/nicholas-fedor/watchtower/internal/metrics"
 	"github.com/nicholas-fedor/watchtower/internal/scheduling"
 	"github.com/nicholas-fedor/watchtower/pkg/container"
@@ -107,46 +106,43 @@ func TestWaitForRunningUpdate(t *testing.T) {
 }
 
 func TestRunUpgradesOnSchedule_EmptySchedule(t *testing.T) {
-	cmd := &cobra.Command{}
 	client := mockActions.CreateMockClient(&mockActions.TestData{}, false, false)
 
 	ctx := t.Context()
-
-	cmd.Flags().Bool("update-on-start", false, "")
 
 	runUpdatesWithNotifications := func(_ context.Context, _ types.Filter, _ types.UpdateParams) *metrics.Metric {
 		return &metrics.Metric{Scanned: 1, Updated: 0, Failed: 0}
 	}
 
-	writeStartupMessage := func(*cobra.Command, time.Time, string, string, container.Client, types.Notifier, string, *bool) {}
+	writeStartupMessage := func(logging.StartupParams) {}
 
 	// Use timeout to avoid hanging
 	timeoutCtx, timeoutCancel := context.WithTimeout(ctx, 10*time.Millisecond)
 	defer timeoutCancel()
 
-	err := scheduling.RunUpgradesOnSchedule(
-		timeoutCtx,
-		cmd,
-		filters.NoFilter,
-		"test filter",
-		nil,   // no lock
-		false, // cleanup
-		"",    // empty schedule
-		writeStartupMessage,
-		runUpdatesWithNotifications,
-		client,
-		"",  // scope
-		nil, // no notifier
-		"v1.0.0",
-		false, // monitorOnly
-		false, // updateOnStart
-		false, // skipFirstRun
-		nil,   // currentWatchtowerContainer
-		false, // startupMessageSent
-		false, // ephemeralSelfUpdate
-		false, // reviveStopped
-		false, // useComposeDependsOn
-	)
+	err := scheduling.RunUpgradesOnSchedule(timeoutCtx, scheduling.ScheduleDeps{
+		Filter:                     filters.NoFilter,
+		FilterDesc:                 "test filter",
+		Lock:                       nil,
+		ScheduleSpec:               "",
+		WriteStartupMessage:        writeStartupMessage,
+		RunUpdate:                  runUpdatesWithNotifications,
+		Client:                     client,
+		Scope:                      "",
+		Notifier:                   nil,
+		MetaVersion:                "v1.0.0",
+		UpdateOnStart:              false,
+		SkipFirstRun:               false,
+		CurrentWatchtowerContainer: nil,
+		StartupMessageSent:         false,
+		BaseParams: types.UpdateParams{
+			Cleanup:             false,
+			MonitorOnly:         false,
+			EphemeralSelfUpdate: false,
+			ReviveStopped:       false,
+			UseComposeDependsOn: false,
+		},
+	})
 	// Should complete without error when context times out (clean cancellation)
 	if err != nil {
 		t.Errorf("expected no error, got %v", err)
@@ -154,12 +150,9 @@ func TestRunUpgradesOnSchedule_EmptySchedule(t *testing.T) {
 }
 
 func TestRunUpgradesOnSchedule_StartupMessageSuppressed(t *testing.T) {
-	cmd := &cobra.Command{}
 	client := mockActions.CreateMockClient(&mockActions.TestData{}, false, false)
 
 	ctx := t.Context()
-
-	cmd.Flags().Bool("update-on-start", false, "")
 
 	runUpdatesWithNotifications := func(_ context.Context, _ types.Filter, _ types.UpdateParams) *metrics.Metric {
 		return &metrics.Metric{Scanned: 1, Updated: 0, Failed: 0}
@@ -167,7 +160,7 @@ func TestRunUpgradesOnSchedule_StartupMessageSuppressed(t *testing.T) {
 
 	// Spy closure to detect if writeStartupMessage is called
 	startupMessageCalled := false
-	writeStartupMessage := func(*cobra.Command, time.Time, string, string, container.Client, types.Notifier, string, *bool) {
+	writeStartupMessage := func(logging.StartupParams) {
 		startupMessageCalled = true
 	}
 
@@ -175,29 +168,29 @@ func TestRunUpgradesOnSchedule_StartupMessageSuppressed(t *testing.T) {
 	timeoutCtx, timeoutCancel := context.WithTimeout(ctx, 10*time.Millisecond)
 	defer timeoutCancel()
 
-	err := scheduling.RunUpgradesOnSchedule(
-		timeoutCtx,
-		cmd,
-		filters.NoFilter,
-		"test filter",
-		nil,   // no lock
-		false, // cleanup
-		"",    // empty schedule
-		writeStartupMessage,
-		runUpdatesWithNotifications,
-		client,
-		"",  // scope
-		nil, // no notifier
-		"v1.0.0",
-		false, // monitorOnly
-		false, // updateOnStart
-		false, // skipFirstRun
-		nil,   // currentWatchtowerContainer
-		true,  // startupMessageSent - suppress the startup message
-		false, // ephemeralSelfUpdate
-		false, // reviveStopped
-		false, // useComposeDependsOn
-	)
+	err := scheduling.RunUpgradesOnSchedule(timeoutCtx, scheduling.ScheduleDeps{
+		Filter:                     filters.NoFilter,
+		FilterDesc:                 "test filter",
+		Lock:                       nil,
+		ScheduleSpec:               "",
+		WriteStartupMessage:        writeStartupMessage,
+		RunUpdate:                  runUpdatesWithNotifications,
+		Client:                     client,
+		Scope:                      "",
+		Notifier:                   nil,
+		MetaVersion:                "v1.0.0",
+		UpdateOnStart:              false,
+		SkipFirstRun:               false,
+		CurrentWatchtowerContainer: nil,
+		StartupMessageSent:         true, // suppress the startup message
+		BaseParams: types.UpdateParams{
+			Cleanup:             false,
+			MonitorOnly:         false,
+			EphemeralSelfUpdate: false,
+			ReviveStopped:       false,
+			UseComposeDependsOn: false,
+		},
+	})
 	// Should complete without error when context times out (clean cancellation)
 	if err != nil {
 		t.Errorf("expected no error, got %v", err)
@@ -210,12 +203,9 @@ func TestRunUpgradesOnSchedule_StartupMessageSuppressed(t *testing.T) {
 }
 
 func TestRunUpgradesOnSchedule_UpdateOnStart(t *testing.T) {
-	cmd := &cobra.Command{}
 	client := mockActions.CreateMockClient(&mockActions.TestData{}, false, false)
 
 	ctx := t.Context()
-
-	cmd.PersistentFlags().Bool("update-on-start", true, "")
 
 	updateCalled := false
 	runUpdatesWithNotifications := func(_ context.Context, _ types.Filter, _ types.UpdateParams) *metrics.Metric {
@@ -224,35 +214,35 @@ func TestRunUpgradesOnSchedule_UpdateOnStart(t *testing.T) {
 		return &metrics.Metric{Scanned: 1, Updated: 1, Failed: 0}
 	}
 
-	writeStartupMessage := func(*cobra.Command, time.Time, string, string, container.Client, types.Notifier, string, *bool) {}
+	writeStartupMessage := func(logging.StartupParams) {}
 
 	// Use timeout to avoid hanging
 	timeoutCtx, timeoutCancel := context.WithTimeout(ctx, 10*time.Millisecond)
 	defer timeoutCancel()
 
-	err := scheduling.RunUpgradesOnSchedule(
-		timeoutCtx,
-		cmd,
-		filters.NoFilter,
-		"test filter",
-		nil,
-		false,
-		"", // no schedule
-		writeStartupMessage,
-		runUpdatesWithNotifications,
-		client,
-		"",
-		nil,
-		"v1.0.0",
-		false, // monitorOnly
-		true,  // updateOnStart
-		false, // skipFirstRun
-		nil,   // currentWatchtowerContainer
-		false, // startupMessageSent
-		false, // ephemeralSelfUpdate
-		false, // reviveStopped
-		false, // useComposeDependsOn
-	)
+	err := scheduling.RunUpgradesOnSchedule(timeoutCtx, scheduling.ScheduleDeps{
+		Filter:                     filters.NoFilter,
+		FilterDesc:                 "test filter",
+		Lock:                       nil,
+		ScheduleSpec:               "",
+		WriteStartupMessage:        writeStartupMessage,
+		RunUpdate:                  runUpdatesWithNotifications,
+		Client:                     client,
+		Scope:                      "",
+		Notifier:                   nil,
+		MetaVersion:                "v1.0.0",
+		UpdateOnStart:              true,
+		SkipFirstRun:               false,
+		CurrentWatchtowerContainer: nil,
+		StartupMessageSent:         false,
+		BaseParams: types.UpdateParams{
+			Cleanup:             false,
+			MonitorOnly:         false,
+			EphemeralSelfUpdate: false,
+			ReviveStopped:       false,
+			UseComposeDependsOn: false,
+		},
+	})
 	if err != nil {
 		t.Errorf("expected no error, got %v", err)
 	}
@@ -280,7 +270,6 @@ func TestWaitForRunningUpdate_NoUpdateRunning(t *testing.T) {
 }
 
 func TestRunUpgradesOnSchedule_InvalidCronSpec(t *testing.T) {
-	cmd := &cobra.Command{}
 	client := mockActions.CreateMockClient(&mockActions.TestData{}, false, false)
 
 	ctx := t.Context()
@@ -289,31 +278,31 @@ func TestRunUpgradesOnSchedule_InvalidCronSpec(t *testing.T) {
 		return &metrics.Metric{Scanned: 0, Updated: 0, Failed: 0}
 	}
 
-	writeStartupMessage := func(*cobra.Command, time.Time, string, string, container.Client, types.Notifier, string, *bool) {}
+	writeStartupMessage := func(logging.StartupParams) {}
 
-	err := scheduling.RunUpgradesOnSchedule(
-		ctx,
-		cmd,
-		filters.NoFilter,
-		"test filter",
-		nil,
-		false,
-		"invalid cron spec",
-		writeStartupMessage,
-		runUpdatesWithNotifications,
-		client,
-		"",
-		nil,
-		"v1.0.0",
-		false, // monitorOnly
-		false, // updateOnStart
-		false, // skipFirstRun
-		nil,   // currentWatchtowerContainer
-		false, // startupMessageSent
-		false, // ephemeralSelfUpdate
-		false, // reviveStopped
-		false, // useComposeDependsOn
-	)
+	err := scheduling.RunUpgradesOnSchedule(ctx, scheduling.ScheduleDeps{
+		Filter:                     filters.NoFilter,
+		FilterDesc:                 "test filter",
+		Lock:                       nil,
+		ScheduleSpec:               "invalid cron spec",
+		WriteStartupMessage:        writeStartupMessage,
+		RunUpdate:                  runUpdatesWithNotifications,
+		Client:                     client,
+		Scope:                      "",
+		Notifier:                   nil,
+		MetaVersion:                "v1.0.0",
+		UpdateOnStart:              false,
+		SkipFirstRun:               false,
+		CurrentWatchtowerContainer: nil,
+		StartupMessageSent:         false,
+		BaseParams: types.UpdateParams{
+			Cleanup:             false,
+			MonitorOnly:         false,
+			EphemeralSelfUpdate: false,
+			ReviveStopped:       false,
+			UseComposeDependsOn: false,
+		},
+	})
 	if err == nil {
 		t.Error("expected error")
 	}
@@ -363,7 +352,6 @@ func TestRunUpgradesOnSchedule_QuotedScheduleSpec(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			cmd := &cobra.Command{}
 			client := mockActions.CreateMockClient(&mockActions.TestData{}, false, false)
 
 			ctx := t.Context()
@@ -372,34 +360,34 @@ func TestRunUpgradesOnSchedule_QuotedScheduleSpec(t *testing.T) {
 				return &metrics.Metric{Scanned: 0, Updated: 0, Failed: 0}
 			}
 
-			writeStartupMessage := func(*cobra.Command, time.Time, string, string, container.Client, types.Notifier, string, *bool) {}
+			writeStartupMessage := func(logging.StartupParams) {}
 
 			timeoutCtx, timeoutCancel := context.WithTimeout(ctx, 10*time.Millisecond)
 			defer timeoutCancel()
 
-			err := scheduling.RunUpgradesOnSchedule(
-				timeoutCtx,
-				cmd,
-				filters.NoFilter,
-				"test filter",
-				nil,
-				false,
-				tt.scheduleSpec,
-				writeStartupMessage,
-				runUpdatesWithNotifications,
-				client,
-				"",
-				nil,
-				"v1.0.0",
-				false, // monitorOnly
-				false, // updateOnStart
-				true,  // skipFirstRun - should skip Watchtower self-update on first run
-				nil,   // currentWatchtowerContainer
-				false, // startupMessageSent
-				false, // ephemeralSelfUpdate
-				false, // reviveStopped
-				false, // useComposeDependsOn
-			)
+			err := scheduling.RunUpgradesOnSchedule(timeoutCtx, scheduling.ScheduleDeps{
+				Filter:                     filters.NoFilter,
+				FilterDesc:                 "test filter",
+				Lock:                       nil,
+				ScheduleSpec:               tt.scheduleSpec,
+				WriteStartupMessage:        writeStartupMessage,
+				RunUpdate:                  runUpdatesWithNotifications,
+				Client:                     client,
+				Scope:                      "",
+				Notifier:                   nil,
+				MetaVersion:                "v1.0.0",
+				UpdateOnStart:              false,
+				SkipFirstRun:               true, // should skip Watchtower self-update on first run
+				CurrentWatchtowerContainer: nil,
+				StartupMessageSent:         false,
+				BaseParams: types.UpdateParams{
+					Cleanup:             false,
+					MonitorOnly:         false,
+					EphemeralSelfUpdate: false,
+					ReviveStopped:       false,
+					UseComposeDependsOn: false,
+				},
+			})
 
 			if tt.expectError {
 				if err == nil {
@@ -415,7 +403,6 @@ func TestRunUpgradesOnSchedule_QuotedScheduleSpec(t *testing.T) {
 }
 
 func TestRunUpgradesOnSchedule_ContextCancellation(t *testing.T) {
-	cmd := &cobra.Command{}
 	client := mockActions.CreateMockClient(&mockActions.TestData{}, false, false)
 
 	ctx := t.Context()
@@ -424,35 +411,35 @@ func TestRunUpgradesOnSchedule_ContextCancellation(t *testing.T) {
 		return &metrics.Metric{Scanned: 0, Updated: 0, Failed: 0}
 	}
 
-	writeStartupMessage := func(*cobra.Command, time.Time, string, string, container.Client, types.Notifier, string, *bool) {}
+	writeStartupMessage := func(logging.StartupParams) {}
 
 	// Cancel immediately
 	canceledCtx, cancelFunc := context.WithCancel(ctx)
 	cancelFunc()
 
-	err := scheduling.RunUpgradesOnSchedule(
-		canceledCtx,
-		cmd,
-		filters.NoFilter,
-		"test filter",
-		nil,
-		false,
-		"",
-		writeStartupMessage,
-		runUpdatesWithNotifications,
-		client,
-		"",
-		nil,
-		"v1.0.0",
-		false, // monitorOnly
-		false, // updateOnStart
-		false, // skipFirstRun
-		nil,   // currentWatchtowerContainer
-		false, // startupMessageSent
-		false, // ephemeralSelfUpdate
-		false, // reviveStopped
-		false, // useComposeDependsOn
-	)
+	err := scheduling.RunUpgradesOnSchedule(canceledCtx, scheduling.ScheduleDeps{
+		Filter:                     filters.NoFilter,
+		FilterDesc:                 "test filter",
+		Lock:                       nil,
+		ScheduleSpec:               "",
+		WriteStartupMessage:        writeStartupMessage,
+		RunUpdate:                  runUpdatesWithNotifications,
+		Client:                     client,
+		Scope:                      "",
+		Notifier:                   nil,
+		MetaVersion:                "v1.0.0",
+		UpdateOnStart:              false,
+		SkipFirstRun:               false,
+		CurrentWatchtowerContainer: nil,
+		StartupMessageSent:         false,
+		BaseParams: types.UpdateParams{
+			Cleanup:             false,
+			MonitorOnly:         false,
+			EphemeralSelfUpdate: false,
+			ReviveStopped:       false,
+			UseComposeDependsOn: false,
+		},
+	})
 	if err != nil {
 		t.Errorf("expected no error, got %v", err)
 	}
@@ -478,7 +465,6 @@ func TestRunUpgradesOnSchedule_MonitorOnlyParameter(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			cmd := &cobra.Command{}
 			client := mockActions.CreateMockClient(&mockActions.TestData{}, false, false)
 
 			ctx := t.Context()
@@ -491,35 +477,35 @@ func TestRunUpgradesOnSchedule_MonitorOnlyParameter(t *testing.T) {
 				return &metrics.Metric{Scanned: 1, Updated: 0, Failed: 0}
 			}
 
-			writeStartupMessage := func(*cobra.Command, time.Time, string, string, container.Client, types.Notifier, string, *bool) {}
+			writeStartupMessage := func(logging.StartupParams) {}
 
 			// Use timeout to avoid hanging
 			timeoutCtx, timeoutCancel := context.WithTimeout(ctx, 10*time.Millisecond)
 			defer timeoutCancel()
 
-			err := scheduling.RunUpgradesOnSchedule(
-				timeoutCtx,
-				cmd,
-				filters.NoFilter,
-				"test filter",
-				nil,   // no lock
-				false, // cleanup
-				"",    // empty schedule
-				writeStartupMessage,
-				runUpdatesWithNotifications,
-				client,
-				"",  // scope
-				nil, // no notifier
-				"v1.0.0",
-				tt.monitorOnly, // monitorOnly parameter
-				true,           // updateOnStart - trigger immediate update
-				false,          // skipFirstRun
-				nil,            // currentWatchtowerContainer
-				false,          // startupMessageSent
-				false,          // ephemeralSelfUpdate
-				false,          // reviveStopped
-				false,          // useComposeDependsOn
-			)
+			err := scheduling.RunUpgradesOnSchedule(timeoutCtx, scheduling.ScheduleDeps{
+				Filter:                     filters.NoFilter,
+				FilterDesc:                 "test filter",
+				Lock:                       nil,
+				ScheduleSpec:               "",
+				WriteStartupMessage:        writeStartupMessage,
+				RunUpdate:                  runUpdatesWithNotifications,
+				Client:                     client,
+				Scope:                      "",
+				Notifier:                   nil,
+				MetaVersion:                "v1.0.0",
+				UpdateOnStart:              true, // trigger immediate update
+				SkipFirstRun:               false,
+				CurrentWatchtowerContainer: nil,
+				StartupMessageSent:         false,
+				BaseParams: types.UpdateParams{
+					Cleanup:             false,
+					MonitorOnly:         tt.monitorOnly,
+					EphemeralSelfUpdate: false,
+					ReviveStopped:       false,
+					UseComposeDependsOn: false,
+				},
+			})
 			if err != nil {
 				t.Errorf("expected no error, got %v", err)
 			}
@@ -596,14 +582,9 @@ func TestShouldExitDueToInvalidRestart(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			// Create flag set
-			flagSet := &pflag.FlagSet{}
-			flagSet.Bool("run-once", tt.runOnceFlag, "")
-
-			// Test the function
 			shouldExit := scheduling.ShouldExitDueToInvalidRestart(
 				tt.container,
-				flagSet,
+				tt.runOnceFlag,
 			)
 
 			assert.Equal(t, tt.expectedExit, shouldExit)
@@ -612,7 +593,6 @@ func TestShouldExitDueToInvalidRestart(t *testing.T) {
 }
 
 func TestRunUpgradesOnSchedule_CronWithSeconds(t *testing.T) {
-	cmd := &cobra.Command{}
 	client := mockActions.CreateMockClient(&mockActions.TestData{}, false, false)
 
 	ctx := t.Context()
@@ -624,7 +604,7 @@ func TestRunUpgradesOnSchedule_CronWithSeconds(t *testing.T) {
 		return &metrics.Metric{Scanned: 1, Updated: 0, Failed: 0}
 	}
 
-	writeStartupMessage := func(*cobra.Command, time.Time, string, string, container.Client, types.Notifier, string, *bool) {}
+	writeStartupMessage := func(logging.StartupParams) {}
 
 	// Use a 6-field cron spec that includes seconds (every 2 seconds)
 	scheduleSpec := "*/2 * * * * *"
@@ -633,29 +613,29 @@ func TestRunUpgradesOnSchedule_CronWithSeconds(t *testing.T) {
 	timeoutCtx, timeoutCancel := context.WithTimeout(ctx, 5*time.Second)
 	defer timeoutCancel()
 
-	err := scheduling.RunUpgradesOnSchedule(
-		timeoutCtx,
-		cmd,
-		filters.NoFilter,
-		"test filter",
-		nil,   // no lock
-		false, // cleanup
-		scheduleSpec,
-		writeStartupMessage,
-		runUpdatesWithNotifications,
-		client,
-		"",  // scope
-		nil, // no notifier
-		"v1.0.0",
-		false, // monitorOnly
-		false, // updateOnStart
-		false, // skipFirstRun
-		nil,   // currentWatchtowerContainer
-		false, // startupMessageSent
-		false, // ephemeralSelfUpdate
-		false, // reviveStopped
-		false, // useComposeDependsOn
-	)
+	err := scheduling.RunUpgradesOnSchedule(timeoutCtx, scheduling.ScheduleDeps{
+		Filter:                     filters.NoFilter,
+		FilterDesc:                 "test filter",
+		Lock:                       nil,
+		ScheduleSpec:               scheduleSpec,
+		WriteStartupMessage:        writeStartupMessage,
+		RunUpdate:                  runUpdatesWithNotifications,
+		Client:                     client,
+		Scope:                      "",
+		Notifier:                   nil,
+		MetaVersion:                "v1.0.0",
+		UpdateOnStart:              false,
+		SkipFirstRun:               false,
+		CurrentWatchtowerContainer: nil,
+		StartupMessageSent:         false,
+		BaseParams: types.UpdateParams{
+			Cleanup:             false,
+			MonitorOnly:         false,
+			EphemeralSelfUpdate: false,
+			ReviveStopped:       false,
+			UseComposeDependsOn: false,
+		},
+	})
 	// Should complete without error when context times out (clean cancellation)
 	if err != nil {
 		t.Errorf("expected no error, got %v", err)
@@ -668,7 +648,6 @@ func TestRunUpgradesOnSchedule_CronWithSeconds(t *testing.T) {
 }
 
 func TestRunUpgradesOnSchedule_SkipFirstRun_True(t *testing.T) {
-	cmd := &cobra.Command{}
 	client := mockActions.CreateMockClient(&mockActions.TestData{}, false, false)
 
 	ctx := t.Context()
@@ -681,7 +660,7 @@ func TestRunUpgradesOnSchedule_SkipFirstRun_True(t *testing.T) {
 		return &metrics.Metric{Scanned: 1, Updated: 0, Failed: 0}
 	}
 
-	writeStartupMessage := func(*cobra.Command, time.Time, string, string, container.Client, types.Notifier, string, *bool) {}
+	writeStartupMessage := func(logging.StartupParams) {}
 
 	// Use a cron spec that runs every second
 	scheduleSpec := "* * * * * *"
@@ -690,29 +669,29 @@ func TestRunUpgradesOnSchedule_SkipFirstRun_True(t *testing.T) {
 	timeoutCtx, timeoutCancel := context.WithTimeout(ctx, 3500*time.Millisecond)
 	defer timeoutCancel()
 
-	err := scheduling.RunUpgradesOnSchedule(
-		timeoutCtx,
-		cmd,
-		filters.NoFilter,
-		"test filter",
-		nil,   // no lock
-		false, // cleanup
-		scheduleSpec,
-		writeStartupMessage,
-		runUpdatesWithNotifications,
-		client,
-		"",  // scope
-		nil, // no notifier
-		"v1.0.0",
-		false, // monitorOnly
-		false, // updateOnStart
-		true,  // skipFirstRun - should skip Watchtower self-update on first run
-		nil,   // currentWatchtowerContainer
-		false, // startupMessageSent
-		false, // ephemeralSelfUpdate
-		false, // reviveStopped
-		false, // useComposeDependsOn
-	)
+	err := scheduling.RunUpgradesOnSchedule(timeoutCtx, scheduling.ScheduleDeps{
+		Filter:                     filters.NoFilter,
+		FilterDesc:                 "test filter",
+		Lock:                       nil,
+		ScheduleSpec:               scheduleSpec,
+		WriteStartupMessage:        writeStartupMessage,
+		RunUpdate:                  runUpdatesWithNotifications,
+		Client:                     client,
+		Scope:                      "",
+		Notifier:                   nil,
+		MetaVersion:                "v1.0.0",
+		UpdateOnStart:              false,
+		SkipFirstRun:               true, // should skip Watchtower self-update on first run
+		CurrentWatchtowerContainer: nil,
+		StartupMessageSent:         false,
+		BaseParams: types.UpdateParams{
+			Cleanup:             false,
+			MonitorOnly:         false,
+			EphemeralSelfUpdate: false,
+			ReviveStopped:       false,
+			UseComposeDependsOn: false,
+		},
+	})
 	// Should complete without error when context times out (clean cancellation)
 	if err != nil {
 		t.Errorf("expected no error, got %v", err)
@@ -735,7 +714,6 @@ func TestRunUpgradesOnSchedule_SkipFirstRun_True(t *testing.T) {
 }
 
 func TestRunUpgradesOnSchedule_WatchtowerParent_Skipping(t *testing.T) {
-	cmd := &cobra.Command{}
 	client := mockActions.CreateMockClient(&mockActions.TestData{}, false, false)
 
 	ctx := t.Context()
@@ -747,7 +725,7 @@ func TestRunUpgradesOnSchedule_WatchtowerParent_Skipping(t *testing.T) {
 		return &metrics.Metric{Scanned: 1, Updated: 0, Failed: 0}
 	}
 
-	writeStartupMessage := func(*cobra.Command, time.Time, string, string, container.Client, types.Notifier, string, *bool) {}
+	writeStartupMessage := func(logging.StartupParams) {}
 
 	// Create a mock Watchtower parent container
 	parentContainer := createTestContainer("test-container-id,parent-id")
@@ -759,29 +737,29 @@ func TestRunUpgradesOnSchedule_WatchtowerParent_Skipping(t *testing.T) {
 	timeoutCtx, timeoutCancel := context.WithTimeout(ctx, 2500*time.Millisecond)
 	defer timeoutCancel()
 
-	err := scheduling.RunUpgradesOnSchedule(
-		timeoutCtx,
-		cmd,
-		filters.NoFilter,
-		"test filter",
-		nil,   // no lock
-		false, // cleanup
-		scheduleSpec,
-		writeStartupMessage,
-		runUpdatesWithNotifications,
-		client,
-		"",  // scope
-		nil, // no notifier
-		"v1.0.0",
-		false,           // monitorOnly
-		false,           // updateOnStart
-		false,           // skipFirstRun
-		parentContainer, // currentWatchtowerContainer - should skip updates
-		false,           // startupMessageSent
-		false,           // ephemeralSelfUpdate
-		false,           // reviveStopped
-		false,           // useComposeDependsOn
-	)
+	err := scheduling.RunUpgradesOnSchedule(timeoutCtx, scheduling.ScheduleDeps{
+		Filter:                     filters.NoFilter,
+		FilterDesc:                 "test filter",
+		Lock:                       nil,
+		ScheduleSpec:               scheduleSpec,
+		WriteStartupMessage:        writeStartupMessage,
+		RunUpdate:                  runUpdatesWithNotifications,
+		Client:                     client,
+		Scope:                      "",
+		Notifier:                   nil,
+		MetaVersion:                "v1.0.0",
+		UpdateOnStart:              false,
+		SkipFirstRun:               false,
+		CurrentWatchtowerContainer: parentContainer, // should skip updates
+		StartupMessageSent:         false,
+		BaseParams: types.UpdateParams{
+			Cleanup:             false,
+			MonitorOnly:         false,
+			EphemeralSelfUpdate: false,
+			ReviveStopped:       false,
+			UseComposeDependsOn: false,
+		},
+	})
 	// Should complete without error when context times out (clean cancellation)
 	if err != nil {
 		t.Errorf("expected no error, got %v", err)
@@ -797,7 +775,6 @@ func TestRunUpgradesOnSchedule_WatchtowerParent_Skipping(t *testing.T) {
 }
 
 func TestRunUpgradesOnSchedule_ScheduledRuns_Execution(t *testing.T) {
-	cmd := &cobra.Command{}
 	client := mockActions.CreateMockClient(&mockActions.TestData{}, false, false)
 
 	ctx := t.Context()
@@ -810,7 +787,7 @@ func TestRunUpgradesOnSchedule_ScheduledRuns_Execution(t *testing.T) {
 		return &metrics.Metric{Scanned: 1, Updated: 0, Failed: 0}
 	}
 
-	writeStartupMessage := func(*cobra.Command, time.Time, string, string, container.Client, types.Notifier, string, *bool) {}
+	writeStartupMessage := func(logging.StartupParams) {}
 
 	// Use a cron spec that runs every 1 second
 	scheduleSpec := "*/1 * * * * *"
@@ -821,29 +798,29 @@ func TestRunUpgradesOnSchedule_ScheduledRuns_Execution(t *testing.T) {
 	timeoutCtx, timeoutCancel := context.WithTimeout(ctx, 2500*time.Millisecond)
 	defer timeoutCancel()
 
-	err := scheduling.RunUpgradesOnSchedule(
-		timeoutCtx,
-		cmd,
-		filters.NoFilter,
-		"test filter",
-		nil,   // no lock
-		false, // cleanup
-		scheduleSpec,
-		writeStartupMessage,
-		runUpdatesWithNotifications,
-		client,
-		"",  // scope
-		nil, // no notifier
-		"v1.0.0",
-		false, // monitorOnly
-		false, // updateOnStart
-		false, // skipFirstRun
-		nil,   // currentWatchtowerContainer
-		false, // startupMessageSent
-		false, // ephemeralSelfUpdate
-		false, // reviveStopped
-		false, // useComposeDependsOn
-	)
+	err := scheduling.RunUpgradesOnSchedule(timeoutCtx, scheduling.ScheduleDeps{
+		Filter:                     filters.NoFilter,
+		FilterDesc:                 "test filter",
+		Lock:                       nil,
+		ScheduleSpec:               scheduleSpec,
+		WriteStartupMessage:        writeStartupMessage,
+		RunUpdate:                  runUpdatesWithNotifications,
+		Client:                     client,
+		Scope:                      "",
+		Notifier:                   nil,
+		MetaVersion:                "v1.0.0",
+		UpdateOnStart:              false,
+		SkipFirstRun:               false,
+		CurrentWatchtowerContainer: nil,
+		StartupMessageSent:         false,
+		BaseParams: types.UpdateParams{
+			Cleanup:             false,
+			MonitorOnly:         false,
+			EphemeralSelfUpdate: false,
+			ReviveStopped:       false,
+			UseComposeDependsOn: false,
+		},
+	})
 	// Should complete without error when context times out (clean cancellation)
 	if err != nil {
 		t.Errorf("expected no error, got %v", err)
@@ -876,7 +853,6 @@ func TestRunUpgradesOnSchedule_ScheduledRuns_Execution(t *testing.T) {
 // proceed because they remove the old container before creating the new one,
 // avoiding port conflicts.
 func TestRunUpgradesOnSchedule_EphemeralSelfUpdateWithExposedPorts(t *testing.T) {
-	cmd := &cobra.Command{}
 	client := mockActions.CreateMockClient(&mockActions.TestData{}, false, false)
 
 	ctx := t.Context()
@@ -889,9 +865,7 @@ func TestRunUpgradesOnSchedule_EphemeralSelfUpdateWithExposedPorts(t *testing.T)
 		return &metrics.Metric{Scanned: 1, Updated: 0, Failed: 0}
 	}
 
-	writeStartupMessage := func(*cobra.Command, time.Time, string, string, container.Client, types.Notifier, string, *bool) {}
-
-	cmd.PersistentFlags().Bool("update-on-start", true, "")
+	writeStartupMessage := func(logging.StartupParams) {}
 
 	// Create a Watchtower container with exposed ports (host-bound port mappings).
 	containerWithPorts := createTestContainer("", withPortBindings())
@@ -903,29 +877,29 @@ func TestRunUpgradesOnSchedule_EphemeralSelfUpdateWithExposedPorts(t *testing.T)
 	timeoutCtx, timeoutCancel := context.WithTimeout(ctx, 10*time.Millisecond)
 	defer timeoutCancel()
 
-	err := scheduling.RunUpgradesOnSchedule(
-		timeoutCtx,
-		cmd,
-		filters.NoFilter,
-		"test filter",
-		nil,   // no lock
-		false, // cleanup
-		"",    // empty schedule
-		writeStartupMessage,
-		runUpdatesWithNotifications,
-		client,
-		"",  // scope
-		nil, // no notifier
-		"v1.0.0",
-		false,              // monitorOnly
-		true,               // updateOnStart - triggers immediate update
-		false,              // skipFirstRun
-		containerWithPorts, // currentWatchtowerContainer with exposed ports
-		false,              // startupMessageSent
-		true,               // ephemeralSelfUpdate - bypasses port-conflict guard
-		false,              // reviveStopped
-		false,              // useComposeDependsOn
-	)
+	err := scheduling.RunUpgradesOnSchedule(timeoutCtx, scheduling.ScheduleDeps{
+		Filter:                     filters.NoFilter,
+		FilterDesc:                 "test filter",
+		Lock:                       nil,
+		ScheduleSpec:               "",
+		WriteStartupMessage:        writeStartupMessage,
+		RunUpdate:                  runUpdatesWithNotifications,
+		Client:                     client,
+		Scope:                      "",
+		Notifier:                   nil,
+		MetaVersion:                "v1.0.0",
+		UpdateOnStart:              true, // triggers immediate update
+		SkipFirstRun:               false,
+		CurrentWatchtowerContainer: containerWithPorts, // with exposed ports
+		StartupMessageSent:         false,
+		BaseParams: types.UpdateParams{
+			Cleanup:             false,
+			MonitorOnly:         false,
+			EphemeralSelfUpdate: true, // bypasses port-conflict guard
+			ReviveStopped:       false,
+			UseComposeDependsOn: false,
+		},
+	})
 	require.NoError(t, err)
 
 	// With ephemeralSelfUpdate=true, the port-conflict guard should be bypassed,
@@ -941,7 +915,6 @@ func TestRunUpgradesOnSchedule_EphemeralSelfUpdateWithExposedPorts(t *testing.T)
 // port-conflict guard forces SkipSelfUpdate to true to prevent the old container
 // from holding the port while the new container tries to bind it.
 func TestRunUpgradesOnSchedule_PortConflictGuard_SkipsSelfUpdate(t *testing.T) {
-	cmd := &cobra.Command{}
 	client := mockActions.CreateMockClient(&mockActions.TestData{}, false, false)
 
 	ctx := t.Context()
@@ -954,9 +927,7 @@ func TestRunUpgradesOnSchedule_PortConflictGuard_SkipsSelfUpdate(t *testing.T) {
 		return &metrics.Metric{Scanned: 1, Updated: 0, Failed: 0}
 	}
 
-	writeStartupMessage := func(*cobra.Command, time.Time, string, string, container.Client, types.Notifier, string, *bool) {}
-
-	cmd.PersistentFlags().Bool("update-on-start", true, "")
+	writeStartupMessage := func(logging.StartupParams) {}
 
 	// Create a Watchtower container with exposed ports (host-bound port mappings).
 	containerWithPorts := createTestContainer("", withPortBindings())
@@ -968,29 +939,29 @@ func TestRunUpgradesOnSchedule_PortConflictGuard_SkipsSelfUpdate(t *testing.T) {
 	timeoutCtx, timeoutCancel := context.WithTimeout(ctx, 10*time.Millisecond)
 	defer timeoutCancel()
 
-	err := scheduling.RunUpgradesOnSchedule(
-		timeoutCtx,
-		cmd,
-		filters.NoFilter,
-		"test filter",
-		nil,   // lock (auto-created)
-		false, // cleanup
-		"",    // empty schedule
-		writeStartupMessage,
-		runUpdatesWithNotifications,
-		client,
-		"",  // scope
-		nil, // no notifier
-		"v1.0.0",
-		false,              // monitorOnly
-		true,               // updateOnStart - triggers immediate update
-		false,              // skipFirstRun
-		containerWithPorts, // currentWatchtowerContainer with exposed ports
-		false,              // startupMessageSent
-		false,              // ephemeralSelfUpdate - port-conflict guard is active
-		false,              // reviveStopped
-		false,              // useComposeDependsOn
-	)
+	err := scheduling.RunUpgradesOnSchedule(timeoutCtx, scheduling.ScheduleDeps{
+		Filter:                     filters.NoFilter,
+		FilterDesc:                 "test filter",
+		Lock:                       nil,
+		ScheduleSpec:               "",
+		WriteStartupMessage:        writeStartupMessage,
+		RunUpdate:                  runUpdatesWithNotifications,
+		Client:                     client,
+		Scope:                      "",
+		Notifier:                   nil,
+		MetaVersion:                "v1.0.0",
+		UpdateOnStart:              true, // triggers immediate update
+		SkipFirstRun:               false,
+		CurrentWatchtowerContainer: containerWithPorts, // with exposed ports
+		StartupMessageSent:         false,
+		BaseParams: types.UpdateParams{
+			Cleanup:             false,
+			MonitorOnly:         false,
+			EphemeralSelfUpdate: false, // port-conflict guard is active
+			ReviveStopped:       false,
+			UseComposeDependsOn: false,
+		},
+	})
 	require.NoError(t, err)
 
 	// With ephemeralSelfUpdate=false and exposed ports, the port-conflict guard
@@ -1021,7 +992,6 @@ func TestRunUpgradesOnSchedule_NoExposedPorts_AllowsSelfUpdate(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			cmd := &cobra.Command{}
 			client := mockActions.CreateMockClient(&mockActions.TestData{}, false, false)
 
 			ctx := t.Context()
@@ -1034,9 +1004,7 @@ func TestRunUpgradesOnSchedule_NoExposedPorts_AllowsSelfUpdate(t *testing.T) {
 				return &metrics.Metric{Scanned: 1, Updated: 0, Failed: 0}
 			}
 
-			writeStartupMessage := func(*cobra.Command, time.Time, string, string, container.Client, types.Notifier, string, *bool) {}
-
-			cmd.PersistentFlags().Bool("update-on-start", true, "")
+			writeStartupMessage := func(logging.StartupParams) {}
 
 			// Create a Watchtower container WITHOUT exposed ports.
 			containerNoPorts := createTestContainer("")
@@ -1048,29 +1016,29 @@ func TestRunUpgradesOnSchedule_NoExposedPorts_AllowsSelfUpdate(t *testing.T) {
 			timeoutCtx, timeoutCancel := context.WithTimeout(ctx, 10*time.Millisecond)
 			defer timeoutCancel()
 
-			err := scheduling.RunUpgradesOnSchedule(
-				timeoutCtx,
-				cmd,
-				filters.NoFilter,
-				"test filter",
-				nil,   // lock (auto-created)
-				false, // cleanup
-				"",    // empty schedule
-				writeStartupMessage,
-				runUpdatesWithNotifications,
-				client,
-				"",  // scope
-				nil, // no notifier
-				"v1.0.0",
-				false,            // monitorOnly
-				true,             // updateOnStart - triggers immediate update
-				false,            // skipFirstRun
-				containerNoPorts, // currentWatchtowerContainer without exposed ports
-				false,            // startupMessageSent
-				tt.ephemeralSelfUpdate,
-				false, // reviveStopped
-				false, // useComposeDependsOn
-			)
+			err := scheduling.RunUpgradesOnSchedule(timeoutCtx, scheduling.ScheduleDeps{
+				Filter:                     filters.NoFilter,
+				FilterDesc:                 "test filter",
+				Lock:                       nil,
+				ScheduleSpec:               "",
+				WriteStartupMessage:        writeStartupMessage,
+				RunUpdate:                  runUpdatesWithNotifications,
+				Client:                     client,
+				Scope:                      "",
+				Notifier:                   nil,
+				MetaVersion:                "v1.0.0",
+				UpdateOnStart:              true, // triggers immediate update
+				SkipFirstRun:               false,
+				CurrentWatchtowerContainer: containerNoPorts, // without exposed ports
+				StartupMessageSent:         false,
+				BaseParams: types.UpdateParams{
+					Cleanup:             false,
+					MonitorOnly:         false,
+					EphemeralSelfUpdate: tt.ephemeralSelfUpdate,
+					ReviveStopped:       false,
+					UseComposeDependsOn: false,
+				},
+			})
 			require.NoError(t, err)
 
 			// Without exposed ports, the port-conflict guard should not trigger,
@@ -1104,7 +1072,6 @@ func TestRunUpgradesOnSchedule_ReviveStoppedPropagation(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			cmd := &cobra.Command{}
 			client := mockActions.CreateMockClient(&mockActions.TestData{}, false, false)
 
 			ctx := t.Context()
@@ -1117,36 +1084,34 @@ func TestRunUpgradesOnSchedule_ReviveStoppedPropagation(t *testing.T) {
 				return &metrics.Metric{Scanned: 1, Updated: 0, Failed: 0}
 			}
 
-			writeStartupMessage := func(*cobra.Command, time.Time, string, string, container.Client, types.Notifier, string, *bool) {}
-
-			cmd.PersistentFlags().Bool("update-on-start", true, "")
+			writeStartupMessage := func(logging.StartupParams) {}
 
 			timeoutCtx, timeoutCancel := context.WithTimeout(ctx, 10*time.Millisecond)
 			defer timeoutCancel()
 
-			err := scheduling.RunUpgradesOnSchedule(
-				timeoutCtx,
-				cmd,
-				filters.NoFilter,
-				"test filter",
-				nil,   // lock (auto-created)
-				false, // cleanup
-				"",    // empty schedule
-				writeStartupMessage,
-				runUpdatesWithNotifications,
-				client,
-				"",  // scope
-				nil, // no notifier
-				"v1.0.0",
-				false,            // monitorOnly
-				true,             // updateOnStart - triggers immediate update
-				false,            // skipFirstRun
-				nil,              // currentWatchtowerContainer
-				false,            // startupMessageSent
-				false,            // ephemeralSelfUpdate
-				tt.reviveStopped, // reviveStopped
-				false,            // useComposeDependsOn
-			)
+			err := scheduling.RunUpgradesOnSchedule(timeoutCtx, scheduling.ScheduleDeps{
+				Filter:                     filters.NoFilter,
+				FilterDesc:                 "test filter",
+				Lock:                       nil,
+				ScheduleSpec:               "",
+				WriteStartupMessage:        writeStartupMessage,
+				RunUpdate:                  runUpdatesWithNotifications,
+				Client:                     client,
+				Scope:                      "",
+				Notifier:                   nil,
+				MetaVersion:                "v1.0.0",
+				UpdateOnStart:              true, // triggers immediate update
+				SkipFirstRun:               false,
+				CurrentWatchtowerContainer: nil,
+				StartupMessageSent:         false,
+				BaseParams: types.UpdateParams{
+					Cleanup:             false,
+					MonitorOnly:         false,
+					EphemeralSelfUpdate: false,
+					ReviveStopped:       tt.reviveStopped,
+					UseComposeDependsOn: false,
+				},
+			})
 			require.NoError(t, err)
 
 			assert.Equal(t, tt.expectSelected, capturedParams.ReviveStopped,
@@ -1178,7 +1143,6 @@ func TestRunUpgradesOnSchedule_UseComposeDependsOnPropagation(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			cmd := &cobra.Command{}
 			client := mockActions.CreateMockClient(&mockActions.TestData{}, false, false)
 
 			ctx := t.Context()
@@ -1191,36 +1155,34 @@ func TestRunUpgradesOnSchedule_UseComposeDependsOnPropagation(t *testing.T) {
 				return &metrics.Metric{Scanned: 1, Updated: 0, Failed: 0}
 			}
 
-			writeStartupMessage := func(*cobra.Command, time.Time, string, string, container.Client, types.Notifier, string, *bool) {}
-
-			cmd.PersistentFlags().Bool("update-on-start", true, "")
+			writeStartupMessage := func(logging.StartupParams) {}
 
 			timeoutCtx, timeoutCancel := context.WithTimeout(ctx, 10*time.Millisecond)
 			defer timeoutCancel()
 
-			err := scheduling.RunUpgradesOnSchedule(
-				timeoutCtx,
-				cmd,
-				filters.NoFilter,
-				"test filter",
-				nil,   // lock (auto-created)
-				false, // cleanup
-				"",    // empty schedule
-				writeStartupMessage,
-				runUpdatesWithNotifications,
-				client,
-				"",  // scope
-				nil, // no notifier
-				"v1.0.0",
-				false,                  // monitorOnly
-				true,                   // updateOnStart - triggers immediate update
-				false,                  // skipFirstRun
-				nil,                    // currentWatchtowerContainer
-				false,                  // startupMessageSent
-				false,                  // ephemeralSelfUpdate
-				false,                  // reviveStopped
-				tt.useComposeDependsOn, // useComposeDependsOn
-			)
+			err := scheduling.RunUpgradesOnSchedule(timeoutCtx, scheduling.ScheduleDeps{
+				Filter:                     filters.NoFilter,
+				FilterDesc:                 "test filter",
+				Lock:                       nil,
+				ScheduleSpec:               "",
+				WriteStartupMessage:        writeStartupMessage,
+				RunUpdate:                  runUpdatesWithNotifications,
+				Client:                     client,
+				Scope:                      "",
+				Notifier:                   nil,
+				MetaVersion:                "v1.0.0",
+				UpdateOnStart:              true, // triggers immediate update
+				SkipFirstRun:               false,
+				CurrentWatchtowerContainer: nil,
+				StartupMessageSent:         false,
+				BaseParams: types.UpdateParams{
+					Cleanup:             false,
+					MonitorOnly:         false,
+					EphemeralSelfUpdate: false,
+					ReviveStopped:       false,
+					UseComposeDependsOn: tt.useComposeDependsOn,
+				},
+			})
 			require.NoError(t, err)
 
 			assert.Equal(t, tt.expectSelected, capturedParams.UseComposeDependsOn,

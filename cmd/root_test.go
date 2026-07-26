@@ -27,6 +27,7 @@ import (
 	"github.com/nicholas-fedor/watchtower/internal/actions"
 	"github.com/nicholas-fedor/watchtower/internal/api"
 	"github.com/nicholas-fedor/watchtower/internal/api/handlers/update"
+	appconfig "github.com/nicholas-fedor/watchtower/internal/config"
 	"github.com/nicholas-fedor/watchtower/internal/flags"
 	"github.com/nicholas-fedor/watchtower/internal/logging"
 	"github.com/nicholas-fedor/watchtower/internal/metrics"
@@ -200,39 +201,19 @@ func TestAwaitDockerClient(t *testing.T) {
 }
 
 func TestLifecycleFlags(t *testing.T) {
-	// Test that lifecycle UID and GID flags are properly read
-	originalLifecycleUID := lifecycleUID
-	originalLifecycleGID := lifecycleGID
-
-	defer func() {
-		lifecycleUID = originalLifecycleUID
-		lifecycleGID = originalLifecycleGID
-	}()
-
-	// Reset to defaults
-	lifecycleUID = 0
-	lifecycleGID = 0
-
-	// Test setting flags
 	cmd := &cobra.Command{}
-	flags.RegisterSystemFlags(cmd)
+
+	flags.SetDefaults()
+	flags.RegisterAll(cmd)
 
 	err := cmd.ParseFlags([]string{"--lifecycle-uid", "1000", "--lifecycle-gid", "1001"})
 	require.NoError(t, err)
 
-	// Simulate preRun flag reading
-	uid, err := cmd.Flags().GetInt("lifecycle-uid")
+	cfg, err := appconfig.Load(cmd, nil)
 	require.NoError(t, err)
 
-	lifecycleUID = uid
-
-	gid, err := cmd.Flags().GetInt("lifecycle-gid")
-	require.NoError(t, err)
-
-	lifecycleGID = gid
-
-	assert.Equal(t, 1000, lifecycleUID, "lifecycleUID should be set to 1000")
-	assert.Equal(t, 1001, lifecycleGID, "lifecycleGID should be set to 1001")
+	assert.Equal(t, 1000, cfg.Lifecycle.UID, "lifecycle UID should be set to 1000")
+	assert.Equal(t, 1001, cfg.Lifecycle.GID, "lifecycle GID should be set to 1001")
 }
 
 func TestGetAPIAddr(t *testing.T) {
@@ -530,29 +511,29 @@ func TestUpdateOnStartTriggersImmediateUpdate(t *testing.T) {
 	filterDesc := testFilterDesc
 
 	// The function should trigger immediate update and then start scheduler
-	err = scheduling.RunUpgradesOnSchedule(
-		ctx,
-		cmd,
-		filter,
-		filterDesc,
-		updateLock,
-		false,
-		"",
-		logging.WriteStartupMessage,
-		runUpdatesWithNotifications,
-		nil,
-		"",
-		nil,
-		"",
-		false,
-		true,
-		false,
-		nil,
-		false, // startupMessageSent
-		false, // ephemeralSelfUpdate
-		false, // reviveStopped
-		false, // useComposeDependsOn
-	)
+	err = scheduling.RunUpgradesOnSchedule(ctx, scheduling.ScheduleDeps{
+		Filter:                     filter,
+		FilterDesc:                 filterDesc,
+		Lock:                       updateLock,
+		ScheduleSpec:               "",
+		WriteStartupMessage:        logging.WriteStartupMessage,
+		RunUpdate:                  runUpdatesWithNotifications,
+		Client:                     nil,
+		Scope:                      "",
+		Notifier:                   nil,
+		MetaVersion:                "",
+		UpdateOnStart:              true,
+		SkipFirstRun:               false,
+		CurrentWatchtowerContainer: nil,
+		StartupMessageSent:         false,
+		BaseParams: types.UpdateParams{
+			Cleanup:             false,
+			MonitorOnly:         false,
+			EphemeralSelfUpdate: false,
+			ReviveStopped:       false,
+			UseComposeDependsOn: false,
+		},
+	})
 
 	// Should not return an error (context cancellation is expected)
 	require.NoError(t, err)
@@ -580,13 +561,6 @@ func TestUpdateOnStartIntegratesWithCronScheduling(t *testing.T) {
 			[]string{"--update-on-start", "--schedule", "@every 1h", "--no-startup-message"},
 		)
 		require.NoError(t, err)
-
-		// Save original scheduleSpec and restore after test
-		originalScheduleSpec := scheduleSpec
-
-		defer func() { scheduleSpec = originalScheduleSpec }()
-
-		scheduleSpec = "@every 1h" // Set the schedule spec that was parsed
 
 		// Track update calls
 		updateCallCount := int32(0)
@@ -622,29 +596,29 @@ func TestUpdateOnStartIntegratesWithCronScheduling(t *testing.T) {
 		filterDesc := testFilterDesc
 
 		startTime := time.Now()
-		err = scheduling.RunUpgradesOnSchedule(
-			ctx,
-			cmd,
-			filter,
-			filterDesc,
-			updateLock,
-			false,
-			"",
-			logging.WriteStartupMessage,
-			runUpdatesWithNotifications,
-			nil,
-			"",
-			nil,
-			"",
-			false,
-			true,
-			false,
-			nil,
-			false, // startupMessageSent
-			false, // ephemeralSelfUpdate
-			false, // reviveStopped
-			false, // useComposeDependsOn
-		)
+		err = scheduling.RunUpgradesOnSchedule(ctx, scheduling.ScheduleDeps{
+			Filter:                     filter,
+			FilterDesc:                 filterDesc,
+			Lock:                       updateLock,
+			ScheduleSpec:               "",
+			WriteStartupMessage:        logging.WriteStartupMessage,
+			RunUpdate:                  runUpdatesWithNotifications,
+			Client:                     nil,
+			Scope:                      "",
+			Notifier:                   nil,
+			MetaVersion:                "",
+			UpdateOnStart:              true,
+			SkipFirstRun:               false,
+			CurrentWatchtowerContainer: nil,
+			StartupMessageSent:         false,
+			BaseParams: types.UpdateParams{
+				Cleanup:             false,
+				MonitorOnly:         false,
+				EphemeralSelfUpdate: false,
+				ReviveStopped:       false,
+				UseComposeDependsOn: false,
+			},
+		})
 
 		// Should not return an error (context cancellation is expected)
 		require.NoError(t, err)
@@ -718,29 +692,29 @@ func TestUpdateOnStartLockingBehavior(t *testing.T) {
 		filter := types.Filter(func(_ types.FilterableContainer) bool { return false })
 		filterDesc := testFilterDesc
 
-		err = scheduling.RunUpgradesOnSchedule(
-			ctx,
-			cmd,
-			filter,
-			filterDesc,
-			updateLock,
-			false,
-			"",
-			logging.WriteStartupMessage,
-			runUpdatesWithNotifications,
-			nil,
-			"",
-			nil,
-			"",
-			false,
-			false,
-			false,
-			nil,
-			false, // startupMessageSent
-			false, // ephemeralSelfUpdate
-			false, // reviveStopped
-			false, // useComposeDependsOn
-		)
+		err = scheduling.RunUpgradesOnSchedule(ctx, scheduling.ScheduleDeps{
+			Filter:                     filter,
+			FilterDesc:                 filterDesc,
+			Lock:                       updateLock,
+			ScheduleSpec:               "",
+			WriteStartupMessage:        logging.WriteStartupMessage,
+			RunUpdate:                  runUpdatesWithNotifications,
+			Client:                     nil,
+			Scope:                      "",
+			Notifier:                   nil,
+			MetaVersion:                "",
+			UpdateOnStart:              false,
+			SkipFirstRun:               false,
+			CurrentWatchtowerContainer: nil,
+			StartupMessageSent:         false,
+			BaseParams: types.UpdateParams{
+				Cleanup:             false,
+				MonitorOnly:         false,
+				EphemeralSelfUpdate: false,
+				ReviveStopped:       false,
+				UseComposeDependsOn: false,
+			},
+		})
 
 		// Should not return an error
 		require.NoError(t, err)
@@ -795,29 +769,29 @@ func TestUpdateOnStartSelfUpdateScenario(t *testing.T) {
 		filter := types.Filter(func(_ types.FilterableContainer) bool { return true })
 		filterDesc := testFilterDesc
 
-		err = scheduling.RunUpgradesOnSchedule(
-			ctx,
-			cmd,
-			filter,
-			filterDesc,
-			updateLock,
-			false,
-			"",
-			logging.WriteStartupMessage,
-			runUpdatesWithNotifications,
-			nil,
-			"",
-			nil,
-			"",
-			false,
-			updateOnStart,
-			false,
-			nil,
-			false, // startupMessageSent
-			false, // ephemeralSelfUpdate
-			false, // reviveStopped
-			false, // useComposeDependsOn
-		)
+		err = scheduling.RunUpgradesOnSchedule(ctx, scheduling.ScheduleDeps{
+			Filter:                     filter,
+			FilterDesc:                 filterDesc,
+			Lock:                       updateLock,
+			ScheduleSpec:               "",
+			WriteStartupMessage:        logging.WriteStartupMessage,
+			RunUpdate:                  runUpdatesWithNotifications,
+			Client:                     nil,
+			Scope:                      "",
+			Notifier:                   nil,
+			MetaVersion:                "",
+			UpdateOnStart:              updateOnStart,
+			SkipFirstRun:               false,
+			CurrentWatchtowerContainer: nil,
+			StartupMessageSent:         false,
+			BaseParams: types.UpdateParams{
+				Cleanup:             false,
+				MonitorOnly:         false,
+				EphemeralSelfUpdate: false,
+				ReviveStopped:       false,
+				UseComposeDependsOn: false,
+			},
+		})
 
 		// Should not return an error
 		require.NoError(t, err)
@@ -885,29 +859,29 @@ func TestUpdateOnStartMultiInstanceScenario(t *testing.T) {
 			filter := types.Filter(func(_ types.FilterableContainer) bool { return false })
 			filterDesc := "instance1"
 
-			err := scheduling.RunUpgradesOnSchedule(
-				ctx,
-				cmd1,
-				filter,
-				filterDesc,
-				updateLock,
-				false,
-				"",
-				logging.WriteStartupMessage,
-				runUpdatesWithNotifications,
-				nil,
-				"",
-				nil,
-				"",
-				false,
-				updateOnStart1,
-				false,
-				nil,
-				false, // startupMessageSent
-				false, // ephemeralSelfUpdate
-				false, // reviveStopped
-				false, // useComposeDependsOn
-			)
+			err := scheduling.RunUpgradesOnSchedule(ctx, scheduling.ScheduleDeps{
+				Filter:                     filter,
+				FilterDesc:                 filterDesc,
+				Lock:                       updateLock,
+				ScheduleSpec:               "",
+				WriteStartupMessage:        logging.WriteStartupMessage,
+				RunUpdate:                  runUpdatesWithNotifications,
+				Client:                     nil,
+				Scope:                      "",
+				Notifier:                   nil,
+				MetaVersion:                "",
+				UpdateOnStart:              updateOnStart1,
+				SkipFirstRun:               false,
+				CurrentWatchtowerContainer: nil,
+				StartupMessageSent:         false,
+				BaseParams: types.UpdateParams{
+					Cleanup:             false,
+					MonitorOnly:         false,
+					EphemeralSelfUpdate: false,
+					ReviveStopped:       false,
+					UseComposeDependsOn: false,
+				},
+			})
 			assert.NoError(t, err)
 			completed.Add(1)
 			close(instance1Called)
@@ -920,29 +894,29 @@ func TestUpdateOnStartMultiInstanceScenario(t *testing.T) {
 			filter := types.Filter(func(_ types.FilterableContainer) bool { return false })
 			filterDesc := "instance2"
 
-			err := scheduling.RunUpgradesOnSchedule(
-				ctx,
-				cmd2,
-				filter,
-				filterDesc,
-				updateLock,
-				false,
-				"",
-				logging.WriteStartupMessage,
-				runUpdatesWithNotifications,
-				nil,
-				"",
-				nil,
-				"",
-				false,
-				updateOnStart2,
-				false,
-				nil,
-				false, // startupMessageSent
-				false, // ephemeralSelfUpdate
-				false, // reviveStopped
-				false, // useComposeDependsOn
-			)
+			err := scheduling.RunUpgradesOnSchedule(ctx, scheduling.ScheduleDeps{
+				Filter:                     filter,
+				FilterDesc:                 filterDesc,
+				Lock:                       updateLock,
+				ScheduleSpec:               "",
+				WriteStartupMessage:        logging.WriteStartupMessage,
+				RunUpdate:                  runUpdatesWithNotifications,
+				Client:                     nil,
+				Scope:                      "",
+				Notifier:                   nil,
+				MetaVersion:                "",
+				UpdateOnStart:              updateOnStart2,
+				SkipFirstRun:               false,
+				CurrentWatchtowerContainer: nil,
+				StartupMessageSent:         false,
+				BaseParams: types.UpdateParams{
+					Cleanup:             false,
+					MonitorOnly:         false,
+					EphemeralSelfUpdate: false,
+					ReviveStopped:       false,
+					UseComposeDependsOn: false,
+				},
+			})
 			assert.NoError(t, err)
 			completed.Add(1)
 			close(instance2Called)
@@ -1122,29 +1096,29 @@ func TestRunUpgradesOnSchedule_ShutdownWaitsForRunningUpdate(t *testing.T) {
 			filterDesc := testFilterDesc
 
 			// This should start and wait for context cancellation
-			err := scheduling.RunUpgradesOnSchedule(
-				ctx,
-				cmd,
-				filter,
-				filterDesc,
-				updateLock,
-				false,
-				"",
-				logging.WriteStartupMessage,
-				runUpdatesWithNotifications,
-				nil,
-				"",
-				nil,
-				"",
-				false,
-				false,
-				false,
-				nil,
-				false, // startupMessageSent
-				false, // ephemeralSelfUpdate
-				false, // reviveStopped
-				false, // useComposeDependsOn
-			)
+			err := scheduling.RunUpgradesOnSchedule(ctx, scheduling.ScheduleDeps{
+				Filter:                     filter,
+				FilterDesc:                 filterDesc,
+				Lock:                       updateLock,
+				ScheduleSpec:               "",
+				WriteStartupMessage:        logging.WriteStartupMessage,
+				RunUpdate:                  runUpdatesWithNotifications,
+				Client:                     nil,
+				Scope:                      "",
+				Notifier:                   nil,
+				MetaVersion:                "",
+				UpdateOnStart:              false,
+				SkipFirstRun:               false,
+				CurrentWatchtowerContainer: nil,
+				StartupMessageSent:         false,
+				BaseParams: types.UpdateParams{
+					Cleanup:             false,
+					MonitorOnly:         false,
+					EphemeralSelfUpdate: false,
+					ReviveStopped:       false,
+					UseComposeDependsOn: false,
+				},
+			})
 			assert.NoError(t, err)
 
 			shutdownCompleted <- true
@@ -1289,29 +1263,29 @@ func TestEphemeralSelfUpdateExercisesTruePath(t *testing.T) {
 	filterDesc := testFilterDesc
 
 	// Call RunUpgradesOnSchedule with ephemeralSelfUpdate=true
-	err = scheduling.RunUpgradesOnSchedule(
-		ctx,
-		cmd,
-		filter,
-		filterDesc,
-		updateLock,
-		false,
-		"",
-		logging.WriteStartupMessage,
-		runUpdatesWithNotifications,
-		nil,
-		"",
-		nil,
-		"",
-		false,
-		true,
-		false,
-		nil,
-		false, // startupMessageSent
-		true,  // ephemeralSelfUpdate
-		false, // reviveStopped
-		false, // useComposeDependsOn
-	)
+	err = scheduling.RunUpgradesOnSchedule(ctx, scheduling.ScheduleDeps{
+		Filter:                     filter,
+		FilterDesc:                 filterDesc,
+		Lock:                       updateLock,
+		ScheduleSpec:               "",
+		WriteStartupMessage:        logging.WriteStartupMessage,
+		RunUpdate:                  runUpdatesWithNotifications,
+		Client:                     nil,
+		Scope:                      "",
+		Notifier:                   nil,
+		MetaVersion:                "",
+		UpdateOnStart:              true,
+		SkipFirstRun:               false,
+		CurrentWatchtowerContainer: nil,
+		StartupMessageSent:         false,
+		BaseParams: types.UpdateParams{
+			Cleanup:             false,
+			MonitorOnly:         false,
+			EphemeralSelfUpdate: true,
+			ReviveStopped:       false,
+			UseComposeDependsOn: false,
+		},
+	})
 
 	require.NoError(t, err)
 
@@ -1810,7 +1784,7 @@ func TestValidateAPIHost(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 
-			err := validateAPIHost(tt.host)
+			err := appconfig.ValidateAPIHost(tt.host)
 			if tt.wantErr {
 				assert.Error(t, err)
 			} else {
@@ -1823,21 +1797,21 @@ func TestValidateAPIHost(t *testing.T) {
 func TestAnyHTTPAPIConfig(t *testing.T) {
 	t.Parallel()
 
-	assert.False(t, anyHTTPAPIConfig(types.RunConfig{}))
-	assert.True(t, anyHTTPAPIConfig(types.RunConfig{APIToken: "secret"}))
-	assert.True(t, anyHTTPAPIConfig(types.RunConfig{TLSCertPath: "/cert.pem"}))
-	assert.True(t, anyHTTPAPIConfig(types.RunConfig{CORSAllowedOrigins: []string{"https://app.example.com"}}))
-	assert.True(t, anyHTTPAPIConfig(types.RunConfig{APIHostChanged: true}))
-	assert.True(t, anyHTTPAPIConfig(types.RunConfig{APIPortChanged: true}))
-	assert.True(t, anyHTTPAPIConfig(types.RunConfig{APIRateLimitChanged: true}))
+	assert.False(t, appconfig.AnyHTTPAPIConfig(types.RunConfig{}))
+	assert.True(t, appconfig.AnyHTTPAPIConfig(types.RunConfig{APIToken: "secret"}))
+	assert.True(t, appconfig.AnyHTTPAPIConfig(types.RunConfig{TLSCertPath: "/cert.pem"}))
+	assert.True(t, appconfig.AnyHTTPAPIConfig(types.RunConfig{CORSAllowedOrigins: []string{"https://app.example.com"}}))
+	assert.True(t, appconfig.AnyHTTPAPIConfig(types.RunConfig{APIHostChanged: true}))
+	assert.True(t, appconfig.AnyHTTPAPIConfig(types.RunConfig{APIPortChanged: true}))
+	assert.True(t, appconfig.AnyHTTPAPIConfig(types.RunConfig{APIRateLimitChanged: true}))
 }
 
 func TestHTTPAPIEndpointsEnabled(t *testing.T) {
 	t.Parallel()
 
-	assert.False(t, httpAPIEndpointsEnabled(types.RunConfig{}))
-	assert.True(t, httpAPIEndpointsEnabled(types.RunConfig{EnableHealthAPI: true}))
-	assert.True(t, httpAPIEndpointsEnabled(types.RunConfig{EnableUpdateAPI: true}))
+	assert.False(t, appconfig.HTTPAPIEndpointsEnabled(types.RunConfig{}))
+	assert.True(t, appconfig.HTTPAPIEndpointsEnabled(types.RunConfig{EnableHealthAPI: true}))
+	assert.True(t, appconfig.HTTPAPIEndpointsEnabled(types.RunConfig{EnableUpdateAPI: true}))
 }
 
 func TestRootCommand_ReviveStoppedFlagParsing(t *testing.T) {

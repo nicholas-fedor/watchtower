@@ -3,12 +3,10 @@ package flags
 import (
 	"errors"
 	"fmt"
-	"math"
 	"os"
 	"regexp"
 	"strings"
 	"testing"
-	"time"
 
 	"github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
@@ -16,6 +14,8 @@ import (
 	"github.com/spf13/viper"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+
+	"github.com/nicholas-fedor/watchtower/internal/flags/utils"
 )
 
 //nolint:godox
@@ -33,6 +33,54 @@ func newTestCommand() *cobra.Command {
 	RegisterNotificationFlags(cmd)
 
 	return cmd
+}
+
+// parseWithEnv parses flags then applies environment values (mirrors production preRun).
+func parseWithEnv(t *testing.T, cmd *cobra.Command, args ...string) {
+	t.Helper()
+
+	require.NoError(t, cmd.ParseFlags(args))
+	require.NoError(t, ApplyEnvToFlags(cmd.PersistentFlags(), AllSpecs()))
+}
+
+// TestApplyEnvToFlags_DoesNotMarkChanged ensures env bridging leaves pflag.Changed false
+// so API *Changed fields only reflect CLI overrides.
+func TestApplyEnvToFlags_DoesNotMarkChanged(t *testing.T) {
+	t.Setenv("WATCHTOWER_HTTP_API_HOST", "127.0.0.1")
+	t.Setenv("WATCHTOWER_HTTP_API_PORT", "9090")
+	t.Setenv("WATCHTOWER_HTTP_API_RATE_LIMIT", "30")
+	t.Setenv("WATCHTOWER_TIMEOUT", "45")
+	t.Setenv("WATCHTOWER_NOTIFICATION_URL", "slack://hook discord://token")
+
+	cmd := newTestCommand()
+	parseWithEnv(t, cmd)
+
+	flagSet := cmd.PersistentFlags()
+
+	assert.False(t, flagSet.Changed("http-api-host"), "env must not mark host Changed")
+	assert.False(t, flagSet.Changed("http-api-port"), "env must not mark port Changed")
+	assert.False(t, flagSet.Changed("http-api-rate-limit"), "env must not mark rate-limit Changed")
+	assert.False(t, flagSet.Changed("stop-timeout"), "env must not mark stop-timeout Changed")
+	assert.False(t, flagSet.Changed("notification-url"), "env must not mark slice Changed")
+
+	host, err := flagSet.GetString("http-api-host")
+	require.NoError(t, err)
+	assert.Equal(t, "127.0.0.1", host)
+
+	port, err := flagSet.GetString("http-api-port")
+	require.NoError(t, err)
+	assert.Equal(t, "9090", port)
+
+	// CLI still marks Changed and wins over env.
+	t.Setenv("WATCHTOWER_HTTP_API_HOST", "10.0.0.1")
+
+	cmdCLI := newTestCommand()
+	parseWithEnv(t, cmdCLI, "--http-api-host", "192.168.1.1")
+
+	assert.True(t, cmdCLI.PersistentFlags().Changed("http-api-host"))
+	cliHost, err := cmdCLI.PersistentFlags().GetString("http-api-host")
+	require.NoError(t, err)
+	assert.Equal(t, "192.168.1.1", cliHost)
 }
 
 // TestEnvConfig tests EnvConfig functionality with various configurations.
@@ -286,7 +334,15 @@ func TestEnvConfig(t *testing.T) {
 
 			if tc.expectError {
 				require.Error(t, err)
-				assert.Contains(t, err.Error(), "failed to set flag value")
+				// Partial flag registration fails during BindAll (flag not registered)
+				// or when setting Docker env vars.
+				errMsg := err.Error()
+				assert.True(t,
+					strings.Contains(errMsg, "failed to set flag value") ||
+						strings.Contains(errMsg, "not registered") ||
+						strings.Contains(errMsg, "bind docker"),
+					"unexpected error: %s", errMsg,
+				)
 
 				return
 			}
@@ -719,23 +775,6 @@ func TestFlagsArePresentInDocumentation(t *testing.T) {
 	}
 }
 
-// TestReadFlags_FlagErrors tests error handling in ReadFlags with mocked logrus.Fatal.
-func TestReadFlags_FlagErrors(t *testing.T) {
-	originalExit := logrus.StandardLogger().ExitFunc
-
-	defer func() { logrus.StandardLogger().ExitFunc = originalExit }()
-
-	logrus.StandardLogger().ExitFunc = func(_ int) { panic("FATAL") }
-
-	cmd := new(cobra.Command)
-
-	SetDefaults()
-	// Don't register flags to force retrieval errors
-	assert.PanicsWithValue(t, "FATAL", func() {
-		ReadFlags(cmd)
-	})
-}
-
 // TestSetEnvOptStr_Error tests error handling in setEnvOptStr.
 // Note: This test is limited without mocking os.Setenv; real failure requires system-specific conditions.
 func TestSetEnvOptStr_Error(t *testing.T) {
@@ -869,22 +908,6 @@ func TestGetSecretFromFile_ParameterlessLoggerAndMockURLs(t *testing.T) {
 	assert.Equal(t, []string{"logger://", "mock://", "discord://token@webhookid"}, urls)
 }
 
-func TestReadFlags_Errors(t *testing.T) {
-	originalExit := logrus.StandardLogger().ExitFunc
-
-	defer func() { logrus.StandardLogger().ExitFunc = originalExit }()
-
-	logrus.StandardLogger().ExitFunc = func(_ int) { panic("FATAL") }
-
-	cmd := new(cobra.Command)
-
-	SetDefaults()
-	// Don't register flags to force errors
-	assert.PanicsWithValue(t, "FATAL", func() {
-		ReadFlags(cmd)
-	})
-}
-
 // TestGetSecretFromFile_CloseError tests file closing errors (simplified without full mocking).
 func TestGetSecretFromFile_CloseError(t *testing.T) {
 	cmd := new(cobra.Command)
@@ -1013,7 +1036,7 @@ func testGetSecretsFromFiles(t *testing.T, flagName, expected string, args ...st
 	SetDefaults()
 	RegisterSystemFlags(cmd)
 	RegisterNotificationFlags(cmd)
-	require.NoError(t, cmd.ParseFlags(args))
+	parseWithEnv(t, cmd, args...)
 	GetSecretsFromFiles(cmd)
 	flag := cmd.PersistentFlags().Lookup(flagName)
 	require.NotNil(t, flag)
@@ -1070,9 +1093,7 @@ func TestUpdateOnStart(t *testing.T) {
 
 			SetDefaults()
 			RegisterSystemFlags(cmd)
-
-			err := cmd.ParseFlags(tc.flags)
-			require.NoError(t, err)
+			parseWithEnv(t, cmd, tc.flags...)
 
 			updateOnStart, err := cmd.PersistentFlags().GetBool("update-on-start")
 			require.NoError(t, err)
@@ -1090,9 +1111,7 @@ func TestWatchtowerNotificationsEnvironmentVariable(t *testing.T) {
 
 	SetDefaults()
 	RegisterNotificationFlags(cmd)
-
-	err := cmd.ParseFlags([]string{})
-	require.NoError(t, err)
+	parseWithEnv(t, cmd)
 
 	notifications, err := cmd.PersistentFlags().GetStringSlice("notifications")
 	require.NoError(t, err)
@@ -1109,9 +1128,7 @@ func TestWatchtowerNotificationURLEnvironmentVariable(t *testing.T) {
 
 	SetDefaults()
 	RegisterNotificationFlags(cmd)
-
-	err := cmd.ParseFlags([]string{})
-	require.NoError(t, err)
+	parseWithEnv(t, cmd)
 
 	urls, err := cmd.PersistentFlags().GetStringArray("notification-url")
 	require.NoError(t, err)
@@ -1132,9 +1149,7 @@ func TestNotificationEnvVarsDoNotAffectContainerFiltering(t *testing.T) {
 	SetDefaults()
 	RegisterSystemFlags(cmd)
 	RegisterNotificationFlags(cmd)
-
-	err := cmd.ParseFlags([]string{})
-	require.NoError(t, err)
+	parseWithEnv(t, cmd)
 
 	disableContainers, err := cmd.PersistentFlags().GetStringSlice("disable-containers")
 	require.NoError(t, err)
@@ -1212,9 +1227,7 @@ func TestNotificationsConfigurationFromEnvVarsVsFlags(t *testing.T) {
 
 			SetDefaults()
 			RegisterNotificationFlags(cmd)
-
-			err := cmd.ParseFlags(tc.flagArgs)
-			require.NoError(t, err)
+			parseWithEnv(t, cmd, tc.flagArgs...)
 
 			notifications, err := cmd.PersistentFlags().GetStringSlice("notifications")
 			require.NoError(t, err)
@@ -1237,9 +1250,7 @@ func TestNotificationURLParsingWithMixedSeparators(t *testing.T) {
 
 	SetDefaults()
 	RegisterNotificationFlags(cmd)
-
-	err := cmd.ParseFlags([]string{})
-	require.NoError(t, err)
+	parseWithEnv(t, cmd)
 
 	urls, err := cmd.PersistentFlags().GetStringArray("notification-url")
 	require.NoError(t, err)
@@ -1256,9 +1267,7 @@ func TestNotificationURLParsingWithInvalidValues(t *testing.T) {
 
 	SetDefaults()
 	RegisterNotificationFlags(cmd)
-
-	err := cmd.ParseFlags([]string{})
-	require.NoError(t, err)
+	parseWithEnv(t, cmd)
 
 	urls, err := cmd.PersistentFlags().GetStringArray("notification-url")
 	require.NoError(t, err)
@@ -1275,9 +1284,7 @@ func TestNotificationURLParsingWithEmptyValues(t *testing.T) {
 
 	SetDefaults()
 	RegisterNotificationFlags(cmd)
-
-	err := cmd.ParseFlags([]string{})
-	require.NoError(t, err)
+	parseWithEnv(t, cmd)
 
 	urls, err := cmd.PersistentFlags().GetStringArray("notification-url")
 	require.NoError(t, err)
@@ -1295,9 +1302,7 @@ func TestNotificationParsingEmptyEnvVar(t *testing.T) {
 
 	SetDefaults()
 	RegisterNotificationFlags(cmd)
-
-	err := cmd.ParseFlags([]string{})
-	require.NoError(t, err)
+	parseWithEnv(t, cmd)
 
 	notifications, err := cmd.PersistentFlags().GetStringSlice("notifications")
 	require.NoError(t, err)
@@ -1313,9 +1318,7 @@ func TestNotificationParsingWhitespaceOnly(t *testing.T) {
 
 	SetDefaults()
 	RegisterNotificationFlags(cmd)
-
-	err := cmd.ParseFlags([]string{})
-	require.NoError(t, err)
+	parseWithEnv(t, cmd)
 
 	notifications, err := cmd.PersistentFlags().GetStringSlice("notifications")
 	require.NoError(t, err)
@@ -1334,9 +1337,7 @@ func TestNotificationParsingSpecialCharsInURLs(t *testing.T) {
 
 	SetDefaults()
 	RegisterNotificationFlags(cmd)
-
-	err := cmd.ParseFlags([]string{})
-	require.NoError(t, err)
+	parseWithEnv(t, cmd)
 
 	urls, err := cmd.PersistentFlags().GetStringArray("notification-url")
 	require.NoError(t, err)
@@ -1357,9 +1358,7 @@ func TestNotificationParsingLongURLs(t *testing.T) {
 
 	SetDefaults()
 	RegisterNotificationFlags(cmd)
-
-	err := cmd.ParseFlags([]string{})
-	require.NoError(t, err)
+	parseWithEnv(t, cmd)
 
 	urls, err := cmd.PersistentFlags().GetStringArray("notification-url")
 	require.NoError(t, err)
@@ -1798,121 +1797,9 @@ func TestNotificationURLParsingComprehensive(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			t.Setenv("WATCHTOWER_NOTIFICATION_URL", tc.envValue)
-
-			cmd := new(cobra.Command)
-
-			SetDefaults()
-			RegisterNotificationFlags(cmd)
-
-			err := cmd.ParseFlags([]string{})
-			require.NoError(t, err)
-
-			urls, err := cmd.PersistentFlags().GetStringArray("notification-url")
-			require.NoError(t, err)
-
+			// List parse is applied at Load from env; unit-test the parser here.
+			urls := utils.FilterEmptyStrings(utils.SplitNotificationValues(tc.envValue))
 			assert.Equal(t, tc.expected, urls)
-		})
-	}
-}
-
-// TestEnvDuration_LegacyBareNumberAsSeconds verifies that bare numeric
-// values supplied for WATCHTOWER_TIMEOUT are interpreted as seconds.
-func TestEnvDuration_LegacyBareNumberAsSeconds(t *testing.T) {
-	tests := []struct {
-		name     string
-		envValue string // "" means ensure unset for default case
-		expected time.Duration
-	}{
-		{
-			name:     "default (no env) is 30s",
-			envValue: "",
-			expected: 30 * time.Second,
-		},
-		{
-			name:     "bare integer as seconds (common legacy)",
-			envValue: "60",
-			expected: 60 * time.Second,
-		},
-		{
-			name:     "larger bare integer",
-			envValue: "300",
-			expected: 300 * time.Second,
-		},
-		{
-			name:     "bare float seconds",
-			envValue: "1.5",
-			expected: 1500 * time.Millisecond,
-		},
-		{
-			name:     "with explicit unit s",
-			envValue: "45s",
-			expected: 45 * time.Second,
-		},
-		{
-			name:     "with unit m",
-			envValue: "2m",
-			expected: 2 * time.Minute,
-		},
-		{
-			name:     "zero value",
-			envValue: "0",
-			expected: 0,
-		},
-		{
-			name:     "negative (parsed as negative; validation in preRun will fatal)",
-			envValue: "-10",
-			expected: -10 * time.Second,
-		},
-		{
-			name:     "invalid non-numeric (viper fallback to zero)",
-			envValue: "abc",
-			expected: 0,
-		},
-		{
-			name:     "invalid multiple decimal points (viper fallback to zero)",
-			envValue: "12.34.56",
-			expected: 0,
-		},
-		{
-			name:     "positive sign prefix",
-			envValue: "+10",
-			expected: 10 * time.Second,
-		},
-		{
-			name:     "whitespace trimmed by envDuration",
-			envValue: "  30  ",
-			expected: 30 * time.Second,
-		},
-		{
-			name:     "very large integer (out of range, viper fallback to zero)",
-			envValue: "1" + strings.Repeat("0", 1000),
-			expected: 0,
-		},
-		{
-			name:     "overflow clamps to max int64",
-			envValue: "9223372038",
-			expected: time.Duration(math.MaxInt64),
-		},
-	}
-
-	for _, tc := range tests {
-		t.Run(tc.name, func(t *testing.T) {
-			if tc.envValue != "" {
-				t.Setenv("WATCHTOWER_TIMEOUT", tc.envValue)
-			} else {
-				_ = os.Unsetenv("WATCHTOWER_TIMEOUT")
-			}
-
-			// Register (with t.Setenv isolation) to capture value via (patched) envDuration at flag creation time
-			SetDefaults()
-
-			cmd := &cobra.Command{}
-			RegisterSystemFlags(cmd)
-
-			got, err := cmd.PersistentFlags().GetDuration("stop-timeout")
-			require.NoError(t, err)
-			assert.Equal(t, tc.expected, got)
 		})
 	}
 }

@@ -39,10 +39,15 @@ func registerUpdateRoute(ctx context.Context, app *fiber.App, auth fiber.Handler
 		Timeout: updateTimeout,
 	}))
 
+	// In blocking HTTP API mode, emit the startup message once when the update route registers.
 	if !opts.UnblockHTTPAPI && opts.WriteStartupMessage != nil {
-		opts.WriteStartupMessage(
-			opts.Command, time.Time{}, opts.FilterDesc, opts.Scope,
-			opts.Client, opts.Notifier, opts.Version, nil,
-		)
+		startup := opts.Startup
+		startup.Sched = time.Time{}
+		startup.Filtering = opts.FilterDesc
+		startup.Scope = opts.Scope
+		startup.Client = opts.Client
+		startup.Notifier = opts.Notifier
+		startup.Version = opts.Version
+		opts.WriteStartupMessage(startup)
 	}
 }

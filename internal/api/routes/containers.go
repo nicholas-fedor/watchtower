@@ -8,7 +8,6 @@ import (
 	"github.com/nicholas-fedor/watchtower/internal/api/config"
 	"github.com/nicholas-fedor/watchtower/internal/api/handlers/containers"
 	"github.com/nicholas-fedor/watchtower/internal/api/handlers/containers/details"
-	"github.com/nicholas-fedor/watchtower/pkg/types"
 )
 
 func registerContainersRoute(app *fiber.App, auth fiber.Handler, opts config.Options) {
@@ -27,11 +26,7 @@ func registerContainersDetailsRoute(app *fiber.App, auth fiber.Handler, opts con
 		return
 	}
 
-	detailsParams := types.UpdateParams{
-		MonitorOnly:     opts.MonitorOnly,
-		NoPull:          opts.NoPull,
-		LabelPrecedence: opts.LabelPrecedence,
-	}
+	detailsParams := config.BuildUpdateParams(opts)
 	handler := details.New(func(ctx context.Context, name, image string) ([]details.ContainerDetails, error) {
 		return details.GetContainerDetails(ctx, opts.Client, opts.Filter, name, image, detailsParams)
 	})

@@ -9,6 +9,7 @@ import (
 	"github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
 
+	notifyConfig "github.com/nicholas-fedor/watchtower/internal/config/notify"
 	"github.com/nicholas-fedor/watchtower/pkg/types"
 )
 
@@ -40,10 +41,10 @@ type msTeamsTypeNotifier struct {
 	webHookURL string
 }
 
-// newMsTeamsNotifier creates a Teams notifier from command-line flags.
+// newMsTeamsNotifier creates a Teams notifier from resolved legacy settings.
 //
 // Parameters:
-//   - cmd: Cobra command with flags.
+//   - legacy: Deprecated MSTeams webhook settings (from process config or flags).
 //
 // Returns:
 //   - types.ConvertibleNotifier: New Teams notifier instance.
@@ -54,11 +55,8 @@ type msTeamsTypeNotifier struct {
 // TODO: Remove newMsTeamsNotifier for the v2 release.
 //
 //nolint:godox
-func newMsTeamsNotifier(cmd *cobra.Command) types.ConvertibleNotifier {
-	flags := cmd.Flags()
-
-	// Extract and validate webhook URL.
-	webHookURL, _ := flags.GetString("notification-msteams-hook")
+func newMsTeamsNotifier(legacy notifyConfig.Legacy) types.ConvertibleNotifier {
+	webHookURL := legacy.MSTeamsHook
 	clog := logrus.WithField("url", webHookURL)
 
 	if len(webHookURL) == 0 {
