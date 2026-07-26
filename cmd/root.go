@@ -610,10 +610,10 @@ func runMain(cfg types.RunConfig) int {
 		logrus.Warn("Published port detected - self-updates disabled.")
 	}
 
-	// Share one complete UpdateParams snapshot with HTTP API and schedule paths.
-	apiBase := baseParams
+	// One UpdateParams snapshot for HTTP API and schedule paths.
+	sharedBase := baseParams
 	if skipSelfUpdate {
-		apiBase.SkipSelfUpdate = true
+		sharedBase.SkipSelfUpdate = true
 	}
 
 	// Mode and HTTP API values for startup messaging (runtime fields filled by callers).
@@ -649,7 +649,7 @@ func runMain(cfg types.RunConfig) int {
 			Filter:                       cfg.Filter,
 			FilterDesc:                   cfg.FilterDesc,
 			UpdateLock:                   updateLock,
-			BaseParams:                   apiBase,
+			BaseParams:                   sharedBase,
 			IncludeStopped:               appCfg.Client.IncludeStopped,
 			IncludeRestarting:            appCfg.Client.IncludeRestarting,
 			LabelEnable:                  appCfg.Filter.LabelEnable,
@@ -691,11 +691,6 @@ func runMain(cfg types.RunConfig) int {
 	// The startup message is skipped here if it was already sent by the HTTP API in blocking mode.
 	startupMessageSent := cfg.EnableUpdateAPI && !cfg.UnblockHTTPAPI
 
-	scheduleBase := baseParams
-	if skipSelfUpdate {
-		scheduleBase.SkipSelfUpdate = true
-	}
-
 	err = scheduling.RunUpgradesOnSchedule(ctx, scheduling.ScheduleDeps{
 		Filter:                     cfg.Filter,
 		FilterDesc:                 cfg.FilterDesc,
@@ -712,7 +707,7 @@ func runMain(cfg types.RunConfig) int {
 		SkipFirstRun:               cleanupOccurred,
 		CurrentWatchtowerContainer: currentWatchtowerContainer,
 		StartupMessageSent:         startupMessageSent,
-		BaseParams:                 scheduleBase,
+		BaseParams:                 sharedBase,
 	})
 	if err != nil {
 		logNotify("Scheduled upgrades failed", err)
