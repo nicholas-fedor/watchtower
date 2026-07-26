@@ -4,14 +4,12 @@ import (
 	"context"
 	"net/http"
 	"testing"
-	"time"
 
-	"github.com/spf13/cobra"
 	"github.com/stretchr/testify/assert"
 
 	"github.com/nicholas-fedor/watchtower/internal/api/config"
+	"github.com/nicholas-fedor/watchtower/internal/logging"
 	"github.com/nicholas-fedor/watchtower/internal/metrics"
-	"github.com/nicholas-fedor/watchtower/pkg/container"
 	"github.com/nicholas-fedor/watchtower/pkg/types"
 )
 
@@ -52,18 +50,20 @@ func TestRegisterUpdateRoute_BuildsFullUpdateParams(t *testing.T) {
 	var got types.UpdateParams
 
 	opts := config.Options{
-		EnableUpdateAPI:     true,
-		UnblockHTTPAPI:      true,
-		Cleanup:             true,
-		ReviveStopped:       true,
-		UseComposeDependsOn: true,
-		NoPull:              true,
-		NoRestart:           true,
-		LifecycleHooks:      true,
-		RollingRestart:      true,
-		LabelPrecedence:     true,
-		SkipSelfUpdate:      true,
-		Filter:              func(_ types.FilterableContainer) bool { return true },
+		EnableUpdateAPI: true,
+		UnblockHTTPAPI:  true,
+		BaseParams: types.UpdateParams{
+			Cleanup:             true,
+			ReviveStopped:       true,
+			UseComposeDependsOn: true,
+			NoPull:              true,
+			NoRestart:           true,
+			LifecycleHooks:      true,
+			RollingRestart:      true,
+			LabelPrecedence:     true,
+			SkipSelfUpdate:      true,
+		},
+		Filter: func(_ types.FilterableContainer) bool { return true },
 		RunUpdatesWithNotifications: func(_ context.Context, _ types.Filter, params types.UpdateParams) *metrics.Metric {
 			got = params
 
@@ -126,15 +126,7 @@ func TestRegisterUpdateRoute_WriteStartupMessageCalledWhenBlocking(t *testing.T)
 		},
 		FilterByImage:  func(_ []string, f types.Filter) types.Filter { return f },
 		DefaultMetrics: func() *metrics.Metrics { return testMetrics },
-		WriteStartupMessage: func(
-			_ *cobra.Command,
-			_ time.Time,
-			_, _ string,
-			_ container.Client,
-			_ types.Notifier,
-			_ string,
-			_ *bool,
-		) {
+		WriteStartupMessage: func(_ logging.StartupParams) {
 			called = true
 		},
 	}

@@ -9,6 +9,7 @@ import (
 	"github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
 
+	notifyConfig "github.com/nicholas-fedor/watchtower/internal/config/notify"
 	"github.com/nicholas-fedor/watchtower/pkg/types"
 )
 
@@ -40,10 +41,10 @@ type slackTypeNotifier struct {
 	IconURL   string // URL icon for messages.
 }
 
-// newSlackNotifier creates a Slack notifier from command-line flags.
+// newSlackNotifier creates a Slack notifier from resolved legacy settings.
 //
 // Parameters:
-//   - c: Cobra command with flags.
+//   - legacy: Deprecated Slack/Discord webhook settings (from process config or flags).
 //
 // Returns:
 //   - types.ConvertibleNotifier: New Slack notifier instance.
@@ -54,15 +55,12 @@ type slackTypeNotifier struct {
 // TODO: Remove newSlackNotifier for the v2 release.
 //
 //nolint:godox
-func newSlackNotifier(c *cobra.Command) types.ConvertibleNotifier {
-	flags := c.Flags()
-
-	// Extract Slack configuration from flags.
-	hookURL, _ := flags.GetString("notification-slack-hook-url")
-	userName, _ := flags.GetString("notification-slack-identifier")
-	channel, _ := flags.GetString("notification-slack-channel")
-	emoji, _ := flags.GetString("notification-slack-icon-emoji")
-	iconURL, _ := flags.GetString("notification-slack-icon-url")
+func newSlackNotifier(legacy notifyConfig.Legacy) types.ConvertibleNotifier {
+	hookURL := legacy.SlackHookURL
+	userName := legacy.SlackIdentifier
+	channel := legacy.SlackChannel
+	emoji := legacy.SlackIconEmoji
+	iconURL := legacy.SlackIconURL
 
 	clog := logrus.WithFields(logrus.Fields{
 		"hook_url": hookURL,
@@ -96,8 +94,13 @@ func newSlackNotifier(c *cobra.Command) types.ConvertibleNotifier {
 // Deprecated: This method is part of the legacy slack notifier and will be removed
 // for the v2 release. Use --notification-url with a slack:// URL instead.
 func (s *slackTypeNotifier) GetURL(_ *cobra.Command) (string, error) {
-	clog := logrus.WithField("hook_url", s.HookURL)
+	clog := logrus.NewEntry(logrus.StandardLogger())
 	clog.Debug("Generating Slack service URL")
+
+	if logrus.IsLevelEnabled(logrus.TraceLevel) {
+		clog.WithField("hook_url", redactServiceURL(s.HookURL)).
+			Trace("Slack hook URL loaded")
+	}
 
 	// Normalize URL and split parts.
 	trimmedURL := strings.TrimRight(s.HookURL, "/")
@@ -121,7 +124,12 @@ func (s *slackTypeNotifier) GetURL(_ *cobra.Command) (string, error) {
 		}
 
 		urlStr := conf.GetURL().String()
-		clog.WithField("service_url", urlStr).Debug("Generated Discord service URL")
+		if logrus.IsLevelEnabled(logrus.TraceLevel) {
+			clog.WithField("service_url", redactServiceURL(urlStr)).
+				Trace("Generated Discord service URL")
+		} else {
+			clog.Debug("Generated Discord service URL")
+		}
 
 		return urlStr, nil
 	}
@@ -151,7 +159,12 @@ func (s *slackTypeNotifier) GetURL(_ *cobra.Command) (string, error) {
 	}
 
 	urlStr := conf.GetURL().String()
-	clog.WithField("service_url", urlStr).Debug("Generated Slack service URL")
+	if logrus.IsLevelEnabled(logrus.TraceLevel) {
+		clog.WithField("service_url", redactServiceURL(urlStr)).
+			Trace("Generated Slack service URL")
+	} else {
+		clog.Debug("Generated Slack service URL")
+	}
 
 	return urlStr, nil
 }

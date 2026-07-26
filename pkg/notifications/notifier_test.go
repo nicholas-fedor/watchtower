@@ -28,7 +28,7 @@ var _ = ginkgo.Describe("notifications", func() {
 			})
 			gomega.Expect(err).NotTo(gomega.HaveOccurred())
 
-			notifier := notifications.NewNotifier(command)
+			notifier := notifications.NewNotifierFromFlags(command)
 
 			gomega.Expect(notifier.GetNames()).To(gomega.BeEmpty())
 		})
@@ -99,25 +99,13 @@ var _ = ginkgo.Describe("notifications", func() {
 		})
 		ginkgo.When("no delay is defined", func() {
 			ginkgo.It("should use the default delay", func() {
-				command := cmd.NewRootCommand()
-				flags.RegisterNotificationFlags(command)
-
-				delay := notifications.GetDelay(command, time.Duration(0))
+				delay := notifications.GetDelay(0, time.Duration(0))
 				gomega.Expect(delay).To(gomega.Equal(time.Duration(0)))
 			})
 		})
 		ginkgo.When("delay is defined", func() {
 			ginkgo.It("should use the specified delay", func() {
-				command := cmd.NewRootCommand()
-				flags.RegisterNotificationFlags(command)
-
-				err := command.ParseFlags([]string{
-					"--notifications-delay",
-					"5",
-				})
-				gomega.Expect(err).NotTo(gomega.HaveOccurred())
-
-				delay := notifications.GetDelay(command, time.Duration(0))
+				delay := notifications.GetDelay(5, time.Duration(0))
 				gomega.Expect(delay).To(gomega.Equal(5 * time.Second))
 			})
 		})
@@ -125,9 +113,7 @@ var _ = ginkgo.Describe("notifications", func() {
 			//nolint:godox
 			// TODO: Remove legacy delay tests when legacy notification types are removed.
 			ginkgo.It("should use the specified legacy delay", func() {
-				command := cmd.NewRootCommand()
-				flags.RegisterNotificationFlags(command)
-				delay := notifications.GetDelay(command, 5*time.Second)
+				delay := notifications.GetDelay(0, 5*time.Second)
 				gomega.Expect(delay).To(gomega.Equal(5 * time.Second))
 			})
 		})
@@ -137,16 +123,7 @@ var _ = ginkgo.Describe("notifications", func() {
 			ginkgo.It(
 				"should use the specified legacy delay and ignore the specified delay",
 				func() {
-					command := cmd.NewRootCommand()
-					flags.RegisterNotificationFlags(command)
-
-					err := command.ParseFlags([]string{
-						"--notifications-delay",
-						"0",
-					})
-					gomega.Expect(err).NotTo(gomega.HaveOccurred())
-
-					delay := notifications.GetDelay(command, 7*time.Second)
+					delay := notifications.GetDelay(5, 7*time.Second)
 					gomega.Expect(delay).To(gomega.Equal(7 * time.Second))
 				},
 			)
@@ -174,7 +151,7 @@ var _ = ginkgo.Describe("notifications", func() {
 				})
 				gomega.Expect(err).NotTo(gomega.HaveOccurred())
 
-				notifier := notifications.NewNotifier(command)
+				notifier := notifications.NewNotifierFromFlags(command)
 				gomega.Expect(notifier).NotTo(gomega.BeNil())
 				gomega.Expect(notifier.GetNames()).To(gomega.ContainElement("logger"))
 			})
@@ -396,7 +373,7 @@ var _ = ginkgo.Describe("notifications", func() {
 				}
 				gomega.Expect(command.ParseFlags(args)).To(gomega.Succeed())
 
-				notifier := notifications.NewNotifier(command)
+				notifier := notifications.NewNotifierFromFlags(command)
 				names := notifier.GetNames()
 				gomega.Expect(names).To(gomega.ContainElement("gotify"))
 
@@ -424,7 +401,7 @@ var _ = ginkgo.Describe("notifications", func() {
 				logrus.SetOutput(io.Discard)
 				defer logrus.SetOutput(os.Stderr)
 
-				notifier := notifications.NewNotifier(command)
+				notifier := notifications.NewNotifierFromFlags(command)
 				names := notifier.GetNames()
 				gomega.Expect(names).To(gomega.ContainElement("gotify"))
 

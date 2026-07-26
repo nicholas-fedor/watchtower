@@ -125,7 +125,7 @@ func (n *shoutrrrTypeNotifier) AddLogHook() {
 	n.hookOnce.Do(func() {
 		n.receiving.Store(true)
 		logrus.AddHook(n)
-		LocalLog.WithField("urls", n.Urls).
+		LocalLog.WithField("urls", redactServiceURLs(n.Urls)).
 			Debug("Added Shoutrrr notifier as logrus hook, starting notification goroutine")
 
 		// Send using a separate goroutine to avoid blocking the main process.

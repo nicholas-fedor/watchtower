@@ -25,20 +25,13 @@
 //		Notifier:                     notifier,
 //		NotificationSplitByContainer: false,
 //		NotificationReport:           false,
-//		Filter:                       filter,
-//		Cleanup:                      true,
-//		NoRestart:                    false,
-//		MonitorOnly:                  false,
-//		LifecycleHooks:               false,
-//		RollingRestart:               false,
-//		LabelPrecedence:              false,
-//		NoPull:                       false,
-//		Timeout:                      30 * time.Second,
-//		LifecycleUID:                 0,
-//		LifecycleGID:                 0,
-//		CPUCopyMode:                  "",
+//		Update: types.UpdateParams{
+//			Filter:  filter,
+//			Cleanup: true,
+//			Timeout: 30 * time.Second,
+//		},
 //	}
-//	metric := actions.RunUpdatesWithNotifications(params)
+//	metric := actions.RunUpdatesWithNotifications(ctx, params)
 //
 // The package integrates with the container package for Docker operations, session package for update reporting, sorter package for container ordering, and lifecycle package for pre/post-update
 // hooks, using logrus for logging operations and errors.
