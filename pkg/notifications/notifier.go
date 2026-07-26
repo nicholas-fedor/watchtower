@@ -7,6 +7,7 @@ import (
 
 	"github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
+	"github.com/spf13/pflag"
 
 	notifyConfig "github.com/nicholas-fedor/watchtower/internal/config/notify"
 	"github.com/nicholas-fedor/watchtower/pkg/types"
@@ -139,6 +140,31 @@ func notifyFromFlags(c *cobra.Command) notifyConfig.Notify {
 	titleTag, _ := flag.GetString("notification-title-tag")
 	emailSubjectTag, _ := flag.GetString("notification-email-subjecttag")
 
+	return notifyConfig.Notify{
+		URLs:            urls,
+		LegacyTypes:     legacyTypes,
+		Level:           level,
+		Template:        template,
+		TemplateFile:    templateFile,
+		Report:          report,
+		LogStdout:       logStdout,
+		SkipTitle:       skipTitle,
+		DelaySeconds:    delaySec,
+		Hostname:        hostname,
+		TitleTag:        titleTag,
+		EmailSubjectTag: emailSubjectTag,
+		Legacy:          legacyFromFlags(flag),
+	}
+}
+
+// legacyFromFlags reads deprecated per-service notification flags into Legacy.
+//
+// Parameters:
+//   - flag: Flag set containing legacy notification options.
+//
+// Returns:
+//   - notifyConfig.Legacy: Email, Slack, MS Teams, and Gotify legacy settings.
+func legacyFromFlags(flag *pflag.FlagSet) notifyConfig.Legacy {
 	emailFrom, _ := flag.GetString("notification-email-from")
 	emailTo, _ := flag.GetString("notification-email-to")
 	emailServer, _ := flag.GetString("notification-email-server")
@@ -157,38 +183,24 @@ func notifyFromFlags(c *cobra.Command) notifyConfig.Notify {
 	gotifyToken, _ := flag.GetString("notification-gotify-token")
 	gotifyTLSSkip, _ := flag.GetBool("notification-gotify-tls-skip-verify")
 
-	return notifyConfig.Notify{
-		URLs:            urls,
-		LegacyTypes:     legacyTypes,
-		Level:           level,
-		Template:        template,
-		TemplateFile:    templateFile,
-		Report:          report,
-		LogStdout:       logStdout,
-		SkipTitle:       skipTitle,
-		DelaySeconds:    delaySec,
-		Hostname:        hostname,
-		TitleTag:        titleTag,
-		EmailSubjectTag: emailSubjectTag,
-		Legacy: notifyConfig.Legacy{
-			EmailFrom:           emailFrom,
-			EmailTo:             emailTo,
-			EmailServer:         emailServer,
-			EmailUser:           emailUser,
-			EmailPassword:       emailPassword,
-			EmailPort:           emailPort,
-			EmailTLSSkipVerify:  emailTLSSkip,
-			EmailDelay:          emailDelay,
-			SlackHookURL:        slackHook,
-			SlackIdentifier:     slackID,
-			SlackChannel:        slackChannel,
-			SlackIconEmoji:      slackEmoji,
-			SlackIconURL:        slackIcon,
-			MSTeamsHook:         msTeamsHook,
-			GotifyURL:           gotifyURL,
-			GotifyToken:         gotifyToken,
-			GotifyTLSSkipVerify: gotifyTLSSkip,
-		},
+	return notifyConfig.Legacy{
+		EmailFrom:           emailFrom,
+		EmailTo:             emailTo,
+		EmailServer:         emailServer,
+		EmailUser:           emailUser,
+		EmailPassword:       emailPassword,
+		EmailPort:           emailPort,
+		EmailTLSSkipVerify:  emailTLSSkip,
+		EmailDelay:          emailDelay,
+		SlackHookURL:        slackHook,
+		SlackIdentifier:     slackID,
+		SlackChannel:        slackChannel,
+		SlackIconEmoji:      slackEmoji,
+		SlackIconURL:        slackIcon,
+		MSTeamsHook:         msTeamsHook,
+		GotifyURL:           gotifyURL,
+		GotifyToken:         gotifyToken,
+		GotifyTLSSkipVerify: gotifyTLSSkip,
 	}
 }
 
