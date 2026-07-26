@@ -121,7 +121,7 @@ func stringSliceValue(
 			continue
 		}
 
-		return parseList(raw, parse)
+		return spec.ParseList(raw, parse)
 	}
 
 	vals := vip.GetStringSlice(name)
@@ -130,18 +130,4 @@ func stringSliceValue(
 	}
 
 	return vals
-}
-
-// parseList applies a ListParseKind to a raw env/default string.
-func parseList(raw string, parse spec.ListParseKind) []string {
-	switch parse {
-	case spec.ListCommaOnly:
-		return utils.SplitCommaOnly(raw)
-	case spec.ListNotificationURLs:
-		return utils.FilterEmptyStrings(utils.SplitNotificationValues(raw))
-	case spec.ListCommaOrSpace, spec.ListNative, spec.ListNone:
-		return utils.SplitCommaOrSpace(raw)
-	default:
-		return utils.SplitCommaOrSpace(raw)
-	}
 }

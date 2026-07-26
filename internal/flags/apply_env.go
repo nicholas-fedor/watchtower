@@ -62,7 +62,7 @@ func applyEnvValue(flagSet *pflag.FlagSet, flagSpec spec.FlagSpec, raw string) e
 
 	switch flagSpec.Kind {
 	case spec.KindStringSlice, spec.KindStringArray:
-		parts := parseEnvList(raw, flagSpec.ListParse)
+		parts := spec.ParseList(raw, flagSpec.ListParse)
 
 		sliceValue, ok := flag.Value.(pflag.SliceValue)
 		if !ok {
@@ -198,19 +198,5 @@ func formatEnvForFlag(flagSpec spec.FlagSpec, raw string) (string, error) {
 		return "", fmt.Errorf("%w: %s handled via Replace", ErrUnsupportedFlagKind, flagSpec.Name)
 	default:
 		return "", fmt.Errorf("%w: %s", ErrUnsupportedFlagKind, flagSpec.Name)
-	}
-}
-
-// parseEnvList splits a raw env list using FlagSpec ListParse.
-func parseEnvList(raw string, parse spec.ListParseKind) []string {
-	switch parse {
-	case spec.ListCommaOnly:
-		return utils.SplitCommaOnly(raw)
-	case spec.ListNotificationURLs:
-		return utils.FilterEmptyStrings(utils.SplitNotificationValues(raw))
-	case spec.ListCommaOrSpace, spec.ListNative, spec.ListNone:
-		return utils.SplitCommaOrSpace(raw)
-	default:
-		return utils.SplitCommaOrSpace(raw)
 	}
 }
