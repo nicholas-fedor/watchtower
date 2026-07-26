@@ -1,7 +1,6 @@
 package config
 
 import (
-	"math"
 	"os"
 	"strconv"
 	"strings"
@@ -72,23 +71,15 @@ func durationValue(
 }
 
 // bareSeconds parses a pure numeric string as seconds.
+//
+// Invalid input yields zero. Overflow is clamped via utils.DurationFromSeconds.
 func bareSeconds(raw string) time.Duration {
 	val, err := strconv.ParseFloat(raw, 64)
 	if err != nil {
 		return 0
 	}
 
-	nanos := val * float64(time.Second)
-
-	if nanos > float64(math.MaxInt64) {
-		return time.Duration(math.MaxInt64)
-	}
-
-	if nanos < float64(math.MinInt64) {
-		return time.Duration(math.MinInt64)
-	}
-
-	return time.Duration(nanos)
+	return utils.DurationFromSeconds(val)
 }
 
 // stringSliceValue reads a string list using the FlagSpec ListParse strategy.
