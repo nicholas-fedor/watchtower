@@ -43,6 +43,31 @@ func parseWithEnv(t *testing.T, cmd *cobra.Command, args ...string) {
 	require.NoError(t, ApplyEnvToFlags(cmd.PersistentFlags(), AllSpecs()))
 }
 
+// TestApplyEnvToFlags_EmptyBoolEnvDoesNotEnable verifies empty non-NO_COLOR bool
+// env vars are treated as unset, while NO_COLOR presence still enables no-color.
+func TestApplyEnvToFlags_EmptyBoolEnvDoesNotEnable(t *testing.T) {
+	t.Setenv("WATCHTOWER_CLEANUP", "")
+	t.Setenv("WATCHTOWER_DEBUG", "")
+	t.Setenv("NO_COLOR", "")
+
+	cmd := newTestCommand()
+	parseWithEnv(t, cmd)
+
+	flagSet := cmd.PersistentFlags()
+
+	cleanup, err := flagSet.GetBool("cleanup")
+	require.NoError(t, err)
+	assert.False(t, cleanup, "empty WATCHTOWER_CLEANUP must not enable cleanup")
+
+	debug, err := flagSet.GetBool("debug")
+	require.NoError(t, err)
+	assert.False(t, debug, "empty WATCHTOWER_DEBUG must not enable debug")
+
+	noColor, err := flagSet.GetBool("no-color")
+	require.NoError(t, err)
+	assert.True(t, noColor, "NO_COLOR presence (empty value) must enable no-color")
+}
+
 // TestApplyEnvToFlags_DoesNotMarkChanged ensures env bridging leaves pflag.Changed false
 // so API *Changed fields only reflect CLI overrides.
 func TestApplyEnvToFlags_DoesNotMarkChanged(t *testing.T) {

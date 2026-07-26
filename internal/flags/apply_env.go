@@ -97,23 +97,52 @@ func applyEnvValue(flagSet *pflag.FlagSet, flagSpec spec.FlagSpec, raw string) e
 	}
 }
 
-// firstEnv returns the first non-empty environment value for the given keys.
+// presenceEmptyEnvKeys are env keys where presence with an empty value means true
+// (https://no-color.org/). All other keys treat empty as unset.
+var presenceEmptyEnvKeys = map[string]struct{}{
+	"NO_COLOR": {},
+}
+
+// firstEnv returns the first usable environment value for the given keys.
+//
+// Empty values are skipped unless the key is in presenceEmptyEnvKeys (NO_COLOR),
+// where presence alone is meaningful.
+//
+// Parameters:
+//   - envKeys: Candidate environment variable names in priority order.
+//
+// Returns:
+//   - string: Raw env value (may be empty only for presenceEmptyEnvKeys).
+//   - bool: True when a usable entry was found.
 func firstEnv(envKeys []string) (string, bool) {
 	for _, key := range envKeys {
-		if raw, ok := os.LookupEnv(key); ok {
-			return raw, true
+		raw, ok := os.LookupEnv(key)
+		if !ok {
+			continue
 		}
+
+		if raw == "" {
+			if _, allowEmpty := presenceEmptyEnvKeys[key]; !allowEmpty {
+				continue
+			}
+		}
+
+		return raw, true
 	}
 
 	return "", false
 }
 
 // formatEnvForFlag converts a raw env string into a pflag.Set value string.
+//
+// For bools, a non-empty value is parsed with strconv.ParseBool. An empty raw
+// value is only accepted for presenceEmptyEnvKeys (NO_COLOR) and means true;
+// firstEnv must not pass empty strings for other keys.
 func formatEnvForFlag(flagSpec spec.FlagSpec, raw string) (string, error) {
 	switch flagSpec.Kind {
 	case spec.KindBool:
-		// NO_COLOR and similar: presence alone means true when value is empty.
 		if raw == "" {
+			// Presence-means-true for NO_COLOR only (see firstEnv / presenceEmptyEnvKeys).
 			return "true", nil
 		}
 
