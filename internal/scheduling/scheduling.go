@@ -108,24 +108,8 @@ type ScheduleDeps struct {
 // Returns:
 //   - error: An error if scheduling fails (e.g., invalid cron spec), nil on successful shutdown.
 func RunUpgradesOnSchedule(ctx context.Context, deps ScheduleDeps) error {
-	filter := deps.Filter
-	filtering := deps.FilterDesc
-	lock := deps.Lock
-	scheduleSpec := deps.ScheduleSpec
-	writeStartupMessage := deps.WriteStartupMessage
-	runUpdatesWithNotifications := deps.RunUpdate
-	client := deps.Client
-	scope := deps.Scope
-	notifier := deps.Notifier
-	metaVersion := deps.MetaVersion
-	updateOnStart := deps.UpdateOnStart
-	skipFirstRun := deps.SkipFirstRun
-	currentWatchtowerContainer := deps.CurrentWatchtowerContainer
-	startupMessageSent := deps.StartupMessageSent
-	baseParams := deps.BaseParams
-	ephemeralSelfUpdate := baseParams.EphemeralSelfUpdate
-
 	// Initialize lock if not provided, ensuring single-update concurrency.
+	lock := deps.Lock
 	if lock == nil {
 		lock = make(chan bool, 1)
 		lock <- true
@@ -150,9 +134,9 @@ func RunUpgradesOnSchedule(ctx context.Context, deps ScheduleDeps) error {
 	// while the new container tries to bind it, resulting in both containers being stopped.
 	// Ephemeral self-updates are exempt from this restriction because they remove
 	// the old container before creating the new one, avoiding port conflicts.
-	skipSelfUpdateForPorts := currentWatchtowerContainer != nil &&
-		currentWatchtowerContainer.HasExposedPorts() &&
-		!ephemeralSelfUpdate
+	skipSelfUpdateForPorts := deps.CurrentWatchtowerContainer != nil &&
+		deps.CurrentWatchtowerContainer.HasExposedPorts() &&
+		!deps.BaseParams.EphemeralSelfUpdate
 
 	// Define the update function to be used both for scheduled runs and immediate execution.
 	// skipWatchtowerSelfUpdate: whether to skip updating the Watchtower container itself
@@ -167,10 +151,10 @@ func RunUpgradesOnSchedule(ctx context.Context, deps ScheduleDeps) error {
 		}
 
 		// Skip update if this is a Watchtower parent container (from self-update chain)
-		if currentWatchtowerContainer != nil {
-			chain, _ := currentWatchtowerContainer.GetContainerChain()
+		if deps.CurrentWatchtowerContainer != nil {
+			chain, _ := deps.CurrentWatchtowerContainer.GetContainerChain()
 
-			if container.IsWatchtowerParent(currentWatchtowerContainer.ID(), chain) {
+			if container.IsWatchtowerParent(deps.CurrentWatchtowerContainer.ID(), chain) {
 				logrus.Debug("Skipping scheduled update for Watchtower parent container")
 
 				nextRuns := scheduler.Entries()
@@ -202,21 +186,21 @@ func RunUpgradesOnSchedule(ctx context.Context, deps ScheduleDeps) error {
 			}
 		}
 
-		params := baseParams
+		params := deps.BaseParams
 		params.RunOnce = false
 		params.SkipSelfUpdate = skipWatchtowerSelfUpdate
 
 		// One filter for this tick: schedule filter when set, else BaseParams.
 		// Keep params.Filter and the positional argument identical so
 		// runUpdatesWithNotifications cannot prefer a divergent source.
-		updateFilter := filter
+		updateFilter := deps.Filter
 		if updateFilter == nil {
 			updateFilter = params.Filter
 		}
 
 		params.Filter = updateFilter
 
-		metric := runUpdatesWithNotifications(ctx, updateFilter, params)
+		metric := deps.RunUpdate(ctx, updateFilter, params)
 		if metric != nil {
 			metrics.Default().RegisterScan(metric)
 		}
@@ -234,7 +218,7 @@ func RunUpgradesOnSchedule(ctx context.Context, deps ScheduleDeps) error {
 
 	// If Watchtower has performed a self-cleanup, then prevent Watchtower
 	// from self-updating during the first update cycle.
-	if skipFirstRun {
+	if deps.SkipFirstRun {
 		var firstRun atomic.Uint32 // atomic flag to track if this is the first run
 
 		scheduledUpdateFunc = func() {
@@ -253,9 +237,8 @@ func RunUpgradesOnSchedule(ctx context.Context, deps ScheduleDeps) error {
 	}
 
 	// Add the update function to the cron schedule, handling concurrency and metrics.
+	scheduleSpec := strings.Trim(deps.ScheduleSpec, `"'`)
 	if scheduleSpec != "" {
-		scheduleSpec = strings.Trim(scheduleSpec, `"'`)
-
 		_, err := scheduler.AddFunc(
 			scheduleSpec,
 			scheduledUpdateFunc)
@@ -273,20 +256,20 @@ func RunUpgradesOnSchedule(ctx context.Context, deps ScheduleDeps) error {
 
 	// Log startup message with the first scheduled run time.
 	// Skip if the startup message was already sent (for example by the HTTP API in blocking mode).
-	if !startupMessageSent && writeStartupMessage != nil {
+	if !deps.StartupMessageSent && deps.WriteStartupMessage != nil {
 		startup := deps.Startup
 		startup.Sched = nextRun
-		startup.Filtering = filtering
-		startup.Scope = scope
-		startup.Client = client
-		startup.Notifier = notifier
-		startup.Version = metaVersion
-		startup.UpdateOnStart = &updateOnStart
-		writeStartupMessage(startup)
+		startup.Filtering = deps.FilterDesc
+		startup.Scope = deps.Scope
+		startup.Client = deps.Client
+		startup.Notifier = deps.Notifier
+		startup.Version = deps.MetaVersion
+		startup.UpdateOnStart = &deps.UpdateOnStart
+		deps.WriteStartupMessage(startup)
 	}
 
 	// Check if update-on-start is enabled and trigger immediate update if so.
-	if updateOnStart {
+	if deps.UpdateOnStart {
 		updateFunc(false, false)
 	}
 
@@ -316,8 +299,8 @@ func RunUpgradesOnSchedule(ctx context.Context, deps ScheduleDeps) error {
 	WaitForRunningUpdate(ctx, lock)
 
 	// Close the notification system to clean up resources during shutdown.
-	if notifier != nil {
-		notifier.Close()
+	if deps.Notifier != nil {
+		deps.Notifier.Close()
 	}
 
 	logrus.Debug("Scheduler stopped and update completed.")
