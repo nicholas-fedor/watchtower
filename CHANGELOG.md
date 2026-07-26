@@ -8,6 +8,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- Centralize watchtower configuration management by @nicholas-fedor in [#2035](https://github.com/nicholas-fedor/watchtower/pull/2035)
+
 ### Chores
 
 - Update module github.com/docker/go-connections to v0.8.0 by @renovate[bot] in [#2033](https://github.com/nicholas-fedor/watchtower/pull/2033)
