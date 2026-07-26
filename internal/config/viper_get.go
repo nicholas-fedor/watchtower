@@ -1,6 +1,7 @@
 package config
 
 import (
+	"fmt"
 	"os"
 	"strconv"
 	"strings"
@@ -50,7 +51,14 @@ func durationValue(
 		envSeen = true
 
 		if utils.IsPureNumeric(raw) {
-			return bareSeconds(raw)
+			d, err := bareSeconds(raw)
+			if err == nil {
+				return d
+			}
+
+			// Unparseable bare number (for example out-of-range float): same as
+			// other invalid env values — fall back to the pflag default below.
+			break
 		}
 
 		d, err := time.ParseDuration(raw)
@@ -72,14 +80,22 @@ func durationValue(
 
 // bareSeconds parses a pure numeric string as seconds.
 //
-// Invalid input yields zero. Overflow is clamped via utils.DurationFromSeconds.
-func bareSeconds(raw string) time.Duration {
+// Overflow is clamped via utils.DurationFromSeconds. Invalid input returns an error
+// so callers can fall back to the static default.
+//
+// Parameters:
+//   - raw: Pure numeric string (no duration unit suffix).
+//
+// Returns:
+//   - time.Duration: Parsed duration in seconds when successful.
+//   - error: Non-nil when raw cannot be parsed as a float.
+func bareSeconds(raw string) (time.Duration, error) {
 	val, err := strconv.ParseFloat(raw, 64)
 	if err != nil {
-		return 0
+		return 0, fmt.Errorf("parse bare seconds: %w", err)
 	}
 
-	return utils.DurationFromSeconds(val)
+	return utils.DurationFromSeconds(val), nil
 }
 
 // stringSliceValue reads a string list using the FlagSpec ListParse strategy.

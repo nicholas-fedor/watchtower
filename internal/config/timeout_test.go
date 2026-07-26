@@ -37,9 +37,9 @@ func TestStopTimeout_LegacyBareNumberAsSeconds(t *testing.T) {
 		{name: "positive sign prefix", envValue: "+10", expected: 10 * time.Second},
 		{name: "whitespace trimmed", envValue: "  30  ", expected: 30 * time.Second},
 		{
-			name:     "unparseable huge integer treated as zero bare seconds",
+			name:     "unparseable huge integer falls back to default",
 			envValue: "1" + strings.Repeat("0", 1000),
-			expected: 0,
+			expected: 30 * time.Second,
 		},
 		{
 			name:     "overflow clamps to max int64",
