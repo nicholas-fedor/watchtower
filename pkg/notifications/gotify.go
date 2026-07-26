@@ -151,8 +151,13 @@ func requireGotifyURL(gotifyURL string) string {
 // Deprecated: This method is part of the legacy gotify notifier and will be removed
 // for the v2 release. Use --notification-url with a gotify:// URL instead.
 func (n *gotifyTypeNotifier) GetURL(_ *cobra.Command) (string, error) {
-	clog := logrus.WithField("url", n.gotifyURL)
+	clog := logrus.NewEntry(logrus.StandardLogger())
 	clog.Debug("Generating Gotify service URL")
+
+	if logrus.IsLevelEnabled(logrus.TraceLevel) {
+		clog.WithField("url", n.gotifyURL).
+			Trace("Gotify API URL loaded")
+	}
 
 	// Parse the API URL.
 	apiURL, err := url.Parse(n.gotifyURL)
@@ -171,10 +176,15 @@ func (n *gotifyTypeNotifier) GetURL(_ *cobra.Command) (string, error) {
 	}
 
 	urlStr := config.GetURL().String()
-	clog.WithFields(logrus.Fields{
-		"service_url": urlStr,
-		"disable_tls": apiURL.Scheme == "http",
-	}).Debug("Generated Gotify service URL")
+
+	clog.WithField("disable_tls", apiURL.Scheme == "http").
+		Debug("Generated Gotify service URL")
+
+	// Service URL embeds the app token; log only at trace.
+	if logrus.IsLevelEnabled(logrus.TraceLevel) {
+		clog.WithField("service_url", urlStr).
+			Trace("Generated Gotify service URL")
+	}
 
 	return urlStr, nil
 }

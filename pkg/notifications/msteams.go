@@ -80,8 +80,13 @@ func newMsTeamsNotifier(legacy notifyConfig.Legacy) types.ConvertibleNotifier {
 // Deprecated: This method is part of the legacy msteams notifier and will be removed
 // for the v2 release. Use --notification-url with a teams:// URL instead.
 func (n *msTeamsTypeNotifier) GetURL(_ *cobra.Command) (string, error) {
-	clog := logrus.WithField("url", n.webHookURL)
+	clog := logrus.NewEntry(logrus.StandardLogger())
 	clog.Debug("Generating Microsoft Teams service URL")
+
+	if logrus.IsLevelEnabled(logrus.TraceLevel) {
+		clog.WithField("url", n.webHookURL).
+			Trace("Microsoft Teams webhook URL loaded")
+	}
 
 	// Validate the webhook URL is parseable and absolute.
 	parsed, err := url.Parse(n.webHookURL)
@@ -102,7 +107,12 @@ func (n *msTeamsTypeNotifier) GetURL(_ *cobra.Command) (string, error) {
 	}
 
 	urlStr := config.GetURL().String()
-	clog.WithField("service_url", urlStr).Debug("Generated Microsoft Teams service URL")
+	if logrus.IsLevelEnabled(logrus.TraceLevel) {
+		clog.WithField("service_url", urlStr).
+			Trace("Generated Microsoft Teams service URL")
+	} else {
+		clog.Debug("Generated Microsoft Teams service URL")
+	}
 
 	return urlStr, nil
 }
