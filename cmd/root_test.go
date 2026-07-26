@@ -470,6 +470,26 @@ func TestHandleAsync(t *testing.T) {
 	}
 }
 
+// testScheduleDeps returns ScheduleDeps with shared defaults for cmd scheduling tests.
+// Callers set Filter, FilterDesc, Lock, UpdateOnStart, and BaseParams.EphemeralSelfUpdate as needed.
+func testScheduleDeps(
+	filter types.Filter,
+	filterDesc string,
+	lock chan bool,
+	updateOnStart bool,
+) scheduling.ScheduleDeps {
+	return scheduling.ScheduleDeps{
+		Filter:              filter,
+		FilterDesc:          filterDesc,
+		Lock:                lock,
+		ScheduleSpec:        "",
+		WriteStartupMessage: logging.WriteStartupMessage,
+		RunUpdate:           runUpdatesWithNotifications,
+		UpdateOnStart:       updateOnStart,
+		BaseParams:          types.UpdateParams{},
+	}
+}
+
 // TestUpdateOnStartTriggersImmediateUpdate verifies that the --update-on-start flag
 // triggers an immediate update before scheduling periodic updates.
 func TestUpdateOnStartTriggersImmediateUpdate(t *testing.T) {
@@ -511,29 +531,8 @@ func TestUpdateOnStartTriggersImmediateUpdate(t *testing.T) {
 	filterDesc := testFilterDesc
 
 	// The function should trigger immediate update and then start scheduler
-	err = scheduling.RunUpgradesOnSchedule(ctx, scheduling.ScheduleDeps{
-		Filter:                     filter,
-		FilterDesc:                 filterDesc,
-		Lock:                       updateLock,
-		ScheduleSpec:               "",
-		WriteStartupMessage:        logging.WriteStartupMessage,
-		RunUpdate:                  runUpdatesWithNotifications,
-		Client:                     nil,
-		Scope:                      "",
-		Notifier:                   nil,
-		MetaVersion:                "",
-		UpdateOnStart:              true,
-		SkipFirstRun:               false,
-		CurrentWatchtowerContainer: nil,
-		StartupMessageSent:         false,
-		BaseParams: types.UpdateParams{
-			Cleanup:             false,
-			MonitorOnly:         false,
-			EphemeralSelfUpdate: false,
-			ReviveStopped:       false,
-			UseComposeDependsOn: false,
-		},
-	})
+	deps := testScheduleDeps(filter, filterDesc, updateLock, true)
+	err = scheduling.RunUpgradesOnSchedule(ctx, deps)
 
 	// Should not return an error (context cancellation is expected)
 	require.NoError(t, err)
@@ -596,29 +595,8 @@ func TestUpdateOnStartIntegratesWithCronScheduling(t *testing.T) {
 		filterDesc := testFilterDesc
 
 		startTime := time.Now()
-		err = scheduling.RunUpgradesOnSchedule(ctx, scheduling.ScheduleDeps{
-			Filter:                     filter,
-			FilterDesc:                 filterDesc,
-			Lock:                       updateLock,
-			ScheduleSpec:               "",
-			WriteStartupMessage:        logging.WriteStartupMessage,
-			RunUpdate:                  runUpdatesWithNotifications,
-			Client:                     nil,
-			Scope:                      "",
-			Notifier:                   nil,
-			MetaVersion:                "",
-			UpdateOnStart:              true,
-			SkipFirstRun:               false,
-			CurrentWatchtowerContainer: nil,
-			StartupMessageSent:         false,
-			BaseParams: types.UpdateParams{
-				Cleanup:             false,
-				MonitorOnly:         false,
-				EphemeralSelfUpdate: false,
-				ReviveStopped:       false,
-				UseComposeDependsOn: false,
-			},
-		})
+		deps := testScheduleDeps(filter, filterDesc, updateLock, true)
+		err = scheduling.RunUpgradesOnSchedule(ctx, deps)
 
 		// Should not return an error (context cancellation is expected)
 		require.NoError(t, err)
@@ -692,29 +670,8 @@ func TestUpdateOnStartLockingBehavior(t *testing.T) {
 		filter := types.Filter(func(_ types.FilterableContainer) bool { return false })
 		filterDesc := testFilterDesc
 
-		err = scheduling.RunUpgradesOnSchedule(ctx, scheduling.ScheduleDeps{
-			Filter:                     filter,
-			FilterDesc:                 filterDesc,
-			Lock:                       updateLock,
-			ScheduleSpec:               "",
-			WriteStartupMessage:        logging.WriteStartupMessage,
-			RunUpdate:                  runUpdatesWithNotifications,
-			Client:                     nil,
-			Scope:                      "",
-			Notifier:                   nil,
-			MetaVersion:                "",
-			UpdateOnStart:              false,
-			SkipFirstRun:               false,
-			CurrentWatchtowerContainer: nil,
-			StartupMessageSent:         false,
-			BaseParams: types.UpdateParams{
-				Cleanup:             false,
-				MonitorOnly:         false,
-				EphemeralSelfUpdate: false,
-				ReviveStopped:       false,
-				UseComposeDependsOn: false,
-			},
-		})
+		deps := testScheduleDeps(filter, filterDesc, updateLock, false)
+		err = scheduling.RunUpgradesOnSchedule(ctx, deps)
 
 		// Should not return an error
 		require.NoError(t, err)
@@ -769,29 +726,8 @@ func TestUpdateOnStartSelfUpdateScenario(t *testing.T) {
 		filter := types.Filter(func(_ types.FilterableContainer) bool { return true })
 		filterDesc := testFilterDesc
 
-		err = scheduling.RunUpgradesOnSchedule(ctx, scheduling.ScheduleDeps{
-			Filter:                     filter,
-			FilterDesc:                 filterDesc,
-			Lock:                       updateLock,
-			ScheduleSpec:               "",
-			WriteStartupMessage:        logging.WriteStartupMessage,
-			RunUpdate:                  runUpdatesWithNotifications,
-			Client:                     nil,
-			Scope:                      "",
-			Notifier:                   nil,
-			MetaVersion:                "",
-			UpdateOnStart:              updateOnStart,
-			SkipFirstRun:               false,
-			CurrentWatchtowerContainer: nil,
-			StartupMessageSent:         false,
-			BaseParams: types.UpdateParams{
-				Cleanup:             false,
-				MonitorOnly:         false,
-				EphemeralSelfUpdate: false,
-				ReviveStopped:       false,
-				UseComposeDependsOn: false,
-			},
-		})
+		deps := testScheduleDeps(filter, filterDesc, updateLock, updateOnStart)
+		err = scheduling.RunUpgradesOnSchedule(ctx, deps)
 
 		// Should not return an error
 		require.NoError(t, err)
@@ -859,29 +795,8 @@ func TestUpdateOnStartMultiInstanceScenario(t *testing.T) {
 			filter := types.Filter(func(_ types.FilterableContainer) bool { return false })
 			filterDesc := "instance1"
 
-			err := scheduling.RunUpgradesOnSchedule(ctx, scheduling.ScheduleDeps{
-				Filter:                     filter,
-				FilterDesc:                 filterDesc,
-				Lock:                       updateLock,
-				ScheduleSpec:               "",
-				WriteStartupMessage:        logging.WriteStartupMessage,
-				RunUpdate:                  runUpdatesWithNotifications,
-				Client:                     nil,
-				Scope:                      "",
-				Notifier:                   nil,
-				MetaVersion:                "",
-				UpdateOnStart:              updateOnStart1,
-				SkipFirstRun:               false,
-				CurrentWatchtowerContainer: nil,
-				StartupMessageSent:         false,
-				BaseParams: types.UpdateParams{
-					Cleanup:             false,
-					MonitorOnly:         false,
-					EphemeralSelfUpdate: false,
-					ReviveStopped:       false,
-					UseComposeDependsOn: false,
-				},
-			})
+			deps := testScheduleDeps(filter, filterDesc, updateLock, updateOnStart1)
+			err = scheduling.RunUpgradesOnSchedule(ctx, deps)
 			assert.NoError(t, err)
 			completed.Add(1)
 			close(instance1Called)
@@ -894,29 +809,8 @@ func TestUpdateOnStartMultiInstanceScenario(t *testing.T) {
 			filter := types.Filter(func(_ types.FilterableContainer) bool { return false })
 			filterDesc := "instance2"
 
-			err := scheduling.RunUpgradesOnSchedule(ctx, scheduling.ScheduleDeps{
-				Filter:                     filter,
-				FilterDesc:                 filterDesc,
-				Lock:                       updateLock,
-				ScheduleSpec:               "",
-				WriteStartupMessage:        logging.WriteStartupMessage,
-				RunUpdate:                  runUpdatesWithNotifications,
-				Client:                     nil,
-				Scope:                      "",
-				Notifier:                   nil,
-				MetaVersion:                "",
-				UpdateOnStart:              updateOnStart2,
-				SkipFirstRun:               false,
-				CurrentWatchtowerContainer: nil,
-				StartupMessageSent:         false,
-				BaseParams: types.UpdateParams{
-					Cleanup:             false,
-					MonitorOnly:         false,
-					EphemeralSelfUpdate: false,
-					ReviveStopped:       false,
-					UseComposeDependsOn: false,
-				},
-			})
+			deps := testScheduleDeps(filter, filterDesc, updateLock, updateOnStart2)
+			err = scheduling.RunUpgradesOnSchedule(ctx, deps)
 			assert.NoError(t, err)
 			completed.Add(1)
 			close(instance2Called)
@@ -1096,29 +990,8 @@ func TestRunUpgradesOnSchedule_ShutdownWaitsForRunningUpdate(t *testing.T) {
 			filterDesc := testFilterDesc
 
 			// This should start and wait for context cancellation
-			err := scheduling.RunUpgradesOnSchedule(ctx, scheduling.ScheduleDeps{
-				Filter:                     filter,
-				FilterDesc:                 filterDesc,
-				Lock:                       updateLock,
-				ScheduleSpec:               "",
-				WriteStartupMessage:        logging.WriteStartupMessage,
-				RunUpdate:                  runUpdatesWithNotifications,
-				Client:                     nil,
-				Scope:                      "",
-				Notifier:                   nil,
-				MetaVersion:                "",
-				UpdateOnStart:              false,
-				SkipFirstRun:               false,
-				CurrentWatchtowerContainer: nil,
-				StartupMessageSent:         false,
-				BaseParams: types.UpdateParams{
-					Cleanup:             false,
-					MonitorOnly:         false,
-					EphemeralSelfUpdate: false,
-					ReviveStopped:       false,
-					UseComposeDependsOn: false,
-				},
-			})
+			deps := testScheduleDeps(filter, filterDesc, updateLock, false)
+			err = scheduling.RunUpgradesOnSchedule(ctx, deps)
 			assert.NoError(t, err)
 
 			shutdownCompleted <- true
@@ -1263,29 +1136,9 @@ func TestEphemeralSelfUpdateExercisesTruePath(t *testing.T) {
 	filterDesc := testFilterDesc
 
 	// Call RunUpgradesOnSchedule with ephemeralSelfUpdate=true
-	err = scheduling.RunUpgradesOnSchedule(ctx, scheduling.ScheduleDeps{
-		Filter:                     filter,
-		FilterDesc:                 filterDesc,
-		Lock:                       updateLock,
-		ScheduleSpec:               "",
-		WriteStartupMessage:        logging.WriteStartupMessage,
-		RunUpdate:                  runUpdatesWithNotifications,
-		Client:                     nil,
-		Scope:                      "",
-		Notifier:                   nil,
-		MetaVersion:                "",
-		UpdateOnStart:              true,
-		SkipFirstRun:               false,
-		CurrentWatchtowerContainer: nil,
-		StartupMessageSent:         false,
-		BaseParams: types.UpdateParams{
-			Cleanup:             false,
-			MonitorOnly:         false,
-			EphemeralSelfUpdate: true,
-			ReviveStopped:       false,
-			UseComposeDependsOn: false,
-		},
-	})
+	deps := testScheduleDeps(filter, filterDesc, updateLock, true)
+	deps.BaseParams.EphemeralSelfUpdate = true
+	err = scheduling.RunUpgradesOnSchedule(ctx, deps)
 
 	require.NoError(t, err)
 
