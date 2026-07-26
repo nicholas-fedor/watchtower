@@ -9,7 +9,6 @@ import (
 	"github.com/spf13/viper"
 
 	"github.com/nicholas-fedor/watchtower/internal/flags/spec"
-	"github.com/nicholas-fedor/watchtower/internal/flags/utils"
 )
 
 var (
@@ -112,103 +111,6 @@ func applyDefault(vip *viper.Viper, flagSpec spec.FlagSpec) error {
 		}
 	default:
 		return fmt.Errorf("%w: %s", ErrUnsupportedFlagKind, flagSpec.Name)
-	}
-
-	return nil
-}
-
-// RegisterFromSpecs registers pflags from FlagSpec rows using static defaults only.
-//
-// Parameters:
-//   - flagSet: Target flag set.
-//   - specs: Domain flag specifications.
-//
-// Returns:
-//   - error: Non-nil when registration fails.
-func RegisterFromSpecs(flagSet *pflag.FlagSet, specs []spec.FlagSpec) error {
-	for _, flagSpec := range specs {
-		err := registerOne(flagSet, flagSpec)
-		if err != nil {
-			return err
-		}
-	}
-
-	return nil
-}
-
-// registerOne registers a single FlagSpec onto flagSet.
-//
-// Parameters:
-//   - flagSet: Target flag set.
-//   - flagSpec: Flag specification.
-//
-// Returns:
-//   - error: Non-nil when the kind/default is invalid.
-func registerOne(flagSet *pflag.FlagSet, flagSpec spec.FlagSpec) error {
-	switch flagSpec.Kind {
-	case spec.KindBool:
-		def, _ := flagSpec.Default.(bool)
-		if flagSpec.Shorthand != "" {
-			flagSet.BoolP(flagSpec.Name, flagSpec.Shorthand, def, flagSpec.Help)
-		} else {
-			flagSet.Bool(flagSpec.Name, def, flagSpec.Help)
-		}
-	case spec.KindString:
-		def, _ := flagSpec.Default.(string)
-		if flagSpec.Shorthand != "" {
-			flagSet.StringP(flagSpec.Name, flagSpec.Shorthand, def, flagSpec.Help)
-		} else {
-			flagSet.String(flagSpec.Name, def, flagSpec.Help)
-		}
-	case spec.KindInt:
-		def, _ := flagSpec.Default.(int)
-		if flagSpec.Shorthand != "" {
-			flagSet.IntP(flagSpec.Name, flagSpec.Shorthand, def, flagSpec.Help)
-		} else {
-			flagSet.Int(flagSpec.Name, def, flagSpec.Help)
-		}
-	case spec.KindDuration:
-		def, _ := flagSpec.Default.(time.Duration)
-		if flagSpec.Shorthand != "" {
-			flagSet.DurationP(flagSpec.Name, flagSpec.Shorthand, def, flagSpec.Help)
-		} else {
-			flagSet.Duration(flagSpec.Name, def, flagSpec.Help)
-		}
-	case spec.KindStringSlice:
-		def, _ := flagSpec.Default.([]string)
-		if def == nil {
-			def = []string{}
-		}
-
-		if flagSpec.Shorthand != "" {
-			flagSet.StringSliceP(flagSpec.Name, flagSpec.Shorthand, def, flagSpec.Help)
-		} else {
-			flagSet.StringSlice(flagSpec.Name, def, flagSpec.Help)
-		}
-	case spec.KindStringArray:
-		def, _ := flagSpec.Default.([]string)
-		if def == nil {
-			def = []string{}
-		}
-
-		if flagSpec.Shorthand != "" {
-			flagSet.StringArrayP(flagSpec.Name, flagSpec.Shorthand, def, flagSpec.Help)
-		} else {
-			flagSet.StringArray(flagSpec.Name, def, flagSpec.Help)
-		}
-	default:
-		return fmt.Errorf("%w: %s", ErrUnsupportedFlagKind, flagSpec.Name)
-	}
-
-	if flagSpec.Deprecated != "" {
-		utils.MarkFlagDeprecated(flagSet, flagSpec.Name, flagSpec.Deprecated)
-	}
-
-	if flagSpec.Hidden {
-		err := flagSet.MarkHidden(flagSpec.Name)
-		if err != nil {
-			return fmt.Errorf("hide %s: %w", flagSpec.Name, err)
-		}
 	}
 
 	return nil
