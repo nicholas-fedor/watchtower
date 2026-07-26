@@ -210,36 +210,58 @@ func loadLifecycle(vip *viper.Viper) lifecycle.Lifecycle {
 	}
 }
 
+// normalizedStringSlice loads a list flag/env value and applies normalize to each element.
+//
+// Parameters:
+//   - vip: Bound Viper instance.
+//   - flagSet: Parsed flag set.
+//   - name: Flag name.
+//   - envKeys: Environment variable aliases.
+//   - parse: List parse strategy.
+//   - normalize: Per-element transform (for example TrimSpace or NormalizeContainerName).
+//
+// Returns:
+//   - []string: Normalized list (empty when unset).
+func normalizedStringSlice(
+	vip *viper.Viper,
+	flagSet *pflag.FlagSet,
+	name string,
+	envKeys []string,
+	parse spec.ListParseKind,
+	normalize func(string) string,
+) []string {
+	values := stringSliceValue(vip, flagSet, name, envKeys, parse)
+	for i := range values {
+		values[i] = normalize(values[i])
+	}
+
+	return values
+}
+
 // loadFilter reads filter settings, normalizes names, and builds the predicate.
 func loadFilter(vip *viper.Viper, flagSet *pflag.FlagSet, args []string) (filter.Filter, error) {
 	labelEnable := vip.GetBool("label-enable")
 
-	disableContainers := stringSliceValue(
+	disableContainers := normalizedStringSlice(
 		vip, flagSet, "disable-containers",
 		[]string{"WATCHTOWER_DISABLE_CONTAINERS"},
 		spec.ListCommaOrSpace,
+		util.NormalizeContainerName,
 	)
-	for i := range disableContainers {
-		disableContainers[i] = util.NormalizeContainerName(disableContainers[i])
-	}
 
-	monitorImages := stringSliceValue(
+	monitorImages := normalizedStringSlice(
 		vip, flagSet, "monitor-image-names",
 		[]string{"WATCHTOWER_MONITOR_IMAGE_NAMES"},
 		spec.ListCommaOrSpace,
+		strings.TrimSpace,
 	)
-	for i := range monitorImages {
-		monitorImages[i] = strings.TrimSpace(monitorImages[i])
-	}
 
-	skipImages := stringSliceValue(
+	skipImages := normalizedStringSlice(
 		vip, flagSet, "skip-image-names",
 		[]string{"WATCHTOWER_SKIP_IMAGE_NAMES"},
 		spec.ListCommaOrSpace,
+		strings.TrimSpace,
 	)
-	for i := range skipImages {
-		skipImages[i] = strings.TrimSpace(skipImages[i])
-	}
 
 	enableByLabel := stringSliceValue(
 		vip, flagSet, "enable-containers-by-label",
