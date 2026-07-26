@@ -72,7 +72,7 @@ func NewNotifier(cfg notifyConfig.Notify) types.Notifier {
 	legacyTemplate := !cfg.Report
 
 	clog.WithFields(logrus.Fields{
-		"urls":        urls,
+		"url_count":   len(urls),
 		"template":    tplString,
 		"skip_report": !cfg.Report,
 		"stdout":      cfg.LogStdout,
@@ -81,6 +81,11 @@ func NewNotifier(cfg notifyConfig.Notify) types.Notifier {
 		"title":       data.Title,
 		"legacy":      legacyTemplate,
 	}).Debug("Creating notifier with configuration")
+
+	// Notification URLs often embed tokens. Log them only at trace (see email.go / gotify.go).
+	if logrus.IsLevelEnabled(logrus.TraceLevel) {
+		clog.WithField("urls", urls).Trace("Notifier Shoutrrr URLs loaded")
+	}
 
 	return createNotifier(
 		urls,
