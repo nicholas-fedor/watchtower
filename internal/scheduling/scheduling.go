@@ -204,13 +204,19 @@ func RunUpgradesOnSchedule(ctx context.Context, deps ScheduleDeps) error {
 
 		params := baseParams
 		params.RunOnce = false
-
 		params.SkipSelfUpdate = skipWatchtowerSelfUpdate
-		if params.Filter == nil {
-			params.Filter = filter
+
+		// One filter for this tick: schedule filter when set, else BaseParams.
+		// Keep params.Filter and the positional argument identical so
+		// runUpdatesWithNotifications cannot prefer a divergent source.
+		updateFilter := filter
+		if updateFilter == nil {
+			updateFilter = params.Filter
 		}
 
-		metric := runUpdatesWithNotifications(ctx, filter, params)
+		params.Filter = updateFilter
+
+		metric := runUpdatesWithNotifications(ctx, updateFilter, params)
 		if metric != nil {
 			metrics.Default().RegisterScan(metric)
 		}
