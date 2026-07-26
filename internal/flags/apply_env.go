@@ -184,7 +184,8 @@ func formatEnvForFlag(flagSpec spec.FlagSpec, raw string) (string, error) {
 				return "", fmt.Errorf("parse duration seconds: %w", err)
 			}
 
-			return time.Duration(val * float64(time.Second)).String(), nil
+			// Clamp EnvDuration so huge bare-second values do not overflow.
+			return utils.DurationFromSeconds(val).String(), nil
 		}
 
 		d, err := time.ParseDuration(trimmed)

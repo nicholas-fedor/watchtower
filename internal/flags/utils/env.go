@@ -49,6 +49,30 @@ func EnvBool(key string) bool {
 	return viper.GetBool(key)
 }
 
+// DurationFromSeconds converts a floating-point second count to time.Duration.
+//
+// The nanosecond product is clamped to MaxInt64/MinInt64 when it would overflow
+// time.Duration's integer range.
+//
+// Parameters:
+//   - seconds: Duration length in seconds (may be fractional).
+//
+// Returns:
+//   - time.Duration: Clamped duration value.
+func DurationFromSeconds(seconds float64) time.Duration {
+	nanos := seconds * float64(time.Second)
+
+	if nanos > float64(math.MaxInt64) {
+		return time.Duration(math.MaxInt64)
+	}
+
+	if nanos < float64(math.MinInt64) {
+		return time.Duration(math.MinInt64)
+	}
+
+	return time.Duration(nanos)
+}
+
 // EnvDuration fetches a duration from an environment variable.
 //
 // Bare values without a time unit are treated as seconds.
@@ -66,17 +90,7 @@ func EnvDuration(key string) time.Duration {
 		if IsPureNumeric(trimmed) {
 			val, err := strconv.ParseFloat(trimmed, 64)
 			if err == nil {
-				nanos := val * float64(time.Second)
-
-				if nanos > float64(math.MaxInt64) {
-					return time.Duration(math.MaxInt64)
-				}
-
-				if nanos < float64(math.MinInt64) {
-					return time.Duration(math.MinInt64)
-				}
-
-				return time.Duration(nanos)
+				return DurationFromSeconds(val)
 			}
 		}
 	}
