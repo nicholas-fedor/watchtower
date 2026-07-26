@@ -616,8 +616,14 @@ func runMain(cfg types.RunConfig) int {
 		sharedBase.SkipSelfUpdate = true
 	}
 
-	// Mode and HTTP API values for startup messaging (runtime fields filled by callers).
+	// Startup messaging snapshot. Sched/UpdateOnStart are filled by schedule/API callers;
+	// populate the rest here so scheduling does not re-derive them from scalar deps.
 	startupBase := appCfg.StartupParams(cfg)
+	startupBase.Filtering = cfg.FilterDesc
+	startupBase.Scope = appCfg.Filter.Scope
+	startupBase.Client = client
+	startupBase.Notifier = notifier
+	startupBase.Version = meta.Version
 
 	err = api.SetupAndStartAPI(
 		ctx,

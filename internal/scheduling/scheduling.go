@@ -65,18 +65,20 @@ type ScheduleDeps struct {
 	// ScheduleSpec is the cron-formatted schedule string for periodic updates.
 	ScheduleSpec string
 	// Startup holds resolved values for startup messaging (no flag reads).
+	// Callers must set Filtering, Scope, Client, Notifier, and Version on Startup.
+	// RunUpgradesOnSchedule only applies Sched and UpdateOnStart at send time.
 	Startup logging.StartupParams
 	// WriteStartupMessage writes the startup message with scheduling information.
 	WriteStartupMessage func(logging.StartupParams)
 	// RunUpdate performs container updates and sends notifications.
 	RunUpdate func(context.Context, types.Filter, types.UpdateParams) *metrics.Metric
-	// Client is the Docker client used for container operations.
+	// Client is retained for callers. Prefer Startup.Client for messaging.
 	Client container.Client
-	// Scope limits updates to containers matching this Watchtower scope.
+	// Scope is retained for callers. Prefer Startup.Scope for messaging.
 	Scope string
-	// Notifier sends update status messages.
+	// Notifier is closed on schedule shutdown. Prefer Startup.Notifier for messaging.
 	Notifier types.Notifier
-	// MetaVersion is the Watchtower version string used in startup messaging.
+	// MetaVersion is retained for callers. Prefer Startup.Version for messaging.
 	MetaVersion string
 	// UpdateOnStart triggers an immediate update before the scheduler starts.
 	UpdateOnStart bool
@@ -256,14 +258,11 @@ func RunUpgradesOnSchedule(ctx context.Context, deps ScheduleDeps) error {
 
 	// Log startup message with the first scheduled run time.
 	// Skip if the startup message was already sent (for example by the HTTP API in blocking mode).
+	// Startup is the single source of truth for messaging fields (Filtering, Scope, Client,
+	// Notifier, Version). Only apply scheduler-owned runtime values here.
 	if !deps.StartupMessageSent && deps.WriteStartupMessage != nil {
 		startup := deps.Startup
 		startup.Sched = nextRun
-		startup.Filtering = deps.FilterDesc
-		startup.Scope = deps.Scope
-		startup.Client = deps.Client
-		startup.Notifier = deps.Notifier
-		startup.Version = deps.MetaVersion
 		startup.UpdateOnStart = &deps.UpdateOnStart
 		deps.WriteStartupMessage(startup)
 	}
