@@ -246,6 +246,20 @@ func templateData(hostname, titleTag, emailSubjectTag string, skipTitle bool) St
 	}
 }
 
+// legacyNotifierCtor builds a ConvertibleNotifier from resolved legacy settings.
+//
+//nolint:staticcheck // SA1019: legacy ConvertibleNotifier until v2.
+type legacyNotifierCtor func(notifyConfig.Legacy) types.ConvertibleNotifier
+
+// legacyNotifierCtors maps legacy notification type names to constructors.
+// shoutrrr is omitted so those entries are skipped during append.
+var legacyNotifierCtors = map[string]legacyNotifierCtor{
+	emailType:   newEmailNotifier,
+	slackType:   newSlackNotifier,
+	msTeamsType: newMsTeamsNotifier,
+	gotifyType:  newGotifyNotifier,
+}
+
 // appendLegacyURLs adds shoutrrr URLs from legacy notification type names.
 //
 // Parameters:
@@ -271,32 +285,25 @@ func appendLegacyURLs(
 	clog := logrus.WithField("function", "appendLegacyURLs")
 	clog.Debug("Appending legacy notification URLs")
 
-	// Fetch legacy notification types.
 	clog.WithField("types", notificationTypes).
 		Debug("Processing legacy notification types")
 
 	legacyDelay := time.Duration(0)
 
 	for _, notificationType := range notificationTypes {
-		var legacyNotifier types.ConvertibleNotifier
-
-		switch notificationType {
-		case emailType:
-			legacyNotifier = newEmailNotifier(legacy)
-		case slackType:
-			legacyNotifier = newSlackNotifier(legacy)
-		case msTeamsType:
-			legacyNotifier = newMsTeamsNotifier(legacy)
-		case gotifyType:
-			legacyNotifier = newGotifyNotifier(legacy)
-		case shoutrrrType:
+		if notificationType == shoutrrrType {
 			continue
-		default:
+		}
+
+		ctor, ok := legacyNotifierCtors[notificationType]
+		if !ok {
 			clog.WithField("type", notificationType).
 				Fatal("Unknown notification type")
 
 			continue
 		}
+
+		legacyNotifier := ctor(legacy)
 
 		// Generate shoutrrr URL from legacy notifier.
 		shoutrrrURL, err := legacyNotifier.GetURL(nil)
