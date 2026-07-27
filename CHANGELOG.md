@@ -15,6 +15,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Chores
 
+- Update module github.com/moby/moby/client to v0.5.1 by @renovate[bot] in [#2051](https://github.com/nicholas-fedor/watchtower/pull/2051)
+- Update go-openapi packages to v0.28.0 by @renovate[bot] in [#2052](https://github.com/nicholas-fedor/watchtower/pull/2052)
 - Update module github.com/docker/go-connections to v0.8.1 by @renovate[bot] in [#2049](https://github.com/nicholas-fedor/watchtower/pull/2049)
 - Update module github.com/valyala/fasthttp to v1.73.0 by @renovate[bot] in [#2047](https://github.com/nicholas-fedor/watchtower/pull/2047)
 - Update nicholas-fedor/go-proxy-pull-action action to v1.1.34 by @renovate[bot] in [#2044](https://github.com/nicholas-fedor/watchtower/pull/2044)
