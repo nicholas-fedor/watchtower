@@ -15,6 +15,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Chores
 
+- Update module github.com/docker/go-connections to v0.8.1 by @renovate[bot] in [#2049](https://github.com/nicholas-fedor/watchtower/pull/2049)
+- Update module github.com/valyala/fasthttp to v1.73.0 by @renovate[bot] in [#2047](https://github.com/nicholas-fedor/watchtower/pull/2047)
 - Update nicholas-fedor/go-proxy-pull-action action to v1.1.34 by @renovate[bot] in [#2044](https://github.com/nicholas-fedor/watchtower/pull/2044)
 - Update nicholas-fedor/go-proxy-pull-action action to v1.1.33 by @renovate[bot] in [#2042](https://github.com/nicholas-fedor/watchtower/pull/2042)
 - Update module go.yaml.in/yaml/v3 to v3.0.5 by @renovate[bot] in [#2039](https://github.com/nicholas-fedor/watchtower/pull/2039)
@@ -32,6 +34,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Ensure SSE stream lifecycle properly unsubscribes broadcaster by @nicholas-fedor in [#2050](https://github.com/nicholas-fedor/watchtower/pull/2050)
 - Honor UseComposeDependsOn on scheduled update runs by @nicholas-fedor in [#2031](https://github.com/nicholas-fedor/watchtower/pull/2031)
 - Harden self-update failure and cancel recovery by @nicholas-fedor in [#2005](https://github.com/nicholas-fedor/watchtower/pull/2005)
 - Clean up failed recreates and nil host config by @nicholas-fedor in [#2004](https://github.com/nicholas-fedor/watchtower/pull/2004)
