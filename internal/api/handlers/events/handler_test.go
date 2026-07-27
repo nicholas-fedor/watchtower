@@ -1,9 +1,11 @@
 package events
 
 import (
+	"bufio"
 	"context"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 	"time"
 
@@ -312,6 +314,56 @@ func TestHandler_Handle_MaxSubscribersHTTP(t *testing.T) {
 	defer resp.Body.Close()
 
 	assert.Equal(t, fiber.StatusServiceUnavailable, resp.StatusCode)
+}
+
+func TestHandler_Handle_StreamStaysOpenAndDeliversEvent(t *testing.T) {
+	b := NewBroadcaster()
+	h := NewHandler(b, nil)
+
+	app := fiber.New(fiber.Config{})
+	app.Get("/v1/events", h.Handle())
+
+	go func() {
+		time.Sleep(20 * time.Millisecond)
+		b.Publish(Event{
+			Type:      "scan_completed",
+			Timestamp: time.Now().UTC(),
+			Data:      ScanCompletedData{Scanned: 1, Updated: 0, Failed: 0},
+		})
+	}()
+
+	resp, err := app.Test(httptest.NewRequestWithContext(
+		t.Context(),
+		http.MethodGet,
+		"/v1/events",
+		http.NoBody,
+	), fiber.TestConfig{
+		Timeout: 500 * time.Millisecond,
+	})
+	require.NoError(t, err)
+
+	defer resp.Body.Close()
+
+	assert.Equal(t, fiber.StatusOK, resp.StatusCode)
+	assert.Equal(t, "text/event-stream", resp.Header.Get("Content-Type"))
+
+	scanner := bufio.NewScanner(resp.Body)
+	found := false
+
+	for scanner.Scan() {
+		if strings.Contains(scanner.Text(), "event: scan_completed") {
+			found = true
+
+			break
+		}
+	}
+
+	err = scanner.Err()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	require.True(t, found, "expected event not received in stream")
 }
 
 func TestHandler_Handle_OriginCheckPrecedence(t *testing.T) {

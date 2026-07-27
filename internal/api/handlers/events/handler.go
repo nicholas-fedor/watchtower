@@ -67,8 +67,6 @@ func (h *Handler) Handle() fiber.Handler {
 			return err
 		}
 
-		defer h.Broadcaster.Unsubscribe(subCh)
-
 		return h.serveStream(c, subCh, done)
 	}
 }
@@ -147,6 +145,9 @@ func (h *Handler) subscribe() (<-chan Event, <-chan struct{}, error) {
 func (h *Handler) serveStream(c fiber.Ctx, subCh <-chan Event, done <-chan struct{}) error {
 	return sse.New(sse.Config{
 		Retry: sseRetryInterval,
+		OnClose: func(_ fiber.Ctx, _ error) {
+			h.Broadcaster.Unsubscribe(subCh)
+		},
 		Handler: func(c fiber.Ctx, stream *sse.Stream) error {
 			return h.dispatchEvents(stream, subCh, done)
 		},
