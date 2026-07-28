@@ -38,6 +38,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Mark slice flags as changed after docker secret expansion by @nicholas-fedor in [#2060](https://github.com/nicholas-fedor/watchtower/pull/2060)
 - Address command execution bugs and update migration docs by @nicholas-fedor in [#2054](https://github.com/nicholas-fedor/watchtower/pull/2054)
 - Ensure SSE stream lifecycle properly unsubscribes broadcaster by @nicholas-fedor in [#2050](https://github.com/nicholas-fedor/watchtower/pull/2050)
 - Honor UseComposeDependsOn on scheduled update runs by @nicholas-fedor in [#2031](https://github.com/nicholas-fedor/watchtower/pull/2031)
