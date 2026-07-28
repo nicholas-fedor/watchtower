@@ -169,7 +169,7 @@ func runNotifyUpgradeE(cmd *cobra.Command, _ []string) error {
 	// Provide user instructions for retrieving the file, split into two log lines for clarity: a prompt and the exact command.
 	logrus.Info(
 		fmt.Sprintf(
-			"To get the environment file, use: cp %s:%s ./watchtower-notifications.env",
+			"To get the environment file, use: docker cp %s:%s ./watchtower-notifications.env",
 			containerID,
 			outFile.Name(),
 		),

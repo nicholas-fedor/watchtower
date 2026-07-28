@@ -137,7 +137,6 @@ If you have not yet deployed Watchtower or if you want to run `notify-upgrade` a
               WATCHTOWER_NOTIFICATIONS: slack
               WATCHTOWER_NOTIFICATION_SLACK_HOOK_URL: "https://hooks.slack.com/services/AAA/BBB/CCC"
               WATCHTOWER_NOTIFICATION_SLACK_IDENTIFIER: watchtower-server-1
-              WATCHTOWER_NOTIFICATION_SLACK_CHANNEL: "#my-custom-channel"
             volumes:
               - /var/run/docker.sock:/var/run/docker.sock
         ```
@@ -149,7 +148,6 @@ If you have not yet deployed Watchtower or if you want to run `notify-upgrade` a
           -e WATCHTOWER_NOTIFICATIONS=slack \
           -e WATCHTOWER_NOTIFICATION_SLACK_HOOK_URL="https://hooks.slack.com/services/AAA/BBB/CCC" \
           -e WATCHTOWER_NOTIFICATION_SLACK_IDENTIFIER=watchtower-server-1 \
-          -e WATCHTOWER_NOTIFICATION_SLACK_CHANNEL="#my-custom-channel" \
           nickfedor/watchtower \
           notify-upgrade
         ```
@@ -163,7 +161,6 @@ If you have not yet deployed Watchtower or if you want to run `notify-upgrade` a
           --notifications slack \
           --notification-slack-hook-url "https://hooks.slack.com/services/AAA/BBB/CCC" \
           --notification-slack-identifier watchtower-server-1 \
-          --notification-slack-channel "#my-custom-channel"
         ```
 
 === "Microsoft Teams"
@@ -212,7 +209,7 @@ After running `notify-upgrade`, the converted Shoutrrr URL is written to a tempo
 The command logs the exact container path and prints a copy command, for example:
 
 ```text
-INFO To get the environment file, use: cp abc123:watchtower-notif-urls-123456789 ./watchtower-notifications.env
+INFO To get the environment file, use: docker cp abc123:watchtower-notif-urls-123456789 ./watchtower-notifications.env
 ```
 
 Copy it to your local machine with:
@@ -286,7 +283,7 @@ Select the tab that matches your legacy notification service.
         Then copy the resulting file out of the container:
 
         ```bash
-        docker cp watchtower:<CONTAINER>:<FILE_PATH> ./watchtower-notifications.env
+        docker cp <CONTAINER>:<FILE_PATH> ./watchtower-notifications.env
         ```
 
     3. The following converted Shoutrrr URL should be produced:
@@ -314,7 +311,7 @@ Select the tab that matches your legacy notification service.
             docker run -d \
               --name watchtower \
               -v /var/run/docker.sock:/var/run/docker.sock \
-              -e WATCHTOWER_NOTIFICATION_URL=smtp://user@example.com:secret@smtp.example.com:587/?fromaddress=sender@example.com&toaddresses=recipient@example.com&encryption=ExplicitTLS&usestarttls=yes \
+              -e "WATCHTOWER_NOTIFICATION_URL=smtp://user@example.com:secret@smtp.example.com:587/?fromaddress=sender@example.com&toaddresses=recipient@example.com&encryption=ExplicitTLS&usestarttls=yes" \
               -e WATCHTOWER_NOTIFICATIONS_DELAY=10 \
               -e WATCHTOWER_NOTIFICATION_TITLE_TAG=Watchtower \
               nickfedor/watchtower
@@ -383,7 +380,7 @@ Select the tab that matches your legacy notification service.
         Then copy the resulting file out of the container:
 
         ```bash
-        docker cp watchtower:<CONTAINER>:<FILE_PATH> ./watchtower-notifications.env
+        docker cp <CONTAINER>:<FILE_PATH> ./watchtower-notifications.env
         ```
 
     3. The following converted Shoutrrr URL should be produced:
@@ -434,7 +431,6 @@ Select the tab that matches your legacy notification service.
                         WATCHTOWER_NOTIFICATIONS: slack
                         WATCHTOWER_NOTIFICATION_SLACK_HOOK_URL: "https://hooks.slack.com/services/AAA/BBB/CCC"
                         WATCHTOWER_NOTIFICATION_SLACK_IDENTIFIER: watchtower-server-1
-                        WATCHTOWER_NOTIFICATION_SLACK_CHANNEL: "#my-custom-channel"
                     volumes:
                     - /var/run/docker.sock:/var/run/docker.sock
             ```
@@ -444,9 +440,8 @@ Select the tab that matches your legacy notification service.
               --name watchtower \
               -v /var/run/docker.sock:/var/run/docker.sock \
               -e WATCHTOWER_NOTIFICATIONS=slack \
-              -e WATCHTOWER_NOTIFICATION_SLACK_HOOK_URL="https://hooks.slack.com/services/AAA/BBB/CCC" \
-              -e WATCHTOWER_NOTIFICATION_SLACK_IDENTIFIER=watchtower-server-1 \
-              -e WATCHTOWER_NOTIFICATION_SLACK_CHANNEL="#my-custom-channel" \
+          -e WATCHTOWER_NOTIFICATION_SLACK_HOOK_URL="https://hooks.slack.com/services/AAA/BBB/CCC" \
+          -e WATCHTOWER_NOTIFICATION_SLACK_IDENTIFIER=watchtower-server-1 \
               nickfedor/watchtower
             ```
         === "Docker CLI (Flags)"
@@ -457,8 +452,7 @@ Select the tab that matches your legacy notification service.
               nickfedor/watchtower \
               --notifications slack \
               --notification-slack-hook-url "https://hooks.slack.com/services/AAA/BBB/CCC" \
-              --notification-slack-identifier watchtower-server-1 \
-              --notification-slack-channel "#my-custom-channel"
+          --notification-slack-identifier watchtower-server-1 \
             ```
 
     2. With the container running, execute the `notify-upgrade` command:
@@ -470,13 +464,13 @@ Select the tab that matches your legacy notification service.
         Then copy the resulting file out of the container:
 
         ```bash
-        docker cp watchtower:<CONTAINER>:<FILE_PATH> ./watchtower-notifications.env
+        docker cp <CONTAINER>:<FILE_PATH> ./watchtower-notifications.env
         ```
 
     3. The following converted Shoutrrr URL should be produced:
 
         ```text
-        slack://hook:AAA-BBB-CCC@webhook?botname=watchtower&color=%23406170&channel=webhook
+        slack://hook:AAA-BBB-CCC@webhook?botname=watchtower&color=%23406170
         ```
 
     4. Replace the deprecated configuration with the coverted Shoutrrr URL:
@@ -487,7 +481,7 @@ Select the tab that matches your legacy notification service.
                 watchtower:
                     image: nickfedor/watchtower:latest
                     environment:
-                        WATCHTOWER_NOTIFICATION_URL: "slack://hook:AAA-BBB-CCC@webhook?botname=watchtower&color=%23406170&channel=webhook"
+                        WATCHTOWER_NOTIFICATION_URL: "slack://hook:AAA-BBB-CCC@webhook?botname=watchtower&color=%23406170"
                     volumes:
                     - /var/run/docker.sock:/var/run/docker.sock
             ```
@@ -496,7 +490,7 @@ Select the tab that matches your legacy notification service.
             docker run -d \
               --name watchtower \
               -v /var/run/docker.sock:/var/run/docker.sock \
-              -e WATCHTOWER_NOTIFICATION_URL="slack://hook:AAA-BBB-CCC@webhook?botname=watchtower&color=%23406170&channel=webhook" \
+              -e WATCHTOWER_NOTIFICATION_URL="slack://hook:AAA-BBB-CCC@webhook?botname=watchtower&color=%23406170" \
               nickfedor/watchtower
             ```
         === "Docker CLI (Flags)"
@@ -505,7 +499,7 @@ Select the tab that matches your legacy notification service.
               --name watchtower \
               -v /var/run/docker.sock:/var/run/docker.sock \
               nickfedor/watchtower \
-              --notification-url "slack://hook:AAA-BBB-CCC@webhook?botname=watchtower&color=%23406170&channel=webhook"
+              --notification-url "slack://hook:AAA-BBB-CCC@webhook?botname=watchtower&color=%23406170"
             ```
 
 === "Microsoft Teams"
@@ -551,7 +545,7 @@ Select the tab that matches your legacy notification service.
         Then copy the resulting file out of the container:
 
         ```bash
-        docker cp watchtower:<CONTAINER>:<FILE_PATH> ./watchtower-notifications.env
+        docker cp <CONTAINER>:<FILE_PATH> ./watchtower-notifications.env
         ```
 
     3. The following converted Shoutrrr URL should be produced:
@@ -604,12 +598,35 @@ CONTAINER=$(docker compose run -d "${SERVICE}" notify-upgrade)
 
 trap 'docker rm -f "${CONTAINER}" >/dev/null 2>&1 || true' EXIT
 
-FILE=$(docker logs "${CONTAINER}" 2>&1 | grep -oP 'watchtower-notif-urls-[^ ]+' | tail -1 || true)
+if ! docker ps -q --filter "id=${CONTAINER}" | grep -q .; then
+    echo "notify-upgrade container exited before producing output. Logs:" >&2
+    docker logs "${CONTAINER}" >&2 || true
+
+    exit 1
+fi
+
+FILE=""
+TIMEOUT=300
+INTERVAL=2
+ELAPSED=0
+
+while [[ ${ELAPSED} -lt ${TIMEOUT} ]]; do
+    FILE=$(docker logs "${CONTAINER}" 2>&1 | grep -oE 'watchtower-notif-urls-[^ ]+' | tail -1 || true)
+
+    if [[ -n "${FILE}" ]]; then
+        break
+    fi
+
+    sleep "${INTERVAL}"
+
+    ELAPSED=$((ELAPSED + INTERVAL))
+done
 
 if [[ -z "${FILE}" ]]; then
-echo "Failed to locate temporary file path in container logs." >&2
+    echo "Timed out waiting for notify-upgrade output. Logs:" >&2
+    docker logs "${CONTAINER}" >/dev/null 2>&1 || true
 
-exit 1
+    exit 1
 fi
 
 docker cp "${CONTAINER}:${FILE}" "${OUTPUT}"
@@ -621,3 +638,4 @@ cat "${OUTPUT}"
 !!! Important
     - The service must already be defined in `docker-compose.yaml` with your legacy notification environment variables. The script assumes the service name defaults to `watchtower`.
     - The command will self-cleanup after 5 minutes or when the script exits.
+    - Slack channel customization is not preserved by `notify-upgrade`. The generated URL always uses the default `webhook` channel. If you need a custom channel, then manually edit the resulting Shoutrrr URL after migration.
