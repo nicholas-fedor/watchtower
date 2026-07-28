@@ -15,6 +15,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Chores
 
+- Update module github.com/nicholas-fedor/shoutrrr to v0.16.3 by @renovate[bot] in [#2058](https://github.com/nicholas-fedor/watchtower/pull/2058)
 - Update docker/login-action action to v4.5.2 by @renovate[bot] in [#2056](https://github.com/nicholas-fedor/watchtower/pull/2056)
 - Update module github.com/moby/moby/client to v0.5.1 by @renovate[bot] in [#2051](https://github.com/nicholas-fedor/watchtower/pull/2051)
 - Update go-openapi packages to v0.28.0 by @renovate[bot] in [#2052](https://github.com/nicholas-fedor/watchtower/pull/2052)
