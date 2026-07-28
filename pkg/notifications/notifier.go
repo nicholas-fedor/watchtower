@@ -1,6 +1,8 @@
 package notifications
 
 import (
+	"errors"
+	"fmt"
 	"os"
 	"strings"
 	"time"
@@ -20,6 +22,9 @@ const ColorHex = "#406170"
 // ColorInt is the default notification color used for services that support it
 // (as an int value).
 const ColorInt = 0x406170
+
+// errUnknownNotificationType indicates an unsupported legacy notification type name.
+var errUnknownNotificationType = errors.New("unknown notification type")
 
 // NewNotifier constructs the notification client from resolved process settings.
 //
@@ -107,6 +112,49 @@ func NewNotifier(cfg notifyConfig.Notify) types.Notifier {
 //   - types.Notifier: Configured notification client.
 func NewNotifierFromFlags(c *cobra.Command) types.Notifier {
 	return NewNotifier(notifyFromFlags(c))
+}
+
+// BuildURLs builds Shoutrrr notification URLs from resolved notification settings
+// without initializing a notifier.
+//
+// It returns configured URLs plus any legacy Shoutrrr URLs generated from deprecated
+// notification types. Errors are returned instead of causing a fatal exit.
+//
+// Parameters:
+//   - cfg: Notification settings from config.Load (Config.Notify).
+//
+// Returns:
+//   - []string: Shoutrrr URLs ready for output or notification use.
+//   - error: Non-nil if an unknown legacy notification type is specified or if
+//     a legacy notifier fails to generate its URL.
+//
+// TODO: Remove BuildURLs after the v2 release.
+//
+//nolint:godox
+func BuildURLs(cfg notifyConfig.Notify) ([]string, error) {
+	urls := append([]string(nil), cfg.URLs...)
+
+	for _, notificationType := range cfg.LegacyTypes {
+		if notificationType == shoutrrrType {
+			continue
+		}
+
+		ctor, ok := legacyNotifierCtors[notificationType]
+		if !ok {
+			return nil, fmt.Errorf("%w: %q", errUnknownNotificationType, notificationType)
+		}
+
+		legacyNotifier := ctor(cfg.Legacy)
+
+		shoutrrrURL, err := legacyNotifier.GetURL(nil)
+		if err != nil {
+			return nil, fmt.Errorf("create %q notification config: %w", notificationType, err)
+		}
+
+		urls = append(urls, shoutrrrURL)
+	}
+
+	return urls, nil
 }
 
 // notifyFromFlags reads notification-related flags into confignotify.Notify.
