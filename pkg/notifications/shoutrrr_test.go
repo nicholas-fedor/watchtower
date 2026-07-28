@@ -16,6 +16,8 @@ import (
 	"github.com/onsi/gomega/gbytes"
 	"github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 
 	mockActions "github.com/nicholas-fedor/watchtower/internal/actions/mocks"
 	"github.com/nicholas-fedor/watchtower/internal/flags"
@@ -1437,4 +1439,42 @@ func TestCloseWithNoGoroutine(t *testing.T) {
 	case <-time.After(1 * time.Second):
 		t.Fatalf("Close() took too long without goroutine (timeout exceeded)")
 	}
+}
+
+// TestCreateNotifier_FatalsOnBadURL verifies that createNotifier calls Fatal
+// when given a docker-secret file path instead of a valid URL.
+func TestCreateNotifier_FatalsOnBadURL(t *testing.T) {
+	originalExit := logrus.StandardLogger().ExitFunc
+
+	defer func() { logrus.StandardLogger().ExitFunc = originalExit }()
+
+	logrus.StandardLogger().ExitFunc = func(_ int) { panic("FATAL") }
+
+	assert.PanicsWithValue(t, "FATAL", func() {
+		createNotifier(
+			[]string{"/run/secrets/WATCHTOWER_NOTIFICATION_URL"},
+			logrus.InfoLevel,
+			"",
+			true,
+			StaticData{},
+			false,
+			0,
+		)
+	})
+}
+
+// TestCreateNotifier_AcceptsGotifyURLFromFileExpansion verifies that createNotifier
+// succeeds when given a valid Gotify URL matching expanded secret content.
+func TestCreateNotifier_AcceptsGotifyURLFromFileExpansion(t *testing.T) {
+	notifier := createNotifier(
+		[]string{"gotify://gotify.example.com/token123"},
+		logrus.InfoLevel,
+		"",
+		true,
+		StaticData{},
+		false,
+		0,
+	)
+
+	require.NotNil(t, notifier)
 }

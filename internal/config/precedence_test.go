@@ -1,6 +1,7 @@
 package config_test
 
 import (
+	"os"
 	"testing"
 	"time"
 
@@ -29,6 +30,8 @@ func newLoadedCommand(t *testing.T, env map[string]string, args ...string) confi
 	flagSet := cmd.PersistentFlags()
 	require.NoError(t, flags.ApplyEnvToFlags(flagSet, flags.AllSpecs()))
 	flags.ProcessFlagAliases(flagSet)
+
+	flags.GetSecretsFromFiles(cmd)
 
 	cfg, err := config.Load(cmd, nil)
 	require.NoError(t, err)
@@ -173,4 +176,63 @@ func TestLoad_APIChangedReflectsCLIOnly(t *testing.T) {
 		assert.True(t, config.AnyHTTPAPIConfig(run),
 			"CLI host/port/rate-limit should still trip the no-endpoint warning")
 	})
+}
+
+// TestLoad_NotificationURLFromSecretFile_ResolvesContentNotPath verifies that
+// a notification-url env pointing to a file resolves to the file content,
+// not the file path, in Config.Notify.URLs.
+func TestLoad_NotificationURLFromSecretFile_ResolvesContentNotPath(t *testing.T) {
+	file, err := os.CreateTemp(t.TempDir(), "watchtower-")
+	require.NoError(t, err)
+	_, err = file.WriteString("gotify://gotify.example.com/token123")
+	require.NoError(t, err)
+	require.NoError(t, file.Close())
+
+	cfg := newLoadedCommand(t, map[string]string{
+		"WATCHTOWER_NOTIFICATION_URL": file.Name(),
+	})
+
+	require.Len(t, cfg.Notify.URLs, 1)
+	assert.Equal(t, "gotify://gotify.example.com/token123", cfg.Notify.URLs[0])
+	assert.NotContains(t, cfg.Notify.URLs[0], "/run/secrets/")
+}
+
+// TestLoad_KindStringSecretFromFiles_ResolveContent verifies that KindString
+// notification secrets resolve their file contents through config.Load.
+func TestLoad_KindStringSecretFromFiles_ResolveContent(t *testing.T) {
+	emailFile, err := os.CreateTemp(t.TempDir(), "watchtower-")
+	require.NoError(t, err)
+	_, err = emailFile.WriteString("supersecretstring")
+	require.NoError(t, err)
+	require.NoError(t, emailFile.Close())
+
+	slackFile, err := os.CreateTemp(t.TempDir(), "watchtower-")
+	require.NoError(t, err)
+	_, err = slackFile.WriteString("slack://token@channel")
+	require.NoError(t, err)
+	require.NoError(t, slackFile.Close())
+
+	msteamsFile, err := os.CreateTemp(t.TempDir(), "watchtower-")
+	require.NoError(t, err)
+	_, err = msteamsFile.WriteString("https://outlook.office.com/webhook/abc123")
+	require.NoError(t, err)
+	require.NoError(t, msteamsFile.Close())
+
+	gotifyFile, err := os.CreateTemp(t.TempDir(), "watchtower-")
+	require.NoError(t, err)
+	_, err = gotifyFile.WriteString("gotify_token_abc")
+	require.NoError(t, err)
+	require.NoError(t, gotifyFile.Close())
+
+	cfg := newLoadedCommand(t, map[string]string{
+		"WATCHTOWER_NOTIFICATION_EMAIL_SERVER_PASSWORD": emailFile.Name(),
+		"WATCHTOWER_NOTIFICATION_SLACK_HOOK_URL":        slackFile.Name(),
+		"WATCHTOWER_NOTIFICATION_MSTEAMS_HOOK_URL":      msteamsFile.Name(),
+		"WATCHTOWER_NOTIFICATION_GOTIFY_TOKEN":          gotifyFile.Name(),
+	})
+
+	assert.Equal(t, "supersecretstring", cfg.Notify.Legacy.EmailPassword)
+	assert.Equal(t, "slack://token@channel", cfg.Notify.Legacy.SlackHookURL)
+	assert.Equal(t, "https://outlook.office.com/webhook/abc123", cfg.Notify.Legacy.MSTeamsHook)
+	assert.Equal(t, "gotify_token_abc", cfg.Notify.Legacy.GotifyToken)
 }
