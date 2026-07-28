@@ -12,9 +12,11 @@ import (
 	"github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
 
-	appconfig "github.com/nicholas-fedor/watchtower/internal/config"
+	appConfig "github.com/nicholas-fedor/watchtower/internal/config"
 	"github.com/nicholas-fedor/watchtower/internal/flags"
+	"github.com/nicholas-fedor/watchtower/pkg/container"
 	"github.com/nicholas-fedor/watchtower/pkg/notifications"
+	"github.com/nicholas-fedor/watchtower/pkg/types"
 )
 
 // cleanupTimeout defines the duration after which the temporary notification file is removed.
@@ -69,8 +71,8 @@ func runNotifyUpgrade(cmd *cobra.Command, args []string) {
 //     Non-critical failures (e.g., file removal after timeout) are logged but do not result in an error return.
 func runNotifyUpgradeE(cmd *cobra.Command, _ []string) error {
 	// Process flag aliases and expand secrets before resolving configuration.
-	// Use PersistentFlags so env/alias bridging matches config.Load's bind source.
-	flagSet := cmd.PersistentFlags()
+	// Use Root().PersistentFlags so env/alias bridging matches config.Load's bind source across subcommands.
+	flagSet := cmd.Root().PersistentFlags()
 
 	err := flags.ApplyEnvToFlags(flagSet, flags.AllSpecs())
 	if err != nil {
@@ -78,23 +80,31 @@ func runNotifyUpgradeE(cmd *cobra.Command, _ []string) error {
 	}
 
 	flags.ProcessFlagAliases(flagSet)
-	flags.GetSecretsFromFiles(cmd)
 
-	cfg, loadErr := appconfig.Load(cmd, nil)
+	err = flags.SetupLogging(flagSet)
+	if err != nil {
+		return fmt.Errorf("setup logging: %w", err)
+	}
+
+	flags.GetSecretsFromFiles(cmd.Root())
+
+	cfg, loadErr := appConfig.Load(cmd.Root(), nil)
 	if loadErr != nil {
 		return fmt.Errorf("load configuration: %w", loadErr)
 	}
 
-	notifier := notifications.NewNotifier(cfg.Notify)
-	urls := notifier.GetURLs()
+	urls, buildErr := notifications.BuildURLs(cfg.Notify)
+	if buildErr != nil {
+		return fmt.Errorf("build notification URLs: %w", buildErr)
+	}
 
 	// Log the identified notification types (e.g., "email, slack") to inform the user of what configurations are being upgraded.
-	logrus.WithField("notifiers", strings.Join(notifier.GetNames(), ", ")).
+	logrus.WithField("notifiers", strings.Join(cfg.Notify.LegacyTypes, ", ")).
 		Info("Found notification config(s)")
 
-	// Create a temporary file in the root directory with a pattern that ensures uniqueness (e.g., "watchtower-notif-urls-123").
+	// Create a temporary file in the working directory with a pattern that ensures uniqueness (e.g., "watchtower-notif-urls-123").
 	// This file will store the generated URLs for user retrieval.
-	outFile, err := os.CreateTemp("/", "watchtower-notif-urls-*")
+	outFile, err := os.CreateTemp(".", "watchtower-notif-urls-*")
 	if err != nil {
 		// Log the failure with the specific error and return a wrapped error to halt execution, as file creation is critical.
 		logrus.WithError(err).Debug("Temporary file creation failed")
@@ -121,7 +131,7 @@ func runNotifyUpgradeE(cmd *cobra.Command, _ []string) error {
 	}
 
 	// Write the constructed string to the temporary file. This is a critical step, as the file's purpose is to store this data.
-	_, err = fmt.Fprint(outFile, urlBuilder.String())
+	_, err = fmt.Fprintln(outFile, urlBuilder.String())
 	if err != nil {
 		logrus.WithError(err).
 			WithField("file", outFile.Name()).
@@ -144,8 +154,16 @@ func runNotifyUpgradeE(cmd *cobra.Command, _ []string) error {
 	// Use a placeholder ("<CONTAINER>") if this fails, ensuring the user still gets actionable guidance.
 	containerID := "<CONTAINER>"
 
-	if currentWatchtowerContainerID != "" {
-		containerID = currentWatchtowerContainerID.ShortID() // Use the short ID (e.g., "abc123") for brevity in user instructions.
+	var cid types.ContainerID
+
+	cid, err = container.GetContainerIDFromMountinfo()
+	if err == nil && cid != "" {
+		containerID = cid.ShortID()
+	} else {
+		cid, err = container.GetContainerIDFromCgroupFile()
+		if err == nil && cid != "" {
+			containerID = cid.ShortID()
+		}
 	}
 
 	// Provide user instructions for retrieving the file, split into two log lines for clarity: a prompt and the exact command.
