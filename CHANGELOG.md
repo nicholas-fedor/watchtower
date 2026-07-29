@@ -8,6 +8,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- Emit SSE events for the HTTP API check endpoint by @nicholas-fedor in [#2066](https://github.com/nicholas-fedor/watchtower/pull/2066)
+
 ### Chores
 
 - Update docker/login-action action to v4.6.0 by @renovate[bot] in [#2064](https://github.com/nicholas-fedor/watchtower/pull/2064)
