@@ -307,3 +307,12 @@ services:
 
 !!! Warning
     Enabling the HTTP API with port mappings will automatically disable Watchtower's self-update functionality to prevent port conflicts during container recreation. See [Updating Watchtower](../../../getting-started/updating-watchtower/index.md#port_configuration_limitation) for more details.
+
+## SSE Events
+
+When the [`/v1/events`](../events/index.md) SSE endpoint is also enabled, the update process broadcasts the following events:
+
+- `scan_started`:  Broadcasted before the update scan begins
+- `scan_completed`:  Broadcasted after the update scan finishes
+- `scan_failed`:  Broadcasted if the update scan encounters an error
+- `image_cleanup`:  Broadcasted after image cleanup if enabled and images were removed

@@ -84,3 +84,15 @@ The `/v1/check` endpoint returns a JSON array of container check results:
 |     200     | Check completed successfully                   |
 |     401     | Invalid or missing authentication token        |
 |     500     | Internal server error during request processing|
+
+## SSE Events
+
+When the [`/v1/events`](../events/index.md) SSE endpoint is also enabled, execution of the `v1/check` endpoint broadcasts the following events:
+
+- `scan_started`:  Broadcasted before the check begins
+- `scan_completed`: Broadcasted after the check finishes successfully
+- `scan_failed`: Broadcasted if the check encounters an error
+
+!!! Note
+    The `scan_completed` payload always reports `updated: 0` because no updates are applied.
+    The `failed` field counts containers whose per-container check returned an error.

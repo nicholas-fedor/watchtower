@@ -48,12 +48,19 @@ The events endpoint uses a separate token from the main API token to limit blast
 
 - Started
 - Completed
+- Failed
+
+!!! Note
+    Scan events are broadcasted only for updates (HTTP API or scheduled) or checks (HTTP API).
 
 ### Update Events
 
 - Started
 - Completed
 - Failed
+
+!!! Note
+    Update events are broadcasted only for HTTP API or scheduled updates.
 
 ## Event Format
 
