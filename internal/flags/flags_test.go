@@ -1069,28 +1069,28 @@ func TestGetSecretFromFile_SlicePath_MultiLineFile(t *testing.T) {
 // notification URLs survive getSecretFromFile without modification and that
 // Changed=true is set on the processed flag.
 func TestGetSecretFromFile_SlicePath_LiteralURLsUnchanged(t *testing.T) {
-    cmd := newTestCommand()
+	cmd := newTestCommand()
 
-    err := cmd.ParseFlags([]string{
-        "--notification-url", "gotify://gotify.example.com/token123",
-        "--notification-url", "discord://token@channel",
-    })
-    require.NoError(t, err)
-    parseWithEnv(t, cmd)
+	err := cmd.ParseFlags([]string{
+		"--notification-url", "gotify://gotify.example.com/token123",
+		"--notification-url", "discord://token@channel",
+	})
+	require.NoError(t, err)
+	parseWithEnv(t, cmd)
 
-    flag := cmd.PersistentFlags().Lookup("notification-url")
-    require.NotNil(t, flag)
+	flag := cmd.PersistentFlags().Lookup("notification-url")
+	require.NotNil(t, flag)
 
-    err = getSecretFromFile(cmd.PersistentFlags(), "notification-url")
-    require.NoError(t, err)
+	err = getSecretFromFile(cmd.PersistentFlags(), "notification-url")
+	require.NoError(t, err)
 
-    urls, err := cmd.PersistentFlags().GetStringArray("notification-url")
-    require.NoError(t, err)
-    assert.Equal(t, []string{"gotify://gotify.example.com/token123", "discord://token@channel"}, urls)
+	urls, err := cmd.PersistentFlags().GetStringArray("notification-url")
+	require.NoError(t, err)
+	assert.Equal(t, []string{"gotify://gotify.example.com/token123", "discord://token@channel"}, urls)
 
-    // Changed is true after Replace regardless of whether expansion occurred; the
-    // processed value is explicit user config and downstream consumers must read it.
-    assert.True(t, flag.Changed)
+	// Changed is true after Replace regardless of whether expansion occurred; the
+	// processed value is explicit user config and downstream consumers must read it.
+	assert.True(t, flag.Changed)
 }
 
 // TestGetSecretsFromFile_PorcelainAppendPreservedWithSecret verifies that

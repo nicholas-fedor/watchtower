@@ -8,16 +8,26 @@ import (
 	"github.com/gofiber/fiber/v3"
 	"github.com/sirupsen/logrus"
 
+	"github.com/nicholas-fedor/watchtower/internal/api/handlers/events"
 	"github.com/nicholas-fedor/watchtower/pkg/types"
 )
 
 // Handler serves the /v1/check endpoint.
 type Handler struct {
-	check            CheckFunc
-	Path             string
-	maxTimeout       time.Duration
-	notifier         types.Notifier
+	// check is the function that checks container update availability.
+	check CheckFunc
+	// Path is the HTTP route path for the check endpoint.
+	Path string
+	// maxTimeout bounds the optional per-request ?timeout= query parameter.
+	maxTimeout time.Duration
+	// notifier batches log entries during the check to suppress immediate notifications.
+	notifier types.Notifier
+	// splitByContainer sends per-container notifications when true.
 	splitByContainer bool
+	// eventBroadcaster publishes SSE events for check runs.
+	eventBroadcaster *events.Broadcaster
+	// scanStartedData carries redacted policy flags reused for every scan_started event.
+	scanStartedData events.ScanStartedData
 }
 
 // New creates a new check handler backed by the given check function.
@@ -28,13 +38,25 @@ type Handler struct {
 //   - notifier: Optional notification system instance. When provided, notification batching is enabled
 //     during the check to prevent log entries from triggering immediate notifications.
 //   - splitByContainer: When true, notifications are split by container instead of being grouped.
-func New(check CheckFunc, maxTimeout time.Duration, notifier types.Notifier, splitByContainer bool) *Handler {
+//   - eventBroadcaster: Optional SSE broadcaster. When provided, scan_started, scan_completed,
+//     and scan_failed events are emitted during check runs.
+//   - scanStartedData: Pre-built redacted policy flags for the scan_started event.
+func New(
+	check CheckFunc,
+	maxTimeout time.Duration,
+	notifier types.Notifier,
+	splitByContainer bool,
+	eventBroadcaster *events.Broadcaster,
+	scanStartedData events.ScanStartedData,
+) *Handler {
 	return &Handler{
 		check:            check,
 		Path:             "/v1/check",
 		maxTimeout:       maxTimeout,
 		notifier:         notifier,
 		splitByContainer: splitByContainer,
+		eventBroadcaster: eventBroadcaster,
+		scanStartedData:  scanStartedData,
 	}
 }
 
@@ -112,10 +134,30 @@ func (h *Handler) Handle(c fiber.Ctx) error {
 		}()
 	}
 
+	// Notify SSE subscribers that the check scan is starting.
+	if h.eventBroadcaster != nil {
+		h.eventBroadcaster.Publish(events.Event{
+			Type:      "scan_started",
+			Timestamp: time.Now().UTC(),
+			Data:      h.scanStartedData,
+		})
+	}
+
 	results, err := h.check(ctx, images, containers)
 	if err != nil {
 		logrus.WithError(err).WithField("notify", "no").
 			Error("Failed to check for updates")
+
+		// Notify SSE subscribers that the check scan failed.
+		if h.eventBroadcaster != nil {
+			h.eventBroadcaster.Publish(events.Event{
+				Type:      "scan_failed",
+				Timestamp: time.Now().UTC(),
+				Data: events.ScanFailedData{
+					Error: err.Error(),
+				},
+			})
+		}
 
 		sendErr := c.Status(fiber.StatusInternalServerError).
 			SendString("failed to check for updates")
@@ -124,6 +166,28 @@ func (h *Handler) Handle(c fiber.Ctx) error {
 		}
 
 		return nil
+	}
+
+	// Count containers whose per-container check returned an error.
+	failedCount := 0
+
+	for _, r := range results {
+		if r.Error != "" {
+			failedCount++
+		}
+	}
+
+	// Notify SSE subscribers that the check scan completed successfully.
+	if h.eventBroadcaster != nil {
+		h.eventBroadcaster.Publish(events.Event{
+			Type:      "scan_completed",
+			Timestamp: time.Now().UTC(),
+			Data: events.ScanCompletedData{
+				Scanned: len(results),
+				Updated: 0,
+				Failed:  failedCount,
+			},
+		})
 	}
 
 	err = c.Status(fiber.StatusOK).JSON(fiber.Map{
