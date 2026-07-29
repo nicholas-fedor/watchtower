@@ -8,6 +8,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Chores
+
+- Update docker/login-action action to v4.6.0 by @renovate[bot] in [#2064](https://github.com/nicholas-fedor/watchtower/pull/2064)
+- Update module github.com/gofiber/utils/v2 to v2.4.1 by @renovate[bot] in [#2063](https://github.com/nicholas-fedor/watchtower/pull/2063)
+
+## [1.20.2] - 2026-07-28
+
 ### Changed
 
 - Update badges by @nicholas-fedor in [#2037](https://github.com/nicholas-fedor/watchtower/pull/2037)
@@ -3351,7 +3358,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## Compare Releases
 
-- [unreleased](https://github.com/nicholas-fedor/watchtower/compare/v1.20.1...HEAD)
+- [unreleased](https://github.com/nicholas-fedor/watchtower/compare/v1.20.2...HEAD)
+- [1.20.2](https://github.com/nicholas-fedor/watchtower/compare/v1.20.1...v1.20.2)
 - [1.20.1](https://github.com/nicholas-fedor/watchtower/compare/v1.20.0...v1.20.1)
 - [1.20.0](https://github.com/nicholas-fedor/watchtower/compare/v1.19.0...v1.20.0)
 - [1.19.0](https://github.com/nicholas-fedor/watchtower/compare/v1.18.1...v1.19.0)
