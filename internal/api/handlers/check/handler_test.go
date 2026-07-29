@@ -312,7 +312,7 @@ func TestHandler_Handle_EmitsEvents(t *testing.T) {
 					failed = true
 					data, ok := evt.Data.(events.ScanFailedData)
 					require.True(t, ok)
-					assert.Equal(t, "docker api error", data.Error)
+					assert.Equal(t, "failed to check for updates", data.Error)
 				case "scan_completed":
 					t.Fatal("unexpected scan_completed event on error")
 				}
