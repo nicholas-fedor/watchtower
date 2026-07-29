@@ -80,20 +80,7 @@ func RunUpdatesWithNotifications(
 		params.EventBroadcaster.Publish(events.Event{
 			Type:      "scan_started",
 			Timestamp: time.Now().UTC(),
-			Data: events.ScanStartedData{
-				Cleanup:             updateConfig.Cleanup,
-				NoRestart:           updateConfig.NoRestart,
-				MonitorOnly:         updateConfig.MonitorOnly,
-				LifecycleHooks:      updateConfig.LifecycleHooks,
-				RollingRestart:      updateConfig.RollingRestart,
-				LabelPrecedence:     updateConfig.LabelPrecedence,
-				NoPull:              updateConfig.NoPull,
-				RunOnce:             updateConfig.RunOnce,
-				UseComposeDependsOn: updateConfig.UseComposeDependsOn,
-				SkipSelfUpdate:      updateConfig.SkipSelfUpdate,
-				EphemeralSelfUpdate: updateConfig.EphemeralSelfUpdate,
-				ReviveStopped:       updateConfig.ReviveStopped,
-			},
+			Data:      events.NewScanStartedData(updateConfig),
 		})
 	}
 

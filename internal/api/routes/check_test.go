@@ -41,9 +41,10 @@ func TestRegisterCheckRoute(t *testing.T) {
 		mockClient := mockContainer.NewMockClient(t)
 
 		opts := config.Options{
-			EnableCheckAPI: true,
-			Client:         mockClient,
-			FilterByImage:  func(_ []string, f types.Filter) types.Filter { return f },
+			EnableCheckAPI:   true,
+			Client:           mockClient,
+			FilterByImage:    func(_ []string, f types.Filter) types.Filter { return f },
+			EventBroadcaster: events.NewBroadcaster(),
 		}
 
 		registerCheckRoute(app, auth, opts)
