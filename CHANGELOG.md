@@ -14,6 +14,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Chores
 
+- Update nicholas-fedor/go-proxy-pull-action action to v1.1.35 by @renovate[bot] in [#2071](https://github.com/nicholas-fedor/watchtower/pull/2071)
 - Update module github.com/gofiber/contrib/v3/swaggo to v1.0.9 by @renovate[bot] in [#2070](https://github.com/nicholas-fedor/watchtower/pull/2070)
 - Update github/codeql-action action to v4.37.4 by @renovate[bot] in [#2068](https://github.com/nicholas-fedor/watchtower/pull/2068)
 - Update docker/login-action action to v4.6.0 by @renovate[bot] in [#2064](https://github.com/nicholas-fedor/watchtower/pull/2064)
