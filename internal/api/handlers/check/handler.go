@@ -148,16 +148,16 @@ func (h *Handler) Handle(c fiber.Ctx) error {
 		logrus.WithError(err).WithField("notify", "no").
 			Error("Failed to check for updates")
 
-	// Notify SSE subscribers that the check scan failed.
-	if h.eventBroadcaster != nil {
-		h.eventBroadcaster.Publish(events.Event{
-			Type:      "scan_failed",
-			Timestamp: time.Now().UTC(),
-			Data: events.ScanFailedData{
-				Error: "failed to check for updates",
-			},
-		})
-	}
+		// Notify SSE subscribers that the check scan failed.
+		if h.eventBroadcaster != nil {
+			h.eventBroadcaster.Publish(events.Event{
+				Type:      "scan_failed",
+				Timestamp: time.Now().UTC(),
+				Data: events.ScanFailedData{
+					Error: "failed to check for updates",
+				},
+			})
+		}
 
 		sendErr := c.Status(fiber.StatusInternalServerError).
 			SendString("failed to check for updates")

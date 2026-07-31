@@ -175,4 +175,32 @@ var _ = ginkgo.Describe("EphemeralSelfUpdate", func() {
 			gomega.Expect(err.Error()).To(gomega.ContainSubstring("ephemeral orchestrator failed"))
 		})
 	})
+
+	// EphemeralSelfUpdate only starts the orchestrator. Replacement is asynchronous.
+	ginkgo.When("the orchestrator launches successfully", func() {
+		ginkgo.It("returns without performing stop or start on the source client path", func() {
+			ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+			defer cancel()
+
+			sourceContainer := createDefaultMockContainer("source-async", map[string]string{
+				"com.centurylinklabs.watchtower": "true",
+			})
+
+			client := createDefaultMockClient(&mockActions.TestData{})
+
+			newID, renamed, err := actions.EphemeralSelfUpdate(
+				ctx,
+				client,
+				sourceContainer,
+				types.UpdateParams{},
+			)
+
+			gomega.Expect(err).NotTo(gomega.HaveOccurred())
+			gomega.Expect(newID).To(gomega.BeEmpty())
+			gomega.Expect(renamed).To(gomega.BeFalse())
+			gomega.Expect(client.TestData.StopContainerCount.Load()).To(gomega.Equal(int32(0)))
+			gomega.Expect(client.TestData.StartContainerCount.Load()).To(gomega.Equal(int32(0)))
+			gomega.Expect(client.TestData.RenameContainerCount.Load()).To(gomega.Equal(int32(0)))
+		})
+	})
 })

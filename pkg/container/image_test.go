@@ -738,6 +738,59 @@ var _ = ginkgo.Describe("the client", func() {
 				}
 			})
 		})
+
+		// Empty RepoDigests skips the registry pull, but HasNewImage still
+		// compares the running image ID to the local tag.
+		ginkgo.When("container image has empty RepoDigests but the local tag points at a different ID", func() {
+			ginkgo.It("skips pull and still reports the container as stale", func() {
+				currentImageID := "sha256:" + util.GenerateRandomSHA256()
+				newerLocalImageID := "sha256:" + util.GenerateRandomSHA256()
+				container := MockContainer(
+					WithImageName("registry.example.com/app:latest"),
+					WithRepoDigests([]string{}),
+					func(container *dockerContainer.InspectResponse, image *dockerImage.InspectResponse) {
+						container.Image = currentImageID
+						image.ID = currentImageID
+					},
+				)
+
+				mockServer.AllowUnhandledRequests = true
+				mockServer.AppendHandlers(
+					ghttp.CombineHandlers(
+						ghttp.VerifyRequest(
+							"GET",
+							gomega.HaveSuffix("/images/registry.example.com/app:latest/json"),
+						),
+						ghttp.RespondWithJSONEncoded(http.StatusOK, dockerImage.InspectResponse{
+							ID:          newerLocalImageID,
+							RepoDigests: []string{},
+						}),
+					),
+				)
+
+				c := &client{api: mockClient}
+
+				resetLogrus, logbuf := captureLogrus(logrus.DebugLevel)
+				defer resetLogrus()
+
+				stale, latestID, latestDigest, err := c.IsContainerStale(
+					context.Background(),
+					container,
+					types.UpdateParams{},
+				)
+				gomega.Expect(err).To(gomega.Succeed())
+				gomega.Expect(stale).To(gomega.BeTrue())
+				gomega.Expect(string(latestID)).To(gomega.Equal(newerLocalImageID))
+				gomega.Expect(latestDigest).To(gomega.BeEmpty())
+				gomega.Eventually(logbuf).Should(gbytes.Say(`empty RepoDigests`))
+				gomega.Eventually(logbuf).Should(gbytes.Say(`Digest match, skipping pull`))
+				gomega.Eventually(logbuf).Should(gbytes.Say(`Found new image`))
+
+				for _, req := range mockServer.ReceivedRequests() {
+					gomega.Expect(req.URL.Path).ToNot(gomega.ContainSubstring("/images/create"))
+				}
+			})
+		})
 	})
 })
 
