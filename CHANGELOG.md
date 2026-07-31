@@ -14,12 +14,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Chores
 
+- Update module github.com/docker/cli to v29.7.1+incompatible by @renovate[bot] in [#2076](https://github.com/nicholas-fedor/watchtower/pull/2076)
 - Update module github.com/docker/cli to v29.7.0+incompatible by @renovate[bot] in [#2073](https://github.com/nicholas-fedor/watchtower/pull/2073)
 - Update nicholas-fedor/go-proxy-pull-action action to v1.1.35 by @renovate[bot] in [#2071](https://github.com/nicholas-fedor/watchtower/pull/2071)
 - Update module github.com/gofiber/contrib/v3/swaggo to v1.0.9 by @renovate[bot] in [#2070](https://github.com/nicholas-fedor/watchtower/pull/2070)
 - Update github/codeql-action action to v4.37.4 by @renovate[bot] in [#2068](https://github.com/nicholas-fedor/watchtower/pull/2068)
 - Update docker/login-action action to v4.6.0 by @renovate[bot] in [#2064](https://github.com/nicholas-fedor/watchtower/pull/2064)
 - Update module github.com/gofiber/utils/v2 to v2.4.1 by @renovate[bot] in [#2063](https://github.com/nicholas-fedor/watchtower/pull/2063)
+
+### Fixed
+
+- Prevent repeated self-updates when host ports are published by @nicholas-fedor in [#2079](https://github.com/nicholas-fedor/watchtower/pull/2079)
 
 ## [1.20.2] - 2026-07-28
 
