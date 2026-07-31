@@ -197,7 +197,9 @@ var _ = ginkgo.Describe("orchestrateSelfUpdate handoff", func() {
 
 		client := mockActions.CreateMockClient(
 			&mockActions.TestData{
-				Containers:          []types.Container{old},
+				Containers: []types.Container{old},
+				// Fail only the replacement create/start path. Leave recovery
+				// StartContainerByID successful so restart can be asserted.
 				StartContainerError: errors.New("simulated create failure"),
 			},
 			false,
@@ -224,6 +226,8 @@ var _ = ginkgo.Describe("orchestrateSelfUpdate handoff", func() {
 		gomega.Expect(client.TestData.RenameTargets[1]).To(gomega.Equal("watchtower"))
 		// Predecessor must not be deleted when handoff fails.
 		gomega.Expect(client.TestData.RemoveContainerCount.Load()).To(gomega.Equal(int32(0)))
+		// Recovery restart succeeded (StartContainerByIDError is unset).
+		gomega.Expect(client.Stopped[string(old.ID())]).To(gomega.BeFalse())
 
 		stopIdx := firstOperationIndex(client.TestData.OperationOrder, "StopContainer")
 		renameIdx := firstOperationIndex(client.TestData.OperationOrder, "RenameContainer")
@@ -232,7 +236,6 @@ var _ = ginkgo.Describe("orchestrateSelfUpdate handoff", func() {
 
 		gomega.Expect(stopIdx).To(gomega.BeNumerically("<", renameIdx))
 		gomega.Expect(renameIdx).To(gomega.BeNumerically("<", startIdx))
-		// Recovery attempts StartContainerByID after restoring the name.
 		gomega.Expect(restartIdx).To(gomega.BeNumerically(">", startIdx))
 	})
 

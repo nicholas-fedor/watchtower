@@ -341,9 +341,11 @@ func orchestrateSelfUpdate(
 		return err
 	}
 
-	renamed := false
 	if !oldGone {
-		renamed, err = renameOldContainerForHandoff(ctx, client, clog, oldContainer, originalName)
+		// renamed controls whether a rename was performed (skip if already
+		// watchtower-old-*). Recovery uses !oldGone so a predecessor left under
+		// that prefix from an earlier attempt is still restored and restarted.
+		_, err = renameOldContainerForHandoff(ctx, client, clog, oldContainer, originalName)
 		if err != nil {
 			return err
 		}
@@ -356,7 +358,9 @@ func orchestrateSelfUpdate(
 		oldContainer,
 	)
 	if err != nil {
-		if renamed {
+		// Recover any existing predecessor, including one already renamed to
+		// watchtower-old-* from an earlier attempt (renamed may be false).
+		if !oldGone {
 			restoreAndStartOldContainer(ctx, client, clog, oldContainer, originalName)
 		}
 
@@ -367,7 +371,7 @@ func orchestrateSelfUpdate(
 	if err != nil {
 		cleanupFailedNewContainer(ctx, client, clog, newContainerID)
 
-		if renamed {
+		if !oldGone {
 			restoreAndStartOldContainer(ctx, client, clog, oldContainer, originalName)
 		}
 
@@ -647,6 +651,12 @@ func stopOldContainer(
 			oldContainer.ID(),
 		)
 		if inspectErr != nil {
+			if cerrdefs.IsNotFound(inspectErr) {
+				clog.Debug("Old container already removed")
+
+				return true, nil
+			}
+
 			clog.WithError(inspectErr).Error("Failed to re-inspect old container after stop failure")
 			clog.WithError(err).Error("Failed to stop old container")
 

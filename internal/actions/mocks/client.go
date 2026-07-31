@@ -52,6 +52,7 @@ type TestData struct {
 	ListContainersFailCount      int                                   // Number of times ListContainers should fail before succeeding.
 	StopContainerError           error                                 // Error to return from StopContainer (for testing).
 	StartContainerError          error                                 // Error to return from StartContainer (for testing).
+	StartContainerByIDError      error                                 // Error to return from StartContainerByID (for testing).
 	CreateContainerError         error                                 // Error to return from CreateContainer (for testing).
 	UpdateContainerError         error                                 // Error to return from UpdateContainer (for testing).
 	StopContainerFailCount       int                                   // Number of times StopContainer should fail before succeeding.
@@ -324,7 +325,7 @@ func (client MockClient) StartContainer(ctx context.Context, c types.Container) 
 
 // StartContainerByID simulates starting a container by its ID directly.
 // It provides a minimal implementation for testing purposes.
-// Returns the configured StartContainerError if set.
+// Returns the configured StartContainerByIDError if set.
 func (client MockClient) StartContainerByID(ctx context.Context, containerID types.ContainerID) error {
 	client.TestData.StartContainerCount.Add(1)
 	client.TestData.recordOperation("StartContainerByID")
@@ -333,8 +334,8 @@ func (client MockClient) StartContainerByID(ctx context.Context, containerID typ
 		return err
 	}
 
-	if client.TestData.StartContainerError != nil {
-		return client.TestData.StartContainerError
+	if client.TestData.StartContainerByIDError != nil {
+		return client.TestData.StartContainerByIDError
 	}
 
 	// Mark the container running when present so re-inspect after start succeeds.
