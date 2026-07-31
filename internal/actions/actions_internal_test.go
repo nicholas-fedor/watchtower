@@ -1532,7 +1532,7 @@ var _ = ginkgo.Describe("DetachedContext", func() {
 					Staleness: map[string]bool{
 						"watchtower": true,
 					},
-					StartContainerError: errors.New("simulated start failure"),
+					StartContainerByIDError: errors.New("simulated start failure"),
 				},
 				false,
 				false,
@@ -1568,7 +1568,7 @@ var _ = ginkgo.Describe("DetachedContext", func() {
 			parentCtx, parentCancel := context.WithCancel(context.Background())
 
 			// Create a mock client with a Watchtower container.
-			// Configure StartContainerError to trigger the cleanup path.
+			// Configure StartContainerByIDError to trigger the cleanup path.
 			// Add simulated latency to allow time for operations to complete.
 			client := mockActions.CreateMockClient(
 				&mockActions.TestData{
@@ -1589,8 +1589,8 @@ var _ = ginkgo.Describe("DetachedContext", func() {
 					Staleness: map[string]bool{
 						"watchtower": true,
 					},
-					StartContainerError: errors.New("simulated start failure"),
-					SimulatedLatency:    5 * time.Millisecond, // Allow time for operations
+					StartContainerByIDError: errors.New("simulated start failure"),
+					SimulatedLatency:        5 * time.Millisecond, // Allow time for operations
 				},
 				false,
 				false,
@@ -1615,7 +1615,7 @@ var _ = ginkgo.Describe("DetachedContext", func() {
 				// Call restartStaleContainer with the parent context.
 				// The test flow is:
 				// 1. RenameContainer succeeds (uses parent context)
-				// 2. StartContainer fails due to StartContainerError
+				// 2. StartContainerByID fails due to StartContainerByIDError
 				// 3. Cleanup runs using the detached context (should survive parent cancellation)
 				_, renamed, err = restartStaleContainer(
 					parentCtx,
@@ -1640,7 +1640,7 @@ var _ = ginkgo.Describe("DetachedContext", func() {
 			// Wait for the goroutine to complete.
 			wg.Wait()
 
-			// The operation should fail due to StartContainer error, but the
+			// The operation should fail due to StartContainerByID error, but the
 			// cleanup (StopAndRemoveContainer) should have been attempted
 			// using the detached context, which survives parent cancellation.
 			gomega.Expect(err).To(gomega.HaveOccurred())
