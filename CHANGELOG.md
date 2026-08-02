@@ -14,6 +14,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Chores
 
+- Update github.com/google/pprof digest to 5106ece by @renovate[bot] in [#2080](https://github.com/nicholas-fedor/watchtower/pull/2080)
 - Update module github.com/docker/cli to v29.7.1+incompatible by @renovate[bot] in [#2076](https://github.com/nicholas-fedor/watchtower/pull/2076)
 - Update module github.com/docker/cli to v29.7.0+incompatible by @renovate[bot] in [#2073](https://github.com/nicholas-fedor/watchtower/pull/2073)
 - Update nicholas-fedor/go-proxy-pull-action action to v1.1.35 by @renovate[bot] in [#2071](https://github.com/nicholas-fedor/watchtower/pull/2071)
