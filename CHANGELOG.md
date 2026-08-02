@@ -27,6 +27,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Prevent repeated self-updates when host ports are published by @nicholas-fedor in [#2079](https://github.com/nicholas-fedor/watchtower/pull/2079)
 
+### Removed
+
+- Remove star history chart by @nicholas-fedor in [#2082](https://github.com/nicholas-fedor/watchtower/pull/2082)
+
 ## [1.20.2] - 2026-07-28
 
 ### Changed
