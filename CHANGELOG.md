@@ -14,6 +14,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Chores
 
+- Update nicholas-fedor/go-proxy-pull-action action to v1.1.37 by @renovate[bot] in [#2089](https://github.com/nicholas-fedor/watchtower/pull/2089)
 - Update github/codeql-action action to v4.37.5 by @renovate[bot] in [#2088](https://github.com/nicholas-fedor/watchtower/pull/2088)
 - Update nicholas-fedor/go-proxy-pull-action action to v1.1.36 by @renovate[bot] in [#2086](https://github.com/nicholas-fedor/watchtower/pull/2086)
 - Update github.com/google/pprof digest to ef3492d by @renovate[bot] in [#2084](https://github.com/nicholas-fedor/watchtower/pull/2084)
