@@ -14,6 +14,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Chores
 
+- Update github/codeql-action action to v4.37.6 by @renovate[bot] in [#2094](https://github.com/nicholas-fedor/watchtower/pull/2094)
 - Update opentelemetry-go monorepo to v1.45.0 by @renovate[bot] in [#2091](https://github.com/nicholas-fedor/watchtower/pull/2091)
 - Update nicholas-fedor/go-proxy-pull-action action to v1.1.37 by @renovate[bot] in [#2089](https://github.com/nicholas-fedor/watchtower/pull/2089)
 - Update github/codeql-action action to v4.37.5 by @renovate[bot] in [#2088](https://github.com/nicholas-fedor/watchtower/pull/2088)
