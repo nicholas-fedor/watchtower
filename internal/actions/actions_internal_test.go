@@ -1370,25 +1370,32 @@ var _ = ginkgo.Describe("DetachedContext", func() {
 	ginkgo.Describe("restartStaleContainer detached context deadline", func() {
 		testCases := []TestDetachedContextDeadlineCase{
 			{
-				name:            "positive timeout creates context with deadline",
+				name:            "positive timeout above minimum uses configured timeout",
+				timeout:         10 * time.Minute,
+				expectDeadline:  true,
+				expectedTimeout: 10 * time.Minute,
+				description:     "When Timeout exceeds defaultCreateStartTimeout, the detached context uses the configured timeout",
+			},
+			{
+				name:            "positive timeout below minimum creates context with minimum deadline",
 				timeout:         30 * time.Second,
 				expectDeadline:  true,
-				expectedTimeout: 30 * time.Second,
-				description:     "When Timeout > 0, the detached context should have a deadline set",
+				expectedTimeout: defaultCreateStartTimeout,
+				description:     "When Timeout is below defaultCreateStartTimeout, the detached context uses the minimum",
 			},
 			{
-				name:            "zero timeout creates context with fallback deadline",
+				name:            "zero timeout creates context with minimum deadline",
 				timeout:         0,
 				expectDeadline:  true,
-				expectedTimeout: defaultRestartPolicyTimeout,
-				description:     "When Timeout is zero, the detached context should use the fallback deadline",
+				expectedTimeout: defaultCreateStartTimeout,
+				description:     "When Timeout is zero, the detached context uses the minimum create/start deadline",
 			},
 			{
-				name:            "negative timeout creates context with fallback deadline",
+				name:            "negative timeout creates context with minimum deadline",
 				timeout:         -1 * time.Second,
 				expectDeadline:  true,
-				expectedTimeout: defaultRestartPolicyTimeout,
-				description:     "When Timeout is negative, the detached context should use the fallback deadline",
+				expectedTimeout: defaultCreateStartTimeout,
+				description:     "When Timeout is negative, the detached context uses the minimum create/start deadline",
 			},
 		}
 
@@ -1508,6 +1515,20 @@ var _ = ginkgo.Describe("DetachedContext", func() {
 			gomega.Expect(client.TestData.RenameTargets).To(gomega.HaveLen(2))
 			gomega.Expect(client.TestData.RenameTargets[1]).To(gomega.Equal("watchtower"))
 			gomega.Expect(client.TestData.StartContainerCount.Load()).To(gomega.Equal(int32(0)))
+
+			// Assert that CreateContainer and RenameContainer received distinct contexts.
+			// The first rename (initial handoff) uses the caller context, the second
+			// rename (recovery after create failure) uses a fresh bounded context.
+			createCtx := client.TestData.CreateContainerCtx
+			renameBackCtx := client.TestData.RenameContainerCtx
+
+			gomega.Expect(createCtx).NotTo(gomega.BeNil(), "CreateContainer should receive a context")
+			gomega.Expect(renameBackCtx).NotTo(gomega.BeNil(), "RenameContainer should receive a context for rename-back")
+			gomega.Expect(createCtx).NotTo(gomega.Equal(renameBackCtx), "CreateContainer and rename-back should use distinct contexts")
+
+			// Assert that the rename-back context has an active deadline (is a bounded timeout context).
+			_, hasDeadline := renameBackCtx.Deadline()
+			gomega.Expect(hasDeadline).To(gomega.BeTrue(), "rename-back context should have a deadline for bounded recovery")
 		})
 	})
 
@@ -1559,6 +1580,21 @@ var _ = ginkgo.Describe("DetachedContext", func() {
 			gomega.Expect(client.TestData.StopAndRemoveContainerCount.Load()).To(gomega.Equal(int32(1)))
 			gomega.Expect(client.TestData.LastStopAndRemoveID).To(gomega.Equal(client.TestData.LastCreatedContainerID))
 			gomega.Expect(client.TestData.LastStopAndRemoveID).ToNot(gomega.Equal(testContainer.ID()))
+
+			// Assert that GetContainer and StopAndRemoveContainer receive a fresh
+			// context distinct from the create/start detached context.
+			getCtx := client.TestData.GetContainerCtx
+			cleanupCtx := client.TestData.StopAndRemoveContainerCtx
+			createCtx := client.TestData.CreateContainerCtx
+
+			gomega.Expect(getCtx).NotTo(gomega.BeNil(), "GetContainer should receive a context")
+			gomega.Expect(cleanupCtx).NotTo(gomega.BeNil(), "StopAndRemoveContainer should receive a context")
+			gomega.Expect(getCtx).To(gomega.Equal(cleanupCtx), "GetContainer and StopAndRemoveContainer should share the same cleanup context")
+			gomega.Expect(getCtx).NotTo(gomega.Equal(createCtx), "cleanup context should be distinct from the create/start detached context")
+
+			// Assert that the cleanup context has an active deadline (is a bounded timeout context).
+			_, hasDeadline := getCtx.Deadline()
+			gomega.Expect(hasDeadline).To(gomega.BeTrue(), "cleanup context should have a deadline for bounded recovery")
 		})
 	})
 

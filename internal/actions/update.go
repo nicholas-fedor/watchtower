@@ -35,6 +35,11 @@ const (
 	// defaultRestartPolicyTimeout defines the fallback timeout for restart policy
 	// updates when config.Timeout is non-positive.
 	defaultRestartPolicyTimeout = 30 * time.Second
+
+	// defaultCreateStartTimeout defines the minimum timeout for container create
+	// and start operations during restart. It guards against slow hosts where
+	// Docker API calls can exceed the default 30s restart policy timeout.
+	defaultCreateStartTimeout = 5 * time.Minute
 )
 
 // Update scans and updates containers based on parameters.
@@ -1820,10 +1825,14 @@ func restartStaleContainer(
 	// Create a detached context to survive parent context cancellation.
 	// This ensures container cleanup and update operations complete even if the
 	// parent context is canceled during the restart process.
-	// A finite fallback is applied when config.Timeout is non-positive.
+	// A finite fallback is applied when config.Timeout is non-positive, and the
+	// create/start phase uses at least defaultCreateStartTimeout to accommodate
+	// slow hosts.
+	detachedTimeout := max(restartPolicyTimeout(config.Timeout), defaultCreateStartTimeout)
+
 	detachedCtx, cancelDetached := context.WithTimeout(
 		context.Background(),
-		restartPolicyTimeout(config.Timeout),
+		detachedTimeout,
 	)
 
 	defer cancelDetached()
@@ -1952,10 +1961,19 @@ func restartStaleContainer(
 
 		// Restore the original name so the running instance is not left only as
 		// watchtower-old-* with the canonical name free and unused.
+		// Use a fresh context here: detachedCtx may already be expired if the
+		// create call hit the timeout, and we do not want recovery to fail for
+		// the same reason.
 		if renamed && originalWatchtowerName != "" && sourceContainer.IsWatchtower() {
-			//nolint:contextcheck // Using detached context intentionally to survive parent cancellation
+			renameBackCtx, renameBackCancel := context.WithTimeout(
+				context.Background(),
+				restartPolicyTimeout(config.Timeout),
+			)
+			defer renameBackCancel()
+
+			//nolint:contextcheck // fresh context is intentional for recovery after timeout
 			renameBackErr := client.RenameContainer(
-				detachedCtx,
+				renameBackCtx,
 				sourceContainer,
 				originalWatchtowerName,
 			)
@@ -1996,25 +2014,33 @@ func restartStaleContainer(
 				WithError(err).
 				Debug("Failed to start container")
 
-				// On start failure after a Watchtower rename, remove only the newly
-			// created container. The renamed source still holds the running process
-			// and must remain so the host keeps a Watchtower instance.
+				// On start failure after a Watchtower rename, remove the failed replacement
+			// container only. The renamed source still holds the running process and must
+			// remain so the host keeps a Watchtower instance.
+			// Use a fresh context because detachedCtx may already be expired if the start
+			// call hit the timeout and we do not want cleanup to fail for the same reason.
 			if renamed && sourceContainer.IsWatchtower() {
 				logrus.WithFields(fields).
 					WithField("new_id", newContainerID.ShortID()).
 					Debug("Cleaning up failed Watchtower container")
 
-				//nolint:contextcheck // Using detached context intentionally to survive parent cancellation
-				failedNew, getErr := client.GetContainer(detachedCtx, newContainerID)
+				cleanupCtx, cleanupCancel := context.WithTimeout(
+					context.Background(),
+					restartPolicyTimeout(config.Timeout),
+				)
+				defer cleanupCancel()
+
+				//nolint:contextcheck // fresh context is intentional for cleanup after timeout
+				failedNew, getErr := client.GetContainer(cleanupCtx, newContainerID)
 				if getErr != nil {
 					logrus.WithError(getErr).
 						WithFields(fields).
 						WithField("new_id", newContainerID.ShortID()).
 						Debug("Failed to inspect failed Watchtower container for cleanup")
 				} else {
-					//nolint:contextcheck // Using detached context intentionally to survive parent cancellation
+					//nolint:contextcheck // fresh context is intentional for cleanup after timeout
 					cleanupErr := client.StopAndRemoveContainer(
-						detachedCtx,
+						cleanupCtx,
 						failedNew,
 						config.Timeout,
 					)
