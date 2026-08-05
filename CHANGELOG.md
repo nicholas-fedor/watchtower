@@ -13,6 +13,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Update step-security/harden-runner action to v2.20.1 by @renovate[bot] in [#2102](https://github.com/nicholas-fedor/watchtower/pull/2102)
 - Update nicholas-fedor/go-proxy-pull-action action to v1.1.39 by @renovate[bot] in [#2101](https://github.com/nicholas-fedor/watchtower/pull/2101)
 
+### Fixed
+
+- Clear engine-generated MACs on container recreation by @nicholas-fedor in [#2106](https://github.com/nicholas-fedor/watchtower/pull/2106)
+
 ## [1.20.3] - 2026-08-05
 
 ### Changed
