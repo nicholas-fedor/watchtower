@@ -1721,7 +1721,7 @@ var _ = ginkgo.Describe("onlyGeneratedMacs", func() {
 				},
 				"custom": {
 					NetworkID:  "custom_network_id",
-					MacAddress: dockerNetwork.HardwareAddr("aa:bb:cc:dd:ee:ff"),
+					MacAddress: dockerNetwork.HardwareAddr("02:42:0a:00:00:05"),
 					IPAddress:  netip.MustParseAddr("10.0.0.5"),
 				},
 			}),
