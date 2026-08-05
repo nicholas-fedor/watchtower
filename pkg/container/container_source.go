@@ -586,9 +586,39 @@ func processEndpoint(
 		} else {
 			clog.Debug("Cleared MAC address, IP address, and DNS names for legacy API")
 		}
+	} else if isEngineGeneratedMAC(targetEndpoint.MacAddress, sourceEndpoint.IPAddress) {
+		targetEndpoint.MacAddress = dockerNetwork.HardwareAddr{}
+
+		clog.Debug("Cleared engine-generated MAC address; Docker will regenerate for new IP")
 	}
 
 	return targetEndpoint, nil
+}
+
+// isEngineGeneratedMAC reports whether mac matches the bridge driver's engine-generated
+// pattern derived from the endpoint's current IPv4 address.
+//
+// Docker's bridge driver stores MACs as ASCII strings of the form "02:42:aa:bb:cc:dd",
+// where the last four bytes are the IPv4 octets. A MAC matching that pattern for the
+// given IP is not a user-configured value and should not be preserved across container
+// recreation. If ip is not a valid IPv4 address, the MAC is assumed to be user-configured
+// and false is returned.
+//
+// Parameters:
+//   - mac: MAC address to check.
+//   - ip: Endpoint's current IPv4 address.
+//
+// Returns:
+//   - bool: True if the MAC was engine-generated from ip, false otherwise.
+func isEngineGeneratedMAC(mac dockerNetwork.HardwareAddr, ip netip.Addr) bool {
+	if len(mac) != 17 || !ip.Is4() {
+		return false
+	}
+
+	ipv4 := ip.As4()
+	expected := fmt.Sprintf("02:42:%02x:%02x:%02x:%02x", ipv4[0], ipv4[1], ipv4[2], ipv4[3])
+
+	return string(mac) == expected
 }
 
 // validateMacAddresses verifies the presence of MAC addresses in a container's network configuration

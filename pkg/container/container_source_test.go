@@ -973,7 +973,7 @@ var _ = ginkgo.Describe("getNetworkConfig", func() {
 				WithNetworkSettings(map[string]*dockerNetwork.EndpointSettings{
 					"bridge": {
 						NetworkID:  "bridge_network_id",
-						MacAddress: dockerNetwork.HardwareAddr("02:42:ac:11:00:02"),
+						MacAddress: dockerNetwork.HardwareAddr("aa:bb:cc:dd:ee:ff"),
 						IPAddress:  netip.MustParseAddr("172.17.0.2"),
 						Aliases:    []string{"container_id", "test-alias"},
 						DNSNames:   []string{"test.example.com"},
@@ -991,7 +991,7 @@ var _ = ginkgo.Describe("getNetworkConfig", func() {
 			endpoint := config.EndpointsConfig["bridge"]
 			gomega.Expect(endpoint.NetworkID).To(gomega.Equal("bridge_network_id"))
 			gomega.Expect(endpoint.MacAddress).To(gomega.Equal(
-				dockerNetwork.HardwareAddr("02:42:ac:11:00:02"),
+				dockerNetwork.HardwareAddr("aa:bb:cc:dd:ee:ff"),
 			))
 			gomega.Expect(endpoint.IPAddress).To(gomega.Equal(
 				netip.MustParseAddr("172.17.0.2"),
@@ -1210,7 +1210,7 @@ var _ = ginkgo.Describe("processEndpoint", func() {
 			ginkgo.It("should preserve MAC address, IP address, and DNS names", func() {
 				sourceEndpoint := &dockerNetwork.EndpointSettings{
 					NetworkID:  "bridge_network_id",
-					MacAddress: dockerNetwork.HardwareAddr("02:42:ac:11:00:02"),
+					MacAddress: dockerNetwork.HardwareAddr("aa:bb:cc:dd:ee:ff"),
 					IPAddress:  netip.MustParseAddr("172.17.0.2"),
 					DNSNames:   []string{"test.example.com"},
 					Aliases:    []string{"container_id", "test-alias"},
@@ -1230,7 +1230,7 @@ var _ = ginkgo.Describe("processEndpoint", func() {
 
 				gomega.Expect(result.NetworkID).To(gomega.Equal("bridge_network_id"))
 				gomega.Expect(result.MacAddress).To(gomega.Equal(
-					dockerNetwork.HardwareAddr("02:42:ac:11:00:02"),
+					dockerNetwork.HardwareAddr("aa:bb:cc:dd:ee:ff"),
 				))
 				gomega.Expect(result.IPAddress).To(gomega.Equal(
 					netip.MustParseAddr("172.17.0.2"),
@@ -1242,6 +1242,130 @@ var _ = ginkgo.Describe("processEndpoint", func() {
 				))
 				// Aliases should be filtered to remove container short ID
 				gomega.Expect(result.Aliases).To(gomega.ConsistOf("test-alias"))
+			})
+
+			ginkgo.It("should clear engine-generated MAC when it matches the endpoint IP", func() {
+				sourceEndpoint := &dockerNetwork.EndpointSettings{
+					NetworkID:  "bridge_network_id",
+					MacAddress: dockerNetwork.HardwareAddr("02:42:ac:11:00:02"),
+					IPAddress:  netip.MustParseAddr("172.17.0.2"),
+				}
+				containerID := types.ContainerID("container_id")
+
+				result, err := processEndpoint(
+					sourceEndpoint,
+					containerID,
+					clientVersion,
+					isHostNetwork,
+				)
+				gomega.Expect(err).ToNot(gomega.HaveOccurred())
+
+				gomega.Expect(result.MacAddress).To(gomega.Equal(dockerNetwork.HardwareAddr{}))
+			})
+
+			ginkgo.It("should preserve user-configured MAC that does not match the endpoint IP", func() {
+				sourceEndpoint := &dockerNetwork.EndpointSettings{
+					NetworkID:  "bridge_network_id",
+					MacAddress: dockerNetwork.HardwareAddr("aa:bb:cc:dd:ee:ff"),
+					IPAddress:  netip.MustParseAddr("172.17.0.2"),
+				}
+				containerID := types.ContainerID("container_id")
+
+				result, err := processEndpoint(
+					sourceEndpoint,
+					containerID,
+					clientVersion,
+					isHostNetwork,
+				)
+				gomega.Expect(err).ToNot(gomega.HaveOccurred())
+
+				gomega.Expect(result.MacAddress).To(gomega.Equal(
+					dockerNetwork.HardwareAddr("aa:bb:cc:dd:ee:ff"),
+				))
+			})
+
+			ginkgo.It("should preserve engine-generated MAC when endpoint IP is empty", func() {
+				sourceEndpoint := &dockerNetwork.EndpointSettings{
+					NetworkID:  "bridge_network_id",
+					MacAddress: dockerNetwork.HardwareAddr("02:42:ac:11:00:02"),
+					IPAddress:  netip.Addr{},
+				}
+				containerID := types.ContainerID("container_id")
+
+				result, err := processEndpoint(
+					sourceEndpoint,
+					containerID,
+					clientVersion,
+					isHostNetwork,
+				)
+				gomega.Expect(err).ToNot(gomega.HaveOccurred())
+
+				gomega.Expect(result.MacAddress).To(gomega.Equal(
+					dockerNetwork.HardwareAddr("02:42:ac:11:00:02"),
+				))
+			})
+
+			ginkgo.It("should preserve engine-generated MAC when endpoint IP is IPv6", func() {
+				sourceEndpoint := &dockerNetwork.EndpointSettings{
+					NetworkID:  "bridge_network_id",
+					MacAddress: dockerNetwork.HardwareAddr("02:42:ac:11:00:02"),
+					IPAddress:  netip.MustParseAddr("::1"),
+				}
+				containerID := types.ContainerID("container_id")
+
+				result, err := processEndpoint(
+					sourceEndpoint,
+					containerID,
+					clientVersion,
+					isHostNetwork,
+				)
+				gomega.Expect(err).ToNot(gomega.HaveOccurred())
+
+				gomega.Expect(result.MacAddress).To(gomega.Equal(
+					dockerNetwork.HardwareAddr("02:42:ac:11:00:02"),
+				))
+			})
+
+			ginkgo.It("should clear empty MAC without error", func() {
+				sourceEndpoint := &dockerNetwork.EndpointSettings{
+					NetworkID:  "bridge_network_id",
+					MacAddress: dockerNetwork.HardwareAddr{},
+					IPAddress:  netip.MustParseAddr("172.17.0.2"),
+				}
+				containerID := types.ContainerID("container_id")
+
+				result, err := processEndpoint(
+					sourceEndpoint,
+					containerID,
+					clientVersion,
+					isHostNetwork,
+				)
+				gomega.Expect(err).ToNot(gomega.HaveOccurred())
+
+				gomega.Expect(result.MacAddress).To(gomega.Equal(dockerNetwork.HardwareAddr{}))
+			})
+
+			ginkgo.It("should preserve user-configured MAC matching engine-generated prefix with different IP", func() {
+				// A user-configured MAC that happens to start with 02:42 but whose last
+				// four bytes do not match the endpoint's IP must not be cleared.
+				sourceEndpoint := &dockerNetwork.EndpointSettings{
+					NetworkID:  "bridge_network_id",
+					MacAddress: dockerNetwork.HardwareAddr("02:42:de:ad:be:ef"),
+					IPAddress:  netip.MustParseAddr("172.17.0.2"),
+				}
+				containerID := types.ContainerID("container_id")
+
+				result, err := processEndpoint(
+					sourceEndpoint,
+					containerID,
+					clientVersion,
+					isHostNetwork,
+				)
+				gomega.Expect(err).ToNot(gomega.HaveOccurred())
+
+				gomega.Expect(result.MacAddress).To(gomega.Equal(
+					dockerNetwork.HardwareAddr("02:42:de:ad:be:ef"),
+				))
 			})
 
 			ginkgo.It("should handle multiple aliases correctly", func() {
@@ -1490,6 +1614,57 @@ var _ = ginkgo.Describe("processEndpoint", func() {
 				gomega.Expect(result).To(gomega.BeNil())
 			})
 		})
+	})
+})
+
+var _ = ginkgo.Describe("isEngineGeneratedMAC", func() {
+	ginkgo.It("should return true for MAC derived from the endpoint IPv4 address", func() {
+		mac := dockerNetwork.HardwareAddr("02:42:ac:11:00:02")
+		ip := netip.MustParseAddr("172.17.0.2")
+
+		gomega.Expect(isEngineGeneratedMAC(mac, ip)).To(gomega.BeTrue())
+	})
+
+	ginkgo.It("should return false for user-configured MAC with matching prefix but different IP", func() {
+		mac := dockerNetwork.HardwareAddr("02:42:de:ad:be:ef")
+		ip := netip.MustParseAddr("172.17.0.2")
+
+		gomega.Expect(isEngineGeneratedMAC(mac, ip)).To(gomega.BeFalse())
+	})
+
+	ginkgo.It("should return false when MAC is empty", func() {
+		mac := dockerNetwork.HardwareAddr{}
+		ip := netip.MustParseAddr("172.17.0.2")
+
+		gomega.Expect(isEngineGeneratedMAC(mac, ip)).To(gomega.BeFalse())
+	})
+
+	ginkgo.It("should return false when IP is empty", func() {
+		mac := dockerNetwork.HardwareAddr("02:42:ac:11:00:02")
+		ip := netip.Addr{}
+
+		gomega.Expect(isEngineGeneratedMAC(mac, ip)).To(gomega.BeFalse())
+	})
+
+	ginkgo.It("should return false when IP is IPv6", func() {
+		mac := dockerNetwork.HardwareAddr("02:42:ac:11:00:02")
+		ip := netip.MustParseAddr("::1")
+
+		gomega.Expect(isEngineGeneratedMAC(mac, ip)).To(gomega.BeFalse())
+	})
+
+	ginkgo.It("should return false when MAC length is not 6", func() {
+		mac := dockerNetwork.HardwareAddr("02:42:ac:11")
+		ip := netip.MustParseAddr("172.17.0.2")
+
+		gomega.Expect(isEngineGeneratedMAC(mac, ip)).To(gomega.BeFalse())
+	})
+
+	ginkgo.It("should return true for the reproduction case from issue #2104", func() {
+		mac := dockerNetwork.HardwareAddr("02:42:0a:63:00:02")
+		ip := netip.MustParseAddr("10.99.0.2")
+
+		gomega.Expect(isEngineGeneratedMAC(mac, ip)).To(gomega.BeTrue())
 	})
 })
 

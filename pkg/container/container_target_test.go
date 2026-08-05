@@ -148,7 +148,7 @@ var _ = ginkgo.Describe("Target Container Operations", func() {
 					"bridge": {
 						NetworkID:  "network_bridge_id",
 						IPAddress:  netip.MustParseAddr("172.17.0.2"),
-						MacAddress: dockerNetwork.HardwareAddr("02:42:ac:11:00:02"),
+						MacAddress: dockerNetwork.HardwareAddr("aa:bb:cc:dd:ee:ff"),
 						Aliases:    []string{"test-watchtower"},
 					},
 				}),
