@@ -1016,6 +1016,27 @@ var _ = ginkgo.Describe("getNetworkConfig", func() {
 			gomega.Expect(config.EndpointsConfig).To(gomega.HaveKey("bridge"))
 			gomega.Expect(config.EndpointsConfig).To(gomega.HaveKey("custom_network"))
 		})
+
+		ginkgo.It("should clear engine-generated MAC for running container without validation error", func() {
+			container := MockContainer(
+				WithNetworkMode("bridge"),
+				WithContainerState(dockerContainer.State{Running: true, Status: "running"}),
+				WithNetworkSettings(map[string]*dockerNetwork.EndpointSettings{
+					"bridge": {
+						NetworkID:  "bridge_network_id",
+						MacAddress: dockerNetwork.HardwareAddr("02:42:ac:11:00:02"),
+						IPAddress:  netip.MustParseAddr("172.17.0.2"),
+					},
+				}),
+			)
+
+			config := getNetworkConfig(container, "1.50")
+
+			gomega.Expect(config).ToNot(gomega.BeNil())
+			gomega.Expect(config.EndpointsConfig).To(gomega.HaveKey("bridge"))
+			endpoint := config.EndpointsConfig["bridge"]
+			gomega.Expect(endpoint.MacAddress).To(gomega.Equal(dockerNetwork.HardwareAddr{}))
+		})
 	})
 
 	ginkgo.Context("with host network mode", func() {

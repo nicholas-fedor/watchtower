@@ -621,6 +621,44 @@ func isEngineGeneratedMAC(mac dockerNetwork.HardwareAddr, ip netip.Addr) bool {
 	return string(mac) == expected
 }
 
+// onlyGeneratedMacs reports whether every non-empty MAC in the source
+// container's original network settings matches the bridge driver's
+// engine-generated pattern for that endpoint's IP.
+//
+// It is used by validateMacAddresses to allow missing MACs in the processed
+// config when those MACs were intentionally cleared by processEndpoint because
+// they were engine-generated.
+//
+// Parameters:
+//   - sourceContainer: The container whose original network settings are inspected.
+//
+// Returns:
+//   - bool: True if the container had at least one MAC and every one of them was
+//     engine-generated. False if there were no MACs or at least one was user-configured.
+func onlyGeneratedMacs(sourceContainer types.Container) bool {
+	containerInfo := sourceContainer.ContainerInfo()
+
+	if containerInfo == nil || containerInfo.NetworkSettings == nil {
+		return false
+	}
+
+	hasMac := false
+
+	for _, endpoint := range containerInfo.NetworkSettings.Networks {
+		if endpoint == nil || len(endpoint.MacAddress) == 0 {
+			continue
+		}
+
+		hasMac = true
+
+		if !isEngineGeneratedMAC(endpoint.MacAddress, endpoint.IPAddress) {
+			return false
+		}
+	}
+
+	return hasMac
+}
+
 // validateMacAddresses verifies the presence of MAC addresses in a container's network configuration
 // and logs appropriate messages based on the container's state, network mode, and Docker API version.
 // It ensures that MAC addresses are correctly handled for modern API versions (>= 1.44) and logs
@@ -740,6 +778,15 @@ func validateMacAddresses(
 
 			return nil
 		}
+
+		// If all original MACs were engine-generated, the absence is expected because
+		// processEndpoint intentionally clears them to avoid stale MACs after IP reassignment.
+		if onlyGeneratedMacs(sourceContainer) {
+			clog.Debug("No MAC address found; all original MACs were engine-generated and intentionally cleared")
+
+			return nil
+		}
+
 		// Running containers should have MAC addresses, but absence may indicate
 		// either a lack of support or a configuration issue.
 		clog.WithField("state", containerState).
