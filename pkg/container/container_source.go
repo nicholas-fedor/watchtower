@@ -587,6 +587,10 @@ func processEndpoint(
 			clog.Debug("Cleared MAC address, IP address, and DNS names for legacy API")
 		}
 	} else if isEngineGeneratedMAC(targetEndpoint.MacAddress, sourceEndpoint.IPAddress) {
+		// Clear MACs derived from the endpoint's IPv4 address. Docker 29.x+ bridge
+		// networks assign random MACs and will not match the engine-generated
+		// pattern, but older Docker versions and overlay networks still produce
+		// IP-derived MACs that become stale after IP reassignment.
 		targetEndpoint.MacAddress = dockerNetwork.HardwareAddr{}
 
 		clog.Debug("Cleared engine-generated MAC address; Docker will regenerate for new IP")
@@ -598,11 +602,13 @@ func processEndpoint(
 // isEngineGeneratedMAC reports whether mac matches the bridge driver's engine-generated
 // pattern derived from the endpoint's current IPv4 address.
 //
-// Docker's bridge driver stores MACs as ASCII strings of the form "02:42:aa:bb:cc:dd",
-// where the last four bytes are the IPv4 octets. A MAC matching that pattern for the
-// given IP is not a user-configured value and should not be preserved across container
-// recreation. If ip is not a valid IPv4 address, the MAC is assumed to be user-configured
-// and false is returned.
+// Docker ≤ 25.x bridge networks assigned MACs of the form "02:42:aa:bb:cc:dd",
+// where the last four bytes are the IPv4 octets. Docker 29.x+ switched the bridge
+// driver to fully random MACs, but overlay networks still use IP-derived MACs, so
+// this check remains relevant for those drivers and for older Docker versions.
+// A MAC matching that pattern for the given IP is not a user-configured value and
+// should not be preserved across container recreation. If ip is not a valid IPv4
+// address, the MAC is assumed to be user-configured and false is returned.
 //
 // Parameters:
 //   - mac: MAC address to check.
