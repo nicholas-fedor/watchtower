@@ -1689,6 +1689,102 @@ var _ = ginkgo.Describe("isEngineGeneratedMAC", func() {
 	})
 })
 
+var _ = ginkgo.Describe("onlyGeneratedMacs", func() {
+	ginkgo.It("should return true when all original MACs are engine-generated and all endpoints are covered", func() {
+		container := MockContainer(
+			WithNetworkSettings(map[string]*dockerNetwork.EndpointSettings{
+				"bridge": {
+					NetworkID:  "bridge_network_id",
+					MacAddress: dockerNetwork.HardwareAddr("02:42:ac:11:00:02"),
+					IPAddress:  netip.MustParseAddr("172.17.0.2"),
+				},
+			}),
+		)
+		processedConfig := &dockerNetwork.NetworkingConfig{
+			EndpointsConfig: map[string]*dockerNetwork.EndpointSettings{
+				"bridge": {
+					NetworkID: "bridge_network_id",
+				},
+			},
+		}
+
+		gomega.Expect(onlyGeneratedMacs(container, processedConfig)).To(gomega.BeTrue())
+	})
+
+	ginkgo.It("should return false when a non-nil original endpoint is missing from the processed config", func() {
+		container := MockContainer(
+			WithNetworkSettings(map[string]*dockerNetwork.EndpointSettings{
+				"bridge": {
+					NetworkID:  "bridge_network_id",
+					MacAddress: dockerNetwork.HardwareAddr("02:42:ac:11:00:02"),
+					IPAddress:  netip.MustParseAddr("172.17.0.2"),
+				},
+				"custom": {
+					NetworkID:  "custom_network_id",
+					MacAddress: dockerNetwork.HardwareAddr("aa:bb:cc:dd:ee:ff"),
+					IPAddress:  netip.MustParseAddr("10.0.0.5"),
+				},
+			}),
+		)
+		processedConfig := &dockerNetwork.NetworkingConfig{
+			EndpointsConfig: map[string]*dockerNetwork.EndpointSettings{
+				"bridge": {
+					NetworkID: "bridge_network_id",
+				},
+			},
+		}
+
+		gomega.Expect(onlyGeneratedMacs(container, processedConfig)).To(gomega.BeFalse())
+	})
+
+	ginkgo.It("should return false when there is a user-configured MAC", func() {
+		container := MockContainer(
+			WithNetworkSettings(map[string]*dockerNetwork.EndpointSettings{
+				"bridge": {
+					NetworkID:  "bridge_network_id",
+					MacAddress: dockerNetwork.HardwareAddr("aa:bb:cc:dd:ee:ff"),
+					IPAddress:  netip.MustParseAddr("172.17.0.2"),
+				},
+			}),
+		)
+		processedConfig := &dockerNetwork.NetworkingConfig{
+			EndpointsConfig: map[string]*dockerNetwork.EndpointSettings{
+				"bridge": {
+					NetworkID: "bridge_network_id",
+				},
+			},
+		}
+
+		gomega.Expect(onlyGeneratedMacs(container, processedConfig)).To(gomega.BeFalse())
+	})
+
+	ginkgo.It("should return false when there are no MACs at all", func() {
+		container := MockContainer(
+			WithNetworkSettings(map[string]*dockerNetwork.EndpointSettings{
+				"bridge": {
+					NetworkID: "bridge_network_id",
+					IPAddress: netip.MustParseAddr("172.17.0.2"),
+				},
+			}),
+		)
+		processedConfig := &dockerNetwork.NetworkingConfig{
+			EndpointsConfig: map[string]*dockerNetwork.EndpointSettings{
+				"bridge": {
+					NetworkID: "bridge_network_id",
+				},
+			},
+		}
+
+		gomega.Expect(onlyGeneratedMacs(container, processedConfig)).To(gomega.BeFalse())
+	})
+
+	ginkgo.It("should return false when container info is nil", func() {
+		processedConfig := &dockerNetwork.NetworkingConfig{}
+
+		gomega.Expect(onlyGeneratedMacs(nil, processedConfig)).To(gomega.BeFalse())
+	})
+})
+
 var _ = ginkgo.Describe("validateMacAddresses", func() {
 	ginkgo.Context("with legacy API version (< 1.44)", func() {
 		clientVersion := "1.40"

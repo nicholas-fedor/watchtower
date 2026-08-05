@@ -623,39 +623,72 @@ func isEngineGeneratedMAC(mac dockerNetwork.HardwareAddr, ip netip.Addr) bool {
 
 // onlyGeneratedMacs reports whether every non-empty MAC in the source
 // container's original network settings matches the bridge driver's
-// engine-generated pattern for that endpoint's IP.
+// engine-generated pattern for that endpoint's IP, and whether every non-nil
+// original endpoint is present in the processed configuration.
 //
 // It is used by validateMacAddresses to allow missing MACs in the processed
-// config when those MACs were intentionally cleared by processEndpoint because
-// they were engine-generated.
+// config only when those MACs were intentionally cleared by processEndpoint and
+// no endpoints were lost during processing.
 //
 // Parameters:
 //   - sourceContainer: The container whose original network settings are inspected.
+//   - processedConfig: The processed network configuration whose endpoint coverage is checked.
 //
 // Returns:
 //   - bool: True if the container had at least one MAC and every one of them was
-//     engine-generated. False if there were no MACs or at least one was user-configured.
-func onlyGeneratedMacs(sourceContainer types.Container) bool {
+//     engine-generated, and all non-nil original endpoints appear in the processed
+//     config. False otherwise.
+func onlyGeneratedMacs(sourceContainer types.Container, processedConfig *dockerNetwork.NetworkingConfig) bool {
+	if sourceContainer == nil {
+		return false
+	}
+
 	containerInfo := sourceContainer.ContainerInfo()
 
 	if containerInfo == nil || containerInfo.NetworkSettings == nil {
 		return false
 	}
 
+	// Build a set of network names present in the processed config so we can
+	// verify that every non-nil original endpoint survived processing.
+	processedNetworks := make(map[string]bool, len(processedConfig.EndpointsConfig))
+
+	for name := range processedConfig.EndpointsConfig {
+		processedNetworks[name] = true
+	}
+
 	hasMac := false
 
-	for _, endpoint := range containerInfo.NetworkSettings.Networks {
-		if endpoint == nil || len(endpoint.MacAddress) == 0 {
+	for networkName, endpoint := range containerInfo.NetworkSettings.Networks {
+		// Nil endpoints carry no MAC and do not participate in coverage checks.
+		if endpoint == nil {
+			continue
+		}
+
+		// A non-nil original endpoint that was dropped during processing means
+		// the missing-MAC result may not be fully explained by intentional
+		// clearing, so do not grant the waiver.
+		if !processedNetworks[networkName] {
+			return false
+		}
+
+		// Endpoints without a MAC cannot be engine-generated, but they also do
+		// not disprove the hypothesis that every original MAC was generated.
+		if len(endpoint.MacAddress) == 0 {
 			continue
 		}
 
 		hasMac = true
 
+		// Any user-configured MAC disproves the all-generated hypothesis and
+		// preserves normal missing-MAC validation behavior.
 		if !isEngineGeneratedMAC(endpoint.MacAddress, endpoint.IPAddress) {
 			return false
 		}
 	}
 
+	// Require at least one original MAC so that containers with no MACs at all
+	// do not incorrectly bypass validation.
 	return hasMac
 }
 
@@ -779,9 +812,11 @@ func validateMacAddresses(
 			return nil
 		}
 
-		// If all original MACs were engine-generated, the absence is expected because
-		// processEndpoint intentionally clears them to avoid stale MACs after IP reassignment.
-		if onlyGeneratedMacs(sourceContainer) {
+		// If all original MACs were engine-generated and every non-nil original
+		// endpoint is present in the processed config, the absence is expected
+		// because processEndpoint intentionally clears them to avoid stale MACs
+		// after IP reassignment.
+		if onlyGeneratedMacs(sourceContainer, config) {
 			clog.Debug("No MAC address found; all original MACs were engine-generated and intentionally cleared")
 
 			return nil
