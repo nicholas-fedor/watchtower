@@ -1541,12 +1541,40 @@ var _ = ginkgo.Describe("DetachedContext", func() {
 			}
 
 			testContainer := client.TestData.Containers[0]
-			_, renamed, err := restartStaleContainer(
-				context.Background(),
-				testContainer,
-				client,
-				params,
+
+			// Use a cancellable parent context to verify rename-back survives cancellation.
+			parentCtx, parentCancel := context.WithCancel(context.Background())
+			defer parentCancel()
+
+			// Add simulated latency to CreateContainer so the initial rename completes
+			// before we cancel the parent context.
+			client.TestData.SimulatedLatency = 5 * time.Millisecond
+
+			var (
+				renamed bool
+				err     error
 			)
+
+			// Run restartStaleContainer in a goroutine so we can cancel the parent
+			// after the initial handoff rename but before/during create failure.
+			var wg sync.WaitGroup
+			wg.Go(func() {
+				_, renamed, err = restartStaleContainer(
+					parentCtx,
+					testContainer,
+					client,
+					params,
+				)
+			})
+
+			// Wait for CreateContainer to be called, indicating the initial rename
+			// has completed. Then cancel the parent context.
+			for client.TestData.CreateContainerCount.Load() == 0 {
+				time.Sleep(1 * time.Millisecond)
+			}
+
+			parentCancel()
+			wg.Wait()
 
 			gomega.Expect(err).To(gomega.HaveOccurred())
 			gomega.Expect(err.Error()).To(gomega.ContainSubstring("failed to create container"))
@@ -1605,12 +1633,40 @@ var _ = ginkgo.Describe("DetachedContext", func() {
 			}
 
 			testContainer := client.TestData.Containers[0]
-			_, renamed, err := restartStaleContainer(
-				context.Background(),
-				testContainer,
-				client,
-				params,
+
+			// Use a cancellable parent context to verify cleanup survives cancellation.
+			parentCtx, parentCancel := context.WithCancel(context.Background())
+			defer parentCancel()
+
+			// Add simulated latency so the initial rename and create complete
+			// before we cancel the parent context.
+			client.TestData.SimulatedLatency = 5 * time.Millisecond
+
+			var (
+				renamed bool
+				err     error
 			)
+
+			// Run restartStaleContainer in a goroutine so we can cancel the parent
+			// after the initial handoff and create but before/during start failure.
+			var wg sync.WaitGroup
+			wg.Go(func() {
+				_, renamed, err = restartStaleContainer(
+					parentCtx,
+					testContainer,
+					client,
+					params,
+				)
+			})
+
+			// Wait for StartContainer to be called, indicating the initial rename
+			// and create have completed. Then cancel the parent context.
+			for client.TestData.StartContainerCount.Load() == 0 {
+				time.Sleep(1 * time.Millisecond)
+			}
+
+			parentCancel()
+			wg.Wait()
 
 			gomega.Expect(err).To(gomega.HaveOccurred())
 			gomega.Expect(err.Error()).To(gomega.ContainSubstring("failed to start container"))
@@ -1618,6 +1674,7 @@ var _ = ginkgo.Describe("DetachedContext", func() {
 			gomega.Expect(client.TestData.CreateContainerCount.Load()).To(gomega.Equal(int32(1)))
 			gomega.Expect(client.TestData.LastCreatedContainerID).ToNot(gomega.BeEmpty())
 			gomega.Expect(client.TestData.StopAndRemoveContainerCount.Load()).To(gomega.Equal(int32(1)))
+			gomega.Expect(client.TestData.RemoveContainerCount.Load()).To(gomega.Equal(int32(1)))
 			gomega.Expect(client.TestData.LastStopAndRemoveID).To(gomega.Equal(client.TestData.LastCreatedContainerID))
 			gomega.Expect(client.TestData.LastStopAndRemoveID).ToNot(gomega.Equal(testContainer.ID()))
 
@@ -1723,10 +1780,10 @@ var _ = ginkgo.Describe("DetachedContext", func() {
 			gomega.Expect(err.Error()).To(gomega.ContainSubstring("failed to start container"))
 			gomega.Expect(renamed).To(gomega.BeTrue())
 
-			// Verify that StopContainer was called during cleanup.
+			// Verify that RemoveContainer was called during cleanup.
 			// This demonstrates that the detached context allowed the cleanup
 			// operation to proceed even though the parent context was canceled.
-			gomega.Expect(client.TestData.StopContainerCount.Load()).To(gomega.BeNumerically(">=", int32(1)))
+			gomega.Expect(client.TestData.RemoveContainerCount.Load()).To(gomega.Equal(int32(1)))
 		})
 
 		ginkgo.It("cleanup operations complete when parent context is already canceled", func() {
