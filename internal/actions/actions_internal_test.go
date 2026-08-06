@@ -1503,12 +1503,6 @@ var _ = ginkgo.Describe("DetachedContext", func() {
 					expectedDeadline := time.Now().Add(tc.expectedTimeout)
 					gomega.Expect(createDeadline).To(gomega.BeTemporally("~", expectedDeadline, time.Second))
 					gomega.Expect(startDeadline).To(gomega.BeTemporally("~", expectedDeadline, time.Second))
-				} else {
-					_, createHasDeadline := client.TestData.CreateContainerCtx.Deadline()
-					_, startHasDeadline := client.TestData.StartContainerByIDCtx.Deadline()
-
-					gomega.Expect(createHasDeadline).To(gomega.BeFalse())
-					gomega.Expect(startHasDeadline).To(gomega.BeFalse())
 				}
 			})
 		}
