@@ -1486,6 +1486,24 @@ var _ = ginkgo.Describe("DetachedContext", func() {
 					gomega.Expect(createHasDeadline).To(gomega.BeFalse())
 					gomega.Expect(startHasDeadline).To(gomega.BeFalse())
 				}
+
+				// Verify CreateContainer and StartContainerByID also use the detached context.
+				// These operations run after CreateContainer succeeds, so the same deadline
+				// should apply when expectDeadline is true.
+				gomega.Expect(client.TestData.CreateContainerCount.Load()).To(gomega.Equal(int32(1)))
+				gomega.Expect(client.TestData.StartContainerCount.Load()).To(gomega.Equal(int32(1)))
+
+				if tc.expectDeadline {
+					createDeadline, createHasDeadline := client.TestData.CreateContainerCtx.Deadline()
+					gomega.Expect(createHasDeadline).To(gomega.BeTrue())
+
+					startDeadline, startHasDeadline := client.TestData.StartContainerByIDCtx.Deadline()
+					gomega.Expect(startHasDeadline).To(gomega.BeTrue())
+
+					expectedDeadline := time.Now().Add(tc.expectedTimeout)
+					gomega.Expect(createDeadline).To(gomega.BeTemporally("~", expectedDeadline, time.Second))
+					gomega.Expect(startDeadline).To(gomega.BeTemporally("~", expectedDeadline, time.Second))
+				}
 			})
 		}
 	})
