@@ -236,4 +236,54 @@ var _ = ginkgo.Describe("TryRecoverOrphanedContainer", func() {
 			gomega.Expect(client.TestData.StartContainerCount.Load()).To(gomega.Equal(int32(0)))
 		})
 	})
+
+	ginkgo.When("the current container has no scope and the orphaned container has an explicit scope", func() {
+		ginkgo.It("should not start it", func() {
+			orphaned := mockActions.CreateMockContainerWithConfig(
+				"orphaned-id",
+				"watchtower-xyz",
+				"watchtower:latest",
+				false,
+				false,
+				time.Now(),
+				&dockerContainer.Config{
+					Image: "watchtower:latest",
+					Labels: map[string]string{
+						"com.centurylinklabs.watchtower":       "true",
+						"com.centurylinklabs.watchtower.scope": "scope-b",
+					},
+				},
+			)
+			orphaned.ContainerInfo().State.Status = dockerContainer.StateCreated
+
+			current := mockActions.CreateMockContainerWithConfig(
+				"current-id",
+				"watchtower-old-abc123",
+				"watchtower:latest",
+				true,
+				false,
+				time.Now(),
+				&dockerContainer.Config{
+					Image: "watchtower:latest",
+					Labels: map[string]string{
+						"com.centurylinklabs.watchtower": "true",
+					},
+				},
+			)
+
+			client := mockActions.CreateMockClient(&mockActions.TestData{
+				Containers: []types.Container{orphaned, current},
+			}, false, false)
+
+			recovered, ok := actions.TryRecoverOrphanedContainer(
+				context.Background(),
+				client,
+				current,
+			)
+
+			gomega.Expect(ok).To(gomega.BeFalse())
+			gomega.Expect(recovered).To(gomega.BeNil())
+			gomega.Expect(client.TestData.StartContainerCount.Load()).To(gomega.Equal(int32(0)))
+		})
+	})
 })

@@ -42,6 +42,51 @@ const (
 	defaultCreateStartTimeout = 5 * time.Minute
 )
 
+// isRecoverableOrphan determines whether a container is a recoverable orphaned
+// Watchtower instance. It excludes the current container, old-container names,
+// non-Watchtower containers, containers that are not in the created state, and
+// containers from a different scope.
+//
+// Parameters:
+//   - c: Candidate container to evaluate.
+//   - currentContainer: The current running container to exclude.
+//   - currentScope: Normalized scope of the current container ("none" when unset).
+//
+// Returns:
+//   - bool: True if the candidate is a recoverable orphan, false otherwise.
+func isRecoverableOrphan(
+	c types.Container,
+	currentContainer types.Container,
+	currentScope string,
+) bool {
+	if !c.IsWatchtower() {
+		return false
+	}
+
+	if c.ID() == currentContainer.ID() {
+		return false
+	}
+
+	if container.IsOldContainer(c.Name()) {
+		return false
+	}
+
+	if !c.IsCreated() {
+		return false
+	}
+
+	candidateScope, candidateHasScope := c.Scope()
+	if !candidateHasScope || candidateScope == "" {
+		candidateScope = "none"
+	}
+
+	if candidateScope != currentScope {
+		return false
+	}
+
+	return true
+}
+
 // TryRecoverOrphanedContainer attempts to start an orphaned Watchtower container
 // that is stuck in the Docker "created" state. This can happen when a self-update
 // creates a replacement container but fails to start it, leaving the old container
@@ -81,28 +126,7 @@ func TryRecoverOrphanedContainer(
 	}
 
 	for _, c := range allContainers {
-		if !c.IsWatchtower() {
-			continue
-		}
-
-		if c.ID() == currentContainer.ID() {
-			continue
-		}
-
-		if container.IsOldContainer(c.Name()) {
-			continue
-		}
-
-		if !c.IsCreated() {
-			continue
-		}
-
-		candidateScope, candidateHasScope := c.Scope()
-		if !candidateHasScope || candidateScope == "" {
-			candidateScope = "none"
-		}
-
-		if candidateScope != currentScope {
+		if !isRecoverableOrphan(c, currentContainer, currentScope) {
 			continue
 		}
 
@@ -187,27 +211,28 @@ func Update(
 					logrus.WithField("container", c.Name()).
 						Debug("Current container is an old Watchtower container, stopping self")
 
-					setNoRestartCtx, setNoRestartCancel := context.WithTimeout(
+					recoverCtx, recoverCancel := context.WithTimeout(
 						context.Background(),
 						restartPolicyTimeout(config.Timeout),
 					)
-					defer setNoRestartCancel()
+					defer recoverCancel()
 
-					//nolint:contextcheck // setNoRestartCtx is intentionally used for recovery and restart policy updates
+					//nolint:contextcheck // recoverCtx is intentionally created with timeout and passed to recovery
 					recoveredContainer, recovered := TryRecoverOrphanedContainer(
-						setNoRestartCtx,
+						recoverCtx,
 						client,
 						c,
 					)
 					if recovered {
 						logrus.WithField("container", recoveredContainer.Name()).
 							Info("Recovered orphaned Watchtower container, exiting old instance")
-
-						//nolint:contextcheck // setNoRestartCtx is intentionally used for restart policy update
-						client.SetNoRestartPolicy(setNoRestartCtx, c)
-
-						return nil, nil, errOldSelfDetected
 					}
+
+					setNoRestartCtx, setNoRestartCancel := context.WithTimeout(
+						context.Background(),
+						restartPolicyTimeout(config.Timeout),
+					)
+					defer setNoRestartCancel()
 
 					//nolint:contextcheck // setNoRestartCtx is intentionally used for restart policy update
 					client.SetNoRestartPolicy(setNoRestartCtx, c)

@@ -1569,9 +1569,9 @@ var _ = ginkgo.Describe("DetachedContext", func() {
 
 			// Wait for CreateContainer to be called, indicating the initial rename
 			// has completed. Then cancel the parent context.
-			for client.TestData.CreateContainerCount.Load() == 0 {
-				time.Sleep(1 * time.Millisecond)
-			}
+			gomega.Eventually(func() int32 {
+				return client.TestData.CreateContainerCount.Load()
+			}).Should(gomega.BeNumerically(">", 0))
 
 			parentCancel()
 			wg.Wait()
@@ -1661,9 +1661,9 @@ var _ = ginkgo.Describe("DetachedContext", func() {
 
 			// Wait for StartContainer to be called, indicating the initial rename
 			// and create have completed. Then cancel the parent context.
-			for client.TestData.StartContainerCount.Load() == 0 {
-				time.Sleep(1 * time.Millisecond)
-			}
+			gomega.Eventually(func() int32 {
+				return client.TestData.StartContainerCount.Load()
+			}).Should(gomega.BeNumerically(">", 0))
 
 			parentCancel()
 			wg.Wait()
@@ -1761,9 +1761,9 @@ var _ = ginkgo.Describe("DetachedContext", func() {
 			// Wait for StartContainer to be called (which means RenameContainer has completed)
 			// before canceling the parent context. This ensures we cancel at the right moment -
 			// after rename succeeds but during/after start fails.
-			for client.TestData.StartContainerCount.Load() == 0 {
-				time.Sleep(1 * time.Millisecond)
-			}
+			gomega.Eventually(func() int32 {
+				return client.TestData.StartContainerCount.Load()
+			}).Should(gomega.BeNumerically(">", 0))
 
 			// Cancel the parent context after StartContainer has been called.
 			// The detached context should allow cleanup to proceed even though

@@ -280,8 +280,14 @@ func preRun(cmd *cobra.Command, _ []string) {
 		// Attempt to recover an orphaned Watchtower container that is stuck
 		// in the created state before exiting. If recovery succeeds, the
 		// old container still exits with restart policy set to "no".
+		recoverCtx, recoverCancel := context.WithTimeout(
+			context.Background(),
+			restartPolicyTimeout,
+		)
+		defer recoverCancel()
+
 		recoveredContainer, recovered := actions.TryRecoverOrphanedContainer(
-			exitCtx,
+			recoverCtx,
 			client,
 			currentWatchtowerContainer,
 		)
