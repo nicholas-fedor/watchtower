@@ -15,6 +15,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Increase create/start timeout and use fresh contexts for recovery by @nicholas-fedor in [#2108](https://github.com/nicholas-fedor/watchtower/pull/2108)
 - Clear engine-generated MACs on container recreation by @nicholas-fedor in [#2106](https://github.com/nicholas-fedor/watchtower/pull/2106)
 
 ## [1.20.3] - 2026-08-05
