@@ -71,6 +71,11 @@ type TestData struct {
 	LastStartedContainerID      types.ContainerID             // ID returned by the last successful StartContainer call.
 	SetNoRestartPolicyContainer types.Container               // Last container passed to SetNoRestartPolicy.
 	SetNoRestartPolicyCtx       context.Context               // Last context passed to SetNoRestartPolicy.
+	CreateContainerCtx          context.Context               // Last context passed to CreateContainer.
+	RenameContainerCtx          context.Context               // Last context passed to RenameContainer.
+	StartContainerByIDCtx       context.Context               // Last context passed to StartContainerByID.
+	GetContainerCtx             context.Context               // Last context passed to GetContainer.
+	StopAndRemoveContainerCtx   context.Context               // Last context passed to StopAndRemoveContainer.
 }
 
 // recordOperation appends an operation name to OperationOrder for sequencing tests.
@@ -215,6 +220,7 @@ func (client MockClient) StopContainer(ctx context.Context, c types.Container, _
 func (client MockClient) StopAndRemoveContainer(ctx context.Context, c types.Container, timeout time.Duration) error {
 	client.TestData.StopAndRemoveContainerCount.Add(1)
 	client.TestData.LastStopAndRemoveID = c.ID()
+	client.TestData.StopAndRemoveContainerCtx = ctx
 	client.TestData.recordOperation("StopAndRemoveContainer")
 
 	err := client.StopContainer(ctx, c, timeout)
@@ -239,6 +245,7 @@ func (client MockClient) IsContainerRunning(c types.Container) bool {
 // new instance from the source (required for self-update failure cleanup tests).
 func (client MockClient) CreateContainer(ctx context.Context, c types.Container) (types.ContainerID, error) {
 	client.TestData.CreateContainerCount.Add(1)
+	client.TestData.CreateContainerCtx = ctx
 
 	if err := client.checkContextCancellation(ctx); err != nil {
 		return "", err
@@ -329,6 +336,7 @@ func (client MockClient) StartContainer(ctx context.Context, c types.Container) 
 func (client MockClient) StartContainerByID(ctx context.Context, containerID types.ContainerID) error {
 	client.TestData.StartContainerCount.Add(1)
 	client.TestData.recordOperation("StartContainerByID")
+	client.TestData.StartContainerByIDCtx = ctx
 
 	if err := client.checkContextCancellation(ctx); err != nil {
 		return err
@@ -357,6 +365,7 @@ func (client MockClient) RenameContainer(ctx context.Context, _ types.Container,
 	client.TestData.LastRenameTarget = newName
 	client.TestData.RenameTargets = append(client.TestData.RenameTargets, newName)
 	client.TestData.recordOperation("RenameContainer")
+	client.TestData.RenameContainerCtx = ctx
 
 	if err := client.checkContextCancellation(ctx); err != nil {
 		return err
@@ -384,6 +393,7 @@ func (client MockClient) SetNoRestartPolicy(ctx context.Context, container types
 	client.TestData.SetNoRestartPolicyCount.Add(1)
 	client.TestData.SetNoRestartPolicyContainer = container
 	client.TestData.SetNoRestartPolicyCtx = ctx
+	client.TestData.recordOperation("SetNoRestartPolicy")
 }
 
 // RemoveImageByID increments the count of image removal attempts in TestData.
@@ -404,10 +414,14 @@ func (client MockClient) RemoveImageByID(ctx context.Context, imageID types.Imag
 
 // GetContainer returns the container with the specified ID from TestData.
 // It provides a mock response for testing container retrieval.
-func (client MockClient) GetContainer(_ context.Context, containerID types.ContainerID) (types.Container, error) {
+func (client MockClient) GetContainer(ctx context.Context, containerID types.ContainerID) (types.Container, error) {
+	client.TestData.GetContainerCtx = ctx
+	client.TestData.recordOperation("GetContainer")
+
 	if c, ok := client.TestData.ContainersByID[containerID]; ok {
 		return c, nil
 	}
+
 	return nil, fmt.Errorf("container not found: %s", containerID)
 }
 
