@@ -140,6 +140,7 @@ func (c *SimpleContainer) PostUpdateTimeout() int {
 	return 30
 }
 func (c *SimpleContainer) IsRestarting() bool                               { return false }
+func (c *SimpleContainer) IsCreated() bool                                  { return false }
 func (c *SimpleContainer) GetCreateConfig() *dockerContainer.Config         { return nil }
 func (c *SimpleContainer) GetCreateHostConfig() *dockerContainer.HostConfig { return nil }
 func (c *SimpleContainer) HasExposedPorts() bool                            { return false }

@@ -48,6 +48,7 @@ type Container interface {
 	PreUpdateTimeout() int                            // Pre-update timeout.
 	PostUpdateTimeout() int                           // Post-update timeout.
 	IsRestarting() bool                               // Restarting status check.
+	IsCreated() bool                                  // Created-state check.
 	GetCreateConfig() *dockerContainer.Config         // Creation config.
 	GetCreateHostConfig() *dockerContainer.HostConfig // Host creation config.
 	GetContainerChain() (string, bool)                // Container chain label value and presence.

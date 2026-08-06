@@ -219,6 +219,19 @@ func (c *Container) IsRestarting() bool {
 	return c.containerInfo.State.Restarting
 }
 
+// IsCreated checks if the container is in the Docker "created" state,
+// meaning it was successfully created but never started.
+//
+// Returns:
+//   - bool: True if the container is in created state, false otherwise.
+func (c *Container) IsCreated() bool {
+	if c.containerInfo == nil || c.containerInfo.State == nil {
+		return false
+	}
+
+	return c.containerInfo.State.Status == dockerContainer.StateCreated
+}
+
 // Name returns the normalized name of the container.
 //
 // Returns:

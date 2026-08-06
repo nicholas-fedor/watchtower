@@ -194,16 +194,62 @@ func CleanupOldWatchtowerContainers(
 		oldContainers = append(oldContainers, c)
 	}
 
+	// Find orphaned Watchtower containers that are stuck in the created state.
+	// These can be left behind when a self-update creates a replacement but
+	// fails to start it. The new container never runs and the old instance
+	// may already be running under its original name.
+	var orphanedCreatedContainers []types.Container
+
+	for _, c := range allContainers {
+		if !c.IsWatchtower() {
+			continue
+		}
+
+		if c.ID() == currentContainerID {
+			continue
+		}
+
+		if container.IsOldContainer(c.Name()) {
+			continue
+		}
+
+		if !c.IsCreated() {
+			continue
+		}
+
+		// Scope check: only clean up orphaned containers in the same scope.
+		containerScope, containerHasScope := c.Scope()
+		if !containerHasScope || containerScope == "" {
+			containerScope = "none"
+		}
+
+		if containerScope != scope {
+			logrus.WithFields(logrus.Fields{
+				"container":       c.Name(),
+				"container_scope": containerScope,
+				"current_scope":   scope,
+			}).Debug("Skipping orphaned Watchtower container in different scope")
+
+			continue
+		}
+
+		orphanedCreatedContainers = append(orphanedCreatedContainers, c)
+	}
+
+	oldContainers = append(oldContainers, orphanedCreatedContainers...)
+
 	if len(oldContainers) == 0 {
-		logrus.Debug("No old Watchtower containers found")
+		logrus.Debug("No old or orphaned Watchtower containers found")
 
 		return 0, nil
 	}
 
 	logrus.WithFields(logrus.Fields{
-		"count":      len(oldContainers),
-		"containers": containerNames(oldContainers),
-	}).Info("Found old Watchtower containers, cleaning up")
+		"count":                  len(oldContainers),
+		"old_count":              len(oldContainers) - len(orphanedCreatedContainers),
+		"orphaned_created_count": len(orphanedCreatedContainers),
+		"containers":             containerNames(oldContainers),
+	}).Info("Found old or orphaned Watchtower containers, cleaning up")
 
 	// Find the current container in the list so image collection works
 	var currentContainerObj types.Container
