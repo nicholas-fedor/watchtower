@@ -1454,15 +1454,37 @@ var _ = ginkgo.Describe("DetachedContext", func() {
 				// renamed Watchtower container.
 				gomega.Expect(client.TestData.SetNoRestartPolicyCount.Load()).To(gomega.Equal(int32(1)))
 
+				// Verify CreateContainer and StartContainerByID also use the detached context.
+				// These operations run after the initial rename, so they should share the same
+				// deadline when expectDeadline is true.
+				createCtx := client.TestData.CreateContainerCtx
+				startCtx := client.TestData.StartContainerByIDCtx
+				noRestartCtx := client.TestData.SetNoRestartPolicyCtx
+
+				gomega.Expect(createCtx).NotTo(gomega.BeNil(), "CreateContainer should receive a context")
+				gomega.Expect(startCtx).NotTo(gomega.BeNil(), "StartContainerByID should receive a context")
+				gomega.Expect(createCtx).To(gomega.Equal(startCtx), "CreateContainer and StartContainerByID should share the same detached context")
+				gomega.Expect(createCtx).To(gomega.Equal(noRestartCtx), "CreateContainer should use the same detached context as SetNoRestartPolicy")
+
 				if tc.expectDeadline {
-					deadline, hasDeadline := client.TestData.SetNoRestartPolicyCtx.Deadline()
-					gomega.Expect(hasDeadline).To(gomega.BeTrue())
+					_, createHasDeadline := createCtx.Deadline()
+					_, startHasDeadline := startCtx.Deadline()
+
+					gomega.Expect(createHasDeadline).To(gomega.BeTrue())
+					gomega.Expect(startHasDeadline).To(gomega.BeTrue())
 
 					expectedDeadline := time.Now().Add(tc.expectedTimeout)
-					gomega.Expect(deadline).To(gomega.BeTemporally("~", expectedDeadline, time.Second))
+					createDeadline, _ := createCtx.Deadline()
+					startDeadline, _ := startCtx.Deadline()
+
+					gomega.Expect(createDeadline).To(gomega.BeTemporally("~", expectedDeadline, time.Second))
+					gomega.Expect(startDeadline).To(gomega.BeTemporally("~", expectedDeadline, time.Second))
 				} else {
-					_, hasDeadline := client.TestData.SetNoRestartPolicyCtx.Deadline()
-					gomega.Expect(hasDeadline).To(gomega.BeFalse())
+					_, createHasDeadline := createCtx.Deadline()
+					_, startHasDeadline := startCtx.Deadline()
+
+					gomega.Expect(createHasDeadline).To(gomega.BeFalse())
+					gomega.Expect(startHasDeadline).To(gomega.BeFalse())
 				}
 			})
 		}
