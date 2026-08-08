@@ -61,7 +61,7 @@ func newMsTeamsNotifier(legacy notifyConfig.Legacy) types.ConvertibleNotifier {
 
 	if len(webHookURL) == 0 {
 		clog.Fatal(
-			"Microsoft Teams webhook URL is empty; required argument --notification-msteams-hook(cli) or WATCHTOWER_NOTIFICATION_MSTEAMS_HOOK_URL(env) missing",
+			"Microsoft Teams webhook URL is empty",
 		)
 	}
 
