@@ -20,6 +20,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Validate required fields and standardize error messages by @nicholas-fedor in [#2124](https://github.com/nicholas-fedor/watchtower/pull/2124)
 - Recover orphaned Watchtower containers on startup by @nicholas-fedor in [#2110](https://github.com/nicholas-fedor/watchtower/pull/2110)
 - Remove orphaned Watchtower containers stuck in created state by @nicholas-fedor in [#2109](https://github.com/nicholas-fedor/watchtower/pull/2109)
 - Increase create/start timeout and use fresh contexts for recovery by @nicholas-fedor in [#2108](https://github.com/nicholas-fedor/watchtower/pull/2108)
