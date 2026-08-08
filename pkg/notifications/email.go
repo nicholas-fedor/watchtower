@@ -66,6 +66,24 @@ type emailTypeNotifier struct {
 //
 //nolint:godox
 func newEmailNotifier(legacy notifyConfig.Legacy) types.ConvertibleNotifier {
+	if legacy.EmailFrom == "" {
+		logrus.Fatal(
+			"Email from address is empty.",
+		)
+	}
+
+	if legacy.EmailTo == "" {
+		logrus.Fatal(
+			"Email to address is empty.",
+		)
+	}
+
+	if legacy.EmailServer == "" {
+		logrus.Fatal(
+			"Email server is empty.",
+		)
+	}
+
 	from := legacy.EmailFrom
 	to := legacy.EmailTo //nolint:varnamelen
 	server := legacy.EmailServer

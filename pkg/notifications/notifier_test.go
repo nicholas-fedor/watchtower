@@ -324,6 +324,28 @@ var _ = ginkgo.Describe("notifications", func() {
 				})
 			})
 		})
+		ginkgo.When("the hook URL is empty", func() {
+			ginkgo.It("should fatal with a clear missing argument message", func() {
+				originalExit := logrus.StandardLogger().ExitFunc
+				defer func() { logrus.StandardLogger().ExitFunc = originalExit }()
+
+				logrus.StandardLogger().ExitFunc = func(_ int) { panic("FATAL") }
+
+				gomega.Expect(func() {
+					command := cmd.NewRootCommand()
+					flags.RegisterNotificationFlags(command)
+
+					args := []string{
+						"--notifications",
+						"slack",
+					}
+
+					command.ParseFlags(args)
+
+					notifications.NewNotifierFromFlags(command)
+				}).To(gomega.Panic())
+			})
+		})
 	})
 
 	//nolint:godox
@@ -513,6 +535,82 @@ var _ = ginkgo.Describe("notifications", func() {
 				}
 
 				testURL(args, expectedOutput, expectedDelay)
+			})
+		})
+		ginkgo.When("a required field is empty", func() {
+			ginkgo.It("should fatal when the from address is empty", func() {
+				originalExit := logrus.StandardLogger().ExitFunc
+				defer func() { logrus.StandardLogger().ExitFunc = originalExit }()
+
+				logrus.StandardLogger().ExitFunc = func(_ int) { panic("FATAL") }
+
+				gomega.Expect(func() {
+					command := cmd.NewRootCommand()
+					flags.RegisterNotificationFlags(command)
+
+					args := []string{
+						"--notifications",
+						"email",
+						"--notification-email-to",
+						"recipient@example.com",
+						"--notification-email-server",
+						"smtp.example.com",
+					}
+
+					command.ParseFlags(args)
+
+					notifications.NewNotifierFromFlags(command)
+				}).To(gomega.Panic())
+			})
+
+			ginkgo.It("should fatal when the to address is empty", func() {
+				originalExit := logrus.StandardLogger().ExitFunc
+				defer func() { logrus.StandardLogger().ExitFunc = originalExit }()
+
+				logrus.StandardLogger().ExitFunc = func(_ int) { panic("FATAL") }
+
+				gomega.Expect(func() {
+					command := cmd.NewRootCommand()
+					flags.RegisterNotificationFlags(command)
+
+					args := []string{
+						"--notifications",
+						"email",
+						"--notification-email-from",
+						"sender@example.com",
+						"--notification-email-server",
+						"smtp.example.com",
+					}
+
+					command.ParseFlags(args)
+
+					notifications.NewNotifierFromFlags(command)
+				}).To(gomega.Panic())
+			})
+
+			ginkgo.It("should fatal when the server is empty", func() {
+				originalExit := logrus.StandardLogger().ExitFunc
+				defer func() { logrus.StandardLogger().ExitFunc = originalExit }()
+
+				logrus.StandardLogger().ExitFunc = func(_ int) { panic("FATAL") }
+
+				gomega.Expect(func() {
+					command := cmd.NewRootCommand()
+					flags.RegisterNotificationFlags(command)
+
+					args := []string{
+						"--notifications",
+						"email",
+						"--notification-email-from",
+						"sender@example.com",
+						"--notification-email-to",
+						"recipient@example.com",
+					}
+
+					command.ParseFlags(args)
+
+					notifications.NewNotifierFromFlags(command)
+				}).To(gomega.Panic())
 			})
 		})
 	})

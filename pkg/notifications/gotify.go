@@ -92,7 +92,7 @@ func requireGotifyToken(gotifyToken string) string {
 	// Fatal error if token is missing.
 	if len(gotifyToken) < 1 {
 		clog.Fatal(
-			"Gotify token is empty; required argument --notification-gotify-token(cli) or WATCHTOWER_NOTIFICATION_GOTIFY_TOKEN(env) is empty",
+			"Gotify token is empty.",
 		)
 	}
 
@@ -120,7 +120,7 @@ func requireGotifyURL(gotifyURL string) string {
 	// Fatal error if URL is missing.
 	if len(gotifyURL) < 1 {
 		clog.Fatal(
-			"Gotify URL is empty; required argument --notification-gotify-url(cli) or WATCHTOWER_NOTIFICATION_GOTIFY_URL(env) is empty",
+			"Gotify URL is empty",
 		)
 	}
 

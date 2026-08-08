@@ -62,6 +62,12 @@ func newSlackNotifier(legacy notifyConfig.Legacy) types.ConvertibleNotifier {
 	emoji := legacy.SlackIconEmoji
 	iconURL := legacy.SlackIconURL
 
+	if hookURL == "" {
+		logrus.Fatal(
+			"Slack hook URL is empty.",
+		)
+	}
+
 	clog := logrus.WithFields(logrus.Fields{
 		"hook_url": hookURL,
 		"username": userName,
