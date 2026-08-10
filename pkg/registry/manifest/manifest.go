@@ -10,7 +10,7 @@ import (
 	"strings"
 
 	"github.com/distribution/reference"
-	"github.com/sirupsen/logrus"
+	"github.com/rs/zerolog"
 
 	"github.com/nicholas-fedor/watchtower/pkg/registry/auth"
 	"github.com/nicholas-fedor/watchtower/pkg/types"
@@ -56,8 +56,8 @@ func parseImageRef(imageName string) (reference.Reference, error) {
 //
 // Returns:
 //   - string: The registry host (e.g., "registry.example.com" or "index.docker.io").
-func resolveRegistryHost(name string) string {
-	host, _ := auth.GetRegistryAddress(name)
+func resolveRegistryHost(log *zerolog.Logger, name string) string {
+	host, _ := auth.GetRegistryAddress(log, name)
 
 	return host
 }
@@ -116,18 +116,18 @@ func digestComponents(digested reference.Digested) (manifestPathComponents, erro
 
 // setManifestURLFields logs the common fields for a parsed image reference.
 //
-// It populates a logrus.Fields map with host, image_path, scheme, and optionally
+// It populates a map[string]any map with host, image_path, scheme, and optionally
 // tag or digest, then emits a debug log entry for tracing URL construction.
 //
 // Parameters:
-//   - fields: Base logrus fields to extend (typically includes container and image).
+//   - fields: Base log fields to extend (typically includes container and image).
 //   - host: Registry host for the manifest request.
 //   - imagePath: Repository path within the registry (e.g., "library/nginx").
 //   - scheme: URL scheme ("https" or "http").
 //   - tag: Tag specifier if present, empty string otherwise.
 //   - digest: Digest specifier if present, empty string otherwise.
-func setManifestURLFields(fields logrus.Fields, host, imagePath, scheme, tag, digest string) {
-	urlFields := logrus.Fields{
+func setManifestURLFields(log *zerolog.Logger, fields map[string]any, host, imagePath, scheme, tag, digest string) {
+	urlFields := map[string]any{
 		"host":       host,
 		"image_path": imagePath,
 		"scheme":     scheme,
@@ -141,7 +141,10 @@ func setManifestURLFields(fields logrus.Fields, host, imagePath, scheme, tag, di
 		urlFields["digest"] = digest
 	}
 
-	logrus.WithFields(fields).WithFields(urlFields).Debug("Constructed manifest URL components")
+	log.Debug().
+		Fields(fields).
+		Fields(urlFields).
+		Msg("Constructed manifest URL components")
 }
 
 // manifestURLPath returns the v2 manifest API path for a given image path and specifier.
@@ -177,9 +180,9 @@ func manifestURLPath(imagePath, specifier string) string {
 // Returns:
 //   - string: Manifest URL using the canonical registry host from the image reference.
 //   - error: Non-nil if parsing or tagging fails, nil on success.
-func BuildManifestURL(container types.Container, scheme string) (string, error) {
+func BuildManifestURL(log *zerolog.Logger, container types.Container, scheme string) (string, error) {
 	// Set up logging fields for consistent tracking.
-	fields := logrus.Fields{
+	fields := map[string]any{
 		"container": container.Name(),
 		"image":     container.ImageName(),
 	}
@@ -187,24 +190,28 @@ func BuildManifestURL(container types.Container, scheme string) (string, error) 
 	// Parse the image name into a normalized reference for reliable processing.
 	normalizedRef, err := parseImageRef(container.ImageName())
 	if err != nil {
-		logrus.WithError(err).WithFields(fields).Debug("Failed to parse image name")
+		log.Debug().
+			Err(err).
+			Fields(fields).
+			Msg("Failed to parse image name")
 
 		return "", err
 	}
 
 	tagged, ok := normalizedRef.(reference.NamedTagged)
 	if ok {
-		return buildTaggedManifestURL(fields, tagged, scheme)
+		return buildTaggedManifestURL(log, fields, tagged, scheme)
 	}
 
 	digested, ok := normalizedRef.(reference.Digested)
 	if ok {
-		return buildDigestedManifestURL(fields, digested, scheme)
+		return buildDigestedManifestURL(log, fields, digested, scheme)
 	}
 
-	logrus.WithFields(fields).
-		WithField("ref", normalizedRef.String()).
-		Debug("Missing tag/digest in image reference")
+	log.Debug().
+		Fields(fields).
+		Str("ref", normalizedRef.String()).
+		Msg("Missing tag/digest in image reference")
 
 	return "", fmt.Errorf("%w: %s", ErrMissingTag, normalizedRef.String())
 }
@@ -215,17 +222,17 @@ func BuildManifestURL(container types.Container, scheme string) (string, error) 
 // and returns the fully qualified manifest URL string.
 //
 // Parameters:
-//   - fields: Logrus fields for tracing the URL construction.
+//   - fields: Log fields for tracing the URL construction.
 //   - tagged: Parsed image reference implementing reference.NamedTagged.
 //   - scheme: URL scheme ("https" or "http").
 //
 // Returns:
 //   - string: Fully qualified manifest URL (e.g., "https://registry.example.com/v2/org/image/manifests/latest").
 //   - error: Non-nil if URL construction fails, nil on success.
-func buildTaggedManifestURL(fields logrus.Fields, tagged reference.NamedTagged, scheme string) (string, error) {
-	host := resolveRegistryHost(tagged.Name())
+func buildTaggedManifestURL(log *zerolog.Logger, fields map[string]any, tagged reference.NamedTagged, scheme string) (string, error) {
+	host := resolveRegistryHost(log, tagged.Name())
 	components := tagComponents(tagged)
-	setManifestURLFields(fields, host, components.imagePath, scheme, components.specifier, "")
+	setManifestURLFields(log, fields, host, components.imagePath, scheme, components.specifier, "")
 
 	return manifestURLString(host, scheme, manifestURLPath(components.imagePath, components.specifier)), nil
 }
@@ -237,24 +244,27 @@ func buildTaggedManifestURL(fields logrus.Fields, tagged reference.NamedTagged, 
 // qualified manifest URL string.
 //
 // Parameters:
-//   - fields: Logrus fields for tracing the URL construction.
+//   - fields: Log fields for tracing the URL construction.
 //   - digested: Parsed image reference implementing reference.Digested.
 //   - scheme: URL scheme ("https" or "http").
 //
 // Returns:
 //   - string: Fully qualified manifest URL (e.g., "https://registry.example.com/v2/org/image/manifests/sha256:abc...").
 //   - error: Non-nil if component extraction fails, nil on success.
-func buildDigestedManifestURL(fields logrus.Fields, digested reference.Digested, scheme string) (string, error) {
+func buildDigestedManifestURL(log *zerolog.Logger, fields map[string]any, digested reference.Digested, scheme string) (string, error) {
 	components, err := digestComponents(digested)
 	if err != nil {
-		logrus.WithError(err).WithFields(fields).Debug("Failed to extract digest components")
+		log.Debug().
+			Err(err).
+			Fields(fields).
+			Msg("Failed to extract digest components")
 
 		return "", err
 	}
 
 	namePart, _, _ := strings.Cut(digested.String(), "@")
-	host := resolveRegistryHost(namePart)
-	setManifestURLFields(fields, host, components.imagePath, scheme, "", components.specifier)
+	host := resolveRegistryHost(log, namePart)
+	setManifestURLFields(log, fields, host, components.imagePath, scheme, "", components.specifier)
 
 	return manifestURLString(host, scheme, manifestURLPath(components.imagePath, components.specifier)), nil
 }

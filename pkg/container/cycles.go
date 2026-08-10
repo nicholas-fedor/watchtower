@@ -187,7 +187,8 @@ func DetectCycles(containers []types.Container, useComposeDependsOn bool) map[st
 		// Translate each link target through the alias map to ensure canonical IDs
 		canonicalLinks := make([]string, 0, len(links))
 		for _, link := range links {
-			if canonical, exists := aliasMap[link]; exists {
+			canonical, exists := aliasMap[link]
+			if exists {
 				canonicalLinks = append(canonicalLinks, canonical)
 			}
 			// Skip unmapped link targets - prevents namespace mismatch
@@ -200,12 +201,13 @@ func DetectCycles(containers []types.Container, useComposeDependsOn bool) map[st
 		cycleDetector.colors[name] = 0
 	}
 
-	// Filter out unknown dependencies: only keep neighbors that are present in the containers list
-	// This prevents DFS from recursing into containers not in the original input
+	// Filter out unknown dependencies by only keeping neighbors that are present in the containers list.
+	// This prevents DFS from recursing into containers not in the original input.
 	for name, neighbors := range cycleDetector.graph {
 		filtered := make([]string, 0, len(neighbors))
 		for _, neighbor := range neighbors {
-			if _, exists := cycleDetector.colors[neighbor]; exists {
+			_, exists := cycleDetector.colors[neighbor]
+			if exists {
 				filtered = append(filtered, neighbor)
 			}
 		}

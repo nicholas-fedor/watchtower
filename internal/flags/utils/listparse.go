@@ -2,11 +2,8 @@
 package utils
 
 import (
-	"net/url"
 	"regexp"
 	"strings"
-
-	"github.com/sirupsen/logrus"
 )
 
 var (
@@ -128,16 +125,7 @@ func SplitNotificationValues(value string) []string {
 		}
 	}
 
-	final := make([]string, 0, len(result))
-	for _, urlStr := range result {
-		_, err := url.Parse(urlStr)
-		if err != nil {
-			// Do not log urlStr; notification URLs often embed tokens.
-			logrus.WithError(err).Warn("Invalid notification URL in list")
-		}
-
-		final = append(final, urlStr)
-	}
-
-	return final
+	// Preserve order. Callers (shoutrrr) validate URLs when building notifiers.
+	// Do not log values here — notification URLs often embed tokens.
+	return append([]string(nil), result...)
 }

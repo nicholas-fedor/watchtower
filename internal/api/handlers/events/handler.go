@@ -8,7 +8,7 @@ import (
 
 	"github.com/gofiber/fiber/v3"
 	"github.com/gofiber/fiber/v3/middleware/sse"
-	"github.com/sirupsen/logrus"
+	"github.com/rs/zerolog"
 )
 
 // sseRetryInterval is the reconnect delay for SSE clients.
@@ -16,6 +16,8 @@ const sseRetryInterval = 5 * time.Second
 
 // Handler serves the /v1/events endpoint with Server-Sent Events.
 type Handler struct {
+	log *zerolog.Logger
+
 	Path           string
 	Broadcaster    *Broadcaster
 	AllowedOrigins []string
@@ -30,8 +32,14 @@ type Handler struct {
 //
 // Returns:
 //   - *Handler: The initialized events handler.
-func NewHandler(b *Broadcaster, allowedOrigins []string) *Handler {
+func NewHandler(log *zerolog.Logger, b *Broadcaster, allowedOrigins []string) *Handler {
+	if log == nil {
+		nop := zerolog.Nop()
+		log = &nop
+	}
+
 	return &Handler{
+		log:            log,
 		Path:           "/v1/events",
 		Broadcaster:    b,
 		AllowedOrigins: allowedOrigins,
@@ -60,7 +68,7 @@ func (h *Handler) Handle() fiber.Handler {
 			return fiber.ErrForbidden
 		}
 
-		logSubscriberConnected(c)
+		logSubscriberConnected(h.log, c)
 
 		subCh, done, err := h.subscribe()
 		if err != nil {
@@ -90,12 +98,12 @@ func (h *Handler) checkOrigin(c fiber.Ctx) bool {
 		return true
 	}
 
-	logrus.WithFields(logrus.Fields{
-		"origin": origin,
-		"host":   host,
-		"ip":     c.IP(),
-		"notify": "no",
-	}).Warn("Rejected SSE connection from disallowed origin")
+	h.log.Warn().
+		Str("origin", origin).
+		Str("host", host).
+		Str("ip", c.IP()).
+		Str("notify", "no").
+		Msg("Rejected SSE connection from disallowed origin")
 
 	return false
 }
@@ -104,13 +112,13 @@ func (h *Handler) checkOrigin(c fiber.Ctx) bool {
 //
 // Parameters:
 //   - c: The Fiber request context.
-func logSubscriberConnected(c fiber.Ctx) {
-	logrus.WithFields(logrus.Fields{
-		"method": c.Method(),
-		"path":   c.Path(),
-		"ip":     c.IP(),
-		"notify": "no",
-	}).Info("New SSE subscriber connected")
+func logSubscriberConnected(log *zerolog.Logger, c fiber.Ctx) {
+	log.Info().
+		Str("method", c.Method()).
+		Str("path", c.Path()).
+		Str("ip", c.IP()).
+		Str("notify", "no").
+		Msg("New SSE subscriber connected")
 }
 
 // subscribe allocates broadcaster subscription resources.
@@ -163,7 +171,7 @@ func (h *Handler) serveStream(c fiber.Ctx, subCh <-chan Event, done <-chan struc
 //   - done: The done channel closed when the subscriber is unsubscribed.
 //
 // Returns:
-//   - error: Non-nil if a stream write fails; nil on normal unsubscribe or stream close.
+//   - error: Non-nil if a stream write fails. Nil on normal unsubscribe or stream close.
 func (h *Handler) dispatchEvents(stream *sse.Stream, subCh <-chan Event, done <-chan struct{}) error {
 	for {
 		select {
@@ -174,7 +182,10 @@ func (h *Handler) dispatchEvents(stream *sse.Stream, subCh <-chan Event, done <-
 
 			data, err := json.Marshal(event)
 			if err != nil {
-				logrus.WithError(err).WithField("notify", "no").Warn("Failed to marshal event")
+				h.log.Warn().
+					Err(err).
+					Str("notify", "no").
+					Msg("Failed to marshal event")
 
 				continue
 			}

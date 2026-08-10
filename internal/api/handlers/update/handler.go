@@ -7,13 +7,15 @@ import (
 	"time"
 
 	"github.com/gofiber/fiber/v3"
-	"github.com/sirupsen/logrus"
+	"github.com/rs/zerolog"
 
 	"github.com/nicholas-fedor/watchtower/internal/metrics"
 )
 
 // Handler triggers container update scans via HTTP.
 type Handler struct {
+	log *zerolog.Logger
+
 	fn         func(ctx context.Context, images, containers []string) *metrics.Metric
 	Path       string
 	lock       chan bool
@@ -42,8 +44,13 @@ const (
 //     new channel is created.
 //   - ctx: Optional application-lifetime context for background work.
 //     If nil, context.Background is used.
-func New(updateFn func(ctx context.Context, images, containers []string) *metrics.Metric, updateLock chan bool, ctx ...context.Context) *Handler {
-	return NewWithTimeout(updateFn, updateLock, 0, ctx...)
+func New(log *zerolog.Logger, updateFn func(ctx context.Context, images, containers []string) *metrics.Metric, updateLock chan bool, ctx ...context.Context) *Handler {
+	if log == nil {
+		nop := zerolog.Nop()
+		log = &nop
+	}
+
+	return NewWithTimeout(log, updateFn, updateLock, 0, ctx...)
 }
 
 // NewWithTimeout creates a new Handler with a maximum per-request timeout.
@@ -58,21 +65,33 @@ func New(updateFn func(ctx context.Context, images, containers []string) *metric
 //     no per-request timeout override is applied.
 //   - ctx: Optional application-lifetime context for background work.
 //     If nil, context.Background is used.
-func NewWithTimeout(updateFn func(ctx context.Context, images, containers []string) *metrics.Metric, updateLock chan bool, maxTimeout time.Duration, ctx ...context.Context) *Handler {
+func NewWithTimeout(
+	log *zerolog.Logger,
+	updateFn func(ctx context.Context, images, containers []string) *metrics.Metric,
+	updateLock chan bool,
+	maxTimeout time.Duration,
+	ctx ...context.Context,
+) *Handler {
+	if log == nil {
+		nop := zerolog.Nop()
+		log = &nop
+	}
+
 	var hLock chan bool
 	if updateLock != nil {
 		hLock = updateLock
 
-		logrus.WithFields(logrus.Fields{
-			"source": "provided",
-			"notify": "no",
-		}).Debug("Initialized update lock from provided channel")
+		log.Debug().
+			Str("source", "provided").
+			Str("notify", "no").
+			Msg("Initialized update lock from provided channel")
 	} else {
 		hLock = make(chan bool, 1)
 		hLock <- true
 
-		logrus.WithField("notify", "no").
-			Debug("Initialized new update lock channel")
+		log.Debug().
+			Str("notify", "no").
+			Msg("Initialized new update lock channel")
 	}
 
 	var bgCtx context.Context
@@ -83,6 +102,7 @@ func NewWithTimeout(updateFn func(ctx context.Context, images, containers []stri
 	}
 
 	return &Handler{
+		log:        log,
 		fn:         updateFn,
 		Path:       "/v1/update",
 		lock:       hLock,
@@ -114,11 +134,11 @@ func NewWithTimeout(updateFn func(ctx context.Context, images, containers []stri
 //	@Security		BearerAuth
 //	@Router			/v1/update [post]
 func (h *Handler) Handle(c fiber.Ctx) error {
-	logrus.WithFields(logrus.Fields{
-		"method": c.Method(),
-		"path":   c.Path(),
-		"notify": "no",
-	}).Info("Received HTTP API update request")
+	h.log.Info().
+		Str("method", c.Method()).
+		Str("path", c.Path()).
+		Str("notify", "no").
+		Msg("Received HTTP API update request")
 
 	images := h.extractImages(c)
 	containers := h.extractContainers(c)
@@ -162,9 +182,14 @@ func (h *Handler) extractImages(c fiber.Ctx) []string {
 	}
 
 	if len(images) > 0 {
-		logrus.WithField("images", images).WithField("notify", "no").Debug("Extracted images from query parameters")
+		h.log.Debug().
+			Strs("images", images).
+			Str("notify", "no").
+			Msg("Extracted images from query parameters")
 	} else {
-		logrus.WithField("notify", "no").Debug("No image query parameters provided")
+		h.log.Debug().
+			Str("notify", "no").
+			Msg("No image query parameters provided")
 	}
 
 	return images
@@ -190,9 +215,14 @@ func (h *Handler) extractContainers(c fiber.Ctx) []string {
 	}
 
 	if len(containers) > 0 {
-		logrus.WithField("containers", containers).WithField("notify", "no").Debug("Extracted container patterns from query parameters")
+		h.log.Debug().
+			Strs("containers", containers).
+			Str("notify", "no").
+			Msg("Extracted container patterns from query parameters")
 	} else {
-		logrus.WithField("notify", "no").Debug("No container query parameters provided")
+		h.log.Debug().
+			Str("notify", "no").
+			Msg("No container query parameters provided")
 	}
 
 	return containers
@@ -205,16 +235,22 @@ func (h *Handler) extractContainers(c fiber.Ctx) []string {
 // it attempts a non-blocking acquire and returns a 429 response if the lock
 // is held.
 func (h *Handler) acquireLock(c fiber.Ctx, images, containers []string) lockResult {
-	logrus.WithField("notify", "no").Debug("Handler: trying to acquire lock")
+	h.log.Debug().
+		Str("notify", "no").
+		Msg("Handler: trying to acquire lock")
 
 	if len(images) > 0 || len(containers) > 0 {
 		select {
 		case token := <-h.lock:
-			logrus.WithField("notify", "no").Debug("Handler: acquired lock for targeted update")
+			h.log.Debug().
+				Str("notify", "no").
+				Msg("Handler: acquired lock for targeted update")
 
 			return lockResult{Token: token, Acquired: true}
 		case <-c.Context().Done():
-			logrus.WithField("notify", "no").Debug("Handler: request cancelled while waiting for lock")
+			h.log.Debug().
+				Str("notify", "no").
+				Msg("Handler: request cancelled while waiting for lock")
 
 			return lockResult{RequestErr: true}
 		}
@@ -222,11 +258,15 @@ func (h *Handler) acquireLock(c fiber.Ctx, images, containers []string) lockResu
 
 	select {
 	case token := <-h.lock:
-		logrus.WithField("notify", "no").Debug("Handler: acquired lock for full update")
+		h.log.Debug().
+			Str("notify", "no").
+			Msg("Handler: acquired lock for full update")
 
 		return lockResult{Token: token, Acquired: true}
 	default:
-		logrus.WithField("notify", "no").Debug("Skipped update, another update already in progress")
+		h.log.Debug().
+			Str("notify", "no").
+			Msg("Skipped update, another update already in progress")
 		h.send429Response(c)
 
 		return lockResult{}
@@ -244,7 +284,10 @@ func (h *Handler) send429Response(c fiber.Ctx) {
 		"timestamp":   time.Now().UTC().Format(time.RFC3339),
 	})
 	if err != nil {
-		logrus.WithError(err).WithField("notify", "no").Debug("Failed to send 429 response")
+		h.log.Error().
+			Err(err).
+			Str("notify", "no").
+			Msg("Failed to send 429 response")
 	}
 }
 
@@ -263,7 +306,9 @@ func (h *Handler) applyTimeout(c fiber.Ctx) context.Context {
 			var cancel func()
 
 			ctx, cancel = context.WithTimeout(ctx, parsed) //nolint:gosec
-			_ = cancel                                     // cancel is a no-op here; Fiber will cancel the parent context when the request ends
+			// cancel is a no-op here.
+			// Fiber will cancel the parent context when the request ends
+			_ = cancel
 		}
 	}
 
@@ -273,11 +318,13 @@ func (h *Handler) applyTimeout(c fiber.Ctx) context.Context {
 // handleAsync processes an asynchronous update request by spawning a
 // goroutine and returning 202 Accepted.
 //
-// updateCtx is used only for deadline projection inside executeUpdateAsync;
-// the goroutine does not run under the request context, which is canceled
+// updateCtx is used only for deadline projection inside executeUpdateAsync.
+// The goroutine does not run under the request context, which is canceled
 // when this handler returns.
 func (h *Handler) handleAsync(c fiber.Ctx, images, containers []string, lockToken bool, updateCtx context.Context) error {
-	logrus.WithField("notify", "no").Info("Handling async update request - spawning async update")
+	h.log.Info().
+		Str("notify", "no").
+		Msg("Handling async update request - spawning async update")
 
 	go h.executeUpdateAsync(updateCtx, images, containers, lockToken)
 
@@ -331,7 +378,10 @@ func (h *Handler) handleSync(c fiber.Ctx, images, containers []string, lockToken
 func (h *Handler) executeUpdateAsync(updateCtx context.Context, images, containers []string, lockToken bool) {
 	defer func() {
 		if rec := recover(); rec != nil {
-			logrus.WithField("panic", rec).WithField("notify", "no").Error("Update goroutine panicked")
+			h.log.Error().
+				Interface("panic", rec).
+				Str("notify", "no").
+				Msg("Update goroutine panicked")
 		}
 
 		h.releaseLock(lockToken)
@@ -345,7 +395,10 @@ func (h *Handler) executeUpdateAsync(updateCtx context.Context, images, containe
 	h.fn(ctx, images, containers)
 
 	duration := time.Since(startTime)
-	logrus.WithField("duration", duration).WithField("notify", "no").Debug("Handler (async): update function completed")
+	h.log.Debug().
+		Dur("duration", duration).
+		Str("notify", "no").
+		Msg("Handler (async): update function completed")
 }
 
 // contextForAsync returns a context rooted at h.ctx for background update work.
@@ -359,7 +412,7 @@ func (h *Handler) executeUpdateAsync(updateCtx context.Context, images, containe
 //
 // Returns:
 //   - context.Context: Context for the async update function.
-//   - context.CancelFunc: Cancel function; always non-nil and safe to defer.
+//   - context.CancelFunc: Cancel function. Always non-nil and safe to defer.
 func (h *Handler) contextForAsync(updateCtx context.Context) (context.Context, context.CancelFunc) {
 	if deadline, ok := updateCtx.Deadline(); ok {
 		return context.WithDeadline(h.ctx, deadline)
@@ -371,13 +424,17 @@ func (h *Handler) contextForAsync(updateCtx context.Context) (context.Context, c
 // executeUpdate runs the update function and returns the metric along with
 // duration.
 func (h *Handler) executeUpdate(ctx context.Context, images, containers []string) (*metrics.Metric, time.Duration) {
-	logrus.WithField("notify", "no").Debug("Handler: executing update function")
+	h.log.Debug().
+		Str("notify", "no").
+		Msg("Handler: executing update function")
 
 	startTime := time.Now()
 	metric := h.fn(ctx, images, containers)
 	duration := time.Since(startTime)
 
-	logrus.WithField("notify", "no").Debug("Handler: update function completed")
+	h.log.Debug().
+		Str("notify", "no").
+		Msg("Handler: update function completed")
 
 	return metric, duration
 }
@@ -385,7 +442,9 @@ func (h *Handler) executeUpdate(ctx context.Context, images, containers []string
 // releaseLock returns the lock token to the channel, allowing another update
 // to proceed.
 func (h *Handler) releaseLock(token bool) {
-	logrus.WithField("notify", "no").Debug("Handler: releasing lock")
+	h.log.Debug().
+		Str("notify", "no").
+		Msg("Handler: releasing lock")
 
 	h.lock <- token
 }

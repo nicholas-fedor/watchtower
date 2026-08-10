@@ -8,7 +8,7 @@ import (
 	"strings"
 
 	"github.com/distribution/reference"
-	"github.com/sirupsen/logrus"
+	"github.com/rs/zerolog"
 
 	cerrdefs "github.com/containerd/errdefs"
 	dockerContainer "github.com/moby/moby/api/types/container"
@@ -33,14 +33,14 @@ const (
 // IsImagePinnedByDigest reports whether imageName is an immutable digest reference.
 //
 // It matches bare digests (sha256:...) and repository-qualified digests
-// (repo@sha256:...), consistent with Config.Image / ImageName() for digest-pinned
+// (repo@sha256:...), consistent with Config.Image / ImageName(log, ) for digest-pinned
 // containers. Tag references such as nginx:latest are not pinned.
 //
 // This is the shared pin-detection primitive used by pull/check paths and by the
 // update flow after image-name resolution.
 //
 // Parameters:
-//   - imageName: Image name from ImageName() or Config.Image.
+//   - imageName: Image name from ImageName(log, ) or Config.Image.
 //
 // Returns:
 //   - bool: True if the image is digest-pinned, false otherwise.
@@ -56,7 +56,7 @@ func IsImagePinnedByDigest(imageName string) bool {
 
 	ref, err := reference.ParseDockerRef(imageName)
 	if err != nil {
-		// Parse can fail on some edge forms; still treat explicit @sha256 as pinned.
+		// Parse can fail on some edge forms. Still treat explicit @sha256 as pinned.
 		return strings.Contains(imageName, "@sha256:")
 	}
 
@@ -78,6 +78,7 @@ type WarningStrategy string
 // It uses a Docker API client for image tasks.
 type imageClient struct {
 	api dockerClient.APIClient
+	log *zerolog.Logger
 }
 
 // IsContainerStale determines if a container's image is outdated.
@@ -103,10 +104,11 @@ func (c imageClient) IsContainerStale(
 	params types.UpdateParams,
 	warnOnHeadFailed WarningStrategy,
 ) (bool, types.ImageID, string, error) {
-	clog := logrus.WithFields(logrus.Fields{
-		"container": sourceContainer.Name(),
-		"image":     sourceContainer.ImageName(),
-	})
+	clogVal := c.logger().With().
+		Str("container", sourceContainer.Name()).
+		Str("image", sourceContainer.ImageName()).
+		Logger()
+	clog := &clogVal
 
 	// Skip pull if NoPull is enabled.
 	if sourceContainer.IsNoPull(params) {
@@ -116,18 +118,24 @@ func (c imageClient) IsContainerStale(
 	err := c.PullImage(ctx, sourceContainer, warnOnHeadFailed, params)
 	if err != nil {
 		if errors.Is(err, ErrImageCooldown) {
-			clog.WithError(err).Debug("Cooldown active - pull skipped")
+			clog.Debug().
+				Err(err).
+				Msg("Cooldown active - pull skipped")
 
 			return false, sourceContainer.ImageID(), "", err
 		}
 
 		if errors.Is(err, ErrPullImageNotFound) {
-			clog.WithError(err).Debug("Image not found in any registry - treating as up-to-date")
+			clog.Debug().
+				Err(err).
+				Msg("Image not found in any registry - treating as up-to-date")
 
 			return false, sourceContainer.ImageID(), "", nil
 		}
 
-		clog.WithError(err).Debug("Failed to pull image")
+		clog.Debug().
+			Err(err).
+			Msg("Failed to pull image")
 
 		return false, sourceContainer.ImageID(), "", err
 	}
@@ -140,7 +148,7 @@ func (c imageClient) IsContainerStale(
 //
 // When NoPull is active it inspects the local Docker cache only. Otherwise it
 // compares the container's local digests against the registry (HEAD with GET
-// fallback). Cooldown is not applied; it remains an apply-time gate for updates.
+// fallback). Cooldown is not applied. It remains an apply-time gate for updates.
 //
 // Parameters:
 //   - ctx: Context for operation control.
@@ -157,10 +165,11 @@ func (c imageClient) CheckContainerUpdate(
 	sourceContainer types.Container,
 	params types.UpdateParams,
 ) (bool, types.ImageID, string, error) {
-	clog := logrus.WithFields(logrus.Fields{
-		"container": sourceContainer.Name(),
-		"image":     sourceContainer.ImageName(),
-	})
+	clogVal := c.logger().With().
+		Str("container", sourceContainer.Name()).
+		Str("image", sourceContainer.ImageName()).
+		Logger()
+	clog := &clogVal
 
 	// Respect no-pull: monitor local image cache only.
 	if sourceContainer.IsNoPull(params) {
@@ -169,16 +178,18 @@ func (c imageClient) CheckContainerUpdate(
 
 	// Pinned digests cannot receive tag-based updates.
 	if IsImagePinnedByDigest(sourceContainer.ImageName()) {
-		clog.Debug("Skipping update check for pinned digest image")
+		clog.Debug().Msg("Skipping update check for pinned digest image")
 
 		return false, sourceContainer.ImageID(), "", nil
 	}
 
-	clog.Debug("Checking registry digests for update availability")
+	clog.Debug().Msg("Checking registry digests for update availability")
 
-	opts, err := registry.GetPullOptions(sourceContainer.ImageName())
+	opts, err := registry.GetPullOptions(c.logger(), sourceContainer.ImageName())
 	if err != nil {
-		clog.WithError(err).Debug("Failed to load authentication credentials")
+		clog.Debug().
+			Err(err).
+			Msg("Failed to load authentication credentials")
 
 		return false, sourceContainer.ImageID(), "", fmt.Errorf(
 			"%w: %s: %w",
@@ -191,28 +202,32 @@ func (c imageClient) CheckContainerUpdate(
 	mirrorInfo := c.resolveRegistryMirrorConfig(ctx)
 	endpoints := c.buildMirrorEndpoints(mirrorInfo)
 
-	match, remoteDigest, err := digest.CompareDigestWithRemote(
+	match, remoteDigest, err := digest.CompareDigestWithRemote(c.logger(),
 		ctx,
 		sourceContainer,
 		opts.RegistryAuth,
 		endpoints...,
 	)
 	if err != nil {
-		clog.WithError(err).Debug("Failed to compare registry digests")
+		clog.Debug().
+			Err(err).
+			Msg("Failed to compare registry digests")
 
 		return false, sourceContainer.ImageID(), "", err
 	}
 
 	if match {
-		clog.WithField("latest_digest", remoteDigest).Debug("No update available")
+		clog.Debug().
+			Str("latest_digest", remoteDigest).
+			Msg("No update available")
 
 		return false, sourceContainer.ImageID(), remoteDigest, nil
 	}
 
-	clog.WithFields(logrus.Fields{
-		"new_id":        types.ImageID(remoteDigest).ShortID(),
-		"latest_digest": remoteDigest,
-	}).Info("Found new image")
+	clog.Info().
+		Str("new_id", types.ImageID(remoteDigest).ShortID()).
+		Str("latest_digest", remoteDigest).
+		Msg("Found new image")
 
 	return true, "", remoteDigest, nil
 }
@@ -234,13 +249,14 @@ func (c imageClient) HasNewImage(
 	ctx context.Context,
 	sourceContainer types.Container,
 ) (bool, types.ImageID, string, error) {
-	clog := logrus.WithFields(logrus.Fields{
-		"container": sourceContainer.Name(),
-		"image":     sourceContainer.ImageName(),
-	})
+	clogVal := c.logger().With().
+		Str("container", sourceContainer.Name()).
+		Str("image", sourceContainer.ImageName()).
+		Logger()
+	clog := &clogVal
 	currentImageID := types.ImageID(sourceContainer.ContainerInfo().Image)
 
-	clog.Debug("Inspecting latest image")
+	clog.Debug().Msg("Inspecting latest image")
 
 	// Inspect the latest image by name.
 	newImageInfo, err := c.api.ImageInspect(
@@ -248,7 +264,9 @@ func (c imageClient) HasNewImage(
 		sourceContainer.ImageName(),
 	)
 	if err != nil {
-		clog.WithError(err).Debug("Failed to inspect latest image")
+		clog.Debug().
+			Err(err).
+			Msg("Failed to inspect latest image")
 
 		return false, currentImageID, "", fmt.Errorf(
 			"%w: %s: %w",
@@ -261,7 +279,7 @@ func (c imageClient) HasNewImage(
 	// Compare IDs to determine staleness.
 	newImageID := types.ImageID(newImageInfo.ID)
 	if newImageID == currentImageID {
-		clog.Debug("No new image found")
+		clog.Debug().Msg("No new image found")
 
 		return false,
 			currentImageID,
@@ -272,7 +290,9 @@ func (c imageClient) HasNewImage(
 			nil
 	}
 
-	clog.WithField("new_id", newImageID.ShortID()).Info("Found new image")
+	clog.Info().
+		Str("new_id", newImageID.ShortID()).
+		Msg("Found new image")
 
 	return true,
 		newImageID,
@@ -359,32 +379,37 @@ func (c imageClient) PullImage(
 	warnOnHeadFailed WarningStrategy,
 	params types.UpdateParams,
 ) error {
-	fields := logrus.Fields{
+	fields := map[string]any{
 		"container": sourceContainer.Name(),
 		"image":     sourceContainer.ImageName(),
 	}
-	clog := logrus.WithFields(fields)
+	clogVal := c.logger().With().
+		Fields(fields).
+		Logger()
+	clog := &clogVal
 
 	// Skip pulling immutable digest-pinned images (bare sha256: or repo@sha256:).
 	if IsImagePinnedByDigest(sourceContainer.ImageName()) {
-		clog.Debug("Skipping pull of pinned digest image")
+		clog.Debug().Msg("Skipping pull of pinned digest image")
 
 		return errPinnedImage
 	}
 
-	clog.Debug("Loading authentication credentials")
+	clog.Debug().Msg("Loading authentication credentials")
 
 	// Get pull options with authentication.
-	opts, err := registry.GetPullOptions(sourceContainer.ImageName())
+	opts, err := registry.GetPullOptions(c.logger(), sourceContainer.ImageName())
 	if err != nil {
-		clog.WithError(err).Debug("Failed to load authentication credentials")
+		clog.Debug().
+			Err(err).
+			Msg("Failed to load authentication credentials")
 
 		return fmt.Errorf("%w: %s: %w", errPullImageFailed, sourceContainer.ImageName(), err)
 	}
 
 	// Log if authentication credentials are successfully loaded.
 	if opts.RegistryAuth != "" {
-		clog.Debug("Authentication credentials loaded")
+		clog.Debug().Msg("Authentication credentials loaded")
 	}
 
 	// Skip the pull if the digest matches the current image (or local-only).
@@ -414,17 +439,20 @@ func (c imageClient) PullImage(
 // Returns:
 //   - error: Non-nil if removal fails, nil on success.
 func (c imageClient) RemoveImageByID(ctx context.Context, imageID types.ImageID, imageName string) error {
-	clog := logrus.WithFields(logrus.Fields{
-		"image_id":   imageID.ShortID(),
-		"image_name": imageName,
-	})
+	clogVal := c.logger().With().
+		Str("image_id", imageID.ShortID()).
+		Str("image_name", imageName).
+		Logger()
+	clog := &clogVal
 
 	containers, err := c.api.ContainerList(
 		ctx,
 		dockerClient.ContainerListOptions{All: true},
 	)
 	if err != nil {
-		clog.WithError(err).Warn("Failed to list containers for image usage check, skipping removal")
+		clog.Warn().
+			Err(err).
+			Msg("Failed to list containers for image usage check, skipping removal")
 
 		return fmt.Errorf("cannot verify image usage: %w", err)
 	}
@@ -440,7 +468,9 @@ func (c imageClient) RemoveImageByID(ctx context.Context, imageID types.ImageID,
 		}
 	}
 
-	clog.WithField("notify", "yes").Info("Removing image")
+	clog.Info().
+		Str("notify", "yes").
+		Msg("Removing image")
 
 	// Perform image removal with force and pruning.
 	items, err := c.api.ImageRemove(
@@ -453,22 +483,26 @@ func (c imageClient) RemoveImageByID(ctx context.Context, imageID types.ImageID,
 	)
 	if err != nil {
 		if cerrdefs.IsNotFound(err) {
-			clog.WithError(err).Debug("Image not found, no removal needed")
+			clog.Debug().
+				Err(err).
+				Msg("Image not found, no removal needed")
 
 			return fmt.Errorf("%w: %s", err, imageID)
 		}
 
-		clog.WithError(err).Debug("Failed to remove image")
+		clog.Debug().
+			Err(err).
+			Msg("Failed to remove image")
 
 		return fmt.Errorf("%w: %s: %w", errRemoveImageFailed, imageID, err)
 	}
 
 	// Log removal details if debug is enabled.
-	if logrus.IsLevelEnabled(logrus.DebugLevel) {
-		logImageRemovalDetails(items.Items, imageID, imageName)
+	if c.logger().GetLevel() <= zerolog.DebugLevel {
+		logImageRemovalDetails(c.logger(), items.Items, imageID, imageName)
 	}
 
-	clog.Debug("Cleaned up old image")
+	clog.Debug().Msg("Cleaned up old image")
 
 	return nil
 }
@@ -481,7 +515,7 @@ func (c imageClient) RemoveImageByID(ctx context.Context, imageID types.ImageID,
 //   - items: Response items from the image removal operation.
 //   - imageID: ID of the image that was removed.
 //   - imageName: Name of the image that was removed.
-func logImageRemovalDetails(items []dockerImage.DeleteResponse, imageID types.ImageID, imageName string) {
+func logImageRemovalDetails(log *zerolog.Logger, items []dockerImage.DeleteResponse, imageID types.ImageID, imageName string) {
 	deleted := strings.Builder{}
 	untagged := strings.Builder{}
 
@@ -503,12 +537,12 @@ func logImageRemovalDetails(items []dockerImage.DeleteResponse, imageID types.Im
 		}
 	}
 
-	logrus.WithFields(logrus.Fields{
-		"deleted":    deleted.String(),
-		"image_id":   imageID.ShortID(),
-		"image_name": imageName,
-		"untagged":   untagged.String(),
-	}).Debug("Image removal details")
+	log.Debug().
+		Str("deleted", deleted.String()).
+		Str("image_id", imageID.ShortID()).
+		Str("image_name", imageName).
+		Str("untagged", untagged.String()).
+		Msg("Image removal details")
 }
 
 // newImageClient creates a new imageClient instance.
@@ -518,8 +552,17 @@ func logImageRemovalDetails(items []dockerImage.DeleteResponse, imageID types.Im
 //
 // Returns:
 //   - imageClient: Initialized client for image operations.
-func newImageClient(api dockerClient.APIClient) imageClient {
-	return imageClient{api: api}
+
+func (c imageClient) logger() *zerolog.Logger {
+	if c.log != nil {
+		return c.log
+	}
+
+	return nopLog()
+}
+
+func newImageClient(api dockerClient.APIClient, log *zerolog.Logger) imageClient {
+	return imageClient{api: api, log: log}
 }
 
 // shouldSkipPull determines if an image pull can be skipped.
@@ -540,10 +583,13 @@ func (c imageClient) shouldSkipPull(
 	sourceContainer types.Container,
 	registryAuth string,
 	warnOnHeadFailed WarningStrategy,
-	fields logrus.Fields,
+	fields map[string]any,
 ) bool {
-	clog := logrus.WithFields(fields)
-	clog.Debug("Checking if pull is needed")
+	clogVal := c.logger().With().
+		Fields(fields).
+		Logger()
+	clog := &clogVal
+	clog.Debug().Msg("Checking if pull is needed")
 
 	warn := c.warnOnHeadFailed(sourceContainer, warnOnHeadFailed)
 
@@ -555,36 +601,39 @@ func (c imageClient) shouldSkipPull(
 
 	// Compare current and remote digests, trying each endpoint.
 	// Local-only images are handled inside CompareDigest (match=true, err=nil).
-	match, err := digest.CompareDigest(ctx, sourceContainer, registryAuth, endpoints...)
+	match, err := digest.CompareDigest(c.logger(), ctx, sourceContainer, registryAuth, endpoints...)
 	if err != nil {
-		clog.WithFields(logrus.Fields{
-			"match": match,
-			"error": err,
-		}).Debug("Digest comparison result")
+		clog.Debug().
+			Bool("match", match).
+			Err(err).
+			Msg("Digest comparison result")
 	} else {
-		clog.WithField("match", match).Debug("Digest comparison result")
+		clog.Debug().
+			Bool("match", match).
+			Msg("Digest comparison result")
 	}
 
 	switch {
 	case err != nil:
 		// Digest retrieval failed. Log based on warning strategy and proceed with pull.
-		headLevel := logrus.DebugLevel
+		headLevel := zerolog.DebugLevel
 		if warn {
-			headLevel = logrus.WarnLevel
+			headLevel = zerolog.WarnLevel
 		}
 
-		clog.WithError(err).
-			Log(headLevel, "Digest retrieval failed, falling back to full pull")
+		clog.WithLevel(headLevel).
+			Err(err).
+			Msg("Digest retrieval failed, falling back to full pull")
 
 		return false
 	case match:
 		// Digests match (or local-only image treated as up-to-date). No pull needed.
-		clog.Debug("Digest match, skipping pull")
+		clog.Debug().Msg("Digest match, skipping pull")
 
 		return true
 	default:
 		// Digests differ. Proceed with pull.
-		clog.Debug("Digest mismatch, proceeding with pull")
+		clog.Debug().Msg("Digest mismatch, proceeding with pull")
 
 		return false
 	}
@@ -606,10 +655,13 @@ func (c imageClient) performImagePull(
 	ctx context.Context,
 	imageName string,
 	opts dockerClient.ImagePullOptions,
-	fields logrus.Fields,
+	fields map[string]any,
 ) error {
-	clog := logrus.WithFields(fields)
-	clog.Debug("Initiating image pull")
+	clogVal := c.logger().With().
+		Fields(fields).
+		Logger()
+	clog := &clogVal
+	clog.Debug().Msg("Initiating image pull")
 
 	// Start the image pull.
 	response, err := c.api.ImagePull(ctx, imageName, opts)
@@ -619,15 +671,21 @@ func (c imageClient) performImagePull(
 		// so callers can programmatically distinguish error categories.
 		switch {
 		case cerrdefs.IsUnauthorized(err):
-			clog.WithError(err).Warn("Image pull failed: authentication required")
+			clog.Warn().
+				Err(err).
+				Msg("Image pull failed: authentication required")
 
 			return fmt.Errorf("%w: %s: %w", ErrPullImageUnauthorized, imageName, err)
 		case cerrdefs.IsNotFound(err):
-			clog.WithError(err).Debug("Image pull failed: image not found in registry")
+			clog.Debug().
+				Err(err).
+				Msg("Image pull failed: image not found in registry")
 
 			return fmt.Errorf("%w: %s: %w", ErrPullImageNotFound, imageName, err)
 		default:
-			clog.WithError(err).Debug("Failed to initiate image pull")
+			clog.Debug().
+				Err(err).
+				Msg("Failed to initiate image pull")
 
 			return fmt.Errorf("%w: %s: %w", errPullImageFailed, imageName, err)
 		}
@@ -637,12 +695,14 @@ func (c imageClient) performImagePull(
 	// Read response to complete the pull.
 	_, err = io.ReadAll(response)
 	if err != nil {
-		clog.WithError(err).Debug("Failed to read image pull response")
+		clog.Debug().
+			Err(err).
+			Msg("Failed to read image pull response")
 
 		return fmt.Errorf("%w: %s: %w", errReadPullResponseFailed, imageName, err)
 	}
 
-	clog.Debug("Image pull completed")
+	clog.Debug().Msg("Image pull completed")
 
 	return nil
 }
@@ -669,7 +729,7 @@ func (c imageClient) warnOnHeadFailed(
 		return false
 	}
 
-	return registry.WarnOnAPIConsumption(sourceContainer)
+	return registry.WarnOnAPIConsumption(c.logger(), sourceContainer)
 }
 
 // checkLocalImageStaleness checks if a container's image is stale without pulling.
@@ -688,23 +748,26 @@ func (c imageClient) warnOnHeadFailed(
 func (c imageClient) checkLocalImageStaleness(
 	ctx context.Context,
 	sourceContainer types.Container,
-	clog *logrus.Entry,
+	clog *zerolog.Logger,
 ) (bool, types.ImageID, string, error) {
-	clog.Debug("Skipping image pull due to no-pull setting - checking local image only")
-	clog.WithField("current_image_id", sourceContainer.ImageID()).
-		Debug("Current container image ID")
+	clog.Debug().Msg("Skipping image pull due to no-pull setting - checking local image only")
+	clog.Debug().
+		Str("current_image_id", string(sourceContainer.ImageID())).
+		Msg("Current container image ID")
 
 	stale, latestID, latestDigest, err := c.HasNewImage(ctx, sourceContainer)
 	if err != nil {
-		clog.WithError(err).Debug("Failed to check local image")
+		clog.Debug().
+			Err(err).
+			Msg("Failed to check local image")
 
 		return false, sourceContainer.ImageID(), "", err
 	}
 
-	clog.WithFields(logrus.Fields{
-		"stale":           stale,
-		"latest_image_id": latestID,
-	}).Debug("Local image check result")
+	clog.Debug().
+		Bool("stale", stale).
+		Str("latest_image_id", string(latestID)).
+		Msg("Local image check result")
 
 	return stale, latestID, latestDigest, nil
 }

@@ -47,7 +47,7 @@ func BenchmarkTransformAuth(b *testing.B) {
 	authWithCredentials := "eyJ1c2VybmFtZSI6InRlc3QiLCJwYXNzd29yZCI6InRlc3RwYXNzIn0=" // {"username":"test","password":"testpass"}
 
 	for b.Loop() {
-		_ = TransformAuth(authWithCredentials)
+		_ = TransformAuth(testLog(), authWithCredentials)
 	}
 }
 
@@ -57,7 +57,7 @@ func BenchmarkTransformAuthNoCredentials(b *testing.B) {
 	emptyAuth := ""
 
 	for b.Loop() {
-		_ = TransformAuth(emptyAuth)
+		_ = TransformAuth(testLog(), emptyAuth)
 	}
 }
 
@@ -67,7 +67,7 @@ func BenchmarkTransformAuthInvalid(b *testing.B) {
 	invalidAuth := "not-valid-base64!!!"
 
 	for b.Loop() {
-		_ = TransformAuth(invalidAuth)
+		_ = TransformAuth(testLog(), invalidAuth)
 	}
 }
 
@@ -84,7 +84,7 @@ func BenchmarkGetRegistryAddress(b *testing.B) {
 
 	for b.Loop() {
 		for _, img := range testImages {
-			_, _ = GetRegistryAddress(img)
+			_, _ = GetRegistryAddress(testLog(), img)
 		}
 	}
 }
@@ -104,7 +104,7 @@ func BenchmarkGetChallengeURL(b *testing.B) {
 
 	for b.Loop() {
 		for _, ref := range refs {
-			_ = GetChallengeURL(ref, "")
+			_ = GetChallengeURL(testLog(), ref, "")
 		}
 	}
 }
@@ -115,7 +115,7 @@ func BenchmarkGetAuthURL(b *testing.B) {
 	ref, _ := reference.ParseNormalizedNamed("ghcr.io/user/repo:latest")
 
 	for b.Loop() {
-		_, _ = GetAuthURL(challenge, ref, "")
+		_, _ = GetAuthURL(testLog(), challenge, ref, "")
 	}
 }
 
@@ -199,7 +199,7 @@ func BenchmarkConcurrentAuthRequests(b *testing.B) {
 				_ = NewAuthClient()
 
 				// Simulate registry address lookup
-				_, _ = GetRegistryAddress(testImages[i])
+				_, _ = GetRegistryAddress(testLog(), testImages[i])
 			}
 		}
 	})
@@ -225,7 +225,7 @@ func BenchmarkAuthWithMultipleRegistries(b *testing.B) {
 			_ = NewAuthClient()
 
 			// Get registry address
-			_, _ = GetRegistryAddress(reg.image)
+			_, _ = GetRegistryAddress(testLog(), reg.image)
 
 			// Process challenge (simulated)
 			_ = strings.ToLower(reg.image)

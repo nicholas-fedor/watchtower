@@ -22,7 +22,7 @@ var (
 
 // BindAll applies Viper defaults, flag binds, and env binds from FlagSpec rows.
 //
-// Call after Cobra has parsed flags. Static flag defaults come from Specs;
+// Call after Cobra has parsed flags. Static flag defaults come from Specs.
 // env values participate through BindEnv without baking into pflag defaults.
 //
 // Parameters:

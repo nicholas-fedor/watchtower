@@ -6,7 +6,7 @@ import (
 	"time"
 
 	"github.com/nicholas-fedor/shoutrrr/pkg/services/email/smtp"
-	"github.com/sirupsen/logrus"
+	"github.com/rs/zerolog"
 	"github.com/spf13/cobra"
 
 	notifyConfig "github.com/nicholas-fedor/watchtower/internal/config/notify"
@@ -34,8 +34,6 @@ var (
 
 // emailTypeNotifier handles email notifications via SMTP.
 //
-// It batches log entries with a configurable delay.
-//
 // Deprecated: Legacy email notifier is deprecated.
 // Use --notification-url with an smtp:// URL instead.
 //
@@ -43,17 +41,18 @@ var (
 //
 //nolint:godox
 type emailTypeNotifier struct {
-	From, To               string          // Sender and recipient email addresses.
-	Server, User, Password string          // SMTP server details.
-	Port                   int             // SMTP server port.
-	tlsSkipVerify          bool            // Skip TLS verification if true.
-	entries                []*logrus.Entry // Queued log entries.
-	delay                  time.Duration   // Delay for batching notifications.
+	From, To               string        // Sender and recipient email addresses.
+	Server, User, Password string        // SMTP server details.
+	Port                   int           // SMTP server port.
+	tlsSkipVerify          bool          // Skip TLS verification if true.
+	delay                  time.Duration // Delay for batching notifications.
+	log                    *zerolog.Logger
 }
 
 // newEmailNotifier creates an email notifier from resolved legacy settings.
 //
 // Parameters:
+//   - log: Logger for configuration diagnostics and fatal validation errors.
 //   - legacy: Deprecated email SMTP settings (from process config or flags).
 //
 // Returns:
@@ -65,23 +64,17 @@ type emailTypeNotifier struct {
 // TODO: Remove newEmailNotifier for the v2 release.
 //
 //nolint:godox
-func newEmailNotifier(legacy notifyConfig.Legacy) types.ConvertibleNotifier {
+func newEmailNotifier(log *zerolog.Logger, legacy notifyConfig.Legacy) types.ConvertibleNotifier {
 	if legacy.EmailFrom == "" {
-		logrus.Fatal(
-			"Email from address is empty.",
-		)
+		log.Fatal().Msg("Email from address is empty.")
 	}
 
 	if legacy.EmailTo == "" {
-		logrus.Fatal(
-			"Email to address is empty.",
-		)
+		log.Fatal().Msg("Email to address is empty.")
 	}
 
 	if legacy.EmailServer == "" {
-		logrus.Fatal(
-			"Email server is empty.",
-		)
+		log.Fatal().Msg("Email server is empty.")
 	}
 
 	from := legacy.EmailFrom
@@ -93,26 +86,25 @@ func newEmailNotifier(legacy notifyConfig.Legacy) types.ConvertibleNotifier {
 	tlsSkipVerify := legacy.EmailTLSSkipVerify
 	delay := legacy.EmailDelay
 
-	clog := logrus.WithFields(logrus.Fields{
-		"from":          from,
-		"to":            to,
-		"server":        server,
-		"port":          port,
-		"tls_skip":      tlsSkipVerify,
-		"delay_seconds": delay,
-	})
-	clog.Debug("Initializing email notifier from flags")
+	clog := log.With().
+		Str("from", from).
+		Str("to", to).
+		Str("server", server).
+		Int("port", port).
+		Bool("tls_skip", tlsSkipVerify).
+		Int("delay_seconds", delay).
+		Logger()
+	clog.Debug().Msg("Initializing email notifier from flags")
 
-	// Log sensitive fields only at trace level.
-	if logrus.IsLevelEnabled(logrus.TraceLevel) {
-		clog.WithFields(logrus.Fields{
-			"user":     user,
-			"password": password,
-		}).Trace("Email notifier credentials loaded")
+	// Log credential presence only at trace level. Never log the password value.
+	if clog.GetLevel() <= zerolog.TraceLevel {
+		clog.Trace().
+			Str("user", user).
+			Bool("credentials_configured", user != "" || password != "").
+			Msg("Email notifier credentials loaded")
 	}
 
 	return &emailTypeNotifier{
-		entries:       []*logrus.Entry{},
 		From:          from,
 		To:            to,
 		Server:        server,
@@ -121,6 +113,7 @@ func newEmailNotifier(legacy notifyConfig.Legacy) types.ConvertibleNotifier {
 		Port:          port,
 		tlsSkipVerify: tlsSkipVerify,
 		delay:         time.Duration(delay) * time.Second,
+		log:           log,
 	}
 }
 
@@ -136,17 +129,17 @@ func newEmailNotifier(legacy notifyConfig.Legacy) types.ConvertibleNotifier {
 // Deprecated: This method is part of the legacy email notifier and will be removed
 // for the v2 release. Use --notification-url with an smtp:// URL instead.
 func (e *emailTypeNotifier) GetURL(_ *cobra.Command) (string, error) {
-	clog := logrus.WithFields(logrus.Fields{
-		"from":   e.From,
-		"to":     e.To,
-		"server": e.Server,
-		"port":   e.Port,
-	})
-	clog.Debug("Generating SMTP URL")
+	clog := e.log.With().
+		Str("from", e.From).
+		Str("to", e.To).
+		Str("server", e.Server).
+		Int("port", e.Port).
+		Logger()
+	clog.Debug().Msg("Generating SMTP URL")
 
 	// Validate port range (0-65535).
 	if e.Port < 0 || e.Port > 65535 {
-		clog.WithField("port", e.Port).Debug("Invalid SMTP port")
+		clog.Debug().Int("port", e.Port).Msg("Invalid SMTP port")
 
 		return "", fmt.Errorf("port %d: %w", e.Port, errInvalidPortRange)
 	}
@@ -174,26 +167,27 @@ func (e *emailTypeNotifier) GetURL(_ *cobra.Command) (string, error) {
 	if len(e.User) > 0 {
 		conf.Auth = smtp.AuthTypes.Plain
 
-		clog.Debug("Using plain authentication")
+		clog.Debug().Msg("Using plain authentication")
 	}
 
 	// Disable encryption if TLS verification is skipped.
 	if e.tlsSkipVerify {
 		conf.Encryption = smtp.EncMethods.None
 
-		clog.Debug("TLS verification skipped")
+		clog.Debug().Msg("TLS verification skipped")
 	}
 
 	url := conf.GetURL().String()
 
-	clog.WithFields(logrus.Fields{
-		"tls_skip":     e.tlsSkipVerify,
-		"auth_enabled": len(e.User) > 0,
-	}).Debug("Generated SMTP URL")
+	clog.Debug().
+		Bool("tls_skip", e.tlsSkipVerify).
+		Bool("auth_enabled", len(e.User) > 0).
+		Msg("Generated SMTP URL")
 
-	if logrus.IsLevelEnabled(logrus.TraceLevel) {
-		clog.WithField("url", redactServiceURL(url)).
-			Trace("Generated SMTP URL")
+	if clog.GetLevel() <= zerolog.TraceLevel {
+		clog.Trace().
+			Str("url", redactServiceURL(url)).
+			Msg("Generated SMTP URL")
 	}
 
 	return url, nil
@@ -207,36 +201,12 @@ func (e *emailTypeNotifier) GetURL(_ *cobra.Command) (string, error) {
 // Deprecated: This method is part of the legacy email notifier and will be removed
 // for the v2 release. Use --notifications-delay instead.
 func (e *emailTypeNotifier) GetDelay() time.Duration {
-	clog := logrus.WithFields(logrus.Fields{
-		"from":   e.From,
-		"to":     e.To,
-		"server": e.Server,
-		"delay":  e.delay,
-	})
-	clog.Debug("Retrieved email notification delay")
+	e.log.Debug().
+		Str("from", e.From).
+		Str("to", e.To).
+		Str("server", e.Server).
+		Dur("delay", e.delay).
+		Msg("Retrieved email notification delay")
 
 	return e.delay
-}
-
-// GetEntries returns nil for legacy notifiers.
-//
-// Returns:
-//   - []*logrus.Entry: Always nil.
-//
-// Deprecated: This method is part of the legacy email notifier and will be removed
-// for the v2 release.
-func (e *emailTypeNotifier) GetEntries() []*logrus.Entry {
-	return nil
-}
-
-// SendFilteredEntries does nothing for legacy notifiers.
-//
-// Parameters:
-//   - entries: Ignored.
-//   - report: Ignored.
-//
-// Deprecated: This method is part of the legacy email notifier and will be removed
-// for the v2 release.
-func (e *emailTypeNotifier) SendFilteredEntries(_ []*logrus.Entry, _ types.Report) {
-	// Legacy notifiers do not support filtered entries.
 }

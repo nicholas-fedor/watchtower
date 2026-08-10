@@ -6,7 +6,7 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/sirupsen/logrus"
+	"github.com/rs/zerolog"
 
 	dockerContainer "github.com/moby/moby/api/types/container"
 	dockerImage "github.com/moby/moby/api/types/image"
@@ -56,6 +56,14 @@ type Operations interface {
 	) (dockerClient.ContainerRenameResult, error)
 }
 
+// nopLog returns a fresh discarded logger for optional construction and fallbacks.
+// It is not a package-level logger store: each call allocates a new Nop instance.
+func nopLog() *zerolog.Logger {
+	n := zerolog.Nop()
+
+	return &n
+}
+
 // Container represents a running Docker container managed by Watchtower.
 //
 // It implements the types.Container interface, storing state and metadata
@@ -70,6 +78,10 @@ type Container struct {
 	normalizedName     string                           // Cached normalized container name
 	containerInfo      *dockerContainer.InspectResponse // Docker container metadata
 	imageInfo          *dockerImage.InspectResponse     // Docker image metadata
+	// log is the process logger for operational Warn/Error/Debug on this instance.
+	// Set at construction (client list/get). Nil falls back to nopLog() so interface
+	// methods never panic. Production paths always set a real logger.
+	log *zerolog.Logger
 }
 
 // NewContainer creates a new Container instance with the specified metadata.
@@ -81,9 +93,14 @@ type Container struct {
 // Returns:
 //   - *Container: Initialized container instance.
 func NewContainer(
+	log *zerolog.Logger,
 	containerInfo *dockerContainer.InspectResponse,
 	imageInfo *dockerImage.InspectResponse,
 ) *Container {
+	if log == nil {
+		log = nopLog()
+	}
+
 	name := ""
 	if containerInfo != nil {
 		name = containerInfo.Name
@@ -96,12 +113,13 @@ func NewContainer(
 		normalizedName:     util.NormalizeContainerName(name),
 		containerInfo:      containerInfo,
 		imageInfo:          imageInfo,
+		log:                log,
 	}
-	logrus.WithFields(logrus.Fields{
-		"container": c.Name(),
-		"id":        c.ID().ShortID(),
-		"image":     c.ImageID(),
-	}).Debug("Created new container instance")
+	c.logger().Debug().
+		Str("container", c.Name()).
+		Str("id", c.ID().ShortID()).
+		Str("image", string(c.ImageID())).
+		Msg("Created new container instance")
 
 	return c
 }
@@ -259,28 +277,35 @@ func (c *Container) ImageID() types.ImageID {
 // Returns:
 //   - string: Image name (e.g., "alpine:latest").
 func (c *Container) ImageName() string {
-	clog := logrus.WithField("container", c.Name())
+	clogVal := c.logger().With().
+		Str("container", c.Name()).
+		Logger()
+	clog := &clogVal
 
 	// Prefer Zodiac label for image name.
 	imageName, ok := c.getLabelValue(zodiacLabel)
 	if !ok {
 		if c.containerInfo == nil || c.containerInfo.Config == nil {
-			clog.Warn("No container config available, using default image name")
+			clog.Warn().Msg("No container config available, using default image name")
 
 			return "unknown:latest"
 		}
 
 		imageName = c.containerInfo.Config.Image
 
-		clog.Debug("Using Config.Image for image name")
+		clog.Debug().Msg("Using Config.Image for image name")
 	} else {
-		clog.WithField("label", zodiacLabel).Debug("Using Zodiac label for image name")
+		clog.Debug().
+			Str("label", zodiacLabel).
+			Msg("Using Zodiac label for image name")
 	}
 
 	// Append default tag if none specified.
 	if !strings.Contains(imageName, ":") {
 		imageName += ":latest"
-		clog.WithField("image", imageName).Debug("Appended :latest to image name")
+		clog.Debug().
+			Str("image", imageName).
+			Msg("Appended :latest to image name")
 	}
 
 	return imageName
@@ -312,10 +337,13 @@ func (c *Container) GetCreateConfig() *dockerContainer.Config {
 	c.mu.RLock()
 	defer c.mu.RUnlock()
 
-	clog := logrus.WithField("container", c.Name())
+	clogVal := c.logger().With().
+		Str("container", c.Name()).
+		Logger()
+	clog := &clogVal
 
 	if c.containerInfo == nil {
-		clog.Warn("No container info available, returning minimal config")
+		clog.Warn().Msg("No container info available, returning minimal config")
 
 		return &dockerContainer.Config{Image: c.ImageName()}
 	}
@@ -325,7 +353,7 @@ func (c *Container) GetCreateConfig() *dockerContainer.Config {
 
 	// Handle missing image info case.
 	if c.imageInfo == nil {
-		clog.Warn("No image info available, using container config as-is")
+		clog.Warn().Msg("No image info available, using container config as-is")
 
 		config.Image = c.ImageName()
 
@@ -403,7 +431,8 @@ func (c *Container) GetCreateConfig() *dockerContainer.Config {
 	}
 
 	for port := range config.ExposedPorts {
-		if _, ok := imageConfig.ExposedPorts[port.String()]; ok {
+		_, ok := imageConfig.ExposedPorts[port.String()]
+		if ok {
 			delete(config.ExposedPorts, port) // Remove ports exposed by image.
 		}
 	}
@@ -413,7 +442,9 @@ func (c *Container) GetCreateConfig() *dockerContainer.Config {
 	}
 
 	config.Image = c.ImageName()
-	clog.WithField("image", config.Image).Debug("Generated create config")
+	clog.Debug().
+		Str("image", config.Image).
+		Msg("Generated create config")
 
 	return &config
 }
@@ -428,10 +459,13 @@ func (c *Container) GetCreateHostConfig() *dockerContainer.HostConfig {
 	c.mu.RLock()
 	defer c.mu.RUnlock()
 
-	clog := logrus.WithField("container", c.Name())
+	clogVal := c.logger().With().
+		Str("container", c.Name()).
+		Logger()
+	clog := &clogVal
 
 	if c.containerInfo == nil || c.containerInfo.HostConfig == nil {
-		clog.Warn("No container host config available")
+		clog.Warn().Msg("No container host config available")
 
 		return &dockerContainer.HostConfig{}
 	}
@@ -451,15 +485,18 @@ func (c *Container) GetCreateHostConfig() *dockerContainer.HostConfig {
 	adjusted := make([]string, 0, len(hostConfig.Links))
 	for _, link := range hostConfig.Links {
 		if !strings.Contains(link, ":") {
-			clog.WithField("link", link).Error("Invalid link format, expected 'name:alias'")
+			clog.Error().
+				Str("link", link).
+				Msg("Invalid link format, expected 'name:alias'")
 
 			continue
 		}
 
 		parts := strings.SplitN(link, ":", linkPartsCount)
 		if len(parts) != linkPartsCount {
-			clog.WithField("link", link).
-				Error("Invalid link format, expected exactly one colon separator")
+			clog.Error().
+				Str("link", link).
+				Msg("Invalid link format, expected exactly one colon separator")
 
 			continue
 		}
@@ -468,7 +505,9 @@ func (c *Container) GetCreateHostConfig() *dockerContainer.HostConfig {
 		alias := parts[1]
 		adjustedLink := fmt.Sprintf("%s:%s", normalizedName, alias)
 		adjusted = append(adjusted, adjustedLink)
-		clog.WithField("link", adjustedLink).Debug("Adjusted link for host config")
+		clog.Debug().
+			Str("link", adjustedLink).
+			Msg("Adjusted link for host config")
 	}
 
 	hostConfig.Links = adjusted
@@ -482,8 +521,9 @@ func (c *Container) GetCreateHostConfig() *dockerContainer.HostConfig {
 	for i := range hostConfig.Devices {
 		if hostConfig.Devices[i].CgroupPermissions == "" {
 			hostConfig.Devices[i].CgroupPermissions = "rwm"
-			clog.WithField("device", hostConfig.Devices[i].PathOnHost).
-				Debug("Defaulted empty device CgroupPermissions to 'rwm'")
+			clog.Debug().
+				Str("device", hostConfig.Devices[i].PathOnHost).
+				Msg("Defaulted empty device CgroupPermissions to 'rwm'")
 		}
 	}
 
@@ -500,22 +540,29 @@ func (c *Container) VerifyConfiguration() error {
 
 	// Check for nil image info.
 	if c.imageInfo == nil {
-		logrus.WithField("container", "<unknown>").Debug("No image info available")
+		c.logger().Debug().
+			Str("container", "<unknown>").
+			Msg("No image info available")
 
 		return errNoImageInfo
 	}
 
 	// Check for nil container info.
 	if c.containerInfo == nil {
-		logrus.WithField("container", "<unknown>").Debug("No container info available")
+		c.logger().Debug().
+			Str("container", "<unknown>").
+			Msg("No container info available")
 
 		return errNoContainerInfo
 	}
 
-	clog := logrus.WithField("container", c.Name())
+	clogVal := c.logger().With().
+		Str("container", c.Name()).
+		Logger()
+	clog := &clogVal
 	// Validate config and host config presence.
 	if c.containerInfo.Config == nil || c.containerInfo.HostConfig == nil {
-		clog.Debug("Invalid container configuration")
+		clog.Debug().Msg("Invalid container configuration")
 
 		return errInvalidConfig
 	}
@@ -525,7 +572,7 @@ func (c *Container) VerifyConfiguration() error {
 		c.containerInfo.Config.ExposedPorts == nil {
 		c.containerInfo.Config.ExposedPorts = dockerNetwork.PortSet{}
 
-		clog.Debug("Initialized ExposedPorts due to PortBindings")
+		clog.Debug().Msg("Initialized ExposedPorts due to PortBindings")
 	}
 
 	// Validate port bindings for empty or malformed port values.
@@ -536,7 +583,7 @@ func (c *Container) VerifyConfiguration() error {
 
 		// Skip and remove completely empty port entries.
 		if portStr == "" {
-			clog.Warn("Skipping empty port binding and exposed port")
+			clog.Warn().Msg("Skipping empty port binding and exposed port")
 
 			delete(c.containerInfo.HostConfig.PortBindings, port)
 			delete(c.containerInfo.Config.ExposedPorts, port)
@@ -545,7 +592,7 @@ func (c *Container) VerifyConfiguration() error {
 		}
 	}
 
-	clog.Debug("Verified container configuration")
+	clog.Debug().Msg("Verified container configuration")
 
 	return nil
 }
@@ -622,7 +669,10 @@ func filterSelfReferences(links []string, containerName string) []string {
 // Returns:
 //   - []string: List of linked container names with self-references removed.
 func (c *Container) Links(useComposeDependsOn bool) []string {
-	clog := logrus.WithField("container", c.Name())
+	clogVal := c.logger().With().
+		Str("container", c.Name()).
+		Logger()
+	clog := &clogVal
 
 	// Check Watchtower's depends-on label first.
 	if links := GetLinksFromWatchtowerLabel(c, clog); links != nil {
@@ -640,6 +690,15 @@ func (c *Container) Links(useComposeDependsOn bool) []string {
 	links := getLinksFromHostConfig(c, clog)
 
 	return filterSelfReferences(links, c.Name())
+}
+
+// logger returns the container's process logger, or a discarded nop if unset.
+func (c *Container) logger() *zerolog.Logger {
+	if c != nil && c.log != nil {
+		return c.log
+	}
+
+	return nopLog()
 }
 
 // ResolveContainerIdentifier returns a standardized container identifier used
@@ -674,9 +733,9 @@ func ResolveContainerIdentifier(c types.Container) string {
 		return nameOrID(c)
 	}
 
-	projectName := compose.GetProjectName(labels)
-	serviceName := compose.GetServiceName(labels)
-	containerNumber := compose.GetContainerNumber(labels)
+	projectName := compose.GetProjectName(nopLog(), labels)
+	serviceName := compose.GetServiceName(nopLog(), labels)
+	containerNumber := compose.GetContainerNumber(nopLog(), labels)
 
 	// Handle replica containers
 	if projectName != "" && serviceName != "" &&
@@ -700,10 +759,11 @@ func ResolveContainerIdentifier(c types.Container) string {
 	return nameOrID(c)
 }
 
-// nameOrID returns the container name if non-empty, otherwise returns the container ID.
+// nameOrID returns the container name if non-empty; otherwise, returns the container ID.
 func nameOrID(c types.Container) string {
 	// Return the container name if available.
-	if name := c.Name(); name != "" {
+	name := c.Name()
+	if name != "" {
 		return name
 	}
 
@@ -728,7 +788,7 @@ func nameOrID(c types.Container) string {
 //
 // Returns:
 //   - []string: List of all normalized links, including potential self-references, or nil if label not present
-func GetLinksFromWatchtowerLabel(c *Container, clog *logrus.Entry) []string {
+func GetLinksFromWatchtowerLabel(c *Container, clog *zerolog.Logger) []string {
 	// Get the depends-on label value or empty string if not present
 	dependsOnLabelValue := c.getLabelValueOrEmpty(dependsOnLabel)
 
@@ -737,10 +797,10 @@ func GetLinksFromWatchtowerLabel(c *Container, clog *logrus.Entry) []string {
 		return nil
 	}
 
-	clog.WithFields(logrus.Fields{
-		"depends_on_label_value": dependsOnLabelValue,
-		"container_name":         c.Name(),
-	}).Debug("Processing watchtower depends-on label")
+	clog.Debug().
+		Str("depends_on_label_value", dependsOnLabelValue).
+		Str("container_name", c.Name()).
+		Msg("Processing watchtower depends-on label")
 
 	// Split the comma-separated values
 	links := strings.Split(dependsOnLabelValue, ",")
@@ -760,10 +820,10 @@ func GetLinksFromWatchtowerLabel(c *Container, clog *logrus.Entry) []string {
 		normalizedLinks = append(normalizedLinks, normalizedLink)
 	}
 
-	clog.WithFields(logrus.Fields{
-		"depends_on":       dependsOnLabelValue,
-		"normalized_links": normalizedLinks,
-	}).Debug("Retrieved links from watchtower depends-on label")
+	clog.Debug().
+		Str("depends_on", dependsOnLabelValue).
+		Strs("normalized_links", normalizedLinks).
+		Msg("Retrieved links from watchtower depends-on label")
 
 	return normalizedLinks
 }
@@ -780,23 +840,24 @@ func GetLinksFromWatchtowerLabel(c *Container, clog *logrus.Entry) []string {
 //
 // Returns:
 //   - []string: List of linked container names, empty if label not present
-func getLinksFromComposeLabel(c *Container, clog *logrus.Entry) []string {
+func getLinksFromComposeLabel(c *Container, clog *zerolog.Logger) []string {
 	composeDependsOnLabelValue := c.getLabelValueOrEmpty(compose.ComposeDependsOnLabel)
-	clog.WithFields(logrus.Fields{
-		"label": compose.ComposeDependsOnLabel,
-		"value": composeDependsOnLabelValue,
-	}).Debug("Checked compose depends-on label")
+	clog.Debug().
+		Str("label", compose.ComposeDependsOnLabel).
+		Str("value", composeDependsOnLabelValue).
+		Msg("Checked compose depends-on label")
 
 	if composeDependsOnLabelValue == "" {
 		return nil
 	}
 
-	clog.WithField("raw_label_value", composeDependsOnLabelValue).
-		Debug("Parsing compose depends-on label")
+	clog.Debug().
+		Str("raw_label_value", composeDependsOnLabelValue).
+		Msg("Parsing compose depends-on label")
 
-	services := compose.ParseDependsOnLabel(composeDependsOnLabelValue)
+	services := compose.ParseDependsOnLabel(clog, composeDependsOnLabelValue)
 
-	projectName := compose.GetProjectName(c.containerInfo.Config.Labels)
+	projectName := compose.GetProjectName(clog, c.containerInfo.Config.Labels)
 
 	normalizedLinks := make([]string, 0, len(services))
 	for _, service := range services {
@@ -814,10 +875,10 @@ func getLinksFromComposeLabel(c *Container, clog *logrus.Entry) []string {
 		return nil
 	}
 
-	clog.WithFields(logrus.Fields{
-		"compose_depends_on": composeDependsOnLabelValue,
-		"parsed_links":       normalizedLinks,
-	}).Debug("Retrieved links from compose depends-on label")
+	clog.Debug().
+		Str("compose_depends_on", composeDependsOnLabelValue).
+		Strs("parsed_links", normalizedLinks).
+		Msg("Retrieved links from compose depends-on label")
 
 	return normalizedLinks
 }
@@ -834,12 +895,12 @@ func getLinksFromComposeLabel(c *Container, clog *logrus.Entry) []string {
 //
 // Returns:
 //   - []string: List of linked container names
-func getLinksFromHostConfig(c *Container, clog *logrus.Entry) []string {
+func getLinksFromHostConfig(c *Container, clog *zerolog.Logger) []string {
 	if c.containerInfo == nil || c.containerInfo.HostConfig == nil {
 		return nil
 	}
 
-	projectName := compose.GetProjectName(c.containerInfo.Config.Labels)
+	projectName := compose.GetProjectName(clog, c.containerInfo.Config.Labels)
 
 	// Pre-allocate for links plus potential network mode dependency
 	capacity := len(c.containerInfo.HostConfig.Links)
@@ -853,16 +914,18 @@ func getLinksFromHostConfig(c *Container, clog *logrus.Entry) []string {
 
 	for _, link := range c.containerInfo.HostConfig.Links {
 		if !strings.Contains(link, ":") {
-			clog.WithField("link", link).
-				Warn("Invalid link format in host config, expected 'name:alias'")
+			clog.Warn().
+				Str("link", link).
+				Msg("Invalid link format in host config, expected 'name:alias'")
 
 			continue
 		}
 
 		parts := strings.SplitN(link, ":", linkPartsCount)
 		if len(parts) < 1 || parts[0] == "" {
-			clog.WithField("link", link).
-				Warn("Invalid link format in host config, missing container name")
+			clog.Warn().
+				Str("link", link).
+				Msg("Invalid link format in host config, missing container name")
 
 			continue
 		}
@@ -885,7 +948,9 @@ func getLinksFromHostConfig(c *Container, clog *logrus.Entry) []string {
 		normalizedLinks = append(normalizedLinks, normalizedName)
 	}
 
-	clog.WithField("links", normalizedLinks).Debug("Retrieved links from host config")
+	clog.Debug().
+		Strs("links", normalizedLinks).
+		Msg("Retrieved links from host config")
 
 	return normalizedLinks
 }

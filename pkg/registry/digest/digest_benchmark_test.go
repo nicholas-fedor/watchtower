@@ -20,9 +20,10 @@ func BenchmarkDigestsMatch(b *testing.B) {
 		"docker.io/library/nginx@sha256:a5967740c5c9a1c4c6f5a5c5c5c5c5c5c5c5c5c5c5c5c5c5c5c5c5c5c",
 	}
 	remoteDigest := testDigest
+	log := testLog()
 
 	for b.Loop() {
-		_ = DigestsMatch(localDigests, remoteDigest)
+		_ = DigestsMatch(log, localDigests, remoteDigest)
 	}
 }
 
@@ -37,9 +38,10 @@ func BenchmarkDigestsMatchNoMatch(b *testing.B) {
 		"gcr.io/distroless/static@sha256:eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
 	}
 	remoteDigest := testDigest
+	log := testLog()
 
 	for b.Loop() {
-		_ = DigestsMatch(localDigests, remoteDigest)
+		_ = DigestsMatch(log, localDigests, remoteDigest)
 	}
 }
 
@@ -56,9 +58,10 @@ func BenchmarkDigestsMatchManyDigests(b *testing.B) {
 	localDigests[19] = "ghcr.io/mirror/registry-t/app@sha256:" + testDigest
 
 	remoteDigest := testDigest
+	log := testLog()
 
 	for b.Loop() {
-		_ = DigestsMatch(localDigests, remoteDigest)
+		_ = DigestsMatch(log, localDigests, remoteDigest)
 	}
 }
 
@@ -71,10 +74,11 @@ func BenchmarkNormalizeDigest(b *testing.B) {
 		testDigest,
 		"sha256:" + strings.Repeat("a", 64),
 	}
+	log := testLog()
 
 	for b.Loop() {
 		for _, d := range testDigests {
-			_ = NormalizeDigest(d)
+			_ = NormalizeDigest(log, d)
 		}
 	}
 }
@@ -88,9 +92,10 @@ func BenchmarkDigestsMatchEarlyMatch(b *testing.B) {
 		"docker.io/library/postgres@sha256:cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
 	}
 	remoteDigest := testDigest
+	log := testLog()
 
 	for b.Loop() {
-		_ = DigestsMatch(localDigests, remoteDigest)
+		_ = DigestsMatch(log, localDigests, remoteDigest)
 	}
 }
 
@@ -104,8 +109,9 @@ func BenchmarkDigestsMatchLateMatch(b *testing.B) {
 		"ghcr.io/example/app@sha256:" + testDigest, // Matches last
 	}
 	remoteDigest := testDigest
+	log := testLog()
 
 	for b.Loop() {
-		_ = DigestsMatch(localDigests, remoteDigest)
+		_ = DigestsMatch(log, localDigests, remoteDigest)
 	}
 }

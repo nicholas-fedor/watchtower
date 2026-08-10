@@ -6,6 +6,7 @@ package mocks
 
 import (
 	"github.com/nicholas-fedor/watchtower/pkg/types"
+	"github.com/rs/zerolog"
 	mock "github.com/stretchr/testify/mock"
 )
 
@@ -37,16 +38,16 @@ func (_m *MockSorter) EXPECT() *MockSorter_Expecter {
 }
 
 // Sort provides a mock function for the type MockSorter
-func (_mock *MockSorter) Sort(containers []types.Container, useComposeDependsOn bool) error {
-	ret := _mock.Called(containers, useComposeDependsOn)
+func (_mock *MockSorter) Sort(log *zerolog.Logger, containers []types.Container, useComposeDependsOn bool) error {
+	ret := _mock.Called(log, containers, useComposeDependsOn)
 
 	if len(ret) == 0 {
 		panic("no return value specified for Sort")
 	}
 
 	var r0 error
-	if returnFunc, ok := ret.Get(0).(func([]types.Container, bool) error); ok {
-		r0 = returnFunc(containers, useComposeDependsOn)
+	if returnFunc, ok := ret.Get(0).(func(*zerolog.Logger, []types.Container, bool) error); ok {
+		r0 = returnFunc(log, containers, useComposeDependsOn)
 	} else {
 		r0 = ret.Error(0)
 	}
@@ -59,25 +60,31 @@ type MockSorter_Sort_Call struct {
 }
 
 // Sort is a helper method to define mock.On call
+//   - log *zerolog.Logger
 //   - containers []types.Container
 //   - useComposeDependsOn bool
-func (_e *MockSorter_Expecter) Sort(containers any, useComposeDependsOn any) *MockSorter_Sort_Call {
-	return &MockSorter_Sort_Call{Call: _e.mock.On("Sort", containers, useComposeDependsOn)}
+func (_e *MockSorter_Expecter) Sort(log any, containers any, useComposeDependsOn any) *MockSorter_Sort_Call {
+	return &MockSorter_Sort_Call{Call: _e.mock.On("Sort", log, containers, useComposeDependsOn)}
 }
 
-func (_c *MockSorter_Sort_Call) Run(run func(containers []types.Container, useComposeDependsOn bool)) *MockSorter_Sort_Call {
+func (_c *MockSorter_Sort_Call) Run(run func(log *zerolog.Logger, containers []types.Container, useComposeDependsOn bool)) *MockSorter_Sort_Call {
 	_c.Call.Run(func(args mock.Arguments) {
-		var arg0 []types.Container
+		var arg0 *zerolog.Logger
 		if args[0] != nil {
-			arg0 = args[0].([]types.Container)
+			arg0 = args[0].(*zerolog.Logger)
 		}
-		var arg1 bool
+		var arg1 []types.Container
 		if args[1] != nil {
-			arg1 = args[1].(bool)
+			arg1 = args[1].([]types.Container)
+		}
+		var arg2 bool
+		if args[2] != nil {
+			arg2 = args[2].(bool)
 		}
 		run(
 			arg0,
 			arg1,
+			arg2,
 		)
 	})
 	return _c
@@ -88,7 +95,7 @@ func (_c *MockSorter_Sort_Call) Return(err error) *MockSorter_Sort_Call {
 	return _c
 }
 
-func (_c *MockSorter_Sort_Call) RunAndReturn(run func(containers []types.Container, useComposeDependsOn bool) error) *MockSorter_Sort_Call {
+func (_c *MockSorter_Sort_Call) RunAndReturn(run func(log *zerolog.Logger, containers []types.Container, useComposeDependsOn bool) error) *MockSorter_Sort_Call {
 	_c.Call.Return(run)
 	return _c
 }

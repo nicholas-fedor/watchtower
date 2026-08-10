@@ -61,7 +61,7 @@ var _ = ginkgo.Describe("EphemeralSelfUpdate", func() {
 
 			client := createDefaultMockClient(&mockActions.TestData{})
 
-			newID, renamed, err := actions.EphemeralSelfUpdate(
+			newID, renamed, err := actions.EphemeralSelfUpdate(testLogger(),
 				ctx,
 				client,
 				sourceContainer,
@@ -85,7 +85,7 @@ var _ = ginkgo.Describe("EphemeralSelfUpdate", func() {
 
 			client := createDefaultMockClient(&mockActions.TestData{})
 
-			newID, renamed, err := actions.EphemeralSelfUpdate(
+			newID, renamed, err := actions.EphemeralSelfUpdate(testLogger(),
 				ctx,
 				client,
 				sourceContainer,
@@ -123,7 +123,7 @@ var _ = ginkgo.Describe("EphemeralSelfUpdate", func() {
 
 			client := createDefaultMockClient(&mockActions.TestData{})
 
-			newID, renamed, err := actions.EphemeralSelfUpdate(
+			newID, renamed, err := actions.EphemeralSelfUpdate(testLogger(),
 				ctx,
 				client,
 				sourceContainer,
@@ -164,7 +164,7 @@ var _ = ginkgo.Describe("EphemeralSelfUpdate", func() {
 				false,
 			)
 
-			_, _, err := actions.EphemeralSelfUpdate(
+			_, _, err := actions.EphemeralSelfUpdate(testLogger(),
 				ctx,
 				client,
 				sourceContainer,
@@ -188,7 +188,7 @@ var _ = ginkgo.Describe("EphemeralSelfUpdate", func() {
 
 			client := createDefaultMockClient(&mockActions.TestData{})
 
-			newID, renamed, err := actions.EphemeralSelfUpdate(
+			newID, renamed, err := actions.EphemeralSelfUpdate(testLogger(),
 				ctx,
 				client,
 				sourceContainer,

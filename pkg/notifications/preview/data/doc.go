@@ -50,7 +50,7 @@
 //
 // Dependencies:
 //   - github.com/nicholas-fedor/watchtower/pkg/types: Provides Report and ContainerReport interfaces.
-//   - github.com/sirupsen/logrus: Used for log entry levels and data structures.
+//   - Local logEntry / LogLevel types (logs.go): Preview log snapshots with Message, Data, Level, Time.
 //   - math/rand: Used for deterministic random generation of IDs, names, and timestamps.
 //   - encoding/hex, strconv, time: Standard library packages for ID generation and time handling.
 //

@@ -219,7 +219,7 @@ After determining the image age, Watchtower evaluates four outcomes:
 |----------------|------------------------------------|-------------------------------------------------------------------|
 | **Proceeding** | Image age > cooldown duration      | The update proceeds normally                                      |
 | **Proceeding** | Image age is negative (clock skew) | The update proceeds with a warning to avoid indefinite deferral   |
-| **Deferring**  | Image age ≤ cooldown duration      | The update is skipped; the container remains on its current image |
+| **Deferring**  | Image age <= cooldown duration     | The update is skipped; the container remains on its current image |
 | **Deferring**  | Image age unavailable              | The update is skipped for safety                                  |
 
 ```mermaid

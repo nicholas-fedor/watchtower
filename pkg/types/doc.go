@@ -19,6 +19,6 @@
 //	report := session.NewReport(progress)
 //	notifier.SendNotification(report)
 //
-// The package integrates with container, notifications, session, and registry packages,
-// using logrus for logging where implemented.
+// The package integrates with container, notifications, session, and registry packages.
+// Logging is provided by callers via github.com/rs/zerolog where implemented.
 package types

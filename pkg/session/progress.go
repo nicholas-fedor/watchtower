@@ -3,7 +3,7 @@ package session
 import (
 	"time"
 
-	"github.com/sirupsen/logrus"
+	"github.com/rs/zerolog"
 
 	"github.com/nicholas-fedor/watchtower/pkg/types"
 )
@@ -21,7 +21,7 @@ type Progress map[types.ContainerID]*ContainerStatus
 //
 // Returns:
 //   - *ContainerStatus: Updated status.
-func UpdateFromContainer(
+func UpdateFromContainer(log *zerolog.Logger,
 	container types.Container,
 	newImage types.ImageID,
 	state State,
@@ -38,11 +38,11 @@ func UpdateFromContainer(
 		monitorOnly:    container.IsMonitorOnly(params),
 		newContainerID: "",
 	}
-	logrus.WithFields(logrus.Fields{
-		"container_id": container.ID().ShortID(),
-		"name":         container.Name(),
-		"state":        update.State(),
-	}).Debug("Updated container status from container")
+	log.Debug().
+		Str("container_id", container.ID().ShortID()).
+		Str("name", container.Name()).
+		Str("state", update.State()).
+		Msg("Updated container status from container")
 
 	return update
 }
@@ -53,14 +53,15 @@ func UpdateFromContainer(
 //   - container: Container to add.
 //   - err: Skip reason error.
 //   - params: Update parameters for monitor-only check.
-func (m Progress) AddSkipped(container types.Container, err error, params types.UpdateParams) {
-	update := UpdateFromContainer(container, container.ImageID(), SkippedState, params)
+func (m Progress) AddSkipped(log *zerolog.Logger, container types.Container, err error, params types.UpdateParams) {
+	update := UpdateFromContainer(log, container, container.ImageID(), SkippedState, params)
 	update.containerError = err
-	m.Add(update)
-	logrus.WithFields(logrus.Fields{
-		"container_id": container.ID().ShortID(),
-		"name":         container.Name(),
-	}).WithError(err).Debug("Added container as skipped")
+	m.Add(log, update)
+	log.Debug().
+		Err(err).
+		Str("container_id", container.ID().ShortID()).
+		Str("name", container.Name()).
+		Msg("Added container as skipped")
 }
 
 // AddScanned adds a container as scanned with a new image.
@@ -69,39 +70,41 @@ func (m Progress) AddSkipped(container types.Container, err error, params types.
 //   - container: Container to add.
 //   - newImage: Latest image ID.
 //   - params: Update parameters for monitor-only check.
-func (m Progress) AddScanned(
+func (m Progress) AddScanned(log *zerolog.Logger,
 	container types.Container,
 	newImage types.ImageID,
 	params types.UpdateParams,
 ) {
-	m.Add(UpdateFromContainer(container, newImage, ScannedState, params))
-	logrus.WithFields(logrus.Fields{
-		"container_id": container.ID().ShortID(),
-		"name":         container.Name(),
-		"new_image":    newImage.ShortID(),
-	}).Debug("Added container as scanned")
+	m.Add(log, UpdateFromContainer(log, container, newImage, ScannedState, params))
+	log.Debug().
+		Str("container_id", container.ID().ShortID()).
+		Str("name", container.Name()).
+		Str("new_image", newImage.ShortID()).
+		Msg("Added container as scanned")
 }
 
 // UpdateFailed marks containers as failed with errors.
 //
 // Parameters:
 //   - failures: Map of container IDs to errors.
-func (m Progress) UpdateFailed(failures map[types.ContainerID]error) {
+func (m Progress) UpdateFailed(log *zerolog.Logger, failures map[types.ContainerID]error) {
 	for containerID, err := range failures {
 		update, exists := m[containerID]
 		if !exists {
-			logrus.WithField("container_id", containerID.ShortID()).
-				Debug("Container not found in progress map, cannot mark as failed")
+			log.Debug().
+				Str("container_id", containerID.ShortID()).
+				Msg("Container not found in progress map, cannot mark as failed")
 
 			continue
 		}
 
 		update.containerError = err
 		update.state = FailedState
-		logrus.WithFields(logrus.Fields{
-			"container_id": containerID.ShortID(),
-			"name":         update.Name(),
-		}).WithError(err).Warn("Updated container state to failed")
+		log.Warn().
+			Err(err).
+			Str("container_id", containerID.ShortID()).
+			Str("name", update.Name()).
+			Msg("Updated container state to failed")
 	}
 }
 
@@ -109,53 +112,55 @@ func (m Progress) UpdateFailed(failures map[types.ContainerID]error) {
 //
 // Parameters:
 //   - update: Status to add.
-func (m Progress) Add(update *ContainerStatus) {
+func (m Progress) Add(log *zerolog.Logger, update *ContainerStatus) {
 	m[update.containerID] = update
-	logrus.WithFields(logrus.Fields{
-		"container_id": update.containerID.ShortID(),
-		"name":         update.containerName,
-		"state":        update.State(),
-	}).Debug("Added container status to progress map")
+	log.Debug().
+		Str("container_id", update.containerID.ShortID()).
+		Str("name", update.containerName).
+		Str("state", update.State()).
+		Msg("Added container status to progress map")
 }
 
 // MarkForUpdate sets a container's state to updated.
 //
 // Parameters:
 //   - containerID: ID of container to mark.
-func (m Progress) MarkForUpdate(containerID types.ContainerID) {
+func (m Progress) MarkForUpdate(log *zerolog.Logger, containerID types.ContainerID) {
 	update, exists := m[containerID]
 	if !exists {
-		logrus.WithField("container_id", containerID.ShortID()).
-			Debug("Attempted to mark non-existent container for update")
+		log.Debug().
+			Str("container_id", containerID.ShortID()).
+			Msg("Attempted to mark non-existent container for update")
 
 		return
 	}
 
 	update.state = UpdatedState
-	logrus.WithFields(logrus.Fields{
-		"container_id": containerID.ShortID(),
-		"name":         update.Name(),
-	}).Debug("Marked container for update")
+	log.Debug().
+		Str("container_id", containerID.ShortID()).
+		Str("name", update.Name()).
+		Msg("Marked container for update")
 }
 
 // MarkRestarted sets a container's state to restarted.
 //
 // Parameters:
 //   - containerID: ID of container to mark.
-func (m Progress) MarkRestarted(containerID types.ContainerID) {
+func (m Progress) MarkRestarted(log *zerolog.Logger, containerID types.ContainerID) {
 	update, exists := m[containerID]
 	if !exists {
-		logrus.WithField("container_id", containerID.ShortID()).
-			Debug("Attempted to mark non-existent container as restarted")
+		log.Debug().
+			Str("container_id", containerID.ShortID()).
+			Msg("Attempted to mark non-existent container as restarted")
 
 		return
 	}
 
 	update.state = RestartedState
-	logrus.WithFields(logrus.Fields{
-		"container_id": containerID.ShortID(),
-		"name":         update.Name(),
-	}).Debug("Marked container as restarted")
+	log.Debug().
+		Str("container_id", containerID.ShortID()).
+		Str("name", update.Name()).
+		Msg("Marked container as restarted")
 }
 
 // SetCooldownInfo sets cooldown metadata on a container's status.
@@ -167,7 +172,7 @@ func (m Progress) MarkRestarted(containerID types.ContainerID) {
 //   - remaining: Human-readable remaining time (empty if passed).
 //   - eligibleAt: Time when the container becomes eligible for update.
 //   - passed: True if the image passed the cooldown check.
-func (m Progress) SetCooldownInfo(
+func (m Progress) SetCooldownInfo(log *zerolog.Logger,
 	containerID types.ContainerID,
 	age,
 	delay,
@@ -177,28 +182,29 @@ func (m Progress) SetCooldownInfo(
 ) {
 	update, exists := m[containerID]
 	if !exists {
-		logrus.WithField("container_id", containerID.ShortID()).
-			Debug("Attempted to set cooldown info on non-existent container")
+		log.Debug().
+			Str("container_id", containerID.ShortID()).
+			Msg("Attempted to set cooldown info on non-existent container")
 
 		return
 	}
 
 	update.SetCooldownInfo(age, delay, remaining, eligibleAt, passed)
-	logrus.WithFields(logrus.Fields{
-		"container_id": containerID.ShortID(),
-		"name":         update.Name(),
-		"passed":       passed,
-		"image_age":    age,
-		"cooldown":     delay,
-		"remaining":    remaining,
-	}).Debug("Set cooldown info on container")
+	log.Debug().
+		Str("container_id", containerID.ShortID()).
+		Str("name", update.Name()).
+		Bool("passed", passed).
+		Str("image_age", age).
+		Str("cooldown", delay).
+		Str("remaining", remaining).
+		Msg("Set cooldown info on container")
 }
 
 // Restarted returns all containers marked as restarted.
 //
 // Returns:
 //   - []types.ContainerReport: List of restarted containers.
-func (m Progress) Restarted() []types.ContainerReport {
+func (m Progress) Restarted(log *zerolog.Logger) []types.ContainerReport {
 	var restarted []types.ContainerReport
 
 	for _, update := range m {
@@ -207,7 +213,9 @@ func (m Progress) Restarted() []types.ContainerReport {
 		}
 	}
 
-	logrus.WithField("count", len(restarted)).Debug("Retrieved restarted containers")
+	log.Debug().
+		Int("count", len(restarted)).
+		Msg("Retrieved restarted containers")
 
 	return restarted
 }
@@ -216,8 +224,10 @@ func (m Progress) Restarted() []types.ContainerReport {
 //
 // Returns:
 //   - types.Report: New report instance.
-func (m Progress) Report() types.Report {
-	logrus.WithField("count", len(m)).Debug("Generating report")
+func (m Progress) Report(log *zerolog.Logger) types.Report {
+	log.Debug().
+		Int("count", len(m)).
+		Msg("Generating report")
 
-	return NewReport(m)
+	return NewReport(log, m)
 }

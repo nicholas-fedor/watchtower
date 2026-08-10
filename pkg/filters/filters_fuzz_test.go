@@ -3,8 +3,16 @@ package filters
 import (
 	"testing"
 
+	"github.com/rs/zerolog"
+
 	"github.com/nicholas-fedor/watchtower/pkg/types"
 )
+
+func fuzzLog() *zerolog.Logger {
+	n := zerolog.Nop()
+
+	return &n
+}
 
 // fuzzableContainer is a minimal FilterableContainer implementation for fuzzing
 // filter functions. It stores labels in a map and returns fixed values for
@@ -125,7 +133,7 @@ func FuzzFilterByEnabledLabels(f *testing.F) {
 		}
 
 		c := newFuzzableContainer(containerName, imageName, true, "", false, containerLabels)
-		filter := FilterByEnabledLabels(filterLabels, NoFilter)
+		filter := FilterByEnabledLabels(fuzzLog(), filterLabels, NoFilter)
 		_ = filter(c)
 	})
 }
@@ -152,7 +160,7 @@ func FuzzFilterByDisabledLabels(f *testing.F) {
 		}
 
 		c := newFuzzableContainer(containerName, imageName, true, "", false, containerLabels)
-		filter := FilterByDisabledLabels(filterLabels, NoFilter)
+		filter := FilterByDisabledLabels(fuzzLog(), filterLabels, NoFilter)
 		_ = filter(c)
 	})
 }

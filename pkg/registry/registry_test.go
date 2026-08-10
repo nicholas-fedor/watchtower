@@ -1,50 +1,66 @@
-package registry_test
+package registry
 
 import (
-	"time"
+	"testing"
 
-	"github.com/onsi/ginkgo/v2"
-	"github.com/onsi/gomega"
+	"github.com/stretchr/testify/assert"
 
-	mockActions "github.com/nicholas-fedor/watchtower/internal/actions/mocks"
-	"github.com/nicholas-fedor/watchtower/pkg/registry"
+	mockTypes "github.com/nicholas-fedor/watchtower/pkg/types/mocks"
 )
 
-var _ = ginkgo.Describe("Registry", func() {
-	ginkgo.Describe("WarnOnAPIConsumption", func() {
-		ginkgo.When("Given a container with an image from ghcr.io", func() {
-			ginkgo.It("should want to warn", func() {
-				gomega.Expect(testContainerWithImage("ghcr.io/nicholas-fedor/watchtower")).
-					To(gomega.BeTrue())
-			})
-		})
-		ginkgo.When("Given a container with an image implicitly from dockerhub", func() {
-			ginkgo.It("should want to warn", func() {
-				gomega.Expect(testContainerWithImage("docker:latest")).To(gomega.BeTrue())
-			})
-		})
-		ginkgo.When("Given a container with an image explicitly from dockerhub", func() {
-			ginkgo.It("should want to warn", func() {
-				gomega.Expect(testContainerWithImage("index.docker.io/docker:latest")).
-					To(gomega.BeTrue())
-				gomega.Expect(testContainerWithImage("docker.io/docker:latest")).To(gomega.BeTrue())
-			})
-		})
-		ginkgo.When("Given a container with an image from some other registry", func() {
-			ginkgo.It("should not want to warn", func() {
-				gomega.Expect(testContainerWithImage("docker.fsf.org/docker:latest")).
-					To(gomega.BeFalse())
-				gomega.Expect(testContainerWithImage("altavista.com/docker:latest")).
-					To(gomega.BeFalse())
-				gomega.Expect(testContainerWithImage("gitlab.com/docker:latest")).
-					To(gomega.BeFalse())
-			})
-		})
-	})
-})
+// TestWarnOnAPIConsumption verifies that WarnOnAPIConsumption returns true for
+// registries that support HEAD requests (Docker Hub, GHCR) and false otherwise.
+func TestWarnOnAPIConsumption(t *testing.T) {
+	tests := []struct {
+		name      string
+		imageName string
+		want      bool
+	}{
+		{
+			name:      "ghcr.io image",
+			imageName: "ghcr.io/nicholas-fedor/watchtower",
+			want:      true,
+		},
+		{
+			name:      "implicit docker hub image",
+			imageName: "docker:latest",
+			want:      true,
+		},
+		{
+			name:      "explicit index.docker.io image",
+			imageName: "index.docker.io/docker:latest",
+			want:      true,
+		},
+		{
+			name:      "explicit docker.io image",
+			imageName: "docker.io/docker:latest",
+			want:      true,
+		},
+		{
+			name:      "other registry fsf.org",
+			imageName: "docker.fsf.org/docker:latest",
+			want:      false,
+		},
+		{
+			name:      "other registry altavista.com",
+			imageName: "altavista.com/docker:latest",
+			want:      false,
+		},
+		{
+			name:      "other registry gitlab.com",
+			imageName: "gitlab.com/docker:latest",
+			want:      false,
+		},
+	}
 
-func testContainerWithImage(imageName string) bool {
-	container := mockActions.CreateMockContainer("", "", imageName, time.Now())
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			container := mockTypes.NewMockContainer(t)
+			container.EXPECT().Name().Return("test-container").Maybe()
+			container.EXPECT().ImageName().Return(tt.imageName)
 
-	return registry.WarnOnAPIConsumption(container)
+			got := WarnOnAPIConsumption(testLog(), container)
+			assert.Equal(t, tt.want, got)
+		})
+	}
 }

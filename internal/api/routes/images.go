@@ -14,7 +14,7 @@ func registerImagesRoute(app *fiber.App, auth fiber.Handler, opts config.Options
 		return
 	}
 
-	handler := images.New(func(ctx context.Context) ([]images.ImageStatus, error) {
+	handler := images.New(opts.Logger, func(ctx context.Context) ([]images.ImageStatus, error) {
 		return images.ListImageStatuses(ctx, opts.Client, opts.Filter)
 	})
 	app.Get(handler.Path, auth, config.TimeoutMiddleware(), handler.Handle)

@@ -1,17 +1,22 @@
-// Package logging provides functions for logging startup information and configuring startup logging in Watchtower.
-// It handles the initialization messages, notifier setup logging, and schedule information display.
 package logging
 
 import (
 	"strings"
 	"time"
 
-	"github.com/sirupsen/logrus"
+	"github.com/rs/zerolog"
 
 	"github.com/nicholas-fedor/watchtower/internal/util"
-	"github.com/nicholas-fedor/watchtower/pkg/container"
 	"github.com/nicholas-fedor/watchtower/pkg/types"
 )
+
+// APIVersionProvider reports the Docker API version for startup messaging.
+//
+// Defined here (rather than depending on pkg/container.Client) so this package
+// stays free of container→flags import cycles when flags configures logging.
+type APIVersionProvider interface {
+	GetVersion() string
+}
 
 // StartupParams holds resolved process values for startup messaging.
 //
@@ -21,6 +26,8 @@ type StartupParams struct {
 	// ScheduleInfo holds run-once, update-on-start, HTTP API, and next-run schedule values.
 	ScheduleInfo
 
+	// Logger is the zerolog logger used for startup messages. Required when NoStartupMessage is false.
+	Logger *zerolog.Logger
 	// NoStartupMessage suppresses all startup logs and notifications when true.
 	NoStartupMessage bool
 	// Filtering is a human-readable description of the container filter.
@@ -28,7 +35,7 @@ type StartupParams struct {
 	// Scope is the operational scope name, or empty when unset.
 	Scope string
 	// Client is the Docker client used for API version reporting.
-	Client container.Client
+	Client APIVersionProvider
 	// Notifier sends batched startup messages when not suppressed.
 	Notifier types.Notifier
 	// Version is the Watchtower version string.
@@ -37,26 +44,34 @@ type StartupParams struct {
 
 // WriteStartupMessage logs or notifies startup information from resolved configuration.
 //
-// It reports Watchtower's version, notification setup, container filtering details, scheduling information,
-// and HTTP API status, providing users with a comprehensive overview of the application's initial state.
+// It reports Watchtower's version, notification setup, container filtering details,
+// scheduling information, and HTTP API status. Callers that suppress startup messages
+// set NoStartupMessage and return without requiring Logger.
 //
 // Parameters:
 //   - params: Resolved startup messaging inputs from config.Load (no CLI flag reads).
+//     When NoStartupMessage is false, Logger must be non-nil and should be the hooked
+//     process logger (after Notifier.RegisterHook) so batching captures startup lines.
 func WriteStartupMessage(params StartupParams) {
 	// If startup messages are suppressed, skip all logging and notifier batching.
 	if params.NoStartupMessage {
 		return
 	}
 
+	if params.Logger == nil {
+		panic("logging.WriteStartupMessage: Logger is required when NoStartupMessage is false")
+	}
+
 	// Batch startup lines through the notifier when present (suppression already returned).
-	startupLog := SetupStartupLogger(params.Notifier)
+	startupLog := SetupStartupLogger(params.Logger, params.Notifier)
 
 	var apiVersion string
 	if params.Client != nil {
 		apiVersion = params.Client.GetVersion()
 	}
 
-	startupLog.Info("Watchtower ", params.Version, " using Docker API v", apiVersion)
+	startupLog.Info().
+		Msg("Watchtower " + params.Version + " using Docker API v" + apiVersion)
 
 	// Log details about configured notifiers or lack thereof.
 	var notifierNames []string
@@ -68,10 +83,11 @@ func WriteStartupMessage(params StartupParams) {
 
 	// Log filtering information, using structured logging for scope when set.
 	if params.Scope != "" {
-		startupLog.WithField("scope", params.Scope).
-			Info("Only checking containers in scope")
+		startupLog.Info().
+			Str("scope", params.Scope).
+			Msg("Only checking containers in scope")
 	} else {
-		startupLog.Debug(params.Filtering)
+		startupLog.Debug().Msg(params.Filtering)
 	}
 
 	// Log scheduling or run mode information based on configuration.
@@ -83,27 +99,25 @@ func WriteStartupMessage(params StartupParams) {
 	}
 
 	// Warn about trace-level logging if enabled, as it may expose sensitive data.
-	if logrus.IsLevelEnabled(logrus.TraceLevel) {
-		startupLog.Warn(
-			"Trace-level logging enabled: Sensitive credentials and tokens may be included in logs",
-		)
+	if startupLog.GetLevel() <= zerolog.TraceLevel {
+		startupLog.Warn().
+			Msg("Trace-level logging enabled: Sensitive credentials and tokens may be included in logs")
 	}
 }
 
-// SetupStartupLogger configures a log entry for startup messages and starts notifier batching.
+// SetupStartupLogger prepares the logger for startup messages and starts notifier batching.
 //
 // Callers that suppress startup messages must return before invoking this helper.
 // When notifier is non-nil, StartNotification batches subsequent startup lines for
 // a single SendNotification.
 //
 // Parameters:
+//   - log: The zerolog logger used for startup messages.
 //   - notifier: The notification system instance for batching messages, or nil.
 //
 // Returns:
-//   - *logrus.Entry: A configured log entry for writing startup messages.
-func SetupStartupLogger(notifier types.Notifier) *logrus.Entry {
-	log := logrus.NewEntry(logrus.StandardLogger())
-
+//   - *zerolog.Logger: The logger to use for writing startup messages.
+func SetupStartupLogger(log *zerolog.Logger, notifier types.Notifier) *zerolog.Logger {
 	if notifier != nil {
 		notifier.StartNotification(false)
 	}
@@ -113,17 +127,17 @@ func SetupStartupLogger(notifier types.Notifier) *logrus.Entry {
 
 // LogNotifierInfo logs details about the notification setup for Watchtower.
 //
-// It reports the list of configured notifier names (e.g., "email, slack") or indicates no notifications
-// are set up, providing visibility into how update statuses will be communicated.
+// It reports the list of configured notifier names (for example "email, slack") or
+// indicates that no notifications are set up.
 //
 // Parameters:
-//   - log: The logrus.Entry used to write the notification information.
-//   - notifierNames: A slice of strings representing the names of configured notifiers.
-func LogNotifierInfo(log *logrus.Entry, notifierNames []string) {
+//   - log: The zerolog logger used to write the notification information.
+//   - notifierNames: Names of configured notifiers.
+func LogNotifierInfo(log *zerolog.Logger, notifierNames []string) {
 	if len(notifierNames) > 0 {
-		log.Info("Using notifications: " + strings.Join(notifierNames, ", "))
+		log.Info().Msg("Using notifications: " + strings.Join(notifierNames, ", "))
 	} else {
-		log.Info("Using no notifications")
+		log.Info().Msg("Using no notifications")
 	}
 }
 
@@ -150,10 +164,10 @@ type ScheduleInfo struct {
 // such as when both run-once and update-on-start are enabled.
 //
 // Parameters:
-//   - log: The logrus.Entry used to write the schedule information.
+//   - log: The zerolog logger used to write the schedule information.
 //   - info: Resolved schedule and mode values (no flag reads).
-func LogScheduleInfo(log *logrus.Entry, info ScheduleInfo) {
-	// Use provided update-on-start value when set; otherwise treat as disabled.
+func LogScheduleInfo(log *zerolog.Logger, info ScheduleInfo) {
+	// Use provided update-on-start value when set. Otherwise treat as disabled.
 	var updateOnStartVal bool
 	if info.UpdateOnStart != nil {
 		updateOnStartVal = *info.UpdateOnStart
@@ -163,9 +177,9 @@ func LogScheduleInfo(log *logrus.Entry, info ScheduleInfo) {
 	if info.RunOnce {
 		// Warn if disregarding update-on-start when already performing a one-time update.
 		if updateOnStartVal {
-			log.Warn("Run once mode: Disregarding update on start")
+			log.Warn().Msg("Run once mode: Disregarding update on start")
 		} else {
-			log.Info("Running a one time update")
+			log.Info().Msg("Running a one time update")
 		}
 
 		return
@@ -173,17 +187,15 @@ func LogScheduleInfo(log *logrus.Entry, info ScheduleInfo) {
 
 	// Check if update on start is enabled.
 	if updateOnStartVal {
-		log.Info(
-			"Update on startup enabled: Performing immediate check",
-		)
+		log.Info().Msg("Update on startup enabled: Performing immediate check")
 	}
 
 	// Handle HTTP API update configurations.
 	if info.HTTPAPIUpdate {
 		if info.HTTPAPIPeriodicPolls {
-			log.Info("HTTP API and periodic updates enabled")
+			log.Info().Msg("HTTP API and periodic updates enabled")
 		} else {
-			log.Info("HTTP API enabled and periodic updates disabled")
+			log.Info().Msg("HTTP API enabled and periodic updates disabled")
 
 			return
 		}
@@ -193,7 +205,7 @@ func LogScheduleInfo(log *logrus.Entry, info ScheduleInfo) {
 	if !info.Sched.IsZero() {
 		until := util.FormatDuration(time.Until(info.Sched))
 		// Example: Next scheduled run: 2025-10-22 00:31:25 MST in 24 hours.
-		log.Info(
+		log.Info().Msg(
 			"Next scheduled run: " + info.Sched.Format(
 				"2006-01-02 15:04:05 MST",
 			) + " in " + until,
@@ -202,6 +214,6 @@ func LogScheduleInfo(log *logrus.Entry, info ScheduleInfo) {
 
 	// Default periodic updates are enabled.
 	if !updateOnStartVal && !info.HTTPAPIUpdate && info.Sched.IsZero() {
-		log.Info("Periodic updates are enabled with default schedule")
+		log.Info().Msg("Periodic updates are enabled with default schedule")
 	}
 }

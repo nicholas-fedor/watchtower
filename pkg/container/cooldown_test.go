@@ -9,7 +9,7 @@ import (
 	"github.com/onsi/ginkgo/v2"
 	"github.com/onsi/gomega"
 	"github.com/onsi/gomega/ghttp"
-	"github.com/sirupsen/logrus"
+	"github.com/rs/zerolog"
 
 	dockerClient "github.com/moby/moby/client"
 
@@ -118,7 +118,7 @@ var _ = ginkgo.Describe("isOutsideCooldown", func() {
 
 	ginkgo.When("no cooldown delay is configured", func() {
 		ginkgo.It("returns true with no registry calls", func() {
-			i := newImageClient(mockClient)
+			i := newImageClient(mockClient, testLog())
 			c := MockContainer(WithImageName("test:latest"))
 
 			outside, err := i.isOutsideCooldown(
@@ -131,7 +131,7 @@ var _ = ginkgo.Describe("isOutsideCooldown", func() {
 
 	ginkgo.When("cooldown delay is zero", func() {
 		ginkgo.It("returns true immediately", func() {
-			i := newImageClient(mockClient)
+			i := newImageClient(mockClient, testLog())
 			c := MockContainer(WithImageName("test:latest"))
 
 			outside, err := i.isOutsideCooldown(
@@ -146,7 +146,7 @@ var _ = ginkgo.Describe("isOutsideCooldown", func() {
 
 	ginkgo.When("container is monitor-only", func() {
 		ginkgo.It("returns true and bypasses the cooldown check", func() {
-			i := newImageClient(mockClient)
+			i := newImageClient(mockClient, testLog())
 			c := MockContainer(WithImageName("test:latest"))
 
 			outside, err := i.isOutsideCooldown(
@@ -162,7 +162,7 @@ var _ = ginkgo.Describe("isOutsideCooldown", func() {
 
 	ginkgo.When("container has no-pull enabled", func() {
 		ginkgo.It("returns true and bypasses the cooldown check", func() {
-			i := newImageClient(mockClient)
+			i := newImageClient(mockClient, testLog())
 			c := MockContainer(WithImageName("test:latest"))
 
 			outside, err := i.isOutsideCooldown(
@@ -178,10 +178,9 @@ var _ = ginkgo.Describe("isOutsideCooldown", func() {
 
 	ginkgo.When("GetPullOptions fails (registry auth unavailable)", func() {
 		ginkgo.It("returns false with a CooldownError wrapping the pull options error", func() {
-			resetLogrus, _ := captureLogrus(logrus.DebugLevel)
-			defer resetLogrus()
+			log, _ := captureLog(zerolog.DebugLevel)
 
-			i := newImageClient(mockClient)
+			i := newImageClient(mockClient, log)
 
 			imageName := "localhost/unsupported-image-format:latest"
 			c := MockContainer(WithImageName(imageName))
@@ -202,8 +201,7 @@ var _ = ginkgo.Describe("isOutsideCooldown", func() {
 
 	ginkgo.When("FetchImageCreationTime fails (registry manifest returns 404)", func() {
 		ginkgo.It("returns false with a CooldownError reflecting the age fetch failure", func() {
-			resetLogrus, _ := captureLogrus(logrus.DebugLevel)
-			defer resetLogrus()
+			log, _ := captureLog(zerolog.DebugLevel)
 
 			mockServer.AppendHandlers(
 				ghttp.CombineHandlers(
@@ -212,7 +210,7 @@ var _ = ginkgo.Describe("isOutsideCooldown", func() {
 				),
 			)
 
-			i := newImageClient(mockClient)
+			i := newImageClient(mockClient, log)
 			c := MockContainer(WithImageName("test:latest"))
 
 			outside, err := i.isOutsideCooldown(
@@ -260,8 +258,7 @@ var _ = ginkgo.Describe("PullImage cooldown gate", func() {
 
 	ginkgo.When("image is stale and cooldown age fetch fails", func() {
 		ginkgo.It("returns a CooldownError without pulling layers", func() {
-			resetLogrus, _ := captureLogrus(logrus.DebugLevel)
-			defer resetLogrus()
+			log, _ := captureLog(zerolog.DebugLevel)
 
 			mockServer.AppendHandlers(
 				ghttp.CombineHandlers(
@@ -270,7 +267,7 @@ var _ = ginkgo.Describe("PullImage cooldown gate", func() {
 				),
 			)
 
-			i := newImageClient(mockClient)
+			i := newImageClient(mockClient, log)
 			// Use an explicit registry host so local-only 404 handling does not apply.
 			// Digest failure must fall through to the cooldown gate.
 			c := MockContainer(

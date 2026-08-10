@@ -1,30 +1,24 @@
 package types
 
-import "github.com/sirupsen/logrus"
+import "github.com/rs/zerolog"
 
 // Notifier defines the common interface for notification services.
+//
+// Log events are received via a zerolog hook registered with RegisterHook.
+// The notifier does not expose queued entry state. Batching, filtering, and
+// deduplication happen inside the implementation driven by the hook callback.
 type Notifier interface {
 	StartNotification(suppressSummary bool) // Begin queuing messages.
-	SendNotification(reportType Report)     // Send queued messages with report.
-	AddLogHook()                            // Add as logrus hook.
-	GetNames() []string                     // Service names.
-	GetURLs() []string                      // Service URLs.
-	Close()                                 // Stop and flush notifications.
+	SendNotification(report Report)         // Send queued messages with report.
+	// RegisterHook attaches this notifier as a zerolog.Hook on the given logger.
+	// Implementations update *log in place to the hooked logger so the composition
+	// root continues using the same pointer for subsequent application logging.
+	RegisterHook(log *zerolog.Logger)
+	GetNames() []string // Service names.
+	GetURLs() []string  // Service URLs.
+	Close()             // Stop and flush notifications.
 
-	// GetEntries returns all queued logrus entries that have been captured during the session.
-	// This is used for notification splitting by container in log mode, allowing notifiers
-	// to filter and send entries specific to individual containers rather than all entries together.
-	GetEntries() []*logrus.Entry
-
-	// SendFilteredEntries sends a subset of log entries with an optional report.
-	// This method enables fine-grained notifications where only entries relevant to specific
-	// containers are sent, supporting the --notification-split-by-container feature in log mode.
-	// The report parameter may be nil when sending filtered log entries without session context.
-	SendFilteredEntries(
-		entries []*logrus.Entry,
-		report Report,
-	)
-
-	// ShouldSendNotification checks if a notification should be sent for the given report based on the notifier's configuration.
+	// ShouldSendNotification checks if a notification should be sent for the given
+	// report based on the notifier's configuration.
 	ShouldSendNotification(report Report) bool
 }

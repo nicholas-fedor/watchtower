@@ -5,11 +5,13 @@ import (
 	"time"
 
 	"github.com/gofiber/fiber/v3"
-	"github.com/sirupsen/logrus"
+	"github.com/rs/zerolog"
 )
 
 // Handler serves the /v1/containers endpoint.
 type Handler struct {
+	log *zerolog.Logger
+
 	list ListFunc
 	Path string
 }
@@ -18,8 +20,14 @@ type Handler struct {
 //
 // Parameters:
 //   - list: Function that returns the current status of all watched containers.
-func New(list ListFunc) *Handler {
+func New(log *zerolog.Logger, list ListFunc) *Handler {
+	if log == nil {
+		nop := zerolog.Nop()
+		log = &nop
+	}
+
 	return &Handler{
+		log:  log,
 		list: list,
 		Path: "/v1/containers",
 	}
@@ -40,16 +48,18 @@ func New(list ListFunc) *Handler {
 //	@Security		BearerAuth
 //	@Router			/v1/containers [get]
 func (h *Handler) Handle(c fiber.Ctx) error {
-	logrus.WithFields(logrus.Fields{
-		"method": c.Method(),
-		"path":   c.Path(),
-		"notify": "no",
-	}).Debug("Received HTTP API containers request")
+	h.log.Debug().
+		Str("method", c.Method()).
+		Str("path", c.Path()).
+		Str("notify", "no").
+		Msg("Received HTTP API containers request")
 
 	statuses, err := h.list(c.Context())
 	if err != nil {
-		logrus.WithError(err).WithField("notify", "no").
-			Error("Failed to list containers for API")
+		h.log.Error().
+			Err(err).
+			Str("notify", "no").
+			Msg("Failed to list containers for API")
 
 		sendErr := c.Status(fiber.StatusInternalServerError).
 			SendString("failed to list containers")

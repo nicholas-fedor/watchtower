@@ -8,15 +8,16 @@
 //
 // Usage example:
 //
-//	err := sorter.SortByDependencies(containers)
+//	// log is the process *zerolog.Logger.
+//	err := sorter.SortByDependencies(log, containers, useComposeDependsOn)
 //	if err != nil {
-//	    logrus.WithError(err).Error("Dependency sort failed")
+//	    log.Error().Err(err).Msg("Dependency sort failed")
 //	}
 //
-//	err = sorter.SortByCreated(containers)
+//	err = sorter.SortByCreated(log, containers)
 //	if err != nil {
-//	    logrus.WithError(err).Error("Time sort failed")
+//	    log.Error().Err(err).Msg("Time sort failed")
 //	}
 //
-// The package uses logrus for logging sort operations and errors.
+// The package uses zerolog for logging sort operations and errors.
 package sorter

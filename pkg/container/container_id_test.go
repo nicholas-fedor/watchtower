@@ -41,7 +41,7 @@ var _ = ginkgo.Describe("GetContainerIDFromCgroupFile", func() {
 				setup()
 			}
 
-			got, err := GetContainerIDFromCgroupFile()
+			got, err := GetContainerIDFromCgroupFile(testLog())
 			if wantErr == nil {
 				gomega.Expect(err).ToNot(gomega.HaveOccurred())
 			} else {
@@ -81,7 +81,7 @@ var _ = ginkgo.Describe("GetContainerIDFromCgroupFile", func() {
 var _ = ginkgo.Describe("ParseContainerIDFromCgroupString", func() {
 	ginkgo.DescribeTable("should extract container ID from string",
 		func(s string, want types.ContainerID, wantErr error) {
-			got, err := ParseContainerIDFromCgroupString(s)
+			got, err := ParseContainerIDFromCgroupString(testLog(), s)
 			if wantErr == nil {
 				gomega.Expect(err).ToNot(gomega.HaveOccurred())
 			} else {
@@ -161,7 +161,7 @@ var _ = ginkgo.Describe("GetContainerIDFromMountinfo", func() {
 				setup()
 			}
 
-			got, err := GetContainerIDFromMountinfo()
+			got, err := GetContainerIDFromMountinfo(testLog())
 			if wantErr == nil {
 				gomega.Expect(err).ToNot(gomega.HaveOccurred())
 			} else {
@@ -210,7 +210,7 @@ var _ = ginkgo.Describe("GetContainerIDFromMountinfo", func() {
 var _ = ginkgo.Describe("ParseContainerIDFromMountinfo", func() {
 	ginkgo.DescribeTable("should extract container ID from mountinfo string",
 		func(s string, want types.ContainerID, wantErr error) {
-			got, err := ParseContainerIDFromMountinfo(s)
+			got, err := ParseContainerIDFromMountinfo(testLog(), s)
 			if wantErr == nil {
 				gomega.Expect(err).ToNot(gomega.HaveOccurred())
 			} else {
@@ -307,7 +307,7 @@ var _ = ginkgo.Describe("GetContainerIDFromHostname", func() {
 				setup()
 			}
 
-			got, err := GetContainerIDFromHostname(context.Background(), mockClient)
+			got, err := GetContainerIDFromHostname(testLog(), context.Background(), mockClient)
 			if wantErr {
 				gomega.Expect(err).To(gomega.HaveOccurred())
 				gomega.Expect(got).To(gomega.BeEmpty())
@@ -544,7 +544,7 @@ var _ = ginkgo.Describe("GetCurrentContainerID", func() {
 				setup()
 			}
 
-			id, err := GetCurrentContainerID(context.Background(), mockClient)
+			id, err := GetCurrentContainerID(testLog(), context.Background(), mockClient)
 			if expectError {
 				gomega.Expect(err).To(gomega.HaveOccurred())
 				gomega.Expect(id).To(gomega.BeEmpty())

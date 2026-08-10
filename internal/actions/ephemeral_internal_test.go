@@ -94,7 +94,7 @@ var _ = ginkgo.Describe("orchestrateSelfUpdate handoff", func() {
 			false,
 		)
 
-		err := orchestrateSelfUpdate(
+		err := orchestrateSelfUpdate(testLogger(),
 			context.Background(),
 			client,
 			"wt-old-id-ok",
@@ -145,7 +145,7 @@ var _ = ginkgo.Describe("orchestrateSelfUpdate handoff", func() {
 			false,
 		)
 
-		err := orchestrateSelfUpdate(
+		err := orchestrateSelfUpdate(testLogger(),
 			context.Background(),
 			client,
 			"wt-old-ports",
@@ -177,7 +177,7 @@ var _ = ginkgo.Describe("orchestrateSelfUpdate handoff", func() {
 			false,
 		)
 
-		err := orchestrateSelfUpdate(
+		err := orchestrateSelfUpdate(testLogger(),
 			context.Background(),
 			client,
 			"wt-old-stop-fail",
@@ -206,7 +206,7 @@ var _ = ginkgo.Describe("orchestrateSelfUpdate handoff", func() {
 			false,
 		)
 
-		err := orchestrateSelfUpdate(
+		err := orchestrateSelfUpdate(testLogger(),
 			context.Background(),
 			client,
 			"wt-old-create-fail",
@@ -250,7 +250,7 @@ var _ = ginkgo.Describe("orchestrateSelfUpdate handoff", func() {
 			false,
 		)
 
-		err := orchestrateSelfUpdate(
+		err := orchestrateSelfUpdate(testLogger(),
 			context.Background(),
 			client,
 			"wt-old-pin",
@@ -276,7 +276,7 @@ var _ = ginkgo.Describe("orchestrateSelfUpdate handoff", func() {
 		)
 
 		chain := "prev-id,wt-old-chain"
-		err := orchestrateSelfUpdate(
+		err := orchestrateSelfUpdate(testLogger(),
 			context.Background(),
 			client,
 			"wt-old-chain",

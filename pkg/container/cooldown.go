@@ -6,7 +6,7 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/sirupsen/logrus"
+	"github.com/rs/zerolog"
 
 	"github.com/nicholas-fedor/watchtower/internal/util"
 	"github.com/nicholas-fedor/watchtower/pkg/registry"
@@ -66,10 +66,11 @@ func (c imageClient) isOutsideCooldown(
 		return true, nil
 	}
 
-	clog := logrus.WithFields(logrus.Fields{
-		"container": sourceContainer.Name(),
-		"image":     sourceContainer.ImageName(),
-	})
+	clogVal := c.log.With().
+		Str("container", sourceContainer.Name()).
+		Str("image", sourceContainer.ImageName()).
+		Logger()
+	clog := &clogVal
 
 	creationTime, cdErr := fetchImageCreationTime(ctx, sourceContainer, delay, clog)
 	if cdErr != nil {
@@ -80,7 +81,7 @@ func (c imageClient) isOutsideCooldown(
 }
 
 // shouldCheckCooldown returns the effective cooldown delay and whether the
-// check can be skipped (delay ≤ 0, no-pull, or monitor-only).
+// check can be skipped (delay <= 0, no-pull, or monitor-only).
 //
 // Parameters:
 //   - sourceContainer: Container to evaluate.
@@ -114,12 +115,13 @@ func fetchImageCreationTime(
 	ctx context.Context,
 	sourceContainer types.Container,
 	delay time.Duration,
-	clog *logrus.Entry,
+	clog *zerolog.Logger,
 ) (time.Time, error) {
-	pullOpts, err := registry.GetPullOptions(sourceContainer.ImageName())
+	pullOpts, err := registry.GetPullOptions(clog, sourceContainer.ImageName())
 	if err != nil {
-		clog.WithError(err).
-			Info("Failed to get pull options for cooldown check - update check unavailable")
+		clog.Info().
+			Err(err).
+			Msg("Failed to get pull options for cooldown check - update check unavailable")
 
 		return time.Time{}, &CooldownError{
 			Delay: util.FormatDuration(delay),
@@ -132,14 +134,15 @@ func fetchImageCreationTime(
 		}
 	}
 
-	creationTime, err := registry.FetchImageCreationTime(
+	creationTime, err := registry.FetchImageCreationTime(clog,
 		ctx,
 		sourceContainer,
 		pullOpts.RegistryAuth,
 	)
 	if err != nil {
-		clog.WithError(err).
-			Info("Image creation time unavailable - update check unavailable")
+		clog.Info().
+			Err(err).
+			Msg("Image creation time unavailable - update check unavailable")
 
 		return time.Time{}, &CooldownError{
 			Delay: util.FormatDuration(delay),
@@ -166,7 +169,7 @@ func fetchImageCreationTime(
 // Returns:
 //   - bool: True if the image age exceeds the cooldown window.
 //   - error: Non-nil CooldownError when the image is within the cooldown window.
-func evalImageAge(creationTime time.Time, delay time.Duration, clog *logrus.Entry) (bool, error) {
+func evalImageAge(creationTime time.Time, delay time.Duration, clog *zerolog.Logger) (bool, error) {
 	imageAge := time.Since(creationTime)
 
 	if imageAge < 0 {
@@ -182,12 +185,12 @@ func evalImageAge(creationTime time.Time, delay time.Duration, clog *logrus.Entr
 		remainingStr := util.FormatDuration(remaining)
 		eligibleAt := time.Now().Add(remaining)
 
-		clog.WithFields(logrus.Fields{
-			"image_age":   ageStr,
-			"cooldown":    cooldownStr,
-			"eligible_in": remainingStr,
-			"eligible_at": eligibleAt.Format(time.RFC3339),
-		}).Info("Image is within cooldown period - not eligible for update")
+		clog.Info().
+			Str("image_age", ageStr).
+			Str("cooldown", cooldownStr).
+			Str("eligible_in", remainingStr).
+			Str("eligible_at", eligibleAt.Format(time.RFC3339)).
+			Msg("Image is within cooldown period - not eligible for update")
 
 		return false, buildCooldownError(imageAge, delay, eligibleAt)
 	}
@@ -221,18 +224,18 @@ func buildCooldownError(imageAge, delay time.Duration, eligibleAt time.Time) *Co
 
 // logClockSkew logs a warning when the image creation time is in the future,
 // indicating possible clock skew between the host and registry.
-func logClockSkew(imageAge, delay time.Duration, clog *logrus.Entry) {
-	clog.WithFields(logrus.Fields{
-		"image_age": util.FormatDuration(imageAge),
-		"cooldown":  util.FormatDuration(delay),
-	}).Warn("Image creation time is in the future (possible clock skew) - update available")
+func logClockSkew(imageAge, delay time.Duration, clog *zerolog.Logger) {
+	clog.Warn().
+		Str("image_age", util.FormatDuration(imageAge)).
+		Str("cooldown", util.FormatDuration(delay)).
+		Msg("Image creation time is in the future (possible clock skew) - update available")
 }
 
 // logCooldownExceeded logs an info message when the image age exceeds the
 // cooldown window and the pull can proceed.
-func logCooldownExceeded(imageAge, delay time.Duration, clog *logrus.Entry) {
-	clog.WithFields(logrus.Fields{
-		"image_age": util.FormatDuration(imageAge),
-		"cooldown":  util.FormatDuration(delay),
-	}).Info("Image age exceeds cooldown - eligible for update")
+func logCooldownExceeded(imageAge, delay time.Duration, clog *zerolog.Logger) {
+	clog.Info().
+		Str("image_age", util.FormatDuration(imageAge)).
+		Str("cooldown", util.FormatDuration(delay)).
+		Msg("Image age exceeds cooldown - eligible for update")
 }

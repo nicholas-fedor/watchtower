@@ -9,10 +9,11 @@ import (
 	"github.com/gofiber/fiber/v3/middleware/cors"
 	"github.com/gofiber/fiber/v3/middleware/helmet"
 	"github.com/gofiber/fiber/v3/middleware/limiter"
-	"github.com/gofiber/fiber/v3/middleware/logger"
 	"github.com/gofiber/fiber/v3/middleware/recover"
 	"github.com/gofiber/fiber/v3/middleware/requestid"
-	"github.com/sirupsen/logrus"
+	"github.com/rs/zerolog"
+
+	fiberzerolog "github.com/gofiber/contrib/v3/zerolog"
 )
 
 const (
@@ -63,7 +64,7 @@ type CORSConfig struct {
 // stack and lifecycle hooks.
 //
 // Parameters:
-//   - logrusLogger: Logger for the Fiber middleware.
+//   - log: Logger for Fiber middleware and server lifecycle messages.
 //   - rateLimitPerMinute: Maximum requests per minute per IP. Values <= 0 fall
 //     back to defaultRateLimitPerMinute (60).
 //   - proxyCfg: Reverse proxy configuration.
@@ -73,7 +74,7 @@ type CORSConfig struct {
 // Returns:
 //   - *fiber.App: Configured Fiber application.
 func New(
-	logrusLogger *logrus.Logger,
+	log *zerolog.Logger,
 	rateLimitPerMinute int,
 	proxyCfg ProxyConfig,
 	corsCfg CORSConfig,
@@ -143,11 +144,26 @@ func New(
 		}))
 	}
 
+	// High-volume request and rate-limit logs must not trigger notification hooks.
+	// Lifecycle hooks (listen/shutdown) use log as given from the composition root.
+	requestLog := log.With().Str("notify", "no").Logger()
+
 	middlewares = append(middlewares,
 		requestid.New(),
-		logger.New(logger.Config{
-			Stream: &logrusWriter{logger: logrusLogger},
-			Format: "${status} - ${method} ${path}\n",
+		fiberzerolog.New(fiberzerolog.Config{
+			Logger: &requestLog,
+			// Structured access fields: status/method/path (prior stream shape) plus
+			// ip/latency/error and request ID for correlation with requestid middleware.
+			// Messages/Levels omit so contrib defaults apply (5xx Error, 4xx Warn, else Info).
+			Fields: []string{
+				fiberzerolog.FieldStatus,
+				fiberzerolog.FieldMethod,
+				fiberzerolog.FieldPath,
+				fiberzerolog.FieldIP,
+				fiberzerolog.FieldLatency,
+				fiberzerolog.FieldError,
+				fiberzerolog.FieldRequestID,
+			},
 		}),
 		compress.New(compress.Config{
 			Level: compress.LevelBestSpeed,
@@ -158,8 +174,7 @@ func New(
 			LimiterMiddleware: limiter.SlidingWindow{},
 			KeyGenerator:      func(c fiber.Ctx) string { return c.IP() },
 			LimitReached: func(c fiber.Ctx) error {
-				logrusLogger.WithField("ip", c.IP()).
-					Warn("Rate limit exceeded")
+				requestLog.Warn().Str("ip", c.IP()).Msg("Rate limit exceeded")
 
 				return c.SendStatus(fiber.StatusTooManyRequests)
 			},
@@ -170,36 +185,33 @@ func New(
 
 	apiServer.Hooks().OnListen(func(data fiber.ListenData) error {
 		if !noStartupMessage {
-			logrusLogger.WithFields(logrus.Fields{
-				"host": data.Host,
-				"port": data.Port,
-				"tls":  data.TLS,
-			}).
-				Debug("Starting HTTP API server")
+			log.Debug().
+				Str("host", data.Host).
+				Str("port", data.Port).
+				Bool("tls", data.TLS).
+				Msg("Starting HTTP API server")
 
-			logrusLogger.WithFields(logrus.Fields{
-				"host": data.Host,
-				"port": data.Port,
-				"tls":  data.TLS,
-			}).
-				Info("HTTP API server is enabled")
+			log.Info().
+				Str("host", data.Host).
+				Str("port", data.Port).
+				Bool("tls", data.TLS).
+				Msg("HTTP API server is enabled")
 		}
 
 		return nil
 	})
 
 	apiServer.Hooks().OnPreShutdown(func() error {
-		logrusLogger.Info("Initiating HTTP API shutdown")
+		log.Info().Msg("Initiating HTTP API shutdown")
 
 		return nil
 	})
 
 	apiServer.Hooks().OnPostShutdown(func(err error) error {
 		if err != nil {
-			logrusLogger.WithError(err).
-				Warn("HTTP server shut down with error")
+			log.Warn().Err(err).Msg("HTTP server shut down with error")
 		} else {
-			logrusLogger.Info("HTTP server shut down successfully")
+			log.Info().Msg("HTTP server shut down successfully")
 		}
 
 		return nil

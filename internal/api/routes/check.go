@@ -26,7 +26,7 @@ func registerCheckRoute(app *fiber.App, auth fiber.Handler, opts config.Options)
 	params := config.BuildUpdateParams(opts)
 	scanStartedData := events.NewScanStartedData(params)
 
-	handler := check.New(
+	handler := check.New(opts.Logger,
 		func(ctx context.Context, images, names []string) ([]check.ContainerCheck, error) {
 			imageFilter := opts.FilterByImage(images, opts.Filter)
 			containerFilter := update.ContainerFilter(names)
@@ -35,6 +35,7 @@ func registerCheckRoute(app *fiber.App, auth fiber.Handler, opts config.Options)
 			}
 
 			return check.CheckForUpdates(
+				opts.Logger,
 				ctx,
 				opts.Client,
 				combinedFilter,

@@ -12,9 +12,9 @@ func registerMetricsRoute(app *fiber.App, auth fiber.Handler, opts config.Option
 		return
 	}
 
-	handler := metrics.New()
+	handler := metrics.New(opts.Logger)
 	app.Get(handler.Path, auth, handler.Handle)
 
-	statusHandler := metrics.NewStatusHandler(opts.DefaultMetrics().GetLastScan)
+	statusHandler := metrics.NewStatusHandler(opts.Logger, opts.DefaultMetrics().GetLastScan)
 	app.Get(statusHandler.Path, auth, config.TimeoutMiddleware(), statusHandler.Handle)
 }

@@ -1,17 +1,27 @@
 package config_test
 
 import (
+	"io"
 	"os"
 	"testing"
 	"time"
 
+	"github.com/rs/zerolog"
 	"github.com/spf13/cobra"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
 	"github.com/nicholas-fedor/watchtower/internal/config"
 	"github.com/nicholas-fedor/watchtower/internal/flags"
+	"github.com/nicholas-fedor/watchtower/internal/logging"
 )
+
+// testLogger returns a discarded zerolog logger for tests that do not assert on logs.
+func testLogger() *zerolog.Logger {
+	nop := zerolog.Nop()
+
+	return &nop
+}
 
 // newLoadedCommand registers flags, applies env, parses args, and loads config.
 func newLoadedCommand(t *testing.T, env map[string]string, args ...string) config.Config {
@@ -29,11 +39,12 @@ func newLoadedCommand(t *testing.T, env map[string]string, args ...string) confi
 
 	flagSet := cmd.PersistentFlags()
 	require.NoError(t, flags.ApplyEnvToFlags(flagSet, flags.AllSpecs()))
-	flags.ProcessFlagAliases(flagSet)
 
-	flags.GetSecretsFromFiles(cmd)
+	log := logging.New(io.Discard, logging.InfoLevel)
+	flags.ProcessFlagAliases(log, flagSet)
+	flags.GetSecretsFromFiles(log, cmd)
 
-	cfg, err := config.Load(cmd, nil)
+	cfg, err := config.Load(testLogger(), cmd, nil)
 	require.NoError(t, err)
 
 	return cfg

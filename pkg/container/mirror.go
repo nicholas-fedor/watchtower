@@ -5,8 +5,6 @@ import (
 	"net/url"
 	"strings"
 
-	"github.com/sirupsen/logrus"
-
 	dockerSystem "github.com/moby/moby/api/types/system"
 	dockerClient "github.com/moby/moby/client"
 )
@@ -27,20 +25,21 @@ func (c imageClient) resolveRegistryMirrorConfig(ctx context.Context) *dockerSys
 		dockerClient.InfoOptions{},
 	)
 	if err != nil {
-		logrus.WithError(err).
-			Debug("Failed to get system info for registry mirror resolution")
+		c.logger().Debug().
+			Err(err).
+			Msg("Failed to get system info for registry mirror resolution")
 
 		return nil
 	}
 
 	if info.Info.RegistryConfig == nil {
-		logrus.Debug("No registry mirror configuration in Docker daemon")
+		c.logger().Debug().Msg("No registry mirror configuration in Docker daemon")
 
 		return nil
 	}
 
 	if len(info.Info.RegistryConfig.Mirrors) == 0 {
-		logrus.Debug("No registry mirrors configured in Docker daemon")
+		c.logger().Debug().Msg("No registry mirrors configured in Docker daemon")
 
 		return nil
 	}
@@ -55,9 +54,9 @@ func (c imageClient) resolveRegistryMirrorConfig(ctx context.Context) *dockerSys
 		}
 	}
 
-	logrus.WithFields(logrus.Fields{
-		"global_mirrors": sanitized,
-	}).Debug("Resolved registry mirror configuration from Docker daemon")
+	c.logger().Debug().
+		Strs("global_mirrors", sanitized).
+		Msg("Resolved registry mirror configuration from Docker daemon")
 
 	return &info.Info
 }

@@ -8,13 +8,15 @@ import (
 	"github.com/gofiber/fiber/v3"
 	"github.com/gofiber/fiber/v3/middleware/adaptor"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
-	"github.com/sirupsen/logrus"
+	"github.com/rs/zerolog"
 
 	"github.com/nicholas-fedor/watchtower/internal/metrics"
 )
 
 // Handler serves the /v1/metrics endpoint.
 type Handler struct {
+	log *zerolog.Logger
+
 	Path string
 }
 
@@ -22,10 +24,16 @@ type Handler struct {
 //
 // It initializes the default Watchtower metrics instance (registering gauges
 // and counters with prometheus.DefaultRegisterer).
-func New() *Handler {
+func New(log *zerolog.Logger) *Handler {
+	if log == nil {
+		nop := zerolog.Nop()
+		log = &nop
+	}
+
 	metrics.Default()
 
 	return &Handler{
+		log:  log,
 		Path: "/v1/metrics",
 	}
 }
@@ -46,6 +54,8 @@ func (h *Handler) Handle(c fiber.Ctx) error {
 
 // StatusHandler serves the /v1/status endpoint.
 type StatusHandler struct {
+	log *zerolog.Logger
+
 	Path    string
 	getLast func() *metrics.Metric
 }
@@ -56,8 +66,14 @@ type StatusHandler struct {
 // Parameters:
 //   - getLast: Function that returns the last scan metric, or nil if no scan
 //     has completed.
-func NewStatusHandler(getLast func() *metrics.Metric) *StatusHandler {
+func NewStatusHandler(log *zerolog.Logger, getLast func() *metrics.Metric) *StatusHandler {
+	if log == nil {
+		nop := zerolog.Nop()
+		log = &nop
+	}
+
 	return &StatusHandler{
+		log:     log,
 		Path:    "/v1/status",
 		getLast: getLast,
 	}
@@ -76,11 +92,11 @@ func NewStatusHandler(getLast func() *metrics.Metric) *StatusHandler {
 //	@Security		BearerAuth
 //	@Router			/v1/status [get]
 func (h *StatusHandler) Handle(c fiber.Ctx) error {
-	logrus.WithFields(logrus.Fields{
-		"method": c.Method(),
-		"path":   c.Path(),
-		"notify": "no",
-	}).Debug("Received HTTP API status request")
+	h.log.Debug().
+		Str("method", c.Method()).
+		Str("path", c.Path()).
+		Str("notify", "no").
+		Msg("Received HTTP API status request")
 
 	last := h.getLast()
 	if last == nil {

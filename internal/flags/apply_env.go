@@ -84,7 +84,7 @@ func applyEnvValue(flagSet *pflag.FlagSet, flagSpec spec.FlagSpec, raw string) e
 			return err
 		}
 
-		// flagSet.Set marks Changed; clear it so env bridging stays CLI-neutral.
+		// flagSet.Set marks Changed. Clear it so env bridging stays CLI-neutral.
 		err = flagSet.Set(flagSpec.Name, value)
 		if err != nil {
 			return fmt.Errorf("set %s: %w", flagSpec.Name, err)
@@ -148,12 +148,12 @@ func firstEnv(envKeys []string) (string, bool) {
 // formatEnvForFlag converts a raw env string into a pflag.Set value string.
 //
 // Presence-based bool flags (NO_COLOR) always become true when firstEnv found
-// the key. Other bools parse non-empty values with strconv.ParseBool; empty is
+// the key. Other bools parse non-empty values with strconv.ParseBool. Empty is
 // not passed for those keys.
 func formatEnvForFlag(flagSpec spec.FlagSpec, raw string) (string, error) {
 	switch flagSpec.Kind {
 	case spec.KindBool:
-		// Presence means true for NO_COLOR (empty, "0", "false", "1", …).
+		// Presence means true for NO_COLOR (empty, "0", "false", "1", ...).
 		if hasPresenceEnvKey(flagSpec) {
 			return "true", nil
 		}
@@ -167,7 +167,7 @@ func formatEnvForFlag(flagSpec spec.FlagSpec, raw string) (string, error) {
 	case spec.KindString:
 		return raw, nil
 	case spec.KindInt:
-		// Allow bare integers only; pflag Set accepts decimal strings.
+		// Allow bare integers only. pflag Set accepts decimal strings.
 		trimmed := strings.TrimSpace(raw)
 
 		_, err := strconv.Atoi(trimmed)

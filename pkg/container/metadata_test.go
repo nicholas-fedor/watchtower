@@ -1402,7 +1402,7 @@ func TestGetEffectiveScope_NilContainer(t *testing.T) {
 // Pass a pointer to a string to set the cooldown delay label to that value.
 //
 // Parameters:
-//   - labelValue: Optional label value; nil omits the label entirely.
+//   - labelValue: Optional label value. nil omits the label entirely.
 //
 // Returns:
 //   - *Container: A test container with the specified cooldown label configuration.

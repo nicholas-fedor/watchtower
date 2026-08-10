@@ -12,6 +12,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/rs/zerolog"
 	"github.com/spf13/viper"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
@@ -20,9 +21,14 @@ import (
 	dockerContainer "github.com/moby/moby/api/types/container"
 	dockerImage "github.com/moby/moby/api/types/image"
 
+	"github.com/nicholas-fedor/watchtower/internal/logging"
 	mockAuth "github.com/nicholas-fedor/watchtower/pkg/registry/auth/mocks"
 	mockTypes "github.com/nicholas-fedor/watchtower/pkg/types/mocks"
 )
+
+func testLog() *zerolog.Logger {
+	return logging.NopLogger()
+}
 
 func TestNormalizeDigest(t *testing.T) {
 	tests := []struct {
@@ -64,7 +70,7 @@ func TestNormalizeDigest(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			result := NormalizeDigest(tt.digest)
+			result := NormalizeDigest(testLog(), tt.digest)
 			assert.Equal(t, tt.expected, result, "NormalizeDigest(%q)", tt.digest)
 		})
 	}
@@ -154,7 +160,7 @@ func TestDigestsMatch(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			result := DigestsMatch(tt.localDigests, tt.remoteDigest)
+			result := DigestsMatch(testLog(), tt.localDigests, tt.remoteDigest)
 			assert.Equal(t, tt.expected, result, "DigestsMatch(%v, %q)", tt.localDigests, tt.remoteDigest)
 		})
 	}
@@ -201,7 +207,7 @@ func TestCompareDigestWithRemote(t *testing.T) {
 	host := parts[len(parts)-1]
 	mc.On("ImageName").Return(host + "/myapp:latest")
 
-	match, remoteDigest, err := CompareDigestWithRemote(context.Background(), mc, "", server.URL)
+	match, remoteDigest, err := CompareDigestWithRemote(testLog(), context.Background(), mc, "", server.URL)
 	require.NoError(t, err)
 	assert.False(t, match)
 	assert.Equal(t, "sha256:"+remoteHash, remoteDigest)
@@ -238,9 +244,9 @@ func TestCompareDigestWithRemote_LocalOnly404(t *testing.T) {
 	var headManifestCalls int
 
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		// Auth probe may GET /v2/; only manifest GET would indicate unwanted fallback.
+		// Auth probe may GET /v2/. Only manifest GET would indicate unwanted fallback.
 		if r.Method == http.MethodGet && strings.Contains(r.URL.Path, "/manifests/") {
-			t.Errorf("unexpected GET to %s; local-only 404 must not fall back to GET", r.URL.Path)
+			t.Errorf("unexpected GET to %s. Local-only 404 must not fall back to GET", r.URL.Path)
 			w.WriteHeader(http.StatusNotFound)
 
 			return
@@ -268,8 +274,7 @@ func TestCompareDigestWithRemote_LocalOnly404(t *testing.T) {
 	parts := strings.SplitN(server.URL, "://", 2)
 	host := parts[len(parts)-1]
 
-	match, remoteDigest, err := CompareDigestWithRemote(
-		context.Background(),
+	match, remoteDigest, err := CompareDigestWithRemote(testLog(), context.Background(),
 		mc,
 		"",
 		host,
@@ -404,13 +409,13 @@ func TestLocalOnlyImageCache(t *testing.T) {
 	host := parts[len(parts)-1]
 
 	// First call: probe registry, cache local-only.
-	match, _, err := CompareDigestWithRemote(context.Background(), mc, "", host)
+	match, _, err := CompareDigestWithRemote(testLog(), context.Background(), mc, "", host)
 	require.NoError(t, err)
 	assert.True(t, match)
 	assert.Equal(t, 1, headManifestCalls)
 
 	// Second call: cache hit, no additional HEAD.
-	match, _, err = CompareDigestWithRemote(context.Background(), mc, "", host)
+	match, _, err = CompareDigestWithRemote(testLog(), context.Background(), mc, "", host)
 	require.NoError(t, err)
 	assert.True(t, match)
 	assert.Equal(t, 1, headManifestCalls, "cached local-only image must not re-probe registry")
@@ -559,7 +564,7 @@ func TestCompareDigest(t *testing.T) {
 
 			container.On("ImageName").Return(host + "/myapp:latest").Maybe()
 
-			got, err := CompareDigest(context.Background(), container, "", serverURL)
+			got, err := CompareDigest(testLog(), context.Background(), container, "", serverURL)
 			if tt.wantErr {
 				require.Error(t, err)
 				assert.Equal(t, tt.expected, got)
@@ -703,7 +708,7 @@ func TestFetchDigest(t *testing.T) {
 			host := parts[len(parts)-1]
 			container.On("ImageName").Return(host + "/myapp:latest").Maybe()
 
-			got, err := FetchDigest(context.Background(), container, "", server.URL)
+			got, err := FetchDigest(testLog(), context.Background(), container, "", server.URL)
 			if tt.wantErr {
 				require.Error(t, err)
 				assert.Empty(t, got)
@@ -823,7 +828,7 @@ func TestBuildManifestURL(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			tt.setupViper()
 
-			gotURL, gotHost, _, err := BuildManifestURL(tt.container(t), tt.hostOverride)
+			gotURL, gotHost, _, err := BuildManifestURL(testLog(), tt.container(t), tt.hostOverride)
 			if tt.wantErr {
 				require.Error(t, err)
 
@@ -1003,8 +1008,7 @@ func TestHandleManifestResponse(t *testing.T) {
 				defer resp.Body.Close()
 			}
 
-			gotDigest, gotURL, gotRetry, err := HandleManifestResponse(
-				resp,
+			gotDigest, gotURL, gotRetry, err := HandleManifestResponse(testLog(), resp,
 				tt.method,
 				tt.originalHost,
 				tt.challengeHost,
@@ -1094,7 +1098,7 @@ func TestExtractHeadDigest(t *testing.T) {
 				defer resp.Body.Close()
 			}
 
-			got, err := ExtractHeadDigest(resp)
+			got, err := ExtractHeadDigest(testLog(), resp)
 			if tt.wantErr {
 				require.Error(t, err)
 				assert.Empty(t, got)
@@ -1269,7 +1273,7 @@ func TestExtractGetDigest(t *testing.T) {
 				defer resp.Body.Close()
 			}
 
-			got, err := ExtractGetDigest(resp)
+			got, err := ExtractGetDigest(testLog(), resp)
 			if tt.wantErr {
 				require.Error(t, err)
 				assert.Empty(t, got)
@@ -1450,8 +1454,7 @@ func TestRetryManifestRequest(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			client := tt.setupClient(t)
 
-			got, err := retryManifestRequest(
-				context.Background(),
+			got, err := retryManifestRequest(testLog(), context.Background(),
 				tt.method,
 				tt.updatedURL,
 				tt.token,

@@ -32,11 +32,13 @@ func BenchmarkTimeSorterSort(b *testing.B) {
 		}
 	}
 
+	log := testLog()
+
 	b.ResetTimer()
 
 	for b.Loop() {
 		temp := make([]types.Container, len(containers))
 		copy(temp, containers)
-		ts.Sort(temp, false)
+		ts.Sort(log, temp, false)
 	}
 }

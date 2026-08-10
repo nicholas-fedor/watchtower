@@ -7,7 +7,7 @@ import (
 
 	"github.com/onsi/ginkgo/v2"
 	"github.com/onsi/gomega"
-	"github.com/sirupsen/logrus"
+	"github.com/rs/zerolog"
 
 	mockActions "github.com/nicholas-fedor/watchtower/internal/actions/mocks"
 	"github.com/nicholas-fedor/watchtower/internal/logging"
@@ -19,25 +19,30 @@ func TestStartupLogging(t *testing.T) {
 	ginkgo.RunSpecs(t, "Internal Logging Startup Suite")
 }
 
+// testLogger builds a *zerolog.Logger that writes to buf at the given level.
+func testLogger(buf *bytes.Buffer, level zerolog.Level) *zerolog.Logger {
+	l := zerolog.New(buf).Level(level).With().Timestamp().Logger()
+
+	return &l
+}
+
 var _ = ginkgo.Describe("WriteStartupMessage", func() {
 	var (
 		client mockActions.MockClient
 		buffer *bytes.Buffer
+		log    *zerolog.Logger
 	)
 
 	ginkgo.BeforeEach(func() {
 		client = mockActions.CreateMockClient(&mockActions.TestData{}, false, false)
 		buffer = &bytes.Buffer{}
-		logrus.SetOutput(buffer)
-	})
-
-	ginkgo.AfterEach(func() {
-		logrus.SetOutput(logrus.StandardLogger().Out)
+		log = testLogger(buffer, zerolog.InfoLevel)
 	})
 
 	ginkgo.It("should log startup information with no notifier", func() {
 		logging.WriteStartupMessage(logging.StartupParams{
 			ScheduleInfo: logging.ScheduleInfo{HTTPAPIUpdate: true},
+			Logger:       log,
 			Filtering:    "Watching all containers",
 			Client:       client,
 			Version:      "v1.0.0",
@@ -50,6 +55,7 @@ var _ = ginkgo.Describe("WriteStartupMessage", func() {
 
 	ginkgo.It("should suppress startup messages when flag is set", func() {
 		logging.WriteStartupMessage(logging.StartupParams{
+			Logger:           log,
 			NoStartupMessage: true,
 			Filtering:        "Watching all containers",
 			Client:           client,
@@ -63,6 +69,7 @@ var _ = ginkgo.Describe("WriteStartupMessage", func() {
 		"should suppress startup messages including HTTP API when no-startup-message is set",
 		func() {
 			logging.WriteStartupMessage(logging.StartupParams{
+				Logger:           log,
 				NoStartupMessage: true,
 				ScheduleInfo:     logging.ScheduleInfo{HTTPAPIUpdate: true},
 				Filtering:        "Watching all containers",
@@ -76,6 +83,7 @@ var _ = ginkgo.Describe("WriteStartupMessage", func() {
 
 	ginkgo.It("should log scope information when provided", func() {
 		logging.WriteStartupMessage(logging.StartupParams{
+			Logger:    log,
 			Filtering: "Watching all containers",
 			Scope:     "prod",
 			Client:    client,
@@ -87,12 +95,10 @@ var _ = ginkgo.Describe("WriteStartupMessage", func() {
 	})
 
 	ginkgo.It("should warn about trace logging", func() {
-		originalLevel := logrus.GetLevel()
-
-		logrus.SetLevel(logrus.TraceLevel)
-		defer logrus.SetLevel(originalLevel)
+		traceLog := testLogger(buffer, zerolog.TraceLevel)
 
 		logging.WriteStartupMessage(logging.StartupParams{
+			Logger:    traceLog,
 			Filtering: "Watching all containers",
 			Client:    client,
 			Version:   "v1.0.0",
@@ -101,41 +107,62 @@ var _ = ginkgo.Describe("WriteStartupMessage", func() {
 		output := buffer.String()
 		gomega.Expect(output).To(gomega.ContainSubstring("Trace-level logging enabled"))
 	})
+
+	ginkgo.It("should panic clearly when Logger is nil and not suppressed", func() {
+		gomega.Expect(func() {
+			logging.WriteStartupMessage(logging.StartupParams{
+				Filtering: "Watching all containers",
+				Client:    client,
+				Version:   "v1.0.0",
+			})
+		}).To(gomega.PanicWith(gomega.MatchRegexp("Logger is required")))
+	})
+
+	ginkgo.It("should not panic when Logger is nil but NoStartupMessage is set", func() {
+		gomega.Expect(func() {
+			logging.WriteStartupMessage(logging.StartupParams{
+				NoStartupMessage: true,
+				Filtering:        "Watching all containers",
+				Client:           client,
+				Version:          "v1.0.0",
+			})
+		}).NotTo(gomega.Panic())
+		gomega.Expect(buffer.String()).To(gomega.BeEmpty())
+	})
 })
 
 var _ = ginkgo.Describe("SetupStartupLogger", func() {
-	ginkgo.It("should return a standard logger entry when notifier is nil", func() {
-		// Suppression is handled by WriteStartupMessage's early return; this helper
-		// always builds a StandardLogger entry (not notifications.LocalLog).
-		logger := logging.SetupStartupLogger(nil)
-		gomega.Expect(logger).NotTo(gomega.BeNil())
-		gomega.Expect(logger.Logger).To(gomega.Equal(logrus.StandardLogger()))
+	ginkgo.It("should return the provided logger when notifier is nil", func() {
+		buf := &bytes.Buffer{}
+		log := testLogger(buf, zerolog.InfoLevel)
+
+		// Suppression is handled by WriteStartupMessage's early return. This helper
+		// returns the logger instance passed in (no global logger).
+		got := logging.SetupStartupLogger(log, nil)
+		gomega.Expect(got).To(gomega.Equal(log))
 	})
 })
 
 var _ = ginkgo.Describe("LogNotifierInfo", func() {
-	var buffer *bytes.Buffer
+	var (
+		buffer *bytes.Buffer
+		log    *zerolog.Logger
+	)
 
 	ginkgo.BeforeEach(func() {
 		buffer = &bytes.Buffer{}
-		logrus.SetOutput(buffer)
-	})
-
-	ginkgo.AfterEach(func() {
-		logrus.SetOutput(logrus.StandardLogger().Out)
+		log = testLogger(buffer, zerolog.InfoLevel)
 	})
 
 	ginkgo.It("should log configured notifiers", func() {
-		logger := logrus.NewEntry(logrus.StandardLogger())
-		logging.LogNotifierInfo(logger, []string{"email", "slack"})
+		logging.LogNotifierInfo(log, []string{"email", "slack"})
 
 		output := buffer.String()
 		gomega.Expect(output).To(gomega.ContainSubstring("Using notifications: email, slack"))
 	})
 
 	ginkgo.It("should log when no notifiers are configured", func() {
-		logger := logrus.NewEntry(logrus.StandardLogger())
-		logging.LogNotifierInfo(logger, []string{})
+		logging.LogNotifierInfo(log, []string{})
 
 		output := buffer.String()
 		gomega.Expect(output).To(gomega.ContainSubstring("Using no notifications"))
@@ -143,41 +170,36 @@ var _ = ginkgo.Describe("LogNotifierInfo", func() {
 })
 
 var _ = ginkgo.Describe("LogScheduleInfo", func() {
-	var buffer *bytes.Buffer
+	var (
+		buffer *bytes.Buffer
+		log    *zerolog.Logger
+	)
 
 	ginkgo.BeforeEach(func() {
 		buffer = &bytes.Buffer{}
-		logrus.SetOutput(buffer)
-	})
-
-	ginkgo.AfterEach(func() {
-		logrus.SetOutput(logrus.StandardLogger().Out)
+		log = testLogger(buffer, zerolog.InfoLevel)
 	})
 
 	ginkgo.It("should log scheduled run information", func() {
-		logger := logrus.NewEntry(logrus.StandardLogger())
 		sched := time.Now().Add(time.Hour)
 
-		logging.LogScheduleInfo(logger, logging.ScheduleInfo{Sched: sched})
+		logging.LogScheduleInfo(log, logging.ScheduleInfo{Sched: sched})
 
 		output := buffer.String()
 		gomega.Expect(output).To(gomega.ContainSubstring("Next scheduled run"))
 	})
 
 	ginkgo.It("should log one-time update", func() {
-		logger := logrus.NewEntry(logrus.StandardLogger())
-
-		logging.LogScheduleInfo(logger, logging.ScheduleInfo{RunOnce: true})
+		logging.LogScheduleInfo(log, logging.ScheduleInfo{RunOnce: true})
 
 		output := buffer.String()
 		gomega.Expect(output).To(gomega.ContainSubstring("Running a one time update"))
 	})
 
 	ginkgo.It("should log flag conflict when both run-once and update-on-start are set", func() {
-		logger := logrus.NewEntry(logrus.StandardLogger())
 		updateOnStart := true
 
-		logging.LogScheduleInfo(logger, logging.ScheduleInfo{
+		logging.LogScheduleInfo(log, logging.ScheduleInfo{
 			RunOnce:       true,
 			UpdateOnStart: &updateOnStart,
 		})
@@ -188,19 +210,16 @@ var _ = ginkgo.Describe("LogScheduleInfo", func() {
 	})
 
 	ginkgo.It("should log update on start", func() {
-		logger := logrus.NewEntry(logrus.StandardLogger())
 		updateOnStart := true
 
-		logging.LogScheduleInfo(logger, logging.ScheduleInfo{UpdateOnStart: &updateOnStart})
+		logging.LogScheduleInfo(log, logging.ScheduleInfo{UpdateOnStart: &updateOnStart})
 
 		output := buffer.String()
 		gomega.Expect(output).To(gomega.ContainSubstring("Update on startup enabled"))
 	})
 
 	ginkgo.It("should log HTTP API without periodic polls", func() {
-		logger := logrus.NewEntry(logrus.StandardLogger())
-
-		logging.LogScheduleInfo(logger, logging.ScheduleInfo{HTTPAPIUpdate: true})
+		logging.LogScheduleInfo(log, logging.ScheduleInfo{HTTPAPIUpdate: true})
 
 		output := buffer.String()
 		gomega.Expect(output).
@@ -208,9 +227,7 @@ var _ = ginkgo.Describe("LogScheduleInfo", func() {
 	})
 
 	ginkgo.It("should log HTTP API with periodic polls", func() {
-		logger := logrus.NewEntry(logrus.StandardLogger())
-
-		logging.LogScheduleInfo(logger, logging.ScheduleInfo{
+		logging.LogScheduleInfo(log, logging.ScheduleInfo{
 			HTTPAPIUpdate:        true,
 			HTTPAPIPeriodicPolls: true,
 		})
@@ -221,9 +238,7 @@ var _ = ginkgo.Describe("LogScheduleInfo", func() {
 	})
 
 	ginkgo.It("should log default periodic updates", func() {
-		logger := logrus.NewEntry(logrus.StandardLogger())
-
-		logging.LogScheduleInfo(logger, logging.ScheduleInfo{})
+		logging.LogScheduleInfo(log, logging.ScheduleInfo{})
 
 		output := buffer.String()
 		gomega.Expect(output).

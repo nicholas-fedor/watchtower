@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"io"
 	"net"
 	"net/http"
 	"os"
@@ -16,7 +17,7 @@ import (
 	"time"
 
 	"github.com/gofiber/fiber/v3"
-	"github.com/sirupsen/logrus"
+	"github.com/rs/zerolog"
 	"github.com/spf13/cobra"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
@@ -38,6 +39,13 @@ import (
 	"github.com/nicholas-fedor/watchtower/pkg/types"
 	mockTypes "github.com/nicholas-fedor/watchtower/pkg/types/mocks"
 )
+
+// testLogger returns a discarded zerolog logger for tests that do not assert on logs.
+func testLogger() *zerolog.Logger {
+	nop := zerolog.Nop()
+
+	return &nop
+}
 
 const testFilterDesc = "test filter"
 
@@ -185,7 +193,8 @@ func TestAwaitDockerClient(t *testing.T) {
 		// and completes within a reasonable time
 		start := time.Now()
 
-		awaitDockerClient()
+		log := logging.New(io.Discard, logging.InfoLevel)
+		awaitDockerClient(log)
 
 		elapsed := time.Since(start)
 
@@ -209,7 +218,7 @@ func TestLifecycleFlags(t *testing.T) {
 	err := cmd.ParseFlags([]string{"--lifecycle-uid", "1000", "--lifecycle-gid", "1001"})
 	require.NoError(t, err)
 
-	cfg, err := appconfig.Load(cmd, nil)
+	cfg, err := appconfig.Load(testLogger(), cmd, nil)
 	require.NoError(t, err)
 
 	assert.Equal(t, 1000, cfg.Lifecycle.UID, "lifecycle UID should be set to 1000")
@@ -331,9 +340,6 @@ func TestUpdateLockSerialization(t *testing.T) {
 // TestConcurrentScheduledAndFullAPIUpdate verifies that a full API-triggered update (no image params)
 // returns 429 immediately when a scheduled update is in progress, rather than blocking indefinitely.
 func TestConcurrentScheduledAndFullAPIUpdate(t *testing.T) {
-	originalLevel := logrus.GetLevel()
-	defer logrus.SetLevel(originalLevel)
-
 	updateLock := make(chan bool, 1)
 	updateLock <- true
 
@@ -346,7 +352,7 @@ func TestConcurrentScheduledAndFullAPIUpdate(t *testing.T) {
 		return &metrics.Metric{Scanned: 1, Updated: 1, Failed: 0}
 	}
 
-	handler := update.New(updateFn, updateLock)
+	handler := update.New(testLogger(), updateFn, updateLock)
 
 	go func() {
 		v := <-updateLock
@@ -401,7 +407,7 @@ func TestHandleAsync(t *testing.T) {
 		return &metrics.Metric{Scanned: 1, Updated: 1, Failed: 0}
 	}
 
-	handler := update.New(updateFn, updateLock)
+	handler := update.New(testLogger(), updateFn, updateLock)
 
 	go func() {
 		v := <-updateLock
@@ -479,10 +485,16 @@ func testScheduleDeps(
 	updateOnStart bool,
 ) scheduling.ScheduleDeps {
 	return scheduling.ScheduleDeps{
-		Filter:              filter,
-		FilterDesc:          filterDesc,
-		Lock:                lock,
-		ScheduleSpec:        "",
+		Logger:       testLogger(),
+		Filter:       filter,
+		FilterDesc:   filterDesc,
+		Lock:         lock,
+		ScheduleSpec: "",
+		// Suppress startup messaging in unit tests (Logger still set for safety if re-enabled).
+		Startup: logging.StartupParams{
+			Logger:           logging.New(io.Discard, logging.InfoLevel),
+			NoStartupMessage: true,
+		},
 		WriteStartupMessage: logging.WriteStartupMessage,
 		RunUpdate:           runUpdatesWithNotifications,
 		UpdateOnStart:       updateOnStart,
@@ -861,7 +873,7 @@ func TestWaitForRunningUpdate_NoUpdateRunning(t *testing.T) {
 	ctx := context.Background()
 	start := time.Now()
 
-	scheduling.WaitForRunningUpdate(ctx, lock)
+	scheduling.WaitForRunningUpdate(testLogger(), ctx, lock)
 
 	elapsed := time.Since(start)
 
@@ -880,7 +892,7 @@ func TestWaitForRunningUpdate_UpdateRunning(t *testing.T) {
 		waitCompleted := make(chan bool, 1)
 
 		go func() {
-			scheduling.WaitForRunningUpdate(ctx, lock)
+			scheduling.WaitForRunningUpdate(testLogger(), ctx, lock)
 
 			waitCompleted <- true
 		}()
@@ -938,7 +950,7 @@ func TestListContainersWithoutFilterIntegration(t *testing.T) {
 	mockContainer.EXPECT().ID().Return(expectedID).Once()
 
 	// Execute the function that calls ListContainers with context
-	resultID, err := container.GetContainerIDFromHostname(context.Background(), mockClient)
+	resultID, err := container.GetContainerIDFromHostname(testLogger(), context.Background(), mockClient)
 
 	// Assert results
 	require.NoError(t, err)
@@ -1046,7 +1058,7 @@ func TestValidateRollingRestartDependenciesAcceptsCancelableContext(t *testing.T
 		// Mock expects ListContainers to be called with the cancelable context
 		mockClient.EXPECT().ListContainers(ctx, mock.Anything, mock.Anything).Return([]types.Container{}, nil).Once()
 
-		err := actions.ValidateRollingRestartDependencies(ctx, mockClient, filter, true)
+		err := actions.ValidateRollingRestartDependencies(testLogger(), ctx, mockClient, filter, true)
 
 		require.NoError(t, err)
 		mockClient.AssertExpectations(t)
@@ -1062,7 +1074,7 @@ func TestValidateRollingRestartDependenciesAcceptsCancelableContext(t *testing.T
 		// Mock expects ListContainers to be called with canceled context
 		mockClient.EXPECT().ListContainers(ctx, mock.Anything, mock.Anything).Return(nil, context.Canceled).Once()
 
-		err := actions.ValidateRollingRestartDependencies(ctx, mockClient, filter, true)
+		err := actions.ValidateRollingRestartDependencies(testLogger(), ctx, mockClient, filter, true)
 
 		// The function should return the error from ListContainers
 		require.Error(t, err)
@@ -1071,7 +1083,7 @@ func TestValidateRollingRestartDependenciesAcceptsCancelableContext(t *testing.T
 
 	// Test with timeout context
 	t.Run("timeout context is propagated to client", func(t *testing.T) {
-		// Use a short but non-trivial timeout; Windows timer resolution can
+		// Use a short but non-trivial timeout. Windows timer resolution can
 		// delay sub-15ms deadlines, so wait by polling rather than a fixed sleep.
 		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Millisecond)
 		defer cancel()
@@ -1087,7 +1099,7 @@ func TestValidateRollingRestartDependenciesAcceptsCancelableContext(t *testing.T
 		// Mock expects ListContainers to be called with timed out context
 		mockClient.EXPECT().ListContainers(ctx, mock.Anything, mock.Anything).Return(nil, context.DeadlineExceeded).Once()
 
-		err := actions.ValidateRollingRestartDependencies(ctx, mockClient, filter, true)
+		err := actions.ValidateRollingRestartDependencies(testLogger(), ctx, mockClient, filter, true)
 
 		// The function should return the error from ListContainers
 		require.Error(t, err)
@@ -1392,7 +1404,7 @@ func TestContainerLookupWithTimeoutContext(t *testing.T) {
 
 			// Call GetCurrentContainerID which internally uses the client
 			// The function will eventually call ListContainers with our expired context
-			_, err := container.GetCurrentContainerID(ctx, mockClient)
+			_, err := container.GetCurrentContainerID(testLogger(), ctx, mockClient)
 
 			// Verify error is propagated
 			require.Error(t, err)
@@ -1423,7 +1435,7 @@ func TestContainerLookupWithTimeoutContext(t *testing.T) {
 			mockClient.EXPECT().ListContainers(ctx).Return(nil, context.Canceled).Once()
 
 			// Call GetCurrentContainerID
-			_, err := container.GetCurrentContainerID(ctx, mockClient)
+			_, err := container.GetCurrentContainerID(testLogger(), ctx, mockClient)
 
 			// Verify error is propagated
 			require.Error(t, err)
@@ -1730,7 +1742,7 @@ func TestResolveCurrentWatchtowerContainerForFallback(t *testing.T) {
 		mockCnt.EXPECT().IsWatchtower().Return(false).Once()
 		mockClient.EXPECT().GetCurrentWatchtowerContainer(mock.Anything, types.ContainerID("test-id")).Return(mockCnt, nil).Once()
 
-		result := resolveCurrentWatchtowerContainerForFallback(context.Background(), mockClient)
+		result := resolveCurrentWatchtowerContainerForFallback(testLogger(), context.Background(), mockClient)
 
 		assert.Equal(t, mockCnt, result)
 	})
@@ -1756,7 +1768,7 @@ func TestResolveCurrentWatchtowerContainerForFallback(t *testing.T) {
 
 		mockClient.EXPECT().ListContainers(mock.Anything).Return(nil, errors.New("list failed")).Once()
 
-		result := resolveCurrentWatchtowerContainerForFallback(context.Background(), mockClient)
+		result := resolveCurrentWatchtowerContainerForFallback(testLogger(), context.Background(), mockClient)
 
 		assert.Nil(t, result)
 	})
@@ -1782,7 +1794,7 @@ func TestResolveCurrentWatchtowerContainerForFallback(t *testing.T) {
 
 		mockClient.EXPECT().ListContainers(mock.Anything).Return([]types.Container{}, nil).Once()
 
-		result := resolveCurrentWatchtowerContainerForFallback(context.Background(), mockClient)
+		result := resolveCurrentWatchtowerContainerForFallback(testLogger(), context.Background(), mockClient)
 
 		assert.Nil(t, result)
 	})
@@ -1815,7 +1827,7 @@ func TestResolveCurrentWatchtowerContainerForFallback(t *testing.T) {
 		mockCnt.EXPECT().IsWatchtower().Return(false).Once()
 		mockClient.EXPECT().GetCurrentWatchtowerContainer(mock.Anything, types.ContainerID("test-id")).Return(nil, nil).Once()
 
-		result := resolveCurrentWatchtowerContainerForFallback(context.Background(), mockClient)
+		result := resolveCurrentWatchtowerContainerForFallback(testLogger(), context.Background(), mockClient)
 
 		assert.Nil(t, result)
 	})

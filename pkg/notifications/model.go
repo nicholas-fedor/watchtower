@@ -1,7 +1,9 @@
 package notifications
 
 import (
-	"github.com/sirupsen/logrus"
+	"time"
+
+	"github.com/rs/zerolog"
 
 	"github.com/nicholas-fedor/watchtower/pkg/types"
 )
@@ -12,10 +14,19 @@ type StaticData struct {
 	Host  string
 }
 
+// notificationEntry is a snapshot of a log event for notification templates.
+// Field names match the shape templates expect (Message, Data, Level, Time).
+type notificationEntry struct {
+	Message string
+	Data    map[string]any
+	Time    time.Time
+	Level   zerolog.Level
+}
+
 // Data is the notification template data model.
 type Data struct {
 	StaticData
 
-	Entries []*logrus.Entry
+	Entries []*notificationEntry
 	Report  types.Report
 }

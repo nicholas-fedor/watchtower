@@ -3,7 +3,15 @@ package notifications
 import (
 	"strings"
 	"testing"
+
+	"github.com/rs/zerolog"
 )
+
+var testFuzzLog = func() *zerolog.Logger {
+	l := zerolog.Nop()
+
+	return &l
+}()
 
 // FuzzGetShoutrrrTemplate fuzzes the getShoutrrrTemplate function to ensure robust parsing of template strings.
 func FuzzGetShoutrrrTemplate(f *testing.F) {
@@ -18,8 +26,8 @@ func FuzzGetShoutrrrTemplate(f *testing.F) {
 	f.Fuzz(func(_ *testing.T, tplString string) {
 		//nolint:godox
 		// TODO: Remove legacy mode fuzzing when legacy notification types are removed.
-		_, _ = getShoutrrrTemplate(tplString, true)
-		_, _ = getShoutrrrTemplate(tplString, false)
+		_, _ = getShoutrrrTemplate(testFuzzLog, tplString, true)
+		_, _ = getShoutrrrTemplate(testFuzzLog, tplString, false)
 	})
 }
 

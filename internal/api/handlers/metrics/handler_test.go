@@ -14,14 +14,14 @@ import (
 )
 
 func TestNew(t *testing.T) {
-	h := New()
+	h := New(testLogger())
 	require.NotNil(t, h)
 	assert.Equal(t, "/v1/metrics", h.Path)
 	assert.NotNil(t, h.Handle)
 }
 
 func TestNew_ServesPrometheusMetrics(t *testing.T) {
-	h := New()
+	h := New(testLogger())
 	require.NotNil(t, h)
 
 	app := fiber.New(fiber.Config{})
@@ -48,7 +48,7 @@ func TestNew_ServesPrometheusMetrics(t *testing.T) {
 }
 
 func TestNew_ReturnsTextContentType(t *testing.T) {
-	h := New()
+	h := New(testLogger())
 	require.NotNil(t, h)
 
 	app := fiber.New(fiber.Config{})
@@ -80,7 +80,7 @@ func TestNewStatusHandler(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			h := NewStatusHandler(tt.getLast)
+			h := NewStatusHandler(testLogger(), tt.getLast)
 			require.NotNil(t, h)
 			assert.Equal(t, "/v1/status", h.Path)
 		})
@@ -90,7 +90,7 @@ func TestNewStatusHandler(t *testing.T) {
 func TestStatusHandler_Handle_WithMetric(t *testing.T) {
 	expected := &metrics.Metric{Scanned: 10, Updated: 3, Failed: 1, Restarted: 2, Skipped: 0}
 
-	h := NewStatusHandler(func() *metrics.Metric { return expected })
+	h := NewStatusHandler(testLogger(), func() *metrics.Metric { return expected })
 	app := fiber.New(fiber.Config{})
 	app.Get("/v1/status", h.Handle)
 
@@ -104,7 +104,7 @@ func TestStatusHandler_Handle_WithMetric(t *testing.T) {
 }
 
 func TestStatusHandler_Handle_NilMetric(t *testing.T) {
-	h := NewStatusHandler(func() *metrics.Metric { return nil })
+	h := NewStatusHandler(testLogger(), func() *metrics.Metric { return nil })
 	app := fiber.New(fiber.Config{})
 	app.Get("/v1/status", h.Handle)
 

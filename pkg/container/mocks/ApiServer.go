@@ -1,3 +1,5 @@
+// Package mocks provides hand-written HTTP API fixtures and Mockery-generated
+// doubles for container package tests.
 package mocks
 
 import (
@@ -38,7 +40,7 @@ func getMockJSONFile(relPath string) ([]byte, error) {
 	return buf, nil
 }
 
-// RespondWithJSONFile expects the file to exist at the given relative path; fails the test otherwise.
+// RespondWithJSONFile expects the file to exist at the given relative path. Otherwise it fails the test.
 func RespondWithJSONFile(
 	relPath string,
 	statusCode int,
@@ -64,7 +66,7 @@ func respondWithJSONFile(
 	return ghttp.RespondWith(statusCode, buf, optionalHeader...), nil
 }
 
-// Includes handlers for the given containers, their references, and associated images.
+// GetContainerHandlers includes handlers for the given containers, their references, and associated images.
 func GetContainerHandlers(containerRefs ...*ContainerRef) []http.HandlerFunc {
 	handlers := make([]http.HandlerFunc, 0, len(containerRefs)*handlersPerContainer)
 	for _, containerRef := range containerRefs {
@@ -100,21 +102,21 @@ var defaultImage = imageRef{
 	file: "default",
 }
 
-// Mock container fixture representing a Watchtower instance.
+// Watchtower is a mock container fixture representing a Watchtower instance.
 var Watchtower = ContainerRef{
 	name:  "watchtower",
 	id:    "3d88e0e3543281c747d88b27e246578b65ae8964ba86c7cd7522cf84e0978134",
 	image: &defaultImage,
 }
 
-// Mock container fixture in a stopped state.
+// Stopped is a mock container fixture in a stopped state.
 var Stopped = ContainerRef{
 	name:  "stopped",
 	id:    "ae8964ba86c7cd7522cf84e09781343d88e0e3543281c747d88b27e246578b65",
 	image: &defaultImage,
 }
 
-// Mock container fixture in a running state with a Portainer image.
+// Running is a mock container fixture in a running state with a Portainer image.
 var Running = ContainerRef{
 	name: "running",
 	id:   "b978af0b858aa8855cce46b628817d4ed58e58f2c4f66c9b9c5449134ed4c008",
@@ -126,7 +128,7 @@ var Running = ContainerRef{
 	},
 }
 
-// Mock container fixture in a restarting state.
+// Restarting is a mock container fixture in a restarting state.
 var Restarting = ContainerRef{
 	name:  "restarting",
 	id:    "ae8964ba86c7cd7522cf84e09781343d88e0e3543281c747d88b27e246578b67",
@@ -152,7 +154,7 @@ var netSupplierNotFound = ContainerRef{
 	isMissing: true,
 }
 
-// Mock container fixture consuming an existing network supplier.
+// NetConsumerOK is a mock container fixture consuming an existing network supplier.
 var NetConsumerOK = ContainerRef{
 	id:   "1f6b79d2aff23244382026c76f4995851322bed5f9c50631620162f6f9aafbd6",
 	name: "net_consumer",
@@ -165,7 +167,7 @@ var NetConsumerOK = ContainerRef{
 	references: []*ContainerRef{&netSupplierOK},
 }
 
-// Mock container fixture referencing a non-existent network supplier.
+// NetConsumerInvalidSupplier is a mock container fixture referencing a non-existent network supplier.
 var NetConsumerInvalidSupplier = ContainerRef{
 	id:         NetConsumerOK.id,
 	name:       "net_consumer-missing_supplier",
@@ -174,11 +176,13 @@ var NetConsumerInvalidSupplier = ContainerRef{
 }
 
 const (
-	NetSupplierNotFoundID    = "badc1dbadc1dbadc1dbadc1dbadc1dbadc1dbadc1dbadc1dbadc1dbadc1dbadc"
+	// NetSupplierNotFoundID is the mock ID for a missing network supplier container.
+	NetSupplierNotFoundID = "badc1dbadc1dbadc1dbadc1dbadc1dbadc1dbadc1dbadc1dbadc1dbadc1dbadc"
+	// NetSupplierContainerName is the mock Docker name for the network supplier container.
 	NetSupplierContainerName = "/wt-contnet-producer-1"
 )
 
-// Fails the test if the file can't be retrieved; returns a 404 handler if the container is missing.
+// Fails the test if the file can't be retrieved. Returns a 404 handler if the container is missing.
 func getContainerFileHandler(container *ContainerRef) http.HandlerFunc {
 	if container.isMissing {
 		return containerNotFoundResponse(string(container.id))
@@ -203,7 +207,7 @@ func getContainerHandler(containerID string, responseHandler http.HandlerFunc) h
 	)
 }
 
-// Returns a 404 if containerInfo is nil; otherwise, serves the provided info.
+// GetContainerHandler returns a 404 if containerInfo is nil. Otherwise it serves the provided info.
 func GetContainerHandler(
 	containerID string,
 	containerInfo *dockerContainer.InspectResponse,
@@ -216,7 +220,7 @@ func GetContainerHandler(
 	return getContainerHandler(containerID, responseHandler)
 }
 
-// Serves the provided image info as a JSON response.
+// GetImageHandler serves the provided image info as a JSON response.
 func GetImageHandler(imageInfo *dockerImage.InspectResponse) http.HandlerFunc {
 	return getImageHandler(
 		types.ImageID(imageInfo.ID),
@@ -224,7 +228,7 @@ func GetImageHandler(imageInfo *dockerImage.InspectResponse) http.HandlerFunc {
 	)
 }
 
-// Filters containers by the given statuses and serves the filtered list.
+// ListContainersHandler filters containers by the given statuses and serves the filtered list.
 func ListContainersHandler(statuses ...string) http.HandlerFunc {
 	filterArgs := createFilterArgs(statuses)
 	bytes, err := json.Marshal(filterArgs)
@@ -274,7 +278,7 @@ func getImageHandler(imageID types.ImageID, responseHandler http.HandlerFunc) ht
 	)
 }
 
-// Returns 204 if found, 404 if not.
+// KillContainerHandler returns 204 if found, or 404 if not.
 func KillContainerHandler(containerID string, found FoundStatus) http.HandlerFunc {
 	responseHandler := noContentStatusResponse
 	if !found {
@@ -287,7 +291,7 @@ func KillContainerHandler(containerID string, found FoundStatus) http.HandlerFun
 	)
 }
 
-// Returns 204 if found, 404 if not.
+// RemoveContainerHandler returns 204 if found, or 404 if not.
 func RemoveContainerHandler(containerID string, found FoundStatus) http.HandlerFunc {
 	responseHandler := noContentStatusResponse
 	if !found {
@@ -311,14 +315,17 @@ func containerNotFoundResponse(containerID string) http.HandlerFunc {
 // Mock response fixture for no-content status (204).
 var noContentStatusResponse = ghttp.RespondWith(http.StatusNoContent, nil)
 
+// FoundStatus indicates whether a mock container resource exists for a handler.
 type FoundStatus bool
 
 const (
-	Found   FoundStatus = true
+	// Found means the mock resource exists.
+	Found FoundStatus = true
+	// Missing means the mock resource does not exist.
 	Missing FoundStatus = false
 )
 
-// Simulates image removal with optional parent images; returns 404 if not found.
+// RemoveImageHandler simulates image removal with optional parent images. Returns 404 if not found.
 func RemoveImageHandler(imagesWithParents map[string][]string) http.HandlerFunc {
 	return ghttp.CombineHandlers(
 		ghttp.VerifyRequest("DELETE", gomega.MatchRegexp("/images/.*")),
@@ -326,7 +333,8 @@ func RemoveImageHandler(imagesWithParents map[string][]string) http.HandlerFunc 
 			parts := strings.Split(r.URL.Path, `/`)
 
 			targetImage := parts[len(parts)-1]
-			if parents, found := imagesWithParents[targetImage]; found {
+			parents, found := imagesWithParents[targetImage]
+			if found {
 				items := []dockerImage.DeleteResponse{
 					{Untagged: targetImage},
 					{Deleted: targetImage},

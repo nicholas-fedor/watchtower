@@ -129,6 +129,7 @@ func TestErrSentinelValues(t *testing.T) {
 		{name: "ErrMissingEventsAPIToken", err: ErrMissingEventsAPIToken, msg: "events API token is required"},
 		{name: "ErrMissingEventBroadcaster", err: ErrMissingEventBroadcaster, msg: "EventBroadcaster must be provided"},
 		{name: "ErrMissingTLSConfig", err: ErrMissingTLSConfig, msg: "TLS requires both"},
+		{name: "ErrMissingLogger", err: ErrMissingLogger, msg: "API Logger must be provided"},
 	}
 
 	for _, tt := range tests {

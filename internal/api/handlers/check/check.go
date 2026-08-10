@@ -7,7 +7,7 @@ import (
 	"time"
 
 	"github.com/gofiber/fiber/v3"
-	"github.com/sirupsen/logrus"
+	"github.com/rs/zerolog"
 
 	"github.com/nicholas-fedor/watchtower/pkg/container"
 	"github.com/nicholas-fedor/watchtower/pkg/types"
@@ -68,7 +68,7 @@ func extractFilterParams(c fiber.Ctx, key string) []string {
 // Returns:
 //   - []ContainerCheck: Update availability for each matching container.
 //   - error: Non-nil if listing containers fails.
-func CheckForUpdates(
+func CheckForUpdates(log *zerolog.Logger,
 	ctx context.Context,
 	client container.Client,
 	filter types.Filter,
@@ -110,11 +110,12 @@ func CheckForUpdates(
 		if err != nil {
 			result.Error = err.Error()
 
-			logrus.WithError(err).WithFields(logrus.Fields{
-				"container": c.Name(),
-				"image":     c.ImageName(),
-				"notify":    "no",
-			}).Debug("Failed to check container for updates")
+			log.Debug().
+				Err(err).
+				Str("container", c.Name()).
+				Str("image", c.ImageName()).
+				Str("notify", "no").
+				Msg("Failed to check container for updates")
 		} else {
 			result.UpdateAvailable = available
 

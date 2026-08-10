@@ -181,7 +181,7 @@ func TestCheckForUpdates(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			client := tt.client(t)
-			results, err := CheckForUpdates(t.Context(), client, tt.filter, types.UpdateParams{})
+			results, err := CheckForUpdates(testLogger(), t.Context(), client, tt.filter, types.UpdateParams{})
 
 			if tt.wantErr {
 				require.Error(t, err)
@@ -226,7 +226,7 @@ func TestCheckForUpdates_DigestExtraction(t *testing.T) {
 	client.EXPECT().CheckContainerUpdate(mock.Anything, mock.Anything, mock.Anything).
 		Return(false, types.ImageID("sha256:abc"), "", nil)
 
-	results, err := CheckForUpdates(t.Context(), client, nil, types.UpdateParams{})
+	results, err := CheckForUpdates(testLogger(), t.Context(), client, nil, types.UpdateParams{})
 	require.NoError(t, err)
 	require.Len(t, results, 1)
 	assert.Equal(t, "sha256:digest123", results[0].Digest)
@@ -243,7 +243,7 @@ func TestCheckForUpdates_CheckContainerUpdateError(t *testing.T) {
 	client.EXPECT().CheckContainerUpdate(mock.Anything, mock.Anything, mock.Anything).
 		Return(false, types.ImageID(""), "", errors.New("registry unavailable"))
 
-	results, err := CheckForUpdates(t.Context(), client, nil, types.UpdateParams{})
+	results, err := CheckForUpdates(testLogger(), t.Context(), client, nil, types.UpdateParams{})
 	require.NoError(t, err)
 	require.Len(t, results, 1)
 	assert.Equal(t, "registry unavailable", results[0].Error)
@@ -268,7 +268,7 @@ func TestCheckForUpdates_ParamsPropagation(t *testing.T) {
 		LabelPrecedence: true,
 		CooldownDelay:   5 * time.Minute,
 	}
-	results, err := CheckForUpdates(t.Context(), client, nil, params)
+	results, err := CheckForUpdates(testLogger(), t.Context(), client, nil, params)
 	require.NoError(t, err)
 	require.Len(t, results, 1)
 	assert.True(t, results[0].UpdateAvailable)
@@ -296,7 +296,7 @@ func TestCheckForUpdates_MixedStaleResults(t *testing.T) {
 	client.EXPECT().CheckContainerUpdate(mock.Anything, container2, mock.Anything).
 		Return(false, types.ImageID("sha256:def"), "", nil)
 
-	results, err := CheckForUpdates(t.Context(), client, nil, types.UpdateParams{})
+	results, err := CheckForUpdates(testLogger(), t.Context(), client, nil, types.UpdateParams{})
 	require.NoError(t, err)
 	require.Len(t, results, 2)
 	assert.True(t, results[0].UpdateAvailable)

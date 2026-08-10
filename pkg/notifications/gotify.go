@@ -6,7 +6,7 @@ import (
 	"strings"
 
 	"github.com/nicholas-fedor/shoutrrr/pkg/services/push/gotify"
-	"github.com/sirupsen/logrus"
+	"github.com/rs/zerolog"
 	"github.com/spf13/cobra"
 
 	notifyConfig "github.com/nicholas-fedor/watchtower/internal/config/notify"
@@ -37,11 +37,13 @@ type gotifyTypeNotifier struct {
 	gotifyURL                string // Gotify server URL.
 	gotifyAppToken           string // Gotify application token.
 	gotifyInsecureSkipVerify bool   // Skip TLS verification if true.
+	log                      *zerolog.Logger
 }
 
 // newGotifyNotifier creates a Gotify notifier from resolved legacy settings.
 //
 // Parameters:
+//   - log: Logger for configuration diagnostics and fatal validation errors.
 //   - legacy: Deprecated Gotify server settings (from process config or flags).
 //
 // Returns:
@@ -53,32 +55,35 @@ type gotifyTypeNotifier struct {
 // TODO: Remove newGotifyNotifier for the v2 release.
 //
 //nolint:godox
-func newGotifyNotifier(legacy notifyConfig.Legacy) types.ConvertibleNotifier {
-	apiURL := requireGotifyURL(legacy.GotifyURL)
-	token := requireGotifyToken(legacy.GotifyToken)
+func newGotifyNotifier(log *zerolog.Logger, legacy notifyConfig.Legacy) types.ConvertibleNotifier {
+	apiURL := requireGotifyURL(log, legacy.GotifyURL)
+	token := requireGotifyToken(log, legacy.GotifyToken)
 	skipVerify := legacy.GotifyTLSSkipVerify
 
-	clog := logrus.WithFields(logrus.Fields{
-		"url":         redactServiceURL(apiURL),
-		"skip_verify": skipVerify,
-	})
-	clog.Debug("Initializing Gotify notifier")
+	clog := log.With().
+		Str("url", redactServiceURL(apiURL)).
+		Bool("skip_verify", skipVerify).
+		Logger()
+	clog.Debug().Msg("Initializing Gotify notifier")
 
-	if logrus.IsLevelEnabled(logrus.TraceLevel) {
-		clog.WithField("token_length", len(token)).
-			Trace("Gotify notifier token loaded")
+	if clog.GetLevel() <= zerolog.TraceLevel {
+		clog.Trace().
+			Int("token_length", len(token)).
+			Msg("Gotify notifier token loaded")
 	}
 
 	return &gotifyTypeNotifier{
 		gotifyURL:                apiURL,
 		gotifyAppToken:           token,
 		gotifyInsecureSkipVerify: skipVerify,
+		log:                      log,
 	}
 }
 
 // requireGotifyToken validates a Gotify token.
 //
 // Parameters:
+//   - log: Logger for fatal validation errors.
 //   - gotifyToken: Token value from resolved configuration or flags.
 //
 // Returns:
@@ -86,17 +91,15 @@ func newGotifyNotifier(legacy notifyConfig.Legacy) types.ConvertibleNotifier {
 //
 // Deprecated: This function is part of the legacy gotify notifier and will be removed
 // for the v2 release. Use --notification-url with a gotify:// URL instead.
-func requireGotifyToken(gotifyToken string) string {
-	clog := logrus.WithField("flag", "notification-gotify-token")
+func requireGotifyToken(log *zerolog.Logger, gotifyToken string) string {
+	clog := log.With().Str("flag", "notification-gotify-token").Logger()
 
 	// Fatal error if token is missing.
 	if len(gotifyToken) < 1 {
-		clog.Fatal(
-			"Gotify token is empty.",
-		)
+		clog.Fatal().Msg("Gotify token is empty.")
 	}
 
-	clog.WithField("token_length", len(gotifyToken)).Debug("Retrieved Gotify token")
+	clog.Debug().Int("token_length", len(gotifyToken)).Msg("Retrieved Gotify token")
 
 	return gotifyToken
 }
@@ -104,6 +107,7 @@ func requireGotifyToken(gotifyToken string) string {
 // requireGotifyURL validates a Gotify URL.
 //
 // Parameters:
+//   - log: Logger for fatal validation errors.
 //   - gotifyURL: URL value from resolved configuration or flags.
 //
 // Returns:
@@ -111,30 +115,30 @@ func requireGotifyToken(gotifyToken string) string {
 //
 // Deprecated: This function is part of the legacy gotify notifier and will be removed
 // for the v2 release. Use --notification-url with a gotify:// URL instead.
-func requireGotifyURL(gotifyURL string) string {
-	clog := logrus.WithFields(logrus.Fields{
-		"flag": "notification-gotify-url",
-		"url":  gotifyURL,
-	})
+func requireGotifyURL(log *zerolog.Logger, gotifyURL string) string {
+	clog := log.With().
+		Str("flag", "notification-gotify-url").
+		Str("url", redactServiceURL(gotifyURL)).
+		Logger()
 
 	// Fatal error if URL is missing.
 	if len(gotifyURL) < 1 {
-		clog.Fatal(
-			"Gotify URL is empty",
-		)
+		clog.Fatal().Msg("Gotify URL is empty")
 	}
 
 	// Validate URL scheme.
 	if !strings.HasPrefix(gotifyURL, "http://") && !strings.HasPrefix(gotifyURL, "https://") {
-		clog.Fatal("Gotify URL must start with \"http://\" or \"https://\"")
+		clog.Fatal().Msg("Gotify URL must start with \"http://\" or \"https://\"")
 	}
 
 	// Warn if using insecure HTTP.
 	if strings.HasPrefix(gotifyURL, "http://") {
-		clog.Warn("Using an HTTP URL for Gotify is insecure")
+		clog.Warn().Msg("Using an HTTP URL for Gotify is insecure")
 	}
 
-	clog.WithField("scheme", strings.Split(gotifyURL, ":")[0]).Debug("Validated Gotify URL")
+	clog.Debug().
+		Str("scheme", strings.Split(gotifyURL, ":")[0]).
+		Msg("Validated Gotify URL")
 
 	return gotifyURL
 }
@@ -151,18 +155,19 @@ func requireGotifyURL(gotifyURL string) string {
 // Deprecated: This method is part of the legacy gotify notifier and will be removed
 // for the v2 release. Use --notification-url with a gotify:// URL instead.
 func (n *gotifyTypeNotifier) GetURL(_ *cobra.Command) (string, error) {
-	clog := logrus.NewEntry(logrus.StandardLogger())
-	clog.Debug("Generating Gotify service URL")
+	clog := n.log
+	clog.Debug().Msg("Generating Gotify service URL")
 
-	if logrus.IsLevelEnabled(logrus.TraceLevel) {
-		clog.WithField("url", redactServiceURL(n.gotifyURL)).
-			Trace("Gotify API URL loaded")
+	if clog.GetLevel() <= zerolog.TraceLevel {
+		clog.Trace().
+			Str("url", redactServiceURL(n.gotifyURL)).
+			Msg("Gotify API URL loaded")
 	}
 
 	// Parse the API URL.
 	apiURL, err := url.Parse(n.gotifyURL)
 	if err != nil {
-		clog.WithError(err).Debug("Failed to parse Gotify URL")
+		clog.Debug().Err(err).Msg("Failed to parse Gotify URL")
 
 		return "", fmt.Errorf("failed to generate Gotify URL: %w", err)
 	}
@@ -177,36 +182,15 @@ func (n *gotifyTypeNotifier) GetURL(_ *cobra.Command) (string, error) {
 
 	urlStr := config.GetURL().String()
 
-	clog.WithField("disable_tls", apiURL.Scheme == "http").
-		Debug("Generated Gotify service URL")
+	clog.Debug().
+		Bool("disable_tls", apiURL.Scheme == "http").
+		Msg("Generated Gotify service URL")
 
-	if logrus.IsLevelEnabled(logrus.TraceLevel) {
-		clog.WithField("service_url", redactServiceURL(urlStr)).
-			Trace("Generated Gotify service URL")
+	if clog.GetLevel() <= zerolog.TraceLevel {
+		clog.Trace().
+			Str("service_url", redactServiceURL(urlStr)).
+			Msg("Generated Gotify service URL")
 	}
 
 	return urlStr, nil
-}
-
-// GetEntries returns nil for legacy notifiers.
-//
-// Returns:
-//   - []*logrus.Entry: Always nil.
-//
-// Deprecated: This method is part of the legacy gotify notifier and will be removed
-// for the v2 release.
-func (n *gotifyTypeNotifier) GetEntries() []*logrus.Entry {
-	return nil
-}
-
-// SendFilteredEntries does nothing for legacy notifiers.
-//
-// Parameters:
-//   - entries: Ignored.
-//   - report: Ignored.
-//
-// Deprecated: This method is part of the legacy gotify notifier and will be removed
-// for the v2 release.
-func (n *gotifyTypeNotifier) SendFilteredEntries(_ []*logrus.Entry, _ types.Report) {
-	// Legacy notifiers do not support filtered entries.
 }

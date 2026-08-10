@@ -7,7 +7,7 @@ import (
 	"time"
 
 	"github.com/gofiber/fiber/v3"
-	"github.com/sirupsen/logrus"
+	"github.com/rs/zerolog"
 
 	"github.com/nicholas-fedor/watchtower/pkg/container"
 	"github.com/nicholas-fedor/watchtower/pkg/types"
@@ -44,6 +44,8 @@ type GetFunc func(ctx context.Context, name, image string) ([]ContainerDetails, 
 
 // Handler serves the /v1/containers/details endpoint.
 type Handler struct {
+	log *zerolog.Logger
+
 	getDetails GetFunc
 	Path       string
 }
@@ -52,8 +54,14 @@ type Handler struct {
 //
 // Parameters:
 //   - getDetails: Function that returns detailed container information.
-func New(getDetails GetFunc) *Handler {
+func New(log *zerolog.Logger, getDetails GetFunc) *Handler {
+	if log == nil {
+		nop := zerolog.Nop()
+		log = &nop
+	}
+
 	return &Handler{
+		log:        log,
 		getDetails: getDetails,
 		Path:       "/v1/containers/details",
 	}
@@ -74,19 +82,21 @@ func New(getDetails GetFunc) *Handler {
 //	@Security		BearerAuth
 //	@Router			/v1/containers/details [get]
 func (h *Handler) Handle(c fiber.Ctx) error {
-	logrus.WithFields(logrus.Fields{
-		"method": c.Method(),
-		"path":   c.Path(),
-		"notify": "no",
-	}).Debug("Received HTTP API container details request")
+	h.log.Debug().
+		Str("method", c.Method()).
+		Str("path", c.Path()).
+		Str("notify", "no").
+		Msg("Received HTTP API container details request")
 
 	nameFilter := c.Query("name")
 	imageFilter := c.Query("image")
 
 	details, err := h.getDetails(c.Context(), nameFilter, imageFilter)
 	if err != nil {
-		logrus.WithError(err).WithField("notify", "no").
-			Error("Failed to get container details for API")
+		h.log.Error().
+			Err(err).
+			Str("notify", "no").
+			Msg("Failed to get container details for API")
 
 		sendErr := c.Status(fiber.StatusInternalServerError).
 			SendString("failed to get container details")

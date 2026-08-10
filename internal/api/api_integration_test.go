@@ -4,7 +4,6 @@ import (
 	"context"
 	"crypto/sha256"
 	"errors"
-	"io"
 	"net/http"
 	"net/http/httptest"
 	"sync"
@@ -12,7 +11,7 @@ import (
 	"time"
 
 	"github.com/gofiber/fiber/v3"
-	"github.com/sirupsen/logrus"
+	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
@@ -31,11 +30,18 @@ import (
 
 var helperMetrics = metrics.Default()
 
-func testLogger() *logrus.Logger {
-	l := logrus.New()
-	l.SetOutput(io.Discard)
+func testLogger() *zerolog.Logger {
+	l := zerolog.Nop()
 
-	return l
+	return &l
+}
+
+func withTestLogger(opts config.Options) config.Options {
+	if opts.Logger == nil {
+		opts.Logger = testLogger()
+	}
+
+	return opts
 }
 
 func makeListContainersMock(t *testing.T) *mockContainer.MockClient {
@@ -55,6 +61,8 @@ func makeFilter(_ *testing.T) types.Filter {
 func NewEventsBroadcasterHelper() *events.Broadcaster { return events.NewBroadcaster() }
 
 func withTestListenAddr(opts config.Options) config.Options {
+	opts = withTestLogger(opts)
+
 	if opts.Host == "" {
 		opts.Host = "127.0.0.1"
 	}
@@ -147,7 +155,7 @@ func TestIntegration_SetupAndStartAPI_NoAPIs(t *testing.T) {
 	ctx, cancel := context.WithCancel(t.Context())
 	defer cancel()
 
-	err := api.SetupAndStartAPI(ctx, config.Options{Token: "test"})
+	err := api.SetupAndStartAPI(ctx, withTestLogger(config.Options{Token: "test"}))
 	assert.NoError(t, err)
 }
 
@@ -238,7 +246,7 @@ func TestIntegration_SetupAndStartAPI_MissingUpdateDependencies(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			err := api.SetupAndStartAPI(ctx, tt.opts)
+			err := api.SetupAndStartAPI(ctx, withTestLogger(tt.opts))
 			require.Error(t, err)
 			assert.Contains(t, err.Error(), tt.errMsg)
 		})
@@ -254,12 +262,12 @@ func TestIntegration_GracefulShutdown_MetricsAPI(t *testing.T) {
 	errCh := make(chan error, 1)
 
 	go func() {
-		errCh <- api.SetupAndStartAPI(ctx, config.Options{
+		errCh <- api.SetupAndStartAPI(ctx, withTestLogger(config.Options{
 			Token:            "test-token",
 			EnableMetricsAPI: true,
 			RateLimit:        60,
 			DefaultMetrics:   func() *metrics.Metrics { return helperMetrics },
-		})
+		}))
 	}()
 
 	time.Sleep(50 * time.Millisecond)
@@ -278,7 +286,7 @@ func TestIntegration_GracefulShutdown_AllAPIs(t *testing.T) {
 	errCh := make(chan error, 1)
 
 	go func() {
-		errCh <- api.SetupAndStartAPI(ctx, config.Options{
+		errCh <- api.SetupAndStartAPI(ctx, withTestLogger(config.Options{
 			Token:               "test-token",
 			EnableUpdateAPI:     true,
 			EnableMetricsAPI:    true,
@@ -292,7 +300,7 @@ func TestIntegration_GracefulShutdown_AllAPIs(t *testing.T) {
 			FilterByImage:  func(_ []string, f types.Filter) types.Filter { return f },
 			DefaultMetrics: func() *metrics.Metrics { return helperMetrics },
 			UnblockHTTPAPI: true,
-		})
+		}))
 	}()
 
 	time.Sleep(50 * time.Millisecond)
@@ -312,7 +320,7 @@ func TestIntegration_GracefulShutdownTiming(t *testing.T) {
 
 	errCh := make(chan error, 1)
 	go func() {
-		errCh <- api.SetupAndStartAPI(ctx, config.Options{
+		errCh <- api.SetupAndStartAPI(ctx, withTestLogger(config.Options{
 			Token:               "test-token",
 			EnableUpdateAPI:     true,
 			EnableMetricsAPI:    true,
@@ -326,7 +334,7 @@ func TestIntegration_GracefulShutdownTiming(t *testing.T) {
 			FilterByImage:  func(_ []string, f types.Filter) types.Filter { return f },
 			DefaultMetrics: func() *metrics.Metrics { return helperMetrics },
 			UnblockHTTPAPI: true,
-		})
+		}))
 	}()
 
 	time.Sleep(50 * time.Millisecond)
@@ -562,7 +570,9 @@ func TestIntegration_CheckDuringUpdate(t *testing.T) {
 		DefaultMetrics: func() *metrics.Metrics { return testMetrics },
 	}
 
-	authMiddleware := api.NewAPIAuthMiddleware(opts.Token)
+	opts = withTestLogger(opts)
+
+	authMiddleware := api.NewAPIAuthMiddleware(testLogger(), opts.Token)
 
 	err := routes.ValidateAndRegister(t.Context(), app, authMiddleware, opts)
 	require.NoError(t, err)
@@ -650,10 +660,16 @@ func TestIntegration_APIAndScheduling_ConcurrentWithUnblockHTTPAPI(t *testing.T)
 	schedCtx, schedCancel := context.WithTimeout(context.Background(), 500*time.Millisecond)
 	defer schedCancel()
 
+	// Seed the lock token the same way production does when creating a new lock.
+	// An empty channel is treated as "update in progress" by WaitForRunningUpdate.
+	lock := make(chan bool, 1)
+	lock <- true
+
 	err := scheduling.RunUpgradesOnSchedule(schedCtx, scheduling.ScheduleDeps{
+		Logger:              testLogger(),
 		Filter:              func(_ types.FilterableContainer) bool { return true },
 		FilterDesc:          "test filter",
-		Lock:                make(chan bool, 1),
+		Lock:                lock,
 		ScheduleSpec:        "@every 1h",
 		WriteStartupMessage: logging.WriteStartupMessage,
 		RunUpdate: func(_ context.Context, _ types.Filter, _ types.UpdateParams) *metrics.Metric {
@@ -706,7 +722,7 @@ func TestIntegration_UpdateHonorsReviveStoppedAndComposeDependsOn(t *testing.T) 
 		DefaultMetrics: func() *metrics.Metrics { return helperMetrics },
 	}
 
-	authMiddleware := api.NewAPIAuthMiddleware(opts.Token)
+	authMiddleware := api.NewAPIAuthMiddleware(testLogger(), opts.Token)
 
 	err := routes.ValidateAndRegister(t.Context(), app, authMiddleware, opts)
 	require.NoError(t, err)

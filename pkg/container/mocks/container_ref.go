@@ -29,7 +29,8 @@ type ContainerRef struct {
 	isMissing  bool
 }
 
-// Uses the explicit file if set, otherwise falls back to the container name; returns an error if the file doesn't exist.
+// Uses the explicit file if set, otherwise falls back to the container name and
+// returns an error if the file doesn't exist.
 func (cr *ContainerRef) getContainerFile() (string, error) {
 	file := cr.file
 	if file == "" {

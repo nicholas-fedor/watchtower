@@ -11,7 +11,7 @@ import (
 
 	"github.com/gofiber/fiber/v3"
 	"github.com/gofiber/fiber/v3/middleware/timeout"
-	"github.com/sirupsen/logrus"
+	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
@@ -20,7 +20,7 @@ import (
 
 func TestNew_ProxyConfig(t *testing.T) {
 	app := New(
-		logrus.New(),
+		testLogger(),
 		60,
 		ProxyConfig{
 			TrustedProxies: []string{"127.0.0.1"},
@@ -32,7 +32,7 @@ func TestNew_ProxyConfig(t *testing.T) {
 	assert.NotNil(t, app)
 
 	app2 := New(
-		logrus.New(),
+		testLogger(),
 		60,
 		ProxyConfig{
 			TrustedProxies: []string{"10.0.0.0/8"},
@@ -45,7 +45,7 @@ func TestNew_ProxyConfig(t *testing.T) {
 
 func TestNew_CORSConfig(t *testing.T) {
 	app := New(
-		logrus.New(),
+		testLogger(),
 		60,
 		ProxyConfig{},
 		CORSConfig{
@@ -75,7 +75,7 @@ func TestNew_CORSConfig(t *testing.T) {
 
 func TestNew_CORSWildcard(t *testing.T) {
 	app := New(
-		logrus.New(),
+		testLogger(),
 		60,
 		ProxyConfig{},
 		CORSConfig{
@@ -109,7 +109,7 @@ func TestNew_CORSWildcard(t *testing.T) {
 
 func TestNew_CORSCustomMethodsHeaders(t *testing.T) {
 	app := New(
-		logrus.New(),
+		testLogger(),
 		60,
 		ProxyConfig{},
 		CORSConfig{
@@ -146,7 +146,7 @@ func TestNew_CORSCustomMethodsHeaders(t *testing.T) {
 
 func TestNew_NoCORSWhenNoOrigins(t *testing.T) {
 	app := New(
-		logrus.New(),
+		testLogger(),
 		60,
 		ProxyConfig{},
 		CORSConfig{},
@@ -174,31 +174,31 @@ func TestNew_NoCORSWhenNoOrigins(t *testing.T) {
 func TestNew(t *testing.T) {
 	tests := []struct {
 		name               string
-		logrusLogger       *logrus.Logger
+		log                *zerolog.Logger
 		rateLimitPerMinute int
 		wantNil            bool
 	}{
 		{
 			name:               "default rate limit",
-			logrusLogger:       logrus.New(),
+			log:                testLogger(),
 			rateLimitPerMinute: 60,
 			wantNil:            false,
 		},
 		{
 			name:               "zero rate limit falls back to default",
-			logrusLogger:       logrus.New(),
+			log:                testLogger(),
 			rateLimitPerMinute: 0,
 			wantNil:            false,
 		},
 		{
 			name:               "negative rate limit falls back to default",
-			logrusLogger:       logrus.New(),
+			log:                testLogger(),
 			rateLimitPerMinute: -1,
 			wantNil:            false,
 		},
 		{
 			name:               "custom rate limit",
-			logrusLogger:       logrus.New(),
+			log:                testLogger(),
 			rateLimitPerMinute: 120,
 			wantNil:            false,
 		},
@@ -207,7 +207,7 @@ func TestNew(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			got := New(
-				tt.logrusLogger,
+				tt.log,
 				tt.rateLimitPerMinute,
 				ProxyConfig{},
 				CORSConfig{},
@@ -283,12 +283,9 @@ func TestTimeoutMiddleware_Timeout(t *testing.T) {
 func TestNew_OnListenHook(t *testing.T) {
 	var buf bytes.Buffer
 
-	logger := logrus.New()
-	logger.SetOutput(&buf)
-	logger.SetFormatter(&logrus.TextFormatter{DisableTimestamp: true})
-	logger.SetLevel(logrus.DebugLevel)
+	logger := zerolog.New(&buf).Level(zerolog.DebugLevel)
 
-	app := New(logger, 60, ProxyConfig{}, CORSConfig{}, false)
+	app := New(&logger, 60, ProxyConfig{}, CORSConfig{}, false)
 
 	app.Get("/test", func(c fiber.Ctx) error {
 		return c.SendString("ok")
@@ -307,9 +304,9 @@ func TestNew_OnListenHook(t *testing.T) {
 	output := buf.String()
 	assert.Contains(t, output, "Starting HTTP API server")
 	assert.Contains(t, output, "HTTP API server is enabled")
-	assert.Contains(t, output, "host=")
-	assert.Contains(t, output, "port=")
-	assert.Contains(t, output, "tls=")
+	assert.Contains(t, output, `"host"`)
+	assert.Contains(t, output, `"port"`)
+	assert.Contains(t, output, `"tls"`)
 
 	_ = app.Shutdown()
 }

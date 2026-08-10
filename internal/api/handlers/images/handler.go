@@ -5,11 +5,13 @@ import (
 	"time"
 
 	"github.com/gofiber/fiber/v3"
-	"github.com/sirupsen/logrus"
+	"github.com/rs/zerolog"
 )
 
 // Handler serves the /v1/images endpoint.
 type Handler struct {
+	log *zerolog.Logger
+
 	list ListFunc
 	Path string
 }
@@ -18,8 +20,14 @@ type Handler struct {
 //
 // Parameters:
 //   - list: Function that returns the current status of all tracked images.
-func New(list ListFunc) *Handler {
+func New(log *zerolog.Logger, list ListFunc) *Handler {
+	if log == nil {
+		nop := zerolog.Nop()
+		log = &nop
+	}
+
 	return &Handler{
+		log:  log,
 		list: list,
 		Path: "/v1/images",
 	}
@@ -40,16 +48,18 @@ func New(list ListFunc) *Handler {
 //	@Security		BearerAuth
 //	@Router			/v1/images [get]
 func (h *Handler) Handle(c fiber.Ctx) error {
-	logrus.WithFields(logrus.Fields{
-		"method": c.Method(),
-		"path":   c.Path(),
-		"notify": "no",
-	}).Debug("Received HTTP API images request")
+	h.log.Debug().
+		Str("method", c.Method()).
+		Str("path", c.Path()).
+		Str("notify", "no").
+		Msg("Received HTTP API images request")
 
 	statuses, err := h.list(c.Context())
 	if err != nil {
-		logrus.WithError(err).WithField("notify", "no").
-			Error("Failed to list images for API")
+		h.log.Error().
+			Err(err).
+			Str("notify", "no").
+			Msg("Failed to list images for API")
 
 		sendErr := c.Status(fiber.StatusInternalServerError).
 			SendString("failed to list images")

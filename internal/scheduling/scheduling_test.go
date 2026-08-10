@@ -8,6 +8,7 @@ import (
 	"testing/synctest"
 	"time"
 
+	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
@@ -22,6 +23,13 @@ import (
 	"github.com/nicholas-fedor/watchtower/pkg/filters"
 	"github.com/nicholas-fedor/watchtower/pkg/types"
 )
+
+// testLogger returns a discarded zerolog logger for tests that do not assert on logs.
+func testLogger() *zerolog.Logger {
+	nop := zerolog.Nop()
+
+	return &nop
+}
 
 // testContainerOption configures optional fields on the InspectResponse for testing.
 type testContainerOption func(*dockerContainer.InspectResponse)
@@ -70,7 +78,7 @@ func createTestContainer(chain string, opts ...testContainerOption) *container.C
 		opt(inspectResponse)
 	}
 
-	return container.NewContainer(inspectResponse, nil)
+	return container.NewContainer(nil, inspectResponse, nil)
 }
 
 // testDeps returns ScheduleDeps with common test defaults.
@@ -81,6 +89,7 @@ func testDeps(
 	writeStartup func(logging.StartupParams),
 ) scheduling.ScheduleDeps {
 	return scheduling.ScheduleDeps{
+		Logger:              testLogger(),
 		Filter:              filters.NoFilter,
 		FilterDesc:          "test filter",
 		WriteStartupMessage: writeStartup,
@@ -102,7 +111,7 @@ func TestWaitForRunningUpdate(t *testing.T) {
 		done := make(chan struct{})
 
 		go func() {
-			scheduling.WaitForRunningUpdate(ctx, lock)
+			scheduling.WaitForRunningUpdate(testLogger(), ctx, lock)
 
 			elapsed := time.Since(start)
 			// Should have waited for the timeout
@@ -218,7 +227,7 @@ func TestWaitForRunningUpdate_NoUpdateRunning(t *testing.T) {
 
 	start := time.Now()
 
-	scheduling.WaitForRunningUpdate(ctx, lock)
+	scheduling.WaitForRunningUpdate(testLogger(), ctx, lock)
 
 	elapsed := time.Since(start)
 

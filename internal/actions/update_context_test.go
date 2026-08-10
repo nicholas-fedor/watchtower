@@ -25,7 +25,7 @@ var _ = ginkgo.Describe("the update action", func() {
 			canceledCtx, cancel := context.WithCancel(context.Background())
 			cancel() // Cancel the context immediately
 
-			report, cleanupImageInfos, err := actions.Update(
+			report, cleanupImageInfos, err := actions.Update(testLogger(),
 				canceledCtx,
 				client,
 				types.UpdateParams{Cleanup: true, CPUCopyMode: "auto"},
@@ -42,7 +42,7 @@ var _ = ginkgo.Describe("the update action", func() {
 			// Simulate IsContainerStale error
 			client.TestData.IsContainerStaleError = context.Canceled
 
-			report, cleanupImageInfos, err := actions.Update(
+			report, cleanupImageInfos, err := actions.Update(testLogger(),
 				context.Background(),
 				client,
 				types.UpdateParams{Cleanup: true, CPUCopyMode: "auto"},
@@ -73,7 +73,7 @@ var _ = ginkgo.Describe("the update action", func() {
 				client.TestData.StopContainerError = context.Canceled
 				client.TestData.StopContainerFailCount = 1 // Fail the first stop attempt
 
-				report, cleanupImageInfos, err := actions.Update(
+				report, cleanupImageInfos, err := actions.Update(testLogger(),
 					context.Background(),
 					client,
 					types.UpdateParams{Cleanup: true, CPUCopyMode: "auto"},
@@ -112,7 +112,7 @@ var _ = ginkgo.Describe("the update action", func() {
 			}
 			client := mockActions.CreateMockClient(testData, false, false)
 
-			report, cleanupImageInfos, err := actions.Update(
+			report, cleanupImageInfos, err := actions.Update(testLogger(),
 				context.Background(),
 				client,
 				types.UpdateParams{
@@ -147,7 +147,7 @@ var _ = ginkgo.Describe("the update action", func() {
 			}
 			client := mockActions.CreateMockClient(testData, false, false)
 
-			_, _, err := actions.Update(
+			_, _, err := actions.Update(testLogger(),
 				context.Background(),
 				client,
 				types.UpdateParams{
@@ -175,7 +175,7 @@ var _ = ginkgo.Describe("the update action", func() {
 			}
 			client := mockActions.CreateMockClient(testData, false, false)
 
-			report, _, err := actions.Update(
+			report, _, err := actions.Update(testLogger(),
 				context.Background(),
 				client,
 				types.UpdateParams{
@@ -195,7 +195,7 @@ var _ = ginkgo.Describe("the update action", func() {
 			}
 			client := mockActions.CreateMockClient(testData, false, false)
 
-			report, _, err := actions.Update(
+			report, _, err := actions.Update(testLogger(),
 				context.Background(),
 				client,
 				types.UpdateParams{
@@ -218,7 +218,7 @@ func TestUpdateAction_HandleTimeout(t *testing.T) {
 		ctx, cancel := context.WithDeadline(context.Background(), pastDeadline)
 		defer cancel()
 
-		report, cleanupImageInfos, err := actions.Update(
+		report, cleanupImageInfos, err := actions.Update(testLogger(),
 			ctx,
 			client,
 			types.UpdateParams{Cleanup: true, CPUCopyMode: "auto"},
@@ -250,7 +250,7 @@ func TestUpdateAction_EarlyCancellationCheck(t *testing.T) {
 		canceledCtx, cancel := context.WithCancel(context.Background())
 		cancel() // Cancel the context immediately
 
-		report, cleanupImageInfos, err := actions.Update(
+		report, cleanupImageInfos, err := actions.Update(testLogger(),
 			canceledCtx,
 			client,
 			types.UpdateParams{Cleanup: true, CPUCopyMode: "auto"},
@@ -295,7 +295,7 @@ func TestUpdateAction_MidOperationCancellationCheck(t *testing.T) {
 		go func() {
 			defer close(done)
 
-			report, _, err = actions.Update(
+			report, _, err = actions.Update(testLogger(),
 				ctx,
 				client,
 				types.UpdateParams{Cleanup: true, CPUCopyMode: "auto"},
@@ -349,7 +349,7 @@ func TestUpdateAction_ContextCancellationStartContainer(t *testing.T) {
 
 		client := mockActions.CreateMockClientWithContext(canceledCtx, testData, false, false)
 
-		_, _, err := actions.Update(
+		_, _, err := actions.Update(testLogger(),
 			canceledCtx,
 			client,
 			types.UpdateParams{Cleanup: true, CPUCopyMode: "auto"},
@@ -385,7 +385,7 @@ func TestUpdateAction_ContextTimeoutDuringProcessing(t *testing.T) {
 		// Capture start time to verify the call completes within a reasonable bound
 		start := time.Now()
 
-		report, _, err := actions.Update(
+		report, _, err := actions.Update(testLogger(),
 			shortCtx,
 			client,
 			types.UpdateParams{Cleanup: true, CPUCopyMode: "auto"},
@@ -430,7 +430,7 @@ func runErrorPropagationTest(
 		client.TestData.StartContainerError = errorToReturn
 	}
 
-	report, cleanupImageInfos, err := actions.Update(
+	report, cleanupImageInfos, err := actions.Update(testLogger(),
 		context.Background(),
 		client,
 		types.UpdateParams{Cleanup: true, CPUCopyMode: "auto"},
@@ -613,7 +613,7 @@ func TestUpdateAction_ContextEdgeCases(t *testing.T) {
 
 				client := mockActions.CreateMockClientWithContext(ctx, testData, false, false)
 
-				report, cleanupImageInfos, err := actions.Update(
+				report, cleanupImageInfos, err := actions.Update(testLogger(),
 					ctx,
 					client,
 					types.UpdateParams{Cleanup: true, CPUCopyMode: "auto"},
@@ -679,7 +679,7 @@ func TestUpdateAction_ParallelStalenessCheckCancellationPropagation(t *testing.T
 		go func() {
 			defer close(done)
 
-			_, _, err = actions.Update(
+			_, _, err = actions.Update(testLogger(),
 				ctx,
 				client,
 				types.UpdateParams{Cleanup: true, CPUCopyMode: "auto"},
@@ -735,7 +735,7 @@ func TestEarlyCancellationStopContainers(t *testing.T) {
 		go func() {
 			defer close(done)
 
-			report, cleanupImageInfos, err = actions.Update(
+			report, cleanupImageInfos, err = actions.Update(testLogger(),
 				ctx,
 				client,
 				types.UpdateParams{Cleanup: true, CPUCopyMode: "auto"},
@@ -800,7 +800,7 @@ func TestEarlyCancellationRestartContainers(t *testing.T) {
 		go func() {
 			defer close(done)
 
-			report, cleanupImageInfos, err = actions.Update(
+			report, cleanupImageInfos, err = actions.Update(testLogger(),
 				ctx,
 				client,
 				types.UpdateParams{Cleanup: true, CPUCopyMode: "auto"},

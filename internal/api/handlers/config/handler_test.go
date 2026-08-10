@@ -8,12 +8,19 @@ import (
 	"testing"
 
 	"github.com/gofiber/fiber/v3"
+	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
+func testLogger() *zerolog.Logger {
+	n := zerolog.Nop()
+
+	return &n
+}
+
 func TestNew(t *testing.T) {
-	h := New(func(_ context.Context) (ConfigData, error) {
+	h := New(testLogger(), func(_ context.Context) (ConfigData, error) {
 		return ConfigData{}, nil
 	})
 	require.NotNil(t, h)
@@ -48,7 +55,7 @@ func TestHandler_Handle(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			h := New(tt.getConfig)
+			h := New(testLogger(), tt.getConfig)
 			app := fiber.New(fiber.Config{})
 			app.Get("/v1/config", h.Handle)
 

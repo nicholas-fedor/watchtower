@@ -413,7 +413,7 @@ func Test_report_All(t *testing.T) {
 			name: "mixed containers with deduplication",
 			r: func() *report {
 				mock1 := mockTypes.NewMockContainerReport(t)
-				// No strict expectation; allow calls without failing if unmet
+				// No strict expectation. Allow calls without failing if unmet
 				mock1.EXPECT().ID().Return(types.ContainerID("cont1")).Times(0)
 
 				mock2 := mockTypes.NewMockContainerReport(t)
@@ -824,22 +824,22 @@ func TestNewReport(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got := NewReport(tt.args.progress)
+			got := NewReport(testLog(), tt.args.progress)
 			if !compareReports(got.(*report), tt.want.(*report)) {
-				t.Errorf("NewReport() = %+v, want %+v", got, tt.want)
+				t.Errorf("NewReport(testLog(), ) = %+v, want %+v", got, tt.want)
 			}
 			// Explicitly exercise Stale() to ensure coverage
 			stale := got.Stale()
 			wantStale := tt.want.Stale()
 
 			if len(stale) != len(wantStale) {
-				t.Errorf("NewReport().Stale() length = %d, want %d", len(stale), len(wantStale))
+				t.Errorf("NewReport(testLog(), ).Stale() length = %d, want %d", len(stale), len(wantStale))
 			}
 
 			for i := range stale {
 				if stale[i].ID() != wantStale[i].ID() {
 					t.Errorf(
-						"NewReport().Stale()[%d].ID() = %v, want %v",
+						"NewReport(testLog(), ).Stale()[%d].ID() = %v, want %v",
 						i,
 						stale[i].ID(),
 						wantStale[i].ID(),
@@ -1030,10 +1030,10 @@ func Test_categorizeContainer(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			categorizeContainer(tt.args.r, tt.args.update)
+			categorizeContainer(testLog(), tt.args.r, tt.args.update)
 
 			if !compareReports(tt.args.r, tt.want) {
-				t.Errorf("categorizeContainer() resulted in %v, want %v", tt.args.r, tt.want)
+				t.Errorf("categorizeContainer(testLog(), ) resulted in %v, want %v", tt.args.r, tt.want)
 			}
 		})
 	}

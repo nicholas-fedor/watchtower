@@ -39,23 +39,18 @@
 package main
 
 import (
-	"github.com/sirupsen/logrus"
+	"os"
 
 	"github.com/nicholas-fedor/watchtower/cmd"
+	"github.com/nicholas-fedor/watchtower/internal/logging"
 )
-
-// init configures the initial logging level for Watchtower.
-//
-// It sets logrus to InfoLevel by default, ensuring basic operational logs
-// are visible unless overridden by flags like --debug or --log-level in cmd.
-func init() {
-	logrus.SetLevel(logrus.InfoLevel)
-}
 
 // main serves as the entry point for the Watchtower application.
 //
-// It delegates execution to the cmd package, which handles CLI setup,
-// flag parsing, and core logic for container updates and notifications.
+// It constructs the process logger and delegates execution to the cmd package,
+// which handles CLI setup, flag parsing, and core logic for container updates
+// and notifications.
 func main() {
-	cmd.Execute()
+	log := logging.New(os.Stderr, logging.InfoLevel)
+	cmd.Execute(log)
 }

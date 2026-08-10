@@ -43,7 +43,7 @@ var _ = ginkgo.Describe("Actions", func() {
 				result := &mockTypes.MockReport{}
 				err := errors.New("test error")
 
-				metric := handleUpdateResult(result, err, nil)
+				metric := handleUpdateResult(testLogger(), result, err, nil)
 				gomega.Expect(metric).NotTo(gomega.BeNil())
 				gomega.Expect(metric.Scanned).To(gomega.Equal(0))
 				gomega.Expect(metric.Updated).To(gomega.Equal(0))
@@ -53,7 +53,7 @@ var _ = ginkgo.Describe("Actions", func() {
 
 		ginkgo.When("given a nil result", func() {
 			ginkgo.It("should return a zero metric", func() {
-				metric := handleUpdateResult(nil, nil, nil)
+				metric := handleUpdateResult(testLogger(), nil, nil, nil)
 				gomega.Expect(metric).NotTo(gomega.BeNil())
 				gomega.Expect(metric.Scanned).To(gomega.Equal(0))
 				gomega.Expect(metric.Updated).To(gomega.Equal(0))
@@ -64,7 +64,7 @@ var _ = ginkgo.Describe("Actions", func() {
 		ginkgo.When("given a valid result with no error", func() {
 			ginkgo.It("should return nil", func() {
 				result := &mockTypes.MockReport{}
-				metric := handleUpdateResult(result, nil, nil)
+				metric := handleUpdateResult(testLogger(), result, nil, nil)
 				gomega.Expect(metric).To(gomega.BeNil())
 			})
 		})
@@ -92,6 +92,7 @@ var _ = ginkgo.Describe("Actions", func() {
 				)
 
 				params := RunUpdatesWithNotificationsParams{
+					Logger:                       testLogger(),
 					Client:                       client,
 					Notifier:                     nil,
 					NotificationSplitByContainer: false,
@@ -128,9 +129,10 @@ var _ = ginkgo.Describe("Actions", func() {
 				notifier := mockTypes.NewMockNotifier(ginkgo.GinkgoT())
 				notifier.EXPECT().StartNotification(true).Return()
 				notifier.EXPECT().ShouldSendNotification(mock.Anything).Return(true)
-				notifier.EXPECT().SendFilteredEntries(mock.Anything, mock.Anything).Return()
+				notifier.EXPECT().SendNotification(mock.Anything).Return()
 
 				params := RunUpdatesWithNotificationsParams{
+					Logger:                       testLogger(),
 					Client:                       client,
 					Notifier:                     notifier,
 					NotificationSplitByContainer: true,
@@ -156,6 +158,7 @@ var _ = ginkgo.Describe("Actions", func() {
 				)
 
 				params := RunUpdatesWithNotificationsParams{
+					Logger:                       testLogger(),
 					Client:                       client,
 					Notifier:                     nil,
 					NotificationSplitByContainer: false,
@@ -219,6 +222,7 @@ var _ = ginkgo.Describe("Actions", func() {
 					update.CurrentContainerID = types.ContainerID("container1-id")
 
 					params := RunUpdatesWithNotificationsParams{
+						Logger:                       testLogger(),
 						Client:                       client,
 						Notifier:                     nil,
 						NotificationSplitByContainer: false,
@@ -289,80 +293,6 @@ var _ = ginkgo.Describe("Actions", func() {
 		})
 	})
 
-	ginkgo.Describe("buildUpdateEntries", func() {
-		ginkgo.It("should create entries for regular container update", func() {
-			mockContainerReport := mockTypes.NewMockContainerReport(ginkgo.GinkgoT())
-
-			mockContainerReport.EXPECT().Name().Return("test-container")
-			mockContainerReport.EXPECT().ImageName().Return("test-image:latest")
-			mockContainerReport.EXPECT().LatestImageID().Return(types.ImageID("sha256:new"))
-			mockContainerReport.EXPECT().IsMonitorOnly().Return(false)
-			mockContainerReport.EXPECT().CurrentImageID().Return(types.ImageID("sha256:old"))
-
-			now := time.Now()
-			entries := buildUpdateEntries(
-				mockContainerReport,
-				types.ContainerID("old-container-id"),
-				types.ContainerID("new-container-id"),
-				now,
-				"",
-				"",
-				false,
-			)
-
-			gomega.Expect(entries).To(gomega.HaveLen(3))
-			gomega.Expect(entries[0].Message).To(gomega.Equal(FoundNewImageMessage))
-			gomega.Expect(entries[0].Data["container"]).To(gomega.Equal("test-container"))
-			gomega.Expect(entries[0].Data["image"]).To(gomega.Equal("test-image:latest"))
-			gomega.Expect(entries[0].Data["new_id"]).To(gomega.Equal("sha256:new"))
-			gomega.Expect(entries[0].Time).To(gomega.Equal(now))
-
-			gomega.Expect(entries[1].Message).To(gomega.Equal(StoppingContainerMessage))
-			gomega.Expect(entries[1].Data["container"]).To(gomega.Equal("test-container"))
-			gomega.Expect(entries[1].Data["id"]).
-				To(gomega.Equal(types.ContainerID("old-container-id").ShortID()))
-			gomega.Expect(entries[1].Data["old_id"]).To(gomega.Equal("sha256:old"))
-
-			gomega.Expect(entries[2].Message).To(gomega.Equal(StartedNewContainerMessage))
-			gomega.Expect(entries[2].Data["container"]).To(gomega.Equal("test-container"))
-			gomega.Expect(entries[2].Data["new_id"]).
-				To(gomega.Equal(types.ContainerID("new-container-id").ShortID()))
-		})
-
-		ginkgo.It("should create entries for monitor-only container", func() {
-			mockContainerReport := mockTypes.NewMockContainerReport(ginkgo.GinkgoT())
-
-			mockContainerReport.EXPECT().Name().Return("test-container")
-			mockContainerReport.EXPECT().ImageName().Return("test-image:latest")
-			mockContainerReport.EXPECT().LatestImageID().Return(types.ImageID("sha256:new"))
-			mockContainerReport.EXPECT().IsMonitorOnly().Return(true)
-
-			now := time.Now()
-			entries := buildUpdateEntries(
-				mockContainerReport,
-				types.ContainerID("container-id"),
-				types.ContainerID("new-container-id"),
-				now,
-				"",
-				"",
-				false,
-			)
-
-			gomega.Expect(entries).To(gomega.HaveLen(3))
-			gomega.Expect(entries[0].Message).To(gomega.Equal(FoundNewImageMessage))
-			gomega.Expect(entries[1].Message).To(gomega.Equal(UpdateSkippedMessage))
-			gomega.Expect(entries[2].Message).To(gomega.Equal(ContainerRemainsRunningMessage))
-		})
-
-		ginkgo.It("should handle nil container gracefully", func() {
-			now := time.Now()
-			// This will panic with nil pointer dereference, so we expect it to panic
-			gomega.Expect(func() {
-				buildUpdateEntries(nil, types.ContainerID(""), types.ContainerID(""), now, "", "", false)
-			}).To(gomega.Panic())
-		})
-	})
-
 	ginkgo.Describe("executeUpdate", func() {
 		ginkgo.It("should execute update and return results", func() {
 			client := mockActions.CreateMockClient(
@@ -399,7 +329,7 @@ var _ = ginkgo.Describe("Actions", func() {
 			}
 
 			// Test that function can be called without panicking
-			result, cleanupImages, err := executeUpdate(
+			result, cleanupImages, err := executeUpdate(testLogger(),
 				context.Background(),
 				client,
 				config,
@@ -417,18 +347,18 @@ var _ = ginkgo.Describe("Actions", func() {
 		ginkgo.It("should start notification when notifier is provided", func() {
 			notifier := mockTypes.NewMockNotifier(ginkgo.GinkgoT())
 			notifier.EXPECT().StartNotification(false).Return()
-			startNotifications(notifier, false)
+			startNotifications(testLogger(), notifier, false)
 			notifier.AssertExpectations(ginkgo.GinkgoT())
 		})
 
 		ginkgo.It("should not panic when notifier is nil", func() {
-			startNotifications(nil, false)
+			startNotifications(testLogger(), nil, false)
 		})
 
 		ginkgo.It("should start notification with split enabled", func() {
 			notifier := mockTypes.NewMockNotifier(ginkgo.GinkgoT())
 			notifier.EXPECT().StartNotification(true).Return()
-			startNotifications(notifier, true)
+			startNotifications(testLogger(), notifier, true)
 			notifier.AssertExpectations(ginkgo.GinkgoT())
 		})
 	})
@@ -450,7 +380,7 @@ var _ = ginkgo.Describe("Actions", func() {
 			mockReport.EXPECT().Failed().Return([]types.ContainerReport{})
 
 			// Function just logs, so we verify it doesn't panic and calls expected methods
-			logUpdateReport(mockReport)
+			logUpdateReport(testLogger(), mockReport)
 		})
 
 		ginkgo.It("should handle reports with no updates", func() {
@@ -466,14 +396,14 @@ var _ = ginkgo.Describe("Actions", func() {
 			mockReport.EXPECT().Failed().Return([]types.ContainerReport{})
 
 			// Should handle empty updated containers gracefully
-			logUpdateReport(mockReport)
+			logUpdateReport(testLogger(), mockReport)
 		})
 	})
 
 	ginkgo.Describe("sendNotifications", func() {
 		ginkgo.It("should not send notifications when notifier is nil", func() {
 			mockReport := mockTypes.NewMockReport(ginkgo.GinkgoT())
-			sendNotifications(nil, false, false, mockReport, []types.RemovedImageInfo{})
+			sendNotifications(testLogger(), nil, false, false, mockReport, []types.RemovedImageInfo{})
 			// No expectations since notifier is nil
 		})
 
@@ -482,7 +412,7 @@ var _ = ginkgo.Describe("Actions", func() {
 			notifier := mockTypes.NewMockNotifier(ginkgo.GinkgoT())
 			notifier.EXPECT().ShouldSendNotification(mockReport).Return(true)
 			notifier.EXPECT().SendNotification(mockReport).Return()
-			sendNotifications(notifier, false, false, mockReport, []types.RemovedImageInfo{})
+			sendNotifications(testLogger(), notifier, false, false, mockReport, []types.RemovedImageInfo{})
 			notifier.AssertExpectations(ginkgo.GinkgoT())
 		})
 
@@ -499,7 +429,7 @@ var _ = ginkgo.Describe("Actions", func() {
 			mockReport.EXPECT().Skipped().Return([]types.ContainerReport{})
 			mockReport.EXPECT().Fresh().Return([]types.ContainerReport{})
 
-			sendNotifications(notifier, true, false, mockReport, []types.RemovedImageInfo{})
+			sendNotifications(testLogger(), notifier, true, false, mockReport, []types.RemovedImageInfo{})
 			notifier.AssertExpectations(ginkgo.GinkgoT())
 		})
 	})
@@ -528,7 +458,7 @@ var _ = ginkgo.Describe("Actions", func() {
 				notifier.EXPECT().ShouldSendNotification(mock.Anything).Return(true)
 				notifier.EXPECT().SendNotification(mock.Anything).Return()
 
-				sendSplitNotifications(notifier, true, mockReport, []types.RemovedImageInfo{})
+				sendSplitNotifications(testLogger(), notifier, true, mockReport, []types.RemovedImageInfo{})
 
 				notifier.AssertExpectations(ginkgo.GinkgoT())
 			},
@@ -547,7 +477,7 @@ var _ = ginkgo.Describe("Actions", func() {
 			mockReport.EXPECT().Fresh().Return([]types.ContainerReport{})
 
 			// With empty results, no notifications should be sent
-			sendSplitNotifications(notifier, true, mockReport, []types.RemovedImageInfo{})
+			sendSplitNotifications(testLogger(), notifier, true, mockReport, []types.RemovedImageInfo{})
 			notifier.AssertExpectations(ginkgo.GinkgoT())
 		})
 
@@ -560,10 +490,6 @@ var _ = ginkgo.Describe("Actions", func() {
 				mockContainer.EXPECT().ID().Return(types.ContainerID("test-id"))
 				mockContainer.EXPECT().Name().Return("test-container")
 				mockContainer.EXPECT().ImageName().Return("test-image:latest")
-				mockContainer.EXPECT().NewContainerID().Return(types.ContainerID("new-id"))
-				mockContainer.EXPECT().IsMonitorOnly().Return(false)
-				mockContainer.EXPECT().LatestImageID().Return(types.ImageID("sha256:latest"))
-				mockContainer.EXPECT().CurrentImageID().Return(types.ImageID("sha256:current"))
 				mockContainer.EXPECT().Error().Return("")
 
 				mockReport.EXPECT().Updated().Return([]types.ContainerReport{mockContainer})
@@ -576,9 +502,9 @@ var _ = ginkgo.Describe("Actions", func() {
 
 				notifier := mockTypes.NewMockNotifier(ginkgo.GinkgoT())
 				notifier.EXPECT().ShouldSendNotification(mock.Anything).Return(true)
-				notifier.EXPECT().SendFilteredEntries(mock.Anything, mock.Anything).Return()
+				notifier.EXPECT().SendNotification(mock.Anything).Return()
 
-				sendSplitNotifications(notifier, false, mockReport, []types.RemovedImageInfo{})
+				sendSplitNotifications(testLogger(), notifier, false, mockReport, []types.RemovedImageInfo{})
 				notifier.AssertExpectations(ginkgo.GinkgoT())
 			},
 		)
@@ -603,7 +529,7 @@ var _ = ginkgo.Describe("Actions", func() {
 			notifier.EXPECT().ShouldSendNotification(mock.Anything).Return(true)
 			notifier.EXPECT().SendNotification(mock.Anything).Return()
 
-			sendSplitNotifications(notifier, true, mockReport, []types.RemovedImageInfo{})
+			sendSplitNotifications(testLogger(), notifier, true, mockReport, []types.RemovedImageInfo{})
 			notifier.AssertExpectations(ginkgo.GinkgoT())
 		})
 
@@ -625,7 +551,7 @@ var _ = ginkgo.Describe("Actions", func() {
 			notifier := mockTypes.NewMockNotifier(ginkgo.GinkgoT())
 			// No SendNotification should be called due to empty name
 
-			sendSplitNotifications(notifier, true, mockReport, []types.RemovedImageInfo{})
+			sendSplitNotifications(testLogger(), notifier, true, mockReport, []types.RemovedImageInfo{})
 			notifier.AssertExpectations(ginkgo.GinkgoT())
 		})
 
@@ -652,7 +578,7 @@ var _ = ginkgo.Describe("Actions", func() {
 				notifier.EXPECT().ShouldSendNotification(mock.Anything).Return(true)
 				notifier.EXPECT().SendNotification(mock.Anything).Return()
 
-				sendSplitNotifications(notifier, true, mockReport, []types.RemovedImageInfo{})
+				sendSplitNotifications(testLogger(), notifier, true, mockReport, []types.RemovedImageInfo{})
 				notifier.AssertExpectations(ginkgo.GinkgoT())
 			},
 		)
@@ -664,8 +590,6 @@ var _ = ginkgo.Describe("Actions", func() {
 			mockContainer.EXPECT().ID().Return(types.ContainerID("restart-id"))
 			mockContainer.EXPECT().Name().Return("restart-container")
 			mockContainer.EXPECT().ImageName().Return("restart-image:latest")
-			mockContainer.EXPECT().NewContainerID().Return(types.ContainerID("new-restart-id"))
-			mockContainer.EXPECT().CurrentImageID().Return(types.ImageID("sha256:current"))
 			mockContainer.EXPECT().Error().Return("")
 
 			mockReport.EXPECT().Updated().Return([]types.ContainerReport{})
@@ -678,9 +602,9 @@ var _ = ginkgo.Describe("Actions", func() {
 
 			notifier := mockTypes.NewMockNotifier(ginkgo.GinkgoT())
 			notifier.EXPECT().ShouldSendNotification(mock.Anything).Return(true)
-			notifier.EXPECT().SendFilteredEntries(mock.Anything, mock.Anything).Return()
+			notifier.EXPECT().SendNotification(mock.Anything).Return()
 
-			sendSplitNotifications(notifier, false, mockReport, []types.RemovedImageInfo{})
+			sendSplitNotifications(testLogger(), notifier, false, mockReport, []types.RemovedImageInfo{})
 			notifier.AssertExpectations(ginkgo.GinkgoT())
 		})
 
@@ -691,8 +615,6 @@ var _ = ginkgo.Describe("Actions", func() {
 			mockContainer.EXPECT().ID().Return(types.ContainerID("restart-id"))
 			mockContainer.EXPECT().Name().Return("restart-container")
 			mockContainer.EXPECT().ImageName().Return("restart-image:latest")
-			mockContainer.EXPECT().NewContainerID().Return(types.ContainerID("")) // Empty new ID
-			mockContainer.EXPECT().CurrentImageID().Return(types.ImageID("sha256:current"))
 			mockContainer.EXPECT().Error().Return("")
 
 			mockReport.EXPECT().Updated().Return([]types.ContainerReport{})
@@ -705,9 +627,9 @@ var _ = ginkgo.Describe("Actions", func() {
 
 			notifier := mockTypes.NewMockNotifier(ginkgo.GinkgoT())
 			notifier.EXPECT().ShouldSendNotification(mock.Anything).Return(true)
-			notifier.EXPECT().SendFilteredEntries(mock.Anything, mock.Anything).Return()
+			notifier.EXPECT().SendNotification(mock.Anything).Return()
 
-			sendSplitNotifications(notifier, false, mockReport, []types.RemovedImageInfo{})
+			sendSplitNotifications(testLogger(), notifier, false, mockReport, []types.RemovedImageInfo{})
 			notifier.AssertExpectations(ginkgo.GinkgoT())
 		})
 
@@ -718,8 +640,6 @@ var _ = ginkgo.Describe("Actions", func() {
 			mockContainer.EXPECT().ID().Return(types.ContainerID("monitor-id"))
 			mockContainer.EXPECT().Name().Return("monitor-container")
 			mockContainer.EXPECT().ImageName().Return("monitor-image:latest")
-			mockContainer.EXPECT().NewContainerID().Return(types.ContainerID("new-monitor-id"))
-			mockContainer.EXPECT().LatestImageID().Return(types.ImageID("sha256:latest"))
 			mockContainer.EXPECT().IsMonitorOnly().Return(true)
 			mockContainer.EXPECT().Error().Return("")
 
@@ -733,9 +653,9 @@ var _ = ginkgo.Describe("Actions", func() {
 
 			notifier := mockTypes.NewMockNotifier(ginkgo.GinkgoT())
 			notifier.EXPECT().ShouldSendNotification(mock.Anything).Return(true)
-			notifier.EXPECT().SendFilteredEntries(mock.Anything, mock.Anything).Return()
+			notifier.EXPECT().SendNotification(mock.Anything).Return()
 
-			sendSplitNotifications(notifier, false, mockReport, []types.RemovedImageInfo{})
+			sendSplitNotifications(testLogger(), notifier, false, mockReport, []types.RemovedImageInfo{})
 			notifier.AssertExpectations(ginkgo.GinkgoT())
 		})
 
@@ -754,7 +674,190 @@ var _ = ginkgo.Describe("Actions", func() {
 			notifier := mockTypes.NewMockNotifier(ginkgo.GinkgoT())
 			// No SendNotification should be called since all lists are empty
 
-			sendSplitNotifications(notifier, true, mockReport, []types.RemovedImageInfo{})
+			sendSplitNotifications(testLogger(), notifier, true, mockReport, []types.RemovedImageInfo{})
+			notifier.AssertExpectations(ginkgo.GinkgoT())
+		})
+
+		ginkgo.It("should emit no cleanup logs when cleanedImages is empty in log mode", func() {
+			mockReport := mockTypes.NewMockReport(ginkgo.GinkgoT())
+			mockContainer := mockTypes.NewMockContainerReport(ginkgo.GinkgoT())
+
+			mockContainer.EXPECT().ID().Return(types.ContainerID("id-a")).Maybe()
+			mockContainer.EXPECT().Name().Return("container-a").Maybe()
+			mockContainer.EXPECT().ImageName().Return("nginx:latest").Maybe()
+			mockContainer.EXPECT().Error().Return("").Maybe()
+
+			mockReport.EXPECT().Updated().Return([]types.ContainerReport{mockContainer})
+			mockReport.EXPECT().Restarted().Return([]types.ContainerReport{})
+			mockReport.EXPECT().Stale().Return([]types.ContainerReport{})
+			mockReport.EXPECT().Scanned().Return([]types.ContainerReport{mockContainer}).Maybe()
+			mockReport.EXPECT().Failed().Return([]types.ContainerReport{}).Maybe()
+			mockReport.EXPECT().Skipped().Return([]types.ContainerReport{}).Maybe()
+			mockReport.EXPECT().Fresh().Return([]types.ContainerReport{}).Maybe()
+
+			notifier := mockTypes.NewMockNotifier(ginkgo.GinkgoT())
+			notifier.EXPECT().ShouldSendNotification(mock.Anything).Return(true)
+			notifier.EXPECT().SendNotification(mock.Anything).Return()
+
+			log, buf := newCaptureLogger()
+			sendSplitNotifications(log, notifier, false, mockReport, []types.RemovedImageInfo{})
+
+			for _, entry := range parseJSONLogEntries(buf) {
+				gomega.Expect(entry["message"]).NotTo(gomega.Equal("Removing image"))
+			}
+
+			notifier.AssertExpectations(ginkgo.GinkgoT())
+		})
+
+		ginkgo.It("should emit container-scoped cleanup fields for each cleanedImages entry in log mode", func() {
+			imageA := types.ImageID("sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa")
+			imageB := types.ImageID("sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb")
+			cleanedImages := []types.RemovedImageInfo{
+				{
+					ImageID:       imageA,
+					ImageName:     "nginx:old",
+					ContainerName: "container-a",
+					ContainerID:   types.ContainerID("id-a"),
+				},
+				{
+					ImageID:       imageB,
+					ImageName:     "redis:old",
+					ContainerName: "container-a",
+					ContainerID:   types.ContainerID("id-a"),
+				},
+				{
+					ImageID:       imageA,
+					ImageName:     "nginx:old",
+					ContainerName: "container-b",
+					ContainerID:   types.ContainerID("id-b"),
+				},
+			}
+
+			mockReport := mockTypes.NewMockReport(ginkgo.GinkgoT())
+			containerA := mockTypes.NewMockContainerReport(ginkgo.GinkgoT())
+			containerB := mockTypes.NewMockContainerReport(ginkgo.GinkgoT())
+
+			containerA.EXPECT().ID().Return(types.ContainerID("id-a")).Maybe()
+			containerA.EXPECT().Name().Return("container-a").Maybe()
+			containerA.EXPECT().ImageName().Return("nginx:latest").Maybe()
+			containerA.EXPECT().Error().Return("").Maybe()
+
+			containerB.EXPECT().ID().Return(types.ContainerID("id-b")).Maybe()
+			containerB.EXPECT().Name().Return("container-b").Maybe()
+			containerB.EXPECT().ImageName().Return("nginx:latest").Maybe()
+			containerB.EXPECT().Error().Return("").Maybe()
+
+			mockReport.EXPECT().Updated().Return([]types.ContainerReport{containerA, containerB})
+			mockReport.EXPECT().Restarted().Return([]types.ContainerReport{})
+			mockReport.EXPECT().Stale().Return([]types.ContainerReport{})
+			mockReport.EXPECT().Scanned().Return([]types.ContainerReport{containerA, containerB}).Maybe()
+			mockReport.EXPECT().Failed().Return([]types.ContainerReport{}).Maybe()
+			mockReport.EXPECT().Skipped().Return([]types.ContainerReport{}).Maybe()
+			mockReport.EXPECT().Fresh().Return([]types.ContainerReport{}).Maybe()
+
+			// Split path sends one SingleContainerReport-focused notification per updated container.
+			var sentFocusNames []string
+
+			notifier := mockTypes.NewMockNotifier(ginkgo.GinkgoT())
+			notifier.EXPECT().ShouldSendNotification(mock.Anything).Return(true).Times(2)
+			notifier.EXPECT().SendNotification(mock.Anything).Run(func(report types.Report) {
+				updated := report.Updated()
+				gomega.Expect(updated).To(gomega.HaveLen(1))
+				sentFocusNames = append(sentFocusNames, updated[0].Name())
+			}).Times(2)
+
+			log, buf := newCaptureLogger()
+			sendSplitNotifications(log, notifier, false, mockReport, cleanedImages)
+
+			type cleanupLog struct {
+				containerName string
+				imageName     string
+				imageID       string
+				notify        string
+			}
+
+			asString := func(v any) string {
+				s, _ := v.(string)
+
+				return s
+			}
+
+			cleanups := make([]cleanupLog, 0)
+
+			for _, entry := range parseJSONLogEntries(buf) {
+				if entry["message"] != "Removing image" {
+					continue
+				}
+
+				cleanups = append(cleanups, cleanupLog{
+					containerName: asString(entry["container_name"]),
+					imageName:     asString(entry["image_name"]),
+					imageID:       asString(entry["image_id"]),
+					notify:        asString(entry["notify"]),
+				})
+			}
+
+			gomega.Expect(cleanups).To(gomega.ConsistOf(
+				cleanupLog{
+					containerName: "container-a",
+					imageName:     "nginx:old",
+					imageID:       imageA.ShortID(),
+					notify:        "yes",
+				},
+				cleanupLog{
+					containerName: "container-a",
+					imageName:     "redis:old",
+					imageID:       imageB.ShortID(),
+					notify:        "yes",
+				},
+				cleanupLog{
+					containerName: "container-b",
+					imageName:     "nginx:old",
+					imageID:       imageA.ShortID(),
+					notify:        "yes",
+				},
+			))
+			gomega.Expect(sentFocusNames).To(gomega.ConsistOf("container-a", "container-b"))
+			notifier.AssertExpectations(ginkgo.GinkgoT())
+		})
+
+		ginkgo.It("should not emit cleanup logs in report mode", func() {
+			cleanedImages := []types.RemovedImageInfo{
+				{
+					ImageID:       types.ImageID("sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"),
+					ImageName:     "nginx:old",
+					ContainerName: "container-a",
+					ContainerID:   types.ContainerID("id-a"),
+				},
+			}
+
+			mockReport := mockTypes.NewMockReport(ginkgo.GinkgoT())
+			mockContainer := mockTypes.NewMockContainerReport(ginkgo.GinkgoT())
+
+			mockContainer.EXPECT().ID().Return(types.ContainerID("id-a")).Maybe()
+			mockContainer.EXPECT().Name().Return("container-a").Maybe()
+			mockContainer.EXPECT().ImageName().Return("nginx:latest").Maybe()
+			mockContainer.EXPECT().Error().Return("").Maybe()
+
+			mockReport.EXPECT().Updated().Return([]types.ContainerReport{mockContainer})
+			mockReport.EXPECT().Restarted().Return([]types.ContainerReport{})
+			mockReport.EXPECT().Stale().Return([]types.ContainerReport{})
+			mockReport.EXPECT().Scanned().Return([]types.ContainerReport{mockContainer}).Maybe()
+			mockReport.EXPECT().Failed().Return([]types.ContainerReport{}).Maybe()
+			mockReport.EXPECT().Skipped().Return([]types.ContainerReport{}).Maybe()
+			mockReport.EXPECT().Fresh().Return([]types.ContainerReport{}).Maybe()
+
+			notifier := mockTypes.NewMockNotifier(ginkgo.GinkgoT())
+			notifier.EXPECT().ShouldSendNotification(mock.Anything).Return(true)
+			notifier.EXPECT().SendNotification(mock.Anything).Return()
+
+			log, buf := newCaptureLogger()
+			sendSplitNotifications(log, notifier, true, mockReport, cleanedImages)
+
+			for _, entry := range parseJSONLogEntries(buf) {
+				gomega.Expect(entry["message"]).NotTo(gomega.Equal("Removing image"))
+			}
+
 			notifier.AssertExpectations(ginkgo.GinkgoT())
 		})
 	})
@@ -782,7 +885,7 @@ var _ = ginkgo.Describe("Actions", func() {
 				notifier.EXPECT().ShouldSendNotification(mock.Anything).Return(false)
 				// With notification level set to error and no errors, no notification should be sent
 
-				sendSplitNotifications(notifier, true, mockReport, []types.RemovedImageInfo{})
+				sendSplitNotifications(testLogger(), notifier, true, mockReport, []types.RemovedImageInfo{})
 				notifier.AssertExpectations(ginkgo.GinkgoT())
 			})
 		})
@@ -791,13 +894,13 @@ var _ = ginkgo.Describe("Actions", func() {
 	ginkgo.Describe("performImageCleanup", func() {
 		ginkgo.It("should return empty slice when cleanup is disabled", func() {
 			client := mockActions.CreateMockClient(&mockActions.TestData{}, false, false)
-			cleanedImages := performImageCleanup(context.Background(), client, false, []types.RemovedImageInfo{})
+			cleanedImages := performImageCleanup(testLogger(), context.Background(), client, false, []types.RemovedImageInfo{})
 			gomega.Expect(cleanedImages).To(gomega.BeEmpty())
 		})
 
 		ginkgo.It("should perform cleanup when cleanup is enabled", func() {
 			client := mockActions.CreateMockClient(&mockActions.TestData{}, false, false)
-			cleanedImages := performImageCleanup(context.Background(), client, true, []types.RemovedImageInfo{
+			cleanedImages := performImageCleanup(testLogger(), context.Background(), client, true, []types.RemovedImageInfo{
 				{
 					ContainerName: "test-container",
 					ImageName:     "test-image:v1.0",
@@ -811,7 +914,7 @@ var _ = ginkgo.Describe("Actions", func() {
 
 		ginkgo.It("should return a valid slice when cleanup input is empty", func() {
 			client := mockActions.CreateMockClient(&mockActions.TestData{}, false, false)
-			cleanedImages := performImageCleanup(context.Background(), client, true, []types.RemovedImageInfo{})
+			cleanedImages := performImageCleanup(testLogger(), context.Background(), client, true, []types.RemovedImageInfo{})
 			// Should return a valid slice even with empty input
 			gomega.Expect(cleanedImages).NotTo(gomega.BeNil())
 		})
@@ -834,7 +937,7 @@ var _ = ginkgo.Describe("Actions", func() {
 			mockReport.EXPECT().Restarted().Return([]types.ContainerReport{})
 			mockReport.EXPECT().Skipped().Return([]types.ContainerReport{})
 
-			metric := generateAndLogMetric(mockReport)
+			metric := generateAndLogMetric(testLogger(), mockReport)
 
 			gomega.Expect(metric).NotTo(gomega.BeNil())
 			gomega.Expect(metric.Scanned).To(gomega.Equal(2))
@@ -852,13 +955,40 @@ var _ = ginkgo.Describe("Actions", func() {
 			mockReport.EXPECT().Restarted().Return([]types.ContainerReport{})
 			mockReport.EXPECT().Skipped().Return([]types.ContainerReport{})
 
-			metric := generateAndLogMetric(mockReport)
+			metric := generateAndLogMetric(testLogger(), mockReport)
 
 			gomega.Expect(metric).NotTo(gomega.BeNil())
 			gomega.Expect(metric.Scanned).To(gomega.Equal(0))
 			gomega.Expect(metric.Updated).To(gomega.Equal(0))
 			gomega.Expect(metric.Failed).To(gomega.Equal(0))
 			gomega.Expect(metric.Restarted).To(gomega.Equal(0))
+		})
+
+		ginkgo.It("should log session completion with notify=no so it is not sent as a notification", func() {
+			mockReport := mockTypes.NewMockReport(ginkgo.GinkgoT())
+
+			mockReport.EXPECT().Scanned().Return([]types.ContainerReport{})
+			mockReport.EXPECT().Updated().Return([]types.ContainerReport{})
+			mockReport.EXPECT().Failed().Return([]types.ContainerReport{})
+			mockReport.EXPECT().Restarted().Return([]types.ContainerReport{})
+			mockReport.EXPECT().Skipped().Return([]types.ContainerReport{})
+
+			log, buf := newCaptureLogger()
+			_ = generateAndLogMetric(log, mockReport)
+
+			var found bool
+
+			for _, entry := range parseJSONLogEntries(buf) {
+				if entry["message"] != "Update session completed" {
+					continue
+				}
+
+				found = true
+
+				gomega.Expect(entry["notify"]).To(gomega.Equal("no"))
+			}
+
+			gomega.Expect(found).To(gomega.BeTrue())
 		})
 	})
 
@@ -932,12 +1062,13 @@ var _ = ginkgo.Describe("Actions", func() {
 					defer wg.Done()
 
 					params := RunUpdatesWithNotificationsParams{
+						Logger:                       testLogger(),
 						Client:                       clientA,
 						Notifier:                     nil,
 						NotificationSplitByContainer: false,
 						NotificationReport:           false,
 						Update: defaultTestUpdateParams(
-							filters.FilterByScope("scope-a", filters.NoFilter),
+							filters.FilterByScope(testLogger(), "scope-a", filters.NoFilter),
 						),
 					}
 
@@ -949,12 +1080,13 @@ var _ = ginkgo.Describe("Actions", func() {
 					defer wg.Done()
 
 					params := RunUpdatesWithNotificationsParams{
+						Logger:                       testLogger(),
 						Client:                       clientB,
 						Notifier:                     nil,
 						NotificationSplitByContainer: false,
 						NotificationReport:           false,
 						Update: defaultTestUpdateParams(
-							filters.FilterByScope("scope-b", filters.NoFilter),
+							filters.FilterByScope(testLogger(), "scope-b", filters.NoFilter),
 						),
 					}
 
@@ -1051,12 +1183,13 @@ var _ = ginkgo.Describe("Actions", func() {
 					defer wg.Done()
 
 					params := RunUpdatesWithNotificationsParams{
+						Logger:                       testLogger(),
 						Client:                       client1,
 						Notifier:                     nil,
 						NotificationSplitByContainer: false,
 						NotificationReport:           false,
 						Update: defaultTestUpdateParams(
-							filters.FilterByScope("scope1", filters.WatchtowerContainersFilter),
+							filters.FilterByScope(testLogger(), "scope1", filters.WatchtowerContainersFilter),
 						),
 					}
 					RunUpdatesWithNotifications(context.Background(), params)
@@ -1066,12 +1199,13 @@ var _ = ginkgo.Describe("Actions", func() {
 					defer wg.Done()
 
 					params := RunUpdatesWithNotificationsParams{
+						Logger:                       testLogger(),
 						Client:                       client2,
 						Notifier:                     nil,
 						NotificationSplitByContainer: false,
 						NotificationReport:           false,
 						Update: defaultTestUpdateParams(
-							filters.FilterByScope("scope2", filters.WatchtowerContainersFilter),
+							filters.FilterByScope(testLogger(), "scope2", filters.WatchtowerContainersFilter),
 						),
 					}
 					RunUpdatesWithNotifications(context.Background(), params)
@@ -1156,11 +1290,12 @@ var _ = ginkgo.Describe("Actions", func() {
 				defer wg.Done()
 
 				updateA := defaultTestUpdateParams(
-					filters.FilterByScope("scope-a", filters.WatchtowerContainersFilter),
+					filters.FilterByScope(testLogger(), "scope-a", filters.WatchtowerContainersFilter),
 				)
 				updateA.Cleanup = true
 
 				params := RunUpdatesWithNotificationsParams{
+					Logger:                       testLogger(),
 					Client:                       clientA,
 					Notifier:                     nil,
 					NotificationSplitByContainer: false,
@@ -1174,11 +1309,12 @@ var _ = ginkgo.Describe("Actions", func() {
 				defer wg.Done()
 
 				updateB := defaultTestUpdateParams(
-					filters.FilterByScope("scope-b", filters.WatchtowerContainersFilter),
+					filters.FilterByScope(testLogger(), "scope-b", filters.WatchtowerContainersFilter),
 				)
 				updateB.Cleanup = true
 
 				params := RunUpdatesWithNotificationsParams{
+					Logger:                       testLogger(),
 					Client:                       clientB,
 					Notifier:                     nil,
 					NotificationSplitByContainer: false,
@@ -1280,12 +1416,13 @@ var _ = ginkgo.Describe("Actions", func() {
 					defer wg.Done()
 
 					params := RunUpdatesWithNotificationsParams{
+						Logger:                       testLogger(),
 						Client:                       clientProd,
 						Notifier:                     nil,
 						NotificationSplitByContainer: false,
 						NotificationReport:           false,
 						Update: defaultTestUpdateParams(
-							filters.FilterByScope("prod", filters.NoFilter),
+							filters.FilterByScope(testLogger(), "prod", filters.NoFilter),
 						),
 					}
 
@@ -1297,12 +1434,13 @@ var _ = ginkgo.Describe("Actions", func() {
 					defer wg.Done()
 
 					params := RunUpdatesWithNotificationsParams{
+						Logger:                       testLogger(),
 						Client:                       clientDev,
 						Notifier:                     nil,
 						NotificationSplitByContainer: false,
 						NotificationReport:           false,
 						Update: defaultTestUpdateParams(
-							filters.FilterByScope("dev", filters.NoFilter),
+							filters.FilterByScope(testLogger(), "dev", filters.NoFilter),
 						),
 					}
 
@@ -1397,12 +1535,13 @@ var _ = ginkgo.Describe("Actions", func() {
 					client := mockActions.CreateMockClient(testData, false, false)
 
 					params := RunUpdatesWithNotificationsParams{
+						Logger:                       testLogger(),
 						Client:                       client,
 						Notifier:                     nil, // No notifications for this test
 						NotificationSplitByContainer: false,
 						NotificationReport:           false,
 						Update: defaultTestUpdateParams(
-							filters.FilterByScope("scope-a", filters.NoFilter),
+							filters.FilterByScope(testLogger(), "scope-a", filters.NoFilter),
 						),
 					}
 
@@ -1476,11 +1615,12 @@ var _ = ginkgo.Describe("Actions", func() {
 
 				// Run scope-a operation (cleanup should fail)
 				updateA := defaultTestUpdateParams(
-					filters.FilterByScope("scope-a", filters.NoFilter),
+					filters.FilterByScope(testLogger(), "scope-a", filters.NoFilter),
 				)
 				updateA.Cleanup = true
 
 				paramsA := RunUpdatesWithNotificationsParams{
+					Logger:                       testLogger(),
 					Client:                       clientA,
 					Notifier:                     nil,
 					NotificationSplitByContainer: false,
@@ -1490,11 +1630,12 @@ var _ = ginkgo.Describe("Actions", func() {
 
 				// Run scope-b operation (cleanup should succeed)
 				updateB := defaultTestUpdateParams(
-					filters.FilterByScope("scope-b", filters.NoFilter),
+					filters.FilterByScope(testLogger(), "scope-b", filters.NoFilter),
 				)
 				updateB.Cleanup = true
 
 				paramsB := RunUpdatesWithNotificationsParams{
+					Logger:                       testLogger(),
 					Client:                       clientB,
 					Notifier:                     nil,
 					NotificationSplitByContainer: false,
@@ -1605,12 +1746,13 @@ var _ = ginkgo.Describe("Actions", func() {
 						defer wg.Done()
 
 						params := RunUpdatesWithNotificationsParams{
+							Logger:                       testLogger(),
 							Client:                       clientX,
 							Notifier:                     nil,
 							NotificationSplitByContainer: false,
 							NotificationReport:           false,
 							Update: defaultTestUpdateParams(
-								filters.FilterByScope("scope-x", filters.NoFilter),
+								filters.FilterByScope(testLogger(), "scope-x", filters.NoFilter),
 							),
 						}
 
@@ -1622,12 +1764,13 @@ var _ = ginkgo.Describe("Actions", func() {
 						defer wg.Done()
 
 						params := RunUpdatesWithNotificationsParams{
+							Logger:                       testLogger(),
 							Client:                       clientY,
 							Notifier:                     nil,
 							NotificationSplitByContainer: false,
 							NotificationReport:           false,
 							Update: defaultTestUpdateParams(
-								filters.FilterByScope("scope-y", filters.NoFilter),
+								filters.FilterByScope(testLogger(), "scope-y", filters.NoFilter),
 							),
 						}
 

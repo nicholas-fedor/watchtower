@@ -5,7 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 
-	"github.com/sirupsen/logrus"
+	"github.com/rs/zerolog"
 
 	"github.com/nicholas-fedor/watchtower/pkg/types"
 )
@@ -22,12 +22,12 @@ import (
 //
 // Returns:
 //   - string: A base64-encoded "username:password" string if credentials are present, otherwise the original input.
-func TransformAuth(registryAuth string) string {
+func TransformAuth(log *zerolog.Logger, registryAuth string) string {
 	if registryAuth == "" {
 		return ""
 	}
 
-	// EncodeCredentials uses URLEncoding; accept StdEncoding as well for
+	// EncodeCredentials uses URLEncoding and accepts StdEncoding as well for
 	// compatibility with credentials produced outside Watchtower.
 	b, err := base64.StdEncoding.DecodeString(registryAuth)
 	if err != nil {
@@ -35,8 +35,9 @@ func TransformAuth(registryAuth string) string {
 	}
 
 	if err != nil {
-		logrus.WithError(err).
-			Debug("Failed to decode base64 registry auth - returning original input")
+		log.Debug().
+			Err(err).
+			Msg("Failed to decode base64 registry auth - returning original input")
 
 		return registryAuth
 	}
@@ -45,8 +46,9 @@ func TransformAuth(registryAuth string) string {
 
 	err = json.Unmarshal(b, credentials)
 	if err != nil {
-		logrus.WithError(err).
-			Debug("Failed to unmarshal registry credentials JSON - returning original input")
+		log.Debug().
+			Err(err).
+			Msg("Failed to unmarshal registry credentials JSON - returning original input")
 
 		return registryAuth
 	}
@@ -67,7 +69,7 @@ func TransformAuth(registryAuth string) string {
 	basicAuth := fmt.Appendf(nil, "%s:%s", username, password)
 	registryAuth = base64.StdEncoding.EncodeToString(basicAuth)
 
-	logrus.Debug("Transformed registry credentials to Basic auth format")
+	log.Debug().Msg("Transformed registry credentials to Basic auth format")
 
 	return registryAuth
 }

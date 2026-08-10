@@ -9,7 +9,6 @@ import (
 	"sync"
 	"time"
 
-	"github.com/sirupsen/logrus"
 	"github.com/spf13/viper"
 )
 
@@ -91,10 +90,9 @@ func (r *registryClient) Do(request *http.Request) (*http.Response, error) {
 //   - tlsConfig: The base TLS configuration to modify.
 func ConfigureTLS(tlsConfig *tls.Config) {
 	// Configure TLS verification based on WATCHTOWER_REGISTRY_TLS_SKIP.
+	// InsecureSkipVerify is intentional when WATCHTOWER_REGISTRY_TLS_SKIP is set.
 	if viper.GetBool("WATCHTOWER_REGISTRY_TLS_SKIP") {
 		tlsConfig.InsecureSkipVerify = true
-
-		logrus.Debug("TLS verification disabled via WATCHTOWER_REGISTRY_TLS_SKIP configuration")
 	}
 
 	// Configure minimum TLS version based on WATCHTOWER_REGISTRY_TLS_MIN_VERSION.
@@ -103,14 +101,8 @@ func ConfigureTLS(tlsConfig *tls.Config) {
 		version, ok := TLSVersionMap[strings.ToUpper(minVersion)]
 		if ok {
 			tlsConfig.MinVersion = version
-
-			logrus.WithField("min_version", minVersion).
-				Debug("Configured TLS minimum version")
 		} else {
 			tlsConfig.MinVersion = tls.VersionTLS12
-
-			logrus.WithField("min_version", minVersion).
-				Warn("Invalid TLS minimum version specified - defaulting to TLS 1.2")
 		}
 	}
 }
