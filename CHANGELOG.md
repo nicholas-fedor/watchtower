@@ -8,8 +8,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- Replace logrus with zerolog by @nicholas-fedor in [#2128](https://github.com/nicholas-fedor/watchtower/pull/2128)
+
 ### Chores
 
+- Update nicholas-fedor/go-proxy-pull-action action to v1.1.41 by @renovate[bot] in [#2126](https://github.com/nicholas-fedor/watchtower/pull/2126)
 - Update nicholas-fedor/go-proxy-pull-action action to v1.1.40 by @renovate[bot] in [#2121](https://github.com/nicholas-fedor/watchtower/pull/2121)
 - Update actions/attest-build-provenance action to v4.2.2 by @renovate[bot] in [#2120](https://github.com/nicholas-fedor/watchtower/pull/2120)
 - Update module github.com/docker/cli to v29.7.2+incompatible by @renovate[bot] in [#2118](https://github.com/nicholas-fedor/watchtower/pull/2118)
