@@ -129,6 +129,53 @@ func Test_configureTLS(t *testing.T) {
 	}
 }
 
+func Test_configureTLS_TLSSkip(t *testing.T) {
+	const tlsSkipKey = "WATCHTOWER_REGISTRY_TLS_SKIP"
+
+	original := viper.GetBool(tlsSkipKey)
+
+	t.Cleanup(func() { viper.Set(tlsSkipKey, original) })
+
+	t.Run("enabled with non-nil logger emits debug", func(t *testing.T) {
+		viper.Set(tlsSkipKey, true)
+
+		var logBuf bytes.Buffer
+
+		log := zerolog.New(&logBuf).Level(zerolog.DebugLevel)
+		tlsConfig := &tls.Config{MinVersion: tls.VersionTLS12}
+
+		ConfigureTLS(&log, tlsConfig)
+
+		assert.True(t, tlsConfig.InsecureSkipVerify)
+		assert.Contains(t, logBuf.String(), "TLS certificate verification disabled via WATCHTOWER_REGISTRY_TLS_SKIP")
+	})
+
+	t.Run("enabled with nil logger does not panic", func(t *testing.T) {
+		viper.Set(tlsSkipKey, true)
+
+		tlsConfig := &tls.Config{MinVersion: tls.VersionTLS12}
+
+		assert.NotPanics(t, func() {
+			ConfigureTLS(nil, tlsConfig)
+		})
+		assert.True(t, tlsConfig.InsecureSkipVerify)
+	})
+
+	t.Run("disabled leaves verification enabled", func(t *testing.T) {
+		viper.Set(tlsSkipKey, false)
+
+		var logBuf bytes.Buffer
+
+		log := zerolog.New(&logBuf).Level(zerolog.DebugLevel)
+		tlsConfig := &tls.Config{MinVersion: tls.VersionTLS12}
+
+		ConfigureTLS(&log, tlsConfig)
+
+		assert.False(t, tlsConfig.InsecureSkipVerify)
+		assert.NotContains(t, logBuf.String(), "TLS certificate verification disabled")
+	})
+}
+
 func Test_buildRegistryTransport(t *testing.T) {
 	tests := []struct {
 		name      string

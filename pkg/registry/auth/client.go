@@ -88,13 +88,18 @@ func (r *registryClient) Do(request *http.Request) (*http.Response, error) {
 // ConfigureTLS builds a TLS configuration from Viper settings.
 //
 // Parameters:
-//   - log: Logger for invalid-version warnings. May be nil (warning is skipped).
+//   - log: Logger for TLS diagnostics. May be nil (events are skipped).
 //   - tlsConfig: The base TLS configuration to modify.
 func ConfigureTLS(log *zerolog.Logger, tlsConfig *tls.Config) {
 	// Configure TLS verification based on WATCHTOWER_REGISTRY_TLS_SKIP.
 	// InsecureSkipVerify is intentional when WATCHTOWER_REGISTRY_TLS_SKIP is set.
 	if viper.GetBool("WATCHTOWER_REGISTRY_TLS_SKIP") {
 		tlsConfig.InsecureSkipVerify = true
+
+		if log != nil {
+			log.Debug().
+				Msg("TLS certificate verification disabled via WATCHTOWER_REGISTRY_TLS_SKIP")
+		}
 	}
 
 	// Configure minimum TLS version based on WATCHTOWER_REGISTRY_TLS_MIN_VERSION.
