@@ -3,22 +3,26 @@ package notifications
 import (
 	"bytes"
 	"context"
+	"encoding/json"
 	"fmt"
-	"log"
 	"net/url"
 	"os"
+	"reflect"
 	"strings"
 	"sync"
 	"sync/atomic"
 	"text/template"
 	"time"
+	"unsafe"
 
 	"github.com/nicholas-fedor/shoutrrr"
-	"github.com/sirupsen/logrus"
+	"github.com/rs/zerolog"
 
 	shoutrrrTypes "github.com/nicholas-fedor/shoutrrr/pkg/types"
+	stdlog "log"
 
 	"github.com/nicholas-fedor/watchtower/pkg/notifications/templates"
+	"github.com/nicholas-fedor/watchtower/pkg/session"
 	"github.com/nicholas-fedor/watchtower/pkg/types"
 )
 
@@ -40,11 +44,6 @@ const messageChannelBufferSize = 1000
 // This allows error logging to complete before canceling the context.
 const shutdownGracePeriod = 50 * time.Millisecond
 
-// LocalLog is a logrus logger that does not send entries as notifications.
-//
-// It's used for internal logging to avoid notification loops.
-var LocalLog = logrus.WithField("notify", "no")
-
 // router defines the interface for sending Shoutrrr notifications.
 //
 // It abstracts the underlying service implementation.
@@ -56,12 +55,13 @@ type router interface {
 //
 // It handles queuing, templating, and sending with delay.
 // Uses mutex for thread-safe access to entries and sync.Once for idempotent operations.
+// Implements zerolog.Hook so log events are pushed via Run.
 type shoutrrrTypeNotifier struct {
 	Urls           []string              // Notification service URLs.
 	Router         router                // Router for sending messages.
-	entries        []*logrus.Entry       // Queued log entries.
+	entries        []*notificationEntry  // Queued log entries.
 	entriesMutex   sync.RWMutex          // Mutex for thread-safe access to entries.
-	logLevel       logrus.Level          // Minimum log level for notifications.
+	logLevel       zerolog.Level         // Minimum log level for notifications.
 	template       *template.Template    // Template for message formatting.
 	messages       chan string           // Channel for message queuing.
 	done           chan struct{}         // Signal for send completion.
@@ -75,10 +75,20 @@ type shoutrrrTypeNotifier struct {
 	// These fields must only be accessed via sync/atomic (e.g., atomic.Load/atomic.Store) to avoid data races.
 	receiving atomic.Bool   // Tracks if receiving logs.
 	delay     time.Duration // Delay between sends.
-	hookOnce  sync.Once     // Ensures AddLogHook executes only once.
+	hookOnce  sync.Once     // Ensures RegisterHook executes only once.
 	closeOnce sync.Once     // Ensures Close executes only once.
+	// extractWarnOnce ensures the eventFieldMap failure warning is emitted only once.
+	extractWarnOnce sync.Once // Guards the first extraction failure warning.
 	// These fields must only be accessed via sync/atomic (e.g., atomic.Load/atomic.Store) to avoid data races.
 	closed atomic.Bool // Tracks if the notifier is closed.
+
+	// localLog is a child logger with notify=no for internal logging (loop prevention).
+	// Initialized at create time from the process logger and rebound in RegisterHook
+	// to a child of the hooked logger. Never a package-level variable.
+	// Still inherits hooks. Run short-circuits on notify=no (and fail-closed parse)
+	// before taking entriesMutex, so internal logs never re-enter the queue or deadlock.
+	// Concurrent application Logs are serialized only by entriesMutex on queue access.
+	localLog *zerolog.Logger
 }
 
 // GetScheme extracts the scheme from a Shoutrrr URL.
@@ -118,15 +128,33 @@ func (n *shoutrrrTypeNotifier) GetURLs() []string {
 	return n.Urls
 }
 
-// AddLogHook enables the notifier as a logrus hook.
+// RegisterHook attaches this notifier as a zerolog.Hook on the given logger instance.
 //
-// It starts a send goroutine if not already active.
-func (n *shoutrrrTypeNotifier) AddLogHook() {
+// It updates *log in place to the hooked logger so the composition root continues
+// using the same pointer for subsequent application logging. A notify=no child of
+// the hooked logger is stored for internal loop-safe logging. Registration is
+// idempotent via hookOnce.
+//
+// Parameters:
+//   - log: Process logger pointer. Replaced with the hooked instance.
+func (n *shoutrrrTypeNotifier) RegisterHook(log *zerolog.Logger) {
+	if log == nil {
+		return
+	}
+
 	n.hookOnce.Do(func() {
 		n.receiving.Store(true)
-		logrus.AddHook(n)
-		LocalLog.WithField("urls", redactServiceURLs(n.Urls)).
-			Debug("Added Shoutrrr notifier as logrus hook, starting notification goroutine")
+
+		// Hook returns Logger by value. Write back so the composition root's pointer is hooked.
+		hooked := log.Hook(n)
+		*log = hooked
+
+		local := log.With().Str("notify", "no").Logger()
+		n.localLog = &local
+
+		n.localLog.Debug().
+			Strs("urls", redactServiceURLs(n.Urls)).
+			Msg("Added Shoutrrr notifier as zerolog hook, starting notification goroutine")
 
 		// Send using a separate goroutine to avoid blocking the main process.
 		go sendNotifications(n)
@@ -136,8 +164,9 @@ func (n *shoutrrrTypeNotifier) AddLogHook() {
 // createNotifier initializes a Shoutrrr notifier.
 //
 // Parameters:
+//   - log: Process logger for config-time logs and the Shoutrrr stdlog bridge.
 //   - urls: Service URLs.
-//   - level: Minimum log level.
+//   - level: Minimum log level for notifications.
 //   - tplString: Template string.
 //   - legacy: Use legacy template if true.
 //   - data: Static notification data.
@@ -147,33 +176,39 @@ func (n *shoutrrrTypeNotifier) AddLogHook() {
 // Returns:
 //   - *shoutrrrTypeNotifier: Initialized notifier.
 func createNotifier(
+	log *zerolog.Logger,
 	urls []string,
-	level logrus.Level,
+	level zerolog.Level,
 	tplString string,
 	legacy bool,
 	data StaticData,
 	stdout bool,
 	delay time.Duration,
 ) *shoutrrrTypeNotifier {
+	// Child logger that must never re-enter the notification hook.
+	local := log.With().Str("notify", "no").Logger()
+	localLog := &local
+
 	// Parse or fallback to default template.
-	tpl, err := getShoutrrrTemplate(tplString, legacy)
+	tpl, err := getShoutrrrTemplate(localLog, tplString, legacy)
 	if err != nil {
-		LocalLog.WithError(err).
-			Error("Could not use configured notification template, falling back to default")
+		localLog.Error().Err(err).
+			Msg("Could not use configured notification template, falling back to default")
 	}
 
 	// Set logger based on stdout flag.
 	var logger shoutrrrTypes.StdLogger
 	if stdout {
-		logger = log.New(os.Stdout, ``, 0)
+		logger = stdlog.New(os.Stdout, ``, 0)
 	} else {
-		logger = log.New(logrus.StandardLogger().WriterLevel(logrus.TraceLevel), "Shoutrrr: ", 0)
+		// Bridge shoutrrr's stdlib logger into the process zerolog (notify=no).
+		logger = stdlog.New(localLog, "Shoutrrr: ", 0)
 	}
 
 	// Initialize sender with default options.
 	router, err := shoutrrr.NewSenderWithOptions(logger, shoutrrrTypes.SenderOptions{}, urls...)
 	if err != nil {
-		LocalLog.WithError(err).Fatal("Failed to initialize Shoutrrr notifications")
+		localLog.Fatal().Err(err).Msg("Failed to initialize Shoutrrr notifications")
 	}
 
 	// Set params with title if provided.
@@ -183,7 +218,6 @@ func createNotifier(
 	}
 
 	// Create context for cancellation
-
 	ctx, cancel := context.WithCancel(context.Background())
 
 	return &shoutrrrTypeNotifier{
@@ -200,15 +234,16 @@ func createNotifier(
 		stop: make(
 			chan struct{},
 		), // Channel for stopping the notifier.
-		logLevel:       level,                                            // Minimum log level for notifications.
-		template:       tpl,                                              // Template for message formatting.
-		legacyTemplate: legacy,                                           // Use legacy log-only template if true.
-		data:           data,                                             // Static notification data.
-		params:         params,                                           // Notification parameters.
-		ctx:            ctx,                                              // Context for cancellation.
-		cancel:         cancel,                                           // Cancel function for the context.
-		delay:          delay,                                            // Delay between sends.
-		entries:        make([]*logrus.Entry, 0, initialEntriesCapacity), // Queued log entries.
+		logLevel:       level,                                                 // Minimum log level for notifications.
+		template:       tpl,                                                   // Template for message formatting.
+		legacyTemplate: legacy,                                                // Use legacy log-only template if true.
+		data:           data,                                                  // Static notification data.
+		params:         params,                                                // Notification parameters.
+		ctx:            ctx,                                                   // Context for cancellation.
+		cancel:         cancel,                                                // Cancel function for the context.
+		delay:          delay,                                                 // Delay between sends.
+		entries:        make([]*notificationEntry, 0, initialEntriesCapacity), // Queued log entries.
+		localLog:       localLog,                                              // Loop-safe internal logger.
 	}
 }
 
@@ -218,6 +253,7 @@ func createNotifier(
 //   - notifier: Notifier instance.
 //   - errs: Errors returned from router send.
 func processSendErrors(notifier *shoutrrrTypeNotifier, errs []error) {
+	log := notifier.ll()
 	failureCount := 0
 
 	var authFailures, networkFailures, rateLimitFailures int
@@ -225,12 +261,13 @@ func processSendErrors(notifier *shoutrrrTypeNotifier, errs []error) {
 	for i, err := range errs {
 		// Index guard against potential errs/Urls length mismatch
 		if i >= len(notifier.Urls) {
-			LocalLog.WithFields(logrus.Fields{
-				"index":        i,
-				"urls_length":  len(notifier.Urls),
-				"errs_length":  len(errs),
-				"failure_type": "index_mismatch",
-			}).WithError(err).Error("Error index out of bounds for URLs slice")
+			log.Error().
+				Err(err).
+				Int("index", i).
+				Int("urls_length", len(notifier.Urls)).
+				Int("errs_length", len(errs)).
+				Str("failure_type", "index_mismatch").
+				Msg("Error index out of bounds for URLs slice")
 
 			continue
 		}
@@ -254,57 +291,62 @@ func processSendErrors(notifier *shoutrrrTypeNotifier, errs []error) {
 				strings.Contains(errStrLower, "invalid credentials"):
 				authFailures++
 
-				LocalLog.WithFields(logrus.Fields{
-					"service":      scheme,
-					"index":        i,
-					"url":          sanitizedURL,
-					"failure_type": "authentication",
-				}).WithError(err).Warn("Authentication failure detected - check API keys/tokens")
+				log.Warn().
+					Err(err).
+					Str("service", scheme).
+					Int("index", i).
+					Str("url", sanitizedURL).
+					Str("failure_type", "authentication").
+					Msg("Authentication failure detected - check API keys/tokens")
 			case strings.Contains(errStrLower, "timeout") ||
 				strings.Contains(errStrLower, "connection") ||
 				strings.Contains(errStrLower, "network"):
 				networkFailures++
 
-				LocalLog.WithFields(logrus.Fields{
-					"service":      scheme,
-					"index":        i,
-					"url":          sanitizedURL,
-					"failure_type": "network",
-				}).WithError(err).Warn("Network connectivity failure detected - check internet connection")
+				log.Warn().
+					Err(err).
+					Str("service", scheme).
+					Int("index", i).
+					Str("url", sanitizedURL).
+					Str("failure_type", "network").
+					Msg("Network connectivity failure detected - check internet connection")
 			case strings.Contains(errStrLower, "rate limit") ||
 				strings.Contains(errStrLower, "too many requests"):
 				rateLimitFailures++
 
-				LocalLog.WithFields(logrus.Fields{
-					"service":      scheme,
-					"index":        i,
-					"url":          sanitizedURL,
-					"failure_type": "rate_limit",
-				}).WithError(err).Warn("Rate limiting detected - consider increasing delays or reducing frequency")
+				log.Warn().
+					Err(err).
+					Str("service", scheme).
+					Int("index", i).
+					Str("url", sanitizedURL).
+					Str("failure_type", "rate_limit").
+					Msg("Rate limiting detected - consider increasing delays or reducing frequency")
 			default:
-				LocalLog.WithFields(logrus.Fields{
-					"service":      scheme,
-					"index":        i,
-					"url":          sanitizedURL,
-					"failure_type": "unknown",
-				}).WithError(err).Error("Failed to send shoutrrr notification")
+				log.Error().
+					Err(err).
+					Str("service", scheme).
+					Int("index", i).
+					Str("url", sanitizedURL).
+					Str("failure_type", "unknown").
+					Msg("Failed to send shoutrrr notification")
 			}
 		}
 	}
 
 	// Diagnostic logging: Summary with categorized failures
 	if failureCount > 0 {
-		LocalLog.WithFields(logrus.Fields{
-			"total_urls":          len(notifier.Urls),
-			"failed_count":        failureCount,
-			"success_count":       len(notifier.Urls) - failureCount,
-			"auth_failures":       authFailures,
-			"network_failures":    networkFailures,
-			"rate_limit_failures": rateLimitFailures,
-		}).Warn("Notification send completed with failures")
+		log.Warn().
+			Int("total_urls", len(notifier.Urls)).
+			Int("failed_count", failureCount).
+			Int("success_count", len(notifier.Urls)-failureCount).
+			Int("auth_failures", authFailures).
+			Int("network_failures", networkFailures).
+			Int("rate_limit_failures", rateLimitFailures).
+			Msg("Notification send completed with failures")
 	} else if len(notifier.Urls) > 0 {
-		LocalLog.WithField("total_urls", len(notifier.Urls)).
-			Debug("Notification send completed successfully")
+		log.Debug().
+			Int("total_urls", len(notifier.Urls)).
+			Msg("Notification send completed successfully")
 	}
 }
 
@@ -313,19 +355,20 @@ func processSendErrors(notifier *shoutrrrTypeNotifier, errs []error) {
 // Parameters:
 //   - notifier: Notifier instance.
 func sendNotifications(notifier *shoutrrrTypeNotifier) {
+	log := notifier.ll()
 	defer func() { notifier.done <- struct{}{} }()
 
 	for {
 		select {
 		case msg := <-notifier.messages:
 			// Log goroutine receipt of message
-			LocalLog.WithFields(logrus.Fields{
-				"msg_length":        len(msg),
-				"notification_type": shoutrrrType,
-				"total_urls":        len(notifier.Urls),
-			}).Trace("Notification goroutine received message from channel")
+			log.Trace().
+				Int("msg_length", len(msg)).
+				Str("notification_type", shoutrrrType).
+				Int("total_urls", len(notifier.Urls)).
+				Msg("Notification goroutine received message from channel")
 
-			LocalLog.WithField("message", msg).Debug("Sending notification")
+			log.Debug().Str("message", msg).Msg("Sending notification")
 
 			// Only delay if a positive delay is configured.
 			// Use a context-aware select to allow interruption when the context is canceled.
@@ -339,72 +382,71 @@ func sendNotifications(notifier *shoutrrrTypeNotifier) {
 				case <-notifier.ctx.Done():
 					// Context canceled - stop the timer and return early
 					timer.Stop()
-					LocalLog.Debug("Context canceled during delay, skipping send")
+					log.Debug().Msg("Context canceled during delay, skipping send")
 
 					return
 				}
 			}
 
 			// Diagnostic logging: Log attempt details before sending
-			LocalLog.WithFields(logrus.Fields{
-				"total_urls": len(notifier.Urls),
-				"delay":      notifier.delay.String(),
-				"msg_length": len(msg),
-			}).Trace("Attempting to send notification to configured services")
+			log.Trace().
+				Int("total_urls", len(notifier.Urls)).
+				Str("delay", notifier.delay.String()).
+				Int("msg_length", len(msg)).
+				Msg("Attempting to send notification to configured services")
 
 			// Log before calling Router.Send
-			LocalLog.WithFields(logrus.Fields{
-				"msg_length":        len(msg),
-				"total_urls":        len(notifier.Urls),
-				"notification_type": shoutrrrType,
-			}).Trace("Calling Router.Send with message")
+			log.Trace().
+				Int("msg_length", len(msg)).
+				Int("total_urls", len(notifier.Urls)).
+				Str("notification_type", shoutrrrType).
+				Msg("Calling Router.Send with message")
 
 			notifier.send(msg)
 		case <-notifier.stop:
 			// Shutdown mode: drain all remaining messages from the channel
-			LocalLog.Debug("Shutdown signal received, draining remaining messages without delay")
+			log.Debug().Msg("Shutdown signal received, draining remaining messages without delay")
 
 			for {
 				select {
 				case msg := <-notifier.messages:
 					// Log goroutine receipt of message during shutdown
-					LocalLog.WithFields(logrus.Fields{
-						"msg_length":        len(msg),
-						"notification_type": shoutrrrType,
-						"total_urls":        len(notifier.Urls),
-						"shutdown_mode":     true,
-					}).Trace("Processing remaining notification message during shutdown")
+					log.Trace().
+						Int("msg_length", len(msg)).
+						Str("notification_type", shoutrrrType).
+						Int("total_urls", len(notifier.Urls)).
+						Bool("shutdown_mode", true).
+						Msg("Processing remaining notification message during shutdown")
 
-					LocalLog.WithField("message", msg).Debug("Sending notification during shutdown")
+					log.Debug().Str("message", msg).Msg("Sending notification during shutdown")
 
 					// Skip delay during shutdown to expedite processing
-					// time.Sleep(notifier.delay) // Omitted for shutdown
 
 					// Diagnostic logging: Log attempt details before sending
-					LocalLog.WithFields(logrus.Fields{
-						"total_urls": len(notifier.Urls),
-						"delay":      notifier.delay.String(),
-						"msg_length": len(msg),
-					}).Trace("Attempting to send notification to configured services during shutdown")
+					log.Trace().
+						Int("total_urls", len(notifier.Urls)).
+						Str("delay", notifier.delay.String()).
+						Int("msg_length", len(msg)).
+						Msg("Attempting to send notification to configured services during shutdown")
 
 					// Log before calling Router.Send
-					LocalLog.WithFields(logrus.Fields{
-						"msg_length":        len(msg),
-						"total_urls":        len(notifier.Urls),
-						"notification_type": shoutrrrType,
-					}).Trace("Calling Router.Send with message during shutdown")
+					log.Trace().
+						Int("msg_length", len(msg)).
+						Int("total_urls", len(notifier.Urls)).
+						Str("notification_type", shoutrrrType).
+						Msg("Calling Router.Send with message during shutdown")
 
 					notifier.send(msg)
 				default:
 					// Channel is empty, all messages drained
-					LocalLog.Debug("All remaining messages drained during shutdown")
+					log.Debug().Msg("All remaining messages drained during shutdown")
 
 					return
 				}
 			}
 		case <-notifier.ctx.Done():
 			// Context canceled
-			LocalLog.Debug("Context canceled, stopping notification goroutine")
+			log.Debug().Msg("Context canceled, stopping notification goroutine")
 
 			return
 		}
@@ -415,48 +457,81 @@ func sendNotifications(notifier *shoutrrrTypeNotifier) {
 //
 // It sends any existing queued entries before resetting the entries slice to ensure a fresh queue for each run.
 // When suppressSummary is true, skip sending queued entries.
+// sendEntries is invoked only after releasing entriesMutex so template work and
+// internal logging never hold the queue lock (avoids re-entrant hook deadlocks).
 func (n *shoutrrrTypeNotifier) StartNotification(suppressSummary bool) {
 	n.entriesMutex.Lock()
 
-	// Send any existing queued entries before resetting, unless suppressed
+	var toSend []*notificationEntry
+	// Capture residual entries to send after unlock when not suppressed.
 	if len(n.entries) > 0 && !suppressSummary {
-		n.sendEntries(n.entries, nil)
+		toSend = n.entries
 	}
 
 	// Capture the count before resetting the slice.
 	preResetCount := len(n.entries)
 
 	// Reset the entries slice to an empty slice with initial capacity for new batching.
-	n.entries = make([]*logrus.Entry, 0, initialEntriesCapacity)
+	n.entries = make([]*notificationEntry, 0, initialEntriesCapacity)
 
-	// Unlock the mutex after resetting the entries slice.
 	n.entriesMutex.Unlock()
 
-	LocalLog.WithFields(logrus.Fields{
-		"legacy_template":  n.legacyTemplate,
-		"receiving":        n.receiving.Load(),
-		"entries_count":    preResetCount,
-		"suppress_summary": suppressSummary,
-	}).Debug("StartNotification called - batching mode enabled")
+	if len(toSend) > 0 {
+		n.sendEntries(toSend, nil)
+	}
+
+	n.ll().Debug().
+		Bool("legacy_template", n.legacyTemplate).
+		Bool("receiving", n.receiving.Load()).
+		Int("entries_count", preResetCount).
+		Bool("suppress_summary", suppressSummary).
+		Msg("StartNotification called - batching mode enabled")
 }
 
 // SendNotification sends queued messages with a report.
 //
+// When the report focuses on a single container (exactly one container across
+// Updated/Restarted, or a single Skipped/Stale focus with no updates), matching
+// queued entries are filtered out of the queue and sent with that report. This
+// supports --notification-split-by-container without exposing entry state.
+// Otherwise the entire queue is drained and sent.
+//
 // Parameters:
 //   - report: Scan report to include.
-//
-// It clears the queue after sending.
 func (n *shoutrrrTypeNotifier) SendNotification(report types.Report) {
 	n.entriesMutex.Lock()
-	entries := n.entries
-	n.entries = nil // Clear the queue after copying to prevent re-sending
+
+	var entries []*notificationEntry
+
+	focus, ok := singleFocusContainer(report)
+	if ok {
+		// Keep non-nil empty slices so Run continues treating batching as active
+		// when every queued entry matched the focus.
+		matched := make([]*notificationEntry, 0)
+		rest := make([]*notificationEntry, 0)
+
+		for _, e := range n.entries {
+			if entryMatchesFocus(e, focus) {
+				matched = append(matched, e)
+			} else {
+				rest = append(rest, e)
+			}
+		}
+
+		n.entries = rest
+		entries = matched
+	} else {
+		entries = n.entries
+		n.entries = nil // Clear the queue after copying to prevent re-sending
+	}
+
 	n.entriesMutex.Unlock()
 
-	LocalLog.WithFields(logrus.Fields{
-		"entries_count":    len(entries),
-		"legacy_template":  n.legacyTemplate,
-		"report_available": report != nil,
-	}).Debug("SendNotification called - sending queued entries and report")
+	n.ll().Debug().
+		Int("entries_count", len(entries)).
+		Bool("legacy_template", n.legacyTemplate).
+		Bool("report_available", report != nil).
+		Msg("SendNotification called - sending queued entries and report")
 
 	// Deduplicate entries to prevent repeated messages when multiple containers
 	// share the same image (e.g., two containers using nginx:latest will both
@@ -466,18 +541,74 @@ func (n *shoutrrrTypeNotifier) SendNotification(report types.Report) {
 	n.sendEntries(entries, report)
 }
 
+// FlushSplitByContainer sends one notification per distinct container value in the
+// queued entries, then clears the queue.
+//
+// Used by the check API split path. This is intentionally a package-level helper
+// (not on types.Notifier): the only production Notifier is *shoutrrrTypeNotifier.
+// Adding a split method to the interface would force every mock or stub to implement
+// it. Non-shoutrrr values fall back to a single SendNotification(nil).
+//
+// Parameters:
+//   - notifier: Active notifier instance (typically *shoutrrrTypeNotifier).
+func FlushSplitByContainer(notifier types.Notifier) {
+	if notifier == nil {
+		return
+	}
+
+	shoutrrr, ok := notifier.(*shoutrrrTypeNotifier)
+	if !ok {
+		notifier.SendNotification(nil)
+
+		return
+	}
+
+	shoutrrr.entriesMutex.Lock()
+	entries := shoutrrr.entries
+	shoutrrr.entries = nil
+	shoutrrr.entriesMutex.Unlock()
+
+	if len(entries) == 0 {
+		return
+	}
+
+	byContainer := make(map[string][]*notificationEntry)
+
+	for _, entry := range entries {
+		container, _ := entry.Data["container"].(string)
+		if container == "" {
+			name, ok := entry.Data["container_name"].(string)
+			if ok && name != "" {
+				container = name
+			} else {
+				container = "unknown"
+			}
+		}
+
+		byContainer[container] = append(byContainer[container], entry)
+	}
+
+	for _, containerEntries := range byContainer {
+		if len(containerEntries) > 0 {
+			shoutrrr.sendEntries(containerEntries, nil)
+		}
+	}
+}
+
 // Close gracefully shuts down the Shoutrrr notifier.
 //
 // It signals the notification goroutine to stop, waits for in-flight messages
 // to complete within the grace period, cancels the context to unblock pending sends,
 // and ensures the goroutine has finished before returning.
 func (n *shoutrrrTypeNotifier) Close() {
+	log := n.ll()
+
 	n.closeOnce.Do(func() {
 		n.closed.Store(true)
 
 		// If no worker goroutine exists, skip waiting and cancel immediately.
 		if !n.receiving.Load() {
-			LocalLog.Debug("No notification worker running, canceling context immediately")
+			log.Debug().Msg("No notification worker running, canceling context immediately")
 			n.cancel()
 
 			return
@@ -485,45 +616,85 @@ func (n *shoutrrrTypeNotifier) Close() {
 
 		// Signal goroutine to stop processing new messages.
 		if n.stop != nil {
-			LocalLog.Debug("Closing stop channel to signal shutdown")
+			log.Debug().Msg("Closing stop channel to signal shutdown")
 			close(n.stop)
 		}
 
 		// Wait for the worker goroutine to exit by waiting on n.done channel.
-		LocalLog.Debug("Waiting for the notification goroutine to finish")
+		log.Debug().Msg("Waiting for the notification goroutine to finish")
 		<-n.done
 
 		// Only AFTER the worker has exited, close n.messages channel.
-		LocalLog.Debug("Closing messages channel after worker exit")
+		log.Debug().Msg("Closing messages channel after worker exit")
 		close(n.messages)
 
 		// Cancel context to unblock any pending operations.
-		LocalLog.Debug("Canceling notification context to unblock pending sends")
+		log.Debug().Msg("Canceling notification context to unblock pending sends")
 		n.cancel()
 	})
 }
 
-// GetEntries returns a copy of the queued log entries.
-//
-// Returns:
-//   - []*logrus.Entry: Copy of queued entries.
-func (n *shoutrrrTypeNotifier) GetEntries() []*logrus.Entry {
-	n.entriesMutex.RLock()
-	defer n.entriesMutex.RUnlock()
+// singleFocusContainer returns the sole focus container when the report is a
+// session.SingleContainerReport (split path), or false for a full session report.
+// Type assertion is required because a full report with one update is otherwise
+// indistinguishable from a split single-container report.
+func singleFocusContainer(report types.Report) (types.ContainerReport, bool) {
+	if report == nil {
+		return nil, false
+	}
 
-	entries := make([]*logrus.Entry, len(n.entries))
-	copy(entries, n.entries)
+	scr, ok := report.(*session.SingleContainerReport)
+	if !ok {
+		return nil, false
+	}
 
-	return entries
+	if len(scr.UpdatedReports) == 1 {
+		return scr.UpdatedReports[0], true
+	}
+
+	if len(scr.RestartedReports) == 1 {
+		return scr.RestartedReports[0], true
+	}
+
+	if len(scr.SkippedReports) == 1 {
+		return scr.SkippedReports[0], true
+	}
+
+	if len(scr.StaleReports) == 1 {
+		return scr.StaleReports[0], true
+	}
+
+	return nil, false
 }
 
-// SendFilteredEntries sends filtered log entries with an optional report.
-//
-// Parameters:
-//   - entries: Log entries to send.
-//   - report: Optional scan report.
-func (n *shoutrrrTypeNotifier) SendFilteredEntries(entries []*logrus.Entry, report types.Report) {
-	n.sendEntries(entries, report)
+// entryMatchesFocus reports whether a queued entry belongs to the focus container.
+func entryMatchesFocus(entry *notificationEntry, focus types.ContainerReport) bool {
+	if entry == nil || focus == nil {
+		return false
+	}
+
+	name := focus.Name()
+	if c, ok := entry.Data["container"].(string); ok && c == name {
+		return true
+	}
+
+	if c, ok := entry.Data["container_name"].(string); ok && c == name {
+		return true
+	}
+
+	// Image-level messages (e.g. cooldown) without a container field match by image name.
+	_, hasContainer := entry.Data["container"]
+	if !hasContainer {
+		_, hasCN := entry.Data["container_name"]
+		if !hasCN {
+			img, ok := entry.Data["image"].(string)
+			if ok && img != "" && img == focus.ImageName() {
+				return true
+			}
+		}
+	}
+
+	return false
 }
 
 // deduplicateEntries removes duplicate log entries that occur when multiple containers
@@ -540,8 +711,8 @@ func (n *shoutrrrTypeNotifier) SendFilteredEntries(entries []*logrus.Entry, repo
 //   - entries: Log entries that may contain duplicates.
 //
 // Returns:
-//   - []*logrus.Entry: Deduplicated entries preserving original order.
-func deduplicateEntries(entries []*logrus.Entry) []*logrus.Entry {
+//   - []*notificationEntry: Deduplicated entries preserving original order.
+func deduplicateEntries(entries []*notificationEntry) []*notificationEntry {
 	if len(entries) <= 1 {
 		return entries
 	}
@@ -552,7 +723,7 @@ func deduplicateEntries(entries []*logrus.Entry) []*logrus.Entry {
 	}
 
 	seen := make(map[dedupKey]bool)
-	result := make([]*logrus.Entry, 0, len(entries))
+	result := make([]*notificationEntry, 0, len(entries))
 
 	for _, entry := range entries {
 		var key dedupKey
@@ -598,7 +769,7 @@ func deduplicateEntries(entries []*logrus.Entry) []*logrus.Entry {
 // Returns:
 //   - bool: True if notification should be sent, false otherwise.
 func (n *shoutrrrTypeNotifier) ShouldSendNotification(report types.Report) bool {
-	if report != nil && n.logLevel == logrus.ErrorLevel {
+	if report != nil && n.logLevel == zerolog.ErrorLevel {
 		if len(report.Failed()) == 0 {
 			return false
 		}
@@ -607,51 +778,209 @@ func (n *shoutrrrTypeNotifier) ShouldSendNotification(report types.Report) bool 
 	return true
 }
 
-// Levels returns log levels that trigger notifications.
+// Run implements the [zerolog.Hook] interface for *shoutrrrTypeNotifier.
 //
-// Returns:
-//   - []logrus.Level: Levels up to configured log level.
-func (n *shoutrrrTypeNotifier) Levels() []logrus.Level {
-	return logrus.AllLevels[:n.logLevel+1]
-}
-
-// Fire handles a log entry as a logrus hook.
+// It queues or immediately sends log events as notifications.
+//
+// Loop prevention:
+//   - Events carrying notify=no (including all localLog output) are ignored before
+//     any lock is taken, so nested localLog calls never re-enter the queue.
+//   - If field extraction fails (nil or unparseable event buffer), the event is
+//     fail-closed and not queued. This never risks missing notify=no and looping.
+//
+// Concurrent application log events are allowed. entriesMutex serializes queue
+// access only. sendEntries and debug logging run after unlock so the lock is never
+// held across template work or re-entrant hook paths that would deadlock.
+//
+// Events below the configured notification level are ignored.
+//
+// Only zerolog events on the hooked process logger are captured. Domain producers
+// such as pkg/container ("Found new image", "Removing image") log through the process
+// logger from NewClient so log-mode notifications receive them. Report-mode
+// notifications (--notification-report) render from types.Report.
 //
 // Parameters:
-//   - entry: Log entry to process.
+//   - event: Zerolog event (fields are read from the in-progress JSON buffer).
+//   - level: Event level.
+//   - message: Log message.
+func (n *shoutrrrTypeNotifier) Run(event *zerolog.Event, level zerolog.Level, message string) {
+	if n.closed.Load() {
+		return
+	}
+
+	// Filter by notification level (zerolog: higher ordinal is more severe).
+	if level < n.logLevel {
+		return
+	}
+
+	// Fail-closed: if we cannot parse fields, we cannot prove notify!=no, so skip queueing.
+	// Done before entriesMutex so nested localLog hooks never contend with a held lock.
+	fields, timestamp, ok := eventFieldMap(event)
+	if !ok {
+		// Emit a warning only on the first extraction failure to aid debugging
+		// without flooding logs on every subsequent malformed event.
+		n.extractWarnOnce.Do(func() {
+			n.ll().Warn().
+				Msg("Failed to extract fields from log event; notification queueing skipped for this event")
+		})
+
+		return
+	}
+
+	notify, has := fields["notify"].(string)
+	if has && notify == "no" {
+		return // Skip non-notify entries (loop prevention).
+	}
+	// notify is an internal control field, not template data.
+	delete(fields, "notify")
+
+	entry := &notificationEntry{
+		Message: message,
+		Data:    fields,
+		Time:    timestamp,
+		Level:   levelToString(level),
+	}
+
+	// Hold the mutex only for queue mutation. Log and send outside the lock.
+	// Concurrent Runs from different goroutines are fine — they serialize here only.
+	n.entriesMutex.Lock()
+	batching := n.entries != nil
+
+	var entriesCount int
+
+	if batching {
+		n.entries = append(n.entries, entry)
+		entriesCount = len(n.entries)
+	}
+	n.entriesMutex.Unlock()
+
+	if batching {
+		// Name the field entry_level. Zerolog reserves level for event severity.
+		// Using Str("level", ...) would overwrite Debug or Info in logfmt output.
+		n.ll().Debug().
+			Str("message", entry.Message).
+			Str("entry_level", entry.Level).
+			Int("entries_count", entriesCount).
+			Bool("legacy_template", n.legacyTemplate).
+			Msg("Log entry queued for batching")
+
+		return
+	}
+
+	// Same entry_level naming as the batching path above.
+	n.ll().Debug().
+		Str("message", entry.Message).
+		Str("entry_level", entry.Level).
+		Bool("legacy_template", n.legacyTemplate).
+		Msg("Log entry sent immediately (not batching)")
+	n.sendEntries([]*notificationEntry{entry}, nil)
+}
+
+// ll returns the notifier's loop-safe logger, falling back to a discarded logger.
 //
 // Returns:
-//   - error: Always nil.
-func (n *shoutrrrTypeNotifier) Fire(entry *logrus.Entry) error {
-	if entry.Data["notify"] == "no" {
-		return nil // Skip non-notify entries.
+//   - *zerolog.Logger: Child logger with notify=no, or a nop logger when unset.
+func (n *shoutrrrTypeNotifier) ll() *zerolog.Logger {
+	if n != nil && n.localLog != nil {
+		return n.localLog
 	}
 
-	if n.closed.Load() {
-		return nil // Skip if closed.
+	nop := zerolog.Nop()
+
+	return &nop
+}
+
+// eventFieldMap extracts application fields and timestamp from a zerolog.Event's
+// in-progress buffer.
+//
+// At hook time the buffer holds a partial JSON object (no message, no closing brace).
+// Zerolog does not expose a public GetString API on Event. This helper reconstructs
+// the field map from the unexported buffer via reflection. The field layout is
+// pinned to zerolog v1.35.x and requires revalidation on upgrades. reflect and
+// unsafe are required because the event buffer is unexported.
+//
+// Parameters:
+//   - event: In-progress zerolog event, or nil.
+//
+// Returns:
+//   - map[string]any: Application fields with standard envelope keys removed.
+//   - time.Time: Event timestamp, or time.Now when missing or unparsable.
+//   - bool: False when extraction fails (caller must fail-closed).
+func eventFieldMap(event *zerolog.Event) (map[string]any, time.Time, bool) {
+	now := time.Now()
+	if event == nil {
+		return nil, now, false
 	}
 
-	n.entriesMutex.Lock()
-	defer n.entriesMutex.Unlock()
-
-	if n.entries != nil {
-		n.entries = append(n.entries, entry) // Queue if batching.
-		LocalLog.WithFields(logrus.Fields{
-			"message":         entry.Message,
-			"level":           entry.Level.String(),
-			"entries_count":   len(n.entries),
-			"legacy_template": n.legacyTemplate,
-		}).Debug("Log entry queued for batching")
-	} else {
-		LocalLog.WithFields(logrus.Fields{
-			"message":         entry.Message,
-			"level":           entry.Level.String(),
-			"legacy_template": n.legacyTemplate,
-		}).Debug("Log entry sent immediately (not batching)")
-		n.sendEntries([]*logrus.Entry{entry}, nil) // Send immediately if not batching.
+	rv := reflect.ValueOf(event).Elem().FieldByName("buf")
+	if !rv.IsValid() || rv.Kind() != reflect.Slice || rv.Len() == 0 {
+		return nil, now, false
 	}
 
-	return nil
+	buf := unsafe.Slice((*byte)(rv.UnsafePointer()), rv.Len())
+
+	// Close the partial JSON object produced before the message is appended.
+	raw := make([]byte, len(buf)+1)
+	copy(raw, buf)
+	raw[len(buf)] = '}'
+
+	var fieldMap map[string]any
+
+	dec := json.NewDecoder(bytes.NewReader(raw))
+	dec.UseNumber()
+
+	err := dec.Decode(&fieldMap)
+	if err != nil {
+		return nil, now, false
+	}
+
+	// Normalize json.Number values to int64 or float64 so templates can compare
+	// them as numbers without precision loss for large integer values.
+	for fieldKey, fieldVal := range fieldMap {
+		num, ok := fieldVal.(json.Number)
+		if !ok {
+			continue
+		}
+
+		intVal, intErr := num.Int64()
+		if intErr == nil {
+			fieldMap[fieldKey] = intVal
+
+			continue
+		}
+
+		floatVal, floatErr := num.Float64()
+		if floatErr == nil {
+			fieldMap[fieldKey] = floatVal
+		}
+	}
+
+	timestamp := now
+
+	rawTS, ok := fieldMap[zerolog.TimestampFieldName]
+	if ok {
+		tsStr, ok := rawTS.(string)
+		if ok {
+			parsed, parseErr := time.Parse(time.RFC3339, tsStr)
+			if parseErr != nil {
+				parsed, parseErr = time.Parse(time.RFC3339Nano, tsStr)
+			}
+
+			if parseErr == nil {
+				timestamp = parsed
+			}
+		}
+	}
+
+	// Drop standard zerolog envelope keys so templates see application fields only.
+	// Keep ErrorFieldName ("error"): templates and JSON historically surface
+	// WithError/Err as Data["error"] (historical notification template field name).
+	delete(fieldMap, zerolog.LevelFieldName)
+	delete(fieldMap, zerolog.TimestampFieldName)
+	delete(fieldMap, zerolog.MessageFieldName)
+	delete(fieldMap, zerolog.CallerFieldName)
+
+	return fieldMap, timestamp, true
 }
 
 // send sends a message via the notification router.
@@ -668,7 +997,7 @@ func (n *shoutrrrTypeNotifier) send(msg string) {
 	case errs := <-sendCh:
 		processSendErrors(n, errs)
 	case <-n.ctx.Done():
-		LocalLog.WithError(n.ctx.Err()).Debug("Notification send canceled")
+		n.ll().Debug().Err(n.ctx.Err()).Msg("Notification send canceled")
 	}
 }
 
@@ -681,6 +1010,8 @@ func (n *shoutrrrTypeNotifier) send(msg string) {
 //   - string: Rendered message.
 //   - error: Non-nil if templating fails, nil on success.
 func (n *shoutrrrTypeNotifier) buildMessage(data Data) (string, error) {
+	log := n.ll()
+
 	var body bytes.Buffer
 
 	dataSource := any(data)
@@ -696,20 +1027,21 @@ func (n *shoutrrrTypeNotifier) buildMessage(data Data) (string, error) {
 		containerCount = len(data.Report.All())
 	}
 
-	LocalLog.WithFields(logrus.Fields{
-		"legacy_template":  n.legacyTemplate,
-		"entries_count":    len(data.Entries),
-		"container_count":  containerCount,
-		"report_available": reportAvailable,
-	}).Debug("Starting template processing for notification message")
+	log.Debug().
+		Bool("legacy_template", n.legacyTemplate).
+		Int("entries_count", len(data.Entries)).
+		Int("container_count", containerCount).
+		Bool("report_available", reportAvailable).
+		Msg("Starting template processing for notification message")
 
 	// Execute template with data.
 	err := n.template.Execute(&body, dataSource)
 	if err != nil {
-		LocalLog.WithError(err).WithFields(logrus.Fields{
-			"legacy_template": n.legacyTemplate,
-			"template_name":   n.template.Name(),
-		}).Debug("Template execution failed")
+		log.Debug().
+			Err(err).
+			Bool("legacy_template", n.legacyTemplate).
+			Str("template_name", n.template.Name()).
+			Msg("Template execution failed")
 
 		return "", fmt.Errorf("failed to execute template: %w", err)
 	}
@@ -717,14 +1049,14 @@ func (n *shoutrrrTypeNotifier) buildMessage(data Data) (string, error) {
 	msg := body.String()
 
 	// Log template processing result
-	LocalLog.WithFields(logrus.Fields{
-		"msg_length":      len(msg),
-		"legacy_template": n.legacyTemplate,
-		"template_name":   n.template.Name(),
-		"entries_count":   len(data.Entries),
-	}).Debug("Template processing completed successfully")
+	log.Debug().
+		Int("msg_length", len(msg)).
+		Bool("legacy_template", n.legacyTemplate).
+		Str("template_name", n.template.Name()).
+		Int("entries_count", len(data.Entries)).
+		Msg("Template processing completed successfully")
 
-	LocalLog.WithField("message", msg).Debug("Generated notification message")
+	log.Debug().Str("message", msg).Msg("Generated notification message")
 
 	return msg, nil
 }
@@ -734,21 +1066,29 @@ func (n *shoutrrrTypeNotifier) buildMessage(data Data) (string, error) {
 // Parameters:
 //   - entries: Log entries to send.
 //   - report: Optional scan report.
-func (n *shoutrrrTypeNotifier) sendEntries(entries []*logrus.Entry, report types.Report) {
-	msg, err := n.buildMessage(Data{n.data, entries, report})
+func (n *shoutrrrTypeNotifier) sendEntries(entries []*notificationEntry, report types.Report) {
+	log := n.ll()
 
-	LocalLog.WithError(err).
-		WithFields(logrus.Fields{"message": msg}).
-		Debug("Preparing to send entries")
+	msg, err := n.buildMessage(Data{n.data, entries, report})
+	if err != nil {
+		log.Debug().
+			Err(err).
+			Str("message", msg).
+			Msg("Preparing to send entries")
+	} else {
+		log.Debug().
+			Str("message", msg).
+			Msg("Preparing to send entries")
+	}
 
 	if msg == "" {
 		if err != nil {
-			LocalLog.WithError(err).Error("Notification template error")
+			log.Error().Err(err).Msg("Notification template error")
 		} else if len(n.Urls) > 1 {
-			LocalLog.Info("Skipping notification due to empty message")
+			log.Info().Msg("Skipping notification due to empty message")
 		}
 
-		LocalLog.Debug("Message empty, skipping send")
+		log.Debug().Msg("Message empty, skipping send")
 
 		return
 	}
@@ -758,21 +1098,21 @@ func (n *shoutrrrTypeNotifier) sendEntries(entries []*logrus.Entry, report types
 	select {
 	case n.messages <- msg:
 		// Message sent successfully to channel
-		LocalLog.WithFields(logrus.Fields{
-			"entries_count":  len(entries),
-			"msg_length":     len(msg),
-			"channel_status": "sent",
-		}).Debug("Successfully sent message to notification channel")
+		log.Debug().
+			Int("entries_count", len(entries)).
+			Int("msg_length", len(msg)).
+			Str("channel_status", "sent").
+			Msg("Successfully sent message to notification channel")
 	default:
 		// Non-blocking send failed - check if closed or done before returning.
 		// This check is done AFTER the send attempt to catch the race condition
 		// where Close() signaled stop but sendEntries was already in progress.
 		if n.closed.Load() {
-			LocalLog.WithFields(logrus.Fields{
-				"entries_count":  len(entries),
-				"msg_length":     len(msg),
-				"channel_status": "closed",
-			}).Debug("Notifier closed, skipping send")
+			log.Debug().
+				Int("entries_count", len(entries)).
+				Int("msg_length", len(msg)).
+				Str("channel_status", "closed").
+				Msg("Notifier closed, skipping send")
 
 			return
 		}
@@ -780,20 +1120,20 @@ func (n *shoutrrrTypeNotifier) sendEntries(entries []*logrus.Entry, report types
 		// Check if worker goroutine has exited
 		select {
 		case <-n.done:
-			LocalLog.WithFields(logrus.Fields{
-				"entries_count":  len(entries),
-				"msg_length":     len(msg),
-				"channel_status": "worker_done",
-			}).Debug("Worker goroutine done, skipping send")
+			log.Debug().
+				Int("entries_count", len(entries)).
+				Int("msg_length", len(msg)).
+				Str("channel_status", "worker_done").
+				Msg("Worker goroutine done, skipping send")
 
 			return
 		default:
 			// Channel is full (not closed, not done), apply backpressure
-			LocalLog.WithFields(logrus.Fields{
-				"entries_count":  len(entries),
-				"msg_length":     len(msg),
-				"channel_status": "full",
-			}).Debug("Channel full, skipping send (backpressure)")
+			log.Debug().
+				Int("entries_count", len(entries)).
+				Int("msg_length", len(msg)).
+				Str("channel_status", "full").
+				Msg("Channel full, skipping send (backpressure)")
 		}
 	}
 }
@@ -801,18 +1141,20 @@ func (n *shoutrrrTypeNotifier) sendEntries(entries []*logrus.Entry, report types
 // getShoutrrrTemplate retrieves or generates a template.
 //
 // Parameters:
+//   - log: Logger for diagnostics.
 //   - tplString: Template string.
 //   - legacy: Use legacy mode if true.
 //
 // Returns:
 //   - *template.Template: Parsed or default template.
 //   - error: Non-nil if parsing fails, nil on success.
-func getShoutrrrTemplate(tplString string, legacy bool) (*template.Template, error) {
+func getShoutrrrTemplate(log *zerolog.Logger, tplString string, legacy bool) (*template.Template, error) {
 	tplBase := template.New("").Funcs(templates.Funcs)
 
 	// Use common template if specified.
-	if builtin, found := commonTemplates[tplString]; found {
-		LocalLog.WithField("template", tplString).Debug("Using common template")
+	builtin, found := commonTemplates[tplString]
+	if found {
+		log.Debug().Str("template", tplString).Msg("Using common template")
 		tplString = builtin
 	}
 
@@ -826,7 +1168,7 @@ func getShoutrrrTemplate(tplString string, legacy bool) (*template.Template, err
 		// Parse provided template if non-empty.
 		tpl, err = tplBase.Parse(tplString)
 		if err != nil {
-			LocalLog.WithError(err).Debug("Parse failed")
+			log.Debug().Err(err).Msg("Parse failed")
 
 			return nil, fmt.Errorf("failed to parse template: %w", err)
 		}

@@ -15,7 +15,6 @@ import (
 	"text/template"
 	"time"
 
-	"github.com/sirupsen/logrus"
 	"golang.org/x/text/cases"
 	"golang.org/x/text/language"
 )
@@ -30,14 +29,10 @@ var Funcs = template.FuncMap{
 }
 
 // toJSON marshals a value to a formatted JSON string for use in templates.
-// If marshaling fails, it logs a warning and returns an error message as the string.
+// If marshaling fails, it returns an error message as the string.
 func toJSON(v any) string {
 	bytes, err := json.MarshalIndent(v, "", "  ")
 	if err != nil {
-		logrus.WithError(err).WithFields(logrus.Fields{
-			"value": fmt.Sprintf("%v", v), // Avoid recursive marshaling issues
-		}).Warn("Failed to marshal JSON in notification template")
-
 		return fmt.Sprintf("failed to marshal JSON in notification template: %v", err)
 	}
 
@@ -45,13 +40,10 @@ func toJSON(v any) string {
 }
 
 // formatRFC1123 parses an RFC3339 timestamp string and formats it as RFC1123.
-// If parsing fails, it logs a warning and returns the original string.
+// If parsing fails, it returns the original string.
 func formatRFC1123(value string) string {
 	timestamp, err := time.Parse(time.RFC3339, value)
 	if err != nil {
-		logrus.WithError(err).WithField("value", value).
-			Warn("Failed to parse RFC3339 timestamp in notification template")
-
 		return value
 	}
 

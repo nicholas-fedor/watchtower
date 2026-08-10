@@ -39,7 +39,6 @@
 //   - config/: Shared configuration types, validation, and sentinel errors.
 //   - lifecycle.go: Server startup, shutdown, and address formatting.
 //   - fiber.go: Fiber app factory, configuration types, and middleware stack.
-//   - middleware.go: logrusWriter adapter for Fiber logger.
 //   - auth.go: Token authentication middleware.
 //   - routes/: Per-endpoint registration including health checks.
 //
@@ -56,11 +55,12 @@
 // Middleware stack (outermost to innermost):
 //  1. recover     — panic recovery
 //  2. helmet      — security headers
-//  3. requestid   — request ID propagation
-//  4. logger      — structured request logging via logrus
-//  5. compress    — response compression
-//  6. limiter     — per-IP rate limiting (sliding window)
-//  7. auth        — Bearer token authentication (per-route)
+//  3. cors        — cross-origin headers (only when AllowedOrigins is configured)
+//  4. requestid   — request ID propagation
+//  5. zerolog     — structured request logging via gofiber/contrib/v3/zerolog
+//  6. compress    — response compression
+//  7. limiter     — per-IP rate limiting (sliding window)
+//  8. auth        — Bearer token authentication (per-route)
 //
 // API server timeout behavior:
 //

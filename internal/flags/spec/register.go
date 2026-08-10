@@ -15,8 +15,8 @@ var ErrUnsupportedFlagKind = errors.New("unsupported flag kind")
 
 // Register registers pflags from FlagSpec rows using static defaults only.
 //
-// Environment values are not baked into pflag defaults; ApplyEnvToFlags and
-// Viper bind resolve env after parse.
+// Environment values are not baked into pflag defaults.
+// ApplyEnvToFlags and Viper bind resolve env after parse.
 //
 // Parameters:
 //   - flagSet: Target flag set that receives the registered flags.

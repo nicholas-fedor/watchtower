@@ -183,6 +183,7 @@ func BenchmarkDependencySorter(b *testing.B) {
 	for _, tc := range testCases {
 		b.Run(tc.name, func(b *testing.B) {
 			containers := tc.containers()
+			benchLog := testLog()
 
 			b.ResetTimer()
 
@@ -192,7 +193,7 @@ func BenchmarkDependencySorter(b *testing.B) {
 				testContainers := make([]types.Container, len(containers))
 				copy(testContainers, containers)
 
-				err := ds.Sort(testContainers, true)
+				err := ds.Sort(benchLog, testContainers, true)
 				if err != nil {
 					b.Fatalf("Unexpected error in benchmark %s: %v", tc.name, err)
 				}
@@ -274,6 +275,7 @@ func BenchmarkCycleDetection(b *testing.B) {
 	for _, tc := range testCases {
 		b.Run(tc.name, func(b *testing.B) {
 			containers := tc.containers()
+			benchLog := testLog()
 
 			b.ResetTimer()
 
@@ -282,7 +284,7 @@ func BenchmarkCycleDetection(b *testing.B) {
 				testContainers := make([]types.Container, len(containers))
 				copy(testContainers, containers)
 
-				err := ds.Sort(testContainers, true)
+				err := ds.Sort(benchLog, testContainers, true)
 				if tc.hasCycle && err == nil {
 					b.Fatalf("Expected cycle detection error in benchmark %s", tc.name)
 				}
@@ -299,6 +301,7 @@ func BenchmarkCycleDetection(b *testing.B) {
 func BenchmarkMemoryUsage(b *testing.B) {
 	b.Run("MemoryEfficiency", func(b *testing.B) {
 		containers := generateBenchmarkContainers(1000, 0.5)
+		benchLog := testLog()
 
 		b.ResetTimer()
 
@@ -309,7 +312,7 @@ func BenchmarkMemoryUsage(b *testing.B) {
 			testContainers := make([]types.Container, len(containers))
 			copy(testContainers, containers)
 
-			err := ds.Sort(testContainers, true)
+			err := ds.Sort(benchLog, testContainers, true)
 			if err != nil {
 				b.Fatalf("Unexpected error: %v", err)
 			}
@@ -319,17 +322,18 @@ func BenchmarkMemoryUsage(b *testing.B) {
 
 // Benchmark sort stability - ensure consistent results for equivalent inputs.
 func BenchmarkSortStability(b *testing.B) {
-	containers := generateBenchmarkContainers(100, 0.3)
-
 	var firstResult []string
 
 	b.Run("StabilityCheck", func(b *testing.B) {
+		containers := generateBenchmarkContainers(100, 0.3)
+		benchLog := testLog()
+
 		for b.Loop() {
 			ds := DependencySorter{}
 			testContainers := make([]types.Container, len(containers))
 			copy(testContainers, containers)
 
-			err := ds.Sort(testContainers, true)
+			err := ds.Sort(benchLog, testContainers, true)
 			if err != nil {
 				b.Fatalf("Unexpected error: %v", err)
 			}

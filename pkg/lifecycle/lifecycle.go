@@ -5,7 +5,7 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/sirupsen/logrus"
+	"github.com/rs/zerolog"
 
 	"github.com/nicholas-fedor/watchtower/pkg/container"
 	"github.com/nicholas-fedor/watchtower/pkg/types"
@@ -26,27 +26,31 @@ var (
 //   - ctx: Context for cancellation and timeout.
 //   - client: Container client for execution.
 //   - params: Update parameters with filter.
-func ExecutePreChecks(ctx context.Context, client container.Client, params types.UpdateParams) {
+func ExecutePreChecks(log *zerolog.Logger, ctx context.Context, client container.Client, params types.UpdateParams) {
 	uid := params.LifecycleUID
 	gid := params.LifecycleGID
-	clog := logrus.WithField(
-		"filter",
-		fmt.Sprintf("%v", params.Filter),
-	) // Simplified filter logging
-	clog.Debug("Listing containers for pre-checks")
+	clogVal := log.With().
+		Str("filter", fmt.Sprintf("%v", params.Filter)).
+		Logger()
+	clog := &clogVal // Simplified filter logging
+	clog.Debug().Msg("Listing containers for pre-checks")
 
 	// Fetch containers using the provided filter.
 	containers, err := client.ListContainers(ctx, params.Filter)
 	if err != nil {
-		clog.WithError(err).Debug("Failed to list containers for pre-checks")
+		clog.Debug().
+			Err(err).
+			Msg("Failed to list containers for pre-checks")
 
 		return
 	}
 
-	clog.WithField("count", len(containers)).Debug("Found containers for pre-checks")
+	clog.Debug().
+		Int("count", len(containers)).
+		Msg("Found containers for pre-checks")
 
 	for _, currentContainer := range containers {
-		ExecutePreCheckCommand(ctx, client, currentContainer, uid, gid)
+		ExecutePreCheckCommand(log, ctx, client, currentContainer, uid, gid)
 	}
 }
 
@@ -56,24 +60,31 @@ func ExecutePreChecks(ctx context.Context, client container.Client, params types
 //   - ctx: Context for cancellation and timeout.
 //   - client: Container client for execution.
 //   - params: Update parameters with filter.
-func ExecutePostChecks(ctx context.Context, client container.Client, params types.UpdateParams) {
+func ExecutePostChecks(log *zerolog.Logger, ctx context.Context, client container.Client, params types.UpdateParams) {
 	uid := params.LifecycleUID
 	gid := params.LifecycleGID
-	clog := logrus.WithField("filter", fmt.Sprintf("%v", params.Filter))
-	clog.Debug("Listing containers for post-checks")
+	clogVal := log.With().
+		Str("filter", fmt.Sprintf("%v", params.Filter)).
+		Logger()
+	clog := &clogVal
+	clog.Debug().Msg("Listing containers for post-checks")
 
 	// Fetch containers using the provided filter.
 	containers, err := client.ListContainers(ctx, params.Filter)
 	if err != nil {
-		clog.WithError(err).Debug("Failed to list containers for post-checks")
+		clog.Debug().
+			Err(err).
+			Msg("Failed to list containers for post-checks")
 
 		return
 	}
 
-	clog.WithField("count", len(containers)).Debug("Found containers for post-checks")
+	clog.Debug().
+		Int("count", len(containers)).
+		Msg("Found containers for post-checks")
 
 	for _, currentContainer := range containers {
-		ExecutePostCheckCommand(ctx, client, currentContainer, uid, gid)
+		ExecutePostCheckCommand(log, ctx, client, currentContainer, uid, gid)
 	}
 }
 
@@ -85,37 +96,17 @@ func ExecutePostChecks(ctx context.Context, client container.Client, params type
 //   - container: Container to process.
 //   - uid: Default UID to run command as.
 //   - gid: Default GID to run command as.
-func ExecutePreCheckCommand(ctx context.Context, client container.Client, container types.Container, uid, gid int) {
-	clog := logrus.WithField("container", container.Name())
-	command := container.GetLifecyclePreCheckCommand()
-
-	// Determine effective UID/GID: use container labels if set, otherwise use defaults.
-	effectiveUID := uid
-	if containerUID, ok := container.GetLifecycleUID(); ok {
-		effectiveUID = containerUID
-	}
-
-	effectiveGID := gid
-	if containerGID, ok := container.GetLifecycleGID(); ok {
-		effectiveGID = containerGID
-	}
-
-	// Skip if no command is set.
-	if len(command) == 0 {
-		clog.Debug("No pre-check command supplied. Skipping")
-
-		return
-	}
-
-	// Execute command with fixed short timeout (1 minute).
-	// Check commands are lightweight health checks that should complete quickly,
-	// unlike update commands which may perform complex operations and use configurable timeouts.
-	clog.WithField("command", command).Debug("Executing pre-check command")
-
-	_, err := client.ExecuteCommand(ctx, container, command, checkCommandTimeout, effectiveUID, effectiveGID)
-	if err != nil {
-		clog.WithError(err).Debug("Pre-check command failed")
-	}
+func ExecutePreCheckCommand(log *zerolog.Logger, ctx context.Context, client container.Client, container types.Container, uid, gid int) {
+	executeCheckCommand(
+		log,
+		ctx,
+		client,
+		container,
+		uid,
+		gid,
+		container.GetLifecyclePreCheckCommand(),
+		"pre-check",
+	)
 }
 
 // ExecutePostCheckCommand executes the post-check hook for a container.
@@ -126,24 +117,63 @@ func ExecutePreCheckCommand(ctx context.Context, client container.Client, contai
 //   - container: Container to process.
 //   - uid: Default UID to run command as.
 //   - gid: Default GID to run command as.
-func ExecutePostCheckCommand(ctx context.Context, client container.Client, container types.Container, uid, gid int) {
-	clog := logrus.WithField("container", container.Name())
-	command := container.GetLifecyclePostCheckCommand()
+func ExecutePostCheckCommand(log *zerolog.Logger, ctx context.Context, client container.Client, container types.Container, uid, gid int) {
+	executeCheckCommand(
+		log,
+		ctx,
+		client,
+		container,
+		uid,
+		gid,
+		container.GetLifecyclePostCheckCommand(),
+		"post-check",
+	)
+}
+
+// executeCheckCommand runs a pre-check or post-check lifecycle command.
+//
+// Parameters:
+//   - log: Process logger.
+//   - ctx: Context for cancellation and timeout.
+//   - client: Container client for execution.
+//   - cont: Container to process.
+//   - uid: Default UID to run command as.
+//   - gid: Default GID to run command as.
+//   - command: Command string from the container labels.
+//   - phase: Label for logs ("pre-check" or "post-check").
+func executeCheckCommand(
+	log *zerolog.Logger,
+	ctx context.Context,
+	client container.Client,
+	cont types.Container,
+	uid, gid int,
+	command string,
+	phase string,
+) {
+	clogVal := log.With().
+		Str("container", cont.Name()).
+		Logger()
+	clog := &clogVal
 
 	// Determine effective UID/GID: use container labels if set, otherwise use defaults.
 	effectiveUID := uid
-	if containerUID, ok := container.GetLifecycleUID(); ok {
+
+	containerUID, ok := cont.GetLifecycleUID()
+	if ok {
 		effectiveUID = containerUID
 	}
 
 	effectiveGID := gid
-	if containerGID, ok := container.GetLifecycleGID(); ok {
+
+	containerGID, ok := cont.GetLifecycleGID()
+	if ok {
 		effectiveGID = containerGID
 	}
 
 	// Skip if no command is set.
-	if len(command) == 0 {
-		clog.Debug("No post-check command supplied. Skipping")
+	if command == "" {
+		clog.Debug().
+			Msg("No " + phase + " command supplied. Skipping")
 
 		return
 	}
@@ -151,11 +181,21 @@ func ExecutePostCheckCommand(ctx context.Context, client container.Client, conta
 	// Execute command with fixed short timeout (1 minute).
 	// Check commands are lightweight health checks that should complete quickly,
 	// unlike update commands which may perform complex operations and use configurable timeouts.
-	clog.WithField("command", command).Debug("Executing post-check command")
+	clog.Debug().
+		Str("command", command).
+		Msg("Executing " + phase + " command")
 
-	_, err := client.ExecuteCommand(ctx, container, command, checkCommandTimeout, effectiveUID, effectiveGID)
+	_, err := client.ExecuteCommand(ctx, cont, command, checkCommandTimeout, effectiveUID, effectiveGID)
 	if err != nil {
-		clog.WithError(err).Debug("Post-check command failed")
+		// Match historical wording: "Pre-check command failed" / "Post-check command failed".
+		failedMsg := "Pre-check command failed"
+		if phase == "post-check" {
+			failedMsg = "Post-check command failed"
+		}
+
+		clog.Debug().
+			Err(err).
+			Msg(failedMsg)
 	}
 }
 
@@ -171,7 +211,7 @@ func ExecutePostCheckCommand(ctx context.Context, client container.Client, conta
 // Returns:
 //   - bool: True if command ran, false if skipped.
 //   - error: Non-nil if execution fails, nil otherwise.
-func ExecutePreUpdateCommand(
+func ExecutePreUpdateCommand(log *zerolog.Logger,
 	ctx context.Context,
 	client container.Client,
 	container types.Container,
@@ -180,44 +220,53 @@ func ExecutePreUpdateCommand(
 ) (bool, error) {
 	timeout := container.PreUpdateTimeout()
 	command := container.GetLifecyclePreUpdateCommand()
-	clog := logrus.WithFields(logrus.Fields{
-		"container": container.Name(),
-		"timeout":   timeout,
-	})
+	clogVal := log.With().
+		Str("container", container.Name()).
+		Int("timeout", timeout).
+		Logger()
+	clog := &clogVal
 
 	// Skip if no command or container isn't running.
 	if len(command) == 0 {
-		clog.Debug("No pre-update command supplied. Skipping")
+		clog.Debug().Msg("No pre-update command supplied. Skipping")
 
 		return false, nil
 	}
 
 	if !container.IsRunning() || container.IsRestarting() {
-		clog.WithFields(logrus.Fields{
-			"is_running":    container.IsRunning(),
-			"is_restarting": container.IsRestarting(),
-		}).Debug("Container is not running. Skipping pre-update command")
+		clog.Debug().
+			Bool("is_running", container.IsRunning()).
+			Bool("is_restarting", container.IsRestarting()).
+			Msg("Container is not running. Skipping pre-update command")
 
 		return false, nil
 	}
 
 	// Determine effective UID/GID: use container labels if set, otherwise use defaults.
 	effectiveUID := uid
-	if containerUID, ok := container.GetLifecycleUID(); ok {
+
+	containerUID, ok := container.GetLifecycleUID()
+	if ok {
 		effectiveUID = containerUID
 	}
 
 	effectiveGID := gid
-	if containerGID, ok := container.GetLifecycleGID(); ok {
+
+	containerGID, ok := container.GetLifecycleGID()
+	if ok {
 		effectiveGID = containerGID
 	}
 
 	// Execute command with configured timeout.
-	clog.WithField("command", command).Debug("Executing pre-update command")
+	clog.Debug().
+		Str("command", command).
+		Msg("Executing pre-update command")
 
 	success, err := client.ExecuteCommand(ctx, container, command, timeout, effectiveUID, effectiveGID)
 	if err != nil {
-		clog.WithError(err).Debug("Pre-update command failed")
+		clog.Debug().
+			Err(err).
+			Msg("Pre-update command failed")
 
 		return true, fmt.Errorf(
 			"%w for container %s: %w",
@@ -227,7 +276,9 @@ func ExecutePreUpdateCommand(
 		)
 	}
 
-	clog.WithField("success", success).Debug("Pre-update command executed")
+	clog.Debug().
+		Bool("success", success).
+		Msg("Pre-update command executed")
 
 	return success, nil
 }
@@ -240,56 +291,69 @@ func ExecutePreUpdateCommand(
 //   - newContainerID: ID of the updated container.
 //   - uid: UID to run command as.
 //   - gid: GID to run command as.
-func ExecutePostUpdateCommand(
+func ExecutePostUpdateCommand(log *zerolog.Logger,
 	ctx context.Context,
 	client container.Client,
 	newContainerID types.ContainerID,
 	uid int,
 	gid int,
 ) {
-	clog := logrus.WithField("container_id", newContainerID.ShortID())
-	clog.Debug("Retrieving container for post-update")
+	clogVal := log.With().
+		Str("container_id", newContainerID.ShortID()).
+		Logger()
+	clog := &clogVal
+	clog.Debug().Msg("Retrieving container for post-update")
 
 	// Retrieve container by ID.
 	newContainer, err := client.GetContainer(ctx, newContainerID)
 	if err != nil {
-		clog.WithError(err).Debug("Failed to get container for post-update")
+		clog.Debug().
+			Err(err).
+			Msg("Failed to get container for post-update")
 
 		return
 	}
 
 	timeout := newContainer.PostUpdateTimeout()
-	clog = logrus.WithFields(logrus.Fields{
-		"container": newContainer.Name(),
-		"timeout":   timeout,
-	})
+	clogVal = log.With().
+		Str("container", newContainer.Name()).
+		Int("timeout", timeout).
+		Logger()
+	clog = &clogVal
 	command := newContainer.GetLifecyclePostUpdateCommand()
 
 	// Determine effective UID/GID: use container labels if set, otherwise use defaults.
 	effectiveUID := uid
-	if containerUID, ok := newContainer.GetLifecycleUID(); ok {
+
+	containerUID, ok := newContainer.GetLifecycleUID()
+	if ok {
 		effectiveUID = containerUID
 	}
 
 	effectiveGID := gid
-	if containerGID, ok := newContainer.GetLifecycleGID(); ok {
+
+	containerGID, ok := newContainer.GetLifecycleGID()
+	if ok {
 		effectiveGID = containerGID
 	}
 
 	// Skip if no command is set.
 	if len(command) == 0 {
-		clog.Debug("No post-update command supplied. Skipping")
+		clog.Debug().Msg("No post-update command supplied. Skipping")
 
 		return
 	}
 
 	// Execute command with configured timeout.
-	clog.WithField("command", command).Debug("Executing post-update command")
+	clog.Debug().
+		Str("command", command).
+		Msg("Executing post-update command")
 
 	_, err = client.ExecuteCommand(ctx, newContainer, command, timeout, effectiveUID, effectiveGID)
 	if err != nil {
-		clog.WithError(err).WithFields(logrus.Fields{
-			"container_id": newContainerID.ShortID(),
-		}).Debug("Post-update command failed")
+		clog.Debug().
+			Err(err).
+			Str("container_id", newContainerID.ShortID()).
+			Msg("Post-update command failed")
 	}
 }

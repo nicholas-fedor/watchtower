@@ -89,7 +89,7 @@ func (c *SimpleContainer) GetLabel(key string) (string, bool) {
 
 	return "", false
 }
-func (c *SimpleContainer) ToRestart() bool       { return false }
+func (c *SimpleContainer) ToRestart() bool { return false }
 
 func (c *SimpleContainer) StopSignal() string {
 	if c.ContainerInfoField != nil {

@@ -5,8 +5,6 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/sirupsen/logrus"
-
 	"github.com/nicholas-fedor/watchtower/pkg/types"
 )
 
@@ -27,13 +25,6 @@ type jsonMap = map[string]any
 //   - []byte: JSON-encoded data.
 //   - error: Non-nil if marshaling fails, nil on success.
 func (d Data) MarshalJSON() ([]byte, error) {
-	clog := logrus.WithFields(logrus.Fields{
-		"title":   d.Title,
-		"host":    d.Host,
-		"entries": len(d.Entries),
-	})
-	clog.Debug("Marshaling notification data to JSON")
-
 	// Convert log entries to JSON maps.
 	entries := make([]jsonMap, len(d.Entries))
 	for i, entry := range d.Entries {
@@ -49,9 +40,6 @@ func (d Data) MarshalJSON() ([]byte, error) {
 	var report jsonMap
 
 	if d.Report != nil {
-		clog.WithField("report_entries", fmt.Sprintf("%d scanned, %d updated", len(d.Report.Scanned()), len(d.Report.Updated()))).
-			Debug("Including report in JSON")
-
 		report = jsonMap{
 			"scanned":   marshalReports(d.Report.Scanned()),
 			"updated":   marshalReports(d.Report.Updated()),
@@ -74,14 +62,8 @@ func (d Data) MarshalJSON() ([]byte, error) {
 	// Marshal to JSON bytes.
 	bytes, err := json.Marshal(data)
 	if err != nil {
-		clog.WithError(err).
-			WithField("data", fmt.Sprintf("%v", data)).
-			Error("Failed to marshal notification data to JSON")
-
 		return nil, fmt.Errorf("%w: %w", errMarshalFailed, err)
 	}
-
-	clog.WithField("size", len(bytes)).Debug("Successfully marshaled notification data to JSON")
 
 	return bytes, nil
 }
@@ -107,8 +89,10 @@ func marshalReports(reports []types.ContainerReport) []jsonMap {
 			"imageName":      report.ImageName(),
 			"state":          report.State(),
 		}
+
 		// Add error if present.
-		if errorMessage := report.Error(); errorMessage != "" {
+		errorMessage := report.Error()
+		if errorMessage != "" {
 			jsonReports[i]["error"] = errorMessage
 		}
 	}

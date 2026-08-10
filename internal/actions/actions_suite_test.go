@@ -7,7 +7,7 @@ import (
 
 	"github.com/onsi/ginkgo/v2"
 	"github.com/onsi/gomega"
-	"github.com/sirupsen/logrus"
+	"github.com/rs/zerolog"
 
 	dockerContainer "github.com/moby/moby/api/types/container"
 	dockerNetwork "github.com/moby/moby/api/types/network"
@@ -17,19 +17,24 @@ import (
 	"github.com/nicholas-fedor/watchtower/pkg/types"
 )
 
+// testLogger returns a discarded zerolog logger for tests that do not assert on logs.
+func testLogger() *zerolog.Logger {
+	nop := zerolog.Nop()
+
+	return &nop
+}
+
 func TestActions(t *testing.T) {
 	t.Parallel()
 
 	// Override retry delay for tests to avoid 30s real-time waits
-	// (30 attempts × 1ms = 30ms instead of 30 attempts × 1s = 30s).
+	// (30 attempts x 1ms = 30ms instead of 30 attempts x 1s = 30s).
 	originalRetryDelay := actions.RemovalRetryDelay
 	actions.RemovalRetryDelay = 1 * time.Millisecond
 
 	t.Cleanup(func() { actions.RemovalRetryDelay = originalRetryDelay })
 
 	gomega.RegisterFailHandler(ginkgo.Fail)
-	logrus.SetOutput(ginkgo.GinkgoWriter)
-	logrus.SetLevel(logrus.DebugLevel) // Enable debug logging for tests.
 	ginkgo.RunSpecs(t, "Actions Suite")
 }
 
@@ -48,7 +53,7 @@ var _ = ginkgo.Describe("the actions package", func() {
 				ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 				defer cancel()
 
-				cleanupOccurred, err := actions.RemoveExcessWatchtowerInstances(
+				cleanupOccurred, err := actions.RemoveExcessWatchtowerInstances(testLogger(),
 					ctx,
 					mockClient,
 					false,
@@ -92,7 +97,7 @@ var _ = ginkgo.Describe("the actions package", func() {
 				ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 				defer cancel()
 
-				cleanupOccurred, err := actions.RemoveExcessWatchtowerInstances(
+				cleanupOccurred, err := actions.RemoveExcessWatchtowerInstances(testLogger(),
 					ctx,
 					client,
 					false,
@@ -156,7 +161,7 @@ var _ = ginkgo.Describe("the actions package", func() {
 				ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 				defer cancel()
 
-				cleanupOccurred, err := actions.RemoveExcessWatchtowerInstances(
+				cleanupOccurred, err := actions.RemoveExcessWatchtowerInstances(testLogger(),
 					ctx,
 					client,
 					false,
@@ -180,7 +185,7 @@ var _ = ginkgo.Describe("the actions package", func() {
 				ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 				defer cancel()
 
-				cleanupOccurred, err := actions.RemoveExcessWatchtowerInstances(
+				cleanupOccurred, err := actions.RemoveExcessWatchtowerInstances(testLogger(),
 					ctx,
 					client,
 					true,
@@ -248,7 +253,7 @@ var _ = ginkgo.Describe("the actions package", func() {
 				ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 				defer cancel()
 
-				cleanupOccurred, err := actions.RemoveExcessWatchtowerInstances(
+				cleanupOccurred, err := actions.RemoveExcessWatchtowerInstances(testLogger(),
 					ctx,
 					client,
 					true,
@@ -337,7 +342,7 @@ var _ = ginkgo.Describe("the actions package", func() {
 				ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 				defer cancel()
 
-				cleanupOccurred, err := actions.RemoveExcessWatchtowerInstances(
+				cleanupOccurred, err := actions.RemoveExcessWatchtowerInstances(testLogger(),
 					ctx,
 					client,
 					false,
@@ -367,7 +372,7 @@ var _ = ginkgo.Describe("the actions package", func() {
 				ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 				defer cancel()
 
-				cleanupOccurred, err := actions.RemoveExcessWatchtowerInstances(
+				cleanupOccurred, err := actions.RemoveExcessWatchtowerInstances(testLogger(),
 					ctx,
 					client,
 					false,

@@ -2,8 +2,9 @@
 // It integrates with Shoutrrr for service delivery, supporting custom templates, batching, and JSON marshaling.
 //
 // Key components:
-//   - NewNotifier: Constructs the client from internal/config/notify.Notify (notifier.go).
+//   - NewNotifier: Constructs the client from a *zerolog.Logger and internal/config/notify.Notify (notifier.go).
 //   - NewNotifierFromFlags: Test helper that reads Cobra flags then calls NewNotifier.
+//   - RegisterHook: Attaches the notifier as a zerolog.Hook on the process logger (shoutrrr.go).
 //   - Shoutrrr Integration: Handles message sending and batching (shoutrrr.go).
 //   - JSON Marshaling: Formats notification data (json.go).
 //   - Preview: Renders notification previews (preview.go).
@@ -15,10 +16,16 @@
 //
 // Usage example (after config.Load):
 //
-//	notifier := notifications.NewNotifier(cfg.Notify)
-//	notifier.StartNotification()
+//	notifier := notifications.NewNotifier(log, cfg.Notify)
+//	notifier.RegisterHook(log) // updates *log in place to the hooked logger
+//	notifier.StartNotification(false)
+//	// ... application logging via the hooked logger is batched ...
 //	notifier.SendNotification(report)
 //	notifier.Close()
 //
-// The package uses Shoutrrr for service abstraction and custom templates, with logging via logrus.
+// The package uses Shoutrrr for service abstraction and custom templates.
+// Logging uses *zerolog.Logger passed from the composition root (no global logger).
+//
+// RegisterHook captures zerolog events for notification batching. All process logging
+// uses github.com/rs/zerolog. There is no dual-logger hook shim.
 package notifications

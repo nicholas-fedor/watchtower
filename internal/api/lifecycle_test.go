@@ -32,8 +32,19 @@ func makeFilter(_ *testing.T) types.Filter {
 	return func(_ types.FilterableContainer) bool { return true }
 }
 
+// withTestLogger injects a discarded logger when opts.Logger is nil.
+func withTestLogger(opts config.Options) config.Options {
+	if opts.Logger == nil {
+		opts.Logger = testLogger()
+	}
+
+	return opts
+}
+
 // withTestListenAddr sets Host/Port so tests bind an ephemeral local port.
 func withTestListenAddr(opts config.Options) config.Options {
+	opts = withTestLogger(opts)
+
 	if opts.Host == "" {
 		opts.Host = "127.0.0.1"
 	}
@@ -148,10 +159,10 @@ func TestSetupAndStartAPI(t *testing.T) {
 			defer cancel()
 
 			if tt.opts.Token == "" {
-				t.Skip("empty token causes logrus.Fatal")
+				t.Skip("empty token not allowed for token-required APIs")
 			}
 
-			err := SetupAndStartAPI(ctx, tt.opts)
+			err := SetupAndStartAPI(ctx, withTestLogger(tt.opts))
 
 			if tt.wantErr {
 				require.Error(t, err)
@@ -368,9 +379,10 @@ func TestSetupAndStartAPI_MissingUpdateDependencies(t *testing.T) {
 	testMetrics := metrics.Default()
 
 	tests := []struct {
-		name    string
-		opts    config.Options
-		wantErr string
+		name           string
+		opts           config.Options
+		wantErr        string
+		leaveLoggerNil bool
 	}{
 		{
 			name: "missing RunUpdatesWithNotifications",
@@ -431,6 +443,16 @@ func TestSetupAndStartAPI_MissingUpdateDependencies(t *testing.T) {
 			},
 			wantErr: "TLS requires both",
 		},
+		{
+			name: "missing Logger",
+			opts: config.Options{
+				Token:            "test-token",
+				EnableMetricsAPI: true,
+				DefaultMetrics:   func() *metrics.Metrics { return testMetrics },
+			},
+			wantErr:        "API Logger must be provided",
+			leaveLoggerNil: true,
+		},
 	}
 
 	for _, tt := range tests {
@@ -438,7 +460,12 @@ func TestSetupAndStartAPI_MissingUpdateDependencies(t *testing.T) {
 			ctx, cancel := context.WithCancel(t.Context())
 			defer cancel()
 
-			err := SetupAndStartAPI(ctx, tt.opts)
+			opts := tt.opts
+			if !tt.leaveLoggerNil {
+				opts = withTestLogger(opts)
+			}
+
+			err := SetupAndStartAPI(ctx, opts)
 			require.Error(t, err)
 			assert.Contains(t, err.Error(), tt.wantErr)
 		})
@@ -614,14 +641,14 @@ func TestRunServer_UnblockWithUpdateAPI_NonBlocking(t *testing.T) {
 func TestRunServer_BindFailure(t *testing.T) {
 	testMetrics := metrics.Default()
 
-	opts := config.Options{
+	opts := withTestLogger(config.Options{
 		Host:             "127.0.0.1",
 		Port:             "99999", // invalid port
 		Token:            "test-token",
 		EnableMetricsAPI: true,
 		RateLimit:        60,
 		DefaultMetrics:   func() *metrics.Metrics { return testMetrics },
-	}
+	})
 
 	ctx, cancel := context.WithCancel(t.Context())
 	defer cancel()
@@ -638,7 +665,7 @@ func TestRunServer_OnUnexpectedServerStopCallback(t *testing.T) {
 			called <- err
 		}
 
-		handleUnexpectedServerStop(errors.New("simulated listen failure"), "127.0.0.1:8080", onStop)
+		handleUnexpectedServerStop(testLogger(), errors.New("simulated listen failure"), "127.0.0.1:8080", onStop)
 
 		select {
 		case err := <-called:
@@ -655,7 +682,7 @@ func TestRunServer_OnUnexpectedServerStopCallback(t *testing.T) {
 			called <- err
 		}
 
-		handleUnexpectedServerStop(nil, "127.0.0.1:8080", onStop)
+		handleUnexpectedServerStop(testLogger(), nil, "127.0.0.1:8080", onStop)
 
 		select {
 		case <-called:

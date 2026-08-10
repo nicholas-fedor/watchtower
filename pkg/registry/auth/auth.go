@@ -9,7 +9,7 @@ import (
 	"strings"
 
 	"github.com/distribution/reference"
-	"github.com/sirupsen/logrus"
+	"github.com/rs/zerolog"
 	"github.com/spf13/viper"
 
 	"github.com/nicholas-fedor/watchtower/internal/meta"
@@ -28,34 +28,44 @@ var (
 
 // TokenResult holds the result of a token acquisition operation.
 type TokenResult struct {
-	Token         string // Authentication token (e.g., "Basic ..." or "Bearer ...").
-	ChallengeHost string // Challenge host (e.g., "ghcr.io"), empty if not applicable.
-	Redirected    bool   // True if the challenge request was redirected, false otherwise.
-	RedirectHost  string // The final host after redirects, empty if not redirected.
+	// Token is the authentication token (for example "Basic ..." or "Bearer ...").
+	Token string
+	// ChallengeHost is the challenge host (for example "ghcr.io"), empty if not applicable.
+	ChallengeHost string
+	// Redirected is true if the challenge request was redirected.
+	Redirected bool
+	// RedirectHost is the final host after redirects, empty if not redirected.
+	RedirectHost string
 }
 
 // challengeResponse holds parsed data from a challenge HTTP response.
 type challengeResponse struct {
-	statusCode    int    // HTTP status code from the challenge response.
-	wwwAuthHeader string // WWW-Authenticate header value.
-	redirected    bool   // Whether the request was redirected.
-	redirectHost  string // Final host after redirects, empty if not redirected.
+	// statusCode is the HTTP status code from the challenge response.
+	statusCode int
+	// wwwAuthHeader is the WWW-Authenticate header value.
+	wwwAuthHeader string
+	// redirected reports whether the request was redirected.
+	redirected bool
+	// redirectHost is the final host after redirects, empty if not redirected.
+	redirectHost string
 }
 
 // resolveChallengeScheme determines the HTTP scheme for registry requests.
 //
 // Parameters:
+//   - log: Logger for scheme selection diagnostics.
 //   - host: The registry host.
 //
 // Returns:
 //   - string: The resolved scheme ("http" or "https").
-func resolveChallengeScheme(host string) string {
+func resolveChallengeScheme(log *zerolog.Logger, host string) string {
 	scheme := "https"
 	if viper.GetBool("WATCHTOWER_REGISTRY_TLS_SKIP") {
 		scheme = "http"
 
-		logrus.WithField("host", host).
-			Debug("Using HTTP scheme due to WATCHTOWER_REGISTRY_TLS_SKIP")
+		log.Debug().
+			Str("host", host).
+			Msg("Using HTTP scheme due to WATCHTOWER_REGISTRY_TLS_SKIP")
 	}
 
 	return scheme
@@ -95,19 +105,20 @@ func resolveEndpointHost(endpoint, canonical, scheme string) (string, string) {
 // GetChallengeURL generates a challenge URL for accessing an image's registry.
 //
 // When endpoint is non-empty, it is used as the registry host for the challenge URL instead
-// of the canonical registry host. The endpoint may include a scheme (e.g.,
+// of the canonical registry host. The endpoint may include a scheme (for example
 // "https://mirror.example.com") or be a bare hostname.
 //
 // Parameters:
+//   - log: Logger for diagnostics.
 //   - imageRef: Normalized image reference.
-//   - endpoint: Optional registry host override (e.g., mirror address). Empty string uses canonical host.
+//   - endpoint: Optional registry host override (for example a mirror address). Empty uses the canonical host.
 //
 // Returns:
 //   - url.URL: Generated challenge URL.
-func GetChallengeURL(imageRef reference.Named, endpoint string) url.URL {
-	host, _ := GetRegistryAddress(imageRef.Name())
+func GetChallengeURL(log *zerolog.Logger, imageRef reference.Named, endpoint string) url.URL {
+	host, _ := GetRegistryAddress(log, imageRef.Name())
 
-	scheme := resolveChallengeScheme(host)
+	scheme := resolveChallengeScheme(log, host)
 
 	endpointHost, endpointScheme := resolveEndpointHost(endpoint, host, scheme)
 	if endpoint != "" {
@@ -115,40 +126,42 @@ func GetChallengeURL(imageRef reference.Named, endpoint string) url.URL {
 		scheme = endpointScheme
 	}
 
-	URL := url.URL{
+	challengeURL := url.URL{
 		Scheme: scheme,
 		Host:   host,
 		Path:   "/v2/",
 	}
-	logrus.WithFields(logrus.Fields{
-		"image": imageRef.Name(),
-		"url":   URL.String(),
-	}).Debug("Generated challenge URL")
+	log.Debug().
+		Str("image", imageRef.Name()).
+		Str("url", challengeURL.String()).
+		Msg("Generated challenge URL")
 
-	return URL
+	return challengeURL
 }
 
 // GetChallengeRequest creates a request for retrieving challenge instructions.
 //
 // Parameters:
+//   - log: Logger for diagnostics.
 //   - ctx: Context for request lifecycle control.
-//   - url: URL for the challenge request.
+//   - challengeURL: URL for the challenge request.
 //
 // Returns:
 //   - *http.Request: Constructed request if successful.
 //   - error: Non-nil if creation fails, nil on success.
-func GetChallengeRequest(ctx context.Context, url url.URL) (*http.Request, error) {
+func GetChallengeRequest(log *zerolog.Logger, ctx context.Context, challengeURL url.URL) (*http.Request, error) {
 	// Create a GET request with context for cancellation and timeout.
 	request, err := http.NewRequestWithContext(
 		ctx,
 		http.MethodGet,
-		url.String(),
+		challengeURL.String(),
 		nil,
 	)
 	if err != nil {
-		logrus.WithError(err).
-			WithField("url", url.String()).
-			Debug("Failed to create challenge request")
+		log.Debug().
+			Err(err).
+			Str("url", challengeURL.String()).
+			Msg("Failed to create challenge request")
 
 		return nil, fmt.Errorf("%w: %w", errFailedCreateChallengeRequest, err)
 	}
@@ -157,9 +170,9 @@ func GetChallengeRequest(ctx context.Context, url url.URL) (*http.Request, error
 	request.Header.Set("Accept", "*/*")
 	request.Header.Set("User-Agent", meta.UserAgent)
 
-	logrus.WithFields(logrus.Fields{
-		"url": url.String(),
-	}).Debug("Created challenge request")
+	log.Debug().
+		Str("url", challengeURL.String()).
+		Msg("Created challenge request")
 
 	return request, nil
 }
@@ -184,18 +197,20 @@ func handleSuccessfulChallenge(redirected bool, redirectHost string) TokenResult
 // handleBasicAuthChallenge returns a TokenResult with Basic authentication.
 //
 // Parameters:
+//   - log: Contextual logger (typically scoped with image and related fields).
 //   - registryAuth: Base64-encoded auth string.
-//   - fields: Logging fields for context.
 //   - redirected: Whether the challenge request was redirected.
 //   - redirectHost: The final host after redirects.
 //   - originalHost: The original registry host the challenge request was sent to.
+//   - originalScheme: Scheme of the original challenge request.
+//   - redirectScheme: Scheme of the final redirect destination.
 //
 // Returns:
 //   - TokenResult: Result with Basic auth token.
-//   - error: Non-nil if no credentials are provided or a cross-origin redirect is detected, nil on success.
+//   - error: Non-nil if no credentials are provided or a cross-origin redirect is detected.
 func handleBasicAuthChallenge(
+	log *zerolog.Logger,
 	registryAuth string,
-	fields logrus.Fields,
 	redirected bool,
 	redirectHost string,
 	originalHost string,
@@ -203,7 +218,7 @@ func handleBasicAuthChallenge(
 	redirectScheme string,
 ) (TokenResult, error) {
 	if registryAuth == "" {
-		logrus.WithFields(fields).Debug("No credentials provided for Basic auth")
+		log.Debug().Msg("No credentials provided for Basic auth")
 
 		return TokenResult{}, fmt.Errorf("%w: basic auth required", errNoCredentials)
 	}
@@ -214,10 +229,10 @@ func handleBasicAuthChallenge(
 		redirectHost != "" &&
 		originalHost != "" &&
 		!strings.EqualFold(redirectHost, originalHost) {
-		logrus.WithFields(fields).
-			WithField("original_host", originalHost).
-			WithField("redirect_host", redirectHost).
-			Debug("Cross-origin redirect detected; rejecting Basic auth challenge")
+		log.Debug().
+			Str("original_host", originalHost).
+			Str("redirect_host", redirectHost).
+			Msg("Cross-origin redirect detected. Rejecting Basic auth challenge")
 
 		redirectURL := (&url.URL{Scheme: redirectScheme, Host: redirectHost}).String()
 		originalURL := (&url.URL{Scheme: originalScheme, Host: originalHost}).String()
@@ -228,10 +243,10 @@ func handleBasicAuthChallenge(
 	// Reject Basic auth when the challenge redirects from HTTPS to HTTP to prevent
 	// credential exposure over an unencrypted connection.
 	if redirected && originalScheme == "https" && redirectScheme == "http" {
-		logrus.WithFields(fields).
-			WithField("original_scheme", originalScheme).
-			WithField("redirect_scheme", redirectScheme).
-			Debug("HTTPS to HTTP downgrade detected; rejecting Basic auth challenge")
+		log.Debug().
+			Str("original_scheme", originalScheme).
+			Str("redirect_scheme", redirectScheme).
+			Msg("HTTPS to HTTP downgrade detected. Rejecting Basic auth challenge")
 
 		redirectURL := (&url.URL{Scheme: redirectScheme, Host: redirectHost}).String()
 		originalURL := (&url.URL{Scheme: originalScheme, Host: originalHost}).String()
@@ -239,7 +254,7 @@ func handleBasicAuthChallenge(
 		return TokenResult{}, fmt.Errorf("%w: %s -> %s", errCrossOriginRedirect, originalURL, redirectURL)
 	}
 
-	logrus.WithFields(fields).Debug("Using Basic auth")
+	log.Debug().Msg("Using Basic auth")
 
 	return TokenResult{
 		Token:         "Basic " + registryAuth,
@@ -252,16 +267,16 @@ func handleBasicAuthChallenge(
 // handleUnsupportedChallenge returns an error for unsupported challenge types.
 //
 // Parameters:
+//   - log: Contextual logger.
 //   - challenge: The unsupported challenge type.
-//   - fields: Logging fields for context.
 //
 // Returns:
 //   - TokenResult: Empty result.
 //   - error: Non-nil describing the unsupported challenge.
-func handleUnsupportedChallenge(challenge string, fields logrus.Fields) (TokenResult, error) {
-	logrus.WithFields(fields).
-		WithField("challenge", challenge).
-		Error("Unsupported challenge type from registry")
+func handleUnsupportedChallenge(log *zerolog.Logger, challenge string) (TokenResult, error) {
+	log.Error().
+		Str("challenge", challenge).
+		Msg("Unsupported challenge type from registry")
 
 	return TokenResult{}, fmt.Errorf("%w: %s", errUnsupportedChallenge, challenge)
 }
@@ -269,6 +284,7 @@ func handleUnsupportedChallenge(challenge string, fields logrus.Fields) (TokenRe
 // processChallengeResponse interprets the challenge HTTP response and routes to the appropriate auth handler.
 //
 // Parameters:
+//   - log: Contextual logger.
 //   - ctx: Context for request lifecycle control.
 //   - container: Container with image info.
 //   - registryAuth: Base64-encoded auth string.
@@ -278,13 +294,13 @@ func handleUnsupportedChallenge(challenge string, fields logrus.Fields) (TokenRe
 //   - originalHost: The original registry host the challenge request was sent to.
 //   - originalScheme: The scheme used for the original challenge request.
 //   - redirectScheme: The scheme used for the final redirect destination.
-//   - fields: Logging fields for context.
 //   - response: Parsed challenge response data.
 //
 // Returns:
 //   - TokenResult: Authentication result containing token and redirect info.
 //   - error: Non-nil if operation fails, nil on success.
 func processChallengeResponse(
+	log *zerolog.Logger,
 	ctx context.Context,
 	container types.Container,
 	registryAuth string,
@@ -294,14 +310,13 @@ func processChallengeResponse(
 	originalHost string,
 	originalScheme string,
 	redirectScheme string,
-	fields logrus.Fields,
 	response challengeResponse,
 ) (TokenResult, error) {
 	// Handle 200 OK response (no auth required).
 	if response.statusCode == http.StatusOK {
-		logrus.WithFields(fields).
-			WithField("url", response.wwwAuthHeader).
-			Debug("No authentication required (200 OK)")
+		log.Debug().
+			Str("url", response.wwwAuthHeader).
+			Msg("No authentication required (200 OK)")
 
 		return handleSuccessfulChallenge(redirected, redirectHost), nil
 	}
@@ -321,14 +336,15 @@ func processChallengeResponse(
 
 	// Normalize challenge for comparison.
 	challenge := strings.ToLower(strings.TrimSpace(response.wwwAuthHeader))
-	logrus.WithFields(fields).WithField("challenge", challenge).
-		Debug("Processing challenge type")
+	log.Debug().
+		Str("challenge", challenge).
+		Msg("Processing challenge type")
 
 	// Handle Basic auth if specified.
 	if strings.HasPrefix(challenge, "basic") {
 		return handleBasicAuthChallenge(
+			log,
 			registryAuth,
-			fields,
 			redirected,
 			redirectHost,
 			originalHost,
@@ -340,6 +356,7 @@ func processChallengeResponse(
 	// Handle Bearer auth.
 	if strings.HasPrefix(challenge, "bearer") {
 		return handleBearerAuth(
+			log,
 			ctx,
 			response.wwwAuthHeader,
 			container,
@@ -347,16 +364,16 @@ func processChallengeResponse(
 			client,
 			redirected,
 			redirectHost,
-			fields,
 		)
 	}
 
-	return handleUnsupportedChallenge(challenge, fields)
+	return handleUnsupportedChallenge(log, challenge)
 }
 
 // handleBearerAuth handles the Bearer authentication challenge.
 //
 // Parameters:
+//   - log: Contextual logger.
 //   - ctx: Context for request lifecycle control.
 //   - wwwAuthHeader: The WWW-Authenticate header value.
 //   - container: Container with image info.
@@ -364,12 +381,12 @@ func processChallengeResponse(
 //   - client: Client for HTTP requests.
 //   - redirected: Whether the challenge request was redirected.
 //   - redirectHost: The final host after redirects.
-//   - fields: Logging fields for context.
 //
 // Returns:
 //   - TokenResult: Authentication result containing token and redirect info.
 //   - error: Non-nil if operation fails, nil on success.
 func handleBearerAuth(
+	log *zerolog.Logger,
 	ctx context.Context,
 	wwwAuthHeader string,
 	container types.Container,
@@ -377,38 +394,41 @@ func handleBearerAuth(
 	client Client,
 	redirected bool,
 	redirectHost string,
-	fields logrus.Fields,
 ) (TokenResult, error) {
-	logrus.WithFields(fields).Debug("Entering Bearer auth path")
+	log.Debug().Msg("Entering Bearer auth path")
 
 	normalizedRef, err := reference.ParseNormalizedNamed(container.ImageName())
 	if err != nil {
-		logrus.WithError(err).WithFields(fields).
-			Debug("Failed to parse image name")
+		log.Debug().
+			Err(err).
+			Msg("Failed to parse image name")
 
 		return TokenResult{}, fmt.Errorf("%w: %w", errFailedParseImageName, err)
 	}
 
 	authURL, err := GetAuthURL(
+		log,
 		strings.ToLower(wwwAuthHeader),
 		normalizedRef,
 		registryAuth,
 	)
 	if err != nil {
-		logrus.WithError(err).WithFields(fields).
-			Debug("Failed to construct bearer auth URL")
+		log.Debug().
+			Err(err).
+			Msg("Failed to construct bearer auth URL")
 
 		return TokenResult{}, fmt.Errorf("%w: %w", errFailedConstructBearerAuthURL, err)
 	}
 
 	challengeHost := authURL.Host
 	if challengeHost != "" {
-		logrus.WithFields(fields).
-			WithField("challenge_host", challengeHost).
-			Debug("Extracted challenge host")
+		log.Debug().
+			Str("challenge_host", challengeHost).
+			Msg("Extracted challenge host")
 	}
 
 	token, err := GetBearerToken(
+		log,
 		ctx,
 		wwwAuthHeader,
 		normalizedRef,
@@ -416,14 +436,15 @@ func handleBearerAuth(
 		client,
 	)
 	if err != nil {
-		logrus.WithError(err).WithFields(fields).
-			Debug("Failed to get bearer token")
+		log.Debug().
+			Err(err).
+			Msg("Failed to get bearer token")
 
 		return TokenResult{}, fmt.Errorf("%w: %w", errFailedDecodeResponse, err)
 	}
 
 	if token == "" {
-		logrus.WithFields(fields).Debug("Empty bearer token received")
+		log.Debug().Msg("Empty bearer token received")
 
 		return TokenResult{}, fmt.Errorf(
 			"%w: empty token in response",
@@ -431,10 +452,10 @@ func handleBearerAuth(
 		)
 	}
 
-	logrus.WithFields(fields).
-		WithField("token_present", token != "").
-		WithField("challenge_host", challengeHost).
-		Debug("Returning Bearer token and challenge host")
+	log.Debug().
+		Bool("token_present", token != "").
+		Str("challenge_host", challengeHost).
+		Msg("Returning Bearer token and challenge host")
 
 	return TokenResult{
 		Token:         token,
@@ -451,56 +472,59 @@ func handleBearerAuth(
 // Docker registry mirrors.
 //
 // Parameters:
+//   - log: Process logger.
 //   - ctx: Context for request lifecycle control.
 //   - container: Container with image info.
 //   - registryAuth: Base64-encoded auth string.
 //   - client: Client for HTTP requests.
-//   - endpoint: Optional registry host override (e.g., mirror address). Empty string uses canonical host.
+//   - endpoint: Optional registry host override (for example a mirror address). Empty uses the canonical host.
 //
 // Returns:
 //   - TokenResult: Authentication result containing token, challenge host, and redirect info.
 //   - error: Non-nil if operation fails, nil on success.
 func GetToken(
+	log *zerolog.Logger,
 	ctx context.Context,
 	container types.Container,
 	registryAuth string,
 	client Client,
 	endpoint string,
 ) (TokenResult, error) {
-	fields := logrus.Fields{
-		"image": container.ImageName(),
-	}
+	// Scope all subsequent logs in this call with the image name.
+	clog := log.With().Str("image", container.ImageName()).Logger()
 
 	// Parse image name into a normalized reference.
 	normalizedRef, err := reference.ParseNormalizedNamed(container.ImageName())
 	if err != nil {
-		logrus.WithError(err).WithFields(fields).
-			Debug("Failed to parse image name")
+		clog.Debug().
+			Err(err).
+			Msg("Failed to parse image name")
 
 		return TokenResult{}, fmt.Errorf("%w: %w", errFailedParseImageName, err)
 	}
 
 	// Generate the challenge URL, using the endpoint override if provided.
-	challengeURL := GetChallengeURL(normalizedRef, endpoint)
-	logrus.WithFields(fields).
-		WithField("url", challengeURL.String()).
-		Debug("Constructed challenge URL")
+	challengeURL := GetChallengeURL(&clog, normalizedRef, endpoint)
+	clog.Debug().
+		Str("url", challengeURL.String()).
+		Msg("Constructed challenge URL")
 
 	// Build and execute the challenge request.
-	request, err := GetChallengeRequest(ctx, challengeURL)
+	request, err := GetChallengeRequest(&clog, ctx, challengeURL)
 	if err != nil {
-		logrus.WithError(err).WithFields(fields).
-			Debug("Failed to create challenge request")
+		clog.Debug().
+			Err(err).
+			Msg("Failed to create challenge request")
 
 		return TokenResult{}, fmt.Errorf("%w: %w", errFailedCreateChallengeRequest, err)
 	}
 
 	response, err := client.Do(request)
 	if err != nil {
-		logrus.WithError(err).
-			WithFields(fields).
-			WithField("url", challengeURL.String()).
-			Debug("Failed to execute challenge request")
+		clog.Debug().
+			Err(err).
+			Str("url", challengeURL.String()).
+			Msg("Failed to execute challenge request")
 
 		return TokenResult{}, fmt.Errorf("%w: %w", errFailedExecuteChallengeRequest, err)
 	}
@@ -519,9 +543,9 @@ func GetToken(
 		redirectHost = response.Request.URL.Host
 		redirectScheme = response.Request.URL.Scheme
 
-		logrus.WithFields(fields).
-			WithField("redirect_host", redirectHost).
-			Debug("Challenge request was redirected to different URL")
+		clog.Debug().
+			Str("redirect_host", redirectHost).
+			Msg("Challenge request was redirected to different URL")
 	}
 
 	// Extract the challenge header.
@@ -531,19 +555,19 @@ func GetToken(
 	if endpoint != "" {
 		sanitizedEndpoint = "<redacted>"
 
-		u, err := url.Parse(endpoint)
-		if err == nil && u.Host != "" {
+		u, parseErr := url.Parse(endpoint)
+		if parseErr == nil && u.Host != "" {
 			sanitizedEndpoint = u.Host
 		}
 	}
 
-	logrus.WithFields(fields).WithFields(logrus.Fields{
-		"status":  response.Status,
-		"header":  wwwAuthHeader,
-		"mirrors": sanitizedEndpoint,
-	}).Debug("Received challenge response")
+	clog.Debug().
+		Str("status", response.Status).
+		Str("header", wwwAuthHeader).
+		Str("mirrors", sanitizedEndpoint).
+		Msg("Received challenge response")
 
-	challengeResponse := challengeResponse{
+	parsedResponse := challengeResponse{
 		statusCode:    response.StatusCode,
 		wwwAuthHeader: wwwAuthHeader,
 		redirected:    redirected,
@@ -551,7 +575,8 @@ func GetToken(
 	}
 
 	// Route the challenge response to the appropriate auth handler.
-	tokenResult, err := processChallengeResponse(
+	return processChallengeResponse(
+		&clog,
 		ctx,
 		container,
 		registryAuth,
@@ -561,9 +586,6 @@ func GetToken(
 		challengeURL.Host,
 		challengeURL.Scheme,
 		redirectScheme,
-		fields,
-		challengeResponse,
+		parsedResponse,
 	)
-
-	return tokenResult, err
 }

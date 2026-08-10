@@ -17,7 +17,6 @@ import (
 	"github.com/gofiber/fiber/v3/middleware/logger"
 	"github.com/gofiber/fiber/v3/middleware/recover"
 	"github.com/gofiber/fiber/v3/middleware/requestid"
-	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
@@ -30,20 +29,12 @@ import (
 
 var testMetrics = metrics.Default()
 
-func testLogger() *logrus.Logger {
-	l := logrus.New()
-	l.SetOutput(io.Discard)
-
-	return l
-}
-
 func makeFilter(_ *testing.T) types.Filter {
 	return func(_ types.FilterableContainer) bool { return true }
 }
 
 // testApp creates a minimal Fiber app for route registration tests.
 func testApp() *fiber.App {
-	l := testLogger()
 	app := fiber.New(fiber.Config{
 		BodyLimit:     1 << 20,
 		ReadTimeout:   10 * time.Second,
@@ -56,7 +47,7 @@ func testApp() *fiber.App {
 		helmet.New(),
 		requestid.New(),
 		logger.New(logger.Config{
-			Stream: l.Writer(),
+			Stream: io.Discard,
 			Format: "${status} - ${method} ${path}\n",
 		}),
 		compress.New(),

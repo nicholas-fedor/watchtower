@@ -1,20 +1,26 @@
 package notifications_test
 
 import (
+	"bytes"
 	"fmt"
-	"io"
 	"net/url"
 	"os"
 	"time"
 
 	"github.com/onsi/ginkgo/v2"
 	"github.com/onsi/gomega"
-	"github.com/sirupsen/logrus"
+	"github.com/rs/zerolog"
 
 	"github.com/nicholas-fedor/watchtower/cmd"
 	"github.com/nicholas-fedor/watchtower/internal/flags"
 	"github.com/nicholas-fedor/watchtower/pkg/notifications"
 )
+
+var testLog = func() *zerolog.Logger {
+	l := zerolog.Nop()
+
+	return &l
+}()
 
 var _ = ginkgo.Describe("notifications", func() {
 	ginkgo.Describe("the notifier", func() {
@@ -28,7 +34,7 @@ var _ = ginkgo.Describe("notifications", func() {
 			})
 			gomega.Expect(err).NotTo(gomega.HaveOccurred())
 
-			notifier := notifications.NewNotifierFromFlags(command)
+			notifier := notifications.NewNotifierFromFlags(testLog, command)
 
 			gomega.Expect(notifier.GetNames()).To(gomega.BeEmpty())
 		})
@@ -43,14 +49,14 @@ var _ = ginkgo.Describe("notifications", func() {
 				})
 				gomega.Expect(err).NotTo(gomega.HaveOccurred())
 
-				data := notifications.GetTemplateData(command)
+				data := notifications.GetTemplateData(testLog, command)
 				title := data.Title
 				gomega.Expect(title).To(gomega.Equal("Watchtower updates on test.host"))
 			})
 		})
 		ginkgo.When("no hostname can be resolved", func() {
 			ginkgo.It("should use the default simple title", func() {
-				title := notifications.GetTitle("", "")
+				title := notifications.GetTitle(testLog, "", "")
 				gomega.Expect(title).To(gomega.Equal("Watchtower updates"))
 			})
 		})
@@ -64,7 +70,7 @@ var _ = ginkgo.Describe("notifications", func() {
 					"PREFIX",
 				})).To(gomega.Succeed())
 
-				data := notifications.GetTemplateData(command)
+				data := notifications.GetTemplateData(testLog, command)
 				gomega.Expect(data.Title).To(gomega.HavePrefix("[PREFIX]"))
 			})
 		})
@@ -80,7 +86,7 @@ var _ = ginkgo.Describe("notifications", func() {
 					"PREFIX",
 				})).To(gomega.Succeed())
 
-				data := notifications.GetTemplateData(command)
+				data := notifications.GetTemplateData(testLog, command)
 				gomega.Expect(data.Title).To(gomega.HavePrefix("[PREFIX]"))
 			})
 		})
@@ -93,19 +99,19 @@ var _ = ginkgo.Describe("notifications", func() {
 					"--notification-skip-title",
 				})).To(gomega.Succeed())
 
-				data := notifications.GetTemplateData(command)
+				data := notifications.GetTemplateData(testLog, command)
 				gomega.Expect(data.Title).To(gomega.BeEmpty())
 			})
 		})
 		ginkgo.When("no delay is defined", func() {
 			ginkgo.It("should use the default delay", func() {
-				delay := notifications.GetDelay(0, time.Duration(0))
+				delay := notifications.GetDelay(testLog, 0, time.Duration(0))
 				gomega.Expect(delay).To(gomega.Equal(time.Duration(0)))
 			})
 		})
 		ginkgo.When("delay is defined", func() {
 			ginkgo.It("should use the specified delay", func() {
-				delay := notifications.GetDelay(5, time.Duration(0))
+				delay := notifications.GetDelay(testLog, 5, time.Duration(0))
 				gomega.Expect(delay).To(gomega.Equal(5 * time.Second))
 			})
 		})
@@ -113,7 +119,7 @@ var _ = ginkgo.Describe("notifications", func() {
 			//nolint:godox
 			// TODO: Remove legacy delay tests when legacy notification types are removed.
 			ginkgo.It("should use the specified legacy delay", func() {
-				delay := notifications.GetDelay(0, 5*time.Second)
+				delay := notifications.GetDelay(testLog, 0, 5*time.Second)
 				gomega.Expect(delay).To(gomega.Equal(5 * time.Second))
 			})
 		})
@@ -123,7 +129,7 @@ var _ = ginkgo.Describe("notifications", func() {
 			ginkgo.It(
 				"should use the specified legacy delay and ignore the specified delay",
 				func() {
-					delay := notifications.GetDelay(5, 7*time.Second)
+					delay := notifications.GetDelay(testLog, 5, 7*time.Second)
 					gomega.Expect(delay).To(gomega.Equal(7 * time.Second))
 				},
 			)
@@ -151,7 +157,7 @@ var _ = ginkgo.Describe("notifications", func() {
 				})
 				gomega.Expect(err).NotTo(gomega.HaveOccurred())
 
-				notifier := notifications.NewNotifierFromFlags(command)
+				notifier := notifications.NewNotifierFromFlags(testLog, command)
 				gomega.Expect(notifier).NotTo(gomega.BeNil())
 				gomega.Expect(notifier.GetNames()).To(gomega.ContainElement("logger"))
 			})
@@ -326,24 +332,10 @@ var _ = ginkgo.Describe("notifications", func() {
 		})
 		ginkgo.When("the hook URL is empty", func() {
 			ginkgo.It("should fatal with a clear missing argument message", func() {
-				originalExit := logrus.StandardLogger().ExitFunc
-				defer func() { logrus.StandardLogger().ExitFunc = originalExit }()
-
-				logrus.StandardLogger().ExitFunc = func(_ int) { panic("FATAL") }
-
-				gomega.Expect(func() {
-					command := cmd.NewRootCommand()
-					flags.RegisterNotificationFlags(command)
-
-					args := []string{
-						"--notifications",
-						"slack",
-					}
-
-					command.ParseFlags(args)
-
-					notifications.NewNotifierFromFlags(command)
-				}).To(gomega.Panic())
+				expectNewNotifierFatal([]string{
+					"--notifications",
+					"slack",
+				}, "Slack hook URL is empty.")
 			})
 		})
 	})
@@ -375,9 +367,6 @@ var _ = ginkgo.Describe("notifications", func() {
 		})
 		ginkgo.When("initializing a gotify notifier via NewNotifier", func() {
 			ginkgo.BeforeEach(func() {
-				// Reset logrus state.
-				logrus.SetLevel(logrus.InfoLevel)
-				logrus.SetOutput(os.Stderr)
 			})
 
 			ginkgo.It("should configure with valid flags", func() {
@@ -395,7 +384,7 @@ var _ = ginkgo.Describe("notifications", func() {
 				}
 				gomega.Expect(command.ParseFlags(args)).To(gomega.Succeed())
 
-				notifier := notifications.NewNotifierFromFlags(command)
+				notifier := notifications.NewNotifierFromFlags(testLog, command)
 				names := notifier.GetNames()
 				gomega.Expect(names).To(gomega.ContainElement("gotify"))
 
@@ -418,12 +407,7 @@ var _ = ginkgo.Describe("notifications", func() {
 				}
 				gomega.Expect(command.ParseFlags(args)).To(gomega.Succeed())
 
-				logrus.SetLevel(logrus.TraceLevel)
-
-				logrus.SetOutput(io.Discard)
-				defer logrus.SetOutput(os.Stderr)
-
-				notifier := notifications.NewNotifierFromFlags(command)
+				notifier := notifications.NewNotifierFromFlags(testLog, command)
 				names := notifier.GetNames()
 				gomega.Expect(names).To(gomega.ContainElement("gotify"))
 
@@ -438,7 +422,6 @@ var _ = ginkgo.Describe("notifications", func() {
 	// TODO: Remove legacy msteams notifier tests when legacy notification types are removed.
 	ginkgo.Describe("the teams notifier", func() {
 		ginkgo.BeforeEach(func() {
-			logrus.SetLevel(logrus.DebugLevel) // Ensure debug logs are visible
 		})
 		ginkgo.When("converting a teams service config into a shoutrrr url", func() {
 			ginkgo.It("should return the expected URL", func() {
@@ -539,82 +522,74 @@ var _ = ginkgo.Describe("notifications", func() {
 		})
 		ginkgo.When("a required field is empty", func() {
 			ginkgo.It("should fatal when the from address is empty", func() {
-				originalExit := logrus.StandardLogger().ExitFunc
-				defer func() { logrus.StandardLogger().ExitFunc = originalExit }()
-
-				logrus.StandardLogger().ExitFunc = func(_ int) { panic("FATAL") }
-
-				gomega.Expect(func() {
-					command := cmd.NewRootCommand()
-					flags.RegisterNotificationFlags(command)
-
-					args := []string{
-						"--notifications",
-						"email",
-						"--notification-email-to",
-						"recipient@example.com",
-						"--notification-email-server",
-						"smtp.example.com",
-					}
-
-					command.ParseFlags(args)
-
-					notifications.NewNotifierFromFlags(command)
-				}).To(gomega.Panic())
+				expectNewNotifierFatal([]string{
+					"--notifications",
+					"email",
+					"--notification-email-to",
+					"to@example.com",
+					"--notification-email-server",
+					"mail.example.com",
+				}, "Email from address is empty.")
 			})
 
 			ginkgo.It("should fatal when the to address is empty", func() {
-				originalExit := logrus.StandardLogger().ExitFunc
-				defer func() { logrus.StandardLogger().ExitFunc = originalExit }()
-
-				logrus.StandardLogger().ExitFunc = func(_ int) { panic("FATAL") }
-
-				gomega.Expect(func() {
-					command := cmd.NewRootCommand()
-					flags.RegisterNotificationFlags(command)
-
-					args := []string{
-						"--notifications",
-						"email",
-						"--notification-email-from",
-						"sender@example.com",
-						"--notification-email-server",
-						"smtp.example.com",
-					}
-
-					command.ParseFlags(args)
-
-					notifications.NewNotifierFromFlags(command)
-				}).To(gomega.Panic())
+				expectNewNotifierFatal([]string{
+					"--notifications",
+					"email",
+					"--notification-email-from",
+					"from@example.com",
+					"--notification-email-server",
+					"mail.example.com",
+				}, "Email to address is empty.")
 			})
 
 			ginkgo.It("should fatal when the server is empty", func() {
-				originalExit := logrus.StandardLogger().ExitFunc
-				defer func() { logrus.StandardLogger().ExitFunc = originalExit }()
-
-				logrus.StandardLogger().ExitFunc = func(_ int) { panic("FATAL") }
-
-				gomega.Expect(func() {
-					command := cmd.NewRootCommand()
-					flags.RegisterNotificationFlags(command)
-
-					args := []string{
-						"--notifications",
-						"email",
-						"--notification-email-from",
-						"sender@example.com",
-						"--notification-email-to",
-						"recipient@example.com",
-					}
-
-					command.ParseFlags(args)
-
-					notifications.NewNotifierFromFlags(command)
-				}).To(gomega.Panic())
+				expectNewNotifierFatal([]string{
+					"--notifications",
+					"email",
+					"--notification-email-from",
+					"from@example.com",
+					"--notification-email-to",
+					"to@example.com",
+				}, "Email server is empty.")
 			})
 		})
 	})
 })
+
+// expectNewNotifierFatal runs NewNotifierFromFlags under a temporary FatalExitFunc
+// that panics instead of os.Exit, captures buffer-backed fatal log output, and
+// restores the previous exit callback.
+//
+// Parameters:
+//   - args: CLI flags to parse before constructing the notifier
+//   - wantMsg: exact fatal message text expected in the log output
+func expectNewNotifierFatal(args []string, wantMsg string) {
+	ginkgo.GinkgoHelper()
+
+	oldFatalExit := zerolog.FatalExitFunc
+	defer func() { zerolog.FatalExitFunc = oldFatalExit }()
+
+	var buf bytes.Buffer
+
+	log := zerolog.New(&buf).Level(zerolog.FatalLevel)
+
+	zerolog.FatalExitFunc = func() {
+		panic("fatal exit")
+	}
+
+	command := cmd.NewRootCommand()
+	flags.RegisterNotificationFlags(command)
+	gomega.Expect(command.ParseFlags(args)).To(gomega.Succeed())
+
+	gomega.Expect(func() {
+		notifications.NewNotifierFromFlags(&log, command)
+	}).To(gomega.PanicWith("fatal exit"))
+
+	out := buf.String()
+	gomega.Expect(out).To(gomega.ContainSubstring(`"message":"`+wantMsg+`"`),
+		"expected exact fatal message %q in output:\n%s", wantMsg, out)
+}
 
 // TODO: Remove buildExpectedURL helper when legacy notification tests are removed.
 //
@@ -649,7 +624,7 @@ func testURL(args []string, expectedURL string, expectedDelay time.Duration) {
 
 	gomega.Expect(command.ParseFlags(args)).To(gomega.Succeed())
 
-	urls, delay := notifications.AppendLegacyUrls([]string{}, command)
+	urls, delay := notifications.AppendLegacyUrls(testLog, []string{}, command)
 
 	gomega.Expect(urls).To(gomega.ContainElement(expectedURL))
 	gomega.Expect(delay).To(gomega.Equal(expectedDelay))

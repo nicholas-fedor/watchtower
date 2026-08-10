@@ -45,7 +45,7 @@ func TestNew(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			h := New(tt.updateFn, tt.updateLock)
+			h := New(testLogger(), tt.updateFn, tt.updateLock)
 			require.NotNil(t, h)
 			assert.Equal(t, tt.wantPath, h.Path)
 		})
@@ -66,7 +66,7 @@ func TestHandler_Handle_Sync(t *testing.T) {
 	lock := make(chan bool, 1)
 	lock <- true
 
-	h := New(updateFn, lock)
+	h := New(testLogger(), updateFn, lock)
 
 	app := fiber.New(fiber.Config{})
 	app.Post("/v1/update", h.Handle)
@@ -87,7 +87,7 @@ func TestHandler_Handle_Async(t *testing.T) {
 	lock := make(chan bool, 1)
 	lock <- true
 
-	h := New(func(_ context.Context, _, _ []string) *metrics.Metric {
+	h := New(testLogger(), func(_ context.Context, _, _ []string) *metrics.Metric {
 		called.Add(1)
 
 		return &metrics.Metric{}
@@ -110,7 +110,7 @@ func TestHandler_Handle_Async(t *testing.T) {
 
 func TestHandler_Handle_FullUpdateLocked(t *testing.T) {
 	lock := make(chan bool, 1)
-	h := New(func(_ context.Context, _, _ []string) *metrics.Metric {
+	h := New(testLogger(), func(_ context.Context, _, _ []string) *metrics.Metric {
 		t.Error("update function should not be called when lock is held")
 
 		return &metrics.Metric{}
@@ -146,7 +146,7 @@ func TestHandler_Handle_TargetedUpdateBlocks(t *testing.T) {
 	}
 
 	lock := make(chan bool, 1)
-	h := New(updateFn, lock)
+	h := New(testLogger(), updateFn, lock)
 
 	app := fiber.New(fiber.Config{})
 	app.Post("/v1/update", h.Handle)
@@ -189,7 +189,7 @@ func TestHandler_Handle_TargetedContainerUpdateBlocks(t *testing.T) {
 	}
 
 	lock := make(chan bool, 1)
-	h := New(updateFn, lock)
+	h := New(testLogger(), updateFn, lock)
 
 	app := fiber.New(fiber.Config{})
 	app.Post("/v1/update", h.Handle)
@@ -224,7 +224,7 @@ func TestHandler_Handle_TargetedContainerUpdateBlocks(t *testing.T) {
 
 func TestHandler_Handle_ContextCancellation(t *testing.T) {
 	lock := make(chan bool, 1)
-	h := New(func(_ context.Context, _, _ []string) *metrics.Metric {
+	h := New(testLogger(), func(_ context.Context, _, _ []string) *metrics.Metric {
 		return &metrics.Metric{}
 	}, lock)
 
@@ -261,7 +261,7 @@ func TestHandler_Handle_PanicRecovery(t *testing.T) {
 	lock := make(chan bool, 1)
 	lock <- true
 
-	h := New(func(_ context.Context, _, _ []string) *metrics.Metric {
+	h := New(testLogger(), func(_ context.Context, _, _ []string) *metrics.Metric {
 		panic("simulated panic")
 	}, lock)
 
@@ -286,7 +286,7 @@ func TestHandler_Handle_PanicRecovery(t *testing.T) {
 }
 
 func TestExtractImages_Unit(t *testing.T) {
-	h := New(func(_ context.Context, _, _ []string) *metrics.Metric {
+	h := New(testLogger(), func(_ context.Context, _, _ []string) *metrics.Metric {
 		return &metrics.Metric{}
 	}, nil)
 
@@ -381,7 +381,7 @@ func TestExtractImages_Unit(t *testing.T) {
 }
 
 func TestExtractContainers_Unit(t *testing.T) {
-	h := New(func(_ context.Context, _, _ []string) *metrics.Metric {
+	h := New(testLogger(), func(_ context.Context, _, _ []string) *metrics.Metric {
 		return &metrics.Metric{}
 	}, nil)
 
@@ -464,7 +464,7 @@ func TestExtractContainers_Unit(t *testing.T) {
 }
 
 func Test_send429Response(t *testing.T) {
-	h := New(func(_ context.Context, _, _ []string) *metrics.Metric {
+	h := New(testLogger(), func(_ context.Context, _, _ []string) *metrics.Metric {
 		return &metrics.Metric{}
 	}, nil)
 
@@ -495,7 +495,7 @@ func Test_send429Response(t *testing.T) {
 func Test_executeUpdate(t *testing.T) {
 	expected := &metrics.Metric{Scanned: 10, Updated: 5, Failed: 2}
 
-	h := New(func(_ context.Context, _, _ []string) *metrics.Metric {
+	h := New(testLogger(), func(_ context.Context, _, _ []string) *metrics.Metric {
 		return expected
 	}, nil)
 
@@ -510,7 +510,7 @@ func Test_executeUpdateAsync(t *testing.T) {
 	lock := make(chan bool, 1)
 	lock <- true
 
-	h := New(func(_ context.Context, _, _ []string) *metrics.Metric {
+	h := New(testLogger(), func(_ context.Context, _, _ []string) *metrics.Metric {
 		called.Add(1)
 
 		return &metrics.Metric{}
@@ -533,7 +533,7 @@ func Test_contextForAsync(t *testing.T) {
 		type ctxKey struct{}
 
 		handlerCtx := context.WithValue(context.Background(), ctxKey{}, "handler")
-		h := New(func(_ context.Context, _, _ []string) *metrics.Metric {
+		h := New(testLogger(), func(_ context.Context, _, _ []string) *metrics.Metric {
 			return &metrics.Metric{}
 		}, nil, handlerCtx)
 
@@ -547,7 +547,7 @@ func Test_contextForAsync(t *testing.T) {
 
 	t.Run("projects deadline without inheriting cancellation", func(t *testing.T) {
 		handlerCtx := context.Background()
-		h := New(func(_ context.Context, _, _ []string) *metrics.Metric {
+		h := New(testLogger(), func(_ context.Context, _, _ []string) *metrics.Metric {
 			return &metrics.Metric{}
 		}, nil, handlerCtx)
 
@@ -573,7 +573,7 @@ func Test_contextForAsync(t *testing.T) {
 
 	t.Run("cancels when handler context is canceled", func(t *testing.T) {
 		handlerCtx, handlerCancel := context.WithCancel(context.Background())
-		h := New(func(_ context.Context, _, _ []string) *metrics.Metric {
+		h := New(testLogger(), func(_ context.Context, _, _ []string) *metrics.Metric {
 			return &metrics.Metric{}
 		}, nil, handlerCtx)
 
@@ -601,7 +601,7 @@ func Test_executeUpdateAsync_ignoresRequestContextCancellation(t *testing.T) {
 	started := make(chan context.Context, 1)
 	release := make(chan struct{})
 
-	h := New(func(ctx context.Context, _, _ []string) *metrics.Metric {
+	h := New(testLogger(), func(ctx context.Context, _, _ []string) *metrics.Metric {
 		started <- ctx
 
 		<-release
@@ -656,7 +656,7 @@ func Test_executeUpdateAsync_ignoresRequestContextCancellation(t *testing.T) {
 
 func Test_releaseLock(t *testing.T) {
 	lock := make(chan bool, 1)
-	h := New(func(_ context.Context, _, _ []string) *metrics.Metric {
+	h := New(testLogger(), func(_ context.Context, _, _ []string) *metrics.Metric {
 		return &metrics.Metric{}
 	}, lock)
 
@@ -678,7 +678,7 @@ func Test_handleSync(t *testing.T) {
 	lock := make(chan bool, 1)
 	lock <- true
 
-	h := New(func(_ context.Context, _, _ []string) *metrics.Metric {
+	h := New(testLogger(), func(_ context.Context, _, _ []string) *metrics.Metric {
 		return expected
 	}, lock)
 
@@ -710,7 +710,7 @@ func Test_handleSync_JSONStructure(t *testing.T) {
 	lock := make(chan bool, 1)
 	lock <- true
 
-	h := New(func(_ context.Context, _, _ []string) *metrics.Metric {
+	h := New(testLogger(), func(_ context.Context, _, _ []string) *metrics.Metric {
 		return expected
 	}, lock)
 
@@ -749,7 +749,7 @@ func Test_handleAsync(t *testing.T) {
 
 	<-lock
 
-	h := New(func(_ context.Context, _, _ []string) *metrics.Metric {
+	h := New(testLogger(), func(_ context.Context, _, _ []string) *metrics.Metric {
 		return &metrics.Metric{}
 	}, lock)
 
@@ -783,7 +783,7 @@ func Test_handleAsync_survivesRequestContextCancellation(t *testing.T) {
 	started := make(chan context.Context, 1)
 	release := make(chan struct{})
 
-	h := NewWithTimeout(func(ctx context.Context, _, _ []string) *metrics.Metric {
+	h := NewWithTimeout(testLogger(), func(ctx context.Context, _, _ []string) *metrics.Metric {
 		started <- ctx
 
 		<-release
@@ -842,7 +842,7 @@ func Test_handleAsync_survivesTimeoutMiddlewareCancellation(t *testing.T) {
 	release := make(chan struct{})
 
 	routeTimeout := 5 * time.Minute
-	h := NewWithTimeout(func(ctx context.Context, _, _ []string) *metrics.Metric {
+	h := NewWithTimeout(testLogger(), func(ctx context.Context, _, _ []string) *metrics.Metric {
 		started <- ctx
 
 		<-release
@@ -903,7 +903,7 @@ func Test_handleSync_NilMetric(t *testing.T) {
 	lock := make(chan bool, 1)
 	lock <- true
 
-	h := New(func(_ context.Context, _, _ []string) *metrics.Metric {
+	h := New(testLogger(), func(_ context.Context, _, _ []string) *metrics.Metric {
 		return nil
 	}, lock)
 
@@ -923,7 +923,7 @@ func Test_acquireLock_ContextCancelled(t *testing.T) {
 	lock := make(chan bool, 1)
 	lock <- true
 
-	h := New(func(_ context.Context, _, _ []string) *metrics.Metric {
+	h := New(testLogger(), func(_ context.Context, _, _ []string) *metrics.Metric {
 		return &metrics.Metric{}
 	}, lock)
 
@@ -959,7 +959,7 @@ func Test_acquireLock_ContextCancelled(t *testing.T) {
 func Test_acquireLock_FullUpdateBusy(t *testing.T) {
 	lock := make(chan bool, 1)
 
-	h := New(func(_ context.Context, _, _ []string) *metrics.Metric {
+	h := New(testLogger(), func(_ context.Context, _, _ []string) *metrics.Metric {
 		return &metrics.Metric{}
 	}, lock)
 
@@ -983,7 +983,7 @@ func TestHandler_Handle_TimeoutOverride(t *testing.T) {
 		lock := make(chan bool, 1)
 		lock <- true
 
-		h := NewWithTimeout(func(ctx context.Context, _, _ []string) *metrics.Metric {
+		h := NewWithTimeout(testLogger(), func(ctx context.Context, _, _ []string) *metrics.Metric {
 			return &metrics.Metric{}
 		}, lock, 5*time.Minute)
 		app := fiber.New(fiber.Config{})
@@ -1002,7 +1002,7 @@ func TestHandler_Handle_TimeoutOverride(t *testing.T) {
 		lock := make(chan bool, 1)
 		lock <- true
 
-		h := NewWithTimeout(func(ctx context.Context, _, _ []string) *metrics.Metric {
+		h := NewWithTimeout(testLogger(), func(ctx context.Context, _, _ []string) *metrics.Metric {
 			return &metrics.Metric{}
 		}, lock, 2*time.Minute)
 		app := fiber.New(fiber.Config{})
@@ -1023,7 +1023,7 @@ func TestHandler_Handle_TimeoutOverride(t *testing.T) {
 
 		started := make(chan context.Context, 1)
 
-		h := NewWithTimeout(func(ctx context.Context, _, _ []string) *metrics.Metric {
+		h := NewWithTimeout(testLogger(), func(ctx context.Context, _, _ []string) *metrics.Metric {
 			started <- ctx
 
 			return &metrics.Metric{}
@@ -1065,7 +1065,7 @@ func TestHandler_Handle_TimeoutOverride(t *testing.T) {
 		lock := make(chan bool, 1)
 		lock <- true
 
-		h := NewWithTimeout(func(ctx context.Context, _, _ []string) *metrics.Metric {
+		h := NewWithTimeout(testLogger(), func(ctx context.Context, _, _ []string) *metrics.Metric {
 			return &metrics.Metric{}
 		}, lock, 5*time.Minute)
 		app := fiber.New(fiber.Config{})

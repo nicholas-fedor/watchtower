@@ -11,7 +11,7 @@
 //   - Schedule and Mode control when the process runs (interval/cron, run-once, health-check).
 //   - Client construction options (include-stopped, revive-stopped, remove-volumes, etc.)
 //     are projected via ClientOptions.
-//   - Notify holds notification settings; notifications.NewNotifier takes Config.Notify.
+//   - Notify holds notification settings. notifications.NewNotifier takes Config.Notify.
 //   - API holds HTTP API transport and endpoint settings.
 //
 // Per-run deltas use RunOverrides only (filter override, run-once, skip self-update,

@@ -7,11 +7,19 @@ import (
 	"testing"
 	"time"
 
+	"github.com/rs/zerolog"
+
 	testifyMock "github.com/stretchr/testify/mock"
 
 	"github.com/nicholas-fedor/watchtower/pkg/types"
 	mockTypes "github.com/nicholas-fedor/watchtower/pkg/types/mocks"
 )
+
+func testLog() *zerolog.Logger {
+	n := zerolog.Nop()
+
+	return &n
+}
 
 func TestUpdateFromContainer(t *testing.T) {
 	type args struct {
@@ -149,7 +157,7 @@ func TestUpdateFromContainer(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got := UpdateFromContainer(
+			got := UpdateFromContainer(testLog(),
 				tt.args.container,
 				tt.args.newImage,
 				tt.args.state,
@@ -162,18 +170,18 @@ func TestUpdateFromContainer(t *testing.T) {
 				got.imageName != tt.want.imageName ||
 				got.state != tt.want.state ||
 				got.monitorOnly != tt.want.monitorOnly {
-				t.Errorf("UpdateFromContainer() = %+v, want %+v", got, tt.want)
+				t.Errorf("UpdateFromContainer(testLog(), ) = %+v, want %+v", got, tt.want)
 			}
 			// Handle error field separately
 			if (got.containerError == nil) != (tt.want.containerError == nil) {
 				t.Errorf(
-					"UpdateFromContainer() error = %v, want %v",
+					"UpdateFromContainer(testLog(), ) error = %v, want %v",
 					got.containerError,
 					tt.want.containerError,
 				)
 			} else if got.containerError != nil && !errors.Is(got.containerError, tt.want.containerError) {
 				t.Errorf(
-					"UpdateFromContainer() error message = %v, want %v",
+					"UpdateFromContainer(testLog(), ) error message = %v, want %v",
 					got.containerError,
 					tt.want.containerError,
 				)
@@ -294,10 +302,10 @@ func TestProgress_AddSkipped(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			tt.m.AddSkipped(tt.args.container, tt.args.err, tt.args.params)
+			tt.m.AddSkipped(testLog(), tt.args.container, tt.args.err, tt.args.params)
 
 			if len(tt.m) != len(tt.want) {
-				t.Errorf("Progress.AddSkipped() map length = %d, want %d", len(tt.m), len(tt.want))
+				t.Errorf("Progress.AddSkipped(testLog(), ) map length = %d, want %d", len(tt.m), len(tt.want))
 
 				return
 			}
@@ -312,7 +320,7 @@ func TestProgress_AddSkipped(t *testing.T) {
 					gotStatus.state != wantStatus.state ||
 					gotStatus.monitorOnly != wantStatus.monitorOnly {
 					t.Errorf(
-						"Progress.AddSkipped() status for %v = %+v, want %+v",
+						"Progress.AddSkipped(testLog(), ) status for %v = %+v, want %+v",
 						id,
 						gotStatus,
 						wantStatus,
@@ -321,7 +329,7 @@ func TestProgress_AddSkipped(t *testing.T) {
 
 				if gotStatus.Error() != wantStatus.Error() {
 					t.Errorf(
-						"Progress.AddSkipped() error for %v = %v, want %v",
+						"Progress.AddSkipped(testLog(), ) error for %v = %v, want %v",
 						id,
 						gotStatus.Error(),
 						wantStatus.Error(),
@@ -444,10 +452,10 @@ func TestProgress_AddScanned(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			tt.m.AddScanned(tt.args.container, tt.args.newImage, tt.args.params)
+			tt.m.AddScanned(testLog(), tt.args.container, tt.args.newImage, tt.args.params)
 
 			if len(tt.m) != len(tt.want) {
-				t.Errorf("Progress.AddScanned() map length = %d, want %d", len(tt.m), len(tt.want))
+				t.Errorf("Progress.AddScanned(testLog(), ) map length = %d, want %d", len(tt.m), len(tt.want))
 
 				return
 			}
@@ -462,7 +470,7 @@ func TestProgress_AddScanned(t *testing.T) {
 					gotStatus.state != wantStatus.state ||
 					gotStatus.monitorOnly != wantStatus.monitorOnly {
 					t.Errorf(
-						"Progress.AddScanned() status for %v = %+v, want %+v",
+						"Progress.AddScanned(testLog(), ) status for %v = %+v, want %+v",
 						id,
 						gotStatus,
 						wantStatus,
@@ -471,14 +479,14 @@ func TestProgress_AddScanned(t *testing.T) {
 
 				if (gotStatus.containerError == nil) != (wantStatus.containerError == nil) {
 					t.Errorf(
-						"Progress.AddScanned() error for %v = %v, want %v",
+						"Progress.AddScanned(testLog(), ) error for %v = %v, want %v",
 						id,
 						gotStatus.containerError,
 						wantStatus.containerError,
 					)
 				} else if gotStatus.containerError != nil && !errors.Is(gotStatus.containerError, wantStatus.containerError) {
 					t.Errorf(
-						"Progress.AddScanned() error message for %v = %v, want %v",
+						"Progress.AddScanned(testLog(), ) error message for %v = %v, want %v",
 						id,
 						gotStatus.containerError,
 						wantStatus.containerError,
@@ -572,11 +580,11 @@ func TestProgress_UpdateFailed(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			tt.m.UpdateFailed(tt.args.failures)
+			tt.m.UpdateFailed(testLog(), tt.args.failures)
 
 			if len(tt.m) != len(tt.want) {
 				t.Errorf(
-					"Progress.UpdateFailed() map length = %d, want %d",
+					"Progress.UpdateFailed(testLog(), ) map length = %d, want %d",
 					len(tt.m),
 					len(tt.want),
 				)
@@ -593,7 +601,7 @@ func TestProgress_UpdateFailed(t *testing.T) {
 					gotStatus.imageName != wantStatus.imageName ||
 					gotStatus.state != wantStatus.state {
 					t.Errorf(
-						"Progress.UpdateFailed() status for %v = %+v, want %+v",
+						"Progress.UpdateFailed(testLog(), ) status for %v = %+v, want %+v",
 						id,
 						gotStatus,
 						wantStatus,
@@ -602,7 +610,7 @@ func TestProgress_UpdateFailed(t *testing.T) {
 
 				if gotStatus.Error() != wantStatus.Error() {
 					t.Errorf(
-						"Progress.UpdateFailed() error for %v = %v, want %v",
+						"Progress.UpdateFailed(testLog(), ) error for %v = %v, want %v",
 						id,
 						gotStatus.Error(),
 						wantStatus.Error(),
@@ -649,10 +657,10 @@ func TestProgress_Add(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			tt.m.Add(tt.args.update)
+			tt.m.Add(testLog(), tt.args.update)
 
 			if len(tt.m) != len(tt.want) {
-				t.Errorf("Progress.Add() map length = %d, want %d", len(tt.m), len(tt.want))
+				t.Errorf("Progress.Add(testLog(), ) map length = %d, want %d", len(tt.m), len(tt.want))
 
 				return
 			}
@@ -666,7 +674,7 @@ func TestProgress_Add(t *testing.T) {
 					gotStatus.imageName != wantStatus.imageName ||
 					gotStatus.state != wantStatus.state {
 					t.Errorf(
-						"Progress.Add() status for %v = %+v, want %+v",
+						"Progress.Add(testLog(), ) status for %v = %+v, want %+v",
 						id,
 						gotStatus,
 						wantStatus,
@@ -675,14 +683,14 @@ func TestProgress_Add(t *testing.T) {
 
 				if (gotStatus.containerError == nil) != (wantStatus.containerError == nil) {
 					t.Errorf(
-						"Progress.Add() error for %v = %v, want %v",
+						"Progress.Add(testLog(), ) error for %v = %v, want %v",
 						id,
 						gotStatus.containerError,
 						wantStatus.containerError,
 					)
 				} else if gotStatus.containerError != nil && !errors.Is(gotStatus.containerError, wantStatus.containerError) {
 					t.Errorf(
-						"Progress.Add() error message for %v = %v, want %v",
+						"Progress.Add(testLog(), ) error message for %v = %v, want %v",
 						id,
 						gotStatus.containerError,
 						wantStatus.containerError,
@@ -737,11 +745,11 @@ func TestProgress_MarkForUpdate(t *testing.T) {
 				}
 			}()
 
-			tt.m.MarkForUpdate(tt.args.containerID)
+			tt.m.MarkForUpdate(testLog(), tt.args.containerID)
 
 			if len(tt.m) != len(tt.want) {
 				t.Errorf(
-					"Progress.MarkForUpdate() map length = %d, want %d",
+					"Progress.MarkForUpdate(testLog(), ) map length = %d, want %d",
 					len(tt.m),
 					len(tt.want),
 				)
@@ -758,7 +766,7 @@ func TestProgress_MarkForUpdate(t *testing.T) {
 					gotStatus.imageName != wantStatus.imageName ||
 					gotStatus.state != wantStatus.state {
 					t.Errorf(
-						"Progress.MarkForUpdate() status for %v = %+v, want %+v",
+						"Progress.MarkForUpdate(testLog(), ) status for %v = %+v, want %+v",
 						id,
 						gotStatus,
 						wantStatus,
@@ -767,14 +775,14 @@ func TestProgress_MarkForUpdate(t *testing.T) {
 
 				if (gotStatus.containerError == nil) != (wantStatus.containerError == nil) {
 					t.Errorf(
-						"Progress.MarkForUpdate() error for %v = %v, want %v",
+						"Progress.MarkForUpdate(testLog(), ) error for %v = %v, want %v",
 						id,
 						gotStatus.containerError,
 						wantStatus.containerError,
 					)
 				} else if gotStatus.containerError != nil && !errors.Is(gotStatus.containerError, wantStatus.containerError) {
 					t.Errorf(
-						"Progress.MarkForUpdate() error message for %v = %v, want %v",
+						"Progress.MarkForUpdate(testLog(), ) error message for %v = %v, want %v",
 						id,
 						gotStatus.containerError,
 						wantStatus.containerError,
@@ -847,8 +855,8 @@ func TestProgress_Report(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			if got := tt.m.Report(); !reflect.DeepEqual(got, tt.want) {
-				t.Errorf("Progress.Report() = %v, want %v", got, tt.want)
+			if got := tt.m.Report(testLog()); !reflect.DeepEqual(got, tt.want) {
+				t.Errorf("Progress.Report(testLog(), ) = %v, want %v", got, tt.want)
 			}
 		})
 	}
@@ -950,11 +958,11 @@ func TestProgress_MarkRestarted(t *testing.T) {
 				}
 			}()
 
-			tt.m.MarkRestarted(tt.args.containerID)
+			tt.m.MarkRestarted(testLog(), tt.args.containerID)
 
 			if len(tt.m) != len(tt.want) {
 				t.Errorf(
-					"Progress.MarkRestarted() map length = %d, want %d",
+					"Progress.MarkRestarted(testLog(), ) map length = %d, want %d",
 					len(tt.m),
 					len(tt.want),
 				)
@@ -971,7 +979,7 @@ func TestProgress_MarkRestarted(t *testing.T) {
 					gotStatus.imageName != wantStatus.imageName ||
 					gotStatus.state != wantStatus.state {
 					t.Errorf(
-						"Progress.MarkRestarted() status for %v = %+v, want %+v",
+						"Progress.MarkRestarted(testLog(), ) status for %v = %+v, want %+v",
 						id,
 						gotStatus,
 						wantStatus,
@@ -980,7 +988,7 @@ func TestProgress_MarkRestarted(t *testing.T) {
 
 				if gotStatus.Error() != wantStatus.Error() {
 					t.Errorf(
-						"Progress.MarkRestarted() error for %v = %v, want %v",
+						"Progress.MarkRestarted(testLog(), ) error for %v = %v, want %v",
 						id,
 						gotStatus.Error(),
 						wantStatus.Error(),
@@ -997,7 +1005,7 @@ func TestProgress_MarkRestarted_UpdateFailed_Integration(t *testing.T) {
 	}
 
 	// Mark as restarted
-	m.MarkRestarted("cont1")
+	m.MarkRestarted(testLog(), "cont1")
 
 	if m["cont1"].state != RestartedState {
 		t.Errorf("Expected state RestartedState, got %v", m["cont1"].state)
@@ -1007,7 +1015,7 @@ func TestProgress_MarkRestarted_UpdateFailed_Integration(t *testing.T) {
 	failures := map[types.ContainerID]error{
 		"cont1": errors.New("restart failed"),
 	}
-	m.UpdateFailed(failures)
+	m.UpdateFailed(testLog(), failures)
 
 	if m["cont1"].state != FailedState {
 		t.Errorf("Expected state FailedState after UpdateFailed, got %v", m["cont1"].state)
@@ -1024,7 +1032,7 @@ func TestProgress_MarkRestarted_AddSkipped_Integration(t *testing.T) {
 	}
 
 	// Mark as restarted
-	m.MarkRestarted("cont1")
+	m.MarkRestarted(testLog(), "cont1")
 
 	if m["cont1"].state != RestartedState {
 		t.Errorf("Expected state RestartedState, got %v", m["cont1"].state)
@@ -1040,7 +1048,7 @@ func TestProgress_MarkRestarted_AddSkipped_Integration(t *testing.T) {
 		IsMonitorOnly(testifyMock.MatchedBy(func(_ types.UpdateParams) bool { return true })).
 		Return(false)
 
-	m.AddSkipped(mock, errors.New("skipped after restart"), types.UpdateParams{})
+	m.AddSkipped(testLog(), mock, errors.New("skipped after restart"), types.UpdateParams{})
 
 	if m["cont1"].state != SkippedState {
 		t.Errorf("Expected state SkippedState after AddSkipped, got %v", m["cont1"].state)
@@ -1062,7 +1070,7 @@ func TestProgress_Restarted_With_Error(t *testing.T) {
 	}
 
 	// Mark as restarted, error should persist
-	m.MarkRestarted("cont1")
+	m.MarkRestarted(testLog(), "cont1")
 
 	if m["cont1"].state != RestartedState {
 		t.Errorf("Expected state RestartedState, got %v", m["cont1"].state)
@@ -1087,7 +1095,7 @@ func TestProgress_Report_With_Restarted_In_All(t *testing.T) {
 		},
 	}
 
-	report := m.Report()
+	report := m.Report(testLog())
 
 	all := report.All()
 
@@ -1132,13 +1140,13 @@ func TestProgress_MarkRestarted_Concurrent(t *testing.T) {
 	go func() {
 		defer wg.Done()
 
-		m.MarkRestarted("cont1")
+		m.MarkRestarted(testLog(), "cont1")
 	}()
 
 	go func() {
 		defer wg.Done()
 
-		m.MarkRestarted("cont2")
+		m.MarkRestarted(testLog(), "cont2")
 	}()
 
 	wg.Wait()
@@ -1290,11 +1298,11 @@ func TestProgress_SetCooldownInfo(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			tt.m.SetCooldownInfo(tt.args.containerID, tt.args.age, tt.args.delay, tt.args.remaining, tt.args.eligibleAt, tt.args.passed)
+			tt.m.SetCooldownInfo(testLog(), tt.args.containerID, tt.args.age, tt.args.delay, tt.args.remaining, tt.args.eligibleAt, tt.args.passed)
 
 			if len(tt.m) != len(tt.want) {
 				t.Errorf(
-					"Progress.SetCooldownInfo() map length = %d, want %d",
+					"Progress.SetCooldownInfo(testLog(), ) map length = %d, want %d",
 					len(tt.m),
 					len(tt.want),
 				)
@@ -1307,7 +1315,7 @@ func TestProgress_SetCooldownInfo(t *testing.T) {
 				if gotStatus.containerID != wantStatus.containerID ||
 					gotStatus.state != wantStatus.state {
 					t.Errorf(
-						"Progress.SetCooldownInfo() status for %v = %+v, want %+v",
+						"Progress.SetCooldownInfo(testLog(), ) status for %v = %+v, want %+v",
 						id,
 						gotStatus,
 						wantStatus,
@@ -1316,7 +1324,7 @@ func TestProgress_SetCooldownInfo(t *testing.T) {
 
 				if gotStatus.CooldownPassed() != wantStatus.cooldownPassed {
 					t.Errorf(
-						"Progress.SetCooldownInfo() CooldownPassed for %v = %v, want %v",
+						"Progress.SetCooldownInfo(testLog(), ) CooldownPassed for %v = %v, want %v",
 						id,
 						gotStatus.CooldownPassed(),
 						wantStatus.cooldownPassed,
@@ -1325,7 +1333,7 @@ func TestProgress_SetCooldownInfo(t *testing.T) {
 
 				if gotStatus.CooldownAge() != wantStatus.cooldownAge {
 					t.Errorf(
-						"Progress.SetCooldownInfo() CooldownAge for %v = %v, want %v",
+						"Progress.SetCooldownInfo(testLog(), ) CooldownAge for %v = %v, want %v",
 						id,
 						gotStatus.CooldownAge(),
 						wantStatus.cooldownAge,
@@ -1334,7 +1342,7 @@ func TestProgress_SetCooldownInfo(t *testing.T) {
 
 				if gotStatus.CooldownDelay() != wantStatus.cooldownDelay {
 					t.Errorf(
-						"Progress.SetCooldownInfo() CooldownDelay for %v = %v, want %v",
+						"Progress.SetCooldownInfo(testLog(), ) CooldownDelay for %v = %v, want %v",
 						id,
 						gotStatus.CooldownDelay(),
 						wantStatus.cooldownDelay,
@@ -1343,7 +1351,7 @@ func TestProgress_SetCooldownInfo(t *testing.T) {
 
 				if gotStatus.CooldownRemaining() != wantStatus.cooldownRemaining {
 					t.Errorf(
-						"Progress.SetCooldownInfo() CooldownRemaining for %v = %v, want %v",
+						"Progress.SetCooldownInfo(testLog(), ) CooldownRemaining for %v = %v, want %v",
 						id,
 						gotStatus.CooldownRemaining(),
 						wantStatus.cooldownRemaining,
@@ -1352,7 +1360,7 @@ func TestProgress_SetCooldownInfo(t *testing.T) {
 
 				if gotStatus.CooldownEligibleAt() != wantStatus.cooldownEligibleAt {
 					t.Errorf(
-						"Progress.SetCooldownInfo() CooldownEligibleAt for %v = %v, want %v",
+						"Progress.SetCooldownInfo(testLog(), ) CooldownEligibleAt for %v = %v, want %v",
 						id,
 						gotStatus.CooldownEligibleAt(),
 						wantStatus.cooldownEligibleAt,
@@ -1375,13 +1383,13 @@ func TestProgress_SetCooldownInfo_Concurrent(t *testing.T) {
 	go func() {
 		defer wg.Done()
 
-		m.SetCooldownInfo("cont1", "1 day", "24 hours", "", time.Time{}, true)
+		m.SetCooldownInfo(testLog(), "cont1", "1 day", "24 hours", "", time.Time{}, true)
 	}()
 
 	go func() {
 		defer wg.Done()
 
-		m.SetCooldownInfo("cont2", "2 hours", "24 hours", "22 hours", time.Date(2026, 5, 26, 0, 45, 0, 0, time.UTC), false)
+		m.SetCooldownInfo(testLog(), "cont2", "2 hours", "24 hours", "22 hours", time.Date(2026, 5, 26, 0, 45, 0, 0, time.UTC), false)
 	}()
 
 	wg.Wait()
@@ -1441,10 +1449,10 @@ func TestProgress_Restarted(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got := tt.m.Restarted()
+			got := tt.m.Restarted(testLog())
 
 			if len(got) != len(tt.want) {
-				t.Errorf("Progress.Restarted() length = %d, want %d", len(got), len(tt.want))
+				t.Errorf("Progress.Restarted(testLog(), ) length = %d, want %d", len(got), len(tt.want))
 
 				return
 			}
@@ -1459,14 +1467,14 @@ func TestProgress_Restarted(t *testing.T) {
 			for _, actual := range got {
 				expected, found := expectedMap[actual.ID()]
 				if !found {
-					t.Errorf("Progress.Restarted() returned unexpected container %v", actual.ID())
+					t.Errorf("Progress.Restarted(testLog(), ) returned unexpected container %v", actual.ID())
 
 					continue
 				}
 
 				if actual.Name() != expected.Name() {
 					t.Errorf(
-						"Progress.Restarted() container %v name = %v, want %v",
+						"Progress.Restarted(testLog(), ) container %v name = %v, want %v",
 						actual.ID(),
 						actual.Name(),
 						expected.Name(),

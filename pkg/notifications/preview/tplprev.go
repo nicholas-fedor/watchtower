@@ -15,7 +15,7 @@
 // This package is consumed by the WebAssembly (WASM) module (tplprev.wasm, built from tools/tplprev/main_wasm.go), which is
 // loaded in the web interface (docs/notifications/template-preview/script.js) to dynamically render previews. The simulated
 // data conforms to the notifications.Data model (model.go), which includes a Report (types.Report from report.go) and log
-// Entries (logrus.Entry from logs.go). The web interface allows users to adjust container counts and log levels, triggering
+// Entries (local logEntry from logs.go). The web interface allows users to adjust container counts and log levels, triggering
 // the Render function to generate updated previews displayed in styled tabs (styles.css) for text and JSON output.
 //
 // Usage:
@@ -39,7 +39,6 @@
 //   - github.com/nicholas-fedor/watchtower/pkg/notifications/preview/data: Provides simulated data (PreviewData, states, logs).
 //   - github.com/nicholas-fedor/watchtower/pkg/notifications/templates: Provides template functions (e.g., ToJSON).
 //   - github.com/nicholas-fedor/watchtower/pkg/types: Provides Report and ContainerReport interfaces.
-//   - github.com/sirupsen/logrus: Used for log entry structures.
 //   - text/template, strings: Standard library packages for template parsing and string building.
 //
 // Notes:

@@ -30,7 +30,7 @@ func FuzzExtractImagesHandler(f *testing.F) {
 	f.Add("registry.com/org/image:v1.2.3")
 
 	f.Fuzz(func(t *testing.T, raw string) {
-		h := New(func(_ context.Context, _, _ []string) *metrics.Metric {
+		h := New(testLogger(), func(_ context.Context, _, _ []string) *metrics.Metric {
 			return &metrics.Metric{}
 		}, nil)
 
@@ -79,7 +79,7 @@ func FuzzExtractContainersHandler(f *testing.F) {
 	f.Add(strings.Repeat("a,", 50))
 
 	f.Fuzz(func(t *testing.T, raw string) {
-		h := New(func(_ context.Context, _, _ []string) *metrics.Metric {
+		h := New(testLogger(), func(_ context.Context, _, _ []string) *metrics.Metric {
 			return &metrics.Metric{}
 		}, nil)
 
@@ -128,7 +128,7 @@ func FuzzHandlerNew(f *testing.F) {
 			lock = make(chan bool, 1)
 		}
 
-		h := New(func(_ context.Context, _, _ []string) *metrics.Metric {
+		h := New(testLogger(), func(_ context.Context, _, _ []string) *metrics.Metric {
 			return &metrics.Metric{}
 		}, lock)
 

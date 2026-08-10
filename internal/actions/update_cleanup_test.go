@@ -22,7 +22,7 @@ var _ = ginkgo.Describe("the update action", func() {
 					"test-container-02": true,
 					"test-container-03": true,
 				}
-				report, cleanupImageInfos, err := actions.Update(
+				report, cleanupImageInfos, err := actions.Update(testLogger(),
 					context.Background(),
 					client,
 					types.UpdateParams{Cleanup: true, CPUCopyMode: "auto"},
@@ -65,7 +65,7 @@ var _ = ginkgo.Describe("the update action", func() {
 					"test-container-03":     true,
 					"unique-test-container": true,
 				}
-				report, cleanupImageInfos, err := actions.Update(
+				report, cleanupImageInfos, err := actions.Update(testLogger(),
 					context.Background(),
 					client,
 					types.UpdateParams{Cleanup: true, CPUCopyMode: "auto"},
@@ -87,7 +87,7 @@ var _ = ginkgo.Describe("the update action", func() {
 			ginkgo.It("should collect only the stale container's image ID", func() {
 				client := mockActions.CreateMockClient(getLinkedTestData(true), false, false)
 				client.TestData.Staleness["test-container-01"] = true
-				report, cleanupImageInfos, err := actions.Update(
+				report, cleanupImageInfos, err := actions.Update(testLogger(),
 					context.Background(),
 					client,
 					types.UpdateParams{Cleanup: true, CPUCopyMode: "auto"},
@@ -110,7 +110,7 @@ var _ = ginkgo.Describe("the update action", func() {
 					"test-container-02": true,
 					"test-container-03": true,
 				}
-				report, cleanupImageInfos, err := actions.Update(
+				report, cleanupImageInfos, err := actions.Update(testLogger(),
 					context.Background(),
 					client,
 					types.UpdateParams{Cleanup: true, RollingRestart: true, CPUCopyMode: "auto"},
@@ -132,7 +132,7 @@ var _ = ginkgo.Describe("the update action", func() {
 			ginkgo.It("should gracefully fail and collect no image IDs", func() {
 				client := mockActions.CreateMockClient(getLinkedTestData(false), false, false)
 				client.TestData.Staleness["test-container-01"] = true
-				report, cleanupImageInfos, err := actions.Update(
+				report, cleanupImageInfos, err := actions.Update(testLogger(),
 					context.Background(),
 					client,
 					types.UpdateParams{Cleanup: true, CPUCopyMode: "auto"},

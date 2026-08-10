@@ -5,7 +5,7 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/sirupsen/logrus"
+	"github.com/rs/zerolog"
 
 	"github.com/nicholas-fedor/watchtower/internal/util"
 	"github.com/nicholas-fedor/watchtower/pkg/container"
@@ -39,12 +39,14 @@ type DependencySorter struct{}
 // Returns:
 //   - error: Non-nil if circular reference detected, nil on success.
 //     Error includes the container name and cycle path for debugging.
-func (ds DependencySorter) Sort(containers []types.Container, useComposeDependsOn bool) error {
+func (ds DependencySorter) Sort(log *zerolog.Logger, containers []types.Container, useComposeDependsOn bool) error {
 	if containers == nil {
 		return nil
 	}
 
-	logrus.WithField("container_count", len(containers)).Debug("Starting dependency sort")
+	log.Debug().
+		Int("container_count", len(containers)).
+		Msg("Starting dependency sort")
 
 	// Separate Watchtower containers from non-Watchtower containers
 	var (
@@ -60,15 +62,17 @@ func (ds DependencySorter) Sort(containers []types.Container, useComposeDependsO
 		}
 	}
 
-	logrus.WithFields(logrus.Fields{
-		"non_watchtower_count": len(nonWatchtowerContainers),
-		"watchtower_count":     len(watchtowerContainers),
-	}).Debug("Separated containers by Watchtower status")
+	log.Debug().
+		Int("non_watchtower_count", len(nonWatchtowerContainers)).
+		Int("watchtower_count", len(watchtowerContainers)).
+		Msg("Separated containers by Watchtower status")
 
 	// Sort non-Watchtower containers by dependencies using internal sorter
-	sortedNonWatchtower, err := sortByDependencies(nonWatchtowerContainers, useComposeDependsOn)
+	sortedNonWatchtower, err := sortByDependencies(log, nonWatchtowerContainers, useComposeDependsOn)
 	if err != nil {
-		logrus.WithError(err).Debug("Dependency sort failed for non-Watchtower containers")
+		log.Debug().
+			Err(err).
+			Msg("Dependency sort failed for non-Watchtower containers")
 
 		return err
 	}
@@ -85,10 +89,10 @@ func (ds DependencySorter) Sort(containers []types.Container, useComposeDependsO
 		sortedNames[i] = c.Name()
 	}
 
-	logrus.WithFields(logrus.Fields{
-		"sorted_count": len(containers),
-		"sorted_order": sortedNames,
-	}).Debug("Completed dependency sort with Watchtower containers last")
+	log.Debug().
+		Int("sorted_count", len(containers)).
+		Strs("sorted_order", sortedNames).
+		Msg("Completed dependency sort with Watchtower containers last")
 
 	return nil
 }
@@ -123,9 +127,9 @@ func (ds DependencySorter) Sort(containers []types.Container, useComposeDependsO
 //   - []types.Container: Sorted list in dependency order (dependencies first).
 //   - error: Non-nil if circular reference detected, nil on success.
 //     Error includes container name and cycle path for debugging.
-func sortByDependencies(containers []types.Container, useComposeDependsOn bool) ([]types.Container, error) {
+func sortByDependencies(log *zerolog.Logger, containers []types.Container, useComposeDependsOn bool) ([]types.Container, error) {
 	// Phase 1: Build the dependency graph data structures
-	containerMap, indegree, adjacency, normalizedMap, err := buildDependencyGraph(containers, useComposeDependsOn)
+	containerMap, indegree, adjacency, normalizedMap, err := buildDependencyGraph(log, containers, useComposeDependsOn)
 	if err != nil {
 		return nil, err
 	}
@@ -146,10 +150,10 @@ func sortByDependencies(containers []types.Container, useComposeDependsOn bool) 
 
 		// Add to sorted result - this container can be updated now
 		sorted = append(sorted, containerMap[current])
-		logrus.WithFields(logrus.Fields{
-			"container_id": containerMap[current].ID().ShortID(),
-			"name":         containerMap[current].Name(),
-		}).Debug("Added container to sorted list")
+		log.Debug().
+			Str("container_id", containerMap[current].ID().ShortID()).
+			Str("name", containerMap[current].Name()).
+			Msg("Added container to sorted list")
 
 		// Update all containers that depend on this one
 		for _, dependent := range adjacency[current] {
@@ -162,7 +166,7 @@ func sortByDependencies(containers []types.Container, useComposeDependsOn bool) 
 	}
 
 	// Phase 4: Cycle detection
-	err = detectAndReportCycle(
+	err = detectAndReportCycle(log,
 		sorted,
 		containers,
 		containerMap,
@@ -181,7 +185,7 @@ func sortByDependencies(containers []types.Container, useComposeDependsOn bool) 
 // This function builds three key data structures:
 //   - containerMap: Maps canonical normalized identifiers to container objects for O(1) lookup
 //   - indegree: Tracks number of incoming dependencies for each container (nodes with indegree 0 have no dependencies)
-//   - adjacency: Lists containers that depend on each container (outgoing edges; keys are canonical)
+//   - adjacency: Lists containers that depend on each container (outgoing edges and keys are canonical)
 //
 // Graph nodes are always keyed by ResolveContainerIdentifier (project-service, service, or name).
 // Links from c.Links() may use Watchtower depends-on container names, Compose service names,
@@ -207,7 +211,7 @@ func sortByDependencies(containers []types.Container, useComposeDependsOn bool) 
 //   - map[string][]string: Adjacency list (canonical dependency -> dependents)
 //   - map[types.Container]string: Reverse map from container to normalized identifier
 //   - error: IdentifierCollisionError if duplicate identifiers detected, nil otherwise
-func buildDependencyGraph(
+func buildDependencyGraph(log *zerolog.Logger,
 	containers []types.Container,
 	useComposeDependsOn bool,
 ) (map[string]types.Container, map[string]int, map[string][]string, map[types.Container]string, error) {
@@ -227,7 +231,7 @@ func buildDependencyGraph(
 	// Check for identifier collisions
 	for identifier, dupContainers := range tempMap {
 		if len(dupContainers) > 1 {
-			logrus.Errorf(
+			log.Error().Msgf(
 				"Identifier collision detected: '%s' used by multiple containers: %v",
 				identifier,
 				dupContainers,
@@ -246,10 +250,10 @@ func buildDependencyGraph(
 
 	// Lookup identifiers for link resolution: canonical keys plus unique bare names.
 	// Docs specify Watchtower depends-on and network_mode targets use container names,
-	// while Compose depends_on uses service names; aliases bridge those forms to the
+	// while Compose depends_on uses service names. Aliases bridge those forms to the
 	// canonical project-service graph keys without inventing extra Kahn nodes.
 	// The identifier set is built once and reused for every link in this graph.
-	matchIDSet, aliasToCanonical := buildLinkMatchIndexes(containerMap)
+	matchIDSet, aliasToCanonical := buildLinkMatchIndexes(log, containerMap)
 
 	// Build the graph by processing container links (dependencies).
 	// Edges always use canonical identifiers so Kahn's algorithm can traverse them.
@@ -292,7 +296,7 @@ func buildDependencyGraph(
 // Returns:
 //   - map[string]bool: Precomputed set of matchable identifiers (canonical keys and unique bare names).
 //   - map[string]string: Maps every matchable identifier to its canonical graph key.
-func buildLinkMatchIndexes(
+func buildLinkMatchIndexes(log *zerolog.Logger,
 	containerMap map[string]types.Container,
 ) (map[string]bool, map[string]string) {
 	// Capacity covers one canonical key plus one optional bare-name alias per container.
@@ -318,7 +322,8 @@ func buildLinkMatchIndexes(
 		}
 
 		// Never use a bare name that is already another container's canonical key.
-		if _, isCanonicalKey := containerMap[bareName]; isCanonicalKey {
+		_, isCanonicalKey := containerMap[bareName]
+		if isCanonicalKey {
 			continue
 		}
 
@@ -333,8 +338,9 @@ func buildLinkMatchIndexes(
 
 	for bareName, owners := range bareOwners {
 		if len(owners) != 1 {
-			logrus.WithField("bare_name", bareName).
-				Debug("Skipped ambiguous bare container name alias for dependency matching")
+			log.Debug().
+				Str("bare_name", bareName).
+				Msg("Skipped ambiguous bare container name alias for dependency matching")
 
 			continue
 		}
@@ -467,7 +473,7 @@ func ExtractServiceName(identifier string) string {
 //     after the hyphen is a positive integer (Docker Compose replica numbering).
 //  3. Project-qualified suffix match (identifier ends with "-"+link), and for
 //     unhyphenated links only, ExtractServiceName equality on both sides.
-//     This strategy only succeeds when exactly one candidate matches; multiple
+//     This strategy only succeeds when exactly one candidate matches. Multiple
 //     matches (e.g. the same service name in different projects) are treated as
 //     ambiguous and return no results.
 //
@@ -604,7 +610,7 @@ func initializeQueue(indegree map[string]int) []string {
 //
 // Returns:
 //   - error: CircularReferenceError if cycle detected, nil otherwise
-func detectAndReportCycle(
+func detectAndReportCycle(log *zerolog.Logger,
 	sorted []types.Container,
 	containers []types.Container,
 	containerMap map[string]types.Container,
@@ -642,10 +648,10 @@ func detectAndReportCycle(
 			cyclePath = findCyclePath(cycleContainer, adjacency, visited)
 		}
 
-		logrus.WithFields(logrus.Fields{
-			"cycle_container": cycleContainer,
-			"cycle_path":      cyclePath,
-		}).Debug("Detected circular reference in dependency graph")
+		log.Debug().
+			Str("cycle_container", cycleContainer).
+			Strs("cycle_path", cyclePath).
+			Msg("Detected circular reference in dependency graph")
 
 		// Return detailed error with cycle information for debugging
 		return CircularReferenceError{ContainerName: cycleContainer, CyclePath: cyclePath}
@@ -720,7 +726,8 @@ func findCyclePath(start string, adjacency map[string][]string, visited map[stri
 
 		// Explore all neighbors (containers that depend on this one)
 		for _, neighbor := range adjacency[node] {
-			if cycle := dfs(neighbor, path); cycle != nil {
+			cycle := dfs(neighbor, path)
+			if cycle != nil {
 				return cycle // Propagate cycle up the call stack
 			}
 		}

@@ -192,7 +192,7 @@ func FormatEndpoints(endpointMap EnabledEndpointsMap) string {
 // and/or legacy configuration options.
 //
 // Rules:
-//  1. Parse the allowlist when non-empty (unknown names fail; "all" expands fully).
+//  1. Parse the allowlist when non-empty (unknown names fail and "all" expands fully).
 //  2. Union with any legacy update/metrics/containers flags (deduplicated).
 //  3. When legacy flags are used, log one deprecation warning with the final
 //     equivalent allowlist value.

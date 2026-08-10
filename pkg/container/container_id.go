@@ -8,7 +8,7 @@ import (
 	"regexp"
 	"strings"
 
-	"github.com/sirupsen/logrus"
+	"github.com/rs/zerolog"
 
 	"github.com/nicholas-fedor/watchtower/pkg/types"
 )
@@ -68,78 +68,93 @@ func IsOldContainer(name string) bool {
 // Returns:
 //   - types.ContainerID: The detected container ID if successful
 //   - error: Non-nil if all detection methods fail, containing the last error encountered
-func GetCurrentContainerID(ctx context.Context, client Client) (types.ContainerID, error) {
+func GetCurrentContainerID(log *zerolog.Logger, ctx context.Context, client Client) (types.ContainerID, error) {
 	// Collect errors from failed detection attempts for final error reporting
 	var errs []error
 
 	// First attempt: Mountinfo-based detection - most reliable when available
-	logrus.Debug("Attempting to get current container ID using mountinfo detection")
+	log.Debug().Msg("Attempting to get current container ID using mountinfo detection")
 
-	containerID, err := GetContainerIDFromMountinfo()
+	containerID, err := GetContainerIDFromMountinfo(log)
 	if err == nil {
-		logrus.WithField("container_id", containerID).
-			Debug("Successfully detected container ID using mountinfo")
+		log.Debug().
+			Str("container_id", string(containerID)).
+			Msg("Successfully detected container ID using mountinfo")
 
 		return containerID, nil
 	}
 
-	logrus.WithError(err).Debug("Mountinfo detection failed")
+	log.Debug().
+		Err(err).
+		Msg("Mountinfo detection failed")
 	errs = append(errs, err)
 
 	// Second attempt: Cgroup file parsing - works in most containerized environments
-	logrus.Debug("Attempting to get current container ID using cgroup file parsing")
+	log.Debug().Msg("Attempting to get current container ID using cgroup file parsing")
 
-	containerID, err = GetContainerIDFromCgroupFile()
+	containerID, err = GetContainerIDFromCgroupFile(log)
 	if err == nil {
-		logrus.WithField("container_id", containerID).
-			Debug("Successfully detected container ID using cgroup file")
+		log.Debug().
+			Str("container_id", string(containerID)).
+			Msg("Successfully detected container ID using cgroup file")
 
 		return containerID, nil
 	}
 
-	logrus.WithError(err).Debug("Cgroup file parsing failed")
+	log.Debug().
+		Err(err).
+		Msg("Cgroup file parsing failed")
 	errs = append(errs, err)
 
 	// Third attempt: Hostname matching - fallback using Docker API
-	logrus.Debug("Attempting to get current container ID using hostname matching")
+	log.Debug().Msg("Attempting to get current container ID using hostname matching")
 
-	containerID, err = GetContainerIDFromHostname(ctx, client)
+	containerID, err = GetContainerIDFromHostname(log, ctx, client)
 	if err == nil {
-		logrus.WithField("container_id", containerID).
-			Debug("Successfully detected container ID using hostname matching")
+		log.Debug().
+			Str("container_id", string(containerID)).
+			Msg("Successfully detected container ID using hostname matching")
 
 		return containerID, nil
 	}
 
-	logrus.WithError(err).Debug("Hostname matching failed")
+	log.Debug().
+		Err(err).
+		Msg("Hostname matching failed")
 	errs = append(errs, err)
 
 	// All methods failed - return the last error with context
 	lastErr := errs[len(errs)-1]
-	logrus.WithError(lastErr).Error("All container ID detection methods failed")
+	log.Error().
+		Err(lastErr).
+		Msg("All container ID detection methods failed")
 
 	return "", fmt.Errorf("failed to detect current container ID: %w", lastErr)
 }
 
 // GetContainerIDFromMountinfo retrieves the container ID from /proc/self/mountinfo.
 // Uses the mountinfo file to find container paths containing /containers/<id>.
-func GetContainerIDFromMountinfo() (types.ContainerID, error) {
+func GetContainerIDFromMountinfo(log *zerolog.Logger) (types.ContainerID, error) {
 	file, err := ReadMountinfoFunc("/proc/self/mountinfo")
 	if err != nil {
-		logrus.WithError(err).
-			WithField("file", "/proc/self/mountinfo").
-			Debug("Failed to read mountinfo file")
+		log.Debug().
+			Err(err).
+			Str("file", "/proc/self/mountinfo").
+			Msg("Failed to read mountinfo file")
 
 		return "", errReadMountinfoFile
 	}
 
-	logrus.WithField("file", "/proc/self/mountinfo").Debug("Read mountinfo file successfully")
+	log.Debug().
+		Str("file", "/proc/self/mountinfo").
+		Msg("Read mountinfo file successfully")
 
-	containerID, err := ParseContainerIDFromMountinfo(string(file))
+	containerID, err := ParseContainerIDFromMountinfo(log, string(file))
 	if err != nil {
-		logrus.WithError(err).
-			WithField("file", "/proc/self/mountinfo").
-			Debug("Failed to extract container ID from mountinfo")
+		log.Debug().
+			Err(err).
+			Str("file", "/proc/self/mountinfo").
+			Msg("Failed to extract container ID from mountinfo")
 
 		return "", errExtractContainerIDFromMountinfo
 	}
@@ -148,7 +163,7 @@ func GetContainerIDFromMountinfo() (types.ContainerID, error) {
 }
 
 // ParseContainerIDFromMountinfo parses the mountinfo string to extract container ID.
-func ParseContainerIDFromMountinfo(mountinfoString string) (types.ContainerID, error) {
+func ParseContainerIDFromMountinfo(log *zerolog.Logger, mountinfoString string) (types.ContainerID, error) {
 	lines := strings.SplitSeq(strings.TrimSpace(mountinfoString), "\n")
 
 	for line := range lines {
@@ -167,12 +182,17 @@ func ParseContainerIDFromMountinfo(mountinfoString string) (types.ContainerID, e
 		fields := strings.Split(firstPart, " ")
 		if len(fields) >= minMountinfoFields {
 			root := fields[3]
-			logrus.WithField("root", root).Debug("Processing mountinfo root")
+			log.Debug().
+				Str("root", root).
+				Msg("Processing mountinfo root")
 
-			if id := ExtractContainerIDFromPath(root); id != "" {
-				logrus.WithField("id", id).Debug("Extracted container ID from mountinfo root")
+			containerID := ExtractContainerIDFromPath(root)
+			if containerID != "" {
+				log.Debug().
+					Str("id", string(containerID)).
+					Msg("Extracted container ID from mountinfo root")
 
-				return id, nil
+				return containerID, nil
 			}
 		}
 	}
@@ -192,23 +212,29 @@ func ExtractContainerIDFromPath(path string) types.ContainerID {
 
 // GetContainerIDFromCgroupFile retrieves the container ID from /proc/<pid>/cgroup.
 // Uses the cgroup file to find Docker container paths.
-func GetContainerIDFromCgroupFile() (types.ContainerID, error) {
+func GetContainerIDFromCgroupFile(log *zerolog.Logger) (types.ContainerID, error) {
 	filePath := fmt.Sprintf("/proc/%d/cgroup", os.Getpid())
 
 	file, err := ReadCgroupFunc(filePath)
 	if err != nil {
-		logrus.WithError(err).WithField("file", filePath).Debug("Failed to read cgroup file")
+		log.Debug().
+			Err(err).
+			Str("file", filePath).
+			Msg("Failed to read cgroup file")
 
 		return "", errReadCgroupFile
 	}
 
-	logrus.WithField("file", filePath).Debug("Read cgroup file successfully")
+	log.Debug().
+		Str("file", filePath).
+		Msg("Read cgroup file successfully")
 
-	containerID, err := ParseContainerIDFromCgroupString(string(file))
+	containerID, err := ParseContainerIDFromCgroupString(log, string(file))
 	if err != nil {
-		logrus.WithError(err).
-			WithField("file", filePath).
-			Debug("Failed to extract container ID from cgroup")
+		log.Debug().
+			Err(err).
+			Str("file", filePath).
+			Msg("Failed to extract container ID from cgroup")
 
 		return "", errExtractContainerID
 	}
@@ -217,7 +243,7 @@ func GetContainerIDFromCgroupFile() (types.ContainerID, error) {
 }
 
 // ParseContainerIDFromCgroupString parses the cgroup string to extract container ID.
-func ParseContainerIDFromCgroupString(cgroupString string) (types.ContainerID, error) {
+func ParseContainerIDFromCgroupString(log *zerolog.Logger, cgroupString string) (types.ContainerID, error) {
 	var lines iter.Seq[string]
 	if strings.Contains(cgroupString, "\n") {
 		lines = strings.Lines(cgroupString)
@@ -232,15 +258,17 @@ func ParseContainerIDFromCgroupString(cgroupString string) (types.ContainerID, e
 
 		matches := dockerContainerPattern.FindStringSubmatch(trimmedLine)
 
-		logrus.WithFields(logrus.Fields{
-			"line":    trimmedLine,
-			"matches": matches,
-			"pattern": dockerContainerPattern.String(),
-		}).Debug("Processed cgroup line for container ID")
+		log.Debug().
+			Str("line", trimmedLine).
+			Strs("matches", matches).
+			Str("pattern", dockerContainerPattern.String()).
+			Msg("Processed cgroup line for container ID")
 
 		if len(matches) >= minMatchGroups {
 			id := types.ContainerID(matches[1])
-			logrus.WithField("id", id).Debug("Extracted container ID from cgroup")
+			log.Debug().
+				Str("id", string(id)).
+				Msg("Extracted container ID from cgroup")
 
 			return id, nil
 		}
@@ -263,7 +291,7 @@ func ParseContainerIDFromCgroupString(cgroupString string) (types.ContainerID, e
 //   - types.ContainerID: The detected container ID if a match is found.
 //   - error: Non-nil if the HOSTNAME env var is missing, the Docker client's
 //     ListContainers call fails (wrapped and propagated), or no matching container is found.
-func GetContainerIDFromHostname(ctx context.Context, client Client) (types.ContainerID, error) {
+func GetContainerIDFromHostname(log *zerolog.Logger, ctx context.Context, client Client) (types.ContainerID, error) {
 	hostname := os.Getenv("HOSTNAME")
 	if hostname == "" {
 		return "", ErrContainerIDNotFound
@@ -283,13 +311,13 @@ func GetContainerIDFromHostname(ctx context.Context, client Client) (types.Conta
 	for _, c := range containers {
 		containerInfo := c.ContainerInfo()
 		if containerInfo == nil {
-			logrus.Debug("Container info is nil, skipping hostname check")
+			log.Debug().Msg("Container info is nil, skipping hostname check")
 
 			continue
 		}
 
 		if containerInfo.Config == nil {
-			logrus.Debug("Container config is nil, skipping hostname check")
+			log.Debug().Msg("Container config is nil, skipping hostname check")
 
 			continue
 		}
@@ -321,16 +349,18 @@ func GetContainerIDFromHostname(ctx context.Context, client Client) (types.Conta
 
 	// Return the Watchtower container if found among matches.
 	if watchtowerMatch != "" {
-		logrus.WithField("container_id", watchtowerMatch).
-			Debug("Found Watchtower container by hostname with Watchtower label")
+		log.Debug().
+			Str("container_id", string(watchtowerMatch)).
+			Msg("Found Watchtower container by hostname with Watchtower label")
 
 		return watchtowerMatch, nil
 	}
 
 	// Fall back to the first match if no Watchtower container was found.
 	if firstMatchID != "" {
-		logrus.WithField("container_id", firstMatchID).
-			Debug("Found container by hostname (first match, no Watchtower label)")
+		log.Debug().
+			Str("container_id", string(firstMatchID)).
+			Msg("Found container by hostname (first match, no Watchtower label)")
 
 		return firstMatchID, nil
 	}

@@ -10,9 +10,10 @@
 //
 // Usage example:
 //
+//	// Callers must provide a non-nil *zerolog.Logger (process logger).
 //	labels := map[string]string{
 //		"com.docker.compose.service": "myservice",
 //	}
-//	services := compose.ParseDependsOnLabel("postgres:service_started:required,redis")
-//	serviceName := compose.GetServiceName(labels)
+//	services := compose.ParseDependsOnLabel(log, "postgres:service_started:required,redis")
+//	serviceName := compose.GetServiceName(log, labels)
 package compose

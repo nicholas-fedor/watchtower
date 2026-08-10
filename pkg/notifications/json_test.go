@@ -3,7 +3,6 @@ package notifications
 import (
 	"github.com/onsi/ginkgo/v2"
 	"github.com/onsi/gomega"
-	"github.com/sirupsen/logrus"
 
 	"github.com/nicholas-fedor/watchtower/pkg/session"
 )
@@ -202,7 +201,7 @@ var _ = ginkgo.Describe("JSON template", func() {
 			ginkgo.It("should handle template rendering edge cases", func() {
 				// Test with empty report
 				data := Data{
-					Entries: []*logrus.Entry{},
+					Entries: []*notificationEntry{},
 					Report:  nil,
 					StaticData: StaticData{
 						Title: "Test Title",

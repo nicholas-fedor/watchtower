@@ -13,7 +13,7 @@ import (
 )
 
 func TestNew(t *testing.T) {
-	h := New(func(_ context.Context) ([]ImageStatus, error) { return nil, nil })
+	h := New(testLogger(), func(_ context.Context) ([]ImageStatus, error) { return nil, nil })
 	require.NotNil(t, h)
 	assert.Equal(t, "/v1/images", h.Path)
 }
@@ -51,7 +51,7 @@ func TestHandler_Handle(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			h := New(tt.listFunc)
+			h := New(testLogger(), tt.listFunc)
 			app := fiber.New(fiber.Config{})
 			app.Get("/v1/images", h.Handle)
 

@@ -13,7 +13,7 @@ import (
 	"time"
 
 	"github.com/distribution/reference"
-	"github.com/sirupsen/logrus"
+	"github.com/rs/zerolog"
 	"github.com/spf13/viper"
 
 	"github.com/nicholas-fedor/watchtower/internal/meta"
@@ -111,12 +111,12 @@ type imageConfig struct {
 // Returns:
 //   - time.Time: The image creation timestamp from the registry config.
 //   - error: Non-nil if any step fails.
-func FetchImageCreationTime(
+func FetchImageCreationTime(log *zerolog.Logger,
 	ctx context.Context,
 	container types.Container,
 	registryAuth string,
 ) (time.Time, error) {
-	fields := logrus.Fields{
+	fields := map[string]any{
 		"container": container.Name(),
 		"image":     container.ImageName(),
 	}
@@ -127,13 +127,13 @@ func FetchImageCreationTime(
 	targetVariant := viper.GetString("WATCHTOWER_COOLDOWN_PLATFORM_VARIANT")
 
 	// Transform auth credentials into usable format.
-	registryAuth = auth.TransformAuth(registryAuth)
+	registryAuth = auth.TransformAuth(log, registryAuth)
 
 	// Use the cached HTTP client for registry requests.
-	client := auth.NewAuthClient()
+	client := auth.NewAuthClient(log)
 
 	// Obtain an authentication token and challenge host for the registry.
-	result, err := auth.GetToken(
+	result, err := auth.GetToken(log,
 		ctx,
 		container,
 		registryAuth,
@@ -141,9 +141,10 @@ func FetchImageCreationTime(
 		"",
 	)
 	if err != nil {
-		logrus.WithError(err).
-			WithFields(fields).
-			Debug("Failed to get auth token for image age check")
+		log.Debug().
+			Err(err).
+			Fields(fields).
+			Msg("Failed to get auth token for image age check")
 
 		return time.Time{},
 			fmt.Errorf("%w: %w", errFetchManifestFailed, err)
@@ -155,14 +156,15 @@ func FetchImageCreationTime(
 	redirectHost := result.RedirectHost
 
 	// Build the initial manifest URL to get the original host.
-	manifestURL, originalHost, parsedURL, err := buildManifestURLForAge(
+	manifestURL, originalHost, parsedURL, err := buildManifestURLForAge(log,
 		container,
 		"",
 	)
 	if err != nil {
-		logrus.WithError(err).
-			WithFields(fields).
-			Debug("Failed to build manifest URL")
+		log.Debug().
+			Err(err).
+			Fields(fields).
+			Msg("Failed to build manifest URL")
 
 		return time.Time{}, fmt.Errorf("%w: %w", errFetchManifestFailed, err)
 	}
@@ -170,14 +172,15 @@ func FetchImageCreationTime(
 	// Determine the primary manifest host based on auth redirect.
 	// If redirected during auth, use the redirect host for manifest requests.
 	if redirectHost != "" && redirectHost != originalHost && redirected {
-		manifestURL, _, parsedURL, err = buildManifestURLForAge(
+		manifestURL, _, parsedURL, err = buildManifestURLForAge(log,
 			container,
 			redirectHost,
 		)
 		if err != nil {
-			logrus.WithError(err).
-				WithFields(fields).
-				Debug("Failed to build manifest URL with redirect host")
+			log.Debug().
+				Err(err).
+				Fields(fields).
+				Msg("Failed to build manifest URL with redirect host")
 
 			return time.Time{},
 				fmt.Errorf("%w: %w", errFetchManifestFailed, err)
@@ -186,7 +189,7 @@ func FetchImageCreationTime(
 
 	// Try manifest fetch with host fallback: primary (redirect/original),
 	// then challenge host, then original host.
-	configDigest, winningHost, err := fetchManifestForAge(
+	configDigest, winningHost, err := fetchManifestForAge(log,
 		ctx,
 		client,
 		manifestURL,
@@ -203,16 +206,17 @@ func FetchImageCreationTime(
 		return time.Time{}, err
 	}
 
-	logrus.WithFields(fields).
-		WithField("config_digest", configDigest).
-		Debug("Extracted config digest from manifest")
+	log.Debug().
+		Fields(fields).
+		Str("config_digest", configDigest).
+		Msg("Extracted config digest from manifest")
 
 	// Use the host that successfully served the manifest for the blob fetch.
 	blobURL := *parsedURL
 	blobURL.Host = winningHost
 
 	// Fetch the config blob.
-	configBody, err := fetchConfigBlob(
+	configBody, err := fetchConfigBlob(log,
 		ctx,
 		client,
 		&blobURL,
@@ -230,9 +234,10 @@ func FetchImageCreationTime(
 
 	err = json.NewDecoder(io.LimitReader(configBody, maxConfigSize+1)).Decode(&config)
 	if err != nil {
-		logrus.WithError(err).
-			WithFields(fields).
-			Debug("Failed to parse image config JSON")
+		log.Debug().
+			Err(err).
+			Fields(fields).
+			Msg("Failed to parse image config JSON")
 
 		return time.Time{},
 			fmt.Errorf("%w: %w", errParseConfigFailed, err)
@@ -240,15 +245,17 @@ func FetchImageCreationTime(
 
 	// Check if the created field is present.
 	if config.Created == nil {
-		logrus.WithFields(fields).
-			Debug("Image config does not contain creation timestamp")
+		log.Debug().
+			Fields(fields).
+			Msg("Image config does not contain creation timestamp")
 
 		return time.Time{}, errImageCreationTimeMissing
 	}
 
-	logrus.WithFields(fields).
-		WithField("created", config.Created).
-		Debug("Fetched image creation time from registry")
+	log.Debug().
+		Fields(fields).
+		Time("created", *config.Created).
+		Msg("Fetched image creation time from registry")
 
 	return *config.Created, nil
 }
@@ -265,7 +272,7 @@ func FetchImageCreationTime(
 //   - string: The original host.
 //   - *url.URL: The parsed URL.
 //   - error: Non-nil if URL construction fails.
-func buildManifestURLForAge(
+func buildManifestURLForAge(log *zerolog.Logger,
 	container types.Container,
 	hostOverride string,
 ) (string, string, *url.URL, error) {
@@ -276,7 +283,7 @@ func buildManifestURLForAge(
 	}
 
 	// Build manifest URL.
-	manifestURLStr, err := buildManifestURLForContainer(container, scheme)
+	manifestURLStr, err := buildManifestURLForContainer(log, container, scheme)
 	if err != nil {
 		return "",
 			"",
@@ -334,12 +341,12 @@ func buildManifestURLForAge(
 //   - string: The winning host that served the manifest.
 //   - string: The HTTP Content-Type header value from the response.
 //   - error: Non-nil if all hosts fail or body exceeds size limit.
-func retryManifestRequest(
+func retryManifestRequest(log *zerolog.Logger,
 	ctx context.Context,
 	client auth.Client,
 	parsedURL *url.URL,
 	manifestURL, token, challengeHost, originalHost string,
-	fields logrus.Fields,
+	fields map[string]any,
 ) ([]byte, string, string, error) {
 	// Use the provided originalHost for fallback. If empty, derive from parsedURL.
 	if originalHost == "" {
@@ -380,10 +387,11 @@ func retryManifestRequest(
 
 		// Skip re-fetching if this is the same URL as the initial manifestURL.
 		if i > 0 || attemptManifestURL != manifestURL {
-			logrus.WithFields(fields).
-				WithField("attempt_host", candidate.host).
-				WithField("attempt_name", candidate.name).
-				Debug("Retrying manifest fetch on alternate host")
+			log.Debug().
+				Fields(fields).
+				Str("attempt_host", candidate.host).
+				Str("attempt_name", candidate.name).
+				Msg("Retrying manifest fetch on alternate host")
 		}
 
 		// Create the manifest request with broad Accept headers.
@@ -394,9 +402,10 @@ func retryManifestRequest(
 			nil,
 		)
 		if err != nil {
-			logrus.WithError(err).
-				WithFields(fields).
-				Debug("Failed to create manifest request")
+			log.Debug().
+				Err(err).
+				Fields(fields).
+				Msg("Failed to create manifest request")
 
 			return nil,
 				"",
@@ -423,9 +432,10 @@ func retryManifestRequest(
 
 		resp, err := client.Do(req)
 		if err != nil {
-			logrus.WithError(err).
-				WithFields(fields).
-				Debug("Failed to execute manifest request")
+			log.Debug().
+				Err(err).
+				Fields(fields).
+				Msg("Failed to execute manifest request")
 
 			return nil,
 				"",
@@ -439,10 +449,11 @@ func retryManifestRequest(
 
 			if (status == http.StatusUnauthorized || status == http.StatusNotFound) &&
 				i < len(hosts)-1 {
-				logrus.WithFields(fields).
-					WithField("status", status).
-					WithField("host", candidate.host).
-					Debug("Manifest request failed, trying next host")
+				log.Debug().
+					Fields(fields).
+					Int("status", status).
+					Str("host", candidate.host).
+					Msg("Manifest request failed, trying next host")
 
 				lastErr = fmt.Errorf(
 					"%w: status %d on %s",
@@ -454,9 +465,10 @@ func retryManifestRequest(
 				continue
 			}
 
-			logrus.WithFields(fields).
-				WithField("status", status).
-				Debug("Manifest request returned non-OK status")
+			log.Debug().
+				Fields(fields).
+				Int("status", status).
+				Msg("Manifest request returned non-OK status")
 
 			return nil,
 				"",
@@ -476,9 +488,10 @@ func retryManifestRequest(
 		resp.Body.Close()
 
 		if err != nil {
-			logrus.WithError(err).
-				WithFields(fields).
-				Debug("Failed to read manifest response")
+			log.Debug().
+				Err(err).
+				Fields(fields).
+				Msg("Failed to read manifest response")
 
 			return nil,
 				"",
@@ -487,10 +500,11 @@ func retryManifestRequest(
 		}
 
 		if len(body) > maxManifestSize {
-			logrus.WithFields(fields).
-				WithField("size", len(body)).
-				WithField("limit", maxManifestSize).
-				Debug("Manifest response exceeds size limit")
+			log.Debug().
+				Fields(fields).
+				Int("size", len(body)).
+				Int("limit", maxManifestSize).
+				Msg("Manifest response exceeds size limit")
 
 			return nil,
 				"",
@@ -539,15 +553,15 @@ func retryManifestRequest(
 // Returns:
 //   - string: Config digest (e.g., "sha256:abc...").
 //   - error: Non-nil if fetch, parse, or platform selection fails.
-func fetchManifestForAge(
+func fetchManifestForAge(log *zerolog.Logger,
 	ctx context.Context,
 	client auth.Client,
 	manifestURL, token string,
 	parsedURL *url.URL,
 	targetOS, targetArch, targetVariant, challengeHost, originalHost string,
-	fields logrus.Fields,
+	fields map[string]any,
 ) (string, string, error) {
-	body, winningHost, contentType, err := retryManifestRequest(
+	body, winningHost, contentType, err := retryManifestRequest(log,
 		ctx,
 		client,
 		parsedURL,
@@ -586,7 +600,7 @@ func fetchManifestForAge(
 		effectiveURL := *parsedURL
 		effectiveURL.Host = winningHost
 
-		return selectPlatformManifest(
+		return selectPlatformManifest(log,
 			ctx,
 			client,
 			index,
@@ -605,9 +619,10 @@ func fetchManifestForAge(
 
 	err = json.Unmarshal(body, &manifest)
 	if err != nil {
-		logrus.WithError(err).
-			WithFields(fields).
-			Debug("Failed to parse manifest JSON")
+		log.Debug().
+			Err(err).
+			Fields(fields).
+			Msg("Failed to parse manifest JSON")
 
 		return "",
 			"",
@@ -615,8 +630,9 @@ func fetchManifestForAge(
 	}
 
 	if manifest.Config.Digest == "" {
-		logrus.WithFields(fields).
-			Debug("Manifest does not contain config digest")
+		log.Debug().
+			Fields(fields).
+			Msg("Manifest does not contain config digest")
 
 		return "", "", errNoConfigDigest
 	}
@@ -643,10 +659,10 @@ func fetchManifestForAge(
 // Returns:
 //   - string: The selected platform manifest digest.
 //   - error: errNoPlatformMatch if no candidates, errAmbiguousPlatformMatch if ambiguous.
-func selectPlatformCandidate(
+func selectPlatformCandidate(log *zerolog.Logger,
 	index imageIndex,
 	targetOS, targetArch, targetVariant string,
-	fields logrus.Fields,
+	fields map[string]any,
 ) (string, error) {
 	type candidate struct {
 		digest  string
@@ -674,10 +690,11 @@ func selectPlatformCandidate(
 	}
 
 	if len(candidates) == 0 {
-		logrus.WithFields(fields).
-			WithField("os", targetOS).
-			WithField("arch", targetArch).
-			Debug("No matching platform found in image index")
+		log.Debug().
+			Fields(fields).
+			Str("os", targetOS).
+			Str("arch", targetArch).
+			Msg("No matching platform found in image index")
 
 		return "", errNoPlatformMatch
 	}
@@ -695,18 +712,20 @@ func selectPlatformCandidate(
 		if len(variantCandidates) == 1 {
 			selectedDigest := variantCandidates[0].digest
 
-			logrus.WithFields(fields).
-				WithField("digest", selectedDigest).
-				WithField("variant", targetVariant).
-				Debug("Selected platform manifest by variant from index")
+			log.Debug().
+				Fields(fields).
+				Str("digest", selectedDigest).
+				Str("variant", targetVariant).
+				Msg("Selected platform manifest by variant from index")
 
 			return selectedDigest, nil
 		}
 
 		if len(variantCandidates) == 0 {
-			logrus.WithFields(fields).
-				WithField("target_variant", targetVariant).
-				Debug("No platform entries match requested variant")
+			log.Debug().
+				Fields(fields).
+				Str("target_variant", targetVariant).
+				Msg("No platform entries match requested variant")
 
 			return "", errNoPlatformMatch
 		}
@@ -715,10 +734,11 @@ func selectPlatformCandidate(
 			// Multiple entries with the same variant. Return the first one.
 			selectedDigest := variantCandidates[0].digest
 
-			logrus.WithFields(fields).
-				WithField("digest", selectedDigest).
-				WithField("variant", targetVariant).
-				Debug("Selected first matching variant platform manifest from index")
+			log.Debug().
+				Fields(fields).
+				Str("digest", selectedDigest).
+				Str("variant", targetVariant).
+				Msg("Selected first matching variant platform manifest from index")
 
 			return selectedDigest, nil
 		}
@@ -736,11 +756,12 @@ func selectPlatformCandidate(
 					variants = append(variants, c.variant)
 				}
 
-				logrus.WithFields(fields).
-					WithField("os", targetOS).
-					WithField("arch", targetArch).
-					WithField("variants", variants).
-					Debug("Ambiguous platform match: multiple entries with differing variants")
+				log.Debug().
+					Fields(fields).
+					Str("os", targetOS).
+					Str("arch", targetArch).
+					Strs("variants", variants).
+					Msg("Ambiguous platform match: multiple entries with differing variants")
 
 				return "", errAmbiguousPlatformMatch
 			}
@@ -749,9 +770,10 @@ func selectPlatformCandidate(
 
 	selectedDigest := candidates[0].digest
 
-	logrus.WithFields(fields).
-		WithField("digest", selectedDigest).
-		Debug("Selected platform manifest from index")
+	log.Debug().
+		Fields(fields).
+		Str("digest", selectedDigest).
+		Msg("Selected platform manifest from index")
 
 	return selectedDigest, nil
 }
@@ -776,20 +798,21 @@ func selectPlatformCandidate(
 //   - string: The config digest from the platform-specific manifest.
 //   - string: The host that successfully served the manifest.
 //   - error: Non-nil if all hosts fail.
-func fetchPlatformManifestWithRetry(
+func fetchPlatformManifestWithRetry(log *zerolog.Logger,
 	ctx context.Context,
 	client auth.Client,
 	parsedURL *url.URL,
 	token, selectedDigest, challengeHost string,
-	fields logrus.Fields,
+	fields map[string]any,
 ) (string, string, error) {
 	// Build URL path for platform-specific manifest.
 	idx := strings.LastIndex(parsedURL.Path, "/manifests/")
 
 	if idx == -1 {
-		logrus.WithFields(fields).
-			WithField("path", parsedURL.Path).
-			Debug("Could not find /manifests/ in URL path")
+		log.Debug().
+			Fields(fields).
+			Str("path", parsedURL.Path).
+			Msg("Could not find /manifests/ in URL path")
 
 		return "",
 			"",
@@ -826,10 +849,11 @@ func fetchPlatformManifestWithRetry(
 		attemptURL.Path = platformPathPrefix + selectedDigest
 
 		if i > 0 {
-			logrus.WithFields(fields).
-				WithField("attempt_host", candidate.host).
-				WithField("attempt_name", candidate.name).
-				Debug("Retrying platform manifest fetch on alternate host")
+			log.Debug().
+				Fields(fields).
+				Str("attempt_host", candidate.host).
+				Str("attempt_name", candidate.name).
+				Msg("Retrying platform manifest fetch on alternate host")
 		}
 
 		// Fetch the platform-specific manifest.
@@ -840,9 +864,10 @@ func fetchPlatformManifestWithRetry(
 			nil,
 		)
 		if err != nil {
-			logrus.WithError(err).
-				WithFields(fields).
-				Debug("Failed to create platform manifest request")
+			log.Debug().
+				Err(err).
+				Fields(fields).
+				Msg("Failed to create platform manifest request")
 
 			return "",
 				"",
@@ -870,9 +895,10 @@ func fetchPlatformManifestWithRetry(
 
 		resp, err := client.Do(req)
 		if err != nil {
-			logrus.WithError(err).
-				WithFields(fields).
-				Debug("Failed to execute platform manifest request")
+			log.Debug().
+				Err(err).
+				Fields(fields).
+				Msg("Failed to execute platform manifest request")
 
 			return "",
 				"",
@@ -891,10 +917,11 @@ func fetchPlatformManifestWithRetry(
 			// Retry on 401/404 if there are more hosts to try.
 			if (status == http.StatusUnauthorized || status == http.StatusNotFound) &&
 				i < len(hosts)-1 {
-				logrus.WithFields(fields).
-					WithField("status", status).
-					WithField("host", candidate.host).
-					Debug("Platform manifest request failed, trying next host")
+				log.Debug().
+					Fields(fields).
+					Int("status", status).
+					Str("host", candidate.host).
+					Msg("Platform manifest request failed, trying next host")
 
 				lastErr = fmt.Errorf(
 					"%w: status %d on %s",
@@ -909,9 +936,10 @@ func fetchPlatformManifestWithRetry(
 			// On non-redirected registries, try challenge host for 401/404 on original.
 			if (status == http.StatusUnauthorized || status == http.StatusNotFound) &&
 				challengeHost != "" && candidate.host == originalHost {
-				logrus.WithFields(fields).
-					WithField("status", status).
-					Debug("Platform manifest failed on original host, trying challenge host")
+				log.Debug().
+					Fields(fields).
+					Int("status", status).
+					Msg("Platform manifest failed on original host, trying challenge host")
 
 				retryURL := *parsedURL
 				retryURL.Host = challengeHost
@@ -955,9 +983,10 @@ func fetchPlatformManifestWithRetry(
 					retryStatus := retryResp.StatusCode
 					retryResp.Body.Close()
 
-					logrus.WithFields(fields).
-						WithField("status", retryStatus).
-						Debug("Platform manifest retry also failed")
+					log.Debug().
+						Fields(fields).
+						Int("status", retryStatus).
+						Msg("Platform manifest retry also failed")
 
 					return "",
 						"",
@@ -974,9 +1003,10 @@ func fetchPlatformManifestWithRetry(
 				retryResp.Body.Close()
 
 				if err != nil {
-					logrus.WithError(err).
-						WithFields(fields).
-						Debug("Failed to parse platform manifest JSON")
+					log.Debug().
+						Err(err).
+						Fields(fields).
+						Msg("Failed to parse platform manifest JSON")
 
 					return "",
 						"",
@@ -984,8 +1014,9 @@ func fetchPlatformManifestWithRetry(
 				}
 
 				if retryManifest.Config.Digest == "" {
-					logrus.WithFields(fields).
-						Debug("Platform manifest does not contain config digest")
+					log.Debug().
+						Fields(fields).
+						Msg("Platform manifest does not contain config digest")
 
 					return "", "", errNoConfigDigest
 				}
@@ -993,9 +1024,10 @@ func fetchPlatformManifestWithRetry(
 				return retryManifest.Config.Digest, challengeHost, nil
 			}
 
-			logrus.WithFields(fields).
-				WithField("status", status).
-				Debug("Platform manifest request returned non-OK status")
+			log.Debug().
+				Fields(fields).
+				Int("status", status).
+				Msg("Platform manifest request returned non-OK status")
 
 			return "",
 				"",
@@ -1012,9 +1044,10 @@ func fetchPlatformManifestWithRetry(
 		resp.Body.Close()
 
 		if err != nil {
-			logrus.WithError(err).
-				WithFields(fields).
-				Debug("Failed to parse platform manifest JSON")
+			log.Debug().
+				Err(err).
+				Fields(fields).
+				Msg("Failed to parse platform manifest JSON")
 
 			return "",
 				"",
@@ -1026,8 +1059,9 @@ func fetchPlatformManifestWithRetry(
 		}
 
 		if manifest.Config.Digest == "" {
-			logrus.WithFields(fields).
-				Debug("Platform manifest does not contain config digest")
+			log.Debug().
+				Fields(fields).
+				Msg("Platform manifest does not contain config digest")
 
 			return "", "", errNoConfigDigest
 		}
@@ -1073,13 +1107,14 @@ func fetchPlatformManifestWithRetry(
 //   - string: The host that successfully served the manifest.
 //   - error: Non-nil if selection or fetching fails.
 func selectPlatformManifest(
+	log *zerolog.Logger,
 	ctx context.Context,
 	client auth.Client,
 	index imageIndex,
 	parsedURL *url.URL,
 	token string,
 	targetOS, targetArch, targetVariant, challengeHost string,
-	fields logrus.Fields,
+	fields map[string]any,
 ) (string, string, error) {
 	// Use runtime defaults if no override is specified.
 	if targetOS == "" {
@@ -1090,7 +1125,7 @@ func selectPlatformManifest(
 		targetArch = runtime.GOARCH
 	}
 
-	selectedDigest, err := selectPlatformCandidate(
+	selectedDigest, err := selectPlatformCandidate(log,
 		index,
 		targetOS,
 		targetArch,
@@ -1101,7 +1136,7 @@ func selectPlatformManifest(
 		return "", "", err
 	}
 
-	return fetchPlatformManifestWithRetry(
+	return fetchPlatformManifestWithRetry(log,
 		ctx,
 		client,
 		parsedURL,
@@ -1126,12 +1161,12 @@ func selectPlatformManifest(
 // Returns:
 //   - io.ReadCloser: The config blob body (caller must close).
 //   - error: Non-nil if fetching fails.
-func fetchConfigBlob(
+func fetchConfigBlob(log *zerolog.Logger,
 	ctx context.Context,
 	client auth.Client,
 	parsedURL *url.URL,
 	configDigest, token string,
-	fields logrus.Fields,
+	fields map[string]any,
 ) (io.ReadCloser, error) {
 	// Extract image path from the manifest URL.
 	// Manifest URL path is: /v2/{image_path}/manifests/{tag}
@@ -1141,8 +1176,9 @@ func fetchConfigBlob(
 	// image paths that contain "/manifests/" as a component.
 	idx := strings.LastIndex(path, "/manifests/")
 	if idx == -1 {
-		logrus.WithFields(fields).
-			Debug("Could not parse image path from manifest URL")
+		log.Debug().
+			Fields(fields).
+			Msg("Could not parse image path from manifest URL")
 
 		return nil, errFetchConfigFailed
 	}
@@ -1153,9 +1189,10 @@ func fetchConfigBlob(
 	blobURL := *parsedURL
 	blobURL.Path = blobPath
 
-	logrus.WithFields(fields).
-		WithField("blob_url", blobURL.String()).
-		Debug("Fetching config blob")
+	log.Debug().
+		Fields(fields).
+		Str("blob_url", blobURL.String()).
+		Msg("Fetching config blob")
 
 	req, err := http.NewRequestWithContext(
 		ctx,
@@ -1164,9 +1201,10 @@ func fetchConfigBlob(
 		nil,
 	)
 	if err != nil {
-		logrus.WithError(err).
-			WithFields(fields).
-			Debug("Failed to create config blob request")
+		log.Debug().
+			Err(err).
+			Fields(fields).
+			Msg("Failed to create config blob request")
 
 		return nil,
 			fmt.Errorf(
@@ -1184,9 +1222,10 @@ func fetchConfigBlob(
 
 	resp, err := client.Do(req)
 	if err != nil {
-		logrus.WithError(err).
-			WithFields(fields).
-			Debug("Failed to execute config blob request")
+		log.Debug().
+			Err(err).
+			Fields(fields).
+			Msg("Failed to execute config blob request")
 
 		return nil,
 			fmt.Errorf("%w: %w", errFetchConfigFailed, err)
@@ -1198,8 +1237,9 @@ func fetchConfigBlob(
 		resp.Body.Close()
 
 		if location == "" {
-			logrus.WithFields(fields).
-				Debug("Redirect response missing Location header")
+			log.Debug().
+				Fields(fields).
+				Msg("Redirect response missing Location header")
 
 			return nil, errFetchConfigFailed
 		}
@@ -1207,9 +1247,10 @@ func fetchConfigBlob(
 		// Resolve relative Location against the current request URL.
 		locationURL, err := url.Parse(location)
 		if err != nil {
-			logrus.WithError(err).
-				WithFields(fields).
-				Debug("Failed to parse redirect Location header")
+			log.Debug().
+				Err(err).
+				Fields(fields).
+				Msg("Failed to parse redirect Location header")
 
 			return nil, fmt.Errorf("%w: %w", errFetchConfigFailed, err)
 		}
@@ -1223,9 +1264,10 @@ func fetchConfigBlob(
 			nil,
 		)
 		if err != nil {
-			logrus.WithError(err).
-				WithFields(fields).
-				Debug("Failed to create redirect request")
+			log.Debug().
+				Err(err).
+				Fields(fields).
+				Msg("Failed to create redirect request")
 
 			return nil,
 				fmt.Errorf("%w: %w", errFetchConfigFailed, err)
@@ -1244,9 +1286,10 @@ func fetchConfigBlob(
 
 		resp, err = client.Do(redirectReq)
 		if err != nil {
-			logrus.WithError(err).
-				WithFields(fields).
-				Debug("Failed to execute redirect request")
+			log.Debug().
+				Err(err).
+				Fields(fields).
+				Msg("Failed to execute redirect request")
 
 			return nil,
 				fmt.Errorf("%w: %w", errFetchConfigFailed, err)
@@ -1255,9 +1298,10 @@ func fetchConfigBlob(
 
 	if resp.StatusCode != http.StatusOK {
 		resp.Body.Close()
-		logrus.WithFields(fields).
-			WithField("status", resp.StatusCode).
-			Debug("Config blob request returned non-OK status")
+		log.Debug().
+			Fields(fields).
+			Int("status", resp.StatusCode).
+			Msg("Config blob request returned non-OK status")
 
 		return nil,
 			fmt.Errorf(
@@ -1285,7 +1329,7 @@ func isIndexMediaType(mediaType string) bool {
 // Returns:
 //   - string: The manifest URL.
 //   - error: Non-nil if URL construction fails.
-func buildManifestURLForContainer(container types.Container, scheme string) (string, error) {
+func buildManifestURLForContainer(log *zerolog.Logger, container types.Container, scheme string) (string, error) {
 	normalizedRef, err := reference.ParseDockerRef(container.ImageName())
 	if err != nil {
 		return "", fmt.Errorf("failed to parse image name: %w", err)
@@ -1301,7 +1345,7 @@ func buildManifestURLForContainer(container types.Container, scheme string) (str
 			)
 	}
 
-	host, err := auth.GetRegistryAddress(container.ImageName())
+	host, err := auth.GetRegistryAddress(log, container.ImageName())
 	if err != nil {
 		return "", fmt.Errorf("failed to get registry address for %s: %w", container.ImageName(), err)
 	}

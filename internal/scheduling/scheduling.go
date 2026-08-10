@@ -14,7 +14,7 @@ import (
 	"time"
 
 	"github.com/robfig/cron/v3"
-	"github.com/sirupsen/logrus"
+	"github.com/rs/zerolog"
 
 	"github.com/nicholas-fedor/watchtower/internal/logging"
 	"github.com/nicholas-fedor/watchtower/internal/metrics"
@@ -22,32 +22,35 @@ import (
 	"github.com/nicholas-fedor/watchtower/pkg/types"
 )
 
+// updateWaitTimeout bounds how long shutdown waits for an in-flight update.
+const updateWaitTimeout = 60 * time.Second
+
 // WaitForRunningUpdate waits for any currently running update to complete before proceeding with shutdown.
 // It checks the lock channel status and blocks with a timeout if an update is in progress.
+//
 // Parameters:
+//   - log: Process logger. Required and must be non-nil. A nil logger panics on the first log call.
 //   - ctx: The context for cancellation, allowing early shutdown on context timeout.
 //   - lock: The channel used to synchronize updates, ensuring only one runs at a time.
-func WaitForRunningUpdate(ctx context.Context, lock chan bool) {
-	const updateWaitTimeout = 60 * time.Second
-
-	logrus.Debug("Checking lock status before shutdown.")
+func WaitForRunningUpdate(log *zerolog.Logger, ctx context.Context, lock chan bool) {
+	log.Debug().Msg("Checking lock status before shutdown.")
 
 	if len(lock) == 0 {
 		select {
 		case v := <-lock:
-			logrus.Debug("Lock acquired, update finished.")
+			log.Debug().Msg("Lock acquired, update finished.")
 
 			lock <- v
 		case <-time.After(updateWaitTimeout):
-			logrus.Warn("Timeout waiting for running update to finish, proceeding with shutdown.")
+			log.Warn().Msg("Timeout waiting for running update to finish, proceeding with shutdown.")
 		case <-ctx.Done():
-			logrus.Warn("Context canceled while waiting for running update.")
+			log.Warn().Msg("Context canceled while waiting for running update.")
 		}
 	} else {
-		logrus.Debug("No update running, lock available.")
+		log.Debug().Msg("No update running, lock available.")
 	}
 
-	logrus.Debug("Lock check completed.")
+	log.Debug().Msg("Lock check completed.")
 }
 
 // ScheduleDeps holds dependencies for scheduled update runs.
@@ -56,6 +59,8 @@ func WaitForRunningUpdate(ctx context.Context, lock chan bool) {
 // (or an equivalent full construction).
 // Each tick copies BaseParams and applies only per-run fields such as SkipSelfUpdate.
 type ScheduleDeps struct {
+	// Logger is the process logger for scheduled runs. Required and must be non-nil.
+	Logger *zerolog.Logger
 	// Filter determines which containers are updated.
 	Filter types.Filter
 	// FilterDesc is a human-readable description of the filter for startup messaging.
@@ -106,10 +111,12 @@ type ScheduleDeps struct {
 // Parameters:
 //   - ctx: The context controlling the scheduler's lifecycle, enabling shutdown on cancellation.
 //   - deps: Schedule dependencies including a complete BaseParams policy snapshot.
+//     deps.Logger is required and must be non-nil (nil panics on first log call).
 //
 // Returns:
 //   - error: An error if scheduling fails (e.g., invalid cron spec), nil on successful shutdown.
 func RunUpgradesOnSchedule(ctx context.Context, deps ScheduleDeps) error {
+	log := deps.Logger
 	// Initialize lock if not provided, ensuring single-update concurrency.
 	lock := deps.Lock
 	if lock == nil {
@@ -149,7 +156,7 @@ func RunUpgradesOnSchedule(ctx context.Context, deps ScheduleDeps) error {
 		if skipSelfUpdateForPorts {
 			skipWatchtowerSelfUpdate = true
 
-			logrus.Debug("Published ports detected - self-update skipped.")
+			log.Debug().Msg("Published ports detected - self-update skipped.")
 		}
 
 		// Skip update if this is a Watchtower parent container (from self-update chain)
@@ -157,11 +164,11 @@ func RunUpgradesOnSchedule(ctx context.Context, deps ScheduleDeps) error {
 			chain, _ := deps.CurrentWatchtowerContainer.GetContainerChain()
 
 			if container.IsWatchtowerParent(deps.CurrentWatchtowerContainer.ID(), chain) {
-				logrus.Debug("Skipping scheduled update for Watchtower parent container")
+				log.Debug().Msg("Skipping scheduled update for Watchtower parent container")
 
 				nextRuns := scheduler.Entries()
 				if len(nextRuns) > 0 {
-					logrus.Debug(
+					log.Debug().Msg(
 						"Scheduled next run: " + nextRuns[0].Schedule.Next(time.Now()).String(),
 					)
 				}
@@ -182,7 +189,7 @@ func RunUpgradesOnSchedule(ctx context.Context, deps ScheduleDeps) error {
 			case v := <-lock:
 				defer func() { lock <- v }()
 			default:
-				logrus.Debug("Update skipped: another update is currently running")
+				log.Debug().Msg("Update skipped: another update is currently running")
 
 				return
 			}
@@ -203,7 +210,7 @@ func RunUpgradesOnSchedule(ctx context.Context, deps ScheduleDeps) error {
 		params.Filter = updateFilter
 
 		if deps.RunUpdate == nil {
-			logrus.Debug("Update skipped: RunUpdate hook is not configured")
+			log.Debug().Msg("Update skipped: RunUpdate hook is not configured")
 
 			return
 		}
@@ -213,11 +220,11 @@ func RunUpgradesOnSchedule(ctx context.Context, deps ScheduleDeps) error {
 			metrics.Default().RegisterScan(metric)
 		}
 
-		logrus.Debug("Update operation completed")
+		log.Debug().Msg("Update operation completed")
 
 		nextRuns := scheduler.Entries()
 		if len(nextRuns) > 0 {
-			logrus.Debug("Scheduled next run: " + nextRuns[0].Schedule.Next(time.Now()).String())
+			log.Debug().Msg("Scheduled next run: " + nextRuns[0].Schedule.Next(time.Now()).String())
 		}
 	}
 
@@ -233,7 +240,7 @@ func RunUpgradesOnSchedule(ctx context.Context, deps ScheduleDeps) error {
 			// Atomically check and set firstRun to ensure only the first execution skips self-update
 			skipWatchtowerSelfUpdate := firstRun.CompareAndSwap(0, 1)
 			if skipWatchtowerSelfUpdate {
-				logrus.Debug(
+				log.Debug().Msg(
 					"Skipping Watchtower self-update on first scheduled run due to cleanup",
 				)
 			}
@@ -291,24 +298,31 @@ func RunUpgradesOnSchedule(ctx context.Context, deps ScheduleDeps) error {
 	// Wait for shutdown signal or context cancellation.
 	select {
 	case <-ctx.Done():
-		logrus.Debug("Context canceled, stopping scheduler...")
+		log.Debug().Msg("Context canceled, stopping scheduler...")
 	case <-interrupt:
-		logrus.Debug("Received interrupt signal, stopping scheduler...")
+		log.Debug().Msg("Received interrupt signal, stopping scheduler...")
 	}
 
 	// Stop the scheduler and wait for any running update to complete.
 	scheduler.Stop()
-	logrus.Debug("Waiting for running update to be finished...")
+	log.Debug().Msg("Waiting for running update to be finished...")
 
-	// Wait for any currently running update to complete before proceeding with shutdown.
-	WaitForRunningUpdate(ctx, lock)
+	// Original ctx is often already canceled at shutdown. Detach cancel and
+	// apply a bound so an active RunUpdate can finish before Notifier.Close().
+	waitCtx, waitCancel := context.WithTimeout(
+		context.WithoutCancel(ctx),
+		updateWaitTimeout,
+	)
+	defer waitCancel()
+
+	WaitForRunningUpdate(log, waitCtx, lock)
 
 	// Close the notification system to clean up resources during shutdown.
 	if deps.Notifier != nil {
 		deps.Notifier.Close()
 	}
 
-	logrus.Debug("Scheduler stopped and update completed.")
+	log.Debug().Msg("Scheduler stopped and update completed.")
 
 	return nil
 }

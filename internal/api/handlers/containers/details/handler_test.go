@@ -13,7 +13,7 @@ import (
 )
 
 func TestNew(t *testing.T) {
-	h := New(func(_ context.Context, _, _ string) ([]ContainerDetails, error) {
+	h := New(testLogger(), func(_ context.Context, _, _ string) ([]ContainerDetails, error) {
 		return nil, nil
 	})
 	require.NotNil(t, h)
@@ -53,7 +53,7 @@ func TestHandler_Handle(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			h := New(tt.getDetails)
+			h := New(testLogger(), tt.getDetails)
 			app := fiber.New(fiber.Config{})
 			app.Get("/v1/containers/details", h.Handle)
 

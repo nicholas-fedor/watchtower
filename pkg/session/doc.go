@@ -16,5 +16,5 @@
 //	report := progress.Report()
 //	scanned := report.Scanned()
 //
-// The package integrates with types.Container and uses logrus for logging session events.
+// The package integrates with types.Container and uses zerolog for logging session events.
 package session

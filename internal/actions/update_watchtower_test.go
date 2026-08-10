@@ -44,7 +44,7 @@ var _ = ginkgo.Describe("Watchtower container handling", func() {
 				false,
 				false,
 			)
-			report, cleanupImageInfos, err := actions.Update(
+			report, cleanupImageInfos, err := actions.Update(testLogger(),
 				context.Background(),
 				client,
 				types.UpdateParams{
@@ -101,7 +101,7 @@ var _ = ginkgo.Describe("Watchtower container handling", func() {
 				Filter:      filters.WatchtowerContainersFilter,
 				CPUCopyMode: "auto",
 			}
-			report, cleanupImageInfos, err := actions.Update(
+			report, cleanupImageInfos, err := actions.Update(testLogger(),
 				context.Background(),
 				client,
 				config,
@@ -139,7 +139,7 @@ var _ = ginkgo.Describe("Watchtower container handling", func() {
 				false,
 				false,
 			)
-			report, cleanupImageInfos, err := actions.Update(
+			report, cleanupImageInfos, err := actions.Update(testLogger(),
 				context.Background(),
 				client,
 				types.UpdateParams{
@@ -184,7 +184,7 @@ var _ = ginkgo.Describe("Watchtower container handling", func() {
 				false,
 				false,
 			)
-			report, cleanupImageInfos, err := actions.Update(
+			report, cleanupImageInfos, err := actions.Update(testLogger(),
 				context.Background(),
 				client,
 				types.UpdateParams{
@@ -228,7 +228,7 @@ var _ = ginkgo.Describe("Watchtower container handling", func() {
 				false,
 				false,
 			)
-			report, cleanupImageInfos, err := actions.Update(
+			report, cleanupImageInfos, err := actions.Update(testLogger(),
 				context.Background(),
 				client,
 				types.UpdateParams{
@@ -281,7 +281,7 @@ var _ = ginkgo.Describe("Watchtower container handling", func() {
 				Filter:      filters.WatchtowerContainersFilter,
 				CPUCopyMode: "auto",
 			}
-			report, cleanupImageInfos, err := actions.Update(
+			report, cleanupImageInfos, err := actions.Update(testLogger(),
 				context.Background(),
 				client,
 				config,
@@ -336,7 +336,7 @@ var _ = ginkgo.Describe("Watchtower container handling", func() {
 
 			var cleanupImageInfos []types.RemovedImageInfo
 
-			cleanupOccurred, err := actions.RemoveExcessWatchtowerInstances(
+			cleanupOccurred, err := actions.RemoveExcessWatchtowerInstances(testLogger(),
 				context.Background(),
 				client,
 				true, // cleanup=true
@@ -386,7 +386,7 @@ var _ = ginkgo.Describe("Watchtower container handling", func() {
 
 			var cleanupImageInfos []types.RemovedImageInfo
 
-			cleanupOccurred, err := actions.RemoveExcessWatchtowerInstances(
+			cleanupOccurred, err := actions.RemoveExcessWatchtowerInstances(testLogger(),
 				context.Background(),
 				client,
 				true,
@@ -426,7 +426,7 @@ var _ = ginkgo.Describe("Watchtower container handling", func() {
 				false,
 				false,
 			)
-			report, cleanupImageInfos, err := actions.Update(
+			report, cleanupImageInfos, err := actions.Update(testLogger(),
 				context.Background(),
 				client,
 				types.UpdateParams{
@@ -476,7 +476,7 @@ var _ = ginkgo.Describe("Watchtower container handling", func() {
 				false,
 				false,
 			)
-			report, cleanupImageInfos, err := actions.Update(
+			report, cleanupImageInfos, err := actions.Update(testLogger(),
 				context.Background(),
 				client,
 				types.UpdateParams{
@@ -526,7 +526,7 @@ var _ = ginkgo.Describe("Watchtower container handling", func() {
 					false,
 					false,
 				)
-				report, cleanupImageInfos, err := actions.Update(
+				report, cleanupImageInfos, err := actions.Update(testLogger(),
 					context.Background(),
 					client,
 					types.UpdateParams{
@@ -579,11 +579,11 @@ var _ = ginkgo.Describe("Watchtower container handling", func() {
 					false,
 				)
 				// Use a scoped filter that matches the container scope
-				scopedFilter := filters.FilterByScope(
+				scopedFilter := filters.FilterByScope(testLogger(),
 					"container-scope",
 					filters.WatchtowerContainersFilter,
 				)
-				report, cleanupImageInfos, err := actions.Update(
+				report, cleanupImageInfos, err := actions.Update(testLogger(),
 					context.Background(),
 					client,
 					types.UpdateParams{
@@ -627,11 +627,11 @@ var _ = ginkgo.Describe("Watchtower container handling", func() {
 					false,
 				)
 				// Use a scoped filter that does not match the container scope
-				scopedFilter := filters.FilterByScope(
+				scopedFilter := filters.FilterByScope(testLogger(),
 					"different-scope",
 					filters.WatchtowerContainersFilter,
 				)
-				report, cleanupImageInfos, err := actions.Update(
+				report, cleanupImageInfos, err := actions.Update(testLogger(),
 					context.Background(),
 					client,
 					types.UpdateParams{
@@ -677,8 +677,8 @@ var _ = ginkgo.Describe("Watchtower container handling", func() {
 			// and assuming the explicit scope takes precedence in filter building,
 			// but in this test, we're testing the filter directly
 			// Since the container has "label-scope", FilterByScope("label-scope") will match
-			scopedFilter := filters.FilterByScope("label-scope", filters.WatchtowerContainersFilter)
-			report, cleanupImageInfos, err := actions.Update(
+			scopedFilter := filters.FilterByScope(testLogger(), "label-scope", filters.WatchtowerContainersFilter)
+			report, cleanupImageInfos, err := actions.Update(testLogger(),
 				context.Background(),
 				client,
 				types.UpdateParams{
@@ -729,11 +729,11 @@ var _ = ginkgo.Describe("Watchtower container handling", func() {
 						false,
 					)
 					// Use scope filter that doesn't match the container's scope
-					scopedFilter := filters.FilterByScope(
+					scopedFilter := filters.FilterByScope(testLogger(),
 						"scope-b",
 						filters.WatchtowerContainersFilter,
 					)
-					report, cleanupImageInfos, err := actions.Update(
+					report, cleanupImageInfos, err := actions.Update(testLogger(),
 						context.Background(),
 						client,
 						types.UpdateParams{
@@ -794,11 +794,11 @@ var _ = ginkgo.Describe("Watchtower container handling", func() {
 						false,
 					)
 					// Filter for scope-a only
-					scopedFilter := filters.FilterByScope(
+					scopedFilter := filters.FilterByScope(testLogger(),
 						"scope-a",
 						filters.WatchtowerContainersFilter,
 					)
-					report, cleanupImageInfos, err := actions.Update(
+					report, cleanupImageInfos, err := actions.Update(testLogger(),
 						context.Background(),
 						client,
 						types.UpdateParams{
@@ -854,11 +854,11 @@ var _ = ginkgo.Describe("Watchtower container handling", func() {
 						false,
 					)
 					// Filter for scope-c only
-					scopedFilter := filters.FilterByScope(
+					scopedFilter := filters.FilterByScope(testLogger(),
 						"scope-c",
 						filters.WatchtowerContainersFilter,
 					)
-					report, cleanupImageInfos, err := actions.Update(
+					report, cleanupImageInfos, err := actions.Update(testLogger(),
 						context.Background(),
 						client,
 						types.UpdateParams{
@@ -909,8 +909,8 @@ var _ = ginkgo.Describe("Watchtower container handling", func() {
 					false,
 				)
 				// Filter for scope-x
-				scopedFilter := filters.FilterByScope("scope-x", filters.WatchtowerContainersFilter)
-				report, cleanupImageInfos, err := actions.Update(
+				scopedFilter := filters.FilterByScope(testLogger(), "scope-x", filters.WatchtowerContainersFilter)
+				report, cleanupImageInfos, err := actions.Update(testLogger(),
 					context.Background(),
 					client,
 					types.UpdateParams{
@@ -974,7 +974,7 @@ var _ = ginkgo.Describe("Watchtower container handling", func() {
 					false,
 					false,
 				)
-				report, cleanupImageInfos, err := actions.Update(
+				report, cleanupImageInfos, err := actions.Update(testLogger(),
 					context.Background(),
 					client,
 					types.UpdateParams{
@@ -1020,7 +1020,7 @@ var _ = ginkgo.Describe("Watchtower container handling", func() {
 				false,
 				false,
 			)
-			report, cleanupImageInfos, err := actions.Update(
+			report, cleanupImageInfos, err := actions.Update(testLogger(),
 				context.Background(),
 				client,
 				types.UpdateParams{
@@ -1070,7 +1070,7 @@ var _ = ginkgo.Describe("Watchtower container handling", func() {
 				// Simulate pull failure by setting an error on IsContainerStale
 				client.TestData.IsContainerStaleError = errors.New("failed to pull image")
 
-				report, cleanupImageInfos, err := actions.Update(
+				report, cleanupImageInfos, err := actions.Update(testLogger(),
 					context.Background(),
 					client,
 					types.UpdateParams{
@@ -1132,7 +1132,7 @@ var _ = ginkgo.Describe("Watchtower container handling", func() {
 					false,
 					false,
 				)
-				report, cleanupImageInfos, err := actions.Update(
+				report, cleanupImageInfos, err := actions.Update(testLogger(),
 					context.Background(),
 					client,
 					types.UpdateParams{
@@ -1188,7 +1188,7 @@ var _ = ginkgo.Describe("Watchtower container handling", func() {
 
 				// Note: PullFailureDelay is tested via synctest in TestSafeguardDelay
 				// This test verifies that the staleness check is called and fails
-				report, cleanupImageInfos, err := actions.Update(
+				report, cleanupImageInfos, err := actions.Update(testLogger(),
 					context.Background(),
 					client,
 					types.UpdateParams{
@@ -1242,7 +1242,7 @@ func TestSafeguardDelay(t *testing.T) {
 		// Mock IsContainerStale to return an error (simulating pull failure)
 		client.TestData.IsContainerStaleError = errors.New("failed to pull image")
 
-		report, cleanupImageInfos, err := actions.Update(
+		report, cleanupImageInfos, err := actions.Update(testLogger(),
 			context.Background(),
 			client,
 			types.UpdateParams{
@@ -1314,7 +1314,7 @@ func TestPullFailureDelayContextCancellation(t *testing.T) {
 		go func() {
 			defer close(done)
 
-			report, cleanupImageInfos, err = actions.Update(
+			report, cleanupImageInfos, err = actions.Update(testLogger(),
 				ctx,
 				client,
 				types.UpdateParams{

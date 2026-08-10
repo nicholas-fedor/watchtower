@@ -6,14 +6,17 @@ import (
 	"time"
 
 	"github.com/gofiber/fiber/v3"
-	"github.com/sirupsen/logrus"
+	"github.com/rs/zerolog"
 
 	"github.com/nicholas-fedor/watchtower/internal/api/handlers/events"
+	"github.com/nicholas-fedor/watchtower/pkg/notifications"
 	"github.com/nicholas-fedor/watchtower/pkg/types"
 )
 
 // Handler serves the /v1/check endpoint.
 type Handler struct {
+	log *zerolog.Logger
+
 	// check is the function that checks container update availability.
 	check CheckFunc
 	// Path is the HTTP route path for the check endpoint.
@@ -42,6 +45,7 @@ type Handler struct {
 //     and scan_failed events are emitted during check runs.
 //   - scanStartedData: Pre-built redacted policy flags for the scan_started event.
 func New(
+	log *zerolog.Logger,
 	check CheckFunc,
 	maxTimeout time.Duration,
 	notifier types.Notifier,
@@ -49,7 +53,13 @@ func New(
 	eventBroadcaster *events.Broadcaster,
 	scanStartedData events.ScanStartedData,
 ) *Handler {
+	if log == nil {
+		nop := zerolog.Nop()
+		log = &nop
+	}
+
 	return &Handler{
+		log:              log,
 		check:            check,
 		Path:             "/v1/check",
 		maxTimeout:       maxTimeout,
@@ -79,10 +89,11 @@ func New(
 //	@Security		BearerAuth
 //	@Router		/v1/check [post]
 func (h *Handler) Handle(c fiber.Ctx) error {
+	// API check path must not re-enter notification hooks (notify=no child of h.log).
+	apiLog := h.log.With().Str("notify", "no").Logger()
+
 	if h.check == nil {
-		logrus.WithFields(logrus.Fields{
-			"notify": "no",
-		}).Warn("Received HTTP API check request but no check function is configured")
+		apiLog.Warn().Msg("Received HTTP API check request but no check function is configured")
 
 		sendErr := c.Status(fiber.StatusInternalServerError).
 			SendString("check function is not configured")
@@ -93,11 +104,10 @@ func (h *Handler) Handle(c fiber.Ctx) error {
 		return nil
 	}
 
-	logrus.WithFields(logrus.Fields{
-		"method": c.Method(),
-		"path":   c.Path(),
-		"notify": "no",
-	}).Info("Received HTTP API check request")
+	apiLog.Info().
+		Str("method", c.Method()).
+		Str("path", c.Path()).
+		Msg("Received HTTP API check request")
 
 	images := extractFilterParams(c, "image")
 	containers := extractFilterParams(c, "container")
@@ -124,7 +134,7 @@ func (h *Handler) Handle(c fiber.Ctx) error {
 
 		defer func() {
 			if h.splitByContainer {
-				sendSplitCheckNotifications(h.notifier)
+				notifications.FlushSplitByContainer(h.notifier)
 				h.notifier.StartNotification(true)
 			} else {
 				h.notifier.SendNotification(nil)
@@ -145,8 +155,7 @@ func (h *Handler) Handle(c fiber.Ctx) error {
 
 	results, err := h.check(ctx, images, containers)
 	if err != nil {
-		logrus.WithError(err).WithField("notify", "no").
-			Error("Failed to check for updates")
+		apiLog.Error().Err(err).Msg("Failed to check for updates")
 
 		// Notify SSE subscribers that the check scan failed.
 		if h.eventBroadcaster != nil {
@@ -201,32 +210,4 @@ func (h *Handler) Handle(c fiber.Ctx) error {
 	}
 
 	return nil
-}
-
-// sendSplitCheckNotifications sends per-container notifications when
-// split-by-container is enabled for the check endpoint.
-// It groups queued log entries by container name and sends one notification
-// per container.
-func sendSplitCheckNotifications(notifier types.Notifier) {
-	entries := notifier.GetEntries()
-	if len(entries) == 0 {
-		return
-	}
-
-	byContainer := make(map[string][]*logrus.Entry)
-
-	for _, entry := range entries {
-		container, _ := entry.Data["container"].(string)
-		if container == "" {
-			container = "unknown"
-		}
-
-		byContainer[container] = append(byContainer[container], entry)
-	}
-
-	for _, containerEntries := range byContainer {
-		if len(containerEntries) > 0 {
-			notifier.SendFilteredEntries(containerEntries, nil)
-		}
-	}
 }

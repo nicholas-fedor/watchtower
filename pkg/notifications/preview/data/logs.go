@@ -11,7 +11,7 @@ type logEntry struct {
 	Level   LogLevel
 }
 
-// LogLevel is the analog of logrus.Level.
+// LogLevel is a preview log level string (info, warning, error, etc.).
 type LogLevel string
 
 const (

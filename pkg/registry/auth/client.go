@@ -9,7 +9,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/sirupsen/logrus"
+	"github.com/rs/zerolog"
 	"github.com/spf13/viper"
 )
 
@@ -88,13 +88,18 @@ func (r *registryClient) Do(request *http.Request) (*http.Response, error) {
 // ConfigureTLS builds a TLS configuration from Viper settings.
 //
 // Parameters:
+//   - log: Logger for TLS diagnostics. May be nil (events are skipped).
 //   - tlsConfig: The base TLS configuration to modify.
-func ConfigureTLS(tlsConfig *tls.Config) {
+func ConfigureTLS(log *zerolog.Logger, tlsConfig *tls.Config) {
 	// Configure TLS verification based on WATCHTOWER_REGISTRY_TLS_SKIP.
+	// InsecureSkipVerify is intentional when WATCHTOWER_REGISTRY_TLS_SKIP is set.
 	if viper.GetBool("WATCHTOWER_REGISTRY_TLS_SKIP") {
 		tlsConfig.InsecureSkipVerify = true
 
-		logrus.Debug("TLS verification disabled via WATCHTOWER_REGISTRY_TLS_SKIP configuration")
+		if log != nil {
+			log.Debug().
+				Msg("TLS certificate verification disabled via WATCHTOWER_REGISTRY_TLS_SKIP")
+		}
 	}
 
 	// Configure minimum TLS version based on WATCHTOWER_REGISTRY_TLS_MIN_VERSION.
@@ -103,14 +108,15 @@ func ConfigureTLS(tlsConfig *tls.Config) {
 		version, ok := TLSVersionMap[strings.ToUpper(minVersion)]
 		if ok {
 			tlsConfig.MinVersion = version
-
-			logrus.WithField("min_version", minVersion).
-				Debug("Configured TLS minimum version")
 		} else {
-			tlsConfig.MinVersion = tls.VersionTLS12
+			if log != nil {
+				log.Warn().
+					Str("configured_version", minVersion).
+					Str("fallback_version", "TLS1.2").
+					Msg("Invalid WATCHTOWER_REGISTRY_TLS_MIN_VERSION. Falling back to TLS 1.2")
+			}
 
-			logrus.WithField("min_version", minVersion).
-				Warn("Invalid TLS minimum version specified - defaulting to TLS 1.2")
+			tlsConfig.MinVersion = tls.VersionTLS12
 		}
 	}
 }
@@ -165,15 +171,19 @@ func buildRegistryClient(tlsConfig *tls.Config) *http.Client {
 // Subsequent calls return the same cached client instance. The client is configured
 // with default timeouts and connection limits for registry access.
 //
+// Parameters:
+//   - log: Logger for TLS configuration diagnostics on first initialization.
+//     May be nil (invalid-version warning is skipped).
+//
 // Returns:
 //   - Client: Ready for registry authentication requests.
-func NewAuthClient() Client {
+func NewAuthClient(log *zerolog.Logger) Client {
 	clientInitOnce.Do(func() {
 		tlsConfig := &tls.Config{
 			MinVersion: tls.VersionTLS12, // Default to TLS 1.2 for secure communication.
 		}
 
-		ConfigureTLS(tlsConfig)
+		ConfigureTLS(log, tlsConfig)
 		cachedClient = &registryClient{
 			client: buildRegistryClient(tlsConfig),
 		}

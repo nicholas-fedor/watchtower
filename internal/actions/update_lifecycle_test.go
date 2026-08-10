@@ -44,7 +44,7 @@ var _ = ginkgo.Describe("the update action", func() {
 				client.TestData.Staleness = map[string]bool{
 					"test-container-02": true,
 				}
-				report, cleanupImageInfos, err := actions.Update(
+				report, cleanupImageInfos, err := actions.Update(testLogger(),
 					context.Background(),
 					client,
 					types.UpdateParams{
@@ -87,7 +87,7 @@ var _ = ginkgo.Describe("the update action", func() {
 				client.TestData.Staleness = map[string]bool{
 					"test-container-uid-gid": true,
 				}
-				report, cleanupImageInfos, err := actions.Update(
+				report, cleanupImageInfos, err := actions.Update(testLogger(),
 					context.Background(),
 					client,
 					types.UpdateParams{
@@ -135,7 +135,7 @@ var _ = ginkgo.Describe("the update action", func() {
 				client.TestData.Staleness = map[string]bool{
 					"test-container-02": true,
 				}
-				report, cleanupImageInfos, err := actions.Update(
+				report, cleanupImageInfos, err := actions.Update(testLogger(),
 					context.Background(),
 					client,
 					types.UpdateParams{
@@ -179,7 +179,7 @@ var _ = ginkgo.Describe("the update action", func() {
 				client.TestData.Staleness = map[string]bool{
 					"test-container-02": true,
 				}
-				report, cleanupImageInfos, err := actions.Update(
+				report, cleanupImageInfos, err := actions.Update(testLogger(),
 					context.Background(),
 					client,
 					types.UpdateParams{
@@ -236,7 +236,7 @@ var _ = ginkgo.Describe("the update action", func() {
 				gomega.Expect(provider.ToRestart()).To(gomega.BeTrue())
 				gomega.Expect(consumer.ToRestart()).To(gomega.BeFalse())
 
-				actions.UpdateImplicitRestart(containers, containers, true)
+				actions.UpdateImplicitRestart(testLogger(), containers, containers, true)
 
 				gomega.Expect(containers[0].ToRestart()).To(gomega.BeTrue())
 				gomega.Expect(containers[1].ToRestart()).To(gomega.BeTrue())
@@ -254,7 +254,7 @@ var _ = ginkgo.Describe("the update action", func() {
 					gomega.Expect(containers[0].ToRestart()).To(gomega.BeTrue())  // db
 					gomega.Expect(containers[1].ToRestart()).To(gomega.BeFalse()) // web
 
-					actions.UpdateImplicitRestart(containers, containers, true)
+					actions.UpdateImplicitRestart(testLogger(), containers, containers, true)
 
 					// web should be marked for restart because it depends on db
 					gomega.Expect(containers[0].ToRestart()).To(gomega.BeTrue())
@@ -275,7 +275,7 @@ var _ = ginkgo.Describe("the update action", func() {
 					gomega.Expect(containers[1].ToRestart()).To(gomega.BeFalse()) // db
 					gomega.Expect(containers[2].ToRestart()).To(gomega.BeFalse()) // app
 
-					actions.UpdateImplicitRestart(containers, containers, true)
+					actions.UpdateImplicitRestart(testLogger(), containers, containers, true)
 
 					// All should be marked for restart: cache -> db -> app
 					gomega.Expect(containers[0].ToRestart()).To(gomega.BeTrue())
@@ -338,7 +338,7 @@ var _ = ginkgo.Describe("the update action", func() {
 				gomega.Expect(containerA.ToRestart()).To(gomega.BeFalse())
 
 				// Run UpdateImplicitRestart to propagate restart through the chain
-				actions.UpdateImplicitRestart(containers, containers, true)
+				actions.UpdateImplicitRestart(testLogger(), containers, containers, true)
 
 				// Verify that restart propagates: A and B should now be marked for restart
 				gomega.Expect(containers[0].ToRestart()).To(gomega.BeTrue()) // C
@@ -374,7 +374,7 @@ var _ = ginkgo.Describe("the update action", func() {
 				client.TestData.Staleness = map[string]bool{
 					"test-container-02": true,
 				}
-				report, cleanupImageInfos, err := actions.Update(
+				report, cleanupImageInfos, err := actions.Update(testLogger(),
 					context.Background(),
 					client,
 					types.UpdateParams{
@@ -420,7 +420,7 @@ var _ = ginkgo.Describe("the update action", func() {
 				client.TestData.Staleness = map[string]bool{
 					"test-container-02": true,
 				}
-				report, cleanupImageInfos, err := actions.Update(
+				report, cleanupImageInfos, err := actions.Update(testLogger(),
 					context.Background(),
 					client,
 					types.UpdateParams{

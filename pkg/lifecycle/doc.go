@@ -7,11 +7,12 @@
 //
 // Usage example:
 //
-//	lifecycle.ExecutePreChecks(client, params)
-//	success, err := lifecycle.ExecutePreUpdateCommand(client, container)
+//	// log is the process *zerolog.Logger. ctx is the request/operation context.
+//	lifecycle.ExecutePreChecks(log, ctx, client, params)
+//	success, err := lifecycle.ExecutePreUpdateCommand(log, ctx, client, container, uid, gid)
 //	if err != nil {
-//	    logrus.WithError(err).Error("Pre-update failed")
+//	    log.Error().Err(err).Msg("Pre-update failed")
 //	}
 //
-// The package integrates with container.Client, supports error handling, and uses logrus for logging.
+// The package integrates with container.Client, supports error handling, and uses zerolog for logging.
 package lifecycle

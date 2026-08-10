@@ -37,7 +37,7 @@ func CreateMockContainer(id, name, image string, created time.Time) types.Contai
 		},
 	}
 
-	return container.NewContainer(
+	return container.NewContainer(nil,
 		&content,
 		CreateMockImageInfo(image),
 	)
@@ -94,7 +94,7 @@ func CreateMockContainerWithImageInfoP(
 		},
 	}
 
-	return container.NewContainer(
+	return container.NewContainer(nil,
 		&content,
 		imageInfo,
 	)
@@ -143,7 +143,7 @@ func CreateMockContainerWithConfig(
 
 	imageInfo := CreateMockImageInfo(image)
 
-	return container.NewContainer(
+	return container.NewContainer(nil,
 		&content,
 		imageInfo,
 	)
@@ -198,7 +198,7 @@ func CreateMockContainerWithLinks(
 		},
 	}
 
-	return container.NewContainer(
+	return container.NewContainer(nil,
 		&content,
 		imageInfo,
 	)

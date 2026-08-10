@@ -7,7 +7,7 @@ import (
 	"os"
 	"time"
 
-	"github.com/sirupsen/logrus"
+	"github.com/rs/zerolog"
 
 	cerrdefs "github.com/containerd/errdefs"
 
@@ -69,6 +69,7 @@ var (
 // mounts the Docker socket for container management.
 //
 // Parameters:
+//   - log: Process logger. Required and must be non-nil. A nil logger panics on the first log call.
 //   - ctx: Context for cancellation and timeouts.
 //   - client: Container client for Docker operations.
 //   - sourceContainer: Current Watchtower container being replaced.
@@ -78,20 +79,22 @@ var (
 //   - types.ContainerID: Empty string (the new container's ID is not known to the caller).
 //   - bool: False (old container is removed, not renamed).
 //   - error: Non-nil if orchestrator creation fails.
-func EphemeralSelfUpdate(
-	ctx context.Context,
+func EphemeralSelfUpdate(log *zerolog.Logger, ctx context.Context,
 	client container.Client,
 	sourceContainer types.Container,
 	config types.UpdateParams,
 ) (types.ContainerID, bool, error) {
-	fields := logrus.Fields{
+	fields := map[string]any{
 		"container": sourceContainer.Name(),
 		"image":     sourceContainer.ImageName(),
 	}
 
-	clog := logrus.WithFields(fields)
+	clogVal := log.With().
+		Fields(fields).
+		Logger()
+	clog := &clogVal
 
-	clog.Debug("Initiating ephemeral self-update for Watchtower")
+	clog.Debug().Msg("Initiating ephemeral self-update for Watchtower")
 
 	// Create a detached context for the orchestrator creation to survive parent cancellation.
 	// Uses a 60-second timeout to prevent indefinite hangs during orchestrator creation.
@@ -117,18 +120,20 @@ func EphemeralSelfUpdate(
 		newChain = string(sourceContainer.ID())
 	}
 
-	clog.WithField("container_chain", newChain).Debug("Computed container chain for ephemeral self-update")
+	clog.Debug().
+		Str("container_chain", newChain).
+		Msg("Computed container chain for ephemeral self-update")
 
-	clog.Debug("Creating ephemeral orchestrator for self-update")
+	clog.Debug().Msg("Creating ephemeral orchestrator for self-update")
 
 	// Log "Stopping container" for notification template compatibility.
 	// The orchestrator will handle the actual stop/start/remove operations,
 	// but we emit these Info entries so notifications match the normal update flow.
-	logrus.WithFields(logrus.Fields{
-		"container":    sourceContainer.Name(),
-		"id":           sourceContainer.ID().ShortID(),
-		"old_image_id": sourceContainer.ImageID().ShortID(),
-	}).Info("Stopping container")
+	log.Info().
+		Str("container", sourceContainer.Name()).
+		Str("id", sourceContainer.ID().ShortID()).
+		Str("old_image_id", sourceContainer.ImageID().ShortID()).
+		Msg("Stopping container")
 
 	// Create the ephemeral orchestrator container.
 	//nolint:contextcheck // detached context is intentional for orchestrator lifecycle
@@ -139,22 +144,24 @@ func EphemeralSelfUpdate(
 		newChain,
 	)
 	if err != nil {
-		clog.WithError(err).Error("Failed to create ephemeral orchestrator")
+		clog.Error().
+			Err(err).
+			Msg("Failed to create ephemeral orchestrator")
 
 		return "", false, fmt.Errorf("%w: %w", errEphemeralOrchestratorFailed, err)
 	}
 
 	// Create and start the new container.
-	logrus.Info("Starting new Watchtower container")
+	log.Info().Msg("Starting new Watchtower container")
 
 	// Log that the orchestrator has been started. The orchestrator ID identifies
 	// the ephemeral container that will perform the replacement. The actual new
 	// container's ID is determined by the orchestrator and emitted in its own
 	// "Started new container" log entry.
-	logrus.WithFields(logrus.Fields{
-		"container":       sourceContainer.Name(),
-		"orchestrator_id": orchestratorID.ShortID(),
-	}).Debug("Started self-update orchestrator")
+	log.Debug().
+		Str("container", sourceContainer.Name()).
+		Str("orchestrator_id", orchestratorID.ShortID()).
+		Msg("Started self-update orchestrator")
 
 	// Return immediately. The orchestrator handles the full replacement sequence
 	// asynchronously: stopping the old container, creating and starting the new one,
@@ -192,25 +199,31 @@ func EphemeralSelfUpdate(
 // predecessor for recovery if create or start fails (restore name and start).
 //
 // Parameters:
+//   - log: Process logger. Required and must be non-nil. A nil logger panics on the first log call.
 //   - ctx: Context for cancellation and timeouts.
 //   - client: Container client for Docker operations.
-func RunOrchestrator(ctx context.Context, client container.Client) {
-	clog := logrus.WithField("mode", "orchestrator")
+func RunOrchestrator(log *zerolog.Logger, ctx context.Context, client container.Client) {
+	clogVal := log.With().
+		Str("mode", "orchestrator").
+		Logger()
+	clog := &clogVal
 
-	clog.Debug("Starting Watchtower self-update orchestrator")
+	clog.Debug().Msg("Starting Watchtower self-update orchestrator")
 
 	// Read environment variables.
 	oldID, newImage, originalName, containerChain, err := readOrchestratorEnv()
 	if err != nil {
-		clog.WithError(err).Fatal("Failed to read orchestrator environment variables")
+		clog.Fatal().
+			Err(err).
+			Msg("Failed to read orchestrator environment variables")
 	}
 
-	clog.WithFields(logrus.Fields{
-		"old_id":          oldID,
-		"new_image":       newImage,
-		"original_name":   originalName,
-		"container_chain": containerChain,
-	}).Debug("Read orchestrator environment variables")
+	clog.Debug().
+		Str("old_id", oldID).
+		Str("new_image", newImage).
+		Str("original_name", originalName).
+		Str("container_chain", containerChain).
+		Msg("Read orchestrator environment variables")
 
 	// Create a timeout context for the entire orchestration.
 	orchCtx, orchCancel := context.WithTimeout(
@@ -219,7 +232,7 @@ func RunOrchestrator(ctx context.Context, client container.Client) {
 	)
 
 	// Execute the orchestration sequence.
-	err = orchestrateSelfUpdate(
+	err = orchestrateSelfUpdate(clog,
 		orchCtx,
 		client,
 		oldID,
@@ -232,9 +245,11 @@ func RunOrchestrator(ctx context.Context, client container.Client) {
 	if err != nil {
 		exitCode = 1
 
-		clog.WithError(err).Error("Orchestration failed")
+		clog.Error().
+			Err(err).
+			Msg("Orchestration failed")
 	} else {
-		clog.Debug("Self-update orchestration completed successfully")
+		clog.Debug().Msg("Self-update orchestration completed successfully")
 	}
 
 	// Explicitly cancel before exit since deferred calls do not run on os.Exit.
@@ -307,19 +322,19 @@ func readOrchestratorEnv() (string, string, string, string, error) {
 //
 // Returns:
 //   - error: Non-nil if any step in the orchestration fails.
-func orchestrateSelfUpdate(
-	ctx context.Context,
+func orchestrateSelfUpdate(log *zerolog.Logger, ctx context.Context,
 	client container.Client,
 	oldID string,
 	newImage string,
 	originalName string,
 	containerChain string,
 ) error {
-	clog := logrus.WithFields(logrus.Fields{
-		"old_id":        oldID,
-		"new_image":     newImage,
-		"original_name": originalName,
-	})
+	clogVal := log.With().
+		Str("old_id", oldID).
+		Str("new_image", newImage).
+		Str("original_name", originalName).
+		Logger()
+	clog := &clogVal
 
 	oldContainer, err := inspectOldContainer(
 		ctx,
@@ -381,15 +396,17 @@ func orchestrateSelfUpdate(
 	if !oldGone {
 		removeErr := removeOldContainer(ctx, client, clog, oldContainer)
 		if removeErr != nil {
-			clog.WithError(removeErr).
-				Warn("New Watchtower is running but cleanup of the old container failed")
+			clog.Warn().
+				Err(removeErr).
+				Msg("New Watchtower is running but cleanup of the old container failed")
 		}
 	}
 
 	// Emit the actual new container ID at Info level so notification templates
 	// can consume the correct "new_id" field.
-	clog.WithField("new_id", newContainerID.ShortID()).
-		Info("Started new container")
+	clog.Info().
+		Str("new_id", newContainerID.ShortID()).
+		Msg("Started new container")
 
 	return nil
 }
@@ -401,14 +418,14 @@ func orchestrateSelfUpdate(
 //   - oldContainer: Source container whose create config is pinned.
 //   - newImage: Image reference to use when creating the replacement.
 //   - clog: Logger with container context fields.
-func pinContainerCreateImage(oldContainer types.Container, newImage string, clog *logrus.Entry) {
+func pinContainerCreateImage(oldContainer types.Container, newImage string, clog *zerolog.Logger) {
 	if newImage == "" {
 		return
 	}
 
 	c, ok := oldContainer.(*container.Container)
 	if !ok {
-		clog.Debug("Old container is not a concrete Container. Cannot pin create image")
+		clog.Debug().Msg("Old container is not a concrete Container. Cannot pin create image")
 
 		return
 	}
@@ -419,7 +436,9 @@ func pinContainerCreateImage(oldContainer types.Container, newImage string, clog
 	}
 
 	info.Config.Image = newImage
-	clog.WithField("pinned_image", newImage).Debug("Pinned create image for ephemeral self-update")
+	clog.Debug().
+		Str("pinned_image", newImage).
+		Msg("Pinned create image for ephemeral self-update")
 }
 
 // renameOldContainerForHandoff renames the stopped old container off its original
@@ -431,31 +450,34 @@ func pinContainerCreateImage(oldContainer types.Container, newImage string, clog
 func renameOldContainerForHandoff(
 	ctx context.Context,
 	client container.Client,
-	clog *logrus.Entry,
+	clog *zerolog.Logger,
 	oldContainer types.Container,
 	originalName string,
 ) (bool, error) {
 	if container.IsOldContainer(oldContainer.Name()) {
-		clog.Debug("Old container already has a watchtower-old name. Skipping rename")
+		clog.Debug().Msg("Old container already has a watchtower-old name. Skipping rename")
 
 		return false, nil
 	}
 
 	targetName := types.WatchtowerOldPrefix + oldContainer.ID().ShortID()
-	clog.WithField("target_name", targetName).
-		Debug("Renaming stopped Watchtower container to free original name")
+	clog.Debug().
+		Str("target_name", targetName).
+		Msg("Renaming stopped Watchtower container to free original name")
 
 	err := client.RenameContainer(ctx, oldContainer, targetName)
 	if err != nil {
-		clog.WithError(err).Error("Failed to rename old container before handoff")
+		clog.Error().
+			Err(err).
+			Msg("Failed to rename old container before handoff")
 
 		return false, fmt.Errorf("%w: %w", errOrchestratorRenameFailed, err)
 	}
 
-	clog.WithFields(logrus.Fields{
-		"original_name": originalName,
-		"target_name":   targetName,
-	}).Debug("Renamed stopped Watchtower container for handoff")
+	clog.Debug().
+		Str("original_name", originalName).
+		Str("target_name", targetName).
+		Msg("Renamed stopped Watchtower container for handoff")
 
 	return true, nil
 }
@@ -472,7 +494,7 @@ func renameOldContainerForHandoff(
 func restoreAndStartOldContainer(
 	ctx context.Context,
 	client container.Client,
-	clog *logrus.Entry,
+	clog *zerolog.Logger,
 	oldContainer types.Container,
 	originalName string,
 ) {
@@ -480,29 +502,33 @@ func restoreAndStartOldContainer(
 		return
 	}
 
-	clog.WithField("original_name", originalName).
-		Warn("Restoring old Watchtower container after handoff failure")
+	clog.Warn().
+		Str("original_name", originalName).
+		Msg("Restoring old Watchtower container after handoff failure")
 
 	err := client.RenameContainer(ctx, oldContainer, originalName)
 	if err != nil {
-		clog.WithError(err).
-			WithField("original_name", originalName).
-			Error("Failed to restore old Watchtower container name. Manual intervention required")
+		clog.Error().
+			Err(err).
+			Str("original_name", originalName).
+			Msg("Failed to restore old Watchtower container name. Manual intervention required")
 
 		return
 	}
 
 	err = client.StartContainerByID(ctx, oldContainer.ID())
 	if err != nil {
-		clog.WithError(err).
-			WithField("original_name", originalName).
-			Error("Failed to restart old Watchtower container after name restore. Manual intervention required")
+		clog.Error().
+			Err(err).
+			Str("original_name", originalName).
+			Msg("Failed to restart old Watchtower container after name restore. Manual intervention required")
 
 		return
 	}
 
-	clog.WithField("original_name", originalName).
-		Info("Restored and restarted old Watchtower container after handoff failure")
+	clog.Info().
+		Str("original_name", originalName).
+		Msg("Restored and restarted old Watchtower container after handoff failure")
 }
 
 // cleanupFailedNewContainer best-effort removes a new container that failed
@@ -516,7 +542,7 @@ func restoreAndStartOldContainer(
 func cleanupFailedNewContainer(
 	ctx context.Context,
 	client container.Client,
-	clog *logrus.Entry,
+	clog *zerolog.Logger,
 	newContainerID types.ContainerID,
 ) {
 	if newContainerID == "" {
@@ -525,18 +551,20 @@ func cleanupFailedNewContainer(
 
 	failedNew, err := client.GetContainer(ctx, newContainerID)
 	if err != nil {
-		clog.WithError(err).
-			WithField("new_id", newContainerID.ShortID()).
-			Debug("Failed to inspect failed new container for cleanup")
+		clog.Debug().
+			Err(err).
+			Str("new_id", newContainerID.ShortID()).
+			Msg("Failed to inspect failed new container for cleanup")
 
 		return
 	}
 
 	cleanupErr := client.StopAndRemoveContainer(ctx, failedNew, orchestratorStopTimeout)
 	if cleanupErr != nil {
-		clog.WithError(cleanupErr).
-			WithField("new_id", newContainerID.ShortID()).
-			Debug("Failed to remove failed new container after verify error")
+		clog.Debug().
+			Err(cleanupErr).
+			Str("new_id", newContainerID.ShortID()).
+			Msg("Failed to remove failed new container after verify error")
 	}
 }
 
@@ -557,11 +585,11 @@ func cleanupFailedNewContainer(
 func inspectOldContainer(
 	ctx context.Context,
 	client container.Client,
-	clog *logrus.Entry,
+	clog *zerolog.Logger,
 	oldID string,
 	containerChain string,
 ) (types.Container, error) {
-	clog.Debug("Inspecting old container")
+	clog.Debug().Msg("Inspecting old container")
 
 	oldContainer, err := client.GetContainer(
 		ctx,
@@ -569,22 +597,25 @@ func inspectOldContainer(
 	)
 	if err != nil {
 		if cerrdefs.IsNotFound(err) {
-			clog.Error("Old container not found")
+			clog.Error().Msg("Old container not found")
 
 			return nil, fmt.Errorf("%w: %s", errOrchestratorOldContainerNotFound, oldID)
 		}
 
-		clog.WithError(err).Error("Failed to inspect old container")
+		clog.Error().
+			Err(err).
+			Msg("Failed to inspect old container")
 
 		return nil, fmt.Errorf("%w: %w", errOrchestratorInspectFailed, err)
 	}
 
 	if !oldContainer.IsRunning() {
-		clog.Warn("Old container is not running - proceeding with creation only")
+		clog.Warn().Msg("Old container is not running - proceeding with creation only")
 	}
 
-	clog.WithField("old_name", oldContainer.Name()).
-		Debug("Inspected old container successfully")
+	clog.Debug().
+		Str("old_name", oldContainer.Name()).
+		Msg("Inspected old container successfully")
 
 	// Propagate the container chain label to the old container's config.
 	// This intentionally mutates the cached container config in-place so that
@@ -604,8 +635,9 @@ func inspectOldContainer(
 			// config to build the new container. Any other references to this
 			// container object will also see this label after this assignment.
 			containerInfo.Config.Labels[container.ContainerChainLabel] = containerChain
-			clog.WithField("container_chain", containerChain).
-				Debug("Set container chain label on source container config")
+			clog.Debug().
+				Str("container_chain", containerChain).
+				Msg("Set container chain label on source container config")
 		}
 	}
 
@@ -628,10 +660,10 @@ func inspectOldContainer(
 func stopOldContainer(
 	ctx context.Context,
 	client container.Client,
-	clog *logrus.Entry,
+	clog *zerolog.Logger,
 	oldContainer types.Container,
 ) (bool, error) {
-	clog.Debug("Stopping old Watchtower container")
+	clog.Debug().Msg("Stopping old Watchtower container")
 
 	err := client.StopContainer(
 		ctx,
@@ -640,7 +672,7 @@ func stopOldContainer(
 	)
 	if err != nil {
 		if cerrdefs.IsNotFound(err) {
-			clog.Debug("Old container already removed")
+			clog.Debug().Msg("Old container already removed")
 
 			return true, nil
 		}
@@ -652,29 +684,35 @@ func stopOldContainer(
 		)
 		if inspectErr != nil {
 			if cerrdefs.IsNotFound(inspectErr) {
-				clog.Debug("Old container already removed")
+				clog.Debug().Msg("Old container already removed")
 
 				return true, nil
 			}
 
-			clog.WithError(inspectErr).Error("Failed to re-inspect old container after stop failure")
-			clog.WithError(err).Error("Failed to stop old container")
+			clog.Error().
+				Err(inspectErr).
+				Msg("Failed to re-inspect old container after stop failure")
+			clog.Error().
+				Err(err).
+				Msg("Failed to stop old container")
 
 			return false, fmt.Errorf("%w: %w", errOrchestratorStopFailed, err)
 		}
 
 		if !freshContainer.IsRunning() {
-			clog.Debug("Old container is not running after stop attempt")
+			clog.Debug().Msg("Old container is not running after stop attempt")
 
 			return false, nil
 		}
 
-		clog.WithError(err).Error("Failed to stop old container")
+		clog.Error().
+			Err(err).
+			Msg("Failed to stop old container")
 
 		return false, fmt.Errorf("%w: %w", errOrchestratorStopFailed, err)
 	}
 
-	clog.Debug("Old container stopped")
+	clog.Debug().Msg("Old container stopped")
 
 	return false, nil
 }
@@ -692,25 +730,27 @@ func stopOldContainer(
 func removeOldContainer(
 	ctx context.Context,
 	client container.Client,
-	clog *logrus.Entry,
+	clog *zerolog.Logger,
 	oldContainer types.Container,
 ) error {
-	clog.Debug("Removing old Watchtower container after successful handoff")
+	clog.Debug().Msg("Removing old Watchtower container after successful handoff")
 
 	err := client.RemoveContainer(ctx, oldContainer)
 	if err != nil {
 		if cerrdefs.IsNotFound(err) {
-			clog.Debug("Old container already removed")
+			clog.Debug().Msg("Old container already removed")
 
 			return nil
 		}
 
-		clog.WithError(err).Error("Failed to remove old container")
+		clog.Error().
+			Err(err).
+			Msg("Failed to remove old container")
 
 		return fmt.Errorf("%w: %w", errOrchestratorRemoveFailed, err)
 	}
 
-	clog.Debug("Old container removed")
+	clog.Debug().Msg("Old container removed")
 
 	return nil
 }
@@ -734,17 +774,19 @@ func removeOldContainer(
 func createAndStartNewContainer(
 	ctx context.Context,
 	client container.Client,
-	clog *logrus.Entry,
+	clog *zerolog.Logger,
 	oldContainer types.Container,
 ) (types.ContainerID, error) {
-	clog.Debug("Creating and starting new Watchtower container")
+	clog.Debug().Msg("Creating and starting new Watchtower container")
 
 	newContainerID, err := client.StartContainer(
 		ctx,
 		oldContainer,
 	)
 	if err != nil {
-		clog.WithError(err).Error("Failed to create and start new container")
+		clog.Error().
+			Err(err).
+			Msg("Failed to create and start new container")
 
 		return "", fmt.Errorf("%w: %w", errOrchestratorCreateFailed, err)
 	}
@@ -768,31 +810,36 @@ func createAndStartNewContainer(
 func ensureContainerRunning(
 	ctx context.Context,
 	client container.Client,
-	clog *logrus.Entry,
+	clog *zerolog.Logger,
 	containerID types.ContainerID,
 ) error {
-	clog.WithField("new_id", containerID.ShortID()).
-		Debug("Verifying new container is running")
+	clog.Debug().
+		Str("new_id", containerID.ShortID()).
+		Msg("Verifying new container is running")
 
 	ctr, err := client.GetContainer(ctx, containerID)
 	if err != nil {
-		clog.WithError(err).Error("Failed to inspect new container")
+		clog.Error().
+			Err(err).
+			Msg("Failed to inspect new container")
 
 		return fmt.Errorf("%w: %w", errOrchestratorInspectFailed, err)
 	}
 
 	if ctr.IsRunning() {
-		clog.Debug("New container verified as running")
+		clog.Debug().Msg("New container verified as running")
 
 		return nil
 	}
 
 	// Container was created but not started. Start it explicitly.
-	clog.Debug("New container was created but not started, starting it now")
+	clog.Debug().Msg("New container was created but not started, starting it now")
 
 	err = client.StartContainerByID(ctx, containerID)
 	if err != nil {
-		clog.WithError(err).Error("Failed to start new container")
+		clog.Error().
+			Err(err).
+			Msg("Failed to start new container")
 
 		return fmt.Errorf("%w: %w", errOrchestratorStartFailed, err)
 	}
@@ -800,18 +847,20 @@ func ensureContainerRunning(
 	// Re-verify the container is running after the explicit start call.
 	ctr, err = client.GetContainer(ctx, containerID)
 	if err != nil {
-		clog.WithError(err).Error("Failed to inspect new container after start")
+		clog.Error().
+			Err(err).
+			Msg("Failed to inspect new container after start")
 
 		return fmt.Errorf("%w: %w", errOrchestratorInspectFailed, err)
 	}
 
 	if !ctr.IsRunning() {
-		clog.Error("New container is not running after explicit start")
+		clog.Error().Msg("New container is not running after explicit start")
 
 		return fmt.Errorf("%w: %s", errNewContainerNotRunning, containerID.ShortID())
 	}
 
-	clog.Debug("New container verified as running")
+	clog.Debug().Msg("New container verified as running")
 
 	return nil
 }

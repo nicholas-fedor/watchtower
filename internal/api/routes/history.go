@@ -12,6 +12,6 @@ func registerHistoryRoute(app *fiber.App, auth fiber.Handler, opts config.Option
 		return
 	}
 
-	handler := history.New(opts.DefaultMetrics().GetHistory)
+	handler := history.New(opts.Logger, opts.DefaultMetrics().GetHistory)
 	app.Get(handler.Path, auth, config.TimeoutMiddleware(), handler.Handle)
 }

@@ -10,7 +10,7 @@ import (
 )
 
 func registerConfigRoute(app *fiber.App, auth fiber.Handler, opts apiconfig.Options) {
-	handler := config.New(func(_ context.Context) (config.ConfigData, error) {
+	handler := config.New(opts.Logger, func(_ context.Context) (config.ConfigData, error) {
 		return config.ConfigData{
 			MonitorOnly:       opts.BaseParams.MonitorOnly,
 			Cleanup:           opts.BaseParams.Cleanup,

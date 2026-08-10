@@ -7,12 +7,13 @@ import (
 
 	"github.com/onsi/ginkgo/v2"
 	"github.com/onsi/gomega"
-	"github.com/sirupsen/logrus"
+	"github.com/rs/zerolog"
 
 	dockerContainer "github.com/moby/moby/api/types/container"
 	dockerMount "github.com/moby/moby/api/types/mount"
 	dockerNetwork "github.com/moby/moby/api/types/network"
 
+	"github.com/nicholas-fedor/watchtower/internal/logging"
 	"github.com/nicholas-fedor/watchtower/pkg/compose"
 	"github.com/nicholas-fedor/watchtower/pkg/types"
 	mockTypes "github.com/nicholas-fedor/watchtower/pkg/types/mocks"
@@ -674,18 +675,10 @@ var _ = ginkgo.Describe("Container", func() {
 
 			ginkgo.It("warns and skips invalid link format without colon", func() {
 				logOutput := &bytes.Buffer{}
-				originalOutput := logrus.StandardLogger().Out
-				originalLevel := logrus.GetLevel()
-
-				logrus.SetOutput(logOutput)
-				logrus.SetLevel(logrus.WarnLevel)
-
-				defer func() {
-					logrus.SetOutput(originalOutput)
-					logrus.SetLevel(originalLevel)
-				}()
-
+				w := logging.LogfmtWriter(logOutput)
+				l := zerolog.New(w).Level(zerolog.DebugLevel).With().Timestamp().Logger()
 				container = MockContainer(WithLinks([]string{"invalidlink"}))
+				container.log = &l
 				links := container.Links(true)
 				gomega.Expect(links).To(gomega.BeEmpty())
 				gomega.Expect(logOutput.String()).
@@ -694,18 +687,10 @@ var _ = ginkgo.Describe("Container", func() {
 
 			ginkgo.It("warns and skips link with empty container name", func() {
 				logOutput := &bytes.Buffer{}
-				originalOutput := logrus.StandardLogger().Out
-				originalLevel := logrus.GetLevel()
-
-				logrus.SetOutput(logOutput)
-				logrus.SetLevel(logrus.WarnLevel)
-
-				defer func() {
-					logrus.SetOutput(originalOutput)
-					logrus.SetLevel(originalLevel)
-				}()
-
+				w := logging.LogfmtWriter(logOutput)
+				l := zerolog.New(w).Level(zerolog.DebugLevel).With().Timestamp().Logger()
 				container = MockContainer(WithLinks([]string{":alias"}))
+				container.log = &l
 				links := container.Links(true)
 				gomega.Expect(links).To(gomega.BeEmpty())
 				gomega.Expect(logOutput.String()).

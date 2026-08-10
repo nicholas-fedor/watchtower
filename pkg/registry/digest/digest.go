@@ -17,7 +17,7 @@ import (
 	"sync"
 
 	"github.com/distribution/reference"
-	"github.com/sirupsen/logrus"
+	"github.com/rs/zerolog"
 	"github.com/spf13/viper"
 
 	"github.com/nicholas-fedor/watchtower/internal/meta"
@@ -54,8 +54,8 @@ var (
 // probes, avoiding Docker Hub rate-limit pressure that can starve concurrent
 // staleness checks for other containers in the same update cycle.
 //
-// Keyed by "imageName|imageID". Entries live for process lifetime; a rebuild
-// (new image ID) forces a fresh probe.
+// Keyed by "imageName|imageID".
+// Entries live for process lifetime and a rebuild (new image ID) forces a fresh probe.
 var localOnlyImageCache sync.Map
 
 // localOnlyCacheKey builds a cache key for a container's image identity.
@@ -99,7 +99,7 @@ func ClearLocalOnlyImageCache() {
 //
 // Returns:
 //   - string: Normalized digest (e.g., "abc123").
-func NormalizeDigest(digest string) string {
+func NormalizeDigest(log *zerolog.Logger, digest string) string {
 	// List of prefixes to strip from the digest.
 	prefixes := []string{"sha256:"}
 	for _, prefix := range prefixes {
@@ -107,10 +107,10 @@ func NormalizeDigest(digest string) string {
 		if ok {
 			// Trim the prefix to get the raw digest value.
 			normalized := after
-			logrus.WithFields(logrus.Fields{
-				"original":   digest,
-				"normalized": normalized,
-			}).Debug("Normalized digest by trimming prefix")
+			log.Debug().
+				Str("original", digest).
+				Str("normalized", normalized).
+				Msg("Normalized digest by trimming prefix")
 
 			return normalized
 		}
@@ -136,12 +136,13 @@ func NormalizeDigest(digest string) string {
 //   - bool: True if digests match (image is up-to-date), false otherwise.
 //   - error: Non-nil if operation fails, nil on success.
 func CompareDigest(
+	log *zerolog.Logger,
 	ctx context.Context,
 	container types.Container,
 	registryAuth string,
 	endpoints ...string,
 ) (bool, error) {
-	match, _, err := CompareDigestWithRemote(
+	match, _, err := CompareDigestWithRemote(log,
 		ctx,
 		container,
 		registryAuth,
@@ -191,7 +192,7 @@ func isLocalImageNotFound(container types.Container, err error) bool {
 		return false
 	}
 
-	// Registry-qualified digests mean the image was pulled from a remote source;
+	// Registry-qualified digests mean the image was pulled from a remote source.
 	// a 404 is a probe failure, not proof the image is local-only. Official Hub
 	// short names often keep a domain-less Config.Image while RepoDigests still
 	// records docker.io/library/... .
@@ -208,7 +209,7 @@ func isLocalImageNotFound(container types.Container, err error) bool {
 // repoPartHasRegistryHost reports whether a RepoDigest repository path includes
 // a registry host (hostname with a dot, or host:port).
 func repoPartHasRegistryHost(repoPart string) bool {
-	// Strip optional scheme leftovers; RepoDigests are host/path form.
+	// Strip optional scheme leftovers. RepoDigests are host/path form.
 	hostOrName, remainder, hasSlash := strings.Cut(repoPart, "/")
 	if !hasSlash {
 		// Bare name (e.g. "nginx") has no host segment.
@@ -220,7 +221,7 @@ func repoPartHasRegistryHost(repoPart string) bool {
 		return true
 	}
 
-	// Remainder unused; keep signature clear for future extension.
+	// Remainder unused. Keep the signature clear for future extension.
 	_ = remainder
 
 	return false
@@ -247,20 +248,22 @@ func repoPartHasRegistryHost(repoPart string) bool {
 //   - bool: True if digests match (image is up-to-date), false otherwise.
 //   - string: Remote registry digest in "sha256:..." form (empty when unavailable).
 //   - error: Non-nil if operation fails, nil on success.
-func CompareDigestWithRemote(
+func CompareDigestWithRemote(log *zerolog.Logger,
 	ctx context.Context,
 	container types.Container,
 	registryAuth string,
 	endpoints ...string,
 ) (bool, string, error) {
-	fields := logrus.Fields{
+	fields := map[string]any{
 		"container": container.Name(),
 		"image":     container.ImageName(),
 	}
 
 	// Ensure the container has image metadata to proceed with digest comparison.
 	if !container.HasImageInfo() {
-		logrus.WithFields(fields).Debug("Container image info missing")
+		log.Debug().
+			Fields(fields).
+			Msg("Container image info missing")
 
 		return false, "", errMissingImageInfo
 	}
@@ -276,8 +279,9 @@ func CompareDigestWithRemote(
 	// 2. For locally built images, RepoDigests are either empty or registry-less
 	// 3. This avoids an extra Docker daemon call
 	if len(container.ImageInfo().RepoDigests) == 0 {
-		logrus.WithFields(fields).
-			Debug("Image with no registry reference detected (empty RepoDigests) - skipping digest comparison")
+		log.Debug().
+			Fields(fields).
+			Msg("Image with no registry reference detected (empty RepoDigests) - skipping digest comparison")
 
 		return true, "", nil
 	}
@@ -286,14 +290,15 @@ func CompareDigestWithRemote(
 	// This prevents repeated Docker Hub 404 traffic that can rate-limit concurrent
 	// checks for other containers in the same update session.
 	if isCachedLocalOnlyImage(container) {
-		logrus.WithFields(fields).
-			Debug("Cached local-only image - skipping digest comparison")
+		log.Debug().
+			Fields(fields).
+			Msg("Cached local-only image - skipping digest comparison")
 
 		return true, "", nil
 	}
 
 	// Fetch the latest digest from the registry using a HEAD request for efficiency.
-	remoteDigest, err := fetchDigest(
+	remoteDigest, err := fetchDigest(log,
 		ctx,
 		container,
 		registryAuth,
@@ -301,12 +306,13 @@ func CompareDigestWithRemote(
 		endpoints...,
 	)
 	if err != nil {
-		// Domain-less image names that 404 are local-only builds; treat as up-to-date
+		// Domain-less image names that 404 are local-only builds. Treat them as up-to-date
 		// with no error so callers skip the pull without logging a warning.
 		if isLocalImageNotFound(container, err) {
 			rememberLocalOnlyImage(container)
-			logrus.WithFields(fields).
-				Debug("Image not found in registry - treating as local image")
+			log.Debug().
+				Fields(fields).
+				Msg("Image not found in registry - treating as local image")
 
 			return true, "", nil
 		}
@@ -317,10 +323,11 @@ func CompareDigestWithRemote(
 	// If HEAD request returned empty digest (due to missing Docker-Content-Digest header),
 	// fall back to GET request.
 	if remoteDigest == "" {
-		logrus.WithFields(fields).
-			Debug("HEAD request returned empty digest - falling back to GET")
+		log.Debug().
+			Fields(fields).
+			Msg("HEAD request returned empty digest - falling back to GET")
 
-		remoteDigest, err = FetchDigest(
+		remoteDigest, err = FetchDigest(log,
 			ctx,
 			container,
 			registryAuth,
@@ -332,13 +339,14 @@ func CompareDigestWithRemote(
 	}
 
 	// Compare the fetched remote digest with the container's local digests.
-	matches := DigestsMatch(
+	matches := DigestsMatch(log,
 		container.ImageInfo().RepoDigests,
 		remoteDigest,
 	)
-	logrus.WithFields(fields).
-		WithField("matches", matches).
-		Debug("Completed digest comparison")
+	log.Debug().
+		Fields(fields).
+		Bool("matches", matches).
+		Msg("Completed digest comparison")
 
 	return matches, FormatDigest(remoteDigest), nil
 }
@@ -379,12 +387,13 @@ func FormatDigest(digest string) string {
 //   - string: The normalized digest (e.g., "abc..." without "sha256:") if successful.
 //   - error: An error if the request fails or digest header is missing, nil if successful.
 func FetchDigest(
+	log *zerolog.Logger,
 	ctx context.Context,
 	container types.Container,
 	authToken string,
 	endpoints ...string,
 ) (string, error) {
-	return fetchDigest(ctx, container, authToken, http.MethodGet, endpoints...)
+	return fetchDigest(log, ctx, container, authToken, http.MethodGet, endpoints...)
 }
 
 // BuildManifestURL constructs and validates a manifest URL for a container.
@@ -408,11 +417,11 @@ func FetchDigest(
 //   - string: The original host before applying hostOverride.
 //   - *url.URL: The parsed URL object.
 //   - error: Non-nil if construction or validation fails.
-func BuildManifestURL(
+func BuildManifestURL(log *zerolog.Logger,
 	container types.Container,
 	hostOverride string,
 ) (string, string, *url.URL, error) {
-	fields := logrus.Fields{
+	fields := map[string]any{
 		"container": container.Name(),
 		"image":     container.ImageName(),
 	}
@@ -433,7 +442,7 @@ func BuildManifestURL(
 	if parseErr == nil {
 		rawDomain := reference.Domain(normalizedRef)
 
-		canonicalHost, _ := auth.GetRegistryAddress(container.ImageName())
+		canonicalHost, _ := auth.GetRegistryAddress(log, container.ImageName())
 		if rawDomain == auth.LSCRRegistryDomain {
 			originalHost = rawDomain
 		} else if canonicalHost != "" {
@@ -442,9 +451,12 @@ func BuildManifestURL(
 	}
 
 	// Build the canonical manifest URL.
-	manifestURLStr, err := manifest.BuildManifestURL(container, scheme)
+	manifestURLStr, err := manifest.BuildManifestURL(log, container, scheme)
 	if err != nil {
-		logrus.WithError(err).WithFields(fields).Debug("Failed to build manifest URL")
+		log.Debug().
+			Err(err).
+			Fields(fields).
+			Msg("Failed to build manifest URL")
 
 		return "", "", nil, fmt.Errorf("%w: %w", errFailedBuildManifestURL, err)
 	}
@@ -523,43 +535,49 @@ func BuildManifestURL(
 // Returns:
 //   - string: Normalized digest.
 //   - error: Non-nil if operation fails, nil on success.
-func fetchDigest(
+func fetchDigest(log *zerolog.Logger,
 	ctx context.Context,
 	container types.Container,
 	registryAuth string,
 	method string,
 	endpoints ...string,
 ) (string, error) {
-	fields := logrus.Fields{
+	fields := map[string]any{
 		"container": container.Name(),
 		"image":     container.ImageName(),
 	}
 
 	// Skip digest fetching for locally built images (empty RepoDigests).
 	if container.HasImageInfo() && len(container.ImageInfo().RepoDigests) == 0 {
-		logrus.WithFields(fields).Debug("Skipping digest fetch for locally built image")
+		log.Debug().
+			Fields(fields).
+			Msg("Skipping digest fetch for locally built image")
 
 		return "", nil
 	}
 
 	// Transform the provided auth string into a usable format for registry authentication.
-	registryAuth = auth.TransformAuth(registryAuth)
+	registryAuth = auth.TransformAuth(log, registryAuth)
 
 	// Create an authentication client for registry requests.
-	client := auth.NewAuthClient()
+	client := auth.NewAuthClient(log)
 
 	// Build the canonical manifest URL and apply lscr.io/host-override handling.
-	manifestURL, originalHost, _, err := BuildManifestURL(container, "")
+	manifestURL, originalHost, _, err := BuildManifestURL(log, container, "")
 	if err != nil {
-		logrus.WithError(err).WithFields(fields).Debug("Failed to build manifest URL")
+		log.Debug().
+			Err(err).
+			Fields(fields).
+			Msg("Failed to build manifest URL")
 
 		return "", fmt.Errorf("failed to build manifest URL: %w", err)
 	}
 
-	logrus.WithFields(fields).
-		WithField("original_host", originalHost).
-		WithField("manifest_url", manifestURL).
-		Debug("Built manifest URL for container")
+	log.Debug().
+		Fields(fields).
+		Str("original_host", originalHost).
+		Str("manifest_url", manifestURL).
+		Msg("Built manifest URL for container")
 
 	// If no endpoints specified, use a single empty endpoint (canonical host).
 	if len(endpoints) == 0 {
@@ -569,7 +587,7 @@ func fetchDigest(
 	var lastErr error
 
 	for _, endpoint := range endpoints {
-		epFields := logrus.Fields{}
+		var epFields map[string]any
 
 		if endpoint != "" {
 			sanitized := "<redacted>"
@@ -579,11 +597,13 @@ func fetchDigest(
 				sanitized = u.Host
 			}
 
-			epFields["registry_endpoint"] = sanitized
+			epFields = map[string]any{
+				"registry_endpoint": sanitized,
+			}
 		}
 
 		// Obtain an authentication token from the current endpoint.
-		result, err := auth.GetToken(
+		result, err := auth.GetToken(log,
 			ctx,
 			container,
 			registryAuth,
@@ -591,8 +611,11 @@ func fetchDigest(
 			endpoint,
 		)
 		if err != nil {
-			logrus.WithError(err).WithFields(fields).WithFields(epFields).
-				Debug("Failed to get token from endpoint")
+			log.Debug().
+				Err(err).
+				Fields(fields).
+				Fields(epFields).
+				Msg("Failed to get token from endpoint")
 			lastErr = fmt.Errorf("%w: %w", errFailedGetToken, err)
 
 			continue
@@ -604,14 +627,18 @@ func fetchDigest(
 		redirectHost := result.RedirectHost
 
 		if token == "" {
-			logrus.WithFields(fields).WithFields(epFields).
-				Debug("No authentication required, proceeding with request")
+			log.Debug().
+				Fields(fields).
+				Fields(epFields).
+				Msg("No authentication required, proceeding with request")
 		} else {
-			logrus.WithFields(fields).WithFields(epFields).
-				WithField("challenge_host", challengeHost).
-				WithField("redirected", redirected).
-				WithField("redirect_host", redirectHost).
-				Debug("Received challenge host and redirect flag from GetToken")
+			log.Debug().
+				Fields(fields).
+				Fields(epFields).
+				Str("challenge_host", challengeHost).
+				Bool("redirected", redirected).
+				Str("redirect_host", redirectHost).
+				Msg("Received challenge host and redirect flag from GetToken")
 		}
 
 		// Decide which host to use for this manifest request attempt.
@@ -632,30 +659,38 @@ func fetchDigest(
 			parsedURL   *url.URL
 		)
 
-		manifestURL, _, parsedURL, err = BuildManifestURL(
+		manifestURL, _, parsedURL, err = BuildManifestURL(log,
 			container,
 			hostForManifest,
 		)
 		if err != nil {
-			logrus.WithError(err).WithFields(fields).WithFields(epFields).
-				Debug("Failed to build manifest URL")
+			log.Debug().
+				Err(err).
+				Fields(fields).
+				Fields(epFields).
+				Msg("Failed to build manifest URL")
 			lastErr = err
 
 			continue
 		}
 
-		logrus.WithFields(fields).WithFields(epFields).WithFields(logrus.Fields{
-			"method": method,
-			"url":    manifestURL,
-		}).Debug("Fetching digest")
+		log.Debug().
+			Fields(fields).
+			Fields(epFields).
+			Str("method", method).
+			Str("url", manifestURL).
+			Msg("Fetching digest")
 
 		// Create the HTTP request for the manifest.
 		req, err := makeManifestRequest(ctx, method, manifestURL, token)
 		if err != nil {
-			logrus.WithError(err).WithFields(fields).WithFields(epFields).WithFields(logrus.Fields{
-				"method": method,
-				"url":    manifestURL,
-			}).Debug("Failed to create request")
+			log.Debug().
+				Err(err).
+				Fields(fields).
+				Fields(epFields).
+				Str("method", method).
+				Str("url", manifestURL).
+				Msg("Failed to create request")
 			lastErr = err
 
 			continue
@@ -664,17 +699,20 @@ func fetchDigest(
 		// Execute the initial request.
 		resp, err := client.Do(req)
 		if err != nil {
-			logrus.WithError(err).WithFields(fields).WithFields(epFields).WithFields(logrus.Fields{
-				"method": method,
-				"url":    manifestURL,
-			}).Debug("Failed to execute request")
+			log.Debug().
+				Err(err).
+				Fields(fields).
+				Fields(epFields).
+				Str("method", method).
+				Str("url", manifestURL).
+				Msg("Failed to execute request")
 			lastErr = fmt.Errorf("%w: %w", errFailedExecuteRequest, err)
 
 			continue
 		}
 
 		// Handle the manifest response, checking for redirects and extracting digest.
-		digest, updatedURL, retry, err := HandleManifestResponse(
+		digest, updatedURL, retry, err := HandleManifestResponse(log,
 			resp,
 			method,
 			originalHost,
@@ -686,19 +724,25 @@ func fetchDigest(
 		_ = resp.Body.Close()
 
 		if err != nil {
-			logrus.WithError(err).WithFields(fields).WithFields(epFields).WithField("status", resp.Status).
-				Debug("Failed to handle manifest response")
+			log.Debug().
+				Err(err).
+				Fields(fields).
+				Fields(epFields).
+				Str("status", resp.Status).
+				Msg("Failed to handle manifest response")
 			lastErr = err
 
 			continue
 		}
 
 		if retry && updatedURL != "" {
-			logrus.WithFields(fields).WithFields(epFields).
-				WithField("retry_url", updatedURL).
-				Debug("Retrying manifest request with updated URL")
+			log.Debug().
+				Fields(fields).
+				Fields(epFields).
+				Str("retry_url", updatedURL).
+				Msg("Retrying manifest request with updated URL")
 
-			digest, err = retryManifestRequest(
+			digest, err = retryManifestRequest(log,
 				ctx,
 				method,
 				updatedURL,
@@ -710,16 +754,23 @@ func fetchDigest(
 				client,
 			)
 			if err != nil {
-				logrus.WithError(err).WithFields(fields).WithFields(epFields).WithField("retry_url", updatedURL).
-					Debug("Failed to retry manifest request")
+				log.Debug().
+					Err(err).
+					Fields(fields).
+					Fields(epFields).
+					Str("retry_url", updatedURL).
+					Msg("Failed to retry manifest request")
 				lastErr = err
 
 				continue
 			}
 		}
 
-		logrus.WithFields(fields).WithFields(epFields).WithField("remote_digest", digest).
-			Debug("Fetched remote digest")
+		log.Debug().
+			Fields(fields).
+			Fields(epFields).
+			Str("remote_digest", digest).
+			Msg("Fetched remote digest")
 
 		return digest, nil
 	}
@@ -746,14 +797,14 @@ func fetchDigest(
 //   - string: Updated manifest URL if redirected, otherwise empty.
 //   - bool: Whether a retry is needed.
 //   - error: Non-nil if processing or extraction fails, nil on success.
-func HandleManifestResponse(
+func HandleManifestResponse(log *zerolog.Logger,
 	resp *http.Response,
 	method, originalHost, challengeHost string,
 	redirected bool,
 	parsedURL *url.URL,
 	currentHost string,
 ) (string, string, bool, error) {
-	fields := logrus.Fields{
+	fields := map[string]any{
 		"method":         method,
 		"status_code":    resp.StatusCode,
 		"status":         resp.Status,
@@ -764,7 +815,9 @@ func HandleManifestResponse(
 		"current_host":   currentHost,
 	}
 
-	logrus.WithFields(fields).Debug("Handling manifest response")
+	log.Debug().
+		Fields(fields).
+		Msg("Handling manifest response")
 
 	var manifestURL string
 
@@ -773,30 +826,34 @@ func HandleManifestResponse(
 	headFallbackCondition := method == http.MethodHead &&
 		(resp.StatusCode < http.StatusOK || resp.StatusCode >= http.StatusMultipleChoices) &&
 		resp.StatusCode != http.StatusNotFound
-	logrus.WithFields(fields).
-		WithField("head_fallback_condition", headFallbackCondition).
-		Debug("Checking HEAD fallback condition")
+	log.Debug().
+		Fields(fields).
+		Bool("head_fallback_condition", headFallbackCondition).
+		Msg("Checking HEAD fallback condition")
 
 	if headFallbackCondition {
 		// For non-redirected registries, try challenge host first before falling back to GET
 		if !redirected && challengeHost != "" && currentHost == originalHost &&
 			(resp.StatusCode == http.StatusNotFound || resp.StatusCode == http.StatusUnauthorized) {
-			logrus.WithFields(fields).
-				WithField("retry_on_challenge", true).
-				Debug("HEAD request failed on original host for non-redirected registry, trying challenge host")
+			log.Debug().
+				Fields(fields).
+				Bool("retry_on_challenge", true).
+				Msg("HEAD request failed on original host for non-redirected registry, trying challenge host")
 
 			parsedURL.Host = challengeHost
 			manifestURL = parsedURL.String()
 
-			logrus.WithFields(fields).
-				WithField("retry_url", manifestURL).
-				Debug("Setting retry due to HEAD failure on original host")
+			log.Debug().
+				Fields(fields).
+				Str("retry_url", manifestURL).
+				Msg("Setting retry due to HEAD failure on original host")
 
 			return "", manifestURL, true, nil
 		}
 
-		logrus.WithFields(fields).
-			Debug("HEAD request failed, returning empty digest to trigger GET fallback")
+		log.Debug().
+			Fields(fields).
+			Msg("HEAD request failed, returning empty digest to trigger GET fallback")
 
 		return "", "", false, nil // Return empty to trigger GET fallback in CompareDigest
 	}
@@ -804,9 +861,10 @@ func HandleManifestResponse(
 	// Check for redirect status codes (3xx)
 	redirectCondition := resp.StatusCode >= http.StatusMultipleChoices &&
 		resp.StatusCode < http.StatusBadRequest
-	logrus.WithFields(fields).
-		WithField("redirect_condition", redirectCondition).
-		Debug("Checking redirect condition")
+	log.Debug().
+		Fields(fields).
+		Bool("redirect_condition", redirectCondition).
+		Msg("Checking redirect condition")
 
 	if redirectCondition {
 		// Handle manifest request redirects by updating URL to redirected host
@@ -814,17 +872,19 @@ func HandleManifestResponse(
 		if location != "" {
 			redirectURL, err := url.Parse(location)
 			if err == nil && redirectURL.Host != "" && redirectURL.Host != currentHost {
-				logrus.WithFields(fields).
-					WithField("redirect_location", location).
-					WithField("redirect_host", redirectURL.Host).
-					Debug("Manifest request redirected, updating URL host")
+				log.Debug().
+					Fields(fields).
+					Str("redirect_location", location).
+					Str("redirect_host", redirectURL.Host).
+					Msg("Manifest request redirected, updating URL host")
 
 				parsedURL.Host = redirectURL.Host
 				manifestURL = parsedURL.String()
 
-				logrus.WithFields(fields).
-					WithField("retry_url", manifestURL).
-					Debug("Setting retry due to redirect")
+				log.Debug().
+					Fields(fields).
+					Str("retry_url", manifestURL).
+					Msg("Setting retry due to redirect")
 
 				return "", manifestURL, true, nil
 			}
@@ -834,16 +894,18 @@ func HandleManifestResponse(
 	// Check for successful status code (only for GET requests, since HEAD is handled above).
 	successCondition := resp.StatusCode >= http.StatusOK &&
 		resp.StatusCode < http.StatusMultipleChoices
-	logrus.WithFields(fields).
-		WithField("success_condition", successCondition).
-		Debug("Checking success status condition")
+	log.Debug().
+		Fields(fields).
+		Bool("success_condition", successCondition).
+		Msg("Checking success status condition")
 
 	if !successCondition {
 		// For HEAD requests, do not retry on 404 to avoid unnecessary GET fallback
 		if method == http.MethodHead && resp.StatusCode == http.StatusNotFound {
-			logrus.WithFields(fields).
-				WithField("error", "HEAD request returned 404, not retrying").
-				Debug("Response status not successful")
+			log.Debug().
+				Fields(fields).
+				Str("error", "HEAD request returned 404, not retrying").
+				Msg("Response status not successful")
 
 			return "", "", false, fmt.Errorf(
 				"%w: %w: status %s",
@@ -856,16 +918,18 @@ func HandleManifestResponse(
 		// Handle 401/404 errors on redirected hosts by retrying on original host
 		if (resp.StatusCode == http.StatusNotFound || resp.StatusCode == http.StatusUnauthorized) &&
 			currentHost != originalHost {
-			logrus.WithFields(fields).
-				WithField("retry_on_original", true).
-				Debug("401/404 on redirected host, retrying on original host")
+			log.Debug().
+				Fields(fields).
+				Bool("retry_on_original", true).
+				Msg("401/404 on redirected host, retrying on original host")
 
 			parsedURL.Host = originalHost
 			manifestURL = parsedURL.String()
 
-			logrus.WithFields(fields).
-				WithField("retry_url", manifestURL).
-				Debug("Setting retry due to 401/404 on redirected host")
+			log.Debug().
+				Fields(fields).
+				Str("retry_url", manifestURL).
+				Msg("Setting retry due to 401/404 on redirected host")
 
 			return "", manifestURL, true, nil
 		}
@@ -873,23 +937,26 @@ func HandleManifestResponse(
 		// If we're on original host and have challenge host, try challenge host
 		if (resp.StatusCode == http.StatusNotFound || resp.StatusCode == http.StatusUnauthorized) &&
 			challengeHost != "" && currentHost == originalHost {
-			logrus.WithFields(fields).
-				WithField("retry_on_challenge", true).
-				Debug("401/404 on original host, trying challenge host")
+			log.Debug().
+				Fields(fields).
+				Bool("retry_on_challenge", true).
+				Msg("401/404 on original host, trying challenge host")
 
 			parsedURL.Host = challengeHost
 			manifestURL = parsedURL.String()
 
-			logrus.WithFields(fields).
-				WithField("retry_url", manifestURL).
-				Debug("Setting retry due to 401/404 on original host with challenge host")
+			log.Debug().
+				Fields(fields).
+				Str("retry_url", manifestURL).
+				Msg("Setting retry due to 401/404 on original host with challenge host")
 
 			return "", manifestURL, true, nil
 		}
 
-		logrus.WithFields(fields).
-			WithField("error", "invalid status code").
-			Debug("Response status not successful")
+		log.Debug().
+			Fields(fields).
+			Str("error", "invalid status code").
+			Msg("Response status not successful")
 
 		return "", "", false, fmt.Errorf("%w: status %s", errInvalidRegistryResponse, resp.Status)
 	}
@@ -900,23 +967,29 @@ func HandleManifestResponse(
 		err    error
 	)
 
-	logrus.WithFields(fields).Debug("Extracting digest")
+	log.Debug().
+		Fields(fields).
+		Msg("Extracting digest")
 
 	if method == http.MethodHead {
-		digest, err = ExtractHeadDigest(resp)
+		digest, err = ExtractHeadDigest(log, resp)
 	} else {
-		digest, err = ExtractGetDigest(resp)
+		digest, err = ExtractGetDigest(log, resp)
 	}
 
 	if err != nil {
-		logrus.WithError(err).WithFields(fields).Debug("Failed to extract digest")
+		log.Debug().
+			Err(err).
+			Fields(fields).
+			Msg("Failed to extract digest")
 
 		return "", "", false, err
 	}
 
-	logrus.WithFields(fields).
-		WithField("extracted_digest", digest).
-		Debug("Successfully extracted digest")
+	log.Debug().
+		Fields(fields).
+		Str("extracted_digest", digest).
+		Msg("Successfully extracted digest")
 
 	return digest, "", false, nil
 }
@@ -932,16 +1005,16 @@ func HandleManifestResponse(
 // Returns:
 //   - string: The normalized digest (e.g., "abc..." without "sha256:") if present.
 //   - error: An error if the digest is missing or the response is invalid, nil if successful.
-func ExtractHeadDigest(resp *http.Response) (string, error) {
+func ExtractHeadDigest(log *zerolog.Logger, resp *http.Response) (string, error) {
 	// Retrieve the digest from the standard header.
 	digest := resp.Header.Get(ContentDigestHeader)
 	if digest == "" {
 		// Log and return an error if the digest is missing, including auth details for debugging.
 		wwwAuthHeader := resp.Header.Get("www-authenticate")
-		logrus.WithFields(logrus.Fields{
-			"status":      resp.Status,
-			"auth_header": wwwAuthHeader,
-		}).Debug("Registry responded with invalid HEAD request")
+		log.Debug().
+			Str("status", resp.Status).
+			Str("auth_header", wwwAuthHeader).
+			Msg("Registry responded with invalid HEAD request")
 
 		return "", fmt.Errorf(
 			"%w: status %q, auth: %q",
@@ -952,10 +1025,10 @@ func ExtractHeadDigest(resp *http.Response) (string, error) {
 	}
 
 	// Normalize the digest (e.g., strip "sha256:") for consistency.
-	normalizedDigest := NormalizeDigest(digest)
-	logrus.WithFields(logrus.Fields{
-		"digest": normalizedDigest,
-	}).Debug("Extracted digest from HEAD response")
+	normalizedDigest := NormalizeDigest(log, digest)
+	log.Debug().
+		Str("digest", normalizedDigest).
+		Msg("Extracted digest from HEAD response")
 
 	return normalizedDigest, nil
 }
@@ -975,15 +1048,15 @@ func ExtractHeadDigest(resp *http.Response) (string, error) {
 // Returns:
 //   - string: The normalized digest (e.g., "abc..." without "sha256:") if present.
 //   - error: An error if the digest cannot be extracted, nil if successful.
-func ExtractGetDigest(resp *http.Response) (string, error) {
+func ExtractGetDigest(log *zerolog.Logger, resp *http.Response) (string, error) {
 	// First, try to retrieve the digest from the standard header.
 	digest := resp.Header.Get(ContentDigestHeader)
 	if digest != "" {
 		// Normalize the digest (e.g., strip "sha256:") for consistency.
-		normalizedDigest := NormalizeDigest(digest)
-		logrus.WithFields(logrus.Fields{
-			"digest": normalizedDigest,
-		}).Debug("Extracted digest from GET response header")
+		normalizedDigest := NormalizeDigest(log, digest)
+		log.Debug().
+			Str("digest", normalizedDigest).
+			Msg("Extracted digest from GET response header")
 
 		return normalizedDigest, nil
 	}
@@ -991,9 +1064,10 @@ func ExtractGetDigest(resp *http.Response) (string, error) {
 	// Fallback: Try to read the response body.
 	bodyBytes, err := io.ReadAll(resp.Body)
 	if err != nil {
-		logrus.WithError(err).WithFields(logrus.Fields{
-			"status": resp.Status,
-		}).Debug("Failed to read response body for digest extraction")
+		log.Debug().
+			Err(err).
+			Str("status", resp.Status).
+			Msg("Failed to read response body for digest extraction")
 
 		return "", fmt.Errorf(
 			"%w: failed to read response body: %w",
@@ -1004,9 +1078,9 @@ func ExtractGetDigest(resp *http.Response) (string, error) {
 
 	bodyStr := strings.TrimSpace(string(bodyBytes))
 	if bodyStr == "" {
-		logrus.WithFields(logrus.Fields{
-			"status": resp.Status,
-		}).Debug("Response body is empty, no digest found")
+		log.Debug().
+			Str("status", resp.Status).
+			Msg("Response body is empty, no digest found")
 
 		return "", fmt.Errorf(
 			"%w: missing digest header and empty body",
@@ -1038,47 +1112,48 @@ func ExtractGetDigest(resp *http.Response) (string, error) {
 			// JSON unmarshaling succeeded, check if digest field contains a value.
 			if manifest.Digest != "" {
 				// Successfully parsed JSON manifest with digest field populated.
-				normalizedDigest := NormalizeDigest(manifest.Digest)
-				logrus.WithFields(logrus.Fields{
-					"digest": normalizedDigest,
-				}).Debug("Extracted digest from JSON manifest")
+				normalizedDigest := NormalizeDigest(log, manifest.Digest)
+				log.Debug().
+					Str("digest", normalizedDigest).
+					Msg("Extracted digest from JSON manifest")
 
 				return normalizedDigest, nil
 			}
 			// JSON parsed successfully but digest field is empty or missing.
-			logrus.WithFields(logrus.Fields{
-				"status": resp.Status,
-				"body":   bodyStr,
-			}).Debug("JSON manifest parsed but digest field is empty")
+			log.Debug().
+				Str("status", resp.Status).
+				Str("body", bodyStr).
+				Msg("JSON manifest parsed but digest field is empty")
 
 			return "", fmt.Errorf("%w: empty digest in JSON manifest", errInvalidRegistryResponse)
 		}
 		// JSON parsing failed, log metadata for debugging (avoid exposing potentially sensitive content).
-		logrus.WithError(jsonErr).WithFields(logrus.Fields{
-			"status":       resp.Status,
-			"body_length":  len(bodyStr),
-			"content_type": resp.Header.Get("Content-Type"),
-		}).Debug("Failed to parse response body as JSON manifest")
+		log.Debug().
+			Err(jsonErr).
+			Str("status", resp.Status).
+			Int("body_length", len(bodyStr)).
+			Str("content_type", resp.Header.Get("Content-Type")).
+			Msg("Failed to parse response body as JSON manifest")
 	}
 
 	// Final fallback: Try to parse as plain text digest for non-standard registries.
 	// Validate that the body looks like a digest (starts with sha256: prefix and has reasonable length).
 	if !strings.HasPrefix(bodyStr, "sha256:") || len(bodyStr) < 20 {
-		logrus.WithFields(logrus.Fields{
-			"status":       resp.Status,
-			"body_length":  len(bodyStr),
-			"content_type": resp.Header.Get("Content-Type"),
-			"body":         bodyStr,
-		}).Debug("Response body does not appear to be a valid digest")
+		log.Debug().
+			Str("status", resp.Status).
+			Int("body_length", len(bodyStr)).
+			Str("content_type", resp.Header.Get("Content-Type")).
+			Str("body", bodyStr).
+			Msg("Response body does not appear to be a valid digest")
 
 		return "", fmt.Errorf("%w: invalid digest format in body", errInvalidRegistryResponse)
 	}
 
 	// Normalize the digest from the plain text body.
-	normalizedDigest := NormalizeDigest(bodyStr)
-	logrus.WithFields(logrus.Fields{
-		"digest": normalizedDigest,
-	}).Debug("Extracted digest from plain text body")
+	normalizedDigest := NormalizeDigest(log, bodyStr)
+	log.Debug().
+		Str("digest", normalizedDigest).
+		Msg("Extracted digest from plain text body")
 
 	return normalizedDigest, nil
 }
@@ -1094,14 +1169,14 @@ func ExtractGetDigest(resp *http.Response) (string, error) {
 //
 // Returns:
 //   - bool: True if any normalized local digest matches the normalized remote digest, false otherwise.
-func DigestsMatch(localDigests []string, remoteDigest string) bool {
+func DigestsMatch(log *zerolog.Logger, localDigests []string, remoteDigest string) bool {
 	// Normalize the remote digest once for efficiency.
-	normalizedRemoteDigest := NormalizeDigest(remoteDigest)
+	normalizedRemoteDigest := NormalizeDigest(log, remoteDigest)
 
-	logrus.WithFields(logrus.Fields{
-		"local_digests": localDigests,
-		"remote_digest": normalizedRemoteDigest,
-	}).Debug("Comparing digests")
+	log.Debug().
+		Strs("local_digests", localDigests).
+		Str("remote_digest", normalizedRemoteDigest).
+		Msg("Comparing digests")
 
 	for _, digest := range localDigests {
 		// Cut the digest into repo and hash parts (e.g., "repo@sha256:abc").
@@ -1109,9 +1184,9 @@ func DigestsMatch(localDigests []string, remoteDigest string) bool {
 
 		// Skip malformed digests without @ separator.
 		if !found {
-			logrus.WithFields(logrus.Fields{
-				"digest": digest,
-			}).Debug("Skipping malformed digest without @ separator")
+			log.Debug().
+				Str("digest", digest).
+				Msg("Skipping malformed digest without @ separator")
 
 			continue
 		}
@@ -1119,21 +1194,21 @@ func DigestsMatch(localDigests []string, remoteDigest string) bool {
 		// Handle case where digest starts with "@" (e.g., "@sha256:abc123")
 		// This is a valid format that Docker may report in some contexts.
 		if repo == "" {
-			logrus.WithFields(logrus.Fields{
-				"digest":        digest,
-				"remote_digest": normalizedRemoteDigest,
-			}).Debug("Local digest has empty repo prefix, comparing only digest part")
+			log.Debug().
+				Str("digest", digest).
+				Str("remote_digest", normalizedRemoteDigest).
+				Msg("Local digest has empty repo prefix, comparing only digest part")
 		}
 
 		// Remove the sha256: prefix, if needed.
-		normalizedLocalDigest := NormalizeDigest(after)
+		normalizedLocalDigest := NormalizeDigest(log, after)
 
 		// Return true on the first match.
 		if normalizedLocalDigest == normalizedRemoteDigest {
-			logrus.WithFields(logrus.Fields{
-				"local_digest":  digest,
-				"remote_digest": normalizedRemoteDigest,
-			}).Debug("Found digest match")
+			log.Debug().
+				Str("local_digest", digest).
+				Str("remote_digest", normalizedRemoteDigest).
+				Msg("Found digest match")
 
 			return true
 		}
@@ -1195,6 +1270,7 @@ func makeManifestRequest(
 //   - string: The extracted digest.
 //   - error: Non-nil if the retry request fails, nil on success.
 func retryManifestRequest(
+	log *zerolog.Logger,
 	ctx context.Context,
 	method, updatedURL, token string,
 	originalHost, challengeHost string,
@@ -1214,7 +1290,7 @@ func retryManifestRequest(
 
 	defer func() { _ = resp.Body.Close() }()
 
-	digest, _, _, err := HandleManifestResponse(
+	digest, _, _, err := HandleManifestResponse(log,
 		resp,
 		method,
 		originalHost,

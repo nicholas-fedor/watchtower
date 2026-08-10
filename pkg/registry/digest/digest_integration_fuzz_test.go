@@ -35,7 +35,7 @@ func FuzzExtractHeadDigest(f *testing.F) {
 		resp.Header.Set(digest.ContentDigestHeader, headerValue)
 
 		// Call extractHeadDigest because we don't care about the result, only that it doesn't panic
-		_, _ = digest.ExtractHeadDigest(resp)
+		_, _ = digest.ExtractHeadDigest(testLog(), resp)
 	})
 }
 
@@ -60,7 +60,7 @@ func FuzzExtractGetDigest(f *testing.F) {
 		defer resp.Body.Close()
 
 		// Call ExtractGetDigest because we don't care about the result, only that it doesn't panic
-		_, _ = digest.ExtractGetDigest(resp)
+		_, _ = digest.ExtractGetDigest(testLog(), resp)
 	})
 }
 
@@ -77,7 +77,7 @@ func FuzzNormalizeDigest(f *testing.F) {
 
 	f.Fuzz(func(_ *testing.T, input string) {
 		// Call NormalizeDigest because we don't care about the result, only that it doesn't panic
-		_ = digest.NormalizeDigest(input)
+		_ = digest.NormalizeDigest(testLog(), input)
 	})
 }
 
@@ -112,7 +112,7 @@ func FuzzDigestsMatch(f *testing.F) {
 		// Ignore unmarshal errors to test robustness with malformed JSON
 		json.Unmarshal([]byte(localJSON), &localDigests)
 		// Call DigestsMatch because we don't care about the result, only that it doesn't panic
-		digest.DigestsMatch(localDigests, remote)
+		digest.DigestsMatch(testLog(), localDigests, remote)
 	})
 }
 
@@ -144,7 +144,7 @@ func FuzzBuildManifestURL(f *testing.F) {
 		t.Setenv("WATCHTOWER_REGISTRY_TLS_SKIP", "false")
 
 		// Call buildManifestURL because we don't care about the result, only that it doesn't panic
-		_, _, _, _ = digest.BuildManifestURL(mockContainer, hostOverride)
+		_, _, _, _ = digest.BuildManifestURL(testLog(), mockContainer, hostOverride)
 	})
 }
 
@@ -219,8 +219,7 @@ func FuzzHandleManifestResponse(f *testing.F) {
 			}
 
 			// Call HandleManifestResponse because we don't care about the result, only that it doesn't panic
-			_, _, _, _ = digest.HandleManifestResponse(
-				resp,
+			_, _, _, _ = digest.HandleManifestResponse(testLog(), resp,
 				method,
 				originalHost,
 				challengeHost,

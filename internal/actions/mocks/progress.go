@@ -3,6 +3,7 @@ package mocks
 
 import (
 	"errors"
+	"github.com/rs/zerolog"
 
 	"github.com/nicholas-fedor/watchtower/pkg/session"
 	"github.com/nicholas-fedor/watchtower/pkg/types"
@@ -29,6 +30,8 @@ const (
 // It assigns each container a unique ID and name based on its state and index,
 // simulating various update outcomes for testing session progress reporting.
 func CreateMockProgressReport(states ...session.State) types.Report {
+	nop := zerolog.Nop()
+	log := &nop
 	// Track the number of occurrences for each state to ensure unique IDs and names.
 	stateNums := make(map[session.State]int)
 	progress := session.Progress{}
@@ -40,23 +43,23 @@ func CreateMockProgressReport(states ...session.State) types.Report {
 		switch state {
 		case session.SkippedState:
 			c, _ := CreateContainerForProgress(index, skippedIDPrefix, "skip%d")
-			progress.AddSkipped(c, errMockSkipped, types.UpdateParams{})
+			progress.AddSkipped(log, c, errMockSkipped, types.UpdateParams{})
 		case session.FreshState:
 			c, _ := CreateContainerForProgress(index, freshIDPrefix, "frsh%d")
-			progress.AddScanned(c, c.ImageID(), types.UpdateParams{})
+			progress.AddScanned(log, c, c.ImageID(), types.UpdateParams{})
 		case session.UpdatedState:
 			c, newImage := CreateContainerForProgress(index, updatedIDPrefix, "updt%d")
-			progress.AddScanned(c, newImage, types.UpdateParams{})
-			progress.MarkForUpdate(c.ID())
+			progress.AddScanned(log, c, newImage, types.UpdateParams{})
+			progress.MarkForUpdate(log, c.ID())
 		case session.FailedState:
 			c, newImage := CreateContainerForProgress(index, failedIDPrefix, "fail%d")
-			progress.AddScanned(c, newImage, types.UpdateParams{})
+			progress.AddScanned(log, c, newImage, types.UpdateParams{})
 
 			failed[c.ID()] = errMockFailed
 		case session.RestartedState:
 			c, _ := CreateContainerForProgress(index, restartedIDPrefix, "rstr%d")
-			progress.AddScanned(c, c.ImageID(), types.UpdateParams{})
-			progress.MarkRestarted(c.ID())
+			progress.AddScanned(log, c, c.ImageID(), types.UpdateParams{})
+			progress.MarkRestarted(log, c.ID())
 		case session.UnknownState, session.ScannedState, session.StaleState:
 			// These states are not explicitly handled in this mock as they're intermediate or unused here.
 			continue
@@ -65,7 +68,7 @@ func CreateMockProgressReport(states ...session.State) types.Report {
 		stateNums[state] = index + 1
 	}
 
-	progress.UpdateFailed(failed)
+	progress.UpdateFailed(log, failed)
 
-	return progress.Report()
+	return progress.Report(log)
 }

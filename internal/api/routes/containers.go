@@ -15,7 +15,7 @@ func registerContainersRoute(app *fiber.App, auth fiber.Handler, opts config.Opt
 		return
 	}
 
-	handler := containers.New(func(ctx context.Context) ([]containers.Status, error) {
+	handler := containers.New(opts.Logger, func(ctx context.Context) ([]containers.Status, error) {
 		return containers.ListContainerStatuses(ctx, opts.Client, opts.Filter)
 	})
 	app.Get(handler.Path, auth, config.TimeoutMiddleware(), handler.Handle)
@@ -27,7 +27,7 @@ func registerContainersDetailsRoute(app *fiber.App, auth fiber.Handler, opts con
 	}
 
 	detailsParams := config.BuildUpdateParams(opts)
-	handler := details.New(func(ctx context.Context, name, image string) ([]details.ContainerDetails, error) {
+	handler := details.New(opts.Logger, func(ctx context.Context, name, image string) ([]details.ContainerDetails, error) {
 		return details.GetContainerDetails(ctx, opts.Client, opts.Filter, name, image, detailsParams)
 	})
 	app.Get(handler.Path, auth, config.TimeoutMiddleware(), handler.Handle)

@@ -43,7 +43,7 @@ var _ = ginkgo.Describe("CheckForMultipleWatchtowerInstances", func() {
 
 			var cleanupImageInfo []types.RemovedImageInfo
 
-			cleanupOccurred, err := RemoveExcessWatchtowerInstances(
+			cleanupOccurred, err := RemoveExcessWatchtowerInstances(testLogger(),
 				context.Background(),
 				mockClient,
 				false,
@@ -95,7 +95,7 @@ var _ = ginkgo.Describe("CheckForMultipleWatchtowerInstances", func() {
 
 				var cleanupImageIDs []types.RemovedImageInfo
 
-				cleanupOccurred, err := RemoveExcessWatchtowerInstances(
+				cleanupOccurred, err := RemoveExcessWatchtowerInstances(testLogger(),
 					context.Background(),
 					mockClient,
 					true,
@@ -136,7 +136,7 @@ var _ = ginkgo.Describe("CheckForMultipleWatchtowerInstances", func() {
 
 			var cleanupImageIDs []types.RemovedImageInfo
 
-			cleanupOccurred, err := RemoveExcessWatchtowerInstances(
+			cleanupOccurred, err := RemoveExcessWatchtowerInstances(testLogger(),
 				context.Background(),
 				mockClient,
 				true,
@@ -188,7 +188,7 @@ var _ = ginkgo.Describe("CheckForMultipleWatchtowerInstances", func() {
 
 			var cleanupImageIDs []types.RemovedImageInfo
 
-			cleanupOccurred, err := RemoveExcessWatchtowerInstances(
+			cleanupOccurred, err := RemoveExcessWatchtowerInstances(testLogger(),
 				context.Background(),
 				mockClient,
 				true,
@@ -226,7 +226,7 @@ var _ = ginkgo.Describe("CheckForMultipleWatchtowerInstances", func() {
 
 			var cleanupImageIDs []types.RemovedImageInfo
 
-			cleanupOccurred, err := RemoveExcessWatchtowerInstances(
+			cleanupOccurred, err := RemoveExcessWatchtowerInstances(testLogger(),
 				context.Background(),
 				mockClient,
 				false,
@@ -275,7 +275,7 @@ var _ = ginkgo.Describe("CheckForMultipleWatchtowerInstances", func() {
 
 			var cleanupImageIDs []types.RemovedImageInfo
 
-			cleanupOccurred, err := RemoveExcessWatchtowerInstances(
+			cleanupOccurred, err := RemoveExcessWatchtowerInstances(testLogger(),
 				context.Background(),
 				mockClient,
 				false,
@@ -298,7 +298,7 @@ var _ = ginkgo.Describe("CheckForMultipleWatchtowerInstances", func() {
 
 			var cleanupImageIDs []types.RemovedImageInfo
 
-			cleanupOccurred, err := RemoveExcessWatchtowerInstances(
+			cleanupOccurred, err := RemoveExcessWatchtowerInstances(testLogger(),
 				context.Background(),
 				mockClient,
 				false,
@@ -348,7 +348,7 @@ var _ = ginkgo.Describe("CheckForMultipleWatchtowerInstances", func() {
 
 			var cleanupImageIDs []types.RemovedImageInfo
 
-			cleanupOccurred, err := RemoveExcessWatchtowerInstances(
+			cleanupOccurred, err := RemoveExcessWatchtowerInstances(testLogger(),
 				context.Background(),
 				mockClient,
 				false,
@@ -412,7 +412,7 @@ var _ = ginkgo.Describe("CheckForMultipleWatchtowerInstances", func() {
 
 			var cleanupImageIDs []types.RemovedImageInfo
 
-			cleanupOccurred, err := RemoveExcessWatchtowerInstances(
+			cleanupOccurred, err := RemoveExcessWatchtowerInstances(testLogger(),
 				context.Background(),
 				mockClient,
 				true,
@@ -480,7 +480,7 @@ var _ = ginkgo.Describe("CheckForMultipleWatchtowerInstances", func() {
 
 				var cleanupImageIDs []types.RemovedImageInfo
 
-				cleanupOccurred, err := RemoveExcessWatchtowerInstances(
+				cleanupOccurred, err := RemoveExcessWatchtowerInstances(testLogger(),
 					context.Background(),
 					mockClient,
 					true,
@@ -549,7 +549,7 @@ var _ = ginkgo.Describe("CheckForMultipleWatchtowerInstances", func() {
 
 				var cleanupImageIDs []types.RemovedImageInfo
 
-				cleanupOccurred, err := RemoveExcessWatchtowerInstances(
+				cleanupOccurred, err := RemoveExcessWatchtowerInstances(testLogger(),
 					context.Background(),
 					mockClient,
 					true,
@@ -603,7 +603,7 @@ var _ = ginkgo.Describe("CheckForMultipleWatchtowerInstances", func() {
 
 				var cleanupImageIDs []types.RemovedImageInfo
 
-				cleanupOccurred, err := RemoveExcessWatchtowerInstances(
+				cleanupOccurred, err := RemoveExcessWatchtowerInstances(testLogger(),
 					context.Background(),
 					mockClient,
 					true,
@@ -651,7 +651,7 @@ var _ = ginkgo.Describe("CheckForMultipleWatchtowerInstances", func() {
 
 			var cleanupImageIDs []types.RemovedImageInfo
 
-			cleanupOccurred, err := RemoveExcessWatchtowerInstances(
+			cleanupOccurred, err := RemoveExcessWatchtowerInstances(testLogger(),
 				context.Background(),
 				mockClient,
 				false,
@@ -709,7 +709,7 @@ var _ = ginkgo.Describe("CheckForMultipleWatchtowerInstances", func() {
 
 			var cleanupImageInfos []types.RemovedImageInfo
 
-			cleanupOccurred, err := RemoveExcessWatchtowerInstances(
+			cleanupOccurred, err := RemoveExcessWatchtowerInstances(testLogger(),
 				context.Background(),
 				mockClient,
 				true,
@@ -766,7 +766,7 @@ var _ = ginkgo.Describe("CheckForMultipleWatchtowerInstances", func() {
 			var cleanupImageInfos []types.RemovedImageInfo
 
 			// Belt case: current detection selected the old predecessor.
-			cleanupOccurred, err := RemoveExcessWatchtowerInstances(
+			cleanupOccurred, err := RemoveExcessWatchtowerInstances(testLogger(),
 				context.Background(),
 				mockClient,
 				true,
@@ -842,7 +842,7 @@ var _ = ginkgo.Describe("CheckForMultipleWatchtowerInstances", func() {
 
 			var cleanupImageInfos []types.RemovedImageInfo
 
-			cleanupOccurred, err := RemoveExcessWatchtowerInstances(
+			cleanupOccurred, err := RemoveExcessWatchtowerInstances(testLogger(),
 				context.Background(),
 				mockClient,
 				true,
@@ -901,7 +901,7 @@ var _ = ginkgo.Describe("CheckForMultipleWatchtowerInstances", func() {
 
 			var cleanupImageInfos []types.RemovedImageInfo
 
-			cleanupOccurred, err := RemoveExcessWatchtowerInstances(
+			cleanupOccurred, err := RemoveExcessWatchtowerInstances(testLogger(),
 				context.Background(),
 				mockClient,
 				true,
@@ -963,7 +963,7 @@ var _ = ginkgo.Describe("CheckForMultipleWatchtowerInstances", func() {
 
 			var cleanupImageInfos []types.RemovedImageInfo
 
-			cleanupOccurred, err := RemoveExcessWatchtowerInstances(
+			cleanupOccurred, err := RemoveExcessWatchtowerInstances(testLogger(),
 				context.Background(),
 				mockClient,
 				true,
@@ -1025,7 +1025,7 @@ var _ = ginkgo.Describe("CheckForMultipleWatchtowerInstances", func() {
 			// Note: unscoped filter excludes containers with scopes, so only chained container is cleaned
 			var cleanupImageInfos []types.RemovedImageInfo
 
-			cleanupOccurred, err := RemoveExcessWatchtowerInstances(
+			cleanupOccurred, err := RemoveExcessWatchtowerInstances(testLogger(),
 				context.Background(),
 				mockClient,
 				true,
@@ -1089,7 +1089,7 @@ var _ = ginkgo.Describe("CheckForMultipleWatchtowerInstances", func() {
 				// Cleanup should clean the referenced container as it's a chained parent container
 				var cleanupImageInfos []types.RemovedImageInfo
 
-				cleanupOccurred, err := RemoveExcessWatchtowerInstances(
+				cleanupOccurred, err := RemoveExcessWatchtowerInstances(testLogger(),
 					context.Background(),
 					mockClient,
 					true,
@@ -1165,7 +1165,7 @@ var _ = ginkgo.Describe("CheckForMultipleWatchtowerInstances", func() {
 
 				var cleanupImageInfos []types.RemovedImageInfo
 
-				cleanupOccurred, err := RemoveExcessWatchtowerInstances(
+				cleanupOccurred, err := RemoveExcessWatchtowerInstances(testLogger(),
 					context.Background(),
 					mockClient,
 					true,
@@ -1242,7 +1242,7 @@ var _ = ginkgo.Describe("CheckForMultipleWatchtowerInstances", func() {
 
 				var cleanupImageInfos []types.RemovedImageInfo
 
-				cleanupOccurred, err := RemoveExcessWatchtowerInstances(
+				cleanupOccurred, err := RemoveExcessWatchtowerInstances(testLogger(),
 					context.Background(),
 					mockClient,
 					false, // No image cleanup to focus on container removal
@@ -1317,7 +1317,7 @@ var _ = ginkgo.Describe("CheckForMultipleWatchtowerInstances", func() {
 
 				var cleanupImageInfos []types.RemovedImageInfo
 
-				cleanupOccurred, err := RemoveExcessWatchtowerInstances(
+				cleanupOccurred, err := RemoveExcessWatchtowerInstances(testLogger(),
 					context.Background(),
 					mockClient,
 					true,
@@ -1374,7 +1374,7 @@ var _ = ginkgo.Describe("CheckForMultipleWatchtowerInstances", func() {
 
 			var cleanupImageInfos []types.RemovedImageInfo
 
-			cleanupOccurred, err := RemoveExcessWatchtowerInstances(
+			cleanupOccurred, err := RemoveExcessWatchtowerInstances(testLogger(),
 				context.Background(),
 				mockClient,
 				false,
@@ -1396,7 +1396,7 @@ var _ = ginkgo.Describe("CleanupImages", func() {
 	ginkgo.It("should do nothing when no images are provided", func() {
 		mockClient := mockContainer.NewMockClient(ginkgo.GinkgoT())
 
-		cleaned, err := RemoveImages(context.Background(), mockClient, nil)
+		cleaned, err := RemoveImages(testLogger(), context.Background(), mockClient, nil)
 		gomega.Expect(err).NotTo(gomega.HaveOccurred())
 		gomega.Expect(cleaned).To(gomega.BeEmpty())
 	})
@@ -1413,7 +1413,7 @@ var _ = ginkgo.Describe("CleanupImages", func() {
 		mockClient.EXPECT().RemoveImageByID(context.Background(), types.ImageID("image1"), "").Return(nil)
 		mockClient.EXPECT().RemoveImageByID(mock.Anything, types.ImageID("image2"), "").Return(nil)
 
-		cleaned, err := RemoveImages(context.Background(), mockClient, cleanedImages)
+		cleaned, err := RemoveImages(testLogger(), context.Background(), mockClient, cleanedImages)
 		gomega.Expect(err).NotTo(gomega.HaveOccurred())
 		gomega.Expect(cleaned).To(gomega.HaveLen(2))
 		gomega.Expect(cleaned[0].ImageID).To(gomega.Equal(types.ImageID("image1")))
@@ -1433,7 +1433,7 @@ var _ = ginkgo.Describe("CleanupImages", func() {
 			RemoveImageByID(context.Background(), types.ImageID("image2"), "").
 			Return(errors.New("image removal failed"))
 
-		cleaned, err := RemoveImages(context.Background(), mockClient, cleanedImages)
+		cleaned, err := RemoveImages(testLogger(), context.Background(), mockClient, cleanedImages)
 		gomega.Expect(err).To(gomega.HaveOccurred())
 		gomega.Expect(err.Error()).
 			To(gomega.ContainSubstring("errors occurred during image cleanup"))
@@ -1454,7 +1454,7 @@ var _ = ginkgo.Describe("CleanupImages", func() {
 			RemoveImageByID(context.Background(), types.ImageID("image2"), "").
 			Return(cerrdefs.ErrNotFound)
 
-		cleaned, err := RemoveImages(context.Background(), mockClient, cleanedImages)
+		cleaned, err := RemoveImages(testLogger(), context.Background(), mockClient, cleanedImages)
 		gomega.Expect(err).NotTo(gomega.HaveOccurred())
 		gomega.Expect(cleaned).To(gomega.HaveLen(1))
 		gomega.Expect(cleaned[0].ImageID).To(gomega.Equal(types.ImageID("image1")))
@@ -1473,7 +1473,7 @@ var _ = ginkgo.Describe("CleanupImages", func() {
 			RemoveImageByID(context.Background(), types.ImageID("image2"), "image2").
 			Return(cerrdefs.ErrConflict)
 
-		cleaned, err := RemoveImages(context.Background(), mockClient, cleanedImages)
+		cleaned, err := RemoveImages(testLogger(), context.Background(), mockClient, cleanedImages)
 		gomega.Expect(err).NotTo(gomega.HaveOccurred())
 		gomega.Expect(cleaned).To(gomega.HaveLen(1))
 		gomega.Expect(cleaned[0].ImageID).To(gomega.Equal(types.ImageID("image1")))
@@ -1509,7 +1509,7 @@ var _ = ginkgo.Describe("removeExcessContainers", func() {
 				RemoveImageByID(context.Background(), types.ImageID("image1"), "image1:latest").
 				Return(nil)
 
-			removed, err := removeExcessContainers(
+			removed, err := removeExcessContainers(testLogger(),
 				context.Background(),
 				mockClient,
 				[]types.Container{excessContainer},
@@ -1553,7 +1553,7 @@ var _ = ginkgo.Describe("removeExcessContainers", func() {
 				RemoveImageByID(context.Background(), types.ImageID("image1"), "image1:latest").
 				Return(nil)
 
-			removed, err := removeExcessContainers(
+			removed, err := removeExcessContainers(testLogger(),
 				context.Background(),
 				mockClient,
 				[]types.Container{excessContainer},
@@ -1610,7 +1610,7 @@ var _ = ginkgo.Describe("removeExcessContainers", func() {
 				RemoveImageByID(mock.Anything, types.ImageID("image2"), "image2:latest").
 				Return(errors.New("remove failed"))
 
-			removed, err := removeExcessContainers(
+			removed, err := removeExcessContainers(testLogger(),
 				context.Background(),
 				mockClient,
 				[]types.Container{excessContainer1, excessContainer2},
@@ -1654,7 +1654,7 @@ var _ = ginkgo.Describe("removeExcessContainers", func() {
 			mockClient.EXPECT().StopAndRemoveContainer(mock.Anything, excessContainer, 10*time.Minute).Return(nil)
 			// No RemoveImageByID expected
 
-			removed, err := removeExcessContainers(
+			removed, err := removeExcessContainers(testLogger(),
 				context.Background(),
 				mockClient,
 				[]types.Container{excessContainer},
@@ -1703,7 +1703,7 @@ var _ = ginkgo.Describe("removeExcessContainers", func() {
 				Return(errors.New("container stop failed")).
 				Times(1)
 
-			removed, err := removeExcessContainers(
+			removed, err := removeExcessContainers(testLogger(),
 				ctx,
 				mockClient,
 				[]types.Container{excessContainer},
@@ -1750,7 +1750,7 @@ var _ = ginkgo.Describe("removeExcessContainers", func() {
 				Return(errors.New("container stop failed")).
 				Times(1)
 
-			removed, err := removeExcessContainers(
+			removed, err := removeExcessContainers(testLogger(),
 				ctx,
 				mockClient,
 				[]types.Container{excessContainer},
@@ -1796,7 +1796,7 @@ var _ = ginkgo.Describe("removeExcessContainers", func() {
 				Return(nil).
 				Times(1)
 
-			removed, err := removeExcessContainers(
+			removed, err := removeExcessContainers(testLogger(),
 				context.Background(),
 				mockClient,
 				[]types.Container{excessContainer},
@@ -1841,7 +1841,7 @@ var _ = ginkgo.Describe("removeExcessContainers", func() {
 				Return(nil).
 				Times(1)
 
-			removed, err := removeExcessContainers(
+			removed, err := removeExcessContainers(testLogger(),
 				context.Background(),
 				mockClient,
 				[]types.Container{excessContainer},
@@ -1882,7 +1882,7 @@ var _ = ginkgo.Describe("removeExcessContainers", func() {
 				Return(errors.New("container stop failed")).
 				Times(maxRemovalAttempts)
 
-			removed, err := removeExcessContainers(
+			removed, err := removeExcessContainers(testLogger(),
 				context.Background(),
 				mockClient,
 				[]types.Container{excessContainer},
@@ -1954,7 +1954,7 @@ func createMockContainer(
 		},
 	}
 
-	return container.NewContainer(&content, imageInfo)
+	return container.NewContainer(nil, &content, imageInfo)
 }
 
 // createMockCreatedContainer creates a Watchtower container in the "created" state,
@@ -1983,7 +1983,7 @@ var _ = ginkgo.Describe("CleanupOldWatchtowerContainers", func() {
 				ListContainers(mock.Anything, mock.Anything).
 				Return([]types.Container{}, nil)
 
-			removed, err := CleanupOldWatchtowerContainers(
+			removed, err := CleanupOldWatchtowerContainers(testLogger(),
 				context.Background(),
 				mockClient,
 				false,
@@ -2013,7 +2013,7 @@ var _ = ginkgo.Describe("CleanupOldWatchtowerContainers", func() {
 				ListContainers(mock.Anything, mock.Anything).
 				Return([]types.Container{nonWT}, nil)
 
-			removed, err := CleanupOldWatchtowerContainers(
+			removed, err := CleanupOldWatchtowerContainers(testLogger(),
 				context.Background(),
 				mockClient,
 				false,
@@ -2045,7 +2045,7 @@ var _ = ginkgo.Describe("CleanupOldWatchtowerContainers", func() {
 				ListContainers(mock.Anything, mock.Anything).
 				Return([]types.Container{current}, nil)
 
-			removed, err := CleanupOldWatchtowerContainers(
+			removed, err := CleanupOldWatchtowerContainers(testLogger(),
 				context.Background(),
 				mockClient,
 				false,
@@ -2082,7 +2082,7 @@ var _ = ginkgo.Describe("CleanupOldWatchtowerContainers", func() {
 				StopAndRemoveContainer(mock.Anything, oldContainer, 10*time.Minute).
 				Return(nil)
 
-			removed, err := CleanupOldWatchtowerContainers(
+			removed, err := CleanupOldWatchtowerContainers(testLogger(),
 				context.Background(),
 				mockClient,
 				false,
@@ -2117,7 +2117,7 @@ var _ = ginkgo.Describe("CleanupOldWatchtowerContainers", func() {
 				ListContainers(mock.Anything, mock.Anything).
 				Return([]types.Container{oldScopedContainer}, nil)
 
-			removed, err := CleanupOldWatchtowerContainers(
+			removed, err := CleanupOldWatchtowerContainers(testLogger(),
 				context.Background(),
 				mockClient,
 				false,
@@ -2150,7 +2150,7 @@ var _ = ginkgo.Describe("CleanupOldWatchtowerContainers", func() {
 				ListContainers(mock.Anything, mock.Anything).
 				Return([]types.Container{oldScopedContainer}, nil)
 
-			removed, err := CleanupOldWatchtowerContainers(
+			removed, err := CleanupOldWatchtowerContainers(testLogger(),
 				context.Background(),
 				mockClient,
 				false,
@@ -2187,7 +2187,7 @@ var _ = ginkgo.Describe("CleanupOldWatchtowerContainers", func() {
 				StopAndRemoveContainer(mock.Anything, oldContainer, 10*time.Minute).
 				Return(nil)
 
-			removed, err := CleanupOldWatchtowerContainers(
+			removed, err := CleanupOldWatchtowerContainers(testLogger(),
 				context.Background(),
 				mockClient,
 				false,
@@ -2223,7 +2223,7 @@ var _ = ginkgo.Describe("CleanupOldWatchtowerContainers", func() {
 				StopAndRemoveContainer(mock.Anything, oldContainer, 10*time.Minute).
 				Return(nil)
 
-			removed, err := CleanupOldWatchtowerContainers(
+			removed, err := CleanupOldWatchtowerContainers(testLogger(),
 				context.Background(),
 				mockClient,
 				false,
@@ -2255,7 +2255,7 @@ var _ = ginkgo.Describe("CleanupOldWatchtowerContainers", func() {
 				ListContainers(mock.Anything, mock.Anything).
 				Return([]types.Container{oldContainer}, nil)
 
-			removed, err := CleanupOldWatchtowerContainers(
+			removed, err := CleanupOldWatchtowerContainers(testLogger(),
 				context.Background(),
 				mockClient,
 				false,
@@ -2306,7 +2306,7 @@ var _ = ginkgo.Describe("CleanupOldWatchtowerContainers", func() {
 				StopAndRemoveContainer(mock.Anything, old2, 10*time.Minute).
 				Return(nil)
 
-			removed, err := CleanupOldWatchtowerContainers(
+			removed, err := CleanupOldWatchtowerContainers(testLogger(),
 				context.Background(),
 				mockClient,
 				false,
@@ -2363,7 +2363,7 @@ var _ = ginkgo.Describe("CleanupOldWatchtowerContainers", func() {
 
 			var imageInfos []types.RemovedImageInfo
 
-			removed, err := CleanupOldWatchtowerContainers(
+			removed, err := CleanupOldWatchtowerContainers(testLogger(),
 				context.Background(),
 				mockClient,
 				true,
@@ -2400,7 +2400,7 @@ var _ = ginkgo.Describe("CleanupOldWatchtowerContainers", func() {
 				Return(errors.New("stop container failed")).
 				Times(maxRemovalAttempts)
 
-			removed, err := CleanupOldWatchtowerContainers(
+			removed, err := CleanupOldWatchtowerContainers(testLogger(),
 				context.Background(),
 				mockClient,
 				false,
@@ -2422,7 +2422,7 @@ var _ = ginkgo.Describe("CleanupOldWatchtowerContainers", func() {
 				ListContainers(mock.Anything, mock.Anything).
 				Return(nil, errors.New("docker daemon unreachable"))
 
-			removed, err := CleanupOldWatchtowerContainers(
+			removed, err := CleanupOldWatchtowerContainers(testLogger(),
 				context.Background(),
 				mockClient,
 				false,
@@ -2460,7 +2460,7 @@ var _ = ginkgo.Describe("CleanupOldWatchtowerContainers", func() {
 				StopAndRemoveContainer(mock.Anything, oldContainer, 10*time.Minute).
 				Return(nil)
 
-			removed, err := CleanupOldWatchtowerContainers(
+			removed, err := CleanupOldWatchtowerContainers(testLogger(),
 				context.Background(),
 				mockClient,
 				false,
@@ -2495,7 +2495,7 @@ var _ = ginkgo.Describe("CleanupOldWatchtowerContainers", func() {
 				StopAndRemoveContainer(mock.Anything, orphaned, 10*time.Minute).
 				Return(nil)
 
-			removed, err := CleanupOldWatchtowerContainers(
+			removed, err := CleanupOldWatchtowerContainers(testLogger(),
 				context.Background(),
 				mockClient,
 				false,
@@ -2523,7 +2523,7 @@ var _ = ginkgo.Describe("CleanupOldWatchtowerContainers", func() {
 				ListContainers(mock.Anything, mock.Anything).
 				Return([]types.Container{nonWT}, nil)
 
-			removed, err := CleanupOldWatchtowerContainers(
+			removed, err := CleanupOldWatchtowerContainers(testLogger(),
 				context.Background(),
 				mockClient,
 				false,
@@ -2553,7 +2553,7 @@ var _ = ginkgo.Describe("CleanupOldWatchtowerContainers", func() {
 				ListContainers(mock.Anything, mock.Anything).
 				Return([]types.Container{current}, nil)
 
-			removed, err := CleanupOldWatchtowerContainers(
+			removed, err := CleanupOldWatchtowerContainers(testLogger(),
 				context.Background(),
 				mockClient,
 				false,
@@ -2600,7 +2600,7 @@ var _ = ginkgo.Describe("CleanupOldWatchtowerContainers", func() {
 				StopAndRemoveContainer(mock.Anything, orphaned, 10*time.Minute).
 				Return(nil)
 
-			removed, err := CleanupOldWatchtowerContainers(
+			removed, err := CleanupOldWatchtowerContainers(testLogger(),
 				context.Background(),
 				mockClient,
 				false,
@@ -2631,7 +2631,7 @@ var _ = ginkgo.Describe("CleanupOldWatchtowerContainers", func() {
 				ListContainers(mock.Anything, mock.Anything).
 				Return([]types.Container{differentScopeOrphaned}, nil)
 
-			removed, err := CleanupOldWatchtowerContainers(
+			removed, err := CleanupOldWatchtowerContainers(testLogger(),
 				context.Background(),
 				mockClient,
 				false,

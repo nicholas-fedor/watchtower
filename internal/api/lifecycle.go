@@ -11,7 +11,7 @@ import (
 	"time"
 
 	"github.com/gofiber/fiber/v3"
-	"github.com/sirupsen/logrus"
+	"github.com/rs/zerolog"
 
 	"github.com/nicholas-fedor/watchtower/internal/api/config"
 	"github.com/nicholas-fedor/watchtower/internal/api/routes"
@@ -61,7 +61,8 @@ func GetAPIAddr(host, port string) string {
 //
 // Parameters:
 //   - ctx: Context for server lifecycle management.
-//   - opts: API configuration options.
+//   - opts: API configuration options. opts.Logger is required when any endpoint
+//     is enabled. Nil yields config.ErrMissingLogger.
 //
 // Returns:
 //   - error: Non-nil if route registration or server startup fails.
@@ -99,8 +100,14 @@ func SetupAndStartAPI(ctx context.Context, opts config.Options) error {
 		return config.ErrMissingEventsAPIToken
 	}
 
+	if opts.Logger == nil {
+		return config.ErrMissingLogger
+	}
+
+	log := opts.Logger
+
 	app := New(
-		logrus.StandardLogger(),
+		log,
 		opts.RateLimit,
 		ProxyConfig{
 			TrustedProxies: opts.TrustedProxies,
@@ -109,7 +116,7 @@ func SetupAndStartAPI(ctx context.Context, opts config.Options) error {
 			AllowedOrigins: opts.CORSAllowedOrigins,
 		}, opts.NoStartupMessage)
 
-	authMiddleware := NewAPIAuthMiddleware(opts.Token)
+	authMiddleware := NewAPIAuthMiddleware(log, opts.Token)
 
 	err := routes.ValidateAndRegister(ctx, app, authMiddleware, opts)
 	if err != nil {
@@ -127,6 +134,7 @@ func SetupAndStartAPI(ctx context.Context, opts config.Options) error {
 
 	return runServer(
 		ctx,
+		log,
 		app,
 		address,
 		tlsCertPath,
@@ -151,13 +159,14 @@ func isCleanServerStop(err error) bool {
 // handleUnexpectedServerStop logs and forwards unexpected listen errors.
 //
 // Parameters:
+//   - log: Logger for unexpected-stop messages.
 //   - err: Error returned by Listen.
 //   - addr: Address the server was listening on.
 //   - onUnexpectedStop: Optional callback invoked with the listen error.
-func handleUnexpectedServerStop(err error, addr string, onUnexpectedStop func(error)) {
+func handleUnexpectedServerStop(log *zerolog.Logger, err error, addr string, onUnexpectedStop func(error)) {
 	if !isCleanServerStop(err) {
-		logrus.WithError(err).WithField("addr", addr).
-			Error("HTTP server stopped unexpectedly")
+		log.Error().Err(err).Str("addr", addr).
+			Msg("HTTP server stopped unexpectedly")
 
 		if onUnexpectedStop != nil {
 			onUnexpectedStop(err)
@@ -174,17 +183,19 @@ func handleUnexpectedServerStop(err error, addr string, onUnexpectedStop func(er
 //
 // Parameters:
 //   - ctx: Context for server lifecycle management.
+//   - log: Logger for bind and listen error messages.
 //   - app: Fiber application to start.
 //   - address: Address to listen on.
 //   - tlsCertPath: Path to TLS certificate file, or empty for HTTP.
 //   - tlsKeyPath: Path to TLS key file, or empty for HTTP.
-//   - block: When true, wait until the server stops; when false, return after bind.
+//   - block: When true, wait until the server stops. When false, return after bind.
 //   - onUnexpectedStop: Optional callback when Listen exits unexpectedly in non-blocking mode.
 //
 // Returns:
 //   - error: Non-nil if the server fails to start or exits with an unexpected error while blocking.
 func runServer(
 	ctx context.Context,
+	log *zerolog.Logger,
 	app *fiber.App,
 	address string,
 	tlsCertPath, tlsKeyPath string,
@@ -227,15 +238,15 @@ func runServer(
 		// Socket bound successfully.
 	case err := <-listenDone:
 		if !isCleanServerStop(err) {
-			logrus.WithError(err).WithField("addr", address).
-				Error("HTTP server failed to start")
+			log.Error().Err(err).Str("addr", address).
+				Msg("HTTP server failed to start")
 
 			return fmt.Errorf("failed to start HTTP server: %w", err)
 		}
 
 		return nil
 	case <-ctx.Done():
-		// Canceled before bind completed; wait briefly for Listen to exit.
+		// Canceled before bind completed. Wait briefly for Listen to exit.
 		select {
 		case err := <-listenDone:
 			if !isCleanServerStop(err) {
@@ -250,7 +261,7 @@ func runServer(
 
 	if !block {
 		go func() {
-			handleUnexpectedServerStop(<-listenDone, address, onUnexpectedStop)
+			handleUnexpectedServerStop(log, <-listenDone, address, onUnexpectedStop)
 		}()
 
 		return nil
@@ -259,8 +270,8 @@ func runServer(
 	// Blocking mode: wait until GracefulContext cancels and Listen returns.
 	err := <-listenDone
 	if !isCleanServerStop(err) {
-		logrus.WithError(err).WithField("addr", address).
-			Error("HTTP server failed")
+		log.Error().Err(err).Str("addr", address).
+			Msg("HTTP server failed")
 
 		return fmt.Errorf("HTTP server failed: %w", err)
 	}

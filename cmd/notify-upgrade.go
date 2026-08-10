@@ -9,11 +9,12 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/sirupsen/logrus"
+	"github.com/rs/zerolog"
 	"github.com/spf13/cobra"
 
 	appConfig "github.com/nicholas-fedor/watchtower/internal/config"
 	"github.com/nicholas-fedor/watchtower/internal/flags"
+	"github.com/nicholas-fedor/watchtower/internal/logging"
 	"github.com/nicholas-fedor/watchtower/pkg/container"
 	"github.com/nicholas-fedor/watchtower/pkg/notifications"
 	"github.com/nicholas-fedor/watchtower/pkg/types"
@@ -47,11 +48,13 @@ func init() {
 }
 
 // runNotifyUpgrade executes the notify-upgrade command, handling errors gracefully.
-// It wraps the main logic in runNotifyUpgradeE and logs any failures with logrus.
+// It wraps the main logic in runNotifyUpgradeE and logs any failures with the reconfigured logger.
 func runNotifyUpgrade(cmd *cobra.Command, args []string) {
-	err := runNotifyUpgradeE(cmd, args)
+	log := logging.New(os.Stderr, logging.InfoLevel)
+
+	log, err := runNotifyUpgradeE(cmd, args, log)
 	if err != nil {
-		logrus.WithError(err).Error("Notification upgrade failed")
+		log.Error().Err(err).Msg("Notification upgrade failed")
 	}
 }
 
@@ -63,59 +66,71 @@ func runNotifyUpgrade(cmd *cobra.Command, args []string) {
 //     such as notification types (e.g., --notifications) and other settings that influence notifier behavior.
 //   - _: A slice of strings representing positional arguments, unused here as the command accepts no arguments (enforced
 //     by cobra.NoArgs), included for compatibility with Cobra's RunE signature.
+//   - log: Process logger, reconfigured from --log-format / --log-level so subcommand output honors those flags.
 //
 // Returns:
+//   - *zerolog.Logger: Logger after SetupLogging (format/level applied) for outer error reporting.
 //   - error: An error value if a critical operation fails (e.g., creating or writing to the temporary file), wrapped with
 //     a static error (e.g., errCreateTempFile) and the underlying system error for context. Returns nil if the function
 //     completes successfully, including cleanup, indicating the notification upgrade process ran without fatal issues.
 //     Non-critical failures (e.g., file removal after timeout) are logged but do not result in an error return.
-func runNotifyUpgradeE(cmd *cobra.Command, _ []string) error {
+func runNotifyUpgradeE(cmd *cobra.Command, _ []string, log *zerolog.Logger) (*zerolog.Logger, error) {
 	// Process flag aliases and expand secrets before resolving configuration.
 	// Use Root().PersistentFlags so env/alias bridging matches config.Load's bind source across subcommands.
 	flagSet := cmd.Root().PersistentFlags()
 
 	err := flags.ApplyEnvToFlags(flagSet, flags.AllSpecs())
 	if err != nil {
-		return fmt.Errorf("apply environment configuration: %w", err)
+		return log, fmt.Errorf("apply environment configuration: %w", err)
 	}
 
-	flags.ProcessFlagAliases(flagSet)
-
-	err = flags.SetupLogging(flagSet)
+	// Format before aliases so Fatal paths use the selected --log-format.
+	log, err = flags.SetupLogging(log, flagSet)
 	if err != nil {
-		return fmt.Errorf("setup logging: %w", err)
+		return log, fmt.Errorf("setup logging: %w", err)
 	}
 
-	flags.GetSecretsFromFiles(cmd.Root())
+	flags.ProcessFlagAliases(log, flagSet)
 
-	cfg, loadErr := appConfig.Load(cmd.Root(), nil)
+	// Re-apply after aliases so debug/trace forced log-level values take effect.
+	log, err = flags.SetupLogging(log, flagSet)
+	if err != nil {
+		return log, fmt.Errorf("setup logging: %w", err)
+	}
+
+	flags.GetSecretsFromFiles(log, cmd.Root())
+
+	cfg, loadErr := appConfig.Load(log, cmd.Root(), nil)
 	if loadErr != nil {
-		return fmt.Errorf("load configuration: %w", loadErr)
+		return log, fmt.Errorf("load configuration: %w", loadErr)
 	}
 
-	urls, buildErr := notifications.BuildURLs(cfg.Notify)
+	urls, buildErr := notifications.BuildURLs(log, cfg.Notify)
 	if buildErr != nil {
-		return fmt.Errorf("build notification URLs: %w", buildErr)
+		return log, fmt.Errorf("build notification URLs: %w", buildErr)
 	}
 
 	// Log the identified notification types (e.g., "email, slack") to inform the user of what configurations are being upgraded.
-	logrus.WithField("notifiers", strings.Join(cfg.Notify.LegacyTypes, ", ")).
-		Info("Found notification config(s)")
+	log.Info().
+		Str("notifiers", strings.Join(cfg.Notify.LegacyTypes, ", ")).
+		Msg("Found notification config(s)")
 
 	// Create a temporary file in the working directory with a pattern that ensures uniqueness (e.g., "watchtower-notif-urls-123").
 	// This file will store the generated URLs for user retrieval.
 	outFile, err := os.CreateTemp(".", "watchtower-notif-urls-*")
 	if err != nil {
 		// Log the failure with the specific error and return a wrapped error to halt execution, as file creation is critical.
-		logrus.WithError(err).Debug("Temporary file creation failed")
+		log.Debug().Err(err).Msg("Temporary file creation failed")
 
-		return fmt.Errorf("%w: %w", errCreateTempFile, err)
+		return log, fmt.Errorf("%w: %w", errCreateTempFile, err)
 	}
 	// Ensure the file is closed after all operations, even on early returns, to prevent resource leaks.
 	defer outFile.Close()
 
 	// Log the file path where URLs will be written, providing the user with a concrete reference for later instructions.
-	logrus.WithField("file", outFile.Name()).Info("Writing notification URLs")
+	log.Info().
+		Str("file", outFile.Name()).
+		Msg("Writing notification URLs")
 
 	// Construct the environment variable string in the format "WATCHTOWER_NOTIFICATION_URL=url1 url2 ...", where multiple URLs
 	// are space-separated as required by shoutrrr. This uses a strings.Builder for efficient string concatenation.
@@ -133,21 +148,23 @@ func runNotifyUpgradeE(cmd *cobra.Command, _ []string) error {
 	// Write the constructed string to the temporary file. This is a critical step, as the file's purpose is to store this data.
 	_, err = fmt.Fprintln(outFile, urlBuilder.String())
 	if err != nil {
-		logrus.WithError(err).
-			WithField("file", outFile.Name()).
-			Debug("Failed to write to temporary file")
+		log.Debug().
+			Err(err).
+			Str("file", outFile.Name()).
+			Msg("Failed to write to temporary file")
 
-		return fmt.Errorf("%w: %w", errWriteTempFile, err)
+		return log, fmt.Errorf("%w: %w", errWriteTempFile, err)
 	}
 
 	// Sync the file to disk to ensure the written data is persisted, preventing loss due to buffering or system crashes.
 	err = outFile.Sync()
 	if err != nil {
-		logrus.WithError(err).
-			WithField("file", outFile.Name()).
-			Debug("Failed to sync temporary file")
+		log.Debug().
+			Err(err).
+			Str("file", outFile.Name()).
+			Msg("Failed to sync temporary file")
 
-		return fmt.Errorf("%w: %w", errSyncTempFile, err)
+		return log, fmt.Errorf("%w: %w", errSyncTempFile, err)
 	}
 
 	// Attempt to retrieve the running container's ID to provide precise instructions for copying the file from the container.
@@ -156,27 +173,26 @@ func runNotifyUpgradeE(cmd *cobra.Command, _ []string) error {
 
 	var cid types.ContainerID
 
-	cid, err = container.GetContainerIDFromMountinfo()
+	cid, err = container.GetContainerIDFromMountinfo(log)
 	if err == nil && cid != "" {
 		containerID = cid.ShortID()
 	} else {
-		cid, err = container.GetContainerIDFromCgroupFile()
+		cid, err = container.GetContainerIDFromCgroupFile(log)
 		if err == nil && cid != "" {
 			containerID = cid.ShortID()
 		}
 	}
 
 	// Provide user instructions for retrieving the file, split into two log lines for clarity: a prompt and the exact command.
-	logrus.Info(
-		fmt.Sprintf(
+	log.Info().
+		Msg(fmt.Sprintf(
 			"To get the environment file, use: docker cp %s:%s ./watchtower-notifications.env",
 			containerID,
 			outFile.Name(),
-		),
-	)
+		))
 
 	// Warn the user that the file is temporary and will be cleaned up, reinforcing the urgency to act within the timeout.
-	logrus.Info("Note: This file will be removed in 5 minutes or when this container is stopped!")
+	log.Info().Msg("Note: This file will be removed in 5 minutes or when this container is stopped!")
 
 	// Set up signal handling for cleanup.
 	signalChannel := make(chan os.Signal, 1)
@@ -193,25 +209,28 @@ func runNotifyUpgradeE(cmd *cobra.Command, _ []string) error {
 	// Wait for a signal and perform cleanup.
 	select {
 	case <-timeoutChannel:
-		logrus.Info("Timed out")
+		log.Info().Msg("Timed out")
 	case sig := <-signalChannel:
-		logrus.WithField("signal", sig).Info("Stopping")
+		log.Info().
+			Str("signal", sig.String()).
+			Msg("Stopping")
 	}
 
 	// Attempt to remove the temporary file. If this fails (e.g., due to permissions or file system issues), log a warning
 	// rather than an error, as the command has completed its primary task, and leftover files are a minor concern.
-	//
-
 	err = os.Remove(outFile.Name())
 	if err != nil {
-		logrus.WithError(err).
-			WithField("file", outFile.Name()).
-			Warn("Failed to remove temporary file")
+		log.Warn().
+			Err(err).
+			Str("file", outFile.Name()).
+			Msg("Failed to remove temporary file")
 	} else {
-		logrus.WithField("file", outFile.Name()).Info("Environment file removed")
+		log.Info().
+			Str("file", outFile.Name()).
+			Msg("Environment file removed")
 	}
 
 	// Return nil to indicate successful completion, even if non-critical operations (e.g., file removal) failed,
 	// as the core task of generating and writing URLs has been accomplished.
-	return nil
+	return log, nil
 }

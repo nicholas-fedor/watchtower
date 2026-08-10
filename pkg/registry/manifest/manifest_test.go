@@ -6,9 +6,11 @@ import (
 
 	"github.com/distribution/reference"
 	"github.com/opencontainers/go-digest"
-	"github.com/sirupsen/logrus"
+	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+
+	"github.com/nicholas-fedor/watchtower/internal/logging"
 )
 
 // mockDigested is a test implementation of reference.Digested with an invalid String() method.
@@ -23,6 +25,10 @@ func (m *mockDigested) String() string {
 
 func (m *mockDigested) Digest() digest.Digest {
 	return m.digest
+}
+
+func testLog() *zerolog.Logger {
+	return logging.NopLogger()
 }
 
 func TestParseImageRef(t *testing.T) {
@@ -100,7 +106,7 @@ func TestResolveRegistryHost(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			result := resolveRegistryHost(tt.input)
+			result := resolveRegistryHost(testLog(), tt.input)
 			assert.Equal(t, tt.expected, result)
 		})
 	}
@@ -263,12 +269,12 @@ func TestBuildTaggedManifestURL(t *testing.T) {
 	tagged, ok := ref.(reference.NamedTagged)
 	require.True(t, ok, "Reference should be NamedTagged")
 
-	fields := logrus.Fields{
+	fields := map[string]any{
 		"container": "test-container",
 		"image":     "ghcr.io/org/image:mytag",
 	}
 
-	url, err := buildTaggedManifestURL(fields, tagged, "https")
+	url, err := buildTaggedManifestURL(testLog(), fields, tagged, "https")
 	require.NoError(t, err)
 
 	expected := "https://ghcr.io/v2/org/image/manifests/mytag"
@@ -282,12 +288,12 @@ func TestBuildDigestedManifestURL(t *testing.T) {
 	digested, ok := ref.(reference.Digested)
 	require.True(t, ok, "Reference should be Digested")
 
-	fields := logrus.Fields{
+	fields := map[string]any{
 		"container": "test-container",
 		"image":     "registry.example.com/org/image@sha256:daf7034c5c89775afe3008393ae033529913548243b84926931d7c84398ecda7",
 	}
 
-	url, err := buildDigestedManifestURL(fields, digested, "https")
+	url, err := buildDigestedManifestURL(testLog(), fields, digested, "https")
 	require.NoError(t, err)
 
 	expected := "https://registry.example.com/v2/org/image/manifests/sha256:daf7034c5c89775afe3008393ae033529913548243b84926931d7c84398ecda7"
@@ -304,12 +310,12 @@ func TestBuildDigestedManifestURLInvalidComponents(t *testing.T) {
 		digest: digestVal,
 	}
 
-	fields := logrus.Fields{
+	fields := map[string]any{
 		"container": "test-container",
 		"image":     "invalid",
 	}
 
-	url, err := buildDigestedManifestURL(fields, mock, "https")
+	url, err := buildDigestedManifestURL(testLog(), fields, mock, "https")
 	require.Error(t, err)
 	assert.Empty(t, url)
 }

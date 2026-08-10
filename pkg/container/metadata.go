@@ -6,8 +6,6 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/sirupsen/logrus"
-
 	"github.com/nicholas-fedor/watchtower/internal/util"
 	"github.com/nicholas-fedor/watchtower/pkg/types"
 )
@@ -93,18 +91,23 @@ func (c *Container) GetLifecyclePostUpdateCommand() string {
 
 // PreUpdateTimeout returns the pre-update command timeout in minutes.
 //
-// It defaults to 1 minute if unset or invalid; 0 allows indefinite execution.
+// It defaults to 1 minute if unset or invalid.
+// 0 allows indefinite execution.
 //
 // Returns:
 //   - int: Timeout in minutes.
 func (c *Container) PreUpdateTimeout() int {
-	clog := logrus.WithField("container", c.Name())
+	clogVal := c.logger().With().
+		Str("container", c.Name()).
+		Logger()
+	clog := &clogVal
 	val := c.getLabelValueOrEmpty(preUpdateTimeoutLabel)
 
 	// Use default if label is unset.
 	if val == "" {
-		clog.WithField("label", preUpdateTimeoutLabel).
-			Debug("Pre-update timeout not set, using default")
+		clog.Debug().
+			Str("label", preUpdateTimeoutLabel).
+			Msg("Pre-update timeout not set, using default")
 
 		return 1
 	}
@@ -112,36 +115,42 @@ func (c *Container) PreUpdateTimeout() int {
 	// Parse timeout value.
 	minutes, err := strconv.Atoi(val)
 	if err != nil {
-		clog.WithError(err).WithFields(logrus.Fields{
-			"label": preUpdateTimeoutLabel,
-			"value": val,
-		}).Warn("Invalid pre-update timeout value, using default")
+		clog.Warn().
+			Err(err).
+			Str("label", preUpdateTimeoutLabel).
+			Str("value", val).
+			Msg("Invalid pre-update timeout value, using default")
 
 		return 1
 	}
 
-	clog.WithFields(logrus.Fields{
-		"label":   preUpdateTimeoutLabel,
-		"minutes": minutes,
-	}).Debug("Retrieved pre-update timeout")
+	clog.Debug().
+		Str("label", preUpdateTimeoutLabel).
+		Int("minutes", minutes).
+		Msg("Retrieved pre-update timeout")
 
 	return minutes
 }
 
 // PostUpdateTimeout returns the post-update command timeout in minutes.
 //
-// It defaults to 1 minute if unset or invalid; 0 allows indefinite execution.
+// It defaults to 1 minute if unset or invalid.
+// 0 allows indefinite execution.
 //
 // Returns:
 //   - int: Timeout in minutes.
 func (c *Container) PostUpdateTimeout() int {
-	clog := logrus.WithField("container", c.Name())
+	clogVal := c.logger().With().
+		Str("container", c.Name()).
+		Logger()
+	clog := &clogVal
 	val := c.getLabelValueOrEmpty(postUpdateTimeoutLabel)
 
 	// Use default if label is unset.
 	if val == "" {
-		clog.WithField("label", postUpdateTimeoutLabel).
-			Debug("Post-update timeout not set, using default")
+		clog.Debug().
+			Str("label", postUpdateTimeoutLabel).
+			Msg("Post-update timeout not set, using default")
 
 		return 1
 	}
@@ -149,18 +158,19 @@ func (c *Container) PostUpdateTimeout() int {
 	// Parse timeout value.
 	minutes, err := strconv.Atoi(val)
 	if err != nil {
-		clog.WithError(err).WithFields(logrus.Fields{
-			"label": postUpdateTimeoutLabel,
-			"value": val,
-		}).Warn("Invalid post-update timeout value, using default")
+		clog.Warn().
+			Err(err).
+			Str("label", postUpdateTimeoutLabel).
+			Str("value", val).
+			Msg("Invalid post-update timeout value, using default")
 
 		return 1
 	}
 
-	clog.WithFields(logrus.Fields{
-		"label":   postUpdateTimeoutLabel,
-		"minutes": minutes,
-	}).Debug("Retrieved post-update timeout")
+	clog.Debug().
+		Str("label", postUpdateTimeoutLabel).
+		Int("minutes", minutes).
+		Msg("Retrieved post-update timeout")
 
 	return minutes
 }
@@ -175,11 +185,16 @@ func (c *Container) PostUpdateTimeout() int {
 //   - int: ID value if set and valid.
 //   - bool: True if label is present and valid, false otherwise.
 func (c *Container) getLifecycleID(label, idType string) (int, bool) {
-	clog := logrus.WithField("container", c.Name())
+	clogVal := c.logger().With().
+		Str("container", c.Name()).
+		Logger()
+	clog := &clogVal
 	rawString, ok := c.getLabelValue(label)
 
 	if !ok {
-		clog.WithField("label", label).Debug(fmt.Sprintf("Lifecycle %s label not set", idType))
+		clog.Debug().
+			Str("label", label).
+			Msg(fmt.Sprintf("Lifecycle %s label not set", idType))
 
 		return 0, false
 	}
@@ -187,21 +202,23 @@ func (c *Container) getLifecycleID(label, idType string) (int, bool) {
 	// Parse ID value.
 	parsedID, err := strconv.Atoi(rawString)
 	if err != nil {
-		clog.WithError(err).WithFields(logrus.Fields{
-			"label": label,
-			"value": rawString,
-		}).Warn(fmt.Sprintf("Invalid lifecycle %s value: not a valid integer", idType))
+		clog.Warn().
+			Err(err).
+			Str("label", label).
+			Str("value", rawString).
+			Msg(fmt.Sprintf("Invalid lifecycle %s value: not a valid integer", idType))
 
 		return 0, false
 	}
 
 	// Validate ID range (must be non-negative and within reasonable bounds).
 	if parsedID < 0 {
-		clog.WithFields(logrus.Fields{
-			"label": label,
-			"value": rawString,
-			idType:  parsedID,
-		}).Warn(fmt.Sprintf("Invalid lifecycle %s value: must be non-negative", idType))
+		clog.Warn().
+			Str("label", label).
+			Str("value", rawString).
+			Str("id_type", idType).
+			Int("id", parsedID).
+			Msg(fmt.Sprintf("Invalid lifecycle %s value: must be non-negative", idType))
 
 		return 0, false
 	}
@@ -209,20 +226,22 @@ func (c *Container) getLifecycleID(label, idType string) (int, bool) {
 	// Check for unreasonably large ID values (greater than 2^31-1).
 	const maxReasonableID = 2147483647 // 2^31-1
 	if parsedID > maxReasonableID {
-		clog.WithFields(logrus.Fields{
-			"label": label,
-			"value": rawString,
-			idType:  parsedID,
-			"max":   maxReasonableID,
-		}).Warn(fmt.Sprintf("Invalid lifecycle %s value: exceeds maximum reasonable value", idType))
+		clog.Warn().
+			Str("label", label).
+			Str("value", rawString).
+			Str("id_type", idType).
+			Int("id", parsedID).
+			Int("max", maxReasonableID).
+			Msg(fmt.Sprintf("Invalid lifecycle %s value: exceeds maximum reasonable value", idType))
 
 		return 0, false
 	}
 
-	clog.WithFields(logrus.Fields{
-		"label": label,
-		idType:  parsedID,
-	}).Debug("Retrieved lifecycle " + idType)
+	clog.Debug().
+		Str("label", label).
+		Str("id_type", idType).
+		Int("id", parsedID).
+		Msg("Retrieved lifecycle " + idType)
 
 	return parsedID, true
 }
@@ -251,12 +270,17 @@ func (c *Container) GetLifecycleGID() (int, bool) {
 //   - bool: True if enabled, false otherwise.
 //   - bool: True if label is set and valid, false if absent or invalid.
 func (c *Container) Enabled() (bool, bool) {
-	clog := logrus.WithField("container", c.Name())
+	clogVal := c.logger().With().
+		Str("container", c.Name()).
+		Logger()
+	clog := &clogVal
 	rawBool, ok := c.getLabelValue(enableLabel)
 
 	// Label not set, return default.
 	if !ok {
-		clog.WithField("label", enableLabel).Debug("Enable label not set")
+		clog.Debug().
+			Str("label", enableLabel).
+			Msg("Enable label not set")
 
 		return false, false
 	}
@@ -264,18 +288,19 @@ func (c *Container) Enabled() (bool, bool) {
 	// Parse enable label value.
 	parsedBool, err := strconv.ParseBool(rawBool)
 	if err != nil {
-		clog.WithError(err).WithFields(logrus.Fields{
-			"label": enableLabel,
-			"value": rawBool,
-		}).Warn("Invalid enable label value")
+		clog.Warn().
+			Err(err).
+			Str("label", enableLabel).
+			Str("value", rawBool).
+			Msg("Invalid enable label value")
 
 		return false, false
 	}
 
-	clog.WithFields(logrus.Fields{
-		"label": enableLabel,
-		"value": parsedBool,
-	}).Debug("Retrieved enable status")
+	clog.Debug().
+		Str("label", enableLabel).
+		Bool("value", parsedBool).
+		Msg("Retrieved enable status")
 
 	return parsedBool, true
 }
@@ -346,20 +371,22 @@ func (c *Container) CooldownDelay(params types.UpdateParams) time.Duration {
 
 	parsed, err := util.ParseDuration(labelVal)
 	if err != nil {
-		logrus.WithError(err).
-			WithField("container", c.Name()).
-			WithField("label", cooldownDelayLabel).
-			WithField("value", labelVal).
-			Warn("Failed to parse cooldown-delay label, using global value")
+		c.logger().Warn().
+			Err(err).
+			Str("container", c.Name()).
+			Str("label", cooldownDelayLabel).
+			Str("value", labelVal).
+			Msg("Failed to parse cooldown-delay label, using global value")
 
 		return params.CooldownDelay
 	}
 
-	logrus.WithField("container", c.Name()).
-		WithField("label", cooldownDelayLabel).
-		WithField("value", labelVal).
-		WithField("duration", parsed).
-		Debug("Parsed cooldown-delay label")
+	c.logger().Debug().
+		Str("container", c.Name()).
+		Str("label", cooldownDelayLabel).
+		Str("value", labelVal).
+		Dur("duration", parsed).
+		Msg("Parsed cooldown-delay label")
 
 	return parsed
 }
@@ -370,19 +397,24 @@ func (c *Container) CooldownDelay(params types.UpdateParams) time.Duration {
 //   - string: Scope value if set, empty otherwise.
 //   - bool: True if label is set, false if absent.
 func (c *Container) Scope() (string, bool) {
-	clog := logrus.WithField("container", c.Name())
+	clogVal := c.logger().With().
+		Str("container", c.Name()).
+		Logger()
+	clog := &clogVal
 	rawString, ok := c.getLabelValue(scope)
 
 	if !ok {
-		clog.WithField("label", scope).Debug("Scope label not set")
+		clog.Debug().
+			Str("label", scope).
+			Msg("Scope label not set")
 
 		return "", false
 	}
 
-	clog.WithFields(logrus.Fields{
-		"label": scope,
-		"value": rawString,
-	}).Debug("Retrieved scope")
+	clog.Debug().
+		Str("label", scope).
+		Str("value", rawString).
+		Msg("Retrieved scope")
 
 	return rawString, true
 }
@@ -411,10 +443,11 @@ func GetEffectiveScope(container types.Container, currentScope string) (string, 
 	}
 
 	// Extract the scope label from the container.
-	if derivedScope, ok := container.Scope(); ok && derivedScope != "" {
-		logrus.WithFields(logrus.Fields{
-			"derived_scope": derivedScope,
-		}).Debug("Derived operational scope from current container's scope label")
+	derivedScope, ok := container.Scope()
+	if ok && derivedScope != "" {
+		nopLog().Debug().
+			Str("derived_scope", derivedScope).
+			Msg("Derived operational scope from current container's scope label")
 
 		return derivedScope, nil
 	}
@@ -436,9 +469,14 @@ func (c *Container) GetContainerChain() (string, bool) {
 // Returns:
 //   - bool: True if watchtower label is "true", false otherwise.
 func (c *Container) IsWatchtower() bool {
-	clog := logrus.WithField("container", c.Name())
+	clogVal := c.logger().With().
+		Str("container", c.Name()).
+		Logger()
+	clog := &clogVal
 	isWatchtower := ContainsWatchtowerLabel(c.containerInfo.Config.Labels)
-	clog.WithField("is_watchtower", isWatchtower).Debug("Checked if container is Watchtower")
+	clog.Debug().
+		Bool("is_watchtower", isWatchtower).
+		Msg("Checked if container is Watchtower")
 
 	return isWatchtower
 }
@@ -448,15 +486,18 @@ func (c *Container) IsWatchtower() bool {
 // Returns:
 //   - string: Signal value, defaulting to "SIGTERM" if unset.
 func (c *Container) StopSignal() string {
-	clog := logrus.WithField("container", c.Name())
+	clogVal := c.logger().With().
+		Str("container", c.Name()).
+		Logger()
+	clog := &clogVal
 
 	// Check label first
 	signal := c.getLabelValueOrEmpty(signalLabel)
 	if signal != "" {
-		clog.WithFields(logrus.Fields{
-			"label":  signalLabel,
-			"signal": signal,
-		}).Debug("Retrieved stop signal from label")
+		clog.Debug().
+			Str("label", signalLabel).
+			Str("signal", signal).
+			Msg("Retrieved stop signal from label")
 
 		return signal
 	}
@@ -465,13 +506,15 @@ func (c *Container) StopSignal() string {
 	if c.containerInfo != nil && c.containerInfo.Config != nil &&
 		c.containerInfo.Config.StopSignal != "" {
 		signal = c.containerInfo.Config.StopSignal
-		clog.WithField("signal", signal).Debug("Retrieved stop signal from Config")
+		clog.Debug().
+			Str("signal", signal).
+			Msg("Retrieved stop signal from Config")
 
 		return signal
 	}
 
 	// Default to SIGTERM
-	clog.Debug("Stop signal not set, using default SIGTERM")
+	clog.Debug().Msg("Stop signal not set, using default SIGTERM")
 
 	return "SIGTERM"
 }
@@ -481,18 +524,23 @@ func (c *Container) StopSignal() string {
 // Returns:
 //   - *int: Timeout in seconds if set, nil if unset.
 func (c *Container) StopTimeout() *int {
-	clog := logrus.WithField("container", c.Name())
+	clogVal := c.logger().With().
+		Str("container", c.Name()).
+		Logger()
+	clog := &clogVal
 
 	// Check Config
 	if c.containerInfo != nil && c.containerInfo.Config != nil &&
 		c.containerInfo.Config.StopTimeout != nil {
 		timeout := *c.containerInfo.Config.StopTimeout
-		clog.WithField("timeout", timeout).Debug("Retrieved stop timeout from Config")
+		clog.Debug().
+			Int("timeout", timeout).
+			Msg("Retrieved stop timeout from Config")
 
 		return &timeout
 	}
 
-	clog.Debug("Stop timeout not set in container config")
+	clog.Debug().Msg("Stop timeout not set in container config")
 
 	return nil
 }
@@ -510,8 +558,11 @@ func ContainsWatchtowerLabel(labels map[string]string) bool {
 	}
 
 	val, ok := labels[watchtowerLabel]
-	logrus.WithFields(logrus.Fields{"label": watchtowerLabel, "val": val, "ok": ok}).
-		Debug("Checking watchtower label")
+	nopLog().Debug().
+		Str("label", watchtowerLabel).
+		Str("val", val).
+		Bool("ok", ok).
+		Msg("Checking watchtower label")
 
 	return ok && val == "true"
 }
@@ -542,22 +593,6 @@ func (c *Container) getRawLabelValue(label string) (string, bool) {
 func (c *Container) getLabelValueOrEmpty(label string) string {
 	val, ok := c.getRawLabelValue(label)
 	if !ok {
-		if logrus.IsLevelEnabled(logrus.DebugLevel) {
-			var clog *logrus.Entry
-			if c.containerInfo == nil || c.containerInfo.Config == nil {
-				clog = logrus.WithField("container", "<unknown>")
-			} else {
-				clog = logrus.WithField("container", c.Name())
-			}
-
-			if c.containerInfo == nil || c.containerInfo.Config == nil ||
-				c.containerInfo.Config.Labels == nil {
-				clog.WithField("label", label).Debug("No labels available")
-			} else {
-				clog.WithField("label", label).Debug("Label not found")
-			}
-		}
-
 		return ""
 	}
 
@@ -572,26 +607,7 @@ func (c *Container) getLabelValueOrEmpty(label string) string {
 func (c *Container) getLabelValue(label string) (string, bool) {
 	val, ok := c.getRawLabelValue(label)
 	if !ok {
-		if logrus.IsLevelEnabled(logrus.DebugLevel) {
-			clog := logrus.WithField("container", c.Name())
-
-			if c.containerInfo == nil || c.containerInfo.Config == nil ||
-				c.containerInfo.Config.Labels == nil {
-				clog.WithField("label", label).Debug("No labels available")
-			} else {
-				clog.WithField("label", label).Debug("Label not found")
-			}
-		}
-
 		return "", false
-	}
-
-	if logrus.IsLevelEnabled(logrus.DebugLevel) {
-		clog := logrus.WithField("container", c.Name())
-		clog.WithFields(logrus.Fields{
-			"label": label,
-			"value": val,
-		}).Debug("Retrieved label value")
 	}
 
 	return val, true
@@ -605,52 +621,24 @@ func (c *Container) getLabelValue(label string) (string, bool) {
 func (c *Container) getBoolLabelValue(label string) (bool, error) {
 	strVal, ok := c.getRawLabelValue(label)
 	if !ok {
-		if logrus.IsLevelEnabled(logrus.DebugLevel) {
-			clog := logrus.WithField("container", c.Name())
-
-			if c.containerInfo == nil || c.containerInfo.Config == nil ||
-				c.containerInfo.Config.Labels == nil {
-				clog.WithField("label", label).Debug("No labels available")
-			} else {
-				clog.WithField("label", label).Debug("Label not found")
-			}
-		}
-
 		return false, errLabelNotFound
 	}
 
 	// Treat empty string as false to handle cases where label is explicitly set to empty
 	if strVal == "" {
-		if logrus.IsLevelEnabled(logrus.DebugLevel) {
-			clog := logrus.WithField("container", c.Name())
-			clog.WithFields(logrus.Fields{
-				"label": label,
-				"value": strVal,
-			}).Debug("Treating empty string as false for boolean label")
-		}
-
 		return false, nil
 	}
 
 	value, err := strconv.ParseBool(strVal)
 	if err != nil {
-		if logrus.IsLevelEnabled(logrus.DebugLevel) {
-			clog := logrus.WithField("container", c.Name())
-			clog.WithError(err).WithFields(logrus.Fields{
-				"label": label,
-				"value": strVal,
-			}).Warn("Failed to parse boolean label value")
-		}
+		c.logger().Warn().
+			Err(err).
+			Str("container", c.Name()).
+			Str("label", label).
+			Str("value", strVal).
+			Msg("Failed to parse boolean label value")
 
 		return false, fmt.Errorf("%w: %s=%q", err, label, strVal)
-	}
-
-	if logrus.IsLevelEnabled(logrus.DebugLevel) {
-		clog := logrus.WithField("container", c.Name())
-		clog.WithFields(logrus.Fields{
-			"label": label,
-			"value": value,
-		}).Debug("Parsed boolean label value")
 	}
 
 	return value, nil
@@ -672,44 +660,48 @@ func (c *Container) getContainerOrGlobalBool(
 	label string,
 	contPrecedence bool,
 ) bool {
-	clog := logrus.WithField("container", c.Name())
+	clogVal := c.logger().With().
+		Str("container", c.Name()).
+		Logger()
+	clog := &clogVal
 
 	// Fetch container-specific value.
 	contVal, err := c.getBoolLabelValue(label)
 	if err != nil {
 		if !errors.Is(err, errLabelNotFound) {
-			clog.WithError(err).
-				WithField("label", label).
-				Warn("Failed to parse label value")
+			clog.Warn().
+				Err(err).
+				Str("label", label).
+				Msg("Failed to parse label value")
 		}
 
-		clog.WithFields(logrus.Fields{
-			"label":      label,
-			"global_val": globalVal,
-		}).Debug("Using global value due to label absence or error")
+		clog.Debug().
+			Str("label", label).
+			Bool("global_val", globalVal).
+			Msg("Using global value due to label absence or error")
 
 		return globalVal
 	}
 
 	// Apply container precedence if set.
 	if contPrecedence {
-		clog.WithFields(logrus.Fields{
-			"label":      label,
-			"cont_val":   contVal,
-			"precedence": "container",
-		}).Debug("Using container label value with precedence")
+		clog.Debug().
+			Str("label", label).
+			Bool("cont_val", contVal).
+			Str("precedence", "container").
+			Msg("Using container label value with precedence")
 
 		return contVal
 	}
 
 	// Combine values if no precedence.
 	result := contVal || globalVal
-	clog.WithFields(logrus.Fields{
-		"label":      label,
-		"cont_val":   contVal,
-		"global_val": globalVal,
-		"result":     result,
-	}).Debug("Combined container and global values")
+	clog.Debug().
+		Str("label", label).
+		Bool("cont_val", contVal).
+		Bool("global_val", globalVal).
+		Bool("result", result).
+		Msg("Combined container and global values")
 
 	return result
 }

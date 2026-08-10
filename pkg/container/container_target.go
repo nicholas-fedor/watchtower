@@ -6,7 +6,7 @@ import (
 	"time"
 
 	"github.com/moby/moby/client/pkg/versions"
-	"github.com/sirupsen/logrus"
+	"github.com/rs/zerolog"
 
 	dockerContainer "github.com/moby/moby/api/types/container"
 	dockerNetwork "github.com/moby/moby/api/types/network"
@@ -43,7 +43,7 @@ const (
 // Returns:
 //   - types.ContainerID: ID of the new container.
 //   - error: Non-nil if creation or start fails, nil on success.
-func StartTargetContainer(
+func StartTargetContainer(log *zerolog.Logger,
 	ctx context.Context,
 	api Operations,
 	sourceContainer types.Container,
@@ -55,7 +55,7 @@ func StartTargetContainer(
 	cpuCopyMode string,
 	isPodman bool,
 ) (types.ContainerID, error) {
-	createdContainerID, err := CreateTargetContainer(
+	createdContainerID, err := CreateTargetContainer(log,
 		ctx,
 		api,
 		sourceContainer,
@@ -70,22 +70,25 @@ func StartTargetContainer(
 		return "", err
 	}
 
-	clog := logrus.WithFields(logrus.Fields{
-		"container": sourceContainer.Name(),
-		"id":        sourceContainer.ID().ShortID(),
-	})
+	clogVal := log.With().
+		Str("container", sourceContainer.Name()).
+		Str("id", sourceContainer.ID().ShortID()).
+		Logger()
+	clog := &clogVal
 
 	// Skip starting if source isn't running and revive isn't enabled.
 	if !sourceContainer.IsRunning() && !reviveStopped {
-		clog.WithField("new_id", createdContainerID).
-			Debug("Created container, not starting due to stopped state")
+		clog.Debug().
+			Str("new_id", string(createdContainerID)).
+			Msg("Created container, not starting due to stopped state")
 
 		return createdContainerID, nil
 	}
 
 	// Start the newly created container.
-	clog.WithField("new_id", createdContainerID).
-		Debug("Starting new container")
+	clog.Debug().
+		Str("new_id", string(createdContainerID)).
+		Msg("Starting new container")
 
 	_, err = api.ContainerStart(
 		ctx,
@@ -93,9 +96,10 @@ func StartTargetContainer(
 		dockerClient.ContainerStartOptions{},
 	)
 	if err != nil {
-		clog.WithError(err).
-			WithField("new_id", createdContainerID).
-			Debug("Failed to start new container")
+		clog.Debug().
+			Err(err).
+			Str("new_id", string(createdContainerID)).
+			Msg("Failed to start new container")
 
 		// Start failures from cancellation or transport errors can leave the
 		// container state ambiguous. Inspect first and force-remove only when
@@ -112,7 +116,9 @@ func StartTargetContainer(
 		message = "Started linked container"
 	}
 
-	clog.WithField("new_id", createdContainerID.ShortID()).Info(message)
+	clog.Info().
+		Str("new_id", createdContainerID.ShortID()).
+		Msg(message)
 
 	return createdContainerID, nil
 }
@@ -122,14 +128,14 @@ func StartTargetContainer(
 // failures can leave state ambiguous. A late-started container is left alone.
 //
 // Parameters:
-//   - parentCtx: Parent context; deadlines are detached so cleanup can finish.
+//   - parentCtx: Parent context. Deadlines are detached so cleanup can finish.
 //   - api: Interface for container operations.
 //   - clog: Logger with container context fields.
 //   - containerID: ID of the container created before the start failure.
 func cleanupFailedStartContainer(
 	parentCtx context.Context,
 	api Operations,
-	clog *logrus.Entry,
+	clog *zerolog.Logger,
 	containerID types.ContainerID,
 ) {
 	cleanupCtx, cancel := context.WithTimeout(
@@ -144,17 +150,19 @@ func cleanupFailedStartContainer(
 		dockerClient.ContainerInspectOptions{},
 	)
 	if inspectErr != nil {
-		clog.WithError(inspectErr).
-			WithField("new_id", containerID).
-			Debug("Failed to inspect container after start error")
+		clog.Debug().
+			Err(inspectErr).
+			Str("new_id", string(containerID)).
+			Msg("Failed to inspect container after start error")
 
 		return
 	}
 
 	state := inspectResult.Container.State
 	if state != nil && state.Running {
-		clog.WithField("new_id", containerID).
-			Debug("Skipped cleanup of running container after start error")
+		clog.Debug().
+			Str("new_id", string(containerID)).
+			Msg("Skipped cleanup of running container after start error")
 
 		return
 	}
@@ -165,9 +173,10 @@ func cleanupFailedStartContainer(
 		dockerClient.ContainerRemoveOptions{Force: true},
 	)
 	if rmErr != nil {
-		clog.WithError(rmErr).
-			WithField("new_id", containerID).
-			Debug("Failed to clean up container after start error")
+		clog.Debug().
+			Err(rmErr).
+			Str("new_id", string(containerID)).
+			Msg("Failed to clean up container after start error")
 	}
 }
 
@@ -189,7 +198,7 @@ func cleanupFailedStartContainer(
 // Returns:
 //   - types.ContainerID: ID of the new container.
 //   - error: Non-nil if creation fails, nil on success.
-func CreateTargetContainer(
+func CreateTargetContainer(log *zerolog.Logger,
 	ctx context.Context,
 	api Operations,
 	sourceContainer types.Container,
@@ -200,10 +209,11 @@ func CreateTargetContainer(
 	cpuCopyMode string,
 	isPodman bool,
 ) (types.ContainerID, error) {
-	clog := logrus.WithFields(logrus.Fields{
-		"container": sourceContainer.Name(),
-		"id":        sourceContainer.ID().ShortID(),
-	})
+	clogVal := log.With().
+		Str("container", sourceContainer.Name()).
+		Str("id", sourceContainer.ID().ShortID()).
+		Logger()
+	clog := &clogVal
 
 	// Extract configuration from the source container.
 	config := sourceContainer.GetCreateConfig()
@@ -213,7 +223,7 @@ func CreateTargetContainer(
 	if disableMemorySwappiness {
 		hostConfig.MemorySwappiness = nil
 
-		clog.Debug("Disabled memory swappiness for Podman compatibility")
+		clog.Debug().Msg("Disabled memory swappiness for Podman compatibility")
 	}
 
 	// Handle CPU settings based on copy mode.
@@ -221,11 +231,13 @@ func CreateTargetContainer(
 
 	// Log network details for debugging, including MAC address validation.
 	isHostNetwork := false
-	if info := sourceContainer.ContainerInfo(); info != nil && info.HostConfig != nil {
+
+	info := sourceContainer.ContainerInfo()
+	if info != nil && info.HostConfig != nil {
 		isHostNetwork = info.HostConfig.NetworkMode.IsHost()
 	}
 
-	debugLogMacAddress(
+	debugLogMacAddress(log,
 		networkConfig,
 		sourceContainer.ID(),
 		clientVersion,
@@ -246,17 +258,18 @@ func CreateTargetContainer(
 			firstNetworkName = name
 			createNetworkConfig.EndpointsConfig[name] = endpoint
 
-			clog.WithField("network", firstNetworkName).
-				Debug("Selected first network for container creation")
+			clog.Debug().
+				Str("network", firstNetworkName).
+				Msg("Selected first network for container creation")
 
 			break // Use only the first network initially.
 		}
 	} else {
-		clog.Debug("Using full network config for API version >= 1.44 or single network")
+		clog.Debug().Msg("Using full network config for API version >= 1.44 or single network")
 	}
 
 	// Create container with the selected network config.
-	clog.Debug("Creating new container")
+	clog.Debug().Msg("Creating new container")
 
 	createdContainer, err := api.ContainerCreate(
 		ctx,
@@ -268,17 +281,20 @@ func CreateTargetContainer(
 		},
 	)
 	if err != nil {
-		clog.WithError(err).Debug("Failed to create new container")
+		clog.Debug().
+			Err(err).
+			Msg("Failed to create new container")
 
 		return "", fmt.Errorf("%w: %w", errCreateContainerFailed, err)
 	}
 
 	createdContainerID := types.ContainerID(createdContainer.ID)
-	clog.WithField("new_id", createdContainerID).
-		Debug("Created container successfully")
+	clog.Debug().
+		Str("new_id", string(createdContainerID)).
+		Msg("Created container successfully")
 
 	// Rename the container to the correct name to avoid conflicts during self-update
-	clog.Debug("Renaming container to correct name")
+	clog.Debug().Msg("Renaming container to correct name")
 
 	_, err = api.ContainerRename(
 		ctx,
@@ -288,7 +304,9 @@ func CreateTargetContainer(
 		},
 	)
 	if err != nil {
-		clog.WithError(err).Debug("Failed to rename container")
+		clog.Debug().
+			Err(err).
+			Msg("Failed to rename container")
 
 		// Clean up the created container to avoid orphaned resources
 		cleanupCtx, cancel := context.WithTimeout(
@@ -303,7 +321,9 @@ func CreateTargetContainer(
 			dockerClient.ContainerRemoveOptions{Force: true},
 		)
 		if rmErr != nil {
-			clog.WithError(rmErr).Warn("Failed to clean up container after rename error")
+			clog.Warn().
+				Err(rmErr).
+				Msg("Failed to clean up container after rename error")
 		}
 
 		return "", fmt.Errorf("%w: %w", errRenameContainerFailed, err)
@@ -333,8 +353,9 @@ func CreateTargetContainer(
 				dockerClient.ContainerRemoveOptions{Force: true},
 			)
 			if rmErr != nil {
-				clog.WithError(rmErr).
-					Warn("Failed to clean up container after network attachment error")
+				clog.Warn().
+					Err(rmErr).
+					Msg("Failed to clean up container after network attachment error")
 			}
 
 			return "", err
@@ -365,7 +386,7 @@ func attachNetworks(
 	containerID string,
 	networkConfig *dockerNetwork.NetworkingConfig,
 	initialNetworkConfig *dockerNetwork.NetworkingConfig,
-	clog *logrus.Entry,
+	clog *zerolog.Logger,
 ) error {
 	// Identify the initial network used during creation to skip it.
 	var initialNetworkName string
@@ -378,7 +399,9 @@ func attachNetworks(
 	// Attach each additional network sequentially.
 	for name, endpoint := range networkConfig.EndpointsConfig {
 		if name != initialNetworkName && name != "" {
-			clog.WithField("network", name).Debug("Attaching additional network to container")
+			clog.Debug().
+				Str("network", name).
+				Msg("Attaching additional network to container")
 
 			_, err := api.NetworkConnect(
 				ctx,
@@ -389,14 +412,17 @@ func attachNetworks(
 				},
 			)
 			if err != nil {
-				clog.WithError(err).
-					WithField("network", name).
-					Error("Failed to attach additional network")
+				clog.Error().
+					Err(err).
+					Str("network", name).
+					Msg("Failed to attach additional network")
 
 				return fmt.Errorf("failed to attach network %s: %w", name, err)
 			}
 
-			clog.WithField("network", name).Debug("Successfully attached additional network")
+			clog.Debug().
+				Str("network", name).
+				Msg("Successfully attached additional network")
 		}
 	}
 
@@ -413,20 +439,21 @@ func attachNetworks(
 //
 // Returns:
 //   - error: Non-nil if rename fails, nil on success.
-func RenameTargetContainer(
+func RenameTargetContainer(log *zerolog.Logger,
 	ctx context.Context,
 	api Operations,
 	targetContainer types.Container,
 	targetName string,
 ) error {
-	clog := logrus.WithFields(logrus.Fields{
-		"container":   targetContainer.Name(),
-		"id":          targetContainer.ID().ShortID(),
-		"target_name": targetName,
-	})
+	clogVal := log.With().
+		Str("container", targetContainer.Name()).
+		Str("id", targetContainer.ID().ShortID()).
+		Str("target_name", targetName).
+		Logger()
+	clog := &clogVal
 
 	// Attempt to rename the container.
-	clog.Debug("Renaming container")
+	clog.Debug().Msg("Renaming container")
 
 	_, err := api.ContainerRename(
 		ctx,
@@ -436,12 +463,14 @@ func RenameTargetContainer(
 		},
 	)
 	if err != nil {
-		clog.WithError(err).Debug("Failed to rename container")
+		clog.Debug().
+			Err(err).
+			Msg("Failed to rename container")
 
 		return fmt.Errorf("%w: %w", errRenameContainerFailed, err)
 	}
 
-	clog.Debug("Renamed container successfully")
+	clog.Debug().Msg("Renamed container successfully")
 
 	return nil
 }
@@ -454,7 +483,7 @@ func handleCPUSettings(
 	hostConfig *dockerContainer.HostConfig,
 	cpuCopyMode string,
 	isPodman bool,
-	clog *logrus.Entry,
+	clog *zerolog.Logger,
 ) {
 	switch cpuCopyMode {
 	case "none":
@@ -466,21 +495,22 @@ func handleCPUSettings(
 		hostConfig.CpusetCpus = ""
 		hostConfig.CpusetMems = ""
 
-		clog.Debug("Stripped all CPU settings")
+		clog.Debug().Msg("Stripped all CPU settings")
 	case "full":
 		// Copy all CPU settings unchanged (default behavior)
-		clog.Debug("Copied all CPU settings unchanged")
+		clog.Debug().Msg("Copied all CPU settings unchanged")
 	case "auto":
 		// Use isPodman flag to filter NanoCpus if Podman
 		if isPodman {
 			hostConfig.NanoCPUs = 0
 
-			clog.Debug("Detected Podman, filtered NanoCPUs for compatibility")
+			clog.Debug().Msg("Detected Podman, filtered NanoCPUs for compatibility")
 		} else {
-			clog.Debug("Detected Docker, copied all CPU settings")
+			clog.Debug().Msg("Detected Docker, copied all CPU settings")
 		}
 	default:
-		clog.WithField("mode", cpuCopyMode).
-			Debug("Unknown CPU copy mode, defaulting to full")
+		clog.Debug().
+			Str("mode", cpuCopyMode).
+			Msg("Unknown CPU copy mode, defaulting to full")
 	}
 }

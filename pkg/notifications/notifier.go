@@ -7,11 +7,12 @@ import (
 	"strings"
 	"time"
 
-	"github.com/sirupsen/logrus"
+	"github.com/rs/zerolog"
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
 
 	notifyConfig "github.com/nicholas-fedor/watchtower/internal/config/notify"
+	"github.com/nicholas-fedor/watchtower/internal/logging"
 	"github.com/nicholas-fedor/watchtower/pkg/types"
 )
 
@@ -32,64 +33,80 @@ var errUnknownNotificationType = errors.New("unknown notification type")
 // template data, appends legacy Shoutrrr URLs when configured, and creates the client.
 //
 // Parameters:
+//   - log: Process logger for configuration-time diagnostics (required and non-nil).
 //   - cfg: Notification settings from config.Load (Config.Notify).
 //
 // Returns:
 //   - types.Notifier: Configured notifier instance.
-func NewNotifier(cfg notifyConfig.Notify) types.Notifier {
-	// Parse log level from resolved configuration.
-	clog := logrus.WithField("level", cfg.Level)
-	clog.Debug("Parsing notifications log level")
-
-	logLevel, err := logrus.ParseLevel(cfg.Level)
-	if err != nil {
-		clog.WithError(err).Fatal("Invalid notifications log level")
+func NewNotifier(log *zerolog.Logger, cfg notifyConfig.Notify) types.Notifier {
+	if log == nil {
+		panic("notifications.NewNotifier: log is required")
 	}
 
-	// Prefer template file contents when set; otherwise use the inline template string.
+	// Parse the notification log level from resolved configuration.
+	// Avoid the field name level. Zerolog reserves it for event severity.
+	clog := log.With().Str("notifications_level", cfg.Level).Logger()
+	clog.Debug().Msg("Parsing notifications log level")
+
+	logLevel, err := logging.ParseLevel(cfg.Level)
+	if err != nil {
+		clog.Fatal().Err(err).Msg("Invalid notifications log level")
+	}
+
+	// Prefer template file contents when set. Otherwise use the inline template string.
 	tplString := cfg.Template
 
 	if cfg.TemplateFile != "" {
 		content, readErr := os.ReadFile(cfg.TemplateFile)
 		if readErr != nil {
-			clog.WithError(readErr).
-				WithField("file", cfg.TemplateFile).
-				Fatal("Failed to read notification template file")
+			clog.Fatal().
+				Err(readErr).
+				Str("file", cfg.TemplateFile).
+				Msg("Failed to read notification template file")
 		}
 
 		tplString = string(content)
 
-		clog.WithField("file", cfg.TemplateFile).
-			Debug("Loaded notification template from file")
+		clog.Debug().
+			Str("file", cfg.TemplateFile).
+			Msg("Loaded notification template from file")
 	}
 
-	data := templateData(cfg.Hostname, cfg.TitleTag, cfg.EmailSubjectTag, cfg.SkipTitle)
+	data := templateData(log, cfg.Hostname, cfg.TitleTag, cfg.EmailSubjectTag, cfg.SkipTitle)
 
 	// Start from configured Shoutrrr URLs, then append any legacy type URLs.
 	urls := append([]string(nil), cfg.URLs...)
-	urls, legacyDelay := appendLegacyURLs(urls, cfg.LegacyTypes, cfg.Legacy)
-	delay := GetDelay(cfg.DelaySeconds, legacyDelay)
+	urls, legacyDelay := appendLegacyURLs(log, urls, cfg.LegacyTypes, cfg.Legacy)
+	delay := GetDelay(log, cfg.DelaySeconds, legacyDelay)
 
 	// Use report template when enabled, otherwise use legacy template.
 	legacyTemplate := !cfg.Report
 
-	clog.WithFields(logrus.Fields{
-		"url_count":   len(urls),
-		"template":    tplString,
-		"skip_report": !cfg.Report,
-		"stdout":      cfg.LogStdout,
-		"delay":       delay,
-		"hostname":    data.Host,
-		"title":       data.Title,
-		"legacy":      legacyTemplate,
-	}).Debug("Creating notifier with configuration")
+	templateSource := "inline"
+	if cfg.TemplateFile != "" {
+		templateSource = cfg.TemplateFile
+	}
 
-	if logrus.IsLevelEnabled(logrus.TraceLevel) {
-		clog.WithField("urls", redactServiceURLs(urls)).
-			Trace("Notifier Shoutrrr URLs loaded")
+	clog.Debug().
+		Int("url_count", len(urls)).
+		Str("template_source", templateSource).
+		Int("template_bytes", len(tplString)).
+		Bool("skip_report", !cfg.Report).
+		Bool("stdout", cfg.LogStdout).
+		Dur("delay", delay).
+		Str("hostname", data.Host).
+		Str("title", data.Title).
+		Bool("legacy", legacyTemplate).
+		Msg("Creating notifier with configuration")
+
+	if clog.GetLevel() <= zerolog.TraceLevel {
+		clog.Trace().
+			Strs("urls", redactServiceURLs(urls)).
+			Msg("Notifier Shoutrrr URLs loaded")
 	}
 
 	return createNotifier(
+		log,
 		urls,
 		logLevel,
 		tplString,
@@ -106,12 +123,13 @@ func NewNotifier(cfg notifyConfig.Notify) types.Notifier {
 // tests that configure notifications via flags only.
 //
 // Parameters:
+//   - log: Process logger for configuration-time diagnostics.
 //   - c: Cobra command with flags.
 //
 // Returns:
 //   - types.Notifier: Configured notification client.
-func NewNotifierFromFlags(c *cobra.Command) types.Notifier {
-	return NewNotifier(notifyFromFlags(c))
+func NewNotifierFromFlags(log *zerolog.Logger, c *cobra.Command) types.Notifier {
+	return NewNotifier(log, notifyFromFlags(c))
 }
 
 // BuildURLs builds Shoutrrr notification URLs from resolved notification settings
@@ -121,6 +139,7 @@ func NewNotifierFromFlags(c *cobra.Command) types.Notifier {
 // notification types. Errors are returned instead of causing a fatal exit.
 //
 // Parameters:
+//   - log: Logger for legacy notifier construction diagnostics.
 //   - cfg: Notification settings from config.Load (Config.Notify).
 //
 // Returns:
@@ -131,7 +150,12 @@ func NewNotifierFromFlags(c *cobra.Command) types.Notifier {
 // TODO: Remove BuildURLs after the v2 release.
 //
 //nolint:godox
-func BuildURLs(cfg notifyConfig.Notify) ([]string, error) {
+func BuildURLs(log *zerolog.Logger, cfg notifyConfig.Notify) ([]string, error) {
+	if log == nil {
+		nop := zerolog.Nop()
+		log = &nop
+	}
+
 	urls := append([]string(nil), cfg.URLs...)
 
 	for _, notificationType := range cfg.LegacyTypes {
@@ -144,7 +168,7 @@ func BuildURLs(cfg notifyConfig.Notify) ([]string, error) {
 			return nil, fmt.Errorf("%w: %q", errUnknownNotificationType, notificationType)
 		}
 
-		legacyNotifier := ctor(cfg.Legacy)
+		legacyNotifier := ctor(log, cfg.Legacy)
 
 		shoutrrrURL, err := legacyNotifier.GetURL(nil)
 		if err != nil {
@@ -251,6 +275,7 @@ func legacyFromFlags(flag *pflag.FlagSet) notifyConfig.Legacy {
 // templateData builds static notification title/host data from resolved values.
 //
 // Parameters:
+//   - log: Logger for diagnostics.
 //   - hostname: Hostname from configuration, or empty to use the system hostname.
 //   - titleTag: Optional title prefix tag.
 //   - emailSubjectTag: Deprecated fallback tag when titleTag is empty.
@@ -258,14 +283,14 @@ func legacyFromFlags(flag *pflag.FlagSet) notifyConfig.Legacy {
 //
 // Returns:
 //   - StaticData: Host and title for notification templates.
-func templateData(hostname, titleTag, emailSubjectTag string, skipTitle bool) StaticData {
-	clog := logrus.WithField("hostname_flag", hostname)
-	clog.Debug("Retrieving template data")
+func templateData(log *zerolog.Logger, hostname, titleTag, emailSubjectTag string, skipTitle bool) StaticData {
+	clog := log.With().Str("hostname_flag", hostname).Logger()
+	clog.Debug().Msg("Retrieving template data")
 
 	// Get hostname from configuration or system.
 	if hostname == "" {
 		hostname, _ = os.Hostname()
-		clog.WithField("hostname", hostname).Debug("Using system hostname")
+		clog.Debug().Str("hostname", hostname).Msg("Using system hostname")
 	}
 
 	title := ""
@@ -275,18 +300,19 @@ func templateData(hostname, titleTag, emailSubjectTag string, skipTitle bool) St
 		if tag == "" {
 			tag = emailSubjectTag
 			if tag != "" {
-				clog.WithField("tag", tag).
-					Warn("Using deprecated email subject tag flag. Use the notification-title-tag configuration option instead.")
+				clog.Warn().
+					Str("tag", tag).
+					Msg("Using deprecated email subject tag flag. Use the notification-title-tag configuration option instead.")
 			}
 		}
 
-		title = GetTitle(hostname, tag)
+		title = GetTitle(log, hostname, tag)
 	}
 
-	clog.WithFields(logrus.Fields{
-		"hostname": hostname,
-		"title":    title,
-	}).Debug("Populated template data")
+	clog.Debug().
+		Str("hostname", hostname).
+		Str("title", title).
+		Msg("Populated template data")
 
 	return StaticData{
 		Host:  hostname,
@@ -297,7 +323,7 @@ func templateData(hostname, titleTag, emailSubjectTag string, skipTitle bool) St
 // legacyNotifierCtor builds a ConvertibleNotifier from resolved legacy settings.
 //
 //nolint:staticcheck // SA1019: legacy ConvertibleNotifier until v2.
-type legacyNotifierCtor func(notifyConfig.Legacy) types.ConvertibleNotifier
+type legacyNotifierCtor func(log *zerolog.Logger, legacy notifyConfig.Legacy) types.ConvertibleNotifier
 
 // legacyNotifierCtors maps legacy notification type names to constructors.
 // shoutrrr is omitted so those entries are skipped during append.
@@ -311,6 +337,7 @@ var legacyNotifierCtors = map[string]legacyNotifierCtor{
 // appendLegacyURLs adds shoutrrr URLs from legacy notification type names.
 //
 // Parameters:
+//   - log: Logger for diagnostics and fatal errors.
 //   - urls: Initial URL list.
 //   - notificationTypes: Legacy type names (email, slack, msteams, gotify).
 //   - legacy: Per-type settings for deprecated notifiers.
@@ -326,15 +353,17 @@ var legacyNotifierCtors = map[string]legacyNotifierCtor{
 //
 //nolint:godox
 func appendLegacyURLs(
+	log *zerolog.Logger,
 	urls []string,
 	notificationTypes []string,
 	legacy notifyConfig.Legacy,
 ) ([]string, time.Duration) {
-	clog := logrus.WithField("function", "appendLegacyURLs")
-	clog.Debug("Appending legacy notification URLs")
+	clog := log.With().Str("function", "appendLegacyURLs").Logger()
+	clog.Debug().Msg("Appending legacy notification URLs")
 
-	clog.WithField("types", notificationTypes).
-		Debug("Processing legacy notification types")
+	clog.Debug().
+		Strs("types", notificationTypes).
+		Msg("Processing legacy notification types")
 
 	legacyDelay := time.Duration(0)
 
@@ -345,43 +374,46 @@ func appendLegacyURLs(
 
 		ctor, ok := legacyNotifierCtors[notificationType]
 		if !ok {
-			clog.WithField("type", notificationType).
-				Fatal("Unknown notification type")
+			clog.Fatal().
+				Str("type", notificationType).
+				Msg("Unknown notification type")
 
 			continue
 		}
 
-		legacyNotifier := ctor(legacy)
+		legacyNotifier := ctor(log, legacy)
 
 		// Generate shoutrrr URL from legacy notifier.
 		shoutrrrURL, err := legacyNotifier.GetURL(nil)
 		if err != nil {
-			clog.WithError(err).
-				WithField("type", notificationType).
-				Fatal("Failed to create notification config")
+			clog.Fatal().
+				Err(err).
+				Str("type", notificationType).
+				Msg("Failed to create notification config")
 		}
 
 		urls = append(urls, shoutrrrURL)
 
 		// Check for delay if supported.
-		if delayNotifier, ok := legacyNotifier.(types.DelayNotifier); ok {
+		delayNotifier, ok := legacyNotifier.(types.DelayNotifier)
+		if ok {
 			legacyDelay = delayNotifier.GetDelay()
-			clog.WithFields(logrus.Fields{
-				"type":  notificationType,
-				"delay": legacyDelay,
-			}).Debug("Retrieved delay from legacy notifier")
+			clog.Debug().
+				Str("type", notificationType).
+				Dur("delay", legacyDelay).
+				Msg("Retrieved delay from legacy notifier")
 		}
 
-		clog.WithFields(logrus.Fields{
-			"type": notificationType,
-			"url":  redactServiceURL(shoutrrrURL),
-		}).Trace("Created Shoutrrr URL from legacy notifier")
+		clog.Trace().
+			Str("type", notificationType).
+			Str("url", redactServiceURL(shoutrrrURL)).
+			Msg("Created Shoutrrr URL from legacy notifier")
 	}
 
-	clog.WithFields(logrus.Fields{
-		"url_count": len(urls),
-		"delay":     legacyDelay,
-	}).Debug("Completed legacy URL appending")
+	clog.Debug().
+		Int("url_count", len(urls)).
+		Dur("delay", legacyDelay).
+		Msg("Completed legacy URL appending")
 
 	return urls, legacyDelay
 }
@@ -389,6 +421,7 @@ func appendLegacyURLs(
 // AppendLegacyUrls adds shoutrrr URLs from legacy notification flags.
 //
 // Parameters:
+//   - log: Logger for diagnostics.
 //   - urls: Initial URL list.
 //   - cmd: Cobra command with flags.
 //
@@ -402,17 +435,18 @@ func appendLegacyURLs(
 // TODO: Remove AppendLegacyUrls for the v2 release.
 //
 //nolint:godox
-func AppendLegacyUrls(urls []string, cmd *cobra.Command) ([]string, time.Duration) {
+func AppendLegacyUrls(log *zerolog.Logger, urls []string, cmd *cobra.Command) ([]string, time.Duration) {
 	cfg := notifyFromFlags(cmd)
 
-	urls, legacyDelay := appendLegacyURLs(urls, cfg.LegacyTypes, cfg.Legacy)
+	urls, legacyDelay := appendLegacyURLs(log, urls, cfg.LegacyTypes, cfg.Legacy)
 
-	return urls, GetDelay(cfg.DelaySeconds, legacyDelay)
+	return urls, GetDelay(log, cfg.DelaySeconds, legacyDelay)
 }
 
 // GetDelay selects the notification delay from a legacy value or configured seconds.
 //
 // Parameters:
+//   - log: Logger for diagnostics.
 //   - delaySeconds: Configured delay in seconds (from Config.Notify.DelaySeconds).
 //   - legacyDelay: Delay from a legacy notifier type, preferred when non-zero.
 //
@@ -424,13 +458,13 @@ func AppendLegacyUrls(urls []string, cmd *cobra.Command) ([]string, time.Duratio
 // TODO: Simplify GetDelay to only use configured delay seconds when legacy types are removed.
 //
 //nolint:godox
-func GetDelay(delaySeconds int, legacyDelay time.Duration) time.Duration {
-	clog := logrus.WithField("legacy_delay", legacyDelay)
-	clog.Debug("Determining notification delay")
+func GetDelay(log *zerolog.Logger, delaySeconds int, legacyDelay time.Duration) time.Duration {
+	clog := log.With().Dur("legacy_delay", legacyDelay).Logger()
+	clog.Debug().Msg("Determining notification delay")
 
 	// Use legacy delay if set.
 	if legacyDelay > 0 {
-		clog.Debug("Using legacy delay")
+		clog.Debug().Msg("Using legacy delay")
 
 		return legacyDelay
 	}
@@ -438,13 +472,14 @@ func GetDelay(delaySeconds int, legacyDelay time.Duration) time.Duration {
 	// Use configured delay when no legacy delay applies.
 	if delaySeconds > 0 {
 		delayDuration := time.Duration(delaySeconds) * time.Second
-		clog.WithField("delay", delayDuration).
-			Debug("Using configured delay")
+		clog.Debug().
+			Dur("delay", delayDuration).
+			Msg("Using configured delay")
 
 		return delayDuration
 	}
 
-	clog.Debug("No delay configured, using zero")
+	clog.Debug().Msg("No delay configured, using zero")
 
 	return 0
 }
@@ -452,17 +487,18 @@ func GetDelay(delaySeconds int, legacyDelay time.Duration) time.Duration {
 // GetTitle formats the notification title with hostname and tag.
 //
 // Parameters:
+//   - log: Logger for diagnostics.
 //   - hostname: Hostname to include.
 //   - tag: Optional tag prefix.
 //
 // Returns:
 //   - string: Formatted title.
-func GetTitle(hostname, tag string) string {
-	clog := logrus.WithFields(logrus.Fields{
-		"hostname": hostname,
-		"tag":      tag,
-	})
-	clog.Debug("Generating notification title")
+func GetTitle(log *zerolog.Logger, hostname, tag string) string {
+	clog := log.With().
+		Str("hostname", hostname).
+		Str("tag", tag).
+		Logger()
+	clog.Debug().Msg("Generating notification title")
 
 	// Build title with optional tag and hostname.
 	b := strings.Builder{}
@@ -481,8 +517,9 @@ func GetTitle(hostname, tag string) string {
 	}
 
 	title := b.String()
-	clog.WithField("title", title).
-		Debug("Generated notification title")
+	clog.Debug().
+		Str("title", title).
+		Msg("Generated notification title")
 
 	return title
 }
@@ -493,16 +530,17 @@ func GetTitle(hostname, tag string) string {
 // and deprecated call paths that still configure notifications via flags.
 //
 // Parameters:
+//   - log: Logger for diagnostics.
 //   - c: Cobra command with flags.
 //
 // Returns:
-//   - StaticData: Populated data (hostname from flag or system; title unless skip-title).
+//   - StaticData: Populated data (hostname from flag or system, title unless skip-title).
 //
 // Deprecated: Prefer NewNotifier with Config.Notify from config.Load.
-func GetTemplateData(c *cobra.Command) StaticData {
+func GetTemplateData(log *zerolog.Logger, c *cobra.Command) StaticData {
 	cfg := notifyFromFlags(c)
 
-	return templateData(cfg.Hostname, cfg.TitleTag, cfg.EmailSubjectTag, cfg.SkipTitle)
+	return templateData(log, cfg.Hostname, cfg.TitleTag, cfg.EmailSubjectTag, cfg.SkipTitle)
 }
 
 // LogLegacyDeprecationWarnings logs deprecation warnings for legacy notification types.
@@ -511,16 +549,17 @@ func GetTemplateData(c *cobra.Command) StaticData {
 // legacy type, advising users to migrate to the notification-url configuration option.
 //
 // Parameters:
+//   - log: Logger for warnings.
 //   - notificationTypes: List of notification type strings to check.
-func LogLegacyDeprecationWarnings(notificationTypes []string) {
+func LogLegacyDeprecationWarnings(log *zerolog.Logger, notificationTypes []string) {
 	for _, notificationType := range notificationTypes {
 		switch notificationType {
 		case emailType, slackType, msTeamsType, gotifyType:
-			logrus.Warnf(
-				"Using deprecated legacy %s notification configuration. "+
+			log.Warn().
+				Str("type", notificationType).
+				Msgf("Using deprecated legacy %s notification configuration. "+
 					"Use the notification-url configuration option instead.",
-				notificationType,
-			)
+					notificationType)
 		}
 	}
 }

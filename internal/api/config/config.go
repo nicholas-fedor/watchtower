@@ -10,6 +10,7 @@ import (
 
 	"github.com/gofiber/fiber/v3"
 	"github.com/gofiber/fiber/v3/middleware/timeout"
+	"github.com/rs/zerolog"
 
 	"github.com/nicholas-fedor/watchtower/internal/api/handlers/events"
 	"github.com/nicholas-fedor/watchtower/internal/logging"
@@ -35,6 +36,8 @@ var (
 	ErrMissingEventBroadcaster = errors.New("EventBroadcaster must be provided when events API is enabled")
 	// ErrMissingTLSConfig indicates only one of TLS cert/key was provided.
 	ErrMissingTLSConfig = errors.New("TLS requires both TLS Cert Path and TLS Key Path to be set")
+	// ErrMissingLogger indicates Options.Logger was nil when an API endpoint is enabled.
+	ErrMissingLogger = errors.New("API Logger must be provided when any HTTP API endpoint is enabled")
 )
 
 const (
@@ -52,6 +55,13 @@ const (
 
 // Options holds transport and runtime configuration for SetupAndStartAPI.
 type Options struct {
+	// Logger is the zerolog logger for the HTTP API server and middleware.
+	// Required when any HTTP API endpoint is enabled.
+	// SetupAndStartAPI returns ErrMissingLogger if it is nil.
+	// The composition root should pass a child with notify=no when high-volume
+	// request/auth logs must not trigger notification hooks.
+	// New also attaches notify=no on request and rate-limit log paths.
+	Logger *zerolog.Logger
 	// Host is the HTTP bind host (empty means all interfaces).
 	Host string
 	// Port is the HTTP bind port.

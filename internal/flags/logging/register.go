@@ -10,7 +10,7 @@ import (
 // Specs returns logging domain flag metadata with static defaults.
 //
 // NO_COLOR is listed in EnvKeys so ApplyEnvToFlags can apply presence-based
-// semantics (https://no-color.org/). The pflag default stays false; env is not
+// semantics (https://no-color.org/). The pflag default stays false. Env is not
 // baked into registration-time defaults. BindAll skips BindEnv for NO_COLOR so
 // Viper does not re-parse "0"/"false" as false after presence apply.
 //

@@ -6,7 +6,7 @@ package mocks
 
 import (
 	"github.com/nicholas-fedor/watchtower/pkg/types"
-	"github.com/sirupsen/logrus"
+	"github.com/rs/zerolog"
 	mock "github.com/stretchr/testify/mock"
 )
 
@@ -35,39 +35,6 @@ type MockNotifier_Expecter struct {
 
 func (_m *MockNotifier) EXPECT() *MockNotifier_Expecter {
 	return &MockNotifier_Expecter{mock: &_m.Mock}
-}
-
-// AddLogHook provides a mock function for the type MockNotifier
-func (_mock *MockNotifier) AddLogHook() {
-	_mock.Called()
-	return
-}
-
-// MockNotifier_AddLogHook_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'AddLogHook'
-type MockNotifier_AddLogHook_Call struct {
-	*mock.Call
-}
-
-// AddLogHook is a helper method to define mock.On call
-func (_e *MockNotifier_Expecter) AddLogHook() *MockNotifier_AddLogHook_Call {
-	return &MockNotifier_AddLogHook_Call{Call: _e.mock.On("AddLogHook")}
-}
-
-func (_c *MockNotifier_AddLogHook_Call) Run(run func()) *MockNotifier_AddLogHook_Call {
-	_c.Call.Run(func(args mock.Arguments) {
-		run()
-	})
-	return _c
-}
-
-func (_c *MockNotifier_AddLogHook_Call) Return() *MockNotifier_AddLogHook_Call {
-	_c.Call.Return()
-	return _c
-}
-
-func (_c *MockNotifier_AddLogHook_Call) RunAndReturn(run func()) *MockNotifier_AddLogHook_Call {
-	_c.Run(run)
-	return _c
 }
 
 // Close provides a mock function for the type MockNotifier
@@ -100,52 +67,6 @@ func (_c *MockNotifier_Close_Call) Return() *MockNotifier_Close_Call {
 
 func (_c *MockNotifier_Close_Call) RunAndReturn(run func()) *MockNotifier_Close_Call {
 	_c.Run(run)
-	return _c
-}
-
-// GetEntries provides a mock function for the type MockNotifier
-func (_mock *MockNotifier) GetEntries() []*logrus.Entry {
-	ret := _mock.Called()
-
-	if len(ret) == 0 {
-		panic("no return value specified for GetEntries")
-	}
-
-	var r0 []*logrus.Entry
-	if returnFunc, ok := ret.Get(0).(func() []*logrus.Entry); ok {
-		r0 = returnFunc()
-	} else {
-		if ret.Get(0) != nil {
-			r0 = ret.Get(0).([]*logrus.Entry)
-		}
-	}
-	return r0
-}
-
-// MockNotifier_GetEntries_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'GetEntries'
-type MockNotifier_GetEntries_Call struct {
-	*mock.Call
-}
-
-// GetEntries is a helper method to define mock.On call
-func (_e *MockNotifier_Expecter) GetEntries() *MockNotifier_GetEntries_Call {
-	return &MockNotifier_GetEntries_Call{Call: _e.mock.On("GetEntries")}
-}
-
-func (_c *MockNotifier_GetEntries_Call) Run(run func()) *MockNotifier_GetEntries_Call {
-	_c.Call.Run(func(args mock.Arguments) {
-		run()
-	})
-	return _c
-}
-
-func (_c *MockNotifier_GetEntries_Call) Return(entrys []*logrus.Entry) *MockNotifier_GetEntries_Call {
-	_c.Call.Return(entrys)
-	return _c
-}
-
-func (_c *MockNotifier_GetEntries_Call) RunAndReturn(run func() []*logrus.Entry) *MockNotifier_GetEntries_Call {
-	_c.Call.Return(run)
 	return _c
 }
 
@@ -241,55 +162,49 @@ func (_c *MockNotifier_GetURLs_Call) RunAndReturn(run func() []string) *MockNoti
 	return _c
 }
 
-// SendFilteredEntries provides a mock function for the type MockNotifier
-func (_mock *MockNotifier) SendFilteredEntries(entries []*logrus.Entry, report types.Report) {
-	_mock.Called(entries, report)
+// RegisterHook provides a mock function for the type MockNotifier
+func (_mock *MockNotifier) RegisterHook(log *zerolog.Logger) {
+	_mock.Called(log)
 	return
 }
 
-// MockNotifier_SendFilteredEntries_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'SendFilteredEntries'
-type MockNotifier_SendFilteredEntries_Call struct {
+// MockNotifier_RegisterHook_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'RegisterHook'
+type MockNotifier_RegisterHook_Call struct {
 	*mock.Call
 }
 
-// SendFilteredEntries is a helper method to define mock.On call
-//   - entries []*logrus.Entry
-//   - report types.Report
-func (_e *MockNotifier_Expecter) SendFilteredEntries(entries any, report any) *MockNotifier_SendFilteredEntries_Call {
-	return &MockNotifier_SendFilteredEntries_Call{Call: _e.mock.On("SendFilteredEntries", entries, report)}
+// RegisterHook is a helper method to define mock.On call
+//   - log *zerolog.Logger
+func (_e *MockNotifier_Expecter) RegisterHook(log any) *MockNotifier_RegisterHook_Call {
+	return &MockNotifier_RegisterHook_Call{Call: _e.mock.On("RegisterHook", log)}
 }
 
-func (_c *MockNotifier_SendFilteredEntries_Call) Run(run func(entries []*logrus.Entry, report types.Report)) *MockNotifier_SendFilteredEntries_Call {
+func (_c *MockNotifier_RegisterHook_Call) Run(run func(log *zerolog.Logger)) *MockNotifier_RegisterHook_Call {
 	_c.Call.Run(func(args mock.Arguments) {
-		var arg0 []*logrus.Entry
+		var arg0 *zerolog.Logger
 		if args[0] != nil {
-			arg0 = args[0].([]*logrus.Entry)
-		}
-		var arg1 types.Report
-		if args[1] != nil {
-			arg1 = args[1].(types.Report)
+			arg0 = args[0].(*zerolog.Logger)
 		}
 		run(
 			arg0,
-			arg1,
 		)
 	})
 	return _c
 }
 
-func (_c *MockNotifier_SendFilteredEntries_Call) Return() *MockNotifier_SendFilteredEntries_Call {
+func (_c *MockNotifier_RegisterHook_Call) Return() *MockNotifier_RegisterHook_Call {
 	_c.Call.Return()
 	return _c
 }
 
-func (_c *MockNotifier_SendFilteredEntries_Call) RunAndReturn(run func(entries []*logrus.Entry, report types.Report)) *MockNotifier_SendFilteredEntries_Call {
+func (_c *MockNotifier_RegisterHook_Call) RunAndReturn(run func(log *zerolog.Logger)) *MockNotifier_RegisterHook_Call {
 	_c.Run(run)
 	return _c
 }
 
 // SendNotification provides a mock function for the type MockNotifier
-func (_mock *MockNotifier) SendNotification(reportType types.Report) {
-	_mock.Called(reportType)
+func (_mock *MockNotifier) SendNotification(report types.Report) {
+	_mock.Called(report)
 	return
 }
 
@@ -299,12 +214,12 @@ type MockNotifier_SendNotification_Call struct {
 }
 
 // SendNotification is a helper method to define mock.On call
-//   - reportType types.Report
-func (_e *MockNotifier_Expecter) SendNotification(reportType any) *MockNotifier_SendNotification_Call {
-	return &MockNotifier_SendNotification_Call{Call: _e.mock.On("SendNotification", reportType)}
+//   - report types.Report
+func (_e *MockNotifier_Expecter) SendNotification(report any) *MockNotifier_SendNotification_Call {
+	return &MockNotifier_SendNotification_Call{Call: _e.mock.On("SendNotification", report)}
 }
 
-func (_c *MockNotifier_SendNotification_Call) Run(run func(reportType types.Report)) *MockNotifier_SendNotification_Call {
+func (_c *MockNotifier_SendNotification_Call) Run(run func(report types.Report)) *MockNotifier_SendNotification_Call {
 	_c.Call.Run(func(args mock.Arguments) {
 		var arg0 types.Report
 		if args[0] != nil {
@@ -322,7 +237,7 @@ func (_c *MockNotifier_SendNotification_Call) Return() *MockNotifier_SendNotific
 	return _c
 }
 
-func (_c *MockNotifier_SendNotification_Call) RunAndReturn(run func(reportType types.Report)) *MockNotifier_SendNotification_Call {
+func (_c *MockNotifier_SendNotification_Call) RunAndReturn(run func(report types.Report)) *MockNotifier_SendNotification_Call {
 	_c.Run(run)
 	return _c
 }

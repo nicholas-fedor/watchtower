@@ -6,7 +6,7 @@ import (
 	"net/url"
 
 	"github.com/nicholas-fedor/shoutrrr/pkg/services/chat/teams"
-	"github.com/sirupsen/logrus"
+	"github.com/rs/zerolog"
 	"github.com/spf13/cobra"
 
 	notifyConfig "github.com/nicholas-fedor/watchtower/internal/config/notify"
@@ -39,11 +39,13 @@ var (
 //nolint:godox
 type msTeamsTypeNotifier struct {
 	webHookURL string
+	log        *zerolog.Logger
 }
 
 // newMsTeamsNotifier creates a Teams notifier from resolved legacy settings.
 //
 // Parameters:
+//   - log: Logger for configuration diagnostics and fatal validation errors.
 //   - legacy: Deprecated MSTeams webhook settings (from process config or flags).
 //
 // Returns:
@@ -55,17 +57,15 @@ type msTeamsTypeNotifier struct {
 // TODO: Remove newMsTeamsNotifier for the v2 release.
 //
 //nolint:godox
-func newMsTeamsNotifier(legacy notifyConfig.Legacy) types.ConvertibleNotifier {
+func newMsTeamsNotifier(log *zerolog.Logger, legacy notifyConfig.Legacy) types.ConvertibleNotifier {
 	webHookURL := legacy.MSTeamsHook
-	clog := logrus.WithField("url", redactServiceURL(webHookURL))
+	clog := log.With().Str("url", redactServiceURL(webHookURL)).Logger()
 
 	if len(webHookURL) == 0 {
-		clog.Fatal(
-			"Microsoft Teams webhook URL is empty",
-		)
+		clog.Fatal().Msg("Microsoft Teams webhook URL is empty")
 	}
 
-	return &msTeamsTypeNotifier{webHookURL: webHookURL}
+	return &msTeamsTypeNotifier{webHookURL: webHookURL, log: log}
 }
 
 // GetURL generates the Teams service URL from the notifier's webhook.
@@ -80,18 +80,19 @@ func newMsTeamsNotifier(legacy notifyConfig.Legacy) types.ConvertibleNotifier {
 // Deprecated: This method is part of the legacy msteams notifier and will be removed
 // for the v2 release. Use --notification-url with a teams:// URL instead.
 func (n *msTeamsTypeNotifier) GetURL(_ *cobra.Command) (string, error) {
-	clog := logrus.NewEntry(logrus.StandardLogger())
-	clog.Debug("Generating Microsoft Teams service URL")
+	clog := n.log
+	clog.Debug().Msg("Generating Microsoft Teams service URL")
 
-	if logrus.IsLevelEnabled(logrus.TraceLevel) {
-		clog.WithField("url", redactServiceURL(n.webHookURL)).
-			Trace("Microsoft Teams webhook URL loaded")
+	if clog.GetLevel() <= zerolog.TraceLevel {
+		clog.Trace().
+			Str("url", redactServiceURL(n.webHookURL)).
+			Msg("Microsoft Teams webhook URL loaded")
 	}
 
 	// Validate the webhook URL is parseable and absolute.
 	parsed, err := url.Parse(n.webHookURL)
 	if err != nil {
-		clog.WithError(err).Debug("Failed to parse Microsoft Teams webhook URL")
+		clog.Debug().Err(err).Msg("Failed to parse Microsoft Teams webhook URL")
 
 		return "", fmt.Errorf("%w: %w", errParseWebhookFailed, err)
 	}
@@ -107,35 +108,13 @@ func (n *msTeamsTypeNotifier) GetURL(_ *cobra.Command) (string, error) {
 	}
 
 	urlStr := config.GetURL().String()
-	if logrus.IsLevelEnabled(logrus.TraceLevel) {
-		clog.WithField("service_url", redactServiceURL(urlStr)).
-			Trace("Generated Microsoft Teams service URL")
+	if clog.GetLevel() <= zerolog.TraceLevel {
+		clog.Trace().
+			Str("service_url", redactServiceURL(urlStr)).
+			Msg("Generated Microsoft Teams service URL")
 	} else {
-		clog.Debug("Generated Microsoft Teams service URL")
+		clog.Debug().Msg("Generated Microsoft Teams service URL")
 	}
 
 	return urlStr, nil
-}
-
-// GetEntries returns nil for legacy notifiers.
-//
-// Returns:
-//   - []*logrus.Entry: Always nil.
-//
-// Deprecated: This method is part of the legacy msteams notifier and will be removed
-// for the v2 release.
-func (n *msTeamsTypeNotifier) GetEntries() []*logrus.Entry {
-	return nil
-}
-
-// SendFilteredEntries does nothing for legacy notifiers.
-//
-// Parameters:
-//   - entries: Ignored.
-//   - report: Ignored.
-//
-// Deprecated: This method is part of the legacy msteams notifier and will be removed
-// for the v2 release.
-func (n *msTeamsTypeNotifier) SendFilteredEntries(_ []*logrus.Entry, _ types.Report) {
-	// Legacy notifiers do not support filtered entries.
 }

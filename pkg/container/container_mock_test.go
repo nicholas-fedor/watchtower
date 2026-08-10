@@ -9,7 +9,6 @@ import (
 
 	"github.com/onsi/gomega"
 	"github.com/onsi/gomega/ghttp"
-	"github.com/sirupsen/logrus"
 
 	dockerspec "github.com/moby/docker-image-spec/specs-go/v1"
 	dockerContainer "github.com/moby/moby/api/types/container"
@@ -19,6 +18,7 @@ import (
 	dockerClient "github.com/moby/moby/client"
 	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
 
+	"github.com/nicholas-fedor/watchtower/internal/logging"
 	mockContainer "github.com/nicholas-fedor/watchtower/pkg/container/mocks"
 )
 
@@ -62,7 +62,7 @@ func MockContainer(updates ...MockContainerUpdate) *Container {
 	}
 
 	// Create and return a new Container instance.
-	return NewContainer(&containerInfo, &image)
+	return NewContainer(nil, &containerInfo, &image)
 }
 
 // WithPortBindings configures port bindings for the mock container.
@@ -195,10 +195,10 @@ func WithNetworkMode(mode string) MockContainerUpdate {
 		}
 
 		c.HostConfig.NetworkMode = dockerContainer.NetworkMode(mode)
-		logrus.WithFields(logrus.Fields{
+		logging.WithFields(testLog(), map[string]any{
 			"mode":    mode,
 			"is_host": mode == "host",
-		}).Debug("MockContainer set NetworkMode")
+		}).Debug().Msg("MockContainer set NetworkMode")
 	}
 }
 
@@ -256,10 +256,10 @@ func WithNetworks(networkNames ...string) MockContainerUpdate {
 				NetworkID: fmt.Sprintf("network_%s_id", name),
 				Aliases:   []string{c.Name},
 			}
-			logrus.WithFields(logrus.Fields{
+			logging.WithFields(testLog(), map[string]any{
 				"container": c.Name,
 				"network":   name,
-			}).Debug("MockContainer added network")
+			}).Debug().Msg("MockContainer added network")
 		}
 	}
 }

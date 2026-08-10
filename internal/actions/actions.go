@@ -5,12 +5,11 @@ import (
 	"strings"
 	"time"
 
-	"github.com/sirupsen/logrus"
+	"github.com/rs/zerolog"
 
 	"github.com/nicholas-fedor/watchtower/internal/api/handlers/events"
 	"github.com/nicholas-fedor/watchtower/internal/metrics"
 	"github.com/nicholas-fedor/watchtower/pkg/container"
-	"github.com/nicholas-fedor/watchtower/pkg/notifications"
 	"github.com/nicholas-fedor/watchtower/pkg/session"
 	"github.com/nicholas-fedor/watchtower/pkg/types"
 )
@@ -39,6 +38,8 @@ const (
 // Update carries the full types.UpdateParams snapshot from config.UpdateParams
 // (or an equivalent complete construction).
 type RunUpdatesWithNotificationsParams struct {
+	// Logger is the process logger for this update session. Required and must be non-nil.
+	Logger *zerolog.Logger
 	// Client is the Docker client for container operations.
 	Client container.Client
 	// Notifier sends update status messages to configured channels.
@@ -61,6 +62,7 @@ type RunUpdatesWithNotificationsParams struct {
 // Parameters:
 //   - ctx: Context for cancellation and timeouts.
 //   - params: The RunUpdatesWithNotificationsParams struct containing all configuration parameters.
+//     params.Logger is required and must be non-nil (nil panics on first log call).
 //
 // Returns:
 //   - *metrics.Metric: A pointer to a metric object summarizing the update session (scanned, updated, failed counts).
@@ -68,10 +70,12 @@ func RunUpdatesWithNotifications(
 	ctx context.Context,
 	params RunUpdatesWithNotificationsParams,
 ) *metrics.Metric {
-	logrus.Debug("Starting RunUpdatesWithNotifications")
+	log := params.Logger
+
+	log.Debug().Msg("Starting RunUpdatesWithNotifications")
 
 	// Initiate notification batching.
-	startNotifications(params.Notifier, params.NotificationSplitByContainer)
+	startNotifications(log, params.Notifier, params.NotificationSplitByContainer)
 
 	updateConfig := params.Update
 
@@ -85,13 +89,13 @@ func RunUpdatesWithNotifications(
 	}
 
 	// Execute the container update operation
-	result, cleanupImageInfosPtr, err := executeUpdate(
+	result, cleanupImageInfosPtr, err := executeUpdate(log,
 		ctx,
 		params.Client,
 		updateConfig,
 	)
 	// Process update result, return metric on failure
-	metric := handleUpdateResult(result, err, params.Notifier)
+	metric := handleUpdateResult(log, result, err, params.Notifier)
 	if metric != nil {
 		if params.EventBroadcaster != nil {
 			errMsg := "unknown error"
@@ -112,7 +116,7 @@ func RunUpdatesWithNotifications(
 	}
 
 	// Perform image cleanup if enabled.
-	cleanedImages := performImageCleanup(
+	cleanedImages := performImageCleanup(log,
 		ctx,
 		params.Client,
 		updateConfig.Cleanup,
@@ -141,16 +145,16 @@ func RunUpdatesWithNotifications(
 	}
 
 	// Log update report details for debugging
-	logUpdateReport(result)
+	logUpdateReport(log, result)
 
-	logrus.WithFields(logrus.Fields{
-		"notification_split_by_container": params.NotificationSplitByContainer,
-		"notification_report":             params.NotificationReport,
-		"notifier_present":                params.Notifier != nil,
-	}).Debug("About to send notifications")
+	log.Debug().
+		Bool("notification_split_by_container", params.NotificationSplitByContainer).
+		Bool("notification_report", params.NotificationReport).
+		Bool("notifier_present", params.Notifier != nil).
+		Msg("About to send notifications")
 
 	// Send notifications about update results
-	sendNotifications(
+	sendNotifications(log,
 		params.Notifier,
 		params.NotificationSplitByContainer,
 		params.NotificationReport,
@@ -179,7 +183,7 @@ func RunUpdatesWithNotifications(
 	}
 
 	// Generate and return metric summarizing the session
-	return generateAndLogMetric(result)
+	return generateAndLogMetric(log, result)
 }
 
 // emptyReport is a non-nil empty report used when sending notifications about errors.
@@ -209,10 +213,12 @@ func (emptyReport) All() []types.ContainerReport       { return nil }
 //
 // Returns:
 //   - *metrics.Metric: A zero metric if an error occurred or result is nil, nil otherwise.
-func handleUpdateResult(result types.Report, err error, notifier types.Notifier) *metrics.Metric {
+func handleUpdateResult(log *zerolog.Logger, result types.Report, err error, notifier types.Notifier) *metrics.Metric {
 	// Check for errors during update execution
 	if err != nil {
-		logrus.WithError(err).Error("Update execution failed")
+		log.Error().
+			Err(err).
+			Msg("Update execution failed")
 
 		// Send notification about the error
 		if notifier != nil {
@@ -228,7 +234,7 @@ func handleUpdateResult(result types.Report, err error, notifier types.Notifier)
 
 	// Check if update result is nil
 	if result == nil {
-		logrus.Debug("Update result is nil, returning zero metric")
+		log.Debug().Msg("Update result is nil, returning zero metric")
 
 		return &metrics.Metric{
 			Scanned: 0,
@@ -290,144 +296,6 @@ func buildSingleRestartedContainerReport(
 	}
 }
 
-// buildCleanupEntriesForContainer constructs log entries for cleaned image events specific to a container.
-//
-// It creates a logrus.Entry struct for each cleaned image associated with the specified container
-// using a standardized message "Removing image" with the image name and ID in the entry data.
-//
-// Parameters:
-//   - cleanedImages: Slice of RemovedImageInfo containing details of cleaned images.
-//   - containerName: Name of the container to filter cleanup entries for.
-//   - now: Timestamp to use for all created log entries.
-//
-// Returns:
-//   - []*logrus.Entry: A slice of log entries for the cleaned images associated with the container.
-func buildCleanupEntriesForContainer(
-	cleanedImages []types.RemovedImageInfo,
-	containerName string,
-	now time.Time,
-) []*logrus.Entry {
-	entries := make([]*logrus.Entry, 0)
-
-	for _, cleanedImage := range cleanedImages {
-		if cleanedImage.ContainerName == containerName {
-			entry := &logrus.Entry{
-				Level:   logrus.InfoLevel,
-				Message: "Removing image",
-				Data: logrus.Fields{
-					"container_name": cleanedImage.ContainerName,
-					"image_name":     cleanedImage.ImageName,
-					"image_id":       cleanedImage.ImageID.ShortID(),
-				},
-				Time: now,
-			}
-			entries = append(entries, entry)
-		}
-	}
-
-	return entries
-}
-
-// buildUpdateEntries constructs log entries for container update events.
-//
-// It creates logrus.Entry structs representing the key stages of a container update:
-// finding a new image, an optional cooldown result, stopping the container, and starting
-// the new container. For monitor-only containers, it reports detection without action.
-//
-// Parameters:
-//   - containerReport: The container report containing update details.
-//   - oldContainerID: The original container ID before update.
-//   - newContainerID: The new container ID after update.
-//   - now: The current timestamp to use for all entries.
-//   - cooldownAge: Human-readable image age (empty if no cooldown check).
-//   - cooldownDelay: Human-readable cooldown duration.
-//   - cooldownPassed: Whether the image passed the cooldown check.
-//
-// Returns:
-//   - []*logrus.Entry: A slice of log entries for the update events.
-func buildUpdateEntries(
-	containerReport types.ContainerReport,
-	oldContainerID, newContainerID types.ContainerID,
-	now time.Time,
-	cooldownAge string,
-	cooldownDelay string,
-	cooldownPassed bool,
-) []*logrus.Entry {
-	// Build the "Found new image" entry.
-	foundEntry := &logrus.Entry{
-		Level:   logrus.InfoLevel,
-		Message: FoundNewImageMessage,
-		Data: logrus.Fields{
-			"container": containerReport.Name(),
-			"image":     containerReport.ImageName(),
-			"new_id":    containerReport.LatestImageID().ShortID(),
-		},
-		Time: now,
-	}
-
-	if containerReport.IsMonitorOnly() {
-		return []*logrus.Entry{
-			foundEntry,
-			{
-				Level:   logrus.DebugLevel,
-				Message: UpdateSkippedMessage,
-				Data: logrus.Fields{
-					"container": containerReport.Name(),
-				},
-				Time: now,
-			},
-			{
-				Level:   logrus.DebugLevel,
-				Message: ContainerRemainsRunningMessage,
-				Data: logrus.Fields{
-					"container": containerReport.Name(),
-				},
-				Time: now,
-			},
-		}
-	}
-
-	entries := []*logrus.Entry{foundEntry}
-
-	// Insert cooldown "proceeding" entry after "Found new image" when available.
-	if cooldownPassed && cooldownAge != "" {
-		entries = append(entries, &logrus.Entry{
-			Level:   logrus.InfoLevel,
-			Message: "Image age exceeds cooldown - eligible for update",
-			Data: logrus.Fields{
-				"image":     containerReport.ImageName(),
-				"image_age": cooldownAge,
-				"cooldown":  cooldownDelay,
-			},
-			Time: now,
-		})
-	}
-
-	entries = append(entries,
-		&logrus.Entry{
-			Level:   logrus.InfoLevel,
-			Message: StoppingContainerMessage,
-			Data: logrus.Fields{
-				"container": containerReport.Name(),
-				"id":        oldContainerID.ShortID(),
-				"old_id":    containerReport.CurrentImageID().ShortID(),
-			},
-			Time: now,
-		},
-		&logrus.Entry{
-			Level:   logrus.InfoLevel,
-			Message: StartedNewContainerMessage,
-			Data: logrus.Fields{
-				"container": containerReport.Name(),
-				"new_id":    newContainerID.ShortID(),
-			},
-			Time: now,
-		},
-	)
-
-	return entries
-}
-
 // startNotifications initiates notification batching if a notifier is provided.
 //
 // It starts the notification process to group update messages, or logs a debug message
@@ -437,11 +305,11 @@ func buildUpdateEntries(
 // Parameters:
 //   - notifier: The notification system instance for sending update status messages.
 //   - notificationSplitByContainer: Boolean flag indicating whether notifications are split by container.
-func startNotifications(notifier types.Notifier, notificationSplitByContainer bool) {
+func startNotifications(log *zerolog.Logger, notifier types.Notifier, notificationSplitByContainer bool) {
 	if notifier != nil {
 		notifier.StartNotification(notificationSplitByContainer)
 	} else {
-		logrus.Debug("Notifier is nil, skipping notification batching")
+		log.Debug().Msg("Notifier is nil, skipping notification batching")
 	}
 }
 
@@ -459,18 +327,17 @@ func startNotifications(notifier types.Notifier, notificationSplitByContainer bo
 //   - types.Report: The report containing the results of the update operation.
 //   - []types.CleanedImageInfo: Slice of cleaned image info to be cleaned up.
 //   - error: Any error encountered during the update execution.
-func executeUpdate(
-	ctx context.Context,
+func executeUpdate(log *zerolog.Logger, ctx context.Context,
 	client container.Client,
 	config types.UpdateParams,
 ) (types.Report, []types.RemovedImageInfo, error) {
 	// Log before calling the Update function
-	logrus.Debug("About to call Update function")
+	log.Debug().Msg("About to call Update function")
 
-	result, cleanupImageInfos, err := Update(ctx, client, config)
+	result, cleanupImageInfos, err := Update(log, ctx, client, config)
 
 	// Log after Update function returns
-	logrus.Debug("Update function returned, about to check cleanup")
+	log.Debug().Msg("Update function returned, about to check cleanup")
 
 	return result, cleanupImageInfos, err
 }
@@ -490,8 +357,7 @@ func executeUpdate(
 //
 // Returns:
 //   - []types.RemovedImageInfo: Slice of successfully cleaned image info.
-func performImageCleanup(
-	ctx context.Context,
+func performImageCleanup(log *zerolog.Logger, ctx context.Context,
 	client container.Client,
 	cleanup bool,
 	cleanupImageInfos []types.RemovedImageInfo,
@@ -505,9 +371,11 @@ func performImageCleanup(
 	// when multiple containers share the same old image.
 	uniqueByImageID := deduplicateByImageID(cleanupImageInfos)
 
-	cleaned, err := RemoveImages(ctx, client, uniqueByImageID)
+	cleaned, err := RemoveImages(log, ctx, client, uniqueByImageID)
 	if err != nil {
-		logrus.WithError(err).Warn("Failed to clean up some images after update")
+		log.Warn().
+			Err(err).
+			Msg("Failed to clean up some images after update")
 	}
 
 	if len(cleaned) == 0 {
@@ -562,7 +430,7 @@ func deduplicateByImageID(images []types.RemovedImageInfo) []types.RemovedImageI
 //
 // Parameters:
 //   - result: The report containing the results of the update operation.
-func logUpdateReport(result types.Report) {
+func logUpdateReport(log *zerolog.Logger, result types.Report) {
 	// Initialize slice for updated container names
 	updatedNames := make([]string, 0, len(result.Updated()))
 	// Collect names of all updated containers
@@ -570,12 +438,12 @@ func logUpdateReport(result types.Report) {
 		updatedNames = append(updatedNames, report.Name())
 	}
 
-	logrus.WithFields(logrus.Fields{
-		"scanned":       len(result.Scanned()),
-		"updated":       len(result.Updated()),
-		"failed":        len(result.Failed()),
-		"updated_names": updatedNames,
-	}).Debug("Report before notification")
+	log.Debug().
+		Int("scanned", len(result.Scanned())).
+		Int("updated", len(result.Updated())).
+		Int("failed", len(result.Failed())).
+		Strs("updated_names", updatedNames).
+		Msg("Report before notification")
 }
 
 // sendNotifications handles sending notifications about update results.
@@ -591,19 +459,16 @@ func logUpdateReport(result types.Report) {
 //   - notificationReport: Boolean flag enabling report-based notifications.
 //   - result: The report containing the results of the update operation.
 //   - cleanedImages: Slice of successfully cleaned image info.
-func sendNotifications(
-	notifier types.Notifier,
+func sendNotifications(log *zerolog.Logger, notifier types.Notifier,
 	notificationSplitByContainer, notificationReport bool,
 	result types.Report,
 	cleanedImages []types.RemovedImageInfo,
 ) {
-	logrus.Debug("About to send notifications")
-
 	// Check if notifier is available
 	if notifier != nil {
 		// Check if notifications should be split by container
 		if notificationSplitByContainer {
-			sendSplitNotifications(notifier, notificationReport, result, cleanedImages)
+			sendSplitNotifications(log, notifier, notificationReport, result, cleanedImages)
 		} else if notifier.ShouldSendNotification(result) {
 			notifier.SendNotification(result)
 		}
@@ -627,8 +492,7 @@ func sendNotifications(
 //   - notificationReport: Boolean flag enabling report-based notifications.
 //   - result: The report containing the results of the update operation.
 //   - cleanedImages: Slice of successfully cleaned image info.
-func sendSplitNotifications(
-	notifier types.Notifier,
+func sendSplitNotifications(log *zerolog.Logger, notifier types.Notifier,
 	notificationReport bool,
 	result types.Report,
 	cleanedImages []types.RemovedImageInfo,
@@ -639,15 +503,15 @@ func sendSplitNotifications(
 	// This map is scoped to the function to ensure tracking is per-notification-session.
 	notified := make(map[string]bool)
 
-	logrus.WithFields(logrus.Fields{
-		"updated_count":   len(result.Updated()),
-		"restarted_count": len(result.Restarted()),
-		"stale_count":     len(result.Stale()),
-		"failed_count":    len(result.Failed()),
-		"skipped_count":   len(result.Skipped()),
-		"fresh_count":     len(result.Fresh()),
-		"scanned_count":   len(result.Scanned()),
-	}).Debug("Split notifications: container counts by category")
+	log.Debug().
+		Int("updated_count", len(result.Updated())).
+		Int("restarted_count", len(result.Restarted())).
+		Int("stale_count", len(result.Stale())).
+		Int("failed_count", len(result.Failed())).
+		Int("skipped_count", len(result.Skipped())).
+		Int("fresh_count", len(result.Fresh())).
+		Int("scanned_count", len(result.Scanned())).
+		Msg("Split notifications: container counts by category")
 
 	if notificationReport {
 		// Log updated containers for debugging
@@ -656,454 +520,247 @@ func sendSplitNotifications(
 			updatedNames = append(updatedNames, report.Name())
 		}
 
-		logrus.WithField("updated_containers", updatedNames).
-			Debug("Split notifications: sending report notifications for updated containers")
+		log.Debug().
+			Strs("updated_containers", updatedNames).
+			Msg("Split notifications: sending report notifications for updated containers")
 
-		// Send individual report notifications for each updated container
-		for _, report := range result.Updated() {
-			// Skip nil container reports
-			if report == nil {
-				logrus.Debug("Encountered nil updated container report, skipping")
+		notifyContainers(notifyContainersParams{
+			log:           log,
+			notifier:      notifier,
+			notified:      notified,
+			reports:       result.Updated(),
+			result:        result,
+			category:      "updated",
+			logBeforeSend: false,
+			include:       func(r types.ContainerReport) bool { return true },
+			buildReport:   buildSingleContainerReport,
+		})
+		notifyContainers(notifyContainersParams{
+			log:           log,
+			notifier:      notifier,
+			notified:      notified,
+			reports:       result.Restarted(),
+			result:        result,
+			category:      "restarted",
+			logBeforeSend: false,
+			include:       func(r types.ContainerReport) bool { return true },
+			buildReport:   buildSingleRestartedContainerReport,
+		})
+		// Monitor-only containers appear in Stale when notificationReport is true.
+		notifyContainers(notifyContainersParams{
+			log:           log,
+			notifier:      notifier,
+			notified:      notified,
+			reports:       result.Stale(),
+			result:        result,
+			category:      "stale",
+			logBeforeSend: false,
+			include:       func(r types.ContainerReport) bool { return r.IsMonitorOnly() },
+			buildReport:   buildSingleContainerReport,
+		})
 
-				continue
-			}
-
-			// Skip containers with empty names
-			if strings.TrimSpace(report.Name()) == "" {
-				logrus.WithField("container_id", report.ID().ShortID()).
-					Debug("Encountered container with empty name, skipping notification")
-
-				continue
-			}
-
-			containerID := string(report.ID())
-			if notified[containerID] {
-				// Skip notification if already sent for this container ID
-				continue
-			}
-
-			singleContainerReport := buildSingleContainerReport(report, result)
-			if notifier.ShouldSendNotification(singleContainerReport) {
-				notifier.SendNotification(singleContainerReport)
-			}
-
-			notified[containerID] = true
-		}
-
-		// Send individual report notifications for each restarted container
-		for _, report := range result.Restarted() {
-			// Skip nil container reports
-			if report == nil {
-				logrus.Debug("Encountered nil restarted container report, skipping")
-
-				continue
-			}
-
-			// Skip containers with empty names
-			if strings.TrimSpace(report.Name()) == "" {
-				logrus.WithField("container_id", report.ID().ShortID()).
-					Debug("Encountered restarted container with empty name, skipping notification")
-
-				continue
-			}
-
-			containerID := string(report.ID())
-			if notified[containerID] {
-				// Skip notification if already sent for this container ID
-				continue
-			}
-
-			singleContainerReport := buildSingleRestartedContainerReport(report, result)
-			if notifier.ShouldSendNotification(singleContainerReport) {
-				notifier.SendNotification(singleContainerReport)
-			}
-
-			notified[containerID] = true
-		}
-
-		// Send notifications for monitor-only containers when notificationReport is true
-		for _, report := range result.Stale() {
-			// Skip nil container reports
-			if report == nil {
-				logrus.Debug("Encountered nil stale container report, skipping")
-
-				continue
-			}
-
-			// Skip containers with empty names
-			if strings.TrimSpace(report.Name()) == "" {
-				logrus.WithField("container_id", report.ID().ShortID()).
-					Debug("Encountered stale container with empty name, skipping notification")
-
-				continue
-			}
-
-			if report.IsMonitorOnly() {
-				containerID := string(report.ID())
-				if notified[containerID] {
-					// Skip notification if already sent for this container ID
-					continue
-				}
-
-				singleContainerReport := buildSingleContainerReport(
-					report,
-					result,
-				)
-				if notifier.ShouldSendNotification(singleContainerReport) {
-					notifier.SendNotification(singleContainerReport)
-				}
-
-				notified[containerID] = true
-			}
-		}
-
-		// Send notifications for cooldown-skipped containers (report mode).
-		for _, report := range result.Skipped() {
-			if report == nil {
-				continue
-			}
-
-			containerStatus, ok := report.(*session.ContainerStatus)
-			if !ok || containerStatus.CooldownDelay() == "" {
-				continue
-			}
-
-			if containerStatus.CooldownPassed() {
-				continue
-			}
-
-			containerID := string(report.ID())
-			if notified[containerID] {
-				continue
-			}
-
-			singleSkippedReport := &session.SingleContainerReport{
-				SkippedReports:   []types.ContainerReport{report},
-				ScannedReports:   result.Scanned(),
-				UpdatedReports:   result.Updated(),
-				RestartedReports: result.Restarted(),
-				FailedReports:    result.Failed(),
-				StaleReports:     result.Stale(),
-				FreshReports:     result.Fresh(),
-			}
-			if notifier.ShouldSendNotification(singleSkippedReport) {
-				notifier.SendNotification(singleSkippedReport)
-			}
-
-			notified[containerID] = true
-		}
+		// Cooldown-skipped containers use a different report shape and stay inline.
+		notifySkippedCooldownContainers(log, notifier, notified, result)
 	} else {
-		// Log updated containers for debugging
+		// Log-mode split: hook-captured entries are filtered by container inside
+		// SendNotification when the report is a SingleContainerReport.
+		//
+		// Image removal logs once per ImageID without container scope. Expanded
+		// cleanedImages retains every container association for shared images, so
+		// emit a hooked container-scoped cleanup event for each entry so both
+		// containers that shared an old image receive cleanup in split mode.
+		for _, img := range cleanedImages {
+			log.Info().
+				Str("notify", "yes").
+				Str("container_name", img.ContainerName).
+				Str("image_name", img.ImageName).
+				Str("image_id", img.ImageID.ShortID()).
+				Msg("Removing image")
+		}
+
 		updatedNames := make([]string, 0, len(result.Updated()))
 		for _, report := range result.Updated() {
 			updatedNames = append(updatedNames, report.Name())
 		}
 
-		logrus.WithField("updated_containers", updatedNames).
-			Debug("Split notifications: sending filtered entry notifications for updated containers")
+		log.Debug().
+			Strs("updated_containers", updatedNames).
+			Msg("Split notifications: sending per-container notifications (log mode)")
 
-		// Send individual filtered entry notifications for each updated container
-		for _, report := range result.Updated() {
-			// Skip nil container reports
-			if report == nil {
-				logrus.Debug("Encountered nil updated container report, skipping")
+		notifyContainers(notifyContainersParams{
+			log:           log,
+			notifier:      notifier,
+			notified:      notified,
+			reports:       result.Updated(),
+			result:        result,
+			category:      "updated",
+			logBeforeSend: true,
+			include:       func(r types.ContainerReport) bool { return true },
+			buildReport:   buildSingleContainerReport,
+		})
+		notifyContainers(notifyContainersParams{
+			log:           log,
+			notifier:      notifier,
+			notified:      notified,
+			reports:       result.Restarted(),
+			result:        result,
+			category:      "restarted",
+			logBeforeSend: true,
+			include:       func(r types.ContainerReport) bool { return true },
+			buildReport:   buildSingleRestartedContainerReport,
+		})
+		notifyContainers(notifyContainersParams{
+			log:           log,
+			notifier:      notifier,
+			notified:      notified,
+			reports:       result.Stale(),
+			result:        result,
+			category:      "monitor-only stale",
+			logBeforeSend: true,
+			include:       func(r types.ContainerReport) bool { return r.IsMonitorOnly() },
+			buildReport:   buildSingleContainerReport,
+		})
 
-				continue
-			}
-
-			// Skip containers with empty names
-			if strings.TrimSpace(report.Name()) == "" {
-				logrus.WithField("container_id", report.ID().ShortID()).
-					Debug("Encountered container with empty name, skipping notification")
-
-				continue
-			}
-
-			containerID := string(report.ID())
-			if notified[containerID] {
-				// Skip notification if already sent for this container ID
-				continue
-			}
-
-			logrus.WithFields(logrus.Fields{
-				"container": report.Name(),
-				"image":     report.ImageName(),
-			}).Debug("Sending individual notification for updated container")
-
-			singleContainerReport := buildSingleContainerReport(report, result)
-
-			now := time.Now()
-
-			// Extract cooldown info from the container status if available.
-			var cdAge, cdDelay string
-
-			var cdPassed bool
-
-			cs, ok := report.(*session.ContainerStatus)
-			if ok {
-				cdAge = cs.CooldownAge()
-				cdDelay = cs.CooldownDelay()
-				cdPassed = cs.CooldownPassed()
-			}
-
-			// Create log entries for container update events
-			entries := buildUpdateEntries(
-				report,
-				report.ID(),
-				report.NewContainerID(),
-				now,
-				cdAge,
-				cdDelay,
-				cdPassed,
-			)
-
-			// Add cleanup entries for this container
-			containerCleanupEntries := buildCleanupEntriesForContainer(
-				cleanedImages,
-				report.Name(),
-				now,
-			)
-			entries = append(entries, containerCleanupEntries...)
-
-			if notifier.ShouldSendNotification(singleContainerReport) {
-				notifier.SendFilteredEntries(entries, singleContainerReport)
-			}
-
-			notified[containerID] = true
-		}
-
-		// Send individual filtered entry notifications for each restarted container
-		for _, report := range result.Restarted() {
-			// Skip nil container reports
-			if report == nil {
-				logrus.Debug("Encountered nil restarted container report, skipping")
-
-				continue
-			}
-
-			// Skip containers with empty names
-			if strings.TrimSpace(report.Name()) == "" {
-				logrus.WithField("container_id", report.ID().ShortID()).
-					Debug("Encountered restarted container with empty name, skipping notification")
-
-				continue
-			}
-
-			containerID := string(report.ID())
-			if notified[containerID] {
-				// Skip notification if already sent for this container ID
-				continue
-			}
-
-			logrus.WithFields(logrus.Fields{
-				"container": report.Name(),
-				"image":     report.ImageName(),
-			}).Debug("Sending individual notification for restarted container")
-
-			singleContainerReport := buildSingleRestartedContainerReport(report, result)
-
-			now := time.Now()
-
-			newID := report.NewContainerID()
-			if newID == "" {
-				newID = report.ID()
-			}
-
-			// Build cleanup entries first to preallocate the entries slice with correct capacity
-			containerCleanupEntries := buildCleanupEntriesForContainer(
-				cleanedImages,
-				report.Name(),
-				now,
-			)
-
-			// Create log entries for container restart events (similar to update but without "Found new image")
-			// Base entries: StoppingLinkedContainerMessage + StartedLinkedContainerMessage
-			const baseEntryCount = 2
-
-			entries := make([]*logrus.Entry, 0, baseEntryCount+len(containerCleanupEntries))
-			entries = append(entries,
-				&logrus.Entry{
-					Level:   logrus.InfoLevel,
-					Message: StoppingLinkedContainerMessage,
-					Data: logrus.Fields{
-						"container": report.Name(),
-						"id":        report.ID().ShortID(),
-						"old_id":    report.CurrentImageID().ShortID(),
-					},
-					Time: now,
-				},
-				&logrus.Entry{
-					Level:   logrus.InfoLevel,
-					Message: StartedLinkedContainerMessage,
-					Data: logrus.Fields{
-						"container": report.Name(),
-						"new_id":    newID.ShortID(),
-					},
-					Time: now,
-				},
-			)
-			entries = append(entries, containerCleanupEntries...)
-
-			if notifier.ShouldSendNotification(singleContainerReport) {
-				notifier.SendFilteredEntries(entries, singleContainerReport)
-			}
-
-			notified[containerID] = true
-		}
-
-		// Send notifications for monitor-only containers when notificationReport is false
-		for _, report := range result.Stale() {
-			// Skip nil container reports
-			if report == nil {
-				logrus.Debug("Encountered nil stale container report, skipping")
-
-				continue
-			}
-
-			// Skip containers with empty names
-			if strings.TrimSpace(report.Name()) == "" {
-				logrus.WithField("container_id", report.ID().ShortID()).
-					Debug("Encountered stale container with empty name, skipping notification")
-
-				continue
-			}
-
-			if report.IsMonitorOnly() {
-				containerID := string(report.ID())
-				if notified[containerID] {
-					// Skip notification if already sent for this container ID
-					continue
-				}
-
-				logrus.WithFields(logrus.Fields{
-					"container": report.Name(),
-					"image":     report.ImageName(),
-				}).Debug("Sending individual notification for monitor-only stale container")
-
-				singleContainerReport := buildSingleContainerReport(report, result)
-
-				now := time.Now()
-
-				// Create log entries for container update events (monitor-only containers don't get updated, but we still send the same format)
-				entries := buildUpdateEntries(
-					report,
-					report.ID(),
-					report.NewContainerID(),
-					now,
-					"",
-					"",
-					false,
-				)
-
-				// Add cleanup entries for this container
-				containerCleanupEntries := buildCleanupEntriesForContainer(
-					cleanedImages,
-					report.Name(),
-					now,
-				)
-				entries = append(entries, containerCleanupEntries...)
-
-				if notifier.ShouldSendNotification(singleContainerReport) {
-					notifier.SendFilteredEntries(entries, singleContainerReport)
-				}
-
-				notified[containerID] = true
-			}
-		}
-
-		// Send notifications for cooldown-skipped containers.
-		// These are skipped containers whose skip reason is related to cooldown.
-		for _, report := range result.Skipped() {
-			if report == nil {
-				continue
-			}
-
-			containerStatus, ok := report.(*session.ContainerStatus)
-			if !ok || containerStatus.CooldownDelay() == "" {
-				// Skip non-cooldown skipped containers.
-				continue
-			}
-
-			if containerStatus.CooldownPassed() {
-				continue // Already handled in the updated container loop above.
-			}
-
-			containerID := string(report.ID())
-			if notified[containerID] {
-				continue
-			}
-
-			now := time.Now()
-
-			singleSkippedReport := &session.SingleContainerReport{
-				SkippedReports:   []types.ContainerReport{report},
-				ScannedReports:   result.Scanned(),
-				UpdatedReports:   result.Updated(),
-				RestartedReports: result.Restarted(),
-				FailedReports:    result.Failed(),
-				StaleReports:     result.Stale(),
-				FreshReports:     result.Fresh(),
-			}
-
-			// Build the appropriate message based on whether image age was available.
-			var entry *logrus.Entry
-
-			if containerStatus.CooldownAge() != "" {
-				entry = &logrus.Entry{
-					Level:   logrus.InfoLevel,
-					Message: "Image is within cooldown period - not eligible for update",
-					Data: logrus.Fields{
-						"image":       report.ImageName(),
-						"image_age":   containerStatus.CooldownAge(),
-						"cooldown":    containerStatus.CooldownDelay(),
-						"eligible_in": containerStatus.CooldownRemaining(),
-						"eligible_at": containerStatus.CooldownEligibleAt().Format(time.RFC3339),
-					},
-					Time: now,
-				}
-			} else {
-				entry = &logrus.Entry{
-					Level:   logrus.InfoLevel,
-					Message: "Image creation time unavailable - update check unavailable",
-					Data: logrus.Fields{
-						"image":    report.ImageName(),
-						"cooldown": containerStatus.CooldownDelay(),
-					},
-					Time: now,
-				}
-			}
-
-			entries := []*logrus.Entry{entry}
-
-			if notifier.ShouldSendNotification(singleSkippedReport) {
-				notifier.SendFilteredEntries(entries, singleSkippedReport)
-			}
-
-			notified[containerID] = true
-		}
+		notifySkippedCooldownContainers(log, notifier, notified, result)
 	}
 
-	logrus.Debug("Finished sending notifications")
+	log.Debug().Msg("Finished sending notifications")
+}
+
+// notifyContainersParams groups inputs for notifyContainers.
+type notifyContainersParams struct {
+	log           *zerolog.Logger
+	notifier      types.Notifier
+	notified      map[string]bool
+	reports       []types.ContainerReport
+	result        types.Report
+	category      string
+	logBeforeSend bool
+	include       func(types.ContainerReport) bool
+	buildReport   func(types.ContainerReport, types.Report) *session.SingleContainerReport
+}
+
+// notifyContainers sends per-container notifications for a report collection.
+//
+// It applies nil and empty-name filtering, container-ID de-duplication via notified,
+// optional category eligibility (include), and ShouldSendNotification before send.
+//
+// Parameters:
+//   - params: Named inputs for the category-specific notification pass.
+func notifyContainers(params notifyContainersParams) {
+	for _, report := range params.reports {
+		if report == nil {
+			params.log.Debug().Msg("Encountered nil " + params.category + " container report, skipping")
+
+			continue
+		}
+
+		if strings.TrimSpace(report.Name()) == "" {
+			params.log.Debug().
+				Str("container_id", report.ID().ShortID()).
+				Msg("Encountered " + params.category + " container with empty name, skipping notification")
+
+			continue
+		}
+
+		if !params.include(report) {
+			continue
+		}
+
+		containerID := string(report.ID())
+		if params.notified[containerID] {
+			continue
+		}
+
+		if params.logBeforeSend {
+			params.log.Debug().
+				Str("container", report.Name()).
+				Str("image", report.ImageName()).
+				Msg("Sending individual notification for " + params.category + " container")
+		}
+
+		singleContainerReport := params.buildReport(report, params.result)
+		if params.notifier.ShouldSendNotification(singleContainerReport) {
+			params.notifier.SendNotification(singleContainerReport)
+		}
+
+		params.notified[containerID] = true
+	}
+}
+
+// notifySkippedCooldownContainers sends notifications for cooldown-skipped containers.
+//
+// Parameters:
+//   - log: Logger (unused currently, reserved for consistency with sibling helpers).
+//   - notifier: Notification client.
+//   - notified: Map of container IDs already notified in this session.
+//   - result: Full session report.
+func notifySkippedCooldownContainers(
+	_ *zerolog.Logger,
+	notifier types.Notifier,
+	notified map[string]bool,
+	result types.Report,
+) {
+	for _, report := range result.Skipped() {
+		if report == nil {
+			continue
+		}
+
+		containerStatus, ok := report.(*session.ContainerStatus)
+		if !ok || containerStatus.CooldownDelay() == "" {
+			continue
+		}
+
+		if containerStatus.CooldownPassed() {
+			continue
+		}
+
+		containerID := string(report.ID())
+		if notified[containerID] {
+			continue
+		}
+
+		singleSkippedReport := &session.SingleContainerReport{
+			SkippedReports:   []types.ContainerReport{report},
+			ScannedReports:   result.Scanned(),
+			UpdatedReports:   result.Updated(),
+			RestartedReports: result.Restarted(),
+			FailedReports:    result.Failed(),
+			StaleReports:     result.Stale(),
+			FreshReports:     result.Fresh(),
+		}
+		if notifier.ShouldSendNotification(singleSkippedReport) {
+			notifier.SendNotification(singleSkippedReport)
+		}
+
+		notified[containerID] = true
+	}
 }
 
 // generateAndLogMetric creates a metric from the update results and logs it.
 //
-// It generates a summary metric of the session and logs the completion details.
+// It builds a session summary metric and writes an Info completion line on the
+// process logger. The line carries notify=no so the Shoutrrr hook does not send
+// a second notification after SendNotification has already flushed the session
+// batch. Without that field, legacy templates would emit a standalone
+// "Update session completed" message with only the scanned, updated, and failed counts.
 //
 // Parameters:
+//   - log: Process logger. Required and must be non-nil.
 //   - result: The report containing the results of the update operation.
 //
 // Returns:
 //   - *metrics.Metric: A pointer to a metric object summarizing the update session.
-func generateAndLogMetric(result types.Report) *metrics.Metric {
-	// Create metric from update results
+func generateAndLogMetric(log *zerolog.Logger, result types.Report) *metrics.Metric {
 	metricResults := metrics.NewMetric(result)
-	// Log session completion with metric details
-	notifications.LocalLog.WithFields(logrus.Fields{
-		"scanned": metricResults.Scanned,
-		"updated": metricResults.Updated,
-		"failed":  metricResults.Failed,
-	}).Info("Update session completed")
+
+	// Process log only. Session content was already notified via sendNotifications.
+	log.Info().
+		Str("notify", "no").
+		Int("scanned", metricResults.Scanned).
+		Int("updated", metricResults.Updated).
+		Int("failed", metricResults.Failed).
+		Msg("Update session completed")
 
 	return metricResults
 }

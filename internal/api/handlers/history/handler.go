@@ -6,13 +6,15 @@ import (
 	"time"
 
 	"github.com/gofiber/fiber/v3"
-	"github.com/sirupsen/logrus"
+	"github.com/rs/zerolog"
 
 	"github.com/nicholas-fedor/watchtower/internal/metrics"
 )
 
 // Handler serves the /v1/history endpoint.
 type Handler struct {
+	log *zerolog.Logger
+
 	Path    string
 	getHist func(*time.Time, *time.Time, int) []metrics.HistoryEntry
 }
@@ -22,8 +24,14 @@ type Handler struct {
 // Parameters:
 //   - getHist: Function that returns scan history entries, optionally filtered
 //     by time range and limited to N entries.
-func New(getHist func(*time.Time, *time.Time, int) []metrics.HistoryEntry) *Handler {
+func New(log *zerolog.Logger, getHist func(*time.Time, *time.Time, int) []metrics.HistoryEntry) *Handler {
+	if log == nil {
+		nop := zerolog.Nop()
+		log = &nop
+	}
+
 	return &Handler{
+		log:     log,
 		Path:    "/v1/history",
 		getHist: getHist,
 	}
@@ -46,11 +54,11 @@ func New(getHist func(*time.Time, *time.Time, int) []metrics.HistoryEntry) *Hand
 //	@Security		BearerAuth
 //	@Router			/v1/history [get]
 func (h *Handler) Handle(c fiber.Ctx) error {
-	logrus.WithFields(logrus.Fields{
-		"method": c.Method(),
-		"path":   c.Path(),
-		"notify": "no",
-	}).Debug("Received HTTP API history request")
+	h.log.Debug().
+		Str("method", c.Method()).
+		Str("path", c.Path()).
+		Str("notify", "no").
+		Msg("Received HTTP API history request")
 
 	sinceRaw := c.Query("since")
 

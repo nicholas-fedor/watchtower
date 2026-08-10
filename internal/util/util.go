@@ -346,8 +346,8 @@ func expandDurationUnits(durationStr string) (string, error) {
 	)
 
 	// processUnit handles the unit character for a parsed numeric string.
-	// For extended units (d, w, M) it converts to hours via multiplyUnit;
-	// for standard Go units it validates and passes through unchanged.
+	// For extended units (d, w, M) it converts to hours via multiplyUnit.
+	// For standard Go units it validates and passes through unchanged.
 	processUnit := func(numStr string, unit byte) (string, error) {
 		switch unit {
 		case 'd':
@@ -385,7 +385,7 @@ func expandDurationUnits(durationStr string) (string, error) {
 
 		if i == numStart {
 			// No number found — validate that the character is a known
-			// duration unit or separator; reject anything else.
+			// duration unit or separator. Reject anything else.
 			char := durationStr[i]
 			if !isValidDurationChar(char) {
 				return "", fmt.Errorf(

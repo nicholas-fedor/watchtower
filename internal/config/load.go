@@ -6,7 +6,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/sirupsen/logrus"
+	"github.com/rs/zerolog"
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
 	"github.com/spf13/viper"
@@ -49,13 +49,14 @@ var (
 // static default) using FlagSpec metadata from every domain.
 //
 // Parameters:
+//   - log: Process logger. Required and must be non-nil. A nil logger panics on the first log call.
 //   - cmd: Parsed root command with persistent flags populated.
 //   - args: Positional container name arguments for filtering.
 //
 // Returns:
 //   - Config: Immutable configuration snapshot.
 //   - error: Non-nil when required flags are missing or values are invalid.
-func Load(cmd *cobra.Command, args []string) (Config, error) {
+func Load(log *zerolog.Logger, cmd *cobra.Command, args []string) (Config, error) {
 	flagSet := cmd.PersistentFlags()
 
 	vip := viper.New()
@@ -83,14 +84,14 @@ func Load(cmd *cobra.Command, args []string) (Config, error) {
 	cfg.Schedule = loadSchedule(vip)
 	cfg.Mode = loadMode(vip)
 
-	cfg.Update, err = loadUpdate(vip, flagSet)
+	cfg.Update, err = loadUpdate(log, vip, flagSet)
 	if err != nil {
 		return Config{}, err
 	}
 
 	cfg.Lifecycle = loadLifecycle(vip)
 
-	cfg.Filter, err = loadFilter(vip, flagSet, args)
+	cfg.Filter, err = loadFilter(log, vip, flagSet, args)
 	if err != nil {
 		return Config{}, err
 	}
@@ -100,7 +101,7 @@ func Load(cmd *cobra.Command, args []string) (Config, error) {
 	cfg.Notify = loadNotify(vip, flagSet)
 	cfg.Logging = loadLogging(vip)
 
-	err = validate(cfg)
+	err = validate(log, cfg)
 	if err != nil {
 		return Config{}, err
 	}
@@ -158,7 +159,7 @@ func loadMode(vip *viper.Viper) mode.Mode {
 }
 
 // loadUpdate reads update policy settings from Viper.
-func loadUpdate(vip *viper.Viper, flagSet *pflag.FlagSet) (update.Update, error) {
+func loadUpdate(log *zerolog.Logger, vip *viper.Viper, flagSet *pflag.FlagSet) (update.Update, error) {
 	stopTimeout := durationValue(vip, flagSet, "stop-timeout", []string{"WATCHTOWER_TIMEOUT"})
 
 	if stopTimeout < 0 {
@@ -166,8 +167,9 @@ func loadUpdate(vip *viper.Viper, flagSet *pflag.FlagSet) (update.Update, error)
 	}
 
 	if stopTimeout > 0 && stopTimeout < time.Second {
-		logrus.WithField("timeout", stopTimeout).
-			Warn("WATCHTOWER_TIMEOUT is less than 1 second")
+		log.Warn().
+			Dur("timeout", stopTimeout).
+			Msg("WATCHTOWER_TIMEOUT is less than 1 second")
 	}
 
 	cooldownStr := vip.GetString("cooldown-delay")
@@ -239,7 +241,7 @@ func normalizedStringSlice(
 }
 
 // loadFilter reads filter settings, normalizes names, and builds the predicate.
-func loadFilter(vip *viper.Viper, flagSet *pflag.FlagSet, args []string) (filter.Filter, error) {
+func loadFilter(log *zerolog.Logger, vip *viper.Viper, flagSet *pflag.FlagSet, args []string) (filter.Filter, error) {
 	labelEnable := vip.GetBool("label-enable")
 
 	disableContainers := normalizedStringSlice(
@@ -283,6 +285,7 @@ func loadFilter(vip *viper.Viper, flagSet *pflag.FlagSet, args []string) (filter
 	}
 
 	predicate, desc, err := filters.BuildFilter(
+		log,
 		names,
 		disableContainers,
 		monitorImages,
@@ -427,16 +430,16 @@ func loadLogging(vip *viper.Viper) logging.Logging {
 }
 
 // validate checks cross-flag constraints that Load can enforce without side effects.
-func validate(cfg Config) error {
+func validate(log *zerolog.Logger, cfg Config) error {
 	if cfg.Update.RollingRestart && cfg.Update.MonitorOnly {
 		return ErrRollingRestartWithMonitorOnly
 	}
 
 	if cfg.Update.MonitorOnly && cfg.Update.NoPull {
-		logrus.WithFields(logrus.Fields{
-			"monitor_only": cfg.Update.MonitorOnly,
-			"no_pull":      cfg.Update.NoPull,
-		}).Warn("Combining monitor-only and no-pull might result in no updates")
+		log.Warn().
+			Bool("monitor_only", cfg.Update.MonitorOnly).
+			Bool("no_pull", cfg.Update.NoPull).
+			Msg("Combining monitor-only and no-pull might result in no updates")
 	}
 
 	return nil

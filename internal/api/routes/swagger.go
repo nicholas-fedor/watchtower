@@ -18,7 +18,7 @@ import (
 //
 // Parameters:
 //   - app: Fiber application.
-//   - opts: API configuration options (unused; reserved for future config).
+//   - opts: API configuration options (Reserved for future config options).
 func registerSwaggerRoute(app *fiber.App, _ config.Options) {
 	swaggerUI := swaggo.New(swaggo.Config{
 		Title:                "Watchtower HTTP API",

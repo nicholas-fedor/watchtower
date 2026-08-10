@@ -6,7 +6,7 @@ import (
 	"time"
 
 	"github.com/gofiber/fiber/v3"
-	"github.com/sirupsen/logrus"
+	"github.com/rs/zerolog"
 )
 
 // ConfigData represents the active Watchtower configuration exposed via the API.
@@ -40,6 +40,8 @@ type GetFunc func(ctx context.Context) (ConfigData, error)
 
 // Handler serves the /v1/config endpoint.
 type Handler struct {
+	log *zerolog.Logger
+
 	getConfig GetFunc
 	Path      string
 }
@@ -48,8 +50,14 @@ type Handler struct {
 //
 // Parameters:
 //   - getConfig: Function that returns the current Watchtower configuration.
-func New(getConfig GetFunc) *Handler {
+func New(log *zerolog.Logger, getConfig GetFunc) *Handler {
+	if log == nil {
+		nop := zerolog.Nop()
+		log = &nop
+	}
+
 	return &Handler{
+		log:       log,
 		getConfig: getConfig,
 		Path:      "/v1/config",
 	}
@@ -68,16 +76,18 @@ func New(getConfig GetFunc) *Handler {
 //	@Security		BearerAuth
 //	@Router			/v1/config [get]
 func (h *Handler) Handle(c fiber.Ctx) error {
-	logrus.WithFields(logrus.Fields{
-		"method": c.Method(),
-		"path":   c.Path(),
-		"notify": "no",
-	}).Debug("Received HTTP API config request")
+	h.log.Debug().
+		Str("method", c.Method()).
+		Str("path", c.Path()).
+		Str("notify", "no").
+		Msg("Received HTTP API config request")
 
 	cfg, err := h.getConfig(c.Context())
 	if err != nil {
-		logrus.WithError(err).WithField("notify", "no").
-			Error("Failed to get config for API")
+		h.log.Error().
+			Err(err).
+			Str("notify", "no").
+			Msg("Failed to get config for API")
 
 		sendErr := c.Status(fiber.StatusInternalServerError).
 			SendString("failed to get configuration")

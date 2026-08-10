@@ -17,7 +17,7 @@ type Notify struct {
 	// Template is the Shoutrrr text/template for messages
 	// (--notification-template / WATCHTOWER_NOTIFICATION_TEMPLATE).
 	Template string
-	// TemplateFile is an optional path to a template file; when set it overrides Template
+	// TemplateFile is an optional path to a template file. When set it overrides Template
 	// (--notification-template-file / WATCHTOWER_NOTIFICATION_TEMPLATE_FILE).
 	TemplateFile string
 	// Report enables report-based notification templates

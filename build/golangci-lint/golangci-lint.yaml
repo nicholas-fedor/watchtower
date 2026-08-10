@@ -177,6 +177,7 @@ linters:
     - varnamelen # Checks that the length of a variable's name matches its scope.
     - wastedassign # Finds wasted assignment statements.
     - wrapcheck # Checks that errors returned from external packages are wrapped.
+    - zerologlint # Detects the wrong usage of zerolog that a user forgets to dispatch with Send or Msg.
   disable:
     - arangolint # Opinionated best practices for arangodb client.
     - cyclop # Checks function and package cyclomatic complexity.
@@ -201,7 +202,6 @@ linters:
     - tagliatelle # Checks the struct tags.
     - testpackage # Linter that makes you use a separate _test package.
     - wsl # deprecated, replaced by wsl_v5 (whitespace linter)
-    - zerologlint # Detects the wrong usage of zerolog that a user forgets to dispatch with Send or Msg.
   settings:
     revive:
       enable-all-rules: false
@@ -248,6 +248,7 @@ linters:
         - ctx
         - i
         - tt
+        - ok
       ignore-decls:
         - b strings.Builder{}
         - c echo.Context

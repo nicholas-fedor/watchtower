@@ -86,7 +86,7 @@ var _ = ginkgo.Describe("the update action", func() {
 				false,
 			)
 
-			report, cleanupImageInfos, err := actions.Update(
+			report, cleanupImageInfos, err := actions.Update(testLogger(),
 				context.Background(),
 				client,
 				types.UpdateParams{
@@ -174,7 +174,7 @@ var _ = ginkgo.Describe("the update action", func() {
 					false,
 				)
 
-				report, cleanupImageInfos, err := actions.Update(
+				report, cleanupImageInfos, err := actions.Update(testLogger(),
 					context.Background(),
 					client,
 					types.UpdateParams{Cleanup: true, CPUCopyMode: "auto"},
@@ -255,7 +255,7 @@ var _ = ginkgo.Describe("the update action", func() {
 				false,
 			)
 
-			report, _, err := actions.Update(
+			report, _, err := actions.Update(testLogger(),
 				context.Background(),
 				client,
 				types.UpdateParams{Cleanup: true, CPUCopyMode: "auto"},
@@ -323,7 +323,7 @@ var _ = ginkgo.Describe("the update action", func() {
 						false,
 					)
 
-					report, _, err := actions.Update(
+					report, _, err := actions.Update(testLogger(),
 						context.Background(),
 						client,
 						types.UpdateParams{Cleanup: true, CPUCopyMode: "auto"},
@@ -382,7 +382,7 @@ var _ = ginkgo.Describe("the update action", func() {
 				false,
 			)
 
-			report, _, err := actions.Update(
+			report, _, err := actions.Update(testLogger(),
 				context.Background(),
 				client,
 				types.UpdateParams{Cleanup: true, CPUCopyMode: "auto"},
@@ -442,7 +442,7 @@ var _ = ginkgo.Describe("the update action", func() {
 				false,
 			)
 
-			report, _, err := actions.Update(
+			report, _, err := actions.Update(testLogger(),
 				context.Background(),
 				client,
 				types.UpdateParams{Cleanup: true, CPUCopyMode: "auto"},
@@ -509,7 +509,7 @@ var _ = ginkgo.Describe("the update action", func() {
 				false,
 			)
 
-			report, _, err := actions.Update(
+			report, _, err := actions.Update(testLogger(),
 				context.Background(),
 				client,
 				types.UpdateParams{Cleanup: true, CPUCopyMode: "auto"},
@@ -549,7 +549,7 @@ var _ = ginkgo.Describe("the update action", func() {
 				false,
 			)
 
-			report, _, err := actions.Update(
+			report, _, err := actions.Update(testLogger(),
 				context.Background(),
 				client,
 				types.UpdateParams{Cleanup: true, CPUCopyMode: "auto"},
@@ -600,7 +600,7 @@ var _ = ginkgo.Describe("the update action", func() {
 					containerB.SetStale(true)
 
 					// Run UpdateImplicitRestart - should not panic or error on invalid dependencies
-					actions.UpdateImplicitRestart(containers, containers, true)
+					actions.UpdateImplicitRestart(testLogger(), containers, containers, true)
 
 					// Container A should not be marked for restart due to invalid dependency
 					gomega.Expect(containerA.ToRestart()).To(gomega.BeFalse())
@@ -674,7 +674,7 @@ var _ = ginkgo.Describe("the update action", func() {
 				gomega.Expect(containerA.ToRestart()).To(gomega.BeFalse())
 
 				// Run UpdateImplicitRestart to propagate restart through the chain
-				actions.UpdateImplicitRestart(containers, containers, true)
+				actions.UpdateImplicitRestart(testLogger(), containers, containers, true)
 
 				// Verify state transitions: all containers should now be marked for restart
 				gomega.Expect(containerD.ToRestart()).To(gomega.BeTrue())
@@ -745,7 +745,7 @@ var _ = ginkgo.Describe("the update action", func() {
 				base.SetStale(true)
 
 				// Run UpdateImplicitRestart
-				actions.UpdateImplicitRestart(containers, containers, true)
+				actions.UpdateImplicitRestart(testLogger(), containers, containers, true)
 
 				// Verify all dependents are marked for restart
 				gomega.Expect(base.ToRestart()).To(gomega.BeTrue())
@@ -790,7 +790,7 @@ var _ = ginkgo.Describe("the update action", func() {
 				containerA.SetStale(true)
 
 				// Run UpdateImplicitRestart - should handle circular dependency gracefully
-				actions.UpdateImplicitRestart(containers, containers, true)
+				actions.UpdateImplicitRestart(testLogger(), containers, containers, true)
 
 				// Both should be marked for restart despite circular dependency
 				gomega.Expect(containerA.ToRestart()).To(gomega.BeTrue())
@@ -846,7 +846,7 @@ var _ = ginkgo.Describe("the update action", func() {
 				staleWithDeps.SetStale(true)
 
 				// Run UpdateImplicitRestart
-				actions.UpdateImplicitRestart(containers, containers, true)
+				actions.UpdateImplicitRestart(testLogger(), containers, containers, true)
 
 				// Verify correct restart marking
 				gomega.Expect(staleNoDeps.ToRestart()).To(gomega.BeTrue())
@@ -959,7 +959,7 @@ var _ = ginkgo.Describe("the update action", func() {
 				gomega.Expect(containerA.ToRestart()).To(gomega.BeFalse())
 
 				// Run UpdateImplicitRestart to propagate restart through the deep chain
-				actions.UpdateImplicitRestart(containers, containers, true)
+				actions.UpdateImplicitRestart(testLogger(), containers, containers, true)
 
 				// Verify state transitions: all containers should now be marked for restart
 				gomega.Expect(containerF.ToRestart()).To(gomega.BeTrue())
@@ -1024,7 +1024,7 @@ var _ = ginkgo.Describe("the update action", func() {
 					gomega.Expect(webContainer.ToRestart()).To(gomega.BeFalse())
 
 					// Run UpdateImplicitRestart - should match "project1-db-1" to "db" and propagate
-					actions.UpdateImplicitRestart(containers, containers, true)
+					actions.UpdateImplicitRestart(testLogger(), containers, containers, true)
 
 					// Verify that restart propagates through service name matching
 					gomega.Expect(dbContainer.ToRestart()).To(gomega.BeTrue())
@@ -1082,7 +1082,7 @@ var _ = ginkgo.Describe("the update action", func() {
 					)
 
 					// Run Update with rolling restart
-					report, cleanupImageInfos, err := actions.Update(
+					report, cleanupImageInfos, err := actions.Update(testLogger(),
 						context.Background(),
 						client,
 						types.UpdateParams{
@@ -1154,7 +1154,7 @@ var _ = ginkgo.Describe("the update action", func() {
 
 					// Measure performance of rolling restart
 					startTime := time.Now()
-					report, _, err := actions.Update(
+					report, _, err := actions.Update(testLogger(),
 						context.Background(),
 						client,
 						types.UpdateParams{
@@ -1192,7 +1192,7 @@ var _ = ginkgo.Describe("the update action", func() {
 				cancel() // Cancel immediately
 
 				// Run Update with rolling restart and canceled context
-				_, _, err := actions.Update(
+				_, _, err := actions.Update(testLogger(),
 					ctx,
 					client,
 					types.UpdateParams{
@@ -1226,7 +1226,7 @@ var _ = ginkgo.Describe("the update action", func() {
 				defer cancel()
 
 				// Run Update with rolling restart - should timeout quickly
-				_, _, err := actions.Update(
+				_, _, err := actions.Update(testLogger(),
 					ctx,
 					client,
 					types.UpdateParams{
@@ -1308,7 +1308,7 @@ var _ = ginkgo.Describe("the update action", func() {
 				)
 
 				// Run Update to test restart ordering
-				report, _, err := actions.Update(
+				report, _, err := actions.Update(testLogger(),
 					context.Background(),
 					client,
 					types.UpdateParams{
@@ -1388,7 +1388,7 @@ var _ = ginkgo.Describe("the update action", func() {
 				)
 
 				// Run Update
-				report, cleanupImageInfos, err := actions.Update(
+				report, cleanupImageInfos, err := actions.Update(testLogger(),
 					context.Background(),
 					client,
 					types.UpdateParams{

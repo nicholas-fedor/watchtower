@@ -11,12 +11,12 @@
 //
 // Usage example:
 //
-//	opts, err := registry.GetPullOptions("docker.io/library/alpine")
+//	opts, err := registry.GetPullOptions(log, "docker.io/library/alpine")
 //	if err != nil {
-//	    logrus.WithError(err).Error("Failed to get pull options")
+//	    log.Error().Err(err).Msg("Failed to get pull options")
 //	}
-//	digest, err := digest.FetchDigest(ctx, container, opts.RegistryAuth)
+//	digest, err := digest.FetchDigest(log, ctx, container, opts.RegistryAuth)
 //
 // The package integrates with Docker's registry API, supports credential fetching from config files
-// or environment variables, and uses logrus for logging operations.
+// or environment variables, and uses zerolog for logging operations.
 package registry

@@ -8,7 +8,7 @@ import (
 
 	"github.com/onsi/ginkgo/v2"
 	"github.com/onsi/gomega"
-	"github.com/sirupsen/logrus"
+	"github.com/rs/zerolog"
 
 	cerrdefs "github.com/containerd/errdefs"
 	dockerContainer "github.com/moby/moby/api/types/container"
@@ -18,6 +18,7 @@ import (
 	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
 
 	"github.com/nicholas-fedor/watchtower/internal/flags"
+	"github.com/nicholas-fedor/watchtower/internal/logging"
 	"github.com/nicholas-fedor/watchtower/pkg/types"
 )
 
@@ -38,22 +39,16 @@ func WithCPUSettings(nanoCPUs, cpuShares, cpuQuota, cpuPeriod int64, cpusetCpus,
 }
 
 var _ = ginkgo.Describe("Target Container Operations", func() {
-	var logOutput *bytes.Buffer
-
 	var (
-		origOutput = logrus.StandardLogger().Out
-		origLevel  = logrus.GetLevel()
+		logOutput *bytes.Buffer
+		targetLog *zerolog.Logger
 	)
 
 	ginkgo.BeforeEach(func() {
 		logOutput = &bytes.Buffer{}
-		logrus.SetOutput(logOutput)
-		logrus.SetLevel(logrus.DebugLevel)
-	})
-
-	ginkgo.AfterEach(func() {
-		logrus.SetOutput(origOutput)
-		logrus.SetLevel(origLevel)
+		w := logging.LogfmtWriter(logOutput)
+		l := zerolog.New(w).Level(zerolog.DebugLevel).With().Timestamp().Logger()
+		targetLog = &l
 	})
 
 	ginkgo.Describe("handleCPUSettings", func() {
@@ -83,7 +78,7 @@ var _ = ginkgo.Describe("Target Container Operations", func() {
 		})
 
 		ginkgo.It("should strip all CPU settings when mode is 'none'", func() {
-			clog := logrus.WithField("test", "handleCPUSettings")
+			clog := logging.With(targetLog, "test", "handleCPUSettings")
 			handleCPUSettings(hostConfig, "none", false, clog)
 			gomega.Expect(hostConfig.NanoCPUs).To(gomega.Equal(int64(0)))
 			gomega.Expect(hostConfig.CPUShares).To(gomega.Equal(int64(0)))
@@ -95,7 +90,7 @@ var _ = ginkgo.Describe("Target Container Operations", func() {
 		})
 
 		ginkgo.It("should preserve all CPU settings when mode is 'full'", func() {
-			clog := logrus.WithField("test", "handleCPUSettings")
+			clog := logging.With(targetLog, "test", "handleCPUSettings")
 			handleCPUSettings(hostConfig, "full", false, clog)
 			gomega.Expect(hostConfig.NanoCPUs).To(gomega.Equal(defaultNanoCPUs))
 			gomega.Expect(hostConfig.CPUShares).To(gomega.Equal(defaultCPUShares))
@@ -107,7 +102,7 @@ var _ = ginkgo.Describe("Target Container Operations", func() {
 		})
 
 		ginkgo.It("should filter NanoCPUs when mode is 'auto' and isPodman is true", func() {
-			clog := logrus.WithField("test", "handleCPUSettings")
+			clog := logging.With(targetLog, "test", "handleCPUSettings")
 			handleCPUSettings(hostConfig, "auto", true, clog)
 			gomega.Expect(hostConfig.NanoCPUs).To(gomega.Equal(int64(0)))
 			gomega.Expect(hostConfig.CPUShares).To(gomega.Equal(defaultCPUShares))
@@ -116,7 +111,7 @@ var _ = ginkgo.Describe("Target Container Operations", func() {
 		})
 
 		ginkgo.It("should preserve all CPU settings when mode is 'auto' and isPodman is false", func() {
-			clog := logrus.WithField("test", "handleCPUSettings")
+			clog := logging.With(targetLog, "test", "handleCPUSettings")
 			handleCPUSettings(hostConfig, "auto", false, clog)
 			gomega.Expect(hostConfig.NanoCPUs).To(gomega.Equal(defaultNanoCPUs))
 			gomega.Expect(hostConfig.CPUShares).To(gomega.Equal(defaultCPUShares))
@@ -124,7 +119,7 @@ var _ = ginkgo.Describe("Target Container Operations", func() {
 		})
 
 		ginkgo.It("should default to 'full' mode for unknown CPU copy mode", func() {
-			clog := logrus.WithField("test", "handleCPUSettings")
+			clog := logging.With(targetLog, "test", "handleCPUSettings")
 			handleCPUSettings(hostConfig, "unknown", false, clog)
 			gomega.Expect(hostConfig.NanoCPUs).To(gomega.Equal(defaultNanoCPUs))
 			gomega.Expect(logOutput.String()).To(gomega.ContainSubstring("Unknown CPU copy mode, defaulting to full"))
@@ -160,12 +155,11 @@ var _ = ginkgo.Describe("Target Container Operations", func() {
 					c.HostConfig.MemorySwappiness = &defaultMem
 				},
 			)
-			networkConfig = getNetworkConfig(mockCont, "1.44")
+			networkConfig = getNetworkConfig(targetLog, mockCont, "1.44")
 		})
 
 		ginkgo.It("should disable memory swappiness when flag is true", func() {
-			newID, err := StartTargetContainer(
-				context.Background(), client, mockCont, networkConfig,
+			newID, err := StartTargetContainer(targetLog, context.Background(), client, mockCont, networkConfig,
 				true, "1.44", flags.DockerAPIMinVersion, true, "auto", false,
 			)
 			gomega.Expect(err).ToNot(gomega.HaveOccurred())
@@ -174,8 +168,7 @@ var _ = ginkgo.Describe("Target Container Operations", func() {
 		})
 
 		ginkgo.It("should log MAC address details", func() {
-			newID, err := StartTargetContainer(
-				context.Background(), client, mockCont, networkConfig,
+			newID, err := StartTargetContainer(targetLog, context.Background(), client, mockCont, networkConfig,
 				true, "1.44", flags.DockerAPIMinVersion, false, "auto", false,
 			)
 			gomega.Expect(err).ToNot(gomega.HaveOccurred())
@@ -184,8 +177,7 @@ var _ = ginkgo.Describe("Target Container Operations", func() {
 		})
 
 		ginkgo.It("should use full network config for API >= 1.44", func() {
-			newID, err := StartTargetContainer(
-				context.Background(), client, mockCont, networkConfig,
+			newID, err := StartTargetContainer(targetLog, context.Background(), client, mockCont, networkConfig,
 				true, "1.44", flags.DockerAPIMinVersion, false, "auto", false,
 			)
 			gomega.Expect(err).ToNot(gomega.HaveOccurred())
@@ -199,8 +191,7 @@ var _ = ginkgo.Describe("Target Container Operations", func() {
 			client.createFunc = func(_ context.Context, _ *dockerContainer.Config, _ *dockerContainer.HostConfig, _ *dockerNetwork.NetworkingConfig, _ *ocispec.Platform, _ string) (dockerClient.ContainerCreateResult, error) {
 				return dockerClient.ContainerCreateResult{}, createErr
 			}
-			newID, err := StartTargetContainer(
-				context.Background(), client, mockCont, networkConfig,
+			newID, err := StartTargetContainer(targetLog, context.Background(), client, mockCont, networkConfig,
 				true, "1.44", flags.DockerAPIMinVersion, false, "auto", false,
 			)
 			gomega.Expect(newID).To(gomega.BeEmpty())
@@ -210,8 +201,7 @@ var _ = ginkgo.Describe("Target Container Operations", func() {
 		})
 
 		ginkgo.It("should log successful container creation", func() {
-			newID, err := StartTargetContainer(
-				context.Background(), client, mockCont, networkConfig,
+			newID, err := StartTargetContainer(targetLog, context.Background(), client, mockCont, networkConfig,
 				true, "1.44", flags.DockerAPIMinVersion, false, "auto", false,
 			)
 			gomega.Expect(err).ToNot(gomega.HaveOccurred())
@@ -224,9 +214,8 @@ var _ = ginkgo.Describe("Target Container Operations", func() {
 				WithNetworkMode("bridge"),
 				WithContainerState(dockerContainer.State{Running: false, Status: "exited"}),
 			)
-			networkConfig = getNetworkConfig(mockCont, "1.44")
-			newID, err := StartTargetContainer(
-				context.Background(), client, mockCont, networkConfig,
+			networkConfig = getNetworkConfig(targetLog, mockCont, "1.44")
+			newID, err := StartTargetContainer(targetLog, context.Background(), client, mockCont, networkConfig,
 				false, "1.44", flags.DockerAPIMinVersion, false, "auto", false,
 			)
 			gomega.Expect(err).ToNot(gomega.HaveOccurred())
@@ -250,8 +239,7 @@ var _ = ginkgo.Describe("Target Container Operations", func() {
 
 				return dockerClient.ContainerRemoveResult{}, nil
 			}
-			newID, err := StartTargetContainer(
-				context.Background(), client, mockCont, networkConfig,
+			newID, err := StartTargetContainer(targetLog, context.Background(), client, mockCont, networkConfig,
 				true, "1.44", flags.DockerAPIMinVersion, false, "auto", false,
 			)
 			gomega.Expect(newID).To(gomega.BeEmpty())
@@ -279,8 +267,7 @@ var _ = ginkgo.Describe("Target Container Operations", func() {
 				}, nil
 			}
 
-			newID, err := StartTargetContainer(
-				context.Background(), client, mockCont, networkConfig,
+			newID, err := StartTargetContainer(targetLog, context.Background(), client, mockCont, networkConfig,
 				true, "1.44", flags.DockerAPIMinVersion, false, "auto", false,
 			)
 			gomega.Expect(newID).To(gomega.BeEmpty())
@@ -299,8 +286,7 @@ var _ = ginkgo.Describe("Target Container Operations", func() {
 				return dockerClient.ContainerInspectResult{}, errors.New("inspect transport failure")
 			}
 
-			newID, err := StartTargetContainer(
-				context.Background(), client, mockCont, networkConfig,
+			newID, err := StartTargetContainer(targetLog, context.Background(), client, mockCont, networkConfig,
 				true, "1.44", flags.DockerAPIMinVersion, false, "auto", false,
 			)
 			gomega.Expect(newID).To(gomega.BeEmpty())
@@ -315,8 +301,7 @@ var _ = ginkgo.Describe("Target Container Operations", func() {
 			client.createFunc = func(_ context.Context, _ *dockerContainer.Config, _ *dockerContainer.HostConfig, _ *dockerNetwork.NetworkingConfig, _ *ocispec.Platform, _ string) (dockerClient.ContainerCreateResult, error) {
 				return dockerClient.ContainerCreateResult{}, cerrdefs.ErrConflict
 			}
-			newID, err := StartTargetContainer(
-				context.Background(), client, mockCont, networkConfig,
+			newID, err := StartTargetContainer(targetLog, context.Background(), client, mockCont, networkConfig,
 				true, "1.44", flags.DockerAPIMinVersion, false, "auto", false,
 			)
 			gomega.Expect(newID).To(gomega.BeEmpty())
@@ -333,8 +318,7 @@ var _ = ginkgo.Describe("Target Container Operations", func() {
 			client.createFunc = func(_ context.Context, _ *dockerContainer.Config, _ *dockerContainer.HostConfig, _ *dockerNetwork.NetworkingConfig, _ *ocispec.Platform, _ string) (dockerClient.ContainerCreateResult, error) {
 				return dockerClient.ContainerCreateResult{}, cerrdefs.ErrInvalidArgument
 			}
-			newID, err := StartTargetContainer(
-				context.Background(), client, mockCont, networkConfig,
+			newID, err := StartTargetContainer(targetLog, context.Background(), client, mockCont, networkConfig,
 				true, "1.44", flags.DockerAPIMinVersion, false, "auto", false,
 			)
 			gomega.Expect(newID).To(gomega.BeEmpty())
@@ -346,8 +330,7 @@ var _ = ginkgo.Describe("Target Container Operations", func() {
 			client.startFunc = func(_ context.Context, _ string, _ dockerClient.ContainerStartOptions) (dockerClient.ContainerStartResult, error) {
 				return dockerClient.ContainerStartResult{}, cerrdefs.ErrConflict
 			}
-			newID, err := StartTargetContainer(
-				context.Background(), client, mockCont, networkConfig,
+			newID, err := StartTargetContainer(targetLog, context.Background(), client, mockCont, networkConfig,
 				true, "1.44", flags.DockerAPIMinVersion, false, "auto", false,
 			)
 			gomega.Expect(newID).To(gomega.BeEmpty())
@@ -365,8 +348,7 @@ var _ = ginkgo.Describe("Target Container Operations", func() {
 			client.startFunc = func(_ context.Context, _ string, _ dockerClient.ContainerStartOptions) (dockerClient.ContainerStartResult, error) {
 				return dockerClient.ContainerStartResult{}, cerrdefs.ErrNotFound
 			}
-			newID, err := StartTargetContainer(
-				context.Background(), client, mockCont, networkConfig,
+			newID, err := StartTargetContainer(targetLog, context.Background(), client, mockCont, networkConfig,
 				true, "1.44", flags.DockerAPIMinVersion, false, "auto", false,
 			)
 			gomega.Expect(newID).To(gomega.BeEmpty())
@@ -376,8 +358,7 @@ var _ = ginkgo.Describe("Target Container Operations", func() {
 		})
 
 		ginkgo.It("should log successful container start", func() {
-			newID, err := StartTargetContainer(
-				context.Background(), client, mockCont, networkConfig,
+			newID, err := StartTargetContainer(targetLog, context.Background(), client, mockCont, networkConfig,
 				true, "1.44", flags.DockerAPIMinVersion, false, "auto", false,
 			)
 			gomega.Expect(err).ToNot(gomega.HaveOccurred())
@@ -392,9 +373,8 @@ var _ = ginkgo.Describe("Target Container Operations", func() {
 				WithContainerState(dockerContainer.State{Running: true, Status: "running"}),
 				WithNetworks("network1", "network2"),
 			)
-			networkConfig = getNetworkConfig(mockCont, "1.23")
-			newID, err := StartTargetContainer(
-				context.Background(), client, mockCont, networkConfig,
+			networkConfig = getNetworkConfig(targetLog, mockCont, "1.23")
+			newID, err := StartTargetContainer(targetLog, context.Background(), client, mockCont, networkConfig,
 				true, "1.23", flags.DockerAPIMinVersion, false, "auto", false,
 			)
 			gomega.Expect(err).ToNot(gomega.HaveOccurred())
@@ -413,7 +393,7 @@ var _ = ginkgo.Describe("Target Container Operations", func() {
 				WithContainerState(dockerContainer.State{Running: true, Status: "running"}),
 				WithNetworks("network1", "network2"),
 			)
-			networkConfig = getNetworkConfig(mockCont, "1.23")
+			networkConfig = getNetworkConfig(targetLog, mockCont, "1.23")
 			connectErr := errors.New("network connect failed")
 			client.connectFunc = func(_ context.Context, _, _ string, _ *dockerNetwork.EndpointSettings) (dockerClient.NetworkConnectResult, error) {
 				return dockerClient.NetworkConnectResult{}, connectErr
@@ -421,8 +401,7 @@ var _ = ginkgo.Describe("Target Container Operations", func() {
 			client.removeFunc = func(_ context.Context, _ string, _ dockerClient.ContainerRemoveOptions) (dockerClient.ContainerRemoveResult, error) {
 				return dockerClient.ContainerRemoveResult{}, nil
 			}
-			newID, err := StartTargetContainer(
-				context.Background(), client, mockCont, networkConfig,
+			newID, err := StartTargetContainer(targetLog, context.Background(), client, mockCont, networkConfig,
 				true, "1.23", flags.DockerAPIMinVersion, false, "auto", false,
 			)
 			gomega.Expect(newID).To(gomega.BeEmpty())
@@ -453,8 +432,7 @@ var _ = ginkgo.Describe("Target Container Operations", func() {
 					return dockerClient.ContainerRemoveResult{}, nil
 				}
 
-				newID, err := StartTargetContainer(
-					ctx, client, mockCont, networkConfig,
+				newID, err := StartTargetContainer(targetLog, ctx, client, mockCont, networkConfig,
 					true, "1.44", flags.DockerAPIMinVersion, false, "auto", false,
 				)
 				gomega.Expect(newID).To(gomega.BeEmpty())
@@ -469,7 +447,7 @@ var _ = ginkgo.Describe("Target Container Operations", func() {
 					WithContainerState(dockerContainer.State{Running: true, Status: "running"}),
 					WithNetworks("network1", "network2"),
 				)
-				networkConfig = getNetworkConfig(mockCont, "1.23")
+				networkConfig = getNetworkConfig(targetLog, mockCont, "1.23")
 
 				ctx, cancel := context.WithCancel(context.Background())
 				cancel()
@@ -490,8 +468,7 @@ var _ = ginkgo.Describe("Target Container Operations", func() {
 					return dockerClient.ContainerRemoveResult{}, nil
 				}
 
-				newID, err := StartTargetContainer(
-					ctx, client, mockCont, networkConfig,
+				newID, err := StartTargetContainer(targetLog, ctx, client, mockCont, networkConfig,
 					true, "1.23", flags.DockerAPIMinVersion, false, "auto", false,
 				)
 				gomega.Expect(newID).To(gomega.BeEmpty())
@@ -511,7 +488,7 @@ var _ = ginkgo.Describe("Target Container Operations", func() {
 
 		ginkgo.It("should rename container successfully", func() {
 			mockCont := MockContainer(WithName("old-name"), WithID("test-id"))
-			err := RenameTargetContainer(context.Background(), client, mockCont, "new-name")
+			err := RenameTargetContainer(targetLog, context.Background(), client, mockCont, "new-name")
 			gomega.Expect(err).ToNot(gomega.HaveOccurred())
 			gomega.Expect(logOutput.String()).To(gomega.ContainSubstring("Renamed container successfully"))
 		})
@@ -521,7 +498,7 @@ var _ = ginkgo.Describe("Target Container Operations", func() {
 				return dockerClient.ContainerRenameResult{}, errors.New("rename failed")
 			}
 			mockCont := MockContainer(WithName("old-name"), WithID("test-id"))
-			err := RenameTargetContainer(context.Background(), client, mockCont, "new-name")
+			err := RenameTargetContainer(targetLog, context.Background(), client, mockCont, "new-name")
 			gomega.Expect(err).To(gomega.HaveOccurred())
 			gomega.Expect(err.Error()).To(gomega.ContainSubstring("rename failed"))
 			gomega.Expect(logOutput.String()).To(gomega.ContainSubstring("Failed to rename container"))
@@ -536,7 +513,7 @@ var _ = ginkgo.Describe("Target Container Operations", func() {
 		})
 
 		ginkgo.It("should attach additional networks successfully", func() {
-			clog := logrus.WithField("test", "attachNetworks")
+			clog := logging.With(targetLog, "test", "attachNetworks")
 			fullConfig := &dockerNetwork.NetworkingConfig{
 				EndpointsConfig: map[string]*dockerNetwork.EndpointSettings{
 					"network1": {NetworkID: "net1"},
@@ -559,7 +536,7 @@ var _ = ginkgo.Describe("Target Container Operations", func() {
 			client.connectFunc = func(_ context.Context, _, _ string, _ *dockerNetwork.EndpointSettings) (dockerClient.NetworkConnectResult, error) {
 				return dockerClient.NetworkConnectResult{}, errors.New("connect failed")
 			}
-			clog := logrus.WithField("test", "attachNetworks")
+			clog := logging.With(targetLog, "test", "attachNetworks")
 			fullConfig := &dockerNetwork.NetworkingConfig{
 				EndpointsConfig: map[string]*dockerNetwork.EndpointSettings{
 					"network1": {NetworkID: "net1"},
@@ -579,7 +556,7 @@ var _ = ginkgo.Describe("Target Container Operations", func() {
 		})
 
 		ginkgo.It("should skip initial network and only attach additional ones", func() {
-			clog := logrus.WithField("test", "attachNetworks")
+			clog := logging.With(targetLog, "test", "attachNetworks")
 			fullConfig := &dockerNetwork.NetworkingConfig{
 				EndpointsConfig: map[string]*dockerNetwork.EndpointSettings{
 					"network1": {NetworkID: "net1"},

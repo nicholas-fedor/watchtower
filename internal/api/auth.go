@@ -8,7 +8,7 @@ import (
 	"github.com/gofiber/fiber/v3"
 	"github.com/gofiber/fiber/v3/extractors"
 	"github.com/gofiber/fiber/v3/middleware/keyauth"
-	"github.com/sirupsen/logrus"
+	"github.com/rs/zerolog"
 )
 
 // NewAPIAuthMiddleware returns a Fiber middleware that validates the HTTP API
@@ -16,17 +16,22 @@ import (
 //
 // Accepted credentials (first match wins):
 //   - Authorization: Bearer <token>
-//   - Authorization: <token> (raw value; Swagger UI apiKey style)
+//   - Authorization: <token> (raw value. Swagger UI apiKey style)
 //   - Cookie access_token=<token>
-func NewAPIAuthMiddleware(token string) fiber.Handler {
+//
+// Auth failure logs use notify=no so they never fan out through notification hooks.
+func NewAPIAuthMiddleware(log *zerolog.Logger, token string) fiber.Handler {
 	expectedHash := sha256.Sum256([]byte(token))
+	// Child logger for high-volume auth warnings. The composition root may already
+	// pass a notify=no logger, but setting it here keeps auth safe either way.
+	authLog := log.With().Str("notify", "no").Logger()
 
 	return func(c fiber.Ctx) error {
 		if token == "" {
 			return c.Status(fiber.StatusUnauthorized).SendString("API token not configured")
 		}
 
-		if !tokenMatches(c, expectedHash) {
+		if !tokenMatches(&authLog, c, expectedHash) {
 			return c.Status(fiber.StatusUnauthorized).SendString(keyauth.ErrMissingOrMalformedAPIKey.Error())
 		}
 
@@ -35,22 +40,16 @@ func NewAPIAuthMiddleware(token string) fiber.Handler {
 }
 
 // tokenMatches reports whether the request carries a valid API token.
-func tokenMatches(c fiber.Ctx, expectedHash [sha256.Size]byte) bool {
+func tokenMatches(log *zerolog.Logger, c fiber.Ctx, expectedHash [sha256.Size]byte) bool {
 	provided, ok := extractAPIToken(c)
 	if !ok {
-		logrus.WithFields(logrus.Fields{
-			"ip":     c.IP(),
-			"notify": "no",
-		}).Warn("Missing or malformed API key")
+		log.Warn().Str("ip", c.IP()).Msg("Missing or malformed API key")
 
 		return false
 	}
 
 	if !tokenHashMatches(expectedHash, provided) {
-		logrus.WithFields(logrus.Fields{
-			"ip":     c.IP(),
-			"notify": "no",
-		}).Warn("Invalid token attempt")
+		log.Warn().Str("ip", c.IP()).Msg("Invalid token attempt")
 
 		return false
 	}

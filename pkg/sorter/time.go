@@ -4,7 +4,7 @@ import (
 	"sort"
 	"time"
 
-	"github.com/sirupsen/logrus"
+	"github.com/rs/zerolog"
 
 	"github.com/nicholas-fedor/watchtower/pkg/types"
 )
@@ -20,18 +20,19 @@ type TimeSorter struct{}
 //
 // Returns:
 //   - error: Always nil (no errors possible).
-func (ts TimeSorter) Sort(containers []types.Container, _ bool) error {
+func (ts TimeSorter) Sort(log *zerolog.Logger, containers []types.Container, _ bool) error {
 	parsedTimes := make([]time.Time, len(containers))
 	farFuture := time.Date(9999, 1, 1, 0, 0, 0, 0, time.UTC)
 
 	for i, c := range containers {
 		createdTime, err := time.Parse(time.RFC3339Nano, c.ContainerInfo().Created)
 		if err != nil {
-			logrus.WithFields(logrus.Fields{
-				"container_id": c.ID().ShortID(),
-				"name":         c.Name(),
-				"created":      c.ContainerInfo().Created,
-			}).WithError(err).Debug("Failed to parse created time, using far future time as fallback")
+			log.Debug().
+				Err(err).
+				Str("container_id", c.ID().ShortID()).
+				Str("name", c.Name()).
+				Str("created", c.ContainerInfo().Created).
+				Msg("Failed to parse created time, using far future time as fallback")
 
 			createdTime = farFuture
 		}

@@ -9,7 +9,6 @@ import (
 	"testing"
 
 	"github.com/distribution/reference"
-	"github.com/sirupsen/logrus"
 
 	"github.com/nicholas-fedor/watchtower/pkg/types"
 )
@@ -60,7 +59,7 @@ func FuzzGetBearerToken(f *testing.F) {
 	)
 
 	f.Fuzz(func(t *testing.T, jsonData []byte) {
-		initTokenCache()
+		initTokenCache(testLog())
 		tokenCache.InvalidateAll()
 
 		// Attempt to unmarshal the JSON data into a TokenResponse struct
@@ -80,7 +79,7 @@ func FuzzGetBearerToken(f *testing.F) {
 		challenge := `bearer realm="https://test.com/token",service="test.com"`
 		registryAuth := ""
 		client := &mockClient{body: jsonData}
-		_, _ = GetBearerToken(ctx, challenge, imageRef, registryAuth, client)
+		_, _ = GetBearerToken(testLog(), ctx, challenge, imageRef, registryAuth, client)
 	})
 }
 
@@ -112,7 +111,7 @@ func FuzzTransformAuth(f *testing.F) {
 	) // {"username":null, "password":"pass"}
 	f.Fuzz(func(_ *testing.T, input string) {
 		// Call TransformAuth because we don't care about the result, only that it doesn't panic
-		TransformAuth(input)
+		TransformAuth(testLog(), input)
 	})
 }
 
@@ -176,7 +175,7 @@ func FuzzGetAuthURL(f *testing.F) {
 
 	f.Fuzz(func(_ *testing.T, challenge string) {
 		// Call GetAuthURL because we don't care about the result, only that it doesn't panic
-		_, _ = GetAuthURL(challenge, imageRef, "")
+		_, _ = GetAuthURL(testLog(), challenge, imageRef, "")
 	})
 }
 
@@ -197,7 +196,7 @@ func FuzzComputeTokenExpiry(f *testing.F) {
 
 		_ = json.Unmarshal(jsonData, &tokenResponse)
 
-		_ = computeTokenExpiry(&tokenResponse)
+		_ = computeTokenExpiry(testLog(), &tokenResponse)
 	})
 }
 
@@ -213,7 +212,7 @@ func FuzzReadBearerTokenWithExpiry(f *testing.F) {
 	f.Add([]byte(``))
 
 	f.Fuzz(func(_ *testing.T, jsonData []byte) {
-		_, _, _ = readBearerTokenWithExpiry(bytes.NewReader(jsonData), "test/image")
+		_, _, _ = readBearerTokenWithExpiry(testLog(), bytes.NewReader(jsonData), "test/image")
 	})
 }
 
@@ -242,6 +241,6 @@ func FuzzExtractChallengeHost(f *testing.F) {
 	f.Add("https://registry.example.com:5000/token")
 
 	f.Fuzz(func(_ *testing.T, realm string) {
-		_ = extractChallengeHost(realm, logrus.Fields{})
+		_ = extractChallengeHost(testLog(), realm)
 	})
 }

@@ -5,7 +5,7 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/sirupsen/logrus"
+	"github.com/rs/zerolog"
 )
 
 // Docker Compose labels.
@@ -30,13 +30,16 @@ const (
 //
 // Returns:
 //   - []string: List of service names.
-func ParseDependsOnLabel(labelValue string) []string {
+func ParseDependsOnLabel(log *zerolog.Logger, labelValue string) []string {
 	if labelValue == "" {
 		return nil
 	}
 
-	clog := logrus.WithField("label_value", labelValue)
-	clog.Debug("Parsing compose depends-on label")
+	clogVal := log.With().
+		Str("label_value", labelValue).
+		Logger()
+	clog := &clogVal
+	clog.Debug().Msg("Parsing compose depends-on label")
 
 	// Try to parse as JSON first (Docker Compose v2+ format)
 	if strings.HasPrefix(strings.TrimSpace(labelValue), "{") {
@@ -44,7 +47,9 @@ func ParseDependsOnLabel(labelValue string) []string {
 
 		err := json.Unmarshal([]byte(labelValue), &dependsOn)
 		if err != nil {
-			clog.WithError(err).Debug("Failed to parse as JSON, falling back to string parsing")
+			clog.Debug().
+				Err(err).
+				Msg("Failed to parse as JSON, falling back to string parsing")
 		} else {
 			services := make([]string, 0, len(dependsOn))
 			for service := range dependsOn {
@@ -52,8 +57,9 @@ func ParseDependsOnLabel(labelValue string) []string {
 			}
 			// Sort for consistent ordering
 			sort.Strings(services)
-			clog.WithField("parsed_services", services).
-				Debug("Parsed JSON format compose depends-on label")
+			clog.Debug().
+				Strs("parsed_services", services).
+				Msg("Parsed JSON format compose depends-on label")
 
 			return services
 		}
@@ -70,7 +76,9 @@ func ParseDependsOnLabel(labelValue string) []string {
 			continue
 		}
 
-		clog.WithField("parsing_dep", dep).Debug("Parsing individual dependency")
+		clog.Debug().
+			Str("parsing_dep", dep).
+			Msg("Parsing individual dependency")
 		// Parse colon-separated format: service:condition:required
 		parts := strings.Split(dep, ":")
 
@@ -80,8 +88,9 @@ func ParseDependsOnLabel(labelValue string) []string {
 		}
 	}
 
-	clog.WithField("parsed_services", services).
-		Debug("Completed parsing string format compose depends-on label")
+	clog.Debug().
+		Strs("parsed_services", services).
+		Msg("Completed parsing string format compose depends-on label")
 
 	return services
 }
@@ -96,7 +105,7 @@ func ParseDependsOnLabel(labelValue string) []string {
 //
 // Returns:
 //   - string: Project name if present, empty string otherwise.
-func GetProjectName(labels map[string]string) string {
+func GetProjectName(log *zerolog.Logger, labels map[string]string) string {
 	if labels == nil {
 		return ""
 	}
@@ -106,10 +115,10 @@ func GetProjectName(labels map[string]string) string {
 		return ""
 	}
 
-	logrus.WithFields(logrus.Fields{
-		"label": ComposeProjectLabel,
-		"value": projectName,
-	}).Debug("Retrieved compose project name")
+	log.Debug().
+		Str("label", ComposeProjectLabel).
+		Str("value", projectName).
+		Msg("Retrieved compose project name")
 
 	return projectName
 }
@@ -124,7 +133,7 @@ func GetProjectName(labels map[string]string) string {
 //
 // Returns:
 //   - string: Service name if present, empty string otherwise.
-func GetServiceName(labels map[string]string) string {
+func GetServiceName(log *zerolog.Logger, labels map[string]string) string {
 	if labels == nil {
 		return ""
 	}
@@ -134,10 +143,10 @@ func GetServiceName(labels map[string]string) string {
 		return ""
 	}
 
-	logrus.WithFields(logrus.Fields{
-		"label": ComposeServiceLabel,
-		"value": serviceName,
-	}).Debug("Retrieved compose service name")
+	log.Debug().
+		Str("label", ComposeServiceLabel).
+		Str("value", serviceName).
+		Msg("Retrieved compose service name")
 
 	return serviceName
 }
@@ -152,7 +161,7 @@ func GetServiceName(labels map[string]string) string {
 //
 // Returns:
 //   - string: Container replica number if present, empty string otherwise.
-func GetContainerNumber(labels map[string]string) string {
+func GetContainerNumber(log *zerolog.Logger, labels map[string]string) string {
 	if labels == nil {
 		return ""
 	}
@@ -162,10 +171,10 @@ func GetContainerNumber(labels map[string]string) string {
 		return ""
 	}
 
-	logrus.WithFields(logrus.Fields{
-		"label": ComposeContainerNumber,
-		"value": containerNumber,
-	}).Debug("Retrieved container replica number")
+	log.Debug().
+		Str("label", ComposeContainerNumber).
+		Str("value", containerNumber).
+		Msg("Retrieved container replica number")
 
 	return containerNumber
 }

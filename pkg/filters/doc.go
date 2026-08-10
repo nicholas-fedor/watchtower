@@ -7,12 +7,12 @@
 //
 // Usage example:
 //
-//	filter, desc, err := filters.BuildFilter(names, disableNames, monitoredImageNamePatterns, skippedImageNamePatterns, enabledLabels, disabledLabels, true, "scope")
+//	filter, desc, err := filters.BuildFilter(log, names, disableNames, monitoredImageNamePatterns, skippedImageNamePatterns, enabledLabels, disabledLabels, true, "scope")
 //	if err != nil {
 //		return err
 //	}
 //	containers, _ := client.ListContainers(filter)
-//	logrus.Info(desc)
+//	log.Info().Msg(desc)
 //
-// The package uses logrus for logging filter operations and integrates with container types.
+// The package uses zerolog for logging filter operations and integrates with container types.
 package filters

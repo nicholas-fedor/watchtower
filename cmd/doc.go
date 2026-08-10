@@ -8,10 +8,13 @@
 //
 // Usage examples:
 //   - Run the CLI from main.go:
-//     cmd.Execute()
+//     log := logging.New(os.Stderr, logging.InfoLevel)
+//     cmd.Execute(log)
 //   - Convert legacy notifications to shoutrrr URLs:
 //     watchtower notify-upgrade
 //
 // The package integrates with actions, container, notifications, and flags packages,
-// using Cobra for CLI parsing and logrus for logging.
+// using Cobra for CLI parsing and github.com/rs/zerolog for process logging. The
+// composition root constructs a *zerolog.Logger in main and passes it through Execute.
+// There is no package-level global logger.
 package cmd

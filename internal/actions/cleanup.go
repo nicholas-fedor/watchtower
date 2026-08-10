@@ -7,7 +7,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/sirupsen/logrus"
+	"github.com/rs/zerolog"
 
 	cerrdefs "github.com/containerd/errdefs"
 
@@ -22,7 +22,7 @@ const stopContainerTimeout = 10 * time.Minute
 // maxRemovalAttempts sets the maximum number of retries for container removal operations.
 // Docker's default stop timeout is 10 seconds, but our stopContainerTimeout overrides it
 // to 10 minutes. With 30 attempts and a 1s delay between retries, the total retry window
-// is approximately 30 seconds (30 × 1s), which covers the default Docker stop timeout
+// is approximately 30 seconds (30 x 1s), which covers the default Docker stop timeout
 // plus overhead for image removal delays.
 const maxRemovalAttempts = 30
 
@@ -38,6 +38,7 @@ var RemovalRetryDelay = 1 * time.Second
 // Removal operations respect scope boundaries to prevent cross-scope interference.
 //
 // Parameters:
+//   - log: Process logger. Required and must be non-nil. A nil logger panics on the first log call.
 //   - ctx: Context for cancellation and timeouts.
 //   - client: Container client for Docker operations.
 //   - cleanupImages: Remove images if true.
@@ -48,25 +49,24 @@ var RemovalRetryDelay = 1 * time.Second
 // Returns:
 //   - int: Number of removed Watchtower containers.
 //   - error: Non-nil if removal fails, nil if single instance or successful removal.
-func RemoveExcessWatchtowerInstances(
-	ctx context.Context,
+func RemoveExcessWatchtowerInstances(log *zerolog.Logger, ctx context.Context,
 	client container.Client,
 	cleanupImages bool,
 	scope string,
 	removeImageInfos *[]types.RemovedImageInfo,
 	currentContainer types.Container,
 ) (int, error) {
-	logrus.WithFields(logrus.Fields{
-		"scope":          scope,
-		"cleanup_images": cleanupImages,
-		"current_container_id": func() string {
+	log.Debug().
+		Str("scope", scope).
+		Bool("cleanup_images", cleanupImages).
+		Str("current_container_id", func() string {
 			if currentContainer != nil {
 				return string(currentContainer.ID())
 			}
 
 			return ""
-		}(),
-	}).Debug("Starting removal of excess Watchtower containers")
+		}()).
+		Msg("Starting removal of excess Watchtower containers")
 
 	// List all containers to find excess instances
 	allContainers, err := client.ListContainers(ctx, filters.NoFilter)
@@ -75,7 +75,7 @@ func RemoveExcessWatchtowerInstances(
 	}
 
 	// Retrieve containers that are excess Watchtower containers within the same scope
-	excessWatchtowerContainers := getExcessContainers(
+	excessWatchtowerContainers := getExcessContainers(log,
 		scope,
 		currentContainer,
 		allContainers,
@@ -83,13 +83,15 @@ func RemoveExcessWatchtowerInstances(
 
 	// If no excess containers found, nothing to remove
 	if len(excessWatchtowerContainers) == 0 {
-		logrus.WithField("scope", scope).Debug("No excess containers found")
+		log.Debug().
+			Str("scope", scope).
+			Msg("No excess containers found")
 
 		return 0, nil
 	}
 
 	// Stop and remove the excess containers, collecting removed image info if removal is enabled
-	removed, err := removeExcessContainers(
+	removed, err := removeExcessContainers(log,
 		ctx,
 		client,
 		excessWatchtowerContainers,
@@ -115,6 +117,7 @@ func RemoveExcessWatchtowerInstances(
 // cleanup (e.g., it was still stopping), it won't persist across update cycles.
 //
 // Parameters:
+//   - log: Process logger. Required and must be non-nil. A nil logger panics on the first log call.
 //   - ctx: Context for cancellation and timeouts.
 //   - client: Container client for Docker operations.
 //   - cleanupImages: Remove images if true.
@@ -125,19 +128,18 @@ func RemoveExcessWatchtowerInstances(
 // Returns:
 //   - int: Number of removed old Watchtower containers.
 //   - error: Non-nil if removal fails, nil if none found or successful removal.
-func CleanupOldWatchtowerContainers(
-	ctx context.Context,
+func CleanupOldWatchtowerContainers(log *zerolog.Logger, ctx context.Context,
 	client container.Client,
 	cleanupImages bool,
 	scope string,
 	currentContainerID types.ContainerID,
 	removeImageInfos *[]types.RemovedImageInfo,
 ) (int, error) {
-	logrus.WithFields(logrus.Fields{
-		"scope":          scope,
-		"current_id":     currentContainerID,
-		"cleanup_images": cleanupImages,
-	}).Debug("Checking for old Watchtower containers")
+	log.Debug().
+		Str("scope", scope).
+		Str("current_id", string(currentContainerID)).
+		Bool("cleanup_images", cleanupImages).
+		Msg("Checking for old Watchtower containers")
 
 	// Normalize empty scope to "none" for consistent comparison.
 	if scope == "" {
@@ -174,11 +176,11 @@ func CleanupOldWatchtowerContainers(
 		}
 
 		if containerScope != scope {
-			logrus.WithFields(logrus.Fields{
-				"container":       c.Name(),
-				"container_scope": containerScope,
-				"current_scope":   scope,
-			}).Debug("Skipping old Watchtower container in different scope")
+			log.Debug().
+				Str("container", c.Name()).
+				Str("container_scope", containerScope).
+				Str("current_scope", scope).
+				Msg("Skipping old Watchtower container in different scope")
 
 			continue
 		}
@@ -224,11 +226,11 @@ func CleanupOldWatchtowerContainers(
 		}
 
 		if containerScope != scope {
-			logrus.WithFields(logrus.Fields{
-				"container":       c.Name(),
-				"container_scope": containerScope,
-				"current_scope":   scope,
-			}).Debug("Skipping orphaned Watchtower container in different scope")
+			log.Debug().
+				Str("container", c.Name()).
+				Str("container_scope", containerScope).
+				Str("current_scope", scope).
+				Msg("Skipping orphaned Watchtower container in different scope")
 
 			continue
 		}
@@ -239,17 +241,17 @@ func CleanupOldWatchtowerContainers(
 	oldContainers = append(oldContainers, orphanedCreatedContainers...)
 
 	if len(oldContainers) == 0 {
-		logrus.Debug("No old or orphaned Watchtower containers found")
+		log.Debug().Msg("No old or orphaned Watchtower containers found")
 
 		return 0, nil
 	}
 
-	logrus.WithFields(logrus.Fields{
-		"count":                  len(oldContainers),
-		"old_count":              len(oldContainers) - len(orphanedCreatedContainers),
-		"orphaned_created_count": len(orphanedCreatedContainers),
-		"containers":             containerNames(oldContainers),
-	}).Info("Found old or orphaned Watchtower containers, cleaning up")
+	log.Info().
+		Int("count", len(oldContainers)).
+		Int("old_count", len(oldContainers)-len(orphanedCreatedContainers)).
+		Int("orphaned_created_count", len(orphanedCreatedContainers)).
+		Strs("containers", containerNames(oldContainers)).
+		Msg("Found old or orphaned Watchtower containers, cleaning up")
 
 	// Find the current container in the list so image collection works
 	var currentContainerObj types.Container
@@ -263,7 +265,7 @@ func CleanupOldWatchtowerContainers(
 	}
 
 	// Reuse the existing removal logic for old containers
-	removed, err := removeExcessContainers(
+	removed, err := removeExcessContainers(log,
 		ctx,
 		client,
 		oldContainers,
@@ -290,23 +292,22 @@ func CleanupOldWatchtowerContainers(
 //
 // Returns:
 //   - []types.Container: Slice of containers to remove.
-func getExcessContainers(
-	watchtowerScope string,
+func getExcessContainers(log *zerolog.Logger, watchtowerScope string,
 	currentContainer types.Container,
 	allContainers []types.Container,
 ) []types.Container {
-	logrus.WithFields(logrus.Fields{
-		"scope": watchtowerScope,
-		"current_container_id": func() string {
+	log.Debug().
+		Str("scope", watchtowerScope).
+		Str("current_container_id", func() string {
 			if currentContainer != nil {
 				return string(currentContainer.ID())
 			}
 
 			return ""
-		}(),
-	}).Debug("Retrieving excess containers")
+		}()).
+		Msg("Retrieving excess containers")
 
-	filteredContainers := getFilteredContainers(
+	filteredContainers := getFilteredContainers(log,
 		watchtowerScope,
 		currentContainer,
 		allContainers,
@@ -331,8 +332,7 @@ func getExcessContainers(
 //
 // Returns:
 //   - []types.Container: Slice of excess containers to remove.
-func getFilteredContainers(
-	scope string,
+func getFilteredContainers(log *zerolog.Logger, scope string,
 	currentContainer types.Container,
 	allContainers []types.Container,
 ) []types.Container {
@@ -344,7 +344,7 @@ func getFilteredContainers(
 
 	switch {
 	case scope != "":
-		filter = filters.FilterByScope(scope, filters.WatchtowerContainersFilter)
+		filter = filters.FilterByScope(log, scope, filters.WatchtowerContainersFilter)
 	default:
 		filter = filters.UnscopedWatchtowerContainersFilter
 	}
@@ -422,11 +422,11 @@ func getFilteredContainers(
 		}
 	}
 
-	logrus.WithFields(logrus.Fields{
-		"scope":                     scope,
-		"excess_containers_found":   len(excessContainers),
-		"filtered_containers_total": len(filteredContainers),
-	}).Debug("Filtered excess containers")
+	log.Debug().
+		Str("scope", scope).
+		Int("excess_containers_found", len(excessContainers)).
+		Int("filtered_containers_total", len(filteredContainers)).
+		Msg("Filtered excess containers")
 
 	return excessContainers
 }
@@ -588,18 +588,17 @@ func addExcessContainers(excessContainers, chainContainers []types.Container) []
 // Returns:
 //   - int: Number of successfully removed containers.
 //   - error: Non-nil if any container removal failed or insufficient removals occurred.
-func removeExcessContainers(
-	ctx context.Context,
+func removeExcessContainers(log *zerolog.Logger, ctx context.Context,
 	client container.Client,
 	excessWatchtowerContainers []types.Container,
 	cleanupImages bool,
 	currentContainer types.Container,
 	removeImageInfos *[]types.RemovedImageInfo,
 ) (int, error) {
-	logrus.WithFields(logrus.Fields{
-		"excess_count":   len(excessWatchtowerContainers),
-		"cleanup_images": cleanupImages,
-	}).Debug("Starting removal of excess containers")
+	log.Debug().
+		Int("excess_count", len(excessWatchtowerContainers)).
+		Bool("cleanup_images", cleanupImages).
+		Msg("Starting removal of excess containers")
 
 	localRemoved := []types.RemovedImageInfo{}
 
@@ -613,27 +612,27 @@ func removeExcessContainers(
 	excessInstancesRemoved := 0
 
 	for _, c := range excessWatchtowerContainers {
-		logrus.WithFields(logrus.Fields{
-			"container_id":   string(c.ID()),
-			"container_name": c.Name(),
-		}).Debug("Starting removal attempts for excess container")
+		log.Debug().
+			Str("container_id", string(c.ID())).
+			Str("container_name", c.Name()).
+			Msg("Starting removal attempts for excess container")
 
 		succeeded := false
 		wasNotFound := false
 
 		for attempt := range maxRemovalAttempts {
-			logrus.WithFields(logrus.Fields{
-				"container_id": string(c.ID()),
-				"attempt":      attempt + 1,
-				"max_attempts": maxRemovalAttempts,
-			}).Debug("Attempting to stop and remove container")
+			log.Debug().
+				Str("container_id", string(c.ID())).
+				Int("attempt", attempt+1).
+				Int("max_attempts", maxRemovalAttempts).
+				Msg("Attempting to stop and remove container")
 
 			err := client.StopAndRemoveContainer(ctx, c, stopContainerTimeout)
 			if err == nil {
-				logrus.WithFields(logrus.Fields{
-					"container_id": string(c.ID()),
-					"attempt":      attempt + 1,
-				}).Debug("Successfully stopped and removed container")
+				log.Debug().
+					Str("container_id", string(c.ID())).
+					Int("attempt", attempt+1).
+					Msg("Successfully stopped and removed container")
 
 				succeeded = true
 
@@ -641,10 +640,10 @@ func removeExcessContainers(
 			}
 
 			if cerrdefs.IsNotFound(err) {
-				logrus.WithFields(logrus.Fields{
-					"container_id": string(c.ID()),
-					"attempt":      attempt + 1,
-				}).Debug("Container not found, considering as removed")
+				log.Debug().
+					Str("container_id", string(c.ID())).
+					Int("attempt", attempt+1).
+					Msg("Container not found, considering as removed")
 
 				succeeded = true
 				wasNotFound = true
@@ -652,10 +651,11 @@ func removeExcessContainers(
 				break
 			}
 
-			logrus.WithError(err).WithFields(logrus.Fields{
-				"container_id": string(c.ID()),
-				"attempt":      attempt + 1,
-			}).Debug("Failed to stop and remove container")
+			log.Debug().
+				Err(err).
+				Str("container_id", string(c.ID())).
+				Int("attempt", attempt+1).
+				Msg("Failed to stop and remove container")
 
 			if attempt < maxRemovalAttempts-1 {
 				select {
@@ -673,11 +673,11 @@ func removeExcessContainers(
 			if cleanupImages && currentContainer != nil &&
 				c.ImageID() != currentContainer.ImageID() &&
 				!wasNotFound {
-				logrus.WithFields(logrus.Fields{
-					"container_id": string(c.ID()),
-					"image_id":     string(c.ImageID()),
-					"image_name":   c.ImageName(),
-				}).Debug("Collecting image info for deferred removal")
+				log.Debug().
+					Str("container_id", string(c.ID())).
+					Str("image_id", string(c.ImageID())).
+					Str("image_name", c.ImageName()).
+					Msg("Collecting image info for deferred removal")
 
 				*collectedInfos = append(*collectedInfos, types.RemovedImageInfo{
 					ImageID:       c.ImageID(),
@@ -694,13 +694,14 @@ func removeExcessContainers(
 	}
 
 	if cleanupImages {
-		removedInfos, err := RemoveImages(ctx, client, *collectedInfos)
+		removedInfos, err := RemoveImages(log, ctx, client, *collectedInfos)
 		if err != nil {
-			logrus.WithError(err).WithFields(logrus.Fields{
-				"removed_images_count": len(removedInfos),
-				"image_infos":          removedInfos,
-				"cleanup_images":       true,
-			}).Error("failed to remove excess images")
+			log.Error().
+				Err(err).
+				Int("removed_images_count", len(removedInfos)).
+				Interface("image_infos", removedInfos).
+				Bool("cleanup_images", true).
+				Msg("failed to remove excess images")
 		}
 
 		if removeImageInfos != nil {
@@ -717,8 +718,9 @@ func removeExcessContainers(
 		)
 	}
 
-	logrus.WithField("removed_instances", excessInstancesRemoved).
-		Info("Successfully removed all excess Watchtower containers")
+	log.Info().
+		Int("removed_instances", excessInstancesRemoved).
+		Msg("Successfully removed all excess Watchtower containers")
 
 	return excessInstancesRemoved, nil
 }
@@ -730,6 +732,7 @@ func removeExcessContainers(
 // If no images are provided, it returns an empty slice and no error.
 //
 // Parameters:
+//   - log: Process logger. Required and must be non-nil. A nil logger panics on the first log call.
 //   - ctx: Context for cancellation and timeouts.
 //   - client: Container client for Docker operations.
 //   - images: Slice of images to remove.
@@ -737,14 +740,13 @@ func removeExcessContainers(
 // Returns:
 //   - []RemovedImageInfo: Slice of successfully removed image info.
 //   - error: Non-nil if any image removal failed, nil otherwise.
-func RemoveImages(
-	ctx context.Context,
+func RemoveImages(log *zerolog.Logger, ctx context.Context,
 	client container.Client,
 	images []types.RemovedImageInfo,
 ) ([]types.RemovedImageInfo, error) {
 	// Return early if no images need removal.
 	if len(images) == 0 {
-		logrus.Debug("No images provided for removal, skipping")
+		log.Debug().Msg("No images provided for removal, skipping")
 
 		return []types.RemovedImageInfo{}, nil
 	}
@@ -759,41 +761,42 @@ func RemoveImages(
 			continue // Skip empty IDs to avoid invalid operations.
 		}
 
-		logrus.WithFields(logrus.Fields{
-			"image_id":     string(imageID),
-			"image_name":   image.ImageName,
-			"container_id": string(image.ContainerID),
-		}).Debug("Attempting to remove image")
+		log.Debug().
+			Str("image_id", string(imageID)).
+			Str("image_name", image.ImageName).
+			Str("container_id", string(image.ContainerID)).
+			Msg("Attempting to remove image")
 
 		err := client.RemoveImageByID(ctx, imageID, image.ImageName)
 		if err != nil {
 			// Check if this is a "not found" error (expected when multiple instances remove the same image)
 			switch {
 			case cerrdefs.IsNotFound(err):
-				logrus.WithFields(logrus.Fields{
-					"image_id":   imageID,
-					"image_name": image.ImageName,
-				}).Debug("Image already removed")
+				log.Debug().
+					Str("image_id", string(imageID)).
+					Str("image_name", image.ImageName).
+					Msg("Image already removed")
 			case cerrdefs.IsConflict(err) || errors.Is(err, container.ErrImageInUse):
-				logrus.WithFields(logrus.Fields{
-					"image_id":   imageID,
-					"image_name": image.ImageName,
-				}).Debug("Image is in use by active container, skipping removal")
+				log.Debug().
+					Str("image_id", string(imageID)).
+					Str("image_name", image.ImageName).
+					Msg("Image is in use by active container, skipping removal")
 			default:
-				logrus.WithError(err).WithFields(logrus.Fields{
-					"image_id":   imageID,
-					"image_name": image.ImageName,
-				}).Debug("Failed to remove image")
+				log.Debug().
+					Err(err).
+					Str("image_id", string(imageID)).
+					Str("image_name", image.ImageName).
+					Msg("Failed to remove image")
 				removalErrors = append(
 					removalErrors,
 					fmt.Errorf("failed to remove image %s: %w", imageID, err),
 				)
 			}
 		} else {
-			logrus.WithFields(logrus.Fields{
-				"image_id":   imageID.ShortID(),
-				"image_name": image.ImageName,
-			}).Debug("Removed old image")
+			log.Debug().
+				Str("image_id", imageID.ShortID()).
+				Str("image_name", image.ImageName).
+				Msg("Removed old image")
 			removed = append(
 				removed,
 				types.RemovedImageInfo{

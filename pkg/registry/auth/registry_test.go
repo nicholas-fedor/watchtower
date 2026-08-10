@@ -3,7 +3,6 @@ package auth
 import (
 	"testing"
 
-	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -106,82 +105,70 @@ func Test_parseChallenge(t *testing.T) {
 
 func Test_extractChallengeHost(t *testing.T) {
 	tests := []struct {
-		name   string
-		realm  string
-		fields logrus.Fields
-		want   string
+		name  string
+		realm string
+		want  string
 	}{
 		{
-			name:   "https URL with path",
-			realm:  "https://ghcr.io/token",
-			fields: logrus.Fields{},
-			want:   "ghcr.io",
+			name:  "https URL with path",
+			realm: "https://ghcr.io/token",
+			want:  "ghcr.io",
 		},
 		{
-			name:   "http URL with path",
-			realm:  "http://localhost:5000/token",
-			fields: logrus.Fields{},
-			want:   "localhost:5000",
+			name:  "http URL with path",
+			realm: "http://localhost:5000/token",
+			want:  "localhost:5000",
 		},
 		{
-			name:   "URL with trailing slash",
-			realm:  "https://registry.example.com/token/",
-			fields: logrus.Fields{},
-			want:   "registry.example.com",
+			name:  "URL with trailing slash",
+			realm: "https://registry.example.com/token/",
+			want:  "registry.example.com",
 		},
 		{
-			name:   "URL without path",
-			realm:  "https://ghcr.io",
-			fields: logrus.Fields{},
-			want:   "ghcr.io",
+			name:  "URL without path",
+			realm: "https://ghcr.io",
+			want:  "ghcr.io",
 		},
 		{
-			name:   "URL with port number",
-			realm:  "https://registry.example.com:5000/token",
-			fields: logrus.Fields{},
-			want:   "registry.example.com:5000",
+			name:  "URL with port number",
+			realm: "https://registry.example.com:5000/token",
+			want:  "registry.example.com:5000",
 		},
 		{
-			name:   "URL with query parameters returns host only",
-			realm:  "https://ghcr.io/token?foo=bar",
-			fields: logrus.Fields{},
-			want:   "ghcr.io",
+			name:  "URL with query parameters returns host only",
+			realm: "https://ghcr.io/token?foo=bar",
+			want:  "ghcr.io",
 		},
 		{
-			name:   "URL with fragment returns host only",
-			realm:  "https://ghcr.io/token#section",
-			fields: logrus.Fields{},
-			want:   "ghcr.io",
+			name:  "URL with fragment returns host only",
+			realm: "https://ghcr.io/token#section",
+			want:  "ghcr.io",
 		},
 		{
-			name:   "unsupported scheme returns empty",
-			realm:  "ftp://ghcr.io/token",
-			fields: logrus.Fields{},
-			want:   "",
+			name:  "unsupported scheme returns empty",
+			realm: "ftp://ghcr.io/token",
+			want:  "",
 		},
 		{
-			name:   "invalid URL returns empty",
-			realm:  "not-a-url",
-			fields: logrus.Fields{},
-			want:   "",
+			name:  "invalid URL returns empty",
+			realm: "not-a-url",
+			want:  "",
 		},
 		{
-			name:   "realm without scheme returns empty",
-			realm:  "ghcr.io/token",
-			fields: logrus.Fields{},
-			want:   "",
+			name:  "realm without scheme returns empty",
+			realm: "ghcr.io/token",
+			want:  "",
 		},
 		{
-			name:   "empty realm returns empty",
-			realm:  "",
-			fields: logrus.Fields{},
-			want:   "",
+			name:  "empty realm returns empty",
+			realm: "",
+			want:  "",
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got := extractChallengeHost(tt.realm, tt.fields)
+			got := extractChallengeHost(testLog(), tt.realm)
 			assert.Equal(t, tt.want, got)
 		})
 	}
@@ -261,7 +248,7 @@ func TestGetRegistryAddress(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got, err := GetRegistryAddress(tt.imageRef)
+			got, err := GetRegistryAddress(testLog(), tt.imageRef)
 			if tt.wantErr {
 				assert.Error(t, err)
 

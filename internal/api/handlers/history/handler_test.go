@@ -14,7 +14,7 @@ import (
 )
 
 func TestNew(t *testing.T) {
-	h := New(func(_, _ *time.Time, _ int) []metrics.HistoryEntry { return nil })
+	h := New(testLogger(), func(_, _ *time.Time, _ int) []metrics.HistoryEntry { return nil })
 	require.NotNil(t, h)
 	assert.Equal(t, "/v1/history", h.Path)
 }
@@ -25,7 +25,7 @@ func TestHandler_Handle(t *testing.T) {
 		{Scanned: 5, Updated: 1, Failed: 0, Restarted: 0, Skipped: 4},
 	}
 
-	h := New(func(_, _ *time.Time, _ int) []metrics.HistoryEntry { return entries })
+	h := New(testLogger(), func(_, _ *time.Time, _ int) []metrics.HistoryEntry { return entries })
 
 	app := fiber.New(fiber.Config{})
 	app.Get("/v1/history", h.Handle)
@@ -40,7 +40,7 @@ func TestHandler_Handle(t *testing.T) {
 }
 
 func TestHandler_HandleWithInvalidSince(t *testing.T) {
-	h := New(func(_, _ *time.Time, _ int) []metrics.HistoryEntry { return nil })
+	h := New(testLogger(), func(_, _ *time.Time, _ int) []metrics.HistoryEntry { return nil })
 
 	app := fiber.New(fiber.Config{})
 	app.Get("/v1/history", h.Handle)
@@ -55,7 +55,7 @@ func TestHandler_HandleWithInvalidSince(t *testing.T) {
 }
 
 func TestHandler_HandleWithInvalidLimit(t *testing.T) {
-	h := New(func(_, _ *time.Time, _ int) []metrics.HistoryEntry { return nil })
+	h := New(testLogger(), func(_, _ *time.Time, _ int) []metrics.HistoryEntry { return nil })
 
 	app := fiber.New(fiber.Config{})
 	app.Get("/v1/history", h.Handle)
@@ -79,7 +79,7 @@ func TestHandler_HandleWithValidTimeRange(t *testing.T) {
 		gotLimit           int
 	)
 
-	h := New(func(since, until *time.Time, limit int) []metrics.HistoryEntry {
+	h := New(testLogger(), func(since, until *time.Time, limit int) []metrics.HistoryEntry {
 		gotSince = since
 		gotUntil = until
 		gotLimit = limit
@@ -111,7 +111,7 @@ func TestHandler_HandleWithValidTimeRange(t *testing.T) {
 }
 
 func TestHandler_HandleWithInvalidUntil(t *testing.T) {
-	h := New(func(_, _ *time.Time, _ int) []metrics.HistoryEntry { return nil })
+	h := New(testLogger(), func(_, _ *time.Time, _ int) []metrics.HistoryEntry { return nil })
 
 	app := fiber.New(fiber.Config{})
 	app.Get("/v1/history", h.Handle)
@@ -126,7 +126,7 @@ func TestHandler_HandleWithInvalidUntil(t *testing.T) {
 }
 
 func TestHandler_HandleWithNegativeLimit(t *testing.T) {
-	h := New(func(_, _ *time.Time, _ int) []metrics.HistoryEntry { return nil })
+	h := New(testLogger(), func(_, _ *time.Time, _ int) []metrics.HistoryEntry { return nil })
 
 	app := fiber.New(fiber.Config{})
 	app.Get("/v1/history", h.Handle)
@@ -143,7 +143,7 @@ func TestHandler_HandleWithNegativeLimit(t *testing.T) {
 func TestHandler_Handle_WithTimezoneOffset(t *testing.T) {
 	var capturedSince *time.Time
 
-	h := New(func(since, _ *time.Time, _ int) []metrics.HistoryEntry {
+	h := New(testLogger(), func(since, _ *time.Time, _ int) []metrics.HistoryEntry {
 		capturedSince = since
 
 		return nil
@@ -168,7 +168,7 @@ func TestHandler_Handle_WithTimezoneOffset(t *testing.T) {
 func TestHandler_Handle_WithFractionalSeconds(t *testing.T) {
 	var capturedUntil *time.Time
 
-	h := New(func(_, until *time.Time, _ int) []metrics.HistoryEntry {
+	h := New(testLogger(), func(_, until *time.Time, _ int) []metrics.HistoryEntry {
 		capturedUntil = until
 
 		return nil
@@ -191,7 +191,7 @@ func TestHandler_Handle_WithFractionalSeconds(t *testing.T) {
 func TestHandler_Handle_NegativeTimezone(t *testing.T) {
 	var capturedSince *time.Time
 
-	h := New(func(since, _ *time.Time, _ int) []metrics.HistoryEntry {
+	h := New(testLogger(), func(since, _ *time.Time, _ int) []metrics.HistoryEntry {
 		capturedSince = since
 
 		return nil

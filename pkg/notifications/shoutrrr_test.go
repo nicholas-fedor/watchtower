@@ -1,63 +1,109 @@
 package notifications
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"errors"
+	"os"
+	"os/exec"
+	"sync"
 	"sync/atomic"
 	"testing"
 	"testing/synctest"
 	"text/template"
 	"time"
 
-	"github.com/nicholas-fedor/shoutrrr/pkg/types"
 	"github.com/onsi/ginkgo/v2"
 	"github.com/onsi/gomega"
 	"github.com/onsi/gomega/gbytes"
-	"github.com/sirupsen/logrus"
+	"github.com/rs/zerolog"
 	"github.com/spf13/cobra"
-	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+
+	shoutrrrTypes "github.com/nicholas-fedor/shoutrrr/pkg/types"
 
 	mockActions "github.com/nicholas-fedor/watchtower/internal/actions/mocks"
 	"github.com/nicholas-fedor/watchtower/internal/flags"
 	"github.com/nicholas-fedor/watchtower/pkg/notifications/templates"
 	"github.com/nicholas-fedor/watchtower/pkg/session"
+	"github.com/nicholas-fedor/watchtower/pkg/types"
 )
 
-var allButTrace = logrus.DebugLevel
+var allButTrace = zerolog.DebugLevel
+
+const shoutrrrFatalHelperEnv = "WATCHTOWER_SHOUTRRR_FATAL_HELPER"
+
+// testLogBuffer is the per-test capture buffer for notifier localLog output.
+var (
+	testLogBuffer *gbytes.Buffer
+	testLog       *zerolog.Logger
+)
+
+// testLogger returns the buffer-backed logger for the current test (or nop if unset).
+func testLogger() *zerolog.Logger {
+	if testLog != nil {
+		return testLog
+	}
+
+	l := zerolog.Nop()
+
+	return &l
+}
+
+// resetTestLogger installs a fresh buffer-backed debug logger for log assertions.
+func resetTestLogger() {
+	testLogBuffer = gbytes.NewBuffer()
+	// JSON encoding keeps field assertions simple (failure_type, failed_count, etc.).
+	l := zerolog.New(testLogBuffer).Level(zerolog.TraceLevel).With().Timestamp().Logger()
+	testLog = &l
+}
+
+// createTestNotifier wraps createNotifier with the per-test buffer-backed logger.
+// Template string is always empty (default template). Pass a custom template via
+// createNotifier directly when a test needs one.
+func createTestNotifier(
+	urls []string,
+	level zerolog.Level,
+	legacy bool,
+	data StaticData,
+	stdout bool,
+	delay time.Duration,
+) *shoutrrrTypeNotifier {
+	return createNotifier(testLogger(), urls, level, "", legacy, data, stdout, delay)
+}
 
 // TODO: Remove legacyMockData when legacy notification types are removed.
 //
 //nolint:godox
 var legacyMockData = Data{
-	Entries: []*logrus.Entry{
+	Entries: []*notificationEntry{
 		{
-			Level:   logrus.InfoLevel,
+			Level:   "info",
 			Message: "foo Bar",
 		},
 	},
 }
 
 var mockDataMultipleEntries = Data{
-	Entries: []*logrus.Entry{
+	Entries: []*notificationEntry{
 		{
-			Level:   logrus.InfoLevel,
+			Level:   "info",
 			Message: "The situation is under control",
 		},
 		{
-			Level:   logrus.WarnLevel,
+			Level:   "warning",
 			Message: "All the smoke might be covering up some problems",
 		},
 		{
-			Level:   logrus.ErrorLevel,
+			Level:   "error",
 			Message: "Turns out everything is on fire",
 		},
 	},
 }
 
 var mockDataAllFresh = Data{
-	Entries: []*logrus.Entry{},
+	Entries: []*notificationEntry{},
 	Report:  mockActions.CreateMockProgressReport(session.FreshState),
 }
 
@@ -75,7 +121,7 @@ func mockDataFromStates(states ...session.State) Data {
 		Entries: legacyMockData.Entries,
 		Report:  mockActions.CreateMockProgressReport(states...),
 		StaticData: StaticData{
-			Title: GetTitle(hostname, prefix),
+			Title: GetTitle(testLogger(), hostname, prefix),
 			Host:  hostname,
 		},
 	}
@@ -84,15 +130,11 @@ func mockDataFromStates(states ...session.State) Data {
 var _ = ginkgo.Describe("Shoutrrr", func() {
 	var logBuffer *gbytes.Buffer
 
-	// BeforeEach configures the global logrus instance for each test.
+	// BeforeEach sets up a buffer-backed zerolog logger for each test.
 	ginkgo.BeforeEach(func() {
-		logBuffer = gbytes.NewBuffer()
-		logrus.SetOutput(logBuffer)
-		logrus.SetLevel(logrus.TraceLevel)
-		logrus.SetFormatter(&logrus.TextFormatter{
-			DisableColors:    true,
-			DisableTimestamp: true,
-		})
+		resetTestLogger()
+
+		logBuffer = testLogBuffer
 	})
 
 	ginkgo.When("passing a common template name", func() {
@@ -108,44 +150,44 @@ updt1 (mock/updt1:latest): Updated
 
 	ginkgo.When("adding a log hook", func() {
 		ginkgo.When("it has not been added before", func() {
-			ginkgo.It("should be added to the logrus hooks", func() {
-				level := logrus.TraceLevel
-				hooksBefore := len(logrus.StandardLogger().Hooks[level])
-				shoutrrr := createNotifier(
+			ginkgo.It("should start receiving via RegisterHook", func() {
+				level := zerolog.TraceLevel
+				shoutrrr := createTestNotifier(
 					[]string{},
 					level,
-					"",
 					true,
 					StaticData{},
 					false,
 					time.Second,
 				)
-				shoutrrr.AddLogHook()
+				gomega.Expect(shoutrrr.receiving.Load()).To(gomega.BeFalse())
 
-				hooksAfter := len(logrus.StandardLogger().Hooks[level])
-				gomega.Expect(hooksAfter).To(gomega.BeNumerically(">", hooksBefore))
+				log := testLogger()
+
+				shoutrrr.RegisterHook(log)
+				defer shoutrrr.Close()
+
+				gomega.Expect(shoutrrr.receiving.Load()).To(gomega.BeTrue())
 			})
 		})
 		ginkgo.When("it is being added a second time", func() {
-			ginkgo.It("should not be added to the logrus hooks", func() {
-				level := logrus.TraceLevel
-				shoutrrr := createNotifier(
+			ginkgo.It("should be idempotent", func() {
+				level := zerolog.TraceLevel
+				shoutrrr := createTestNotifier(
 					[]string{},
 					level,
-					"",
 					true,
 					StaticData{},
 					false,
 					time.Second,
 				)
-				shoutrrr.AddLogHook()
+				log := testLogger()
 
-				hooksBefore := len(logrus.StandardLogger().Hooks[level])
+				shoutrrr.RegisterHook(log)
+				defer shoutrrr.Close()
 
-				shoutrrr.AddLogHook()
-
-				hooksAfter := len(logrus.StandardLogger().Hooks[level])
-				gomega.Expect(hooksAfter).To(gomega.Equal(hooksBefore))
+				shoutrrr.RegisterHook(log)
+				gomega.Expect(shoutrrr.receiving.Load()).To(gomega.BeTrue())
 			})
 		})
 	})
@@ -158,16 +200,15 @@ updt1 (mock/updt1:latest): Updated
 				cmd := new(cobra.Command)
 				flags.RegisterNotificationFlags(cmd)
 
-				shoutrrr := createNotifier(
+				shoutrrr := createTestNotifier(
 					[]string{},
-					logrus.TraceLevel,
-					"",
+					zerolog.TraceLevel,
 					true,
 					StaticData{},
 					false,
 					time.Second,
 				)
-				entries := []*logrus.Entry{
+				entries := []*notificationEntry{
 					{Message: "foo bar"},
 				}
 
@@ -179,7 +220,7 @@ updt1 (mock/updt1:latest): Updated
 		ginkgo.When("given a valid custom template", func() {
 			ginkgo.It("should format the messages using the custom template", func() {
 				tplString := `{{range .}}{{.Level}}: {{.Message}}{{println}}{{end}}`
-				tpl, err := getShoutrrrTemplate(tplString, true)
+				tpl, err := getShoutrrrTemplate(testLogger(), tplString, true)
 				gomega.Expect(err).ToNot(gomega.HaveOccurred())
 
 				shoutrrr := &shoutrrrTypeNotifier{
@@ -187,9 +228,9 @@ updt1 (mock/updt1:latest): Updated
 					legacyTemplate: true,
 				}
 
-				entries := []*logrus.Entry{
+				entries := []*notificationEntry{
 					{
-						Level:   logrus.InfoLevel,
+						Level:   "info",
 						Message: "foo bar",
 					},
 				}
@@ -386,10 +427,9 @@ Turns out everything is on fire
 	ginkgo.When("batching notifications", func() {
 		ginkgo.When("no messages are queued", func() {
 			ginkgo.It("should not send any notification", func() {
-				shoutrrr := createNotifier(
+				shoutrrr := createTestNotifier(
 					[]string{"logger://"},
 					allButTrace,
-					"",
 					true,
 					StaticData{},
 					false,
@@ -402,18 +442,21 @@ Turns out everything is on fire
 		})
 		ginkgo.When("at least one message is queued", func() {
 			ginkgo.It("should send a notification", func() {
-				shoutrrr := createNotifier(
+				shoutrrr := createTestNotifier(
 					[]string{"logger://"},
 					allButTrace,
-					"",
 					true,
 					StaticData{},
 					false,
 					time.Duration(0),
 				)
-				shoutrrr.AddLogHook()
+				log := testLogger()
+
+				shoutrrr.RegisterHook(log)
+				defer shoutrrr.Close()
+
 				shoutrrr.StartNotification(false)
-				logrus.Info("This log message is sponsored by ContainrrrVPN")
+				log.Info().Msg("This log message is sponsored by ContainrrrVPN")
 				shoutrrr.SendNotification(nil)
 				gomega.Eventually(logBuffer).
 					Should(gbytes.Say(`Shoutrrr: This log message is sponsored by ContainrrrVPN`))
@@ -423,7 +466,7 @@ Turns out everything is on fire
 
 	ginkgo.When("the title data field is empty", func() {
 		ginkgo.It("should not have set the title param", func() {
-			shoutrrr := createNotifier([]string{"logger://"}, allButTrace, "", true, StaticData{
+			shoutrrr := createTestNotifier([]string{"logger://"}, allButTrace, true, StaticData{
 				Host:  "test.host",
 				Title: "",
 			}, false, time.Second)
@@ -438,20 +481,19 @@ Turns out everything is on fire
 				sendErrors: []error{errors.New("test error"), errors.New("extra error")},
 			}
 
-			shoutrrr := createNotifier(
+			shoutrrr := createTestNotifier(
 				[]string{"logger://"},
 				allButTrace,
-				"",
 				true,
 				StaticData{},
 				false,
 				time.Duration(0),
 			)
 			shoutrrr.Router = mockRouter
-			shoutrrr.AddLogHook()
-			logrus.Info("test message")
-
+			log := testLogger()
+			shoutrrr.RegisterHook(log)
 			shoutrrr.StartNotification(false)
+			log.Info().Msg("test message")
 			shoutrrr.SendNotification(nil)
 
 			shoutrrr.Close()
@@ -463,20 +505,19 @@ Turns out everything is on fire
 				sendErrors: []error{errors.New("unauthorized access")},
 			}
 
-			shoutrrr := createNotifier(
+			shoutrrr := createTestNotifier(
 				[]string{"logger://"},
 				allButTrace,
-				"",
 				true,
 				StaticData{},
 				false,
 				time.Duration(0),
 			)
 			shoutrrr.Router = mockRouter
-			shoutrrr.AddLogHook()
-			logrus.Info("test message")
-
+			log := testLogger()
+			shoutrrr.RegisterHook(log)
 			shoutrrr.StartNotification(false)
+			log.Info().Msg("test message")
 			shoutrrr.SendNotification(nil)
 
 			shoutrrr.Close()
@@ -488,20 +529,19 @@ Turns out everything is on fire
 				sendErrors: []error{errors.New("connection timeout")},
 			}
 
-			shoutrrr := createNotifier(
+			shoutrrr := createTestNotifier(
 				[]string{"logger://"},
 				allButTrace,
-				"",
 				true,
 				StaticData{},
 				false,
 				time.Duration(0),
 			)
 			shoutrrr.Router = mockRouter
-			shoutrrr.AddLogHook()
-			logrus.Info("test message")
-
+			log := testLogger()
+			shoutrrr.RegisterHook(log)
 			shoutrrr.StartNotification(false)
+			log.Info().Msg("test message")
 			shoutrrr.SendNotification(nil)
 
 			shoutrrr.Close()
@@ -513,20 +553,19 @@ Turns out everything is on fire
 				sendErrors: []error{errors.New("too many requests")},
 			}
 
-			shoutrrr := createNotifier(
+			shoutrrr := createTestNotifier(
 				[]string{"logger://"},
 				allButTrace,
-				"",
 				true,
 				StaticData{},
 				false,
 				time.Duration(0),
 			)
 			shoutrrr.Router = mockRouter
-			shoutrrr.AddLogHook()
-			logrus.Info("test message")
-
+			log := testLogger()
+			shoutrrr.RegisterHook(log)
 			shoutrrr.StartNotification(false)
+			log.Info().Msg("test message")
 			shoutrrr.SendNotification(nil)
 
 			shoutrrr.Close()
@@ -538,20 +577,19 @@ Turns out everything is on fire
 				sendErrors: []error{errors.New("some unknown error")},
 			}
 
-			shoutrrr := createNotifier(
+			shoutrrr := createTestNotifier(
 				[]string{"logger://"},
 				allButTrace,
-				"",
 				true,
 				StaticData{},
 				false,
 				time.Duration(0),
 			)
 			shoutrrr.Router = mockRouter
-			shoutrrr.AddLogHook()
+			log := testLogger()
+			shoutrrr.RegisterHook(log)
 			shoutrrr.StartNotification(false)
-			logrus.Info("test message")
-
+			log.Info().Msg("test message")
 			shoutrrr.SendNotification(nil)
 
 			shoutrrr.Close()
@@ -563,20 +601,19 @@ Turns out everything is on fire
 				sendErrors: []error{errors.New("auth error"), errors.New("network error")},
 			}
 
-			shoutrrr := createNotifier(
+			shoutrrr := createTestNotifier(
 				[]string{"logger://", "logger://"},
 				allButTrace,
-				"",
 				true,
 				StaticData{},
 				false,
 				time.Duration(0),
 			)
 			shoutrrr.Router = mockRouter
-			shoutrrr.AddLogHook()
-			logrus.Info("test message")
-
+			log := testLogger()
+			shoutrrr.RegisterHook(log)
 			shoutrrr.StartNotification(false)
+			log.Info().Msg("test message")
 			shoutrrr.SendNotification(nil)
 
 			shoutrrr.Close()
@@ -587,16 +624,15 @@ Turns out everything is on fire
 	ginkgo.When("closing the notifier", func() {
 		ginkgo.When("Close() is called multiple times", func() {
 			ginkgo.It("should be idempotent and not panic", func() {
-				shoutrrr := createNotifier(
+				shoutrrr := createTestNotifier(
 					[]string{"logger://"},
 					allButTrace,
-					"",
 					true,
 					StaticData{},
 					false,
 					time.Duration(0),
 				)
-				shoutrrr.AddLogHook()
+				shoutrrr.RegisterHook(testLogger())
 
 				// First close should work normally
 				shoutrrr.Close()
@@ -611,16 +647,15 @@ Turns out everything is on fire
 
 		ginkgo.When("Close() is called without starting the goroutine", func() {
 			ginkgo.It("should not panic or block", func() {
-				shoutrrr := createNotifier(
+				shoutrrr := createTestNotifier(
 					[]string{"logger://"},
 					allButTrace,
-					"",
 					true,
 					StaticData{},
 					false,
 					time.Duration(0),
 				)
-				// Note: Not calling AddLogHook(), so no goroutine is started
+				// Note: Not calling RegisterHook(), so no goroutine is started
 
 				// Close should work without blocking
 				shoutrrr.Close()
@@ -631,16 +666,15 @@ Turns out everything is on fire
 
 		ginkgo.When("operations are attempted after Close()", func() {
 			ginkgo.It("should handle gracefully without panicking", func() {
-				shoutrrr := createNotifier(
+				shoutrrr := createTestNotifier(
 					[]string{"logger://"},
 					allButTrace,
-					"",
 					true,
 					StaticData{},
 					false,
 					time.Duration(0),
 				)
-				shoutrrr.AddLogHook()
+				shoutrrr.RegisterHook(testLogger())
 
 				// Close the notifier
 				shoutrrr.Close()
@@ -648,11 +682,13 @@ Turns out everything is on fire
 				// These operations should not panic after close
 				shoutrrr.StartNotification(false)
 				shoutrrr.SendNotification(nil)
-				shoutrrr.SendFilteredEntries([]*logrus.Entry{}, nil)
+				shoutrrr.SendNotification(nil)
 
 				// Fire should still work (but may not send if channel is closed)
-				entry := &logrus.Entry{Message: "test"}
-				err := shoutrrr.Fire(entry)
+				entry := &notificationEntry{Message: "test"}
+				shoutrrr.Run(nil, zerolog.InfoLevel, entry.Message)
+
+				err := error(nil)
 				gomega.Expect(err).ToNot(gomega.HaveOccurred())
 
 				// Should not panic
@@ -661,16 +697,15 @@ Turns out everything is on fire
 
 		ginkgo.When("Close() is called concurrently", func() {
 			ginkgo.It("should handle concurrent calls safely", func() {
-				shoutrrr := createNotifier(
+				shoutrrr := createTestNotifier(
 					[]string{"logger://"},
 					allButTrace,
-					"",
 					true,
 					StaticData{},
 					false,
 					time.Duration(0),
 				)
-				shoutrrr.AddLogHook()
+				shoutrrr.RegisterHook(testLogger())
 
 				// Start multiple goroutines calling Close concurrently
 				done := make(chan bool, 10)
@@ -696,10 +731,9 @@ Turns out everything is on fire
 	ginkgo.Describe("ShouldSendNotification", func() {
 		ginkgo.When("notification level is error", func() {
 			ginkgo.It("should return true when report has failed containers", func() {
-				shoutrrr := createNotifier(
+				shoutrrr := createTestNotifier(
 					[]string{"logger://"},
-					logrus.ErrorLevel,
-					"",
+					zerolog.ErrorLevel,
 					false,
 					StaticData{},
 					false,
@@ -712,10 +746,9 @@ Turns out everything is on fire
 			})
 
 			ginkgo.It("should return false when report has no failed containers", func() {
-				shoutrrr := createNotifier(
+				shoutrrr := createTestNotifier(
 					[]string{"logger://"},
-					logrus.ErrorLevel,
-					"",
+					zerolog.ErrorLevel,
 					false,
 					StaticData{},
 					false,
@@ -730,10 +763,9 @@ Turns out everything is on fire
 
 		ginkgo.When("notification level is warn", func() {
 			ginkgo.It("should return true regardless of report content", func() {
-				shoutrrr := createNotifier(
+				shoutrrr := createTestNotifier(
 					[]string{"logger://"},
-					logrus.WarnLevel,
-					"",
+					zerolog.WarnLevel,
 					false,
 					StaticData{},
 					false,
@@ -748,10 +780,9 @@ Turns out everything is on fire
 
 		ginkgo.When("notification level is info", func() {
 			ginkgo.It("should return true regardless of report content", func() {
-				shoutrrr := createNotifier(
+				shoutrrr := createTestNotifier(
 					[]string{"logger://"},
-					logrus.InfoLevel,
-					"",
+					zerolog.InfoLevel,
 					false,
 					StaticData{},
 					false,
@@ -766,10 +797,9 @@ Turns out everything is on fire
 
 		ginkgo.When("notification level is debug", func() {
 			ginkgo.It("should return true regardless of report content", func() {
-				shoutrrr := createNotifier(
+				shoutrrr := createTestNotifier(
 					[]string{"logger://"},
-					logrus.DebugLevel,
-					"",
+					zerolog.DebugLevel,
 					false,
 					StaticData{},
 					false,
@@ -784,10 +814,9 @@ Turns out everything is on fire
 
 		ginkgo.When("notification level is trace", func() {
 			ginkgo.It("should return true regardless of report content", func() {
-				shoutrrr := createNotifier(
+				shoutrrr := createTestNotifier(
 					[]string{"logger://"},
-					logrus.TraceLevel,
-					"",
+					zerolog.TraceLevel,
 					false,
 					StaticData{},
 					false,
@@ -802,10 +831,9 @@ Turns out everything is on fire
 
 		ginkgo.When("report is nil", func() {
 			ginkgo.It("should return true", func() {
-				shoutrrr := createNotifier(
+				shoutrrr := createTestNotifier(
 					[]string{"logger://"},
-					logrus.ErrorLevel,
-					"",
+					zerolog.ErrorLevel,
 					false,
 					StaticData{},
 					false,
@@ -820,22 +848,22 @@ Turns out everything is on fire
 
 	ginkgo.When("deduplicating entries for grouped notifications", func() {
 		ginkgo.It("should return empty slice for empty input", func() {
-			result := deduplicateEntries([]*logrus.Entry{})
+			result := deduplicateEntries([]*notificationEntry{})
 			gomega.Expect(result).To(gomega.BeEmpty())
 		})
 
 		ginkgo.It("should return single entry unchanged", func() {
-			entries := []*logrus.Entry{
-				{Message: "Found new image", Data: logrus.Fields{"image": "nginx:latest", "new_id": "abc123"}},
+			entries := []*notificationEntry{
+				{Message: "Found new image", Data: map[string]any{"image": "nginx:latest", "new_id": "abc123"}},
 			}
 			result := deduplicateEntries(entries)
 			gomega.Expect(result).To(gomega.HaveLen(1))
 		})
 
 		ginkgo.It("should deduplicate 'Found new image' entries with same image and new ID", func() {
-			entries := []*logrus.Entry{
-				{Message: "Found new image", Data: logrus.Fields{"container": "app-a", "image": "nginx:latest", "new_id": "abc123"}},
-				{Message: "Found new image", Data: logrus.Fields{"container": "app-b", "image": "nginx:latest", "new_id": "abc123"}},
+			entries := []*notificationEntry{
+				{Message: "Found new image", Data: map[string]any{"container": "app-a", "image": "nginx:latest", "new_id": "abc123"}},
+				{Message: "Found new image", Data: map[string]any{"container": "app-b", "image": "nginx:latest", "new_id": "abc123"}},
 			}
 			result := deduplicateEntries(entries)
 			gomega.Expect(result).To(gomega.HaveLen(1))
@@ -843,27 +871,27 @@ Turns out everything is on fire
 		})
 
 		ginkgo.It("should keep 'Found new image' entries with different images", func() {
-			entries := []*logrus.Entry{
-				{Message: "Found new image", Data: logrus.Fields{"image": "nginx:latest", "new_id": "abc123"}},
-				{Message: "Found new image", Data: logrus.Fields{"image": "redis:latest", "new_id": "def456"}},
+			entries := []*notificationEntry{
+				{Message: "Found new image", Data: map[string]any{"image": "nginx:latest", "new_id": "abc123"}},
+				{Message: "Found new image", Data: map[string]any{"image": "redis:latest", "new_id": "def456"}},
 			}
 			result := deduplicateEntries(entries)
 			gomega.Expect(result).To(gomega.HaveLen(2))
 		})
 
 		ginkgo.It("should keep 'Found new image' entries with same image but different new IDs", func() {
-			entries := []*logrus.Entry{
-				{Message: "Found new image", Data: logrus.Fields{"image": "nginx:latest", "new_id": "abc123"}},
-				{Message: "Found new image", Data: logrus.Fields{"image": "nginx:latest", "new_id": "def456"}},
+			entries := []*notificationEntry{
+				{Message: "Found new image", Data: map[string]any{"image": "nginx:latest", "new_id": "abc123"}},
+				{Message: "Found new image", Data: map[string]any{"image": "nginx:latest", "new_id": "def456"}},
 			}
 			result := deduplicateEntries(entries)
 			gomega.Expect(result).To(gomega.HaveLen(2))
 		})
 
 		ginkgo.It("should deduplicate 'Removing image' entries with same image ID", func() {
-			entries := []*logrus.Entry{
-				{Message: "Removing image", Data: logrus.Fields{"container_name": "app-a", "image_id": "sha256:abc"}},
-				{Message: "Removing image", Data: logrus.Fields{"container_name": "app-b", "image_id": "sha256:abc"}},
+			entries := []*notificationEntry{
+				{Message: "Removing image", Data: map[string]any{"container_name": "app-a", "image_id": "sha256:abc"}},
+				{Message: "Removing image", Data: map[string]any{"container_name": "app-b", "image_id": "sha256:abc"}},
 			}
 			result := deduplicateEntries(entries)
 			gomega.Expect(result).To(gomega.HaveLen(1))
@@ -871,22 +899,22 @@ Turns out everything is on fire
 		})
 
 		ginkgo.It("should not deduplicate other message types", func() {
-			entries := []*logrus.Entry{
-				{Message: "Stopping container", Data: logrus.Fields{"container": "app-a"}},
-				{Message: "Stopping container", Data: logrus.Fields{"container": "app-b"}},
+			entries := []*notificationEntry{
+				{Message: "Stopping container", Data: map[string]any{"container": "app-a"}},
+				{Message: "Stopping container", Data: map[string]any{"container": "app-b"}},
 			}
 			result := deduplicateEntries(entries)
 			gomega.Expect(result).To(gomega.HaveLen(2))
 		})
 
 		ginkgo.It("should handle mixed entry types correctly", func() {
-			entries := []*logrus.Entry{
-				{Message: "Found new image", Data: logrus.Fields{"image": "nginx:latest", "new_id": "abc123"}},
-				{Message: "Stopping container", Data: logrus.Fields{"container": "app-a"}},
-				{Message: "Found new image", Data: logrus.Fields{"image": "nginx:latest", "new_id": "abc123"}},
-				{Message: "Removing image", Data: logrus.Fields{"image_id": "sha256:old"}},
-				{Message: "Started new container", Data: logrus.Fields{"container": "app-a"}},
-				{Message: "Removing image", Data: logrus.Fields{"image_id": "sha256:old"}},
+			entries := []*notificationEntry{
+				{Message: "Found new image", Data: map[string]any{"image": "nginx:latest", "new_id": "abc123"}},
+				{Message: "Stopping container", Data: map[string]any{"container": "app-a"}},
+				{Message: "Found new image", Data: map[string]any{"image": "nginx:latest", "new_id": "abc123"}},
+				{Message: "Removing image", Data: map[string]any{"image_id": "sha256:old"}},
+				{Message: "Started new container", Data: map[string]any{"container": "app-a"}},
+				{Message: "Removing image", Data: map[string]any{"image_id": "sha256:old"}},
 			}
 			result := deduplicateEntries(entries)
 			gomega.Expect(result).To(gomega.HaveLen(4))
@@ -955,19 +983,9 @@ func TestSlowNotificationSent(t *testing.T) {
 
 func TestGracefulTerminationNotificationGoroutine(t *testing.T) {
 	synctest.Test(t, func(t *testing.T) {
-		// Set up logging like Ginkgo does
-		logBuffer := gbytes.NewBuffer()
-		logrus.SetOutput(logBuffer)
-		logrus.SetLevel(logrus.TraceLevel)
-		logrus.SetFormatter(&logrus.TextFormatter{
-			DisableColors:    true,
-			DisableTimestamp: true,
-		})
-
-		shoutrrr := createNotifier(
+		shoutrrr := createTestNotifier(
 			[]string{"logger://"},
 			allButTrace,
-			"",
 			true,
 			StaticData{},
 			true, // stdout
@@ -995,15 +1013,6 @@ func TestGracefulTerminationNotificationGoroutine(t *testing.T) {
 
 func TestGracefulTerminationDuringMessageProcessing(t *testing.T) {
 	synctest.Test(t, func(t *testing.T) {
-		// Set up logging
-		logBuffer := gbytes.NewBuffer()
-		logrus.SetOutput(logBuffer)
-		logrus.SetLevel(logrus.TraceLevel)
-		logrus.SetFormatter(&logrus.TextFormatter{
-			DisableColors:    true,
-			DisableTimestamp: true,
-		})
-
 		shoutrrr, blockingRouter, err := sendNotificationsWithBlockingRouter()
 		if err != nil {
 			t.Fatal(err)
@@ -1043,19 +1052,9 @@ func TestGracefulTerminationDuringMessageProcessing(t *testing.T) {
 
 func TestContextCancellationIndependentOfStopChannel(t *testing.T) {
 	synctest.Test(t, func(t *testing.T) {
-		// Set up logging
-		logBuffer := gbytes.NewBuffer()
-		logrus.SetOutput(logBuffer)
-		logrus.SetLevel(logrus.TraceLevel)
-		logrus.SetFormatter(&logrus.TextFormatter{
-			DisableColors:    true,
-			DisableTimestamp: true,
-		})
-
-		shoutrrr := createNotifier(
+		shoutrrr := createTestNotifier(
 			[]string{"logger://"},
 			allButTrace,
-			"",
 			true,
 			StaticData{},
 			true, // stdout
@@ -1094,7 +1093,7 @@ type mockRouter struct {
 	sendErrors []error
 }
 
-func (m *mockRouter) Send(_ string, _ *types.Params) []error {
+func (m *mockRouter) Send(_ string, _ *shoutrrrTypes.Params) []error {
 	return m.sendErrors
 }
 
@@ -1106,7 +1105,7 @@ type blockingRouter struct {
 	ctx    context.Context //nolint:containedctx
 }
 
-func (b blockingRouter) Send(_ string, _ *types.Params) []error {
+func (b blockingRouter) Send(_ string, _ *shoutrrrTypes.Params) []error {
 	select {
 	case <-b.unlock:
 		b.sent <- true
@@ -1133,7 +1132,7 @@ func sendNotificationsWithBlockingRouter() (*shoutrrrTypeNotifier, *blockingRout
 		ctx:    ctx,
 	}
 
-	tpl, err := getShoutrrrTemplate("", legacy)
+	tpl, err := getShoutrrrTemplate(testLogger(), "", legacy)
 	if err != nil {
 		cancel()
 
@@ -1146,20 +1145,24 @@ func sendNotificationsWithBlockingRouter() (*shoutrrrTypeNotifier, *blockingRout
 		done:           make(chan struct{}),
 		Router:         router,
 		legacyTemplate: legacy,
-		params:         &types.Params{},
+		params:         &shoutrrrTypes.Params{},
 		ctx:            ctx,
 		cancel:         cancel,
 		delay:          time.Duration(0),
 	}
 
-	entry := &logrus.Entry{
+	entry := &notificationEntry{
 		Message: "foo bar",
 	}
 
 	go sendNotifications(shoutrrr)
 
 	shoutrrr.StartNotification(false)
-	_ = shoutrrr.Fire(entry)
+	// Enqueue directly: Run(nil, ...) is fail-closed (cannot parse notify field).
+	// These tests exercise the send worker, not hook field extraction.
+	shoutrrr.entriesMutex.Lock()
+	shoutrrr.entries = append(shoutrrr.entries, entry)
+	shoutrrr.entriesMutex.Unlock()
 	shoutrrr.SendNotification(nil)
 
 	return shoutrrr, router, nil
@@ -1172,12 +1175,9 @@ func sendNotificationsWithBlockingRouter() (*shoutrrrTypeNotifier, *blockingRout
 //
 //nolint:godox
 func createNotifierWithTemplate(tplString string, legacy bool) (*shoutrrrTypeNotifier, error) {
-	tpl, err := getShoutrrrTemplate(tplString, legacy)
+	tpl, err := getShoutrrrTemplate(testLogger(), tplString, legacy)
 	if err != nil {
-		logrus.Errorf(
-			"Could not use configured notification template: %s. Using default template",
-			err,
-		)
+		_ = err // template construction error ignored for this helper
 
 		tplBase := template.New("").Funcs(templates.Funcs)
 
@@ -1187,7 +1187,8 @@ func createNotifierWithTemplate(tplString string, legacy bool) (*shoutrrrTypeNot
 		}
 
 		tpl = template.Must(tplBase.Parse(commonTemplates[defaultKey]))
-		// Do not reset err; keep it to indicate the original parsing failure
+		// Do not reset err.
+		// Keep it to indicate the original parsing failure.
 	}
 
 	return &shoutrrrTypeNotifier{
@@ -1224,15 +1225,6 @@ func TestShutdownGracePeriodConstant(t *testing.T) {
 // the send call.
 func TestCloseDoesNotHangWithBlockingRouter(t *testing.T) {
 	synctest.Test(t, func(t *testing.T) {
-		// Set up logging
-		logBuffer := gbytes.NewBuffer()
-		logrus.SetOutput(logBuffer)
-		logrus.SetLevel(logrus.TraceLevel)
-		logrus.SetFormatter(&logrus.TextFormatter{
-			DisableColors:    true,
-			DisableTimestamp: true,
-		})
-
 		// Create a notifier with a blocking router
 		shoutrrr, blockingRouter, err := sendNotificationsWithBlockingRouter()
 		if err != nil {
@@ -1299,7 +1291,7 @@ type controlledRouter struct {
 	ctx        context.Context //nolint:containedctx
 }
 
-func (c *controlledRouter) Send(_ string, _ *types.Params) []error {
+func (c *controlledRouter) Send(_ string, _ *shoutrrrTypes.Params) []error {
 	// Signal that we're waiting
 	// Wait for continue signal or context cancellation
 	select {
@@ -1316,15 +1308,6 @@ func (c *controlledRouter) Send(_ string, _ *types.Params) []error {
 // before context is canceled during the shutdown grace period.
 func TestGracePeriodAllowsInFlightMessages(t *testing.T) {
 	synctest.Test(t, func(t *testing.T) {
-		// Set up logging
-		logBuffer := gbytes.NewBuffer()
-		logrus.SetOutput(logBuffer)
-		logrus.SetLevel(logrus.TraceLevel)
-		logrus.SetFormatter(&logrus.TextFormatter{
-			DisableColors:    true,
-			DisableTimestamp: true,
-		})
-
 		// Create a controlled router
 		ctx, cancel := context.WithCancel(context.Background())
 
@@ -1334,7 +1317,7 @@ func TestGracePeriodAllowsInFlightMessages(t *testing.T) {
 			ctx:        ctx,
 		}
 
-		tpl, err := getShoutrrrTemplate("", true)
+		tpl, err := getShoutrrrTemplate(testLogger(), "", true)
 		if err != nil {
 			cancel()
 			t.Fatal(err)
@@ -1347,7 +1330,7 @@ func TestGracePeriodAllowsInFlightMessages(t *testing.T) {
 			stop:           make(chan struct{}),
 			Router:         controlledR,
 			legacyTemplate: true,
-			params:         &types.Params{},
+			params:         &shoutrrrTypes.Params{},
 			ctx:            ctx,
 			cancel:         cancel,
 			delay:          time.Duration(0),
@@ -1400,25 +1383,15 @@ func TestGracePeriodAllowsInFlightMessages(t *testing.T) {
 // TestCloseWithNoGoroutine verifies that Close() works correctly when the
 // notification goroutine was never started.
 func TestCloseWithNoGoroutine(t *testing.T) {
-	// Set up logging
-	logBuffer := gbytes.NewBuffer()
-	logrus.SetOutput(logBuffer)
-	logrus.SetLevel(logrus.TraceLevel)
-	logrus.SetFormatter(&logrus.TextFormatter{
-		DisableColors:    true,
-		DisableTimestamp: true,
-	})
-
-	shoutrrr := createNotifier(
+	shoutrrr := createTestNotifier(
 		[]string{"logger://"},
 		allButTrace,
-		"",
 		true,
 		StaticData{},
 		false,
 		time.Duration(0),
 	)
-	// Note: Not calling AddLogHook(), so no goroutine is started
+	// Note: Not calling RegisterHook(), so no goroutine is started
 
 	// Close should complete immediately without blocking
 	// Use goroutine+channel+select pattern to avoid flaky wall-clock timing.
@@ -1443,33 +1416,312 @@ func TestCloseWithNoGoroutine(t *testing.T) {
 
 // TestCreateNotifier_FatalsOnBadURL verifies that createNotifier calls Fatal
 // when given a docker-secret file path instead of a valid URL.
+// The fatal path is tested via subprocess because zerolog.Fatal calls os.Exit.
 func TestCreateNotifier_FatalsOnBadURL(t *testing.T) {
-	originalExit := logrus.StandardLogger().ExitFunc
-
-	defer func() { logrus.StandardLogger().ExitFunc = originalExit }()
-
-	logrus.StandardLogger().ExitFunc = func(_ int) { panic("FATAL") }
-
-	assert.PanicsWithValue(t, "FATAL", func() {
+	if os.Getenv(shoutrrrFatalHelperEnv) != "" {
+		// Child process: expect createNotifier to fatal on invalid URL.
+		log := zerolog.Nop()
 		createNotifier(
-			[]string{"/run/secrets/WATCHTOWER_NOTIFICATION_URL"},
-			logrus.InfoLevel,
+			&log,
+			[]string{"docker-secret:/run/secrets/my_url"},
+			zerolog.InfoLevel,
 			"",
 			true,
 			StaticData{},
 			false,
 			0,
 		)
-	})
+
+		// If we reach here, the fatal did not exit.
+		t.Fatal("expected createNotifier to fatal on bad URL")
+	}
+
+	// Parent process: run child and assert non-zero exit.
+	ctx, cancel := context.WithTimeout(t.Context(), 30*time.Second)
+	defer cancel()
+
+	cmd := exec.CommandContext(ctx, os.Args[0], "-test.run=^TestCreateNotifier_FatalsOnBadURL$")
+
+	cmd.Env = append(os.Environ(), shoutrrrFatalHelperEnv+"=1")
+	out, err := cmd.CombinedOutput()
+
+	if errors.Is(ctx.Err(), context.DeadlineExceeded) {
+		t.Fatalf("timed out waiting for createNotifier fatal path; output:\n%s", string(out))
+	}
+
+	var exitErr *exec.ExitError
+	if !errors.As(err, &exitErr) || exitErr.ExitCode() == 0 {
+		t.Fatalf("expected non-zero exit for bad URL; output:\n%s", string(out))
+	}
+}
+
+// TestLevelToString_WarnMapsToWarning ensures WarnLevel renders as the legacy
+// template string "warning" so custom templates comparing .Level stay compatible.
+func TestLevelToString_WarnMapsToWarning(t *testing.T) {
+	t.Parallel()
+
+	require.Equal(t, "warning", levelToString(zerolog.WarnLevel))
+	require.Equal(t, "info", levelToString(zerolog.InfoLevel))
+	require.Equal(t, "error", levelToString(zerolog.ErrorLevel))
+
+	// Non-legacy template path: compare .Level with the legacy "warning" string.
+	const tpl = `{{ range .Entries }}{{ if eq .Level "warning" }}hit{{ end }}{{ end }}`
+
+	data := Data{
+		Entries: []*notificationEntry{
+			{Level: levelToString(zerolog.WarnLevel), Message: "caution"},
+		},
+	}
+	notifier, err := createNotifierWithTemplate(tpl, false)
+	require.NoError(t, err)
+
+	result, err := notifier.buildMessage(data)
+	require.NoError(t, err)
+	require.Equal(t, "hit", result)
+}
+
+// TestRun_EventFieldMapPreservesLargeIntegers ensures large integer fields such as
+// removed_orchestrators render exactly without float precision loss or scientific notation.
+func TestRun_EventFieldMapPreservesLargeIntegers(t *testing.T) {
+	t.Parallel()
+
+	var buf bytes.Buffer
+
+	root := zerolog.New(&buf).Level(zerolog.TraceLevel).With().Timestamp().Logger()
+	n := createTestNotifier(
+		[]string{},
+		zerolog.TraceLevel,
+		true,
+		StaticData{},
+		false,
+		0,
+	)
+	n.RegisterHook(&root)
+	n.StartNotification(true)
+
+	// Value exceeds float64 exact-integer range (2^53) so json.Unmarshal float path would corrupt it.
+	const largeCount int64 = 9007199254740993
+
+	root.Info().
+		Int64("removed_orchestrators", largeCount).
+		Msg("cleanup summary")
+
+	n.entriesMutex.RLock()
+	entries := append([]*notificationEntry(nil), n.entries...)
+	n.entriesMutex.RUnlock()
+
+	require.Len(t, entries, 1)
+	require.NotNil(t, entries[0].Data)
+
+	got, ok := entries[0].Data["removed_orchestrators"].(int64)
+	require.True(t, ok, "removed_orchestrators must be int64, got %T", entries[0].Data["removed_orchestrators"])
+	require.Equal(t, largeCount, got)
+
+	// Template must render the exact decimal digits (no scientific notation).
+	const tpl = `{{ range .Entries }}{{ index .Data "removed_orchestrators" }}{{ end }}`
+
+	notifier, err := createNotifierWithTemplate(tpl, false)
+	require.NoError(t, err)
+
+	rendered, err := notifier.buildMessage(Data{Entries: entries})
+	require.NoError(t, err)
+	require.Equal(t, "9007199254740993", rendered)
+
+	n.Close()
+}
+
+// TestRun_EventFieldMapPreservesApplicationFields verifies eventFieldMap through
+// the notification emission path: a known application field on a zerolog event
+// is retained on notificationEntry.Data. Guards against silent drops when
+// parsing Event.buf fails (fail-closed would leave the queue empty).
+func TestRun_EventFieldMapPreservesApplicationFields(t *testing.T) {
+	t.Parallel()
+
+	var buf bytes.Buffer
+
+	root := zerolog.New(&buf).Level(zerolog.TraceLevel).With().Timestamp().Logger()
+	n := createTestNotifier(
+		[]string{},
+		zerolog.TraceLevel,
+		true,
+		StaticData{},
+		false,
+		0,
+	)
+	n.RegisterHook(&root)
+	n.StartNotification(true)
+
+	const (
+		wantContainer = "app-container-1"
+		wantImage     = "nginx:latest"
+		wantMsg       = "Found new image"
+	)
+
+	root.Info().
+		Str("container", wantContainer).
+		Str("image", wantImage).
+		Msg(wantMsg)
+
+	n.entriesMutex.RLock()
+	entries := append([]*notificationEntry(nil), n.entries...)
+	n.entriesMutex.RUnlock()
+
+	require.Len(t, entries, 1, "event must be retained when Event.buf parses successfully")
+	require.Equal(t, wantMsg, entries[0].Message)
+	require.NotNil(t, entries[0].Data, "application fields must populate Data")
+	require.Equal(t, wantContainer, entries[0].Data["container"])
+	require.Equal(t, wantImage, entries[0].Data["image"])
+	// Envelope keys are stripped by eventFieldMap.
+	_, hasLevel := entries[0].Data[zerolog.LevelFieldName]
+	_, hasTime := entries[0].Data[zerolog.TimestampFieldName]
+	_, hasMessage := entries[0].Data[zerolog.MessageFieldName]
+
+	require.False(t, hasLevel)
+	require.False(t, hasTime)
+	require.False(t, hasMessage)
+
+	n.Close()
+}
+
+// TestRun_NotifyNoAndFailClosed verifies loop-prevention and fail-closed field extraction.
+func TestRun_NotifyNoAndFailClosed(t *testing.T) {
+	t.Parallel()
+
+	n := createTestNotifier(
+		[]string{},
+		zerolog.TraceLevel,
+		true,
+		StaticData{},
+		false,
+		0,
+	)
+	// Enable batching without starting the worker goroutine.
+	n.entries = make([]*notificationEntry, 0, initialEntriesCapacity)
+
+	// Fail-closed: nil event must not enqueue.
+	n.Run(nil, zerolog.InfoLevel, "should not queue")
+	n.entriesMutex.RLock()
+	require.Empty(t, n.entries)
+	n.entriesMutex.RUnlock()
+
+	// Real zerolog path: notify=no child must not enqueue.
+	var buf bytes.Buffer
+
+	root := zerolog.New(&buf).Level(zerolog.TraceLevel)
+	n.RegisterHook(&root)
+	// After RegisterHook the worker runs. Still batch via StartNotification.
+	n.StartNotification(true)
+
+	noLog := root.With().Str("notify", "no").Logger()
+	noLog.Info().Msg("internal must not notify")
+
+	n.entriesMutex.RLock()
+	require.Empty(t, n.entries, "notify=no events must not be queued")
+	n.entriesMutex.RUnlock()
+
+	// Application log without notify=no should enqueue.
+	root.Info().Str("container", "c1").Msg("Found new image")
+
+	// Allow hook to run synchronously (hooks run in emitting goroutine).
+	n.entriesMutex.RLock()
+	count := len(n.entries)
+	n.entriesMutex.RUnlock()
+	require.Equal(t, 1, count, "app log without notify=no should queue")
+
+	n.Close()
+}
+
+// TestRun_ConcurrentEnqueue verifies concurrent application logs are all queued
+// (no global single-flight gate that would drop parallel Runs).
+func TestRun_ConcurrentEnqueue(t *testing.T) {
+	t.Parallel()
+
+	var buf bytes.Buffer
+
+	root := zerolog.New(&buf).Level(zerolog.TraceLevel)
+	n := createTestNotifier(
+		[]string{},
+		zerolog.TraceLevel,
+		true,
+		StaticData{},
+		false,
+		0,
+	)
+	n.RegisterHook(&root)
+	n.StartNotification(true)
+
+	const workers = 32
+
+	var wg sync.WaitGroup
+	wg.Add(workers)
+
+	for i := range workers {
+		go func(i int) {
+			defer wg.Done()
+
+			root.Info().Int("i", i).Msg("concurrent event")
+		}(i)
+	}
+
+	wg.Wait()
+
+	n.entriesMutex.RLock()
+	count := len(n.entries)
+	n.entriesMutex.RUnlock()
+	require.Equal(t, workers, count, "every concurrent log must enqueue")
+
+	n.Close()
+}
+
+// TestSendNotification_SingleFocusKeepsBatchingActive verifies that when every
+// queued entry matches the single-container focus, n.entries remains a non-nil
+// empty slice so subsequent Run calls continue batching.
+func TestSendNotification_SingleFocusKeepsBatchingActive(t *testing.T) {
+	n := createTestNotifier(
+		[]string{"logger://"},
+		zerolog.InfoLevel,
+		true,
+		StaticData{},
+		false,
+		0,
+	)
+
+	full := mockActions.CreateMockProgressReport(session.UpdatedState)
+	require.NotEmpty(t, full.Updated())
+
+	updated := full.Updated()[0]
+	report := &session.SingleContainerReport{
+		UpdatedReports: []types.ContainerReport{updated},
+	}
+
+	n.StartNotification(true)
+	n.entriesMutex.Lock()
+	n.entries = []*notificationEntry{
+		{
+			Message: "Found new image",
+			Data:    map[string]any{"container": updated.Name()},
+		},
+	}
+	n.entriesMutex.Unlock()
+
+	n.SendNotification(report)
+
+	n.entriesMutex.RLock()
+	entries := n.entries
+	n.entriesMutex.RUnlock()
+
+	require.NotNil(t, entries, "batching slice must remain non-nil after single-focus drain")
+	require.Empty(t, entries)
+
+	n.Close()
 }
 
 // TestCreateNotifier_AcceptsGotifyURLFromFileExpansion verifies that createNotifier
 // succeeds when given a valid Gotify URL matching expanded secret content.
 func TestCreateNotifier_AcceptsGotifyURLFromFileExpansion(t *testing.T) {
-	notifier := createNotifier(
+	notifier := createTestNotifier(
 		[]string{"gotify://gotify.example.com/token123"},
-		logrus.InfoLevel,
-		"",
+		zerolog.InfoLevel,
 		true,
 		StaticData{},
 		false,

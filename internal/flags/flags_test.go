@@ -1,26 +1,46 @@
 package flags
 
 import (
+	"bytes"
+	"context"
 	"errors"
 	"fmt"
+	"io"
 	"os"
+	"os/exec"
 	"regexp"
 	"strings"
 	"testing"
 	"time"
 
-	"github.com/sirupsen/logrus"
+	"github.com/rs/zerolog"
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
 	"github.com/spf13/viper"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+
+	"github.com/nicholas-fedor/watchtower/internal/logging"
 )
+
+// processFlagAliasesHelperEnv selects a ProcessFlagAliases fatal case when the
+// test binary is re-executed as a subprocess. Empty means the parent process.
+const processFlagAliasesHelperEnv = "WATCHTOWER_FLAGS_PROCESS_ALIASES_HELPER"
 
 //nolint:godox
 // TODO: Remove and/or update unit testing of deprecated configuration options just before v2 Release.
 
 var errSetFailed = errors.New("set failed")
+
+// testLogger returns a discard logger for tests that do not assert on log output.
+func testLogger() *zerolog.Logger {
+	return logging.New(io.Discard, logging.InfoLevel)
+}
+
+// testLoggerAt returns a logger writing to w at the given level.
+func testLoggerAt(w io.Writer, level logging.Level) *zerolog.Logger {
+	return logging.New(w, level)
+}
 
 // newTestCommand creates a new cobra.Command with default flags registered for testing.
 func newTestCommand() *cobra.Command {
@@ -254,7 +274,7 @@ func TestEnvConfig(t *testing.T) {
 			expectEnv: map[string]string{
 				"DOCKER_HOST": "unix:///var/run/docker.sock",
 			},
-			expectWarning: "TLS verification is enabled but DOCKER_HOST uses local socket 'unix://'. TLS is not applicable for local sockets; consider disabling TLS verification.",
+			expectWarning: "TLS verification is enabled but DOCKER_HOST uses local socket 'unix://'. TLS is not applicable for local sockets. Consider disabling TLS verification.",
 		},
 		{
 			name: "tls warnings https with tls",
@@ -300,6 +320,8 @@ func TestEnvConfig(t *testing.T) {
 			expectEnv: map[string]string{
 				"DOCKER_TLS_VERIFY": "1",
 			},
+			// Default host is unix://; TLS verify on a local socket emits this warning.
+			expectWarning: "TLS verification is enabled but DOCKER_HOST uses local socket 'unix://'",
 		},
 		{
 			name: "docker cert path env var",
@@ -361,7 +383,15 @@ func TestEnvConfig(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			// Set env vars
+			// Clear Docker env written by prior EnvConfig calls so cases do not leak.
+			for _, key := range []string{
+				"DOCKER_HOST", "DOCKER_TLS_VERIFY", "DOCKER_API_VERSION", "DOCKER_CERT_PATH",
+			} {
+				t.Setenv(key, "")
+				os.Unsetenv(key)
+			}
+
+			// Set env vars for this case.
 			for k, v := range tc.envVars {
 				if v == "" {
 					os.Unsetenv(k)
@@ -383,18 +413,16 @@ func TestEnvConfig(t *testing.T) {
 				require.NoError(t, err)
 			}
 
-			var logOutput strings.Builder
-			if tc.expectWarning != "" {
-				logrus.SetOutput(&logOutput)
-				logrus.SetLevel(logrus.WarnLevel)
+			var logOutput bytes.Buffer
 
-				defer func() {
-					logrus.SetOutput(os.Stderr)
-					logrus.SetLevel(logrus.InfoLevel)
-				}()
+			// Always capture through the shared buffer so no-warning cases can
+			// observe unexpected output. Use Warn when a warning is expected.
+			log := testLoggerAt(&logOutput, logging.InfoLevel)
+			if tc.expectWarning != "" {
+				log = testLoggerAt(&logOutput, logging.WarnLevel)
 			}
 
-			err := EnvConfig(cmd)
+			err := EnvConfig(log, cmd)
 
 			if tc.expectError {
 				require.Error(t, err)
@@ -590,11 +618,10 @@ func TestIsFile(t *testing.T) {
 // TestProcessFlagAliases tests flag alias processing with various configurations.
 func TestProcessFlagAliases(t *testing.T) {
 	testCases := []struct {
-		name        string
-		envVars     map[string]string
-		flags       []string
-		expectPanic bool
-		checks      func(t *testing.T, flags *pflag.FlagSet)
+		name    string
+		envVars map[string]string
+		flags   []string
+		checks  func(t *testing.T, flags *pflag.FlagSet)
 	}{
 		{
 			name: "porcelain v1 with interval and trace",
@@ -645,16 +672,6 @@ func TestProcessFlagAliases(t *testing.T) {
 				assert.Equal(t, "@hourly", sched)
 			},
 		},
-		{
-			name:        "schedule and interval conflict",
-			flags:       []string{"--schedule", "@hourly", "--interval", "10"},
-			expectPanic: true,
-		},
-		{
-			name:        "invalid porcelain version",
-			flags:       []string{"--porcelain", "v2"},
-			expectPanic: true,
-		},
 	}
 
 	for _, tc := range testCases {
@@ -664,20 +681,9 @@ func TestProcessFlagAliases(t *testing.T) {
 				t.Setenv(k, v)
 			}
 
-			if tc.expectPanic {
-				logrus.StandardLogger().ExitFunc = func(_ int) { panic("FATAL") }
-				cmd := newTestCommand()
-				require.NoError(t, cmd.ParseFlags(tc.flags))
-				assert.PanicsWithValue(t, "FATAL", func() {
-					ProcessFlagAliases(cmd.Flags())
-				})
-
-				return
-			}
-
 			cmd := newTestCommand()
 			require.NoError(t, cmd.ParseFlags(tc.flags))
-			ProcessFlagAliases(cmd.Flags())
+			ProcessFlagAliases(testLogger(), cmd.Flags())
 
 			if tc.checks != nil {
 				tc.checks(t, cmd.Flags())
@@ -686,52 +692,171 @@ func TestProcessFlagAliases(t *testing.T) {
 	}
 }
 
+// TestProcessFlagAliases_FatalCases covers zerolog.Fatal paths via subprocess.
+// In-process interception is unavailable (Fatal always calls os.Exit).
+func TestProcessFlagAliases_FatalCases(t *testing.T) {
+	if caseName := os.Getenv(processFlagAliasesHelperEnv); caseName != "" {
+		runProcessFlagAliasesFatalHelper(caseName)
+
+		// Fatal paths must exit. Reaching here means the helper did not Fatal.
+		os.Exit(0)
+	}
+
+	cases := []struct {
+		name       string
+		helperCase string
+		wantDiag   string
+	}{
+		{
+			name:       "schedule and interval conflict",
+			helperCase: "schedule-interval-conflict",
+			wantDiag:   "Cannot define both interval and schedule",
+		},
+		{
+			name:       "invalid porcelain version",
+			helperCase: "invalid-porcelain",
+			wantDiag:   "Unknown porcelain version, supported: v1",
+		},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			out, err := runProcessFlagAliasesHelper(t, tc.helperCase)
+			require.Error(t, err, "fatal path must exit non-zero; output:\n%s", out)
+
+			var exitErr *exec.ExitError
+			require.ErrorAs(t, err, &exitErr)
+			assert.NotEqual(t, 0, exitErr.ExitCode(), "expected non-zero exit; output:\n%s", out)
+			assert.Contains(t, out, tc.wantDiag)
+		})
+	}
+}
+
+// runProcessFlagAliasesHelper re-executes the test binary for a named fatal case.
+//
+// Parameters:
+//   - t: test handle
+//   - caseName: helper case key (see runProcessFlagAliasesFatalHelper)
+//
+// Returns:
+//   - string: combined stdout/stderr from the child
+//   - error: non-nil when the child exits non-zero or fails to start
+func runProcessFlagAliasesHelper(t *testing.T, caseName string) (string, error) {
+	t.Helper()
+
+	// Match only this test so nested subtests and other packages do not run.
+	ctx, cancel := context.WithTimeout(t.Context(), 30*time.Second)
+	defer cancel()
+
+	// Codacy: static argv only (os.Args[0] is this test binary, case names are fixed literals).
+	// nosemgrep: go.lang.security.audit.dangerous-exec-command.dangerous-exec-command
+	cmd := exec.CommandContext(ctx, os.Args[0], "-test.run=^TestProcessFlagAliases_FatalCases$", "-test.v=false")
+
+	cmd.Env = append(os.Environ(), processFlagAliasesHelperEnv+"="+caseName)
+	out, err := cmd.CombinedOutput()
+
+	return string(out), err
+}
+
+// runProcessFlagAliasesFatalHelper executes ProcessFlagAliases for a fatal case
+// in the child process. It always ends in zerolog.Fatal (os.Exit) on success.
+//
+// Parameters:
+//   - caseName: "schedule-interval-conflict" or "invalid-porcelain"
+func runProcessFlagAliasesFatalHelper(caseName string) {
+	cmd := newTestCommand()
+
+	var flagArgs []string
+
+	switch caseName {
+	case "schedule-interval-conflict":
+		flagArgs = []string{"--schedule", "@hourly", "--interval", "10"}
+	case "invalid-porcelain":
+		flagArgs = []string{"--porcelain", "v2"}
+	default:
+		fmt.Fprintf(os.Stderr, "unknown helper case %q\n", caseName)
+		os.Exit(2)
+	}
+
+	err := cmd.ParseFlags(flagArgs)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "parse flags: %v\n", err)
+		os.Exit(2)
+	}
+
+	// Write diagnostics to stderr so the parent can assert on CombinedOutput.
+	log := zerolog.New(os.Stderr).Level(zerolog.InfoLevel)
+	ProcessFlagAliases(&log, cmd.Flags())
+}
+
 // TestSetupLogging tests logging setup with various formats and levels.
+//
+// Format writer shape (JSON vs ConsoleWriter pretty/logfmt) is unit-tested in
+// internal/logging/config_test.go. Here we assert SetupLogging integration:
+// success/error contracts, applied levels, and that the returned logger accepts
+// write-through without panic. Optional: capture writer output samples per
+// format via injectable writer or subprocess if ConfigureWriter gains a test seam.
 func TestSetupLogging(t *testing.T) {
 	testCases := []struct {
 		name        string
 		flags       []string
 		expectError bool
-		checks      func(t *testing.T)
+		wantLevel   zerolog.Level
+		checks      func(t *testing.T, log *zerolog.Logger)
 	}{
 		{
-			name:  "default format",
-			flags: []string{},
-			checks: func(t *testing.T) {
+			name:      "default format",
+			flags:     []string{},
+			wantLevel: zerolog.InfoLevel,
+			checks: func(t *testing.T, log *zerolog.Logger) {
 				t.Helper()
-				assert.IsType(t, &logrus.TextFormatter{}, logrus.StandardLogger().Formatter)
+				// Write-through smoke: must not panic (output goes to configured stderr writer).
+				log.Info().Msg("setuplogging default format smoke")
 			},
 		},
 		{
-			name:  "JSON format",
-			flags: []string{"--log-format", "JSON"},
-			checks: func(t *testing.T) {
+			name:      "JSON format",
+			flags:     []string{"--log-format", "JSON"},
+			wantLevel: zerolog.InfoLevel,
+			checks: func(t *testing.T, log *zerolog.Logger) {
 				t.Helper()
-				assert.IsType(t, &logrus.JSONFormatter{}, logrus.StandardLogger().Formatter)
+				log.Info().Str("format", "json").Msg("setuplogging json smoke")
 			},
 		},
 		{
-			name:  "pretty format",
-			flags: []string{"--log-format", "pretty"},
-			checks: func(t *testing.T) {
+			name:      "pretty format",
+			flags:     []string{"--log-format", "pretty"},
+			wantLevel: zerolog.InfoLevel,
+			checks: func(t *testing.T, log *zerolog.Logger) {
 				t.Helper()
-				assert.IsType(t, &logrus.TextFormatter{}, logrus.StandardLogger().Formatter)
-				textFormatter, isOk := logrus.StandardLogger().Formatter.(*logrus.TextFormatter)
-				assert.True(t, isOk)
-				assert.True(t, textFormatter.ForceColors)
-				assert.False(t, textFormatter.FullTimestamp)
+				log.Info().Str("format", "pretty").Msg("setuplogging pretty smoke")
 			},
 		},
 		{
-			name:  "logfmt format",
-			flags: []string{"--log-format", "logfmt"},
-			checks: func(t *testing.T) {
+			name:      "logfmt format",
+			flags:     []string{"--log-format", "logfmt"},
+			wantLevel: zerolog.InfoLevel,
+			checks: func(t *testing.T, log *zerolog.Logger) {
 				t.Helper()
-
-				textFormatter, isOk := logrus.StandardLogger().Formatter.(*logrus.TextFormatter)
-				assert.True(t, isOk)
-				assert.True(t, textFormatter.DisableColors)
-				assert.True(t, textFormatter.FullTimestamp)
+				log.Info().Str("format", "logfmt").Msg("setuplogging logfmt smoke")
+			},
+		},
+		{
+			name:      "debug level",
+			flags:     []string{"--log-level", "debug"},
+			wantLevel: zerolog.DebugLevel,
+			checks: func(t *testing.T, log *zerolog.Logger) {
+				t.Helper()
+				log.Debug().Msg("setuplogging debug smoke")
+			},
+		},
+		{
+			name:      "json format with debug level",
+			flags:     []string{"--log-format", "json", "--log-level", "debug"},
+			wantLevel: zerolog.DebugLevel,
+			checks: func(t *testing.T, log *zerolog.Logger) {
+				t.Helper()
+				log.Debug().Str("format", "json").Msg("setuplogging json+debug smoke")
 			},
 		},
 		{
@@ -751,7 +876,7 @@ func TestSetupLogging(t *testing.T) {
 			cmd := newTestCommand()
 			require.NoError(t, cmd.ParseFlags(tc.flags))
 
-			err := SetupLogging(cmd.Flags())
+			log, err := SetupLogging(testLogger(), cmd.Flags())
 
 			if tc.expectError {
 				require.Error(t, err)
@@ -760,9 +885,11 @@ func TestSetupLogging(t *testing.T) {
 			}
 
 			require.NoError(t, err)
+			require.NotNil(t, log)
+			assert.Equal(t, tc.wantLevel, log.GetLevel())
 
 			if tc.checks != nil {
-				tc.checks(t)
+				tc.checks(t, log)
 			}
 		})
 	}
@@ -844,9 +971,9 @@ func TestFlagsArePresentInDocumentation(t *testing.T) {
 func TestSetEnvOptStr_Error(t *testing.T) {
 	// Mocking os.Setenv is complex without dependency injection; test assumes rare failure case
 	// For coverage, ensure environment is writable and check logic
-	err := setEnvOptStr("TEST_ENV", "value")
+	err := setEnvOptStr(testLogger(), "TEST_ENV", "value")
 	assert.NoError(t, err) // Normally succeeds; mock needed for failure
-	// To truly test line 592, use a system where Setenv fails (e.g., read-only env)
+	// To truly test setenv failure, use a system where Setenv fails (e.g., read-only env)
 }
 
 // TestGetSecretFromFile_OpenError tests file opening errors in getSecretFromFile.
@@ -905,7 +1032,7 @@ func TestGetSecretFromFile_SkipCommentsAndEmptyLines(t *testing.T) {
 	err = cmd.ParseFlags([]string{"--notification-url", file.Name()})
 	require.NoError(t, err)
 
-	err = getSecretFromFile(cmd.PersistentFlags(), "notification-url")
+	err = getSecretFromFile(testLogger(), cmd.PersistentFlags(), "notification-url")
 	require.NoError(t, err)
 
 	urls, err := cmd.PersistentFlags().GetStringArray("notification-url")
@@ -937,7 +1064,7 @@ func TestGetSecretFromFile_InvalidSecretURL(t *testing.T) {
 	err = cmd.ParseFlags([]string{"--notification-url", file.Name()})
 	require.NoError(t, err)
 
-	err = getSecretFromFile(cmd.PersistentFlags(), "notification-url")
+	err = getSecretFromFile(testLogger(), cmd.PersistentFlags(), "notification-url")
 	require.Error(t, err)
 	require.ErrorIs(t, err, errInvalidSecretURL)
 }
@@ -963,7 +1090,7 @@ func TestGetSecretFromFile_ParameterlessLoggerAndMockURLs(t *testing.T) {
 	err = cmd.ParseFlags([]string{"--notification-url", file.Name()})
 	require.NoError(t, err)
 
-	err = getSecretFromFile(cmd.PersistentFlags(), "notification-url")
+	err = getSecretFromFile(testLogger(), cmd.PersistentFlags(), "notification-url")
 	require.NoError(t, err)
 
 	urls, err := cmd.PersistentFlags().GetStringArray("notification-url")
@@ -986,7 +1113,7 @@ func TestGetSecretFromFile_CloseError(t *testing.T) {
 	// Close file early to simulate potential issues
 	file.Close()
 
-	err = getSecretFromFile(cmd.PersistentFlags(), "notification-email-server-password")
+	err = getSecretFromFile(testLogger(), cmd.PersistentFlags(), "notification-email-server-password")
 	assert.NoError(t, err) // Still succeeds unless Close failure is mocked
 	// Full coverage requires mocking os.File.Close to fail
 }
@@ -1004,7 +1131,7 @@ func TestGetSecretFromFile_StringPathStillMarksChanged(t *testing.T) {
 	err = cmd.ParseFlags([]string{"--notification-email-server-password", file.Name()})
 	require.NoError(t, err)
 
-	err = getSecretFromFile(cmd.PersistentFlags(), "notification-email-server-password")
+	err = getSecretFromFile(testLogger(), cmd.PersistentFlags(), "notification-email-server-password")
 	require.NoError(t, err)
 
 	flag := cmd.PersistentFlags().Lookup("notification-email-server-password")
@@ -1031,7 +1158,7 @@ func TestGetSecretFromFile_SlicePath_MarksChangedAfterReplace(t *testing.T) {
 	flag := cmd.PersistentFlags().Lookup("notification-url")
 	require.NotNil(t, flag)
 
-	err = getSecretFromFile(cmd.PersistentFlags(), "notification-url")
+	err = getSecretFromFile(testLogger(), cmd.PersistentFlags(), "notification-url")
 	require.NoError(t, err)
 
 	urls, err := cmd.PersistentFlags().GetStringArray("notification-url")
@@ -1054,7 +1181,7 @@ func TestGetSecretFromFile_SlicePath_MultiLineFile(t *testing.T) {
 	require.NoError(t, err)
 	parseWithEnv(t, cmd)
 
-	err = getSecretFromFile(cmd.PersistentFlags(), "notification-url")
+	err = getSecretFromFile(testLogger(), cmd.PersistentFlags(), "notification-url")
 	require.NoError(t, err)
 
 	urls, err := cmd.PersistentFlags().GetStringArray("notification-url")
@@ -1081,7 +1208,7 @@ func TestGetSecretFromFile_SlicePath_LiteralURLsUnchanged(t *testing.T) {
 	flag := cmd.PersistentFlags().Lookup("notification-url")
 	require.NotNil(t, flag)
 
-	err = getSecretFromFile(cmd.PersistentFlags(), "notification-url")
+	err = getSecretFromFile(testLogger(), cmd.PersistentFlags(), "notification-url")
 	require.NoError(t, err)
 
 	urls, err := cmd.PersistentFlags().GetStringArray("notification-url")
@@ -1111,13 +1238,13 @@ func TestGetSecretsFromFile_PorcelainAppendPreservedWithSecret(t *testing.T) {
 		"--porcelain", "v1",
 	})
 	require.NoError(t, err)
-	ProcessFlagAliases(cmd.PersistentFlags())
+	ProcessFlagAliases(testLogger(), cmd.PersistentFlags())
 
 	urls, err := cmd.PersistentFlags().GetStringArray("notification-url")
 	require.NoError(t, err)
 	assert.Contains(t, urls, "logger://", "porcelain value must survive secret expansion")
 
-	err = getSecretFromFile(cmd.PersistentFlags(), "notification-url")
+	err = getSecretFromFile(testLogger(), cmd.PersistentFlags(), "notification-url")
 	require.NoError(t, err)
 
 	urls, err = cmd.PersistentFlags().GetStringArray("notification-url")
@@ -1152,7 +1279,7 @@ func TestApplyEnvToFlags_DoesNotReBrideExpandedSecret(t *testing.T) {
 	assert.False(t, flag.Changed, "env bridge must leave Changed=false")
 
 	// Step 2: secret expansion replaces content and marks Changed=true
-	err = getSecretFromFile(cmd.PersistentFlags(), "notification-url")
+	err = getSecretFromFile(testLogger(), cmd.PersistentFlags(), "notification-url")
 	require.NoError(t, err)
 
 	urls, err := cmd.PersistentFlags().GetStringArray("notification-url")
@@ -1170,37 +1297,12 @@ func TestApplyEnvToFlags_DoesNotReBrideExpandedSecret(t *testing.T) {
 	assert.True(t, flag.Changed)
 }
 
-// TestProcessFlagAliases_InvalidPorcelain tests invalid porcelain version handling.
-func TestProcessFlagAliases_InvalidPorcelain(t *testing.T) {
-	originalExit := logrus.StandardLogger().ExitFunc
-
-	defer func() { logrus.StandardLogger().ExitFunc = originalExit }()
-
-	logrus.StandardLogger().ExitFunc = func(_ int) { panic("FATAL") }
-
-	cmd := new(cobra.Command)
-
-	SetDefaults()
-	RegisterSystemFlags(cmd)
-	err := cmd.ParseFlags([]string{"--porcelain", "v2"})
-	require.NoError(t, err)
-	assert.PanicsWithValue(t, "FATAL", func() {
-		ProcessFlagAliases(cmd.Flags())
-	})
-}
-
 // TestProcessFlagAliases_FlagSetErrors tests error logging for flag operations.
 func TestProcessFlagAliases_FlagSetErrors(t *testing.T) {
-	// Capture log output to verify error logging
-	var logOutput strings.Builder
+	// Capture log output to verify debug logging
+	var logOutput bytes.Buffer
 
-	logrus.SetOutput(&logOutput)
-	logrus.SetLevel(logrus.DebugLevel) // Ensure Debug logs are captured
-
-	defer func() {
-		logrus.SetOutput(os.Stderr)       // Restore default output
-		logrus.SetLevel(logrus.InfoLevel) // Restore default level
-	}()
+	log := testLoggerAt(&logOutput, logging.DebugLevel)
 
 	cmd := new(cobra.Command)
 
@@ -1217,7 +1319,7 @@ func TestProcessFlagAliases_FlagSetErrors(t *testing.T) {
 
 	defer func() { flag.Value = originalValue }() // Restore original value
 
-	ProcessFlagAliases(flags)
+	ProcessFlagAliases(log, flags)
 	assert.Contains(
 		t,
 		logOutput.String(),
@@ -1241,7 +1343,7 @@ func TestSetupLogging_FlagErrors(t *testing.T) {
 
 	SetDefaults()
 	// Don't register flags to force retrieval errors
-	err := SetupLogging(cmd.Flags())
+	_, err := SetupLogging(testLogger(), cmd.Flags())
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "failed to set flag value")
 }
@@ -1257,7 +1359,7 @@ func testGetSecretsFromFiles(t *testing.T, flagName, expected string, args ...st
 	RegisterSystemFlags(cmd)
 	RegisterNotificationFlags(cmd)
 	parseWithEnv(t, cmd, args...)
-	GetSecretsFromFiles(cmd)
+	GetSecretsFromFiles(testLogger(), cmd)
 	flag := cmd.PersistentFlags().Lookup(flagName)
 	require.NotNil(t, flag)
 	value := flag.Value.String()
@@ -1625,7 +1727,7 @@ func TestGetSecretsFromFilesReadErrors(t *testing.T) {
 	require.NoError(t, err)
 
 	// This should log an error but not panic
-	err = getSecretFromFile(cmd.PersistentFlags(), "notification-email-server-password")
+	err = getSecretFromFile(testLogger(), cmd.PersistentFlags(), "notification-email-server-password")
 	require.NoError(t, err) // Since not a file path, no error
 
 	password, err := cmd.PersistentFlags().GetString("notification-email-server-password")

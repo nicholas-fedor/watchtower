@@ -14,7 +14,7 @@ import (
 )
 
 func registerEventsRoute(app *fiber.App, opts config.Options) {
-	handler := events.NewHandler(opts.EventBroadcaster, opts.CORSAllowedOrigins)
+	handler := events.NewHandler(opts.Logger, opts.EventBroadcaster, opts.CORSAllowedOrigins)
 
 	eventsToken := opts.EventsToken
 	expectedHash := sha256.Sum256([]byte(eventsToken))
@@ -44,7 +44,7 @@ func registerEventsRoute(app *fiber.App, opts config.Options) {
 //
 // Order:
 //  1. Authorization Bearer scheme
-//  2. Raw Authorization header (Swagger UI apiKey style; optional Bearer prefix)
+//  2. Raw Authorization header (Swagger UI apiKey style and optional Bearer prefix)
 //  3. access_token query parameter (browser EventSource)
 func extractEventsToken(c fiber.Ctx) (string, bool) {
 	token, err := extractors.FromAuthHeader("Bearer").Extract(c)

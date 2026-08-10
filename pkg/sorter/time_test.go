@@ -46,7 +46,7 @@ var _ = ginkgo.Describe("TimeSorter", func() {
 			c3.EXPECT().Name().Return("c3")
 
 			containers := []types.Container{c3, c1, c2}
-			err := ts.Sort(containers, false)
+			err := ts.Sort(testLog(), containers, false)
 			gomega.Expect(err).ToNot(gomega.HaveOccurred())
 			gomega.Expect(containers[0].Name()).To(gomega.Equal("c1"))
 			gomega.Expect(containers[1].Name()).To(gomega.Equal("c2"))
@@ -86,12 +86,12 @@ var _ = ginkgo.Describe("TimeSorter", func() {
 
 			// Sort with useComposeDependsOn=false
 			containersFalse := []types.Container{c3, c1, c2}
-			err := ts.Sort(containersFalse, false)
+			err := ts.Sort(testLog(), containersFalse, false)
 			gomega.Expect(err).ToNot(gomega.HaveOccurred())
 
 			// Sort with useComposeDependsOn=true
 			containersTrue := []types.Container{c3, c1, c2}
-			err = ts.Sort(containersTrue, true)
+			err = ts.Sort(testLog(), containersTrue, true)
 			gomega.Expect(err).ToNot(gomega.HaveOccurred())
 
 			// Both should produce identical ordering
@@ -126,7 +126,7 @@ var _ = ginkgo.Describe("TimeSorter", func() {
 				c2.EXPECT().Name().Return("c2")
 
 				containers := []types.Container{c1, c2}
-				err := ts.Sort(containers, false)
+				err := ts.Sort(testLog(), containers, false)
 				gomega.Expect(err).ToNot(gomega.HaveOccurred())
 				// Invalid date uses far future time, so c1 (far future) should come after c2 (now)
 				gomega.Expect(containers[0].Name()).To(gomega.Equal("c2"))
@@ -137,7 +137,7 @@ var _ = ginkgo.Describe("TimeSorter", func() {
 		ginkgo.It("should handle empty slice", func() {
 			ts := TimeSorter{}
 			containers := []types.Container{}
-			err := ts.Sort(containers, false)
+			err := ts.Sort(testLog(), containers, false)
 			gomega.Expect(err).ToNot(gomega.HaveOccurred())
 			gomega.Expect(containers).To(gomega.BeEmpty())
 		})
@@ -154,7 +154,7 @@ var _ = ginkgo.Describe("TimeSorter", func() {
 			c1.EXPECT().Name().Return("c1")
 
 			containers := []types.Container{c1}
-			err := ts.Sort(containers, false)
+			err := ts.Sort(testLog(), containers, false)
 			gomega.Expect(err).ToNot(gomega.HaveOccurred())
 			gomega.Expect(containers).To(gomega.HaveLen(1))
 			gomega.Expect(containers[0].Name()).To(gomega.Equal("c1"))
@@ -183,7 +183,7 @@ var _ = ginkgo.Describe("TimeSorter", func() {
 			c2.EXPECT().Name().Return("c2").Maybe()
 
 			containers := []types.Container{c2, c1}
-			err := ts.Sort(containers, false)
+			err := ts.Sort(testLog(), containers, false)
 			gomega.Expect(err).ToNot(gomega.HaveOccurred())
 			gomega.Expect(containers).To(gomega.HaveLen(2))
 			// Order may be stable, but since times are equal, any order is fine

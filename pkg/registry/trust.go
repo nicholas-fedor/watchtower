@@ -7,7 +7,7 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/sirupsen/logrus"
+	"github.com/rs/zerolog"
 
 	dockerCliConfig "github.com/docker/cli/cli/config"
 	dockerConfigConfigfile "github.com/docker/cli/cli/config/configfile"
@@ -44,31 +44,37 @@ var (
 // Returns:
 //   - string: Base64-encoded credentials string if successful, empty if none found.
 //   - error: Non-nil if both methods fail, nil on success or if no credentials are available.
-func EncodedAuth(imageName string) (string, error) {
+func EncodedAuth(log *zerolog.Logger, imageName string) (string, error) {
 	// Set up logging fields for tracking.
-	fields := logrus.Fields{
+	fields := map[string]any{
 		"image_ref": imageName,
 	}
 
-	logrus.WithFields(fields).Debug("Attempting to retrieve auth credentials")
+	log.Debug().
+		Fields(fields).
+		Msg("Attempting to retrieve auth credentials")
 
-	configCredentials, configErr := EncodedConfigCredentials(imageName)
+	configCredentials, configErr := EncodedConfigCredentials(log, imageName)
 	if configErr == nil && configCredentials != "" {
-		logrus.WithFields(fields).Debug("Successfully retrieved encoded auth credentials from config")
+		log.Debug().
+			Fields(fields).
+			Msg("Successfully retrieved encoded auth credentials from config")
 
 		return configCredentials, nil
 	}
 
 	if configErr != nil {
-		logrus.WithError(configErr).
-			WithFields(fields).
-			Debug("Config auth not available, trying environment")
+		log.Debug().
+			Err(configErr).
+			Fields(fields).
+			Msg("Config auth not available, trying environment")
 	} else {
-		logrus.WithFields(fields).
-			Debug("No config credentials for registry, trying environment")
+		log.Debug().
+			Fields(fields).
+			Msg("No config credentials for registry, trying environment")
 	}
 
-	credentials, err := EncodedEnvAuth()
+	credentials, err := EncodedEnvAuth(log)
 	if err != nil {
 		// Prefer surfacing a config load/address error when env is also unset.
 		if configErr != nil {
@@ -80,7 +86,9 @@ func EncodedAuth(imageName string) (string, error) {
 	}
 
 	if credentials != "" {
-		logrus.WithFields(fields).Debug("Successfully retrieved encoded auth credentials from environment")
+		log.Debug().
+			Fields(fields).
+			Msg("Successfully retrieved encoded auth credentials from environment")
 	}
 
 	return credentials, nil
@@ -93,7 +101,7 @@ func EncodedAuth(imageName string) (string, error) {
 // Returns:
 //   - string: Base64-encoded auth string if credentials are found.
 //   - error: Non-nil if env vars are missing, nil on success.
-func EncodedEnvAuth() (string, error) {
+func EncodedEnvAuth(log *zerolog.Logger) (string, error) {
 	// Retrieve username and password from environment.
 	username := os.Getenv("REPO_USER")
 	password := os.Getenv("REPO_PASS")
@@ -105,24 +113,24 @@ func EncodedEnvAuth() (string, error) {
 			Password: password,
 		}
 
-		logrus.WithFields(logrus.Fields{
-			"username": username,
-		}).Debug("Loaded auth credentials from environment")
+		log.Debug().
+			Bool("has_username", true).
+			Msg("Loaded auth credentials from environment")
 
-		// Trace only non-sensitive presence indicators; never log REPO_PASS.
-		if logrus.GetLevel() == logrus.TraceLevel {
-			logrus.WithFields(logrus.Fields{
-				"username":     username,
-				"has_password": true,
-			}).Trace("Using environment credentials")
+		// Trace only non-sensitive presence indicators. Never log REPO_PASS.
+		if log.GetLevel() == zerolog.TraceLevel {
+			log.Trace().
+				Bool("has_username", true).
+				Bool("has_password", true).
+				Msg("Using environment credentials")
 		}
 
 		// Encode and return the auth config.
-		return EncodeCredentials(credentials)
+		return EncodeCredentials(log, credentials)
 	}
 
 	// Return error if variables are missing.
-	logrus.Debug("Environment auth variables not set")
+	log.Debug().Msg("Environment auth variables not set")
 
 	return "", errUnsetRegAuthVars
 }
@@ -137,16 +145,19 @@ func EncodedEnvAuth() (string, error) {
 // Returns:
 //   - string: Base64-encoded credentials string if found, empty if none.
 //   - error: Non-nil if config loading or address retrieval fails, nil on success or if no auth is found.
-func EncodedConfigCredentials(imageRef string) (string, error) {
+func EncodedConfigCredentials(log *zerolog.Logger, imageRef string) (string, error) {
 	// Set up logging fields for tracking.
-	fields := logrus.Fields{
+	fields := map[string]any{
 		"image_ref": imageRef,
 	}
 
 	// Get the registry server address from the image reference.
-	server, err := auth.GetRegistryAddress(imageRef)
+	server, err := auth.GetRegistryAddress(log, imageRef)
 	if err != nil {
-		logrus.WithError(err).WithFields(fields).Debug("Failed to get registry address")
+		log.Debug().
+			Err(err).
+			Fields(fields).
+			Msg("Failed to get registry address")
 
 		return "", fmt.Errorf("%w: %w", errFailedGetRegistryAddress, err)
 	}
@@ -156,16 +167,19 @@ func EncodedConfigCredentials(imageRef string) (string, error) {
 	if configDir == "" {
 		configDir = "/"
 
-		logrus.WithFields(fields).Debug("No DOCKER_CONFIG set, using default directory")
+		log.Debug().
+			Fields(fields).
+			Msg("No DOCKER_CONFIG set, using default directory")
 	}
 
 	// Load the Docker config file from the specified directory.
 	configFile, err := dockerCliConfig.Load(configDir)
 	if err != nil {
-		logrus.WithError(err).
-			WithFields(fields).
-			WithField("config_dir", configDir).
-			Debug("Failed to load Docker config")
+		log.Debug().
+			Err(err).
+			Fields(fields).
+			Str("config_dir", configDir).
+			Msg("Failed to load Docker config")
 
 		return "", fmt.Errorf("%w: %w", errFailedLoadDockerConfig, err)
 	}
@@ -177,35 +191,38 @@ func EncodedConfigCredentials(imageRef string) (string, error) {
 	// Accept username+password, password-only tokens, or identity tokens from
 	// credential helpers (ECR and similar). Empty AuthConfig is a miss.
 	if !hasUsableRegistryCredentials(credentials) {
-		logrus.WithFields(fields).WithFields(logrus.Fields{
-			"server":      server,
-			"config_file": configFile.Filename,
-		}).Debug("No credentials found in config")
+		log.Debug().
+			Fields(fields).
+			Str("server", server).
+			Str("config_file", configFile.Filename).
+			Msg("No credentials found in config")
 
 		return "", nil
 	}
 
 	// Log successful credential retrieval with non-sensitive presence flags only.
-	logrus.WithFields(fields).WithFields(logrus.Fields{
-		"username":         credentials.Username,
-		"has_password":     credentials.Password != "",
-		"has_identity_tok": credentials.IdentityToken != "",
-		"server":           server,
-		"config_file":      configFile.Filename,
-	}).Debug("Loaded auth credentials from config")
+	log.Debug().
+		Fields(fields).
+		Bool("has_username", credentials.Username != "").
+		Bool("has_password", credentials.Password != "").
+		Bool("has_identity_tok", credentials.IdentityToken != "").
+		Str("server", server).
+		Str("config_file", configFile.Filename).
+		Msg("Loaded auth credentials from config")
 
-	// Trace only non-sensitive presence indicators; never log password or tokens.
-	if logrus.GetLevel() == logrus.TraceLevel {
-		logrus.WithFields(fields).WithFields(logrus.Fields{
-			"username":         credentials.Username,
-			"has_password":     credentials.Password != "",
-			"has_identity_tok": credentials.IdentityToken != "",
-			"server":           server,
-		}).Trace("Using config credentials")
+	// Trace only non-sensitive presence indicators. Never log password or tokens.
+	if log.GetLevel() == zerolog.TraceLevel {
+		log.Trace().
+			Fields(fields).
+			Bool("has_username", credentials.Username != "").
+			Bool("has_password", credentials.Password != "").
+			Bool("has_identity_tok", credentials.IdentityToken != "").
+			Str("server", server).
+			Msg("Using config credentials")
 	}
 
 	// Encode and return the auth config (includes IdentityToken when set).
-	return EncodeCredentials(credentials)
+	return EncodeCredentials(log, credentials)
 }
 
 // hasUsableRegistryCredentials reports whether AuthConfig carries material the
@@ -260,17 +277,20 @@ func CredentialsStore(configFile dockerConfigConfigfile.ConfigFile) dockerConfig
 // Returns:
 //   - string: Base64-encoded auth string if successful.
 //   - error: Non-nil if marshaling fails, nil on success.
-func EncodeCredentials(authConfig dockerConfig.AuthConfig) (string, error) {
-	// Set up logging fields with username for tracking.
-	fields := logrus.Fields{
-		"username": authConfig.Username,
+func EncodeCredentials(log *zerolog.Logger, authConfig dockerConfig.AuthConfig) (string, error) {
+	// Set up logging fields with non-sensitive username presence indicator.
+	fields := map[string]any{
+		"has_username": authConfig.Username != "",
 	}
 
 	// Marshal the auth config to JSON.
 	//nolint:gosec // G117: This is the expected standard Docker auth format
 	buf, err := json.Marshal(authConfig)
 	if err != nil {
-		logrus.WithError(err).WithFields(fields).Debug("Failed to marshal auth config to JSON")
+		log.Debug().
+			Err(err).
+			Fields(fields).
+			Msg("Failed to marshal auth config to JSON")
 
 		return "", fmt.Errorf("%w: %w", errFailedMarshalAuthConfig, err)
 	}
@@ -278,7 +298,9 @@ func EncodeCredentials(authConfig dockerConfig.AuthConfig) (string, error) {
 	// Encode the JSON to base64 for safe transmission.
 	encoded := base64.URLEncoding.EncodeToString(buf)
 
-	logrus.WithFields(fields).Debug("Encoded auth config")
+	log.Debug().
+		Fields(fields).
+		Msg("Encoded auth config")
 
 	return encoded, nil
 }

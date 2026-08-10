@@ -193,5 +193,5 @@ func buildMockContainerManifestURL(imageRef string) (string, error) {
 		scheme = "http"
 	}
 
-	return manifest.BuildManifestURL(mock, scheme)
+	return manifest.BuildManifestURL(testLog(), mock, scheme)
 }
