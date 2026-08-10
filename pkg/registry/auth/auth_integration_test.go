@@ -498,7 +498,7 @@ var _ = ginkgo.Describe("the auth module", func() {
 			defer viper.Set("WATCHTOWER_REGISTRY_TLS_MIN_VERSION", "")
 
 			tlsConfig := &tls.Config{MinVersion: tls.VersionTLS13}
-			auth.ConfigureTLS(tlsConfig)
+			auth.ConfigureTLS(nil, tlsConfig)
 			gomega.Expect(tlsConfig.MinVersion).To(gomega.Equal(uint16(tls.VersionTLS12)))
 		})
 

@@ -29,7 +29,7 @@ func (d Data) MarshalJSON() ([]byte, error) {
 	entries := make([]jsonMap, len(d.Entries))
 	for i, entry := range d.Entries {
 		entries[i] = jsonMap{
-			"level":   entry.Level.String(),
+			"level":   entry.Level,
 			"message": entry.Message,
 			"data":    entry.Data,
 			"time":    entry.Time,

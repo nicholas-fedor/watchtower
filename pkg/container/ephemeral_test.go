@@ -10,6 +10,7 @@ import (
 	"github.com/onsi/ginkgo/v2"
 	"github.com/onsi/gomega"
 	"github.com/onsi/gomega/ghttp"
+	"github.com/rs/zerolog"
 
 	dockerContainer "github.com/moby/moby/api/types/container"
 	dockerClient "github.com/moby/moby/client"
@@ -18,6 +19,12 @@ import (
 	mockContainer "github.com/nicholas-fedor/watchtower/pkg/container/mocks"
 	"github.com/nicholas-fedor/watchtower/pkg/types"
 )
+
+func nopLogger() *zerolog.Logger {
+	nop := zerolog.Nop()
+
+	return &nop
+}
 
 var _ = ginkgo.Describe("Ephemeral Orchestrator", func() {
 	ginkgo.Describe("parseEnvVar", func() {
@@ -169,7 +176,7 @@ var _ = ginkgo.Describe("Ephemeral Orchestrator", func() {
 					WithName("watchtower"),
 				)
 
-				config := extractDockerConnectionConfig(source)
+				config := extractDockerConnectionConfig(source, nopLogger())
 
 				gomega.Expect(config).NotTo(gomega.BeNil())
 				gomega.Expect(config.IsLocal).To(gomega.BeTrue())
@@ -193,7 +200,7 @@ var _ = ginkgo.Describe("Ephemeral Orchestrator", func() {
 					}),
 				)
 
-				config := extractDockerConnectionConfig(source)
+				config := extractDockerConnectionConfig(source, nopLogger())
 
 				gomega.Expect(config.IsLocal).To(gomega.BeTrue())
 				gomega.Expect(config.Host).To(gomega.Equal("unix:///custom/docker.sock"))
@@ -216,7 +223,7 @@ var _ = ginkgo.Describe("Ephemeral Orchestrator", func() {
 					}),
 				)
 
-				config := extractDockerConnectionConfig(source)
+				config := extractDockerConnectionConfig(source, nopLogger())
 
 				gomega.Expect(config.IsLocal).To(gomega.BeTrue())
 				gomega.Expect(config.Host).To(gomega.Equal("npipe:////./pipe/docker_engine"))
@@ -236,7 +243,7 @@ var _ = ginkgo.Describe("Ephemeral Orchestrator", func() {
 					}),
 				)
 
-				config := extractDockerConnectionConfig(source)
+				config := extractDockerConnectionConfig(source, nopLogger())
 
 				gomega.Expect(config.IsLocal).To(gomega.BeFalse())
 				gomega.Expect(config.Host).To(gomega.Equal("tcp://remote-host:2375"))
@@ -255,7 +262,7 @@ var _ = ginkgo.Describe("Ephemeral Orchestrator", func() {
 					}),
 				)
 
-				config := extractDockerConnectionConfig(source)
+				config := extractDockerConnectionConfig(source, nopLogger())
 
 				gomega.Expect(config.IsLocal).To(gomega.BeFalse())
 				gomega.Expect(config.Host).To(gomega.Equal("https://remote-host:2376"))
@@ -272,7 +279,7 @@ var _ = ginkgo.Describe("Ephemeral Orchestrator", func() {
 					}),
 				)
 
-				config := extractDockerConnectionConfig(source)
+				config := extractDockerConnectionConfig(source, nopLogger())
 
 				gomega.Expect(config.IsLocal).To(gomega.BeFalse())
 				gomega.Expect(config.Host).To(gomega.Equal("ssh://user@remote-host"))
@@ -291,7 +298,7 @@ var _ = ginkgo.Describe("Ephemeral Orchestrator", func() {
 					}),
 				)
 
-				config := extractDockerConnectionConfig(source)
+				config := extractDockerConnectionConfig(source, nopLogger())
 
 				gomega.Expect(config.TLSVerify).To(gomega.Equal("1"))
 				gomega.Expect(config.CertPath).To(gomega.Equal("/certs"))
@@ -309,7 +316,7 @@ var _ = ginkgo.Describe("Ephemeral Orchestrator", func() {
 					}),
 				)
 
-				config := extractDockerConnectionConfig(source)
+				config := extractDockerConnectionConfig(source, nopLogger())
 
 				gomega.Expect(config.APIVersion).To(gomega.Equal("1.41"))
 			})
@@ -326,7 +333,7 @@ var _ = ginkgo.Describe("Ephemeral Orchestrator", func() {
 					}),
 				)
 
-				config := extractDockerConnectionConfig(source)
+				config := extractDockerConnectionConfig(source, nopLogger())
 
 				gomega.Expect(config.IsLocal).To(gomega.BeTrue())
 				gomega.Expect(config.SocketBind).To(gomega.Equal(
@@ -342,7 +349,7 @@ var _ = ginkgo.Describe("Ephemeral Orchestrator", func() {
 					WithName("watchtower"),
 				)
 
-				config := extractDockerConnectionConfig(source)
+				config := extractDockerConnectionConfig(source, nopLogger())
 
 				gomega.Expect(config).NotTo(gomega.BeNil())
 				gomega.Expect(config.IsLocal).To(gomega.BeTrue())

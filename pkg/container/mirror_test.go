@@ -3,6 +3,7 @@ package container
 import (
 	"context"
 	"net/http"
+	"regexp"
 	"testing"
 
 	"github.com/onsi/gomega/ghttp"
@@ -135,11 +136,17 @@ func Test_newImageClient_nilLogger_noMirrors(t *testing.T) {
 	server := ghttp.NewServer()
 	t.Cleanup(server.Close)
 
+	var infoPath string
+
 	server.AppendHandlers(APIVersionPingHandler())
-	server.RouteToHandler("GET", "/info", func(w http.ResponseWriter, _ *http.Request) {
+	server.RouteToHandler("GET", regexp.MustCompile(`^/v\d+(\.\d+)*/info$`), func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusOK)
 		_, _ = w.Write([]byte(`{}`))
+
+		if r != nil {
+			infoPath = r.URL.Path
+		}
 	})
 
 	api, err := dockerClient.New(
@@ -154,4 +161,6 @@ func Test_newImageClient_nilLogger_noMirrors(t *testing.T) {
 		got := c.resolveRegistryMirrorConfig(context.Background())
 		assert.Nil(t, got)
 	})
+
+	assert.Regexp(t, `^/v\d+(\.\d+)*/info$`, infoPath, "resolveRegistryMirrorConfig must call the versioned /info endpoint")
 }

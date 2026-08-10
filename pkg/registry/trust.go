@@ -114,13 +114,13 @@ func EncodedEnvAuth(log *zerolog.Logger) (string, error) {
 		}
 
 		log.Debug().
-			Str("username", username).
+			Bool("has_username", true).
 			Msg("Loaded auth credentials from environment")
 
 		// Trace only non-sensitive presence indicators. Never log REPO_PASS.
 		if log.GetLevel() == zerolog.TraceLevel {
 			log.Trace().
-				Str("username", username).
+				Bool("has_username", true).
 				Bool("has_password", true).
 				Msg("Using environment credentials")
 		}
@@ -203,7 +203,7 @@ func EncodedConfigCredentials(log *zerolog.Logger, imageRef string) (string, err
 	// Log successful credential retrieval with non-sensitive presence flags only.
 	log.Debug().
 		Fields(fields).
-		Str("username", credentials.Username).
+		Bool("has_username", credentials.Username != "").
 		Bool("has_password", credentials.Password != "").
 		Bool("has_identity_tok", credentials.IdentityToken != "").
 		Str("server", server).
@@ -214,7 +214,7 @@ func EncodedConfigCredentials(log *zerolog.Logger, imageRef string) (string, err
 	if log.GetLevel() == zerolog.TraceLevel {
 		log.Trace().
 			Fields(fields).
-			Str("username", credentials.Username).
+			Bool("has_username", credentials.Username != "").
 			Bool("has_password", credentials.Password != "").
 			Bool("has_identity_tok", credentials.IdentityToken != "").
 			Str("server", server).
@@ -278,9 +278,9 @@ func CredentialsStore(configFile dockerConfigConfigfile.ConfigFile) dockerConfig
 //   - string: Base64-encoded auth string if successful.
 //   - error: Non-nil if marshaling fails, nil on success.
 func EncodeCredentials(log *zerolog.Logger, authConfig dockerConfig.AuthConfig) (string, error) {
-	// Set up logging fields with username for tracking.
+	// Set up logging fields with non-sensitive username presence indicator.
 	fields := map[string]any{
-		"username": authConfig.Username,
+		"has_username": authConfig.Username != "",
 	}
 
 	// Marshal the auth config to JSON.

@@ -20,7 +20,7 @@ type notificationEntry struct {
 	Message string
 	Data    map[string]any
 	Time    time.Time
-	Level   zerolog.Level
+	Level   string
 }
 
 // Data is the notification template data model.
@@ -29,4 +29,16 @@ type Data struct {
 
 	Entries []*notificationEntry
 	Report  types.Report
+}
+
+// levelToString converts a zerolog level to the legacy template string.
+// WarnLevel maps to "warning" for backwards compatibility with templates
+// that compare .Level against "warning". All other levels use zerolog's
+// standard string representation.
+func levelToString(level zerolog.Level) string {
+	if level == zerolog.WarnLevel {
+		return "warning"
+	}
+
+	return level.String()
 }

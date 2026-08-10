@@ -216,7 +216,8 @@ func (c *Container) getLifecycleID(label, idType string) (int, bool) {
 		clog.Warn().
 			Str("label", label).
 			Str("value", rawString).
-			Int("idType", parsedID).
+			Str("id_type", idType).
+			Int("id", parsedID).
 			Msg(fmt.Sprintf("Invalid lifecycle %s value: must be non-negative", idType))
 
 		return 0, false
@@ -228,7 +229,8 @@ func (c *Container) getLifecycleID(label, idType string) (int, bool) {
 		clog.Warn().
 			Str("label", label).
 			Str("value", rawString).
-			Int("idType", parsedID).
+			Str("id_type", idType).
+			Int("id", parsedID).
 			Int("max", maxReasonableID).
 			Msg(fmt.Sprintf("Invalid lifecycle %s value: exceeds maximum reasonable value", idType))
 
@@ -237,7 +239,8 @@ func (c *Container) getLifecycleID(label, idType string) (int, bool) {
 
 	clog.Debug().
 		Str("label", label).
-		Int("idType", parsedID).
+		Str("id_type", idType).
+		Int("id", parsedID).
 		Msg("Retrieved lifecycle " + idType)
 
 	return parsedID, true

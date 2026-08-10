@@ -320,6 +320,8 @@ func TestEnvConfig(t *testing.T) {
 			expectEnv: map[string]string{
 				"DOCKER_TLS_VERIFY": "1",
 			},
+			// Default host is unix://; TLS verify on a local socket emits this warning.
+			expectWarning: "TLS verification is enabled but DOCKER_HOST uses local socket 'unix://'",
 		},
 		{
 			name: "docker cert path env var",
@@ -381,7 +383,15 @@ func TestEnvConfig(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			// Set env vars
+			// Clear Docker env written by prior EnvConfig calls so cases do not leak.
+			for _, key := range []string{
+				"DOCKER_HOST", "DOCKER_TLS_VERIFY", "DOCKER_API_VERSION", "DOCKER_CERT_PATH",
+			} {
+				t.Setenv(key, "")
+				os.Unsetenv(key)
+			}
+
+			// Set env vars for this case.
 			for k, v := range tc.envVars {
 				if v == "" {
 					os.Unsetenv(k)
@@ -405,7 +415,9 @@ func TestEnvConfig(t *testing.T) {
 
 			var logOutput bytes.Buffer
 
-			log := testLogger()
+			// Always capture through the shared buffer so no-warning cases can
+			// observe unexpected output. Use Warn when a warning is expected.
+			log := testLoggerAt(&logOutput, logging.InfoLevel)
 			if tc.expectWarning != "" {
 				log = testLoggerAt(&logOutput, logging.WarnLevel)
 			}
@@ -736,6 +748,8 @@ func runProcessFlagAliasesHelper(t *testing.T, caseName string) (string, error) 
 	ctx, cancel := context.WithTimeout(t.Context(), 30*time.Second)
 	defer cancel()
 
+	// Codacy: static argv only (os.Args[0] is this test binary, case names are fixed literals).
+	// nosemgrep: go.lang.security.audit.dangerous-exec-command.dangerous-exec-command
 	cmd := exec.CommandContext(ctx, os.Args[0], "-test.run=^TestProcessFlagAliases_FatalCases$", "-test.v=false")
 
 	cmd.Env = append(os.Environ(), processFlagAliasesHelperEnv+"="+caseName)
@@ -1281,23 +1295,6 @@ func TestApplyEnvToFlags_DoesNotReBrideExpandedSecret(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, []string{"gotify://host/token"}, urls, "re-applying env must not clobber expanded secret")
 	assert.True(t, flag.Changed)
-}
-
-// TestProcessFlagAliases_InvalidPorcelain tests invalid porcelain version handling.
-// Covered by TestProcessFlagAliases_FatalCases via subprocess (zerolog.Fatal → os.Exit).
-func TestProcessFlagAliases_InvalidPorcelain(t *testing.T) {
-	if os.Getenv(processFlagAliasesHelperEnv) != "" {
-		// Nested re-exec of the package test binary can match this name; no-op.
-		return
-	}
-
-	out, err := runProcessFlagAliasesHelper(t, "invalid-porcelain")
-	require.Error(t, err, "invalid porcelain must exit non-zero; output:\n%s", out)
-
-	var exitErr *exec.ExitError
-	require.ErrorAs(t, err, &exitErr)
-	assert.NotEqual(t, 0, exitErr.ExitCode())
-	assert.Contains(t, out, "Unknown porcelain version, supported: v1")
 }
 
 // TestProcessFlagAliases_FlagSetErrors tests error logging for flag operations.

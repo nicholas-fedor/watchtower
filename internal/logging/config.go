@@ -7,6 +7,7 @@ import (
 	"os"
 	"strings"
 	"time"
+	"unicode"
 
 	"github.com/mattn/go-isatty"
 	"github.com/rs/zerolog"
@@ -167,14 +168,14 @@ func formatLogfmtFieldValue(i any) string {
 //   - s: Field or message value.
 //
 // Returns:
-//   - bool: True when the value contains spaces, equals signs, quotes, or is empty.
+//   - bool: True when the value contains spaces, equals signs, quotes, is empty, or contains Unicode whitespace or control characters.
 func needsQuote(s string) bool {
 	if s == "" {
 		return true
 	}
 
 	for _, r := range s {
-		if r == ' ' || r == '=' || r == '"' {
+		if r == ' ' || r == '=' || r == '"' || unicode.IsSpace(r) || unicode.IsControl(r) {
 			return true
 		}
 	}

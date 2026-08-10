@@ -127,7 +127,7 @@ func (c *client) CreateEphemeralOrchestrator(
 	// Extract the Docker connection configuration from the source container.
 	// This ensures the orchestrator uses the same connection method as the source,
 	// supporting local sockets, named pipes, remote TCP/TLS, and socket proxies.
-	connConfig := extractDockerConnectionConfig(sourceContainer)
+	connConfig := extractDockerConnectionConfig(sourceContainer, clog)
 
 	clog.Debug().
 		Str("docker_host", connConfig.Host).
@@ -420,10 +420,11 @@ func isWindows() bool {
 //
 // Parameters:
 //   - sourceContainer: The source Watchtower container to extract configuration from.
+//   - log: Logger for isLocalDockerHost diagnostics.
 //
 // Returns:
 //   - *DockerConnectionConfig: The extracted connection configuration.
-func extractDockerConnectionConfig(sourceContainer types.Container) *DockerConnectionConfig {
+func extractDockerConnectionConfig(sourceContainer types.Container, log *zerolog.Logger) *DockerConnectionConfig {
 	config := &DockerConnectionConfig{
 		// Default to local connection with platform-appropriate socket.
 		IsLocal:    true,
@@ -459,8 +460,7 @@ func extractDockerConnectionConfig(sourceContainer types.Container) *DockerConne
 
 	// Determine connection type based on DOCKER_HOST.
 	if config.Host != "" {
-		nopLog := zerolog.Nop()
-		config.IsLocal = isLocalDockerHost(&nopLog, config.Host)
+		config.IsLocal = isLocalDockerHost(log, config.Host)
 
 		if config.IsLocal {
 			// Local connection: extract socket path from DOCKER_HOST.

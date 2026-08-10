@@ -77,6 +77,8 @@ type shoutrrrTypeNotifier struct {
 	delay     time.Duration // Delay between sends.
 	hookOnce  sync.Once     // Ensures RegisterHook executes only once.
 	closeOnce sync.Once     // Ensures Close executes only once.
+	// extractWarnOnce ensures the eventFieldMap failure warning is emitted only once.
+	extractWarnOnce sync.Once // Guards the first extraction failure warning.
 	// These fields must only be accessed via sync/atomic (e.g., atomic.Load/atomic.Store) to avoid data races.
 	closed atomic.Bool // Tracks if the notifier is closed.
 
@@ -815,6 +817,13 @@ func (n *shoutrrrTypeNotifier) Run(event *zerolog.Event, level zerolog.Level, me
 	// Done before entriesMutex so nested localLog hooks never contend with a held lock.
 	fields, timestamp, ok := eventFieldMap(event)
 	if !ok {
+		// Emit a warning only on the first extraction failure to aid debugging
+		// without flooding logs on every subsequent malformed event.
+		n.extractWarnOnce.Do(func() {
+			n.ll().Warn().
+				Msg("Failed to extract fields from log event; notification queueing skipped for this event")
+		})
+
 		return
 	}
 
@@ -829,7 +838,7 @@ func (n *shoutrrrTypeNotifier) Run(event *zerolog.Event, level zerolog.Level, me
 		Message: message,
 		Data:    fields,
 		Time:    timestamp,
-		Level:   level,
+		Level:   levelToString(level),
 	}
 
 	// Hold the mutex only for queue mutation. Log and send outside the lock.
@@ -850,7 +859,7 @@ func (n *shoutrrrTypeNotifier) Run(event *zerolog.Event, level zerolog.Level, me
 		// Using Str("level", ...) would overwrite Debug or Info in logfmt output.
 		n.ll().Debug().
 			Str("message", entry.Message).
-			Str("entry_level", entry.Level.String()).
+			Str("entry_level", entry.Level).
 			Int("entries_count", entriesCount).
 			Bool("legacy_template", n.legacyTemplate).
 			Msg("Log entry queued for batching")
@@ -861,7 +870,7 @@ func (n *shoutrrrTypeNotifier) Run(event *zerolog.Event, level zerolog.Level, me
 	// Same entry_level naming as the batching path above.
 	n.ll().Debug().
 		Str("message", entry.Message).
-		Str("entry_level", entry.Level.String()).
+		Str("entry_level", entry.Level).
 		Bool("legacy_template", n.legacyTemplate).
 		Msg("Log entry sent immediately (not batching)")
 	n.sendEntries([]*notificationEntry{entry}, nil)
@@ -917,9 +926,33 @@ func eventFieldMap(event *zerolog.Event) (map[string]any, time.Time, bool) {
 
 	var fieldMap map[string]any
 
-	err := json.Unmarshal(raw, &fieldMap)
+	dec := json.NewDecoder(bytes.NewReader(raw))
+	dec.UseNumber()
+
+	err := dec.Decode(&fieldMap)
 	if err != nil {
 		return nil, now, false
+	}
+
+	// Normalize json.Number values to int64 or float64 so templates can compare
+	// them as numbers without precision loss for large integer values.
+	for fieldKey, fieldVal := range fieldMap {
+		num, ok := fieldVal.(json.Number)
+		if !ok {
+			continue
+		}
+
+		intVal, intErr := num.Int64()
+		if intErr == nil {
+			fieldMap[fieldKey] = intVal
+
+			continue
+		}
+
+		floatVal, floatErr := num.Float64()
+		if floatErr == nil {
+			fieldMap[fieldKey] = floatVal
+		}
 	}
 
 	timestamp := now

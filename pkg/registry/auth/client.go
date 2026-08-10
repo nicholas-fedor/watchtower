@@ -9,6 +9,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/rs/zerolog"
 	"github.com/spf13/viper"
 )
 
@@ -87,8 +88,9 @@ func (r *registryClient) Do(request *http.Request) (*http.Response, error) {
 // ConfigureTLS builds a TLS configuration from Viper settings.
 //
 // Parameters:
+//   - log: Logger for invalid-version warnings. May be nil (warning is skipped).
 //   - tlsConfig: The base TLS configuration to modify.
-func ConfigureTLS(tlsConfig *tls.Config) {
+func ConfigureTLS(log *zerolog.Logger, tlsConfig *tls.Config) {
 	// Configure TLS verification based on WATCHTOWER_REGISTRY_TLS_SKIP.
 	// InsecureSkipVerify is intentional when WATCHTOWER_REGISTRY_TLS_SKIP is set.
 	if viper.GetBool("WATCHTOWER_REGISTRY_TLS_SKIP") {
@@ -102,6 +104,13 @@ func ConfigureTLS(tlsConfig *tls.Config) {
 		if ok {
 			tlsConfig.MinVersion = version
 		} else {
+			if log != nil {
+				log.Warn().
+					Str("configured_version", minVersion).
+					Str("fallback_version", "TLS1.2").
+					Msg("Invalid WATCHTOWER_REGISTRY_TLS_MIN_VERSION. Falling back to TLS 1.2")
+			}
+
 			tlsConfig.MinVersion = tls.VersionTLS12
 		}
 	}
@@ -165,7 +174,9 @@ func NewAuthClient() Client {
 			MinVersion: tls.VersionTLS12, // Default to TLS 1.2 for secure communication.
 		}
 
-		ConfigureTLS(tlsConfig)
+		// No process logger is available at package init.
+		// nil skips the invalid-version warning.
+		ConfigureTLS(nil, tlsConfig)
 		cachedClient = &registryClient{
 			client: buildRegistryClient(tlsConfig),
 		}

@@ -464,8 +464,6 @@ func sendNotifications(log *zerolog.Logger, notifier types.Notifier,
 	result types.Report,
 	cleanedImages []types.RemovedImageInfo,
 ) {
-	log.Debug().Msg("About to send notifications")
-
 	// Check if notifier is available
 	if notifier != nil {
 		// Check if notifications should be split by container
@@ -526,142 +524,19 @@ func sendSplitNotifications(log *zerolog.Logger, notifier types.Notifier,
 			Strs("updated_containers", updatedNames).
 			Msg("Split notifications: sending report notifications for updated containers")
 
-		// Send individual report notifications for each updated container
-		for _, report := range result.Updated() {
-			// Skip nil container reports
-			if report == nil {
-				log.Debug().Msg("Encountered nil updated container report, skipping")
+		notifyContainers(log, notifier, notified, result.Updated(), result, "updated", false,
+			func(r types.ContainerReport) bool { return true },
+			buildSingleContainerReport)
+		notifyContainers(log, notifier, notified, result.Restarted(), result, "restarted", false,
+			func(r types.ContainerReport) bool { return true },
+			buildSingleRestartedContainerReport)
+		// Monitor-only containers appear in Stale when notificationReport is true.
+		notifyContainers(log, notifier, notified, result.Stale(), result, "stale", false,
+			func(r types.ContainerReport) bool { return r.IsMonitorOnly() },
+			buildSingleContainerReport)
 
-				continue
-			}
-
-			// Skip containers with empty names
-			if strings.TrimSpace(report.Name()) == "" {
-				log.Debug().
-					Str("container_id", report.ID().ShortID()).
-					Msg("Encountered container with empty name, skipping notification")
-
-				continue
-			}
-
-			containerID := string(report.ID())
-			if notified[containerID] {
-				// Skip notification if already sent for this container ID
-				continue
-			}
-
-			singleContainerReport := buildSingleContainerReport(report, result)
-			if notifier.ShouldSendNotification(singleContainerReport) {
-				notifier.SendNotification(singleContainerReport)
-			}
-
-			notified[containerID] = true
-		}
-
-		// Send individual report notifications for each restarted container
-		for _, report := range result.Restarted() {
-			// Skip nil container reports
-			if report == nil {
-				log.Debug().Msg("Encountered nil restarted container report, skipping")
-
-				continue
-			}
-
-			// Skip containers with empty names
-			if strings.TrimSpace(report.Name()) == "" {
-				log.Debug().
-					Str("container_id", report.ID().ShortID()).
-					Msg("Encountered restarted container with empty name, skipping notification")
-
-				continue
-			}
-
-			containerID := string(report.ID())
-			if notified[containerID] {
-				// Skip notification if already sent for this container ID
-				continue
-			}
-
-			singleContainerReport := buildSingleRestartedContainerReport(report, result)
-			if notifier.ShouldSendNotification(singleContainerReport) {
-				notifier.SendNotification(singleContainerReport)
-			}
-
-			notified[containerID] = true
-		}
-
-		// Send notifications for monitor-only containers when notificationReport is true
-		for _, report := range result.Stale() {
-			// Skip nil container reports
-			if report == nil {
-				log.Debug().Msg("Encountered nil stale container report, skipping")
-
-				continue
-			}
-
-			// Skip containers with empty names
-			if strings.TrimSpace(report.Name()) == "" {
-				log.Debug().
-					Str("container_id", report.ID().ShortID()).
-					Msg("Encountered stale container with empty name, skipping notification")
-
-				continue
-			}
-
-			if report.IsMonitorOnly() {
-				containerID := string(report.ID())
-				if notified[containerID] {
-					// Skip notification if already sent for this container ID
-					continue
-				}
-
-				singleContainerReport := buildSingleContainerReport(
-					report,
-					result,
-				)
-				if notifier.ShouldSendNotification(singleContainerReport) {
-					notifier.SendNotification(singleContainerReport)
-				}
-
-				notified[containerID] = true
-			}
-		}
-
-		// Send notifications for cooldown-skipped containers (report mode).
-		for _, report := range result.Skipped() {
-			if report == nil {
-				continue
-			}
-
-			containerStatus, ok := report.(*session.ContainerStatus)
-			if !ok || containerStatus.CooldownDelay() == "" {
-				continue
-			}
-
-			if containerStatus.CooldownPassed() {
-				continue
-			}
-
-			containerID := string(report.ID())
-			if notified[containerID] {
-				continue
-			}
-
-			singleSkippedReport := &session.SingleContainerReport{
-				SkippedReports:   []types.ContainerReport{report},
-				ScannedReports:   result.Scanned(),
-				UpdatedReports:   result.Updated(),
-				RestartedReports: result.Restarted(),
-				FailedReports:    result.Failed(),
-				StaleReports:     result.Stale(),
-				FreshReports:     result.Fresh(),
-			}
-			if notifier.ShouldSendNotification(singleSkippedReport) {
-				notifier.SendNotification(singleSkippedReport)
-			}
-
-			notified[containerID] = true
-		}
+		// Cooldown-skipped containers use a different report shape and stay inline.
+		notifySkippedCooldownContainers(log, notifier, notified, result)
 	} else {
 		// Log-mode split: hook-captured entries are filtered by container inside
 		// SendNotification when the report is a SingleContainerReport.
@@ -688,144 +563,135 @@ func sendSplitNotifications(log *zerolog.Logger, notifier types.Notifier,
 			Strs("updated_containers", updatedNames).
 			Msg("Split notifications: sending per-container notifications (log mode)")
 
-		for _, report := range result.Updated() {
-			if report == nil {
-				log.Debug().Msg("Encountered nil updated container report, skipping")
+		notifyContainers(log, notifier, notified, result.Updated(), result, "updated", true,
+			func(r types.ContainerReport) bool { return true },
+			buildSingleContainerReport)
+		notifyContainers(log, notifier, notified, result.Restarted(), result, "restarted", true,
+			func(r types.ContainerReport) bool { return true },
+			buildSingleRestartedContainerReport)
+		notifyContainers(log, notifier, notified, result.Stale(), result, "monitor-only stale", true,
+			func(r types.ContainerReport) bool { return r.IsMonitorOnly() },
+			buildSingleContainerReport)
 
-				continue
-			}
-
-			if strings.TrimSpace(report.Name()) == "" {
-				log.Debug().
-					Str("container_id", report.ID().ShortID()).
-					Msg("Encountered container with empty name, skipping notification")
-
-				continue
-			}
-
-			containerID := string(report.ID())
-			if notified[containerID] {
-				continue
-			}
-
-			log.Debug().
-				Str("container", report.Name()).
-				Str("image", report.ImageName()).
-				Msg("Sending individual notification for updated container")
-
-			singleContainerReport := buildSingleContainerReport(report, result)
-			if notifier.ShouldSendNotification(singleContainerReport) {
-				notifier.SendNotification(singleContainerReport)
-			}
-
-			notified[containerID] = true
-		}
-
-		for _, report := range result.Restarted() {
-			if report == nil {
-				log.Debug().Msg("Encountered nil restarted container report, skipping")
-
-				continue
-			}
-
-			if strings.TrimSpace(report.Name()) == "" {
-				log.Debug().
-					Str("container_id", report.ID().ShortID()).
-					Msg("Encountered restarted container with empty name, skipping notification")
-
-				continue
-			}
-
-			containerID := string(report.ID())
-			if notified[containerID] {
-				continue
-			}
-
-			log.Debug().
-				Str("container", report.Name()).
-				Str("image", report.ImageName()).
-				Msg("Sending individual notification for restarted container")
-
-			singleContainerReport := buildSingleRestartedContainerReport(report, result)
-			if notifier.ShouldSendNotification(singleContainerReport) {
-				notifier.SendNotification(singleContainerReport)
-			}
-
-			notified[containerID] = true
-		}
-
-		for _, report := range result.Stale() {
-			if report == nil {
-				log.Debug().Msg("Encountered nil stale container report, skipping")
-
-				continue
-			}
-
-			if strings.TrimSpace(report.Name()) == "" {
-				log.Debug().
-					Str("container_id", report.ID().ShortID()).
-					Msg("Encountered stale container with empty name, skipping notification")
-
-				continue
-			}
-
-			if report.IsMonitorOnly() {
-				containerID := string(report.ID())
-				if notified[containerID] {
-					continue
-				}
-
-				log.Debug().
-					Str("container", report.Name()).
-					Str("image", report.ImageName()).
-					Msg("Sending individual notification for monitor-only stale container")
-
-				singleContainerReport := buildSingleContainerReport(report, result)
-				if notifier.ShouldSendNotification(singleContainerReport) {
-					notifier.SendNotification(singleContainerReport)
-				}
-
-				notified[containerID] = true
-			}
-		}
-
-		for _, report := range result.Skipped() {
-			if report == nil {
-				continue
-			}
-
-			containerStatus, ok := report.(*session.ContainerStatus)
-			if !ok || containerStatus.CooldownDelay() == "" {
-				continue
-			}
-
-			if containerStatus.CooldownPassed() {
-				continue
-			}
-
-			containerID := string(report.ID())
-			if notified[containerID] {
-				continue
-			}
-
-			singleSkippedReport := &session.SingleContainerReport{
-				SkippedReports:   []types.ContainerReport{report},
-				ScannedReports:   result.Scanned(),
-				UpdatedReports:   result.Updated(),
-				RestartedReports: result.Restarted(),
-				FailedReports:    result.Failed(),
-				StaleReports:     result.Stale(),
-				FreshReports:     result.Fresh(),
-			}
-			if notifier.ShouldSendNotification(singleSkippedReport) {
-				notifier.SendNotification(singleSkippedReport)
-			}
-
-			notified[containerID] = true
-		}
+		notifySkippedCooldownContainers(log, notifier, notified, result)
 	}
 
 	log.Debug().Msg("Finished sending notifications")
+}
+
+// notifyContainers sends per-container notifications for a report collection.
+//
+// It applies nil and empty-name filtering, container-ID de-duplication via notified,
+// optional category eligibility (include), and ShouldSendNotification before send.
+//
+// Parameters:
+//   - log: Logger for debug diagnostics.
+//   - notifier: Notification client.
+//   - notified: Map of container IDs already notified in this session.
+//   - reports: Category-specific container reports to process.
+//   - result: Full session report used when building single-container reports.
+//   - category: Label used in skip and send debug messages.
+//   - logBeforeSend: When true, emit a debug line before each send (log mode).
+//   - include: Predicate for category eligibility (for example monitor-only stale).
+//   - buildReport: Builds the SingleContainerReport for one container.
+func notifyContainers(
+	log *zerolog.Logger,
+	notifier types.Notifier,
+	notified map[string]bool,
+	reports []types.ContainerReport,
+	result types.Report,
+	category string,
+	logBeforeSend bool,
+	include func(types.ContainerReport) bool,
+	buildReport func(types.ContainerReport, types.Report) *session.SingleContainerReport,
+) {
+	for _, report := range reports {
+		if report == nil {
+			log.Debug().Msg("Encountered nil " + category + " container report, skipping")
+
+			continue
+		}
+
+		if strings.TrimSpace(report.Name()) == "" {
+			log.Debug().
+				Str("container_id", report.ID().ShortID()).
+				Msg("Encountered " + category + " container with empty name, skipping notification")
+
+			continue
+		}
+
+		if !include(report) {
+			continue
+		}
+
+		containerID := string(report.ID())
+		if notified[containerID] {
+			continue
+		}
+
+		if logBeforeSend {
+			log.Debug().
+				Str("container", report.Name()).
+				Str("image", report.ImageName()).
+				Msg("Sending individual notification for " + category + " container")
+		}
+
+		singleContainerReport := buildReport(report, result)
+		if notifier.ShouldSendNotification(singleContainerReport) {
+			notifier.SendNotification(singleContainerReport)
+		}
+
+		notified[containerID] = true
+	}
+}
+
+// notifySkippedCooldownContainers sends notifications for cooldown-skipped containers.
+//
+// Parameters:
+//   - log: Logger (unused currently, reserved for consistency with sibling helpers).
+//   - notifier: Notification client.
+//   - notified: Map of container IDs already notified in this session.
+//   - result: Full session report.
+func notifySkippedCooldownContainers(
+	_ *zerolog.Logger,
+	notifier types.Notifier,
+	notified map[string]bool,
+	result types.Report,
+) {
+	for _, report := range result.Skipped() {
+		if report == nil {
+			continue
+		}
+
+		containerStatus, ok := report.(*session.ContainerStatus)
+		if !ok || containerStatus.CooldownDelay() == "" {
+			continue
+		}
+
+		if containerStatus.CooldownPassed() {
+			continue
+		}
+
+		containerID := string(report.ID())
+		if notified[containerID] {
+			continue
+		}
+
+		singleSkippedReport := &session.SingleContainerReport{
+			SkippedReports:   []types.ContainerReport{report},
+			ScannedReports:   result.Scanned(),
+			UpdatedReports:   result.Updated(),
+			RestartedReports: result.Restarted(),
+			FailedReports:    result.Failed(),
+			StaleReports:     result.Stale(),
+			FreshReports:     result.Fresh(),
+		}
+		if notifier.ShouldSendNotification(singleSkippedReport) {
+			notifier.SendNotification(singleSkippedReport)
+		}
+
+		notified[containerID] = true
+	}
 }
 
 // generateAndLogMetric creates a metric from the update results and logs it.

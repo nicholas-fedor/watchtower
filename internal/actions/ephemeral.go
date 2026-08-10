@@ -232,7 +232,7 @@ func RunOrchestrator(log *zerolog.Logger, ctx context.Context, client container.
 	)
 
 	// Execute the orchestration sequence.
-	err = orchestrateSelfUpdate(log,
+	err = orchestrateSelfUpdate(clog,
 		orchCtx,
 		client,
 		oldID,

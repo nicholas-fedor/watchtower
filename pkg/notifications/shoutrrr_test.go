@@ -5,6 +5,8 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"os"
+	"os/exec"
 	"sync"
 	"sync/atomic"
 	"testing"
@@ -29,6 +31,8 @@ import (
 )
 
 var allButTrace = zerolog.DebugLevel
+
+const shoutrrrFatalHelperEnv = "WATCHTOWER_SHOUTRRR_FATAL_HELPER"
 
 // testLogBuffer is the per-test capture buffer for notifier localLog output.
 var (
@@ -75,7 +79,7 @@ func createTestNotifier(
 var legacyMockData = Data{
 	Entries: []*notificationEntry{
 		{
-			Level:   zerolog.InfoLevel,
+			Level:   "info",
 			Message: "foo Bar",
 		},
 	},
@@ -84,15 +88,15 @@ var legacyMockData = Data{
 var mockDataMultipleEntries = Data{
 	Entries: []*notificationEntry{
 		{
-			Level:   zerolog.InfoLevel,
+			Level:   "info",
 			Message: "The situation is under control",
 		},
 		{
-			Level:   zerolog.WarnLevel,
+			Level:   "warning",
 			Message: "All the smoke might be covering up some problems",
 		},
 		{
-			Level:   zerolog.ErrorLevel,
+			Level:   "error",
 			Message: "Turns out everything is on fire",
 		},
 	},
@@ -220,7 +224,7 @@ updt1 (mock/updt1:latest): Updated
 
 				entries := []*notificationEntry{
 					{
-						Level:   zerolog.InfoLevel,
+						Level:   "info",
 						Message: "foo bar",
 					},
 				}
@@ -642,7 +646,7 @@ Turns out everything is on fire
 					false,
 					time.Duration(0),
 				)
-				// Note: Not calling AddLogHook(), so no goroutine is started
+				// Note: Not calling RegisterHook(), so no goroutine is started
 
 				// Close should work without blocking
 				shoutrrr.Close()
@@ -970,9 +974,6 @@ func TestSlowNotificationSent(t *testing.T) {
 
 func TestGracefulTerminationNotificationGoroutine(t *testing.T) {
 	synctest.Test(t, func(t *testing.T) {
-		// Set up logging like Ginkgo does
-		_ = gbytes.NewBuffer()
-
 		shoutrrr := createTestNotifier(
 			[]string{"logger://"},
 			allButTrace,
@@ -1003,9 +1004,6 @@ func TestGracefulTerminationNotificationGoroutine(t *testing.T) {
 
 func TestGracefulTerminationDuringMessageProcessing(t *testing.T) {
 	synctest.Test(t, func(t *testing.T) {
-		// Set up logging
-		_ = gbytes.NewBuffer()
-
 		shoutrrr, blockingRouter, err := sendNotificationsWithBlockingRouter()
 		if err != nil {
 			t.Fatal(err)
@@ -1045,9 +1043,6 @@ func TestGracefulTerminationDuringMessageProcessing(t *testing.T) {
 
 func TestContextCancellationIndependentOfStopChannel(t *testing.T) {
 	synctest.Test(t, func(t *testing.T) {
-		// Set up logging
-		_ = gbytes.NewBuffer()
-
 		shoutrrr := createTestNotifier(
 			[]string{"logger://"},
 			allButTrace,
@@ -1221,9 +1216,6 @@ func TestShutdownGracePeriodConstant(t *testing.T) {
 // the send call.
 func TestCloseDoesNotHangWithBlockingRouter(t *testing.T) {
 	synctest.Test(t, func(t *testing.T) {
-		// Set up logging
-		_ = gbytes.NewBuffer()
-
 		// Create a notifier with a blocking router
 		shoutrrr, blockingRouter, err := sendNotificationsWithBlockingRouter()
 		if err != nil {
@@ -1307,9 +1299,6 @@ func (c *controlledRouter) Send(_ string, _ *shoutrrrTypes.Params) []error {
 // before context is canceled during the shutdown grace period.
 func TestGracePeriodAllowsInFlightMessages(t *testing.T) {
 	synctest.Test(t, func(t *testing.T) {
-		// Set up logging
-		_ = gbytes.NewBuffer()
-
 		// Create a controlled router
 		ctx, cancel := context.WithCancel(context.Background())
 
@@ -1385,9 +1374,6 @@ func TestGracePeriodAllowsInFlightMessages(t *testing.T) {
 // TestCloseWithNoGoroutine verifies that Close() works correctly when the
 // notification goroutine was never started.
 func TestCloseWithNoGoroutine(t *testing.T) {
-	// Set up logging
-	_ = gbytes.NewBuffer()
-
 	shoutrrr := createTestNotifier(
 		[]string{"logger://"},
 		allButTrace,
@@ -1396,7 +1382,7 @@ func TestCloseWithNoGoroutine(t *testing.T) {
 		false,
 		time.Duration(0),
 	)
-	// Note: Not calling AddLogHook(), so no goroutine is started
+	// Note: Not calling RegisterHook(), so no goroutine is started
 
 	// Close should complete immediately without blocking
 	// Use goroutine+channel+select pattern to avoid flaky wall-clock timing.
@@ -1421,8 +1407,114 @@ func TestCloseWithNoGoroutine(t *testing.T) {
 
 // TestCreateNotifier_FatalsOnBadURL verifies that createNotifier calls Fatal
 // when given a docker-secret file path instead of a valid URL.
+// The fatal path is tested via subprocess because zerolog.Fatal calls os.Exit.
 func TestCreateNotifier_FatalsOnBadURL(t *testing.T) {
-	t.Skip("zerolog.Fatal exit interception requires subprocess. No production exitFunc seam")
+	if os.Getenv(shoutrrrFatalHelperEnv) != "" {
+		// Child process: expect createNotifier to fatal on invalid URL.
+		log := zerolog.Nop()
+		createNotifier(
+			&log,
+			[]string{"docker-secret:/run/secrets/my_url"},
+			zerolog.InfoLevel,
+			"",
+			true,
+			StaticData{},
+			false,
+			0,
+		)
+
+		// If we reach here, the fatal did not exit.
+		t.Fatal("expected createNotifier to fatal on bad URL")
+	}
+
+	// Parent process: run child and assert non-zero exit.
+	ctx, cancel := context.WithTimeout(t.Context(), 30*time.Second)
+	defer cancel()
+
+	cmd := exec.CommandContext(ctx, os.Args[0], "-test.run=^TestCreateNotifier_FatalsOnBadURL$")
+
+	cmd.Env = append(os.Environ(), shoutrrrFatalHelperEnv+"=1")
+	out, err := cmd.CombinedOutput()
+
+	var exitErr *exec.ExitError
+	if !errors.As(err, &exitErr) || exitErr.ExitCode() == 0 {
+		t.Fatalf("expected non-zero exit for bad URL; output:\n%s", string(out))
+	}
+}
+
+// TestLevelToString_WarnMapsToWarning ensures WarnLevel renders as the legacy
+// template string "warning" so custom templates comparing .Level stay compatible.
+func TestLevelToString_WarnMapsToWarning(t *testing.T) {
+	t.Parallel()
+
+	require.Equal(t, "warning", levelToString(zerolog.WarnLevel))
+	require.Equal(t, "info", levelToString(zerolog.InfoLevel))
+	require.Equal(t, "error", levelToString(zerolog.ErrorLevel))
+
+	// Non-legacy template path: compare .Level with the legacy "warning" string.
+	const tpl = `{{ range .Entries }}{{ if eq .Level "warning" }}hit{{ end }}{{ end }}`
+
+	data := Data{
+		Entries: []*notificationEntry{
+			{Level: levelToString(zerolog.WarnLevel), Message: "caution"},
+		},
+	}
+	notifier, err := createNotifierWithTemplate(tpl, false)
+	require.NoError(t, err)
+
+	result, err := notifier.buildMessage(data)
+	require.NoError(t, err)
+	require.Equal(t, "hit", result)
+}
+
+// TestRun_EventFieldMapPreservesLargeIntegers ensures large integer fields such as
+// removed_orchestrators render exactly without float precision loss or scientific notation.
+func TestRun_EventFieldMapPreservesLargeIntegers(t *testing.T) {
+	t.Parallel()
+
+	var buf bytes.Buffer
+
+	root := zerolog.New(&buf).Level(zerolog.TraceLevel).With().Timestamp().Logger()
+	n := createTestNotifier(
+		[]string{},
+		zerolog.TraceLevel,
+		true,
+		StaticData{},
+		false,
+		0,
+	)
+	n.RegisterHook(&root)
+	n.StartNotification(true)
+
+	// Value exceeds float64 exact-integer range (2^53) so json.Unmarshal float path would corrupt it.
+	const largeCount int64 = 9007199254740993
+
+	root.Info().
+		Int64("removed_orchestrators", largeCount).
+		Msg("cleanup summary")
+
+	n.entriesMutex.RLock()
+	entries := append([]*notificationEntry(nil), n.entries...)
+	n.entriesMutex.RUnlock()
+
+	require.Len(t, entries, 1)
+	require.NotNil(t, entries[0].Data)
+
+	got, ok := entries[0].Data["removed_orchestrators"].(int64)
+	require.True(t, ok, "removed_orchestrators must be int64, got %T", entries[0].Data["removed_orchestrators"])
+	require.Equal(t, largeCount, got)
+
+	// Template must render the exact decimal digits (no scientific notation).
+	const tpl = `{{ range .Entries }}{{ index .Data "removed_orchestrators" }}{{ end }}`
+
+	notifier, err := createNotifierWithTemplate(tpl, false)
+	require.NoError(t, err)
+
+	rendered, err := notifier.buildMessage(Data{Entries: entries})
+	require.NoError(t, err)
+	require.Equal(t, "9007199254740993", rendered)
+
+	n.Close()
 }
 
 // TestRun_EventFieldMapPreservesApplicationFields verifies eventFieldMap through

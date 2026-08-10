@@ -15,8 +15,9 @@
 //	var c types.Container
 //	params := types.UpdateParams{Filter: someFilter, Cleanup: true}
 //	notifier := someNotifierImpl{}
-//	notifier.StartNotification()
-//	report := session.NewReport(progress)
+//	notifier.StartNotification(false)
+//	log := logging.New(os.Stderr, logging.InfoLevel)
+//	progress := session.NewReport(log, progressMap)
 //	notifier.SendNotification(report)
 //
 // The package integrates with container, notifications, session, and registry packages.

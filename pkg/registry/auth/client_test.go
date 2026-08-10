@@ -1,11 +1,13 @@
 package auth
 
 import (
+	"bytes"
 	"context"
 	"crypto/tls"
 	"net/http"
 	"testing"
 
+	"github.com/rs/zerolog"
 	"github.com/spf13/viper"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -69,10 +71,11 @@ func Test_configureTLS(t *testing.T) {
 	const tlsMinVersionKey = "WATCHTOWER_REGISTRY_TLS_MIN_VERSION"
 
 	tests := []struct {
-		name      string
-		tlsConfig *tls.Config
-		override  string
-		wantMin   uint16
+		name           string
+		tlsConfig      *tls.Config
+		override       string
+		wantMin        uint16
+		wantWarnSubstr string
 	}{
 		{
 			name: "existing config retains min version when no override configured",
@@ -91,12 +94,13 @@ func Test_configureTLS(t *testing.T) {
 			wantMin:  tls.VersionTLS12,
 		},
 		{
-			name: "invalid override defaults to TLS 1.2",
+			name: "invalid override defaults to TLS 1.2 and warns",
 			tlsConfig: &tls.Config{
 				MinVersion: tls.VersionTLS10,
 			},
-			override: "TLS1.0",
-			wantMin:  tls.VersionTLS12,
+			override:       "TLS1.0",
+			wantMin:        tls.VersionTLS12,
+			wantWarnSubstr: "Invalid WATCHTOWER_REGISTRY_TLS_MIN_VERSION",
 		},
 	}
 
@@ -106,10 +110,20 @@ func Test_configureTLS(t *testing.T) {
 			viper.Set(tlsMinVersionKey, tt.override)
 			t.Cleanup(func() { viper.Set(tlsMinVersionKey, original) })
 
-			ConfigureTLS(tt.tlsConfig)
+			var logBuf bytes.Buffer
+
+			log := zerolog.New(&logBuf).Level(zerolog.WarnLevel)
+
+			ConfigureTLS(&log, tt.tlsConfig)
 
 			if tt.tlsConfig != nil {
 				assert.Equal(t, tt.wantMin, tt.tlsConfig.MinVersion)
+			}
+
+			if tt.wantWarnSubstr != "" {
+				assert.Contains(t, logBuf.String(), tt.wantWarnSubstr)
+			} else {
+				assert.Empty(t, logBuf.String())
 			}
 		})
 	}
