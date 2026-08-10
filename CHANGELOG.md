@@ -14,6 +14,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Chores
 
+- Update module google.golang.org/protobuf to v1.36.12 by @renovate[bot] in [#2129](https://github.com/nicholas-fedor/watchtower/pull/2129)
 - Update nicholas-fedor/go-proxy-pull-action action to v1.1.41 by @renovate[bot] in [#2126](https://github.com/nicholas-fedor/watchtower/pull/2126)
 - Update nicholas-fedor/go-proxy-pull-action action to v1.1.40 by @renovate[bot] in [#2121](https://github.com/nicholas-fedor/watchtower/pull/2121)
 - Update actions/attest-build-provenance action to v4.2.2 by @renovate[bot] in [#2120](https://github.com/nicholas-fedor/watchtower/pull/2120)
