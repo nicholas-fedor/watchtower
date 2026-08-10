@@ -628,7 +628,7 @@ func TestEncodedAuth_TraceLogsOmitSecrets(t *testing.T) {
 		// Positive: Trace path ran and logged non-sensitive indicators.
 		assert.Contains(t, out, "Using environment credentials")
 		assert.Contains(t, out, "has_username=true")
-		assert.Contains(t, out, "has_password")
+		assert.Contains(t, out, "has_password=true")
 		assert.NotContains(t, out, secretPass)
 		assert.NotContains(t, out, "env-user")
 	})
@@ -652,7 +652,7 @@ func TestEncodedAuth_TraceLogsOmitSecrets(t *testing.T) {
 		out := logBuf.String()
 		assert.Contains(t, out, "Using config credentials")
 		assert.Contains(t, out, "has_username=true")
-		assert.Contains(t, out, "has_password")
+		assert.Contains(t, out, "has_password=true")
 		assert.NotContains(t, out, secretPass)
 		assert.NotContains(t, out, "cfg-user")
 	})

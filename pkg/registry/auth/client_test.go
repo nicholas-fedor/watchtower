@@ -216,11 +216,11 @@ func TestNewAuthClient(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got := NewAuthClient()
+			got := NewAuthClient(nil)
 			assert.NotNil(t, got)
 
 			if tt.name == "multiple calls return same client" {
-				got2 := NewAuthClient()
+				got2 := NewAuthClient(nil)
 				assert.Same(t, got, got2)
 			}
 		})

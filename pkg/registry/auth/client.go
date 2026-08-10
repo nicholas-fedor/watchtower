@@ -166,17 +166,19 @@ func buildRegistryClient(tlsConfig *tls.Config) *http.Client {
 // Subsequent calls return the same cached client instance. The client is configured
 // with default timeouts and connection limits for registry access.
 //
+// Parameters:
+//   - log: Logger for TLS configuration diagnostics on first initialization.
+//     May be nil (invalid-version warning is skipped).
+//
 // Returns:
 //   - Client: Ready for registry authentication requests.
-func NewAuthClient() Client {
+func NewAuthClient(log *zerolog.Logger) Client {
 	clientInitOnce.Do(func() {
 		tlsConfig := &tls.Config{
 			MinVersion: tls.VersionTLS12, // Default to TLS 1.2 for secure communication.
 		}
 
-		// No process logger is available at package init.
-		// nil skips the invalid-version warning.
-		ConfigureTLS(nil, tlsConfig)
+		ConfigureTLS(log, tlsConfig)
 		cachedClient = &registryClient{
 			client: buildRegistryClient(tlsConfig),
 		}

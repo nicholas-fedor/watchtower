@@ -130,7 +130,7 @@ func FetchImageCreationTime(log *zerolog.Logger,
 	registryAuth = auth.TransformAuth(log, registryAuth)
 
 	// Use the cached HTTP client for registry requests.
-	client := auth.NewAuthClient()
+	client := auth.NewAuthClient(log)
 
 	// Obtain an authentication token and challenge host for the registry.
 	result, err := auth.GetToken(log,

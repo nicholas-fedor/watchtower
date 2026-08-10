@@ -244,7 +244,7 @@ var _ = ginkgo.Describe("the auth module", func() {
 				mockContainerInstance := mockTypes.NewMockContainer(ginkgo.GinkgoT())
 				mockContainerInstance.On("ImageName").Return(mockImage).Maybe()
 
-				client := auth.NewAuthClient()
+				client := auth.NewAuthClient(nil)
 				result, err := auth.GetToken(testLog(), context.Background(),
 					mockContainerInstance,
 					auth.TransformAuth(testLog(), base64.StdEncoding.EncodeToString([]byte(creds))),
@@ -298,7 +298,7 @@ var _ = ginkgo.Describe("the auth module", func() {
 			containerInstance := mockTypes.NewMockContainer(ginkgo.GinkgoT())
 			containerInstance.On("ImageName").Return("nonexistent.local/test/image").Maybe()
 
-			client := auth.NewAuthClient()
+			client := auth.NewAuthClient(nil)
 			result, err := auth.GetToken(testLog(), context.Background(),
 				containerInstance,
 				"user:pass",
@@ -385,7 +385,7 @@ var _ = ginkgo.Describe("the auth module", func() {
 			defer viper.Set("WATCHTOWER_REGISTRY_TLS_SKIP", false)
 
 			// Create a new authentication client with default TLS settings.
-			client := auth.NewAuthClient()
+			client := auth.NewAuthClient(nil)
 
 			// Execute GetToken and verify the expected failure.
 			result, err := auth.GetToken(testLog(), context.Background(),
@@ -1399,9 +1399,9 @@ var _ = ginkgo.Describe("the auth module", func() {
 		// Test case: Verifies that multiple calls to NewAuthClient return the same
 		// client instance, ensuring proper caching behavior.
 		ginkgo.It("should return the same client instance on multiple calls", func() {
-			client1 := auth.NewAuthClient()
-			client2 := auth.NewAuthClient()
-			client3 := auth.NewAuthClient()
+			client1 := auth.NewAuthClient(nil)
+			client2 := auth.NewAuthClient(nil)
+			client3 := auth.NewAuthClient(nil)
 
 			// All calls should return the exact same client instance
 			gomega.Expect(client1).To(gomega.BeIdenticalTo(client2))
@@ -1423,7 +1423,7 @@ var _ = ginkgo.Describe("the auth module", func() {
 				go func(idx int) {
 					defer wg.Done()
 
-					clients[idx] = auth.NewAuthClient()
+					clients[idx] = auth.NewAuthClient(nil)
 				}(i)
 			}
 
@@ -1449,7 +1449,7 @@ var _ = ginkgo.Describe("the auth module", func() {
 			)
 			defer server.Close()
 
-			client := auth.NewAuthClient()
+			client := auth.NewAuthClient(nil)
 
 			// Create a simple HTTP request to the mock server.
 			req, err := http.NewRequestWithContext(

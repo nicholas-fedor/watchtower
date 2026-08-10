@@ -14,7 +14,7 @@ import (
 // client creation including TLS configuration and transport setup.
 func BenchmarkNewAuthClient(b *testing.B) {
 	for b.Loop() {
-		_ = NewAuthClient()
+		_ = NewAuthClient(nil)
 	}
 }
 
@@ -23,7 +23,7 @@ func BenchmarkNewAuthClientWithAlloc(b *testing.B) {
 	b.ReportAllocs()
 
 	for b.Loop() {
-		_ = NewAuthClient()
+		_ = NewAuthClient(nil)
 	}
 }
 
@@ -34,7 +34,7 @@ func BenchmarkNewAuthClientParallel(b *testing.B) {
 	b.ReportAllocs()
 	b.RunParallel(func(pb *testing.PB) {
 		for pb.Next() {
-			_ = NewAuthClient()
+			_ = NewAuthClient(nil)
 		}
 	})
 }
@@ -196,7 +196,7 @@ func BenchmarkConcurrentAuthRequests(b *testing.B) {
 		for pb.Next() {
 			for i := range numGoroutines {
 				// Simulate auth client creation per container
-				_ = NewAuthClient()
+				_ = NewAuthClient(nil)
 
 				// Simulate registry address lookup
 				_, _ = GetRegistryAddress(testLog(), testImages[i])
@@ -222,7 +222,7 @@ func BenchmarkAuthWithMultipleRegistries(b *testing.B) {
 	for b.Loop() {
 		for _, reg := range registries {
 			// Create client for each registry
-			_ = NewAuthClient()
+			_ = NewAuthClient(nil)
 
 			// Get registry address
 			_, _ = GetRegistryAddress(testLog(), reg.image)

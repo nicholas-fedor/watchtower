@@ -163,7 +163,10 @@ updt1 (mock/updt1:latest): Updated
 				gomega.Expect(shoutrrr.receiving.Load()).To(gomega.BeFalse())
 
 				log := testLogger()
+
 				shoutrrr.RegisterHook(log)
+				defer shoutrrr.Close()
+
 				gomega.Expect(shoutrrr.receiving.Load()).To(gomega.BeTrue())
 			})
 		})
@@ -179,7 +182,10 @@ updt1 (mock/updt1:latest): Updated
 					time.Second,
 				)
 				log := testLogger()
+
 				shoutrrr.RegisterHook(log)
+				defer shoutrrr.Close()
+
 				shoutrrr.RegisterHook(log)
 				gomega.Expect(shoutrrr.receiving.Load()).To(gomega.BeTrue())
 			})
@@ -445,7 +451,10 @@ Turns out everything is on fire
 					time.Duration(0),
 				)
 				log := testLogger()
+
 				shoutrrr.RegisterHook(log)
+				defer shoutrrr.Close()
+
 				shoutrrr.StartNotification(false)
 				log.Info().Msg("This log message is sponsored by ContainrrrVPN")
 				shoutrrr.SendNotification(nil)
@@ -1435,6 +1444,10 @@ func TestCreateNotifier_FatalsOnBadURL(t *testing.T) {
 
 	cmd.Env = append(os.Environ(), shoutrrrFatalHelperEnv+"=1")
 	out, err := cmd.CombinedOutput()
+
+	if errors.Is(ctx.Err(), context.DeadlineExceeded) {
+		t.Fatalf("timed out waiting for createNotifier fatal path; output:\n%s", string(out))
+	}
 
 	var exitErr *exec.ExitError
 	if !errors.As(err, &exitErr) || exitErr.ExitCode() == 0 {

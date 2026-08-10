@@ -560,7 +560,7 @@ func fetchDigest(log *zerolog.Logger,
 	registryAuth = auth.TransformAuth(log, registryAuth)
 
 	// Create an authentication client for registry requests.
-	client := auth.NewAuthClient()
+	client := auth.NewAuthClient(log)
 
 	// Build the canonical manifest URL and apply lscr.io/host-override handling.
 	manifestURL, originalHost, _, err := BuildManifestURL(log, container, "")
