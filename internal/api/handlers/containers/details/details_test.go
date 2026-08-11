@@ -18,11 +18,13 @@ func TestGetContainerDetails(t *testing.T) {
 		name    string
 		client  func(t *testing.T) *mockContainer.MockClient
 		filter  types.Filter
+		params  types.UpdateParams
 		wantErr bool
 		wantLen int
+		want    func(t *testing.T, details []ContainerDetails)
 	}{
 		{
-			name: "successful list with container",
+			name: "successful list with labeled enabled container",
 			client: func(t *testing.T) *mockContainer.MockClient {
 				t.Helper()
 				c := mockContainer.NewMockClient(t)
@@ -42,9 +44,100 @@ func TestGetContainerDetails(t *testing.T) {
 
 				return c
 			},
-			filter:  nil,
+			params:  types.UpdateParams{},
 			wantErr: false,
 			wantLen: 1,
+			want: func(t *testing.T, details []ContainerDetails) {
+				t.Helper()
+				assert.True(t, details[0].Enabled)
+			},
+		},
+		{
+			name: "unlabeled container is enabled when label-enable is false",
+			client: func(t *testing.T) *mockContainer.MockClient {
+				t.Helper()
+				c := mockContainer.NewMockClient(t)
+				container := mockTypes.NewMockContainer(t)
+				container.EXPECT().Name().Return("unlabeled-container")
+				container.EXPECT().ImageName().Return("nginx:latest")
+				container.EXPECT().ImageID().Return(types.ImageID("sha256:abc123"))
+				container.EXPECT().IsRunning().Return(true)
+				container.EXPECT().IsWatchtower().Return(false)
+				container.EXPECT().IsMonitorOnly(mock.Anything).Return(false)
+				container.EXPECT().IsNoPull(mock.Anything).Return(false)
+				container.EXPECT().Enabled().Return(false, false)
+				container.EXPECT().IsStale().Return(false)
+				container.EXPECT().Scope().Return("", true)
+				container.EXPECT().ImageInfo().Return(nil)
+				c.EXPECT().ListContainers(mock.Anything).Return([]types.Container{container}, nil)
+
+				return c
+			},
+			params:  types.UpdateParams{LabelEnable: false},
+			wantErr: false,
+			wantLen: 1,
+			want: func(t *testing.T, details []ContainerDetails) {
+				t.Helper()
+				assert.True(t, details[0].Enabled)
+			},
+		},
+		{
+			name: "unlabeled container is disabled when label-enable is true",
+			client: func(t *testing.T) *mockContainer.MockClient {
+				t.Helper()
+				c := mockContainer.NewMockClient(t)
+				container := mockTypes.NewMockContainer(t)
+				container.EXPECT().Name().Return("unlabeled-container")
+				container.EXPECT().ImageName().Return("nginx:latest")
+				container.EXPECT().ImageID().Return(types.ImageID("sha256:abc123"))
+				container.EXPECT().IsRunning().Return(true)
+				container.EXPECT().IsWatchtower().Return(false)
+				container.EXPECT().IsMonitorOnly(mock.Anything).Return(false)
+				container.EXPECT().IsNoPull(mock.Anything).Return(false)
+				container.EXPECT().Enabled().Return(false, false)
+				container.EXPECT().IsStale().Return(false)
+				container.EXPECT().Scope().Return("", true)
+				container.EXPECT().ImageInfo().Return(nil)
+				c.EXPECT().ListContainers(mock.Anything).Return([]types.Container{container}, nil)
+
+				return c
+			},
+			params:  types.UpdateParams{LabelEnable: true},
+			wantErr: false,
+			wantLen: 1,
+			want: func(t *testing.T, details []ContainerDetails) {
+				t.Helper()
+				assert.False(t, details[0].Enabled)
+			},
+		},
+		{
+			name: "labeled false container is disabled when label-enable is false",
+			client: func(t *testing.T) *mockContainer.MockClient {
+				t.Helper()
+				c := mockContainer.NewMockClient(t)
+				container := mockTypes.NewMockContainer(t)
+				container.EXPECT().Name().Return("disabled-container")
+				container.EXPECT().ImageName().Return("nginx:latest")
+				container.EXPECT().ImageID().Return(types.ImageID("sha256:abc123"))
+				container.EXPECT().IsRunning().Return(true)
+				container.EXPECT().IsWatchtower().Return(false)
+				container.EXPECT().IsMonitorOnly(mock.Anything).Return(false)
+				container.EXPECT().IsNoPull(mock.Anything).Return(false)
+				container.EXPECT().Enabled().Return(false, true)
+				container.EXPECT().IsStale().Return(false)
+				container.EXPECT().Scope().Return("", true)
+				container.EXPECT().ImageInfo().Return(nil)
+				c.EXPECT().ListContainers(mock.Anything).Return([]types.Container{container}, nil)
+
+				return c
+			},
+			params:  types.UpdateParams{LabelEnable: false},
+			wantErr: false,
+			wantLen: 1,
+			want: func(t *testing.T, details []ContainerDetails) {
+				t.Helper()
+				assert.False(t, details[0].Enabled)
+			},
 		},
 		{
 			name: "client error returns wrapped error",
@@ -56,6 +149,7 @@ func TestGetContainerDetails(t *testing.T) {
 				return c
 			},
 			filter:  nil,
+			params:  types.UpdateParams{},
 			wantErr: true,
 		},
 	}
@@ -63,13 +157,17 @@ func TestGetContainerDetails(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			client := tt.client(t)
-			details, err := GetContainerDetails(t.Context(), client, tt.filter, "", "", types.UpdateParams{})
+			details, err := GetContainerDetails(t.Context(), client, tt.filter, "", "", tt.params)
 
 			if tt.wantErr {
 				require.Error(t, err)
 			} else {
 				require.NoError(t, err)
 				assert.Len(t, details, tt.wantLen)
+
+				if tt.want != nil {
+					tt.want(t, details)
+				}
 			}
 		})
 	}

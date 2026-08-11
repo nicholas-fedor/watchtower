@@ -26,4 +26,5 @@ type UpdateParams struct {
 	SkipSelfUpdate      bool          `json:"skip_self_update"`       // Skip Watchtower self-update if true.
 	EphemeralSelfUpdate bool          `json:"ephemeral_self_update"`  // Use ephemeral container for self-update if true.
 	CooldownDelay       time.Duration `json:"cooldown_delay"`         // Minimum time since image creation before allowing updates.
+	LabelEnable         bool          `json:"label_enable"`           // Require enable label for monitoring.
 }

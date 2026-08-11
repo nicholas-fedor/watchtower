@@ -129,13 +129,19 @@ func (h *Handler) Handle(c fiber.Ctx) error {
 //   - filter: Container filter function.
 //   - nameFilter: Exact container name to filter by, or empty for no filter.
 //   - imageFilter: Exact image name to filter by, or empty for no filter.
-//   - params: Update parameters supplying MonitorOnly, NoPull and LabelPrecedence
-//     globals for computing per-container effective flags.
+//   - params: Update parameters for computing per-container effective flags.
 //
 // Returns:
 //   - []ContainerDetails: Detailed information for each matching container.
 //   - error: Non-nil if listing containers fails.
-func GetContainerDetails(ctx context.Context, client container.Client, filter types.Filter, nameFilter, imageFilter string, params types.UpdateParams) ([]ContainerDetails, error) {
+func GetContainerDetails(
+	ctx context.Context,
+	client container.Client,
+	filter types.Filter,
+	nameFilter,
+	imageFilter string,
+	params types.UpdateParams,
+) ([]ContainerDetails, error) {
 	var list []types.Container
 
 	var err error
@@ -161,7 +167,15 @@ func GetContainerDetails(ctx context.Context, client container.Client, filter ty
 			continue
 		}
 
-		enabled, _ := c.Enabled()
+		rawEnabled, hasLabel := c.Enabled()
+
+		var enabled bool
+		if !hasLabel {
+			enabled = !params.LabelEnable
+		} else {
+			enabled = rawEnabled
+		}
+
 		scope, _ := c.Scope()
 
 		containerDetails := ContainerDetails{
@@ -177,7 +191,8 @@ func GetContainerDetails(ctx context.Context, client container.Client, filter ty
 			Scope:       scope,
 		}
 
-		if info := c.ImageInfo(); info != nil && len(info.RepoDigests) > 0 {
+		info := c.ImageInfo()
+		if info != nil && len(info.RepoDigests) > 0 {
 			_, digest, found := strings.Cut(info.RepoDigests[0], "@")
 			if found {
 				containerDetails.Digest = digest
