@@ -54,8 +54,9 @@ func TestUpdateParamsAssignsEveryField(t *testing.T) {
 			GID:     1000,
 		},
 		Filter: filter.Filter{
-			Predicate: filters.NoFilter,
-			Desc:      "all",
+			Predicate:   filters.NoFilter,
+			Desc:        "all",
+			LabelEnable: true,
 		},
 	}
 

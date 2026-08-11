@@ -46,5 +46,6 @@ func (c Config) UpdateParams(overrides RunOverrides) types.UpdateParams {
 		SkipSelfUpdate:      overrides.SkipSelfUpdate,
 		EphemeralSelfUpdate: c.Update.EphemeralSelfUpdate,
 		CooldownDelay:       c.Update.CooldownDelay,
+		LabelEnable:         c.Filter.LabelEnable,
 	}
 }
