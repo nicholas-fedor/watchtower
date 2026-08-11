@@ -14,6 +14,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Chores
 
+- Update nicholas-fedor/go-proxy-pull-action action to v1.1.42 by @renovate[bot] in [#2134](https://github.com/nicholas-fedor/watchtower/pull/2134)
 - Update module github.com/onsi/ginkgo/v2 to v2.32.1 by @renovate[bot] in [#2133](https://github.com/nicholas-fedor/watchtower/pull/2133)
 - Update module golang.org/x/mod to v0.39.0 by @renovate[bot] in [#2131](https://github.com/nicholas-fedor/watchtower/pull/2131)
 - Update module google.golang.org/protobuf to v1.36.12 by @renovate[bot] in [#2129](https://github.com/nicholas-fedor/watchtower/pull/2129)
@@ -28,6 +29,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Respect label-enable setting for container details by @nicholas-fedor in [#2137](https://github.com/nicholas-fedor/watchtower/pull/2137)
 - Validate required fields and standardize error messages by @nicholas-fedor in [#2124](https://github.com/nicholas-fedor/watchtower/pull/2124)
 - Recover orphaned Watchtower containers on startup by @nicholas-fedor in [#2110](https://github.com/nicholas-fedor/watchtower/pull/2110)
 - Remove orphaned Watchtower containers stuck in created state by @nicholas-fedor in [#2109](https://github.com/nicholas-fedor/watchtower/pull/2109)
