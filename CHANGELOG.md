@@ -14,6 +14,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Chores
 
+- Update module golang.org/x/text to v0.41.0 by @renovate[bot] in [#2143](https://github.com/nicholas-fedor/watchtower/pull/2143)
 - Update module golang.org/x/crypto to v0.55.0 by @renovate[bot] in [#2142](https://github.com/nicholas-fedor/watchtower/pull/2142)
 - Update module github.com/gofiber/schema to v1.8.4 by @renovate[bot] in [#2138](https://github.com/nicholas-fedor/watchtower/pull/2138)
 - Update nicholas-fedor/go-proxy-pull-action action to v1.1.42 by @renovate[bot] in [#2134](https://github.com/nicholas-fedor/watchtower/pull/2134)
@@ -31,6 +32,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Remove non-running AutoRemove containers explicitly by @nicholas-fedor in [#2141](https://github.com/nicholas-fedor/watchtower/pull/2141)
 - Respect label-enable setting for container details by @nicholas-fedor in [#2137](https://github.com/nicholas-fedor/watchtower/pull/2137)
 - Validate required fields and standardize error messages by @nicholas-fedor in [#2124](https://github.com/nicholas-fedor/watchtower/pull/2124)
 - Recover orphaned Watchtower containers on startup by @nicholas-fedor in [#2110](https://github.com/nicholas-fedor/watchtower/pull/2110)
