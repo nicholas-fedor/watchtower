@@ -14,6 +14,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Chores
 
+- Update module golang.org/x/crypto to v0.55.0 by @renovate[bot] in [#2142](https://github.com/nicholas-fedor/watchtower/pull/2142)
 - Update module github.com/gofiber/schema to v1.8.4 by @renovate[bot] in [#2138](https://github.com/nicholas-fedor/watchtower/pull/2138)
 - Update nicholas-fedor/go-proxy-pull-action action to v1.1.42 by @renovate[bot] in [#2134](https://github.com/nicholas-fedor/watchtower/pull/2134)
 - Update module github.com/onsi/ginkgo/v2 to v2.32.1 by @renovate[bot] in [#2133](https://github.com/nicholas-fedor/watchtower/pull/2133)
