@@ -4,15 +4,43 @@ import (
 	"context"
 	"net/url"
 	"strings"
+	"sync"
+	"time"
 
 	dockerSystem "github.com/moby/moby/api/types/system"
 	dockerClient "github.com/moby/moby/client"
 )
 
+// daemonInfoTTL is how long a Docker Info and mirrors snapshot is reused.
+const daemonInfoTTL = 5 * time.Minute
+
+// sharedDaemonInfoCache is reused across imageClient instances in one process.
+var sharedDaemonInfoCache = &daemonInfoCache{}
+
+// daemonInfoCache holds one Docker Info snapshot for concurrent check/pull paths.
+type daemonInfoCache struct {
+	mu      sync.Mutex
+	info    *dockerSystem.Info
+	expires time.Time
+	fetched bool
+}
+
+// resetDaemonInfoCache clears the process-wide Docker Info cache.
+//
+// Tests use this to isolate Info() call counts between cases.
+func resetDaemonInfoCache() {
+	sharedDaemonInfoCache.mu.Lock()
+	defer sharedDaemonInfoCache.mu.Unlock()
+
+	sharedDaemonInfoCache.info = nil
+	sharedDaemonInfoCache.expires = time.Time{}
+	sharedDaemonInfoCache.fetched = false
+}
+
 // resolveRegistryMirrorConfig fetches the registry mirror configuration from the Docker daemon.
 //
-// It calls Info() and returns the system.Info containing global mirrors (RegistryConfig.Mirrors).
-// Returns nil if the call fails or no mirrors are configured.
+// Successful Info() results are reused for daemonInfoTTL so concurrent check and
+// pull paths share one daemon call. Failures are not cached.
 //
 // Parameters:
 //   - ctx: Context for cancellation and timeout control.
@@ -20,6 +48,23 @@ import (
 // Returns:
 //   - *dockerSystem.Info: System info with mirror configuration, or nil if unavailable.
 func (c imageClient) resolveRegistryMirrorConfig(ctx context.Context) *dockerSystem.Info {
+	cache := c.daemonInfo
+	if cache == nil {
+		cache = sharedDaemonInfoCache
+	}
+
+	// Return a still-valid snapshot without calling Info().
+	cache.mu.Lock()
+	if cache.fetched && time.Now().Before(cache.expires) {
+		info := cache.info
+		cache.mu.Unlock()
+
+		return info
+	}
+	cache.mu.Unlock()
+
+	// Cache miss or expired snapshot. Fetch a fresh Info() result.
+
 	info, err := c.api.Info(
 		ctx,
 		dockerClient.InfoOptions{},
@@ -32,14 +77,15 @@ func (c imageClient) resolveRegistryMirrorConfig(ctx context.Context) *dockerSys
 		return nil
 	}
 
-	if info.Info.RegistryConfig == nil {
+	if info.Info.RegistryConfig == nil || len(info.Info.RegistryConfig.Mirrors) == 0 {
 		c.logger().Debug().Msg("No registry mirror configuration in Docker daemon")
 
-		return nil
-	}
-
-	if len(info.Info.RegistryConfig.Mirrors) == 0 {
-		c.logger().Debug().Msg("No registry mirrors configured in Docker daemon")
+		// Cache the empty result so concurrent callers do not repeat Info().
+		cache.mu.Lock()
+		cache.info = nil
+		cache.fetched = true
+		cache.expires = time.Now().Add(daemonInfoTTL)
+		cache.mu.Unlock()
 
 		return nil
 	}
@@ -58,7 +104,16 @@ func (c imageClient) resolveRegistryMirrorConfig(ctx context.Context) *dockerSys
 		Strs("global_mirrors", sanitized).
 		Msg("Resolved registry mirror configuration from Docker daemon")
 
-	return &info.Info
+	resolved := &info.Info
+
+	// Store the snapshot for daemonInfoTTL.
+	cache.mu.Lock()
+	cache.info = resolved
+	cache.fetched = true
+	cache.expires = time.Now().Add(daemonInfoTTL)
+	cache.mu.Unlock()
+
+	return resolved
 }
 
 // buildMirrorEndpoints returns the list of registry endpoints to try for digest comparison.

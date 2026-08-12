@@ -295,7 +295,7 @@ func Update(log *zerolog.Logger, ctx context.Context,
 	// Run pre-check lifecycle hooks if enabled to validate the environment before updates.
 	if config.LifecycleHooks {
 		log.Debug().Msg("Executing pre-check lifecycle hooks")
-		lifecycle.ExecutePreChecks(log, ctx, client, config)
+		lifecycle.ExecutePreChecks(log, ctx, client, config, allContainers)
 	}
 
 	// Filter containers based on the provided filter (e.g., all, specific names).
@@ -778,7 +778,7 @@ func Update(log *zerolog.Logger, ctx context.Context,
 	// Run post-check lifecycle hooks if enabled to finalize the update process.
 	if config.LifecycleHooks {
 		log.Debug().Msg("Executing post-check lifecycle hooks")
-		lifecycle.ExecutePostChecks(log, ctx, client, config)
+		lifecycle.ExecutePostChecks(log, ctx, client, config, allContainers)
 	}
 
 	// Add safeguard delay if Watchtower self-update pull failed

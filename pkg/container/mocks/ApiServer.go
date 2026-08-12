@@ -69,13 +69,20 @@ func respondWithJSONFile(
 // GetContainerHandlers includes handlers for the given containers, their references, and associated images.
 func GetContainerHandlers(containerRefs ...*ContainerRef) []http.HandlerFunc {
 	handlers := make([]http.HandlerFunc, 0, len(containerRefs)*handlersPerContainer)
+	seenImages := make(map[types.ImageID]struct{}, len(containerRefs))
+
 	for _, containerRef := range containerRefs {
 		handlers = append(handlers, getContainerFileHandler(containerRef))
 		// Append handlers for referenced containers
 		for _, ref := range containerRef.references {
 			handlers = append(handlers, getContainerFileHandler(ref))
 		}
-		// Append image handler for each container's image
+
+		if _, seen := seenImages[containerRef.image.id]; seen {
+			continue
+		}
+
+		seenImages[containerRef.image.id] = struct{}{}
 		handlers = append(handlers, getImageHandler(containerRef.image.id,
 			RespondWithJSONFile(containerRef.image.getFileName(), http.StatusOK),
 		))

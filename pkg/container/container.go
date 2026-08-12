@@ -76,6 +76,7 @@ type Container struct {
 	Stale              bool                             // Marks the container as having an outdated image
 	OldImageID         types.ImageID                    // Stores the image ID before update for cleanup tracking
 	normalizedName     string                           // Cached normalized container name
+	imageName          string                           // Cached resolved image name with tag
 	containerInfo      *dockerContainer.InspectResponse // Docker container metadata
 	imageInfo          *dockerImage.InspectResponse     // Docker image metadata
 	// log is the process logger for operational Warn/Error/Debug on this instance.
@@ -86,7 +87,10 @@ type Container struct {
 
 // NewContainer creates a new Container instance with the specified metadata.
 //
+// The resolved image name is cached so later ImageName calls do not recompute it.
+//
 // Parameters:
+//   - log: Process logger. A nop logger is used when nil.
 //   - containerInfo: Docker container metadata.
 //   - imageInfo: Docker image metadata.
 //
@@ -115,6 +119,8 @@ func NewContainer(
 		imageInfo:          imageInfo,
 		log:                log,
 	}
+	// Cache the resolved image name at construct time.
+	c.imageName = c.resolveImageName()
 	c.logger().Debug().
 		Str("container", c.Name()).
 		Str("id", c.ID().ShortID()).
@@ -270,45 +276,48 @@ func (c *Container) ImageID() types.ImageID {
 	return types.ImageID(c.imageInfo.ID)
 }
 
-// ImageName returns the name of the container's image.
+// ImageName returns the cached name of the container's image.
 //
-// It uses the Zodiac label if present, otherwise Config.Image, appending ":latest" if untagged.
+// The value is resolved once in NewContainer from the Zodiac label or Config.Image.
+// When containerInfo is later cleared, the name is resolved again.
 //
 // Returns:
 //   - string: Image name (e.g., "alpine:latest").
 func (c *Container) ImageName() string {
-	clogVal := c.logger().With().
-		Str("container", c.Name()).
-		Logger()
-	clog := &clogVal
-
-	// Prefer Zodiac label for image name.
-	imageName, ok := c.getLabelValue(zodiacLabel)
-	if !ok {
-		if c.containerInfo == nil || c.containerInfo.Config == nil {
-			clog.Warn().Msg("No container config available, using default image name")
-
-			return "unknown:latest"
-		}
-
-		imageName = c.containerInfo.Config.Image
-
-		clog.Debug().Msg("Using Config.Image for image name")
-	} else {
-		clog.Debug().
-			Str("label", zodiacLabel).
-			Msg("Using Zodiac label for image name")
+	if c == nil {
+		return "unknown:latest"
 	}
 
-	// Append default tag if none specified.
-	if !strings.Contains(imageName, ":") {
-		imageName += ":latest"
-		clog.Debug().
-			Str("image", imageName).
-			Msg("Appended :latest to image name")
+	// Re-resolve when inspect data was cleared after construction.
+	if c.containerInfo == nil {
+		return c.resolveImageName()
 	}
 
-	return imageName
+	return c.imageName
+}
+
+// SetImageName updates Config.Image and the cached image name used by ImageName.
+//
+// An untagged name receives a ":latest" suffix so ImageName stays consistent
+// with resolveImageName.
+//
+// Parameters:
+//   - name: Image reference to store.
+func (c *Container) SetImageName(name string) {
+	if c == nil {
+		return
+	}
+
+	// Keep Config.Image in sync so GetCreateConfig uses the pinned reference.
+	if c.containerInfo != nil && c.containerInfo.Config != nil {
+		c.containerInfo.Config.Image = name
+	}
+
+	c.imageName = name
+	// Append the default tag if none was specified.
+	if !strings.Contains(c.imageName, ":") {
+		c.imageName += ":latest"
+	}
 }
 
 // HasImageInfo indicates whether image metadata is available.
@@ -690,6 +699,35 @@ func (c *Container) Links(useComposeDependsOn bool) []string {
 	links := getLinksFromHostConfig(c, clog)
 
 	return filterSelfReferences(links, c.Name())
+}
+
+// resolveImageName computes the image name from the Zodiac label or Config.Image.
+//
+// An untagged name receives a ":latest" suffix. Missing config yields "unknown:latest".
+//
+// Returns:
+//   - string: Image name with a tag (e.g., "alpine:latest").
+func (c *Container) resolveImageName() string {
+	// Prefer the Zodiac label for the image name.
+	imageName, ok := c.getLabelValue(zodiacLabel)
+	if !ok {
+		if c.containerInfo == nil || c.containerInfo.Config == nil {
+			c.logger().Warn().
+				Str("container", c.Name()).
+				Msg("No container config available, using default image name")
+
+			return "unknown:latest"
+		}
+
+		imageName = c.containerInfo.Config.Image
+	}
+
+	// Append the default tag if none was specified.
+	if !strings.Contains(imageName, ":") {
+		imageName += ":latest"
+	}
+
+	return imageName
 }
 
 // logger returns the container's process logger, or a discarded nop if unset.

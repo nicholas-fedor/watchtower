@@ -133,6 +133,9 @@ func Test_imageClient_buildMirrorEndpoints(t *testing.T) {
 // Test_newImageClient_nilLogger_noMirrors verifies resolveRegistryMirrorConfig does not
 // panic when the image client logger is nil and Docker reports no registry mirrors.
 func Test_newImageClient_nilLogger_noMirrors(t *testing.T) {
+	resetDaemonInfoCache()
+	t.Cleanup(resetDaemonInfoCache)
+
 	server := ghttp.NewServer()
 	t.Cleanup(server.Close)
 
@@ -163,4 +166,100 @@ func Test_newImageClient_nilLogger_noMirrors(t *testing.T) {
 	})
 
 	assert.Regexp(t, `^/v\d+(\.\d+)*/info$`, infoPath, "resolveRegistryMirrorConfig must call the versioned /info endpoint")
+}
+
+func TestResolveRegistryMirrorConfig_CachesInfo(t *testing.T) {
+	resetDaemonInfoCache()
+	t.Cleanup(resetDaemonInfoCache)
+
+	server := ghttp.NewServer()
+	t.Cleanup(server.Close)
+
+	var infoCalls int
+
+	server.AppendHandlers(APIVersionPingHandler())
+	server.RouteToHandler("GET", regexp.MustCompile(`^/v\d+(\.\d+)*/info$`), func(w http.ResponseWriter, _ *http.Request) {
+		infoCalls++
+
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusOK)
+		_, _ = w.Write([]byte(`{"RegistryConfig":{"Mirrors":["https://mirror.example.com"]}}`))
+	})
+
+	api, err := dockerClient.New(
+		dockerClient.WithHost(server.URL()),
+		dockerClient.WithHTTPClient(server.HTTPTestServer.Client()),
+	)
+	require.NoError(t, err)
+
+	first := newImageClient(api, testLog())
+	second := newImageClient(api, testLog())
+
+	gotFirst := first.resolveRegistryMirrorConfig(context.Background())
+	gotSecond := second.resolveRegistryMirrorConfig(context.Background())
+
+	require.NotNil(t, gotFirst)
+	require.NotNil(t, gotSecond)
+	assert.Equal(t, 1, infoCalls)
+	assert.Equal(t, gotFirst.RegistryConfig.Mirrors, gotSecond.RegistryConfig.Mirrors)
+}
+
+func TestResolveRegistryMirrorConfig_InfoErrorNotCached(t *testing.T) {
+	resetDaemonInfoCache()
+	t.Cleanup(resetDaemonInfoCache)
+
+	server := ghttp.NewServer()
+	t.Cleanup(server.Close)
+
+	var infoCalls int
+
+	server.AppendHandlers(APIVersionPingHandler())
+	server.RouteToHandler("GET", regexp.MustCompile(`^/v\d+(\.\d+)*/info$`), func(w http.ResponseWriter, _ *http.Request) {
+		infoCalls++
+
+		w.WriteHeader(http.StatusInternalServerError)
+	})
+
+	api, err := dockerClient.New(
+		dockerClient.WithHost(server.URL()),
+		dockerClient.WithHTTPClient(server.HTTPTestServer.Client()),
+	)
+	require.NoError(t, err)
+
+	client := newImageClient(api, testLog())
+
+	assert.Nil(t, client.resolveRegistryMirrorConfig(context.Background()))
+	assert.Nil(t, client.resolveRegistryMirrorConfig(context.Background()))
+	assert.Equal(t, 2, infoCalls)
+}
+
+func TestResolveRegistryMirrorConfig_NilDaemonInfoUsesShared(t *testing.T) {
+	resetDaemonInfoCache()
+	t.Cleanup(resetDaemonInfoCache)
+
+	server := ghttp.NewServer()
+	t.Cleanup(server.Close)
+
+	var infoCalls int
+
+	server.AppendHandlers(APIVersionPingHandler())
+	server.RouteToHandler("GET", regexp.MustCompile(`^/v\d+(\.\d+)*/info$`), func(w http.ResponseWriter, _ *http.Request) {
+		infoCalls++
+
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusOK)
+		_, _ = w.Write([]byte(`{"RegistryConfig":{"Mirrors":["https://mirror.example.com"]}}`))
+	})
+
+	api, err := dockerClient.New(
+		dockerClient.WithHost(server.URL()),
+		dockerClient.WithHTTPClient(server.HTTPTestServer.Client()),
+	)
+	require.NoError(t, err)
+
+	client := imageClient{api: api, log: testLog()}
+
+	got := client.resolveRegistryMirrorConfig(context.Background())
+	require.NotNil(t, got)
+	assert.Equal(t, 1, infoCalls)
 }

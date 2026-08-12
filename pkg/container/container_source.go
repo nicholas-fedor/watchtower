@@ -12,6 +12,7 @@ import (
 
 	cerrdefs "github.com/containerd/errdefs"
 	dockerContainer "github.com/moby/moby/api/types/container"
+	dockerImage "github.com/moby/moby/api/types/image"
 	dockerNetwork "github.com/moby/moby/api/types/network"
 	dockerClient "github.com/moby/moby/client"
 	dockerAPIVersion "github.com/moby/moby/client/pkg/versions"
@@ -103,10 +104,12 @@ func ListSourceContainers(log *zerolog.Logger,
 	}
 
 	// Convert and filter containers.
-	hostContainers := []types.Container{}
+	hostContainers := make([]types.Container, 0, len(containers.Items))
+	// Reuse ImageInspect results when multiple containers share an image ID.
+	imageCache := make(map[string]*dockerImage.InspectResponse, len(containers.Items))
 
 	for _, runningContainer := range containers.Items {
-		container, err := GetSourceContainer(log, ctx, api, types.ContainerID(runningContainer.ID))
+		container, err := getSourceContainer(log, ctx, api, types.ContainerID(runningContainer.ID), imageCache)
 		if err != nil {
 			// Log detailed error information for debugging container inspect failures
 			log.Debug().
@@ -154,6 +157,7 @@ func ListSourceContainers(log *zerolog.Logger,
 // It resolves network mode if it references another container.
 //
 // Parameters:
+//   - log: Logger for debug output.
 //   - ctx: Context for cancellation and timeout control.
 //   - api: Docker API client.
 //   - containerID: ID of the container to inspect.
@@ -166,6 +170,28 @@ func GetSourceContainer(log *zerolog.Logger,
 	api dockerClient.APIClient,
 	containerID types.ContainerID,
 ) (types.Container, error) {
+	// No per-list cache for standalone inspects.
+	return getSourceContainer(log, ctx, api, containerID, nil)
+}
+
+// getSourceContainer inspects a container and optionally reuses ImageInspect results.
+//
+// Parameters:
+//   - log: Logger for debug output.
+//   - ctx: Context for cancellation and timeout control.
+//   - api: Docker API client.
+//   - containerID: ID of the container to inspect.
+//   - imageCache: Optional per-list cache of ImageInspect results keyed by image ID.
+//
+// Returns:
+//   - types.Container: Container object if successful.
+//   - error: Non-nil if inspection fails, nil on success.
+func getSourceContainer(log *zerolog.Logger,
+	ctx context.Context,
+	api dockerClient.APIClient,
+	containerID types.ContainerID,
+	imageCache map[string]*dockerImage.InspectResponse,
+) (types.Container, error) {
 	clogVal := log.With().
 		Str("container_id", string(containerID)).
 		Logger()
@@ -174,7 +200,11 @@ func GetSourceContainer(log *zerolog.Logger,
 	clog.Debug().Msg("Inspecting container")
 
 	// Inspect the container to get its details.
-	containerResult, err := api.ContainerInspect(ctx, string(containerID), dockerClient.ContainerInspectOptions{})
+	containerResult, err := api.ContainerInspect(
+		ctx,
+		string(containerID),
+		dockerClient.ContainerInspectOptions{},
+	)
 	if err != nil {
 		// Log detailed error information for debugging
 		clog.Debug().
@@ -197,7 +227,10 @@ func GetSourceContainer(log *zerolog.Logger,
 	if containerInfo.HostConfig != nil {
 		netType, netContainerID, found := strings.Cut(string(containerInfo.HostConfig.NetworkMode), ":")
 		if found && netType == "container" {
-			parentResult, err := api.ContainerInspect(ctx, netContainerID, dockerClient.ContainerInspectOptions{})
+			parentResult, err := api.ContainerInspect(ctx,
+				netContainerID,
+				dockerClient.ContainerInspectOptions{},
+			)
 			if err != nil {
 				clog.Warn().
 					Err(err).
@@ -216,6 +249,15 @@ func GetSourceContainer(log *zerolog.Logger,
 		}
 	}
 
+	cached, ok := imageCache[containerInfo.Image]
+	if ok {
+		clog.Debug().
+			Str("image", containerInfo.Image).
+			Msg("Retrieved container and image info")
+
+		return NewContainer(log, containerInfo, cached), nil
+	}
+
 	// Fetch image info, falling back if it fails.
 	imageResult, err := api.ImageInspect(ctx, containerInfo.Image)
 	if err != nil {
@@ -228,11 +270,17 @@ func GetSourceContainer(log *zerolog.Logger,
 		return NewContainer(log, containerInfo, nil), nil
 	}
 
+	imageInfo := &imageResult.InspectResponse
+	if imageCache != nil {
+		// Store successful inspects so later containers with the same image skip the API.
+		imageCache[containerInfo.Image] = imageInfo
+	}
+
 	clog.Debug().
 		Str("image", containerInfo.Image).
 		Msg("Retrieved container and image info")
 
-	return NewContainer(log, containerInfo, &imageResult.InspectResponse), nil
+	return NewContainer(log, containerInfo, imageInfo), nil
 }
 
 // StopSourceContainer stops the specified container using the Docker API's StopContainer method.
@@ -410,10 +458,13 @@ func StopAndRemoveSourceContainer(log *zerolog.Logger,
 
 	// Call the Docker API's ContainerRemove to delete the container, forcing termination of any
 	// lingering processes (via SIGKILL if needed) and removing volumes if specified.
-	_, err = api.ContainerRemove(ctx, string(sourceContainer.ID()), dockerClient.ContainerRemoveOptions{
-		Force:         true,          // Ensure any lingering processes are terminated before removal.
-		RemoveVolumes: removeVolumes, // Remove associated volumes if the parameter is true.
-	})
+	_, err = api.ContainerRemove(
+		ctx,
+		string(sourceContainer.ID()),
+		dockerClient.ContainerRemoveOptions{
+			Force:         true,          // Ensure any lingering processes are terminated before removal.
+			RemoveVolumes: removeVolumes, // Remove associated volumes if the parameter is true.
+		})
 	if err != nil && !cerrdefs.IsNotFound(err) {
 		// Log removal failure with elapsed time and error details, excluding cases where the container
 		// was already removed by another process.
@@ -576,7 +627,8 @@ func newEmptyNetworkConfig() *dockerNetwork.NetworkingConfig {
 
 // processEndpoint sanitizes a single network endpoint for the target container.
 //
-// It filters aliases, copies IPAM config, and handles MAC addresses based on API version and network mode. Returns an error if sourceEndpoint is nil.
+// It filters aliases, copies IPAM config, and handles MAC addresses based on API
+// version and network mode. Returns an error if sourceEndpoint is nil.
 //
 // Parameters:
 //   - sourceEndpoint: Source endpoint to process.

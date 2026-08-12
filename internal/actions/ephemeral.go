@@ -414,6 +414,8 @@ func orchestrateSelfUpdate(log *zerolog.Logger, ctx context.Context,
 // pinContainerCreateImage sets Config.Image on a concrete container.Container so
 // GetCreateConfig uses newImage for the replacement instance.
 //
+// SetImageName also updates the cached ImageName used after the pin.
+//
 // Parameters:
 //   - oldContainer: Source container whose create config is pinned.
 //   - newImage: Image reference to use when creating the replacement.
@@ -435,7 +437,7 @@ func pinContainerCreateImage(oldContainer types.Container, newImage string, clog
 		return
 	}
 
-	info.Config.Image = newImage
+	c.SetImageName(newImage)
 	clog.Debug().
 		Str("pinned_image", newImage).
 		Msg("Pinned create image for ephemeral self-update")

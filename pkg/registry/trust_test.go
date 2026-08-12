@@ -7,6 +7,7 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/distribution/reference"
 	"github.com/stretchr/testify/assert"
@@ -704,6 +705,72 @@ func TestEncodedConfigCredentials_InvalidImageRef(t *testing.T) {
 	credentials, err := EncodedConfigCredentials(testLog(), "")
 	require.Error(t, err)
 	assert.Empty(t, credentials)
+}
+
+func TestEncodedConfigCredentials_CacheHitAndMtimeInvalidation(t *testing.T) {
+	resetEncodedAuthCache()
+	t.Cleanup(resetEncodedAuthCache)
+
+	tempDir := writeTestDockerConfig(t, map[string]map[string]string{
+		"ghcr.io": {
+			"username": "cache-user",
+			"password": "cache-pass",
+		},
+	})
+	t.Cleanup(func() { _ = os.RemoveAll(tempDir) })
+
+	first, err := EncodedConfigCredentials(testLog(), "ghcr.io/org/app:latest")
+	require.NoError(t, err)
+	require.NotEmpty(t, first)
+
+	second, err := EncodedConfigCredentials(testLog(), "ghcr.io/org/app:latest")
+	require.NoError(t, err)
+	assert.Equal(t, first, second)
+
+	configPath := filepath.Join(tempDir, "config.json")
+	updated, err := json.Marshal(map[string]any{
+		"auths": map[string]any{
+			"ghcr.io": map[string]string{
+				"username": "cache-user",
+				"password": "rotated-pass",
+			},
+		},
+	})
+	require.NoError(t, err)
+
+	// Ensure mtime changes even on coarse filesystems.
+	past := configFileModTime(tempDir) - int64(time.Second)
+	require.NoError(t, os.Chtimes(configPath, time.Unix(0, past), time.Unix(0, past)))
+	require.NoError(t, os.WriteFile(configPath, updated, 0o600))
+
+	future := time.Now().Add(2 * time.Second)
+	require.NoError(t, os.Chtimes(configPath, future, future))
+
+	third, err := EncodedConfigCredentials(testLog(), "ghcr.io/org/app:latest")
+	require.NoError(t, err)
+	require.NotEmpty(t, third)
+	assert.NotEqual(t, first, third)
+}
+
+func TestEncodedConfigCredentials_FailedLookupNotCached(t *testing.T) {
+	resetEncodedAuthCache()
+	t.Cleanup(resetEncodedAuthCache)
+
+	tempDir := writeTestDockerConfig(t, map[string]map[string]string{
+		"ghcr.io": {
+			"username": "later-user",
+			"password": "later-pass",
+		},
+	})
+	t.Cleanup(func() { _ = os.RemoveAll(tempDir) })
+
+	empty, err := EncodedConfigCredentials(testLog(), "")
+	require.Error(t, err)
+	assert.Empty(t, empty)
+
+	got, err := EncodedConfigCredentials(testLog(), "ghcr.io/org/app:latest")
+	require.NoError(t, err)
+	require.NotEmpty(t, got)
 }
 
 // writeTestDockerConfig writes a Docker config.json with the given auths map

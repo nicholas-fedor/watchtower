@@ -1298,6 +1298,21 @@ func (e *errReadCloser) Close() error {
 	return nil
 }
 
+func TestExtractGetDigest_OversizedBody(t *testing.T) {
+	resp := &http.Response{
+		StatusCode: http.StatusOK,
+		Status:     "200 OK",
+		Header:     http.Header{"Content-Type": []string{"application/json"}},
+		Body:       io.NopCloser(strings.NewReader(strings.Repeat("a", maxManifestSize+2))),
+	}
+
+	t.Cleanup(func() { _ = resp.Body.Close() })
+
+	got, err := ExtractGetDigest(testLog(), resp)
+	require.ErrorIs(t, err, errManifestTooLarge)
+	assert.Empty(t, got)
+}
+
 func TestMakeManifestRequest(t *testing.T) {
 	tests := []struct {
 		name        string

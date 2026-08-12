@@ -2,6 +2,7 @@ package filters
 
 import (
 	"fmt"
+	"io"
 	"strings"
 	"testing"
 
@@ -956,14 +957,14 @@ func TestFilterByImageNames(t *testing.T) {
 
 	// Image matches -> kept.
 	container := new(mockContainer.FilterableContainer)
-	container.On("Name").Return("web")
+	container.On("Name").Return("web").Maybe()
 	container.On("ImageName").Return("nginx:latest")
 	assert.True(t, filter(container))
 	container.AssertExpectations(t)
 
 	// Image does not match -> excluded.
 	container = new(mockContainer.FilterableContainer)
-	container.On("Name").Return("cache")
+	container.On("Name").Return("cache").Maybe()
 	container.On("ImageName").Return("redis:latest")
 	assert.False(t, filter(container))
 	container.AssertExpectations(t)
@@ -977,14 +978,14 @@ func TestFilterByImageNamesRegex(t *testing.T) {
 
 	// Anchored regex matches any nginx tag.
 	container := new(mockContainer.FilterableContainer)
-	container.On("Name").Return("web")
+	container.On("Name").Return("web").Maybe()
 	container.On("ImageName").Return("nginx:1.25")
 	assert.True(t, filter(container))
 	container.AssertExpectations(t)
 
 	// Anchored regex does not match a different image name.
 	container = new(mockContainer.FilterableContainer)
-	container.On("Name").Return("web")
+	container.On("Name").Return("web").Maybe()
 	container.On("ImageName").Return("nginxx:1.25")
 	assert.False(t, filter(container))
 	container.AssertExpectations(t)
@@ -998,14 +999,14 @@ func TestFilterByImageNamesRegistryPath(t *testing.T) {
 
 	// Registry path with slashes matches.
 	container := new(mockContainer.FilterableContainer)
-	container.On("Name").Return("web")
+	container.On("Name").Return("web").Maybe()
 	container.On("ImageName").Return("docker.io/library/nginx:1.25")
 	assert.True(t, filter(container))
 	container.AssertExpectations(t)
 
 	// Different registry does not match.
 	container = new(mockContainer.FilterableContainer)
-	container.On("Name").Return("web")
+	container.On("Name").Return("web").Maybe()
 	container.On("ImageName").Return("ghcr.io/org/nginx:1.25")
 	assert.False(t, filter(container))
 	container.AssertExpectations(t)
@@ -1025,14 +1026,14 @@ func TestFilterBySkippedImageNames(t *testing.T) {
 
 	// Skipped image.
 	container := new(mockContainer.FilterableContainer)
-	container.On("Name").Return("web")
+	container.On("Name").Return("web").Maybe()
 	container.On("ImageName").Return("nginx:latest")
 	assert.False(t, filter(container))
 	container.AssertExpectations(t)
 
 	// Non-skipped image passes through baseFilter.
 	container = new(mockContainer.FilterableContainer)
-	container.On("Name").Return("cache")
+	container.On("Name").Return("cache").Maybe()
 	container.On("ImageName").Return("redis:latest")
 	assert.True(t, filter(container))
 	container.AssertExpectations(t)
@@ -1396,4 +1397,91 @@ func TestParseLabelPairs_Malformed(t *testing.T) {
 			assert.ErrorIs(t, err, tc.errPrefix)
 		})
 	}
+}
+
+func TestFilterByDisableNames_InvalidRegexIsExactMatch(t *testing.T) {
+	t.Parallel()
+
+	filter := FilterByDisableNames(testLog(), []string{"["}, NoFilter)
+
+	excluded := new(mockContainer.FilterableContainer)
+	excluded.On("Name").Return("[")
+	assert.False(t, filter(excluded))
+	excluded.AssertExpectations(t)
+
+	kept := new(mockContainer.FilterableContainer)
+	kept.On("Name").Return("app")
+	assert.True(t, filter(kept))
+	kept.AssertExpectations(t)
+}
+
+func TestFilterByNames_InvalidRegexIsExactMatch(t *testing.T) {
+	t.Parallel()
+
+	filter := FilterByNames(testLog(), []string{"["}, NoFilter)
+
+	matched := new(mockContainer.FilterableContainer)
+	matched.On("Name").Return("[")
+	assert.True(t, filter(matched))
+	matched.AssertExpectations(t)
+
+	other := new(mockContainer.FilterableContainer)
+	other.On("Name").Return("app")
+	assert.False(t, filter(other))
+	other.AssertExpectations(t)
+}
+
+func TestFilters_DebugLogging(t *testing.T) {
+	t.Parallel()
+
+	debug := zerolog.New(io.Discard).Level(zerolog.DebugLevel)
+
+	nameFilter := FilterByNames(&debug, []string{"web"}, NoFilter)
+	named := new(mockContainer.FilterableContainer)
+	named.On("Name").Return("web")
+	assert.True(t, nameFilter(named))
+
+	missed := new(mockContainer.FilterableContainer)
+	missed.On("Name").Return("db")
+	assert.False(t, nameFilter(missed))
+
+	disableFilter := FilterByDisableNames(&debug, []string{"skip"}, NoFilter)
+	skipped := new(mockContainer.FilterableContainer)
+	skipped.On("Name").Return("skip")
+	assert.False(t, disableFilter(skipped))
+
+	kept := new(mockContainer.FilterableContainer)
+	kept.On("Name").Return("web")
+	assert.True(t, disableFilter(kept))
+
+	imageFilter := FilterByMonitoredImageNamePatterns(&debug, []string{"nginx:.*"}, NoFilter)
+	matchedImage := new(mockContainer.FilterableContainer)
+	matchedImage.On("Name").Return("web").Maybe()
+	matchedImage.On("ImageName").Return("nginx:1.25")
+	assert.True(t, imageFilter(matchedImage))
+
+	otherImage := new(mockContainer.FilterableContainer)
+	otherImage.On("Name").Return("cache").Maybe()
+	otherImage.On("ImageName").Return("redis:latest")
+	assert.False(t, imageFilter(otherImage))
+
+	skipImageFilter := FilterBySkippedImageNamePatterns(&debug, []string{"redis:.*"}, NoFilter)
+	skippedImage := new(mockContainer.FilterableContainer)
+	skippedImage.On("Name").Return("cache").Maybe()
+	skippedImage.On("ImageName").Return("redis:latest")
+	assert.False(t, skipImageFilter(skippedImage))
+
+	keptImage := new(mockContainer.FilterableContainer)
+	keptImage.On("Name").Return("web").Maybe()
+	keptImage.On("ImageName").Return("nginx:latest")
+	assert.True(t, skipImageFilter(keptImage))
+}
+
+func TestMatchesImageName(t *testing.T) {
+	t.Parallel()
+
+	assert.True(t, matchesImageName("nginx:latest", "nginx:latest"))
+	assert.True(t, matchesImageName("nginx:1.25", "nginx:.*"))
+	assert.False(t, matchesImageName("redis:latest", "nginx:.*"))
+	assert.False(t, matchesImageName("app", "["))
 }
