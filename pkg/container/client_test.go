@@ -215,6 +215,8 @@ var _ = ginkgo.Describe("the client", func() {
 
 				err := (&client{log: testLog(), api: docker}).StopAndRemoveContainer(context.Background(), mockedContainer, time.Second)
 				gomega.Expect(err).ToNot(gomega.HaveOccurred())
+				// API version ping + stop. No DELETE. Docker AutoRemove handles cleanup after stop.
+				gomega.Expect(mockServer.ReceivedRequests()).To(gomega.HaveLen(2))
 			})
 
 			ginkgo.It("should remove a non-running AutoRemove container explicitly", func() {
@@ -229,6 +231,8 @@ var _ = ginkgo.Describe("the client", func() {
 
 				err := (&client{log: testLog(), api: docker}).StopAndRemoveContainer(context.Background(), mockedContainer, time.Second)
 				gomega.Expect(err).ToNot(gomega.HaveOccurred())
+				// API version ping + DELETE. AutoRemove does not apply to never-started containers.
+				gomega.Expect(mockServer.ReceivedRequests()).To(gomega.HaveLen(2))
 			})
 		})
 	})
