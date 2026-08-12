@@ -216,6 +216,85 @@ var _ = ginkgo.Describe("ListSourceContainers", func() {
 			gomega.Expect(containers).To(gomega.BeEmpty())
 		})
 	})
+
+	ginkgo.When("image inspection fails", func() {
+		// Mocks a container whose image can no longer be inspected, which happens
+		// when the image is removed out from under a running container.
+		mockMissingImage := func(containerID string) []http.HandlerFunc {
+			return []http.HandlerFunc{
+				ghttp.CombineHandlers(
+					ghttp.VerifyRequest(
+						"GET",
+						gomega.MatchRegexp(
+							fmt.Sprintf("^/v[0-9.]+/containers/%s/json$", containerID),
+						),
+					),
+					ghttp.RespondWithJSONEncoded(http.StatusOK, dockerContainer.InspectResponse{
+						ID:    containerID,
+						Name:  "/test-container",
+						Image: "test-image:latest",
+						State: &dockerContainer.State{
+							Status:  "running",
+							Running: true,
+						},
+						HostConfig: &dockerContainer.HostConfig{},
+						Config: &dockerContainer.Config{
+							Image: "test-image:latest",
+						},
+					}),
+				),
+				ghttp.CombineHandlers(
+					ghttp.VerifyRequest(
+						"GET",
+						gomega.MatchRegexp("^/v[0-9.]+/images/test-image:latest/json$"),
+					),
+					ghttp.RespondWith(http.StatusNotFound, `{"message":"No such image"}`),
+				),
+			}
+		}
+
+		ginkgo.It("should not warn for containers excluded by the filter", func() {
+			mockServer.AppendHandlers(verifyFilters([]string{"running"}))
+			mockServer.AppendHandlers(mockMissingImage(testContainerID)...)
+
+			log, logBuf := captureLog(zerolog.WarnLevel)
+			excludeAll := filters.FilterByDisableNames(
+				log,
+				[]string{"test-container"},
+				filters.NoFilter,
+			)
+
+			containers, err := ListSourceContainers(log, context.Background(),
+				docker,
+				ClientOptions{},
+				excludeAll,
+			)
+			gomega.Expect(err).ToNot(gomega.HaveOccurred())
+			gomega.Expect(containers).To(gomega.BeEmpty())
+			gomega.Expect(string(logBuf.Contents())).
+				ToNot(gomega.ContainSubstring("Failed to retrieve image info"))
+		})
+
+		ginkgo.It("should warn for containers that pass the filter", func() {
+			mockServer.AppendHandlers(verifyFilters([]string{"running"}))
+			mockServer.AppendHandlers(mockMissingImage(testContainerID)...)
+
+			log, logBuf := captureLog(zerolog.WarnLevel)
+
+			containers, err := ListSourceContainers(log, context.Background(),
+				docker,
+				ClientOptions{},
+				nil,
+			)
+			gomega.Expect(err).ToNot(gomega.HaveOccurred())
+			gomega.Expect(containers).To(gomega.HaveLen(1))
+
+			logged := string(logBuf.Contents())
+			gomega.Expect(logged).To(gomega.ContainSubstring("Failed to retrieve image info"))
+			// The warning must identify the container by name, not just by ID.
+			gomega.Expect(logged).To(gomega.ContainSubstring("test-container"))
+		})
+	})
 })
 
 var _ = ginkgo.Describe("buildListFilterArgs", func() {
