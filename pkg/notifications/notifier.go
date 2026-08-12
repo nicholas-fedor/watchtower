@@ -556,7 +556,6 @@ func LogLegacyDeprecationWarnings(log *zerolog.Logger, notificationTypes []strin
 		switch notificationType {
 		case emailType, slackType, msTeamsType, gotifyType:
 			log.Warn().
-				Str("type", notificationType).
 				Msgf("Using deprecated legacy %s notification configuration. "+
 					"Use the notification-url configuration option instead.",
 					notificationType)
