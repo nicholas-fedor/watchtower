@@ -614,9 +614,6 @@ func (c *client) GetContainer(ctx context.Context, containerID types.ContainerID
 		return nil, err
 	}
 
-	// Containers reaching this path have already passed filtering, so missing image
-	// metadata is worth a warning here even though GetSourceContainer logs it at
-	// debug level. See the comment there for why that call site cannot warn.
 	if !container.HasImageInfo() {
 		c.logger().Warn().
 			Str("container", container.Name()).

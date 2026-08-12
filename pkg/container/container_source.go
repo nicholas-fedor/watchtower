@@ -130,10 +130,6 @@ func ListSourceContainers(log *zerolog.Logger,
 		}
 
 		if filter == nil || filter(container) {
-			// Warn about missing image metadata only for containers that survive the
-			// filter. GetSourceContainer logs this at debug level because it runs
-			// before filtering, and warning there would produce notifications for
-			// containers the user has explicitly excluded from monitoring.
 			if !container.HasImageInfo() {
 				log.Warn().
 					Str("container", container.Name()).
@@ -223,11 +219,6 @@ func GetSourceContainer(log *zerolog.Logger,
 	// Fetch image info, falling back if it fails.
 	imageResult, err := api.ImageInspect(ctx, containerInfo.Image)
 	if err != nil {
-		// Logged at debug level because this runs before container filtering.
-		// Warning here would notify about containers the user has excluded via
-		// --disable-containers and friends. Callers that know the container is
-		// actually monitored re-log this at warning level; see
-		// ListSourceContainers and client.GetContainer.
 		clog.Debug().
 			Err(err).
 			Str("container", util.NormalizeContainerName(containerInfo.Name)).
