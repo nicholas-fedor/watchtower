@@ -61,40 +61,43 @@ func (c imageClient) resolveRegistryMirrorConfig(ctx context.Context) *dockerSys
 		cache = sharedDaemonInfoCache
 	}
 
-	cache.mu.Lock()
-	if cache.fetched && time.Now().Before(cache.expires) {
-		info := cache.info
-		cache.mu.Unlock()
-
-		return info
-	}
-
-	if cache.inflight != nil {
-		wait := cache.inflight
-		cache.mu.Unlock()
-
-		select {
-		case <-wait:
-			cache.mu.Lock()
-			fetched := cache.fetched && time.Now().Before(cache.expires)
+	for {
+		cache.mu.Lock()
+		if cache.fetched && time.Now().Before(cache.expires) {
 			info := cache.info
 			cache.mu.Unlock()
 
-			if fetched {
-				return info
-			}
-
-			// The in-flight fetch failed. Do not stampede another Info() call.
-			return nil
-		case <-ctx.Done():
-			return nil
+			return info
 		}
+
+		if cache.inflight != nil {
+			wait := cache.inflight
+			cache.mu.Unlock()
+
+			select {
+			case <-wait:
+				// Retry so a failed or panicked leader does not strand later callers.
+				continue
+			case <-ctx.Done():
+				return nil
+			}
+		}
+
+		break
 	}
 
 	// This caller performs the fetch. Others wait on inflight.
 	done := make(chan struct{})
 	cache.inflight = done
 	cache.mu.Unlock()
+
+	defer func() {
+		cache.mu.Lock()
+		cache.inflight = nil
+
+		close(done)
+		cache.mu.Unlock()
+	}()
 
 	resolved := c.fetchDaemonInfo(ctx)
 
@@ -104,10 +107,6 @@ func (c imageClient) resolveRegistryMirrorConfig(ctx context.Context) *dockerSys
 		cache.fetched = true
 		cache.expires = time.Now().Add(daemonInfoTTL)
 	}
-
-	cache.inflight = nil
-
-	close(done)
 	cache.mu.Unlock()
 
 	if !resolved.ok {

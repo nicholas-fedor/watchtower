@@ -280,6 +280,7 @@ func (c *Container) ImageID() types.ImageID {
 //
 // The value is resolved once in NewContainer from the Zodiac label or Config.Image.
 // When containerInfo is later cleared, the name is resolved again.
+// Callers that already hold c.mu must use imageNameLocked.
 //
 // Returns:
 //   - string: Image name (e.g., "alpine:latest").
@@ -288,12 +289,10 @@ func (c *Container) ImageName() string {
 		return "unknown:latest"
 	}
 
-	// Re-resolve when inspect data was cleared after construction.
-	if c.containerInfo == nil {
-		return c.resolveImageName()
-	}
+	c.mu.RLock()
+	defer c.mu.RUnlock()
 
-	return c.imageName
+	return c.imageNameLocked()
 }
 
 // SetImageName updates Config.Image and the cached image name used by ImageName.
@@ -307,6 +306,9 @@ func (c *Container) SetImageName(name string) {
 	if c == nil {
 		return
 	}
+
+	c.mu.Lock()
+	defer c.mu.Unlock()
 
 	normalized := ensureImageTag(name)
 
@@ -352,7 +354,7 @@ func (c *Container) GetCreateConfig() *dockerContainer.Config {
 	if c.containerInfo == nil {
 		clog.Warn().Msg("No container info available, returning minimal config")
 
-		return &dockerContainer.Config{Image: c.ImageName()}
+		return &dockerContainer.Config{Image: c.imageNameLocked()}
 	}
 
 	config := *c.containerInfo.Config
@@ -362,7 +364,7 @@ func (c *Container) GetCreateConfig() *dockerContainer.Config {
 	if c.imageInfo == nil {
 		clog.Warn().Msg("No image info available, using container config as-is")
 
-		config.Image = c.ImageName()
+		config.Image = c.imageNameLocked()
 
 		return &config
 	}
@@ -448,7 +450,7 @@ func (c *Container) GetCreateConfig() *dockerContainer.Config {
 		config.ExposedPorts[p] = struct{}{} // Add ports from bindings.
 	}
 
-	config.Image = c.ImageName()
+	config.Image = c.imageNameLocked()
 	clog.Debug().
 		Str("image", config.Image).
 		Msg("Generated create config")
@@ -697,6 +699,16 @@ func (c *Container) Links(useComposeDependsOn bool) []string {
 	links := getLinksFromHostConfig(c, clog)
 
 	return filterSelfReferences(links, c.Name())
+}
+
+// imageNameLocked returns the cached image name. The caller must hold c.mu.
+func (c *Container) imageNameLocked() string {
+	// Re-resolve when inspect data was cleared after construction.
+	if c.containerInfo == nil {
+		return c.resolveImageName()
+	}
+
+	return c.imageName
 }
 
 // resolveImageName computes the image name from the Zodiac label or Config.Image.

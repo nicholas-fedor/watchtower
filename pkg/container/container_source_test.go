@@ -9,6 +9,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/moby/moby/api/types/storage"
 	"github.com/onsi/ginkgo/v2"
 	"github.com/onsi/gomega"
 	"github.com/onsi/gomega/gbytes"
@@ -16,10 +17,12 @@ import (
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/require"
 
+	dockerspec "github.com/moby/docker-image-spec/specs-go/v1"
 	dockerContainer "github.com/moby/moby/api/types/container"
 	dockerImage "github.com/moby/moby/api/types/image"
 	dockerNetwork "github.com/moby/moby/api/types/network"
 	dockerClient "github.com/moby/moby/client"
+	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
 
 	"github.com/nicholas-fedor/watchtower/pkg/filters"
 	"github.com/nicholas-fedor/watchtower/pkg/types"
@@ -2843,6 +2846,25 @@ func TestCloneImageInspect_IsolatesMutations(t *testing.T) {
 		ID:          "sha256:abc",
 		RepoDigests: []string{"app@sha256:abc"},
 		RepoTags:    []string{"app:latest"},
+		Config: &dockerspec.DockerOCIImageConfig{
+			ImageConfig: ocispec.ImageConfig{
+				Env:        []string{"PATH=/usr/bin"},
+				Cmd:        []string{"app"},
+				Entrypoint: []string{"/bin/sh"},
+				Labels:     map[string]string{"app": "web"},
+				Volumes:    map[string]struct{}{"/data": {}},
+				ExposedPorts: map[string]struct{}{
+					"80/tcp": {},
+				},
+			},
+			DockerOCIImageConfigExt: dockerspec.DockerOCIImageConfigExt{
+				Healthcheck: &dockerspec.HealthcheckConfig{Test: []string{"CMD", "true"}},
+			},
+		},
+		GraphDriver: &storage.DriverData{
+			Name: "overlay2",
+			Data: map[string]string{"MergedDir": "/var/lib/docker/overlay2/abc"},
+		},
 	}
 
 	cloned := cloneImageInspect(src)
@@ -2851,8 +2873,24 @@ func TestCloneImageInspect_IsolatesMutations(t *testing.T) {
 
 	cloned.RepoDigests[0] = "app@sha256:mutated"
 	cloned.RepoTags = append(cloned.RepoTags, "app:dev")
+	cloned.Config.Env[0] = "PATH=/mutated"
+	cloned.Config.Cmd[0] = "mutated"
+	cloned.Config.Entrypoint[0] = "/bin/mutated"
+	cloned.Config.Labels["app"] = "mutated"
+	cloned.Config.Volumes["/tmp"] = struct{}{}
+	delete(cloned.Config.ExposedPorts, "80/tcp")
+	cloned.Config.Healthcheck.Test[0] = "NONE"
+	cloned.GraphDriver.Data["MergedDir"] = "/mutated"
 
 	require.Equal(t, []string{"app@sha256:abc"}, src.RepoDigests)
 	require.Equal(t, []string{"app:latest"}, src.RepoTags)
+	require.Equal(t, []string{"PATH=/usr/bin"}, src.Config.Env)
+	require.Equal(t, []string{"app"}, src.Config.Cmd)
+	require.Equal(t, []string{"/bin/sh"}, src.Config.Entrypoint)
+	require.Equal(t, map[string]string{"app": "web"}, src.Config.Labels)
+	require.Equal(t, map[string]struct{}{"/data": {}}, src.Config.Volumes)
+	require.Equal(t, map[string]struct{}{"80/tcp": {}}, src.Config.ExposedPorts)
+	require.Equal(t, []string{"CMD", "true"}, src.Config.Healthcheck.Test)
+	require.Equal(t, "/var/lib/docker/overlay2/abc", src.GraphDriver.Data["MergedDir"])
 	require.Nil(t, cloneImageInspect(nil))
 }

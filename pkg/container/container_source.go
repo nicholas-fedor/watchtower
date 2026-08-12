@@ -3,6 +3,7 @@ package container
 import (
 	"context"
 	"fmt"
+	"maps"
 	"net/netip"
 	"os"
 	"slices"
@@ -250,18 +251,7 @@ func getSourceContainer(log *zerolog.Logger,
 		}
 	}
 
-	cached, ok := imageCache[containerInfo.Image]
-	if ok {
-		clog.Debug().
-			Str("image", containerInfo.Image).
-			Msg("Retrieved container and image info")
-
-		// Clone so later mutations cannot affect other containers sharing the cache.
-		return NewContainer(log, containerInfo, cloneImageInspect(cached)), nil
-	}
-
-	// Fetch image info, falling back if it fails.
-	imageResult, err := api.ImageInspect(ctx, containerInfo.Image)
+	imageInfo, err := resolveImageInspect(ctx, api, containerInfo.Image, imageCache)
 	if err != nil {
 		clog.Debug().
 			Err(err).
@@ -272,18 +262,47 @@ func getSourceContainer(log *zerolog.Logger,
 		return NewContainer(log, containerInfo, nil), nil
 	}
 
-	imageInfo := &imageResult.InspectResponse
-	if imageCache != nil {
-		// Store successful inspects so later containers with the same image skip the API.
-		imageCache[containerInfo.Image] = imageInfo
-		imageInfo = cloneImageInspect(imageInfo)
-	}
-
 	clog.Debug().
 		Str("image", containerInfo.Image).
 		Msg("Retrieved container and image info")
 
 	return NewContainer(log, containerInfo, imageInfo), nil
+}
+
+// resolveImageInspect returns image inspect metadata, using imageCache when set.
+//
+// Parameters:
+//   - ctx: Context for cancellation and timeout control.
+//   - api: Docker API client.
+//   - imageID: Image ID or name to inspect.
+//   - imageCache: Optional per-list cache of ImageInspect results.
+//
+// Returns:
+//   - *dockerImage.InspectResponse: Isolated inspect metadata, or nil on inspect failure.
+//   - error: Non-nil if ImageInspect fails.
+func resolveImageInspect(
+	ctx context.Context,
+	api dockerClient.APIClient,
+	imageID string,
+	imageCache map[string]*dockerImage.InspectResponse,
+) (*dockerImage.InspectResponse, error) {
+	if cached, ok := imageCache[imageID]; ok {
+		return cloneImageInspect(cached), nil
+	}
+
+	imageResult, err := api.ImageInspect(ctx, imageID)
+	if err != nil {
+		return nil, fmt.Errorf("inspect image: %w", err)
+	}
+
+	imageInfo := &imageResult.InspectResponse
+	if imageCache != nil {
+		imageCache[imageID] = imageInfo
+
+		return cloneImageInspect(imageInfo), nil
+	}
+
+	return imageInfo, nil
 }
 
 // cloneImageInspect returns an independent copy of image inspect metadata.
@@ -309,11 +328,27 @@ func cloneImageInspect(src *dockerImage.InspectResponse) *dockerImage.InspectRes
 
 	if src.Config != nil {
 		cfg := *src.Config
+		cfg.Env = slices.Clone(src.Config.Env)
+		cfg.Cmd = slices.Clone(src.Config.Cmd)
+		cfg.Entrypoint = slices.Clone(src.Config.Entrypoint)
+		cfg.OnBuild = slices.Clone(src.Config.OnBuild)
+		cfg.Shell = slices.Clone(src.Config.Shell)
+		cfg.Labels = maps.Clone(src.Config.Labels)
+		cfg.Volumes = maps.Clone(src.Config.Volumes)
+		cfg.ExposedPorts = maps.Clone(src.Config.ExposedPorts)
+
+		if src.Config.Healthcheck != nil {
+			health := *src.Config.Healthcheck
+			health.Test = slices.Clone(src.Config.Healthcheck.Test)
+			cfg.Healthcheck = &health
+		}
+
 		dst.Config = &cfg
 	}
 
 	if src.GraphDriver != nil {
 		driver := *src.GraphDriver
+		driver.Data = maps.Clone(src.GraphDriver.Data)
 		dst.GraphDriver = &driver
 	}
 
