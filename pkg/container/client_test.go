@@ -1327,7 +1327,7 @@ var _ = ginkgo.Describe("the client", func() {
 			client := &client{log: testLog(), api: hijackClient}
 			out, err := client.captureExecOutput(context.Background(), "exec-id")
 			gomega.Expect(err).NotTo(gomega.HaveOccurred())
-			gomega.Expect(len(out)).To(gomega.BeNumerically("<=", maxExecOutputSize))
+			gomega.Expect(out).To(gomega.HaveLen(maxExecOutputSize))
 		})
 	})
 

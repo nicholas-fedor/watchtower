@@ -1087,7 +1087,7 @@ func ExtractGetDigest(log *zerolog.Logger, resp *http.Response) (string, error) 
 	if len(bodyBytes) > maxManifestSize {
 		log.Debug().
 			Str("status", resp.Status).
-			Int("size", len(bodyBytes)).
+			Int("observed_size", len(bodyBytes)).
 			Int("limit", maxManifestSize).
 			Msg("Digest response body exceeds size limit")
 

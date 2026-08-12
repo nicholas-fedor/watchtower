@@ -47,6 +47,9 @@ const shutdownGracePeriod = 50 * time.Millisecond
 // eventFieldRawCapacity is the initial close-brace buffer size for eventFieldMap.
 const eventFieldRawCapacity = 256
 
+// eventFieldRawMaxCapacity is the largest pooled close-brace buffer that is reused.
+const eventFieldRawMaxCapacity = 8 << 10
+
 // eventFieldRawPool reuses close-brace JSON buffers across hooked log events.
 var eventFieldRawPool = sync.Pool{
 	New: func() any {
@@ -955,9 +958,11 @@ func eventFieldMap(event *zerolog.Event) (map[string]any, time.Time, bool) {
 
 	err := dec.Decode(&fieldMap)
 
-	// Return the scratch buffer after Decode has finished reading it.
-	*rawPtr = raw
-	eventFieldRawPool.Put(rawPtr)
+	// Return only bounded buffers so oversized events do not stay in the pool.
+	if cap(raw) <= eventFieldRawMaxCapacity {
+		*rawPtr = raw[:0]
+		eventFieldRawPool.Put(rawPtr)
+	}
 
 	if err != nil {
 		return nil, now, false
@@ -1014,8 +1019,8 @@ func eventFieldMap(event *zerolog.Event) (map[string]any, time.Time, bool) {
 
 // send sends a message via the notification router.
 //
-// Cancellation before Send skips the delivery. An in-flight Send finishes on
-// the worker goroutine.
+// Cancellation before Send skips the delivery. An in-flight Send is abandoned
+// after shutdownGracePeriod so Close cannot block indefinitely.
 //
 // Parameters:
 //   - msg: Message to send.
@@ -1029,7 +1034,26 @@ func (n *shoutrrrTypeNotifier) send(msg string) {
 	default:
 	}
 
-	processSendErrors(n, n.Router.Send(msg, n.params))
+	errsCh := make(chan []error, 1)
+
+	go func() {
+		errsCh <- n.Router.Send(msg, n.params)
+	}()
+
+	select {
+	case errs := <-errsCh:
+		processSendErrors(n, errs)
+	case <-n.ctx.Done():
+		timer := time.NewTimer(shutdownGracePeriod)
+		defer timer.Stop()
+
+		select {
+		case errs := <-errsCh:
+			processSendErrors(n, errs)
+		case <-timer.C:
+			n.ll().Debug().Err(n.ctx.Err()).Msg("Notification send canceled")
+		}
+	}
 }
 
 // buildMessage constructs a notification message from data.

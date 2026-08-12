@@ -200,6 +200,34 @@ func TestExecutePostChecks_UsesListedContainers(t *testing.T) {
 	assert.Contains(t, logBuf.String(), "Found containers for post-checks")
 }
 
+func TestExecutePreChecks_EmptyListedDoesNotRelist(t *testing.T) {
+	log, _ := logging.NewTestLogger(logging.DebugLevel)
+	client := mockContainer.NewMockClient(t)
+	listed := []types.Container{}
+
+	ExecutePreChecks(log, context.Background(), client, types.UpdateParams{
+		Filter:         func(types.FilterableContainer) bool { return true },
+		LifecycleHooks: true,
+	}, listed)
+
+	client.AssertNotCalled(t, "ListContainers", mock.Anything, mock.Anything)
+	client.AssertNotCalled(t, "ExecuteCommand", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything)
+}
+
+func TestExecutePostChecks_EmptyListedDoesNotRelist(t *testing.T) {
+	log, _ := logging.NewTestLogger(logging.DebugLevel)
+	client := mockContainer.NewMockClient(t)
+	listed := []types.Container{}
+
+	ExecutePostChecks(log, context.Background(), client, types.UpdateParams{
+		Filter:         func(types.FilterableContainer) bool { return true },
+		LifecycleHooks: true,
+	}, listed)
+
+	client.AssertNotCalled(t, "ListContainers", mock.Anything, mock.Anything)
+	client.AssertNotCalled(t, "ExecuteCommand", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything)
+}
+
 // TestExecutePreCheckCommand tests the ExecutePreCheckCommand function.
 func TestExecutePreCheckCommand(t *testing.T) {
 	tests := []struct {

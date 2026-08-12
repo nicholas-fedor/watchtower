@@ -19,10 +19,17 @@ var sharedDaemonInfoCache = &daemonInfoCache{}
 
 // daemonInfoCache holds one Docker Info snapshot for concurrent check/pull paths.
 type daemonInfoCache struct {
-	mu      sync.Mutex
-	info    *dockerSystem.Info
-	expires time.Time
-	fetched bool
+	mu       sync.Mutex
+	info     *dockerSystem.Info
+	expires  time.Time
+	fetched  bool
+	inflight chan struct{}
+}
+
+// daemonInfoResult is the outcome of one Docker Info fetch.
+type daemonInfoResult struct {
+	info *dockerSystem.Info
+	ok   bool
 }
 
 // resetDaemonInfoCache clears the process-wide Docker Info cache.
@@ -35,6 +42,7 @@ func resetDaemonInfoCache() {
 	sharedDaemonInfoCache.info = nil
 	sharedDaemonInfoCache.expires = time.Time{}
 	sharedDaemonInfoCache.fetched = false
+	sharedDaemonInfoCache.inflight = nil
 }
 
 // resolveRegistryMirrorConfig fetches the registry mirror configuration from the Docker daemon.
@@ -53,7 +61,6 @@ func (c imageClient) resolveRegistryMirrorConfig(ctx context.Context) *dockerSys
 		cache = sharedDaemonInfoCache
 	}
 
-	// Return a still-valid snapshot without calling Info().
 	cache.mu.Lock()
 	if cache.fetched && time.Now().Before(cache.expires) {
 		info := cache.info
@@ -61,10 +68,65 @@ func (c imageClient) resolveRegistryMirrorConfig(ctx context.Context) *dockerSys
 
 		return info
 	}
+
+	if cache.inflight != nil {
+		wait := cache.inflight
+		cache.mu.Unlock()
+
+		select {
+		case <-wait:
+			cache.mu.Lock()
+			fetched := cache.fetched && time.Now().Before(cache.expires)
+			info := cache.info
+			cache.mu.Unlock()
+
+			if fetched {
+				return info
+			}
+
+			// The in-flight fetch failed. Do not stampede another Info() call.
+			return nil
+		case <-ctx.Done():
+			return nil
+		}
+	}
+
+	// This caller performs the fetch. Others wait on inflight.
+	done := make(chan struct{})
+	cache.inflight = done
 	cache.mu.Unlock()
 
-	// Cache miss or expired snapshot. Fetch a fresh Info() result.
+	resolved := c.fetchDaemonInfo(ctx)
 
+	cache.mu.Lock()
+	if resolved.ok {
+		cache.info = resolved.info
+		cache.fetched = true
+		cache.expires = time.Now().Add(daemonInfoTTL)
+	}
+
+	cache.inflight = nil
+
+	close(done)
+	cache.mu.Unlock()
+
+	if !resolved.ok {
+		return nil
+	}
+
+	return resolved.info
+}
+
+// fetchDaemonInfo loads Docker Info for registry mirror resolution.
+//
+// Failures are not cached. An empty mirror list is a successful empty snapshot.
+//
+// Parameters:
+//   - ctx: Context for cancellation and timeout control.
+//
+// Returns:
+//   - daemonInfoResult: Snapshot and whether the fetch succeeded.
+func (c imageClient) fetchDaemonInfo(ctx context.Context) daemonInfoResult {
 	info, err := c.api.Info(
 		ctx,
 		dockerClient.InfoOptions{},
@@ -74,20 +136,13 @@ func (c imageClient) resolveRegistryMirrorConfig(ctx context.Context) *dockerSys
 			Err(err).
 			Msg("Failed to get system info for registry mirror resolution")
 
-		return nil
+		return daemonInfoResult{}
 	}
 
 	if info.Info.RegistryConfig == nil || len(info.Info.RegistryConfig.Mirrors) == 0 {
 		c.logger().Debug().Msg("No registry mirror configuration in Docker daemon")
 
-		// Cache the empty result so concurrent callers do not repeat Info().
-		cache.mu.Lock()
-		cache.info = nil
-		cache.fetched = true
-		cache.expires = time.Now().Add(daemonInfoTTL)
-		cache.mu.Unlock()
-
-		return nil
+		return daemonInfoResult{ok: true}
 	}
 
 	sanitized := make([]string, 0, len(info.Info.RegistryConfig.Mirrors))
@@ -104,16 +159,7 @@ func (c imageClient) resolveRegistryMirrorConfig(ctx context.Context) *dockerSys
 		Strs("global_mirrors", sanitized).
 		Msg("Resolved registry mirror configuration from Docker daemon")
 
-	resolved := &info.Info
-
-	// Store the snapshot for daemonInfoTTL.
-	cache.mu.Lock()
-	cache.info = resolved
-	cache.fetched = true
-	cache.expires = time.Now().Add(daemonInfoTTL)
-	cache.mu.Unlock()
-
-	return resolved
+	return daemonInfoResult{info: &info.Info, ok: true}
 }
 
 // buildMirrorEndpoints returns the list of registry endpoints to try for digest comparison.

@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"net/http"
 	"net/netip"
+	"testing"
 	"time"
 
 	"github.com/onsi/ginkgo/v2"
@@ -2833,4 +2834,25 @@ func getStatusFilterKeys(f dockerClient.Filters) []string {
 	}
 
 	return keys
+}
+
+func TestCloneImageInspect_IsolatesMutations(t *testing.T) {
+	t.Parallel()
+
+	src := &dockerImage.InspectResponse{
+		ID:          "sha256:abc",
+		RepoDigests: []string{"app@sha256:abc"},
+		RepoTags:    []string{"app:latest"},
+	}
+
+	cloned := cloneImageInspect(src)
+	require.NotNil(t, cloned)
+	require.NotSame(t, src, cloned)
+
+	cloned.RepoDigests[0] = "app@sha256:mutated"
+	cloned.RepoTags = append(cloned.RepoTags, "app:dev")
+
+	require.Equal(t, []string{"app@sha256:abc"}, src.RepoDigests)
+	require.Equal(t, []string{"app:latest"}, src.RepoTags)
+	require.Nil(t, cloneImageInspect(nil))
 }

@@ -299,7 +299,7 @@ func (c *Container) ImageName() string {
 // SetImageName updates Config.Image and the cached image name used by ImageName.
 //
 // An untagged name receives a ":latest" suffix so ImageName stays consistent
-// with resolveImageName.
+// with resolveImageName. Registry host ports are not treated as tags.
 //
 // Parameters:
 //   - name: Image reference to store.
@@ -308,16 +308,14 @@ func (c *Container) SetImageName(name string) {
 		return
 	}
 
+	normalized := ensureImageTag(name)
+
 	// Keep Config.Image in sync so GetCreateConfig uses the pinned reference.
 	if c.containerInfo != nil && c.containerInfo.Config != nil {
-		c.containerInfo.Config.Image = name
+		c.containerInfo.Config.Image = normalized
 	}
 
-	c.imageName = name
-	// Append the default tag if none was specified.
-	if !strings.Contains(c.imageName, ":") {
-		c.imageName += ":latest"
-	}
+	c.imageName = normalized
 }
 
 // HasImageInfo indicates whether image metadata is available.
@@ -722,12 +720,30 @@ func (c *Container) resolveImageName() string {
 		imageName = c.containerInfo.Config.Image
 	}
 
-	// Append the default tag if none was specified.
-	if !strings.Contains(imageName, ":") {
-		imageName += ":latest"
+	return ensureImageTag(imageName)
+}
+
+// ensureImageTag appends ":latest" when the reference has no tag.
+//
+// A colon in the registry host (for example "registry.example:5000/app") is
+// not treated as a tag.
+//
+// Parameters:
+//   - name: Image reference to normalize.
+//
+// Returns:
+//   - string: Image name with a tag.
+func ensureImageTag(name string) string {
+	if name == "" {
+		return "unknown:latest"
 	}
 
-	return imageName
+	slash := strings.LastIndex(name, "/")
+	if strings.Contains(name[slash+1:], ":") {
+		return name
+	}
+
+	return name + ":latest"
 }
 
 // logger returns the container's process logger, or a discarded nop if unset.

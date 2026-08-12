@@ -4,7 +4,10 @@ import (
 	"context"
 	"net/http"
 	"regexp"
+	"sync"
+	"sync/atomic"
 	"testing"
+	"time"
 
 	"github.com/onsi/gomega/ghttp"
 	"github.com/stretchr/testify/assert"
@@ -262,4 +265,67 @@ func TestResolveRegistryMirrorConfig_NilDaemonInfoUsesShared(t *testing.T) {
 	got := client.resolveRegistryMirrorConfig(context.Background())
 	require.NotNil(t, got)
 	assert.Equal(t, 1, infoCalls)
+}
+
+func TestResolveRegistryMirrorConfig_CoalescesConcurrentFetches(t *testing.T) {
+	resetDaemonInfoCache()
+	t.Cleanup(resetDaemonInfoCache)
+
+	server := ghttp.NewServer()
+	t.Cleanup(server.Close)
+
+	started := make(chan struct{})
+	release := make(chan struct{})
+
+	var infoCalls atomic.Int32
+
+	server.AppendHandlers(APIVersionPingHandler())
+	server.RouteToHandler("GET", regexp.MustCompile(`^/v\d+(\.\d+)*/info$`), func(w http.ResponseWriter, _ *http.Request) {
+		if infoCalls.Add(1) == 1 {
+			close(started)
+			<-release
+		}
+
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusOK)
+		_, _ = w.Write([]byte(`{"RegistryConfig":{"Mirrors":["https://mirror.example.com"]}}`))
+	})
+
+	api, err := dockerClient.New(
+		dockerClient.WithHost(server.URL()),
+		dockerClient.WithHTTPClient(server.HTTPTestServer.Client()),
+	)
+	require.NoError(t, err)
+
+	firstClient := newImageClient(api, testLog())
+	secondClient := newImageClient(api, testLog())
+
+	var (
+		wg          sync.WaitGroup
+		first, next *dockerSystem.Info
+	)
+
+	wg.Go(func() {
+		first = firstClient.resolveRegistryMirrorConfig(context.Background())
+	})
+	wg.Go(func() {
+		next = secondClient.resolveRegistryMirrorConfig(context.Background())
+	})
+
+	<-started
+	require.Eventually(t, func() bool {
+		sharedDaemonInfoCache.mu.Lock()
+		defer sharedDaemonInfoCache.mu.Unlock()
+
+		return sharedDaemonInfoCache.inflight != nil
+	}, time.Second, 5*time.Millisecond)
+	// Let the second caller park on the in-flight fetch before unblocking Info().
+	time.Sleep(20 * time.Millisecond)
+
+	close(release)
+	wg.Wait()
+
+	require.NotNil(t, first)
+	require.NotNil(t, next)
+	assert.Equal(t, int32(1), infoCalls.Load())
 }

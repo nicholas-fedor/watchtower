@@ -1298,19 +1298,49 @@ func (e *errReadCloser) Close() error {
 	return nil
 }
 
-func TestExtractGetDigest_OversizedBody(t *testing.T) {
-	resp := &http.Response{
-		StatusCode: http.StatusOK,
-		Status:     "200 OK",
-		Header:     http.Header{"Content-Type": []string{"application/json"}},
-		Body:       io.NopCloser(strings.NewReader(strings.Repeat("a", maxManifestSize+2))),
+func TestExtractGetDigest_ManifestSizeLimits(t *testing.T) {
+	const digestPrefix = "sha256:abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890"
+
+	tests := []struct {
+		name    string
+		size    int
+		wantErr error
+	}{
+		{
+			name: "accepts body of exactly maxManifestSize",
+			size: maxManifestSize,
+		},
+		{
+			name:    "rejects body of maxManifestSize plus one",
+			size:    maxManifestSize + 1,
+			wantErr: errManifestTooLarge,
+		},
 	}
 
-	t.Cleanup(func() { _ = resp.Body.Close() })
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			body := digestPrefix + strings.Repeat("a", tc.size-len(digestPrefix))
+			resp := &http.Response{
+				StatusCode: http.StatusOK,
+				Status:     "200 OK",
+				Header:     http.Header{"Content-Type": []string{"text/plain"}},
+				Body:       io.NopCloser(strings.NewReader(body)),
+			}
 
-	got, err := ExtractGetDigest(testLog(), resp)
-	require.ErrorIs(t, err, errManifestTooLarge)
-	assert.Empty(t, got)
+			t.Cleanup(func() { _ = resp.Body.Close() })
+
+			got, err := ExtractGetDigest(testLog(), resp)
+			if tc.wantErr != nil {
+				require.ErrorIs(t, err, tc.wantErr)
+				assert.Empty(t, got)
+
+				return
+			}
+
+			require.NoError(t, err)
+			assert.Equal(t, strings.TrimPrefix(body, "sha256:"), got)
+		})
+	}
 }
 
 func TestMakeManifestRequest(t *testing.T) {

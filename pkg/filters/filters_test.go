@@ -1,8 +1,8 @@
 package filters
 
 import (
+	"bytes"
 	"fmt"
-	"io"
 	"strings"
 	"testing"
 
@@ -1399,6 +1399,19 @@ func TestParseLabelPairs_Malformed(t *testing.T) {
 	}
 }
 
+func TestCompileNamePatterns_ClassifiesLiteralsAndRegex(t *testing.T) {
+	t.Parallel()
+
+	compiled := compileNamePatterns([]string{"web", "nginx:.*", "["}, false)
+
+	require.Equal(t, []string{"web", "["}, compiled.exact)
+	require.Len(t, compiled.regexes, 1)
+	assert.True(t, compiled.match("web"))
+	assert.True(t, compiled.match("nginx:1.25"))
+	assert.True(t, compiled.match("["))
+	assert.False(t, compiled.match("db"))
+}
+
 func TestFilterByDisableNames_InvalidRegexIsExactMatch(t *testing.T) {
 	t.Parallel()
 
@@ -1434,47 +1447,79 @@ func TestFilterByNames_InvalidRegexIsExactMatch(t *testing.T) {
 func TestFilters_DebugLogging(t *testing.T) {
 	t.Parallel()
 
-	debug := zerolog.New(io.Discard).Level(zerolog.DebugLevel)
+	var logBuf bytes.Buffer
+
+	debug := zerolog.New(&logBuf).Level(zerolog.DebugLevel)
 
 	nameFilter := FilterByNames(&debug, []string{"web"}, NoFilter)
 	named := new(mockContainer.FilterableContainer)
 	named.On("Name").Return("web")
 	assert.True(t, nameFilter(named))
+	named.AssertExpectations(t)
+	assert.Contains(t, logBuf.String(), "Matched container by name/pattern")
+
+	logBuf.Reset()
 
 	missed := new(mockContainer.FilterableContainer)
 	missed.On("Name").Return("db")
 	assert.False(t, nameFilter(missed))
+	missed.AssertExpectations(t)
+	assert.Contains(t, logBuf.String(), "Container name did not match any filter")
+
+	logBuf.Reset()
 
 	disableFilter := FilterByDisableNames(&debug, []string{"skip"}, NoFilter)
 	skipped := new(mockContainer.FilterableContainer)
 	skipped.On("Name").Return("skip")
 	assert.False(t, disableFilter(skipped))
+	skipped.AssertExpectations(t)
+	assert.Contains(t, logBuf.String(), "Container excluded by disable name/pattern")
+
+	logBuf.Reset()
 
 	kept := new(mockContainer.FilterableContainer)
 	kept.On("Name").Return("web")
 	assert.True(t, disableFilter(kept))
+	kept.AssertExpectations(t)
+	assert.Contains(t, logBuf.String(), "Container not excluded by disable names")
+
+	logBuf.Reset()
 
 	imageFilter := FilterByMonitoredImageNamePatterns(&debug, []string{"nginx:.*"}, NoFilter)
 	matchedImage := new(mockContainer.FilterableContainer)
-	matchedImage.On("Name").Return("web").Maybe()
+	matchedImage.On("Name").Return("web")
 	matchedImage.On("ImageName").Return("nginx:1.25")
 	assert.True(t, imageFilter(matchedImage))
+	matchedImage.AssertExpectations(t)
+	assert.Contains(t, logBuf.String(), "Container image matched pattern")
+
+	logBuf.Reset()
 
 	otherImage := new(mockContainer.FilterableContainer)
-	otherImage.On("Name").Return("cache").Maybe()
+	otherImage.On("Name").Return("cache")
 	otherImage.On("ImageName").Return("redis:latest")
 	assert.False(t, imageFilter(otherImage))
+	otherImage.AssertExpectations(t)
+	assert.Contains(t, logBuf.String(), "Container image did not match any pattern")
+
+	logBuf.Reset()
 
 	skipImageFilter := FilterBySkippedImageNamePatterns(&debug, []string{"redis:.*"}, NoFilter)
 	skippedImage := new(mockContainer.FilterableContainer)
-	skippedImage.On("Name").Return("cache").Maybe()
+	skippedImage.On("Name").Return("cache")
 	skippedImage.On("ImageName").Return("redis:latest")
 	assert.False(t, skipImageFilter(skippedImage))
+	skippedImage.AssertExpectations(t)
+	assert.Contains(t, logBuf.String(), "Container image matched skip pattern")
+
+	logBuf.Reset()
 
 	keptImage := new(mockContainer.FilterableContainer)
-	keptImage.On("Name").Return("web").Maybe()
+	keptImage.On("Name").Return("web")
 	keptImage.On("ImageName").Return("nginx:latest")
 	assert.True(t, skipImageFilter(keptImage))
+	keptImage.AssertExpectations(t)
+	assert.Contains(t, logBuf.String(), "Container not skipped by image name patterns")
 }
 
 func TestMatchesImageName(t *testing.T) {

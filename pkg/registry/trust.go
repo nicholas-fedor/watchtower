@@ -43,6 +43,8 @@ var (
 	errFailedLoadDockerConfig = errors.New("failed to load Docker config")
 	// errFailedMarshalAuthConfig indicates a failure to marshal the auth config to JSON.
 	errFailedMarshalAuthConfig = errors.New("failed to marshal auth config to JSON")
+	// errFailedGetCredentials indicates a failure to retrieve credentials from the Docker store.
+	errFailedGetCredentials = errors.New("failed to get registry credentials")
 )
 
 var (
@@ -302,7 +304,17 @@ func EncodedConfigCredentials(log *zerolog.Logger, imageRef string) (string, err
 
 	// Retrieve credentials from the config store.
 	credStore := CredentialsStore(*configFile)
-	credentials, _ := credStore.Get(server)
+
+	credentials, err := credStore.Get(server)
+	if err != nil {
+		log.Debug().
+			Err(err).
+			Str("image_ref", imageRef).
+			Str("server", server).
+			Msg("Failed to get registry credentials")
+
+		return "", fmt.Errorf("%w: %w", errFailedGetCredentials, err)
+	}
 
 	// Empty AuthConfig is a miss. Cache it so later lookups skip Load.
 	if !hasUsableRegistryCredentials(credentials) {

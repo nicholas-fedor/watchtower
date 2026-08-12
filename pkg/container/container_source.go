@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"net/netip"
 	"os"
+	"slices"
 	"strings"
 	"time"
 
@@ -255,7 +256,8 @@ func getSourceContainer(log *zerolog.Logger,
 			Str("image", containerInfo.Image).
 			Msg("Retrieved container and image info")
 
-		return NewContainer(log, containerInfo, cached), nil
+		// Clone so later mutations cannot affect other containers sharing the cache.
+		return NewContainer(log, containerInfo, cloneImageInspect(cached)), nil
 	}
 
 	// Fetch image info, falling back if it fails.
@@ -274,6 +276,7 @@ func getSourceContainer(log *zerolog.Logger,
 	if imageCache != nil {
 		// Store successful inspects so later containers with the same image skip the API.
 		imageCache[containerInfo.Image] = imageInfo
+		imageInfo = cloneImageInspect(imageInfo)
 	}
 
 	clog.Debug().
@@ -281,6 +284,50 @@ func getSourceContainer(log *zerolog.Logger,
 		Msg("Retrieved container and image info")
 
 	return NewContainer(log, containerInfo, imageInfo), nil
+}
+
+// cloneImageInspect returns an independent copy of image inspect metadata.
+//
+// Slice and nested pointer fields are duplicated so the cached original stays
+// read-only for other containers.
+//
+// Parameters:
+//   - src: Cached inspect response, or nil.
+//
+// Returns:
+//   - *dockerImage.InspectResponse: Isolated copy, or nil when src is nil.
+func cloneImageInspect(src *dockerImage.InspectResponse) *dockerImage.InspectResponse {
+	if src == nil {
+		return nil
+	}
+
+	dst := *src
+	dst.RepoTags = slices.Clone(src.RepoTags)
+	dst.RepoDigests = slices.Clone(src.RepoDigests)
+	dst.RootFS.Layers = slices.Clone(src.RootFS.Layers)
+	dst.Manifests = slices.Clone(src.Manifests)
+
+	if src.Config != nil {
+		cfg := *src.Config
+		dst.Config = &cfg
+	}
+
+	if src.GraphDriver != nil {
+		driver := *src.GraphDriver
+		dst.GraphDriver = &driver
+	}
+
+	if src.Descriptor != nil {
+		desc := *src.Descriptor
+		dst.Descriptor = &desc
+	}
+
+	if src.Identity != nil {
+		identity := *src.Identity
+		dst.Identity = &identity
+	}
+
+	return &dst
 }
 
 // StopSourceContainer stops the specified container using the Docker API's StopContainer method.

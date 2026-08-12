@@ -583,7 +583,8 @@ type compiledPatterns struct {
 
 // compileNamePatterns compiles name or image filter patterns once.
 //
-// Invalid regex patterns are kept as exact literals.
+// Patterns without regex metacharacters are stored as exact literals.
+// Invalid regex patterns are also kept as exact literals.
 //
 // Parameters:
 //   - patterns: Name or image patterns.
@@ -601,6 +602,13 @@ func compileNamePatterns(patterns []string, trimSlash bool) compiledPatterns {
 		// Container names are stored without a leading slash.
 		if trimSlash {
 			pattern = strings.TrimPrefix(pattern, "/")
+		}
+
+		// Literal names skip compilation. Only patterns with metacharacters become regexes.
+		if regexp.QuoteMeta(pattern) == pattern {
+			compiled.exact = append(compiled.exact, pattern)
+
+			continue
 		}
 
 		// Invalid regex stays an exact literal, matching matchesName behavior.

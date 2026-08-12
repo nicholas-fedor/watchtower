@@ -22,8 +22,8 @@ var (
 
 // ExecutePreChecks runs pre-check lifecycle hooks for filtered containers.
 //
-// When listed is non-empty, those containers are used and ListContainers is skipped.
-// An empty or nil listed slice falls back to listing with params.Filter.
+// When listed is non-nil, those containers are used and ListContainers is skipped.
+// A non-nil empty slice is a valid filtered snapshot. Nil falls back to listing.
 //
 // Parameters:
 //   - log: Logger for debug output.
@@ -45,8 +45,8 @@ func ExecutePreChecks(log *zerolog.Logger, ctx context.Context, client container
 
 // ExecutePostChecks runs post-check lifecycle hooks for filtered containers.
 //
-// When listed is non-empty, those containers are used and ListContainers is skipped.
-// An empty or nil listed slice falls back to listing with params.Filter.
+// When listed is non-nil, those containers are used and ListContainers is skipped.
+// A non-nil empty slice is a valid filtered snapshot. Nil falls back to listing.
 //
 // Parameters:
 //   - log: Logger for debug output.
@@ -66,7 +66,7 @@ func ExecutePostChecks(log *zerolog.Logger, ctx context.Context, client containe
 	}
 }
 
-// resolveCheckContainers returns listed containers, or lists them when listed is empty.
+// resolveCheckContainers returns listed containers, or lists them when listed is nil.
 //
 // Parameters:
 //   - log: Logger for debug output.
@@ -92,7 +92,7 @@ func resolveCheckContainers(
 		Logger()
 	clog := &clogVal
 
-	if len(listed) > 0 {
+	if listed != nil {
 		// Use the scan snapshot instead of listing again.
 		clog.Debug().
 			Int("count", len(listed)).

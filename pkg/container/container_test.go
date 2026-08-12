@@ -396,8 +396,22 @@ var _ = ginkgo.Describe("Container", func() {
 
 				container.SetImageName("app")
 
-				gomega.Expect(container.ContainerInfo().Config.Image).To(gomega.Equal("app"))
+				gomega.Expect(container.ContainerInfo().Config.Image).To(gomega.Equal("app:latest"))
 				gomega.Expect(container.ImageName()).To(gomega.Equal("app:latest"))
+			})
+
+			ginkgo.It("appends latest without treating a registry port as a tag", func() {
+				container = NewContainer(testLog(), &dockerContainer.InspectResponse{
+					Name: "/app",
+					Config: &dockerContainer.Config{
+						Image: "app:v1",
+					},
+				}, nil)
+
+				container.SetImageName("registry.example:5000/app")
+
+				gomega.Expect(container.ContainerInfo().Config.Image).To(gomega.Equal("registry.example:5000/app:latest"))
+				gomega.Expect(container.ImageName()).To(gomega.Equal("registry.example:5000/app:latest"))
 			})
 		})
 

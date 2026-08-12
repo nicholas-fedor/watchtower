@@ -756,17 +756,32 @@ func TestEncodedConfigCredentials_FailedLookupNotCached(t *testing.T) {
 	resetEncodedAuthCache()
 	t.Cleanup(resetEncodedAuthCache)
 
-	tempDir := writeTestDockerConfig(t, map[string]map[string]string{
-		"ghcr.io": {
-			"username": "later-user",
-			"password": "later-pass",
+	tempDir := t.TempDir()
+	configPath := filepath.Join(tempDir, "config.json")
+	require.NoError(t, os.WriteFile(configPath, []byte("{"), 0o600))
+
+	t.Setenv("DOCKER_CONFIG", tempDir)
+	t.Setenv("HOME", tempDir)
+	dockerCliConfig.SetDir(tempDir)
+
+	mtime := configFileModTime(tempDir)
+
+	empty, err := EncodedConfigCredentials(testLog(), "ghcr.io/org/app:latest")
+	require.Error(t, err)
+	require.ErrorIs(t, err, errFailedLoadDockerConfig)
+	assert.Empty(t, empty)
+
+	valid, err := json.Marshal(map[string]any{
+		"auths": map[string]any{
+			"ghcr.io": map[string]string{
+				"username": "later-user",
+				"password": "later-pass",
+			},
 		},
 	})
-	t.Cleanup(func() { _ = os.RemoveAll(tempDir) })
-
-	empty, err := EncodedConfigCredentials(testLog(), "")
-	require.Error(t, err)
-	assert.Empty(t, empty)
+	require.NoError(t, err)
+	require.NoError(t, os.WriteFile(configPath, valid, 0o600))
+	require.NoError(t, os.Chtimes(configPath, time.Unix(0, mtime), time.Unix(0, mtime)))
 
 	got, err := EncodedConfigCredentials(testLog(), "ghcr.io/org/app:latest")
 	require.NoError(t, err)
