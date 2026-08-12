@@ -14,6 +14,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Chores
 
+- Update docker/dockerfile:1 docker digest to ecfaec9 by @renovate[bot] in [#2148](https://github.com/nicholas-fedor/watchtower/pull/2148)
 - Update module golang.org/x/text to v0.41.0 by @renovate[bot] in [#2143](https://github.com/nicholas-fedor/watchtower/pull/2143)
 - Update module golang.org/x/crypto to v0.55.0 by @renovate[bot] in [#2142](https://github.com/nicholas-fedor/watchtower/pull/2142)
 - Update module github.com/gofiber/schema to v1.8.4 by @renovate[bot] in [#2138](https://github.com/nicholas-fedor/watchtower/pull/2138)
@@ -32,6 +33,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Only warn about missing image info for monitored containers by @ncrosty58 in [#2140](https://github.com/nicholas-fedor/watchtower/pull/2140)
 - Remove redundant type field from deprecation warnings by @nicholas-fedor in [#2146](https://github.com/nicholas-fedor/watchtower/pull/2146)
 - Remove non-running AutoRemove containers explicitly by @nicholas-fedor in [#2141](https://github.com/nicholas-fedor/watchtower/pull/2141)
 - Respect label-enable setting for container details by @nicholas-fedor in [#2137](https://github.com/nicholas-fedor/watchtower/pull/2137)
@@ -40,6 +42,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Remove orphaned Watchtower containers stuck in created state by @nicholas-fedor in [#2109](https://github.com/nicholas-fedor/watchtower/pull/2109)
 - Increase create/start timeout and use fresh contexts for recovery by @nicholas-fedor in [#2108](https://github.com/nicholas-fedor/watchtower/pull/2108)
 - Clear engine-generated MACs on container recreation by @nicholas-fedor in [#2106](https://github.com/nicholas-fedor/watchtower/pull/2106)
+
+### New Contributors
+
+- @ncrosty58 made their first contribution in [#2140](https://github.com/nicholas-fedor/watchtower/pull/2140)
 
 ## [1.20.3] - 2026-08-05
 
