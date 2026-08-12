@@ -692,6 +692,10 @@ func (c *client) StopContainer(ctx context.Context, container types.Container, t
 
 // StopAndRemoveContainer stops and removes a specified container.
 //
+// AutoRemove containers that were running are left for Docker to delete after
+// stop. Non-running AutoRemove containers are removed explicitly so the name
+// is available for recreation.
+//
 // Parameters:
 //   - ctx: Context for cancellation and timeout control.
 //   - container: Container to stop and remove.

@@ -203,18 +203,30 @@ var _ = ginkgo.Describe("the client", func() {
 		})
 
 		ginkgo.When("stopping a container with AutoRemove enabled", func() {
-			ginkgo.It("should skip removal after stopping", func() {
-				// Create a mock container with AutoRemove enabled.
+			ginkgo.It("should skip removal after stopping a running container", func() {
 				mockedContainer := MockContainer(
 					WithContainerState(dockerContainer.State{Running: true}),
 					WithAutoRemove(true),
 				)
 				cid := mockedContainer.ContainerInfo().ID
-				// Set up mock server handler for stop only (no remove call expected).
 				mockServer.AppendHandlers(
 					StopContainerHandler(cid, mockContainer.Found),
 				)
-				// Execute StopAndRemoveContainer and verify no error occurs.
+
+				err := (&client{log: testLog(), api: docker}).StopAndRemoveContainer(context.Background(), mockedContainer, time.Second)
+				gomega.Expect(err).ToNot(gomega.HaveOccurred())
+			})
+
+			ginkgo.It("should remove a non-running AutoRemove container explicitly", func() {
+				mockedContainer := MockContainer(
+					WithContainerState(dockerContainer.State{Running: false, Status: "created"}),
+					WithAutoRemove(true),
+				)
+				cid := mockedContainer.ContainerInfo().ID
+				mockServer.AppendHandlers(
+					mockContainer.RemoveContainerHandler(cid, mockContainer.Found),
+				)
+
 				err := (&client{log: testLog(), api: docker}).StopAndRemoveContainer(context.Background(), mockedContainer, time.Second)
 				gomega.Expect(err).ToNot(gomega.HaveOccurred())
 			})

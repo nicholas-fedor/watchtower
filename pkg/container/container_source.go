@@ -336,6 +336,10 @@ func StopSourceContainer(log *zerolog.Logger,
 // StopAndRemoveSourceContainer stops and removes the specified container using the Docker API.
 //
 // It first stops the container if running, then removes it with optional volume cleanup.
+// When HostConfig.AutoRemove is set, Docker only removes the container after a started
+// instance exits. Explicit removal is therefore skipped only when the container was
+// running before stop. Non-running containers (for example created but never started)
+// are always removed explicitly so the name is freed for recreation.
 //
 // Parameters:
 //   - ctx: Context for cancellation and timeout control.
@@ -359,20 +363,32 @@ func StopAndRemoveSourceContainer(log *zerolog.Logger,
 		Logger()
 	clog := &clogVal
 
-	// Stop the container first
+	// Capture running state before stop. AutoRemove only applies after a started container exits.
+	wasRunning := sourceContainer.IsRunning()
+
+	// Stop the container first.
 	err := StopSourceContainer(log, ctx, api, sourceContainer, timeout)
 	if err != nil {
 		return err
 	}
 
-	// Check if the container has AutoRemove enabled in its HostConfig, which automatically removes
-	// the container after stopping, eliminating the need for an explicit removal call.
+	// HostConfig.AutoRemove removes a container after it stops. That only applies
+	// when the container was running and Docker handles cleanup after stop.
 	info := sourceContainer.ContainerInfo()
-	if info != nil && info.HostConfig != nil && info.HostConfig.AutoRemove {
+	autoRemove := info != nil && info.HostConfig != nil && info.HostConfig.AutoRemove
+
+	// Skip explicit removal only when AutoRemove will run after stop. Never-started
+	// or already-stopped AutoRemove containers remain until removed explicitly and
+	// would otherwise block name reuse on recreate.
+	if autoRemove && wasRunning {
 		// Log that the container is skipped due to AutoRemove configuration.
 		clog.Debug().Msg("Skipping container removal due to AutoRemove configuration")
 
 		return nil
+	}
+
+	if autoRemove && !wasRunning {
+		clog.Debug().Msg("Removing non-running AutoRemove container explicitly")
 	}
 
 	// Proceed with explicit container removal, including volumes if specified.

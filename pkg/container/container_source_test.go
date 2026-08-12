@@ -738,7 +738,7 @@ var _ = ginkgo.Describe("StopAndRemoveSourceContainer", func() {
 	})
 
 	ginkgo.When("container has AutoRemove enabled", func() {
-		ginkgo.It("should stop but skip removal", func() {
+		ginkgo.It("should stop but skip removal when running", func() {
 			container := MockContainer(
 				WithContainerState(dockerContainer.State{Running: true}),
 				WithAutoRemove(true),
@@ -762,7 +762,38 @@ var _ = ginkgo.Describe("StopAndRemoveSourceContainer", func() {
 				true,
 			)
 			gomega.Expect(err).ToNot(gomega.HaveOccurred())
-			// Should not have made a DELETE request since AutoRemove is true
+			// API version ping + stop. No DELETE. Docker AutoRemove handles cleanup after stop.
+			gomega.Expect(mockServer.ReceivedRequests()).To(gomega.HaveLen(2))
+		})
+
+		ginkgo.It("should remove explicitly when not running", func() {
+			container := MockContainer(
+				WithContainerState(dockerContainer.State{Running: false, Status: "created"}),
+				WithAutoRemove(true),
+			)
+			cid := container.ContainerInfo().ID
+
+			mockServer.AppendHandlers(
+				ghttp.CombineHandlers(
+					ghttp.VerifyRequest(
+						"DELETE",
+						gomega.MatchRegexp(fmt.Sprintf("^/v[0-9.]+/containers/%s$", cid)),
+					),
+					func(w http.ResponseWriter, r *http.Request) {
+						gomega.Expect(r.URL.Query().Get("force")).To(gomega.Equal("1"))
+						w.WriteHeader(http.StatusNoContent)
+					},
+				),
+			)
+
+			err := StopAndRemoveSourceContainer(testLog(), context.Background(),
+				docker,
+				container,
+				10*time.Second,
+				false,
+			)
+			gomega.Expect(err).ToNot(gomega.HaveOccurred())
+			// API version ping + DELETE. AutoRemove does not apply to never-started containers.
 			gomega.Expect(mockServer.ReceivedRequests()).To(gomega.HaveLen(2))
 		})
 	})
