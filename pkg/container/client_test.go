@@ -516,6 +516,34 @@ var _ = ginkgo.Describe("the client", func() {
 			})
 		})
 
+		ginkgo.When(`the image of a container cannot be inspected`, func() {
+			ginkgo.It("should warn, naming the container and its image", func() {
+				// GetContainer is only reached for containers already being acted
+				// upon, so missing image metadata is worth a warning here even
+				// though GetSourceContainer logs it at debug level.
+				mockServer.AppendHandlers(missingImageHandlers(testContainerID)...)
+
+				log, logBuf := captureLog(zerolog.WarnLevel)
+				client := &client{
+					api:           docker,
+					log:           log,
+					ClientOptions: ClientOptions{},
+				}
+
+				container, err := client.GetContainer(
+					context.Background(),
+					types.ContainerID(testContainerID),
+				)
+				gomega.Expect(err).NotTo(gomega.HaveOccurred())
+				gomega.Expect(container.HasImageInfo()).To(gomega.BeFalse())
+
+				logged := string(logBuf.Contents())
+				gomega.Expect(logged).To(gomega.ContainSubstring("Failed to retrieve image info"))
+				gomega.Expect(logged).To(gomega.ContainSubstring("test-container"))
+				gomega.Expect(logged).To(gomega.ContainSubstring("test-image:latest"))
+			})
+		})
+
 		ginkgo.When(`a container uses container network mode`, func() {
 			ginkgo.When(`the network container can be resolved`, func() {
 				ginkgo.It("should return the container name instead of the ID", func() {
