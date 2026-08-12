@@ -614,6 +614,14 @@ func (c *client) GetContainer(ctx context.Context, containerID types.ContainerID
 		return nil, err
 	}
 
+	if !container.HasImageInfo() {
+		c.logger().Warn().
+			Str("container", container.Name()).
+			Str("container_id", string(containerID)).
+			Str("image", container.ImageName()).
+			Msg("Failed to retrieve image info")
+	}
+
 	c.logger().Debug().
 		Str("container_id", string(containerID)).
 		Msg("Retrieved container details")

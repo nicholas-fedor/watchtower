@@ -130,6 +130,14 @@ func ListSourceContainers(log *zerolog.Logger,
 		}
 
 		if filter == nil || filter(container) {
+			if !container.HasImageInfo() {
+				log.Warn().
+					Str("container", container.Name()).
+					Str("container_id", runningContainer.ID).
+					Str("image", container.ImageName()).
+					Msg("Failed to retrieve image info")
+			}
+
 			hostContainers = append(hostContainers, container)
 		}
 	}
@@ -211,8 +219,10 @@ func GetSourceContainer(log *zerolog.Logger,
 	// Fetch image info, falling back if it fails.
 	imageResult, err := api.ImageInspect(ctx, containerInfo.Image)
 	if err != nil {
-		clog.Warn().
+		clog.Debug().
 			Err(err).
+			Str("container", util.NormalizeContainerName(containerInfo.Name)).
+			Str("image", containerInfo.Image).
 			Msg("Failed to retrieve image info")
 
 		return NewContainer(log, containerInfo, nil), nil
