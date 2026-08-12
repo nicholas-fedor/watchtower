@@ -6,7 +6,12 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"path/filepath"
+	"sync"
+	"time"
 
+	"github.com/maypok86/otter/v2"
+	"github.com/maypok86/otter/v2/stats"
 	"github.com/rs/zerolog"
 
 	dockerCliConfig "github.com/docker/cli/cli/config"
@@ -15,6 +20,15 @@ import (
 	dockerConfig "github.com/docker/cli/cli/config/types"
 
 	"github.com/nicholas-fedor/watchtower/pkg/registry/auth"
+)
+
+const (
+	// encodedAuthCacheMaximumSize is the maximum number of encoded auth entries.
+	encodedAuthCacheMaximumSize = 256
+	// encodedAuthCacheInitialCapacity is the initial otter cache capacity.
+	encodedAuthCacheInitialCapacity = 16
+	// encodedAuthTTL is how long encoded registry auth is reused.
+	encodedAuthTTL = 2 * time.Minute
 )
 
 // Errors for registry authentication operations.
@@ -29,7 +43,98 @@ var (
 	errFailedLoadDockerConfig = errors.New("failed to load Docker config")
 	// errFailedMarshalAuthConfig indicates a failure to marshal the auth config to JSON.
 	errFailedMarshalAuthConfig = errors.New("failed to marshal auth config to JSON")
+	// errFailedGetCredentials indicates a failure to retrieve credentials from the Docker store.
+	errFailedGetCredentials = errors.New("failed to get registry credentials")
 )
+
+var (
+	// encodedAuthCache holds encoded Docker-config credentials by host and config dir.
+	encodedAuthCache *otter.Cache[string, encodedAuthEntry]
+	// encodedAuthCacheOnce initializes encodedAuthCache exactly once.
+	encodedAuthCacheOnce sync.Once
+)
+
+// encodedAuthEntry stores encoded credentials and the Docker config mtime.
+type encodedAuthEntry struct {
+	encoded string
+	mtime   int64
+}
+
+// encodedAuthExpiryCalculator applies encodedAuthTTL to otter cache entries.
+type encodedAuthExpiryCalculator struct{}
+
+// ExpireAfterCreate returns the TTL for a newly created auth cache entry.
+func (e *encodedAuthExpiryCalculator) ExpireAfterCreate(_ otter.Entry[string, encodedAuthEntry]) time.Duration {
+	return encodedAuthTTL
+}
+
+// ExpireAfterUpdate returns the TTL for an updated auth cache entry.
+func (e *encodedAuthExpiryCalculator) ExpireAfterUpdate(_ otter.Entry[string, encodedAuthEntry], _ encodedAuthEntry) time.Duration {
+	return encodedAuthTTL
+}
+
+// ExpireAfterRead preserves the remaining TTL when an auth cache entry is read.
+func (e *encodedAuthExpiryCalculator) ExpireAfterRead(entry otter.Entry[string, encodedAuthEntry]) time.Duration {
+	return entry.ExpiresAfter()
+}
+
+// initEncodedAuthCache initializes the encoded registry auth cache once.
+//
+// Otter construction failure panics because auth lookup cannot proceed without it.
+func initEncodedAuthCache() {
+	encodedAuthCacheOnce.Do(func() {
+		cache, err := otter.New(
+			&otter.Options[string, encodedAuthEntry]{
+				MaximumSize:      encodedAuthCacheMaximumSize,
+				InitialCapacity:  encodedAuthCacheInitialCapacity,
+				ExpiryCalculator: &encodedAuthExpiryCalculator{},
+				StatsRecorder:    stats.NewCounter(),
+			})
+		if err != nil {
+			panic("failed to initialize encoded auth cache: " + err.Error())
+		}
+
+		encodedAuthCache = cache
+	})
+}
+
+// resetEncodedAuthCache clears cached encoded auth entries.
+//
+// Tests use this to isolate Docker config mutations between cases.
+func resetEncodedAuthCache() {
+	initEncodedAuthCache()
+	encodedAuthCache.InvalidateAll()
+}
+
+// encodedAuthCacheKey builds a cache key from registry host and config directory.
+//
+// Parameters:
+//   - server: Registry host address.
+//   - configDir: Docker config directory.
+//
+// Returns:
+//   - string: Cache key unique to that host and config path.
+func encodedAuthCacheKey(server, configDir string) string {
+	return server + "\x00" + configDir
+}
+
+// configFileModTime returns the config.json mtime in nanoseconds, or 0 if missing.
+//
+// Parameters:
+//   - configDir: Docker config directory.
+//
+// Returns:
+//   - int64: File modification time in nanoseconds, or 0 when the file is absent.
+func configFileModTime(configDir string) int64 {
+	configPath := filepath.Join(filepath.Clean(configDir), "config.json")
+
+	info, err := os.Stat(configPath)
+	if err != nil {
+		return 0
+	}
+
+	return info.ModTime().UnixNano()
+}
 
 // EncodedAuth attempts to retrieve encoded authentication credentials for a given image name.
 //
@@ -117,7 +222,7 @@ func EncodedEnvAuth(log *zerolog.Logger) (string, error) {
 			Bool("has_username", true).
 			Msg("Loaded auth credentials from environment")
 
-		// Trace only non-sensitive presence indicators. Never log REPO_PASS.
+		// Trace only non-sensitive presence indicators. Never log password or tokens.
 		if log.GetLevel() == zerolog.TraceLevel {
 			log.Trace().
 				Bool("has_username", true).
@@ -137,39 +242,52 @@ func EncodedEnvAuth(log *zerolog.Logger) (string, error) {
 
 // EncodedConfigCredentials retrieves authentication credentials from the Docker config file.
 //
-// The Docker config must be mounted on the container.
+// Successful and empty lookups are cached by registry host and config directory.
+// The cache is invalidated when config.json mtime changes or the TTL expires.
+// Failed loads are not cached.
 //
 // Parameters:
+//   - log: Logger for debug output.
 //   - imageRef: Image reference string for registry lookup.
 //
 // Returns:
 //   - string: Base64-encoded credentials string if found, empty if none.
 //   - error: Non-nil if config loading or address retrieval fails, nil on success or if no auth is found.
 func EncodedConfigCredentials(log *zerolog.Logger, imageRef string) (string, error) {
-	// Set up logging fields for tracking.
-	fields := map[string]any{
-		"image_ref": imageRef,
-	}
-
 	// Get the registry server address from the image reference.
 	server, err := auth.GetRegistryAddress(log, imageRef)
 	if err != nil {
 		log.Debug().
 			Err(err).
-			Fields(fields).
+			Str("image_ref", imageRef).
 			Msg("Failed to get registry address")
 
 		return "", fmt.Errorf("%w: %w", errFailedGetRegistryAddress, err)
 	}
 
-	// Use DOCKER_CONFIG env var or default to root directory.
+	// Use DOCKER_CONFIG or default to the root directory.
 	configDir := os.Getenv("DOCKER_CONFIG")
 	if configDir == "" {
 		configDir = "/"
 
 		log.Debug().
-			Fields(fields).
+			Str("image_ref", imageRef).
 			Msg("No DOCKER_CONFIG set, using default directory")
+	}
+
+	initEncodedAuthCache()
+
+	mtime := configFileModTime(configDir)
+	cacheKey := encodedAuthCacheKey(server, configDir)
+
+	// Reuse encoded auth when the Docker config file has not changed.
+	if entry, ok := encodedAuthCache.GetIfPresent(cacheKey); ok && entry.mtime == mtime {
+		log.Debug().
+			Str("image_ref", imageRef).
+			Str("server", server).
+			Msg("Using cached registry auth credentials")
+
+		return entry.encoded, nil
 	}
 
 	// Load the Docker config file from the specified directory.
@@ -177,32 +295,43 @@ func EncodedConfigCredentials(log *zerolog.Logger, imageRef string) (string, err
 	if err != nil {
 		log.Debug().
 			Err(err).
-			Fields(fields).
+			Str("image_ref", imageRef).
 			Str("config_dir", configDir).
 			Msg("Failed to load Docker config")
 
 		return "", fmt.Errorf("%w: %w", errFailedLoadDockerConfig, err)
 	}
 
-	// Retrieve credentials from the config's store.
+	// Retrieve credentials from the config store.
 	credStore := CredentialsStore(*configFile)
-	credentials, _ := credStore.Get(server)
 
-	// Accept username+password, password-only tokens, or identity tokens from
-	// credential helpers (ECR and similar). Empty AuthConfig is a miss.
+	credentials, err := credStore.Get(server)
+	if err != nil {
+		log.Debug().
+			Err(err).
+			Str("image_ref", imageRef).
+			Str("server", server).
+			Msg("Failed to get registry credentials")
+
+		return "", fmt.Errorf("%w: %w", errFailedGetCredentials, err)
+	}
+
+	// Empty AuthConfig is a miss. Cache it so later lookups skip Load.
 	if !hasUsableRegistryCredentials(credentials) {
 		log.Debug().
-			Fields(fields).
+			Str("image_ref", imageRef).
 			Str("server", server).
 			Str("config_file", configFile.Filename).
 			Msg("No credentials found in config")
 
+		encodedAuthCache.Set(cacheKey, encodedAuthEntry{mtime: mtime})
+
 		return "", nil
 	}
 
-	// Log successful credential retrieval with non-sensitive presence flags only.
+	// Log successful retrieval with non-sensitive presence flags only.
 	log.Debug().
-		Fields(fields).
+		Str("image_ref", imageRef).
 		Bool("has_username", credentials.Username != "").
 		Bool("has_password", credentials.Password != "").
 		Bool("has_identity_tok", credentials.IdentityToken != "").
@@ -210,10 +339,9 @@ func EncodedConfigCredentials(log *zerolog.Logger, imageRef string) (string, err
 		Str("config_file", configFile.Filename).
 		Msg("Loaded auth credentials from config")
 
-	// Trace only non-sensitive presence indicators. Never log password or tokens.
 	if log.GetLevel() == zerolog.TraceLevel {
 		log.Trace().
-			Fields(fields).
+			Str("image_ref", imageRef).
 			Bool("has_username", credentials.Username != "").
 			Bool("has_password", credentials.Password != "").
 			Bool("has_identity_tok", credentials.IdentityToken != "").
@@ -221,8 +349,15 @@ func EncodedConfigCredentials(log *zerolog.Logger, imageRef string) (string, err
 			Msg("Using config credentials")
 	}
 
-	// Encode and return the auth config (includes IdentityToken when set).
-	return EncodeCredentials(log, credentials)
+	// Encode the auth config, including IdentityToken when set.
+	encoded, err := EncodeCredentials(log, credentials)
+	if err != nil {
+		return "", err
+	}
+
+	encodedAuthCache.Set(cacheKey, encodedAuthEntry{encoded: encoded, mtime: mtime})
+
+	return encoded, nil
 }
 
 // hasUsableRegistryCredentials reports whether AuthConfig carries material the

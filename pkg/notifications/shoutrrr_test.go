@@ -5,6 +5,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"io"
 	"os"
 	"os/exec"
 	"sync"
@@ -19,6 +20,7 @@ import (
 	"github.com/onsi/gomega/gbytes"
 	"github.com/rs/zerolog"
 	"github.com/spf13/cobra"
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
 	shoutrrrTypes "github.com/nicholas-fedor/shoutrrr/pkg/types"
@@ -944,9 +946,12 @@ func TestSlowNotificationNotSent(t *testing.T) {
 			// Good, channel is empty
 		}
 
-		// Cancel to clean up goroutines
+		// Cancel cannot interrupt an in-flight Router.Send. Unlock so Send returns
+		// and the worker can observe cancellation and exit.
 		shoutrrr.cancel()
-		// Wait for sendNotifications to exit
+
+		blockingRouter.unlock <- true
+
 		<-shoutrrr.done
 	})
 }
@@ -1729,4 +1734,89 @@ func TestCreateNotifier_AcceptsGotifyURLFromFileExpansion(t *testing.T) {
 	)
 
 	require.NotNil(t, notifier)
+}
+
+func TestReportCategoryCount(t *testing.T) {
+	t.Parallel()
+
+	assert.Equal(t, 0, reportCategoryCount(nil))
+
+	report := categoryCountReport{
+		scanned:   make([]types.ContainerReport, 2),
+		updated:   make([]types.ContainerReport, 1),
+		restarted: make([]types.ContainerReport, 1),
+	}
+	assert.Equal(t, 4, reportCategoryCount(report))
+}
+
+func TestSend_CanceledBeforeSend(t *testing.T) {
+	t.Parallel()
+
+	ctx, cancel := context.WithCancel(t.Context())
+	cancel()
+
+	router := &countingRouter{}
+	notifier := &shoutrrrTypeNotifier{
+		Router: router,
+		ctx:    ctx,
+		cancel: cancel,
+	}
+
+	notifier.send("should not send")
+	assert.Equal(t, int32(0), router.sends.Load())
+}
+
+func TestEventFieldMap_NilEvent(t *testing.T) {
+	t.Parallel()
+
+	fields, _, ok := eventFieldMap(nil)
+	assert.False(t, ok)
+	assert.Nil(t, fields)
+}
+
+func TestEventFieldMap_NumbersAndTimestamp(t *testing.T) {
+	t.Parallel()
+
+	var captured map[string]any
+
+	hook := zerolog.HookFunc(func(event *zerolog.Event, _ zerolog.Level, _ string) {
+		fields, _, ok := eventFieldMap(event)
+		if ok {
+			captured = fields
+		}
+	})
+
+	log := zerolog.New(io.Discard).Hook(hook)
+	log.Info().
+		Int64("count", 42).
+		Float64("ratio", 1.5).
+		Str(zerolog.TimestampFieldName, "not-a-timestamp").
+		Msg("numbers")
+
+	require.NotNil(t, captured)
+	assert.Equal(t, int64(42), captured["count"])
+	assert.InDelta(t, 1.5, captured["ratio"], 0.001)
+}
+
+type categoryCountReport struct {
+	scanned, updated, failed, skipped, stale, fresh, restarted []types.ContainerReport
+}
+
+func (r categoryCountReport) Scanned() []types.ContainerReport   { return r.scanned }
+func (r categoryCountReport) Updated() []types.ContainerReport   { return r.updated }
+func (r categoryCountReport) Failed() []types.ContainerReport    { return r.failed }
+func (r categoryCountReport) Skipped() []types.ContainerReport   { return r.skipped }
+func (r categoryCountReport) Stale() []types.ContainerReport     { return r.stale }
+func (r categoryCountReport) Fresh() []types.ContainerReport     { return r.fresh }
+func (r categoryCountReport) Restarted() []types.ContainerReport { return r.restarted }
+func (r categoryCountReport) All() []types.ContainerReport       { return nil }
+
+type countingRouter struct {
+	sends atomic.Int32
+}
+
+func (c *countingRouter) Send(_ string, _ *shoutrrrTypes.Params) []error {
+	c.sends.Add(1)
+
+	return nil
 }

@@ -292,19 +292,21 @@ func Update(log *zerolog.Logger, ctx context.Context,
 	// Track if Watchtower self-update pull failed to add safeguard delay.
 	var watchtowerPullFailed bool
 
-	// Run pre-check lifecycle hooks if enabled to validate the environment before updates.
-	if config.LifecycleHooks {
-		log.Debug().Msg("Executing pre-check lifecycle hooks")
-		lifecycle.ExecutePreChecks(log, ctx, client, config)
-	}
-
 	// Filter containers based on the provided filter (e.g., all, specific names).
-	var filteredContainers []types.Container
+	// Use a non-nil empty slice so lifecycle hooks can distinguish a valid empty
+	// snapshot from an uninitialized list.
+	filteredContainers := make([]types.Container, 0, len(allContainers))
 
 	for _, c := range allContainers {
 		if config.Filter == nil || config.Filter(c) {
 			filteredContainers = append(filteredContainers, c)
 		}
+	}
+
+	// Run pre-check lifecycle hooks if enabled to validate the environment before updates.
+	if config.LifecycleHooks {
+		log.Debug().Msg("Executing pre-check lifecycle hooks")
+		lifecycle.ExecutePreChecks(log, ctx, client, config, filteredContainers)
 	}
 
 	// Prepare a list of container names and images for detailed debugging output.
@@ -778,7 +780,7 @@ func Update(log *zerolog.Logger, ctx context.Context,
 	// Run post-check lifecycle hooks if enabled to finalize the update process.
 	if config.LifecycleHooks {
 		log.Debug().Msg("Executing post-check lifecycle hooks")
-		lifecycle.ExecutePostChecks(log, ctx, client, config)
+		lifecycle.ExecutePostChecks(log, ctx, client, config, filteredContainers)
 	}
 
 	// Add safeguard delay if Watchtower self-update pull failed

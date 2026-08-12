@@ -76,9 +76,12 @@ type WarningStrategy string
 // imageClient manages image-related operations for Watchtower.
 //
 // It uses a Docker API client for image tasks.
+// imageClient performs image inspect, pull, and stale checks.
 type imageClient struct {
 	api dockerClient.APIClient
 	log *zerolog.Logger
+	// daemonInfo shares Docker Info and mirrors across check and pull paths.
+	daemonInfo *daemonInfoCache
 }
 
 // IsContainerStale determines if a container's image is outdated.
@@ -545,14 +548,7 @@ func logImageRemovalDetails(log *zerolog.Logger, items []dockerImage.DeleteRespo
 		Msg("Image removal details")
 }
 
-// newImageClient creates a new imageClient instance.
-//
-// Parameters:
-//   - api: Docker API client.
-//
-// Returns:
-//   - imageClient: Initialized client for image operations.
-
+// logger returns the image client's logger, or a discarded nop if unset.
 func (c imageClient) logger() *zerolog.Logger {
 	if c.log != nil {
 		return c.log
@@ -561,8 +557,18 @@ func (c imageClient) logger() *zerolog.Logger {
 	return nopLog()
 }
 
+// newImageClient creates a new imageClient instance.
+//
+// The client shares the process-wide Docker Info cache used for registry mirrors.
+//
+// Parameters:
+//   - api: Docker API client.
+//   - log: Logger for debug output.
+//
+// Returns:
+//   - imageClient: Initialized client for image operations.
 func newImageClient(api dockerClient.APIClient, log *zerolog.Logger) imageClient {
-	return imageClient{api: api, log: log}
+	return imageClient{api: api, log: log, daemonInfo: sharedDaemonInfoCache}
 }
 
 // shouldSkipPull determines if an image pull can be skipped.
@@ -692,8 +698,8 @@ func (c imageClient) performImagePull(
 	}
 	defer response.Close()
 
-	// Read response to complete the pull.
-	_, err = io.ReadAll(response)
+	// Drain the progress stream so the daemon finishes the pull without buffering it.
+	_, err = io.Copy(io.Discard, response)
 	if err != nil {
 		clog.Debug().
 			Err(err).

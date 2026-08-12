@@ -31,6 +31,9 @@ import (
 // allowing Watchtower to compare or fetch it without downloading the full manifest body.
 const ContentDigestHeader = "Docker-Content-Digest"
 
+// maxManifestSize is the maximum allowed size for a digest GET fallback body (1 MiB).
+const maxManifestSize = 1 << 20
+
 // Errors for digest retrieval operations.
 var (
 	// errMissingImageInfo indicates the container lacks image metadata, preventing digest operations.
@@ -47,6 +50,8 @@ var (
 	errFailedCreateRequest = errors.New("failed to create request")
 	// errFailedExecuteRequest indicates a failure to execute an HTTP request to the registry.
 	errFailedExecuteRequest = errors.New("failed to execute request")
+	// errManifestTooLarge indicates the digest GET fallback body exceeded the size limit.
+	errManifestTooLarge = errors.New("manifest response exceeds size limit")
 )
 
 // localOnlyImageCache records image name+ID pairs previously confirmed as local-only
@@ -1038,11 +1043,13 @@ func ExtractHeadDigest(log *zerolog.Logger, resp *http.Response) (string, error)
 // It first tries to retrieve the digest from the "Docker-Content-Digest" header.
 // If the header is missing, it falls back to parsing the response body as a JSON
 // manifest or as a plain text digest for non-standard registries.
+// The fallback body is limited to maxManifestSize.
 // When attempting JSON parsing, the Content-Type header must contain "application/json",
 // "application/vnd.oci", or "application/vnd.docker".
 // The digest is normalized for consistency.
 //
 // Parameters:
+//   - log: Logger for debug output.
 //   - resp: The HTTP response from a GET request containing headers and body.
 //
 // Returns:
@@ -1061,8 +1068,8 @@ func ExtractGetDigest(log *zerolog.Logger, resp *http.Response) (string, error) 
 		return normalizedDigest, nil
 	}
 
-	// Fallback: Try to read the response body.
-	bodyBytes, err := io.ReadAll(resp.Body)
+	// Fallback: read the body with a size limit. The extra byte detects overflow.
+	bodyBytes, err := io.ReadAll(io.LimitReader(resp.Body, maxManifestSize+1))
 	if err != nil {
 		log.Debug().
 			Err(err).
@@ -1073,6 +1080,22 @@ func ExtractGetDigest(log *zerolog.Logger, resp *http.Response) (string, error) 
 			"%w: failed to read response body: %w",
 			errInvalidRegistryResponse,
 			err,
+		)
+	}
+
+	// Reject oversized bodies before parsing or converting to a string.
+	if len(bodyBytes) > maxManifestSize {
+		log.Debug().
+			Str("status", resp.Status).
+			Int("observed_size", len(bodyBytes)).
+			Int("limit", maxManifestSize).
+			Msg("Digest response body exceeds size limit")
+
+		return "", fmt.Errorf(
+			"%w: %d bytes exceeds limit of %d bytes",
+			errManifestTooLarge,
+			len(bodyBytes),
+			maxManifestSize,
 		)
 	}
 

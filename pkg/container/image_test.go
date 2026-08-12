@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"net/url"
 	"regexp"
+	"strings"
 	"time"
 
 	"github.com/onsi/ginkgo/v2"
@@ -188,6 +189,29 @@ var _ = ginkgo.Describe("the client", func() {
 			gomega.Expect(errors.Is(err, ErrPullImageUnauthorized)).To(gomega.BeFalse())
 			gomega.Expect(errors.Is(err, ErrPullImageNotFound)).To(gomega.BeFalse())
 			gomega.Eventually(logbuf).Should(gbytes.Say(`Failed to initiate image pull`))
+		})
+	})
+
+	ginkgo.When("draining an image pull progress stream", func() {
+		ginkgo.It("consumes the full stream without retaining the body", func() {
+			const streamSize = 2 << 20
+
+			mockServer.AllowUnhandledRequests = true
+			mockServer.AppendHandlers(
+				ghttp.CombineHandlers(
+					ghttp.VerifyRequest("POST", gomega.MatchRegexp("/images/create")),
+					ghttp.RespondWith(http.StatusOK, strings.Repeat("x", streamSize)),
+				),
+			)
+
+			i := newImageClient(mockClient, testLog())
+			err := i.performImagePull(
+				context.Background(),
+				"registry.example.com/app:latest",
+				dockerClient.ImagePullOptions{},
+				nil,
+			)
+			gomega.Expect(err).NotTo(gomega.HaveOccurred())
 		})
 	})
 

@@ -354,6 +354,65 @@ var _ = ginkgo.Describe("Container", func() {
 				container = MockContainer(WithImageName(name))
 				gomega.Expect(container.ImageName()).To(gomega.Equal(name + ":latest"))
 			})
+
+			ginkgo.It("returns unknown:latest for a nil receiver", func() {
+				var nilContainer *Container
+
+				gomega.Expect(nilContainer.ImageName()).To(gomega.Equal("unknown:latest"))
+			})
+		})
+
+		ginkgo.Context("setting image name", func() {
+			ginkgo.It("is a no-op on a nil receiver", func() {
+				var nilContainer *Container
+
+				gomega.Expect(func() {
+					nilContainer.SetImageName("app:v2")
+				}).NotTo(gomega.Panic())
+			})
+
+			ginkgo.It("pins a tagged name on config and cache", func() {
+				container = NewContainer(testLog(), &dockerContainer.InspectResponse{
+					Name: "/app",
+					Config: &dockerContainer.Config{
+						Image: "app:v1",
+					},
+				}, nil)
+
+				container.SetImageName("app:v2")
+
+				gomega.Expect(container.ContainerInfo()).NotTo(gomega.BeNil())
+				gomega.Expect(container.ContainerInfo().Config.Image).To(gomega.Equal("app:v2"))
+				gomega.Expect(container.ImageName()).To(gomega.Equal("app:v2"))
+			})
+
+			ginkgo.It("appends latest when the pinned name is untagged", func() {
+				container = NewContainer(testLog(), &dockerContainer.InspectResponse{
+					Name: "/app",
+					Config: &dockerContainer.Config{
+						Image: "app:v1",
+					},
+				}, nil)
+
+				container.SetImageName("app")
+
+				gomega.Expect(container.ContainerInfo().Config.Image).To(gomega.Equal("app:latest"))
+				gomega.Expect(container.ImageName()).To(gomega.Equal("app:latest"))
+			})
+
+			ginkgo.It("appends latest without treating a registry port as a tag", func() {
+				container = NewContainer(testLog(), &dockerContainer.InspectResponse{
+					Name: "/app",
+					Config: &dockerContainer.Config{
+						Image: "app:v1",
+					},
+				}, nil)
+
+				container.SetImageName("registry.example:5000/app")
+
+				gomega.Expect(container.ContainerInfo().Config.Image).To(gomega.Equal("registry.example:5000/app:latest"))
+				gomega.Expect(container.ImageName()).To(gomega.Equal("registry.example:5000/app:latest"))
+			})
 		})
 
 		ginkgo.Context("fetching image ID", func() {

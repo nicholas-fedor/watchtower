@@ -41,6 +41,9 @@ const (
 	// maxListRetries is the maximum number of retry attempts for transient Docker
 	// connection failures when listing containers.
 	maxListRetries = 3
+
+	// maxExecOutputSize is the maximum captured exec stdout/stderr size (1 MiB).
+	maxExecOutputSize = 1 << 20
 )
 
 // baseListRetryDelay is the base delay for exponential backoff between retries.
@@ -1777,13 +1780,18 @@ func (c *client) captureExecOutput(ctx context.Context, execID string) (string, 
 
 	defer response.Close()
 
-	// Read output into a buffer with timeout.
+	// Read output into a buffer with timeout and a size cap.
 	var writer bytes.Buffer
 
 	done := make(chan error, 1)
 
 	go func() {
-		_, err := io.Copy(&writer, response.Reader)
+		_, err := io.Copy(
+			&writer,
+			io.LimitReader(
+				response.Reader,
+				maxExecOutputSize,
+			))
 		done <- err
 	}()
 

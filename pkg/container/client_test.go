@@ -5,8 +5,10 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"net"
 	"net/http"
 	"net/http/httptest"
+	"net/url"
 	"os"
 	"strings"
 	"testing"
@@ -1284,6 +1286,48 @@ var _ = ginkgo.Describe("the client", func() {
 
 			_, err := client.captureExecOutput(ctx, "exec-id")
 			gomega.Expect(err).To(gomega.HaveOccurred())
+		})
+
+		ginkgo.It("should truncate output that exceeds the size cap", func() {
+			mockServer.AppendHandlers(ghttp.CombineHandlers(
+				ghttp.VerifyRequest("POST", gomega.MatchRegexp(`^/v[0-9.]+/exec/exec-id/start$`)),
+				func(writer http.ResponseWriter, req *http.Request) {
+					_, _ = io.Copy(io.Discard, req.Body)
+
+					hijacker, ok := writer.(http.Hijacker)
+					gomega.Expect(ok).To(gomega.BeTrue())
+
+					conn, bufWriter, err := hijacker.Hijack()
+					gomega.Expect(err).NotTo(gomega.HaveOccurred())
+
+					defer conn.Close()
+
+					_, _ = bufWriter.WriteString("HTTP/1.1 101 UPGRADED\r\nConnection: Upgrade\r\nUpgrade: tcp\r\n\r\n")
+					_, _ = bufWriter.WriteString(strings.Repeat("x", maxExecOutputSize+4096))
+					_ = bufWriter.Flush()
+
+					if tcpConn, ok := conn.(*net.TCPConn); ok {
+						_ = tcpConn.CloseWrite()
+					}
+				},
+			))
+
+			// ExecAttach hijacks the TCP connection. The suite client uses an http://
+			// host, which the Docker dialer cannot hijack. Use tcp:// against the same
+			// ghttp server.
+			serverURL, err := url.Parse(mockServer.URL())
+			gomega.Expect(err).NotTo(gomega.HaveOccurred())
+
+			hijackClient, err := dockerClient.New(
+				dockerClient.WithHost("tcp://"+serverURL.Host),
+				dockerClient.WithHTTPClient(mockServer.HTTPTestServer.Client()),
+			)
+			gomega.Expect(err).NotTo(gomega.HaveOccurred())
+
+			client := &client{log: testLog(), api: hijackClient}
+			out, err := client.captureExecOutput(context.Background(), "exec-id")
+			gomega.Expect(err).NotTo(gomega.HaveOccurred())
+			gomega.Expect(out).To(gomega.HaveLen(maxExecOutputSize))
 		})
 	})
 

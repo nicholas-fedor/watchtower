@@ -44,6 +44,21 @@ const messageChannelBufferSize = 1000
 // This allows error logging to complete before canceling the context.
 const shutdownGracePeriod = 50 * time.Millisecond
 
+// eventFieldRawCapacity is the initial close-brace buffer size for eventFieldMap.
+const eventFieldRawCapacity = 256
+
+// eventFieldRawMaxCapacity is the largest pooled close-brace buffer that is reused.
+const eventFieldRawMaxCapacity = 8 << 10
+
+// eventFieldRawPool reuses close-brace JSON buffers across hooked log events.
+var eventFieldRawPool = sync.Pool{
+	New: func() any {
+		buf := make([]byte, 0, eventFieldRawCapacity)
+
+		return &buf
+	},
+}
+
 // router defines the interface for sending Shoutrrr notifications.
 //
 // It abstracts the underlying service implementation.
@@ -919,10 +934,22 @@ func eventFieldMap(event *zerolog.Event) (map[string]any, time.Time, bool) {
 
 	buf := unsafe.Slice((*byte)(rv.UnsafePointer()), rv.Len())
 
+	rawPtr, ok := eventFieldRawPool.Get().(*[]byte)
+	if !ok || rawPtr == nil {
+		buf := make([]byte, 0, eventFieldRawCapacity)
+		rawPtr = &buf
+	}
+
+	// Reset the pooled buffer without dropping its capacity.
+	raw := (*rawPtr)[:0]
+
+	if cap(raw) < len(buf)+1 {
+		raw = make([]byte, 0, len(buf)+1)
+	}
+
 	// Close the partial JSON object produced before the message is appended.
-	raw := make([]byte, len(buf)+1)
-	copy(raw, buf)
-	raw[len(buf)] = '}'
+	raw = append(raw, buf...)
+	raw = append(raw, '}')
 
 	var fieldMap map[string]any
 
@@ -930,6 +957,13 @@ func eventFieldMap(event *zerolog.Event) (map[string]any, time.Time, bool) {
 	dec.UseNumber()
 
 	err := dec.Decode(&fieldMap)
+
+	// Return only bounded buffers so oversized events do not stay in the pool.
+	if cap(raw) <= eventFieldRawMaxCapacity {
+		*rawPtr = raw[:0]
+		eventFieldRawPool.Put(rawPtr)
+	}
+
 	if err != nil {
 		return nil, now, false
 	}
@@ -985,19 +1019,40 @@ func eventFieldMap(event *zerolog.Event) (map[string]any, time.Time, bool) {
 
 // send sends a message via the notification router.
 //
+// Cancellation before Send skips the delivery. An in-flight Send is abandoned
+// after shutdownGracePeriod so Close cannot block indefinitely.
+//
 // Parameters:
 //   - msg: Message to send.
 func (n *shoutrrrTypeNotifier) send(msg string) {
-	sendCh := make(chan []error, 1)
+	// Skip delivery when Close already canceled the worker.
+	select {
+	case <-n.ctx.Done():
+		n.ll().Debug().Err(n.ctx.Err()).Msg("Notification send canceled")
+
+		return
+	default:
+	}
+
+	errsCh := make(chan []error, 1)
+
 	go func() {
-		sendCh <- n.Router.Send(msg, n.params)
+		errsCh <- n.Router.Send(msg, n.params)
 	}()
 
 	select {
-	case errs := <-sendCh:
+	case errs := <-errsCh:
 		processSendErrors(n, errs)
 	case <-n.ctx.Done():
-		n.ll().Debug().Err(n.ctx.Err()).Msg("Notification send canceled")
+		timer := time.NewTimer(shutdownGracePeriod)
+		defer timer.Stop()
+
+		select {
+		case errs := <-errsCh:
+			processSendErrors(n, errs)
+		case <-timer.C:
+			n.ll().Debug().Err(n.ctx.Err()).Msg("Notification send canceled")
+		}
 	}
 }
 
@@ -1019,20 +1074,17 @@ func (n *shoutrrrTypeNotifier) buildMessage(data Data) (string, error) {
 		dataSource = data.Entries // Use entries only for legacy mode.
 	}
 
-	// Log template processing start with nil-safe report access
-	containerCount := 0
-
+	// Log template processing start with nil-safe report access.
 	reportAvailable := data.Report != nil
-	if reportAvailable {
-		containerCount = len(data.Report.All())
-	}
 
-	log.Debug().
-		Bool("legacy_template", n.legacyTemplate).
-		Int("entries_count", len(data.Entries)).
-		Int("container_count", containerCount).
-		Bool("report_available", reportAvailable).
-		Msg("Starting template processing for notification message")
+	if log.GetLevel() <= zerolog.DebugLevel {
+		log.Debug().
+			Bool("legacy_template", n.legacyTemplate).
+			Int("entries_count", len(data.Entries)).
+			Int("container_count", reportCategoryCount(data.Report)).
+			Bool("report_available", reportAvailable).
+			Msg("Starting template processing for notification message")
+	}
 
 	// Execute template with data.
 	err := n.template.Execute(&body, dataSource)
@@ -1059,6 +1111,29 @@ func (n *shoutrrrTypeNotifier) buildMessage(data Data) (string, error) {
 	log.Debug().Str("message", msg).Msg("Generated notification message")
 
 	return msg, nil
+}
+
+// reportCategoryCount returns the sum of report category lengths without calling All().
+//
+// Categories can overlap, so the sum may exceed the deduplicated All() count.
+//
+// Parameters:
+//   - report: Session report, or nil.
+//
+// Returns:
+//   - int: Combined length of all report categories.
+func reportCategoryCount(report types.Report) int {
+	if report == nil {
+		return 0
+	}
+
+	return len(report.Scanned()) +
+		len(report.Updated()) +
+		len(report.Failed()) +
+		len(report.Skipped()) +
+		len(report.Stale()) +
+		len(report.Fresh()) +
+		len(report.Restarted())
 }
 
 // sendEntries sends batched entries and optional report.

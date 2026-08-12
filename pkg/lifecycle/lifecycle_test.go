@@ -99,7 +99,7 @@ func TestExecutePreChecks(t *testing.T) {
 				LifecycleHooks: true,
 				LifecycleUID:   0,
 				LifecycleGID:   0,
-			})
+			}, nil)
 
 			output := logBuf.String()
 			assert.NotEmpty(t, output, "expected log output")
@@ -149,13 +149,83 @@ func TestExecutePostChecks(t *testing.T) {
 				LifecycleHooks: true,
 				LifecycleUID:   0,
 				LifecycleGID:   0,
-			})
+			}, nil)
 
 			output := logBuf.String()
 			assert.NotEmpty(t, output, "expected log output")
 			assert.Contains(t, output, tt.expectedLogMsg)
 		})
 	}
+}
+
+func TestExecutePreChecks_UsesListedContainers(t *testing.T) {
+	log, logBuf := logging.NewTestLogger(logging.DebugLevel)
+	client := mockContainer.NewMockClient(t)
+	listed := []types.Container{
+		mockedContainer(withLabels(map[string]string{
+			"com.centurylinklabs.watchtower.lifecycle.pre-check": "pre-check",
+		})),
+	}
+
+	client.On("ExecuteCommand", mock.Anything, mock.Anything, "pre-check", 1, 0, 0).
+		Return(true, nil)
+
+	ExecutePreChecks(log, context.Background(), client, types.UpdateParams{
+		Filter:         func(types.FilterableContainer) bool { return true },
+		LifecycleHooks: true,
+	}, listed)
+
+	client.AssertNotCalled(t, "ListContainers", mock.Anything, mock.Anything)
+	assert.Contains(t, logBuf.String(), "Found containers for pre-checks")
+}
+
+func TestExecutePostChecks_UsesListedContainers(t *testing.T) {
+	log, logBuf := logging.NewTestLogger(logging.DebugLevel)
+	client := mockContainer.NewMockClient(t)
+	listed := []types.Container{
+		mockedContainer(withLabels(map[string]string{
+			"com.centurylinklabs.watchtower.lifecycle.post-check": "post-check",
+		})),
+	}
+
+	client.On("ExecuteCommand", mock.Anything, mock.Anything, "post-check", 1, 0, 0).
+		Return(true, nil)
+
+	ExecutePostChecks(log, context.Background(), client, types.UpdateParams{
+		Filter:         func(types.FilterableContainer) bool { return true },
+		LifecycleHooks: true,
+	}, listed)
+
+	client.AssertNotCalled(t, "ListContainers", mock.Anything, mock.Anything)
+	assert.Contains(t, logBuf.String(), "Found containers for post-checks")
+}
+
+func TestExecutePreChecks_EmptyListedDoesNotRelist(t *testing.T) {
+	log, _ := logging.NewTestLogger(logging.DebugLevel)
+	client := mockContainer.NewMockClient(t)
+	listed := []types.Container{}
+
+	ExecutePreChecks(log, context.Background(), client, types.UpdateParams{
+		Filter:         func(types.FilterableContainer) bool { return true },
+		LifecycleHooks: true,
+	}, listed)
+
+	client.AssertNotCalled(t, "ListContainers", mock.Anything, mock.Anything)
+	client.AssertNotCalled(t, "ExecuteCommand", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything)
+}
+
+func TestExecutePostChecks_EmptyListedDoesNotRelist(t *testing.T) {
+	log, _ := logging.NewTestLogger(logging.DebugLevel)
+	client := mockContainer.NewMockClient(t)
+	listed := []types.Container{}
+
+	ExecutePostChecks(log, context.Background(), client, types.UpdateParams{
+		Filter:         func(types.FilterableContainer) bool { return true },
+		LifecycleHooks: true,
+	}, listed)
+
+	client.AssertNotCalled(t, "ListContainers", mock.Anything, mock.Anything)
+	client.AssertNotCalled(t, "ExecuteCommand", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything)
 }
 
 // TestExecutePreCheckCommand tests the ExecutePreCheckCommand function.

@@ -110,21 +110,23 @@ func allFromSlices(
 	scanned, updated, restarted, failed, skipped, stale, fresh []types.ContainerReport,
 ) []types.ContainerReport {
 	// Calculate total capacity for all containers to pre-allocate slice efficiently.
-	allLen := len(scanned) + len(updated) + len(failed) + len(skipped) + len(stale) + len(fresh)
+	allLen := len(scanned) + len(updated) + len(restarted) + len(failed) + len(skipped) + len(stale) + len(fresh)
 	all := make([]types.ContainerReport, 0, allLen)
-	presentIDs := map[types.ContainerID][]string{} // Track container IDs to prevent duplicates
+	// Track container IDs to prevent duplicates.
+	presentIDs := make(map[types.ContainerID]struct{}, allLen)
 
 	// appendUnique adds containers from a slice only if they haven't been added before.
 	// This ensures deduplication while maintaining the priority order defined by the calling sequence.
 	appendUnique := func(reports []types.ContainerReport) {
 		for _, report := range reports {
-			_, found := presentIDs[report.ID()]
-			if found {
-				continue // Skip containers already added from higher-priority categories
+			if _, found := presentIDs[report.ID()]; found {
+				// Skip containers already added from higher-priority categories.
+				continue
 			}
 
 			all = append(all, report)
-			presentIDs[report.ID()] = nil // Mark this container ID as processed
+			// Mark this container ID as processed.
+			presentIDs[report.ID()] = struct{}{}
 		}
 	}
 

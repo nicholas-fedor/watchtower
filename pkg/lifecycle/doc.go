@@ -8,7 +8,7 @@
 // Usage example:
 //
 //	// log is the process *zerolog.Logger. ctx is the request/operation context.
-//	lifecycle.ExecutePreChecks(log, ctx, client, params)
+//	lifecycle.ExecutePreChecks(log, ctx, client, params, listed)
 //	success, err := lifecycle.ExecutePreUpdateCommand(log, ctx, client, container, uid, gid)
 //	if err != nil {
 //	    log.Error().Err(err).Msg("Pre-update failed")

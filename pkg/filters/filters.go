@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"regexp"
+	"slices"
 	"strings"
 
 	"github.com/distribution/reference"
@@ -138,7 +139,10 @@ func NoFilter(c types.FilterableContainer) bool {
 
 // FilterByNames selects containers matching specified names.
 //
+// Name patterns are compiled once when the filter is built.
+//
 // Parameters:
+//   - log: Logger for debug output.
 //   - normalizedNames: List of normalized names or regex patterns to match.
 //   - baseFilter: Base filter to chain.
 //
@@ -149,23 +153,29 @@ func FilterByNames(log *zerolog.Logger, normalizedNames []string, baseFilter typ
 		return baseFilter
 	}
 
+	// Compile once. The returned closure only evaluates the compiled matchers.
+	compiled := compileNamePatterns(normalizedNames, true)
+
 	return func(c types.FilterableContainer) bool {
-		containerName := c.Name() // Normalized name
-		clogVal := log.With().
-			Str("container", c.Name()).
-			Strs("names", normalizedNames).
-			Logger()
-		clog := &clogVal
+		containerName := c.Name()
 
-		for _, pattern := range normalizedNames {
-			if matchesName(containerName, pattern) {
-				clog.Debug().Msg("Matched container by name/pattern")
-
-				return baseFilter(c)
+		if compiled.match(containerName) {
+			if debugEnabled(log) {
+				log.Debug().
+					Str("container", containerName).
+					Strs("names", normalizedNames).
+					Msg("Matched container by name/pattern")
 			}
+
+			return baseFilter(c)
 		}
 
-		clog.Debug().Msg("Container name did not match any filter")
+		if debugEnabled(log) {
+			log.Debug().
+				Str("container", containerName).
+				Strs("names", normalizedNames).
+				Msg("Container name did not match any filter")
+		}
 
 		return false
 	}
@@ -173,7 +183,10 @@ func FilterByNames(log *zerolog.Logger, normalizedNames []string, baseFilter typ
 
 // FilterByDisableNames excludes containers matching specified names.
 //
+// Name patterns are compiled once when the filter is built.
+//
 // Parameters:
+//   - log: Logger for debug output.
 //   - normalizedDisableNames: Names or regex patterns to exclude.
 //   - baseFilter: Base filter to chain.
 //
@@ -184,23 +197,29 @@ func FilterByDisableNames(log *zerolog.Logger, normalizedDisableNames []string, 
 		return baseFilter
 	}
 
+	// Compile once. The returned closure only evaluates the compiled matchers.
+	compiled := compileNamePatterns(normalizedDisableNames, true)
+
 	return func(c types.FilterableContainer) bool {
-		containerName := c.Name() // Normalized name
-		clogVal := log.With().
-			Str("container", c.Name()).
-			Strs("disableNames", normalizedDisableNames).
-			Logger()
-		clog := &clogVal
+		containerName := c.Name()
 
-		for _, pattern := range normalizedDisableNames {
-			if matchesName(containerName, pattern) {
-				clog.Debug().Msg("Container excluded by disable name/pattern")
-
-				return false
+		if compiled.match(containerName) {
+			if debugEnabled(log) {
+				log.Debug().
+					Str("container", containerName).
+					Strs("disableNames", normalizedDisableNames).
+					Msg("Container excluded by disable name/pattern")
 			}
+
+			return false
 		}
 
-		clog.Debug().Msg("Container not excluded by disable names")
+		if debugEnabled(log) {
+			log.Debug().
+				Str("container", containerName).
+				Strs("disableNames", normalizedDisableNames).
+				Msg("Container not excluded by disable names")
+		}
 
 		return baseFilter(c)
 	}
@@ -209,7 +228,10 @@ func FilterByDisableNames(log *zerolog.Logger, normalizedDisableNames []string, 
 // FilterByMonitoredImageNamePatterns restricts monitoring to containers whose image name
 // matches specified patterns. When set, only matching containers are monitored.
 //
+// Image patterns are compiled once when the filter is built.
+//
 // Parameters:
+//   - log: Logger for debug output.
 //   - namePatterns: Image name regex patterns.
 //   - baseFilter: Base filter to chain.
 //
@@ -221,24 +243,31 @@ func FilterByMonitoredImageNamePatterns(log *zerolog.Logger, namePatterns []stri
 		return baseFilter
 	}
 
+	// Compile once. The returned closure only evaluates the compiled matchers.
+	compiled := compileNamePatterns(namePatterns, false)
+
 	return func(c types.FilterableContainer) bool {
 		imageName := c.ImageName()
-		clogVal := log.With().
-			Str("container", c.Name()).
-			Str("image", imageName).
-			Strs("namePatterns", namePatterns).
-			Logger()
-		clog := &clogVal
 
-		for _, pattern := range namePatterns {
-			if matchesImageName(imageName, pattern) {
-				clog.Debug().Msg("Container image matched pattern")
-
-				return baseFilter(c)
+		if compiled.match(imageName) {
+			if debugEnabled(log) {
+				log.Debug().
+					Str("container", c.Name()).
+					Str("image", imageName).
+					Strs("namePatterns", namePatterns).
+					Msg("Container image matched pattern")
 			}
+
+			return baseFilter(c)
 		}
 
-		clog.Debug().Msg("Container image did not match any pattern")
+		if debugEnabled(log) {
+			log.Debug().
+				Str("container", c.Name()).
+				Str("image", imageName).
+				Strs("namePatterns", namePatterns).
+				Msg("Container image did not match any pattern")
+		}
 
 		return false
 	}
@@ -247,7 +276,10 @@ func FilterByMonitoredImageNamePatterns(log *zerolog.Logger, namePatterns []stri
 // FilterBySkippedImageNamePatterns prevents monitoring of containers whose image name
 // matches specified patterns. Matching containers are excluded from monitoring.
 //
+// Image patterns are compiled once when the filter is built.
+//
 // Parameters:
+//   - log: Logger for debug output.
 //   - namePatterns: Image name regex patterns.
 //   - baseFilter: Base filter to chain.
 //
@@ -259,24 +291,31 @@ func FilterBySkippedImageNamePatterns(log *zerolog.Logger, namePatterns []string
 		return baseFilter
 	}
 
+	// Compile once. The returned closure only evaluates the compiled matchers.
+	compiled := compileNamePatterns(namePatterns, false)
+
 	return func(c types.FilterableContainer) bool {
 		imageName := c.ImageName()
-		clogVal := log.With().
-			Str("container", c.Name()).
-			Str("image", imageName).
-			Strs("namePatterns", namePatterns).
-			Logger()
-		clog := &clogVal
 
-		for _, pattern := range namePatterns {
-			if matchesImageName(imageName, pattern) {
-				clog.Debug().Msg("Container image matched skip pattern")
-
-				return false
+		if compiled.match(imageName) {
+			if debugEnabled(log) {
+				log.Debug().
+					Str("container", c.Name()).
+					Str("image", imageName).
+					Strs("namePatterns", namePatterns).
+					Msg("Container image matched skip pattern")
 			}
+
+			return false
 		}
 
-		clog.Debug().Msg("Container not skipped by image name patterns")
+		if debugEnabled(log) {
+			log.Debug().
+				Str("container", c.Name()).
+				Str("image", imageName).
+				Strs("namePatterns", namePatterns).
+				Msg("Container not skipped by image name patterns")
+		}
 
 		return baseFilter(c)
 	}
@@ -534,6 +573,88 @@ func FilterByImage(log *zerolog.Logger, images []string, baseFilter types.Filter
 
 		return false // No matching image found.
 	}
+}
+
+// compiledPatterns holds precompiled name or image matchers.
+type compiledPatterns struct {
+	exact   []string
+	regexes []*regexp.Regexp
+}
+
+// compileNamePatterns compiles name or image filter patterns once.
+//
+// Patterns without regex metacharacters are stored as exact literals.
+// Invalid regex patterns are also kept as exact literals.
+//
+// Parameters:
+//   - patterns: Name or image patterns.
+//   - trimSlash: Strip a leading slash from each pattern for container names.
+//
+// Returns:
+//   - compiledPatterns: Exact literals and compiled regexes.
+func compileNamePatterns(patterns []string, trimSlash bool) compiledPatterns {
+	compiled := compiledPatterns{
+		exact:   make([]string, 0, len(patterns)),
+		regexes: make([]*regexp.Regexp, 0, len(patterns)),
+	}
+
+	for _, pattern := range patterns {
+		// Container names are stored without a leading slash.
+		if trimSlash {
+			pattern = strings.TrimPrefix(pattern, "/")
+		}
+
+		// Literal names skip compilation. Only patterns with metacharacters become regexes.
+		if regexp.QuoteMeta(pattern) == pattern {
+			compiled.exact = append(compiled.exact, pattern)
+
+			continue
+		}
+
+		// Invalid regex stays an exact literal, matching matchesName behavior.
+		patternRe, err := regexp.Compile("^" + pattern + "$")
+		if err != nil {
+			compiled.exact = append(compiled.exact, pattern)
+
+			continue
+		}
+
+		compiled.regexes = append(compiled.regexes, patternRe)
+	}
+
+	return compiled
+}
+
+// match reports whether value matches an exact literal or compiled regex.
+//
+// Parameters:
+//   - value: Container name or image name to test.
+//
+// Returns:
+//   - bool: True when value matches a literal or regex.
+func (p compiledPatterns) match(value string) bool {
+	if slices.Contains(p.exact, value) {
+		return true
+	}
+
+	for _, re := range p.regexes {
+		if re.MatchString(value) {
+			return true
+		}
+	}
+
+	return false
+}
+
+// debugEnabled reports whether debug logging is active on log.
+//
+// Parameters:
+//   - log: Logger to inspect. Nil is treated as disabled.
+//
+// Returns:
+//   - bool: True when debug-level logging is enabled.
+func debugEnabled(log *zerolog.Logger) bool {
+	return log != nil && log.GetLevel() <= zerolog.DebugLevel
 }
 
 // matchesImageName checks if a container's image name matches a given pattern (exact or regex).
