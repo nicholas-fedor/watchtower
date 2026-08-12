@@ -10,6 +10,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- Reduce scan-cycle memory allocations by @nicholas-fedor in [#2152](https://github.com/nicholas-fedor/watchtower/pull/2152)
 - Replace logrus with zerolog by @nicholas-fedor in [#2128](https://github.com/nicholas-fedor/watchtower/pull/2128)
 
 ### Chores
