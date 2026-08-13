@@ -35,11 +35,12 @@ func ToPorcelainReport(sourceReport types.Report) PorcelainReport {
 		return PorcelainReport{Containers: make([]PorcelainContainer, 0)}
 	}
 
+	allContainers := sourceReport.All()
 	report := PorcelainReport{
-		Containers: make([]PorcelainContainer, 0, len(sourceReport.All())),
+		Containers: make([]PorcelainContainer, 0, len(allContainers)),
 	}
 
-	for _, containerReport := range sourceReport.All() {
+	for _, containerReport := range allContainers {
 		container := PorcelainContainer{
 			Name:            containerReport.Name(),
 			Image:           containerReport.ImageName(),

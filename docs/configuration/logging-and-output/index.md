@@ -114,6 +114,6 @@ Fields:
 - `image` — image name with tag
 - `image_id` — current short image ID
 - `latest_image_id` — latest short image ID
-- `state` — container state (`Updated`, `Fresh`, `Failed`, `Skipped`, `Restarted`)
+- `state` — container state (`Updated`, `Fresh`, `Failed`, `Skipped`, `Restarted`, `Stale`)
 - `update_available` — whether an update is available
 - `error` — error message if any (omitted when empty)
