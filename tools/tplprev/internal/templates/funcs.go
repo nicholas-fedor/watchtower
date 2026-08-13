@@ -58,31 +58,32 @@ func toPorcelainJSON(v any) string {
 		return "{\n  \"containers\": []\n}"
 	}
 
-	r, ok := v.(report.Report)
+	sourceReport, ok := v.(report.Report)
 	if !ok {
 		return "failed to marshal porcelain JSON: input is not a report.Report"
 	}
 
-	pr := porcelainReport{
-		Containers: make([]porcelainContainer, 0, len(r.All())),
+	report := porcelainReport{
+		Containers: make([]porcelainContainer, 0, len(sourceReport.All())),
 	}
 
-	for _, cr := range r.All() {
+	for _, containerReport := range sourceReport.All() {
 		container := porcelainContainer{
-			Name:            cr.Name(),
-			Image:           cr.ImageName(),
-			ImageID:         cr.CurrentImageID().ShortID(),
-			LatestImageID:   cr.LatestImageID().ShortID(),
-			State:           cr.State(),
-			UpdateAvailable: cr.CurrentImageID() != cr.LatestImageID(),
+			Name:            containerReport.Name(),
+			Image:           containerReport.ImageName(),
+			ImageID:         containerReport.CurrentImageID().ShortID(),
+			LatestImageID:   containerReport.LatestImageID().ShortID(),
+			State:           containerReport.State(),
+			UpdateAvailable: containerReport.CurrentImageID() != containerReport.LatestImageID(),
 		}
-		if err := cr.Error(); err != "" {
+		if err := containerReport.Error(); err != "" {
 			container.Error = err
 		}
-		pr.Containers = append(pr.Containers, container)
+
+		report.Containers = append(report.Containers, container)
 	}
 
-	bytes, err := json.MarshalIndent(pr, "", "  ")
+	bytes, err := json.MarshalIndent(report, "", "  ")
 	if err != nil {
 		return fmt.Sprintf("failed to marshal porcelain JSON: %v", err)
 	}
