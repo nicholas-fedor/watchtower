@@ -49,7 +49,8 @@ func jsTplPrev(_ js.Value, args []js.Value) any {
 }
 
 func statesFromJS(arg js.Value) ([]preview.State, error) {
-	switch classifyJSType(arg.Type().String()) {
+	isArray, isTypedArray := jsCollectionFlags(arg)
+	switch classifyJSType(arg.Type().String(), isArray, isTypedArray) {
 	case jsKindString:
 		return preview.StatesFromString(arg.String()), nil
 	case jsKindCollection:
@@ -65,7 +66,8 @@ func statesFromJS(arg js.Value) ([]preview.State, error) {
 }
 
 func levelsFromJS(arg js.Value) ([]preview.LogLevel, error) {
-	switch classifyJSType(arg.Type().String()) {
+	isArray, isTypedArray := jsCollectionFlags(arg)
+	switch classifyJSType(arg.Type().String(), isArray, isTypedArray) {
 	case jsKindString:
 		return preview.LevelsFromString(arg.String()), nil
 	case jsKindCollection:
@@ -78,4 +80,25 @@ func levelsFromJS(arg js.Value) ([]preview.LogLevel, error) {
 	default:
 		return nil, errInvalidJSArg
 	}
+}
+
+func jsCollectionFlags(arg js.Value) (isArray, isTypedArray bool) {
+	if arg.Type() != js.TypeObject {
+		return false, false
+	}
+
+	array := js.Global().Get("Array")
+	if array.Truthy() {
+		isArray = array.Call("isArray", arg).Bool()
+	}
+
+	arrayBuffer := js.Global().Get("ArrayBuffer")
+	if arrayBuffer.Truthy() {
+		isView := arrayBuffer.Get("isView")
+		if isView.Truthy() {
+			isTypedArray = arrayBuffer.Call("isView", arg).Bool()
+		}
+	}
+
+	return isArray, isTypedArray
 }
