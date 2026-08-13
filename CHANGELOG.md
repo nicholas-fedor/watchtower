@@ -16,6 +16,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Chores
 
+- Update module github.com/gofiber/fiber/v3 to v3.5.0 by @renovate[bot] in [#2156](https://github.com/nicholas-fedor/watchtower/pull/2156)
 - Update module golang.org/x/net to v0.58.0 by @renovate[bot] in [#2150](https://github.com/nicholas-fedor/watchtower/pull/2150)
 - Update docker/dockerfile:1 docker digest to ecfaec9 by @renovate[bot] in [#2148](https://github.com/nicholas-fedor/watchtower/pull/2148)
 - Update module golang.org/x/text to v0.41.0 by @renovate[bot] in [#2143](https://github.com/nicholas-fedor/watchtower/pull/2143)
