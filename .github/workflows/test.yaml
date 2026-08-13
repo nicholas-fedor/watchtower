@@ -9,6 +9,7 @@ on:
       - cmd/**
       - internal/**
       - pkg/**
+      - tools/tplprev/**
       - go.mod
       - go.sum
       - main.go
@@ -52,6 +53,9 @@ jobs:
       - name: Run Tests
         run: |
           go test -timeout 60s -v -coverprofile="coverage.out" -covermode atomic ./...
+
+      - name: Run tplprev Tests
+        run: go -C tools/tplprev test -timeout 60s -v ./...
 
       - name: Upload Coverage Report to Codecov
         uses: codecov/codecov-action@fb8b3582c8e4def4969c97caa2f19720cb33a72f # v7.0.0

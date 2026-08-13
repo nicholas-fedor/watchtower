@@ -47,6 +47,27 @@ install: ## Install the application
 	$(GO) install ./...
 
 # =============================================================================
+# Template Preview Module Targets
+# =============================================================================
+
+.PHONY: tplprev-test tplprev-lint tplprev-vet tplprev-fmt
+
+TPLPREV_DIR=tools/tplprev
+GOLANGCI_CONFIG=$(CURDIR)/build/golangci-lint/golangci-lint.yaml
+
+tplprev-test: ## Run tplprev module tests
+	$(GO) -C $(TPLPREV_DIR) test -timeout 30s -v ./...
+
+tplprev-lint: ## Lint the tplprev module
+	cd $(TPLPREV_DIR) && $(GOLANGCI_LINT) run --config $(GOLANGCI_CONFIG) ./...
+
+tplprev-vet: ## Run go vet on the tplprev module
+	$(GO) -C $(TPLPREV_DIR) vet ./...
+
+tplprev-fmt: ## Format the tplprev module
+	cd $(TPLPREV_DIR) && $(GOLANGCI_LINT) fmt --config $(GOLANGCI_CONFIG) ./...
+
+# =============================================================================
 # Dependency Management
 # =============================================================================
 

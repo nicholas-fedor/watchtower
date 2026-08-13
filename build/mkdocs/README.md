@@ -17,7 +17,7 @@ It is then deployed to GitHub Pages.
 
 - `docs-requirements.txt`: Python dependencies for documentation build
 - `mkdocs.yaml`: Main MkDocs configuration file
-- `build-tplprev.sh`: Script for generating template preview documentation
+- `scripts/build-tplprev.sh`: Builds `tplprev.wasm` and copies `wasm_exec.js` into `docs/assets/`
 
 ## Build Process
 
@@ -25,7 +25,7 @@ The documentation build process involves:
 
 1. Setting up a Python virtual environment
 2. Installing dependencies from `docs-requirements.txt`
-3. Generating template preview documentation using `build-tplprev.sh`
+3. Generating the template preview by running `scripts/build-tplprev.sh`, which builds `tplprev.wasm` and copies `wasm_exec.js` into `docs/assets/`
 4. Building the static site using MkDocs
 
 ## Versioning

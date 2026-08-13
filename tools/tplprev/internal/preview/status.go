@@ -1,21 +1,23 @@
-package data
+package preview
 
-import "github.com/nicholas-fedor/watchtower/pkg/types"
+import "github.com/nicholas-fedor/tplprev/internal/report"
 
-//nolint:errname // containerStatus is not an error type, it contains an error field
+var _ report.ContainerReport = (*containerStatus)(nil)
+
+//nolint:errname // containerStatus is not an error type. It contains an error field.
 type containerStatus struct {
-	containerID    types.ContainerID
-	oldImage       types.ImageID
-	newImage       types.ImageID
+	containerID    report.ContainerID
+	oldImage       report.ImageID
+	newImage       report.ImageID
 	containerName  string
 	imageName      string
 	containerError error
 	state          State
 	monitorOnly    bool
-	newContainerID types.ContainerID
+	newContainerID report.ContainerID
 }
 
-func (u *containerStatus) ID() types.ContainerID {
+func (u *containerStatus) ID() report.ContainerID {
 	return u.containerID
 }
 
@@ -23,11 +25,11 @@ func (u *containerStatus) Name() string {
 	return u.containerName
 }
 
-func (u *containerStatus) CurrentImageID() types.ImageID {
+func (u *containerStatus) CurrentImageID() report.ImageID {
 	return u.oldImage
 }
 
-func (u *containerStatus) LatestImageID() types.ImageID {
+func (u *containerStatus) LatestImageID() report.ImageID {
 	return u.newImage
 }
 
@@ -51,6 +53,6 @@ func (u *containerStatus) IsMonitorOnly() bool {
 	return u.monitorOnly
 }
 
-func (u *containerStatus) NewContainerID() types.ContainerID {
+func (u *containerStatus) NewContainerID() report.ContainerID {
 	return u.newContainerID
 }

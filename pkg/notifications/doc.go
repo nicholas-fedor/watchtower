@@ -7,7 +7,6 @@
 //   - RegisterHook: Attaches the notifier as a zerolog.Hook on the process logger (shoutrrr.go).
 //   - Shoutrrr Integration: Handles message sending and batching (shoutrrr.go).
 //   - JSON Marshaling: Formats notification data (json.go).
-//   - Preview: Renders notification previews (preview.go).
 //
 // Note: The legacy notification types (email, slack, msteams, gotify) and their individual flags
 // (e.g., --notification-email-from, --notification-slack-hook-url) are deprecated.

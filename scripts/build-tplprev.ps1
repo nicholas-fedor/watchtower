@@ -27,11 +27,22 @@ else {
     }
 }
 
-# Build WASM binary
+# Build WASM binary from the nested tplprev module
 Write-Output "Building tplprev.wasm..."
+$version = git describe --tags --always --dirty 2>$null
+if (-not $version) { $version = "dev" }
+$commit = git rev-parse HEAD 2>$null
+if (-not $commit) { $commit = "none" }
+$date = git log -1 --format=%cI 2>$null
+if (-not $date) { $date = [DateTime]::UtcNow.ToString("yyyy-MM-ddTHH:mm:ssZ") }
+$ldflags = "-X github.com/nicholas-fedor/tplprev/internal/metadata.Version=$version -X github.com/nicholas-fedor/tplprev/internal/metadata.Commit=$commit -X github.com/nicholas-fedor/tplprev/internal/metadata.Date=$date"
 $env:GOARCH = "wasm"
 $env:GOOS = "js"
-go build -o ./docs/assets/tplprev.wasm ./tools/tplprev
+go -C ./tools/tplprev build -ldflags $ldflags -o ../../docs/assets/tplprev.wasm .
+if ($LASTEXITCODE -ne 0) {
+    Write-Error "Failed to build tplprev.wasm"
+    exit $LASTEXITCODE
+}
 
 # Verify output
 Write-Output "Files in ./docs/assets:"

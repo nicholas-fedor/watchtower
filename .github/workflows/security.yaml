@@ -9,6 +9,7 @@ on:
       - cmd/**
       - pkg/**
       - internal/**
+      - tools/tplprev/**
       - main.go
       - go.mod
       - go.sum
@@ -75,3 +76,31 @@ jobs:
         with:
           sarif_file: ${{ env.OUTPUT_FILE }}
           category: govulncheck-sarif
+
+  govulncheck-tplprev:
+    name: Run govulncheck Scanner on tplprev
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      security-events: write
+    steps:
+      - name: Harden the Runner (Step Security)
+        uses: step-security/harden-runner@b09bb98e06d4d774595224525879c09bc6e98c40 # v2.20.1
+        with:
+          egress-policy: audit
+
+      - name: Run govulncheck
+        id: govulncheck
+        uses: nicholas-fedor/govulncheck-action@2e8328bfd2a2259f6b48ad47edc8101c86e74883 # v1.0.5
+        with:
+          output-format: sarif
+          output-file: ${{ env.OUTPUT_FILE }}
+          go-version-file: tools/tplprev/go.mod
+          work-dir: tools/tplprev
+          cache-dependency-path: tools/tplprev/go.sum
+
+      - name: Upload SARIF file
+        uses: github/codeql-action/upload-sarif@5595ccaf912efad79be6eef63a5619ff05969be3 # v4.37.6
+        with:
+          sarif_file: ${{ env.OUTPUT_FILE }}
+          category: govulncheck-tplprev-sarif

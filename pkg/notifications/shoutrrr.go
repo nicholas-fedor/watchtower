@@ -21,7 +21,6 @@ import (
 	shoutrrrTypes "github.com/nicholas-fedor/shoutrrr/pkg/types"
 	stdlog "log"
 
-	"github.com/nicholas-fedor/watchtower/pkg/notifications/templates"
 	"github.com/nicholas-fedor/watchtower/pkg/session"
 	"github.com/nicholas-fedor/watchtower/pkg/types"
 )
@@ -1224,7 +1223,7 @@ func (n *shoutrrrTypeNotifier) sendEntries(entries []*notificationEntry, report 
 //   - *template.Template: Parsed or default template.
 //   - error: Non-nil if parsing fails, nil on success.
 func getShoutrrrTemplate(log *zerolog.Logger, tplString string, legacy bool) (*template.Template, error) {
-	tplBase := template.New("").Funcs(templates.Funcs)
+	tplBase := template.New("").Funcs(Funcs)
 
 	// Use common template if specified.
 	builtin, found := commonTemplates[tplString]

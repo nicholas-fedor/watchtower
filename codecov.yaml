@@ -66,8 +66,8 @@ parsers:
 ignore:
   # Command-line entry points, not core logic
   - "cmd/*"
-  # Templating for docs
-  - "tplprev/*"
+  # Nested template-preview module
+  - "tools/tplprev/**"
   # Markdown files
   - "*.md"
   # Vendored dependencies

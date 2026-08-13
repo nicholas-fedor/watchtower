@@ -8,6 +8,7 @@ on:
     paths:
       - docs/**
       - build/mkdocs/**
+      - tools/tplprev/**
   release:
     types: [published]
 

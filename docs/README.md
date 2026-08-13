@@ -380,8 +380,7 @@ Versions are deployed automatically via GitHub Actions:
 
 #### Core Components
 
-- `tools/tplprev/main_wasm.go`: WebAssembly build target for browser execution
-- `tools/tplprev/main.go`: CLI version for local testing
+- `tools/tplprev/`: Nested `github.com/nicholas-fedor/tplprev` module (CLI + WASM)
 - `scripts/build-tplprev.sh`: Build script for WASM compilation
 
 #### Build Process
