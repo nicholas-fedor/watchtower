@@ -16,6 +16,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Chores
 
+- Update golang:alpine3.24 docker digest to 70b4654 by @renovate[bot] in [#2162](https://github.com/nicholas-fedor/watchtower/pull/2162)
 - Update module github.com/sirupsen/logrus to v1.10.0 by @renovate[bot] in [#2160](https://github.com/nicholas-fedor/watchtower/pull/2160)
 - Update github/codeql-action action to v4.37.7 by @renovate[bot] in [#2159](https://github.com/nicholas-fedor/watchtower/pull/2159)
 - Update module github.com/gofiber/fiber/v3 to v3.5.0 by @renovate[bot] in [#2156](https://github.com/nicholas-fedor/watchtower/pull/2156)
