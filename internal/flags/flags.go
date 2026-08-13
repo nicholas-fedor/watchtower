@@ -455,10 +455,12 @@ func ProcessFlagAliases(log *zerolog.Logger, flags *pflag.FlagSet) {
 	}
 
 	if porcelain != "" {
-		if porcelain != "v1" {
+		switch porcelain {
+		case "v1", "json":
+		default:
 			log.Fatal().
 				Str("version", porcelain).
-				Msg("Unknown porcelain version, supported: v1")
+				Msg("Unknown porcelain version, supported: v1, json")
 		}
 
 		err := appendFlagValue(log, flags, "notification-url", "logger://")
@@ -469,7 +471,13 @@ func ProcessFlagAliases(log *zerolog.Logger, flags *pflag.FlagSet) {
 		setFlagIfDefault(log, flags, "notification-log-stdout", "true")
 		setFlagIfDefault(log, flags, "notification-report", "true")
 
-		tpl := fmt.Sprintf("porcelain.%s.summary-no-log", porcelain)
+		var tpl string
+		if porcelain == "v1" {
+			tpl = "porcelain.v1.summary-no-log"
+		} else {
+			tpl = "porcelain.json"
+		}
+
 		setFlagIfDefault(log, flags, "notification-template", tpl)
 		log.Debug().
 			Str("porcelain", porcelain).

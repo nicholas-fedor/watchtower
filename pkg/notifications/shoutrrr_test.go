@@ -149,6 +149,43 @@ updt1 (mock/updt1:latest): Updated
 		})
 	})
 
+	ginkgo.When("rendering porcelain JSON", func() {
+		ginkgo.It("should produce valid JSON with container details", func() {
+			data := mockDataFromStates(session.UpdatedState, session.FreshState, session.FailedState)
+			result := getTemplatedResult(`porcelain.json`, false, data)
+
+			gomega.Expect(result).To(gomega.MatchJSON(`{
+				"containers": [
+					{
+						"name": "updt1",
+						"image": "mock/updt1:latest",
+						"image_id": "01d110000000",
+						"latest_image_id": "d0a110000000",
+						"state": "Updated",
+						"update_available": true
+					},
+					{
+						"name": "fail1",
+						"image": "mock/fail1:latest",
+						"image_id": "01d210000000",
+						"latest_image_id": "d0a210000000",
+						"state": "Failed",
+						"update_available": true,
+						"error": "accidentally the whole container"
+					},
+					{
+						"name": "frsh1",
+						"image": "mock/frsh1:latest",
+						"image_id": "01d310000000",
+						"latest_image_id": "01d310000000",
+						"state": "Fresh",
+						"update_available": false
+					}
+				]
+			}`))
+		})
+	})
+
 	ginkgo.When("adding a log hook", func() {
 		ginkgo.When("it has not been added before", func() {
 			ginkgo.It("should start receiving via RegisterHook", func() {

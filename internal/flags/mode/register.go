@@ -33,7 +33,7 @@ func Specs() []spec.FlagSpec {
 			Kind:      spec.KindString,
 			Default:   "",
 			EnvKeys:   []string{"WATCHTOWER_PORCELAIN"},
-			Help:      `Write session results to stdout using a stable versioned format. Supported values: "v1"`,
+			Help:      `Write session results to stdout using a stable versioned format. Supported values: "v1", "json"`,
 		},
 		{
 			Name:    "no-startup-message",

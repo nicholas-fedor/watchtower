@@ -101,6 +101,8 @@ var Templates = map[string]string{
 {{- end -}}`,
 
 	"json.v1": `{{ . | ToJSON }}`,
+
+	"porcelain.json": `{{ .Report | ToPorcelainJSON }}`,
 }
 
 // Lookup returns a named builtin template.

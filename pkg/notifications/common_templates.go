@@ -127,4 +127,9 @@ var commonTemplates = map[string]string{
 	// Useful for integrations that need structured data.
 	// Expects any data structure that can be JSON marshaled (typically the full report or entries).
 	`json.v1`: `{{ . | ToJSON }}`,
+
+	// "porcelain.json" template outputs the update report as a stable JSON document with per-container details.
+	// It omits log entries and focuses on the report: name, image, image_id, latest_image_id, state, update_available, and error.
+	// Expects .Report with an All() method returning []ContainerReport.
+	`porcelain.json`: `{{ .Report | ToPorcelainJSON }}`,
 }

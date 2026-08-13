@@ -13,11 +13,12 @@ import (
 
 // Funcs defines utility functions for notification templates.
 var Funcs = template.FuncMap{
-	"ToUpper": strings.ToUpper,
-	"ToLower": strings.ToLower,
-	"ToJSON":  toJSON,
-	"Title":   cases.Title(language.AmericanEnglish).String,
-	"RFC1123": formatRFC1123,
+	"ToUpper":         strings.ToUpper,
+	"ToLower":         strings.ToLower,
+	"ToJSON":          toJSON,
+	"ToPorcelainJSON": ToPorcelainJSON,
+	"Title":           cases.Title(language.AmericanEnglish).String,
+	"RFC1123":         formatRFC1123,
 }
 
 // toJSON marshals a value to a formatted JSON string for use in templates.

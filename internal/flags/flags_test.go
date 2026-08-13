@@ -653,6 +653,31 @@ func TestProcessFlagAliases(t *testing.T) {
 			},
 		},
 		{
+			name: "porcelain json with interval",
+			flags: []string{
+				"--porcelain", "json",
+				"--interval", "10",
+			},
+			checks: func(t *testing.T, flags *pflag.FlagSet) {
+				t.Helper()
+
+				urls, _ := flags.GetStringArray("notification-url")
+				assert.Contains(t, urls, "logger://")
+
+				logStdout, _ := flags.GetBool("notification-log-stdout")
+				assert.True(t, logStdout)
+
+				report, _ := flags.GetBool("notification-report")
+				assert.True(t, report)
+
+				template, _ := flags.GetString("notification-template")
+				assert.Equal(t, "porcelain.json", template)
+
+				sched, _ := flags.GetString("schedule")
+				assert.Equal(t, "@every 10s", sched)
+			},
+		},
+		{
 			name:    "log level from environment",
 			envVars: map[string]string{"WATCHTOWER_DEBUG": "true"},
 			checks: func(t *testing.T, flags *pflag.FlagSet) {
@@ -715,7 +740,7 @@ func TestProcessFlagAliases_FatalCases(t *testing.T) {
 		{
 			name:       "invalid porcelain version",
 			helperCase: "invalid-porcelain",
-			wantDiag:   "Unknown porcelain version, supported: v1",
+			wantDiag:   "Unknown porcelain version, supported: v1, json",
 		},
 	}
 
