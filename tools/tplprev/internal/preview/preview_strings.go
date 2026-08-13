@@ -1,7 +1,5 @@
-package data
+package preview
 
-// containerNames is an array of realistic container names used in the preview tool.
-// These are used to simulate container names in the notification output, matching the style of real Watchtower containers.
 var containerNames = []string{
 	"cyberscribe",
 	"datamatrix",
@@ -45,8 +43,6 @@ var containerNames = []string{
 	"innoscan",
 }
 
-// organizationNames is an array of realistic organization names used to construct image names in the preview tool.
-// These prepend container names to form realistic image references (e.g., "techwave/cyberscribe:latest").
 var organizationNames = []string{
 	"techwave",
 	"codecrafters",
@@ -89,25 +85,29 @@ var organizationNames = []string{
 	"innovault",
 }
 
-// infoMessages is an array of realistic info-level log messages based on typical Watchtower operations.
-// These are derived from real Watchtower logs, including container operations, session management, and notifications.
 var infoMessages = []string{
-	"Detected multiple Watchtower instances - initiating cleanup",
+	"Found new image",
 	"Stopping container",
+	"Started new container",
+	"Stopping linked container",
+	"Started linked container",
 	"Removing image",
-	"Successfully cleaned up old Watchtower containers",
+	"Container updated",
+	"Detected multiple Watchtower instances - initiating cleanup",
+	"Successfully removed all excess Watchtower containers",
+	"Image is within cooldown period - not eligible for update",
+	"Image age exceeds cooldown - eligible for update",
+	"Image creation time unavailable - update check unavailable",
+	"Starting HTTP API server",
+	"HTTP API server is enabled",
+	"Only checking containers in scope",
+	"Skipping Watchtower self-update in run-once mode",
 	"Watchtower v1.11.7 using Docker API v1.51",
 	"Using notifications: gotify",
 	"Checking all containers (except explicitly disabled with label)",
-	"Scheduling first run: 2025-08-19 06:00:00 +0000 UTC",
-	"Note that the first check will be performed in 5 hours, 59 minutes, 22 seconds",
 	"Update session completed",
-	"Found new image",
-	"Started new container",
 }
 
-// warningMessages is an array of realistic warning-level messages based on potential Watchtower issues.
-// These reflect non-critical issues that may occur during operations, such as failures in specific tasks.
 var warningMessages = []string{
 	"Failed to stop container",
 	"Failed to remove image",
@@ -118,8 +118,6 @@ var warningMessages = []string{
 	"Failed to inspect container",
 }
 
-// errorMessages is an array of realistic error-level messages based on critical Watchtower failures.
-// These include issues like update failures or network errors, derived from real logs and error cases.
 var errorMessages = []string{
 	"Update installation failed. Rolling back to the previous version...",
 	"Unable to check for updates. Please check your internet connection.",
@@ -134,8 +132,6 @@ var errorMessages = []string{
 	"Failed to inspect container",
 }
 
-// skippedMessages is an array of realistic error messages for containers in the SkippedState.
-// These reflect reasons why containers might be skipped during updates, based on typical user scenarios.
 var skippedMessages = []string{
 	"container skipped: Avoiding potential subscription fees",
 	"container skipped: Concerns about update breaking third-party plugins or extensions",
@@ -150,7 +146,3 @@ var skippedMessages = []string{
 	"container skipped: Fear of introducing new bugs",
 	"container skipped: Limited bandwidth for downloading updates",
 }
-
-// Note: These arrays can be expanded with additional messages from real logs to increase variety.
-// The preview tool randomly selects from these to simulate dynamic output.
-// Levels are separated to allow precise mapping in `logs.go` (e.g., error from errorMessages, warning from warningMessages, info from infoMessages).

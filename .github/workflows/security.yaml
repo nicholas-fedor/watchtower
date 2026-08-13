@@ -9,6 +9,7 @@ on:
       - cmd/**
       - pkg/**
       - internal/**
+      - tools/tplprev/**
       - main.go
       - go.mod
       - go.sum

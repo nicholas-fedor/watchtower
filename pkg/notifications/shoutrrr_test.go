@@ -27,7 +27,6 @@ import (
 
 	mockActions "github.com/nicholas-fedor/watchtower/internal/actions/mocks"
 	"github.com/nicholas-fedor/watchtower/internal/flags"
-	"github.com/nicholas-fedor/watchtower/pkg/notifications/templates"
 	"github.com/nicholas-fedor/watchtower/pkg/session"
 	"github.com/nicholas-fedor/watchtower/pkg/types"
 )
@@ -1184,7 +1183,7 @@ func createNotifierWithTemplate(tplString string, legacy bool) (*shoutrrrTypeNot
 	if err != nil {
 		_ = err // template construction error ignored for this helper
 
-		tplBase := template.New("").Funcs(templates.Funcs)
+		tplBase := template.New("").Funcs(Funcs)
 
 		defaultKey := "default"
 		if legacy {

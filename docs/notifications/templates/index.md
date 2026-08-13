@@ -100,12 +100,15 @@ Simple templates are used when the [`notification-report`](#notification_report)
 
 ### Using Simple Templates in the Preview Tool
 
-The [Template Preview Tool](../template-preview/index.md) uses a `notifications.Data` struct with `.Entries` as the log list.
+The [Template Preview Tool](../template-preview/index.md) uses the same template root as Watchtower:
+
+- Report toggle off (legacy mode): the root is the log entry slice. Range over `.`, the same as the default simple template above.
+- Report toggle on (report mode): the root is a `notifications.Data` value. Range over `.Entries` (and use `.Report` for session results).
 
 !!! Note
-    To use the simple template in the preview tool, modify the range to `{{- range $i, $e := .Entries -}}` to match the data structure.
+    The example below is for report mode. With the report toggle off, use `range .` instead of `range .Entries`.
 
-```go title="Example Simple Template for the Template Preview Tool"
+```go title="Preview example (report mode)"
 {{- range $i, $e := .Entries -}}
 {{- if $i}}{{- println -}}{{- end -}}
 {{- $msg := $e.Message -}}
@@ -272,7 +275,7 @@ You can create custom templates to format notifications differently.
 Use the [Template Preview Tool](../template-preview/index.md) to test your templates interactively.
 
 !!! Note
-    When testing simple templates in the preview tool, ensure the range iterates over `.Entries` (e.g., `{{- range $i, $e := .Entries -}}`) to match the `notifications.Data` struct.
+    When the preview report toggle is off, simple templates can range over `.` just as they do in Watchtower. When the report toggle is on, range over `.Entries`.
 
 ## Additional Resources
 

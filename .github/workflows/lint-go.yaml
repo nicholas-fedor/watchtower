@@ -8,6 +8,7 @@ on:
       - cmd/**
       - internal/**
       - pkg/**
+      - tools/tplprev/**
       - go.mod
       - go.sum
       - main.go
@@ -45,3 +46,6 @@ jobs:
         with:
           args: --timeout=5m --config=build/golangci-lint/golangci-lint.yaml
           only-new-issues: true
+
+      - name: Lint tplprev
+        run: make tplprev-lint
