@@ -3024,12 +3024,16 @@
 <li>It sends each event immediately in legacy mode, mimicking a step-by-step log.</li>
 </ul>
 <h3 id="using_simple_templates_in_the_preview_tool">Using Simple Templates in the Preview Tool<a class="headerlink" href="#using_simple_templates_in_the_preview_tool" title="Permanent link">&para;</a></h3>
-<p>The <a href="../template-preview/">Template Preview Tool</a> uses a <code>notifications.Data</code> struct with <code>.Entries</code> as the log list.</p>
+<p>The <a href="../template-preview/">Template Preview Tool</a> uses the same template root as Watchtower:</p>
+<ul>
+<li>Report toggle off (legacy mode): the root is the log entry slice. Range over <code>.</code>, the same as the default simple template above.</li>
+<li>Report toggle on (report mode): the root is a <code>notifications.Data</code> value. Range over <code>.Entries</code> (and use <code>.Report</code> for session results).</li>
+</ul>
 <div class="admonition note">
 <p class="admonition-title">Note</p>
-<p>To use the simple template in the preview tool, modify the range to <code>{{- range $i, $e := .Entries -}}</code> to match the data structure.</p>
+<p>The example below is for report mode. With the report toggle off, use <code>range .</code> instead of <code>range .Entries</code>.</p>
 </div>
-<div class="highlight"><span class="filename">Example Simple Template for the Template Preview Tool</span><pre><span></span><code><a id="__codelineno-6-1" name="__codelineno-6-1" href="#__codelineno-6-1"></a><span class="p">{{</span><span class="o">-</span><span class="w"> </span><span class="k">range</span><span class="w"> </span><span class="err">$</span><span class="nx">i</span><span class="p">,</span><span class="w"> </span><span class="err">$</span><span class="nx">e</span><span class="w"> </span><span class="o">:=</span><span class="w"> </span><span class="p">.</span><span class="nx">Entries</span><span class="w"> </span><span class="o">-</span><span class="p">}}</span>
+<div class="highlight"><span class="filename">Preview example (report mode)</span><pre><span></span><code><a id="__codelineno-6-1" name="__codelineno-6-1" href="#__codelineno-6-1"></a><span class="p">{{</span><span class="o">-</span><span class="w"> </span><span class="k">range</span><span class="w"> </span><span class="err">$</span><span class="nx">i</span><span class="p">,</span><span class="w"> </span><span class="err">$</span><span class="nx">e</span><span class="w"> </span><span class="o">:=</span><span class="w"> </span><span class="p">.</span><span class="nx">Entries</span><span class="w"> </span><span class="o">-</span><span class="p">}}</span>
 <a id="__codelineno-6-2" name="__codelineno-6-2" href="#__codelineno-6-2"></a><span class="p">{{</span><span class="o">-</span><span class="w"> </span><span class="k">if</span><span class="w"> </span><span class="err">$</span><span class="nx">i</span><span class="p">}}{{</span><span class="o">-</span><span class="w"> </span><span class="nx">println</span><span class="w"> </span><span class="o">-</span><span class="p">}}{{</span><span class="o">-</span><span class="w"> </span><span class="nx">end</span><span class="w"> </span><span class="o">-</span><span class="p">}}</span>
 <a id="__codelineno-6-3" name="__codelineno-6-3" href="#__codelineno-6-3"></a><span class="p">{{</span><span class="o">-</span><span class="w"> </span><span class="err">$</span><span class="nx">msg</span><span class="w"> </span><span class="o">:=</span><span class="w"> </span><span class="err">$</span><span class="nx">e</span><span class="p">.</span><span class="nx">Message</span><span class="w"> </span><span class="o">-</span><span class="p">}}</span>
 <a id="__codelineno-6-4" name="__codelineno-6-4" href="#__codelineno-6-4"></a><span class="p">{{</span><span class="o">-</span><span class="w"> </span><span class="k">if</span><span class="w"> </span><span class="nx">eq</span><span class="w"> </span><span class="err">$</span><span class="nx">msg</span><span class="w"> </span><span class="s">&quot;Found new image&quot;</span><span class="w"> </span><span class="o">-</span><span class="p">}}</span>
@@ -3181,7 +3185,7 @@
 <p>Use the <a href="../template-preview/">Template Preview Tool</a> to test your templates interactively.</p>
 <div class="admonition note">
 <p class="admonition-title">Note</p>
-<p>When testing simple templates in the preview tool, ensure the range iterates over <code>.Entries</code> (e.g., <code>{{- range $i, $e := .Entries -}}</code>) to match the <code>notifications.Data</code> struct.</p>
+<p>When the preview report toggle is off, simple templates can range over <code>.</code> just as they do in Watchtower. When the report toggle is on, range over <code>.Entries</code>.</p>
 </div>
 <h2 id="additional_resources">Additional Resources<a class="headerlink" href="#additional_resources" title="Permanent link">&para;</a></h2>
 <ul>
@@ -3210,7 +3214,7 @@
     <span class="md-icon" title="Last update">
       <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M21 13.1c-.1 0-.3.1-.4.2l-1 1 2.1 2.1 1-1c.2-.2.2-.6 0-.8l-1.3-1.3c-.1-.1-.2-.2-.4-.2m-1.9 1.8-6.1 6V23h2.1l6.1-6.1zM12.5 7v5.2l4 2.4-1 1L11 13V7zM11 21.9c-5.1-.5-9-4.8-9-9.9C2 6.5 6.5 2 12 2c5.3 0 9.6 4.1 10 9.3-.3-.1-.6-.2-1-.2s-.7.1-1 .2C19.6 7.2 16.2 4 12 4c-4.4 0-8 3.6-8 8 0 4.1 3.1 7.5 7.1 7.9l-.1.2z"/></svg>
     </span>
-    <span class="git-revision-date-localized-plugin git-revision-date-localized-plugin-timeago" title="August 10, 2026 13:24:00 UTC"><span class="timeago" datetime="2026-08-10T13:24:00+00:00" locale="en"></span></span><span class="git-revision-date-localized-plugin git-revision-date-localized-plugin-iso_date" title="August 10, 2026 13:24:00 UTC">2026-08-10</span>
+    <span class="git-revision-date-localized-plugin git-revision-date-localized-plugin-timeago" title="August 13, 2026 01:43:34 UTC"><span class="timeago" datetime="2026-08-13T01:43:34+00:00" locale="en"></span></span><span class="git-revision-date-localized-plugin git-revision-date-localized-plugin-iso_date" title="August 13, 2026 01:43:34 UTC">2026-08-13</span>
   </span>
 
     
