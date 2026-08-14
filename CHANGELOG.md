@@ -20,6 +20,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Chores
 
+- Update module golang.org/x/mod to v0.40.0 by @renovate[bot] in [#2169](https://github.com/nicholas-fedor/watchtower/pull/2169)
+- Update nicholas-fedor/go-proxy-pull-action action to v1.1.43 by @renovate[bot] in [#2167](https://github.com/nicholas-fedor/watchtower/pull/2167)
+- Update golang docker tag to v1.26.6 by @renovate[bot] in [#2166](https://github.com/nicholas-fedor/watchtower/pull/2166)
 - Update go module directive to v1.26.6 by @renovate[bot] in [#2163](https://github.com/nicholas-fedor/watchtower/pull/2163)
 - Update golang:alpine3.24 docker digest to 70b4654 by @renovate[bot] in [#2162](https://github.com/nicholas-fedor/watchtower/pull/2162)
 - Update module github.com/sirupsen/logrus to v1.10.0 by @renovate[bot] in [#2160](https://github.com/nicholas-fedor/watchtower/pull/2160)
