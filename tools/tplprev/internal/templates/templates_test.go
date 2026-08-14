@@ -18,6 +18,7 @@ func TestLookup(t *testing.T) {
 		{give: "default-legacy", wantFound: true},
 		{give: "json.v1", wantFound: true},
 		{give: "porcelain.v1.summary-no-log", wantFound: true},
+		{give: "porcelain.json", wantFound: true},
 		{give: "missing", wantFound: false},
 		{give: "", wantFound: false},
 	}
@@ -46,6 +47,7 @@ func TestNames(t *testing.T) {
 		"default",
 		"default-legacy",
 		"json.v1",
+		"porcelain.json",
 		"porcelain.v1.summary-no-log",
 	}, Names())
 }

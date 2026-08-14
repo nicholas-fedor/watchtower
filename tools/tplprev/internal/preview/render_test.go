@@ -136,3 +136,22 @@ func TestRenderParseError(t *testing.T) {
 	_, err := Render("{{ .Report", nil, nil)
 	require.Error(t, err)
 }
+
+func TestRenderPorcelainJSONWithNilReport(t *testing.T) {
+	t.Parallel()
+
+	result, err := Render(
+		templates.Templates["porcelain.json"],
+		nil,
+		nil,
+	)
+	require.NoError(t, err)
+
+	var decoded map[string]any
+	require.NoError(t, json.Unmarshal([]byte(result), &decoded))
+	require.Contains(t, decoded, "containers")
+
+	containers, ok := decoded["containers"].([]any)
+	require.True(t, ok)
+	assert.Empty(t, containers)
+}

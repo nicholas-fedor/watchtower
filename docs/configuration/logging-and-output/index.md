@@ -72,12 +72,12 @@ Environment Variable: NO_COLOR
 
 ## Programmatic Output (Porcelain)
 
-Outputs session results in a machine-readable format (version specified by `VERSION`).
+Outputs session results in a machine-readable format.
 
 ```text
             Argument: --porcelain, -P
 Environment Variable: WATCHTOWER_PORCELAIN
-     Possible Values: v1
+     Possible Values: v1, json
              Default: None
 ```
 
@@ -87,5 +87,33 @@ Environment Variable: WATCHTOWER_PORCELAIN
     --notification-url logger://
     --notification-log-stdout
     --notification-report
-    --notification-template porcelain.VERSION.summary-no-log
     ```
+
+For `v1`, the template is `porcelain.v1.summary-no-log`, producing one container per line.
+
+For `json`, the template is `porcelain.json`, producing a JSON document:
+
+```json
+{
+  "containers": [
+    {
+      "name": "nginx",
+      "image": "nginx:latest",
+      "image_id": "abc123",
+      "latest_image_id": "def456",
+      "state": "Updated",
+      "update_available": true
+    }
+  ]
+}
+```
+
+Fields:
+
+- `name` — container name
+- `image` — image name with tag
+- `image_id` — current short image ID
+- `latest_image_id` — latest short image ID
+- `state` — container state (`Updated`, `Fresh`, `Failed`, `Skipped`, `Restarted`, `Stale`)
+- `update_available` — whether an update is available
+- `error` — error message if any (omitted when empty)
