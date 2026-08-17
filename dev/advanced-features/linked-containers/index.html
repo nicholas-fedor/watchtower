@@ -3328,7 +3328,7 @@ It automatically detects container dependencies through various mechanisms and u
 </ol>
 <h4 id="watchtower_depends-on_label">Watchtower Depends-On Label<a class="headerlink" href="#watchtower_depends-on_label" title="Permanent link">&para;</a></h4>
 <p>The <code>com.centurylinklabs.watchtower.depends-on</code> label allows explicit declaration of dependencies:</p>
-<div class="highlight"><span class="filename">Explicit dependency declaration</span><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="k">LABEL</span><span class="w"> </span>com.centurylinklabs.watchtower.depends-on<span class="o">=</span><span class="s2">&quot;database,redis&quot;</span>
+<div class="highlight"><span class="filename">Explicit dependency declaration</span><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="k">LABEL</span><span class="w"> </span>com.centurylinklabs.watchtower.depends-on<span class="o">=</span><span class="s2">"database,redis"</span>
 </code></pre></div>
 <p>This label accepts a comma-separated list of container names that must be available before this container starts.
 This supports referencing containers from other Docker Compose projects or stacks, enabling cross-project dependency management.</p>
@@ -3446,7 +3446,7 @@ Ensure your dependency graph is acyclic.</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-6-1" name="__codelineno-6-1" href="#__codelineno-6-1"></a><span class="k">FROM</span><span class="w"> </span><span class="s">nginx:latest</span>
 <a id="__codelineno-6-2" name="__codelineno-6-2" href="#__codelineno-6-2"></a>
 <a id="__codelineno-6-3" name="__codelineno-6-3" href="#__codelineno-6-3"></a><span class="c"># Declare dependencies on database and cache services</span>
-<a id="__codelineno-6-4" name="__codelineno-6-4" href="#__codelineno-6-4"></a><span class="k">LABEL</span><span class="w"> </span>com.centurylinklabs.watchtower.depends-on<span class="o">=</span><span class="s2">&quot;postgres,redis&quot;</span>
+<a id="__codelineno-6-4" name="__codelineno-6-4" href="#__codelineno-6-4"></a><span class="k">LABEL</span><span class="w"> </span>com.centurylinklabs.watchtower.depends-on<span class="o">=</span><span class="s2">"postgres,redis"</span>
 </code></pre></div>
 </div>
 <div class="tabbed-block">
@@ -3465,7 +3465,7 @@ Ensure your dependency graph is acyclic.</p>
 </div>
 <h3 id="advanced_scenarios">Advanced Scenarios<a class="headerlink" href="#advanced_scenarios" title="Permanent link">&para;</a></h3>
 <h4 id="multiple_dependencies">Multiple Dependencies<a class="headerlink" href="#multiple_dependencies" title="Permanent link">&para;</a></h4>
-<div class="highlight"><span class="filename">Multiple dependencies</span><pre><span></span><code><a id="__codelineno-8-1" name="__codelineno-8-1" href="#__codelineno-8-1"></a><span class="k">LABEL</span><span class="w"> </span>com.centurylinklabs.watchtower.depends-on<span class="o">=</span><span class="s2">&quot;database,cache,queue&quot;</span>
+<div class="highlight"><span class="filename">Multiple dependencies</span><pre><span></span><code><a id="__codelineno-8-1" name="__codelineno-8-1" href="#__codelineno-8-1"></a><span class="k">LABEL</span><span class="w"> </span>com.centurylinklabs.watchtower.depends-on<span class="o">=</span><span class="s2">"database,cache,queue"</span>
 </code></pre></div>
 <h4 id="complex_dependency_chains">Complex Dependency Chains<a class="headerlink" href="#complex_dependency_chains" title="Permanent link">&para;</a></h4>
 <div class="highlight"><span class="filename">Complex dependency chain</span><pre><span></span><code><a id="__codelineno-9-1" name="__codelineno-9-1" href="#__codelineno-9-1"></a><span class="nt">services</span><span class="p">:</span>
@@ -3619,7 +3619,7 @@ Ensure your dependency graph is acyclic.</p>
 <a id="__codelineno-16-5" name="__codelineno-16-5" href="#__codelineno-16-5"></a><span class="w">  </span>--run-once
 </code></pre></div>
 <p>Check container labels:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-17-1" name="__codelineno-17-1" href="#__codelineno-17-1"></a>docker<span class="w"> </span>inspect<span class="w"> </span>container_name<span class="w"> </span><span class="p">|</span><span class="w"> </span>jq<span class="w"> </span><span class="s1">&#39;.[0].Config.Labels&#39;</span>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-17-1" name="__codelineno-17-1" href="#__codelineno-17-1"></a>docker<span class="w"> </span>inspect<span class="w"> </span>container_name<span class="w"> </span><span class="p">|</span><span class="w"> </span>jq<span class="w"> </span><span class="s1">'.[0].Config.Labels'</span>
 </code></pre></div>
 
 

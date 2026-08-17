@@ -3446,7 +3446,7 @@ You are <strong>highly</strong> encouraged to perform your own due diligence to 
 </li>
 <li>
 <p>Create a self-signed X.509 certificate for the Certificate Authority (valid for 365 days) using the private key and save it to <code>ca.pem</code>:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-7-1" name="__codelineno-7-1" href="#__codelineno-7-1"></a>openssl<span class="w"> </span>req<span class="w"> </span>-new<span class="w"> </span>-x509<span class="w"> </span>-days<span class="w"> </span><span class="m">365</span><span class="w"> </span>-key<span class="w"> </span>ca-key.pem<span class="w"> </span>-sha256<span class="w"> </span>-out<span class="w"> </span>ca.pem<span class="w"> </span>-subj<span class="w"> </span><span class="s2">&quot;/C=US/ST=State/L=City/O=Org/CN=ca&quot;</span>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-7-1" name="__codelineno-7-1" href="#__codelineno-7-1"></a>openssl<span class="w"> </span>req<span class="w"> </span>-new<span class="w"> </span>-x509<span class="w"> </span>-days<span class="w"> </span><span class="m">365</span><span class="w"> </span>-key<span class="w"> </span>ca-key.pem<span class="w"> </span>-sha256<span class="w"> </span>-out<span class="w"> </span>ca.pem<span class="w"> </span>-subj<span class="w"> </span><span class="s2">"/C=US/ST=State/L=City/O=Org/CN=ca"</span>
 </code></pre></div>
 </li>
 </ol>
@@ -3459,12 +3459,12 @@ You are <strong>highly</strong> encouraged to perform your own due diligence to 
 </li>
 <li>
 <p>Generate a certificate signing request (CSR) for the server with common name "localhost" and save it to <code>server.csr</code>:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-9-1" name="__codelineno-9-1" href="#__codelineno-9-1"></a>openssl<span class="w"> </span>req<span class="w"> </span>-subj<span class="w"> </span><span class="s2">&quot;/CN=</span><span class="nv">$HOST</span><span class="s2">&quot;</span><span class="w"> </span>-sha256<span class="w"> </span>-new<span class="w"> </span>-key<span class="w"> </span>server-key.pem<span class="w"> </span>-out<span class="w"> </span>server.csr
+<div class="highlight"><pre><span></span><code><a id="__codelineno-9-1" name="__codelineno-9-1" href="#__codelineno-9-1"></a>openssl<span class="w"> </span>req<span class="w"> </span>-subj<span class="w"> </span><span class="s2">"/CN=</span><span class="nv">$HOST</span><span class="s2">"</span><span class="w"> </span>-sha256<span class="w"> </span>-new<span class="w"> </span>-key<span class="w"> </span>server-key.pem<span class="w"> </span>-out<span class="w"> </span>server.csr
 </code></pre></div>
 </li>
 <li>
 <p>Sign the server CSR with the CA certificate, creating a server certificate valid for 365 days with the specified extensions, and save it to <code>server-cert.pem</code>:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-10-1" name="__codelineno-10-1" href="#__codelineno-10-1"></a><span class="nb">echo</span><span class="w"> </span><span class="s2">&quot;subjectAltName = DNS:</span><span class="nv">$HOST</span><span class="s2">,IP:10.10.10.20,IP:127.0.0.1&quot;</span><span class="w"> </span>&gt;<span class="w"> </span>extfile-server.cnf
+<div class="highlight"><pre><span></span><code><a id="__codelineno-10-1" name="__codelineno-10-1" href="#__codelineno-10-1"></a><span class="nb">echo</span><span class="w"> </span><span class="s2">"subjectAltName = DNS:</span><span class="nv">$HOST</span><span class="s2">,IP:10.10.10.20,IP:127.0.0.1"</span><span class="w"> </span>&gt;<span class="w"> </span>extfile-server.cnf
 </code></pre></div>
 <div class="admonition tip">
 <p class="admonition-title"><code>IP:10.10.10.20</code> is an example IP. Replace with your host's actual IP.</p>
@@ -3472,7 +3472,7 @@ You are <strong>highly</strong> encouraged to perform your own due diligence to 
 <div class="admonition tip">
 <p class="admonition-title"><code>$HOST</code> typically resolves to the hostname. Change this as necessary (i.e. <code>localhost</code> for testing) </p>
 </div>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-11-1" name="__codelineno-11-1" href="#__codelineno-11-1"></a><span class="nb">echo</span><span class="w"> </span><span class="s2">&quot;extendedKeyUsage = serverAuth&quot;</span><span class="w"> </span>&gt;&gt;<span class="w"> </span>extfile-server.cnf
+<div class="highlight"><pre><span></span><code><a id="__codelineno-11-1" name="__codelineno-11-1" href="#__codelineno-11-1"></a><span class="nb">echo</span><span class="w"> </span><span class="s2">"extendedKeyUsage = serverAuth"</span><span class="w"> </span>&gt;&gt;<span class="w"> </span>extfile-server.cnf
 </code></pre></div>
 <div class="admonition tip">
 <p class="admonition-title">This sets the Docker daemon key's extended usage attributes to be used only for server authentication.</p>
@@ -3490,12 +3490,12 @@ You are <strong>highly</strong> encouraged to perform your own due diligence to 
 </li>
 <li>
 <p>Generate a certificate signing request (CSR) for the client with common name "client" and save it to <code>client.csr</code>:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-14-1" name="__codelineno-14-1" href="#__codelineno-14-1"></a>openssl<span class="w"> </span>req<span class="w"> </span>-subj<span class="w"> </span><span class="s1">&#39;/CN=client&#39;</span><span class="w"> </span>-new<span class="w"> </span>-key<span class="w"> </span>key.pem<span class="w"> </span>-out<span class="w"> </span>client.csr
+<div class="highlight"><pre><span></span><code><a id="__codelineno-14-1" name="__codelineno-14-1" href="#__codelineno-14-1"></a>openssl<span class="w"> </span>req<span class="w"> </span>-subj<span class="w"> </span><span class="s1">'/CN=client'</span><span class="w"> </span>-new<span class="w"> </span>-key<span class="w"> </span>key.pem<span class="w"> </span>-out<span class="w"> </span>client.csr
 </code></pre></div>
 </li>
 <li>
 <p>Sign the client CSR with the CA certificate, creating a client certificate valid for 365 days with the client authentication extension, and save it to <code>cert.pem</code>:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-15-1" name="__codelineno-15-1" href="#__codelineno-15-1"></a><span class="nb">echo</span><span class="w"> </span><span class="s2">&quot;extendedKeyUsage = clientAuth&quot;</span><span class="w"> </span>&gt;<span class="w"> </span>extfile-client.cnf
+<div class="highlight"><pre><span></span><code><a id="__codelineno-15-1" name="__codelineno-15-1" href="#__codelineno-15-1"></a><span class="nb">echo</span><span class="w"> </span><span class="s2">"extendedKeyUsage = clientAuth"</span><span class="w"> </span>&gt;<span class="w"> </span>extfile-client.cnf
 </code></pre></div>
 <div class="admonition tip">
 <p class="admonition-title">This makes the key suitable for client authentication.</p>
@@ -3575,11 +3575,11 @@ You are <strong>highly</strong> encouraged to perform your own due diligence to 
 <li>
 <p>Edit or create <code>/etc/docker/daemon.json</code> to enable TLS and TCP listening:</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-27-1" name="__codelineno-27-1" href="#__codelineno-27-1"></a><span class="p">{</span>
-<a id="__codelineno-27-2" name="__codelineno-27-2" href="#__codelineno-27-2"></a><span class="w">  </span><span class="nt">&quot;tls&quot;</span><span class="p">:</span><span class="w"> </span><span class="kc">true</span><span class="p">,</span>
-<a id="__codelineno-27-3" name="__codelineno-27-3" href="#__codelineno-27-3"></a><span class="w">  </span><span class="nt">&quot;tlscacert&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;/etc/docker/certs/ca.pem&quot;</span><span class="p">,</span>
-<a id="__codelineno-27-4" name="__codelineno-27-4" href="#__codelineno-27-4"></a><span class="w">  </span><span class="nt">&quot;tlscert&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;/etc/docker/certs/server-cert.pem&quot;</span><span class="p">,</span>
-<a id="__codelineno-27-5" name="__codelineno-27-5" href="#__codelineno-27-5"></a><span class="w">  </span><span class="nt">&quot;tlskey&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;/etc/docker/certs/server-key.pem&quot;</span><span class="p">,</span>
-<a id="__codelineno-27-6" name="__codelineno-27-6" href="#__codelineno-27-6"></a><span class="w">  </span><span class="nt">&quot;hosts&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">[</span><span class="s2">&quot;unix:///var/run/docker.sock&quot;</span><span class="p">,</span><span class="w"> </span><span class="s2">&quot;tcp://0.0.0.0:2376&quot;</span><span class="p">]</span>
+<a id="__codelineno-27-2" name="__codelineno-27-2" href="#__codelineno-27-2"></a><span class="w">  </span><span class="nt">"tls"</span><span class="p">:</span><span class="w"> </span><span class="kc">true</span><span class="p">,</span>
+<a id="__codelineno-27-3" name="__codelineno-27-3" href="#__codelineno-27-3"></a><span class="w">  </span><span class="nt">"tlscacert"</span><span class="p">:</span><span class="w"> </span><span class="s2">"/etc/docker/certs/ca.pem"</span><span class="p">,</span>
+<a id="__codelineno-27-4" name="__codelineno-27-4" href="#__codelineno-27-4"></a><span class="w">  </span><span class="nt">"tlscert"</span><span class="p">:</span><span class="w"> </span><span class="s2">"/etc/docker/certs/server-cert.pem"</span><span class="p">,</span>
+<a id="__codelineno-27-5" name="__codelineno-27-5" href="#__codelineno-27-5"></a><span class="w">  </span><span class="nt">"tlskey"</span><span class="p">:</span><span class="w"> </span><span class="s2">"/etc/docker/certs/server-key.pem"</span><span class="p">,</span>
+<a id="__codelineno-27-6" name="__codelineno-27-6" href="#__codelineno-27-6"></a><span class="w">  </span><span class="nt">"hosts"</span><span class="p">:</span><span class="w"> </span><span class="p">[</span><span class="s2">"unix:///var/run/docker.sock"</span><span class="p">,</span><span class="w"> </span><span class="s2">"tcp://0.0.0.0:2376"</span><span class="p">]</span>
 <a id="__codelineno-27-7" name="__codelineno-27-7" href="#__codelineno-27-7"></a><span class="p">}</span>
 </code></pre></div>
 <div class="admonition notes">

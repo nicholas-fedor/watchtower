@@ -2606,7 +2606,7 @@
 <p>When Watchtower detects that a running container needs to be updated it will stop the container by sending it a SIGTERM signal.
 If your container should be shutdown with a different signal you can communicate this to Watchtower by setting a label named <em>com.centurylinklabs.watchtower.stop-signal</em> with the value of the desired signal.</p>
 <p>This label can be coded directly into your image by using the <code>LABEL</code> instruction in your Dockerfile:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="k">LABEL</span><span class="w"> </span>com.centurylinklabs.watchtower.stop-signal<span class="o">=</span><span class="s2">&quot;SIGHUP&quot;</span>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="k">LABEL</span><span class="w"> </span>com.centurylinklabs.watchtower.stop-signal<span class="o">=</span><span class="s2">"SIGHUP"</span>
 </code></pre></div>
 <p>Or, it can be specified as part of the <code>docker run</code> command line:</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a>docker<span class="w"> </span>run<span class="w"> </span>-d<span class="w"> </span>--label<span class="o">=</span>com.centurylinklabs.watchtower.stop-signal<span class="o">=</span>SIGHUP<span class="w"> </span>someimage
