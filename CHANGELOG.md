@@ -20,6 +20,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Chores
 
+- Update nicholas-fedor/go-proxy-pull-action action to v1.1.46 by @renovate[bot] in [#2184](https://github.com/nicholas-fedor/watchtower/pull/2184)
+- Update golang:alpine3.24 docker digest to 3889b42 by @renovate[bot] in [#2181](https://github.com/nicholas-fedor/watchtower/pull/2181)
 - Update golang:1.26.6-alpine docker digest to 3889b42 by @renovate[bot] in [#2180](https://github.com/nicholas-fedor/watchtower/pull/2180)
 - Update nicholas-fedor/go-proxy-pull-action action to v1.1.45 by @renovate[bot] in [#2178](https://github.com/nicholas-fedor/watchtower/pull/2178)
 - Update step-security/harden-runner action to v2.21.0 by @renovate[bot] in [#2174](https://github.com/nicholas-fedor/watchtower/pull/2174)
