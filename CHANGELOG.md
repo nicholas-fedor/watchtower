@@ -20,6 +20,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Chores
 
+- Update module github.com/nicholas-fedor/shoutrrr to v0.17.1 by @renovate[bot] in [#2191](https://github.com/nicholas-fedor/watchtower/pull/2191)
 - Update module github.com/stretchr/testify to v1.12.0 by @renovate[bot] in [#2185](https://github.com/nicholas-fedor/watchtower/pull/2185)
 - Update nicholas-fedor/go-proxy-pull-action action to v1.1.46 by @renovate[bot] in [#2184](https://github.com/nicholas-fedor/watchtower/pull/2184)
 - Update golang:alpine3.24 docker digest to 3889b42 by @renovate[bot] in [#2181](https://github.com/nicholas-fedor/watchtower/pull/2181)
