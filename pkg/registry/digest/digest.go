@@ -23,6 +23,7 @@ import (
 	"github.com/nicholas-fedor/watchtower/internal/meta"
 	"github.com/nicholas-fedor/watchtower/pkg/registry/auth"
 	"github.com/nicholas-fedor/watchtower/pkg/registry/manifest"
+	"github.com/nicholas-fedor/watchtower/pkg/registry/ratelimit"
 	"github.com/nicholas-fedor/watchtower/pkg/types"
 )
 
@@ -608,13 +609,24 @@ func fetchDigest(log *zerolog.Logger,
 		}
 
 		// Obtain an authentication token from the current endpoint.
-		result, err := auth.GetToken(log,
-			ctx,
-			container,
-			registryAuth,
-			client,
-			endpoint,
-		)
+		limitHost, hostErr := auth.GetRegistryAddress(log, container.ImageName())
+		if hostErr != nil || limitHost == "" {
+			log.Debug().
+				Err(hostErr).
+				Fields(fields).
+				Fields(epFields).
+				Msg("Failed to resolve registry host for rate limiting")
+		}
+
+		result, err := ratelimit.DoValue(ctx, log, limitHost, func() (auth.TokenResult, error) {
+			return auth.GetToken(log,
+				ctx,
+				container,
+				registryAuth,
+				client,
+				endpoint,
+			)
+		})
 		if err != nil {
 			log.Debug().
 				Err(err).
@@ -622,6 +634,10 @@ func fetchDigest(log *zerolog.Logger,
 				Fields(epFields).
 				Msg("Failed to get token from endpoint")
 			lastErr = fmt.Errorf("%w: %w", errFailedGetToken, err)
+
+			if ratelimit.Is(err) {
+				return "", lastErr
+			}
 
 			continue
 		}
@@ -686,56 +702,49 @@ func fetchDigest(log *zerolog.Logger,
 			Str("url", manifestURL).
 			Msg("Fetching digest")
 
-		// Create the HTTP request for the manifest.
-		req, err := makeManifestRequest(ctx, method, manifestURL, token)
-		if err != nil {
-			log.Debug().
-				Err(err).
-				Fields(fields).
-				Fields(epFields).
-				Str("method", method).
-				Str("url", manifestURL).
-				Msg("Failed to create request")
-			lastErr = err
-
-			continue
-		}
-
-		// Execute the initial request.
-		resp, err := client.Do(req)
-		if err != nil {
-			log.Debug().
-				Err(err).
-				Fields(fields).
-				Fields(epFields).
-				Str("method", method).
-				Str("url", manifestURL).
-				Msg("Failed to execute request")
-			lastErr = fmt.Errorf("%w: %w", errFailedExecuteRequest, err)
-
-			continue
-		}
-
-		// Handle the manifest response, checking for redirects and extracting digest.
-		digest, updatedURL, retry, err := HandleManifestResponse(log,
-			resp,
-			method,
-			originalHost,
-			challengeHost,
-			redirected,
-			parsedURL,
-			parsedURL.Host,
+		var (
+			digest     string
+			updatedURL string
+			retry      bool
 		)
-		_ = resp.Body.Close()
 
+		err = ratelimit.Do(ctx, log, parsedURL.Host, func() error {
+			req, reqErr := makeManifestRequest(ctx, method, manifestURL, token)
+			if reqErr != nil {
+				return reqErr
+			}
+
+			resp, doErr := client.Do(req)
+			if doErr != nil {
+				return fmt.Errorf("%w: %w", errFailedExecuteRequest, doErr)
+			}
+
+			var handleErr error
+
+			digest, updatedURL, retry, handleErr = HandleManifestResponse(log,
+				resp,
+				method,
+				originalHost,
+				challengeHost,
+				redirected,
+				parsedURL,
+				parsedURL.Host,
+			)
+			_ = resp.Body.Close()
+
+			return handleErr
+		})
 		if err != nil {
 			log.Debug().
 				Err(err).
 				Fields(fields).
 				Fields(epFields).
-				Str("status", resp.Status).
 				Msg("Failed to handle manifest response")
 			lastErr = err
+
+			if ratelimit.Is(err) {
+				return "", lastErr
+			}
 
 			continue
 		}
@@ -766,6 +775,10 @@ func fetchDigest(log *zerolog.Logger,
 					Str("retry_url", updatedURL).
 					Msg("Failed to retry manifest request")
 				lastErr = err
+
+				if ratelimit.Is(err) {
+					return "", lastErr
+				}
 
 				continue
 			}
@@ -823,6 +836,16 @@ func HandleManifestResponse(log *zerolog.Logger,
 	log.Debug().
 		Fields(fields).
 		Msg("Handling manifest response")
+
+	if resp.StatusCode == http.StatusTooManyRequests {
+		body := ratelimit.ReadBody(resp, ratelimit.DefaultBodyLimit)
+
+		log.Debug().
+			Fields(fields).
+			Msg("Registry returned 429 for manifest request")
+
+		return "", "", false, ratelimit.FromResponse(resp, body)
+	}
 
 	var manifestURL string
 
@@ -1301,29 +1324,40 @@ func retryManifestRequest(
 	parsedURL *url.URL,
 	client auth.Client,
 ) (string, error) {
-	req, err := makeManifestRequest(ctx, method, updatedURL, token)
-	if err != nil {
-		return "", err
-	}
+	var digest string
 
-	resp, err := client.Do(req)
-	if err != nil {
-		return "", fmt.Errorf("%w: %w", errFailedExecuteRequest, err)
-	}
+	err := ratelimit.Do(ctx, log, parsedURL.Host, func() error {
+		req, reqErr := makeManifestRequest(ctx, method, updatedURL, token)
+		if reqErr != nil {
+			return reqErr
+		}
 
-	defer func() { _ = resp.Body.Close() }()
+		resp, doErr := client.Do(req)
+		if doErr != nil {
+			return fmt.Errorf("%w: %w", errFailedExecuteRequest, doErr)
+		}
 
-	digest, _, _, err := HandleManifestResponse(log,
-		resp,
-		method,
-		originalHost,
-		challengeHost,
-		redirected,
-		parsedURL,
-		parsedURL.Host,
-	)
+		defer func() { _ = resp.Body.Close() }()
+
+		got, _, _, handleErr := HandleManifestResponse(log,
+			resp,
+			method,
+			originalHost,
+			challengeHost,
+			redirected,
+			parsedURL,
+			parsedURL.Host,
+		)
+		if handleErr != nil {
+			return handleErr
+		}
+
+		digest = got
+
+		return nil
+	})
 	if err != nil {
-		return "", err
+		return "", fmt.Errorf("manifest retry: %w", err)
 	}
 
 	return digest, nil

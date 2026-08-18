@@ -10,6 +10,7 @@ import (
 	"net/http/httptest"
 	"net/url"
 	"strings"
+	"sync/atomic"
 	"testing"
 
 	"github.com/rs/zerolog"
@@ -23,6 +24,7 @@ import (
 
 	"github.com/nicholas-fedor/watchtower/internal/logging"
 	mockAuth "github.com/nicholas-fedor/watchtower/pkg/registry/auth/mocks"
+	"github.com/nicholas-fedor/watchtower/pkg/registry/ratelimit"
 	mockTypes "github.com/nicholas-fedor/watchtower/pkg/types/mocks"
 )
 
@@ -211,6 +213,166 @@ func TestCompareDigestWithRemote(t *testing.T) {
 	require.NoError(t, err)
 	assert.False(t, match)
 	assert.Equal(t, "sha256:"+remoteHash, remoteDigest)
+}
+
+func TestCompareDigestWithRemote_Head429DoesNotFallBackToGET(t *testing.T) {
+	ratelimit.ResetForTest()
+	t.Cleanup(ratelimit.ResetForTest)
+
+	viper.Set("WATCHTOWER_REGISTRY_TLS_SKIP", true)
+	t.Cleanup(func() {
+		viper.Set("WATCHTOWER_REGISTRY_TLS_SKIP", false)
+	})
+
+	mc := mockTypes.NewMockContainer(t)
+	mc.On("Name").Return("radarr")
+	mc.On("HasImageInfo").Return(true)
+	mc.On("ImageInfo").Return(&dockerImage.InspectResponse{
+		RepoDigests: []string{
+			"lscr.io/linuxserver/radarr@sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+		},
+	})
+
+	var getManifests atomic.Int64
+
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Method == http.MethodGet && strings.Contains(r.URL.Path, "/manifests/") {
+			getManifests.Add(1)
+
+			t.Errorf("HEAD 429 must not fall back to GET of %s", r.URL.Path)
+			w.WriteHeader(http.StatusOK)
+
+			return
+		}
+
+		if r.Method == http.MethodHead && strings.Contains(r.URL.Path, "/manifests/") {
+			w.Header().Set("Retry-After", "7200")
+			w.WriteHeader(http.StatusTooManyRequests)
+			_, _ = w.Write([]byte("toomanyrequests: retry-after: 331.163µs, allowed: 44000/minute"))
+
+			return
+		}
+
+		if r.Method == http.MethodGet && (r.URL.Path == "/v2/" || r.URL.Path == "/v2") {
+			w.WriteHeader(http.StatusOK)
+
+			return
+		}
+
+		w.WriteHeader(http.StatusOK)
+	}))
+	defer server.Close()
+
+	parts := strings.SplitN(server.URL, "://", 2)
+	host := parts[len(parts)-1]
+	mc.On("ImageName").Return(host + "/linuxserver/radarr:latest")
+
+	match, _, err := CompareDigestWithRemote(testLog(), context.Background(), mc, "", server.URL)
+	require.Error(t, err)
+	require.ErrorIs(t, err, ratelimit.ErrRateLimited)
+	assert.False(t, match)
+	assert.Equal(t, int64(0), getManifests.Load())
+}
+
+// TestCompareDigestWithRemote_Retry429DoesNotContinueToNextEndpoint is a
+// regression test for a 429 on the challenge-host retry. That error must abort
+// the endpoint loop instead of trying the next mirror.
+func TestCompareDigestWithRemote_Retry429DoesNotContinueToNextEndpoint(t *testing.T) {
+	ratelimit.ResetForTest()
+	t.Cleanup(ratelimit.ResetForTest)
+
+	viper.Set("WATCHTOWER_REGISTRY_TLS_SKIP", true)
+	t.Cleanup(func() {
+		viper.Set("WATCHTOWER_REGISTRY_TLS_SKIP", false)
+	})
+
+	mc := mockTypes.NewMockContainer(t)
+	mc.On("Name").Return("radarr")
+	mc.On("HasImageInfo").Return(true)
+	mc.On("ImageInfo").Return(&dockerImage.InspectResponse{
+		RepoDigests: []string{
+			"lscr.io/linuxserver/radarr@sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+		},
+	})
+
+	var (
+		primaryHeads atomic.Int64
+		mirrorHeads  atomic.Int64
+	)
+
+	primary := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Method == http.MethodGet && (r.URL.Path == "/v2/" || r.URL.Path == "/v2") {
+			w.Header().Set("WWW-Authenticate", fmt.Sprintf(
+				`Bearer realm="http://%s/token",service="test-service",scope="repository:linuxserver/radarr:pull"`,
+				r.Host,
+			))
+			w.WriteHeader(http.StatusUnauthorized)
+
+			return
+		}
+
+		if r.Method == http.MethodGet && r.URL.Path == "/token" {
+			w.Header().Set("Content-Type", "application/json")
+			w.WriteHeader(http.StatusOK)
+			_, _ = w.Write([]byte(`{"token":"test-token"}`))
+
+			return
+		}
+
+		if r.Method == http.MethodHead && strings.Contains(r.URL.Path, "/manifests/") {
+			if primaryHeads.Add(1) == 1 {
+				w.WriteHeader(http.StatusUnauthorized)
+
+				return
+			}
+
+			w.Header().Set("Retry-After", "7200")
+			w.WriteHeader(http.StatusTooManyRequests)
+			_, _ = w.Write([]byte("toomanyrequests: retry-after: 331.163µs, allowed: 44000/minute"))
+
+			return
+		}
+
+		w.WriteHeader(http.StatusOK)
+	}))
+	defer primary.Close()
+
+	mirror := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Method == http.MethodHead && strings.Contains(r.URL.Path, "/manifests/") {
+			mirrorHeads.Add(1)
+			w.Header().Set("Docker-Content-Digest", "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb")
+			w.WriteHeader(http.StatusOK)
+
+			return
+		}
+
+		if r.Method == http.MethodGet && (r.URL.Path == "/v2/" || r.URL.Path == "/v2") {
+			w.WriteHeader(http.StatusOK)
+
+			return
+		}
+
+		w.WriteHeader(http.StatusOK)
+	}))
+	defer mirror.Close()
+
+	parts := strings.SplitN(primary.URL, "://", 2)
+	host := parts[len(parts)-1]
+	mc.On("ImageName").Return(host + "/linuxserver/radarr:latest")
+
+	match, _, err := CompareDigestWithRemote(
+		testLog(),
+		context.Background(),
+		mc,
+		"",
+		primary.URL,
+		mirror.URL,
+	)
+	require.Error(t, err)
+	require.ErrorIs(t, err, ratelimit.ErrRateLimited)
+	assert.False(t, match)
+	assert.GreaterOrEqual(t, primaryHeads.Load(), int64(2))
+	assert.Equal(t, int64(0), mirrorHeads.Load())
 }
 
 // TestCompareDigestWithRemote_LocalOnly404 is a regression test for locally built
@@ -999,6 +1161,48 @@ func TestHandleManifestResponse(t *testing.T) {
 			expectedRetry: true,
 			wantErr:       false,
 		},
+		{
+			name:   "HEAD 429 returns rate-limit error without GET fallback",
+			method: http.MethodHead,
+			setupResponse: func() *http.Response {
+				return &http.Response{
+					StatusCode: http.StatusTooManyRequests,
+					Status:     "429 Too Many Requests",
+					Header:     http.Header{"Retry-After": []string{"2"}},
+					Body: io.NopCloser(strings.NewReader(
+						"toomanyrequests: retry-after: 331.163µs, allowed: 44000/minute",
+					)),
+					Request: &http.Request{URL: mustParseURL("https://ghcr.io/v2/linuxserver/nginx/manifests/latest")},
+				}
+			},
+			originalHost:  "ghcr.io",
+			challengeHost: "",
+			redirected:    false,
+			parsedURL:     mustParseURL("https://ghcr.io/v2/linuxserver/nginx/manifests/latest"),
+			currentHost:   "ghcr.io",
+			wantErr:       true,
+		},
+		{
+			name:   "GET 429 returns rate-limit error",
+			method: http.MethodGet,
+			setupResponse: func() *http.Response {
+				return &http.Response{
+					StatusCode: http.StatusTooManyRequests,
+					Status:     "429 Too Many Requests",
+					Header:     http.Header{"Retry-After": []string{"2"}},
+					Body: io.NopCloser(strings.NewReader(
+						"toomanyrequests: retry-after: 331.163µs, allowed: 44000/minute",
+					)),
+					Request: &http.Request{URL: mustParseURL("https://ghcr.io/v2/linuxserver/nginx/manifests/latest")},
+				}
+			},
+			originalHost:  "ghcr.io",
+			challengeHost: "",
+			redirected:    false,
+			parsedURL:     mustParseURL("https://ghcr.io/v2/linuxserver/nginx/manifests/latest"),
+			currentHost:   "ghcr.io",
+			wantErr:       true,
+		},
 	}
 
 	for _, tt := range tests {
@@ -1018,6 +1222,10 @@ func TestHandleManifestResponse(t *testing.T) {
 			)
 			if tt.wantErr {
 				require.Error(t, err)
+
+				if resp.StatusCode == http.StatusTooManyRequests {
+					require.ErrorIs(t, err, ratelimit.ErrRateLimited)
+				}
 
 				return
 			}
@@ -1435,6 +1643,7 @@ func TestRetryManifestRequest(t *testing.T) {
 		setupClient func(t *testing.T) *mockAuth.MockClient
 		expected    string
 		wantErr     bool
+		rateLimited bool
 	}{
 		{
 			name:       "returns digest from successful retry response",
@@ -1493,10 +1702,39 @@ func TestRetryManifestRequest(t *testing.T) {
 			expected: "",
 			wantErr:  true,
 		},
+		{
+			name:       "returns rate-limit error on 429",
+			method:     http.MethodHead,
+			updatedURL: "https://registry.example.com/v2/manifests/latest",
+			token:      "",
+			setupClient: func(t *testing.T) *mockAuth.MockClient {
+				t.Helper()
+
+				header := http.Header{}
+				header.Set("Retry-After", "7200")
+
+				mc := mockAuth.NewMockClient(t)
+				mc.On("Do", mock.Anything).Return(&http.Response{
+					StatusCode: http.StatusTooManyRequests,
+					Status:     "429 Too Many Requests",
+					Header:     header,
+					Body:       io.NopCloser(strings.NewReader("toomanyrequests: retry-after: 2h, allowed: 44000/minute")),
+					Request:    &http.Request{URL: mustParseURL("https://registry.example.com/v2/manifests/latest")},
+				}, nil)
+
+				return mc
+			},
+			expected:    "",
+			wantErr:     true,
+			rateLimited: true,
+		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			ratelimit.ResetForTest()
+			t.Cleanup(ratelimit.ResetForTest)
+
 			client := tt.setupClient(t)
 
 			got, err := retryManifestRequest(testLog(), context.Background(),
@@ -1512,6 +1750,7 @@ func TestRetryManifestRequest(t *testing.T) {
 			if tt.wantErr {
 				require.Error(t, err)
 				assert.Empty(t, got)
+				assert.Equal(t, tt.rateLimited, ratelimit.Is(err))
 
 				return
 			}

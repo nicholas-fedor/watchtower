@@ -18,6 +18,7 @@ import (
 
 	"github.com/nicholas-fedor/watchtower/internal/meta"
 	"github.com/nicholas-fedor/watchtower/pkg/registry/auth"
+	"github.com/nicholas-fedor/watchtower/pkg/registry/ratelimit"
 	"github.com/nicholas-fedor/watchtower/pkg/types"
 )
 
@@ -132,14 +133,24 @@ func FetchImageCreationTime(log *zerolog.Logger,
 	// Use the cached HTTP client for registry requests.
 	client := auth.NewAuthClient(log)
 
+	limitHost, hostErr := auth.GetRegistryAddress(log, container.ImageName())
+	if hostErr != nil || limitHost == "" {
+		log.Debug().
+			Err(hostErr).
+			Fields(fields).
+			Msg("Failed to resolve registry host for rate limiting")
+	}
+
 	// Obtain an authentication token and challenge host for the registry.
-	result, err := auth.GetToken(log,
-		ctx,
-		container,
-		registryAuth,
-		client,
-		"",
-	)
+	result, err := ratelimit.DoValue(ctx, log, limitHost, func() (auth.TokenResult, error) {
+		return auth.GetToken(log,
+			ctx,
+			container,
+			registryAuth,
+			client,
+			"",
+		)
+	})
 	if err != nil {
 		log.Debug().
 			Err(err).
@@ -441,6 +452,13 @@ func retryManifestRequest(log *zerolog.Logger,
 				"",
 				"",
 				fmt.Errorf("%w: %w", errFetchManifestFailed, err)
+		}
+
+		rateErr := registryRateLimitError(resp)
+		if rateErr != nil {
+			resp.Body.Close()
+
+			return nil, "", "", rateErr
 		}
 
 		if resp.StatusCode != http.StatusOK {
@@ -910,6 +928,13 @@ func fetchPlatformManifestWithRetry(log *zerolog.Logger,
 		}
 
 		// Handle non-success responses with retry logic.
+		rateErr := registryRateLimitError(resp)
+		if rateErr != nil {
+			resp.Body.Close()
+
+			return "", "", rateErr
+		}
+
 		if resp.StatusCode != http.StatusOK {
 			status := resp.StatusCode
 			resp.Body.Close()
@@ -1296,6 +1321,13 @@ func fetchConfigBlob(log *zerolog.Logger,
 		}
 	}
 
+	rateErr := registryRateLimitError(resp)
+	if rateErr != nil {
+		resp.Body.Close()
+
+		return nil, rateErr
+	}
+
 	if resp.StatusCode != http.StatusOK {
 		resp.Body.Close()
 		log.Debug().
@@ -1312,6 +1344,27 @@ func fetchConfigBlob(log *zerolog.Logger,
 	}
 
 	return resp.Body, nil
+}
+
+// registryRateLimitError returns a rate-limit error when the registry responded 429.
+//
+// The parsed error is recorded on the host limiter so sibling age fetches honor
+// the same cooldown.
+//
+// Parameters:
+//   - resp: HTTP response from a registry request.
+//
+// Returns:
+//   - error: Parsed rate-limit error, or nil when the status is not 429.
+func registryRateLimitError(resp *http.Response) error {
+	if resp == nil || resp.StatusCode != http.StatusTooManyRequests {
+		return nil
+	}
+
+	info := ratelimit.FromResponse(resp, ratelimit.ReadBody(resp, ratelimit.DefaultBodyLimit))
+	ratelimit.Observe(info.Host, info)
+
+	return info
 }
 
 // isIndexMediaType checks if the media type indicates an image index (multi-platform).
