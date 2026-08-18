@@ -616,8 +616,6 @@ func fetchDigest(log *zerolog.Logger,
 				Fields(fields).
 				Fields(epFields).
 				Msg("Failed to resolve registry host for rate limiting")
-
-			limitHost = container.ImageName()
 		}
 
 		result, err := ratelimit.DoValue(ctx, log, limitHost, func() (auth.TokenResult, error) {

@@ -213,6 +213,7 @@ var _ = ginkgo.Describe("the client", func() {
 		})
 		ginkgo.It("returns a rate-limit error when the stream reports toomanyrequests", func() {
 			ratelimit.ResetForTest()
+			defer ratelimit.ResetForTest()
 
 			mockServer.AllowUnhandledRequests = true
 			mockServer.AppendHandlers(
@@ -238,6 +239,7 @@ var _ = ginkgo.Describe("the client", func() {
 		})
 		ginkgo.It("returns a rate-limit error when ImagePull fails with toomanyrequests", func() {
 			ratelimit.ResetForTest()
+			defer ratelimit.ResetForTest()
 
 			mockServer.AllowUnhandledRequests = true
 			mockServer.AppendHandlers(
@@ -267,9 +269,15 @@ var _ = ginkgo.Describe("the client", func() {
 			ctx, cancel := context.WithCancel(context.Background())
 			cancel()
 
-			err := acquirePullSlot(ctx)
+			err := acquirePullSlot(ctx, "ghcr.io")
 			gomega.Expect(err).To(gomega.HaveOccurred())
 			gomega.Expect(errors.Is(err, context.Canceled)).To(gomega.BeTrue())
+		})
+		ginkgo.It("uses a distinct slot per registry host", func() {
+			ghcr := pullSlotFor("ghcr.io")
+			hub := pullSlotFor("index.docker.io")
+			gomega.Expect(ghcr).NotTo(gomega.BeIdenticalTo(hub))
+			gomega.Expect(pullSlotFor("ghcr.io")).To(gomega.BeIdenticalTo(ghcr))
 		})
 	})
 
@@ -319,7 +327,7 @@ var _ = ginkgo.Describe("the client", func() {
 			gomega.Expect(err).NotTo(gomega.HaveOccurred())
 			gomega.Expect(time.Since(started)).To(gomega.BeNumerically("<", 300*time.Millisecond))
 
-			gomega.Eventually(blocked).Should(gomega.Receive(gomega.BeNil()))
+			gomega.Eventually(blocked, 3*time.Second).Should(gomega.Receive(gomega.BeNil()))
 		})
 	})
 

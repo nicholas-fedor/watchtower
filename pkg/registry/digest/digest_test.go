@@ -217,6 +217,7 @@ func TestCompareDigestWithRemote(t *testing.T) {
 
 func TestCompareDigestWithRemote_Head429DoesNotFallBackToGET(t *testing.T) {
 	ratelimit.ResetForTest()
+	t.Cleanup(ratelimit.ResetForTest)
 
 	viper.Set("WATCHTOWER_REGISTRY_TLS_SKIP", true)
 	t.Cleanup(func() {

@@ -78,7 +78,7 @@ func TestDoValueReturnsSuccessfulResult(t *testing.T) {
 	assert.Equal(t, "digest", got)
 }
 
-func TestDoRetriesWrappedSentinelWithoutTypedError(t *testing.T) {
+func TestDoTreatsSentinelTextWithoutWrappingAsPermanent(t *testing.T) {
 	ResetForTest()
 
 	var attempts atomic.Int32

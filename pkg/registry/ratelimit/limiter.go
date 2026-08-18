@@ -109,11 +109,7 @@ func Wait(ctx context.Context, host string) error {
 	}
 
 	for {
-		wait, err := nextWait(host)
-		if err != nil {
-			return err
-		}
-
+		wait := nextWait(host)
 		if wait <= 0 {
 			return nil
 		}
@@ -136,8 +132,7 @@ func Wait(ctx context.Context, host string) error {
 //
 // Returns:
 //   - time.Duration: Sleep before the next request. Zero when the caller may proceed.
-//   - error: Reserved for future wait failures. Currently always nil.
-func nextWait(host string) (time.Duration, error) {
+func nextWait(host string) time.Duration {
 	hostsMu.Lock()
 	defer hostsMu.Unlock()
 
@@ -145,11 +140,11 @@ func nextWait(host string) (time.Duration, error) {
 	now := time.Now()
 
 	if now.Before(state.cooldownUntil) {
-		return time.Until(state.cooldownUntil), nil
+		return time.Until(state.cooldownUntil)
 	}
 
 	if state.allowed <= 0 || state.window <= 0 {
-		return 0, nil
+		return 0
 	}
 
 	state.refillLocked(now)
@@ -157,12 +152,12 @@ func nextWait(host string) (time.Duration, error) {
 	if state.tokens >= 1 {
 		state.tokens--
 
-		return 0, nil
+		return 0
 	}
 
 	perToken := max(state.window/time.Duration(state.allowed), time.Millisecond)
 
-	return perToken, nil
+	return perToken
 }
 
 // hostLocked returns the per-host limiter state, creating it when missing.

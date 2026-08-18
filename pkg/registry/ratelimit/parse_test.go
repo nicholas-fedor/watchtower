@@ -385,6 +385,8 @@ func TestFromErrorMessageRecognizesPhrases(t *testing.T) {
 
 	require.NotNil(t, FromErrorMessage("Too Many Requests from registry"))
 	require.NotNil(t, FromErrorMessage("registry returned 429"))
+	require.NotNil(t, FromErrorMessage("HTTP 429 from registry"))
+	require.NotNil(t, FromErrorMessage("status: 429"))
 }
 
 func TestFromErrorMessageIgnoresUnrelatedErrors(t *testing.T) {
@@ -395,6 +397,8 @@ func TestFromErrorMessageIgnoresUnrelatedErrors(t *testing.T) {
 	assert.Nil(t, FromErrorMessage("sha256:abcdef429abcdef"))
 	assert.Nil(t, FromErrorMessage("dial tcp 127.0.0.1:4290: connect: connection refused"))
 	assert.Nil(t, FromErrorMessage("wrote 1429 bytes"))
+	assert.Nil(t, FromErrorMessage("wrote 429 bytes"))
+	assert.Nil(t, FromErrorMessage("dial tcp 10.0.0.1:429: connect: connection refused"))
 }
 
 func TestDecisionCapsTinyAndHugeRetryAfter(t *testing.T) {

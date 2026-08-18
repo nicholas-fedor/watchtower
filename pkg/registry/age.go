@@ -139,8 +139,6 @@ func FetchImageCreationTime(log *zerolog.Logger,
 			Err(hostErr).
 			Fields(fields).
 			Msg("Failed to resolve registry host for rate limiting")
-
-		limitHost = container.ImageName()
 	}
 
 	// Obtain an authentication token and challenge host for the registry.

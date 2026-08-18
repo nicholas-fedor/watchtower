@@ -13,7 +13,9 @@ var (
 	retryAfterBody = regexp.MustCompile(`(?i)retry-after:\s*([0-9]+(?:\.[0-9]+)?(?:ns|us|µs|μs|ms|s|m|h))`)
 	allowedBody    = regexp.MustCompile(`(?i)allowed:\s*([0-9]+)\s*/\s*(seconds?|secs?|minutes?|mins?|hours?|hrs?)`)
 	rateLimitLimit = regexp.MustCompile(`(?i)([0-9]+)(?:\s*,\s*[0-9]+)*\s*(?:;\s*w=([0-9]+))?`)
-	status429      = regexp.MustCompile(`(?i)\b429\b`)
+	status429      = regexp.MustCompile(
+		`(?i)(?:\b(?:https?|status(?:\s+code)?)\s*[:\-]?\s*429\b|\breturned\s+429\b|\b429\s+(?:too many|error|response))`,
+	)
 )
 
 // ParseRetryAfterHeader parses an HTTP Retry-After header.
@@ -196,8 +198,8 @@ func ReadBody(resp *http.Response, limit int64) []byte {
 
 // looksRateLimited reports whether message looks like a registry 429.
 //
-// A bare 429 is matched as a whole token so digest hashes and ports that
-// contain those digits are ignored.
+// A bare 429 is recognized only with HTTP or status context so byte counts,
+// ports, and digest hashes are ignored.
 //
 // Parameters:
 //   - message: Registry body or Docker pull-stream error text.
@@ -249,7 +251,7 @@ func parseRateLimitLimit(header string) (int, time.Duration) {
 	}
 
 	match := rateLimitLimit.FindStringSubmatch(header)
-	if len(match) < rateLimitMinGroups {
+	if match == nil {
 		return 0, 0
 	}
 
@@ -260,7 +262,7 @@ func parseRateLimitLimit(header string) (int, time.Duration) {
 
 	window := time.Duration(0)
 
-	if len(match) > 2 && match[2] != "" {
+	if match[2] != "" {
 		seconds, convErr := strconv.Atoi(match[2])
 		if convErr == nil && seconds > 0 {
 			window = time.Duration(seconds) * time.Second

@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"strings"
+	"sync"
 
 	"github.com/distribution/reference"
 	"github.com/rs/zerolog"
@@ -30,13 +31,17 @@ const (
 	// WarnAuto indicates warnings should be logged for HEAD request failures based on registry heuristics.
 	WarnAuto WarningStrategy = "auto"
 
-	// maxConcurrentPulls caps simultaneous ImagePull calls so digest checks can
-	// stay parallel without bursting registry blob downloads.
+	// maxConcurrentPulls caps simultaneous ImagePull calls per registry host
+	// so digest checks can stay parallel without bursting blob downloads
+	// against one registry.
 	maxConcurrentPulls = 1
 )
 
-// pullSlots serializes layer pulls across the parallel staleness-check workers.
-var pullSlots = make(chan struct{}, maxConcurrentPulls)
+// pullSlots serializes layer pulls per registry host.
+var (
+	pullSlotsMu sync.Mutex
+	pullSlots   = map[string]chan struct{}{}
+)
 
 // IsImagePinnedByDigest reports whether imageName is an immutable digest reference.
 //
@@ -668,8 +673,8 @@ func (c imageClient) shouldSkipPull(
 // performImagePull executes a full image pull.
 //
 // It pulls the image and reads the response to ensure completion.
-// The process-wide pull slot is held only around the daemon ImagePull
-// so host cooldown sleeps do not block pulls to other registries.
+// The per-host pull slot is held only around the daemon ImagePull
+// so cooldown sleeps and pulls to other registries stay unblocked.
 //
 // Parameters:
 //   - ctx: Context for operation control.
@@ -696,16 +701,14 @@ func (c imageClient) performImagePull(
 		clog.Debug().
 			Err(hostErr).
 			Msg("Failed to resolve registry host for rate limiting")
-
-		pullHost = imageName
 	}
 
 	pullErr := ratelimit.Do(ctx, clog, pullHost, func() error {
-		err := acquirePullSlot(ctx)
+		err := acquirePullSlot(ctx, pullHost)
 		if err != nil {
 			return err
 		}
-		defer releasePullSlot()
+		defer releasePullSlot(pullHost)
 
 		response, err := c.api.ImagePull(ctx, imageName, opts)
 		if err != nil {
@@ -769,32 +772,56 @@ func (c imageClient) performImagePull(
 	return nil
 }
 
-// acquirePullSlot waits for a pull concurrency slot.
+// pullSlotFor returns the per-host pull slot channel, creating it when missing.
+//
+// Parameters:
+//   - host: Registry host key. Empty hosts share one unknown-host slot.
+//
+// Returns:
+//   - chan struct{}: Buffered slot channel with capacity maxConcurrentPulls.
+func pullSlotFor(host string) chan struct{} {
+	pullSlotsMu.Lock()
+	defer pullSlotsMu.Unlock()
+
+	slot := pullSlots[host]
+	if slot == nil {
+		slot = make(chan struct{}, maxConcurrentPulls)
+		pullSlots[host] = slot
+	}
+
+	return slot
+}
+
+// acquirePullSlot waits for a pull concurrency slot for host.
 //
 // Parameters:
 //   - ctx: Context that can cancel the wait.
+//   - host: Registry host whose slot should be acquired.
 //
 // Returns:
 //   - error: ctx.Err() when canceled. Nil when a slot was acquired.
-func acquirePullSlot(ctx context.Context) error {
+func acquirePullSlot(ctx context.Context, host string) error {
 	ctxErr := ctx.Err()
 	if ctxErr != nil {
 		return fmt.Errorf("image pull slot wait canceled: %w", ctxErr)
 	}
 
 	select {
-	case pullSlots <- struct{}{}:
+	case pullSlotFor(host) <- struct{}{}:
 		return nil
 	case <-ctx.Done():
 		return fmt.Errorf("image pull slot wait canceled: %w", ctx.Err())
 	}
 }
 
-// releasePullSlot returns a pull concurrency slot.
+// releasePullSlot returns a pull concurrency slot for host.
 //
-// The caller must have acquired a slot with acquirePullSlot.
-func releasePullSlot() {
-	<-pullSlots
+// The caller must have acquired a slot with acquirePullSlot for the same host.
+//
+// Parameters:
+//   - host: Registry host whose slot should be released.
+func releasePullSlot(host string) {
+	<-pullSlotFor(host)
 }
 
 // warnOnHeadFailed decides whether to warn about failed HEAD requests during image pulls.
