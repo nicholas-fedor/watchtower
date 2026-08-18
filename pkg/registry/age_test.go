@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"io"
 	"net/http"
 	"net/url"
 	"os"
@@ -19,11 +20,44 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/nicholas-fedor/watchtower/internal/logging"
+	"github.com/nicholas-fedor/watchtower/pkg/registry/ratelimit"
 	mockTypes "github.com/nicholas-fedor/watchtower/pkg/types/mocks"
 )
 
 func testLog() *zerolog.Logger {
 	return logging.NopLogger()
+}
+
+func TestRegistryRateLimitError(t *testing.T) {
+	ratelimit.ResetForTest()
+	t.Cleanup(ratelimit.ResetForTest)
+
+	assert.NoError(t, registryRateLimitError(nil))
+	assert.NoError(t, registryRateLimitError(&http.Response{
+		StatusCode: http.StatusOK,
+		Body:       http.NoBody,
+	}))
+
+	req, err := http.NewRequestWithContext(t.Context(), http.MethodGet, "https://ghcr.io/v2/linuxserver/nginx/manifests/latest", nil)
+	require.NoError(t, err)
+
+	resp := &http.Response{
+		StatusCode: http.StatusTooManyRequests,
+		Header:     http.Header{"Retry-After": []string{"2"}},
+		Body:       io.NopCloser(strings.NewReader("toomanyrequests: retry-after: 331.163µs, allowed: 44000/minute")),
+		Request:    req,
+	}
+
+	got := registryRateLimitError(resp)
+	require.Error(t, got)
+	require.ErrorIs(t, got, ratelimit.ErrRateLimited)
+
+	ctx, cancel := context.WithTimeout(t.Context(), 20*time.Millisecond)
+	defer cancel()
+
+	waitErr := ratelimit.Wait(ctx, "ghcr.io")
+	require.Error(t, waitErr)
+	assert.ErrorIs(t, waitErr, context.DeadlineExceeded)
 }
 
 // newMockContainer creates a mockery-generated mock Container with the given image name.

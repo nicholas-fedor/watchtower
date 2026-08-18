@@ -17,6 +17,7 @@ import (
 	"github.com/rs/zerolog"
 	"github.com/spf13/viper"
 
+	"github.com/nicholas-fedor/watchtower/pkg/registry/ratelimit"
 	"github.com/nicholas-fedor/watchtower/pkg/types"
 )
 
@@ -266,6 +267,12 @@ func performBearerTokenFetch(log *zerolog.Logger,
 
 	// Reject non-success responses before reading the body to avoid
 	// attempting to parse error pages as bearer token JSON.
+	if authResponse.StatusCode == http.StatusTooManyRequests {
+		body := ratelimit.ReadBody(authResponse, ratelimit.DefaultBodyLimit)
+
+		return "", time.Time{}, ratelimit.FromResponse(authResponse, body)
+	}
+
 	if authResponse.StatusCode < http.StatusOK || authResponse.StatusCode >= http.StatusMultipleChoices {
 		return "", time.Time{}, fmt.Errorf(
 			"%w: status %s",

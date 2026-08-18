@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"io"
 	"strings"
 
 	"github.com/distribution/reference"
@@ -16,7 +15,9 @@ import (
 	dockerClient "github.com/moby/moby/client"
 
 	"github.com/nicholas-fedor/watchtower/pkg/registry"
+	"github.com/nicholas-fedor/watchtower/pkg/registry/auth"
 	"github.com/nicholas-fedor/watchtower/pkg/registry/digest"
+	"github.com/nicholas-fedor/watchtower/pkg/registry/ratelimit"
 	"github.com/nicholas-fedor/watchtower/pkg/types"
 )
 
@@ -28,7 +29,14 @@ const (
 	WarnNever WarningStrategy = "never"
 	// WarnAuto indicates warnings should be logged for HEAD request failures based on registry heuristics.
 	WarnAuto WarningStrategy = "auto"
+
+	// maxConcurrentPulls caps simultaneous ImagePull calls so digest checks can
+	// stay parallel without bursting registry blob downloads.
+	maxConcurrentPulls = 1
 )
+
+// pullSlots serializes layer pulls across the parallel staleness-check workers.
+var pullSlots = make(chan struct{}, maxConcurrentPulls)
 
 // IsImagePinnedByDigest reports whether imageName is an immutable digest reference.
 //
@@ -416,7 +424,12 @@ func (c imageClient) PullImage(
 	}
 
 	// Skip the pull if the digest matches the current image (or local-only).
-	if c.shouldSkipPull(ctx, sourceContainer, opts.RegistryAuth, warnOnHeadFailed, fields) {
+	skip, skipErr := c.shouldSkipPull(ctx, sourceContainer, opts.RegistryAuth, warnOnHeadFailed, fields)
+	if skipErr != nil {
+		return skipErr
+	}
+
+	if skip {
 		return nil
 	}
 
@@ -578,19 +591,20 @@ func newImageClient(api dockerClient.APIClient, log *zerolog.Logger) imageClient
 // Parameters:
 //   - ctx: Context for operation control.
 //   - sourceContainer: Container to check.
-//   - auth: Registry authentication credentials.
+//   - registryAuth: Registry authentication credentials.
 //   - warnOnHeadFailed: Strategy for logging warnings on HEAD request failures.
 //   - fields: Logging fields for context.
 //
 // Returns:
 //   - bool: True if pull can be skipped, false otherwise.
+//   - error: Non-nil when a registry rate limit should abort the pull.
 func (c imageClient) shouldSkipPull(
 	ctx context.Context,
 	sourceContainer types.Container,
 	registryAuth string,
 	warnOnHeadFailed WarningStrategy,
 	fields map[string]any,
-) bool {
+) (bool, error) {
 	clogVal := c.logger().With().
 		Fields(fields).
 		Logger()
@@ -620,6 +634,12 @@ func (c imageClient) shouldSkipPull(
 	}
 
 	switch {
+	case ratelimit.Is(err):
+		clog.Warn().
+			Err(err).
+			Msg("Registry rate limited digest check. Aborting pull")
+
+		return false, fmt.Errorf("digest check rate limited: %w", err)
 	case err != nil:
 		// Digest retrieval failed. Log based on warning strategy and proceed with pull.
 		headLevel := zerolog.DebugLevel
@@ -631,23 +651,25 @@ func (c imageClient) shouldSkipPull(
 			Err(err).
 			Msg("Digest retrieval failed, falling back to full pull")
 
-		return false
+		return false, nil
 	case match:
 		// Digests match (or local-only image treated as up-to-date). No pull needed.
 		clog.Debug().Msg("Digest match, skipping pull")
 
-		return true
+		return true, nil
 	default:
 		// Digests differ. Proceed with pull.
 		clog.Debug().Msg("Digest mismatch, proceeding with pull")
 
-		return false
+		return false, nil
 	}
 }
 
 // performImagePull executes a full image pull.
 //
 // It pulls the image and reads the response to ensure completion.
+// The process-wide pull slot is held only around the daemon ImagePull
+// so host cooldown sleeps do not block pulls to other registries.
 //
 // Parameters:
 //   - ctx: Context for operation control.
@@ -669,48 +691,110 @@ func (c imageClient) performImagePull(
 	clog := &clogVal
 	clog.Debug().Msg("Initiating image pull")
 
-	// Start the image pull.
-	response, err := c.api.ImagePull(ctx, imageName, opts)
-	if err != nil {
-		// Differentiate error types for appropriate logging and handling.
-		// Auth failures and missing images return distinct sentinel errors
-		// so callers can programmatically distinguish error categories.
-		switch {
-		case cerrdefs.IsUnauthorized(err):
-			clog.Warn().
-				Err(err).
-				Msg("Image pull failed: authentication required")
-
-			return fmt.Errorf("%w: %s: %w", ErrPullImageUnauthorized, imageName, err)
-		case cerrdefs.IsNotFound(err):
-			clog.Debug().
-				Err(err).
-				Msg("Image pull failed: image not found in registry")
-
-			return fmt.Errorf("%w: %s: %w", ErrPullImageNotFound, imageName, err)
-		default:
-			clog.Debug().
-				Err(err).
-				Msg("Failed to initiate image pull")
-
-			return fmt.Errorf("%w: %s: %w", errPullImageFailed, imageName, err)
-		}
-	}
-	defer response.Close()
-
-	// Drain the progress stream so the daemon finishes the pull without buffering it.
-	_, err = io.Copy(io.Discard, response)
-	if err != nil {
+	pullHost, hostErr := auth.GetRegistryAddress(clog, imageName)
+	if hostErr != nil || pullHost == "" {
 		clog.Debug().
-			Err(err).
-			Msg("Failed to read image pull response")
+			Err(hostErr).
+			Msg("Failed to resolve registry host for rate limiting")
 
-		return fmt.Errorf("%w: %s: %w", errReadPullResponseFailed, imageName, err)
+		pullHost = imageName
 	}
 
-	clog.Debug().Msg("Image pull completed")
+	pullErr := ratelimit.Do(ctx, clog, pullHost, func() error {
+		err := acquirePullSlot(ctx)
+		if err != nil {
+			return err
+		}
+		defer releasePullSlot()
+
+		response, err := c.api.ImagePull(ctx, imageName, opts)
+		if err != nil {
+			info := ratelimit.FromErrorMessage(err.Error())
+			if info != nil {
+				return info
+			}
+
+			// Differentiate error types for appropriate logging and handling.
+			// Auth failures and missing images return distinct sentinel errors
+			// so callers can programmatically distinguish error categories.
+			switch {
+			case cerrdefs.IsUnauthorized(err):
+				clog.Warn().
+					Err(err).
+					Msg("Image pull failed: authentication required")
+
+				return fmt.Errorf("%w: %s: %w", ErrPullImageUnauthorized, imageName, err)
+			case cerrdefs.IsNotFound(err):
+				clog.Debug().
+					Err(err).
+					Msg("Image pull failed: image not found in registry")
+
+				return fmt.Errorf("%w: %s: %w", ErrPullImageNotFound, imageName, err)
+			default:
+				clog.Debug().
+					Err(err).
+					Msg("Failed to initiate image pull")
+
+				return fmt.Errorf("%w: %s: %w", errPullImageFailed, imageName, err)
+			}
+		}
+		defer response.Close()
+
+		waitErr := response.Wait(ctx)
+		if waitErr != nil {
+			info := ratelimit.FromErrorMessage(waitErr.Error())
+			if info != nil {
+				clog.Warn().
+					Err(info).
+					Msg("Registry rate limited image pull")
+
+				return info
+			}
+
+			clog.Debug().
+				Err(waitErr).
+				Msg("Failed to read image pull response")
+
+			return fmt.Errorf("%w: %s: %w", errReadPullResponseFailed, imageName, waitErr)
+		}
+
+		clog.Debug().Msg("Image pull completed")
+
+		return nil
+	})
+	if pullErr != nil {
+		return fmt.Errorf("image pull: %w", pullErr)
+	}
 
 	return nil
+}
+
+// acquirePullSlot waits for a pull concurrency slot.
+//
+// Parameters:
+//   - ctx: Context that can cancel the wait.
+//
+// Returns:
+//   - error: ctx.Err() when canceled. Nil when a slot was acquired.
+func acquirePullSlot(ctx context.Context) error {
+	ctxErr := ctx.Err()
+	if ctxErr != nil {
+		return fmt.Errorf("image pull slot wait canceled: %w", ctxErr)
+	}
+
+	select {
+	case pullSlots <- struct{}{}:
+		return nil
+	case <-ctx.Done():
+		return fmt.Errorf("image pull slot wait canceled: %w", ctx.Err())
+	}
+}
+
+// releasePullSlot returns a pull concurrency slot.
+//
+// The caller must have acquired a slot with acquirePullSlot.
+func releasePullSlot() {
+	<-pullSlots
 }
 
 // warnOnHeadFailed decides whether to warn about failed HEAD requests during image pulls.

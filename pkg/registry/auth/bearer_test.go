@@ -17,6 +17,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	mockAuth "github.com/nicholas-fedor/watchtower/pkg/registry/auth/mocks"
+	"github.com/nicholas-fedor/watchtower/pkg/registry/ratelimit"
 	"github.com/nicholas-fedor/watchtower/pkg/types"
 )
 
@@ -679,6 +680,10 @@ func Test_performBearerTokenFetch(t *testing.T) {
 			got, _, err := performBearerTokenFetch(testLog(), ctx, tt.authURL, tt.imageName, tt.auth, mockClient)
 			if tt.wantErr {
 				assert.Error(t, err)
+
+				if tt.onDo != nil && tt.onDo.StatusCode == http.StatusTooManyRequests {
+					require.ErrorIs(t, err, ratelimit.ErrRateLimited)
+				}
 
 				return
 			}

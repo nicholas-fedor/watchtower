@@ -6,6 +6,7 @@ go 1.26.6
 retract [v1.7.2, v1.7.9]
 
 require (
+	github.com/cenkalti/backoff/v7 v7.0.0
 	github.com/containerd/errdefs v1.0.0
 	github.com/distribution/reference v0.6.0
 	github.com/docker/cli v29.7.2+incompatible

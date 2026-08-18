@@ -16,6 +16,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	mockAuth "github.com/nicholas-fedor/watchtower/pkg/registry/auth/mocks"
+	"github.com/nicholas-fedor/watchtower/pkg/registry/ratelimit"
 	"github.com/nicholas-fedor/watchtower/pkg/types"
 	mockTypes "github.com/nicholas-fedor/watchtower/pkg/types/mocks"
 )
@@ -773,6 +774,26 @@ func TestGetToken(t *testing.T) {
 			wantErr:     true,
 			errContains: "failed to execute challenge request",
 		},
+		{
+			name:         "challenge 429 returns rate-limit error",
+			container:    newRemoteContainer(t),
+			registryAuth: "",
+			endpoint:     "",
+			setupMock: func(mockClient *mockAuth.MockClient) {
+				challengeURL, _ := url.Parse("https://index.docker.io/v2/")
+				mockClient.On("Do", mock.Anything).Return(&http.Response{
+					StatusCode: http.StatusTooManyRequests,
+					Body: io.NopCloser(strings.NewReader(
+						"toomanyrequests: retry-after: 331.163µs, allowed: 44000/minute",
+					)),
+					Header:  http.Header{"Retry-After": []string{"7200"}},
+					Request: &http.Request{URL: challengeURL},
+				}, nil).Once()
+			},
+			want:        TokenResult{},
+			wantErr:     true,
+			errContains: "registry rate limited",
+		},
 	}
 
 	for _, tt := range tests {
@@ -790,6 +811,10 @@ func TestGetToken(t *testing.T) {
 
 				if tt.errContains != "" {
 					assert.Contains(t, err.Error(), tt.errContains)
+				}
+
+				if tt.errContains == "registry rate limited" {
+					require.ErrorIs(t, err, ratelimit.ErrRateLimited)
 				}
 
 				return
