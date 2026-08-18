@@ -191,8 +191,8 @@ func (_c *MockClient_CreateContainer_Call) RunAndReturn(run func(ctx context.Con
 }
 
 // CreateEphemeralOrchestrator provides a mock function for the type MockClient
-func (_mock *MockClient) CreateEphemeralOrchestrator(ctx context.Context, sourceContainer types.Container, newImage string, containerChain string) (types.ContainerID, error) {
-	ret := _mock.Called(ctx, sourceContainer, newImage, containerChain)
+func (_mock *MockClient) CreateEphemeralOrchestrator(ctx context.Context, sourceContainer types.Container, newImage string, containerChain string, cleanup bool) (types.ContainerID, error) {
+	ret := _mock.Called(ctx, sourceContainer, newImage, containerChain, cleanup)
 
 	if len(ret) == 0 {
 		panic("no return value specified for CreateEphemeralOrchestrator")
@@ -200,16 +200,16 @@ func (_mock *MockClient) CreateEphemeralOrchestrator(ctx context.Context, source
 
 	var r0 types.ContainerID
 	var r1 error
-	if returnFunc, ok := ret.Get(0).(func(context.Context, types.Container, string, string) (types.ContainerID, error)); ok {
-		return returnFunc(ctx, sourceContainer, newImage, containerChain)
+	if returnFunc, ok := ret.Get(0).(func(context.Context, types.Container, string, string, bool) (types.ContainerID, error)); ok {
+		return returnFunc(ctx, sourceContainer, newImage, containerChain, cleanup)
 	}
-	if returnFunc, ok := ret.Get(0).(func(context.Context, types.Container, string, string) types.ContainerID); ok {
-		r0 = returnFunc(ctx, sourceContainer, newImage, containerChain)
+	if returnFunc, ok := ret.Get(0).(func(context.Context, types.Container, string, string, bool) types.ContainerID); ok {
+		r0 = returnFunc(ctx, sourceContainer, newImage, containerChain, cleanup)
 	} else {
 		r0 = ret.Get(0).(types.ContainerID)
 	}
-	if returnFunc, ok := ret.Get(1).(func(context.Context, types.Container, string, string) error); ok {
-		r1 = returnFunc(ctx, sourceContainer, newImage, containerChain)
+	if returnFunc, ok := ret.Get(1).(func(context.Context, types.Container, string, string, bool) error); ok {
+		r1 = returnFunc(ctx, sourceContainer, newImage, containerChain, cleanup)
 	} else {
 		r1 = ret.Error(1)
 	}
@@ -226,11 +226,12 @@ type MockClient_CreateEphemeralOrchestrator_Call struct {
 //   - sourceContainer types.Container
 //   - newImage string
 //   - containerChain string
-func (_e *MockClient_Expecter) CreateEphemeralOrchestrator(ctx any, sourceContainer any, newImage any, containerChain any) *MockClient_CreateEphemeralOrchestrator_Call {
-	return &MockClient_CreateEphemeralOrchestrator_Call{Call: _e.mock.On("CreateEphemeralOrchestrator", ctx, sourceContainer, newImage, containerChain)}
+//   - cleanup bool
+func (_e *MockClient_Expecter) CreateEphemeralOrchestrator(ctx any, sourceContainer any, newImage any, containerChain any, cleanup any) *MockClient_CreateEphemeralOrchestrator_Call {
+	return &MockClient_CreateEphemeralOrchestrator_Call{Call: _e.mock.On("CreateEphemeralOrchestrator", ctx, sourceContainer, newImage, containerChain, cleanup)}
 }
 
-func (_c *MockClient_CreateEphemeralOrchestrator_Call) Run(run func(ctx context.Context, sourceContainer types.Container, newImage string, containerChain string)) *MockClient_CreateEphemeralOrchestrator_Call {
+func (_c *MockClient_CreateEphemeralOrchestrator_Call) Run(run func(ctx context.Context, sourceContainer types.Container, newImage string, containerChain string, cleanup bool)) *MockClient_CreateEphemeralOrchestrator_Call {
 	_c.Call.Run(func(args mock.Arguments) {
 		var arg0 context.Context
 		if args[0] != nil {
@@ -248,11 +249,16 @@ func (_c *MockClient_CreateEphemeralOrchestrator_Call) Run(run func(ctx context.
 		if args[3] != nil {
 			arg3 = args[3].(string)
 		}
+		var arg4 bool
+		if args[4] != nil {
+			arg4 = args[4].(bool)
+		}
 		run(
 			arg0,
 			arg1,
 			arg2,
 			arg3,
+			arg4,
 		)
 	})
 	return _c
@@ -263,7 +269,7 @@ func (_c *MockClient_CreateEphemeralOrchestrator_Call) Return(containerID types.
 	return _c
 }
 
-func (_c *MockClient_CreateEphemeralOrchestrator_Call) RunAndReturn(run func(ctx context.Context, sourceContainer types.Container, newImage string, containerChain string) (types.ContainerID, error)) *MockClient_CreateEphemeralOrchestrator_Call {
+func (_c *MockClient_CreateEphemeralOrchestrator_Call) RunAndReturn(run func(ctx context.Context, sourceContainer types.Container, newImage string, containerChain string, cleanup bool) (types.ContainerID, error)) *MockClient_CreateEphemeralOrchestrator_Call {
 	_c.Call.Return(run)
 	return _c
 }

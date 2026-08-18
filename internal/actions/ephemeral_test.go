@@ -51,7 +51,7 @@ func createDefaultMockClient(td *mockActions.TestData) mockActions.MockClient {
 
 var _ = ginkgo.Describe("EphemeralSelfUpdate", func() {
 	ginkgo.When("the orchestrator is created successfully", func() {
-		ginkgo.It("should return empty container ID and false (not renamed)", func() {
+		ginkgo.It("should return empty container ID and true so the dying process skips cleanup", func() {
 			ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 			defer cancel()
 
@@ -70,7 +70,7 @@ var _ = ginkgo.Describe("EphemeralSelfUpdate", func() {
 
 			gomega.Expect(err).NotTo(gomega.HaveOccurred())
 			gomega.Expect(newID).To(gomega.BeEmpty())
-			gomega.Expect(renamed).To(gomega.BeFalse())
+			gomega.Expect(renamed).To(gomega.BeTrue())
 		})
 	})
 
@@ -94,7 +94,7 @@ var _ = ginkgo.Describe("EphemeralSelfUpdate", func() {
 
 			gomega.Expect(err).NotTo(gomega.HaveOccurred())
 			gomega.Expect(newID).To(gomega.BeEmpty())
-			gomega.Expect(renamed).To(gomega.BeFalse())
+			gomega.Expect(renamed).To(gomega.BeTrue())
 
 			// Verify the orchestrator's chain was set to the source container ID.
 			gomega.Expect(client.TestData.LastContainerChain).To(
@@ -132,7 +132,7 @@ var _ = ginkgo.Describe("EphemeralSelfUpdate", func() {
 
 			gomega.Expect(err).NotTo(gomega.HaveOccurred())
 			gomega.Expect(newID).To(gomega.BeEmpty())
-			gomega.Expect(renamed).To(gomega.BeFalse())
+			gomega.Expect(renamed).To(gomega.BeTrue())
 
 			// Verify the orchestrator's chain has the source ID appended to the existing chain.
 			gomega.Expect(client.TestData.LastContainerChain).To(
@@ -176,6 +176,30 @@ var _ = ginkgo.Describe("EphemeralSelfUpdate", func() {
 		})
 	})
 
+	ginkgo.When("cleanup is enabled on the update params", func() {
+		ginkgo.It("should pass cleanup=true to the orchestrator", func() {
+			ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+			defer cancel()
+
+			sourceContainer := createDefaultMockContainer("source-cleanup", map[string]string{
+				"com.centurylinklabs.watchtower": "true",
+			})
+
+			client := createDefaultMockClient(&mockActions.TestData{})
+
+			_, renamed, err := actions.EphemeralSelfUpdate(testLogger(),
+				ctx,
+				client,
+				sourceContainer,
+				types.UpdateParams{Cleanup: true},
+			)
+
+			gomega.Expect(err).NotTo(gomega.HaveOccurred())
+			gomega.Expect(renamed).To(gomega.BeTrue())
+			gomega.Expect(client.TestData.LastCleanup).To(gomega.BeTrue())
+		})
+	})
+
 	// EphemeralSelfUpdate only starts the orchestrator. Replacement is asynchronous.
 	ginkgo.When("the orchestrator launches successfully", func() {
 		ginkgo.It("returns without performing stop or start on the source client path", func() {
@@ -197,7 +221,7 @@ var _ = ginkgo.Describe("EphemeralSelfUpdate", func() {
 
 			gomega.Expect(err).NotTo(gomega.HaveOccurred())
 			gomega.Expect(newID).To(gomega.BeEmpty())
-			gomega.Expect(renamed).To(gomega.BeFalse())
+			gomega.Expect(renamed).To(gomega.BeTrue())
 			gomega.Expect(client.TestData.StopContainerCount.Load()).To(gomega.Equal(int32(0)))
 			gomega.Expect(client.TestData.StartContainerCount.Load()).To(gomega.Equal(int32(0)))
 			gomega.Expect(client.TestData.RenameContainerCount.Load()).To(gomega.Equal(int32(0)))
