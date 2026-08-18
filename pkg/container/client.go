@@ -341,6 +341,7 @@ type Client interface {
 	//   - sourceContainer: The current Watchtower container being replaced.
 	//   - newImage: The image reference for the new Watchtower container.
 	//   - containerChain: The container chain label for lineage tracking.
+	//   - cleanup: When true, the orchestrator removes the old image after handoff.
 	//
 	// Returns:
 	//   - types.ContainerID: ID of the ephemeral orchestrator container.
@@ -350,6 +351,7 @@ type Client interface {
 		sourceContainer types.Container,
 		newImage string,
 		containerChain string,
+		cleanup bool,
 	) (types.ContainerID, error)
 
 	// StartContainerByID starts a container by its ID directly.

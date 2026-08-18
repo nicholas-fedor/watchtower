@@ -1460,6 +1460,25 @@ var _ = ginkgo.Describe("CleanupImages", func() {
 		gomega.Expect(cleaned[0].ImageID).To(gomega.Equal(types.ImageID("image1")))
 	})
 
+	ginkgo.It("should treat context cancellation as a non-error and not add to cleaned", func() {
+		mockClient := mockContainer.NewMockClient(ginkgo.GinkgoT())
+
+		cleanedImages := []types.RemovedImageInfo{
+			{ImageID: "image1", ImageName: "image1"},
+			{ImageID: "image2", ImageName: "image2"},
+		}
+
+		mockClient.EXPECT().RemoveImageByID(mock.Anything, types.ImageID("image1"), "image1").Return(nil)
+		mockClient.EXPECT().
+			RemoveImageByID(context.Background(), types.ImageID("image2"), "image2").
+			Return(context.Canceled)
+
+		cleaned, err := RemoveImages(testLogger(), context.Background(), mockClient, cleanedImages)
+		gomega.Expect(err).NotTo(gomega.HaveOccurred())
+		gomega.Expect(cleaned).To(gomega.HaveLen(1))
+		gomega.Expect(cleaned[0].ImageID).To(gomega.Equal(types.ImageID("image1")))
+	})
+
 	ginkgo.It("should treat 'conflict' errors as non-errors and not add to cleaned", func() {
 		mockClient := mockContainer.NewMockClient(ginkgo.GinkgoT())
 

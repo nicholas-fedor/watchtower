@@ -9,10 +9,12 @@ import (
 	"github.com/onsi/ginkgo/v2"
 	"github.com/onsi/gomega"
 
+	cerrdefs "github.com/containerd/errdefs"
 	dockerContainer "github.com/moby/moby/api/types/container"
 	dockerNetwork "github.com/moby/moby/api/types/network"
 
 	mockActions "github.com/nicholas-fedor/watchtower/internal/actions/mocks"
+	"github.com/nicholas-fedor/watchtower/pkg/container"
 	"github.com/nicholas-fedor/watchtower/pkg/types"
 )
 
@@ -101,6 +103,7 @@ var _ = ginkgo.Describe("orchestrateSelfUpdate handoff", func() {
 			"watchtower:v2",
 			"watchtower",
 			"",
+			false,
 		)
 
 		gomega.Expect(err).NotTo(gomega.HaveOccurred())
@@ -152,6 +155,7 @@ var _ = ginkgo.Describe("orchestrateSelfUpdate handoff", func() {
 			"watchtower:v2",
 			"watchtower",
 			"",
+			false,
 		)
 
 		gomega.Expect(err).NotTo(gomega.HaveOccurred())
@@ -184,6 +188,7 @@ var _ = ginkgo.Describe("orchestrateSelfUpdate handoff", func() {
 			"watchtower:v2",
 			"watchtower",
 			"",
+			false,
 		)
 
 		gomega.Expect(err).To(gomega.HaveOccurred())
@@ -213,6 +218,7 @@ var _ = ginkgo.Describe("orchestrateSelfUpdate handoff", func() {
 			"watchtower:v2",
 			"watchtower",
 			"",
+			false,
 		)
 
 		gomega.Expect(err).To(gomega.HaveOccurred())
@@ -257,6 +263,7 @@ var _ = ginkgo.Describe("orchestrateSelfUpdate handoff", func() {
 			"watchtower:v2",
 			"watchtower",
 			"",
+			false,
 		)
 
 		gomega.Expect(err).NotTo(gomega.HaveOccurred())
@@ -283,6 +290,7 @@ var _ = ginkgo.Describe("orchestrateSelfUpdate handoff", func() {
 			"watchtower:v2",
 			"watchtower",
 			chain,
+			false,
 		)
 
 		gomega.Expect(err).NotTo(gomega.HaveOccurred())
@@ -291,5 +299,110 @@ var _ = ginkgo.Describe("orchestrateSelfUpdate handoff", func() {
 		gotChain, present := client.TestData.LastStartedContainer.GetContainerChain()
 		gomega.Expect(present).To(gomega.BeTrue())
 		gomega.Expect(gotChain).To(gomega.Equal(chain))
+	})
+
+	ginkgo.It("removes the old image after a successful handoff when cleanup is enabled", func() {
+		old := createEphemeralHandoffContainer("wt-old-cleanup", nil)
+
+		client := mockActions.CreateMockClient(
+			&mockActions.TestData{
+				Containers: []types.Container{old},
+			},
+			false,
+			false,
+		)
+
+		err := orchestrateSelfUpdate(testLogger(),
+			context.Background(),
+			client,
+			"wt-old-cleanup",
+			"watchtower:v2",
+			"watchtower",
+			"",
+			true,
+		)
+
+		gomega.Expect(err).NotTo(gomega.HaveOccurred())
+		gomega.Expect(client.TestData.TriedToRemoveImageCount.Load()).To(gomega.Equal(int32(1)))
+		gomega.Expect(client.TestData.RemoveContainerCount.Load()).To(gomega.BeNumerically(">=", int32(1)))
+	})
+
+	ginkgo.It("does not remove the old image when cleanup is disabled", func() {
+		old := createEphemeralHandoffContainer("wt-old-no-cleanup", nil)
+
+		client := mockActions.CreateMockClient(
+			&mockActions.TestData{
+				Containers: []types.Container{old},
+			},
+			false,
+			false,
+		)
+
+		err := orchestrateSelfUpdate(testLogger(),
+			context.Background(),
+			client,
+			"wt-old-no-cleanup",
+			"watchtower:v2",
+			"watchtower",
+			"",
+			false,
+		)
+
+		gomega.Expect(err).NotTo(gomega.HaveOccurred())
+		gomega.Expect(client.TestData.TriedToRemoveImageCount.Load()).To(gomega.Equal(int32(0)))
+	})
+
+	ginkgo.It("treats an in-use old image as a non-fatal skip", func() {
+		old := createEphemeralHandoffContainer("wt-old-in-use", nil)
+
+		client := mockActions.CreateMockClient(
+			&mockActions.TestData{
+				Containers:       []types.Container{old},
+				FailedImageIDs:   []types.ImageID{old.ImageID()},
+				RemoveImageError: container.ErrImageInUse,
+			},
+			false,
+			false,
+		)
+
+		err := orchestrateSelfUpdate(testLogger(),
+			context.Background(),
+			client,
+			"wt-old-in-use",
+			"watchtower:v2",
+			"watchtower",
+			"",
+			true,
+		)
+
+		gomega.Expect(err).NotTo(gomega.HaveOccurred())
+		gomega.Expect(client.TestData.TriedToRemoveImageCount.Load()).To(gomega.Equal(int32(1)))
+	})
+
+	ginkgo.It("treats a missing old image as a non-fatal skip", func() {
+		old := createEphemeralHandoffContainer("wt-old-missing-image", nil)
+
+		client := mockActions.CreateMockClient(
+			&mockActions.TestData{
+				Containers:       []types.Container{old},
+				FailedImageIDs:   []types.ImageID{old.ImageID()},
+				RemoveImageError: cerrdefs.ErrNotFound,
+			},
+			false,
+			false,
+		)
+
+		err := orchestrateSelfUpdate(testLogger(),
+			context.Background(),
+			client,
+			"wt-old-missing-image",
+			"watchtower:v2",
+			"watchtower",
+			"",
+			true,
+		)
+
+		gomega.Expect(err).NotTo(gomega.HaveOccurred())
+		gomega.Expect(client.TestData.TriedToRemoveImageCount.Load()).To(gomega.Equal(int32(1)))
 	})
 })

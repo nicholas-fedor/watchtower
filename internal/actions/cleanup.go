@@ -781,6 +781,12 @@ func RemoveImages(log *zerolog.Logger, ctx context.Context,
 					Str("image_id", string(imageID)).
 					Str("image_name", image.ImageName).
 					Msg("Image is in use by active container, skipping removal")
+			case errors.Is(err, context.Canceled), errors.Is(err, context.DeadlineExceeded):
+				log.Debug().
+					Err(err).
+					Str("image_id", string(imageID)).
+					Str("image_name", image.ImageName).
+					Msg("Image removal interrupted by cancellation, skipping")
 			default:
 				log.Debug().
 					Err(err).

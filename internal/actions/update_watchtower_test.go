@@ -70,6 +70,52 @@ var _ = ginkgo.Describe("Watchtower container handling", func() {
 				To(gomega.Equal(int32(1)), "IsContainerStale should be called once for Watchtower")
 		})
 
+		ginkgo.It("should not collect Watchtower image cleanup during ephemeral self-update", func() {
+			client := mockActions.CreateMockClient(
+				&mockActions.TestData{
+					Containers: []types.Container{
+						mockActions.CreateMockContainerWithConfig(
+							"watchtower",
+							"/watchtower",
+							"watchtower:latest",
+							true,
+							false,
+							time.Now(),
+							&dockerContainer.Config{
+								Labels: map[string]string{
+									"com.centurylinklabs.watchtower": "true",
+								},
+							}),
+					},
+					Staleness: map[string]bool{
+						"watchtower": true,
+					},
+				},
+				false,
+				false,
+			)
+			report, cleanupImageInfos, err := actions.Update(testLogger(),
+				context.Background(),
+				client,
+				types.UpdateParams{
+					Cleanup:             true,
+					EphemeralSelfUpdate: true,
+					Filter:              filters.WatchtowerContainersFilter,
+					CPUCopyMode:         "auto",
+					PullFailureDelay:    10 * time.Millisecond,
+				},
+			)
+			gomega.Expect(err).NotTo(gomega.HaveOccurred())
+			gomega.Expect(report.Updated()).To(gomega.HaveLen(1))
+			gomega.Expect(cleanupImageInfos).
+				To(gomega.BeEmpty(), "Dying process must not collect the Watchtower image for cleanup")
+			gomega.Expect(client.TestData.TriedToRemoveImageCount.Load()).
+				To(gomega.Equal(int32(0)), "RemoveImageByID should not be called during Update")
+			gomega.Expect(client.TestData.RenameContainerCount.Load()).
+				To(gomega.Equal(int32(0)), "RenameContainer should not be called for ephemeral self-update")
+			gomega.Expect(client.TestData.LastCleanup).To(gomega.BeTrue())
+		})
+
 		ginkgo.It("should skip rename with no-restart for Watchtower", func() {
 			client := mockActions.CreateMockClient(
 				&mockActions.TestData{

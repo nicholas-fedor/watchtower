@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"strconv"
 	"time"
 
 	"github.com/rs/zerolog"
@@ -58,7 +59,8 @@ var (
 //  3. Creates a new container from the new image with the same config
 //  4. Starts the new container
 //  5. Removes the old container
-//  6. Exits (AutoRemove cleans up the orchestrator)
+//  6. When cleanup is enabled, removes the unused predecessor image
+//  7. Exits (AutoRemove cleans up the orchestrator)
 //
 // This function returns immediately after starting the orchestrator. The
 // orchestrator handles the full replacement sequence asynchronously. The
@@ -77,7 +79,8 @@ var (
 //
 // Returns:
 //   - types.ContainerID: Empty string (the new container's ID is not known to the caller).
-//   - bool: False (old container is removed, not renamed).
+//   - bool: True so the dying process skips image cleanup. The orchestrator
+//     removes the old container and, when cleanup is enabled, the old image.
 //   - error: Non-nil if orchestrator creation fails.
 func EphemeralSelfUpdate(log *zerolog.Logger, ctx context.Context,
 	client container.Client,
@@ -142,6 +145,7 @@ func EphemeralSelfUpdate(log *zerolog.Logger, ctx context.Context,
 		sourceContainer,
 		newImage,
 		newChain,
+		config.Cleanup,
 	)
 	if err != nil {
 		clog.Error().
@@ -173,10 +177,11 @@ func EphemeralSelfUpdate(log *zerolog.Logger, ctx context.Context,
 	// stopped. Callers must handle the ephemeral case specially (skip health checks
 	// and post-update hooks since the old process exits before the new container exists).
 	//
-	// Return false for "renamed" because in the ephemeral flow the old container
-	// IS removed (not renamed). This allows cleanup image info to be collected
-	// for the old image, unlike the rename path where the old container persists.
-	return "", false, nil
+	// Return true for "renamed" so the dying process does not collect the old
+	// image for cleanup. This process is about to be stopped and still uses that
+	// image. The orchestrator removes the old container and, when cleanup is
+	// enabled, the old image after the replacement is running.
+	return "", true, nil
 }
 
 // RunOrchestrator executes the orchestrator mode for self-update.
@@ -194,6 +199,7 @@ func EphemeralSelfUpdate(log *zerolog.Logger, ctx context.Context,
 //  6. START NEW: Start the new Watchtower container
 //  7. VERIFY: Confirm the new container is running
 //  8. REMOVE OLD: Delete the renamed predecessor
+//  9. REMOVE OLD IMAGE: When cleanup is enabled, delete the unused predecessor image
 //
 // Stop before create releases published host ports. Rename keeps the stopped
 // predecessor for recovery if create or start fails (restore name and start).
@@ -211,7 +217,7 @@ func RunOrchestrator(log *zerolog.Logger, ctx context.Context, client container.
 	clog.Debug().Msg("Starting Watchtower self-update orchestrator")
 
 	// Read environment variables.
-	oldID, newImage, originalName, containerChain, err := readOrchestratorEnv()
+	oldID, newImage, originalName, containerChain, cleanup, err := readOrchestratorEnv()
 	if err != nil {
 		clog.Fatal().
 			Err(err).
@@ -223,6 +229,7 @@ func RunOrchestrator(log *zerolog.Logger, ctx context.Context, client container.
 		Str("new_image", newImage).
 		Str("original_name", originalName).
 		Str("container_chain", containerChain).
+		Bool("cleanup", cleanup).
 		Msg("Read orchestrator environment variables")
 
 	// Create a timeout context for the entire orchestration.
@@ -239,6 +246,7 @@ func RunOrchestrator(log *zerolog.Logger, ctx context.Context, client container.
 		newImage,
 		originalName,
 		containerChain,
+		cleanup,
 	)
 	// Determine exit code and log result.
 	exitCode := 0
@@ -265,11 +273,12 @@ func RunOrchestrator(log *zerolog.Logger, ctx context.Context, client container.
 //   - string: New image reference.
 //   - string: Original container name.
 //   - string: Container chain for lineage tracking.
+//   - bool: Whether old-image cleanup is enabled.
 //   - error: Non-nil if any required variable is missing.
-func readOrchestratorEnv() (string, string, string, string, error) {
+func readOrchestratorEnv() (string, string, string, string, bool, error) {
 	oldID := os.Getenv("WT_ORCHESTRATOR_OLD_ID")
 	if oldID == "" {
-		return "", "", "", "", fmt.Errorf(
+		return "", "", "", "", false, fmt.Errorf(
 			"%w: WT_ORCHESTRATOR_OLD_ID",
 			errOrchestratorMissingEnv,
 		)
@@ -277,7 +286,7 @@ func readOrchestratorEnv() (string, string, string, string, error) {
 
 	newImage := os.Getenv("WT_ORCHESTRATOR_NEW_IMAGE")
 	if newImage == "" {
-		return "", "", "", "", fmt.Errorf(
+		return "", "", "", "", false, fmt.Errorf(
 			"%w: WT_ORCHESTRATOR_NEW_IMAGE",
 			errOrchestratorMissingEnv,
 		)
@@ -285,7 +294,7 @@ func readOrchestratorEnv() (string, string, string, string, error) {
 
 	originalName := os.Getenv("WT_ORCHESTRATOR_ORIGINAL_NAME")
 	if originalName == "" {
-		return "", "", "", "", fmt.Errorf(
+		return "", "", "", "", false, fmt.Errorf(
 			"%w: WT_ORCHESTRATOR_ORIGINAL_NAME",
 			errOrchestratorMissingEnv,
 		)
@@ -293,7 +302,9 @@ func readOrchestratorEnv() (string, string, string, string, error) {
 
 	containerChain := os.Getenv("WT_ORCHESTRATOR_CONTAINER_CHAIN")
 
-	return oldID, newImage, originalName, containerChain, nil
+	cleanup, _ := strconv.ParseBool(os.Getenv("WT_ORCHESTRATOR_CLEANUP"))
+
+	return oldID, newImage, originalName, containerChain, cleanup, nil
 }
 
 // orchestrateSelfUpdate performs the container replacement sequence for a
@@ -307,6 +318,7 @@ func readOrchestratorEnv() (string, string, string, string, error) {
 //  5. Create and start the new container under the original name.
 //  6. Verify the new container is running.
 //  7. Remove the renamed predecessor.
+//  8. When cleanup is enabled, remove the unused predecessor image.
 //
 // Stop before create releases published host ports. Rename keeps the stopped
 // predecessor available for recovery. On create/start/verify failure after
@@ -319,6 +331,7 @@ func readOrchestratorEnv() (string, string, string, string, error) {
 //   - newImage: Image reference for the new container.
 //   - originalName: Original container name to preserve on the new container.
 //   - containerChain: Container chain label for lineage tracking.
+//   - cleanup: Remove the old image after the predecessor container is gone.
 //
 // Returns:
 //   - error: Non-nil if any step in the orchestration fails.
@@ -328,6 +341,7 @@ func orchestrateSelfUpdate(log *zerolog.Logger, ctx context.Context,
 	newImage string,
 	originalName string,
 	containerChain string,
+	cleanup bool,
 ) error {
 	clogVal := log.With().
 		Str("old_id", oldID).
@@ -346,6 +360,10 @@ func orchestrateSelfUpdate(log *zerolog.Logger, ctx context.Context,
 	if err != nil {
 		return err
 	}
+
+	// Capture before pinContainerCreateImage overwrites the cached image name.
+	oldImageID := oldContainer.ImageID()
+	oldImageName := oldContainer.ImageName()
 
 	pinContainerCreateImage(oldContainer, newImage, clog)
 
@@ -400,6 +418,10 @@ func orchestrateSelfUpdate(log *zerolog.Logger, ctx context.Context,
 				Err(removeErr).
 				Msg("New Watchtower is running but cleanup of the old container failed")
 		}
+	}
+
+	if cleanup {
+		removeOldImage(ctx, client, clog, oldImageID, oldImageName)
 	}
 
 	// Emit the actual new container ID at Info level so notification templates
@@ -755,6 +777,57 @@ func removeOldContainer(
 	clog.Debug().Msg("Old container removed")
 
 	return nil
+}
+
+// removeOldImage removes the predecessor Watchtower image after a successful
+// handoff. NotFound and in-use errors are skipped. Other failures are logged
+// and do not fail orchestration because the replacement is already running.
+//
+// Parameters:
+//   - ctx: Context for cancellation and timeouts.
+//   - client: Container client for Docker operations.
+//   - clog: Logger with container context fields.
+//   - imageID: ID of the predecessor image captured before create-image pinning.
+//   - imageName: Name of the predecessor image captured before create-image pinning.
+func removeOldImage(
+	ctx context.Context,
+	client container.Client,
+	clog *zerolog.Logger,
+	imageID types.ImageID,
+	imageName string,
+) {
+	if imageID == "" {
+		return
+	}
+
+	clog.Debug().
+		Str("image_id", imageID.ShortID()).
+		Str("image_name", imageName).
+		Msg("Removing old Watchtower image after ephemeral handoff")
+
+	err := client.RemoveImageByID(ctx, imageID, imageName)
+	if err == nil {
+		return
+	}
+
+	switch {
+	case cerrdefs.IsNotFound(err),
+		cerrdefs.IsConflict(err),
+		errors.Is(err, container.ErrImageInUse),
+		errors.Is(err, context.Canceled),
+		errors.Is(err, context.DeadlineExceeded):
+		clog.Debug().
+			Err(err).
+			Str("image_id", imageID.ShortID()).
+			Str("image_name", imageName).
+			Msg("Skipped old Watchtower image removal")
+	default:
+		clog.Warn().
+			Err(err).
+			Str("image_id", imageID.ShortID()).
+			Str("image_name", imageName).
+			Msg("New Watchtower is running but cleanup of the old image failed")
+	}
 }
 
 // createAndStartNewContainer creates and starts a new container using the old
