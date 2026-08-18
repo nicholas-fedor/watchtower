@@ -125,6 +125,39 @@ func Wait(ctx context.Context, host string) error {
 	}
 }
 
+// WaitCooldown blocks until host is outside its 429 cooldown.
+//
+// Unlike Wait, this does not reserve a quota token. Callers that already
+// passed Wait use it to recheck cooldown after a lock or slot handoff.
+//
+// Parameters:
+//   - ctx: Context that can cancel the wait.
+//   - host: Registry host. Empty hosts return immediately.
+//
+// Returns:
+//   - error: ctx.Err() when canceled. Nil when the caller may proceed.
+func WaitCooldown(ctx context.Context, host string) error {
+	if host == "" {
+		return nil
+	}
+
+	for {
+		wait := nextCooldownWait(host)
+		if wait <= 0 {
+			return nil
+		}
+
+		timer := time.NewTimer(wait)
+		select {
+		case <-ctx.Done():
+			timer.Stop()
+
+			return fmt.Errorf("registry rate-limit wait canceled: %w", ctx.Err())
+		case <-timer.C:
+		}
+	}
+}
+
 // nextWait computes how long the caller must wait before contacting host.
 //
 // Parameters:
@@ -158,6 +191,25 @@ func nextWait(host string) time.Duration {
 	perToken := max(state.window/time.Duration(state.allowed), time.Millisecond)
 
 	return perToken
+}
+
+// nextCooldownWait returns remaining 429 cooldown for host without taking a token.
+//
+// Parameters:
+//   - host: Registry host whose cooldown should be inspected.
+//
+// Returns:
+//   - time.Duration: Sleep before the next request. Zero when there is no cooldown.
+func nextCooldownWait(host string) time.Duration {
+	hostsMu.Lock()
+	defer hostsMu.Unlock()
+
+	state := hosts[host]
+	if state == nil || !time.Now().Before(state.cooldownUntil) {
+		return 0
+	}
+
+	return time.Until(state.cooldownUntil)
 }
 
 // hostLocked returns the per-host limiter state, creating it when missing.

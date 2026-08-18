@@ -52,6 +52,57 @@ func TestWaitHonorsAllowedBudget(t *testing.T) {
 	assert.GreaterOrEqual(t, time.Since(started), 80*time.Millisecond)
 }
 
+func TestWaitCooldownRespectsHostCooldown(t *testing.T) {
+	ResetForTest()
+
+	Observe("ghcr.io", &Error{RetryAfter: 80 * time.Millisecond})
+
+	started := time.Now()
+	err := WaitCooldown(t.Context(), "ghcr.io")
+	require.NoError(t, err)
+	assert.GreaterOrEqual(t, time.Since(started), 70*time.Millisecond)
+}
+
+func TestWaitCooldownDoesNotConsumeQuotaToken(t *testing.T) {
+	ResetForTest()
+
+	Observe("ghcr.io", &Error{
+		Allowed:       2,
+		AllowedWindow: 200 * time.Millisecond,
+	})
+
+	time.Sleep(220 * time.Millisecond)
+	require.NoError(t, WaitCooldown(t.Context(), "ghcr.io"))
+
+	started := time.Now()
+
+	require.NoError(t, Wait(t.Context(), "ghcr.io"))
+	require.NoError(t, Wait(t.Context(), "ghcr.io"))
+	assert.Less(t, time.Since(started), 50*time.Millisecond)
+}
+
+func TestWaitCooldownEmptyHostReturnsImmediately(t *testing.T) {
+	ResetForTest()
+
+	started := time.Now()
+	err := WaitCooldown(t.Context(), "")
+	require.NoError(t, err)
+	assert.Less(t, time.Since(started), 20*time.Millisecond)
+}
+
+func TestWaitCooldownCancelsWithContext(t *testing.T) {
+	ResetForTest()
+
+	Observe("ghcr.io", &Error{RetryAfter: 5 * time.Second})
+
+	ctx, cancel := context.WithTimeout(t.Context(), 20*time.Millisecond)
+	defer cancel()
+
+	err := WaitCooldown(ctx, "ghcr.io")
+	require.Error(t, err)
+	assert.ErrorIs(t, err, context.DeadlineExceeded)
+}
+
 func TestWaitEmptyHostReturnsImmediately(t *testing.T) {
 	ResetForTest()
 

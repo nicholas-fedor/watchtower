@@ -710,10 +710,20 @@ func (c imageClient) performImagePull(
 		}
 		defer releasePullSlot(pullHost)
 
+		// A sibling pull may have recorded a 429 after this attempt passed Wait
+		// and while it was queued on the slot. Recheck cooldown without taking
+		// another quota token.
+		cooldownErr := ratelimit.WaitCooldown(ctx, pullHost)
+		if cooldownErr != nil {
+			return fmt.Errorf("image pull cooldown wait: %w", cooldownErr)
+		}
+
 		response, err := c.api.ImagePull(ctx, imageName, opts)
 		if err != nil {
 			info := ratelimit.FromErrorMessage(err.Error())
 			if info != nil {
+				ratelimit.Observe(pullHost, info)
+
 				return info
 			}
 
@@ -747,6 +757,7 @@ func (c imageClient) performImagePull(
 		if waitErr != nil {
 			info := ratelimit.FromErrorMessage(waitErr.Error())
 			if info != nil {
+				ratelimit.Observe(pullHost, info)
 				clog.Warn().
 					Err(info).
 					Msg("Registry rate limited image pull")

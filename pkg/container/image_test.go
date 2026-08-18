@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"net/url"
 	"regexp"
+	"sync/atomic"
 	"time"
 
 	"github.com/onsi/ginkgo/v2"
@@ -328,6 +329,76 @@ var _ = ginkgo.Describe("the client", func() {
 			gomega.Expect(time.Since(started)).To(gomega.BeNumerically("<", 300*time.Millisecond))
 
 			gomega.Eventually(blocked, 3*time.Second).Should(gomega.Receive(gomega.BeNil()))
+		})
+		ginkgo.It("does not start a queued same-host pull during Retry-After cooldown", func() {
+			ratelimit.ResetForTest()
+			defer ratelimit.ResetForTest()
+
+			firstEntered := make(chan struct{})
+			releaseFirst := make(chan struct{})
+			secondStarted := make(chan time.Time, 1)
+
+			var pulls atomic.Int32
+
+			mockServer.AllowUnhandledRequests = true
+			mockServer.RouteToHandler("POST", regexp.MustCompile(`/images/create`), func(w http.ResponseWriter, _ *http.Request) {
+				if pulls.Add(1) == 1 {
+					close(firstEntered)
+					<-releaseFirst
+					w.WriteHeader(http.StatusTooManyRequests)
+					_, _ = w.Write([]byte(`{"message":"toomanyrequests: retry-after: 1s, allowed: 44000/minute"}`))
+
+					return
+				}
+
+				select {
+				case secondStarted <- time.Now():
+				default:
+				}
+
+				w.WriteHeader(http.StatusOK)
+				_, _ = w.Write([]byte(`{"status":"Download complete"}` + "\n"))
+			})
+
+			i := newImageClient(mockClient, testLog())
+
+			ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+			defer cancel()
+
+			firstErr := make(chan error, 1)
+			go func() {
+				firstErr <- i.performImagePull(
+					ctx,
+					"ghcr.io/linuxserver/nginx:latest",
+					dockerClient.ImagePullOptions{},
+					nil,
+				)
+			}()
+
+			gomega.Eventually(firstEntered).Should(gomega.BeClosed())
+
+			secondErr := make(chan error, 1)
+			go func() {
+				secondErr <- i.performImagePull(
+					ctx,
+					"ghcr.io/linuxserver/radarr:latest",
+					dockerClient.ImagePullOptions{},
+					nil,
+				)
+			}()
+
+			time.Sleep(50 * time.Millisecond)
+
+			released := time.Now()
+
+			close(releaseFirst)
+
+			var started time.Time
+			gomega.Eventually(secondStarted, 3*time.Second).Should(gomega.Receive(&started))
+			gomega.Expect(started.Sub(released)).To(gomega.BeNumerically(">=", 800*time.Millisecond))
+
+			gomega.Eventually(firstErr, 3*time.Second).Should(gomega.Receive())
+			gomega.Eventually(secondErr, 3*time.Second).Should(gomega.Receive(gomega.BeNil()))
 		})
 	})
 
