@@ -10,6 +10,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Add ncrosty58 as a contributor for code by @allcontributors[bot] in [#2194](https://github.com/nicholas-fedor/watchtower/pull/2194)
+- Add llc1123 as a contributor for code by @allcontributors[bot] in [#2193](https://github.com/nicholas-fedor/watchtower/pull/2193)
+
+### Chores
+
+- Update docker/setup-buildx-action action to v4.3.0 by @renovate[bot] in [#2196](https://github.com/nicholas-fedor/watchtower/pull/2196)
+- Update module github.com/sirupsen/logrus to v1.10.1 by @renovate[bot] in [#2195](https://github.com/nicholas-fedor/watchtower/pull/2195)
+
+## [1.21.0] - 2026-08-18
+
+### Added
+
 - Add JSON porcelain output format by @nicholas-fedor in [#2158](https://github.com/nicholas-fedor/watchtower/pull/2158)
 
 ### Changed
@@ -3453,7 +3465,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## Compare Releases
 
-- [unreleased](https://github.com/nicholas-fedor/watchtower/compare/v1.20.3...HEAD)
+- [unreleased](https://github.com/nicholas-fedor/watchtower/compare/v1.21.0...HEAD)
+- [1.21.0](https://github.com/nicholas-fedor/watchtower/compare/v1.20.3...v1.21.0)
 - [1.20.3](https://github.com/nicholas-fedor/watchtower/compare/v1.20.2...v1.20.3)
 - [1.20.2](https://github.com/nicholas-fedor/watchtower/compare/v1.20.1...v1.20.2)
 - [1.20.1](https://github.com/nicholas-fedor/watchtower/compare/v1.20.0...v1.20.1)
