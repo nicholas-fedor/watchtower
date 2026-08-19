@@ -199,6 +199,7 @@ Thanks goes to these wonderful people ([emoji key](https://allcontributors.org/e
       <td align="center" valign="top" width="14.28%"><a href="https://gauthierpainteaux.fr"><img src="https://avatars.githubusercontent.com/u/32100821?v=4?s=100" width="100px;" alt="Gauthier Painteaux"/><br /><sub><b>Gauthier Painteaux</b></sub></a><br /><a href="https://github.com/nicholas-fedor/watchtower/commits?author=Greite" title="Code">💻</a> <a href="https://github.com/nicholas-fedor/watchtower/commits?author=Greite" title="Tests">⚠️</a> <a href="https://github.com/nicholas-fedor/watchtower/commits?author=Greite" title="Documentation">📖</a></td>
     </tr>
     <tr>
+      <td align="center" valign="top" width="14.28%"><a href="https://github.com/llc1123"><img src="https://avatars.githubusercontent.com/u/5478730?v=4?s=100" width="100px;" alt="粒粒橙"/><br /><sub><b>粒粒橙</b></sub></a><br /><a href="https://github.com/nicholas-fedor/watchtower/commits?author=llc1123" title="Code">💻</a></td>
       <td align="center" valign="top" width="14.28%"><a href="https://github.com/ncrosty58"><img src="https://avatars.githubusercontent.com/u/96956364?v=4?s=100" width="100px;" alt="ncrosty58"/><br /><sub><b>ncrosty58</b></sub></a><br /><a href="https://github.com/nicholas-fedor/watchtower/commits?author=ncrosty58" title="Code">💻</a></td>
     </tr>
   </tbody>
