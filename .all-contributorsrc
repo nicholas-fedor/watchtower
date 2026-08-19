@@ -984,6 +984,15 @@
         "test",
         "doc"
       ]
+    },
+    {
+      "login": "llc1123",
+      "name": "粒粒橙",
+      "avatar_url": "https://avatars.githubusercontent.com/u/5478730?v=4",
+      "profile": "https://github.com/llc1123",
+      "contributions": [
+        "code"
+      ]
     }
   ],
   "contributorsPerLine": 7,
