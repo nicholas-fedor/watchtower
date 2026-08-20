@@ -15,6 +15,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Chores
 
+- Update go-openapi packages to v0.29.0 by @renovate[bot] in [#2208](https://github.com/nicholas-fedor/watchtower/pull/2208)
+- Update go module directive to v1.27.0 by @renovate[bot] in [#2206](https://github.com/nicholas-fedor/watchtower/pull/2206)
 - Update cimg/go docker tag to v1.27.0 by @renovate[bot] in [#2205](https://github.com/nicholas-fedor/watchtower/pull/2205)
 - Update module github.com/stretchr/testify to v1.12.1 by @renovate[bot] in [#2202](https://github.com/nicholas-fedor/watchtower/pull/2202)
 - Update golang:alpine3.24 docker digest to 4c9fe60 by @renovate[bot] in [#2201](https://github.com/nicholas-fedor/watchtower/pull/2201)
