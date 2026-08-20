@@ -15,6 +15,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Chores
 
+- Update golang:alpine3.24 docker digest to 4c9fe60 by @renovate[bot] in [#2201](https://github.com/nicholas-fedor/watchtower/pull/2201)
 - Update cimg/go docker tag to v1.26.7 by @renovate[bot] in [#2199](https://github.com/nicholas-fedor/watchtower/pull/2199)
 - Update golang:alpine3.24 docker digest to 28d89ee by @renovate[bot] in [#2198](https://github.com/nicholas-fedor/watchtower/pull/2198)
 - Update docker/setup-buildx-action action to v4.3.0 by @renovate[bot] in [#2196](https://github.com/nicholas-fedor/watchtower/pull/2196)
