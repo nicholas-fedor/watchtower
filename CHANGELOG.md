@@ -15,6 +15,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Chores
 
+- Bump go-openapi jsonreference and spec by @nicholas-fedor in [#2224](https://github.com/nicholas-fedor/watchtower/pull/2224)
 - Update github.com/google/pprof digest to 8a17677 by @renovate[bot] in [#2222](https://github.com/nicholas-fedor/watchtower/pull/2222)
 - Update cimg/go:1.27.0 docker digest to 4da2d4b by @renovate[bot] in [#2221](https://github.com/nicholas-fedor/watchtower/pull/2221)
 - Update module github.com/gofiber/utils/v2 to v2.4.2 by @renovate[bot] in [#2219](https://github.com/nicholas-fedor/watchtower/pull/2219)
