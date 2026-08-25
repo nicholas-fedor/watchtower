@@ -24,7 +24,7 @@ on:
     types: [published]
 
 concurrency:
-  group: ${{ github.workflow }}
+  group: publish-docs
   cancel-in-progress: false
 
 permissions:
