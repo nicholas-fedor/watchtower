@@ -64,6 +64,7 @@ type ScanCompletedData struct {
 	Scanned int `json:"scanned"`
 	Updated int `json:"updated"`
 	Failed  int `json:"failed"`
+	Skipped int `json:"skipped"`
 }
 
 // ScanFailedData carries details about a scan that encountered an error.

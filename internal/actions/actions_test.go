@@ -990,6 +990,41 @@ var _ = ginkgo.Describe("Actions", func() {
 
 			gomega.Expect(found).To(gomega.BeTrue())
 		})
+
+		ginkgo.It("should log skipped count on the session completion line", func() {
+			mockReport := mockTypes.NewMockReport(ginkgo.GinkgoT())
+			skippedA := mockTypes.NewMockContainerReport(ginkgo.GinkgoT())
+			skippedB := mockTypes.NewMockContainerReport(ginkgo.GinkgoT())
+
+			mockReport.EXPECT().Scanned().Return(make([]types.ContainerReport, 23))
+			mockReport.EXPECT().Updated().Return([]types.ContainerReport{})
+			mockReport.EXPECT().Failed().Return([]types.ContainerReport{})
+			mockReport.EXPECT().Restarted().Return([]types.ContainerReport{})
+			mockReport.EXPECT().Skipped().Return([]types.ContainerReport{skippedA, skippedB})
+
+			log, buf := newCaptureLogger()
+			metric := generateAndLogMetric(log, mockReport)
+
+			gomega.Expect(metric.Skipped).To(gomega.Equal(2))
+			gomega.Expect(metric.Scanned).To(gomega.Equal(23))
+
+			var found bool
+
+			for _, entry := range parseJSONLogEntries(buf) {
+				if entry["message"] != "Update session completed" {
+					continue
+				}
+
+				found = true
+
+				gomega.Expect(entry["skipped"]).To(gomega.BeEquivalentTo(2))
+				gomega.Expect(entry["scanned"]).To(gomega.BeEquivalentTo(23))
+				gomega.Expect(entry["updated"]).To(gomega.BeEquivalentTo(0))
+				gomega.Expect(entry["failed"]).To(gomega.BeEquivalentTo(0))
+			}
+
+			gomega.Expect(found).To(gomega.BeTrue())
+		})
 	})
 
 	ginkgo.Describe("Multiple Concurrent Scopes", func() {
