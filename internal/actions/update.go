@@ -1887,7 +1887,8 @@ func restartContainersInSortedOrder(log *zerolog.Logger, ctx context.Context,
 						c.ImageID(),
 						c.ImageName(),
 						c.Name(),
-						c.ID())
+						c.ID(),
+					)
 				}
 			}
 		}

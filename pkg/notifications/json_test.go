@@ -203,10 +203,8 @@ var _ = ginkgo.Describe("JSON template", func() {
 				data := Data{
 					Entries: []*notificationEntry{},
 					Report:  nil,
-					StaticData: StaticData{
-						Title: "Test Title",
-						Host:  "Test Host",
-					},
+					Title:   "Test Title",
+					Host:    "Test Host",
 				}
 				result := getTemplatedResult(`json.v1`, false, data)
 

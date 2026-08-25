@@ -87,7 +87,7 @@ func New(
 //	@Failure		500			{string}	string					"Failed to check for updates"
 //	@Failure		401			{string}	string					"Missing or invalid API token"
 //	@Security		BearerAuth
-//	@Router		/v1/check [post]
+//	@Router			/v1/check [post]
 func (h *Handler) Handle(c fiber.Ctx) error {
 	// API check path must not re-enter notification hooks (notify=no child of h.log).
 	apiLog := h.log.With().Str("notify", "no").Logger()

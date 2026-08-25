@@ -907,7 +907,8 @@ func fetchPlatformManifestWithRetry(log *zerolog.Logger,
 					"application/vnd.oci.image.manifest.v1+json",
 					"application/vnd.docker.distribution.manifest.v2+json",
 				},
-				", "),
+				", ",
+			),
 		)
 		req.Header.Set("User-Agent", meta.UserAgent)
 
@@ -993,7 +994,8 @@ func fetchPlatformManifestWithRetry(log *zerolog.Logger,
 							"application/vnd.oci.image.manifest.v1+json",
 							"application/vnd.docker.distribution.manifest.v2+json",
 						},
-						", "),
+						", ",
+					),
 				)
 				retryReq.Header.Set("User-Agent", meta.UserAgent)
 

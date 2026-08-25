@@ -82,7 +82,8 @@ func initTokenCache(log *zerolog.Logger) {
 				InitialCapacity:  tokenCacheInitialCapacity,
 				ExpiryCalculator: &tokenExpiryCalculator{},
 				StatsRecorder:    counter,
-			})
+			},
+		)
 		if err != nil {
 			panic(fmt.Sprintf("failed to initialize token cache: %v", err))
 		}

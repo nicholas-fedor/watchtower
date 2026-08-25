@@ -344,7 +344,8 @@ var _ = ginkgo.Describe("the client", func() {
 					mockContainer.GetContainerHandlers(
 						&mockContainer.Watchtower,
 						&mockContainer.Running,
-					)...)
+					)...,
+				)
 
 				client := &client{
 					api:           docker,
@@ -368,7 +369,8 @@ var _ = ginkgo.Describe("the client", func() {
 					mockContainer.GetContainerHandlers(
 						&mockContainer.Watchtower,
 						&mockContainer.Running,
-					)...)
+					)...,
+				)
 
 				filter := filters.FilterByNames(testLog(), []string{"lollercoaster"}, filters.NoFilter)
 				client := &client{
@@ -390,7 +392,8 @@ var _ = ginkgo.Describe("the client", func() {
 					mockContainer.GetContainerHandlers(
 						&mockContainer.Watchtower,
 						&mockContainer.Running,
-					)...)
+					)...,
+				)
 
 				client := &client{
 					api:           docker,
@@ -418,11 +421,12 @@ var _ = ginkgo.Describe("the client", func() {
 						&mockContainer.Stopped,
 						&mockContainer.Watchtower,
 						&mockContainer.Running,
-					)...)
+					)...,
+				)
 
 				client := &client{
-					api:           docker,
-					ClientOptions: ClientOptions{IncludeStopped: true},
+					api:            docker,
+					IncludeStopped: true,
 				}
 				// Execute ListContainers and verify stopped containers are included.
 				containers, err := client.ListContainers(
@@ -445,11 +449,12 @@ var _ = ginkgo.Describe("the client", func() {
 						&mockContainer.Watchtower,
 						&mockContainer.Running,
 						&mockContainer.Restarting,
-					)...)
+					)...,
+				)
 
 				client := &client{
-					api:           docker,
-					ClientOptions: ClientOptions{IncludeRestarting: true},
+					api:               docker,
+					IncludeRestarting: true,
 				}
 				// Execute ListContainers and verify restarting containers are included.
 				containers, err := client.ListContainers(
@@ -469,11 +474,12 @@ var _ = ginkgo.Describe("the client", func() {
 					mockContainer.GetContainerHandlers(
 						&mockContainer.Watchtower,
 						&mockContainer.Running,
-					)...)
+					)...,
+				)
 
 				client := &client{
-					api:           docker,
-					ClientOptions: ClientOptions{IncludeRestarting: false},
+					api:               docker,
+					IncludeRestarting: false,
 				}
 				// Execute ListContainers and verify no restarting containers are included.
 				containers, err := client.ListContainers(
@@ -493,7 +499,8 @@ var _ = ginkgo.Describe("the client", func() {
 					mockContainer.GetContainerHandlers(
 						&mockContainer.Watchtower,
 						&mockContainer.Running,
-					)...)
+					)...,
+				)
 
 				client := &client{
 					api:           docker,
@@ -515,7 +522,8 @@ var _ = ginkgo.Describe("the client", func() {
 					mockContainer.GetContainerHandlers(
 						&mockContainer.Watchtower,
 						&mockContainer.Running,
-					)...)
+					)...,
+				)
 
 				client := &client{
 					api:           docker,
@@ -568,7 +576,8 @@ var _ = ginkgo.Describe("the client", func() {
 					// Set up mock server for a container with network mode.
 					consumerContainerRef := mockContainer.NetConsumerOK
 					mockServer.AppendHandlers(
-						mockContainer.GetContainerHandlers(&consumerContainerRef)...)
+						mockContainer.GetContainerHandlers(&consumerContainerRef)...,
+					)
 
 					client := &client{
 						api:           docker,
@@ -589,7 +598,8 @@ var _ = ginkgo.Describe("the client", func() {
 					// Set up mock server for a container with invalid network supplier.
 					consumerContainerRef := mockContainer.NetConsumerInvalidSupplier
 					mockServer.AppendHandlers(
-						mockContainer.GetContainerHandlers(&consumerContainerRef)...)
+						mockContainer.GetContainerHandlers(&consumerContainerRef)...,
+					)
 
 					client := &client{
 						api:           docker,
@@ -711,11 +721,9 @@ var _ = ginkgo.Describe("the client", func() {
 					memFs := afero.NewMemMapFs()
 					afero.WriteFile(memFs, "/run/.containerenv", []byte{}, 0o644)
 					testClient := &client{
-						api: docker,
-						ClientOptions: ClientOptions{
-							CPUCopyMode: CPUCopyModeAuto,
-							Fs:          memFs,
-						},
+						api:         docker,
+						CPUCopyMode: CPUCopyModeAuto,
+						Fs:          memFs,
 					}
 					result := testClient.getRuntime()
 					gomega.Expect(result).To(gomega.BeTrue())
@@ -728,11 +736,9 @@ var _ = ginkgo.Describe("the client", func() {
 					defer restore()
 
 					testClient := &client{
-						api: docker,
-						ClientOptions: ClientOptions{
-							CPUCopyMode: CPUCopyModeAuto,
-							Fs:          memFs,
-						},
+						api:         docker,
+						CPUCopyMode: CPUCopyModeAuto,
+						Fs:          memFs,
 					}
 					result := testClient.getRuntime()
 					gomega.Expect(result).To(gomega.BeTrue())
@@ -751,11 +757,9 @@ var _ = ginkgo.Describe("the client", func() {
 					)
 
 					testClient := &client{
-						api: docker,
-						ClientOptions: ClientOptions{
-							CPUCopyMode: CPUCopyModeAuto,
-							Fs:          memFs,
-						},
+						api:         docker,
+						CPUCopyMode: CPUCopyModeAuto,
+						Fs:          memFs,
 					}
 					result := testClient.getRuntime()
 					gomega.Expect(result).To(gomega.BeTrue())
@@ -774,11 +778,9 @@ var _ = ginkgo.Describe("the client", func() {
 					)
 
 					testClient := &client{
-						api: docker,
-						ClientOptions: ClientOptions{
-							CPUCopyMode: CPUCopyModeAuto,
-							Fs:          memFs,
-						},
+						api:         docker,
+						CPUCopyMode: CPUCopyModeAuto,
+						Fs:          memFs,
 					}
 					result := testClient.getRuntime()
 					gomega.Expect(result).To(gomega.BeTrue())
@@ -797,11 +799,9 @@ var _ = ginkgo.Describe("the client", func() {
 					)
 
 					testClient := &client{
-						api: docker,
-						ClientOptions: ClientOptions{
-							CPUCopyMode: CPUCopyModeAuto,
-							Fs:          memFs,
-						},
+						api:         docker,
+						CPUCopyMode: CPUCopyModeAuto,
+						Fs:          memFs,
 					}
 					result := testClient.getRuntime()
 					gomega.Expect(result).To(gomega.BeFalse())
@@ -820,12 +820,10 @@ var _ = ginkgo.Describe("the client", func() {
 					log, logbuf := captureLog(zerolog.DebugLevel)
 
 					testClient := &client{
-						log: log,
-						api: docker,
-						ClientOptions: ClientOptions{
-							CPUCopyMode: CPUCopyModeAuto,
-							Fs:          memFs,
-						},
+						log:         log,
+						api:         docker,
+						CPUCopyMode: CPUCopyModeAuto,
+						Fs:          memFs,
 					}
 					result := testClient.getRuntime()
 					gomega.Expect(result).To(gomega.BeFalse())
@@ -838,12 +836,10 @@ var _ = ginkgo.Describe("the client", func() {
 				ginkgo.It("should return false without calling detection", func() {
 					memFs := afero.NewMemMapFs()
 					testClient := &client{
-						log: testLog(),
-						api: docker,
-						ClientOptions: ClientOptions{
-							CPUCopyMode: "manual",
-							Fs:          memFs,
-						},
+						log:         testLog(),
+						api:         docker,
+						CPUCopyMode: "manual",
+						Fs:          memFs,
 					}
 					result := testClient.getRuntime()
 					gomega.Expect(result).To(gomega.BeFalse())
@@ -861,9 +857,7 @@ var _ = ginkgo.Describe("the client", func() {
 			afero.WriteFile(memFs, "/run/.containerenv", []byte{}, 0o644)
 			testClient := &client{
 				log: testLog(),
-				ClientOptions: ClientOptions{
-					Fs: memFs,
-				},
+				Fs:  memFs,
 			}
 			result, err := testClient.detectRuntimeByMarker()
 			gomega.Expect(err).ToNot(gomega.HaveOccurred())
@@ -874,9 +868,7 @@ var _ = ginkgo.Describe("the client", func() {
 			memFs := afero.NewMemMapFs()
 			afero.WriteFile(memFs, "/.dockerenv", []byte{}, 0o644)
 			testClient := &client{
-				ClientOptions: ClientOptions{
-					Fs: memFs,
-				},
+				Fs: memFs,
 			}
 			result, err := testClient.detectRuntimeByMarker()
 			gomega.Expect(err).ToNot(gomega.HaveOccurred())
@@ -886,9 +878,7 @@ var _ = ginkgo.Describe("the client", func() {
 		ginkgo.It("should return RuntimeUnknown when neither marker file exists", func() {
 			memFs := afero.NewMemMapFs()
 			testClient := &client{
-				ClientOptions: ClientOptions{
-					Fs: memFs,
-				},
+				Fs: memFs,
 			}
 			result, err := testClient.detectRuntimeByMarker()
 			gomega.Expect(err).ToNot(gomega.HaveOccurred())
@@ -900,9 +890,7 @@ var _ = ginkgo.Describe("the client", func() {
 			afero.WriteFile(memFs, "/run/.containerenv", []byte{}, 0o644)
 			afero.WriteFile(memFs, "/.dockerenv", []byte{}, 0o644)
 			testClient := &client{
-				ClientOptions: ClientOptions{
-					Fs: memFs,
-				},
+				Fs: memFs,
 			}
 			result, err := testClient.detectRuntimeByMarker()
 			gomega.Expect(err).ToNot(gomega.HaveOccurred())

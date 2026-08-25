@@ -111,12 +111,10 @@ func (c Config) BuildRunConfig(input RunConfigInput) (types.RunConfig, error) {
 //   - logging.StartupParams: Mode and HTTP API values for startup messaging.
 func (c Config) StartupParams(run types.RunConfig) logging.StartupParams {
 	return logging.StartupParams{
-		NoStartupMessage: c.Mode.NoStartupMessage,
-		ScheduleInfo: logging.ScheduleInfo{
-			RunOnce:              c.Mode.RunOnce,
-			HTTPAPIUpdate:        run.EnableUpdateAPI,
-			HTTPAPIPeriodicPolls: run.UnblockHTTPAPI,
-		},
+		NoStartupMessage:     c.Mode.NoStartupMessage,
+		RunOnce:              c.Mode.RunOnce,
+		HTTPAPIUpdate:        run.EnableUpdateAPI,
+		HTTPAPIPeriodicPolls: run.UnblockHTTPAPI,
 	}
 }
 
