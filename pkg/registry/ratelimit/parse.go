@@ -201,12 +201,8 @@ func ReadBody(resp *http.Response, limit int64) []byte {
 // A bare 429 is recognized only with HTTP or status context so byte counts,
 // ports, and digest hashes are ignored.
 //
-// Some registries throttle without emitting a 429 or "too many requests"
-// token, advertising the limit only through retry-after and quota markers such
-// as "retry-after: 1.08ms, allowed: 44000/minute". Those are treated as rate
-// limits too, so the pull is retried rather than failing permanently. Both
-// patterns require a unit suffix or an explicit quota window, so byte counts,
-// ports, and digest hashes remain unmatched.
+// Some registries advertise a throttle only through retry-after text, with no
+// 429 or "too many requests" token.
 //
 // Parameters:
 //   - message: Registry body or Docker pull-stream error text.
@@ -216,13 +212,10 @@ func ReadBody(resp *http.Response, limit int64) []byte {
 func looksRateLimited(message string) bool {
 	lower := strings.ToLower(message)
 
-	if strings.Contains(lower, "toomanyrequests") ||
+	return strings.Contains(lower, "toomanyrequests") ||
 		strings.Contains(lower, "too many requests") ||
-		status429.MatchString(lower) {
-		return true
-	}
-
-	return retryAfterBody.MatchString(message) || allowedBody.MatchString(message)
+		status429.MatchString(lower) ||
+		retryAfterBody.MatchString(message)
 }
 
 // parseQuotaWindow maps an allowed-quota unit word to a duration.

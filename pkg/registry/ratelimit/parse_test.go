@@ -390,9 +390,9 @@ func TestFromErrorMessageRecognizesPhrases(t *testing.T) {
 }
 
 // TestFromErrorMessageRecognizesQuotaOnlyThrottle covers registries that
-// throttle without a 429 or "too many requests" token, advertising the limit
-// only via retry-after and allowed quota markers. The message is a verbatim
-// Docker daemon pull error from lscr.io.
+// throttle without a 429 or "too many requests" token, advertising the wait
+// only via retry-after text. The first message is a verbatim Docker daemon
+// pull error from lscr.io.
 func TestFromErrorMessageRecognizesQuotaOnlyThrottle(t *testing.T) {
 	t.Parallel()
 
@@ -405,9 +405,10 @@ func TestFromErrorMessageRecognizesQuotaOnlyThrottle(t *testing.T) {
 	assert.Equal(t, 44000, info.Allowed)
 	assert.Equal(t, time.Minute, info.AllowedWindow)
 
-	// retry-after alone, and allowed alone, are each sufficient.
 	require.NotNil(t, FromErrorMessage("error from registry: retry-after: 1.08ms"))
-	require.NotNil(t, FromErrorMessage("error from registry: allowed: 44000/minute"))
+	require.NotNil(t, FromErrorMessage(
+		"error from registry: retry-after: 802.695\u00b5s, allowed: 44000/minute",
+	))
 }
 
 func TestFromErrorMessageIgnoresUnrelatedErrors(t *testing.T) {
@@ -420,6 +421,12 @@ func TestFromErrorMessageIgnoresUnrelatedErrors(t *testing.T) {
 	assert.Nil(t, FromErrorMessage("wrote 1429 bytes"))
 	assert.Nil(t, FromErrorMessage("wrote 429 bytes"))
 	assert.Nil(t, FromErrorMessage("dial tcp 10.0.0.1:429: connect: connection refused"))
+	assert.Nil(t, FromErrorMessage("error from registry: allowed: 44000/minute"))
+	assert.Nil(t, FromErrorMessage("retry-after: 5"))
+	assert.Nil(t, FromErrorMessage("Retry-After: Wed, 21 Oct 2015 07:28:00 GMT"))
+	assert.Nil(t, FromErrorMessage("not allowed: 5/minute"))
+	assert.Nil(t, FromErrorMessage("disallowed: 10/hour"))
+	assert.Nil(t, FromErrorMessage("max allowed: 100/minute"))
 }
 
 func TestDecisionCapsTinyAndHugeRetryAfter(t *testing.T) {
