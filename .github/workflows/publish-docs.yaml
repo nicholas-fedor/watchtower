@@ -23,6 +23,10 @@ on:
   release:
     types: [published]
 
+concurrency:
+  group: ${{ github.workflow }}
+  cancel-in-progress: false
+
 permissions:
   contents: read # Set default read-only permissions
 

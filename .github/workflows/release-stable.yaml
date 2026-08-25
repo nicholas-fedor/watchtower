@@ -51,7 +51,7 @@ jobs:
   publish-docs:
     name: Publish Documentation
     needs: [build]
-    if: ${{ !inputs.DRY_RUN }}
+    if: ${{ !inputs.DRY_RUN && github.ref_type == 'tag' }}
     permissions:
       contents: write
       actions: read
