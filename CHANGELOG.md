@@ -8,17 +8,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- Add jmooo as a contributor for bug, and code by @allcontributors[bot] in [#2239](https://github.com/nicholas-fedor/watchtower/pull/2239)
+
 ### Changed
 
 - Publish docs on stable tag releases by @nicholas-fedor in [#2235](https://github.com/nicholas-fedor/watchtower/pull/2235)
 
 ### Chores
 
+- Apply gofumpt extras and golangci-lint formatter updates by @nicholas-fedor in [#2242](https://github.com/nicholas-fedor/watchtower/pull/2242)
+- Update nicholas-fedor/go-proxy-pull-action action to v1.1.48 by @renovate[bot] in [#2238](https://github.com/nicholas-fedor/watchtower/pull/2238)
+- Update module github.com/sirupsen/logrus to v1.10.2 by @renovate[bot] in [#2237](https://github.com/nicholas-fedor/watchtower/pull/2237)
 - Update opentelemetry-go monorepo to v1.46.0 by @renovate[bot] in [#2232](https://github.com/nicholas-fedor/watchtower/pull/2232)
 - Update github.com/google/pprof digest to 4d45320 by @renovate[bot] in [#2231](https://github.com/nicholas-fedor/watchtower/pull/2231)
 
 ### Fixed
 
+- Include skipped containers in scan summaries by @nicholas-fedor in [#2241](https://github.com/nicholas-fedor/watchtower/pull/2241)
 - Detect throttles advertised only via retry-after by @jmooo in [#2230](https://github.com/nicholas-fedor/watchtower/pull/2230)
 
 ### New Contributors
