@@ -164,11 +164,12 @@ func RunUpdatesWithNotifications(
 
 	// Publish scan completed event
 	if params.EventBroadcaster != nil {
-		scanned, updated, failed := 0, 0, 0
+		scanned, updated, failed, skipped := 0, 0, 0, 0
 		if result != nil {
 			scanned = len(result.Scanned())
 			updated = len(result.Updated())
 			failed = len(result.Failed())
+			skipped = len(result.Skipped())
 		}
 
 		params.EventBroadcaster.Publish(events.Event{
@@ -178,6 +179,7 @@ func RunUpdatesWithNotifications(
 				Scanned: scanned,
 				Updated: updated,
 				Failed:  failed,
+				Skipped: skipped,
 			},
 		})
 	}
@@ -743,7 +745,8 @@ func notifySkippedCooldownContainers(
 // process logger. The line carries notify=no so the Shoutrrr hook does not send
 // a second notification after SendNotification has already flushed the session
 // batch. Without that field, legacy templates would emit a standalone
-// "Update session completed" message with only the scanned, updated, and failed counts.
+// "Update session completed" message with only the scanned, updated, failed,
+// and skipped counts.
 //
 // Parameters:
 //   - log: Process logger. Required and must be non-nil.
@@ -760,6 +763,7 @@ func generateAndLogMetric(log *zerolog.Logger, result types.Report) *metrics.Met
 		Int("scanned", metricResults.Scanned).
 		Int("updated", metricResults.Updated).
 		Int("failed", metricResults.Failed).
+		Int("skipped", metricResults.Skipped).
 		Msg("Update session completed")
 
 	return metricResults
