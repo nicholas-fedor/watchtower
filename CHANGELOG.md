@@ -17,6 +17,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Update opentelemetry-go monorepo to v1.46.0 by @renovate[bot] in [#2232](https://github.com/nicholas-fedor/watchtower/pull/2232)
 - Update github.com/google/pprof digest to 4d45320 by @renovate[bot] in [#2231](https://github.com/nicholas-fedor/watchtower/pull/2231)
 
+### Fixed
+
+- Detect throttles advertised only via retry-after by @jmooo in [#2230](https://github.com/nicholas-fedor/watchtower/pull/2230)
+
+### New Contributors
+
+- @jmooo made their first contribution in [#2230](https://github.com/nicholas-fedor/watchtower/pull/2230)
+
 ## [1.21.1] - 2026-08-25
 
 ### Added
