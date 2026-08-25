@@ -8,8 +8,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- Publish docs on stable tag releases by @nicholas-fedor in [#2235](https://github.com/nicholas-fedor/watchtower/pull/2235)
+
 ### Chores
 
+- Update opentelemetry-go monorepo to v1.46.0 by @renovate[bot] in [#2232](https://github.com/nicholas-fedor/watchtower/pull/2232)
 - Update github.com/google/pprof digest to 4d45320 by @renovate[bot] in [#2231](https://github.com/nicholas-fedor/watchtower/pull/2231)
 
 ## [1.21.1] - 2026-08-25
