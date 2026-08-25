@@ -150,17 +150,20 @@ func FromResponse(resp *http.Response, body []byte) *Error {
 
 // FromErrorMessage builds a rate-limit error from Docker pull-stream text.
 //
+// Some registries advertise a throttle only through retry-after text, with no
+// 429 or "too many requests" token. That path requires a duration that
+// [time.ParseDuration] accepts.
+//
 // Parameters:
 //   - message: Stream error or registry body. Empty or unrelated text returns nil.
 //
 // Returns:
 //   - *Error: Parsed rate-limit error, or nil when the message is not a 429.
 func FromErrorMessage(message string) *Error {
-	if !looksRateLimited(message) {
+	retryAfter, allowed, window := ParseQuotaMessage(message)
+	if retryAfter == 0 && !looksRateLimited(message) {
 		return nil
 	}
-
-	retryAfter, allowed, window := ParseQuotaMessage(message)
 
 	return &Error{
 		StatusCode:    http.StatusTooManyRequests,
@@ -201,9 +204,6 @@ func ReadBody(resp *http.Response, limit int64) []byte {
 // A bare 429 is recognized only with HTTP or status context so byte counts,
 // ports, and digest hashes are ignored.
 //
-// Some registries advertise a throttle only through retry-after text, with no
-// 429 or "too many requests" token.
-//
 // Parameters:
 //   - message: Registry body or Docker pull-stream error text.
 //
@@ -214,8 +214,7 @@ func looksRateLimited(message string) bool {
 
 	return strings.Contains(lower, "toomanyrequests") ||
 		strings.Contains(lower, "too many requests") ||
-		status429.MatchString(lower) ||
-		retryAfterBody.MatchString(message)
+		status429.MatchString(lower)
 }
 
 // parseQuotaWindow maps an allowed-quota unit word to a duration.
