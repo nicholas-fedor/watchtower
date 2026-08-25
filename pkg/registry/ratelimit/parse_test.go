@@ -389,6 +389,32 @@ func TestFromErrorMessageRecognizesPhrases(t *testing.T) {
 	require.NotNil(t, FromErrorMessage("status: 429"))
 }
 
+// TestFromErrorMessageRecognizesQuotaOnlyThrottle covers registries that
+// throttle without a 429 or "too many requests" token, advertising the wait
+// only via retry-after text. The first message is a verbatim Docker daemon
+// pull error from lscr.io.
+func TestFromErrorMessageRecognizesQuotaOnlyThrottle(t *testing.T) {
+	t.Parallel()
+
+	msg := "Error response from daemon: error from registry: " +
+		"retry-after: 92.923\u00b5s, allowed: 44000/minute"
+
+	info := FromErrorMessage(msg)
+	require.NotNil(t, info)
+	assert.Equal(t, 92923*time.Nanosecond, info.RetryAfter)
+	assert.Equal(t, 44000, info.Allowed)
+	assert.Equal(t, time.Minute, info.AllowedWindow)
+
+	require.NotNil(t, FromErrorMessage("error from registry: retry-after: 1.08ms"))
+	require.NotNil(t, FromErrorMessage(
+		"error from registry: retry-after: 802.695\u00b5s, allowed: 44000/minute",
+	))
+
+	compound := FromErrorMessage("error from registry: retry-after: 1m30s")
+	require.NotNil(t, compound)
+	assert.Equal(t, 90*time.Second, compound.RetryAfter)
+}
+
 func TestFromErrorMessageIgnoresUnrelatedErrors(t *testing.T) {
 	t.Parallel()
 
@@ -399,6 +425,14 @@ func TestFromErrorMessageIgnoresUnrelatedErrors(t *testing.T) {
 	assert.Nil(t, FromErrorMessage("wrote 1429 bytes"))
 	assert.Nil(t, FromErrorMessage("wrote 429 bytes"))
 	assert.Nil(t, FromErrorMessage("dial tcp 10.0.0.1:429: connect: connection refused"))
+	assert.Nil(t, FromErrorMessage("error from registry: allowed: 44000/minute"))
+	assert.Nil(t, FromErrorMessage("retry-after: 5"))
+	assert.Nil(t, FromErrorMessage("retry-after: 5seconds"))
+	assert.Nil(t, FromErrorMessage("retry-after: 5S"))
+	assert.Nil(t, FromErrorMessage("Retry-After: Wed, 21 Oct 2015 07:28:00 GMT"))
+	assert.Nil(t, FromErrorMessage("not allowed: 5/minute"))
+	assert.Nil(t, FromErrorMessage("disallowed: 10/hour"))
+	assert.Nil(t, FromErrorMessage("max allowed: 100/minute"))
 }
 
 func TestDecisionCapsTinyAndHugeRetryAfter(t *testing.T) {

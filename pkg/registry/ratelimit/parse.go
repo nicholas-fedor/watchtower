@@ -10,7 +10,7 @@ import (
 )
 
 var (
-	retryAfterBody = regexp.MustCompile(`(?i)retry-after:\s*([0-9]+(?:\.[0-9]+)?(?:ns|us|µs|μs|ms|s|m|h))`)
+	retryAfterBody = regexp.MustCompile(`(?i)retry-after:\s*((?:[0-9]+(?:\.[0-9]+)?(?:ns|us|µs|μs|ms|s|m|h))+)\b`)
 	allowedBody    = regexp.MustCompile(`(?i)allowed:\s*([0-9]+)\s*/\s*(seconds?|secs?|minutes?|mins?|hours?|hrs?)`)
 	rateLimitLimit = regexp.MustCompile(`(?i)([0-9]+)(?:\s*,\s*[0-9]+)*\s*(?:;\s*w=([0-9]+))?`)
 	status429      = regexp.MustCompile(
@@ -150,17 +150,20 @@ func FromResponse(resp *http.Response, body []byte) *Error {
 
 // FromErrorMessage builds a rate-limit error from Docker pull-stream text.
 //
+// Some registries advertise a throttle only through retry-after text, with no
+// 429 or "too many requests" token. That path requires a duration that
+// [time.ParseDuration] accepts.
+//
 // Parameters:
 //   - message: Stream error or registry body. Empty or unrelated text returns nil.
 //
 // Returns:
 //   - *Error: Parsed rate-limit error, or nil when the message is not a 429.
 func FromErrorMessage(message string) *Error {
-	if !looksRateLimited(message) {
+	retryAfter, allowed, window := ParseQuotaMessage(message)
+	if retryAfter == 0 && !looksRateLimited(message) {
 		return nil
 	}
-
-	retryAfter, allowed, window := ParseQuotaMessage(message)
 
 	return &Error{
 		StatusCode:    http.StatusTooManyRequests,
