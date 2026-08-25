@@ -8,6 +8,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Chores
+
+- Update github.com/google/pprof digest to 4d45320 by @renovate[bot] in [#2231](https://github.com/nicholas-fedor/watchtower/pull/2231)
+
+## [1.21.1] - 2026-08-25
+
 ### Added
 
 - Add ncrosty58 as a contributor for code by @allcontributors[bot] in [#2194](https://github.com/nicholas-fedor/watchtower/pull/2194)
@@ -3483,7 +3489,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## Compare Releases
 
-- [unreleased](https://github.com/nicholas-fedor/watchtower/compare/v1.21.0...HEAD)
+- [unreleased](https://github.com/nicholas-fedor/watchtower/compare/v1.21.1...HEAD)
+- [1.21.1](https://github.com/nicholas-fedor/watchtower/compare/v1.21.0...v1.21.1)
 - [1.21.0](https://github.com/nicholas-fedor/watchtower/compare/v1.20.3...v1.21.0)
 - [1.20.3](https://github.com/nicholas-fedor/watchtower/compare/v1.20.2...v1.20.3)
 - [1.20.2](https://github.com/nicholas-fedor/watchtower/compare/v1.20.1...v1.20.2)
