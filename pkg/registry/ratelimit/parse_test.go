@@ -423,6 +423,7 @@ func TestFromErrorMessageIgnoresUnrelatedErrors(t *testing.T) {
 	assert.Nil(t, FromErrorMessage("dial tcp 10.0.0.1:429: connect: connection refused"))
 	assert.Nil(t, FromErrorMessage("error from registry: allowed: 44000/minute"))
 	assert.Nil(t, FromErrorMessage("retry-after: 5"))
+	assert.Nil(t, FromErrorMessage("retry-after: 5seconds"))
 	assert.Nil(t, FromErrorMessage("Retry-After: Wed, 21 Oct 2015 07:28:00 GMT"))
 	assert.Nil(t, FromErrorMessage("not allowed: 5/minute"))
 	assert.Nil(t, FromErrorMessage("disallowed: 10/hour"))
