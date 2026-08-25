@@ -1002,6 +1002,16 @@
       "contributions": [
         "code"
       ]
+    },
+    {
+      "login": "jmooo",
+      "name": "Justin Montgomery",
+      "avatar_url": "https://avatars.githubusercontent.com/u/1500269?v=4",
+      "profile": "https://justinmontgomery.com",
+      "contributions": [
+        "bug",
+        "code"
+      ]
     }
   ],
   "contributorsPerLine": 7,
