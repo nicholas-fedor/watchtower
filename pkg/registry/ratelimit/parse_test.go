@@ -389,6 +389,27 @@ func TestFromErrorMessageRecognizesPhrases(t *testing.T) {
 	require.NotNil(t, FromErrorMessage("status: 429"))
 }
 
+// TestFromErrorMessageRecognizesQuotaOnlyThrottle covers registries that
+// throttle without a 429 or "too many requests" token, advertising the limit
+// only via retry-after and allowed quota markers. The message is a verbatim
+// Docker daemon pull error from lscr.io.
+func TestFromErrorMessageRecognizesQuotaOnlyThrottle(t *testing.T) {
+	t.Parallel()
+
+	msg := "Error response from daemon: error from registry: " +
+		"retry-after: 92.923\u00b5s, allowed: 44000/minute"
+
+	info := FromErrorMessage(msg)
+	require.NotNil(t, info)
+	assert.Equal(t, 92923*time.Nanosecond, info.RetryAfter)
+	assert.Equal(t, 44000, info.Allowed)
+	assert.Equal(t, time.Minute, info.AllowedWindow)
+
+	// retry-after alone, and allowed alone, are each sufficient.
+	require.NotNil(t, FromErrorMessage("error from registry: retry-after: 1.08ms"))
+	require.NotNil(t, FromErrorMessage("error from registry: allowed: 44000/minute"))
+}
+
 func TestFromErrorMessageIgnoresUnrelatedErrors(t *testing.T) {
 	t.Parallel()
 
