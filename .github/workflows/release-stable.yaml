@@ -47,3 +47,14 @@ jobs:
     permissions:
       contents: read
     uses: ./.github/workflows/update-go-docs.yaml
+
+  publish-docs:
+    name: Publish Documentation
+    needs: [build]
+    if: ${{ !inputs.DRY_RUN && github.ref_type == 'tag' }}
+    permissions:
+      contents: write
+      actions: read
+    uses: ./.github/workflows/publish-docs.yaml
+    with:
+      version: ${{ github.ref_name }}
