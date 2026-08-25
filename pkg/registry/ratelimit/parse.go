@@ -10,7 +10,7 @@ import (
 )
 
 var (
-	retryAfterBody = regexp.MustCompile(`(?i)retry-after:\s*([0-9]+(?:\.[0-9]+)?(?:ns|us|µs|μs|ms|s|m|h))\b`)
+	retryAfterBody = regexp.MustCompile(`(?i)retry-after:\s*((?:[0-9]+(?:\.[0-9]+)?(?:ns|us|µs|μs|ms|s|m|h))+)\b`)
 	allowedBody    = regexp.MustCompile(`(?i)allowed:\s*([0-9]+)\s*/\s*(seconds?|secs?|minutes?|mins?|hours?|hrs?)`)
 	rateLimitLimit = regexp.MustCompile(`(?i)([0-9]+)(?:\s*,\s*[0-9]+)*\s*(?:;\s*w=([0-9]+))?`)
 	status429      = regexp.MustCompile(

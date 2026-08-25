@@ -409,6 +409,10 @@ func TestFromErrorMessageRecognizesQuotaOnlyThrottle(t *testing.T) {
 	require.NotNil(t, FromErrorMessage(
 		"error from registry: retry-after: 802.695\u00b5s, allowed: 44000/minute",
 	))
+
+	compound := FromErrorMessage("error from registry: retry-after: 1m30s")
+	require.NotNil(t, compound)
+	assert.Equal(t, 90*time.Second, compound.RetryAfter)
 }
 
 func TestFromErrorMessageIgnoresUnrelatedErrors(t *testing.T) {
