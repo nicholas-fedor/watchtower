@@ -35,7 +35,8 @@ var _ = ginkgo.Describe("Watchtower container handling", func() {
 								Labels: map[string]string{
 									"com.centurylinklabs.watchtower": "true",
 								},
-							}),
+							},
+						),
 					},
 					Staleness: map[string]bool{
 						"watchtower": true,
@@ -85,7 +86,8 @@ var _ = ginkgo.Describe("Watchtower container handling", func() {
 								Labels: map[string]string{
 									"com.centurylinklabs.watchtower": "true",
 								},
-							}),
+							},
+						),
 					},
 					Staleness: map[string]bool{
 						"watchtower": true,
@@ -132,7 +134,8 @@ var _ = ginkgo.Describe("Watchtower container handling", func() {
 									"com.centurylinklabs.watchtower":              "true",
 									"com.centurylinklabs.watchtower.monitor-only": "true",
 								},
-							}),
+							},
+						),
 					},
 					Staleness: map[string]bool{
 						"watchtower": true,
@@ -176,7 +179,8 @@ var _ = ginkgo.Describe("Watchtower container handling", func() {
 							time.Now(),
 							&dockerContainer.Config{
 								Labels: map[string]string{},
-							}),
+							},
+						),
 					},
 					Staleness: map[string]bool{
 						"nginx": true,
@@ -221,7 +225,8 @@ var _ = ginkgo.Describe("Watchtower container handling", func() {
 							time.Now(),
 							&dockerContainer.Config{
 								Labels: map[string]string{},
-							}),
+							},
+						),
 					},
 					Staleness: map[string]bool{
 						"stopped-nginx": true,
@@ -265,7 +270,8 @@ var _ = ginkgo.Describe("Watchtower container handling", func() {
 							time.Now(),
 							&dockerContainer.Config{
 								Labels: map[string]string{},
-							}),
+							},
+						),
 					},
 					Staleness: map[string]bool{
 						"stopped-nginx": true,
@@ -312,7 +318,8 @@ var _ = ginkgo.Describe("Watchtower container handling", func() {
 								Labels: map[string]string{
 									"com.centurylinklabs.watchtower": "true",
 								},
-							}),
+							},
+						),
 					},
 					Staleness: map[string]bool{
 						"watchtower": true,
@@ -361,7 +368,8 @@ var _ = ginkgo.Describe("Watchtower container handling", func() {
 									"com.centurylinklabs.watchtower":       "true",
 									"com.centurylinklabs.watchtower.scope": "prod",
 								},
-							}),
+							},
+						),
 						mockActions.CreateMockContainerWithConfig(
 							"watchtower-unscoped",
 							"/watchtower-unscoped",
@@ -373,7 +381,8 @@ var _ = ginkgo.Describe("Watchtower container handling", func() {
 								Labels: map[string]string{
 									"com.centurylinklabs.watchtower": "true",
 								},
-							}),
+							},
+						),
 					},
 				},
 				false,
@@ -413,7 +422,8 @@ var _ = ginkgo.Describe("Watchtower container handling", func() {
 							time.Now().Add(-time.Hour),
 							&dockerContainer.Config{
 								Labels: map[string]string{"com.centurylinklabs.watchtower": "true"},
-							}),
+							},
+						),
 						mockActions.CreateMockContainerWithConfig(
 							"new",
 							"/watchtower",
@@ -423,7 +433,8 @@ var _ = ginkgo.Describe("Watchtower container handling", func() {
 							time.Now(),
 							&dockerContainer.Config{
 								Labels: map[string]string{"com.centurylinklabs.watchtower": "true"},
-							}),
+							},
+						),
 					},
 				},
 				false,
@@ -463,7 +474,8 @@ var _ = ginkgo.Describe("Watchtower container handling", func() {
 									"com.centurylinklabs.watchtower":                 "true",
 									"com.centurylinklabs.watchtower.container-chain": "previous-id",
 								},
-							}),
+							},
+						),
 					},
 					Staleness: map[string]bool{
 						"watchtower": true,
@@ -513,7 +525,8 @@ var _ = ginkgo.Describe("Watchtower container handling", func() {
 									"com.centurylinklabs.watchtower":       "true",
 									"com.centurylinklabs.watchtower.scope": "prod",
 								},
-							}),
+							},
+						),
 					},
 					Staleness: map[string]bool{
 						"watchtower": true,
@@ -563,7 +576,8 @@ var _ = ginkgo.Describe("Watchtower container handling", func() {
 										"com.centurylinklabs.watchtower":       "true",
 										"com.centurylinklabs.watchtower.scope": "test-scope",
 									},
-								}),
+								},
+							),
 						},
 						Staleness: map[string]bool{
 							"watchtower": true,
@@ -615,7 +629,8 @@ var _ = ginkgo.Describe("Watchtower container handling", func() {
 										"com.centurylinklabs.watchtower":       "true",
 										"com.centurylinklabs.watchtower.scope": "container-scope",
 									},
-								}),
+								},
+							),
 						},
 						Staleness: map[string]bool{
 							"watchtower": true,
@@ -663,7 +678,8 @@ var _ = ginkgo.Describe("Watchtower container handling", func() {
 										"com.centurylinklabs.watchtower":       "true",
 										"com.centurylinklabs.watchtower.scope": "container-scope",
 									},
-								}),
+								},
+							),
 						},
 						Staleness: map[string]bool{
 							"watchtower": true,
@@ -710,7 +726,8 @@ var _ = ginkgo.Describe("Watchtower container handling", func() {
 									"com.centurylinklabs.watchtower":       "true",
 									"com.centurylinklabs.watchtower.scope": "label-scope",
 								},
-							}),
+							},
+						),
 					},
 					Staleness: map[string]bool{
 						"watchtower": true,
@@ -765,7 +782,8 @@ var _ = ginkgo.Describe("Watchtower container handling", func() {
 											"com.centurylinklabs.watchtower.scope":           "scope-a",
 											"com.centurylinklabs.watchtower.container-chain": "previous-id",
 										},
-									}),
+									},
+								),
 							},
 							Staleness: map[string]bool{
 								"watchtower": true,
@@ -816,7 +834,8 @@ var _ = ginkgo.Describe("Watchtower container handling", func() {
 											"com.centurylinklabs.watchtower.scope":           "scope-a",
 											"com.centurylinklabs.watchtower.container-chain": "previous-id-scope-b",
 										},
-									}),
+									},
+								),
 								// Previous container in scope-b
 								mockActions.CreateMockContainerWithConfig(
 									"previous-id-scope-b",
@@ -830,7 +849,8 @@ var _ = ginkgo.Describe("Watchtower container handling", func() {
 											"com.centurylinklabs.watchtower":       "true",
 											"com.centurylinklabs.watchtower.scope": "scope-b",
 										},
-									}),
+									},
+								),
 							},
 							Staleness: map[string]bool{
 								"watchtower-a": true,
@@ -890,7 +910,8 @@ var _ = ginkgo.Describe("Watchtower container handling", func() {
 											"com.centurylinklabs.watchtower.scope":           "scope-c",
 											"com.centurylinklabs.watchtower.container-chain": "id-scope-a,id-scope-b",
 										},
-									}),
+									},
+								),
 							},
 							Staleness: map[string]bool{
 								"watchtower-c": true,
@@ -945,7 +966,8 @@ var _ = ginkgo.Describe("Watchtower container handling", func() {
 										"com.centurylinklabs.watchtower.scope":           "scope-x",
 										"com.centurylinklabs.watchtower.container-chain": "id-scope-y", // Different scope
 									},
-								}),
+								},
+							),
 						},
 						Staleness: map[string]bool{
 							"watchtower-invalid": true,
@@ -999,7 +1021,8 @@ var _ = ginkgo.Describe("Watchtower container handling", func() {
 									Labels: map[string]string{
 										"com.centurylinklabs.watchtower": "true",
 									},
-								}),
+								},
+							),
 							mockActions.CreateMockContainerWithConfig(
 								"regular",
 								"/regular",
@@ -1010,7 +1033,8 @@ var _ = ginkgo.Describe("Watchtower container handling", func() {
 								&dockerContainer.Config{
 									Image:  "nginx:latest",
 									Labels: make(map[string]string),
-								}),
+								},
+							),
 						},
 						Staleness: map[string]bool{
 							"watchtower": true,
@@ -1057,7 +1081,8 @@ var _ = ginkgo.Describe("Watchtower container handling", func() {
 								Labels: map[string]string{
 									"com.centurylinklabs.watchtower": "true",
 								},
-							}),
+							},
+						),
 					},
 					Staleness: map[string]bool{
 						"watchtower": true,
@@ -1104,7 +1129,8 @@ var _ = ginkgo.Describe("Watchtower container handling", func() {
 									Labels: map[string]string{
 										"com.centurylinklabs.watchtower": "true",
 									},
-								}),
+								},
+							),
 						},
 						Staleness: map[string]bool{
 							"watchtower": true,
@@ -1157,7 +1183,8 @@ var _ = ginkgo.Describe("Watchtower container handling", func() {
 									Labels: map[string]string{
 										"com.centurylinklabs.watchtower": "true",
 									},
-								}),
+								},
+							),
 							mockActions.CreateMockContainerWithConfig(
 								"regular",
 								"/regular",
@@ -1168,7 +1195,8 @@ var _ = ginkgo.Describe("Watchtower container handling", func() {
 								&dockerContainer.Config{
 									Image:  "nginx:latest",
 									Labels: make(map[string]string),
-								}),
+								},
+							),
 						},
 						Staleness: map[string]bool{
 							"watchtower": true,
@@ -1220,7 +1248,8 @@ var _ = ginkgo.Describe("Watchtower container handling", func() {
 									Labels: map[string]string{
 										"com.centurylinklabs.watchtower": "true",
 									},
-								}),
+								},
+							),
 						},
 						Staleness: map[string]bool{
 							"watchtower": true,
@@ -1275,7 +1304,8 @@ func TestSafeguardDelay(t *testing.T) {
 							Labels: map[string]string{
 								"com.centurylinklabs.watchtower": "true",
 							},
-						}),
+						},
+					),
 				},
 				Staleness: map[string]bool{
 					"watchtower": true, // Simulate stale Watchtower
@@ -1336,7 +1366,8 @@ func TestPullFailureDelayContextCancellation(t *testing.T) {
 							Labels: map[string]string{
 								"com.centurylinklabs.watchtower": "true",
 							},
-						}),
+						},
+					),
 				},
 				Staleness: map[string]bool{
 					"watchtower": true, // Simulate stale Watchtower

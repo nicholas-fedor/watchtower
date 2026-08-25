@@ -38,7 +38,8 @@ var _ = ginkgo.Describe("the update action", func() {
 							"tagged-container",
 							"/tagged-container",
 							"image:1.0.0",
-							time.Now()),
+							time.Now(),
+						),
 					},
 					Staleness: map[string]bool{
 						"tagged-container": true,
@@ -70,7 +71,8 @@ var _ = ginkgo.Describe("the update action", func() {
 							"untagged-container",
 							"/untagged-container",
 							"image",
-							time.Now()),
+							time.Now(),
+						),
 					},
 					Staleness: map[string]bool{
 						"untagged-container": true,
@@ -207,7 +209,8 @@ var _ = ginkgo.Describe("the update action", func() {
 							"invalid-container",
 							"/invalid-container",
 							":latest",
-							time.Now()),
+							time.Now(),
+						),
 					},
 					Staleness: map[string]bool{
 						"invalid-container": true,
@@ -284,7 +287,8 @@ var _ = ginkgo.Describe("the update action", func() {
 							"InvalidContainer",
 							"/InvalidContainer",
 							":latest",
-							time.Now()),
+							time.Now(),
+						),
 					},
 					Staleness: map[string]bool{
 						"InvalidContainer": true,

@@ -1793,7 +1793,8 @@ func (c *client) captureExecOutput(ctx context.Context, execID string) (string, 
 			io.LimitReader(
 				response.Reader,
 				maxExecOutputSize,
-			))
+			),
+		)
 		done <- err
 	}()
 

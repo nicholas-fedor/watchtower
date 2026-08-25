@@ -20,11 +20,13 @@ run:
 # Formatters Configuration
 formatters:
   enable:
-    - gci
+    - gci # Check if code and import statements are formatted, with additional rules.
     - gofmt # Standard Go code formatter
-    - gofumpt
+    - gofumpt # Enforce a stricter format than gofmt, while being backwards compatible.
     - goimports # Manages Go import lines, adds missing imports, removes unused ones
-    - golines
+    - golines # Checks if code is formatted, and fixes long lines.
+    - swaggo # Check if swaggo comments are formatted.
+
   settings:
     gci:
       sections:
@@ -67,7 +69,17 @@ formatters:
           # or better: just "[]T{x}" if building a new slice
     gofumpt:
       module-path: "github.com/nicholas-fedor/watchtower"
-      extra-rules: true
+      # Extra formatting rules.
+      extra:
+        # Groups function parameters with repeated types.
+        # Default: false
+        group-params: true
+        # Clothes naked returns in functions with named results.
+        # Default: false
+        clothe-returns: true
+        # Multi-line function calls with the opening parenthesis at the end of a line should place the closing parenthesis at the start of a line.
+        # Default: false
+        balance-calls: true
     golines:
       # Target maximum line length.
       # Default: 100
@@ -105,8 +117,10 @@ linters:
     - intrange # Intrange is a linter to find places where for loops could make use of an integer range.
     - mirror # Reports wrong mirror patterns of bytes/strings usage.
     - misspell # Finds commonly misspelled English words.
+    - modernize # A suite of analyzers that suggest simplifications to Go code, using modern language and library features.
     - nakedret # Checks that functions with naked returns are not longer than a maximum size (can be zero).
     - nlreturn # Nlreturn checks for a new line before return and branch statements to increase code clarity.
+    - noinlineerr # Disallows inline error handling (if err := ...; err != nil {).
     - nolintlint # Reports ill-formed or insufficient nolint directives.
     - perfsprint # Checks that fmt.Sprintf can be replaced with a faster alternative.
     - protogetter # Reports direct reads from proto message fields when getters should be used. [auto-fix]
@@ -153,13 +167,11 @@ linters:
     - loggercheck # Checks key value pairs for common logger libraries (kitlog,klog,logr,zap).
     - makezero # Finds slice declarations with non-zero initial length.
     - mnd # An analyzer to detect magic numbers.
-    - modernize # A suite of analyzers that suggest simplifications to Go code, using modern language and library features.
     - musttag # Enforce field tags in (un)marshaled structs.
     - nilerr # Finds the code that returns nil even if it checks that the error is not nil.
     - nilnesserr # Reports constructs that checks for err != nil, but returns a different nil value error.
     - nilnil # Checks that there is no simultaneous return of `nil` error and an invalid value.
     - noctx # Finds sending http request without context.Context.
-    - noinlineerr # Disallows inline error handling (if err := ...; err != nil {).
     - nonamedreturns # Reports all named returns.
     - nosprintfhostport # Checks for misuse of Sprintf to construct a host with port in a URL.
     - prealloc # Finds slice declarations that could potentially be pre-allocated.

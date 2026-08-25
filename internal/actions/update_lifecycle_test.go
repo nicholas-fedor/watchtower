@@ -35,7 +35,8 @@ var _ = ginkgo.Describe("the update action", func() {
 										"com.centurylinklabs.watchtower.lifecycle.pre-update":         "/PreUpdateReturn1.sh",
 									},
 									ExposedPorts: dockerNetwork.PortSet{},
-								}),
+								},
+							),
 						},
 					},
 					false,
@@ -78,7 +79,8 @@ var _ = ginkgo.Describe("the update action", func() {
 										"com.centurylinklabs.watchtower.lifecycle.pre-update": "/PreUpdateReturn0.sh",
 									},
 									ExposedPorts: dockerNetwork.PortSet{},
-								}),
+								},
+							),
 						},
 					},
 					false,
@@ -126,7 +128,8 @@ var _ = ginkgo.Describe("the update action", func() {
 										"com.centurylinklabs.watchtower.lifecycle.pre-update":         "/PreUpdateReturn75.sh",
 									},
 									ExposedPorts: dockerNetwork.PortSet{},
-								}),
+								},
+							),
 						},
 					},
 					false,
@@ -170,7 +173,8 @@ var _ = ginkgo.Describe("the update action", func() {
 										"com.centurylinklabs.watchtower.lifecycle.pre-update":         "/PreUpdateReturn0.sh",
 									},
 									ExposedPorts: dockerNetwork.PortSet{},
-								}),
+								},
+							),
 						},
 					},
 					false,
@@ -210,7 +214,8 @@ var _ = ginkgo.Describe("the update action", func() {
 					&dockerContainer.Config{
 						Labels:       map[string]string{},
 						ExposedPorts: dockerNetwork.PortSet{},
-					})
+					},
+				)
 
 				provider.SetStale(true)
 
@@ -226,7 +231,8 @@ var _ = ginkgo.Describe("the update action", func() {
 							"com.centurylinklabs.watchtower.depends-on": "test-container-provider",
 						},
 						ExposedPorts: dockerNetwork.PortSet{},
-					})
+					},
+				)
 
 				containers := []types.Container{
 					provider,
@@ -295,7 +301,8 @@ var _ = ginkgo.Describe("the update action", func() {
 					&dockerContainer.Config{
 						Labels:       map[string]string{},
 						ExposedPorts: dockerNetwork.PortSet{},
-					})
+					},
+				)
 
 				containerB := mockActions.CreateMockContainerWithConfig(
 					"test-container-b",
@@ -309,7 +316,8 @@ var _ = ginkgo.Describe("the update action", func() {
 							"com.centurylinklabs.watchtower.depends-on": "test-container-c",
 						},
 						ExposedPorts: dockerNetwork.PortSet{},
-					})
+					},
+				)
 
 				containerA := mockActions.CreateMockContainerWithConfig(
 					"test-container-a",
@@ -323,7 +331,8 @@ var _ = ginkgo.Describe("the update action", func() {
 							"com.centurylinklabs.watchtower.depends-on": "test-container-b",
 						},
 						ExposedPorts: dockerNetwork.PortSet{},
-					})
+					},
+				)
 
 				containers := []types.Container{
 					containerC,
@@ -365,7 +374,8 @@ var _ = ginkgo.Describe("the update action", func() {
 										"com.centurylinklabs.watchtower.lifecycle.pre-update":         "/PreUpdateReturn1.sh",
 									},
 									ExposedPorts: dockerNetwork.PortSet{},
-								}),
+								},
+							),
 						},
 					},
 					false,
@@ -411,7 +421,8 @@ var _ = ginkgo.Describe("the update action", func() {
 										"com.centurylinklabs.watchtower.lifecycle.pre-update":         "/PreUpdateReturn1.sh",
 									},
 									ExposedPorts: dockerNetwork.PortSet{},
-								}),
+								},
+							),
 						},
 					},
 					false,
