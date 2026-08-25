@@ -15,6 +15,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Chores
 
+- Update module github.com/nicholas-fedor/shoutrrr to v0.17.2 by @renovate[bot] in [#2227](https://github.com/nicholas-fedor/watchtower/pull/2227)
+- Update module github.com/go-openapi/spec to v0.22.11 by @renovate[bot] in [#2226](https://github.com/nicholas-fedor/watchtower/pull/2226)
 - Bump go-openapi jsonreference and spec by @nicholas-fedor in [#2224](https://github.com/nicholas-fedor/watchtower/pull/2224)
 - Update github.com/google/pprof digest to 8a17677 by @renovate[bot] in [#2222](https://github.com/nicholas-fedor/watchtower/pull/2222)
 - Update cimg/go:1.27.0 docker digest to 4da2d4b by @renovate[bot] in [#2221](https://github.com/nicholas-fedor/watchtower/pull/2221)
