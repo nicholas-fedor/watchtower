@@ -15,6 +15,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Update github/codeql-action action to v4.37.9 by @renovate[bot] in [#2246](https://github.com/nicholas-fedor/watchtower/pull/2246)
 - Update module github.com/nicholas-fedor/shoutrrr to v0.18.0 by @renovate[bot] in [#2243](https://github.com/nicholas-fedor/watchtower/pull/2243)
 
+### Fixed
+
+- Complete image removal after self-update SIGTERM by @nicholas-fedor in [#2251](https://github.com/nicholas-fedor/watchtower/pull/2251)
+
 ## [1.21.2] - 2026-08-25
 
 ### Added
