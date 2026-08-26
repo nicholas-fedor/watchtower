@@ -450,7 +450,8 @@ func (c imageClient) PullImage(
 
 // RemoveImageByID deletes an image from the Docker host.
 //
-// It removes the image with force and pruning, logging details if debug enabled.
+// It lists containers first to skip images still in use. Context cancellation
+// during that check or the removal itself is returned without a warning.
 //
 // Parameters:
 //   - ctx: Context for cancellation and timeout control.
@@ -471,6 +472,14 @@ func (c imageClient) RemoveImageByID(ctx context.Context, imageID types.ImageID,
 		dockerClient.ContainerListOptions{All: true},
 	)
 	if err != nil {
+		if ctx.Err() != nil {
+			clog.Debug().
+				Err(err).
+				Msg("Image usage check interrupted by cancellation, skipping removal")
+
+			return fmt.Errorf("cannot verify image usage: %w", ctx.Err())
+		}
+
 		clog.Warn().
 			Err(err).
 			Msg("Failed to list containers for image usage check, skipping removal")
@@ -503,6 +512,14 @@ func (c imageClient) RemoveImageByID(ctx context.Context, imageID types.ImageID,
 		},
 	)
 	if err != nil {
+		if ctx.Err() != nil {
+			clog.Debug().
+				Err(err).
+				Msg("Image removal interrupted by cancellation")
+
+			return fmt.Errorf("%w: %s: %w", errRemoveImageFailed, imageID, ctx.Err())
+		}
+
 		if cerrdefs.IsNotFound(err) {
 			clog.Debug().
 				Err(err).

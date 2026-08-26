@@ -782,9 +782,10 @@ func removeOldContainer(
 // removeOldImage removes the predecessor Watchtower image after a successful
 // handoff. NotFound and in-use errors are skipped. Other failures are logged
 // and do not fail orchestration because the replacement is already running.
+// Docker calls use a detached timeout so SIGTERM cannot abort removal.
 //
 // Parameters:
-//   - ctx: Context for cancellation and timeouts.
+//   - ctx: Parent session context. Cancellation is detached for Docker calls.
 //   - client: Container client for Docker operations.
 //   - clog: Logger with container context fields.
 //   - imageID: ID of the predecessor image captured before create-image pinning.
@@ -805,7 +806,15 @@ func removeOldImage(
 		Str("image_name", imageName).
 		Msg("Removing old Watchtower image after ephemeral handoff")
 
-	err := client.RemoveImageByID(ctx, imageID, imageName)
+	// Detach from the session context so SIGTERM cannot abort predecessor
+	// image removal after the replacement is already running.
+	cleanupCtx, cancel := context.WithTimeout(
+		context.WithoutCancel(ctx),
+		restartPolicyTimeout(0),
+	)
+	defer cancel()
+
+	err := client.RemoveImageByID(cleanupCtx, imageID, imageName)
 	if err == nil {
 		return
 	}
@@ -815,7 +824,8 @@ func removeOldImage(
 		cerrdefs.IsConflict(err),
 		errors.Is(err, container.ErrImageInUse),
 		errors.Is(err, context.Canceled),
-		errors.Is(err, context.DeadlineExceeded):
+		errors.Is(err, context.DeadlineExceeded),
+		cleanupCtx.Err() != nil:
 		clog.Debug().
 			Err(err).
 			Str("image_id", imageID.ShortID()).

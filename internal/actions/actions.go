@@ -121,6 +121,7 @@ func RunUpdatesWithNotifications(
 		params.Client,
 		updateConfig.Cleanup,
 		cleanupImageInfosPtr,
+		updateConfig.Timeout,
 	)
 
 	// Publish image cleanup event
@@ -350,12 +351,15 @@ func executeUpdate(log *zerolog.Logger, ctx context.Context,
 // When multiple containers share the same old image, the image is only removed once
 // (preventing duplicate "Removing image" log entries), but the returned slice includes
 // all container associations so that split-by-container notifications report correctly.
+// Docker calls use a detached timeout so SIGTERM after a Watchtower self-update
+// cannot abort leftover image removal.
 //
 // Parameters:
-//   - ctx: Context for cancellation and timeouts.
+//   - ctx: Parent session context. Cancellation is detached for Docker calls.
 //   - client: The Docker client instance used for container operations.
 //   - cleanup: Boolean indicating whether to perform image cleanup.
 //   - cleanupImageInfos: Slice of cleaned image info to be removed.
+//   - timeout: Bound for detached cleanup Docker calls. Non-positive uses the restart-policy fallback.
 //
 // Returns:
 //   - []types.RemovedImageInfo: Slice of successfully cleaned image info.
@@ -363,6 +367,7 @@ func performImageCleanup(log *zerolog.Logger, ctx context.Context,
 	client container.Client,
 	cleanup bool,
 	cleanupImageInfos []types.RemovedImageInfo,
+	timeout time.Duration,
 ) []types.RemovedImageInfo {
 	if !cleanup || len(cleanupImageInfos) == 0 {
 		return []types.RemovedImageInfo{}
@@ -373,7 +378,15 @@ func performImageCleanup(log *zerolog.Logger, ctx context.Context,
 	// when multiple containers share the same old image.
 	uniqueByImageID := deduplicateByImageID(cleanupImageInfos)
 
-	cleaned, err := RemoveImages(log, ctx, client, uniqueByImageID)
+	// Detach from the session context so SIGTERM after self-update cannot
+	// abort leftover image removal.
+	cleanupCtx, cancel := context.WithTimeout(
+		context.WithoutCancel(ctx),
+		restartPolicyTimeout(timeout),
+	)
+	defer cancel()
+
+	cleaned, err := RemoveImages(log, cleanupCtx, client, uniqueByImageID)
 	if err != nil {
 		log.Warn().
 			Err(err).

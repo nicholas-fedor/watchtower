@@ -116,6 +116,7 @@ var warningMessages = []string{
 	"Failed to find new image",
 	"Failed to list containers",
 	"Failed to inspect container",
+	"Failed to list containers for image usage check, skipping removal",
 }
 
 var errorMessages = []string{
