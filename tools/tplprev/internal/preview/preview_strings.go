@@ -92,7 +92,6 @@ var infoMessages = []string{
 	"Stopping linked container",
 	"Started linked container",
 	"Removing image",
-	"Failed to list containers for image usage check, skipping removal",
 	"Container updated",
 	"Detected multiple Watchtower instances - initiating cleanup",
 	"Successfully removed all excess Watchtower containers",
@@ -117,6 +116,7 @@ var warningMessages = []string{
 	"Failed to find new image",
 	"Failed to list containers",
 	"Failed to inspect container",
+	"Failed to list containers for image usage check, skipping removal",
 }
 
 var errorMessages = []string{
