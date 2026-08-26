@@ -213,6 +213,12 @@ func (p *PreviewData) dataForMessage(msg, name, image string) map[string]any {
 		return map[string]any{"container": name, "new_id": newID}
 	case "Removing image":
 		return map[string]any{"image_name": image, "image_id": oldID}
+	case "Failed to list containers for image usage check, skipping removal":
+		return map[string]any{
+			"image_name": image,
+			"image_id":   oldID,
+			"error":      "cannot verify image usage",
+		}
 	case "Container updated":
 		return map[string]any{
 			"container": name,

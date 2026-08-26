@@ -68,7 +68,7 @@ func TestDataMarshalJSON(t *testing.T) {
 	}
 
 	payload := Data{
-		StaticData: StaticData{Title: "Title", Host: "Host"},
+		Title: "Title", Host: "Host",
 		Entries: []*Entry{
 			{
 				Message: "Found new image",
@@ -115,8 +115,8 @@ func TestDataMarshalJSONNilReport(t *testing.T) {
 	t.Parallel()
 
 	payload := Data{
-		StaticData: StaticData{Title: "Title", Host: "Host"},
-		Entries:    []*Entry{},
+		Title: "Title", Host: "Host",
+		Entries: []*Entry{},
 	}
 
 	bytes, err := json.Marshal(payload)

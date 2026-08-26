@@ -85,6 +85,8 @@ Simple templates are used when the [`notification-report`](#notification_report)
     Started new container: {{$e.Data.container}} ({{with $e.Data.new_id}}{{.}}{{else}}unknown{{end}})
 {{- else if eq $msg "Removing image" -}}
     Removed stale image: {{with $e.Data.image_id}}{{.}}{{else}}unknown{{end}}
+{{- else if eq $msg "Failed to list containers for image usage check, skipping removal" -}}
+    Skipped image cleanup: {{with $e.Data.image_name}}{{.}}{{else}}unknown{{end}} ({{with $e.Data.image_id}}{{.}}{{else}}unknown{{end}}){{with $e.Data.error}}: {{.}}{{end}}
 {{- else if eq $msg "Detected multiple Watchtower instances - initiating cleanup" -}}
     Detected {{$e.Data.count}} Watchtower instances - initiating cleanup
 {{- else if $e.Data -}}
@@ -120,6 +122,8 @@ The [Template Preview Tool](../template-preview/index.md) uses the same template
     Started new container: {{$e.Data.container}} ({{with $e.Data.new_id}}{{.}}{{else}}unknown{{end}})
 {{- else if eq $msg "Removing image" -}}
     Removed stale image: {{with $e.Data.image_id}}{{.}}{{else}}unknown{{end}}
+{{- else if eq $msg "Failed to list containers for image usage check, skipping removal" -}}
+    Skipped image cleanup: {{with $e.Data.image_name}}{{.}}{{else}}unknown{{end}} ({{with $e.Data.image_id}}{{.}}{{else}}unknown{{end}}){{with $e.Data.error}}: {{.}}{{end}}
 {{- else if eq $msg "Detected multiple Watchtower instances - initiating cleanup" -}}
     Detected {{$e.Data.count}} Watchtower instances - initiating cleanup
 {{- else if $e.Data -}}

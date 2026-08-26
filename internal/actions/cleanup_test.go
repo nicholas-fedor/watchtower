@@ -1479,6 +1479,25 @@ var _ = ginkgo.Describe("CleanupImages", func() {
 		gomega.Expect(cleaned[0].ImageID).To(gomega.Equal(types.ImageID("image1")))
 	})
 
+	ginkgo.It("should treat a canceled context cause that is not context.Canceled as a non-error", func() {
+		mockClient := mockContainer.NewMockClient(ginkgo.GinkgoT())
+
+		cleanedImages := []types.RemovedImageInfo{
+			{ImageID: "image1", ImageName: "image1"},
+		}
+
+		canceledCtx, cancel := context.WithCancelCause(context.Background())
+		cancel(errors.New("terminated signal received"))
+
+		mockClient.EXPECT().
+			RemoveImageByID(canceledCtx, types.ImageID("image1"), "image1").
+			Return(errors.New("cannot verify image usage: terminated signal received"))
+
+		cleaned, err := RemoveImages(testLogger(), canceledCtx, mockClient, cleanedImages)
+		gomega.Expect(err).NotTo(gomega.HaveOccurred())
+		gomega.Expect(cleaned).To(gomega.BeEmpty())
+	})
+
 	ginkgo.It("should treat 'conflict' errors as non-errors and not add to cleaned", func() {
 		mockClient := mockContainer.NewMockClient(ginkgo.GinkgoT())
 

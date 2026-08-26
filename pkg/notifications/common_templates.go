@@ -9,7 +9,9 @@ var commonTemplates = map[string]string{
 	// It iterates over .Entries, checking each entry's Message to format specific container lifecycle events.
 	// Handles messages: "Found new image" (new image available), "Stopping container" (stopping old container),
 	// "Started new container" (new container started), "Stopping linked container" (stopping linked container),
-	// "Started linked container" (linked container started), "Removing image" (image cleanup completed), "Container updated" (update completed),
+	// "Started linked container" (linked container started), "Removing image" (image cleanup completed),
+	// "Failed to list containers for image usage check, skipping removal" (image cleanup skipped),
+	// "Container updated" (update completed),
 	// "Image is within cooldown period - deferring update" (image too new for update), "Image age exceeds cooldown - eligible for update" (image old enough),
 	// "Image creation time unavailable - update check unavailable" (image age could not be determined from registry),
 	// "Detected multiple Watchtower instances - initiating cleanup" (multiple instances detected).
@@ -35,6 +37,8 @@ var commonTemplates = map[string]string{
     Started linked container: {{index $e.Data "container"}} ({{with (index $e.Data "new_id")}}{{.}}{{else}}unknown{{end}})
 {{- else if eq $msg "Removing image" -}}
     Cleaned up old image: {{with (index $e.Data "image_name")}}{{.}}{{else}}unknown{{end}} ({{with (index $e.Data "image_id")}}{{.}}{{else}}unknown{{end}})
+{{- else if eq $msg "Failed to list containers for image usage check, skipping removal" -}}
+    Skipped image cleanup: {{with (index $e.Data "image_name")}}{{.}}{{else}}unknown{{end}} ({{with (index $e.Data "image_id")}}{{.}}{{else}}unknown{{end}}){{with (index $e.Data "error")}}: {{.}}{{end}}
 {{- else if eq $msg "Container updated" -}}
     Updated container: {{with (index $e.Data "container")}}{{.}}{{else}}unknown{{end}} ({{with (index $e.Data "image")}}{{.}}{{else}}unknown{{end}}): {{with (index $e.Data "old_id")}}{{.}}{{else}}unknown{{end}} updated to {{with (index $e.Data "new_id")}}{{.}}{{else}}unknown{{end}}
 {{- else if eq $msg "Skipping Watchtower self-update in run-once mode" -}}

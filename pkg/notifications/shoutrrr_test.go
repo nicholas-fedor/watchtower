@@ -252,6 +252,35 @@ updt1 (mock/updt1:latest): Updated
 				gomega.Expect(err).NotTo(gomega.HaveOccurred())
 				gomega.Expect(s).To(gomega.Equal("foo bar"))
 			})
+
+			ginkgo.It("should format image usage-check skips without dumping raw fields", func() {
+				shoutrrr := createTestNotifier(
+					[]string{},
+					zerolog.TraceLevel,
+					true,
+					StaticData{},
+					false,
+					time.Second,
+				)
+				entries := []*notificationEntry{
+					{
+						Message: "Failed to list containers for image usage check, skipping removal",
+						Data: map[string]any{
+							"error":      `Get "http://socket-proxy-write:2375/v1.55/containers/json?all=1": terminated signal received`,
+							"image_id":   "769846626f2f",
+							"image_name": "ghcr.io/amir20/dtop:latest",
+						},
+					},
+				}
+
+				s, err := shoutrrr.buildMessage(Data{Entries: entries})
+				gomega.Expect(err).NotTo(gomega.HaveOccurred())
+				gomega.Expect(s).To(gomega.Equal(
+					"Skipped image cleanup: ghcr.io/amir20/dtop:latest (769846626f2f): " +
+						`Get "http://socket-proxy-write:2375/v1.55/containers/json?all=1": terminated signal received`,
+				))
+				gomega.Expect(s).NotTo(gomega.ContainSubstring(" | "))
+			})
 		})
 		ginkgo.When("given a valid custom template", func() {
 			ginkgo.It("should format the messages using the custom template", func() {

@@ -894,7 +894,7 @@ var _ = ginkgo.Describe("Actions", func() {
 	ginkgo.Describe("performImageCleanup", func() {
 		ginkgo.It("should return empty slice when cleanup is disabled", func() {
 			client := mockActions.CreateMockClient(&mockActions.TestData{}, false, false)
-			cleanedImages := performImageCleanup(testLogger(), context.Background(), client, false, []types.RemovedImageInfo{})
+			cleanedImages := performImageCleanup(testLogger(), context.Background(), client, false, []types.RemovedImageInfo{}, 0)
 			gomega.Expect(cleanedImages).To(gomega.BeEmpty())
 		})
 
@@ -906,7 +906,7 @@ var _ = ginkgo.Describe("Actions", func() {
 					ImageName:     "test-image:v1.0",
 					ImageID:       types.ImageID("sha256:123"),
 				},
-			})
+			}, 0)
 			// The function should return the cleaned images when cleanup is enabled
 			gomega.Expect(cleanedImages).To(gomega.HaveLen(1))
 			gomega.Expect(cleanedImages[0].ContainerName).To(gomega.Equal("test-container"))
@@ -914,9 +914,25 @@ var _ = ginkgo.Describe("Actions", func() {
 
 		ginkgo.It("should return a valid slice when cleanup input is empty", func() {
 			client := mockActions.CreateMockClient(&mockActions.TestData{}, false, false)
-			cleanedImages := performImageCleanup(testLogger(), context.Background(), client, true, []types.RemovedImageInfo{})
+			cleanedImages := performImageCleanup(testLogger(), context.Background(), client, true, []types.RemovedImageInfo{}, 0)
 			// Should return a valid slice even with empty input
 			gomega.Expect(cleanedImages).NotTo(gomega.BeNil())
+		})
+
+		ginkgo.It("should still remove images when the parent context is already canceled", func() {
+			client := mockActions.CreateMockClient(&mockActions.TestData{}, false, false)
+			ctx, cancel := context.WithCancel(context.Background())
+			cancel()
+
+			cleanedImages := performImageCleanup(testLogger(), ctx, client, true, []types.RemovedImageInfo{
+				{
+					ContainerName: "test-container",
+					ImageName:     "test-image:v1.0",
+					ImageID:       types.ImageID("sha256:123"),
+				},
+			}, 0)
+			gomega.Expect(cleanedImages).To(gomega.HaveLen(1))
+			gomega.Expect(client.TestData.TriedToRemoveImageCount.Load()).To(gomega.Equal(int32(1)))
 		})
 	})
 
