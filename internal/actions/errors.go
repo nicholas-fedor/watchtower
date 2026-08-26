@@ -40,6 +40,12 @@ var (
 	errCircularDependency = errors.New("circular dependency detected")
 	// errSelfDependency indicates a container has a self-dependency.
 	errSelfDependency = errors.New("container has self-dependency")
+	// errGitNotAssociated indicates a Git rebuild was requested without an association.
+	errGitNotAssociated = errors.New("container is not associated with a Git repository")
+	// errGitComposeService indicates a Compose project was resolved without a service name.
+	errGitComposeService = errors.New("compose project has no com.docker.compose.service label")
+	// errGitComposeInstance indicates Compose apply did not return the requested service.
+	errGitComposeInstance = errors.New("compose apply did not recreate the service")
 )
 
 // Errors for Watchtower self-update operations.

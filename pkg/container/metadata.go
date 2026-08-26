@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/nicholas-fedor/watchtower/internal/util"
+	"github.com/nicholas-fedor/watchtower/pkg/container/git"
 	"github.com/nicholas-fedor/watchtower/pkg/types"
 )
 
@@ -344,6 +345,20 @@ func (c *Container) IsMonitorOnly(params types.UpdateParams) bool {
 //   - bool: True if no-pull, false otherwise.
 func (c *Container) IsNoPull(params types.UpdateParams) bool {
 	return c.getContainerOrGlobalBool(params.NoPull, noPullLabel, params.LabelPrecedence)
+}
+
+// IsGitWatch reports whether the Git watcher is on for this container.
+//
+// A present git-watch label overrides --git-enable. When the label is absent
+// the process-wide --git-enable default is used.
+//
+// Parameters:
+//   - params: Update parameters from types.UpdateParams.
+//
+// Returns:
+//   - bool: True when the watcher should run for an associated container.
+func (c *Container) IsGitWatch(params types.UpdateParams) bool {
+	return git.WatchEnabled(c, params)
 }
 
 // CooldownDelay returns the effective cooldown delay for this container.

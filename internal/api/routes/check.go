@@ -40,6 +40,7 @@ func registerCheckRoute(app *fiber.App, auth fiber.Handler, opts config.Options)
 				opts.Client,
 				combinedFilter,
 				params,
+				opts.GitClient,
 			)
 		},
 		checkTimeout,

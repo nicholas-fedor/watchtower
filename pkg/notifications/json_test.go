@@ -1,10 +1,13 @@
 package notifications
 
 import (
+	"encoding/json"
+
 	"github.com/onsi/ginkgo/v2"
 	"github.com/onsi/gomega"
 
 	"github.com/nicholas-fedor/watchtower/pkg/session"
+	"github.com/nicholas-fedor/watchtower/pkg/types"
 )
 
 var _ = ginkgo.Describe("JSON template", func() {
@@ -230,5 +233,54 @@ var _ = ginkgo.Describe("JSON template", func() {
 				gomega.Expect(result).To(gomega.ContainSubstring(`"state"`))
 			})
 		})
+	})
+})
+
+var _ = ginkgo.Describe("JSON Git and OCI report fields", func() {
+	ginkgo.It("includes populated Git and OCI fields", func() {
+		status := session.NewContainerStatus("app", "org/app:latest")
+		status.SetGitMetadata(
+			"https://github.com/org/app.git",
+			"main",
+			"https://github.com/org/app/releases",
+			"https://github.com/org/app",
+			"https://example.com/image",
+			"https://example.com/docs",
+			"deadbeef",
+		)
+
+		got := marshalReports([]types.ContainerReport{status})
+		gomega.Expect(got).To(gomega.HaveLen(1))
+		gomega.Expect(got[0]["gitRepo"]).To(gomega.Equal("https://github.com/org/app.git"))
+		gomega.Expect(got[0]["gitRef"]).To(gomega.Equal("main"))
+		gomega.Expect(got[0]["changelog"]).To(gomega.Equal("https://github.com/org/app/releases"))
+		gomega.Expect(got[0]["ociSource"]).To(gomega.Equal("https://github.com/org/app"))
+		gomega.Expect(got[0]["imageUrl"]).To(gomega.Equal("https://example.com/image"))
+		gomega.Expect(got[0]["documentation"]).To(gomega.Equal("https://example.com/docs"))
+		gomega.Expect(got[0]["revision"]).To(gomega.Equal("deadbeef"))
+	})
+
+	ginkgo.It("omits empty Git and OCI fields", func() {
+		status := session.NewContainerStatus("app", "org/app:latest")
+		got := marshalReports([]types.ContainerReport{status})
+		gomega.Expect(got).To(gomega.HaveLen(1))
+		gomega.Expect(got[0]).NotTo(gomega.HaveKey("gitRepo"))
+		gomega.Expect(got[0]).NotTo(gomega.HaveKey("changelog"))
+		gomega.Expect(got[0]).NotTo(gomega.HaveKey("ociSource"))
+	})
+
+	ginkgo.It("marshals updated reports with Git fields", func() {
+		status := session.NewContainerStatus("app", "org/app:latest")
+		status.SetGitMetadata("https://github.com/org/app.git", "main", "", "", "", "", "")
+
+		raw, err := json.Marshal(Data{
+			StaticData: StaticData{Title: "update", Host: "box"},
+			Report: &session.SingleContainerReport{
+				UpdatedReports: []types.ContainerReport{status},
+			},
+		})
+		gomega.Expect(err).NotTo(gomega.HaveOccurred())
+		gomega.Expect(string(raw)).To(gomega.ContainSubstring(`"gitRepo":"https://github.com/org/app.git"`))
+		gomega.Expect(string(raw)).To(gomega.ContainSubstring(`"gitRef":"main"`))
 	})
 })

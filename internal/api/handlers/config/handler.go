@@ -33,6 +33,8 @@ type ConfigData struct {
 	FilterDesc string `json:"filter_desc"`
 	// Scope is the monitoring scope.
 	Scope string `json:"scope"`
+	// GitEnable is the process-wide Git watcher default.
+	GitEnable bool `json:"git_enable"`
 }
 
 // GetFunc returns the current configuration.

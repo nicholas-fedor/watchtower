@@ -16,6 +16,8 @@ Upon successful validation, the contents of the file are read and used as the va
 | [HTTP API Token](../../configuration/http-api/index.md#http_api_token)                    | No         |
 | [HTTP API Events Token](../../configuration/http-api/index.md#http_api_events_token)      | No         |
 | [Notification URL](../../configuration/notifications/index.md#notification_url)           | No         |
+| [Git Auth Token](../../configuration/git-monitoring/index.md#git_auth_token)              | No         |
+| [Git Password](../../configuration/git-monitoring/index.md#git_password)                  | No         |
 | [Email Server Password](../../configuration/notifications/index.md#email_server_password) | Yes        |
 | [Gotify Token](../../configuration/notifications/index.md#gotify_token)                   | Yes        |
 | [Microsoft Teams Hook](../../configuration/notifications/index.md#microsoft_teams_hook)   | Yes        |
@@ -24,7 +26,7 @@ Upon successful validation, the contents of the file are read and used as the va
 !!! Warning "Watchtower v2 Legacy Notification Deprecation"
     Deprecated notification configuration options will be removed with the release of Watchtower v2.
 
-    Use the the [`NOTIFICATION URL`](../../configuration/notifications/index.md#notification_url) with the appropriate Shoutrrr URL scheme instead.
+    Use the [`NOTIFICATION URL`](../../configuration/notifications/index.md#notification_url) with the appropriate Shoutrrr URL scheme instead.
 
 !!! Note
 
@@ -146,6 +148,82 @@ Provide the [Notification URL](../../configuration/notifications/index.md#notifi
         -v /var/run/docker.sock:/var/run/docker.sock \
         -v $(pwd)/secrets/notification_url.txt:/run/secrets/notification_url:ro \
         -e WATCHTOWER_NOTIFICATION_URL=/run/secrets/notification_url \
+        --restart unless-stopped \
+        nickfedor/watchtower
+    ```
+
+### Git Auth Token
+
+Provide the [Git Auth Token](../../configuration/git-monitoring/index.md#git_auth_token) from a file.
+
+=== "Docker Compose"
+
+    ```yaml
+    services:
+        watchtower:
+            image: nickfedor/watchtower:latest
+            volumes:
+                - /var/run/docker.sock:/var/run/docker.sock
+            secrets:
+                - git_auth_token
+            environment:
+                - WATCHTOWER_GIT_ENABLE=true
+                - WATCHTOWER_GIT_AUTH_TOKEN=/run/secrets/git_auth_token
+            restart: unless-stopped
+
+    secrets:
+        git_auth_token:
+            file: ./secrets/git_auth_token.txt
+    ```
+
+=== "Docker CLI"
+
+    ```bash
+    docker run -d \
+        --name watchtower \
+        -v /var/run/docker.sock:/var/run/docker.sock \
+        -v $(pwd)/secrets/git_auth_token.txt:/run/secrets/git_auth_token:ro \
+        -e WATCHTOWER_GIT_ENABLE=true \
+        -e WATCHTOWER_GIT_AUTH_TOKEN=/run/secrets/git_auth_token \
+        --restart unless-stopped \
+        nickfedor/watchtower
+    ```
+
+### Git Password
+
+Provide the [Git Password](../../configuration/git-monitoring/index.md#git_password) from a file.
+
+=== "Docker Compose"
+
+    ```yaml
+    services:
+        watchtower:
+            image: nickfedor/watchtower:latest
+            volumes:
+                - /var/run/docker.sock:/var/run/docker.sock
+            secrets:
+                - git_password
+            environment:
+                - WATCHTOWER_GIT_ENABLE=true
+                - WATCHTOWER_GIT_USERNAME=git
+                - WATCHTOWER_GIT_PASSWORD=/run/secrets/git_password
+            restart: unless-stopped
+
+    secrets:
+        git_password:
+            file: ./secrets/git_password.txt
+    ```
+
+=== "Docker CLI"
+
+    ```bash
+    docker run -d \
+        --name watchtower \
+        -v /var/run/docker.sock:/var/run/docker.sock \
+        -v $(pwd)/secrets/git_password.txt:/run/secrets/git_password:ro \
+        -e WATCHTOWER_GIT_ENABLE=true \
+        -e WATCHTOWER_GIT_USERNAME=git \
+        -e WATCHTOWER_GIT_PASSWORD=/run/secrets/git_password \
         --restart unless-stopped \
         nickfedor/watchtower
     ```

@@ -285,3 +285,21 @@ var _ = ginkgo.Describe("PullImage cooldown gate", func() {
 		})
 	})
 })
+
+var _ = ginkgo.Describe("CheckLocalImageCooldown", func() {
+	ginkgo.It("defers when the local image is younger than the cooldown", func() {
+		c := MockContainer(WithImageName("app:latest"))
+		c.imageInfo.Created = time.Now().Add(-time.Hour).Format(time.RFC3339Nano)
+
+		err := CheckLocalImageCooldown(c, types.UpdateParams{CooldownDelay: 24 * time.Hour})
+		gomega.Expect(err).To(gomega.MatchError(ErrImageCooldown))
+	})
+
+	ginkgo.It("allows rebuilds when the local image is older than the cooldown", func() {
+		c := MockContainer(WithImageName("app:latest"))
+		c.imageInfo.Created = time.Now().Add(-48 * time.Hour).Format(time.RFC3339Nano)
+
+		err := CheckLocalImageCooldown(c, types.UpdateParams{CooldownDelay: 24 * time.Hour})
+		gomega.Expect(err).NotTo(gomega.HaveOccurred())
+	})
+})

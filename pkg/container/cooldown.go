@@ -231,6 +231,59 @@ func logClockSkew(imageAge, delay time.Duration, clog *zerolog.Logger) {
 		Msg("Image creation time is in the future (possible clock skew) - update available")
 }
 
+// CheckLocalImageCooldown applies cooldown-delay using the local image Created time.
+//
+// Unlike the registry path, this does not contact a registry. Missing image
+// info skips the check so a session is not failed.
+//
+// Parameters:
+//   - c: Container whose local image age is evaluated.
+//   - params: Update parameters (global cooldown and label override).
+//
+// Returns:
+//   - error: Non-nil CooldownError when the image is inside the cooldown window.
+func CheckLocalImageCooldown(c types.Container, params types.UpdateParams) error {
+	delay, skip := shouldCheckCooldown(c, params)
+	if skip {
+		return nil
+	}
+
+	created, ok := localImageCreated(c)
+	if !ok {
+		return nil
+	}
+
+	clog := nopLog()
+	if concrete, isConcrete := c.(*Container); isConcrete {
+		clog = concrete.logger()
+	}
+
+	_, err := evalImageAge(created, delay, clog)
+
+	return err
+}
+
+func localImageCreated(c types.Container) (time.Time, bool) {
+	if c == nil || !c.HasImageInfo() {
+		return time.Time{}, false
+	}
+
+	info := c.ImageInfo()
+	if info == nil || info.Created == "" {
+		return time.Time{}, false
+	}
+
+	created, err := time.Parse(time.RFC3339Nano, info.Created)
+	if err != nil {
+		created, err = time.Parse(time.RFC3339, info.Created)
+		if err != nil {
+			return time.Time{}, false
+		}
+	}
+
+	return created, true
+}
+
 // logCooldownExceeded logs an info message when the image age exceeds the
 // cooldown window and the pull can proceed.
 func logCooldownExceeded(imageAge, delay time.Duration, clog *zerolog.Logger) {

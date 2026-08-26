@@ -950,6 +950,7 @@ func TestFlagsArePresentInDocumentation(t *testing.T) {
 		"../../docs/configuration/registry-and-authentication/index.md",
 		"../../docs/configuration/scheduling/index.md",
 		"../../docs/configuration/update-behavior/index.md",
+		"../../docs/configuration/git-monitoring/index.md",
 	}
 	allDocs := ""
 

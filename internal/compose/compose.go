@@ -18,6 +18,12 @@ const (
 	ComposeServiceLabel = "com.docker.compose.service"
 	// ComposeContainerNumber specifies the container number of the container in Docker Compose.
 	ComposeContainerNumber = "com.docker.compose.container-number"
+	// ComposeWorkingDirLabel is the host working directory Compose recorded on the container.
+	ComposeWorkingDirLabel = "com.docker.compose.project.working_dir"
+	// ComposeConfigFilesLabel lists compose files Compose used, comma-separated.
+	ComposeConfigFilesLabel = "com.docker.compose.project.config_files"
+	// WatchtowerComposeDirLabel is a path inside Watchtower to the Compose project directory.
+	WatchtowerComposeDirLabel = "com.centurylinklabs.watchtower.compose-dir"
 )
 
 // ParseDependsOnLabel parses the Docker Compose depends_on label value.

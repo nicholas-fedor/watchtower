@@ -14,6 +14,7 @@ import (
 	"github.com/nicholas-fedor/watchtower/internal/config"
 	"github.com/nicholas-fedor/watchtower/internal/flags"
 	"github.com/nicholas-fedor/watchtower/internal/logging"
+	"github.com/nicholas-fedor/watchtower/pkg/types"
 )
 
 // testLogger returns a discarded zerolog logger for tests that do not assert on logs.
@@ -246,4 +247,15 @@ func TestLoad_KindStringSecretFromFiles_ResolveContent(t *testing.T) {
 	assert.Equal(t, "slack://token@channel", cfg.Notify.Legacy.SlackHookURL)
 	assert.Equal(t, "https://outlook.office.com/webhook/abc123", cfg.Notify.Legacy.MSTeamsHook)
 	assert.Equal(t, "gotify_token_abc", cfg.Notify.Legacy.GotifyToken)
+}
+
+func TestLoad_GitEnvImageAndEnable(t *testing.T) {
+	cfg := newLoadedCommand(t, map[string]string{
+		"WATCHTOWER_GIT_IMAGE":  "myapp:latest=https://github.com/org/app.git#develop@patch",
+		"WATCHTOWER_GIT_ENABLE": "true",
+	})
+
+	assert.True(t, cfg.Git.Enable)
+	assert.Equal(t, "develop", cfg.Git.Images["myapp:latest"].Ref)
+	assert.Equal(t, types.GitPolicyPatch, cfg.Git.Images["myapp:latest"].Policy)
 }

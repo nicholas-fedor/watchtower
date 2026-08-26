@@ -5,6 +5,7 @@ import (
 
 	"github.com/rs/zerolog"
 
+	"github.com/nicholas-fedor/watchtower/pkg/container"
 	"github.com/nicholas-fedor/watchtower/pkg/types"
 )
 
@@ -38,6 +39,7 @@ func UpdateFromContainer(log *zerolog.Logger,
 		monitorOnly:    container.IsMonitorOnly(params),
 		newContainerID: "",
 	}
+	applyReportMeta(update, container, params)
 	log.Debug().
 		Str("container_id", container.ID().ShortID()).
 		Str("name", container.Name()).
@@ -106,6 +108,86 @@ func (m Progress) UpdateFailed(log *zerolog.Logger, failures map[types.Container
 			Str("name", update.Name()).
 			Msg("Updated container state to failed")
 	}
+}
+
+// applyReportMeta copies Git and OCI fields onto a scanned container status.
+//
+// Parameters:
+//   - status: Status to update.
+//   - c: Source container.
+//   - params: Update parameters used to resolve report metadata.
+func applyReportMeta(status *ContainerStatus, c types.Container, params types.UpdateParams) {
+	if status == nil {
+		return
+	}
+
+	if _, ok := c.(*container.Container); !ok {
+		return
+	}
+
+	meta := container.ResolveReportMeta(c, params, container.ChangelogVars{})
+	status.SetGitMetadata(
+		meta.GitRepo,
+		meta.GitRef,
+		meta.Changelog,
+		meta.Source,
+		meta.ImageURL,
+		meta.Documentation,
+		meta.Revision,
+	)
+}
+
+// SetLatestImage updates the latest image ID recorded for a container.
+//
+// Parameters:
+//   - log: Process logger.
+//   - containerID: Container identity.
+//   - image: Newest image ID, including a Git-built image.
+//
+// Returns:
+//   - none.
+func (m Progress) SetLatestImage(log *zerolog.Logger, containerID types.ContainerID, image types.ImageID) {
+	update, exists := m[containerID]
+	if !exists {
+		return
+	}
+
+	update.newImage = image
+	log.Debug().
+		Str("container_id", containerID.ShortID()).
+		Str("image", image.ShortID()).
+		Msg("Updated latest image on container status")
+}
+
+// RefreshChangelog re-resolves the changelog using a known new version.
+//
+// Parameters:
+//   - c: Container whose report should be updated.
+//   - params: Update parameters.
+//   - tag: New tag for placeholders.
+//   - commit: New commit for placeholders.
+//
+// Returns:
+//   - none.
+func (m Progress) RefreshChangelog(
+	c types.Container,
+	params types.UpdateParams,
+	tag, commit string,
+) {
+	if c == nil {
+		return
+	}
+
+	update, exists := m[c.ID()]
+	if !exists {
+		return
+	}
+
+	meta := container.ResolveReportMeta(c, params, container.ChangelogVars{
+		Tag:    tag,
+		Commit: commit,
+	})
+	update.changelog = meta.Changelog
 }
 
 // Add inserts a container status into the progress map.

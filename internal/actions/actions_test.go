@@ -333,6 +333,7 @@ var _ = ginkgo.Describe("Actions", func() {
 				context.Background(),
 				client,
 				config,
+				nil,
 			)
 
 			// We expect some result or error, but mainly that it doesn't panic

@@ -378,6 +378,38 @@ updt1 (mock/updt1:latest): Updated
 			})
 		})
 
+		ginkgo.When("using a template referencing Git and OCI report fields", func() {
+			ginkgo.It("should render Changelog, GitRepo, and Source", func() {
+				status := session.NewContainerStatus("app", "org/app:latest")
+				status.SetGitMetadata(
+					"https://github.com/org/app.git",
+					"v1.2.3",
+					"https://github.com/org/app/releases",
+					"https://github.com/org/app",
+					"https://example.com/image",
+					"https://example.com/docs",
+					"abc123",
+				)
+
+				report := &session.SingleContainerReport{
+					UpdatedReports: []types.ContainerReport{status},
+				}
+
+				tpl, err := template.New("git").Parse(
+					`{{ range .Report.Updated }}{{ .Name }} {{ .Changelog }}{{ if .Source }} ({{ .Source }}){{ end }} repo={{ .GitRepo }}{{ end }}`,
+				)
+				gomega.Expect(err).ToNot(gomega.HaveOccurred())
+
+				var buf bytes.Buffer
+
+				err = tpl.Execute(&buf, Data{Report: report})
+				gomega.Expect(err).ToNot(gomega.HaveOccurred())
+				gomega.Expect(buf.String()).To(gomega.Equal(
+					"app https://github.com/org/app/releases (https://github.com/org/app) repo=https://github.com/org/app.git",
+				))
+			})
+		})
+
 		ginkgo.Describe("the default template", func() {
 			ginkgo.When("all containers are fresh", func() {
 				ginkgo.It("should return the summary", func() {

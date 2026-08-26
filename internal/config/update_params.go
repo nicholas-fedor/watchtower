@@ -47,5 +47,14 @@ func (c Config) UpdateParams(overrides RunOverrides) types.UpdateParams {
 		EphemeralSelfUpdate: c.Update.EphemeralSelfUpdate,
 		CooldownDelay:       c.Update.CooldownDelay,
 		LabelEnable:         c.Filter.LabelEnable,
+		EnableGitMonitoring: c.Git.Enable,
+		GitDefaultRef:       c.Git.DefaultRef,
+		GitSemverPolicy:     c.Git.SemverPolicy,
+		GitTimeout:          c.Git.Timeout,
+		GitImages:           c.Git.Images,
+		GitDockerfile:       c.Git.Dockerfile,
+		GitContext:          c.Git.Context,
+		GitComposeStash:     c.Git.ComposeStash,
+		ComposeProjects:     c.Git.ComposeProjects,
 	}
 }

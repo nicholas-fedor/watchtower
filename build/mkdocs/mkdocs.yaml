@@ -181,6 +181,7 @@ nav:
       - Container Selection: configuration/container-selection/index.md
       - Scheduling: configuration/scheduling/index.md
       - Registry and Authentication: configuration/registry-and-authentication/index.md
+      - Git Monitoring: configuration/git-monitoring/index.md
       - Image Cooldown: configuration/image-cooldown/index.md
       - Update Behavior: configuration/update-behavior/index.md
       - Lifecycle Hooks: configuration/lifecycle-hooks/index.md
@@ -222,6 +223,7 @@ nav:
           - Update: http-api/endpoints/update/index.md
   - Advanced Features:
       - Ephemeral Self-Updates: advanced-features/ephemeral-self-updates/index.md
+      - Git Monitoring: advanced-features/git-monitoring/index.md
       - Image Cooldown: advanced-features/image-cooldown/index.md
       - Lifecycle Hooks: advanced-features/lifecycle-hooks/index.md
       - Linked Containers: advanced-features/linked-containers/index.md

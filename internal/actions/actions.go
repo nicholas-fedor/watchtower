@@ -8,6 +8,7 @@ import (
 	"github.com/rs/zerolog"
 
 	"github.com/nicholas-fedor/watchtower/internal/api/handlers/events"
+	"github.com/nicholas-fedor/watchtower/internal/git"
 	"github.com/nicholas-fedor/watchtower/internal/metrics"
 	"github.com/nicholas-fedor/watchtower/pkg/container"
 	"github.com/nicholas-fedor/watchtower/pkg/session"
@@ -42,6 +43,8 @@ type RunUpdatesWithNotificationsParams struct {
 	Logger *zerolog.Logger
 	// Client is the Docker client for container operations.
 	Client container.Client
+	// GitClient inspects remotes and clones repositories when the Git watcher is used.
+	GitClient *git.Client
 	// Notifier sends update status messages to configured channels.
 	Notifier types.Notifier
 	// NotificationSplitByContainer enables a separate notification per updated container.
@@ -93,6 +96,7 @@ func RunUpdatesWithNotifications(
 		ctx,
 		params.Client,
 		updateConfig,
+		params.GitClient,
 	)
 	// Process update result, return metric on failure
 	metric := handleUpdateResult(log, result, err, params.Notifier)
@@ -315,26 +319,31 @@ func startNotifications(log *zerolog.Logger, notifier types.Notifier, notificati
 
 // executeUpdate performs the container update operation and handles errors.
 //
-// It calls the Update function with the provided parameters, captures the results,
-// and returns them along with any error encountered.
+// It calls Update with the provided parameters, including the optional Git
+// monitor client used for associated containers.
 //
 // Parameters:
+//   - log: Process logger.
 //   - ctx: Context for cancellation and timeouts.
-//   - client: The Docker client instance used for container operations.
-//   - config: The UpdateParams struct containing all update configuration parameters.
+//   - client: Docker client used for container operations.
+//   - config: Update parameters.
+//   - gitClient: Git monitor client. Nil when Git monitoring is unused.
 //
 // Returns:
-//   - types.Report: The report containing the results of the update operation.
-//   - []types.CleanedImageInfo: Slice of cleaned image info to be cleaned up.
-//   - error: Any error encountered during the update execution.
-func executeUpdate(log *zerolog.Logger, ctx context.Context,
+//   - types.Report: Results of the update operation.
+//   - []types.RemovedImageInfo: Images eligible for cleanup.
+//   - error: Non-nil when Update fails.
+func executeUpdate(
+	log *zerolog.Logger,
+	ctx context.Context,
 	client container.Client,
 	config types.UpdateParams,
+	gitClient *git.Client,
 ) (types.Report, []types.RemovedImageInfo, error) {
 	// Log before calling the Update function
 	log.Debug().Msg("About to call Update function")
 
-	result, cleanupImageInfos, err := Update(log, ctx, client, config)
+	result, cleanupImageInfos, err := Update(log, ctx, client, config, gitClient)
 
 	// Log after Update function returns
 	log.Debug().Msg("Update function returned, about to check cleanup")

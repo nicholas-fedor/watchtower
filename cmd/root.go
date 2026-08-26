@@ -17,6 +17,7 @@ import (
 	"github.com/nicholas-fedor/watchtower/internal/api/handlers/events"
 	appConfig "github.com/nicholas-fedor/watchtower/internal/config"
 	"github.com/nicholas-fedor/watchtower/internal/flags"
+	"github.com/nicholas-fedor/watchtower/internal/git"
 	"github.com/nicholas-fedor/watchtower/internal/logging"
 	"github.com/nicholas-fedor/watchtower/internal/meta"
 	"github.com/nicholas-fedor/watchtower/internal/metrics"
@@ -530,6 +531,24 @@ func (p *process) runMain(cfg types.RunConfig) int {
 	//
 	// Returns:
 	//   - *metrics.Metric: A pointer to a metric object summarizing the update session (scanned, updated, failed counts).
+	gitClient := git.New(p.log, git.Options{
+		Token:           appCfg.Git.Token,
+		Username:        appCfg.Git.Username,
+		Password:        appCfg.Git.Password,
+		SSHKeyPath:      appCfg.Git.SSHKeyPath,
+		SSHKnownHosts:   appCfg.Git.SSHKnownHosts,
+		Timeout:         appCfg.Git.Timeout,
+		CABundle:        appCfg.Git.CABundle,
+		InsecureSkipTLS: appCfg.Git.InsecureSkipTLS,
+	})
+
+	ctx, stop := createSignalContext(
+		context.Background(),
+		os.Interrupt,
+		syscall.SIGTERM,
+	)
+	defer stop()
+
 	runUpdatesWithNotifications = func(ctx context.Context, filter types.Filter, params types.UpdateParams) *metrics.Metric {
 		update := params
 		if filter != nil {
@@ -543,6 +562,7 @@ func (p *process) runMain(cfg types.RunConfig) int {
 		return actions.RunUpdatesWithNotifications(ctx, actions.RunUpdatesWithNotificationsParams{
 			Logger:                       p.log,
 			Client:                       client,
+			GitClient:                    gitClient,
 			Notifier:                     notifier,
 			NotificationSplitByContainer: appCfg.Notify.SplitByContainer,
 			NotificationReport:           appCfg.Notify.Report,
@@ -550,17 +570,6 @@ func (p *process) runMain(cfg types.RunConfig) int {
 			Update:                       update,
 		})
 	}
-
-	// Create a context that is automatically canceled on SIGINT/SIGTERM signals,
-	// enabling graceful shutdown of the API, scheduler, and validation operations.
-	// The stop function is returned but not needed as the context automatically
-	// handles cleanup when the program exits.
-	ctx, stop := createSignalContext(
-		context.Background(),
-		os.Interrupt,
-		syscall.SIGTERM,
-	)
-	defer stop()
 
 	// If rolling restarts are enabled, validate that the containers being monitored for
 	// updates do not have linked dependencies.
@@ -749,6 +758,7 @@ func (p *process) runMain(cfg types.RunConfig) int {
 			IncludeRestarting:            appCfg.Client.IncludeRestarting,
 			LabelEnable:                  appCfg.Filter.LabelEnable,
 			Client:                       client,
+			GitClient:                    gitClient,
 			Notifier:                     notifier,
 			NotificationSplitByContainer: appCfg.Notify.SplitByContainer,
 			Scope:                        appCfg.Filter.Scope,

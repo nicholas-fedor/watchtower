@@ -36,6 +36,50 @@ func (_m *MockContainerReport) EXPECT() *MockContainerReport_Expecter {
 	return &MockContainerReport_Expecter{mock: &_m.Mock}
 }
 
+// Changelog provides a mock function for the type MockContainerReport
+func (_mock *MockContainerReport) Changelog() string {
+	ret := _mock.Called()
+
+	if len(ret) == 0 {
+		panic("no return value specified for Changelog")
+	}
+
+	var r0 string
+	if returnFunc, ok := ret.Get(0).(func() string); ok {
+		r0 = returnFunc()
+	} else {
+		r0 = ret.Get(0).(string)
+	}
+	return r0
+}
+
+// MockContainerReport_Changelog_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'Changelog'
+type MockContainerReport_Changelog_Call struct {
+	*mock.Call
+}
+
+// Changelog is a helper method to define mock.On call
+func (_e *MockContainerReport_Expecter) Changelog() *MockContainerReport_Changelog_Call {
+	return &MockContainerReport_Changelog_Call{Call: _e.mock.On("Changelog")}
+}
+
+func (_c *MockContainerReport_Changelog_Call) Run(run func()) *MockContainerReport_Changelog_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run()
+	})
+	return _c
+}
+
+func (_c *MockContainerReport_Changelog_Call) Return(s string) *MockContainerReport_Changelog_Call {
+	_c.Call.Return(s)
+	return _c
+}
+
+func (_c *MockContainerReport_Changelog_Call) RunAndReturn(run func() string) *MockContainerReport_Changelog_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // CurrentImageID provides a mock function for the type MockContainerReport
 func (_mock *MockContainerReport) CurrentImageID() types.ImageID {
 	ret := _mock.Called()
@@ -80,6 +124,50 @@ func (_c *MockContainerReport_CurrentImageID_Call) RunAndReturn(run func() types
 	return _c
 }
 
+// Documentation provides a mock function for the type MockContainerReport
+func (_mock *MockContainerReport) Documentation() string {
+	ret := _mock.Called()
+
+	if len(ret) == 0 {
+		panic("no return value specified for Documentation")
+	}
+
+	var r0 string
+	if returnFunc, ok := ret.Get(0).(func() string); ok {
+		r0 = returnFunc()
+	} else {
+		r0 = ret.Get(0).(string)
+	}
+	return r0
+}
+
+// MockContainerReport_Documentation_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'Documentation'
+type MockContainerReport_Documentation_Call struct {
+	*mock.Call
+}
+
+// Documentation is a helper method to define mock.On call
+func (_e *MockContainerReport_Expecter) Documentation() *MockContainerReport_Documentation_Call {
+	return &MockContainerReport_Documentation_Call{Call: _e.mock.On("Documentation")}
+}
+
+func (_c *MockContainerReport_Documentation_Call) Run(run func()) *MockContainerReport_Documentation_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run()
+	})
+	return _c
+}
+
+func (_c *MockContainerReport_Documentation_Call) Return(s string) *MockContainerReport_Documentation_Call {
+	_c.Call.Return(s)
+	return _c
+}
+
+func (_c *MockContainerReport_Documentation_Call) RunAndReturn(run func() string) *MockContainerReport_Documentation_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // Error provides a mock function for the type MockContainerReport
 func (_mock *MockContainerReport) Error() string {
 	ret := _mock.Called()
@@ -120,6 +208,94 @@ func (_c *MockContainerReport_Error_Call) Return(s string) *MockContainerReport_
 }
 
 func (_c *MockContainerReport_Error_Call) RunAndReturn(run func() string) *MockContainerReport_Error_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
+// GitRef provides a mock function for the type MockContainerReport
+func (_mock *MockContainerReport) GitRef() string {
+	ret := _mock.Called()
+
+	if len(ret) == 0 {
+		panic("no return value specified for GitRef")
+	}
+
+	var r0 string
+	if returnFunc, ok := ret.Get(0).(func() string); ok {
+		r0 = returnFunc()
+	} else {
+		r0 = ret.Get(0).(string)
+	}
+	return r0
+}
+
+// MockContainerReport_GitRef_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'GitRef'
+type MockContainerReport_GitRef_Call struct {
+	*mock.Call
+}
+
+// GitRef is a helper method to define mock.On call
+func (_e *MockContainerReport_Expecter) GitRef() *MockContainerReport_GitRef_Call {
+	return &MockContainerReport_GitRef_Call{Call: _e.mock.On("GitRef")}
+}
+
+func (_c *MockContainerReport_GitRef_Call) Run(run func()) *MockContainerReport_GitRef_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run()
+	})
+	return _c
+}
+
+func (_c *MockContainerReport_GitRef_Call) Return(s string) *MockContainerReport_GitRef_Call {
+	_c.Call.Return(s)
+	return _c
+}
+
+func (_c *MockContainerReport_GitRef_Call) RunAndReturn(run func() string) *MockContainerReport_GitRef_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
+// GitRepo provides a mock function for the type MockContainerReport
+func (_mock *MockContainerReport) GitRepo() string {
+	ret := _mock.Called()
+
+	if len(ret) == 0 {
+		panic("no return value specified for GitRepo")
+	}
+
+	var r0 string
+	if returnFunc, ok := ret.Get(0).(func() string); ok {
+		r0 = returnFunc()
+	} else {
+		r0 = ret.Get(0).(string)
+	}
+	return r0
+}
+
+// MockContainerReport_GitRepo_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'GitRepo'
+type MockContainerReport_GitRepo_Call struct {
+	*mock.Call
+}
+
+// GitRepo is a helper method to define mock.On call
+func (_e *MockContainerReport_Expecter) GitRepo() *MockContainerReport_GitRepo_Call {
+	return &MockContainerReport_GitRepo_Call{Call: _e.mock.On("GitRepo")}
+}
+
+func (_c *MockContainerReport_GitRepo_Call) Run(run func()) *MockContainerReport_GitRepo_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run()
+	})
+	return _c
+}
+
+func (_c *MockContainerReport_GitRepo_Call) Return(s string) *MockContainerReport_GitRepo_Call {
+	_c.Call.Return(s)
+	return _c
+}
+
+func (_c *MockContainerReport_GitRepo_Call) RunAndReturn(run func() string) *MockContainerReport_GitRepo_Call {
 	_c.Call.Return(run)
 	return _c
 }
@@ -208,6 +384,50 @@ func (_c *MockContainerReport_ImageName_Call) Return(s string) *MockContainerRep
 }
 
 func (_c *MockContainerReport_ImageName_Call) RunAndReturn(run func() string) *MockContainerReport_ImageName_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
+// ImageURL provides a mock function for the type MockContainerReport
+func (_mock *MockContainerReport) ImageURL() string {
+	ret := _mock.Called()
+
+	if len(ret) == 0 {
+		panic("no return value specified for ImageURL")
+	}
+
+	var r0 string
+	if returnFunc, ok := ret.Get(0).(func() string); ok {
+		r0 = returnFunc()
+	} else {
+		r0 = ret.Get(0).(string)
+	}
+	return r0
+}
+
+// MockContainerReport_ImageURL_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'ImageURL'
+type MockContainerReport_ImageURL_Call struct {
+	*mock.Call
+}
+
+// ImageURL is a helper method to define mock.On call
+func (_e *MockContainerReport_Expecter) ImageURL() *MockContainerReport_ImageURL_Call {
+	return &MockContainerReport_ImageURL_Call{Call: _e.mock.On("ImageURL")}
+}
+
+func (_c *MockContainerReport_ImageURL_Call) Run(run func()) *MockContainerReport_ImageURL_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run()
+	})
+	return _c
+}
+
+func (_c *MockContainerReport_ImageURL_Call) Return(s string) *MockContainerReport_ImageURL_Call {
+	_c.Call.Return(s)
+	return _c
+}
+
+func (_c *MockContainerReport_ImageURL_Call) RunAndReturn(run func() string) *MockContainerReport_ImageURL_Call {
 	_c.Call.Return(run)
 	return _c
 }
@@ -384,6 +604,94 @@ func (_c *MockContainerReport_NewContainerID_Call) Return(containerID types.Cont
 }
 
 func (_c *MockContainerReport_NewContainerID_Call) RunAndReturn(run func() types.ContainerID) *MockContainerReport_NewContainerID_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
+// Revision provides a mock function for the type MockContainerReport
+func (_mock *MockContainerReport) Revision() string {
+	ret := _mock.Called()
+
+	if len(ret) == 0 {
+		panic("no return value specified for Revision")
+	}
+
+	var r0 string
+	if returnFunc, ok := ret.Get(0).(func() string); ok {
+		r0 = returnFunc()
+	} else {
+		r0 = ret.Get(0).(string)
+	}
+	return r0
+}
+
+// MockContainerReport_Revision_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'Revision'
+type MockContainerReport_Revision_Call struct {
+	*mock.Call
+}
+
+// Revision is a helper method to define mock.On call
+func (_e *MockContainerReport_Expecter) Revision() *MockContainerReport_Revision_Call {
+	return &MockContainerReport_Revision_Call{Call: _e.mock.On("Revision")}
+}
+
+func (_c *MockContainerReport_Revision_Call) Run(run func()) *MockContainerReport_Revision_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run()
+	})
+	return _c
+}
+
+func (_c *MockContainerReport_Revision_Call) Return(s string) *MockContainerReport_Revision_Call {
+	_c.Call.Return(s)
+	return _c
+}
+
+func (_c *MockContainerReport_Revision_Call) RunAndReturn(run func() string) *MockContainerReport_Revision_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
+// Source provides a mock function for the type MockContainerReport
+func (_mock *MockContainerReport) Source() string {
+	ret := _mock.Called()
+
+	if len(ret) == 0 {
+		panic("no return value specified for Source")
+	}
+
+	var r0 string
+	if returnFunc, ok := ret.Get(0).(func() string); ok {
+		r0 = returnFunc()
+	} else {
+		r0 = ret.Get(0).(string)
+	}
+	return r0
+}
+
+// MockContainerReport_Source_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'Source'
+type MockContainerReport_Source_Call struct {
+	*mock.Call
+}
+
+// Source is a helper method to define mock.On call
+func (_e *MockContainerReport_Expecter) Source() *MockContainerReport_Source_Call {
+	return &MockContainerReport_Source_Call{Call: _e.mock.On("Source")}
+}
+
+func (_c *MockContainerReport_Source_Call) Run(run func()) *MockContainerReport_Source_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run()
+	})
+	return _c
+}
+
+func (_c *MockContainerReport_Source_Call) Return(s string) *MockContainerReport_Source_Call {
+	_c.Call.Return(s)
+	return _c
+}
+
+func (_c *MockContainerReport_Source_Call) RunAndReturn(run func() string) *MockContainerReport_Source_Call {
 	_c.Call.Return(run)
 	return _c
 }

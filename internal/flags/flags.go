@@ -18,6 +18,7 @@ import (
 	"github.com/nicholas-fedor/watchtower/internal/flags/compat"
 	"github.com/nicholas-fedor/watchtower/internal/flags/docker"
 	"github.com/nicholas-fedor/watchtower/internal/flags/filter"
+	"github.com/nicholas-fedor/watchtower/internal/flags/git"
 	"github.com/nicholas-fedor/watchtower/internal/flags/lifecycle"
 	flagslogging "github.com/nicholas-fedor/watchtower/internal/flags/logging"
 	"github.com/nicholas-fedor/watchtower/internal/flags/mode"
@@ -83,6 +84,7 @@ func RegisterSystemFlags(rootCmd *cobra.Command) {
 	compat.Register(rootCmd)
 	api.Register(rootCmd)
 	flagslogging.Register(rootCmd)
+	git.Register(rootCmd)
 }
 
 // RegisterNotificationFlags adds notification flags to the root command.
@@ -125,17 +127,17 @@ func EnvConfig(log *zerolog.Logger, cmd *cobra.Command) error {
 	flagSet := cmd.PersistentFlags()
 
 	// Resolve Docker settings via Viper (flag > env > static default) after BindAll.
-	vip := viper.New()
+	vCfg := viper.New()
 
-	err := BindAll(vip, flagSet, docker.Specs())
+	err := BindAll(vCfg, flagSet, docker.Specs())
 	if err != nil {
 		return fmt.Errorf("bind docker flags: %w", err)
 	}
 
-	host := vip.GetString("host")
-	tls := vip.GetBool("tlsverify")
-	version := strings.Trim(vip.GetString("api-version"), "\"")
-	certPath := vip.GetString("cert-path")
+	host := vCfg.GetString("host")
+	tls := vCfg.GetBool("tlsverify")
+	version := strings.Trim(vCfg.GetString("api-version"), "\"")
+	certPath := vCfg.GetString("cert-path")
 
 	// Convert tcp:// to https:// when TLS is enabled.
 	if tls && strings.HasPrefix(host, "tcp://") {
@@ -255,6 +257,8 @@ func GetSecretsFromFiles(log *zerolog.Logger, rootCmd *cobra.Command) {
 		"notification-url",
 		"http-api-token",
 		"http-api-events-token",
+		"git-auth-token",
+		"git-password",
 	}
 
 	// Process each secret flag.

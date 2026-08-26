@@ -142,6 +142,17 @@ func WithLabels(labels map[string]string) MockContainerUpdate {
 	}
 }
 
+// WithImageLabels sets labels on the mock image config (OCI annotations).
+func WithImageLabels(labels map[string]string) MockContainerUpdate {
+	return func(_ *dockerContainer.InspectResponse, i *dockerImage.InspectResponse) {
+		if i.Config == nil {
+			i.Config = &dockerspec.DockerOCIImageConfig{}
+		}
+
+		i.Config.Labels = labels
+	}
+}
+
 // WithContainerState sets the state for the mock container.
 //
 // Parameters:

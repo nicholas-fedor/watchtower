@@ -388,6 +388,62 @@ func TestContainerStatus_RestartedStateWithMissingData(t *testing.T) {
 	}
 }
 
+func TestNewContainerStatus(t *testing.T) {
+	got := NewContainerStatus("app", "org/app:latest")
+	if got.Name() != "app" {
+		t.Errorf("Name() = %q, want app", got.Name())
+	}
+
+	if got.ImageName() != "org/app:latest" {
+		t.Errorf("ImageName() = %q, want org/app:latest", got.ImageName())
+	}
+
+	if got.State() != UpdatedStateString {
+		t.Errorf("State() = %q, want %q", got.State(), UpdatedStateString)
+	}
+}
+
+func TestContainerStatus_SetGitMetadata(t *testing.T) {
+	u := &ContainerStatus{}
+	u.SetGitMetadata(
+		"https://github.com/org/app.git",
+		"main",
+		"https://github.com/org/app/releases",
+		"https://github.com/org/app",
+		"https://example.com/image",
+		"https://example.com/docs",
+		"deadbeef",
+	)
+
+	if u.GitRepo() != "https://github.com/org/app.git" {
+		t.Errorf("GitRepo() = %q", u.GitRepo())
+	}
+
+	if u.GitRef() != "main" {
+		t.Errorf("GitRef() = %q", u.GitRef())
+	}
+
+	if u.Changelog() != "https://github.com/org/app/releases" {
+		t.Errorf("Changelog() = %q", u.Changelog())
+	}
+
+	if u.Source() != "https://github.com/org/app" {
+		t.Errorf("Source() = %q", u.Source())
+	}
+
+	if u.ImageURL() != "https://example.com/image" {
+		t.Errorf("ImageURL() = %q", u.ImageURL())
+	}
+
+	if u.Documentation() != "https://example.com/docs" {
+		t.Errorf("Documentation() = %q", u.Documentation())
+	}
+
+	if u.Revision() != "deadbeef" {
+		t.Errorf("Revision() = %q", u.Revision())
+	}
+}
+
 func TestContainerStatus_SetCooldownInfo(t *testing.T) {
 	tests := []struct {
 		name       string

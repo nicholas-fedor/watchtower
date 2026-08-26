@@ -268,6 +268,46 @@ Logs:
 2025-08-20T06:00:13-07:00 [error] Operation failed. Try again later.
 ```
 
+## Git and OCI report fields
+
+Default templates are unchanged.
+Custom report templates can use these fields on each container.
+They are populated even when Git monitoring is off.
+
+| Field | Meaning |
+|:------|:--------|
+| `.GitRepo` | `com.centurylinklabs.watchtower.git-repo`, else [`git-image`](../../configuration/git-monitoring/index.md#git_image) mapping, else OCI `org.opencontainers.image.source` |
+| `.GitRef` | `com.centurylinklabs.watchtower.git-ref` (or `com.centurylinklabs.watchtower.git-branch`), else mapping ref, else OCI version when it looks like a tag |
+| `.Changelog` | `com.centurylinklabs.watchtower.changelog`, else a derived releases URL, else OCI `url` / `documentation` |
+| `.Source` | OCI `org.opencontainers.image.source` |
+| `.ImageURL` | OCI `org.opencontainers.image.url` |
+| `.Documentation` | OCI `org.opencontainers.image.documentation` |
+| `.Revision` | OCI `org.opencontainers.image.revision` |
+
+```go
+{{ range .Report.Updated }}{{ .Name }} {{ .Changelog }}{{ if .Source }} ({{ .Source }}){{ end }}{{ end }}
+```
+
+An explicit `com.centurylinklabs.watchtower.changelog` label may include placeholders from the new version when known: `{major}`, `{minor}`, `{patch}`, `{tag}`, `{commit}`.
+
+```yaml
+labels:
+    com.centurylinklabs.watchtower.git-repo: https://github.com/org/app.git
+    com.centurylinklabs.watchtower.changelog: https://github.com/org/app/releases/tag/v{major}.{minor}.{patch}
+```
+
+If `com.centurylinklabs.watchtower.changelog` is unset, Watchtower builds a releases URL for `github.com`, `gitlab.com`, `codeberg.org`, and for a container that sets `com.centurylinklabs.watchtower.git-host`.
+Otherwise it falls back to OCI `org.opencontainers.image.url`, then `org.opencontainers.image.documentation`.
+
+Malformed placeholders are left as-is.
+The session does not fail.
+
+An image with only `org.opencontainers.image.source` still exposes `.Source` / derived `.GitRepo`.
+Git monitoring stays off unless the container is associated and the watcher is on.
+See [Git Monitoring](../../advanced-features/git-monitoring/index.md) for association and rebuilds.
+
+Porcelain JSON and `/v1/check` expose the same values as `git_repo`, `git_ref`, `changelog`, `oci_source`, `image_url`, `documentation`, and `revision`.
+
 ## Customizing Templates
 
 You can create custom templates to format notifications differently.

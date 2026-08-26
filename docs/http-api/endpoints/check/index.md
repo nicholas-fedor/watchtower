@@ -2,7 +2,10 @@
 
 ## Overview
 
-The `v1/check` endpoint enables checking monitored containers for available image updates by querying the registry for the latest digest (HTTP HEAD with GET fallback).
+The `v1/check` endpoint enables checking monitored containers for available image updates.
+
+Containers on the registry path are checked by querying the registry for the latest digest (HTTP HEAD with GET fallback).
+Containers associated for [Git monitoring](../../../advanced-features/git-monitoring/index.md) use the same watch split as scheduled updates: Watchtower checks the hosted Git ref and does not clone or build.
 
 It does **not** download image layers and does **not** check against the configured [image cooldown](../../../advanced-features/image-cooldown/index.md), as the cooldown functionality remains an apply-time gate for scheduled updates and `/v1/update`.
 
@@ -59,6 +62,11 @@ The `/v1/check` endpoint returns a JSON array of container check results:
             "update_available": true,
             "latest_image_id": "",
             "latest_digest": "sha256:new...",
+            "update_source": "registry",
+            "git_repo": "https://github.com/org/app.git",
+            "git_ref": "main",
+            "changelog": "https://github.com/org/app/releases",
+            "oci_source": "https://github.com/org/app",
             "timestamp": "2025-01-20T11:30:45Z"
         }
     ],
@@ -76,6 +84,14 @@ The `/v1/check` endpoint returns a JSON array of container check results:
 - `latest_image_id`: Local image ID of the newer image when known (often empty for registry digest checks that do not pull)
 - `latest_digest`: Newest registry digest when known
 - `error`: Per-container error message when the check failed
+- `update_source`: `registry` or `git` (the staleness path; not OCI `source`)
+- `git_repo`, `git_ref`, `changelog`: Resolved Git metadata when present
+- `oci_source`, `image_url`, `documentation`, `revision`: OCI image annotations when present
+
+Containers associated for Git watching use the same watch split as scheduled updates.
+The check does not clone or build.
+See [Git Monitoring](../../../advanced-features/git-monitoring/index.md).
+Git and OCI report fields are documented under [notification templates](../../../notifications/templates/index.md#git_and_oci_report_fields).
 
 ## HTTP Status Codes
 

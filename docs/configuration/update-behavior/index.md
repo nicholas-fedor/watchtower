@@ -1,5 +1,10 @@
 # Update Behavior
 
+These options apply after Watchtower has decided a container is stale.
+The default staleness signal is a registry digest change.
+[Git monitoring](../git-monitoring/index.md) is an alternate signal that still ends in this same container update process (or Compose apply for a local path context).
+See [Advanced Features → Git Monitoring](../../advanced-features/git-monitoring/index.md#interaction_with_other_update_options).
+
 ## Disable Container Restart
 
 Stops and removes the old containers and creates new ones with the updated image, but does not start the new containers.

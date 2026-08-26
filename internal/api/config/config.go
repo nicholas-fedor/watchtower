@@ -13,6 +13,7 @@ import (
 	"github.com/rs/zerolog"
 
 	"github.com/nicholas-fedor/watchtower/internal/api/handlers/events"
+	"github.com/nicholas-fedor/watchtower/internal/git"
 	"github.com/nicholas-fedor/watchtower/internal/logging"
 	mt "github.com/nicholas-fedor/watchtower/internal/metrics"
 	"github.com/nicholas-fedor/watchtower/pkg/container"
@@ -122,6 +123,8 @@ type Options struct {
 	LabelEnable bool
 	// Client is the Docker client used by API handlers.
 	Client container.Client
+	// GitClient inspects remotes for Git-watched containers on /v1/check.
+	GitClient *git.Client
 	// Notifier sends update and check status messages.
 	Notifier types.Notifier
 	// NotificationSplitByContainer sends one notification per updated container when true.

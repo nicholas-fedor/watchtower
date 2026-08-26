@@ -580,3 +580,20 @@ func (client MockClient) GetInfo(ctx context.Context) (map[string]any, error) {
 func (client MockClient) Ping(ctx context.Context) error {
 	return client.checkContextCancellation(ctx)
 }
+
+// BuildRemoteImage simulates building an image from a Git URL context.
+func (client MockClient) BuildRemoteImage(ctx context.Context, _ string, _ string, tags []string) (types.ImageID, error) {
+	if err := client.checkContextCancellation(ctx); err != nil {
+		return "", err
+	}
+
+	if client.TestData != nil {
+		client.TestData.recordOperation("BuildRemoteImage")
+	}
+
+	if len(tags) > 0 {
+		return types.ImageID("sha256:gitbuild" + tags[0]), nil
+	}
+
+	return types.ImageID("sha256:gitbuild"), nil
+}

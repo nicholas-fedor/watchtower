@@ -23,4 +23,11 @@ type ContainerReport interface {
 	State() string               // Human-readable state.
 	IsMonitorOnly() bool         // Monitor-only status.
 	NewContainerID() ContainerID // New container ID after update.
+	GitRepo() string             // Resolved Git repository URL.
+	GitRef() string              // Resolved Git ref.
+	Changelog() string           // Changelog or releases URL.
+	Source() string              // OCI org.opencontainers.image.source.
+	ImageURL() string            // OCI org.opencontainers.image.url.
+	Documentation() string       // OCI org.opencontainers.image.documentation.
+	Revision() string            // OCI org.opencontainers.image.revision.
 }

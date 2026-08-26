@@ -26,15 +26,15 @@ var (
 // env values participate through BindEnv without baking into pflag defaults.
 //
 // Parameters:
-//   - vip: Local Viper instance for this process load.
+//   - vCfg: Local Viper instance for this process load.
 //   - flagSet: Parsed persistent flag set.
 //   - specs: Aggregated domain flag specifications.
 //
 // Returns:
 //   - error: Non-nil when a bind or default application fails.
-func BindAll(vip *viper.Viper, flagSet *pflag.FlagSet, specs []spec.FlagSpec) error {
+func BindAll(vCfg *viper.Viper, flagSet *pflag.FlagSet, specs []spec.FlagSpec) error {
 	for _, flagSpec := range specs {
-		err := applyDefault(vip, flagSpec)
+		err := applyDefault(vCfg, flagSpec)
 		if err != nil {
 			return fmt.Errorf("default %s: %w", flagSpec.Name, err)
 		}
@@ -44,7 +44,7 @@ func BindAll(vip *viper.Viper, flagSet *pflag.FlagSet, specs []spec.FlagSpec) er
 			return fmt.Errorf("%w: %q", ErrFlagNotRegistered, flagSpec.Name)
 		}
 
-		err = vip.BindPFlag(flagSpec.Name, flag)
+		err = vCfg.BindPFlag(flagSpec.Name, flag)
 		if err != nil {
 			return fmt.Errorf("bind flag %s: %w", flagSpec.Name, err)
 		}
@@ -68,7 +68,7 @@ func BindAll(vip *viper.Viper, flagSet *pflag.FlagSet, specs []spec.FlagSpec) er
 		bindArgs = append(bindArgs, flagSpec.Name)
 		bindArgs = append(bindArgs, envAliases...)
 
-		err = vip.BindEnv(bindArgs...)
+		err = vCfg.BindEnv(bindArgs...)
 		if err != nil {
 			return fmt.Errorf("bind env %s -> %v: %w", flagSpec.Name, envAliases, err)
 		}
@@ -80,12 +80,12 @@ func BindAll(vip *viper.Viper, flagSet *pflag.FlagSet, specs []spec.FlagSpec) er
 // applyDefault sets the Viper default for a FlagSpec.
 //
 // Parameters:
-//   - vip: Viper instance.
+//   - vCfg: Viper instance.
 //   - flagSpec: Flag specification.
 //
 // Returns:
 //   - error: Non-nil when the default type is unsupported.
-func applyDefault(vip *viper.Viper, flagSpec spec.FlagSpec) error {
+func applyDefault(vCfg *viper.Viper, flagSpec spec.FlagSpec) error {
 	switch flagSpec.Kind {
 	case spec.KindBool:
 		b, ok := flagSpec.Default.(bool)
@@ -93,30 +93,30 @@ func applyDefault(vip *viper.Viper, flagSpec spec.FlagSpec) error {
 			return fmt.Errorf("%w: bool %s", ErrInvalidFlagDefault, flagSpec.Name)
 		}
 
-		vip.SetDefault(flagSpec.Name, b)
+		vCfg.SetDefault(flagSpec.Name, b)
 	case spec.KindString:
 		str, _ := flagSpec.Default.(string)
-		vip.SetDefault(flagSpec.Name, str)
+		vCfg.SetDefault(flagSpec.Name, str)
 	case spec.KindInt:
 		n, ok := flagSpec.Default.(int)
 		if !ok && flagSpec.Default != nil {
 			return fmt.Errorf("%w: int %s", ErrInvalidFlagDefault, flagSpec.Name)
 		}
 
-		vip.SetDefault(flagSpec.Name, n)
+		vCfg.SetDefault(flagSpec.Name, n)
 	case spec.KindDuration:
 		d, ok := flagSpec.Default.(time.Duration)
 		if !ok && flagSpec.Default != nil {
 			return fmt.Errorf("%w: duration %s", ErrInvalidFlagDefault, flagSpec.Name)
 		}
 
-		vip.SetDefault(flagSpec.Name, d)
+		vCfg.SetDefault(flagSpec.Name, d)
 	case spec.KindStringSlice, spec.KindStringArray:
 		switch typed := flagSpec.Default.(type) {
 		case []string:
-			vip.SetDefault(flagSpec.Name, typed)
+			vCfg.SetDefault(flagSpec.Name, typed)
 		case nil:
-			vip.SetDefault(flagSpec.Name, []string{})
+			vCfg.SetDefault(flagSpec.Name, []string{})
 		default:
 			return fmt.Errorf("%w: string slice %s", ErrInvalidFlagDefault, flagSpec.Name)
 		}

@@ -75,7 +75,9 @@ func New(
 // configured, it returns a 500 response.
 //
 //	@Summary		Check for available container updates
-//	@Description	Checks each watched container for available updates by querying the registry for the latest digest without pulling image layers.
+//	@Description	Checks each watched container for available updates. Associated Git-watched containers compare the hosted Git ref (no clone or build). Other containers query the registry for the
+//
+// latest digest without pulling image layers.
 //
 //	@Tags			check
 //	@Accept			json

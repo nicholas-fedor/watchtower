@@ -84,6 +84,12 @@ var (
 	errReadPullResponseFailed = errors.New("failed to read pull response")
 	// errRemoveImageFailed indicates a failure to remove an image from the Docker host.
 	errRemoveImageFailed = errors.New("failed to remove image")
+	// errBuildImageIDMissing indicates a successful-looking build returned no image ID.
+	errBuildImageIDMissing = errors.New("image build did not return an image ID")
+	// errGitRemoteEmpty indicates no clone URL was associated.
+	errGitRemoteEmpty = errors.New("git remote is empty")
+	// errGitDockerfileEscape indicates a Dockerfile path left the build context.
+	errGitDockerfileEscape = errors.New("git dockerfile path escapes context")
 )
 
 // Errors for image cooldown operations in cooldown.go and image.go.

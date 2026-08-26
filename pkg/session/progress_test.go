@@ -8,9 +8,15 @@ import (
 	"time"
 
 	"github.com/rs/zerolog"
+	"github.com/stretchr/testify/assert"
 
+	dockerspec "github.com/moby/docker-image-spec/specs-go/v1"
+	dockerContainer "github.com/moby/moby/api/types/container"
+	dockerImage "github.com/moby/moby/api/types/image"
 	testifyMock "github.com/stretchr/testify/mock"
 
+	"github.com/nicholas-fedor/watchtower/pkg/container"
+	gitPkg "github.com/nicholas-fedor/watchtower/pkg/container/git"
 	"github.com/nicholas-fedor/watchtower/pkg/types"
 	mockTypes "github.com/nicholas-fedor/watchtower/pkg/types/mocks"
 )
@@ -1483,4 +1489,114 @@ func TestProgress_Restarted(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestApplyReportMeta(t *testing.T) {
+	t.Parallel()
+
+	t.Run("nil status", func(t *testing.T) {
+		t.Parallel()
+
+		applyReportMeta(nil, reportTestContainer(t, map[string]string{
+			gitPkg.RepoLabel: "https://github.com/org/app.git",
+		}), types.UpdateParams{})
+	})
+
+	t.Run("skips mock containers", func(t *testing.T) {
+		t.Parallel()
+
+		mock := mockTypes.NewMockContainer(t)
+		status := &ContainerStatus{}
+		applyReportMeta(status, mock, types.UpdateParams{})
+		assert.Empty(t, status.GitRepo())
+	})
+
+	t.Run("copies git and oci fields from a concrete container", func(t *testing.T) {
+		t.Parallel()
+
+		c := reportTestContainer(t, map[string]string{
+			gitPkg.RepoLabel: "https://github.com/org/app.git",
+			gitPkg.RefLabel:  "main",
+		})
+		got := UpdateFromContainer(testLog(), c, "img2", ScannedState, types.UpdateParams{})
+		assert.Equal(t, "https://github.com/org/app.git", got.GitRepo())
+		assert.Equal(t, "main", got.GitRef())
+		assert.Equal(t, "https://github.com/org/app/releases", got.Changelog())
+	})
+}
+
+func TestProgressSetLatestImage(t *testing.T) {
+	t.Parallel()
+
+	id := types.ContainerID("cont1")
+	progress := Progress{
+		id: &ContainerStatus{containerID: id, newImage: "old"},
+	}
+
+	progress.SetLatestImage(testLog(), id, "sha256:gitbuilt")
+	assert.Equal(t, types.ImageID("sha256:gitbuilt"), progress[id].LatestImageID())
+
+	progress.SetLatestImage(testLog(), "missing", "ignored")
+	assert.NotContains(t, progress, types.ContainerID("missing"))
+}
+
+func TestProgressRefreshChangelog(t *testing.T) {
+	t.Parallel()
+
+	t.Run("nil container", func(t *testing.T) {
+		t.Parallel()
+
+		Progress{}.RefreshChangelog(nil, types.UpdateParams{}, "v1.0.0", "abc")
+	})
+
+	t.Run("unknown container", func(t *testing.T) {
+		t.Parallel()
+
+		c := reportTestContainer(t, map[string]string{
+			gitPkg.ChangelogLabel: "https://example.com/{tag}",
+		})
+		Progress{}.RefreshChangelog(c, types.UpdateParams{}, "v1.0.0", "abc")
+	})
+
+	t.Run("substitutes new tag", func(t *testing.T) {
+		t.Parallel()
+
+		c := reportTestContainer(t, map[string]string{
+			gitPkg.RepoLabel:      "https://github.com/org/app.git",
+			gitPkg.ChangelogLabel: "https://example.com/notes/{tag}",
+		})
+		status := UpdateFromContainer(testLog(), c, "img", ScannedState, types.UpdateParams{})
+		progress := Progress{c.ID(): status}
+
+		progress.RefreshChangelog(c, types.UpdateParams{}, "v1.2.3", "deadbeef")
+		assert.Equal(t, "https://example.com/notes/v1.2.3", status.Changelog())
+	})
+}
+
+// reportTestContainer builds a concrete container used to exercise applyReportMeta.
+//
+// Parameters:
+//   - t: Test handle.
+//   - labels: Container config labels.
+//
+// Returns:
+//   - *container.Container: Container with inspect metadata.
+func reportTestContainer(t *testing.T, labels map[string]string) *container.Container {
+	t.Helper()
+
+	cfg := &dockerspec.DockerOCIImageConfig{}
+	cfg.Labels = map[string]string{}
+
+	return container.NewContainer(nil, &dockerContainer.InspectResponse{
+		ID:   "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+		Name: "/app",
+		Config: &dockerContainer.Config{
+			Image:  "myapp:latest",
+			Labels: labels,
+		},
+	}, &dockerImage.InspectResponse{
+		ID:       "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+		Config:   cfg,
+		RepoTags: []string{"myapp:latest"},
+	})
 }
