@@ -5,6 +5,7 @@
 //   - age: Fetches image creation time from registry config blobs for cooldown support.
 //   - auth: Manages registry authentication (token fetching, challenge handling).
 //   - digest: Retrieves and compares image digests via HTTP requests.
+//   - ratelimit: Parses registry 429 responses and retries them with backoff.
 //   - helpers: Utilities for registry address parsing and digest normalization.
 //   - manifest: Constructs manifest URLs for digest fetching.
 //   - registry: Configures pull options, API consumption checks, and image age fetching.

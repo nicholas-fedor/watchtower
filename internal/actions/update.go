@@ -1967,7 +1967,8 @@ func restartContainersInSortedOrder(
 						c.ImageID(),
 						c.ImageName(),
 						c.Name(),
-						c.ID())
+						c.ID(),
+					)
 				}
 			}
 		}

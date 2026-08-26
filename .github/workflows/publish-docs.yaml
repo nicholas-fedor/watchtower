@@ -2,7 +2,18 @@
 name: Publish Documentation
 
 on:
+  workflow_call:
+    inputs:
+      version:
+        description: "Version to deploy (e.g., v1.21.1). Leave empty for dev."
+        required: false
+        type: string
   workflow_dispatch:
+    inputs:
+      version:
+        description: "Version to deploy (e.g., v1.21.1). Leave empty for dev."
+        required: false
+        type: string
   push:
     branches: [main]
     paths:
@@ -11,6 +22,10 @@ on:
       - tools/tplprev/**
   release:
     types: [published]
+
+concurrency:
+  group: publish-docs
+  cancel-in-progress: false
 
 permissions:
   contents: read # Set default read-only permissions
@@ -61,17 +76,6 @@ jobs:
         uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
         with:
           python-version: "3.14.7"
-          cache: "pip"
-          cache-dependency-path: |
-            build/mkdocs/docs-requirements.txt
-
-      - name: Setup Cache
-        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
-        with:
-          key: mkdocs-material-${{ hashFiles('build/mkdocs/docs-requirements.txt') }}
-          path: .cache
-          restore-keys: |
-            mkdocs-material-
 
       - name: Install mkdocs
         run: |
@@ -81,9 +85,13 @@ jobs:
         id: mike
         env:
           TAG_NAME: ${{ github.event.release.tag_name }}
+          INPUT_VERSION: ${{ inputs.version }}
         run: |
           if [[ "${{ github.event_name }}" == "release" ]]; then
             echo "version=${TAG_NAME}" >> "$GITHUB_OUTPUT"
+            echo "aliases=latest" >> "$GITHUB_OUTPUT"
+          elif [[ -n "${INPUT_VERSION}" ]]; then
+            echo "version=${INPUT_VERSION}" >> "$GITHUB_OUTPUT"
             echo "aliases=latest" >> "$GITHUB_OUTPUT"
           else
             echo "version=dev" >> "$GITHUB_OUTPUT"

@@ -114,7 +114,8 @@ func SetupAndStartAPI(ctx context.Context, opts config.Options) error {
 			ProxyHeader:    opts.ProxyHeader,
 		}, CORSConfig{
 			AllowedOrigins: opts.CORSAllowedOrigins,
-		}, opts.NoStartupMessage)
+		}, opts.NoStartupMessage,
+	)
 
 	authMiddleware := NewAPIAuthMiddleware(log, opts.Token)
 

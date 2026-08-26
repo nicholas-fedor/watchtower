@@ -29,6 +29,8 @@ const (
 	orchestratorOriginalNameEnv = "WT_ORCHESTRATOR_ORIGINAL_NAME"
 	// orchestratorContainerChainEnv is the environment variable key for the container chain label.
 	orchestratorContainerChainEnv = "WT_ORCHESTRATOR_CONTAINER_CHAIN"
+	// orchestratorCleanupEnv is the environment variable key for old-image cleanup.
+	orchestratorCleanupEnv = "WT_ORCHESTRATOR_CLEANUP"
 	// orchestratorCleanupTimeout is the timeout for cleanup operations on failed orchestrator creation.
 	orchestratorCleanupTimeout = 5 * time.Second
 )
@@ -105,6 +107,7 @@ type DockerConnectionConfig struct {
 //   - sourceContainer: Current Watchtower container being replaced.
 //   - newImage: Image reference for the new Watchtower container.
 //   - containerChain: Container chain label for lineage tracking.
+//   - cleanup: When true, the orchestrator removes the old image after handoff.
 //
 // Returns:
 //   - types.ContainerID: ID of the ephemeral orchestrator container.
@@ -114,6 +117,7 @@ func (c *client) CreateEphemeralOrchestrator(
 	sourceContainer types.Container,
 	newImage string,
 	containerChain string,
+	cleanup bool,
 ) (types.ContainerID, error) {
 	clogVal := c.log.With().
 		Str("source_container", sourceContainer.Name()).
@@ -137,7 +141,7 @@ func (c *client) CreateEphemeralOrchestrator(
 		Msg("Extracted Docker connection configuration")
 
 	// Build the orchestrator container configuration with Docker env vars.
-	config := buildOrchestratorConfig(sourceContainer, newImage, containerChain, connConfig)
+	config := buildOrchestratorConfig(sourceContainer, newImage, containerChain, connConfig, cleanup)
 
 	// Build the host configuration with appropriate socket/TLS mounts.
 	// The orchestrator inherits the source container's NetworkMode to ensure
@@ -235,6 +239,7 @@ func (c *client) CreateEphemeralOrchestrator(
 //   - newImage: Image reference for the new container.
 //   - containerChain: Container chain label for lineage tracking.
 //   - connConfig: Docker connection configuration extracted from the source container.
+//   - cleanup: When true, the orchestrator removes the old image after handoff.
 //
 // Returns:
 //   - *dockerContainer.Config: The container configuration.
@@ -243,6 +248,7 @@ func buildOrchestratorConfig(
 	newImage string,
 	containerChain string,
 	connConfig *DockerConnectionConfig,
+	cleanup bool,
 ) *dockerContainer.Config {
 	// Build the environment variables with orchestrator-specific values.
 	env := []string{
@@ -250,6 +256,7 @@ func buildOrchestratorConfig(
 		fmt.Sprintf("%s=%s", orchestratorNewImageEnv, newImage),
 		fmt.Sprintf("%s=%s", orchestratorOriginalNameEnv, sourceContainer.Name()),
 		fmt.Sprintf("%s=%s", orchestratorContainerChainEnv, containerChain),
+		fmt.Sprintf("%s=%t", orchestratorCleanupEnv, cleanup),
 	}
 
 	// Forward Docker connection environment variables to maintain parity with the source.

@@ -66,6 +66,7 @@ type TestData struct {
 	RemoveContainerCount        atomic.Int32                  // Number of times RemoveContainer was called.
 	SimulatedLatency            time.Duration                 // Simulated latency for operations (default 0 for fast tests, set for context cancellation tests).
 	LastContainerChain          string                        // Last container chain passed to CreateEphemeralOrchestrator.
+	LastCleanup                 bool                          // Last cleanup flag passed to CreateEphemeralOrchestrator.
 	LastUpdateConfig            *dockerContainer.UpdateConfig // Last UpdateContainer config received.
 	LastStartedContainer        types.Container               // Last container passed to StartContainer.
 	LastStartedContainerID      types.ContainerID             // ID returned by the last successful StartContainer call.
@@ -552,12 +553,14 @@ func (client MockClient) CreateEphemeralOrchestrator(
 	_ types.Container,
 	_ string,
 	containerChain string,
+	cleanup bool,
 ) (types.ContainerID, error) {
 	if err := client.checkContextCancellation(ctx); err != nil {
 		return "", err
 	}
 
 	client.TestData.LastContainerChain = containerChain
+	client.TestData.LastCleanup = cleanup
 
 	return types.ContainerID("mock-ephemeral-orchestrator"), nil
 }

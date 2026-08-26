@@ -371,7 +371,7 @@ var _ = ginkgo.Describe("Ephemeral Orchestrator", func() {
 					SocketBind: "/var/run/docker.sock:/var/run/docker.sock",
 				}
 
-				config := buildOrchestratorConfig(source, "watchtower:v2", "old1,old2", connConfig)
+				config := buildOrchestratorConfig(source, "watchtower:v2", "old1,old2", connConfig, false)
 
 				gomega.Expect(config).NotTo(gomega.BeNil())
 				gomega.Expect(config.Image).To(gomega.Equal("watchtower:v2"))
@@ -391,10 +391,29 @@ var _ = ginkgo.Describe("Ephemeral Orchestrator", func() {
 				gomega.Expect(config.Env).To(gomega.ContainElement(
 					"WT_ORCHESTRATOR_CONTAINER_CHAIN=old1,old2",
 				))
+				gomega.Expect(config.Env).To(gomega.ContainElement(
+					"WT_ORCHESTRATOR_CLEANUP=false",
+				))
 
 				// Verify the orchestrator label is set but the watchtower label is NOT set.
 				gomega.Expect(config.Labels).To(gomega.HaveKeyWithValue(OrchestratorLabel, "true"))
 				gomega.Expect(config.Labels).NotTo(gomega.HaveKey("com.centurylinklabs.watchtower"))
+			})
+		})
+
+		ginkgo.When("cleanup is enabled", func() {
+			ginkgo.It("should set WT_ORCHESTRATOR_CLEANUP to true", func() {
+				source := MockContainer(
+					WithID("abc123"),
+					WithName("watchtower"),
+					WithImageName("watchtower:latest"),
+				)
+
+				config := buildOrchestratorConfig(source, "watchtower:v2", "", nil, true)
+
+				gomega.Expect(config.Env).To(gomega.ContainElement(
+					"WT_ORCHESTRATOR_CLEANUP=true",
+				))
 			})
 		})
 
@@ -410,7 +429,7 @@ var _ = ginkgo.Describe("Ephemeral Orchestrator", func() {
 					SocketBind: "/var/run/docker.sock:/var/run/docker.sock",
 				}
 
-				config := buildOrchestratorConfig(source, "watchtower:v2", "", connConfig)
+				config := buildOrchestratorConfig(source, "watchtower:v2", "", connConfig, false)
 
 				gomega.Expect(config.Env).To(gomega.ContainElement(
 					"WT_ORCHESTRATOR_CONTAINER_CHAIN=",
@@ -433,7 +452,7 @@ var _ = ginkgo.Describe("Ephemeral Orchestrator", func() {
 					IsLocal:    false,
 				}
 
-				config := buildOrchestratorConfig(source, "watchtower:v2", "chain1", connConfig)
+				config := buildOrchestratorConfig(source, "watchtower:v2", "chain1", connConfig, false)
 
 				gomega.Expect(config.Env).To(gomega.ContainElement(
 					"DOCKER_HOST=tcp://remote:2375",
@@ -458,7 +477,7 @@ var _ = ginkgo.Describe("Ephemeral Orchestrator", func() {
 					WithImageName("watchtower:latest"),
 				)
 
-				config := buildOrchestratorConfig(source, "watchtower:v2", "chain1", nil)
+				config := buildOrchestratorConfig(source, "watchtower:v2", "chain1", nil, false)
 
 				// Should still have orchestrator env vars but no Docker env vars.
 				gomega.Expect(config.Env).To(gomega.ContainElement(
@@ -665,7 +684,7 @@ var _ = ginkgo.Describe("Ephemeral Orchestrator", func() {
 
 			ginkgo.It("should return the orchestrator container ID", func() {
 				orchestratorID, err := testClient.CreateEphemeralOrchestrator(
-					ctx, source, "watchtower:v2", "chain1",
+					ctx, source, "watchtower:v2", "chain1", false,
 				)
 
 				gomega.Expect(err).NotTo(gomega.HaveOccurred())
@@ -687,7 +706,7 @@ var _ = ginkgo.Describe("Ephemeral Orchestrator", func() {
 
 			ginkgo.It("should return an error wrapping ErrEphemeralCreateFailed", func() {
 				orchestratorID, err := testClient.CreateEphemeralOrchestrator(
-					ctx, source, "watchtower:v2", "chain1",
+					ctx, source, "watchtower:v2", "chain1", false,
 				)
 
 				gomega.Expect(err).To(gomega.MatchError(gomega.ContainSubstring(
@@ -743,7 +762,7 @@ var _ = ginkgo.Describe("Ephemeral Orchestrator", func() {
 
 			ginkgo.It("should attempt cleanup and return ErrEphemeralStartFailed", func() {
 				orchestratorID, err := testClient.CreateEphemeralOrchestrator(
-					ctx, source, "watchtower:v2", "chain1",
+					ctx, source, "watchtower:v2", "chain1", false,
 				)
 
 				gomega.Expect(err).To(gomega.MatchError(gomega.ContainSubstring(

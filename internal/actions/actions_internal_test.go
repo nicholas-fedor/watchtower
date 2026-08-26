@@ -51,7 +51,8 @@ var _ = ginkgo.Describe("restartStaleContainer", func() {
 							Labels: map[string]string{
 								"com.centurylinklabs.watchtower": "true",
 							},
-						}),
+						},
+					),
 				},
 				Staleness: map[string]bool{
 					"watchtower": true,
@@ -86,7 +87,8 @@ var _ = ginkgo.Describe("restartStaleContainer", func() {
 							Labels: map[string]string{
 								"com.centurylinklabs.watchtower": "true",
 							},
-						}),
+						},
+					),
 				},
 				Staleness: map[string]bool{
 					"watchtower": true,
@@ -121,7 +123,8 @@ var _ = ginkgo.Describe("restartStaleContainer", func() {
 							Labels: map[string]string{
 								"com.centurylinklabs.watchtower": "true",
 							},
-						}),
+						},
+					),
 				},
 				Staleness: map[string]bool{
 					"watchtower": true,
@@ -139,6 +142,44 @@ var _ = ginkgo.Describe("restartStaleContainer", func() {
 		gomega.Expect(renamed).To(gomega.BeTrue())
 		gomega.Expect(client.TestData.RenameContainerCount.Load()).To(gomega.Equal(int32(0)))
 		gomega.Expect(newID).NotTo(gomega.BeEmpty())
+	})
+
+	ginkgo.It("should treat ephemeral self-update as a completed handoff", func() {
+		client := mockActions.CreateMockClient(
+			&mockActions.TestData{
+				Containers: []types.Container{
+					mockActions.CreateMockContainerWithConfig(
+						"watchtower",
+						"/watchtower",
+						"watchtower:latest",
+						true,
+						false,
+						time.Now(),
+						&dockerContainer.Config{
+							Labels: map[string]string{
+								"com.centurylinklabs.watchtower": "true",
+							},
+						},
+					),
+				},
+				Staleness: map[string]bool{
+					"watchtower": true,
+				},
+			},
+			false,
+			false,
+		)
+		params := types.UpdateParams{
+			EphemeralSelfUpdate: true,
+			Cleanup:             true,
+		}
+		testContainer := client.TestData.Containers[0]
+		newID, renamed, err := restartStaleContainer(testLogger(), context.Background(), testContainer, client, params)
+		gomega.Expect(err).NotTo(gomega.HaveOccurred())
+		gomega.Expect(renamed).To(gomega.BeTrue())
+		gomega.Expect(newID).To(gomega.BeEmpty())
+		gomega.Expect(client.TestData.RenameContainerCount.Load()).To(gomega.Equal(int32(0)))
+		gomega.Expect(client.TestData.LastCleanup).To(gomega.BeTrue())
 	})
 })
 
@@ -313,7 +354,8 @@ var _ = ginkgo.Describe("executeUpdate", func() {
 							Labels: map[string]string{
 								"com.centurylinklabs.watchtower": "true",
 							},
-						}),
+						},
+					),
 				},
 				Staleness: map[string]bool{
 					"watchtower": true,
@@ -354,7 +396,8 @@ var _ = ginkgo.Describe("executeUpdate", func() {
 							Labels: map[string]string{
 								"com.centurylinklabs.watchtower": "true",
 							},
-						}),
+						},
+					),
 				},
 				Staleness: map[string]bool{
 					"watchtower": true,
@@ -1139,7 +1182,8 @@ var _ = ginkgo.Describe("hasSelfDependency", func() {
 			&dockerContainer.Config{
 				Labels:       map[string]string{},
 				ExposedPorts: dockerNetwork.PortSet{},
-			})
+			},
+		)
 		result := hasSelfDependency(testLogger(), container)
 		gomega.Expect(result).To(gomega.BeFalse())
 	})
@@ -1157,7 +1201,8 @@ var _ = ginkgo.Describe("hasSelfDependency", func() {
 					"com.centurylinklabs.watchtower.depends-on": "",
 				},
 				ExposedPorts: dockerNetwork.PortSet{},
-			})
+			},
+		)
 		result := hasSelfDependency(testLogger(), container)
 		gomega.Expect(result).To(gomega.BeFalse())
 	})
@@ -1175,7 +1220,8 @@ var _ = ginkgo.Describe("hasSelfDependency", func() {
 					"com.centurylinklabs.watchtower.depends-on": "other-container",
 				},
 				ExposedPorts: dockerNetwork.PortSet{},
-			})
+			},
+		)
 		result := hasSelfDependency(testLogger(), container)
 		gomega.Expect(result).To(gomega.BeFalse())
 	})
@@ -1193,7 +1239,8 @@ var _ = ginkgo.Describe("hasSelfDependency", func() {
 					"com.centurylinklabs.watchtower.depends-on": "test-container",
 				},
 				ExposedPorts: dockerNetwork.PortSet{},
-			})
+			},
+		)
 		result := hasSelfDependency(testLogger(), container)
 		gomega.Expect(result).To(gomega.BeTrue())
 	})
@@ -1213,7 +1260,8 @@ var _ = ginkgo.Describe("hasSelfDependency", func() {
 						"com.centurylinklabs.watchtower.depends-on": "other-container,test-container,another-container",
 					},
 					ExposedPorts: dockerNetwork.PortSet{},
-				})
+				},
+			)
 			result := hasSelfDependency(testLogger(), container)
 			gomega.Expect(result).To(gomega.BeTrue())
 		},
@@ -1232,7 +1280,8 @@ var _ = ginkgo.Describe("hasSelfDependency", func() {
 					"com.centurylinklabs.watchtower.depends-on": " other-container , test-container , another-container ",
 				},
 				ExposedPorts: dockerNetwork.PortSet{},
-			})
+			},
+		)
 		result := hasSelfDependency(testLogger(), container)
 		gomega.Expect(result).To(gomega.BeTrue())
 	})
@@ -1250,7 +1299,8 @@ var _ = ginkgo.Describe("hasSelfDependency", func() {
 					"com.centurylinklabs.watchtower.depends-on": "/test-container",
 				},
 				ExposedPorts: dockerNetwork.PortSet{},
-			})
+			},
+		)
 		result := hasSelfDependency(testLogger(), container)
 		gomega.Expect(result).To(gomega.BeTrue())
 	})
@@ -1263,7 +1313,8 @@ var _ = ginkgo.Describe("hasSelfDependency", func() {
 			true,
 			false,
 			time.Now(),
-			nil) // Config is nil
+			nil,
+		) // Config is nil
 		result := hasSelfDependency(testLogger(), container)
 		gomega.Expect(result).To(gomega.BeFalse())
 	})
@@ -1279,7 +1330,8 @@ var _ = ginkgo.Describe("hasSelfDependency", func() {
 			&dockerContainer.Config{
 				Labels:       nil, // Labels is nil
 				ExposedPorts: dockerNetwork.PortSet{},
-			})
+			},
+		)
 		result := hasSelfDependency(testLogger(), container)
 		gomega.Expect(result).To(gomega.BeFalse())
 	})
@@ -1433,7 +1485,8 @@ var _ = ginkgo.Describe("DetachedContext", func() {
 									Labels: map[string]string{
 										"com.centurylinklabs.watchtower": "true",
 									},
-								}),
+								},
+							),
 						},
 						Staleness: map[string]bool{
 							"watchtower": true,
@@ -1540,7 +1593,8 @@ var _ = ginkgo.Describe("DetachedContext", func() {
 								Labels: map[string]string{
 									"com.centurylinklabs.watchtower": "true",
 								},
-							}),
+							},
+						),
 					},
 					Staleness: map[string]bool{
 						"watchtower": true,
@@ -1632,7 +1686,8 @@ var _ = ginkgo.Describe("DetachedContext", func() {
 								Labels: map[string]string{
 									"com.centurylinklabs.watchtower": "true",
 								},
-							}),
+							},
+						),
 					},
 					Staleness: map[string]bool{
 						"watchtower": true,
@@ -1733,7 +1788,8 @@ var _ = ginkgo.Describe("DetachedContext", func() {
 								Labels: map[string]string{
 									"com.centurylinklabs.watchtower": "true",
 								},
-							}),
+							},
+						),
 					},
 					Staleness: map[string]bool{
 						"watchtower": true,
@@ -1823,7 +1879,8 @@ var _ = ginkgo.Describe("DetachedContext", func() {
 								Labels: map[string]string{
 									"com.centurylinklabs.watchtower": "true",
 								},
-							}),
+							},
+						),
 					},
 					Staleness: map[string]bool{
 						"watchtower": true,
@@ -1882,7 +1939,8 @@ var _ = ginkgo.Describe("DetachedContext", func() {
 								Labels: map[string]string{
 									"com.centurylinklabs.watchtower": "true",
 								},
-							}),
+							},
+						),
 					},
 					Staleness: map[string]bool{
 						"watchtower": true,

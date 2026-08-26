@@ -22,7 +22,6 @@ import (
 	dockerImage "github.com/moby/moby/api/types/image"
 	dockerNetwork "github.com/moby/moby/api/types/network"
 	dockerClient "github.com/moby/moby/client"
-	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
 
 	"github.com/nicholas-fedor/watchtower/pkg/filters"
 	"github.com/nicholas-fedor/watchtower/pkg/types"
@@ -46,7 +45,8 @@ var _ = ginkgo.Describe("ListSourceContainers", func() {
 
 		docker, err = dockerClient.New(
 			dockerClient.WithHost(mockServer.URL()),
-			dockerClient.WithHTTPClient(mockServer.HTTPTestServer.Client()))
+			dockerClient.WithHTTPClient(mockServer.HTTPTestServer.Client()),
+		)
 		require.NoError(ginkgo.GinkgoT(), err)
 
 		mockServer.AppendHandlers(APIVersionPingHandler())
@@ -62,7 +62,8 @@ var _ = ginkgo.Describe("ListSourceContainers", func() {
 			ghttp.VerifyRequest(
 				"GET",
 				gomega.MatchRegexp(
-					"^/v[0-9.]+/containers/json$"),
+					"^/v[0-9.]+/containers/json$",
+				),
 			),
 			func(w http.ResponseWriter, r *http.Request) {
 				filtersParam := r.URL.Query().Get("filters")
@@ -1455,7 +1456,8 @@ var _ = ginkgo.Describe("processEndpoint", func() {
 				gomega.Expect(err).ToNot(gomega.HaveOccurred())
 
 				gomega.Expect(result.Aliases).To(gomega.ConsistOf(
-					"alias1", "alias2", "other_id"),
+					"alias1", "alias2", "other_id",
+				),
 				)
 			})
 
@@ -2847,19 +2849,15 @@ func TestCloneImageInspect_IsolatesMutations(t *testing.T) {
 		RepoDigests: []string{"app@sha256:abc"},
 		RepoTags:    []string{"app:latest"},
 		Config: &dockerspec.DockerOCIImageConfig{
-			ImageConfig: ocispec.ImageConfig{
-				Env:        []string{"PATH=/usr/bin"},
-				Cmd:        []string{"app"},
-				Entrypoint: []string{"/bin/sh"},
-				Labels:     map[string]string{"app": "web"},
-				Volumes:    map[string]struct{}{"/data": {}},
-				ExposedPorts: map[string]struct{}{
-					"80/tcp": {},
-				},
+			Env:        []string{"PATH=/usr/bin"},
+			Cmd:        []string{"app"},
+			Entrypoint: []string{"/bin/sh"},
+			Labels:     map[string]string{"app": "web"},
+			Volumes:    map[string]struct{}{"/data": {}},
+			ExposedPorts: map[string]struct{}{
+				"80/tcp": {},
 			},
-			DockerOCIImageConfigExt: dockerspec.DockerOCIImageConfigExt{
-				Healthcheck: &dockerspec.HealthcheckConfig{Test: []string{"CMD", "true"}},
-			},
+			Healthcheck: &dockerspec.HealthcheckConfig{Test: []string{"CMD", "true"}},
 		},
 		GraphDriver: &storage.DriverData{
 			Name: "overlay2",

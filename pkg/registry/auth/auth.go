@@ -13,6 +13,7 @@ import (
 	"github.com/spf13/viper"
 
 	"github.com/nicholas-fedor/watchtower/internal/meta"
+	"github.com/nicholas-fedor/watchtower/pkg/registry/ratelimit"
 	"github.com/nicholas-fedor/watchtower/pkg/types"
 )
 
@@ -529,6 +530,12 @@ func GetToken(
 		return TokenResult{}, fmt.Errorf("%w: %w", errFailedExecuteChallengeRequest, err)
 	}
 	defer response.Body.Close()
+
+	if response.StatusCode == http.StatusTooManyRequests {
+		body := ratelimit.ReadBody(response, ratelimit.DefaultBodyLimit)
+
+		return TokenResult{}, ratelimit.FromResponse(response, body)
+	}
 
 	// Detect if the request was redirected by comparing the complete final URL.
 	redirected := response.Request.URL.String() != challengeURL.String()

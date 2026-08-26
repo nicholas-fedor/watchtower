@@ -76,7 +76,8 @@ var _ = ginkgo.Describe("the update action", func() {
 								Labels: map[string]string{
 									"com.centurylinklabs.watchtower": "true",
 								},
-							}),
+							},
+						),
 					},
 					Staleness: map[string]bool{
 						"watchtower": true, // Simulate stale Watchtower
@@ -126,7 +127,8 @@ var _ = ginkgo.Describe("the update action", func() {
 					&dockerContainer.Config{
 						Labels:       map[string]string{},
 						ExposedPorts: dockerNetwork.PortSet{},
-					})
+					},
+				)
 
 				// Create two containers that depend on the base
 				restartContainer1 := mockActions.CreateMockContainerWithConfig(
@@ -141,7 +143,8 @@ var _ = ginkgo.Describe("the update action", func() {
 							"com.centurylinklabs.watchtower.depends-on": "stale-container",
 						},
 						ExposedPorts: dockerNetwork.PortSet{},
-					})
+					},
+				)
 
 				restartContainer2 := mockActions.CreateMockContainerWithConfig(
 					"restart-container-2",
@@ -155,7 +158,8 @@ var _ = ginkgo.Describe("the update action", func() {
 							"com.centurylinklabs.watchtower.depends-on": "stale-container",
 						},
 						ExposedPorts: dockerNetwork.PortSet{},
-					})
+					},
+				)
 
 				client := mockActions.CreateMockClient(
 					&mockActions.TestData{
@@ -194,7 +198,8 @@ var _ = ginkgo.Describe("the update action", func() {
 				gomega.Expect(updated[0].Name()).To(gomega.Equal("stale-container"))
 				gomega.Expect(restarted[0].Name()).To(gomega.Equal("restart-container-1"))
 				gomega.Expect(restarted[1].Name()).To(gomega.Equal("restart-container-2"))
-			})
+			},
+		)
 	})
 
 	ginkgo.When("testing container categorization logic for restarted containers", func() {
@@ -210,7 +215,8 @@ var _ = ginkgo.Describe("the update action", func() {
 				&dockerContainer.Config{
 					Labels:       map[string]string{},
 					ExposedPorts: dockerNetwork.PortSet{},
-				})
+				},
+			)
 
 			restartedContainer := mockActions.CreateMockContainerWithConfig(
 				"restarted-container",
@@ -224,7 +230,8 @@ var _ = ginkgo.Describe("the update action", func() {
 						"com.centurylinklabs.watchtower.depends-on": "updated-container",
 					},
 					ExposedPorts: dockerNetwork.PortSet{},
-				})
+				},
+			)
 
 			freshContainer := mockActions.CreateMockContainerWithConfig(
 				"fresh-container",
@@ -236,7 +243,8 @@ var _ = ginkgo.Describe("the update action", func() {
 				&dockerContainer.Config{
 					Labels:       map[string]string{},
 					ExposedPorts: dockerNetwork.PortSet{},
-				})
+				},
+			)
 
 			client := mockActions.CreateMockClient(
 				&mockActions.TestData{
@@ -295,7 +303,8 @@ var _ = ginkgo.Describe("the update action", func() {
 						&dockerContainer.Config{
 							Labels:       map[string]string{},
 							ExposedPorts: dockerNetwork.PortSet{},
-						})
+						},
+					)
 
 					restartedContainer := mockActions.CreateMockContainerWithConfig(
 						"restarted-container",
@@ -309,7 +318,8 @@ var _ = ginkgo.Describe("the update action", func() {
 								"com.centurylinklabs.watchtower.depends-on": "updated-container",
 							},
 							ExposedPorts: dockerNetwork.PortSet{},
-						})
+						},
+					)
 
 					client := mockActions.CreateMockClient(
 						&mockActions.TestData{
@@ -354,7 +364,8 @@ var _ = ginkgo.Describe("the update action", func() {
 				&dockerContainer.Config{
 					Labels:       map[string]string{},
 					ExposedPorts: dockerNetwork.PortSet{},
-				})
+				},
+			)
 
 			restartedContainer := mockActions.CreateMockContainerWithConfig(
 				"restarted-container",
@@ -368,7 +379,8 @@ var _ = ginkgo.Describe("the update action", func() {
 						"com.centurylinklabs.watchtower.depends-on": "updated-container",
 					},
 					ExposedPorts: dockerNetwork.PortSet{},
-				})
+				},
+			)
 
 			client := mockActions.CreateMockClient(
 				&mockActions.TestData{
@@ -414,7 +426,8 @@ var _ = ginkgo.Describe("the update action", func() {
 				&dockerContainer.Config{
 					Labels:       map[string]string{},
 					ExposedPorts: dockerNetwork.PortSet{},
-				})
+				},
+			)
 
 			dependent := mockActions.CreateMockContainerWithConfig(
 				"dependent",
@@ -428,7 +441,8 @@ var _ = ginkgo.Describe("the update action", func() {
 						"com.centurylinklabs.watchtower.depends-on": "dependency",
 					},
 					ExposedPorts: dockerNetwork.PortSet{},
-				})
+				},
+			)
 
 			client := mockActions.CreateMockClient(
 				&mockActions.TestData{
@@ -466,7 +480,8 @@ var _ = ginkgo.Describe("the update action", func() {
 				&dockerContainer.Config{
 					Labels:       map[string]string{},
 					ExposedPorts: dockerNetwork.PortSet{},
-				})
+				},
+			)
 
 			containerB := mockActions.CreateMockContainerWithConfig(
 				"container-b",
@@ -480,7 +495,8 @@ var _ = ginkgo.Describe("the update action", func() {
 						"com.centurylinklabs.watchtower.depends-on": "container-c",
 					},
 					ExposedPorts: dockerNetwork.PortSet{},
-				})
+				},
+			)
 
 			containerA := mockActions.CreateMockContainerWithConfig(
 				"container-a",
@@ -494,7 +510,8 @@ var _ = ginkgo.Describe("the update action", func() {
 						"com.centurylinklabs.watchtower.depends-on": "container-b",
 					},
 					ExposedPorts: dockerNetwork.PortSet{},
-				})
+				},
+			)
 
 			client := mockActions.CreateMockClient(
 				&mockActions.TestData{
@@ -533,7 +550,8 @@ var _ = ginkgo.Describe("the update action", func() {
 				&dockerContainer.Config{
 					Labels:       map[string]string{},
 					ExposedPorts: dockerNetwork.PortSet{},
-				})
+				},
+			)
 
 			// Manually set it to restart (simulating some other restart condition)
 			container.SetLinkedToRestarting(true)
@@ -580,7 +598,8 @@ var _ = ginkgo.Describe("the update action", func() {
 								"com.centurylinklabs.watchtower.depends-on": "nonexistent",
 							},
 							ExposedPorts: dockerNetwork.PortSet{},
-						})
+						},
+					)
 
 					containerB := mockActions.CreateMockContainerWithConfig(
 						"container-b",
@@ -592,7 +611,8 @@ var _ = ginkgo.Describe("the update action", func() {
 						&dockerContainer.Config{
 							Labels:       map[string]string{},
 							ExposedPorts: dockerNetwork.PortSet{},
-						})
+						},
+					)
 
 					containers := []types.Container{containerA, containerB}
 
@@ -620,7 +640,8 @@ var _ = ginkgo.Describe("the update action", func() {
 					&dockerContainer.Config{
 						Labels:       map[string]string{},
 						ExposedPorts: dockerNetwork.PortSet{},
-					})
+					},
+				)
 
 				containerC := mockActions.CreateMockContainerWithConfig(
 					"container-c",
@@ -634,7 +655,8 @@ var _ = ginkgo.Describe("the update action", func() {
 							"com.centurylinklabs.watchtower.depends-on": "container-d",
 						},
 						ExposedPorts: dockerNetwork.PortSet{},
-					})
+					},
+				)
 
 				containerB := mockActions.CreateMockContainerWithConfig(
 					"container-b",
@@ -648,7 +670,8 @@ var _ = ginkgo.Describe("the update action", func() {
 							"com.centurylinklabs.watchtower.depends-on": "container-c",
 						},
 						ExposedPorts: dockerNetwork.PortSet{},
-					})
+					},
+				)
 
 				containerA := mockActions.CreateMockContainerWithConfig(
 					"container-a",
@@ -662,7 +685,8 @@ var _ = ginkgo.Describe("the update action", func() {
 							"com.centurylinklabs.watchtower.depends-on": "container-b",
 						},
 						ExposedPorts: dockerNetwork.PortSet{},
-					})
+					},
+				)
 
 				containers := []types.Container{containerD, containerC, containerB, containerA}
 
@@ -695,7 +719,8 @@ var _ = ginkgo.Describe("the update action", func() {
 					&dockerContainer.Config{
 						Labels:       map[string]string{},
 						ExposedPorts: dockerNetwork.PortSet{},
-					})
+					},
+				)
 
 				dep1 := mockActions.CreateMockContainerWithConfig(
 					"dep1",
@@ -709,7 +734,8 @@ var _ = ginkgo.Describe("the update action", func() {
 							"com.centurylinklabs.watchtower.depends-on": "base",
 						},
 						ExposedPorts: dockerNetwork.PortSet{},
-					})
+					},
+				)
 
 				dep2 := mockActions.CreateMockContainerWithConfig(
 					"dep2",
@@ -723,7 +749,8 @@ var _ = ginkgo.Describe("the update action", func() {
 							"com.centurylinklabs.watchtower.depends-on": "base",
 						},
 						ExposedPorts: dockerNetwork.PortSet{},
-					})
+					},
+				)
 
 				dep3 := mockActions.CreateMockContainerWithConfig(
 					"dep3",
@@ -737,7 +764,8 @@ var _ = ginkgo.Describe("the update action", func() {
 							"com.centurylinklabs.watchtower.depends-on": "dep1,dep2",
 						},
 						ExposedPorts: dockerNetwork.PortSet{},
-					})
+					},
+				)
 
 				containers := []types.Container{base, dep1, dep2, dep3}
 
@@ -768,7 +796,8 @@ var _ = ginkgo.Describe("the update action", func() {
 							"com.centurylinklabs.watchtower.depends-on": "container-b",
 						},
 						ExposedPorts: dockerNetwork.PortSet{},
-					})
+					},
+				)
 
 				containerB := mockActions.CreateMockContainerWithConfig(
 					"container-b",
@@ -782,7 +811,8 @@ var _ = ginkgo.Describe("the update action", func() {
 							"com.centurylinklabs.watchtower.depends-on": "container-a",
 						},
 						ExposedPorts: dockerNetwork.PortSet{},
-					})
+					},
+				)
 
 				containers := []types.Container{containerA, containerB}
 
@@ -809,7 +839,8 @@ var _ = ginkgo.Describe("the update action", func() {
 					&dockerContainer.Config{
 						Labels:       map[string]string{},
 						ExposedPorts: dockerNetwork.PortSet{},
-					})
+					},
+				)
 
 				freshWithDeps := mockActions.CreateMockContainerWithConfig(
 					"fresh-with-deps",
@@ -823,7 +854,8 @@ var _ = ginkgo.Describe("the update action", func() {
 							"com.centurylinklabs.watchtower.depends-on": "stale-no-deps",
 						},
 						ExposedPorts: dockerNetwork.PortSet{},
-					})
+					},
+				)
 
 				staleWithDeps := mockActions.CreateMockContainerWithConfig(
 					"stale-with-deps",
@@ -837,7 +869,8 @@ var _ = ginkgo.Describe("the update action", func() {
 							"com.centurylinklabs.watchtower.depends-on": "stale-no-deps",
 						},
 						ExposedPorts: dockerNetwork.PortSet{},
-					})
+					},
+				)
 
 				containers := []types.Container{staleNoDeps, freshWithDeps, staleWithDeps}
 
@@ -868,7 +901,8 @@ var _ = ginkgo.Describe("the update action", func() {
 					&dockerContainer.Config{
 						Labels:       map[string]string{},
 						ExposedPorts: dockerNetwork.PortSet{},
-					})
+					},
+				)
 
 				containerE := mockActions.CreateMockContainerWithConfig(
 					"container-e",
@@ -882,7 +916,8 @@ var _ = ginkgo.Describe("the update action", func() {
 							"com.centurylinklabs.watchtower.depends-on": "container-f",
 						},
 						ExposedPorts: dockerNetwork.PortSet{},
-					})
+					},
+				)
 
 				containerD := mockActions.CreateMockContainerWithConfig(
 					"container-d",
@@ -896,7 +931,8 @@ var _ = ginkgo.Describe("the update action", func() {
 							"com.centurylinklabs.watchtower.depends-on": "container-e",
 						},
 						ExposedPorts: dockerNetwork.PortSet{},
-					})
+					},
+				)
 
 				containerC := mockActions.CreateMockContainerWithConfig(
 					"container-c",
@@ -910,7 +946,8 @@ var _ = ginkgo.Describe("the update action", func() {
 							"com.centurylinklabs.watchtower.depends-on": "container-d",
 						},
 						ExposedPorts: dockerNetwork.PortSet{},
-					})
+					},
+				)
 
 				containerB := mockActions.CreateMockContainerWithConfig(
 					"container-b",
@@ -924,7 +961,8 @@ var _ = ginkgo.Describe("the update action", func() {
 							"com.centurylinklabs.watchtower.depends-on": "container-c",
 						},
 						ExposedPorts: dockerNetwork.PortSet{},
-					})
+					},
+				)
 
 				containerA := mockActions.CreateMockContainerWithConfig(
 					"container-a",
@@ -938,7 +976,8 @@ var _ = ginkgo.Describe("the update action", func() {
 							"com.centurylinklabs.watchtower.depends-on": "container-b",
 						},
 						ExposedPorts: dockerNetwork.PortSet{},
-					})
+					},
+				)
 
 				containers := []types.Container{
 					containerF,
@@ -985,7 +1024,8 @@ var _ = ginkgo.Describe("the update action", func() {
 						&dockerContainer.Config{
 							Labels:       map[string]string{},
 							ExposedPorts: dockerNetwork.PortSet{},
-						})
+						},
+					)
 
 					appContainer := mockActions.CreateMockContainerWithConfig(
 						"project1-app-1",
@@ -999,7 +1039,8 @@ var _ = ginkgo.Describe("the update action", func() {
 								"com.centurylinklabs.watchtower.depends-on": "db",
 							},
 							ExposedPorts: dockerNetwork.PortSet{},
-						})
+						},
+					)
 
 					webContainer := mockActions.CreateMockContainerWithConfig(
 						"project1-web-1",
@@ -1013,7 +1054,8 @@ var _ = ginkgo.Describe("the update action", func() {
 								"com.centurylinklabs.watchtower.depends-on": "app",
 							},
 							ExposedPorts: dockerNetwork.PortSet{},
-						})
+						},
+					)
 
 					containers := []types.Container{dbContainer, appContainer, webContainer}
 
@@ -1053,7 +1095,8 @@ var _ = ginkgo.Describe("the update action", func() {
 						&dockerContainer.Config{
 							Labels:       map[string]string{},
 							ExposedPorts: dockerNetwork.PortSet{},
-						})
+						},
+					)
 
 					restartContainer := mockActions.CreateMockContainerWithConfig(
 						"restart-container",
@@ -1067,7 +1110,8 @@ var _ = ginkgo.Describe("the update action", func() {
 								"com.centurylinklabs.watchtower.depends-on": "stale-container",
 							},
 							ExposedPorts: dockerNetwork.PortSet{},
-						})
+						},
+					)
 
 					client := mockActions.CreateMockClient(
 						&mockActions.TestData{
@@ -1131,7 +1175,8 @@ var _ = ginkgo.Describe("the update action", func() {
 							&dockerContainer.Config{
 								Labels:       labels,
 								ExposedPorts: dockerNetwork.PortSet{},
-							})
+							},
+						)
 					}
 
 					client := mockActions.CreateMockClient(
@@ -1261,7 +1306,8 @@ var _ = ginkgo.Describe("the update action", func() {
 					&dockerContainer.Config{
 						Labels:       map[string]string{},
 						ExposedPorts: dockerNetwork.PortSet{},
-					})
+					},
+				)
 
 				containerB := mockActions.CreateMockContainerWithConfig(
 					"priority-b",
@@ -1275,7 +1321,8 @@ var _ = ginkgo.Describe("the update action", func() {
 							"com.centurylinklabs.watchtower.depends-on": "priority-c",
 						},
 						ExposedPorts: dockerNetwork.PortSet{},
-					})
+					},
+				)
 
 				containerA := mockActions.CreateMockContainerWithConfig(
 					"priority-a",
@@ -1289,7 +1336,8 @@ var _ = ginkgo.Describe("the update action", func() {
 							"com.centurylinklabs.watchtower.depends-on": "priority-b",
 						},
 						ExposedPorts: dockerNetwork.PortSet{},
-					})
+					},
+				)
 
 				client := mockActions.CreateMockClient(
 					&mockActions.TestData{
@@ -1340,7 +1388,8 @@ var _ = ginkgo.Describe("the update action", func() {
 					&dockerContainer.Config{
 						Labels:       map[string]string{},
 						ExposedPorts: dockerNetwork.PortSet{},
-					})
+					},
+				)
 
 				restartContainer1 := mockActions.CreateMockContainerWithConfig(
 					"mixed-restart-1",
@@ -1354,7 +1403,8 @@ var _ = ginkgo.Describe("the update action", func() {
 							"com.centurylinklabs.watchtower.depends-on": "mixed-stale",
 						},
 						ExposedPorts: dockerNetwork.PortSet{},
-					})
+					},
+				)
 
 				restartContainer2 := mockActions.CreateMockContainerWithConfig(
 					"mixed-restart-2",
@@ -1368,7 +1418,8 @@ var _ = ginkgo.Describe("the update action", func() {
 							"com.centurylinklabs.watchtower.depends-on": "mixed-stale",
 						},
 						ExposedPorts: dockerNetwork.PortSet{},
-					})
+					},
+				)
 
 				client := mockActions.CreateMockClient(
 					&mockActions.TestData{

@@ -35,12 +35,12 @@ func TestEvent_JSONRoundTrip(t *testing.T) {
 func TestScanCompletedData_JSON(t *testing.T) {
 	t.Parallel()
 
-	data := ScanCompletedData{Scanned: 5, Updated: 2, Failed: 1}
+	data := ScanCompletedData{Scanned: 23, Updated: 0, Failed: 0, Skipped: 5}
 
 	raw, err := json.Marshal(data)
 	require.NoError(t, err)
 
-	assert.Equal(t, []byte(`{"scanned":5,"updated":2,"failed":1}`), raw)
+	assert.JSONEq(t, `{"scanned":23,"updated":0,"failed":0,"skipped":5}`, string(raw))
 }
 
 func TestScanFailedData_JSON(t *testing.T) {

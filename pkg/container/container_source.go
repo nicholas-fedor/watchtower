@@ -546,7 +546,8 @@ func StopAndRemoveSourceContainer(log *zerolog.Logger,
 		dockerClient.ContainerRemoveOptions{
 			Force:         true,          // Ensure any lingering processes are terminated before removal.
 			RemoveVolumes: removeVolumes, // Remove associated volumes if the parameter is true.
-		})
+		},
+	)
 	if err != nil && !cerrdefs.IsNotFound(err) {
 		// Log removal failure with elapsed time and error details, excluding cases where the container
 		// was already removed by another process.

@@ -89,7 +89,8 @@ func initEncodedAuthCache() {
 				InitialCapacity:  encodedAuthCacheInitialCapacity,
 				ExpiryCalculator: &encodedAuthExpiryCalculator{},
 				StatsRecorder:    stats.NewCounter(),
-			})
+			},
+		)
 		if err != nil {
 			panic("failed to initialize encoded auth cache: " + err.Error())
 		}

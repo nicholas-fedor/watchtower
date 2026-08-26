@@ -19,17 +19,20 @@ func getCommonTestData() *mockActions.TestData {
 				"test-container-01",
 				"test-container-01",
 				"fake-image:latest",
-				time.Now().AddDate(0, 0, -1)),
+				time.Now().AddDate(0, 0, -1),
+			),
 			mockActions.CreateMockContainer(
 				"test-container-02",
 				"test-container-02",
 				"fake-image:latest",
-				time.Now()),
+				time.Now(),
+			),
 			mockActions.CreateMockContainer(
 				"test-container-03",
 				"test-container-03",
 				"fake-image:latest",
-				time.Now()),
+				time.Now(),
+			),
 		},
 	}
 }
@@ -39,7 +42,8 @@ func getLinkedTestData(withImageInfo bool) *mockActions.TestData {
 		"test-container-01",
 		"/test-container-01",
 		"fake-image1:latest",
-		time.Now().AddDate(0, 0, -1))
+		time.Now().AddDate(0, 0, -1),
+	)
 
 	var imageInfo *dockerImage.InspectResponse
 	if withImageInfo {
@@ -52,7 +56,8 @@ func getLinkedTestData(withImageInfo bool) *mockActions.TestData {
 		"fake-image2:latest",
 		time.Now(),
 		[]string{staleContainer.Name()},
-		imageInfo)
+		imageInfo,
+	)
 
 	return &mockActions.TestData{
 		Staleness: map[string]bool{linkingContainer.Name(): false},
@@ -68,7 +73,8 @@ func getNetworkModeTestData() *mockActions.TestData {
 		"network-dependency",
 		"/network-dependency",
 		"fake-image:latest",
-		time.Now().AddDate(0, 0, -1))
+		time.Now().AddDate(0, 0, -1),
+	)
 
 	dependentContainer := mockActions.CreateMockContainerWithConfig(
 		"network-dependent",
@@ -81,7 +87,8 @@ func getNetworkModeTestData() *mockActions.TestData {
 			Image:        "fake-image2:latest",
 			Labels:       make(map[string]string),
 			ExposedPorts: dockerNetwork.PortSet{},
-		})
+		},
+	)
 
 	// Set network mode to container:network-dependency
 	dependentContainer.ContainerInfo().HostConfig.NetworkMode = "container:network-dependency"
@@ -107,7 +114,8 @@ func getComposeTestData() *mockActions.TestData {
 				"com.docker.compose.service": "db",
 			},
 			ExposedPorts: dockerNetwork.PortSet{},
-		})
+		},
+	)
 
 	// Create a web container with service name "web" but container name "myproject_web_1"
 	// that depends on "db"
@@ -125,7 +133,8 @@ func getComposeTestData() *mockActions.TestData {
 				"com.docker.compose.depends_on": "db",
 			},
 			ExposedPorts: dockerNetwork.PortSet{},
-		})
+		},
+	)
 
 	return &mockActions.TestData{
 		Staleness:  map[string]bool{dbContainer.Name(): true, webContainer.Name(): false},
@@ -149,7 +158,8 @@ func getComposeProjectPrefixedTestData() *mockActions.TestData {
 				"com.docker.compose.service": "database",
 			},
 			ExposedPorts: dockerNetwork.PortSet{},
-		})
+		},
+	)
 
 	// Create a web container with project and service labels that depends on "database"
 	webContainer := mockActions.CreateMockContainerWithConfig(
@@ -167,7 +177,8 @@ func getComposeProjectPrefixedTestData() *mockActions.TestData {
 				"com.docker.compose.depends_on": "database:service_started:true",
 			},
 			ExposedPorts: dockerNetwork.PortSet{},
-		})
+		},
+	)
 
 	return &mockActions.TestData{
 		Staleness:  map[string]bool{dbContainer.Name(): true, webContainer.Name(): false},
@@ -191,7 +202,8 @@ func getComposeMultiHopTestData() *mockActions.TestData {
 				"com.docker.compose.service": "cache",
 			},
 			ExposedPorts: dockerNetwork.PortSet{},
-		})
+		},
+	)
 
 	dbContainer := mockActions.CreateMockContainerWithConfig(
 		"myproject_db_1",
@@ -207,7 +219,8 @@ func getComposeMultiHopTestData() *mockActions.TestData {
 				"com.docker.compose.depends_on": "cache",
 			},
 			ExposedPorts: dockerNetwork.PortSet{},
-		})
+		},
+	)
 
 	appContainer := mockActions.CreateMockContainerWithConfig(
 		"myproject_app_1",
@@ -223,7 +236,8 @@ func getComposeMultiHopTestData() *mockActions.TestData {
 				"com.docker.compose.depends_on": "db",
 			},
 			ExposedPorts: dockerNetwork.PortSet{},
-		})
+		},
+	)
 
 	return &mockActions.TestData{
 		Staleness: map[string]bool{
@@ -256,7 +270,8 @@ func getComposeHyphenatedProjectTestData() *mockActions.TestData {
 				"com.docker.compose.container-number": "1",
 			},
 			ExposedPorts: dockerNetwork.PortSet{},
-		})
+		},
+	)
 
 	// Dependent with bare container_name + real Compose-emitted depends_on label format.
 	dependentContainer := mockActions.CreateMockContainerWithConfig(
@@ -275,7 +290,8 @@ func getComposeHyphenatedProjectTestData() *mockActions.TestData {
 				"com.docker.compose.depends_on":       "base:service_started:false",
 			},
 			ExposedPorts: dockerNetwork.PortSet{},
-		})
+		},
+	)
 
 	return &mockActions.TestData{
 		Staleness:  map[string]bool{baseContainer.Name(): true, dependentContainer.Name(): false},
@@ -306,7 +322,8 @@ func getHyphenatedProjectWithContainerNameTestData() *mockActions.TestData {
 				"com.docker.compose.container-number": "1",
 			},
 			ExposedPorts: dockerNetwork.PortSet{},
-		})
+		},
+	)
 
 	dependentSimple := mockActions.CreateMockContainerWithConfig(
 		"dependent-simple",
@@ -324,7 +341,8 @@ func getHyphenatedProjectWithContainerNameTestData() *mockActions.TestData {
 				"com.docker.compose.depends_on":       "base:service_started:false",
 			},
 			ExposedPorts: dockerNetwork.PortSet{},
-		})
+		},
+	)
 
 	dependentNetwork := mockActions.CreateMockContainerWithConfig(
 		"dependent-network",
@@ -342,7 +360,8 @@ func getHyphenatedProjectWithContainerNameTestData() *mockActions.TestData {
 				"com.docker.compose.depends_on":       "base:service_started:false",
 			},
 			ExposedPorts: dockerNetwork.PortSet{},
-		})
+		},
+	)
 	dependentNetwork.ContainerInfo().HostConfig.NetworkMode = "container:base"
 
 	return &mockActions.TestData{
@@ -382,7 +401,8 @@ func createDependencyChain(names []string) []types.Container {
 			&dockerContainer.Config{
 				Labels:       labels,
 				ExposedPorts: dockerNetwork.PortSet{},
-			})
+			},
+		)
 	}
 
 	return containers
@@ -403,7 +423,8 @@ func getComposeDependsOnWithNetworkModeTestData() *mockActions.TestData {
 				"com.docker.compose.service": "vpn",
 			},
 			ExposedPorts: dockerNetwork.PortSet{},
-		})
+		},
+	)
 
 	dependentContainer := mockActions.CreateMockContainerWithConfig(
 		"download-stack-web-1",
@@ -420,7 +441,8 @@ func getComposeDependsOnWithNetworkModeTestData() *mockActions.TestData {
 				"com.docker.compose.depends_on": "vpn:service_started:false",
 			},
 			ExposedPorts: dockerNetwork.PortSet{},
-		})
+		},
+	)
 
 	dependentContainer.ContainerInfo().HostConfig.NetworkMode = "container:download-stack-vpn-1"
 
