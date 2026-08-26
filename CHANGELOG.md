@@ -10,6 +10,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Chores
 
+- Update module go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp to v0.71.0 by @renovate[bot] in [#2247](https://github.com/nicholas-fedor/watchtower/pull/2247)
+- Update github/codeql-action action to v4.37.9 by @renovate[bot] in [#2246](https://github.com/nicholas-fedor/watchtower/pull/2246)
 - Update module github.com/nicholas-fedor/shoutrrr to v0.18.0 by @renovate[bot] in [#2243](https://github.com/nicholas-fedor/watchtower/pull/2243)
 
 ## [1.21.2] - 2026-08-25
