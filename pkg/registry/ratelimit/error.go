@@ -24,6 +24,8 @@ const (
 	retryAfterCaptureCount = 2
 	// allowedCaptureCount is the expected regex group count for allowed quotas.
 	allowedCaptureCount = 3
+	// equalJitterDivisor splits a wait into the equal-jitter half range.
+	equalJitterDivisor = 2
 )
 
 // Error is a registry 429 with the wait and quota the registry advertised.

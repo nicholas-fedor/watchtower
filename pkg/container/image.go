@@ -657,7 +657,7 @@ func (c imageClient) shouldSkipPull(
 
 	switch {
 	case ratelimit.Is(err):
-		clog.Warn().
+		clog.Debug().
 			Err(err).
 			Msg("Registry rate limited digest check. Aborting pull")
 
@@ -775,7 +775,7 @@ func (c imageClient) performImagePull(
 			info := ratelimit.FromErrorMessage(waitErr.Error())
 			if info != nil {
 				ratelimit.Observe(pullHost, info)
-				clog.Warn().
+				clog.Debug().
 					Err(info).
 					Msg("Registry rate limited image pull")
 

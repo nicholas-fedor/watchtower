@@ -309,8 +309,9 @@ Authenticating with a Docker Hub account raises the limit from 100 to 200 pulls,
 
 #### GitHub Container Registry (ghcr.io)
 
-GHCR.io does not publish explicit pull rate limits and currently provides free storage and bandwidth for container images.
-Observed limits are in the range of tens of thousands of requests per minute, which is well beyond what Watchtower's cooldown feature would generate under any realistic deployment.
+GHCR.io does not publish Docker Hub-style pull quotas. It does advertise an undocumented edge budget (observed as `allowed: 44000/minute` with a sub-second `retry-after`) that trips on bursts of concurrent requests, including anonymous pulls of `lscr.io` images hosted there.
+
+Watchtower treats that advertised figure as a fill rate, not a burst size: after a 429 it paces one request at a time for that host. Authenticating to the registry is still the most reliable way to leave a shared anonymous bucket.
 
 #### Per-Registry Impact Summary
 
@@ -319,7 +320,7 @@ Observed limits are in the range of tens of thousands of requests per minute, wh
 | Docker Hub (unauthenticated)    | 100 / 6 hours               | Moderate — may exceed limit with many containers on short intervals |
 | Docker Hub (authenticated free) | 200 / 6 hours               | Low — sufficient for most deployments                               |
 | Docker Hub (paid)               | Unlimited                   | None                                                                |
-| GHCR.io                         | ~44,000 / minute (observed) | None                                                                |
+| GHCR.io                         | ~44,000 / minute fill rate (small burst) | Low — paced after a 429; authenticate if you see retries |
 
 ### Monitor-Only Containers
 
