@@ -11,10 +11,12 @@ import (
 type hostState struct {
 	// cooldownUntil is when the next request to this host may proceed.
 	cooldownUntil time.Time
-	// allowed is the advertised request budget. Zero when unknown.
+	// allowed is the advertised fill rate numerator. Zero when unknown.
 	allowed int
 	// window is the period for allowed. Zero when unknown.
 	window time.Duration
+	// burst is the maximum tokens held. Zero uses the advertised allowance.
+	burst int
 	// tokens is the remaining budget in the current window.
 	tokens float64
 	// lastRefill is when tokens were last replenished.
@@ -38,6 +40,11 @@ func ResetForTest() {
 
 // Observe records a 429 against host so later Wait calls honor it.
 //
+// Advertised "allowed: N/window" values are treated as a fill rate, not a
+// burst size. After a throttle, the host is limited to one outstanding token
+// so concurrent waiters cannot dump the advertised budget at once.
+// Cooldown time does not accrue tokens.
+//
 // Parameters:
 //   - host: Registry host. Empty values are ignored.
 //   - info: Parsed 429. Nil values are ignored.
@@ -50,6 +57,7 @@ func Observe(host string, info *Error) {
 	defer hostsMu.Unlock()
 
 	state := hostLocked(host)
+	now := time.Now()
 
 	cooldown := min(info.RetryAfter, maxHonorWait)
 
@@ -58,24 +66,39 @@ func Observe(host string, info *Error) {
 	}
 
 	if cooldown > 0 {
-		until := time.Now().Add(cooldown)
+		until := now.Add(cooldown)
 		if until.After(state.cooldownUntil) {
 			state.cooldownUntil = until
 		}
 	}
 
+	state.burst = 1
+	state.tokens = 1
+
+	if state.cooldownUntil.After(now) {
+		state.lastRefill = state.cooldownUntil
+	} else {
+		state.lastRefill = now
+	}
+
 	if info.Allowed > 0 && info.AllowedWindow > 0 {
 		state.allowed = info.Allowed
 		state.window = info.AllowedWindow
-		state.tokens = 0
-		state.lastRefill = time.Now()
+	} else if state.allowed <= 0 || state.window <= 0 {
+		window := cooldown
+		if window <= 0 {
+			window = minHonorWait
+		}
+
+		state.allowed = 1
+		state.window = window
 	}
 }
 
-// ObserveSuccess refreshes host's advertised budget after a successful request.
+// ObserveSuccess refreshes host's fill-rate tokens after a successful request.
 //
-// Token reservation happens in Wait. This only refills so a success does not
-// spend a second token.
+// Token reservation happens in Wait. This only refills up to the burst cap so
+// a success does not spend a second token or restore a pre-throttle dump.
 //
 // Parameters:
 //   - host: Registry host. Empty values are ignored.
@@ -244,7 +267,7 @@ func (s *hostState) refillLocked(now time.Time) {
 
 	if s.lastRefill.IsZero() {
 		s.lastRefill = now
-		s.tokens = float64(s.allowed)
+		s.tokens = s.tokenCap()
 
 		return
 	}
@@ -255,9 +278,25 @@ func (s *hostState) refillLocked(now time.Time) {
 	}
 
 	s.tokens += float64(elapsed) / float64(s.window) * float64(s.allowed)
-	if s.tokens > float64(s.allowed) {
-		s.tokens = float64(s.allowed)
+	if ceiling := s.tokenCap(); s.tokens > ceiling {
+		s.tokens = ceiling
 	}
 
 	s.lastRefill = now
+}
+
+// tokenCap is the maximum tokens this host may hold.
+//
+// After a throttle, burst is 1 so an advertised fill rate cannot rebuild a
+// large dump of tokens. Before any throttle, burst is 0 and the cap is the
+// advertised budget when a quota is present.
+//
+// Returns:
+//   - float64: Token ceiling used by refillLocked.
+func (s *hostState) tokenCap() float64 {
+	if s.burst > 0 {
+		return float64(s.burst)
+	}
+
+	return float64(s.allowed)
 }
