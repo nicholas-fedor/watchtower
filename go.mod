@@ -20,7 +20,7 @@ require (
 	github.com/moby/moby/client v0.5.1
 	github.com/nicholas-fedor/shoutrrr v0.18.0
 	github.com/onsi/ginkgo/v2 v2.32.1
-	github.com/onsi/gomega v1.42.1
+	github.com/onsi/gomega v1.43.0
 	github.com/opencontainers/go-digest v1.0.0
 	github.com/opencontainers/image-spec v1.1.1
 	github.com/prometheus/client_golang v1.24.1
