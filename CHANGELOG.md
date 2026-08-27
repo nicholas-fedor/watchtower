@@ -18,6 +18,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Chores
 
+- Update anchore/sbom-action action to v0.24.1 by @renovate[bot] in [#2264](https://github.com/nicholas-fedor/watchtower/pull/2264)
 - Update module github.com/andybalholm/brotli to v1.2.3 by @renovate[bot] in [#2263](https://github.com/nicholas-fedor/watchtower/pull/2263)
 - Update module github.com/onsi/gomega to v1.43.0 by @renovate[bot] in [#2260](https://github.com/nicholas-fedor/watchtower/pull/2260)
 - Update nicholas-fedor/go-proxy-pull-action action to v1.1.49 by @renovate[bot] in [#2255](https://github.com/nicholas-fedor/watchtower/pull/2255)
