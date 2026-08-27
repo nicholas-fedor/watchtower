@@ -1556,6 +1556,74 @@ var _ = ginkgo.Describe("the client", func() {
 		})
 	})
 
+	ginkgo.Describe("GetImageDiskUsage", func() {
+		ginkgo.It("maps image usage from /system/df", func() {
+			mockServer.Reset()
+
+			api, err := dockerClient.New(
+				dockerClient.WithHost(mockServer.URL()),
+				dockerClient.WithHTTPClient(mockServer.HTTPTestServer.Client()),
+				dockerClient.WithAPIVersion("1.52"),
+			)
+			gomega.Expect(err).NotTo(gomega.HaveOccurred())
+
+			mockServer.AppendHandlers(
+				ghttp.CombineHandlers(
+					ghttp.VerifyRequest(
+						"GET",
+						gomega.MatchRegexp(`^/v[0-9.]+/system/df$`),
+						"type=image",
+					),
+					ghttp.RespondWithJSONEncoded(http.StatusOK, map[string]any{
+						"ImageUsage": map[string]any{
+							"TotalSize":   4096,
+							"Reclaimable": 1024,
+							"TotalCount":  2,
+							"ActiveCount": 1,
+						},
+					}),
+				),
+			)
+
+			usage, usageErr := (&client{log: testLog(), api: api}).GetImageDiskUsage(
+				context.Background(),
+			)
+			gomega.Expect(usageErr).NotTo(gomega.HaveOccurred())
+			gomega.Expect(usage.TotalSize).To(gomega.Equal(int64(4096)))
+			gomega.Expect(usage.Reclaimable).To(gomega.Equal(int64(1024)))
+			gomega.Expect(usage.TotalCount).To(gomega.Equal(int64(2)))
+			gomega.Expect(usage.ActiveCount).To(gomega.Equal(int64(1)))
+		})
+
+		ginkgo.It("wraps daemon errors", func() {
+			mockServer.Reset()
+
+			api, err := dockerClient.New(
+				dockerClient.WithHost(mockServer.URL()),
+				dockerClient.WithHTTPClient(mockServer.HTTPTestServer.Client()),
+				dockerClient.WithAPIVersion("1.52"),
+			)
+			gomega.Expect(err).NotTo(gomega.HaveOccurred())
+
+			mockServer.AppendHandlers(
+				ghttp.CombineHandlers(
+					ghttp.VerifyRequest(
+						"GET",
+						gomega.MatchRegexp(`^/v[0-9.]+/system/df$`),
+						"type=image",
+					),
+					ghttp.RespondWith(http.StatusInternalServerError, "df failed"),
+				),
+			)
+
+			_, usageErr := (&client{log: testLog(), api: api}).GetImageDiskUsage(
+				context.Background(),
+			)
+			gomega.Expect(usageErr).To(gomega.HaveOccurred())
+			gomega.Expect(usageErr.Error()).To(gomega.ContainSubstring("failed to get image disk usage"))
+		})
+	})
+
 	ginkgo.Describe("TLS client methods", func() {
 		var (
 			tlsServer  *ghttp.Server

@@ -40,6 +40,10 @@ type StartupParams struct {
 	Notifier types.Notifier
 	// Version is the Watchtower version string.
 	Version string
+	// DiskSpaceMaxBytes is the parsed Docker image-usage block threshold, or 0 if unset.
+	DiskSpaceMaxBytes int64
+	// DiskSpaceWarnBytes is the parsed Docker image-usage warning threshold, or 0 if unset.
+	DiskSpaceWarnBytes int64
 }
 
 // WriteStartupMessage logs or notifies startup information from resolved configuration.
@@ -72,6 +76,13 @@ func WriteStartupMessage(params StartupParams) {
 
 	startupLog.Info().
 		Msg("Watchtower " + params.Version + " using Docker API v" + apiVersion)
+
+	if params.DiskSpaceMaxBytes > 0 || params.DiskSpaceWarnBytes > 0 {
+		startupLog.Info().
+			Int64("disk_space_max", params.DiskSpaceMaxBytes).
+			Int64("disk_space_warn", params.DiskSpaceWarnBytes).
+			Msg("Docker image usage budget enabled")
+	}
 
 	// Log details about configured notifiers or lack thereof.
 	var notifierNames []string

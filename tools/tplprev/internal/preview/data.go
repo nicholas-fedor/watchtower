@@ -31,6 +31,11 @@ const (
 	previewCooldown         = "24h"
 	previewEligibleIn       = "6h"
 	previewEligibleAfter    = 6 * time.Hour
+	previewDiskUsage        = int64(32_000_000_000)
+	previewDiskMax          = int64(40_000_000_000)
+	previewDiskWarn         = int64(32_000_000_000)
+	previewDiskReclaimable  = int64(4_000_000_000)
+	previewDiskImageCount   = int64(12)
 )
 
 var (
@@ -244,6 +249,29 @@ func (p *PreviewData) dataForMessage(msg, name, image string) map[string]any {
 		return map[string]any{"tls": false, "host": "0.0.0.0", "port": previewAPIPort}
 	case "Only checking containers in scope":
 		return map[string]any{"scope": "prod"}
+	case "Docker image usage exceeds configured maximum":
+		return map[string]any{
+			"usage":       previewDiskMax,
+			"max":         previewDiskMax,
+			"warn":        previewDiskWarn,
+			"reclaimable": previewDiskReclaimable,
+			"image_count": previewDiskImageCount,
+		}
+	case "Docker image usage exceeds configured warning threshold":
+		return map[string]any{
+			"usage":       previewDiskUsage,
+			"max":         previewDiskMax,
+			"warn":        previewDiskWarn,
+			"reclaimable": previewDiskReclaimable,
+			"image_count": previewDiskImageCount,
+		}
+	case "Failed to query Docker image disk usage":
+		return map[string]any{"error": "daemon disk usage unavailable"}
+	case "Docker image usage budget enabled":
+		return map[string]any{
+			"disk_space_max":  previewDiskMax,
+			"disk_space_warn": previewDiskWarn,
+		}
 	default:
 		return nil
 	}

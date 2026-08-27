@@ -47,5 +47,7 @@ func (c Config) UpdateParams(overrides RunOverrides) types.UpdateParams {
 		EphemeralSelfUpdate: c.Update.EphemeralSelfUpdate,
 		CooldownDelay:       c.Update.CooldownDelay,
 		LabelEnable:         c.Filter.LabelEnable,
+		DiskSpaceMax:        c.Update.DiskSpaceMaxBytes,
+		DiskSpaceWarn:       c.Update.DiskSpaceWarnBytes,
 	}
 }

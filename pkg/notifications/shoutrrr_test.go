@@ -281,6 +281,79 @@ updt1 (mock/updt1:latest): Updated
 				))
 				gomega.Expect(s).NotTo(gomega.ContainSubstring(" | "))
 			})
+
+			ginkgo.It("should format Docker image usage budget messages without dumping raw fields", func() {
+				shoutrrr := createTestNotifier(
+					[]string{},
+					zerolog.TraceLevel,
+					true,
+					StaticData{},
+					false,
+					time.Second,
+				)
+				entries := []*notificationEntry{
+					{
+						Message: "Docker image usage exceeds configured maximum",
+						Data: map[string]any{
+							"usage":       int64(10_000),
+							"max":         int64(10_000),
+							"warn":        int64(8_000),
+							"reclaimable": int64(2_000),
+							"image_count": int64(4),
+						},
+					},
+					{
+						Message: "Docker image usage exceeds configured warning threshold",
+						Data: map[string]any{
+							"usage":       int64(8_000),
+							"max":         int64(10_000),
+							"warn":        int64(8_000),
+							"reclaimable": int64(2_000),
+							"image_count": int64(4),
+						},
+					},
+					{
+						Message: "Failed to query Docker image disk usage",
+						Data:    map[string]any{"error": "df unavailable"},
+					},
+					{
+						Message: "Docker image usage budget enabled",
+						Data: map[string]any{
+							"disk_space_max":  int64(40_000_000_000),
+							"disk_space_warn": int64(32_000_000_000),
+						},
+					},
+					{
+						Message: "Docker image usage exceeds configured maximum",
+						Data: map[string]any{
+							"usage":       int64(0),
+							"max":         int64(0),
+							"reclaimable": int64(0),
+							"image_count": int64(0),
+						},
+					},
+				}
+
+				s, err := shoutrrr.buildMessage(Data{Entries: entries})
+				gomega.Expect(err).NotTo(gomega.HaveOccurred())
+				gomega.Expect(s).To(gomega.ContainSubstring(
+					"Docker image usage exceeds configured maximum: 10000/10000 bytes used (reclaimable 2000, 4 images)",
+				))
+				gomega.Expect(s).To(gomega.ContainSubstring(
+					"Docker image usage exceeds configured warning threshold: 8000/8000 bytes used (reclaimable 2000, 4 images)",
+				))
+				gomega.Expect(s).To(gomega.ContainSubstring(
+					"Failed to query Docker image disk usage: df unavailable",
+				))
+				gomega.Expect(s).To(gomega.ContainSubstring(
+					"Docker image usage budget enabled: max 40000000000 bytes, warn 32000000000 bytes",
+				))
+				gomega.Expect(s).To(gomega.ContainSubstring(
+					"Docker image usage exceeds configured maximum: 0/0 bytes used (reclaimable 0, 0 images)",
+				))
+				gomega.Expect(s).NotTo(gomega.ContainSubstring("unknown"))
+				gomega.Expect(s).NotTo(gomega.ContainSubstring(" | "))
+			})
 		})
 		ginkgo.When("given a valid custom template", func() {
 			ginkgo.It("should format the messages using the custom template", func() {

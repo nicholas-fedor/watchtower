@@ -223,6 +223,7 @@ nav:
   - Advanced Features:
       - Ephemeral Self-Updates: advanced-features/ephemeral-self-updates/index.md
       - Image Cooldown: advanced-features/image-cooldown/index.md
+      - Disk Usage Monitor: advanced-features/disk-usage-monitor/index.md
       - Lifecycle Hooks: advanced-features/lifecycle-hooks/index.md
       - Linked Containers: advanced-features/linked-containers/index.md
       - Private Registries: advanced-features/private-registries/index.md

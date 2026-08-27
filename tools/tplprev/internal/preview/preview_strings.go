@@ -103,6 +103,7 @@ var infoMessages = []string{
 	"Only checking containers in scope",
 	"Skipping Watchtower self-update in run-once mode",
 	"Watchtower v1.11.7 using Docker API v1.51",
+	"Docker image usage budget enabled",
 	"Using notifications: gotify",
 	"Checking all containers (except explicitly disabled with label)",
 	"Update session completed",
@@ -117,6 +118,7 @@ var warningMessages = []string{
 	"Failed to list containers",
 	"Failed to inspect container",
 	"Failed to list containers for image usage check, skipping removal",
+	"Docker image usage exceeds configured warning threshold",
 }
 
 var errorMessages = []string{
@@ -131,6 +133,8 @@ var errorMessages = []string{
 	"Failed to find new image",
 	"Failed to list containers",
 	"Failed to inspect container",
+	"Docker image usage exceeds configured maximum",
+	"Failed to query Docker image disk usage",
 }
 
 var skippedMessages = []string{
