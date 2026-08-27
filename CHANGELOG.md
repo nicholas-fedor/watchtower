@@ -18,6 +18,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Chores
 
+- Update module github.com/andybalholm/brotli to v1.2.3 by @renovate[bot] in [#2263](https://github.com/nicholas-fedor/watchtower/pull/2263)
+- Update module github.com/onsi/gomega to v1.43.0 by @renovate[bot] in [#2260](https://github.com/nicholas-fedor/watchtower/pull/2260)
 - Update nicholas-fedor/go-proxy-pull-action action to v1.1.49 by @renovate[bot] in [#2255](https://github.com/nicholas-fedor/watchtower/pull/2255)
 - Update module github.com/docker/docker-credential-helpers to v0.9.9 by @renovate[bot] in [#2253](https://github.com/nicholas-fedor/watchtower/pull/2253)
 - Update securego/gosec action to v2.29.0 by @renovate[bot] in [#2249](https://github.com/nicholas-fedor/watchtower/pull/2249)
@@ -27,6 +29,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Pace throttled registry hosts without bursting advertised quotas by @nicholas-fedor in [#2262](https://github.com/nicholas-fedor/watchtower/pull/2262)
 - Complete image removal after self-update SIGTERM by @nicholas-fedor in [#2251](https://github.com/nicholas-fedor/watchtower/pull/2251)
 
 ## [1.21.2] - 2026-08-25
