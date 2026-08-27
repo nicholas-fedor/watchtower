@@ -28,23 +28,27 @@ type Metric struct {
 
 // Metrics handles processing and exposing scan metrics.
 type Metrics struct {
-	channel        chan *Metric       // Channel for queuing metrics.
-	scanned        prometheus.Gauge   // Gauge for scanned containers.
-	updated        prometheus.Gauge   // Gauge for updated containers.
-	failed         prometheus.Gauge   // Gauge for failed containers.
-	restarted      prometheus.Gauge   // Gauge for restarted containers.
-	skipped        prometheus.Gauge   // Gauge for skipped containers.
-	restartedTotal prometheus.Counter // Counter for total restarted containers.
-	total          prometheus.Counter // Counter for total scans.
-	skippedScans   prometheus.Counter // Counter for skipped scans.
-	dropped        prometheus.Counter // Counter for dropped metrics.
-	stopCh         chan struct{}      // Channel for shutdown signaling.
-	shutdownOnce   sync.Once          // Ensures shutdown is called only once.
-	lastMetric     *Metric            // Last scan metric for status endpoint.
-	lastMetricMu   sync.RWMutex       // Protects lastMetric.
-	history        []HistoryEntry     // Ring buffer of scan history.
-	historyIdx     int                // Current write position in the ring buffer.
-	historyMu      sync.RWMutex       // Protects history and historyIdx.
+	channel            chan *Metric       // Channel for queuing metrics.
+	scanned            prometheus.Gauge   // Gauge for scanned containers.
+	updated            prometheus.Gauge   // Gauge for updated containers.
+	failed             prometheus.Gauge   // Gauge for failed containers.
+	restarted          prometheus.Gauge   // Gauge for restarted containers.
+	skipped            prometheus.Gauge   // Gauge for skipped containers.
+	restartedTotal     prometheus.Counter // Counter for total restarted containers.
+	total              prometheus.Counter // Counter for total scans.
+	skippedScans       prometheus.Counter // Counter for skipped scans.
+	dropped            prometheus.Counter // Counter for dropped metrics.
+	imageBytes         prometheus.Gauge   // Gauge for Docker image usage bytes.
+	imageReclaimable   prometheus.Gauge   // Gauge for reclaimable Docker image bytes.
+	diskSpaceMaxBytes  prometheus.Gauge   // Gauge for the configured image-usage maximum.
+	diskSpaceWarnBytes prometheus.Gauge   // Gauge for the configured image-usage warning threshold.
+	stopCh             chan struct{}      // Channel for shutdown signaling.
+	shutdownOnce       sync.Once          // Ensures shutdown is called only once.
+	lastMetric         *Metric            // Last scan metric for status endpoint.
+	lastMetricMu       sync.RWMutex       // Protects lastMetric.
+	history            []HistoryEntry     // Ring buffer of scan history.
+	historyIdx         int                // Current write position in the ring buffer.
+	historyMu          sync.RWMutex       // Protects history and historyIdx.
 	//nolint:containedctx
 	ctx    context.Context    // Context for cancellation.
 	cancel context.CancelFunc // Cancel function for the context.
@@ -103,6 +107,22 @@ func NewWithRegistry(registry prometheus.Registerer) (*Metrics, error) {
 			Name: "watchtower_metrics_dropped_total",
 			Help: "Number of metrics dropped due to full channel",
 		}),
+		imageBytes: prometheus.NewGauge(prometheus.GaugeOpts{
+			Name: "watchtower_docker_images_bytes",
+			Help: "Docker image storage usage in bytes reported by the last disk-space check",
+		}),
+		imageReclaimable: prometheus.NewGauge(prometheus.GaugeOpts{
+			Name: "watchtower_docker_images_reclaimable_bytes",
+			Help: "Reclaimable Docker image storage in bytes reported by the last disk-space check",
+		}),
+		diskSpaceMaxBytes: prometheus.NewGauge(prometheus.GaugeOpts{
+			Name: "watchtower_disk_space_max_bytes",
+			Help: "Configured Docker image-usage maximum in bytes (0 if unset)",
+		}),
+		diskSpaceWarnBytes: prometheus.NewGauge(prometheus.GaugeOpts{
+			Name: "watchtower_disk_space_warn_bytes",
+			Help: "Configured Docker image-usage warning threshold in bytes (0 if unset)",
+		}),
 		channel: make(chan *Metric, channelBufferSize),
 		stopCh:  make(chan struct{}),
 		ctx:     ctx,
@@ -121,6 +141,10 @@ func NewWithRegistry(registry prometheus.Registerer) (*Metrics, error) {
 		metrics.total,
 		metrics.skippedScans,
 		metrics.dropped,
+		metrics.imageBytes,
+		metrics.imageReclaimable,
+		metrics.diskSpaceMaxBytes,
+		metrics.diskSpaceWarnBytes,
 	}
 
 	for _, c := range collectors {
@@ -209,6 +233,41 @@ func Default() *Metrics {
 //   - metric: Metric to register.
 func (m *Metrics) RegisterScan(metric *Metric) {
 	m.Register(metric)
+}
+
+// RecordImageDiskUsage updates Docker image-usage gauges on the default handler.
+//
+// It is a no-op when metrics have not been initialized.
+//
+// Parameters:
+//   - totalSize: Bytes used by Docker images.
+//   - reclaimable: Bytes that unused images could free.
+//   - maxBytes: Configured block threshold in bytes, or 0 if unset.
+//   - warnBytes: Configured warning threshold in bytes, or 0 if unset.
+func RecordImageDiskUsage(totalSize, reclaimable, maxBytes, warnBytes int64) {
+	if metrics == nil {
+		return
+	}
+
+	metrics.SetImageDiskUsage(totalSize, reclaimable, maxBytes, warnBytes)
+}
+
+// SetImageDiskUsage updates Docker image-usage gauges.
+//
+// Parameters:
+//   - totalSize: Bytes used by Docker images.
+//   - reclaimable: Bytes that unused images could free.
+//   - maxBytes: Configured block threshold in bytes, or 0 if unset.
+//   - warnBytes: Configured warning threshold in bytes, or 0 if unset.
+func (m *Metrics) SetImageDiskUsage(totalSize, reclaimable, maxBytes, warnBytes int64) {
+	if m == nil || m.imageBytes == nil {
+		return
+	}
+
+	m.imageBytes.Set(float64(totalSize))
+	m.imageReclaimable.Set(float64(reclaimable))
+	m.diskSpaceMaxBytes.Set(float64(maxBytes))
+	m.diskSpaceWarnBytes.Set(float64(warnBytes))
 }
 
 // Shutdown gracefully stops the metrics processing goroutine.

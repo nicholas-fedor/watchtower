@@ -47,6 +47,8 @@ func TestUpdateParamsAssignsEveryField(t *testing.T) {
 			LabelPrecedence:     true,
 			EphemeralSelfUpdate: true,
 			PullFailureDelay:    5 * time.Second,
+			DiskSpaceMaxBytes:   40_000_000_000,
+			DiskSpaceWarnBytes:  32_000_000_000,
 		},
 		Lifecycle: lifecycle.Lifecycle{
 			Enabled: true,
@@ -88,6 +90,8 @@ func TestUpdateParamsAssignsEveryField(t *testing.T) {
 	assert.True(t, params.SkipSelfUpdate)
 	assert.True(t, params.EphemeralSelfUpdate)
 	assert.Equal(t, 24*time.Hour, params.CooldownDelay)
+	assert.Equal(t, int64(40_000_000_000), params.DiskSpaceMax)
+	assert.Equal(t, int64(32_000_000_000), params.DiskSpaceWarn)
 
 	// Exhaustiveness: every exported field must be non-zero in this fixture
 	// (Filter is a func; RunOnce and SkipSelfUpdate come from overrides).

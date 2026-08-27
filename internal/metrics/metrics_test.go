@@ -519,6 +519,22 @@ func TestDefault(t *testing.T) {
 				t.Errorf("Default().dropped is nil")
 			}
 
+			if got.imageBytes == nil {
+				t.Errorf("Default().imageBytes is nil")
+			}
+
+			if got.imageReclaimable == nil {
+				t.Errorf("Default().imageReclaimable is nil")
+			}
+
+			if got.diskSpaceMaxBytes == nil {
+				t.Errorf("Default().diskSpaceMaxBytes is nil")
+			}
+
+			if got.diskSpaceWarnBytes == nil {
+				t.Errorf("Default().diskSpaceWarnBytes is nil")
+			}
+
 			gotAgain := Default()
 			if got != gotAgain {
 				t.Errorf("Default() did not return singleton: got %p, gotAgain %p", got, gotAgain)
@@ -691,20 +707,24 @@ func TestNewWithRegistry(t *testing.T) {
 				t.Fatalf("Failed to gather metrics: %v", err)
 			}
 
-			if len(metricFamilies) != 9 {
-				t.Errorf("Expected 9 metric families registered, got %d", len(metricFamilies))
+			if len(metricFamilies) != 13 {
+				t.Errorf("Expected 13 metric families registered, got %d", len(metricFamilies))
 			}
 
 			expectedNames := map[string]bool{
-				"watchtower_containers_scanned":         true,
-				"watchtower_containers_updated":         true,
-				"watchtower_containers_failed":          true,
-				"watchtower_containers_restarted":       true,
-				"watchtower_containers_skipped":         true,
-				"watchtower_containers_restarted_total": true,
-				"watchtower_scans_total":                true,
-				"watchtower_scans_skipped_total":        true,
-				"watchtower_metrics_dropped_total":      true,
+				"watchtower_containers_scanned":              true,
+				"watchtower_containers_updated":              true,
+				"watchtower_containers_failed":               true,
+				"watchtower_containers_restarted":            true,
+				"watchtower_containers_skipped":              true,
+				"watchtower_containers_restarted_total":      true,
+				"watchtower_scans_total":                     true,
+				"watchtower_scans_skipped_total":             true,
+				"watchtower_metrics_dropped_total":           true,
+				"watchtower_docker_images_bytes":             true,
+				"watchtower_docker_images_reclaimable_bytes": true,
+				"watchtower_disk_space_max_bytes":            true,
+				"watchtower_disk_space_warn_bytes":           true,
 			}
 
 			for _, mf := range metricFamilies {
@@ -1269,5 +1289,54 @@ func assertMetricsStoppedAfterShutdown(
 				)
 			}
 		}
+	}
+}
+
+func TestSetImageDiskUsage(t *testing.T) {
+	registry := prometheus.NewRegistry()
+
+	m, err := NewWithRegistry(registry)
+	if err != nil {
+		t.Fatalf("Failed to create metrics: %v", err)
+	}
+
+	t.Cleanup(m.Shutdown)
+
+	m.SetImageDiskUsage(4096, 1024, 40_000, 32_000)
+
+	metricFamilies, err := registry.Gather()
+	if err != nil {
+		t.Fatalf("Failed to gather metrics: %v", err)
+	}
+
+	want := map[string]float64{
+		"watchtower_docker_images_bytes":             4096,
+		"watchtower_docker_images_reclaimable_bytes": 1024,
+		"watchtower_disk_space_max_bytes":            40_000,
+		"watchtower_disk_space_warn_bytes":           32_000,
+	}
+
+	for _, mf := range metricFamilies {
+		expected, ok := want[mf.GetName()]
+		if !ok {
+			continue
+		}
+
+		if len(mf.GetMetric()) == 0 {
+			t.Errorf("No samples for %s", mf.GetName())
+
+			continue
+		}
+
+		got := mf.GetMetric()[0].GetGauge().GetValue()
+		if got != expected {
+			t.Errorf("%s = %v, want %v", mf.GetName(), got, expected)
+		}
+
+		delete(want, mf.GetName())
+	}
+
+	if len(want) != 0 {
+		t.Errorf("missing metrics: %v", want)
 	}
 }

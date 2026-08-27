@@ -39,6 +39,46 @@ Environment Variable: WATCHTOWER_ROLLING_RESTART
 !!! Warning "This functionality is currently not supported when used in combination with linked-containers."
      This limitation exists because linked-containers require coordinated updates across dependency chains, which conflicts with the incremental nature of rolling restarts.
 
+## Disk Space Max
+
+Sets the maximum allowed Docker **image** usage and blocks the update session when the usage amount is greater than or equal to the configured allowance.
+
+```text
+            Argument: --disk-space-max
+Environment Variable: WATCHTOWER_DISK_SPACE_MAX
+                Type: String
+             Default: unset
+```
+
+!!! Warning "This is not host free space and does not include volumes, container writable layers, or the build cache."
+
+!!! Note
+    - Accepted sizes: bare bytes, decimal `B`/`KB`/`MB`/`GB`/`TB`/`PB`, or binary `KiB`/`MiB`/`GiB`/`TiB`/`PiB`.
+    - This option cannot be a percentage.
+    - Either this option or [`disk-space-warn`](#disk_space_warn) enables the check and updates the Prometheus image-usage gauges.
+
+See [Disk Usage Monitor](../../advanced-features/disk-usage-monitor/index.md) for more information.
+
+## Disk Space Warn
+
+Sets a warning threshold for when Docker image usage is greater than or equal to the configured amount.
+
+```text
+            Argument: --disk-space-warn
+Environment Variable: WATCHTOWER_DISK_SPACE_WARN
+                Type: String
+             Default: unset
+```
+
+!!! Note
+    - Accepted sizes: bare bytes, decimal `B`/`KB`/`MB`/`GB`/`TB`/`PB`, or binary `KiB`/`MiB`/`GiB`/`TiB`/`PiB`.
+    - This option may also be a percent of [`disk-space-max`](#disk_space_max) (for example `80%`).
+    - A percent value requires [`disk-space-max`](#disk_space_max).
+    - When both are set, the warn amount must be less than the max.
+    - Configuring a warning threshold without a maximum is valid and supported.
+
+See [Disk Usage Monitor](../../advanced-features/disk-usage-monitor/index.md) for more information.
+
 ## Cleanup Old Images
 
 Removes old images after updating containers to free disk space.

@@ -263,6 +263,19 @@ type Client interface {
 	//   - string: Docker API version (e.g., "1.44").
 	GetVersion() string
 
+	// GetImageDiskUsage returns Docker image storage usage from the daemon.
+	//
+	// It queries GET /system/df for images only and returns the daemon's
+	// aggregated totals. Shared layers are not double-counted.
+	//
+	// Parameters:
+	//   - ctx: Context for cancellation and timeout control.
+	//
+	// Returns:
+	//   - types.ImageDiskUsage: Aggregated image usage.
+	//   - error: Non-nil if retrieval fails, nil on success.
+	GetImageDiskUsage(ctx context.Context) (types.ImageDiskUsage, error)
+
 	// GetInfo returns system information from the Docker daemon.
 	//
 	// Parameters:
@@ -1433,6 +1446,34 @@ func (c *client) GetInfo(ctx context.Context) (map[string]any, error) {
 	}
 
 	return infoMap, nil
+}
+
+// GetImageDiskUsage returns Docker image storage usage from the daemon.
+//
+// Parameters:
+//   - ctx: Context for cancellation and timeout control.
+//
+// Returns:
+//   - types.ImageDiskUsage: Aggregated image usage.
+//   - error: Non-nil if retrieval fails, nil on success.
+func (c *client) GetImageDiskUsage(ctx context.Context) (types.ImageDiskUsage, error) {
+	result, err := c.api.DiskUsage(ctx, dockerClient.DiskUsageOptions{
+		Images: true,
+	})
+	if err != nil {
+		c.logger().Debug().
+			Err(err).
+			Msg("Failed to get image disk usage")
+
+		return types.ImageDiskUsage{}, fmt.Errorf("failed to get image disk usage: %w", err)
+	}
+
+	return types.ImageDiskUsage{
+		TotalSize:   result.Images.TotalSize,
+		Reclaimable: result.Images.Reclaimable,
+		TotalCount:  result.Images.TotalCount,
+		ActiveCount: result.Images.ActiveCount,
+	}, nil
 }
 
 // WaitForContainerHealthy waits for a container to become healthy or times out.

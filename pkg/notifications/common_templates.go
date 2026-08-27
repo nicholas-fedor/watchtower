@@ -14,7 +14,11 @@ var commonTemplates = map[string]string{
 	// "Container updated" (update completed),
 	// "Image is within cooldown period - deferring update" (image too new for update), "Image age exceeds cooldown - eligible for update" (image old enough),
 	// "Image creation time unavailable - update check unavailable" (image age could not be determined from registry),
-	// "Detected multiple Watchtower instances - initiating cleanup" (multiple instances detected).
+	// "Detected multiple Watchtower instances - initiating cleanup" (multiple instances detected),
+	// "Docker image usage exceeds configured maximum" (session blocked by image-usage budget),
+	// "Docker image usage exceeds configured warning threshold" (image-usage budget warning),
+	// "Failed to query Docker image disk usage" (image-usage query failed),
+	// "Docker image usage budget enabled" (startup budget configuration).
 	// For unrecognized messages, displays the message with key=value data pairs if Data exists, otherwise just the message.
 	// Expects .Entries []Entry where each Entry has Message string and Data map[string]interface{}.
 	"default-legacy": `
@@ -59,6 +63,14 @@ var commonTemplates = map[string]string{
     HTTP API server is available at {{if (index $e.Data "tls")}}https{{else}}http{{end}}://{{index $e.Data "host"}}:{{index $e.Data "port"}}
 {{- else if eq $msg "Only checking containers in scope" -}}
     Only checking containers in scope: {{index $e.Data "scope"}}
+{{- else if eq $msg "Docker image usage exceeds configured maximum" -}}
+    Docker image usage exceeds configured maximum: {{if HasKey $e.Data "usage"}}{{index $e.Data "usage"}}{{else}}unknown{{end}}/{{if HasKey $e.Data "max"}}{{index $e.Data "max"}}{{else}}unknown{{end}} bytes used (reclaimable {{if HasKey $e.Data "reclaimable"}}{{index $e.Data "reclaimable"}}{{else}}unknown{{end}}, {{if HasKey $e.Data "image_count"}}{{index $e.Data "image_count"}}{{else}}unknown{{end}} images)
+{{- else if eq $msg "Docker image usage exceeds configured warning threshold" -}}
+    Docker image usage exceeds configured warning threshold: {{if HasKey $e.Data "usage"}}{{index $e.Data "usage"}}{{else}}unknown{{end}}/{{if HasKey $e.Data "warn"}}{{index $e.Data "warn"}}{{else}}unknown{{end}} bytes used (reclaimable {{if HasKey $e.Data "reclaimable"}}{{index $e.Data "reclaimable"}}{{else}}unknown{{end}}, {{if HasKey $e.Data "image_count"}}{{index $e.Data "image_count"}}{{else}}unknown{{end}} images)
+{{- else if eq $msg "Failed to query Docker image disk usage" -}}
+    Failed to query Docker image disk usage{{with (index $e.Data "error")}}: {{.}}{{end}}
+{{- else if eq $msg "Docker image usage budget enabled" -}}
+    Docker image usage budget enabled: max {{if HasKey $e.Data "disk_space_max"}}{{index $e.Data "disk_space_max"}}{{else}}0{{end}} bytes, warn {{if HasKey $e.Data "disk_space_warn"}}{{index $e.Data "disk_space_warn"}}{{else}}0{{end}} bytes
 {{- else if $e.Data -}}
     {{- /* For messages with data, show message and key=value pairs */ -}}
     {{$msg}} | {{range $k, $v := $e.Data}}{{$k}}={{$v}} {{end}}

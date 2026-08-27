@@ -77,6 +77,9 @@ type TestData struct {
 	StartContainerByIDCtx       context.Context               // Last context passed to StartContainerByID.
 	GetContainerCtx             context.Context               // Last context passed to GetContainer.
 	StopAndRemoveContainerCtx   context.Context               // Last context passed to StopAndRemoveContainer.
+	GetImageDiskUsageCount      atomic.Int32                  // Number of times GetImageDiskUsage was called.
+	ImageDiskUsage              types.ImageDiskUsage          // Usage returned by GetImageDiskUsage.
+	GetImageDiskUsageError      error                         // Error to return from GetImageDiskUsage.
 }
 
 // recordOperation appends an operation name to OperationOrder for sequencing tests.
@@ -563,6 +566,25 @@ func (client MockClient) CreateEphemeralOrchestrator(
 	client.TestData.LastCleanup = cleanup
 
 	return types.ContainerID("mock-ephemeral-orchestrator"), nil
+}
+
+// GetImageDiskUsage returns configured mock image usage for testing.
+func (client MockClient) GetImageDiskUsage(ctx context.Context) (types.ImageDiskUsage, error) {
+	if client.TestData == nil {
+		return types.ImageDiskUsage{}, nil
+	}
+
+	if err := client.checkContextCancellation(ctx); err != nil {
+		return types.ImageDiskUsage{}, err
+	}
+
+	client.TestData.GetImageDiskUsageCount.Add(1)
+
+	if client.TestData.GetImageDiskUsageError != nil {
+		return types.ImageDiskUsage{}, client.TestData.GetImageDiskUsageError
+	}
+
+	return client.TestData.ImageDiskUsage, nil
 }
 
 // GetInfo returns mock system information for testing.

@@ -91,6 +91,20 @@ func Specs() []spec.FlagSpec {
 			EnvKeys: []string{"WATCHTOWER_EPHEMERAL_SELF_UPDATE"},
 			Help:    "Use an ephemeral container to orchestrate Watchtower self-updates (experimental)",
 		},
+		{
+			Name:    "disk-space-max",
+			Kind:    spec.KindString,
+			Default: "",
+			EnvKeys: []string{"WATCHTOWER_DISK_SPACE_MAX"},
+			Help:    "Block the update session when Docker image usage reaches this size (e.g., 40GB, 20GiB)",
+		},
+		{
+			Name:    "disk-space-warn",
+			Kind:    spec.KindString,
+			Default: "",
+			EnvKeys: []string{"WATCHTOWER_DISK_SPACE_WARN"},
+			Help:    "Warn when Docker image usage reaches this size or percent of --disk-space-max (e.g., 30GB, 80%)",
+		},
 	}
 }
 

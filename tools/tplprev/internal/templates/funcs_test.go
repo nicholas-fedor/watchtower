@@ -6,6 +6,16 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
+func TestHasKey(t *testing.T) {
+	t.Parallel()
+
+	data := map[string]any{"usage": int64(0)}
+	assert.True(t, hasKey(data, "usage"))
+	assert.False(t, hasKey(data, "max"))
+	assert.False(t, hasKey("not-a-map", "usage"))
+	assert.False(t, hasKey(nil, "usage"))
+}
+
 func TestToJSON(t *testing.T) {
 	t.Parallel()
 

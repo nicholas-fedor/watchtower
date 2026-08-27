@@ -500,6 +500,66 @@ func (_c *MockClient_GetCurrentWatchtowerContainer_Call) RunAndReturn(run func(c
 	return _c
 }
 
+// GetImageDiskUsage provides a mock function for the type MockClient
+func (_mock *MockClient) GetImageDiskUsage(ctx context.Context) (types.ImageDiskUsage, error) {
+	ret := _mock.Called(ctx)
+
+	if len(ret) == 0 {
+		panic("no return value specified for GetImageDiskUsage")
+	}
+
+	var r0 types.ImageDiskUsage
+	var r1 error
+	if returnFunc, ok := ret.Get(0).(func(context.Context) (types.ImageDiskUsage, error)); ok {
+		return returnFunc(ctx)
+	}
+	if returnFunc, ok := ret.Get(0).(func(context.Context) types.ImageDiskUsage); ok {
+		r0 = returnFunc(ctx)
+	} else {
+		r0 = ret.Get(0).(types.ImageDiskUsage)
+	}
+	if returnFunc, ok := ret.Get(1).(func(context.Context) error); ok {
+		r1 = returnFunc(ctx)
+	} else {
+		r1 = ret.Error(1)
+	}
+	return r0, r1
+}
+
+// MockClient_GetImageDiskUsage_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'GetImageDiskUsage'
+type MockClient_GetImageDiskUsage_Call struct {
+	*mock.Call
+}
+
+// GetImageDiskUsage is a helper method to define mock.On call
+//   - ctx context.Context
+func (_e *MockClient_Expecter) GetImageDiskUsage(ctx any) *MockClient_GetImageDiskUsage_Call {
+	return &MockClient_GetImageDiskUsage_Call{Call: _e.mock.On("GetImageDiskUsage", ctx)}
+}
+
+func (_c *MockClient_GetImageDiskUsage_Call) Run(run func(ctx context.Context)) *MockClient_GetImageDiskUsage_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		var arg0 context.Context
+		if args[0] != nil {
+			arg0 = args[0].(context.Context)
+		}
+		run(
+			arg0,
+		)
+	})
+	return _c
+}
+
+func (_c *MockClient_GetImageDiskUsage_Call) Return(imageDiskUsage types.ImageDiskUsage, err error) *MockClient_GetImageDiskUsage_Call {
+	_c.Call.Return(imageDiskUsage, err)
+	return _c
+}
+
+func (_c *MockClient_GetImageDiskUsage_Call) RunAndReturn(run func(ctx context.Context) (types.ImageDiskUsage, error)) *MockClient_GetImageDiskUsage_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // GetInfo provides a mock function for the type MockClient
 func (_mock *MockClient) GetInfo(ctx context.Context) (map[string]any, error) {
 	ret := _mock.Called(ctx)
@@ -552,8 +612,8 @@ func (_c *MockClient_GetInfo_Call) Run(run func(ctx context.Context)) *MockClien
 	return _c
 }
 
-func (_c *MockClient_GetInfo_Call) Return(stringToV map[string]any, err error) *MockClient_GetInfo_Call {
-	_c.Call.Return(stringToV, err)
+func (_c *MockClient_GetInfo_Call) Return(stringToAnyMoqParam map[string]any, err error) *MockClient_GetInfo_Call {
+	_c.Call.Return(stringToAnyMoqParam, err)
 	return _c
 }
 

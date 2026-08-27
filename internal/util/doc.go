@@ -9,6 +9,7 @@
 //   - MinInt: Returns the smaller of two integers.
 //   - RandName: Generates random 32-character container names.
 //   - GenerateRandomSHA256: Creates random 64-character SHA-256 hashes.
+//   - ParseDiskSpace: Parses absolute disk-space strings into bytes.
 //
 // Usage example:
 //
