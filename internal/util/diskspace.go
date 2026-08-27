@@ -3,7 +3,7 @@ package util
 import (
 	"errors"
 	"fmt"
-	"math"
+	"math/big"
 	"strconv"
 	"strings"
 	"unicode"
@@ -95,25 +95,99 @@ func ParseDiskSpace(size string) (int64, error) {
 		return 0, fmt.Errorf("invalid disk space %q: %w", size, errInvalidDiskSpaceUnit)
 	}
 
-	value, err := strconv.ParseFloat(valueStr, 64)
+	bytes, err := scaleDiskSpaceValue(valueStr, multiplier)
 	if err != nil {
-		return 0, fmt.Errorf("invalid disk space %q: %w", size, errInvalidDiskSpaceNumber)
+		return 0, fmt.Errorf("invalid disk space %q: %w", size, err)
+	}
+
+	return bytes, nil
+}
+
+// scaleDiskSpaceValue converts a numeric size string into bytes using multiplier.
+//
+// Integer values use overflow-checked integer arithmetic.
+// Fractional values use exact rational arithmetic and truncate toward zero to whole bytes.
+//
+// Parameters:
+//   - valueStr: Numeric portion of the size string.
+//   - multiplier: Unit multiplier in bytes.
+//
+// Returns:
+//   - int64: Size in bytes.
+//   - error: Non-nil if the number is invalid, negative, or overflows int64.
+func scaleDiskSpaceValue(valueStr string, multiplier int64) (int64, error) {
+	valueStr = strings.TrimSpace(valueStr)
+	if valueStr == "" {
+		return 0, errInvalidDiskSpaceNumber
+	}
+
+	if strings.Contains(valueStr, ".") {
+		return scaleDecimalDiskSpace(valueStr, multiplier)
+	}
+
+	return scaleIntegerDiskSpace(valueStr, multiplier)
+}
+
+// scaleIntegerDiskSpace parses a whole-number size and multiplies it by the unit.
+//
+// Parameters:
+//   - valueStr: Integer numeric portion.
+//   - multiplier: Unit multiplier in bytes.
+//
+// Returns:
+//   - int64: Size in bytes.
+//   - error: Non-nil if the number is invalid, negative, or overflows int64.
+func scaleIntegerDiskSpace(valueStr string, multiplier int64) (int64, error) {
+	value, err := strconv.ParseInt(valueStr, 10, 64)
+	if err != nil {
+		var numErr *strconv.NumError
+		if errors.As(err, &numErr) && errors.Is(numErr.Err, strconv.ErrRange) {
+			return 0, errDiskSpaceOverflow
+		}
+
+		return 0, errInvalidDiskSpaceNumber
 	}
 
 	if value < 0 {
-		return 0, fmt.Errorf("invalid disk space %q: %w", size, errNegativeDiskSpace)
+		return 0, errNegativeDiskSpace
 	}
 
-	if math.IsNaN(value) || math.IsInf(value, 0) {
-		return 0, fmt.Errorf("invalid disk space %q: %w", size, errInvalidDiskSpaceNumber)
+	product := new(big.Int).Mul(big.NewInt(value), big.NewInt(multiplier))
+	if !product.IsInt64() {
+		return 0, errDiskSpaceOverflow
 	}
 
-	product := value * float64(multiplier)
-	if product > float64(math.MaxInt64) {
-		return 0, fmt.Errorf("invalid disk space %q: %w", size, errDiskSpaceOverflow)
+	return product.Int64(), nil
+}
+
+// scaleDecimalDiskSpace parses a fractional size with exact rational arithmetic.
+//
+// Parameters:
+//   - valueStr: Decimal numeric portion.
+//   - multiplier: Unit multiplier in bytes.
+//
+// Returns:
+//   - int64: Size in bytes, truncated toward zero.
+//   - error: Non-nil if the number is invalid, negative, or overflows int64.
+func scaleDecimalDiskSpace(valueStr string, multiplier int64) (int64, error) {
+	rat, ok := new(big.Rat).SetString(valueStr)
+	if !ok {
+		return 0, errInvalidDiskSpaceNumber
 	}
 
-	return int64(product), nil
+	if rat.Sign() < 0 {
+		return 0, errNegativeDiskSpace
+	}
+
+	rat.Mul(rat, new(big.Rat).SetInt64(multiplier))
+
+	bytes := new(big.Int).Quo(rat.Num(), rat.Denom())
+
+	if !bytes.IsInt64() {
+		return 0, errDiskSpaceOverflow
+	}
+
+	return bytes.Int64(), nil
 }
 
 // splitDiskSpaceValueAndUnit splits a size string into its numeric prefix and
