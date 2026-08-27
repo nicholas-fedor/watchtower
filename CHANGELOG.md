@@ -8,8 +8,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- Add configurable Docker image disk usage thresholds by @nicholas-fedor in [#2257](https://github.com/nicholas-fedor/watchtower/pull/2257)
+
+### Changed
+
+- Rename Viper locals from vip to vCfg by @nicholas-fedor in [#2258](https://github.com/nicholas-fedor/watchtower/pull/2258)
+
 ### Chores
 
+- Update nicholas-fedor/go-proxy-pull-action action to v1.1.49 by @renovate[bot] in [#2255](https://github.com/nicholas-fedor/watchtower/pull/2255)
 - Update module github.com/docker/docker-credential-helpers to v0.9.9 by @renovate[bot] in [#2253](https://github.com/nicholas-fedor/watchtower/pull/2253)
 - Update securego/gosec action to v2.29.0 by @renovate[bot] in [#2249](https://github.com/nicholas-fedor/watchtower/pull/2249)
 - Update module go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp to v0.71.0 by @renovate[bot] in [#2247](https://github.com/nicholas-fedor/watchtower/pull/2247)
