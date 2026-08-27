@@ -204,6 +204,11 @@ func Update(
 	// Initialize logging for the update process start.
 	log.Debug().Msg("Starting container update check")
 
+	err := checkImageDiskSpace(log, ctx, client, config)
+	if err != nil {
+		return nil, nil, err
+	}
+
 	// Fetch all containers for monitoring
 	allContainers, err := client.ListContainers(
 		ctx,

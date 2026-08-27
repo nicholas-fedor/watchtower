@@ -50,6 +50,41 @@ func TestRenderDefaultLegacyEntriesRoot(t *testing.T) {
 	assert.Contains(t, result, "Found new image: techwave/cyberscribe:latest (abc123def456)")
 }
 
+func TestRenderDefaultLegacyDiskSpaceMessages(t *testing.T) {
+	t.Parallel()
+
+	payload := notify.Data{
+		Entries: []*notify.Entry{
+			{
+				Message: "Docker image usage exceeds configured maximum",
+				Data: map[string]any{
+					"usage":       int64(32000000000),
+					"max":         int64(40000000000),
+					"warn":        int64(32000000000),
+					"reclaimable": int64(4000000000),
+					"image_count": int64(12),
+				},
+				Level: "error",
+			},
+			{
+				Message: "Failed to query Docker image disk usage",
+				Data:    map[string]any{"error": "daemon disk usage unavailable"},
+				Level:   "error",
+			},
+		},
+	}
+
+	result, err := Execute(templates.Templates["default-legacy"], payload, false)
+	require.NoError(t, err)
+	assert.Contains(
+		t,
+		result,
+		"Docker image usage exceeds configured maximum: 32000000000/40000000000 bytes used (reclaimable 4000000000, 12 images)",
+	)
+	assert.Contains(t, result, "Failed to query Docker image disk usage: daemon disk usage unavailable")
+	assert.NotContains(t, result, " | ")
+}
+
 func TestRenderJSONIncludesReport(t *testing.T) {
 	t.Parallel()
 

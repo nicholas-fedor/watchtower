@@ -27,6 +27,8 @@ type UpdateParams struct {
 	EphemeralSelfUpdate bool                `json:"ephemeral_self_update"`  // Use ephemeral container for self-update if true.
 	CooldownDelay       time.Duration       `json:"cooldown_delay"`         // Minimum time since image creation before allowing updates.
 	LabelEnable         bool                `json:"label_enable"`           // Require enable label for monitoring.
+	DiskSpaceMax        int64               `json:"disk_space_max"`         // Block session when Docker image usage reaches this many bytes. Zero disables the block gate.
+	DiskSpaceWarn       int64               `json:"disk_space_warn"`        // Warn when Docker image usage reaches this many bytes. Zero disables the warning.
 	EnableGitMonitoring bool                `json:"enable_git_monitoring"`  // Process-wide Git watcher default.
 	GitDefaultRef       string              `json:"git_default_ref"`        // Ref used when a mapping or label omits one.
 	GitSemverPolicy     string              `json:"git_semver_policy"`      // Semver policy used when a mapping or label omits one.

@@ -85,8 +85,18 @@ Simple templates are used when the [`notification-report`](#notification_report)
     Started new container: {{$e.Data.container}} ({{with $e.Data.new_id}}{{.}}{{else}}unknown{{end}})
 {{- else if eq $msg "Removing image" -}}
     Removed stale image: {{with $e.Data.image_id}}{{.}}{{else}}unknown{{end}}
+{{- else if eq $msg "Failed to list containers for image usage check, skipping removal" -}}
+    Skipped image cleanup: {{with $e.Data.image_name}}{{.}}{{else}}unknown{{end}} ({{with $e.Data.image_id}}{{.}}{{else}}unknown{{end}}){{with $e.Data.error}}: {{.}}{{end}}
 {{- else if eq $msg "Detected multiple Watchtower instances - initiating cleanup" -}}
     Detected {{$e.Data.count}} Watchtower instances - initiating cleanup
+{{- else if eq $msg "Docker image usage exceeds configured maximum" -}}
+    Docker image usage exceeds configured maximum: {{with $e.Data.usage}}{{.}}{{else}}unknown{{end}}/{{with $e.Data.max}}{{.}}{{else}}unknown{{end}} bytes used (reclaimable {{with $e.Data.reclaimable}}{{.}}{{else}}unknown{{end}}, {{with $e.Data.image_count}}{{.}}{{else}}unknown{{end}} images)
+{{- else if eq $msg "Docker image usage exceeds configured warning threshold" -}}
+    Docker image usage exceeds configured warning threshold: {{with $e.Data.usage}}{{.}}{{else}}unknown{{end}}/{{with $e.Data.warn}}{{.}}{{else}}unknown{{end}} bytes used (reclaimable {{with $e.Data.reclaimable}}{{.}}{{else}}unknown{{end}}, {{with $e.Data.image_count}}{{.}}{{else}}unknown{{end}} images)
+{{- else if eq $msg "Failed to query Docker image disk usage" -}}
+    Failed to query Docker image disk usage{{with $e.Data.error}}: {{.}}{{end}}
+{{- else if eq $msg "Docker image usage budget enabled" -}}
+    Docker image usage budget enabled: max {{with $e.Data.disk_space_max}}{{.}}{{else}}0{{end}} bytes, warn {{with $e.Data.disk_space_warn}}{{.}}{{else}}0{{end}} bytes
 {{- else if $e.Data -}}
     {{$msg}} | {{range $k, $v := $e.Data -}}{{$k}}={{$v}} {{- end}}
 {{- else -}}
@@ -120,8 +130,18 @@ The [Template Preview Tool](../template-preview/index.md) uses the same template
     Started new container: {{$e.Data.container}} ({{with $e.Data.new_id}}{{.}}{{else}}unknown{{end}})
 {{- else if eq $msg "Removing image" -}}
     Removed stale image: {{with $e.Data.image_id}}{{.}}{{else}}unknown{{end}}
+{{- else if eq $msg "Failed to list containers for image usage check, skipping removal" -}}
+    Skipped image cleanup: {{with $e.Data.image_name}}{{.}}{{else}}unknown{{end}} ({{with $e.Data.image_id}}{{.}}{{else}}unknown{{end}}){{with $e.Data.error}}: {{.}}{{end}}
 {{- else if eq $msg "Detected multiple Watchtower instances - initiating cleanup" -}}
     Detected {{$e.Data.count}} Watchtower instances - initiating cleanup
+{{- else if eq $msg "Docker image usage exceeds configured maximum" -}}
+    Docker image usage exceeds configured maximum: {{with $e.Data.usage}}{{.}}{{else}}unknown{{end}}/{{with $e.Data.max}}{{.}}{{else}}unknown{{end}} bytes used (reclaimable {{with $e.Data.reclaimable}}{{.}}{{else}}unknown{{end}}, {{with $e.Data.image_count}}{{.}}{{else}}unknown{{end}} images)
+{{- else if eq $msg "Docker image usage exceeds configured warning threshold" -}}
+    Docker image usage exceeds configured warning threshold: {{with $e.Data.usage}}{{.}}{{else}}unknown{{end}}/{{with $e.Data.warn}}{{.}}{{else}}unknown{{end}} bytes used (reclaimable {{with $e.Data.reclaimable}}{{.}}{{else}}unknown{{end}}, {{with $e.Data.image_count}}{{.}}{{else}}unknown{{end}} images)
+{{- else if eq $msg "Failed to query Docker image disk usage" -}}
+    Failed to query Docker image disk usage{{with $e.Data.error}}: {{.}}{{end}}
+{{- else if eq $msg "Docker image usage budget enabled" -}}
+    Docker image usage budget enabled: max {{with $e.Data.disk_space_max}}{{.}}{{else}}0{{end}} bytes, warn {{with $e.Data.disk_space_warn}}{{.}}{{else}}0{{end}} bytes
 {{- else if $e.Data -}}
     {{$msg}} | {{range $k, $v := $e.Data -}}{{$k}}={{$v}} {{- end}}
 {{- else -}}

@@ -41,4 +41,14 @@ type Update struct {
 	EphemeralSelfUpdate bool
 	// PullFailureDelay is the delay after a failed Watchtower self-update pull.
 	PullFailureDelay time.Duration
+	// DiskSpaceMax is the raw --disk-space-max / WATCHTOWER_DISK_SPACE_MAX value.
+	DiskSpaceMax string
+	// DiskSpaceWarn is the raw --disk-space-warn / WATCHTOWER_DISK_SPACE_WARN value.
+	DiskSpaceWarn string
+	// DiskSpaceMaxBytes is the parsed Docker image-usage block threshold in bytes.
+	// Zero means the block gate is unset.
+	DiskSpaceMaxBytes int64
+	// DiskSpaceWarnBytes is the parsed Docker image-usage warning threshold in bytes.
+	// Zero means the warning threshold is unset.
+	DiskSpaceWarnBytes int64
 }

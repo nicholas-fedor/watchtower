@@ -27,6 +27,8 @@ var Templates = map[string]string{
     Started linked container: {{index $e.Data "container"}} ({{with (index $e.Data "new_id")}}{{.}}{{else}}unknown{{end}})
 {{- else if eq $msg "Removing image" -}}
     Cleaned up old image: {{with (index $e.Data "image_name")}}{{.}}{{else}}unknown{{end}} ({{with (index $e.Data "image_id")}}{{.}}{{else}}unknown{{end}})
+{{- else if eq $msg "Failed to list containers for image usage check, skipping removal" -}}
+    Skipped image cleanup: {{with (index $e.Data "image_name")}}{{.}}{{else}}unknown{{end}} ({{with (index $e.Data "image_id")}}{{.}}{{else}}unknown{{end}}){{with (index $e.Data "error")}}: {{.}}{{end}}
 {{- else if eq $msg "Container updated" -}}
     Updated container: {{with (index $e.Data "container")}}{{.}}{{else}}unknown{{end}} ({{with (index $e.Data "image")}}{{.}}{{else}}unknown{{end}}): {{with (index $e.Data "old_id")}}{{.}}{{else}}unknown{{end}} updated to {{with (index $e.Data "new_id")}}{{.}}{{else}}unknown{{end}}
 {{- else if eq $msg "Skipping Watchtower self-update in run-once mode" -}}
@@ -47,6 +49,14 @@ var Templates = map[string]string{
     HTTP API server is available at {{if (index $e.Data "tls")}}https{{else}}http{{end}}://{{index $e.Data "host"}}:{{index $e.Data "port"}}
 {{- else if eq $msg "Only checking containers in scope" -}}
     Only checking containers in scope: {{index $e.Data "scope"}}
+{{- else if eq $msg "Docker image usage exceeds configured maximum" -}}
+    Docker image usage exceeds configured maximum: {{if HasKey $e.Data "usage"}}{{index $e.Data "usage"}}{{else}}unknown{{end}}/{{if HasKey $e.Data "max"}}{{index $e.Data "max"}}{{else}}unknown{{end}} bytes used (reclaimable {{if HasKey $e.Data "reclaimable"}}{{index $e.Data "reclaimable"}}{{else}}unknown{{end}}, {{if HasKey $e.Data "image_count"}}{{index $e.Data "image_count"}}{{else}}unknown{{end}} images)
+{{- else if eq $msg "Docker image usage exceeds configured warning threshold" -}}
+    Docker image usage exceeds configured warning threshold: {{if HasKey $e.Data "usage"}}{{index $e.Data "usage"}}{{else}}unknown{{end}}/{{if HasKey $e.Data "warn"}}{{index $e.Data "warn"}}{{else}}unknown{{end}} bytes used (reclaimable {{if HasKey $e.Data "reclaimable"}}{{index $e.Data "reclaimable"}}{{else}}unknown{{end}}, {{if HasKey $e.Data "image_count"}}{{index $e.Data "image_count"}}{{else}}unknown{{end}} images)
+{{- else if eq $msg "Failed to query Docker image disk usage" -}}
+    Failed to query Docker image disk usage{{with (index $e.Data "error")}}: {{.}}{{end}}
+{{- else if eq $msg "Docker image usage budget enabled" -}}
+    Docker image usage budget enabled: max {{if HasKey $e.Data "disk_space_max"}}{{index $e.Data "disk_space_max"}}{{else}}0{{end}} bytes, warn {{if HasKey $e.Data "disk_space_warn"}}{{index $e.Data "disk_space_warn"}}{{else}}0{{end}} bytes
 {{- else if $e.Data -}}
     {{- /* For messages with data, show message and key=value pairs */ -}}
     {{$msg}} | {{range $k, $v := $e.Data}}{{$k}}={{$v}} {{end}}

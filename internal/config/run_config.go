@@ -115,6 +115,8 @@ func (c Config) StartupParams(run types.RunConfig) logging.StartupParams {
 		RunOnce:              c.Mode.RunOnce,
 		HTTPAPIUpdate:        run.EnableUpdateAPI,
 		HTTPAPIPeriodicPolls: run.UnblockHTTPAPI,
+		DiskSpaceMaxBytes:    c.Update.DiskSpaceMaxBytes,
+		DiskSpaceWarnBytes:   c.Update.DiskSpaceWarnBytes,
 	}
 }
 

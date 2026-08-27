@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"strconv"
 	"strings"
 	"time"
 
@@ -31,6 +32,9 @@ import (
 	"github.com/nicholas-fedor/watchtower/pkg/filters"
 )
 
+// diskSpacePercentBase is the divisor used to convert a 0-100 percentage into a fraction of max.
+const diskSpacePercentBase = 100
+
 var (
 	// ErrNegativeStopTimeout indicates stop-timeout was set to a negative duration.
 	ErrNegativeStopTimeout = errors.New("stop-timeout must be non-negative")
@@ -39,6 +43,20 @@ var (
 	// ErrRollingRestartWithMonitorOnly indicates incompatible rolling-restart and monitor-only flags.
 	ErrRollingRestartWithMonitorOnly = errors.New(
 		"rolling-restart and monitor-only cannot both be enabled",
+	)
+	// ErrDiskSpaceMaxPercent indicates disk-space-max was given as a percentage.
+	ErrDiskSpaceMaxPercent = errors.New("disk-space-max cannot be a percentage")
+	// ErrDiskSpacePercentWithoutMax indicates a percentage warn value without disk-space-max.
+	ErrDiskSpacePercentWithoutMax = errors.New(
+		"disk-space-warn percentage requires disk-space-max",
+	)
+	// ErrDiskSpacePercentOutOfRange indicates a percentage outside (0, 100].
+	ErrDiskSpacePercentOutOfRange = errors.New(
+		"disk-space percentage must be greater than 0 and at most 100",
+	)
+	// ErrDiskSpaceWarnNotBelowMax indicates the warn threshold is not below the max.
+	ErrDiskSpaceWarnNotBelowMax = errors.New(
+		"disk-space-warn must be below disk-space-max",
 	)
 )
 
@@ -196,6 +214,14 @@ func loadUpdate(log *zerolog.Logger, vCfg *viper.Viper, flagSet *pflag.FlagSet) 
 		cooldown = parsed
 	}
 
+	maxRaw := vCfg.GetString("disk-space-max")
+	warnRaw := vCfg.GetString("disk-space-warn")
+
+	maxBytes, warnBytes, err := resolveDiskSpaceThresholds(maxRaw, warnRaw)
+	if err != nil {
+		return update.Update{}, err
+	}
+
 	return update.Update{
 		Cleanup:             vCfg.GetBool("cleanup"),
 		NoPull:              vCfg.GetBool("no-pull"),
@@ -207,7 +233,90 @@ func loadUpdate(log *zerolog.Logger, vCfg *viper.Viper, flagSet *pflag.FlagSet) 
 		UseComposeDependsOn: vCfg.GetBool("use-compose-depends-on"),
 		LabelPrecedence:     vCfg.GetBool("label-take-precedence"),
 		EphemeralSelfUpdate: vCfg.GetBool("ephemeral-self-update"),
+		DiskSpaceMax:        maxRaw,
+		DiskSpaceWarn:       warnRaw,
+		DiskSpaceMaxBytes:   maxBytes,
+		DiskSpaceWarnBytes:  warnBytes,
 	}, nil
+}
+
+// resolveDiskSpaceThresholds parses disk-space-max and disk-space-warn into bytes.
+//
+// Max must be an absolute size. Warn may be absolute or a percent of max.
+// When both are set, warn must be strictly below max.
+//
+// Parameters:
+//   - maxRaw: Raw disk-space-max value.
+//   - warnRaw: Raw disk-space-warn value.
+//
+// Returns:
+//   - int64: Parsed max in bytes, or 0 when unset.
+//   - int64: Parsed warn in bytes, or 0 when unset.
+//   - error: Non-nil when values are invalid or inconsistent.
+func resolveDiskSpaceThresholds(maxRaw, warnRaw string) (int64, int64, error) {
+	maxRaw = strings.TrimSpace(maxRaw)
+	warnRaw = strings.TrimSpace(warnRaw)
+
+	if strings.HasSuffix(maxRaw, "%") {
+		return 0, 0, ErrDiskSpaceMaxPercent
+	}
+
+	maxBytes, err := util.ParseDiskSpace(maxRaw)
+	if err != nil {
+		return 0, 0, fmt.Errorf("disk-space-max: %w", err)
+	}
+
+	warnBytes, err := parseDiskSpaceWarn(warnRaw, maxBytes)
+	if err != nil {
+		return 0, 0, err
+	}
+
+	if maxBytes > 0 && warnBytes > 0 && warnBytes >= maxBytes {
+		return 0, 0, ErrDiskSpaceWarnNotBelowMax
+	}
+
+	return maxBytes, warnBytes, nil
+}
+
+// parseDiskSpaceWarn parses an absolute or percentage warning threshold.
+//
+// Parameters:
+//   - raw: Raw disk-space-warn value.
+//   - maxBytes: Parsed disk-space-max in bytes; required when raw is a percentage.
+//
+// Returns:
+//   - int64: Parsed warn threshold in bytes, or 0 when unset.
+//   - error: Non-nil when the value is invalid.
+func parseDiskSpaceWarn(raw string, maxBytes int64) (int64, error) {
+	if raw == "" || raw == "0" {
+		return 0, nil
+	}
+
+	if strings.HasSuffix(raw, "%") {
+		if maxBytes <= 0 {
+			return 0, ErrDiskSpacePercentWithoutMax
+		}
+
+		pctStr := strings.TrimSpace(strings.TrimSuffix(raw, "%"))
+
+		pct, err := strconv.ParseFloat(pctStr, 64)
+		if err != nil {
+			return 0, fmt.Errorf("disk-space-warn: invalid percentage %q: %w", raw, err)
+		}
+
+		if pct <= 0 || pct > diskSpacePercentBase {
+			return 0, ErrDiskSpacePercentOutOfRange
+		}
+
+		return int64(float64(maxBytes) * pct / diskSpacePercentBase), nil
+	}
+
+	warnBytes, err := util.ParseDiskSpace(raw)
+	if err != nil {
+		return 0, fmt.Errorf("disk-space-warn: %w", err)
+	}
+
+	return warnBytes, nil
 }
 
 // loadLifecycle reads lifecycle hook settings from Viper.

@@ -22,6 +22,26 @@ var Funcs = template.FuncMap{
 	"ToPorcelainJSON": toPorcelainJSON,
 	"Title":           cases.Title(language.AmericanEnglish).String,
 	"RFC1123":         formatRFC1123,
+	"HasKey":          hasKey,
+}
+
+// hasKey reports whether key is present in m.
+//
+// Parameters:
+//   - m: Map to inspect. Non-map values are treated as missing.
+//   - key: Map key to look up.
+//
+// Returns:
+//   - bool: True when key is present.
+func hasKey(m any, key string) bool {
+	data, ok := m.(map[string]any)
+	if !ok {
+		return false
+	}
+
+	_, exists := data[key]
+
+	return exists
 }
 
 // toJSON marshals a value to a formatted JSON string for use in templates.

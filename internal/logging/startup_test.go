@@ -81,6 +81,22 @@ var _ = ginkgo.Describe("WriteStartupMessage", func() {
 		},
 	)
 
+	ginkgo.It("should log Docker image usage budget when configured", func() {
+		logging.WriteStartupMessage(logging.StartupParams{
+			Logger:             log,
+			Filtering:          "Watching all containers",
+			Client:             client,
+			Version:            "v1.0.0",
+			DiskSpaceMaxBytes:  40_000_000_000,
+			DiskSpaceWarnBytes: 32_000_000_000,
+		})
+
+		output := buffer.String()
+		gomega.Expect(output).To(gomega.ContainSubstring("Docker image usage budget enabled"))
+		gomega.Expect(output).To(gomega.ContainSubstring(`"disk_space_max":40000000000`))
+		gomega.Expect(output).To(gomega.ContainSubstring(`"disk_space_warn":32000000000`))
+	})
+
 	ginkgo.It("should log scope information when provided", func() {
 		logging.WriteStartupMessage(logging.StartupParams{
 			Logger:    log,
