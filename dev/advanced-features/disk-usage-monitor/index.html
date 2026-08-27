@@ -11,31 +11,31 @@
       
       
       
-        <link rel="canonical" href="https://watchtower.nickfedor.com/dev/http-api/configuration/authentication/">
+        <link rel="canonical" href="https://watchtower.nickfedor.com/dev/advanced-features/disk-usage-monitor/">
       
       
-        <link rel="prev" href="../host-and-port/">
+        <link rel="prev" href="../image-cooldown/">
       
       
-        <link rel="next" href="../tls/">
+        <link rel="next" href="../lifecycle-hooks/">
       
       
         
       
       
-      <link rel="icon" href="../../../assets/media/favicon.ico">
+      <link rel="icon" href="../../assets/media/favicon.ico">
       <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.7">
     
     
       
-        <title>Authentication - Watchtower</title>
+        <title>Disk Usage Monitor - Watchtower</title>
       
     
     
-      <link rel="stylesheet" href="../../../assets/stylesheets/main.ec1eaa64.min.css">
+      <link rel="stylesheet" href="../../assets/stylesheets/main.ec1eaa64.min.css">
       
         
-        <link rel="stylesheet" href="../../../assets/stylesheets/palette.ab4e12ef.min.css">
+        <link rel="stylesheet" href="../../assets/stylesheets/palette.ab4e12ef.min.css">
       
       
 
@@ -54,13 +54,13 @@
       
     
     
-      <link rel="stylesheet" href="../../../css/timeago.css">
+      <link rel="stylesheet" href="../../css/timeago.css">
     
-      <link rel="stylesheet" href="../../../assets/styles/theme.css">
+      <link rel="stylesheet" href="../../assets/styles/theme.css">
     
-      <link rel="stylesheet" href="../../../assets/styles/extra.css">
+      <link rel="stylesheet" href="../../assets/styles/extra.css">
     
-    <script>__md_scope=new URL("../../..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    <script>__md_scope=new URL("../..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
     
       
 
@@ -99,7 +99,7 @@
     <div data-md-component="skip">
       
         
-        <a href="#authentication" class="md-skip">
+        <a href="#disk_usage_monitor" class="md-skip">
           Skip to content
         </a>
       
@@ -119,9 +119,9 @@
 
 <header class="md-header md-header--shadow md-header--lifted" data-md-component="header">
   <nav class="md-header__inner md-grid" aria-label="Header">
-    <a href="../../.." title="Watchtower" class="md-header__button md-logo" aria-label="Watchtower" data-md-component="logo">
+    <a href="../.." title="Watchtower" class="md-header__button md-logo" aria-label="Watchtower" data-md-component="logo">
       
-  <img src="../../../assets/media/logo-450px.png" alt="logo">
+  <img src="../../assets/media/logo-450px.png" alt="logo">
 
     </a>
     <label class="md-header__button md-icon" for="__drawer">
@@ -138,7 +138,7 @@
         <div class="md-header__topic" data-md-component="header-topic">
           <span class="md-ellipsis">
             
-              Authentication
+              Disk Usage Monitor
             
           </span>
         </div>
@@ -250,7 +250,7 @@
   
   
     <li class="md-tabs__item">
-      <a href="../../.." class="md-tabs__link">
+      <a href="../.." class="md-tabs__link">
         
   
   
@@ -269,7 +269,7 @@
   
   
     <li class="md-tabs__item">
-      <a href="../../../quickstart/" class="md-tabs__link">
+      <a href="../../quickstart/" class="md-tabs__link">
         
   
   
@@ -290,7 +290,7 @@
     
     
       <li class="md-tabs__item">
-        <a href="../../../getting-started/introduction/" class="md-tabs__link">
+        <a href="../../getting-started/introduction/" class="md-tabs__link">
           
   
   
@@ -310,7 +310,7 @@
     
     
       <li class="md-tabs__item">
-        <a href="../../../configuration/introduction/" class="md-tabs__link">
+        <a href="../../configuration/introduction/" class="md-tabs__link">
           
   
   
@@ -330,11 +330,31 @@
     
     
       <li class="md-tabs__item">
-        <a href="../../../notifications/introduction/" class="md-tabs__link">
+        <a href="../../notifications/introduction/" class="md-tabs__link">
           
   
   
   Notifications
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../http-api/overview/" class="md-tabs__link">
+          
+  
+  
+  API
 
         </a>
       </li>
@@ -352,27 +372,7 @@
     
     
       <li class="md-tabs__item md-tabs__item--active">
-        <a href="../../overview/" class="md-tabs__link">
-          
-  
-  
-  API
-
-        </a>
-      </li>
-    
-  
-
-      
-        
-  
-  
-  
-  
-    
-    
-      <li class="md-tabs__item">
-        <a href="../../../advanced-features/ephemeral-self-updates/" class="md-tabs__link">
+        <a href="../ephemeral-self-updates/" class="md-tabs__link">
           
   
   
@@ -412,9 +412,9 @@
 
 <nav class="md-nav md-nav--primary md-nav--lifted" aria-label="Navigation" data-md-level="0">
   <label class="md-nav__title" for="__drawer">
-    <a href="../../.." title="Watchtower" class="md-nav__button md-logo" aria-label="Watchtower" data-md-component="logo">
+    <a href="../.." title="Watchtower" class="md-nav__button md-logo" aria-label="Watchtower" data-md-component="logo">
       
-  <img src="../../../assets/media/logo-450px.png" alt="logo">
+  <img src="../../assets/media/logo-450px.png" alt="logo">
 
     </a>
     Watchtower
@@ -441,7 +441,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../.." class="md-nav__link">
+      <a href="../.." class="md-nav__link">
         
   
   
@@ -468,7 +468,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../quickstart/" class="md-nav__link">
+      <a href="../../quickstart/" class="md-nav__link">
         
   
   
@@ -549,7 +549,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../getting-started/introduction/" class="md-nav__link">
+      <a href="../../getting-started/introduction/" class="md-nav__link">
         
   
   
@@ -577,7 +577,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../getting-started/installation/" class="md-nav__link">
+      <a href="../../getting-started/installation/" class="md-nav__link">
         
   
   
@@ -605,7 +605,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../getting-started/usage/" class="md-nav__link">
+      <a href="../../getting-started/usage/" class="md-nav__link">
         
   
   
@@ -633,7 +633,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../getting-started/container-selection/" class="md-nav__link">
+      <a href="../../getting-started/container-selection/" class="md-nav__link">
         
   
   
@@ -661,7 +661,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../getting-started/docker-secrets/" class="md-nav__link">
+      <a href="../../getting-started/docker-secrets/" class="md-nav__link">
         
   
   
@@ -689,7 +689,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../getting-started/updating-watchtower/" class="md-nav__link">
+      <a href="../../getting-started/updating-watchtower/" class="md-nav__link">
         
   
   
@@ -778,7 +778,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../configuration/introduction/" class="md-nav__link">
+      <a href="../../configuration/introduction/" class="md-nav__link">
         
   
   
@@ -806,7 +806,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../configuration/docker-connection/" class="md-nav__link">
+      <a href="../../configuration/docker-connection/" class="md-nav__link">
         
   
   
@@ -834,7 +834,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../configuration/container-selection/" class="md-nav__link">
+      <a href="../../configuration/container-selection/" class="md-nav__link">
         
   
   
@@ -862,7 +862,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../configuration/scheduling/" class="md-nav__link">
+      <a href="../../configuration/scheduling/" class="md-nav__link">
         
   
   
@@ -890,7 +890,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../configuration/registry-and-authentication/" class="md-nav__link">
+      <a href="../../configuration/registry-and-authentication/" class="md-nav__link">
         
   
   
@@ -918,7 +918,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../configuration/image-cooldown/" class="md-nav__link">
+      <a href="../../configuration/image-cooldown/" class="md-nav__link">
         
   
   
@@ -946,7 +946,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../configuration/update-behavior/" class="md-nav__link">
+      <a href="../../configuration/update-behavior/" class="md-nav__link">
         
   
   
@@ -974,7 +974,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../configuration/lifecycle-hooks/" class="md-nav__link">
+      <a href="../../configuration/lifecycle-hooks/" class="md-nav__link">
         
   
   
@@ -1002,7 +1002,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../configuration/logging-and-output/" class="md-nav__link">
+      <a href="../../configuration/logging-and-output/" class="md-nav__link">
         
   
   
@@ -1030,7 +1030,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../configuration/notifications/" class="md-nav__link">
+      <a href="../../configuration/notifications/" class="md-nav__link">
         
   
   
@@ -1058,7 +1058,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../configuration/http-api/" class="md-nav__link">
+      <a href="../../configuration/http-api/" class="md-nav__link">
         
   
   
@@ -1147,7 +1147,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../notifications/introduction/" class="md-nav__link">
+      <a href="../../notifications/introduction/" class="md-nav__link">
         
   
   
@@ -1175,7 +1175,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../notifications/general-settings/" class="md-nav__link">
+      <a href="../../notifications/general-settings/" class="md-nav__link">
         
   
   
@@ -1203,7 +1203,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../notifications/templates/" class="md-nav__link">
+      <a href="../../notifications/templates/" class="md-nav__link">
         
   
   
@@ -1231,7 +1231,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../notifications/template-preview/" class="md-nav__link">
+      <a href="../../notifications/template-preview/" class="md-nav__link">
         
   
   
@@ -1313,7 +1313,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../notifications/deprecations/deprecation-notice/" class="md-nav__link">
+      <a href="../../notifications/deprecations/deprecation-notice/" class="md-nav__link">
         
   
   
@@ -1341,7 +1341,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../notifications/deprecations/migration-tool/" class="md-nav__link">
+      <a href="../../notifications/deprecations/migration-tool/" class="md-nav__link">
         
   
   
@@ -1369,7 +1369,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../notifications/deprecations/email/" class="md-nav__link">
+      <a href="../../notifications/deprecations/email/" class="md-nav__link">
         
   
   
@@ -1397,7 +1397,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../notifications/deprecations/gotify/" class="md-nav__link">
+      <a href="../../notifications/deprecations/gotify/" class="md-nav__link">
         
   
   
@@ -1425,7 +1425,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../notifications/deprecations/slack/" class="md-nav__link">
+      <a href="../../notifications/deprecations/slack/" class="md-nav__link">
         
   
   
@@ -1453,7 +1453,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../notifications/deprecations/teams/" class="md-nav__link">
+      <a href="../../notifications/deprecations/teams/" class="md-nav__link">
         
   
   
@@ -1543,7 +1543,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../notifications/guides/signal/" class="md-nav__link">
+      <a href="../../notifications/guides/signal/" class="md-nav__link">
         
   
   
@@ -1551,772 +1551,6 @@
     
   
     Signal
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-          </ul>
-        </nav>
-      
-    </li>
-  
-
-              
-            
-          </ul>
-        </nav>
-      
-    </li>
-  
-
-    
-      
-      
-  
-  
-    
-  
-  
-  
-    
-    
-    
-    
-      
-        
-        
-      
-      
-        
-      
-    
-    
-    <li class="md-nav__item md-nav__item--active md-nav__item--section md-nav__item--nested">
-      
-        
-        
-        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_6" checked>
-        
-          
-          <label class="md-nav__link" for="__nav_6" id="__nav_6_label" tabindex="">
-            
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    API
-  
-
-    
-  </span>
-  
-  
-
-            <span class="md-nav__icon md-icon"></span>
-          </label>
-        
-        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_6_label" aria-expanded="true">
-          <label class="md-nav__title" for="__nav_6">
-            <span class="md-nav__icon md-icon"></span>
-            
-  
-    API
-  
-
-          </label>
-          <ul class="md-nav__list" data-md-scrollfix>
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../../overview/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Overview
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-    
-  
-  
-  
-    
-    
-    
-    
-      
-      
-        
-          
-          
-        
-      
-    
-    
-    <li class="md-nav__item md-nav__item--active md-nav__item--section md-nav__item--nested">
-      
-        
-        
-        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_6_2" checked>
-        
-          
-          <label class="md-nav__link" for="__nav_6_2" id="__nav_6_2_label" tabindex="">
-            
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Configuration
-  
-
-    
-  </span>
-  
-  
-
-            <span class="md-nav__icon md-icon"></span>
-          </label>
-        
-        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_6_2_label" aria-expanded="true">
-          <label class="md-nav__title" for="__nav_6_2">
-            <span class="md-nav__icon md-icon"></span>
-            
-  
-    Configuration
-  
-
-          </label>
-          <ul class="md-nav__list" data-md-scrollfix>
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../host-and-port/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Host and Port
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-    
-  
-  
-  
-    <li class="md-nav__item md-nav__item--active">
-      
-      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
-      
-      
-        
-      
-      
-        <label class="md-nav__link md-nav__link--active" for="__toc">
-          
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Authentication
-  
-
-    
-  </span>
-  
-  
-
-          <span class="md-nav__icon md-icon"></span>
-        </label>
-      
-      <a href="./" class="md-nav__link md-nav__link--active">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Authentication
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-      
-        
-
-<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
-  
-  
-  
-    
-  
-  
-    <label class="md-nav__title" for="__toc">
-      <span class="md-nav__icon md-icon"></span>
-      Table of contents
-    </label>
-    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
-      
-        <li class="md-nav__item">
-  <a href="#overview" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Overview
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#http_api_token" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        HTTP API Token
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#http_api_events_token" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        HTTP API Events Token
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#examples" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Examples
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#unauthenticated_endpoints" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Unauthenticated Endpoints
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#best_practices" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Best Practices
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#related_documentation" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Related Documentation
-      
-    </span>
-  </a>
-  
-</li>
-      
-    </ul>
-  
-</nav>
-      
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../tls/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    TLS
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-          </ul>
-        </nav>
-      
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    
-    
-    
-    
-      
-      
-        
-          
-          
-        
-      
-    
-    
-    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
-      
-        
-        
-          
-        
-        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_6_3" >
-        
-          
-          <label class="md-nav__link" for="__nav_6_3" id="__nav_6_3_label" tabindex="">
-            
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Endpoints
-  
-
-    
-  </span>
-  
-  
-
-            <span class="md-nav__icon md-icon"></span>
-          </label>
-        
-        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_6_3_label" aria-expanded="false">
-          <label class="md-nav__title" for="__nav_6_3">
-            <span class="md-nav__icon md-icon"></span>
-            
-  
-    Endpoints
-  
-
-          </label>
-          <ul class="md-nav__list" data-md-scrollfix>
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../../endpoints/check/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Check
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../../endpoints/config/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Config
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../../endpoints/container-details/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Container Details
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../../endpoints/containers/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Containers
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../../endpoints/events/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Events
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../../endpoints/health/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Health
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../../endpoints/history/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    History
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../../endpoints/images/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Images
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../../endpoints/metrics/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Metrics
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../../endpoints/status/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Status
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../../endpoints/swagger/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Swagger UI
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../../endpoints/update/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Update
   
 
     
@@ -2367,10 +1601,646 @@
         
           
         
-        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_7" >
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_6" >
         
           
-          <label class="md-nav__link" for="__nav_7" id="__nav_7_label" tabindex="0">
+          <label class="md-nav__link" for="__nav_6" id="__nav_6_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    API
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_6_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_6">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    API
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../http-api/overview/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_6_2" >
+        
+          
+          <label class="md-nav__link" for="__nav_6_2" id="__nav_6_2_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Configuration
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_6_2_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_6_2">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Configuration
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../http-api/configuration/host-and-port/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Host and Port
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../http-api/configuration/authentication/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Authentication
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../http-api/configuration/tls/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    TLS
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_6_3" >
+        
+          
+          <label class="md-nav__link" for="__nav_6_3" id="__nav_6_3_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Endpoints
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_6_3_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_6_3">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Endpoints
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../http-api/endpoints/check/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Check
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../http-api/endpoints/config/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Config
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../http-api/endpoints/container-details/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Container Details
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../http-api/endpoints/containers/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Containers
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../http-api/endpoints/events/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Events
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../http-api/endpoints/health/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Health
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../http-api/endpoints/history/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    History
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../http-api/endpoints/images/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Images
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../http-api/endpoints/metrics/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Metrics
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../http-api/endpoints/status/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Status
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../http-api/endpoints/swagger/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Swagger UI
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../http-api/endpoints/update/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Update
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+    
+  
+  
+  
+    
+    
+    
+    
+      
+        
+        
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--active md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_7" checked>
+        
+          
+          <label class="md-nav__link" for="__nav_7" id="__nav_7_label" tabindex="">
             
   
   
@@ -2388,7 +2258,7 @@
             <span class="md-nav__icon md-icon"></span>
           </label>
         
-        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_7_label" aria-expanded="false">
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_7_label" aria-expanded="true">
           <label class="md-nav__title" for="__nav_7">
             <span class="md-nav__icon md-icon"></span>
             
@@ -2406,7 +2276,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../advanced-features/ephemeral-self-updates/" class="md-nav__link">
+      <a href="../ephemeral-self-updates/" class="md-nav__link">
         
   
   
@@ -2434,7 +2304,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../advanced-features/image-cooldown/" class="md-nav__link">
+      <a href="../image-cooldown/" class="md-nav__link">
         
   
   
@@ -2459,10 +2329,37 @@
                 
   
   
+    
   
   
-    <li class="md-nav__item">
-      <a href="../../../advanced-features/disk-usage-monitor/" class="md-nav__link">
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Disk Usage Monitor
+  
+
+    
+  </span>
+  
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="./" class="md-nav__link md-nav__link--active">
         
   
   
@@ -2478,6 +2375,103 @@
   
 
       </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#overview" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Overview
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#configuration" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Configuration
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#behavior" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Behavior
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#metrics" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Metrics
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#notifications" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Notifications
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#interactions" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Interactions
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#limitations" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Limitations
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
     </li>
   
 
@@ -2490,7 +2484,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../advanced-features/lifecycle-hooks/" class="md-nav__link">
+      <a href="../lifecycle-hooks/" class="md-nav__link">
         
   
   
@@ -2518,7 +2512,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../advanced-features/linked-containers/" class="md-nav__link">
+      <a href="../linked-containers/" class="md-nav__link">
         
   
   
@@ -2546,7 +2540,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../advanced-features/private-registries/" class="md-nav__link">
+      <a href="../private-registries/" class="md-nav__link">
         
   
   
@@ -2574,7 +2568,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../advanced-features/registry-mirrors/" class="md-nav__link">
+      <a href="../registry-mirrors/" class="md-nav__link">
         
   
   
@@ -2602,7 +2596,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../advanced-features/remote-hosts/" class="md-nav__link">
+      <a href="../remote-hosts/" class="md-nav__link">
         
   
   
@@ -2630,7 +2624,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../advanced-features/running-multiple-instances/" class="md-nav__link">
+      <a href="../running-multiple-instances/" class="md-nav__link">
         
   
   
@@ -2658,7 +2652,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../advanced-features/secure-connections/" class="md-nav__link">
+      <a href="../secure-connections/" class="md-nav__link">
         
   
   
@@ -2686,7 +2680,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../advanced-features/stop-signals/" class="md-nav__link">
+      <a href="../stop-signals/" class="md-nav__link">
         
   
   
@@ -2752,10 +2746,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#http_api_token" class="md-nav__link">
+  <a href="#configuration" class="md-nav__link">
     <span class="md-ellipsis">
       
-        HTTP API Token
+        Configuration
       
     </span>
   </a>
@@ -2763,10 +2757,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#http_api_events_token" class="md-nav__link">
+  <a href="#behavior" class="md-nav__link">
     <span class="md-ellipsis">
       
-        HTTP API Events Token
+        Behavior
       
     </span>
   </a>
@@ -2774,10 +2768,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#examples" class="md-nav__link">
+  <a href="#metrics" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Examples
+        Metrics
       
     </span>
   </a>
@@ -2785,10 +2779,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#unauthenticated_endpoints" class="md-nav__link">
+  <a href="#notifications" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Unauthenticated Endpoints
+        Notifications
       
     </span>
   </a>
@@ -2796,10 +2790,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#best_practices" class="md-nav__link">
+  <a href="#interactions" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Best Practices
+        Interactions
       
     </span>
   </a>
@@ -2807,10 +2801,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#related_documentation" class="md-nav__link">
+  <a href="#limitations" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Related Documentation
+        Limitations
       
     </span>
   </a>
@@ -2837,172 +2831,169 @@
   
 
 
-<h1 id="authentication">Authentication<a class="headerlink" href="#authentication" title="Permanent link">&para;</a></h1>
+<h1 id="disk_usage_monitor">Disk Usage Monitor<a class="headerlink" href="#disk_usage_monitor" title="Permanent link">&para;</a></h1>
 <h2 id="overview">Overview<a class="headerlink" href="#overview" title="Permanent link">&para;</a></h2>
-<p>Watchtower's HTTP API uses token-based authentication to protect sensitive endpoints.</p>
-<p>Two separate tokens are available:</p>
+<p>By default, Watchtower does not monitor how much disk space container images occupy before pulling new layers.
+If <a href="../../configuration/update-behavior/#cleanup_old_images"><code>image cleanup</code></a> is not enabled, unused layers tend to accumulate, and each later session can still pull a newer image.
+This can contribute to storage exhaustion over time.</p>
+<p>Two optional settings address that problem:</p>
 <ul>
-<li><strong><a href="../../../configuration/http-api/#http_api_token">HTTP API Token</a></strong>: Used for most authenticated endpoints.</li>
-<li><strong><a href="../../../configuration/http-api/#http_api_events_token">HTTP API Events Token</a></strong>: Used exclusively for the <a href="../../endpoints/events/"><code>/v1/events</code></a> endpoint.</li>
+<li><a href="../../configuration/update-behavior/#disk_space_max"><code>disk-space-max</code></a> stops the update session when current image usage already meets or exceeds a configured ceiling.</li>
+<li><a href="../../configuration/update-behavior/#disk_space_warn"><code>disk-space-warn</code></a> emits a warning when usage reaches a threshold, then continues.</li>
 </ul>
-<p>Authentication is enforced at the route level after other middleware (rate limiting, CORS, etc.).</p>
-<h2 id="http_api_token">HTTP API Token<a class="headerlink" href="#http_api_token" title="Permanent link">&para;</a></h2>
-<p>Use the <a href="../../../configuration/http-api/#http_api_token">HTTP API Token</a> configuration option to set the primary authentication token.</p>
-<p>This token is required when any of the following endpoints are enabled:</p>
-<ul>
-<li><a href="../../endpoints/check/"><code>/v1/check</code></a></li>
-<li><a href="../../endpoints/config/"><code>/v1/config</code></a></li>
-<li><a href="../../endpoints/containers/"><code>/v1/containers</code></a></li>
-<li><a href="../../endpoints/container-details/"><code>/v1/containers/details</code></a></li>
-<li><a href="../../endpoints/history/"><code>/v1/history</code></a></li>
-<li><a href="../../endpoints/images/"><code>/v1/images</code></a></li>
-<li><a href="../../endpoints/metrics/"><code>/v1/metrics</code></a></li>
-<li><a href="../../endpoints/status/"><code>/v1/status</code></a></li>
-<li><a href="../../endpoints/update/"><code>/v1/update</code></a></li>
-</ul>
-<p>Clients must include the token using the <code>Authorization: Bearer &lt;token&gt;</code> header:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>curl<span class="w"> </span>-H<span class="w"> </span><span class="s2">"Authorization: Bearer your-secure-token"</span><span class="w"> </span>http://localhost:8080/v1/metrics
-</code></pre></div>
-<p>Invalid or missing tokens result in <code>401 Unauthorized</code>.
-Failed authentication attempts are logged with the client IP address.</p>
-<p>A cookie-based fallback is also supported for clients that cannot set custom headers.
-The token may be provided in a cookie named <code>access_token</code>:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a><span class="err">Cookie: access_token=your-secure-token</span>
-</code></pre></div>
-<div class="admonition note">
-<p class="admonition-title">Note</p>
-<p>The cookie fallback exists primarily for browser-based or limited clients.
-The header <code>Authorization: Bearer</code> is the recommended method.</p>
-</div>
+<p>Either option enables the monitor.
+A warning without a maximum is valid and is useful when you only want visibility.</p>
+<p>The monitor measures <strong>Docker image usage only</strong>.
+It does not include container writable layers, named or anonymous volumes, or the build cache, so large application data cannot false-block updates.</p>
 <div class="admonition warning">
-<p class="admonition-title">Cookie auth and CSRF</p>
-<p>When the <a href="../../../configuration/http-api/#http_api_cors_origins"><code>http-api-cors-origins</code></a> is configured and credentials are allowed (for example, <code>Access-Control-Allow-Credentials: true</code>), the cookie fallback is vulnerable to cross-site request forgery (CSRF).
-A browser on an attacker-controlled origin can issue authenticated POST requests to the API without the user's knowledge.
-Prefer header-based <code>Authorization: Bearer</code> auth.</p>
+<p class="admonition-title">This is not a host free-space floor.</p>
+<p>The Docker Engine does not report how much free space remains on the host filesystem.
+Image usage can be under budget while the host disk is full of logs, bind mounts, or other data, and the reverse can also be true.
+Set the thresholds as the amount of <strong>image</strong> storage you are willing to let Docker keep, not as "leave 5 GB free on <code>/</code>".</p>
 </div>
-<h2 id="http_api_events_token">HTTP API Events Token<a class="headerlink" href="#http_api_events_token" title="Permanent link">&para;</a></h2>
-<p>The <a href="../../endpoints/events/"><code>/v1/events</code></a> endpoint uses a separate token set via the <a href="../../../configuration/http-api/#http_api_events_token">HTTP API Events Token</a> configuration option.</p>
-<p>This token is <strong>required</strong> when the <a href="../../endpoints/events/"><code>/v1/events</code></a> endpoint is enabled.</p>
-<p>The events token can be supplied in two ways:</p>
-<ul>
-<li><code>Authorization: Bearer</code> header (recommended for most clients)</li>
-<li><code>access_token</code> query parameter (required for browser <code>EventSource</code>, which cannot set custom headers)</li>
-</ul>
-<p>Example using the header:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a>curl<span class="w"> </span>-N<span class="w"> </span>-H<span class="w"> </span><span class="s2">"Authorization: Bearer your-events-token"</span><span class="w"> </span>http://localhost:8080/v1/events
-</code></pre></div>
-<p>Example using the query parameter:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a>curl<span class="w"> </span>-N<span class="w"> </span><span class="s2">"http://localhost:8080/v1/events?access_token=your-events-token"</span>
-</code></pre></div>
-<p>In JavaScript (for browsers):</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a><span class="kd">const</span><span class="w"> </span><span class="nx">eventSource</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="ow">new</span><span class="w"> </span><span class="nx">EventSource</span><span class="p">(</span><span class="s1">'http://localhost:8080/v1/events?access_token=your-events-token'</span><span class="p">);</span>
-</code></pre></div>
-<div class="admonition important">
-<p class="admonition-title">Important</p>
-<p>The events token is intentionally separate from the main API token. Query parameters can appear in access logs, browser history, and proxy logs. Using a dedicated token limits exposure.</p>
-</div>
-<p>See the <a href="../../endpoints/events/">Events endpoint documentation</a> for more details.</p>
-<h2 id="examples">Examples<a class="headerlink" href="#examples" title="Permanent link">&para;</a></h2>
-<p>Tokens can be provided to Watchtower using Docker Secrets, environment variables, or CLI flags.</p>
-<div class="tabbed-set tabbed-alternate" data-tabs="1:2"><input checked="checked" id="__tabbed_1_1" name="__tabbed_1" type="radio" /><input id="__tabbed_1_2" name="__tabbed_1" type="radio" /><div class="tabbed-labels"><label for="__tabbed_1_1">Docker Compose</label><label for="__tabbed_1_2">Docker CLI</label></div>
+<h2 id="configuration">Configuration<a class="headerlink" href="#configuration" title="Permanent link">&para;</a></h2>
+<p>The <a href="../../configuration/update-behavior/#disk_space_max"><code>disk-space-max</code></a> and <a href="../../configuration/update-behavior/#disk_space_warn"><code>disk-space-warn</code></a> configuration options are set via the Watchtower container using either environment variables or CLI flags.
+No extra host bind mount is required, as the check uses the Docker API.</p>
+<div class="tabbed-set tabbed-alternate" data-tabs="1:3"><input checked="checked" id="__tabbed_1_1" name="__tabbed_1" type="radio" /><input id="__tabbed_1_2" name="__tabbed_1" type="radio" /><input id="__tabbed_1_3" name="__tabbed_1" type="radio" /><div class="tabbed-labels"><label for="__tabbed_1_1">Docker Compose</label><label for="__tabbed_1_2">Docker CLI</label><label for="__tabbed_1_3">Warn only</label></div>
 <div class="tabbed-content">
 <div class="tabbed-block">
-<div class="tabbed-set tabbed-alternate" data-tabs="2:2"><input checked="checked" id="__tabbed_2_1" name="__tabbed_2" type="radio" /><input id="__tabbed_2_2" name="__tabbed_2" type="radio" /><div class="tabbed-labels"><label for="__tabbed_2_1">Docker Secrets</label><label for="__tabbed_2_2">Environment  Variables</label></div>
-<div class="tabbed-content">
-<div class="tabbed-block">
-<p>Use Compose secrets to mount the token file inside the container and point the environment variable at the mounted path (commonly <code>/run/secrets/&lt;name&gt;</code>).</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a><span class="nt">services</span><span class="p">:</span>
-<a id="__codelineno-5-2" name="__codelineno-5-2" href="#__codelineno-5-2"></a><span class="w">    </span><span class="nt">watchtower</span><span class="p">:</span>
-<a id="__codelineno-5-3" name="__codelineno-5-3" href="#__codelineno-5-3"></a><span class="w">        </span><span class="nt">image</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">nickfedor/watchtower:latest</span>
-<a id="__codelineno-5-4" name="__codelineno-5-4" href="#__codelineno-5-4"></a><span class="w">        </span><span class="nt">volumes</span><span class="p">:</span>
-<a id="__codelineno-5-5" name="__codelineno-5-5" href="#__codelineno-5-5"></a><span class="w">            </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">/var/run/docker.sock:/var/run/docker.sock</span>
-<a id="__codelineno-5-6" name="__codelineno-5-6" href="#__codelineno-5-6"></a><span class="w">        </span><span class="nt">secrets</span><span class="p">:</span>
-<a id="__codelineno-5-7" name="__codelineno-5-7" href="#__codelineno-5-7"></a><span class="w">            </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">http_api_token</span>
-<a id="__codelineno-5-8" name="__codelineno-5-8" href="#__codelineno-5-8"></a><span class="w">        </span><span class="nt">environment</span><span class="p">:</span>
-<a id="__codelineno-5-9" name="__codelineno-5-9" href="#__codelineno-5-9"></a><span class="w">            </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">WATCHTOWER_HTTP_API_TOKEN=/run/secrets/http_api_token</span>
-<a id="__codelineno-5-10" name="__codelineno-5-10" href="#__codelineno-5-10"></a><span class="w">            </span><span class="c1"># Enable an endpoint that requires authentication</span>
-<a id="__codelineno-5-11" name="__codelineno-5-11" href="#__codelineno-5-11"></a><span class="w">            </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">WATCHTOWER_HTTP_API_ENDPOINTS=metrics</span>
-<a id="__codelineno-5-12" name="__codelineno-5-12" href="#__codelineno-5-12"></a><span class="w">        </span><span class="nt">ports</span><span class="p">:</span>
-<a id="__codelineno-5-13" name="__codelineno-5-13" href="#__codelineno-5-13"></a><span class="w">            </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="s">"8080:8080"</span>
-<a id="__codelineno-5-14" name="__codelineno-5-14" href="#__codelineno-5-14"></a><span class="w">        </span><span class="nt">restart</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">unless-stopped</span>
-<a id="__codelineno-5-15" name="__codelineno-5-15" href="#__codelineno-5-15"></a>
-<a id="__codelineno-5-16" name="__codelineno-5-16" href="#__codelineno-5-16"></a><span class="nt">secrets</span><span class="p">:</span>
-<a id="__codelineno-5-17" name="__codelineno-5-17" href="#__codelineno-5-17"></a><span class="w">    </span><span class="nt">http_api_token</span><span class="p">:</span>
-<a id="__codelineno-5-18" name="__codelineno-5-18" href="#__codelineno-5-18"></a><span class="w">        </span><span class="nt">file</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">./secrets/http_api_token.txt</span>
+<div class="highlight"><span class="filename">docker-compose.yml</span><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="nt">services</span><span class="p">:</span>
+<a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a><span class="w">    </span><span class="nt">watchtower</span><span class="p">:</span>
+<a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a><span class="w">        </span><span class="nt">image</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">nickfedor/watchtower</span>
+<a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a><span class="w">        </span><span class="nt">volumes</span><span class="p">:</span>
+<a id="__codelineno-0-5" name="__codelineno-0-5" href="#__codelineno-0-5"></a><span class="w">            </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">/var/run/docker.sock:/var/run/docker.sock</span>
+<a id="__codelineno-0-6" name="__codelineno-0-6" href="#__codelineno-0-6"></a><span class="w">        </span><span class="nt">environment</span><span class="p">:</span>
+<a id="__codelineno-0-7" name="__codelineno-0-7" href="#__codelineno-0-7"></a><span class="w">            </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">WATCHTOWER_DISK_SPACE_MAX=40GB</span>
+<a id="__codelineno-0-8" name="__codelineno-0-8" href="#__codelineno-0-8"></a><span class="w">            </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">WATCHTOWER_DISK_SPACE_WARN=80%</span>
 </code></pre></div>
 </div>
 <div class="tabbed-block">
-<div class="highlight"><pre><span></span><code><a id="__codelineno-6-1" name="__codelineno-6-1" href="#__codelineno-6-1"></a><span class="nt">services</span><span class="p">:</span>
-<a id="__codelineno-6-2" name="__codelineno-6-2" href="#__codelineno-6-2"></a><span class="w">    </span><span class="nt">watchtower</span><span class="p">:</span>
-<a id="__codelineno-6-3" name="__codelineno-6-3" href="#__codelineno-6-3"></a><span class="w">        </span><span class="nt">image</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">nickfedor/watchtower:latest</span>
-<a id="__codelineno-6-4" name="__codelineno-6-4" href="#__codelineno-6-4"></a><span class="w">        </span><span class="nt">volumes</span><span class="p">:</span>
-<a id="__codelineno-6-5" name="__codelineno-6-5" href="#__codelineno-6-5"></a><span class="w">            </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">/var/run/docker.sock:/var/run/docker.sock</span>
-<a id="__codelineno-6-6" name="__codelineno-6-6" href="#__codelineno-6-6"></a><span class="w">        </span><span class="nt">environment</span><span class="p">:</span>
-<a id="__codelineno-6-7" name="__codelineno-6-7" href="#__codelineno-6-7"></a><span class="w">            </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">WATCHTOWER_HTTP_API_TOKEN=your-secure-token</span>
-<a id="__codelineno-6-8" name="__codelineno-6-8" href="#__codelineno-6-8"></a><span class="w">            </span><span class="c1"># Enable an endpoint that requires authentication</span>
-<a id="__codelineno-6-9" name="__codelineno-6-9" href="#__codelineno-6-9"></a><span class="w">            </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">WATCHTOWER_HTTP_API_ENDPOINTS=metrics</span>
-<a id="__codelineno-6-10" name="__codelineno-6-10" href="#__codelineno-6-10"></a><span class="w">        </span><span class="nt">ports</span><span class="p">:</span>
-<a id="__codelineno-6-11" name="__codelineno-6-11" href="#__codelineno-6-11"></a><span class="w">            </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="s">"8080:8080"</span>
-<a id="__codelineno-6-12" name="__codelineno-6-12" href="#__codelineno-6-12"></a><span class="w">        </span><span class="nt">restart</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">unless-stopped</span>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a>docker<span class="w"> </span>run<span class="w"> </span>-d<span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a><span class="w">    </span>--name<span class="w"> </span>watchtower<span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-1-3" name="__codelineno-1-3" href="#__codelineno-1-3"></a><span class="w">    </span>-v<span class="w"> </span>/var/run/docker.sock:/var/run/docker.sock<span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-1-4" name="__codelineno-1-4" href="#__codelineno-1-4"></a><span class="w">    </span>--restart<span class="w"> </span>unless-stopped<span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-1-5" name="__codelineno-1-5" href="#__codelineno-1-5"></a><span class="w">    </span>nickfedor/watchtower<span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-1-6" name="__codelineno-1-6" href="#__codelineno-1-6"></a><span class="w">    </span>--disk-space-max<span class="w"> </span>40GB<span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-1-7" name="__codelineno-1-7" href="#__codelineno-1-7"></a><span class="w">    </span>--disk-space-warn<span class="w"> </span><span class="m">80</span>%
+</code></pre></div>
+</div>
+<div class="tabbed-block">
+<div class="highlight"><span class="filename">Observability without blocking</span><pre><span></span><code><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a><span class="nt">services</span><span class="p">:</span>
+<a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a><span class="w">    </span><span class="nt">watchtower</span><span class="p">:</span>
+<a id="__codelineno-2-3" name="__codelineno-2-3" href="#__codelineno-2-3"></a><span class="w">        </span><span class="nt">image</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">nickfedor/watchtower</span>
+<a id="__codelineno-2-4" name="__codelineno-2-4" href="#__codelineno-2-4"></a><span class="w">        </span><span class="nt">volumes</span><span class="p">:</span>
+<a id="__codelineno-2-5" name="__codelineno-2-5" href="#__codelineno-2-5"></a><span class="w">            </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">/var/run/docker.sock:/var/run/docker.sock</span>
+<a id="__codelineno-2-6" name="__codelineno-2-6" href="#__codelineno-2-6"></a><span class="w">        </span><span class="nt">environment</span><span class="p">:</span>
+<a id="__codelineno-2-7" name="__codelineno-2-7" href="#__codelineno-2-7"></a><span class="w">            </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">WATCHTOWER_DISK_SPACE_WARN=20GiB</span>
 </code></pre></div>
 </div>
 </div>
 </div>
-</div>
-<div class="tabbed-block">
-<div class="tabbed-set tabbed-alternate" data-tabs="3:2"><input checked="checked" id="__tabbed_3_1" name="__tabbed_3" type="radio" /><input id="__tabbed_3_2" name="__tabbed_3" type="radio" /><div class="tabbed-labels"><label for="__tabbed_3_1">Environment Variables</label><label for="__tabbed_3_2">CLI Flags</label></div>
-<div class="tabbed-content">
-<div class="tabbed-block">
-<div class="highlight"><pre><span></span><code><a id="__codelineno-7-1" name="__codelineno-7-1" href="#__codelineno-7-1"></a>docker<span class="w"> </span>run<span class="w"> </span>-d<span class="w"> </span><span class="se">\</span>
-<a id="__codelineno-7-2" name="__codelineno-7-2" href="#__codelineno-7-2"></a><span class="w">    </span>--name<span class="w"> </span>watchtower<span class="w"> </span><span class="se">\</span>
-<a id="__codelineno-7-3" name="__codelineno-7-3" href="#__codelineno-7-3"></a><span class="w">    </span>-v<span class="w"> </span>/var/run/docker.sock:/var/run/docker.sock<span class="w"> </span><span class="se">\</span>
-<a id="__codelineno-7-4" name="__codelineno-7-4" href="#__codelineno-7-4"></a><span class="w">    </span>-e<span class="w"> </span><span class="nv">WATCHTOWER_HTTP_API_TOKEN</span><span class="o">=</span>your-secure-token<span class="w"> </span><span class="se">\</span>
-<a id="__codelineno-7-5" name="__codelineno-7-5" href="#__codelineno-7-5"></a><span class="w">    </span>-e<span class="w"> </span><span class="nv">WATCHTOWER_HTTP_API_ENDPOINTS</span><span class="o">=</span>metrics<span class="w"> </span><span class="se">\</span>
-<a id="__codelineno-7-6" name="__codelineno-7-6" href="#__codelineno-7-6"></a><span class="w">    </span>-p<span class="w"> </span><span class="m">8080</span>:8080<span class="w"> </span><span class="se">\</span>
-<a id="__codelineno-7-7" name="__codelineno-7-7" href="#__codelineno-7-7"></a><span class="w">    </span>--restart<span class="w"> </span>unless-stopped<span class="w"> </span><span class="se">\</span>
-<a id="__codelineno-7-8" name="__codelineno-7-8" href="#__codelineno-7-8"></a><span class="w">    </span>nickfedor/watchtower
-</code></pre></div>
-</div>
-<div class="tabbed-block">
-<div class="highlight"><pre><span></span><code><a id="__codelineno-8-1" name="__codelineno-8-1" href="#__codelineno-8-1"></a>docker<span class="w"> </span>run<span class="w"> </span>-d<span class="w"> </span><span class="se">\</span>
-<a id="__codelineno-8-2" name="__codelineno-8-2" href="#__codelineno-8-2"></a><span class="w">    </span>--name<span class="w"> </span>watchtower<span class="w"> </span><span class="se">\</span>
-<a id="__codelineno-8-3" name="__codelineno-8-3" href="#__codelineno-8-3"></a><span class="w">    </span>-v<span class="w"> </span>/var/run/docker.sock:/var/run/docker.sock<span class="w"> </span><span class="se">\</span>
-<a id="__codelineno-8-4" name="__codelineno-8-4" href="#__codelineno-8-4"></a><span class="w">    </span>-p<span class="w"> </span><span class="m">8080</span>:8080<span class="w"> </span><span class="se">\</span>
-<a id="__codelineno-8-5" name="__codelineno-8-5" href="#__codelineno-8-5"></a><span class="w">    </span>--restart<span class="w"> </span>unless-stopped<span class="w"> </span><span class="se">\</span>
-<a id="__codelineno-8-6" name="__codelineno-8-6" href="#__codelineno-8-6"></a><span class="w">    </span>nickfedor/watchtower<span class="w"> </span><span class="se">\</span>
-<a id="__codelineno-8-7" name="__codelineno-8-7" href="#__codelineno-8-7"></a><span class="w">    </span>--http-api-token<span class="o">=</span>your-secure-token<span class="w"> </span><span class="se">\</span>
-<a id="__codelineno-8-8" name="__codelineno-8-8" href="#__codelineno-8-8"></a><span class="w">    </span>--http-api-endpoints<span class="o">=</span>metrics
-</code></pre></div>
-</div>
-</div>
-</div>
-</div>
-</div>
-</div>
-<h2 id="unauthenticated_endpoints">Unauthenticated Endpoints<a class="headerlink" href="#unauthenticated_endpoints" title="Permanent link">&para;</a></h2>
-<p>The following endpoints do not require authentication when enabled:</p>
+<p>See <a href="../../configuration/update-behavior/#disk_space_max"><code>disk-space-max</code></a> and <a href="../../configuration/update-behavior/#disk_space_warn"><code>disk-space-warn</code></a> for accepted units, percentage rules, and defaults.</p>
+<h2 id="behavior">Behavior<a class="headerlink" href="#behavior" title="Permanent link">&para;</a></h2>
+<p>When the monitor is enabled, Watchtower asks the Docker daemon for image disk usage once at the start of each update session, before containers are listed.
+That query is the same information shown by <a href="https://docs.docker.com/reference/cli/docker/system/df/" rel="noopener noreferrer" target="_blank"><code>docker system df</code></a>, restricted to images so volume and build-cache walks are skipped.
+Shared image layers are counted once.</p>
+<table>
+<thead>
+<tr>
+<th>Condition</th>
+<th>Session</th>
+<th>Notification</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Both options unset</td>
+<td>Runs normally</td>
+<td>None from this feature</td>
+</tr>
+<tr>
+<td>Usage below the configured thresholds</td>
+<td>Runs normally</td>
+<td>Debug log only</td>
+</tr>
+<tr>
+<td>Usage at or above warn, max unset</td>
+<td>Runs normally</td>
+<td>Warning</td>
+</tr>
+<tr>
+<td>Usage at or above warn, below a configured max</td>
+<td>Runs normally</td>
+<td>Warning</td>
+</tr>
+<tr>
+<td>Usage at or above max</td>
+<td>Aborted</td>
+<td>Error</td>
+</tr>
+<tr>
+<td>Image usage cannot be queried</td>
+<td>Aborted</td>
+<td>Error</td>
+</tr>
+</tbody>
+</table>
+<p>An aborted session does not list containers, does not pull, and does not run <a href="../../configuration/update-behavior/#cleanup_old_images"><code>cleanup</code></a>.
+If the daemon cannot report image usage, Watchtower treats pulling more images as unsafe and fails closed.</p>
+<p>The check runs once per session, not before every pull.
+Watchtower cannot reserve space for the next image, so a single large pull can still push usage over the budget after the session has started.
+An out-of-space failure during a pull is reported as a normal container update failure.</p>
+<h2 id="metrics">Metrics<a class="headerlink" href="#metrics" title="Permanent link">&para;</a></h2>
+<p>When the <a href="../../http-api/endpoints/metrics/"><code>metrics</code></a> endpoint is enabled through <a href="../../configuration/http-api/#http_api_endpoints"><code>http-api-endpoints</code></a>, each check updates:</p>
+<table>
+<thead>
+<tr>
+<th>Gauge</th>
+<th>Meaning</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>watchtower_docker_images_bytes</code></td>
+<td>Image storage in use at the last check</td>
+</tr>
+<tr>
+<td><code>watchtower_docker_images_reclaimable_bytes</code></td>
+<td>Image storage that unused images could free</td>
+</tr>
+<tr>
+<td><code>watchtower_disk_space_max_bytes</code></td>
+<td>Configured maximum, or <code>0</code> if unset</td>
+</tr>
+<tr>
+<td><code>watchtower_disk_space_warn_bytes</code></td>
+<td>Configured warning threshold, or <code>0</code> if unset</td>
+</tr>
+</tbody>
+</table>
+<p>Reclaimable bytes are informational.
+The monitor does not prune unused images.</p>
+<h2 id="notifications">Notifications<a class="headerlink" href="#notifications" title="Permanent link">&para;</a></h2>
+<p>Warning and block events use the existing notification log hook.</p>
+<p>The default simple template includes usage, the relevant threshold, reclaimable bytes, and image count.
+See <a href="../../notifications/templates/">Templates</a>.</p>
+<h2 id="interactions">Interactions<a class="headerlink" href="#interactions" title="Permanent link">&para;</a></h2>
 <ul>
-<li><a href="../../endpoints/health/">Health probes</a>: <code>/livez</code>, <code>/readyz</code>, <code>/startupz</code></li>
-<li><a href="../../endpoints/swagger/">Swagger UI</a>: <code>/swagger/*</code> ("Try it out" functionality still requires authorization)</li>
+<li><a href="../../configuration/update-behavior/#cleanup_old_images"><code>cleanup</code></a> runs only after a successful session, so a blocked session does not free image space.</li>
+<li><a href="../../configuration/update-behavior/#remove_anonymous_volumes"><code>remove-volumes</code></a> is unrelated.
+  It deletes anonymous volumes when a container is recreated.</li>
+<li><a href="../../configuration/update-behavior/#disable_image_pulling"><code>no-pull</code></a> does not disable the monitor.
+  The check still measures existing image usage.</li>
+<li>HTTP <a href="../../http-api/endpoints/update/"><code>update</code></a> uses the same session-start gate as a scheduled run.</li>
+<li>HTTP <a href="../../http-api/endpoints/check/"><code>check</code></a> compares digests only and does not apply the monitor.</li>
+<li><a href="../../configuration/update-behavior/#rolling_restart"><code>rolling-restart</code></a> is not re-checked between containers.
+  If the session starts, rolling restart proceeds under that session's budget.</li>
 </ul>
-<h2 id="best_practices">Best Practices<a class="headerlink" href="#best_practices" title="Permanent link">&para;</a></h2>
+<h2 id="limitations">Limitations<a class="headerlink" href="#limitations" title="Permanent link">&para;</a></h2>
 <ul>
-<li>Generate strong, random tokens (for example: <code>openssl rand -base64 32</code>).</li>
-<li>Use a separate events token when enabling the <a href="../../endpoints/events/"><code>/v1/events</code></a> endpoint.</li>
-<li>Always run the HTTP API behind TLS in production (see the <a href="../tls/">TLS documentation</a>).</li>
-<li><strong>Never</strong> expose the HTTP API directly to the public internet.</li>
-<li>Store tokens using Docker Secrets or a secrets manager rather than plain environment variables or CLI flags when possible.</li>
-<li>Rotate tokens if they may have been exposed.</li>
-<li>Combine authentication with network controls (firewalls, reverse proxies with IP allowlists).</li>
-</ul>
-<h2 id="related_documentation">Related Documentation<a class="headerlink" href="#related_documentation" title="Permanent link">&para;</a></h2>
-<ul>
-<li><a href="../../../configuration/http-api/">HTTP API Configuration</a></li>
-<li><a href="../tls/">HTTP API TLS</a></li>
-<li><a href="../host-and-port/">HTTP API Host and Port</a></li>
-<li><a href="../../endpoints/events/">Events Endpoint</a></li>
-<li><a href="../../../getting-started/docker-secrets/">Docker Secrets</a></li>
-<li><a href="../../overview/#security_considerations">HTTP API Overview</a></li>
+<li>The monitor cannot see host free space, logs, bind mounts, or other non-image data.</li>
+<li>Volumes and the build cache can still fill the Docker data root.</li>
+<li>The gate cannot reserve space for an incoming pull.</li>
+<li>Reclaimable figures from some compatible runtimes can be overstated when images share layers.</li>
+<li>There is no automatic prune.
+  Use <a href="../../configuration/update-behavior/#cleanup_old_images"><code>cleanup</code></a> after successful updates, or remove unused images yourself.</li>
 </ul>
 
 
@@ -3026,7 +3017,7 @@ Prefer header-based <code>Authorization: Bearer</code> auth.</p>
     <span class="md-icon" title="Last update">
       <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M21 13.1c-.1 0-.3.1-.4.2l-1 1 2.1 2.1 1-1c.2-.2.2-.6 0-.8l-1.3-1.3c-.1-.1-.2-.2-.4-.2m-1.9 1.8-6.1 6V23h2.1l6.1-6.1zM12.5 7v5.2l4 2.4-1 1L11 13V7zM11 21.9c-5.1-.5-9-4.8-9-9.9C2 6.5 6.5 2 12 2c5.3 0 9.6 4.1 10 9.3-.3-.1-.6-.2-1-.2s-.7.1-1 .2C19.6 7.2 16.2 4 12 4c-4.4 0-8 3.6-8 8 0 4.1 3.1 7.5 7.1 7.9l-.1.2z"/></svg>
     </span>
-    <span class="git-revision-date-localized-plugin git-revision-date-localized-plugin-timeago" title="July 14, 2026 14:36:11 UTC"><span class="timeago" datetime="2026-07-14T14:36:11+00:00" locale="en"></span></span><span class="git-revision-date-localized-plugin git-revision-date-localized-plugin-iso_date" title="July 14, 2026 14:36:11 UTC">2026-07-14</span>
+    <span class="git-revision-date-localized-plugin git-revision-date-localized-plugin-timeago" title="August 27, 2026 02:39:41 UTC"><span class="timeago" datetime="2026-08-27T02:39:41+00:00" locale="en"></span></span><span class="git-revision-date-localized-plugin git-revision-date-localized-plugin-iso_date" title="August 27, 2026 02:39:41 UTC">2026-08-27</span>
   </span>
 
     
@@ -3036,7 +3027,7 @@ Prefer header-based <code>Authorization: Bearer</code> auth.</p>
     <span class="md-icon" title="Created">
       <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M14.47 15.08 11 13V7h1.5v5.25l3.08 1.83c-.41.28-.79.62-1.11 1m-1.39 4.84c-.36.05-.71.08-1.08.08-4.42 0-8-3.58-8-8s3.58-8 8-8 8 3.58 8 8c0 .37-.03.72-.08 1.08.69.1 1.33.32 1.92.64.1-.56.16-1.13.16-1.72 0-5.5-4.5-10-10-10S2 6.5 2 12s4.47 10 10 10c.59 0 1.16-.06 1.72-.16-.32-.59-.54-1.23-.64-1.92M18 15v3h-3v2h3v3h2v-3h3v-2h-3v-3z"/></svg>
     </span>
-    <span class="git-revision-date-localized-plugin git-revision-date-localized-plugin-timeago" title="July 14, 2026 14:36:11 UTC"><span class="timeago" datetime="2026-07-14T14:36:11+00:00" locale="en"></span></span><span class="git-revision-date-localized-plugin git-revision-date-localized-plugin-iso_date" title="July 14, 2026 14:36:11 UTC">2026-07-14</span>
+    <span class="git-revision-date-localized-plugin git-revision-date-localized-plugin-timeago" title="August 27, 2026 02:39:41 UTC"><span class="timeago" datetime="2026-08-27T02:39:41+00:00" locale="en"></span></span><span class="git-revision-date-localized-plugin git-revision-date-localized-plugin-iso_date" title="August 27, 2026 02:39:41 UTC">2026-08-27</span>
   </span>
 
     
@@ -3108,14 +3099,14 @@ Prefer header-based <code>Authorization: Bearer</code> auth.</p>
     
       
       
-      <script id="__config" type="application/json">{"annotate": null, "base": "../../..", "features": ["navigation.instant", "navigation.tracking", "navigation.tabs", "navigation.tabs.sticky", "navigation.sections", "navigation.expand", "toc.follow", "navigation.top", "search.suggest", "search.highlight", "search.share", "content.code.copy", "content.tooltips", "content.tabs.link"], "search": "../../../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": {"alias": true, "default": ["latest", "dev"], "provider": "mike"}}</script>
+      <script id="__config" type="application/json">{"annotate": null, "base": "../..", "features": ["navigation.instant", "navigation.tracking", "navigation.tabs", "navigation.tabs.sticky", "navigation.sections", "navigation.expand", "toc.follow", "navigation.top", "search.suggest", "search.highlight", "search.share", "content.code.copy", "content.tooltips", "content.tabs.link"], "search": "../../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": {"alias": true, "default": ["latest", "dev"], "provider": "mike"}}</script>
     
     
-      <script src="../../../assets/javascripts/bundle.d7400e89.min.js"></script>
+      <script src="../../assets/javascripts/bundle.d7400e89.min.js"></script>
       
-        <script src="../../../js/timeago.min.js"></script>
+        <script src="../../js/timeago.min.js"></script>
       
-        <script src="../../../js/timeago_mkdocs_material.js"></script>
+        <script src="../../js/timeago_mkdocs_material.js"></script>
       
     
   </body>

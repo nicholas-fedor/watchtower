@@ -1031,6 +1031,28 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#disk_space_max" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Disk Space Max
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#disk_space_warn" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Disk Space Warn
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#cleanup_old_images" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -2467,6 +2489,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../../advanced-features/disk-usage-monitor/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Disk Usage Monitor
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../../advanced-features/lifecycle-hooks/" class="md-nav__link">
         
   
@@ -2740,6 +2790,28 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#disk_space_max" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Disk Space Max
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#disk_space_warn" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Disk Space Warn
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#cleanup_old_images" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -2858,12 +2930,49 @@ This is typically negligible for homelab setups but monitor disk space on resour
 <p class="admonition-title">This functionality is currently not supported when used in combination with linked-containers.</p>
 <p>This limitation exists because linked-containers require coordinated updates across dependency chains, which conflicts with the incremental nature of rolling restarts.</p>
 </div>
+<h2 id="disk_space_max">Disk Space Max<a class="headerlink" href="#disk_space_max" title="Permanent link">&para;</a></h2>
+<p>Sets the maximum allowed Docker <strong>image</strong> usage and blocks the update session when the usage amount is greater than or equal to the configured allowance.</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a>            Argument: --disk-space-max
+<a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a>Environment Variable: WATCHTOWER_DISK_SPACE_MAX
+<a id="__codelineno-2-3" name="__codelineno-2-3" href="#__codelineno-2-3"></a>                Type: String
+<a id="__codelineno-2-4" name="__codelineno-2-4" href="#__codelineno-2-4"></a>             Default: unset
+</code></pre></div>
+<div class="admonition warning">
+<p class="admonition-title">This is not host free space and does not include volumes, container writable layers, or the build cache.</p>
+</div>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<ul>
+<li>Accepted sizes: bare bytes, decimal <code>B</code>/<code>KB</code>/<code>MB</code>/<code>GB</code>/<code>TB</code>/<code>PB</code>, or binary <code>KiB</code>/<code>MiB</code>/<code>GiB</code>/<code>TiB</code>/<code>PiB</code>.</li>
+<li>This option cannot be a percentage.</li>
+<li>Either this option or <a href="#disk_space_warn"><code>disk-space-warn</code></a> enables the check and updates the Prometheus image-usage gauges.</li>
+</ul>
+</div>
+<p>See <a href="../../advanced-features/disk-usage-monitor/">Disk Usage Monitor</a> for more information.</p>
+<h2 id="disk_space_warn">Disk Space Warn<a class="headerlink" href="#disk_space_warn" title="Permanent link">&para;</a></h2>
+<p>Sets a warning threshold for when Docker image usage is greater than or equal to the configured amount.</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a>            Argument: --disk-space-warn
+<a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a>Environment Variable: WATCHTOWER_DISK_SPACE_WARN
+<a id="__codelineno-3-3" name="__codelineno-3-3" href="#__codelineno-3-3"></a>                Type: String
+<a id="__codelineno-3-4" name="__codelineno-3-4" href="#__codelineno-3-4"></a>             Default: unset
+</code></pre></div>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<ul>
+<li>Accepted sizes: bare bytes, decimal <code>B</code>/<code>KB</code>/<code>MB</code>/<code>GB</code>/<code>TB</code>/<code>PB</code>, or binary <code>KiB</code>/<code>MiB</code>/<code>GiB</code>/<code>TiB</code>/<code>PiB</code>.</li>
+<li>This option may also be a percent of <a href="#disk_space_max"><code>disk-space-max</code></a> (for example <code>80%</code>).</li>
+<li>A percent value requires <a href="#disk_space_max"><code>disk-space-max</code></a>.</li>
+<li>When both are set, the warn amount must be less than the max.</li>
+<li>Configuring a warning threshold without a maximum is valid and supported.</li>
+</ul>
+</div>
+<p>See <a href="../../advanced-features/disk-usage-monitor/">Disk Usage Monitor</a> for more information.</p>
 <h2 id="cleanup_old_images">Cleanup Old Images<a class="headerlink" href="#cleanup_old_images" title="Permanent link">&para;</a></h2>
 <p>Removes old images after updating containers to free disk space.</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a>            Argument: --cleanup
-<a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a>Environment Variable: WATCHTOWER_CLEANUP
-<a id="__codelineno-2-3" name="__codelineno-2-3" href="#__codelineno-2-3"></a>                Type: Boolean
-<a id="__codelineno-2-4" name="__codelineno-2-4" href="#__codelineno-2-4"></a>             Default: false
+<div class="highlight"><pre><span></span><code><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a>            Argument: --cleanup
+<a id="__codelineno-4-2" name="__codelineno-4-2" href="#__codelineno-4-2"></a>Environment Variable: WATCHTOWER_CLEANUP
+<a id="__codelineno-4-3" name="__codelineno-4-3" href="#__codelineno-4-3"></a>                Type: Boolean
+<a id="__codelineno-4-4" name="__codelineno-4-4" href="#__codelineno-4-4"></a>             Default: false
 </code></pre></div>
 <div class="admonition note">
 <p class="admonition-title">Note</p>
@@ -2873,10 +2982,10 @@ This is typically negligible for homelab setups but monitor disk space on resour
 <h2 id="remove_anonymous_volumes">Remove Anonymous Volumes<a class="headerlink" href="#remove_anonymous_volumes" title="Permanent link">&para;</a></h2>
 <p>Deletes anonymous volumes when updating containers.
 Named volumes remain unaffected.</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a>            Argument: --remove-volumes
-<a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a>Environment Variable: WATCHTOWER_REMOVE_VOLUMES
-<a id="__codelineno-3-3" name="__codelineno-3-3" href="#__codelineno-3-3"></a>                Type: Boolean
-<a id="__codelineno-3-4" name="__codelineno-3-4" href="#__codelineno-3-4"></a>             Default: false
+<div class="highlight"><pre><span></span><code><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a>            Argument: --remove-volumes
+<a id="__codelineno-5-2" name="__codelineno-5-2" href="#__codelineno-5-2"></a>Environment Variable: WATCHTOWER_REMOVE_VOLUMES
+<a id="__codelineno-5-3" name="__codelineno-5-3" href="#__codelineno-5-3"></a>                Type: Boolean
+<a id="__codelineno-5-4" name="__codelineno-5-4" href="#__codelineno-5-4"></a>             Default: false
 </code></pre></div>
 <div class="admonition note">
 <p class="admonition-title">Note</p>
@@ -2886,10 +2995,10 @@ This does not affect named volumes.</p>
 </div>
 <h2 id="container_stop_timeout">Container Stop Timeout<a class="headerlink" href="#container_stop_timeout" title="Permanent link">&para;</a></h2>
 <p>Sets the timeout (e.g., <code>30s</code>) before forcibly stopping a container during updates.</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a>            Argument: --stop-timeout
-<a id="__codelineno-4-2" name="__codelineno-4-2" href="#__codelineno-4-2"></a>Environment Variable: WATCHTOWER_TIMEOUT
-<a id="__codelineno-4-3" name="__codelineno-4-3" href="#__codelineno-4-3"></a>                Type: Duration (e.g., 30s, 1m, 5m)
-<a id="__codelineno-4-4" name="__codelineno-4-4" href="#__codelineno-4-4"></a>              Default: 30s
+<div class="highlight"><pre><span></span><code><a id="__codelineno-6-1" name="__codelineno-6-1" href="#__codelineno-6-1"></a>            Argument: --stop-timeout
+<a id="__codelineno-6-2" name="__codelineno-6-2" href="#__codelineno-6-2"></a>Environment Variable: WATCHTOWER_TIMEOUT
+<a id="__codelineno-6-3" name="__codelineno-6-3" href="#__codelineno-6-3"></a>                Type: Duration (e.g., 30s, 1m, 5m)
+<a id="__codelineno-6-4" name="__codelineno-6-4" href="#__codelineno-6-4"></a>              Default: 30s
 </code></pre></div>
 <div class="admonition note">
 <p class="admonition-title">Note</p>
@@ -2898,10 +3007,10 @@ Using a unit suffix (<code>s</code>, <code>m</code>, etc.) is recommended and re
 </div>
 <h2 id="monitor_only">Monitor Only<a class="headerlink" href="#monitor_only" title="Permanent link">&para;</a></h2>
 <p>Monitors for new images, sends notifications, and runs lifecycle hooks without updating containers.</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a>            Argument: --monitor-only
-<a id="__codelineno-5-2" name="__codelineno-5-2" href="#__codelineno-5-2"></a>Environment Variable: WATCHTOWER_MONITOR_ONLY
-<a id="__codelineno-5-3" name="__codelineno-5-3" href="#__codelineno-5-3"></a>                Type: Boolean
-<a id="__codelineno-5-4" name="__codelineno-5-4" href="#__codelineno-5-4"></a>             Default: false
+<div class="highlight"><pre><span></span><code><a id="__codelineno-7-1" name="__codelineno-7-1" href="#__codelineno-7-1"></a>            Argument: --monitor-only
+<a id="__codelineno-7-2" name="__codelineno-7-2" href="#__codelineno-7-2"></a>Environment Variable: WATCHTOWER_MONITOR_ONLY
+<a id="__codelineno-7-3" name="__codelineno-7-3" href="#__codelineno-7-3"></a>                Type: Boolean
+<a id="__codelineno-7-4" name="__codelineno-7-4" href="#__codelineno-7-4"></a>             Default: false
 </code></pre></div>
 <div class="admonition note">
 <p class="admonition-title">Note</p>
@@ -2912,10 +3021,10 @@ Using a unit suffix (<code>s</code>, <code>m</code>, etc.) is recommended and re
 <h2 id="disable_image_pulling">Disable Image Pulling<a class="headerlink" href="#disable_image_pulling" title="Permanent link">&para;</a></h2>
 <p>Prevents pulling new images from registries, monitoring only local image cache changes.
 Useful for locally built images.</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-6-1" name="__codelineno-6-1" href="#__codelineno-6-1"></a>            Argument: --no-pull
-<a id="__codelineno-6-2" name="__codelineno-6-2" href="#__codelineno-6-2"></a>Environment Variable: WATCHTOWER_NO_PULL
-<a id="__codelineno-6-3" name="__codelineno-6-3" href="#__codelineno-6-3"></a>                Type: Boolean
-<a id="__codelineno-6-4" name="__codelineno-6-4" href="#__codelineno-6-4"></a>             Default: false
+<div class="highlight"><pre><span></span><code><a id="__codelineno-8-1" name="__codelineno-8-1" href="#__codelineno-8-1"></a>            Argument: --no-pull
+<a id="__codelineno-8-2" name="__codelineno-8-2" href="#__codelineno-8-2"></a>Environment Variable: WATCHTOWER_NO_PULL
+<a id="__codelineno-8-3" name="__codelineno-8-3" href="#__codelineno-8-3"></a>                Type: Boolean
+<a id="__codelineno-8-4" name="__codelineno-8-4" href="#__codelineno-8-4"></a>             Default: false
 </code></pre></div>
 <div class="admonition note">
 <p class="admonition-title">Note</p>
@@ -2925,10 +3034,10 @@ Useful for locally built images.</p>
 </div>
 <h2 id="ephemeral_self-update">Ephemeral Self-Update<a class="headerlink" href="#ephemeral_self-update" title="Permanent link">&para;</a></h2>
 <p>Uses a short-lived orchestrator container to perform Watchtower self-updates instead of the default rename-based approach.</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-7-1" name="__codelineno-7-1" href="#__codelineno-7-1"></a>            Argument: --ephemeral-self-update
-<a id="__codelineno-7-2" name="__codelineno-7-2" href="#__codelineno-7-2"></a>Environment Variable: WATCHTOWER_EPHEMERAL_SELF_UPDATE
-<a id="__codelineno-7-3" name="__codelineno-7-3" href="#__codelineno-7-3"></a>                Type: Boolean
-<a id="__codelineno-7-4" name="__codelineno-7-4" href="#__codelineno-7-4"></a>             Default: false
+<div class="highlight"><pre><span></span><code><a id="__codelineno-9-1" name="__codelineno-9-1" href="#__codelineno-9-1"></a>            Argument: --ephemeral-self-update
+<a id="__codelineno-9-2" name="__codelineno-9-2" href="#__codelineno-9-2"></a>Environment Variable: WATCHTOWER_EPHEMERAL_SELF_UPDATE
+<a id="__codelineno-9-3" name="__codelineno-9-3" href="#__codelineno-9-3"></a>                Type: Boolean
+<a id="__codelineno-9-4" name="__codelineno-9-4" href="#__codelineno-9-4"></a>             Default: false
 </code></pre></div>
 <div class="admonition warning">
 <p class="admonition-title">This is an experimental feature.</p>
@@ -2961,7 +3070,7 @@ See <a href="../../advanced-features/ephemeral-self-updates/">Advanced Features 
     <span class="md-icon" title="Last update">
       <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M21 13.1c-.1 0-.3.1-.4.2l-1 1 2.1 2.1 1-1c.2-.2.2-.6 0-.8l-1.3-1.3c-.1-.1-.2-.2-.4-.2m-1.9 1.8-6.1 6V23h2.1l6.1-6.1zM12.5 7v5.2l4 2.4-1 1L11 13V7zM11 21.9c-5.1-.5-9-4.8-9-9.9C2 6.5 6.5 2 12 2c5.3 0 9.6 4.1 10 9.3-.3-.1-.6-.2-1-.2s-.7.1-1 .2C19.6 7.2 16.2 4 12 4c-4.4 0-8 3.6-8 8 0 4.1 3.1 7.5 7.1 7.9l-.1.2z"/></svg>
     </span>
-    <span class="git-revision-date-localized-plugin git-revision-date-localized-plugin-timeago" title="July 14, 2026 14:36:11 UTC"><span class="timeago" datetime="2026-07-14T14:36:11+00:00" locale="en"></span></span><span class="git-revision-date-localized-plugin git-revision-date-localized-plugin-iso_date" title="July 14, 2026 14:36:11 UTC">2026-07-14</span>
+    <span class="git-revision-date-localized-plugin git-revision-date-localized-plugin-timeago" title="August 27, 2026 02:39:41 UTC"><span class="timeago" datetime="2026-08-27T02:39:41+00:00" locale="en"></span></span><span class="git-revision-date-localized-plugin git-revision-date-localized-plugin-iso_date" title="August 27, 2026 02:39:41 UTC">2026-08-27</span>
   </span>
 
     

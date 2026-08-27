@@ -2429,6 +2429,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../../../advanced-features/disk-usage-monitor/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Disk Usage Monitor
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../../../advanced-features/lifecycle-hooks/" class="md-nav__link">
         
   
@@ -2806,8 +2834,30 @@ Requests with other HTTP methods will receive a <code>405 Method Not Allowed</co
 <td>Counter</td>
 <td>Number of skipped scans since watchtower started</td>
 </tr>
+<tr>
+<td><code>watchtower_docker_images_bytes</code></td>
+<td>Gauge</td>
+<td>Docker image storage usage in bytes from the last disk-space check</td>
+</tr>
+<tr>
+<td><code>watchtower_docker_images_reclaimable_bytes</code></td>
+<td>Gauge</td>
+<td>Reclaimable Docker image storage in bytes from the last disk-space check</td>
+</tr>
+<tr>
+<td><code>watchtower_disk_space_max_bytes</code></td>
+<td>Gauge</td>
+<td>Configured Docker image-usage maximum in bytes (0 if unset)</td>
+</tr>
+<tr>
+<td><code>watchtower_disk_space_warn_bytes</code></td>
+<td>Gauge</td>
+<td>Configured Docker image-usage warning threshold in bytes (0 if unset)</td>
+</tr>
 </tbody>
 </table>
+<p>The four image-usage gauges are updated when <a href="../../../configuration/update-behavior/#disk_space_max"><code>disk-space-max</code></a> or <a href="../../../configuration/update-behavior/#disk_space_warn"><code>disk-space-warn</code></a> are set.
+See <a href="../../../advanced-features/disk-usage-monitor/#metrics">Disk Usage Monitor</a>.</p>
 <h2 id="example_prometheus_scrape_config">Example Prometheus <code>scrape_config</code><a class="headerlink" href="#example_prometheus_scrape_config" title="Permanent link">&para;</a></h2>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="nt">scrape_configs</span><span class="p">:</span>
 <a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a><span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">job_name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">watchtower</span>
@@ -2845,7 +2895,7 @@ This demo is preconfigured with a dashboard, which will look something like this
     <span class="md-icon" title="Last update">
       <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M21 13.1c-.1 0-.3.1-.4.2l-1 1 2.1 2.1 1-1c.2-.2.2-.6 0-.8l-1.3-1.3c-.1-.1-.2-.2-.4-.2m-1.9 1.8-6.1 6V23h2.1l6.1-6.1zM12.5 7v5.2l4 2.4-1 1L11 13V7zM11 21.9c-5.1-.5-9-4.8-9-9.9C2 6.5 6.5 2 12 2c5.3 0 9.6 4.1 10 9.3-.3-.1-.6-.2-1-.2s-.7.1-1 .2C19.6 7.2 16.2 4 12 4c-4.4 0-8 3.6-8 8 0 4.1 3.1 7.5 7.1 7.9l-.1.2z"/></svg>
     </span>
-    <span class="git-revision-date-localized-plugin git-revision-date-localized-plugin-timeago" title="March 31, 2026 22:08:29 UTC"><span class="timeago" datetime="2026-03-31T22:08:29+00:00" locale="en"></span></span><span class="git-revision-date-localized-plugin git-revision-date-localized-plugin-iso_date" title="March 31, 2026 22:08:29 UTC">2026-03-31</span>
+    <span class="git-revision-date-localized-plugin git-revision-date-localized-plugin-timeago" title="August 27, 2026 02:39:41 UTC"><span class="timeago" datetime="2026-08-27T02:39:41+00:00" locale="en"></span></span><span class="git-revision-date-localized-plugin git-revision-date-localized-plugin-iso_date" title="August 27, 2026 02:39:41 UTC">2026-08-27</span>
   </span>
 
     
