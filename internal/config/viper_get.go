@@ -20,7 +20,7 @@ import (
 // number, it is treated as seconds (legacy WATCHTOWER_TIMEOUT behavior).
 //
 // Parameters:
-//   - v: Bound Viper instance.
+//   - vCfg: Bound Viper instance.
 //   - flagSet: Parsed flag set (for Changed checks).
 //   - name: Flag name.
 //   - envKeys: Environment keys bound to this flag.
@@ -28,7 +28,7 @@ import (
 // Returns:
 //   - time.Duration: Resolved duration.
 func durationValue(
-	vip *viper.Viper,
+	vCfg *viper.Viper,
 	flagSet *pflag.FlagSet,
 	name string,
 	envKeys []string,
@@ -75,7 +75,7 @@ func durationValue(
 		}
 	}
 
-	return vip.GetDuration(name)
+	return vCfg.GetDuration(name)
 }
 
 // bareSeconds parses a pure numeric string as seconds.
@@ -101,7 +101,7 @@ func bareSeconds(raw string) (time.Duration, error) {
 // stringSliceValue reads a string list using the FlagSpec ListParse strategy.
 //
 // Parameters:
-//   - v: Bound Viper instance.
+//   - vCfg: Bound Viper instance.
 //   - flagSet: Parsed flag set.
 //   - name: Flag name.
 //   - envKeys: Environment keys bound to this flag.
@@ -110,7 +110,7 @@ func bareSeconds(raw string) (time.Duration, error) {
 // Returns:
 //   - []string: Resolved list (never nil).
 func stringSliceValue(
-	vip *viper.Viper,
+	vCfg *viper.Viper,
 	flagSet *pflag.FlagSet,
 	name string,
 	envKeys []string,
@@ -140,7 +140,7 @@ func stringSliceValue(
 		return spec.ParseList(raw, parse)
 	}
 
-	vals := vip.GetStringSlice(name)
+	vals := vCfg.GetStringSlice(name)
 	if vals == nil {
 		return []string{}
 	}

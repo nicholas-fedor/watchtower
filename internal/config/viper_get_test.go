@@ -14,7 +14,7 @@ import (
 // TestStringSliceValue_ChangedFlagWinsOverEnv verifies that stringSliceValue
 // reads the flag when Changed=true instead of falling back to os.Getenv.
 func TestStringSliceValue_ChangedFlagWinsOverEnv(t *testing.T) {
-	vip := viper.New()
+	vCfg := viper.New()
 	flagSet := pflag.NewFlagSet(t.Name(), pflag.ContinueOnError)
 
 	flagSet.StringArray("test-flag", []string{}, "")
@@ -28,7 +28,7 @@ func TestStringSliceValue_ChangedFlagWinsOverEnv(t *testing.T) {
 	t.Setenv("TEST_NOTIFICATION_URL", "/run/secrets/WATCHTOWER_NOTIFICATION_URL")
 
 	result := stringSliceValue(
-		vip,
+		vCfg,
 		flagSet,
 		"test-flag",
 		[]string{"TEST_NOTIFICATION_URL"},
@@ -42,7 +42,7 @@ func TestStringSliceValue_ChangedFlagWinsOverEnv(t *testing.T) {
 // TestStringSliceValue_UnchangedFlagFallsBackToEnv verifies that stringSliceValue
 // falls back to os.Getenv when the flag value is unchanged.
 func TestStringSliceValue_UnchangedFlagFallsBackToEnv(t *testing.T) {
-	vip := viper.New()
+	vCfg := viper.New()
 	flagSet := pflag.NewFlagSet(t.Name(), pflag.ContinueOnError)
 
 	flagSet.StringArray("test-flag", []string{}, "")
@@ -54,7 +54,7 @@ func TestStringSliceValue_UnchangedFlagFallsBackToEnv(t *testing.T) {
 	t.Setenv("TEST_NOTIFICATION_URL", "/run/secrets/WATCHTOWER_NOTIFICATION_URL")
 
 	result := stringSliceValue(
-		vip,
+		vCfg,
 		flagSet,
 		"test-flag",
 		[]string{"TEST_NOTIFICATION_URL"},
@@ -68,7 +68,7 @@ func TestStringSliceValue_UnchangedFlagFallsBackToEnv(t *testing.T) {
 // TestStringSliceValue_ViperGetStringSliceIsFinalFallback verifies that stringSliceValue
 // falls back to Viper when neither the flag nor env provide a value.
 func TestStringSliceValue_ViperGetStringSliceIsFinalFallback(t *testing.T) {
-	vip := viper.New()
+	vCfg := viper.New()
 	flagSet := pflag.NewFlagSet(t.Name(), pflag.ContinueOnError)
 
 	flagSet.StringArray("test-flag", []string{}, "")
@@ -81,10 +81,10 @@ func TestStringSliceValue_ViperGetStringSliceIsFinalFallback(t *testing.T) {
 	t.Setenv("TEST_NOTIFICATION_URL", "")
 
 	// Set value via viper (simulating a config file).
-	vip.Set("test-flag", []string{"smtp://user:pass@host:25"})
+	vCfg.Set("test-flag", []string{"smtp://user:pass@host:25"})
 
 	result := stringSliceValue(
-		vip,
+		vCfg,
 		flagSet,
 		"test-flag",
 		[]string{"TEST_NOTIFICATION_URL"},
