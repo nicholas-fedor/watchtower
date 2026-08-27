@@ -125,17 +125,17 @@ func EnvConfig(log *zerolog.Logger, cmd *cobra.Command) error {
 	flagSet := cmd.PersistentFlags()
 
 	// Resolve Docker settings via Viper (flag > env > static default) after BindAll.
-	vip := viper.New()
+	vCfg := viper.New()
 
-	err := BindAll(vip, flagSet, docker.Specs())
+	err := BindAll(vCfg, flagSet, docker.Specs())
 	if err != nil {
 		return fmt.Errorf("bind docker flags: %w", err)
 	}
 
-	host := vip.GetString("host")
-	tls := vip.GetBool("tlsverify")
-	version := strings.Trim(vip.GetString("api-version"), "\"")
-	certPath := vip.GetString("cert-path")
+	host := vCfg.GetString("host")
+	tls := vCfg.GetBool("tlsverify")
+	version := strings.Trim(vCfg.GetString("api-version"), "\"")
+	certPath := vCfg.GetString("cert-path")
 
 	// Convert tcp:// to https:// when TLS is enabled.
 	if tls && strings.HasPrefix(host, "tcp://") {
