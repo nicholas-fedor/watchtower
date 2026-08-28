@@ -1,0 +1,21 @@
+# issue: https://github.com/nicholas-fedor/watchtower/issues/2104
+# title: Recreate must not preserve engine-generated MAC addresses
+# assert: Config.MacAddress stays empty after update so Docker can regenerate it
+# expect: both subjects update, config MAC is empty
+
+id: issue-2104
+packaging: container
+channel: flags
+shape: run-once
+image_source: thin
+watchtower:
+  run_once: true
+topology:
+  subject_kind: echo
+  subject_state: running
+  subject_count: 2
+  graph: none
+  networks:
+    - e2e-mac
+expect:
+  outcome: updated

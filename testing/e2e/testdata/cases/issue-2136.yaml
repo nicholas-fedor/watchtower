@@ -1,0 +1,25 @@
+# issue: https://github.com/nicholas-fedor/watchtower/issues/2136
+# title: /v1/containers/details enabled ignores WATCHTOWER_LABEL_ENABLE
+# assert: unlabeled containers report enabled true when label-enable is off
+# expect: details.enabled is true for the subject
+
+id: issue-2136
+packaging: container
+channel: flags
+shape: http-update
+image_source: thin
+watchtower:
+  http_api_update: true
+  http_api_containers: true
+  http_api_host: "0.0.0.0"
+  http_api_port: "8080"
+  http_api_token: e2e-api-auth
+  http_api_endpoints:
+    - health
+    - containers
+topology:
+  subject_kind: echo
+  subject_state: running
+  graph: none
+expect:
+  outcome: no-update

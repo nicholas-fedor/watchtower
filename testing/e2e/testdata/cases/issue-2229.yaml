@@ -1,0 +1,20 @@
+# issue: https://github.com/nicholas-fedor/watchtower/issues/2229
+# title: Registry throttle without 429/toomanyrequests token bypasses rate-limit detection
+# assert: a quota body with retry-after and allowed, but no 429 token, is treated as rate-limited
+# expect: subject is not updated, logs mention rate limited
+
+id: issue-2229
+packaging: container
+channel: flags
+shape: run-once
+image_source: thin
+watchtower:
+  run_once: true
+topology:
+  subject_kind: echo
+  subject_state: running
+  graph: none
+  registry_persona: lscr
+  registry_fault: quota-no-429
+expect:
+  outcome: rate-limited

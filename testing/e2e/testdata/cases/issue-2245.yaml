@@ -1,0 +1,19 @@
+# issue: https://github.com/nicholas-fedor/watchtower/issues/2245
+# title: Failed to list containers for image usage check, skipping removal
+# assert: cleanup removes the stale image after a successful update
+# expect: subject image ID changes, previous image ID is gone
+
+id: issue-2245
+packaging: container
+channel: flags
+shape: run-once
+image_source: thin
+watchtower:
+  run_once: true
+  cleanup: true
+topology:
+  subject_kind: echo
+  subject_state: running
+  graph: none
+expect:
+  outcome: updated

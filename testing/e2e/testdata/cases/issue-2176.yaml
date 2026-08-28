@@ -1,0 +1,20 @@
+# issue: https://github.com/nicholas-fedor/watchtower/issues/2176
+# title: Docker Hub image failing to pull because of a rate limit
+# assert: Hub 429 from the in-DinD Hub mock is detected as rate-limited
+# expect: subject is not updated, logs mention rate limited
+
+id: issue-2176
+packaging: container
+channel: flags
+shape: run-once
+image_source: thin
+watchtower:
+  run_once: true
+topology:
+  subject_kind: echo
+  subject_state: running
+  graph: none
+  registry_persona: hub
+  registry_fault: 429-hub
+expect:
+  outcome: rate-limited
