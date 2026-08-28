@@ -100,6 +100,39 @@ This will run the `go test` command with the following flags:
 * `-coverprofile coverage.out` - generates a coverage profile
 * `-covermode atomic` - sets the cover mode to atomic
 
+### End-to-end engine
+
+The black-box e2e engine is a nested module at `testing/e2e`.
+Root `make test` does not recurse into it.
+It needs privileged Docker-in-Docker and never talks to live container registries.
+While developing, run one topic (`go run . run --topic ratelimit --limit 20 --keep`) rather than the full product.
+Use `make test-e2e` as the check before a PR merges.
+
+Engine unit tests (no Docker):
+
+```bash
+make -C testing/e2e test
+```
+
+Smoke run (unscoped `--run-once`, Watchtower defaults):
+
+```bash
+make test-e2e-smoke
+```
+
+Full cartesian product (hours).
+Shard it across sittings:
+
+```bash
+cd testing/e2e
+go run . run --workers 4 --shard 1/4
+```
+
+`go run . list --dump-factors` prints cardinality without Docker.
+Artifacts land in `testing/e2e/artifacts/<run-id>/`.
+Replay a YAML case with `go run . run --generator file --file testdata/cases/smoke.yaml --keep`.
+The operator manual is `testing/e2e/README.md`.
+
 ## Building
 
 ### Binary and Archives
