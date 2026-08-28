@@ -1,0 +1,4 @@
+/artifacts/
+/*.test
+/coverage.out
+!watchtower/

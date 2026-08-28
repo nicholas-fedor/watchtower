@@ -206,3 +206,6 @@ test-reports/
 # TODO
 TODO/
 TODO.md
+
+# Nested e2e engine artifacts
+testing/e2e/artifacts/

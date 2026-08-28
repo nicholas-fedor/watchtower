@@ -1,0 +1,13 @@
+id: depends-chain
+packaging: container
+channel: flags
+shape: run-once
+image_source: thin
+watchtower:
+  run_once: true
+topology:
+  subject_kind: echo
+  subject_state: running
+  graph: chain-4
+expect:
+  outcome: updated

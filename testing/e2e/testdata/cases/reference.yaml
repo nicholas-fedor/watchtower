@@ -1,0 +1,476 @@
+# Catalog of YAML keys accepted by --generator file.
+# This is documentation, not a case to run as-is.
+# Omit any key to leave that Watchtower setting at its default.
+# Copy keys you need into a new file under testdata/cases/.
+# Durations use Go syntax such as 30s, 2m, or 24h.
+
+# Stable case id used in artifacts and checkpoints.
+id: example
+
+# How Watchtower is launched. container (inside DinD) or binary (host process).
+packaging: container
+
+# How settings are delivered. flags, env, mixed, or secret-file.
+channel: flags
+
+# Process shape. run-once, interval, schedule, interval+schedule, http-update, or http-update+periodic.
+shape: run-once
+
+# Watchtower image wrap. thin (scratch + binary) or self-local.
+image_source: thin
+
+# Positional container name filters passed after flags.
+names:
+  - e2e-subject
+
+# Optional factor labels recorded on the case. Product fills these. File cases may leave this empty.
+factors: {}
+
+watchtower:
+  # --host / DOCKER_HOST. Docker API URL.
+  host: unix:///var/run/docker.sock
+
+  # --tlsverify / DOCKER_TLS_VERIFY.
+  tlsverify: false
+
+  # --api-version / DOCKER_API_VERSION.
+  api_version: "1.44"
+
+  # --cert-path / DOCKER_CERT_PATH.
+  cert_path: /certs
+
+  # --include-stopped / WATCHTOWER_INCLUDE_STOPPED.
+  include_stopped: false
+
+  # --include-restarting / WATCHTOWER_INCLUDE_RESTARTING.
+  include_restarting: false
+
+  # --revive-stopped / WATCHTOWER_REVIVE_STOPPED.
+  revive_stopped: false
+
+  # --remove-volumes / WATCHTOWER_REMOVE_VOLUMES.
+  remove_volumes: false
+
+  # --warn-on-head-failure / WATCHTOWER_WARN_ON_HEAD_FAILURE. always, auto, never, or omit.
+  warn_on_head_failure: auto
+
+  # --interval / WATCHTOWER_POLL_INTERVAL. Seconds. Do not set together with schedule.
+  interval: 2
+
+  # --schedule / WATCHTOWER_SCHEDULE. Cron or @every. Do not set together with interval.
+  schedule: "@every 2s"
+
+  # --update-on-start / WATCHTOWER_UPDATE_ON_START.
+  update_on_start: false
+
+  # --run-once / WATCHTOWER_RUN_ONCE.
+  run_once: true
+
+  # --health-check. Docker HEALTHCHECK helper. Not an env binding.
+  health_check: false
+
+  # --porcelain / WATCHTOWER_PORCELAIN. json or v1.
+  porcelain: json
+
+  # --no-startup-message / WATCHTOWER_NO_STARTUP_MESSAGE.
+  no_startup_message: false
+
+  # --self-update-orchestrator. Not an env binding.
+  self_update_orchestrator: false
+
+  # --cleanup / WATCHTOWER_CLEANUP.
+  cleanup: false
+
+  # --no-pull / WATCHTOWER_NO_PULL.
+  no_pull: false
+
+  # --no-restart / WATCHTOWER_NO_RESTART.
+  no_restart: false
+
+  # --monitor-only / WATCHTOWER_MONITOR_ONLY.
+  monitor_only: false
+
+  # --rolling-restart / WATCHTOWER_ROLLING_RESTART.
+  rolling_restart: false
+
+  # --stop-timeout / WATCHTOWER_TIMEOUT.
+  stop_timeout: 30s
+
+  # --cooldown-delay / WATCHTOWER_COOLDOWN_DELAY. Duration or 0.
+  cooldown_delay: "0"
+
+  # --use-compose-depends-on / WATCHTOWER_USE_COMPOSE_DEPENDS_ON.
+  use_compose_depends_on: true
+
+  # --label-take-precedence / WATCHTOWER_LABEL_TAKE_PRECEDENCE.
+  label_take_precedence: false
+
+  # --ephemeral-self-update / WATCHTOWER_EPHEMERAL_SELF_UPDATE.
+  ephemeral_self_update: false
+
+  # --disk-space-max / WATCHTOWER_DISK_SPACE_MAX. Absolute size such as 40GB.
+  disk_space_max: 40GB
+
+  # --disk-space-warn / WATCHTOWER_DISK_SPACE_WARN. Absolute size or a percent of max.
+  disk_space_warn: 80%
+
+  # --enable-lifecycle-hooks / WATCHTOWER_LIFECYCLE_HOOKS.
+  enable_lifecycle_hooks: false
+
+  # --lifecycle-uid / WATCHTOWER_LIFECYCLE_UID.
+  lifecycle_uid: 0
+
+  # --lifecycle-gid / WATCHTOWER_LIFECYCLE_GID.
+  lifecycle_gid: 0
+
+  # --label-enable / WATCHTOWER_LABEL_ENABLE.
+  label_enable: false
+
+  # --disable-containers / WATCHTOWER_DISABLE_CONTAINERS.
+  disable_containers:
+    - e2e-decoy
+
+  # --monitor-image-names / WATCHTOWER_MONITOR_IMAGE_NAMES.
+  monitor_image_names:
+    - e2e/app:latest
+
+  # --skip-image-names / WATCHTOWER_SKIP_IMAGE_NAMES.
+  skip_image_names:
+    - e2e/skip:latest
+
+  # --enable-containers-by-label / WATCHTOWER_ENABLE_CONTAINERS_BY_LABEL.
+  enable_containers_by_label:
+    - e2e=keep
+
+  # --disable-containers-by-label / WATCHTOWER_DISABLE_CONTAINERS_BY_LABEL.
+  disable_containers_by_label:
+    - e2e=drop
+
+  # --scope / WATCHTOWER_SCOPE. Empty or omitted means unscoped.
+  scope: ""
+
+  # --registry-tls-skip / WATCHTOWER_REGISTRY_TLS_SKIP.
+  registry_tls_skip: false
+
+  # --registry-tls-min-version / WATCHTOWER_REGISTRY_TLS_MIN_VERSION. TLS1.2 or TLS1.3.
+  registry_tls_min_version: TLS1.2
+
+  # --disable-memory-swappiness / WATCHTOWER_DISABLE_MEMORY_SWAPPINESS.
+  disable_memory_swappiness: false
+
+  # --cpu-copy-mode / WATCHTOWER_CPU_COPY_MODE. auto, full, or none.
+  cpu_copy_mode: auto
+
+  # --http-api-endpoints / WATCHTOWER_HTTP_API_ENDPOINTS. all, or a list of endpoint names.
+  http_api_endpoints:
+    - health
+    - update
+
+  # --http-api-update / WATCHTOWER_HTTP_API_UPDATE.
+  http_api_update: false
+
+  # --http-api-metrics / WATCHTOWER_HTTP_API_METRICS.
+  http_api_metrics: false
+
+  # --http-api-containers / WATCHTOWER_HTTP_API_CONTAINERS.
+  http_api_containers: false
+
+  # --http-api-host / WATCHTOWER_HTTP_API_HOST.
+  http_api_host: "0.0.0.0"
+
+  # --http-api-port / WATCHTOWER_HTTP_API_PORT.
+  http_api_port: "8080"
+
+  # --http-api-token / WATCHTOWER_HTTP_API_TOKEN.
+  http_api_token: e2e-api-auth
+
+  # --http-api-events-token / WATCHTOWER_HTTP_API_EVENTS_TOKEN.
+  http_api_events_token: e2e-events-auth
+
+  # --http-api-periodic-polls / WATCHTOWER_HTTP_API_PERIODIC_POLLS.
+  http_api_periodic_polls: false
+
+  # --http-api-rate-limit / WATCHTOWER_HTTP_API_RATE_LIMIT. Requests per minute.
+  http_api_rate_limit: 60
+
+  # --http-api-tls-cert / WATCHTOWER_HTTP_API_TLS_CERT.
+  http_api_tls_cert: /certs/tls.crt
+
+  # --http-api-tls-key / WATCHTOWER_HTTP_API_TLS_KEY.
+  http_api_tls_key: /certs/tls.key
+
+  # --http-api-trusted-proxies / WATCHTOWER_HTTP_API_TRUSTED_PROXIES.
+  http_api_trusted_proxies:
+    - 10.0.0.1
+
+  # --http-api-proxy-header / WATCHTOWER_HTTP_API_PROXY_HEADER.
+  http_api_proxy_header: X-Forwarded-For
+
+  # --http-api-cors-origins / WATCHTOWER_HTTP_API_CORS_ORIGINS.
+  http_api_cors_origins:
+    - https://example.invalid
+
+  # --http-api-check-timeout / WATCHTOWER_HTTP_API_CHECK_TIMEOUT.
+  http_api_check_timeout: 30s
+
+  # --http-api-update-timeout / WATCHTOWER_HTTP_API_UPDATE_TIMEOUT.
+  http_api_update_timeout: 1m
+
+  # --notification-url / WATCHTOWER_NOTIFICATION_URL. Shoutrrr URLs.
+  notification_url:
+    - generic://webhook.e2e/notify
+
+  # --notifications-level / WATCHTOWER_NOTIFICATIONS_LEVEL.
+  notifications_level: info
+
+  # --notifications-delay / WATCHTOWER_NOTIFICATIONS_DELAY. Seconds.
+  notifications_delay: 0
+
+  # --notifications-hostname / WATCHTOWER_NOTIFICATIONS_HOSTNAME.
+  notifications_hostname: watchtower
+
+  # --notification-template / WATCHTOWER_NOTIFICATION_TEMPLATE.
+  notification_template: ""
+
+  # --notification-template-file / WATCHTOWER_NOTIFICATION_TEMPLATE_FILE.
+  notification_template_file: ""
+
+  # --notification-report / WATCHTOWER_NOTIFICATION_REPORT.
+  notification_report: false
+
+  # --notification-title-tag / WATCHTOWER_NOTIFICATION_TITLE_TAG.
+  notification_title_tag: ""
+
+  # --notification-skip-title / WATCHTOWER_NOTIFICATION_SKIP_TITLE.
+  notification_skip_title: false
+
+  # --notification-log-stdout / WATCHTOWER_NOTIFICATION_LOG_STDOUT.
+  notification_log_stdout: false
+
+  # --notification-split-by-container / WATCHTOWER_NOTIFICATION_SPLIT_BY_CONTAINER.
+  notification_split_by_container: false
+
+  # --notifications / WATCHTOWER_NOTIFICATIONS. Deprecated. Prefer notification_url.
+  notifications:
+    - gotify
+
+  # --notification-email-from / WATCHTOWER_NOTIFICATION_EMAIL_FROM. Deprecated.
+  notification_email_from: ""
+
+  # --notification-email-to / WATCHTOWER_NOTIFICATION_EMAIL_TO. Deprecated.
+  notification_email_to: ""
+
+  # --notification-email-delay / WATCHTOWER_NOTIFICATION_EMAIL_DELAY. Deprecated.
+  notification_email_delay: 0
+
+  # --notification-email-server / WATCHTOWER_NOTIFICATION_EMAIL_SERVER. Deprecated.
+  notification_email_server: ""
+
+  # --notification-email-server-port / WATCHTOWER_NOTIFICATION_EMAIL_SERVER_PORT. Deprecated.
+  notification_email_server_port: 25
+
+  # --notification-email-server-tls-skip-verify. Deprecated.
+  notification_email_tls_skip: false
+
+  # --notification-email-server-user. Deprecated.
+  notification_email_user: ""
+
+  # --notification-email-server-password. Deprecated.
+  notification_email_password: ""
+
+  # --notification-email-subjecttag. Deprecated.
+  notification_email_subjecttag: ""
+
+  # --notification-slack-hook-url. Deprecated.
+  notification_slack_hook_url: ""
+
+  # --notification-slack-identifier. Deprecated.
+  notification_slack_identifier: ""
+
+  # --notification-slack-channel. Deprecated.
+  notification_slack_channel: ""
+
+  # --notification-slack-icon-emoji. Deprecated.
+  notification_slack_icon_emoji: ""
+
+  # --notification-slack-icon-url. Deprecated.
+  notification_slack_icon_url: ""
+
+  # --notification-msteams-hook. Deprecated.
+  notification_msteams_hook: ""
+
+  # --notification-gotify-url. Deprecated.
+  notification_gotify_url: ""
+
+  # --notification-gotify-token. Deprecated.
+  notification_gotify_token: ""
+
+  # --notification-gotify-tls-skip-verify. Deprecated.
+  notification_gotify_tls_skip: false
+
+  # --log-format / WATCHTOWER_LOG_FORMAT. json, pretty, logfmt, or auto.
+  log_format: json
+
+  # --log-level / WATCHTOWER_LOG_LEVEL. panic through trace.
+  log_level: info
+
+  # --debug / WATCHTOWER_DEBUG.
+  debug: false
+
+  # --trace / WATCHTOWER_TRACE.
+  trace: false
+
+  # --no-color / NO_COLOR.
+  no_color: true
+
+topology:
+  # Subject family. echo, slow-term, deaf-term, custom-signal, healthcheck, nonroot, volume-writer, or self.
+  subject_kind: echo
+
+  # Docker state before Watchtower starts. running, exited, created, paused, or restarting.
+  subject_state: running
+
+  # How many primary subjects to create. Zero means one.
+  subject_count: 1
+
+  # Depends-on graph. none, chain-4, cycle, or compose-depends.
+  graph: none
+
+  # Extra inner networks attached to the subject.
+  networks:
+    - e2e-a
+
+  # Docker network_mode. bridge, host, none, or container:.
+  network_mode: bridge
+
+  # Pin the subject to repo@sha256 so it must not update.
+  digest_pinned: false
+
+  # Fake registry dialect. none, hub, ghcr, lscr, or private.
+  registry_persona: none
+
+  # Programmable registry fault. none, 429-hub, 429-ghcr, 401, 403, expire-token, slow-head, or 5xx.
+  registry_fault: none
+
+  # Docker API transport. unix, tcp, tcp-tls, or remote.
+  docker_transport: unix
+
+  # CPU and memory budget on the outer DinD container. Zero fields mean unset.
+  host_envelope:
+    # HostConfig.Memory in bytes.
+    memory_bytes: 0
+    # HostConfig.NanoCPUs.
+    nano_cpus: 0
+    # HostConfig.PidsLimit.
+    pids_limit: 0
+
+  # CPU and memory budget on the Watchtower container.
+  watchtower_envelope:
+    # HostConfig.Memory in bytes.
+    memory_bytes: 0
+    # HostConfig.NanoCPUs.
+    nano_cpus: 0
+    # HostConfig.PidsLimit.
+    pids_limit: 0
+
+  # CPU and memory budget on subject containers.
+  subject_envelope:
+    # HostConfig.Memory in bytes.
+    memory_bytes: 0
+    # HostConfig.NanoCPUs.
+    nano_cpus: 0
+    # HostConfig.PidsLimit.
+    pids_limit: 0
+
+  # Extra labels on the primary subject.
+  labels:
+    e2e: "true"
+
+  # com.centurylinklabs.watchtower.stop-signal.
+  stop_signal: SIGTERM
+
+  # Lifecycle hook labels on the primary subject.
+  lifecycle:
+    # com.centurylinklabs.watchtower.lifecycle.pre-check.
+    pre_check: ""
+    # com.centurylinklabs.watchtower.lifecycle.post-check.
+    post_check: ""
+    # com.centurylinklabs.watchtower.lifecycle.pre-update.
+    pre_update: ""
+    # com.centurylinklabs.watchtower.lifecycle.post-update.
+    post_update: ""
+    # com.centurylinklabs.watchtower.lifecycle.pre-update-timeout. Minutes, or 0 for unlimited.
+    pre_timeout: ""
+    # Per-container lifecycle UID label.
+    uid: ""
+    # Per-container lifecycle GID label.
+    gid: ""
+
+  # HTTP API ?image= and ?container= intersection.
+  http_query:
+    # ?image= regex or literal.
+    image: ""
+    # ?container= regex or literal.
+    container: ""
+
+  # Notification sink fixture. none, webhook, or webhook-5xx.
+  notify_sink: none
+
+  # Watchtower in one DinD talks to a second DinD.
+  remote_docker: false
+
+  # Fake image Created age for cooldown cases.
+  image_created_age: 0s
+
+  # Point the inner daemon at a second in-DinD persona.
+  mirror: false
+
+  # Share one image ID across several containers for cleanup.
+  shared_image: false
+
+  # Start an extra container that must not be updated.
+  decoy: false
+
+  # com.centurylinklabs.watchtower.enable.
+  enable_label: "true"
+
+  # com.centurylinklabs.watchtower.scope.
+  scope_label: ""
+
+  # Per-container monitor-only label.
+  monitor_only_label: ""
+
+  # Per-container no-pull label.
+  no_pull_label: ""
+
+  # Per-container cooldown-delay label.
+  cooldown_label: ""
+
+  # Artificial latency in front of the persona.
+  net_delay: 0s
+
+  # Subject restart policy. no, always, unless-stopped, or on-failure.
+  restart_policy: no
+
+  # Extra environment on the subject, checked after recreate.
+  extra_env:
+    - FOO=bar
+
+expect:
+  # updated, no-update, reject-config, blocked, auth-fail, timeout, oom, killed, crash, leftover, or rate-limited.
+  outcome: updated
+
+  # Why reject-config was chosen. Optional.
+  reject_reason: ""
+
+  # Acceptable HTTP API statuses when the case hits the API.
+  http_status:
+    - 200
+    - 202
+
+  # Values that must never appear in logs, porcelain, or /v1/config.
+  secrets:
+    - e2e-api-auth
+
+  # Minimum observed stop duration for timeout cases.
+  timeout_at_least: 0s

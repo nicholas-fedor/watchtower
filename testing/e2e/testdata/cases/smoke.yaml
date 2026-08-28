@@ -1,0 +1,13 @@
+id: smoke
+packaging: container
+channel: flags
+shape: run-once
+image_source: thin
+watchtower:
+  run_once: true
+topology:
+  subject_kind: echo
+  subject_state: running
+  graph: none
+expect:
+  outcome: updated

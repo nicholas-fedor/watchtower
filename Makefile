@@ -20,13 +20,22 @@ help: ## Show this help message
 # Development Targets
 # =============================================================================
 
-.PHONY: build test mocks lint vet run install
+.PHONY: build test mocks lint vet run install test-e2e test-e2e-smoke test-e2e-clean
 
 build: ## Build the application binary
 	$(GO) build -o bin/$(BINARY_NAME) ./...
 
 test: ## Run all tests
 	$(GO) test -timeout 30s -v -coverprofile coverage.out -covermode atomic ./...
+
+test-e2e: ## Run the nested e2e cartesian sitting (hours, needs privileged Docker)
+	$(MAKE) -C testing/e2e run
+
+test-e2e-smoke: ## Unscoped run-once e2e case (needs privileged Docker)
+	$(MAKE) -C testing/e2e run-smoke
+
+test-e2e-clean: ## Remove testing/e2e/artifacts
+	$(MAKE) -C testing/e2e clean
 
 mocks: ## Generate mocks
 	$(MOCKERY) --config build/mockery/mockery.yaml
