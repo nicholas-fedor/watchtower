@@ -437,7 +437,11 @@ Docker socket proxies provide a security layer between applications and the Dock
 
 While this documentation focuses on TLS-based connections, socket proxies represent another approach for securing Docker daemon access in environments where full socket exposure is undesirable.
 
+Refer to the documentation for the [Docker Host URL](#docker_host_url) to connect Watchtower to a Docker socket proxy.
+
 The following projects are examples of Docker socket proxies:
 
 - <https://github.com/Tecnativa/docker-socket-proxy>{target="_blank" rel="noopener noreferrer"}
 - <https://github.com/11notes/docker-socket-proxy>{target="_blank" rel="noopener noreferrer"}
+- <https://github.com/linuxserver/docker-socket-proxy>{target="_blank" rel="noopener noreferrer"}
+- <https://github.com/wollomatic/socket-proxy>{target="_blank" rel="noopener noreferrer"}
