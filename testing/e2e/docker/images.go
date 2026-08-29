@@ -15,8 +15,6 @@ import (
 )
 
 const (
-	// subjectImageRepo is the local name of the dummy subject image.
-	subjectImageRepo = "e2e/app"
 	// scratchDockerfile is the subject image recipe. TAG, REV, and SUBJECT_KIND are filled in.
 	scratchDockerfile = "FROM scratch\nCOPY subject /subject\nENV TAG=%s REV=%s SUBJECT_KIND=%s\nEXPOSE 8080\nENTRYPOINT [\"/subject\"]\n"
 	// watchtowerDockerfile is the thin Watchtower image recipe.

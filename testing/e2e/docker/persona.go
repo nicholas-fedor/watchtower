@@ -157,6 +157,7 @@ func SetPersonaFault(ctx context.Context, daemon *Daemon, fault registry.Fault) 
 	if !strings.Contains(out, "armed") {
 		return fmt.Errorf("%w: unexpected response %q", errPersonaFault, out)
 	}
+
 	if err != nil {
 		return fmt.Errorf("set persona fault: %w", err)
 	}

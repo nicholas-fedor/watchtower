@@ -39,8 +39,6 @@ const (
 	postUpdateLabel = "com.centurylinklabs.watchtower.lifecycle.post-update"
 	// preTimeoutLabel is the lifecycle pre-update-timeout label.
 	preTimeoutLabel = "com.centurylinklabs.watchtower.lifecycle.pre-update-timeout"
-	// subjectHTTPPort is the dummy subject's listen port.
-	subjectHTTPPort = "8080/tcp"
 )
 
 // CreateSubject starts one subject container on the inner daemon.
@@ -56,38 +54,9 @@ const (
 //   - string: Container ID.
 //   - error: Create or start failure.
 func CreateSubject(ctx context.Context, cli *client.Client, name, image string, topo engine.Topology) (string, error) {
-	labels := map[string]string{}
-	maps.Copy(labels, topo.Labels)
-
-	if topo.EnableLabel != "" {
-		labels[watchtowerEnableLabel] = topo.EnableLabel
-	}
-
-	if topo.ScopeLabel != "" {
-		labels[watchtowerScopeLabel] = topo.ScopeLabel
-	}
-
-	if topo.StopSignal != "" {
-		labels[stopSignalLabel] = topo.StopSignal
-	}
-
-	if topo.MonitorOnlyLabel != "" {
-		labels[monitorOnlyLabel] = topo.MonitorOnlyLabel
-	}
-
-	if topo.NoPullLabel != "" {
-		labels[noPullLabel] = topo.NoPullLabel
-	}
-
-	if topo.CooldownLabel != "" {
-		labels[cooldownLabel] = topo.CooldownLabel
-	}
-
-	applyLifecycleLabels(labels, topo.Lifecycle)
-
 	cfg := &containerTypes.Config{
 		Image:  image,
-		Labels: labels,
+		Labels: subjectLabels(topo),
 		Env:    append([]string{}, topo.ExtraEnv...),
 	}
 
@@ -143,6 +112,46 @@ func CreateSubject(ctx context.Context, cli *client.Client, name, image string, 
 	}
 
 	return created.ID, nil
+}
+
+// subjectLabels copies topology labels onto the Watchtower label set for one subject.
+//
+// Parameters:
+//   - topo: Topology for enable, scope, stop-signal, and lifecycle labels.
+//
+// Returns:
+//   - map[string]string: Container labels.
+func subjectLabels(topo engine.Topology) map[string]string {
+	labels := map[string]string{}
+	maps.Copy(labels, topo.Labels)
+
+	if topo.EnableLabel != "" {
+		labels[watchtowerEnableLabel] = topo.EnableLabel
+	}
+
+	if topo.ScopeLabel != "" {
+		labels[watchtowerScopeLabel] = topo.ScopeLabel
+	}
+
+	if topo.StopSignal != "" {
+		labels[stopSignalLabel] = topo.StopSignal
+	}
+
+	if topo.MonitorOnlyLabel != "" {
+		labels[monitorOnlyLabel] = topo.MonitorOnlyLabel
+	}
+
+	if topo.NoPullLabel != "" {
+		labels[noPullLabel] = topo.NoPullLabel
+	}
+
+	if topo.CooldownLabel != "" {
+		labels[cooldownLabel] = topo.CooldownLabel
+	}
+
+	applyLifecycleLabels(labels, topo.Lifecycle)
+
+	return labels
 }
 
 // applyLifecycleLabels copies hook commands onto Watchtower lifecycle labels.
