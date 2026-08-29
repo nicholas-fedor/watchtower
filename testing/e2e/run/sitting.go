@@ -3,8 +3,10 @@ package run
 import (
 	"context"
 	"fmt"
+	"iter"
 	"os"
 	"path/filepath"
+	"regexp"
 	"time"
 
 	"github.com/nicholas-fedor/watchtower/testing/e2e/docker"
@@ -54,6 +56,20 @@ type SittingResult struct {
 	Skipped int
 }
 
+// sitting is one cartesian or file-backed run against a DinD pool.
+type sitting struct {
+	req       SittingRequest
+	runID     string
+	runDir    string
+	artifacts watchtower.Artifacts
+	pool      *docker.Pool
+	point     *engine.Checkpoint
+	filters   []*regexp.Regexp
+	shardIdx  int
+	shardTot  int
+	seq       iter.Seq[engine.Case]
+}
+
 // Sitting prepares artifacts, runs the scheduler, and writes reports.
 //
 // Parameters:
@@ -64,99 +80,124 @@ type SittingResult struct {
 //   - SittingResult: Counts and run ID.
 //   - error: Setup, scheduler, or report failure. ErrCasesFailed when any case failed.
 func Sitting(ctx context.Context, req SittingRequest) (SittingResult, error) {
+	sit := &sitting{req: req}
+
+	prepErr := sit.prepare(ctx)
+	if prepErr != nil {
+		return SittingResult{}, prepErr
+	}
+	defer sit.pool.Close(ctx)
+
+	return sit.execute(ctx)
+}
+
+// prepare builds artifacts, the DinD pool, checkpoint, filters, and case sequence.
+//
+// Parameters:
+//   - ctx: Cancellation.
+//
+// Returns:
+//   - error: Setup failure.
+func (s *sitting) prepare(ctx context.Context) error {
 	moduleRoot, rootErr := docker.ModuleRoot()
 	if rootErr != nil {
-		return SittingResult{}, fmt.Errorf("module root: %w", rootErr)
+		return fmt.Errorf("module root: %w", rootErr)
 	}
 
-	runID := docker.StampRunID(time.Now(), docker.GitSHA(ctx, moduleRoot))
-	runDir := filepath.Join(moduleRoot, "artifacts", runID)
+	s.runID = docker.StampRunID(time.Now(), docker.GitSHA(ctx, moduleRoot))
+	s.runDir = filepath.Join(moduleRoot, "artifacts", s.runID)
 
-	mkdirErr := os.MkdirAll(runDir, permDir)
+	mkdirErr := os.MkdirAll(s.runDir, permDir)
 	if mkdirErr != nil {
-		return SittingResult{}, fmt.Errorf("run dir: %w", mkdirErr)
+		return fmt.Errorf("run dir: %w", mkdirErr)
 	}
 
-	artifacts, prepErr := watchtower.Prepare(ctx, moduleRoot, watchtower.WatchtowerSource(), runID, watchtower.ImageSourceThin)
+	artifacts, prepErr := watchtower.Prepare(ctx, moduleRoot, watchtower.WatchtowerSource(), s.runID, watchtower.ImageSourceThin)
 	if prepErr != nil {
-		return SittingResult{}, fmt.Errorf("prepare artifacts: %w", prepErr)
+		return fmt.Errorf("prepare artifacts: %w", prepErr)
 	}
+
+	s.artifacts = artifacts
 
 	var unset engine.Envelope
 
-	pool, poolErr := docker.NewPool(ctx, req.Workers, unset)
+	pool, poolErr := docker.NewPool(ctx, s.req.Workers, unset)
 	if poolErr != nil {
-		return SittingResult{}, fmt.Errorf("dind pool: %w", poolErr)
+		return fmt.Errorf("dind pool: %w", poolErr)
 	}
-	defer pool.Close(ctx)
 
-	checkpointPath := filepath.Join(runDir, "checkpoint.json")
-	if req.Resume != "" {
-		checkpointPath = req.Resume
+	s.pool = pool
+
+	checkpointPath := filepath.Join(s.runDir, "checkpoint.json")
+	if s.req.Resume != "" {
+		checkpointPath = s.req.Resume
 	}
 
 	point, loadErr := engine.LoadCheckpoint(checkpointPath)
 	if loadErr != nil {
-		return SittingResult{}, fmt.Errorf("checkpoint: %w", loadErr)
+		return fmt.Errorf("checkpoint: %w", loadErr)
 	}
 
-	point.RunID = runID
+	point.RunID = s.runID
+	s.point = point
 
-	filters, filterErr := engine.CompileFilters(req.Topic, req.Filter)
+	filters, filterErr := engine.CompileFilters(s.req.Topic, s.req.Filter)
 	if filterErr != nil {
-		return SittingResult{}, fmt.Errorf("selector: %w", filterErr)
+		return fmt.Errorf("selector: %w", filterErr)
 	}
 
-	shardIndex, shardTotal, shardErr := engine.ParseShard(req.Shard)
+	s.filters = filters
+
+	shardIndex, shardTotal, shardErr := engine.ParseShard(s.req.Shard)
 	if shardErr != nil {
-		return SittingResult{}, fmt.Errorf("shard: %w", shardErr)
+		return fmt.Errorf("shard: %w", shardErr)
 	}
+
+	s.shardIdx = shardIndex
+	s.shardTot = shardTotal
 
 	seq, seqErr := engine.Sequence(engine.SequenceRequest{
-		Generator: req.Generator,
-		Seed:      req.Seed,
-		FilePath:  req.FilePath,
+		Generator: s.req.Generator,
+		Seed:      s.req.Seed,
+		FilePath:  s.req.FilePath,
 	})
 	if seqErr != nil {
-		return SittingResult{}, fmt.Errorf("case sequence: %w", seqErr)
+		return fmt.Errorf("case sequence: %w", seqErr)
 	}
 
+	s.seq = seq
+
+	return nil
+}
+
+// execute runs the scheduler and writes the sitting report.
+//
+// Parameters:
+//   - ctx: Cancellation.
+//
+// Returns:
+//   - SittingResult: Counts and run ID.
+//   - error: Scheduler, report, or case failure.
+func (s *sitting) execute(ctx context.Context) (SittingResult, error) {
 	started := time.Now()
 	sched := engine.Scheduler{
-		Workers:    req.Workers,
-		ShardIndex: shardIndex,
-		ShardTotal: shardTotal,
-		Offset:     req.Offset,
-		Limit:      req.Limit,
-		Filters:    filters,
-		Resume:     point,
-		Run: func(runCtx context.Context, item engine.Case) engine.Result {
-			daemon, acquireErr := pool.Acquire(runCtx)
-			if acquireErr != nil {
-				return engine.Result{CaseID: item.ID(), Status: "fail", Err: acquireErr.Error()}
-			}
-			defer pool.Release(daemon)
-
-			result := Execute(runCtx, Options{
-				Daemon:    daemon,
-				Artifacts: artifacts,
-				RunDir:    runDir,
-				Keep:      req.Keep,
-			}, item)
-
-			_ = point.Record(result.CaseID, result.Status)
-
-			return result
-		},
+		Workers:    s.req.Workers,
+		ShardIndex: s.shardIdx,
+		ShardTotal: s.shardTot,
+		Offset:     s.req.Offset,
+		Limit:      s.req.Limit,
+		Filters:    s.filters,
+		Resume:     s.point,
+		Run:        s.runCase,
 	}
 
-	results, runErr := sched.RunStream(ctx, seq)
+	results, runErr := sched.RunStream(ctx, s.seq)
 	if runErr != nil {
 		return SittingResult{}, fmt.Errorf("scheduler: %w", runErr)
 	}
 
 	summary := report.Summary{
-		RunID:    runID,
+		RunID:    s.runID,
 		Started:  started,
 		Finished: time.Now(),
 		Cases:    results,
@@ -172,13 +213,13 @@ func Sitting(ctx context.Context, req SittingRequest) (SittingResult, error) {
 		}
 	}
 
-	writeErr := report.Write(runDir, summary)
+	writeErr := report.Write(s.runDir, summary)
 	if writeErr != nil {
 		return SittingResult{}, fmt.Errorf("write report: %w", writeErr)
 	}
 
 	out := SittingResult{
-		RunID:   runID,
+		RunID:   s.runID,
 		Passed:  summary.Passed,
 		Failed:  summary.Failed,
 		Skipped: summary.Skipped,
@@ -188,4 +229,31 @@ func Sitting(ctx context.Context, req SittingRequest) (SittingResult, error) {
 	}
 
 	return out, nil
+}
+
+// runCase acquires a worker, executes the case, and records the checkpoint.
+//
+// Parameters:
+//   - runCtx: Cancellation for this case.
+//   - item: Case vector.
+//
+// Returns:
+//   - engine.Result: Pass/fail/skip.
+func (s *sitting) runCase(runCtx context.Context, item engine.Case) engine.Result {
+	daemon, acquireErr := s.pool.Acquire(runCtx)
+	if acquireErr != nil {
+		return engine.Result{CaseID: item.ID(), Status: "fail", Err: acquireErr.Error()}
+	}
+	defer s.pool.Release(daemon)
+
+	result := Execute(runCtx, Options{
+		Daemon:    daemon,
+		Artifacts: s.artifacts,
+		RunDir:    s.runDir,
+		Keep:      s.req.Keep,
+	}, item)
+
+	_ = s.point.Record(result.CaseID, result.Status)
+
+	return result
 }

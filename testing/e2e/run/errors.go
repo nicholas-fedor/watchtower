@@ -21,4 +21,6 @@ var (
 	errPreservedMAC = errors.New("engine-generated MAC was preserved on recreate")
 	// errStaleImageLeft means --cleanup did not remove the previous image ID.
 	errStaleImageLeft = errors.New("cleanup left the previous image")
+	// errRejectConfigExitZero means reject-config was expected but Watchtower exited 0.
+	errRejectConfigExitZero = errors.New("expected reject-config but watchtower exited 0")
 )
