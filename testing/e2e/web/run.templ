@@ -1,0 +1,72 @@
+package web
+
+templ runPage(model runModel) {
+	@layout("Watchtower e2e " + shortID(model.Run.ID)) {
+		@runPartial(model)
+	}
+}
+
+templ runPartial(model runModel) {
+	<section id="run"
+		if model.shouldPoll() {
+			hx-get={ templ.URL(model.pagePath()) }
+			hx-trigger="every 2s"
+			hx-swap="outerMorph"
+			hx-sync="this:replace"
+		}
+	>
+		<p><a href="/">← all runs</a></p>
+		@errorBanner(model.Err)
+		<div class="mb-5">
+			<h1>{ shortID(model.Run.ID) }</h1>
+			<p class="m-0 text-muted">{ string(model.Run.Status) } · { model.Run.Label }</p>
+		</div>
+		<div class="mb-6 flex flex-wrap gap-4">
+			<span class="rounded-full border border-line bg-card px-3 py-1.5 tabular-nums">passed { fmtInt(model.Run.Passed) }</span>
+			<span class="rounded-full border border-line bg-card px-3 py-1.5 tabular-nums">failed { fmtInt(model.Run.Failed) }</span>
+			<span class="rounded-full border border-line bg-card px-3 py-1.5 tabular-nums">skipped { fmtInt(model.Run.Skipped) }</span>
+			<span class="rounded-full border border-line bg-card px-3 py-1.5 tabular-nums">live { joinIDs(model.Run.CurrentIDs) }</span>
+		</div>
+		<p class="mb-4 text-muted">
+			for _, filter := range statusFilters() {
+				<a
+					href={ templ.URL(model.filterPage(filter.Query)) }
+					hx-get={ templ.URL(model.filterPage(filter.Query)) }
+					hx-target="#run"
+					hx-swap="outerMorph"
+					hx-push-url="true"
+				>{ filter.Label }</a>
+			}
+			· { fmtInt(model.Total) } shown
+		</p>
+		<div class="overflow-hidden rounded-xl border border-line bg-card">
+			<table>
+				<thead>
+					<tr>
+						<th>case</th>
+						<th>status</th>
+						<th>ms</th>
+						<th>error</th>
+					</tr>
+				</thead>
+				<tbody>
+					if len(model.Cases) == 0 {
+						<tr>
+							<td colspan="4" class="text-muted">No cases yet.</td>
+						</tr>
+					}
+					for _, item := range model.Cases {
+						<tr>
+							<td><a href={ templ.URL(casePagePath(model.Run.ID, item.CaseID)) }><code>{ item.CaseID }</code></a></td>
+							<td>
+								@statusPill(string(item.Status))
+							</td>
+							<td>{ fmtInt64(item.DurationMs) }</td>
+							<td class="text-muted">{ item.Error }</td>
+						</tr>
+					}
+				</tbody>
+			</table>
+		</div>
+	</section>
+}

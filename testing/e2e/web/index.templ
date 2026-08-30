@@ -1,0 +1,56 @@
+package web
+
+templ indexPage(model indexModel) {
+	@layout("Watchtower e2e") {
+		@indexPartial(model)
+	}
+}
+
+templ indexPartial(model indexModel) {
+	<section id="runs" hx-get="/" hx-trigger="every 2s" hx-swap="outerMorph" hx-sync="this:replace">
+		<div class="mb-5">
+			<h1>Watchtower e2e</h1>
+			<p class="m-0 text-muted">control plane</p>
+		</div>
+		if model.HostOK {
+			<div class="mb-6 flex flex-wrap gap-4">
+				<span class="rounded-full border border-line bg-card px-3 py-1.5 tabular-nums">{ fmtInt(model.Host.CPUs) } CPU</span>
+				<span class="rounded-full border border-line bg-card px-3 py-1.5 tabular-nums">{ fmtGiB(model.Host.MemoryAvailBytes) } GiB avail</span>
+				<span class="rounded-full border border-line bg-card px-3 py-1.5 tabular-nums">pool { fmtInt(model.Host.PoolSize) } · rec { fmtInt(model.Host.RecommendedWorkers) }</span>
+			</div>
+		}
+		@errorBanner(model.Err)
+		<div class="overflow-hidden rounded-xl border border-line bg-card">
+			<table>
+				<thead>
+					<tr>
+						<th>run</th>
+						<th>status</th>
+						<th>p / f / s</th>
+						<th>topic</th>
+					</tr>
+				</thead>
+				<tbody>
+					if len(model.Runs) == 0 {
+						<tr>
+							<td colspan="4" class="text-muted">No sittings yet. <code>e2e run …</code> or POST /v1/runs</td>
+						</tr>
+					}
+					for _, run := range model.Runs {
+						<tr>
+							<td>
+								<a href={ templ.URL("/runs/" + run.ID) }>{ shortID(run.ID) }</a>
+								<div class="mt-0.5 text-xs text-muted">{ run.Label }</div>
+							</td>
+							<td>
+								@statusPill(string(run.Status))
+							</td>
+							<td>{ fmtInt(run.Passed) } / { fmtInt(run.Failed) } / { fmtInt(run.Skipped) }</td>
+							<td>{ run.Spec.Topic } { run.Spec.Generator }</td>
+						</tr>
+					}
+				</tbody>
+			</table>
+		</div>
+	</section>
+}

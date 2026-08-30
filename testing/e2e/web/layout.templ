@@ -1,0 +1,32 @@
+package web
+
+templ layout(title string) {
+	<!DOCTYPE html>
+	<html lang="en">
+		<head>
+			<meta charset="utf-8"/>
+			<meta name="viewport" content="width=device-width, initial-scale=1"/>
+			<title>{ title }</title>
+			<link rel="stylesheet" href="/static/app.css"/>
+			<script src="/static/htmx.min.js"></script>
+		</head>
+		<body class="m-0 bg-bg font-sans text-[15px] leading-normal text-fg">
+			<main class="mx-auto max-w-6xl px-6 pt-8 pb-16" hx-history-elt hx-boost:inherited="true">
+				{ children... }
+			</main>
+		</body>
+	</html>
+}
+
+templ errorBanner(message string) {
+	if message != "" {
+		<p class="text-muted">{ message }</p>
+	}
+}
+
+templ statusPill(status string) {
+	<span
+		data-status={ status }
+		class="inline-flex items-center rounded-full bg-line px-2 py-0.5 text-xs font-medium tracking-wide text-muted uppercase data-[status=completed]:bg-pass/20 data-[status=completed]:text-pass data-[status=fail]:bg-fail/20 data-[status=fail]:text-fail data-[status=failed]:bg-fail/20 data-[status=failed]:text-fail data-[status=pass]:bg-pass/20 data-[status=pass]:text-pass data-[status=queued]:bg-warn/20 data-[status=queued]:text-warn data-[status=running]:bg-warn/20 data-[status=running]:text-warn"
+	>{ status }</span>
+}

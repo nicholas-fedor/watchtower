@@ -1,0 +1,97 @@
+@import "tailwindcss";
+
+@source "../**/*.templ";
+
+@theme {
+  --font-sans: ui-sans-serif, system-ui, sans-serif;
+  --font-mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  --color-bg: hsl(199 15% 10%);
+  --color-fg: hsl(199 75% 95%);
+  --color-muted: hsl(199 20% 65%);
+  --color-card: hsl(199 15% 14%);
+  --color-line: hsl(199 15% 22%);
+  --color-link: hsl(199 45% 72%);
+  --color-pass: hsl(152 50% 75%);
+  --color-fail: hsl(346 80% 80%);
+  --color-warn: hsl(32 90% 80%);
+}
+
+@layer base {
+  html {
+    color-scheme: dark;
+  }
+
+  a {
+    color: var(--color-link);
+    text-decoration: none;
+  }
+
+  a:hover {
+    text-decoration: underline;
+  }
+
+  code {
+    font-family: var(--font-mono);
+    font-size: 0.82em;
+  }
+
+  h1 {
+    margin: 0 0 0.25rem;
+    font-size: 1.6rem;
+    font-weight: 600;
+    letter-spacing: -0.02em;
+  }
+
+  h2 {
+    margin: 1.6rem 0 0.6rem;
+    font-size: 0.95rem;
+    font-weight: 500;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    color: var(--color-muted);
+  }
+
+  h3 {
+    margin: 0.8rem 0 0.4rem;
+    font-size: 0.85rem;
+    color: var(--color-muted);
+  }
+
+  table {
+    width: 100%;
+    border-collapse: collapse;
+  }
+
+  th,
+  td {
+    padding: 0.65rem 0.85rem;
+    text-align: left;
+    vertical-align: top;
+    border-bottom: 1px solid var(--color-line);
+  }
+
+  th {
+    font-size: 0.8rem;
+    font-weight: 600;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    color: var(--color-muted);
+  }
+
+  pre {
+    font-family: var(--font-mono);
+  }
+
+  details {
+    margin: 1rem 0;
+  }
+
+  summary {
+    cursor: pointer;
+    color: var(--color-muted);
+  }
+
+  details[open] > summary {
+    margin-bottom: 0.6rem;
+  }
+}

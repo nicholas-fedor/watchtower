@@ -1,0 +1,170 @@
+package web
+
+templ casePage(model caseModel) {
+	@layout("Watchtower e2e " + model.Case.CaseID) {
+		@casePartial(model)
+	}
+}
+
+templ casePartial(model caseModel) {
+	<section id="case"
+		if model.shouldPoll() {
+			hx-get={ templ.URL(model.pagePath()) }
+			hx-trigger="every 2s"
+			hx-swap="outerMorph"
+			hx-sync="this:replace"
+		}
+	>
+		<p>
+			<a href="/">← all runs</a>
+			·
+			<a href={ templ.URL(model.runPath()) }>sitting { shortID(model.Run.ID) }</a>
+		</p>
+		@errorBanner(model.Err)
+		<div class="mb-5">
+			<h1><code>{ model.Case.CaseID }</code></h1>
+			<p class="m-0 text-muted">
+				@statusPill(string(model.Case.Status))
+				if model.Case.DurationMs > 0 {
+					· { fmtInt64(model.Case.DurationMs) } ms
+				}
+				if model.Verdict.Expect != "" {
+					· expect { model.Verdict.Expect }
+				}
+			</p>
+		</div>
+		if model.Verdict.Headline != "" {
+			<p
+				data-status={ string(model.Case.Status) }
+				class="rounded-lg border border-line bg-card px-4 py-3 data-[status=fail]:bg-fail/15 data-[status=failed]:bg-fail/15 data-[status=pass]:bg-pass/15 data-[status=completed]:bg-pass/15"
+			>{ model.Verdict.Headline }</p>
+		}
+		<div class="mb-6 flex flex-wrap gap-4">
+			<span class="rounded-full border border-line bg-card px-3 py-1.5 tabular-nums">
+				image
+				if model.Verdict.ImageChanged {
+					{ model.Verdict.ImageBefore } → { model.Verdict.ImageAfter }
+				} else if model.Verdict.ImageBefore != "" {
+					unchanged { model.Verdict.ImageBefore }
+				} else {
+					—
+				}
+			</span>
+			<span class="rounded-full border border-line bg-card px-3 py-1.5 tabular-nums">
+				if model.Verdict.Recreated {
+					container recreated
+				} else {
+					container kept
+				}
+			</span>
+		</div>
+		<h2>What changed</h2>
+		if len(model.Changes) == 0 {
+			if model.InspectBeforeJSON == "" && model.InspectAfterJSON == "" {
+				<p class="text-muted">No inspect snapshots were recorded for this case.</p>
+			} else {
+				<p class="text-muted">Nothing in inspect changed. Image { model.Verdict.ImageBefore } — container kept.</p>
+			}
+		} else {
+			<div class="overflow-hidden rounded-xl border border-line bg-card">
+				<table>
+					<thead>
+						<tr>
+							<th>field</th>
+							<th>before</th>
+							<th>after</th>
+						</tr>
+					</thead>
+					<tbody>
+						for _, row := range model.Changes {
+							<tr>
+								<td><code>{ row.Path }</code></td>
+								<td class="text-sm text-fail whitespace-pre-wrap"><code>{ row.Before }</code></td>
+								<td class="text-sm text-pass whitespace-pre-wrap"><code>{ row.After }</code></td>
+							</tr>
+						}
+					</tbody>
+				</table>
+			</div>
+		}
+		if model.InspectBeforeJSON != "" || model.InspectAfterJSON != "" {
+			<details>
+				<summary>Full inspect JSON</summary>
+				if model.InspectBeforeJSON != "" {
+					<h3>Before</h3>
+					<pre class="overflow-auto rounded-lg border border-line bg-card p-3 text-xs leading-snug whitespace-pre-wrap">{ model.InspectBeforeJSON }</pre>
+				}
+				if model.InspectAfterJSON != "" {
+					<h3>After</h3>
+					<pre class="overflow-auto rounded-lg border border-line bg-card p-3 text-xs leading-snug whitespace-pre-wrap">{ model.InspectAfterJSON }</pre>
+				}
+			</details>
+		}
+		if len(model.Factors) > 0 {
+			<h2>Factors</h2>
+			<dl class="m-0 grid gap-2 md:grid-cols-[minmax(12rem,22%)_1fr]">
+				for _, item := range model.Factors {
+					<div class="contents">
+						<dt class="text-sm text-muted">{ item.Key }</dt>
+						<dd class="m-0 break-all"><code>{ item.Value }</code></dd>
+					</div>
+				}
+			</dl>
+		}
+		if len(model.Case.Argv) > 0 {
+			<details>
+				<summary>Watchtower argv</summary>
+				<pre class="overflow-auto rounded-lg border border-line bg-card p-3 text-xs leading-snug whitespace-pre-wrap">{ joinArgv(model.Case.Argv) }</pre>
+			</details>
+		}
+		if model.ExpectJSON != "" {
+			<details>
+				<summary>Expect document</summary>
+				<pre class="overflow-auto rounded-lg border border-line bg-card p-3 text-xs leading-snug whitespace-pre-wrap">{ model.ExpectJSON }</pre>
+			</details>
+		}
+		if model.PorcelainJSON != "" {
+			<details>
+				<summary>Porcelain</summary>
+				<pre class="overflow-auto rounded-lg border border-line bg-card p-3 text-xs leading-snug whitespace-pre-wrap">{ model.PorcelainJSON }</pre>
+			</details>
+		}
+		if model.Case.HTTPDetails != "" {
+			<details>
+				<summary>HTTP details</summary>
+				<pre class="overflow-auto rounded-lg border border-line bg-card p-3 text-xs leading-snug whitespace-pre-wrap">{ model.Case.HTTPDetails }</pre>
+			</details>
+		}
+		<h2>Logs</h2>
+		if len(model.LogRows) == 0 {
+			<p class="text-muted">No Watchtower logs for this case.</p>
+		} else {
+			if len(model.signalLogs()) == 0 {
+				<p class="text-muted">No info/warn/error lines. Debug is collapsed below.</p>
+			} else {
+				@logList(model.signalLogs())
+			}
+			if len(model.noiseLogs()) > 0 {
+				<details>
+					<summary>Debug / trace ({ fmtInt(len(model.noiseLogs())) })</summary>
+					@logList(model.noiseLogs())
+				</details>
+			}
+		}
+	</section>
+}
+
+templ logList(rows []logRow) {
+	<ol class="m-0 max-h-[32rem] list-none overflow-auto rounded-lg border border-line bg-card p-0">
+		for _, row := range rows {
+			<li
+				data-level={ row.Level }
+				class="grid grid-cols-[5.2rem_4.2rem_minmax(0,1fr)] gap-2 border-b border-line px-3 py-1 font-mono text-xs leading-snug text-fg last:border-b-0 max-sm:grid-cols-1 data-[level=debug]:text-muted data-[level=error]:text-fail data-[level=trace]:text-muted data-[level=warn]:text-warn"
+			>
+				<time class="text-muted">{ row.Time }</time>
+				<span class="text-muted">{ row.Level }</span>
+				<span>{ row.Message }</span>
+			</li>
+		}
+	</ol>
+}
