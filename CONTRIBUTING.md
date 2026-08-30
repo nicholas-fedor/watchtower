@@ -129,9 +129,9 @@ go run . run --workers 4 --shard 1/4
 ```
 
 `go run . list --dump-factors` prints cardinality without Docker.
-Artifacts land in `testing/e2e/artifacts/<run-id>/`.
+Results live in [Postgres](https://www.postgresql.org/) and [Loki](https://grafana.com/oss/loki/). Watch a sitting in the dashboard or `go run . status`.
 Replay a YAML case with `go run . run --generator file --file testdata/cases/smoke.yaml --keep`.
-The operator manual is `testing/e2e/README.md`.
+See `testing/e2e/README.md`.
 
 ## Building
 

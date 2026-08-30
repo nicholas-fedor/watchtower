@@ -78,14 +78,14 @@ Privileged DinD ping and flag coverage:
 make doctor
 ```
 
-Unscoped `--run-once` with Watchtower defaults (one echo subject, keep artifacts):
+Unscoped `--run-once` with Watchtower defaults (one echo subject):
 
 ```bash
 make run-smoke
 ```
 
 From the Watchtower repository root, smoke is `make test-e2e-smoke` and the full product is `make test-e2e`.
-Remove `artifacts/<run-id>/` with `make clean` here, or `make test-e2e-clean` from the repository root.
+`make clean` here (or `make test-e2e-clean` from the repository root) only removes leftover `artifacts/` dirs from older file-based sittings.
 
 ## Commands
 
@@ -99,6 +99,8 @@ go run . run [flags]
 go run . status [run-id]
 go run . cases --run <id> --status fail
 go run . logs --run <id> --case <case-id>
+go run . cancel --run <id>
+go run . run --resume <run-id>
 go run . list [--dump-factors]
 go run . doctor
 go run . replay --case artifacts/<run-id>/cases/<id>
@@ -141,19 +143,24 @@ Cleanup is the DinD container going away.
 ## Stopping and resuming
 
 There is no pause command.
-Ctrl-C cancels the run.
-Each finished case is written to `artifacts/<run-id>/checkpoint.json` before the next one starts.
-A case that was still running when you interrupted is not in the checkpoint and will be tried again.
-
-Resume by pointing at that file:
+Ctrl-C stops the CLI wait.
+If `serve` is already running, the sitting keeps going until you cancel it.
+If `run` started the control plane itself, Ctrl-C stops that process too.
 
 ```bash
-go run . run --resume artifacts/20260828T195500Z-abc1234/checkpoint.json
+go run . cancel --run <run-id>
 ```
 
-Keep the same generator, shard, and filter you used on the original run.
-A new `artifacts/<run-id>/` directory is still created for logs from this attempt.
-The checkpoint you passed is the one that is updated.
+Finished cases are stored in [Postgres](https://www.postgresql.org/).
+A case that was still running is marked interrupted and will be tried again.
+
+Resume by run UUID (interrupted, canceled, or still queued):
+
+```bash
+go run . run --resume <run-id>
+```
+
+That re-queues the same sitting. Completed case IDs in the store are skipped.
 
 ## Targeting one change
 
@@ -226,54 +233,41 @@ They do not replace `--filter`.
 You can combine them.
 
 `--workers` is how many DinD daemons run in parallel on this machine.
-`WATCHTOWER_E2E_WORKERS` sets the default when `--workers` is omitted or `0`.
+`0` (the default) sizes the pool from host CPU and available RAM (2 GiB per worker, cap 8).
+`WATCHTOWER_E2E_WORKERS` sets that default when `--workers` is omitted or `0`. Unset means auto.
 
 ## `run` flags
 
 | Flag                                | Meaning                                              |
 |-------------------------------------|------------------------------------------------------|
-| `--workers N`                       | Parallel DinD workers (default 1)                    |
+| `--workers N`                       | Parallel DinD workers (`0` means auto from host)     |
 | `--shard i/n`                       | Keep hash bucket `i` of `n`                          |
 | `--offset N`                        | Skip N selected cases                                |
 | `--limit N`                         | Stop after N executed cases (0 means no cap)         |
 | `--generator product\|random\|file` | How cases are produced (default `product`)           |
 | `--seed S`                          | Seed for `random` (default 1)                        |
 | `--file PATH`                       | YAML cases when `--generator file`                   |
-| `--resume PATH`                     | Checkpoint to skip completed IDs                     |
+| `--resume ID`                       | Re-queue an interrupted or canceled sitting by UUID  |
 | `--topic NAME`                      | Named development slice (`go run . list`)            |
 | `--filter REGEX`                    | Extra regex on case ID, factor name, or factor value |
-| `--keep`                            | Keep artifact dirs for passing cases                 |
+| `--keep`                            | Keep extra per-case documents (inspect, porcelain)   |
 
 Environment:
 
 - `WATCHTOWER_SOURCE` is the Watchtower repository to compile (default `../..` from this module)
 - `WATCHTOWER_IMAGE` is a prebuilt image instead of compiling
-- `WATCHTOWER_E2E_WORKERS` is the default worker count
+- `WATCHTOWER_E2E_WORKERS` is the default worker count (`0` or unset means auto)
 - `WATCHTOWER_E2E_KEEP=1` is the same as `--keep`
 
-## Artifacts
+## Results
 
-Each run writes `artifacts/<run-id>/`.
-The id is `20060102T150405Z-` plus a short git SHA, or `dirty` if git is unavailable.
+Sittings, cases, inspect documents, and events live in [Postgres](https://www.postgresql.org/).
+Watchtower stdout and stderr live in [Loki](https://grafana.com/oss/loki/).
+Watch a sitting in the dashboard or with `go run . status`, `go run . cases`, and `go run . logs`.
 
-```text
-artifacts/<run-id>/
-  summary.md
-  summary.json
-  junit.xml
-  checkpoint.json
-  cases/<case-id>/
-    meta.json
-    watchtower.stdout.jsonl
-    watchtower.stderr.jsonl
-    inspect-before.json
-    inspect-after.json
-    porcelain.json
-    failure.txt
-```
+`--keep` retains extra per-case documents on the sitting (inspect and porcelain). Failed cases keep those documents either way.
 
-Failed cases always keep `cases/<case-id>/`.
-Passed cases are deleted unless you passed `--keep` or set `WATCHTOWER_E2E_KEEP=1`.
+`make clean` only removes leftover `artifacts/` dirs from older file-based sittings.
 
 ## Watchtower image
 
@@ -298,7 +292,13 @@ Watchtower is compiled from `WATCHTOWER_SOURCE` and treated as an external binar
 | [Ryuk](https://github.com/testcontainers/moby-ryuk)                                    | Deletes host Testcontainers resources when the run exits                    | [Garbage collector](https://golang.testcontainers.org/features/garbage_collector/) |
 | [Moby Engine API client](https://pkg.go.dev/github.com/moby/moby/client)               | Talks to the inner daemon (create, inspect, build, wait)                    | [API types](https://pkg.go.dev/github.com/moby/moby/api)                           |
 | [Distribution Registry](https://distribution.github.io/distribution/) `registry:2.8.3` | In-DinD image store the persona proxy fronts                                | [Image](https://hub.docker.com/_/registry)                                         |
-| [Cobra](https://cobra.dev/)                                                            | `run`, `list`, `doctor`, `replay`, `persona`                                | [Repository](https://github.com/spf13/cobra)                                       |
+| [Cobra](https://cobra.dev/)                                                            | `serve`, `run`, `status`, `cases`, `logs`, `cancel`, `list`, `doctor`       | [Repository](https://github.com/spf13/cobra)                                       |
+| [Fiber](https://docs.gofiber.io/) v3                                                   | HTTP server for `/v1` and the dashboard                                     | [Docs](https://docs.gofiber.io/)                                                   |
+| [Huma](https://huma.rocks/)                                                            | JSON API and OpenAPI at `/v1`                                               | [Docs](https://huma.rocks/)                                                        |
+| [templ](https://templ.guide/)                                                          | Dashboard markup                                                            | [Docs](https://templ.guide/)                                                       |
+| [HTMX](https://htmx.org/)                                                              | Dashboard partials                                                          | [Docs](https://htmx.org/docs/)                                                     |
+| [Postgres](https://www.postgresql.org/) 18                                             | Runs, cases, inspect documents, and events                                  | [Docs](https://www.postgresql.org/docs/)                                           |
+| [Loki](https://grafana.com/oss/loki/)                                                  | Watchtower stdout and stderr                                                | [Docs](https://grafana.com/docs/loki/latest/)                                      |
 | [testify](https://github.com/stretchr/testify)                                         | Unit tests for the engine, registry proxy, and assertions                   | [assert](https://pkg.go.dev/github.com/stretchr/testify/assert)                    |
 | [go.yaml.in/yaml](https://github.com/yaml/go-yaml)                                     | Named cases under `testdata/cases/`                                         | [v3 module](https://pkg.go.dev/go.yaml.in/yaml/v3)                                 |
 | [Go `regexp`](https://pkg.go.dev/regexp)                                               | `--filter`                                                                  | [Package docs](https://pkg.go.dev/regexp)                                          |

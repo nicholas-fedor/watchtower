@@ -1,7 +1,7 @@
 # Nested Watchtower e2e engine. Parent make test does not recurse here.
 
 GO ?= go
-WORKERS ?= 1
+WORKERS ?= 0
 GOLANGCI_LINT ?= golangci-lint
 GOLANGCI_CONFIG := $(CURDIR)/../../build/golangci-lint/golangci-lint.yaml
 TAILWIND ?= tailwindcss
