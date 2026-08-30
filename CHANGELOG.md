@@ -18,6 +18,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Chores
 
+- Update github.com/google/pprof digest to 4932ad3 by @renovate[bot] in [#2275](https://github.com/nicholas-fedor/watchtower/pull/2275)
+- Update github.com/google/pprof digest to 67a7179 by @renovate[bot] in [#2274](https://github.com/nicholas-fedor/watchtower/pull/2274)
+- Update anchore/sbom-action action to v0.24.2 by @renovate[bot] in [#2271](https://github.com/nicholas-fedor/watchtower/pull/2271)
 - Update module github.com/prometheus/procfs to v0.22.0 by @renovate[bot] in [#2269](https://github.com/nicholas-fedor/watchtower/pull/2269)
 - Update module github.com/gofiber/contrib/v3/zerolog to v1.1.4 by @renovate[bot] in [#2268](https://github.com/nicholas-fedor/watchtower/pull/2268)
 - Update module github.com/gofiber/contrib/v3/swaggo to v1.0.10 by @renovate[bot] in [#2265](https://github.com/nicholas-fedor/watchtower/pull/2265)
