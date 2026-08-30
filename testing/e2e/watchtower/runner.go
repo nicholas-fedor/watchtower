@@ -6,7 +6,6 @@ import (
 	"io"
 	"os"
 	"os/exec"
-	"path/filepath"
 	"time"
 
 	"github.com/moby/moby/api/pkg/stdcopy"
@@ -35,9 +34,9 @@ type Instance struct {
 	// Cmd is the host process when packaging is binary.
 	Cmd *exec.Cmd
 	// Stdout is captured stdout.
-	Stdout *os.File
+	Stdout io.Writer
 	// Stderr is captured stderr.
-	Stderr *os.File
+	Stderr io.Writer
 	// logsDone is closed when container log copy finishes.
 	logsDone <-chan struct{}
 }
@@ -62,7 +61,7 @@ func Start(
 	daemon *docker.Daemon,
 	artifacts Artifacts,
 	item engine.Case,
-	caseDir string,
+	stdout, stderr io.WriteCloser,
 	extraHosts []string,
 ) (*Instance, []string, map[string]string, error) {
 	cfg := item.Watchtower
@@ -75,19 +74,8 @@ func Start(
 	args, env := cfg.Render(item.Channel)
 	args = append(args, item.Names...)
 
-	stdoutPath := filepath.Join(caseDir, "watchtower.stdout.jsonl")
-	stderrPath := filepath.Join(caseDir, "watchtower.stderr.jsonl")
-
-	stdout, outErr := os.Create(stdoutPath)
-	if outErr != nil {
-		return nil, nil, nil, fmt.Errorf("stdout log: %w", outErr)
-	}
-
-	stderr, errErr := os.Create(stderrPath)
-	if errErr != nil {
-		_ = stdout.Close()
-
-		return nil, nil, nil, fmt.Errorf("stderr log: %w", errErr)
+	if stdout == nil || stderr == nil {
+		return nil, nil, nil, fmt.Errorf("watchtower logs: writers required")
 	}
 
 	if item.Packaging == engine.PackagingBinary {
@@ -121,7 +109,7 @@ func startBinary(
 	binary string,
 	args []string,
 	env map[string]string,
-	stdout, stderr *os.File,
+	stdout, stderr io.Writer,
 ) (*Instance, error) {
 	cmd := exec.CommandContext(ctx, binary, args...)
 	cmd.Stdout = stdout
@@ -164,7 +152,7 @@ func startContainer(
 	args []string,
 	env map[string]string,
 	extraHosts []string,
-	stdout, stderr *os.File,
+	stdout, stderr io.Writer,
 	item engine.Case,
 ) (*Instance, error) {
 	loadErr := ensureWatchtowerImage(ctx, daemon, artifacts)
@@ -238,6 +226,10 @@ func startContainer(
 // Returns:
 //   - error: Build failure.
 func ensureWatchtowerImage(ctx context.Context, daemon *docker.Daemon, artifacts Artifacts) error {
+	if docker.HasImage(ctx, daemon.Client(), watchtowerImage) {
+		return nil
+	}
+
 	dockerfile := docker.WatchtowerDockerfile()
 
 	tarStream, err := docker.ContextTar(dockerfile, "watchtower", artifacts.Binary)
@@ -268,7 +260,7 @@ func ensureWatchtowerImage(ctx context.Context, daemon *docker.Daemon, artifacts
 //   - id: Watchtower container ID.
 //   - stdout: Destination for stdout.
 //   - stderr: Destination for stderr.
-func copyLogs(ctx context.Context, cli *client.Client, id string, stdout, stderr *os.File) {
+func copyLogs(ctx context.Context, cli *client.Client, id string, stdout, stderr io.Writer) {
 	logs, err := cli.ContainerLogs(ctx, id, client.ContainerLogsOptions{
 		ShowStdout: true,
 		ShowStderr: true,
@@ -357,12 +349,12 @@ func (i *Instance) Close(ctx context.Context, daemon *docker.Daemon) {
 		return
 	}
 
-	if i.Stdout != nil {
-		_ = i.Stdout.Close()
+	if closer, ok := i.Stdout.(io.Closer); ok {
+		_ = closer.Close()
 	}
 
-	if i.Stderr != nil {
-		_ = i.Stderr.Close()
+	if closer, ok := i.Stderr.(io.Closer); ok {
+		_ = closer.Close()
 	}
 
 	if i.ID != "" && daemon != nil {

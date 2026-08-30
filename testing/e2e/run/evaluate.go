@@ -58,6 +58,14 @@ func (s *session) assertOutcome() error {
 	switch s.item.Expect.Outcome {
 	case engine.OutcomeUpdated:
 		if !imageChanged {
+			if watchtowerScannedNone(s.logs) {
+				return fmt.Errorf("%w (subject image %q)", ErrWatchtowerSawNoContainers, s.before.ImageRef)
+			}
+
+			if pullDenied(s.logs) {
+				return fmt.Errorf("%w for %s", errRegistryPullDenied, s.before.ImageRef)
+			}
+
 			return ErrImageIDUnchanged
 		}
 
@@ -100,6 +108,16 @@ func (s *session) assertOutcome() error {
 //
 // Returns:
 //   - bool: True when a rate-limit or pull-fail phrase is present.
+func watchtowerScannedNone(logs string) bool {
+	return strings.Contains(logs, `"scanned":0`) || strings.Contains(logs, `"scanned": 0`)
+}
+
+func pullDenied(logs string) bool {
+	return strings.Contains(logs, "Failed to pull image") ||
+		strings.Contains(logs, "connect: connection refused") ||
+		strings.Contains(logs, `Head "http://127.0.0.1:5000`)
+}
+
 func rateLimitLogged(logs string) bool {
 	lower := strings.ToLower(logs)
 
@@ -173,9 +191,15 @@ func (s *session) assertHTTPDetails() error {
 // Returns:
 //   - error: Missing updated record.
 func (s *session) assertPorcelain() error {
-	raw, readErr := os.ReadFile(filepath.Join(s.caseDir, "watchtower.stdout.jsonl"))
-	if readErr == nil && s.item.Watchtower.Porcelain != nil && *s.item.Watchtower.Porcelain == "json" {
-		_ = os.WriteFile(filepath.Join(s.caseDir, "porcelain.json"), raw, permFile) //nolint:gosec // G703: caseDir is created by the harness.
+	raw := s.stdoutBuf.Bytes()
+	if len(raw) == 0 && s.caseDir != "" {
+		raw, _ = os.ReadFile(filepath.Join(s.caseDir, "watchtower.stdout.jsonl"))
+	}
+
+	if len(raw) > 0 && s.item.Watchtower.Porcelain != nil && *s.item.Watchtower.Porcelain == "json" {
+		if s.caseDir != "" {
+			_ = os.WriteFile(filepath.Join(s.caseDir, "porcelain.json"), raw, permFile) //nolint:gosec // G703: caseDir is created by the harness.
+		}
 
 		parsed, parseErr := assert.ParsePorcelain(raw)
 		if parseErr == nil && s.item.Expect.Outcome == engine.OutcomeUpdated {

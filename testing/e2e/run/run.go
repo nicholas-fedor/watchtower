@@ -4,6 +4,8 @@ import (
 	"time"
 
 	"github.com/nicholas-fedor/watchtower/testing/e2e/docker"
+	"github.com/nicholas-fedor/watchtower/testing/e2e/store"
+	"github.com/nicholas-fedor/watchtower/testing/e2e/stream"
 	"github.com/nicholas-fedor/watchtower/testing/e2e/watchtower"
 )
 
@@ -38,4 +40,10 @@ type Options struct {
 	RunDir string
 	// Keep retains passing case directories.
 	Keep bool
+	// RunID is the control-plane sitting id.
+	RunID string
+	// Logs is the stream backend. Nil writes jsonl files.
+	Logs stream.Logs
+	// Records is the durable store for inspect/porcelain documents.
+	Records store.Store
 }

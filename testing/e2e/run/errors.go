@@ -5,9 +5,11 @@ import "errors"
 var (
 	// ErrImageIDUnchanged means Expect updated but inspect image id did not change.
 	ErrImageIDUnchanged = errors.New("expected image id to change on update")
+	// ErrWatchtowerSawNoContainers means Watchtower's filter selected zero subjects.
+	ErrWatchtowerSawNoContainers = errors.New("watchtower scanned 0 containers")
 	// ErrSubjectMissing means the subject container was gone after the session.
 	ErrSubjectMissing = errors.New("container not found after session")
-	// ErrCasesFailed means at least one executed case failed.
+	// ErrCasesFailed is the CLI exit for a completed sitting with failing cases.
 	ErrCasesFailed = errors.New("e2e cases failed")
 	// ErrReplayNeedsCase means replay was invoked without a case directory.
 	ErrReplayNeedsCase = errors.New("replay requires --case")
@@ -17,6 +19,8 @@ var (
 	errExtraEnvMissing = errors.New("fidelity: extra env missing after recreate")
 	// errNoRateLimitLog means a rate-limited case produced no pull or quota evidence.
 	errNoRateLimitLog = errors.New("expected rate-limit log line")
+	// errRegistryPullDenied means Watchtower saw the subject but the registry refused the pull.
+	errRegistryPullDenied = errors.New("registry denied image pull")
 	// errPreservedMAC means a 02:42 engine MAC was copied onto the new container.
 	errPreservedMAC = errors.New("engine-generated MAC was preserved on recreate")
 	// errStaleImageLeft means --cleanup did not remove the previous image ID.

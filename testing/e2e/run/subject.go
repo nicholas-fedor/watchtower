@@ -61,6 +61,10 @@ func publishSubject(ctx context.Context, opts Options, kind, generation string) 
 // Returns:
 //   - string: Combined log text.
 func readLogs(caseDir string) string {
+	if caseDir == "" {
+		return ""
+	}
+
 	stdout, _ := os.ReadFile(filepath.Join(caseDir, "watchtower.stdout.jsonl"))
 	stderr, _ := os.ReadFile(filepath.Join(caseDir, "watchtower.stderr.jsonl"))
 

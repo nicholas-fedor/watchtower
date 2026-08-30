@@ -1,8 +1,10 @@
 package run
 
 import (
+	"bytes"
 	"context"
 	"fmt"
+	"io"
 	"os"
 	"path/filepath"
 	"time"
@@ -14,6 +16,8 @@ import (
 	"github.com/nicholas-fedor/watchtower/testing/e2e/engine"
 	"github.com/nicholas-fedor/watchtower/testing/e2e/registry"
 	"github.com/nicholas-fedor/watchtower/testing/e2e/report"
+	"github.com/nicholas-fedor/watchtower/testing/e2e/store"
+	"github.com/nicholas-fedor/watchtower/testing/e2e/stream"
 	"github.com/nicholas-fedor/watchtower/testing/e2e/watchtower"
 )
 
@@ -34,6 +38,11 @@ type session struct {
 	inst     *watchtower.Instance
 	exitCode int
 	waitErr  error
+
+	stdoutBuf bytes.Buffer
+	stderrBuf bytes.Buffer
+	outClose  io.Closer
+	errClose  io.Closer
 }
 
 // Execute runs one case on the acquired worker.
@@ -145,6 +154,11 @@ func (s *session) run(ctx context.Context) engine.Result {
 // Returns:
 //   - error: Directory creation failure.
 func (s *session) openDir() error {
+	s.prefix = "e2e-" + s.caseID[:min(prefixIDLen, len(s.caseID))]
+	if s.opts.Logs != nil {
+		return nil
+	}
+
 	caseDir, dirErr := report.WriteCaseDir(s.opts.RunDir, report.Meta{
 		ID:      s.caseID,
 		Factors: s.item.Factors,
@@ -155,9 +169,52 @@ func (s *session) openDir() error {
 	}
 
 	s.caseDir = caseDir
-	s.prefix = "e2e-" + s.caseID[:min(prefixIDLen, len(s.caseID))]
 
 	return nil
+}
+
+// logWriters returns stdout and stderr sinks for Watchtower.
+//
+// Parameters:
+//   - ctx: Cancellation for Loki pushes.
+//
+// Returns:
+//   - io.WriteCloser: Stdout sink.
+//   - io.WriteCloser: Stderr sink.
+func (s *session) logWriters(ctx context.Context) (io.WriteCloser, io.WriteCloser) {
+	if s.opts.Logs != nil {
+		outLog := stream.NewWriter(ctx, s.opts.Logs, s.opts.RunID, s.caseID, stream.StreamStdout)
+		errLog := stream.NewWriter(ctx, s.opts.Logs, s.opts.RunID, s.caseID, stream.StreamStderr)
+
+		return &teeCloser{Writer: io.MultiWriter(&s.stdoutBuf, outLog), closer: outLog},
+			&teeCloser{Writer: io.MultiWriter(&s.stderrBuf, errLog), closer: errLog}
+	}
+
+	stdoutPath := filepath.Join(s.caseDir, "watchtower.stdout.jsonl")
+	stderrPath := filepath.Join(s.caseDir, "watchtower.stderr.jsonl")
+	stdout, _ := os.Create(stdoutPath)
+	stderr, _ := os.Create(stderrPath)
+
+	return stdout, stderr
+}
+
+// teeCloser writes to Writer and closes closer.
+type teeCloser struct {
+	io.Writer
+	// closer is the stream.Writer being teed.
+	closer io.Closer
+}
+
+// Close closes the underlying stream writer.
+//
+// Returns:
+//   - error: Close failure.
+func (t *teeCloser) Close() error {
+	if t.closer == nil {
+		return nil
+	}
+
+	return t.closer.Close()
 }
 
 // startRegistry starts distribution and the persona proxy inside DinD.
@@ -206,7 +263,10 @@ func (s *session) createFixtures(ctx context.Context) error {
 		return publishErr
 	}
 
-	imageRef := docker.SubjectPullRef()
+	imageRef := engine.ImageRefForPersona(s.item.Topology.RegistryPersona)
+	if tagErr := docker.TagLocal(ctx, s.opts.Daemon.Client(), docker.SubjectPullRef(), imageRef); tagErr != nil {
+		return tagErr
+	}
 
 	subjects, createErr := docker.CreateSubjects(ctx, s.opts.Daemon.Client(), s.prefix, imageRef, s.item.Topology)
 	if createErr != nil {
@@ -244,7 +304,18 @@ func (s *session) inspectBefore(ctx context.Context) error {
 	}
 
 	s.before = beforeSnap
-	_ = os.WriteFile(filepath.Join(s.caseDir, "inspect-before.json"), beforeRaw, permFile)
+	if s.caseDir != "" {
+		_ = os.WriteFile(filepath.Join(s.caseDir, "inspect-before.json"), beforeRaw, permFile)
+	}
+
+	if s.opts.Records != nil {
+		_ = s.opts.Records.UpsertCase(ctx, store.Case{
+			RunID:         s.opts.RunID,
+			CaseID:        s.caseID,
+			Status:        store.CaseRunning,
+			InspectBefore: beforeRaw,
+		})
+	}
 
 	return nil
 }
@@ -266,7 +337,12 @@ func (s *session) publishReplacement(ctx context.Context) error {
 		kind = "echo"
 	}
 
-	return publishSubject(ctx, s.opts, kind, imageGeneration2)
+	pubErr := publishSubject(ctx, s.opts, kind, imageGeneration2)
+	if pubErr != nil {
+		return pubErr
+	}
+
+	return docker.TagLocal(ctx, s.opts.Daemon.Client(), docker.SubjectPullRef(), engine.ImageRefForPersona(s.item.Topology.RegistryPersona))
 }
 
 // armFault programs the persona when Topology.RegistryFault is set.
@@ -297,19 +373,50 @@ func (s *session) armFault(ctx context.Context) error {
 // Returns:
 //   - error: Start failure.
 func (s *session) startWatchtower(ctx context.Context) error {
-	inst, argv, env, startErr := watchtower.Start(ctx, s.opts.Daemon, s.opts.Artifacts, s.item, s.caseDir, nil)
+	stdout, stderr := s.logWriters(ctx)
+	s.outClose, s.errClose = stdout, stderr
+
+	hosts := []string{}
+	persona := registry.Persona(s.item.Topology.RegistryPersona)
+	if persona != "" && persona != registry.PersonaNone {
+		ip, ipErr := docker.PersonaProxyIP(ctx, s.opts.Daemon.Client())
+		if ipErr != nil {
+			return fmt.Errorf("persona ip: %w", ipErr)
+		}
+
+		hosts = docker.ExtraHosts(persona, ip)
+		if hostErr := s.opts.Daemon.AppendHosts(ctx, hosts); hostErr != nil {
+			return hostErr
+		}
+	}
+
+	inst, argv, env, startErr := watchtower.Start(ctx, s.opts.Daemon, s.opts.Artifacts, s.item, stdout, stderr, hosts)
 	if startErr != nil {
 		return fmt.Errorf("start watchtower: %w", startErr)
 	}
 
 	s.inst = inst
-	_, _ = report.WriteCaseDir(s.opts.RunDir, report.Meta{
-		ID:      s.caseID,
-		Factors: s.item.Factors,
-		Expect:  s.item.Expect,
-		Argv:    argv,
-		Env:     env,
-	})
+	if s.caseDir != "" {
+		_, _ = report.WriteCaseDir(s.opts.RunDir, report.Meta{
+			ID:      s.caseID,
+			Factors: s.item.Factors,
+			Expect:  s.item.Expect,
+			Argv:    argv,
+			Env:     env,
+		})
+	}
+
+	if s.opts.Records != nil {
+		_ = s.opts.Records.UpsertCase(ctx, store.Case{
+			RunID:   s.opts.RunID,
+			CaseID:  s.caseID,
+			Status:  store.CaseRunning,
+			Factors: s.item.Factors,
+			Expect:  mustJSON(s.item.Expect),
+			Argv:    argv,
+			Env:     env,
+		})
+	}
 
 	return nil
 }
@@ -349,7 +456,11 @@ func (s *session) await(ctx context.Context) error {
 		s.exitCode, s.waitErr = watchtower.WaitRunOnce(ctx, s.opts.Daemon, s.inst)
 	}
 
-	s.logs = readLogs(s.caseDir)
+	if s.opts.Logs != nil {
+		s.logs = s.stdoutBuf.String() + s.stderrBuf.String()
+	} else {
+		s.logs = readLogs(s.caseDir)
+	}
 
 	return nil
 }
@@ -376,7 +487,18 @@ func (s *session) inspectAfter(ctx context.Context) error {
 	}
 
 	s.after = afterSnap
-	_ = os.WriteFile(filepath.Join(s.caseDir, "inspect-after.json"), afterRaw, permFile)
+	if s.caseDir != "" {
+		_ = os.WriteFile(filepath.Join(s.caseDir, "inspect-after.json"), afterRaw, permFile)
+	}
+
+	if s.opts.Records != nil {
+		_ = s.opts.Records.UpsertCase(ctx, store.Case{
+			RunID:        s.opts.RunID,
+			CaseID:       s.caseID,
+			Status:       store.CaseRunning,
+			InspectAfter: afterRaw,
+		})
+	}
 
 	return nil
 }
