@@ -53,3 +53,43 @@ func Sequence(req SequenceRequest) (iter.Seq[Case], error) {
 		return Product(Model()), nil
 	}
 }
+
+// WorkBound is how many cases this sitting will run when that number is known.
+//
+// File generators use the YAML length. Product and random are unbounded unless
+// limit is set. Zero means "unknown / unbounded".
+//
+// Parameters:
+//   - generator: product, random, or file.
+//   - filePath: YAML path when generator is file.
+//   - limit: --limit. Zero means no cap.
+//
+// Returns:
+//   - int: Known job count, or 0 if unbounded.
+//   - error: File load failure.
+func WorkBound(generator, filePath string, limit int) (int, error) {
+	known := 0
+
+	if generator == generatorFile {
+		if filePath == "" {
+			return 0, ErrFileGeneratorNeedsPath
+		}
+
+		cases, err := LoadFile(filePath)
+		if err != nil {
+			return 0, err
+		}
+
+		known = len(cases)
+	}
+
+	if limit > 0 {
+		if known == 0 {
+			return limit, nil
+		}
+
+		return min(known, limit), nil
+	}
+
+	return known, nil
+}

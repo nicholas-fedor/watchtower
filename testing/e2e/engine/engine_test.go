@@ -339,6 +339,39 @@ func TestUncoveredFlagsEmpty(t *testing.T) {
 	assert.Empty(t, UncoveredFlags())
 }
 
+func TestFilterStackMonitorSkipUsesInnerRegistryRef(t *testing.T) {
+	t.Parallel()
+
+	item := Case{}
+	personaFactor().Apply(&item, "lscr")
+	filterStackFactor().Apply(&item, "monitor-skip")
+	require.Equal(t, []string{"lscr.io/e2e/app:latest"}, *item.Watchtower.MonitorImageNames)
+	require.Equal(t, []string{SkipImageRef()}, *item.Watchtower.SkipImageNames)
+	require.Equal(t, "127.0.0.1:5000/e2e/app:latest", SubjectImageRef())
+	require.Equal(t, "lscr.io/e2e/app:latest", ImageRefForPersona("lscr"))
+}
+
+func TestWorkBoundFileAndLimit(t *testing.T) {
+	t.Parallel()
+
+	path := filepath.Join("..", "testdata", "cases", "smoke.yaml")
+	n, err := WorkBound(generatorFile, path, 0)
+	require.NoError(t, err)
+	require.Equal(t, 1, n)
+
+	n, err = WorkBound(generatorFile, path, 20)
+	require.NoError(t, err)
+	require.Equal(t, 1, n)
+
+	n, err = WorkBound(generatorProduct, "", 20)
+	require.NoError(t, err)
+	require.Equal(t, 20, n)
+
+	n, err = WorkBound(generatorProduct, "", 0)
+	require.NoError(t, err)
+	require.Equal(t, 0, n)
+}
+
 func TestSequenceFileRequiresPath(t *testing.T) {
 	t.Parallel()
 
@@ -356,6 +389,42 @@ func TestLookupTopic(t *testing.T) {
 
 	_, err = LookupTopic("not-a-topic")
 	require.ErrorIs(t, err, ErrUnknownTopic)
+}
+
+func TestProductMatchingRatelimitFindsCasesQuickly(t *testing.T) {
+	t.Parallel()
+
+	filters, err := CompileFilters("ratelimit", "")
+	require.NoError(t, err)
+
+	n := 0
+	for item := range ProductMatching(Model(), filters) {
+		require.True(t, matchFilters(filters, item))
+		n++
+		if n >= 20 {
+			break
+		}
+	}
+
+	require.Equal(t, 20, n)
+}
+
+func TestProductMatchingAndsTopicAndShape(t *testing.T) {
+	t.Parallel()
+
+	filters, err := CompileFilters("ratelimit", "run-once")
+	require.NoError(t, err)
+
+	n := 0
+	for item := range ProductMatching(Model(), filters) {
+		require.True(t, matchFilters(filters, item))
+		n++
+		if n >= 5 {
+			break
+		}
+	}
+
+	require.Equal(t, 5, n)
 }
 
 func TestCompileFiltersAndsTopicAndExtra(t *testing.T) {

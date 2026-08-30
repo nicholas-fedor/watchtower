@@ -3,6 +3,7 @@ package docker
 import (
 	"context"
 	"fmt"
+	"slices"
 	"sync"
 
 	"github.com/nicholas-fedor/watchtower/testing/e2e/engine"
@@ -80,8 +81,34 @@ func (p *Pool) Acquire(ctx context.Context) (*Daemon, error) {
 	case daemon := <-waiter:
 		return daemon, nil
 	case <-ctx.Done():
+		p.mu.Lock()
+		idx := slices.Index(p.waiters, waiter)
+		if idx >= 0 {
+			p.waiters = slices.Delete(p.waiters, idx, idx+1)
+			p.mu.Unlock()
+
+			return nil, fmt.Errorf("acquire dind worker: %w", ctx.Err())
+		}
+		p.mu.Unlock()
+		p.Release(<-waiter)
+
 		return nil, fmt.Errorf("acquire dind worker: %w", ctx.Err())
 	}
+}
+
+// Stats returns how many workers are in a case versus idle.
+//
+// Returns:
+//   - int: Workers currently acquired.
+//   - int: Workers waiting for a case.
+func (p *Pool) Stats() (int, int) {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+
+	idle := len(p.idle)
+	busy := max(len(p.all)-idle, 0)
+
+	return busy, idle
 }
 
 // Release returns a worker to the pool.
@@ -117,7 +144,7 @@ func (p *Pool) Release(daemon *Daemon) {
 //   - error: First close error.
 func (p *Pool) Close(ctx context.Context) error {
 	p.mu.Lock()
-	all := append([]*Daemon{}, p.all...)
+	all := slices.Clone(p.all)
 	p.idle = nil
 	p.all = nil
 	p.mu.Unlock()

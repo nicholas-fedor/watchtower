@@ -65,24 +65,26 @@ func StartPersona(ctx context.Context, daemon *Daemon, binary string, persona re
 		persona = registry.PersonaHub
 	}
 
-	dockerfile := "FROM scratch\nCOPY persona /persona\nENTRYPOINT [\"/persona\"]\n"
+	if !HasImage(ctx, daemon.Client(), personaImage) {
+		dockerfile := "FROM scratch\nCOPY persona /persona\nENTRYPOINT [\"/persona\"]\n"
 
-	tarStream, err := ContextTar(dockerfile, "persona", binary)
-	if err != nil {
-		return err
+		tarStream, err := ContextTar(dockerfile, "persona", binary)
+		if err != nil {
+			return err
+		}
+
+		build, buildErr := daemon.Client().ImageBuild(ctx, tarStream, client.ImageBuildOptions{
+			Tags:       []string{personaImage},
+			Dockerfile: "Dockerfile",
+			Remove:     true,
+		})
+		if buildErr != nil {
+			return fmt.Errorf("build persona image: %w", buildErr)
+		}
+
+		_, _ = io.Copy(io.Discard, build.Body)
+		_ = build.Body.Close()
 	}
-
-	build, buildErr := daemon.Client().ImageBuild(ctx, tarStream, client.ImageBuildOptions{
-		Tags:       []string{personaImage},
-		Dockerfile: "Dockerfile",
-		Remove:     true,
-	})
-	if buildErr != nil {
-		return fmt.Errorf("build persona image: %w", buildErr)
-	}
-	defer build.Body.Close()
-
-	_, _ = io.Copy(io.Discard, build.Body)
 
 	port, portErr := network.ParsePort("80/tcp")
 	if portErr != nil {

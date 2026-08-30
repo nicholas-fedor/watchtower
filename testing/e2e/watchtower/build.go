@@ -47,7 +47,7 @@ type Artifacts struct {
 //   - Artifacts: Built paths.
 //   - error: Compile failure.
 func Prepare(ctx context.Context, moduleRoot, source, runID, imageSource string) (Artifacts, error) {
-	dir := filepath.Join(moduleRoot, "artifacts", runID)
+	dir := filepath.Join(moduleRoot, "cache", "bin", runID)
 
 	mkdirErr := os.MkdirAll(dir, permDir)
 	if mkdirErr != nil {

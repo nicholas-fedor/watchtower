@@ -8,6 +8,8 @@ import (
 	"github.com/moby/moby/client"
 
 	containerTypes "github.com/moby/moby/api/types/container"
+
+	"github.com/nicholas-fedor/watchtower/testing/e2e/engine"
 )
 
 const (
@@ -26,7 +28,7 @@ const (
 // Returns:
 //   - string: 127.0.0.1:5000/e2e/app:latest
 func SubjectPullRef() string {
-	return innerRegistryAddr + "/e2e/app:latest"
+	return engine.SubjectImageRef()
 }
 
 // StartInnerRegistry runs distribution v2 inside DinD after loading RegistryImage.
@@ -43,9 +45,11 @@ func SubjectPullRef() string {
 //   - string: Container ID.
 //   - error: Load, create, or start failure.
 func StartInnerRegistry(ctx context.Context, daemon *Daemon) (string, error) {
-	loadErr := daemon.LoadImage(ctx, RegistryImage)
-	if loadErr != nil {
-		return "", loadErr
+	if !HasImage(ctx, daemon.Client(), RegistryImage) {
+		loadErr := daemon.LoadImage(ctx, RegistryImage)
+		if loadErr != nil {
+			return "", loadErr
+		}
 	}
 
 	created, err := daemon.Client().ContainerCreate(ctx, client.ContainerCreateOptions{

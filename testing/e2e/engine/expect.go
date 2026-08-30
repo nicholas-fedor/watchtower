@@ -37,6 +37,12 @@ func DeriveExpect(item Case) Expect {
 		return expect
 	}
 
+	if item.Topology.EnableLabel == "false" || item.Topology.MonitorOnlyLabel == "true" {
+		expect.Outcome = OutcomeNoUpdate
+
+		return expect
+	}
+
 	if item.Topology.DigestPinned {
 		expect.Outcome = OutcomeNoUpdate
 

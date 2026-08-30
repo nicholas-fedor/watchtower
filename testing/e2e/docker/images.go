@@ -228,6 +228,29 @@ func StampRunID(now time.Time, gitSHA string) string {
 	return now.UTC().Format("20060102T150405Z") + "-" + gitSHA
 }
 
+// TagLocal adds dst as another name for src on the inner daemon.
+//
+// Parameters:
+//   - ctx: Cancellation.
+//   - cli: Inner Docker client.
+//   - src: Existing image name.
+//   - dst: Additional name (persona public DNS).
+//
+// Returns:
+//   - error: Tag failure. No-op when src == dst.
+func TagLocal(ctx context.Context, cli *client.Client, src, dst string) error {
+	if src == dst || dst == "" {
+		return nil
+	}
+
+	_, err := cli.ImageTag(ctx, client.ImageTagOptions{Source: src, Target: dst})
+	if err != nil {
+		return fmt.Errorf("tag %s as %s: %w", src, dst, err)
+	}
+
+	return nil
+}
+
 // PushSubject publishes a locally built e2e/app:latest to the inner registry.
 //
 // Watchtower pulls through the inner dockerd, so the name must be

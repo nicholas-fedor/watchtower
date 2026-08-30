@@ -41,8 +41,8 @@ type Scheduler struct {
 	Limit int
 	// Filters are AND-ed regexes matched against case ID and factor values.
 	Filters []*regexp.Regexp
-	// Resume skips IDs already in the checkpoint.
-	Resume *Checkpoint
+	// Resume skips IDs already completed (checkpoint or store).
+	Resume interface{ Has(string) bool }
 	// Run executes a selected case.
 	Run RunFunc
 }

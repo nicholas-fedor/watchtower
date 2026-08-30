@@ -59,10 +59,10 @@ func flagFactors() []Factor {
 		enumFlag("disable-containers", "disable-containers", []string{LevelUnset, "decoy"}, func(c *Case, level string) {
 			c.Watchtower.DisableContainers = StringsPtr(level)
 		}),
-		enumFlag("monitor-image-names", "monitor-image-names", []string{LevelUnset, "e2e/app:latest"}, func(c *Case, level string) {
-			c.Watchtower.MonitorImageNames = StringsPtr(level)
+		enumFlag("monitor-image-names", "monitor-image-names", []string{LevelUnset, "subject"}, func(c *Case, level string) {
+			c.Watchtower.MonitorImageNames = StringsPtr(ImageRefForPersona(c.Topology.RegistryPersona))
 		}),
-		enumFlag("skip-image-names", "skip-image-names", []string{LevelUnset, "e2e/skip:latest"}, func(c *Case, level string) {
+		enumFlag("skip-image-names", "skip-image-names", []string{LevelUnset, SkipImageRef()}, func(c *Case, level string) {
 			c.Watchtower.SkipImageNames = StringsPtr(level)
 		}),
 		enumFlag("enable-containers-by-label", "enable-containers-by-label", []string{LevelUnset, "e2e=true"}, func(c *Case, level string) {
@@ -233,11 +233,11 @@ func filterStackFactor() Factor {
 				c.Watchtower.LabelEnable = new(true)
 				c.Topology.EnableLabel = "true"
 			case "names+disable":
-				c.Names = []string{"e2e-subject"}
-				c.Watchtower.DisableContainers = StringsPtr("e2e-decoy")
+				c.Names = []string{SubjectNamePattern}
+				c.Watchtower.DisableContainers = StringsPtr(DecoyNamePattern)
 			case "monitor-skip":
-				c.Watchtower.MonitorImageNames = StringsPtr("e2e/app:latest")
-				c.Watchtower.SkipImageNames = StringsPtr("e2e/skip:latest")
+				c.Watchtower.MonitorImageNames = StringsPtr(ImageRefForPersona(c.Topology.RegistryPersona))
+				c.Watchtower.SkipImageNames = StringsPtr(SkipImageRef())
 			case "enable-disable-label":
 				c.Watchtower.EnableContainersByLabel = StringsPtr("e2e=keep")
 				c.Watchtower.DisableContainersByLabel = StringsPtr("e2e=drop")

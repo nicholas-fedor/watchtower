@@ -76,6 +76,10 @@ func StartDaemon(ctx context.Context, envelope engine.Envelope) (*Daemon, error)
 			"-H", "tcp://0.0.0.0:2375",
 			"--tls=false",
 			"--insecure-registry=127.0.0.1:5000",
+			"--insecure-registry=lscr.io",
+			"--insecure-registry=ghcr.io",
+			"--insecure-registry=docker.io",
+			"--insecure-registry=registry-1.docker.io",
 		),
 		testcontainers.WithHostConfigModifier(func(hostConfig *containerTypes.HostConfig) {
 			hostConfig.Privileged = true
