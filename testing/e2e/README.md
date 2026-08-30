@@ -1,14 +1,21 @@
 # Watchtower e2e tests
 
 This directory is a nested [Go](https://go.dev/doc/install) module that drives [Watchtower](https://watchtower.nickfedor.com) as a black box.
-It builds the binary from source, runs it against a [Docker-in-Docker](https://golang.testcontainers.org/modules/dind/) daemon, and checks [inspect](https://docs.docker.com/reference/cli/docker/container/inspect/) output, logs, [porcelain JSON](https://watchtower.nickfedor.com/configuration/logging-and-output/), and the [HTTP API](https://watchtower.nickfedor.com/http-api/overview/).
+It is a **control plane**: Fiber v3 + [Huma](https://huma.rocks/) JSON API, HTMX dashboard, [Postgres](https://www.postgresql.org/) for runs/cases, [Loki](https://grafana.com/oss/loki/) for stdout/stderr.
+DinD workers are still Testcontainers (Ryuk reaps **compute only**). Postgres and Loki are Docker Compose named volumes — not Ryuk, not host `daemon.json`.
+
 Root `make test` does not run these tests.
 
 Work from this directory unless a command is shown from the repository root.
 
 ```bash
 cd testing/e2e
+go run . serve          # http://127.0.0.1:9472  dashboard + /v1 + /v1/docs
+go run . run --topic ratelimit --limit 20
+go run . status
 ```
+
+`--workers 0` (the default) sizes the DinD pool from host CPU and available RAM (2 GiB per worker, cap 8).
 
 ## What you need
 
@@ -40,7 +47,7 @@ go run . run --topic ratelimit --limit 20 --keep
 `go run . list` prints the topic names.
 `--topic` selects that slice.
 `--limit 20` stops after twenty cases.
-`--keep` leaves `artifacts/<run-id>/cases/` on disk so you can read inspect and logs.
+Results live in Postgres and Loki. Watch a sitting in the dashboard or `go run . status <run-id>`.
 
 Before you open or merge a PR, run the unbounded product (hours):
 
@@ -86,15 +93,20 @@ The entrypoint is `testing/e2e/main.go`.
 The CLI is built with [Cobra](https://cobra.dev/).
 
 ```bash
+go run . serve
 go run . run --topic ratelimit --limit 20 --keep
 go run . run [flags]
+go run . status [run-id]
+go run . cases --run <id> --status fail
+go run . logs --run <id> --case <case-id>
 go run . list [--dump-factors]
 go run . doctor
-go run . replay --case artifacts/<run-id>/cases/<case-id>
+go run . replay --case artifacts/<run-id>/cases/<id>
 go run . persona --listen :80 --backend http://127.0.0.1:5000 --persona hub
 ```
 
-`run` is the only command that executes cases.
+`serve` is the long-lived control plane (embeds from `run` if nothing is listening).
+`run` queues a sitting on the API (one-off YAML, `--topic`, or unbounded product).
 `list` does not start Docker.
 `doctor` starts one DinD worker, pings it, and exits.
 `replay` does not re-execute a case from `meta.json`.

@@ -19,17 +19,22 @@ func Execute() {
 	}
 }
 
-// newRootCommand builds the Cobra tree for run, list, doctor, replay, and persona.
+// newRootCommand builds the Cobra tree for serve, run, status, cases, logs, cancel, list, doctor, replay, and persona.
 //
 // Returns:
 //   - *cobra.Command: Root command.
 func newRootCommand() *cobra.Command {
 	root := &cobra.Command{
 		Use:   "e2e",
-		Short: "Watchtower black-box e2e engine (Testcontainers DinD, cartesian product)",
+		Short: "Watchtower black-box e2e control plane (DinD, Postgres, Loki)",
 	}
 	root.AddCommand(
 		newRunCommand(),
+		newServeCommand(),
+		newStatusCommand(),
+		newCasesCommand(),
+		newLogsCommand(),
+		newCancelCommand(),
 		newListCommand(),
 		newDoctorCommand(),
 		newReplayCommand(),
@@ -59,6 +64,17 @@ func envInt(key string, fallback int) int {
 	}
 
 	return parsed
+}
+
+// envBool reports whether key is the string "1".
+//
+// Parameters:
+//   - key: Environment variable name.
+//
+// Returns:
+//   - bool: True when the variable is "1".
+func envBool(key string) bool {
+	return os.Getenv(key) == "1"
 }
 
 // wrapCmd prefixes a backend error with the subcommand name.
