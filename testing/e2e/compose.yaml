@@ -1,0 +1,46 @@
+# Durable e2e control-plane sidecars. Named volumes. Not Testcontainers.
+# Ryuk must not own these containers. Do not add testcontainers labels.
+#
+# Pins (checked 2026-08-29):
+#   postgres 18.6 is current stable.
+#   Official image stores data under /var/lib/postgresql (not /var/lib/postgresql/data) from 18 on.
+#   grafana/loki 3.7.7 is current latest.
+#   The image is distroless: no wget/shell, so compose has no HTTP healthcheck.
+#   e2e serve probes /ready.
+#
+#   docker compose -f testing/e2e/compose.yaml up -d
+
+name: watchtower-e2e
+
+services:
+  postgres:
+    image: postgres:18.6-alpine
+    container_name: watchtower-e2e-postgres
+    ports:
+      - "127.0.0.1:5432:5432"
+    environment:
+      POSTGRES_USER: e2e
+      POSTGRES_PASSWORD: e2e
+      POSTGRES_DB: e2e
+    volumes:
+      - e2e-pg:/var/lib/postgresql
+    healthcheck:
+      test: [ "CMD-SHELL", "pg_isready -U e2e -d e2e" ]
+      interval: 2s
+      timeout: 3s
+      retries: 20
+    restart: unless-stopped
+
+  loki:
+    image: grafana/loki:3.7.7
+    container_name: watchtower-e2e-loki
+    ports:
+      - "127.0.0.1:3100:3100"
+    command: [ "-config.file=/etc/loki/local-config.yaml" ]
+    volumes:
+      - e2e-loki:/loki
+    restart: unless-stopped
+
+volumes:
+  e2e-pg:
+  e2e-loki:
