@@ -18,6 +18,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Chores
 
+- Update module github.com/prometheus/client_model to v0.6.3 by @renovate[bot] in [#2279](https://github.com/nicholas-fedor/watchtower/pull/2279)
 - Update step-security/harden-runner action to v2.21.1 by @renovate[bot] in [#2277](https://github.com/nicholas-fedor/watchtower/pull/2277)
 - Update github.com/google/pprof digest to 4932ad3 by @renovate[bot] in [#2275](https://github.com/nicholas-fedor/watchtower/pull/2275)
 - Update github.com/google/pprof digest to 67a7179 by @renovate[bot] in [#2274](https://github.com/nicholas-fedor/watchtower/pull/2274)
