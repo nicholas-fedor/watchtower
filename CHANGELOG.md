@@ -18,6 +18,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Chores
 
+- Update orhun/git-cliff-action action to v4.9.0 by @renovate[bot] in [#2285](https://github.com/nicholas-fedor/watchtower/pull/2285)
+- Update module github.com/gofiber/schema to v1.8.5 by @renovate[bot] in [#2284](https://github.com/nicholas-fedor/watchtower/pull/2284)
 - Update docker/setup-qemu-action action to v4.3.0 by @renovate[bot] in [#2283](https://github.com/nicholas-fedor/watchtower/pull/2283)
 - Update module github.com/prometheus/common to v0.71.0 by @renovate[bot] in [#2280](https://github.com/nicholas-fedor/watchtower/pull/2280)
 - Update module github.com/prometheus/client_model to v0.6.3 by @renovate[bot] in [#2279](https://github.com/nicholas-fedor/watchtower/pull/2279)
