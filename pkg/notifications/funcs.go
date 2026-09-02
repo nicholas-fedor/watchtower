@@ -3,12 +3,15 @@ package notifications
 import (
 	"encoding/json"
 	"fmt"
+	"math"
 	"strings"
 	"text/template"
 	"time"
 
 	"golang.org/x/text/cases"
 	"golang.org/x/text/language"
+
+	"github.com/nicholas-fedor/watchtower/internal/util"
 )
 
 // Funcs defines utility functions for notification templates.
@@ -20,6 +23,7 @@ var Funcs = template.FuncMap{
 	"Title":           cases.Title(language.AmericanEnglish).String,
 	"RFC1123":         formatRFC1123,
 	"HasKey":          hasKey,
+	"FormatDiskSpace": formatDiskSpace,
 }
 
 // hasKey reports whether key is present in m.
@@ -61,4 +65,63 @@ func formatRFC1123(value string) string {
 	}
 
 	return timestamp.Format(time.RFC1123)
+}
+
+// formatDiskSpace formats a template value as a human-readable disk size.
+//
+// Numeric values use decimal units from util.FormatDiskSpace. Non-numeric
+// values, including nil, return "unknown".
+//
+// Parameters:
+//   - value: Template value, typically an int64 byte count from log data.
+//
+// Returns:
+//   - string: Human-readable size such as "10 GB", or "unknown".
+func formatDiskSpace(value any) string {
+	bytes, ok := int64FromAny(value)
+	if !ok {
+		return "unknown"
+	}
+
+	return util.FormatDiskSpace(bytes)
+}
+
+// int64FromAny converts common numeric template values to int64.
+//
+// Parameters:
+//   - value: Value from log data or JSON decoding.
+//
+// Returns:
+//   - int64: Converted integer when the value is a supported numeric type.
+//   - bool: False when the value is missing, non-numeric, or out of range.
+func int64FromAny(value any) (int64, bool) {
+	switch typed := value.(type) {
+	case int:
+		return int64(typed), true
+	case int32:
+		return int64(typed), true
+	case int64:
+		return typed, true
+	case uint64:
+		if typed > math.MaxInt64 {
+			return 0, false
+		}
+
+		return int64(typed), true
+	case float64:
+		if math.IsNaN(typed) || typed >= float64(math.MaxInt64) || typed < float64(math.MinInt64) {
+			return 0, false
+		}
+
+		return int64(typed), true
+	case json.Number:
+		parsed, err := typed.Int64()
+		if err != nil {
+			return 0, false
+		}
+
+		return parsed, true
+	default:
+		return 0, false
+	}
 }

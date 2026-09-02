@@ -1,6 +1,7 @@
 package util
 
 import (
+	"math"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -64,6 +65,38 @@ func TestParseDiskSpace(t *testing.T) {
 
 			require.NoError(t, err)
 			assert.Equal(t, tc.want, got)
+		})
+	}
+}
+
+func TestFormatDiskSpace(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name  string
+		bytes int64
+		want  string
+	}{
+		{name: "zero", bytes: 0, want: "0 B"},
+		{name: "bytes", bytes: 512, want: "512 B"},
+		{name: "999 bytes", bytes: 999, want: "999 B"},
+		{name: "exact kilobyte", bytes: 1000, want: "1 KB"},
+		{name: "fractional kilobyte", bytes: 1536, want: "1.54 KB"},
+		{name: "exact megabyte", bytes: 2_000_000, want: "2 MB"},
+		{name: "exact gigabyte", bytes: 10_000_000_000, want: "10 GB"},
+		{name: "warning gigabytes", bytes: 8_000_000_000, want: "8 GB"},
+		{name: "decimal gigabyte", bytes: 1_500_000_000, want: "1.5 GB"},
+		{name: "exact terabyte", bytes: 1_000_000_000_000, want: "1 TB"},
+		{name: "exact petabyte", bytes: 1_000_000_000_000_000, want: "1 PB"},
+		{name: "negative gigabyte", bytes: -10_000_000_000, want: "-10 GB"},
+		{name: "min int64", bytes: math.MinInt64, want: "-9223.37 PB"},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+
+			assert.Equal(t, tc.want, FormatDiskSpace(tc.bytes))
 		})
 	}
 }

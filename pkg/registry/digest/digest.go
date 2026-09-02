@@ -1038,7 +1038,7 @@ func ExtractHeadDigest(log *zerolog.Logger, resp *http.Response) (string, error)
 	digest := resp.Header.Get(ContentDigestHeader)
 	if digest == "" {
 		// Log and return an error if the digest is missing, including auth details for debugging.
-		wwwAuthHeader := resp.Header.Get("www-authenticate")
+		wwwAuthHeader := resp.Header.Get("WWW-Authenticate")
 		log.Debug().
 			Str("status", resp.Status).
 			Str("auth_header", wwwAuthHeader).
