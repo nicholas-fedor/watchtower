@@ -18,6 +18,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Chores
 
+- Update module github.com/nicholas-fedor/shoutrrr to v0.19.0 by @renovate[bot] in [#2294](https://github.com/nicholas-fedor/watchtower/pull/2294)
+- Update golang docker tag to v1.27.1 by @renovate[bot] in [#2293](https://github.com/nicholas-fedor/watchtower/pull/2293)
+- Update cimg/go docker tag to v1.27.1 by @renovate[bot] in [#2292](https://github.com/nicholas-fedor/watchtower/pull/2292)
+- Update golang:alpine3.24 docker digest to 26402d8 by @renovate[bot] in [#2291](https://github.com/nicholas-fedor/watchtower/pull/2291)
 - Update github.com/google/pprof digest to ca85771 by @renovate[bot] in [#2290](https://github.com/nicholas-fedor/watchtower/pull/2290)
 - Update cimg/go:1.27.0 docker digest to 6026c28 by @renovate[bot] in [#2289](https://github.com/nicholas-fedor/watchtower/pull/2289)
 - Update go module directive to v1.27.1 by @renovate[bot] in [#2287](https://github.com/nicholas-fedor/watchtower/pull/2287)
