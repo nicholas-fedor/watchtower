@@ -109,7 +109,7 @@ func int64FromAny(value any) (int64, bool) {
 
 		return int64(typed), true
 	case float64:
-		if typed > math.MaxInt64 || typed < math.MinInt64 {
+		if math.IsNaN(typed) || typed >= float64(math.MaxInt64) || typed < float64(math.MinInt64) {
 			return 0, false
 		}
 

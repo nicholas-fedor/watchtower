@@ -1,6 +1,7 @@
 package templates
 
 import (
+	"math"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -29,6 +30,9 @@ func TestFormatDiskSpace(t *testing.T) {
 	assert.Equal(t, "10 GB", formatDiskSpace(int64(10_000_000_000)))
 	assert.Equal(t, "0 B", formatDiskSpace(int64(0)))
 	assert.Equal(t, "unknown", formatDiskSpace(nil))
+	assert.Equal(t, "unknown", formatDiskSpace(math.NaN()))
+	assert.Equal(t, "unknown", formatDiskSpace(float64(1<<63)))
+	assert.Equal(t, "-9223.37 PB", formatDiskSpace(int64(math.MinInt64)))
 }
 
 func TestFormatRFC1123(t *testing.T) {

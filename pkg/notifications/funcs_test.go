@@ -24,6 +24,8 @@ func TestFormatDiskSpace(t *testing.T) {
 		{name: "nil", value: nil, want: "unknown"},
 		{name: "string", value: "10GB", want: "unknown"},
 		{name: "uint64 overflow", value: uint64(math.MaxInt64) + 1, want: "unknown"},
+		{name: "float64 nan", value: math.NaN(), want: "unknown"},
+		{name: "float64 max int64", value: float64(1 << 63), want: "unknown"},
 	}
 
 	for _, tc := range tests {

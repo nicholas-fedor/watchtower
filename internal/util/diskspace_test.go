@@ -1,6 +1,7 @@
 package util
 
 import (
+	"math"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -88,6 +89,7 @@ func TestFormatDiskSpace(t *testing.T) {
 		{name: "exact terabyte", bytes: 1_000_000_000_000, want: "1 TB"},
 		{name: "exact petabyte", bytes: 1_000_000_000_000_000, want: "1 PB"},
 		{name: "negative gigabyte", bytes: -10_000_000_000, want: "-10 GB"},
+		{name: "min int64", bytes: math.MinInt64, want: "-9223.37 PB"},
 	}
 
 	for _, tc := range tests {

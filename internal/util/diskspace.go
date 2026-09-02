@@ -3,6 +3,7 @@ package util
 import (
 	"errors"
 	"fmt"
+	"math"
 	"math/big"
 	"strconv"
 	"strings"
@@ -228,6 +229,10 @@ func splitDiskSpaceValueAndUnit(size string) (string, string) {
 // Returns:
 //   - string: Human-readable size such as "10 GB" or "512 B".
 func FormatDiskSpace(bytes int64) string {
+	if bytes == math.MinInt64 {
+		return "-" + FormatDiskSpace(math.MaxInt64)
+	}
+
 	if bytes < 0 {
 		return "-" + FormatDiskSpace(-bytes)
 	}
