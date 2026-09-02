@@ -90,13 +90,13 @@ Simple templates are used when the [`notification-report`](#notification_report)
 {{- else if eq $msg "Detected multiple Watchtower instances - initiating cleanup" -}}
     Detected {{$e.Data.count}} Watchtower instances - initiating cleanup
 {{- else if eq $msg "Docker image usage exceeds configured maximum" -}}
-    Docker image usage exceeds configured maximum: {{with $e.Data.usage}}{{.}}{{else}}unknown{{end}}/{{with $e.Data.max}}{{.}}{{else}}unknown{{end}} bytes used (reclaimable {{with $e.Data.reclaimable}}{{.}}{{else}}unknown{{end}}, {{with $e.Data.image_count}}{{.}}{{else}}unknown{{end}} images)
+    Docker image usage exceeds configured maximum: {{with $e.Data.usage}}{{FormatDiskSpace .}}{{else}}unknown{{end}} of {{with $e.Data.max}}{{FormatDiskSpace .}}{{else}}unknown{{end}} used ({{with $e.Data.reclaimable}}{{FormatDiskSpace .}}{{else}}unknown{{end}} reclaimable, {{with $e.Data.image_count}}{{.}}{{else}}unknown{{end}} images)
 {{- else if eq $msg "Docker image usage exceeds configured warning threshold" -}}
-    Docker image usage exceeds configured warning threshold: {{with $e.Data.usage}}{{.}}{{else}}unknown{{end}}/{{with $e.Data.warn}}{{.}}{{else}}unknown{{end}} bytes used (reclaimable {{with $e.Data.reclaimable}}{{.}}{{else}}unknown{{end}}, {{with $e.Data.image_count}}{{.}}{{else}}unknown{{end}} images)
+    Docker image usage exceeds configured warning threshold: {{with $e.Data.usage}}{{FormatDiskSpace .}}{{else}}unknown{{end}} of {{with $e.Data.warn}}{{FormatDiskSpace .}}{{else}}unknown{{end}} used ({{with $e.Data.reclaimable}}{{FormatDiskSpace .}}{{else}}unknown{{end}} reclaimable, {{with $e.Data.image_count}}{{.}}{{else}}unknown{{end}} images)
 {{- else if eq $msg "Failed to query Docker image disk usage" -}}
     Failed to query Docker image disk usage{{with $e.Data.error}}: {{.}}{{end}}
 {{- else if eq $msg "Docker image usage budget enabled" -}}
-    Docker image usage budget enabled: max {{with $e.Data.disk_space_max}}{{.}}{{else}}0{{end}} bytes, warn {{with $e.Data.disk_space_warn}}{{.}}{{else}}0{{end}} bytes
+    Docker image usage budget enabled: maximum {{with $e.Data.disk_space_max}}{{FormatDiskSpace .}}{{else}}0 B{{end}}, warning at {{with $e.Data.disk_space_warn}}{{FormatDiskSpace .}}{{else}}0 B{{end}}
 {{- else if $e.Data -}}
     {{$msg}} | {{range $k, $v := $e.Data -}}{{$k}}={{$v}} {{- end}}
 {{- else -}}
@@ -135,13 +135,13 @@ The [Template Preview Tool](../template-preview/index.md) uses the same template
 {{- else if eq $msg "Detected multiple Watchtower instances - initiating cleanup" -}}
     Detected {{$e.Data.count}} Watchtower instances - initiating cleanup
 {{- else if eq $msg "Docker image usage exceeds configured maximum" -}}
-    Docker image usage exceeds configured maximum: {{with $e.Data.usage}}{{.}}{{else}}unknown{{end}}/{{with $e.Data.max}}{{.}}{{else}}unknown{{end}} bytes used (reclaimable {{with $e.Data.reclaimable}}{{.}}{{else}}unknown{{end}}, {{with $e.Data.image_count}}{{.}}{{else}}unknown{{end}} images)
+    Docker image usage exceeds configured maximum: {{with $e.Data.usage}}{{FormatDiskSpace .}}{{else}}unknown{{end}} of {{with $e.Data.max}}{{FormatDiskSpace .}}{{else}}unknown{{end}} used ({{with $e.Data.reclaimable}}{{FormatDiskSpace .}}{{else}}unknown{{end}} reclaimable, {{with $e.Data.image_count}}{{.}}{{else}}unknown{{end}} images)
 {{- else if eq $msg "Docker image usage exceeds configured warning threshold" -}}
-    Docker image usage exceeds configured warning threshold: {{with $e.Data.usage}}{{.}}{{else}}unknown{{end}}/{{with $e.Data.warn}}{{.}}{{else}}unknown{{end}} bytes used (reclaimable {{with $e.Data.reclaimable}}{{.}}{{else}}unknown{{end}}, {{with $e.Data.image_count}}{{.}}{{else}}unknown{{end}} images)
+    Docker image usage exceeds configured warning threshold: {{with $e.Data.usage}}{{FormatDiskSpace .}}{{else}}unknown{{end}} of {{with $e.Data.warn}}{{FormatDiskSpace .}}{{else}}unknown{{end}} used ({{with $e.Data.reclaimable}}{{FormatDiskSpace .}}{{else}}unknown{{end}} reclaimable, {{with $e.Data.image_count}}{{.}}{{else}}unknown{{end}} images)
 {{- else if eq $msg "Failed to query Docker image disk usage" -}}
     Failed to query Docker image disk usage{{with $e.Data.error}}: {{.}}{{end}}
 {{- else if eq $msg "Docker image usage budget enabled" -}}
-    Docker image usage budget enabled: max {{with $e.Data.disk_space_max}}{{.}}{{else}}0{{end}} bytes, warn {{with $e.Data.disk_space_warn}}{{.}}{{else}}0{{end}} bytes
+    Docker image usage budget enabled: maximum {{with $e.Data.disk_space_max}}{{FormatDiskSpace .}}{{else}}0 B{{end}}, warning at {{with $e.Data.disk_space_warn}}{{FormatDiskSpace .}}{{else}}0 B{{end}}
 {{- else if $e.Data -}}
     {{$msg}} | {{range $k, $v := $e.Data -}}{{$k}}={{$v}} {{- end}}
 {{- else -}}

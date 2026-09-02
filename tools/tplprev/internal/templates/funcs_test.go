@@ -23,6 +23,14 @@ func TestToJSON(t *testing.T) {
 	assert.Contains(t, got, `"title": "Title"`)
 }
 
+func TestFormatDiskSpace(t *testing.T) {
+	t.Parallel()
+
+	assert.Equal(t, "10 GB", formatDiskSpace(int64(10_000_000_000)))
+	assert.Equal(t, "0 B", formatDiskSpace(int64(0)))
+	assert.Equal(t, "unknown", formatDiskSpace(nil))
+}
+
 func TestFormatRFC1123(t *testing.T) {
 	t.Parallel()
 
