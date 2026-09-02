@@ -18,6 +18,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Chores
 
+- Update github.com/google/pprof digest to ca85771 by @renovate[bot] in [#2290](https://github.com/nicholas-fedor/watchtower/pull/2290)
+- Update cimg/go:1.27.0 docker digest to 6026c28 by @renovate[bot] in [#2289](https://github.com/nicholas-fedor/watchtower/pull/2289)
+- Update go module directive to v1.27.1 by @renovate[bot] in [#2287](https://github.com/nicholas-fedor/watchtower/pull/2287)
 - Update orhun/git-cliff-action action to v4.9.0 by @renovate[bot] in [#2285](https://github.com/nicholas-fedor/watchtower/pull/2285)
 - Update module github.com/gofiber/schema to v1.8.5 by @renovate[bot] in [#2284](https://github.com/nicholas-fedor/watchtower/pull/2284)
 - Update docker/setup-qemu-action action to v4.3.0 by @renovate[bot] in [#2283](https://github.com/nicholas-fedor/watchtower/pull/2283)
