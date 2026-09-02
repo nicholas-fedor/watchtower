@@ -49,6 +49,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Format disk usage sizes in human-readable units by @nicholas-fedor in [#2297](https://github.com/nicholas-fedor/watchtower/pull/2297)
 - Pace throttled registry hosts without bursting advertised quotas by @nicholas-fedor in [#2262](https://github.com/nicholas-fedor/watchtower/pull/2262)
 - Complete image removal after self-update SIGTERM by @nicholas-fedor in [#2251](https://github.com/nicholas-fedor/watchtower/pull/2251)
 
