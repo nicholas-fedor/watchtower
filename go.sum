@@ -131,8 +131,8 @@ github.com/moby/moby/client v0.5.1 h1:tYNaJno4c0HXz12y5BiqEDy0rVTYkWzI26lGvnTMiJ
 github.com/moby/moby/client v0.5.1/go.mod h1:odLstlZ6uSnfvAgVxMpvgmb8SUdd+siH2T0GBuxVAlM=
 github.com/munnerz/goautoneg v0.0.0-20191010083416-a7dc8b61c822 h1:C3w9PqII01/Oq1c1nUAm88MOHcQC9l5mIlSMApZMrHA=
 github.com/munnerz/goautoneg v0.0.0-20191010083416-a7dc8b61c822/go.mod h1:+n7T8mK8HuQTcFwEeznm/DIxMOiR9yIdICNftLE1DvQ=
-github.com/nicholas-fedor/shoutrrr v0.18.0 h1:j1t4YLVZTys4f0/Ct+VYq0ljJp6U7xeV0GdS9Nx7q9I=
-github.com/nicholas-fedor/shoutrrr v0.18.0/go.mod h1:opx/+ls6kVZviuEUnmtlT8xYB8+OM5jB+Bzzv+P1OZw=
+github.com/nicholas-fedor/shoutrrr v0.19.0 h1:Rl6bpK3DXuR2Trtx2JV8t+wjUwkHdRHrc8nBKoEpHr0=
+github.com/nicholas-fedor/shoutrrr v0.19.0/go.mod h1:Glfdi8AGTbnEn2k2+hW62n8oL0i9vqRVFtXaUIthNks=
 github.com/onsi/ginkgo/v2 v2.32.1 h1:6tlvcDm/3sE8lGJbZ4+d4mO3RLy24/tQWOFzVSQNIfw=
 github.com/onsi/ginkgo/v2 v2.32.1/go.mod h1:+aXOY+vzZ5mu2iI2HpTZUPmM//oQfsNFX6gU9kNcA44=
 github.com/onsi/gomega v1.43.0 h1:VlG/1FxqNxhSO+lq/OHBNaaqwiBK/mO8JbVkX9Y+FeU=
