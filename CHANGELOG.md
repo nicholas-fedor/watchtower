@@ -10,6 +10,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Chores
 
+- Update module github.com/gofiber/utils/v2 to v2.4.3 by @renovate[bot] in [#2303](https://github.com/nicholas-fedor/watchtower/pull/2303)
 - Update golang:1.27.1-alpine docker digest to cf6fca6 by @renovate[bot] in [#2299](https://github.com/nicholas-fedor/watchtower/pull/2299)
 - Update golang:alpine3.24 docker digest to cf6fca6 by @renovate[bot] in [#2300](https://github.com/nicholas-fedor/watchtower/pull/2300)
 
