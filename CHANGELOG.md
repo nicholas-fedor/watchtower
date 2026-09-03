@@ -10,6 +10,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Chores
 
+- Update github.com/google/pprof digest to d6c3cb2 by @renovate[bot] in [#2309](https://github.com/nicholas-fedor/watchtower/pull/2309)
 - Update module github.com/go-openapi/spec to v1 by @renovate[bot] in [#2307](https://github.com/nicholas-fedor/watchtower/pull/2307)
 - Update module golang.org/x/crypto to v0.56.0 by @renovate[bot] in [#2306](https://github.com/nicholas-fedor/watchtower/pull/2306)
 - Update module github.com/klauspost/compress to v1.20.0 by @renovate[bot] in [#2304](https://github.com/nicholas-fedor/watchtower/pull/2304)
