@@ -8,6 +8,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Chores
+
+- Update golang:1.27.1-alpine docker digest to cf6fca6 by @renovate[bot] in [#2299](https://github.com/nicholas-fedor/watchtower/pull/2299)
+- Update golang:alpine3.24 docker digest to cf6fca6 by @renovate[bot] in [#2300](https://github.com/nicholas-fedor/watchtower/pull/2300)
+
+## [1.22.0] - 2026-09-02
+
 ### Added
 
 - Add configurable Docker image disk usage thresholds by @nicholas-fedor in [#2257](https://github.com/nicholas-fedor/watchtower/pull/2257)
@@ -3557,7 +3564,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## Compare Releases
 
-- [unreleased](https://github.com/nicholas-fedor/watchtower/compare/v1.21.2...HEAD)
+- [unreleased](https://github.com/nicholas-fedor/watchtower/compare/v1.22.0...HEAD)
+- [1.22.0](https://github.com/nicholas-fedor/watchtower/compare/v1.21.2...v1.22.0)
 - [1.21.2](https://github.com/nicholas-fedor/watchtower/compare/v1.21.1...v1.21.2)
 - [1.21.1](https://github.com/nicholas-fedor/watchtower/compare/v1.21.0...v1.21.1)
 - [1.21.0](https://github.com/nicholas-fedor/watchtower/compare/v1.20.3...v1.21.0)
