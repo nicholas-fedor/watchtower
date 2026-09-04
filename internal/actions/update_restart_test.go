@@ -15,9 +15,43 @@ import (
 	"github.com/nicholas-fedor/watchtower/internal/actions"
 	mockActions "github.com/nicholas-fedor/watchtower/internal/actions/mocks"
 	"github.com/nicholas-fedor/watchtower/internal/metrics"
+	"github.com/nicholas-fedor/watchtower/pkg/container"
 	"github.com/nicholas-fedor/watchtower/pkg/filters"
 	"github.com/nicholas-fedor/watchtower/pkg/types"
 )
+
+// createNetworkModeContainer builds a container that joins another container's
+// network namespace, with Compose project and service labels applied.
+func createNetworkModeContainer(
+	id, name, project, service, networkMode string,
+) types.Container {
+	hostConfig := &dockerContainer.HostConfig{
+		PortBindings: dockerNetwork.PortMap{},
+	}
+	if networkMode != "" {
+		hostConfig.NetworkMode = dockerContainer.NetworkMode(networkMode)
+	}
+
+	content := dockerContainer.InspectResponse{
+		ID:    id,
+		Image: "image:latest",
+		Name:  name,
+		State: &dockerContainer.State{Running: true},
+		Created: time.Now().
+			AddDate(0, 0, -1).
+			Format(time.RFC3339Nano),
+		HostConfig: hostConfig,
+		Config: &dockerContainer.Config{
+			Labels: map[string]string{
+				"com.docker.compose.project": project,
+				"com.docker.compose.service": service,
+			},
+			ExposedPorts: dockerNetwork.PortSet{},
+		},
+	}
+
+	return container.NewContainer(nil, &content, mockActions.CreateMockImageInfo("image:latest"))
+}
 
 // createStaleContainersForTest creates two stale containers and returns them along with TestData.
 // This is a helper function used by tests that need to set up containers for rolling restart scenarios.
@@ -780,6 +814,27 @@ var _ = ginkgo.Describe("the update action", func() {
 				gomega.Expect(dep1.ToRestart()).To(gomega.BeTrue())
 				gomega.Expect(dep2.ToRestart()).To(gomega.BeTrue())
 				gomega.Expect(dep3.ToRestart()).To(gomega.BeTrue())
+			})
+
+			ginkgo.It("marks a container sharing a network namespace across Compose projects", func() {
+				// gluetun and qbittorrent are separate Compose projects, which is
+				// the usual layout when one VPN container is shared between
+				// several stacks.
+				gluetun := createNetworkModeContainer(
+					"gluetun-id", "/gluetun", "gluetun", "app", "",
+				)
+				qbittorrent := createNetworkModeContainer(
+					"qbittorrent-id", "/qbittorrent", "qbittorrent", "app",
+					"container:gluetun",
+				)
+
+				containers := []types.Container{gluetun, qbittorrent}
+				gluetun.SetStale(true)
+
+				actions.UpdateImplicitRestart(testLogger(), containers, containers, true)
+
+				gomega.Expect(gluetun.ToRestart()).To(gomega.BeTrue())
+				gomega.Expect(qbittorrent.ToRestart()).To(gomega.BeTrue())
 			})
 
 			ginkgo.It("should handle restarted containers with circular dependencies", func() {

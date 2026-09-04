@@ -785,6 +785,18 @@ var _ = ginkgo.Describe("Container", func() {
 				links := container.Links(true)
 				gomega.Expect(links).To(gomega.ContainElement("myproject-other"))
 			})
+
+			ginkgo.It("includes the bare network mode container name", func() {
+				// The network mode references a container name that may belong
+				// to another Compose project, so the unqualified name has to be
+				// offered as well.
+				container = MockContainer(
+					WithNetworkMode("container:gluetun"),
+					WithLabels(map[string]string{"com.docker.compose.project": "qbittorrent"}),
+				)
+				links := container.Links(true)
+				gomega.Expect(links).To(gomega.ContainElement("gluetun"))
+			})
 		})
 
 		ginkgo.It("returns pre and post update timeout values", func() {

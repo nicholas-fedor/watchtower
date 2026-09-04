@@ -973,7 +973,7 @@ func getLinksFromHostConfig(c *Container, clog *zerolog.Logger) []string {
 
 	networkMode := c.containerInfo.HostConfig.NetworkMode
 	if networkMode.IsContainer() {
-		capacity++
+		capacity += 2
 	}
 
 	normalizedLinks := make([]string, 0, capacity)
@@ -1005,13 +1005,19 @@ func getLinksFromHostConfig(c *Container, clog *zerolog.Logger) []string {
 	}
 
 	// Add network dependency.
+	//
+	// Unlike a Compose service reference, the network mode holds a container
+	// name that is not necessarily part of this container's project: a shared
+	// VPN or sidecar container is commonly defined in a separate Compose
+	// project. Emit the bare name in addition to the project-qualified one so
+	// dependency resolution matches either layout.
 	if networkMode.IsContainer() {
 		normalizedName := util.NormalizeContainerName(networkMode.ConnectedContainer())
-		if projectName != "" && !strings.HasPrefix(normalizedName, projectName+"-") {
-			normalizedName = projectName + "-" + normalizedName
-		}
-
 		normalizedLinks = append(normalizedLinks, normalizedName)
+
+		if projectName != "" && !strings.HasPrefix(normalizedName, projectName+"-") {
+			normalizedLinks = append(normalizedLinks, projectName+"-"+normalizedName)
+		}
 	}
 
 	clog.Debug().
