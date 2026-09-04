@@ -10,6 +10,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Chores
 
+- Update go-openapi packages by @renovate[bot] in [#2317](https://github.com/nicholas-fedor/watchtower/pull/2317)
 - Update module github.com/moby/moby/client to v0.6.0 by @renovate[bot] in [#2315](https://github.com/nicholas-fedor/watchtower/pull/2315)
 - Update module github.com/moby/moby/api to v1.56.0 by @renovate[bot] in [#2312](https://github.com/nicholas-fedor/watchtower/pull/2312)
 - Update module github.com/docker/cli to v29.8.0+incompatible by @renovate[bot] in [#2311](https://github.com/nicholas-fedor/watchtower/pull/2311)
