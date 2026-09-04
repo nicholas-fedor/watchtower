@@ -10,6 +10,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Chores
 
+- Update module github.com/docker/cli to v29.8.0+incompatible by @renovate[bot] in [#2311](https://github.com/nicholas-fedor/watchtower/pull/2311)
 - Update github.com/google/pprof digest to d6c3cb2 by @renovate[bot] in [#2309](https://github.com/nicholas-fedor/watchtower/pull/2309)
 - Update module github.com/go-openapi/spec to v1 by @renovate[bot] in [#2307](https://github.com/nicholas-fedor/watchtower/pull/2307)
 - Update module golang.org/x/crypto to v0.56.0 by @renovate[bot] in [#2306](https://github.com/nicholas-fedor/watchtower/pull/2306)
