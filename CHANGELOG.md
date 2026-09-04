@@ -10,6 +10,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Chores
 
+- Update module github.com/moby/moby/client to v0.6.0 by @renovate[bot] in [#2315](https://github.com/nicholas-fedor/watchtower/pull/2315)
+- Update module github.com/moby/moby/api to v1.56.0 by @renovate[bot] in [#2312](https://github.com/nicholas-fedor/watchtower/pull/2312)
 - Update module github.com/docker/cli to v29.8.0+incompatible by @renovate[bot] in [#2311](https://github.com/nicholas-fedor/watchtower/pull/2311)
 - Update github.com/google/pprof digest to d6c3cb2 by @renovate[bot] in [#2309](https://github.com/nicholas-fedor/watchtower/pull/2309)
 - Update module github.com/go-openapi/spec to v1 by @renovate[bot] in [#2307](https://github.com/nicholas-fedor/watchtower/pull/2307)
