@@ -309,9 +309,11 @@ Authenticating with a Docker Hub account raises the limit from 100 to 200 pulls,
 
 #### GitHub Container Registry (ghcr.io)
 
-GHCR.io does not publish Docker Hub-style pull quotas. It does advertise an undocumented edge budget (observed as `allowed: 44000/minute` with a sub-second `retry-after`) that trips on bursts of concurrent requests, including anonymous pulls of `lscr.io` images hosted there.
+GHCR.io does not publish Docker Hub-style pull quotas. Anonymous pulls of a public org share an undocumented edge token bucket, observed as `allowed: 44000/minute` with a sub-millisecond `retry-after`. That includes `lscr.io/linuxserver/*` images, which Watchtower remaps to `ghcr.io` for digest and auth.
 
-Watchtower treats that advertised figure as a fill rate, not a burst size: after a 429 it paces one request at a time for that host. Authenticating to the registry is still the most reliable way to leave a shared anonymous bucket.
+Unauthenticated GHCR checks run one at a time. Tiny waits are floored to 100ms and retried for up to 30 seconds. In-cycle retries stay at debug so they do not become notifications. If the window is exhausted, that container is **failed** for the cycle.
+
+`docker login ghcr.io` (or equivalent credentials in `config.json` / `REPO_USER` and `REPO_PASS`) uses a per-user bucket and restores parallel GHCR checks. Login to `lscr.io` alone does not count. Credential lookup uses `ghcr.io` after the remap.
 
 #### Per-Registry Impact Summary
 
@@ -320,7 +322,7 @@ Watchtower treats that advertised figure as a fill rate, not a burst size: after
 | Docker Hub (unauthenticated)    | 100 / 6 hours               | Moderate — may exceed limit with many containers on short intervals |
 | Docker Hub (authenticated free) | 200 / 6 hours               | Low — sufficient for most deployments                               |
 | Docker Hub (paid)               | Unlimited                   | None                                                                |
-| GHCR.io                         | ~44,000 / minute fill rate (small burst) | Low — paced after a 429; authenticate if you see retries |
+| GHCR.io                         | ~44,000 / minute fill rate (small burst, org-scoped when anonymous) | Low — unauthenticated checks are sequential and retry for up to 30s. Authenticate to `ghcr.io` for a per-user bucket and parallel checks. |
 
 ### Monitor-Only Containers
 

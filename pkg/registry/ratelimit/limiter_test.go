@@ -3,6 +3,7 @@ package ratelimit
 import (
 	"context"
 	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -340,4 +341,93 @@ func TestWaitDoesNotAccrueBurstDuringCooldown(t *testing.T) {
 	}
 
 	assert.LessOrEqual(t, granted, 1)
+}
+
+func TestScopeSeparatesAnonymousGHCR(t *testing.T) {
+	t.Parallel()
+
+	assert.Equal(t, "ghcr.io|anon", Scope("ghcr.io", false))
+	assert.Equal(t, "ghcr.io", Scope("ghcr.io", true))
+	assert.Equal(t, "index.docker.io", Scope("index.docker.io", false))
+	assert.Empty(t, Scope("", false))
+	assert.True(t, IsAnonymousScope(Scope("ghcr.io", false)))
+	assert.False(t, IsAnonymousScope(Scope("ghcr.io", true)))
+}
+
+func TestAnonymousGHCRSerializes(t *testing.T) {
+	ResetForTest()
+
+	key := Scope("ghcr.io", false)
+
+	var (
+		inFlight atomic.Int32
+		peak     atomic.Int32
+	)
+
+	var wg sync.WaitGroup
+
+	for range 8 {
+		wg.Go(func() {
+			require.NoError(t, AcquireSerial(t.Context(), key))
+			defer ReleaseSerial(key)
+
+			n := inFlight.Add(1)
+
+			for {
+				old := peak.Load()
+				if n <= old || peak.CompareAndSwap(old, n) {
+					break
+				}
+			}
+
+			time.Sleep(20 * time.Millisecond)
+			inFlight.Add(-1)
+		})
+	}
+
+	wg.Wait()
+	assert.Equal(t, int32(1), peak.Load())
+}
+
+func TestAuthenticatedGHCRDoesNotTakeAnonLock(t *testing.T) {
+	ResetForTest()
+
+	anonKey := Scope("ghcr.io", false)
+
+	require.NoError(t, AcquireSerial(t.Context(), anonKey))
+	defer ReleaseSerial(anonKey)
+
+	started := time.Now()
+	authKey := Scope("ghcr.io", true)
+	require.Equal(t, "ghcr.io", authKey)
+	require.NoError(t, Wait(t.Context(), authKey))
+	assert.Less(t, time.Since(started), 50*time.Millisecond)
+}
+
+func TestResetForTestSerialSlotsConcurrent(t *testing.T) {
+	t.Cleanup(ResetForTest)
+
+	var wg sync.WaitGroup
+
+	for range 32 {
+		wg.Go(func() {
+			ResetForTest()
+		})
+		wg.Go(func() {
+			_ = serialSlotFor("serial-race")
+		})
+	}
+
+	wg.Wait()
+}
+
+func TestObserveAnonDoesNotPaceAuth(t *testing.T) {
+	ResetForTest()
+
+	Observe(Scope("ghcr.io", false), &Error{RetryAfter: time.Hour})
+
+	started := time.Now()
+
+	require.NoError(t, Wait(t.Context(), Scope("ghcr.io", true)))
+	assert.Less(t, time.Since(started), 50*time.Millisecond)
 }

@@ -713,19 +713,21 @@ func (c imageClient) performImagePull(
 	clog := &clogVal
 	clog.Debug().Msg("Initiating image pull")
 
-	pullHost, hostErr := auth.GetRegistryAddress(clog, imageName)
-	if hostErr != nil || pullHost == "" {
+	address, hostErr := auth.GetRegistryAddress(clog, imageName)
+	if hostErr != nil || address == "" {
 		clog.Debug().
 			Err(hostErr).
 			Msg("Failed to resolve registry host for rate limiting")
 	}
 
+	pullHost := ratelimit.Scope(address, opts.RegistryAuth != "")
+
 	pullErr := ratelimit.Do(ctx, clog, pullHost, func() error {
-		err := acquirePullSlot(ctx, pullHost)
+		err := acquirePullSlot(ctx, address)
 		if err != nil {
 			return err
 		}
-		defer releasePullSlot(pullHost)
+		defer releasePullSlot(address)
 
 		// A sibling pull may have recorded a 429 after this attempt passed Wait
 		// and while it was queued on the slot. Recheck cooldown without taking

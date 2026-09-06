@@ -64,6 +64,24 @@ func (m Progress) AddSkipped(log *zerolog.Logger, container types.Container, err
 		Msg("Added container as skipped")
 }
 
+// AddFailed adds a container as failed with an error.
+//
+// Parameters:
+//   - log: Logger for diagnostics.
+//   - container: Container to add.
+//   - err: Failure reason error.
+//   - params: Update parameters for monitor-only check.
+func (m Progress) AddFailed(log *zerolog.Logger, container types.Container, err error, params types.UpdateParams) {
+	update := UpdateFromContainer(log, container, container.ImageID(), FailedState, params)
+	update.containerError = err
+	m.Add(log, update)
+	log.Debug().
+		Err(err).
+		Str("container_id", container.ID().ShortID()).
+		Str("name", container.Name()).
+		Msg("Added container as failed")
+}
+
 // AddScanned adds a container as scanned with a new image.
 //
 // Parameters:

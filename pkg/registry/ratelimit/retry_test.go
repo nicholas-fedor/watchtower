@@ -116,6 +116,7 @@ func TestDoGivesUpWhenTinyRetryAfterExceedsElapsedBudget(t *testing.T) {
 	ResetForTest()
 
 	retryElapsed = 250 * time.Millisecond
+
 	defer ResetForTest()
 
 	var buf bytes.Buffer

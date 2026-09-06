@@ -13,18 +13,18 @@ import (
 
 // Do retries operation when the registry returns a 429 that is worth retrying.
 //
-// Permanent errors are not retried. A Retry-After longer than maxHonorWait
+// Permanent errors are not retried. A Retry-After longer than the honor window
 // stops retries so the next Watchtower cycle can try again. Tiny token-bucket
-// waits retry until retryElapsed.
+// waits retry until that same window elapses.
 //
 // Parameters:
 //   - ctx: Context that bounds the retry loop.
 //   - log: Logger for retry notices. May be nil.
 //   - host: Registry host used for shared cooldown and quota.
-//   - operation: Function to run. It should return a rate-limit Error on 429.
+//   - operation: Function to run. It should return an [Error] on 429.
 //
 // Returns:
-//   - error: The last operation error, or ctx.Err() when canceled.
+//   - error: The last operation error, or [context.Context.Err] when canceled.
 func Do(ctx context.Context, log *zerolog.Logger, host string, operation func() error) error {
 	_, err := DoValue(ctx, log, host, func() (struct{}, error) {
 		return struct{}{}, operation()
@@ -33,7 +33,7 @@ func Do(ctx context.Context, log *zerolog.Logger, host string, operation func() 
 	return err
 }
 
-// DoValue is Do with a successful result.
+// DoValue is [Do] with a successful result.
 //
 // Parameters:
 //   - ctx: Context that bounds the retry loop.
@@ -43,7 +43,7 @@ func Do(ctx context.Context, log *zerolog.Logger, host string, operation func() 
 //
 // Returns:
 //   - T: Value from a successful attempt.
-//   - error: The last operation error, or ctx.Err() when canceled.
+//   - error: The last operation error, or [context.Context.Err] when canceled.
 func DoValue[T any](
 	ctx context.Context,
 	log *zerolog.Logger,
@@ -136,8 +136,11 @@ func DoValue[T any](
 
 // maxRetryAttempts is a circuit breaker derived from the elapsed budget.
 //
-// Token-bucket 429s retry until retryElapsed, not a fixed handful of tries.
+// Token-bucket 429s retry until [retryElapsed], not a fixed handful of tries.
 // This cap only stops a zero-wait loop from spinning.
+//
+// Returns:
+//   - uint: Maximum attempts passed to [backoff.WithMaxTries].
 func maxRetryAttempts() uint {
 	n := retryElapsed/minHonorWait + 1
 	if n < 1 {

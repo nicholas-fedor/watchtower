@@ -20,6 +20,7 @@ import (
 	"github.com/nicholas-fedor/watchtower/pkg/container"
 	"github.com/nicholas-fedor/watchtower/pkg/filters"
 	"github.com/nicholas-fedor/watchtower/pkg/lifecycle"
+	"github.com/nicholas-fedor/watchtower/pkg/registry/ratelimit"
 	"github.com/nicholas-fedor/watchtower/pkg/session"
 	"github.com/nicholas-fedor/watchtower/pkg/sorter"
 	"github.com/nicholas-fedor/watchtower/pkg/types"
@@ -525,7 +526,11 @@ func Update(log *zerolog.Logger, ctx context.Context,
 					parallelStaleCheckFailed++
 				}
 
-				progress.AddSkipped(log, sourceContainer, checkErr, config)
+				if ratelimit.Is(checkErr) {
+					progress.AddFailed(log, sourceContainer, checkErr, config)
+				} else {
+					progress.AddSkipped(log, sourceContainer, checkErr, config)
+				}
 
 				// Restore rich cooldown metadata for reports/notifications (preserves the
 				// structured CooldownAge/Delay/Remaining/Passed fields that the removed

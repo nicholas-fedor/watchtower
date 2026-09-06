@@ -340,6 +340,34 @@ func TestProgress_AddSkipped(t *testing.T) {
 	}
 }
 
+func TestProgress_AddFailed(t *testing.T) {
+	mock := mockTypes.NewMockContainer(t)
+	mock.EXPECT().ID().Return(types.ContainerID("cont1"))
+	mock.EXPECT().ImageID().Return(types.ImageID("img1"))
+	mock.EXPECT().Name().Return("container1")
+	mock.EXPECT().ImageName().Return("image1:latest")
+	mock.EXPECT().
+		IsMonitorOnly(testifyMock.MatchedBy(func(_ types.UpdateParams) bool { return true })).
+		Return(false)
+
+	progress := Progress{}
+	failErr := errors.New("registry rate limited")
+	progress.AddFailed(testLog(), mock, failErr, types.UpdateParams{})
+
+	got := progress["cont1"]
+	if got == nil {
+		t.Fatal("Progress.AddFailed did not store the container")
+	}
+
+	if got.state != FailedState {
+		t.Errorf("Progress.AddFailed state = %v, want %v", got.state, FailedState)
+	}
+
+	if got.Error() != failErr.Error() {
+		t.Errorf("Progress.AddFailed error = %v, want %v", got.Error(), failErr.Error())
+	}
+}
+
 func TestProgress_AddScanned(t *testing.T) {
 	type args struct {
 		container types.Container
