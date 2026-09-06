@@ -36,6 +36,7 @@ func ResetForTest() {
 	defer hostsMu.Unlock()
 
 	hosts = map[string]*hostState{}
+	retryElapsed = maxRetryElapsed
 }
 
 // Observe records a 429 against host so later Wait calls honor it.

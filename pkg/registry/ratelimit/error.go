@@ -14,9 +14,7 @@ const (
 	minHonorWait = 100 * time.Millisecond
 	// maxHonorWait is the longest Retry-After this process will sleep in one update cycle.
 	maxHonorWait = 30 * time.Second
-	// maxRetryTries is the attempt cap passed to cenkalti/backoff.
-	maxRetryTries = 5
-	// maxRetryElapsed bounds how long a single operation keeps retrying 429s.
+	// maxRetryElapsed is the production in-cycle bound for retrying 429s.
 	maxRetryElapsed = 30 * time.Second
 	// DefaultBodyLimit is how many response bytes we read when parsing a 429.
 	DefaultBodyLimit = 4096
@@ -27,6 +25,10 @@ const (
 	// equalJitterDivisor splits a wait into the equal-jitter half range.
 	equalJitterDivisor = 2
 )
+
+// retryElapsed bounds how long a single operation keeps retrying 429s.
+// Tests shorten it so elapsed-budget exhaustion does not sleep 30s.
+var retryElapsed = maxRetryElapsed
 
 // Error is a registry 429 with the wait and quota the registry advertised.
 type Error struct {

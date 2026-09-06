@@ -14,7 +14,8 @@ import (
 // Do retries operation when the registry returns a 429 that is worth retrying.
 //
 // Permanent errors are not retried. A Retry-After longer than maxHonorWait
-// stops retries so the next Watchtower cycle can try again.
+// stops retries so the next Watchtower cycle can try again. Tiny token-bucket
+// waits retry until retryElapsed.
 //
 // Parameters:
 //   - ctx: Context that bounds the retry loop.
@@ -61,6 +62,8 @@ func DoValue[T any](
 	exp.MaxInterval = maxHonorWait
 
 	attempt := 0
+	lastHonoredWait := time.Duration(0)
+	lastRawRetryAfter := time.Duration(0)
 
 	result, err := backoff.Retry(ctx, func() (T, error) {
 		waitErr := Wait(ctx, host)
@@ -86,12 +89,15 @@ func DoValue[T any](
 			}
 
 			Observe(host, info)
+			lastRawRetryAfter = info.RetryAfter
 		}
 
 		wait, giveUp := Decision(info)
 
 		attempt++
-		if giveUp || attempt >= maxRetryTries {
+		lastHonoredWait = wait
+
+		if giveUp {
 			return zero, backoff.Permanent(opErr)
 		}
 
@@ -107,8 +113,8 @@ func DoValue[T any](
 		return zero, backoff.RetryAfter(wait, opErr)
 	},
 		backoff.WithBackOff(exp),
-		backoff.WithMaxTries(maxRetryTries),
-		backoff.WithMaxElapsedTime(maxRetryElapsed),
+		backoff.WithMaxTries(maxRetryAttempts()),
+		backoff.WithMaxElapsedTime(retryElapsed),
 	)
 	if err == nil {
 		return result, nil
@@ -119,10 +125,26 @@ func DoValue[T any](
 		log.Warn().
 			Err(err).
 			Str("host", host).
+			Int("attempts", attempt).
+			Dur("honored_wait", lastHonoredWait).
+			Dur("retry_after", lastRawRetryAfter).
 			Msg("Registry rate limited. Stopping retries")
 	}
 
 	return result, err
+}
+
+// maxRetryAttempts is a circuit breaker derived from the elapsed budget.
+//
+// Token-bucket 429s retry until retryElapsed, not a fixed handful of tries.
+// This cap only stops a zero-wait loop from spinning.
+func maxRetryAttempts() uint {
+	n := retryElapsed/minHonorWait + 1
+	if n < 1 {
+		return 1
+	}
+
+	return uint(n)
 }
 
 // lastOperationError unwraps a cenkalti RetryError to the last operation error.
