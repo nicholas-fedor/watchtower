@@ -10,6 +10,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Chores
 
+- Update module github.com/gofiber/utils/v2 to v2.5.0 by @renovate[bot] in [#2323](https://github.com/nicholas-fedor/watchtower/pull/2323)
 - Update go-openapi packages to v0.29.2 by @renovate[bot] in [#2320](https://github.com/nicholas-fedor/watchtower/pull/2320)
 - Update go-openapi packages by @renovate[bot] in [#2317](https://github.com/nicholas-fedor/watchtower/pull/2317)
 - Update module github.com/moby/moby/client to v0.6.0 by @renovate[bot] in [#2315](https://github.com/nicholas-fedor/watchtower/pull/2315)
