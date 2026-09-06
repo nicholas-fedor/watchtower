@@ -10,6 +10,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Chores
 
+- Update github.com/google/pprof digest to 6331bc6 by @renovate[bot] in [#2325](https://github.com/nicholas-fedor/watchtower/pull/2325)
 - Update module github.com/gofiber/utils/v2 to v2.5.0 by @renovate[bot] in [#2323](https://github.com/nicholas-fedor/watchtower/pull/2323)
 - Update go-openapi packages to v0.29.2 by @renovate[bot] in [#2320](https://github.com/nicholas-fedor/watchtower/pull/2320)
 - Update go-openapi packages by @renovate[bot] in [#2317](https://github.com/nicholas-fedor/watchtower/pull/2317)
