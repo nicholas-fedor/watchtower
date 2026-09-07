@@ -8,6 +8,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- Add star history by @nicholas-fedor in [#2338](https://github.com/nicholas-fedor/watchtower/pull/2338)
+- Add shawly as a contributor for code by @allcontributors[bot] in [#2331](https://github.com/nicholas-fedor/watchtower/pull/2331)
+
 ### Chores
 
 - Update nicholas-fedor/go-proxy-pull-action action to v1.1.50 by @renovate[bot] in [#2329](https://github.com/nicholas-fedor/watchtower/pull/2329)
