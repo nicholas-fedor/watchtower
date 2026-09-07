@@ -54,6 +54,16 @@ The full documentation is available at <https://watchtower.nickfedor.com/>.
 
 <!-- markdownlint-restore -->
 
+## Star History
+
+<a href="https://www.star-history.com/?repos=nicholas-fedor%2Fwatchtower&type=date&legend=bottom-right">
+ <picture>
+   <source media="(prefers-color-scheme: dark)" srcset="https://api.star-history.com/chart?repos=nicholas-fedor/watchtower&type=date&theme=dark&legend=bottom-right" />
+   <source media="(prefers-color-scheme: light)" srcset="https://api.star-history.com/chart?repos=nicholas-fedor/watchtower&type=date&legend=bottom-right" />
+   <img alt="Star History Chart" src="https://api.star-history.com/chart?repos=nicholas-fedor/watchtower&type=date&legend=bottom-right" />
+ </picture>
+</a>
+
 ## Contributors
 
 Thanks goes to these wonderful people ([emoji key](https://allcontributors.org/en/reference/emoji-key/)):
