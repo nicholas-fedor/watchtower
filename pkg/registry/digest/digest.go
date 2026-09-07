@@ -22,6 +22,7 @@ import (
 
 	"github.com/nicholas-fedor/watchtower/internal/meta"
 	"github.com/nicholas-fedor/watchtower/pkg/registry/auth"
+	"github.com/nicholas-fedor/watchtower/pkg/registry/hosts"
 	"github.com/nicholas-fedor/watchtower/pkg/registry/manifest"
 	"github.com/nicholas-fedor/watchtower/pkg/registry/ratelimit"
 	"github.com/nicholas-fedor/watchtower/pkg/types"
@@ -449,7 +450,7 @@ func BuildManifestURL(log *zerolog.Logger,
 		rawDomain := reference.Domain(normalizedRef)
 
 		canonicalHost, _ := auth.GetRegistryAddress(log, container.ImageName())
-		if rawDomain == auth.LSCRRegistryDomain {
+		if rawDomain == hosts.LSCRRegistryDomain {
 			originalHost = rawDomain
 		} else if canonicalHost != "" {
 			originalHost = canonicalHost
@@ -493,8 +494,8 @@ func BuildManifestURL(log *zerolog.Logger,
 	// 2. Authentication tokens are obtained from ghcr.io using the redirected challenge
 	// 3. Manifest requests are made directly to ghcr.io (not lscr.io) to avoid 401/404 errors
 	// 4. Digest extraction succeeds from the 200 OK response
-	if parsedURL.Host == auth.LSCRRegistryDomain {
-		parsedURL.Host = auth.GitHubRegistryDomain
+	if parsedURL.Host == hosts.LSCRRegistryDomain {
+		parsedURL.Host = hosts.GitHubRegistryDomain
 		manifestURLStr = parsedURL.String()
 	}
 

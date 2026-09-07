@@ -18,6 +18,7 @@ import (
 
 	"github.com/nicholas-fedor/watchtower/internal/meta"
 	"github.com/nicholas-fedor/watchtower/pkg/registry/auth"
+	"github.com/nicholas-fedor/watchtower/pkg/registry/hosts"
 	"github.com/nicholas-fedor/watchtower/pkg/registry/ratelimit"
 	"github.com/nicholas-fedor/watchtower/pkg/types"
 )
@@ -326,8 +327,8 @@ func buildManifestURLForAge(log *zerolog.Logger,
 	originalHost := parsedURL.Host
 
 	// Handle lscr.io → ghcr.io host swap.
-	if parsedURL.Host == auth.LSCRRegistryDomain {
-		parsedURL.Host = auth.GitHubRegistryDomain
+	if parsedURL.Host == hosts.LSCRRegistryDomain {
+		parsedURL.Host = hosts.GitHubRegistryDomain
 		manifestURLStr = parsedURL.String()
 	}
 

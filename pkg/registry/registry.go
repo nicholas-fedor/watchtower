@@ -11,6 +11,7 @@ import (
 	dockerClient "github.com/moby/moby/client"
 
 	"github.com/nicholas-fedor/watchtower/pkg/registry/auth"
+	"github.com/nicholas-fedor/watchtower/pkg/registry/hosts"
 	"github.com/nicholas-fedor/watchtower/pkg/types"
 )
 
@@ -140,7 +141,7 @@ func WarnOnAPIConsumption(log *zerolog.Logger, container types.Container) bool {
 	}
 
 	// Check if the registry is known to support HEAD requests.
-	if containerHost == auth.DockerRegistryHost || containerHost == auth.GitHubRegistryDomain {
+	if containerHost == hosts.DockerRegistryHost || containerHost == hosts.GitHubRegistryDomain {
 		log.Debug().
 			Fields(fields).
 			Str("host", containerHost).

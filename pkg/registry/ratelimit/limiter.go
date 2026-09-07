@@ -6,6 +6,8 @@ import (
 	"strings"
 	"sync"
 	"time"
+
+	"github.com/nicholas-fedor/watchtower/pkg/registry/hosts"
 )
 
 // hostState holds the cooldown and token-bucket budget for one registry host.
@@ -25,17 +27,13 @@ type hostState struct {
 }
 
 const (
-	// githubRegistryHost is the GHCR API host.
-	githubRegistryHost = "ghcr.io"
-	// linuxServerRegistryHost is LinuxServer's vanity GHCR front.
-	linuxServerRegistryHost = "lscr.io"
 	// anonSuffix marks limiter keys for unauthenticated GHCR traffic.
 	anonSuffix = "|anon"
 )
 
 var (
 	hostsMu     sync.Mutex
-	hosts       = map[string]*hostState{}
+	hostStates  = map[string]*hostState{}
 	serialMu    sync.Mutex
 	serialSlots = map[string]chan struct{}{}
 )
@@ -46,7 +44,7 @@ var (
 // It also restores the production honor window used by [Do] and [DoValue].
 func ResetForTest() {
 	hostsMu.Lock()
-	hosts = map[string]*hostState{}
+	hostStates = map[string]*hostState{}
 	retryElapsed = maxRetryElapsed
 	hostsMu.Unlock()
 
@@ -58,8 +56,9 @@ func ResetForTest() {
 // Scope returns the limiter key for host.
 //
 // Unauthenticated GHCR uses a distinct key so anonymous 429s cannot pace
-// authenticated traffic to the same registry. Unauthenticated lscr.io is
-// normalized to the same key as GHCR, matching the manifest remap.
+// authenticated traffic to the same registry. Unauthenticated
+// [hosts.LSCRRegistryDomain] is normalized to the same key as GHCR, matching
+// the manifest remap.
 //
 // Parameters:
 //   - host: Registry host, such as ghcr.io. Empty values return empty.
@@ -72,8 +71,8 @@ func Scope(host string, authenticated bool) string {
 		return ""
 	}
 
-	if !authenticated && (host == githubRegistryHost || host == linuxServerRegistryHost) {
-		return githubRegistryHost + anonSuffix
+	if !authenticated && hosts.IsGitHubRegistry(host) {
+		return hosts.GitHubRegistryDomain + anonSuffix
 	}
 
 	return host
@@ -258,7 +257,7 @@ func ObserveSuccess(host string) {
 	hostsMu.Lock()
 	defer hostsMu.Unlock()
 
-	state := hosts[host]
+	state := hostStates[host]
 	if state == nil || state.allowed <= 0 || state.window <= 0 {
 		return
 	}
@@ -375,7 +374,7 @@ func nextCooldownWait(host string) time.Duration {
 	hostsMu.Lock()
 	defer hostsMu.Unlock()
 
-	state := hosts[host]
+	state := hostStates[host]
 	if state == nil || !time.Now().Before(state.cooldownUntil) {
 		return 0
 	}
@@ -393,10 +392,10 @@ func nextCooldownWait(host string) time.Duration {
 // Returns:
 //   - *hostState: Existing or newly created state for host.
 func hostLocked(host string) *hostState {
-	state := hosts[host]
+	state := hostStates[host]
 	if state == nil {
 		state = &hostState{lastRefill: time.Now()}
-		hosts[host] = state
+		hostStates[host] = state
 	}
 
 	return state
