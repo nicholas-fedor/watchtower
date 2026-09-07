@@ -281,31 +281,73 @@ var _ = ginkgo.Describe("the client", func() {
 			gomega.Expect(pullSlotFor("ghcr.io")).To(gomega.BeIdenticalTo(ghcr))
 		})
 		ginkgo.It("uses distinct slots for anonymous and authenticated GHCR pulls", func() {
+			ratelimit.ResetForTest()
+			defer ratelimit.ResetForTest()
+
 			anon := ratelimit.Scope("ghcr.io", false)
 			authed := ratelimit.Scope("ghcr.io", true)
 
 			gomega.Expect(anon).To(gomega.Equal("ghcr.io|anon"))
 			gomega.Expect(authed).To(gomega.Equal("ghcr.io"))
-			gomega.Expect(pullSlotFor(anon)).NotTo(gomega.BeIdenticalTo(pullSlotFor(authed)))
+			gomega.Expect(anon).NotTo(gomega.Equal(authed))
 
-			ctx, cancel := context.WithTimeout(context.Background(), time.Second)
+			authEntered := make(chan struct{})
+			releaseAuth := make(chan struct{})
+			complete := `{"status":"Download complete"}` + "\n"
+
+			mockServer.AllowUnhandledRequests = true
+			mockServer.AppendHandlers(
+				ghttp.CombineHandlers(
+					ghttp.VerifyRequest("POST", gomega.MatchRegexp("/images/create")),
+					func(w http.ResponseWriter, req *http.Request) {
+						close(authEntered)
+
+						select {
+						case <-releaseAuth:
+						case <-req.Context().Done():
+						}
+
+						w.Header().Set("Content-Type", "application/json")
+						w.WriteHeader(http.StatusOK)
+						_, _ = w.Write([]byte(complete))
+					},
+				),
+				ghttp.CombineHandlers(
+					ghttp.VerifyRequest("POST", gomega.MatchRegexp("/images/create")),
+					ghttp.RespondWith(http.StatusOK, complete),
+				),
+			)
+
+			i := newImageClient(mockClient, testLog())
+
+			ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 			defer cancel()
 
-			gomega.Expect(acquirePullSlot(ctx, authed)).To(gomega.Succeed())
-			defer releasePullSlot(authed)
-
-			done := make(chan error, 1)
-
+			authDone := make(chan error, 1)
 			go func() {
-				err := acquirePullSlot(ctx, anon)
-				if err == nil {
-					releasePullSlot(anon)
-				}
-
-				done <- err
+				authDone <- i.performImagePull(
+					ctx,
+					"ghcr.io/linuxserver/nginx:latest",
+					dockerClient.ImagePullOptions{RegistryAuth: "e30="},
+					nil,
+				)
 			}()
 
-			gomega.Eventually(done, "200ms").Should(gomega.Receive(gomega.BeNil()))
+			gomega.Eventually(authEntered).Should(gomega.BeClosed())
+
+			anonDone := make(chan error, 1)
+			go func() {
+				anonDone <- i.performImagePull(
+					ctx,
+					"ghcr.io/linuxserver/nginx:latest",
+					dockerClient.ImagePullOptions{},
+					nil,
+				)
+			}()
+
+			gomega.Eventually(anonDone, "1s").Should(gomega.Receive(gomega.BeNil()))
+			close(releaseAuth)
+			gomega.Eventually(authDone).Should(gomega.Receive(gomega.BeNil()))
 		})
 	})
 

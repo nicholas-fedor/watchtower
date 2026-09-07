@@ -115,7 +115,7 @@ func TestDoRetriesPastFiveWhenRetryAfterIsTiny(t *testing.T) {
 func TestDoGivesUpWhenTinyRetryAfterExceedsElapsedBudget(t *testing.T) {
 	ResetForTest()
 
-	retryElapsed = 250 * time.Millisecond
+	retryElapsed = 450 * time.Millisecond
 
 	defer ResetForTest()
 
@@ -123,7 +123,12 @@ func TestDoGivesUpWhenTinyRetryAfterExceedsElapsedBudget(t *testing.T) {
 
 	log := zerolog.New(&buf).Level(zerolog.DebugLevel)
 
+	var attempts atomic.Int32
+
+	started := time.Now()
 	err := Do(t.Context(), &log, "ghcr.io", func() error {
+		attempts.Add(1)
+
 		return &Error{
 			RetryAfter:    23722 * time.Nanosecond,
 			Allowed:       44000,
@@ -132,8 +137,12 @@ func TestDoGivesUpWhenTinyRetryAfterExceedsElapsedBudget(t *testing.T) {
 	})
 	require.ErrorIs(t, err, ErrRateLimited)
 	assert.Contains(t, buf.String(), "Registry rate limited. Stopping retries")
-	assert.Contains(t, buf.String(), `"attempts":`)
 	assert.Contains(t, buf.String(), "Retrying after delay")
+
+	maxStep := minHonorWait + minHonorWait/equalJitterDivisor
+	minAttempts := int(retryElapsed / maxStep)
+	assert.GreaterOrEqual(t, attempts.Load(), int32(minAttempts))
+	assert.GreaterOrEqual(t, time.Since(started), time.Duration(minAttempts-1)*minHonorWait)
 }
 
 func TestDoRetriesRateLimitedOperations(t *testing.T) {
