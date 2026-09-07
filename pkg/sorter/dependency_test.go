@@ -16,6 +16,25 @@ import (
 
 var _ = ginkgo.Describe("DependencySorter", func() {
 	ginkgo.Describe("Sort", func() {
+		ginkgo.It("should sort a network_mode dependent after a provider referenced by Docker ID", func() {
+			const providerID = "25e75393800b5c450a6841212a3b92ed28fa35414a586dec9f2c8a520d4910c2"
+
+			gluetun := concreteLinkedContainer(providerID, "/gluetun", "gluetun", "vpn", "")
+			qbittorrent := concreteLinkedContainer(
+				"qbittorrent-id",
+				"/qbittorrent",
+				"qbittorrent",
+				"app",
+				"container:"+providerID,
+			)
+
+			containers := []types.Container{qbittorrent, gluetun}
+			err := DependencySorter{}.Sort(testLog(), containers, false)
+			gomega.Expect(err).ToNot(gomega.HaveOccurred())
+			gomega.Expect(containers[0].Name()).To(gomega.Equal("gluetun"))
+			gomega.Expect(containers[1].Name()).To(gomega.Equal("qbittorrent"))
+		})
+
 		ginkgo.It("should sort containers with no dependencies", func() {
 			c1 := mockTypes.NewMockContainer(ginkgo.GinkgoT())
 			c1.EXPECT().Name().Return("c1")
@@ -1896,6 +1915,34 @@ func mockLinkedContainer(
 	return c
 }
 
+// concreteLinkedContainer builds a *container.Container so Docker ID aliases
+// in buildLinkMatchIndexes are exercised. networkMode is the HostConfig
+// NetworkMode value, such as container:<id>.
+func concreteLinkedContainer(
+	id, name, project, service, networkMode string,
+) types.Container {
+	labels := map[string]string{}
+	if project != "" {
+		labels["com.docker.compose.project"] = project
+	}
+
+	if service != "" {
+		labels["com.docker.compose.service"] = service
+	}
+
+	hostConfig := &dockerContainer.HostConfig{}
+	if networkMode != "" {
+		hostConfig.NetworkMode = dockerContainer.NetworkMode(networkMode)
+	}
+
+	return container.NewContainer(nil, &dockerContainer.InspectResponse{
+		ID:         id,
+		Name:       name,
+		HostConfig: hostConfig,
+		Config:     &dockerContainer.Config{Labels: labels},
+	}, nil)
+}
+
 var _ = ginkgo.Describe("FindMatchingIdentifiers", func() {
 	// Exhaustive link x identifier permutations across Compose stacks, multi-segment
 	// services, replicas, bare container names, and ambiguous cross-project cases.
@@ -2040,6 +2087,61 @@ var _ = ginkgo.Describe("buildLinkMatchIndexes", func() {
 		gomega.Expect(idSet).To(gomega.HaveKey("shared"))
 		gomega.Expect(idSet).To(gomega.HaveKey("project-service"))
 		gomega.Expect(idSet).To(gomega.HaveLen(2))
+	})
+
+	ginkgo.It("should map a Docker ID alias for concrete containers", func() {
+		const providerID = "25e75393800b5c450a6841212a3b92ed28fa35414a586dec9f2c8a520d4910c2"
+
+		gluetun := concreteLinkedContainer(providerID, "/gluetun", "gluetun", "vpn", "")
+
+		containerMap := map[string]types.Container{
+			"gluetun-vpn": gluetun,
+		}
+
+		idSet, aliasToCanonical := buildLinkMatchIndexes(testLog(), containerMap)
+		gomega.Expect(aliasToCanonical[providerID]).To(gomega.Equal("gluetun-vpn"))
+		gomega.Expect(idSet).To(gomega.HaveKey(providerID))
+	})
+
+	ginkgo.It("should skip an empty Docker ID", func() {
+		gluetun := concreteLinkedContainer("", "/gluetun", "gluetun", "vpn", "")
+
+		containerMap := map[string]types.Container{
+			"gluetun-vpn": gluetun,
+		}
+
+		idSet, aliasToCanonical := buildLinkMatchIndexes(testLog(), containerMap)
+		gomega.Expect(aliasToCanonical["gluetun-vpn"]).To(gomega.Equal("gluetun-vpn"))
+		gomega.Expect(aliasToCanonical["gluetun"]).To(gomega.Equal("gluetun-vpn"))
+		gomega.Expect(idSet).To(gomega.HaveLen(2))
+	})
+
+	ginkgo.It("should skip a Docker ID that equals the canonical identifier", func() {
+		const providerID = "25e75393800b5c450a6841212a3b92ed28fa35414a586dec9f2c8a520d4910c2"
+
+		gluetun := concreteLinkedContainer(providerID, "/"+providerID, "", "", "")
+
+		containerMap := map[string]types.Container{
+			providerID: gluetun,
+		}
+
+		_, aliasToCanonical := buildLinkMatchIndexes(testLog(), containerMap)
+		gomega.Expect(aliasToCanonical[providerID]).To(gomega.Equal(providerID))
+	})
+
+	ginkgo.It("should not overwrite an existing canonical key with a Docker ID", func() {
+		const providerID = "25e75393800b5c450a6841212a3b92ed28fa35414a586dec9f2c8a520d4910c2"
+
+		owner := concreteLinkedContainer("owner-id", "/owner", "owner", "svc", "")
+		claimant := concreteLinkedContainer(providerID, "/gluetun", "gluetun", "vpn", "")
+
+		containerMap := map[string]types.Container{
+			providerID:    owner,
+			"gluetun-vpn": claimant,
+		}
+
+		_, aliasToCanonical := buildLinkMatchIndexes(testLog(), containerMap)
+		gomega.Expect(aliasToCanonical[providerID]).To(gomega.Equal(providerID))
 	})
 })
 
