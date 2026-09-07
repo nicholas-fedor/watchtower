@@ -789,13 +789,13 @@ var _ = ginkgo.Describe("Container", func() {
 			ginkgo.It("includes the bare network mode container name", func() {
 				// The network mode references a container name that may belong
 				// to another Compose project, so the unqualified name has to be
-				// offered as well.
+				// offered as well as the project-qualified candidate.
 				container = MockContainer(
 					WithNetworkMode("container:gluetun"),
 					WithLabels(map[string]string{"com.docker.compose.project": "qbittorrent"}),
 				)
 				links := container.Links(true)
-				gomega.Expect(links).To(gomega.ContainElement("gluetun"))
+				gomega.Expect(links).To(gomega.ContainElements("gluetun", "qbittorrent-gluetun"))
 			})
 		})
 
