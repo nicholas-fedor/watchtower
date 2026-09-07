@@ -783,7 +783,7 @@ var _ = ginkgo.Describe("Container", func() {
 					WithLabels(map[string]string{"com.docker.compose.project": "myproject"}),
 				)
 				links := container.Links(true)
-				gomega.Expect(links).To(gomega.ContainElement("myproject-other"))
+				gomega.Expect(links).To(gomega.ContainElements("other", "myproject-other"))
 			})
 
 			ginkgo.It("includes the bare network mode container name", func() {
@@ -796,6 +796,26 @@ var _ = ginkgo.Describe("Container", func() {
 				)
 				links := container.Links(true)
 				gomega.Expect(links).To(gomega.ContainElements("gluetun", "qbittorrent-gluetun"))
+			})
+
+			ginkgo.It("strips a leading slash from the network mode container name", func() {
+				// Inspect rewrite stores container: plus the Docker name, which
+				// includes a leading slash.
+				container = MockContainer(
+					WithNetworkMode("container:/gluetun"),
+					WithLabels(map[string]string{"com.docker.compose.project": "qbittorrent"}),
+				)
+				links := container.Links(true)
+				gomega.Expect(links).To(gomega.ContainElements("gluetun", "qbittorrent-gluetun"))
+			})
+
+			ginkgo.It("does not double-prefix an already project-qualified network mode name", func() {
+				container = MockContainer(
+					WithNetworkMode("container:gluetun-vpn-1"),
+					WithLabels(map[string]string{"com.docker.compose.project": "gluetun"}),
+				)
+				links := container.Links(true)
+				gomega.Expect(links).To(gomega.ConsistOf("gluetun-vpn-1"))
 			})
 		})
 
