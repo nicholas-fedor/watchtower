@@ -25,6 +25,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Update golang:1.27.1-alpine docker digest to cf6fca6 by @renovate[bot] in [#2299](https://github.com/nicholas-fedor/watchtower/pull/2299)
 - Update golang:alpine3.24 docker digest to cf6fca6 by @renovate[bot] in [#2300](https://github.com/nicholas-fedor/watchtower/pull/2300)
 
+### Fixed
+
+- Stop skipping GHCR images on sub-millisecond 429s by @nicholas-fedor in [#2327](https://github.com/nicholas-fedor/watchtower/pull/2327)
+
 ## [1.22.0] - 2026-09-02
 
 ### Added
