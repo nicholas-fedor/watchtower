@@ -10,6 +10,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Chores
 
+- Update nicholas-fedor/go-proxy-pull-action action to v1.1.50 by @renovate[bot] in [#2329](https://github.com/nicholas-fedor/watchtower/pull/2329)
 - Update github.com/google/pprof digest to 6331bc6 by @renovate[bot] in [#2325](https://github.com/nicholas-fedor/watchtower/pull/2325)
 - Update module github.com/gofiber/utils/v2 to v2.5.0 by @renovate[bot] in [#2323](https://github.com/nicholas-fedor/watchtower/pull/2323)
 - Update go-openapi packages to v0.29.2 by @renovate[bot] in [#2320](https://github.com/nicholas-fedor/watchtower/pull/2320)
@@ -27,7 +28,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Match network_mode links across Compose projects by @shawly in [#2319](https://github.com/nicholas-fedor/watchtower/pull/2319)
 - Stop skipping GHCR images on sub-millisecond 429s by @nicholas-fedor in [#2327](https://github.com/nicholas-fedor/watchtower/pull/2327)
+
+### New Contributors
+
+- @shawly made their first contribution in [#2319](https://github.com/nicholas-fedor/watchtower/pull/2319)
 
 ## [1.22.0] - 2026-09-02
 
