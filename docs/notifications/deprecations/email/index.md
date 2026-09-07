@@ -182,11 +182,17 @@ Watchtower uses Shoutrrr's [SMTP service](https://shoutrrr.nickfedor.com/latest/
     | UseStartTLS | `Yes`         |
 
     ```text
-    smtp://${USER}:${PASSWORD}@smtp.gmail.com:587/?fromaddress=${FROM}&toaddresses=${TO}&encryption=ExplicitTLS&usestarttls=yes&timeout=30s
+    smtp://user%40gmail.com:${PASSWORD}@smtp.gmail.com:587/?fromaddress=user%40gmail.com&toaddresses=user%40gmail.com&encryption=ExplicitTLS&usestarttls=yes&timeout=30s
     ```
 
     !!! Note
         For Gmail, use an [App Password](https://support.google.com/accounts/answer/185833){target="_blank" rel="noopener noreferrer"} if two-factor authentication is enabled.
+
+        Omit spaces from the App Password. Google displays the 16-character passcode in groups of four, but those spaces are not part of the password.
+
+        URL-encode `@` in the username as `%40`.
+
+        Do not use `&auth=OAuth2` with an App Password. That method expects a SASL XOAUTH2 access token in the password field.
 
 === "AWS SES"
 
@@ -245,8 +251,8 @@ Watchtower uses Shoutrrr's [SMTP service](https://shoutrrr.nickfedor.com/latest/
 
 - **Authentication**:
 
-    * Use `&auth=Plain` for username/password authentication (default if credentials provided).
-    * For OAuth2 (e.g., Gmail with app-specific passwords), use `&auth=OAuth2`.
+    * Use `&auth=Plain` for username and password authentication, including [Gmail App Passwords](https://support.google.com/accounts/answer/185833){target="_blank" rel="noopener noreferrer"}. This is the default when credentials are provided.
+    * Use `&auth=OAuth2` only for [SASL XOAUTH2](https://shoutrrr.nickfedor.com/latest/services/email/smtp/#authentication){target="_blank" rel="noopener noreferrer"} with a static access token in the password field. App Passwords are not OAuth2.
 
 - **Testing**:
 
