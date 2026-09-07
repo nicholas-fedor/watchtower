@@ -79,7 +79,7 @@ func TestDoLogsExhaustionAtWarn(t *testing.T) {
 
 	var buf bytes.Buffer
 
-	log := zerolog.New(&buf).Level(zerolog.InfoLevel)
+	log := zerolog.New(&buf).Level(zerolog.DebugLevel)
 
 	err := Do(t.Context(), &log, "registry.example", func() error {
 		return &Error{RetryAfter: 2 * time.Hour}
@@ -121,7 +121,7 @@ func TestDoGivesUpWhenTinyRetryAfterExceedsElapsedBudget(t *testing.T) {
 
 	var buf bytes.Buffer
 
-	log := zerolog.New(&buf).Level(zerolog.InfoLevel)
+	log := zerolog.New(&buf).Level(zerolog.DebugLevel)
 
 	err := Do(t.Context(), &log, "ghcr.io", func() error {
 		return &Error{
@@ -133,7 +133,7 @@ func TestDoGivesUpWhenTinyRetryAfterExceedsElapsedBudget(t *testing.T) {
 	require.ErrorIs(t, err, ErrRateLimited)
 	assert.Contains(t, buf.String(), "Registry rate limited. Stopping retries")
 	assert.Contains(t, buf.String(), `"attempts":`)
-	assert.NotContains(t, buf.String(), "Retrying after delay")
+	assert.Contains(t, buf.String(), "Retrying after delay")
 }
 
 func TestDoRetriesRateLimitedOperations(t *testing.T) {

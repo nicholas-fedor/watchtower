@@ -723,11 +723,11 @@ func (c imageClient) performImagePull(
 	pullHost := ratelimit.Scope(address, opts.RegistryAuth != "")
 
 	pullErr := ratelimit.Do(ctx, clog, pullHost, func() error {
-		err := acquirePullSlot(ctx, address)
+		err := acquirePullSlot(ctx, pullHost)
 		if err != nil {
 			return err
 		}
-		defer releasePullSlot(address)
+		defer releasePullSlot(pullHost)
 
 		// A sibling pull may have recorded a 429 after this attempt passed Wait
 		// and while it was queued on the slot. Recheck cooldown without taking

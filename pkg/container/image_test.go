@@ -280,6 +280,33 @@ var _ = ginkgo.Describe("the client", func() {
 			gomega.Expect(ghcr).NotTo(gomega.BeIdenticalTo(hub))
 			gomega.Expect(pullSlotFor("ghcr.io")).To(gomega.BeIdenticalTo(ghcr))
 		})
+		ginkgo.It("uses distinct slots for anonymous and authenticated GHCR pulls", func() {
+			anon := ratelimit.Scope("ghcr.io", false)
+			authed := ratelimit.Scope("ghcr.io", true)
+
+			gomega.Expect(anon).To(gomega.Equal("ghcr.io|anon"))
+			gomega.Expect(authed).To(gomega.Equal("ghcr.io"))
+			gomega.Expect(pullSlotFor(anon)).NotTo(gomega.BeIdenticalTo(pullSlotFor(authed)))
+
+			ctx, cancel := context.WithTimeout(context.Background(), time.Second)
+			defer cancel()
+
+			gomega.Expect(acquirePullSlot(ctx, authed)).To(gomega.Succeed())
+			defer releasePullSlot(authed)
+
+			done := make(chan error, 1)
+
+			go func() {
+				err := acquirePullSlot(ctx, anon)
+				if err == nil {
+					releasePullSlot(anon)
+				}
+
+				done <- err
+			}()
+
+			gomega.Eventually(done, "200ms").Should(gomega.Receive(gomega.BeNil()))
+		})
 	})
 
 	ginkgo.When("a host is in rate-limit cooldown", func() {
