@@ -2280,7 +2280,7 @@ var _ = ginkgo.Describe("the update action", func() {
 					&mockActions.TestData{
 						Containers: []types.Container{qbittorrent, gluetun},
 						Staleness: map[string]bool{
-							"qbittorrent": true,
+							"qbittorrent": false,
 							"gluetun":     true,
 						},
 						StopOrder:   []string{},
@@ -2297,7 +2297,7 @@ var _ = ginkgo.Describe("the update action", func() {
 					types.UpdateParams{Cleanup: true, CPUCopyMode: "auto"},
 				)
 				gomega.Expect(err).NotTo(gomega.HaveOccurred())
-				gomega.Expect(report.Updated()).To(gomega.HaveLen(2))
+				gomega.Expect(report.Updated()).To(gomega.HaveLen(1))
 				gomega.Expect(gluetun.ToRestart()).To(gomega.BeTrue())
 				gomega.Expect(qbittorrent.ToRestart()).To(gomega.BeTrue())
 
@@ -2352,7 +2352,7 @@ var _ = ginkgo.Describe("the update action", func() {
 					&mockActions.TestData{
 						Containers: []types.Container{qbittorrent, gluetun},
 						Staleness: map[string]bool{
-							"qbittorrent-app-1": true,
+							"qbittorrent-app-1": false,
 							"gluetun-vpn-1":     true,
 						},
 						StopOrder:   []string{},
@@ -2369,7 +2369,7 @@ var _ = ginkgo.Describe("the update action", func() {
 					types.UpdateParams{Cleanup: true, CPUCopyMode: "auto"},
 				)
 				gomega.Expect(err).NotTo(gomega.HaveOccurred())
-				gomega.Expect(report.Updated()).To(gomega.HaveLen(2))
+				gomega.Expect(report.Updated()).To(gomega.HaveLen(1))
 				gomega.Expect(gluetun.ToRestart()).To(gomega.BeTrue())
 				gomega.Expect(qbittorrent.ToRestart()).To(gomega.BeTrue())
 
