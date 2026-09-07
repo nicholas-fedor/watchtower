@@ -783,19 +783,19 @@ var _ = ginkgo.Describe("Container", func() {
 					WithLabels(map[string]string{"com.docker.compose.project": "myproject"}),
 				)
 				links := container.Links(true)
-				gomega.Expect(links).To(gomega.ContainElements("other", "myproject-other"))
+				gomega.Expect(links).To(gomega.ContainElement("other"))
+				gomega.Expect(links).NotTo(gomega.ContainElement("myproject-other"))
 			})
 
 			ginkgo.It("includes the bare network mode container name", func() {
-				// The network mode references a container name that may belong
-				// to another Compose project, so the unqualified name has to be
-				// offered as well as the project-qualified candidate.
+				// The network mode holds a real container name, including when
+				// that container belongs to another Compose project.
 				container = MockContainer(
 					WithNetworkMode("container:gluetun"),
 					WithLabels(map[string]string{"com.docker.compose.project": "qbittorrent"}),
 				)
 				links := container.Links(true)
-				gomega.Expect(links).To(gomega.ContainElements("gluetun", "qbittorrent-gluetun"))
+				gomega.Expect(links).To(gomega.ConsistOf("gluetun"))
 			})
 
 			ginkgo.It("strips a leading slash from the network mode container name", func() {
@@ -806,7 +806,7 @@ var _ = ginkgo.Describe("Container", func() {
 					WithLabels(map[string]string{"com.docker.compose.project": "qbittorrent"}),
 				)
 				links := container.Links(true)
-				gomega.Expect(links).To(gomega.ContainElements("gluetun", "qbittorrent-gluetun"))
+				gomega.Expect(links).To(gomega.ConsistOf("gluetun"))
 			})
 
 			ginkgo.It("does not double-prefix an already project-qualified network mode name", func() {
@@ -816,6 +816,19 @@ var _ = ginkgo.Describe("Container", func() {
 				)
 				links := container.Links(true)
 				gomega.Expect(links).To(gomega.ConsistOf("gluetun-vpn-1"))
+			})
+
+			ginkgo.It("does not prefix a network mode container ID", func() {
+				// Moby inspect stores container:<id> after create. Prefixing
+				// that ID with the dependent's project would never match.
+				const providerID = "25e75393800b5c450a6841212a3b92ed28fa35414a586dec9f2c8a520d4910c2"
+
+				container = MockContainer(
+					WithNetworkMode("container:"+providerID),
+					WithLabels(map[string]string{"com.docker.compose.project": "qbittorrent"}),
+				)
+				links := container.Links(true)
+				gomega.Expect(links).To(gomega.ConsistOf(providerID))
 			})
 		})
 

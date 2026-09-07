@@ -2380,6 +2380,82 @@ var _ = ginkgo.Describe("the update action", func() {
 			},
 		)
 
+		// Inspect stores container:<id> until list rewrite. Matching and
+		// sort order must still work on that form.
+		ginkgo.It(
+			"should stop and start cross-project network_mode peers referenced by container ID",
+			func() {
+				const providerID = "25e75393800b5c450a6841212a3b92ed28fa35414a586dec9f2c8a520d4910c2"
+
+				gluetun := mockActions.CreateMockContainerWithConfig(
+					providerID,
+					"/gluetun",
+					"gluetun:latest",
+					true,
+					false,
+					time.Now().AddDate(0, 0, -1),
+					&dockerContainer.Config{
+						Labels: map[string]string{
+							"com.docker.compose.project":            "gluetun",
+							"com.docker.compose.service":            "vpn",
+							"com.centurylinklabs.watchtower.enable": "true",
+						},
+						ExposedPorts: dockerNetwork.PortSet{},
+					},
+				)
+
+				qbittorrent := mockActions.CreateMockContainerWithConfig(
+					"qbittorrent",
+					"/qbittorrent",
+					"qbittorrent:latest",
+					true,
+					false,
+					time.Now(),
+					&dockerContainer.Config{
+						Labels: map[string]string{
+							"com.docker.compose.project":            "qbittorrent",
+							"com.docker.compose.service":            "app",
+							"com.centurylinklabs.watchtower.enable": "true",
+						},
+						ExposedPorts: dockerNetwork.PortSet{},
+					},
+				)
+				qbittorrent.ContainerInfo().HostConfig.NetworkMode = dockerContainer.NetworkMode(
+					"container:" + providerID,
+				)
+
+				client := mockActions.CreateMockClient(
+					&mockActions.TestData{
+						Containers: []types.Container{qbittorrent, gluetun},
+						Staleness: map[string]bool{
+							"qbittorrent": false,
+							"gluetun":     true,
+						},
+						StopOrder:   []string{},
+						CreateOrder: []string{},
+						StartOrder:  []string{},
+					},
+					false,
+					false,
+				)
+
+				report, _, err := actions.Update(testLogger(),
+					context.Background(),
+					client,
+					types.UpdateParams{Cleanup: true, CPUCopyMode: "auto"},
+				)
+				gomega.Expect(err).NotTo(gomega.HaveOccurred())
+				gomega.Expect(report.Updated()).To(gomega.HaveLen(1))
+				gomega.Expect(gluetun.ToRestart()).To(gomega.BeTrue())
+				gomega.Expect(qbittorrent.ToRestart()).To(gomega.BeTrue())
+
+				gomega.Expect(client.TestData.StopOrder).
+					To(gomega.Equal([]string{"qbittorrent", "gluetun"}))
+				gomega.Expect(client.TestData.CreateOrder).
+					To(gomega.Equal([]string{"gluetun", "qbittorrent"}))
+			},
+		)
+
 		// Provider image is stale, dependents are not. Implicit restart must
 		// still pull them into the update and stop them before the provider.
 		ginkgo.It(

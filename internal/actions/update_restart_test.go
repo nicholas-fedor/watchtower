@@ -837,6 +837,50 @@ var _ = ginkgo.Describe("the update action", func() {
 				gomega.Expect(qbittorrent.ToRestart()).To(gomega.BeTrue())
 			})
 
+			ginkgo.It("marks a dependent whose network mode still references the provider ID", func() {
+				// Moby inspect stores container:<id> until Watchtower rewrites
+				// it to a name. Matching must accept the ID form as well.
+				const providerID = "25e75393800b5c450a6841212a3b92ed28fa35414a586dec9f2c8a520d4910c2"
+
+				gluetun := createNetworkModeContainer(
+					providerID, "/gluetun", "gluetun", "app", "",
+				)
+				qbittorrent := createNetworkModeContainer(
+					"qbittorrent-id", "/qbittorrent", "qbittorrent", "app",
+					"container:"+providerID,
+				)
+
+				containers := []types.Container{gluetun, qbittorrent}
+				gluetun.SetStale(true)
+
+				actions.UpdateImplicitRestart(testLogger(), containers, containers, true)
+
+				gomega.Expect(gluetun.ToRestart()).To(gomega.BeTrue())
+				gomega.Expect(qbittorrent.ToRestart()).To(gomega.BeTrue())
+			})
+
+			ginkgo.It("does not treat a project-prefixed peer name as the network provider", func() {
+				gluetun := createNetworkModeContainer(
+					"gluetun-id", "/gluetun", "gluetun", "app", "",
+				)
+				decoy := createNetworkModeContainer(
+					"decoy-id", "/qbittorrent-gluetun", "other", "svc", "",
+				)
+				qbittorrent := createNetworkModeContainer(
+					"qbittorrent-id", "/qbittorrent", "qbittorrent", "app",
+					"container:gluetun",
+				)
+
+				containers := []types.Container{gluetun, decoy, qbittorrent}
+				decoy.SetStale(true)
+
+				actions.UpdateImplicitRestart(testLogger(), containers, containers, true)
+
+				gomega.Expect(decoy.ToRestart()).To(gomega.BeTrue())
+				gomega.Expect(gluetun.ToRestart()).To(gomega.BeFalse())
+				gomega.Expect(qbittorrent.ToRestart()).To(gomega.BeFalse())
+			})
+
 			ginkgo.It("should handle restarted containers with circular dependencies", func() {
 				// Create circular dependency: A -> B -> A
 				containerA := mockActions.CreateMockContainerWithConfig(
