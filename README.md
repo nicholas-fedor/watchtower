@@ -202,6 +202,7 @@ Thanks goes to these wonderful people ([emoji key](https://allcontributors.org/e
       <td align="center" valign="top" width="14.28%"><a href="https://github.com/llc1123"><img src="https://avatars.githubusercontent.com/u/5478730?v=4?s=100" width="100px;" alt="粒粒橙"/><br /><sub><b>粒粒橙</b></sub></a><br /><a href="https://github.com/nicholas-fedor/watchtower/commits?author=llc1123" title="Code">💻</a></td>
       <td align="center" valign="top" width="14.28%"><a href="https://github.com/ncrosty58"><img src="https://avatars.githubusercontent.com/u/96956364?v=4?s=100" width="100px;" alt="ncrosty58"/><br /><sub><b>ncrosty58</b></sub></a><br /><a href="https://github.com/nicholas-fedor/watchtower/commits?author=ncrosty58" title="Code">💻</a></td>
       <td align="center" valign="top" width="14.28%"><a href="https://justinmontgomery.com"><img src="https://avatars.githubusercontent.com/u/1500269?v=4?s=100" width="100px;" alt="Justin Montgomery"/><br /><sub><b>Justin Montgomery</b></sub></a><br /><a href="https://github.com/nicholas-fedor/watchtower/issues?q=author%3Ajmooo" title="Bug reports">🐛</a> <a href="https://github.com/nicholas-fedor/watchtower/commits?author=jmooo" title="Code">💻</a></td>
+      <td align="center" valign="top" width="14.28%"><a href="https://github.com/shawly"><img src="https://avatars.githubusercontent.com/u/6448794?v=4?s=100" width="100px;" alt="shawly"/><br /><sub><b>shawly</b></sub></a><br /><a href="https://github.com/nicholas-fedor/watchtower/commits?author=shawly" title="Code">💻</a></td>
     </tr>
   </tbody>
 </table>
