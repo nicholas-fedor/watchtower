@@ -35,6 +35,30 @@ var _ = ginkgo.Describe("DependencySorter", func() {
 			gomega.Expect(containers[1].Name()).To(gomega.Equal("qbittorrent"))
 		})
 
+		ginkgo.It("should resolve container ID network_mode to the ID owner when a peer reuses that ID as its name", func() {
+			const providerID = "25e75393800b5c450a6841212a3b92ed28fa35414a586dec9f2c8a520d4910c2"
+
+			gluetun := concreteLinkedContainer(providerID, "/gluetun", "gluetun", "vpn", "")
+			decoy := concreteLinkedContainer("decoy-id", "/"+providerID, "other", "svc", "")
+			qbittorrent := concreteLinkedContainer(
+				"qbittorrent-id",
+				"/qbittorrent",
+				"qbittorrent",
+				"app",
+				"container:"+providerID,
+			)
+
+			_, indegree, adjacency, _, err := buildDependencyGraph(
+				testLog(),
+				[]types.Container{qbittorrent, decoy, gluetun},
+				false,
+			)
+			gomega.Expect(err).ToNot(gomega.HaveOccurred())
+			gomega.Expect(indegree["qbittorrent-app"]).To(gomega.Equal(1))
+			gomega.Expect(adjacency["gluetun-vpn"]).To(gomega.ContainElement("qbittorrent-app"))
+			gomega.Expect(adjacency["other-svc"]).NotTo(gomega.ContainElement("qbittorrent-app"))
+		})
+
 		ginkgo.It("should sort containers with no dependencies", func() {
 			c1 := mockTypes.NewMockContainer(ginkgo.GinkgoT())
 			c1.EXPECT().Name().Return("c1")
@@ -2142,6 +2166,21 @@ var _ = ginkgo.Describe("buildLinkMatchIndexes", func() {
 
 		_, aliasToCanonical := buildLinkMatchIndexes(testLog(), containerMap)
 		gomega.Expect(aliasToCanonical[providerID]).To(gomega.Equal(providerID))
+	})
+
+	ginkgo.It("should retain a Docker ID alias when another container uses that ID as its name", func() {
+		const providerID = "25e75393800b5c450a6841212a3b92ed28fa35414a586dec9f2c8a520d4910c2"
+
+		gluetun := concreteLinkedContainer(providerID, "/gluetun", "gluetun", "vpn", "")
+		decoy := concreteLinkedContainer("decoy-id", "/"+providerID, "other", "svc", "")
+
+		containerMap := map[string]types.Container{
+			"gluetun-vpn": gluetun,
+			"other-svc":   decoy,
+		}
+
+		_, aliasToCanonical := buildLinkMatchIndexes(testLog(), containerMap)
+		gomega.Expect(aliasToCanonical[providerID]).To(gomega.Equal("gluetun-vpn"))
 	})
 })
 

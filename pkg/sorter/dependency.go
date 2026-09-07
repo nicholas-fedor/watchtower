@@ -355,6 +355,10 @@ func buildLinkMatchIndexes(log *zerolog.Logger,
 			continue
 		}
 
+		if _, exists := aliasToCanonical[bareName]; exists {
+			continue
+		}
+
 		for owner := range owners {
 			aliasToCanonical[bareName] = owner
 		}
