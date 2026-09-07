@@ -26,8 +26,9 @@ type hostState struct {
 
 const (
 	// githubRegistryHost is the GHCR API host.
-	// Keep in sync with [github.com/nicholas-fedor/watchtower/pkg/registry/auth.GitHubRegistryDomain].
 	githubRegistryHost = "ghcr.io"
+	// linuxServerRegistryHost is LinuxServer's vanity GHCR front.
+	linuxServerRegistryHost = "lscr.io"
 	// anonSuffix marks limiter keys for unauthenticated GHCR traffic.
 	anonSuffix = "|anon"
 )
@@ -57,21 +58,22 @@ func ResetForTest() {
 // Scope returns the limiter key for host.
 //
 // Unauthenticated GHCR uses a distinct key so anonymous 429s cannot pace
-// authenticated traffic to the same registry.
+// authenticated traffic to the same registry. Unauthenticated lscr.io is
+// normalized to the same key as GHCR, matching the manifest remap.
 //
 // Parameters:
 //   - host: Registry host, such as ghcr.io. Empty values return empty.
 //   - authenticated: True when the caller has registry credentials.
 //
 // Returns:
-//   - string: Limiter key. Unauthenticated GHCR is host plus "|anon".
+//   - string: Limiter key. Unauthenticated GHCR is "ghcr.io|anon".
 func Scope(host string, authenticated bool) string {
 	if host == "" {
 		return ""
 	}
 
-	if !authenticated && host == githubRegistryHost {
-		return host + anonSuffix
+	if !authenticated && (host == githubRegistryHost || host == linuxServerRegistryHost) {
+		return githubRegistryHost + anonSuffix
 	}
 
 	return host
