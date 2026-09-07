@@ -2379,6 +2379,102 @@ var _ = ginkgo.Describe("the update action", func() {
 					To(gomega.Equal([]string{"gluetun-vpn-1", "qbittorrent-app-1"}))
 			},
 		)
+
+		// Provider image is stale, dependents are not. Implicit restart must
+		// still pull them into the update and stop them before the provider.
+		ginkgo.It(
+			"should restart multiple cross-project network_mode dependents when the provider is stale",
+			func() {
+				gluetun := mockActions.CreateMockContainerWithConfig(
+					"gluetun",
+					"/gluetun",
+					"gluetun:latest",
+					true,
+					false,
+					time.Now().AddDate(0, 0, -1),
+					&dockerContainer.Config{
+						Labels: map[string]string{
+							"com.docker.compose.project":            "gluetun",
+							"com.docker.compose.service":            "vpn",
+							"com.centurylinklabs.watchtower.enable": "true",
+						},
+						ExposedPorts: dockerNetwork.PortSet{},
+					},
+				)
+
+				qbittorrent := mockActions.CreateMockContainerWithConfig(
+					"qbittorrent",
+					"/qbittorrent",
+					"qbittorrent:latest",
+					true,
+					false,
+					time.Now(),
+					&dockerContainer.Config{
+						Labels: map[string]string{
+							"com.docker.compose.project":            "qbittorrent",
+							"com.docker.compose.service":            "app",
+							"com.centurylinklabs.watchtower.enable": "true",
+						},
+						ExposedPorts: dockerNetwork.PortSet{},
+					},
+				)
+				qbittorrent.ContainerInfo().HostConfig.NetworkMode = "container:gluetun"
+
+				prowlarr := mockActions.CreateMockContainerWithConfig(
+					"prowlarr",
+					"/prowlarr",
+					"prowlarr:latest",
+					true,
+					false,
+					time.Now(),
+					&dockerContainer.Config{
+						Labels: map[string]string{
+							"com.docker.compose.project":            "prowlarr",
+							"com.docker.compose.service":            "app",
+							"com.centurylinklabs.watchtower.enable": "true",
+						},
+						ExposedPorts: dockerNetwork.PortSet{},
+					},
+				)
+				prowlarr.ContainerInfo().HostConfig.NetworkMode = "container:/gluetun"
+
+				client := mockActions.CreateMockClient(
+					&mockActions.TestData{
+						Containers: []types.Container{qbittorrent, prowlarr, gluetun},
+						Staleness: map[string]bool{
+							"qbittorrent": false,
+							"prowlarr":    false,
+							"gluetun":     true,
+						},
+						StopOrder:   []string{},
+						CreateOrder: []string{},
+						StartOrder:  []string{},
+					},
+					false,
+					false,
+				)
+
+				report, _, err := actions.Update(testLogger(),
+					context.Background(),
+					client,
+					types.UpdateParams{Cleanup: true, CPUCopyMode: "auto"},
+				)
+				gomega.Expect(err).NotTo(gomega.HaveOccurred())
+				gomega.Expect(report.Updated()).To(gomega.HaveLen(1))
+				gomega.Expect(gluetun.ToRestart()).To(gomega.BeTrue())
+				gomega.Expect(qbittorrent.ToRestart()).To(gomega.BeTrue())
+				gomega.Expect(prowlarr.ToRestart()).To(gomega.BeTrue())
+
+				gomega.Expect(client.TestData.StopOrder).To(gomega.HaveLen(3))
+				gomega.Expect(client.TestData.StopOrder[2]).To(gomega.Equal("gluetun"))
+				gomega.Expect(client.TestData.StopOrder).
+					To(gomega.ContainElements("qbittorrent", "prowlarr"))
+				gomega.Expect(client.TestData.CreateOrder).To(gomega.HaveLen(3))
+				gomega.Expect(client.TestData.CreateOrder[0]).To(gomega.Equal("gluetun"))
+				gomega.Expect(client.TestData.CreateOrder).
+					To(gomega.ContainElements("qbittorrent", "prowlarr"))
+			},
+		)
 	})
 
 	ginkgo.When("handling cross-project dependencies", func() {
