@@ -13,8 +13,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Add star history by @nicholas-fedor in [#2338](https://github.com/nicholas-fedor/watchtower/pull/2338)
 - Add shawly as a contributor for code by @allcontributors[bot] in [#2331](https://github.com/nicholas-fedor/watchtower/pull/2331)
 
+### Changed
+
+- Correct Gmail SMTP authentication guidance by @nicholas-fedor in [#2342](https://github.com/nicholas-fedor/watchtower/pull/2342)
+
 ### Chores
 
+- Update nicholas-fedor/go-proxy-pull-action action to v1.1.51 by @renovate[bot] in [#2346](https://github.com/nicholas-fedor/watchtower/pull/2346)
+- Update module github.com/valyala/fasthttp to v1.74.0 by @renovate[bot] in [#2345](https://github.com/nicholas-fedor/watchtower/pull/2345)
+- Update module github.com/gofiber/utils/v2 to v2.5.1 by @renovate[bot] in [#2344](https://github.com/nicholas-fedor/watchtower/pull/2344)
 - Update nicholas-fedor/go-proxy-pull-action action to v1.1.50 by @renovate[bot] in [#2329](https://github.com/nicholas-fedor/watchtower/pull/2329)
 - Update github.com/google/pprof digest to 6331bc6 by @renovate[bot] in [#2325](https://github.com/nicholas-fedor/watchtower/pull/2325)
 - Update module github.com/gofiber/utils/v2 to v2.5.0 by @renovate[bot] in [#2323](https://github.com/nicholas-fedor/watchtower/pull/2323)
