@@ -19,6 +19,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Chores
 
+- Update module golang.org/x/crypto to v0.57.0 by @renovate[bot] in [#2353](https://github.com/nicholas-fedor/watchtower/pull/2353)
+- Update module github.com/nicholas-fedor/shoutrrr to v0.20.0 by @renovate[bot] in [#2349](https://github.com/nicholas-fedor/watchtower/pull/2349)
 - Update module github.com/gofiber/schema to v1.8.6 by @renovate[bot] in [#2348](https://github.com/nicholas-fedor/watchtower/pull/2348)
 - Update nicholas-fedor/go-proxy-pull-action action to v1.1.51 by @renovate[bot] in [#2346](https://github.com/nicholas-fedor/watchtower/pull/2346)
 - Update module github.com/valyala/fasthttp to v1.74.0 by @renovate[bot] in [#2345](https://github.com/nicholas-fedor/watchtower/pull/2345)
