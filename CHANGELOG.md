@@ -19,6 +19,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Chores
 
+- Update module golang.org/x/net to v0.59.0 by @renovate[bot] in [#2355](https://github.com/nicholas-fedor/watchtower/pull/2355)
 - Update module golang.org/x/crypto to v0.57.0 by @renovate[bot] in [#2353](https://github.com/nicholas-fedor/watchtower/pull/2353)
 - Update module github.com/nicholas-fedor/shoutrrr to v0.20.0 by @renovate[bot] in [#2349](https://github.com/nicholas-fedor/watchtower/pull/2349)
 - Update module github.com/gofiber/schema to v1.8.6 by @renovate[bot] in [#2348](https://github.com/nicholas-fedor/watchtower/pull/2348)
