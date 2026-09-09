@@ -10,6 +10,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Chores
 
+- Update github/codeql-action action to v4.38.0 by @renovate[bot] in [#2362](https://github.com/nicholas-fedor/watchtower/pull/2362)
+- Update module golang.org/x/tools to v0.50.0 by @renovate[bot] in [#2360](https://github.com/nicholas-fedor/watchtower/pull/2360)
 - Update module github.com/onsi/ginkgo/v2 to v2.32.2 by @renovate[bot] in [#2359](https://github.com/nicholas-fedor/watchtower/pull/2359)
 
 ## [1.22.1] - 2026-09-09
