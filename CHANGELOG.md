@@ -8,6 +8,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Chores
+
+- Update module github.com/onsi/ginkgo/v2 to v2.32.2 by @renovate[bot] in [#2359](https://github.com/nicholas-fedor/watchtower/pull/2359)
+
+## [1.22.1] - 2026-09-09
+
 ### Added
 
 - Add star history by @nicholas-fedor in [#2338](https://github.com/nicholas-fedor/watchtower/pull/2338)
@@ -19,6 +25,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Chores
 
+- Update module golang.org/x/text to v0.42.0 by @renovate[bot] in [#2356](https://github.com/nicholas-fedor/watchtower/pull/2356)
 - Update module golang.org/x/net to v0.59.0 by @renovate[bot] in [#2355](https://github.com/nicholas-fedor/watchtower/pull/2355)
 - Update module golang.org/x/crypto to v0.57.0 by @renovate[bot] in [#2353](https://github.com/nicholas-fedor/watchtower/pull/2353)
 - Update module github.com/nicholas-fedor/shoutrrr to v0.20.0 by @renovate[bot] in [#2349](https://github.com/nicholas-fedor/watchtower/pull/2349)
@@ -3602,7 +3609,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## Compare Releases
 
-- [unreleased](https://github.com/nicholas-fedor/watchtower/compare/v1.22.0...HEAD)
+- [unreleased](https://github.com/nicholas-fedor/watchtower/compare/v1.22.1...HEAD)
+- [1.22.1](https://github.com/nicholas-fedor/watchtower/compare/v1.22.0...v1.22.1)
 - [1.22.0](https://github.com/nicholas-fedor/watchtower/compare/v1.21.2...v1.22.0)
 - [1.21.2](https://github.com/nicholas-fedor/watchtower/compare/v1.21.1...v1.21.2)
 - [1.21.1](https://github.com/nicholas-fedor/watchtower/compare/v1.21.0...v1.21.1)
