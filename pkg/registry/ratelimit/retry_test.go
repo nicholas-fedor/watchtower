@@ -91,6 +91,31 @@ func TestDoLogsExhaustionAtWarn(t *testing.T) {
 	assert.NotContains(t, buf.String(), "Retrying after delay")
 }
 
+func TestDoLogsTinyTokenBucketExhaustionAtDebug(t *testing.T) {
+	ResetForTest()
+
+	retryElapsed = 250 * time.Millisecond
+
+	defer ResetForTest()
+
+	var buf bytes.Buffer
+
+	log := zerolog.New(&buf).Level(zerolog.DebugLevel)
+
+	err := Do(t.Context(), &log, "ghcr.io", func() error {
+		return &Error{
+			RetryAfter:    975 * time.Microsecond,
+			Allowed:       44000,
+			AllowedWindow: time.Minute,
+			Host:          "ghcr.io",
+		}
+	})
+	require.ErrorIs(t, err, ErrRateLimited)
+	assert.Contains(t, buf.String(), "Registry rate limited. Stopping retries")
+	assert.Contains(t, buf.String(), `"level":"debug"`)
+	assert.NotContains(t, buf.String(), `"level":"warn"`)
+}
+
 func TestDoRetriesPastFiveWhenRetryAfterIsTiny(t *testing.T) {
 	ResetForTest()
 
@@ -138,6 +163,8 @@ func TestDoGivesUpWhenTinyRetryAfterExceedsElapsedBudget(t *testing.T) {
 	require.ErrorIs(t, err, ErrRateLimited)
 	assert.Contains(t, buf.String(), "Registry rate limited. Stopping retries")
 	assert.Contains(t, buf.String(), "Retrying after delay")
+	assert.Contains(t, buf.String(), `"level":"debug"`)
+	assert.NotContains(t, buf.String(), `"level":"warn"`)
 
 	maxStep := minHonorWait + minHonorWait/equalJitterDivisor
 	minAttempts := int(retryElapsed / maxStep)

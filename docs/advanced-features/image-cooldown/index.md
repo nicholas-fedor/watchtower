@@ -311,7 +311,7 @@ Authenticating with a Docker Hub account raises the limit from 100 to 200 pulls,
 
 GHCR.io does not publish Docker Hub-style pull quotas. Anonymous pulls of a public org share an undocumented edge token bucket, observed as `allowed: 44000/minute` with a sub-millisecond `retry-after`. That includes `lscr.io/linuxserver/*` images, which Watchtower remaps to `ghcr.io` for digest and auth.
 
-Unauthenticated GHCR checks reuse one anonymous token across public images and run one at a time. Later images in that token lifetime skip the registry challenge. Tiny waits are floored to 100ms and retried for up to 30 seconds. In-cycle retries stay at debug so they do not become notifications. If the window is exhausted, that container is **failed** for the cycle.
+Unauthenticated GHCR checks reuse one anonymous token across public images and run one at a time. Later images in that token lifetime skip the registry challenge. Tiny waits are floored to 100ms and retried for up to 30 seconds. Those retries and the exhaustion of that window stay at debug so they do not become notifications. The container is **failed** for the cycle. A Retry-After longer than 30 seconds is logged as a warning and is not retried until the next run.
 
 `docker login ghcr.io` (or equivalent credentials in `config.json` / `REPO_USER` and `REPO_PASS`) uses a per-user bucket and restores parallel GHCR checks. Login to `lscr.io` alone does not count. Credential lookup uses `ghcr.io` after the remap.
 

@@ -122,7 +122,7 @@ func DoValue[T any](
 
 	err = lastOperationError(err)
 	if log != nil && Is(err) {
-		log.Warn().
+		log.WithLevel(exhaustionLevel(err)).
 			Err(err).
 			Str("host", host).
 			Int("attempts", attempt).
@@ -132,6 +132,27 @@ func DoValue[T any](
 	}
 
 	return result, err
+}
+
+// exhaustionLevel chooses the log level when in-cycle 429 retries stop.
+//
+// A Retry-After longer than the honor window is a real registry backoff and
+// is logged at warn. Tiny token-bucket waits that exhaust the retry budget
+// stay at debug so they do not become notifications. The container is still
+// Failed on the session report.
+//
+// Parameters:
+//   - err: Last rate-limit error from the retry loop.
+//
+// Returns:
+//   - zerolog.Level: Warn for long Retry-After, debug otherwise.
+func exhaustionLevel(err error) zerolog.Level {
+	info, ok := errors.AsType[*Error](err)
+	if ok && info != nil && info.RetryAfter > maxHonorWait {
+		return zerolog.WarnLevel
+	}
+
+	return zerolog.DebugLevel
 }
 
 // maxRetryAttempts is a circuit breaker derived from the elapsed budget.
