@@ -10,7 +10,7 @@ require (
 	github.com/containerd/errdefs v1.0.0
 	github.com/distribution/reference v0.6.0
 	github.com/docker/cli v29.8.0+incompatible
-	github.com/gofiber/contrib/v3/swaggo v1.0.10
+	github.com/gofiber/contrib/v3/swaggo v1.0.11
 	github.com/gofiber/contrib/v3/zerolog v1.1.4
 	github.com/gofiber/fiber/v3 v3.5.0
 	github.com/mattn/go-isatty v0.0.24
