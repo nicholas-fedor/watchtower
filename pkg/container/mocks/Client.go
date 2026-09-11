@@ -19,10 +19,19 @@ func NewMockClient(t interface {
 	mock.TestingT
 	Cleanup(func())
 }) *MockClient {
+	if helper, ok := t.(interface{ Helper() }); ok {
+		helper.Helper()
+	}
+
 	mock := &MockClient{}
 	mock.Mock.Test(t)
 
-	t.Cleanup(func() { mock.AssertExpectations(t) })
+	t.Cleanup(func() {
+		if helper, ok := t.(interface{ Helper() }); ok {
+			helper.Helper()
+		}
+		mock.AssertExpectations(t)
+	})
 
 	return mock
 }
@@ -561,24 +570,22 @@ func (_c *MockClient_GetImageDiskUsage_Call) RunAndReturn(run func(ctx context.C
 }
 
 // GetInfo provides a mock function for the type MockClient
-func (_mock *MockClient) GetInfo(ctx context.Context) (map[string]any, error) {
+func (_mock *MockClient) GetInfo(ctx context.Context) (types.SystemInfo, error) {
 	ret := _mock.Called(ctx)
 
 	if len(ret) == 0 {
 		panic("no return value specified for GetInfo")
 	}
 
-	var r0 map[string]any
+	var r0 types.SystemInfo
 	var r1 error
-	if returnFunc, ok := ret.Get(0).(func(context.Context) (map[string]any, error)); ok {
+	if returnFunc, ok := ret.Get(0).(func(context.Context) (types.SystemInfo, error)); ok {
 		return returnFunc(ctx)
 	}
-	if returnFunc, ok := ret.Get(0).(func(context.Context) map[string]any); ok {
+	if returnFunc, ok := ret.Get(0).(func(context.Context) types.SystemInfo); ok {
 		r0 = returnFunc(ctx)
 	} else {
-		if ret.Get(0) != nil {
-			r0 = ret.Get(0).(map[string]any)
-		}
+		r0 = ret.Get(0).(types.SystemInfo)
 	}
 	if returnFunc, ok := ret.Get(1).(func(context.Context) error); ok {
 		r1 = returnFunc(ctx)
@@ -612,12 +619,12 @@ func (_c *MockClient_GetInfo_Call) Run(run func(ctx context.Context)) *MockClien
 	return _c
 }
 
-func (_c *MockClient_GetInfo_Call) Return(stringToAnyMoqParam map[string]any, err error) *MockClient_GetInfo_Call {
-	_c.Call.Return(stringToAnyMoqParam, err)
+func (_c *MockClient_GetInfo_Call) Return(systemInfo types.SystemInfo, err error) *MockClient_GetInfo_Call {
+	_c.Call.Return(systemInfo, err)
 	return _c
 }
 
-func (_c *MockClient_GetInfo_Call) RunAndReturn(run func(ctx context.Context) (map[string]any, error)) *MockClient_GetInfo_Call {
+func (_c *MockClient_GetInfo_Call) RunAndReturn(run func(ctx context.Context) (types.SystemInfo, error)) *MockClient_GetInfo_Call {
 	_c.Call.Return(run)
 	return _c
 }

@@ -588,16 +588,15 @@ func (client MockClient) GetImageDiskUsage(ctx context.Context) (types.ImageDisk
 }
 
 // GetInfo returns mock system information for testing.
-// It provides a basic map with mock Docker/Podman info.
-func (client MockClient) GetInfo(ctx context.Context) (map[string]any, error) {
+func (client MockClient) GetInfo(ctx context.Context) (types.SystemInfo, error) {
 	if err := client.checkContextCancellation(ctx); err != nil {
-		return nil, err
+		return types.SystemInfo{}, err
 	}
 
-	return map[string]any{
-		"Name":          "docker",
-		"ServerVersion": "1.50",
-		"OSType":        "linux",
+	return types.SystemInfo{
+		Name:          "docker",
+		ServerVersion: "1.50",
+		OSType:        "linux",
 	}, nil
 }
 

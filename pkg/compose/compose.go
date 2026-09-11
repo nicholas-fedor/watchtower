@@ -2,7 +2,8 @@ package compose
 
 import (
 	"encoding/json"
-	"sort"
+	"maps"
+	"slices"
 	"strings"
 
 	"github.com/rs/zerolog"
@@ -35,62 +36,31 @@ func ParseDependsOnLabel(log *zerolog.Logger, labelValue string) []string {
 		return nil
 	}
 
-	clogVal := log.With().
-		Str("label_value", labelValue).
-		Logger()
-	clog := &clogVal
-	clog.Debug().Msg("Parsing compose depends-on label")
-
-	// Try to parse as JSON first (Docker Compose v2+ format)
 	if strings.HasPrefix(strings.TrimSpace(labelValue), "{") {
-		var dependsOn map[string]any
+		var dependsOn map[string]json.RawMessage
 
 		err := json.Unmarshal([]byte(labelValue), &dependsOn)
 		if err != nil {
-			clog.Debug().
+			log.Debug().
 				Err(err).
+				Str("label_value", labelValue).
 				Msg("Failed to parse as JSON, falling back to string parsing")
 		} else {
-			services := make([]string, 0, len(dependsOn))
-			for service := range dependsOn {
-				services = append(services, service)
-			}
-			// Sort for consistent ordering
-			sort.Strings(services)
-			clog.Debug().
-				Strs("parsed_services", services).
-				Msg("Parsed JSON format compose depends-on label")
-
-			return services
+			return slices.Sorted(maps.Keys(dependsOn))
 		}
 	}
 
-	// Fall back to string parsing (legacy format)
 	deps := strings.Split(labelValue, ",")
 	services := make([]string, 0, len(deps))
 
-	// Parse comma-separated list of service:condition:required
 	for _, dep := range deps {
-		dep = strings.TrimSpace(dep)
-		if dep == "" {
-			continue
-		}
+		serviceName, _, _ := strings.Cut(strings.TrimSpace(dep), ":")
 
-		clog.Debug().
-			Str("parsing_dep", dep).
-			Msg("Parsing individual dependency")
-		// Parse colon-separated format: service:condition:required
-		parts := strings.Split(dep, ":")
-
-		serviceName := strings.TrimSpace(parts[0])
+		serviceName = strings.TrimSpace(serviceName)
 		if serviceName != "" {
 			services = append(services, serviceName)
 		}
 	}
-
-	clog.Debug().
-		Strs("parsed_services", services).
-		Msg("Completed parsing string format compose depends-on label")
 
 	return services
 }
@@ -105,22 +75,8 @@ func ParseDependsOnLabel(log *zerolog.Logger, labelValue string) []string {
 //
 // Returns:
 //   - string: Project name if present, empty string otherwise.
-func GetProjectName(log *zerolog.Logger, labels map[string]string) string {
-	if labels == nil {
-		return ""
-	}
-
-	projectName, ok := labels[ComposeProjectLabel]
-	if !ok {
-		return ""
-	}
-
-	log.Debug().
-		Str("label", ComposeProjectLabel).
-		Str("value", projectName).
-		Msg("Retrieved compose project name")
-
-	return projectName
+func GetProjectName(labels map[string]string) string {
+	return labels[ComposeProjectLabel]
 }
 
 // GetServiceName extracts the service name from Docker Compose labels.
@@ -133,22 +89,8 @@ func GetProjectName(log *zerolog.Logger, labels map[string]string) string {
 //
 // Returns:
 //   - string: Service name if present, empty string otherwise.
-func GetServiceName(log *zerolog.Logger, labels map[string]string) string {
-	if labels == nil {
-		return ""
-	}
-
-	serviceName, ok := labels[ComposeServiceLabel]
-	if !ok {
-		return ""
-	}
-
-	log.Debug().
-		Str("label", ComposeServiceLabel).
-		Str("value", serviceName).
-		Msg("Retrieved compose service name")
-
-	return serviceName
+func GetServiceName(labels map[string]string) string {
+	return labels[ComposeServiceLabel]
 }
 
 // GetContainerNumber extracts the container number from the Docker Compose labels.
@@ -161,20 +103,6 @@ func GetServiceName(log *zerolog.Logger, labels map[string]string) string {
 //
 // Returns:
 //   - string: Container replica number if present, empty string otherwise.
-func GetContainerNumber(log *zerolog.Logger, labels map[string]string) string {
-	if labels == nil {
-		return ""
-	}
-
-	containerNumber, ok := labels[ComposeContainerNumber]
-	if !ok {
-		return ""
-	}
-
-	log.Debug().
-		Str("label", ComposeContainerNumber).
-		Str("value", containerNumber).
-		Msg("Retrieved container replica number")
-
-	return containerNumber
+func GetContainerNumber(labels map[string]string) string {
+	return labels[ComposeContainerNumber]
 }

@@ -3,6 +3,7 @@ package container
 import (
 	"context"
 	"fmt"
+	"slices"
 	"strings"
 	"sync"
 
@@ -387,15 +388,15 @@ func (c *Container) GetCreateConfig() *dockerContainer.Config {
 		config.Hostname = "" // Clear hostname for UTS mode.
 	}
 
-	if util.SliceEqual(config.Entrypoint, imageConfig.Entrypoint) {
+	if slices.Equal(config.Entrypoint, imageConfig.Entrypoint) {
 		config.Entrypoint = nil
-		if util.SliceEqual(config.Cmd, imageConfig.Cmd) {
+		if slices.Equal(config.Cmd, imageConfig.Cmd) {
 			config.Cmd = nil
 		}
 	}
 	// Clear HEALTHCHECK if it matches the image default.
 	if config.Healthcheck != nil && imageConfig.Healthcheck != nil {
-		if util.SliceEqual(config.Healthcheck.Test, imageConfig.Healthcheck.Test) {
+		if slices.Equal(config.Healthcheck.Test, imageConfig.Healthcheck.Test) {
 			config.Healthcheck.Test = nil
 		}
 
@@ -799,9 +800,9 @@ func ResolveContainerIdentifier(c types.Container) string {
 		return nameOrID(c)
 	}
 
-	projectName := compose.GetProjectName(nopLog(), labels)
-	serviceName := compose.GetServiceName(nopLog(), labels)
-	containerNumber := compose.GetContainerNumber(nopLog(), labels)
+	projectName := compose.GetProjectName(labels)
+	serviceName := compose.GetServiceName(labels)
+	containerNumber := compose.GetContainerNumber(labels)
 
 	// Handle replica containers
 	if projectName != "" && serviceName != "" &&
@@ -923,7 +924,7 @@ func getLinksFromComposeLabel(c *Container, clog *zerolog.Logger) []string {
 
 	services := compose.ParseDependsOnLabel(clog, composeDependsOnLabelValue)
 
-	projectName := compose.GetProjectName(clog, c.containerInfo.Config.Labels)
+	projectName := compose.GetProjectName(c.containerInfo.Config.Labels)
 
 	normalizedLinks := make([]string, 0, len(services))
 	for _, service := range services {
@@ -966,7 +967,7 @@ func getLinksFromHostConfig(c *Container, clog *zerolog.Logger) []string {
 		return nil
 	}
 
-	projectName := compose.GetProjectName(clog, c.containerInfo.Config.Labels)
+	projectName := compose.GetProjectName(c.containerInfo.Config.Labels)
 
 	// Pre-allocate for links plus potential network mode dependency
 	capacity := len(c.containerInfo.HostConfig.Links)

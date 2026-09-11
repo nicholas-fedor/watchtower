@@ -29,28 +29,6 @@ type timeUnit struct {
 	plural   string // The plural form of the unit (e.g., "hours")
 }
 
-// SliceEqual checks if two string slices are identical.
-//
-// Parameters:
-//   - slice1: First slice.
-//   - slice2: Second slice.
-//
-// Returns:
-//   - bool: True if equal, false otherwise.
-func SliceEqual(slice1, slice2 []string) bool {
-	if len(slice1) != len(slice2) {
-		return false
-	}
-
-	for i := range slice1 {
-		if slice1[i] != slice2[i] {
-			return false
-		}
-	}
-
-	return true
-}
-
 // SliceSubtract returns elements in the first slice that are not in the second slice.
 //
 // Parameters:
@@ -71,22 +49,6 @@ func SliceSubtract(slice, subtractFrom []string) []string {
 	}
 
 	return result
-}
-
-// MinInt returns the smaller of two integers.
-//
-// Parameters:
-//   - a: First integer.
-//   - b: Second integer.
-//
-// Returns:
-//   - int: The smaller of the two integers.
-func MinInt(a, b int) int {
-	if a < b {
-		return a
-	}
-
-	return b
 }
 
 // StringMapSubtract removes matching key-value pairs.

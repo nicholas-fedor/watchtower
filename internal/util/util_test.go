@@ -8,45 +8,6 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-// TestSliceEqual_True verifies that identical slices are considered equal.
-// It ensures SliceEqual returns true for matching content.
-func TestSliceEqual_True(t *testing.T) {
-	t.Parallel()
-
-	slice1 := []string{"a", "b", "c"}
-	slice2 := []string{"a", "b", "c"}
-
-	result := SliceEqual(slice1, slice2)
-
-	assert.True(t, result)
-}
-
-// TestSliceEqual_DifferentLengths verifies that slices of different lengths are not equal.
-// It ensures SliceEqual returns false when lengths differ.
-func TestSliceEqual_DifferentLengths(t *testing.T) {
-	t.Parallel()
-
-	slice1 := []string{"a", "b", "c"}
-	slice2 := []string{"a", "b", "c", "d"}
-
-	result := SliceEqual(slice1, slice2)
-
-	assert.False(t, result)
-}
-
-// TestSliceEqual_DifferentContents verifies that slices with different contents are not equal.
-// It ensures SliceEqual returns false when elements differ.
-func TestSliceEqual_DifferentContents(t *testing.T) {
-	t.Parallel()
-
-	slice1 := []string{"a", "b", "c"}
-	slice2 := []string{"a", "b", "d"}
-
-	result := SliceEqual(slice1, slice2)
-
-	assert.False(t, result)
-}
-
 // TestSliceSubtract verifies that SliceSubtract correctly removes matching elements.
 // It ensures the result contains only unique elements from the first slice.
 func TestSliceSubtract(t *testing.T) {
@@ -107,46 +68,6 @@ func TestGenerateRandomPrefixedSHA256(t *testing.T) {
 
 	result := GenerateRandomPrefixedSHA256()
 	assert.Regexp(t, "sha256:[0-9|a-f]{64}", result)
-}
-
-// TestMinInt_FirstSmaller verifies that MinInt returns the smaller value when the first argument is smaller.
-func TestMinInt_FirstSmaller(t *testing.T) {
-	t.Parallel()
-
-	result := MinInt(3, 5)
-	assert.Equal(t, 3, result)
-}
-
-// TestMinInt_SecondSmaller verifies that MinInt returns the smaller value when the second argument is smaller.
-func TestMinInt_SecondSmaller(t *testing.T) {
-	t.Parallel()
-
-	result := MinInt(7, 2)
-	assert.Equal(t, 2, result)
-}
-
-// TestMinInt_Equal verifies that MinInt returns either value when both arguments are equal.
-func TestMinInt_Equal(t *testing.T) {
-	t.Parallel()
-
-	result := MinInt(4, 4)
-	assert.Equal(t, 4, result)
-}
-
-// TestMinInt_NegativeNumbers verifies that MinInt works correctly with negative numbers.
-func TestMinInt_NegativeNumbers(t *testing.T) {
-	t.Parallel()
-
-	result := MinInt(-1, -3)
-	assert.Equal(t, -3, result)
-}
-
-// TestMinInt_Zero verifies that MinInt works correctly with zero.
-func TestMinInt_Zero(t *testing.T) {
-	t.Parallel()
-
-	result := MinInt(0, 5)
-	assert.Equal(t, 0, result)
 }
 
 // TestFormatDuration_Zero verifies that FormatDuration returns "0 seconds" for zero duration.

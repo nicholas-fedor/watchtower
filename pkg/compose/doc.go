@@ -7,13 +7,4 @@
 //     returns a slice of service names.
 //   - GetServiceName: Extracts the service name from Docker Compose labels
 //     using the com.docker.compose.service label.
-//
-// Usage example:
-//
-//	// Callers must provide a non-nil *zerolog.Logger (process logger).
-//	labels := map[string]string{
-//		"com.docker.compose.service": "myservice",
-//	}
-//	services := compose.ParseDependsOnLabel(log, "postgres:service_started:required,redis")
-//	serviceName := compose.GetServiceName(log, labels)
 package compose

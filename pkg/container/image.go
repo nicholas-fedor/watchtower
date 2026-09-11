@@ -395,12 +395,9 @@ func (c imageClient) PullImage(
 	warnOnHeadFailed WarningStrategy,
 	params types.UpdateParams,
 ) error {
-	fields := map[string]any{
-		"container": sourceContainer.Name(),
-		"image":     sourceContainer.ImageName(),
-	}
 	clogVal := c.logger().With().
-		Fields(fields).
+		Str("container", sourceContainer.Name()).
+		Str("image", sourceContainer.ImageName()).
 		Logger()
 	clog := &clogVal
 
@@ -429,7 +426,7 @@ func (c imageClient) PullImage(
 	}
 
 	// Skip the pull if the digest matches the current image (or local-only).
-	skip, skipErr := c.shouldSkipPull(ctx, sourceContainer, opts.RegistryAuth, warnOnHeadFailed, fields)
+	skip, skipErr := c.shouldSkipPull(ctx, sourceContainer, opts.RegistryAuth, warnOnHeadFailed)
 	if skipErr != nil {
 		return skipErr
 	}
@@ -445,7 +442,7 @@ func (c imageClient) PullImage(
 		return cooldownErr
 	}
 
-	return c.performImagePull(ctx, sourceContainer.ImageName(), opts, fields)
+	return c.performImagePull(ctx, sourceContainer.ImageName(), opts)
 }
 
 // RemoveImageByID deletes an image from the Docker host.
@@ -615,7 +612,6 @@ func newImageClient(api dockerClient.APIClient, log *zerolog.Logger) imageClient
 //   - sourceContainer: Container to check.
 //   - registryAuth: Registry authentication credentials.
 //   - warnOnHeadFailed: Strategy for logging warnings on HEAD request failures.
-//   - fields: Logging fields for context.
 //
 // Returns:
 //   - bool: True if pull can be skipped, false otherwise.
@@ -625,10 +621,10 @@ func (c imageClient) shouldSkipPull(
 	sourceContainer types.Container,
 	registryAuth string,
 	warnOnHeadFailed WarningStrategy,
-	fields map[string]any,
 ) (bool, error) {
 	clogVal := c.logger().With().
-		Fields(fields).
+		Str("container", sourceContainer.Name()).
+		Str("image", sourceContainer.ImageName()).
 		Logger()
 	clog := &clogVal
 	clog.Debug().Msg("Checking if pull is needed")
@@ -697,7 +693,6 @@ func (c imageClient) shouldSkipPull(
 //   - ctx: Context for operation control.
 //   - imageName: Image to pull.
 //   - opts: Pull options with auth.
-//   - fields: Logging fields for context.
 //
 // Returns:
 //   - error: Non-nil if pull or read fails, nil on success.
@@ -705,10 +700,9 @@ func (c imageClient) performImagePull(
 	ctx context.Context,
 	imageName string,
 	opts dockerClient.ImagePullOptions,
-	fields map[string]any,
 ) error {
 	clogVal := c.logger().With().
-		Fields(fields).
+		Str("image", imageName).
 		Logger()
 	clog := &clogVal
 	clog.Debug().Msg("Initiating image pull")
