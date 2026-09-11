@@ -10,6 +10,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Chores
 
+- Update module github.com/gofiber/contrib/v3/zerolog to v1.1.5 by @renovate[bot] in [#2369](https://github.com/nicholas-fedor/watchtower/pull/2369)
+- Update module github.com/gofiber/contrib/v3/swaggo to v1.0.11 by @renovate[bot] in [#2368](https://github.com/nicholas-fedor/watchtower/pull/2368)
 - Update module github.com/molecule-man/go-brrr to v1.1.0 by @renovate[bot] in [#2364](https://github.com/nicholas-fedor/watchtower/pull/2364)
 - Update github/codeql-action action to v4.38.0 by @renovate[bot] in [#2362](https://github.com/nicholas-fedor/watchtower/pull/2362)
 - Update module golang.org/x/tools to v0.50.0 by @renovate[bot] in [#2360](https://github.com/nicholas-fedor/watchtower/pull/2360)
