@@ -8,6 +8,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- Replace untyped maps with concrete types by @nicholas-fedor in [#2371](https://github.com/nicholas-fedor/watchtower/pull/2371)
+
 ### Chores
 
 - Update module github.com/gofiber/contrib/v3/zerolog to v1.1.5 by @renovate[bot] in [#2369](https://github.com/nicholas-fedor/watchtower/pull/2369)
