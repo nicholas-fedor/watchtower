@@ -1051,7 +1051,7 @@ func linkedIdentifierMarkedForRestart(log *zerolog.Logger, links []string,
 		}
 	}
 
-	dependentProject := getProject(log, dependentContainer)
+	dependentProject := getProject(dependentContainer)
 
 	// Collect known projects so we can distinguish bare service-name references
 	// (which may contain hyphens) from explicit project-qualified identifiers
@@ -1059,7 +1059,7 @@ func linkedIdentifierMarkedForRestart(log *zerolog.Logger, links []string,
 	knownProjects := map[string]bool{}
 
 	for _, c := range allContainers {
-		p := getProject(log, c)
+		p := getProject(c)
 		if p != "" {
 			knownProjects[p] = true
 		}
@@ -1127,7 +1127,7 @@ func linkedIdentifierMarkedForRestart(log *zerolog.Logger, links []string,
 		matches := sorter.FindMatchingIdentifiers(link, restartingNames)
 
 		if len(matches) > 0 {
-			dependentProject := getProject(log, dependentContainer)
+			dependentProject := getProject(dependentContainer)
 
 			// Prefer any candidate that shares the dependent's project (from labels).
 			for _, matchedID := range matches {
@@ -1136,7 +1136,7 @@ func linkedIdentifierMarkedForRestart(log *zerolog.Logger, links []string,
 					continue
 				}
 
-				if getProject(log, matchedContainer) == dependentProject && dependentProject != "" {
+				if getProject(matchedContainer) == dependentProject && dependentProject != "" {
 					log.Debug().
 						Str("link", link).
 						Str("matched", matchedID).
@@ -1196,7 +1196,7 @@ func linkedIdentifierMarkedForRestart(log *zerolog.Logger, links []string,
 			continue
 		}
 
-		dependentProject := getProject(log, dependentContainer)
+		dependentProject := getProject(dependentContainer)
 		linkService := sorter.ExtractServiceName(link)
 
 		// Build the list of currently restarting containers that match on service name alone.
@@ -1216,7 +1216,7 @@ func linkedIdentifierMarkedForRestart(log *zerolog.Logger, links []string,
 					continue
 				}
 
-				if getProject(log, c) == dependentProject &&
+				if getProject(c) == dependentProject &&
 					dependentProject != "" {
 					log.Debug().
 						Str("link", link).
@@ -1257,12 +1257,12 @@ func linkedIdentifierMarkedForRestart(log *zerolog.Logger, links []string,
 //
 // Returns:
 //   - string: Project name, or "" if none can be determined.
-func getProject(log *zerolog.Logger, c types.Container) string {
+func getProject(c types.Container) string {
 	monitoredContainer, ok := c.(*container.Container)
 	if ok {
 		info := monitoredContainer.ContainerInfo()
 		if info != nil && info.Config != nil {
-			project := compose.GetProjectName(log, info.Config.Labels)
+			project := compose.GetProjectName(info.Config.Labels)
 			if project != "" {
 				return project
 			}

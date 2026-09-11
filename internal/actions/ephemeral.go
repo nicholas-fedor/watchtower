@@ -87,13 +87,9 @@ func EphemeralSelfUpdate(log *zerolog.Logger, ctx context.Context,
 	sourceContainer types.Container,
 	config types.UpdateParams,
 ) (types.ContainerID, bool, error) {
-	fields := map[string]any{
-		"container": sourceContainer.Name(),
-		"image":     sourceContainer.ImageName(),
-	}
-
 	clogVal := log.With().
-		Fields(fields).
+		Str("container", sourceContainer.Name()).
+		Str("image", sourceContainer.ImageName()).
 		Logger()
 	clog := &clogVal
 

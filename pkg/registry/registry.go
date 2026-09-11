@@ -32,45 +32,32 @@ var (
 //   - image.PullOptions: Configured pull options if successful.
 //   - error: Non-nil if auth retrieval fails, nil on success.
 func GetPullOptions(log *zerolog.Logger, imageName string) (dockerClient.ImagePullOptions, error) {
-	// Set up logging fields for consistent tracking.
-	fields := map[string]any{
-		"image": imageName,
-	}
+	clogVal := log.With().Str("image", imageName).Logger()
+	clog := &clogVal
 
-	log.Debug().
-		Fields(fields).
-		Msg("Retrieving pull options")
+	clog.Debug().Msg("Retrieving pull options")
 
-	// Fetch encoded registry credentials for the image.
 	registryCredentials, err := EncodedAuth(log, imageName)
 	if err != nil {
-		log.Debug().
+		clog.Debug().
 			Err(err).
-			Fields(fields).
 			Msg("Failed to get authentication credentials")
 
 		return dockerClient.ImagePullOptions{}, fmt.Errorf("%w: %w", errFailedGetAuth, err)
 	}
 
-	// Return empty options if no auth is available.
 	if registryCredentials == "" {
-		log.Debug().
-			Fields(fields).
-			Msg("No authentication credentials retrieved")
+		clog.Debug().Msg("No authentication credentials retrieved")
 
 		return dockerClient.ImagePullOptions{}, nil
 	}
 
-	// Log non-sensitive context only in trace mode.
-	// Never log credential payload.
-	if log.GetLevel() == zerolog.TraceLevel {
-		log.Trace().
-			Fields(fields).
+	if clog.GetLevel() == zerolog.TraceLevel {
+		clog.Trace().
 			Bool("has_credentials", true).
 			Msg("Retrieved authentication credentials")
 	}
 
-	// Configure pull options with auth and a default privilege handler.
 	pullOptions := dockerClient.ImagePullOptions{
 		RegistryAuth: registryCredentials,
 		PrivilegeFunc: func(ctx context.Context) (string, error) {
@@ -78,9 +65,7 @@ func GetPullOptions(log *zerolog.Logger, imageName string) (dockerClient.ImagePu
 		},
 	}
 
-	log.Debug().
-		Fields(fields).
-		Msg("Configured pull options")
+	clog.Debug().Msg("Configured pull options")
 
 	return pullOptions, nil
 }
@@ -112,47 +97,39 @@ func DefaultAuthHandler(log *zerolog.Logger, _ context.Context) (string, error) 
 // Returns:
 //   - bool: True if a warning is warranted, false otherwise.
 func WarnOnAPIConsumption(log *zerolog.Logger, container types.Container) bool {
-	// Set up logging fields for tracking.
-	fields := map[string]any{
-		"container": container.Name(),
-		"image":     container.ImageName(),
-	}
+	clogVal := log.With().
+		Str("container", container.Name()).
+		Str("image", container.ImageName()).
+		Logger()
+	clog := &clogVal
 
-	// Parse the image name into a normalized reference.
 	normalizedRef, err := reference.ParseNormalizedNamed(container.ImageName())
 	if err != nil {
-		log.Debug().
+		clog.Debug().
 			Err(err).
-			Fields(fields).
 			Msg("Failed to parse image reference, assuming API consumption")
 
 		return true
 	}
 
-	// Extract the registry host from the reference.
 	containerHost, err := auth.GetRegistryAddress(log, normalizedRef.Name())
 	if err != nil {
-		log.Debug().
+		clog.Debug().
 			Err(err).
-			Fields(fields).
 			Msg("Failed to get registry address, assuming API consumption")
 
 		return true
 	}
 
-	// Check if the registry is known to support HEAD requests.
 	if containerHost == hosts.DockerRegistryHost || containerHost == hosts.GitHubRegistryDomain {
-		log.Debug().
-			Fields(fields).
+		clog.Debug().
 			Str("host", containerHost).
 			Msg("Registry supports HEAD requests, warning on API consumption")
 
 		return true
 	}
 
-	// No warning if registry behavior is unknown.
-	log.Debug().
-		Fields(fields).
+	clog.Debug().
 		Str("host", containerHost).
 		Msg("Registry behavior unknown, no API consumption warning")
 

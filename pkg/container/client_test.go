@@ -1666,8 +1666,7 @@ var _ = ginkgo.Describe("the client", func() {
 
 			info, err := testClient.GetInfo(context.Background())
 			gomega.Expect(err).NotTo(gomega.HaveOccurred())
-			gomega.Expect(info).NotTo(gomega.BeNil())
-			gomega.Expect(info["Name"]).To(gomega.Equal("docker-server"))
+			gomega.Expect(info.Name).To(gomega.Equal("docker-server"))
 		})
 
 		ginkgo.It("GetInfo handles TLS connection failures gracefully", func() {
@@ -1713,11 +1712,13 @@ var _ = ginkgo.Describe("the client", func() {
 
 			info, err := testClient.GetInfo(context.Background())
 			gomega.Expect(err).NotTo(gomega.HaveOccurred())
-			gomega.Expect(info).To(gomega.HaveKeyWithValue("Name", "test-docker"))
-			gomega.Expect(info).To(gomega.HaveKeyWithValue("ServerVersion", "25.0.0"))
-			gomega.Expect(info).To(gomega.HaveKeyWithValue("OSType", "linux"))
-			gomega.Expect(info).To(gomega.HaveKeyWithValue("OperatingSystem", "Alpine Linux"))
-			gomega.Expect(info).To(gomega.HaveKeyWithValue("Driver", "btrfs"))
+			gomega.Expect(info).To(gomega.Equal(types.SystemInfo{
+				Name:            "test-docker",
+				ServerVersion:   "25.0.0",
+				OSType:          "linux",
+				OperatingSystem: "Alpine Linux",
+				Driver:          "btrfs",
+			}))
 		})
 	})
 
