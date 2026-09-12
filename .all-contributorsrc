@@ -1021,6 +1021,15 @@
       "contributions": [
         "code"
       ]
+    },
+    {
+      "login": "NotaInutilis",
+      "name": "Nota Inutilis",
+      "avatar_url": "https://avatars.githubusercontent.com/u/9675966?v=4",
+      "profile": "https://notainutilis.fr",
+      "contributions": [
+        "doc"
+      ]
     }
   ],
   "contributorsPerLine": 7,
