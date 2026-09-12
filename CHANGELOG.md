@@ -10,6 +10,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- Improve docker connection and socket proxy info by @NotaInutilis in [#2352](https://github.com/nicholas-fedor/watchtower/pull/2352)
 - Replace untyped maps with concrete types by @nicholas-fedor in [#2371](https://github.com/nicholas-fedor/watchtower/pull/2371)
 
 ### Chores
@@ -24,6 +25,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Fixed
 
 - Reuse anonymous GHCR tokens across public images by @nicholas-fedor in [#2366](https://github.com/nicholas-fedor/watchtower/pull/2366)
+
+### New Contributors
+
+- @NotaInutilis made their first contribution in [#2352](https://github.com/nicholas-fedor/watchtower/pull/2352)
 
 ## [1.22.1] - 2026-09-09
 
