@@ -137,7 +137,7 @@ The following endpoints can be enabled by using the[`http-api-endpoints`](../../
 
 Watchtower was originally designed to be a stateless application with direct access to the Docker socket.
 By having direct access to the Docker socket, the application effectively runs with root-level privileges.
-It is worth taking a moment to review and familiarize yourself with the [Docker Engine security documentation](https://docs.docker.com/engine/security/){target="_blank" rel="noopener noreferrer"}.
+It is worth taking a moment to review and familiarize yourself with the [Docker Engine security documentation](https://docs.docker.com/engine/security/){target="_blank" rel="noopener noreferrer"} and explore other security tools such as [Docker socket proxies](../../advanced-features/secure-connections/index.md#docker_socket_proxies).
 
 - !!! Warning "The HTTP API should never be directly exposed to the Internet!"
 - !!! Warning "Using the HTTP API without TLS encryption is insecure and not recommended!"
