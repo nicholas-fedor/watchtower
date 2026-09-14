@@ -8,6 +8,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- Add NotaInutilis as a contributor for doc by @allcontributors[bot] in [#2374](https://github.com/nicholas-fedor/watchtower/pull/2374)
+
 ### Changed
 
 - Improve docker connection and socket proxy info by @NotaInutilis in [#2352](https://github.com/nicholas-fedor/watchtower/pull/2352)
@@ -15,6 +19,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Chores
 
+- Update module github.com/gofiber/utils/v2 to v2.5.2 by @renovate[bot] in [#2376](https://github.com/nicholas-fedor/watchtower/pull/2376)
 - Update module github.com/gofiber/contrib/v3/zerolog to v1.1.5 by @renovate[bot] in [#2369](https://github.com/nicholas-fedor/watchtower/pull/2369)
 - Update module github.com/gofiber/contrib/v3/swaggo to v1.0.11 by @renovate[bot] in [#2368](https://github.com/nicholas-fedor/watchtower/pull/2368)
 - Update module github.com/molecule-man/go-brrr to v1.1.0 by @renovate[bot] in [#2364](https://github.com/nicholas-fedor/watchtower/pull/2364)
