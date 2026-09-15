@@ -1764,13 +1764,27 @@ func stopStaleContainer(log *zerolog.Logger, ctx context.Context,
 		}
 	}
 
+	err := snapshotCopyFilesForRecreate(ctx, client, container)
+	if err != nil {
+		log.Debug().
+			Err(err).
+			Fields(fields).
+			Msg("Failed to snapshot copy-file paths")
+
+		return err
+	}
+
 	// Stop the container with the configured timeout.
-	err := client.StopAndRemoveContainer(
+	err = client.StopAndRemoveContainer(
 		ctx,
 		container,
 		config.Timeout,
 	)
 	if err != nil {
+		if !cerrdefs.IsNotFound(err) {
+			discardCopyFilesForRecreate(client, container.ID())
+		}
+
 		// Check if the container is already gone (e.g., "No such container" error).
 		// Treat this as non-fatal, similar to RemoveExcessWatchtowerInstances.
 		if cerrdefs.IsNotFound(err) {
@@ -1791,6 +1805,47 @@ func stopStaleContainer(log *zerolog.Logger, ctx context.Context,
 	}
 
 	return nil
+}
+
+// snapshotCopyFilesForRecreate stores labeled files before the source is removed.
+//
+// Parameters:
+//   - ctx: Context for cancellation and timeout control.
+//   - client: Docker client. No-op unless it implements container.CopyFileStore.
+//   - source: Container about to be stopped and removed.
+//
+// Returns:
+//   - error: Non-nil if a labeled path cannot be snapshotted.
+func snapshotCopyFilesForRecreate(
+	ctx context.Context,
+	client container.Client,
+	source types.Container,
+) error {
+	store, ok := client.(container.CopyFileStore)
+	if !ok {
+		return nil
+	}
+
+	err := store.SnapshotCopyFiles(ctx, source)
+	if err != nil {
+		return fmt.Errorf("snapshot copy-file paths: %w", err)
+	}
+
+	return nil
+}
+
+// discardCopyFilesForRecreate drops a leftover snapshot after a failed stop.
+//
+// Parameters:
+//   - client: Docker client. No-op unless it implements container.CopyFileStore.
+//   - containerID: Source container ID whose snapshot should be discarded.
+func discardCopyFilesForRecreate(client container.Client, containerID types.ContainerID) {
+	store, ok := client.(container.CopyFileStore)
+	if !ok {
+		return
+	}
+
+	store.DiscardCopyFiles(containerID)
 }
 
 // restartContainersInSortedOrder restarts stopped containers.
