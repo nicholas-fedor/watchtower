@@ -601,15 +601,6 @@ func containerHasReadOnlyRoot(c types.Container) bool {
 	return info.HostConfig.ReadonlyRootfs
 }
 
-// SnapshotCopyFiles captures labeled files before the source is removed.
-//
-// Parameters:
-//   - ctx: Context for cancellation and timeout control.
-//   - source: Source container about to be stopped and removed.
-//
-// Returns:
-//   - error: Non-nil if a labeled path cannot be snapshotted.
-//
 // copyArchiveAPI returns the Docker copy API used for snapshot and inject.
 //
 // Returns:
@@ -622,6 +613,14 @@ func (c *client) copyArchiveAPI() ArchiveAPI {
 	return c.api
 }
 
+// SnapshotCopyFiles captures labeled files before the source is removed.
+//
+// Parameters:
+//   - ctx: Context for cancellation and timeout control.
+//   - source: Source container about to be stopped and removed.
+//
+// Returns:
+//   - error: Non-nil if a labeled path cannot be snapshotted.
 func (c *client) SnapshotCopyFiles(ctx context.Context, source types.Container) error {
 	snapshot, err := snapshotCopyFiles(c.logger(), ctx, c.copyArchiveAPI(), source)
 	if err != nil {
