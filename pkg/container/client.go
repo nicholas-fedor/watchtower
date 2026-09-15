@@ -324,17 +324,21 @@ type Client interface {
 	//   - error: Non-nil if update fails, nil on success.
 	UpdateContainer(ctx context.Context, container types.Container, config dockerContainer.UpdateConfig) error
 
-	// SetNoRestartPolicy updates the restart policy of a container to "no" to prevent
-	// restart loops after fatal startup failures.
+	// SetRestartPolicy updates a container's restart policy.
 	//
-	// It is a convenience wrapper around UpdateContainer that constructs the restart
-	// policy configuration and logs a warning if the update fails, ensuring the
-	// failure does not block the exit path.
+	// An empty policy name is treated as no automatic restart (Docker "no").
+	// Only the restart policy is sent to the Engine. Resource limits are left
+	// unchanged. Failures are logged and do not abort the caller.
 	//
 	// Parameters:
 	//   - ctx: Context for cancellation and timeout control.
 	//   - container: Container whose restart policy should be updated.
-	SetNoRestartPolicy(ctx context.Context, container types.Container)
+	//   - policy: Restart policy to apply. Empty Name disables automatic restart.
+	SetRestartPolicy(
+		ctx context.Context,
+		container types.Container,
+		policy dockerContainer.RestartPolicy,
+	)
 
 	// RemoveContainer removes a container from the Docker host.
 	//
@@ -956,41 +960,48 @@ func (c *client) UpdateContainer(
 	return nil
 }
 
-// SetNoRestartPolicy updates the restart policy of a container to "no" to prevent
-// restart loops after fatal startup failures.
+// SetRestartPolicy updates a container's restart policy.
 //
-// It is a convenience wrapper around UpdateContainer that constructs the restart
-// policy configuration and logs a warning if the update fails, ensuring the
-// failure does not block the exit path.
+// An empty policy name is treated as no automatic restart (Docker "no").
+// Only the restart policy is sent to the Engine. Resource limits are left
+// unchanged. Failures are logged and do not abort the caller.
 //
 // Parameters:
 //   - ctx: Context for cancellation and timeout control.
 //   - container: Container whose restart policy should be updated.
-func (c *client) SetNoRestartPolicy(ctx context.Context, container types.Container) {
+//   - policy: Restart policy to apply. Empty Name disables automatic restart.
+func (c *client) SetRestartPolicy(
+	ctx context.Context,
+	container types.Container,
+	policy dockerContainer.RestartPolicy,
+) {
 	if container == nil {
 		return
 	}
 
+	if policy.Name == "" {
+		policy.Name = dockerContainer.RestartPolicyDisabled
+	}
+
 	clogVal := c.logger().With().
 		Str("container_id", string(container.ID())).
+		Str("restart_policy", string(policy.Name)).
 		Logger()
 	clog := &clogVal
 
-	clog.Debug().Msg("Setting restart policy to 'no'")
+	clog.Debug().Msg("Setting container restart policy")
 
 	_, err := c.api.ContainerUpdate(
 		ctx,
 		string(container.ID()),
 		dockerClient.ContainerUpdateOptions{
-			RestartPolicy: &dockerContainer.RestartPolicy{
-				Name: "no",
-			},
+			RestartPolicy: &policy,
 		},
 	)
 	if err != nil {
-		clog.Warn().
+		clog.Debug().
 			Err(err).
-			Msg("Failed to set restart policy to 'no'")
+			Msg("Failed to set container restart policy")
 	}
 }
 
