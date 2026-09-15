@@ -8,12 +8,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Chores
+
+- Update module github.com/gofiber/schema to v1.8.7 by @renovate[bot] in [#2388](https://github.com/nicholas-fedor/watchtower/pull/2388)
+
+## [1.22.2] - 2026-09-15
+
 ### Added
 
 - Add NotaInutilis as a contributor for doc by @allcontributors[bot] in [#2374](https://github.com/nicholas-fedor/watchtower/pull/2374)
 
 ### Changed
 
+- Replace SetNoRestartPolicy with SetRestartPolicy by @nicholas-fedor in [#2385](https://github.com/nicholas-fedor/watchtower/pull/2385)
 - Improve docker connection and socket proxy info by @NotaInutilis in [#2352](https://github.com/nicholas-fedor/watchtower/pull/2352)
 - Replace untyped maps with concrete types by @nicholas-fedor in [#2371](https://github.com/nicholas-fedor/watchtower/pull/2371)
 
@@ -3636,7 +3643,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## Compare Releases
 
-- [unreleased](https://github.com/nicholas-fedor/watchtower/compare/v1.22.1...HEAD)
+- [unreleased](https://github.com/nicholas-fedor/watchtower/compare/v1.22.2...HEAD)
+- [1.22.2](https://github.com/nicholas-fedor/watchtower/compare/v1.22.1...v1.22.2)
 - [1.22.1](https://github.com/nicholas-fedor/watchtower/compare/v1.22.0...v1.22.1)
 - [1.22.0](https://github.com/nicholas-fedor/watchtower/compare/v1.21.2...v1.22.0)
 - [1.21.2](https://github.com/nicholas-fedor/watchtower/compare/v1.21.1...v1.21.2)
