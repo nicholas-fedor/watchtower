@@ -131,8 +131,8 @@ github.com/molecule-man/go-brrr v1.1.0 h1:rLBGSXA393y+5ttCBLkW34CHESop5tahrOFxVv
 github.com/molecule-man/go-brrr v1.1.0/go.mod h1:7ybW6/7gA3oKY45jOfVNjSJDtrr6ea4tzbsTkjmQDC4=
 github.com/munnerz/goautoneg v0.0.0-20191010083416-a7dc8b61c822 h1:C3w9PqII01/Oq1c1nUAm88MOHcQC9l5mIlSMApZMrHA=
 github.com/munnerz/goautoneg v0.0.0-20191010083416-a7dc8b61c822/go.mod h1:+n7T8mK8HuQTcFwEeznm/DIxMOiR9yIdICNftLE1DvQ=
-github.com/nicholas-fedor/shoutrrr v0.20.0 h1:hMAxIYlfAeZ1FcTDgU0kUOvVXUsOirWo8IWlnzGLkac=
-github.com/nicholas-fedor/shoutrrr v0.20.0/go.mod h1:hgde37yNWCXh8+N6WemyDRMNYLOFTf326GsBx8Z7CFA=
+github.com/nicholas-fedor/shoutrrr v0.21.0 h1:as/mEwdaZMijCVu0FkTUEXashhvC3Y7C5g9dsXMcmQc=
+github.com/nicholas-fedor/shoutrrr v0.21.0/go.mod h1:dgg4kJv9K0tLXBH/1TXiSibNbM2hcd4SK6xb0sglyU4=
 github.com/onsi/ginkgo/v2 v2.32.2 h1:2o6vyFvR6snrJWgRVztC+OwuqqPEMI1UzYl2s2iU7Cg=
 github.com/onsi/ginkgo/v2 v2.32.2/go.mod h1:+aXOY+vzZ5mu2iI2HpTZUPmM//oQfsNFX6gU9kNcA44=
 github.com/onsi/gomega v1.43.0 h1:VlG/1FxqNxhSO+lq/OHBNaaqwiBK/mO8JbVkX9Y+FeU=
@@ -245,5 +245,13 @@ google.golang.org/protobuf v1.36.12/go.mod h1:HTf+CrKn2C3g5S8VImy6tdcUvCska2kB7j
 gopkg.in/check.v1 v0.0.0-20161208181325-20d25e280405/go.mod h1:Co6ibVJAznAaIkqp8huTwlJQCZ016jof/cbN4VW5Yz0=
 gotest.tools/v3 v3.5.2 h1:7koQfIKdy+I8UTetycgUqXWSDwpgv193Ka+qRsmBY8Q=
 gotest.tools/v3 v3.5.2/go.mod h1:LtdLGcnqToBH83WByAAi/wiwSFCArdFIUV/xxN4pcjA=
+mellium.im/reader v0.1.0 h1:UUEMev16gdvaxxZC7fC08j7IzuDKh310nB6BlwnxTww=
+mellium.im/reader v0.1.0/go.mod h1:F+X5HXpkIfJ9EE1zHQG9lM/hO946iYAmU7xjg5dsQHI=
+mellium.im/sasl v0.3.2 h1:PT6Xp7ccn9XaXAnJ03FcEjmAn7kK1x7aoXV6F+Vmrl0=
+mellium.im/sasl v0.3.2/go.mod h1:NKXDi1zkr+BlMHLQjY3ofYuU4KSPFxknb8mfEu6SveY=
+mellium.im/xmlstream v0.15.4 h1:gLKxcWl4rLMUpKgtzrTBvr4OexPeO/edYus+uK3F6ZI=
+mellium.im/xmlstream v0.15.4/go.mod h1:yXaCW2++fmVO4L9piKVkyLDqnCmictVYF7FDQW8prb4=
+mellium.im/xmpp v0.23.0 h1:rvKvOvMdIURCLaAWEJN8J0QpO3AJYCDKjxLsqtTPSjY=
+mellium.im/xmpp v0.23.0/go.mod h1:GHDKlKKQe0LNmD9YqExyxnFEEBiz84KGqnfiA2VNzb8=
 pgregory.net/rapid v1.2.0 h1:keKAYRcjm+e1F0oAuU5F5+YPAWcyxNNRK2wud503Gnk=
 pgregory.net/rapid v1.2.0/go.mod h1:PY5XlDGj0+V1FCq0o192FdRhpKHGTRIWBgqjDBTrq04=
