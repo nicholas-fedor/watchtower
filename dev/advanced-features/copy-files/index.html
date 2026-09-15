@@ -11,31 +11,31 @@
       
       
       
-        <link rel="canonical" href="https://watchtower.nickfedor.com/dev/notifications/deprecations/gotify/">
+        <link rel="canonical" href="https://watchtower.nickfedor.com/dev/advanced-features/copy-files/">
       
       
-        <link rel="prev" href="../email/">
+        <link rel="prev" href="../disk-usage-monitor/">
       
       
-        <link rel="next" href="../slack/">
+        <link rel="next" href="../lifecycle-hooks/">
       
       
         
       
       
-      <link rel="icon" href="../../../assets/media/favicon.ico">
+      <link rel="icon" href="../../assets/media/favicon.ico">
       <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.7">
     
     
       
-        <title>Gotify - Watchtower</title>
+        <title>Copy Files - Watchtower</title>
       
     
     
-      <link rel="stylesheet" href="../../../assets/stylesheets/main.ec1eaa64.min.css">
+      <link rel="stylesheet" href="../../assets/stylesheets/main.ec1eaa64.min.css">
       
         
-        <link rel="stylesheet" href="../../../assets/stylesheets/palette.ab4e12ef.min.css">
+        <link rel="stylesheet" href="../../assets/stylesheets/palette.ab4e12ef.min.css">
       
       
 
@@ -54,13 +54,13 @@
       
     
     
-      <link rel="stylesheet" href="../../../css/timeago.css">
+      <link rel="stylesheet" href="../../css/timeago.css">
     
-      <link rel="stylesheet" href="../../../assets/styles/theme.css">
+      <link rel="stylesheet" href="../../assets/styles/theme.css">
     
-      <link rel="stylesheet" href="../../../assets/styles/extra.css">
+      <link rel="stylesheet" href="../../assets/styles/extra.css">
     
-    <script>__md_scope=new URL("../../..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    <script>__md_scope=new URL("../..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
     
       
 
@@ -99,7 +99,7 @@
     <div data-md-component="skip">
       
         
-        <a href="#gotify_notifications" class="md-skip">
+        <a href="#copy_files" class="md-skip">
           Skip to content
         </a>
       
@@ -119,9 +119,9 @@
 
 <header class="md-header md-header--shadow md-header--lifted" data-md-component="header">
   <nav class="md-header__inner md-grid" aria-label="Header">
-    <a href="../../.." title="Watchtower" class="md-header__button md-logo" aria-label="Watchtower" data-md-component="logo">
+    <a href="../.." title="Watchtower" class="md-header__button md-logo" aria-label="Watchtower" data-md-component="logo">
       
-  <img src="../../../assets/media/logo-450px.png" alt="logo">
+  <img src="../../assets/media/logo-450px.png" alt="logo">
 
     </a>
     <label class="md-header__button md-icon" for="__drawer">
@@ -138,7 +138,7 @@
         <div class="md-header__topic" data-md-component="header-topic">
           <span class="md-ellipsis">
             
-              Gotify
+              Copy Files
             
           </span>
         </div>
@@ -250,7 +250,7 @@
   
   
     <li class="md-tabs__item">
-      <a href="../../.." class="md-tabs__link">
+      <a href="../.." class="md-tabs__link">
         
   
   
@@ -269,7 +269,7 @@
   
   
     <li class="md-tabs__item">
-      <a href="../../../quickstart/" class="md-tabs__link">
+      <a href="../../quickstart/" class="md-tabs__link">
         
   
   
@@ -290,7 +290,7 @@
     
     
       <li class="md-tabs__item">
-        <a href="../../../getting-started/introduction/" class="md-tabs__link">
+        <a href="../../getting-started/introduction/" class="md-tabs__link">
           
   
   
@@ -310,7 +310,7 @@
     
     
       <li class="md-tabs__item">
-        <a href="../../../configuration/introduction/" class="md-tabs__link">
+        <a href="../../configuration/introduction/" class="md-tabs__link">
           
   
   
@@ -326,13 +326,11 @@
   
   
   
-    
-  
   
     
     
-      <li class="md-tabs__item md-tabs__item--active">
-        <a href="../../introduction/" class="md-tabs__link">
+      <li class="md-tabs__item">
+        <a href="../../notifications/introduction/" class="md-tabs__link">
           
   
   
@@ -352,7 +350,7 @@
     
     
       <li class="md-tabs__item">
-        <a href="../../../http-api/overview/" class="md-tabs__link">
+        <a href="../../http-api/overview/" class="md-tabs__link">
           
   
   
@@ -368,11 +366,13 @@
   
   
   
+    
+  
   
     
     
-      <li class="md-tabs__item">
-        <a href="../../../advanced-features/ephemeral-self-updates/" class="md-tabs__link">
+      <li class="md-tabs__item md-tabs__item--active">
+        <a href="../ephemeral-self-updates/" class="md-tabs__link">
           
   
   
@@ -412,9 +412,9 @@
 
 <nav class="md-nav md-nav--primary md-nav--lifted" aria-label="Navigation" data-md-level="0">
   <label class="md-nav__title" for="__drawer">
-    <a href="../../.." title="Watchtower" class="md-nav__button md-logo" aria-label="Watchtower" data-md-component="logo">
+    <a href="../.." title="Watchtower" class="md-nav__button md-logo" aria-label="Watchtower" data-md-component="logo">
       
-  <img src="../../../assets/media/logo-450px.png" alt="logo">
+  <img src="../../assets/media/logo-450px.png" alt="logo">
 
     </a>
     Watchtower
@@ -441,7 +441,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../.." class="md-nav__link">
+      <a href="../.." class="md-nav__link">
         
   
   
@@ -468,7 +468,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../quickstart/" class="md-nav__link">
+      <a href="../../quickstart/" class="md-nav__link">
         
   
   
@@ -549,7 +549,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../getting-started/introduction/" class="md-nav__link">
+      <a href="../../getting-started/introduction/" class="md-nav__link">
         
   
   
@@ -577,7 +577,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../getting-started/installation/" class="md-nav__link">
+      <a href="../../getting-started/installation/" class="md-nav__link">
         
   
   
@@ -605,7 +605,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../getting-started/usage/" class="md-nav__link">
+      <a href="../../getting-started/usage/" class="md-nav__link">
         
   
   
@@ -633,7 +633,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../getting-started/container-selection/" class="md-nav__link">
+      <a href="../../getting-started/container-selection/" class="md-nav__link">
         
   
   
@@ -661,7 +661,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../getting-started/docker-secrets/" class="md-nav__link">
+      <a href="../../getting-started/docker-secrets/" class="md-nav__link">
         
   
   
@@ -689,7 +689,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../getting-started/updating-watchtower/" class="md-nav__link">
+      <a href="../../getting-started/updating-watchtower/" class="md-nav__link">
         
   
   
@@ -778,7 +778,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../configuration/introduction/" class="md-nav__link">
+      <a href="../../configuration/introduction/" class="md-nav__link">
         
   
   
@@ -806,7 +806,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../configuration/docker-connection/" class="md-nav__link">
+      <a href="../../configuration/docker-connection/" class="md-nav__link">
         
   
   
@@ -834,7 +834,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../configuration/container-selection/" class="md-nav__link">
+      <a href="../../configuration/container-selection/" class="md-nav__link">
         
   
   
@@ -862,7 +862,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../configuration/scheduling/" class="md-nav__link">
+      <a href="../../configuration/scheduling/" class="md-nav__link">
         
   
   
@@ -890,7 +890,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../configuration/registry-and-authentication/" class="md-nav__link">
+      <a href="../../configuration/registry-and-authentication/" class="md-nav__link">
         
   
   
@@ -918,7 +918,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../configuration/image-cooldown/" class="md-nav__link">
+      <a href="../../configuration/image-cooldown/" class="md-nav__link">
         
   
   
@@ -946,7 +946,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../configuration/update-behavior/" class="md-nav__link">
+      <a href="../../configuration/update-behavior/" class="md-nav__link">
         
   
   
@@ -974,7 +974,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../configuration/lifecycle-hooks/" class="md-nav__link">
+      <a href="../../configuration/lifecycle-hooks/" class="md-nav__link">
         
   
   
@@ -1002,7 +1002,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../configuration/logging-and-output/" class="md-nav__link">
+      <a href="../../configuration/logging-and-output/" class="md-nav__link">
         
   
   
@@ -1030,7 +1030,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../configuration/notifications/" class="md-nav__link">
+      <a href="../../configuration/notifications/" class="md-nav__link">
         
   
   
@@ -1058,7 +1058,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../configuration/http-api/" class="md-nav__link">
+      <a href="../../configuration/http-api/" class="md-nav__link">
         
   
   
@@ -1090,31 +1090,28 @@
       
   
   
-    
   
   
-  
     
     
     
     
-      
-        
-        
       
       
         
       
     
     
-    <li class="md-nav__item md-nav__item--active md-nav__item--section md-nav__item--nested">
+    <li class="md-nav__item md-nav__item--nested">
       
         
-        
-        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_5" checked>
         
           
-          <label class="md-nav__link" for="__nav_5" id="__nav_5_label" tabindex="">
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_5" >
+        
+          
+          <label class="md-nav__link" for="__nav_5" id="__nav_5_label" tabindex="0">
             
   
   
@@ -1132,7 +1129,7 @@
             <span class="md-nav__icon md-icon"></span>
           </label>
         
-        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_5_label" aria-expanded="true">
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_5_label" aria-expanded="false">
           <label class="md-nav__title" for="__nav_5">
             <span class="md-nav__icon md-icon"></span>
             
@@ -1150,7 +1147,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../introduction/" class="md-nav__link">
+      <a href="../../notifications/introduction/" class="md-nav__link">
         
   
   
@@ -1178,7 +1175,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../general-settings/" class="md-nav__link">
+      <a href="../../notifications/general-settings/" class="md-nav__link">
         
   
   
@@ -1206,7 +1203,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../templates/" class="md-nav__link">
+      <a href="../../notifications/templates/" class="md-nav__link">
         
   
   
@@ -1234,7 +1231,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../template-preview/" class="md-nav__link">
+      <a href="../../notifications/template-preview/" class="md-nav__link">
         
   
   
@@ -1259,31 +1256,28 @@
                 
   
   
-    
   
   
-  
     
     
     
     
       
       
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
         
           
-          
         
-      
-    
-    
-    <li class="md-nav__item md-nav__item--active md-nav__item--section md-nav__item--nested">
-      
-        
-        
-        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_5_5" checked>
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_5_5" >
         
           
-          <label class="md-nav__link" for="__nav_5_5" id="__nav_5_5_label" tabindex="">
+          <label class="md-nav__link" for="__nav_5_5" id="__nav_5_5_label" tabindex="0">
             
   
   
@@ -1301,7 +1295,7 @@
             <span class="md-nav__icon md-icon"></span>
           </label>
         
-        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_5_5_label" aria-expanded="true">
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_5_5_label" aria-expanded="false">
           <label class="md-nav__title" for="__nav_5_5">
             <span class="md-nav__icon md-icon"></span>
             
@@ -1319,7 +1313,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../deprecation-notice/" class="md-nav__link">
+      <a href="../../notifications/deprecations/deprecation-notice/" class="md-nav__link">
         
   
   
@@ -1347,7 +1341,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../migration-tool/" class="md-nav__link">
+      <a href="../../notifications/deprecations/migration-tool/" class="md-nav__link">
         
   
   
@@ -1375,7 +1369,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../email/" class="md-nav__link">
+      <a href="../../notifications/deprecations/email/" class="md-nav__link">
         
   
   
@@ -1400,37 +1394,10 @@
                 
   
   
-    
   
   
-  
-    <li class="md-nav__item md-nav__item--active">
-      
-      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
-      
-      
-        
-      
-      
-        <label class="md-nav__link md-nav__link--active" for="__toc">
-          
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Gotify
-  
-
-    
-  </span>
-  
-  
-
-          <span class="md-nav__icon md-icon"></span>
-        </label>
-      
-      <a href="./" class="md-nav__link md-nav__link--active">
+    <li class="md-nav__item">
+      <a href="../../notifications/deprecations/gotify/" class="md-nav__link">
         
   
   
@@ -1446,48 +1413,6 @@
   
 
       </a>
-      
-        
-
-<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
-  
-  
-  
-    
-  
-  
-    <label class="md-nav__title" for="__toc">
-      <span class="md-nav__icon md-icon"></span>
-      Table of contents
-    </label>
-    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
-      
-        <li class="md-nav__item">
-  <a href="#overview" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Overview
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#examples" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Examples
-      
-    </span>
-  </a>
-  
-</li>
-      
-    </ul>
-  
-</nav>
-      
     </li>
   
 
@@ -1500,7 +1425,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../slack/" class="md-nav__link">
+      <a href="../../notifications/deprecations/slack/" class="md-nav__link">
         
   
   
@@ -1528,7 +1453,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../teams/" class="md-nav__link">
+      <a href="../../notifications/deprecations/teams/" class="md-nav__link">
         
   
   
@@ -1570,13 +1495,10 @@
       
       
         
-          
-          
-        
       
     
     
-    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+    <li class="md-nav__item md-nav__item--nested">
       
         
         
@@ -1585,7 +1507,7 @@
         <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_5_6" >
         
           
-          <label class="md-nav__link" for="__nav_5_6" id="__nav_5_6_label" tabindex="">
+          <label class="md-nav__link" for="__nav_5_6" id="__nav_5_6_label" tabindex="0">
             
   
   
@@ -1621,7 +1543,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../guides/signal/" class="md-nav__link">
+      <a href="../../notifications/guides/signal/" class="md-nav__link">
         
   
   
@@ -1718,7 +1640,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../http-api/overview/" class="md-nav__link">
+      <a href="../../http-api/overview/" class="md-nav__link">
         
   
   
@@ -1800,7 +1722,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../http-api/configuration/host-and-port/" class="md-nav__link">
+      <a href="../../http-api/configuration/host-and-port/" class="md-nav__link">
         
   
   
@@ -1828,7 +1750,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../http-api/configuration/authentication/" class="md-nav__link">
+      <a href="../../http-api/configuration/authentication/" class="md-nav__link">
         
   
   
@@ -1856,7 +1778,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../http-api/configuration/tls/" class="md-nav__link">
+      <a href="../../http-api/configuration/tls/" class="md-nav__link">
         
   
   
@@ -1946,7 +1868,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../http-api/endpoints/check/" class="md-nav__link">
+      <a href="../../http-api/endpoints/check/" class="md-nav__link">
         
   
   
@@ -1974,7 +1896,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../http-api/endpoints/config/" class="md-nav__link">
+      <a href="../../http-api/endpoints/config/" class="md-nav__link">
         
   
   
@@ -2002,7 +1924,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../http-api/endpoints/container-details/" class="md-nav__link">
+      <a href="../../http-api/endpoints/container-details/" class="md-nav__link">
         
   
   
@@ -2030,7 +1952,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../http-api/endpoints/containers/" class="md-nav__link">
+      <a href="../../http-api/endpoints/containers/" class="md-nav__link">
         
   
   
@@ -2058,7 +1980,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../http-api/endpoints/events/" class="md-nav__link">
+      <a href="../../http-api/endpoints/events/" class="md-nav__link">
         
   
   
@@ -2086,7 +2008,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../http-api/endpoints/health/" class="md-nav__link">
+      <a href="../../http-api/endpoints/health/" class="md-nav__link">
         
   
   
@@ -2114,7 +2036,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../http-api/endpoints/history/" class="md-nav__link">
+      <a href="../../http-api/endpoints/history/" class="md-nav__link">
         
   
   
@@ -2142,7 +2064,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../http-api/endpoints/images/" class="md-nav__link">
+      <a href="../../http-api/endpoints/images/" class="md-nav__link">
         
   
   
@@ -2170,7 +2092,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../http-api/endpoints/metrics/" class="md-nav__link">
+      <a href="../../http-api/endpoints/metrics/" class="md-nav__link">
         
   
   
@@ -2198,7 +2120,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../http-api/endpoints/status/" class="md-nav__link">
+      <a href="../../http-api/endpoints/status/" class="md-nav__link">
         
   
   
@@ -2226,7 +2148,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../http-api/endpoints/swagger/" class="md-nav__link">
+      <a href="../../http-api/endpoints/swagger/" class="md-nav__link">
         
   
   
@@ -2254,7 +2176,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../http-api/endpoints/update/" class="md-nav__link">
+      <a href="../../http-api/endpoints/update/" class="md-nav__link">
         
   
   
@@ -2294,28 +2216,31 @@
       
   
   
+    
   
   
+  
     
     
     
     
+      
+        
+        
       
       
         
       
     
     
-    <li class="md-nav__item md-nav__item--nested">
+    <li class="md-nav__item md-nav__item--active md-nav__item--section md-nav__item--nested">
       
         
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_7" checked>
         
           
-        
-        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_7" >
-        
-          
-          <label class="md-nav__link" for="__nav_7" id="__nav_7_label" tabindex="0">
+          <label class="md-nav__link" for="__nav_7" id="__nav_7_label" tabindex="">
             
   
   
@@ -2333,7 +2258,7 @@
             <span class="md-nav__icon md-icon"></span>
           </label>
         
-        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_7_label" aria-expanded="false">
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_7_label" aria-expanded="true">
           <label class="md-nav__title" for="__nav_7">
             <span class="md-nav__icon md-icon"></span>
             
@@ -2351,7 +2276,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../advanced-features/ephemeral-self-updates/" class="md-nav__link">
+      <a href="../ephemeral-self-updates/" class="md-nav__link">
         
   
   
@@ -2379,7 +2304,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../advanced-features/image-cooldown/" class="md-nav__link">
+      <a href="../image-cooldown/" class="md-nav__link">
         
   
   
@@ -2407,7 +2332,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../advanced-features/disk-usage-monitor/" class="md-nav__link">
+      <a href="../disk-usage-monitor/" class="md-nav__link">
         
   
   
@@ -2432,10 +2357,37 @@
                 
   
   
+    
   
   
-    <li class="md-nav__item">
-      <a href="../../../advanced-features/copy-files/" class="md-nav__link">
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Copy Files
+  
+
+    
+  </span>
+  
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="./" class="md-nav__link md-nav__link--active">
         
   
   
@@ -2451,6 +2403,81 @@
   
 
       </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#overview" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Overview
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#label" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Label
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#compose_configs" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Compose Configs
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#rules" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Rules
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#underlying_technology" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Underlying Technology
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
     </li>
   
 
@@ -2463,7 +2490,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../advanced-features/lifecycle-hooks/" class="md-nav__link">
+      <a href="../lifecycle-hooks/" class="md-nav__link">
         
   
   
@@ -2491,7 +2518,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../advanced-features/linked-containers/" class="md-nav__link">
+      <a href="../linked-containers/" class="md-nav__link">
         
   
   
@@ -2519,7 +2546,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../advanced-features/private-registries/" class="md-nav__link">
+      <a href="../private-registries/" class="md-nav__link">
         
   
   
@@ -2547,7 +2574,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../advanced-features/registry-mirrors/" class="md-nav__link">
+      <a href="../registry-mirrors/" class="md-nav__link">
         
   
   
@@ -2575,7 +2602,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../advanced-features/remote-hosts/" class="md-nav__link">
+      <a href="../remote-hosts/" class="md-nav__link">
         
   
   
@@ -2603,7 +2630,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../advanced-features/running-multiple-instances/" class="md-nav__link">
+      <a href="../running-multiple-instances/" class="md-nav__link">
         
   
   
@@ -2631,7 +2658,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../advanced-features/secure-connections/" class="md-nav__link">
+      <a href="../secure-connections/" class="md-nav__link">
         
   
   
@@ -2659,7 +2686,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../advanced-features/stop-signals/" class="md-nav__link">
+      <a href="../stop-signals/" class="md-nav__link">
         
   
   
@@ -2725,10 +2752,43 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#examples" class="md-nav__link">
+  <a href="#label" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Examples
+        Label
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#compose_configs" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Compose Configs
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#rules" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Rules
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#underlying_technology" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Underlying Technology
       
     </span>
   </a>
@@ -2755,84 +2815,79 @@
   
 
 
-<h1 id="gotify_notifications">Gotify Notifications<a class="headerlink" href="#gotify_notifications" title="Permanent link">&para;</a></h1>
-<div class="admonition warning">
-<p class="admonition-title">Deprecated Gotify Notification Options</p>
-<p>The following legacy Gotify notification options are deprecated and subject to removal with the release of Watchtower v2:</p>
-<ul>
-<li><a href="../../../configuration/notifications/#gotify_url"><code>notification-gotify-url</code></a></li>
-<li><a href="../../../configuration/notifications/#gotify_token"><code>notification-gotify-token</code></a></li>
-<li><a href="../../../configuration/notifications/#gotify_tls_skip_verify"><code>notification-gotify-tls-skip-verify</code></a></li>
-</ul>
-<p>Use the <a href="../../../configuration/notifications/#notification_url"><code>notification-url</code></a> configuration option with a <code>gotify://</code> Shoutrrr URL instead.</p>
-</div>
+<h1 id="copy_files">Copy Files<a class="headerlink" href="#copy_files" title="Permanent link">&para;</a></h1>
 <h2 id="overview">Overview<a class="headerlink" href="#overview" title="Permanent link">&para;</a></h2>
-<p>Watchtower can use Shoutrrr's <a href="https://shoutrrr.nickfedor.com/latest/services/push/gotify/" rel="noopener noreferrer" target="_blank">Gotify service</a> to send <a href="https://gotify.net/" rel="noopener noreferrer" target="_blank">Gotify</a> notifications.</p>
-<h2 id="examples">Examples<a class="headerlink" href="#examples" title="Permanent link">&para;</a></h2>
-<div class="tabbed-set tabbed-alternate" data-tabs="1:2"><input checked="checked" id="__tabbed_1_1" name="__tabbed_1" type="radio" /><input id="__tabbed_1_2" name="__tabbed_1" type="radio" /><div class="tabbed-labels"><label for="__tabbed_1_1">Docker Compose</label><label for="__tabbed_1_2">Docker CLI</label></div>
+<p>When Watchtower recreates containers, it uses the Docker API data to ensure that items, such as bind mounts and volumes are preserved.
+Files that exist only in the container's writable layer are not typically migrated to the new container.</p>
+<p>As an example, <a href="https://docs.docker.com/reference/compose-file/configs/" rel="noopener noreferrer" target="_blank">Docker Compose configs</a> that are added to services using the <code>content:</code> or <code>environment:</code> option are written into that writable layer after a container is created.
+The Docker Engine API does not record those paths on inspect, so Watchtower cannot discover them automatically.</p>
+<p>In order to work around this limitation, add the <a href="../../getting-started/container-selection/#container_labels"><code>com.centurylinklabs.watchtower.copy-file</code></a> label to the monitored container and use the in-container path of each file that should be copied onto the replacement container.</p>
+<h2 id="label">Label<a class="headerlink" href="#label" title="Permanent link">&para;</a></h2>
+<p>The label value is a comma-separated list of absolute paths inside the container.</p>
+<div class="tabbed-set tabbed-alternate" data-tabs="1:3"><input checked="checked" id="__tabbed_1_1" name="__tabbed_1" type="radio" /><input id="__tabbed_1_2" name="__tabbed_1" type="radio" /><input id="__tabbed_1_3" name="__tabbed_1" type="radio" /><div class="tabbed-labels"><label for="__tabbed_1_1">Docker Compose</label><label for="__tabbed_1_2">Docker CLI</label><label for="__tabbed_1_3">Dockerfile</label></div>
 <div class="tabbed-content">
 <div class="tabbed-block">
 <div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="nt">services</span><span class="p">:</span>
-<a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a><span class="w">  </span><span class="nt">watchtower</span><span class="p">:</span>
-<a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a><span class="w">    </span><span class="nt">image</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">nickfedor/watchtower:latest</span>
-<a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a><span class="w">    </span><span class="nt">environment</span><span class="p">:</span>
-<a id="__codelineno-0-5" name="__codelineno-0-5" href="#__codelineno-0-5"></a><span class="w">      </span><span class="nt">WATCHTOWER_NOTIFICATION_URL</span><span class="p">:</span><span class="w"> </span><span class="s">"gotify://my.gotify.tld/SuperSecretToken"</span>
-<a id="__codelineno-0-6" name="__codelineno-0-6" href="#__codelineno-0-6"></a><span class="w">    </span><span class="nt">volumes</span><span class="p">:</span>
-<a id="__codelineno-0-7" name="__codelineno-0-7" href="#__codelineno-0-7"></a><span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">/var/run/docker.sock:/var/run/docker.sock</span>
+<a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a><span class="w">    </span><span class="nt">unbound</span><span class="p">:</span>
+<a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a><span class="w">        </span><span class="nt">image</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">alpinelinux/unbound</span>
+<a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a><span class="w">        </span><span class="nt">configs</span><span class="p">:</span>
+<a id="__codelineno-0-5" name="__codelineno-0-5" href="#__codelineno-0-5"></a><span class="w">            </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">source</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">unbound_conf</span>
+<a id="__codelineno-0-6" name="__codelineno-0-6" href="#__codelineno-0-6"></a><span class="w">              </span><span class="nt">target</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">/etc/unbound/unbound.conf</span>
+<a id="__codelineno-0-7" name="__codelineno-0-7" href="#__codelineno-0-7"></a><span class="w">        </span><span class="nt">labels</span><span class="p">:</span>
+<a id="__codelineno-0-8" name="__codelineno-0-8" href="#__codelineno-0-8"></a><span class="w">            </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="s">"com.centurylinklabs.watchtower.copy-file=/etc/unbound/unbound.conf"</span>
 </code></pre></div>
 </div>
 <div class="tabbed-block">
 <div class="highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a>docker<span class="w"> </span>run<span class="w"> </span>-d<span class="w"> </span><span class="se">\</span>
-<a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a><span class="w">  </span>--name<span class="w"> </span>watchtower<span class="w"> </span><span class="se">\</span>
-<a id="__codelineno-1-3" name="__codelineno-1-3" href="#__codelineno-1-3"></a><span class="w">  </span>-v<span class="w"> </span>/var/run/docker.sock:/var/run/docker.sock<span class="w"> </span><span class="se">\</span>
-<a id="__codelineno-1-4" name="__codelineno-1-4" href="#__codelineno-1-4"></a><span class="w">  </span>nickfedor/watchtower<span class="w"> </span><span class="se">\</span>
-<a id="__codelineno-1-5" name="__codelineno-1-5" href="#__codelineno-1-5"></a><span class="w">  </span>--notification-url<span class="w"> </span><span class="s2">"gotify://my.gotify.tld/SuperSecretToken"</span>
-</code></pre></div>
-</div>
-</div>
-</div>
-<details class="warning">
-<summary>The following legacy Gotify configuration examples are deprecated and will be removed with the release of Watchtower v2.</summary>
-<div class="tabbed-set tabbed-alternate" data-tabs="2:3"><input checked="checked" id="__tabbed_2_1" name="__tabbed_2" type="radio" /><input id="__tabbed_2_2" name="__tabbed_2" type="radio" /><input id="__tabbed_2_3" name="__tabbed_2" type="radio" /><div class="tabbed-labels"><label for="__tabbed_2_1">Docker Compose</label><label for="__tabbed_2_2">Docker CLI (Env Vars)</label><label for="__tabbed_2_3">Docker CLI (Flags)</label></div>
-<div class="tabbed-content">
-<div class="tabbed-block">
-<div class="highlight"><pre><span></span><code><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a><span class="nt">services</span><span class="p">:</span>
-<a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a><span class="w">  </span><span class="nt">watchtower</span><span class="p">:</span>
-<a id="__codelineno-2-3" name="__codelineno-2-3" href="#__codelineno-2-3"></a><span class="w">    </span><span class="nt">image</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">nickfedor/watchtower:latest</span>
-<a id="__codelineno-2-4" name="__codelineno-2-4" href="#__codelineno-2-4"></a><span class="w">    </span><span class="nt">environment</span><span class="p">:</span>
-<a id="__codelineno-2-5" name="__codelineno-2-5" href="#__codelineno-2-5"></a><span class="w">      </span><span class="nt">WATCHTOWER_NOTIFICATIONS</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">gotify</span>
-<a id="__codelineno-2-6" name="__codelineno-2-6" href="#__codelineno-2-6"></a><span class="w">      </span><span class="nt">WATCHTOWER_NOTIFICATION_GOTIFY_URL</span><span class="p">:</span><span class="w"> </span><span class="s">"https://my.gotify.tld/"</span>
-<a id="__codelineno-2-7" name="__codelineno-2-7" href="#__codelineno-2-7"></a><span class="w">      </span><span class="nt">WATCHTOWER_NOTIFICATION_GOTIFY_TOKEN</span><span class="p">:</span><span class="w"> </span><span class="s">"SuperSecretToken"</span>
-<a id="__codelineno-2-8" name="__codelineno-2-8" href="#__codelineno-2-8"></a><span class="w">      </span><span class="nt">WATCHTOWER_NOTIFICATION_GOTIFY_TLS_SKIP_VERIFY</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">true</span>
-<a id="__codelineno-2-9" name="__codelineno-2-9" href="#__codelineno-2-9"></a><span class="w">    </span><span class="nt">volumes</span><span class="p">:</span>
-<a id="__codelineno-2-10" name="__codelineno-2-10" href="#__codelineno-2-10"></a><span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">/var/run/docker.sock:/var/run/docker.sock</span>
+<a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a><span class="w">    </span>--label<span class="o">=</span>com.centurylinklabs.watchtower.copy-file<span class="o">=</span>/etc/unbound/unbound.conf<span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-1-3" name="__codelineno-1-3" href="#__codelineno-1-3"></a><span class="w">    </span>someimage
 </code></pre></div>
 </div>
 <div class="tabbed-block">
-<div class="highlight"><pre><span></span><code><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a>docker<span class="w"> </span>run<span class="w"> </span>-d<span class="w"> </span><span class="se">\</span>
-<a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a><span class="w">  </span>--name<span class="w"> </span>watchtower<span class="w"> </span><span class="se">\</span>
-<a id="__codelineno-3-3" name="__codelineno-3-3" href="#__codelineno-3-3"></a><span class="w">  </span>-v<span class="w"> </span>/var/run/docker.sock:/var/run/docker.sock<span class="w"> </span><span class="se">\</span>
-<a id="__codelineno-3-4" name="__codelineno-3-4" href="#__codelineno-3-4"></a><span class="w">  </span>-e<span class="w"> </span><span class="nv">WATCHTOWER_NOTIFICATIONS</span><span class="o">=</span>gotify<span class="w"> </span><span class="se">\</span>
-<a id="__codelineno-3-5" name="__codelineno-3-5" href="#__codelineno-3-5"></a><span class="w">  </span>-e<span class="w"> </span><span class="nv">WATCHTOWER_NOTIFICATION_GOTIFY_URL</span><span class="o">=</span><span class="s2">"https://my.gotify.tld/"</span><span class="w"> </span><span class="se">\</span>
-<a id="__codelineno-3-6" name="__codelineno-3-6" href="#__codelineno-3-6"></a><span class="w">  </span>-e<span class="w"> </span><span class="nv">WATCHTOWER_NOTIFICATION_GOTIFY_TOKEN</span><span class="o">=</span><span class="s2">"SuperSecretToken"</span><span class="w"> </span><span class="se">\</span>
-<a id="__codelineno-3-7" name="__codelineno-3-7" href="#__codelineno-3-7"></a><span class="w">  </span>-e<span class="w"> </span><span class="nv">WATCHTOWER_NOTIFICATION_GOTIFY_TLS_SKIP_VERIFY</span><span class="o">=</span><span class="nb">true</span><span class="w"> </span><span class="se">\</span>
-<a id="__codelineno-3-8" name="__codelineno-3-8" href="#__codelineno-3-8"></a><span class="w">  </span>nickfedor/watchtower
-</code></pre></div>
-</div>
-<div class="tabbed-block">
-<div class="highlight"><pre><span></span><code><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a>docker<span class="w"> </span>run<span class="w"> </span>-d<span class="w"> </span><span class="se">\</span>
-<a id="__codelineno-4-2" name="__codelineno-4-2" href="#__codelineno-4-2"></a><span class="w">  </span>--name<span class="w"> </span>watchtower<span class="w"> </span><span class="se">\</span>
-<a id="__codelineno-4-3" name="__codelineno-4-3" href="#__codelineno-4-3"></a><span class="w">  </span>-v<span class="w"> </span>/var/run/docker.sock:/var/run/docker.sock<span class="w"> </span><span class="se">\</span>
-<a id="__codelineno-4-4" name="__codelineno-4-4" href="#__codelineno-4-4"></a><span class="w">  </span>nickfedor/watchtower<span class="w"> </span><span class="se">\</span>
-<a id="__codelineno-4-5" name="__codelineno-4-5" href="#__codelineno-4-5"></a><span class="w">  </span>--notifications<span class="w"> </span>gotify<span class="w"> </span><span class="se">\</span>
-<a id="__codelineno-4-6" name="__codelineno-4-6" href="#__codelineno-4-6"></a><span class="w">  </span>--notification-gotify-url<span class="w"> </span><span class="s2">"https://my.gotify.tld/"</span><span class="w"> </span><span class="se">\</span>
-<a id="__codelineno-4-7" name="__codelineno-4-7" href="#__codelineno-4-7"></a><span class="w">  </span>--notification-gotify-token<span class="w"> </span><span class="s2">"SuperSecretToken"</span><span class="w"> </span><span class="se">\</span>
-<a id="__codelineno-4-8" name="__codelineno-4-8" href="#__codelineno-4-8"></a><span class="w">  </span>--notification-gotify-tls-skip-verify
+<div class="highlight"><pre><span></span><code><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a><span class="k">LABEL</span><span class="w"> </span>com.centurylinklabs.watchtower.copy-file<span class="o">=</span><span class="s2">"/etc/unbound/unbound.conf"</span>
 </code></pre></div>
 </div>
 </div>
 </div>
-</details>
+<p>Multiple files:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a><span class="nt">labels</span><span class="p">:</span>
+<a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a><span class="w">    </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="s">"com.centurylinklabs.watchtower.copy-file=/etc/unbound/unbound.conf,/etc/nginx/nginx.conf"</span>
+</code></pre></div>
+<h2 id="compose_configs">Compose Configs<a class="headerlink" href="#compose_configs" title="Permanent link">&para;</a></h2>
+<table>
+<thead>
+<tr>
+<th>Compose source</th>
+<th>How Docker Compose applies it</th>
+<th>Watchtower behavior</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><a href="https://docs.docker.com/reference/compose-file/configs/#example-1" rel="noopener noreferrer" target="_blank"><code>file:</code></a></td>
+<td>Bind-mount of the host file</td>
+<td>Preserved automatically. The copy-file label is not needed.</td>
+</tr>
+<tr>
+<td><a href="https://docs.docker.com/reference/compose-file/configs/" rel="noopener noreferrer" target="_blank"><code>content:</code></a> or <a href="https://docs.docker.com/reference/compose-file/configs/" rel="noopener noreferrer" target="_blank"><code>environment:</code></a></td>
+<td>Copied into the container after create</td>
+<td>Lost on recreate unless the copy-file label names the in-container path.</td>
+</tr>
+</tbody>
+</table>
+<p>Swarm <a href="https://docs.docker.com/engine/swarm/configs/" rel="noopener noreferrer" target="_blank">Docker configs</a> are a separate Engine feature for swarm services. This label is for standalone containers, including Compose on a non-swarm Docker Engine.</p>
+<h2 id="rules">Rules<a class="headerlink" href="#rules" title="Permanent link">&para;</a></h2>
+<ul>
+<li>Paths must be absolute and must not contain <code>..</code>.</li>
+<li>Paths that are already bind mounts or volumes are skipped. Those mounts are already copied with the rest of the host config.</li>
+<li>A missing path is skipped.</li>
+<li>A directory, symlink, oversized file, unsafe archive, or copy failure stops that container's update.</li>
+<li>Files are not written into a container with a read-only root filesystem.</li>
+</ul>
+<p>Each file is capped at 1 MiB. Watchtower keeps at most 16 MiB of copy-file data in memory at once.</p>
+<h2 id="underlying_technology">Underlying Technology<a class="headerlink" href="#underlying_technology" title="Permanent link">&para;</a></h2>
+<p>Watchtower uses the Docker Engine archive endpoints <a href="https://docs.docker.com/reference/api/engine/latest/#tag/Container/operation/ContainerArchive" rel="noopener noreferrer" target="_blank"><code>GET /containers/{id}/archive</code></a> and <a href="https://docs.docker.com/reference/api/engine/latest/#tag/Container/operation/PutContainerArchive" rel="noopener noreferrer" target="_blank"><code>PUT /containers/{id}/archive</code></a> to snapshot labeled files before the old container is removed and to write them into the new container before it starts.</p>
+<p>That is the same mechanism <a href="https://docs.docker.com/reference/compose-file/configs/" rel="noopener noreferrer" target="_blank">Docker Compose</a> uses to inject <code>content:</code> and <code>environment:</code> configs.</p>
 
 
 
@@ -2855,7 +2910,7 @@
     <span class="md-icon" title="Last update">
       <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M21 13.1c-.1 0-.3.1-.4.2l-1 1 2.1 2.1 1-1c.2-.2.2-.6 0-.8l-1.3-1.3c-.1-.1-.2-.2-.4-.2m-1.9 1.8-6.1 6V23h2.1l6.1-6.1zM12.5 7v5.2l4 2.4-1 1L11 13V7zM11 21.9c-5.1-.5-9-4.8-9-9.9C2 6.5 6.5 2 12 2c5.3 0 9.6 4.1 10 9.3-.3-.1-.6-.2-1-.2s-.7.1-1 .2C19.6 7.2 16.2 4 12 4c-4.4 0-8 3.6-8 8 0 4.1 3.1 7.5 7.1 7.9l-.1.2z"/></svg>
     </span>
-    <span class="git-revision-date-localized-plugin git-revision-date-localized-plugin-timeago" title="July 14, 2026 14:36:11 UTC"><span class="timeago" datetime="2026-07-14T14:36:11+00:00" locale="en"></span></span><span class="git-revision-date-localized-plugin git-revision-date-localized-plugin-iso_date" title="July 14, 2026 14:36:11 UTC">2026-07-14</span>
+    <span class="git-revision-date-localized-plugin git-revision-date-localized-plugin-timeago" title="September 15, 2026 15:20:27 UTC"><span class="timeago" datetime="2026-09-15T15:20:27+00:00" locale="en"></span></span><span class="git-revision-date-localized-plugin git-revision-date-localized-plugin-iso_date" title="September 15, 2026 15:20:27 UTC">2026-09-15</span>
   </span>
 
     
@@ -2865,7 +2920,7 @@
     <span class="md-icon" title="Created">
       <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M14.47 15.08 11 13V7h1.5v5.25l3.08 1.83c-.41.28-.79.62-1.11 1m-1.39 4.84c-.36.05-.71.08-1.08.08-4.42 0-8-3.58-8-8s3.58-8 8-8 8 3.58 8 8c0 .37-.03.72-.08 1.08.69.1 1.33.32 1.92.64.1-.56.16-1.13.16-1.72 0-5.5-4.5-10-10-10S2 6.5 2 12s4.47 10 10 10c.59 0 1.16-.06 1.72-.16-.32-.59-.54-1.23-.64-1.92M18 15v3h-3v2h3v3h2v-3h3v-2h-3v-3z"/></svg>
     </span>
-    <span class="git-revision-date-localized-plugin git-revision-date-localized-plugin-timeago" title="July 14, 2026 14:36:11 UTC"><span class="timeago" datetime="2026-07-14T14:36:11+00:00" locale="en"></span></span><span class="git-revision-date-localized-plugin git-revision-date-localized-plugin-iso_date" title="July 14, 2026 14:36:11 UTC">2026-07-14</span>
+    <span class="git-revision-date-localized-plugin git-revision-date-localized-plugin-timeago" title="September 15, 2026 15:20:27 UTC"><span class="timeago" datetime="2026-09-15T15:20:27+00:00" locale="en"></span></span><span class="git-revision-date-localized-plugin git-revision-date-localized-plugin-iso_date" title="September 15, 2026 15:20:27 UTC">2026-09-15</span>
   </span>
 
     
@@ -2937,14 +2992,14 @@
     
       
       
-      <script id="__config" type="application/json">{"annotate": null, "base": "../../..", "features": ["navigation.instant", "navigation.tracking", "navigation.tabs", "navigation.tabs.sticky", "navigation.sections", "navigation.expand", "toc.follow", "navigation.top", "search.suggest", "search.highlight", "search.share", "content.code.copy", "content.tooltips", "content.tabs.link"], "search": "../../../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": {"alias": true, "default": ["latest", "dev"], "provider": "mike"}}</script>
+      <script id="__config" type="application/json">{"annotate": null, "base": "../..", "features": ["navigation.instant", "navigation.tracking", "navigation.tabs", "navigation.tabs.sticky", "navigation.sections", "navigation.expand", "toc.follow", "navigation.top", "search.suggest", "search.highlight", "search.share", "content.code.copy", "content.tooltips", "content.tabs.link"], "search": "../../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": {"alias": true, "default": ["latest", "dev"], "provider": "mike"}}</script>
     
     
-      <script src="../../../assets/javascripts/bundle.d7400e89.min.js"></script>
+      <script src="../../assets/javascripts/bundle.d7400e89.min.js"></script>
       
-        <script src="../../../js/timeago.min.js"></script>
+        <script src="../../js/timeago.min.js"></script>
       
-        <script src="../../../js/timeago_mkdocs_material.js"></script>
+        <script src="../../js/timeago_mkdocs_material.js"></script>
       
     
   </body>

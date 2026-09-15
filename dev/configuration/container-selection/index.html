@@ -1028,6 +1028,17 @@
   
 </li>
       
+        <li class="md-nav__item">
+  <a href="#copy_files_during_recreate" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Copy Files During Recreate
+      
+    </span>
+  </a>
+  
+</li>
+      
     </ul>
   
 </nav>
@@ -2539,6 +2550,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../../advanced-features/copy-files/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Copy Files
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../../advanced-features/lifecycle-hooks/" class="md-nav__link">
         
   
@@ -2921,6 +2960,17 @@
   
 </li>
       
+        <li class="md-nav__item">
+  <a href="#copy_files_during_recreate" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Copy Files During Recreate
+      
+    </span>
+  </a>
+  
+</li>
+      
     </ul>
   
 </nav>
@@ -3094,6 +3144,11 @@ For more information on Watchtower's handling of linked containers, please refer
 <p>Rolling restarts are not supported when any container has linked dependencies (including Docker Compose <code>depends_on</code>, Watchtower <code>depends-on</code> labels, Docker links, or network mode dependencies).
 When <a href="../update-behavior/#rolling_restart"><code>rolling-restart</code></a> is enabled, the <a href="./#use_docker_compose_depends-on"><code>use-compose-depends-on</code></a> configuration option controls whether Docker Compose <code>depends_on</code> labels are included in the dependency validation check.</p>
 </div>
+<h2 id="copy_files_during_recreate">Copy Files During Recreate<a class="headerlink" href="#copy_files_during_recreate" title="Permanent link">&para;</a></h2>
+<p>Copies named files from the old container into the replacement container during an update.</p>
+<p>This is a per-container label, not a Watchtower process option. Set <a href="../../getting-started/container-selection/#container_labels"><code>com.centurylinklabs.watchtower.copy-file</code></a> to a comma-separated list of absolute paths inside the container.</p>
+<p>Use this for <a href="https://docs.docker.com/reference/compose-file/configs/" rel="noopener noreferrer" target="_blank">Docker Compose configs</a> that use <code>content:</code> or <code>environment:</code>. Compose <code>file:</code> configs are bind-mounts and are already preserved.</p>
+<p>See <a href="../../advanced-features/copy-files/">Copy Files</a> for path rules and Compose examples.</p>
 
 
 
@@ -3116,7 +3171,7 @@ When <a href="../update-behavior/#rolling_restart"><code>rolling-restart</code><
     <span class="md-icon" title="Last update">
       <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M21 13.1c-.1 0-.3.1-.4.2l-1 1 2.1 2.1 1-1c.2-.2.2-.6 0-.8l-1.3-1.3c-.1-.1-.2-.2-.4-.2m-1.9 1.8-6.1 6V23h2.1l6.1-6.1zM12.5 7v5.2l4 2.4-1 1L11 13V7zM11 21.9c-5.1-.5-9-4.8-9-9.9C2 6.5 6.5 2 12 2c5.3 0 9.6 4.1 10 9.3-.3-.1-.6-.2-1-.2s-.7.1-1 .2C19.6 7.2 16.2 4 12 4c-4.4 0-8 3.6-8 8 0 4.1 3.1 7.5 7.1 7.9l-.1.2z"/></svg>
     </span>
-    <span class="git-revision-date-localized-plugin git-revision-date-localized-plugin-timeago" title="July 18, 2026 23:08:33 UTC"><span class="timeago" datetime="2026-07-18T23:08:33+00:00" locale="en"></span></span><span class="git-revision-date-localized-plugin git-revision-date-localized-plugin-iso_date" title="July 18, 2026 23:08:33 UTC">2026-07-18</span>
+    <span class="git-revision-date-localized-plugin git-revision-date-localized-plugin-timeago" title="September 15, 2026 15:20:27 UTC"><span class="timeago" datetime="2026-09-15T15:20:27+00:00" locale="en"></span></span><span class="git-revision-date-localized-plugin git-revision-date-localized-plugin-iso_date" title="September 15, 2026 15:20:27 UTC">2026-09-15</span>
   </span>
 
     
