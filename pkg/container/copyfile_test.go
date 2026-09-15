@@ -7,6 +7,8 @@ import (
 	"errors"
 	"io"
 	"os"
+	"strconv"
+	"strings"
 	"testing"
 	"time"
 
@@ -420,6 +422,43 @@ func TestSnapshotCopyFiles(t *testing.T) {
 
 		_, err := snapshotCopyFiles(testLog(), t.Context(), api, c)
 		require.ErrorIs(t, err, errCopyFileInvalidPath)
+	})
+
+	t.Run("rejects when labeled files exceed store cap", func(t *testing.T) {
+		t.Parallel()
+
+		const fileCount = 17
+
+		body := bytes.Repeat([]byte("x"), maxCopyFileBytes)
+		paths := make([]string, fileCount)
+		api := mockContainer.NewMockArchiveAPI(t)
+
+		for i := range fileCount {
+			name := strconv.Itoa(i)
+			paths[i] = "/app/" + name
+			tarBytes := mustFileTar(t, name, body)
+
+			call := api.EXPECT().
+				CopyFromContainer(mock.Anything, "container_id", copyFromPath(paths[i])).
+				Return(dockerClient.CopyFromContainerResult{
+					Content: io.NopCloser(bytes.NewReader(tarBytes)),
+					Stat: dockerContainer.PathStat{
+						Name: name,
+						Size: int64(len(body)),
+						Mode: 0o444,
+					},
+				}, nil)
+			if i == fileCount-1 {
+				call.Maybe()
+			}
+		}
+
+		c := MockContainer(WithLabels(map[string]string{
+			copyFileLabel: strings.Join(paths, ","),
+		}))
+
+		_, err := snapshotCopyFiles(testLog(), t.Context(), api, c)
+		require.ErrorIs(t, err, errCopyFileStoreFull)
 	})
 }
 

@@ -296,6 +296,8 @@ func snapshotCopyFiles(
 	clog := &clogVal
 	files := make([]copyFileEntry, 0, len(paths))
 
+	var total int64
+
 	for _, filePath := range paths {
 		if copyFilePathIsMounted(source, filePath) {
 			clog.Debug().
@@ -314,7 +316,13 @@ func snapshotCopyFiles(
 			continue
 		}
 
+		next := total + int64(len(entry.archive))
+		if next > maxCopyFileStoreBytes {
+			return copyFileSnapshot{}, fmt.Errorf("%w: %d bytes", errCopyFileStoreFull, next)
+		}
+
 		files = append(files, entry)
+		total = next
 	}
 
 	return copyFileSnapshot{files: files}, nil
