@@ -8,6 +8,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- Copy labeled files across container recreate by @nicholas-fedor in [#2387](https://github.com/nicholas-fedor/watchtower/pull/2387)
+
 ### Chores
 
 - Update module github.com/gofiber/schema to v1.8.7 by @renovate[bot] in [#2388](https://github.com/nicholas-fedor/watchtower/pull/2388)
