@@ -234,6 +234,36 @@ func WithMounts(mounts []dockerMount.Mount) MockContainerUpdate {
 	}
 }
 
+// WithInspectMounts sets runtime mount points on the mock container inspect response.
+//
+// Parameters:
+//   - mounts: Runtime mount points reported by container inspect.
+//
+// Returns:
+//   - MockContainerUpdate: Function to set inspect Mounts.
+func WithInspectMounts(mounts []dockerContainer.MountPoint) MockContainerUpdate {
+	return func(c *dockerContainer.InspectResponse, _ *dockerImage.InspectResponse) {
+		c.Mounts = mounts
+	}
+}
+
+// WithReadonlyRootfs sets HostConfig.ReadonlyRootfs on the mock container.
+//
+// Parameters:
+//   - readOnly: Whether the container root filesystem is read-only.
+//
+// Returns:
+//   - MockContainerUpdate: Function to set ReadonlyRootfs.
+func WithReadonlyRootfs(readOnly bool) MockContainerUpdate {
+	return func(c *dockerContainer.InspectResponse, _ *dockerImage.InspectResponse) {
+		if c.HostConfig == nil {
+			c.HostConfig = &dockerContainer.HostConfig{}
+		}
+
+		c.HostConfig.ReadonlyRootfs = readOnly
+	}
+}
+
 // WithNetworks adds multiple networks to the mock container.
 //
 // Parameters:

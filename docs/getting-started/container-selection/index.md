@@ -529,14 +529,15 @@ This applies to the [`monitor-only`](../../configuration/update-behavior/index.m
 
 ### Container Labels
 
-| Label                                           | Values                | Effect                            |
-|-------------------------------------------------|-----------------------|-----------------------------------|
-| `com.centurylinklabs.watchtower.enable`         | true / false          | Enable or disable management      |
-| `com.centurylinklabs.watchtower.monitor-only`   | true / false          | Monitor without updating          |
-| `com.centurylinklabs.watchtower.no-pull`        | true / false          | Skip image pulls                  |
-| `com.centurylinklabs.watchtower.scope`          | any string            | Assign to a monitoring scope      |
-| `com.centurylinklabs.watchtower.depends-on`     | comma-separated names | Declare container dependencies    |
-| `com.centurylinklabs.watchtower.cooldown-delay` | duration string       | Minimum image age before updating |
+| Label                                                                                     | Values                | Effect                                          |
+|-------------------------------------------------------------------------------------------|-----------------------|-------------------------------------------------|
+| `com.centurylinklabs.watchtower.enable`                                                   | true / false          | Enable or disable management                    |
+| `com.centurylinklabs.watchtower.monitor-only`                                             | true / false          | Monitor without updating                        |
+| `com.centurylinklabs.watchtower.no-pull`                                                  | true / false          | Skip image pulls                                |
+| `com.centurylinklabs.watchtower.scope`                                                    | any string            | Assign to a monitoring scope                    |
+| `com.centurylinklabs.watchtower.depends-on`                                               | comma-separated names | Declare container dependencies                  |
+| `com.centurylinklabs.watchtower.cooldown-delay`                                           | duration string       | Minimum image age before updating               |
+| [`com.centurylinklabs.watchtower.copy-file`](../../advanced-features/copy-files/index.md) | comma-separated paths | Copy named files onto the replacement container |
 
 ## Common Patterns
 

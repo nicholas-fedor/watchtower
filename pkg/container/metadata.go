@@ -35,6 +35,8 @@ const (
 	// cooldownDelayLabel sets the minimum image age before updating this container.
 	// Accepts duration strings (e.g., "24h", "3d", "1w", "0" to disable).
 	cooldownDelayLabel = "com.centurylinklabs.watchtower.cooldown-delay"
+	// copyFileLabel lists in-container file paths to copy during recreation, comma-separated.
+	copyFileLabel = "com.centurylinklabs.watchtower.copy-file"
 )
 
 // Lifecycle hook labels configure commands executed during container update phases.
