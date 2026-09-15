@@ -18,7 +18,7 @@ require (
 	github.com/moby/docker-image-spec v1.3.1
 	github.com/moby/moby/api v1.56.0
 	github.com/moby/moby/client v0.6.0
-	github.com/nicholas-fedor/shoutrrr v0.20.0
+	github.com/nicholas-fedor/shoutrrr v0.21.0
 	github.com/onsi/ginkgo/v2 v2.32.2
 	github.com/onsi/gomega v1.43.0
 	github.com/opencontainers/go-digest v1.0.0
@@ -101,4 +101,8 @@ require (
 	golang.org/x/term v0.46.0 // indirect
 	golang.org/x/tools v0.50.0 // indirect
 	google.golang.org/protobuf v1.36.12 // indirect
+	mellium.im/reader v0.1.0 // indirect
+	mellium.im/sasl v0.3.2 // indirect
+	mellium.im/xmlstream v0.15.4 // indirect
+	mellium.im/xmpp v0.23.0 // indirect
 )
