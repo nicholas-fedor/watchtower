@@ -15,6 +15,7 @@ import (
 	"golang.org/x/sync/errgroup"
 
 	cerrdefs "github.com/containerd/errdefs"
+	dockerContainer "github.com/moby/moby/api/types/container"
 
 	"github.com/nicholas-fedor/watchtower/pkg/compose"
 	"github.com/nicholas-fedor/watchtower/pkg/container"
@@ -245,7 +246,11 @@ func Update(log *zerolog.Logger, ctx context.Context,
 					defer setNoRestartCancel()
 
 					//nolint:contextcheck // setNoRestartCtx is intentionally used for restart policy update
-					client.SetNoRestartPolicy(setNoRestartCtx, c)
+					client.SetRestartPolicy(
+						setNoRestartCtx,
+						c,
+						dockerContainer.RestartPolicy{Name: dockerContainer.RestartPolicyDisabled},
+					)
 
 					return nil, nil, errOldSelfDetected
 				}
@@ -2248,7 +2253,11 @@ func restartStaleContainer(log *zerolog.Logger, ctx context.Context,
 			Msg("Updating restart policy for old Watchtower container")
 
 		//nolint:contextcheck // Using detached context intentionally to survive parent cancellation
-		client.SetNoRestartPolicy(detachedCtx, sourceContainer)
+		client.SetRestartPolicy(
+			detachedCtx,
+			sourceContainer,
+			dockerContainer.RestartPolicy{Name: dockerContainer.RestartPolicyDisabled},
+		)
 	}
 
 	return newContainerID, renamed, nil
