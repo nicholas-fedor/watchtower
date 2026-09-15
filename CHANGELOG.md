@@ -19,6 +19,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Chores
 
+- Update docker/setup-qemu-action action to v4.4.0 by @renovate[bot] in [#2382](https://github.com/nicholas-fedor/watchtower/pull/2382)
+- Update docker/setup-buildx-action action to v4.4.0 by @renovate[bot] in [#2381](https://github.com/nicholas-fedor/watchtower/pull/2381)
 - Update codecov/codecov-action action to v7.1.0 by @renovate[bot] in [#2379](https://github.com/nicholas-fedor/watchtower/pull/2379)
 - Update module github.com/gofiber/utils/v2 to v2.5.2 by @renovate[bot] in [#2376](https://github.com/nicholas-fedor/watchtower/pull/2376)
 - Update module github.com/gofiber/contrib/v3/zerolog to v1.1.5 by @renovate[bot] in [#2369](https://github.com/nicholas-fedor/watchtower/pull/2369)
