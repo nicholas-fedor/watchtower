@@ -19,6 +19,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Chores
 
+- Update module github.com/nicholas-fedor/shoutrrr to v0.21.0 by @renovate[bot] in [#2384](https://github.com/nicholas-fedor/watchtower/pull/2384)
 - Update docker/setup-qemu-action action to v4.4.0 by @renovate[bot] in [#2382](https://github.com/nicholas-fedor/watchtower/pull/2382)
 - Update docker/setup-buildx-action action to v4.4.0 by @renovate[bot] in [#2381](https://github.com/nicholas-fedor/watchtower/pull/2381)
 - Update codecov/codecov-action action to v7.1.0 by @renovate[bot] in [#2379](https://github.com/nicholas-fedor/watchtower/pull/2379)
