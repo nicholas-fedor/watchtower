@@ -605,6 +605,14 @@ func ContainerUpdateHandler(
 				name, ok := restartPolicy["Name"].(string)
 				gomega.Expect(ok).To(gomega.BeTrue(), "RestartPolicy.Name should be a string")
 				gomega.Expect(name).To(gomega.Equal(expectedPolicy), "RestartPolicy.Name should match")
+
+				if expectedPolicy == "no" {
+					retryCount, hasRetryCount := restartPolicy["MaximumRetryCount"]
+					if hasRetryCount {
+						gomega.Expect(retryCount).To(gomega.BeNumerically("==", 0),
+							"disabled policy should not keep a retry count")
+					}
+				}
 			}
 
 			body := []byte(nil)

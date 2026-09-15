@@ -65,6 +65,8 @@ var _ = ginkgo.Describe("Watchtower container handling", func() {
 				To(gomega.Equal(int32(1)), "RenameContainer should be called once")
 			gomega.Expect(client.TestData.SetRestartPolicyCount.Load()).
 				To(gomega.Equal(int32(1)), "SetRestartPolicy should be called once for old Watchtower")
+			gomega.Expect(client.TestData.LastRestartPolicy.Name).
+				To(gomega.Equal(dockerContainer.RestartPolicyDisabled))
 			gomega.Expect(client.TestData.StopContainerCount.Load()).
 				To(gomega.Equal(int32(0)), "StopContainer should not be called for old Watchtower (handled by cleanup logic)")
 			gomega.Expect(client.TestData.IsContainerStaleCount.Load()).

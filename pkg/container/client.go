@@ -327,8 +327,10 @@ type Client interface {
 	// SetRestartPolicy updates a container's restart policy.
 	//
 	// An empty policy name is treated as no automatic restart (Docker "no").
-	// Only the restart policy is sent to the Engine. Resource limits are left
-	// unchanged. Failures are logged and do not abort the caller.
+	// MaximumRetryCount is cleared in that case because retry counts apply only
+	// to on-failure policies. Only the restart policy is sent to the Engine.
+	// Resource limits are left unchanged. Failures are logged and do not abort
+	// the caller.
 	//
 	// Parameters:
 	//   - ctx: Context for cancellation and timeout control.
@@ -963,8 +965,10 @@ func (c *client) UpdateContainer(
 // SetRestartPolicy updates a container's restart policy.
 //
 // An empty policy name is treated as no automatic restart (Docker "no").
-// Only the restart policy is sent to the Engine. Resource limits are left
-// unchanged. Failures are logged and do not abort the caller.
+// MaximumRetryCount is cleared in that case because retry counts apply only
+// to on-failure policies. Only the restart policy is sent to the Engine.
+// Resource limits are left unchanged. Failures are logged and do not abort
+// the caller.
 //
 // Parameters:
 //   - ctx: Context for cancellation and timeout control.
@@ -981,6 +985,7 @@ func (c *client) SetRestartPolicy(
 
 	if policy.Name == "" {
 		policy.Name = dockerContainer.RestartPolicyDisabled
+		policy.MaximumRetryCount = 0
 	}
 
 	clogVal := c.logger().With().

@@ -2466,6 +2466,25 @@ var _ = ginkgo.Describe("SetRestartPolicy", func() {
 				dockerContainer.RestartPolicy{},
 			)
 		})
+
+		ginkgo.It("should clear MaximumRetryCount when normalizing an empty name", func() {
+			cid := "watchtower-container-id"
+			mockedContainer := MockContainer(
+				WithID(cid),
+			)
+
+			mockServer.AppendHandlers(
+				ContainerUpdateHandler(cid, http.StatusOK, "no"),
+			)
+
+			c := &client{log: testLog(), api: docker}
+
+			c.SetRestartPolicy(
+				context.Background(),
+				mockedContainer,
+				dockerContainer.RestartPolicy{MaximumRetryCount: 5},
+			)
+		})
 	})
 
 	ginkgo.When("the policy is always", func() {
