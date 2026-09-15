@@ -895,7 +895,7 @@ func (c *client) StartContainer(ctx context.Context, container types.Container) 
 		message = "Started linked container"
 	}
 
-	clog.Info().
+	clog.Debug().
 		Str("new_id", newID.ShortID()).
 		Msg(message)
 
