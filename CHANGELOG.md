@@ -14,6 +14,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Chores
 
+- Update module github.com/onsi/ginkgo/v2 to v2.33.0 by @renovate[bot] in [#2398](https://github.com/nicholas-fedor/watchtower/pull/2398)
 - Update module github.com/onsi/gomega to v1.43.1 by @renovate[bot] in [#2397](https://github.com/nicholas-fedor/watchtower/pull/2397)
 - Update codecov/codecov-action action to v7.1.1 by @renovate[bot] in [#2396](https://github.com/nicholas-fedor/watchtower/pull/2396)
 - Update docker/setup-buildx-action action to v4.4.1 by @renovate[bot] in [#2394](https://github.com/nicholas-fedor/watchtower/pull/2394)
