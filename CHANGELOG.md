@@ -14,6 +14,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Chores
 
+- Update github/codeql-action action to v4.38.1 by @renovate[bot] in [#2411](https://github.com/nicholas-fedor/watchtower/pull/2411)
+- Update alpine docker tag to v3.24.2 by @renovate[bot] in [#2410](https://github.com/nicholas-fedor/watchtower/pull/2410)
+- Update golang:alpine3.24 docker digest to 4cb7ac9 by @renovate[bot] in [#2407](https://github.com/nicholas-fedor/watchtower/pull/2407)
 - Update golang:1.27.1-alpine docker digest to 4cb7ac9 by @renovate[bot] in [#2406](https://github.com/nicholas-fedor/watchtower/pull/2406)
 - Update golang:alpine3.24 docker digest to e9bbdf2 by @renovate[bot] in [#2401](https://github.com/nicholas-fedor/watchtower/pull/2401)
 - Update golang:1.27.1-alpine docker digest to e9bbdf2 by @renovate[bot] in [#2400](https://github.com/nicholas-fedor/watchtower/pull/2400)
