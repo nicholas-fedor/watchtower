@@ -14,6 +14,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Chores
 
+- Update golang:1.27.1-alpine docker digest to 4cb7ac9 by @renovate[bot] in [#2406](https://github.com/nicholas-fedor/watchtower/pull/2406)
+- Update golang:alpine3.24 docker digest to e9bbdf2 by @renovate[bot] in [#2401](https://github.com/nicholas-fedor/watchtower/pull/2401)
 - Update golang:1.27.1-alpine docker digest to e9bbdf2 by @renovate[bot] in [#2400](https://github.com/nicholas-fedor/watchtower/pull/2400)
 - Update module github.com/onsi/ginkgo/v2 to v2.33.0 by @renovate[bot] in [#2398](https://github.com/nicholas-fedor/watchtower/pull/2398)
 - Update module github.com/onsi/gomega to v1.43.1 by @renovate[bot] in [#2397](https://github.com/nicholas-fedor/watchtower/pull/2397)
