@@ -533,6 +533,325 @@ var _ = ginkgo.Describe("GetSourceContainer", func() {
 		})
 	})
 
+	ginkgo.When("container has volumes-from requiring resolution", func() {
+		ginkgo.It("should rewrite volumes-from container ID to name", func() {
+			containerID := testContainerID
+			appID := "9b738d6a78250d731816cc5020d8cfaf55e605cd510f4d4662688bd9a6c4e0c7"
+			mockServer.AppendHandlers(
+				ghttp.CombineHandlers(
+					ghttp.VerifyRequest(
+						"GET",
+						gomega.MatchRegexp(
+							fmt.Sprintf("^/v[0-9.]+/containers/%s/json$", containerID),
+						),
+					),
+					ghttp.RespondWithJSONEncoded(http.StatusOK, dockerContainer.InspectResponse{
+						ID:    containerID,
+						Name:  "/nextcloud-nginx",
+						Image: "test-image:latest",
+						State: &dockerContainer.State{
+							Status:  "running",
+							Running: true,
+						},
+						HostConfig: &dockerContainer.HostConfig{
+							VolumesFrom: []string{appID + ":rw"},
+						},
+						Config: &dockerContainer.Config{
+							Image: "test-image:latest",
+						},
+					}),
+				),
+				ghttp.CombineHandlers(
+					ghttp.VerifyRequest(
+						"GET",
+						gomega.MatchRegexp(
+							fmt.Sprintf("^/v[0-9.]+/containers/%s/json$", appID),
+						),
+					),
+					ghttp.RespondWithJSONEncoded(http.StatusOK, dockerContainer.InspectResponse{
+						ID:   appID,
+						Name: "/nextcloud-app",
+					}),
+				),
+				ghttp.CombineHandlers(
+					ghttp.VerifyRequest(
+						"GET",
+						gomega.MatchRegexp("^/v[0-9.]+/images/test-image:latest/json$"),
+					),
+					ghttp.RespondWithJSONEncoded(http.StatusOK, dockerImage.InspectResponse{
+						ID: "test-image-id",
+					}),
+				),
+			)
+
+			container, err := GetSourceContainer(testLog(), context.Background(),
+				docker,
+				types.ContainerID(containerID),
+			)
+			gomega.Expect(err).ToNot(gomega.HaveOccurred())
+			gomega.Expect(container.ContainerInfo().HostConfig.VolumesFrom).
+				To(gomega.Equal([]string{"nextcloud-app:rw"}))
+			gomega.Expect(container.GetCreateHostConfig().VolumesFrom).
+				To(gomega.Equal([]string{"nextcloud-app:rw"}))
+		})
+
+		ginkgo.It("should leave volumes-from ID when the source cannot be resolved", func() {
+			containerID := testContainerID
+			appID := "9b738d6a78250d731816cc5020d8cfaf55e605cd510f4d4662688bd9a6c4e0c7"
+			mockServer.AppendHandlers(
+				ghttp.CombineHandlers(
+					ghttp.VerifyRequest(
+						"GET",
+						gomega.MatchRegexp(
+							fmt.Sprintf("^/v[0-9.]+/containers/%s/json$", containerID),
+						),
+					),
+					ghttp.RespondWithJSONEncoded(http.StatusOK, dockerContainer.InspectResponse{
+						ID:    containerID,
+						Name:  "/nextcloud-nginx",
+						Image: "test-image:latest",
+						State: &dockerContainer.State{
+							Status:  "running",
+							Running: true,
+						},
+						HostConfig: &dockerContainer.HostConfig{
+							VolumesFrom: []string{appID},
+						},
+						Config: &dockerContainer.Config{
+							Image: "test-image:latest",
+						},
+					}),
+				),
+				ghttp.CombineHandlers(
+					ghttp.VerifyRequest(
+						"GET",
+						gomega.MatchRegexp(
+							fmt.Sprintf("^/v[0-9.]+/containers/%s/json$", appID),
+						),
+					),
+					ghttp.RespondWith(http.StatusNotFound, `{"message":"No such container"}`),
+				),
+				ghttp.CombineHandlers(
+					ghttp.VerifyRequest(
+						"GET",
+						gomega.MatchRegexp("^/v[0-9.]+/images/test-image:latest/json$"),
+					),
+					ghttp.RespondWithJSONEncoded(http.StatusOK, dockerImage.InspectResponse{
+						ID: "test-image-id",
+					}),
+				),
+			)
+
+			container, err := GetSourceContainer(testLog(), context.Background(),
+				docker,
+				types.ContainerID(containerID),
+			)
+			gomega.Expect(err).ToNot(gomega.HaveOccurred())
+			gomega.Expect(container.ContainerInfo().HostConfig.VolumesFrom).
+				To(gomega.Equal([]string{appID}))
+		})
+
+		ginkgo.It("should rewrite volumes-from IDs and preserve ro mode", func() {
+			containerID := testContainerID
+			appID := "9b738d6a78250d731816cc5020d8cfaf55e605cd510f4d4662688bd9a6c4e0c7"
+			mockServer.AppendHandlers(
+				ghttp.CombineHandlers(
+					ghttp.VerifyRequest(
+						"GET",
+						gomega.MatchRegexp(
+							fmt.Sprintf("^/v[0-9.]+/containers/%s/json$", containerID),
+						),
+					),
+					ghttp.RespondWithJSONEncoded(http.StatusOK, dockerContainer.InspectResponse{
+						ID:    containerID,
+						Name:  "/nextcloud-nginx",
+						Image: "test-image:latest",
+						State: &dockerContainer.State{
+							Status:  "running",
+							Running: true,
+						},
+						HostConfig: &dockerContainer.HostConfig{
+							VolumesFrom: []string{appID + ":ro"},
+						},
+						Config: &dockerContainer.Config{
+							Image: "test-image:latest",
+						},
+					}),
+				),
+				ghttp.CombineHandlers(
+					ghttp.VerifyRequest(
+						"GET",
+						gomega.MatchRegexp(
+							fmt.Sprintf("^/v[0-9.]+/containers/%s/json$", appID),
+						),
+					),
+					ghttp.RespondWithJSONEncoded(http.StatusOK, dockerContainer.InspectResponse{
+						ID:   appID,
+						Name: "/nextcloud-app",
+					}),
+				),
+				ghttp.CombineHandlers(
+					ghttp.VerifyRequest(
+						"GET",
+						gomega.MatchRegexp("^/v[0-9.]+/images/test-image:latest/json$"),
+					),
+					ghttp.RespondWithJSONEncoded(http.StatusOK, dockerImage.InspectResponse{
+						ID: "test-image-id",
+					}),
+				),
+			)
+
+			container, err := GetSourceContainer(testLog(), context.Background(),
+				docker,
+				types.ContainerID(containerID),
+			)
+			gomega.Expect(err).ToNot(gomega.HaveOccurred())
+			gomega.Expect(container.ContainerInfo().HostConfig.VolumesFrom).
+				To(gomega.Equal([]string{"nextcloud-app:ro"}))
+		})
+
+		ginkgo.It("should rewrite multiple volumes-from entries independently", func() {
+			containerID := testContainerID
+			appID := "9b738d6a78250d731816cc5020d8cfaf55e605cd510f4d4662688bd9a6c4e0c7"
+			dbID := "a1b2c3d4e5f60718293a4b5c6d7e8f901234567890abcdef1234567890abcd"
+			mockServer.AppendHandlers(
+				ghttp.CombineHandlers(
+					ghttp.VerifyRequest(
+						"GET",
+						gomega.MatchRegexp(
+							fmt.Sprintf("^/v[0-9.]+/containers/%s/json$", containerID),
+						),
+					),
+					ghttp.RespondWithJSONEncoded(http.StatusOK, dockerContainer.InspectResponse{
+						ID:    containerID,
+						Name:  "/nextcloud-nginx",
+						Image: "test-image:latest",
+						State: &dockerContainer.State{
+							Status:  "running",
+							Running: true,
+						},
+						HostConfig: &dockerContainer.HostConfig{
+							VolumesFrom: []string{appID + ":rw", dbID},
+						},
+						Config: &dockerContainer.Config{
+							Image: "test-image:latest",
+						},
+					}),
+				),
+				ghttp.CombineHandlers(
+					ghttp.VerifyRequest(
+						"GET",
+						gomega.MatchRegexp(
+							fmt.Sprintf("^/v[0-9.]+/containers/%s/json$", appID),
+						),
+					),
+					ghttp.RespondWithJSONEncoded(http.StatusOK, dockerContainer.InspectResponse{
+						ID:   appID,
+						Name: "/nextcloud-app",
+					}),
+				),
+				ghttp.CombineHandlers(
+					ghttp.VerifyRequest(
+						"GET",
+						gomega.MatchRegexp(
+							fmt.Sprintf("^/v[0-9.]+/containers/%s/json$", dbID),
+						),
+					),
+					ghttp.RespondWithJSONEncoded(http.StatusOK, dockerContainer.InspectResponse{
+						ID:   dbID,
+						Name: "/nextcloud-db",
+					}),
+				),
+				ghttp.CombineHandlers(
+					ghttp.VerifyRequest(
+						"GET",
+						gomega.MatchRegexp("^/v[0-9.]+/images/test-image:latest/json$"),
+					),
+					ghttp.RespondWithJSONEncoded(http.StatusOK, dockerImage.InspectResponse{
+						ID: "test-image-id",
+					}),
+				),
+			)
+
+			container, err := GetSourceContainer(testLog(), context.Background(),
+				docker,
+				types.ContainerID(containerID),
+			)
+			gomega.Expect(err).ToNot(gomega.HaveOccurred())
+			gomega.Expect(container.ContainerInfo().HostConfig.VolumesFrom).
+				To(gomega.Equal([]string{"nextcloud-app:rw", "nextcloud-db"}))
+		})
+
+		ginkgo.It("should rewrite resolved volumes-from entries and leave unresolved IDs", func() {
+			containerID := testContainerID
+			appID := "9b738d6a78250d731816cc5020d8cfaf55e605cd510f4d4662688bd9a6c4e0c7"
+			missingID := "deadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeef"
+			mockServer.AppendHandlers(
+				ghttp.CombineHandlers(
+					ghttp.VerifyRequest(
+						"GET",
+						gomega.MatchRegexp(
+							fmt.Sprintf("^/v[0-9.]+/containers/%s/json$", containerID),
+						),
+					),
+					ghttp.RespondWithJSONEncoded(http.StatusOK, dockerContainer.InspectResponse{
+						ID:    containerID,
+						Name:  "/nextcloud-nginx",
+						Image: "test-image:latest",
+						State: &dockerContainer.State{
+							Status:  "running",
+							Running: true,
+						},
+						HostConfig: &dockerContainer.HostConfig{
+							VolumesFrom: []string{appID + ":rw", missingID},
+						},
+						Config: &dockerContainer.Config{
+							Image: "test-image:latest",
+						},
+					}),
+				),
+				ghttp.CombineHandlers(
+					ghttp.VerifyRequest(
+						"GET",
+						gomega.MatchRegexp(
+							fmt.Sprintf("^/v[0-9.]+/containers/%s/json$", appID),
+						),
+					),
+					ghttp.RespondWithJSONEncoded(http.StatusOK, dockerContainer.InspectResponse{
+						ID:   appID,
+						Name: "/nextcloud-app",
+					}),
+				),
+				ghttp.CombineHandlers(
+					ghttp.VerifyRequest(
+						"GET",
+						gomega.MatchRegexp(
+							fmt.Sprintf("^/v[0-9.]+/containers/%s/json$", missingID),
+						),
+					),
+					ghttp.RespondWith(http.StatusNotFound, `{"message":"No such container"}`),
+				),
+				ghttp.CombineHandlers(
+					ghttp.VerifyRequest(
+						"GET",
+						gomega.MatchRegexp("^/v[0-9.]+/images/test-image:latest/json$"),
+					),
+					ghttp.RespondWithJSONEncoded(http.StatusOK, dockerImage.InspectResponse{
+						ID: "test-image-id",
+					}),
+				),
+			)
+
+			container, err := GetSourceContainer(testLog(), context.Background(),
+				docker,
+				types.ContainerID(containerID),
+			)
+			gomega.Expect(err).ToNot(gomega.HaveOccurred())
+			gomega.Expect(container.ContainerInfo().HostConfig.VolumesFrom).
+				To(gomega.Equal([]string{"nextcloud-app:rw", missingID}))
+		})
+	})
+
 	ginkgo.When("container ID is invalid", func() {
 		ginkgo.It("should return error for 404 not found", func() {
 			containerID := "invalid-container-id"
