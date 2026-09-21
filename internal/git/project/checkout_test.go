@@ -64,6 +64,42 @@ func TestCheckoutStashReappliesLocalEnv(t *testing.T) {
 	assert.Equal(t, "services: {}\n", string(compose))
 }
 
+func TestCheckoutRestoreFailureRollsBack(t *testing.T) {
+	t.Parallel()
+
+	dir, first, second := initTwoCommitRepo(t)
+	require.NoError(t, os.WriteFile(filepath.Join(dir, ".env"), []byte("SECRET=local\n"), 0o600))
+
+	calls := 0
+	err := Checkout(t.Context(), dir, first, CheckoutOptions{
+		Stash: true,
+		restore: func(root string, saved []savedFile) error {
+			calls++
+			if calls == 1 {
+				return os.ErrPermission
+			}
+
+			return restoreSaved(root, saved)
+		},
+	})
+	require.ErrorIs(t, err, os.ErrPermission)
+	assert.Equal(t, 2, calls)
+
+	repo, err := goGit.PlainOpen(dir)
+	require.NoError(t, err)
+	head, err := repo.Head()
+	require.NoError(t, err)
+	assert.Equal(t, second, head.Hash().String())
+
+	got, err := os.ReadFile(filepath.Join(dir, ".env"))
+	require.NoError(t, err)
+	assert.Equal(t, "SECRET=local\n", string(got))
+
+	compose, err := os.ReadFile(filepath.Join(dir, "compose.yaml"))
+	require.NoError(t, err)
+	assert.Equal(t, "services: {api: {}}\n", string(compose))
+}
+
 func TestCheckoutCleanWorktree(t *testing.T) {
 	t.Parallel()
 

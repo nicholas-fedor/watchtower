@@ -27,6 +27,8 @@ type CheckoutOptions struct {
 	Stash bool
 	// AuthFor returns fetch credentials for the origin URL. Nil is anonymous fetch.
 	AuthFor func(repoURL string) (transport.AuthMethod, error)
+	// restore replaces restoreSaved. Tests use it to fail a restore. Nil uses restoreSaved.
+	restore func(root string, saved []savedFile) error
 	// CABundle is extra PEM CAs for HTTPS fetch.
 	CABundle []byte
 	// InsecureSkipTLS skips TLS verification for HTTPS fetch.
@@ -83,12 +85,23 @@ func Checkout(ctx context.Context, dir, commit string, opts CheckoutOptions) err
 		return err
 	}
 
+	// Keep a copy outside the worktree. A failed restore after checkout
+	// must not be the only copy of those bytes.
+	snapshotDir, err := writeSnapshot(opts.Stash, saved)
+	if err != nil {
+		return err
+	}
+
+	head, headErr := repo.Head()
+
 	// Fetch may fail on a private origin or a dead remote. A commit already
 	// in the local object store is enough to check out.
 	fetchErr := fetchOrigin(ctx, repo, opts)
 
 	resolved, err := repo.ResolveRevision(plumbing.Revision(commit))
 	if err != nil {
+		discardSnapshot(snapshotDir)
+
 		if fetchErr != nil {
 			return fetchErr
 		}
@@ -101,14 +114,68 @@ func Checkout(ctx context.Context, dir, commit string, opts CheckoutOptions) err
 		Force: true,
 	})
 	if err != nil {
-		return fmt.Errorf("checkout %s: %w", commit, err)
+		return finishCheckout(dir, snapshotDir, saved, opts, fmt.Errorf("checkout %s: %w", commit, err))
 	}
 
-	if opts.Stash {
-		return restoreSaved(dir, saved)
+	if !opts.Stash {
+		discardSnapshot(snapshotDir)
+
+		return nil
 	}
 
-	return nil
+	err = restoreSnapshot(dir, saved, opts)
+	if err == nil {
+		discardSnapshot(snapshotDir)
+
+		return nil
+	}
+
+	if headErr == nil && head != nil {
+		rbErr := worktree.Checkout(&goGit.CheckoutOptions{
+			Hash:  head.Hash(),
+			Force: true,
+		})
+		if rbErr != nil {
+			return fmt.Errorf("%w (rollback checkout: %w; snapshot %s)", err, rbErr, snapshotDir)
+		}
+	}
+
+	rbErr := restoreSnapshot(dir, saved, opts)
+	if rbErr != nil {
+		return fmt.Errorf("%w (rollback restore: %w; snapshot %s)", err, rbErr, snapshotDir)
+	}
+
+	discardSnapshot(snapshotDir)
+
+	return err
+}
+
+// finishCheckout puts local files back when checkout fails part way through.
+//
+// Parameters:
+//   - dir: Worktree root.
+//   - snapshotDir: Temp copy of local files. Kept when restore fails.
+//   - saved: In-memory snapshot.
+//   - opts: Stash and test restore hook.
+//   - checkoutErr: Checkout failure to return.
+//
+// Returns:
+//   - error: checkoutErr, wrapped when the snapshot cannot be restored.
+func finishCheckout(dir, snapshotDir string, saved []savedFile, opts CheckoutOptions, checkoutErr error) error {
+	if !opts.Stash || len(saved) == 0 {
+		discardSnapshot(snapshotDir)
+
+		return checkoutErr
+	}
+
+	err := restoreSnapshot(dir, saved, opts)
+	if err != nil {
+		return fmt.Errorf("%w (local files: %w; snapshot %s)", checkoutErr, err, snapshotDir)
+	}
+
+	discardSnapshot(snapshotDir)
+
+	return checkoutErr
 }
 
 // fetchOrigin updates refs from origin using process-wide Git auth and TLS.
@@ -282,6 +349,67 @@ func snapshotDirty(root string, status goGit.Status) ([]savedFile, error) {
 	}
 
 	return saved, nil
+}
+
+// writeSnapshot copies saved files to a temp directory outside the worktree.
+//
+// Parameters:
+//   - stash: When false, no directory is created.
+//   - saved: Files captured by snapshotDirty.
+//
+// Returns:
+//   - string: Temp directory, or empty when there is nothing to keep.
+//   - error: Non-nil when the copy cannot be written.
+func writeSnapshot(stash bool, saved []savedFile) (string, error) {
+	if !stash || len(saved) == 0 {
+		return "", nil
+	}
+
+	dir, err := os.MkdirTemp("", "watchtower-git-stash-*")
+	if err != nil {
+		return "", fmt.Errorf("stash snapshot: %w", err)
+	}
+
+	err = restoreSaved(dir, saved)
+	if err != nil {
+		_ = os.RemoveAll(dir)
+
+		return "", err
+	}
+
+	return dir, nil
+}
+
+// restoreSnapshot writes saved files back using the test hook when set.
+//
+// Parameters:
+//   - dir: Worktree root.
+//   - saved: Files captured by snapshotDirty.
+//   - opts: Optional restore hook.
+//
+// Returns:
+//   - error: Non-nil when a file cannot be written.
+func restoreSnapshot(dir string, saved []savedFile, opts CheckoutOptions) error {
+	if opts.restore != nil {
+		return opts.restore(dir, saved)
+	}
+
+	return restoreSaved(dir, saved)
+}
+
+// discardSnapshot removes a temp snapshot. An empty path is a no-op.
+//
+// Parameters:
+//   - dir: Temp directory from writeSnapshot.
+//
+// Returns:
+//   - none.
+func discardSnapshot(dir string) {
+	if dir == "" {
+		return
+	}
+
+	_ = os.RemoveAll(dir)
 }
 
 // restoreSaved writes snapshotted files back onto the worktree.
