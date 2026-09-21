@@ -617,7 +617,7 @@ func TestGiteaRefs(t *testing.T) {
 			writeJSON(w, []any{})
 		})
 
-		_, found, err := newDetectClient(t, mux).giteaRefs(t.Context(), "https://git.example.com/refs", "main", kindBranch)
+		_, found, err := newDetectClient(t, mux).giteaRefs(t.Context(), "https://git.example.com/refs", "main", kindBranch, "")
 		require.NoError(t, err)
 		assert.False(t, found)
 	})
@@ -630,7 +630,7 @@ func TestGiteaRefs(t *testing.T) {
 			writeJSON(w, []map[string]any{{"object": map[string]string{"sha": ""}}})
 		})
 
-		_, found, err := newDetectClient(t, mux).giteaRefs(t.Context(), "https://git.example.com/refs", "main", kindBranch)
+		_, found, err := newDetectClient(t, mux).giteaRefs(t.Context(), "https://git.example.com/refs", "main", kindBranch, "")
 		require.NoError(t, err)
 		assert.False(t, found)
 	})
@@ -646,7 +646,7 @@ func TestGiteaRefs(t *testing.T) {
 			})
 		})
 
-		resolved, found, err := newDetectClient(t, mux).giteaRefs(t.Context(), "https://git.example.com/refs", "v1.0.0", kindTag)
+		resolved, found, err := newDetectClient(t, mux).giteaRefs(t.Context(), "https://git.example.com/refs", "v1.0.0", kindTag, "")
 		require.NoError(t, err)
 		require.True(t, found)
 		assert.Equal(t, "peeled", resolved.Hash)
@@ -662,7 +662,7 @@ func TestGiteaRefs(t *testing.T) {
 			})
 		})
 
-		resolved, found, err := newDetectClient(t, mux).giteaRefs(t.Context(), "https://git.example.com/refs", "v1.0.0", kindTag)
+		resolved, found, err := newDetectClient(t, mux).giteaRefs(t.Context(), "https://git.example.com/refs", "v1.0.0", kindTag, "")
 		require.NoError(t, err)
 		assert.False(t, found)
 		assert.Empty(t, resolved.Hash)
@@ -779,7 +779,7 @@ func TestGetJSON(t *testing.T) {
 		ID string `json:"id"`
 	}
 
-	_, err := client.getJSONPage(t.Context(), srv.URL, &body)
+	_, err := client.getJSONPage(t.Context(), srv.URL, &body, "")
 	require.NoError(t, err)
 	assert.Equal(t, "ok", body.ID)
 }
@@ -804,7 +804,7 @@ func TestGetJSONPage(t *testing.T) {
 
 		var dest map[string]string
 
-		next, err := client.getJSONPage(t.Context(), srv.URL, &dest)
+		next, err := client.getJSONPage(t.Context(), srv.URL, &dest, "")
 		require.NoError(t, err)
 		assert.True(t, strings.HasSuffix(next, "/page2"))
 	})
@@ -821,7 +821,7 @@ func TestGetJSONPage(t *testing.T) {
 		client := New(&nop, Options{})
 		client.http = srv.Client()
 
-		_, err := client.getJSONPage(t.Context(), srv.URL, &map[string]any{})
+		_, err := client.getJSONPage(t.Context(), srv.URL, &map[string]any{}, "")
 		require.ErrorIs(t, err, errAPINotFound)
 		require.ErrorIs(t, err, ErrRefNotFound)
 	})
@@ -838,7 +838,7 @@ func TestGetJSONPage(t *testing.T) {
 		client := New(&nop, Options{})
 		client.http = srv.Client()
 
-		_, err := client.getJSONPage(t.Context(), srv.URL, &map[string]any{})
+		_, err := client.getJSONPage(t.Context(), srv.URL, &map[string]any{}, "")
 		require.ErrorIs(t, err, errAPIStatus)
 	})
 
@@ -854,7 +854,7 @@ func TestGetJSONPage(t *testing.T) {
 		client := New(&nop, Options{})
 		client.http = srv.Client()
 
-		_, err := client.getJSONPage(t.Context(), srv.URL, &map[string]any{})
+		_, err := client.getJSONPage(t.Context(), srv.URL, &map[string]any{}, "")
 		require.Error(t, err)
 		assert.ErrorContains(t, err, "decode json:")
 	})
@@ -868,7 +868,7 @@ func TestGetJSONPage(t *testing.T) {
 			return nil, errors.New("dial failed")
 		})}
 
-		_, err := client.getJSONPage(t.Context(), "https://git.example.com/api", &map[string]any{})
+		_, err := client.getJSONPage(t.Context(), "https://git.example.com/api", &map[string]any{}, "")
 		require.Error(t, err)
 		assert.ErrorContains(t, err, "http get:")
 	})
@@ -876,7 +876,7 @@ func TestGetJSONPage(t *testing.T) {
 	t.Run("invalid request url", func(t *testing.T) {
 		t.Parallel()
 
-		_, err := (&Client{}).getJSONPage(t.Context(), ":", &map[string]any{})
+		_, err := (&Client{}).getJSONPage(t.Context(), ":", &map[string]any{}, "")
 		require.Error(t, err)
 		assert.ErrorContains(t, err, "new request:")
 	})
@@ -910,7 +910,7 @@ func TestGetJSONPageDropsCrossHostNext(t *testing.T) {
 
 	var dest map[string]string
 
-	next, err := client.getJSONPage(t.Context(), srv.URL, &dest)
+	next, err := client.getJSONPage(t.Context(), srv.URL, &dest, "")
 	require.NoError(t, err)
 	assert.Empty(t, next)
 }

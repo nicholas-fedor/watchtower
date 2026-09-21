@@ -673,11 +673,16 @@ This label does not turn monitoring on, choose the repository, or supply credent
 
 ### When You Need It
 
-The container's `git-repo` is an SSH URL, or the HTTP API is on a different host, port, or path than the clone URL, and you want Watchtower to use that HTTP API.
+The container's `git-repo` is an SSH URL, or the HTTP API is on a different port or path than the clone URL, and you want Watchtower to use that HTTP API.
+
+The label's hostname must match the clone URL.
+`git@git.example.com:org/app.git` may use `https://git.example.com:3000`.
+A different hostname is ignored, and Watchtower asks Git on the clone URL.
+The process token is not sent to that other host.
 
 ### What to Put In It
 
-The API base URL only, for example `https://git.example.com:3000` or `https://company.com/gitlab`.
+The API base URL only, for example `https://git.example.com:3000` or `https://git.example.com/gitlab`.
 Do not include a repository path.
 
 ### Example

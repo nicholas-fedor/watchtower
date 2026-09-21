@@ -17,7 +17,7 @@ func TestApplyAuth(t *testing.T) {
 	t.Run("nil request", func(t *testing.T) {
 		t.Parallel()
 
-		(&Client{opts: Options{Token: "tok"}}).applyAuth(nil)
+		(&Client{opts: Options{Token: "tok"}}).applyAuth(nil, "")
 	})
 
 	t.Run("token is bearer", func(t *testing.T) {
@@ -26,7 +26,7 @@ func TestApplyAuth(t *testing.T) {
 		req, err := http.NewRequestWithContext(t.Context(), http.MethodGet, "https://git.example.com", nil)
 		require.NoError(t, err)
 
-		(&Client{opts: Options{Token: "tok", Username: "user", Password: "pw"}}).applyAuth(req)
+		(&Client{opts: Options{Token: "tok", Username: "user", Password: "pw"}}).applyAuth(req, "git.example.com")
 		assert.Equal(t, "Bearer tok", req.Header.Get("Authorization"))
 	})
 
@@ -36,7 +36,7 @@ func TestApplyAuth(t *testing.T) {
 		req, err := http.NewRequestWithContext(t.Context(), http.MethodGet, "https://git.example.com", nil)
 		require.NoError(t, err)
 
-		(&Client{opts: Options{Username: "octocat", Password: "pw"}}).applyAuth(req)
+		(&Client{opts: Options{Username: "octocat", Password: "pw"}}).applyAuth(req, "git.example.com")
 		user, pass, ok := req.BasicAuth()
 		require.True(t, ok)
 		assert.Equal(t, "octocat", user)
@@ -49,7 +49,7 @@ func TestApplyAuth(t *testing.T) {
 		req, err := http.NewRequestWithContext(t.Context(), http.MethodGet, "https://git.example.com", nil)
 		require.NoError(t, err)
 
-		(&Client{opts: Options{Username: "octocat"}}).applyAuth(req)
+		(&Client{opts: Options{Username: "octocat"}}).applyAuth(req, "git.example.com")
 		user, pass, ok := req.BasicAuth()
 		require.True(t, ok)
 		assert.Equal(t, "octocat", user)
@@ -62,7 +62,37 @@ func TestApplyAuth(t *testing.T) {
 		req, err := http.NewRequestWithContext(t.Context(), http.MethodGet, "https://git.example.com", nil)
 		require.NoError(t, err)
 
-		(&Client{}).applyAuth(req)
+		(&Client{}).applyAuth(req, "git.example.com")
+		assert.Empty(t, req.Header.Get("Authorization"))
+	})
+
+	t.Run("foreign host gets no token", func(t *testing.T) {
+		t.Parallel()
+
+		req, err := http.NewRequestWithContext(t.Context(), http.MethodGet, "https://evil.example/api", nil)
+		require.NoError(t, err)
+
+		(&Client{opts: Options{Token: "secret", Username: "user", Password: "pw"}}).applyAuth(req, "git.example.com")
+		assert.Empty(t, req.Header.Get("Authorization"))
+	})
+
+	t.Run("github api host", func(t *testing.T) {
+		t.Parallel()
+
+		req, err := http.NewRequestWithContext(t.Context(), http.MethodGet, "https://api.github.com/repos/org/app", nil)
+		require.NoError(t, err)
+
+		(&Client{opts: Options{Token: "secret"}}).applyAuth(req, "github.com")
+		assert.Equal(t, "Bearer secret", req.Header.Get("Authorization"))
+	})
+
+	t.Run("http gets no token", func(t *testing.T) {
+		t.Parallel()
+
+		req, err := http.NewRequestWithContext(t.Context(), http.MethodGet, "http://git.example.com/api", nil)
+		require.NoError(t, err)
+
+		(&Client{opts: Options{Token: "secret"}}).applyAuth(req, "git.example.com")
 		assert.Empty(t, req.Header.Get("Authorization"))
 	})
 }

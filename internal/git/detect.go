@@ -91,7 +91,7 @@ func (c *Client) ClassifyHosts(ctx context.Context, origins []url.URL) map[strin
 			continue
 		}
 
-		kind := c.detectKind(ctx, origin)
+		kind := c.detectKind(ctx, origin, "")
 		if kind == "" {
 			continue
 		}
@@ -118,12 +118,12 @@ func (c *Client) ClassifyHosts(ctx context.Context, origins []url.URL) map[strin
 //
 // Returns:
 //   - string: Product kind, or empty when no API matches.
-func (c *Client) detectKind(ctx context.Context, origin url.URL) string {
+func (c *Client) detectKind(ctx context.Context, origin url.URL, cloneHost string) string {
 	for _, spec := range knownAPIs {
 		for _, segments := range spec.paths {
 			endpoint := origin.JoinPath(segments...)
 
-			probe, err := c.probeAPI(ctx, endpoint)
+			probe, err := c.probeAPI(ctx, endpoint, cloneHost)
 			if err != nil {
 				continue
 			}
@@ -151,7 +151,7 @@ func (c *Client) detectKind(ctx context.Context, origin url.URL) string {
 // Returns:
 //   - apiProbe: Status, headers, and truncated body.
 //   - error: Non-nil on request or read failure.
-func (c *Client) probeAPI(ctx context.Context, endpoint *url.URL) (apiProbe, error) {
+func (c *Client) probeAPI(ctx context.Context, endpoint *url.URL, cloneHost string) (apiProbe, error) {
 	if endpoint == nil || endpoint.Host == "" {
 		return apiProbe{}, errEmptyProbeURL
 	}
@@ -162,10 +162,7 @@ func (c *Client) probeAPI(ctx context.Context, endpoint *url.URL) (apiProbe, err
 	}
 
 	req.Header.Set("Accept", "application/json")
-
-	if endpoint.Scheme == "https" {
-		c.applyAuth(req)
-	}
+	c.applyAuth(req, cloneHost)
 
 	resp, err := c.http.Do(req)
 	if err != nil {

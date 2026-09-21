@@ -83,7 +83,7 @@ func TestDetectKind(t *testing.T) {
 		})
 
 		client := newDetectClient(t, mux)
-		assert.Equal(t, types.GitHostGitea, client.detectKind(t.Context(), httpsOrigin("git.example.com")))
+		assert.Equal(t, types.GitHostGitea, client.detectKind(t.Context(), httpsOrigin("git.example.com"), ""))
 	})
 
 	t.Run("gitlab metadata", func(t *testing.T) {
@@ -95,7 +95,7 @@ func TestDetectKind(t *testing.T) {
 		})
 
 		client := newDetectClient(t, mux)
-		assert.Equal(t, types.GitHostGitLab, client.detectKind(t.Context(), httpsOrigin("gitlab.internal")))
+		assert.Equal(t, types.GitHostGitLab, client.detectKind(t.Context(), httpsOrigin("gitlab.internal"), ""))
 	})
 
 	t.Run("gitlab version path after metadata 404", func(t *testing.T) {
@@ -107,7 +107,7 @@ func TestDetectKind(t *testing.T) {
 		})
 
 		client := newDetectClient(t, mux)
-		assert.Equal(t, types.GitHostGitLab, client.detectKind(t.Context(), httpsOrigin("gitlab.internal")))
+		assert.Equal(t, types.GitHostGitLab, client.detectKind(t.Context(), httpsOrigin("gitlab.internal"), ""))
 	})
 
 	t.Run("github headers", func(t *testing.T) {
@@ -120,7 +120,7 @@ func TestDetectKind(t *testing.T) {
 		})
 
 		client := newDetectClient(t, mux)
-		assert.Equal(t, types.GitHostGitHub, client.detectKind(t.Context(), httpsOrigin("github.company.com")))
+		assert.Equal(t, types.GitHostGitHub, client.detectKind(t.Context(), httpsOrigin("github.company.com"), ""))
 	})
 
 	t.Run("401 with matching body still classifies", func(t *testing.T) {
@@ -133,7 +133,7 @@ func TestDetectKind(t *testing.T) {
 		})
 
 		client := newDetectClient(t, mux)
-		assert.Equal(t, types.GitHostGitea, client.detectKind(t.Context(), httpsOrigin("git.example.com")))
+		assert.Equal(t, types.GitHostGitea, client.detectKind(t.Context(), httpsOrigin("git.example.com"), ""))
 	})
 
 	t.Run("unusable status is skipped", func(t *testing.T) {
@@ -146,7 +146,7 @@ func TestDetectKind(t *testing.T) {
 		})
 
 		client := newDetectClient(t, mux)
-		assert.Empty(t, client.detectKind(t.Context(), httpsOrigin("git.example.com")))
+		assert.Empty(t, client.detectKind(t.Context(), httpsOrigin("git.example.com"), ""))
 	})
 
 	t.Run("probe error continues", func(t *testing.T) {
@@ -158,7 +158,7 @@ func TestDetectKind(t *testing.T) {
 			return nil, errors.New("dial failed")
 		})}
 
-		assert.Empty(t, client.detectKind(t.Context(), httpsOrigin("git.example.com")))
+		assert.Empty(t, client.detectKind(t.Context(), httpsOrigin("git.example.com"), ""))
 	})
 
 	t.Run("cancelled context", func(t *testing.T) {
@@ -168,7 +168,7 @@ func TestDetectKind(t *testing.T) {
 		cancel()
 
 		client := newDetectClient(t, http.NewServeMux())
-		assert.Empty(t, client.detectKind(ctx, httpsOrigin("git.example.com")))
+		assert.Empty(t, client.detectKind(ctx, httpsOrigin("git.example.com"), ""))
 	})
 }
 
@@ -178,14 +178,14 @@ func TestProbeAPI(t *testing.T) {
 	t.Run("nil endpoint", func(t *testing.T) {
 		t.Parallel()
 
-		_, err := (&Client{}).probeAPI(t.Context(), nil)
+		_, err := (&Client{}).probeAPI(t.Context(), nil, "")
 		require.ErrorIs(t, err, errEmptyProbeURL)
 	})
 
 	t.Run("empty host", func(t *testing.T) {
 		t.Parallel()
 
-		_, err := (&Client{}).probeAPI(t.Context(), &url.URL{Scheme: "https", Path: "/api/v1/version"})
+		_, err := (&Client{}).probeAPI(t.Context(), &url.URL{Scheme: "https", Path: "/api/v1/version"}, "")
 		require.ErrorIs(t, err, errEmptyProbeURL)
 	})
 
@@ -209,7 +209,7 @@ func TestProbeAPI(t *testing.T) {
 		endpoint, err := url.Parse(srv.URL + "/api/v1/version")
 		require.NoError(t, err)
 
-		got, err := client.probeAPI(t.Context(), endpoint)
+		got, err := client.probeAPI(t.Context(), endpoint, "")
 		require.NoError(t, err)
 		assert.Equal(t, http.StatusForbidden, got.Status)
 		assert.Equal(t, "ok", got.Header.Get("X-Test"))
@@ -228,7 +228,7 @@ func TestProbeAPI(t *testing.T) {
 		endpoint, err := url.Parse("https://git.example.com/api/v1/version")
 		require.NoError(t, err)
 
-		_, err = client.probeAPI(t.Context(), endpoint)
+		_, err = client.probeAPI(t.Context(), endpoint, "")
 		require.Error(t, err)
 		assert.ErrorContains(t, err, "http get:")
 	})
@@ -249,7 +249,7 @@ func TestProbeAPI(t *testing.T) {
 		endpoint, err := url.Parse("https://git.example.com/api/v1/version")
 		require.NoError(t, err)
 
-		_, err = client.probeAPI(t.Context(), endpoint)
+		_, err = client.probeAPI(t.Context(), endpoint, "")
 		require.Error(t, err)
 		assert.ErrorContains(t, err, "read body:")
 	})

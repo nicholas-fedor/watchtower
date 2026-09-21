@@ -15,13 +15,22 @@ var errCrossHostRedirect = errors.New("git http redirect left the original host"
 
 // applyAuth sets Bearer or basic credentials on req.
 //
+// Credentials are sent only for HTTPS, and only when the request hostname
+// is the clone host or GitHub's api.github.com for a github.com clone.
+// A container git-host label cannot redirect the process token.
+//
 // Parameters:
 //   - req: Outgoing HTTP request. Ignored when nil.
+//   - cloneHost: Hostname from the clone URL. Empty sends no credentials.
 //
 // Returns:
 //   - none.
-func (c *Client) applyAuth(req *http.Request) {
-	if req == nil {
+func (c *Client) applyAuth(req *http.Request, cloneHost string) {
+	if c == nil || req == nil || req.URL == nil || req.URL.Scheme != "https" {
+		return
+	}
+
+	if !credentialHostAllowed(req.URL.Hostname(), cloneHost) {
 		return
 	}
 
@@ -34,6 +43,29 @@ func (c *Client) applyAuth(req *http.Request) {
 	if c.opts.Username != "" || c.opts.Password != "" {
 		req.SetBasicAuth(c.opts.Username, c.opts.Password)
 	}
+}
+
+// credentialHostAllowed reports whether a process credential may be sent to requestHost.
+//
+// Parameters:
+//   - requestHost: Hostname of the outgoing request, port ignored.
+//   - cloneHost: Hostname from the clone URL, port ignored.
+//
+// Returns:
+//   - bool: True when the hosts match, or the request is api.github.com for github.com.
+func credentialHostAllowed(requestHost, cloneHost string) bool {
+	requestHost = toHostname(requestHost)
+	cloneHost = toHostname(cloneHost)
+
+	if requestHost == "" || cloneHost == "" {
+		return false
+	}
+
+	if requestHost == cloneHost {
+		return true
+	}
+
+	return cloneHost == "github.com" && requestHost == "api.github.com"
 }
 
 // originOf returns the classified HTTP origin for host.

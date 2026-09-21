@@ -119,9 +119,15 @@ func (c *Client) lookupAPI(ctx context.Context, cloneHost, apiOrigin string) (st
 			return "", url.URL{}, false
 		}
 
+		// A label may select another port or path. A different hostname
+		// would receive the process token, so ignore it and use ls-remote.
+		if toHostname(parsed.Hostname()) != toHostname(cloneHost) {
+			return "", url.URL{}, false
+		}
+
 		kind := types.ResolveGitHostKind(parsed.Hostname(), c.opts.Hosts)
 		if kind == "" {
-			kind = c.detectKind(ctx, parsed)
+			kind = c.detectKind(ctx, parsed, cloneHost)
 		}
 
 		if kind == "" {
@@ -214,7 +220,7 @@ func (c *Client) githubRef(ctx context.Context, host string, origin url.URL, own
 		} `json:"object"`
 	}
 
-	_, err := c.getJSONPage(ctx, endpoint.String(), &body)
+	_, err := c.getJSONPage(ctx, endpoint.String(), &body, host)
 	if errors.Is(err, errAPINotFound) {
 		return resolvedRef{}, false, nil
 	}
@@ -237,7 +243,7 @@ func (c *Client) githubRef(ctx context.Context, host string, origin url.URL, own
 			} `json:"object"`
 		}
 
-		_, err := c.getJSONPage(ctx, body.Object.URL, &tag)
+		_, err := c.getJSONPage(ctx, body.Object.URL, &tag, host)
 		if err != nil {
 			//nolint:nilerr // Peel failure is not-found so ls-remote can try ^{}.
 			return resolvedRef{}, false, nil
@@ -295,7 +301,7 @@ func (c *Client) githubTags(ctx context.Context, host string, origin url.URL, ow
 	for range maxTagPages {
 		var body tagPage
 
-		next, err := c.getJSONPage(ctx, endpoint, &body)
+		next, err := c.getJSONPage(ctx, endpoint, &body, host)
 		if err != nil {
 			return nil, false, err
 		}
@@ -334,7 +340,7 @@ func (c *Client) gitlabRef(ctx context.Context, host string, origin url.URL, own
 		ID string `json:"id"`
 	}
 
-	_, err := c.getJSONPage(ctx, endpoint.String(), &body)
+	_, err := c.getJSONPage(ctx, endpoint.String(), &body, host)
 	if errors.Is(err, errAPINotFound) {
 		return resolvedRef{}, false, nil
 	}
@@ -386,7 +392,7 @@ func (c *Client) gitlabTags(ctx context.Context, host string, origin url.URL, ow
 	for range maxTagPages {
 		var body tagPage
 
-		next, err := c.getJSONPage(ctx, endpoint, &body)
+		next, err := c.getJSONPage(ctx, endpoint, &body, host)
 		if err != nil {
 			return nil, false, err
 		}
@@ -421,14 +427,14 @@ func (c *Client) gitlabTags(ctx context.Context, host string, origin url.URL, ow
 func (c *Client) giteaRef(ctx context.Context, host string, origin url.URL, owner, repo, ref string) (resolvedRef, bool, error) {
 	endpoint := c.giteaAPIAt(origin, host, "repos", owner, repo, "git", "refs", "heads", ref)
 
-	resolved, found, err := c.giteaRefs(ctx, endpoint.String(), ref, kindBranch)
+	resolved, found, err := c.giteaRefs(ctx, endpoint.String(), ref, kindBranch, host)
 	if err != nil || found {
 		return resolved, found, err
 	}
 
 	endpoint = c.giteaAPIAt(origin, host, "repos", owner, repo, "git", "refs", "tags", ref)
 
-	return c.giteaRefs(ctx, endpoint.String(), ref, kindTag)
+	return c.giteaRefs(ctx, endpoint.String(), ref, kindTag, host)
 }
 
 // giteaRefs decodes a Gitea git/refs response.
@@ -443,7 +449,7 @@ func (c *Client) giteaRef(ctx context.Context, host string, origin url.URL, owne
 //   - resolvedRef: Name, hash, and kind.
 //   - bool: True when a SHA is present.
 //   - error: Non-nil on HTTP failure.
-func (c *Client) giteaRefs(ctx context.Context, endpoint, ref, kind string) (resolvedRef, bool, error) {
+func (c *Client) giteaRefs(ctx context.Context, endpoint, ref, kind, cloneHost string) (resolvedRef, bool, error) {
 	var body []struct {
 		Ref    string `json:"ref"`
 		Object struct {
@@ -452,7 +458,7 @@ func (c *Client) giteaRefs(ctx context.Context, endpoint, ref, kind string) (res
 		} `json:"object"`
 	}
 
-	_, err := c.getJSONPage(ctx, endpoint, &body)
+	_, err := c.getJSONPage(ctx, endpoint, &body, cloneHost)
 	if errors.Is(err, errAPINotFound) {
 		return resolvedRef{}, false, nil
 	}
@@ -521,7 +527,7 @@ func (c *Client) giteaTags(ctx context.Context, host string, origin url.URL, own
 
 		var body tagPage
 
-		_, err := c.getJSONPage(ctx, endpoint, &body)
+		_, err := c.getJSONPage(ctx, endpoint, &body, host)
 		if err != nil {
 			return nil, false, err
 		}
@@ -564,21 +570,19 @@ const (
 //   - ctx: Cancellation and timeout.
 //   - endpoint: Absolute URL.
 //   - dest: JSON destination.
+//   - cloneHost: Clone URL hostname. Credentials are sent only for this host.
 //
 // Returns:
 //   - string: Next page URL, or empty.
 //   - error: Non-nil on HTTP or decode failure.
-func (c *Client) getJSONPage(ctx context.Context, endpoint string, dest any) (string, error) {
+func (c *Client) getJSONPage(ctx context.Context, endpoint string, dest any, cloneHost string) (string, error) {
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, endpoint, nil)
 	if err != nil {
 		return "", fmt.Errorf("new request: %w", err)
 	}
 
 	req.Header.Set("Accept", "application/json")
-
-	if req.URL != nil && req.URL.Scheme == "https" {
-		c.applyAuth(req)
-	}
+	c.applyAuth(req, cloneHost)
 
 	resp, err := c.http.Do(req)
 	if err != nil {

@@ -261,6 +261,50 @@ func TestCheck_EmptyRefDefaultsToMain(t *testing.T) {
 	assert.False(t, got.Stale)
 }
 
+func TestCheck_MismatchedGitHostUsesLister(t *testing.T) {
+	t.Parallel()
+
+	client := testClient(t, []RemoteRef{
+		{Name: "refs/heads/main", Hash: "abc1111"},
+	})
+	client.opts.Token = "super-secret"
+	called := false
+	client.http = &http.Client{Transport: roundTripFunc(func(r *http.Request) (*http.Response, error) {
+		called = true
+		if strings.Contains(r.Header.Get("Authorization"), "super-secret") {
+			t.Errorf("token sent to %s", r.URL.Host)
+		}
+
+		return nil, errors.New("git-host probe")
+	})}
+
+	got, err := client.Check(t.Context(), CheckRequest{
+		Repo:       "https://git.example.com/org/app.git",
+		Ref:        "main",
+		Host:       "https://evil.example",
+		LastCommit: "old",
+	})
+	require.NoError(t, err)
+	assert.False(t, called)
+	assert.True(t, got.Stale)
+	assert.Equal(t, "abc1111", got.Commit)
+}
+
+func TestLookupAPIHostMatch(t *testing.T) {
+	t.Parallel()
+
+	client := testClient(t, nil)
+	client.opts.Hosts = map[string]string{"git.example.com": types.GitHostGitea}
+
+	kind, origin, ok := client.lookupAPI(t.Context(), "git.example.com", "https://git.example.com:3000/gitea")
+	require.True(t, ok)
+	assert.Equal(t, types.GitHostGitea, kind)
+	assert.Equal(t, "git.example.com:3000", origin.Host)
+
+	_, _, ok = client.lookupAPI(t.Context(), "git.example.com", "https://evil.example")
+	assert.False(t, ok)
+}
+
 func TestCheck_TagPolicyNoStampSelectsHighest(t *testing.T) {
 	t.Parallel()
 
@@ -733,7 +777,7 @@ func TestGitHubAPIWithRewrittenClient(t *testing.T) {
 		} `json:"object"`
 	}
 
-	_, err = client.getJSONPage(t.Context(), srv.URL+"/repos/org/app/git/ref/heads/main", &body)
+	_, err = client.getJSONPage(t.Context(), srv.URL+"/repos/org/app/git/ref/heads/main", &body, "")
 	require.NoError(t, err)
 	assert.Equal(t, "apihash", body.Object.SHA)
 
@@ -754,7 +798,7 @@ func githubTagsAt(ctx context.Context, client *Client, base, owner, repo string)
 		} `json:"commit"`
 	}
 
-	_, err := client.getJSONPage(ctx, endpoint, &body)
+	_, err := client.getJSONPage(ctx, endpoint, &body, "")
 	if err != nil {
 		return nil, false, err
 	}
