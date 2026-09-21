@@ -55,10 +55,10 @@ func ResetForTest() {
 
 // Scope returns the limiter key for host.
 //
-// Unauthenticated GHCR uses a distinct key so anonymous 429s cannot pace
-// authenticated traffic to the same registry. Unauthenticated
-// [hosts.LSCRRegistryDomain] is normalized to the same key as GHCR, matching
-// the manifest remap.
+// GHCR and lscr.io are the same registry. Both use ghcr.io so an authenticated
+// lscr.io check does not keep a separate slot from GHCR. Unauthenticated
+// traffic uses a distinct key so anonymous 429s cannot pace authenticated
+// requests.
 //
 // Parameters:
 //   - host: Registry host, such as ghcr.io. Empty values return empty.
@@ -71,8 +71,12 @@ func Scope(host string, authenticated bool) string {
 		return ""
 	}
 
-	if !authenticated && hosts.IsGitHubRegistry(host) {
-		return hosts.GitHubRegistryDomain + anonSuffix
+	if hosts.IsGitHubRegistry(host) {
+		if !authenticated {
+			return hosts.GitHubRegistryDomain + anonSuffix
+		}
+
+		return hosts.GitHubRegistryDomain
 	}
 
 	return host

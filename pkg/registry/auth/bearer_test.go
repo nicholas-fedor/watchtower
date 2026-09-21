@@ -767,6 +767,33 @@ func TestGetBearerToken_anonymousGHCRSharesAcrossImages(t *testing.T) {
 	}
 }
 
+func Test_performBearerTokenFetch_sendsBasicAuth(t *testing.T) {
+	ctx := context.Background()
+	authURL, err := url.Parse("https://ghcr.io/token?service=ghcr.io&scope=repository:linuxserver/radarr:pull")
+	require.NoError(t, err)
+
+	const registryAuth = "dXNlcjpwYXNz"
+
+	mockClient := mockAuth.NewMockClient(t)
+	mockClient.On("Do", mock.MatchedBy(func(req *http.Request) bool {
+		return req != nil && req.Header.Get("Authorization") == "Basic "+registryAuth
+	})).Return(&http.Response{
+		StatusCode: http.StatusOK,
+		Body:       io.NopCloser(strings.NewReader(`{"token":"scoped-token","expires_in":60}`)),
+	}, nil).Once()
+
+	token, _, err := performBearerTokenFetch(
+		testLog(),
+		ctx,
+		authURL,
+		"lscr.io/linuxserver/radarr:latest",
+		registryAuth,
+		mockClient,
+	)
+	require.NoError(t, err)
+	assert.Equal(t, "scoped-token", token)
+}
+
 func Test_performBearerTokenFetch(t *testing.T) {
 	ctx := context.Background()
 	authURL, _ := url.Parse("https://test.com/token?service=test.com")

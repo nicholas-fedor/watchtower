@@ -349,7 +349,7 @@ func TestScopeSeparatesAnonymousGHCR(t *testing.T) {
 	assert.Equal(t, "ghcr.io|anon", Scope("ghcr.io", false))
 	assert.Equal(t, "ghcr.io", Scope("ghcr.io", true))
 	assert.Equal(t, "ghcr.io|anon", Scope("lscr.io", false))
-	assert.Equal(t, "lscr.io", Scope("lscr.io", true))
+	assert.Equal(t, "ghcr.io", Scope("lscr.io", true))
 	assert.Equal(t, "index.docker.io", Scope("index.docker.io", false))
 	assert.Empty(t, Scope("", false))
 	assert.True(t, IsAnonymousScope(Scope("ghcr.io", false)))
