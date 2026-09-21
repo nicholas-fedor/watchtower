@@ -489,6 +489,11 @@ There is no process-wide default repository.
 An explicit `com.centurylinklabs.watchtower.git-semver-policy` that is not `none`, `patch`, `minor`, or `major` is rejected.
 That container is skipped for the session.
 
+`patch`, `minor`, and `major` consider release tags only.
+A pre-release such as `v1.2.4-rc.1` is ignored.
+Build metadata (`v1.2.3+sha`) does not change the comparison.
+A pre-release baseline still advances to the later release (`v1.2.3-rc.1` to `v1.2.3`).
+
 ### Per-Image Mapping
 
 The [Git Image](../../configuration/git-monitoring/index.md#git_image) configuration option uses `image=repo[#ref][@policy]`.

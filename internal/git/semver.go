@@ -10,7 +10,8 @@ import (
 
 // SelectTag returns the highest policy-allowed tag newer than lastTag.
 //
-// Non-semver tags are ignored. When none remain, ok is false (not stale).
+// Non-semver tags and pre-releases are ignored. Build metadata does not
+// affect ordering. When none remain, ok is false (not stale).
 //
 // Parameters:
 //   - lastTag: Last observed tag (empty selects the highest allowed tag).
@@ -35,7 +36,7 @@ func SelectTag(lastTag string, tags []string, policy string) (string, bool) {
 
 	for _, tag := range tags {
 		canon := canonicalize(tag)
-		if !semver.IsValid(canon) {
+		if !semver.IsValid(canon) || semver.Prerelease(canon) != "" {
 			continue
 		}
 
@@ -108,4 +109,22 @@ func canonicalize(tag string) string {
 	}
 
 	return tag
+}
+
+// baselineTag returns lastTag when it is a semver tag, including pre-releases.
+//
+// Non-semver stamps such as nightly are not a tag baseline.
+//
+// Parameters:
+//   - lastTag: Last observed tag.
+//
+// Returns:
+//   - string: Trimmed lastTag, or empty when it is not semver.
+func baselineTag(lastTag string) string {
+	lastTag = strings.TrimSpace(lastTag)
+	if !semver.IsValid(canonicalize(lastTag)) {
+		return ""
+	}
+
+	return lastTag
 }

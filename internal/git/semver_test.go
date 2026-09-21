@@ -35,6 +35,11 @@ func TestSelectTag(t *testing.T) {
 		{name: "unprefixed remote tags", lastTag: "v1.2.3", tags: []string{"1.2.4", "1.3.0"}, policy: types.GitPolicyPatch, want: "1.2.4", ok: true},
 		{name: "whitespace last tag", lastTag: "  ", tags: []string{"v1.0.1"}, policy: types.GitPolicyMajor, want: "v1.0.1", ok: true},
 		{name: "older candidates ignored", lastTag: "v1.2.4", tags: []string{"v1.2.3", "v1.2.4"}, policy: types.GitPolicyPatch},
+		{name: "patch skips pre-release", lastTag: "v1.2.3", tags: []string{"v1.2.4-rc.1", "v1.2.4"}, policy: types.GitPolicyPatch, want: "v1.2.4", ok: true},
+		{name: "patch ignores only pre-release", lastTag: "v1.2.3", tags: []string{"v1.2.4-rc.1"}, policy: types.GitPolicyPatch},
+		{name: "minor skips pre-release", lastTag: "v1.2.3", tags: []string{"v1.3.0-rc.1", "v1.3.0"}, policy: types.GitPolicyMinor, want: "v1.3.0", ok: true},
+		{name: "pre-release baseline moves to release", lastTag: "v1.2.3-rc.1", tags: []string{"v1.2.3", "v1.2.4-rc.1"}, policy: types.GitPolicyPatch, want: "v1.2.3", ok: true},
+		{name: "build metadata does not hide a release", lastTag: "v1.2.3", tags: []string{"v1.2.4+sha.1"}, policy: types.GitPolicyPatch, want: "v1.2.4+sha.1", ok: true},
 	}
 
 	for _, tt := range tests {
