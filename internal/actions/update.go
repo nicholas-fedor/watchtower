@@ -780,6 +780,31 @@ func Update(
 	)
 	progress.UpdateFailed(log, gitFailed)
 
+	// A failed Git apply cleared Stale. Recompute linked restarts so those
+	// dependencies are not stopped. Containers that are still stale stay anchors.
+	allContainersToRestart = reconcileImplicitRestarts(
+		log,
+		allContainers,
+		filteredContainers,
+		config,
+	)
+
+	err = sorter.SortByDependencies(log,
+		allContainersToRestart,
+		config.UseComposeDependsOn,
+	)
+	if err != nil {
+		log.Debug().
+			Err(err).
+			Msg("Failed to sort all containers to restart by dependencies")
+
+		return nil, []types.RemovedImageInfo{}, fmt.Errorf(
+			"%w: %w",
+			errSortDependenciesFailed,
+			err,
+		)
+	}
+
 	// Compose apply already recreated those services. Do not inspect-recreate.
 	allContainersToRestart = gitSession.excludeApplied(allContainersToRestart)
 
@@ -1011,6 +1036,42 @@ func UpdateImplicitRestart(log *zerolog.Logger, allContainers,
 	log.Debug().
 		Strs("marked_containers", markedContainers).
 		Msg("Completed UpdateImplicitRestart")
+}
+
+// reconcileImplicitRestarts clears linked-restart marks and derives them again.
+//
+// Git failures clear Stale after the first UpdateImplicitRestart pass.
+// Dependents of those containers must not stay in the restart list.
+// Containers that are still stale anchor the chain, including a successful
+// Compose apply that has not yet been excluded.
+//
+// Parameters:
+//   - log: Process logger.
+//   - allContainers: Full list of containers being managed.
+//   - containers: Containers eligible for this session.
+//   - params: Update parameters.
+//
+// Returns:
+//   - []types.Container: Containers that should still restart.
+func reconcileImplicitRestarts(
+	log *zerolog.Logger,
+	allContainers, containers []types.Container,
+	params types.UpdateParams,
+) []types.Container {
+	for _, c := range containers {
+		c.SetLinkedToRestarting(false)
+	}
+
+	UpdateImplicitRestart(log, allContainers, containers, params.UseComposeDependsOn)
+
+	restart := make([]types.Container, 0, len(containers))
+	for _, c := range containers {
+		if c.ToRestart() && !c.IsMonitorOnly(params) {
+			restart = append(restart, c)
+		}
+	}
+
+	return restart
 }
 
 // shouldUpdateContainer determines if a container should be updated

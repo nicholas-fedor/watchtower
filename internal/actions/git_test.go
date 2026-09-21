@@ -918,6 +918,62 @@ var _ = ginkgo.Describe("gitSession", ginkgo.Label("git-session"), func() {
 		})
 	})
 
+	ginkgo.Describe("reconcileImplicitRestarts", func() {
+		ginkgo.It("drops dependents when the anchor apply failed", func() {
+			log := gitTestLogger()
+			app := mockActions.CreateMockContainerWithLinks(
+				"app",
+				"/app",
+				"app:latest",
+				time.Now(),
+				nil,
+				nil,
+			)
+			db := mockActions.CreateMockContainerWithLinks(
+				"db",
+				"/db",
+				"db:latest",
+				time.Now(),
+				[]string{"/app:app"},
+				nil,
+			)
+			app.SetStale(true)
+			containers := []types.Container{app, db}
+			UpdateImplicitRestart(log, containers, containers, false)
+			gomega.Expect(db.IsLinkedToRestarting()).To(gomega.BeTrue())
+
+			app.SetStale(false)
+			got := reconcileImplicitRestarts(log, containers, containers, types.UpdateParams{})
+			gomega.Expect(db.IsLinkedToRestarting()).To(gomega.BeFalse())
+			gomega.Expect(got).To(gomega.BeEmpty())
+		})
+
+		ginkgo.It("keeps dependents when the anchor is still stale", func() {
+			log := gitTestLogger()
+			app := mockActions.CreateMockContainerWithLinks(
+				"app",
+				"/app",
+				"app:latest",
+				time.Now(),
+				nil,
+				nil,
+			)
+			db := mockActions.CreateMockContainerWithLinks(
+				"db",
+				"/db",
+				"db:latest",
+				time.Now(),
+				[]string{"/app:app"},
+				nil,
+			)
+			app.SetStale(true)
+			containers := []types.Container{app, db}
+			got := reconcileImplicitRestarts(log, containers, containers, types.UpdateParams{})
+			gomega.Expect(db.IsLinkedToRestarting()).To(gomega.BeTrue())
+			gomega.Expect(got).To(gomega.ConsistOf(app, db))
+		})
+	})
+
 	ginkgo.Describe("gitImageTag", func() {
 		ginkgo.DescribeTable("formats name:git-<shortsha>",
 			func(image, commit, want string) {

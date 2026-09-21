@@ -571,9 +571,9 @@ var _ = ginkgo.Describe("the update action", func() {
 			gomega.Expect(report.Restarted()).To(gomega.HaveLen(1)) // B
 		})
 
-		ginkgo.It("should handle containers with no dependencies that are restarted", func() {
-			// Test a container that gets restarted for reasons other than dependencies
-			// This is harder to test directly, but we can verify the logic handles it
+		ginkgo.It("should drop a linked restart when nothing is stale", func() {
+			// Restart marks are derived from containers that are still stale.
+			// A mark with no stale anchor does not stop the container.
 			container := mockActions.CreateMockContainerWithConfig(
 				"standalone-container",
 				"/standalone-container",
@@ -587,7 +587,6 @@ var _ = ginkgo.Describe("the update action", func() {
 				},
 			)
 
-			// Manually set it to restart (simulating some other restart condition)
 			container.SetLinkedToRestarting(true)
 
 			client := mockActions.CreateMockClient(
@@ -609,8 +608,8 @@ var _ = ginkgo.Describe("the update action", func() {
 
 			gomega.Expect(err).NotTo(gomega.HaveOccurred())
 			gomega.Expect(report.Updated()).To(gomega.BeEmpty())
-			gomega.Expect(report.Restarted()).To(gomega.HaveLen(1))
-			gomega.Expect(report.Fresh()).To(gomega.BeEmpty())
+			gomega.Expect(report.Restarted()).To(gomega.BeEmpty())
+			gomega.Expect(container.IsLinkedToRestarting()).To(gomega.BeFalse())
 		})
 	})
 
