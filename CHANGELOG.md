@@ -14,6 +14,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Chores
 
+- Update golang:1.27.1-alpine docker digest to 8a5910f by @renovate[bot] in [#2420](https://github.com/nicholas-fedor/watchtower/pull/2420)
 - Update orhun/git-cliff-action action to v4.9.1 by @renovate[bot] in [#2414](https://github.com/nicholas-fedor/watchtower/pull/2414)
 - Update module github.com/molecule-man/go-brrr to v1.1.1 by @renovate[bot] in [#2413](https://github.com/nicholas-fedor/watchtower/pull/2413)
 - Update github/codeql-action action to v4.38.1 by @renovate[bot] in [#2411](https://github.com/nicholas-fedor/watchtower/pull/2411)
