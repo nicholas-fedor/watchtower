@@ -785,10 +785,12 @@ func processEndpoint(log *zerolog.Logger,
 			clog.Debug().Msg("Cleared MAC address, IP address, and DNS names for legacy API")
 		}
 	} else if isEngineGeneratedMAC(targetEndpoint.MacAddress, sourceEndpoint.IPAddress) {
-		// Clear MACs derived from the endpoint's IPv4 address. Docker 29.x+ bridge
-		// networks assign random MACs and will not match the engine-generated
-		// pattern, but older Docker versions and overlay networks still produce
-		// IP-derived MACs that become stale after IP reassignment.
+		// Clear MACs derived from the endpoint's IPv4 address.
+		//
+		// Docker 28.0.0+ bridge networks assign random MACs and will not match
+		// the engine-generated pattern, but older Docker versions and overlay
+		// networks still produce IP-derived MACs that become stale after IP
+		// reassignment.
 		targetEndpoint.MacAddress = dockerNetwork.HardwareAddr{}
 
 		clog.Debug().Msg("Cleared engine-generated MAC address. Docker will regenerate for new IP")
@@ -800,13 +802,17 @@ func processEndpoint(log *zerolog.Logger,
 // isEngineGeneratedMAC reports whether mac matches the bridge driver's engine-generated
 // pattern derived from the endpoint's current IPv4 address.
 //
-// Docker <= 25.x bridge networks assigned MACs of the form "02:42:aa:bb:cc:dd",
-// where the last four bytes are the IPv4 octets. Docker 29.x+ switched the bridge
-// driver to fully random MACs, but overlay networks still use IP-derived MACs, so
-// this check remains relevant for those drivers and for older Docker versions.
-// A MAC matching that pattern for the given IP is not a user-configured value and
-// should not be preserved across container recreation. If ip is not a valid IPv4
-// address, the MAC is assumed to be user-configured and false is returned.
+// Docker inspect unmarshals MacAddress into a 6-byte HardwareAddr.
+// Compare the canonical colon-separated form, not the raw byte length.
+// Docker < 28.0.0 bridge networks assigned MACs of the form "02:42:aa:bb:cc:dd",
+// where the last four bytes are the IPv4 octets.
+// Docker 28.0.0+ switched the bridge driver to fully random MACs, but overlay
+// networks still use IP-derived MACs, so this check remains relevant for those
+// drivers and for older Docker versions.
+// A MAC matching that pattern for the given IP is not a user-configured value
+// and should not be preserved across container recreation.
+// If ip is not a valid IPv4 address, the MAC is assumed to be user-configured
+// and false is returned.
 //
 // Parameters:
 //   - mac: MAC address to check.
@@ -815,14 +821,14 @@ func processEndpoint(log *zerolog.Logger,
 // Returns:
 //   - bool: True if the MAC was engine-generated from ip, false otherwise.
 func isEngineGeneratedMAC(mac dockerNetwork.HardwareAddr, ip netip.Addr) bool {
-	if len(mac) != 17 || !ip.Is4() {
+	if !ip.Is4() {
 		return false
 	}
 
 	ipv4 := ip.As4()
 	expected := fmt.Sprintf("02:42:%02x:%02x:%02x:%02x", ipv4[0], ipv4[1], ipv4[2], ipv4[3])
 
-	return string(mac) == expected
+	return mac.String() == expected
 }
 
 // onlyGeneratedMacs reports whether every non-empty MAC in the source
