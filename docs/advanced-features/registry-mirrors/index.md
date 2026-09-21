@@ -8,8 +8,8 @@ Watchtower uses these mirrors when checking whether containers need updates, ens
 When the Docker daemon is configured with registry mirrors, Watchtower automatically detects and uses them during its update checks.
 This means:
 
-- **Digest comparisons** — Watchtower fetches image manifests from mirrors before falling back to the canonical registry, so it can detect updates even when the primary registry is inaccessible.
-- **All registries supported** — Global mirrors apply to all image registries (Docker Hub, GHCR, private registries, etc.).
+- **Digest comparisons** — For Docker Hub images, Watchtower fetches manifests from mirrors before falling back to the canonical registry, so it can detect updates even when Docker Hub is inaccessible.
+- **Docker Hub only** — Daemon `registry-mirrors` apply to Docker Hub (`docker.io`, `index.docker.io`, and bare image names). GHCR, `lscr.io`, and other registries are checked on their canonical host.
 
 !!! Note
     Mirror support in Watchtower covers **digest comparison only** — determining whether a newer image exists.
@@ -33,8 +33,8 @@ sudo systemctl restart docker
 
 ### Configuration Format
 
-Global mirrors apply to all image registries.
-Add them under the `registry-mirrors` key:
+Docker's `registry-mirrors` setting is a Docker Hub mirror list.
+Add Hub mirrors under the `registry-mirrors` key:
 
 ```json title="/etc/docker/daemon.json"
 {
@@ -56,19 +56,21 @@ dockerd --registry-mirror https://mirror.example.com
 
 ## How Watchtower Uses Mirrors
 
-When checking if a container's image has been updated, Watchtower resolves the mirror to use in this order:
+When checking if a Docker Hub image has been updated, Watchtower resolves the mirror to use in this order:
 
-1. **Configured mirrors** — The global mirror list from the Docker daemon is tried first.
-2. **Canonical registry** — If all mirrors fail, Watchtower falls back to the original registry (e.g., `index.docker.io`).
+1. **Configured mirrors** — The daemon mirror list is tried first.
+2. **Canonical registry** — If all mirrors fail, Watchtower falls back to `index.docker.io`.
 
 The first mirror to successfully respond with the image manifest wins.
-This means a fast, nearby mirror is preferred over a distant canonical registry.
+This means a fast, nearby mirror is preferred over Docker Hub.
+
+Images on other registries, such as `ghcr.io` and `lscr.io`, skip the mirror list and use their own host.
 
 ## Configuration Examples
 
 ### Single Global Mirror
 
-A single mirror used for all registries:
+A single mirror used for Docker Hub:
 
 ```json title="/etc/docker/daemon.json"
 {
@@ -122,6 +124,7 @@ When using internal mirrors that may use self-signed certificates:
     ```
 
     Look for log output containing `Resolved registry mirror configuration`.
+    A non-Hub image logs `Skipping Docker Hub registry mirrors for non-Hub image` and is not a misconfiguration.
 3. **Check network access** — Ensure the host can reach the mirror URLs (e.g., `curl -I https://mirror.example.com/v2/`).
 4. **Verify mirror content** — Confirm the mirror is operational and has the required images.
 
