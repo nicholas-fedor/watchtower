@@ -11,6 +11,8 @@ import (
 	"github.com/rs/zerolog"
 	"github.com/spf13/cobra"
 
+	dockerContainer "github.com/moby/moby/api/types/container"
+
 	"github.com/nicholas-fedor/watchtower/internal/actions"
 	"github.com/nicholas-fedor/watchtower/internal/api"
 	"github.com/nicholas-fedor/watchtower/internal/api/config"
@@ -247,9 +249,10 @@ func (p *process) preRun(cmd *cobra.Command, _ []string) {
 		)
 		defer cancel()
 
-		client.SetNoRestartPolicy(
+		client.SetRestartPolicy(
 			setNoRestartPolicyCtx,
 			currentWatchtowerContainer,
+			dockerContainer.RestartPolicy{Name: dockerContainer.RestartPolicyDisabled},
 		)
 
 		p.log.Fatal().
@@ -363,7 +366,11 @@ func exitInvalidWatchtowerRestart(
 	}
 
 	// Prevent the old container from being restarted by the runtime after exit.
-	dockerClient.SetNoRestartPolicy(exitCtx, watchtowerContainer)
+	dockerClient.SetRestartPolicy(
+		exitCtx,
+		watchtowerContainer,
+		dockerContainer.RestartPolicy{Name: dockerContainer.RestartPolicyDisabled},
+	)
 
 	recoverCancel()
 	exitCancel()
@@ -388,7 +395,12 @@ func (p *process) run(command *cobra.Command, args []string) {
 				context.Background(),
 				restartPolicyTimeout,
 			)
-			client.SetNoRestartPolicy(setNoRestartPolicyCtx, currentWatchtowerContainer)
+			client.SetRestartPolicy(
+				setNoRestartPolicyCtx,
+				currentWatchtowerContainer,
+				dockerContainer.RestartPolicy{Name: dockerContainer.RestartPolicyDisabled},
+			)
+
 			cancel()
 		}
 
@@ -429,7 +441,12 @@ func (p *process) run(command *cobra.Command, args []string) {
 					context.Background(),
 					restartPolicyTimeout,
 				)
-				client.SetNoRestartPolicy(setNoRestartPolicyCtx, currentWatchtowerContainer)
+				client.SetRestartPolicy(
+					setNoRestartPolicyCtx,
+					currentWatchtowerContainer,
+					dockerContainer.RestartPolicy{Name: dockerContainer.RestartPolicyDisabled},
+				)
+
 				cancel()
 			}
 
@@ -501,9 +518,10 @@ func (p *process) runMain(cfg types.RunConfig) int {
 		)
 		defer cancel()
 
-		client.SetNoRestartPolicy(
+		client.SetRestartPolicy(
 			setNoRestartPolicyCtx,
 			currentWatchtowerContainer,
+			dockerContainer.RestartPolicy{Name: dockerContainer.RestartPolicyDisabled},
 		)
 
 		p.log.Fatal().
@@ -591,7 +609,11 @@ func (p *process) runMain(cfg types.RunConfig) int {
 			)
 			defer cancel()
 
-			client.SetNoRestartPolicy(setNoRestartPolicyCtx, currentWatchtowerContainer)
+			client.SetRestartPolicy(
+				setNoRestartPolicyCtx,
+				currentWatchtowerContainer,
+				dockerContainer.RestartPolicy{Name: dockerContainer.RestartPolicyDisabled},
+			)
 
 			return 1 // Exit immediately after logging failure
 		}
@@ -633,7 +655,11 @@ func (p *process) runMain(cfg types.RunConfig) int {
 		)
 		defer cancel()
 
-		client.SetNoRestartPolicy(setNoRestartPolicyCtx, currentWatchtowerContainer)
+		client.SetRestartPolicy(
+			setNoRestartPolicyCtx,
+			currentWatchtowerContainer,
+			dockerContainer.RestartPolicy{Name: dockerContainer.RestartPolicyDisabled},
+		)
 
 		return 0 // Exit after successful execution.
 	}
@@ -789,7 +815,11 @@ func (p *process) runMain(cfg types.RunConfig) int {
 		)
 		defer cancel()
 
-		client.SetNoRestartPolicy(setNoRestartPolicyCtx, currentWatchtowerContainer)
+		client.SetRestartPolicy(
+			setNoRestartPolicyCtx,
+			currentWatchtowerContainer,
+			dockerContainer.RestartPolicy{Name: dockerContainer.RestartPolicyDisabled},
+		)
 
 		return 1 // Exit while indicating failure.
 	}
@@ -827,7 +857,11 @@ func (p *process) runMain(cfg types.RunConfig) int {
 		)
 		defer cancel()
 
-		client.SetNoRestartPolicy(setNoRestartPolicyCtx, currentWatchtowerContainer)
+		client.SetRestartPolicy(
+			setNoRestartPolicyCtx,
+			currentWatchtowerContainer,
+			dockerContainer.RestartPolicy{Name: dockerContainer.RestartPolicyDisabled},
+		)
 
 		return 1 // Exit while indicating failure.
 	}

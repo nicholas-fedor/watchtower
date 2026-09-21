@@ -272,7 +272,7 @@ var _ = ginkgo.Describe("JSON Git and OCI report fields", func() {
 		status.SetGitMetadata("https://github.com/org/app.git", "main", "", "", "", "", "")
 
 		raw, err := json.Marshal(Data{
-			StaticData: StaticData{Title: "update", Host: "box"},
+			Title: "update", Host: "box",
 			Report: &session.SingleContainerReport{
 				UpdatedReports: []types.ContainerReport{status},
 			},

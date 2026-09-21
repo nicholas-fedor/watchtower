@@ -44,7 +44,7 @@ var _ = ginkgo.Describe("Compose", func() {
 	ginkgo.DescribeTable(
 		"GetServiceName",
 		func(labels map[string]string, expected string) {
-			result := GetServiceName(testLog(), labels)
+			result := GetServiceName(labels)
 			gomega.Expect(result).To(gomega.Equal(expected))
 		},
 		ginkgo.Entry("returns empty string for nil labels", nil, ""),
@@ -64,7 +64,7 @@ var _ = ginkgo.Describe("Compose", func() {
 	ginkgo.DescribeTable(
 		"GetProjectName",
 		func(labels map[string]string, expected string) {
-			result := GetProjectName(testLog(), labels)
+			result := GetProjectName(labels)
 			gomega.Expect(result).To(gomega.Equal(expected))
 		},
 		ginkgo.Entry("returns empty string for nil labels", nil, ""),
@@ -84,7 +84,7 @@ var _ = ginkgo.Describe("Compose", func() {
 	ginkgo.DescribeTable(
 		"GetContainerNumber",
 		func(labels map[string]string, expected string) {
-			result := GetContainerNumber(testLog(), labels)
+			result := GetContainerNumber(labels)
 			gomega.Expect(result).To(gomega.Equal(expected))
 		},
 		ginkgo.Entry("returns empty string for nil labels", nil, ""),

@@ -8,21 +8,12 @@ import (
 
 	"github.com/distribution/reference"
 	"github.com/rs/zerolog"
+
+	"github.com/nicholas-fedor/watchtower/pkg/registry/hosts"
 )
 
 // ChallengeHeader is the HTTP Header containing challenge instructions.
 const ChallengeHeader = "WWW-Authenticate"
-
-const (
-	// DockerRegistryDomain is the primary domain for Docker Hub image references.
-	DockerRegistryDomain = "docker.io"
-	// DockerRegistryHost is the current Docker Hub registry API endpoint.
-	DockerRegistryHost = "index.docker.io"
-	// GitHubRegistryDomain is the canonical domain for GitHub Container Registry.
-	GitHubRegistryDomain = "ghcr.io"
-	// LSCRRegistryDomain is LinuxServer's vanity domain. Images are hosted on ghcr.io.
-	LSCRRegistryDomain = "lscr.io"
-)
 
 // Errors for registry operations.
 var (
@@ -172,8 +163,8 @@ func extractChallengeHost(log *zerolog.Logger, realm string) string {
 // GetRegistryAddress extracts the registry address from an image reference.
 //
 // It returns the domain part of the reference, mapping Docker Hub's default
-// domain to its canonical host if needed. lscr.io is mapped to ghcr.io since
-// lscr.io images are hosted on GitHub Container Registry.
+// domain to its canonical host if needed. [hosts.LSCRRegistryDomain] is mapped
+// to [hosts.GitHubRegistryDomain] since those images are hosted on GHCR.
 //
 // Parameters:
 //   - log: Logger for diagnostics.
@@ -198,8 +189,8 @@ func GetRegistryAddress(log *zerolog.Logger, imageRef string) (string, error) {
 	domain := reference.Domain(normalizedRef)
 
 	// Map Docker Hub's default domain to its canonical host for registry requests.
-	if domain == DockerRegistryDomain {
-		domain = DockerRegistryHost
+	if domain == hosts.DockerRegistryDomain {
+		domain = hosts.DockerRegistryHost
 
 		log.Debug().
 			Str("image_ref", imageRef).
@@ -209,8 +200,8 @@ func GetRegistryAddress(log *zerolog.Logger, imageRef string) (string, error) {
 
 	// lscr.io images are hosted on GitHub Container Registry (ghcr.io).
 	// Map here so all callers benefit, including GetChallengeURL and GetAuthURL.
-	if domain == LSCRRegistryDomain {
-		domain = GitHubRegistryDomain
+	if domain == hosts.LSCRRegistryDomain {
+		domain = hosts.GitHubRegistryDomain
 
 		log.Debug().
 			Str("image_ref", imageRef).

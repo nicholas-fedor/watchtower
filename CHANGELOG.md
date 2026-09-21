@@ -8,8 +8,152 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- Copy labeled files across container recreate by @nicholas-fedor in [#2387](https://github.com/nicholas-fedor/watchtower/pull/2387)
+
 ### Chores
 
+- Update module github.com/gofiber/utils/v2 to v2.5.3 by @renovate[bot] in [#2426](https://github.com/nicholas-fedor/watchtower/pull/2426)
+- Update golang:alpine3.24 docker digest to 8a5910f by @renovate[bot] in [#2421](https://github.com/nicholas-fedor/watchtower/pull/2421)
+- Update golang:1.27.1-alpine docker digest to 8a5910f by @renovate[bot] in [#2420](https://github.com/nicholas-fedor/watchtower/pull/2420)
+- Update orhun/git-cliff-action action to v4.9.1 by @renovate[bot] in [#2414](https://github.com/nicholas-fedor/watchtower/pull/2414)
+- Update module github.com/molecule-man/go-brrr to v1.1.1 by @renovate[bot] in [#2413](https://github.com/nicholas-fedor/watchtower/pull/2413)
+- Update github/codeql-action action to v4.38.1 by @renovate[bot] in [#2411](https://github.com/nicholas-fedor/watchtower/pull/2411)
+- Update alpine docker tag to v3.24.2 by @renovate[bot] in [#2410](https://github.com/nicholas-fedor/watchtower/pull/2410)
+- Update golang:alpine3.24 docker digest to 4cb7ac9 by @renovate[bot] in [#2407](https://github.com/nicholas-fedor/watchtower/pull/2407)
+- Update golang:1.27.1-alpine docker digest to 4cb7ac9 by @renovate[bot] in [#2406](https://github.com/nicholas-fedor/watchtower/pull/2406)
+- Update golang:alpine3.24 docker digest to e9bbdf2 by @renovate[bot] in [#2401](https://github.com/nicholas-fedor/watchtower/pull/2401)
+- Update golang:1.27.1-alpine docker digest to e9bbdf2 by @renovate[bot] in [#2400](https://github.com/nicholas-fedor/watchtower/pull/2400)
+- Update module github.com/onsi/ginkgo/v2 to v2.33.0 by @renovate[bot] in [#2398](https://github.com/nicholas-fedor/watchtower/pull/2398)
+- Update module github.com/onsi/gomega to v1.43.1 by @renovate[bot] in [#2397](https://github.com/nicholas-fedor/watchtower/pull/2397)
+- Update codecov/codecov-action action to v7.1.1 by @renovate[bot] in [#2396](https://github.com/nicholas-fedor/watchtower/pull/2396)
+- Update docker/setup-buildx-action action to v4.4.1 by @renovate[bot] in [#2394](https://github.com/nicholas-fedor/watchtower/pull/2394)
+- Update module github.com/docker/cli to v29.8.1+incompatible by @renovate[bot] in [#2391](https://github.com/nicholas-fedor/watchtower/pull/2391)
+- Update module github.com/gofiber/schema to v1.8.7 by @renovate[bot] in [#2388](https://github.com/nicholas-fedor/watchtower/pull/2388)
+
+### Fixed
+
+- Share authenticated lscr.io rate limit with ghcr.io by @nicholas-fedor in [#2430](https://github.com/nicholas-fedor/watchtower/pull/2430)
+- Apply registry mirrors only to Docker Hub by @nicholas-fedor in [#2428](https://github.com/nicholas-fedor/watchtower/pull/2428)
+- Rewrite volumes-from IDs before recreate by @nicholas-fedor in [#2424](https://github.com/nicholas-fedor/watchtower/pull/2424)
+- Match engine-generated MACs as inspect HardwareAddr by @nicholas-fedor in [#2418](https://github.com/nicholas-fedor/watchtower/pull/2418)
+
+## [1.22.2] - 2026-09-15
+
+### Added
+
+- Add NotaInutilis as a contributor for doc by @allcontributors[bot] in [#2374](https://github.com/nicholas-fedor/watchtower/pull/2374)
+
+### Changed
+
+- Replace SetNoRestartPolicy with SetRestartPolicy by @nicholas-fedor in [#2385](https://github.com/nicholas-fedor/watchtower/pull/2385)
+- Improve docker connection and socket proxy info by @NotaInutilis in [#2352](https://github.com/nicholas-fedor/watchtower/pull/2352)
+- Replace untyped maps with concrete types by @nicholas-fedor in [#2371](https://github.com/nicholas-fedor/watchtower/pull/2371)
+
+### Chores
+
+- Update module github.com/nicholas-fedor/shoutrrr to v0.21.0 by @renovate[bot] in [#2384](https://github.com/nicholas-fedor/watchtower/pull/2384)
+- Update docker/setup-qemu-action action to v4.4.0 by @renovate[bot] in [#2382](https://github.com/nicholas-fedor/watchtower/pull/2382)
+- Update docker/setup-buildx-action action to v4.4.0 by @renovate[bot] in [#2381](https://github.com/nicholas-fedor/watchtower/pull/2381)
+- Update codecov/codecov-action action to v7.1.0 by @renovate[bot] in [#2379](https://github.com/nicholas-fedor/watchtower/pull/2379)
+- Update module github.com/gofiber/utils/v2 to v2.5.2 by @renovate[bot] in [#2376](https://github.com/nicholas-fedor/watchtower/pull/2376)
+- Update module github.com/gofiber/contrib/v3/zerolog to v1.1.5 by @renovate[bot] in [#2369](https://github.com/nicholas-fedor/watchtower/pull/2369)
+- Update module github.com/gofiber/contrib/v3/swaggo to v1.0.11 by @renovate[bot] in [#2368](https://github.com/nicholas-fedor/watchtower/pull/2368)
+- Update module github.com/molecule-man/go-brrr to v1.1.0 by @renovate[bot] in [#2364](https://github.com/nicholas-fedor/watchtower/pull/2364)
+- Update github/codeql-action action to v4.38.0 by @renovate[bot] in [#2362](https://github.com/nicholas-fedor/watchtower/pull/2362)
+- Update module golang.org/x/tools to v0.50.0 by @renovate[bot] in [#2360](https://github.com/nicholas-fedor/watchtower/pull/2360)
+- Update module github.com/onsi/ginkgo/v2 to v2.32.2 by @renovate[bot] in [#2359](https://github.com/nicholas-fedor/watchtower/pull/2359)
+
+### Fixed
+
+- Reuse anonymous GHCR tokens across public images by @nicholas-fedor in [#2366](https://github.com/nicholas-fedor/watchtower/pull/2366)
+
+### New Contributors
+
+- @NotaInutilis made their first contribution in [#2352](https://github.com/nicholas-fedor/watchtower/pull/2352)
+
+## [1.22.1] - 2026-09-09
+
+### Added
+
+- Add star history by @nicholas-fedor in [#2338](https://github.com/nicholas-fedor/watchtower/pull/2338)
+- Add shawly as a contributor for code by @allcontributors[bot] in [#2331](https://github.com/nicholas-fedor/watchtower/pull/2331)
+
+### Changed
+
+- Correct Gmail SMTP authentication guidance by @nicholas-fedor in [#2342](https://github.com/nicholas-fedor/watchtower/pull/2342)
+
+### Chores
+
+- Update module golang.org/x/text to v0.42.0 by @renovate[bot] in [#2356](https://github.com/nicholas-fedor/watchtower/pull/2356)
+- Update module golang.org/x/net to v0.59.0 by @renovate[bot] in [#2355](https://github.com/nicholas-fedor/watchtower/pull/2355)
+- Update module golang.org/x/crypto to v0.57.0 by @renovate[bot] in [#2353](https://github.com/nicholas-fedor/watchtower/pull/2353)
+- Update module github.com/nicholas-fedor/shoutrrr to v0.20.0 by @renovate[bot] in [#2349](https://github.com/nicholas-fedor/watchtower/pull/2349)
+- Update module github.com/gofiber/schema to v1.8.6 by @renovate[bot] in [#2348](https://github.com/nicholas-fedor/watchtower/pull/2348)
+- Update nicholas-fedor/go-proxy-pull-action action to v1.1.51 by @renovate[bot] in [#2346](https://github.com/nicholas-fedor/watchtower/pull/2346)
+- Update module github.com/valyala/fasthttp to v1.74.0 by @renovate[bot] in [#2345](https://github.com/nicholas-fedor/watchtower/pull/2345)
+- Update module github.com/gofiber/utils/v2 to v2.5.1 by @renovate[bot] in [#2344](https://github.com/nicholas-fedor/watchtower/pull/2344)
+- Update nicholas-fedor/go-proxy-pull-action action to v1.1.50 by @renovate[bot] in [#2329](https://github.com/nicholas-fedor/watchtower/pull/2329)
+- Update github.com/google/pprof digest to 6331bc6 by @renovate[bot] in [#2325](https://github.com/nicholas-fedor/watchtower/pull/2325)
+- Update module github.com/gofiber/utils/v2 to v2.5.0 by @renovate[bot] in [#2323](https://github.com/nicholas-fedor/watchtower/pull/2323)
+- Update go-openapi packages to v0.29.2 by @renovate[bot] in [#2320](https://github.com/nicholas-fedor/watchtower/pull/2320)
+- Update go-openapi packages by @renovate[bot] in [#2317](https://github.com/nicholas-fedor/watchtower/pull/2317)
+- Update module github.com/moby/moby/client to v0.6.0 by @renovate[bot] in [#2315](https://github.com/nicholas-fedor/watchtower/pull/2315)
+- Update module github.com/moby/moby/api to v1.56.0 by @renovate[bot] in [#2312](https://github.com/nicholas-fedor/watchtower/pull/2312)
+- Update module github.com/docker/cli to v29.8.0+incompatible by @renovate[bot] in [#2311](https://github.com/nicholas-fedor/watchtower/pull/2311)
+- Update github.com/google/pprof digest to d6c3cb2 by @renovate[bot] in [#2309](https://github.com/nicholas-fedor/watchtower/pull/2309)
+- Update module github.com/go-openapi/spec to v1 by @renovate[bot] in [#2307](https://github.com/nicholas-fedor/watchtower/pull/2307)
+- Update module golang.org/x/crypto to v0.56.0 by @renovate[bot] in [#2306](https://github.com/nicholas-fedor/watchtower/pull/2306)
+- Update module github.com/klauspost/compress to v1.20.0 by @renovate[bot] in [#2304](https://github.com/nicholas-fedor/watchtower/pull/2304)
+- Update module github.com/gofiber/utils/v2 to v2.4.3 by @renovate[bot] in [#2303](https://github.com/nicholas-fedor/watchtower/pull/2303)
+- Update golang:1.27.1-alpine docker digest to cf6fca6 by @renovate[bot] in [#2299](https://github.com/nicholas-fedor/watchtower/pull/2299)
+- Update golang:alpine3.24 docker digest to cf6fca6 by @renovate[bot] in [#2300](https://github.com/nicholas-fedor/watchtower/pull/2300)
+
+### Fixed
+
+- Match network_mode links across Compose projects by @shawly in [#2319](https://github.com/nicholas-fedor/watchtower/pull/2319)
+- Stop skipping GHCR images on sub-millisecond 429s by @nicholas-fedor in [#2327](https://github.com/nicholas-fedor/watchtower/pull/2327)
+
+### New Contributors
+
+- @shawly made their first contribution in [#2319](https://github.com/nicholas-fedor/watchtower/pull/2319)
+
+## [1.22.0] - 2026-09-02
+
+### Added
+
+- Add configurable Docker image disk usage thresholds by @nicholas-fedor in [#2257](https://github.com/nicholas-fedor/watchtower/pull/2257)
+
+### Changed
+
+- Rename Viper locals from vip to vCfg by @nicholas-fedor in [#2258](https://github.com/nicholas-fedor/watchtower/pull/2258)
+
+### Chores
+
+- Update module github.com/nicholas-fedor/shoutrrr to v0.19.0 by @renovate[bot] in [#2294](https://github.com/nicholas-fedor/watchtower/pull/2294)
+- Update golang docker tag to v1.27.1 by @renovate[bot] in [#2293](https://github.com/nicholas-fedor/watchtower/pull/2293)
+- Update cimg/go docker tag to v1.27.1 by @renovate[bot] in [#2292](https://github.com/nicholas-fedor/watchtower/pull/2292)
+- Update golang:alpine3.24 docker digest to 26402d8 by @renovate[bot] in [#2291](https://github.com/nicholas-fedor/watchtower/pull/2291)
+- Update github.com/google/pprof digest to ca85771 by @renovate[bot] in [#2290](https://github.com/nicholas-fedor/watchtower/pull/2290)
+- Update cimg/go:1.27.0 docker digest to 6026c28 by @renovate[bot] in [#2289](https://github.com/nicholas-fedor/watchtower/pull/2289)
+- Update go module directive to v1.27.1 by @renovate[bot] in [#2287](https://github.com/nicholas-fedor/watchtower/pull/2287)
+- Update orhun/git-cliff-action action to v4.9.0 by @renovate[bot] in [#2285](https://github.com/nicholas-fedor/watchtower/pull/2285)
+- Update module github.com/gofiber/schema to v1.8.5 by @renovate[bot] in [#2284](https://github.com/nicholas-fedor/watchtower/pull/2284)
+- Update docker/setup-qemu-action action to v4.3.0 by @renovate[bot] in [#2283](https://github.com/nicholas-fedor/watchtower/pull/2283)
+- Update module github.com/prometheus/common to v0.71.0 by @renovate[bot] in [#2280](https://github.com/nicholas-fedor/watchtower/pull/2280)
+- Update module github.com/prometheus/client_model to v0.6.3 by @renovate[bot] in [#2279](https://github.com/nicholas-fedor/watchtower/pull/2279)
+- Update step-security/harden-runner action to v2.21.1 by @renovate[bot] in [#2277](https://github.com/nicholas-fedor/watchtower/pull/2277)
+- Update github.com/google/pprof digest to 4932ad3 by @renovate[bot] in [#2275](https://github.com/nicholas-fedor/watchtower/pull/2275)
+- Update github.com/google/pprof digest to 67a7179 by @renovate[bot] in [#2274](https://github.com/nicholas-fedor/watchtower/pull/2274)
+- Update anchore/sbom-action action to v0.24.2 by @renovate[bot] in [#2271](https://github.com/nicholas-fedor/watchtower/pull/2271)
+- Update module github.com/prometheus/procfs to v0.22.0 by @renovate[bot] in [#2269](https://github.com/nicholas-fedor/watchtower/pull/2269)
+- Update module github.com/gofiber/contrib/v3/zerolog to v1.1.4 by @renovate[bot] in [#2268](https://github.com/nicholas-fedor/watchtower/pull/2268)
+- Update module github.com/gofiber/contrib/v3/swaggo to v1.0.10 by @renovate[bot] in [#2265](https://github.com/nicholas-fedor/watchtower/pull/2265)
+- Update anchore/sbom-action action to v0.24.1 by @renovate[bot] in [#2264](https://github.com/nicholas-fedor/watchtower/pull/2264)
+- Update module github.com/andybalholm/brotli to v1.2.3 by @renovate[bot] in [#2263](https://github.com/nicholas-fedor/watchtower/pull/2263)
+- Update module github.com/onsi/gomega to v1.43.0 by @renovate[bot] in [#2260](https://github.com/nicholas-fedor/watchtower/pull/2260)
+- Update nicholas-fedor/go-proxy-pull-action action to v1.1.49 by @renovate[bot] in [#2255](https://github.com/nicholas-fedor/watchtower/pull/2255)
 - Update module github.com/docker/docker-credential-helpers to v0.9.9 by @renovate[bot] in [#2253](https://github.com/nicholas-fedor/watchtower/pull/2253)
 - Update securego/gosec action to v2.29.0 by @renovate[bot] in [#2249](https://github.com/nicholas-fedor/watchtower/pull/2249)
 - Update module go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp to v0.71.0 by @renovate[bot] in [#2247](https://github.com/nicholas-fedor/watchtower/pull/2247)
@@ -18,6 +162,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Format disk usage sizes in human-readable units by @nicholas-fedor in [#2297](https://github.com/nicholas-fedor/watchtower/pull/2297)
+- Pace throttled registry hosts without bursting advertised quotas by @nicholas-fedor in [#2262](https://github.com/nicholas-fedor/watchtower/pull/2262)
 - Complete image removal after self-update SIGTERM by @nicholas-fedor in [#2251](https://github.com/nicholas-fedor/watchtower/pull/2251)
 
 ## [1.21.2] - 2026-08-25
@@ -3524,7 +3670,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## Compare Releases
 
-- [unreleased](https://github.com/nicholas-fedor/watchtower/compare/v1.21.2...HEAD)
+- [unreleased](https://github.com/nicholas-fedor/watchtower/compare/v1.22.2...HEAD)
+- [1.22.2](https://github.com/nicholas-fedor/watchtower/compare/v1.22.1...v1.22.2)
+- [1.22.1](https://github.com/nicholas-fedor/watchtower/compare/v1.22.0...v1.22.1)
+- [1.22.0](https://github.com/nicholas-fedor/watchtower/compare/v1.21.2...v1.22.0)
 - [1.21.2](https://github.com/nicholas-fedor/watchtower/compare/v1.21.1...v1.21.2)
 - [1.21.1](https://github.com/nicholas-fedor/watchtower/compare/v1.21.0...v1.21.1)
 - [1.21.0](https://github.com/nicholas-fedor/watchtower/compare/v1.20.3...v1.21.0)

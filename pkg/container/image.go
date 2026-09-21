@@ -216,7 +216,7 @@ func (c imageClient) CheckContainerUpdate(
 	}
 
 	mirrorInfo := c.resolveRegistryMirrorConfig(ctx)
-	endpoints := c.buildMirrorEndpoints(mirrorInfo)
+	endpoints := c.buildMirrorEndpoints(mirrorInfo, sourceContainer.ImageName())
 
 	match, remoteDigest, err := digest.CompareDigestWithRemote(c.logger(),
 		ctx,
@@ -395,12 +395,9 @@ func (c imageClient) PullImage(
 	warnOnHeadFailed WarningStrategy,
 	params types.UpdateParams,
 ) error {
-	fields := map[string]any{
-		"container": sourceContainer.Name(),
-		"image":     sourceContainer.ImageName(),
-	}
 	clogVal := c.logger().With().
-		Fields(fields).
+		Str("container", sourceContainer.Name()).
+		Str("image", sourceContainer.ImageName()).
 		Logger()
 	clog := &clogVal
 
@@ -429,7 +426,7 @@ func (c imageClient) PullImage(
 	}
 
 	// Skip the pull if the digest matches the current image (or local-only).
-	skip, skipErr := c.shouldSkipPull(ctx, sourceContainer, opts.RegistryAuth, warnOnHeadFailed, fields)
+	skip, skipErr := c.shouldSkipPull(ctx, sourceContainer, opts.RegistryAuth, warnOnHeadFailed)
 	if skipErr != nil {
 		return skipErr
 	}
@@ -445,7 +442,7 @@ func (c imageClient) PullImage(
 		return cooldownErr
 	}
 
-	return c.performImagePull(ctx, sourceContainer.ImageName(), opts, fields)
+	return c.performImagePull(ctx, sourceContainer.ImageName(), opts)
 }
 
 // RemoveImageByID deletes an image from the Docker host.
@@ -615,7 +612,6 @@ func newImageClient(api dockerClient.APIClient, log *zerolog.Logger) imageClient
 //   - sourceContainer: Container to check.
 //   - registryAuth: Registry authentication credentials.
 //   - warnOnHeadFailed: Strategy for logging warnings on HEAD request failures.
-//   - fields: Logging fields for context.
 //
 // Returns:
 //   - bool: True if pull can be skipped, false otherwise.
@@ -625,10 +621,10 @@ func (c imageClient) shouldSkipPull(
 	sourceContainer types.Container,
 	registryAuth string,
 	warnOnHeadFailed WarningStrategy,
-	fields map[string]any,
 ) (bool, error) {
 	clogVal := c.logger().With().
-		Fields(fields).
+		Str("container", sourceContainer.Name()).
+		Str("image", sourceContainer.ImageName()).
 		Logger()
 	clog := &clogVal
 	clog.Debug().Msg("Checking if pull is needed")
@@ -638,8 +634,9 @@ func (c imageClient) shouldSkipPull(
 	// Resolve registry mirror configuration from Docker daemon.
 	mirrorInfo := c.resolveRegistryMirrorConfig(ctx)
 
-	// Build candidate endpoints: mirrors first, then canonical (empty string).
-	endpoints := c.buildMirrorEndpoints(mirrorInfo)
+	// Build candidate endpoints: Hub mirrors first, then canonical (empty string).
+	// Non-Hub images skip daemon registry-mirrors.
+	endpoints := c.buildMirrorEndpoints(mirrorInfo, sourceContainer.ImageName())
 
 	// Compare current and remote digests, trying each endpoint.
 	// Local-only images are handled inside CompareDigest (match=true, err=nil).
@@ -657,7 +654,7 @@ func (c imageClient) shouldSkipPull(
 
 	switch {
 	case ratelimit.Is(err):
-		clog.Warn().
+		clog.Debug().
 			Err(err).
 			Msg("Registry rate limited digest check. Aborting pull")
 
@@ -697,7 +694,6 @@ func (c imageClient) shouldSkipPull(
 //   - ctx: Context for operation control.
 //   - imageName: Image to pull.
 //   - opts: Pull options with auth.
-//   - fields: Logging fields for context.
 //
 // Returns:
 //   - error: Non-nil if pull or read fails, nil on success.
@@ -705,20 +701,21 @@ func (c imageClient) performImagePull(
 	ctx context.Context,
 	imageName string,
 	opts dockerClient.ImagePullOptions,
-	fields map[string]any,
 ) error {
 	clogVal := c.logger().With().
-		Fields(fields).
+		Str("image", imageName).
 		Logger()
 	clog := &clogVal
 	clog.Debug().Msg("Initiating image pull")
 
-	pullHost, hostErr := auth.GetRegistryAddress(clog, imageName)
-	if hostErr != nil || pullHost == "" {
+	address, hostErr := auth.GetRegistryAddress(clog, imageName)
+	if hostErr != nil || address == "" {
 		clog.Debug().
 			Err(hostErr).
 			Msg("Failed to resolve registry host for rate limiting")
 	}
+
+	pullHost := ratelimit.Scope(address, opts.RegistryAuth != "")
 
 	pullErr := ratelimit.Do(ctx, clog, pullHost, func() error {
 		err := acquirePullSlot(ctx, pullHost)
@@ -775,7 +772,7 @@ func (c imageClient) performImagePull(
 			info := ratelimit.FromErrorMessage(waitErr.Error())
 			if info != nil {
 				ratelimit.Observe(pullHost, info)
-				clog.Warn().
+				clog.Debug().
 					Err(info).
 					Msg("Registry rate limited image pull")
 

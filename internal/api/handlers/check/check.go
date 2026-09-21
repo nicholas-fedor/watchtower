@@ -158,7 +158,8 @@ func CheckForUpdates(log *zerolog.Logger,
 						container.ChangelogVars{
 							Tag:    checkResult.Tag,
 							Commit: checkResult.Commit,
-						}).Changelog
+						},
+					).Changelog
 				}
 			}
 		} else {

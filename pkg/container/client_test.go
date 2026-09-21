@@ -1666,8 +1666,7 @@ var _ = ginkgo.Describe("the client", func() {
 
 			info, err := testClient.GetInfo(context.Background())
 			gomega.Expect(err).NotTo(gomega.HaveOccurred())
-			gomega.Expect(info).NotTo(gomega.BeNil())
-			gomega.Expect(info["Name"]).To(gomega.Equal("docker-server"))
+			gomega.Expect(info.Name).To(gomega.Equal("docker-server"))
 		})
 
 		ginkgo.It("GetInfo handles TLS connection failures gracefully", func() {
@@ -1713,11 +1712,13 @@ var _ = ginkgo.Describe("the client", func() {
 
 			info, err := testClient.GetInfo(context.Background())
 			gomega.Expect(err).NotTo(gomega.HaveOccurred())
-			gomega.Expect(info).To(gomega.HaveKeyWithValue("Name", "test-docker"))
-			gomega.Expect(info).To(gomega.HaveKeyWithValue("ServerVersion", "25.0.0"))
-			gomega.Expect(info).To(gomega.HaveKeyWithValue("OSType", "linux"))
-			gomega.Expect(info).To(gomega.HaveKeyWithValue("OperatingSystem", "Alpine Linux"))
-			gomega.Expect(info).To(gomega.HaveKeyWithValue("Driver", "btrfs"))
+			gomega.Expect(info).To(gomega.Equal(types.SystemInfo{
+				Name:            "test-docker",
+				ServerVersion:   "25.0.0",
+				OSType:          "linux",
+				OperatingSystem: "Alpine Linux",
+				Driver:          "btrfs",
+			}))
 		})
 	})
 
@@ -2411,7 +2412,7 @@ var _ = ginkgo.Describe("isDaemonConnectionError", func() {
 	)
 })
 
-var _ = ginkgo.Describe("SetNoRestartPolicy", func() {
+var _ = ginkgo.Describe("SetRestartPolicy", func() {
 	var (
 		mockServer *ghttp.Server
 		docker     *dockerClient.Client
@@ -2438,11 +2439,15 @@ var _ = ginkgo.Describe("SetNoRestartPolicy", func() {
 		ginkgo.It("should short-circuit without calling ContainerUpdate", func() {
 			c := &client{log: testLog()}
 
-			c.SetNoRestartPolicy(context.Background(), nil)
+			c.SetRestartPolicy(
+				context.Background(),
+				nil,
+				dockerContainer.RestartPolicy{},
+			)
 		})
 	})
 
-	ginkgo.When("the container is non-nil and update succeeds", func() {
+	ginkgo.When("the policy name is empty", func() {
 		ginkgo.It("should send restart policy Name=no to the Docker API", func() {
 			cid := "watchtower-container-id"
 			mockedContainer := MockContainer(
@@ -2450,18 +2455,62 @@ var _ = ginkgo.Describe("SetNoRestartPolicy", func() {
 			)
 
 			mockServer.AppendHandlers(
-				ContainerUpdateHandler(cid, http.StatusOK, true),
+				ContainerUpdateHandler(cid, http.StatusOK, "no"),
 			)
 
 			c := &client{log: testLog(), api: docker}
 
-			c.SetNoRestartPolicy(context.Background(), mockedContainer)
+			c.SetRestartPolicy(
+				context.Background(),
+				mockedContainer,
+				dockerContainer.RestartPolicy{},
+			)
+		})
+
+		ginkgo.It("should clear MaximumRetryCount when normalizing an empty name", func() {
+			cid := "watchtower-container-id"
+			mockedContainer := MockContainer(
+				WithID(cid),
+			)
+
+			mockServer.AppendHandlers(
+				ContainerUpdateHandler(cid, http.StatusOK, "no"),
+			)
+
+			c := &client{log: testLog(), api: docker}
+
+			c.SetRestartPolicy(
+				context.Background(),
+				mockedContainer,
+				dockerContainer.RestartPolicy{MaximumRetryCount: 5},
+			)
+		})
+	})
+
+	ginkgo.When("the policy is always", func() {
+		ginkgo.It("should send restart policy Name=always to the Docker API", func() {
+			cid := "watchtower-container-id"
+			mockedContainer := MockContainer(
+				WithID(cid),
+			)
+
+			mockServer.AppendHandlers(
+				ContainerUpdateHandler(cid, http.StatusOK, "always"),
+			)
+
+			c := &client{log: testLog(), api: docker}
+
+			c.SetRestartPolicy(
+				context.Background(),
+				mockedContainer,
+				dockerContainer.RestartPolicy{Name: dockerContainer.RestartPolicyAlways},
+			)
 		})
 	})
 
 	ginkgo.When("the container update fails", func() {
-		ginkgo.It("should log a warning and not return an error", func() {
-			log, logbuf := captureLog(zerolog.WarnLevel)
+		ginkgo.It("should log the failure and not panic", func() {
+			log, logbuf := captureLog(zerolog.DebugLevel)
 
 			cid := "watchtower-container-id"
 			mockedContainer := MockContainer(
@@ -2469,14 +2518,18 @@ var _ = ginkgo.Describe("SetNoRestartPolicy", func() {
 			)
 
 			mockServer.AppendHandlers(
-				ContainerUpdateHandler(cid, http.StatusInternalServerError, false),
+				ContainerUpdateHandler(cid, http.StatusInternalServerError, ""),
 			)
 
 			c := &client{log: log, api: docker}
 
-			c.SetNoRestartPolicy(context.Background(), mockedContainer)
+			c.SetRestartPolicy(
+				context.Background(),
+				mockedContainer,
+				dockerContainer.RestartPolicy{Name: dockerContainer.RestartPolicyDisabled},
+			)
 
-			gomega.Expect(logbuf).To(gbytes.Say("Failed to set restart policy to 'no'"))
+			gomega.Expect(logbuf).To(gbytes.Say("Failed to set container restart policy"))
 		})
 	})
 })

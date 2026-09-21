@@ -54,5 +54,5 @@ The ephemeral self-update mechanism is an alternative to the default rename-base
 
 ## Limitations
 
-- The Docker socket must be mounted in the Watchtower container (required for both mechanisms).
+- For both update mechanisms, the Watchtower container requires the Docker socket to be mounted as a volume or a Docker host URL.
 - The orchestrator container is identified by the `com.centurylinklabs.watchtower.ephemeral-orchestrator` label. Orphaned orchestrators from crashes are cleaned up on Watchtower startup.

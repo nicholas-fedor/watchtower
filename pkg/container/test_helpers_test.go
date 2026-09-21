@@ -2,6 +2,7 @@ package container
 
 import (
 	"fmt"
+	"net"
 	"net/http"
 	"time"
 
@@ -11,6 +12,7 @@ import (
 	"github.com/rs/zerolog"
 
 	dockerContainer "github.com/moby/moby/api/types/container"
+	dockerNetwork "github.com/moby/moby/api/types/network"
 
 	"github.com/nicholas-fedor/watchtower/internal/logging"
 )
@@ -18,6 +20,17 @@ import (
 // testLog returns a discarded zerolog logger for tests that do not assert on output.
 func testLog() *zerolog.Logger {
 	return logging.NopLogger()
+}
+
+// mustParseMAC returns a 6-byte HardwareAddr as Docker inspect JSON unmarshals it.
+//
+// Tests must not construct HardwareAddr from the colon-separated string bytes.
+// That 17-byte value is not what the Engine API produces.
+func mustParseMAC(mac string) dockerNetwork.HardwareAddr {
+	parsed, err := net.ParseMAC(mac)
+	gomega.Expect(err).ToNot(gomega.HaveOccurred(), "parse MAC %q", mac)
+
+	return dockerNetwork.HardwareAddr(parsed)
 }
 
 // captureLog returns a logfmt *zerolog.Logger writing to a gbytes.Buffer for gomega.Say assertions.

@@ -208,7 +208,9 @@ func categorizeContainer(log *zerolog.Logger, report *report, update *ContainerS
 		Msg("Categorizing container status")
 
 	// Categorize based on image or state.
-	if update.newImage == update.oldImage && update.state != RestartedState {
+	if update.newImage == update.oldImage &&
+		update.state != RestartedState &&
+		update.state != FailedState {
 		log.Debug().
 			Str("container", update.containerName).
 			Str("old_state", update.State()).

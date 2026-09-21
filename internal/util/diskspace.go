@@ -3,6 +3,7 @@ package util
 import (
 	"errors"
 	"fmt"
+	"math"
 	"math/big"
 	"strconv"
 	"strings"
@@ -213,4 +214,66 @@ func splitDiskSpaceValueAndUnit(size string) (string, string) {
 	}
 
 	return strings.TrimSpace(size[:end]), size[end:]
+}
+
+// FormatDiskSpace formats a byte count as a compact decimal size string.
+//
+// Values below 1000 bytes stay in bytes. Larger values use KB, MB, GB, TB, or PB
+// (powers of 1000) to match ParseDiskSpace decimal units. Exact multiples are
+// whole numbers. Other values use up to two decimal places with trailing zeros
+// trimmed.
+//
+// Parameters:
+//   - bytes: Size in bytes. Negative values are formatted with a leading minus.
+//
+// Returns:
+//   - string: Human-readable size such as "10 GB" or "512 B".
+func FormatDiskSpace(bytes int64) string {
+	if bytes == math.MinInt64 {
+		return "-" + FormatDiskSpace(math.MaxInt64)
+	}
+
+	if bytes < 0 {
+		return "-" + FormatDiskSpace(-bytes)
+	}
+
+	units := []struct {
+		suffix string
+		size   int64
+	}{
+		{"PB", petabyteMultiplier},
+		{"TB", terabyteMultiplier},
+		{"GB", gigabyteMultiplier},
+		{"MB", megabyteMultiplier},
+		{"KB", kilobyteMultiplier},
+	}
+
+	for _, unit := range units {
+		if bytes >= unit.size {
+			return formatDiskSpaceAmount(bytes, unit.size, unit.suffix)
+		}
+	}
+
+	return strconv.FormatInt(bytes, 10) + " B"
+}
+
+// formatDiskSpaceAmount formats bytes as a decimal quantity of the given unit.
+//
+// Parameters:
+//   - bytes: Size in bytes. Must be non-negative.
+//   - size: Unit multiplier in bytes.
+//   - suffix: Unit label such as "GB".
+//
+// Returns:
+//   - string: Quantity and unit separated by a space.
+func formatDiskSpaceAmount(bytes, size int64, suffix string) string {
+	if bytes%size == 0 {
+		return strconv.FormatInt(bytes/size, 10) + " " + suffix
+	}
+
+	formatted := strconv.FormatFloat(float64(bytes)/float64(size), 'f', 2, 64)
+	formatted = strings.TrimRight(formatted, "0")
+	formatted = strings.TrimRight(formatted, ".")
+
+	return formatted + " " + suffix
 }

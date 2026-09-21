@@ -2,18 +2,15 @@
 // It includes tools for slice and map manipulation, random name generation, and SHA-256 hashing.
 //
 // Key components:
-//   - SliceEqual: Compares string slices for equality.
 //   - SliceSubtract: Removes elements from string slices.
 //   - StringMapSubtract: Removes matching key-value pairs from string maps.
 //   - StructMapSubtract: Removes matching keys from struct maps.
-//   - MinInt: Returns the smaller of two integers.
 //   - RandName: Generates random 32-character container names.
 //   - GenerateRandomSHA256: Creates random 64-character SHA-256 hashes.
 //   - ParseDiskSpace: Parses absolute disk-space strings into bytes.
 //
 // Usage example:
 //
-//	equal := util.SliceEqual(slice1, slice2)
 //	name := util.RandName()
 //	hash := util.GenerateRandomPrefixedSHA256()
 //

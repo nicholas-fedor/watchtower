@@ -50,13 +50,13 @@ var Templates = map[string]string{
 {{- else if eq $msg "Only checking containers in scope" -}}
     Only checking containers in scope: {{index $e.Data "scope"}}
 {{- else if eq $msg "Docker image usage exceeds configured maximum" -}}
-    Docker image usage exceeds configured maximum: {{if HasKey $e.Data "usage"}}{{index $e.Data "usage"}}{{else}}unknown{{end}}/{{if HasKey $e.Data "max"}}{{index $e.Data "max"}}{{else}}unknown{{end}} bytes used (reclaimable {{if HasKey $e.Data "reclaimable"}}{{index $e.Data "reclaimable"}}{{else}}unknown{{end}}, {{if HasKey $e.Data "image_count"}}{{index $e.Data "image_count"}}{{else}}unknown{{end}} images)
+    Docker image usage exceeds configured maximum: {{if HasKey $e.Data "usage"}}{{FormatDiskSpace (index $e.Data "usage")}}{{else}}unknown{{end}} of {{if HasKey $e.Data "max"}}{{FormatDiskSpace (index $e.Data "max")}}{{else}}unknown{{end}} used ({{if HasKey $e.Data "reclaimable"}}{{FormatDiskSpace (index $e.Data "reclaimable")}}{{else}}unknown{{end}} reclaimable, {{if HasKey $e.Data "image_count"}}{{index $e.Data "image_count"}}{{else}}unknown{{end}} images)
 {{- else if eq $msg "Docker image usage exceeds configured warning threshold" -}}
-    Docker image usage exceeds configured warning threshold: {{if HasKey $e.Data "usage"}}{{index $e.Data "usage"}}{{else}}unknown{{end}}/{{if HasKey $e.Data "warn"}}{{index $e.Data "warn"}}{{else}}unknown{{end}} bytes used (reclaimable {{if HasKey $e.Data "reclaimable"}}{{index $e.Data "reclaimable"}}{{else}}unknown{{end}}, {{if HasKey $e.Data "image_count"}}{{index $e.Data "image_count"}}{{else}}unknown{{end}} images)
+    Docker image usage exceeds configured warning threshold: {{if HasKey $e.Data "usage"}}{{FormatDiskSpace (index $e.Data "usage")}}{{else}}unknown{{end}} of {{if HasKey $e.Data "warn"}}{{FormatDiskSpace (index $e.Data "warn")}}{{else}}unknown{{end}} used ({{if HasKey $e.Data "reclaimable"}}{{FormatDiskSpace (index $e.Data "reclaimable")}}{{else}}unknown{{end}} reclaimable, {{if HasKey $e.Data "image_count"}}{{index $e.Data "image_count"}}{{else}}unknown{{end}} images)
 {{- else if eq $msg "Failed to query Docker image disk usage" -}}
     Failed to query Docker image disk usage{{with (index $e.Data "error")}}: {{.}}{{end}}
 {{- else if eq $msg "Docker image usage budget enabled" -}}
-    Docker image usage budget enabled: max {{if HasKey $e.Data "disk_space_max"}}{{index $e.Data "disk_space_max"}}{{else}}0{{end}} bytes, warn {{if HasKey $e.Data "disk_space_warn"}}{{index $e.Data "disk_space_warn"}}{{else}}0{{end}} bytes
+    Docker image usage budget enabled: maximum {{if HasKey $e.Data "disk_space_max"}}{{FormatDiskSpace (index $e.Data "disk_space_max")}}{{else}}0 B{{end}}, warning at {{if HasKey $e.Data "disk_space_warn"}}{{FormatDiskSpace (index $e.Data "disk_space_warn")}}{{else}}0 B{{end}}
 {{- else if $e.Data -}}
     {{- /* For messages with data, show message and key=value pairs */ -}}
     {{$msg}} | {{range $k, $v := $e.Data}}{{$k}}={{$v}} {{end}}

@@ -9,6 +9,9 @@ import (
 
 	dockerSystem "github.com/moby/moby/api/types/system"
 	dockerClient "github.com/moby/moby/client"
+
+	"github.com/nicholas-fedor/watchtower/pkg/registry/auth"
+	"github.com/nicholas-fedor/watchtower/pkg/registry/hosts"
 )
 
 // daemonInfoTTL is how long a Docker Info and mirrors snapshot is reused.
@@ -163,19 +166,23 @@ func (c imageClient) fetchDaemonInfo(ctx context.Context) daemonInfoResult {
 
 // buildMirrorEndpoints returns the list of registry endpoints to try for digest comparison.
 //
-// It uses the global mirrors from the Docker daemon configuration.
-// An empty string in the returned list means use the canonical registry host.
-// The canonical host is always appended as the final fallback.
+// Docker daemon registry-mirrors apply only to Docker Hub. Non-Hub images,
+// including ghcr.io and lscr.io, return nil so digest checks use the canonical
+// host. An empty string in the returned list means use the canonical registry
+// host. The canonical host is always appended as the final fallback.
 //
-// If no mirrors are configured, nil is returned (use canonical behavior).
+// If no mirrors are configured, or the image is not on Docker Hub, nil is
+// returned (use canonical behavior).
 //
 // Parameters:
 //   - info: System info with mirror configuration from the Docker daemon (may be nil).
+//   - imageRef: Image reference used to decide whether Hub mirrors apply.
 //
 // Returns:
 //   - []string: List of host overrides to try. Empty string means use canonical host.
 func (c imageClient) buildMirrorEndpoints(
 	info *dockerSystem.Info,
+	imageRef string,
 ) []string {
 	if info == nil || info.RegistryConfig == nil {
 		return nil
@@ -183,6 +190,14 @@ func (c imageClient) buildMirrorEndpoints(
 
 	mirrors := info.RegistryConfig.Mirrors
 	if len(mirrors) == 0 {
+		return nil
+	}
+
+	if !c.isDockerHubImage(imageRef) {
+		c.logger().Debug().
+			Str("image", imageRef).
+			Msg("Skipping Docker Hub registry mirrors for non-Hub image")
+
 		return nil
 	}
 
@@ -199,4 +214,23 @@ func (c imageClient) buildMirrorEndpoints(
 	endpoints = append(endpoints, "")
 
 	return endpoints
+}
+
+// isDockerHubImage reports whether imageRef is served by Docker Hub.
+//
+// Bare names and docker.io references resolve to index.docker.io. Other
+// registries, including ghcr.io and lscr.io, are not Hub.
+//
+// Parameters:
+//   - imageRef: Image reference to classify.
+//
+// Returns:
+//   - bool: True when the canonical registry host is Docker Hub.
+func (c imageClient) isDockerHubImage(imageRef string) bool {
+	address, err := auth.GetRegistryAddress(c.logger(), imageRef)
+	if err != nil {
+		return false
+	}
+
+	return address == hosts.DockerRegistryHost
 }

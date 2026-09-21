@@ -1012,6 +1012,24 @@
         "bug",
         "code"
       ]
+    },
+    {
+      "login": "shawly",
+      "name": "shawly",
+      "avatar_url": "https://avatars.githubusercontent.com/u/6448794?v=4",
+      "profile": "https://github.com/shawly",
+      "contributions": [
+        "code"
+      ]
+    },
+    {
+      "login": "NotaInutilis",
+      "name": "Nota Inutilis",
+      "avatar_url": "https://avatars.githubusercontent.com/u/9675966?v=4",
+      "profile": "https://notainutilis.fr",
+      "contributions": [
+        "doc"
+      ]
     }
   ],
   "contributorsPerLine": 7,

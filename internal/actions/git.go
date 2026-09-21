@@ -199,7 +199,7 @@ func (s *gitSession) prepareRebuilds(
 
 		result, _ := s.result(c.ID())
 
-		ref, err := compose.ResolveProjectDir(log, containerLabels(c), params.ComposeProjects)
+		ref, err := compose.ResolveProjectDir(containerLabels(c), params.ComposeProjects)
 		if err != nil {
 			failed[c.ID()] = err
 			c.SetStale(false)

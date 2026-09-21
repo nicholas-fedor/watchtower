@@ -10,4 +10,6 @@
 //   - lscr.io images are hosted on ghcr.io, so auth challenges are remapped
 //   - Docker Hub's docker.io maps to index.docker.io
 //   - Basic auth is supported when credentials are provided
+//   - Anonymous GHCR bearer tokens are reused across public images
+//   - A cached anonymous GHCR token skips the /v2/ challenge
 package auth

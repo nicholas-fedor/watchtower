@@ -826,6 +826,102 @@ func TestGetToken(t *testing.T) {
 	}
 }
 
+func TestGetToken_anonymousGHCRSkipsChallengeOnCachedToken(t *testing.T) {
+	seedAnonymousGHCRToken(t)
+
+	mockClient := mockAuth.NewMockClient(t)
+	got, err := GetToken(testLog(), context.Background(), newGHCRContainer(t), "", mockClient, "")
+	require.NoError(t, err)
+	assert.Equal(t, TokenResult{
+		Token:         testAnonymousGHCRToken,
+		ChallengeHost: "ghcr.io",
+	}, got)
+}
+
+func TestGetToken_anonymousLSCRSkipsChallengeOnCachedToken(t *testing.T) {
+	seedAnonymousGHCRToken(t)
+
+	mockClient := mockAuth.NewMockClient(t)
+	got, err := GetToken(testLog(), context.Background(), newLSCRContainer(t), "", mockClient, "")
+	require.NoError(t, err)
+	assert.Equal(t, TokenResult{
+		Token:         testAnonymousGHCRToken,
+		ChallengeHost: "ghcr.io",
+	}, got)
+}
+
+func TestGetToken_anonymousGHCRChallengesWhenCacheEmpty(t *testing.T) {
+	resetTokenCache(t)
+
+	mockClient := mockAuth.NewMockClient(t)
+	challengeURL, err := url.Parse("https://ghcr.io/v2/")
+	require.NoError(t, err)
+
+	mockClient.On("Do", mock.Anything).Return(&http.Response{
+		StatusCode: http.StatusUnauthorized,
+		Body:       http.NoBody,
+		Header:     http.Header{"Www-Authenticate": []string{`Bearer realm="https://ghcr.io/token",service="ghcr.io"`}},
+		Request:    &http.Request{URL: challengeURL},
+	}, nil).Once()
+	mockClient.On("Do", mock.Anything).Return(&http.Response{
+		StatusCode: http.StatusOK,
+		Body:       io.NopCloser(strings.NewReader(`{"token":"fresh-ghcr-token","expires_in":3600}`)),
+		Header:     make(http.Header),
+		Request:    &http.Request{URL: mustParseURL("https://ghcr.io/token")},
+	}, nil).Once()
+
+	got, err := GetToken(testLog(), context.Background(), newGHCRContainer(t), "", mockClient, "")
+	require.NoError(t, err)
+	assert.Equal(t, TokenResult{
+		Token:         "Bearer fresh-ghcr-token",
+		ChallengeHost: "ghcr.io",
+	}, got)
+}
+
+func TestGetToken_anonymousGHCRDoesNotSkipMirrorOrCredentials(t *testing.T) {
+	seedAnonymousGHCRToken(t)
+
+	tests := []struct {
+		name         string
+		registryAuth string
+		endpoint     string
+		challengeURL string
+	}{
+		{
+			name:         "credentials still challenge",
+			registryAuth: "dXNlcjpwYXNz",
+			challengeURL: "https://ghcr.io/v2/",
+		},
+		{
+			name:         "mirror endpoint still challenge",
+			endpoint:     "https://mirror.example.com",
+			challengeURL: "https://mirror.example.com/v2/",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			mockClient := mockAuth.NewMockClient(t)
+			challengeURL, err := url.Parse(tt.challengeURL)
+			require.NoError(t, err)
+
+			mockClient.On("Do", mock.Anything).Return(&http.Response{
+				StatusCode: http.StatusOK,
+				Body:       http.NoBody,
+				Header:     make(http.Header),
+				Request:    &http.Request{URL: challengeURL},
+			}, nil).Once()
+
+			got, err := GetToken(testLog(), context.Background(), newGHCRContainer(t), tt.registryAuth, mockClient, tt.endpoint)
+			require.NoError(t, err)
+			assert.Equal(t, TokenResult{
+				Redirected:   false,
+				RedirectHost: "",
+			}, got)
+		})
+	}
+}
+
 func newNoPullContainer(t *testing.T) types.Container {
 	t.Helper()
 
@@ -855,6 +951,30 @@ func newRemoteContainer(t *testing.T) types.Container {
 
 	container := mockTypes.NewMockContainer(t)
 	container.On("ImageName").Return("test/image:latest").Maybe()
+	container.On("IsNoPull", mock.Anything).Return(false).Maybe()
+	container.On("IsStale").Return(false).Maybe()
+	container.On("IsRunning").Return(true).Maybe()
+
+	return container
+}
+
+func newGHCRContainer(t *testing.T) types.Container {
+	t.Helper()
+
+	container := mockTypes.NewMockContainer(t)
+	container.On("ImageName").Return("ghcr.io/linuxserver/sonarr:latest").Maybe()
+	container.On("IsNoPull", mock.Anything).Return(false).Maybe()
+	container.On("IsStale").Return(false).Maybe()
+	container.On("IsRunning").Return(true).Maybe()
+
+	return container
+}
+
+func newLSCRContainer(t *testing.T) types.Container {
+	t.Helper()
+
+	container := mockTypes.NewMockContainer(t)
+	container.On("ImageName").Return("lscr.io/linuxserver/sonarr:latest").Maybe()
 	container.On("IsNoPull", mock.Anything).Return(false).Maybe()
 	container.On("IsStale").Return(false).Maybe()
 	container.On("IsRunning").Return(true).Maybe()

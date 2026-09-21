@@ -5,7 +5,6 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -13,15 +12,13 @@ import (
 func TestResolveProjectDir(t *testing.T) {
 	t.Parallel()
 
-	nop := zerolog.Nop()
-
 	t.Run("compose-dir wins over the process map", func(t *testing.T) {
 		t.Parallel()
 
 		dir := writeComposeDir(t, "compose.yaml")
 		other := writeComposeDir(t, "compose.yaml")
 
-		ref, err := ResolveProjectDir(&nop, map[string]string{
+		ref, err := ResolveProjectDir(map[string]string{
 			WatchtowerComposeDirLabel: dir,
 			ComposeProjectLabel:       "web",
 			ComposeWorkingDirLabel:    other,
@@ -36,7 +33,7 @@ func TestResolveProjectDir(t *testing.T) {
 
 		missing := filepath.Join(t.TempDir(), "missing")
 		dir := writeComposeDir(t, "compose.yaml")
-		_, err := ResolveProjectDir(&nop, map[string]string{
+		_, err := ResolveProjectDir(map[string]string{
 			WatchtowerComposeDirLabel: missing,
 			ComposeProjectLabel:       "web",
 		}, map[string]string{"web": dir})
@@ -47,7 +44,7 @@ func TestResolveProjectDir(t *testing.T) {
 		t.Parallel()
 
 		dir := writeComposeDir(t, "compose.yaml")
-		ref, err := ResolveProjectDir(&nop, map[string]string{
+		ref, err := ResolveProjectDir(map[string]string{
 			ComposeProjectLabel:    "web",
 			ComposeWorkingDirLabel: writeComposeDir(t, "compose.yaml"),
 		}, map[string]string{"web": dir})
@@ -59,7 +56,7 @@ func TestResolveProjectDir(t *testing.T) {
 		t.Parallel()
 
 		missing := filepath.Join(t.TempDir(), "missing")
-		_, err := ResolveProjectDir(&nop, map[string]string{
+		_, err := ResolveProjectDir(map[string]string{
 			ComposeProjectLabel:    "web",
 			ComposeWorkingDirLabel: writeComposeDir(t, "compose.yaml"),
 		}, map[string]string{"web": missing})
@@ -69,7 +66,7 @@ func TestResolveProjectDir(t *testing.T) {
 	t.Run("working dir alone does not opt in", func(t *testing.T) {
 		t.Parallel()
 
-		ref, err := ResolveProjectDir(&nop, map[string]string{
+		ref, err := ResolveProjectDir(map[string]string{
 			ComposeWorkingDirLabel: writeComposeDir(t, "compose.yaml"),
 		}, nil)
 		require.NoError(t, err)
@@ -79,7 +76,7 @@ func TestResolveProjectDir(t *testing.T) {
 	t.Run("nil labels", func(t *testing.T) {
 		t.Parallel()
 
-		ref, err := ResolveProjectDir(&nop, nil, map[string]string{"web": writeComposeDir(t, "compose.yaml")})
+		ref, err := ResolveProjectDir(nil, map[string]string{"web": writeComposeDir(t, "compose.yaml")})
 		require.NoError(t, err)
 		assert.Empty(t, ref.Dir)
 	})
@@ -88,7 +85,7 @@ func TestResolveProjectDir(t *testing.T) {
 		t.Parallel()
 
 		dir := writeComposeDir(t, "compose.yaml")
-		ref, err := ResolveProjectDir(&nop, map[string]string{
+		ref, err := ResolveProjectDir(map[string]string{
 			WatchtowerComposeDirLabel: "  ",
 			ComposeProjectLabel:       "web",
 		}, map[string]string{"web": dir})
@@ -99,7 +96,7 @@ func TestResolveProjectDir(t *testing.T) {
 	t.Run("git labels only are not a compose project", func(t *testing.T) {
 		t.Parallel()
 
-		ref, err := ResolveProjectDir(&nop, map[string]string{
+		ref, err := ResolveProjectDir(map[string]string{
 			"com.centurylinklabs.watchtower.git-repo": "https://git.example.com/org/app.git",
 		}, nil)
 		require.NoError(t, err)
@@ -111,7 +108,7 @@ func TestResolveProjectDir(t *testing.T) {
 
 		dir := writeComposeDir(t, "compose.yaml")
 		abs := filepath.Join(t.TempDir(), "override.yaml")
-		ref, err := ResolveProjectDir(&nop, map[string]string{
+		ref, err := ResolveProjectDir(map[string]string{
 			WatchtowerComposeDirLabel: dir,
 			ComposeConfigFilesLabel:   "compose.yaml,  extra.yml, " + abs + ", ,",
 		}, nil)

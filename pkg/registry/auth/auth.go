@@ -472,6 +472,9 @@ func handleBearerAuth(
 // instead of the canonical registry host. This enables digest checks against configured
 // Docker registry mirrors.
 //
+// Anonymous GHCR requests skip the /v2/ challenge when a shared, unexpired
+// bearer token is already cached.
+//
 // Parameters:
 //   - log: Process logger.
 //   - ctx: Context for request lifecycle control.
@@ -502,6 +505,20 @@ func GetToken(
 			Msg("Failed to parse image name")
 
 		return TokenResult{}, fmt.Errorf("%w: %w", errFailedParseImageName, err)
+	}
+
+	result, ok := cachedAnonymousGHCRToken(
+		&clog,
+		normalizedRef,
+		registryAuth,
+		endpoint,
+	)
+	if ok {
+		clog.Debug().
+			Str("challenge_host", result.ChallengeHost).
+			Msg("Using cached anonymous GHCR token, skipping challenge")
+
+		return result, nil
 	}
 
 	// Generate the challenge URL, using the endpoint override if provided.

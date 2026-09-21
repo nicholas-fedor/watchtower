@@ -17,6 +17,7 @@ import (
 	"github.com/rs/zerolog"
 	"github.com/spf13/viper"
 
+	"github.com/nicholas-fedor/watchtower/pkg/registry/hosts"
 	"github.com/nicholas-fedor/watchtower/pkg/registry/ratelimit"
 	"github.com/nicholas-fedor/watchtower/pkg/types"
 )
@@ -98,6 +99,8 @@ func initTokenCache(log *zerolog.Logger) {
 //
 // It parses the challenge header, constructs the auth URL, and retrieves a bearer token.
 // The token is cached to avoid redundant HTTP requests for the same challenge.
+// Anonymous GHCR tokens are reused across public images because GHCR does not
+// bind those tokens to the requested repository scope.
 //
 // Parameters:
 //   - ctx: Context for request lifecycle control, enabling cancellation or timeouts.
@@ -151,6 +154,7 @@ func GetBearerToken(log *zerolog.Logger,
 //
 // It checks the token cache for a valid, unexpired entry. On a cache miss or expiry,
 // it executes the HTTP request, parses the response, and populates the cache.
+// Anonymous GHCR entries share a cache key that omits repository scope.
 //
 // Parameters:
 //   - ctx: Context for request lifecycle control.
@@ -171,7 +175,8 @@ func executeBearerTokenRequest(log *zerolog.Logger,
 ) (string, error) {
 	initTokenCache(log)
 
-	cacheKeyStr := authURL.String() + "|" + registryAuth
+	// Anonymous GHCR requests share a cache key that omits repository scope.
+	cacheKeyStr := bearerCacheKey(authURL, registryAuth)
 
 	// Attempt cache lookup.
 	entry, ok := tokenCache.GetIfPresent(cacheKeyStr)
@@ -222,6 +227,124 @@ func executeBearerTokenRequest(log *zerolog.Logger,
 		Msg("Retrieved and cached bearer token")
 
 	return fullToken, nil
+}
+
+// bearerCacheKey returns the cache key for a bearer token request.
+//
+// Anonymous GHCR tokens are reusable across public repositories, so the
+// repository scope is omitted from the key. Authenticated GHCR tokens and
+// tokens for other registries remain scoped to the full token URL.
+//
+// Parameters:
+//   - authURL: Token endpoint URL, including service and scope query parameters.
+//   - registryAuth: Base64-encoded credentials. Empty for anonymous pulls.
+//
+// Returns:
+//   - string: Cache key used by the bearer token cache.
+func bearerCacheKey(authURL *url.URL, registryAuth string) string {
+	if sharedAnonymousGHCRToken(authURL, registryAuth) {
+		shared := *authURL
+		query := shared.Query()
+		query.Del("scope")
+		shared.RawQuery = query.Encode()
+
+		return shared.String() + "|"
+	}
+
+	return authURL.String() + "|" + registryAuth
+}
+
+// sharedAnonymousGHCRToken reports whether authURL and registryAuth identify
+// an anonymous GitHub Container Registry token that can be reused across
+// public images.
+//
+// Parameters:
+//   - authURL: Token endpoint URL.
+//   - registryAuth: Base64-encoded credentials. Empty for anonymous pulls.
+//
+// Returns:
+//   - bool: True when the token should use the shared anonymous GHCR cache key.
+func sharedAnonymousGHCRToken(authURL *url.URL, registryAuth string) bool {
+	return registryAuth == "" && hosts.IsGitHubRegistry(authURL.Hostname())
+}
+
+// anonymousGHCRTokenURL returns the GHCR token endpoint used for the shared
+// anonymous cache key.
+//
+// Returns:
+//   - *url.URL: https://ghcr.io/token?service=ghcr.io
+func anonymousGHCRTokenURL() *url.URL {
+	query := url.Values{}
+	query.Set("service", hosts.GitHubRegistryDomain)
+
+	return &url.URL{
+		Scheme:   "https",
+		Host:     hosts.GitHubRegistryDomain,
+		Path:     "/token",
+		RawQuery: query.Encode(),
+	}
+}
+
+// lookupAnonymousGHCRToken returns a cached anonymous GHCR bearer token when
+// one is present and unexpired.
+//
+// Parameters:
+//   - log: Logger used to initialize the token cache on first use.
+//
+// Returns:
+//   - string: Cached bearer token header (for example "Bearer ...").
+//   - bool: True when a valid cached token was found.
+func lookupAnonymousGHCRToken(log *zerolog.Logger) (string, bool) {
+	initTokenCache(log)
+
+	entry, ok := tokenCache.GetIfPresent(
+		bearerCacheKey(anonymousGHCRTokenURL(), ""),
+	)
+	if !ok || !time.Now().Before(entry.expiresAt) {
+		return "", false
+	}
+
+	return entry.token, true
+}
+
+// cachedAnonymousGHCRToken returns a TokenResult for a cached anonymous GHCR
+// token when the request can skip the registry challenge.
+//
+// Credentials, registry mirrors, and non-GHCR hosts still require a live
+// challenge. A cache miss or expired token also falls through.
+//
+// Parameters:
+//   - log: Logger used for cache initialization.
+//   - imageRef: Normalized image reference whose registry host is inspected.
+//   - registryAuth: Base64-encoded credentials. Empty for anonymous pulls.
+//   - endpoint: Optional registry mirror override. Empty uses the canonical host.
+//
+// Returns:
+//   - TokenResult: Cached token and ghcr.io challenge host when skipping.
+//   - bool: True when the caller may skip the /v2/ challenge.
+func cachedAnonymousGHCRToken(
+	log *zerolog.Logger,
+	imageRef reference.Named,
+	registryAuth string,
+	endpoint string,
+) (TokenResult, bool) {
+	if endpoint != "" || registryAuth != "" {
+		return TokenResult{}, false
+	}
+
+	if !hosts.IsGitHubRegistry(reference.Domain(imageRef)) {
+		return TokenResult{}, false
+	}
+
+	token, ok := lookupAnonymousGHCRToken(log)
+	if !ok {
+		return TokenResult{}, false
+	}
+
+	return TokenResult{
+		Token:         token,
+		ChallengeHost: hosts.GitHubRegistryDomain,
+	}, true
 }
 
 // performBearerTokenFetch executes the HTTP request to fetch a bearer token.

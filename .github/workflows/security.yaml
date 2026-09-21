@@ -31,7 +31,7 @@ jobs:
       security-events: write
     steps:
       - name: Harden the Runner (Step Security)
-        uses: step-security/harden-runner@05e31511f85b41b11d1cf0ef85d0992719546e2c # v2.21.0
+        uses: step-security/harden-runner@e14015d583714f6e62063499dc959a02595150a1 # v2.21.1
         with:
           egress-policy: audit
 
@@ -46,7 +46,7 @@ jobs:
           args: "-exclude-generated -no-fail -fmt sarif -out ${{ env.OUTPUT_FILE }} ./..."
 
       - name: Upload SARIF file
-        uses: github/codeql-action/upload-sarif@cdf488f595d80d6e07e03d4674febd5ab45fa938 # v4.37.9
+        uses: github/codeql-action/upload-sarif@1c5b675653bb5c22dbe9b12b556ec555138e09fd # v4.38.1
         with:
           sarif_file: ${{ env.OUTPUT_FILE }}
           category: gosec-sarif
@@ -59,7 +59,7 @@ jobs:
       security-events: write
     steps:
       - name: Harden the Runner (Step Security)
-        uses: step-security/harden-runner@05e31511f85b41b11d1cf0ef85d0992719546e2c # v2.21.0
+        uses: step-security/harden-runner@e14015d583714f6e62063499dc959a02595150a1 # v2.21.1
         with:
           egress-policy: audit
 
@@ -72,7 +72,7 @@ jobs:
           go-version-file: "go.mod"
 
       - name: Upload SARIF file
-        uses: github/codeql-action/upload-sarif@cdf488f595d80d6e07e03d4674febd5ab45fa938 # v4.37.9
+        uses: github/codeql-action/upload-sarif@1c5b675653bb5c22dbe9b12b556ec555138e09fd # v4.38.1
         with:
           sarif_file: ${{ env.OUTPUT_FILE }}
           category: govulncheck-sarif
@@ -85,7 +85,7 @@ jobs:
       security-events: write
     steps:
       - name: Harden the Runner (Step Security)
-        uses: step-security/harden-runner@05e31511f85b41b11d1cf0ef85d0992719546e2c # v2.21.0
+        uses: step-security/harden-runner@e14015d583714f6e62063499dc959a02595150a1 # v2.21.1
         with:
           egress-policy: audit
 
@@ -100,7 +100,7 @@ jobs:
           cache-dependency-path: tools/tplprev/go.sum
 
       - name: Upload SARIF file
-        uses: github/codeql-action/upload-sarif@cdf488f595d80d6e07e03d4674febd5ab45fa938 # v4.37.9
+        uses: github/codeql-action/upload-sarif@1c5b675653bb5c22dbe9b12b556ec555138e09fd # v4.38.1
         with:
           sarif_file: ${{ env.OUTPUT_FILE }}
           category: govulncheck-tplprev-sarif

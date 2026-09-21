@@ -5,8 +5,6 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
-
-	"github.com/rs/zerolog"
 )
 
 // ProjectRef is a Compose project Watchtower can apply.
@@ -26,15 +24,14 @@ type ProjectRef struct {
 // or has no compose file is an error. Watchtower does not fall back to a Git URL context.
 //
 // Parameters:
-//   - log: Process logger.
 //   - labels: Container labels.
 //   - projectDirs: Map of Compose project name to a path inside Watchtower.
 //
 // Returns:
 //   - ProjectRef: Directory when the user opted in. Dir is empty when they did not.
 //   - error: Non-nil when an opted-in path is not a readable Compose project.
-func ResolveProjectDir(log *zerolog.Logger, labels, projectDirs map[string]string) (ProjectRef, error) {
-	name := GetProjectName(log, labels)
+func ResolveProjectDir(labels, projectDirs map[string]string) (ProjectRef, error) {
+	name := GetProjectName(labels)
 
 	if dir := labelValue(labels, WatchtowerComposeDirLabel); dir != "" {
 		return projectRefOrErr(name, dir, labels)

@@ -1,6 +1,7 @@
 package ratelimit
 
 import (
+	"bytes"
 	"context"
 	"errors"
 	"sync/atomic"
@@ -20,6 +21,155 @@ func testLog() *zerolog.Logger {
 	logger := zerolog.Nop()
 
 	return &logger
+}
+
+func TestJitterWaitDoesNotShortenDecisionWait(t *testing.T) {
+	t.Parallel()
+
+	wait := 100 * time.Millisecond
+	seen := map[time.Duration]struct{}{}
+	maxExtra := wait / equalJitterDivisor
+
+	for range 200 {
+		got := jitterWait(wait)
+		assert.GreaterOrEqual(t, got, wait)
+		assert.LessOrEqual(t, got, wait+maxExtra)
+		seen[got] = struct{}{}
+	}
+
+	assert.Greater(t, len(seen), 1)
+}
+
+func TestJitterWaitLeavesZeroUnchanged(t *testing.T) {
+	t.Parallel()
+
+	assert.Equal(t, time.Duration(0), jitterWait(0))
+}
+
+func TestJitterWaitDoesNotExceedHonorWindow(t *testing.T) {
+	t.Parallel()
+
+	assert.Equal(t, maxHonorWait, jitterWait(maxHonorWait))
+}
+
+func TestDoLogsRetryAtDebug(t *testing.T) {
+	ResetForTest()
+
+	var buf bytes.Buffer
+
+	log := zerolog.New(&buf)
+
+	var attempts atomic.Int32
+
+	err := Do(t.Context(), &log, "registry.example", func() error {
+		if attempts.Add(1) < 2 {
+			return &Error{RetryAfter: minHonorWait}
+		}
+
+		return nil
+	})
+	require.NoError(t, err)
+	assert.Contains(t, buf.String(), `"level":"debug"`)
+	assert.Contains(t, buf.String(), "Registry rate limited. Retrying after delay")
+	assert.NotContains(t, buf.String(), `"level":"warn"`)
+}
+
+func TestDoLogsExhaustionAtWarn(t *testing.T) {
+	ResetForTest()
+
+	var buf bytes.Buffer
+
+	log := zerolog.New(&buf).Level(zerolog.DebugLevel)
+
+	err := Do(t.Context(), &log, "registry.example", func() error {
+		return &Error{RetryAfter: 2 * time.Hour}
+	})
+	require.ErrorIs(t, err, ErrRateLimited)
+	assert.Contains(t, buf.String(), `"level":"warn"`)
+	assert.Contains(t, buf.String(), "Registry rate limited. Stopping retries")
+	assert.Contains(t, buf.String(), `"attempts":1`)
+	assert.NotContains(t, buf.String(), "Retrying after delay")
+}
+
+func TestDoLogsTinyTokenBucketExhaustionAtDebug(t *testing.T) {
+	ResetForTest()
+
+	retryElapsed = 250 * time.Millisecond
+
+	defer ResetForTest()
+
+	var buf bytes.Buffer
+
+	log := zerolog.New(&buf).Level(zerolog.DebugLevel)
+
+	err := Do(t.Context(), &log, "ghcr.io", func() error {
+		return &Error{
+			RetryAfter:    975 * time.Microsecond,
+			Allowed:       44000,
+			AllowedWindow: time.Minute,
+			Host:          "ghcr.io",
+		}
+	})
+	require.ErrorIs(t, err, ErrRateLimited)
+	assert.Contains(t, buf.String(), "Registry rate limited. Stopping retries")
+	assert.Contains(t, buf.String(), `"level":"debug"`)
+	assert.NotContains(t, buf.String(), `"level":"warn"`)
+}
+
+func TestDoRetriesPastFiveWhenRetryAfterIsTiny(t *testing.T) {
+	ResetForTest()
+
+	var attempts atomic.Int32
+
+	err := Do(t.Context(), testLog(), "ghcr.io", func() error {
+		if attempts.Add(1) < 8 {
+			return &Error{
+				RetryAfter:    23722 * time.Nanosecond,
+				Allowed:       44000,
+				AllowedWindow: time.Minute,
+				Host:          "ghcr.io",
+			}
+		}
+
+		return nil
+	})
+	require.NoError(t, err)
+	assert.Equal(t, int32(8), attempts.Load())
+}
+
+func TestDoGivesUpWhenTinyRetryAfterExceedsElapsedBudget(t *testing.T) {
+	ResetForTest()
+
+	retryElapsed = 450 * time.Millisecond
+
+	defer ResetForTest()
+
+	var buf bytes.Buffer
+
+	log := zerolog.New(&buf).Level(zerolog.DebugLevel)
+
+	var attempts atomic.Int32
+
+	started := time.Now()
+	err := Do(t.Context(), &log, "ghcr.io", func() error {
+		attempts.Add(1)
+
+		return &Error{
+			RetryAfter:    23722 * time.Nanosecond,
+			Allowed:       44000,
+			AllowedWindow: time.Minute,
+		}
+	})
+	require.ErrorIs(t, err, ErrRateLimited)
+	assert.Contains(t, buf.String(), "Registry rate limited. Stopping retries")
+	assert.Contains(t, buf.String(), "Retrying after delay")
+	assert.Contains(t, buf.String(), `"level":"debug"`)
+	assert.NotContains(t, buf.String(), `"level":"warn"`)
+
+	maxStep := minHonorWait + minHonorWait/equalJitterDivisor
+	minAttempts := int(retryElapsed / maxStep)
+	assert.GreaterOrEqual(t, attempts.Load(), int32(minAttempts))
+	assert.GreaterOrEqual(t, time.Since(started), time.Duration(minAttempts-1)*minHonorWait)
 }
 
 func TestDoRetriesRateLimitedOperations(t *testing.T) {
@@ -119,8 +269,6 @@ func TestDoValueConsumesOneTokenPerAttempt(t *testing.T) {
 		AllowedWindow: 200 * time.Millisecond,
 	})
 
-	time.Sleep(220 * time.Millisecond)
-
 	got, err := DoValue(t.Context(), testLog(), "ghcr.io", func() (string, error) {
 		return "ok", nil
 	})
@@ -130,7 +278,7 @@ func TestDoValueConsumesOneTokenPerAttempt(t *testing.T) {
 	started := time.Now()
 
 	require.NoError(t, Wait(t.Context(), "ghcr.io"))
-	assert.Less(t, time.Since(started), 50*time.Millisecond)
+	assert.GreaterOrEqual(t, time.Since(started), 80*time.Millisecond)
 }
 
 func TestDoValueHonorsHostWaitCancellation(t *testing.T) {

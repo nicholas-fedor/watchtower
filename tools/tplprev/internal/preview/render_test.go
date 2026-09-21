@@ -79,7 +79,7 @@ func TestRenderDefaultLegacyDiskSpaceMessages(t *testing.T) {
 	assert.Contains(
 		t,
 		result,
-		"Docker image usage exceeds configured maximum: 32000000000/40000000000 bytes used (reclaimable 4000000000, 12 images)",
+		"Docker image usage exceeds configured maximum: 32 GB of 40 GB used (4 GB reclaimable, 12 images)",
 	)
 	assert.Contains(t, result, "Failed to query Docker image disk usage: daemon disk usage unavailable")
 	assert.NotContains(t, result, " | ")

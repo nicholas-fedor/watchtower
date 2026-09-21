@@ -1745,6 +1745,7 @@ func TestRetryManifestRequest(t *testing.T) {
 				"ghcr.io",
 				false,
 				mustParseURL("https://registry.example.com/v2/manifests/latest"),
+				"",
 				client,
 			)
 			if tt.wantErr {

@@ -129,3 +129,23 @@ var (
 	// ErrEphemeralStartFailed indicates a failure to start the ephemeral orchestrator container.
 	ErrEphemeralStartFailed = errors.New("failed to start ephemeral orchestrator container")
 )
+
+// Errors for copy-file label operations in copyfile.go.
+var (
+	// errCopyFileInvalidPath indicates a copy-file label path is not a clean absolute file path.
+	errCopyFileInvalidPath = errors.New("invalid copy-file path")
+	// errCopyFileDirectory indicates a copy-file label path refers to a directory.
+	errCopyFileDirectory = errors.New("copy-file path is a directory")
+	// errCopyFileTooLarge indicates a copy-file label path exceeds the per-file size cap.
+	errCopyFileTooLarge = errors.New("copy-file path exceeds size limit")
+	// errCopyFileSnapshotFailed indicates CopyFromContainer failed for a labeled path.
+	errCopyFileSnapshotFailed = errors.New("failed to snapshot copy-file path")
+	// errCopyFileInjectFailed indicates CopyToContainer failed for a labeled path.
+	errCopyFileInjectFailed = errors.New("failed to copy file into new container")
+	// errCopyFileSymlink indicates a copy-file label path is a symbolic link.
+	errCopyFileSymlink = errors.New("copy-file path is a symbolic link")
+	// errCopyFileUnsafeArchive indicates the copied archive was not a single regular file.
+	errCopyFileUnsafeArchive = errors.New("copy-file archive is not a single regular file")
+	// errCopyFileStoreFull indicates in-flight copy-file snapshots exceed the memory cap.
+	errCopyFileStoreFull = errors.New("copy-file snapshot store exceeds size limit")
+)

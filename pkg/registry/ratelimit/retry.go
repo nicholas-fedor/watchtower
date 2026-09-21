@@ -4,6 +4,8 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"math/rand/v2"
+	"time"
 
 	"github.com/cenkalti/backoff/v7"
 	"github.com/rs/zerolog"
@@ -11,17 +13,18 @@ import (
 
 // Do retries operation when the registry returns a 429 that is worth retrying.
 //
-// Permanent errors are not retried. A Retry-After longer than maxHonorWait
-// stops retries so the next Watchtower cycle can try again.
+// Permanent errors are not retried. A Retry-After longer than the honor window
+// stops retries so the next Watchtower cycle can try again. Tiny token-bucket
+// waits retry until that same window elapses.
 //
 // Parameters:
 //   - ctx: Context that bounds the retry loop.
 //   - log: Logger for retry notices. May be nil.
 //   - host: Registry host used for shared cooldown and quota.
-//   - operation: Function to run. It should return a rate-limit Error on 429.
+//   - operation: Function to run. It should return an [Error] on 429.
 //
 // Returns:
-//   - error: The last operation error, or ctx.Err() when canceled.
+//   - error: The last operation error, or [context.Context.Err] when canceled.
 func Do(ctx context.Context, log *zerolog.Logger, host string, operation func() error) error {
 	_, err := DoValue(ctx, log, host, func() (struct{}, error) {
 		return struct{}{}, operation()
@@ -30,7 +33,7 @@ func Do(ctx context.Context, log *zerolog.Logger, host string, operation func() 
 	return err
 }
 
-// DoValue is Do with a successful result.
+// DoValue is [Do] with a successful result.
 //
 // Parameters:
 //   - ctx: Context that bounds the retry loop.
@@ -40,7 +43,7 @@ func Do(ctx context.Context, log *zerolog.Logger, host string, operation func() 
 //
 // Returns:
 //   - T: Value from a successful attempt.
-//   - error: The last operation error, or ctx.Err() when canceled.
+//   - error: The last operation error, or [context.Context.Err] when canceled.
 func DoValue[T any](
 	ctx context.Context,
 	log *zerolog.Logger,
@@ -57,6 +60,10 @@ func DoValue[T any](
 	exp := backoff.NewExponentialBackOff()
 	exp.InitialInterval = minHonorWait
 	exp.MaxInterval = maxHonorWait
+
+	attempt := 0
+	lastHonoredWait := time.Duration(0)
+	lastRawRetryAfter := time.Duration(0)
 
 	result, err := backoff.Retry(ctx, func() (T, error) {
 		waitErr := Wait(ctx, host)
@@ -82,15 +89,22 @@ func DoValue[T any](
 			}
 
 			Observe(host, info)
+			lastRawRetryAfter = info.RetryAfter
 		}
 
 		wait, giveUp := Decision(info)
+
+		attempt++
+		lastHonoredWait = wait
+
 		if giveUp {
 			return zero, backoff.Permanent(opErr)
 		}
 
+		wait = jitterWait(wait)
+
 		if log != nil {
-			log.Warn().
+			log.Debug().
 				Str("host", host).
 				Dur("retry_after", wait).
 				Msg("Registry rate limited. Retrying after delay")
@@ -99,14 +113,62 @@ func DoValue[T any](
 		return zero, backoff.RetryAfter(wait, opErr)
 	},
 		backoff.WithBackOff(exp),
-		backoff.WithMaxTries(maxRetryTries),
-		backoff.WithMaxElapsedTime(maxRetryElapsed),
+		backoff.WithMaxTries(maxRetryAttempts()),
+		backoff.WithMaxElapsedTime(retryElapsed),
 	)
 	if err == nil {
 		return result, nil
 	}
 
-	return result, lastOperationError(err)
+	err = lastOperationError(err)
+	if log != nil && Is(err) {
+		log.WithLevel(exhaustionLevel(err)).
+			Err(err).
+			Str("host", host).
+			Int("attempts", attempt).
+			Dur("honored_wait", lastHonoredWait).
+			Dur("retry_after", lastRawRetryAfter).
+			Msg("Registry rate limited. Stopping retries")
+	}
+
+	return result, err
+}
+
+// exhaustionLevel chooses the log level when in-cycle 429 retries stop.
+//
+// A Retry-After longer than the honor window is a real registry backoff and
+// is logged at warn. Tiny token-bucket waits that exhaust the retry budget
+// stay at debug so they do not become notifications. The container is still
+// Failed on the session report.
+//
+// Parameters:
+//   - err: Last rate-limit error from the retry loop.
+//
+// Returns:
+//   - zerolog.Level: Warn for long Retry-After, debug otherwise.
+func exhaustionLevel(err error) zerolog.Level {
+	info, ok := errors.AsType[*Error](err)
+	if ok && info != nil && info.RetryAfter > maxHonorWait {
+		return zerolog.WarnLevel
+	}
+
+	return zerolog.DebugLevel
+}
+
+// maxRetryAttempts is a circuit breaker derived from the elapsed budget.
+//
+// Token-bucket 429s retry until [retryElapsed], not a fixed handful of tries.
+// This cap only stops a zero-wait loop from spinning.
+//
+// Returns:
+//   - uint: Maximum attempts passed to [backoff.WithMaxTries].
+func maxRetryAttempts() uint {
+	n := retryElapsed/minHonorWait + 1
+	if n < 1 {
+		return 1
+	}
+
+	return uint(n)
 }
 
 // lastOperationError unwraps a cenkalti RetryError to the last operation error.
@@ -135,4 +197,31 @@ func lastOperationError(err error) error {
 	}
 
 	return err
+}
+
+// jitterWait adds nonnegative jitter so concurrent retries do not wake together.
+//
+// The Decision wait is the minimum. Extra delay is in
+// [0, wait/equalJitterDivisor], capped so the result does not exceed
+// maxHonorWait. Zero and negative waits are unchanged.
+//
+// Parameters:
+//   - wait: Decision wait before the next attempt.
+//
+// Returns:
+//   - time.Duration: Jittered wait, never shorter than wait when wait > 0.
+func jitterWait(wait time.Duration) time.Duration {
+	if wait <= 0 {
+		return wait
+	}
+
+	room := maxHonorWait - wait
+	if room <= 0 {
+		return wait
+	}
+
+	spread := min(wait/equalJitterDivisor, room)
+
+	//nolint:gosec // Jitter only needs to desynchronize retries, not be cryptographic.
+	return wait + time.Duration(rand.Int64N(int64(spread)+1))
 }

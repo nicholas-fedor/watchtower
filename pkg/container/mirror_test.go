@@ -19,10 +19,17 @@ import (
 )
 
 func Test_imageClient_buildMirrorEndpoints(t *testing.T) {
+	hubMirrors := &dockerSystem.Info{
+		RegistryConfig: &dockerRegistry.ServiceConfig{
+			Mirrors: []string{"https://mirror.example.com"},
+		},
+	}
+
 	tests := []struct {
-		name string
-		info *dockerSystem.Info
-		want []string
+		name     string
+		info     *dockerSystem.Info
+		imageRef string
+		want     []string
 	}{
 		{
 			name: "nil info returns nil",
@@ -41,7 +48,8 @@ func Test_imageClient_buildMirrorEndpoints(t *testing.T) {
 					Mirrors: []string{},
 				},
 			},
-			want: nil,
+			imageRef: "nginx:latest",
+			want:     nil,
 		},
 		{
 			name: "global mirrors applied to docker hub image",
@@ -50,16 +58,42 @@ func Test_imageClient_buildMirrorEndpoints(t *testing.T) {
 					Mirrors: []string{"https://mirror.example.com"},
 				},
 			},
-			want: []string{"https://mirror.example.com", ""},
+			imageRef: "nginx:latest",
+			want:     []string{"https://mirror.example.com", ""},
 		},
 		{
-			name: "non-hub image uses global mirrors",
+			name:     "docker.io image uses hub mirrors",
+			info:     hubMirrors,
+			imageRef: "docker.io/library/nginx:latest",
+			want:     []string{"https://mirror.example.com", ""},
+		},
+		{
+			name:     "index.docker.io image uses hub mirrors",
+			info:     hubMirrors,
+			imageRef: "index.docker.io/library/nginx:latest",
+			want:     []string{"https://mirror.example.com", ""},
+		},
+		{
+			name: "ghcr image ignores hub mirrors",
 			info: &dockerSystem.Info{
 				RegistryConfig: &dockerRegistry.ServiceConfig{
 					Mirrors: []string{"https://global-mirror.example.com"},
 				},
 			},
-			want: []string{"https://global-mirror.example.com", ""},
+			imageRef: "ghcr.io/org/app:latest",
+			want:     nil,
+		},
+		{
+			name:     "lscr image ignores hub mirrors",
+			info:     hubMirrors,
+			imageRef: "lscr.io/linuxserver/radarr:latest",
+			want:     nil,
+		},
+		{
+			name:     "quay image ignores hub mirrors",
+			info:     hubMirrors,
+			imageRef: "quay.io/org/app:latest",
+			want:     nil,
 		},
 		{
 			name: "multiple mirrors tried in order",
@@ -71,6 +105,7 @@ func Test_imageClient_buildMirrorEndpoints(t *testing.T) {
 					},
 				},
 			},
+			imageRef: "nginx:latest",
 			want: []string{
 				"https://primary-mirror.example.com",
 				"https://backup-mirror.example.com",
@@ -84,7 +119,8 @@ func Test_imageClient_buildMirrorEndpoints(t *testing.T) {
 					Mirrors: []string{"  ", "https://mirror.example.com", "   "},
 				},
 			},
-			want: []string{"https://mirror.example.com", ""},
+			imageRef: "nginx:latest",
+			want:     []string{"https://mirror.example.com", ""},
 		},
 		{
 			name: "empty mirrors are skipped",
@@ -93,7 +129,8 @@ func Test_imageClient_buildMirrorEndpoints(t *testing.T) {
 					Mirrors: []string{"", "https://mirror.example.com", ""},
 				},
 			},
-			want: []string{"https://mirror.example.com", ""},
+			imageRef: "nginx:latest",
+			want:     []string{"https://mirror.example.com", ""},
 		},
 		{
 			name: "canonical host always appended as final fallback",
@@ -102,7 +139,8 @@ func Test_imageClient_buildMirrorEndpoints(t *testing.T) {
 					Mirrors: []string{"https://mirror.example.com"},
 				},
 			},
-			want: []string{"https://mirror.example.com", ""},
+			imageRef: "nginx:latest",
+			want:     []string{"https://mirror.example.com", ""},
 		},
 		{
 			name: "mirror URL with path and query is kept verbatim",
@@ -111,7 +149,8 @@ func Test_imageClient_buildMirrorEndpoints(t *testing.T) {
 					Mirrors: []string{"https://mirror.example.com/v2/?foo=bar#baz"},
 				},
 			},
-			want: []string{"https://mirror.example.com/v2/?foo=bar#baz", ""},
+			imageRef: "nginx:latest",
+			want:     []string{"https://mirror.example.com/v2/?foo=bar#baz", ""},
 		},
 		{
 			name: "ipv6 mirror address is supported",
@@ -120,14 +159,15 @@ func Test_imageClient_buildMirrorEndpoints(t *testing.T) {
 					Mirrors: []string{"https://[2001:db8::1]:5000"},
 				},
 			},
-			want: []string{"https://[2001:db8::1]:5000", ""},
+			imageRef: "nginx:latest",
+			want:     []string{"https://[2001:db8::1]:5000", ""},
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			c := imageClient{log: testLog()}
-			got := c.buildMirrorEndpoints(tt.info)
+			got := c.buildMirrorEndpoints(tt.info, tt.imageRef)
 			assert.Equal(t, tt.want, got)
 		})
 	}

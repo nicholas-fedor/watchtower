@@ -438,7 +438,8 @@ func CheckContainer(
 	}
 
 	if raw := strings.TrimSpace(assoc.Host); raw != "" {
-		if _, err := gitPkg.ParseAPIOrigin(raw); err != nil {
+		_, err := gitPkg.ParseAPIOrigin(raw)
+		if err != nil {
 			return CheckResult{}, fmt.Errorf("%w: %s", ErrInvalidHost, raw)
 		}
 	}

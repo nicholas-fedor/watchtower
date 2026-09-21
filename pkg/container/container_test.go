@@ -232,6 +232,20 @@ var _ = ginkgo.Describe("Container", func() {
 			})
 		})
 
+		ginkgo.It("uses container config when image config is nil", func() {
+			c := MockContainer(WithImageName("ghcr.io/home-assistant/home-assistant:latest"))
+			c.imageInfo.Config = nil
+			c.containerInfo.Config.WorkingDir = "/config"
+			c.containerInfo.Config.Env = []string{"TZ=Europe/Amsterdam"}
+
+			config := c.GetCreateConfig()
+
+			gomega.Expect(config.Image).
+				To(gomega.Equal("ghcr.io/home-assistant/home-assistant:latest"))
+			gomega.Expect(config.WorkingDir).To(gomega.Equal("/config"))
+			gomega.Expect(config.Env).To(gomega.Equal([]string{"TZ=Europe/Amsterdam"}))
+		})
+
 		ginkgo.It("returns minimal config when containerInfo is nil", func() {
 			c := MockContainer(WithImageName("test-image"))
 			c.containerInfo = nil
@@ -777,13 +791,157 @@ var _ = ginkgo.Describe("Container", func() {
 				gomega.Expect(links).To(gomega.ContainElement("redis"))
 			})
 
-			ginkgo.It("includes network mode dependencies", func() {
-				container = MockContainer(
-					WithNetworkMode("container:other"),
-					WithLabels(map[string]string{"com.docker.compose.project": "myproject"}),
-				)
-				links := container.Links(true)
-				gomega.Expect(links).To(gomega.ContainElement("myproject-other"))
+			ginkgo.Context("network mode", func() {
+				ginkgo.It("includes network mode dependencies", func() {
+					container = MockContainer(
+						WithNetworkMode("container:other"),
+						WithLabels(map[string]string{"com.docker.compose.project": "myproject"}),
+					)
+					links := container.Links(true)
+					gomega.Expect(links).To(gomega.ContainElement("other"))
+					gomega.Expect(links).NotTo(gomega.ContainElement("myproject-other"))
+				})
+
+				ginkgo.It("includes the bare network mode container name", func() {
+					// The network mode holds a real container name, including when
+					// that container belongs to another Compose project.
+					container = MockContainer(
+						WithNetworkMode("container:gluetun"),
+						WithLabels(map[string]string{"com.docker.compose.project": "qbittorrent"}),
+					)
+					links := container.Links(true)
+					gomega.Expect(links).To(gomega.ConsistOf("gluetun"))
+				})
+
+				ginkgo.It("strips a leading slash from the network mode container name", func() {
+					// Inspect rewrite stores container: plus the Docker name, which
+					// includes a leading slash.
+					container = MockContainer(
+						WithNetworkMode("container:/gluetun"),
+						WithLabels(map[string]string{"com.docker.compose.project": "qbittorrent"}),
+					)
+					links := container.Links(true)
+					gomega.Expect(links).To(gomega.ConsistOf("gluetun"))
+				})
+
+				ginkgo.It("does not double-prefix an already project-qualified network mode name", func() {
+					container = MockContainer(
+						WithNetworkMode("container:gluetun-vpn-1"),
+						WithLabels(map[string]string{"com.docker.compose.project": "gluetun"}),
+					)
+					links := container.Links(true)
+					gomega.Expect(links).To(gomega.ConsistOf("gluetun-vpn-1"))
+				})
+
+				ginkgo.It("does not prefix a network mode container ID", func() {
+					// Moby inspect stores container:<id> after create. Prefixing
+					// that ID with the dependent's project would never match.
+					const providerID = "25e75393800b5c450a6841212a3b92ed28fa35414a586dec9f2c8a520d4910c2"
+
+					container = MockContainer(
+						WithNetworkMode("container:"+providerID),
+						WithLabels(map[string]string{"com.docker.compose.project": "qbittorrent"}),
+					)
+					links := container.Links(true)
+					gomega.Expect(links).To(gomega.ConsistOf(providerID))
+				})
+			})
+
+			ginkgo.Context("volumes-from", func() {
+				ginkgo.It("includes volumes-from container names without a project prefix", func() {
+					container = MockContainer(
+						WithVolumesFrom([]string{"app:rw"}),
+						WithLabels(map[string]string{"com.docker.compose.project": "nextcloud"}),
+					)
+					links := container.Links(true)
+					gomega.Expect(links).To(gomega.ConsistOf("app"))
+				})
+
+				ginkgo.It("includes volumes-from container IDs without a project prefix", func() {
+					const appID = "9b738d6a78250d731816cc5020d8cfaf55e605cd510f4d4662688bd9a6c4e0c7"
+
+					container = MockContainer(
+						WithVolumesFrom([]string{appID}),
+						WithLabels(map[string]string{"com.docker.compose.project": "nextcloud"}),
+					)
+					links := container.Links(true)
+					gomega.Expect(links).To(gomega.ConsistOf(appID))
+				})
+
+				ginkgo.It("strips a leading slash from a volumes-from container name", func() {
+					container = MockContainer(
+						WithVolumesFrom([]string{"/nextcloud-app:ro"}),
+					)
+					links := container.Links(true)
+					gomega.Expect(links).To(gomega.ConsistOf("nextcloud-app"))
+				})
+
+				ginkgo.It("includes multiple volumes-from identities", func() {
+					container = MockContainer(
+						WithVolumesFrom([]string{"app:rw", "db:ro"}),
+					)
+					links := container.Links(true)
+					gomega.Expect(links).To(gomega.ConsistOf("app", "db"))
+				})
+
+				ginkgo.It("skips empty volumes-from specs", func() {
+					container = MockContainer(
+						WithVolumesFrom([]string{"", "app:rw"}),
+					)
+					links := container.Links(true)
+					gomega.Expect(links).To(gomega.ConsistOf("app"))
+				})
+
+				ginkgo.It("does not treat a non-mode colon suffix as a volumes-from mode", func() {
+					container = MockContainer(
+						WithVolumesFrom([]string{"app:latest"}),
+					)
+					links := container.Links(true)
+					gomega.Expect(links).To(gomega.ConsistOf("app:latest"))
+				})
+
+				ginkgo.It("includes volumes-from along with a watchtower depends-on label", func() {
+					container = MockContainer(
+						WithLabels(map[string]string{
+							"com.centurylinklabs.watchtower.depends-on": "redis",
+						}),
+						WithVolumesFrom([]string{"app:rw"}),
+					)
+					links := container.Links(true)
+					gomega.Expect(links).To(gomega.Equal([]string{"redis", "app"}))
+				})
+
+				ginkgo.It("includes volumes-from along with a compose depends_on label", func() {
+					container = MockContainer(
+						WithLabels(map[string]string{
+							"com.docker.compose.depends_on": "postgres",
+						}),
+						WithVolumesFrom([]string{"app:rw"}),
+					)
+					links := container.Links(true)
+					gomega.Expect(links).To(gomega.Equal([]string{"postgres", "app"}))
+				})
+
+				ginkgo.It("does not duplicate a volumes-from identity already listed by depends-on", func() {
+					container = MockContainer(
+						WithLabels(map[string]string{
+							"com.centurylinklabs.watchtower.depends-on": "app",
+						}),
+						WithVolumesFrom([]string{"app:rw"}),
+					)
+					links := container.Links(true)
+					gomega.Expect(links).To(gomega.Equal([]string{"app"}))
+				})
+
+				ginkgo.It("includes network mode and volumes-from identities together", func() {
+					container = MockContainer(
+						WithNetworkMode("container:gluetun"),
+						WithVolumesFrom([]string{"app:rw"}),
+						WithLabels(map[string]string{"com.docker.compose.project": "qbittorrent"}),
+					)
+					links := container.Links(true)
+					gomega.Expect(links).To(gomega.ConsistOf("gluetun", "app"))
+				})
 			})
 		})
 
@@ -1192,5 +1350,39 @@ var _ = ginkgo.Describe("Container", func() {
 			gomega.Expect(hostConfig.Devices[1].CgroupPermissions).
 				To(gomega.Equal("rw"), "explicit CgroupPermissions must be preserved")
 		})
+
+		ginkgo.It("returns a copy of VolumesFrom so create config does not alias inspect data", func() {
+			container := MockContainer(WithVolumesFrom([]string{"app:rw"}))
+			hostConfig := container.GetCreateHostConfig()
+			hostConfig.VolumesFrom[0] = "mutated"
+
+			gomega.Expect(container.ContainerInfo().HostConfig.VolumesFrom).
+				To(gomega.Equal([]string{"app:rw"}))
+		})
 	})
+
+	ginkgo.DescribeTable("parseVolumesFromSpec",
+		func(spec, wantName, wantMode string) {
+			name, mode := parseVolumesFromSpec(spec)
+			gomega.Expect(name).To(gomega.Equal(wantName))
+			gomega.Expect(mode).To(gomega.Equal(wantMode))
+		},
+		ginkgo.Entry("empty spec", "", "", ""),
+		ginkgo.Entry("bare name", "app", "app", ""),
+		ginkgo.Entry("name with rw", "app:rw", "app", "rw"),
+		ginkgo.Entry("name with ro", "app:ro", "app", "ro"),
+		ginkgo.Entry("name with SELinux z", "app:z", "app", "z"),
+		ginkgo.Entry("name with SELinux Z", "app:Z", "app", "Z"),
+		ginkgo.Entry("combined ro and z", "app:ro,z", "app", "ro,z"),
+		ginkgo.Entry("full container ID",
+			"9b738d6a78250d731816cc5020d8cfaf55e605cd510f4d4662688bd9a6c4e0c7",
+			"9b738d6a78250d731816cc5020d8cfaf55e605cd510f4d4662688bd9a6c4e0c7",
+			""),
+		ginkgo.Entry("full container ID with rw",
+			"9b738d6a78250d731816cc5020d8cfaf55e605cd510f4d4662688bd9a6c4e0c7:rw",
+			"9b738d6a78250d731816cc5020d8cfaf55e605cd510f4d4662688bd9a6c4e0c7",
+			"rw"),
+		ginkgo.Entry("non-mode suffix stays part of the name", "app:latest", "app:latest", ""),
+		ginkgo.Entry("trailing colon is not a mode", "app:", "app:", ""),
+	)
 })

@@ -120,7 +120,7 @@ var _ = ginkgo.Describe("Digests", func() {
 			return "", fmt.Errorf(
 				"registry responded with invalid HEAD request: status %q, auth: %q",
 				resp.Status,
-				resp.Header.Get("Www-Authenticate"),
+				resp.Header.Get("WWW-Authenticate"),
 			)
 		}
 

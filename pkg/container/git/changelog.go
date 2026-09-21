@@ -158,7 +158,8 @@ func derivedReleasesURL(repo, apiOrigin string) string {
 	displayHost := host
 
 	if apiOrigin != "" {
-		if origin, err := ParseAPIOrigin(apiOrigin); err == nil {
+		origin, err := ParseAPIOrigin(apiOrigin)
+		if err == nil {
 			displayHost = origin.Host
 			if kind == "" {
 				kind = types.ResolveGitHostKind(origin.Hostname(), nil)

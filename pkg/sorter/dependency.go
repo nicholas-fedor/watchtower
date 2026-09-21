@@ -288,7 +288,8 @@ func buildDependencyGraph(log *zerolog.Logger,
 // Each canonical ResolveContainerIdentifier is always included and never overwritten.
 // Bare container names are registered as aliases only when they uniquely identify one
 // container and do not collide with another container's canonical key, so ambiguous
-// names do not create non-deterministic edges.
+// names do not create non-deterministic edges. Docker IDs are also registered because
+// inspect stores network_mode as container:<id> until Watchtower rewrites it to a name.
 //
 // Parameters:
 //   - containerMap: Canonical identifier → container map from graph construction.
@@ -299,8 +300,8 @@ func buildDependencyGraph(log *zerolog.Logger,
 func buildLinkMatchIndexes(log *zerolog.Logger,
 	containerMap map[string]types.Container,
 ) (map[string]bool, map[string]string) {
-	// Capacity covers one canonical key plus one optional bare-name alias per container.
-	const aliasCapacityFactor = 2
+	// Capacity covers canonical key, optional bare-name alias, and Docker ID per container.
+	const aliasCapacityFactor = 3
 
 	aliasToCanonical := make(map[string]string, len(containerMap)*aliasCapacityFactor)
 
@@ -316,6 +317,15 @@ func buildLinkMatchIndexes(log *zerolog.Logger,
 	bareOwners := make(map[string]map[string]struct{})
 
 	for identifier, c := range containerMap {
+		if concrete, ok := c.(*container.Container); ok {
+			containerID := string(concrete.ID())
+			if containerID != "" && containerID != identifier {
+				if _, exists := aliasToCanonical[containerID]; !exists {
+					aliasToCanonical[containerID] = identifier
+				}
+			}
+		}
+
 		bareName := util.NormalizeContainerName(c.Name())
 		if bareName == "" || bareName == identifier {
 			continue
@@ -342,6 +352,10 @@ func buildLinkMatchIndexes(log *zerolog.Logger,
 				Str("bare_name", bareName).
 				Msg("Skipped ambiguous bare container name alias for dependency matching")
 
+			continue
+		}
+
+		if _, exists := aliasToCanonical[bareName]; exists {
 			continue
 		}
 

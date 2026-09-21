@@ -337,19 +337,19 @@ updt1 (mock/updt1:latest): Updated
 				s, err := shoutrrr.buildMessage(Data{Entries: entries})
 				gomega.Expect(err).NotTo(gomega.HaveOccurred())
 				gomega.Expect(s).To(gomega.ContainSubstring(
-					"Docker image usage exceeds configured maximum: 10000/10000 bytes used (reclaimable 2000, 4 images)",
+					"Docker image usage exceeds configured maximum: 10 KB of 10 KB used (2 KB reclaimable, 4 images)",
 				))
 				gomega.Expect(s).To(gomega.ContainSubstring(
-					"Docker image usage exceeds configured warning threshold: 8000/8000 bytes used (reclaimable 2000, 4 images)",
+					"Docker image usage exceeds configured warning threshold: 8 KB of 8 KB used (2 KB reclaimable, 4 images)",
 				))
 				gomega.Expect(s).To(gomega.ContainSubstring(
 					"Failed to query Docker image disk usage: df unavailable",
 				))
 				gomega.Expect(s).To(gomega.ContainSubstring(
-					"Docker image usage budget enabled: max 40000000000 bytes, warn 32000000000 bytes",
+					"Docker image usage budget enabled: maximum 40 GB, warning at 32 GB",
 				))
 				gomega.Expect(s).To(gomega.ContainSubstring(
-					"Docker image usage exceeds configured maximum: 0/0 bytes used (reclaimable 0, 0 images)",
+					"Docker image usage exceeds configured maximum: 0 B of 0 B used (0 B reclaimable, 0 images)",
 				))
 				gomega.Expect(s).NotTo(gomega.ContainSubstring("unknown"))
 				gomega.Expect(s).NotTo(gomega.ContainSubstring(" | "))

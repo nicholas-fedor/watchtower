@@ -22,6 +22,7 @@ import (
 
 	"github.com/nicholas-fedor/watchtower/internal/meta"
 	"github.com/nicholas-fedor/watchtower/pkg/registry/auth"
+	"github.com/nicholas-fedor/watchtower/pkg/registry/hosts"
 	"github.com/nicholas-fedor/watchtower/pkg/registry/manifest"
 	"github.com/nicholas-fedor/watchtower/pkg/registry/ratelimit"
 	"github.com/nicholas-fedor/watchtower/pkg/types"
@@ -449,7 +450,7 @@ func BuildManifestURL(log *zerolog.Logger,
 		rawDomain := reference.Domain(normalizedRef)
 
 		canonicalHost, _ := auth.GetRegistryAddress(log, container.ImageName())
-		if rawDomain == auth.LSCRRegistryDomain {
+		if rawDomain == hosts.LSCRRegistryDomain {
 			originalHost = rawDomain
 		} else if canonicalHost != "" {
 			originalHost = canonicalHost
@@ -493,8 +494,8 @@ func BuildManifestURL(log *zerolog.Logger,
 	// 2. Authentication tokens are obtained from ghcr.io using the redirected challenge
 	// 3. Manifest requests are made directly to ghcr.io (not lscr.io) to avoid 401/404 errors
 	// 4. Digest extraction succeeds from the 200 OK response
-	if parsedURL.Host == auth.LSCRRegistryDomain {
-		parsedURL.Host = auth.GitHubRegistryDomain
+	if parsedURL.Host == hosts.LSCRRegistryDomain {
+		parsedURL.Host = hosts.GitHubRegistryDomain
 		manifestURLStr = parsedURL.String()
 	}
 
@@ -590,6 +591,20 @@ func fetchDigest(log *zerolog.Logger,
 		endpoints = []string{""}
 	}
 
+	limitHost, hostErr := auth.GetRegistryAddress(log, container.ImageName())
+	if hostErr != nil || limitHost == "" {
+		log.Debug().
+			Err(hostErr).
+			Fields(fields).
+			Msg("Failed to resolve registry host for rate limiting")
+	}
+
+	limitKey, release, holdErr := ratelimit.HoldAnonymous(ctx, limitHost, registryAuth != "")
+	if holdErr != nil {
+		return "", fmt.Errorf("%w: %w", errFailedGetToken, holdErr)
+	}
+	defer release()
+
 	var lastErr error
 
 	for _, endpoint := range endpoints {
@@ -608,17 +623,7 @@ func fetchDigest(log *zerolog.Logger,
 			}
 		}
 
-		// Obtain an authentication token from the current endpoint.
-		limitHost, hostErr := auth.GetRegistryAddress(log, container.ImageName())
-		if hostErr != nil || limitHost == "" {
-			log.Debug().
-				Err(hostErr).
-				Fields(fields).
-				Fields(epFields).
-				Msg("Failed to resolve registry host for rate limiting")
-		}
-
-		result, err := ratelimit.DoValue(ctx, log, limitHost, func() (auth.TokenResult, error) {
+		result, err := ratelimit.DoValue(ctx, log, limitKey, func() (auth.TokenResult, error) {
 			return auth.GetToken(log,
 				ctx,
 				container,
@@ -708,7 +713,7 @@ func fetchDigest(log *zerolog.Logger,
 			retry      bool
 		)
 
-		err = ratelimit.Do(ctx, log, parsedURL.Host, func() error {
+		err = ratelimit.Do(ctx, log, limitKey, func() error {
 			req, reqErr := makeManifestRequest(ctx, method, manifestURL, token)
 			if reqErr != nil {
 				return reqErr
@@ -765,6 +770,7 @@ func fetchDigest(log *zerolog.Logger,
 				challengeHost,
 				redirected,
 				parsedURL,
+				limitKey,
 				client,
 			)
 			if err != nil {
@@ -1038,7 +1044,7 @@ func ExtractHeadDigest(log *zerolog.Logger, resp *http.Response) (string, error)
 	digest := resp.Header.Get(ContentDigestHeader)
 	if digest == "" {
 		// Log and return an error if the digest is missing, including auth details for debugging.
-		wwwAuthHeader := resp.Header.Get("www-authenticate")
+		wwwAuthHeader := resp.Header.Get("WWW-Authenticate")
 		log.Debug().
 			Str("status", resp.Status).
 			Str("auth_header", wwwAuthHeader).
@@ -1310,6 +1316,7 @@ func makeManifestRequest(
 //   - challengeHost: The challenge host.
 //   - redirected: Whether authentication was redirected.
 //   - parsedURL: Parsed URL object.
+//   - limitKey: Rate-limit host key from [ratelimit.Scope]. Empty uses parsedURL.Host.
 //   - client: The HTTP client to use for the request.
 //
 // Returns:
@@ -1322,11 +1329,16 @@ func retryManifestRequest(
 	originalHost, challengeHost string,
 	redirected bool,
 	parsedURL *url.URL,
+	limitKey string,
 	client auth.Client,
 ) (string, error) {
 	var digest string
 
-	err := ratelimit.Do(ctx, log, parsedURL.Host, func() error {
+	if limitKey == "" {
+		limitKey = parsedURL.Host
+	}
+
+	err := ratelimit.Do(ctx, log, limitKey, func() error {
 		req, reqErr := makeManifestRequest(ctx, method, updatedURL, token)
 		if reqErr != nil {
 			return reqErr

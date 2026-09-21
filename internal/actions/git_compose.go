@@ -44,7 +44,7 @@ func (s *gitSession) applyCompose(
 	byService := make(map[string]types.Container, len(batch.containers))
 
 	for _, c := range batch.containers {
-		name := compose.GetServiceName(log, containerLabels(c))
+		name := compose.GetServiceName(containerLabels(c))
 		if name == "" {
 			failed[c.ID()] = errGitComposeService
 			c.SetStale(false)
