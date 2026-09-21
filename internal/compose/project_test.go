@@ -107,17 +107,52 @@ func TestResolveProjectDir(t *testing.T) {
 		t.Parallel()
 
 		dir := writeComposeDir(t, "compose.yaml")
-		abs := filepath.Join(t.TempDir(), "override.yaml")
 		ref, err := ResolveProjectDir(map[string]string{
 			WatchtowerComposeDirLabel: dir,
-			ComposeConfigFilesLabel:   "compose.yaml,  extra.yml, " + abs + ", ,",
+			ComposeConfigFilesLabel:   "compose.yaml,  extra.yml, ,",
 		}, nil)
 		require.NoError(t, err)
 		assert.Equal(t, []string{
 			filepath.Join(dir, "compose.yaml"),
 			filepath.Join(dir, "extra.yml"),
-			abs,
 		}, ref.ConfigFiles)
+	})
+
+	t.Run("rejects config file outside the project", func(t *testing.T) {
+		t.Parallel()
+
+		dir := writeComposeDir(t, "compose.yaml")
+		outside := filepath.Join(t.TempDir(), "override.yaml")
+		_, err := ResolveProjectDir(map[string]string{
+			WatchtowerComposeDirLabel: dir,
+			ComposeConfigFilesLabel:   "compose.yaml," + outside,
+		}, nil)
+		require.ErrorIs(t, err, ErrConfigFile)
+
+		_, err = ResolveProjectDir(map[string]string{
+			WatchtowerComposeDirLabel: dir,
+			ComposeConfigFilesLabel:   "../secret.yml",
+		}, nil)
+		require.ErrorIs(t, err, ErrConfigFile)
+	})
+
+	t.Run("rejects a symlink that leaves the project", func(t *testing.T) {
+		t.Parallel()
+
+		dir := writeComposeDir(t, "compose.yaml")
+		outside := filepath.Join(t.TempDir(), "outside.yaml")
+		require.NoError(t, os.WriteFile(outside, []byte("services: {}\n"), 0o600))
+		link := filepath.Join(dir, "override.yaml")
+		require.NoError(t, os.Symlink(outside, link))
+
+		_, err := ResolveProjectDir(map[string]string{
+			WatchtowerComposeDirLabel: dir,
+			ComposeConfigFilesLabel:   "override.yaml",
+		}, nil)
+		require.ErrorIs(t, err, ErrConfigFile)
+
+		_, err = Load(t.Context(), ProjectRef{Dir: dir, ConfigFiles: []string{link}})
+		require.ErrorIs(t, err, ErrConfigFile)
 	})
 }
 
@@ -127,25 +162,46 @@ func TestConfigFiles(t *testing.T) {
 	t.Run("absent label", func(t *testing.T) {
 		t.Parallel()
 
-		assert.Nil(t, configFiles(map[string]string{}, "/proj"))
-		assert.Nil(t, configFiles(nil, "/proj"))
+		got, err := configFiles(map[string]string{}, "/proj")
+		require.NoError(t, err)
+		assert.Nil(t, got)
+
+		got, err = configFiles(nil, "/proj")
+		require.NoError(t, err)
+		assert.Nil(t, got)
 	})
 
-	t.Run("relative and absolute", func(t *testing.T) {
+	t.Run("relative paths stay in the project", func(t *testing.T) {
 		t.Parallel()
 
-		got := configFiles(map[string]string{
-			ComposeConfigFilesLabel: "compose.yaml,/abs/file.yml,  nested/app.yml",
+		got, err := configFiles(map[string]string{
+			ComposeConfigFilesLabel: "compose.yaml,  nested/app.yml",
 		}, "/proj")
-		assert.Equal(t, []string{"/proj/compose.yaml", "/abs/file.yml", "/proj/nested/app.yml"}, got)
+		require.NoError(t, err)
+		assert.Equal(t, []string{"/proj/compose.yaml", "/proj/nested/app.yml"}, got)
+	})
+
+	t.Run("rejects paths outside the project", func(t *testing.T) {
+		t.Parallel()
+
+		_, err := configFiles(map[string]string{
+			ComposeConfigFilesLabel: "compose.yaml,/abs/file.yml",
+		}, "/proj")
+		require.ErrorIs(t, err, ErrConfigFile)
+
+		_, err = configFiles(map[string]string{
+			ComposeConfigFilesLabel: "../secret.yml",
+		}, "/proj")
+		require.ErrorIs(t, err, ErrConfigFile)
 	})
 
 	t.Run("skips blanks", func(t *testing.T) {
 		t.Parallel()
 
-		got := configFiles(map[string]string{
+		got, err := configFiles(map[string]string{
 			ComposeConfigFilesLabel: ",  ,compose.yaml,",
 		}, "/proj")
+		require.NoError(t, err)
 		assert.Equal(t, []string{"/proj/compose.yaml"}, got)
 	})
 }

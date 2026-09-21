@@ -3,6 +3,7 @@ package compose
 import (
 	"context"
 	"fmt"
+	"path/filepath"
 
 	"github.com/compose-spec/compose-go/v2/cli"
 
@@ -25,6 +26,10 @@ import (
 func Load(ctx context.Context, ref ProjectRef) (*composetypes.Project, error) {
 	if ref.Dir == "" {
 		return nil, errEmptyProjectDir
+	}
+
+	if err := rejectEscapingConfig(ref.Dir, ref.ConfigFiles); err != nil {
+		return nil, err
 	}
 
 	opts := []cli.ProjectOptionsFn{
@@ -52,4 +57,34 @@ func Load(ctx context.Context, ref ProjectRef) (*composetypes.Project, error) {
 	}
 
 	return project, nil
+}
+
+// rejectEscapingConfig checks compose files again after checkout.
+//
+// A repository can contain a symlink that lexical path checks accepted
+// before the files existed. Default compose filenames are checked when
+// the label did not list files.
+//
+// Parameters:
+//   - dir: Project directory.
+//   - files: Explicit compose files, or empty for the defaults.
+//
+// Returns:
+//   - error: ErrConfigFile when a symlink resolves outside dir.
+func rejectEscapingConfig(dir string, files []string) error {
+	candidates := files
+	if len(candidates) == 0 {
+		for _, name := range []string{"compose.yaml", "compose.yml", "docker-compose.yaml", "docker-compose.yml"} {
+			candidates = append(candidates, filepath.Join(dir, name))
+		}
+	}
+
+	for _, path := range candidates {
+		err := symlinkEscapes(dir, path)
+		if err != nil {
+			return err
+		}
+	}
+
+	return nil
 }

@@ -11,4 +11,6 @@ var (
 	errNoComposeServices = errors.New("no compose services to apply")
 	// ErrProjectDir indicates compose-dir or --compose-project pointed at an unreadable path.
 	ErrProjectDir = errors.New("compose project directory is not readable")
+	// ErrConfigFile indicates a compose config_files entry leaves the project directory.
+	ErrConfigFile = errors.New("compose config file is outside the project directory")
 )

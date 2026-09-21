@@ -61,10 +61,15 @@ func projectRefOrErr(name, dir string, labels map[string]string) (ProjectRef, er
 		return ProjectRef{}, fmt.Errorf("%w: %s", ErrProjectDir, dir)
 	}
 
+	files, err := configFiles(labels, dir)
+	if err != nil {
+		return ProjectRef{}, err
+	}
+
 	return ProjectRef{
 		Name:        name,
 		Dir:         dir,
-		ConfigFiles: configFiles(labels, dir),
+		ConfigFiles: files,
 	}, nil
 }
 
@@ -84,7 +89,7 @@ func labelValue(labels map[string]string, key string) string {
 	return strings.TrimSpace(labels[key])
 }
 
-// configFiles splits Compose's config_files label into absolute paths.
+// configFiles splits Compose's config_files label into paths inside dir.
 //
 // Parameters:
 //   - labels: Container labels.
@@ -92,10 +97,11 @@ func labelValue(labels map[string]string, key string) string {
 //
 // Returns:
 //   - []string: Compose file paths, or nil when the label is absent.
-func configFiles(labels map[string]string, dir string) []string {
+//   - error: ErrConfigFile when an entry leaves dir.
+func configFiles(labels map[string]string, dir string) ([]string, error) {
 	raw := labelValue(labels, ComposeConfigFilesLabel)
 	if raw == "" {
-		return nil
+		return nil, nil
 	}
 
 	var out []string
@@ -106,14 +112,87 @@ func configFiles(labels map[string]string, dir string) []string {
 			continue
 		}
 
-		if !filepath.IsAbs(part) {
-			part = filepath.Join(dir, part)
+		cleaned, err := containedConfigFile(dir, part)
+		if err != nil {
+			return nil, err
 		}
 
-		out = append(out, part)
+		out = append(out, cleaned)
 	}
 
-	return out
+	return out, nil
+}
+
+// containedConfigFile resolves part and rejects paths outside dir.
+//
+// Parameters:
+//   - dir: Project directory.
+//   - part: One config_files entry.
+//
+// Returns:
+//   - string: Absolute or joined path inside dir.
+//   - error: ErrConfigFile when part escapes dir.
+func containedConfigFile(dir, part string) (string, error) {
+	var cleaned string
+
+	if !filepath.IsAbs(part) {
+		if !filepath.IsLocal(part) {
+			return "", fmt.Errorf("%w: %s", ErrConfigFile, part)
+		}
+
+		cleaned = filepath.Join(dir, part)
+	} else {
+		rel, err := filepath.Rel(dir, filepath.Clean(part))
+		if err != nil || !filepath.IsLocal(rel) {
+			return "", fmt.Errorf("%w: %s", ErrConfigFile, part)
+		}
+
+		cleaned = filepath.Clean(part)
+	}
+
+	if err := symlinkEscapes(dir, cleaned); err != nil {
+		return "", err
+	}
+
+	return cleaned, nil
+}
+
+// symlinkEscapes reports whether path exists and resolves outside dir.
+//
+// A missing path is not an escape. Compose reports that later.
+//
+// Parameters:
+//   - dir: Project directory.
+//   - path: Candidate compose file.
+//
+// Returns:
+//   - error: ErrConfigFile when the resolved path leaves dir.
+func symlinkEscapes(dir, path string) error {
+	_, err := os.Lstat(path)
+	if err != nil {
+		if os.IsNotExist(err) {
+			return nil
+		}
+
+		return fmt.Errorf("%w: %s", ErrConfigFile, path)
+	}
+
+	realDir, err := filepath.EvalSymlinks(dir)
+	if err != nil {
+		return fmt.Errorf("%w: %s", ErrConfigFile, dir)
+	}
+
+	realPath, err := filepath.EvalSymlinks(path)
+	if err != nil {
+		return fmt.Errorf("%w: %s", ErrConfigFile, path)
+	}
+
+	rel, err := filepath.Rel(realDir, realPath)
+	if err != nil || !filepath.IsLocal(rel) {
+		return fmt.Errorf("%w: %s", ErrConfigFile, path)
+	}
+
+	return nil
 }
 
 // readableProjectDir reports whether dir exists and contains a compose file.

@@ -8,24 +8,28 @@ import (
 )
 
 // FuzzConfigFiles verifies Compose config_files labels never panic and that
-// results contain no empty paths.
+// accepted paths stay inside the project directory.
 func FuzzConfigFiles(f *testing.F) {
-	f.Add("compose.yaml,/abs/file.yml,nested/app.yml")
+	f.Add("compose.yaml,nested/app.yml")
 	f.Add(",  ,compose.yaml,")
 	f.Add("")
 	f.Add("compose.yaml")
 	f.Add("/abs/only.yml")
+	f.Add("../secret.yml")
 
 	f.Fuzz(func(t *testing.T, raw string) {
-		got := configFiles(map[string]string{ComposeConfigFilesLabel: raw}, "/proj")
+		got, err := configFiles(map[string]string{ComposeConfigFilesLabel: raw}, "/proj")
+		if err != nil {
+			assert.ErrorIs(t, err, ErrConfigFile)
+
+			return
+		}
+
 		for _, path := range got {
 			assert.NotEmpty(t, path)
-
-			if filepath.IsAbs(path) {
-				continue
-			}
-
-			t.Fatalf("expected absolute path, got %q", path)
+			rel, relErr := filepath.Rel("/proj", path)
+			assert.NoError(t, relErr)
+			assert.True(t, filepath.IsLocal(rel), path)
 		}
 	})
 }
