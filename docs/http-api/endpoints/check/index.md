@@ -10,6 +10,7 @@ Containers associated for [Git monitoring](../../../advanced-features/git-monito
 It does **not** download image layers and does **not** check against the configured [image cooldown](../../../advanced-features/image-cooldown/index.md), as the cooldown functionality remains an apply-time gate for scheduled updates and `/v1/update`.
 
 When [no-pull](../../../configuration/update-behavior/index.md#disable_image_pulling) is enabled globally or via the container label, the check inspects the local image cache only and does not contact the registry.
+A Git-watched container is reported with `update_available: false` and the Git remote is not contacted.
 
 Include `check` in [`http-api-endpoints`](../../../configuration/http-api/index.md#http_api_endpoints) to enable this endpoint.
 

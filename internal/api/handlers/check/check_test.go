@@ -13,6 +13,11 @@ import (
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 
+	dockerContainer "github.com/moby/moby/api/types/container"
+
+	"github.com/nicholas-fedor/watchtower/internal/git"
+	wtcontainer "github.com/nicholas-fedor/watchtower/pkg/container"
+	gitPkg "github.com/nicholas-fedor/watchtower/pkg/container/git"
 	mockContainer "github.com/nicholas-fedor/watchtower/pkg/container/mocks"
 	"github.com/nicholas-fedor/watchtower/pkg/types"
 	mockTypes "github.com/nicholas-fedor/watchtower/pkg/types/mocks"
@@ -305,6 +310,33 @@ func TestCheckForUpdates_MixedStaleResults(t *testing.T) {
 	assert.False(t, results[1].UpdateAvailable)
 	assert.Equal(t, "sha256:def", results[1].LatestImageID)
 	assert.Empty(t, results[1].LatestDigest)
+}
+
+func TestCheckForUpdates_GitNoPullSkipsCheck(t *testing.T) {
+	client := mockContainer.NewMockClient(t)
+	watched := wtcontainer.NewContainer(testLogger(), &dockerContainer.InspectResponse{
+		ID:   "app-id",
+		Name: "/app",
+		Config: &dockerContainer.Config{
+			Image: "app:latest",
+			Labels: map[string]string{
+				gitPkg.RepoLabel: "https://git.example.com/org/app.git",
+			},
+		},
+	}, nil)
+	client.EXPECT().ListContainers(mock.Anything, mock.Anything).Return([]types.Container{watched}, nil)
+
+	gitClient := git.New(testLogger(), git.Options{Timeout: time.Millisecond})
+	results, err := CheckForUpdates(testLogger(), t.Context(), client, nil, types.UpdateParams{
+		EnableGitMonitoring: true,
+		NoPull:              true,
+	}, gitClient)
+	require.NoError(t, err)
+	require.Len(t, results, 1)
+	assert.Equal(t, "git", results[0].UpdateSource)
+	assert.False(t, results[0].UpdateAvailable)
+	assert.Empty(t, results[0].Error)
+	assert.Empty(t, results[0].LatestImageID)
 }
 
 func TestExtractFilterParams(t *testing.T) {

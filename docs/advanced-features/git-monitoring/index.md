@@ -105,6 +105,9 @@ Watchtower does not rebuild only to write labels.
 
 ### Update Session
 
+[No-pull](../../configuration/update-behavior/index.md#disable_image_pulling) skips Git rebuilds for that container.
+`/v1/check` reports no update and does not contact the Git remote.
+
 Git work runs only during an update session.
 A session starts from the [Schedule](../../configuration/scheduling/index.md#schedule) or [Interval](../../configuration/scheduling/index.md#interval) configuration option, from the [Run Once](../../configuration/scheduling/index.md#run_once) configuration option, or from HTTP [`/v1/update`](../../http-api/endpoints/update/index.md).
 Process start is not a session.

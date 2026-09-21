@@ -130,6 +130,13 @@ func CheckForUpdates(log *zerolog.Logger,
 		if gitClient != nil && concrete && gitPkg.ShouldMonitor(log, c, params) {
 			result.UpdateSource = "git"
 
+			// no-pull skips the Git rebuild. Report the same skip here.
+			if c.IsNoPull(params) {
+				results = append(results, result)
+
+				continue
+			}
+
 			checkResult, err := git.CheckContainer(
 				ctx,
 				gitClient,

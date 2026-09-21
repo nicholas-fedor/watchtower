@@ -167,6 +167,9 @@ Environment Variable: WATCHTOWER_NO_PULL
 
     The HTTP API [`/v1/check`](../../http-api/endpoints/check/index.md) endpoint also respects no-pull and inspects the local cache only.
 
+    No-pull also skips [Git monitoring](../../advanced-features/git-monitoring/index.md) rebuilds.
+    `/v1/check` reports no update for a Git-watched container while no-pull applies to it.
+
     See [Label Precedence](../container-selection/index.md#label_precedence).
 
 ## Ephemeral Self-Update
