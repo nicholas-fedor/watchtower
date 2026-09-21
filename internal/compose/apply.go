@@ -25,6 +25,8 @@ type Request struct {
 // Container is a running Compose service instance after apply.
 type Container struct {
 	Service string
+	// Name is the container name from compose ps, used to match replicas.
+	Name    string
 	ID      types.ContainerID
 	ImageID types.ImageID
 }

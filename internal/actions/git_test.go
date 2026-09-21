@@ -749,6 +749,156 @@ var _ = ginkgo.Describe("gitSession", ginkgo.Label("git-session"), func() {
 			gomega.Expect(sess.built[c.ID()]).To(gomega.Equal(types.ImageID("sha256:built")))
 			gomega.Expect(sess.skipRecreate(c, types.UpdateParams{NoRestart: true})).To(gomega.BeTrue())
 		})
+
+		ginkgo.It("fails the project when services resolve different commits", func() {
+			dir := writeComposeProjectDir()
+			checkedOut := false
+			sess := newGitSession(gitTestClient())
+			sess.checkout = func(context.Context, string, string, project.CheckoutOptions) error {
+				checkedOut = true
+
+				return nil
+			}
+
+			api := gitAssociatedContainer("api", "/api", "webstack-api:latest", map[string]string{
+				gitPkg.ComposeDirLabel:      dir,
+				compose.ComposeServiceLabel: "api",
+			})
+			worker := gitAssociatedContainer("worker", "/worker", "webstack-worker:latest", map[string]string{
+				gitPkg.ComposeDirLabel:      dir,
+				compose.ComposeServiceLabel: "worker",
+			})
+			api.SetStale(true)
+			worker.SetStale(true)
+			sess.store(api.ID(), git.CheckResult{Stale: true, Commit: "aaa"})
+			sess.store(worker.ID(), git.CheckResult{Stale: true, Commit: "bbb"})
+
+			failed := map[types.ContainerID]error{}
+			docker := mockActions.CreateMockClient(&mockActions.TestData{}, false, false)
+			sess.prepareRebuilds(gitTestLogger(), ginkgo.GinkgoT().Context(), docker, []types.Container{api, worker}, types.UpdateParams{EnableGitMonitoring: true}, nil, failed)
+
+			gomega.Expect(checkedOut).To(gomega.BeFalse())
+			gomega.Expect(failed[api.ID()]).To(gomega.MatchError(errGitComposeCommit))
+			gomega.Expect(failed[worker.ID()]).To(gomega.MatchError(errGitComposeCommit))
+			gomega.Expect(api.IsStale()).To(gomega.BeFalse())
+			gomega.Expect(worker.IsStale()).To(gomega.BeFalse())
+		})
+
+		ginkgo.It("stamps each service from its own tag", func() {
+			dir := writeComposeProjectDir()
+			applier := &stubComposeApplier{
+				out: []compose.Container{
+					{Service: "api", ID: "new-api", ImageID: "sha256:api"},
+					{Service: "worker", ID: "new-worker", ImageID: "sha256:worker"},
+				},
+			}
+			sess := newGitSession(gitTestClient())
+			sess.apply = applier
+			sess.checkout = func(context.Context, string, string, project.CheckoutOptions) error {
+				return nil
+			}
+
+			api := gitAssociatedContainer("api", "/api", "webstack-api:latest", map[string]string{
+				gitPkg.ComposeDirLabel:      dir,
+				compose.ComposeServiceLabel: "api",
+			})
+			worker := gitAssociatedContainer("worker", "/worker", "webstack-worker:latest", map[string]string{
+				gitPkg.ComposeDirLabel:      dir,
+				compose.ComposeServiceLabel: "worker",
+			})
+			api.SetStale(true)
+			worker.SetStale(true)
+			sess.store(api.ID(), git.CheckResult{Stale: true, Commit: "abc", Tag: "v1.2.3"})
+			sess.store(worker.ID(), git.CheckResult{Stale: true, Commit: "abc", Tag: "v1.2.4"})
+
+			failed := map[types.ContainerID]error{}
+			docker := mockActions.CreateMockClient(&mockActions.TestData{}, false, false)
+			sess.prepareRebuilds(gitTestLogger(), ginkgo.GinkgoT().Context(), docker, []types.Container{api, worker}, types.UpdateParams{EnableGitMonitoring: true}, nil, failed)
+
+			gomega.Expect(failed).To(gomega.BeEmpty())
+			gomega.Expect(applier.reqs).To(gomega.HaveLen(1))
+			gomega.Expect(applier.reqs[0].Labels["api"][gitPkg.LastTagLabel]).To(gomega.Equal("v1.2.3"))
+			gomega.Expect(applier.reqs[0].Labels["worker"][gitPkg.LastTagLabel]).To(gomega.Equal("v1.2.4"))
+			gomega.Expect(sess.applied).To(gomega.HaveKey(api.ID()))
+			gomega.Expect(sess.applied).To(gomega.HaveKey(worker.ID()))
+		})
+
+		ginkgo.It("marks every replica of a service applied", func() {
+			dir := writeComposeProjectDir()
+			applier := &stubComposeApplier{
+				out: []compose.Container{
+					{Service: "api", Name: "/web-1", ID: "new-1", ImageID: "sha256:api"},
+					{Service: "api", Name: "/web-2", ID: "new-2", ImageID: "sha256:api"},
+				},
+			}
+			sess := newGitSession(gitTestClient())
+			sess.apply = applier
+			sess.checkout = func(context.Context, string, string, project.CheckoutOptions) error {
+				return nil
+			}
+
+			one := gitAssociatedContainer("api-1", "web-1", "webstack-api:latest", map[string]string{
+				gitPkg.ComposeDirLabel:      dir,
+				compose.ComposeServiceLabel: "api",
+			})
+			two := gitAssociatedContainer("api-2", "web-2", "webstack-api:latest", map[string]string{
+				gitPkg.ComposeDirLabel:      dir,
+				compose.ComposeServiceLabel: "api",
+			})
+			one.SetStale(true)
+			two.SetStale(true)
+			result := git.CheckResult{Stale: true, Commit: "abc"}
+			sess.store(one.ID(), result)
+			sess.store(two.ID(), result)
+
+			failed := map[types.ContainerID]error{}
+			docker := mockActions.CreateMockClient(&mockActions.TestData{}, false, false)
+			sess.prepareRebuilds(gitTestLogger(), ginkgo.GinkgoT().Context(), docker, []types.Container{one, two}, types.UpdateParams{EnableGitMonitoring: true}, nil, failed)
+
+			gomega.Expect(failed).To(gomega.BeEmpty())
+			gomega.Expect(applier.reqs).To(gomega.HaveLen(1))
+			gomega.Expect(applier.reqs[0].Services).To(gomega.Equal([]string{"api"}))
+			gomega.Expect(sess.applied).To(gomega.HaveKey(one.ID()))
+			gomega.Expect(sess.applied).To(gomega.HaveKey(two.ID()))
+		})
+
+		ginkgo.It("does not apply a replica compose did not identify", func() {
+			dir := writeComposeProjectDir()
+			applier := &stubComposeApplier{
+				out: []compose.Container{
+					{Service: "api", Name: "web-1", ID: "new-1", ImageID: "sha256:api"},
+				},
+			}
+			sess := newGitSession(gitTestClient())
+			sess.apply = applier
+			sess.checkout = func(context.Context, string, string, project.CheckoutOptions) error {
+				return nil
+			}
+
+			one := gitAssociatedContainer("api-1", "web-1", "webstack-api:latest", map[string]string{
+				gitPkg.ComposeDirLabel:      dir,
+				compose.ComposeServiceLabel: "api",
+			})
+			two := gitAssociatedContainer("api-2", "web-2", "webstack-api:latest", map[string]string{
+				gitPkg.ComposeDirLabel:      dir,
+				compose.ComposeServiceLabel: "api",
+			})
+			one.SetStale(true)
+			two.SetStale(true)
+			result := git.CheckResult{Stale: true, Commit: "abc"}
+			sess.store(one.ID(), result)
+			sess.store(two.ID(), result)
+
+			failed := map[types.ContainerID]error{}
+			docker := mockActions.CreateMockClient(&mockActions.TestData{}, false, false)
+			sess.prepareRebuilds(gitTestLogger(), ginkgo.GinkgoT().Context(), docker, []types.Container{one, two}, types.UpdateParams{EnableGitMonitoring: true}, nil, failed)
+
+			gomega.Expect(failed).NotTo(gomega.HaveKey(one.ID()))
+			gomega.Expect(failed[two.ID()]).To(gomega.MatchError(errGitComposeInstance))
+			gomega.Expect(two.IsStale()).To(gomega.BeFalse())
+			gomega.Expect(sess.applied).To(gomega.HaveKey(one.ID()))
+			gomega.Expect(sess.applied).NotTo(gomega.HaveKey(two.ID()))
+		})
 	})
 
 	ginkgo.Describe("composeServiceLabels", func() {

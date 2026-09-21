@@ -33,11 +33,16 @@ type gitSession struct {
 	applied  map[types.ContainerID]struct{}
 }
 
+// composeMember is one stale container and the check result that selected its commit.
+type composeMember struct {
+	container types.Container
+	result    git.CheckResult
+}
+
 // composeBatch is one on-disk Compose project to checkout and apply.
 type composeBatch struct {
-	ref        compose.ProjectRef
-	containers []types.Container
-	result     git.CheckResult
+	ref     compose.ProjectRef
+	members []composeMember
 }
 
 // newGitSession constructs an empty session for one Update() call.
@@ -220,11 +225,11 @@ func (s *gitSession) prepareRebuilds(
 
 		batch := batches[ref.Dir]
 		if batch == nil {
-			batch = &composeBatch{ref: ref, result: result}
+			batch = &composeBatch{ref: ref}
 			batches[ref.Dir] = batch
 		}
 
-		batch.containers = append(batch.containers, c)
+		batch.members = append(batch.members, composeMember{container: c, result: result})
 	}
 
 	for _, batch := range batches {

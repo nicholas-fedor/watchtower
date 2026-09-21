@@ -46,6 +46,8 @@ var (
 	errGitComposeService = errors.New("compose project has no com.docker.compose.service label")
 	// errGitComposeInstance indicates Compose apply did not return the requested service.
 	errGitComposeInstance = errors.New("compose apply did not recreate the service")
+	// errGitComposeCommit indicates stale services in one project resolved different commits.
+	errGitComposeCommit = errors.New("compose project services resolved different commits")
 )
 
 // Errors for Watchtower self-update operations.

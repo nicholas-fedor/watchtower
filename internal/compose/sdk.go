@@ -176,6 +176,7 @@ func listApplied(
 	for _, summary := range summaries {
 		out = append(out, Container{
 			Service: summary.Service,
+			Name:    summary.Name,
 			ID:      types.ContainerID(summary.ID),
 			ImageID: appliedImageID(summary, images),
 		})

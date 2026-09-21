@@ -3,6 +3,7 @@ package actions
 import (
 	"context"
 	"fmt"
+	"strings"
 
 	"github.com/rs/zerolog"
 
@@ -35,15 +36,23 @@ func (s *gitSession) applyCompose(
 	progress *session.Progress,
 	failed map[types.ContainerID]error,
 ) {
-	if batch == nil || len(batch.containers) == 0 {
+	if batch == nil || len(batch.members) == 0 {
 		return
 	}
 
-	services := make([]string, 0, len(batch.containers))
-	labels := make(map[string]map[string]string, len(batch.containers))
-	byService := make(map[string]types.Container, len(batch.containers))
+	commit, err := sharedComposeCommit(batch.members)
+	if err != nil {
+		failComposeBatch(log, batch, failed, err)
 
-	for _, c := range batch.containers {
+		return
+	}
+
+	services := make([]string, 0, len(batch.members))
+	labels := make(map[string]map[string]string, len(batch.members))
+	byService := make(map[string][]composeMember, len(batch.members))
+
+	for _, member := range batch.members {
+		c := member.container
 		name := compose.GetServiceName(containerLabels(c))
 		if name == "" {
 			failed[c.ID()] = errGitComposeService
@@ -56,9 +65,12 @@ func (s *gitSession) applyCompose(
 			continue
 		}
 
-		services = append(services, name)
-		byService[name] = c
-		labels[name] = composeServiceLabels(c, params, batch.result)
+		if _, seen := byService[name]; !seen {
+			services = append(services, name)
+			labels[name] = composeServiceLabels(c, params, member.result)
+		}
+
+		byService[name] = append(byService[name], member)
 	}
 
 	if len(services) == 0 {
@@ -76,7 +88,7 @@ func (s *gitSession) applyCompose(
 		opts.CABundle, opts.InsecureSkipTLS = s.client.TLSSettings()
 	}
 
-	err := checkout(ctx, batch.ref.Dir, batch.result.Commit, opts)
+	err = checkout(ctx, batch.ref.Dir, commit, opts)
 	if err != nil {
 		failComposeBatch(log, batch, failed, fmt.Errorf("compose checkout: %w", err))
 
@@ -100,34 +112,59 @@ func (s *gitSession) applyCompose(
 		return
 	}
 
-	appliedByService := make(map[string]compose.Container, len(applied))
+	appliedByService := make(map[string][]compose.Container, len(applied))
 	for _, item := range applied {
-		appliedByService[item.Service] = item
+		appliedByService[item.Service] = append(appliedByService[item.Service], item)
 	}
 
 	for _, name := range services {
-		c := byService[name]
-
-		item, ok := appliedByService[name]
-		if !ok {
-			failed[c.ID()] = errGitComposeInstance
-			c.SetStale(false)
-			log.Warn().
-				Str("container", c.Name()).
-				Str("image", c.ImageName()).
-				Str("service", name).
-				Msg("Compose apply omitted service. Leaving running container untouched")
+		members := byService[name]
+		items := appliedByService[name]
+		if len(items) == 0 {
+			for _, member := range members {
+				c := member.container
+				failed[c.ID()] = errGitComposeInstance
+				c.SetStale(false)
+				log.Warn().
+					Str("container", c.Name()).
+					Str("image", c.ImageName()).
+					Str("service", name).
+					Msg("Compose apply omitted service. Leaving running container untouched")
+			}
 
 			continue
 		}
 
-		s.recordCompose(c, item, params, batch.result, progress, log)
+		byName := make(map[string]compose.Container, len(items))
+		for _, item := range items {
+			if item.Name != "" {
+				byName[strings.TrimPrefix(item.Name, "/")] = item
+			}
+		}
+
+		for _, member := range members {
+			c := member.container
+			item, matched := matchedComposeInstance(c, members, items, byName)
+			if !matched {
+				failed[c.ID()] = errGitComposeInstance
+				c.SetStale(false)
+				log.Warn().
+					Str("container", c.Name()).
+					Str("image", c.ImageName()).
+					Str("service", name).
+					Msg("Compose apply did not identify this replica. Leaving running container untouched")
+
+				continue
+			}
+
+			s.recordCompose(c, item, params, member.result, progress, log)
+		}
 	}
 
 	log.Info().
 		Str("project", batch.ref.Name).
 		Str("dir", batch.ref.Dir).
-		Str("commit", batch.result.Commit).
+		Str("commit", commit).
 		Strs("services", services).
 		Bool("build_only", params.NoRestart).
 		Msg("Applied Compose project from Git")
@@ -212,7 +249,8 @@ func failComposeBatch(
 	failed map[types.ContainerID]error,
 	err error,
 ) {
-	for _, c := range batch.containers {
+	for _, member := range batch.members {
+		c := member.container
 		if _, exists := failed[c.ID()]; exists {
 			continue
 		}
@@ -226,6 +264,74 @@ func failComposeBatch(
 			Str("dir", batch.ref.Dir).
 			Msg("Compose apply failed. Leaving running container untouched")
 	}
+}
+
+// matchedComposeInstance finds the compose result for one container.
+//
+// A single container uses the only result. Replicas match by container name.
+// An unmatched replica is not applied.
+//
+// Parameters:
+//   - c: Container being recorded.
+//   - members: Containers that share the service name.
+//   - items: Compose results for that service.
+//   - byName: Results keyed by container name without a leading slash.
+//
+// Returns:
+//   - compose.Container: Matched instance.
+//   - bool: False when the replica cannot be identified.
+func matchedComposeInstance(
+	c types.Container,
+	members []composeMember,
+	items []compose.Container,
+	byName map[string]compose.Container,
+) (compose.Container, bool) {
+	if named, ok := byName[strings.TrimPrefix(c.Name(), "/")]; ok {
+		return named, true
+	}
+
+	if len(members) == 1 && len(items) == 1 {
+		return items[0], true
+	}
+
+	return compose.Container{}, false
+}
+
+// sharedComposeCommit returns the commit every member resolved.
+//
+// One project directory is one worktree, so a mismatch fails the batch.
+//
+// Parameters:
+//   - members: Stale containers in one project directory.
+//
+// Returns:
+//   - string: Shared commit.
+//   - error: errGitComposeCommit when the commits differ or one is empty.
+func sharedComposeCommit(members []composeMember) (string, error) {
+	var commit string
+
+	for _, member := range members {
+		got := member.result.Commit
+		if got == "" {
+			return "", errGitComposeCommit
+		}
+
+		if commit == "" {
+			commit = got
+
+			continue
+		}
+
+		if got != commit {
+			return "", errGitComposeCommit
+		}
+	}
+
+	if commit == "" {
+		return "", errGitComposeCommit
+	}
+
+	return commit, nil
 }
 
 // containerLabels returns the container config labels, or nil.
