@@ -129,6 +129,23 @@ func WithLinks(links []string) MockContainerUpdate {
 	}
 }
 
+// WithVolumesFrom sets HostConfig.VolumesFrom for the mock container.
+//
+// Parameters:
+//   - volumesFrom: List of volumes-from specs (name or ID, optional :ro/:rw).
+//
+// Returns:
+//   - MockContainerUpdate: Function to set VolumesFrom in container HostConfig.
+func WithVolumesFrom(volumesFrom []string) MockContainerUpdate {
+	return func(c *dockerContainer.InspectResponse, _ *dockerImage.InspectResponse) {
+		if c.HostConfig == nil {
+			c.HostConfig = &dockerContainer.HostConfig{}
+		}
+
+		c.HostConfig.VolumesFrom = volumesFrom
+	}
+}
+
 // WithLabels sets labels for the mock container.
 //
 // Parameters:

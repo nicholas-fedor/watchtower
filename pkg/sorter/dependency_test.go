@@ -16,6 +16,132 @@ import (
 
 var _ = ginkgo.Describe("DependencySorter", func() {
 	ginkgo.Describe("Sort", func() {
+		ginkgo.It("should sort a volumes-from dependent after a source referenced by Docker ID", func() {
+			const appID = "9b738d6a78250d731816cc5020d8cfaf55e605cd510f4d4662688bd9a6c4e0c7"
+
+			app := concreteLinkedContainer(appID, "/nextcloud-app", "nextcloud", "app", "")
+			nginx := container.NewContainer(nil, &dockerContainer.InspectResponse{
+				ID:   "nginx-id",
+				Name: "/nextcloud-nginx",
+				HostConfig: &dockerContainer.HostConfig{
+					VolumesFrom: []string{appID + ":rw"},
+				},
+				Config: &dockerContainer.Config{Labels: map[string]string{
+					"com.docker.compose.project": "nextcloud",
+					"com.docker.compose.service": "web",
+				}},
+			}, nil)
+
+			containers := []types.Container{nginx, app}
+			err := DependencySorter{}.Sort(testLog(), containers, false)
+			gomega.Expect(err).ToNot(gomega.HaveOccurred())
+			gomega.Expect(containers[0].Name()).To(gomega.Equal("nextcloud-app"))
+			gomega.Expect(containers[1].Name()).To(gomega.Equal("nextcloud-nginx"))
+		})
+
+		ginkgo.It("should sort a volumes-from dependent after a source in another Compose project", func() {
+			const appID = "9b738d6a78250d731816cc5020d8cfaf55e605cd510f4d4662688bd9a6c4e0c7"
+
+			app := concreteLinkedContainer(appID, "/shared-app", "data", "app", "")
+			nginx := container.NewContainer(nil, &dockerContainer.InspectResponse{
+				ID:   "nginx-id",
+				Name: "/nextcloud-nginx",
+				HostConfig: &dockerContainer.HostConfig{
+					VolumesFrom: []string{appID + ":rw"},
+				},
+				Config: &dockerContainer.Config{Labels: map[string]string{
+					"com.docker.compose.project": "nextcloud",
+					"com.docker.compose.service": "web",
+				}},
+			}, nil)
+
+			containers := []types.Container{nginx, app}
+			err := DependencySorter{}.Sort(testLog(), containers, false)
+			gomega.Expect(err).ToNot(gomega.HaveOccurred())
+			gomega.Expect(containers[0].Name()).To(gomega.Equal("shared-app"))
+			gomega.Expect(containers[1].Name()).To(gomega.Equal("nextcloud-nginx"))
+		})
+
+		ginkgo.It("should sort a volumes-from chain after compose depends_on", func() {
+			const appID = "9b738d6a78250d731816cc5020d8cfaf55e605cd510f4d4662688bd9a6c4e0c7"
+
+			postgres := concreteLinkedContainer(
+				"postgres-id",
+				"/nextcloud-db",
+				"nextcloud",
+				"db",
+				"",
+			)
+			app := container.NewContainer(nil, &dockerContainer.InspectResponse{
+				ID:         appID,
+				Name:       "/nextcloud-app",
+				HostConfig: &dockerContainer.HostConfig{},
+				Config: &dockerContainer.Config{Labels: map[string]string{
+					"com.docker.compose.project":    "nextcloud",
+					"com.docker.compose.service":    "app",
+					"com.docker.compose.depends_on": "db",
+				}},
+			}, nil)
+			nginx := container.NewContainer(nil, &dockerContainer.InspectResponse{
+				ID:   "nginx-id",
+				Name: "/nextcloud-nginx",
+				HostConfig: &dockerContainer.HostConfig{
+					VolumesFrom: []string{appID + ":rw"},
+				},
+				Config: &dockerContainer.Config{Labels: map[string]string{
+					"com.docker.compose.project": "nextcloud",
+					"com.docker.compose.service": "web",
+				}},
+			}, nil)
+
+			containers := []types.Container{nginx, app, postgres}
+			err := DependencySorter{}.Sort(testLog(), containers, true)
+			gomega.Expect(err).ToNot(gomega.HaveOccurred())
+			gomega.Expect(containers[0].Name()).To(gomega.Equal("nextcloud-db"))
+			gomega.Expect(containers[1].Name()).To(gomega.Equal("nextcloud-app"))
+			gomega.Expect(containers[2].Name()).To(gomega.Equal("nextcloud-nginx"))
+		})
+
+		ginkgo.It("should sort a volumes-from chain after watchtower depends-on", func() {
+			const appID = "9b738d6a78250d731816cc5020d8cfaf55e605cd510f4d4662688bd9a6c4e0c7"
+
+			postgres := concreteLinkedContainer(
+				"postgres-id",
+				"/nextcloud-db",
+				"nextcloud",
+				"db",
+				"",
+			)
+			app := container.NewContainer(nil, &dockerContainer.InspectResponse{
+				ID:         appID,
+				Name:       "/nextcloud-app",
+				HostConfig: &dockerContainer.HostConfig{},
+				Config: &dockerContainer.Config{Labels: map[string]string{
+					"com.docker.compose.project":                "nextcloud",
+					"com.docker.compose.service":                "app",
+					"com.centurylinklabs.watchtower.depends-on": "nextcloud-db",
+				}},
+			}, nil)
+			nginx := container.NewContainer(nil, &dockerContainer.InspectResponse{
+				ID:   "nginx-id",
+				Name: "/nextcloud-nginx",
+				HostConfig: &dockerContainer.HostConfig{
+					VolumesFrom: []string{appID + ":rw"},
+				},
+				Config: &dockerContainer.Config{Labels: map[string]string{
+					"com.docker.compose.project": "nextcloud",
+					"com.docker.compose.service": "web",
+				}},
+			}, nil)
+
+			containers := []types.Container{nginx, app, postgres}
+			err := DependencySorter{}.Sort(testLog(), containers, false)
+			gomega.Expect(err).ToNot(gomega.HaveOccurred())
+			gomega.Expect(containers[0].Name()).To(gomega.Equal("nextcloud-db"))
+			gomega.Expect(containers[1].Name()).To(gomega.Equal("nextcloud-app"))
+			gomega.Expect(containers[2].Name()).To(gomega.Equal("nextcloud-nginx"))
+		})
+
 		ginkgo.It("should sort a network_mode dependent after a provider referenced by Docker ID", func() {
 			const providerID = "25e75393800b5c450a6841212a3b92ed28fa35414a586dec9f2c8a520d4910c2"
 
