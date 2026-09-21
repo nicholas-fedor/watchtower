@@ -29,6 +29,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Update module github.com/docker/cli to v29.8.1+incompatible by @renovate[bot] in [#2391](https://github.com/nicholas-fedor/watchtower/pull/2391)
 - Update module github.com/gofiber/schema to v1.8.7 by @renovate[bot] in [#2388](https://github.com/nicholas-fedor/watchtower/pull/2388)
 
+### Fixed
+
+- Match engine-generated MACs as inspect HardwareAddr by @nicholas-fedor in [#2418](https://github.com/nicholas-fedor/watchtower/pull/2418)
+
 ## [1.22.2] - 2026-09-15
 
 ### Added
