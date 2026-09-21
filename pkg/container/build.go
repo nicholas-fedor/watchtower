@@ -11,6 +11,7 @@ import (
 	"net/url"
 	"path"
 	"path/filepath"
+	"regexp"
 	"strings"
 
 	dockerClient "github.com/moby/moby/client"
@@ -58,13 +59,13 @@ func (c *client) BuildRemoteImage(ctx context.Context, remote, dockerfile string
 		Dockerfile:    dockerfile,
 	})
 	if err != nil {
-		return "", fmt.Errorf("image build: %w", err)
+		return "", fmt.Errorf("image build: %w", redactBuildError(err, remote))
 	}
 	defer result.Body.Close()
 
 	imageID, err := consumeBuildStream(result.Body)
 	if err != nil {
-		return "", err
+		return "", redactBuildError(err, remote)
 	}
 
 	if imageID == "" && len(tags) > 0 {
@@ -107,6 +108,49 @@ func redactedRemote(remote string) string {
 	}
 
 	return parsed.String()
+}
+
+// userinfoInError matches scheme://user@ and scheme://user:password@ in a daemon error.
+var userinfoInError = regexp.MustCompile(`://[^/\s@]+@`)
+
+// redactBuildError removes Git credentials from a build error.
+//
+// The Docker daemon receives the credentialed remote and may echo it.
+// The original error is returned unchanged when it contains no userinfo.
+//
+// Parameters:
+//   - err: Build client or stream error.
+//   - remote: Credentialed Git context URL sent to the daemon.
+//
+// Returns:
+//   - error: err, or a new error with userinfo replaced.
+func redactBuildError(err error, remote string) error {
+	if err == nil {
+		return nil
+	}
+
+	msg := redactUserinfo(err.Error(), remote)
+	if msg == err.Error() {
+		return err
+	}
+
+	return errors.New(msg)
+}
+
+// redactUserinfo replaces the credentialed remote and any leftover userinfo.
+//
+// Parameters:
+//   - msg: Error text.
+//   - remote: Credentialed Git context URL.
+//
+// Returns:
+//   - string: msg with credentials replaced by xxxxx.
+func redactUserinfo(msg, remote string) string {
+	if remote != "" {
+		msg = strings.ReplaceAll(msg, remote, redactedRemote(remote))
+	}
+
+	return userinfoInError.ReplaceAllString(msg, "://xxxxx:xxxxx@")
 }
 
 // confinedDockerfile rejects Dockerfile paths that leave the build context.

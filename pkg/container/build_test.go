@@ -1,6 +1,7 @@
 package container
 
 import (
+	"fmt"
 	"strings"
 
 	"github.com/onsi/ginkgo/v2"
@@ -54,6 +55,23 @@ var _ = ginkgo.Describe("consumeBuildStream", func() {
 	ginkgo.It("returns a build error from the stream", func() {
 		_, err := consumeBuildStream(strings.NewReader(`{"error":"failed to solve"}`))
 		gomega.Expect(err).To(gomega.MatchError(errImageBuildFailed))
+	})
+
+	ginkgo.It("redacts a token echoed by the daemon", func() {
+		remote := "https://git:secret@github.com/org/app.git#abc"
+		streamErr := fmt.Errorf("%w: failed %s", errImageBuildFailed, remote)
+		got := redactBuildError(streamErr, remote)
+		gomega.Expect(got.Error()).NotTo(gomega.ContainSubstring("secret"))
+		gomega.Expect(got.Error()).To(gomega.ContainSubstring("xxxxx:xxxxx"))
+
+		clientErr := fmt.Errorf("image build: Get %q: denied", remote)
+		got = redactBuildError(clientErr, remote)
+		gomega.Expect(got.Error()).NotTo(gomega.ContainSubstring("secret"))
+		gomega.Expect(got.Error()).To(gomega.ContainSubstring("xxxxx:xxxxx"))
+
+		tokenOnly := redactBuildError(fmt.Errorf("clone https://token@github.com/org/app.git failed"), "")
+		gomega.Expect(tokenOnly.Error()).NotTo(gomega.ContainSubstring("token@"))
+		gomega.Expect(tokenOnly.Error()).To(gomega.ContainSubstring("xxxxx:xxxxx@"))
 	})
 
 	ginkgo.It("returns a decode error for invalid JSON", func() {
