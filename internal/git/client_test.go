@@ -261,6 +261,92 @@ func TestCheck_EmptyRefDefaultsToMain(t *testing.T) {
 	assert.False(t, got.Stale)
 }
 
+func TestCheck_TagPolicyKnownCommitIsBaseline(t *testing.T) {
+	t.Parallel()
+
+	client := testClient(t, []RemoteRef{
+		{Name: "refs/tags/v1.2.3", Hash: "abc1111"},
+		{Name: "refs/tags/v1.2.4", Hash: "def2222"},
+		{Name: "refs/tags/nightly", Hash: "zzz9999"},
+	})
+
+	t.Run("empty tag matches selected commit", func(t *testing.T) {
+		t.Parallel()
+
+		got, err := client.Check(t.Context(), CheckRequest{
+			Repo:       "https://example.com/org/app.git",
+			Policy:     types.GitPolicyPatch,
+			LastCommit: "def2222",
+		})
+		require.NoError(t, err)
+		assert.False(t, got.Stale)
+		assert.Equal(t, "v1.2.4", got.Tag)
+		assert.Equal(t, "def2222", got.Commit)
+	})
+
+	t.Run("non-semver tag matches selected commit", func(t *testing.T) {
+		t.Parallel()
+
+		got, err := client.Check(t.Context(), CheckRequest{
+			Repo:       "https://example.com/org/app.git",
+			Policy:     types.GitPolicyPatch,
+			LastTag:    "nightly",
+			LastCommit: "def2222",
+		})
+		require.NoError(t, err)
+		assert.False(t, got.Stale)
+		assert.Equal(t, "v1.2.4", got.Tag)
+		assert.Equal(t, "def2222", got.Commit)
+	})
+
+	t.Run("patch does not jump past the commit tag", func(t *testing.T) {
+		t.Parallel()
+
+		wider := testClient(t, []RemoteRef{
+			{Name: "refs/tags/v1.2.3", Hash: "abc1111"},
+			{Name: "refs/tags/v1.2.4", Hash: "def2222"},
+			{Name: "refs/tags/v1.3.0", Hash: "ghi3333"},
+		})
+		got, err := wider.Check(t.Context(), CheckRequest{
+			Repo:       "https://example.com/org/app.git",
+			Policy:     types.GitPolicyPatch,
+			LastCommit: "abc1111",
+		})
+		require.NoError(t, err)
+		assert.True(t, got.Stale)
+		assert.Equal(t, "v1.2.4", got.Tag)
+		assert.Equal(t, "def2222", got.Commit)
+	})
+
+	t.Run("known commit differs from selected tag", func(t *testing.T) {
+		t.Parallel()
+
+		got, err := client.Check(t.Context(), CheckRequest{
+			Repo:       "https://example.com/org/app.git",
+			Policy:     types.GitPolicyPatch,
+			LastCommit: "abc1111",
+		})
+		require.NoError(t, err)
+		assert.True(t, got.Stale)
+		assert.Equal(t, "v1.2.4", got.Tag)
+		assert.Equal(t, "def2222", got.Commit)
+	})
+
+	t.Run("non-semver tag and empty commit records highest", func(t *testing.T) {
+		t.Parallel()
+
+		got, err := client.Check(t.Context(), CheckRequest{
+			Repo:    "https://example.com/org/app.git",
+			Policy:  types.GitPolicyMajor,
+			LastTag: "nightly",
+		})
+		require.NoError(t, err)
+		assert.False(t, got.Stale)
+		assert.Equal(t, "v1.2.4", got.Tag)
+		assert.Equal(t, "def2222", got.Commit)
+	})
+}
+
 func TestCheck_MismatchedGitHostUsesLister(t *testing.T) {
 	t.Parallel()
 

@@ -13,6 +13,7 @@ import (
 	"unicode"
 
 	"github.com/rs/zerolog"
+	"golang.org/x/mod/semver"
 
 	gitPkg "github.com/nicholas-fedor/watchtower/pkg/container/git"
 	"github.com/nicholas-fedor/watchtower/pkg/types"
@@ -254,7 +255,19 @@ func (c *Client) checkTagPolicy(ctx context.Context, req CheckRequest) (CheckRes
 		byName[tag.Name] = tag.Hash
 	}
 
-	if req.LastTag == "" && req.LastCommit == "" {
+	lastTag := baselineTag(req.LastTag)
+	inferred := false
+	// An empty or non-semver stamp still names a release when the commit
+	// matches that tag. Use the tag so patch and minor do not jump to the
+	// highest release.
+	if lastTag == "" && req.LastCommit != "" {
+		if matched := tagForCommit(byName, req.LastCommit); matched != "" {
+			lastTag = matched
+			inferred = true
+		}
+	}
+
+	if lastTag == "" && req.LastCommit == "" {
 		selected, ok := SelectTag("", names, req.Policy)
 		if !ok {
 			// No usable semver tags. Observe the configured ref without
@@ -277,18 +290,73 @@ func (c *Client) checkTagPolicy(ctx context.Context, req CheckRequest) (CheckRes
 		}, nil
 	}
 
-	selected, ok := SelectTag(req.LastTag, names, req.Policy)
+	selected, ok := SelectTag(lastTag, names, req.Policy)
 	if !ok {
+		if inferred {
+			return CheckResult{
+				Stale:  false,
+				Commit: byName[lastTag],
+				Tag:    lastTag,
+				Kind:   kindTag,
+				Ref:    lastTag,
+			}, nil
+		}
+
 		return CheckResult{Stale: false}, nil
+	}
+
+	hash := byName[selected]
+	// A known revision that already is the selected tag is the baseline.
+	// Remember the tag so the next session does not treat a missing stamp
+	// as a reason to rebuild.
+	if req.LastCommit != "" && sameRevision(req.LastCommit, hash) {
+		return CheckResult{
+			Stale:  false,
+			Commit: hash,
+			Tag:    selected,
+			Kind:   kindTag,
+			Ref:    selected,
+		}, nil
 	}
 
 	return CheckResult{
 		Stale:  true,
-		Commit: byName[selected],
+		Commit: hash,
 		Tag:    selected,
 		Kind:   kindTag,
 		Ref:    selected,
 	}, nil
+}
+
+// tagForCommit returns the highest release tag whose hash matches commit.
+//
+// Parameters:
+//   - byName: Tag name to commit hash.
+//   - commit: Known running revision.
+//
+// Returns:
+//   - string: Matching tag name, or empty.
+func tagForCommit(byName map[string]string, commit string) string {
+	bestName := ""
+	bestCanon := ""
+
+	for name, hash := range byName {
+		if !sameRevision(commit, hash) {
+			continue
+		}
+
+		canon := canonicalize(name)
+		if !semver.IsValid(canon) || semver.Prerelease(canon) != "" {
+			continue
+		}
+
+		if bestCanon == "" || semver.Compare(canon, bestCanon) > 0 {
+			bestCanon = canon
+			bestName = name
+		}
+	}
+
+	return bestName
 }
 
 type resolvedRef struct {
