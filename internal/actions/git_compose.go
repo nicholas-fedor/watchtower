@@ -97,7 +97,7 @@ func (s *gitSession) applyCompose(
 
 	applier := s.apply
 	if applier == nil {
-		applier = compose.NewSDK()
+		applier = compose.NewClient()
 	}
 
 	applied, err := applier.Apply(ctx, compose.Request{

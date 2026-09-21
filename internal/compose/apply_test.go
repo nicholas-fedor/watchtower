@@ -162,14 +162,14 @@ func TestAppliedImageID(t *testing.T) {
 	)
 }
 
-func TestSDKApplyValidation(t *testing.T) {
+func TestClientApplyValidation(t *testing.T) {
 	t.Parallel()
 
-	sdk := NewSDK()
+	client := NewClient()
 
-	_, err := sdk.Apply(t.Context(), Request{})
+	_, err := client.Apply(t.Context(), Request{})
 	require.ErrorIs(t, err, errEmptyProjectDir)
 
-	_, err = sdk.Apply(t.Context(), Request{Ref: ProjectRef{Dir: t.TempDir()}})
+	_, err = client.Apply(t.Context(), Request{Ref: ProjectRef{Dir: t.TempDir()}})
 	require.ErrorIs(t, err, errNoComposeServices)
 }

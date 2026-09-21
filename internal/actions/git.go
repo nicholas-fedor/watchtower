@@ -55,7 +55,7 @@ type composeBatch struct {
 func newGitSession(client *git.Client) *gitSession {
 	return &gitSession{
 		client:   client,
-		apply:    compose.NewSDK(),
+		apply:    compose.NewClient(),
 		checkout: project.Checkout,
 		results:  make(map[types.ContainerID]git.CheckResult),
 		built:    make(map[types.ContainerID]types.ImageID),

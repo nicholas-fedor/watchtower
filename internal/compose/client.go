@@ -18,18 +18,18 @@ import (
 	"github.com/nicholas-fedor/watchtower/pkg/types"
 )
 
-// SDK applies a Compose project through docker/compose v5.
-type SDK struct {
+// Client applies a Compose project through docker/compose v5.
+type Client struct {
 	mu      sync.Mutex
 	service api.Compose
 }
 
-// NewSDK returns an applier that talks to the Docker daemon on first Apply.
+// NewClient returns an applier that talks to the Docker daemon on first Apply.
 //
 // Returns:
-//   - *SDK: Lazy Compose service.
-func NewSDK() *SDK {
-	return &SDK{}
+//   - *Client: Lazy Compose service.
+func NewClient() *Client {
+	return &Client{}
 }
 
 // Apply loads the project and runs compose up, or compose build when BuildOnly is set.
@@ -41,7 +41,7 @@ func NewSDK() *SDK {
 // Returns:
 //   - []Container: Service instances after apply.
 //   - error: Non-nil when load or apply fails.
-func (a *SDK) Apply(ctx context.Context, req Request) ([]Container, error) {
+func (c *Client) Apply(ctx context.Context, req Request) ([]Container, error) {
 	if req.Ref.Dir == "" {
 		return nil, errEmptyProjectDir
 	}
@@ -60,7 +60,7 @@ func (a *SDK) Apply(ctx context.Context, req Request) ([]Container, error) {
 		return nil, fmt.Errorf("inject compose labels: %w", err)
 	}
 
-	svc, err := a.composeService()
+	svc, err := c.composeService()
 	if err != nil {
 		return nil, err
 	}
@@ -108,12 +108,12 @@ func (a *SDK) Apply(ctx context.Context, req Request) ([]Container, error) {
 // Returns:
 //   - api.Compose: Compose service.
 //   - error: Non-nil when the Docker CLI cannot be initialized.
-func (a *SDK) composeService() (api.Compose, error) {
-	a.mu.Lock()
-	defer a.mu.Unlock()
+func (c *Client) composeService() (api.Compose, error) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
 
-	if a.service != nil {
-		return a.service, nil
+	if c.service != nil {
+		return c.service, nil
 	}
 
 	dockerCLI, err := command.NewDockerCli()
@@ -135,7 +135,7 @@ func (a *SDK) composeService() (api.Compose, error) {
 		return nil, fmt.Errorf("compose service: %w", err)
 	}
 
-	a.service = svc
+	c.service = svc
 
 	return svc, nil
 }
