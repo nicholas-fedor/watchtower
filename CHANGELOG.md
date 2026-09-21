@@ -34,6 +34,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Keep container config when image Config is nil by @nicholas-fedor in [#2432](https://github.com/nicholas-fedor/watchtower/pull/2432)
 - Share authenticated lscr.io rate limit with ghcr.io by @nicholas-fedor in [#2430](https://github.com/nicholas-fedor/watchtower/pull/2430)
 - Apply registry mirrors only to Docker Hub by @nicholas-fedor in [#2428](https://github.com/nicholas-fedor/watchtower/pull/2428)
 - Rewrite volumes-from IDs before recreate by @nicholas-fedor in [#2424](https://github.com/nicholas-fedor/watchtower/pull/2424)
