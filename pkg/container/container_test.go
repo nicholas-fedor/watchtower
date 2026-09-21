@@ -232,6 +232,20 @@ var _ = ginkgo.Describe("Container", func() {
 			})
 		})
 
+		ginkgo.It("uses container config when image config is nil", func() {
+			c := MockContainer(WithImageName("ghcr.io/home-assistant/home-assistant:latest"))
+			c.imageInfo.Config = nil
+			c.containerInfo.Config.WorkingDir = "/config"
+			c.containerInfo.Config.Env = []string{"TZ=Europe/Amsterdam"}
+
+			config := c.GetCreateConfig()
+
+			gomega.Expect(config.Image).
+				To(gomega.Equal("ghcr.io/home-assistant/home-assistant:latest"))
+			gomega.Expect(config.WorkingDir).To(gomega.Equal("/config"))
+			gomega.Expect(config.Env).To(gomega.Equal([]string{"TZ=Europe/Amsterdam"}))
+		})
+
 		ginkgo.It("returns minimal config when containerInfo is nil", func() {
 			c := MockContainer(WithImageName("test-image"))
 			c.containerInfo = nil
