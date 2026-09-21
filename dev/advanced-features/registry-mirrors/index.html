@@ -3078,8 +3078,8 @@ Watchtower uses these mirrors when checking whether containers need updates, ens
 <p>When the Docker daemon is configured with registry mirrors, Watchtower automatically detects and uses them during its update checks.
 This means:</p>
 <ul>
-<li><strong>Digest comparisons</strong> — Watchtower fetches image manifests from mirrors before falling back to the canonical registry, so it can detect updates even when the primary registry is inaccessible.</li>
-<li><strong>All registries supported</strong> — Global mirrors apply to all image registries (Docker Hub, GHCR, private registries, etc.).</li>
+<li><strong>Digest comparisons</strong> — For Docker Hub images, Watchtower fetches manifests from mirrors before falling back to the canonical registry, so it can detect updates even when Docker Hub is inaccessible.</li>
+<li><strong>Docker Hub only</strong> — Daemon <code>registry-mirrors</code> apply to Docker Hub (<code>docker.io</code>, <code>index.docker.io</code>, and bare image names). GHCR, <code>lscr.io</code>, and other registries are checked on their canonical host.</li>
 </ul>
 <div class="admonition note">
 <p class="admonition-title">Note</p>
@@ -3098,8 +3098,8 @@ The actual image pull is handled by the Docker daemon, which already uses config
 <div class="highlight"><span class="filename">Linux with systemd</span><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>sudo<span class="w"> </span>systemctl<span class="w"> </span>restart<span class="w"> </span>docker
 </code></pre></div>
 <h3 id="configuration_format">Configuration Format<a class="headerlink" href="#configuration_format" title="Permanent link">&para;</a></h3>
-<p>Global mirrors apply to all image registries.
-Add them under the <code>registry-mirrors</code> key:</p>
+<p>Docker's <code>registry-mirrors</code> setting is a Docker Hub mirror list.
+Add Hub mirrors under the <code>registry-mirrors</code> key:</p>
 <div class="highlight"><span class="filename">/etc/docker/daemon.json</span><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a><span class="p">{</span>
 <a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a><span class="w">    </span><span class="nt">"registry-mirrors"</span><span class="p">:</span><span class="w"> </span><span class="p">[</span>
 <a id="__codelineno-1-3" name="__codelineno-1-3" href="#__codelineno-1-3"></a><span class="w">        </span><span class="s2">"https://mirror.example.com"</span>
@@ -3112,16 +3112,17 @@ Add them under the <code>registry-mirrors</code> key:</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a>dockerd<span class="w"> </span>--registry-mirror<span class="w"> </span>https://mirror.example.com
 </code></pre></div>
 <h2 id="how_watchtower_uses_mirrors">How Watchtower Uses Mirrors<a class="headerlink" href="#how_watchtower_uses_mirrors" title="Permanent link">&para;</a></h2>
-<p>When checking if a container's image has been updated, Watchtower resolves the mirror to use in this order:</p>
+<p>When checking if a Docker Hub image has been updated, Watchtower resolves the mirror to use in this order:</p>
 <ol>
-<li><strong>Configured mirrors</strong> — The global mirror list from the Docker daemon is tried first.</li>
-<li><strong>Canonical registry</strong> — If all mirrors fail, Watchtower falls back to the original registry (e.g., <code>index.docker.io</code>).</li>
+<li><strong>Configured mirrors</strong> — The daemon mirror list is tried first.</li>
+<li><strong>Canonical registry</strong> — If all mirrors fail without a rate-limit (429) response, Watchtower falls back to <code>index.docker.io</code>. A 429 stops the check instead of trying Docker Hub.</li>
 </ol>
 <p>The first mirror to successfully respond with the image manifest wins.
-This means a fast, nearby mirror is preferred over a distant canonical registry.</p>
+This means a fast, nearby mirror is preferred over Docker Hub.</p>
+<p>Images on other registries, such as <code>ghcr.io</code> and <code>lscr.io</code>, skip the mirror list and use their own host.</p>
 <h2 id="configuration_examples">Configuration Examples<a class="headerlink" href="#configuration_examples" title="Permanent link">&para;</a></h2>
 <h3 id="single_global_mirror">Single Global Mirror<a class="headerlink" href="#single_global_mirror" title="Permanent link">&para;</a></h3>
-<p>A single mirror used for all registries:</p>
+<p>A single mirror used for Docker Hub:</p>
 <div class="highlight"><span class="filename">/etc/docker/daemon.json</span><pre><span></span><code><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a><span class="p">{</span>
 <a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a><span class="w">    </span><span class="nt">"registry-mirrors"</span><span class="p">:</span><span class="w"> </span><span class="p">[</span>
 <a id="__codelineno-3-3" name="__codelineno-3-3" href="#__codelineno-3-3"></a><span class="w">        </span><span class="s2">"https://docker-mirror.company.com"</span>
@@ -3161,6 +3162,7 @@ If the first is unreachable, the next is used:</p>
 <a id="__codelineno-6-4" name="__codelineno-6-4" href="#__codelineno-6-4"></a>nickfedor/watchtower
 </code></pre></div>
 <p>Look for log output containing <code>Resolved registry mirror configuration</code>.
+A non-Hub image logs <code>Skipping Docker Hub registry mirrors for non-Hub image</code> and is not a misconfiguration.
 3. <strong>Check network access</strong> — Ensure the host can reach the mirror URLs (e.g., <code>curl -I https://mirror.example.com/v2/</code>).
 4. <strong>Verify mirror content</strong> — Confirm the mirror is operational and has the required images.</p>
 </li>
@@ -3206,7 +3208,7 @@ Only use this for internal mirrors under your control.</p>
     <span class="md-icon" title="Last update">
       <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M21 13.1c-.1 0-.3.1-.4.2l-1 1 2.1 2.1 1-1c.2-.2.2-.6 0-.8l-1.3-1.3c-.1-.1-.2-.2-.4-.2m-1.9 1.8-6.1 6V23h2.1l6.1-6.1zM12.5 7v5.2l4 2.4-1 1L11 13V7zM11 21.9c-5.1-.5-9-4.8-9-9.9C2 6.5 6.5 2 12 2c5.3 0 9.6 4.1 10 9.3-.3-.1-.6-.2-1-.2s-.7.1-1 .2C19.6 7.2 16.2 4 12 4c-4.4 0-8 3.6-8 8 0 4.1 3.1 7.5 7.1 7.9l-.1.2z"/></svg>
     </span>
-    <span class="git-revision-date-localized-plugin git-revision-date-localized-plugin-timeago" title="July 14, 2026 14:36:11 UTC"><span class="timeago" datetime="2026-07-14T14:36:11+00:00" locale="en"></span></span><span class="git-revision-date-localized-plugin git-revision-date-localized-plugin-iso_date" title="July 14, 2026 14:36:11 UTC">2026-07-14</span>
+    <span class="git-revision-date-localized-plugin git-revision-date-localized-plugin-timeago" title="September 21, 2026 19:28:17 UTC"><span class="timeago" datetime="2026-09-21T19:28:17+00:00" locale="en"></span></span><span class="git-revision-date-localized-plugin git-revision-date-localized-plugin-iso_date" title="September 21, 2026 19:28:17 UTC">2026-09-21</span>
   </span>
 
     
