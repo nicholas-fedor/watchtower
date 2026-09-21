@@ -14,6 +14,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Chores
 
+- Update golang:alpine3.24 docker digest to 8a5910f by @renovate[bot] in [#2421](https://github.com/nicholas-fedor/watchtower/pull/2421)
 - Update golang:1.27.1-alpine docker digest to 8a5910f by @renovate[bot] in [#2420](https://github.com/nicholas-fedor/watchtower/pull/2420)
 - Update orhun/git-cliff-action action to v4.9.1 by @renovate[bot] in [#2414](https://github.com/nicholas-fedor/watchtower/pull/2414)
 - Update module github.com/molecule-man/go-brrr to v1.1.1 by @renovate[bot] in [#2413](https://github.com/nicholas-fedor/watchtower/pull/2413)
@@ -32,6 +33,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Rewrite volumes-from IDs before recreate by @nicholas-fedor in [#2424](https://github.com/nicholas-fedor/watchtower/pull/2424)
 - Match engine-generated MACs as inspect HardwareAddr by @nicholas-fedor in [#2418](https://github.com/nicholas-fedor/watchtower/pull/2418)
 
 ## [1.22.2] - 2026-09-15
