@@ -59,7 +59,7 @@ dockerd --registry-mirror https://mirror.example.com
 When checking if a Docker Hub image has been updated, Watchtower resolves the mirror to use in this order:
 
 1. **Configured mirrors** — The daemon mirror list is tried first.
-2. **Canonical registry** — If all mirrors fail, Watchtower falls back to `index.docker.io`.
+2. **Canonical registry** — If all mirrors fail without a rate-limit (429) response, Watchtower falls back to `index.docker.io`. A 429 stops the check instead of trying Docker Hub.
 
 The first mirror to successfully respond with the image manifest wins.
 This means a fast, nearby mirror is preferred over Docker Hub.
