@@ -216,7 +216,7 @@ func (c imageClient) CheckContainerUpdate(
 	}
 
 	mirrorInfo := c.resolveRegistryMirrorConfig(ctx)
-	endpoints := c.buildMirrorEndpoints(mirrorInfo)
+	endpoints := c.buildMirrorEndpoints(mirrorInfo, sourceContainer.ImageName())
 
 	match, remoteDigest, err := digest.CompareDigestWithRemote(c.logger(),
 		ctx,
@@ -634,8 +634,9 @@ func (c imageClient) shouldSkipPull(
 	// Resolve registry mirror configuration from Docker daemon.
 	mirrorInfo := c.resolveRegistryMirrorConfig(ctx)
 
-	// Build candidate endpoints: mirrors first, then canonical (empty string).
-	endpoints := c.buildMirrorEndpoints(mirrorInfo)
+	// Build candidate endpoints: Hub mirrors first, then canonical (empty string).
+	// Non-Hub images skip daemon registry-mirrors.
+	endpoints := c.buildMirrorEndpoints(mirrorInfo, sourceContainer.ImageName())
 
 	// Compare current and remote digests, trying each endpoint.
 	// Local-only images are handled inside CompareDigest (match=true, err=nil).
