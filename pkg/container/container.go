@@ -361,9 +361,10 @@ func (c *Container) GetCreateConfig() *dockerContainer.Config {
 	config := *c.containerInfo.Config
 	hostConfig := c.containerInfo.HostConfig
 
-	// Handle missing image info case.
-	if c.imageInfo == nil {
-		clog.Warn().Msg("No image info available, using container config as-is")
+	// Handle missing image info, including a nil image Config. The containerd
+	// image store can return image inspect with Config unset.
+	if c.imageInfo == nil || c.imageInfo.Config == nil {
+		clog.Warn().Msg("No image config available, using container config as-is")
 
 		config.Image = c.imageNameLocked()
 
