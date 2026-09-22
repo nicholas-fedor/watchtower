@@ -131,8 +131,8 @@ github.com/molecule-man/go-brrr v1.1.1 h1:KYwusQhjtV3smALnhmafZf4OBrh7vP4p8O47Dy
 github.com/molecule-man/go-brrr v1.1.1/go.mod h1:7ybW6/7gA3oKY45jOfVNjSJDtrr6ea4tzbsTkjmQDC4=
 github.com/munnerz/goautoneg v0.0.0-20191010083416-a7dc8b61c822 h1:C3w9PqII01/Oq1c1nUAm88MOHcQC9l5mIlSMApZMrHA=
 github.com/munnerz/goautoneg v0.0.0-20191010083416-a7dc8b61c822/go.mod h1:+n7T8mK8HuQTcFwEeznm/DIxMOiR9yIdICNftLE1DvQ=
-github.com/nicholas-fedor/shoutrrr v0.21.0 h1:as/mEwdaZMijCVu0FkTUEXashhvC3Y7C5g9dsXMcmQc=
-github.com/nicholas-fedor/shoutrrr v0.21.0/go.mod h1:dgg4kJv9K0tLXBH/1TXiSibNbM2hcd4SK6xb0sglyU4=
+github.com/nicholas-fedor/shoutrrr v0.21.1 h1:6xp6FCVatK6EJKC9OcQPkFF3wmOpzsXXdn24lSEnn6M=
+github.com/nicholas-fedor/shoutrrr v0.21.1/go.mod h1:q97ykXzJCVEre7+AVW50onUVi+NmoqSw86V6NJ+Ep3c=
 github.com/onsi/ginkgo/v2 v2.33.0 h1:C8gBA6Uc2ZEubiV+SXiu5tZnMTwEmXHgkJwGozKtZf8=
 github.com/onsi/ginkgo/v2 v2.33.0/go.mod h1:+aXOY+vzZ5mu2iI2HpTZUPmM//oQfsNFX6gU9kNcA44=
 github.com/onsi/gomega v1.43.1 h1:vGIPFuYrIO6/0Z09s0I0QQQgFchiX4+tb1re3MScJYo=
