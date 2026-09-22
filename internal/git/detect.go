@@ -3,7 +3,6 @@ package git
 import (
 	"context"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"io"
 	"maps"
@@ -42,8 +41,6 @@ var knownAPIs = []knownAPI{
 		match: matchGitHubAPI,
 	},
 }
-
-var errEmptyProbeURL = errors.New("empty probe url")
 
 // apiProbe is the closed HTTP result of one fingerprint request.
 type apiProbe struct {

@@ -671,10 +671,3 @@ func nextLink(header string) string {
 
 	return ""
 }
-
-var (
-	// errAPINotFound indicates the provider has no such ref.
-	errAPINotFound = fmt.Errorf("%w", ErrRefNotFound)
-	// errAPIStatus indicates a non-success HTTP status from a Git provider.
-	errAPIStatus = errors.New("git provider http error")
-)

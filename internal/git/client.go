@@ -19,26 +19,6 @@ import (
 	"github.com/nicholas-fedor/watchtower/pkg/types"
 )
 
-// Errors returned by the Git watcher.
-var (
-	// ErrRefNotFound indicates the requested branch or tag does not exist.
-	ErrRefNotFound = errors.New("git ref not found")
-	// ErrInvalidRef indicates a ref name is not a safe Git reference.
-	ErrInvalidRef = errors.New("invalid git ref")
-	// ErrCloneFailed indicates clone or checkout failed.
-	ErrCloneFailed = errors.New("git clone failed")
-	// ErrAuthRequired indicates the remote rejected anonymous access.
-	ErrAuthRequired = errors.New("git authentication required")
-	// ErrAuthFailed indicates the configured credentials were rejected.
-	ErrAuthFailed = errors.New("git authorization failed")
-	// ErrRepoNotFound indicates the remote repository does not exist.
-	ErrRepoNotFound = errors.New("git repository not found")
-	// ErrInvalidPolicy indicates a git-semver-policy label is not none/patch/minor/major.
-	ErrInvalidPolicy = errors.New("invalid git semver policy")
-	// ErrInvalidHost indicates a git-host label is not an HTTP base URL.
-	ErrInvalidHost = errors.New("invalid git-host")
-)
-
 // Options configures a Git watcher client. Credentials stay here, not on UpdateParams.
 type Options struct {
 	Token           string

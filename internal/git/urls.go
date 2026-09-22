@@ -3,15 +3,11 @@ package git
 import (
 	"crypto/tls"
 	"crypto/x509"
-	"errors"
 	"net/http"
 	"net/url"
 	"strings"
 	"time"
 )
-
-// errCrossHostRedirect indicates a Location header pointed at another origin.
-var errCrossHostRedirect = errors.New("git http redirect left the original host")
 
 // applyAuth sets Bearer or basic credentials on req.
 //
