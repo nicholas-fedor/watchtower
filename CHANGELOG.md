@@ -10,10 +10,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- Use the commit date for archive mtime by @nicholas-fedor in [#2435](https://github.com/nicholas-fedor/watchtower/pull/2435)
 - Copy labeled files across container recreate by @nicholas-fedor in [#2387](https://github.com/nicholas-fedor/watchtower/pull/2387)
 
 ### Chores
 
+- Update module github.com/nicholas-fedor/shoutrrr to v0.21.1 by @renovate[bot] in [#2437](https://github.com/nicholas-fedor/watchtower/pull/2437)
 - Update module github.com/gofiber/utils/v2 to v2.5.3 by @renovate[bot] in [#2426](https://github.com/nicholas-fedor/watchtower/pull/2426)
 - Update golang:alpine3.24 docker digest to 8a5910f by @renovate[bot] in [#2421](https://github.com/nicholas-fedor/watchtower/pull/2421)
 - Update golang:1.27.1-alpine docker digest to 8a5910f by @renovate[bot] in [#2420](https://github.com/nicholas-fedor/watchtower/pull/2420)
