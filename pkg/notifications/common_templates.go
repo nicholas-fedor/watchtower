@@ -71,6 +71,14 @@ var commonTemplates = map[string]string{
     Failed to query Docker image disk usage{{with (index $e.Data "error")}}: {{.}}{{end}}
 {{- else if eq $msg "Docker image usage budget enabled" -}}
     Docker image usage budget enabled: maximum {{if HasKey $e.Data "disk_space_max"}}{{FormatDiskSpace (index $e.Data "disk_space_max")}}{{else}}0 B{{end}}, warning at {{if HasKey $e.Data "disk_space_warn"}}{{FormatDiskSpace (index $e.Data "disk_space_warn")}}{{else}}0 B{{end}}
+{{- else if eq $msg "Built image from Git URL context" -}}
+    Built {{with (index $e.Data "container")}}{{.}}{{else}}container{{end}} from {{with (index $e.Data "repo")}}{{.}}{{else}}Git{{end}}{{with (index $e.Data "ref")}} @ {{.}}{{end}} ({{with (index $e.Data "commit")}}{{.}}{{else}}unknown{{end}}){{with (index $e.Data "changelog")}}: {{.}}{{end}}
+{{- else if eq $msg "Applied Compose project from Git" -}}
+    Applied Compose project {{with (index $e.Data "project")}}{{.}}{{else}}unknown{{end}} at {{with (index $e.Data "commit")}}{{.}}{{else}}unknown{{end}}{{with (index $e.Data "changelog")}}: {{.}}{{end}}
+{{- else if eq $msg "Git build failed. Leaving running container untouched" -}}
+    Git build failed for {{with (index $e.Data "container")}}{{.}}{{else}}unknown{{end}}{{with (index $e.Data "repo")}} ({{.}}){{end}}{{with (index $e.Data "error")}}: {{.}}{{end}}
+{{- else if eq $msg "Compose apply failed. Leaving running container untouched" -}}
+    Compose apply failed for {{with (index $e.Data "container")}}{{.}}{{else}}unknown{{end}}{{with (index $e.Data "dir")}} in {{.}}{{end}}{{with (index $e.Data "error")}}: {{.}}{{end}}
 {{- else if $e.Data -}}
     {{- /* For messages with data, show message and key=value pairs */ -}}
     {{$msg}} | {{range $k, $v := $e.Data}}{{$k}}={{$v}} {{end}}
@@ -97,7 +105,7 @@ var commonTemplates = map[string]string{
     {{len .Scanned}} Scanned, {{len .Updated}} Updated, {{len .Restarted}} Restarted, {{len .Failed}} Failed, {{len .Fresh}} Fresh, {{len .Skipped}} Skipped
       {{- /* List successfully updated containers */ -}}
       {{- range .Updated}}
-- {{.Name}} ({{.ImageName}}): {{.CurrentImageID.ShortID}} updated to {{.LatestImageID.ShortID}}
+- {{.Name}} ({{.ImageName}}): {{.CurrentImageID.ShortID}} updated to {{.LatestImageID.ShortID}}{{with .GitRef}} ref {{.}}{{end}}{{with .Changelog}} {{.}}{{end}}
       {{- end -}}
       {{- /* List restarted containers */ -}}
       {{- range .Restarted}}

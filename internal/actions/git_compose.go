@@ -42,7 +42,7 @@ func (s *gitSession) applyCompose(
 
 	commit, err := sharedComposeCommit(batch.members)
 	if err != nil {
-		failComposeBatch(log, batch, failed, err)
+		failComposeBatch(log, batch, params, failed, err)
 
 		return
 	}
@@ -90,7 +90,7 @@ func (s *gitSession) applyCompose(
 
 	err = checkout(ctx, batch.ref.Dir, commit, opts)
 	if err != nil {
-		failComposeBatch(log, batch, failed, fmt.Errorf("compose checkout: %w", err))
+		failComposeBatch(log, batch, params, failed, fmt.Errorf("compose checkout: %w", err))
 
 		return
 	}
@@ -107,7 +107,7 @@ func (s *gitSession) applyCompose(
 		BuildOnly: params.NoRestart,
 	})
 	if err != nil {
-		failComposeBatch(log, batch, failed, fmt.Errorf("compose apply: %w", err))
+		failComposeBatch(log, batch, params, failed, fmt.Errorf("compose apply: %w", err))
 
 		return
 	}
@@ -161,13 +161,19 @@ func (s *gitSession) applyCompose(
 		}
 	}
 
-	log.Info().
+	event := log.Info().
 		Str("project", batch.ref.Name).
 		Str("dir", batch.ref.Dir).
-		Str("commit", commit).
 		Strs("services", services).
-		Bool("build_only", params.NoRestart).
-		Msg("Applied Compose project from Git")
+		Bool("build_only", params.NoRestart)
+	if len(batch.members) > 0 {
+		member := batch.members[0]
+		event = withGitMeta(event, member.container, params, member.result.Tag, commit)
+	} else if commit != "" {
+		event = event.Str("commit", commit)
+	}
+
+	event.Msg("Applied Compose project from Git")
 }
 
 // recordCompose records a successful Compose apply for one container.
@@ -238,6 +244,7 @@ func (s *gitSession) recordCompose(
 // Parameters:
 //   - log: Process logger.
 //   - batch: Project batch.
+//   - params: Update parameters used to resolve repository and changelog fields.
 //   - failed: Map to record errors.
 //   - err: Apply or checkout error.
 //
@@ -246,6 +253,7 @@ func (s *gitSession) recordCompose(
 func failComposeBatch(
 	log *zerolog.Logger,
 	batch *composeBatch,
+	params types.UpdateParams,
 	failed map[types.ContainerID]error,
 	err error,
 ) {
@@ -257,11 +265,12 @@ func failComposeBatch(
 
 		failed[c.ID()] = err
 		c.SetStale(false)
-		log.Warn().
+		withGitMeta(log.Warn().
 			Err(err).
 			Str("container", c.Name()).
 			Str("image", c.ImageName()).
-			Str("dir", batch.ref.Dir).
+			Str("dir", batch.ref.Dir),
+			c, params, member.result.Tag, member.result.Commit).
 			Msg("Compose apply failed. Leaving running container untouched")
 	}
 }

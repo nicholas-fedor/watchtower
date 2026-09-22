@@ -45,6 +45,8 @@ func (c stubContainerError) Error() string                      { return c.err }
 func (c stubContainerError) State() string                      { return c.state }
 func (c stubContainerError) IsMonitorOnly() bool                { return false }
 func (c stubContainerError) NewContainerID() report.ContainerID { return "" }
+func (c stubContainerError) GitRef() string                     { return "" }
+func (c stubContainerError) Changelog() string                  { return "" }
 
 func TestDataMarshalJSON(t *testing.T) {
 	t.Parallel()

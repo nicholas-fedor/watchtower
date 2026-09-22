@@ -15,6 +15,8 @@ type containerStatus struct {
 	state          State
 	monitorOnly    bool
 	newContainerID report.ContainerID
+	gitRef         string
+	changelog      string
 }
 
 func (u *containerStatus) ID() report.ContainerID {
@@ -55,4 +57,12 @@ func (u *containerStatus) IsMonitorOnly() bool {
 
 func (u *containerStatus) NewContainerID() report.ContainerID {
 	return u.newContainerID
+}
+
+func (u *containerStatus) GitRef() string {
+	return u.gitRef
+}
+
+func (u *containerStatus) Changelog() string {
+	return u.changelog
 }

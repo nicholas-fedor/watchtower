@@ -166,7 +166,7 @@ When the [`notification-report`](#notification_report) configuration option is s
     {{len .Scanned}} Scanned, {{len .Updated}} Updated, {{len .Restarted}} Restarted, {{len .Failed}} Failed
     {{- if ( or .Updated .Restarted .Failed ) -}}
       {{- range .Updated}}
-- {{.Name}} ({{.ImageName}}): {{.CurrentImageID.ShortID}} updated to {{.LatestImageID.ShortID}}
+- {{.Name}} ({{.ImageName}}): {{.CurrentImageID.ShortID}} updated to {{.LatestImageID.ShortID}}{{with .GitRef}} ref {{.}}{{end}}{{with .Changelog}} {{.}}{{end}}
       {{- end -}}
       {{- range .Fresh}}
 - {{.Name}} ({{.ImageName}}): {{.State}}
@@ -213,7 +213,7 @@ Logs:
                     {{len .Scanned}} Scanned, {{len .Updated}} Updated, {{len .Restarted}} Restarted, {{len .Failed}} Failed
                     {{- if ( or .Updated .Restarted .Failed ) -}}
                         {{- range .Updated -}}
-                    - {{.Name}} ({{.ImageName}}): {{.CurrentImageID.ShortID}} updated to {{.LatestImageID.ShortID}}
+                    - {{.Name}} ({{.ImageName}}): {{.CurrentImageID.ShortID}} updated to {{.LatestImageID.ShortID}}{{with .GitRef}} ref {{.}}{{end}}{{with .Changelog}} {{.}}{{end}}
                         {{- end -}}
                         {{- range .Fresh -}}
                     - {{.Name}} ({{.ImageName}}): {{.State}}
@@ -250,7 +250,7 @@ Logs:
     {{len .Scanned}} Scanned, {{len .Updated}} Updated, {{len .Restarted}} Restarted, {{len .Failed}} Failed
     {{- if ( or .Updated .Restarted .Failed ) -}}
           {{- range .Updated -}}
-    - {{.Name}} ({{.ImageName}}): {{.CurrentImageID.ShortID}} updated to {{.LatestImageID.ShortID}}
+    - {{.Name}} ({{.ImageName}}): {{.CurrentImageID.ShortID}} updated to {{.LatestImageID.ShortID}}{{with .GitRef}} ref {{.}}{{end}}{{with .Changelog}} {{.}}{{end}}
           {{- end -}}
           {{- range .Fresh -}}
     - {{.Name}} ({{.ImageName}}): {{.State}}
@@ -304,8 +304,18 @@ They are populated even when Git monitoring is off.
 | `.Documentation` | OCI `org.opencontainers.image.documentation` |
 | `.Revision` | OCI `org.opencontainers.image.revision` |
 
+`.GitRef` is the configured Git ref. When the container is not associated with Git and `org.opencontainers.image.version` looks like a tag, that version is copied into `.GitRef`. There is one value, not a previous version and a new version, so a template cannot print `10.11.5 → 10.11.6` from these fields.
+
+The built-in `default` report template prints the ref and the changelog on an updated container when they are set:
+
+```text
+- /app (myapp:latest): abcdef12 updated to 34567890 ref v1.2.4 https://github.com/org/app/releases
+```
+
+A custom report template can do the same:
+
 ```go
-{{ range .Report.Updated }}{{ .Name }} {{ .Changelog }}{{ if .Source }} ({{ .Source }}){{ end }}{{ end }}
+{{ range .Report.Updated }}{{ .Name }}{{ with .GitRef }} {{ . }}{{ end }}{{ with .Changelog }} {{ . }}{{ end }}{{ end }}
 ```
 
 An explicit `com.centurylinklabs.watchtower.changelog` label may include placeholders from the new version when known: `{major}`, `{minor}`, `{patch}`, `{tag}`, `{commit}`.
@@ -325,6 +335,25 @@ The session does not fail.
 An image with only `org.opencontainers.image.source` still exposes `.Source` / derived `.GitRepo`.
 Git monitoring stays off unless the container is associated and the watcher is on.
 See [Git Monitoring](../../advanced-features/git-monitoring/index.md) for association and rebuilds.
+
+### Log lines from a Git update
+
+With [notification report](../../configuration/notifications/index.md#notification_report) off, Watchtower sends the log line itself. The `default-legacy` template formats these messages instead of dumping every field:
+
+| Message | What the notification says |
+|:--------|:---------------------------|
+| `Built image from Git URL context` | Container, repository, ref, commit, and changelog URL |
+| `Applied Compose project from Git` | Project name, commit, and changelog URL |
+| `Git build failed. Leaving running container untouched` | Container, repository, and the error |
+| `Compose apply failed. Leaving running container untouched` | Container, project directory, and the error |
+
+The log fields are `container`, `image`, `repo`, `ref`, `commit`, `changelog`, `project`, `dir`, and `error`. A custom simple template reads them from `.Data`:
+
+```go
+{{ range . }}{{ if eq .Message "Built image from Git URL context" }}
+{{ .Data.container }} {{ .Data.commit }} {{ .Data.changelog }}
+{{ end }}{{ end }}
+```
 
 Porcelain JSON and `/v1/check` expose the same values as `git_repo`, `git_ref`, `changelog`, `oci_source`, `image_url`, `documentation`, and `revision`.
 

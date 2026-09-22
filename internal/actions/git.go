@@ -243,10 +243,11 @@ func (s *gitSession) prepareRebuilds(
 		if err != nil {
 			failed[c.ID()] = err
 			c.SetStale(false)
-			log.Warn().
+			withGitMeta(log.Warn().
 				Err(err).
 				Str("container", c.Name()).
-				Str("image", c.ImageName()).
+				Str("image", c.ImageName()),
+				c, params, result.Tag, result.Commit).
 				Msg("Git build failed. Leaving running container untouched")
 		}
 	}
@@ -350,13 +351,57 @@ func (s *gitSession) buildOne(
 		progress.RefreshChangelog(c, params, result.Tag, result.Commit)
 	}
 
-	log.Info().
+	withGitMeta(log.Info().
 		Str("container", c.Name()).
-		Str("image", tag).
-		Str("commit", result.Commit).
+		Str("image", tag),
+		c, params, result.Tag, result.Commit).
 		Msg("Built image from Git URL context")
 
 	return nil
+}
+
+// withGitMeta adds the repository, ref, commit, and changelog when they are known.
+//
+// Parameters:
+//   - evt: Log event to extend.
+//   - c: Container the event describes.
+//   - params: Update parameters used to resolve the report fields.
+//   - tag: New tag for changelog placeholders.
+//   - commit: New commit for changelog placeholders.
+//
+// Returns:
+//   - *zerolog.Event: evt, or nil when evt is nil.
+func withGitMeta(
+	evt *zerolog.Event,
+	c types.Container,
+	params types.UpdateParams,
+	tag, commit string,
+) *zerolog.Event {
+	if evt == nil {
+		return nil
+	}
+
+	meta := container.ResolveReportMeta(c, params, container.ChangelogVars{
+		Tag:    tag,
+		Commit: commit,
+	})
+	if meta.GitRepo != "" {
+		evt = evt.Str("repo", meta.GitRepo)
+	}
+
+	if meta.GitRef != "" {
+		evt = evt.Str("ref", meta.GitRef)
+	}
+
+	if commit != "" {
+		evt = evt.Str("commit", commit)
+	}
+
+	if meta.Changelog != "" {
+		evt = evt.Str("changelog", meta.Changelog)
+	}
+
+	return evt
 }
 
 // skipRecreate reports whether inspect recreate should be skipped for c.

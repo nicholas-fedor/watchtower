@@ -1385,6 +1385,31 @@ func getTemplatedResult(tplString string, legacy bool, data Data) string {
 	return msg
 }
 
+func TestDefaultLegacyGitMessages(t *testing.T) {
+	t.Parallel()
+
+	tpl := template.Must(template.New("git").Funcs(Funcs).Parse(commonTemplates["default-legacy"]))
+
+	var buf bytes.Buffer
+
+	err := tpl.Execute(&buf, []*notificationEntry{{
+		Message: "Built image from Git URL context",
+		Data: map[string]any{
+			"container": "/app",
+			"repo":      "https://github.com/org/app.git",
+			"ref":       "main",
+			"commit":    "abc123",
+			"changelog": "https://github.com/org/app/releases",
+		},
+	}})
+	require.NoError(t, err)
+	assert.Contains(
+		t,
+		buf.String(),
+		"Built /app from https://github.com/org/app.git @ main (abc123): https://github.com/org/app/releases",
+	)
+}
+
 // TestShutdownGracePeriodConstant verifies that the shutdownGracePeriod constant is set to 50ms.
 func TestShutdownGracePeriodConstant(t *testing.T) {
 	expectedGracePeriod := 50 * time.Millisecond
