@@ -21,6 +21,13 @@ type knownAPI struct {
 	match func(apiProbe) bool
 }
 
+// apiProbe is the closed HTTP result of one fingerprint request.
+type apiProbe struct {
+	Status int
+	Header http.Header
+	Body   []byte
+}
+
 // knownAPIs is the canonical map of product → version/metadata endpoints.
 // A host is classified only when a probe response matches that product's
 // payload or headers. Status codes alone are not enough.
@@ -40,13 +47,6 @@ var knownAPIs = []knownAPI{
 		paths: [][]string{{"api", "v3"}},
 		match: matchGitHubAPI,
 	},
-}
-
-// apiProbe is the closed HTTP result of one fingerprint request.
-type apiProbe struct {
-	Status int
-	Header http.Header
-	Body   []byte
 }
 
 // ClassifyHosts probes extra HTTP origins and records which product they speak.

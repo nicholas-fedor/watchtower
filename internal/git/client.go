@@ -80,6 +80,13 @@ type RemoteRef struct {
 	Hash string
 }
 
+// resolvedRef is a branch or tag resolved to a commit.
+type resolvedRef struct {
+	Name string
+	Hash string
+	Kind string
+}
+
 const (
 	kindBranch        = "branch"
 	kindTag           = "tag"
@@ -184,6 +191,65 @@ func (c *Client) Clone(ctx context.Context, repo string, rev CheckResult) (strin
 	}
 
 	return dir, nil
+}
+
+// CheckContainer runs Check using association and stamp labels from the container.
+//
+// Parameters:
+//   - ctx: Cancellation and timeout.
+//   - client: Git monitor client.
+//   - c: Container to inspect.
+//   - params: Update parameters with mappings and defaults.
+//
+// Returns:
+//   - CheckResult: Empty result when the container is not associated.
+//   - error: Non-nil on monitor failure.
+func CheckContainer(
+	ctx context.Context,
+	client *Client,
+	c types.Container,
+	params types.UpdateParams,
+) (CheckResult, error) {
+	assoc, ok := gitPkg.ResolveAssociation(c, params)
+	if !ok {
+		return CheckResult{}, nil
+	}
+
+	if raw := strings.TrimSpace(policyLabelValue(c)); raw != "" && !types.ValidGitPolicy(strings.ToLower(raw)) {
+		return CheckResult{}, fmt.Errorf("%w: %s", ErrInvalidPolicy, raw)
+	}
+
+	if raw := strings.TrimSpace(assoc.Host); raw != "" {
+		_, err := gitPkg.ParseAPIOrigin(raw)
+		if err != nil {
+			return CheckResult{}, fmt.Errorf("%w: %s", ErrInvalidHost, raw)
+		}
+	}
+
+	lastCommit, lastTag := gitPkg.Baseline(c)
+	if lastCommit == "" && lastTag == "" {
+		lastCommit, lastTag = client.recall(assoc.Repo, assoc.Ref, assoc.Policy)
+	}
+
+	result, err := client.Check(ctx, CheckRequest{
+		Repo:       assoc.Repo,
+		Ref:        assoc.Ref,
+		Policy:     assoc.Policy,
+		Host:       assoc.Host,
+		LastCommit: lastCommit,
+		LastTag:    lastTag,
+	})
+	if err != nil {
+		return result, err
+	}
+
+	// Record an observed tip only when this session did not rebuild. A stale
+	// result must keep the previous baseline so a failed apply can retry.
+	if !result.Stale {
+		client.remember(assoc.Repo, assoc.Ref, assoc.Policy, result.Commit, result.Tag)
+	}
+
+	return result, nil
 }
 
 // checkExactRef compares one branch or tag to the last-commit stamp.
@@ -308,43 +374,6 @@ func (c *Client) checkTagPolicy(ctx context.Context, req CheckRequest) (CheckRes
 	}, nil
 }
 
-// tagForCommit returns the highest release tag whose hash matches commit.
-//
-// Parameters:
-//   - byName: Tag name to commit hash.
-//   - commit: Known running revision.
-//
-// Returns:
-//   - string: Matching tag name, or empty.
-func tagForCommit(byName map[string]string, commit string) string {
-	bestName := ""
-	bestCanon := ""
-
-	for name, hash := range byName {
-		if !sameRevision(commit, hash) {
-			continue
-		}
-
-		canon := canonicalize(name)
-		if !semver.IsValid(canon) || semver.Prerelease(canon) != "" {
-			continue
-		}
-
-		if bestCanon == "" || semver.Compare(canon, bestCanon) > 0 {
-			bestCanon = canon
-			bestName = name
-		}
-	}
-
-	return bestName
-}
-
-type resolvedRef struct {
-	Name string
-	Hash string
-	Kind string
-}
-
 // resolveRef resolves ref via the product API, then go-git ls-remote.
 //
 // Parameters:
@@ -407,21 +436,6 @@ func (c *Client) listTags(ctx context.Context, repo, apiOrigin string) ([]Remote
 	return listed, nil
 }
 
-// tagName returns the resolved name when the ref is a tag.
-//
-// Parameters:
-//   - resolved: Resolved branch or tag.
-//
-// Returns:
-//   - string: Tag name, or empty for a branch.
-func tagName(resolved resolvedRef) string {
-	if resolved.Kind == kindTag {
-		return resolved.Name
-	}
-
-	return ""
-}
-
 // withTimeout returns ctx with the Git timeout unless a tighter deadline exists.
 //
 // Parameters:
@@ -441,81 +455,6 @@ func (c *Client) withTimeout(ctx context.Context) (context.Context, context.Canc
 	}
 
 	return context.WithTimeout(ctx, timeout)
-}
-
-// cmpOr returns value, or fallback when value is empty.
-//
-// Parameters:
-//   - value: Preferred string.
-//   - fallback: Used when value is empty.
-//
-// Returns:
-//   - string: Non-empty preference.
-func cmpOr(value, fallback string) string {
-	if value == "" {
-		return fallback
-	}
-
-	return value
-}
-
-// CheckContainer runs Check using association and stamp labels from the container.
-//
-// Parameters:
-//   - ctx: Cancellation and timeout.
-//   - client: Git monitor client.
-//   - c: Container to inspect.
-//   - params: Update parameters with mappings and defaults.
-//
-// Returns:
-//   - CheckResult: Empty result when the container is not associated.
-//   - error: Non-nil on monitor failure.
-func CheckContainer(
-	ctx context.Context,
-	client *Client,
-	c types.Container,
-	params types.UpdateParams,
-) (CheckResult, error) {
-	assoc, ok := gitPkg.ResolveAssociation(c, params)
-	if !ok {
-		return CheckResult{}, nil
-	}
-
-	if raw := strings.TrimSpace(policyLabelValue(c)); raw != "" && !types.ValidGitPolicy(strings.ToLower(raw)) {
-		return CheckResult{}, fmt.Errorf("%w: %s", ErrInvalidPolicy, raw)
-	}
-
-	if raw := strings.TrimSpace(assoc.Host); raw != "" {
-		_, err := gitPkg.ParseAPIOrigin(raw)
-		if err != nil {
-			return CheckResult{}, fmt.Errorf("%w: %s", ErrInvalidHost, raw)
-		}
-	}
-
-	lastCommit, lastTag := gitPkg.Baseline(c)
-	if lastCommit == "" && lastTag == "" {
-		lastCommit, lastTag = client.recall(assoc.Repo, assoc.Ref, assoc.Policy)
-	}
-
-	result, err := client.Check(ctx, CheckRequest{
-		Repo:       assoc.Repo,
-		Ref:        assoc.Ref,
-		Policy:     assoc.Policy,
-		Host:       assoc.Host,
-		LastCommit: lastCommit,
-		LastTag:    lastTag,
-	})
-	if err != nil {
-		return result, err
-	}
-
-	// Record an observed tip only when this session did not rebuild. A stale
-	// result must keep the previous baseline so a failed apply can retry.
-	if !result.Stale {
-		client.remember(assoc.Repo, assoc.Ref, assoc.Policy, result.Commit, result.Tag)
-	}
-
-	return result, nil
 }
 
 // recall returns a remote tip observed earlier in this process.
@@ -565,6 +504,68 @@ func (c *Client) remember(repo, ref, policy, commit, tag string) {
 	}
 
 	c.seen[seenKey(repo, ref, policy)] = seenStamp{commit: commit, tag: tag}
+}
+
+// tagForCommit returns the highest release tag whose hash matches commit.
+//
+// Parameters:
+//   - byName: Tag name to commit hash.
+//   - commit: Known running revision.
+//
+// Returns:
+//   - string: Matching tag name, or empty.
+func tagForCommit(byName map[string]string, commit string) string {
+	bestName := ""
+	bestCanon := ""
+
+	for name, hash := range byName {
+		if !sameRevision(commit, hash) {
+			continue
+		}
+
+		canon := canonicalize(name)
+		if !semver.IsValid(canon) || semver.Prerelease(canon) != "" {
+			continue
+		}
+
+		if bestCanon == "" || semver.Compare(canon, bestCanon) > 0 {
+			bestCanon = canon
+			bestName = name
+		}
+	}
+
+	return bestName
+}
+
+// tagName returns the resolved name when the ref is a tag.
+//
+// Parameters:
+//   - resolved: Resolved branch or tag.
+//
+// Returns:
+//   - string: Tag name, or empty for a branch.
+func tagName(resolved resolvedRef) string {
+	if resolved.Kind == kindTag {
+		return resolved.Name
+	}
+
+	return ""
+}
+
+// cmpOr returns value, or fallback when value is empty.
+//
+// Parameters:
+//   - value: Preferred string.
+//   - fallback: Used when value is empty.
+//
+// Returns:
+//   - string: Non-empty preference.
+func cmpOr(value, fallback string) string {
+	if value == "" {
+		return fallback
+	}
+
+	return value
 }
 
 // seenKey identifies one watched repo, ref, and policy in process memory.

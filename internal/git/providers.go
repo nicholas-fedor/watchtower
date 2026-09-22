@@ -17,6 +17,11 @@ import (
 	"github.com/nicholas-fedor/watchtower/pkg/types"
 )
 
+const (
+	tagsPerPage = 100
+	maxTagPages = 50
+)
+
 // resolveViaAPI resolves ref using the classified host's REST API.
 //
 // Parameters:
@@ -558,11 +563,6 @@ func (c *Client) giteaTags(ctx context.Context, host string, origin url.URL, own
 func looksLikeTagRef(ref string) bool {
 	return strings.HasPrefix(ref, "v") || strings.Contains(ref, ".")
 }
-
-const (
-	tagsPerPage = 100
-	maxTagPages = 50
-)
 
 // getJSONPage GET decodes endpoint into dest and returns the next Link URL.
 //

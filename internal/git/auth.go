@@ -18,6 +18,65 @@ const (
 	tokenUserGit    = "git"
 )
 
+// Auth returns the process-wide go-git auth method for repo.
+//
+// Parameters:
+//   - repo: Clone or origin URL.
+//
+// Returns:
+//   - transport.AuthMethod: Auth for go-git, or nil for anonymous access.
+//   - error: Non-nil when an SSH key or known_hosts file cannot be loaded.
+func (c *Client) Auth(repo string) (transport.AuthMethod, error) {
+	if c == nil {
+		//nolint:nilnil // Anonymous Git access is a nil AuthMethod, not an error.
+		return nil, nil
+	}
+
+	return c.authMethod(repo)
+}
+
+// TLSSettings returns the process-wide Git HTTPS TLS settings.
+//
+// Returns:
+//   - []byte: PEM CA bundle, or nil.
+//   - bool: True when TLS verification is skipped.
+func (c *Client) TLSSettings() ([]byte, bool) {
+	if c == nil {
+		return nil, false
+	}
+
+	return c.opts.CABundle, c.opts.InsecureSkipTLS
+}
+
+// BuildAuth returns HTTPS credentials the Docker builder can embed in a Git context URL.
+//
+// Parameters:
+//   - repo: Associated clone URL.
+//
+// Returns:
+//   - username: Basic user for the token or configured username.
+//   - token: Token or password. Empty when the builder should clone anonymously.
+func (c *Client) BuildAuth(repo string) (string, string) {
+	if c == nil {
+		return tokenUserGit, ""
+	}
+
+	if c.opts.Token != "" {
+		return tokenUsername(repo, c.opts.Hosts), c.opts.Token
+	}
+
+	if c.opts.Password != "" {
+		username := c.opts.Username
+		if username == "" {
+			username = tokenUserGit
+		}
+
+		return username, c.opts.Password
+	}
+
+	return tokenUserGit, ""
+}
+
 // authMethod returns the auth method that matches the remote URL scheme.
 //
 // HTTPS/HTTP uses token, then username/password, then none.
@@ -95,65 +154,6 @@ func sshRemote(repo string) bool {
 	}
 
 	return endpoint.Protocol == "ssh"
-}
-
-// Auth returns the process-wide go-git auth method for repo.
-//
-// Parameters:
-//   - repo: Clone or origin URL.
-//
-// Returns:
-//   - transport.AuthMethod: Auth for go-git, or nil for anonymous access.
-//   - error: Non-nil when an SSH key or known_hosts file cannot be loaded.
-func (c *Client) Auth(repo string) (transport.AuthMethod, error) {
-	if c == nil {
-		//nolint:nilnil // Anonymous Git access is a nil AuthMethod, not an error.
-		return nil, nil
-	}
-
-	return c.authMethod(repo)
-}
-
-// TLSSettings returns the process-wide Git HTTPS TLS settings.
-//
-// Returns:
-//   - []byte: PEM CA bundle, or nil.
-//   - bool: True when TLS verification is skipped.
-func (c *Client) TLSSettings() ([]byte, bool) {
-	if c == nil {
-		return nil, false
-	}
-
-	return c.opts.CABundle, c.opts.InsecureSkipTLS
-}
-
-// BuildAuth returns HTTPS credentials the Docker builder can embed in a Git context URL.
-//
-// Parameters:
-//   - repo: Associated clone URL.
-//
-// Returns:
-//   - username: Basic user for the token or configured username.
-//   - token: Token or password. Empty when the builder should clone anonymously.
-func (c *Client) BuildAuth(repo string) (string, string) {
-	if c == nil {
-		return tokenUserGit, ""
-	}
-
-	if c.opts.Token != "" {
-		return tokenUsername(repo, c.opts.Hosts), c.opts.Token
-	}
-
-	if c.opts.Password != "" {
-		username := c.opts.Username
-		if username == "" {
-			username = tokenUserGit
-		}
-
-		return username, c.opts.Password
-	}
-
-	return tokenUserGit, ""
 }
 
 // tokenUsername returns the Basic-auth user for a hosted Git token.
