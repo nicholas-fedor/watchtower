@@ -5,6 +5,13 @@ When that ref advances, Watchtower asks the Docker host to rebuild the image fro
 
 Configuration options for this feature are listed in [Configuration → Git Monitoring](../../configuration/git-monitoring/index.md).
 
+Two choices decide the rest of the setup:
+
+1. Associate the container and turn the watcher on. A repository label by itself does not enable updates.
+2. Choose a [build context](#build_context). A [Git URL context](#git_url_context) lets the Docker daemon clone and build. A [local path context](#local_path_context) checks out a Compose project mounted into Watchtower.
+
+Follow [Walkthrough](#walkthrough) for the two setups most people use. If an update does not happen, use [Common mistakes](#common_mistakes) before changing flags.
+
 ## Overview
 
 ### What Git Monitoring Does
@@ -38,6 +45,324 @@ Both of the following must be true:
 | Treat `org.opencontainers.image.source` as an association | Set `com.centurylinklabs.watchtower.git-repo` or [Git Image](../../configuration/git-monitoring/index.md#git_image) |
 
 See [Local filesystem monitoring](#local_filesystem_monitoring).
+
+## Walkthrough
+
+Most setups are one of these two. Follow the one that matches how the image is built.
+
+- One application, with the Dockerfile in a hosted repository: [A single service built from Git](#a_single_service_built_from_git).
+- Several services built from a Compose project on disk, plus containers that should stay on the registry: [A Compose project on disk](#a_compose_project_on_disk).
+
+Starting Watchtower does not rebuild the application. An update session does, and only after the hosted ref moves past the revision Watchtower already knows.
+
+You need the Docker socket mounted into Watchtower. A private repository needs a read token in a [Docker Secret](../../getting-started/docker-secrets/index.md). Do not put the token in the compose file, and do not put the raw token in the process environment.
+
+### A single service built from Git
+
+The Docker daemon clones the repository when `main` moves, builds the image, and Watchtower recreates the container. This is a [Git URL context](#git_url_context).
+
+1. Confirm the repository has a `Dockerfile` at its root.
+    If the Dockerfile is somewhere else, and its `COPY` instructions only use files from inside its own directory, set `com.centurylinklabs.watchtower.git-dockerfile` to that path.
+    Leave [Git Context](../../configuration/git-monitoring/index.md#git_context) unset when `COPY` needs files outside that directory.
+    See [Nested Dockerfiles](#nested_dockerfiles).
+
+2. Use an `https://` clone URL.
+    A private repository cannot use `git@host:path` for this build. The daemon does not receive Watchtower's SSH key.
+    A public repository can skip the token in the next step.
+
+3. For a private repository, create a read token and store it in a file.
+    The scope depends on the server.
+
+    | Server | Clone URL | Token scope |
+    |:-------|:----------|:------------|
+    | GitHub | `https://github.com/org/app.git` | Repository contents: Read |
+    | GitLab | `https://gitlab.com/group/app.git` | `read_repository`. Nested groups belong in the URL |
+    | Codeberg | `https://codeberg.org/org/app.git` | Repository read |
+    | Gitea or Forgejo you host | `https://git.example.com/org/app.git` | Repository read |
+
+    ```bash title="Create a secret file"
+    mkdir -p ./secrets
+    printf '%s' "$GIT_AUTH_TOKEN" > ./secrets/git_auth_token.txt
+    chmod 600 ./secrets/git_auth_token.txt
+    ```
+
+4. Associate the container and turn the watcher on.
+    `git-repo` names the repository. It does not enable updates.
+    `WATCHTOWER_GIT_ENABLE` turns the watcher on for every associated container.
+    `github.com`, `gitlab.com`, and `codeberg.org` do not need `com.centurylinklabs.watchtower.git-host`.
+
+    <!-- markdownlint-disable MD046 -->
+    === "Docker Compose"
+
+        === "Public repository"
+
+            ```yaml title="docker-compose.yml"
+            services:
+                watchtower:
+                    image: nickfedor/watchtower
+                    volumes:
+                        - /var/run/docker.sock:/var/run/docker.sock
+                    environment:
+                        WATCHTOWER_GIT_ENABLE: "true"
+                    restart: unless-stopped
+                app:
+                    image: myapp:latest
+                    labels:
+                        com.centurylinklabs.watchtower.git-repo: "https://github.com/org/app.git"
+                        com.centurylinklabs.watchtower.git-ref: "main"
+            ```
+
+            ```bash title="Start the stack"
+            docker compose up -d
+            ```
+
+        === "Private repository"
+
+            ```yaml title="docker-compose.yml"
+            secrets:
+                git_auth_token:
+                    file: ./secrets/git_auth_token.txt
+
+            services:
+                watchtower:
+                    image: nickfedor/watchtower
+                    volumes:
+                        - /var/run/docker.sock:/var/run/docker.sock
+                    secrets:
+                        - git_auth_token
+                    environment:
+                        WATCHTOWER_GIT_ENABLE: "true"
+                        WATCHTOWER_GIT_AUTH_TOKEN: /run/secrets/git_auth_token
+                    restart: unless-stopped
+                app:
+                    image: myapp:latest
+                    labels:
+                        com.centurylinklabs.watchtower.git-repo: "https://github.com/org/app.git"
+                        com.centurylinklabs.watchtower.git-ref: "main"
+            ```
+
+            ```bash title="Start the stack"
+            docker compose up -d
+            ```
+
+    === "Docker CLI"
+
+        === "Public repository"
+
+            ```bash title="Start app and Watchtower"
+            docker run -d \
+                --name app \
+                --label com.centurylinklabs.watchtower.git-repo="https://github.com/org/app.git" \
+                --label com.centurylinklabs.watchtower.git-ref="main" \
+                myapp:latest
+
+            docker run -d \
+                --name watchtower \
+                -v /var/run/docker.sock:/var/run/docker.sock \
+                --restart unless-stopped \
+                -e WATCHTOWER_GIT_ENABLE=true \
+                nickfedor/watchtower
+            ```
+
+        === "Private repository"
+
+            ```bash title="Start app and Watchtower"
+            docker run -d \
+                --name app \
+                --label com.centurylinklabs.watchtower.git-repo="https://github.com/org/app.git" \
+                --label com.centurylinklabs.watchtower.git-ref="main" \
+                myapp:latest
+
+            docker run -d \
+                --name watchtower \
+                -v /var/run/docker.sock:/var/run/docker.sock \
+                -v "$(pwd)/secrets/git_auth_token.txt:/run/secrets/git_auth_token:ro" \
+                --restart unless-stopped \
+                -e WATCHTOWER_GIT_ENABLE=true \
+                -e WATCHTOWER_GIT_AUTH_TOKEN=/run/secrets/git_auth_token \
+                nickfedor/watchtower
+            ```
+    <!-- markdownlint-enable MD046 -->
+
+    Replace `https://github.com/org/app.git` with the clone URL from the table.
+    A self-hosted API on another port or path also needs [Hosts](#hosts).
+    `git@git.example.com:org/app.git` may use `https://git.example.com:3000`.
+    The hostname must match. A different hostname is ignored, and the token is not sent there.
+
+5. Wait for the next update session.
+    Process start is not a session.
+    The first session records what is already running and does not rebuild `app`.
+
+    ```bash title="The stamp is empty after the first session"
+    docker inspect -f '{{index .Config.Labels "com.centurylinklabs.watchtower.git-last-commit"}}' app
+    ```
+
+6. Push a commit to `main`.
+    On the next session the daemon builds `https://github.com/org/app.git#<commit>`, Watchtower recreates `app`, and the replacement receives the stamp.
+
+    ```bash title="After the rebuild the stamp is that commit"
+    docker inspect -f '{{index .Config.Labels "com.centurylinklabs.watchtower.git-last-commit"}}' app
+    ```
+
+To follow release tags instead of `main`, set `com.centurylinklabs.watchtower.git-ref` to the tag that is running now, for example `v1.2.0`, and set `com.centurylinklabs.watchtower.git-semver-policy` to `patch`, `minor`, or `major`.
+A pre-release such as `v1.2.4-rc.1` is not selected.
+[Run Once](../../configuration/scheduling/index.md#run_once) has no memory of the previous tip, so bake `org.opencontainers.image.revision` into the image, and `org.opencontainers.image.version` when you use a tag policy.
+
+### A Compose project on disk
+
+Use this when `api` and `worker` are built from a Compose file on disk, and `db` should keep using the registry. Watchtower checks out the repository in a directory mounted into Watchtower, then applies Compose for the stale services. This is a [local path context](#local_path_context).
+
+1. Keep `api` and `worker` on the same ref and the same semver policy.
+    One project directory is checked out once.
+    If the two services resolve different commits, Watchtower leaves the project untouched.
+    `db` has no Git labels, so it stays on the registry path.
+
+2. Choose the path where the project will live inside Watchtower, and bind-mount the host directory there.
+    In the example the path is `/srv/webstack`.
+    The Compose project name is `webstack`.
+    Those two strings meet in `WATCHTOWER_COMPOSE_PROJECT`.
+    `com.docker.compose.project.working_dir` is not this opt-in. Watchtower does not check out the host path Compose recorded when the container was created.
+
+3. For a private HTTPS origin, create the same secret file as in the single-service walkthrough and give it only to Watchtower.
+    An SSH origin uses the key and `known_hosts` file from [Authentication](#authentication).
+    That key fetches into the mounted directory.
+    It is not used to build a Git URL context.
+
+4. Start the stack.
+
+    <!-- markdownlint-disable MD046 -->
+    === "Docker Compose"
+
+        === "Public repository"
+
+            ```yaml title="docker-compose.yml"
+            name: webstack
+
+            services:
+                api:
+                    build: ./api
+                    labels:
+                        com.centurylinklabs.watchtower.git-repo: "https://github.com/org/webstack.git"
+                        com.centurylinklabs.watchtower.git-ref: "main"
+                worker:
+                    build: ./worker
+                    labels:
+                        com.centurylinklabs.watchtower.git-repo: "https://github.com/org/webstack.git"
+                        com.centurylinklabs.watchtower.git-ref: "main"
+                db:
+                    image: postgres:16
+                watchtower:
+                    image: nickfedor/watchtower
+                    volumes:
+                        - /var/run/docker.sock:/var/run/docker.sock
+                        - /srv/webstack:/srv/webstack
+                    environment:
+                        WATCHTOWER_GIT_ENABLE: "true"
+                        WATCHTOWER_COMPOSE_PROJECT: |
+                            webstack=/srv/webstack
+                    restart: unless-stopped
+            ```
+
+            ```bash title="Start the stack"
+            docker compose up -d
+            ```
+
+        === "Private repository"
+
+            ```yaml title="docker-compose.yml"
+            name: webstack
+
+            secrets:
+                git_auth_token:
+                    file: ./secrets/git_auth_token.txt
+
+            services:
+                api:
+                    build: ./api
+                    labels:
+                        com.centurylinklabs.watchtower.git-repo: "https://github.com/org/webstack.git"
+                        com.centurylinklabs.watchtower.git-ref: "main"
+                worker:
+                    build: ./worker
+                    labels:
+                        com.centurylinklabs.watchtower.git-repo: "https://github.com/org/webstack.git"
+                        com.centurylinklabs.watchtower.git-ref: "main"
+                db:
+                    image: postgres:16
+                watchtower:
+                    image: nickfedor/watchtower
+                    volumes:
+                        - /var/run/docker.sock:/var/run/docker.sock
+                        - /srv/webstack:/srv/webstack
+                    secrets:
+                        - git_auth_token
+                    environment:
+                        WATCHTOWER_GIT_ENABLE: "true"
+                        WATCHTOWER_GIT_AUTH_TOKEN: /run/secrets/git_auth_token
+                        WATCHTOWER_COMPOSE_PROJECT: |
+                            webstack=/srv/webstack
+                    restart: unless-stopped
+            ```
+
+            ```bash title="Start the stack"
+            docker compose up -d
+            ```
+
+    === "Docker CLI"
+
+        The application containers are already running from Compose, with the Git labels above.
+        This command is only Watchtower.
+
+        === "Public repository"
+
+            ```bash title="Start Watchtower against the mounted project"
+            docker run -d \
+                --name watchtower \
+                -v /var/run/docker.sock:/var/run/docker.sock \
+                -v /srv/webstack:/srv/webstack \
+                --restart unless-stopped \
+                -e WATCHTOWER_GIT_ENABLE=true \
+                -e WATCHTOWER_COMPOSE_PROJECT="webstack=/srv/webstack" \
+                nickfedor/watchtower
+            ```
+
+        === "Private repository"
+
+            ```bash title="Start Watchtower against the mounted project"
+            docker run -d \
+                --name watchtower \
+                -v /var/run/docker.sock:/var/run/docker.sock \
+                -v /srv/webstack:/srv/webstack \
+                -v "$(pwd)/secrets/git_auth_token.txt:/run/secrets/git_auth_token:ro" \
+                --restart unless-stopped \
+                -e WATCHTOWER_GIT_ENABLE=true \
+                -e WATCHTOWER_GIT_AUTH_TOKEN=/run/secrets/git_auth_token \
+                -e WATCHTOWER_COMPOSE_PROJECT="webstack=/srv/webstack" \
+                nickfedor/watchtower
+            ```
+    <!-- markdownlint-enable MD046 -->
+
+    Each applied service must keep `com.docker.compose.service`.
+    Compose writes that label.
+    Without it, Watchtower cannot name the service and leaves the container untouched.
+    You can set `com.centurylinklabs.watchtower.compose-dir=/srv/webstack` on `api` and `worker` instead of `WATCHTOWER_COMPOSE_PROJECT`.
+
+5. Wait for the next update session.
+    The first session records `api` and `worker` and does not checkout or apply Compose.
+
+    ```bash title="The stamp is empty after the first session"
+    docker inspect -f '{{index .Config.Labels "com.centurylinklabs.watchtower.git-last-commit"}}' api
+    ```
+
+6. Push a commit to `main`.
+    On the next session Watchtower fetches that commit in `/srv/webstack`, applies Compose for `api` and `worker`, and writes the stamp.
+    `db` is not part of that apply.
+
+    ```bash title="After the apply the stamp is that commit"
+    docker inspect -f '{{index .Config.Labels "com.centurylinklabs.watchtower.git-last-commit"}}' api
+    ```
+
+If the mounted project has local files that are not in Git, such as `.env`, enable [Git Compose Stash](../../configuration/git-monitoring/index.md#git_compose_stash) or the checkout stops and the running containers stay as they are.
 
 ## How It Works
 
@@ -146,6 +471,15 @@ For each associated container whose watcher is on:
 
 Annotated tags are resolved to the peeled commit, not the tag object.
 
+### Notifications
+
+A custom [notification template](../../notifications/templates/index.md#git_and_oci_report_fields) can print `.Changelog`, `.GitRepo`, `.GitRef`, `.Source`, and `.Revision` for each updated container.
+`.GitRef` is also where a semver-shaped OCI `org.opencontainers.image.version` appears when the container is not associated with Git.
+That is one value, not the old version and the new version.
+
+The built-in report template adds the ref and the changelog to an updated container when they are set.
+With report mode off, the log lines `Built image from Git URL context` and `Applied Compose project from Git` carry `repo`, `ref`, `commit`, and `changelog`, and `default-legacy` prints them.
+
 ### Failed Builds
 
 The host build, or Compose apply, finishes before the running container is replaced.
@@ -178,9 +512,9 @@ You choose how the image is built.
 !!! Warning "A missing local path does not fall back to a Git URL context"
     If you set `compose-dir` or the [Compose Project](../../configuration/git-monitoring/index.md#compose_project) configuration option and the path is missing or has no compose file, that container is left untouched.
 
-## Git URL Context
+### Git URL Context
 
-### When to Use It
+#### When to Use It
 
 Use this when the image should be built from a hosted Git URL, the same as Compose `build.context: https://host/repo.git`.
 
@@ -191,7 +525,7 @@ A Git URL context does not read `compose.yaml`.
 New env vars, services, or volumes added only in Compose are not applied.
 Use a [local path context](#local_path_context) when the compose file is the source of truth.
 
-### What the Daemon Builds
+#### What the Daemon Builds
 
 On a stale session:
 
@@ -203,20 +537,20 @@ On a stale session:
 5. Watchtower recreates the container from the running inspect config.
 6. Stamp labels are written onto the new container.
 
-### Private Repositories
+#### Private Repositories
 
 !!! Note "Private Git URL builds require HTTPS"
     The Docker daemon's Git URL context cannot use the Watchtower SSH key.
     Use HTTPS with the [Git Auth Token](../../configuration/git-monitoring/index.md#git_auth_token) configuration option, or the [Git Username](../../configuration/git-monitoring/index.md#git_username) and [Git Password](../../configuration/git-monitoring/index.md#git_password) configuration options.
 
-### Nested Dockerfiles
+#### Nested Dockerfiles
 
 Keep the context at the repository root when the Dockerfile `COPY`s files from outside its own directory.
 
 Set `com.centurylinklabs.watchtower.git-dockerfile` to `build/docker/Dockerfile`.
 Set `com.centurylinklabs.watchtower.git-context`, or the [Git Context](../../configuration/git-monitoring/index.md#git_context) configuration option, only when the daemon should receive a subdirectory as the context.
 
-### Example
+#### Example
 
 === "Docker Compose"
 
@@ -241,9 +575,9 @@ Set `com.centurylinklabs.watchtower.git-context`, or the [Git Context](../../con
         myapp:latest
     ```
 
-## Local Path Context
+### Local Path Context
 
-### When to Use It
+#### When to Use It
 
 Use this when the running services were created from a Compose file that uses a local `build.context` (`build: ./api`), and you mount that Compose project directory into Watchtower.
 
@@ -252,7 +586,7 @@ Typical setup: `api` and `worker` with `build: ./api` or `build: ./worker`, plus
 A Compose `build:` key alone does not associate a container.
 The container still needs a Git association and the watcher to be on.
 
-### How You Opt In
+#### How You Opt In
 
 Use one of:
 
@@ -263,7 +597,7 @@ Bind-mount the project directory into Watchtower at that path.
 Each applied container must have `com.docker.compose.service`.
 Without that label Watchtower cannot target a service and leaves the running container untouched.
 
-### What Watchtower Applies
+#### What Watchtower Applies
 
 On a stale session:
 
@@ -274,19 +608,23 @@ On a stale session:
 5. Write stamp and association labels onto the new containers.
 6. Do not also recreate those containers through the inspect path.
 
+Every stale service in that directory must resolve the same commit.
+One worktree cannot be checked out at two commits.
+When the commits differ, Watchtower leaves the project untouched and retries on a later session.
+
 Compose uses each service's `build.context` relative to the project directory.
 Image-only services in the same file are not rebuilt from Git.
 
 Fetch uses the same [Git Auth Token](../../configuration/git-monitoring/index.md#git_auth_token), [Git Password](../../configuration/git-monitoring/index.md#git_password), [Git SSH Key Path](../../configuration/git-monitoring/index.md#git_ssh_key_path), [Git CA Bundle](../../configuration/git-monitoring/index.md#git_ca_bundle), and [Git Insecure Skip TLS](../../configuration/git-monitoring/index.md#git_insecure_skip_tls) configuration options as monitoring.
 If fetch fails but the monitored commit is already in the local object store, checkout continues.
 
-### Dirty Worktrees
+#### Dirty Worktrees
 
 If the worktree is dirty and the [Git Compose Stash](../../configuration/git-monitoring/index.md#git_compose_stash) configuration option is off, Watchtower aborts that project and leaves the running containers untouched.
 
 If that configuration option is on, Watchtower saves local files (for example an untracked `.env`), checks out the monitored commit, then writes those files back.
 
-### Compose Interpolation
+#### Compose Interpolation
 
 Compose interpolates the project's `.env` file.
 Watchtower's process environment is not interpolated into `compose.yaml`.
@@ -295,7 +633,7 @@ Enable the [Git Compose Stash](../../configuration/git-monitoring/index.md#git_c
 The [Disable Container Restart](../../configuration/update-behavior/index.md#disable_container_restart) configuration option checkouts and runs Compose **build** only.
 It does not recreate running services.
 
-### Example
+#### Example
 
 === "Docker Compose"
 
@@ -330,30 +668,32 @@ It does not recreate running services.
 
 `api` and `worker` track the hosted repo.
 `db` stays on the registry path.
+`/srv/webstack` is the path inside the Watchtower container.
+The host directory must be bind-mounted there, and `webstack` must match the Compose project name.
 
-## Local Filesystem Monitoring
+### Local Filesystem Monitoring
 
 Watchtower does not monitor a local Git working tree for file saves.
 
 That workflow is [Compose Watch](https://docs.docker.com/compose/how-tos/file-watch/){target="_blank" rel="noopener noreferrer"}, configured with [`develop.watch`](https://docs.docker.com/reference/compose-file/develop/#watch){target="_blank" rel="noopener noreferrer"} and run with `docker compose up --watch`.
 
-## Enabling Git Monitoring
+## Configuring a Container
 
-### Process-Wide Default
+### Enabling Git Monitoring
+
+#### Process-Wide Default
 
 Turn the process-wide default on with the [Git Enable](../../configuration/git-monitoring/index.md#git_enable) configuration option.
 
-### Per-Container Override
+#### Per-Container Override
 
 Override that default with `com.centurylinklabs.watchtower.git-watch`.
 
-### What Is Written After a Rebuild
+#### What Is Written After a Rebuild
 
 `git-watch=true` is written only when the source container already had an explicit enabling watch label.
 When the watcher was on only because of the [Git Enable](../../configuration/git-monitoring/index.md#git_enable) configuration option, the replacement has no `git-watch` label.
 Setting [Git Enable](../../configuration/git-monitoring/index.md#git_enable) to `false` later still applies.
-
-## Configuring a Container
 
 ### Where Settings Come From
 
@@ -507,9 +847,9 @@ Repeatable values are newline-separated.
 | `#ref` | `main` |
 | `@policy` | `none` |
 
-## Labels
+### Labels
 
-### Association Labels
+#### Association Labels
 
 | Label | Values | Effect |
 |:------|:-------|:-------|
@@ -524,7 +864,7 @@ Repeatable values are newline-separated.
 | `com.centurylinklabs.watchtower.compose-dir` | path inside Watchtower | Opts this service into a [local path context](#local_path_context) |
 | `com.centurylinklabs.watchtower.changelog` | URL template | Optional notification changelog URL |
 
-### Stamp Labels
+#### Stamp Labels
 
 | Label | Values | Effect |
 |:------|:-------|:-------|
@@ -539,20 +879,42 @@ Repeatable values are newline-separated.
 
 ### HTTPS and HTTP
 
-Order: the [Git Auth Token](../../configuration/git-monitoring/index.md#git_auth_token) configuration option, then the [Git Username](../../configuration/git-monitoring/index.md#git_username) and [Git Password](../../configuration/git-monitoring/index.md#git_password) configuration options, then none.
+Use a token or a username and password when the clone URL starts with `https://` or `http://`.
 
-A private Git URL context ImageBuild requires this path.
+Watchtower tries the configured credentials in this order and stops at the first match:
+
+1. [Git Auth Token](../../configuration/git-monitoring/index.md#git_auth_token)
+2. [Git Username](../../configuration/git-monitoring/index.md#git_username) together with [Git Password](../../configuration/git-monitoring/index.md#git_password)
+3. No credentials. The remote must allow anonymous reads.
+
+A [Git URL context](#git_url_context) build is performed by the Docker daemon, not by Watchtower.
+The daemon is given those credentials inside an `https://` clone URL.
+It is not given an SSH key.
+A private repository on this path needs an `https://` URL and either a token or a username and password.
+
+A plain `http://` URL is not given those credentials for the build.
+Use HTTPS for a private repository.
 
 ### SSH
 
-Order: the [Git SSH Key Path](../../configuration/git-monitoring/index.md#git_ssh_key_path) configuration option with the [Git SSH Known Hosts](../../configuration/git-monitoring/index.md#git_ssh_known_hosts) configuration option, then none.
+Use an SSH key when the clone URL is `ssh://` or `git@host:path`.
 
-A configured token is not sent on `git@host:path` or `ssh://` remotes.
+Mount the private key and set [Git SSH Key Path](../../configuration/git-monitoring/index.md#git_ssh_key_path).
+Also mount a `known_hosts` file and set [Git SSH Known Hosts](../../configuration/git-monitoring/index.md#git_ssh_known_hosts).
+The Watchtower image has no host keys of its own, so the connection fails when that file is missing.
+
+The HTTPS token and password are not sent on the SSH connection.
+They can still be used for the HTTP API when [Hosts](#hosts) names the same hostname as the clone URL.
+
+SSH lists refs, and it checks out a [local path context](#local_path_context) whose origin is SSH.
+It does not build a Git URL context.
 
 ### Local Path Origins
 
-Local path project checkout uses the origin URL in that directory.
-An SSH-cloned Compose project uses the SSH key even when a token is configured for HTTPS monitoring.
+Checkout uses the origin URL already recorded in that project directory.
+
+An SSH origin uses the SSH key, even when an HTTPS token is also configured.
+An HTTPS origin uses the token, or the username and password.
 
 ### Docker Secrets
 
@@ -646,9 +1008,9 @@ The [Git Insecure Skip TLS](../../configuration/git-monitoring/index.md#git_inse
             nickfedor/watchtower
         ```
 
-## Hosts
+### Hosts
 
-### Purpose
+#### Purpose
 
 Watchtower has two ways to see whether a branch or tag has moved:
 
@@ -669,12 +1031,12 @@ If the server is not GitHub, GitLab, Gitea, or Forgejo, Watchtower still asks Gi
 
 This label does not turn monitoring on, choose the repository, or supply credentials.
 
-### When You Do Not Need It
+#### When You Do Not Need It
 
 - The repository is on `github.com`, `gitlab.com`, or `codeberg.org`
 - The clone URL is already `https://git.example.com/org/app.git` on port 443 and you only need Watchtower to ask Git
 
-### When You Need It
+#### When You Need It
 
 The container's `git-repo` is an SSH URL, or the HTTP API is on a different port or path than the clone URL, and you want Watchtower to use that HTTP API.
 
@@ -683,12 +1045,12 @@ The label's hostname must match the clone URL.
 A different hostname is ignored, and Watchtower asks Git on the clone URL.
 The process token is not sent to that other host.
 
-### What to Put In It
+#### What to Put In It
 
 The API base URL only, for example `https://git.example.com:3000` or `https://git.example.com/gitlab`.
 Do not include a repository path.
 
-### Example
+#### Example
 
 === "Docker Compose"
 
@@ -719,1125 +1081,23 @@ The example does the following:
 - `git-host` is the Gitea HTTP API at port 3000
 - Watchtower asks that API whether `main` has moved
 
-## Walkthrough
-
-Choose the [build context](#build_context), then which Git server you use.
-Each path is an ordered procedure.
-Starting Watchtower does not rebuild the application.
-
-You need Docker (and Compose for the Compose examples), the Docker socket mounted into Watchtower, and a hosted repository the daemon can clone.
-A private repository also needs a read token stored as a [Docker Secret](../../getting-started/docker-secrets/index.md).
-
-<!-- markdownlint-disable MD046 -->
-=== "Git URL Context"
-
-    The Docker daemon clones the hosted repository when the image is stale.
-    See [Git URL context](#git_url_context).
-
-    === "GitHub"
-
-        1. Confirm `https://github.com/org/app.git` has a `Dockerfile` at the repository root, or plan to set `com.centurylinklabs.watchtower.git-dockerfile`.
-            If the repository is private, the clone URL must be HTTPS.
-            Leave the [Git Context](../../configuration/git-monitoring/index.md#git_context) configuration option unset when `COPY` needs the rest of the tree.
-        2. For a private repository, create a GitHub token with read access to the repository contents and write it to `./secrets/git_auth_token.txt`.
-            Do not put the token in Compose YAML or in the Watchtower process environment.
-
-            ```bash title="Create a secret file"
-            mkdir -p ./secrets
-            printf '%s' "$GIT_AUTH_TOKEN" > ./secrets/git_auth_token.txt
-            chmod 600 ./secrets/git_auth_token.txt
-            ```
-
-        3. Apply the association and start Watchtower.
-
-            === "Docker Compose"
-
-                === "Public repository"
-
-                    ```yaml title="docker-compose.yml"
-                    services:
-                        watchtower:
-                            image: nickfedor/watchtower
-                            volumes:
-                                - /var/run/docker.sock:/var/run/docker.sock
-                            environment:
-                                WATCHTOWER_GIT_ENABLE: "true"
-                            restart: unless-stopped
-                        app:
-                            image: myapp:latest
-                            labels:
-                                com.centurylinklabs.watchtower.git-repo: "https://github.com/org/app.git"
-                                com.centurylinklabs.watchtower.git-ref: "main"
-                    ```
-
-                    ```bash title="Start the stack"
-                    docker compose up -d
-                    ```
-
-                === "Private repository"
-
-                    ```yaml title="docker-compose.yml"
-                    secrets:
-                        git_auth_token:
-                            file: ./secrets/git_auth_token.txt
-
-                    services:
-                        watchtower:
-                            image: nickfedor/watchtower
-                            volumes:
-                                - /var/run/docker.sock:/var/run/docker.sock
-                            secrets:
-                                - git_auth_token
-                            environment:
-                                WATCHTOWER_GIT_ENABLE: "true"
-                                WATCHTOWER_GIT_AUTH_TOKEN: /run/secrets/git_auth_token
-                            restart: unless-stopped
-                        app:
-                            image: myapp:latest
-                            labels:
-                                com.centurylinklabs.watchtower.git-repo: "https://github.com/org/app.git"
-                                com.centurylinklabs.watchtower.git-ref: "main"
-                    ```
-
-                    ```bash title="Start the stack"
-                    docker compose up -d
-                    ```
-
-            === "Docker CLI"
-
-                === "Public repository"
-
-                    ```bash title="Start app and Watchtower"
-                    docker run -d \
-                        --name app \
-                        --label com.centurylinklabs.watchtower.git-repo="https://github.com/org/app.git" \
-                        --label com.centurylinklabs.watchtower.git-ref="main" \
-                        myapp:latest
-
-                    docker run -d \
-                        --name watchtower \
-                        -v /var/run/docker.sock:/var/run/docker.sock \
-                        --restart unless-stopped \
-                        -e WATCHTOWER_GIT_ENABLE=true \
-                        nickfedor/watchtower
-                    ```
-
-                === "Private repository"
-
-                    ```bash title="Start app and Watchtower"
-                    docker run -d \
-                        --name app \
-                        --label com.centurylinklabs.watchtower.git-repo="https://github.com/org/app.git" \
-                        --label com.centurylinklabs.watchtower.git-ref="main" \
-                        myapp:latest
-
-                    docker run -d \
-                        --name watchtower \
-                        -v /var/run/docker.sock:/var/run/docker.sock \
-                        -v $(pwd)/secrets/git_auth_token.txt:/run/secrets/git_auth_token:ro \
-                        --restart unless-stopped \
-                        -e WATCHTOWER_GIT_ENABLE=true \
-                        -e WATCHTOWER_GIT_AUTH_TOKEN=/run/secrets/git_auth_token \
-                        nickfedor/watchtower
-                    ```
-
-            The example does the following:
-
-            - `com.centurylinklabs.watchtower.git-repo` and `com.centurylinklabs.watchtower.git-ref` associate `app` with `https://github.com/org/app.git` on `main`. Those labels do not turn the watcher on.
-            - The [Git Enable](../../configuration/git-monitoring/index.md#git_enable) configuration option turns the watcher on.
-            - `github.com` does not need `com.centurylinklabs.watchtower.git-host`.
-
-        4. Wait for the next [update session](#update_session).
-            Process start is not a session.
-            The first session records what is already running and does not rebuild `app`.
-
-            ```bash title="Confirm no stamp was written"
-            docker inspect -f '{{index .Config.Labels "com.centurylinklabs.watchtower.git-last-commit"}}' app
-            ```
-
-        5. Push a commit to `main`.
-            On the next session the daemon builds `https://github.com/org/app.git#<commit>`, Watchtower recreates `app`, and the replacement receives `com.centurylinklabs.watchtower.git-last-commit`.
-
-            ```bash title="Confirm the stamp after a rebuild"
-            docker inspect -f '{{index .Config.Labels "com.centurylinklabs.watchtower.git-last-commit"}}' app
-            ```
-
-    === "GitLab"
-
-        1. Confirm `https://gitlab.com/group/app.git` has a `Dockerfile` at the repository root, or plan to set `com.centurylinklabs.watchtower.git-dockerfile`.
-            Nested groups are valid in the clone URL.
-            If the repository is private, the clone URL must be HTTPS.
-            Leave the [Git Context](../../configuration/git-monitoring/index.md#git_context) configuration option unset when `COPY` needs the rest of the tree.
-        2. For a private repository, create a GitLab token with `read_repository` and write it to `./secrets/git_auth_token.txt`.
-            Do not put the token in Compose YAML or in the Watchtower process environment.
-
-            ```bash title="Create a secret file"
-            mkdir -p ./secrets
-            printf '%s' "$GIT_AUTH_TOKEN" > ./secrets/git_auth_token.txt
-            chmod 600 ./secrets/git_auth_token.txt
-            ```
-
-        3. Apply the association and start Watchtower.
-
-            === "Docker Compose"
-
-                === "Public repository"
-
-                    ```yaml title="docker-compose.yml"
-                    services:
-                        watchtower:
-                            image: nickfedor/watchtower
-                            volumes:
-                                - /var/run/docker.sock:/var/run/docker.sock
-                            environment:
-                                WATCHTOWER_GIT_ENABLE: "true"
-                            restart: unless-stopped
-                        app:
-                            image: myapp:latest
-                            labels:
-                                com.centurylinklabs.watchtower.git-repo: "https://gitlab.com/group/app.git"
-                                com.centurylinklabs.watchtower.git-ref: "main"
-                    ```
-
-                    ```bash title="Start the stack"
-                    docker compose up -d
-                    ```
-
-                === "Private repository"
-
-                    ```yaml title="docker-compose.yml"
-                    secrets:
-                        git_auth_token:
-                            file: ./secrets/git_auth_token.txt
-
-                    services:
-                        watchtower:
-                            image: nickfedor/watchtower
-                            volumes:
-                                - /var/run/docker.sock:/var/run/docker.sock
-                            secrets:
-                                - git_auth_token
-                            environment:
-                                WATCHTOWER_GIT_ENABLE: "true"
-                                WATCHTOWER_GIT_AUTH_TOKEN: /run/secrets/git_auth_token
-                            restart: unless-stopped
-                        app:
-                            image: myapp:latest
-                            labels:
-                                com.centurylinklabs.watchtower.git-repo: "https://gitlab.com/group/app.git"
-                                com.centurylinklabs.watchtower.git-ref: "main"
-                    ```
-
-                    ```bash title="Start the stack"
-                    docker compose up -d
-                    ```
-
-            === "Docker CLI"
-
-                === "Public repository"
-
-                    ```bash title="Start app and Watchtower"
-                    docker run -d \
-                        --name app \
-                        --label com.centurylinklabs.watchtower.git-repo="https://gitlab.com/group/app.git" \
-                        --label com.centurylinklabs.watchtower.git-ref="main" \
-                        myapp:latest
-
-                    docker run -d \
-                        --name watchtower \
-                        -v /var/run/docker.sock:/var/run/docker.sock \
-                        --restart unless-stopped \
-                        -e WATCHTOWER_GIT_ENABLE=true \
-                        nickfedor/watchtower
-                    ```
-
-                === "Private repository"
-
-                    ```bash title="Start app and Watchtower"
-                    docker run -d \
-                        --name app \
-                        --label com.centurylinklabs.watchtower.git-repo="https://gitlab.com/group/app.git" \
-                        --label com.centurylinklabs.watchtower.git-ref="main" \
-                        myapp:latest
-
-                    docker run -d \
-                        --name watchtower \
-                        -v /var/run/docker.sock:/var/run/docker.sock \
-                        -v $(pwd)/secrets/git_auth_token.txt:/run/secrets/git_auth_token:ro \
-                        --restart unless-stopped \
-                        -e WATCHTOWER_GIT_ENABLE=true \
-                        -e WATCHTOWER_GIT_AUTH_TOKEN=/run/secrets/git_auth_token \
-                        nickfedor/watchtower
-                    ```
-
-            The example does the following:
-
-            - `com.centurylinklabs.watchtower.git-repo` and `com.centurylinklabs.watchtower.git-ref` associate `app` with `https://gitlab.com/group/app.git` on `main`. Those labels do not turn the watcher on.
-            - The [Git Enable](../../configuration/git-monitoring/index.md#git_enable) configuration option turns the watcher on.
-            - `gitlab.com` does not need `com.centurylinklabs.watchtower.git-host`.
-
-        4. Wait for the next [update session](#update_session).
-            Process start is not a session.
-            The first session records what is already running and does not rebuild `app`.
-
-            ```bash title="Confirm no stamp was written"
-            docker inspect -f '{{index .Config.Labels "com.centurylinklabs.watchtower.git-last-commit"}}' app
-            ```
-
-        5. Push a commit to `main`.
-            On the next session the daemon builds `https://gitlab.com/group/app.git#<commit>`, Watchtower recreates `app`, and the replacement receives `com.centurylinklabs.watchtower.git-last-commit`.
-
-            ```bash title="Confirm the stamp after a rebuild"
-            docker inspect -f '{{index .Config.Labels "com.centurylinklabs.watchtower.git-last-commit"}}' app
-            ```
-
-    === "Codeberg"
-
-        1. Confirm `https://codeberg.org/org/app.git` has a `Dockerfile` at the repository root, or plan to set `com.centurylinklabs.watchtower.git-dockerfile`.
-            If the repository is private, the clone URL must be HTTPS.
-            Leave the [Git Context](../../configuration/git-monitoring/index.md#git_context) configuration option unset when `COPY` needs the rest of the tree.
-        2. For a private repository, create a Codeberg access token with repository read permission and write it to `./secrets/git_auth_token.txt`.
-            Do not put the token in Compose YAML or in the Watchtower process environment.
-
-            ```bash title="Create a secret file"
-            mkdir -p ./secrets
-            printf '%s' "$GIT_AUTH_TOKEN" > ./secrets/git_auth_token.txt
-            chmod 600 ./secrets/git_auth_token.txt
-            ```
-
-        3. Apply the association and start Watchtower.
-
-            === "Docker Compose"
-
-                === "Public repository"
-
-                    ```yaml title="docker-compose.yml"
-                    services:
-                        watchtower:
-                            image: nickfedor/watchtower
-                            volumes:
-                                - /var/run/docker.sock:/var/run/docker.sock
-                            environment:
-                                WATCHTOWER_GIT_ENABLE: "true"
-                            restart: unless-stopped
-                        app:
-                            image: myapp:latest
-                            labels:
-                                com.centurylinklabs.watchtower.git-repo: "https://codeberg.org/org/app.git"
-                                com.centurylinklabs.watchtower.git-ref: "main"
-                    ```
-
-                    ```bash title="Start the stack"
-                    docker compose up -d
-                    ```
-
-                === "Private repository"
-
-                    ```yaml title="docker-compose.yml"
-                    secrets:
-                        git_auth_token:
-                            file: ./secrets/git_auth_token.txt
-
-                    services:
-                        watchtower:
-                            image: nickfedor/watchtower
-                            volumes:
-                                - /var/run/docker.sock:/var/run/docker.sock
-                            secrets:
-                                - git_auth_token
-                            environment:
-                                WATCHTOWER_GIT_ENABLE: "true"
-                                WATCHTOWER_GIT_AUTH_TOKEN: /run/secrets/git_auth_token
-                            restart: unless-stopped
-                        app:
-                            image: myapp:latest
-                            labels:
-                                com.centurylinklabs.watchtower.git-repo: "https://codeberg.org/org/app.git"
-                                com.centurylinklabs.watchtower.git-ref: "main"
-                    ```
-
-                    ```bash title="Start the stack"
-                    docker compose up -d
-                    ```
-
-            === "Docker CLI"
-
-                === "Public repository"
-
-                    ```bash title="Start app and Watchtower"
-                    docker run -d \
-                        --name app \
-                        --label com.centurylinklabs.watchtower.git-repo="https://codeberg.org/org/app.git" \
-                        --label com.centurylinklabs.watchtower.git-ref="main" \
-                        myapp:latest
-
-                    docker run -d \
-                        --name watchtower \
-                        -v /var/run/docker.sock:/var/run/docker.sock \
-                        --restart unless-stopped \
-                        -e WATCHTOWER_GIT_ENABLE=true \
-                        nickfedor/watchtower
-                    ```
-
-                === "Private repository"
-
-                    ```bash title="Start app and Watchtower"
-                    docker run -d \
-                        --name app \
-                        --label com.centurylinklabs.watchtower.git-repo="https://codeberg.org/org/app.git" \
-                        --label com.centurylinklabs.watchtower.git-ref="main" \
-                        myapp:latest
-
-                    docker run -d \
-                        --name watchtower \
-                        -v /var/run/docker.sock:/var/run/docker.sock \
-                        -v $(pwd)/secrets/git_auth_token.txt:/run/secrets/git_auth_token:ro \
-                        --restart unless-stopped \
-                        -e WATCHTOWER_GIT_ENABLE=true \
-                        -e WATCHTOWER_GIT_AUTH_TOKEN=/run/secrets/git_auth_token \
-                        nickfedor/watchtower
-                    ```
-
-            The example does the following:
-
-            - `com.centurylinklabs.watchtower.git-repo` and `com.centurylinklabs.watchtower.git-ref` associate `app` with `https://codeberg.org/org/app.git` on `main`. Those labels do not turn the watcher on.
-            - The [Git Enable](../../configuration/git-monitoring/index.md#git_enable) configuration option turns the watcher on.
-            - `codeberg.org` does not need `com.centurylinklabs.watchtower.git-host`.
-
-        4. Wait for the next [update session](#update_session).
-            Process start is not a session.
-            The first session records what is already running and does not rebuild `app`.
-
-            ```bash title="Confirm no stamp was written"
-            docker inspect -f '{{index .Config.Labels "com.centurylinklabs.watchtower.git-last-commit"}}' app
-            ```
-
-        5. Push a commit to `main`.
-            On the next session the daemon builds `https://codeberg.org/org/app.git#<commit>`, Watchtower recreates `app`, and the replacement receives `com.centurylinklabs.watchtower.git-last-commit`.
-
-            ```bash title="Confirm the stamp after a rebuild"
-            docker inspect -f '{{index .Config.Labels "com.centurylinklabs.watchtower.git-last-commit"}}' app
-            ```
-
-    === "Gitea / Forgejo"
-
-        1. Confirm `https://git.example.com/org/app.git` has a `Dockerfile` at the repository root, or plan to set `com.centurylinklabs.watchtower.git-dockerfile`.
-            If the repository is private, the clone URL must be HTTPS.
-            Leave the [Git Context](../../configuration/git-monitoring/index.md#git_context) configuration option unset when `COPY` needs the rest of the tree.
-        2. For a private repository, create a Gitea or Forgejo access token with repository read permission and write it to `./secrets/git_auth_token.txt`.
-            Do not put the token in Compose YAML or in the Watchtower process environment.
-
-            ```bash title="Create a secret file"
-            mkdir -p ./secrets
-            printf '%s' "$GIT_AUTH_TOKEN" > ./secrets/git_auth_token.txt
-            chmod 600 ./secrets/git_auth_token.txt
-            ```
-
-        3. Apply the association and start Watchtower.
-
-            === "Docker Compose"
-
-                === "Public repository"
-
-                    ```yaml title="docker-compose.yml"
-                    services:
-                        watchtower:
-                            image: nickfedor/watchtower
-                            volumes:
-                                - /var/run/docker.sock:/var/run/docker.sock
-                            environment:
-                                WATCHTOWER_GIT_ENABLE: "true"
-                            restart: unless-stopped
-                        app:
-                            image: myapp:latest
-                            labels:
-                                com.centurylinklabs.watchtower.git-repo: "https://git.example.com/org/app.git"
-                                com.centurylinklabs.watchtower.git-ref: "main"
-                                com.centurylinklabs.watchtower.git-host: "https://git.example.com"
-                    ```
-
-                    ```bash title="Start the stack"
-                    docker compose up -d
-                    ```
-
-                === "Private repository"
-
-                    ```yaml title="docker-compose.yml"
-                    secrets:
-                        git_auth_token:
-                            file: ./secrets/git_auth_token.txt
-
-                    services:
-                        watchtower:
-                            image: nickfedor/watchtower
-                            volumes:
-                                - /var/run/docker.sock:/var/run/docker.sock
-                            secrets:
-                                - git_auth_token
-                            environment:
-                                WATCHTOWER_GIT_ENABLE: "true"
-                                WATCHTOWER_GIT_AUTH_TOKEN: /run/secrets/git_auth_token
-                            restart: unless-stopped
-                        app:
-                            image: myapp:latest
-                            labels:
-                                com.centurylinklabs.watchtower.git-repo: "https://git.example.com/org/app.git"
-                                com.centurylinklabs.watchtower.git-ref: "main"
-                                com.centurylinklabs.watchtower.git-host: "https://git.example.com"
-                    ```
-
-                    ```bash title="Start the stack"
-                    docker compose up -d
-                    ```
-
-            === "Docker CLI"
-
-                === "Public repository"
-
-                    ```bash title="Start app and Watchtower"
-                    docker run -d \
-                        --name app \
-                        --label com.centurylinklabs.watchtower.git-repo="https://git.example.com/org/app.git" \
-                        --label com.centurylinklabs.watchtower.git-ref="main" \
-                        --label com.centurylinklabs.watchtower.git-host="https://git.example.com" \
-                        myapp:latest
-
-                    docker run -d \
-                        --name watchtower \
-                        -v /var/run/docker.sock:/var/run/docker.sock \
-                        --restart unless-stopped \
-                        -e WATCHTOWER_GIT_ENABLE=true \
-                        nickfedor/watchtower
-                    ```
-
-                === "Private repository"
-
-                    ```bash title="Start app and Watchtower"
-                    docker run -d \
-                        --name app \
-                        --label com.centurylinklabs.watchtower.git-repo="https://git.example.com/org/app.git" \
-                        --label com.centurylinklabs.watchtower.git-ref="main" \
-                        --label com.centurylinklabs.watchtower.git-host="https://git.example.com" \
-                        myapp:latest
-
-                    docker run -d \
-                        --name watchtower \
-                        -v /var/run/docker.sock:/var/run/docker.sock \
-                        -v $(pwd)/secrets/git_auth_token.txt:/run/secrets/git_auth_token:ro \
-                        --restart unless-stopped \
-                        -e WATCHTOWER_GIT_ENABLE=true \
-                        -e WATCHTOWER_GIT_AUTH_TOKEN=/run/secrets/git_auth_token \
-                        nickfedor/watchtower
-                    ```
-
-            The example does the following:
-
-            - `com.centurylinklabs.watchtower.git-repo` and `com.centurylinklabs.watchtower.git-ref` associate `app` with `https://git.example.com/org/app.git` on `main`. Those labels do not turn the watcher on.
-            - The [Git Enable](../../configuration/git-monitoring/index.md#git_enable) configuration option turns the watcher on.
-            - `com.centurylinklabs.watchtower.git-host` is `https://git.example.com` because this is a server you host.
-
-        4. Wait for the next [update session](#update_session).
-            Process start is not a session.
-            The first session records what is already running and does not rebuild `app`.
-
-            ```bash title="Confirm no stamp was written"
-            docker inspect -f '{{index .Config.Labels "com.centurylinklabs.watchtower.git-last-commit"}}' app
-            ```
-
-        5. Push a commit to `main`.
-            On the next session the daemon builds `https://git.example.com/org/app.git#<commit>`, Watchtower recreates `app`, and the replacement receives `com.centurylinklabs.watchtower.git-last-commit`.
-
-            ```bash title="Confirm the stamp after a rebuild"
-            docker inspect -f '{{index .Config.Labels "com.centurylinklabs.watchtower.git-last-commit"}}' app
-            ```
-
-=== "Local Path Context"
-
-    Watchtower checks out the Compose project directory and applies Compose for the stale associated services.
-    Bind-mount that directory into Watchtower.
-    See [Local path context](#local_path_context).
-
-    === "GitHub"
-
-        1. Confirm the Compose file uses a local `build.context` (`build: ./api`) and that `https://github.com/org/webstack.git` is the hosted remote.
-        2. Bind-mount the project directory into Watchtower at `/srv/webstack`.
-            Each applied service must have `com.docker.compose.service`.
-        3. For a private repository, create a GitHub token with read access to the repository contents and write it to `./secrets/git_auth_token.txt`.
-
-            ```bash title="Create a secret file"
-            mkdir -p ./secrets
-            printf '%s' "$GIT_AUTH_TOKEN" > ./secrets/git_auth_token.txt
-            chmod 600 ./secrets/git_auth_token.txt
-            ```
-
-        4. Apply the association and start Watchtower.
-
-            === "Docker Compose"
-
-                === "Public repository"
-
-                    ```yaml title="docker-compose.yml"
-                    name: webstack
-
-                    services:
-                        api:
-                            build: ./api
-                            labels:
-                                com.centurylinklabs.watchtower.git-repo: "https://github.com/org/webstack.git"
-                                com.centurylinklabs.watchtower.git-ref: "main"
-                        worker:
-                            build: ./worker
-                            labels:
-                                com.centurylinklabs.watchtower.git-repo: "https://github.com/org/webstack.git"
-                                com.centurylinklabs.watchtower.git-ref: "main"
-                        db:
-                            image: postgres:16
-                        watchtower:
-                            image: nickfedor/watchtower
-                            volumes:
-                                - /var/run/docker.sock:/var/run/docker.sock
-                                - /srv/webstack:/srv/webstack
-                            environment:
-                                WATCHTOWER_GIT_ENABLE: "true"
-                                WATCHTOWER_COMPOSE_PROJECT: |
-                                    webstack=/srv/webstack
-                            restart: unless-stopped
-                    ```
-
-                    ```bash title="Start the stack"
-                    docker compose up -d
-                    ```
-
-                === "Private repository"
-
-                    ```yaml title="docker-compose.yml"
-                    name: webstack
-
-                    secrets:
-                        git_auth_token:
-                            file: ./secrets/git_auth_token.txt
-
-                    services:
-                        api:
-                            build: ./api
-                            labels:
-                                com.centurylinklabs.watchtower.git-repo: "https://github.com/org/webstack.git"
-                                com.centurylinklabs.watchtower.git-ref: "main"
-                        worker:
-                            build: ./worker
-                            labels:
-                                com.centurylinklabs.watchtower.git-repo: "https://github.com/org/webstack.git"
-                                com.centurylinklabs.watchtower.git-ref: "main"
-                        db:
-                            image: postgres:16
-                        watchtower:
-                            image: nickfedor/watchtower
-                            volumes:
-                                - /var/run/docker.sock:/var/run/docker.sock
-                                - /srv/webstack:/srv/webstack
-                            secrets:
-                                - git_auth_token
-                            environment:
-                                WATCHTOWER_GIT_ENABLE: "true"
-                                WATCHTOWER_GIT_AUTH_TOKEN: /run/secrets/git_auth_token
-                                WATCHTOWER_COMPOSE_PROJECT: |
-                                    webstack=/srv/webstack
-                            restart: unless-stopped
-                    ```
-
-                    ```bash title="Start the stack"
-                    docker compose up -d
-                    ```
-
-            === "Docker CLI"
-
-                === "Public repository"
-
-                    ```bash title="Start Watchtower against a mounted Compose project"
-                    docker run -d \
-                        --name watchtower \
-                        -v /var/run/docker.sock:/var/run/docker.sock \
-                        -v /srv/webstack:/srv/webstack \
-                        --restart unless-stopped \
-                        -e WATCHTOWER_GIT_ENABLE=true \
-                        -e WATCHTOWER_COMPOSE_PROJECT="webstack=/srv/webstack" \
-                        nickfedor/watchtower
-                    ```
-
-                === "Private repository"
-
-                    ```bash title="Start Watchtower against a mounted Compose project"
-                    docker run -d \
-                        --name watchtower \
-                        -v /var/run/docker.sock:/var/run/docker.sock \
-                        -v /srv/webstack:/srv/webstack \
-                        -v $(pwd)/secrets/git_auth_token.txt:/run/secrets/git_auth_token:ro \
-                        --restart unless-stopped \
-                        -e WATCHTOWER_GIT_ENABLE=true \
-                        -e WATCHTOWER_GIT_AUTH_TOKEN=/run/secrets/git_auth_token \
-                        -e WATCHTOWER_COMPOSE_PROJECT="webstack=/srv/webstack" \
-                        nickfedor/watchtower
-                    ```
-
-            The example does the following:
-
-            - `com.centurylinklabs.watchtower.git-repo` and `com.centurylinklabs.watchtower.git-ref` associate `api` and `worker` with `https://github.com/org/webstack.git` on `main`. Those labels do not turn the watcher on.
-            - The [Compose Project](../../configuration/git-monitoring/index.md#compose_project) configuration option maps `webstack` to `/srv/webstack`. You can set `com.centurylinklabs.watchtower.compose-dir` on each service instead.
-            - The [Git Enable](../../configuration/git-monitoring/index.md#git_enable) configuration option turns the watcher on.
-            - `github.com` does not need `com.centurylinklabs.watchtower.git-host`.
-
-        5. Wait for the next [update session](#update_session).
-            The first session records what is already running and does not checkout or apply Compose.
-
-            ```bash title="Confirm no stamp was written"
-            docker inspect -f '{{index .Config.Labels "com.centurylinklabs.watchtower.git-last-commit"}}' api
-            ```
-
-        6. Push a commit to `main`.
-            On the next session Watchtower fetches that commit in `/srv/webstack`, applies Compose for `api` and `worker`, and writes stamp labels.
-            `db` stays on the registry path.
-
-            ```bash title="Confirm the stamp after a rebuild"
-            docker inspect -f '{{index .Config.Labels "com.centurylinklabs.watchtower.git-last-commit"}}' api
-            ```
-
-    === "GitLab"
-
-        1. Confirm the Compose file uses a local `build.context` (`build: ./api`) and that `https://gitlab.com/group/webstack.git` is the hosted remote.
-            Nested groups are valid in the clone URL.
-        2. Bind-mount the project directory into Watchtower at `/srv/webstack`.
-            Each applied service must have `com.docker.compose.service`.
-        3. For a private repository, create a GitLab token with `read_repository` and write it to `./secrets/git_auth_token.txt`.
-
-            ```bash title="Create a secret file"
-            mkdir -p ./secrets
-            printf '%s' "$GIT_AUTH_TOKEN" > ./secrets/git_auth_token.txt
-            chmod 600 ./secrets/git_auth_token.txt
-            ```
-
-        4. Apply the association and start Watchtower.
-
-            === "Docker Compose"
-
-                === "Public repository"
-
-                    ```yaml title="docker-compose.yml"
-                    name: webstack
-
-                    services:
-                        api:
-                            build: ./api
-                            labels:
-                                com.centurylinklabs.watchtower.git-repo: "https://gitlab.com/group/webstack.git"
-                                com.centurylinklabs.watchtower.git-ref: "main"
-                        worker:
-                            build: ./worker
-                            labels:
-                                com.centurylinklabs.watchtower.git-repo: "https://gitlab.com/group/webstack.git"
-                                com.centurylinklabs.watchtower.git-ref: "main"
-                        db:
-                            image: postgres:16
-                        watchtower:
-                            image: nickfedor/watchtower
-                            volumes:
-                                - /var/run/docker.sock:/var/run/docker.sock
-                                - /srv/webstack:/srv/webstack
-                            environment:
-                                WATCHTOWER_GIT_ENABLE: "true"
-                                WATCHTOWER_COMPOSE_PROJECT: |
-                                    webstack=/srv/webstack
-                            restart: unless-stopped
-                    ```
-
-                    ```bash title="Start the stack"
-                    docker compose up -d
-                    ```
-
-                === "Private repository"
-
-                    ```yaml title="docker-compose.yml"
-                    name: webstack
-
-                    secrets:
-                        git_auth_token:
-                            file: ./secrets/git_auth_token.txt
-
-                    services:
-                        api:
-                            build: ./api
-                            labels:
-                                com.centurylinklabs.watchtower.git-repo: "https://gitlab.com/group/webstack.git"
-                                com.centurylinklabs.watchtower.git-ref: "main"
-                        worker:
-                            build: ./worker
-                            labels:
-                                com.centurylinklabs.watchtower.git-repo: "https://gitlab.com/group/webstack.git"
-                                com.centurylinklabs.watchtower.git-ref: "main"
-                        db:
-                            image: postgres:16
-                        watchtower:
-                            image: nickfedor/watchtower
-                            volumes:
-                                - /var/run/docker.sock:/var/run/docker.sock
-                                - /srv/webstack:/srv/webstack
-                            secrets:
-                                - git_auth_token
-                            environment:
-                                WATCHTOWER_GIT_ENABLE: "true"
-                                WATCHTOWER_GIT_AUTH_TOKEN: /run/secrets/git_auth_token
-                                WATCHTOWER_COMPOSE_PROJECT: |
-                                    webstack=/srv/webstack
-                            restart: unless-stopped
-                    ```
-
-                    ```bash title="Start the stack"
-                    docker compose up -d
-                    ```
-
-            === "Docker CLI"
-
-                === "Public repository"
-
-                    ```bash title="Start Watchtower against a mounted Compose project"
-                    docker run -d \
-                        --name watchtower \
-                        -v /var/run/docker.sock:/var/run/docker.sock \
-                        -v /srv/webstack:/srv/webstack \
-                        --restart unless-stopped \
-                        -e WATCHTOWER_GIT_ENABLE=true \
-                        -e WATCHTOWER_COMPOSE_PROJECT="webstack=/srv/webstack" \
-                        nickfedor/watchtower
-                    ```
-
-                === "Private repository"
-
-                    ```bash title="Start Watchtower against a mounted Compose project"
-                    docker run -d \
-                        --name watchtower \
-                        -v /var/run/docker.sock:/var/run/docker.sock \
-                        -v /srv/webstack:/srv/webstack \
-                        -v $(pwd)/secrets/git_auth_token.txt:/run/secrets/git_auth_token:ro \
-                        --restart unless-stopped \
-                        -e WATCHTOWER_GIT_ENABLE=true \
-                        -e WATCHTOWER_GIT_AUTH_TOKEN=/run/secrets/git_auth_token \
-                        -e WATCHTOWER_COMPOSE_PROJECT="webstack=/srv/webstack" \
-                        nickfedor/watchtower
-                    ```
-
-            The example does the following:
-
-            - `com.centurylinklabs.watchtower.git-repo` and `com.centurylinklabs.watchtower.git-ref` associate `api` and `worker` with `https://gitlab.com/group/webstack.git` on `main`. Those labels do not turn the watcher on.
-            - The [Compose Project](../../configuration/git-monitoring/index.md#compose_project) configuration option maps `webstack` to `/srv/webstack`. You can set `com.centurylinklabs.watchtower.compose-dir` on each service instead.
-            - The [Git Enable](../../configuration/git-monitoring/index.md#git_enable) configuration option turns the watcher on.
-            - `gitlab.com` does not need `com.centurylinklabs.watchtower.git-host`.
-
-        5. Wait for the next [update session](#update_session).
-            The first session records what is already running and does not checkout or apply Compose.
-
-            ```bash title="Confirm no stamp was written"
-            docker inspect -f '{{index .Config.Labels "com.centurylinklabs.watchtower.git-last-commit"}}' api
-            ```
-
-        6. Push a commit to `main`.
-            On the next session Watchtower fetches that commit in `/srv/webstack`, applies Compose for `api` and `worker`, and writes stamp labels.
-            `db` stays on the registry path.
-
-            ```bash title="Confirm the stamp after a rebuild"
-            docker inspect -f '{{index .Config.Labels "com.centurylinklabs.watchtower.git-last-commit"}}' api
-            ```
-
-    === "Codeberg"
-
-        1. Confirm the Compose file uses a local `build.context` (`build: ./api`) and that `https://codeberg.org/org/webstack.git` is the hosted remote.
-        2. Bind-mount the project directory into Watchtower at `/srv/webstack`.
-            Each applied service must have `com.docker.compose.service`.
-        3. For a private repository, create a Codeberg access token with repository read permission and write it to `./secrets/git_auth_token.txt`.
-
-            ```bash title="Create a secret file"
-            mkdir -p ./secrets
-            printf '%s' "$GIT_AUTH_TOKEN" > ./secrets/git_auth_token.txt
-            chmod 600 ./secrets/git_auth_token.txt
-            ```
-
-        4. Apply the association and start Watchtower.
-
-            === "Docker Compose"
-
-                === "Public repository"
-
-                    ```yaml title="docker-compose.yml"
-                    name: webstack
-
-                    services:
-                        api:
-                            build: ./api
-                            labels:
-                                com.centurylinklabs.watchtower.git-repo: "https://codeberg.org/org/webstack.git"
-                                com.centurylinklabs.watchtower.git-ref: "main"
-                        worker:
-                            build: ./worker
-                            labels:
-                                com.centurylinklabs.watchtower.git-repo: "https://codeberg.org/org/webstack.git"
-                                com.centurylinklabs.watchtower.git-ref: "main"
-                        db:
-                            image: postgres:16
-                        watchtower:
-                            image: nickfedor/watchtower
-                            volumes:
-                                - /var/run/docker.sock:/var/run/docker.sock
-                                - /srv/webstack:/srv/webstack
-                            environment:
-                                WATCHTOWER_GIT_ENABLE: "true"
-                                WATCHTOWER_COMPOSE_PROJECT: |
-                                    webstack=/srv/webstack
-                            restart: unless-stopped
-                    ```
-
-                    ```bash title="Start the stack"
-                    docker compose up -d
-                    ```
-
-                === "Private repository"
-
-                    ```yaml title="docker-compose.yml"
-                    name: webstack
-
-                    secrets:
-                        git_auth_token:
-                            file: ./secrets/git_auth_token.txt
-
-                    services:
-                        api:
-                            build: ./api
-                            labels:
-                                com.centurylinklabs.watchtower.git-repo: "https://codeberg.org/org/webstack.git"
-                                com.centurylinklabs.watchtower.git-ref: "main"
-                        worker:
-                            build: ./worker
-                            labels:
-                                com.centurylinklabs.watchtower.git-repo: "https://codeberg.org/org/webstack.git"
-                                com.centurylinklabs.watchtower.git-ref: "main"
-                        db:
-                            image: postgres:16
-                        watchtower:
-                            image: nickfedor/watchtower
-                            volumes:
-                                - /var/run/docker.sock:/var/run/docker.sock
-                                - /srv/webstack:/srv/webstack
-                            secrets:
-                                - git_auth_token
-                            environment:
-                                WATCHTOWER_GIT_ENABLE: "true"
-                                WATCHTOWER_GIT_AUTH_TOKEN: /run/secrets/git_auth_token
-                                WATCHTOWER_COMPOSE_PROJECT: |
-                                    webstack=/srv/webstack
-                            restart: unless-stopped
-                    ```
-
-                    ```bash title="Start the stack"
-                    docker compose up -d
-                    ```
-
-            === "Docker CLI"
-
-                === "Public repository"
-
-                    ```bash title="Start Watchtower against a mounted Compose project"
-                    docker run -d \
-                        --name watchtower \
-                        -v /var/run/docker.sock:/var/run/docker.sock \
-                        -v /srv/webstack:/srv/webstack \
-                        --restart unless-stopped \
-                        -e WATCHTOWER_GIT_ENABLE=true \
-                        -e WATCHTOWER_COMPOSE_PROJECT="webstack=/srv/webstack" \
-                        nickfedor/watchtower
-                    ```
-
-                === "Private repository"
-
-                    ```bash title="Start Watchtower against a mounted Compose project"
-                    docker run -d \
-                        --name watchtower \
-                        -v /var/run/docker.sock:/var/run/docker.sock \
-                        -v /srv/webstack:/srv/webstack \
-                        -v $(pwd)/secrets/git_auth_token.txt:/run/secrets/git_auth_token:ro \
-                        --restart unless-stopped \
-                        -e WATCHTOWER_GIT_ENABLE=true \
-                        -e WATCHTOWER_GIT_AUTH_TOKEN=/run/secrets/git_auth_token \
-                        -e WATCHTOWER_COMPOSE_PROJECT="webstack=/srv/webstack" \
-                        nickfedor/watchtower
-                    ```
-
-            The example does the following:
-
-            - `com.centurylinklabs.watchtower.git-repo` and `com.centurylinklabs.watchtower.git-ref` associate `api` and `worker` with `https://codeberg.org/org/webstack.git` on `main`. Those labels do not turn the watcher on.
-            - The [Compose Project](../../configuration/git-monitoring/index.md#compose_project) configuration option maps `webstack` to `/srv/webstack`. You can set `com.centurylinklabs.watchtower.compose-dir` on each service instead.
-            - The [Git Enable](../../configuration/git-monitoring/index.md#git_enable) configuration option turns the watcher on.
-            - `codeberg.org` does not need `com.centurylinklabs.watchtower.git-host`.
-
-        5. Wait for the next [update session](#update_session).
-            The first session records what is already running and does not checkout or apply Compose.
-
-            ```bash title="Confirm no stamp was written"
-            docker inspect -f '{{index .Config.Labels "com.centurylinklabs.watchtower.git-last-commit"}}' api
-            ```
-
-        6. Push a commit to `main`.
-            On the next session Watchtower fetches that commit in `/srv/webstack`, applies Compose for `api` and `worker`, and writes stamp labels.
-            `db` stays on the registry path.
-
-            ```bash title="Confirm the stamp after a rebuild"
-            docker inspect -f '{{index .Config.Labels "com.centurylinklabs.watchtower.git-last-commit"}}' api
-            ```
-
-    === "Gitea / Forgejo"
-
-        1. Confirm the Compose file uses a local `build.context` (`build: ./api`) and that `https://git.example.com/org/webstack.git` is the hosted remote.
-        2. Bind-mount the project directory into Watchtower at `/srv/webstack`.
-            Each applied service must have `com.docker.compose.service`.
-        3. For a private repository, create a Gitea or Forgejo access token with repository read permission and write it to `./secrets/git_auth_token.txt`.
-
-            ```bash title="Create a secret file"
-            mkdir -p ./secrets
-            printf '%s' "$GIT_AUTH_TOKEN" > ./secrets/git_auth_token.txt
-            chmod 600 ./secrets/git_auth_token.txt
-            ```
-
-        4. Apply the association and start Watchtower.
-
-            === "Docker Compose"
-
-                === "Public repository"
-
-                    ```yaml title="docker-compose.yml"
-                    name: webstack
-
-                    services:
-                        api:
-                            build: ./api
-                            labels:
-                                com.centurylinklabs.watchtower.git-repo: "https://git.example.com/org/webstack.git"
-                                com.centurylinklabs.watchtower.git-ref: "main"
-                                com.centurylinklabs.watchtower.git-host: "https://git.example.com"
-                        worker:
-                            build: ./worker
-                            labels:
-                                com.centurylinklabs.watchtower.git-repo: "https://git.example.com/org/webstack.git"
-                                com.centurylinklabs.watchtower.git-ref: "main"
-                                com.centurylinklabs.watchtower.git-host: "https://git.example.com"
-                        db:
-                            image: postgres:16
-                        watchtower:
-                            image: nickfedor/watchtower
-                            volumes:
-                                - /var/run/docker.sock:/var/run/docker.sock
-                                - /srv/webstack:/srv/webstack
-                            environment:
-                                WATCHTOWER_GIT_ENABLE: "true"
-                                WATCHTOWER_COMPOSE_PROJECT: |
-                                    webstack=/srv/webstack
-                            restart: unless-stopped
-                    ```
-
-                    ```bash title="Start the stack"
-                    docker compose up -d
-                    ```
-
-                === "Private repository"
-
-                    ```yaml title="docker-compose.yml"
-                    name: webstack
-
-                    secrets:
-                        git_auth_token:
-                            file: ./secrets/git_auth_token.txt
-
-                    services:
-                        api:
-                            build: ./api
-                            labels:
-                                com.centurylinklabs.watchtower.git-repo: "https://git.example.com/org/webstack.git"
-                                com.centurylinklabs.watchtower.git-ref: "main"
-                                com.centurylinklabs.watchtower.git-host: "https://git.example.com"
-                        worker:
-                            build: ./worker
-                            labels:
-                                com.centurylinklabs.watchtower.git-repo: "https://git.example.com/org/webstack.git"
-                                com.centurylinklabs.watchtower.git-ref: "main"
-                                com.centurylinklabs.watchtower.git-host: "https://git.example.com"
-                        db:
-                            image: postgres:16
-                        watchtower:
-                            image: nickfedor/watchtower
-                            volumes:
-                                - /var/run/docker.sock:/var/run/docker.sock
-                                - /srv/webstack:/srv/webstack
-                            secrets:
-                                - git_auth_token
-                            environment:
-                                WATCHTOWER_GIT_ENABLE: "true"
-                                WATCHTOWER_GIT_AUTH_TOKEN: /run/secrets/git_auth_token
-                                WATCHTOWER_COMPOSE_PROJECT: |
-                                    webstack=/srv/webstack
-                            restart: unless-stopped
-                    ```
-
-                    ```bash title="Start the stack"
-                    docker compose up -d
-                    ```
-
-            === "Docker CLI"
-
-                === "Public repository"
-
-                    ```bash title="Start Watchtower against a mounted Compose project"
-                    docker run -d \
-                        --name watchtower \
-                        -v /var/run/docker.sock:/var/run/docker.sock \
-                        -v /srv/webstack:/srv/webstack \
-                        --restart unless-stopped \
-                        -e WATCHTOWER_GIT_ENABLE=true \
-                        -e WATCHTOWER_COMPOSE_PROJECT="webstack=/srv/webstack" \
-                        nickfedor/watchtower
-                    ```
-
-                === "Private repository"
-
-                    ```bash title="Start Watchtower against a mounted Compose project"
-                    docker run -d \
-                        --name watchtower \
-                        -v /var/run/docker.sock:/var/run/docker.sock \
-                        -v /srv/webstack:/srv/webstack \
-                        -v $(pwd)/secrets/git_auth_token.txt:/run/secrets/git_auth_token:ro \
-                        --restart unless-stopped \
-                        -e WATCHTOWER_GIT_ENABLE=true \
-                        -e WATCHTOWER_GIT_AUTH_TOKEN=/run/secrets/git_auth_token \
-                        -e WATCHTOWER_COMPOSE_PROJECT="webstack=/srv/webstack" \
-                        nickfedor/watchtower
-                    ```
-
-            The example does the following:
-
-            - `com.centurylinklabs.watchtower.git-repo` and `com.centurylinklabs.watchtower.git-ref` associate `api` and `worker` with `https://git.example.com/org/webstack.git` on `main`. Those labels do not turn the watcher on.
-            - The [Compose Project](../../configuration/git-monitoring/index.md#compose_project) configuration option maps `webstack` to `/srv/webstack`. You can set `com.centurylinklabs.watchtower.compose-dir` on each service instead.
-            - The [Git Enable](../../configuration/git-monitoring/index.md#git_enable) configuration option turns the watcher on.
-            - `com.centurylinklabs.watchtower.git-host` is `https://git.example.com` because this is a server you host.
-
-        5. Wait for the next [update session](#update_session).
-            The first session records what is already running and does not checkout or apply Compose.
-
-            ```bash title="Confirm no stamp was written"
-            docker inspect -f '{{index .Config.Labels "com.centurylinklabs.watchtower.git-last-commit"}}' api
-            ```
-
-        6. Push a commit to `main`.
-            On the next session Watchtower fetches that commit in `/srv/webstack`, applies Compose for `api` and `worker`, and writes stamp labels.
-            `db` stays on the registry path.
-
-            ```bash title="Confirm the stamp after a rebuild"
-            docker inspect -f '{{index .Config.Labels "com.centurylinklabs.watchtower.git-last-commit"}}' api
-            ```
-<!-- markdownlint-enable MD046 -->
+## Common mistakes
+
+| What you see | Cause | What to change |
+|:-------------|:------|:---------------|
+| Repository label is set and nothing rebuilds | The watcher is off | Set `WATCHTOWER_GIT_ENABLE=true`, or `com.centurylinklabs.watchtower.git-watch=true` |
+| `git-watch=true` and the container stays on the registry path | No repository association | Set `git-repo`, or a [Git Image](../../configuration/git-monitoring/index.md#git_image) mapping whose key matches `ImageName()` including the tag |
+| Labels and `--git-image` disagree | Labels win | Remove the mapping or the labels. Do not expect both to merge |
+| First session does not rebuild | There is no baseline yet, or the image already matches the remote | Push a new commit, or bake `org.opencontainers.image.revision` before using [Run Once](../../configuration/scheduling/index.md#run_once) |
+| Compose project never updates | `com.docker.compose.project.working_dir` was used as the opt-in | Set `com.centurylinklabs.watchtower.compose-dir` or [Compose Project](../../configuration/git-monitoring/index.md#compose_project). The path is inside Watchtower |
+| Compose apply is skipped | The path is missing, has no compose file, or the container has no `com.docker.compose.service` | Mount the project and keep the Compose service label |
+| Local files such as `.env` disappear, or the project is skipped | The worktree is dirty | Commit the files, or enable [Git Compose Stash](../../configuration/git-monitoring/index.md#git_compose_stash) |
+| Two services in one project never update together | They resolved different commits | Point them at the same ref and policy. One directory is checked out once |
+| Private Git URL build fails | The clone URL is SSH | Use HTTPS and a token. SSH is for a local path checkout |
+| Self-hosted API is never used | `git-host` names a different hostname than the clone URL | Use the same hostname. Port and path may differ |
+| A new `v1.2.4-rc.1` tag is ignored | `patch`, `minor`, and `major` select release tags only | Publish `v1.2.4`, or follow the pre-release ref with policy `none` |
+| A session sees a newer ref and does not rebuild | [No-pull](../../configuration/update-behavior/index.md#disable_image_pulling) or [Monitor Only](../../configuration/update-behavior/index.md#monitor_only) is set | Those options check Git and do not build. `/v1/check` with no-pull does not contact Git and reports no update |
+| An invalid policy skips one container | `git-semver-policy` is not `none`, `patch`, `minor`, or `major` | Fix or remove the label. Other containers continue |
 
 ## Behavior
 
