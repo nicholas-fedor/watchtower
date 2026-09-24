@@ -8,6 +8,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Chores
+
+- Update module github.com/gofiber/schema to v1.8.8 by @renovate[bot] in [#2441](https://github.com/nicholas-fedor/watchtower/pull/2441)
+- Update github/codeql-action action to v4.38.2 by @renovate[bot] in [#2440](https://github.com/nicholas-fedor/watchtower/pull/2440)
+- Update module github.com/gofiber/utils/v2 to v2.6.0 by @renovate[bot] in [#2438](https://github.com/nicholas-fedor/watchtower/pull/2438)
+
+## [1.22.3] - 2026-09-22
+
 ### Changed
 
 - Use the commit date for archive mtime by @nicholas-fedor in [#2435](https://github.com/nicholas-fedor/watchtower/pull/2435)
@@ -3673,7 +3681,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## Compare Releases
 
-- [unreleased](https://github.com/nicholas-fedor/watchtower/compare/v1.22.2...HEAD)
+- [unreleased](https://github.com/nicholas-fedor/watchtower/compare/v1.22.3...HEAD)
+- [1.22.3](https://github.com/nicholas-fedor/watchtower/compare/v1.22.2...v1.22.3)
 - [1.22.2](https://github.com/nicholas-fedor/watchtower/compare/v1.22.1...v1.22.2)
 - [1.22.1](https://github.com/nicholas-fedor/watchtower/compare/v1.22.0...v1.22.1)
 - [1.22.0](https://github.com/nicholas-fedor/watchtower/compare/v1.21.2...v1.22.0)
