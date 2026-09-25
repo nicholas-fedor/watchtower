@@ -101,7 +101,7 @@ const docTemplate = `{
                         "BearerAuth": []
                     }
                 ],
-                "description": "Checks each watched container for available updates by querying the registry for the latest digest without pulling image layers.",
+                "description": "Checks each watched container for available updates. Associated Git-watched containers compare the hosted Git ref (no clone or build). Other containers query the registry for the",
                 "consumes": [
                     "application/json"
                 ],
