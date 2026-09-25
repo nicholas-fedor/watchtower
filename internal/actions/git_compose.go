@@ -53,6 +53,7 @@ func (s *gitSession) applyCompose(
 
 	for _, member := range batch.members {
 		c := member.container
+
 		name := compose.GetServiceName(containerLabels(c))
 		if name == "" {
 			failed[c.ID()] = errGitComposeService
@@ -119,6 +120,7 @@ func (s *gitSession) applyCompose(
 
 	for _, name := range services {
 		members := byService[name]
+
 		items := appliedByService[name]
 		if len(items) == 0 {
 			for _, member := range members {
@@ -144,6 +146,7 @@ func (s *gitSession) applyCompose(
 
 		for _, member := range members {
 			c := member.container
+
 			item, matched := matchedComposeInstance(c, members, items, byName)
 			if !matched {
 				failed[c.ID()] = errGitComposeInstance

@@ -28,7 +28,8 @@ func Load(ctx context.Context, ref ProjectRef) (*composetypes.Project, error) {
 		return nil, errEmptyProjectDir
 	}
 
-	if err := rejectEscapingConfig(ref.Dir, ref.ConfigFiles); err != nil {
+	err := rejectEscapingConfig(ref.Dir, ref.ConfigFiles)
+	if err != nil {
 		return nil, err
 	}
 

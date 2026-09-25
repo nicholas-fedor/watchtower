@@ -1,6 +1,7 @@
 package container
 
 import (
+	"errors"
 	"fmt"
 	"strings"
 
@@ -69,7 +70,7 @@ var _ = ginkgo.Describe("consumeBuildStream", func() {
 		gomega.Expect(got.Error()).NotTo(gomega.ContainSubstring("secret"))
 		gomega.Expect(got.Error()).To(gomega.ContainSubstring("xxxxx:xxxxx"))
 
-		tokenOnly := redactBuildError(fmt.Errorf("clone https://token@github.com/org/app.git failed"), "")
+		tokenOnly := redactBuildError(errors.New("clone https://token@github.com/org/app.git failed"), "")
 		gomega.Expect(tokenOnly.Error()).NotTo(gomega.ContainSubstring("token@"))
 		gomega.Expect(tokenOnly.Error()).To(gomega.ContainSubstring("xxxxx:xxxxx@"))
 	})

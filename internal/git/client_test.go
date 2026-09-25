@@ -357,6 +357,7 @@ func TestCheck_MismatchedGitHostUsesLister(t *testing.T) {
 	called := false
 	client.http = &http.Client{Transport: roundTripFunc(func(r *http.Request) (*http.Response, error) {
 		called = true
+
 		if strings.Contains(r.Header.Get("Authorization"), "super-secret") {
 			t.Errorf("token sent to %s", r.URL.Host)
 		}

@@ -150,7 +150,8 @@ func containedConfigFile(dir, part string) (string, error) {
 		cleaned = filepath.Clean(part)
 	}
 
-	if err := symlinkEscapes(dir, cleaned); err != nil {
+	err := symlinkEscapes(dir, cleaned)
+	if err != nil {
 		return "", err
 	}
 

@@ -10,9 +10,9 @@ import (
 	"github.com/onsi/ginkgo/v2"
 	"github.com/onsi/gomega"
 	"github.com/rs/zerolog"
+	"github.com/stretchr/testify/mock"
 
 	dockerContainer "github.com/moby/moby/api/types/container"
-	"github.com/stretchr/testify/mock"
 
 	mockActions "github.com/nicholas-fedor/watchtower/internal/actions/mocks"
 	"github.com/nicholas-fedor/watchtower/internal/compose"

@@ -134,7 +134,7 @@ func redactBuildError(err error, remote string) error {
 		return err
 	}
 
-	return errors.New(msg)
+	return fmt.Errorf("%w: %s", errImageBuildFailed, msg)
 }
 
 // redactUserinfo replaces the credentialed remote and any leftover userinfo.

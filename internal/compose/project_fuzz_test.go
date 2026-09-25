@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 // FuzzConfigFiles verifies Compose config_files labels never panic and that
@@ -28,7 +29,7 @@ func FuzzConfigFiles(f *testing.F) {
 		for _, path := range got {
 			assert.NotEmpty(t, path)
 			rel, relErr := filepath.Rel("/proj", path)
-			assert.NoError(t, relErr)
+			require.NoError(t, relErr)
 			assert.True(t, filepath.IsLocal(rel), path)
 		}
 	})

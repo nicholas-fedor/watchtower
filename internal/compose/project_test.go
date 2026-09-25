@@ -142,6 +142,7 @@ func TestResolveProjectDir(t *testing.T) {
 		dir := writeComposeDir(t, "compose.yaml")
 		outside := filepath.Join(t.TempDir(), "outside.yaml")
 		require.NoError(t, os.WriteFile(outside, []byte("services: {}\n"), 0o600))
+
 		link := filepath.Join(dir, "override.yaml")
 		require.NoError(t, os.Symlink(outside, link))
 
