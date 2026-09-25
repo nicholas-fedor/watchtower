@@ -10,6 +10,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Chores
 
+- Update module github.com/go-openapi/jsonpointer to v1.0.2 by @renovate[bot] in [#2442](https://github.com/nicholas-fedor/watchtower/pull/2442)
 - Update module github.com/gofiber/schema to v1.8.8 by @renovate[bot] in [#2441](https://github.com/nicholas-fedor/watchtower/pull/2441)
 - Update github/codeql-action action to v4.38.2 by @renovate[bot] in [#2440](https://github.com/nicholas-fedor/watchtower/pull/2440)
 - Update module github.com/gofiber/utils/v2 to v2.6.0 by @renovate[bot] in [#2438](https://github.com/nicholas-fedor/watchtower/pull/2438)
