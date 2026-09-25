@@ -12,27 +12,17 @@ import (
 	"github.com/rs/zerolog"
 
 	dockerContainer "github.com/moby/moby/api/types/container"
+	"github.com/stretchr/testify/mock"
 
 	mockActions "github.com/nicholas-fedor/watchtower/internal/actions/mocks"
 	"github.com/nicholas-fedor/watchtower/internal/compose"
+	mockCompose "github.com/nicholas-fedor/watchtower/internal/compose/mocks"
 	"github.com/nicholas-fedor/watchtower/internal/git"
 	"github.com/nicholas-fedor/watchtower/internal/git/project"
 	gitPkg "github.com/nicholas-fedor/watchtower/pkg/container/git"
 	"github.com/nicholas-fedor/watchtower/pkg/session"
 	"github.com/nicholas-fedor/watchtower/pkg/types"
 )
-
-type stubComposeApplier struct {
-	reqs []compose.Request
-	out  []compose.Container
-	err  error
-}
-
-func (s *stubComposeApplier) Apply(_ context.Context, req compose.Request) ([]compose.Container, error) {
-	s.reqs = append(s.reqs, req)
-
-	return s.out, s.err
-}
 
 func writeComposeProjectDir() string {
 	dir := ginkgo.GinkgoT().TempDir()
@@ -248,6 +238,7 @@ var _ = ginkgo.Describe("gitSession", ginkgo.Label("git-session"), func() {
 
 		ginkgo.It("skips containers that are not stale or have no stored stale result", func() {
 			sess := newGitSession(gitTestClient())
+			sess.apply = mockCompose.NewMockApplier(ginkgo.GinkgoT())
 			fresh := gitAssociatedContainer("fresh", "/fresh", "myapp:latest", nil)
 			staleNoResult := gitAssociatedContainer("none", "/none", "myapp:latest", nil)
 			staleFreshResult := gitAssociatedContainer("stored", "/stored", "myapp:latest", nil)
@@ -266,6 +257,7 @@ var _ = ginkgo.Describe("gitSession", ginkgo.Label("git-session"), func() {
 
 		ginkgo.It("skips monitor-only and no-pull containers", func() {
 			sess := newGitSession(gitTestClient())
+			sess.apply = mockCompose.NewMockApplier(ginkgo.GinkgoT())
 			monitor := gitAssociatedContainer("mon", "/mon", "myapp:latest", map[string]string{
 				"com.centurylinklabs.watchtower.monitor-only": "true",
 			})
@@ -288,6 +280,7 @@ var _ = ginkgo.Describe("gitSession", ginkgo.Label("git-session"), func() {
 
 		ginkgo.It("records a failed build and unmarks the container stale", func() {
 			sess := newGitSession(gitTestClient())
+			sess.apply = mockCompose.NewMockApplier(ginkgo.GinkgoT())
 			c := gitAssociatedContainer("fail", "/fail", "myapp:latest", nil)
 			c.SetStale(true)
 			sess.store(c.ID(), git.CheckResult{Stale: true, Commit: ""})
@@ -302,6 +295,7 @@ var _ = ginkgo.Describe("gitSession", ginkgo.Label("git-session"), func() {
 
 		ginkgo.It("builds a stale associated container", func() {
 			sess := newGitSession(gitTestClient())
+			sess.apply = mockCompose.NewMockApplier(ginkgo.GinkgoT())
 			c := gitAssociatedContainer("ok", "/ok", "myapp:latest", nil)
 			c.SetStale(true)
 			sess.store(c.ID(), git.CheckResult{Stale: true, Commit: "0123456789abcdef0123456789abcdef01234567", Tag: "v1.0.0"})
@@ -502,12 +496,21 @@ var _ = ginkgo.Describe("gitSession", ginkgo.Label("git-session"), func() {
 	ginkgo.Describe("compose apply", func() {
 		ginkgo.It("checkouts once and applies stale services that share a project dir", func() {
 			dir := writeComposeProjectDir()
-			applier := &stubComposeApplier{
-				out: []compose.Container{
+			applier := mockCompose.NewMockApplier(ginkgo.GinkgoT())
+
+			var got compose.Request
+
+			applier.EXPECT().
+				Apply(mock.Anything, mock.Anything).
+				Run(func(_ context.Context, req compose.Request) {
+					got = req
+				}).
+				Return([]compose.Container{
 					{Service: "api", ID: "new-api", ImageID: "sha256:api"},
 					{Service: "worker", ID: "new-worker", ImageID: "sha256:worker"},
-				},
-			}
+				}, nil).
+				Once()
+
 			sess := newGitSession(gitTestClient())
 			sess.apply = applier
 
@@ -556,11 +559,10 @@ var _ = ginkgo.Describe("gitSession", ginkgo.Label("git-session"), func() {
 
 			gomega.Expect(failed).To(gomega.BeEmpty())
 			gomega.Expect(checkouts).To(gomega.Equal(1))
-			gomega.Expect(applier.reqs).To(gomega.HaveLen(1))
-			gomega.Expect(applier.reqs[0].Ref.Dir).To(gomega.Equal(dir))
-			gomega.Expect(applier.reqs[0].Services).To(gomega.ConsistOf("api", "worker"))
-			gomega.Expect(applier.reqs[0].BuildOnly).To(gomega.BeFalse())
-			gomega.Expect(applier.reqs[0].Labels["api"][gitPkg.LastCommitLabel]).To(gomega.Equal(result.Commit))
+			gomega.Expect(got.Ref.Dir).To(gomega.Equal(dir))
+			gomega.Expect(got.Services).To(gomega.ConsistOf("api", "worker"))
+			gomega.Expect(got.BuildOnly).To(gomega.BeFalse())
+			gomega.Expect(got.Labels["api"][gitPkg.LastCommitLabel]).To(gomega.Equal(result.Commit))
 			gomega.Expect(sess.applied).To(gomega.HaveKey(api.ID()))
 			gomega.Expect(sess.applied).To(gomega.HaveKey(worker.ID()))
 			gomega.Expect(sess.skipRecreate(api, types.UpdateParams{})).To(gomega.BeTrue())
@@ -568,7 +570,7 @@ var _ = ginkgo.Describe("gitSession", ginkgo.Label("git-session"), func() {
 
 		ginkgo.It("uses a remote Git build when compose-dir is unset", func() {
 			sess := newGitSession(gitTestClient())
-			applier := &stubComposeApplier{}
+			applier := mockCompose.NewMockApplier(ginkgo.GinkgoT())
 			sess.apply = applier
 			c := gitAssociatedContainer("ok", "/ok", "myapp:latest", nil)
 			c.SetStale(true)
@@ -579,14 +581,13 @@ var _ = ginkgo.Describe("gitSession", ginkgo.Label("git-session"), func() {
 			sess.prepareRebuilds(gitTestLogger(), ginkgo.GinkgoT().Context(), docker, []types.Container{c}, types.UpdateParams{EnableGitMonitoring: true}, nil, failed)
 
 			gomega.Expect(failed).To(gomega.BeEmpty())
-			gomega.Expect(applier.reqs).To(gomega.BeEmpty())
 			gomega.Expect(sess.built).To(gomega.HaveKey(c.ID()))
 			gomega.Expect(sess.applied).To(gomega.BeEmpty())
 		})
 
 		ginkgo.It("fails when compose-dir is set but the path is not a compose project", func() {
 			missing := filepath.Join(ginkgo.GinkgoT().TempDir(), "missing")
-			applier := &stubComposeApplier{}
+			applier := mockCompose.NewMockApplier(ginkgo.GinkgoT())
 			sess := newGitSession(gitTestClient())
 			sess.apply = applier
 
@@ -603,14 +604,13 @@ var _ = ginkgo.Describe("gitSession", ginkgo.Label("git-session"), func() {
 
 			gomega.Expect(failed[c.ID()]).To(gomega.MatchError(compose.ErrProjectDir))
 			gomega.Expect(c.IsStale()).To(gomega.BeFalse())
-			gomega.Expect(applier.reqs).To(gomega.BeEmpty())
 			gomega.Expect(sess.built).To(gomega.BeEmpty())
 		})
 
 		ginkgo.It("fails a compose container that has no service label", func() {
 			dir := writeComposeProjectDir()
 			sess := newGitSession(gitTestClient())
-			sess.apply = &stubComposeApplier{}
+			sess.apply = mockCompose.NewMockApplier(ginkgo.GinkgoT())
 			c := gitAssociatedContainer("api", "/api", "webstack-api:latest", map[string]string{
 				gitPkg.ComposeDirLabel: dir,
 			})
@@ -627,7 +627,7 @@ var _ = ginkgo.Describe("gitSession", ginkgo.Label("git-session"), func() {
 
 		ginkgo.It("aborts the project when checkout fails", func() {
 			dir := writeComposeProjectDir()
-			applier := &stubComposeApplier{}
+			applier := mockCompose.NewMockApplier(ginkgo.GinkgoT())
 			sess := newGitSession(gitTestClient())
 			sess.apply = applier
 			sess.checkout = func(context.Context, string, string, project.CheckoutOptions) error {
@@ -647,12 +647,16 @@ var _ = ginkgo.Describe("gitSession", ginkgo.Label("git-session"), func() {
 
 			gomega.Expect(failed[c.ID()]).To(gomega.MatchError(project.ErrDirty))
 			gomega.Expect(c.IsStale()).To(gomega.BeFalse())
-			gomega.Expect(applier.reqs).To(gomega.BeEmpty())
 		})
 
 		ginkgo.It("unmarks stale containers when compose apply fails", func() {
 			dir := writeComposeProjectDir()
-			applier := &stubComposeApplier{err: context.Canceled}
+			applier := mockCompose.NewMockApplier(ginkgo.GinkgoT())
+			applier.EXPECT().
+				Apply(mock.Anything, mock.Anything).
+				Return(nil, context.Canceled).
+				Once()
+
 			sess := newGitSession(gitTestClient())
 			sess.apply = applier
 			sess.checkout = func(context.Context, string, string, project.CheckoutOptions) error {
@@ -677,9 +681,12 @@ var _ = ginkgo.Describe("gitSession", ginkgo.Label("git-session"), func() {
 
 		ginkgo.It("fails a service omitted from the compose apply result", func() {
 			dir := writeComposeProjectDir()
-			applier := &stubComposeApplier{
-				out: []compose.Container{{Service: "api", ID: "new-api", ImageID: "sha256:api"}},
-			}
+			applier := mockCompose.NewMockApplier(ginkgo.GinkgoT())
+			applier.EXPECT().
+				Apply(mock.Anything, mock.Anything).
+				Return([]compose.Container{{Service: "api", ID: "new-api", ImageID: "sha256:api"}}, nil).
+				Once()
+
 			sess := newGitSession(gitTestClient())
 			sess.apply = applier
 			sess.checkout = func(context.Context, string, string, project.CheckoutOptions) error {
@@ -715,9 +722,18 @@ var _ = ginkgo.Describe("gitSession", ginkgo.Label("git-session"), func() {
 
 		ginkgo.It("builds only when no-restart is set", func() {
 			dir := writeComposeProjectDir()
-			applier := &stubComposeApplier{
-				out: []compose.Container{{Service: "api", ImageID: "sha256:built"}},
-			}
+			applier := mockCompose.NewMockApplier(ginkgo.GinkgoT())
+
+			var got compose.Request
+
+			applier.EXPECT().
+				Apply(mock.Anything, mock.Anything).
+				Run(func(_ context.Context, req compose.Request) {
+					got = req
+				}).
+				Return([]compose.Container{{Service: "api", ImageID: "sha256:built"}}, nil).
+				Once()
+
 			sess := newGitSession(gitTestClient())
 			sess.apply = applier
 			sess.checkout = func(context.Context, string, string, project.CheckoutOptions) error {
@@ -744,7 +760,7 @@ var _ = ginkgo.Describe("gitSession", ginkgo.Label("git-session"), func() {
 			)
 
 			gomega.Expect(failed).To(gomega.BeEmpty())
-			gomega.Expect(applier.reqs[0].BuildOnly).To(gomega.BeTrue())
+			gomega.Expect(got.BuildOnly).To(gomega.BeTrue())
 			gomega.Expect(sess.applied).To(gomega.BeEmpty())
 			gomega.Expect(sess.built[c.ID()]).To(gomega.Equal(types.ImageID("sha256:built")))
 			gomega.Expect(sess.skipRecreate(c, types.UpdateParams{NoRestart: true})).To(gomega.BeTrue())
@@ -754,6 +770,7 @@ var _ = ginkgo.Describe("gitSession", ginkgo.Label("git-session"), func() {
 			dir := writeComposeProjectDir()
 			checkedOut := false
 			sess := newGitSession(gitTestClient())
+			sess.apply = mockCompose.NewMockApplier(ginkgo.GinkgoT())
 			sess.checkout = func(context.Context, string, string, project.CheckoutOptions) error {
 				checkedOut = true
 
@@ -768,6 +785,7 @@ var _ = ginkgo.Describe("gitSession", ginkgo.Label("git-session"), func() {
 				gitPkg.ComposeDirLabel:      dir,
 				compose.ComposeServiceLabel: "worker",
 			})
+
 			api.SetStale(true)
 			worker.SetStale(true)
 			sess.store(api.ID(), git.CheckResult{Stale: true, Commit: "aaa"})
@@ -786,12 +804,21 @@ var _ = ginkgo.Describe("gitSession", ginkgo.Label("git-session"), func() {
 
 		ginkgo.It("stamps each service from its own tag", func() {
 			dir := writeComposeProjectDir()
-			applier := &stubComposeApplier{
-				out: []compose.Container{
+			applier := mockCompose.NewMockApplier(ginkgo.GinkgoT())
+
+			var got compose.Request
+
+			applier.EXPECT().
+				Apply(mock.Anything, mock.Anything).
+				Run(func(_ context.Context, req compose.Request) {
+					got = req
+				}).
+				Return([]compose.Container{
 					{Service: "api", ID: "new-api", ImageID: "sha256:api"},
 					{Service: "worker", ID: "new-worker", ImageID: "sha256:worker"},
-				},
-			}
+				}, nil).
+				Once()
+
 			sess := newGitSession(gitTestClient())
 			sess.apply = applier
 			sess.checkout = func(context.Context, string, string, project.CheckoutOptions) error {
@@ -806,6 +833,7 @@ var _ = ginkgo.Describe("gitSession", ginkgo.Label("git-session"), func() {
 				gitPkg.ComposeDirLabel:      dir,
 				compose.ComposeServiceLabel: "worker",
 			})
+
 			api.SetStale(true)
 			worker.SetStale(true)
 			sess.store(api.ID(), git.CheckResult{Stale: true, Commit: "abc", Tag: "v1.2.3"})
@@ -816,21 +844,29 @@ var _ = ginkgo.Describe("gitSession", ginkgo.Label("git-session"), func() {
 			sess.prepareRebuilds(gitTestLogger(), ginkgo.GinkgoT().Context(), docker, []types.Container{api, worker}, types.UpdateParams{EnableGitMonitoring: true}, nil, failed)
 
 			gomega.Expect(failed).To(gomega.BeEmpty())
-			gomega.Expect(applier.reqs).To(gomega.HaveLen(1))
-			gomega.Expect(applier.reqs[0].Labels["api"][gitPkg.LastTagLabel]).To(gomega.Equal("v1.2.3"))
-			gomega.Expect(applier.reqs[0].Labels["worker"][gitPkg.LastTagLabel]).To(gomega.Equal("v1.2.4"))
+			gomega.Expect(got.Labels["api"][gitPkg.LastTagLabel]).To(gomega.Equal("v1.2.3"))
+			gomega.Expect(got.Labels["worker"][gitPkg.LastTagLabel]).To(gomega.Equal("v1.2.4"))
 			gomega.Expect(sess.applied).To(gomega.HaveKey(api.ID()))
 			gomega.Expect(sess.applied).To(gomega.HaveKey(worker.ID()))
 		})
 
 		ginkgo.It("marks every replica of a service applied", func() {
 			dir := writeComposeProjectDir()
-			applier := &stubComposeApplier{
-				out: []compose.Container{
+			applier := mockCompose.NewMockApplier(ginkgo.GinkgoT())
+
+			var got compose.Request
+
+			applier.EXPECT().
+				Apply(mock.Anything, mock.Anything).
+				Run(func(_ context.Context, req compose.Request) {
+					got = req
+				}).
+				Return([]compose.Container{
 					{Service: "api", Name: "/web-1", ID: "new-1", ImageID: "sha256:api"},
 					{Service: "api", Name: "/web-2", ID: "new-2", ImageID: "sha256:api"},
-				},
-			}
+				}, nil).
+				Once()
+
 			sess := newGitSession(gitTestClient())
 			sess.apply = applier
 			sess.checkout = func(context.Context, string, string, project.CheckoutOptions) error {
@@ -845,8 +881,10 @@ var _ = ginkgo.Describe("gitSession", ginkgo.Label("git-session"), func() {
 				gitPkg.ComposeDirLabel:      dir,
 				compose.ComposeServiceLabel: "api",
 			})
+
 			one.SetStale(true)
 			two.SetStale(true)
+
 			result := git.CheckResult{Stale: true, Commit: "abc"}
 			sess.store(one.ID(), result)
 			sess.store(two.ID(), result)
@@ -856,19 +894,21 @@ var _ = ginkgo.Describe("gitSession", ginkgo.Label("git-session"), func() {
 			sess.prepareRebuilds(gitTestLogger(), ginkgo.GinkgoT().Context(), docker, []types.Container{one, two}, types.UpdateParams{EnableGitMonitoring: true}, nil, failed)
 
 			gomega.Expect(failed).To(gomega.BeEmpty())
-			gomega.Expect(applier.reqs).To(gomega.HaveLen(1))
-			gomega.Expect(applier.reqs[0].Services).To(gomega.Equal([]string{"api"}))
+			gomega.Expect(got.Services).To(gomega.Equal([]string{"api"}))
 			gomega.Expect(sess.applied).To(gomega.HaveKey(one.ID()))
 			gomega.Expect(sess.applied).To(gomega.HaveKey(two.ID()))
 		})
 
 		ginkgo.It("does not apply a replica compose did not identify", func() {
 			dir := writeComposeProjectDir()
-			applier := &stubComposeApplier{
-				out: []compose.Container{
+			applier := mockCompose.NewMockApplier(ginkgo.GinkgoT())
+			applier.EXPECT().
+				Apply(mock.Anything, mock.Anything).
+				Return([]compose.Container{
 					{Service: "api", Name: "web-1", ID: "new-1", ImageID: "sha256:api"},
-				},
-			}
+				}, nil).
+				Once()
+
 			sess := newGitSession(gitTestClient())
 			sess.apply = applier
 			sess.checkout = func(context.Context, string, string, project.CheckoutOptions) error {
@@ -883,8 +923,10 @@ var _ = ginkgo.Describe("gitSession", ginkgo.Label("git-session"), func() {
 				gitPkg.ComposeDirLabel:      dir,
 				compose.ComposeServiceLabel: "api",
 			})
+
 			one.SetStale(true)
 			two.SetStale(true)
+
 			result := git.CheckResult{Stale: true, Commit: "abc"}
 			sess.store(one.ID(), result)
 			sess.store(two.ID(), result)
@@ -937,13 +979,16 @@ var _ = ginkgo.Describe("gitSession", ginkgo.Label("git-session"), func() {
 				[]string{"/app:app"},
 				nil,
 			)
+
 			app.SetStale(true)
 			containers := []types.Container{app, db}
 			UpdateImplicitRestart(log, containers, containers, false)
 			gomega.Expect(db.IsLinkedToRestarting()).To(gomega.BeTrue())
 
 			app.SetStale(false)
+
 			got := reconcileImplicitRestarts(log, containers, containers, types.UpdateParams{})
+
 			gomega.Expect(db.IsLinkedToRestarting()).To(gomega.BeFalse())
 			gomega.Expect(got).To(gomega.BeEmpty())
 		})
@@ -966,9 +1011,11 @@ var _ = ginkgo.Describe("gitSession", ginkgo.Label("git-session"), func() {
 				[]string{"/app:app"},
 				nil,
 			)
+
 			app.SetStale(true)
 			containers := []types.Container{app, db}
 			got := reconcileImplicitRestarts(log, containers, containers, types.UpdateParams{})
+
 			gomega.Expect(db.IsLinkedToRestarting()).To(gomega.BeTrue())
 			gomega.Expect(got).To(gomega.ConsistOf(app, db))
 		})
