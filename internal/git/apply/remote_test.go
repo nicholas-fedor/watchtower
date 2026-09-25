@@ -69,6 +69,41 @@ func TestRemoteContextRejectsInvalidInput(t *testing.T) {
 	assert.Equal(t, "https://github.com:8443/org/app.git#abc123", got)
 }
 
+// TestRemoteContextInvalidRemoteDoesNotExposeCredentials verifies that invalid remote errors omit repository credentials.
+func TestRemoteContextInvalidRemoteDoesNotExposeCredentials(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name    string
+		remote  string
+		secrets []string
+	}{
+		{
+			name:    "malformed HTTPS",
+			remote:  "https://audit-user:https-password@git.example.com/%zz?token=https-query-secret",
+			secrets: []string{"audit-user", "https-password", "https-query-secret"},
+		},
+		{
+			name:    "HTTPS without host",
+			remote:  "https://audit-user:https-password@/org/app.git?token=https-query-secret",
+			secrets: []string{"audit-user", "https-password", "https-query-secret"},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			_, err := RemoteContext(tt.remote, "abc123", "")
+			require.ErrorIs(t, err, ErrRemoteInvalid)
+
+			for _, secret := range tt.secrets {
+				assert.NotContains(t, err.Error(), secret)
+			}
+		})
+	}
+}
+
 func TestWithAuth(t *testing.T) {
 	t.Parallel()
 
@@ -92,6 +127,33 @@ func TestWithAuth(t *testing.T) {
 
 	_, err = WithAuth("://", "git", "secret")
 	require.Error(t, err)
+}
+
+// TestWithAuthErrorsDoNotExposeRemoteCredentials verifies that authentication errors omit remote credentials for unsupported or malformed URLs.
+func TestWithAuthErrorsDoNotExposeRemoteCredentials(t *testing.T) {
+	t.Parallel()
+
+	t.Run("malformed HTTPS", func(t *testing.T) {
+		t.Parallel()
+
+		remote := "https://audit-user:https-password@git.example.com/%zz?token=https-query-secret"
+		_, err := WithAuth(remote, "git", "secret")
+		require.Error(t, err)
+		assert.NotContains(t, err.Error(), "audit-user")
+		assert.NotContains(t, err.Error(), "https-password")
+		assert.NotContains(t, err.Error(), "https-query-secret")
+	})
+
+	t.Run("SCP", func(t *testing.T) {
+		t.Parallel()
+
+		remote := "audit-user:scp-password@git.example.com:org/app.git?token=scp-query-secret"
+		_, err := WithAuth(remote, "git", "secret")
+		require.ErrorIs(t, err, ErrNeedsHTTPS)
+		assert.NotContains(t, err.Error(), "audit-user")
+		assert.NotContains(t, err.Error(), "scp-password")
+		assert.NotContains(t, err.Error(), "scp-query-secret")
+	})
 }
 
 func TestSafeRelPath(t *testing.T) {

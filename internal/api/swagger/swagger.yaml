@@ -1,6 +1,59 @@
 basePath: /
 consumes:
 - application/json
+definitions:
+  check.CheckResponse:
+    properties:
+      api_version:
+        type: string
+      containers:
+        items:
+          $ref: '#/definitions/check.ContainerCheck'
+        type: array
+      count:
+        type: integer
+      timestamp:
+        type: string
+    type: object
+  check.ContainerCheck:
+    properties:
+      changelog:
+        type: string
+      digest:
+        type: string
+      documentation:
+        type: string
+      error:
+        type: string
+      git_commit:
+        type: string
+      git_ref:
+        type: string
+      git_repo:
+        type: string
+      image:
+        type: string
+      image_id:
+        type: string
+      image_url:
+        type: string
+      latest_digest:
+        type: string
+      latest_image_id:
+        type: string
+      name:
+        type: string
+      oci_source:
+        type: string
+      revision:
+        type: string
+      timestamp:
+        type: string
+      update_available:
+        type: boolean
+      update_source:
+        type: string
+    type: object
 host: localhost:8080
 info:
   contact:
@@ -91,8 +144,7 @@ paths:
         "200":
           description: Container update availability results
           schema:
-            additionalProperties: true
-            type: object
+            $ref: '#/definitions/check.CheckResponse'
         "401":
           description: Missing or invalid API token
           schema:

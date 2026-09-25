@@ -90,6 +90,7 @@ func labelValue(labels map[string]string, key string) string {
 }
 
 // configFiles splits Compose's config_files label into paths inside dir.
+// Absolute host paths under Compose's working_dir are rebased onto dir.
 //
 // Parameters:
 //   - labels: Container labels.
@@ -106,13 +107,24 @@ func configFiles(labels map[string]string, dir string) ([]string, error) {
 
 	var out []string
 
+	workingDir := labelValue(labels, ComposeWorkingDirLabel)
+
 	for part := range strings.SplitSeq(raw, ",") {
 		part = strings.TrimSpace(part)
 		if part == "" {
 			continue
 		}
 
-		cleaned, err := containedConfigFile(dir, part)
+		var (
+			cleaned string
+			err     error
+		)
+		if workingDir == "" {
+			cleaned, err = containedConfigFile(dir, part)
+		} else {
+			cleaned, err = resolveConfigFile(dir, workingDir, part)
+		}
+
 		if err != nil {
 			return nil, err
 		}
@@ -133,29 +145,97 @@ func configFiles(labels map[string]string, dir string) ([]string, error) {
 //   - string: Absolute or joined path inside dir.
 //   - error: ErrConfigFile when part escapes dir.
 func containedConfigFile(dir, part string) (string, error) {
-	var cleaned string
+	return resolveConfigFile(dir, "", part)
+}
+
+// resolveConfigFile resolves a config path within the mounted project or maps
+// an absolute host path from workingDir into the mounted project.
+//
+// Parameters:
+//   - dir: Project directory inside Watchtower.
+//   - workingDir: Optional Compose working directory on the host.
+//   - part: One config_files entry.
+//
+// Returns:
+//   - string: Resolved path inside dir.
+//   - error: ErrConfigFile when the entry is invalid or escapes the project.
+func resolveConfigFile(dir, workingDir, part string) (string, error) {
+	mountDir, err := filepath.Abs(filepath.Clean(dir))
+	if err != nil {
+		return "", fmt.Errorf("%w: %s", ErrConfigFile, dir)
+	}
 
 	if !filepath.IsAbs(part) {
 		if !filepath.IsLocal(part) {
 			return "", fmt.Errorf("%w: %s", ErrConfigFile, part)
 		}
 
-		cleaned = filepath.Join(dir, part)
-	} else {
-		rel, err := filepath.Rel(dir, filepath.Clean(part))
-		if err != nil || !filepath.IsLocal(rel) {
+		cleaned, err := filepath.Abs(filepath.Join(mountDir, part))
+		if err != nil {
 			return "", fmt.Errorf("%w: %s", ErrConfigFile, part)
 		}
 
-		cleaned = filepath.Clean(part)
+		return checkedConfigFile(mountDir, cleaned)
 	}
 
-	err := symlinkEscapes(dir, cleaned)
+	hostPath, err := filepath.Abs(filepath.Clean(part))
+	if err != nil {
+		return "", fmt.Errorf("%w: %s", ErrConfigFile, part)
+	}
+
+	if pathWithin(mountDir, hostPath) {
+		return checkedConfigFile(mountDir, hostPath)
+	}
+
+	if workingDir == "" || !filepath.IsAbs(workingDir) {
+		return "", fmt.Errorf("%w: %s", ErrConfigFile, part)
+	}
+
+	hostRoot, err := filepath.Abs(filepath.Clean(workingDir))
+	if err != nil {
+		return "", fmt.Errorf("%w: %s", ErrConfigFile, workingDir)
+	}
+
+	rel, err := filepath.Rel(hostRoot, hostPath)
+	if err != nil || !filepath.IsLocal(rel) {
+		return "", fmt.Errorf("%w: %s", ErrConfigFile, part)
+	}
+
+	mountPath := filepath.Join(mountDir, rel)
+
+	return checkedConfigFile(mountDir, mountPath)
+}
+
+// checkedConfigFile verifies that path remains inside dir after symlink resolution.
+//
+// Parameters:
+//   - dir: Project directory.
+//   - path: Candidate compose file.
+//
+// Returns:
+//   - string: The verified path.
+//   - error: ErrConfigFile when the path resolves outside dir.
+func checkedConfigFile(dir, path string) (string, error) {
+	err := symlinkEscapes(dir, path)
 	if err != nil {
 		return "", err
 	}
 
-	return cleaned, nil
+	return path, nil
+}
+
+// pathWithin reports whether path is within dir according to lexical path comparison.
+//
+// Parameters:
+//   - dir: Container project directory.
+//   - path: Path to compare.
+//
+// Returns:
+//   - bool: True when path is local to dir.
+func pathWithin(dir, path string) bool {
+	rel, err := filepath.Rel(dir, path)
+
+	return err == nil && filepath.IsLocal(rel)
 }
 
 // symlinkEscapes reports whether path exists and resolves outside dir.

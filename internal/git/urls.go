@@ -7,6 +7,8 @@ import (
 	"net/url"
 	"strings"
 	"time"
+
+	"github.com/nicholas-fedor/watchtower/pkg/types"
 )
 
 // applyAuth sets Bearer or basic credentials on req.
@@ -31,7 +33,18 @@ func (c *Client) applyAuth(req *http.Request, cloneHost string) {
 	}
 
 	if c.opts.Token != "" {
-		req.Header.Set("Authorization", "Bearer "+c.opts.Token)
+		scheme := "Bearer"
+
+		kind := types.ResolveGitHostKind(cloneHost, c.opts.Hosts)
+		if kind == "" && isGiteaAPIPath(req.URL.Path) {
+			kind = types.GitHostGitea
+		}
+
+		if kind == types.GitHostGitea {
+			scheme = "token"
+		}
+
+		req.Header.Set("Authorization", scheme+" "+c.opts.Token)
 
 		return
 	}
@@ -39,6 +52,191 @@ func (c *Client) applyAuth(req *http.Request, cloneHost string) {
 	if c.opts.Username != "" || c.opts.Password != "" {
 		req.SetBasicAuth(c.opts.Username, c.opts.Password)
 	}
+}
+
+// isGiteaAPIPath reports whether path contains the Gitea API v1 prefix.
+//
+// Parameters:
+//   - path: HTTP request path.
+//
+// Returns:
+//   - bool: True when the path contains the Gitea API v1 prefix.
+func isGiteaAPIPath(path string) bool {
+	parts := strings.Split(strings.Trim(path, "/"), "/")
+	for i := 0; i+1 < len(parts); i++ {
+		if parts[i] == "api" && parts[i+1] == "v1" {
+			return true
+		}
+	}
+
+	return false
+}
+
+// sanitizeRepository removes credentials and repository details from raw.
+//
+// Parameters:
+//   - raw: Repository URL, SCP-style remote, or local path.
+//
+// Returns:
+//   - string: Safe repository identifier, or empty when raw cannot be sanitized.
+func sanitizeRepository(raw string) string {
+	raw = strings.TrimSpace(raw)
+	if raw == "" {
+		return ""
+	}
+
+	if strings.HasPrefix(raw, "git@") {
+		return sanitizeSCPRepository(raw)
+	}
+
+	if !strings.Contains(raw, "://") {
+		if strings.Contains(raw, "@") && strings.Contains(raw, ":") {
+			return ""
+		}
+
+		return stripRepositoryDetails(raw)
+	}
+
+	parsed, err := url.Parse(raw)
+	if err != nil || parsed.Scheme == "" || (parsed.Host == "" && parsed.Scheme != "file") {
+		return ""
+	}
+
+	parsed.User = nil
+	parsed.RawQuery = ""
+	parsed.ForceQuery = false
+	parsed.Fragment = ""
+	parsed.RawFragment = ""
+
+	return parsed.String()
+}
+
+// sanitizeSCPRepository removes details from an SCP-style remote.
+//
+// Parameters:
+//   - raw: SCP-style repository remote.
+//
+// Returns:
+//   - string: Sanitized remote, or empty when its host or path is invalid.
+func sanitizeSCPRepository(raw string) string {
+	raw = stripRepositoryDetails(raw)
+
+	_, remote, found := strings.Cut(raw, "@")
+	if !found {
+		return ""
+	}
+
+	separator := strings.LastIndexByte(remote, ':')
+	if separator <= 0 || separator == len(remote)-1 {
+		return ""
+	}
+
+	host := remote[:separator]
+	path := remote[separator+1:]
+
+	parsedHost, err := url.Parse("//" + host)
+	if err != nil || parsedHost.Host == "" || parsedHost.User != nil || parsedHost.Path != "" {
+		return ""
+	}
+
+	return "git@" + host + ":" + path
+}
+
+// stripRepositoryDetails removes query and fragment details from raw.
+//
+// Parameters:
+//   - raw: Repository URL, SCP-style remote, or local path.
+//
+// Returns:
+//   - string: Value without query or fragment details.
+func stripRepositoryDetails(raw string) string {
+	raw, _, _ = strings.Cut(raw, "#")
+	raw, _, _ = strings.Cut(raw, "?")
+
+	return raw
+}
+
+// sanitizeRepositoryMessage replaces repository details and secrets in message.
+//
+// Parameters:
+//   - raw: Repository value whose details must be removed.
+//   - message: Error message to sanitize.
+//
+// Returns:
+//   - string: Message with repository secrets redacted.
+func sanitizeRepositoryMessage(raw, message string) string {
+	replacement := sanitizeRepository(raw)
+	if replacement == "" {
+		return "remote operation failed"
+	}
+
+	const repositoryPlaceholder = "\x00watchtower-git-repository\x00"
+
+	message = strings.ReplaceAll(message, raw, repositoryPlaceholder)
+	for _, secret := range repositorySecrets(raw) {
+		message = strings.ReplaceAll(message, secret, "redacted")
+	}
+
+	return strings.ReplaceAll(message, repositoryPlaceholder, replacement)
+}
+
+// repositorySecrets extracts credential-like values from raw repository details.
+//
+// Parameters:
+//   - raw: Repository value to inspect for sensitive details.
+//
+// Returns:
+//   - []string: Non-empty values that may be sensitive in a remote error.
+func repositorySecrets(raw string) []string {
+	var secrets []string
+
+	_, rawQuery, hasQuery := strings.Cut(raw, "?")
+	if hasQuery {
+		rawQuery, _, _ = strings.Cut(rawQuery, "#")
+
+		values, err := url.ParseQuery(rawQuery)
+		if err == nil {
+			for _, params := range values {
+				for _, secret := range params {
+					if secret != "" {
+						secrets = append(secrets, secret)
+					}
+				}
+			}
+		}
+	}
+
+	_, rawFragment, hasFragment := strings.Cut(raw, "#")
+	if hasFragment && rawFragment != "" {
+		secrets = append(secrets, rawFragment)
+
+		unescaped, err := url.QueryUnescape(rawFragment)
+		if err == nil && unescaped != "" {
+			secrets = append(secrets, unescaped)
+		}
+	}
+
+	parsed, err := url.Parse(raw)
+	if err != nil {
+		return secrets
+	}
+
+	if parsed.User != nil {
+		password, hasPassword := parsed.User.Password()
+		if hasPassword && password != "" {
+			if user := parsed.User.String(); user != "" {
+				secrets = append(secrets, user)
+			}
+
+			if username := parsed.User.Username(); username != "" {
+				secrets = append(secrets, username)
+			}
+
+			secrets = append(secrets, password)
+		}
+	}
+
+	return secrets
 }
 
 // credentialHostAllowed reports whether a process credential may be sent to requestHost.
@@ -223,7 +421,11 @@ func newGitHTTPClient(timeout time.Duration, insecure bool, caPEM []byte) *http.
 	}
 
 	if len(caPEM) > 0 {
-		pool := x509.NewCertPool()
+		pool, err := x509.SystemCertPool()
+		if err != nil || pool == nil {
+			pool = x509.NewCertPool()
+		}
+
 		if pool.AppendCertsFromPEM(caPEM) {
 			cfg.RootCAs = pool
 		}

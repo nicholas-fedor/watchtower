@@ -232,6 +232,58 @@ var _ = ginkgo.Describe("Git wrappers", func() {
 			}))
 		})
 
+		ginkgo.It("preserves bare local repository paths in labels", func() {
+			c := MockContainer()
+			ApplyGitAssociation(c, GitAssociation{Repo: "../repos/app", Ref: "main"}, true)
+
+			repo, ok := c.GetLabel(git.RepoLabel)
+			gomega.Expect(ok).To(gomega.BeTrue())
+			gomega.Expect(repo).To(gomega.Equal("../repos/app"))
+		})
+
+		ginkgo.It("preserves SSH identities and benign local path queries", func() {
+			sshContainer := MockContainer()
+			ApplyGitAssociation(sshContainer, GitAssociation{Repo: "ssh://git@git.example.com/org/app.git"}, true)
+			sshRepo, ok := sshContainer.GetLabel(git.RepoLabel)
+			gomega.Expect(ok).To(gomega.BeTrue())
+			gomega.Expect(sshRepo).To(gomega.Equal("ssh://git@git.example.com/org/app.git"))
+
+			pathContainer := MockContainer()
+			ApplyGitAssociation(pathContainer, GitAssociation{Repo: "/srv/repos/app?release=1"}, true)
+			pathRepo, ok := pathContainer.GetLabel(git.RepoLabel)
+			gomega.Expect(ok).To(gomega.BeTrue())
+			gomega.Expect(pathRepo).To(gomega.Equal("/srv/repos/app?release=1"))
+		})
+
+		ginkgo.It("redacts credentials and query tokens before persisting labels", func() {
+			c := MockContainer()
+			ApplyGitAssociation(c, GitAssociation{
+				Repo: "https://user:secret@github.com/org/app.git?access_token=query#main",
+				Host: "https://git.example.com:3000?token=host-secret",
+				Ref:  "main",
+			}, true)
+
+			repo, ok := c.GetLabel(git.RepoLabel)
+			gomega.Expect(ok).To(gomega.BeTrue())
+			gomega.Expect(repo).To(gomega.Equal("https://github.com/org/app.git#main"))
+			gomega.Expect(repo).NotTo(gomega.ContainSubstring("secret"))
+
+			host, ok := c.GetLabel(git.HostLabel)
+			gomega.Expect(ok).To(gomega.BeTrue())
+			gomega.Expect(host).To(gomega.Equal("https://git.example.com:3000"))
+			gomega.Expect(host).NotTo(gomega.ContainSubstring("secret"))
+		})
+
+		ginkgo.It("removes association labels when a repository cannot be sanitized", func() {
+			c := MockContainer(WithLabels(map[string]string{
+				git.RepoLabel: "https://user:secret@github.com/org/app.git",
+			}))
+			ApplyGitAssociation(c, GitAssociation{Repo: "://invalid"}, true)
+
+			_, ok := c.GetLabel(git.RepoLabel)
+			gomega.Expect(ok).To(gomega.BeFalse())
+		})
+
 		ginkgo.It("omits empty optional fields and does not force watch", func() {
 			c := MockContainer()
 			c.SetLabel(git.RefLabel, "old")

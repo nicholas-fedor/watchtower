@@ -3,6 +3,7 @@ package actions
 import (
 	"context"
 	"fmt"
+	"slices"
 	"strings"
 	"sync"
 
@@ -16,6 +17,7 @@ import (
 	"github.com/nicholas-fedor/watchtower/pkg/container"
 	gitPkg "github.com/nicholas-fedor/watchtower/pkg/container/git"
 	"github.com/nicholas-fedor/watchtower/pkg/session"
+	"github.com/nicholas-fedor/watchtower/pkg/sorter"
 	"github.com/nicholas-fedor/watchtower/pkg/types"
 )
 
@@ -43,6 +45,27 @@ type composeMember struct {
 type composeBatch struct {
 	ref     compose.ProjectRef
 	members []composeMember
+}
+
+type composeBatchKey struct {
+	name        string
+	dir         string
+	configFiles string
+}
+
+// composeBatchKeyFor returns the identity used to group one Compose project batch.
+//
+// Parameters:
+//   - ref: Resolved Compose project reference.
+//
+// Returns:
+//   - composeBatchKey: Identity derived from the project name, directory, and config files.
+func composeBatchKeyFor(ref compose.ProjectRef) composeBatchKey {
+	return composeBatchKey{
+		name:        ref.Name,
+		dir:         ref.Dir,
+		configFiles: strings.Join(ref.ConfigFiles, "\x00"),
+	}
 }
 
 // newGitSession constructs an empty session for one Update() call.
@@ -167,7 +190,9 @@ func (s *gitSession) check(
 // Git labels alone use a Git URL context. The Docker daemon clones that URL.
 //
 // Failures are recorded in failed and those containers are unmarked stale so
-// the running instance is left untouched.
+// the current session does not stop them. Checkout and build failures leave the
+// running instance untouched. Compose apply failures report that Docker Compose
+// may have partially recreated the batch.
 //
 // Parameters:
 //   - log: Process logger.
@@ -195,9 +220,11 @@ func (s *gitSession) prepareRebuilds(
 
 	var remote []types.Container
 
-	batches := map[string]*composeBatch{}
+	ordered := orderedComposeContainers(log, containers, params.UseComposeDependsOn)
+	batches := make(map[composeBatchKey]*composeBatch)
+	orderedBatches := make([]*composeBatch, 0)
 
-	for _, c := range containers {
+	for _, c := range ordered {
 		if !s.needsApply(c, params) {
 			continue
 		}
@@ -223,16 +250,21 @@ func (s *gitSession) prepareRebuilds(
 			continue
 		}
 
-		batch := batches[ref.Dir]
-		if batch == nil {
+		key := composeBatchKeyFor(ref)
+
+		batch, ok := batches[key]
+		if !ok {
 			batch = &composeBatch{ref: ref}
-			batches[ref.Dir] = batch
+			batches[key] = batch
+			orderedBatches = append(orderedBatches, batch)
 		}
 
 		batch.members = append(batch.members, composeMember{container: c, result: result})
 	}
 
-	for _, batch := range batches {
+	orderedBatches = orderComposeBatches(log, orderedBatches, containers, params.UseComposeDependsOn)
+
+	for _, batch := range orderedBatches {
 		s.applyCompose(log, ctx, batch, params, progress, failed)
 	}
 
@@ -251,6 +283,150 @@ func (s *gitSession) prepareRebuilds(
 				Msg("Git build failed. Leaving running container untouched")
 		}
 	}
+}
+
+// orderedComposeContainers returns a dependency-ordered copy of the containers.
+//
+// Parameters:
+//   - log: Process logger.
+//   - containers: Containers to order.
+//   - useComposeDependsOn: Whether to include Compose depends_on relationships when sorting.
+//
+// Returns:
+//   - []types.Container: Containers in dependency order, or a copy of the original order if sorting fails.
+func orderedComposeContainers(
+	log *zerolog.Logger,
+	containers []types.Container,
+	useComposeDependsOn bool,
+) []types.Container {
+	ordered := slices.Clone(containers)
+	if len(ordered) == 0 || len(ordered) == 1 {
+		return ordered
+	}
+
+	err := sorter.SortByDependencies(log, ordered, useComposeDependsOn)
+	if err != nil {
+		log.Warn().
+			Err(err).
+			Msg("Could not dependency-sort Compose batches. Using the existing container order")
+
+		return slices.Clone(containers)
+	}
+
+	return ordered
+}
+
+// orderComposeBatches orders project batches by cross-project dependencies.
+//
+// First-seen order is wrong when a project contains both an independent service
+// and a service that depends on another project. A batch runs after every batch
+// that contains a dependency of any of its members. Independent batches keep
+// their relative order. A sort failure leaves the existing order in place.
+//
+// Parameters:
+//   - log: Process logger.
+//   - batches: Batches in first-seen order.
+//   - containers: Containers used to resolve dependency links.
+//   - useComposeDependsOn: Whether to include Compose depends_on relationships.
+//
+// Returns:
+//   - []*composeBatch: Batches in dependency order.
+func orderComposeBatches(
+	log *zerolog.Logger,
+	batches []*composeBatch,
+	containers []types.Container,
+	useComposeDependsOn bool,
+) []*composeBatch {
+	const minBatchesToOrder = 2
+	if len(batches) < minBatchesToOrder {
+		return batches
+	}
+
+	dependencies, err := sorter.ContainerDependencies(log, containers, useComposeDependsOn)
+	if err != nil {
+		log.Warn().
+			Err(err).
+			Msg("Could not order Compose batches by dependencies. Using first-seen order")
+
+		return batches
+	}
+
+	batchOf := make(map[types.ContainerID]int, len(containers))
+
+	for i, batch := range batches {
+		for _, member := range batch.members {
+			batchOf[member.container.ID()] = i
+		}
+	}
+
+	indegree := make([]int, len(batches))
+	after := make([][]int, len(batches))
+	seen := make(map[[2]int]struct{})
+
+	for i, batch := range batches {
+		for _, member := range batch.members {
+			for _, dependencyID := range dependencies[member.container.ID()] {
+				predecessor, ok := batchOf[dependencyID]
+				if !ok || predecessor == i {
+					continue
+				}
+
+				edge := [2]int{predecessor, i}
+				if _, exists := seen[edge]; exists {
+					continue
+				}
+
+				seen[edge] = struct{}{}
+
+				after[predecessor] = append(after[predecessor], i)
+				indegree[i]++
+			}
+		}
+	}
+
+	ready := make([]int, 0, len(batches))
+
+	for i, degree := range indegree {
+		if degree == 0 {
+			ready = append(ready, i)
+		}
+	}
+
+	ordered := make([]*composeBatch, 0, len(batches))
+	for len(ready) > 0 {
+		pick := 0
+		for i := 1; i < len(ready); i++ {
+			if ready[i] < ready[pick] {
+				pick = i
+			}
+		}
+
+		current := ready[pick]
+		ready = append(ready[:pick], ready[pick+1:]...)
+		ordered = append(ordered, batches[current])
+
+		for _, next := range after[current] {
+			indegree[next]--
+			if indegree[next] == 0 {
+				ready = append(ready, next)
+			}
+		}
+	}
+
+	if len(ordered) == len(batches) {
+		return ordered
+	}
+
+	log.Warn().
+		Msg("Compose batch dependencies are cyclic. Appending unresolved batches in first-seen order")
+
+	for i, batch := range batches {
+		if indegree[i] > 0 {
+			ordered = append(ordered, batch)
+		}
+	}
+
+	return ordered
 }
 
 // needsApply reports whether c is a stale Git-associated container that may be rebuilt.
@@ -326,11 +502,14 @@ func (s *gitSession) buildOne(
 	tag := gitImageTag(originalName, result.Commit)
 	tags := []string{tag}
 
-	if originalName != "" && originalName != tag {
+	if originalName != "" && originalName != tag && validDockerTag(originalName) {
 		tags = append(tags, originalName)
 	}
 
-	imageID, err := docker.BuildRemoteImage(ctx, remote, dockerfile, tags)
+	buildCtx, cancel := s.client.WithTimeout(ctx)
+	defer cancel()
+
+	imageID, err := docker.BuildRemoteImage(buildCtx, remote, dockerfile, tags)
 	if err != nil {
 		return fmt.Errorf("build git image: %w", err)
 	}
@@ -495,6 +674,24 @@ func (s *gitSession) excludeNoRestart(
 	}
 
 	return kept
+}
+
+// validDockerTag reports whether imageName is a valid Docker reference without a digest.
+//
+// Parameters:
+//   - imageName: Docker image reference to validate.
+//
+// Returns:
+//   - bool: True when the reference is valid and does not use a digest.
+func validDockerTag(imageName string) bool {
+	ref, err := reference.ParseDockerRef(imageName)
+	if err != nil {
+		return false
+	}
+
+	_, isDigest := ref.(reference.Digested)
+
+	return !isDigest
 }
 
 // gitImageTag builds name:git-<shortsha> from the current image name.

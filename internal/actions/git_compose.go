@@ -2,7 +2,9 @@ package actions
 
 import (
 	"context"
+	"errors"
 	"fmt"
+	"net/url"
 	"strings"
 
 	"github.com/rs/zerolog"
@@ -21,7 +23,7 @@ import (
 // Parameters:
 //   - log: Process logger.
 //   - ctx: Cancellation and timeout.
-//   - batch: Containers that share one project directory.
+//   - batch: Containers that share one Compose project identity.
 //   - params: Update parameters including stash and no-restart.
 //   - progress: Session progress, or nil.
 //   - failed: Map to record per-container apply errors.
@@ -89,9 +91,35 @@ func (s *gitSession) applyCompose(
 		opts.CABundle, opts.InsecureSkipTLS = s.client.TLSSettings()
 	}
 
-	err = checkout(ctx, batch.ref.Dir, commit, opts)
+	var prior string
+
+	opts.Prior = &prior
+
+	checkoutCtx, cancelCheckout := s.client.WithTimeout(ctx)
+	err = checkout(checkoutCtx, batch.ref.Dir, commit, opts)
+
+	cancelCheckout()
+
 	if err != nil {
 		failComposeBatch(log, batch, params, failed, fmt.Errorf("compose checkout: %w", err))
+
+		return
+	}
+
+	// A nil checkout error means the worktree is already at the commit.
+	// Do not discard that result because the derived timeout elapsed as it
+	// returned. If the parent is canceled, do not start apply, and put the
+	// worktree back so a bind mount does not keep the new tree.
+	ctxErr := ctx.Err()
+	if ctxErr != nil {
+		cause := fmt.Errorf("compose checkout canceled: %w", ctxErr)
+
+		restoreErr := project.RestoreHead(batch.ref.Dir, prior, params.GitComposeStash)
+		if restoreErr != nil {
+			cause = errors.Join(cause, fmt.Errorf("rollback checkout: %w", restoreErr))
+		}
+
+		failComposeBatch(log, batch, params, failed, cause)
 
 		return
 	}
@@ -101,14 +129,25 @@ func (s *gitSession) applyCompose(
 		applier = compose.NewClient()
 	}
 
-	applied, err := applier.Apply(ctx, compose.Request{
+	applyCtx, cancelApply := s.client.WithTimeout(ctx)
+	applied, err := applier.Apply(applyCtx, compose.Request{
 		Ref:       batch.ref,
 		Services:  services,
 		Labels:    labels,
 		BuildOnly: params.NoRestart,
 	})
+
+	cancelApply()
+
 	if err != nil {
-		failComposeBatch(log, batch, params, failed, fmt.Errorf("compose apply: %w", err))
+		applyErr := composeApplyError(params, err)
+		markComposeResultFailures(applied, progress, failed, applyErr)
+
+		if !params.NoRestart {
+			s.rejectComposeApply(batch)
+		}
+
+		failComposeBatchWithRuntime(log, batch, params, failed, applyErr, !params.NoRestart)
 
 		return
 	}
@@ -131,7 +170,7 @@ func (s *gitSession) applyCompose(
 					Str("container", c.Name()).
 					Str("image", c.ImageName()).
 					Str("service", name).
-					Msg("Compose apply omitted service. Leaving running container untouched")
+					Msg("Compose apply result omitted this service. Runtime state is unknown")
 			}
 
 			continue
@@ -144,23 +183,42 @@ func (s *gitSession) applyCompose(
 			}
 		}
 
+		matched := make(map[types.ContainerID]struct{}, len(items))
+
 		for _, member := range members {
 			c := member.container
 
-			item, matched := matchedComposeInstance(c, members, items, byName)
-			if !matched {
+			item, matchedInstance := matchedComposeInstance(c, members, items, byName)
+			if !matchedInstance || (!params.NoRestart && item.ID == "") {
 				failed[c.ID()] = errGitComposeInstance
 				c.SetStale(false)
 				log.Warn().
 					Str("container", c.Name()).
 					Str("image", c.ImageName()).
 					Str("service", name).
-					Msg("Compose apply did not identify this replica. Leaving running container untouched")
+					Msg("Compose apply did not return an identifiable instance for this replica. Runtime state is unknown")
 
 				continue
 			}
 
 			s.recordCompose(c, item, params, member.result, progress, log)
+			matched[c.ID()] = struct{}{}
+		}
+
+		s.recordComposeReplicas(items, members, params, progress, log, matched)
+	}
+
+	if !params.NoRestart {
+		s.acceptComposeApply(batch, failed)
+	}
+
+	message := "Applied Compose project from Git"
+
+	for _, member := range batch.members {
+		if _, failed := failed[member.container.ID()]; failed {
+			message = "Compose apply finished with unconfirmed service results"
+
+			break
 		}
 	}
 
@@ -176,7 +234,7 @@ func (s *gitSession) applyCompose(
 		event = event.Str("commit", commit)
 	}
 
-	event.Msg("Applied Compose project from Git")
+	event.Msg(message)
 }
 
 // recordCompose records a successful Compose apply for one container.
@@ -199,6 +257,10 @@ func (s *gitSession) recordCompose(
 	progress *session.Progress,
 	log *zerolog.Logger,
 ) {
+	if !params.NoRestart && item.ID == "" {
+		return
+	}
+
 	assoc, _ := gitPkg.ResolveAssociation(c, params)
 	if concrete, ok := c.(*container.Container); ok {
 		container.ApplyGitAssociation(concrete, assoc, gitPkg.PersistWatch(c))
@@ -240,9 +302,229 @@ func (s *gitSession) recordCompose(
 	}
 
 	status.SetNewContainerID(item.ID)
+
+	if !params.NoRestart {
+		progress.MarkForUpdate(log, c.ID())
+	}
 }
 
-// failComposeBatch records an apply error on every container in the batch still pending.
+// markComposeResultFailures records apply failures for result containers represented in session progress.
+//
+// Parameters:
+//   - items: Compose results returned before the failure.
+//   - progress: Session progress, or nil.
+//   - failed: Map to record errors.
+//   - err: Failure to record for each matching tracked container.
+//
+// Returns:
+//   - none.
+func markComposeResultFailures(
+	items []compose.Container,
+	progress *session.Progress,
+	failed map[types.ContainerID]error,
+	err error,
+) {
+	if progress == nil {
+		return
+	}
+
+	statuses := make(map[string]struct{}, len(*progress))
+	for _, status := range *progress {
+		if status != nil {
+			statuses[strings.TrimPrefix(status.Name(), "/")] = struct{}{}
+		}
+	}
+
+	for _, item := range items {
+		if item.Name == "" {
+			continue
+		}
+
+		name := strings.TrimPrefix(item.Name, "/")
+		if _, known := statuses[name]; known {
+			for id, status := range *progress {
+				if status != nil && strings.TrimPrefix(status.Name(), "/") == name {
+					failed[id] = err
+				}
+			}
+		}
+	}
+}
+
+// recordComposeReplicas records successful Compose results for tracked replicas that were not already matched.
+//
+// Parameters:
+//   - items: Compose results returned for the service.
+//   - members: Containers that share the service name.
+//   - params: Update parameters.
+//   - progress: Session progress containing tracked replica statuses.
+//   - log: Process logger.
+//   - matched: Container IDs already recorded from direct instance matches.
+//
+// Returns:
+//   - none.
+func (s *gitSession) recordComposeReplicas(
+	items []compose.Container,
+	members []composeMember,
+	params types.UpdateParams,
+	progress *session.Progress,
+	log *zerolog.Logger,
+	matched map[types.ContainerID]struct{},
+) {
+	if len(members) == 0 {
+		return
+	}
+
+	if matched == nil {
+		matched = make(map[types.ContainerID]struct{}, len(items))
+	}
+
+	statuses := make(map[string]*session.ContainerStatus)
+	if progress != nil {
+		statuses = make(map[string]*session.ContainerStatus, len(*progress))
+		for _, status := range *progress {
+			if status != nil {
+				statuses[strings.TrimPrefix(status.Name(), "/")] = status
+			}
+		}
+	}
+
+	representative := members[0]
+
+	for _, item := range items {
+		if item.Name == "" || item.ID == "" {
+			continue
+		}
+
+		status, ok := statuses[strings.TrimPrefix(item.Name, "/")]
+		if !ok {
+			log.Debug().
+				Str("service", item.Service).
+				Str("replica", item.Name).
+				Msg("Compose recreated a replica absent from filtered progress")
+
+			continue
+		}
+
+		if _, alreadyMatched := matched[status.ID()]; alreadyMatched {
+			continue
+		}
+
+		s.mu.Lock()
+		if params.NoRestart {
+			if item.ImageID != "" {
+				s.built[status.ID()] = item.ImageID
+			} else {
+				s.built[status.ID()] = types.ImageID("git:" + representative.result.Commit)
+			}
+		} else {
+			s.applied[status.ID()] = struct{}{}
+			if item.ImageID != "" {
+				s.built[status.ID()] = item.ImageID
+			}
+		}
+		s.mu.Unlock()
+
+		if item.ImageID != "" {
+			progress.SetLatestImage(log, status.ID(), item.ImageID)
+		}
+
+		meta := container.ResolveReportMeta(representative.container, params, container.ChangelogVars{
+			Tag:    representative.result.Tag,
+			Commit: representative.result.Commit,
+		})
+		status.SetGitMetadata(
+			status.GitRepo(),
+			status.GitRef(),
+			meta.Changelog,
+			status.Source(),
+			status.ImageURL(),
+			status.Documentation(),
+			status.Revision(),
+		)
+
+		if !params.NoRestart {
+			status.SetNewContainerID(item.ID)
+			progress.MarkForUpdate(log, status.ID())
+		}
+
+		matched[status.ID()] = struct{}{}
+	}
+}
+
+// acceptComposeApply clears the rejected stamp for members this apply confirmed.
+//
+// Members that were not confirmed keep their own rejection. Another project
+// in the same directory is not cleared.
+//
+// Parameters:
+//   - batch: Project whose apply returned success.
+//   - failed: Members whose result was not accepted.
+//
+// Returns:
+//   - none.
+func (s *gitSession) acceptComposeApply(batch *composeBatch, failed map[types.ContainerID]error) {
+	if s == nil || s.client == nil || batch == nil {
+		return
+	}
+
+	for _, member := range batch.members {
+		if _, ok := failed[member.container.ID()]; ok || member.result.Commit == "" {
+			continue
+		}
+
+		s.client.AcceptApply(git.ApplyStampKeyFrom(member.container), member.result.Commit)
+	}
+}
+
+// rejectComposeApply records that a failed apply must not accept its new stamp.
+//
+// Compose writes the commit into container labels before up, and those labels
+// cannot be removed after create. The next check substitutes the previous
+// baseline while that stamp remains rejected.
+//
+// Parameters:
+//   - batch: Project whose apply failed after containers may have been replaced.
+//
+// Returns:
+//   - none.
+func (s *gitSession) rejectComposeApply(batch *composeBatch) {
+	if s == nil || s.client == nil || batch == nil {
+		return
+	}
+
+	for _, member := range batch.members {
+		if member.result.Commit == "" {
+			continue
+		}
+
+		previousCommit, previousTag := gitPkg.Baseline(member.container)
+		s.client.RejectApply(
+			git.ApplyStampKeyFrom(member.container),
+			member.result.Commit,
+			previousCommit,
+			previousTag,
+		)
+	}
+}
+
+// composeApplyError annotates a Compose failure with the operation that failed.
+//
+// Parameters:
+//   - params: Update parameters selecting build-only or apply mode.
+//   - err: Compose failure to annotate.
+//
+// Returns:
+//   - error: Failure annotated as a Compose build or apply error.
+func composeApplyError(params types.UpdateParams, err error) error {
+	if params.NoRestart {
+		return fmt.Errorf("compose build failed: %w", err)
+	}
+
+	return fmt.Errorf("compose apply failed, Docker Compose may have partially recreated services: %w", err)
+}
+
+// failComposeBatch records a Compose update error on every pending batch member.
 //
 // Parameters:
 //   - log: Process logger.
@@ -260,21 +542,51 @@ func failComposeBatch(
 	failed map[types.ContainerID]error,
 	err error,
 ) {
+	failComposeBatchWithRuntime(log, batch, params, failed, err, false)
+}
+
+// failComposeBatchWithRuntime marks a failed Compose batch non-stale and logs possible runtime changes.
+//
+// Parameters:
+//   - log: Process logger.
+//   - batch: Project batch.
+//   - params: Update parameters used to resolve repository and changelog fields.
+//   - failed: Map to record errors.
+//   - err: Failure to record when a member has no more specific error.
+//   - runtimeMayHaveChanged: Whether the failed operation may already have replaced services.
+//
+// Returns:
+//   - none.
+func failComposeBatchWithRuntime(
+	log *zerolog.Logger,
+	batch *composeBatch,
+	params types.UpdateParams,
+	failed map[types.ContainerID]error,
+	err error,
+	runtimeMayHaveChanged bool,
+) {
+	message := "Compose update failed before container replacement"
+	if runtimeMayHaveChanged {
+		message = "Compose apply failed. Docker Compose may have partially recreated services"
+	}
+
 	for _, member := range batch.members {
 		c := member.container
-		if _, exists := failed[c.ID()]; exists {
-			continue
+
+		failureErr, exists := failed[c.ID()]
+		if !exists {
+			failureErr = err
+			failed[c.ID()] = err
 		}
 
-		failed[c.ID()] = err
 		c.SetStale(false)
 		withGitMeta(log.Warn().
-			Err(err).
+			Err(failureErr).
 			Str("container", c.Name()).
 			Str("image", c.ImageName()).
 			Str("dir", batch.ref.Dir),
 			c, params, member.result.Tag, member.result.Commit).
-			Msg("Compose apply failed. Leaving running container untouched")
+			Msg(message)
 	}
 }
 
@@ -311,7 +623,7 @@ func matchedComposeInstance(
 
 // sharedComposeCommit returns the commit every member resolved.
 //
-// One project directory is one worktree, so a mismatch fails the batch.
+// One project identity has one worktree, so a mismatch fails the batch.
 //
 // Parameters:
 //   - members: Stale containers in one project directory.
@@ -366,6 +678,42 @@ func containerLabels(c types.Container) map[string]string {
 	return info.Config.Labels
 }
 
+// safeComposeAPIOrigin returns a credential-free API origin or an empty string for invalid input.
+//
+// Parameters:
+//   - raw: API origin to normalize and redact.
+//
+// Returns:
+//   - string: Normalized origin without credentials, query parameters, or a fragment.
+func safeComposeAPIOrigin(raw string) string {
+	raw = strings.TrimSpace(raw)
+	if raw == "" {
+		return ""
+	}
+
+	parseRaw := raw
+	if !strings.Contains(parseRaw, "://") {
+		parseRaw = "https://" + parseRaw
+	}
+
+	parsed, err := url.Parse(parseRaw)
+	if err != nil || parsed.Hostname() == "" {
+		return ""
+	}
+
+	parsed.User = nil
+	parsed.RawQuery = ""
+	parsed.ForceQuery = false
+	parsed.Fragment = ""
+
+	origin, err := gitPkg.ParseAPIOrigin(parsed.String())
+	if err != nil {
+		return ""
+	}
+
+	return strings.TrimRight(origin.String(), "/")
+}
+
 // composeServiceLabels is the stamp and association labels written onto new Compose containers.
 //
 // Parameters:
@@ -376,6 +724,9 @@ func containerLabels(c types.Container) map[string]string {
 // Returns:
 //   - map[string]string: Labels merged into the compose service.
 func composeServiceLabels(c types.Container, params types.UpdateParams, result git.CheckResult) map[string]string {
+	// The commit is written at create time because container labels cannot be
+	// changed afterward. A failed apply rejects this stamp so the next check
+	// retries from the previous baseline.
 	out := map[string]string{
 		gitPkg.LastCommitLabel: result.Commit,
 	}
@@ -386,7 +737,13 @@ func composeServiceLabels(c types.Container, params types.UpdateParams, result g
 
 	assoc, ok := gitPkg.ResolveAssociation(c, params)
 	if ok && assoc.Repo != "" {
-		out[gitPkg.RepoLabel] = assoc.Repo
+		meta := container.ResolveReportMeta(c, params, container.ChangelogVars{
+			Tag:    result.Tag,
+			Commit: result.Commit,
+		})
+		if meta.GitRepo != "" {
+			out[gitPkg.RepoLabel] = meta.GitRepo
+		}
 
 		if assoc.Ref != "" {
 			out[gitPkg.RefLabel] = assoc.Ref
@@ -397,7 +754,9 @@ func composeServiceLabels(c types.Container, params types.UpdateParams, result g
 		}
 
 		if assoc.Host != "" {
-			out[gitPkg.HostLabel] = assoc.Host
+			if origin := safeComposeAPIOrigin(assoc.Host); origin != "" {
+				out[gitPkg.HostLabel] = origin
+			}
 		}
 
 		if assoc.Dockerfile != "" {

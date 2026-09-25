@@ -15,6 +15,7 @@ import (
 	"github.com/rs/zerolog"
 	"golang.org/x/mod/semver"
 
+	"github.com/nicholas-fedor/watchtower/internal/compose"
 	gitPkg "github.com/nicholas-fedor/watchtower/pkg/container/git"
 	"github.com/nicholas-fedor/watchtower/pkg/types"
 )
@@ -54,13 +55,14 @@ type CheckResult struct {
 
 // Client inspects remotes and clones repositories for Git-sourced updates.
 type Client struct {
-	log     *zerolog.Logger
-	opts    Options
-	http    *http.Client
-	lister  RefLister
-	origins map[string]url.URL
-	mu      sync.Mutex
-	seen    map[string]seenStamp
+	log      *zerolog.Logger
+	opts     Options
+	http     *http.Client
+	lister   RefLister
+	origins  map[string]url.URL
+	mu       sync.Mutex
+	seen     map[string]seenStamp
+	rejected map[string]rejectedApply
 }
 
 // seenStamp is a remote tip observed without rebuilding the running container.
@@ -68,6 +70,20 @@ type seenStamp struct {
 	commit string
 	tag    string
 }
+
+// rejectedApply is a commit written onto Compose containers before apply failed.
+//
+// previousCommit and previousTag are the baseline to compare on the next check.
+type rejectedApply struct {
+	commit         string
+	previousCommit string
+	previousTag    string
+}
+
+// unacceptedRevision is a baseline that cannot match a real Git object.
+//
+// It forces a retry when a failed apply had no previous stamp to restore.
+const unacceptedRevision = "unaccepted"
 
 // RefLister lists remote refs for staleness checks.
 type RefLister interface {
@@ -140,7 +156,7 @@ func (c *Client) Check(ctx context.Context, req CheckRequest) (CheckResult, erro
 		return CheckResult{}, nil
 	}
 
-	ctx, cancel := c.withTimeout(ctx)
+	ctx, cancel := c.WithTimeout(ctx)
 	defer cancel()
 
 	req.Ref = cmpOr(req.Ref, "main")
@@ -175,7 +191,7 @@ func (c *Client) Clone(ctx context.Context, repo string, rev CheckResult) (strin
 		return "", fmt.Errorf("%w: client is nil", ErrCloneFailed)
 	}
 
-	ctx, cancel := c.withTimeout(ctx)
+	ctx, cancel := c.WithTimeout(ctx)
 	defer cancel()
 
 	dir, err := os.MkdirTemp("", "watchtower-git-*")
@@ -222,11 +238,16 @@ func CheckContainer(
 	if raw := strings.TrimSpace(assoc.Host); raw != "" {
 		_, err := gitPkg.ParseAPIOrigin(raw)
 		if err != nil {
-			return CheckResult{}, fmt.Errorf("%w: %s", ErrInvalidHost, raw)
+			return CheckResult{}, fmt.Errorf("%w: %w", ErrInvalidHost, err)
 		}
 	}
 
 	lastCommit, lastTag := gitPkg.Baseline(c)
+	if commit, tag, rejected := client.unacceptedBaseline(ApplyStampKeyFrom(c), lastCommit); rejected {
+		lastCommit = commit
+		lastTag = tag
+	}
+
 	if lastCommit == "" && lastTag == "" {
 		lastCommit, lastTag = client.recall(assoc.Repo, assoc.Ref, assoc.Policy)
 	}
@@ -250,6 +271,184 @@ func CheckContainer(
 	}
 
 	return result, nil
+}
+
+// WithTimeout returns ctx with the Git timeout unless a tighter deadline exists.
+//
+// Parameters:
+//   - ctx: Parent context.
+//
+// Returns:
+//   - context.Context: Context that expires at the Git timeout.
+//   - context.CancelFunc: Cancel function. A no-op when ctx already expires sooner.
+func (c *Client) WithTimeout(ctx context.Context) (context.Context, context.CancelFunc) {
+	timeout := defaultGitTimeout
+	if c != nil && c.opts.Timeout > 0 {
+		timeout = c.opts.Timeout
+	}
+
+	if deadline, ok := ctx.Deadline(); ok && time.Until(deadline) <= timeout {
+		return ctx, func() {}
+	}
+
+	return context.WithTimeout(ctx, timeout)
+}
+
+// ApplyStampKey identifies one Compose member whose commit stamp may be rejected.
+//
+// Project, Dir, and ConfigFiles are the project identity. Service and Number
+// identify the container within that project. CheckContainer rebuilds the same
+// key from labels, so accepting one member does not clear another.
+type ApplyStampKey struct {
+	Project     string
+	Dir         string
+	ConfigFiles string
+	Service     string
+	Number      string
+}
+
+// ApplyStampKeyFrom reads the Compose identity and member from container labels.
+//
+// Parameters:
+//   - c: Container whose labels are read.
+//
+// Returns:
+//   - ApplyStampKey: Project name, directory, config files, service, and replica number.
+func ApplyStampKeyFrom(c types.Container) ApplyStampKey {
+	if c == nil {
+		return ApplyStampKey{}
+	}
+
+	dir, _ := c.GetLabel(gitPkg.ComposeDirLabel)
+
+	dir = strings.TrimSpace(dir)
+	if dir == "" {
+		return ApplyStampKey{}
+	}
+
+	projectName, _ := c.GetLabel(compose.ComposeProjectLabel)
+	files, _ := c.GetLabel(compose.ComposeConfigFilesLabel)
+	service, _ := c.GetLabel(compose.ComposeServiceLabel)
+	number, _ := c.GetLabel(compose.ComposeContainerNumber)
+
+	service = strings.TrimSpace(service)
+	if service == "" {
+		service = strings.TrimPrefix(strings.TrimSpace(c.Name()), "/")
+	}
+
+	return ApplyStampKey{
+		Project:     strings.TrimSpace(projectName),
+		Dir:         dir,
+		ConfigFiles: strings.TrimSpace(files),
+		Service:     service,
+		Number:      strings.TrimSpace(number),
+	}
+}
+
+// memberKey is the map key for one member. Fields are separated so values cannot collide.
+//
+// Returns:
+//   - string: Stable key, or empty when the member cannot be identified.
+func (k ApplyStampKey) memberKey() string {
+	if k.Dir == "" || k.Service == "" {
+		return ""
+	}
+
+	return strings.Join([]string{k.Project, k.Dir, k.ConfigFiles, k.Service, k.Number}, "\x00")
+}
+
+// RejectApply records that commit must not be treated as this member's running baseline.
+//
+// Compose writes the commit into container labels before up. A failed apply
+// cannot remove that label. The next check of this member uses its own previous
+// baseline. Another project or service in the same directory is left unchanged.
+//
+// Parameters:
+//   - key: Compose project and member identity.
+//   - commit: Commit written by the failed apply.
+//   - previousCommit: This member's baseline from before the apply.
+//   - previousTag: This member's tag baseline from before the apply.
+//
+// Returns:
+//   - none.
+func (c *Client) RejectApply(key ApplyStampKey, commit, previousCommit, previousTag string) {
+	memberKey := key.memberKey()
+	if c == nil || memberKey == "" || commit == "" {
+		return
+	}
+
+	c.mu.Lock()
+	defer c.mu.Unlock()
+
+	if c.rejected == nil {
+		c.rejected = make(map[string]rejectedApply)
+	}
+
+	c.rejected[memberKey] = rejectedApply{
+		commit:         strings.ToLower(strings.TrimSpace(commit)),
+		previousCommit: previousCommit,
+		previousTag:    previousTag,
+	}
+}
+
+// AcceptApply clears one member's rejected stamp after a later apply is accepted.
+//
+// Parameters:
+//   - key: Compose project and member identity.
+//   - commit: Commit that may now be treated as this member's running baseline.
+//
+// Returns:
+//   - none.
+func (c *Client) AcceptApply(key ApplyStampKey, commit string) {
+	memberKey := key.memberKey()
+	if c == nil || memberKey == "" || commit == "" {
+		return
+	}
+
+	c.mu.Lock()
+	defer c.mu.Unlock()
+
+	rejected, ok := c.rejected[memberKey]
+	if !ok || !sameRevision(commit, rejected.commit) {
+		return
+	}
+
+	delete(c.rejected, memberKey)
+}
+
+// repositoryOperationError wraps a remote operation failure without exposing repository credentials.
+//
+// Parameters:
+//   - operation: Operation being performed.
+//   - repo: Repository URL or path associated with the operation.
+//   - err: Original remote error.
+//
+// Returns:
+//   - error: Sanitized operation error preserving recognized transport and context failures.
+func repositoryOperationError(operation, repo string, err error) error {
+	safeRepo := sanitizeRepository(repo)
+	if safeRepo == "" {
+		safeRepo = "repository"
+	}
+
+	classified := classifyTransport(err)
+	switch {
+	case errors.Is(classified, ErrAuthRequired),
+		errors.Is(classified, ErrAuthFailed),
+		errors.Is(classified, ErrRepoNotFound):
+		return fmt.Errorf("%s %s: %w", operation, safeRepo, classified)
+	case errors.Is(err, context.Canceled):
+		return fmt.Errorf("%s %s: %w", operation, safeRepo, context.Canceled)
+	case errors.Is(err, context.DeadlineExceeded):
+		return fmt.Errorf("%s %s: %w", operation, safeRepo, context.DeadlineExceeded)
+	}
+
+	detail := sanitizeRepositoryMessage(repo, err.Error())
+	if detail == "" {
+		detail = "remote operation failed"
+	}
+
+	return fmt.Errorf("%w: %s %s: %s", errRepositoryOperation, operation, safeRepo, detail)
 }
 
 // checkExactRef compares one branch or tag to the last-commit stamp.
@@ -389,7 +588,15 @@ func (c *Client) resolveRef(ctx context.Context, repo, ref, apiOrigin string) (r
 	resolved, ok, err := c.resolveViaAPI(ctx, repo, ref, apiOrigin)
 	if err != nil {
 		if !errors.Is(err, errAPINotFound) {
-			c.log.Debug().Err(err).Str("repo", repo).Str("ref", ref).Msg("Git API resolve failed, using ls-remote")
+			c.log.Debug().
+				Err(fmt.Errorf(
+					"%w: %s",
+					errRepositoryOperation,
+					sanitizeRepositoryMessage(repo, err.Error()),
+				)).
+				Str("repo", sanitizeRepository(repo)).
+				Str("ref", ref).
+				Msg("Git API resolve failed, using ls-remote")
 		}
 	} else if ok {
 		return resolved, nil
@@ -397,7 +604,7 @@ func (c *Client) resolveRef(ctx context.Context, repo, ref, apiOrigin string) (r
 
 	refs, err := c.lister.List(ctx, repo)
 	if err != nil {
-		return resolvedRef{}, fmt.Errorf("ls-remote %s: %w", repo, err)
+		return resolvedRef{}, repositoryOperationError("ls-remote", repo, err)
 	}
 
 	return resolveListedRef(refs, ref)
@@ -416,14 +623,21 @@ func (c *Client) resolveRef(ctx context.Context, repo, ref, apiOrigin string) (r
 func (c *Client) listTags(ctx context.Context, repo, apiOrigin string) ([]RemoteRef, error) {
 	tags, ok, err := c.listTagsViaAPI(ctx, repo, apiOrigin)
 	if err != nil {
-		c.log.Debug().Err(err).Str("repo", repo).Msg("Git API list tags failed, using ls-remote")
+		c.log.Debug().
+			Err(fmt.Errorf(
+				"%w: %s",
+				errRepositoryOperation,
+				sanitizeRepositoryMessage(repo, err.Error()),
+			)).
+			Str("repo", sanitizeRepository(repo)).
+			Msg("Git API list tags failed, using ls-remote")
 	} else if ok {
 		return tags, nil
 	}
 
 	refs, err := c.lister.List(ctx, repo)
 	if err != nil {
-		return nil, fmt.Errorf("ls-remote tags %s: %w", repo, err)
+		return nil, repositoryOperationError("ls-remote tags", repo, err)
 	}
 
 	byName := collectTagHashes(refs)
@@ -436,25 +650,35 @@ func (c *Client) listTags(ctx context.Context, repo, apiOrigin string) ([]Remote
 	return listed, nil
 }
 
-// withTimeout returns ctx with the Git timeout unless a tighter deadline exists.
+// unacceptedBaseline returns the baseline to use when labelCommit was not accepted.
 //
 // Parameters:
-//   - ctx: Parent context.
+//   - key: Compose project and member identity from the running container.
+//   - labelCommit: Stamp or image revision currently visible on the container.
 //
 // Returns:
-//   - context.Context: Context that expires at the Git timeout.
-//   - context.CancelFunc: Cancel function. A no-op when ctx already expires sooner.
-func (c *Client) withTimeout(ctx context.Context) (context.Context, context.CancelFunc) {
-	timeout := c.opts.Timeout
-	if timeout <= 0 {
-		timeout = defaultGitTimeout
+//   - string: This member's previous commit, or a sentinel when none exists.
+//   - string: This member's previous tag.
+//   - bool: True when labelCommit matches this member's rejected apply.
+func (c *Client) unacceptedBaseline(key ApplyStampKey, labelCommit string) (string, string, bool) {
+	memberKey := key.memberKey()
+	if c == nil || memberKey == "" || labelCommit == "" {
+		return "", "", false
 	}
 
-	if deadline, ok := ctx.Deadline(); ok && time.Until(deadline) <= timeout {
-		return ctx, func() {}
+	c.mu.Lock()
+	defer c.mu.Unlock()
+
+	rejected, ok := c.rejected[memberKey]
+	if !ok || !sameRevision(labelCommit, rejected.commit) {
+		return "", "", false
 	}
 
-	return context.WithTimeout(ctx, timeout)
+	if rejected.previousCommit == "" && rejected.previousTag == "" {
+		return unacceptedRevision, "", true
+	}
+
+	return rejected.previousCommit, rejected.previousTag, true
 }
 
 // recall returns a remote tip observed earlier in this process.

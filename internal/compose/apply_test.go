@@ -1,6 +1,7 @@
 package compose
 
 import (
+	"context"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -9,6 +10,8 @@ import (
 	"github.com/docker/compose/v5/pkg/api"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+
+	composetypes "github.com/compose-spec/compose-go/v2/types"
 
 	"github.com/nicholas-fedor/watchtower/pkg/types"
 )
@@ -162,14 +165,134 @@ func TestAppliedImageID(t *testing.T) {
 	)
 }
 
-func TestClientApplyValidation(t *testing.T) {
+// TestClientApplyScopesStartProject verifies that applying a service scopes the project to that service and its dependencies.
+func TestClientApplyScopesStartProject(t *testing.T) {
 	t.Parallel()
 
-	client := NewClient()
+	dir := t.TempDir()
+	require.NoError(t, os.WriteFile(filepath.Join(dir, "compose.yaml"), []byte(`
+services:
+  app:
+    image: app
+    depends_on:
+      - db
+  db:
+    image: db
+  cache:
+    image: cache
+`), 0o600))
 
-	_, err := client.Apply(t.Context(), Request{})
+	var (
+		upProject *composetypes.Project
+		upOptions api.UpOptions
+	)
+
+	service := &composeServiceStub{
+		up: func(_ context.Context, project *composetypes.Project, options api.UpOptions) error {
+			upProject = project
+			upOptions = options
+
+			return nil
+		},
+		ps: func(context.Context, string, api.PsOptions) ([]api.ContainerSummary, error) {
+			return []api.ContainerSummary{{Service: "app", Name: "project-app-1", ID: "app-id"}}, nil
+		},
+		images: func(context.Context, string, api.ImagesOptions) (map[string]api.ImageSummary, error) {
+			return map[string]api.ImageSummary{}, nil
+		},
+	}
+
+	client := &Client{service: service}
+	containers, err := client.Apply(t.Context(), Request{
+		Ref:      ProjectRef{Dir: dir, Name: "project"},
+		Services: []string{"app"},
+	})
+	require.NoError(t, err)
+	assert.Equal(t, []Container{{
+		Service: "app",
+		Name:    "project-app-1",
+		ID:      types.ContainerID("app-id"),
+	}}, containers)
+
+	require.NotNil(t, upProject)
+	assert.Same(t, upProject, upOptions.Start.Project)
+	assert.ElementsMatch(t, []string{"app", "db"}, upProject.ServiceNames())
+	assert.NotContains(t, upProject.ServiceNames(), "cache")
+	assert.Equal(t, []string{"app"}, upOptions.Create.Services)
+	assert.Equal(t, api.RecreateNever, upOptions.Create.RecreateDependencies)
+	assert.Empty(t, upOptions.Start.Services)
+}
+
+// TestClientApplyRejectsInvalidRequests verifies that Client.Apply rejects invalid requests before invoking Compose.
+func TestClientApplyRejectsInvalidRequests(t *testing.T) {
+	t.Parallel()
+
+	service := &composeServiceStub{
+		up: func(context.Context, *composetypes.Project, api.UpOptions) error {
+			t.Fatal("Compose up must not run for invalid requests")
+
+			return nil
+		},
+		ps: func(context.Context, string, api.PsOptions) ([]api.ContainerSummary, error) {
+			t.Fatal("Compose ps must not run for invalid requests")
+
+			return []api.ContainerSummary{}, nil
+		},
+		images: func(context.Context, string, api.ImagesOptions) (map[string]api.ImageSummary, error) {
+			t.Fatal("Compose images must not run for invalid requests")
+
+			return map[string]api.ImageSummary{}, nil
+		},
+	}
+	client := &Client{service: service}
+
+	_, err := client.Apply(t.Context(), Request{
+		Ref:      ProjectRef{},
+		Services: []string{"app"},
+	})
 	require.ErrorIs(t, err, errEmptyProjectDir)
 
-	_, err = client.Apply(t.Context(), Request{Ref: ProjectRef{Dir: t.TempDir()}})
+	_, err = client.Apply(t.Context(), Request{
+		Ref:      ProjectRef{Dir: t.TempDir()},
+		Services: nil,
+	})
 	require.ErrorIs(t, err, errNoComposeServices)
+}
+
+// TestScopeComposeProjectRejectsMissingService verifies that selecting an unknown service returns an error.
+func TestScopeComposeProjectRejectsMissingService(t *testing.T) {
+	t.Parallel()
+
+	dir := t.TempDir()
+	require.NoError(t, os.WriteFile(filepath.Join(dir, "compose.yaml"), []byte("services:\n  app:\n    image: app\n"), 0o600))
+
+	project, err := Load(t.Context(), ProjectRef{Dir: dir, Name: "project"})
+	require.NoError(t, err)
+
+	_, err = scopeComposeProject(project, []string{"missing"})
+	require.Error(t, err)
+	assert.ErrorContains(t, err, `no such service: missing`)
+}
+
+type composeServiceStub struct {
+	api.Compose
+
+	up     func(context.Context, *composetypes.Project, api.UpOptions) error
+	ps     func(context.Context, string, api.PsOptions) ([]api.ContainerSummary, error)
+	images func(context.Context, string, api.ImagesOptions) (map[string]api.ImageSummary, error)
+}
+
+// Up delegates the stubbed Compose up call.
+func (s *composeServiceStub) Up(ctx context.Context, project *composetypes.Project, options api.UpOptions) error {
+	return s.up(ctx, project, options)
+}
+
+// Ps delegates the stubbed Compose ps call.
+func (s *composeServiceStub) Ps(ctx context.Context, projectName string, options api.PsOptions) ([]api.ContainerSummary, error) {
+	return s.ps(ctx, projectName, options)
+}
+
+// Images delegates the stubbed Compose images call.
+func (s *composeServiceStub) Images(ctx context.Context, projectName string, options api.ImagesOptions) (map[string]api.ImageSummary, error) {
+	return s.images(ctx, projectName, options)
 }

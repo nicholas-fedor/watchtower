@@ -136,8 +136,7 @@ const docTemplate = `{
                     "200": {
                         "description": "Container update availability results",
                         "schema": {
-                            "type": "object",
-                            "additionalProperties": true
+                            "$ref": "#/definitions/check.CheckResponse"
                         }
                     },
                     "401": {
@@ -598,6 +597,87 @@ const docTemplate = `{
                             "type": "string"
                         }
                     }
+                }
+            }
+        }
+    },
+    "definitions": {
+        "check.CheckResponse": {
+            "type": "object",
+            "properties": {
+                "api_version": {
+                    "type": "string"
+                },
+                "containers": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/check.ContainerCheck"
+                    }
+                },
+                "count": {
+                    "type": "integer"
+                },
+                "timestamp": {
+                    "type": "string"
+                }
+            }
+        },
+        "check.ContainerCheck": {
+            "type": "object",
+            "properties": {
+                "changelog": {
+                    "type": "string"
+                },
+                "digest": {
+                    "type": "string"
+                },
+                "documentation": {
+                    "type": "string"
+                },
+                "error": {
+                    "type": "string"
+                },
+                "git_commit": {
+                    "type": "string"
+                },
+                "git_ref": {
+                    "type": "string"
+                },
+                "git_repo": {
+                    "type": "string"
+                },
+                "image": {
+                    "type": "string"
+                },
+                "image_id": {
+                    "type": "string"
+                },
+                "image_url": {
+                    "type": "string"
+                },
+                "latest_digest": {
+                    "type": "string"
+                },
+                "latest_image_id": {
+                    "type": "string"
+                },
+                "name": {
+                    "type": "string"
+                },
+                "oci_source": {
+                    "type": "string"
+                },
+                "revision": {
+                    "type": "string"
+                },
+                "timestamp": {
+                    "type": "string"
+                },
+                "update_available": {
+                    "type": "boolean"
+                },
+                "update_source": {
+                    "type": "string"
                 }
             }
         }

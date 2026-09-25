@@ -82,7 +82,8 @@ The `/v1/check` endpoint returns a JSON array of container check results:
 - `image_id`: Current local image ID
 - `digest`: Current local registry digest when known
 - `update_available`: Whether a newer image is available
-- `latest_image_id`: Local image ID of the newer image when known (often empty for registry digest checks that do not pull)
+- `latest_image_id`: Local image ID of the newer image when known. It is empty for Git checks, which do not build or pull an image
+- `git_commit`: Resolved Git commit for a Git-watched container when known
 - `latest_digest`: Newest registry digest when known
 - `error`: Per-container error message when the check failed
 - `update_source`: `registry` or `git` (the staleness path; not OCI `source`)

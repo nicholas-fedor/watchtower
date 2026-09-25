@@ -2,13 +2,18 @@ package git
 
 import (
 	"crypto/tls"
+	"crypto/x509"
+	"encoding/pem"
 	"net/http"
+	"net/http/httptest"
 	"net/url"
 	"testing"
 	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+
+	"github.com/nicholas-fedor/watchtower/pkg/types"
 )
 
 func TestApplyAuth(t *testing.T) {
@@ -76,6 +81,19 @@ func TestApplyAuth(t *testing.T) {
 		assert.Empty(t, req.Header.Get("Authorization"))
 	})
 
+	t.Run("foreign gitea host gets no token", func(t *testing.T) {
+		t.Parallel()
+
+		req, err := http.NewRequestWithContext(t.Context(), http.MethodGet, "https://evil.example/api/v1/version", nil)
+		require.NoError(t, err)
+
+		(&Client{opts: Options{
+			Token: "secret",
+			Hosts: map[string]string{"git.example.com": types.GitHostGitea},
+		}}).applyAuth(req, "git.example.com")
+		assert.Empty(t, req.Header.Get("Authorization"))
+	})
+
 	t.Run("github api host", func(t *testing.T) {
 		t.Parallel()
 
@@ -95,6 +113,43 @@ func TestApplyAuth(t *testing.T) {
 		(&Client{opts: Options{Token: "secret"}}).applyAuth(req, "git.example.com")
 		assert.Empty(t, req.Header.Get("Authorization"))
 	})
+}
+
+// TestApplyAuthProviderSchemes verifies that each provider receives its expected token authorization scheme.
+func TestApplyAuthProviderSchemes(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name      string
+		cloneHost string
+		path      string
+		hosts     map[string]string
+		want      string
+	}{
+		{name: "github", cloneHost: "github.com", path: "/api", want: "Bearer tok"},
+		{name: "gitlab", cloneHost: "gitlab.com", path: "/api", want: "Bearer tok"},
+		{name: "gitea", cloneHost: "codeberg.org", path: "/api", want: "token tok"},
+		{
+			name:      "self-hosted gitea",
+			cloneHost: "git.example.com",
+			path:      "/api",
+			hosts:     map[string]string{"git.example.com": types.GitHostGitea},
+			want:      "token tok",
+		},
+		{name: "gitea api path", cloneHost: "git.example.com", path: "/api/v1/version", want: "token tok"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			req, err := http.NewRequestWithContext(t.Context(), http.MethodGet, "https://"+tt.cloneHost+tt.path, nil)
+			require.NoError(t, err)
+
+			(&Client{opts: Options{Token: "tok", Hosts: tt.hosts}}).applyAuth(req, tt.cloneHost)
+			assert.Equal(t, tt.want, req.Header.Get("Authorization"))
+		})
+	}
 }
 
 func TestOriginOf(t *testing.T) {
@@ -233,6 +288,43 @@ func TestNewGitHTTPClient(t *testing.T) {
 		assert.Nil(t, tr.TLSClientConfig.RootCAs)
 		assert.False(t, tr.TLSClientConfig.InsecureSkipVerify)
 	})
+
+	t.Run("ca bundle augments system roots", func(t *testing.T) {
+		t.Parallel()
+
+		server := httptest.NewTLSServer(http.HandlerFunc(func(http.ResponseWriter, *http.Request) {}))
+		t.Cleanup(server.Close)
+		bundle := pem.EncodeToMemory(&pem.Block{Type: "CERTIFICATE", Bytes: server.Certificate().Raw})
+
+		got := newGitHTTPClient(time.Second, false, bundle)
+		tr, ok := got.Transport.(*http.Transport)
+		require.True(t, ok)
+		require.NotNil(t, tr.TLSClientConfig)
+		require.NotNil(t, tr.TLSClientConfig.RootCAs)
+
+		systemPool, systemErr := x509.SystemCertPool()
+
+		var expected *x509.CertPool
+		if systemErr == nil && systemPool != nil {
+			expected = systemPool
+		} else {
+			expected = x509.NewCertPool()
+		}
+
+		require.True(t, expected.AppendCertsFromPEM(bundle))
+		assert.True(t, expected.Equal(tr.TLSClientConfig.RootCAs))
+	})
+
+	t.Run("insecure TLS with invalid ca bundle", func(t *testing.T) {
+		t.Parallel()
+
+		got := newGitHTTPClient(time.Second, true, []byte("not-a-real-pem"))
+		tr, ok := got.Transport.(*http.Transport)
+		require.True(t, ok)
+		require.NotNil(t, tr.TLSClientConfig)
+		assert.Nil(t, tr.TLSClientConfig.RootCAs)
+		assert.True(t, tr.TLSClientConfig.InsecureSkipVerify)
+	})
 }
 
 func TestToHostname(t *testing.T) {
@@ -242,6 +334,78 @@ func TestToHostname(t *testing.T) {
 	assert.Equal(t, "2001:db8::1", toHostname("[2001:db8::1]"))
 	assert.Equal(t, "git.example.com", toHostname("[git.example.com]"))
 	assert.Empty(t, toHostname(""))
+}
+
+// TestSanitizeRepository verifies that repository sanitization removes credentials and details from supported remote formats.
+func TestSanitizeRepository(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name string
+		raw  string
+		want string
+	}{
+		{name: "empty"},
+		{name: "absolute local path", raw: "/srv/git/app.git", want: "/srv/git/app.git"},
+		{name: "relative local path", raw: "../repos/app.git", want: "../repos/app.git"},
+		{name: "local path query", raw: "../repos/app.git?token=secret", want: "../repos/app.git"},
+		{name: "windows local path", raw: `C:\repos\app.git`, want: `C:\repos\app.git`},
+		{name: "file URL", raw: "file:///srv/git/app.git?token=secret#fragment", want: "file:///srv/git/app.git"},
+		{
+			name: "HTTPS URL",
+			raw:  "https://user:password-secret@github.com/org/app.git?token=query-secret#fragment-secret",
+			want: "https://github.com/org/app.git",
+		},
+		{
+			name: "SSH URL",
+			raw:  "ssh://git@gitlab.example.com/group/app.git?token=query-secret#fragment-secret",
+			want: "ssh://gitlab.example.com/group/app.git",
+		},
+		{
+			name: "SCP URL",
+			raw:  "git@github.com:org/app.git?token=query-secret#fragment-secret",
+			want: "git@github.com:org/app.git",
+		},
+		{name: "malformed URL", raw: "https://user:secret@%zz/repo.git"},
+		{name: "unsafe SCP userinfo", raw: "token@github.com:org/app.git"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			assert.Equal(t, tt.want, sanitizeRepository(tt.raw))
+		})
+	}
+}
+
+// TestSanitizeRepositoryMessage verifies that repository messages redact secrets and retain a safe repository identifier.
+func TestSanitizeRepositoryMessage(t *testing.T) {
+	t.Parallel()
+
+	repo := "git@github.com:org/app.git?token=query-secret#fragment-secret"
+	got := sanitizeRepositoryMessage(repo, "request failed for "+repo+" with query-secret and fragment-secret")
+
+	assert.Contains(t, got, "git@github.com:org/app.git")
+	assert.NotContains(t, got, "query-secret")
+	assert.NotContains(t, got, "fragment-secret")
+
+	t.Run("does not redact the sanitized repository", func(t *testing.T) {
+		t.Parallel()
+
+		raw := "https://user:token@token.example/org/app.git?query=secret"
+		got := sanitizeRepositoryMessage(raw, "request failed for "+raw)
+
+		assert.Contains(t, got, "https://token.example/org/app.git")
+		assert.NotContains(t, got, "user:token")
+		assert.NotContains(t, got, "query=secret")
+	})
+
+	t.Run("does not treat a username without a password as a secret", func(t *testing.T) {
+		t.Parallel()
+
+		assert.Empty(t, repositorySecrets("https://user@git.example.com/org/app.git"))
+	})
 }
 
 func TestJoinEscaped(t *testing.T) {

@@ -3,6 +3,7 @@ package compose
 import (
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -116,6 +117,77 @@ func TestResolveProjectDir(t *testing.T) {
 			filepath.Join(dir, "compose.yaml"),
 			filepath.Join(dir, "extra.yml"),
 		}, ref.ConfigFiles)
+	})
+
+	t.Run("accepts an absolute config file inside the mounted project", func(t *testing.T) {
+		t.Parallel()
+
+		dir := writeComposeDir(t, "compose.yaml")
+		configFile := filepath.Join(dir, "compose.yaml")
+		ref, err := ResolveProjectDir(map[string]string{
+			WatchtowerComposeDirLabel: dir,
+			ComposeWorkingDirLabel:    filepath.Join(t.TempDir(), "host-project"),
+			ComposeConfigFilesLabel:   configFile,
+		}, nil)
+		require.NoError(t, err)
+		assert.Equal(t, []string{configFile}, ref.ConfigFiles)
+	})
+
+	t.Run("maps absolute host config files to the mounted project", func(t *testing.T) {
+		t.Parallel()
+
+		hostDir := t.TempDir()
+		mountDir := writeComposeDir(t, "compose.yaml")
+		require.NoError(t, os.MkdirAll(filepath.Join(mountDir, "overrides"), 0o700))
+		require.NoError(t, os.WriteFile(filepath.Join(mountDir, "overrides", "api.yml"), []byte("services: {}\n"), 0o600))
+
+		ref, err := ResolveProjectDir(map[string]string{
+			WatchtowerComposeDirLabel: mountDir,
+			ComposeWorkingDirLabel:    hostDir,
+			ComposeConfigFilesLabel: strings.Join([]string{
+				filepath.Join(hostDir, "compose.yaml"),
+				filepath.Join(hostDir, "overrides", "api.yml"),
+			}, ","),
+		}, nil)
+		require.NoError(t, err)
+		assert.Equal(t, []string{
+			filepath.Join(mountDir, "compose.yaml"),
+			filepath.Join(mountDir, "overrides", "api.yml"),
+		}, ref.ConfigFiles)
+		_, err = Load(t.Context(), ref)
+		require.NoError(t, err)
+	})
+
+	t.Run("rejects an absolute config file outside both roots", func(t *testing.T) {
+		t.Parallel()
+
+		hostDir := t.TempDir()
+		mountDir := writeComposeDir(t, "compose.yaml")
+		external := filepath.Join(filepath.Dir(hostDir), "external.yml")
+
+		_, err := ResolveProjectDir(map[string]string{
+			WatchtowerComposeDirLabel: mountDir,
+			ComposeWorkingDirLabel:    hostDir,
+			ComposeConfigFilesLabel:   external,
+		}, nil)
+		require.ErrorIs(t, err, ErrConfigFile)
+	})
+
+	t.Run("rejects a mapped config symlink that leaves the project", func(t *testing.T) {
+		t.Parallel()
+
+		hostDir := t.TempDir()
+		mountDir := writeComposeDir(t, "compose.yaml")
+		outside := filepath.Join(t.TempDir(), "outside.yml")
+		require.NoError(t, os.WriteFile(outside, []byte("services: {}\n"), 0o600))
+		require.NoError(t, os.Symlink(outside, filepath.Join(mountDir, "override.yml")))
+
+		_, err := ResolveProjectDir(map[string]string{
+			WatchtowerComposeDirLabel: mountDir,
+			ComposeWorkingDirLabel:    hostDir,
+			ComposeConfigFilesLabel:   filepath.Join(hostDir, "override.yml"),
+		}, nil)
+		require.ErrorIs(t, err, ErrConfigFile)
 	})
 
 	t.Run("rejects config file outside the project", func(t *testing.T) {

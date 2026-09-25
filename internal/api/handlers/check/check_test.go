@@ -4,15 +4,19 @@ import (
 	"errors"
 	"net/http"
 	"net/http/httptest"
+	"os"
+	"path/filepath"
 	"testing"
 	"time"
 
+	"github.com/go-git/go-git/v5/plumbing/object"
 	"github.com/gofiber/fiber/v3"
 	"github.com/moby/moby/api/types/image"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 
+	goGit "github.com/go-git/go-git/v5"
 	dockerContainer "github.com/moby/moby/api/types/container"
 
 	"github.com/nicholas-fedor/watchtower/internal/git"
@@ -337,6 +341,60 @@ func TestCheckForUpdates_GitNoPullSkipsCheck(t *testing.T) {
 	assert.False(t, results[0].UpdateAvailable)
 	assert.Empty(t, results[0].Error)
 	assert.Empty(t, results[0].LatestImageID)
+}
+
+// TestCheckForUpdates_GitCommitField verifies that Git results expose the commit separately from the local image ID.
+func TestCheckForUpdates_GitCommitField(t *testing.T) {
+	repoDir, branch, commit := initCheckGitRepo(t)
+	watched := wtcontainer.NewContainer(testLogger(), &dockerContainer.InspectResponse{
+		ID:   "app-id",
+		Name: "/app",
+		Config: &dockerContainer.Config{
+			Image: "app:latest",
+			Labels: map[string]string{
+				gitPkg.RepoLabel: repoDir,
+				gitPkg.RefLabel:  branch,
+			},
+		},
+	}, nil)
+
+	client := mockContainer.NewMockClient(t)
+	client.EXPECT().ListContainers(mock.Anything, mock.Anything).Return([]types.Container{watched}, nil)
+
+	results, err := CheckForUpdates(testLogger(), t.Context(), client, nil, types.UpdateParams{
+		EnableGitMonitoring: true,
+	}, git.New(testLogger(), git.Options{Timeout: time.Second}))
+	require.NoError(t, err)
+	require.Len(t, results, 1)
+	assert.Equal(t, "git", results[0].UpdateSource)
+	assert.Equal(t, commit, results[0].GitCommit)
+	assert.Empty(t, results[0].LatestImageID)
+}
+
+// initCheckGitRepo creates a temporary Git repository and returns its directory, branch, and commit.
+func initCheckGitRepo(t *testing.T) (string, string, string) {
+	t.Helper()
+
+	dir := t.TempDir()
+	repo, err := goGit.PlainInit(dir, false)
+	require.NoError(t, err)
+
+	worktree, err := repo.Worktree()
+	require.NoError(t, err)
+	require.NoError(t, os.WriteFile(filepath.Join(dir, "README"), []byte("hello\n"), 0o600))
+
+	_, err = worktree.Add("README")
+	require.NoError(t, err)
+
+	hash, err := worktree.Commit("init", &goGit.CommitOptions{
+		Author: &object.Signature{Name: "test", Email: "test@example.com", When: time.Now()},
+	})
+	require.NoError(t, err)
+
+	head, err := repo.Head()
+	require.NoError(t, err)
+
+	return dir, head.Name().Short(), hash.String()
 }
 
 func TestExtractFilterParams(t *testing.T) {

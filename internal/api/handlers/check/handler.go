@@ -82,12 +82,12 @@ func New(
 //	@Tags			check
 //	@Accept			json
 //	@Produce		json
-//	@Param			image		query		string					false	"Image names to check (comma-separated, repeatable). When combined with container, only containers matching both are checked."
-//	@Param			container	query		string					false	"Container names to check (comma-separated, repeatable). When combined with image, only containers matching both are checked."
-//	@Param			timeout		query		string					false	"Per-request timeout override (e.g. 30s, 2m). Bounded by the configured check API timeout."
-//	@Success		200			{object}	map[string]interface{}	"Container update availability results"
-//	@Failure		500			{string}	string					"Failed to check for updates"
-//	@Failure		401			{string}	string					"Missing or invalid API token"
+//	@Param			image		query		string			false	"Image names to check (comma-separated, repeatable). When combined with container, only containers matching both are checked."
+//	@Param			container	query		string			false	"Container names to check (comma-separated, repeatable). When combined with image, only containers matching both are checked."
+//	@Param			timeout		query		string			false	"Per-request timeout override (e.g. 30s, 2m). Bounded by the configured check API timeout."
+//	@Success		200			{object}	CheckResponse	"Container update availability results"
+//	@Failure		500			{string}	string			"Failed to check for updates"
+//	@Failure		401			{string}	string			"Missing or invalid API token"
 //	@Security		BearerAuth
 //	@Router			/v1/check [post]
 func (h *Handler) Handle(c fiber.Ctx) error {
@@ -201,11 +201,11 @@ func (h *Handler) Handle(c fiber.Ctx) error {
 		})
 	}
 
-	err = c.Status(fiber.StatusOK).JSON(fiber.Map{
-		"containers":  results,
-		"count":       len(results),
-		"timestamp":   time.Now().UTC().Format(time.RFC3339),
-		"api_version": "v1",
+	err = c.Status(fiber.StatusOK).JSON(CheckResponse{
+		Containers: results,
+		Count:      len(results),
+		Timestamp:  time.Now().UTC().Format(time.RFC3339),
+		APIVersion: "v1",
 	})
 	if err != nil {
 		return fmt.Errorf("failed to send JSON response: %w", err)

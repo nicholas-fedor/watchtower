@@ -294,15 +294,15 @@ Default templates are unchanged.
 Custom report templates can use these fields on each container.
 They are populated even when Git monitoring is off.
 
-| Field | Meaning |
-|:------|:--------|
-| `.GitRepo` | `com.centurylinklabs.watchtower.git-repo`, else [`git-image`](../../configuration/git-monitoring/index.md#git_image) mapping, else OCI `org.opencontainers.image.source` |
-| `.GitRef` | `com.centurylinklabs.watchtower.git-ref` (or `com.centurylinklabs.watchtower.git-branch`), else mapping ref, else OCI version when it looks like a tag |
-| `.Changelog` | `com.centurylinklabs.watchtower.changelog`, else a derived releases URL, else OCI `url` / `documentation` |
-| `.Source` | OCI `org.opencontainers.image.source` |
-| `.ImageURL` | OCI `org.opencontainers.image.url` |
-| `.Documentation` | OCI `org.opencontainers.image.documentation` |
-| `.Revision` | OCI `org.opencontainers.image.revision` |
+| Field            | Meaning                                                                                                                                                                  |
+|:-----------------|:-------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| `.GitRepo`       | `com.centurylinklabs.watchtower.git-repo`, else [`git-image`](../../configuration/git-monitoring/index.md#git_image) mapping, else OCI `org.opencontainers.image.source` |
+| `.GitRef`        | `com.centurylinklabs.watchtower.git-ref` (or `com.centurylinklabs.watchtower.git-branch`), else mapping ref, else OCI version when it looks like a tag                   |
+| `.Changelog`     | `com.centurylinklabs.watchtower.changelog`, else a derived releases URL, else OCI `url` / `documentation`                                                                |
+| `.Source`        | OCI `org.opencontainers.image.source`                                                                                                                                    |
+| `.ImageURL`      | OCI `org.opencontainers.image.url`                                                                                                                                       |
+| `.Documentation` | OCI `org.opencontainers.image.documentation`                                                                                                                             |
+| `.Revision`      | OCI `org.opencontainers.image.revision`                                                                                                                                  |
 
 `.GitRef` is the configured Git ref. When the container is not associated with Git and `org.opencontainers.image.version` looks like a tag, that version is copied into `.GitRef`. There is one value, not a previous version and a new version, so a template cannot print `10.11.5 → 10.11.6` from these fields.
 
@@ -340,12 +340,12 @@ See [Git Monitoring](../../advanced-features/git-monitoring/index.md) for associ
 
 With [notification report](../../configuration/notifications/index.md#notification_report) off, Watchtower sends the log line itself. The `default-legacy` template formats these messages instead of dumping every field:
 
-| Message | What the notification says |
-|:--------|:---------------------------|
-| `Built image from Git URL context` | Container, repository, ref, commit, and changelog URL |
-| `Applied Compose project from Git` | Project name, commit, and changelog URL |
-| `Git build failed. Leaving running container untouched` | Container, repository, and the error |
-| `Compose apply failed. Leaving running container untouched` | Container, project directory, and the error |
+| Message                                                                      | What the notification says                            |
+|:-----------------------------------------------------------------------------|:------------------------------------------------------|
+| `Built image from Git URL context`                                           | Container, repository, ref, commit, and changelog URL |
+| `Applied Compose project from Git`                                           | Project name, commit, and changelog URL               |
+| `Git build failed. Leaving running container untouched`                      | Container, repository, and the error                  |
+| `Compose apply failed. Docker Compose may have partially recreated services` | Container, project directory, and the error           |
 
 The log fields are `container`, `image`, `repo`, `ref`, `commit`, `changelog`, `project`, `dir`, and `error`. A custom simple template reads them from `.Data`:
 

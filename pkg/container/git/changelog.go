@@ -154,32 +154,88 @@ func derivedReleasesURL(repo, apiOrigin string) string {
 		return ""
 	}
 
-	kind := types.ResolveGitHostKind(host, nil)
-	displayHost := host
+	cloneKind := types.ResolveGitHostKind(host, nil)
+	kind := cloneKind
+	base := "https://" + host
 
 	if apiOrigin != "" {
 		origin, err := ParseAPIOrigin(apiOrigin)
-		if err == nil {
-			displayHost = origin.Host
+		if err != nil || !sameChangelogHost(host, origin) {
+			return ""
+		}
+
+		if cloneKind != "" {
+			base = strings.TrimRight(origin.Scheme+"://"+origin.Host, "/")
+		} else {
+			kind = changelogProvider(origin.Path, "")
 			if kind == "" {
-				kind = types.ResolveGitHostKind(origin.Hostname(), nil)
+				return ""
 			}
 
-			if kind == "" {
-				kind = types.GitHostGitea
-			}
+			base = strings.TrimRight(origin.Scheme+"://"+origin.Host+origin.Path, "/")
 		}
+	}
+
+	if kind == "" {
+		return ""
 	}
 
 	path := owner + "/" + name
 
 	switch kind {
 	case types.GitHostGitHub:
-		return "https://" + displayHost + "/" + path + "/releases"
+		return base + "/" + path + "/releases"
 	case types.GitHostGitLab:
-		return "https://" + displayHost + "/" + path + "/-/releases"
+		return base + "/" + path + "/-/releases"
 	case types.GitHostGitea:
-		return "https://" + displayHost + "/" + path + "/releases"
+		return base + "/" + path + "/releases"
+	default:
+		return ""
+	}
+}
+
+// sameChangelogHost reports whether a clone host and API origin share a hostname.
+//
+// Parameters:
+//   - cloneHost: Hostname with an optional port from the clone URL.
+//   - origin: Parsed API origin.
+//
+// Returns:
+//   - bool: True when the hostnames match, ignoring ports.
+func sameChangelogHost(cloneHost string, origin url.URL) bool {
+	parsed, err := url.Parse("//" + cloneHost)
+	if err != nil {
+		return false
+	}
+
+	return strings.EqualFold(parsed.Hostname(), origin.Hostname())
+}
+
+// changelogProvider identifies a provider from a documented API path prefix.
+//
+// Parameters:
+//   - pathPrefix: API path prefix from git-host.
+//   - known: Provider already identified from the clone hostname.
+//
+// Returns:
+//   - string: GitHub, GitLab, Gitea, or empty.
+func changelogProvider(pathPrefix, known string) string {
+	if known != "" {
+		return known
+	}
+
+	prefix := strings.ToLower(strings.Trim(pathPrefix, "/"))
+	if prefix == "" || strings.Contains(prefix, "/") {
+		return ""
+	}
+
+	switch prefix {
+	case types.GitHostGitHub:
+		return types.GitHostGitHub
+	case types.GitHostGitLab:
+		return types.GitHostGitLab
+	case types.GitHostGitea, types.GitHostForgejo, "codeberg":
+		return types.GitHostGitea
 	default:
 		return ""
 	}

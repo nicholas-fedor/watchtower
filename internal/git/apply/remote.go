@@ -33,6 +33,8 @@ var (
 	ErrNeedsHTTPS = errors.New("git build token requires an HTTPS remote")
 	// ErrPathEscape indicates a context subdirectory left the repository.
 	ErrPathEscape = errors.New("git build path escapes checkout")
+
+	errMalformedRemote = errors.New("parse git remote: malformed URL")
 )
 
 // RemoteContext builds a Docker Git build-context URL.
@@ -94,11 +96,11 @@ func WithAuth(remote, username, token string) (string, error) {
 
 	parsed, err := url.Parse(remote)
 	if err != nil {
-		return "", fmt.Errorf("parse git remote: %w", err)
+		return "", errMalformedRemote
 	}
 
 	if parsed.Scheme != "https" {
-		return "", fmt.Errorf("%w: %s", ErrNeedsHTTPS, remote)
+		return "", fmt.Errorf("%w: remote scheme must be https", ErrNeedsHTTPS)
 	}
 
 	if username == "" {
@@ -126,17 +128,17 @@ func httpsRemote(repo string) (string, error) {
 
 	endpoint, err := transport.NewEndpoint(repo)
 	if err != nil {
-		return "", fmt.Errorf("%w: %s", ErrRemoteInvalid, repo)
+		return "", fmt.Errorf("%w: endpoint could not be parsed", ErrRemoteInvalid)
 	}
 
 	host := strings.Trim(endpoint.Host, "[]")
 	if host == "" {
-		return "", fmt.Errorf("%w: %s", ErrRemoteInvalid, repo)
+		return "", fmt.Errorf("%w: missing host", ErrRemoteInvalid)
 	}
 
 	repoPath := strings.TrimPrefix(endpoint.Path, "/")
 	if repoPath == "" {
-		return "", fmt.Errorf("%w: %s", ErrRemoteInvalid, repo)
+		return "", fmt.Errorf("%w: missing repository path", ErrRemoteInvalid)
 	}
 
 	if !strings.HasSuffix(repoPath, ".git") {
@@ -146,7 +148,7 @@ func httpsRemote(repo string) (string, error) {
 	switch endpoint.Protocol {
 	case "http", "https", "ssh", "git":
 	default:
-		return "", fmt.Errorf("%w: %s", ErrRemoteInvalid, repo)
+		return "", fmt.Errorf("%w: unsupported protocol", ErrRemoteInvalid)
 	}
 
 	// Preserve http only when the operator used it. Everything else becomes https.

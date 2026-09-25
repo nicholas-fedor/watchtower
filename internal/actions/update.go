@@ -782,11 +782,12 @@ func Update(
 
 	// A failed Git apply cleared Stale. Recompute linked restarts so those
 	// dependencies are not stopped. Containers that are still stale stay anchors.
-	allContainersToRestart = reconcileImplicitRestarts(
+	allContainersToRestart = reconcileImplicitRestartsExcluding(
 		log,
 		allContainers,
 		filteredContainers,
 		config,
+		gitSession.noRestartBuiltIDs(config),
 	)
 
 	err = sorter.SortByDependencies(log,
@@ -929,6 +930,24 @@ func UpdateImplicitRestart(log *zerolog.Logger, allContainers,
 	containers []types.Container,
 	useComposeDependsOn bool,
 ) {
+	updateImplicitRestart(log, allContainers, containers, useComposeDependsOn, nil)
+}
+
+// updateImplicitRestart marks linked containers while honoring excluded identifiers in the lookup index.
+//
+// Parameters:
+//   - log: Process logger. Required and must be non-nil. A nil logger panics on the first log call.
+//   - allContainers: Full list of containers being managed.
+//   - containers: Containers eligible for restart propagation.
+//   - useComposeDependsOn: Whether to consider Docker Compose depends_on labels.
+//   - excluded: Container IDs that must be indexed as non-restarting.
+//
+// This function mutates the ToRestart / LinkedToRestarting state on containers in place.
+func updateImplicitRestart(log *zerolog.Logger, allContainers,
+	containers []types.Container,
+	useComposeDependsOn bool,
+	excluded map[types.ContainerID]struct{},
+) {
 	log.Debug().Msg("Starting UpdateImplicitRestart")
 
 	byID := make(map[types.ContainerID]types.Container, len(allContainers))
@@ -962,19 +981,24 @@ func UpdateImplicitRestart(log *zerolog.Logger, allContainers,
 			continue
 		}
 
-		restartByIdentifier[resolvedID] = c.ToRestart()
+		restarting := c.ToRestart()
+		if _, skip := excluded[c.ID()]; skip {
+			restarting = false
+		}
+
+		restartByIdentifier[resolvedID] = restarting
 
 		bareName := c.Name()
 		if bareName != "" && bareName != resolvedID {
 			if _, exists := restartByIdentifier[bareName]; !exists {
-				restartByIdentifier[bareName] = c.ToRestart()
+				restartByIdentifier[bareName] = restarting
 			}
 		}
 
 		containerID := string(c.ID())
 		if containerID != "" && containerID != resolvedID && containerID != bareName {
 			if _, exists := restartByIdentifier[containerID]; !exists {
-				restartByIdentifier[containerID] = c.ToRestart()
+				restartByIdentifier[containerID] = restarting
 			}
 		}
 	}
@@ -1038,12 +1062,30 @@ func UpdateImplicitRestart(log *zerolog.Logger, allContainers,
 		Msg("Completed UpdateImplicitRestart")
 }
 
-// reconcileImplicitRestarts clears linked-restart marks and derives them again.
+// noRestartBuiltIDs returns a snapshot of container IDs built during a no-restart update.
 //
-// Git failures clear Stale after the first UpdateImplicitRestart pass.
-// Dependents of those containers must not stay in the restart list.
-// Containers that are still stale anchor the chain, including a successful
-// Compose apply that has not yet been excluded.
+// Parameters:
+//   - params: Update parameters.
+//
+// Returns:
+//   - map[types.ContainerID]struct{}: Built container IDs, or nil when restart is enabled.
+func (s *gitSession) noRestartBuiltIDs(params types.UpdateParams) map[types.ContainerID]struct{} {
+	if s == nil || !params.NoRestart {
+		return nil
+	}
+
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	ids := make(map[types.ContainerID]struct{}, len(s.built))
+	for id := range s.built {
+		ids[id] = struct{}{}
+	}
+
+	return ids
+}
+
+// reconcileImplicitRestarts clears linked-restart marks and derives them again.
 //
 // Parameters:
 //   - log: Process logger.
@@ -1058,14 +1100,52 @@ func reconcileImplicitRestarts(
 	allContainers, containers []types.Container,
 	params types.UpdateParams,
 ) []types.Container {
+	return reconcileImplicitRestartsExcluding(log, allContainers, containers, params, nil)
+}
+
+// reconcileImplicitRestartsExcluding clears linked-restart marks and derives restart candidates while omitting excluded containers.
+//
+// Parameters:
+//   - log: Process logger.
+//   - allContainers: Full list of containers being managed.
+//   - containers: Containers eligible for this session.
+//   - params: Update parameters.
+//   - excluded: Container IDs that must not propagate or receive implicit restarts.
+//
+// Returns:
+//   - []types.Container: Containers that should still restart.
+func reconcileImplicitRestartsExcluding(
+	log *zerolog.Logger,
+	allContainers, containers []types.Container,
+	params types.UpdateParams,
+	excluded map[types.ContainerID]struct{},
+) []types.Container {
 	for _, c := range containers {
 		c.SetLinkedToRestarting(false)
 	}
 
-	UpdateImplicitRestart(log, allContainers, containers, params.UseComposeDependsOn)
+	restartAll := allContainers
+	restartContainers := containers
+
+	if len(excluded) > 0 {
+		restartContainers = make([]types.Container, 0, len(containers))
+		for _, c := range containers {
+			if _, skip := excluded[c.ID()]; skip {
+				continue
+			}
+
+			restartContainers = append(restartContainers, c)
+		}
+	}
+
+	updateImplicitRestart(log, restartAll, restartContainers, params.UseComposeDependsOn, excluded)
 
 	restart := make([]types.Container, 0, len(containers))
 	for _, c := range containers {
+		if _, skip := excluded[c.ID()]; skip {
+			continue
+		}
+
 		if c.ToRestart() && !c.IsMonitorOnly(params) {
 			restart = append(restart, c)
 		}

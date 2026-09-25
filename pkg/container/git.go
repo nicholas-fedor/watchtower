@@ -100,13 +100,21 @@ func ApplyGitAssociation(c *Container, assoc GitAssociation, watch bool) {
 		return
 	}
 
-	c.SetLabel(git.RepoLabel, assoc.Repo)
+	repo := redactGitURL(assoc.Repo)
+
+	c.DeleteLabel(git.RepoLabel)
 	c.DeleteLabel(git.RefLabel)
 	c.DeleteLabel(git.SemverPolicyLabel)
 	c.DeleteLabel(git.HostLabel)
 	c.DeleteLabel(git.DockerfileLabel)
 	c.DeleteLabel(git.ContextLabel)
 	c.DeleteLabel(git.WatchLabel)
+
+	if repo == "" {
+		return
+	}
+
+	c.SetLabel(git.RepoLabel, repo)
 
 	if assoc.Ref != "" {
 		c.SetLabel(git.RefLabel, assoc.Ref)
@@ -117,7 +125,9 @@ func ApplyGitAssociation(c *Container, assoc GitAssociation, watch bool) {
 	}
 
 	if assoc.Host != "" {
-		c.SetLabel(git.HostLabel, assoc.Host)
+		if host := redactGitURL(assoc.Host); host != "" {
+			c.SetLabel(git.HostLabel, host)
+		}
 	}
 
 	if assoc.Dockerfile != "" {

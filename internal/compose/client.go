@@ -55,6 +55,11 @@ func (c *Client) Apply(ctx context.Context, req Request) ([]Container, error) {
 		return nil, err
 	}
 
+	project, err = scopeComposeProject(project, req.Services)
+	if err != nil {
+		return nil, fmt.Errorf("select compose services: %w", err)
+	}
+
 	project, err = InjectLabels(project, req.Labels)
 	if err != nil {
 		return nil, fmt.Errorf("inject compose labels: %w", err)
@@ -91,9 +96,8 @@ func (c *Client) Apply(ctx context.Context, req Request) ([]Container, error) {
 			Inherit:              true,
 		},
 		Start: api.StartOptions{
-			Project:  project,
-			Services: req.Services,
-			Wait:     true,
+			Project: project,
+			Wait:    true,
 		},
 	})
 	if err != nil {
@@ -101,6 +105,33 @@ func (c *Client) Apply(ctx context.Context, req Request) ([]Container, error) {
 	}
 
 	return listApplied(ctx, svc, project, req.Services)
+}
+
+// scopeComposeProject scopes a project to the requested services and their dependencies.
+//
+// Parameters:
+//   - project: Loaded Compose project.
+//   - services: Service names to select.
+//
+// Returns:
+//   - *composeTypes.Project: Scoped Compose project.
+//   - error: Non-nil when service selection fails.
+func scopeComposeProject(project *composeTypes.Project, services []string) (*composeTypes.Project, error) {
+	if project == nil {
+		return nil, errNilProject
+	}
+
+	project, err := project.WithServicesEnabled(services...)
+	if err != nil {
+		return nil, fmt.Errorf("enable selected compose services: %w", err)
+	}
+
+	project, err = project.WithSelectedServices(services, composeTypes.IncludeDependencies)
+	if err != nil {
+		return nil, fmt.Errorf("select selected compose services: %w", err)
+	}
+
+	return project, nil
 }
 
 // composeService returns the docker/compose service, creating it on first use.

@@ -29,7 +29,7 @@ func ParseAPIOrigin(raw string) (url.URL, error) {
 	}
 
 	if strings.Contains(raw, "=") {
-		return url.URL{}, fmt.Errorf("%w: %q", ErrInvalidHost, raw)
+		return url.URL{}, fmt.Errorf("%w: host=type mappings are not supported", ErrInvalidHost)
 	}
 
 	if !strings.Contains(raw, "://") {
@@ -37,12 +37,16 @@ func ParseAPIOrigin(raw string) (url.URL, error) {
 	}
 
 	parsed, err := url.Parse(raw)
-	if err != nil || parsed.Hostname() == "" {
-		return url.URL{}, fmt.Errorf("%w: %q", ErrInvalidHost, raw)
+	if err != nil {
+		return url.URL{}, fmt.Errorf("%w: malformed URL", ErrInvalidHost)
+	}
+
+	if parsed.Hostname() == "" {
+		return url.URL{}, fmt.Errorf("%w: missing hostname", ErrInvalidHost)
 	}
 
 	if parsed.Scheme != "http" && parsed.Scheme != "https" {
-		return url.URL{}, fmt.Errorf("%w: %q", ErrInvalidHost, raw)
+		return url.URL{}, fmt.Errorf("%w: scheme must be http or https", ErrInvalidHost)
 	}
 
 	parsed.User = nil

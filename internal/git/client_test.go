@@ -1,6 +1,7 @@
 package git
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"errors"
@@ -21,6 +22,7 @@ import (
 	dockerspec "github.com/moby/docker-image-spec/specs-go/v1"
 	dockerImage "github.com/moby/moby/api/types/image"
 
+	"github.com/nicholas-fedor/watchtower/internal/compose"
 	gitPkg "github.com/nicholas-fedor/watchtower/pkg/container/git"
 	"github.com/nicholas-fedor/watchtower/pkg/container/oci"
 	"github.com/nicholas-fedor/watchtower/pkg/types"
@@ -45,6 +47,61 @@ func testClient(t *testing.T, refs []RemoteRef) *Client {
 	client.opts.Hosts = nil
 
 	return client
+}
+
+func TestCheckContainer_RejectedComposeStampRetries(t *testing.T) {
+	t.Parallel()
+
+	const (
+		dir           = "/srv/app"
+		files         = "compose.yaml"
+		previous      = "aaa1111111"
+		otherPrevious = "ccc3333333"
+		current       = "bbb2222222"
+	)
+
+	client := testClient(t, []RemoteRef{{Name: "refs/heads/main", Hash: current}})
+	api := labeledComposeMember(t, "web", "api", "1", dir, files, current)
+	worker := labeledComposeMember(t, "web", "worker", "1", dir, files, current)
+	other := labeledComposeMember(t, "other", "api", "1", dir, files, current)
+
+	client.RejectApply(ApplyStampKeyFrom(api), current, previous, "")
+	client.RejectApply(ApplyStampKeyFrom(worker), current, otherPrevious, "")
+	client.RejectApply(ApplyStampKeyFrom(other), current, previous, "")
+
+	got, err := CheckContainer(t.Context(), client, api, types.UpdateParams{})
+	require.NoError(t, err)
+	assert.True(t, got.Stale)
+	assert.Equal(t, current, got.Commit)
+
+	client.AcceptApply(ApplyStampKeyFrom(api), current)
+
+	got, err = CheckContainer(t.Context(), client, api, types.UpdateParams{})
+	require.NoError(t, err)
+	assert.False(t, got.Stale)
+
+	got, err = CheckContainer(t.Context(), client, worker, types.UpdateParams{})
+	require.NoError(t, err)
+	assert.True(t, got.Stale)
+
+	got, err = CheckContainer(t.Context(), client, other, types.UpdateParams{})
+	require.NoError(t, err)
+	assert.True(t, got.Stale)
+}
+
+func labeledComposeMember(t *testing.T, project, service, number, dir, files, commit string) types.Container {
+	t.Helper()
+
+	return labeledContainer(t, map[string]string{
+		gitPkg.RepoLabel:                "https://example.com/org/app.git",
+		gitPkg.RefLabel:                 "main",
+		gitPkg.LastCommitLabel:          commit,
+		gitPkg.ComposeDirLabel:          dir,
+		compose.ComposeProjectLabel:     project,
+		compose.ComposeServiceLabel:     service,
+		compose.ComposeContainerNumber:  number,
+		compose.ComposeConfigFilesLabel: files,
+	})
 }
 
 func TestCheck_NoStampIsNotStale(t *testing.T) {
@@ -444,6 +501,106 @@ func TestCheck_TagPolicyListError(t *testing.T) {
 	assert.ErrorContains(t, err, "ls-remote tags")
 }
 
+// TestRepositoryDiagnosticsAreSanitized verifies that diagnostic logs omit repository credentials while preserving a safe repository URL.
+func TestRepositoryDiagnosticsAreSanitized(t *testing.T) {
+	t.Parallel()
+
+	repo := "https://user:debug-secret@github.com/org/app.git?token=debug-query#debug-fragment"
+
+	tests := []struct {
+		name string
+		refs []RemoteRef
+		run  func(*Client) error
+	}{
+		{
+			name: "resolve ref",
+			refs: []RemoteRef{{Name: "refs/heads/main", Hash: "abc111"}},
+			run: func(client *Client) error {
+				_, err := client.resolveRef(t.Context(), repo, "main", "")
+
+				return err
+			},
+		},
+		{
+			name: "list tags",
+			refs: []RemoteRef{{Name: "refs/tags/v1.0.0", Hash: "abc111"}},
+			run: func(client *Client) error {
+				_, err := client.listTags(t.Context(), repo, "")
+
+				return err
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			var logs bytes.Buffer
+
+			logger := zerolog.New(&logs)
+			client := New(&logger, Options{})
+			client.http = &http.Client{Transport: roundTripFunc(func(*http.Request) (*http.Response, error) {
+				return nil, errors.New("API unavailable")
+			})}
+			client.lister = stubLister{refs: tt.refs}
+
+			require.NoError(t, tt.run(client))
+			assert.NotContains(t, logs.String(), "debug-secret")
+			assert.NotContains(t, logs.String(), "debug-query")
+			assert.NotContains(t, logs.String(), "debug-fragment")
+			assert.Contains(t, logs.String(), `"repo":"https://github.com/org/app.git"`)
+		})
+	}
+}
+
+// TestRepositoryErrorsAreSanitized verifies that remote errors omit repository credentials while retaining a safe repository URL.
+func TestRepositoryErrorsAreSanitized(t *testing.T) {
+	t.Parallel()
+
+	repo := "https://user:error-secret@github.com/org/app.git?token=error-query#error-fragment"
+	tests := []struct {
+		name string
+		run  func(*Client) error
+	}{
+		{
+			name: "resolve ref",
+			run: func(client *Client) error {
+				_, err := client.resolveRef(t.Context(), repo, "main", "")
+
+				return err
+			},
+		},
+		{
+			name: "list tags",
+			run: func(client *Client) error {
+				_, err := client.listTags(t.Context(), repo, "")
+
+				return err
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			client := testClient(t, nil)
+			client.http = &http.Client{Transport: roundTripFunc(func(*http.Request) (*http.Response, error) {
+				return nil, errors.New("API unavailable")
+			})}
+			client.lister = stubLister{err: errors.New("remote rejected " + repo)}
+
+			err := tt.run(client)
+			require.Error(t, err)
+			assert.Contains(t, err.Error(), "https://github.com/org/app.git")
+			assert.NotContains(t, err.Error(), "error-secret")
+			assert.NotContains(t, err.Error(), "error-query")
+			assert.NotContains(t, err.Error(), "error-fragment")
+		})
+	}
+}
+
 func TestClone(t *testing.T) {
 	t.Parallel()
 
@@ -593,7 +750,7 @@ func TestWithTimeout(t *testing.T) {
 
 		client := &Client{opts: Options{Timeout: 50 * time.Millisecond}}
 
-		ctx, cancel := client.withTimeout(t.Context())
+		ctx, cancel := client.WithTimeout(t.Context())
 		defer cancel()
 
 		deadline, ok := ctx.Deadline()
@@ -609,7 +766,7 @@ func TestWithTimeout(t *testing.T) {
 
 		client := &Client{opts: Options{Timeout: time.Hour}}
 
-		ctx, cancel := client.withTimeout(parent)
+		ctx, cancel := client.WithTimeout(parent)
 		defer cancel()
 
 		parentDeadline, ok := parent.Deadline()
@@ -622,7 +779,7 @@ func TestWithTimeout(t *testing.T) {
 	t.Run("zero timeout uses default", func(t *testing.T) {
 		t.Parallel()
 
-		ctx, cancel := (&Client{}).withTimeout(t.Context())
+		ctx, cancel := (&Client{}).WithTimeout(t.Context())
 		defer cancel()
 
 		deadline, ok := ctx.Deadline()
@@ -678,13 +835,16 @@ func TestCheckContainer(t *testing.T) {
 	t.Run("invalid git-host is fail-closed", func(t *testing.T) {
 		t.Parallel()
 
+		rawHost := "https://user:secret@git.example.com?token=secret=bad"
 		c := labeledContainer(t, map[string]string{
 			gitPkg.RepoLabel: "https://example.com/org/app.git",
-			gitPkg.HostLabel: "git.example.com=gitea",
+			gitPkg.HostLabel: rawHost,
 		})
 
 		got, err := CheckContainer(t.Context(), testClient(t, nil), c, types.UpdateParams{})
 		require.ErrorIs(t, err, ErrInvalidHost)
+		assert.NotContains(t, err.Error(), "secret")
+		assert.NotContains(t, err.Error(), rawHost)
 		assert.Equal(t, CheckResult{}, got)
 	})
 

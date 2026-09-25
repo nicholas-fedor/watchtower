@@ -42,6 +42,42 @@ var _ = ginkgo.Describe("ResolveReportMeta", func() {
 		gomega.Expect(meta.Source).To(gomega.Equal("https://github.com/org/from-oci.git"))
 	})
 
+	ginkgo.It("preserves bare local Git repository paths", func() {
+		c := MockContainer(
+			WithImageName("app:latest"),
+			WithLabels(map[string]string{
+				git.RepoLabel: "../repos/app?release=1",
+			}),
+		)
+
+		meta := ResolveReportMeta(c, types.UpdateParams{}, ChangelogVars{})
+		gomega.Expect(meta.GitRepo).To(gomega.Equal("../repos/app?release=1"))
+	})
+
+	ginkgo.It("redacts credentials and query tokens from Git metadata", func() {
+		c := MockContainer(
+			WithImageName("app:latest"),
+			WithLabels(map[string]string{
+				git.RepoLabel:      "https://user:secret@github.com/org/app.git?access_token=query#main",
+				git.ChangelogLabel: "https://example.com/notes?version=2#install",
+			}),
+			WithImageLabels(map[string]string{
+				oci.SourceLabel:        "https://source:source-secret@example.com/org/source.git?token=source-query",
+				oci.URLLabel:           "https://example.com/image?format=json&author=team#download",
+				oci.DocumentationLabel: "https://example.com/docs?lang=en#install",
+			}),
+		)
+
+		meta := ResolveReportMeta(c, types.UpdateParams{}, ChangelogVars{})
+		gomega.Expect(meta.GitRepo).To(gomega.Equal("https://github.com/org/app.git#main"))
+		gomega.Expect(meta.GitRepo).NotTo(gomega.ContainSubstring("secret"))
+		gomega.Expect(meta.GitRepo).NotTo(gomega.ContainSubstring("query"))
+		gomega.Expect(meta.Changelog).To(gomega.Equal("https://example.com/notes?version=2#install"))
+		gomega.Expect(meta.Source).To(gomega.Equal("https://example.com/org/source.git"))
+		gomega.Expect(meta.ImageURL).To(gomega.Equal("https://example.com/image?format=json&author=team#download"))
+		gomega.Expect(meta.Documentation).To(gomega.Equal("https://example.com/docs?lang=en#install"))
+	})
+
 	ginkgo.It("uses an image mapping then OCI source when labels are absent", func() {
 		c := MockContainer(
 			WithImageName("myapp:latest"),
@@ -88,23 +124,30 @@ var _ = ginkgo.Describe("ResolveReportMeta", func() {
 
 		mappedHost := MockContainer(WithImageName("app:latest"), WithLabels(map[string]string{
 			git.RepoLabel: "git@git.example.com:org/app.git",
-			git.HostLabel: "https://git.example.com:3000",
+			git.HostLabel: "https://git.example.com:3000/gitea",
 		}))
 		gomega.Expect(ResolveReportMeta(mappedHost, types.UpdateParams{}, ChangelogVars{}).Changelog).
-			To(gomega.Equal("https://git.example.com:3000/org/app/releases"))
+			To(gomega.Equal("https://git.example.com:3000/gitea/org/app/releases"))
 
 		ghe := MockContainer(WithImageName("app:latest"), WithLabels(map[string]string{
 			git.RepoLabel: "https://github.company.com/org/app.git",
-			git.HostLabel: "https://github.company.com",
+			git.HostLabel: "https://github.company.com/github",
 		}))
 		gomega.Expect(ResolveReportMeta(ghe, types.UpdateParams{}, ChangelogVars{}).Changelog).
-			To(gomega.Equal("https://github.company.com/org/app/releases"))
+			To(gomega.Equal("https://github.company.com/github/org/app/releases"))
 
 		nested := MockContainer(WithImageName("app:latest"), WithLabels(map[string]string{
 			git.RepoLabel: "https://gitlab.com/group/sub/repo.git",
 		}))
 		gomega.Expect(ResolveReportMeta(nested, types.UpdateParams{}, ChangelogVars{}).Changelog).
 			To(gomega.Equal("https://gitlab.com/group/sub/repo/-/releases"))
+	})
+
+	ginkgo.It("does not persist an SCP URL whose user is a token", func() {
+		gomega.Expect(redactGitURL("token@github.com:org/app.git")).To(gomega.BeEmpty())
+		gomega.Expect(redactGitURL("ghp_abcdefghijklmnopqrstuvwxyz@github.com:org/app.git")).To(gomega.BeEmpty())
+		gomega.Expect(redactGitURL("git@github.com:org/app.git")).To(gomega.Equal("git@github.com:org/app.git"))
+		gomega.Expect(redactGitURL("deploy@git.example.com:org/app.git")).To(gomega.Equal("deploy@git.example.com:org/app.git"))
 	})
 
 	ginkgo.It("leaves changelog empty for an unknown host without OCI URL fields", func() {

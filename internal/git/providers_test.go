@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"net/url"
+	"strconv"
 	"strings"
 	"testing"
 
@@ -82,13 +83,13 @@ func TestResolveViaAPI(t *testing.T) {
 
 		mux := http.NewServeMux()
 		mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
-			if !strings.Contains(r.URL.Path, "/repository/commits/") {
+			if !strings.Contains(r.URL.Path, "/repository/branches/") {
 				w.WriteHeader(http.StatusNotFound)
 
 				return
 			}
 
-			writeJSON(w, map[string]string{"id": "glsha"})
+			writeJSON(w, map[string]any{"commit": map[string]string{"id": "glsha"}})
 		})
 
 		client := newDetectClient(t, mux)
@@ -107,7 +108,7 @@ func TestResolveViaAPI(t *testing.T) {
 		mux := http.NewServeMux()
 		mux.HandleFunc("/api/v1/repos/org/app/git/refs/heads/main", func(w http.ResponseWriter, _ *http.Request) {
 			writeJSON(w, []map[string]any{
-				{"ref": "refs/heads/main", "object": map[string]string{"sha": "giteasha"}},
+				{"ref": "refs/heads/main", "object": map[string]string{"sha": "giteasha", "type": "commit"}},
 			})
 		})
 
@@ -315,7 +316,7 @@ func TestGithubRef(t *testing.T) {
 		})
 		mux.HandleFunc("/repos/org/app/git/tags/tagobject", func(w http.ResponseWriter, _ *http.Request) {
 			writeJSON(w, map[string]any{
-				"object": map[string]any{"sha": "peeled"},
+				"object": map[string]string{"sha": "peeled", "type": "commit"},
 			})
 		})
 
@@ -324,6 +325,31 @@ func TestGithubRef(t *testing.T) {
 		require.True(t, found)
 		assert.Equal(t, "v1.0.0", resolved.Name)
 		assert.Equal(t, "peeled", resolved.Hash)
+	})
+
+	t.Run("rejects an annotated tag targeting a tree", func(t *testing.T) {
+		t.Parallel()
+
+		mux := http.NewServeMux()
+		mux.HandleFunc("/repos/org/app/git/ref/tags/tree", func(w http.ResponseWriter, _ *http.Request) {
+			writeJSON(w, map[string]any{
+				"object": map[string]any{
+					"sha":  "tagobject",
+					"type": "tag",
+					"url":  "https://api.github.com/repos/org/app/git/tags/tagobject",
+				},
+			})
+		})
+		mux.HandleFunc("/repos/org/app/git/tags/tagobject", func(w http.ResponseWriter, _ *http.Request) {
+			writeJSON(w, map[string]any{
+				"object": map[string]string{"sha": "treeobject", "type": "tree"},
+			})
+		})
+
+		resolved, found, err := newDetectClient(t, mux).githubRef(t.Context(), "github.com", url.URL{}, "org", "app", "tags/tree")
+		require.NoError(t, err)
+		assert.False(t, found)
+		assert.Empty(t, resolved.Hash)
 	})
 
 	t.Run("unpeeled annotated tag is not found", func(t *testing.T) {
@@ -429,13 +455,14 @@ func TestGitlabRef(t *testing.T) {
 
 		mux := http.NewServeMux()
 		mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
-			assert.Contains(t, r.URL.RawPath+r.URL.Path, "commits")
-			writeJSON(w, map[string]string{"id": "glsha"})
+			assert.Contains(t, r.URL.EscapedPath(), "/repository/branches/main")
+			writeJSON(w, map[string]any{"commit": map[string]string{"id": "glsha"}})
 		})
 
 		resolved, found, err := newDetectClient(t, mux).gitlabRef(t.Context(), "gitlab.com", url.URL{}, "org", "app", "main")
 		require.NoError(t, err)
 		require.True(t, found)
+		assert.Equal(t, "main", resolved.Name)
 		assert.Equal(t, kindBranch, resolved.Kind)
 		assert.Equal(t, "glsha", resolved.Hash)
 	})
@@ -444,22 +471,87 @@ func TestGitlabRef(t *testing.T) {
 		t.Parallel()
 
 		mux := http.NewServeMux()
-		mux.HandleFunc("/", func(w http.ResponseWriter, _ *http.Request) {
-			writeJSON(w, map[string]string{"id": "tagsha"})
+		mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
+			path := r.URL.EscapedPath()
+			switch {
+			case strings.Contains(path, "/repository/branches/v1.2.3"):
+				w.WriteHeader(http.StatusNotFound)
+			case strings.Contains(path, "/repository/tags/v1.2.3"):
+				writeJSON(w, map[string]any{"commit": map[string]string{"id": "tagsha"}})
+			default:
+				w.WriteHeader(http.StatusNotFound)
+			}
 		})
 
 		resolved, found, err := newDetectClient(t, mux).gitlabRef(t.Context(), "gitlab.com", url.URL{}, "org", "app", "v1.2.3")
 		require.NoError(t, err)
 		require.True(t, found)
 		assert.Equal(t, kindTag, resolved.Kind)
+		assert.Equal(t, "tagsha", resolved.Hash)
 	})
 
-	t.Run("empty id", func(t *testing.T) {
+	t.Run("non-semver tag", func(t *testing.T) {
 		t.Parallel()
 
 		mux := http.NewServeMux()
-		mux.HandleFunc("/", func(w http.ResponseWriter, _ *http.Request) {
-			writeJSON(w, map[string]string{"id": ""})
+		mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
+			path := r.URL.EscapedPath()
+			switch {
+			case strings.Contains(path, "/repository/branches/release"):
+				w.WriteHeader(http.StatusNotFound)
+			case strings.Contains(path, "/repository/tags/release"):
+				writeJSON(w, map[string]any{"commit": map[string]string{"id": "releasesha"}})
+			default:
+				w.WriteHeader(http.StatusNotFound)
+			}
+		})
+
+		resolved, found, err := newDetectClient(t, mux).gitlabRef(t.Context(), "gitlab.com", url.URL{}, "org", "app", "release")
+		require.NoError(t, err)
+		require.True(t, found)
+		assert.Equal(t, "release", resolved.Name)
+		assert.Equal(t, kindTag, resolved.Kind)
+		assert.Equal(t, "releasesha", resolved.Hash)
+	})
+
+	t.Run("same-named branch takes precedence", func(t *testing.T) {
+		t.Parallel()
+
+		mux := http.NewServeMux()
+		mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
+			path := r.URL.EscapedPath()
+			switch {
+			case strings.Contains(path, "/repository/branches/release"):
+				writeJSON(w, map[string]any{"commit": map[string]string{"id": "branchsha"}})
+			case strings.Contains(path, "/repository/tags/release"):
+				writeJSON(w, map[string]any{"commit": map[string]string{"id": "tagsha"}})
+			default:
+				w.WriteHeader(http.StatusNotFound)
+			}
+		})
+
+		resolved, found, err := newDetectClient(t, mux).gitlabRef(t.Context(), "gitlab.com", url.URL{}, "org", "app", "release")
+		require.NoError(t, err)
+		require.True(t, found)
+		assert.Equal(t, "release", resolved.Name)
+		assert.Equal(t, kindBranch, resolved.Kind)
+		assert.Equal(t, "branchsha", resolved.Hash)
+	})
+
+	t.Run("empty commit id", func(t *testing.T) {
+		t.Parallel()
+
+		mux := http.NewServeMux()
+		mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
+			path := r.URL.EscapedPath()
+			switch {
+			case strings.Contains(path, "/repository/branches/main"):
+				writeJSON(w, map[string]any{"commit": map[string]string{"id": ""}})
+			case strings.Contains(path, "/repository/tags/main"):
+				w.WriteHeader(http.StatusNotFound)
+			default:
+				w.WriteHeader(http.StatusNotFound)
+			}
 		})
 
 		_, found, err := newDetectClient(t, mux).gitlabRef(t.Context(), "gitlab.com", url.URL{}, "org", "app", "main")
@@ -562,7 +654,7 @@ func TestGiteaRef(t *testing.T) {
 		mux := http.NewServeMux()
 		mux.HandleFunc("/api/v1/repos/org/app/git/refs/heads/main", func(w http.ResponseWriter, _ *http.Request) {
 			writeJSON(w, []map[string]any{
-				{"object": map[string]string{"sha": "branchsha"}},
+				{"object": map[string]string{"sha": "branchsha", "type": "commit"}},
 			})
 		})
 
@@ -582,7 +674,7 @@ func TestGiteaRef(t *testing.T) {
 		})
 		mux.HandleFunc("/api/v1/repos/org/app/git/refs/tags/v1.0.0", func(w http.ResponseWriter, _ *http.Request) {
 			writeJSON(w, []map[string]any{
-				{"object": map[string]string{"sha": "tagsha"}},
+				{"object": map[string]string{"sha": "tagsha", "type": "commit"}},
 			})
 		})
 
@@ -652,6 +744,23 @@ func TestGiteaRefs(t *testing.T) {
 		assert.Equal(t, "peeled", resolved.Hash)
 	})
 
+	t.Run("rejects a peeled tree object", func(t *testing.T) {
+		t.Parallel()
+
+		mux := http.NewServeMux()
+		mux.HandleFunc("/", func(w http.ResponseWriter, _ *http.Request) {
+			writeJSON(w, []map[string]any{
+				{"ref": "refs/tags/v1.0.0", "object": map[string]string{"sha": "tagobject", "type": "tag"}},
+				{"ref": "refs/tags/v1.0.0^{}", "object": map[string]string{"sha": "treeobject", "type": "tree"}},
+			})
+		})
+
+		resolved, found, err := newDetectClient(t, mux).giteaRefs(t.Context(), "https://git.example.com/refs", "v1.0.0", kindTag, "")
+		require.NoError(t, err)
+		assert.False(t, found)
+		assert.Empty(t, resolved.Hash)
+	})
+
 	t.Run("tag object only is not found", func(t *testing.T) {
 		t.Parallel()
 
@@ -704,14 +813,16 @@ func TestGiteaTags(t *testing.T) {
 		assert.Empty(t, tags)
 	})
 
-	t.Run("paginates until short page", func(t *testing.T) {
+	t.Run("paginates when the server caps pages at 50", func(t *testing.T) {
 		t.Parallel()
 
 		mux := http.NewServeMux()
 		mux.HandleFunc("/api/v1/repos/org/app/tags", func(w http.ResponseWriter, r *http.Request) {
+			assert.Equal(t, strconv.Itoa(giteaTagsPerPage), r.URL.Query().Get("limit"))
+
 			page := r.URL.Query().Get("page")
 			if page == "1" {
-				items := make([]map[string]any, tagsPerPage)
+				items := make([]map[string]any, giteaTagsPerPage)
 				for i := range items {
 					items[i] = map[string]any{
 						"name":   "v1.0.0",
@@ -724,16 +835,59 @@ func TestGiteaTags(t *testing.T) {
 				return
 			}
 
+			if page == "2" {
+				items := make([]map[string]any, giteaTagsPerPage)
+				for i := range items {
+					items[i] = map[string]any{
+						"name":   "v1.0.1",
+						"commit": map[string]string{"sha": "bbb"},
+					}
+				}
+
+				writeJSON(w, items)
+
+				return
+			}
+
 			writeJSON(w, []map[string]any{
-				{"name": "v1.0.1", "commit": map[string]string{"sha": "bbb"}},
+				{"name": "v1.0.2", "commit": map[string]string{"sha": "ccc"}},
 			})
 		})
 
 		tags, used, err := newDetectClient(t, mux).giteaTags(t.Context(), "git.example.com", url.URL{}, "org", "app")
 		require.NoError(t, err)
 		assert.True(t, used)
-		require.Len(t, tags, tagsPerPage+1)
-		assert.Equal(t, "v1.0.1", tags[len(tags)-1].Name)
+		require.Len(t, tags, giteaTagsPerPage*2+1)
+		assert.Equal(t, "v1.0.2", tags[len(tags)-1].Name)
+	})
+
+	t.Run("normalizes a Gitea Link page to the safe limit", func(t *testing.T) {
+		t.Parallel()
+
+		mux := http.NewServeMux()
+		mux.HandleFunc("/api/v1/repos/org/app/tags", func(w http.ResponseWriter, r *http.Request) {
+			assert.Equal(t, strconv.Itoa(giteaTagsPerPage), r.URL.Query().Get("limit"))
+
+			if r.URL.Query().Get("page") == "1" {
+				w.Header().Set("Link", "<https://git.example.com/api/v1/repos/org/app/tags?page=2&limit=100>; rel=\"next\"")
+				writeJSON(w, []map[string]any{
+					{"name": "v1.0.0", "commit": map[string]string{"sha": "aaa"}},
+				})
+
+				return
+			}
+
+			writeJSON(w, []map[string]any{
+				{"name": "v1.0.1", "commit": map[string]string{"sha": "bbb"}},
+			})
+		})
+
+		client := newDetectClient(t, mux)
+		tags, used, err := client.giteaTags(t.Context(), "git.example.com", url.URL{}, "org", "app")
+		require.NoError(t, err)
+		assert.True(t, used)
+		require.Len(t, tags, 2)
+		assert.Equal(t, "v1.0.1", tags[1].Name)
 	})
 
 	t.Run("http error", func(t *testing.T) {
@@ -748,17 +902,6 @@ func TestGiteaTags(t *testing.T) {
 		require.Error(t, err)
 		assert.False(t, used)
 	})
-}
-
-func TestLooksLikeTagRef(t *testing.T) {
-	t.Parallel()
-
-	assert.True(t, looksLikeTagRef("v1.2.3"))
-	assert.True(t, looksLikeTagRef("1.2.3"))
-	assert.True(t, looksLikeTagRef("release.1"))
-	assert.False(t, looksLikeTagRef("main"))
-	assert.False(t, looksLikeTagRef("release/1"))
-	assert.False(t, looksLikeTagRef(""))
 }
 
 func TestGetJSON(t *testing.T) {

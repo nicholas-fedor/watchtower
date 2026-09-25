@@ -18,8 +18,10 @@ import (
 )
 
 const (
-	tagsPerPage = 100
-	maxTagPages = 50
+	tagsPerPage      = 100
+	giteaTagsPerPage = 50
+	maxTagPages      = 50
+	maxTagPeels      = 10
 )
 
 // resolveViaAPI resolves ref using the classified host's REST API.
@@ -234,34 +236,42 @@ func (c *Client) githubRef(ctx context.Context, host string, origin url.URL, own
 		return resolvedRef{}, false, err
 	}
 
-	sha := body.Object.SHA
-	// Annotated tags point at a tag object. Use the peeled commit only.
-	// An unpeeled tag object hash is not a valid Docker Git URL fragment.
-	if body.Object.Type == "tag" {
-		if body.Object.URL == "" || sameOriginNext(endpoint.String(), body.Object.URL) == "" {
+	object := body.Object
+	sha := object.SHA
+	// Annotated tags can target another tag object. Peel until the API
+	// identifies the target as a commit, and reject trees and blobs.
+	for range maxTagPeels {
+		if object.Type != "tag" {
+			break
+		}
+
+		if object.URL == "" || sameOriginNext(endpoint.String(), object.URL) == "" {
 			return resolvedRef{}, false, nil
 		}
 
 		var tag struct {
 			Object struct {
-				SHA string `json:"sha"`
+				SHA  string `json:"sha"`
+				Type string `json:"type"`
+				URL  string `json:"url"`
 			} `json:"object"`
 		}
 
-		_, err := c.getJSONPage(ctx, body.Object.URL, &tag, host)
+		_, err := c.getJSONPage(ctx, object.URL, &tag, host)
 		if err != nil {
 			//nolint:nilerr // Peel failure is not-found so ls-remote can try ^{}.
 			return resolvedRef{}, false, nil
 		}
 
-		if tag.Object.SHA == "" {
+		object = tag.Object
+
+		sha = object.SHA
+		if sha == "" {
 			return resolvedRef{}, false, nil
 		}
-
-		sha = tag.Object.SHA
 	}
 
-	if sha == "" {
+	if object.Type != "commit" {
 		return resolvedRef{}, false, nil
 	}
 
@@ -325,7 +335,7 @@ func (c *Client) githubTags(ctx context.Context, host string, origin url.URL, ow
 	return tags, true, nil
 }
 
-// gitlabRef resolves a GitLab branch or tag via the commits API.
+// gitlabRef resolves a GitLab branch, then tag, via repository metadata.
 //
 // Parameters:
 //   - ctx: Cancellation and timeout.
@@ -335,35 +345,51 @@ func (c *Client) githubTags(ctx context.Context, host string, origin url.URL, ow
 //   - ref: Branch or tag name.
 //
 // Returns:
-//   - resolvedRef: Name, hash, and inferred kind.
+//   - resolvedRef: Name, hash, and kind.
 //   - bool: True when the ref exists.
 //   - error: Non-nil on HTTP failure.
 func (c *Client) gitlabRef(ctx context.Context, host string, origin url.URL, owner, repo, ref string) (resolvedRef, bool, error) {
-	endpoint := joinEscaped(c.gitlabAPIAt(origin, host), "projects", owner+"/"+repo, "repository", "commits", ref)
-
-	var body struct {
-		ID string `json:"id"`
+	refKinds := [...]struct {
+		resource string
+		kind     string
+	}{
+		{resource: "branches", kind: kindBranch},
+		{resource: "tags", kind: kindTag},
 	}
 
-	_, err := c.getJSONPage(ctx, endpoint.String(), &body, host)
-	if errors.Is(err, errAPINotFound) {
-		return resolvedRef{}, false, nil
+	for _, refKind := range refKinds {
+		endpoint := joinEscaped(
+			c.gitlabAPIAt(origin, host),
+			"projects",
+			owner+"/"+repo,
+			"repository",
+			refKind.resource,
+			ref,
+		)
+
+		var body struct {
+			Commit struct {
+				ID string `json:"id"`
+			} `json:"commit"`
+		}
+
+		_, err := c.getJSONPage(ctx, endpoint.String(), &body, host)
+		if errors.Is(err, errAPINotFound) {
+			continue
+		}
+
+		if err != nil {
+			return resolvedRef{}, false, err
+		}
+
+		if body.Commit.ID == "" {
+			continue
+		}
+
+		return resolvedRef{Name: ref, Hash: body.Commit.ID, Kind: refKind.kind}, true, nil
 	}
 
-	if err != nil {
-		return resolvedRef{}, false, err
-	}
-
-	if body.ID == "" {
-		return resolvedRef{}, false, nil
-	}
-
-	kind := kindBranch
-	if looksLikeTagRef(ref) {
-		kind = kindTag
-	}
-
-	return resolvedRef{Name: ref, Hash: body.ID, Kind: kind}, true, nil
+	return resolvedRef{}, false, nil
 }
 
 // gitlabTags lists GitLab tags with pagination.
@@ -472,25 +498,33 @@ func (c *Client) giteaRefs(ctx context.Context, endpoint, ref, kind, cloneHost s
 		return resolvedRef{}, false, err
 	}
 
-	var commitHash string
+	var (
+		commitHash string
+		peeledHash string
+	)
 
 	for _, item := range body {
 		if item.Object.SHA == "" {
 			continue
 		}
 
-		// Prefer the peeled commit over an annotated-tag object.
 		if strings.HasSuffix(item.Ref, "^{}") {
-			return resolvedRef{Name: ref, Hash: item.Object.SHA, Kind: kind}, true, nil
-		}
+			if item.Object.Type != "commit" {
+				return resolvedRef{}, false, nil
+			}
 
-		if item.Object.Type == "tag" {
+			peeledHash = item.Object.SHA
+
 			continue
 		}
 
-		if commitHash == "" {
+		if item.Object.Type == "commit" && commitHash == "" {
 			commitHash = item.Object.SHA
 		}
+	}
+
+	if peeledHash != "" {
+		return resolvedRef{Name: ref, Hash: peeledHash, Kind: kind}, true, nil
 	}
 
 	if commitHash == "" {
@@ -522,17 +556,17 @@ func (c *Client) giteaTags(ctx context.Context, host string, origin url.URL, own
 
 	var tags []RemoteRef
 
-	for page := 1; page <= maxTagPages; page++ {
-		endpointURL := c.giteaAPIAt(origin, host, "repos", owner, repo, "tags")
-		query := endpointURL.Query()
-		query.Set("limit", strconv.Itoa(tagsPerPage))
-		query.Set("page", strconv.Itoa(page))
-		endpointURL.RawQuery = query.Encode()
-		endpoint := endpointURL.String()
+	endpointURL := c.giteaAPIAt(origin, host, "repos", owner, repo, "tags")
+	query := endpointURL.Query()
+	query.Set("limit", strconv.Itoa(giteaTagsPerPage))
+	query.Set("page", "1")
+	endpointURL.RawQuery = query.Encode()
+	endpoint := endpointURL.String()
 
+	for page := 1; page <= maxTagPages; page++ {
 		var body tagPage
 
-		_, err := c.getJSONPage(ctx, endpoint, &body, host)
+		next, err := c.getJSONPage(ctx, endpoint, &body, host)
 		if err != nil {
 			return nil, false, err
 		}
@@ -545,23 +579,33 @@ func (c *Client) giteaTags(ctx context.Context, host string, origin url.URL, own
 			tags = append(tags, RemoteRef{Name: tag.Name, Hash: tag.Commit.SHA})
 		}
 
-		if len(body) < tagsPerPage {
-			break
+		if next == "" {
+			if len(body) < giteaTagsPerPage {
+				break
+			}
+
+			endpointURL = c.giteaAPIAt(origin, host, "repos", owner, repo, "tags")
+			query = endpointURL.Query()
+			query.Set("limit", strconv.Itoa(giteaTagsPerPage))
+			query.Set("page", strconv.Itoa(page+1))
+			endpointURL.RawQuery = query.Encode()
+			endpoint = endpointURL.String()
+
+			continue
 		}
+
+		nextURL, err := url.Parse(next)
+		if err != nil {
+			return nil, false, fmt.Errorf("parse Gitea pagination URL: %w", err)
+		}
+
+		nextQuery := nextURL.Query()
+		nextQuery.Set("limit", strconv.Itoa(giteaTagsPerPage))
+		nextURL.RawQuery = nextQuery.Encode()
+		endpoint = nextURL.String()
 	}
 
 	return tags, true, nil
-}
-
-// looksLikeTagRef reports whether ref looks like a version tag, not a branch.
-//
-// Parameters:
-//   - ref: Branch or tag name.
-//
-// Returns:
-//   - bool: True when ref starts with v or contains a dot.
-func looksLikeTagRef(ref string) bool {
-	return strings.HasPrefix(ref, "v") || strings.Contains(ref, ".")
 }
 
 // getJSONPage GET decodes endpoint into dest and returns the next Link URL.

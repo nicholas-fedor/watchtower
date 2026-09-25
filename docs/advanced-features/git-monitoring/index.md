@@ -482,10 +482,8 @@ With report mode off, the log lines `Built image from Git URL context` and `Appl
 
 ### Failed Builds
 
-The host build, or Compose apply, finishes before the running container is replaced.
-If apply fails, the running container is left untouched.
-The previous baseline is kept so the next session can retry.
-Other containers continue.
+For a Git URL build, the host build finishes before the running container is replaced. If the build fails, the running container is left untouched.
+Docker Compose can partially recreate services before reporting an apply error. Watchtower does not accept the commit written onto those containers, so a later session in the same process retries from the previous baseline, and continues with other projects and containers. That rejection is held only in memory for the current Watchtower process. A restart, self-update, or separate [Run Once](../../configuration/scheduling/index.md#run_once) invocation may read the new container stamp and therefore will not retry from the previous baseline.
 
 ## Build Context
 
@@ -1026,7 +1024,10 @@ On a server you run yourself, the clone URL is often not the HTTP API. A common 
 - Web UI and HTTP API: `https://git.example.com:3000`
 
 Set `com.centurylinklabs.watchtower.git-host` on **that container** to the HTTP API base URL.
-Watchtower then uses that URL for ref checks and for a derived releases link.
+Watchtower then uses that URL for ref checks.
+It derives a releases link when the built-in hostname identifies the provider, or when the API origin has one exact path prefix named `github`, `gitlab`, `gitea`, `forgejo`, or `codeberg`.
+A pathless self-hosted origin such as `https://git.example.com:3000` does not identify the provider, so Watchtower does not guess a changelog link.
+Set `com.centurylinklabs.watchtower.changelog` when a custom server needs a different release-page layout.
 If the server is not GitHub, GitLab, Gitea, or Forgejo, Watchtower still asks Git.
 
 This label does not turn monitoring on, choose the repository, or supply credentials.
@@ -1049,6 +1050,8 @@ The process token is not sent to that other host.
 
 The API base URL only, for example `https://git.example.com:3000` or `https://git.example.com/gitlab`.
 Do not include a repository path.
+For an unknown self-hosted hostname, only the exact single-segment prefixes `github`, `gitlab`, `gitea`, `forgejo`, and `codeberg` provide a provider hint for changelog derivation.
+A pathless or custom multi-segment prefix does not identify the provider.
 
 #### Example
 
@@ -1120,7 +1123,7 @@ A later session in the same process rebuilds only if the remote advances past th
 2. Wait for the next update session.
 3. Watchtower compares the remote tip to the known running revision.
 4. If the tip has advanced, Watchtower rebuilds using the configured build context and writes a stamp on the replacement.
-5. If apply fails, the running container is left untouched.
+5. If a Git URL build fails, the running container is left untouched. If a Compose apply fails, Docker Compose may have partially recreated services. Watchtower does not accept that commit stamp for the rest of this process, so a later session retries from the previous baseline. A restart, self-update, or separate [Run Once](../../configuration/scheduling/index.md#run_once) invocation has no memory of that rejection and may read the new container stamp instead.
 
 ### Interaction with Other Update Options
 

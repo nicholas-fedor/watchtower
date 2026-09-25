@@ -104,6 +104,21 @@ func TestCloneCheckout(t *testing.T) {
 		require.ErrorIs(t, err, ErrCloneFailed)
 		assert.ErrorContains(t, err, "resolve")
 	})
+
+	t.Run("repository error is sanitized", func(t *testing.T) {
+		t.Parallel()
+
+		repo := "https://user:clone-secret@%zz/repo.git?token=clone-query#clone-fragment"
+		err := cloneCheckout(t.Context(), filepath.Join(t.TempDir(), "clone"), repo, CheckResult{
+			Commit: "aaa111",
+			Kind:   kindBranch,
+			Ref:    "main",
+		}, &Client{})
+		require.ErrorIs(t, err, ErrCloneFailed)
+		assert.NotContains(t, err.Error(), "clone-secret")
+		assert.NotContains(t, err.Error(), "clone-query")
+		assert.NotContains(t, err.Error(), "clone-fragment")
+	})
 }
 
 func TestCloneOptions(t *testing.T) {

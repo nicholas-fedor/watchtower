@@ -23,6 +23,8 @@ var (
 	ErrInvalidPolicy = errors.New("invalid git semver policy")
 	// ErrInvalidHost indicates a git-host label is not an HTTP base URL.
 	ErrInvalidHost = errors.New("invalid git-host")
+	// errRepositoryOperation identifies a sanitized remote operation failure.
+	errRepositoryOperation = errors.New("git repository operation failed")
 )
 
 // Errors for HTTP provider probes.

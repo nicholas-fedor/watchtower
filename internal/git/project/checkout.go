@@ -21,6 +21,46 @@ const projectDirPerm = 0o700
 // ErrDirty indicates the worktree has local changes and stash is off.
 var ErrDirty = errors.New("git project worktree is dirty")
 
+var (
+	errRestoreHeadMissing = errors.New("restore project head: missing directory or commit")
+	errRestoreHeadInvalid = errors.New("restore project head: invalid commit")
+)
+
+type remoteOperationError struct {
+	cause error
+}
+
+// Error returns a sanitized message for a remote operation failure.
+//
+// Returns:
+//   - string: Generic remote operation failure message.
+func (e *remoteOperationError) Error() string {
+	return "remote operation failed"
+}
+
+// Unwrap returns the underlying remote operation error.
+//
+// Returns:
+//   - error: Original error, if present.
+func (e *remoteOperationError) Unwrap() error {
+	return e.cause
+}
+
+// sanitizeRemoteError wraps err so its message cannot expose remote details.
+//
+// Parameters:
+//   - err: Error returned by a remote operation.
+//
+// Returns:
+//   - error: Sanitized wrapper, or nil when err is nil.
+func sanitizeRemoteError(err error) error {
+	if err == nil {
+		return nil
+	}
+
+	return &remoteOperationError{cause: err}
+}
+
 // CheckoutOptions controls how a project worktree is moved to a commit.
 type CheckoutOptions struct {
 	// Stash saves local changes, checks out the commit, then writes those files back.
@@ -33,6 +73,9 @@ type CheckoutOptions struct {
 	CABundle []byte
 	// InsecureSkipTLS skips TLS verification for HTTPS fetch.
 	InsecureSkipTLS bool
+	// Prior, when non-nil, receives the HEAD hash from before checkout.
+	// The caller uses it to restore the worktree when it will not apply.
+	Prior *string
 }
 
 // savedFile is a local file restored after checkout when Stash is set.
@@ -59,9 +102,19 @@ type savedFile struct {
 // Returns:
 //   - error: Non-nil on dirty-tree, missing commit, checkout, or restore failure.
 func Checkout(ctx context.Context, dir, commit string, opts CheckoutOptions) error {
+	err := ctx.Err()
+	if err != nil {
+		return fmt.Errorf("checkout canceled: %w", err)
+	}
+
 	repo, err := goGit.PlainOpen(dir)
 	if err != nil {
 		return fmt.Errorf("open git project: %w", err)
+	}
+
+	err = ctx.Err()
+	if err != nil {
+		return fmt.Errorf("checkout canceled: %w", err)
 	}
 
 	worktree, err := repo.Worktree()
@@ -93,14 +146,41 @@ func Checkout(ctx context.Context, dir, commit string, opts CheckoutOptions) err
 	}
 
 	head, headErr := repo.Head()
+	if opts.Prior != nil && headErr == nil && head != nil {
+		*opts.Prior = head.Hash().String()
+	}
 
 	// Fetch may fail on a private origin or a dead remote. A commit already
 	// in the local object store is enough to check out.
 	fetchErr := fetchOrigin(ctx, repo, opts)
 
+	ctxErr := ctx.Err()
+	if ctxErr == nil && errors.Is(fetchErr, context.Canceled) {
+		ctxErr = context.Canceled
+	}
+
+	if ctxErr == nil && errors.Is(fetchErr, context.DeadlineExceeded) {
+		ctxErr = context.DeadlineExceeded
+	}
+
+	if ctxErr != nil {
+		discardSnapshot(snapshotDir)
+
+		if fetchErr != nil {
+			return fetchErr
+		}
+
+		return fmt.Errorf("checkout canceled: %w", ctxErr)
+	}
+
 	resolved, err := repo.ResolveRevision(plumbing.Revision(commit))
 	if err != nil {
 		discardSnapshot(snapshotDir)
+
+		ctxErr := ctx.Err()
+		if ctxErr != nil {
+			return fmt.Errorf("checkout canceled: %w", ctxErr)
+		}
 
 		if fetchErr != nil {
 			return fetchErr
@@ -109,12 +189,33 @@ func Checkout(ctx context.Context, dir, commit string, opts CheckoutOptions) err
 		return fmt.Errorf("resolve %s: %w", commit, err)
 	}
 
+	ctxErr = ctx.Err()
+	if ctxErr != nil {
+		discardSnapshot(snapshotDir)
+
+		return fmt.Errorf("checkout canceled: %w", ctxErr)
+	}
+
 	err = worktree.Checkout(&goGit.CheckoutOptions{
 		Hash:  *resolved,
 		Force: true,
 	})
 	if err != nil {
-		return finishCheckout(dir, snapshotDir, saved, opts, fmt.Errorf("checkout %s: %w", commit, err))
+		err = rollbackProjectHead(worktree, head, headErr, err)
+
+		return finishCheckout(dir, snapshotDir, saved, opts, err)
+	}
+
+	err = ctx.Err()
+	if err != nil {
+		err = rollbackProjectHead(
+			worktree,
+			head,
+			headErr,
+			fmt.Errorf("checkout canceled: %w", err),
+		)
+
+		return finishCheckout(dir, snapshotDir, saved, opts, err)
 	}
 
 	if !opts.Stash {
@@ -125,6 +226,18 @@ func Checkout(ctx context.Context, dir, commit string, opts CheckoutOptions) err
 
 	err = restoreSnapshot(dir, saved, opts)
 	if err == nil {
+		err = ctx.Err()
+		if err != nil {
+			err = rollbackProjectHead(
+				worktree,
+				head,
+				headErr,
+				fmt.Errorf("checkout canceled: %w", err),
+			)
+
+			return finishCheckout(dir, snapshotDir, saved, opts, err)
+		}
+
 		discardSnapshot(snapshotDir)
 
 		return nil
@@ -178,6 +291,153 @@ func finishCheckout(dir, snapshotDir string, saved []savedFile, opts CheckoutOpt
 	return checkoutErr
 }
 
+// rollbackProjectHead restores the worktree HEAD after a failed checkout.
+//
+// Parameters:
+//   - worktree: Open project worktree.
+//   - head: Previous HEAD reference.
+//   - headErr: Error reading the previous HEAD.
+//   - cause: Checkout error to preserve.
+//
+// Returns:
+//   - error: Original cause, joined with any rollback error.
+func rollbackProjectHead(worktree *goGit.Worktree, head *plumbing.Reference, headErr, cause error) error {
+	if headErr != nil || head == nil {
+		return cause
+	}
+
+	rollbackErr := worktree.Checkout(&goGit.CheckoutOptions{
+		Hash:  head.Hash(),
+		Force: true,
+	})
+	if rollbackErr != nil {
+		return errors.Join(cause, fmt.Errorf("rollback checkout: %w", rollbackErr))
+	}
+
+	return cause
+}
+
+// RestoreHead checks the worktree out at hash.
+//
+// Call this after Checkout returned nil when the caller will not apply that
+// commit. A local checkout does not use the caller's context, which may
+// already be canceled. When stash is set, dirty files are saved before the
+// forced checkout and written back afterward. When stash is unset, the forced
+// checkout is unchanged.
+//
+// Parameters:
+//   - dir: Existing Git checkout.
+//   - hash: Commit recorded in CheckoutOptions.Prior.
+//   - stash: Whether to save and restore local files around the checkout.
+//
+// Returns:
+//   - error: Non-nil when dir or hash is missing, or the checkout fails.
+func RestoreHead(dir, hash string, stash bool) error {
+	if dir == "" || hash == "" {
+		return errRestoreHeadMissing
+	}
+
+	parsed := plumbing.NewHash(hash)
+	if parsed.IsZero() {
+		return fmt.Errorf("%w: %s", errRestoreHeadInvalid, hash)
+	}
+
+	repo, err := goGit.PlainOpen(dir)
+	if err != nil {
+		return fmt.Errorf("restore project head: %w", err)
+	}
+
+	worktree, err := repo.Worktree()
+	if err != nil {
+		return fmt.Errorf("restore project head: %w", err)
+	}
+
+	saved, snapshotDir, err := snapshotForRestore(dir, worktree, stash)
+	if err != nil {
+		return err
+	}
+
+	err = worktree.Checkout(&goGit.CheckoutOptions{
+		Hash:  parsed,
+		Force: true,
+	})
+	restoreErr := restoreAfterHead(dir, snapshotDir, saved)
+
+	if err != nil {
+		if restoreErr != nil {
+			return fmt.Errorf("restore project head: %w", errors.Join(err, restoreErr))
+		}
+
+		return fmt.Errorf("restore project head: %w", err)
+	}
+
+	if restoreErr != nil {
+		return fmt.Errorf("restore project head: %w", restoreErr)
+	}
+
+	return nil
+}
+
+// snapshotForRestore saves dirty files when stash is set.
+//
+// Parameters:
+//   - dir: Worktree root.
+//   - worktree: Open project worktree.
+//   - stash: Whether local files should be preserved.
+//
+// Returns:
+//   - []savedFile: Files to write back after checkout.
+//   - string: Temp snapshot directory, or empty.
+//   - error: Non-nil when the snapshot cannot be taken.
+func snapshotForRestore(dir string, worktree *goGit.Worktree, stash bool) ([]savedFile, string, error) {
+	if !stash {
+		return nil, "", nil
+	}
+
+	status, err := worktree.Status()
+	if err != nil {
+		return nil, "", fmt.Errorf("restore project head: %w", err)
+	}
+
+	saved, err := snapshotDirty(dir, status)
+	if err != nil {
+		return nil, "", err
+	}
+
+	snapshotDir, err := writeSnapshot(true, saved)
+	if err != nil {
+		return nil, "", err
+	}
+
+	return saved, snapshotDir, nil
+}
+
+// restoreAfterHead writes a stash snapshot back and removes the temp copy.
+//
+// Parameters:
+//   - dir: Worktree root.
+//   - snapshotDir: Temp copy from snapshotForRestore.
+//   - saved: Files captured before the forced checkout.
+//
+// Returns:
+//   - error: Non-nil when a saved file cannot be written. The temp copy is kept.
+func restoreAfterHead(dir, snapshotDir string, saved []savedFile) error {
+	if len(saved) == 0 {
+		discardSnapshot(snapshotDir)
+
+		return nil
+	}
+
+	err := restoreSnapshot(dir, saved, CheckoutOptions{Stash: true})
+	if err != nil {
+		return fmt.Errorf("%w; snapshot %s", err, snapshotDir)
+	}
+
+	discardSnapshot(snapshotDir)
+
+	return nil
+}
+
 // fetchOrigin updates refs from origin using process-wide Git auth and TLS.
 //
 // Parameters:
@@ -198,7 +458,7 @@ func fetchOrigin(ctx context.Context, repo *goGit.Repository, opts CheckoutOptio
 		return nil
 	}
 
-	return fmt.Errorf("fetch project: %w", err)
+	return fmt.Errorf("fetch project: %w", sanitizeRemoteError(err))
 }
 
 // originFetchOptions builds fetch options for origin, dropping HTTP BasicAuth on SSH remotes.
@@ -223,7 +483,7 @@ func originFetchOptions(origin string, opts CheckoutOptions) (*goGit.FetchOption
 
 	auth, err := opts.AuthFor(origin)
 	if err != nil {
-		return nil, fmt.Errorf("project auth: %w", err)
+		return nil, fmt.Errorf("project auth: %w", sanitizeRemoteError(err))
 	}
 
 	fetchOpts.Auth = originFetchAuth(origin, auth)

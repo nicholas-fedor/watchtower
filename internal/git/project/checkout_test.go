@@ -1,6 +1,10 @@
 package project
 
 import (
+	"context"
+	"errors"
+	"net/http"
+	"net/http/httptest"
 	"os"
 	"path/filepath"
 	"testing"
@@ -62,6 +66,75 @@ func TestCheckoutStashReappliesLocalEnv(t *testing.T) {
 	compose, err := os.ReadFile(filepath.Join(dir, "compose.yaml"))
 	require.NoError(t, err)
 	assert.Equal(t, "services: {}\n", string(compose))
+}
+
+func TestCheckoutStashCanceledAfterRestoreRollsBack(t *testing.T) {
+	t.Parallel()
+
+	dir, first, second := initTwoCommitRepo(t)
+	require.NoError(t, os.WriteFile(filepath.Join(dir, ".env"), []byte("SECRET=local\n"), 0o600))
+
+	ctx, cancel := context.WithCancel(t.Context())
+	defer cancel()
+
+	err := Checkout(ctx, dir, first, CheckoutOptions{
+		Stash: true,
+		restore: func(root string, saved []savedFile) error {
+			cancel()
+
+			return restoreSaved(root, saved)
+		},
+	})
+	require.ErrorIs(t, err, context.Canceled)
+
+	repo, err := goGit.PlainOpen(dir)
+	require.NoError(t, err)
+	head, err := repo.Head()
+	require.NoError(t, err)
+	assert.Equal(t, second, head.Hash().String())
+
+	got, err := os.ReadFile(filepath.Join(dir, ".env"))
+	require.NoError(t, err)
+	assert.Equal(t, "SECRET=local\n", string(got))
+}
+
+func TestRestoreHead(t *testing.T) {
+	t.Parallel()
+
+	dir, first, second := initTwoCommitRepo(t)
+	require.NoError(t, Checkout(t.Context(), dir, first, CheckoutOptions{}))
+	require.NoError(t, RestoreHead(dir, second, false))
+
+	repo, err := goGit.PlainOpen(dir)
+	require.NoError(t, err)
+	head, err := repo.Head()
+	require.NoError(t, err)
+	assert.Equal(t, second, head.Hash().String())
+	require.Error(t, RestoreHead(dir, "", false))
+}
+
+func TestRestoreHeadStashKeepsLocalFiles(t *testing.T) {
+	t.Parallel()
+
+	dir, first, _ := initTwoCommitRepo(t)
+	require.NoError(t, os.WriteFile(filepath.Join(dir, ".env"), []byte("SECRET=local\n"), 0o600))
+	require.NoError(t, os.WriteFile(filepath.Join(dir, "compose.yaml"), []byte("services: {local: {}}\n"), 0o600))
+
+	require.NoError(t, RestoreHead(dir, first, true))
+
+	repo, err := goGit.PlainOpen(dir)
+	require.NoError(t, err)
+	head, err := repo.Head()
+	require.NoError(t, err)
+	assert.Equal(t, first, head.Hash().String())
+
+	got, err := os.ReadFile(filepath.Join(dir, ".env"))
+	require.NoError(t, err)
+	assert.Equal(t, "SECRET=local\n", string(got))
+
+	composeFile, err := os.ReadFile(filepath.Join(dir, "compose.yaml"))
+	require.NoError(t, err)
+	assert.Equal(t, "services: {local: {}}\n", string(composeFile))
 }
 
 func TestCheckoutRestoreFailureRollsBack(t *testing.T) {
@@ -165,6 +238,111 @@ func TestCheckoutFetchFailUsesLocalCommit(t *testing.T) {
 	got, err := os.ReadFile(filepath.Join(dir, "compose.yaml"))
 	require.NoError(t, err)
 	assert.Equal(t, "services: {}\n", string(got))
+}
+
+// TestCheckoutCanceledFetchDoesNotMutate verifies that a canceled fetch leaves the project at its original commit.
+func TestCheckoutCanceledFetchDoesNotMutate(t *testing.T) {
+	t.Parallel()
+
+	dir, first, second := initTwoCommitRepo(t)
+
+	ctx, cancel := context.WithCancel(t.Context())
+	defer cancel()
+
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		cancel()
+		<-r.Context().Done()
+	}))
+	defer server.Close()
+
+	repo, err := goGit.PlainOpen(dir)
+	require.NoError(t, err)
+	_, err = repo.CreateRemote(&config.RemoteConfig{
+		Name: "origin",
+		URLs: []string{server.URL + "/repo.git"},
+	})
+	require.NoError(t, err)
+
+	err = Checkout(ctx, dir, first, CheckoutOptions{})
+	require.ErrorIs(t, err, context.Canceled)
+
+	repo, err = goGit.PlainOpen(dir)
+	require.NoError(t, err)
+	head, err := repo.Head()
+	require.NoError(t, err)
+	assert.Equal(t, second, head.Hash().String())
+
+	got, err := os.ReadFile(filepath.Join(dir, "compose.yaml"))
+	require.NoError(t, err)
+	assert.Equal(t, "services: {api: {}}\n", string(got))
+}
+
+// TestCheckoutFetchErrorDoesNotExposeRemoteCredentials verifies that project fetch errors redact remote credentials.
+func TestCheckoutFetchErrorDoesNotExposeRemoteCredentials(t *testing.T) {
+	t.Parallel()
+
+	const remote = "https://audit-user:fetch-password@%zz/repo.git?token=fetch-query-secret"
+
+	dir, _, _ := initTwoCommitRepo(t)
+	repo, err := goGit.PlainOpen(dir)
+	require.NoError(t, err)
+	_, err = repo.CreateRemote(&config.RemoteConfig{Name: "origin", URLs: []string{remote}})
+	require.NoError(t, err)
+
+	err = Checkout(
+		t.Context(),
+		dir,
+		"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+		CheckoutOptions{},
+	)
+	require.Error(t, err)
+	require.ErrorContains(t, err, "fetch project: remote operation failed")
+	assert.NotContains(t, err.Error(), remote)
+	assert.NotContains(t, err.Error(), "audit-user")
+	assert.NotContains(t, err.Error(), "fetch-password")
+	assert.NotContains(t, err.Error(), "fetch-query-secret")
+}
+
+// TestOriginFetchOptionsErrorDoesNotExposeRemoteCredentials verifies that project authentication errors redact remote credentials.
+func TestOriginFetchOptionsErrorDoesNotExposeRemoteCredentials(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name    string
+		remote  string
+		secrets []string
+	}{
+		{
+			name:    "HTTPS",
+			remote:  "https://audit-user:fetch-password@git.example.com/org/app.git?token=fetch-query-secret",
+			secrets: []string{"audit-user", "fetch-password", "fetch-query-secret"},
+		},
+		{
+			name:    "SCP",
+			remote:  "audit-user:scp-password@git.example.com:org/app.git?token=scp-query-secret",
+			secrets: []string{"audit-user", "scp-password", "scp-query-secret"},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			sentinel := errors.New("auth unavailable")
+			_, err := originFetchOptions(tt.remote, CheckoutOptions{
+				AuthFor: func(string) (transport.AuthMethod, error) {
+					return nil, errors.Join(sentinel, errors.New(tt.remote))
+				},
+			})
+			require.ErrorIs(t, err, sentinel)
+			assert.Equal(t, "project auth: remote operation failed", err.Error())
+			assert.NotContains(t, err.Error(), tt.remote)
+
+			for _, secret := range tt.secrets {
+				assert.NotContains(t, err.Error(), secret)
+			}
+		})
+	}
 }
 
 func TestCheckoutAuthForUsesOriginURL(t *testing.T) {

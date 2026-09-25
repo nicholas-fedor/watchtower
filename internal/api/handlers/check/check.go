@@ -23,6 +23,7 @@ type ContainerCheck struct {
 	Digest          string    `json:"digest"`
 	UpdateAvailable bool      `json:"update_available"`
 	LatestImageID   string    `json:"latest_image_id"`
+	GitCommit       string    `json:"git_commit,omitempty"`
 	LatestDigest    string    `json:"latest_digest"`
 	Error           string    `json:"error,omitempty"`
 	Timestamp       time.Time `json:"timestamp"`
@@ -34,6 +35,16 @@ type ContainerCheck struct {
 	ImageURL        string    `json:"image_url,omitempty"`
 	Documentation   string    `json:"documentation,omitempty"`
 	Revision        string    `json:"revision,omitempty"`
+}
+
+// CheckResponse is the response returned by POST /v1/check.
+//
+// Parameters/returns are documented by the handler's Swagger annotations.
+type CheckResponse struct {
+	Containers []ContainerCheck `json:"containers"`
+	Count      int              `json:"count"`
+	Timestamp  string           `json:"timestamp"`
+	APIVersion string           `json:"api_version"`
 }
 
 // CheckFunc performs the update availability check for all watched containers.
@@ -155,7 +166,7 @@ func CheckForUpdates(log *zerolog.Logger,
 			} else {
 				result.UpdateAvailable = checkResult.Stale
 				if checkResult.Commit != "" {
-					result.LatestImageID = "git:" + checkResult.Commit
+					result.GitCommit = checkResult.Commit
 				}
 
 				if checkResult.Tag != "" {

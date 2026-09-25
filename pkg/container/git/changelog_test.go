@@ -109,8 +109,35 @@ func TestDerivedReleasesURL(t *testing.T) {
 		{
 			name:      "git-host label origin",
 			repo:      "git@git.example.com:org/app.git",
+			apiOrigin: "https://git.example.com:3000/gitea",
+			want:      "https://git.example.com:3000/gitea/org/app/releases",
+		},
+		{
+			name:      "self-hosted GitLab path",
+			repo:      "https://gitlab.example.com/group/app.git",
+			apiOrigin: "https://gitlab.example.com/gitlab",
+			want:      "https://gitlab.example.com/gitlab/group/app/-/releases",
+		},
+		{
+			name:      "known GitHub API path is not in releases URL",
+			repo:      "https://github.com/org/app.git",
+			apiOrigin: "https://github.com/api/v3",
+			want:      "https://github.com/org/app/releases",
+		},
+		{
+			name:      "mismatched git-host",
+			repo:      "https://github.com/org/app.git",
+			apiOrigin: "https://git.example.com/gitlab",
+		},
+		{
+			name:      "pathless unknown git-host",
+			repo:      "git@git.example.com:org/app.git",
 			apiOrigin: "https://git.example.com:3000",
-			want:      "https://git.example.com:3000/org/app/releases",
+		},
+		{
+			name:      "unknown git-host path",
+			repo:      "https://git.example.com/org/app.git",
+			apiOrigin: "https://git.example.com/internal",
 		},
 		{name: "unknown", repo: "https://git.unknown.example/org/app.git"},
 		{name: "empty"},

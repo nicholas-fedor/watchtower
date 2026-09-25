@@ -29,7 +29,7 @@ func cloneCheckout(ctx context.Context, dir, repo string, rev CheckResult, clien
 
 	repoObj, err := goGit.PlainCloneContext(ctx, dir, false, client.cloneOptions(repo, rev, auth))
 	if err != nil {
-		return fmt.Errorf("%w: %w", ErrCloneFailed, classifyTransport(err))
+		return fmt.Errorf("%w: %w", ErrCloneFailed, repositoryOperationError("clone", repo, err))
 	}
 
 	target := revisionTarget(rev)
