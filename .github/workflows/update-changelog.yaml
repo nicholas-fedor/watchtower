@@ -56,7 +56,11 @@ jobs:
 
       - name: Enable auto-merge
         if: "${{ steps.create_pr.outputs.pull-request-number }}"
+        run: |
+          pr_number="${{ steps.create_pr.outputs.pull-request-number }}"
+          if ! gh pr merge --auto --squash "$pr_number"; then
+            echo "Auto-merge is unavailable; merging the clean pull request directly"
+            gh pr merge --squash "$pr_number"
+          fi
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          PULL_REQUEST_NUMBER: ${{ steps.create_pr.outputs.pull-request-number }}
-        run: gh pr merge --auto --squash "${PULL_REQUEST_NUMBER}"
