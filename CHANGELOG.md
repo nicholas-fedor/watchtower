@@ -10,6 +10,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Chores
 
+- Update github.com/google/pprof digest to aaccee0 by @renovate[bot] in [#2449](https://github.com/nicholas-fedor/watchtower/pull/2449)
 - Update module github.com/go-openapi/jsonreference to v1.0.3 by @renovate[bot] in [#2447](https://github.com/nicholas-fedor/watchtower/pull/2447)
 - Update module github.com/klauspost/compress to v1.20.1 by @renovate[bot] in [#2446](https://github.com/nicholas-fedor/watchtower/pull/2446)
 - Update module github.com/onsi/gomega to v1.44.0 by @renovate[bot] in [#2443](https://github.com/nicholas-fedor/watchtower/pull/2443)
@@ -17,6 +18,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Update module github.com/gofiber/schema to v1.8.8 by @renovate[bot] in [#2441](https://github.com/nicholas-fedor/watchtower/pull/2441)
 - Update github/codeql-action action to v4.38.2 by @renovate[bot] in [#2440](https://github.com/nicholas-fedor/watchtower/pull/2440)
 - Update module github.com/gofiber/utils/v2 to v2.6.0 by @renovate[bot] in [#2438](https://github.com/nicholas-fedor/watchtower/pull/2438)
+
+### Fixed
+
+- Fix changelog automation workflows by @nicholas-fedor in [#2451](https://github.com/nicholas-fedor/watchtower/pull/2451)
 
 ## [1.22.3] - 2026-09-22
 
