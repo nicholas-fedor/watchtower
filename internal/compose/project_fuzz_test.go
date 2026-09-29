@@ -19,6 +19,9 @@ func FuzzConfigFiles(f *testing.F) {
 	f.Add("../secret.yml")
 
 	f.Fuzz(func(t *testing.T, raw string) {
+		root, err := filepath.Abs("/proj")
+		require.NoError(t, err)
+
 		got, err := configFiles(map[string]string{ComposeConfigFilesLabel: raw}, "/proj")
 		if err != nil {
 			assert.ErrorIs(t, err, ErrConfigFile)
@@ -28,7 +31,7 @@ func FuzzConfigFiles(f *testing.F) {
 
 		for _, path := range got {
 			assert.NotEmpty(t, path)
-			rel, relErr := filepath.Rel("/proj", path)
+			rel, relErr := filepath.Rel(root, path)
 			require.NoError(t, relErr)
 			assert.True(t, filepath.IsLocal(rel), path)
 		}

@@ -221,16 +221,17 @@ func validCommit(commit string) bool {
 	return true
 }
 
-// keepPort reports whether port should appear on an HTTPS Git context host.
+// keepPort reports whether port should appear on an HTTP or HTTPS Git context host.
 //
-// SSH's default port 22 is dropped when converting to HTTPS.
+// SSH and git ports are not copied onto the HTTPS URL. A non-default SSH port
+// is not an HTTPS port.
 //
 // Parameters:
 //   - protocol: Original transport protocol from go-git.
 //   - port: Endpoint port, or 0 when unset.
 //
 // Returns:
-//   - bool: True when the port is non-default for the target URL.
+//   - bool: True when the port is a non-default HTTP or HTTPS port.
 func keepPort(protocol string, port int) bool {
 	if port == 0 {
 		return false
@@ -242,7 +243,7 @@ func keepPort(protocol string, port int) bool {
 	case "https":
 		return port != httpsPort
 	default:
-		return port != sshPort
+		return false
 	}
 }
 

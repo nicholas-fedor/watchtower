@@ -24,6 +24,16 @@ type Association struct {
 	Host       string
 	Dockerfile string
 	Context    string
+
+	// RefFromDefault is true when Ref came from the process default, not a
+	// label or image mapping. ApplyGitAssociation does not persist those values.
+	RefFromDefault bool
+	// PolicyFromDefault is true when Policy came from the process default.
+	PolicyFromDefault bool
+	// DockerfileFromDefault is true when Dockerfile came from the process default.
+	DockerfileFromDefault bool
+	// ContextFromDefault is true when Context came from the process default.
+	ContextFromDefault bool
 }
 
 // ResolveAssociation returns the monitor association for a container.
@@ -47,13 +57,22 @@ func ResolveAssociation(c types.Container, params types.UpdateParams) (Associati
 
 	// Container labels win over --git-image mappings.
 	if repo := label(c, RepoLabel); repo != "" {
+		ref, refDefault := sourced(refLabel(c), "", defaultRef(params))
+		policy, policyDefault := sourced(policyLabel(c), "", defaultPolicy(params))
+		dockerfile, dockerfileDefault := sourced(label(c, DockerfileLabel), "", params.GitDockerfile)
+		context, contextDefault := sourced(label(c, ContextLabel), "", params.GitContext)
+
 		return Association{
-			Repo:       repo,
-			Ref:        cmp.Or(refLabel(c), defaultRef(params)),
-			Policy:     cmp.Or(policyLabel(c), defaultPolicy(params)),
-			Host:       label(c, HostLabel),
-			Dockerfile: cmp.Or(label(c, DockerfileLabel), params.GitDockerfile),
-			Context:    cmp.Or(label(c, ContextLabel), params.GitContext),
+			Repo:                  repo,
+			Ref:                   ref,
+			Policy:                policy,
+			Host:                  label(c, HostLabel),
+			Dockerfile:            dockerfile,
+			Context:               context,
+			RefFromDefault:        refDefault,
+			PolicyFromDefault:     policyDefault,
+			DockerfileFromDefault: dockerfileDefault,
+			ContextFromDefault:    contextDefault,
 		}, true
 	}
 
@@ -62,14 +81,45 @@ func ResolveAssociation(c types.Container, params types.UpdateParams) (Associati
 		return Association{}, false
 	}
 
+	ref, refDefault := sourced("", mapping.Ref, defaultRef(params))
+	policy, policyDefault := sourced("", mapping.Policy, defaultPolicy(params))
+	dockerfile, dockerfileDefault := sourced(label(c, DockerfileLabel), mapping.Dockerfile, params.GitDockerfile)
+	context, contextDefault := sourced(label(c, ContextLabel), mapping.Context, params.GitContext)
+
 	return Association{
-		Repo:       mapping.Repo,
-		Ref:        cmp.Or(mapping.Ref, defaultRef(params)),
-		Policy:     cmp.Or(mapping.Policy, defaultPolicy(params)),
-		Host:       label(c, HostLabel),
-		Dockerfile: cmp.Or(label(c, DockerfileLabel), mapping.Dockerfile, params.GitDockerfile),
-		Context:    cmp.Or(label(c, ContextLabel), mapping.Context, params.GitContext),
+		Repo:                  mapping.Repo,
+		Ref:                   ref,
+		Policy:                policy,
+		Host:                  label(c, HostLabel),
+		Dockerfile:            dockerfile,
+		Context:               context,
+		RefFromDefault:        refDefault,
+		PolicyFromDefault:     policyDefault,
+		DockerfileFromDefault: dockerfileDefault,
+		ContextFromDefault:    contextDefault,
 	}, true
+}
+
+// sourced returns the first non-empty value and whether it came from fallback.
+//
+// Parameters:
+//   - primary: Highest-precedence value, usually a container label.
+//   - secondary: Image-mapping value. Empty when there is no mapping.
+//   - fallback: Process default.
+//
+// Returns:
+//   - string: Chosen value.
+//   - bool: True when the chosen value is the process default.
+func sourced(primary, secondary, fallback string) (string, bool) {
+	if primary != "" {
+		return primary, false
+	}
+
+	if secondary != "" {
+		return secondary, false
+	}
+
+	return fallback, fallback != ""
 }
 
 // ShouldMonitor reports whether Git monitoring should run for the container.

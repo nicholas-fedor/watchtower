@@ -118,7 +118,8 @@ func CheckForUpdates(log *zerolog.Logger,
 			Timestamp: now,
 		}
 
-		if _, ok := c.(*container.Container); ok {
+		_, concrete := c.(*container.Container)
+		if concrete {
 			meta := container.ResolveReportMeta(c, params, container.ChangelogVars{})
 			result.GitRepo = meta.GitRepo
 			result.GitRef = meta.GitRef
@@ -137,7 +138,6 @@ func CheckForUpdates(log *zerolog.Logger,
 			)
 		}
 
-		_, concrete := c.(*container.Container)
 		if gitClient != nil && concrete && gitPkg.ShouldMonitor(log, c, params) {
 			result.UpdateSource = "git"
 

@@ -680,12 +680,18 @@ func Update(
 	}
 
 	// Sort containers by dependencies to ensure correct update and restart order.
+	// A cycle must not be re-derived later, or an unrelated stale container
+	// is pulled into the failed sort and the session aborts.
+	dependenciesSorted := true
+
 	err = sorter.SortByDependencies(log,
 		filteredContainers,
 		config.UseComposeDependsOn,
 	)
 	if err != nil {
 		if errors.Is(err, sorter.ErrCircularReference) {
+			dependenciesSorted = false
+
 			circularErr, ok := errors.AsType[sorter.CircularReferenceError](err)
 			if ok {
 				circularName := circularErr.ContainerName
@@ -784,13 +790,17 @@ func Update(
 
 	// A failed Git apply cleared Stale. Recompute linked restarts so those
 	// dependencies are not stopped. Containers that are still stale stay anchors.
-	allContainersToRestart = reconcileImplicitRestartsExcluding(
-		log,
-		allContainers,
-		filteredContainers,
-		config,
-		gitSession.noRestartBuiltIDs(config),
-	)
+	// Skip the recompute after a cycle. It would mark cycle members for restart
+	// and the later sort would fail the unrelated stale containers too.
+	if dependenciesSorted {
+		allContainersToRestart = reconcileImplicitRestartsExcluding(
+			log,
+			allContainers,
+			filteredContainers,
+			config,
+			gitSession.noRestartBuiltIDs(config),
+		)
+	}
 
 	err = sorter.SortByDependencies(log,
 		allContainersToRestart,

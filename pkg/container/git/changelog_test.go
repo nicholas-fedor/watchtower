@@ -207,6 +207,8 @@ func TestSplitOwnerRepo(t *testing.T) {
 		{name: "no slash", host: "github.com", path: "app"},
 		{name: "trailing slash", host: "github.com", path: "org/"},
 		{name: "empty path", host: "github.com", path: ""},
+		{name: "dot segment", host: "github.com", path: "org/./app"},
+		{name: "parent segment", host: "github.com", path: "org/../app"},
 	}
 
 	for _, tt := range tests {

@@ -35,7 +35,7 @@ func FuzzParseRepo(f *testing.F) {
 		assert.NotEmpty(t, host)
 		assert.NotEmpty(t, owner)
 		assert.NotEmpty(t, name)
-		assert.False(t, strings.HasSuffix(name, ".git"))
+		assert.False(t, strings.HasSuffix(name, "/"))
 	})
 }
 
@@ -57,21 +57,12 @@ func FuzzDerivedReleasesURL(f *testing.F) {
 	f.Add("https://github.com/org/app.git", "")
 	f.Add("https://gitlab.com/org/app.git", "")
 	f.Add("https://codeberg.org/org/app.git", "")
-	f.Add("https://git.example.com/org/app.git", "git.example.com=gitea")
+	f.Add("https://git.example.com/org/app.git", "https://git.example.com/api/v1")
 	f.Add("https://unknown.example/org/app.git", "")
 	f.Add("", "")
 
 	f.Fuzz(func(t *testing.T, repo, extra string) {
-		hosts := map[string]string{}
-
-		if extra != "" {
-			name, kind, ok := strings.Cut(extra, "=")
-			if ok {
-				hosts[name] = kind
-			}
-		}
-
-		got := derivedReleasesURL(repo, "")
+		got := derivedReleasesURL(repo, extra)
 		if got == "" {
 			return
 		}

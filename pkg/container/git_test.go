@@ -284,6 +284,25 @@ var _ = ginkgo.Describe("Git wrappers", func() {
 			gomega.Expect(ok).To(gomega.BeFalse())
 		})
 
+		ginkgo.It("does not persist process defaults", func() {
+			c := MockContainer()
+			ApplyGitAssociation(c, GitAssociation{
+				Repo:                  "https://github.com/org/app.git",
+				Ref:                   "main",
+				Policy:                types.GitPolicyNone,
+				Dockerfile:            "Dockerfile",
+				Context:               ".",
+				RefFromDefault:        true,
+				PolicyFromDefault:     true,
+				DockerfileFromDefault: true,
+				ContextFromDefault:    true,
+			}, false)
+
+			gomega.Expect(c.containerInfo.Config.Labels).To(gomega.Equal(map[string]string{
+				git.RepoLabel: "https://github.com/org/app.git",
+			}))
+		})
+
 		ginkgo.It("omits empty optional fields and does not force watch", func() {
 			c := MockContainer()
 			c.SetLabel(git.RefLabel, "old")

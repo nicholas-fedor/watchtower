@@ -628,7 +628,7 @@ Compose interpolates the project's `.env` file.
 Watchtower's process environment is not interpolated into `compose.yaml`.
 Enable the [Git Compose Stash](../../configuration/git-monitoring/index.md#git_compose_stash) configuration option if that `.env` is local and not committed.
 
-The [Disable Container Restart](../../configuration/update-behavior/index.md#disable_container_restart) configuration option checkouts and runs Compose **build** only.
+The [Disable Container Restart](../../configuration/update-behavior/index.md#disable_container_restart) configuration option checks out the commit and runs Compose build only.
 It does not recreate running services.
 
 #### Example

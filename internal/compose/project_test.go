@@ -251,7 +251,10 @@ func TestConfigFiles(t *testing.T) {
 			ComposeConfigFilesLabel: "compose.yaml,  nested/app.yml",
 		}, "/proj")
 		require.NoError(t, err)
-		assert.Equal(t, []string{"/proj/compose.yaml", "/proj/nested/app.yml"}, got)
+		assert.Equal(t, []string{
+			projectPath("compose.yaml"),
+			projectPath("nested", "app.yml"),
+		}, got)
 	})
 
 	t.Run("rejects paths outside the project", func(t *testing.T) {
@@ -275,7 +278,7 @@ func TestConfigFiles(t *testing.T) {
 			ComposeConfigFilesLabel: ",  ,compose.yaml,",
 		}, "/proj")
 		require.NoError(t, err)
-		assert.Equal(t, []string{"/proj/compose.yaml"}, got)
+		assert.Equal(t, []string{projectPath("compose.yaml")}, got)
 	})
 }
 
@@ -345,4 +348,22 @@ func writeComposeDir(t *testing.T, filename string) string {
 	require.NoError(t, os.WriteFile(filepath.Join(dir, filename), []byte("services: {}\n"), 0o600))
 
 	return dir
+}
+
+// projectPath joins parts onto the absolute form of the fake /proj root.
+//
+// filepath.Abs("/proj") is "/proj" on Unix and a drive-qualified path on Windows.
+//
+// Parameters:
+//   - parts: Path elements under the project root.
+//
+// Returns:
+//   - string: Absolute path matching configFiles.
+func projectPath(parts ...string) string {
+	root, err := filepath.Abs("/proj")
+	if err != nil {
+		return filepath.Join(append([]string{"/proj"}, parts...)...)
+	}
+
+	return filepath.Join(append([]string{root}, parts...)...)
 }

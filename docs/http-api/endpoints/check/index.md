@@ -66,6 +66,7 @@ The `/v1/check` endpoint returns a JSON array of container check results:
             "update_source": "registry",
             "git_repo": "https://github.com/org/app.git",
             "git_ref": "main",
+            "git_commit": "abc123def456",
             "changelog": "https://github.com/org/app/releases",
             "oci_source": "https://github.com/org/app",
             "timestamp": "2025-01-20T11:30:45Z"

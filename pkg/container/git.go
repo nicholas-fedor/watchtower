@@ -89,6 +89,8 @@ func ApplyGitStamp(c *Container, commit, tag string) {
 // ApplyGitAssociation writes monitor association labels onto the replacement container.
 //
 // This keeps git-image mappings working after Config.Image is rewritten to name:git-<sha>.
+// Ref, policy, Dockerfile, and context labels are written only when a label or
+// image mapping supplied them. Process defaults stay off the replacement.
 //
 // Parameters:
 //   - c: Concrete container whose create labels will be mutated.
@@ -116,11 +118,11 @@ func ApplyGitAssociation(c *Container, assoc GitAssociation, watch bool) {
 
 	c.SetLabel(git.RepoLabel, repo)
 
-	if assoc.Ref != "" {
+	if assoc.Ref != "" && !assoc.RefFromDefault {
 		c.SetLabel(git.RefLabel, assoc.Ref)
 	}
 
-	if assoc.Policy != "" {
+	if assoc.Policy != "" && !assoc.PolicyFromDefault {
 		c.SetLabel(git.SemverPolicyLabel, assoc.Policy)
 	}
 
@@ -130,11 +132,11 @@ func ApplyGitAssociation(c *Container, assoc GitAssociation, watch bool) {
 		}
 	}
 
-	if assoc.Dockerfile != "" {
+	if assoc.Dockerfile != "" && !assoc.DockerfileFromDefault {
 		c.SetLabel(git.DockerfileLabel, assoc.Dockerfile)
 	}
 
-	if assoc.Context != "" {
+	if assoc.Context != "" && !assoc.ContextFromDefault {
 		c.SetLabel(git.ContextLabel, assoc.Context)
 	}
 

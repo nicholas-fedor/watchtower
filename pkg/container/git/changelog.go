@@ -311,9 +311,30 @@ func splitOwnerRepo(host, path string) (string, string, string, bool) {
 	owner := path[:slash]
 	name := path[slash+1:]
 
-	if host == "" || owner == "" || name == "" {
+	if host == "" || !safeRepoPath(owner) || !safeRepoPath(name) {
 		return "", "", "", false
 	}
 
 	return host, owner, name, true
+}
+
+// safeRepoPath reports whether a Git path segment can be used in a release URL.
+//
+// Parameters:
+//   - value: Owner path or repository name.
+//
+// Returns:
+//   - bool: False when value is empty or contains a "." or ".." segment.
+func safeRepoPath(value string) bool {
+	if value == "" {
+		return false
+	}
+
+	for part := range strings.SplitSeq(value, "/") {
+		if part == "" || part == "." || part == ".." {
+			return false
+		}
+	}
+
+	return true
 }

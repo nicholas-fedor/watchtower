@@ -44,11 +44,12 @@ func TestResolveAssociation(t *testing.T) {
 		})
 		require.True(t, ok)
 		assert.Equal(t, Association{
-			Repo:       "https://github.com/org/from-label.git",
-			Ref:        "release",
-			Policy:     types.GitPolicyPatch,
-			Dockerfile: "build/Dockerfile",
-			Context:    "src",
+			Repo:              "https://github.com/org/from-label.git",
+			Ref:               "release",
+			Policy:            types.GitPolicyPatch,
+			Dockerfile:        "build/Dockerfile",
+			Context:           "src",
+			PolicyFromDefault: true,
 		}, got)
 	})
 
@@ -136,11 +137,15 @@ func TestResolveAssociation(t *testing.T) {
 		})
 		require.True(t, ok)
 		assert.Equal(t, Association{
-			Repo:       "https://github.com/org/mapped.git",
-			Ref:        "trunk",
-			Policy:     types.GitPolicyMajor,
-			Dockerfile: "ci/Dockerfile",
-			Context:    "docker",
+			Repo:                  "https://github.com/org/mapped.git",
+			Ref:                   "trunk",
+			Policy:                types.GitPolicyMajor,
+			Dockerfile:            "ci/Dockerfile",
+			Context:               "docker",
+			RefFromDefault:        true,
+			PolicyFromDefault:     true,
+			DockerfileFromDefault: true,
+			ContextFromDefault:    true,
 		}, got)
 	})
 

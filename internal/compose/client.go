@@ -12,6 +12,7 @@ import (
 	"github.com/docker/cli/cli/command"
 	"github.com/docker/compose/v5/pkg/api"
 	"github.com/docker/compose/v5/pkg/compose"
+	"github.com/rs/zerolog"
 
 	composeTypes "github.com/compose-spec/compose-go/v2/types"
 	dockerFlags "github.com/docker/cli/cli/flags"
@@ -257,6 +258,8 @@ func listApplied(
 
 	images, err := svc.Images(ctx, project.Name, api.ImagesOptions{Services: services})
 	if err != nil {
+		zerolog.Ctx(ctx).Warn().Err(err).Msg("Failed to list Compose images. Image IDs from that call will be omitted.")
+
 		images = nil
 	}
 

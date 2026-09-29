@@ -201,5 +201,6 @@ func TestHTTPSRemoteAndHostHelpers(t *testing.T) {
 	assert.False(t, keepPort("http", httpPort))
 	assert.True(t, keepPort("http", 8080))
 	assert.False(t, keepPort("ssh", sshPort))
-	assert.True(t, keepPort("ssh", 2222))
+	assert.False(t, keepPort("ssh", 2222))
+	assert.False(t, keepPort("git", 9418))
 }

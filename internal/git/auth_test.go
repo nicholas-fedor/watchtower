@@ -55,10 +55,14 @@ func TestAuthMethod(t *testing.T) {
 		assert.Equal(t, "ghp_xxx", basic.Password)
 	})
 
-	t.Run("basic username and password", func(t *testing.T) {
+	t.Run("basic username and password on a trusted host", func(t *testing.T) {
 		t.Parallel()
 
-		client := &Client{opts: Options{Username: "octocat", Password: "pw"}}
+		client := &Client{opts: Options{
+			Username: "octocat",
+			Password: "pw",
+			Hosts:    map[string]string{"git.example.com": types.GitHostGitea},
+		}}
 		got, err := client.authMethod("https://git.example.com/org/app.git")
 		require.NoError(t, err)
 
@@ -68,10 +72,13 @@ func TestAuthMethod(t *testing.T) {
 		assert.Equal(t, "pw", basic.Password)
 	})
 
-	t.Run("username only", func(t *testing.T) {
+	t.Run("username only on a trusted host", func(t *testing.T) {
 		t.Parallel()
 
-		client := &Client{opts: Options{Username: "octocat"}}
+		client := &Client{opts: Options{
+			Username: "octocat",
+			Hosts:    map[string]string{"git.example.com": types.GitHostGitea},
+		}}
 		got, err := client.authMethod("https://git.example.com/org/app.git")
 		require.NoError(t, err)
 
@@ -81,10 +88,13 @@ func TestAuthMethod(t *testing.T) {
 		assert.Empty(t, basic.Password)
 	})
 
-	t.Run("password only", func(t *testing.T) {
+	t.Run("password only on a trusted host", func(t *testing.T) {
 		t.Parallel()
 
-		client := &Client{opts: Options{Password: "pw"}}
+		client := &Client{opts: Options{
+			Password: "pw",
+			Hosts:    map[string]string{"git.example.com": types.GitHostGitea},
+		}}
 		got, err := client.authMethod("https://git.example.com/org/app.git")
 		require.NoError(t, err)
 
@@ -92,6 +102,28 @@ func TestAuthMethod(t *testing.T) {
 		require.True(t, ok)
 		assert.Empty(t, basic.Username)
 		assert.Equal(t, "pw", basic.Password)
+	})
+
+	t.Run("untrusted host is anonymous", func(t *testing.T) {
+		t.Parallel()
+
+		client := &Client{opts: Options{Token: "tok", Username: "octocat", Password: "pw"}}
+		got, err := client.authMethod("https://evil.example/org/app.git")
+		require.NoError(t, err)
+		assert.Nil(t, got)
+	})
+
+	t.Run("plaintext http is anonymous", func(t *testing.T) {
+		t.Parallel()
+
+		client := &Client{opts: Options{
+			Username: "octocat",
+			Password: "pw",
+			Hosts:    map[string]string{"git.example.com": types.GitHostGitea},
+		}}
+		got, err := client.authMethod("http://git.example.com/org/app.git")
+		require.NoError(t, err)
+		assert.Nil(t, got)
 	})
 
 	t.Run("anonymous when no credentials", func(t *testing.T) {
@@ -270,23 +302,45 @@ func TestBuildAuth(t *testing.T) {
 			token:    "tok",
 		},
 		{
-			name:     "password with username",
-			client:   &Client{opts: Options{Username: "octocat", Password: "pw"}},
+			name: "password with username on a trusted host",
+			client: &Client{opts: Options{
+				Username: "octocat",
+				Password: "pw",
+				Hosts:    map[string]string{"git.example.com": types.GitHostGitea},
+			}},
 			repo:     "https://git.example.com/org/app.git",
 			username: "octocat",
 			token:    "pw",
 		},
 		{
-			name:     "password without username defaults to git",
-			client:   &Client{opts: Options{Password: "pw"}},
+			name: "password without username defaults to git",
+			client: &Client{opts: Options{
+				Password: "pw",
+				Hosts:    map[string]string{"git.example.com": types.GitHostGitea},
+			}},
 			repo:     "https://git.example.com/org/app.git",
 			username: tokenUserGit,
 			token:    "pw",
 		},
 		{
+			name:     "untrusted host is anonymous",
+			client:   &Client{opts: Options{Token: "tok", Password: "pw"}},
+			repo:     "https://evil.example/org/app.git",
+			username: tokenUserGit,
+		},
+		{
+			name: "plaintext http is anonymous",
+			client: &Client{opts: Options{
+				Token: "tok",
+				Hosts: map[string]string{"git.example.com": types.GitHostGitea},
+			}},
+			repo:     "http://git.example.com/org/app.git",
+			username: tokenUserGit,
+		},
+		{
 			name:     "username without password is anonymous",
 			client:   &Client{opts: Options{Username: "octocat"}},
-			repo:     "https://git.example.com/org/app.git",
+			repo:     "https://github.com/org/app.git",
 			username: tokenUserGit,
 		},
 	}
