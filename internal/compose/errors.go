@@ -18,4 +18,6 @@ var (
 	errEmptyProjectDir = errors.New("compose project directory is empty")
 	// errNoComposeServices indicates Apply was called with no service names.
 	errNoComposeServices = errors.New("no compose services to apply")
+	// errEmptyProjectName indicates the loaded project has no name, so compose start cannot find its containers.
+	errEmptyProjectName = errors.New("compose project name is empty")
 )

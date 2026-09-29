@@ -1003,7 +1003,7 @@ var _ = ginkgo.Describe("gitSession", ginkgo.Label("git-session"), func() {
 			gomega.Expect(sess.applied).To(gomega.BeEmpty())
 		})
 
-		ginkgo.It("fails when compose-dir is set but the path is not a compose project", func() {
+		ginkgo.It("skips when compose-dir is set but the path is not a compose project", func() {
 			missing := filepath.Join(ginkgo.GinkgoT().TempDir(), "missing")
 			applier := mockCompose.NewMockApplier(ginkgo.GinkgoT())
 			sess := newGitSession(gitTestClient())
@@ -1020,9 +1020,46 @@ var _ = ginkgo.Describe("gitSession", ginkgo.Label("git-session"), func() {
 			docker := mockActions.CreateMockClient(&mockActions.TestData{}, false, false)
 			sess.prepareRebuilds(gitTestLogger(), ginkgo.GinkgoT().Context(), docker, []types.Container{c}, types.UpdateParams{EnableGitMonitoring: true}, nil, failed)
 
-			gomega.Expect(failed[c.ID()]).To(gomega.MatchError(compose.ErrProjectDir))
+			gomega.Expect(failed).NotTo(gomega.HaveKey(c.ID()))
 			gomega.Expect(c.IsStale()).To(gomega.BeFalse())
 			gomega.Expect(sess.built).To(gomega.BeEmpty())
+			gomega.Expect(sess.applied).To(gomega.BeEmpty())
+		})
+
+		ginkgo.It("skips a scanned container when compose-dir is set but the path is not a compose project", func() {
+			missing := filepath.Join(ginkgo.GinkgoT().TempDir(), "missing")
+			applier := mockCompose.NewMockApplier(ginkgo.GinkgoT())
+			sess := newGitSession(gitTestClient())
+			sess.apply = applier
+
+			c := gitAssociatedContainer("api", "/api", "webstack-api:latest", map[string]string{
+				gitPkg.ComposeDirLabel:      missing,
+				compose.ComposeServiceLabel: "api",
+			})
+			c.SetStale(true)
+			sess.store(c.ID(), git.CheckResult{Stale: true, Commit: "abc"})
+
+			params := types.UpdateParams{EnableGitMonitoring: true}
+			log := gitTestLogger()
+			progress := &session.Progress{}
+			progress.AddScanned(log, c, types.ImageID("git:abc"), params)
+
+			failed := map[types.ContainerID]error{}
+			docker := mockActions.CreateMockClient(&mockActions.TestData{}, false, false)
+			sess.prepareRebuilds(log, ginkgo.GinkgoT().Context(), docker, []types.Container{c}, params, progress, failed)
+			progress.UpdateFailed(log, failed)
+
+			report := progress.Report(log)
+
+			gomega.Expect(failed).NotTo(gomega.HaveKey(c.ID()))
+			gomega.Expect(c.IsStale()).To(gomega.BeFalse())
+			gomega.Expect(sess.built).To(gomega.BeEmpty())
+			gomega.Expect(sess.applied).To(gomega.BeEmpty())
+			gomega.Expect(report.Skipped()).To(gomega.HaveLen(1))
+			gomega.Expect(report.Skipped()[0].ID()).To(gomega.Equal(c.ID()))
+			gomega.Expect(report.Skipped()[0].Error()).To(gomega.ContainSubstring(compose.ErrProjectDir.Error()))
+			gomega.Expect(report.Failed()).To(gomega.BeEmpty())
+			gomega.Expect(report.Scanned()).To(gomega.BeEmpty())
 		})
 
 		ginkgo.It("fails a compose container that has no service label", func() {

@@ -5,6 +5,7 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"maps"
 	"strings"
 	"sync"
 
@@ -63,6 +64,11 @@ func (c *Client) Apply(ctx context.Context, req Request) ([]Container, error) {
 	project, err = InjectLabels(project, req.Labels)
 	if err != nil {
 		return nil, fmt.Errorf("inject compose labels: %w", err)
+	}
+
+	project, err = stampComposeIdentity(project)
+	if err != nil {
+		return nil, err
 	}
 
 	svc, err := c.composeService()
@@ -129,6 +135,58 @@ func scopeComposeProject(project *composeTypes.Project, services []string) (*com
 	project, err = project.WithSelectedServices(services, composeTypes.IncludeDependencies)
 	if err != nil {
 		return nil, fmt.Errorf("select selected compose services: %w", err)
+	}
+
+	return project, nil
+}
+
+// stampComposeIdentity sets the compose identity CustomLabels that docker/compose
+// applies in its unexported postProcessProject before create and start.
+//
+// svc.Up lists containers with com.docker.compose.oneoff=False. A replacement
+// created without that label is left Created, and start then reports that the
+// service has no container to start. Existing CustomLabels are kept. Identity
+// keys are overwritten. Watchtower git stamps stay on service.Labels.
+//
+// Parameters:
+//   - project: Loaded Compose project about to be built or started.
+//
+// Returns:
+//   - *composeTypes.Project: Project with identity CustomLabels on every service.
+//   - error: Non-nil when the project is nil, its name is empty, or a transform fails.
+func stampComposeIdentity(project *composeTypes.Project) (*composeTypes.Project, error) {
+	if project == nil {
+		return nil, errNilProject
+	}
+
+	if project.Name == "" {
+		return nil, errEmptyProjectName
+	}
+
+	projectName := project.Name
+	workingDir := project.WorkingDir
+	configFiles := strings.Join(project.ComposeFiles, ",")
+
+	project, err := project.WithServicesTransform(func(name string, service composeTypes.ServiceConfig) (composeTypes.ServiceConfig, error) {
+		labels := maps.Clone(service.CustomLabels)
+		if labels == nil {
+			labels = composeTypes.Labels{}
+		}
+
+		labels[api.ProjectLabel] = projectName
+		labels[api.ServiceLabel] = name
+		labels[api.VersionLabel] = api.ComposeVersion
+		labels[api.WorkingDirLabel] = workingDir
+		labels[api.ConfigFilesLabel] = configFiles
+		// Start filters on this exact string. "false" does not match.
+		labels[api.OneoffLabel] = "False"
+
+		service.CustomLabels = labels
+
+		return service, nil
+	})
+	if err != nil {
+		return nil, fmt.Errorf("stamp compose identity: %w", err)
 	}
 
 	return project, nil

@@ -192,7 +192,9 @@ func (s *gitSession) check(
 // Failures are recorded in failed and those containers are unmarked stale so
 // the current session does not stop them. Checkout and build failures leave the
 // running instance untouched. Compose apply failures report that Docker Compose
-// may have partially recreated the batch.
+// may have partially recreated the batch. An unreadable compose project
+// directory is not recorded in failed. That container is unmarked stale, marked
+// skipped when progress is set, and is not rebuilt from a Git URL.
 //
 // Parameters:
 //   - log: Process logger.
@@ -233,8 +235,11 @@ func (s *gitSession) prepareRebuilds(
 
 		ref, err := compose.ResolveProjectDir(containerLabels(c), params.ComposeProjects)
 		if err != nil {
-			failed[c.ID()] = err
 			c.SetStale(false)
+			if progress != nil {
+				progress.AddSkipped(log, c, err, params)
+			}
+
 			log.Warn().
 				Err(err).
 				Str("container", c.Name()).
