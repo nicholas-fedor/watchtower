@@ -1215,8 +1215,8 @@ func fetchConfigBlob(log *zerolog.Logger,
 	path := parsedURL.Path
 	// Find the last /manifests/ and replace with /blobs/ to correctly handle
 	// image paths that contain "/manifests/" as a component.
-	idx := strings.LastIndex(path, "/manifests/")
-	if idx == -1 {
+	before, _, ok := strings.CutLast(path, "/manifests/")
+	if !ok {
 		log.Debug().
 			Fields(fields).
 			Msg("Could not parse image path from manifest URL")
@@ -1224,7 +1224,7 @@ func fetchConfigBlob(log *zerolog.Logger,
 		return nil, errFetchConfigFailed
 	}
 
-	imagePath := path[:idx]
+	imagePath := before
 	blobPath := imagePath + "/blobs/" + configDigest
 
 	blobURL := *parsedURL

@@ -1,5 +1,10 @@
 # Update Behavior
 
+These options apply after Watchtower has decided a container is stale.
+The default staleness signal is a registry digest change.
+[Git monitoring](../git-monitoring/index.md) is an alternate signal that still ends in this same container update process (or Compose apply for a local path context).
+See [Advanced Features → Git Monitoring](../../advanced-features/git-monitoring/index.md#interaction_with_other_update_options).
+
 ## Disable Container Restart
 
 Stops and removes the old containers and creates new ones with the updated image, but does not start the new containers.
@@ -161,6 +166,9 @@ Environment Variable: WATCHTOWER_NO_PULL
     Can be set per container via the `com.centurylinklabs.watchtower.no-pull` label.
 
     The HTTP API [`/v1/check`](../../http-api/endpoints/check/index.md) endpoint also respects no-pull and inspects the local cache only.
+
+    No-pull also skips [Git monitoring](../../advanced-features/git-monitoring/index.md) rebuilds.
+    `/v1/check` reports no update for a Git-watched container while no-pull applies to it.
 
     See [Label Precedence](../container-selection/index.md#label_precedence).
 

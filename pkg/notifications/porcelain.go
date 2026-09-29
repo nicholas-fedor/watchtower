@@ -16,6 +16,13 @@ type PorcelainContainer struct {
 	State           string `json:"state"`
 	UpdateAvailable bool   `json:"update_available"`
 	Error           string `json:"error,omitempty"`
+	GitRepo         string `json:"git_repo,omitempty"`
+	GitRef          string `json:"git_ref,omitempty"`
+	Changelog       string `json:"changelog,omitempty"`
+	OCISource       string `json:"oci_source,omitempty"`
+	ImageURL        string `json:"image_url,omitempty"`
+	Documentation   string `json:"documentation,omitempty"`
+	Revision        string `json:"revision,omitempty"`
 }
 
 // PorcelainReport is the top-level JSON structure for --porcelain json.
@@ -48,6 +55,13 @@ func ToPorcelainReport(sourceReport types.Report) PorcelainReport {
 			LatestImageID:   containerReport.LatestImageID().ShortID(),
 			State:           containerReport.State(),
 			UpdateAvailable: containerReport.CurrentImageID() != containerReport.LatestImageID(),
+			GitRepo:         containerReport.GitRepo(),
+			GitRef:          containerReport.GitRef(),
+			Changelog:       containerReport.Changelog(),
+			OCISource:       containerReport.Source(),
+			ImageURL:        containerReport.ImageURL(),
+			Documentation:   containerReport.Documentation(),
+			Revision:        containerReport.Revision(),
 		}
 		if err := containerReport.Error(); err != "" {
 			container.Error = err

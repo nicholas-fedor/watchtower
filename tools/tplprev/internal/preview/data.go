@@ -92,6 +92,10 @@ func (p *PreviewData) AddFromState(state State) {
 		containerError: err,
 		state:          state,
 	}
+	if state == UpdatedState {
+		status.gitRef = "v1.2.4"
+		status.changelog = "https://github.com/org/app/releases"
+	}
 
 	switch state {
 	case ScannedState:

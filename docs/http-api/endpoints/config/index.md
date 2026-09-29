@@ -24,7 +24,8 @@ The `/v1/config` endpoint returns the current configuration:
         "lifecycle_hooks": false,
         "label_enable": false,
         "filter_desc": "",
-        "scope": ""
+        "scope": "",
+        "git_enable": false
     },
     "timestamp": "2025-01-20T11:30:45Z",
     "api_version": "v1"
@@ -44,6 +45,9 @@ The `/v1/config` endpoint returns the current configuration:
 | `label_enable`       | `boolean` | Whether label-based enabling is active           |
 | `filter_desc`        | `string`  | Human-readable description of the applied filter |
 | `scope`              | `string`  | Monitoring scope                                 |
+| `git_enable`         | `boolean` | Process-wide Git watcher default                 |
+
+Tokens, passwords, and SSH key paths are never included.
 
 ## HTTP Status Codes
 

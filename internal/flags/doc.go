@@ -9,7 +9,7 @@
 //
 // Domain packages match the config taxonomy:
 // docker, client, schedule, mode, update, lifecycle, filter, registry, compat,
-// api, notify, logging.
+// api, notify, logging, git.
 //
 // Key components:
 //   - RegisterAll: Registers every domain's flags on the root command.

@@ -12,7 +12,7 @@ events token.
 | GET    | `/livez`                 | No   | Health check — always returns 200 when running                                                          |
 | GET    | `/readyz`                | No   | Health check — verifies Docker client connectivity                                                      |
 | GET    | `/startupz`              | No   | Health check — always returns 200 once started                                                          |
-| POST   | `/v1/check`              | Yes  | Check containers for available updates via registry digest                                              |
+| POST   | `/v1/check`              | Yes  | Check containers for available updates (registry digest or Git ref)                                     |
 | GET    | `/v1/containers`         | Yes  | List watched container statuses                                                                         |
 | GET    | `/v1/containers/details` | Yes  | Detailed container information including config flags                                                   |
 | GET    | `/v1/history`            | Yes  | Historical scan results from the in-memory ring buffer                                                  |

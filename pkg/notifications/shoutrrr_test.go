@@ -8,6 +8,7 @@ import (
 	"io"
 	"os"
 	"os/exec"
+	"strings"
 	"sync"
 	"sync/atomic"
 	"testing"
@@ -475,6 +476,38 @@ updt1 (mock/updt1:latest): Updated
 				data := mockDataFromStates(session.UpdatedState)
 				gomega.Expect(getTemplatedResult(`{{ .Host }}`, false, data)).
 					To(gomega.Equal(expected))
+			})
+		})
+
+		ginkgo.When("using a template referencing Git and OCI report fields", func() {
+			ginkgo.It("should render Changelog, GitRepo, and Source", func() {
+				status := session.NewContainerStatus("app", "org/app:latest")
+				status.SetGitMetadata(
+					"https://github.com/org/app.git",
+					"v1.2.3",
+					"https://github.com/org/app/releases",
+					"https://github.com/org/app",
+					"https://example.com/image",
+					"https://example.com/docs",
+					"abc123",
+				)
+
+				report := &session.SingleContainerReport{
+					UpdatedReports: []types.ContainerReport{status},
+				}
+
+				tpl, err := template.New("git").Parse(
+					`{{ range .Report.Updated }}{{ .Name }} {{ .Changelog }}{{ if .Source }} ({{ .Source }}){{ end }} repo={{ .GitRepo }}{{ end }}`,
+				)
+				gomega.Expect(err).ToNot(gomega.HaveOccurred())
+
+				var buf bytes.Buffer
+
+				err = tpl.Execute(&buf, Data{Report: report})
+				gomega.Expect(err).ToNot(gomega.HaveOccurred())
+				gomega.Expect(buf.String()).To(gomega.Equal(
+					"app https://github.com/org/app/releases (https://github.com/org/app) repo=https://github.com/org/app.git",
+				))
 			})
 		})
 
@@ -1351,6 +1384,101 @@ func getTemplatedResult(tplString string, legacy bool, data Data) string {
 	gomega.ExpectWithOffset(1, err).NotTo(gomega.HaveOccurred())
 
 	return msg
+}
+
+func TestDefaultLegacyGitMessages(t *testing.T) {
+	t.Parallel()
+
+	tpl := template.Must(template.New("git").Funcs(Funcs).Parse(commonTemplates["default-legacy"]))
+
+	var buf bytes.Buffer
+
+	err := tpl.Execute(&buf, []*notificationEntry{
+		{
+			Message: "Found new Git revision",
+			Data: map[string]any{
+				"revision":     "forgejo.papago.casa/nick/watchtower-git-support-test@v1.2.1",
+				"short_commit": "7ab67c773bf4",
+			},
+		},
+		{
+			Message: "Built image from Git URL context",
+			Data: map[string]any{
+				"image":    "wtgit-semver:git-7ab67c773bf4",
+				"image_id": "27c196745ab8",
+			},
+		},
+		{
+			Message: "Stopping container",
+			Data:    map[string]any{"container": "wtgit-semver", "id": "76caeb3ef2ce"},
+		},
+		{
+			Message: "Started new container",
+			Data:    map[string]any{"container": "wtgit-semver", "new_id": "0f492bb11f3b"},
+		},
+	})
+	require.NoError(t, err)
+	assert.Equal(t, strings.Join([]string{
+		"Found new Git revision: forgejo.papago.casa/nick/watchtower-git-support-test@v1.2.1 (7ab67c773bf4)",
+		"Built image: wtgit-semver:git-7ab67c773bf4 (27c196745ab8)",
+		"Stopped stale container: wtgit-semver (76caeb3ef2ce)",
+		"Started new container: wtgit-semver (0f492bb11f3b)",
+	}, "\n"), strings.TrimSpace(buf.String()))
+}
+
+func TestDefaultLegacyGitSkipAndComposeMessages(t *testing.T) {
+	t.Parallel()
+
+	tpl := template.Must(template.New("git").Funcs(Funcs).Parse(commonTemplates["default-legacy"]))
+
+	cases := []struct {
+		name    string
+		message string
+		data    map[string]any
+		want    string
+	}{
+		{
+			name:    "compose build only",
+			message: "Built Compose project",
+			data:    map[string]any{"project": "wtgitweb", "service": "api"},
+			want:    "Built Compose project: wtgitweb (api)",
+		},
+		{
+			name:    "missing compose dir",
+			message: "Compose project directory is not readable. Leaving the running container untouched",
+			data: map[string]any{
+				"container": "wtgit-missing",
+				"error":     "compose project directory is not readable: /srv/missing",
+				"image":     "wtgit-app:latest",
+			},
+			want: "Skipped wtgit-missing: compose directory is not readable",
+		},
+		{
+			name:    "invalid policy",
+			message: "Skipped container with an invalid git semver policy",
+			data:    map[string]any{"container": "wtgit-app"},
+			want:    "Skipped wtgit-app: invalid git semver policy",
+		},
+		{
+			name:    "invalid host",
+			message: "Skipped container with an invalid git-host",
+			data:    map[string]any{"container": "wtgit-app"},
+			want:    "Skipped wtgit-app: invalid git-host",
+		},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+
+			var buf bytes.Buffer
+
+			err := tpl.Execute(&buf, []*notificationEntry{{Message: tc.message, Data: tc.data}})
+			require.NoError(t, err)
+			assert.Equal(t, tc.want, strings.TrimSpace(buf.String()))
+			assert.NotContains(t, buf.String(), "|")
+		})
+	}
 }
 
 // TestShutdownGracePeriodConstant verifies that the shutdownGracePeriod constant is set to 50ms.

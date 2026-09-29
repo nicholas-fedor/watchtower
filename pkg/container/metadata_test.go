@@ -9,6 +9,7 @@ import (
 
 	dockerContainer "github.com/moby/moby/api/types/container"
 
+	"github.com/nicholas-fedor/watchtower/pkg/container/git"
 	"github.com/nicholas-fedor/watchtower/pkg/types"
 )
 
@@ -440,6 +441,46 @@ func TestContainer_IsMonitorOnly(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			got := tt.c.IsMonitorOnly(tt.args.params)
 			assert.Equal(t, tt.want, got)
+		})
+	}
+}
+
+func TestContainer_IsGitWatch(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name    string
+		label   string
+		present bool
+		global  bool
+		want    bool
+	}{
+		{name: "missing uses process true", global: true, want: true},
+		{name: "missing uses process false"},
+		{name: "label true", label: "true", present: true, want: true},
+		{name: "label false", label: "false", present: true, global: true},
+		{name: "invalid uses process", label: "maybe", present: true, global: true, want: true},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			labels := map[string]string{}
+			if tt.present {
+				labels[git.WatchLabel] = tt.label
+			}
+
+			c := &Container{
+				containerInfo: &dockerContainer.InspectResponse{
+					Name: "/test-container",
+					Config: &dockerContainer.Config{
+						Labels: labels,
+					},
+				},
+			}
+
+			assert.Equal(t, tt.want, c.IsGitWatch(types.UpdateParams{EnableGitMonitoring: tt.global}))
 		})
 	}
 }

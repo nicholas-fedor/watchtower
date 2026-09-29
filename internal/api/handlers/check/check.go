@@ -9,7 +9,9 @@ import (
 	"github.com/gofiber/fiber/v3"
 	"github.com/rs/zerolog"
 
+	"github.com/nicholas-fedor/watchtower/internal/git"
 	"github.com/nicholas-fedor/watchtower/pkg/container"
+	gitPkg "github.com/nicholas-fedor/watchtower/pkg/container/git"
 	"github.com/nicholas-fedor/watchtower/pkg/types"
 )
 
@@ -21,9 +23,28 @@ type ContainerCheck struct {
 	Digest          string    `json:"digest"`
 	UpdateAvailable bool      `json:"update_available"`
 	LatestImageID   string    `json:"latest_image_id"`
+	GitCommit       string    `json:"git_commit,omitempty"`
 	LatestDigest    string    `json:"latest_digest"`
 	Error           string    `json:"error,omitempty"`
 	Timestamp       time.Time `json:"timestamp"`
+	UpdateSource    string    `json:"update_source,omitempty"`
+	GitRepo         string    `json:"git_repo,omitempty"`
+	GitRef          string    `json:"git_ref,omitempty"`
+	Changelog       string    `json:"changelog,omitempty"`
+	OCISource       string    `json:"oci_source,omitempty"`
+	ImageURL        string    `json:"image_url,omitempty"`
+	Documentation   string    `json:"documentation,omitempty"`
+	Revision        string    `json:"revision,omitempty"`
+}
+
+// CheckResponse is the response returned by POST /v1/check.
+//
+// Parameters/returns are documented by the handler's Swagger annotations.
+type CheckResponse struct {
+	Containers []ContainerCheck `json:"containers"`
+	Count      int              `json:"count"`
+	Timestamp  string           `json:"timestamp"`
+	APIVersion string           `json:"api_version"`
 }
 
 // CheckFunc performs the update availability check for all watched containers.
@@ -52,9 +73,11 @@ func extractFilterParams(c fiber.Ctx, key string) []string {
 
 // CheckForUpdates checks all watched containers for available image updates.
 //
-// It queries the registry for the latest digest (HEAD with GET fallback) without
-// pulling image layers.
-// If no-pull is configured, then only the local cache is used.
+// Associated Git-watched containers use the same watch split as scheduled
+// updates: CheckContainer compares the hosted Git ref and does not clone or
+// build. Other containers query the registry for the latest digest (HEAD with
+// GET fallback) without pulling image layers.
+// If no-pull is configured, then only the local cache is used for registry checks.
 // Configured image cooldown checks are not applied.
 // The provided filter determines which containers are included.
 // nil or a pass-through filter includes all.
@@ -73,6 +96,7 @@ func CheckForUpdates(log *zerolog.Logger,
 	client container.Client,
 	filter types.Filter,
 	params types.UpdateParams,
+	gitClient *git.Client,
 ) ([]ContainerCheck, error) {
 	containers, err := client.ListContainers(ctx, filter)
 	if err != nil {
@@ -94,6 +118,18 @@ func CheckForUpdates(log *zerolog.Logger,
 			Timestamp: now,
 		}
 
+		_, concrete := c.(*container.Container)
+		if concrete {
+			meta := container.ResolveReportMeta(c, params, container.ChangelogVars{})
+			result.GitRepo = meta.GitRepo
+			result.GitRef = meta.GitRef
+			result.Changelog = meta.Changelog
+			result.OCISource = meta.Source
+			result.ImageURL = meta.ImageURL
+			result.Documentation = meta.Documentation
+			result.Revision = meta.Revision
+		}
+
 		info := c.ImageInfo()
 		if info != nil {
 			result.Digest = container.ExtractImageDigest(
@@ -102,29 +138,75 @@ func CheckForUpdates(log *zerolog.Logger,
 			)
 		}
 
-		available, latestID, latestDigest, err := client.CheckContainerUpdate(
-			ctx,
-			c,
-			params,
-		)
-		if err != nil {
-			result.Error = err.Error()
+		if gitClient != nil && concrete && gitPkg.ShouldMonitor(log, c, params) {
+			result.UpdateSource = "git"
 
-			log.Debug().
-				Err(err).
-				Str("container", c.Name()).
-				Str("image", c.ImageName()).
-				Str("notify", "no").
-				Msg("Failed to check container for updates")
-		} else {
-			result.UpdateAvailable = available
+			// no-pull skips the Git rebuild. Report the same skip here.
+			if c.IsNoPull(params) {
+				results = append(results, result)
 
-			if latestDigest != "" {
-				result.LatestDigest = latestDigest
+				continue
 			}
 
-			if latestID != "" {
-				result.LatestImageID = string(latestID)
+			checkResult, err := git.CheckContainer(
+				ctx,
+				gitClient,
+				c,
+				params,
+			)
+			if err != nil {
+				result.Error = err.Error()
+
+				log.Debug().
+					Err(err).
+					Str("container", c.Name()).
+					Str("image", c.ImageName()).
+					Str("notify", "no").
+					Msg("Failed to check container Git source")
+			} else {
+				result.UpdateAvailable = checkResult.Stale
+				if checkResult.Commit != "" {
+					result.GitCommit = checkResult.Commit
+				}
+
+				if checkResult.Tag != "" {
+					result.Changelog = container.ResolveReportMeta(
+						c,
+						params,
+						container.ChangelogVars{
+							Tag:    checkResult.Tag,
+							Commit: checkResult.Commit,
+						},
+					).Changelog
+				}
+			}
+		} else {
+			result.UpdateSource = "registry"
+
+			available, latestID, latestDigest, err := client.CheckContainerUpdate(
+				ctx,
+				c,
+				params,
+			)
+			if err != nil {
+				result.Error = err.Error()
+
+				log.Debug().
+					Err(err).
+					Str("container", c.Name()).
+					Str("image", c.ImageName()).
+					Str("notify", "no").
+					Msg("Failed to check container for updates")
+			} else {
+				result.UpdateAvailable = available
+
+				if latestDigest != "" {
+					result.LatestDigest = latestDigest
+				}
+
+				if latestID != "" {
+					result.LatestImageID = string(latestID)
+				}
 			}
 		}
 

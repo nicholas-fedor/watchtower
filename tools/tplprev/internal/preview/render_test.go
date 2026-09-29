@@ -26,6 +26,8 @@ func TestRenderDefaultReport(t *testing.T) {
 	assert.Contains(t, result, "1 Failed")
 	assert.Contains(t, result, "datamatrix")
 	assert.Contains(t, result, "updated to")
+	assert.Contains(t, result, "ref v1.2.4")
+	assert.Contains(t, result, "https://github.com/org/app/releases")
 }
 
 func TestRenderDefaultLegacyEntriesRoot(t *testing.T) {

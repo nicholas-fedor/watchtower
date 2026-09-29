@@ -3,6 +3,7 @@ package config
 import (
 	"errors"
 	"fmt"
+	"os"
 	"strconv"
 	"strings"
 	"time"
@@ -17,6 +18,7 @@ import (
 	"github.com/nicholas-fedor/watchtower/internal/config/compatibility"
 	"github.com/nicholas-fedor/watchtower/internal/config/docker"
 	"github.com/nicholas-fedor/watchtower/internal/config/filter"
+	gitConfig "github.com/nicholas-fedor/watchtower/internal/config/git"
 	"github.com/nicholas-fedor/watchtower/internal/config/lifecycle"
 	"github.com/nicholas-fedor/watchtower/internal/config/logging"
 	"github.com/nicholas-fedor/watchtower/internal/config/mode"
@@ -118,6 +120,11 @@ func Load(log *zerolog.Logger, cmd *cobra.Command, args []string) (Config, error
 	cfg.API = loadAPI(vCfg, flagSet)
 	cfg.Notify = loadNotify(vCfg, flagSet)
 	cfg.Logging = loadLogging(vCfg)
+
+	cfg.Git, err = loadGit(vCfg, flagSet)
+	if err != nil {
+		return Config{}, err
+	}
 
 	err = validate(log, cfg)
 	if err != nil {
@@ -321,14 +328,14 @@ func loadLifecycle(vCfg *viper.Viper) lifecycle.Lifecycle {
 	}
 }
 
-// normalizedStringSlice loads a list flag/env value and applies normalize to each element.
+// normalizedStringSlice loads a comma- or space-separated list flag/env value
+// and applies normalize to each element.
 //
 // Parameters:
 //   - vCfg: Bound Viper instance.
 //   - flagSet: Parsed flag set.
 //   - name: Flag name.
 //   - envKeys: Environment variable aliases.
-//   - parse: List parse strategy.
 //   - normalize: Per-element transform (for example TrimSpace or NormalizeContainerName).
 //
 // Returns:
@@ -338,10 +345,9 @@ func normalizedStringSlice(
 	flagSet *pflag.FlagSet,
 	name string,
 	envKeys []string,
-	parse spec.ListParseKind,
 	normalize func(string) string,
 ) []string {
-	values := stringSliceValue(vCfg, flagSet, name, envKeys, parse)
+	values := stringSliceValue(vCfg, flagSet, name, envKeys, spec.ListCommaOrSpace)
 	for i := range values {
 		values[i] = normalize(values[i])
 	}
@@ -356,21 +362,18 @@ func loadFilter(log *zerolog.Logger, vCfg *viper.Viper, flagSet *pflag.FlagSet, 
 	disableContainers := normalizedStringSlice(
 		vCfg, flagSet, "disable-containers",
 		[]string{"WATCHTOWER_DISABLE_CONTAINERS"},
-		spec.ListCommaOrSpace,
 		util.NormalizeContainerName,
 	)
 
 	monitorImages := normalizedStringSlice(
 		vCfg, flagSet, "monitor-image-names",
 		[]string{"WATCHTOWER_MONITOR_IMAGE_NAMES"},
-		spec.ListCommaOrSpace,
 		strings.TrimSpace,
 	)
 
 	skipImages := normalizedStringSlice(
 		vCfg, flagSet, "skip-image-names",
 		[]string{"WATCHTOWER_SKIP_IMAGE_NAMES"},
-		spec.ListCommaOrSpace,
 		strings.TrimSpace,
 	)
 
@@ -536,6 +539,90 @@ func loadLogging(vCfg *viper.Viper) logging.Logging {
 		Trace:   vCfg.GetBool("trace"),
 		NoColor: vCfg.GetBool("no-color"),
 	}
+}
+
+// loadGit reads Git association and watcher settings from Viper.
+//
+// Parameters:
+//   - vCfg: Bound configuration.
+//   - flagSet: Command flag set used for list-valued flags.
+//
+// Returns:
+//   - cfggit.Git: Parsed Git settings.
+//   - error: Non-nil when a mapping, host, or CA bundle is invalid.
+func loadGit(vCfg *viper.Viper, flagSet *pflag.FlagSet) (gitConfig.Git, error) {
+	rawImages := stringSliceValue(
+		vCfg, flagSet, "git-image",
+		[]string{"WATCHTOWER_GIT_IMAGE"},
+		spec.ListNewline,
+	)
+
+	images, err := gitConfig.ParseImageMappings(rawImages)
+	if err != nil {
+		return gitConfig.Git{}, fmt.Errorf("git-image: %w", err)
+	}
+
+	timeout := durationValue(
+		vCfg, flagSet, "git-timeout",
+		[]string{"WATCHTOWER_GIT_TIMEOUT"},
+	)
+
+	caBundle, err := readOptionalFile(vCfg.GetString("git-ca-bundle"))
+	if err != nil {
+		return gitConfig.Git{}, fmt.Errorf("git-ca-bundle: %w", err)
+	}
+
+	rawProjects := stringSliceValue(
+		vCfg, flagSet, "compose-project",
+		[]string{"WATCHTOWER_COMPOSE_PROJECT"},
+		spec.ListNewline,
+	)
+
+	projects, err := gitConfig.ParseComposeProjects(rawProjects)
+	if err != nil {
+		return gitConfig.Git{}, fmt.Errorf("compose-project: %w", err)
+	}
+
+	return gitConfig.Git{
+		Enable:          vCfg.GetBool("git-enable"),
+		DefaultRef:      gitConfig.DefaultRef,
+		SemverPolicy:    gitConfig.DefaultPolicy,
+		Timeout:         timeout,
+		Token:           vCfg.GetString("git-auth-token"),
+		Username:        vCfg.GetString("git-username"),
+		Password:        vCfg.GetString("git-password"),
+		SSHKeyPath:      vCfg.GetString("git-ssh-key-path"),
+		SSHKnownHosts:   vCfg.GetString("git-ssh-known-hosts"),
+		CABundle:        caBundle,
+		InsecureSkipTLS: vCfg.GetBool("git-insecure-skip-tls"),
+		Dockerfile:      strings.TrimSpace(vCfg.GetString("git-dockerfile")),
+		Context:         strings.TrimSpace(vCfg.GetString("git-context")),
+		Images:          images,
+		ComposeStash:    vCfg.GetBool("git-compose-stash"),
+		ComposeProjects: projects,
+	}, nil
+}
+
+// readOptionalFile reads path when it is non-empty.
+//
+// Parameters:
+//   - path: Filesystem path, or empty.
+//
+// Returns:
+//   - []byte: File contents, or nil when path is empty.
+//   - error: Non-nil when the file cannot be read.
+func readOptionalFile(path string) ([]byte, error) {
+	path = strings.TrimSpace(path)
+	if path == "" {
+		return nil, nil
+	}
+
+	data, err := os.ReadFile(path)
+	if err != nil {
+		return nil, fmt.Errorf("read %s: %w", path, err)
+	}
+
+	return data, nil
 }
 
 // validate checks cross-flag constraints that Load can enforce without side effects.

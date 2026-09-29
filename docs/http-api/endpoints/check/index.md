@@ -2,11 +2,15 @@
 
 ## Overview
 
-The `v1/check` endpoint enables checking monitored containers for available image updates by querying the registry for the latest digest (HTTP HEAD with GET fallback).
+The `v1/check` endpoint enables checking monitored containers for available image updates.
+
+Containers on the registry path are checked by querying the registry for the latest digest (HTTP HEAD with GET fallback).
+Containers associated for [Git monitoring](../../../advanced-features/git-monitoring/index.md) use the same watch split as scheduled updates. Watchtower reports whether the hosted Git ref is stale. It does not clone or build.
 
 It does **not** download image layers and does **not** check against the configured [image cooldown](../../../advanced-features/image-cooldown/index.md), as the cooldown functionality remains an apply-time gate for scheduled updates and `/v1/update`.
 
-When [no-pull](../../../configuration/update-behavior/index.md#disable_image_pulling) is enabled globally or via the container label, the check inspects the local image cache only and does not contact the registry.
+When [no-pull](../../../configuration/update-behavior/index.md#disable_image_pulling) is enabled globally or via the container label, a registry-path container is checked against the local image cache only. The registry is not contacted.
+A Git-watched container is not checked. The Git remote is not contacted, and the result is `update_available: false`.
 
 Include `check` in [`http-api-endpoints`](../../../configuration/http-api/index.md#http_api_endpoints) to enable this endpoint.
 
@@ -59,6 +63,12 @@ The `/v1/check` endpoint returns a JSON array of container check results:
             "update_available": true,
             "latest_image_id": "",
             "latest_digest": "sha256:new...",
+            "update_source": "registry",
+            "git_repo": "https://github.com/org/app.git",
+            "git_ref": "main",
+            "git_commit": "abc123def456",
+            "changelog": "https://github.com/org/app/releases",
+            "oci_source": "https://github.com/org/app",
             "timestamp": "2025-01-20T11:30:45Z"
         }
     ],
@@ -73,9 +83,18 @@ The `/v1/check` endpoint returns a JSON array of container check results:
 - `image_id`: Current local image ID
 - `digest`: Current local registry digest when known
 - `update_available`: Whether a newer image is available
-- `latest_image_id`: Local image ID of the newer image when known (often empty for registry digest checks that do not pull)
+- `latest_image_id`: Local image ID of the newer image when known. It is empty for Git checks, which do not build or pull an image
+- `git_commit`: Resolved Git commit for a Git-watched container when known
 - `latest_digest`: Newest registry digest when known
 - `error`: Per-container error message when the check failed
+- `update_source`: `registry` or `git` (the staleness path; not OCI `source`)
+- `git_repo`, `git_ref`, `changelog`: Resolved Git metadata when present
+- `oci_source`, `image_url`, `documentation`, `revision`: OCI image annotations when present
+
+Containers associated for Git watching use the same watch split as scheduled updates.
+The check does not clone or build.
+See [Git Monitoring](../../../advanced-features/git-monitoring/index.md).
+Git and OCI report fields are documented under [notification templates](../../../notifications/templates/index.md#git_and_oci_report_fields).
 
 ## HTTP Status Codes
 

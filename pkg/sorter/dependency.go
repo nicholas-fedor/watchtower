@@ -282,6 +282,71 @@ func buildDependencyGraph(log *zerolog.Logger,
 	return containerMap, indegree, adjacency, normalizedMap, nil
 }
 
+// ContainerDependencies maps each container to the containers in the set that it depends on.
+//
+// Link matching is the same graph used by SortByDependencies. Callers that group
+// containers into larger units can order those units from this map.
+//
+// Parameters:
+//   - log: Process logger. Required and must be non-nil.
+//   - containers: Containers to inspect.
+//   - useComposeDependsOn: Whether Links() should include Compose depends_on labels.
+//
+// Returns:
+//   - map[types.ContainerID][]types.ContainerID: Dependent ID to dependency IDs.
+//   - error: Non-nil when dependency identifiers collide.
+func ContainerDependencies(
+	log *zerolog.Logger,
+	containers []types.Container,
+	useComposeDependsOn bool,
+) (map[types.ContainerID][]types.ContainerID, error) {
+	if len(containers) == 0 {
+		return map[types.ContainerID][]types.ContainerID{}, nil
+	}
+
+	containerMap, _, adjacency, _, err := buildDependencyGraph(log, containers, useComposeDependsOn)
+	if err != nil {
+		return nil, err
+	}
+
+	dependencies := make(map[types.ContainerID][]types.ContainerID, len(containers))
+	seen := make(map[types.ContainerID]map[types.ContainerID]struct{}, len(containers))
+
+	for dependencyKey, dependents := range adjacency {
+		dependency, ok := containerMap[dependencyKey]
+		if !ok || dependency == nil {
+			continue
+		}
+
+		dependencyID := dependency.ID()
+
+		for _, dependentKey := range dependents {
+			dependent, ok := containerMap[dependentKey]
+			if !ok || dependent == nil {
+				continue
+			}
+
+			dependentID := dependent.ID()
+			if dependentID == "" || dependentID == dependencyID {
+				continue
+			}
+
+			if seen[dependentID] == nil {
+				seen[dependentID] = make(map[types.ContainerID]struct{})
+			}
+
+			if _, exists := seen[dependentID][dependencyID]; exists {
+				continue
+			}
+
+			seen[dependentID][dependencyID] = struct{}{}
+			dependencies[dependentID] = append(dependencies[dependentID], dependencyID)
+		}
+	}
+
+	return dependencies, nil
+}
+
 // buildLinkMatchIndexes builds the identifier set and alias→canonical map used when
 // resolving dependency links against graph nodes.
 //

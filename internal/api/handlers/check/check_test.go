@@ -4,15 +4,24 @@ import (
 	"errors"
 	"net/http"
 	"net/http/httptest"
+	"os"
+	"path/filepath"
 	"testing"
 	"time"
 
+	"github.com/go-git/go-git/v5/plumbing/object"
 	"github.com/gofiber/fiber/v3"
 	"github.com/moby/moby/api/types/image"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 
+	goGit "github.com/go-git/go-git/v5"
+	dockerContainer "github.com/moby/moby/api/types/container"
+
+	"github.com/nicholas-fedor/watchtower/internal/git"
+	wtcontainer "github.com/nicholas-fedor/watchtower/pkg/container"
+	gitPkg "github.com/nicholas-fedor/watchtower/pkg/container/git"
 	mockContainer "github.com/nicholas-fedor/watchtower/pkg/container/mocks"
 	"github.com/nicholas-fedor/watchtower/pkg/types"
 	mockTypes "github.com/nicholas-fedor/watchtower/pkg/types/mocks"
@@ -181,7 +190,7 @@ func TestCheckForUpdates(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			client := tt.client(t)
-			results, err := CheckForUpdates(testLogger(), t.Context(), client, tt.filter, types.UpdateParams{})
+			results, err := CheckForUpdates(testLogger(), t.Context(), client, tt.filter, types.UpdateParams{}, nil)
 
 			if tt.wantErr {
 				require.Error(t, err)
@@ -226,7 +235,7 @@ func TestCheckForUpdates_DigestExtraction(t *testing.T) {
 	client.EXPECT().CheckContainerUpdate(mock.Anything, mock.Anything, mock.Anything).
 		Return(false, types.ImageID("sha256:abc"), "", nil)
 
-	results, err := CheckForUpdates(testLogger(), t.Context(), client, nil, types.UpdateParams{})
+	results, err := CheckForUpdates(testLogger(), t.Context(), client, nil, types.UpdateParams{}, nil)
 	require.NoError(t, err)
 	require.Len(t, results, 1)
 	assert.Equal(t, "sha256:digest123", results[0].Digest)
@@ -243,7 +252,7 @@ func TestCheckForUpdates_CheckContainerUpdateError(t *testing.T) {
 	client.EXPECT().CheckContainerUpdate(mock.Anything, mock.Anything, mock.Anything).
 		Return(false, types.ImageID(""), "", errors.New("registry unavailable"))
 
-	results, err := CheckForUpdates(testLogger(), t.Context(), client, nil, types.UpdateParams{})
+	results, err := CheckForUpdates(testLogger(), t.Context(), client, nil, types.UpdateParams{}, nil)
 	require.NoError(t, err)
 	require.Len(t, results, 1)
 	assert.Equal(t, "registry unavailable", results[0].Error)
@@ -268,7 +277,7 @@ func TestCheckForUpdates_ParamsPropagation(t *testing.T) {
 		LabelPrecedence: true,
 		CooldownDelay:   5 * time.Minute,
 	}
-	results, err := CheckForUpdates(testLogger(), t.Context(), client, nil, params)
+	results, err := CheckForUpdates(testLogger(), t.Context(), client, nil, params, nil)
 	require.NoError(t, err)
 	require.Len(t, results, 1)
 	assert.True(t, results[0].UpdateAvailable)
@@ -296,7 +305,7 @@ func TestCheckForUpdates_MixedStaleResults(t *testing.T) {
 	client.EXPECT().CheckContainerUpdate(mock.Anything, container2, mock.Anything).
 		Return(false, types.ImageID("sha256:def"), "", nil)
 
-	results, err := CheckForUpdates(testLogger(), t.Context(), client, nil, types.UpdateParams{})
+	results, err := CheckForUpdates(testLogger(), t.Context(), client, nil, types.UpdateParams{}, nil)
 	require.NoError(t, err)
 	require.Len(t, results, 2)
 	assert.True(t, results[0].UpdateAvailable)
@@ -305,6 +314,87 @@ func TestCheckForUpdates_MixedStaleResults(t *testing.T) {
 	assert.False(t, results[1].UpdateAvailable)
 	assert.Equal(t, "sha256:def", results[1].LatestImageID)
 	assert.Empty(t, results[1].LatestDigest)
+}
+
+func TestCheckForUpdates_GitNoPullSkipsCheck(t *testing.T) {
+	client := mockContainer.NewMockClient(t)
+	watched := wtcontainer.NewContainer(testLogger(), &dockerContainer.InspectResponse{
+		ID:   "app-id",
+		Name: "/app",
+		Config: &dockerContainer.Config{
+			Image: "app:latest",
+			Labels: map[string]string{
+				gitPkg.RepoLabel: "https://git.example.com/org/app.git",
+			},
+		},
+	}, nil)
+	client.EXPECT().ListContainers(mock.Anything, mock.Anything).Return([]types.Container{watched}, nil)
+
+	gitClient := git.New(testLogger(), git.Options{Timeout: time.Millisecond})
+	results, err := CheckForUpdates(testLogger(), t.Context(), client, nil, types.UpdateParams{
+		EnableGitMonitoring: true,
+		NoPull:              true,
+	}, gitClient)
+	require.NoError(t, err)
+	require.Len(t, results, 1)
+	assert.Equal(t, "git", results[0].UpdateSource)
+	assert.False(t, results[0].UpdateAvailable)
+	assert.Empty(t, results[0].Error)
+	assert.Empty(t, results[0].LatestImageID)
+}
+
+// TestCheckForUpdates_GitCommitField verifies that Git results expose the commit separately from the local image ID.
+func TestCheckForUpdates_GitCommitField(t *testing.T) {
+	repoDir, branch, commit := initCheckGitRepo(t)
+	watched := wtcontainer.NewContainer(testLogger(), &dockerContainer.InspectResponse{
+		ID:   "app-id",
+		Name: "/app",
+		Config: &dockerContainer.Config{
+			Image: "app:latest",
+			Labels: map[string]string{
+				gitPkg.RepoLabel: repoDir,
+				gitPkg.RefLabel:  branch,
+			},
+		},
+	}, nil)
+
+	client := mockContainer.NewMockClient(t)
+	client.EXPECT().ListContainers(mock.Anything, mock.Anything).Return([]types.Container{watched}, nil)
+
+	results, err := CheckForUpdates(testLogger(), t.Context(), client, nil, types.UpdateParams{
+		EnableGitMonitoring: true,
+	}, git.New(testLogger(), git.Options{Timeout: time.Second}))
+	require.NoError(t, err)
+	require.Len(t, results, 1)
+	assert.Equal(t, "git", results[0].UpdateSource)
+	assert.Equal(t, commit, results[0].GitCommit)
+	assert.Empty(t, results[0].LatestImageID)
+}
+
+// initCheckGitRepo creates a temporary Git repository and returns its directory, branch, and commit.
+func initCheckGitRepo(t *testing.T) (string, string, string) {
+	t.Helper()
+
+	dir := t.TempDir()
+	repo, err := goGit.PlainInit(dir, false)
+	require.NoError(t, err)
+
+	worktree, err := repo.Worktree()
+	require.NoError(t, err)
+	require.NoError(t, os.WriteFile(filepath.Join(dir, "README"), []byte("hello\n"), 0o600))
+
+	_, err = worktree.Add("README")
+	require.NoError(t, err)
+
+	hash, err := worktree.Commit("init", &goGit.CommitOptions{
+		Author: &object.Signature{Name: "test", Email: "test@example.com", When: time.Now()},
+	})
+	require.NoError(t, err)
+
+	head, err := repo.Head()
+	require.NoError(t, err)
+
+	return dir, head.Name().Short(), hash.String()
 }
 
 func TestExtractFilterParams(t *testing.T) {

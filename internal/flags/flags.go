@@ -18,6 +18,7 @@ import (
 	"github.com/nicholas-fedor/watchtower/internal/flags/compat"
 	"github.com/nicholas-fedor/watchtower/internal/flags/docker"
 	"github.com/nicholas-fedor/watchtower/internal/flags/filter"
+	"github.com/nicholas-fedor/watchtower/internal/flags/git"
 	"github.com/nicholas-fedor/watchtower/internal/flags/lifecycle"
 	flagslogging "github.com/nicholas-fedor/watchtower/internal/flags/logging"
 	"github.com/nicholas-fedor/watchtower/internal/flags/mode"
@@ -83,6 +84,7 @@ func RegisterSystemFlags(rootCmd *cobra.Command) {
 	compat.Register(rootCmd)
 	api.Register(rootCmd)
 	flagslogging.Register(rootCmd)
+	git.Register(rootCmd)
 }
 
 // RegisterNotificationFlags adds notification flags to the root command.
@@ -255,6 +257,8 @@ func GetSecretsFromFiles(log *zerolog.Logger, rootCmd *cobra.Command) {
 		"notification-url",
 		"http-api-token",
 		"http-api-events-token",
+		"git-auth-token",
+		"git-password",
 	}
 
 	// Process each secret flag.

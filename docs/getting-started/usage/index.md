@@ -39,6 +39,11 @@ docker run -d \
   nickfedor/watchtower
 ```
 
+### Git Monitoring
+
+Registry digest comparison is the default staleness signal.
+To rebuild from source when a hosted Git branch or tag changes, see [Git Monitoring](../../advanced-features/git-monitoring/index.md).
+
 ### Private Registries
 
 If pulling images from private Docker registries, then supply registry authentication credentials with the environment variables `REPO_USER` and `REPO_PASS`

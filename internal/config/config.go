@@ -6,6 +6,7 @@ import (
 	"github.com/nicholas-fedor/watchtower/internal/config/compatibility"
 	"github.com/nicholas-fedor/watchtower/internal/config/docker"
 	"github.com/nicholas-fedor/watchtower/internal/config/filter"
+	"github.com/nicholas-fedor/watchtower/internal/config/git"
 	"github.com/nicholas-fedor/watchtower/internal/config/lifecycle"
 	"github.com/nicholas-fedor/watchtower/internal/config/logging"
 	"github.com/nicholas-fedor/watchtower/internal/config/mode"
@@ -45,4 +46,6 @@ type Config struct {
 	Notify notify.Notify
 	// Logging holds console log format and level settings.
 	Logging logging.Logging
+	// Git holds Git association mappings and watcher credentials.
+	Git git.Git
 }

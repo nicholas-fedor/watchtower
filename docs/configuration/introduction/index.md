@@ -71,6 +71,10 @@ To run a single update attempt and exit, use the [`run-once`](../scheduling/inde
 
 - This command triggers an update attempt for "nginx" and "redis" containers, displays debug output, and removes the Watchtower container upon completion.
 
+By default, Watchtower decides that an image is stale by comparing registry digests.
+[Git monitoring](../git-monitoring/index.md) is an optional alternate staleness signal: associate a container with a hosted repository, and Watchtower rebuilds from a Git URL context or a local Compose project directory when that ref changes.
+See [Advanced Features → Git Monitoring](../../advanced-features/git-monitoring/index.md).
+
 !!! Note
     Regex patterns are supported. See [Regex Pattern Matching](../../getting-started/container-selection/index.md#regex_pattern_matching) for details.
 

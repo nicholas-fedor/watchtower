@@ -118,7 +118,7 @@ func stringSliceValue(
 ) []string {
 	if flagSet.Changed(name) {
 		switch parse {
-		case spec.ListNotificationURLs:
+		case spec.ListNotificationURLs, spec.ListNewline:
 			vals, err := flagSet.GetStringArray(name)
 			if err == nil {
 				return vals

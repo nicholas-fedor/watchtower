@@ -17,7 +17,8 @@ import (
 	cerrdefs "github.com/containerd/errdefs"
 	dockerContainer "github.com/moby/moby/api/types/container"
 
-	"github.com/nicholas-fedor/watchtower/pkg/compose"
+	"github.com/nicholas-fedor/watchtower/internal/compose"
+	"github.com/nicholas-fedor/watchtower/internal/git"
 	"github.com/nicholas-fedor/watchtower/pkg/container"
 	"github.com/nicholas-fedor/watchtower/pkg/filters"
 	"github.com/nicholas-fedor/watchtower/pkg/lifecycle"
@@ -106,7 +107,9 @@ func isRecoverableOrphan(
 // Returns:
 //   - types.Container: The recovered container if successful, nil otherwise.
 //   - bool: True if a container was found and started, false otherwise.
-func TryRecoverOrphanedContainer(log *zerolog.Logger, ctx context.Context,
+func TryRecoverOrphanedContainer(
+	log *zerolog.Logger,
+	ctx context.Context,
 	client container.Client,
 	currentContainer types.Container,
 ) (types.Container, bool) {
@@ -173,14 +176,18 @@ func TryRecoverOrphanedContainer(log *zerolog.Logger, ctx context.Context,
 //   - ctx: Context for cancellation and timeouts.
 //   - client: Container client for interacting with Docker API.
 //   - config: UpdateParams specifying behavior like cleanup, restart, and filtering.
+//   - gitClient: Git monitor client. Nil when Git monitoring is unused.
 //
 // Returns:
 //   - types.Report: Session report summarizing scanned, updated, and failed containers.
 //   - []types.RemovedImageInfo: Slice of cleaned image info to clean up after updates.
 //   - error: Non-nil if listing or sorting fails, nil on success.
-func Update(log *zerolog.Logger, ctx context.Context,
+func Update(
+	log *zerolog.Logger,
+	ctx context.Context,
 	client container.Client,
 	config types.UpdateParams,
+	gitClient ...*git.Client,
 ) (types.Report, []types.RemovedImageInfo, error) {
 	// Check for context cancellation early
 	select {
@@ -188,6 +195,13 @@ func Update(log *zerolog.Logger, ctx context.Context,
 		return nil, nil, fmt.Errorf("update canceled: %w", ctx.Err())
 	default:
 	}
+
+	var watcher *git.Client
+	if len(gitClient) > 0 {
+		watcher = gitClient[0]
+	}
+
+	gitSession := newGitSession(watcher)
 
 	// Initialize logging for the update process start.
 	log.Debug().Msg("Starting container update check")
@@ -401,7 +415,7 @@ func Update(log *zerolog.Logger, ctx context.Context,
 		clog := &clogVal
 
 		// Check if the container uses a pinned (digest-based) image to skip updates.
-		isPinnedVal, err := isPinned(log, sourceContainer, progress, config)
+		isPinnedVal, err := isPinned(log, sourceContainer, progress, config, gitSession)
 		if err != nil {
 			// Log and skip containers with unparsable image references, marking as skipped.
 			clog.Debug().
@@ -478,23 +492,29 @@ func Update(log *zerolog.Logger, ctx context.Context,
 			// Determine if the container is stale and needs updating.
 			// If the container is Watchtower and SkipSelfUpdate is enabled, skip the update
 			// by setting stale to false and using the current image. Otherwise, check staleness.
-			if sourceContainer.IsWatchtower() && config.SkipSelfUpdate {
+			switch {
+			case sourceContainer.IsWatchtower() && config.SkipSelfUpdate:
 				stale = false
 				newestImage = sourceContainer.ImageID()
-			} else {
+			case gitSession.watching(log, sourceContainer, config):
+				stale, newestImage, checkErr = gitSession.check(ctx, sourceContainer, config)
+			default:
 				stale, newestImage, _, checkErr = client.IsContainerStale(
 					ctx,
 					sourceContainer,
 					config,
 				)
+			}
 
-				if checkErr != nil && (errors.Is(checkErr, context.Canceled) || errors.Is(checkErr, context.DeadlineExceeded)) {
-					return fmt.Errorf("staleness check canceled: %w", checkErr)
-				}
+			if checkErr != nil && (errors.Is(checkErr, context.Canceled) || errors.Is(checkErr, context.DeadlineExceeded)) {
+				return fmt.Errorf("staleness check canceled: %w", checkErr)
 			}
 
 			// Determine if the container should be updated based on staleness and config.
 			shouldUpdate := shouldUpdateContainer(sourceContainer, stale, config)
+			if gitSession.watching(log, sourceContainer, config) && sourceContainer.IsNoPull(config) {
+				shouldUpdate = false
+			}
 
 			// Log when skipping Watchtower self-update in run-once mode.
 			if stale && sourceContainer.IsWatchtower() && config.RunOnce {
@@ -527,6 +547,8 @@ func Update(log *zerolog.Logger, ctx context.Context,
 			switch {
 			case checkErr != nil:
 				// Skip containers with staleness check errors, marking them as skipped.
+				warnGitConfigSkip(log, sourceContainer.Name(), sourceContainer.ImageName(), checkErr)
+
 				if !errors.Is(checkErr, container.ErrImageCooldown) {
 					parallelStaleCheckFailed++
 				}
@@ -658,12 +680,18 @@ func Update(log *zerolog.Logger, ctx context.Context,
 	}
 
 	// Sort containers by dependencies to ensure correct update and restart order.
+	// A cycle must not be re-derived later, or an unrelated stale container
+	// is pulled into the failed sort and the session aborts.
+	dependenciesSorted := true
+
 	err = sorter.SortByDependencies(log,
 		filteredContainers,
 		config.UseComposeDependsOn,
 	)
 	if err != nil {
 		if errors.Is(err, sorter.ErrCircularReference) {
+			dependenciesSorted = false
+
 			circularErr, ok := errors.AsType[sorter.CircularReferenceError](err)
 			if ok {
 				circularName := circularErr.ContainerName
@@ -748,15 +776,70 @@ func Update(log *zerolog.Logger, ctx context.Context,
 		failedStart   map[types.ContainerID]error
 	)
 
+	gitFailed := make(map[types.ContainerID]error)
+	gitSession.prepareRebuilds(
+		log,
+		ctx,
+		client,
+		allContainersToRestart,
+		config,
+		progress,
+		gitFailed,
+	)
+	progress.UpdateFailed(log, gitFailed)
+
+	// A failed Git apply cleared Stale. Recompute linked restarts so those
+	// dependencies are not stopped. Containers that are still stale stay anchors.
+	// Skip the recompute after a cycle. It would mark cycle members for restart
+	// and the later sort would fail the unrelated stale containers too.
+	if dependenciesSorted {
+		allContainersToRestart = reconcileImplicitRestartsExcluding(
+			log,
+			allContainers,
+			filteredContainers,
+			config,
+			gitSession.noRestartBuiltIDs(config),
+		)
+	}
+
+	err = sorter.SortByDependencies(log,
+		allContainersToRestart,
+		config.UseComposeDependsOn,
+	)
+	if err != nil {
+		log.Debug().
+			Err(err).
+			Msg("Failed to sort all containers to restart by dependencies")
+
+		return nil, []types.RemovedImageInfo{}, fmt.Errorf(
+			"%w: %w",
+			errSortDependenciesFailed,
+			err,
+		)
+	}
+
+	// Compose apply already recreated those services. Do not inspect-recreate.
+	allContainersToRestart = gitSession.excludeApplied(allContainersToRestart)
+
+	// Git no-restart builds must not enter stop/create.
+	// The default non-rolling path stops first.
+	// skipRecreate after stop would leave the running container deleted.
+	allContainersToRestart = gitSession.excludeNoRestart(
+		allContainersToRestart,
+		config,
+	)
+
 	if config.RollingRestart {
 		// Apply rolling restarts for all containers in dependency order.
-		rollingFailed, rollingErr := performRollingRestart(log,
+		rollingFailed, rollingErr := performRollingRestart(
+			log,
 			ctx,
 			allContainersToRestart,
 			client,
 			config,
 			&cleanupImageInfos,
 			progress,
+			gitSession,
 		)
 		progress.UpdateFailed(log, rollingFailed)
 
@@ -772,7 +855,8 @@ func Update(log *zerolog.Logger, ctx context.Context,
 		}
 
 		// Stop and restart containers in batches, respecting dependency order.
-		failedStop, stoppedImages = stopContainersInReversedOrder(log,
+		failedStop, stoppedImages = stopContainersInReversedOrder(
+			log,
 			ctx,
 			allContainersToRestart,
 			client,
@@ -780,7 +864,8 @@ func Update(log *zerolog.Logger, ctx context.Context,
 		)
 		progress.UpdateFailed(log, failedStop)
 
-		failedStart = restartContainersInSortedOrder(log,
+		failedStart = restartContainersInSortedOrder(
+			log,
 			ctx,
 			allContainersToRestart,
 			client,
@@ -788,6 +873,7 @@ func Update(log *zerolog.Logger, ctx context.Context,
 			stoppedImages,
 			&cleanupImageInfos,
 			progress,
+			gitSession,
 		)
 		progress.UpdateFailed(log, failedStart)
 	}
@@ -856,6 +942,24 @@ func UpdateImplicitRestart(log *zerolog.Logger, allContainers,
 	containers []types.Container,
 	useComposeDependsOn bool,
 ) {
+	updateImplicitRestart(log, allContainers, containers, useComposeDependsOn, nil)
+}
+
+// updateImplicitRestart marks linked containers while honoring excluded identifiers in the lookup index.
+//
+// Parameters:
+//   - log: Process logger. Required and must be non-nil. A nil logger panics on the first log call.
+//   - allContainers: Full list of containers being managed.
+//   - containers: Containers eligible for restart propagation.
+//   - useComposeDependsOn: Whether to consider Docker Compose depends_on labels.
+//   - excluded: Container IDs that must be indexed as non-restarting.
+//
+// This function mutates the ToRestart / LinkedToRestarting state on containers in place.
+func updateImplicitRestart(log *zerolog.Logger, allContainers,
+	containers []types.Container,
+	useComposeDependsOn bool,
+	excluded map[types.ContainerID]struct{},
+) {
 	log.Debug().Msg("Starting UpdateImplicitRestart")
 
 	byID := make(map[types.ContainerID]types.Container, len(allContainers))
@@ -889,19 +993,24 @@ func UpdateImplicitRestart(log *zerolog.Logger, allContainers,
 			continue
 		}
 
-		restartByIdentifier[resolvedID] = c.ToRestart()
+		restarting := c.ToRestart()
+		if _, skip := excluded[c.ID()]; skip {
+			restarting = false
+		}
+
+		restartByIdentifier[resolvedID] = restarting
 
 		bareName := c.Name()
 		if bareName != "" && bareName != resolvedID {
 			if _, exists := restartByIdentifier[bareName]; !exists {
-				restartByIdentifier[bareName] = c.ToRestart()
+				restartByIdentifier[bareName] = restarting
 			}
 		}
 
 		containerID := string(c.ID())
 		if containerID != "" && containerID != resolvedID && containerID != bareName {
 			if _, exists := restartByIdentifier[containerID]; !exists {
-				restartByIdentifier[containerID] = c.ToRestart()
+				restartByIdentifier[containerID] = restarting
 			}
 		}
 	}
@@ -963,6 +1072,98 @@ func UpdateImplicitRestart(log *zerolog.Logger, allContainers,
 	log.Debug().
 		Strs("marked_containers", markedContainers).
 		Msg("Completed UpdateImplicitRestart")
+}
+
+// noRestartBuiltIDs returns a snapshot of container IDs built during a no-restart update.
+//
+// Parameters:
+//   - params: Update parameters.
+//
+// Returns:
+//   - map[types.ContainerID]struct{}: Built container IDs, or nil when restart is enabled.
+func (s *gitSession) noRestartBuiltIDs(params types.UpdateParams) map[types.ContainerID]struct{} {
+	if s == nil || !params.NoRestart {
+		return nil
+	}
+
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	ids := make(map[types.ContainerID]struct{}, len(s.built))
+	for id := range s.built {
+		ids[id] = struct{}{}
+	}
+
+	return ids
+}
+
+// reconcileImplicitRestarts clears linked-restart marks and derives them again.
+//
+// Parameters:
+//   - log: Process logger.
+//   - allContainers: Full list of containers being managed.
+//   - containers: Containers eligible for this session.
+//   - params: Update parameters.
+//
+// Returns:
+//   - []types.Container: Containers that should still restart.
+func reconcileImplicitRestarts(
+	log *zerolog.Logger,
+	allContainers, containers []types.Container,
+	params types.UpdateParams,
+) []types.Container {
+	return reconcileImplicitRestartsExcluding(log, allContainers, containers, params, nil)
+}
+
+// reconcileImplicitRestartsExcluding clears linked-restart marks and derives restart candidates while omitting excluded containers.
+//
+// Parameters:
+//   - log: Process logger.
+//   - allContainers: Full list of containers being managed.
+//   - containers: Containers eligible for this session.
+//   - params: Update parameters.
+//   - excluded: Container IDs that must not propagate or receive implicit restarts.
+//
+// Returns:
+//   - []types.Container: Containers that should still restart.
+func reconcileImplicitRestartsExcluding(
+	log *zerolog.Logger,
+	allContainers, containers []types.Container,
+	params types.UpdateParams,
+	excluded map[types.ContainerID]struct{},
+) []types.Container {
+	for _, c := range containers {
+		c.SetLinkedToRestarting(false)
+	}
+
+	restartAll := allContainers
+	restartContainers := containers
+
+	if len(excluded) > 0 {
+		restartContainers = make([]types.Container, 0, len(containers))
+		for _, c := range containers {
+			if _, skip := excluded[c.ID()]; skip {
+				continue
+			}
+
+			restartContainers = append(restartContainers, c)
+		}
+	}
+
+	updateImplicitRestart(log, restartAll, restartContainers, params.UseComposeDependsOn, excluded)
+
+	restart := make([]types.Container, 0, len(containers))
+	for _, c := range containers {
+		if _, skip := excluded[c.ID()]; skip {
+			continue
+		}
+
+		if c.ToRestart() && !c.IsMonitorOnly(params) {
+			restart = append(restart, c)
+		}
+	}
+
+	return restart
 }
 
 // shouldUpdateContainer determines if a container should be updated
@@ -1345,9 +1546,12 @@ func parseReference(log *zerolog.Logger, imageName, configImage, fallbackImage s
 // Returns:
 //   - bool: True if the image is pinned by digest, false otherwise.
 //   - error: Non-nil if no valid image reference can be resolved, nil on success.
-func isPinned(log *zerolog.Logger, cont types.Container,
+func isPinned(
+	log *zerolog.Logger,
+	cont types.Container,
 	progress *session.Progress,
 	config types.UpdateParams,
+	gitSession *gitSession,
 ) (bool, error) {
 	// Set up logging with container and image details for debugging.
 	clogVal := log.With().
@@ -1390,9 +1594,16 @@ func isPinned(log *zerolog.Logger, cont types.Container,
 		return false, errInvalidImageReference
 	}
 
-	// Detect digests before parse-fallback. A repo@sha256 reference must stay
-	// pinned even when ParseDockerRef fails for unrelated reasons.
+	// Detect digests before parse-fallback.
+	// A repo@sha256 reference must stay pinned even when ParseDockerRef fails
+	// for unrelated reasons.
 	if container.IsImagePinnedByDigest(imageName) {
+		if gitSession.watching(log, cont, config) {
+			clog.Debug().Msg("Pinned digest uses Git path because watcher is on")
+
+			return false, nil
+		}
+
 		clog.Debug().
 			Bool("is_digested", true).
 			Msg("Pinned image detected, marking as scanned")
@@ -1423,6 +1634,10 @@ func isPinned(log *zerolog.Logger, cont types.Container,
 
 			// Fallback name might itself be digest-pinned (unlikely but consistent).
 			if container.IsImagePinnedByDigest(fallbackImage) {
+				if gitSession.watching(log, cont, config) {
+					return false, nil
+				}
+
 				clog.Debug().
 					Bool("is_digested", true).
 					Msg("Pinned image detected via fallback, marking as scanned")
@@ -1474,12 +1689,15 @@ func isInvalidImageName(name string) bool {
 // Returns:
 //   - map[types.ContainerID]error: Map of container IDs to errors for failed updates.
 //   - error: Non-nil if context was canceled, nil otherwise.
-func performRollingRestart(log *zerolog.Logger, ctx context.Context,
+func performRollingRestart(
+	log *zerolog.Logger,
+	ctx context.Context,
 	containers []types.Container,
 	client container.Client,
 	config types.UpdateParams,
 	cleanupImageInfos *[]types.RemovedImageInfo,
 	progress *session.Progress,
+	gitSession *gitSession,
 ) (map[types.ContainerID]error, error) {
 	failed := make(map[types.ContainerID]error, len(containers))
 
@@ -1523,6 +1741,10 @@ func performRollingRestart(log *zerolog.Logger, ctx context.Context,
 
 		c := containers[i]
 		if !c.ToRestart() {
+			continue
+		}
+
+		if gitSession.skipRecreate(c, config) {
 			continue
 		}
 
@@ -1618,7 +1840,9 @@ func performRollingRestart(log *zerolog.Logger, ctx context.Context,
 // Returns:
 //   - map[types.ContainerID]error: Map of container IDs to errors for failed stops.
 //   - []types.RemovedImageInfo: Slice of cleaned image info for stopped containers.
-func stopContainersInReversedOrder(log *zerolog.Logger, ctx context.Context,
+func stopContainersInReversedOrder(
+	log *zerolog.Logger,
+	ctx context.Context,
 	containers []types.Container,
 	client container.Client,
 	config types.UpdateParams,
@@ -1696,7 +1920,9 @@ func stopContainersInReversedOrder(log *zerolog.Logger, ctx context.Context,
 //
 // Returns:
 //   - error: Non-nil if stop fails, nil on success or if skipped.
-func stopStaleContainer(log *zerolog.Logger, ctx context.Context,
+func stopStaleContainer(
+	log *zerolog.Logger,
+	ctx context.Context,
 	container types.Container,
 	client container.Client,
 	config types.UpdateParams,
@@ -1865,13 +2091,16 @@ func discardCopyFilesForRecreate(client container.Client, containerID types.Cont
 //
 // Returns:
 //   - map[types.ContainerID]error: Map of container IDs to errors for failed restarts.
-func restartContainersInSortedOrder(log *zerolog.Logger, ctx context.Context,
+func restartContainersInSortedOrder(
+	log *zerolog.Logger,
+	ctx context.Context,
 	containers []types.Container,
 	client container.Client,
 	config types.UpdateParams,
 	stoppedImages []types.RemovedImageInfo,
 	cleanupImageInfos *[]types.RemovedImageInfo,
 	progress *session.Progress,
+	gitSession *gitSession,
 ) map[types.ContainerID]error {
 	failed := make(map[types.ContainerID]error, len(containers))
 	// Track renamed containers to skip cleanup.
@@ -1882,6 +2111,10 @@ func restartContainersInSortedOrder(log *zerolog.Logger, ctx context.Context,
 		c := containers[i]
 
 		if !c.ToRestart() {
+			continue
+		}
+
+		if gitSession.skipRecreate(c, config) {
 			continue
 		}
 
@@ -2027,7 +2260,9 @@ func addCleanupImageInfo(
 //   - types.ContainerID: ID of the new container if started, original ID if renamed only, empty otherwise.
 //   - bool: True if the container was renamed, false otherwise.
 //   - error: Non-nil if restart fails, nil on success.
-func restartStaleContainer(log *zerolog.Logger, ctx context.Context,
+func restartStaleContainer(
+	log *zerolog.Logger,
+	ctx context.Context,
 	sourceContainer types.Container,
 	client container.Client,
 	config types.UpdateParams,

@@ -276,6 +276,7 @@ var _ = ginkgo.Describe("executeUpdate", func() {
 			context.Background(),
 			client,
 			config,
+			nil,
 		)
 		gomega.Expect(err).NotTo(gomega.HaveOccurred())
 		gomega.Expect(report).NotTo(gomega.BeNil())
@@ -295,6 +296,7 @@ var _ = ginkgo.Describe("executeUpdate", func() {
 			context.Background(),
 			client,
 			config,
+			nil,
 		)
 		gomega.Expect(err).NotTo(gomega.HaveOccurred())
 		gomega.Expect(report).NotTo(gomega.BeNil())
@@ -329,6 +331,7 @@ var _ = ginkgo.Describe("executeUpdate", func() {
 			context.Background(),
 			client,
 			config,
+			nil,
 		)
 		gomega.Expect(err).NotTo(gomega.HaveOccurred())
 		gomega.Expect(report).NotTo(gomega.BeNil())
@@ -369,6 +372,7 @@ var _ = ginkgo.Describe("executeUpdate", func() {
 			context.Background(),
 			client,
 			config,
+			nil,
 		)
 		gomega.Expect(err).NotTo(gomega.HaveOccurred())
 		gomega.Expect(report).NotTo(gomega.BeNil())
@@ -409,6 +413,7 @@ var _ = ginkgo.Describe("executeUpdate", func() {
 			context.Background(),
 			client,
 			config,
+			nil,
 		)
 		gomega.Expect(err).NotTo(gomega.HaveOccurred())
 		gomega.Expect(report).NotTo(gomega.BeNil())
@@ -2453,6 +2458,7 @@ var _ = ginkgo.Describe("restartContainersInSortedOrder cancel recovery", func()
 			stoppedImages,
 			&cleanup,
 			&progress,
+			nil,
 		)
 
 		gomega.Expect(failed).To(gomega.BeEmpty(), "stopped containers must still be recreated after cancel")
@@ -2602,6 +2608,7 @@ var _ = ginkgo.Describe("performRollingRestart", func() {
 					types.UpdateParams{},
 					&cleanupImageInfos,
 					nil, // progress is not needed for this test
+					nil,
 				)
 
 				// Verify the number of failed containers.
@@ -2697,6 +2704,7 @@ var _ = ginkgo.Describe("performRollingRestart", func() {
 				types.UpdateParams{},
 				&cleanupImageInfos,
 				nil,
+				nil,
 			)
 
 			// All 4 containers should be in failed map (containers 0, 1, 2, 3).
@@ -2779,6 +2787,7 @@ var _ = ginkgo.Describe("performRollingRestart", func() {
 				types.UpdateParams{},
 				&cleanupImageInfos,
 				nil,
+				nil,
 			)
 
 			// Verify log entries contain expected container details.
@@ -2857,6 +2866,7 @@ var _ = ginkgo.Describe("performRollingRestart", func() {
 				types.UpdateParams{},
 				&cleanupImageInfos,
 				nil,
+				nil,
 			)
 
 			// All containers should be processed, none failed due to cancellation.
@@ -2919,6 +2929,7 @@ var _ = ginkgo.Describe("performRollingRestart", func() {
 				types.UpdateParams{},
 				&cleanupImageInfos,
 				nil,
+				nil,
 			)
 
 			// Verify create order is forward (container-0, container-1, container-2).
@@ -2970,6 +2981,7 @@ var _ = ginkgo.Describe("performRollingRestart", func() {
 				client,
 				types.UpdateParams{},
 				&cleanupImageInfos,
+				nil,
 				nil,
 			)
 
@@ -3032,6 +3044,7 @@ var _ = ginkgo.Describe("performRollingRestart", func() {
 				client,
 				types.UpdateParams{},
 				&cleanupImageInfos,
+				nil,
 				nil,
 			)
 
@@ -3118,7 +3131,7 @@ var _ = ginkgo.Describe("isPinned", func() {
 			progress := session.Progress{}
 			params := types.UpdateParams{}
 
-			pinned, err := isPinned(testLogger(), cont, &progress, params)
+			pinned, err := isPinned(testLogger(), cont, &progress, params, nil)
 			gomega.Expect(err).NotTo(gomega.HaveOccurred())
 			gomega.Expect(pinned).To(gomega.Equal(wantPinned))
 
@@ -3145,7 +3158,7 @@ var _ = ginkgo.Describe("isPinned", func() {
 		)
 		progress := session.Progress{}
 
-		pinned, err := isPinned(testLogger(), cont, &progress, types.UpdateParams{})
+		pinned, err := isPinned(testLogger(), cont, &progress, types.UpdateParams{}, nil)
 		gomega.Expect(err).NotTo(gomega.HaveOccurred())
 		gomega.Expect(pinned).To(gomega.BeTrue())
 		gomega.Expect(progress).To(gomega.HaveLen(1))
@@ -3160,7 +3173,7 @@ var _ = ginkgo.Describe("isPinned", func() {
 		)
 		progress := session.Progress{}
 
-		pinned, err := isPinned(testLogger(), cont, &progress, types.UpdateParams{})
+		pinned, err := isPinned(testLogger(), cont, &progress, types.UpdateParams{}, nil)
 		gomega.Expect(err).To(gomega.HaveOccurred())
 		gomega.Expect(pinned).To(gomega.BeFalse())
 		gomega.Expect(progress).To(gomega.BeEmpty())
@@ -3176,7 +3189,7 @@ var _ = ginkgo.Describe("isPinned", func() {
 
 		progress := session.Progress{}
 
-		pinned, err := isPinned(testLogger(), cont, &progress, types.UpdateParams{})
+		pinned, err := isPinned(testLogger(), cont, &progress, types.UpdateParams{}, nil)
 		gomega.Expect(err).NotTo(gomega.HaveOccurred())
 		gomega.Expect(pinned).To(gomega.BeFalse())
 	})

@@ -17,6 +17,8 @@ const (
 	ListNotificationURLs
 	// ListNative uses pflag native StringSlice/StringArray semantics only.
 	ListNative
+	// ListNewline splits env values on newlines only (repeatable mappings).
+	ListNewline
 )
 
 // FlagKind is the pflag value kind for registration.

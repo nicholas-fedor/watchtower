@@ -6,7 +6,6 @@ import (
 	"github.com/nicholas-fedor/watchtower/pkg/types"
 )
 
-// State enum values.
 const (
 	UnknownState   State = iota // Uninitialized state.
 	SkippedState                // Container skipped.
@@ -17,9 +16,6 @@ const (
 	StaleState                  // Container is stale.
 	RestartedState              // Container restarted (linked dependency).
 )
-
-// State indicates what the current state is of the container.
-type State int
 
 // State string constants.
 const (
@@ -32,6 +28,9 @@ const (
 	StaleStateString     = "Stale"
 	RestartedStateString = "Restarted"
 )
+
+// State indicates what the current state is of the container.
+type State int
 
 // ContainerStatus holds a container's state during a session.
 //
@@ -51,6 +50,29 @@ type ContainerStatus struct {
 	cooldownDelay      string            // Human-readable cooldown duration (e.g., "24 hours").
 	cooldownRemaining  string            // Human-readable remaining time (empty if passed).
 	cooldownEligibleAt time.Time         // Time when the container becomes eligible for update.
+	gitRepo            string            // Resolved Git repository URL.
+	gitRef             string            // Resolved Git ref.
+	changelog          string            // Changelog or releases URL.
+	source             string            // OCI image source annotation.
+	imageURL           string            // OCI image URL annotation.
+	documentation      string            // OCI image documentation annotation.
+	revision           string            // OCI image revision annotation.
+}
+
+// NewContainerStatus builds a report status with identity fields populated.
+//
+// Parameters:
+//   - name: Container name.
+//   - image: Image name with tag.
+//
+// Returns:
+//   - *ContainerStatus: Status in the updated state for template tests and previews.
+func NewContainerStatus(name, image string) *ContainerStatus {
+	return &ContainerStatus{
+		containerName: name,
+		imageName:     image,
+		state:         UpdatedState,
+	}
 }
 
 // ID returns the container ID.
@@ -204,4 +226,71 @@ func (u *ContainerStatus) CooldownDelay() string {
 // CooldownRemaining returns the human-readable remaining cooldown time.
 func (u *ContainerStatus) CooldownRemaining() string {
 	return u.cooldownRemaining
+}
+
+// GitRepo returns the resolved Git repository URL.
+//
+// Returns:
+//   - string: Clone URL, or empty.
+func (u *ContainerStatus) GitRepo() string { return u.gitRepo }
+
+// GitRef returns the resolved Git ref.
+//
+// Returns:
+//   - string: Branch or tag, or empty.
+func (u *ContainerStatus) GitRef() string { return u.gitRef }
+
+// Changelog returns the changelog or releases URL.
+//
+// Returns:
+//   - string: Changelog URL, or empty.
+func (u *ContainerStatus) Changelog() string { return u.changelog }
+
+// Source returns the OCI image source annotation.
+//
+// Returns:
+//   - string: OCI source URL, or empty.
+func (u *ContainerStatus) Source() string { return u.source }
+
+// ImageURL returns the OCI image URL annotation.
+//
+// Returns:
+//   - string: OCI image URL, or empty.
+func (u *ContainerStatus) ImageURL() string { return u.imageURL }
+
+// Documentation returns the OCI image documentation annotation.
+//
+// Returns:
+//   - string: OCI documentation URL, or empty.
+func (u *ContainerStatus) Documentation() string { return u.documentation }
+
+// Revision returns the OCI image revision annotation.
+//
+// Returns:
+//   - string: OCI revision, or empty.
+func (u *ContainerStatus) Revision() string { return u.revision }
+
+// SetGitMetadata sets Git and OCI report fields for this container.
+//
+// Parameters:
+//   - gitRepo: Clone URL.
+//   - gitRef: Branch or tag.
+//   - changelog: Changelog or releases URL.
+//   - source: OCI source.
+//   - imageURL: OCI image URL.
+//   - documentation: OCI documentation URL.
+//   - revision: OCI revision.
+//
+// Returns:
+//   - none.
+func (u *ContainerStatus) SetGitMetadata(
+	gitRepo, gitRef, changelog, source, imageURL, documentation, revision string,
+) {
+	u.gitRepo = gitRepo
+	u.gitRef = gitRef
+	u.changelog = changelog
+	u.source = source
+	u.imageURL = imageURL
+	u.documentation = documentation
+	u.revision = revision
 }

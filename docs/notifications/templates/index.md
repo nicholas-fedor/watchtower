@@ -166,7 +166,7 @@ When the [`notification-report`](#notification_report) configuration option is s
     {{len .Scanned}} Scanned, {{len .Updated}} Updated, {{len .Restarted}} Restarted, {{len .Failed}} Failed
     {{- if ( or .Updated .Restarted .Failed ) -}}
       {{- range .Updated}}
-- {{.Name}} ({{.ImageName}}): {{.CurrentImageID.ShortID}} updated to {{.LatestImageID.ShortID}}
+- {{.Name}} ({{.ImageName}}): {{.CurrentImageID.ShortID}} updated to {{.LatestImageID.ShortID}}{{with .GitRef}} ref {{.}}{{end}}{{with .Changelog}} {{.}}{{end}}
       {{- end -}}
       {{- range .Fresh}}
 - {{.Name}} ({{.ImageName}}): {{.State}}
@@ -213,7 +213,7 @@ Logs:
                     {{len .Scanned}} Scanned, {{len .Updated}} Updated, {{len .Restarted}} Restarted, {{len .Failed}} Failed
                     {{- if ( or .Updated .Restarted .Failed ) -}}
                         {{- range .Updated -}}
-                    - {{.Name}} ({{.ImageName}}): {{.CurrentImageID.ShortID}} updated to {{.LatestImageID.ShortID}}
+                    - {{.Name}} ({{.ImageName}}): {{.CurrentImageID.ShortID}} updated to {{.LatestImageID.ShortID}}{{with .GitRef}} ref {{.}}{{end}}{{with .Changelog}} {{.}}{{end}}
                         {{- end -}}
                         {{- range .Fresh -}}
                     - {{.Name}} ({{.ImageName}}): {{.State}}
@@ -250,7 +250,7 @@ Logs:
     {{len .Scanned}} Scanned, {{len .Updated}} Updated, {{len .Restarted}} Restarted, {{len .Failed}} Failed
     {{- if ( or .Updated .Restarted .Failed ) -}}
           {{- range .Updated -}}
-    - {{.Name}} ({{.ImageName}}): {{.CurrentImageID.ShortID}} updated to {{.LatestImageID.ShortID}}
+    - {{.Name}} ({{.ImageName}}): {{.CurrentImageID.ShortID}} updated to {{.LatestImageID.ShortID}}{{with .GitRef}} ref {{.}}{{end}}{{with .Changelog}} {{.}}{{end}}
           {{- end -}}
           {{- range .Fresh -}}
     - {{.Name}} ({{.ImageName}}): {{.State}}
@@ -287,6 +287,79 @@ Example output for a session with one updated container, one restarted container
 Logs:
 2025-08-20T06:00:13-07:00 [error] Operation failed. Try again later.
 ```
+
+## Git and OCI report fields
+
+Default templates are unchanged.
+Custom report templates can use these fields on each container.
+They are populated even when Git monitoring is off.
+
+| Field            | Meaning                                                                                                                                                                  |
+|:-----------------|:-------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| `.GitRepo`       | `com.centurylinklabs.watchtower.git-repo`, else [`git-image`](../../configuration/git-monitoring/index.md#git_image) mapping, else OCI `org.opencontainers.image.source` |
+| `.GitRef`        | `com.centurylinklabs.watchtower.git-ref` (or `com.centurylinklabs.watchtower.git-branch`), else mapping ref, else OCI version when it looks like a tag                   |
+| `.Changelog`     | `com.centurylinklabs.watchtower.changelog`, else a derived releases URL, else OCI `url` / `documentation`                                                                |
+| `.Source`        | OCI `org.opencontainers.image.source`                                                                                                                                    |
+| `.ImageURL`      | OCI `org.opencontainers.image.url`                                                                                                                                       |
+| `.Documentation` | OCI `org.opencontainers.image.documentation`                                                                                                                             |
+| `.Revision`      | OCI `org.opencontainers.image.revision`                                                                                                                                  |
+
+`.GitRef` is the configured Git ref. When the container is not associated with Git and `org.opencontainers.image.version` looks like a tag, that version is copied into `.GitRef`. There is one value, not a previous version and a new version, so a template cannot print `10.11.5 → 10.11.6` from these fields.
+
+The built-in `default` report template prints the ref and the changelog on an updated container when they are set:
+
+```text
+- /app (myapp:latest): abcdef12 updated to 34567890 ref v1.2.4 https://github.com/org/app/releases
+```
+
+A custom report template can do the same:
+
+```go
+{{ range .Report.Updated }}{{ .Name }}{{ with .GitRef }} {{ . }}{{ end }}{{ with .Changelog }} {{ . }}{{ end }}{{ end }}
+```
+
+An explicit `com.centurylinklabs.watchtower.changelog` label may include placeholders from the new version when known: `{major}`, `{minor}`, `{patch}`, `{tag}`, `{commit}`.
+
+```yaml
+labels:
+    com.centurylinklabs.watchtower.git-repo: https://github.com/org/app.git
+    com.centurylinklabs.watchtower.changelog: https://github.com/org/app/releases/tag/v{major}.{minor}.{patch}
+```
+
+If `com.centurylinklabs.watchtower.changelog` is unset, Watchtower builds a releases URL for `github.com`, `gitlab.com`, `codeberg.org`, and for a container that sets `com.centurylinklabs.watchtower.git-host`.
+Otherwise it falls back to OCI `org.opencontainers.image.url`, then `org.opencontainers.image.documentation`.
+
+Malformed placeholders are left as-is.
+The session does not fail.
+
+An image with only `org.opencontainers.image.source` still exposes `.Source` / derived `.GitRepo`.
+Git monitoring stays off unless the container is associated and the watcher is on.
+See [Git Monitoring](../../advanced-features/git-monitoring/index.md) for association and rebuilds.
+
+### Log lines from a Git update
+
+With [notification report](../../configuration/notifications/index.md#notification_report) off, Watchtower sends the log line itself. The `default-legacy` template formats these messages instead of dumping every field:
+
+| Message                                                                      | What the notification says                            |
+|:-----------------------------------------------------------------------------|:------------------------------------------------------|
+| `Found new Git revision`                                                     | `Found new Git revision: <host/path>@<tag or branch> (<12-char sha>)` |
+| `Built image from Git URL context`                                           | `Built image: <name:git-shortsha> (<short image id>)` |
+| `Built Compose project`                                                      | `Built Compose project: <project> (<services>)`, only when containers are not restarted |
+| `Git build failed. Leaving running container untouched`                      | Container and the error. The running container was left in place. |
+| `Compose apply failed. Docker Compose may have partially recreated services` | Container and a short failure line. |
+| `Compose project directory is not readable. Leaving the running container untouched` | `Skipped <container>: compose directory is not readable` |
+| `Skipped container with an invalid git semver policy`                        | `Skipped <container>: invalid git semver policy` |
+| `Skipped container with an invalid git-host`                                 | `Skipped <container>: invalid git-host` |
+
+The log fields are `container`, `image`, `repo`, `ref`, `commit`, `changelog`, `project`, `dir`, and `error`. A custom simple template reads them from `.Data`:
+
+```go
+{{ range . }}{{ if eq .Message "Built image from Git URL context" }}
+{{ .Data.container }} {{ .Data.commit }} {{ .Data.changelog }}
+{{ end }}{{ end }}
+```
+
+Porcelain JSON and `/v1/check` expose the same values as `git_repo`, `git_ref`, `changelog`, `oci_source`, `image_url`, `documentation`, and `revision`.
 
 ## Customizing Templates
 

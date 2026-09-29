@@ -95,6 +95,34 @@ func marshalReports(reports []types.ContainerReport) []jsonMap {
 		if errorMessage != "" {
 			jsonReports[i]["error"] = errorMessage
 		}
+
+		if gitRepo := report.GitRepo(); gitRepo != "" {
+			jsonReports[i]["gitRepo"] = gitRepo
+		}
+
+		if gitRef := report.GitRef(); gitRef != "" {
+			jsonReports[i]["gitRef"] = gitRef
+		}
+
+		if changelog := report.Changelog(); changelog != "" {
+			jsonReports[i]["changelog"] = changelog
+		}
+
+		if source := report.Source(); source != "" {
+			jsonReports[i]["ociSource"] = source
+		}
+
+		if imageURL := report.ImageURL(); imageURL != "" {
+			jsonReports[i]["imageUrl"] = imageURL
+		}
+
+		if documentation := report.Documentation(); documentation != "" {
+			jsonReports[i]["documentation"] = documentation
+		}
+
+		if revision := report.Revision(); revision != "" {
+			jsonReports[i]["revision"] = revision
+		}
 	}
 
 	return jsonReports
