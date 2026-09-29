@@ -748,6 +748,10 @@ func deduplicateEntries(entries []*notificationEntry) []*notificationEntry {
 			image, _ := entry.Data["image"].(string)
 			newID, _ := entry.Data["new_id"].(string)
 			key = dedupKey{message: entry.Message, data: image + "\x00" + newID}
+		case "Found new Git revision":
+			revision, _ := entry.Data["revision"].(string)
+			shortCommit, _ := entry.Data["short_commit"].(string)
+			key = dedupKey{message: entry.Message, data: revision + "\x00" + shortCommit}
 		case "Removing image":
 			// Deduplicate by image ID.
 			imageID, _ := entry.Data["image_id"].(string)

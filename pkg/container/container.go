@@ -1129,18 +1129,18 @@ func parseVolumesFromSpec(spec string) (string, string) {
 		return "", ""
 	}
 
-	index := strings.LastIndex(spec, ":")
-	if index < 0 {
+	before, after, ok := strings.CutLast(spec, ":")
+	if !ok {
 		return spec, ""
 	}
 
-	suffix := spec[index+1:]
+	suffix := after
 	if !isVolumesFromMode(suffix) {
 		// A colon that is not a volume mode stays part of the identity.
 		return spec, ""
 	}
 
-	return spec[:index], suffix
+	return before, suffix
 }
 
 // isVolumesFromMode reports whether suffix is a Docker volumes-from access mode.

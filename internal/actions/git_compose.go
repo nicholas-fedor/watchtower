@@ -95,6 +95,11 @@ func (s *gitSession) applyCompose(
 
 	opts.Prior = &prior
 
+	if len(batch.members) > 0 {
+		member := batch.members[0]
+		logFoundGitRevision(log, member.container, params, member.result.Tag, commit)
+	}
+
 	checkoutCtx, cancelCheckout := s.client.WithTimeout(ctx)
 	err = checkout(checkoutCtx, batch.ref.Dir, commit, opts)
 
@@ -212,29 +217,51 @@ func (s *gitSession) applyCompose(
 		s.acceptComposeApply(batch, failed)
 	}
 
-	message := "Applied Compose project from Git"
+	if params.NoRestart {
+		log.Info().
+			Str("project", batch.ref.Name).
+			Str("service", strings.Join(services, ", ")).
+			Msg("Built Compose project")
+
+		return
+	}
 
 	for _, member := range batch.members {
 		if _, failed := failed[member.container.ID()]; failed {
-			message = "Compose apply finished with unconfirmed service results"
+			log.Warn().
+				Str("project", batch.ref.Name).
+				Str("service", strings.Join(services, ", ")).
+				Msg("Compose apply finished with unconfirmed service results")
 
-			break
+			return
 		}
 	}
+}
 
-	event := log.Info().
-		Str("project", batch.ref.Name).
-		Str("dir", batch.ref.Dir).
-		Strs("services", services).
-		Bool("build_only", params.NoRestart)
-	if len(batch.members) > 0 {
-		member := batch.members[0]
-		event = withGitMeta(event, member.container, params, member.result.Tag, commit)
-	} else if commit != "" {
-		event = event.Str("commit", commit)
+// logComposeReplaced records the same stop and start lines a registry update uses.
+//
+// Parameters:
+//   - log: Process logger.
+//   - c: Container that was replaced.
+//   - item: Compose instance after apply.
+//
+// Returns:
+//   - none.
+func logComposeReplaced(log *zerolog.Logger, c types.Container, item compose.Container) {
+	if log == nil || c == nil || item.ID == "" || item.ID == c.ID() {
+		return
 	}
 
-	event.Msg(message)
+	name := c.Name()
+	log.Info().
+		Str("container", name).
+		Str("id", c.ID().ShortID()).
+		Msg("Stopping container")
+	log.Info().
+		Str("container", name).
+		Str("image", c.ImageName()).
+		Str("new_id", item.ID.ShortID()).
+		Msg("Started new container")
 }
 
 // recordCompose records a successful Compose apply for one container.
@@ -281,6 +308,10 @@ func (s *gitSession) recordCompose(
 		}
 	}
 	s.mu.Unlock()
+
+	if !params.NoRestart {
+		logComposeReplaced(log, c, item)
+	}
 
 	if progress == nil {
 		return

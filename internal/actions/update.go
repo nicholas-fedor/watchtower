@@ -547,6 +547,8 @@ func Update(
 			switch {
 			case checkErr != nil:
 				// Skip containers with staleness check errors, marking them as skipped.
+				warnGitConfigSkip(log, sourceContainer.Name(), sourceContainer.ImageName(), checkErr)
+
 				if !errors.Is(checkErr, container.ErrImageCooldown) {
 					parallelStaleCheckFailed++
 				}

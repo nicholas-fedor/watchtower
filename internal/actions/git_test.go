@@ -3,6 +3,8 @@ package actions
 import (
 	"bytes"
 	"context"
+	"errors"
+	"fmt"
 	"maps"
 	"os"
 	"path/filepath"
@@ -1819,5 +1821,30 @@ var _ = ginkgo.Describe("gitSession", ginkgo.Label("git-session"), func() {
 			ginkgo.Entry("tagged digest image", "myapp:latest@sha256:"+strings.Repeat("a", 64), false),
 			ginkgo.Entry("invalid image", "not a ref:dev", false),
 		)
+
+		ginkgo.It("notifies invalid git config without the raw host", func() {
+			var buf bytes.Buffer
+
+			log := zerolog.New(&buf).Level(zerolog.WarnLevel)
+			warnGitConfigSkip(
+				&log,
+				"app",
+				"app:latest",
+				fmt.Errorf("%w: %w", git.ErrInvalidHost, errors.New("https://user:supersecret@evil.example")),
+			)
+			warnGitConfigSkip(&log, "app", "app:latest", fmt.Errorf("%w: nightly", git.ErrInvalidPolicy))
+
+			text := buf.String()
+			gomega.Expect(text).To(gomega.ContainSubstring("Skipped container with an invalid git-host"))
+			gomega.Expect(text).To(gomega.ContainSubstring("Skipped container with an invalid git semver policy"))
+			gomega.Expect(text).NotTo(gomega.ContainSubstring("supersecret"))
+			gomega.Expect(shortGitSHA("7ab67c773bf4bf670a97bc7b03a032a7fbd80892")).To(gomega.Equal("7ab67c773bf4"))
+			gomega.Expect(gitNoticePath("https://forgejo.papago.casa/nick/watchtower-git-support-test.git")).
+				To(gomega.Equal("forgejo.papago.casa/nick/watchtower-git-support-test"))
+			gomega.Expect(gitNoticePath("git@forgejo.papago.casa:nick/watchtower-git-support-test.git")).
+				To(gomega.Equal("forgejo.papago.casa/nick/watchtower-git-support-test"))
+			gomega.Expect(familiarImage("docker.io/library/wtgit-semver:git-7ab67c773bf4")).
+				To(gomega.Equal("wtgit-semver:git-7ab67c773bf4"))
+		})
 	})
 })

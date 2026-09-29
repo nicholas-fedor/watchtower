@@ -342,10 +342,14 @@ With [notification report](../../configuration/notifications/index.md#notificati
 
 | Message                                                                      | What the notification says                            |
 |:-----------------------------------------------------------------------------|:------------------------------------------------------|
-| `Built image from Git URL context`                                           | Container, repository, ref, commit, and changelog URL |
-| `Applied Compose project from Git`                                           | Project name, commit, and changelog URL               |
-| `Git build failed. Leaving running container untouched`                      | Container, repository, and the error                  |
-| `Compose apply failed. Docker Compose may have partially recreated services` | Container, project directory, and the error           |
+| `Found new Git revision`                                                     | `Found new Git revision: <host/path>@<tag or branch> (<12-char sha>)` |
+| `Built image from Git URL context`                                           | `Built image: <name:git-shortsha> (<short image id>)` |
+| `Built Compose project`                                                      | `Built Compose project: <project> (<services>)`, only when containers are not restarted |
+| `Git build failed. Leaving running container untouched`                      | Container and the error. The running container was left in place. |
+| `Compose apply failed. Docker Compose may have partially recreated services` | Container and a short failure line. |
+| `Compose project directory is not readable. Leaving the running container untouched` | `Skipped <container>: compose directory is not readable` |
+| `Skipped container with an invalid git semver policy`                        | `Skipped <container>: invalid git semver policy` |
+| `Skipped container with an invalid git-host`                                 | `Skipped <container>: invalid git-host` |
 
 The log fields are `container`, `image`, `repo`, `ref`, `commit`, `changelog`, `project`, `dir`, and `error`. A custom simple template reads them from `.Data`:
 

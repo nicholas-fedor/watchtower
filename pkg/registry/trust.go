@@ -129,6 +129,7 @@ func encodedAuthCacheKey(server, configDir string) string {
 func configFileModTime(configDir string) int64 {
 	configPath := filepath.Join(filepath.Clean(configDir), "config.json")
 
+	//nolint:gosec // G703: Path traversal via taint analysis - DOCKER_CONFIG is an operator-provided directory.
 	info, err := os.Stat(configPath)
 	if err != nil {
 		return 0

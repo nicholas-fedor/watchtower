@@ -57,14 +57,38 @@ var Templates = map[string]string{
     Failed to query Docker image disk usage{{with (index $e.Data "error")}}: {{.}}{{end}}
 {{- else if eq $msg "Docker image usage budget enabled" -}}
     Docker image usage budget enabled: maximum {{if HasKey $e.Data "disk_space_max"}}{{FormatDiskSpace (index $e.Data "disk_space_max")}}{{else}}0 B{{end}}, warning at {{if HasKey $e.Data "disk_space_warn"}}{{FormatDiskSpace (index $e.Data "disk_space_warn")}}{{else}}0 B{{end}}
+{{- else if eq $msg "Found new Git revision" -}}
+    Found new Git revision: {{with (index $e.Data "revision")}}{{.}}{{else}}unknown{{end}} ({{with (index $e.Data "short_commit")}}{{.}}{{else}}unknown{{end}})
 {{- else if eq $msg "Built image from Git URL context" -}}
-    Built {{with (index $e.Data "container")}}{{.}}{{else}}container{{end}} from {{with (index $e.Data "repo")}}{{.}}{{else}}Git{{end}}{{with (index $e.Data "ref")}} @ {{.}}{{end}} ({{with (index $e.Data "commit")}}{{.}}{{else}}unknown{{end}}){{with (index $e.Data "changelog")}}: {{.}}{{end}}
-{{- else if eq $msg "Applied Compose project from Git" -}}
-    Applied Compose project {{with (index $e.Data "project")}}{{.}}{{else}}unknown{{end}} at {{with (index $e.Data "commit")}}{{.}}{{else}}unknown{{end}}{{with (index $e.Data "changelog")}}: {{.}}{{end}}
+    Built image: {{with (index $e.Data "image")}}{{.}}{{else}}unknown{{end}} ({{with (index $e.Data "image_id")}}{{.}}{{else}}unknown{{end}})
+{{- else if eq $msg "Built Compose project" -}}
+    Built Compose project: {{with (index $e.Data "project")}}{{.}}{{else}}unknown{{end}} ({{with (index $e.Data "service")}}{{.}}{{else}}unknown{{end}})
+{{- else if eq $msg "Compose apply finished with unconfirmed service results" -}}
+    Compose update finished with unconfirmed results for {{with (index $e.Data "service")}}{{.}}{{else}}unknown{{end}}
 {{- else if eq $msg "Git build failed. Leaving running container untouched" -}}
-    Git build failed for {{with (index $e.Data "container")}}{{.}}{{else}}unknown{{end}}{{with (index $e.Data "repo")}} ({{.}}){{end}}{{with (index $e.Data "error")}}: {{.}}{{end}}
-{{- else if eq $msg "Compose apply failed. Leaving running container untouched" -}}
-    Compose apply failed for {{with (index $e.Data "container")}}{{.}}{{else}}unknown{{end}}{{with (index $e.Data "dir")}} in {{.}}{{end}}{{with (index $e.Data "error")}}: {{.}}{{end}}
+    Git update failed for {{with (index $e.Data "container")}}{{.}}{{else}}unknown{{end}}. The running container was left in place{{with (index $e.Data "error")}}: {{.}}{{end}}
+{{- else if eq $msg "Compose apply failed. Docker Compose may have partially recreated services" -}}
+    Compose update failed for {{with (index $e.Data "container")}}{{.}}{{else}}unknown{{end}}. Docker Compose may have partially recreated services{{with (index $e.Data "error")}}: {{.}}{{end}}
+{{- else if eq $msg "Compose update failed before container replacement" -}}
+    Compose update failed for {{with (index $e.Data "container")}}{{.}}{{else}}unknown{{end}}. The running container was left in place{{with (index $e.Data "error")}}: {{.}}{{end}}
+{{- else if eq $msg "Compose project directory is not readable. Leaving the running container untouched" -}}
+    Skipped {{with (index $e.Data "container")}}{{.}}{{else}}container{{end}}: compose directory is not readable
+{{- else if eq $msg "Compose apply skipped. Container has no compose service label" -}}
+    Skipped {{with (index $e.Data "container")}}{{.}}{{else}}container{{end}}: container has no compose service label
+{{- else if eq $msg "Compose apply result omitted this service. Runtime state is unknown" -}}
+    Skipped {{with (index $e.Data "container")}}{{.}}{{else}}container{{end}}: compose result did not include {{with (index $e.Data "service")}}{{.}}{{else}}the service{{end}}
+{{- else if eq $msg "Compose apply did not return an identifiable instance for this replica. Runtime state is unknown" -}}
+    Skipped {{with (index $e.Data "container")}}{{.}}{{else}}container{{end}}: compose result did not identify this replica
+{{- else if eq $msg "Could not dependency-sort Compose batches. Using the existing container order" -}}
+    Compose dependency order is unavailable. Using the current container order
+{{- else if eq $msg "Could not order Compose batches by dependencies. Using first-seen order" -}}
+    Compose dependency order is unavailable. Using the current container order
+{{- else if eq $msg "Compose batch dependencies are cyclic. Appending unresolved batches in first-seen order" -}}
+    Compose dependency order is unavailable. Using the current container order
+{{- else if eq $msg "Skipped container with an invalid git semver policy" -}}
+    Skipped {{with (index $e.Data "container")}}{{.}}{{else}}container{{end}}: invalid git semver policy
+{{- else if eq $msg "Skipped container with an invalid git-host" -}}
+    Skipped {{with (index $e.Data "container")}}{{.}}{{else}}container{{end}}: invalid git-host
 {{- else if $e.Data -}}
     {{- /* For messages with data, show message and key=value pairs */ -}}
     {{$msg}} | {{range $k, $v := $e.Data}}{{$k}}={{$v}} {{end}}

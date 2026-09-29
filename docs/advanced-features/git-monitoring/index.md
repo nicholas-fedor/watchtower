@@ -478,7 +478,7 @@ A custom [notification template](../../notifications/templates/index.md#git_and_
 That is one value, not the old version and the new version.
 
 The built-in report template adds the ref and the changelog to an updated container when they are set.
-With report mode off, the log lines `Built image from Git URL context` and `Applied Compose project from Git` carry `repo`, `ref`, `commit`, and `changelog`, and `default-legacy` prints them.
+With report mode off, a Git update sends `Found new Git revision`, then `Built image` for a Git URL build, then the same stop and start lines as a registry update. Compose sends the found line once, then those stop and start lines for each recreated container. It does not send a built-image line. The identity is `host/path@tag` or `host/path@branch`, with a 12-character commit. The log still records the full commit.
 
 ### Failed Builds
 
