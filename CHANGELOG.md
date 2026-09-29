@@ -8,6 +8,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- Add Git ref monitoring and container rebuilds by @nicholas-fedor in [#2456](https://github.com/nicholas-fedor/watchtower/pull/2456)
+
 ### Chores
 
 - Update nicholas-fedor/go-proxy-pull-action action to v1.1.52 by @renovate[bot] in [#2454](https://github.com/nicholas-fedor/watchtower/pull/2454)
