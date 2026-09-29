@@ -10,6 +10,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Chores
 
+- Update nicholas-fedor/go-proxy-pull-action action to v1.1.52 by @renovate[bot] in [#2454](https://github.com/nicholas-fedor/watchtower/pull/2454)
 - Update module github.com/prometheus/common to v0.72.0 by @renovate[bot] in [#2452](https://github.com/nicholas-fedor/watchtower/pull/2452)
 - Update github.com/google/pprof digest to aaccee0 by @renovate[bot] in [#2449](https://github.com/nicholas-fedor/watchtower/pull/2449)
 - Update module github.com/go-openapi/jsonreference to v1.0.3 by @renovate[bot] in [#2447](https://github.com/nicholas-fedor/watchtower/pull/2447)
