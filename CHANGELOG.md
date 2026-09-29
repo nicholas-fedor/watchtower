@@ -8,12 +8,33 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Chores
+
+- Update nicholas-fedor/go-proxy-pull-action action to v1.1.52 by @renovate[bot] in [#2454](https://github.com/nicholas-fedor/watchtower/pull/2454)
+- Update module github.com/prometheus/common to v0.72.0 by @renovate[bot] in [#2452](https://github.com/nicholas-fedor/watchtower/pull/2452)
+- Update github.com/google/pprof digest to aaccee0 by @renovate[bot] in [#2449](https://github.com/nicholas-fedor/watchtower/pull/2449)
+- Update module github.com/go-openapi/jsonreference to v1.0.3 by @renovate[bot] in [#2447](https://github.com/nicholas-fedor/watchtower/pull/2447)
+- Update module github.com/klauspost/compress to v1.20.1 by @renovate[bot] in [#2446](https://github.com/nicholas-fedor/watchtower/pull/2446)
+- Update module github.com/onsi/gomega to v1.44.0 by @renovate[bot] in [#2443](https://github.com/nicholas-fedor/watchtower/pull/2443)
+- Update module github.com/go-openapi/jsonpointer to v1.0.2 by @renovate[bot] in [#2442](https://github.com/nicholas-fedor/watchtower/pull/2442)
+- Update module github.com/gofiber/schema to v1.8.8 by @renovate[bot] in [#2441](https://github.com/nicholas-fedor/watchtower/pull/2441)
+- Update github/codeql-action action to v4.38.2 by @renovate[bot] in [#2440](https://github.com/nicholas-fedor/watchtower/pull/2440)
+- Update module github.com/gofiber/utils/v2 to v2.6.0 by @renovate[bot] in [#2438](https://github.com/nicholas-fedor/watchtower/pull/2438)
+
+### Fixed
+
+- Fix changelog automation workflows by @nicholas-fedor in [#2451](https://github.com/nicholas-fedor/watchtower/pull/2451)
+
+## [1.22.3] - 2026-09-22
+
 ### Changed
 
+- Use the commit date for archive mtime by @nicholas-fedor in [#2435](https://github.com/nicholas-fedor/watchtower/pull/2435)
 - Copy labeled files across container recreate by @nicholas-fedor in [#2387](https://github.com/nicholas-fedor/watchtower/pull/2387)
 
 ### Chores
 
+- Update module github.com/nicholas-fedor/shoutrrr to v0.21.1 by @renovate[bot] in [#2437](https://github.com/nicholas-fedor/watchtower/pull/2437)
 - Update module github.com/gofiber/utils/v2 to v2.5.3 by @renovate[bot] in [#2426](https://github.com/nicholas-fedor/watchtower/pull/2426)
 - Update golang:alpine3.24 docker digest to 8a5910f by @renovate[bot] in [#2421](https://github.com/nicholas-fedor/watchtower/pull/2421)
 - Update golang:1.27.1-alpine docker digest to 8a5910f by @renovate[bot] in [#2420](https://github.com/nicholas-fedor/watchtower/pull/2420)
@@ -34,6 +55,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Keep container config when image Config is nil by @nicholas-fedor in [#2432](https://github.com/nicholas-fedor/watchtower/pull/2432)
 - Share authenticated lscr.io rate limit with ghcr.io by @nicholas-fedor in [#2430](https://github.com/nicholas-fedor/watchtower/pull/2430)
 - Apply registry mirrors only to Docker Hub by @nicholas-fedor in [#2428](https://github.com/nicholas-fedor/watchtower/pull/2428)
 - Rewrite volumes-from IDs before recreate by @nicholas-fedor in [#2424](https://github.com/nicholas-fedor/watchtower/pull/2424)
@@ -3670,7 +3692,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## Compare Releases
 
-- [unreleased](https://github.com/nicholas-fedor/watchtower/compare/v1.22.2...HEAD)
+- [unreleased](https://github.com/nicholas-fedor/watchtower/compare/v1.22.3...HEAD)
+- [1.22.3](https://github.com/nicholas-fedor/watchtower/compare/v1.22.2...v1.22.3)
 - [1.22.2](https://github.com/nicholas-fedor/watchtower/compare/v1.22.1...v1.22.2)
 - [1.22.1](https://github.com/nicholas-fedor/watchtower/compare/v1.22.0...v1.22.1)
 - [1.22.0](https://github.com/nicholas-fedor/watchtower/compare/v1.21.2...v1.22.0)
