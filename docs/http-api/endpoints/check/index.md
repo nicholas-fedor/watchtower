@@ -5,12 +5,12 @@
 The `v1/check` endpoint enables checking monitored containers for available image updates.
 
 Containers on the registry path are checked by querying the registry for the latest digest (HTTP HEAD with GET fallback).
-Containers associated for [Git monitoring](../../../advanced-features/git-monitoring/index.md) use the same watch split as scheduled updates: Watchtower checks the hosted Git ref and does not clone or build.
+Containers associated for [Git monitoring](../../../advanced-features/git-monitoring/index.md) use the same watch split as scheduled updates. Watchtower reports whether the hosted Git ref is stale. It does not clone or build.
 
 It does **not** download image layers and does **not** check against the configured [image cooldown](../../../advanced-features/image-cooldown/index.md), as the cooldown functionality remains an apply-time gate for scheduled updates and `/v1/update`.
 
-When [no-pull](../../../configuration/update-behavior/index.md#disable_image_pulling) is enabled globally or via the container label, the check inspects the local image cache only and does not contact the registry.
-A Git-watched container is reported with `update_available: false` and the Git remote is not contacted.
+When [no-pull](../../../configuration/update-behavior/index.md#disable_image_pulling) is enabled globally or via the container label, a registry-path container is checked against the local image cache only. The registry is not contacted.
+A Git-watched container is not checked. The Git remote is not contacted, and the result is `update_available: false`.
 
 Include `check` in [`http-api-endpoints`](../../../configuration/http-api/index.md#http_api_endpoints) to enable this endpoint.
 
