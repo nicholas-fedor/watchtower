@@ -918,6 +918,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../../configuration/git-monitoring/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Git Monitoring
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../../configuration/image-cooldown/" class="md-nav__link">
         
   
@@ -1377,6 +1405,34 @@
     <span class="md-ellipsis">
       
         Example Usage
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#git_and_oci_report_fields" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Git and OCI report fields
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Git and OCI report fields">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#log_lines_from_a_git_update" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Log lines from a Git update
       
     </span>
   </a>
@@ -2502,6 +2558,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../../advanced-features/git-monitoring/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Git Monitoring
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../../advanced-features/image-cooldown/" class="md-nav__link">
         
   
@@ -2960,6 +3044,34 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#git_and_oci_report_fields" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Git and OCI report fields
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Git and OCI report fields">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#log_lines_from_a_git_update" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Log lines from a Git update
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#customizing_templates" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -3139,7 +3251,7 @@
 <a id="__codelineno-8-3" name="__codelineno-8-3" href="#__codelineno-8-3"></a><span class="w">    </span><span class="p">{{</span><span class="nx">len</span><span class="w"> </span><span class="p">.</span><span class="nx">Scanned</span><span class="p">}}</span><span class="w"> </span><span class="nx">Scanned</span><span class="p">,</span><span class="w"> </span><span class="p">{{</span><span class="nx">len</span><span class="w"> </span><span class="p">.</span><span class="nx">Updated</span><span class="p">}}</span><span class="w"> </span><span class="nx">Updated</span><span class="p">,</span><span class="w"> </span><span class="p">{{</span><span class="nx">len</span><span class="w"> </span><span class="p">.</span><span class="nx">Restarted</span><span class="p">}}</span><span class="w"> </span><span class="nx">Restarted</span><span class="p">,</span><span class="w"> </span><span class="p">{{</span><span class="nx">len</span><span class="w"> </span><span class="p">.</span><span class="nx">Failed</span><span class="p">}}</span><span class="w"> </span><span class="nx">Failed</span>
 <a id="__codelineno-8-4" name="__codelineno-8-4" href="#__codelineno-8-4"></a><span class="w">    </span><span class="p">{{</span><span class="o">-</span><span class="w"> </span><span class="k">if</span><span class="w"> </span><span class="p">(</span><span class="w"> </span><span class="nx">or</span><span class="w"> </span><span class="p">.</span><span class="nx">Updated</span><span class="w"> </span><span class="p">.</span><span class="nx">Restarted</span><span class="w"> </span><span class="p">.</span><span class="nx">Failed</span><span class="w"> </span><span class="p">)</span><span class="w"> </span><span class="o">-</span><span class="p">}}</span>
 <a id="__codelineno-8-5" name="__codelineno-8-5" href="#__codelineno-8-5"></a><span class="w">      </span><span class="p">{{</span><span class="o">-</span><span class="w"> </span><span class="k">range</span><span class="w"> </span><span class="p">.</span><span class="nx">Updated</span><span class="p">}}</span>
-<a id="__codelineno-8-6" name="__codelineno-8-6" href="#__codelineno-8-6"></a><span class="o">-</span><span class="w"> </span><span class="p">{{.</span><span class="nx">Name</span><span class="p">}}</span><span class="w"> </span><span class="p">({{.</span><span class="nx">ImageName</span><span class="p">}}):</span><span class="w"> </span><span class="p">{{.</span><span class="nx">CurrentImageID</span><span class="p">.</span><span class="nx">ShortID</span><span class="p">}}</span><span class="w"> </span><span class="nx">updated</span><span class="w"> </span><span class="nx">to</span><span class="w"> </span><span class="p">{{.</span><span class="nx">LatestImageID</span><span class="p">.</span><span class="nx">ShortID</span><span class="p">}}</span>
+<a id="__codelineno-8-6" name="__codelineno-8-6" href="#__codelineno-8-6"></a><span class="o">-</span><span class="w"> </span><span class="p">{{.</span><span class="nx">Name</span><span class="p">}}</span><span class="w"> </span><span class="p">({{.</span><span class="nx">ImageName</span><span class="p">}}):</span><span class="w"> </span><span class="p">{{.</span><span class="nx">CurrentImageID</span><span class="p">.</span><span class="nx">ShortID</span><span class="p">}}</span><span class="w"> </span><span class="nx">updated</span><span class="w"> </span><span class="nx">to</span><span class="w"> </span><span class="p">{{.</span><span class="nx">LatestImageID</span><span class="p">.</span><span class="nx">ShortID</span><span class="p">}}{{</span><span class="nx">with</span><span class="w"> </span><span class="p">.</span><span class="nx">GitRef</span><span class="p">}}</span><span class="w"> </span><span class="nx">ref</span><span class="w"> </span><span class="p">{{.}}{{</span><span class="nx">end</span><span class="p">}}{{</span><span class="nx">with</span><span class="w"> </span><span class="p">.</span><span class="nx">Changelog</span><span class="p">}}</span><span class="w"> </span><span class="p">{{.}}{{</span><span class="nx">end</span><span class="p">}}</span>
 <a id="__codelineno-8-7" name="__codelineno-8-7" href="#__codelineno-8-7"></a><span class="w">      </span><span class="p">{{</span><span class="o">-</span><span class="w"> </span><span class="nx">end</span><span class="w"> </span><span class="o">-</span><span class="p">}}</span>
 <a id="__codelineno-8-8" name="__codelineno-8-8" href="#__codelineno-8-8"></a><span class="w">      </span><span class="p">{{</span><span class="o">-</span><span class="w"> </span><span class="k">range</span><span class="w"> </span><span class="p">.</span><span class="nx">Fresh</span><span class="p">}}</span>
 <a id="__codelineno-8-9" name="__codelineno-8-9" href="#__codelineno-8-9"></a><span class="o">-</span><span class="w"> </span><span class="p">{{.</span><span class="nx">Name</span><span class="p">}}</span><span class="w"> </span><span class="p">({{.</span><span class="nx">ImageName</span><span class="p">}}):</span><span class="w"> </span><span class="p">{{.</span><span class="nx">State</span><span class="p">}}</span>
@@ -3185,7 +3297,7 @@
 <a id="__codelineno-9-14" name="__codelineno-9-14" href="#__codelineno-9-14"></a><span class="w">                </span><span class="no">{{len .Scanned}} Scanned, {{len .Updated}} Updated, {{len .Restarted}} Restarted, {{len .Failed}} Failed</span>
 <a id="__codelineno-9-15" name="__codelineno-9-15" href="#__codelineno-9-15"></a><span class="w">                </span><span class="no">{{- if ( or .Updated .Restarted .Failed ) -}}</span>
 <a id="__codelineno-9-16" name="__codelineno-9-16" href="#__codelineno-9-16"></a><span class="w">                    </span><span class="no">{{- range .Updated -}}</span>
-<a id="__codelineno-9-17" name="__codelineno-9-17" href="#__codelineno-9-17"></a><span class="w">                </span><span class="no">- {{.Name}} ({{.ImageName}}): {{.CurrentImageID.ShortID}} updated to {{.LatestImageID.ShortID}}</span>
+<a id="__codelineno-9-17" name="__codelineno-9-17" href="#__codelineno-9-17"></a><span class="w">                </span><span class="no">- {{.Name}} ({{.ImageName}}): {{.CurrentImageID.ShortID}} updated to {{.LatestImageID.ShortID}}{{with .GitRef}} ref {{.}}{{end}}{{with .Changelog}} {{.}}{{end}}</span>
 <a id="__codelineno-9-18" name="__codelineno-9-18" href="#__codelineno-9-18"></a><span class="w">                    </span><span class="no">{{- end -}}</span>
 <a id="__codelineno-9-19" name="__codelineno-9-19" href="#__codelineno-9-19"></a><span class="w">                    </span><span class="no">{{- range .Fresh -}}</span>
 <a id="__codelineno-9-20" name="__codelineno-9-20" href="#__codelineno-9-20"></a><span class="w">                </span><span class="no">- {{.Name}} ({{.ImageName}}): {{.State}}</span>
@@ -3220,7 +3332,7 @@
 <a id="__codelineno-10-8" name="__codelineno-10-8" href="#__codelineno-10-8"></a><span class="s2">{{len .Scanned}} Scanned, {{len .Updated}} Updated, {{len .Restarted}} Restarted, {{len .Failed}} Failed</span>
 <a id="__codelineno-10-9" name="__codelineno-10-9" href="#__codelineno-10-9"></a><span class="s2">{{- if ( or .Updated .Restarted .Failed ) -}}</span>
 <a id="__codelineno-10-10" name="__codelineno-10-10" href="#__codelineno-10-10"></a><span class="s2">      {{- range .Updated -}}</span>
-<a id="__codelineno-10-11" name="__codelineno-10-11" href="#__codelineno-10-11"></a><span class="s2">- {{.Name}} ({{.ImageName}}): {{.CurrentImageID.ShortID}} updated to {{.LatestImageID.ShortID}}</span>
+<a id="__codelineno-10-11" name="__codelineno-10-11" href="#__codelineno-10-11"></a><span class="s2">- {{.Name}} ({{.ImageName}}): {{.CurrentImageID.ShortID}} updated to {{.LatestImageID.ShortID}}{{with .GitRef}} ref {{.}}{{end}}{{with .Changelog}} {{.}}{{end}}</span>
 <a id="__codelineno-10-12" name="__codelineno-10-12" href="#__codelineno-10-12"></a><span class="s2">      {{- end -}}</span>
 <a id="__codelineno-10-13" name="__codelineno-10-13" href="#__codelineno-10-13"></a><span class="s2">      {{- range .Fresh -}}</span>
 <a id="__codelineno-10-14" name="__codelineno-10-14" href="#__codelineno-10-14"></a><span class="s2">- {{.Name}} ({{.ImageName}}): {{.State}}</span>
@@ -3256,6 +3368,117 @@
 <a id="__codelineno-11-5" name="__codelineno-11-5" href="#__codelineno-11-5"></a>Logs:
 <a id="__codelineno-11-6" name="__codelineno-11-6" href="#__codelineno-11-6"></a>2025-08-20T06:00:13-07:00 [error] Operation failed. Try again later.
 </code></pre></div>
+<h2 id="git_and_oci_report_fields">Git and OCI report fields<a class="headerlink" href="#git_and_oci_report_fields" title="Permanent link">&para;</a></h2>
+<p>Default templates are unchanged.
+Custom report templates can use these fields on each container.
+They are populated even when Git monitoring is off.</p>
+<table>
+<thead>
+<tr>
+<th style="text-align: left;">Field</th>
+<th style="text-align: left;">Meaning</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align: left;"><code>.GitRepo</code></td>
+<td style="text-align: left;"><code>com.centurylinklabs.watchtower.git-repo</code>, else <a href="../../configuration/git-monitoring/#git_image"><code>git-image</code></a> mapping, else OCI <code>org.opencontainers.image.source</code></td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>.GitRef</code></td>
+<td style="text-align: left;"><code>com.centurylinklabs.watchtower.git-ref</code> (or <code>com.centurylinklabs.watchtower.git-branch</code>), else mapping ref, else OCI version when it looks like a tag</td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>.Changelog</code></td>
+<td style="text-align: left;"><code>com.centurylinklabs.watchtower.changelog</code>, else a derived releases URL, else OCI <code>url</code> / <code>documentation</code></td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>.Source</code></td>
+<td style="text-align: left;">OCI <code>org.opencontainers.image.source</code></td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>.ImageURL</code></td>
+<td style="text-align: left;">OCI <code>org.opencontainers.image.url</code></td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>.Documentation</code></td>
+<td style="text-align: left;">OCI <code>org.opencontainers.image.documentation</code></td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>.Revision</code></td>
+<td style="text-align: left;">OCI <code>org.opencontainers.image.revision</code></td>
+</tr>
+</tbody>
+</table>
+<p><code>.GitRef</code> is the configured Git ref. When the container is not associated with Git and <code>org.opencontainers.image.version</code> looks like a tag, that version is copied into <code>.GitRef</code>. There is one value, not a previous version and a new version, so a template cannot print <code>10.11.5 → 10.11.6</code> from these fields.</p>
+<p>The built-in <code>default</code> report template prints the ref and the changelog on an updated container when they are set:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-12-1" name="__codelineno-12-1" href="#__codelineno-12-1"></a>- /app (myapp:latest): abcdef12 updated to 34567890 ref v1.2.4 https://github.com/org/app/releases
+</code></pre></div>
+<p>A custom report template can do the same:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-13-1" name="__codelineno-13-1" href="#__codelineno-13-1"></a><span class="p">{{</span><span class="w"> </span><span class="k">range</span><span class="w"> </span><span class="p">.</span><span class="nx">Report</span><span class="p">.</span><span class="nx">Updated</span><span class="w"> </span><span class="p">}}{{</span><span class="w"> </span><span class="p">.</span><span class="nx">Name</span><span class="w"> </span><span class="p">}}{{</span><span class="w"> </span><span class="nx">with</span><span class="w"> </span><span class="p">.</span><span class="nx">GitRef</span><span class="w"> </span><span class="p">}}</span><span class="w"> </span><span class="p">{{</span><span class="w"> </span><span class="p">.</span><span class="w"> </span><span class="p">}}{{</span><span class="w"> </span><span class="nx">end</span><span class="w"> </span><span class="p">}}{{</span><span class="w"> </span><span class="nx">with</span><span class="w"> </span><span class="p">.</span><span class="nx">Changelog</span><span class="w"> </span><span class="p">}}</span><span class="w"> </span><span class="p">{{</span><span class="w"> </span><span class="p">.</span><span class="w"> </span><span class="p">}}{{</span><span class="w"> </span><span class="nx">end</span><span class="w"> </span><span class="p">}}{{</span><span class="w"> </span><span class="nx">end</span><span class="w"> </span><span class="p">}}</span>
+</code></pre></div>
+<p>An explicit <code>com.centurylinklabs.watchtower.changelog</code> label may include placeholders from the new version when known: <code>{major}</code>, <code>{minor}</code>, <code>{patch}</code>, <code>{tag}</code>, <code>{commit}</code>.</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-14-1" name="__codelineno-14-1" href="#__codelineno-14-1"></a><span class="nt">labels</span><span class="p">:</span>
+<a id="__codelineno-14-2" name="__codelineno-14-2" href="#__codelineno-14-2"></a><span class="w">    </span><span class="nt">com.centurylinklabs.watchtower.git-repo</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">https://github.com/org/app.git</span>
+<a id="__codelineno-14-3" name="__codelineno-14-3" href="#__codelineno-14-3"></a><span class="w">    </span><span class="nt">com.centurylinklabs.watchtower.changelog</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">https://github.com/org/app/releases/tag/v{major}.{minor}.{patch}</span>
+</code></pre></div>
+<p>If <code>com.centurylinklabs.watchtower.changelog</code> is unset, Watchtower builds a releases URL for <code>github.com</code>, <code>gitlab.com</code>, <code>codeberg.org</code>, and for a container that sets <code>com.centurylinklabs.watchtower.git-host</code>.
+Otherwise it falls back to OCI <code>org.opencontainers.image.url</code>, then <code>org.opencontainers.image.documentation</code>.</p>
+<p>Malformed placeholders are left as-is.
+The session does not fail.</p>
+<p>An image with only <code>org.opencontainers.image.source</code> still exposes <code>.Source</code> / derived <code>.GitRepo</code>.
+Git monitoring stays off unless the container is associated and the watcher is on.
+See <a href="../../advanced-features/git-monitoring/">Git Monitoring</a> for association and rebuilds.</p>
+<h3 id="log_lines_from_a_git_update">Log lines from a Git update<a class="headerlink" href="#log_lines_from_a_git_update" title="Permanent link">&para;</a></h3>
+<p>With <a href="../../configuration/notifications/#notification_report">notification report</a> off, Watchtower sends the log line itself. The <code>default-legacy</code> template formats these messages instead of dumping every field:</p>
+<table>
+<thead>
+<tr>
+<th style="text-align: left;">Message</th>
+<th style="text-align: left;">What the notification says</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align: left;"><code>Found new Git revision</code></td>
+<td style="text-align: left;"><code>Found new Git revision: &lt;host/path&gt;@&lt;tag or branch&gt; (&lt;12-char sha&gt;)</code></td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>Built image from Git URL context</code></td>
+<td style="text-align: left;"><code>Built image: &lt;name:git-shortsha&gt; (&lt;short image id&gt;)</code></td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>Built Compose project</code></td>
+<td style="text-align: left;"><code>Built Compose project: &lt;project&gt; (&lt;services&gt;)</code>, only when containers are not restarted</td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>Git build failed. Leaving running container untouched</code></td>
+<td style="text-align: left;">Container and the error. The running container was left in place.</td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>Compose apply failed. Docker Compose may have partially recreated services</code></td>
+<td style="text-align: left;">Container and a short failure line.</td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>Compose project directory is not readable. Leaving the running container untouched</code></td>
+<td style="text-align: left;"><code>Skipped &lt;container&gt;: compose directory is not readable</code></td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>Skipped container with an invalid git semver policy</code></td>
+<td style="text-align: left;"><code>Skipped &lt;container&gt;: invalid git semver policy</code></td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>Skipped container with an invalid git-host</code></td>
+<td style="text-align: left;"><code>Skipped &lt;container&gt;: invalid git-host</code></td>
+</tr>
+</tbody>
+</table>
+<p>The log fields are <code>container</code>, <code>image</code>, <code>repo</code>, <code>ref</code>, <code>commit</code>, <code>changelog</code>, <code>project</code>, <code>dir</code>, and <code>error</code>. A custom simple template reads them from <code>.Data</code>:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-15-1" name="__codelineno-15-1" href="#__codelineno-15-1"></a><span class="p">{{</span><span class="w"> </span><span class="k">range</span><span class="w"> </span><span class="p">.</span><span class="w"> </span><span class="p">}}{{</span><span class="w"> </span><span class="k">if</span><span class="w"> </span><span class="nx">eq</span><span class="w"> </span><span class="p">.</span><span class="nx">Message</span><span class="w"> </span><span class="s">"Built image from Git URL context"</span><span class="w"> </span><span class="p">}}</span>
+<a id="__codelineno-15-2" name="__codelineno-15-2" href="#__codelineno-15-2"></a><span class="p">{{</span><span class="w"> </span><span class="p">.</span><span class="nx">Data</span><span class="p">.</span><span class="nx">container</span><span class="w"> </span><span class="p">}}</span><span class="w"> </span><span class="p">{{</span><span class="w"> </span><span class="p">.</span><span class="nx">Data</span><span class="p">.</span><span class="nx">commit</span><span class="w"> </span><span class="p">}}</span><span class="w"> </span><span class="p">{{</span><span class="w"> </span><span class="p">.</span><span class="nx">Data</span><span class="p">.</span><span class="nx">changelog</span><span class="w"> </span><span class="p">}}</span>
+<a id="__codelineno-15-3" name="__codelineno-15-3" href="#__codelineno-15-3"></a><span class="p">{{</span><span class="w"> </span><span class="nx">end</span><span class="w"> </span><span class="p">}}{{</span><span class="w"> </span><span class="nx">end</span><span class="w"> </span><span class="p">}}</span>
+</code></pre></div>
+<p>Porcelain JSON and <code>/v1/check</code> expose the same values as <code>git_repo</code>, <code>git_ref</code>, <code>changelog</code>, <code>oci_source</code>, <code>image_url</code>, <code>documentation</code>, and <code>revision</code>.</p>
 <h2 id="customizing_templates">Customizing Templates<a class="headerlink" href="#customizing_templates" title="Permanent link">&para;</a></h2>
 <p>You can create custom templates to format notifications differently.</p>
 <p>Use the <a href="../template-preview/">Template Preview Tool</a> to test your templates interactively.</p>
@@ -3290,7 +3513,7 @@
     <span class="md-icon" title="Last update">
       <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M21 13.1c-.1 0-.3.1-.4.2l-1 1 2.1 2.1 1-1c.2-.2.2-.6 0-.8l-1.3-1.3c-.1-.1-.2-.2-.4-.2m-1.9 1.8-6.1 6V23h2.1l6.1-6.1zM12.5 7v5.2l4 2.4-1 1L11 13V7zM11 21.9c-5.1-.5-9-4.8-9-9.9C2 6.5 6.5 2 12 2c5.3 0 9.6 4.1 10 9.3-.3-.1-.6-.2-1-.2s-.7.1-1 .2C19.6 7.2 16.2 4 12 4c-4.4 0-8 3.6-8 8 0 4.1 3.1 7.5 7.1 7.9l-.1.2z"/></svg>
     </span>
-    <span class="git-revision-date-localized-plugin git-revision-date-localized-plugin-timeago" title="September 2, 2026 05:17:59 UTC"><span class="timeago" datetime="2026-09-02T05:17:59+00:00" locale="en"></span></span><span class="git-revision-date-localized-plugin git-revision-date-localized-plugin-iso_date" title="September 2, 2026 05:17:59 UTC">2026-09-02</span>
+    <span class="git-revision-date-localized-plugin git-revision-date-localized-plugin-timeago" title="September 29, 2026 16:46:40 UTC"><span class="timeago" datetime="2026-09-29T16:46:40+00:00" locale="en"></span></span><span class="git-revision-date-localized-plugin git-revision-date-localized-plugin-iso_date" title="September 29, 2026 16:46:40 UTC">2026-09-29</span>
   </span>
 
     

@@ -1001,6 +1001,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../../configuration/git-monitoring/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Git Monitoring
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../../configuration/image-cooldown/" class="md-nav__link">
         
   
@@ -2384,6 +2412,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../../advanced-features/git-monitoring/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Git Monitoring
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../../advanced-features/image-cooldown/" class="md-nav__link">
         
   
@@ -2775,8 +2831,10 @@
 <h2 id="overview">Overview<a class="headerlink" href="#overview" title="Permanent link">&para;</a></h2>
 <p>Watchtower is an application that will monitor your running Docker containers and watch for changes to the images that those containers were originally started from.
 If Watchtower detects that an image has changed, it will automatically restart the container using the new image.</p>
-<p>With Watchtower you can update the container by pushing a new image to the registry that's repective to the container's image.
+<p>With Watchtower you can update the container by pushing a new image to the registry that is respective to the container's image.
 Watchtower will pull the new image, gracefully shut down the existing container, and restart it with the same options that were used when it was deployed initially.</p>
+<p>Alternatively, <a href="../../advanced-features/git-monitoring/">Git monitoring</a> uses a hosted Git branch or tag as the staleness signal.
+When that ref changes, Watchtower asks the Docker host to rebuild the image from a <a href="https://docs.docker.com/build/concepts/context/#git-repositories" rel="noopener noreferrer" target="_blank">Git URL context</a> or a local Compose <a href="https://docs.docker.com/reference/compose-file/build/#context" rel="noopener noreferrer" target="_blank">project directory</a>, then uses the same container update process.</p>
 <h2 id="how_image_updates_work">How Image Updates Work<a class="headerlink" href="#how_image_updates_work" title="Permanent link">&para;</a></h2>
 <p>Watchtower monitors containers using their <strong>exact image reference</strong>, including any tags specified.</p>
 <p>This means:</p>
@@ -2847,7 +2905,7 @@ The container updates to the latest patch within that period but not to <code>20
     <span class="md-icon" title="Last update">
       <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M21 13.1c-.1 0-.3.1-.4.2l-1 1 2.1 2.1 1-1c.2-.2.2-.6 0-.8l-1.3-1.3c-.1-.1-.2-.2-.4-.2m-1.9 1.8-6.1 6V23h2.1l6.1-6.1zM12.5 7v5.2l4 2.4-1 1L11 13V7zM11 21.9c-5.1-.5-9-4.8-9-9.9C2 6.5 6.5 2 12 2c5.3 0 9.6 4.1 10 9.3-.3-.1-.6-.2-1-.2s-.7.1-1 .2C19.6 7.2 16.2 4 12 4c-4.4 0-8 3.6-8 8 0 4.1 3.1 7.5 7.1 7.9l-.1.2z"/></svg>
     </span>
-    <span class="git-revision-date-localized-plugin git-revision-date-localized-plugin-timeago" title="December 9, 2025 20:08:53 UTC"><span class="timeago" datetime="2025-12-09T20:08:53+00:00" locale="en"></span></span><span class="git-revision-date-localized-plugin git-revision-date-localized-plugin-iso_date" title="December 9, 2025 20:08:53 UTC">2025-12-09</span>
+    <span class="git-revision-date-localized-plugin git-revision-date-localized-plugin-timeago" title="September 29, 2026 16:46:40 UTC"><span class="timeago" datetime="2026-09-29T16:46:40+00:00" locale="en"></span></span><span class="git-revision-date-localized-plugin git-revision-date-localized-plugin-iso_date" title="September 29, 2026 16:46:40 UTC">2026-09-29</span>
   </span>
 
     

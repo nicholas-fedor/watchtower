@@ -11,13 +11,13 @@
       
       
       
-        <link rel="canonical" href="https://watchtower.nickfedor.com/dev/configuration/update-behavior/">
+        <link rel="canonical" href="https://watchtower.nickfedor.com/dev/configuration/git-monitoring/">
       
       
-        <link rel="prev" href="../image-cooldown/">
+        <link rel="prev" href="../registry-and-authentication/">
       
       
-        <link rel="next" href="../lifecycle-hooks/">
+        <link rel="next" href="../image-cooldown/">
       
       
         
@@ -28,7 +28,7 @@
     
     
       
-        <title>Update Behavior - Watchtower</title>
+        <title>Git Monitoring - Watchtower</title>
       
     
     
@@ -99,7 +99,7 @@
     <div data-md-component="skip">
       
         
-        <a href="#update_behavior" class="md-skip">
+        <a href="#git_monitoring" class="md-skip">
           Skip to content
         </a>
       
@@ -138,7 +138,7 @@
         <div class="md-header__topic" data-md-component="header-topic">
           <span class="md-ellipsis">
             
-              Update Behavior
+              Git Monitoring
             
           </span>
         </div>
@@ -918,10 +918,37 @@
                 
   
   
+    
   
   
-    <li class="md-nav__item">
-      <a href="../git-monitoring/" class="md-nav__link">
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Git Monitoring
+  
+
+    
+  </span>
+  
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="./" class="md-nav__link md-nav__link--active">
         
   
   
@@ -937,6 +964,180 @@
   
 
       </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#git_enable" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Git Enable
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#git_image" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Git Image
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#git_auth_token" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Git Auth Token
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#git_username" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Git Username
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#git_password" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Git Password
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#git_ssh_key_path" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Git SSH Key Path
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#git_ssh_known_hosts" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Git SSH Known Hosts
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#git_timeout" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Git Timeout
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#git_ca_bundle" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Git CA Bundle
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#git_insecure_skip_tls" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Git Insecure Skip TLS
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#git_dockerfile" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Git Dockerfile
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#git_context" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Git Context
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#git_compose_stash" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Git Compose Stash
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#compose_project" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Compose Project
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
     </li>
   
 
@@ -974,37 +1175,10 @@
                 
   
   
-    
   
   
-  
-    <li class="md-nav__item md-nav__item--active">
-      
-      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
-      
-      
-        
-      
-      
-        <label class="md-nav__link md-nav__link--active" for="__toc">
-          
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Update Behavior
-  
-
-    
-  </span>
-  
-  
-
-          <span class="md-nav__icon md-icon"></span>
-        </label>
-      
-      <a href="./" class="md-nav__link md-nav__link--active">
+    <li class="md-nav__item">
+      <a href="../update-behavior/" class="md-nav__link">
         
   
   
@@ -1020,136 +1194,6 @@
   
 
       </a>
-      
-        
-
-<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
-  
-  
-  
-    
-  
-  
-    <label class="md-nav__title" for="__toc">
-      <span class="md-nav__icon md-icon"></span>
-      Table of contents
-    </label>
-    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
-      
-        <li class="md-nav__item">
-  <a href="#disable_container_restart" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Disable Container Restart
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#rolling_restart" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Rolling Restart
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#disk_space_max" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Disk Space Max
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#disk_space_warn" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Disk Space Warn
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#cleanup_old_images" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Cleanup Old Images
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#remove_anonymous_volumes" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Remove Anonymous Volumes
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#container_stop_timeout" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Container Stop Timeout
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#monitor_only" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Monitor Only
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#disable_image_pulling" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Disable Image Pulling
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#ephemeral_self-update" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Ephemeral Self-Update
-      
-    </span>
-  </a>
-  
-</li>
-      
-    </ul>
-  
-</nav>
-      
     </li>
   
 
@@ -2852,10 +2896,10 @@
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
       
         <li class="md-nav__item">
-  <a href="#disable_container_restart" class="md-nav__link">
+  <a href="#git_enable" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Disable Container Restart
+        Git Enable
       
     </span>
   </a>
@@ -2863,10 +2907,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#rolling_restart" class="md-nav__link">
+  <a href="#git_image" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Rolling Restart
+        Git Image
       
     </span>
   </a>
@@ -2874,10 +2918,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#disk_space_max" class="md-nav__link">
+  <a href="#git_auth_token" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Disk Space Max
+        Git Auth Token
       
     </span>
   </a>
@@ -2885,10 +2929,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#disk_space_warn" class="md-nav__link">
+  <a href="#git_username" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Disk Space Warn
+        Git Username
       
     </span>
   </a>
@@ -2896,10 +2940,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#cleanup_old_images" class="md-nav__link">
+  <a href="#git_password" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Cleanup Old Images
+        Git Password
       
     </span>
   </a>
@@ -2907,10 +2951,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#remove_anonymous_volumes" class="md-nav__link">
+  <a href="#git_ssh_key_path" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Remove Anonymous Volumes
+        Git SSH Key Path
       
     </span>
   </a>
@@ -2918,10 +2962,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#container_stop_timeout" class="md-nav__link">
+  <a href="#git_ssh_known_hosts" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Container Stop Timeout
+        Git SSH Known Hosts
       
     </span>
   </a>
@@ -2929,10 +2973,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#monitor_only" class="md-nav__link">
+  <a href="#git_timeout" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Monitor Only
+        Git Timeout
       
     </span>
   </a>
@@ -2940,10 +2984,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#disable_image_pulling" class="md-nav__link">
+  <a href="#git_ca_bundle" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Disable Image Pulling
+        Git CA Bundle
       
     </span>
   </a>
@@ -2951,10 +2995,54 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#ephemeral_self-update" class="md-nav__link">
+  <a href="#git_insecure_skip_tls" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Ephemeral Self-Update
+        Git Insecure Skip TLS
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#git_dockerfile" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Git Dockerfile
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#git_context" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Git Context
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#git_compose_stash" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Git Compose Stash
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#compose_project" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Compose Project
       
     </span>
   </a>
@@ -2981,163 +3069,163 @@
   
 
 
-<h1 id="update_behavior">Update Behavior<a class="headerlink" href="#update_behavior" title="Permanent link">&para;</a></h1>
-<p>These options apply after Watchtower has decided a container is stale.
-The default staleness signal is a registry digest change.
-<a href="../git-monitoring/">Git monitoring</a> is an alternate signal that still ends in this same container update process (or Compose apply for a local path context).
-See <a href="../../advanced-features/git-monitoring/#interaction_with_other_update_options">Advanced Features → Git Monitoring</a>.</p>
-<h2 id="disable_container_restart">Disable Container Restart<a class="headerlink" href="#disable_container_restart" title="Permanent link">&para;</a></h2>
-<p>Stops and removes the old containers and creates new ones with the updated image, but does not start the new containers.
-This is useful when an external system (e.g., systemd) manages the container lifecycle.</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>            Argument: --no-restart
-<a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a>Environment Variable: WATCHTOWER_NO_RESTART
+<h1 id="git_monitoring">Git Monitoring<a class="headerlink" href="#git_monitoring" title="Permanent link">&para;</a></h1>
+<h2 id="git_enable">Git Enable<a class="headerlink" href="#git_enable" title="Permanent link">&para;</a></h2>
+<p>Sets the process-wide default for Git ref change detection.
+When true, associated containers are watched unless a container <a href="../../advanced-features/git-monitoring/#labels"><code>com.centurylinklabs.watchtower.git-watch</code></a> label overrides it.</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>            Argument: --git-enable
+<a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a>Environment Variable: WATCHTOWER_GIT_ENABLE
 <a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a>                Type: Boolean
 <a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a>             Default: false
 </code></pre></div>
-<div class="admonition warning">
-<p class="admonition-title">Warning</p>
-<p>Combining <code>--no-restart</code> with <code>--cleanup</code> during Watchtower self-update may leave a renamed Watchtower container running without starting a new one, preventing cleanup of the old image.</p>
-<p>Use cautiously for self-updating Watchtower instances and consider external lifecycle management (e.g., Docker Compose) to restart containers manually.</p>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>A repository URL does not enable the watcher by itself.
+See <a href="../../advanced-features/git-monitoring/#behavior">Git Monitoring</a>.</p>
 </div>
-<h2 id="rolling_restart">Rolling Restart<a class="headerlink" href="#rolling_restart" title="Permanent link">&para;</a></h2>
-<p>Restarts containers one at a time to minimize downtime.
-This is ideal for zero-downtime deployments with lifecycle hooks.
-When containers have health checks configured, Watchtower waits for each container to become healthy before proceeding to the next one.</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a>            Argument: --rolling-restart
-<a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a>Environment Variable: WATCHTOWER_ROLLING_RESTART
-<a id="__codelineno-1-3" name="__codelineno-1-3" href="#__codelineno-1-3"></a>                Type: Boolean
-<a id="__codelineno-1-4" name="__codelineno-1-4" href="#__codelineno-1-4"></a>             Default: false
+<h2 id="git_image">Git Image<a class="headerlink" href="#git_image" title="Permanent link">&para;</a></h2>
+<p>Associates an image name with a Git repository.
+Repeatable.
+Not comma-glued.
+Format: <code>image=repo[#ref][@policy]</code>.</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a>            Argument: --git-image
+<a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a>Environment Variable: WATCHTOWER_GIT_IMAGE
+<a id="__codelineno-1-3" name="__codelineno-1-3" href="#__codelineno-1-3"></a>                Type: String array
+<a id="__codelineno-1-4" name="__codelineno-1-4" href="#__codelineno-1-4"></a>             Default: (empty)
 </code></pre></div>
 <div class="admonition note">
 <p class="admonition-title">Note</p>
-<p>When combined with <code>--cleanup</code>, image cleanup is deferred until all containers are updated, which may temporarily increase disk usage for large numbers of containers (&gt;50).
-This is typically negligible for homelab setups but monitor disk space on resource-constrained hosts.</p>
-<p>If a container fails to become healthy within 5 minutes, Watchtower logs a warning but continues with the next container to avoid blocking the entire update process.</p>
+<p>See <a href="../../advanced-features/git-monitoring/#per-image_mapping">Git Monitoring</a>.</p>
 </div>
-<div class="admonition warning">
-<p class="admonition-title">This functionality is currently not supported when used in combination with linked-containers.</p>
-<p>This limitation exists because linked-containers require coordinated updates across dependency chains, which conflicts with the incremental nature of rolling restarts.</p>
-</div>
-<h2 id="disk_space_max">Disk Space Max<a class="headerlink" href="#disk_space_max" title="Permanent link">&para;</a></h2>
-<p>Sets the maximum allowed Docker <strong>image</strong> usage and blocks the update session when the usage amount is greater than or equal to the configured allowance.</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a>            Argument: --disk-space-max
-<a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a>Environment Variable: WATCHTOWER_DISK_SPACE_MAX
+<h2 id="git_auth_token">Git Auth Token<a class="headerlink" href="#git_auth_token" title="Permanent link">&para;</a></h2>
+<p>HTTPS authentication token for private repositories.
+Takes priority over username/password and SSH.</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a>            Argument: --git-auth-token
+<a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a>Environment Variable: WATCHTOWER_GIT_AUTH_TOKEN
 <a id="__codelineno-2-3" name="__codelineno-2-3" href="#__codelineno-2-3"></a>                Type: String
-<a id="__codelineno-2-4" name="__codelineno-2-4" href="#__codelineno-2-4"></a>             Default: unset
+<a id="__codelineno-2-4" name="__codelineno-2-4" href="#__codelineno-2-4"></a>             Default: (empty)
 </code></pre></div>
-<div class="admonition warning">
-<p class="admonition-title">This is not host free space and does not include volumes, container writable layers, or the build cache.</p>
-</div>
 <div class="admonition note">
 <p class="admonition-title">Note</p>
-<ul>
-<li>Accepted sizes: bare bytes, decimal <code>B</code>/<code>KB</code>/<code>MB</code>/<code>GB</code>/<code>TB</code>/<code>PB</code>, or binary <code>KiB</code>/<code>MiB</code>/<code>GiB</code>/<code>TiB</code>/<code>PiB</code>.</li>
-<li>This option cannot be a percentage.</li>
-<li>Either this option or <a href="#disk_space_warn"><code>disk-space-warn</code></a> enables the check and updates the Prometheus image-usage gauges.</li>
-</ul>
+<p>Supports a file path for <a href="../../getting-started/docker-secrets/">Docker Secrets</a> (for example <code>/run/secrets/git_auth_token</code>).
+Prefer Docker Secrets over putting the token in the environment.
+Tokens never appear in labels, <code>/v1/config</code>, or events.</p>
 </div>
-<p>See <a href="../../advanced-features/disk-usage-monitor/">Disk Usage Monitor</a> for more information.</p>
-<h2 id="disk_space_warn">Disk Space Warn<a class="headerlink" href="#disk_space_warn" title="Permanent link">&para;</a></h2>
-<p>Sets a warning threshold for when Docker image usage is greater than or equal to the configured amount.</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a>            Argument: --disk-space-warn
-<a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a>Environment Variable: WATCHTOWER_DISK_SPACE_WARN
+<h2 id="git_username">Git Username<a class="headerlink" href="#git_username" title="Permanent link">&para;</a></h2>
+<p>Basic-auth username for private repositories.</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a>            Argument: --git-username
+<a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a>Environment Variable: WATCHTOWER_GIT_USERNAME
 <a id="__codelineno-3-3" name="__codelineno-3-3" href="#__codelineno-3-3"></a>                Type: String
-<a id="__codelineno-3-4" name="__codelineno-3-4" href="#__codelineno-3-4"></a>             Default: unset
+<a id="__codelineno-3-4" name="__codelineno-3-4" href="#__codelineno-3-4"></a>             Default: (empty)
+</code></pre></div>
+<h2 id="git_password">Git Password<a class="headerlink" href="#git_password" title="Permanent link">&para;</a></h2>
+<p>Basic-auth password for private repositories.</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a>            Argument: --git-password
+<a id="__codelineno-4-2" name="__codelineno-4-2" href="#__codelineno-4-2"></a>Environment Variable: WATCHTOWER_GIT_PASSWORD
+<a id="__codelineno-4-3" name="__codelineno-4-3" href="#__codelineno-4-3"></a>                Type: String
+<a id="__codelineno-4-4" name="__codelineno-4-4" href="#__codelineno-4-4"></a>             Default: (empty)
 </code></pre></div>
 <div class="admonition note">
 <p class="admonition-title">Note</p>
-<ul>
-<li>Accepted sizes: bare bytes, decimal <code>B</code>/<code>KB</code>/<code>MB</code>/<code>GB</code>/<code>TB</code>/<code>PB</code>, or binary <code>KiB</code>/<code>MiB</code>/<code>GiB</code>/<code>TiB</code>/<code>PiB</code>.</li>
-<li>This option may also be a percent of <a href="#disk_space_max"><code>disk-space-max</code></a> (for example <code>80%</code>).</li>
-<li>A percent value requires <a href="#disk_space_max"><code>disk-space-max</code></a>.</li>
-<li>When both are set, the warn amount must be less than the max.</li>
-<li>Configuring a warning threshold without a maximum is valid and supported.</li>
-</ul>
+<p>Supports a file path for <a href="../../getting-started/docker-secrets/">Docker Secrets</a> (for example <code>/run/secrets/git_password</code>).
+Prefer Docker Secrets over putting the password in the environment.
+Passwords never appear in labels, <code>/v1/config</code>, or events.</p>
 </div>
-<p>See <a href="../../advanced-features/disk-usage-monitor/">Disk Usage Monitor</a> for more information.</p>
-<h2 id="cleanup_old_images">Cleanup Old Images<a class="headerlink" href="#cleanup_old_images" title="Permanent link">&para;</a></h2>
-<p>Removes old images after updating containers to free disk space.</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a>            Argument: --cleanup
-<a id="__codelineno-4-2" name="__codelineno-4-2" href="#__codelineno-4-2"></a>Environment Variable: WATCHTOWER_CLEANUP
-<a id="__codelineno-4-3" name="__codelineno-4-3" href="#__codelineno-4-3"></a>                Type: Boolean
-<a id="__codelineno-4-4" name="__codelineno-4-4" href="#__codelineno-4-4"></a>             Default: false
+<h2 id="git_ssh_key_path">Git SSH Key Path<a class="headerlink" href="#git_ssh_key_path" title="Permanent link">&para;</a></h2>
+<p>Path to an SSH private key used for clone, ls-remote, and local path project checkout.</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a>            Argument: --git-ssh-key-path
+<a id="__codelineno-5-2" name="__codelineno-5-2" href="#__codelineno-5-2"></a>Environment Variable: WATCHTOWER_GIT_SSH_KEY_PATH
+<a id="__codelineno-5-3" name="__codelineno-5-3" href="#__codelineno-5-3"></a>                Type: String
+<a id="__codelineno-5-4" name="__codelineno-5-4" href="#__codelineno-5-4"></a>             Default: (empty)
+</code></pre></div>
+<h2 id="git_ssh_known_hosts">Git SSH Known Hosts<a class="headerlink" href="#git_ssh_known_hosts" title="Permanent link">&para;</a></h2>
+<p>Path to an SSH <code>known_hosts</code> file used to verify Git hosts.
+Required for SSH remotes in the scratch runtime image, which has no default host keys.</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-6-1" name="__codelineno-6-1" href="#__codelineno-6-1"></a>            Argument: --git-ssh-known-hosts
+<a id="__codelineno-6-2" name="__codelineno-6-2" href="#__codelineno-6-2"></a>Environment Variable: WATCHTOWER_GIT_SSH_KNOWN_HOSTS
+<a id="__codelineno-6-3" name="__codelineno-6-3" href="#__codelineno-6-3"></a>                Type: String
+<a id="__codelineno-6-4" name="__codelineno-6-4" href="#__codelineno-6-4"></a>             Default: (empty)
 </code></pre></div>
 <div class="admonition note">
 <p class="admonition-title">Note</p>
-<p>During Watchtower self-updates, cleanup is deferred to the new container to prevent premature image deletion.</p>
-<p>Ensure <code>--no-restart</code> is not used with <code>--cleanup</code> to avoid incomplete updates.</p>
+<p>See <a href="../../advanced-features/git-monitoring/#authentication">Git Monitoring</a>.</p>
 </div>
-<h2 id="remove_anonymous_volumes">Remove Anonymous Volumes<a class="headerlink" href="#remove_anonymous_volumes" title="Permanent link">&para;</a></h2>
-<p>Deletes anonymous volumes when updating containers.
-Named volumes remain unaffected.</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a>            Argument: --remove-volumes
-<a id="__codelineno-5-2" name="__codelineno-5-2" href="#__codelineno-5-2"></a>Environment Variable: WATCHTOWER_REMOVE_VOLUMES
-<a id="__codelineno-5-3" name="__codelineno-5-3" href="#__codelineno-5-3"></a>                Type: Boolean
-<a id="__codelineno-5-4" name="__codelineno-5-4" href="#__codelineno-5-4"></a>             Default: false
+<h2 id="git_timeout">Git Timeout<a class="headerlink" href="#git_timeout" title="Permanent link">&para;</a></h2>
+<p>Timeout for Git network operations (for example <code>30s</code> or <code>1m</code>).</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-7-1" name="__codelineno-7-1" href="#__codelineno-7-1"></a>            Argument: --git-timeout
+<a id="__codelineno-7-2" name="__codelineno-7-2" href="#__codelineno-7-2"></a>Environment Variable: WATCHTOWER_GIT_TIMEOUT
+<a id="__codelineno-7-3" name="__codelineno-7-3" href="#__codelineno-7-3"></a>                Type: Duration
+<a id="__codelineno-7-4" name="__codelineno-7-4" href="#__codelineno-7-4"></a>             Default: 30s
 </code></pre></div>
-<div class="admonition note">
-<p class="admonition-title">Note</p>
-<p>Containers with the Docker <code>AutoRemove</code> option enabled are automatically removed by the Docker daemon after stopping.
-Watchtower skips explicit removal in such cases.
-This does not affect named volumes.</p>
-</div>
-<h2 id="container_stop_timeout">Container Stop Timeout<a class="headerlink" href="#container_stop_timeout" title="Permanent link">&para;</a></h2>
-<p>Sets the timeout (e.g., <code>30s</code>) before forcibly stopping a container during updates.</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-6-1" name="__codelineno-6-1" href="#__codelineno-6-1"></a>            Argument: --stop-timeout
-<a id="__codelineno-6-2" name="__codelineno-6-2" href="#__codelineno-6-2"></a>Environment Variable: WATCHTOWER_TIMEOUT
-<a id="__codelineno-6-3" name="__codelineno-6-3" href="#__codelineno-6-3"></a>                Type: Duration (e.g., 30s, 1m, 5m)
-<a id="__codelineno-6-4" name="__codelineno-6-4" href="#__codelineno-6-4"></a>              Default: 30s
+<h2 id="git_ca_bundle">Git CA Bundle<a class="headerlink" href="#git_ca_bundle" title="Permanent link">&para;</a></h2>
+<p>Path to a PEM file of extra CA certificates for Git HTTPS.
+Applied to clone, ls-remote, REST probes, and local path project checkout.</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-8-1" name="__codelineno-8-1" href="#__codelineno-8-1"></a>            Argument: --git-ca-bundle
+<a id="__codelineno-8-2" name="__codelineno-8-2" href="#__codelineno-8-2"></a>Environment Variable: WATCHTOWER_GIT_CA_BUNDLE
+<a id="__codelineno-8-3" name="__codelineno-8-3" href="#__codelineno-8-3"></a>                Type: String
+<a id="__codelineno-8-4" name="__codelineno-8-4" href="#__codelineno-8-4"></a>             Default: (empty)
 </code></pre></div>
-<div class="admonition note">
-<p class="admonition-title">Note</p>
-<p>Bare numeric values (e.g., <code>60</code> or <code>1.5</code>) without a time unit are interpreted as seconds.
-Using a unit suffix (<code>s</code>, <code>m</code>, etc.) is recommended and required for other time units.</p>
-</div>
-<h2 id="monitor_only">Monitor Only<a class="headerlink" href="#monitor_only" title="Permanent link">&para;</a></h2>
-<p>Monitors for new images, sends notifications, and runs lifecycle hooks without updating containers.</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-7-1" name="__codelineno-7-1" href="#__codelineno-7-1"></a>            Argument: --monitor-only
-<a id="__codelineno-7-2" name="__codelineno-7-2" href="#__codelineno-7-2"></a>Environment Variable: WATCHTOWER_MONITOR_ONLY
-<a id="__codelineno-7-3" name="__codelineno-7-3" href="#__codelineno-7-3"></a>                Type: Boolean
-<a id="__codelineno-7-4" name="__codelineno-7-4" href="#__codelineno-7-4"></a>             Default: false
-</code></pre></div>
-<div class="admonition note">
-<p class="admonition-title">Note</p>
-<p>Images may still be pulled due to Docker API limitations for digest comparison.</p>
-<p>Can be set per container via the <code>com.centurylinklabs.watchtower.monitor-only</code> label.</p>
-<p>See <a href="../container-selection/#label_precedence">Label Precedence</a>.</p>
-</div>
-<h2 id="disable_image_pulling">Disable Image Pulling<a class="headerlink" href="#disable_image_pulling" title="Permanent link">&para;</a></h2>
-<p>Prevents pulling new images from registries, monitoring only local image cache changes.
-Useful for locally built images.</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-8-1" name="__codelineno-8-1" href="#__codelineno-8-1"></a>            Argument: --no-pull
-<a id="__codelineno-8-2" name="__codelineno-8-2" href="#__codelineno-8-2"></a>Environment Variable: WATCHTOWER_NO_PULL
-<a id="__codelineno-8-3" name="__codelineno-8-3" href="#__codelineno-8-3"></a>                Type: Boolean
-<a id="__codelineno-8-4" name="__codelineno-8-4" href="#__codelineno-8-4"></a>             Default: false
-</code></pre></div>
-<div class="admonition note">
-<p class="admonition-title">Note</p>
-<p>Can be set per container via the <code>com.centurylinklabs.watchtower.no-pull</code> label.</p>
-<p>The HTTP API <a href="../../http-api/endpoints/check/"><code>/v1/check</code></a> endpoint also respects no-pull and inspects the local cache only.</p>
-<p>No-pull also skips <a href="../../advanced-features/git-monitoring/">Git monitoring</a> rebuilds.
-<code>/v1/check</code> reports no update for a Git-watched container while no-pull applies to it.</p>
-<p>See <a href="../container-selection/#label_precedence">Label Precedence</a>.</p>
-</div>
-<h2 id="ephemeral_self-update">Ephemeral Self-Update<a class="headerlink" href="#ephemeral_self-update" title="Permanent link">&para;</a></h2>
-<p>Uses a short-lived orchestrator container to perform Watchtower self-updates instead of the default rename-based approach.</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-9-1" name="__codelineno-9-1" href="#__codelineno-9-1"></a>            Argument: --ephemeral-self-update
-<a id="__codelineno-9-2" name="__codelineno-9-2" href="#__codelineno-9-2"></a>Environment Variable: WATCHTOWER_EPHEMERAL_SELF_UPDATE
+<h2 id="git_insecure_skip_tls">Git Insecure Skip TLS<a class="headerlink" href="#git_insecure_skip_tls" title="Permanent link">&para;</a></h2>
+<p>Skip TLS verification for Git HTTPS.
+Applied to clone, ls-remote, REST probes, and local path project checkout.</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-9-1" name="__codelineno-9-1" href="#__codelineno-9-1"></a>            Argument: --git-insecure-skip-tls
+<a id="__codelineno-9-2" name="__codelineno-9-2" href="#__codelineno-9-2"></a>Environment Variable: WATCHTOWER_GIT_INSECURE_SKIP_TLS
 <a id="__codelineno-9-3" name="__codelineno-9-3" href="#__codelineno-9-3"></a>                Type: Boolean
 <a id="__codelineno-9-4" name="__codelineno-9-4" href="#__codelineno-9-4"></a>             Default: false
 </code></pre></div>
-<div class="admonition warning">
-<p class="admonition-title">This is an experimental feature.</p>
-</div>
+<h2 id="git_dockerfile">Git Dockerfile<a class="headerlink" href="#git_dockerfile" title="Permanent link">&para;</a></h2>
+<p>Default Dockerfile path relative to the build context.
+Used when a container does not set <code>com.centurylinklabs.watchtower.git-dockerfile</code>.
+Empty means <code>Dockerfile</code> in the build context.</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-10-1" name="__codelineno-10-1" href="#__codelineno-10-1"></a>            Argument: --git-dockerfile
+<a id="__codelineno-10-2" name="__codelineno-10-2" href="#__codelineno-10-2"></a>Environment Variable: WATCHTOWER_GIT_DOCKERFILE
+<a id="__codelineno-10-3" name="__codelineno-10-3" href="#__codelineno-10-3"></a>                Type: String
+<a id="__codelineno-10-4" name="__codelineno-10-4" href="#__codelineno-10-4"></a>             Default: (empty)
+</code></pre></div>
 <div class="admonition note">
 <p class="admonition-title">Note</p>
-<p>The ephemeral self-update mechanism is only active when Watchtower is running in normal daemon mode.
-When Watchtower is started with the <a href="../scheduling/#run_once"><code>run-once</code></a> configuration option, this flag is ignored because the process exits immediately after the initial update pass and there is no continuously running instance to replace.
-See <a href="../../advanced-features/ephemeral-self-updates/">Advanced Features - Ephemeral Self-Updates</a> for details on how this mechanism works.</p>
+<p>See <a href="../../advanced-features/git-monitoring/#labels">Git Monitoring</a>.
+Watchtower's own image uses <code>build/docker/Dockerfile</code> with the repository root as the context.</p>
 </div>
+<h2 id="git_context">Git Context<a class="headerlink" href="#git_context" title="Permanent link">&para;</a></h2>
+<p>Default subdirectory of a Git URL context sent to the Docker daemon as the build context.
+Used when a container does not set <code>com.centurylinklabs.watchtower.git-context</code>.
+Empty means the repository root.</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-11-1" name="__codelineno-11-1" href="#__codelineno-11-1"></a>            Argument: --git-context
+<a id="__codelineno-11-2" name="__codelineno-11-2" href="#__codelineno-11-2"></a>Environment Variable: WATCHTOWER_GIT_CONTEXT
+<a id="__codelineno-11-3" name="__codelineno-11-3" href="#__codelineno-11-3"></a>                Type: String
+<a id="__codelineno-11-4" name="__codelineno-11-4" href="#__codelineno-11-4"></a>             Default: (empty)
+</code></pre></div>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>See <a href="../../advanced-features/git-monitoring/#labels">Git Monitoring</a>.
+Keep the context at the repository root when the Dockerfile <code>COPY</code>s files from outside its directory.</p>
+</div>
+<h2 id="git_compose_stash">Git Compose Stash<a class="headerlink" href="#git_compose_stash" title="Permanent link">&para;</a></h2>
+<p>Save local files in a Compose project directory, check out the monitored commit, then write those files back.
+Use this when the project has local files that are not gitignored, such as an extra <code>.env</code>.
+When false, a dirty worktree aborts Compose apply.
+Compose interpolates that project's <code>.env</code>. It does not interpolate Watchtower's process environment.</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-12-1" name="__codelineno-12-1" href="#__codelineno-12-1"></a>            Argument: --git-compose-stash
+<a id="__codelineno-12-2" name="__codelineno-12-2" href="#__codelineno-12-2"></a>Environment Variable: WATCHTOWER_GIT_COMPOSE_STASH
+<a id="__codelineno-12-3" name="__codelineno-12-3" href="#__codelineno-12-3"></a>                Type: Boolean
+<a id="__codelineno-12-4" name="__codelineno-12-4" href="#__codelineno-12-4"></a>             Default: false
+</code></pre></div>
+<h2 id="compose_project">Compose Project<a class="headerlink" href="#compose_project" title="Permanent link">&para;</a></h2>
+<p>Maps a Docker Compose project name to a directory inside Watchtower.
+Format: <code>name=/path</code>. Repeatable, newline-separated.</p>
+<p>This is an explicit opt-in for a <a href="../../advanced-features/git-monitoring/#local_path_context">local path context</a>, together with <code>com.centurylinklabs.watchtower.compose-dir</code>.
+Watchtower does not infer a project from <code>com.docker.compose.project.working_dir</code>.
+Each applied container needs <code>com.docker.compose.service</code>.</p>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>See <a href="../../advanced-features/git-monitoring/#local_path_context">Local path context</a>.</p>
+</div>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-13-1" name="__codelineno-13-1" href="#__codelineno-13-1"></a>            Argument: --compose-project
+<a id="__codelineno-13-2" name="__codelineno-13-2" href="#__codelineno-13-2"></a>Environment Variable: WATCHTOWER_COMPOSE_PROJECT
+<a id="__codelineno-13-3" name="__codelineno-13-3" href="#__codelineno-13-3"></a>                Type: List
+<a id="__codelineno-13-4" name="__codelineno-13-4" href="#__codelineno-13-4"></a>             Default: (empty)
+</code></pre></div>
 
 
 
@@ -3170,7 +3258,7 @@ See <a href="../../advanced-features/ephemeral-self-updates/">Advanced Features 
     <span class="md-icon" title="Created">
       <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M14.47 15.08 11 13V7h1.5v5.25l3.08 1.83c-.41.28-.79.62-1.11 1m-1.39 4.84c-.36.05-.71.08-1.08.08-4.42 0-8-3.58-8-8s3.58-8 8-8 8 3.58 8 8c0 .37-.03.72-.08 1.08.69.1 1.33.32 1.92.64.1-.56.16-1.13.16-1.72 0-5.5-4.5-10-10-10S2 6.5 2 12s4.47 10 10 10c.59 0 1.16-.06 1.72-.16-.32-.59-.54-1.23-.64-1.92M18 15v3h-3v2h3v3h2v-3h3v-2h-3v-3z"/></svg>
     </span>
-    <span class="git-revision-date-localized-plugin git-revision-date-localized-plugin-timeago" title="July 14, 2026 14:36:11 UTC"><span class="timeago" datetime="2026-07-14T14:36:11+00:00" locale="en"></span></span><span class="git-revision-date-localized-plugin git-revision-date-localized-plugin-iso_date" title="July 14, 2026 14:36:11 UTC">2026-07-14</span>
+    <span class="git-revision-date-localized-plugin git-revision-date-localized-plugin-timeago" title="September 29, 2026 16:46:40 UTC"><span class="timeago" datetime="2026-09-29T16:46:40+00:00" locale="en"></span></span><span class="git-revision-date-localized-plugin git-revision-date-localized-plugin-iso_date" title="September 29, 2026 16:46:40 UTC">2026-09-29</span>
   </span>
 
     
