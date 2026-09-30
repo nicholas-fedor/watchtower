@@ -14,6 +14,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Chores
 
+- Update module github.com/docker/cli to v29.8.2+incompatible by @renovate[bot] in [#2471](https://github.com/nicholas-fedor/watchtower/pull/2471)
 - Update module github.com/go-git/gcfg to v2 by @renovate[bot] in [#2464](https://github.com/nicholas-fedor/watchtower/pull/2464)
 - Revert compose-go to v2.15.0 by @nicholas-fedor in [#2465](https://github.com/nicholas-fedor/watchtower/pull/2465)
 - Update module github.com/compose-spec/compose-go/v2 to v2.16.1 by @renovate[bot] in [#2462](https://github.com/nicholas-fedor/watchtower/pull/2462)
