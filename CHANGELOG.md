@@ -18,6 +18,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Chores
 
+- Update module github.com/tinylib/msgp to v1.6.5 by @renovate[bot] in [#2480](https://github.com/nicholas-fedor/watchtower/pull/2480)
+- Update module github.com/cenkalti/backoff/v7 to v7.0.1 by @renovate[bot] in [#2476](https://github.com/nicholas-fedor/watchtower/pull/2476)
 - Update module github.com/moby/buildkit to v0.33.1 by @renovate[bot] in [#2477](https://github.com/nicholas-fedor/watchtower/pull/2477)
 - Update module github.com/go-git/gcfg to v2 by @renovate[bot] in [#2468](https://github.com/nicholas-fedor/watchtower/pull/2468)
 - Update docker/dockerfile:1 docker digest to 4edf897 by @renovate[bot] in [#2470](https://github.com/nicholas-fedor/watchtower/pull/2470)
