@@ -254,8 +254,8 @@ github.com/maypok86/otter/v2 v2.3.0 h1:8H8AVVFUSzJwIegKwv1uF5aGitTY+AIrtktg7OcLs
 github.com/maypok86/otter/v2 v2.3.0/go.mod h1:XgIdlpmL6jYz882/CAx1E4C1ukfgDKSaw4mWq59+7l8=
 github.com/mfridman/tparse v0.18.0 h1:wh6dzOKaIwkUGyKgOntDW4liXSo37qg5AXbIhkMV3vE=
 github.com/mfridman/tparse v0.18.0/go.mod h1:gEvqZTuCgEhPbYk/2lS3Kcxg1GmTxxU7kTC8DvP0i/A=
-github.com/moby/buildkit v0.33.0 h1:zBbt1FiMcTB/oFg1iCNcKa83k5Rn8MGcVjXFIcfYhuQ=
-github.com/moby/buildkit v0.33.0/go.mod h1:uNKSZnfMk1aSa18JiCR5BT68M/3jIDGo6XuAByUK3ek=
+github.com/moby/buildkit v0.33.1 h1:UUrdifmRdRadykO+f5l8BT1CseUXst2sJHV7AmkjjxE=
+github.com/moby/buildkit v0.33.1/go.mod h1:584wW8T/WG4O+lpXUCoDaWEc5e+rTGC3iP+l9mNcX8E=
 github.com/moby/docker-image-spec v1.3.1 h1:jMKff3w6PgbfSa69GfNg+zN/XLhfXJGnEx3Nl2EsFP0=
 github.com/moby/docker-image-spec v1.3.1/go.mod h1:eKmb5VW8vQEh/BAr2yvVNvuiJuY6UIocYsFu/DxxRpo=
 github.com/moby/go-archive v0.3.3 h1:OxxR9paxsluYi+zDUEXTTaIxtkK3viymW+Ka7vRhhME=
