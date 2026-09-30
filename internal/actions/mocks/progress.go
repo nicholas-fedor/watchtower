@@ -3,6 +3,7 @@ package mocks
 
 import (
 	"errors"
+
 	"github.com/rs/zerolog"
 
 	"github.com/nicholas-fedor/watchtower/pkg/session"

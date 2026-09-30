@@ -54,20 +54,48 @@ func FuzzApplyVars(f *testing.F) {
 
 // FuzzDerivedReleasesURL verifies release URL derivation never panics.
 func FuzzDerivedReleasesURL(f *testing.F) {
-	f.Add("https://github.com/org/app.git", "")
-	f.Add("https://gitlab.com/org/app.git", "")
-	f.Add("https://codeberg.org/org/app.git", "")
-	f.Add("https://git.example.com/org/app.git", "https://git.example.com/api/v1")
-	f.Add("https://unknown.example/org/app.git", "")
-	f.Add("", "")
+	f.Add("https://github.com/org/app.git", "", "")
+	f.Add("https://gitlab.com/org/app.git", "", "v1.2.3")
+	f.Add("https://codeberg.org/org/app.git", "", "release/1.2.3")
+	f.Add("https://git.example.com/org/app.git", "https://git.example.com/api/v1", "")
+	f.Add("https://unknown.example/org/app.git", "", "v1.2.3")
+	f.Add("", "", "")
 
-	f.Fuzz(func(t *testing.T, repo, extra string) {
-		got := derivedReleasesURL(repo, extra)
+	f.Fuzz(func(t *testing.T, repo, extra, tag string) {
+		got := derivedReleasesURL(repo, extra, tag)
 		if got == "" {
 			return
 		}
 
 		assert.True(t, strings.HasPrefix(got, "http://") || strings.HasPrefix(got, "https://"), got)
 		assert.NotContains(t, got, "..")
+	})
+}
+
+// FuzzSafeReleaseTag verifies tag admission never panics and never admits a
+// tag that could restructure the derived release path.
+func FuzzSafeReleaseTag(f *testing.F) {
+	f.Add("v1.2.3")
+	f.Add("1.2.3")
+	f.Add("release/1.2.3")
+	f.Add("..")
+	f.Add("/")
+	f.Add("")
+	f.Add("1.2.3?a=b")
+
+	f.Fuzz(func(t *testing.T, tag string) {
+		if !safeReleaseTag(tag) {
+			return
+		}
+
+		assert.NotEmpty(t, tag)
+		assert.NotContains(t, tag, "..")
+		assert.NotContains(t, tag, "?")
+
+		for part := range strings.SplitSeq(tag, "/") {
+			assert.NotEqual(t, ".", part)
+			assert.NotEqual(t, "..", part)
+			assert.NotEmpty(t, part)
+		}
 	})
 }

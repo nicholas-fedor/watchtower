@@ -13,6 +13,7 @@ type UpdateParams struct {
 	Timeout             time.Duration       `json:"timeout"`                // Update timeout.
 	MonitorOnly         bool                `json:"monitor_only"`           // Monitor without updating if true.
 	NoPull              bool                `json:"no_pull"`                // Skip image pulls if true.
+	EnableChangelog     bool                `json:"enable_changelog"`       // Resolve a release-notes link in notifications if true.
 	LifecycleHooks      bool                `json:"lifecycle_hooks"`        // Enable lifecycle hooks if true.
 	RollingRestart      bool                `json:"rolling_restart"`        // Use rolling restart if true.
 	LabelPrecedence     bool                `json:"label_precedence"`       // Prioritize labels if true.

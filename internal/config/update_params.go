@@ -33,6 +33,7 @@ func (c Config) UpdateParams(overrides RunOverrides) types.UpdateParams {
 		Timeout:             c.Update.StopTimeout,
 		MonitorOnly:         c.Update.MonitorOnly,
 		NoPull:              c.Update.NoPull,
+		EnableChangelog:     c.Update.EnableChangelog,
 		LifecycleHooks:      c.Lifecycle.Enabled,
 		RollingRestart:      c.Update.RollingRestart,
 		LabelPrecedence:     c.Update.LabelPrecedence,

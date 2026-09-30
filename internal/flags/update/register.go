@@ -34,6 +34,13 @@ func Specs() []spec.FlagSpec {
 			Help:    "Do not pull any new images",
 		},
 		{
+			Name:    "enable-changelog",
+			Kind:    spec.KindBool,
+			Default: false,
+			EnvKeys: []string{"WATCHTOWER_ENABLE_CHANGELOG"},
+			Help:    "Include a release-notes link in notifications. Resolving the exact release tag adds one or two extra registry requests per updated container",
+		},
+		{
 			Name:    "no-restart",
 			Kind:    spec.KindBool,
 			Default: false,

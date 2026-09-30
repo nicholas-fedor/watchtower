@@ -120,8 +120,20 @@ func marshalReports(reports []types.ContainerReport) []jsonMap {
 			jsonReports[i]["documentation"] = documentation
 		}
 
-		if revision := report.Revision(); revision != "" {
-			jsonReports[i]["revision"] = revision
+		if currentRevision := report.CurrentImageRevision(); currentRevision != "" {
+			jsonReports[i]["currentImageRevision"] = currentRevision
+		}
+
+		if latestRevision := report.LatestImageRevision(); latestRevision != "" {
+			jsonReports[i]["latestImageRevision"] = latestRevision
+		}
+
+		if currentVersion := report.CurrentImageVersion(); currentVersion != "" {
+			jsonReports[i]["currentImageVersion"] = currentVersion
+		}
+
+		if latestVersion := report.LatestImageVersion(); latestVersion != "" {
+			jsonReports[i]["latestImageVersion"] = latestVersion
 		}
 	}
 

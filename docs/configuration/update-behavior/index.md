@@ -172,6 +172,33 @@ Environment Variable: WATCHTOWER_NO_PULL
 
     See [Label Precedence](../container-selection/index.md#label_precedence).
 
+## Changelog Links
+
+Adds a release-notes link to notifications, and resolves that link to the exact release being installed rather than the release index.
+
+```text
+            Argument: --enable-changelog
+Environment Variable: WATCHTOWER_ENABLE_CHANGELOG
+                Type: Boolean
+             Default: false
+```
+
+!!! Warning "Extra registry requests"
+    Resolving the exact release tag requires confirming which tag the maintainer actually published.
+    Watchtower issues one or two extra manifest requests per updated container on a registry it has already contacted, which roughly doubles that session's manifest requests for the update.
+
+    This is why the option is off by default.
+    With it off, `.Changelog` still resolves to the unversioned release index and costs no requests.
+    A Git-monitored container never needs the lookup, because its tag is already known.
+
+!!! Note
+    Can be set per container via the `com.centurylinklabs.watchtower.enable-changelog` label.
+
+    The `com.centurylinklabs.watchtower.changelog-url` label supplies a changelog URL template but does **not** enable this option.
+    A template that references `{tag}` stays unresolved until the option is turned on for that container.
+
+    See [Label Precedence](../container-selection/index.md#label_precedence) and [Notification Templates](../../notifications/templates/index.md).
+
 ## Ephemeral Self-Update
 
 Uses a short-lived orchestrator container to perform Watchtower self-updates instead of the default rename-based approach.

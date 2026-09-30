@@ -14,6 +14,11 @@ type Update struct {
 	// NoPull skips pulling new images from the registry
 	// (--no-pull / WATCHTOWER_NO_PULL).
 	NoPull bool
+	// EnableChangelog turns on the changelog notification line and the versioned
+	// release link. It is off by default because resolving the exact release tag
+	// costs one or two extra registry manifest requests per updated container
+	// (--enable-changelog / WATCHTOWER_ENABLE_CHANGELOG).
+	EnableChangelog bool
 	// NoRestart prevents containers from being restarted after an update
 	// (--no-restart / WATCHTOWER_NO_RESTART).
 	NoRestart bool

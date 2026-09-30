@@ -46,6 +46,7 @@ func TestUpdateParamsAssignsEveryField(t *testing.T) {
 			CooldownDelay:       24 * time.Hour,
 			UseComposeDependsOn: true,
 			LabelPrecedence:     true,
+			EnableChangelog:     true,
 			EphemeralSelfUpdate: true,
 			PullFailureDelay:    5 * time.Second,
 			DiskSpaceMaxBytes:   40_000_000_000,
@@ -98,6 +99,7 @@ func TestUpdateParamsAssignsEveryField(t *testing.T) {
 	assert.True(t, params.LifecycleHooks)
 	assert.False(t, params.RollingRestart)
 	assert.True(t, params.LabelPrecedence)
+	assert.True(t, params.EnableChangelog)
 	assert.Equal(t, 5*time.Second, params.PullFailureDelay)
 	assert.Equal(t, 1000, params.LifecycleUID)
 	assert.Equal(t, 1000, params.LifecycleGID)

@@ -15,6 +15,7 @@ import (
 	dockerImage "github.com/moby/moby/api/types/image"
 	dockerClient "github.com/moby/moby/client"
 
+	"github.com/nicholas-fedor/watchtower/pkg/container/oci"
 	"github.com/nicholas-fedor/watchtower/pkg/registry"
 	"github.com/nicholas-fedor/watchtower/pkg/registry/auth"
 	"github.com/nicholas-fedor/watchtower/pkg/registry/digest"
@@ -578,6 +579,54 @@ func logImageRemovalDetails(log *zerolog.Logger, items []dockerImage.DeleteRespo
 		Str("image_name", imageName).
 		Str("untagged", untagged.String()).
 		Msg("Image removal details")
+}
+
+// GetImageAnnotations reads the OCI annotations of an image by reference.
+//
+// This is a local Docker daemon inspect, not a registry request, so it never
+// counts against a registry rate limit. It resolves the new image's annotations
+// after a pull, which the running container's inspect cannot provide.
+//
+// A failed inspect is not an error for the caller: an image that is absent or
+// unreadable simply has no annotations, and metadata must never fail a session.
+//
+// Parameters:
+//   - ctx: Context for operation control.
+//   - imageRef: Image reference, tag or digest, to inspect.
+//
+// Returns:
+//   - oci.Annotations: Annotations from the image config labels, or empty.
+func (c imageClient) GetImageAnnotations(
+	ctx context.Context,
+	imageRef string,
+) oci.Annotations {
+	clogVal := c.logger().With().Str("image", imageRef).Logger()
+	clog := &clogVal
+
+	if imageRef == "" {
+		return oci.Annotations{}
+	}
+
+	imageInfo, err := c.api.ImageInspect(ctx, imageRef)
+	if err != nil {
+		clog.Debug().
+			Err(err).
+			Msg("Failed to inspect image for OCI annotations")
+
+		return oci.Annotations{}
+	}
+
+	if imageInfo.Config == nil {
+		return oci.Annotations{}
+	}
+
+	anns := oci.FromLabels(imageInfo.Config.Labels)
+	clog.Debug().
+		Str("version", anns.Version).
+		Str("revision", anns.Revision).
+		Msg("Read OCI annotations from image")
+
+	return anns
 }
 
 // logger returns the image client's logger, or a discarded nop if unset.

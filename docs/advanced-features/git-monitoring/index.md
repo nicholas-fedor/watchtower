@@ -473,9 +473,12 @@ Annotated tags are resolved to the peeled commit, not the tag object.
 
 ### Notifications
 
-A custom [notification template](../../notifications/templates/index.md#git_and_oci_report_fields) can print `.Changelog`, `.GitRepo`, `.GitRef`, `.Source`, and `.Revision` for each updated container.
-`.GitRef` is also where a semver-shaped OCI `org.opencontainers.image.version` appears when the container is not associated with Git.
-That is one value, not the old version and the new version.
+A custom [notification template](../../notifications/templates/index.md#git_and_oci_report_fields) can print `.Changelog`, `.GitRepo`, `.GitRef`, `.Source`, `.CurrentImageVersion`, `.LatestImageVersion`, `.CurrentImageRevision`, and `.LatestImageRevision` for each updated container.
+`.GitRef` is the configured Git ref and nothing else.
+A semver-shaped OCI `org.opencontainers.image.version` is never copied into it.
+A Git rebuild has no pulled image, so `.LatestImageVersion` and `.LatestImageRevision` stay empty and the new version comes from the resolved Git tag through the changelog `{tag}` placeholder.
+A container Watchtower rebuilds from Git needs no release tag lookup, so enabling [`--enable-changelog`](../../configuration/update-behavior/index.md#changelog_links) costs such a container nothing.
+A container that only carries Git labels, but is still updated from its registry image, needs the lookup like any other registry update.
 
 The built-in report template adds the ref and the changelog to an updated container when they are set.
 With report mode off, a Git update sends `Found new Git revision`, then `Built image` for a Git URL build, then the same stop and start lines as a registry update. Compose sends the found line once, then those stop and start lines for each recreated container. It does not send a built-image line. The identity is `host/path@tag` or `host/path@branch`, with a 12-character commit. The log still records the full commit.
@@ -860,7 +863,8 @@ Repeatable values are newline-separated.
 | `com.centurylinklabs.watchtower.git-dockerfile` | path relative to the build context | Dockerfile for a Git URL context. Defaults to `Dockerfile`, or the [Git Dockerfile](../../configuration/git-monitoring/index.md#git_dockerfile) configuration option |
 | `com.centurylinklabs.watchtower.git-context` | subdirectory of the Git repository | Git URL context subdirectory (`#commit:subdir`). Defaults to the [Git Context](../../configuration/git-monitoring/index.md#git_context) configuration option |
 | `com.centurylinklabs.watchtower.compose-dir` | path inside Watchtower | Opts this service into a [local path context](#local_path_context) |
-| `com.centurylinklabs.watchtower.changelog` | URL template | Optional notification changelog URL |
+| `com.centurylinklabs.watchtower.changelog-url` | URL template | Optional notification changelog URL. Does not enable [`--enable-changelog`](../../configuration/update-behavior/index.md#changelog_links) |
+| `com.centurylinklabs.watchtower.enable-changelog` | loose boolean | Enables the changelog notification line and the versioned release link for this container |
 
 #### Stamp Labels
 
@@ -1027,7 +1031,7 @@ Set `com.centurylinklabs.watchtower.git-host` on **that container** to the HTTP 
 Watchtower then uses that URL for ref checks.
 It derives a releases link when the built-in hostname identifies the provider, or when the API origin has one exact path prefix named `github`, `gitlab`, `gitea`, `forgejo`, or `codeberg`.
 A pathless self-hosted origin such as `https://git.example.com:3000` does not identify the provider, so Watchtower does not guess a changelog link.
-Set `com.centurylinklabs.watchtower.changelog` when a custom server needs a different release-page layout.
+Set `com.centurylinklabs.watchtower.changelog-url` when a custom server needs a different release-page layout.
 If the server is not GitHub, GitLab, Gitea, or Forgejo, Watchtower still asks Git.
 
 This label does not turn monitoring on, choose the repository, or supply credentials.

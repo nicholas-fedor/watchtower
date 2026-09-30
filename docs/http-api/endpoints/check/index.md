@@ -69,6 +69,8 @@ The `/v1/check` endpoint returns a JSON array of container check results:
             "git_commit": "abc123def456",
             "changelog": "https://github.com/org/app/releases",
             "oci_source": "https://github.com/org/app",
+            "current_image_version": "1.2.3",
+            "current_revision": "1111111111",
             "timestamp": "2025-01-20T11:30:45Z"
         }
     ],
@@ -89,7 +91,12 @@ The `/v1/check` endpoint returns a JSON array of container check results:
 - `error`: Per-container error message when the check failed
 - `update_source`: `registry` or `git` (the staleness path; not OCI `source`)
 - `git_repo`, `git_ref`, `changelog`: Resolved Git metadata when present
-- `oci_source`, `image_url`, `documentation`, `revision`: OCI image annotations when present
+- `oci_source`, `image_url`, `documentation`: OCI image annotations when present
+- `current_image_version`, `current_revision`: OCI `version` and `revision` of the running image when present
+
+!!! Note "No latest version here"
+    This endpoint never pulls an image, so `latest_image_version` and `latest_revision` are always empty.
+    Use `update_available` and `latest_digest` to detect a pending update, and read the new version from a [notification template](../../../notifications/templates/index.md#git_and_oci_report_fields) after the update session runs.
 
 Containers associated for Git watching use the same watch split as scheduled updates.
 The check does not clone or build.

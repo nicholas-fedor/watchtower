@@ -225,6 +225,7 @@ func loadUpdate(log *zerolog.Logger, vCfg *viper.Viper, flagSet *pflag.FlagSet) 
 	return update.Update{
 		Cleanup:             vCfg.GetBool("cleanup"),
 		NoPull:              vCfg.GetBool("no-pull"),
+		EnableChangelog:     vCfg.GetBool("enable-changelog"),
 		NoRestart:           vCfg.GetBool("no-restart"),
 		MonitorOnly:         vCfg.GetBool("monitor-only"),
 		RollingRestart:      vCfg.GetBool("rolling-restart"),

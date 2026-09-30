@@ -628,6 +628,12 @@ const docTemplate = `{
                 "changelog": {
                     "type": "string"
                 },
+                "current_image_version": {
+                    "type": "string"
+                },
+                "current_revision": {
+                    "type": "string"
+                },
                 "digest": {
                     "type": "string"
                 },
@@ -661,13 +667,16 @@ const docTemplate = `{
                 "latest_image_id": {
                     "type": "string"
                 },
+                "latest_image_version": {
+                    "type": "string"
+                },
+                "latest_revision": {
+                    "type": "string"
+                },
                 "name": {
                     "type": "string"
                 },
                 "oci_source": {
-                    "type": "string"
-                },
-                "revision": {
                     "type": "string"
                 },
                 "timestamp": {

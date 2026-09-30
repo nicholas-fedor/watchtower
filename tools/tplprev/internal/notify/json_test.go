@@ -5,10 +5,9 @@ import (
 	"testing"
 	"time"
 
+	"github.com/nicholas-fedor/tplprev/internal/report"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-
-	"github.com/nicholas-fedor/tplprev/internal/report"
 )
 
 type stubReport struct {
@@ -47,6 +46,14 @@ func (c stubContainerError) IsMonitorOnly() bool                { return false }
 func (c stubContainerError) NewContainerID() report.ContainerID { return "" }
 func (c stubContainerError) GitRef() string                     { return "" }
 func (c stubContainerError) Changelog() string                  { return "" }
+
+func (c stubContainerError) CurrentImageVersion() string { return "" }
+
+func (c stubContainerError) LatestImageVersion() string { return "" }
+
+func (c stubContainerError) CurrentImageRevision() string { return "" }
+
+func (c stubContainerError) LatestImageRevision() string { return "" }
 
 func TestDataMarshalJSON(t *testing.T) {
 	t.Parallel()

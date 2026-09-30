@@ -25,4 +25,8 @@ type ContainerReport interface {
 	NewContainerID() ContainerID
 	GitRef() string
 	Changelog() string
+	CurrentImageVersion() string
+	LatestImageVersion() string
+	CurrentImageRevision() string
+	LatestImageRevision() string
 }

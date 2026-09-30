@@ -18,6 +18,7 @@ import (
 	"github.com/nicholas-fedor/watchtower/internal/git/project"
 	"github.com/nicholas-fedor/watchtower/pkg/container"
 	gitPkg "github.com/nicholas-fedor/watchtower/pkg/container/git"
+	"github.com/nicholas-fedor/watchtower/pkg/container/oci"
 	"github.com/nicholas-fedor/watchtower/pkg/session"
 	"github.com/nicholas-fedor/watchtower/pkg/sorter"
 	"github.com/nicholas-fedor/watchtower/pkg/types"
@@ -537,7 +538,15 @@ func (s *gitSession) buildOne(
 
 	if progress != nil {
 		progress.SetLatestImage(log, c.ID(), imageID)
-		progress.RefreshChangelog(c, params, result.Tag, result.Commit)
+		// A Git rebuild has no pulled image, so no latest image annotations are
+		// passed and LatestImageVersion stays empty. The resolved Git tag is the
+		// only new version available for this path.
+		meta := progress.SetLatestImageMeta(log, c, params, container.ChangelogVars{
+			Tag:    result.Tag,
+			Commit: result.Commit,
+		}, oci.Annotations{})
+
+		logChangelog(log, c, params, meta)
 	}
 
 	withGitMeta(log.Info().
@@ -574,7 +583,7 @@ func withGitMeta(
 	meta := container.ResolveReportMeta(c, params, container.ChangelogVars{
 		Tag:    tag,
 		Commit: commit,
-	})
+	}, oci.Annotations{})
 	if meta.GitRepo != "" {
 		evt = evt.Str("repo", meta.GitRepo)
 	}

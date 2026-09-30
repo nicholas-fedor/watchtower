@@ -17,6 +17,7 @@ import (
 
 	"github.com/nicholas-fedor/watchtower/pkg/container"
 	gitPkg "github.com/nicholas-fedor/watchtower/pkg/container/git"
+	"github.com/nicholas-fedor/watchtower/pkg/container/oci"
 	"github.com/nicholas-fedor/watchtower/pkg/types"
 	mockTypes "github.com/nicholas-fedor/watchtower/pkg/types/mocks"
 )
@@ -1568,36 +1569,101 @@ func TestProgressSetLatestImage(t *testing.T) {
 	assert.NotContains(t, progress, types.ContainerID("missing"))
 }
 
-func TestProgressRefreshChangelog(t *testing.T) {
+func TestProgressSetLatestImageMeta(t *testing.T) {
 	t.Parallel()
 
 	t.Run("nil container", func(t *testing.T) {
 		t.Parallel()
 
-		Progress{}.RefreshChangelog(nil, types.UpdateParams{}, "v1.0.0", "abc")
+		meta := Progress{}.SetLatestImageMeta(
+			testLog(),
+			nil,
+			types.UpdateParams{},
+			container.ChangelogVars{},
+			oci.Annotations{},
+		)
+		assert.Equal(t, container.ReportMeta{}, meta)
 	})
 
 	t.Run("unknown container", func(t *testing.T) {
 		t.Parallel()
 
 		c := reportTestContainer(t, map[string]string{
-			gitPkg.ChangelogLabel: "https://example.com/{tag}",
+			gitPkg.ChangelogURLLabel: "https://example.com/{tag}",
 		})
-		Progress{}.RefreshChangelog(c, types.UpdateParams{}, "v1.0.0", "abc")
+		meta := Progress{}.SetLatestImageMeta(
+			testLog(),
+			c,
+			types.UpdateParams{},
+			container.ChangelogVars{Tag: "v1.0.0"},
+			oci.Annotations{},
+		)
+		assert.Equal(t, container.ReportMeta{}, meta)
 	})
 
 	t.Run("substitutes new tag", func(t *testing.T) {
 		t.Parallel()
 
 		c := reportTestContainer(t, map[string]string{
-			gitPkg.RepoLabel:      "https://github.com/org/app.git",
-			gitPkg.ChangelogLabel: "https://example.com/notes/{tag}",
+			gitPkg.RepoLabel:         "https://github.com/org/app.git",
+			gitPkg.ChangelogURLLabel: "https://example.com/notes/{tag}",
 		})
 		status := UpdateFromContainer(testLog(), c, "img", ScannedState, types.UpdateParams{})
 		progress := Progress{c.ID(): status}
 
-		progress.RefreshChangelog(c, types.UpdateParams{}, "v1.2.3", "deadbeef")
+		progress.SetLatestImageMeta(
+			testLog(),
+			c,
+			types.UpdateParams{},
+			container.ChangelogVars{Tag: "v1.2.3", Commit: "deadbeef"},
+			oci.Annotations{},
+		)
 		assert.Equal(t, "https://example.com/notes/v1.2.3", status.Changelog())
+	})
+
+	t.Run("derives a versioned releases url from a probed tag", func(t *testing.T) {
+		t.Parallel()
+
+		c := reportTestContainer(t, map[string]string{
+			gitPkg.RepoLabel: "https://github.com/org/app.git",
+		})
+		status := UpdateFromContainer(testLog(), c, "img", ScannedState, types.UpdateParams{})
+		progress := Progress{c.ID(): status}
+
+		meta := progress.SetLatestImageMeta(
+			testLog(),
+			c,
+			types.UpdateParams{},
+			container.ChangelogVars{Tag: "v1.2.3"},
+			oci.Annotations{Version: "1.2.3", Revision: "newrev"},
+		)
+
+		assert.Equal(t, "https://github.com/org/app/releases/tag/v1.2.3", meta.Changelog)
+		assert.Equal(t, "https://github.com/org/app/releases/tag/v1.2.3", status.Changelog())
+		assert.Equal(t, "1.2.3", status.LatestImageVersion())
+		assert.Equal(t, "newrev", status.LatestImageRevision())
+		assert.Empty(t, status.CurrentImageVersion())
+	})
+
+	t.Run("a git rebuild leaves the latest version empty", func(t *testing.T) {
+		t.Parallel()
+
+		c := reportTestContainer(t, map[string]string{
+			gitPkg.RepoLabel: "https://github.com/org/app.git",
+		})
+		status := UpdateFromContainer(testLog(), c, "img", ScannedState, types.UpdateParams{})
+		progress := Progress{c.ID(): status}
+
+		progress.SetLatestImageMeta(
+			testLog(),
+			c,
+			types.UpdateParams{},
+			container.ChangelogVars{Tag: "v9.9.9", Commit: "deadbeef"},
+			oci.Annotations{},
+		)
+
+		assert.Equal(t, "https://github.com/org/app/releases/tag/v9.9.9", status.Changelog())
+		assert.Empty(t, status.LatestImageVersion())
 	})
 }
 
