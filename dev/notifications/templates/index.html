@@ -1429,6 +1429,39 @@
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
+  <a href="#changelog_resolution" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Changelog resolution
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#versioned_release_links" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Versioned release links
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#changelog_in_the_legacy_notification" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Changelog in the legacy notification
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
   <a href="#log_lines_from_a_git_update" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -3056,6 +3089,39 @@
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
+  <a href="#changelog_resolution" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Changelog resolution
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#versioned_release_links" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Versioned release links
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#changelog_in_the_legacy_notification" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Changelog in the legacy notification
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
   <a href="#log_lines_from_a_git_update" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -3386,11 +3452,11 @@ They are populated even when Git monitoring is off.</p>
 </tr>
 <tr>
 <td style="text-align: left;"><code>.GitRef</code></td>
-<td style="text-align: left;"><code>com.centurylinklabs.watchtower.git-ref</code> (or <code>com.centurylinklabs.watchtower.git-branch</code>), else mapping ref, else OCI version when it looks like a tag</td>
+<td style="text-align: left;"><code>com.centurylinklabs.watchtower.git-ref</code> (or <code>com.centurylinklabs.watchtower.git-branch</code>), else mapping ref. Empty when the container is not Git-associated.</td>
 </tr>
 <tr>
 <td style="text-align: left;"><code>.Changelog</code></td>
-<td style="text-align: left;"><code>com.centurylinklabs.watchtower.changelog</code>, else a derived releases URL, else OCI <code>url</code> / <code>documentation</code></td>
+<td style="text-align: left;"><code>com.centurylinklabs.watchtower.changelog-url</code>, else a derived releases URL, else OCI <code>url</code> / <code>documentation</code></td>
 </tr>
 <tr>
 <td style="text-align: left;"><code>.Source</code></td>
@@ -3405,30 +3471,81 @@ They are populated even when Git monitoring is off.</p>
 <td style="text-align: left;">OCI <code>org.opencontainers.image.documentation</code></td>
 </tr>
 <tr>
-<td style="text-align: left;"><code>.Revision</code></td>
-<td style="text-align: left;">OCI <code>org.opencontainers.image.revision</code></td>
+<td style="text-align: left;"><code>.CurrentImageVersion</code></td>
+<td style="text-align: left;">OCI <code>org.opencontainers.image.version</code> of the running image</td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>.LatestImageVersion</code></td>
+<td style="text-align: left;">OCI <code>org.opencontainers.image.version</code> of the newly pulled image. Empty when there is no newer image.</td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>.CurrentImageRevision</code></td>
+<td style="text-align: left;">OCI <code>org.opencontainers.image.revision</code> of the running image</td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>.LatestImageRevision</code></td>
+<td style="text-align: left;">OCI <code>org.opencontainers.image.revision</code> of the newly pulled image. Empty when there is no newer image.</td>
 </tr>
 </tbody>
 </table>
-<p><code>.GitRef</code> is the configured Git ref. When the container is not associated with Git and <code>org.opencontainers.image.version</code> looks like a tag, that version is copied into <code>.GitRef</code>. There is one value, not a previous version and a new version, so a template cannot print <code>10.11.5 → 10.11.6</code> from these fields.</p>
-<p>The built-in <code>default</code> report template prints the ref and the changelog on an updated container when they are set:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-12-1" name="__codelineno-12-1" href="#__codelineno-12-1"></a>- /app (myapp:latest): abcdef12 updated to 34567890 ref v1.2.4 https://github.com/org/app/releases
+<p>The <code>Current*</code> fields describe the image the container is running, the <code>Latest*</code> fields the image it is moving to.
+<code>.Changelog</code>, <code>.Source</code>, <code>.ImageURL</code>, and <code>.Documentation</code> are resolved from the <strong>latest known</strong> image, so they describe the new version once one is found and the running image otherwise.</p>
+<p><code>.GitRef</code> is the configured Git ref and nothing else.
+An OCI version is never copied into it.
+Use <code>.CurrentImageVersion</code> or <code>.LatestImageVersion</code> instead.</p>
+<p>Because the two versions are separate fields, a template can print the transition:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-12-1" name="__codelineno-12-1" href="#__codelineno-12-1"></a><span class="p">{{</span><span class="w"> </span><span class="k">range</span><span class="w"> </span><span class="p">.</span><span class="nx">Report</span><span class="p">.</span><span class="nx">Updated</span><span class="w"> </span><span class="p">}}{{</span><span class="w"> </span><span class="p">.</span><span class="nx">Name</span><span class="w"> </span><span class="p">}}:</span><span class="w"> </span><span class="p">{{</span><span class="w"> </span><span class="p">.</span><span class="nx">CurrentImageVersion</span><span class="w"> </span><span class="p">}}</span><span class="w"> </span><span class="err">→</span><span class="w"> </span><span class="p">{{</span><span class="w"> </span><span class="p">.</span><span class="nx">LatestImageVersion</span><span class="w"> </span><span class="p">}}</span>
+<a id="__codelineno-12-2" name="__codelineno-12-2" href="#__codelineno-12-2"></a><span class="p">{{</span><span class="o">-</span><span class="w"> </span><span class="nx">with</span><span class="w"> </span><span class="p">.</span><span class="nx">Changelog</span><span class="w"> </span><span class="p">}}</span>
+<a id="__codelineno-12-3" name="__codelineno-12-3" href="#__codelineno-12-3"></a><span class="p">{{</span><span class="w"> </span><span class="p">.</span><span class="w"> </span><span class="p">}}</span>
+<a id="__codelineno-12-4" name="__codelineno-12-4" href="#__codelineno-12-4"></a><span class="p">{{</span><span class="o">-</span><span class="w"> </span><span class="nx">end</span><span class="w"> </span><span class="p">}}</span>
+<a id="__codelineno-12-5" name="__codelineno-12-5" href="#__codelineno-12-5"></a><span class="p">{{</span><span class="w"> </span><span class="nx">end</span><span class="w"> </span><span class="p">}}</span>
 </code></pre></div>
-<p>A custom report template can do the same:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-13-1" name="__codelineno-13-1" href="#__codelineno-13-1"></a><span class="p">{{</span><span class="w"> </span><span class="k">range</span><span class="w"> </span><span class="p">.</span><span class="nx">Report</span><span class="p">.</span><span class="nx">Updated</span><span class="w"> </span><span class="p">}}{{</span><span class="w"> </span><span class="p">.</span><span class="nx">Name</span><span class="w"> </span><span class="p">}}{{</span><span class="w"> </span><span class="nx">with</span><span class="w"> </span><span class="p">.</span><span class="nx">GitRef</span><span class="w"> </span><span class="p">}}</span><span class="w"> </span><span class="p">{{</span><span class="w"> </span><span class="p">.</span><span class="w"> </span><span class="p">}}{{</span><span class="w"> </span><span class="nx">end</span><span class="w"> </span><span class="p">}}{{</span><span class="w"> </span><span class="nx">with</span><span class="w"> </span><span class="p">.</span><span class="nx">Changelog</span><span class="w"> </span><span class="p">}}</span><span class="w"> </span><span class="p">{{</span><span class="w"> </span><span class="p">.</span><span class="w"> </span><span class="p">}}{{</span><span class="w"> </span><span class="nx">end</span><span class="w"> </span><span class="p">}}{{</span><span class="w"> </span><span class="nx">end</span><span class="w"> </span><span class="p">}}</span>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-13-1" name="__codelineno-13-1" href="#__codelineno-13-1"></a>/app: 1.2.2 → 1.2.3
+<a id="__codelineno-13-2" name="__codelineno-13-2" href="#__codelineno-13-2"></a>https://github.com/org/app/releases/tag/v1.2.3
 </code></pre></div>
-<p>An explicit <code>com.centurylinklabs.watchtower.changelog</code> label may include placeholders from the new version when known: <code>{major}</code>, <code>{minor}</code>, <code>{patch}</code>, <code>{tag}</code>, <code>{commit}</code>.</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-14-1" name="__codelineno-14-1" href="#__codelineno-14-1"></a><span class="nt">labels</span><span class="p">:</span>
-<a id="__codelineno-14-2" name="__codelineno-14-2" href="#__codelineno-14-2"></a><span class="w">    </span><span class="nt">com.centurylinklabs.watchtower.git-repo</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">https://github.com/org/app.git</span>
-<a id="__codelineno-14-3" name="__codelineno-14-3" href="#__codelineno-14-3"></a><span class="w">    </span><span class="nt">com.centurylinklabs.watchtower.changelog</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">https://github.com/org/app/releases/tag/v{major}.{minor}.{patch}</span>
+<p>The built-in <code>default</code> report template is unchanged and still prints image IDs, the ref, and the changelog on an updated container when they are set:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-14-1" name="__codelineno-14-1" href="#__codelineno-14-1"></a>- /app (myapp:latest): abcdef12 updated to 34567890 ref v1.2.4 https://github.com/org/app/releases
 </code></pre></div>
-<p>If <code>com.centurylinklabs.watchtower.changelog</code> is unset, Watchtower builds a releases URL for <code>github.com</code>, <code>gitlab.com</code>, <code>codeberg.org</code>, and for a container that sets <code>com.centurylinklabs.watchtower.git-host</code>.
-Otherwise it falls back to OCI <code>org.opencontainers.image.url</code>, then <code>org.opencontainers.image.documentation</code>.</p>
-<p>Malformed placeholders are left as-is.
+<h3 id="changelog_resolution">Changelog resolution<a class="headerlink" href="#changelog_resolution" title="Permanent link">&para;</a></h3>
+<ol>
+<li><code>com.centurylinklabs.watchtower.changelog-url</code> label, with placeholders substituted.</li>
+<li>A <strong>versioned</strong> releases URL, when the exact release tag is known. See <a href="#versioned_release_links">Versioned release links</a>.</li>
+<li>An <strong>unversioned</strong> releases URL built for <code>github.com</code>, <code>gitlab.com</code>, <code>codeberg.org</code>, and for a container that sets <code>com.centurylinklabs.watchtower.git-host</code>.</li>
+<li>OCI <code>org.opencontainers.image.url</code>.</li>
+<li>OCI <code>org.opencontainers.image.documentation</code>.</li>
+</ol>
+<p>An explicit <code>com.centurylinklabs.watchtower.changelog-url</code> label may include placeholders from the new version when known: <code>{major}</code>, <code>{minor}</code>, <code>{patch}</code>, <code>{tag}</code>, <code>{commit}</code>.</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-15-1" name="__codelineno-15-1" href="#__codelineno-15-1"></a><span class="nt">labels</span><span class="p">:</span>
+<a id="__codelineno-15-2" name="__codelineno-15-2" href="#__codelineno-15-2"></a><span class="w">    </span><span class="nt">com.centurylinklabs.watchtower.git-repo</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">https://github.com/org/app.git</span>
+<a id="__codelineno-15-3" name="__codelineno-15-3" href="#__codelineno-15-3"></a><span class="w">    </span><span class="nt">com.centurylinklabs.watchtower.changelog-url</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">https://github.com/org/app/releases/tag/v{major}.{minor}.{patch}</span>
+</code></pre></div>
+<p>Malformed or unfilled placeholders are left as-is.
 The session does not fail.</p>
 <p>An image with only <code>org.opencontainers.image.source</code> still exposes <code>.Source</code> / derived <code>.GitRepo</code>.
 Git monitoring stays off unless the container is associated and the watcher is on.
 See <a href="../../advanced-features/git-monitoring/">Git Monitoring</a> for association and rebuilds.</p>
+<h3 id="versioned_release_links">Versioned release links<a class="headerlink" href="#versioned_release_links" title="Permanent link">&para;</a></h3>
+<p>A derived changelog normally points at the <strong>release index</strong>, for example <code>https://github.com/org/app/releases</code>.
+A versioned link such as <code>https://github.com/org/app/releases/tag/v1.2.3</code> is better, but the exact tag spelling cannot be derived from the OCI version alone. A release tag and the version annotation of the same release need not agree on a leading <code>v</code>.</p>
+<p>To resolve it, Watchtower confirms which tag actually matches the image it pulled by comparing manifest digests, then uses that tag's exact spelling.</p>
+<div class="admonition warning">
+<p class="admonition-title">This costs extra registry requests</p>
+<p>Resolving the tag issues one or two extra manifest requests per updated container, which roughly doubles that session's manifest requests for the update.</p>
+<p>The lookup is therefore <strong>off by default</strong>. Enable it per deployment with <a href="../../configuration/update-behavior/#changelog_links"><code>--enable-changelog</code></a> or the <code>com.centurylinklabs.watchtower.enable-changelog</code> label.</p>
+<p>A <code>changelog-url</code> label does <strong>not</strong> enable it. Setting a URL says what the link is, not that a registry request is authorized, so a template referencing <code>{tag}</code> stays unfilled until the option is turned on for that container.</p>
+</div>
+<p>With the option off, the changelog resolves to the unversioned release index and costs no requests.
+A Git-monitored container never needs the lookup, because its tag comes from the semver policy rather than a registry.
+Under a policy of <code>none</code> a branch-triggered rebuild resolves no tag, so a template referencing <code>{tag}</code> stays unfilled.
+A container with no OCI version, a digest-pinned image, and an unknown or unparseable repo host all skip the lookup.
+A rate limit on the first candidate abandons the probe rather than spend a second request the registry will refuse.
+Results are cached per session, so sibling containers on the same image only pay once.</p>
+<h3 id="changelog_in_the_legacy_notification">Changelog in the legacy notification<a class="headerlink" href="#changelog_in_the_legacy_notification" title="Permanent link">&para;</a></h3>
+<p>When the option is enabled and a URL resolves, the <code>default-legacy</code> notification gains one line per updated container:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-16-1" name="__codelineno-16-1" href="#__codelineno-16-1"></a>Updated container: /app (org/app:latest): abcdef12 updated to 34567890
+<a id="__codelineno-16-2" name="__codelineno-16-2" href="#__codelineno-16-2"></a>Changelog: https://github.com/org/app/releases/tag/v1.2.3
+</code></pre></div>
+<p>Nothing is emitted when the option is off, so a default deployment's output is unchanged.</p>
 <h3 id="log_lines_from_a_git_update">Log lines from a Git update<a class="headerlink" href="#log_lines_from_a_git_update" title="Permanent link">&para;</a></h3>
 <p>With <a href="../../configuration/notifications/#notification_report">notification report</a> off, Watchtower sends the log line itself. The <code>default-legacy</code> template formats these messages instead of dumping every field:</p>
 <table>
@@ -3474,11 +3591,12 @@ See <a href="../../advanced-features/git-monitoring/">Git Monitoring</a> for ass
 </tbody>
 </table>
 <p>The log fields are <code>container</code>, <code>image</code>, <code>repo</code>, <code>ref</code>, <code>commit</code>, <code>changelog</code>, <code>project</code>, <code>dir</code>, and <code>error</code>. A custom simple template reads them from <code>.Data</code>:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-15-1" name="__codelineno-15-1" href="#__codelineno-15-1"></a><span class="p">{{</span><span class="w"> </span><span class="k">range</span><span class="w"> </span><span class="p">.</span><span class="w"> </span><span class="p">}}{{</span><span class="w"> </span><span class="k">if</span><span class="w"> </span><span class="nx">eq</span><span class="w"> </span><span class="p">.</span><span class="nx">Message</span><span class="w"> </span><span class="s">"Built image from Git URL context"</span><span class="w"> </span><span class="p">}}</span>
-<a id="__codelineno-15-2" name="__codelineno-15-2" href="#__codelineno-15-2"></a><span class="p">{{</span><span class="w"> </span><span class="p">.</span><span class="nx">Data</span><span class="p">.</span><span class="nx">container</span><span class="w"> </span><span class="p">}}</span><span class="w"> </span><span class="p">{{</span><span class="w"> </span><span class="p">.</span><span class="nx">Data</span><span class="p">.</span><span class="nx">commit</span><span class="w"> </span><span class="p">}}</span><span class="w"> </span><span class="p">{{</span><span class="w"> </span><span class="p">.</span><span class="nx">Data</span><span class="p">.</span><span class="nx">changelog</span><span class="w"> </span><span class="p">}}</span>
-<a id="__codelineno-15-3" name="__codelineno-15-3" href="#__codelineno-15-3"></a><span class="p">{{</span><span class="w"> </span><span class="nx">end</span><span class="w"> </span><span class="p">}}{{</span><span class="w"> </span><span class="nx">end</span><span class="w"> </span><span class="p">}}</span>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-17-1" name="__codelineno-17-1" href="#__codelineno-17-1"></a><span class="p">{{</span><span class="w"> </span><span class="k">range</span><span class="w"> </span><span class="p">.</span><span class="w"> </span><span class="p">}}{{</span><span class="w"> </span><span class="k">if</span><span class="w"> </span><span class="nx">eq</span><span class="w"> </span><span class="p">.</span><span class="nx">Message</span><span class="w"> </span><span class="s">"Built image from Git URL context"</span><span class="w"> </span><span class="p">}}</span>
+<a id="__codelineno-17-2" name="__codelineno-17-2" href="#__codelineno-17-2"></a><span class="p">{{</span><span class="w"> </span><span class="p">.</span><span class="nx">Data</span><span class="p">.</span><span class="nx">container</span><span class="w"> </span><span class="p">}}</span><span class="w"> </span><span class="p">{{</span><span class="w"> </span><span class="p">.</span><span class="nx">Data</span><span class="p">.</span><span class="nx">commit</span><span class="w"> </span><span class="p">}}</span><span class="w"> </span><span class="p">{{</span><span class="w"> </span><span class="p">.</span><span class="nx">Data</span><span class="p">.</span><span class="nx">changelog</span><span class="w"> </span><span class="p">}}</span>
+<a id="__codelineno-17-3" name="__codelineno-17-3" href="#__codelineno-17-3"></a><span class="p">{{</span><span class="w"> </span><span class="nx">end</span><span class="w"> </span><span class="p">}}{{</span><span class="w"> </span><span class="nx">end</span><span class="w"> </span><span class="p">}}</span>
 </code></pre></div>
-<p>Porcelain JSON and <code>/v1/check</code> expose the same values as <code>git_repo</code>, <code>git_ref</code>, <code>changelog</code>, <code>oci_source</code>, <code>image_url</code>, <code>documentation</code>, and <code>revision</code>.</p>
+<p>The <code>json</code> notification report emits the same values under camelCase keys: <code>gitRepo</code>, <code>gitRef</code>, <code>changelog</code>, <code>ociSource</code>, <code>imageUrl</code>, <code>documentation</code>, <code>currentImageVersion</code>, <code>latestImageVersion</code>, <code>currentImageRevision</code>, and <code>latestImageRevision</code>.
+Porcelain JSON and <code>/v1/check</code> use snake_case instead: <code>git_repo</code>, <code>git_ref</code>, <code>changelog</code>, <code>oci_source</code>, <code>image_url</code>, <code>documentation</code>, <code>current_image_version</code>, <code>latest_image_version</code>, <code>current_revision</code>, and <code>latest_revision</code>.</p>
 <h2 id="customizing_templates">Customizing Templates<a class="headerlink" href="#customizing_templates" title="Permanent link">&para;</a></h2>
 <p>You can create custom templates to format notifications differently.</p>
 <p>Use the <a href="../template-preview/">Template Preview Tool</a> to test your templates interactively.</p>
@@ -3513,7 +3631,7 @@ See <a href="../../advanced-features/git-monitoring/">Git Monitoring</a> for ass
     <span class="md-icon" title="Last update">
       <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M21 13.1c-.1 0-.3.1-.4.2l-1 1 2.1 2.1 1-1c.2-.2.2-.6 0-.8l-1.3-1.3c-.1-.1-.2-.2-.4-.2m-1.9 1.8-6.1 6V23h2.1l6.1-6.1zM12.5 7v5.2l4 2.4-1 1L11 13V7zM11 21.9c-5.1-.5-9-4.8-9-9.9C2 6.5 6.5 2 12 2c5.3 0 9.6 4.1 10 9.3-.3-.1-.6-.2-1-.2s-.7.1-1 .2C19.6 7.2 16.2 4 12 4c-4.4 0-8 3.6-8 8 0 4.1 3.1 7.5 7.1 7.9l-.1.2z"/></svg>
     </span>
-    <span class="git-revision-date-localized-plugin git-revision-date-localized-plugin-timeago" title="September 29, 2026 16:46:40 UTC"><span class="timeago" datetime="2026-09-29T16:46:40+00:00" locale="en"></span></span><span class="git-revision-date-localized-plugin git-revision-date-localized-plugin-iso_date" title="September 29, 2026 16:46:40 UTC">2026-09-29</span>
+    <span class="git-revision-date-localized-plugin git-revision-date-localized-plugin-timeago" title="September 30, 2026 22:25:05 UTC"><span class="timeago" datetime="2026-09-30T22:25:05+00:00" locale="en"></span></span><span class="git-revision-date-localized-plugin git-revision-date-localized-plugin-iso_date" title="September 30, 2026 22:25:05 UTC">2026-09-30</span>
   </span>
 
     

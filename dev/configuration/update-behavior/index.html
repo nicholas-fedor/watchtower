@@ -1136,6 +1136,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#changelog_links" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Changelog Links
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#ephemeral_self-update" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -2951,6 +2962,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#changelog_links" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Changelog Links
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#ephemeral_self-update" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -3122,12 +3144,34 @@ Useful for locally built images.</p>
 <code>/v1/check</code> reports no update for a Git-watched container while no-pull applies to it.</p>
 <p>See <a href="../container-selection/#label_precedence">Label Precedence</a>.</p>
 </div>
-<h2 id="ephemeral_self-update">Ephemeral Self-Update<a class="headerlink" href="#ephemeral_self-update" title="Permanent link">&para;</a></h2>
-<p>Uses a short-lived orchestrator container to perform Watchtower self-updates instead of the default rename-based approach.</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-9-1" name="__codelineno-9-1" href="#__codelineno-9-1"></a>            Argument: --ephemeral-self-update
-<a id="__codelineno-9-2" name="__codelineno-9-2" href="#__codelineno-9-2"></a>Environment Variable: WATCHTOWER_EPHEMERAL_SELF_UPDATE
+<h2 id="changelog_links">Changelog Links<a class="headerlink" href="#changelog_links" title="Permanent link">&para;</a></h2>
+<p>Adds a release-notes link to notifications, and resolves that link to the exact release being installed rather than the release index.</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-9-1" name="__codelineno-9-1" href="#__codelineno-9-1"></a>            Argument: --enable-changelog
+<a id="__codelineno-9-2" name="__codelineno-9-2" href="#__codelineno-9-2"></a>Environment Variable: WATCHTOWER_ENABLE_CHANGELOG
 <a id="__codelineno-9-3" name="__codelineno-9-3" href="#__codelineno-9-3"></a>                Type: Boolean
 <a id="__codelineno-9-4" name="__codelineno-9-4" href="#__codelineno-9-4"></a>             Default: false
+</code></pre></div>
+<div class="admonition warning">
+<p class="admonition-title">Extra registry requests</p>
+<p>Resolving the exact release tag requires confirming which tag the maintainer actually published.
+Watchtower issues one or two extra manifest requests per updated container on a registry it has already contacted, which roughly doubles that session's manifest requests for the update.</p>
+<p>This is why the option is off by default.
+With it off, <code>.Changelog</code> still resolves to the unversioned release index and costs no requests.
+A Git-monitored container never needs the lookup, because its tag is already known.</p>
+</div>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>Can be set per container via the <code>com.centurylinklabs.watchtower.enable-changelog</code> label.</p>
+<p>The <code>com.centurylinklabs.watchtower.changelog-url</code> label supplies a changelog URL template but does <strong>not</strong> enable this option.
+A template that references <code>{tag}</code> stays unresolved until the option is turned on for that container.</p>
+<p>See <a href="../container-selection/#label_precedence">Label Precedence</a> and <a href="../../notifications/templates/">Notification Templates</a>.</p>
+</div>
+<h2 id="ephemeral_self-update">Ephemeral Self-Update<a class="headerlink" href="#ephemeral_self-update" title="Permanent link">&para;</a></h2>
+<p>Uses a short-lived orchestrator container to perform Watchtower self-updates instead of the default rename-based approach.</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-10-1" name="__codelineno-10-1" href="#__codelineno-10-1"></a>            Argument: --ephemeral-self-update
+<a id="__codelineno-10-2" name="__codelineno-10-2" href="#__codelineno-10-2"></a>Environment Variable: WATCHTOWER_EPHEMERAL_SELF_UPDATE
+<a id="__codelineno-10-3" name="__codelineno-10-3" href="#__codelineno-10-3"></a>                Type: Boolean
+<a id="__codelineno-10-4" name="__codelineno-10-4" href="#__codelineno-10-4"></a>             Default: false
 </code></pre></div>
 <div class="admonition warning">
 <p class="admonition-title">This is an experimental feature.</p>
@@ -3160,7 +3204,7 @@ See <a href="../../advanced-features/ephemeral-self-updates/">Advanced Features 
     <span class="md-icon" title="Last update">
       <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M21 13.1c-.1 0-.3.1-.4.2l-1 1 2.1 2.1 1-1c.2-.2.2-.6 0-.8l-1.3-1.3c-.1-.1-.2-.2-.4-.2m-1.9 1.8-6.1 6V23h2.1l6.1-6.1zM12.5 7v5.2l4 2.4-1 1L11 13V7zM11 21.9c-5.1-.5-9-4.8-9-9.9C2 6.5 6.5 2 12 2c5.3 0 9.6 4.1 10 9.3-.3-.1-.6-.2-1-.2s-.7.1-1 .2C19.6 7.2 16.2 4 12 4c-4.4 0-8 3.6-8 8 0 4.1 3.1 7.5 7.1 7.9l-.1.2z"/></svg>
     </span>
-    <span class="git-revision-date-localized-plugin git-revision-date-localized-plugin-timeago" title="September 29, 2026 16:46:40 UTC"><span class="timeago" datetime="2026-09-29T16:46:40+00:00" locale="en"></span></span><span class="git-revision-date-localized-plugin git-revision-date-localized-plugin-iso_date" title="September 29, 2026 16:46:40 UTC">2026-09-29</span>
+    <span class="git-revision-date-localized-plugin git-revision-date-localized-plugin-timeago" title="September 30, 2026 22:25:05 UTC"><span class="timeago" datetime="2026-09-30T22:25:05+00:00" locale="en"></span></span><span class="git-revision-date-localized-plugin git-revision-date-localized-plugin-iso_date" title="September 30, 2026 22:25:05 UTC">2026-09-30</span>
   </span>
 
     

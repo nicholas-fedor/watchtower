@@ -4873,9 +4873,12 @@ Process start is not a session.</p>
 </ol>
 <p>Annotated tags are resolved to the peeled commit, not the tag object.</p>
 <h3 id="notifications">Notifications<a class="headerlink" href="#notifications" title="Permanent link">&para;</a></h3>
-<p>A custom <a href="../../notifications/templates/#git_and_oci_report_fields">notification template</a> can print <code>.Changelog</code>, <code>.GitRepo</code>, <code>.GitRef</code>, <code>.Source</code>, and <code>.Revision</code> for each updated container.
-<code>.GitRef</code> is also where a semver-shaped OCI <code>org.opencontainers.image.version</code> appears when the container is not associated with Git.
-That is one value, not the old version and the new version.</p>
+<p>A custom <a href="../../notifications/templates/#git_and_oci_report_fields">notification template</a> can print <code>.Changelog</code>, <code>.GitRepo</code>, <code>.GitRef</code>, <code>.Source</code>, <code>.CurrentImageVersion</code>, <code>.LatestImageVersion</code>, <code>.CurrentImageRevision</code>, and <code>.LatestImageRevision</code> for each updated container.
+<code>.GitRef</code> is the configured Git ref and nothing else.
+A semver-shaped OCI <code>org.opencontainers.image.version</code> is never copied into it.
+A Git rebuild has no pulled image, so <code>.LatestImageVersion</code> and <code>.LatestImageRevision</code> stay empty and the new version comes from the resolved Git tag through the changelog <code>{tag}</code> placeholder.
+A container Watchtower rebuilds from Git needs no release tag lookup, so enabling <a href="../../configuration/update-behavior/#changelog_links"><code>--enable-changelog</code></a> costs such a container nothing.
+A container that only carries Git labels, but is still updated from its registry image, needs the lookup like any other registry update.</p>
 <p>The built-in report template adds the ref and the changelog to an updated container when they are set.
 With report mode off, a Git update sends <code>Found new Git revision</code>, then <code>Built image</code> for a Git URL build, then the same stop and start lines as a registry update. Compose sends the found line once, then those stop and start lines for each recreated container. It does not send a built-image line. The identity is <code>host/path@tag</code> or <code>host/path@branch</code>, with a 12-character commit. The log still records the full commit.</p>
 <h3 id="failed_builds">Failed Builds<a class="headerlink" href="#failed_builds" title="Permanent link">&para;</a></h3>
@@ -5291,9 +5294,14 @@ Repeatable values are newline-separated.</p>
 <td style="text-align: left;">Opts this service into a <a href="#local_path_context">local path context</a></td>
 </tr>
 <tr>
-<td style="text-align: left;"><code>com.centurylinklabs.watchtower.changelog</code></td>
+<td style="text-align: left;"><code>com.centurylinklabs.watchtower.changelog-url</code></td>
 <td style="text-align: left;">URL template</td>
-<td style="text-align: left;">Optional notification changelog URL</td>
+<td style="text-align: left;">Optional notification changelog URL. Does not enable <a href="../../configuration/update-behavior/#changelog_links"><code>--enable-changelog</code></a></td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>com.centurylinklabs.watchtower.enable-changelog</code></td>
+<td style="text-align: left;">loose boolean</td>
+<td style="text-align: left;">Enables the changelog notification line and the versioned release link for this container</td>
 </tr>
 </tbody>
 </table>
@@ -5458,7 +5466,7 @@ You do not set anything extra for those remotes.</p>
 Watchtower then uses that URL for ref checks.
 It derives a releases link when the built-in hostname identifies the provider, or when the API origin has one exact path prefix named <code>github</code>, <code>gitlab</code>, <code>gitea</code>, <code>forgejo</code>, or <code>codeberg</code>.
 A pathless self-hosted origin such as <code>https://git.example.com:3000</code> does not identify the provider, so Watchtower does not guess a changelog link.
-Set <code>com.centurylinklabs.watchtower.changelog</code> when a custom server needs a different release-page layout.
+Set <code>com.centurylinklabs.watchtower.changelog-url</code> when a custom server needs a different release-page layout.
 If the server is not GitHub, GitLab, Gitea, or Forgejo, Watchtower still asks Git.</p>
 <p>This label does not turn monitoring on, choose the repository, or supply credentials.</p>
 <h4 id="when_you_do_not_need_it">When You Do Not Need It<a class="headerlink" href="#when_you_do_not_need_it" title="Permanent link">&para;</a></h4>
@@ -5668,7 +5676,7 @@ The next session uses image identity or the remembered tip, and rebuilds only if
     <span class="md-icon" title="Last update">
       <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M21 13.1c-.1 0-.3.1-.4.2l-1 1 2.1 2.1 1-1c.2-.2.2-.6 0-.8l-1.3-1.3c-.1-.1-.2-.2-.4-.2m-1.9 1.8-6.1 6V23h2.1l6.1-6.1zM12.5 7v5.2l4 2.4-1 1L11 13V7zM11 21.9c-5.1-.5-9-4.8-9-9.9C2 6.5 6.5 2 12 2c5.3 0 9.6 4.1 10 9.3-.3-.1-.6-.2-1-.2s-.7.1-1 .2C19.6 7.2 16.2 4 12 4c-4.4 0-8 3.6-8 8 0 4.1 3.1 7.5 7.1 7.9l-.1.2z"/></svg>
     </span>
-    <span class="git-revision-date-localized-plugin git-revision-date-localized-plugin-timeago" title="September 29, 2026 16:46:40 UTC"><span class="timeago" datetime="2026-09-29T16:46:40+00:00" locale="en"></span></span><span class="git-revision-date-localized-plugin git-revision-date-localized-plugin-iso_date" title="September 29, 2026 16:46:40 UTC">2026-09-29</span>
+    <span class="git-revision-date-localized-plugin git-revision-date-localized-plugin-timeago" title="September 30, 2026 22:25:05 UTC"><span class="timeago" datetime="2026-09-30T22:25:05+00:00" locale="en"></span></span><span class="git-revision-date-localized-plugin git-revision-date-localized-plugin-iso_date" title="September 30, 2026 22:25:05 UTC">2026-09-30</span>
   </span>
 
     
