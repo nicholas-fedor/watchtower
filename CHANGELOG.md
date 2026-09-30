@@ -12,6 +12,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Add Git ref monitoring and container rebuilds by @nicholas-fedor in [#2456](https://github.com/nicholas-fedor/watchtower/pull/2456)
 
+### Changed
+
+- Expose OCI image versions and resolve versioned changelog links by @nicholas-fedor in [#2474](https://github.com/nicholas-fedor/watchtower/pull/2474)
+
 ### Chores
 
 - Update module github.com/go-git/gcfg to v2 by @renovate[bot] in [#2468](https://github.com/nicholas-fedor/watchtower/pull/2468)
