@@ -294,47 +294,100 @@ Default templates are unchanged.
 Custom report templates can use these fields on each container.
 They are populated even when Git monitoring is off.
 
-| Field            | Meaning                                                                                                                                                                  |
-|:-----------------|:-------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
-| `.GitRepo`       | `com.centurylinklabs.watchtower.git-repo`, else [`git-image`](../../configuration/git-monitoring/index.md#git_image) mapping, else OCI `org.opencontainers.image.source` |
-| `.GitRef`        | `com.centurylinklabs.watchtower.git-ref` (or `com.centurylinklabs.watchtower.git-branch`), else mapping ref, else OCI version when it looks like a tag                   |
-| `.Changelog`     | `com.centurylinklabs.watchtower.changelog`, else a derived releases URL, else OCI `url` / `documentation`                                                                |
-| `.Source`        | OCI `org.opencontainers.image.source`                                                                                                                                    |
-| `.ImageURL`      | OCI `org.opencontainers.image.url`                                                                                                                                       |
-| `.Documentation` | OCI `org.opencontainers.image.documentation`                                                                                                                             |
-| `.Revision`      | OCI `org.opencontainers.image.revision`                                                                                                                                  |
+| Field                   | Meaning                                                                                                                                                                  |
+|:------------------------|:-------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| `.GitRepo`              | `com.centurylinklabs.watchtower.git-repo`, else [`git-image`](../../configuration/git-monitoring/index.md#git_image) mapping, else OCI `org.opencontainers.image.source` |
+| `.GitRef`               | `com.centurylinklabs.watchtower.git-ref` (or `com.centurylinklabs.watchtower.git-branch`), else mapping ref. Empty when the container is not Git-associated.             |
+| `.Changelog`            | `com.centurylinklabs.watchtower.changelog-url`, else a derived releases URL, else OCI `url` / `documentation`                                                            |
+| `.Source`               | OCI `org.opencontainers.image.source`                                                                                                                                    |
+| `.ImageURL`             | OCI `org.opencontainers.image.url`                                                                                                                                       |
+| `.Documentation`        | OCI `org.opencontainers.image.documentation`                                                                                                                             |
+| `.CurrentImageVersion`  | OCI `org.opencontainers.image.version` of the running image                                                                                                              |
+| `.LatestImageVersion`   | OCI `org.opencontainers.image.version` of the newly pulled image. Empty when there is no newer image.                                                                    |
+| `.CurrentImageRevision` | OCI `org.opencontainers.image.revision` of the running image                                                                                                             |
+| `.LatestImageRevision`  | OCI `org.opencontainers.image.revision` of the newly pulled image. Empty when there is no newer image.                                                                   |
 
-`.GitRef` is the configured Git ref. When the container is not associated with Git and `org.opencontainers.image.version` looks like a tag, that version is copied into `.GitRef`. There is one value, not a previous version and a new version, so a template cannot print `10.11.5 → 10.11.6` from these fields.
+The `Current*` fields describe the image the container is running, the `Latest*` fields the image it is moving to.
+`.Changelog`, `.Source`, `.ImageURL`, and `.Documentation` are resolved from the **latest known** image, so they describe the new version once one is found and the running image otherwise.
 
-The built-in `default` report template prints the ref and the changelog on an updated container when they are set:
+`.GitRef` is the configured Git ref and nothing else.
+An OCI version is never copied into it.
+Use `.CurrentImageVersion` or `.LatestImageVersion` instead.
+
+Because the two versions are separate fields, a template can print the transition:
+
+```go
+{{ range .Report.Updated }}{{ .Name }}: {{ .CurrentImageVersion }} → {{ .LatestImageVersion }}
+{{- with .Changelog }}
+{{ . }}
+{{- end }}
+{{ end }}
+```
+
+```text
+/app: 1.2.2 → 1.2.3
+https://github.com/org/app/releases/tag/v1.2.3
+```
+
+The built-in `default` report template is unchanged and still prints image IDs, the ref, and the changelog on an updated container when they are set:
 
 ```text
 - /app (myapp:latest): abcdef12 updated to 34567890 ref v1.2.4 https://github.com/org/app/releases
 ```
 
-A custom report template can do the same:
+### Changelog resolution
 
-```go
-{{ range .Report.Updated }}{{ .Name }}{{ with .GitRef }} {{ . }}{{ end }}{{ with .Changelog }} {{ . }}{{ end }}{{ end }}
-```
+1. `com.centurylinklabs.watchtower.changelog-url` label, with placeholders substituted.
+2. A **versioned** releases URL, when the exact release tag is known. See [Versioned release links](#versioned_release_links).
+3. An **unversioned** releases URL built for `github.com`, `gitlab.com`, `codeberg.org`, and for a container that sets `com.centurylinklabs.watchtower.git-host`.
+4. OCI `org.opencontainers.image.url`.
+5. OCI `org.opencontainers.image.documentation`.
 
-An explicit `com.centurylinklabs.watchtower.changelog` label may include placeholders from the new version when known: `{major}`, `{minor}`, `{patch}`, `{tag}`, `{commit}`.
+An explicit `com.centurylinklabs.watchtower.changelog-url` label may include placeholders from the new version when known: `{major}`, `{minor}`, `{patch}`, `{tag}`, `{commit}`.
 
 ```yaml
 labels:
     com.centurylinklabs.watchtower.git-repo: https://github.com/org/app.git
-    com.centurylinklabs.watchtower.changelog: https://github.com/org/app/releases/tag/v{major}.{minor}.{patch}
+    com.centurylinklabs.watchtower.changelog-url: https://github.com/org/app/releases/tag/v{major}.{minor}.{patch}
 ```
 
-If `com.centurylinklabs.watchtower.changelog` is unset, Watchtower builds a releases URL for `github.com`, `gitlab.com`, `codeberg.org`, and for a container that sets `com.centurylinklabs.watchtower.git-host`.
-Otherwise it falls back to OCI `org.opencontainers.image.url`, then `org.opencontainers.image.documentation`.
-
-Malformed placeholders are left as-is.
+Malformed or unfilled placeholders are left as-is.
 The session does not fail.
 
 An image with only `org.opencontainers.image.source` still exposes `.Source` / derived `.GitRepo`.
 Git monitoring stays off unless the container is associated and the watcher is on.
 See [Git Monitoring](../../advanced-features/git-monitoring/index.md) for association and rebuilds.
+
+### Versioned release links
+
+A derived changelog normally points at the **release index**, for example `https://github.com/org/app/releases`.
+A versioned link such as `https://github.com/org/app/releases/tag/v1.2.3` is better, but the exact tag spelling cannot be derived from the OCI version alone. A release tag and the version annotation of the same release need not agree on a leading `v`.
+
+To resolve it, Watchtower confirms which tag actually matches the image it pulled by comparing manifest digests, then uses that tag's exact spelling.
+
+!!! Warning "This costs extra registry requests"
+    Resolving the tag issues one or two extra manifest requests per updated container, which roughly doubles that session's manifest requests for the update.
+
+    The lookup is therefore **off by default**. Enable it per deployment with [`--enable-changelog`](../../configuration/update-behavior/index.md#changelog_links) or the `com.centurylinklabs.watchtower.enable-changelog` label.
+
+    A `changelog-url` label does **not** enable it. Setting a URL says what the link is, not that a registry request is authorized, so a template referencing `{tag}` stays unfilled until the option is turned on for that container.
+
+With the option off, the changelog resolves to the unversioned release index and costs no requests.
+A Git-monitored container never needs the lookup, because its tag is already known from the semver policy.
+A container with no OCI version, a digest-pinned image, and an unknown or unparseable repo host all skip the lookup.
+A rate limit on the first candidate abandons the probe rather than spend a second request the registry will refuse.
+Results are cached per session, so sibling containers on the same image only pay once.
+
+### Changelog in the legacy notification
+
+When the option is enabled and a URL resolves, the `default-legacy` notification gains one line per updated container:
+
+```text
+Updated container: /app (org/app:latest): abcdef12 updated to 34567890
+Changelog: https://github.com/org/app/releases/tag/v1.2.3
+```
+
+Nothing is emitted when the option is off, so a default deployment's output is unchanged.
 
 ### Log lines from a Git update
 
@@ -359,7 +412,8 @@ The log fields are `container`, `image`, `repo`, `ref`, `commit`, `changelog`, `
 {{ end }}{{ end }}
 ```
 
-Porcelain JSON and `/v1/check` expose the same values as `git_repo`, `git_ref`, `changelog`, `oci_source`, `image_url`, `documentation`, and `revision`.
+The `json` notification report emits the same values under camelCase keys: `gitRepo`, `gitRef`, `changelog`, `ociSource`, `imageUrl`, `documentation`, `currentImageVersion`, `latestImageVersion`, `currentImageRevision`, and `latestImageRevision`.
+Porcelain JSON and `/v1/check` use snake_case instead: `git_repo`, `git_ref`, `changelog`, `oci_source`, `image_url`, `documentation`, `current_image_version`, `latest_image_version`, `current_revision`, and `latest_revision`.
 
 ## Customizing Templates
 

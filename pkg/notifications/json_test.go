@@ -6,6 +6,7 @@ import (
 	"github.com/onsi/ginkgo/v2"
 	"github.com/onsi/gomega"
 
+	"github.com/nicholas-fedor/watchtower/pkg/container"
 	"github.com/nicholas-fedor/watchtower/pkg/session"
 	"github.com/nicholas-fedor/watchtower/pkg/types"
 )
@@ -237,15 +238,18 @@ var _ = ginkgo.Describe("JSON template", func() {
 var _ = ginkgo.Describe("JSON Git and OCI report fields", func() {
 	ginkgo.It("includes populated Git and OCI fields", func() {
 		status := session.NewContainerStatus("app", "org/app:latest")
-		status.SetGitMetadata(
-			"https://github.com/org/app.git",
-			"main",
-			"https://github.com/org/app/releases",
-			"https://github.com/org/app",
-			"https://example.com/image",
-			"https://example.com/docs",
-			"deadbeef",
-		)
+		status.SetGitMetadata(container.ReportMeta{
+			GitRepo:         "https://github.com/org/app.git",
+			GitRef:          "main",
+			Changelog:       "https://github.com/org/app/releases",
+			Source:          "https://github.com/org/app",
+			ImageURL:        "https://example.com/image",
+			Documentation:   "https://example.com/docs",
+			CurrentVersion:  "1.2.2",
+			LatestVersion:   "1.2.3",
+			CurrentRevision: "olddeadbeef",
+			LatestRevision:  "deadbeef",
+		})
 
 		got := marshalReports([]types.ContainerReport{status})
 		gomega.Expect(got).To(gomega.HaveLen(1))
@@ -255,7 +259,10 @@ var _ = ginkgo.Describe("JSON Git and OCI report fields", func() {
 		gomega.Expect(got[0]["ociSource"]).To(gomega.Equal("https://github.com/org/app"))
 		gomega.Expect(got[0]["imageUrl"]).To(gomega.Equal("https://example.com/image"))
 		gomega.Expect(got[0]["documentation"]).To(gomega.Equal("https://example.com/docs"))
-		gomega.Expect(got[0]["revision"]).To(gomega.Equal("deadbeef"))
+		gomega.Expect(got[0]["currentImageRevision"]).To(gomega.Equal("olddeadbeef"))
+		gomega.Expect(got[0]["latestImageRevision"]).To(gomega.Equal("deadbeef"))
+		gomega.Expect(got[0]["currentImageVersion"]).To(gomega.Equal("1.2.2"))
+		gomega.Expect(got[0]["latestImageVersion"]).To(gomega.Equal("1.2.3"))
 	})
 
 	ginkgo.It("omits empty Git and OCI fields", func() {
@@ -265,11 +272,13 @@ var _ = ginkgo.Describe("JSON Git and OCI report fields", func() {
 		gomega.Expect(got[0]).NotTo(gomega.HaveKey("gitRepo"))
 		gomega.Expect(got[0]).NotTo(gomega.HaveKey("changelog"))
 		gomega.Expect(got[0]).NotTo(gomega.HaveKey("ociSource"))
+		gomega.Expect(got[0]).NotTo(gomega.HaveKey("latestImageVersion"))
+		gomega.Expect(got[0]).NotTo(gomega.HaveKey("currentImageRevision"))
 	})
 
 	ginkgo.It("marshals updated reports with Git fields", func() {
 		status := session.NewContainerStatus("app", "org/app:latest")
-		status.SetGitMetadata("https://github.com/org/app.git", "main", "", "", "", "", "")
+		status.SetGitMetadata(container.ReportMeta{GitRepo: "https://github.com/org/app.git", GitRef: "main"})
 
 		raw, err := json.Marshal(Data{
 			Title: "update", Host: "box",

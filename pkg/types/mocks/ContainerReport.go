@@ -133,6 +133,94 @@ func (_c *MockContainerReport_CurrentImageID_Call) RunAndReturn(run func() types
 	return _c
 }
 
+// CurrentImageRevision provides a mock function for the type MockContainerReport
+func (_mock *MockContainerReport) CurrentImageRevision() string {
+	ret := _mock.Called()
+
+	if len(ret) == 0 {
+		panic("no return value specified for CurrentImageRevision")
+	}
+
+	var r0 string
+	if returnFunc, ok := ret.Get(0).(func() string); ok {
+		r0 = returnFunc()
+	} else {
+		r0 = ret.Get(0).(string)
+	}
+	return r0
+}
+
+// MockContainerReport_CurrentImageRevision_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'CurrentImageRevision'
+type MockContainerReport_CurrentImageRevision_Call struct {
+	*mock.Call
+}
+
+// CurrentImageRevision is a helper method to define mock.On call
+func (_e *MockContainerReport_Expecter) CurrentImageRevision() *MockContainerReport_CurrentImageRevision_Call {
+	return &MockContainerReport_CurrentImageRevision_Call{Call: _e.mock.On("CurrentImageRevision")}
+}
+
+func (_c *MockContainerReport_CurrentImageRevision_Call) Run(run func()) *MockContainerReport_CurrentImageRevision_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run()
+	})
+	return _c
+}
+
+func (_c *MockContainerReport_CurrentImageRevision_Call) Return(s string) *MockContainerReport_CurrentImageRevision_Call {
+	_c.Call.Return(s)
+	return _c
+}
+
+func (_c *MockContainerReport_CurrentImageRevision_Call) RunAndReturn(run func() string) *MockContainerReport_CurrentImageRevision_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
+// CurrentImageVersion provides a mock function for the type MockContainerReport
+func (_mock *MockContainerReport) CurrentImageVersion() string {
+	ret := _mock.Called()
+
+	if len(ret) == 0 {
+		panic("no return value specified for CurrentImageVersion")
+	}
+
+	var r0 string
+	if returnFunc, ok := ret.Get(0).(func() string); ok {
+		r0 = returnFunc()
+	} else {
+		r0 = ret.Get(0).(string)
+	}
+	return r0
+}
+
+// MockContainerReport_CurrentImageVersion_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'CurrentImageVersion'
+type MockContainerReport_CurrentImageVersion_Call struct {
+	*mock.Call
+}
+
+// CurrentImageVersion is a helper method to define mock.On call
+func (_e *MockContainerReport_Expecter) CurrentImageVersion() *MockContainerReport_CurrentImageVersion_Call {
+	return &MockContainerReport_CurrentImageVersion_Call{Call: _e.mock.On("CurrentImageVersion")}
+}
+
+func (_c *MockContainerReport_CurrentImageVersion_Call) Run(run func()) *MockContainerReport_CurrentImageVersion_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run()
+	})
+	return _c
+}
+
+func (_c *MockContainerReport_CurrentImageVersion_Call) Return(s string) *MockContainerReport_CurrentImageVersion_Call {
+	_c.Call.Return(s)
+	return _c
+}
+
+func (_c *MockContainerReport_CurrentImageVersion_Call) RunAndReturn(run func() string) *MockContainerReport_CurrentImageVersion_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // Documentation provides a mock function for the type MockContainerReport
 func (_mock *MockContainerReport) Documentation() string {
 	ret := _mock.Called()
@@ -529,6 +617,94 @@ func (_c *MockContainerReport_LatestImageID_Call) RunAndReturn(run func() types.
 	return _c
 }
 
+// LatestImageRevision provides a mock function for the type MockContainerReport
+func (_mock *MockContainerReport) LatestImageRevision() string {
+	ret := _mock.Called()
+
+	if len(ret) == 0 {
+		panic("no return value specified for LatestImageRevision")
+	}
+
+	var r0 string
+	if returnFunc, ok := ret.Get(0).(func() string); ok {
+		r0 = returnFunc()
+	} else {
+		r0 = ret.Get(0).(string)
+	}
+	return r0
+}
+
+// MockContainerReport_LatestImageRevision_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'LatestImageRevision'
+type MockContainerReport_LatestImageRevision_Call struct {
+	*mock.Call
+}
+
+// LatestImageRevision is a helper method to define mock.On call
+func (_e *MockContainerReport_Expecter) LatestImageRevision() *MockContainerReport_LatestImageRevision_Call {
+	return &MockContainerReport_LatestImageRevision_Call{Call: _e.mock.On("LatestImageRevision")}
+}
+
+func (_c *MockContainerReport_LatestImageRevision_Call) Run(run func()) *MockContainerReport_LatestImageRevision_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run()
+	})
+	return _c
+}
+
+func (_c *MockContainerReport_LatestImageRevision_Call) Return(s string) *MockContainerReport_LatestImageRevision_Call {
+	_c.Call.Return(s)
+	return _c
+}
+
+func (_c *MockContainerReport_LatestImageRevision_Call) RunAndReturn(run func() string) *MockContainerReport_LatestImageRevision_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
+// LatestImageVersion provides a mock function for the type MockContainerReport
+func (_mock *MockContainerReport) LatestImageVersion() string {
+	ret := _mock.Called()
+
+	if len(ret) == 0 {
+		panic("no return value specified for LatestImageVersion")
+	}
+
+	var r0 string
+	if returnFunc, ok := ret.Get(0).(func() string); ok {
+		r0 = returnFunc()
+	} else {
+		r0 = ret.Get(0).(string)
+	}
+	return r0
+}
+
+// MockContainerReport_LatestImageVersion_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'LatestImageVersion'
+type MockContainerReport_LatestImageVersion_Call struct {
+	*mock.Call
+}
+
+// LatestImageVersion is a helper method to define mock.On call
+func (_e *MockContainerReport_Expecter) LatestImageVersion() *MockContainerReport_LatestImageVersion_Call {
+	return &MockContainerReport_LatestImageVersion_Call{Call: _e.mock.On("LatestImageVersion")}
+}
+
+func (_c *MockContainerReport_LatestImageVersion_Call) Run(run func()) *MockContainerReport_LatestImageVersion_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run()
+	})
+	return _c
+}
+
+func (_c *MockContainerReport_LatestImageVersion_Call) Return(s string) *MockContainerReport_LatestImageVersion_Call {
+	_c.Call.Return(s)
+	return _c
+}
+
+func (_c *MockContainerReport_LatestImageVersion_Call) RunAndReturn(run func() string) *MockContainerReport_LatestImageVersion_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // Name provides a mock function for the type MockContainerReport
 func (_mock *MockContainerReport) Name() string {
 	ret := _mock.Called()
@@ -613,50 +789,6 @@ func (_c *MockContainerReport_NewContainerID_Call) Return(containerID types.Cont
 }
 
 func (_c *MockContainerReport_NewContainerID_Call) RunAndReturn(run func() types.ContainerID) *MockContainerReport_NewContainerID_Call {
-	_c.Call.Return(run)
-	return _c
-}
-
-// Revision provides a mock function for the type MockContainerReport
-func (_mock *MockContainerReport) Revision() string {
-	ret := _mock.Called()
-
-	if len(ret) == 0 {
-		panic("no return value specified for Revision")
-	}
-
-	var r0 string
-	if returnFunc, ok := ret.Get(0).(func() string); ok {
-		r0 = returnFunc()
-	} else {
-		r0 = ret.Get(0).(string)
-	}
-	return r0
-}
-
-// MockContainerReport_Revision_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'Revision'
-type MockContainerReport_Revision_Call struct {
-	*mock.Call
-}
-
-// Revision is a helper method to define mock.On call
-func (_e *MockContainerReport_Expecter) Revision() *MockContainerReport_Revision_Call {
-	return &MockContainerReport_Revision_Call{Call: _e.mock.On("Revision")}
-}
-
-func (_c *MockContainerReport_Revision_Call) Run(run func()) *MockContainerReport_Revision_Call {
-	_c.Call.Run(func(args mock.Arguments) {
-		run()
-	})
-	return _c
-}
-
-func (_c *MockContainerReport_Revision_Call) Return(s string) *MockContainerReport_Revision_Call {
-	_c.Call.Return(s)
-	return _c
-}
-
-func (_c *MockContainerReport_Revision_Call) RunAndReturn(run func() string) *MockContainerReport_Revision_Call {
 	_c.Call.Return(run)
 	return _c
 }

@@ -94,7 +94,11 @@ func (p *PreviewData) AddFromState(state State) {
 	}
 	if state == UpdatedState {
 		status.gitRef = "v1.2.4"
-		status.changelog = "https://github.com/org/app/releases"
+		status.changelog = "https://github.com/org/app/releases/tag/v1.2.4"
+		status.currentImageVersion = "1.2.3"
+		status.latestImageVersion = "1.2.4"
+		status.currentImageRevision = "1111111111"
+		status.latestImageRevision = "2222222222"
 	}
 
 	switch state {

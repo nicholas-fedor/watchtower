@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/moby/moby/api/types/container"
+	"github.com/nicholas-fedor/watchtower/pkg/container/oci"
 	"github.com/nicholas-fedor/watchtower/pkg/types"
 	mock "github.com/stretchr/testify/mock"
 )
@@ -583,6 +584,63 @@ func (_c *MockClient_GetCurrentWatchtowerContainer_Call) Return(container types.
 }
 
 func (_c *MockClient_GetCurrentWatchtowerContainer_Call) RunAndReturn(run func(ctx context.Context, containerID types.ContainerID) (types.Container, error)) *MockClient_GetCurrentWatchtowerContainer_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
+// GetImageAnnotations provides a mock function for the type MockClient
+func (_mock *MockClient) GetImageAnnotations(ctx context.Context, imageRef string) oci.Annotations {
+	ret := _mock.Called(ctx, imageRef)
+
+	if len(ret) == 0 {
+		panic("no return value specified for GetImageAnnotations")
+	}
+
+	var r0 oci.Annotations
+	if returnFunc, ok := ret.Get(0).(func(context.Context, string) oci.Annotations); ok {
+		r0 = returnFunc(ctx, imageRef)
+	} else {
+		r0 = ret.Get(0).(oci.Annotations)
+	}
+	return r0
+}
+
+// MockClient_GetImageAnnotations_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'GetImageAnnotations'
+type MockClient_GetImageAnnotations_Call struct {
+	*mock.Call
+}
+
+// GetImageAnnotations is a helper method to define mock.On call
+//   - ctx context.Context
+//   - imageRef string
+func (_e *MockClient_Expecter) GetImageAnnotations(ctx any, imageRef any) *MockClient_GetImageAnnotations_Call {
+	return &MockClient_GetImageAnnotations_Call{Call: _e.mock.On("GetImageAnnotations", ctx, imageRef)}
+}
+
+func (_c *MockClient_GetImageAnnotations_Call) Run(run func(ctx context.Context, imageRef string)) *MockClient_GetImageAnnotations_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		var arg0 context.Context
+		if args[0] != nil {
+			arg0 = args[0].(context.Context)
+		}
+		var arg1 string
+		if args[1] != nil {
+			arg1 = args[1].(string)
+		}
+		run(
+			arg0,
+			arg1,
+		)
+	})
+	return _c
+}
+
+func (_c *MockClient_GetImageAnnotations_Call) Return(annotations oci.Annotations) *MockClient_GetImageAnnotations_Call {
+	_c.Call.Return(annotations)
+	return _c
+}
+
+func (_c *MockClient_GetImageAnnotations_Call) RunAndReturn(run func(ctx context.Context, imageRef string) oci.Annotations) *MockClient_GetImageAnnotations_Call {
 	_c.Call.Return(run)
 	return _c
 }

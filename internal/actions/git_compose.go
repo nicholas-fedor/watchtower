@@ -14,6 +14,7 @@ import (
 	"github.com/nicholas-fedor/watchtower/internal/git/project"
 	"github.com/nicholas-fedor/watchtower/pkg/container"
 	gitPkg "github.com/nicholas-fedor/watchtower/pkg/container/git"
+	"github.com/nicholas-fedor/watchtower/pkg/container/oci"
 	"github.com/nicholas-fedor/watchtower/pkg/session"
 	"github.com/nicholas-fedor/watchtower/pkg/types"
 )
@@ -321,7 +322,14 @@ func (s *gitSession) recordCompose(
 		progress.SetLatestImage(log, c.ID(), item.ImageID)
 	}
 
-	progress.RefreshChangelog(c, params, result.Tag, result.Commit)
+	// A Git rebuild has no pulled image, so no latest image annotations are
+	// passed and LatestImageVersion stays empty.
+	meta := progress.SetLatestImageMeta(log, c, params, container.ChangelogVars{
+		Tag:    result.Tag,
+		Commit: result.Commit,
+	}, oci.Annotations{})
+
+	logChangelog(log, c, params, meta)
 
 	if item.ID == "" {
 		return
@@ -463,16 +471,8 @@ func (s *gitSession) recordComposeReplicas(
 		meta := container.ResolveReportMeta(representative.container, params, container.ChangelogVars{
 			Tag:    representative.result.Tag,
 			Commit: representative.result.Commit,
-		})
-		status.SetGitMetadata(
-			status.GitRepo(),
-			status.GitRef(),
-			meta.Changelog,
-			status.Source(),
-			status.ImageURL(),
-			status.Documentation(),
-			status.Revision(),
-		)
+		}, oci.Annotations{})
+		status.SetGitMetadata(meta)
 
 		if !params.NoRestart {
 			status.SetNewContainerID(item.ID)
@@ -771,7 +771,7 @@ func composeServiceLabels(c types.Container, params types.UpdateParams, result g
 		meta := container.ResolveReportMeta(c, params, container.ChangelogVars{
 			Tag:    result.Tag,
 			Commit: result.Commit,
-		})
+		}, oci.Annotations{})
 		if meta.GitRepo != "" {
 			out[gitPkg.RepoLabel] = meta.GitRepo
 		}

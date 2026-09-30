@@ -6,6 +6,7 @@ import (
 	"github.com/rs/zerolog"
 
 	"github.com/nicholas-fedor/watchtower/pkg/container"
+	"github.com/nicholas-fedor/watchtower/pkg/container/oci"
 	"github.com/nicholas-fedor/watchtower/pkg/types"
 )
 
@@ -143,16 +144,8 @@ func applyReportMeta(status *ContainerStatus, c types.Container, params types.Up
 		return
 	}
 
-	meta := container.ResolveReportMeta(c, params, container.ChangelogVars{})
-	status.SetGitMetadata(
-		meta.GitRepo,
-		meta.GitRef,
-		meta.Changelog,
-		meta.Source,
-		meta.ImageURL,
-		meta.Documentation,
-		meta.Revision,
-	)
+	meta := container.ResolveReportMeta(c, params, container.ChangelogVars{}, oci.Annotations{})
+	status.SetGitMetadata(meta)
 }
 
 // SetLatestImage updates the latest image ID recorded for a container.
@@ -177,35 +170,50 @@ func (m Progress) SetLatestImage(log *zerolog.Logger, containerID types.Containe
 		Msg("Updated latest image on container status")
 }
 
-// RefreshChangelog re-resolves the changelog using a known new version.
+// SetLatestImageMeta re-resolves report metadata for a known new image and
+// applies it to a container's status.
+//
+// It serves both update paths. A registry update passes the pulled image's
+// annotations and, when the changelog feature is enabled, a probed release
+// tag. A Git rebuild passes its resolved tag and commit with no latest
+// annotations, so LatestImageVersion stays empty.
 //
 // Parameters:
+//   - log: Process logger.
 //   - c: Container whose report should be updated.
 //   - params: Update parameters.
-//   - tag: New tag for placeholders.
-//   - commit: New commit for placeholders.
+//   - vars: New-version values for changelog placeholders.
+//   - latest: OCI annotations from a newly pulled image, or empty for none.
 //
 // Returns:
-//   - none.
-func (m Progress) RefreshChangelog(
+//   - container.ReportMeta: The applied metadata, or empty when nothing changed.
+func (m Progress) SetLatestImageMeta(
+	log *zerolog.Logger,
 	c types.Container,
 	params types.UpdateParams,
-	tag, commit string,
-) {
+	vars container.ChangelogVars,
+	latest oci.Annotations,
+) container.ReportMeta {
 	if c == nil {
-		return
+		return container.ReportMeta{}
 	}
 
 	update, exists := m[c.ID()]
 	if !exists {
-		return
+		return container.ReportMeta{}
 	}
 
-	meta := container.ResolveReportMeta(c, params, container.ChangelogVars{
-		Tag:    tag,
-		Commit: commit,
-	})
-	update.changelog = meta.Changelog
+	meta := container.ResolveReportMeta(c, params, vars, latest)
+	update.SetGitMetadata(meta)
+
+	log.Debug().
+		Str("container_id", c.ID().ShortID()).
+		Str("name", update.Name()).
+		Str("latest_version", meta.LatestVersion).
+		Str("changelog", meta.Changelog).
+		Msg("Applied latest image metadata to container status")
+
+	return meta
 }
 
 // Add inserts a container status into the progress map.

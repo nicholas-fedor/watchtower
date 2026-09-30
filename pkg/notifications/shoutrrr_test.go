@@ -28,6 +28,7 @@ import (
 
 	mockActions "github.com/nicholas-fedor/watchtower/internal/actions/mocks"
 	"github.com/nicholas-fedor/watchtower/internal/flags"
+	"github.com/nicholas-fedor/watchtower/pkg/container"
 	"github.com/nicholas-fedor/watchtower/pkg/session"
 	"github.com/nicholas-fedor/watchtower/pkg/types"
 )
@@ -482,15 +483,17 @@ updt1 (mock/updt1:latest): Updated
 		ginkgo.When("using a template referencing Git and OCI report fields", func() {
 			ginkgo.It("should render Changelog, GitRepo, and Source", func() {
 				status := session.NewContainerStatus("app", "org/app:latest")
-				status.SetGitMetadata(
-					"https://github.com/org/app.git",
-					"v1.2.3",
-					"https://github.com/org/app/releases",
-					"https://github.com/org/app",
-					"https://example.com/image",
-					"https://example.com/docs",
-					"abc123",
-				)
+				status.SetGitMetadata(container.ReportMeta{
+					GitRepo:         "https://github.com/org/app.git",
+					GitRef:          "v1.2.3",
+					Changelog:       "https://github.com/org/app/releases",
+					Source:          "https://github.com/org/app",
+					ImageURL:        "https://example.com/image",
+					Documentation:   "https://example.com/docs",
+					CurrentVersion:  "1.2.2",
+					LatestVersion:   "1.2.3",
+					CurrentRevision: "abc123",
+				})
 
 				report := &session.SingleContainerReport{
 					UpdatedReports: []types.ContainerReport{status},

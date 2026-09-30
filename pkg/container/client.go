@@ -21,6 +21,7 @@ import (
 	dockerClient "github.com/moby/moby/client"
 
 	"github.com/nicholas-fedor/watchtower/internal/flags"
+	"github.com/nicholas-fedor/watchtower/pkg/container/oci"
 	"github.com/nicholas-fedor/watchtower/pkg/registry"
 	"github.com/nicholas-fedor/watchtower/pkg/types"
 )
@@ -211,6 +212,22 @@ type Client interface {
 		container types.Container,
 		params types.UpdateParams,
 	) (bool, types.ImageID, string, error)
+
+	// GetImageAnnotations reads the OCI annotations of an image by reference.
+	//
+	// The read is a local Docker daemon inspect, so it never counts against a
+	// registry rate limit. It resolves the new image's annotations after a pull,
+	// which the running container's inspect cannot provide. An unreadable image
+	// yields empty annotations rather than an error, because metadata must never
+	// fail a session.
+	//
+	// Parameters:
+	//   - ctx: Context for cancellation and timeout control.
+	//   - imageRef: Image reference, tag or digest, to inspect.
+	//
+	// Returns:
+	//   - oci.Annotations: Annotations from the image config labels, or empty.
+	GetImageAnnotations(ctx context.Context, imageRef string) oci.Annotations
 
 	// ExecuteCommand runs a command inside a container and returns whether
 	// to skip updates based on the result.
@@ -1230,6 +1247,20 @@ func (c *client) CheckContainerUpdate(
 	}
 
 	return available, newestImage, latestDigest, err
+}
+
+// GetImageAnnotations reads the OCI annotations of an image by reference.
+//
+// Parameters:
+//   - ctx: Context for cancellation and timeout control.
+//   - imageRef: Image reference, tag or digest, to inspect.
+//
+// Returns:
+//   - oci.Annotations: Annotations from the image config labels, or empty.
+func (c *client) GetImageAnnotations(ctx context.Context, imageRef string) oci.Annotations {
+	imgClient := newImageClient(c.api, c.logger())
+
+	return imgClient.GetImageAnnotations(ctx, imageRef)
 }
 
 // ExecuteCommand runs a command inside a container and evaluates its result.

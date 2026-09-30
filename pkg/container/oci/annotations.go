@@ -32,8 +32,24 @@ func Read(c types.Container) Annotations {
 		return Annotations{}
 	}
 
-	// Image inspect stores OCI annotations as ordinary config labels.
-	labels := info.Config.Labels
+	return FromLabels(info.Config.Labels)
+}
+
+// FromLabels extracts OCI annotations from a raw image config label map.
+//
+// Image inspect stores OCI annotations as ordinary config labels, so both the
+// running image and a pulled image are read through this one implementation.
+// Values are trimmed, and a whitespace-only value becomes empty.
+//
+// Parameters:
+//   - labels: Raw image config labels. A nil map yields empty annotations.
+//
+// Returns:
+//   - Annotations: Populated from the known OCI label keys only.
+func FromLabels(labels map[string]string) Annotations {
+	if labels == nil {
+		return Annotations{}
+	}
 
 	return Annotations{
 		Source:        strings.TrimSpace(labels[SourceLabel]),

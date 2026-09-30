@@ -23,16 +23,18 @@ type ChangelogVars struct {
 // Changelog returns an explicit template, a derived releases URL, or empty.
 //
 // It does not read OCI annotations. Callers may fall back to OCI URL or docs.
+// When vars.Tag is set, a derived URL points at that specific release rather
+// than the release index.
 //
 // Parameters:
 //   - c: Container that may carry a changelog or git-host label.
 //   - repo: Associated or inferred Git clone URL.
-//   - vars: Placeholder values for an explicit template.
+//   - vars: Placeholder values for an explicit template and the derived release tag.
 //
 // Returns:
 //   - string: Changelog URL, or empty when none can be derived.
 func Changelog(c types.Container, repo string, vars ChangelogVars) string {
-	if template := label(c, ChangelogLabel); template != "" {
+	if template := label(c, ChangelogURLLabel); template != "" {
 		return applyVars(template, vars)
 	}
 
@@ -41,7 +43,7 @@ func Changelog(c types.Container, repo string, vars ChangelogVars) string {
 		apiOrigin = label(c, HostLabel)
 	}
 
-	return derivedReleasesURL(repo, apiOrigin)
+	return derivedReleasesURL(repo, apiOrigin, vars.Tag)
 }
 
 // applyVars substitutes {tag}, {commit}, and semver placeholders in template.
@@ -142,13 +144,17 @@ func canonicalizeSemver(tag string) string {
 
 // derivedReleasesURL builds a product-specific releases URL for a clone URL.
 //
+// When tag is a safe release tag, the URL points at that single release. An
+// empty or unsafe tag yields the release index instead.
+//
 // Parameters:
 //   - repo: Git clone URL.
 //   - apiOrigin: Optional HTTP API base URL from the git-host label.
+//   - tag: Exact release tag spelling, or empty for the release index.
 //
 // Returns:
 //   - string: Releases URL, or empty for unknown hosts.
-func derivedReleasesURL(repo, apiOrigin string) string {
+func derivedReleasesURL(repo, apiOrigin, tag string) string {
 	host, owner, name, ok := parseRepo(repo)
 	if !ok {
 		return ""
@@ -181,17 +187,70 @@ func derivedReleasesURL(repo, apiOrigin string) string {
 	}
 
 	path := owner + "/" + name
+	suffix := releaseTagSuffix(kind, tag)
 
+	if suffix == "" {
+		return ""
+	}
+
+	return base + "/" + path + suffix
+}
+
+// releaseTagSuffix returns the path suffix for a provider, pointing at one
+// release when tag is safe.
+//
+// An empty result means the provider is unknown. A safe tag appends a versioned
+// path. An empty or unsafe tag appends the release index so a malformed or
+// hostile tag can never be spliced into a URL.
+//
+// Parameters:
+//   - kind: Provider classification from the clone host or git-host label.
+//   - tag: Exact release tag spelling, or empty for the release index.
+//
+// Returns:
+//   - string: Path suffix beginning with a slash, or empty for an unknown provider.
+func releaseTagSuffix(kind, tag string) string {
 	switch kind {
-	case types.GitHostGitHub:
-		return base + "/" + path + "/releases"
+	case types.GitHostGitHub, types.GitHostGitea:
+		if safeReleaseTag(tag) {
+			return "/releases/tag/" + tag
+		}
+
+		return "/releases"
 	case types.GitHostGitLab:
-		return base + "/" + path + "/-/releases"
-	case types.GitHostGitea:
-		return base + "/" + path + "/releases"
+		if safeReleaseTag(tag) {
+			return "/-/releases/" + tag
+		}
+
+		return "/-/releases"
 	default:
 		return ""
 	}
+}
+
+// safeReleaseTag reports whether a tag can be embedded in a release URL.
+//
+// Git permits slashes in tag names, so a hierarchical tag such as
+// "release/1.2.3" stays usable. Empty, dot, and parent segments are rejected so
+// a tag cannot alter the path structure of the derived URL.
+//
+// Parameters:
+//   - tag: Candidate release tag.
+//
+// Returns:
+//   - bool: True when the tag is safe to embed.
+func safeReleaseTag(tag string) bool {
+	if tag == "" || strings.ContainsAny(tag, " ?#\\%\x00") {
+		return false
+	}
+
+	for part := range strings.SplitSeq(tag, "/") {
+		if part == "" || part == "." || part == ".." {
+			return false
+		}
+	}
+
+	return true
 }
 
 // sameChangelogHost reports whether a clone host and API origin share a hostname.

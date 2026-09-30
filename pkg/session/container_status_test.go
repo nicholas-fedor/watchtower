@@ -6,6 +6,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/nicholas-fedor/watchtower/pkg/container"
 	"github.com/nicholas-fedor/watchtower/pkg/types"
 )
 
@@ -405,15 +406,18 @@ func TestNewContainerStatus(t *testing.T) {
 
 func TestContainerStatus_SetGitMetadata(t *testing.T) {
 	u := &ContainerStatus{}
-	u.SetGitMetadata(
-		"https://github.com/org/app.git",
-		"main",
-		"https://github.com/org/app/releases",
-		"https://github.com/org/app",
-		"https://example.com/image",
-		"https://example.com/docs",
-		"deadbeef",
-	)
+	u.SetGitMetadata(container.ReportMeta{
+		GitRepo:         "https://github.com/org/app.git",
+		GitRef:          "main",
+		Changelog:       "https://github.com/org/app/releases/tag/v1.2.3",
+		Source:          "https://github.com/org/app",
+		ImageURL:        "https://example.com/image",
+		Documentation:   "https://example.com/docs",
+		CurrentVersion:  "1.2.2",
+		LatestVersion:   "1.2.3",
+		CurrentRevision: "olddeadbeef",
+		LatestRevision:  "deadbeef",
+	})
 
 	if u.GitRepo() != "https://github.com/org/app.git" {
 		t.Errorf("GitRepo() = %q", u.GitRepo())
@@ -423,7 +427,7 @@ func TestContainerStatus_SetGitMetadata(t *testing.T) {
 		t.Errorf("GitRef() = %q", u.GitRef())
 	}
 
-	if u.Changelog() != "https://github.com/org/app/releases" {
+	if u.Changelog() != "https://github.com/org/app/releases/tag/v1.2.3" {
 		t.Errorf("Changelog() = %q", u.Changelog())
 	}
 
@@ -439,8 +443,40 @@ func TestContainerStatus_SetGitMetadata(t *testing.T) {
 		t.Errorf("Documentation() = %q", u.Documentation())
 	}
 
-	if u.Revision() != "deadbeef" {
-		t.Errorf("Revision() = %q", u.Revision())
+	if u.CurrentImageVersion() != "1.2.2" {
+		t.Errorf("CurrentImageVersion() = %q", u.CurrentImageVersion())
+	}
+
+	if u.LatestImageVersion() != "1.2.3" {
+		t.Errorf("LatestImageVersion() = %q", u.LatestImageVersion())
+	}
+
+	if u.CurrentImageRevision() != "olddeadbeef" {
+		t.Errorf("CurrentImageRevision() = %q", u.CurrentImageRevision())
+	}
+
+	if u.LatestImageRevision() != "deadbeef" {
+		t.Errorf("LatestImageRevision() = %q", u.LatestImageRevision())
+	}
+}
+
+func TestContainerStatus_ImageVersionDefaultsToEmpty(t *testing.T) {
+	u := &ContainerStatus{}
+
+	if got := u.CurrentImageVersion(); got != "" {
+		t.Errorf("CurrentImageVersion() = %q, want empty", got)
+	}
+
+	if got := u.LatestImageVersion(); got != "" {
+		t.Errorf("LatestImageVersion() = %q, want empty", got)
+	}
+
+	if got := u.CurrentImageRevision(); got != "" {
+		t.Errorf("CurrentImageRevision() = %q, want empty", got)
+	}
+
+	if got := u.LatestImageRevision(); got != "" {
+		t.Errorf("LatestImageRevision() = %q, want empty", got)
 	}
 }
 

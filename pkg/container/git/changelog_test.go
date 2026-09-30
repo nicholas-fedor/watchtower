@@ -13,7 +13,7 @@ func TestChangelog(t *testing.T) {
 		t.Parallel()
 
 		c := testContainer(t, map[string]string{
-			ChangelogLabel: "https://example.com/notes/{tag}#{commit}",
+			ChangelogURLLabel: "https://example.com/notes/{tag}#{commit}",
 		}, "app:latest")
 		got := Changelog(c, "https://github.com/org/app.git", ChangelogVars{Tag: "v1.2.3", Commit: "abc"})
 		assert.Equal(t, "https://example.com/notes/v1.2.3#abc", got)
@@ -26,11 +26,35 @@ func TestChangelog(t *testing.T) {
 		assert.Equal(t, "https://github.com/org/app/releases", got)
 	})
 
+	t.Run("derived url for a known tag", func(t *testing.T) {
+		t.Parallel()
+
+		got := Changelog(testContainer(t, nil, "app:latest"), "https://github.com/org/app.git", ChangelogVars{Tag: "v1.2.3"})
+		assert.Equal(t, "https://github.com/org/app/releases/tag/v1.2.3", got)
+	})
+
+	t.Run("explicit template wins over a known tag", func(t *testing.T) {
+		t.Parallel()
+
+		c := testContainer(t, map[string]string{
+			ChangelogURLLabel: "https://example.com/notes/{tag}",
+		}, "app:latest")
+		got := Changelog(c, "https://github.com/org/app.git", ChangelogVars{Tag: "v1.2.3"})
+		assert.Equal(t, "https://example.com/notes/v1.2.3", got)
+	})
+
 	t.Run("empty when unknown host", func(t *testing.T) {
 		t.Parallel()
 
 		got := Changelog(testContainer(t, nil, "app:latest"), "https://git.unknown.example/org/app.git", ChangelogVars{})
 		assert.Empty(t, got)
+	})
+
+	t.Run("unsafe tag falls back to the release index", func(t *testing.T) {
+		t.Parallel()
+
+		got := Changelog(testContainer(t, nil, "app:latest"), "https://github.com/org/app.git", ChangelogVars{Tag: "../other"})
+		assert.Equal(t, "https://github.com/org/app/releases", got)
 	})
 }
 
@@ -101,11 +125,23 @@ func TestDerivedReleasesURL(t *testing.T) {
 		name      string
 		repo      string
 		apiOrigin string
+		tag       string
 		want      string
 	}{
 		{name: "github", repo: "https://github.com/org/app.git", want: "https://github.com/org/app/releases"},
 		{name: "gitlab", repo: "https://gitlab.com/org/app.git", want: "https://gitlab.com/org/app/-/releases"},
 		{name: "codeberg", repo: "https://codeberg.org/org/app.git", want: "https://codeberg.org/org/app/releases"},
+		{name: "github versioned", repo: "https://github.com/org/app.git", tag: "v1.2.3", want: "https://github.com/org/app/releases/tag/v1.2.3"},
+		{name: "github versioned unprefixed", repo: "https://github.com/org/app.git", tag: "1.2.3", want: "https://github.com/org/app/releases/tag/1.2.3"},
+		{name: "gitlab versioned", repo: "https://gitlab.com/org/app.git", tag: "v1.2.3", want: "https://gitlab.com/org/app/-/releases/v1.2.3"},
+		{name: "codeberg versioned", repo: "https://codeberg.org/org/app.git", tag: "v1.2.3", want: "https://codeberg.org/org/app/releases/tag/v1.2.3"},
+		{name: "hierarchical tag", repo: "https://github.com/org/app.git", tag: "release/1.2.3", want: "https://github.com/org/app/releases/tag/release/1.2.3"},
+		{name: "dot-dot tag", repo: "https://github.com/org/app.git", tag: "../../secret", want: "https://github.com/org/app/releases"},
+		{name: "dot tag", repo: "https://github.com/org/app.git", tag: ".", want: "https://github.com/org/app/releases"},
+		{name: "tag with query", repo: "https://github.com/org/app.git", tag: "1.2.3?a=b", want: "https://github.com/org/app/releases"},
+		{name: "tag with space", repo: "https://github.com/org/app.git", tag: "1.2.3 x", want: "https://github.com/org/app/releases"},
+		{name: "tag with fragment", repo: "https://github.com/org/app.git", tag: "1.2.3#f", want: "https://github.com/org/app/releases"},
+		{name: "gitlab traversal", repo: "https://gitlab.com/org/app.git", tag: "..", want: "https://gitlab.com/org/app/-/releases"},
 		{
 			name:      "git-host label origin",
 			repo:      "git@git.example.com:org/app.git",
@@ -113,10 +149,24 @@ func TestDerivedReleasesURL(t *testing.T) {
 			want:      "https://git.example.com:3000/gitea/org/app/releases",
 		},
 		{
+			name:      "git-host label origin versioned",
+			repo:      "git@git.example.com:org/app.git",
+			apiOrigin: "https://git.example.com:3000/gitea",
+			tag:       "v1.2.3",
+			want:      "https://git.example.com:3000/gitea/org/app/releases/tag/v1.2.3",
+		},
+		{
 			name:      "self-hosted GitLab path",
 			repo:      "https://gitlab.example.com/group/app.git",
 			apiOrigin: "https://gitlab.example.com/gitlab",
 			want:      "https://gitlab.example.com/gitlab/group/app/-/releases",
+		},
+		{
+			name:      "self-hosted GitLab path versioned",
+			repo:      "https://gitlab.example.com/group/app.git",
+			apiOrigin: "https://gitlab.example.com/gitlab",
+			tag:       "v1.2.3",
+			want:      "https://gitlab.example.com/gitlab/group/app/-/releases/v1.2.3",
 		},
 		{
 			name:      "known GitHub API path is not in releases URL",
@@ -140,6 +190,7 @@ func TestDerivedReleasesURL(t *testing.T) {
 			apiOrigin: "https://git.example.com/internal",
 		},
 		{name: "unknown", repo: "https://git.unknown.example/org/app.git"},
+		{name: "unknown with tag", repo: "https://git.unknown.example/org/app.git", tag: "v1.2.3"},
 		{name: "empty"},
 	}
 
@@ -147,7 +198,45 @@ func TestDerivedReleasesURL(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 
-			assert.Equal(t, tt.want, derivedReleasesURL(tt.repo, tt.apiOrigin))
+			assert.Equal(t, tt.want, derivedReleasesURL(tt.repo, tt.apiOrigin, tt.tag))
+		})
+	}
+}
+
+func TestSafeReleaseTag(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		tag  string
+		want bool
+	}{
+		{tag: "v1.2.3", want: true},
+		{tag: "1.2.3", want: true},
+		{tag: "v1.2.3-rc.1", want: true},
+		{tag: "release/1.2.3", want: true},
+		{tag: "2026.09.1", want: true},
+		{tag: "nightly", want: true},
+		{tag: ""},
+		{tag: "/"},
+		{tag: "//"},
+		{tag: "a//b"},
+		{tag: "."},
+		{tag: ".."},
+		{tag: "a/../b"},
+		{tag: "a/./b"},
+		{tag: "1.2.3 x"},
+		{tag: "1.2.3?a=b"},
+		{tag: "1.2.3#f"},
+		{tag: "1.2.3\\x"},
+		{tag: "1.2.3%2f"},
+		{tag: "1.2.3\x00"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.tag, func(t *testing.T) {
+			t.Parallel()
+
+			assert.Equal(t, tt.want, safeReleaseTag(tt.tag))
 		})
 	}
 }

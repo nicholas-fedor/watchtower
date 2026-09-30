@@ -48,6 +48,8 @@ var (
 	errFailedGetToken = errors.New("failed to get token")
 	// errFailedBuildManifestURL indicates a failure to construct the manifest URL for the registry.
 	errFailedBuildManifestURL = errors.New("failed to build manifest URL")
+	// errFailedParseImageName indicates an image reference could not be parsed or retagged.
+	errFailedParseImageName = errors.New("failed to parse image name")
 	// errFailedCreateRequest indicates a failure to construct an HTTP request for digest retrieval.
 	errFailedCreateRequest = errors.New("failed to create request")
 	// errFailedExecuteRequest indicates a failure to execute an HTTP request to the registry.
@@ -310,6 +312,7 @@ func CompareDigestWithRemote(log *zerolog.Logger,
 		container,
 		registryAuth,
 		http.MethodHead,
+		"",
 		endpoints...,
 	)
 	if err != nil {
@@ -400,7 +403,39 @@ func FetchDigest(
 	authToken string,
 	endpoints ...string,
 ) (string, error) {
-	return fetchDigest(log, ctx, container, authToken, http.MethodGet, endpoints...)
+	return fetchDigest(log, ctx, container, authToken, http.MethodGet, "", endpoints...)
+}
+
+// FetchDigestForTag retrieves the manifest digest of a specific tag.
+//
+// It is used to confirm which release tag a maintainer actually published, so a
+// changelog link can name the exact release rather than the release index. The
+// request is a HEAD: a missing digest header is not retried with a GET, because
+// the probe is optional and must stay cheap.
+//
+// Authentication is scoped to the container's repository, which is the same for
+// every tag, so only the manifest specifier changes between candidates.
+//
+// Parameters:
+//   - log: Logger.
+//   - ctx: The context controlling the request's lifecycle.
+//   - container: Container whose image supplies the repository and registry host.
+//   - authToken: A base64-encoded authentication string for registry access.
+//   - tag: Exact tag to fetch the digest for.
+//   - endpoints: Optional list of registry mirror host overrides to try before the canonical host.
+//
+// Returns:
+//   - string: The normalized digest, or empty when the tag does not exist.
+//   - error: Non-nil if the request fails, nil on success.
+func FetchDigestForTag(
+	log *zerolog.Logger,
+	ctx context.Context,
+	container types.Container,
+	authToken string,
+	tag string,
+	endpoints ...string,
+) (string, error) {
+	return fetchDigest(log, ctx, container, authToken, http.MethodHead, tag, endpoints...)
 }
 
 // BuildManifestURL constructs and validates a manifest URL for a container.
@@ -428,9 +463,99 @@ func BuildManifestURL(log *zerolog.Logger,
 	container types.Container,
 	hostOverride string,
 ) (string, string, *url.URL, error) {
+	return buildManifestURLForImage(log, container.ImageName(), container.Name(), hostOverride)
+}
+
+// BuildManifestURLForTag constructs a manifest URL for a specific tag of an
+// image, leaving the repository and registry host unchanged.
+//
+// This is how a release tag is confirmed without pulling it: the manifest for
+// the candidate tag is requested and its digest compared with the digest of the
+// image that was actually pulled. Authentication scope is the repository, which
+// is identical for every tag, so only the manifest specifier changes.
+//
+// Parameters:
+//   - log: Logger.
+//   - container: Container whose image supplies the repository and registry host.
+//   - hostOverride: Optional host or endpoint URL to use instead of the canonical host.
+//   - tag: Exact tag to target. An empty tag yields the container's own reference.
+//
+// Returns:
+//   - string: The final manifest URL.
+//   - string: The original host before applying hostOverride.
+//   - *url.URL: The parsed URL object.
+//   - error: Non-nil if construction or validation fails.
+func BuildManifestURLForTag(log *zerolog.Logger,
+	container types.Container,
+	hostOverride string,
+	tag string,
+) (string, string, *url.URL, error) {
+	imageName, err := imageNameForTag(container.ImageName(), tag)
+	if err != nil {
+		log.Debug().
+			Err(err).
+			Str("image", container.ImageName()).
+			Str("tag", tag).
+			Msg("Failed to resolve image name for tag")
+
+		return "", "", nil, fmt.Errorf("%w: %w", errFailedBuildManifestURL, err)
+	}
+
+	return buildManifestURLForImage(log, imageName, container.Name(), hostOverride)
+}
+
+// imageNameForTag returns the image reference with its tag replaced by tag.
+//
+// The repository and registry host are preserved. A reference that carries no
+// usable tag gets one appended, so a bare repository name still resolves.
+//
+// Parameters:
+//   - imageName: Original image reference.
+//   - tag: Exact tag to apply, or empty to leave the reference unchanged.
+//
+// Returns:
+//   - string: Image reference for the requested tag.
+//   - error: Non-nil when the reference or the tag cannot be parsed.
+func imageNameForTag(imageName, tag string) (string, error) {
+	if tag == "" {
+		return imageName, nil
+	}
+
+	named, err := reference.ParseNormalizedNamed(imageName)
+	if err != nil {
+		return "", fmt.Errorf("%w: %w", errFailedParseImageName, err)
+	}
+
+	tagged, err := reference.WithTag(reference.TrimNamed(named), tag)
+	if err != nil {
+		return "", fmt.Errorf("%w: %w", errFailedParseImageName, err)
+	}
+
+	return tagged.String(), nil
+}
+
+// buildManifestURLForImage constructs and validates a manifest URL for an image
+// reference.
+//
+// Parameters:
+//   - log: Logger.
+//   - imageName: Image reference supplying the registry host and repository.
+//   - containerName: Container name used only for log context.
+//   - hostOverride: Optional host or endpoint URL to use instead of the canonical host.
+//
+// Returns:
+//   - string: The final manifest URL.
+//   - string: The original host before applying hostOverride.
+//   - *url.URL: The parsed URL object.
+//   - error: Non-nil if construction or validation fails.
+func buildManifestURLForImage(log *zerolog.Logger,
+	imageName,
+	containerName,
+	hostOverride string,
+) (string, string, *url.URL, error) {
 	fields := map[string]any{
-		"container": container.Name(),
-		"image":     container.ImageName(),
+		"container": containerName,
+		"image":     imageName,
 	}
 
 	// Determine scheme based on WATCHTOWER_REGISTRY_TLS_SKIP.
@@ -445,11 +570,11 @@ func BuildManifestURL(log *zerolog.Logger,
 	// from its ghcr.io target. For all other images use the canonical host.
 	originalHost := ""
 
-	normalizedRef, parseErr := reference.ParseNormalizedNamed(container.ImageName())
+	normalizedRef, parseErr := reference.ParseNormalizedNamed(imageName)
 	if parseErr == nil {
 		rawDomain := reference.Domain(normalizedRef)
 
-		canonicalHost, _ := auth.GetRegistryAddress(log, container.ImageName())
+		canonicalHost, _ := auth.GetRegistryAddress(log, imageName)
 		if rawDomain == hosts.LSCRRegistryDomain {
 			originalHost = rawDomain
 		} else if canonicalHost != "" {
@@ -458,7 +583,7 @@ func BuildManifestURL(log *zerolog.Logger,
 	}
 
 	// Build the canonical manifest URL.
-	manifestURLStr, err := manifest.BuildManifestURL(log, container, scheme)
+	manifestURLStr, err := manifest.BuildManifestURLForImage(log, imageName, "", scheme)
 	if err != nil {
 		log.Debug().
 			Err(err).
@@ -528,6 +653,11 @@ func BuildManifestURL(log *zerolog.Logger,
 
 // fetchDigest retrieves an image digest using the specified HTTP method.
 //
+// When a tag is supplied the manifest request targets that tag of the
+// container's repository instead of the container's own reference, so a
+// candidate release tag can be confirmed without pulling it. Authentication
+// stays scoped to the container's repository, which every tag shares.
+//
 // When endpoints are provided, each mirror host is tried in order. An empty string
 // endpoint means use the canonical registry host. If all endpoints fail, the last
 // error is returned.
@@ -537,6 +667,7 @@ func BuildManifestURL(log *zerolog.Logger,
 //   - container: Container whose digest is being retrieved.
 //   - registryAuth: Base64-encoded auth string.
 //   - method: HTTP method ("HEAD" or "GET").
+//   - tag: Optional tag override for the manifest specifier.
 //   - endpoints: Optional list of registry mirror host overrides to try before the canonical host.
 //
 // Returns:
@@ -547,6 +678,7 @@ func fetchDigest(log *zerolog.Logger,
 	container types.Container,
 	registryAuth string,
 	method string,
+	tag string,
 	endpoints ...string,
 ) (string, error) {
 	fields := map[string]any{
@@ -685,9 +817,10 @@ func fetchDigest(log *zerolog.Logger,
 			parsedURL   *url.URL
 		)
 
-		manifestURL, _, parsedURL, err = BuildManifestURL(log,
+		manifestURL, _, parsedURL, err = BuildManifestURLForTag(log,
 			container,
 			hostForManifest,
+			tag,
 		)
 		if err != nil {
 			log.Debug().

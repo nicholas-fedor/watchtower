@@ -19,7 +19,9 @@ import (
 
 	"github.com/nicholas-fedor/watchtower/internal/compose"
 	"github.com/nicholas-fedor/watchtower/internal/git"
+	"github.com/nicholas-fedor/watchtower/internal/release"
 	"github.com/nicholas-fedor/watchtower/pkg/container"
+	"github.com/nicholas-fedor/watchtower/pkg/container/oci"
 	"github.com/nicholas-fedor/watchtower/pkg/filters"
 	"github.com/nicholas-fedor/watchtower/pkg/lifecycle"
 	"github.com/nicholas-fedor/watchtower/pkg/registry/ratelimit"
@@ -466,6 +468,10 @@ func Update(
 		parallelStaleCount           int
 	)
 
+	// One resolver per session so sibling containers on the same upstream image
+	// share a single release tag lookup.
+	tagResolver := release.NewResolver(nil)
+
 	for _, task := range checkTasks {
 		checkGroup.Go(func() error {
 			// Check for context cancellation to enable faster shutdown during long update cycles.
@@ -485,6 +491,8 @@ func Update(
 			var (
 				stale       bool
 				newestImage types.ImageID
+				newDigest   string
+				gitWatched  bool
 				checkErr    error
 				verifyErr   error
 			)
@@ -497,9 +505,11 @@ func Update(
 				stale = false
 				newestImage = sourceContainer.ImageID()
 			case gitSession.watching(log, sourceContainer, config):
+				gitWatched = true
+
 				stale, newestImage, checkErr = gitSession.check(ctx, sourceContainer, config)
 			default:
-				stale, newestImage, _, checkErr = client.IsContainerStale(
+				stale, newestImage, newDigest, checkErr = client.IsContainerStale(
 					ctx,
 					sourceContainer,
 					config,
@@ -538,6 +548,36 @@ func Update(
 						errors.Is(verifyErr, context.DeadlineExceeded)) {
 					return fmt.Errorf("configuration verification canceled: %w", verifyErr)
 				}
+			}
+
+			// Record the new image's OCI metadata so a notification can describe
+			// what the container is moving to. This runs only for a container
+			// that will actually be updated. The inspect and the optional
+			// release tag lookup happen before resultMu is taken, because a
+			// registry round trip under that lock would serialize every
+			// parallel check behind one container's request.
+			// A Git-watched container is excluded because the build path resolves
+			// and logs its own changelog from the resolved tag afterwards.
+			resolveLatest := stale && shouldUpdate && !gitWatched && checkErr == nil && verifyErr == nil
+
+			var (
+				changelogVars container.ChangelogVars
+				latestAnns    oci.Annotations
+			)
+
+			if resolveLatest {
+				latest := latestImageMetadata{
+					annotations: client.GetImageAnnotations(ctx, sourceContainer.ImageName()),
+					digest:      newDigest,
+				}
+				changelogVars, latestAnns = resolveLatestImageMeta(
+					log,
+					ctx,
+					tagResolver,
+					sourceContainer,
+					config,
+					latest,
+				)
 			}
 
 			resultMu.Lock()
@@ -614,6 +654,18 @@ func Update(
 					sourceContainer,
 					newestImage,
 					config,
+				)
+			}
+
+			// Write the pre-resolved metadata now that the session state is locked.
+			if resolveLatest {
+				applyLatestImageMeta(
+					clog,
+					progress,
+					sourceContainer,
+					config,
+					changelogVars,
+					latestAnns,
 				)
 			}
 
@@ -1451,6 +1503,41 @@ func linkedIdentifierMarkedForRestart(log *zerolog.Logger, links []string,
 	log.Debug().Msg("No restarting linked container found")
 
 	return ""
+}
+
+// logChangelog emits the Changelog notification entry for an updated container.
+//
+// The entry is only produced when the changelog feature is enabled for the
+// container and a URL was resolved, so a default session produces no entry at
+// all. The legacy template renders it as a single "Changelog: <url>" line.
+//
+// Parameters:
+//   - log: Process logger.
+//   - c: Container the entry describes.
+//   - params: Update parameters carrying the changelog enable gate.
+//   - meta: Resolved report metadata.
+//
+// Returns:
+//   - none.
+func logChangelog(
+	log *zerolog.Logger,
+	c types.Container,
+	params types.UpdateParams,
+	meta container.ReportMeta,
+) {
+	if c == nil || meta.Changelog == "" {
+		return
+	}
+
+	concrete, ok := c.(*container.Container)
+	if !ok || !concrete.IsChangelogEnabled(params) {
+		return
+	}
+
+	log.Info().
+		Str("container", c.Name()).
+		Str("changelog", meta.Changelog).
+		Msg("Changelog")
 }
 
 // getProject extracts the project name from a container's compose project label.

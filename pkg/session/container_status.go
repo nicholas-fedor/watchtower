@@ -3,6 +3,7 @@ package session
 import (
 	"time"
 
+	"github.com/nicholas-fedor/watchtower/pkg/container"
 	"github.com/nicholas-fedor/watchtower/pkg/types"
 )
 
@@ -36,27 +37,30 @@ type State int
 //
 //nolint:errname // ContainerStatus is not an error type, it contains an error field.
 type ContainerStatus struct {
-	containerID        types.ContainerID // Container ID.
-	oldImage           types.ImageID     // Original image ID.
-	newImage           types.ImageID     // Latest image ID.
-	containerName      string            // Container name.
-	imageName          string            // Image name with tag.
-	containerError     error             // Error encountered, if any.
-	state              State             // Current state.
-	monitorOnly        bool              // Monitor-only flag.
-	newContainerID     types.ContainerID // New container ID after update.
-	cooldownPassed     bool              // True if image passed cooldown check.
-	cooldownAge        string            // Human-readable image age (e.g., "47 days, 11 hours").
-	cooldownDelay      string            // Human-readable cooldown duration (e.g., "24 hours").
-	cooldownRemaining  string            // Human-readable remaining time (empty if passed).
-	cooldownEligibleAt time.Time         // Time when the container becomes eligible for update.
-	gitRepo            string            // Resolved Git repository URL.
-	gitRef             string            // Resolved Git ref.
-	changelog          string            // Changelog or releases URL.
-	source             string            // OCI image source annotation.
-	imageURL           string            // OCI image URL annotation.
-	documentation      string            // OCI image documentation annotation.
-	revision           string            // OCI image revision annotation.
+	containerID          types.ContainerID // Container ID.
+	oldImage             types.ImageID     // Original image ID.
+	newImage             types.ImageID     // Latest image ID.
+	containerName        string            // Container name.
+	imageName            string            // Image name with tag.
+	containerError       error             // Error encountered, if any.
+	state                State             // Current state.
+	monitorOnly          bool              // Monitor-only flag.
+	newContainerID       types.ContainerID // New container ID after update.
+	cooldownPassed       bool              // True if image passed cooldown check.
+	cooldownAge          string            // Human-readable image age (e.g., "47 days, 11 hours").
+	cooldownDelay        string            // Human-readable cooldown duration (e.g., "24 hours").
+	cooldownRemaining    string            // Human-readable remaining time (empty if passed).
+	cooldownEligibleAt   time.Time         // Time when the container becomes eligible for update.
+	gitRepo              string            // Resolved Git repository URL.
+	gitRef               string            // Resolved Git ref.
+	changelog            string            // Changelog or releases URL.
+	source               string            // OCI image source annotation.
+	imageURL             string            // OCI image URL annotation.
+	documentation        string            // OCI image documentation annotation.
+	currentImageVersion  string            // OCI version annotation of the running image.
+	latestImageVersion   string            // OCI version annotation of the new image.
+	currentImageRevision string            // OCI revision annotation of the running image.
+	latestImageRevision  string            // OCI revision annotation of the new image.
 }
 
 // NewContainerStatus builds a report status with identity fields populated.
@@ -264,33 +268,46 @@ func (u *ContainerStatus) ImageURL() string { return u.imageURL }
 //   - string: OCI documentation URL, or empty.
 func (u *ContainerStatus) Documentation() string { return u.documentation }
 
-// Revision returns the OCI image revision annotation.
+// CurrentImageRevision returns the OCI image revision annotation of the running image.
 //
 // Returns:
 //   - string: OCI revision, or empty.
-func (u *ContainerStatus) Revision() string { return u.revision }
+func (u *ContainerStatus) CurrentImageRevision() string { return u.currentImageRevision }
+
+// LatestImageRevision returns the OCI image revision annotation of a newer image.
+//
+// Returns:
+//   - string: OCI revision, or empty.
+func (u *ContainerStatus) LatestImageRevision() string { return u.latestImageRevision }
+
+// CurrentImageVersion returns the OCI image version annotation of the running image.
+//
+// Returns:
+//   - string: OCI version, or empty.
+func (u *ContainerStatus) CurrentImageVersion() string { return u.currentImageVersion }
+
+// LatestImageVersion returns the OCI image version annotation of a newer image.
+//
+// Returns:
+//   - string: OCI version, or empty.
+func (u *ContainerStatus) LatestImageVersion() string { return u.latestImageVersion }
 
 // SetGitMetadata sets Git and OCI report fields for this container.
 //
 // Parameters:
-//   - gitRepo: Clone URL.
-//   - gitRef: Branch or tag.
-//   - changelog: Changelog or releases URL.
-//   - source: OCI source.
-//   - imageURL: OCI image URL.
-//   - documentation: OCI documentation URL.
-//   - revision: OCI revision.
+//   - meta: Resolved report metadata.
 //
 // Returns:
 //   - none.
-func (u *ContainerStatus) SetGitMetadata(
-	gitRepo, gitRef, changelog, source, imageURL, documentation, revision string,
-) {
-	u.gitRepo = gitRepo
-	u.gitRef = gitRef
-	u.changelog = changelog
-	u.source = source
-	u.imageURL = imageURL
-	u.documentation = documentation
-	u.revision = revision
+func (u *ContainerStatus) SetGitMetadata(meta container.ReportMeta) {
+	u.gitRepo = meta.GitRepo
+	u.gitRef = meta.GitRef
+	u.changelog = meta.Changelog
+	u.source = meta.Source
+	u.imageURL = meta.ImageURL
+	u.documentation = meta.Documentation
+	u.currentImageVersion = meta.CurrentVersion
+	u.latestImageVersion = meta.LatestVersion
+	u.currentImageRevision = meta.CurrentRevision
+	u.latestImageRevision = meta.LatestRevision
 }

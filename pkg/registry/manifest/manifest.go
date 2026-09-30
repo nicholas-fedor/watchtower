@@ -181,14 +181,39 @@ func manifestURLPath(imagePath, specifier string) string {
 //   - string: Manifest URL using the canonical registry host from the image reference.
 //   - error: Non-nil if parsing or tagging fails, nil on success.
 func BuildManifestURL(log *zerolog.Logger, container types.Container, scheme string) (string, error) {
+	return BuildManifestURLForImage(log, container.ImageName(), container.Name(), scheme)
+}
+
+// BuildManifestURLForImage constructs a manifest URL for an image reference.
+//
+// It is the name-based form of BuildManifestURL, so a caller probing a
+// different tag of the same repository does not need a container to stand in
+// for one. Resolution scope is the repository, which is identical for every
+// tag of an image.
+//
+// Parameters:
+//   - log: Logger.
+//   - imageName: Image reference supplying the registry host, repository, and specifier.
+//   - containerName: Container name used only for log context.
+//   - scheme: The scheme to use for the URL (for example, "https" or "http").
+//
+// Returns:
+//   - string: Manifest URL using the canonical registry host from the image reference.
+//   - error: Non-nil if parsing or tagging fails, nil on success.
+func BuildManifestURLForImage(
+	log *zerolog.Logger,
+	imageName,
+	containerName,
+	scheme string,
+) (string, error) {
 	// Set up logging fields for consistent tracking.
 	fields := map[string]any{
-		"container": container.Name(),
-		"image":     container.ImageName(),
+		"container": containerName,
+		"image":     imageName,
 	}
 
 	// Parse the image name into a normalized reference for reliable processing.
-	normalizedRef, err := parseImageRef(container.ImageName())
+	normalizedRef, err := parseImageRef(imageName)
 	if err != nil {
 		log.Debug().
 			Err(err).

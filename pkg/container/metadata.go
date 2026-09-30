@@ -349,6 +349,28 @@ func (c *Container) IsNoPull(params types.UpdateParams) bool {
 	return c.getContainerOrGlobalBool(params.NoPull, noPullLabel, params.LabelPrecedence)
 }
 
+// IsChangelogEnabled reports whether the changelog notification line and the
+// versioned release link are enabled for this container.
+//
+// It uses UpdateParams.EnableChangelog and label precedence, with the same two
+// sources no-pull uses. A changelog-url label is a value, not a switch, so it
+// never enables the feature on its own.
+// A user who authorizes the extra
+// registry request must say so explicitly.
+//
+// Parameters:
+//   - params: Update parameters from types.UpdateParams.
+//
+// Returns:
+//   - bool: True when the changelog feature is enabled.
+func (c *Container) IsChangelogEnabled(params types.UpdateParams) bool {
+	return c.getContainerOrGlobalBool(
+		params.EnableChangelog,
+		git.EnableChangelogLabel,
+		params.LabelPrecedence,
+	)
+}
+
 // IsGitWatch reports whether the Git watcher is on for this container.
 //
 // A present git-watch label overrides --git-enable. When the label is absent

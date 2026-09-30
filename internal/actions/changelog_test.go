@@ -1,0 +1,382 @@
+package actions
+
+import (
+	"bytes"
+	"context"
+	"encoding/json"
+	"testing"
+
+	"github.com/rs/zerolog"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
+
+	dockerspec "github.com/moby/docker-image-spec/specs-go/v1"
+	dockerContainer "github.com/moby/moby/api/types/container"
+	dockerImage "github.com/moby/moby/api/types/image"
+
+	"github.com/nicholas-fedor/watchtower/internal/release"
+	"github.com/nicholas-fedor/watchtower/pkg/container"
+	"github.com/nicholas-fedor/watchtower/pkg/container/git"
+	"github.com/nicholas-fedor/watchtower/pkg/container/oci"
+	"github.com/nicholas-fedor/watchtower/pkg/session"
+	"github.com/nicholas-fedor/watchtower/pkg/types"
+)
+
+// newDigest is the manifest digest of the new image in these tests.
+const newDigest = "sha256:1111111111111111111111111111111111111111111111111111111111111111"
+
+// panickingFetcher fails the test if it is ever called.
+//
+// The default configuration must never reach the registry, so the assertion is
+// stronger than counting calls: any invocation fails outright.
+type panickingFetcher struct {
+	t *testing.T
+}
+
+func (f panickingFetcher) FetchDigestForTag(
+	_ *zerolog.Logger,
+	_ context.Context,
+	_ types.Container,
+	_ string,
+	_ string,
+	_ ...string,
+) (string, error) {
+	f.t.Fatal("the release tag lookup must not run without the changelog feature enabled")
+
+	return "", nil
+}
+
+// stubFetcher returns a fixed tag for every candidate.
+type stubFetcher struct {
+	tag   string
+	calls []string
+}
+
+func (f *stubFetcher) FetchDigestForTag(
+	_ *zerolog.Logger,
+	_ context.Context,
+	_ types.Container,
+	_ string,
+	tag string,
+	_ ...string,
+) (string, error) {
+	f.calls = append(f.calls, tag)
+
+	return newDigest, nil
+}
+
+// newProgressWithContainer registers a container status and returns the progress map.
+func newProgressWithContainer(t *testing.T, c *container.Container) *session.Progress {
+	t.Helper()
+
+	status := session.NewContainerStatus(c.Name(), c.ImageName())
+	progress := session.Progress{c.ID(): status}
+
+	return &progress
+}
+
+// newReportContainer builds a real container so the changelog gate, which reads
+// container labels, is exercised rather than bypassed.
+func newReportContainer(t *testing.T, labels, imageLabels map[string]string) *container.Container {
+	t.Helper()
+
+	const name = "app"
+
+	const image = "org/app:latest"
+
+	imageConfig := &dockerspec.DockerOCIImageConfig{}
+	imageConfig.Labels = imageLabels
+
+	c := container.NewContainer(nil, &dockerContainer.InspectResponse{
+		ID:   name,
+		Name: "/" + name,
+		Config: &dockerContainer.Config{
+			Image:  image,
+			Labels: labels,
+		},
+	}, &dockerImage.InspectResponse{
+		ID:       "sha256:currentimage",
+		Config:   imageConfig,
+		RepoTags: []string{image},
+	})
+
+	require.Equal(t, types.ContainerID(name), c.ID())
+
+	return c
+}
+
+func TestApplyLatestImageMetadataRecordsVersionWithoutEnabledFeature(t *testing.T) {
+	t.Parallel()
+
+	c := newReportContainer(t, map[string]string{
+		git.RepoLabel: "https://github.com/org/app.git",
+	}, map[string]string{
+		oci.VersionLabel: "1.2.2",
+	})
+
+	progress := newProgressWithContainer(t, c)
+	client := stubClient{annotations: oci.Annotations{Version: "1.2.3", Revision: "newrev"}}
+
+	vars, anns := resolveLatestImageMeta(
+		testLogger(),
+		context.Background(),
+		release.NewResolver(panickingFetcher{t}),
+		c,
+		types.UpdateParams{},
+		latestImageMetadata{annotations: client.annotations, digest: newDigest},
+	)
+	applyLatestImageMeta(testLogger(), progress, c, types.UpdateParams{}, vars, anns)
+
+	status := (*progress)[c.ID()]
+	assert.Equal(t, "1.2.2", status.CurrentImageVersion())
+	assert.Equal(t, "1.2.3", status.LatestImageVersion())
+	assert.Equal(t, "newrev", status.LatestImageRevision())
+	// Without the feature the changelog stays on the unversioned release index.
+	assert.Equal(t, "https://github.com/org/app/releases", status.Changelog())
+}
+
+// A changelog-url label is a value, not a switch. It must not authorize a lookup.
+func TestApplyLatestImageMetadataChangelogLabelDoesNotEnableProbe(t *testing.T) {
+	t.Parallel()
+
+	c := newReportContainer(t, map[string]string{
+		git.RepoLabel:         "https://github.com/org/app.git",
+		git.ChangelogURLLabel: "https://example.com/notes/{tag}",
+	}, nil)
+
+	progress := newProgressWithContainer(t, c)
+	client := stubClient{annotations: oci.Annotations{Version: "1.2.3"}}
+
+	vars, anns := resolveLatestImageMeta(
+		testLogger(),
+		context.Background(),
+		release.NewResolver(panickingFetcher{t}),
+		c,
+		types.UpdateParams{},
+		latestImageMetadata{annotations: client.annotations, digest: newDigest},
+	)
+	applyLatestImageMeta(testLogger(), progress, c, types.UpdateParams{}, vars, anns)
+
+	status := (*progress)[c.ID()]
+	// The label still populates the changelog. An unfilled {tag} placeholder is
+	// left in place, and the redaction pass percent-encodes its braces.
+	assert.Equal(t, "https://example.com/notes/%7Btag%7D", status.Changelog())
+}
+
+func TestApplyLatestImageMetadataResolvesVersionedChangelogWhenEnabled(t *testing.T) {
+	t.Parallel()
+
+	c := newReportContainer(t, map[string]string{
+		git.RepoLabel: "https://github.com/org/app.git",
+	}, nil)
+
+	progress := newProgressWithContainer(t, c)
+	fetcher := &stubFetcher{tag: "v1.2.3"}
+	client := stubClient{annotations: oci.Annotations{Version: "1.2.3"}}
+
+	vars, anns := resolveLatestImageMeta(
+		testLogger(),
+		context.Background(),
+		release.NewResolver(fetcher),
+		c,
+		types.UpdateParams{EnableChangelog: true},
+		latestImageMetadata{annotations: client.annotations, digest: newDigest},
+	)
+	applyLatestImageMeta(testLogger(), progress, c, types.UpdateParams{EnableChangelog: true}, vars, anns)
+
+	status := (*progress)[c.ID()]
+	assert.Equal(t, "https://github.com/org/app/releases/tag/v1.2.3", status.Changelog())
+	assert.Equal(t, "1.2.3", status.LatestImageVersion())
+}
+
+// The per-container label enables the feature without the global flag.
+func TestApplyLatestImageMetadataEnabledByLabel(t *testing.T) {
+	t.Parallel()
+
+	c := newReportContainer(t, map[string]string{
+		git.RepoLabel:            "https://github.com/org/app.git",
+		git.EnableChangelogLabel: "true",
+	}, nil)
+
+	progress := newProgressWithContainer(t, c)
+	fetcher := &stubFetcher{tag: "v1.2.3"}
+	client := stubClient{annotations: oci.Annotations{Version: "1.2.3"}}
+
+	vars, anns := resolveLatestImageMeta(
+		testLogger(),
+		context.Background(),
+		release.NewResolver(fetcher),
+		c,
+		types.UpdateParams{},
+		latestImageMetadata{annotations: client.annotations, digest: newDigest},
+	)
+	applyLatestImageMeta(testLogger(), progress, c, types.UpdateParams{}, vars, anns)
+
+	assert.Equal(
+		t,
+		"https://github.com/org/app/releases/tag/v1.2.3",
+		(*progress)[c.ID()].Changelog(),
+	)
+}
+
+// A probe that finds nothing must leave the unversioned link in place.
+func TestApplyLatestImageMetadataFallsBackWhenProbeMisses(t *testing.T) {
+	t.Parallel()
+
+	c := newReportContainer(t, map[string]string{
+		git.RepoLabel: "https://github.com/org/app.git",
+	}, nil)
+
+	progress := newProgressWithContainer(t, c)
+	client := stubClient{annotations: oci.Annotations{Version: "1.2.3"}}
+
+	vars, anns := resolveLatestImageMeta(
+		testLogger(),
+		context.Background(),
+		release.NewResolver(&missFetcher{}),
+		c,
+		types.UpdateParams{EnableChangelog: true},
+		latestImageMetadata{annotations: client.annotations, digest: newDigest},
+	)
+	applyLatestImageMeta(testLogger(), progress, c, types.UpdateParams{EnableChangelog: true}, vars, anns)
+
+	assert.Equal(t, "https://github.com/org/app/releases", (*progress)[c.ID()].Changelog())
+}
+
+// The changelog log entry is what makes the legacy notification line appear, and
+// it must only be emitted when the feature is enabled.
+func TestLogChangelogOnlyWhenEnabled(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name       string
+		labels     map[string]string
+		params     types.UpdateParams
+		wantEvents int
+	}{
+		{
+			name:       "disabled",
+			labels:     map[string]string{git.RepoLabel: "https://github.com/org/app.git"},
+			wantEvents: 0,
+		},
+		{
+			name:       "changelog url alone is not enough",
+			labels:     map[string]string{git.ChangelogURLLabel: "https://example.com/notes"},
+			wantEvents: 0,
+		},
+		{
+			name:       "global flag",
+			labels:     map[string]string{git.RepoLabel: "https://github.com/org/app.git"},
+			params:     types.UpdateParams{EnableChangelog: true},
+			wantEvents: 1,
+		},
+		{
+			name:       "container label",
+			labels:     map[string]string{git.EnableChangelogLabel: "true"},
+			wantEvents: 1,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			c := newReportContainer(t, tt.labels, nil)
+			meta := container.ReportMeta{Changelog: "https://example.com/notes"}
+
+			var buf bytes.Buffer
+
+			log := zerolog.New(&buf)
+
+			logChangelog(&log, c, tt.params, meta)
+
+			events := 0
+
+			for line := range bytes.Lines(buf.Bytes()) {
+				if len(line) == 0 {
+					continue
+				}
+
+				var entry map[string]any
+				require.NoError(t, json.Unmarshal(line, &entry))
+
+				events++
+			}
+
+			assert.Equal(t, tt.wantEvents, events, "log output: %s", buf.String())
+		})
+	}
+}
+
+func TestLogChangelogSkipsEmptyURL(t *testing.T) {
+	t.Parallel()
+
+	c := newReportContainer(t, nil, nil)
+
+	var buf bytes.Buffer
+
+	log := zerolog.New(&buf)
+
+	logChangelog(&log, c, types.UpdateParams{EnableChangelog: true}, container.ReportMeta{})
+	logChangelog(&log, nil, types.UpdateParams{EnableChangelog: true}, container.ReportMeta{
+		Changelog: "https://example.com/notes",
+	})
+
+	assert.Empty(t, buf.String())
+}
+
+// A Git-watched container resolves and logs its changelog after the build, so
+// the pre-update path must not also emit one. Two Changelog entries for a single
+// container would be duplicated notification noise.
+func TestLogChangelogIsSingleEntryForAGitRebuild(t *testing.T) {
+	t.Parallel()
+
+	c := newReportContainer(t, map[string]string{
+		git.RepoLabel: "https://github.com/org/app.git",
+	}, nil)
+
+	params := types.UpdateParams{EnableChangelog: true}
+	meta := container.ReportMeta{Changelog: "https://github.com/org/app/releases/tag/v1.2.3"}
+
+	var buf bytes.Buffer
+
+	log := zerolog.New(&buf)
+
+	// The build path emits the versioned entry once.
+	logChangelog(&log, c, params, meta)
+
+	entries := 0
+
+	for line := range bytes.Lines(buf.Bytes()) {
+		if len(line) == 0 {
+			continue
+		}
+
+		entries++
+	}
+
+	assert.Equal(t, 1, entries, "log output: %s", buf.String())
+}
+
+// stubClient returns fixed annotations for any image reference.
+type stubClient struct {
+	annotations oci.Annotations
+}
+
+func (c stubClient) GetImageAnnotations(_ context.Context, _ string) oci.Annotations {
+	return c.annotations
+}
+
+// missFetcher reports no tag for any candidate.
+type missFetcher struct{}
+
+func (f *missFetcher) FetchDigestForTag(
+	_ *zerolog.Logger,
+	_ context.Context,
+	_ types.Container,
+	_ string,
+	_ string,
+	_ ...string,
+) (string, error) {
+	return "", nil
+}
