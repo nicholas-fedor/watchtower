@@ -2,6 +2,7 @@ package actions
 
 import (
 	"context"
+	"time"
 
 	"github.com/rs/zerolog"
 
@@ -12,6 +13,13 @@ import (
 	"github.com/nicholas-fedor/watchtower/pkg/session"
 	"github.com/nicholas-fedor/watchtower/pkg/types"
 )
+
+// releaseTagLookupTimeout bounds the optional release tag lookup.
+//
+// The lookup is a convenience, so a slow or unresponsive registry must not stall
+// the session. Each request already carries a registry client timeout, but this
+// bounds the whole sweep so two candidates cannot double the wait.
+const releaseTagLookupTimeout = 30 * time.Second
 
 // latestImageMetadata describes a container's new image for report metadata.
 //

@@ -570,14 +570,20 @@ func Update(
 					annotations: client.GetImageAnnotations(ctx, sourceContainer.ImageName()),
 					digest:      newDigest,
 				}
+
+				// Bound the whole tag lookup, not just its requests, so an
+				// unresponsive registry cannot stall the session behind it.
+				lookupCtx, cancelLookup := context.WithTimeout(ctx, releaseTagLookupTimeout)
 				changelogVars, latestAnns = resolveLatestImageMeta(
 					log,
-					ctx,
+					lookupCtx,
 					tagResolver,
 					sourceContainer,
 					config,
 					latest,
 				)
+
+				cancelLookup()
 			}
 
 			resultMu.Lock()

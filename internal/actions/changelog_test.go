@@ -5,6 +5,7 @@ import (
 	"context"
 	"encoding/json"
 	"testing"
+	"time"
 
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/assert"
@@ -14,6 +15,8 @@ import (
 	dockerContainer "github.com/moby/moby/api/types/container"
 	dockerImage "github.com/moby/moby/api/types/image"
 
+	mockActions "github.com/nicholas-fedor/watchtower/internal/actions/mocks"
+	internalGit "github.com/nicholas-fedor/watchtower/internal/git"
 	"github.com/nicholas-fedor/watchtower/internal/release"
 	"github.com/nicholas-fedor/watchtower/pkg/container"
 	"github.com/nicholas-fedor/watchtower/pkg/container/git"
@@ -325,37 +328,86 @@ func TestLogChangelogSkipsEmptyURL(t *testing.T) {
 	assert.Empty(t, buf.String())
 }
 
-// A Git-watched container resolves and logs its changelog after the build, so
-// the pre-update path must not also emit one. Two Changelog entries for a single
-// container would be duplicated notification noise.
-func TestLogChangelogIsSingleEntryForAGitRebuild(t *testing.T) {
+// A Git rebuild must produce exactly one Changelog entry, resolved from the Git
+// tag. The registry path is skipped for a Git-watched container, and the second
+// half of this test shows what that skip prevents: the same container driven
+// through the registry helpers emits a second, unversioned entry.
+func TestGitRebuildEmitsExactlyOneChangelogEntry(t *testing.T) {
 	t.Parallel()
 
 	c := newReportContainer(t, map[string]string{
 		git.RepoLabel: "https://github.com/org/app.git",
+		git.RefLabel:  "main",
 	}, nil)
 
-	params := types.UpdateParams{EnableChangelog: true}
-	meta := container.ReportMeta{Changelog: "https://github.com/org/app/releases/tag/v1.2.3"}
+	params := types.UpdateParams{EnableGitMonitoring: true, EnableChangelog: true}
+	progress := newProgressWithContainer(t, c)
 
 	var buf bytes.Buffer
 
 	log := zerolog.New(&buf)
 
-	// The build path emits the versioned entry once.
-	logChangelog(&log, c, params, meta)
+	sess := newGitSession(internalGit.New(testLogger(), internalGit.Options{Timeout: time.Second}))
+	docker := mockActions.CreateMockClient(&mockActions.TestData{}, false, false)
 
+	err := sess.buildOne(
+		&log,
+		t.Context(),
+		docker,
+		c,
+		internalGit.CheckResult{
+			Stale:  true,
+			Commit: "0123456789abcdef0123456789abcdef01234567",
+			Tag:    "v1.2.3",
+		},
+		params,
+		progress,
+	)
+	require.NoError(t, err)
+
+	assert.Equal(t, 1, countChangelogEntries(buf.Bytes()), "build path should emit one: %s", buf.String())
+	assert.Equal(t, "https://github.com/org/app/releases/tag/v1.2.3", (*progress)[c.ID()].Changelog())
+
+	// The registry path, if it ran for this container, would add a second entry
+	// pointing at the unversioned release index. That is why executeUpdate
+	// resolves latest image metadata only when the container is not Git-watched.
+	buf.Reset()
+
+	vars, anns := resolveLatestImageMeta(
+		&log,
+		t.Context(),
+		release.NewResolver(panickingFetcher{t}),
+		c,
+		params,
+		latestImageMetadata{annotations: oci.Annotations{Version: "10.11.6"}},
+	)
+	applyLatestImageMeta(&log, progress, c, params, vars, anns)
+
+	assert.Equal(t, 1, countChangelogEntries(buf.Bytes()), "registry path would duplicate: %s", buf.String())
+	assert.Equal(t, "https://github.com/org/app/releases", (*progress)[c.ID()].Changelog())
+}
+
+// countChangelogEntries returns how many Changelog notification entries appear
+// in the captured log output.
+func countChangelogEntries(output []byte) int {
 	entries := 0
 
-	for line := range bytes.Lines(buf.Bytes()) {
+	for line := range bytes.Lines(output) {
 		if len(line) == 0 {
 			continue
 		}
 
-		entries++
+		var entry map[string]any
+		if json.Unmarshal(line, &entry) != nil {
+			continue
+		}
+
+		if entry["message"] == "Changelog" {
+			entries++
+		}
 	}
 
-	assert.Equal(t, 1, entries, "log output: %s", buf.String())
+	return entries
 }
 
 // stubClient returns fixed annotations for any image reference.

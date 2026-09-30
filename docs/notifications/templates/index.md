@@ -373,7 +373,8 @@ To resolve it, Watchtower confirms which tag actually matches the image it pulle
     A `changelog-url` label does **not** enable it. Setting a URL says what the link is, not that a registry request is authorized, so a template referencing `{tag}` stays unfilled until the option is turned on for that container.
 
 With the option off, the changelog resolves to the unversioned release index and costs no requests.
-A Git-monitored container never needs the lookup, because its tag is already known from the semver policy.
+A Git-monitored container never needs the lookup, because its tag comes from the semver policy rather than a registry.
+Under a policy of `none` a branch-triggered rebuild resolves no tag, so a template referencing `{tag}` stays unfilled.
 A container with no OCI version, a digest-pinned image, and an unknown or unparseable repo host all skip the lookup.
 A rate limit on the first candidate abandons the probe rather than spend a second request the registry will refuse.
 Results are cached per session, so sibling containers on the same image only pay once.
