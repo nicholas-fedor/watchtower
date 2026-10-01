@@ -13,7 +13,7 @@ require (
 	github.com/docker/cli v29.8.2+incompatible
 	github.com/docker/compose/v5 v5.5.1
 	github.com/go-git/go-git/v5 v5.19.2
-	github.com/gofiber/contrib/v3/swaggo v1.0.11
+	github.com/gofiber/contrib/v3/swaggo v1.0.12
 	github.com/gofiber/contrib/v3/zerolog v1.1.5
 	github.com/gofiber/fiber/v3 v3.5.0
 	github.com/mattn/go-isatty v0.0.24
