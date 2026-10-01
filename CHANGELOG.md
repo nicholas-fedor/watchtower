@@ -18,6 +18,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Chores
 
+- Update github.com/google/pprof digest to 60bf690 by @renovate[bot] in [#2487](https://github.com/nicholas-fedor/watchtower/pull/2487)
+- Update github.com/microsoft/go-winio digest to f19d971 by @renovate[bot] in [#2488](https://github.com/nicholas-fedor/watchtower/pull/2488)
 - Update module github.com/pjbgf/sha1cd to v0.7.0 by @renovate[bot] in [#2482](https://github.com/nicholas-fedor/watchtower/pull/2482)
 - Update module go.opentelemetry.io/proto/otlp to v1.11.1 by @renovate[bot] in [#2481](https://github.com/nicholas-fedor/watchtower/pull/2481)
 - Update module github.com/tinylib/msgp to v1.6.5 by @renovate[bot] in [#2480](https://github.com/nicholas-fedor/watchtower/pull/2480)
