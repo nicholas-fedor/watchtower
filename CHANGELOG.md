@@ -18,6 +18,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Chores
 
+- Update module github.com/pjbgf/sha1cd to v0.7.0 by @renovate[bot] in [#2482](https://github.com/nicholas-fedor/watchtower/pull/2482)
+- Update module go.opentelemetry.io/proto/otlp to v1.11.1 by @renovate[bot] in [#2481](https://github.com/nicholas-fedor/watchtower/pull/2481)
 - Update module github.com/tinylib/msgp to v1.6.5 by @renovate[bot] in [#2480](https://github.com/nicholas-fedor/watchtower/pull/2480)
 - Update module github.com/cenkalti/backoff/v7 to v7.0.1 by @renovate[bot] in [#2476](https://github.com/nicholas-fedor/watchtower/pull/2476)
 - Update module github.com/moby/buildkit to v0.33.1 by @renovate[bot] in [#2477](https://github.com/nicholas-fedor/watchtower/pull/2477)
@@ -42,6 +44,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Copy labeled files under a mount and into missing parent paths by @nicholas-fedor in [#2486](https://github.com/nicholas-fedor/watchtower/pull/2486)
 - Fix changelog automation workflows by @nicholas-fedor in [#2451](https://github.com/nicholas-fedor/watchtower/pull/2451)
 
 ## [1.22.3] - 2026-09-22
