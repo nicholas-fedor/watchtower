@@ -161,36 +161,60 @@ func TestCopyFilePathsFromContainer(t *testing.T) {
 	})
 }
 
-func TestCopyFilePathIsMounted(t *testing.T) {
+func TestCopyFileSkipForPath(t *testing.T) {
 	t.Parallel()
+
+	nilHostConfig := func() *Container {
+		c := MockContainer()
+		c.containerInfo.HostConfig = nil
+
+		return c
+	}()
+
+	nilHostConfigWithMount := func() *Container {
+		c := MockContainer(WithInspectMounts([]dockerContainer.MountPoint{
+			{Destination: "/etc/searxng", RW: false},
+		}))
+		c.containerInfo.HostConfig = nil
+
+		return c
+	}()
 
 	tests := []struct {
 		name string
 		c    *Container
 		path string
-		want bool
+		want copyFileSkipReason
 	}{
 		{
-			name: "not mounted",
+			name: "no mounts",
 			c:    MockContainer(),
 			path: "/app/config.yaml",
-			want: false,
+			want: copyFileSkipNone,
 		},
 		{
 			name: "exact inspect mount",
 			c: MockContainer(WithInspectMounts([]dockerContainer.MountPoint{
-				{Destination: "/app/config.yaml"},
+				{Destination: "/app/config.yaml", RW: true},
 			})),
 			path: "/app/config.yaml",
-			want: true,
+			want: copyFileSkipMountedAtPath,
 		},
 		{
-			name: "under inspect mount",
+			name: "writable inspect mount above path",
 			c: MockContainer(WithInspectMounts([]dockerContainer.MountPoint{
-				{Destination: "/app"},
+				{Destination: "/etc/searxng", RW: true},
 			})),
-			path: "/app/config.yaml",
-			want: true,
+			path: "/etc/searxng/settings.yml",
+			want: copyFileSkipNone,
+		},
+		{
+			name: "read-only inspect mount above path",
+			c: MockContainer(WithInspectMounts([]dockerContainer.MountPoint{
+				{Destination: "/etc/searxng", RW: false},
+			})),
+			path: "/etc/searxng/settings.yml",
+			want: copyFileSkipReadOnlyMount,
 		},
 		{
 			name: "host config mount target",
@@ -198,42 +222,109 @@ func TestCopyFilePathIsMounted(t *testing.T) {
 				{Target: "/run/secrets"},
 			})),
 			path: "/run/secrets/token",
-			want: true,
+			want: copyFileSkipNone,
 		},
 		{
-			name: "bind destination",
+			name: "read-only host config mount above path",
+			c: MockContainer(WithMounts([]dockerMount.Mount{
+				{Target: "/etc/conf", ReadOnly: true},
+			})),
+			path: "/etc/conf/app.conf",
+			want: copyFileSkipReadOnlyMount,
+		},
+		{
+			name: "bind destination at path",
 			c:    MockContainer(WithBinds([]string{"/host/config.yaml:/app/config.yaml:ro"})),
 			path: "/app/config.yaml",
-			want: true,
+			want: copyFileSkipMountedAtPath,
+		},
+		{
+			name: "writable bind above path",
+			c:    MockContainer(WithBinds([]string{"/host/data:/data"})),
+			path: "/data/app.db",
+			want: copyFileSkipNone,
+		},
+		{
+			name: "read-only bind above path",
+			c:    MockContainer(WithBinds([]string{"/host/data:/data:ro,z"})),
+			path: "/data/app.db",
+			want: copyFileSkipReadOnlyMount,
+		},
+		{
+			name: "deeper writable mount shadows read-only mount",
+			c: MockContainer(WithInspectMounts([]dockerContainer.MountPoint{
+				{Destination: "/data", RW: false},
+				{Destination: "/data/inner", RW: true},
+			})),
+			path: "/data/inner/app.db",
+			want: copyFileSkipNone,
+		},
+		{
+			name: "deeper mount wins regardless of order",
+			c: MockContainer(WithInspectMounts([]dockerContainer.MountPoint{
+				{Destination: "/data/inner", RW: true},
+				{Destination: "/data", RW: false},
+			})),
+			path: "/data/inner/app.db",
+			want: copyFileSkipNone,
 		},
 		{
 			name: "unrelated bind",
 			c:    MockContainer(WithBinds([]string{"/host/data:/data"})),
 			path: "/app/config.yaml",
-			want: false,
+			want: copyFileSkipNone,
 		},
 		{
 			name: "malformed bind",
 			c:    MockContainer(WithBinds([]string{"nocolon"})),
 			path: "/app/config.yaml",
-			want: false,
+			want: copyFileSkipNone,
+		},
+		{
+			name: "read-only rootfs without mount",
+			c:    MockContainer(WithReadonlyRootfs(true)),
+			path: "/app/config.yaml",
+			want: copyFileSkipReadOnlyRootfs,
+		},
+		{
+			name: "read-only rootfs with volume above path",
+			c: MockContainer(
+				WithReadonlyRootfs(true),
+				WithInspectMounts([]dockerContainer.MountPoint{
+					{Destination: "/etc/searxng", RW: true},
+				}),
+			),
+			path: "/etc/searxng/settings.yml",
+			want: copyFileSkipReadOnlyRootfs,
+		},
+		{
+			name: "read-only rootfs with mount at path",
+			c: MockContainer(
+				WithReadonlyRootfs(true),
+				WithInspectMounts([]dockerContainer.MountPoint{
+					{Destination: "/app/config.yaml", RW: true},
+				}),
+			),
+			path: "/app/config.yaml",
+			want: copyFileSkipReadOnlyRootfs,
 		},
 		{
 			name: "nil inspect",
 			c:    &Container{},
 			path: "/app/config.yaml",
-			want: false,
+			want: copyFileSkipNone,
 		},
 		{
 			name: "nil host config",
-			c: func() *Container {
-				c := MockContainer()
-				c.containerInfo.HostConfig = nil
-
-				return c
-			}(),
+			c:    nilHostConfig,
 			path: "/app/config.yaml",
-			want: false,
+			want: copyFileSkipNone,
+		},
+		{
+			name: "nil host config with read-only inspect mount",
+			c:    nilHostConfigWithMount,
+			path: "/etc/searxng/settings.yml",
+			want: copyFileSkipReadOnlyMount,
 		},
 	}
 
@@ -241,7 +332,7 @@ func TestCopyFilePathIsMounted(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 
-			assert.Equal(t, tt.want, copyFilePathIsMounted(tt.c, tt.path))
+			assert.Equal(t, tt.want, copyFileSkipForPath(tt.c, tt.path))
 		})
 	}
 }
@@ -284,7 +375,7 @@ func TestSnapshotCopyFiles(t *testing.T) {
 		assert.Equal(t, "/app/config.yaml", snap.files[0].target)
 
 		name, body, mode := tarRegularFile(t, snap.files[0].archive)
-		assert.Equal(t, "config.yaml", name)
+		assert.Equal(t, "/app/config.yaml", name)
 		assert.Equal(t, []byte("setting=1"), body)
 		assert.Equal(t, int64(0o444), mode)
 	})
@@ -306,7 +397,7 @@ func TestSnapshotCopyFiles(t *testing.T) {
 		assert.True(t, snap.empty())
 	})
 
-	t.Run("skips mounted path", func(t *testing.T) {
+	t.Run("skips path a mount provides", func(t *testing.T) {
 		t.Parallel()
 
 		api := mockContainer.NewMockArchiveAPI(t)
@@ -320,6 +411,77 @@ func TestSnapshotCopyFiles(t *testing.T) {
 		snap, err := snapshotCopyFiles(testLog(), t.Context(), api, c)
 		require.NoError(t, err)
 		assert.True(t, snap.empty())
+	})
+
+	t.Run("skips path under read-only mount", func(t *testing.T) {
+		t.Parallel()
+
+		api := mockContainer.NewMockArchiveAPI(t)
+		c := MockContainer(
+			WithLabels(map[string]string{
+				copyFileLabel: "/etc/searxng/settings.yml",
+			}),
+			WithInspectMounts([]dockerContainer.MountPoint{
+				{Destination: "/etc/searxng", RW: false},
+			}),
+		)
+
+		snap, err := snapshotCopyFiles(testLog(), t.Context(), api, c)
+		require.NoError(t, err)
+		assert.True(t, snap.empty())
+	})
+
+	t.Run("skips path when root filesystem is read-only", func(t *testing.T) {
+		t.Parallel()
+
+		api := mockContainer.NewMockArchiveAPI(t)
+		c := MockContainer(
+			WithLabels(map[string]string{
+				copyFileLabel: "/etc/searxng/settings.yml",
+			}),
+			WithReadonlyRootfs(true),
+			WithInspectMounts([]dockerContainer.MountPoint{
+				{Destination: "/etc/searxng", RW: true},
+			}),
+		)
+
+		snap, err := snapshotCopyFiles(testLog(), t.Context(), api, c)
+		require.NoError(t, err)
+		assert.True(t, snap.empty())
+	})
+
+	t.Run("copies path under a directory mount", func(t *testing.T) {
+		t.Parallel()
+
+		tarBytes := mustFileTar(t, "settings.yml", []byte("use_default_settings: false"))
+		api := mockContainer.NewMockArchiveAPI(t)
+		api.EXPECT().
+			CopyFromContainer(mock.Anything, "container_id", copyFromPath("/etc/searxng/settings.yml")).
+			Return(dockerClient.CopyFromContainerResult{
+				Content: io.NopCloser(bytes.NewReader(tarBytes)),
+				Stat: dockerContainer.PathStat{
+					Name: "settings.yml",
+					Size: int64(len(tarBytes)),
+					Mode: 0o644,
+				},
+			}, nil)
+
+		c := MockContainer(
+			WithLabels(map[string]string{
+				copyFileLabel: "/etc/searxng/settings.yml",
+			}),
+			WithInspectMounts([]dockerContainer.MountPoint{
+				{Destination: "/etc/searxng", RW: true},
+			}),
+		)
+
+		snap, err := snapshotCopyFiles(testLog(), t.Context(), api, c)
+		require.NoError(t, err)
+		require.Len(t, snap.files, 1)
+
+		name, body, _ := tarRegularFile(t, snap.files[0].archive)
+		assert.Equal(t, "/etc/searxng/settings.yml", name)
+		assert.Equal(t, []byte("use_default_settings: false"), body)
 	})
 
 	t.Run("rejects directory", func(t *testing.T) {
@@ -480,7 +642,7 @@ func TestInjectCopyFiles(t *testing.T) {
 		require.NoError(t, err)
 	})
 
-	t.Run("copies archive into parent directory", func(t *testing.T) {
+	t.Run("copies archive at the container root", func(t *testing.T) {
 		t.Parallel()
 
 		tarBytes := mustFileTar(t, "config.yaml", []byte("setting=1"))
@@ -490,7 +652,7 @@ func TestInjectCopyFiles(t *testing.T) {
 			Run(func(_ context.Context, _ string, options dockerClient.CopyToContainerOptions) {
 				payload, readErr := io.ReadAll(options.Content)
 				require.NoError(t, readErr)
-				assert.Equal(t, "/app", options.DestinationPath)
+				assert.Equal(t, injectRootPath, options.DestinationPath)
 				assert.Equal(t, tarBytes, payload)
 				assert.True(t, options.CopyUIDGID)
 			}).
@@ -510,19 +672,38 @@ func TestInjectCopyFiles(t *testing.T) {
 		require.NoError(t, err)
 	})
 
-	t.Run("skips read-only rootfs", func(t *testing.T) {
+	t.Run("member name carries a missing parent directory", func(t *testing.T) {
 		t.Parallel()
 
+		archive, err := sanitizeCopyFileArchive(
+			mustFileTar(t, "config.yml", []byte("setting=1")),
+			"/config/config.yml",
+		)
+		require.NoError(t, err)
+
 		api := mockContainer.NewMockArchiveAPI(t)
-		err := injectCopyFiles(
+		api.EXPECT().
+			CopyToContainer(mock.Anything, "new-id", mock.Anything).
+			Run(func(_ context.Context, _ string, options dockerClient.CopyToContainerOptions) {
+				payload, readErr := io.ReadAll(options.Content)
+				require.NoError(t, readErr)
+				assert.Equal(t, injectRootPath, options.DestinationPath)
+
+				name, body, _ := tarRegularFile(t, payload)
+				assert.Equal(t, "/config/config.yml", name)
+				assert.Equal(t, []byte("setting=1"), body)
+			}).
+			Return(dockerClient.CopyToContainerResult{}, nil)
+
+		err = injectCopyFiles(
 			testLog(),
 			t.Context(),
 			api,
 			"new-id",
-			MockContainer(WithReadonlyRootfs(true)),
+			MockContainer(),
 			copyFileSnapshot{files: []copyFileEntry{{
-				target:  "/app/config.yaml",
-				archive: []byte("tar"),
+				target:  "/config/config.yml",
+				archive: archive,
 			}}},
 		)
 		require.NoError(t, err)
@@ -574,7 +755,7 @@ func TestDiscardStoredCopyFiles(t *testing.T) {
 func TestSanitizeCopyFileArchive(t *testing.T) {
 	t.Parallel()
 
-	t.Run("rewrites basename and strips setuid", func(t *testing.T) {
+	t.Run("rewrites to the full destination path and strips setuid", func(t *testing.T) {
 		t.Parallel()
 
 		raw := mustFileTarWithMode(t, "config.yaml", []byte("setting=1"), 0o4755)
@@ -582,9 +763,17 @@ func TestSanitizeCopyFileArchive(t *testing.T) {
 		require.NoError(t, err)
 
 		name, body, mode := tarRegularFile(t, got)
-		assert.Equal(t, "config.yaml", name)
+		assert.Equal(t, "/app/config.yaml", name)
 		assert.Equal(t, []byte("setting=1"), body)
 		assert.Equal(t, int64(0o755), mode)
+	})
+
+	t.Run("rejects invalid destination path", func(t *testing.T) {
+		t.Parallel()
+
+		raw := mustFileTar(t, "config.yaml", []byte("setting=1"))
+		_, err := sanitizeCopyFileArchive(raw, "../config.yaml")
+		require.ErrorIs(t, err, errCopyFileInvalidPath)
 	})
 
 	t.Run("rejects parent traversal", func(t *testing.T) {
@@ -719,7 +908,7 @@ func TestSanitizeCopyFileArchive(t *testing.T) {
 		require.NoError(t, err)
 
 		name, body, _ := tarRegularFile(t, got)
-		assert.Equal(t, "config.yaml", name)
+		assert.Equal(t, "/app/config.yaml", name)
 		assert.Equal(t, []byte("a"), body)
 	})
 }
@@ -798,15 +987,24 @@ func TestPathIsUnderMount(t *testing.T) {
 	assert.True(t, pathIsUnderMount("/app/config.yaml", "/app/config.yaml"))
 }
 
-func TestContainerHasReadOnlyRoot(t *testing.T) {
+func TestPathHasMount(t *testing.T) {
 	t.Parallel()
 
-	assert.False(t, containerHasReadOnlyRoot(&Container{}))
+	assert.False(t, pathHasMount("/app/config.yaml", ""))
+	assert.False(t, pathHasMount("/app/config.yaml", "."))
+	assert.False(t, pathHasMount("/app/config.yaml", "/app"))
+	assert.True(t, pathHasMount("/app/config.yaml", "/app/config.yaml"))
+	assert.True(t, pathHasMount("/app/./config.yaml", "/app/config.yaml"))
+}
 
-	c := MockContainer()
-	c.containerInfo.HostConfig = nil
-	assert.False(t, containerHasReadOnlyRoot(c))
-	assert.True(t, containerHasReadOnlyRoot(MockContainer(WithReadonlyRootfs(true))))
+func TestBindIsReadOnly(t *testing.T) {
+	t.Parallel()
+
+	assert.False(t, bindIsReadOnly("nocolon"))
+	assert.False(t, bindIsReadOnly("/host/config.yaml:/app/config.yaml"))
+	assert.False(t, bindIsReadOnly("/host/data:/data:rw,z"))
+	assert.True(t, bindIsReadOnly("/host/data:/data:ro"))
+	assert.True(t, bindIsReadOnly("/host/data:/data:z,ro"))
 }
 
 func TestSnapshotCopyFileErrors(t *testing.T) {

@@ -9,11 +9,13 @@ import (
 	"io"
 	"os"
 	"path"
+	"slices"
 	"strings"
 
 	"github.com/rs/zerolog"
 
 	cerrdefs "github.com/containerd/errdefs"
+	dockerContainer "github.com/moby/moby/api/types/container"
 	dockerClient "github.com/moby/moby/client"
 
 	"github.com/nicholas-fedor/watchtower/pkg/types"
@@ -30,6 +32,26 @@ const (
 	unixFilePermMask = 0o777
 	// bindStringMinParts is source and destination in a HostConfig.Binds entry.
 	bindStringMinParts = 2
+	// injectRootPath is the extraction point for injected files. The daemon requires
+	// it to name an existing directory, and the archive extractor creates any absent
+	// parent of the archived member, so injecting at the root matches Docker Compose.
+	injectRootPath = "/"
+	// bindReadOnlyOption is the HostConfig.Binds option that marks a bind read-only.
+	bindReadOnlyOption = "ro"
+)
+
+// copyFileSkipReason explains why a labeled path is not copied into a replacement.
+type copyFileSkipReason uint8
+
+const (
+	// copyFileSkipNone means the path should be snapshotted and injected.
+	copyFileSkipNone copyFileSkipReason = iota
+	// copyFileSkipMountedAtPath means a mount destination is the path itself.
+	copyFileSkipMountedAtPath
+	// copyFileSkipReadOnlyMount means the path sits under a read-only mount.
+	copyFileSkipReadOnlyMount
+	// copyFileSkipReadOnlyRootfs means no mount covers the path and the root filesystem is read-only.
+	copyFileSkipReadOnlyRootfs
 )
 
 // CopyFileStore captures labeled files around recreate and discards leftovers.
@@ -179,46 +201,151 @@ func copyFilePaths(c types.Container) ([]string, error) {
 	return parseCopyFileLabel(val)
 }
 
-// copyFilePathIsMounted reports whether path is a mount or under a mount.
+// copyFileSkipForPath reports why a labeled path is not copied, if it is skipped.
 //
-// Bind mounts and volumes are already preserved on recreation, so labeled
-// copies of those paths are skipped.
+// A read-only root filesystem skips every path because the archive is extracted at the
+// container root and the Engine refuses a write there. A mount whose destination is the
+// path itself already provides the file on recreation, so a labeled copy of it is
+// redundant. A mount that is only an ancestor does not, so the file is copied unless that
+// mount is read-only and the Engine would refuse the write.
 //
 // Parameters:
 //   - c: Container whose inspect mounts should be checked.
 //   - filePath: Absolute in-container path.
 //
 // Returns:
-//   - bool: True if the path is covered by an existing mount.
-func copyFilePathIsMounted(c types.Container, filePath string) bool {
+//   - copyFileSkipReason: Reason the path must be skipped, or copyFileSkipNone.
+func copyFileSkipForPath(c types.Container, filePath string) copyFileSkipReason {
 	info := c.ContainerInfo()
 	if info == nil {
-		return false
+		return copyFileSkipNone
+	}
+
+	if info.HostConfig != nil && info.HostConfig.ReadonlyRootfs {
+		return copyFileSkipReadOnlyRootfs
+	}
+
+	dest, readOnly, covered := mostSpecificMount(info, filePath)
+	if !covered {
+		return copyFileSkipNone
+	}
+
+	if pathHasMount(filePath, dest) {
+		return copyFileSkipMountedAtPath
+	}
+
+	if readOnly {
+		return copyFileSkipReadOnlyMount
+	}
+
+	return copyFileSkipNone
+}
+
+// mostSpecificMount returns the deepest mount covering filePath.
+//
+// Docker resolves a path against the deepest mount whose destination contains it, so a
+// deeper writable mount shadows a shallower read-only one. Using the deepest entry
+// keeps a path copyable whenever the write would actually succeed.
+//
+// Parameters:
+//   - info: Container inspect response.
+//   - filePath: Absolute in-container path.
+//
+// Returns:
+//   - string: Cleaned destination of the deepest covering mount.
+//   - bool: Whether that mount is read-only.
+//   - bool: True when any mount covers filePath.
+func mostSpecificMount(info *dockerContainer.InspectResponse, filePath string) (string, bool, bool) {
+	var (
+		bestDest string
+		bestRO   bool
+		found    bool
+	)
+
+	consider := func(dest string, readOnly bool) {
+		if !pathIsUnderMount(filePath, dest) {
+			return
+		}
+
+		clean := path.Clean(dest)
+		if found && len(clean) <= len(bestDest) {
+			return
+		}
+
+		bestDest, bestRO, found = clean, readOnly, true
 	}
 
 	for _, mount := range info.Mounts {
-		if pathIsUnderMount(filePath, mount.Destination) {
-			return true
-		}
+		consider(mount.Destination, !mount.RW)
 	}
 
 	if info.HostConfig == nil {
-		return false
+		return bestDest, bestRO, found
 	}
 
 	for _, mount := range info.HostConfig.Mounts {
-		if pathIsUnderMount(filePath, mount.Target) {
-			return true
-		}
+		consider(mount.Target, mount.ReadOnly)
 	}
 
 	for _, bind := range info.HostConfig.Binds {
-		if dest := bindDestination(bind); dest != "" && pathIsUnderMount(filePath, dest) {
-			return true
+		if dest := bindDestination(bind); dest != "" {
+			consider(dest, bindIsReadOnly(bind))
 		}
 	}
 
+	return bestDest, bestRO, found
+}
+
+// shouldSkipCopyFile logs and reports whether a labeled path cannot be copied.
+//
+// Parameters:
+//   - clog: Logger with container fields.
+//   - source: Source container being snapshotted.
+//   - filePath: Absolute in-container path.
+//
+// Returns:
+//   - bool: True when the path must be skipped.
+func shouldSkipCopyFile(clog *zerolog.Logger, source types.Container, filePath string) bool {
+	switch copyFileSkipForPath(source, filePath) {
+	case copyFileSkipMountedAtPath:
+		clog.Debug().
+			Str("path", filePath).
+			Msg("Skipping copy-file path because a mount provides it")
+
+		return true
+	case copyFileSkipReadOnlyMount:
+		clog.Warn().
+			Str("path", filePath).
+			Msg("Skipping copy-file path because the covering mount is read-only")
+
+		return true
+	case copyFileSkipReadOnlyRootfs:
+		clog.Debug().
+			Str("path", filePath).
+			Msg("Skipping copy-file path because the root filesystem is read-only")
+
+		return true
+	case copyFileSkipNone:
+	}
+
 	return false
+}
+
+// pathHasMount reports whether filePath is exactly a mount destination.
+//
+// Parameters:
+//   - filePath: Absolute in-container file path.
+//   - mountDest: Absolute mount destination.
+//
+// Returns:
+//   - bool: True when filePath is the mount destination itself.
+func pathHasMount(filePath, mountDest string) bool {
+	mountDest = path.Clean(mountDest)
+	if mountDest == "" || mountDest == "." {
+		return false
+	}
+
+	return path.Clean(filePath) == mountDest
 }
 
 // pathIsUnderMount reports whether filePath is mountDest or a descendant.
@@ -230,18 +357,11 @@ func copyFilePathIsMounted(c types.Container, filePath string) bool {
 // Returns:
 //   - bool: True if filePath is at or under mountDest.
 func pathIsUnderMount(filePath, mountDest string) bool {
-	filePath = path.Clean(filePath)
-	mountDest = path.Clean(mountDest)
-
-	if mountDest == "" || mountDest == "." {
-		return false
-	}
-
-	if filePath == mountDest {
+	if pathHasMount(filePath, mountDest) {
 		return true
 	}
 
-	return strings.HasPrefix(filePath, mountDest+"/")
+	return strings.HasPrefix(path.Clean(filePath), path.Clean(mountDest)+"/")
 }
 
 // bindDestination returns the container path from a Unix bind string.
@@ -258,6 +378,22 @@ func bindDestination(bind string) string {
 	}
 
 	return parts[1]
+}
+
+// bindIsReadOnly reports whether a Unix bind string marks the mount read-only.
+//
+// Parameters:
+//   - bind: HostConfig.Binds entry in source:destination[:options] form.
+//
+// Returns:
+//   - bool: True when the options include ro.
+func bindIsReadOnly(bind string) bool {
+	parts := strings.Split(bind, ":")
+	if len(parts) < bindStringMinParts+1 {
+		return false
+	}
+
+	return slices.Contains(strings.Split(parts[bindStringMinParts], ","), bindReadOnlyOption)
 }
 
 // snapshotCopyFiles reads labeled files from the source container into memory.
@@ -299,11 +435,7 @@ func snapshotCopyFiles(
 	var total int64
 
 	for _, filePath := range paths {
-		if copyFilePathIsMounted(source, filePath) {
-			clog.Debug().
-				Str("path", filePath).
-				Msg("Skipping copy-file path because it is a mount")
-
+		if shouldSkipCopyFile(clog, source, filePath) {
 			continue
 		}
 
@@ -404,8 +536,10 @@ func snapshotCopyFile(
 
 // sanitizeCopyFileArchive rewrites a Docker copy archive to a single regular file.
 //
-// The output tar has the destination basename, permission bits without setuid,
-// setgid, or sticky, and the original uid, gid, and file contents.
+// The output tar holds one regular file named with the full destination path, permission
+// bits without setuid, setgid, or sticky, and the original uid, gid, and file contents.
+// Naming the member with the whole path lets the daemon create any absent parent, which
+// is the same mechanism Docker Compose uses to write content-based configs.
 //
 // Parameters:
 //   - raw: Tar stream returned by CopyFromContainer.
@@ -415,6 +549,11 @@ func snapshotCopyFile(
 //   - []byte: Sanitized tar archive.
 //   - error: Non-nil if the archive is not a single regular file at destPath.
 func sanitizeCopyFileArchive(raw []byte, destPath string) ([]byte, error) {
+	err := validateCopyFilePath(destPath)
+	if err != nil {
+		return nil, err
+	}
+
 	base := path.Base(destPath)
 	reader := tar.NewReader(bytes.NewReader(raw))
 
@@ -473,7 +612,7 @@ func sanitizeCopyFileArchive(raw []byte, destPath string) ([]byte, error) {
 		return nil, fmt.Errorf("%w: empty archive", errCopyFileUnsafeArchive)
 	}
 
-	return writeSanitizedCopyFileTar(base, body, header)
+	return writeSanitizedCopyFileTar(destPath, body, header)
 }
 
 // copyFileTarNameOK reports whether a tar member name is the destination basename.
@@ -495,21 +634,21 @@ func copyFileTarNameOK(name, base string) bool {
 // writeSanitizedCopyFileTar builds a one-member regular-file tar.
 //
 // Parameters:
-//   - base: File basename to write into the tar header.
+//   - destPath: Absolute in-container path written into the tar header.
 //   - body: File contents.
 //   - src: Original tar header for uid, gid, mode, and modtime.
 //
 // Returns:
 //   - []byte: Tar archive.
 //   - error: Non-nil if the tar cannot be written.
-func writeSanitizedCopyFileTar(base string, body []byte, src *tar.Header) ([]byte, error) {
+func writeSanitizedCopyFileTar(destPath string, body []byte, src *tar.Header) ([]byte, error) {
 	var buf bytes.Buffer
 
 	writer := tar.NewWriter(&buf)
 
 	err := writer.WriteHeader(&tar.Header{
 		Typeflag: tar.TypeReg,
-		Name:     base,
+		Name:     destPath,
 		Size:     int64(len(body)),
 		Mode:     src.Mode & unixFilePermMask,
 		Uid:      src.Uid,
@@ -537,12 +676,15 @@ func writeSanitizedCopyFileTar(base string, body []byte, src *tar.Header) ([]byt
 
 // injectCopyFiles writes a snapshot into a newly created container before start.
 //
+// The archive is extracted at the container root with the destination as the member name,
+// so a parent directory missing from the new image is created rather than failing the copy.
+//
 // Parameters:
 //   - log: Logger for debug messages.
 //   - ctx: Context for cancellation and timeout control.
 //   - api: Docker copy API.
 //   - containerID: Replacement container ID.
-//   - source: Source container whose host config is checked for a read-only root.
+//   - source: Source container whose name is attached to log records.
 //   - snapshot: Files captured from the source container.
 //
 // Returns:
@@ -559,14 +701,6 @@ func injectCopyFiles(
 		return nil
 	}
 
-	if containerHasReadOnlyRoot(source) {
-		log.Debug().
-			Str("container", source.Name()).
-			Msg("Skipping copy-file inject because the root filesystem is read-only")
-
-		return nil
-	}
-
 	clogVal := log.With().
 		Str("container", source.Name()).
 		Str("new_id", containerID).
@@ -574,10 +708,8 @@ func injectCopyFiles(
 	clog := &clogVal
 
 	for _, file := range snapshot.files {
-		dest := path.Dir(file.target)
-
 		_, err := api.CopyToContainer(ctx, containerID, dockerClient.CopyToContainerOptions{
-			DestinationPath: dest,
+			DestinationPath: injectRootPath,
 			Content:         bytes.NewReader(file.archive),
 			CopyUIDGID:      true,
 		})
@@ -591,22 +723,6 @@ func injectCopyFiles(
 	}
 
 	return nil
-}
-
-// containerHasReadOnlyRoot reports whether the container root filesystem is read-only.
-//
-// Parameters:
-//   - c: Container to inspect.
-//
-// Returns:
-//   - bool: True when HostConfig.ReadonlyRootfs is set.
-func containerHasReadOnlyRoot(c types.Container) bool {
-	info := c.ContainerInfo()
-	if info == nil || info.HostConfig == nil {
-		return false
-	}
-
-	return info.HostConfig.ReadonlyRootfs
 }
 
 // copyArchiveAPI returns the Docker copy API used for snapshot and inject.
