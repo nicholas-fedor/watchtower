@@ -92,7 +92,7 @@ A skipped path is logged and does not block the update.
 | Condition | Why |
 | --- | --- |
 | The path is itself a mount destination | That mount already provides the file, and it survives recreation. |
-| The path is under a read-only mount | The Engine would refuse the write. Watchtower logs a warning. |
+| The path is under a read-only mount | The Engine would refuse the write, and that mount provides the file regardless. |
 | The path does not exist | There is nothing to copy. |
 | The container has a read-only root filesystem | Watchtower extracts at the container root, where the Engine refuses any write. This applies even to a path under a writable volume. |
 

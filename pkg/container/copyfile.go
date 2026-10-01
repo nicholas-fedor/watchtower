@@ -48,7 +48,7 @@ const (
 	copyFileSkipNone copyFileSkipReason = iota
 	// copyFileSkipMountedAtPath means a mount destination is the path itself.
 	copyFileSkipMountedAtPath
-	// copyFileSkipReadOnlyMount means the path sits under a read-only mount.
+	// copyFileSkipReadOnlyMount means a read-only mount above the path provides the file.
 	copyFileSkipReadOnlyMount
 	// copyFileSkipReadOnlyRootfs means no mount covers the path and the root filesystem is read-only.
 	copyFileSkipReadOnlyRootfs
@@ -204,10 +204,12 @@ func copyFilePaths(c types.Container) ([]string, error) {
 // copyFileSkipForPath reports why a labeled path is not copied, if it is skipped.
 //
 // A read-only root filesystem skips every path because the archive is extracted at the
-// container root and the Engine refuses a write there. A mount whose destination is the
-// path itself already provides the file on recreation, so a labeled copy of it is
-// redundant. A mount that is only an ancestor does not, so the file is copied unless that
-// mount is read-only and the Engine would refuse the write.
+// container root and the Engine refuses a write there.
+//
+// A mount that provides the file skips the copy too, because that mount is preserved on
+// recreation. That covers a mount whose destination is the path itself and a read-only
+// mount above it. Anonymous volumes are always writable, so a writable mount above the
+// path does not skip it and the file is copied into the recreated volume.
 //
 // Parameters:
 //   - c: Container whose inspect mounts should be checked.
@@ -314,9 +316,9 @@ func shouldSkipCopyFile(clog *zerolog.Logger, source types.Container, filePath s
 
 		return true
 	case copyFileSkipReadOnlyMount:
-		clog.Warn().
+		clog.Debug().
 			Str("path", filePath).
-			Msg("Skipping copy-file path because the covering mount is read-only")
+			Msg("Skipping copy-file path because a read-only mount provides it")
 
 		return true
 	case copyFileSkipReadOnlyRootfs:
