@@ -6,6 +6,7 @@ import (
 	"errors"
 	"io"
 	"path"
+	"slices"
 	"strings"
 	"testing"
 
@@ -108,11 +109,12 @@ func FuzzValidateCopyFilePath(f *testing.F) {
 }
 
 // FuzzSanitizeCopyFileArchive verifies tar sanitization never panics and that
-// accepted archives are a single regular file named as the destination basename
+// accepted archives are a single regular file named as the full destination path
 // with setuid, setgid, and sticky bits cleared.
 func FuzzSanitizeCopyFileArchive(f *testing.F) {
 	f.Add(seedCopyFileTar("config.yaml", []byte("setting=1"), 0o444), "/app/config.yaml")
 	f.Add(seedCopyFileTar("config.yaml", []byte("setting=1"), 0o4755), "/app/config.yaml")
+	f.Add(seedCopyFileTar("config.yaml", []byte("setting=1"), 0o644), "/config/config.yml")
 	f.Add(seedCopyFileTar("../config.yaml", []byte("x"), 0o644), "/app/config.yaml")
 	f.Add(seedCopyFileTar("extra.yaml", []byte("x"), 0o644), "/app/config.yaml")
 	f.Add(seedCopyFileSymlink("config.yaml", "/tmp/other"), "/app/config.yaml")
@@ -121,6 +123,9 @@ func FuzzSanitizeCopyFileArchive(f *testing.F) {
 	f.Add([]byte{0x1f, 0x8b}, "/app/config.yaml")
 	f.Add(seedCopyFileTar("config.yaml", []byte(""), 0o644), "/app/config.yaml")
 	f.Add(seedCopyFileTar("./config.yaml", []byte("ok"), 0o600), "/app/config.yaml")
+	f.Add(seedCopyFileTar("config.yaml", []byte("x"), 0o644), "../config.yaml")
+	f.Add(seedCopyFileTar("config.yaml", []byte("x"), 0o644), "config.yaml")
+	f.Add(seedCopyFileTar("config.yaml", []byte("x"), 0o644), "/")
 
 	f.Fuzz(func(t *testing.T, raw []byte, destPath string) {
 		if len(raw) > maxCopyFileTarBytes*2 {
@@ -133,6 +138,7 @@ func FuzzSanitizeCopyFileArchive(f *testing.F) {
 			case errors.Is(err, errCopyFileUnsafeArchive),
 				errors.Is(err, errCopyFileSymlink),
 				errors.Is(err, errCopyFileTooLarge),
+				errors.Is(err, errCopyFileInvalidPath),
 				errors.Is(err, errCopyFileSnapshotFailed):
 				return
 			default:
@@ -140,11 +146,10 @@ func FuzzSanitizeCopyFileArchive(f *testing.F) {
 			}
 		}
 
-		base := path.Base(destPath)
 		name, body, mode := mustReadSingleTarFile(t, got)
 
-		if name != base {
-			t.Fatalf("sanitized name %q want %q", name, base)
+		if name != destPath {
+			t.Fatalf("sanitized name %q want %q", name, destPath)
 		}
 
 		if strings.Contains(name, "..") {
@@ -223,6 +228,35 @@ func FuzzPathIsUnderMount(f *testing.F) {
 	})
 }
 
+// FuzzPathHasMount verifies mount equality checks never panic and that a true
+// result means the cleaned file path and mount destination are identical.
+func FuzzPathHasMount(f *testing.F) {
+	f.Add("/app/config.yaml", "/app/config.yaml")
+	f.Add("/app/config.yaml", "/app")
+	f.Add("/app/./config.yaml", "/app/config.yaml")
+	f.Add("/app/config.yaml", "")
+	f.Add("/app/config.yaml", ".")
+	f.Add("/", "/")
+	f.Add("/app/config.yaml", "/app/config.yaml/")
+
+	f.Fuzz(func(t *testing.T, filePath, mountDest string) {
+		if !pathHasMount(filePath, mountDest) {
+			return
+		}
+
+		cleanedFile := path.Clean(filePath)
+		cleanedMount := path.Clean(mountDest)
+
+		if cleanedMount == "" || cleanedMount == "." {
+			t.Fatalf("matched empty mount %q for %q", mountDest, filePath)
+		}
+
+		if cleanedFile != cleanedMount {
+			t.Fatalf("matched %q against %q without equality", filePath, mountDest)
+		}
+	})
+}
+
 // FuzzBindDestination verifies bind parsing never panics.
 func FuzzBindDestination(f *testing.F) {
 	f.Add("/host/config.yaml:/app/config.yaml:ro")
@@ -240,6 +274,33 @@ func FuzzBindDestination(f *testing.F) {
 
 		if !strings.Contains(bind, ":") {
 			t.Fatalf("non-empty dest %q from bind without colon %q", dest, bind)
+		}
+	})
+}
+
+// FuzzBindIsReadOnly verifies read-only bind option detection never panics and
+// that a true result means the bind options contain the ro flag.
+func FuzzBindIsReadOnly(f *testing.F) {
+	f.Add("/host/config.yaml:/app/config.yaml:ro")
+	f.Add("/host/data:/data")
+	f.Add("/host/data:/data:rw,z")
+	f.Add("/host/data:/data:z,ro")
+	f.Add("nocolon")
+	f.Add("::")
+	f.Add("")
+
+	f.Fuzz(func(t *testing.T, bind string) {
+		if !bindIsReadOnly(bind) {
+			return
+		}
+
+		parts := strings.Split(bind, ":")
+		if len(parts) < bindStringMinParts+1 {
+			t.Fatalf("read-only bind %q has no options field", bind)
+		}
+
+		if !slices.Contains(strings.Split(parts[bindStringMinParts], ","), bindReadOnlyOption) {
+			t.Fatalf("bind %q reported read-only without ro option", bind)
 		}
 	})
 }
