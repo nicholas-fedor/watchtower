@@ -85,6 +85,15 @@ Every labeled path ends in one of three outcomes: copied, skipped, or the update
 | Parent directory missing from the new image | Watchtower creates it with mode `0755` and writes the file into it. |
 | Container with a writable root filesystem | Watchtower copies the file, even when the path sits inside a mount. |
 
+### Paths Under a Mount
+
+When a writable mount sits above the labeled path, Watchtower reads the file out of that mount and writes it back into it on every update, so a change made to the mount after the read is overwritten by the older content.
+Watchtower reads labeled files while the old container is still running and writes them afterwards, so the two moments are never the same instant.
+
+The write lands in the mount rather than in the container's own filesystem, and removing the container does not undo it.
+If the update fails after the file is written, the mount keeps that content even though no container is running.
+Use a [named volume](https://docs.docker.com/engine/storage/volumes/){target="_blank" rel="noopener noreferrer"} or a bind mount that you control if another process also writes to the same path, and avoid labeling a file that must never be rewritten.
+
 ### Skipped
 
 A skipped path is logged and does not block the update.
