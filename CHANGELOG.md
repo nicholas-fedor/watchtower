@@ -18,6 +18,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Chores
 
+- Update dependency python to v3.14.8 by @renovate[bot] in [#2490](https://github.com/nicholas-fedor/watchtower/pull/2490)
 - Update github.com/google/pprof digest to 60bf690 by @renovate[bot] in [#2487](https://github.com/nicholas-fedor/watchtower/pull/2487)
 - Update github.com/microsoft/go-winio digest to f19d971 by @renovate[bot] in [#2488](https://github.com/nicholas-fedor/watchtower/pull/2488)
 - Update module github.com/pjbgf/sha1cd to v0.7.0 by @renovate[bot] in [#2482](https://github.com/nicholas-fedor/watchtower/pull/2482)
