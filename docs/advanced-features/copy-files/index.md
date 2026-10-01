@@ -98,15 +98,23 @@ A skipped path is logged and does not block the update.
 
 ### Update Stops
 
+Watchtower copies labeled files in two phases and a failure in either one stops that container's update.
+
+**Before the container is stopped.** Watchtower reads every labeled file out of the running container. A failure here leaves the container running and untouched.
+
 | Condition | Why |
 | --- | --- |
+| The path is not absolute or contains `..` | The label value is invalid. |
 | The path is a directory | A directory cannot be copied as a file. |
 | The path is a symlink | Symlinks are rejected rather than followed. |
 | The file is larger than 1 MiB | The file exceeds the per-file cap. |
 | The archive is unsafe | The archive contains traversal entries, extra members, or special file types. |
-| The copy into the new container fails | The replacement container is discarded. |
 
-A failure detected before the container is replaced leaves the running container untouched.
+**After the container is stopped.** Watchtower writes the files into the replacement container. A failure here discards the replacement, and the container is not recreated for that cycle.
+
+| Condition | Why |
+| --- | --- |
+| The copy into the new container fails | The Engine refused the write, or the connection failed. |
 
 ### Size Limits
 
