@@ -18,6 +18,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Chores
 
+- Update github.com/google/pprof digest to 77d3b59 by @renovate[bot] in [#2496](https://github.com/nicholas-fedor/watchtower/pull/2496)
 - Update module github.com/mattn/go-shellwords to v1.0.16 by @renovate[bot] in [#2495](https://github.com/nicholas-fedor/watchtower/pull/2495)
 - Update module github.com/gofiber/contrib/v3/zerolog to v1.1.6 by @renovate[bot] in [#2494](https://github.com/nicholas-fedor/watchtower/pull/2494)
 - Update module github.com/gofiber/contrib/v3/swaggo to v1.0.12 by @renovate[bot] in [#2491](https://github.com/nicholas-fedor/watchtower/pull/2491)
