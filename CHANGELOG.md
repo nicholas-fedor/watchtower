@@ -18,6 +18,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Chores
 
+- Update opentelemetry-go monorepo to v1.47.0 by @renovate[bot] in [#2501](https://github.com/nicholas-fedor/watchtower/pull/2501)
 - Update module github.com/moby/moby/client to v0.6.1 by @renovate[bot] in [#2500](https://github.com/nicholas-fedor/watchtower/pull/2500)
 - Update module github.com/moby/moby/api to v1.56.1 by @renovate[bot] in [#2497](https://github.com/nicholas-fedor/watchtower/pull/2497)
 - Update github.com/google/pprof digest to 77d3b59 by @renovate[bot] in [#2496](https://github.com/nicholas-fedor/watchtower/pull/2496)
