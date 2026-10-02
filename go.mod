@@ -7,11 +7,11 @@ retract [v1.7.2, v1.7.9]
 
 require (
 	github.com/cenkalti/backoff/v7 v7.0.1
-	github.com/compose-spec/compose-go/v2 v2.15.0
+	github.com/compose-spec/compose-go/v2 v2.16.1
 	github.com/containerd/errdefs v1.0.0
 	github.com/distribution/reference v0.6.0
 	github.com/docker/cli v29.8.2+incompatible
-	github.com/docker/compose/v5 v5.5.1
+	github.com/docker/compose/v5 v5.6.0
 	github.com/go-git/go-git/v5 v5.19.2
 	github.com/gofiber/contrib/v3/swaggo v1.0.12
 	github.com/gofiber/contrib/v3/zerolog v1.1.6
@@ -112,7 +112,6 @@ require (
 	github.com/inconshreveable/mousetrap v1.1.0 // indirect
 	github.com/inhies/go-bytesize v0.0.0-20220417184213-4913239db9cf // indirect
 	github.com/jbenet/go-context v0.0.0-20150711004518-d14ea06fba99 // indirect
-	github.com/jonboulle/clockwork v0.5.0 // indirect
 	github.com/kevinburke/ssh_config v1.6.0 // indirect
 	github.com/klauspost/compress v1.20.1 // indirect
 	github.com/mattn/go-colorable v0.1.15 // indirect
