@@ -18,6 +18,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Chores
 
+- Update module github.com/docker/compose/v5 to v5.6.0 by @renovate[bot] in [#2508](https://github.com/nicholas-fedor/watchtower/pull/2508)
+- Update module github.com/go-git/go-billy/v5 to v5.9.2 by @renovate[bot] in [#2505](https://github.com/nicholas-fedor/watchtower/pull/2505)
 - Update anchore/sbom-action action to v0.24.3 by @renovate[bot] in [#2504](https://github.com/nicholas-fedor/watchtower/pull/2504)
 - Update opentelemetry-go monorepo to v1.47.0 by @renovate[bot] in [#2501](https://github.com/nicholas-fedor/watchtower/pull/2501)
 - Update module github.com/moby/moby/client to v0.6.1 by @renovate[bot] in [#2500](https://github.com/nicholas-fedor/watchtower/pull/2500)
