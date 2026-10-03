@@ -18,6 +18,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Chores
 
+- Update github.com/google/pprof digest to ebaad5f by @renovate[bot] in [#2512](https://github.com/nicholas-fedor/watchtower/pull/2512)
 - Update opentelemetry-go-contrib monorepo to v0.72.0 by @renovate[bot] in [#2511](https://github.com/nicholas-fedor/watchtower/pull/2511)
 - Update module golang.org/x/tools to v0.51.0 by @renovate[bot] in [#2509](https://github.com/nicholas-fedor/watchtower/pull/2509)
 - Update module github.com/docker/compose/v5 to v5.6.0 by @renovate[bot] in [#2508](https://github.com/nicholas-fedor/watchtower/pull/2508)
