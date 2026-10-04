@@ -18,6 +18,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Chores
 
+- Update module github.com/go-git/go-git/v5 to v5.19.3 by @renovate[bot] in [#2516](https://github.com/nicholas-fedor/watchtower/pull/2516)
+- Update module github.com/molecule-man/go-brrr to v1.2.0 by @renovate[bot] in [#2513](https://github.com/nicholas-fedor/watchtower/pull/2513)
 - Update github.com/google/pprof digest to ebaad5f by @renovate[bot] in [#2512](https://github.com/nicholas-fedor/watchtower/pull/2512)
 - Update opentelemetry-go-contrib monorepo to v0.72.0 by @renovate[bot] in [#2511](https://github.com/nicholas-fedor/watchtower/pull/2511)
 - Update module golang.org/x/tools to v0.51.0 by @renovate[bot] in [#2509](https://github.com/nicholas-fedor/watchtower/pull/2509)
