@@ -195,7 +195,11 @@ func RunUpgradesOnSchedule(ctx context.Context, deps ScheduleDeps) error {
 	// guards it because cron jobs and label rescans run concurrently.
 	var specsMu sync.Mutex
 
-	customSpecs := make(map[string]struct{})
+	// scanMu serializes label scans so a stale scan cannot remove jobs
+	// registered by a newer one.
+	var scanMu sync.Mutex
+
+	customSpecs := make(map[string]cron.EntryID)
 	invalidSpecs := make(map[string]struct{})
 
 	// hasCustomSchedule reports whether the container's schedule label names a
@@ -351,10 +355,6 @@ func RunUpgradesOnSchedule(ctx context.Context, deps ScheduleDeps) error {
 	// blocking: whether to wait for the lock (true for scheduled runs, false for immediate runs)
 	// scheduleMatch: predicate limiting the run to containers assigned to this schedule
 	updateFunc := func(skipWatchtowerSelfUpdate, blocking bool, scheduleMatch types.Filter) {
-		params := deps.BaseParams
-		params.RunOnce = false
-		params.SkipSelfUpdate = resolveSkipSelfUpdate(skipWatchtowerSelfUpdate)
-
 		if isWatchtowerParentUpdate() {
 			return
 		}
@@ -372,6 +372,9 @@ func RunUpgradesOnSchedule(ctx context.Context, deps ScheduleDeps) error {
 			syncContainerSchedules()
 		}
 
+		params := deps.BaseParams
+		params.RunOnce = false
+
 		// Keep params.Filter and the positional filter argument identical so
 		// runUpdatesWithNotifications cannot prefer a divergent source.
 		params.Filter = buildUpdateFilter(scheduleMatch)
@@ -381,6 +384,10 @@ func RunUpgradesOnSchedule(ctx context.Context, deps ScheduleDeps) error {
 
 			return
 		}
+
+		// Claim the first-run skip only once the run is actually executing so
+		// invocations that abort above do not consume it.
+		params.SkipSelfUpdate = resolveSkipSelfUpdate(skipWatchtowerSelfUpdate)
 
 		metric := deps.RunUpdate(ctx, params.Filter, params)
 		if metric != nil {
@@ -423,9 +430,10 @@ func RunUpgradesOnSchedule(ctx context.Context, deps ScheduleDeps) error {
 			return containerScheduleSpec(fc) == spec
 		}
 
-		if _, err := scheduler.AddFunc(spec, func() {
+		entryID, err := scheduler.AddFunc(spec, func() {
 			updateFunc(false, true, scheduleMatch)
-		}); err != nil {
+		})
+		if err != nil {
 			invalidSpecs[spec] = struct{}{}
 
 			log.Warn().
@@ -436,7 +444,7 @@ func RunUpgradesOnSchedule(ctx context.Context, deps ScheduleDeps) error {
 			return
 		}
 
-		customSpecs[spec] = struct{}{}
+		customSpecs[spec] = entryID
 
 		log.Info().
 			Str("schedule", spec).
@@ -453,6 +461,9 @@ func RunUpgradesOnSchedule(ctx context.Context, deps ScheduleDeps) error {
 			return
 		}
 
+		scanMu.Lock()
+		defer scanMu.Unlock()
+
 		var listFilters []types.Filter
 		if baseFilter != nil {
 			listFilters = append(listFilters, baseFilter)
@@ -465,10 +476,34 @@ func RunUpgradesOnSchedule(ctx context.Context, deps ScheduleDeps) error {
 			return
 		}
 
+		seen := make(map[string]struct{}, len(containers))
+
 		for _, c := range containers {
-			if spec := containerScheduleSpec(c); spec != "" && spec != scheduleSpec {
-				registerScheduleSpec(spec)
+			spec := containerScheduleSpec(c)
+			if spec == "" || spec == scheduleSpec {
+				continue
 			}
+
+			seen[spec] = struct{}{}
+			registerScheduleSpec(spec)
+		}
+
+		// Remove jobs whose spec no longer appears on any container, so removed
+		// labels stop firing.
+		specsMu.Lock()
+		defer specsMu.Unlock()
+
+		for spec, entryID := range customSpecs {
+			if _, ok := seen[spec]; ok {
+				continue
+			}
+
+			scheduler.Remove(entryID)
+			delete(customSpecs, spec)
+
+			log.Info().
+				Str("schedule", spec).
+				Msg("Removed per-container schedule override")
 		}
 	}
 

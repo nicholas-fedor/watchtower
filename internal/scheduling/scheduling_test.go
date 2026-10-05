@@ -998,6 +998,84 @@ func TestRunUpgradesOnSchedule_ScheduleLabelDiscoveredAtTick(t *testing.T) {
 	}
 }
 
+// TestRunUpgradesOnSchedule_ScheduleLabelRemovedOnRescan verifies that an
+// override job is removed once no container carries its spec: after the
+// labeled container disappears, the next run's in-tick scan drops the job and
+// the container is no longer excluded from the default schedule.
+func TestRunUpgradesOnSchedule_ScheduleLabelRemovedOnRescan(t *testing.T) {
+	labeled := createTestContainer(
+		"",
+		withName("labeled-app"),
+		withLabel(container.ScheduleLabel, "@every 1h"),
+	)
+	unlabeled := createTestContainer("", withName("plain-app"))
+
+	data := &mockActions.TestData{Containers: []types.Container{unlabeled, labeled}}
+	client := mockActions.CreateMockClient(data, false, false)
+
+	ctx := t.Context()
+
+	var (
+		mu       sync.Mutex
+		outcomes []filterOutcome
+	)
+
+	hook := recordOutcomes(labeled, unlabeled, &outcomes, &mu)
+	swapped := false
+
+	// The labeled container disappears after the first update run completes;
+	// the next run's scan must drop its job.
+	runUpdatesWithNotifications := func(ctx context.Context, f types.Filter, p types.UpdateParams) *metrics.Metric {
+		m := hook(ctx, f, p)
+
+		mu.Lock()
+		defer mu.Unlock()
+
+		if !swapped {
+			swapped = true
+			data.Containers = []types.Container{unlabeled}
+		}
+
+		return m
+	}
+
+	writeStartupMessage := func(logging.StartupParams) {}
+
+	timeoutCtx, timeoutCancel := context.WithTimeout(ctx, 2500*time.Millisecond)
+	defer timeoutCancel()
+
+	deps := testDeps(client, runUpdatesWithNotifications, writeStartupMessage)
+	// The default schedule fires every second; the override never does.
+	deps.ScheduleSpec = "* * * * * *"
+
+	err := scheduling.RunUpgradesOnSchedule(timeoutCtx, deps)
+	if err != nil {
+		t.Errorf("expected no error, got %v", err)
+	}
+
+	mu.Lock()
+	defer mu.Unlock()
+
+	if len(outcomes) < 2 {
+		t.Fatalf("expected at least 2 update calls, got %d", len(outcomes))
+	}
+
+	// The first run excludes the labeled container while its job is registered.
+	if outcomes[0].labeled {
+		t.Error("expected first run to exclude the labeled container")
+	}
+
+	for i, o := range outcomes[1:] {
+		if !o.labeled {
+			t.Errorf("expected run %d to include the container after its override was removed", i+2)
+		}
+
+		if !o.unlabeled {
+			t.Errorf("expected run %d to include the unlabeled container", i+2)
+		}
+	}
+}
+
 // TestRunUpgradesOnSchedule_EphemeralSelfUpdateWithExposedPorts verifies that when
 // ephemeralSelfUpdate=true, the port-conflict guard is bypassed even when the
 // Watchtower container has exposed ports. This allows ephemeral self-updates to
