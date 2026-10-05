@@ -38,6 +38,9 @@ const (
 	cooldownDelayLabel = "com.centurylinklabs.watchtower.cooldown-delay"
 	// copyFileLabel lists in-container file paths to copy during recreation, comma-separated.
 	copyFileLabel = "com.centurylinklabs.watchtower.copy-file"
+	// ScheduleLabel overrides the default update schedule for this container.
+	// Accepts a cron expression (with optional seconds) or descriptor (e.g., "@hourly").
+	ScheduleLabel = "com.centurylinklabs.watchtower.schedule"
 )
 
 // Lifecycle hook labels configure commands executed during container update phases.

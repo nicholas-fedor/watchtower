@@ -4,6 +4,7 @@ import (
 	"context"
 	"net/netip"
 	"strings"
+	"sync"
 	"testing"
 	"testing/synctest"
 	"time"
@@ -38,6 +39,17 @@ type testContainerOption func(*dockerContainer.InspectResponse)
 func withName(name string) testContainerOption {
 	return func(ir *dockerContainer.InspectResponse) {
 		ir.Name = name
+	}
+}
+
+// withLabel sets an arbitrary container label on the test container config.
+func withLabel(key, value string) testContainerOption {
+	return func(ir *dockerContainer.InspectResponse) {
+		if ir.Config.Labels == nil {
+			ir.Config.Labels = make(map[string]string)
+		}
+
+		ir.Config.Labels[key] = value
 	}
 }
 
@@ -656,6 +668,332 @@ func TestRunUpgradesOnSchedule_ScheduledRuns_Execution(t *testing.T) {
 	for _, execTime := range executionTimes {
 		if execTime.Before(startTime) {
 			t.Errorf("execution time %v is before start time %v", execTime, startTime)
+		}
+	}
+}
+
+// filterOutcome records how a captured update filter treated a labeled and an
+// unlabeled container, used to assert per-container schedule selection.
+type filterOutcome struct {
+	labeled   bool
+	unlabeled bool
+}
+
+// recordOutcomes returns a RunUpdate hook that evaluates the received filter
+// against both containers and stores the result of each invocation.
+func recordOutcomes(
+	labeled, unlabeled types.Container,
+	outcomes *[]filterOutcome,
+	mu *sync.Mutex,
+) func(context.Context, types.Filter, types.UpdateParams) *metrics.Metric {
+	return func(_ context.Context, f types.Filter, _ types.UpdateParams) *metrics.Metric {
+		mu.Lock()
+		defer mu.Unlock()
+
+		*outcomes = append(*outcomes, filterOutcome{f(labeled), f(unlabeled)})
+
+		return &metrics.Metric{Scanned: 1, Updated: 0, Failed: 0}
+	}
+}
+
+// TestRunUpgradesOnSchedule_PerContainerScheduleOverride verifies that a
+// container carrying the schedule label runs on its own cron schedule and that
+// the override run selects only matching containers.
+func TestRunUpgradesOnSchedule_PerContainerScheduleOverride(t *testing.T) {
+	labeled := createTestContainer(
+		"",
+		withName("labeled-app"),
+		withLabel(container.ScheduleLabel, "* * * * * *"),
+	)
+	unlabeled := createTestContainer("", withName("plain-app"))
+
+	client := mockActions.CreateMockClient(
+		&mockActions.TestData{Containers: []types.Container{labeled, unlabeled}},
+		false,
+		false,
+	)
+
+	ctx := t.Context()
+
+	var (
+		mu       sync.Mutex
+		outcomes []filterOutcome
+	)
+
+	writeStartupMessage := func(logging.StartupParams) {}
+
+	timeoutCtx, timeoutCancel := context.WithTimeout(ctx, 2500*time.Millisecond)
+	defer timeoutCancel()
+
+	deps := testDeps(client, recordOutcomes(labeled, unlabeled, &outcomes, &mu), writeStartupMessage)
+	// The default schedule must not fire during the test window.
+	deps.ScheduleSpec = "@every 1h"
+
+	err := scheduling.RunUpgradesOnSchedule(timeoutCtx, deps)
+	if err != nil {
+		t.Errorf("expected no error, got %v", err)
+	}
+
+	mu.Lock()
+	defer mu.Unlock()
+
+	if len(outcomes) == 0 {
+		t.Fatal("expected at least one update call for the schedule override")
+	}
+
+	for _, o := range outcomes {
+		if !o.labeled {
+			t.Error("expected override run to include the labeled container")
+		}
+
+		if o.unlabeled {
+			t.Error("expected override run to exclude the unlabeled container")
+		}
+	}
+}
+
+// TestRunUpgradesOnSchedule_ScheduleLabelExcludedFromDefault verifies that
+// containers with a schedule label are skipped by the default schedule once
+// their override has been registered.
+func TestRunUpgradesOnSchedule_ScheduleLabelExcludedFromDefault(t *testing.T) {
+	labeled := createTestContainer(
+		"",
+		withName("labeled-app"),
+		withLabel(container.ScheduleLabel, "@every 1h"),
+	)
+	unlabeled := createTestContainer("", withName("plain-app"))
+
+	client := mockActions.CreateMockClient(
+		&mockActions.TestData{Containers: []types.Container{labeled, unlabeled}},
+		false,
+		false,
+	)
+
+	ctx := t.Context()
+
+	var (
+		mu       sync.Mutex
+		outcomes []filterOutcome
+	)
+
+	writeStartupMessage := func(logging.StartupParams) {}
+
+	timeoutCtx, timeoutCancel := context.WithTimeout(ctx, 2500*time.Millisecond)
+	defer timeoutCancel()
+
+	deps := testDeps(client, recordOutcomes(labeled, unlabeled, &outcomes, &mu), writeStartupMessage)
+	// The default schedule fires every second; the override never does.
+	deps.ScheduleSpec = "* * * * * *"
+
+	err := scheduling.RunUpgradesOnSchedule(timeoutCtx, deps)
+	if err != nil {
+		t.Errorf("expected no error, got %v", err)
+	}
+
+	mu.Lock()
+	defer mu.Unlock()
+
+	if len(outcomes) == 0 {
+		t.Fatal("expected at least one default update call")
+	}
+
+	for _, o := range outcomes {
+		if o.labeled {
+			t.Error("expected default run to exclude the container with a schedule override")
+		}
+
+		if !o.unlabeled {
+			t.Error("expected default run to include the unlabeled container")
+		}
+	}
+}
+
+// TestRunUpgradesOnSchedule_InvalidScheduleLabel verifies that a container with
+// an unparseable schedule label keeps following the default schedule.
+func TestRunUpgradesOnSchedule_InvalidScheduleLabel(t *testing.T) {
+	labeled := createTestContainer(
+		"",
+		withName("bad-label-app"),
+		withLabel(container.ScheduleLabel, "not a cron"),
+	)
+	unlabeled := createTestContainer("", withName("plain-app"))
+
+	client := mockActions.CreateMockClient(
+		&mockActions.TestData{Containers: []types.Container{labeled, unlabeled}},
+		false,
+		false,
+	)
+
+	ctx := t.Context()
+
+	var (
+		mu       sync.Mutex
+		outcomes []filterOutcome
+	)
+
+	writeStartupMessage := func(logging.StartupParams) {}
+
+	timeoutCtx, timeoutCancel := context.WithTimeout(ctx, 2500*time.Millisecond)
+	defer timeoutCancel()
+
+	deps := testDeps(client, recordOutcomes(labeled, unlabeled, &outcomes, &mu), writeStartupMessage)
+	deps.ScheduleSpec = "* * * * * *"
+
+	err := scheduling.RunUpgradesOnSchedule(timeoutCtx, deps)
+	if err != nil {
+		t.Errorf("expected no error, got %v", err)
+	}
+
+	mu.Lock()
+	defer mu.Unlock()
+
+	if len(outcomes) == 0 {
+		t.Fatal("expected at least one default update call")
+	}
+
+	for _, o := range outcomes {
+		if !o.labeled {
+			t.Error("expected default run to include the container with an invalid schedule label")
+		}
+
+		if !o.unlabeled {
+			t.Error("expected default run to include the unlabeled container")
+		}
+	}
+}
+
+// TestRunUpgradesOnSchedule_SkipFirstRun_AppliesToOverrideJob verifies that the
+// first-run self-update skip applies to whichever scheduled job fires first:
+// a per-container override firing before the default schedule must still skip
+// the Watchtower self-update.
+func TestRunUpgradesOnSchedule_SkipFirstRun_AppliesToOverrideJob(t *testing.T) {
+	labeled := createTestContainer(
+		"",
+		withName("labeled-app"),
+		withLabel(container.ScheduleLabel, "* * * * * *"),
+	)
+
+	client := mockActions.CreateMockClient(
+		&mockActions.TestData{Containers: []types.Container{labeled}},
+		false,
+		false,
+	)
+
+	ctx := t.Context()
+
+	var capturedParams []types.UpdateParams
+
+	runUpdatesWithNotifications := func(_ context.Context, _ types.Filter, params types.UpdateParams) *metrics.Metric {
+		capturedParams = append(capturedParams, params)
+
+		return &metrics.Metric{Scanned: 1, Updated: 0, Failed: 0}
+	}
+
+	writeStartupMessage := func(logging.StartupParams) {}
+
+	timeoutCtx, timeoutCancel := context.WithTimeout(ctx, 2500*time.Millisecond)
+	defer timeoutCancel()
+
+	deps := testDeps(client, runUpdatesWithNotifications, writeStartupMessage)
+	// The default schedule never fires inside the test window; only the
+	// per-container override job runs.
+	deps.ScheduleSpec = "@every 1h"
+	deps.SkipFirstRun = true
+
+	err := scheduling.RunUpgradesOnSchedule(timeoutCtx, deps)
+	if err != nil {
+		t.Errorf("expected no error, got %v", err)
+	}
+
+	if len(capturedParams) < 2 {
+		t.Fatalf("expected at least 2 update calls, got %d", len(capturedParams))
+	}
+
+	if !capturedParams[0].SkipSelfUpdate {
+		t.Error("expected first run (override job) to skip Watchtower self-update")
+	}
+
+	if capturedParams[1].SkipSelfUpdate {
+		t.Error("expected second run to not skip Watchtower self-update")
+	}
+}
+
+// TestRunUpgradesOnSchedule_ScheduleLabelDiscoveredAtTick verifies that
+// discovery runs inside each update run: a container that gains a schedule
+// label after startup is excluded from the default schedule on the very next
+// run, without waiting for the periodic rescan.
+func TestRunUpgradesOnSchedule_ScheduleLabelDiscoveredAtTick(t *testing.T) {
+	labeled := createTestContainer(
+		"",
+		withName("labeled-app"),
+		withLabel(container.ScheduleLabel, "@every 1h"),
+	)
+	unlabeled := createTestContainer("", withName("plain-app"))
+
+	// Only the unlabeled container exists at startup.
+	data := &mockActions.TestData{Containers: []types.Container{unlabeled}}
+	client := mockActions.CreateMockClient(data, false, false)
+
+	ctx := t.Context()
+
+	var (
+		mu       sync.Mutex
+		outcomes []filterOutcome
+	)
+
+	hook := recordOutcomes(labeled, unlabeled, &outcomes, &mu)
+	swapped := false
+
+	// The labeled container appears after the first update run completes; the
+	// next default run must already exclude it.
+	runUpdatesWithNotifications := func(ctx context.Context, f types.Filter, p types.UpdateParams) *metrics.Metric {
+		m := hook(ctx, f, p)
+
+		mu.Lock()
+		defer mu.Unlock()
+
+		if !swapped {
+			swapped = true
+			data.Containers = []types.Container{unlabeled, labeled}
+		}
+
+		return m
+	}
+
+	writeStartupMessage := func(logging.StartupParams) {}
+
+	timeoutCtx, timeoutCancel := context.WithTimeout(ctx, 2500*time.Millisecond)
+	defer timeoutCancel()
+
+	deps := testDeps(client, runUpdatesWithNotifications, writeStartupMessage)
+	// The default schedule fires every second; the override never does.
+	deps.ScheduleSpec = "* * * * * *"
+
+	err := scheduling.RunUpgradesOnSchedule(timeoutCtx, deps)
+	if err != nil {
+		t.Errorf("expected no error, got %v", err)
+	}
+
+	mu.Lock()
+	defer mu.Unlock()
+
+	if len(outcomes) < 2 {
+		t.Fatalf("expected at least 2 update calls, got %d", len(outcomes))
+	}
+
+	// The first run predates discovery: the not-yet-registered spec cannot
+	// exclude the container yet.
+	if !outcomes[0].labeled {
+		t.Error("expected first run to include the labeled container before its spec registered")
+	}
+
+	for i, o := range outcomes[1:] {
+		if o.labeled {
+			t.Errorf("expected run %d to exclude the container once its override registered", i+2)
+		}
+
+		if !o.unlabeled {
+			t.Errorf("expected run %d to include the unlabeled container", i+2)
 		}
 	}
 }

@@ -72,6 +72,9 @@ docs/public/
 .vscode/c_cpp_properties.json
 .vscode/keybindings.json
 
+# Visual Studio Code plugins
+.markdownlint.yaml
+
 # Other IDEs and editors
 .idea/
 *.iml

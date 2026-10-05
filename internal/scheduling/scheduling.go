@@ -9,6 +9,7 @@ import (
 	"os"
 	"os/signal"
 	"strings"
+	"sync"
 	"sync/atomic"
 	"syscall"
 	"time"
@@ -24,6 +25,39 @@ import (
 
 // updateWaitTimeout bounds how long shutdown waits for an in-flight update.
 const updateWaitTimeout = 60 * time.Second
+
+// scheduleRescanSpec is the internal cron spec used to periodically rescan
+// container labels for per-container schedule overrides, so containers created
+// after startup get their override registered without a restart.
+const scheduleRescanSpec = "@every 60s"
+
+// normalizeScheduleSpec trims whitespace and surrounding quotes from a cron spec.
+//
+// Parameters:
+//   - spec: Raw schedule specification from a flag or container label.
+//
+// Returns:
+//   - string: Normalized schedule specification.
+func normalizeScheduleSpec(spec string) string {
+	return strings.Trim(strings.TrimSpace(spec), `"'`)
+}
+
+// containerScheduleSpec returns the normalized per-container schedule override
+// from the com.centurylinklabs.watchtower.schedule label.
+//
+// Parameters:
+//   - c: Container to inspect.
+//
+// Returns:
+//   - string: The schedule override spec, or an empty string when unset.
+func containerScheduleSpec(c types.FilterableContainer) string {
+	raw, ok := c.GetLabel(container.ScheduleLabel)
+	if !ok {
+		return ""
+	}
+
+	return normalizeScheduleSpec(raw)
+}
 
 // WaitForRunningUpdate waits for any currently running update to complete before proceeding with shutdown.
 // It checks the lock channel status and blocks with a timeout if an update is in progress.
@@ -87,8 +121,8 @@ type ScheduleDeps struct {
 	MetaVersion string
 	// UpdateOnStart triggers an immediate update before the scheduler starts.
 	UpdateOnStart bool
-	// SkipFirstRun skips Watchtower self-update on the first scheduled run
-	// (useful after self-update cleanup of old instances).
+	// SkipFirstRun skips Watchtower self-update on the first update run of any
+	// kind (useful after self-update cleanup of old instances).
 	SkipFirstRun bool
 	// CurrentWatchtowerContainer is the running Watchtower container for parent checking.
 	CurrentWatchtowerContainer types.Container
@@ -106,7 +140,7 @@ type ScheduleDeps struct {
 // It sets up a cron scheduler, runs updates at specified intervals, and ensures graceful shutdown on interrupt
 // signals (SIGINT, SIGTERM) or context cancellation, handling concurrency with a lock channel.
 // If update-on-start is enabled, it triggers the first update immediately before starting the scheduler.
-// If SkipFirstRun is true, it skips Watchtower self-update on the first scheduled run (useful after self-update cleanup).
+// If SkipFirstRun is true, it skips Watchtower self-update on the first update run (useful after self-update cleanup).
 //
 // Parameters:
 //   - ctx: The context controlling the scheduler's lifecycle, enabling shutdown on cancellation.
@@ -126,17 +160,20 @@ func RunUpgradesOnSchedule(ctx context.Context, deps ScheduleDeps) error {
 
 	// Create a new cron scheduler for managing periodic updates.
 	// Configured with optional seconds, skip overlapping runs, and panic recovery.
+	// The parser is retained to compute next update run times across all jobs.
+	parser := cron.NewParser(
+		cron.SecondOptional | cron.Minute | cron.Hour | cron.Dom | cron.Month | cron.Dow | cron.Descriptor,
+	)
 	scheduler := cron.New(
-		cron.WithParser(
-			cron.NewParser(
-				cron.SecondOptional|cron.Minute|cron.Hour|cron.Dom|cron.Month|cron.Dow|cron.Descriptor,
-			),
-		),
+		cron.WithParser(parser),
 		cron.WithChain(
 			cron.SkipIfStillRunning(cron.DefaultLogger),
 			cron.Recover(cron.DefaultLogger),
 		),
 	)
+
+	// The default schedule spec, applied to containers without a schedule override label.
+	scheduleSpec := normalizeScheduleSpec(deps.ScheduleSpec)
 
 	// Determine if self-update should be skipped due to exposed port conflicts.
 	// When a port is configured (e.g., HTTP API), the old container holds the port
@@ -147,10 +184,99 @@ func RunUpgradesOnSchedule(ctx context.Context, deps ScheduleDeps) error {
 		deps.CurrentWatchtowerContainer.HasExposedPorts() &&
 		!deps.BaseParams.EphemeralSelfUpdate
 
+	// The base container filter, identical to what updateFunc derives per tick.
+	baseFilter := deps.Filter
+	if baseFilter == nil {
+		baseFilter = deps.BaseParams.Filter
+	}
+
+	// Per-container schedule overrides (com.centurylinklabs.watchtower.schedule).
+	// customSpecs holds override specs registered with the scheduler; specsMu
+	// guards it because cron jobs and label rescans run concurrently.
+	var specsMu sync.Mutex
+
+	customSpecs := make(map[string]struct{})
+	invalidSpecs := make(map[string]struct{})
+
+	// hasCustomSchedule reports whether the container's schedule label names a
+	// registered override spec, meaning it is excluded from the default schedule.
+	hasCustomSchedule := func(c types.FilterableContainer) bool {
+		spec := containerScheduleSpec(c)
+		if spec == "" {
+			return false
+		}
+
+		specsMu.Lock()
+		defer specsMu.Unlock()
+
+		_, ok := customSpecs[spec]
+
+		return ok
+	}
+
+	// defaultScheduleMatch admits containers that follow the default schedule:
+	// everything except containers with a registered schedule override.
+	defaultScheduleMatch := func(c types.FilterableContainer) bool {
+		return !hasCustomSchedule(c)
+	}
+
+	// firstRun marks whether the first update after a self-update cleanup has
+	// run yet; whichever scheduled job fires first skips the Watchtower
+	// self-update, including per-container override jobs.
+	var firstRun atomic.Uint32
+
+	// syncContainerSchedules refreshes schedule override registrations. It is
+	// assigned after updateFunc because each job closure calls updateFunc.
+	var syncContainerSchedules func()
+
+	// nextUpdateRun returns the soonest next activation across the default
+	// schedule and all registered per-container overrides.
+	nextUpdateRun := func() time.Time {
+		var specs []string
+		if scheduleSpec != "" {
+			specs = append(specs, scheduleSpec)
+		}
+
+		specsMu.Lock()
+
+		for spec := range customSpecs {
+			specs = append(specs, spec)
+		}
+
+		specsMu.Unlock()
+
+		var next time.Time
+		for _, spec := range specs {
+			sched, err := parser.Parse(spec)
+			if err != nil {
+				continue
+			}
+
+			if t := sched.Next(time.Now()); next.IsZero() || t.Before(next) {
+				next = t
+			}
+		}
+
+		return next
+	}
+
 	// Define the update function to be used both for scheduled runs and immediate execution.
 	// skipWatchtowerSelfUpdate: whether to skip updating the Watchtower container itself
 	// blocking: whether to wait for the lock (true for scheduled runs, false for immediate runs)
-	updateFunc := func(skipWatchtowerSelfUpdate, blocking bool) {
+	// scheduleMatch: predicate limiting the run to containers assigned to this schedule
+	updateFunc := func(skipWatchtowerSelfUpdate, blocking bool, scheduleMatch types.Filter) {
+		// If Watchtower has performed a self-cleanup, then prevent Watchtower
+		// from self-updating during the first update cycle. The check lives here
+		// rather than in a job wrapper so it applies to whichever schedule fires
+		// first, including per-container override jobs.
+		if deps.SkipFirstRun && firstRun.CompareAndSwap(0, 1) {
+			skipWatchtowerSelfUpdate = true
+
+			log.Debug().Msg(
+				"Skipping Watchtower self-update on first scheduled run due to cleanup",
+			)
+		}
+
 		// Skip self-update if the container has exposed ports to prevent port conflicts.
 		// This takes precedence over the skipWatchtowerSelfUpdate parameter.
 		if skipSelfUpdateForPorts {
@@ -166,11 +292,8 @@ func RunUpgradesOnSchedule(ctx context.Context, deps ScheduleDeps) error {
 			if container.IsWatchtowerParent(deps.CurrentWatchtowerContainer.ID(), chain) {
 				log.Debug().Msg("Skipping scheduled update for Watchtower parent container")
 
-				nextRuns := scheduler.Entries()
-				if len(nextRuns) > 0 {
-					log.Debug().Msg(
-						"Scheduled next run: " + nextRuns[0].Schedule.Next(time.Now()).String(),
-					)
+				if nextRun := nextUpdateRun(); !nextRun.IsZero() {
+					log.Debug().Msg("Scheduled next run: " + nextRun.String())
 				}
 
 				return
@@ -195,16 +318,33 @@ func RunUpgradesOnSchedule(ctx context.Context, deps ScheduleDeps) error {
 			}
 		}
 
+		// Refresh override registrations so a container labeled since the last
+		// scan follows its own schedule instead of being picked up by this one.
+		if syncContainerSchedules != nil {
+			syncContainerSchedules()
+		}
+
 		params := deps.BaseParams
 		params.RunOnce = false
 		params.SkipSelfUpdate = skipWatchtowerSelfUpdate
 
-		// One filter for this tick: schedule filter when set, else BaseParams.
-		// Keep params.Filter and the positional argument identical so
-		// runUpdatesWithNotifications cannot prefer a divergent source.
-		updateFilter := deps.Filter
-		if updateFilter == nil {
-			updateFilter = params.Filter
+		// One filter for this tick: the base filter narrowed to the containers
+		// assigned to this schedule. Keep params.Filter and the positional
+		// argument identical so runUpdatesWithNotifications cannot prefer a
+		// divergent source.
+		updateFilter := baseFilter
+		if scheduleMatch != nil {
+			updateFilter = func(c types.FilterableContainer) bool {
+				if !scheduleMatch(c) {
+					return false
+				}
+
+				if baseFilter == nil {
+					return true
+				}
+
+				return baseFilter(c)
+			}
 		}
 
 		params.Filter = updateFilter
@@ -222,53 +362,108 @@ func RunUpgradesOnSchedule(ctx context.Context, deps ScheduleDeps) error {
 
 		log.Debug().Msg("Update operation completed")
 
-		nextRuns := scheduler.Entries()
-		if len(nextRuns) > 0 {
-			log.Debug().Msg("Scheduled next run: " + nextRuns[0].Schedule.Next(time.Now()).String())
+		if nextRun := nextUpdateRun(); !nextRun.IsZero() {
+			log.Debug().Msg("Scheduled next run: " + nextRun.String())
 		}
-	}
-
-	// Wrapper function that can skip Watchtower self-update on the first run if needed
-	var scheduledUpdateFunc func()
-
-	// If Watchtower has performed a self-cleanup, then prevent Watchtower
-	// from self-updating during the first update cycle.
-	if deps.SkipFirstRun {
-		var firstRun atomic.Uint32 // atomic flag to track if this is the first run
-
-		scheduledUpdateFunc = func() {
-			// Atomically check and set firstRun to ensure only the first execution skips self-update
-			skipWatchtowerSelfUpdate := firstRun.CompareAndSwap(0, 1)
-			if skipWatchtowerSelfUpdate {
-				log.Debug().Msg(
-					"Skipping Watchtower self-update on first scheduled run due to cleanup",
-				)
-			}
-
-			updateFunc(skipWatchtowerSelfUpdate, true)
-		}
-	} else {
-		scheduledUpdateFunc = func() { updateFunc(false, true) }
 	}
 
 	// Add the update function to the cron schedule, handling concurrency and metrics.
-	scheduleSpec := strings.Trim(deps.ScheduleSpec, `"'`)
 	if scheduleSpec != "" {
 		_, err := scheduler.AddFunc(
 			scheduleSpec,
-			scheduledUpdateFunc,
+			func() { updateFunc(false, true, defaultScheduleMatch) },
 		)
 		if err != nil {
 			return fmt.Errorf("failed to schedule updates: %w", err)
 		}
 	}
 
+	// syncContainerSchedules scans containers for schedule override labels and
+	// registers a cron job per distinct spec. Overrides already registered or
+	// equal to the default schedule are skipped; specs that fail to parse are
+	// remembered so each is only warned about once, and the affected containers
+	// keep following the default schedule.
+	syncContainerSchedules = func() {
+		if deps.Client == nil {
+			return
+		}
+
+		var listFilters []types.Filter
+		if baseFilter != nil {
+			listFilters = append(listFilters, baseFilter)
+		}
+
+		containers, err := deps.Client.ListContainers(ctx, listFilters...)
+		if err != nil {
+			log.Warn().Err(err).Msg("Failed to list containers for schedule overrides")
+
+			return
+		}
+
+		for _, c := range containers {
+			spec := containerScheduleSpec(c)
+			if spec == "" || spec == scheduleSpec {
+				continue
+			}
+
+			specsMu.Lock()
+
+			if _, ok := customSpecs[spec]; ok {
+				specsMu.Unlock()
+
+				continue
+			}
+
+			if _, ok := invalidSpecs[spec]; ok {
+				specsMu.Unlock()
+
+				continue
+			}
+
+			scheduleMatch := func(fc types.FilterableContainer) bool {
+				return containerScheduleSpec(fc) == spec
+			}
+
+			_, err := scheduler.AddFunc(spec, func() {
+				updateFunc(false, true, scheduleMatch)
+			})
+			if err != nil {
+				invalidSpecs[spec] = struct{}{}
+				specsMu.Unlock()
+
+				log.Warn().
+					Err(err).
+					Str("schedule", spec).
+					Msg("Invalid per-container schedule label, using default schedule")
+
+				continue
+			}
+
+			customSpecs[spec] = struct{}{}
+			specsMu.Unlock()
+
+			log.Info().
+				Str("schedule", spec).
+				Msg("Registered per-container schedule override")
+		}
+	}
+
+	syncContainerSchedules()
+
+	// Periodically rescan container labels so containers created after startup
+	// pick up their schedule overrides without waiting for a restart.
+	if deps.Client != nil {
+		if _, err := scheduler.AddFunc(scheduleRescanSpec, syncContainerSchedules); err != nil {
+			log.Debug().
+				Err(err).
+				Str("schedule", scheduleRescanSpec).
+				Msg("Failed to register schedule rescan job")
+		}
+	}
+
 	// Log startup message with the first scheduled run time.
 	// Skip if the startup message was already sent (e.g., by the HTTP API in blocking mode).
-	var nextRun time.Time
-	if len(scheduler.Entries()) > 0 {
-		nextRun = scheduler.Entries()[0].Schedule.Next(time.Now())
-	}
+	nextRun := nextUpdateRun()
 
 	// Log startup message with the first scheduled run time.
 	// Skip if the startup message was already sent (for example by the HTTP API in blocking mode).
@@ -282,13 +477,14 @@ func RunUpgradesOnSchedule(ctx context.Context, deps ScheduleDeps) error {
 	}
 
 	// Check if update-on-start is enabled and trigger immediate update if so.
+	// The immediate run follows the default schedule's container selection.
 	if deps.UpdateOnStart {
-		updateFunc(false, false)
+		updateFunc(false, false, defaultScheduleMatch)
 	}
 
-	// Start the scheduler to begin periodic execution if scheduling is enabled.
-	// Only start if a schedule spec was provided (empty string means no scheduling).
-	if scheduleSpec != "" {
+	// Start the scheduler to begin periodic execution if any jobs were
+	// registered (default schedule, per-container overrides, or label rescan).
+	if len(scheduler.Entries()) > 0 {
 		scheduler.Start()
 	}
 

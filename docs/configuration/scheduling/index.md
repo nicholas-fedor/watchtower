@@ -32,6 +32,39 @@ Environment Variable: WATCHTOWER_POLL_INTERVAL
     Cannot be used with `--schedule`.
     Overrides cron-based scheduling.
 
+## Per-Container Schedule
+
+Individual containers can override the default schedule (set via `--schedule` or `--interval`)
+using the `com.centurylinklabs.watchtower.schedule` label. The label accepts the same 6-field
+cron expressions and descriptors (e.g., `@hourly`, `@every 30m`) as `--schedule`.
+
+Containers carrying the label are checked on their own schedule instead of the default one.
+If the label value is not a valid cron expression, a warning is logged and the container keeps
+following the default schedule. Containers created after startup are picked up automatically
+when their labels are rescanned.
+
+<!-- markdownlint-disable -->
+=== "Docker Compose"
+    ```yaml
+    services:
+        app:
+            image: someimage
+            labels:
+                - "com.centurylinklabs.watchtower.schedule=0 0 3 * * *"
+    ```
+=== "Docker CLI"
+    ```bash
+    docker run -d \
+        --label=com.centurylinklabs.watchtower.schedule="0 0 3 * * *" \
+        someimage
+    ```
+<!-- markdownlint-enable -->
+
+!!! Note
+    The label only affects scheduled runs. Manual update triggers (for example the
+    [`update`](../../http-api/endpoints/update/index.md) HTTP API endpoint) still include
+    the container regardless of its schedule label.
+
 ## Run Once
 
 Triggers a single update attempt for specified containers and exits immediately.
