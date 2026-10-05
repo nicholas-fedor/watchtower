@@ -451,6 +451,33 @@ func RunUpgradesOnSchedule(ctx context.Context, deps ScheduleDeps) error {
 			Msg("Registered per-container schedule override")
 	}
 
+	// reconcileSpecs removes registered jobs and remembered invalid specs whose
+	// spec no longer appears in the latest scan, so both maps stay bounded by
+	// labels on live containers.
+	reconcileSpecs := func(seen map[string]struct{}) {
+		specsMu.Lock()
+		defer specsMu.Unlock()
+
+		for spec, entryID := range customSpecs {
+			if _, ok := seen[spec]; ok {
+				continue
+			}
+
+			scheduler.Remove(entryID)
+			delete(customSpecs, spec)
+
+			log.Info().
+				Str("schedule", spec).
+				Msg("Removed per-container schedule override")
+		}
+
+		for spec := range invalidSpecs {
+			if _, ok := seen[spec]; !ok {
+				delete(invalidSpecs, spec)
+			}
+		}
+	}
+
 	// syncContainerSchedules scans containers for schedule override labels and
 	// registers a cron job per distinct spec. Overrides already registered or
 	// equal to the default schedule are skipped; specs that fail to parse are
@@ -490,29 +517,8 @@ func RunUpgradesOnSchedule(ctx context.Context, deps ScheduleDeps) error {
 		}
 
 		// Remove jobs whose spec no longer appears on any container, so removed
-		// labels stop firing, and forget invalid specs that are gone too so
-		// both maps stay bounded by labels on live containers.
-		specsMu.Lock()
-		defer specsMu.Unlock()
-
-		for spec, entryID := range customSpecs {
-			if _, ok := seen[spec]; ok {
-				continue
-			}
-
-			scheduler.Remove(entryID)
-			delete(customSpecs, spec)
-
-			log.Info().
-				Str("schedule", spec).
-				Msg("Removed per-container schedule override")
-		}
-
-		for spec := range invalidSpecs {
-			if _, ok := seen[spec]; !ok {
-				delete(invalidSpecs, spec)
-			}
-		}
+		// labels stop firing.
+		reconcileSpecs(seen)
 	}
 
 	syncContainerSchedules()
