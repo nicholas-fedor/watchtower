@@ -260,63 +260,111 @@ func RunUpgradesOnSchedule(ctx context.Context, deps ScheduleDeps) error {
 		return next
 	}
 
+	// resolveSkipSelfUpdate applies the self-update skip conditions. If
+	// Watchtower has performed a self-cleanup, the first update of any kind
+	// skips the self-update; the check lives here rather than in a job wrapper
+	// so it applies to whichever schedule fires first, including per-container
+	// override jobs. Exposed ports also force the skip to prevent port
+	// conflicts during container replacement.
+	resolveSkipSelfUpdate := func(skipWatchtowerSelfUpdate bool) bool {
+		if deps.SkipFirstRun && firstRun.CompareAndSwap(0, 1) {
+			log.Debug().Msg(
+				"Skipping Watchtower self-update on first scheduled run due to cleanup",
+			)
+
+			return true
+		}
+
+		if skipSelfUpdateForPorts {
+			log.Debug().Msg("Published ports detected - self-update skipped.")
+
+			return true
+		}
+
+		return skipWatchtowerSelfUpdate
+	}
+
+	// isWatchtowerParentUpdate reports whether the run should be skipped
+	// because the current container is an old Watchtower parent left over
+	// from a self-update chain.
+	isWatchtowerParentUpdate := func() bool {
+		if deps.CurrentWatchtowerContainer == nil {
+			return false
+		}
+
+		chain, _ := deps.CurrentWatchtowerContainer.GetContainerChain()
+		if !container.IsWatchtowerParent(deps.CurrentWatchtowerContainer.ID(), chain) {
+			return false
+		}
+
+		log.Debug().Msg("Skipping scheduled update for Watchtower parent container")
+
+		if nextRun := nextUpdateRun(); !nextRun.IsZero() {
+			log.Debug().Msg("Scheduled next run: " + nextRun.String())
+		}
+
+		return true
+	}
+
+	// acquireUpdateLock takes the update lock, waiting indefinitely when
+	// blocking and returning nil immediately otherwise if an update is already
+	// running. The returned function releases the lock.
+	acquireUpdateLock := func(blocking bool) func() {
+		if blocking {
+			v := <-lock
+
+			return func() { lock <- v }
+		}
+
+		select {
+		case v := <-lock:
+			return func() { lock <- v }
+		default:
+			log.Debug().Msg("Update skipped: another update is currently running")
+
+			return nil
+		}
+	}
+
+	// buildUpdateFilter narrows the base filter to the containers assigned to
+	// this schedule. A nil scheduleMatch leaves the base filter untouched.
+	buildUpdateFilter := func(scheduleMatch types.Filter) types.Filter {
+		if scheduleMatch == nil {
+			return baseFilter
+		}
+
+		return func(c types.FilterableContainer) bool {
+			if !scheduleMatch(c) {
+				return false
+			}
+
+			if baseFilter == nil {
+				return true
+			}
+
+			return baseFilter(c)
+		}
+	}
+
 	// Define the update function to be used both for scheduled runs and immediate execution.
 	// skipWatchtowerSelfUpdate: whether to skip updating the Watchtower container itself
 	// blocking: whether to wait for the lock (true for scheduled runs, false for immediate runs)
 	// scheduleMatch: predicate limiting the run to containers assigned to this schedule
 	updateFunc := func(skipWatchtowerSelfUpdate, blocking bool, scheduleMatch types.Filter) {
-		// If Watchtower has performed a self-cleanup, then prevent Watchtower
-		// from self-updating during the first update cycle. The check lives here
-		// rather than in a job wrapper so it applies to whichever schedule fires
-		// first, including per-container override jobs.
-		if deps.SkipFirstRun && firstRun.CompareAndSwap(0, 1) {
-			skipWatchtowerSelfUpdate = true
+		params := deps.BaseParams
+		params.RunOnce = false
+		params.SkipSelfUpdate = resolveSkipSelfUpdate(skipWatchtowerSelfUpdate)
 
-			log.Debug().Msg(
-				"Skipping Watchtower self-update on first scheduled run due to cleanup",
-			)
+		if isWatchtowerParentUpdate() {
+			return
 		}
 
-		// Skip self-update if the container has exposed ports to prevent port conflicts.
-		// This takes precedence over the skipWatchtowerSelfUpdate parameter.
-		if skipSelfUpdateForPorts {
-			skipWatchtowerSelfUpdate = true
-
-			log.Debug().Msg("Published ports detected - self-update skipped.")
+		release := acquireUpdateLock(blocking)
+		if release == nil {
+			return
 		}
 
-		// Skip update if this is a Watchtower parent container (from self-update chain)
-		if deps.CurrentWatchtowerContainer != nil {
-			chain, _ := deps.CurrentWatchtowerContainer.GetContainerChain()
-
-			if container.IsWatchtowerParent(deps.CurrentWatchtowerContainer.ID(), chain) {
-				log.Debug().Msg("Skipping scheduled update for Watchtower parent container")
-
-				if nextRun := nextUpdateRun(); !nextRun.IsZero() {
-					log.Debug().Msg("Scheduled next run: " + nextRun.String())
-				}
-
-				return
-			}
-		}
-
-		// Acquire the update lock: blocking waits indefinitely, non-blocking returns if unavailable
-		if blocking {
-			// Blocking acquisition: wait for the lock to become available
-			v := <-lock
-
-			defer func() { lock <- v }()
-		} else {
-			// Non-blocking acquisition: try to get lock without waiting, skip update if busy
-			select {
-			case v := <-lock:
-				defer func() { lock <- v }()
-			default:
-				log.Debug().Msg("Update skipped: another update is currently running")
-
-				return
-			}
-		}
+		defer release()
 
 		// Refresh override registrations so a container labeled since the last
 		// scan follows its own schedule instead of being picked up by this one.
@@ -324,30 +372,9 @@ func RunUpgradesOnSchedule(ctx context.Context, deps ScheduleDeps) error {
 			syncContainerSchedules()
 		}
 
-		params := deps.BaseParams
-		params.RunOnce = false
-		params.SkipSelfUpdate = skipWatchtowerSelfUpdate
-
-		// One filter for this tick: the base filter narrowed to the containers
-		// assigned to this schedule. Keep params.Filter and the positional
-		// argument identical so runUpdatesWithNotifications cannot prefer a
-		// divergent source.
-		updateFilter := baseFilter
-		if scheduleMatch != nil {
-			updateFilter = func(c types.FilterableContainer) bool {
-				if !scheduleMatch(c) {
-					return false
-				}
-
-				if baseFilter == nil {
-					return true
-				}
-
-				return baseFilter(c)
-			}
-		}
-
-		params.Filter = updateFilter
+		// Keep params.Filter and the positional filter argument identical so
+		// runUpdatesWithNotifications cannot prefer a divergent source.
+		params.Filter = buildUpdateFilter(scheduleMatch)
 
 		if deps.RunUpdate == nil {
 			log.Debug().Msg("Update skipped: RunUpdate hook is not configured")
@@ -355,7 +382,7 @@ func RunUpgradesOnSchedule(ctx context.Context, deps ScheduleDeps) error {
 			return
 		}
 
-		metric := deps.RunUpdate(ctx, updateFilter, params)
+		metric := deps.RunUpdate(ctx, params.Filter, params)
 		if metric != nil {
 			metrics.Default().RegisterScan(metric)
 		}
@@ -376,6 +403,44 @@ func RunUpgradesOnSchedule(ctx context.Context, deps ScheduleDeps) error {
 		if err != nil {
 			return fmt.Errorf("failed to schedule updates: %w", err)
 		}
+	}
+
+	// registerScheduleSpec registers a cron job for one distinct override spec
+	// unless it is already known (registered or remembered as invalid).
+	registerScheduleSpec := func(spec string) {
+		specsMu.Lock()
+		defer specsMu.Unlock()
+
+		if _, ok := customSpecs[spec]; ok {
+			return
+		}
+
+		if _, ok := invalidSpecs[spec]; ok {
+			return
+		}
+
+		scheduleMatch := func(fc types.FilterableContainer) bool {
+			return containerScheduleSpec(fc) == spec
+		}
+
+		if _, err := scheduler.AddFunc(spec, func() {
+			updateFunc(false, true, scheduleMatch)
+		}); err != nil {
+			invalidSpecs[spec] = struct{}{}
+
+			log.Warn().
+				Err(err).
+				Str("schedule", spec).
+				Msg("Invalid per-container schedule label, using default schedule")
+
+			return
+		}
+
+		customSpecs[spec] = struct{}{}
+
+		log.Info().
+			Str("schedule", spec).
+			Msg("Registered per-container schedule override")
 	}
 
 	// syncContainerSchedules scans containers for schedule override labels and
@@ -401,50 +466,9 @@ func RunUpgradesOnSchedule(ctx context.Context, deps ScheduleDeps) error {
 		}
 
 		for _, c := range containers {
-			spec := containerScheduleSpec(c)
-			if spec == "" || spec == scheduleSpec {
-				continue
+			if spec := containerScheduleSpec(c); spec != "" && spec != scheduleSpec {
+				registerScheduleSpec(spec)
 			}
-
-			specsMu.Lock()
-
-			if _, ok := customSpecs[spec]; ok {
-				specsMu.Unlock()
-
-				continue
-			}
-
-			if _, ok := invalidSpecs[spec]; ok {
-				specsMu.Unlock()
-
-				continue
-			}
-
-			scheduleMatch := func(fc types.FilterableContainer) bool {
-				return containerScheduleSpec(fc) == spec
-			}
-
-			_, err := scheduler.AddFunc(spec, func() {
-				updateFunc(false, true, scheduleMatch)
-			})
-			if err != nil {
-				invalidSpecs[spec] = struct{}{}
-				specsMu.Unlock()
-
-				log.Warn().
-					Err(err).
-					Str("schedule", spec).
-					Msg("Invalid per-container schedule label, using default schedule")
-
-				continue
-			}
-
-			customSpecs[spec] = struct{}{}
-			specsMu.Unlock()
-
-			log.Info().
-				Str("schedule", spec).
-				Msg("Registered per-container schedule override")
 		}
 	}
 
