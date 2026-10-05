@@ -454,8 +454,9 @@ func RunUpgradesOnSchedule(ctx context.Context, deps ScheduleDeps) error {
 	// syncContainerSchedules scans containers for schedule override labels and
 	// registers a cron job per distinct spec. Overrides already registered or
 	// equal to the default schedule are skipped; specs that fail to parse are
-	// remembered so each is only warned about once, and the affected containers
-	// keep following the default schedule.
+	// remembered while present so each is only warned about once, and the
+	// affected containers keep following the default schedule. Specs that no
+	// longer appear on any container are removed again.
 	syncContainerSchedules = func() {
 		if deps.Client == nil {
 			return
@@ -489,7 +490,8 @@ func RunUpgradesOnSchedule(ctx context.Context, deps ScheduleDeps) error {
 		}
 
 		// Remove jobs whose spec no longer appears on any container, so removed
-		// labels stop firing.
+		// labels stop firing, and forget invalid specs that are gone too so
+		// both maps stay bounded by labels on live containers.
 		specsMu.Lock()
 		defer specsMu.Unlock()
 
@@ -504,6 +506,12 @@ func RunUpgradesOnSchedule(ctx context.Context, deps ScheduleDeps) error {
 			log.Info().
 				Str("schedule", spec).
 				Msg("Removed per-container schedule override")
+		}
+
+		for spec := range invalidSpecs {
+			if _, ok := seen[spec]; !ok {
+				delete(invalidSpecs, spec)
+			}
 		}
 	}
 
