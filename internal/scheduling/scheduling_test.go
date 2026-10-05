@@ -944,6 +944,11 @@ func TestRunUpgradesOnSchedule_ScheduleLabelDiscoveredAtTick(t *testing.T) {
 	hook := recordOutcomes(labeled, unlabeled, &outcomes, &mu)
 	swapped := false
 
+	// The timeout is only a failure guard; the run is canceled once two
+	// default-schedule updates have completed.
+	timeoutCtx, timeoutCancel := context.WithTimeout(ctx, 5*time.Second)
+	defer timeoutCancel()
+
 	// The labeled container appears after the first update run completes; the
 	// next default run must already exclude it.
 	runUpdatesWithNotifications := func(ctx context.Context, f types.Filter, p types.UpdateParams) *metrics.Metric {
@@ -957,13 +962,14 @@ func TestRunUpgradesOnSchedule_ScheduleLabelDiscoveredAtTick(t *testing.T) {
 			data.Containers = []types.Container{unlabeled, labeled}
 		}
 
+		if len(outcomes) >= 2 {
+			timeoutCancel()
+		}
+
 		return m
 	}
 
 	writeStartupMessage := func(logging.StartupParams) {}
-
-	timeoutCtx, timeoutCancel := context.WithTimeout(ctx, 2500*time.Millisecond)
-	defer timeoutCancel()
 
 	deps := testDeps(client, runUpdatesWithNotifications, writeStartupMessage)
 	// The default schedule fires every second; the override never does.
@@ -1023,6 +1029,11 @@ func TestRunUpgradesOnSchedule_ScheduleLabelRemovedOnRescan(t *testing.T) {
 	hook := recordOutcomes(labeled, unlabeled, &outcomes, &mu)
 	swapped := false
 
+	// The timeout is only a failure guard; the run is canceled once two
+	// default-schedule updates have completed.
+	timeoutCtx, timeoutCancel := context.WithTimeout(ctx, 5*time.Second)
+	defer timeoutCancel()
+
 	// The labeled container disappears after the first update run completes;
 	// the next run's scan must drop its job.
 	runUpdatesWithNotifications := func(ctx context.Context, f types.Filter, p types.UpdateParams) *metrics.Metric {
@@ -1036,13 +1047,14 @@ func TestRunUpgradesOnSchedule_ScheduleLabelRemovedOnRescan(t *testing.T) {
 			data.Containers = []types.Container{unlabeled}
 		}
 
+		if len(outcomes) >= 2 {
+			timeoutCancel()
+		}
+
 		return m
 	}
 
 	writeStartupMessage := func(logging.StartupParams) {}
-
-	timeoutCtx, timeoutCancel := context.WithTimeout(ctx, 2500*time.Millisecond)
-	defer timeoutCancel()
 
 	deps := testDeps(client, runUpdatesWithNotifications, writeStartupMessage)
 	// The default schedule fires every second; the override never does.
