@@ -8,6 +8,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Chores
+
+- Update github.com/azure/go-ansiterm digest to 8c912ac by @renovate[bot] in [#2536](https://github.com/nicholas-fedor/watchtower/pull/2536)
+
+## [1.23.0] - 2026-10-06
+
 ### Added
 
 - Add Git ref monitoring and container rebuilds by @nicholas-fedor in [#2456](https://github.com/nicholas-fedor/watchtower/pull/2456)
@@ -3741,7 +3747,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## Compare Releases
 
-- [unreleased](https://github.com/nicholas-fedor/watchtower/compare/v1.22.3...HEAD)
+- [unreleased](https://github.com/nicholas-fedor/watchtower/compare/v1.23.0...HEAD)
+- [1.23.0](https://github.com/nicholas-fedor/watchtower/compare/v1.22.3...v1.23.0)
 - [1.22.3](https://github.com/nicholas-fedor/watchtower/compare/v1.22.2...v1.22.3)
 - [1.22.2](https://github.com/nicholas-fedor/watchtower/compare/v1.22.1...v1.22.2)
 - [1.22.1](https://github.com/nicholas-fedor/watchtower/compare/v1.22.0...v1.22.1)
