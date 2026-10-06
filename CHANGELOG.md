@@ -18,6 +18,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Chores
 
+- Update google.golang.org/genproto/googleapis/api digest to fad4113 by @renovate[bot] in [#2522](https://github.com/nicholas-fedor/watchtower/pull/2522)
+- Update github.com/microsoft/go-winio digest to 2430248 by @renovate[bot] in [#2520](https://github.com/nicholas-fedor/watchtower/pull/2520)
+- Update github.com/google/pprof digest to 639476b by @renovate[bot] in [#2519](https://github.com/nicholas-fedor/watchtower/pull/2519)
 - Update module github.com/valyala/fasthttp to v1.75.0 by @renovate[bot] in [#2517](https://github.com/nicholas-fedor/watchtower/pull/2517)
 - Update module github.com/go-git/go-git/v5 to v5.19.3 by @renovate[bot] in [#2516](https://github.com/nicholas-fedor/watchtower/pull/2516)
 - Update module github.com/molecule-man/go-brrr to v1.2.0 by @renovate[bot] in [#2513](https://github.com/nicholas-fedor/watchtower/pull/2513)
