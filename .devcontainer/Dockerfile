@@ -24,7 +24,7 @@ RUN adduser $USERNAME -s /bin/sh -D -u $USER_UID $USER_GID && \
     chmod 0440 /etc/sudoers.d/$USERNAME
 
 # Install golangci-lint
-RUN wget -O- https://raw.githubusercontent.com/golangci/golangci-lint/HEAD/install.sh | sh -s -- -b /usr/local/bin/ v2.5.0
+RUN wget -O- https://raw.githubusercontent.com/golangci/golangci-lint/HEAD/install.sh | sh -s -- -b /usr/local/bin/
 
 # Install mockery
 # Map Docker's TARGETARCH (amd64/arm64) to Mockery's naming (x86_64/arm64)

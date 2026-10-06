@@ -61,3 +61,32 @@ jobs:
         uses: codecov/codecov-action@303a32d7a59b442fa8d48b6a1cc6825c09c847a5 # v7.1.1
         with:
           token: ${{ secrets.CODECOV_TOKEN }}
+
+  race:
+    name: Run Tests with the Race Detector
+    runs-on: ubuntu-latest
+    env:
+      # Packages with known data races. Remove each one as its races are fixed.
+      RACE_EXCLUDE: /cmd$|/internal/actions$|/internal/api$|/pkg/notifications$
+    steps:
+      - name: Harden the Runner (Step Security)
+        uses: step-security/harden-runner@351661ca32ac09a36dc5ee2d536e3128f2a3c8ed # v2.22.0
+        with:
+          egress-policy: audit
+
+      - name: Checkout Repo
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Setup Go
+        uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          cache: true
+          cache-dependency-path: "**/go.sum"
+          go-version-file: go.mod
+
+      - name: Run Tests with the Race Detector
+        run: |
+          # shellcheck disable=SC2046
+          go test -race -timeout 120s $(go list ./... | grep -Ev "${RACE_EXCLUDE}")

@@ -190,7 +190,6 @@ sitemap.xml.gz
 search/search_index.json
 
 # CI/CD artifacts
-.circleci/cache/
 .github/cache/
 codecov/
 test-reports/
