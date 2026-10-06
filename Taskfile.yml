@@ -169,7 +169,7 @@ tasks:
   docker:run:
     desc: Run the local Docker image
     cmds:
-      - docker run -p 8080:8080 {{.BINARY_NAME}}
+      - docker run -p 8080:8080 -v /var/run/docker.sock:/var/run/docker.sock {{.BINARY_NAME}}
 
   # Housekeeping
 

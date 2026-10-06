@@ -3,8 +3,11 @@ FROM golang:1.27.1-alpine@sha256:8a5910f31396cd4d89662f56c68b3ae31d374308270a1c3
 ARG GOOS=linux
 ARG TARGETARCH
 
+# gcc and musl-dev provide the cgo toolchain that the race detector requires.
 RUN apk add --no-cache \
+    gcc \
     git \
+    musl-dev \
     nano \
     openssh
 
