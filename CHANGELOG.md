@@ -18,6 +18,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Chores
 
+- Update module github.com/nicholas-fedor/shoutrrr to v0.21.2 by @renovate[bot] in [#2530](https://github.com/nicholas-fedor/watchtower/pull/2530)
+- Update module github.com/mattn/go-colorable to v0.1.16 by @renovate[bot] in [#2529](https://github.com/nicholas-fedor/watchtower/pull/2529)
 - Update step-security/harden-runner action to v2.22.0 by @renovate[bot] in [#2527](https://github.com/nicholas-fedor/watchtower/pull/2527)
 - Update google.golang.org/genproto/googleapis/rpc digest to fad4113 by @renovate[bot] in [#2523](https://github.com/nicholas-fedor/watchtower/pull/2523)
 - Update google.golang.org/genproto/googleapis/api digest to fad4113 by @renovate[bot] in [#2522](https://github.com/nicholas-fedor/watchtower/pull/2522)
