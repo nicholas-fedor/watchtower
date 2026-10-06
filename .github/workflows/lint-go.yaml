@@ -48,4 +48,5 @@ jobs:
           only-new-issues: true
 
       - name: Lint tplprev
-        run: make tplprev-lint
+        working-directory: tools/tplprev
+        run: golangci-lint run --config "${GITHUB_WORKSPACE}/build/golangci-lint/golangci-lint.yaml" ./...

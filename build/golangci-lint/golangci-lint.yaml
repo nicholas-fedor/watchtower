@@ -241,7 +241,6 @@ linters:
           severity: warning
           disabled: false
           exclude:
-            - ".*internal/api/metrics/.*"
             - ".*internal/metrics/.*"
     testifylint:
       enable-all: true

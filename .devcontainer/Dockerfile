@@ -36,6 +36,7 @@ RUN case ${TARGETARCH} in \
 
 USER $USERNAME
 
+RUN go install -v github.com/go-task/task/v3/cmd/task@v3.54.0
 RUN go install -v golang.org/x/tools/gopls@latest
 RUN go install -v github.com/go-delve/delve/cmd/dlv@latest
 RUN go install -v honnef.co/go/tools/cmd/staticcheck@latest
