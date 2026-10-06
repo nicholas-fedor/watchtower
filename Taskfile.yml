@@ -1,0 +1,179 @@
+# yaml-language-server: $schema=https://taskfile.dev/schema.json
+
+version: "3"
+
+vars:
+  BINARY_NAME: watchtower
+  GOLANGCI_CONFIG: "{{.ROOT_DIR}}/build/golangci-lint/golangci-lint.yaml"
+  MOCKERY_CONFIG: build/mockery/mockery.yaml
+  MKDOCS_CONFIG: build/mkdocs/mkdocs.yaml
+  DOCS_VENV: watchtower-docs
+  TPLPREV_DIR: tools/tplprev
+  # Packages that cannot run under -count/-shuffle yet: Ginkgo suites reject
+  # -count>1, cmd tests depend on declaration order, and the metrics tests leak
+  # the package singleton between runs. Packages leave this list as they are fixed.
+  REPEAT_EXCLUDE: >-
+    /cmd$|/internal/actions$|/internal/compose$|/internal/logging$|/internal/metrics$|/pkg/container$|/pkg/notifications$|/pkg/registry/auth$|/pkg/registry/digest$|/pkg/registry/manifest$|/pkg/sorter$
+
+tasks:
+  default:
+    desc: List available tasks
+    cmds:
+      - task --list
+    silent: true
+
+  # Development
+
+  build:
+    desc: Build the watchtower binary into bin/
+    cmds:
+      - go build -o bin/{{.BINARY_NAME}} .
+
+  run:
+    desc: "Run watchtower (pass flags after --, e.g. task run -- --help)"
+    cmds:
+      - go run . {{.CLI_ARGS}}
+
+  install:
+    desc: Install the watchtower binary
+    cmds:
+      - go install .
+
+  test:
+    desc: Run all tests with coverage
+    cmds:
+      - go test -timeout 30s -v -coverprofile coverage.out -covermode atomic ./...
+
+  test:race:
+    desc: Run all tests with the race detector
+    cmds:
+      - go test -race -timeout 120s ./...
+
+  test:repeat:
+    desc: Run repeat-safe packages twice in shuffled order to catch leaked state
+    cmds:
+      - go test -count=2 -shuffle=on -timeout 120s $(go list ./... | grep -Ev '{{.REPEAT_EXCLUDE}}')
+
+  vet:
+    desc: Run go vet
+    cmds:
+      - go vet ./...
+
+  lint:
+    desc: Run golangci-lint and apply automatic fixes
+    cmds:
+      - golangci-lint run --fix --config {{.GOLANGCI_CONFIG}} ./...
+
+  lint:check:
+    desc: Run golangci-lint without modifying files
+    cmds:
+      - golangci-lint run --fix=false --config {{.GOLANGCI_CONFIG}} ./...
+
+  fmt:
+    desc: Format the codebase
+    cmds:
+      - golangci-lint fmt --config {{.GOLANGCI_CONFIG}} ./...
+
+  mocks:
+    desc: Generate mocks
+    cmds:
+      - mockery --config {{.MOCKERY_CONFIG}}
+
+  # Template preview module
+
+  tplprev:test:
+    desc: Run tplprev module tests
+    cmds:
+      - go -C {{.TPLPREV_DIR}} test -timeout 30s -v ./...
+
+  tplprev:lint:
+    desc: Lint the tplprev module
+    dir: "{{.TPLPREV_DIR}}"
+    cmds:
+      - golangci-lint run --config {{.GOLANGCI_CONFIG}} ./...
+
+  tplprev:vet:
+    desc: Run go vet on the tplprev module
+    cmds:
+      - go -C {{.TPLPREV_DIR}} vet ./...
+
+  tplprev:fmt:
+    desc: Format the tplprev module
+    dir: "{{.TPLPREV_DIR}}"
+    cmds:
+      - golangci-lint fmt --config {{.GOLANGCI_CONFIG}} ./...
+
+  # Dependencies
+
+  mod:tidy:
+    desc: Tidy Go module dependencies
+    cmds:
+      - go mod tidy
+
+  mod:download:
+    desc: Download Go module dependencies
+    cmds:
+      - go mod download
+
+  # Documentation
+
+  docs:
+    desc: Set up, build the template preview assets, and serve the documentation site locally
+    cmds:
+      - task: docs:setup
+      - task: docs:gen
+      - task: docs:serve
+
+  docs:setup:
+    desc: Create the MkDocs virtual environment and install dependencies
+    cmds:
+      - python3 -m venv {{.DOCS_VENV}}
+      - "{{.DOCS_VENV}}/bin/pip install -r build/mkdocs/docs-requirements.txt"
+
+  docs:gen:
+    desc: Build the template preview WASM assets for the docs
+    cmds:
+      - bash ./scripts/build-tplprev.sh
+
+  docs:build:
+    desc: Build the MkDocs site
+    cmds:
+      - "{{.DOCS_VENV}}/bin/mkdocs build --config-file {{.MKDOCS_CONFIG}}"
+
+  docs:serve:
+    desc: Serve the MkDocs site locally with live reload
+    cmds:
+      - "{{.DOCS_VENV}}/bin/mkdocs serve --config-file {{.MKDOCS_CONFIG}} --livereload"
+
+  # Release and Docker
+
+  release:
+    desc: "Create a release with GoReleaser (CONFIG=stable|nightly, default stable)"
+    vars:
+      CONFIG: '{{.CONFIG | default "stable"}}'
+    cmds:
+      - goreleaser release --config build/goreleaser/{{.CONFIG}}.yaml --clean
+
+  release:snapshot:
+    desc: "Build a local snapshot with GoReleaser without publishing (CONFIG=stable|nightly)"
+    vars:
+      CONFIG: '{{.CONFIG | default "stable"}}'
+    cmds:
+      - goreleaser release --config build/goreleaser/{{.CONFIG}}.yaml --snapshot --clean
+
+  docker:build:
+    desc: Build a local Docker image from the working tree
+    cmds:
+      - docker build -f build/docker/Dockerfile.self-local -t {{.BINARY_NAME}} .
+
+  docker:run:
+    desc: Run the local Docker image
+    cmds:
+      - docker run -p 8080:8080 -v /var/run/docker.sock:/var/run/docker.sock {{.BINARY_NAME}}
+
+  # Housekeeping
+
+  clean:
+    desc: Remove build artifacts
+    cmds:
+      - rm -rf bin/
