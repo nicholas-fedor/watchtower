@@ -18,6 +18,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Chores
 
+- Update step-security/harden-runner action to v2.22.0 by @renovate[bot] in [#2527](https://github.com/nicholas-fedor/watchtower/pull/2527)
 - Update google.golang.org/genproto/googleapis/rpc digest to fad4113 by @renovate[bot] in [#2523](https://github.com/nicholas-fedor/watchtower/pull/2523)
 - Update google.golang.org/genproto/googleapis/api digest to fad4113 by @renovate[bot] in [#2522](https://github.com/nicholas-fedor/watchtower/pull/2522)
 - Update github.com/microsoft/go-winio digest to 2430248 by @renovate[bot] in [#2520](https://github.com/nicholas-fedor/watchtower/pull/2520)
