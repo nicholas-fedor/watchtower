@@ -8,6 +8,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- Consolidate ci on github actions by @nicholas-fedor in [#2539](https://github.com/nicholas-fedor/watchtower/pull/2539)
+
 ### Chores
 
 - Migrate makefile to taskfile by @nicholas-fedor in [#2535](https://github.com/nicholas-fedor/watchtower/pull/2535)
