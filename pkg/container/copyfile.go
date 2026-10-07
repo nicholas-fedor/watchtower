@@ -38,6 +38,8 @@ const (
 	injectRootPath = "/"
 	// bindReadOnlyOption is the HostConfig.Binds option that marks a bind read-only.
 	bindReadOnlyOption = "ro"
+	// userNSSecurityOption is the daemon security option reported under --userns-remap.
+	userNSSecurityOption = "name=userns"
 )
 
 // copyFileSkipReason explains why a labeled path is not copied into a replacement.
@@ -64,8 +66,9 @@ type CopyFileStore interface {
 
 var _ CopyFileStore = (*client)(nil)
 
-// ArchiveAPI is the Docker copy subset used to snapshot and inject labeled files.
+// ArchiveAPI is the Docker API subset used to snapshot and inject labeled files.
 type ArchiveAPI interface {
+	Info(ctx context.Context, options dockerClient.InfoOptions) (dockerClient.SystemInfoResult, error)
 	CopyFromContainer(
 		ctx context.Context,
 		containerID string,
@@ -680,6 +683,8 @@ func writeSanitizedCopyFileTar(destPath string, body []byte, src *tar.Header) ([
 //
 // The archive is extracted at the container root with the destination as the member name,
 // so a parent directory missing from the new image is created rather than failing the copy.
+// Files keep the uid and gid captured in the snapshot unless the daemon remaps user
+// namespaces, as described on copyFileUIDGID.
 //
 // Parameters:
 //   - log: Logger for debug messages.
@@ -708,17 +713,13 @@ func injectCopyFiles(
 		Str("new_id", containerID).
 		Logger()
 	clog := &clogVal
+	copyUIDGID := copyFileUIDGID(ctx, clog, api)
 
 	for _, file := range snapshot.files {
-		// CopyUIDGID must stay false: true substitutes Config.User ownership onto
-		// extracted members, while false preserves the uid/gid captured in the
-		// snapshot archive. Snapshot fidelity requires the captured numeric
-		// ownership to survive the update; Config.User substitution would silently
-		// chown secret/config payloads when a non-root user is configured.
 		_, err := api.CopyToContainer(ctx, containerID, dockerClient.CopyToContainerOptions{
 			DestinationPath: injectRootPath,
 			Content:         bytes.NewReader(file.archive),
-			CopyUIDGID:      false,
+			CopyUIDGID:      copyUIDGID,
 		})
 		if err != nil {
 			return fmt.Errorf("%w: %s: %w", errCopyFileInjectFailed, file.target, err)
@@ -730,6 +731,60 @@ func injectCopyFiles(
 	}
 
 	return nil
+}
+
+// copyFileUIDGID reports whether injection asks the daemon to apply Config.User ownership.
+//
+// With CopyUIDGID false the daemon keeps the uid and gid stored in the archive, which
+// preserves the ownership captured from the source container. A daemon that remaps user
+// namespaces returns host IDs when it archives a file but treats archive IDs as container
+// IDs when it extracts one, so it rejects any captured owner other than root. On those
+// daemons CopyUIDGID true chowns each file to Config.User instead, which the daemon maps
+// itself. When the daemon info is unavailable, the captured ownership is kept.
+//
+// Parameters:
+//   - ctx: Context for cancellation and timeout control.
+//   - clog: Logger with container fields.
+//   - api: Docker API used to read the daemon security options.
+//
+// Returns:
+//   - bool: True when the daemon remaps user namespaces.
+func copyFileUIDGID(ctx context.Context, clog *zerolog.Logger, api ArchiveAPI) bool {
+	result, err := api.Info(ctx, dockerClient.InfoOptions{})
+	if err != nil {
+		clog.Debug().
+			Err(err).
+			Msg("Failed to get daemon info, keeping copied file ownership")
+
+		return false
+	}
+
+	if !daemonRemapsUserNamespaces(result.Info.SecurityOptions) {
+		return false
+	}
+
+	clog.Debug().Msg("Daemon remaps user namespaces, copied files take the container user ownership")
+
+	return true
+}
+
+// daemonRemapsUserNamespaces reports whether daemon security options include userns.
+//
+// Parameters:
+//   - securityOptions: Info.SecurityOptions entries, each a comma-separated key=value list.
+//
+// Returns:
+//   - bool: True when any entry names the userns option.
+func daemonRemapsUserNamespaces(securityOptions []string) bool {
+	for _, option := range securityOptions {
+		for field := range strings.SplitSeq(option, ",") {
+			if field == userNSSecurityOption {
+				return true
+			}
+		}
+	}
+
+	return false
 }
 
 // copyArchiveAPI returns the Docker copy API used for snapshot and inject.

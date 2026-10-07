@@ -83,6 +83,7 @@ Every labeled path ends in one of three outcomes: copied, skipped, or the update
 | --- | --- |
 | Absolute path with no `..` | Copied onto the replacement container. |
 | Parent directory missing from the new image | Watchtower creates it with mode `0755` and writes the file into it. |
+| File owner and permissions | The copy keeps the file's numeric UID, GID, and permission bits. See [File Ownership](#file-ownership). |
 | Container with a writable root filesystem | Watchtower copies the file, even when the path sits inside a mount. |
 
 ### Paths Under a Mount
@@ -124,6 +125,7 @@ Watchtower copies labeled files in two phases and a failure in either one stops 
 | Condition | Why |
 | --- | --- |
 | The copy into the new container fails | The Engine refused the write, or the connection failed. |
+| The daemon remaps user namespaces, the container sets no user, and the file is not owned by root | The Engine cannot map the file's owner into the new container. See [File Ownership](#file-ownership). |
 
 ### Size Limits
 
@@ -154,3 +156,15 @@ The first endpoint snapshots labeled files before the old container is removed. 
 
 That is the same mechanism [Docker Compose](https://docs.docker.com/reference/compose-file/configs/){target="_blank" rel="noopener noreferrer"} uses to inject `content:` and `environment:` configs.
 Both extract the archive at the container root and name the single member with the full in-container path, so the Engine creates any parent directory the new image does not contain.
+
+### File Ownership
+
+Watchtower writes each file with the numeric UID and GID it had in the old container, and with the same permission bits except setuid, setgid, and sticky.
+The container's `user:` setting and the image's `USER` do not change the owner.
+If a new image switches to a different user, the file keeps its previous owner and mode, which can leave it unreadable to that user.
+
+!!! Note "Daemons with user namespace remapping"
+    A daemon started with [`--userns-remap`](https://docs.docker.com/engine/security/userns-remap/){target="_blank" rel="noopener noreferrer"} reports file owners as host IDs when it reads a file, and rejects those IDs when it writes the file back.
+    On these daemons Watchtower asks the Engine to give each copied file to the container's configured user and group instead of the original owner.
+    A user given by name must exist in the new image.
+    A container with no user set receives files as root, so only files owned by root can be copied, and any other owner stops that container's update.

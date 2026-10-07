@@ -19,6 +19,7 @@ import (
 	cerrdefs "github.com/containerd/errdefs"
 	dockerContainer "github.com/moby/moby/api/types/container"
 	dockerMount "github.com/moby/moby/api/types/mount"
+	dockerSystem "github.com/moby/moby/api/types/system"
 	dockerClient "github.com/moby/moby/client"
 
 	mockContainer "github.com/nicholas-fedor/watchtower/pkg/container/mocks"
@@ -647,6 +648,7 @@ func TestInjectCopyFiles(t *testing.T) {
 
 		tarBytes := mustFileTar(t, "config.yaml", []byte("setting=1"))
 		api := mockContainer.NewMockArchiveAPI(t)
+		expectDaemonInfo(api, "name=seccomp,profile=builtin", "name=rootless", "name=cgroupns")
 		api.EXPECT().
 			CopyToContainer(mock.Anything, "new-id", mock.Anything).
 			Run(func(_ context.Context, _ string, options dockerClient.CopyToContainerOptions) {
@@ -682,6 +684,7 @@ func TestInjectCopyFiles(t *testing.T) {
 		require.NoError(t, err)
 
 		api := mockContainer.NewMockArchiveAPI(t)
+		expectDaemonInfo(api)
 		api.EXPECT().
 			CopyToContainer(mock.Anything, "new-id", mock.Anything).
 			Run(func(_ context.Context, _ string, options dockerClient.CopyToContainerOptions) {
@@ -713,6 +716,7 @@ func TestInjectCopyFiles(t *testing.T) {
 		t.Parallel()
 
 		api := mockContainer.NewMockArchiveAPI(t)
+		expectDaemonInfo(api)
 		api.EXPECT().
 			CopyToContainer(mock.Anything, "new-id", mock.Anything).
 			Return(dockerClient.CopyToContainerResult{}, errors.New("denied"))
@@ -730,6 +734,91 @@ func TestInjectCopyFiles(t *testing.T) {
 		)
 		require.ErrorIs(t, err, errCopyFileInjectFailed)
 	})
+
+	// A userns-remap daemon rejects captured non-root owners on upload, so every file in
+	// the snapshot takes Config.User ownership, and the daemon is queried only once.
+	t.Run("userns daemon applies container user ownership", func(t *testing.T) {
+		t.Parallel()
+
+		api := mockContainer.NewMockArchiveAPI(t)
+		expectDaemonInfo(api, "name=seccomp,profile=builtin", "name=userns", "name=cgroupns")
+		api.EXPECT().
+			CopyToContainer(mock.Anything, "new-id", mock.Anything).
+			Run(func(_ context.Context, _ string, options dockerClient.CopyToContainerOptions) {
+				assert.True(t, options.CopyUIDGID)
+			}).
+			Return(dockerClient.CopyToContainerResult{}, nil).
+			Twice()
+
+		err := injectCopyFiles(
+			testLog(),
+			t.Context(),
+			api,
+			"new-id",
+			MockContainer(),
+			copyFileSnapshot{files: []copyFileEntry{
+				{target: "/app/config.yaml", archive: mustFileTar(t, "config.yaml", []byte("a"))},
+				{target: "/run/secrets/token", archive: mustFileTar(t, "token", []byte("b"))},
+			}},
+		)
+		require.NoError(t, err)
+	})
+
+	t.Run("daemon info failure keeps captured ownership", func(t *testing.T) {
+		t.Parallel()
+
+		api := mockContainer.NewMockArchiveAPI(t)
+		api.EXPECT().
+			Info(mock.Anything, dockerClient.InfoOptions{}).
+			Return(dockerClient.SystemInfoResult{}, errors.New("unavailable")).
+			Once()
+		api.EXPECT().
+			CopyToContainer(mock.Anything, "new-id", mock.Anything).
+			Run(func(_ context.Context, _ string, options dockerClient.CopyToContainerOptions) {
+				assert.False(t, options.CopyUIDGID)
+			}).
+			Return(dockerClient.CopyToContainerResult{}, nil)
+
+		err := injectCopyFiles(
+			testLog(),
+			t.Context(),
+			api,
+			"new-id",
+			MockContainer(),
+			copyFileSnapshot{files: []copyFileEntry{{
+				target:  "/app/config.yaml",
+				archive: mustFileTar(t, "config.yaml", []byte("a")),
+			}}},
+		)
+		require.NoError(t, err)
+	})
+}
+
+// TestDaemonRemapsUserNamespaces covers parsing of Info.SecurityOptions entries, which
+// are comma-separated key=value lists such as "name=seccomp,profile=builtin".
+func TestDaemonRemapsUserNamespaces(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name    string
+		options []string
+		want    bool
+	}{
+		{name: "no options", options: nil, want: false},
+		{name: "default docker", options: []string{"name=seccomp,profile=builtin", "name=cgroupns"}, want: false},
+		{name: "rootless", options: []string{"name=seccomp,profile=builtin", "name=rootless"}, want: false},
+		{name: "userns remap", options: []string{"name=seccomp,profile=builtin", "name=userns"}, want: true},
+		{name: "userns among fields", options: []string{"name=userns,profile=custom"}, want: true},
+		{name: "similar option name", options: []string{"name=usernsx", "profile=userns"}, want: false},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			assert.Equal(t, tt.want, daemonRemapsUserNamespaces(tt.options))
+		})
+	}
 }
 
 func TestDiscardStoredCopyFiles(t *testing.T) {
@@ -1151,6 +1240,7 @@ func TestClientCopyFileStore(t *testing.T) {
 		tarBytes := mustFileTar(t, "config.yaml", []byte("setting=1"))
 		source := MockContainer()
 		api := mockContainer.NewMockArchiveAPI(t)
+		expectDaemonInfo(api)
 		api.EXPECT().
 			CopyToContainer(mock.Anything, "new-id", mock.Anything).
 			Return(dockerClient.CopyToContainerResult{}, nil)
@@ -1176,6 +1266,7 @@ func TestClientCopyFileStore(t *testing.T) {
 
 		source := MockContainer()
 		api := mockContainer.NewMockArchiveAPI(t)
+		expectDaemonInfo(api)
 		api.EXPECT().
 			CopyToContainer(mock.Anything, "new-id", mock.Anything).
 			Return(dockerClient.CopyToContainerResult{}, errors.New("denied"))
@@ -1234,6 +1325,16 @@ type errReader struct {
 
 func (e errReader) Read(_ []byte) (int, error) {
 	return 0, e.err
+}
+
+// expectDaemonInfo stubs the single daemon info call made by one injection.
+func expectDaemonInfo(api *mockContainer.MockArchiveAPI, securityOptions ...string) {
+	api.EXPECT().
+		Info(mock.Anything, dockerClient.InfoOptions{}).
+		Return(dockerClient.SystemInfoResult{
+			Info: dockerSystem.Info{SecurityOptions: securityOptions},
+		}, nil).
+		Once()
 }
 
 func copyFromPath(filePath string) any {
