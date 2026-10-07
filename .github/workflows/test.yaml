@@ -88,5 +88,11 @@ jobs:
 
       - name: Run Tests with the Race Detector
         run: |
-          # shellcheck disable=SC2046
-          go test -race -timeout 120s $(go list ./... | grep -Ev "${RACE_EXCLUDE}")
+          all_packages="$(go list ./...)"
+          packages="$(grep -Ev "${RACE_EXCLUDE}" <<< "${all_packages}")"
+          if [ -z "${packages}" ]; then
+            echo "No packages left to test after applying RACE_EXCLUDE" >&2
+            exit 1
+          fi
+          # shellcheck disable=SC2086
+          go test -race -timeout 120s ${packages}
