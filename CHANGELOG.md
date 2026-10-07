@@ -19,6 +19,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Chores
 
+- Update module github.com/urfave/cli/v2 to v2.27.7 by @renovate[bot] in [#2548](https://github.com/nicholas-fedor/watchtower/pull/2548)
 - Resolve existing lint findings by @nicholas-fedor in [#2541](https://github.com/nicholas-fedor/watchtower/pull/2541)
 - Migrate makefile to taskfile by @nicholas-fedor in [#2535](https://github.com/nicholas-fedor/watchtower/pull/2535)
 - Update github.com/azure/go-ansiterm digest to 8c912ac by @renovate[bot] in [#2536](https://github.com/nicholas-fedor/watchtower/pull/2536)
