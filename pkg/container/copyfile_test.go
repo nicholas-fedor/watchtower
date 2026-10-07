@@ -654,7 +654,7 @@ func TestInjectCopyFiles(t *testing.T) {
 				require.NoError(t, readErr)
 				assert.Equal(t, injectRootPath, options.DestinationPath)
 				assert.Equal(t, tarBytes, payload)
-				assert.True(t, options.CopyUIDGID)
+				assert.False(t, options.CopyUIDGID)
 			}).
 			Return(dockerClient.CopyToContainerResult{}, nil)
 

@@ -710,10 +710,15 @@ func injectCopyFiles(
 	clog := &clogVal
 
 	for _, file := range snapshot.files {
+		// CopyUIDGID must stay false: true substitutes Config.User ownership onto
+		// extracted members, while false preserves the uid/gid captured in the
+		// snapshot archive. Snapshot fidelity requires the captured numeric
+		// ownership to survive the update; Config.User substitution would silently
+		// chown secret/config payloads when a non-root user is configured.
 		_, err := api.CopyToContainer(ctx, containerID, dockerClient.CopyToContainerOptions{
 			DestinationPath: injectRootPath,
 			Content:         bytes.NewReader(file.archive),
-			CopyUIDGID:      true,
+			CopyUIDGID:      false,
 		})
 		if err != nil {
 			return fmt.Errorf("%w: %s: %w", errCopyFileInjectFailed, file.target, err)
