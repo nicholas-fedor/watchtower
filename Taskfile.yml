@@ -96,11 +96,11 @@ tasks:
     vars:
       CHECK_DIR: "{{.ROOT_DIR}}/bin/swag-check/swagger"
     cmds:
-      - rm -rf {{.CHECK_DIR}}
-      - go tool swag init --quiet -d ./ -g main.go -o {{.CHECK_DIR}}
-      - diff -u internal/api/swagger/docs.go {{.CHECK_DIR}}/docs.go
-      - diff -u internal/api/swagger/swagger.json {{.CHECK_DIR}}/swagger.json
-      - diff -u internal/api/swagger/swagger.yaml {{.CHECK_DIR}}/swagger.yaml
+      - rm -rf "{{.CHECK_DIR}}"
+      - go tool swag init --quiet -d ./ -g main.go -o "{{.CHECK_DIR}}"
+      - diff -u internal/api/swagger/docs.go "{{.CHECK_DIR}}/docs.go"
+      - diff -u internal/api/swagger/swagger.json "{{.CHECK_DIR}}/swagger.json"
+      - diff -u internal/api/swagger/swagger.yaml "{{.CHECK_DIR}}/swagger.yaml"
 
   mocks:
     desc: Generate mocks

@@ -9,6 +9,7 @@ import (
 	"slices"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/gofiber/fiber/v3"
 	"github.com/stretchr/testify/mock"
@@ -22,6 +23,10 @@ import (
 	mockContainer "github.com/nicholas-fedor/watchtower/pkg/container/mocks"
 	"github.com/nicholas-fedor/watchtower/pkg/types"
 )
+
+// probeTimeout bounds each route probe so a handler that never responds, such as
+// a streaming endpoint, fails the test instead of hanging it.
+const probeTimeout = 5 * time.Second
 
 // routeParamPattern matches named route parameters such as ":id".
 var routeParamPattern = regexp.MustCompile(`:[A-Za-z0-9_]+`)
@@ -125,8 +130,8 @@ func probeStatus(t *testing.T, app *fiber.App, method, pattern string) int {
 
 	req := httptest.NewRequestWithContext(t.Context(), method, target, nil)
 
-	resp, err := app.Test(req, fiber.TestConfig{Timeout: 0})
-	require.NoError(t, err)
+	resp, err := app.Test(req, fiber.TestConfig{Timeout: probeTimeout, FailOnTimeout: true})
+	require.NoError(t, err, "%s %s", method, target)
 
 	defer resp.Body.Close()
 
