@@ -49,3 +49,14 @@ jobs:
       - name: Lint tplprev
         working-directory: tools/tplprev
         run: golangci-lint run --config "${GITHUB_WORKSPACE}/build/golangci-lint/golangci-lint.yaml" ./...
+
+      - name: Check Swagger documents are up to date
+        run: |
+          check_dir="${RUNNER_TEMP}/swagger"
+          go tool swag init --quiet -d ./ -g main.go -o "${check_dir}"
+          for file in docs.go swagger.json swagger.yaml; do
+            if ! diff -u "internal/api/swagger/${file}" "${check_dir}/${file}"; then
+              echo "::error file=internal/api/swagger/${file}::Swagger documents are stale. Run 'task swag:gen' and commit the result."
+              exit 1
+            fi
+          done

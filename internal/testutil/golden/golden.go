@@ -24,7 +24,8 @@ const goldenDirMode = 0o755
 
 // Assert compares got with testdata/<name>.golden in the calling package.
 //
-// When UPDATE_GOLDEN=1, the golden file is written from got instead.
+// When UPDATE_GOLDEN=1, the golden file is written from got instead, unless the
+// test has already failed.
 //
 // Parameters:
 //   - t: Test handle.
@@ -36,6 +37,12 @@ func Assert(t *testing.T, name string, got []byte) {
 	path := filepath.Join("testdata", name+".golden")
 
 	if os.Getenv(updateEnv) == "1" {
+		// A test that already failed may have produced partial output, so it
+		// must not overwrite the golden file.
+		if t.Failed() {
+			t.Fatalf("not updating %s because the test has already failed", path)
+		}
+
 		require.NoError(t, os.MkdirAll(filepath.Dir(path), goldenDirMode))
 		require.NoError(t, os.WriteFile(path, got, goldenFileMode))
 

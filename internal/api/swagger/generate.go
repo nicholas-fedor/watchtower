@@ -1,2 +1,2 @@
-//go:generate swag init -d ../../.. -o .
+//go:generate go tool swag init -d ../../.. -o .
 package swagger
