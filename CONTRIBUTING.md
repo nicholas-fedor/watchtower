@@ -116,6 +116,16 @@ Two further tasks help catch concurrency and test-isolation bugs:
 * `task test:race` - runs the tests with the race detector
 * `task test:repeat` - runs the repeat-safe packages twice in shuffled order to catch state leaking between tests
 
+### Golden Files
+
+Some tests compare output against golden files in `testdata/` directories, such as the `--help` output, the flag manifest, and the inventory of environment variables and container labels.
+These guard Watchtower's user-facing configuration surface, so a failing golden test means a user-visible change.
+If the change is intended, regenerate the files and review the diff before committing:
+
+```bash
+task test:update-golden
+```
+
 ## Building
 
 ### Binary and Archives
