@@ -54,6 +54,13 @@ tasks:
     cmds:
       - go test -count=2 -shuffle=on -timeout 120s $(go list ./... | grep -Ev '{{.REPEAT_EXCLUDE}}')
 
+  test:update-golden:
+    desc: Rewrite golden test files from the current output (review the diff before committing)
+    env:
+      UPDATE_GOLDEN: "1"
+    cmds:
+      - go test -count=1 ./...
+
   vet:
     desc: Run go vet
     cmds:
