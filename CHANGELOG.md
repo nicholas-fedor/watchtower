@@ -20,6 +20,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Chores
 
+- Restore urfave/cli v2 for swag by @nicholas-fedor in [#2557](https://github.com/nicholas-fedor/watchtower/pull/2557)
 - Update module github.com/urfave/cli/v2 to v3 by @renovate[bot] in [#2549](https://github.com/nicholas-fedor/watchtower/pull/2549)
 - Update github.com/xrash/smetrics digest to 55b8f29 by @renovate[bot] in [#2551](https://github.com/nicholas-fedor/watchtower/pull/2551)
 - Update module github.com/urfave/cli/v2 to v2.27.7 by @renovate[bot] in [#2548](https://github.com/nicholas-fedor/watchtower/pull/2548)
