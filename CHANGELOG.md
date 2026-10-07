@@ -25,6 +25,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Migrate makefile to taskfile by @nicholas-fedor in [#2535](https://github.com/nicholas-fedor/watchtower/pull/2535)
 - Update github.com/azure/go-ansiterm digest to 8c912ac by @renovate[bot] in [#2536](https://github.com/nicholas-fedor/watchtower/pull/2536)
 
+### Fixed
+
+- Preserve captured file ownership on inject #2546) by @rooty0 in [#2546](https://github.com/nicholas-fedor/watchtower/pull/2546)
+
+### New Contributors
+
+- @rooty0 made their first contribution in [#2546](https://github.com/nicholas-fedor/watchtower/pull/2546)
+
 ## [1.23.0] - 2026-10-06
 
 ### Added
