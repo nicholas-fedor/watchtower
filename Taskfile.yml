@@ -84,7 +84,23 @@ tasks:
   swag:fmt:
     desc: Format Swagger annotation comments with the swag CLI
     cmds:
-      - swag fmt -d ./ -g main.go
+      - go tool swag fmt -d ./ -g main.go
+
+  swag:gen:
+    desc: Regenerate the Swagger documents in internal/api/swagger
+    cmds:
+      - go tool swag init --quiet -d ./ -g main.go -o internal/api/swagger
+
+  swag:check:
+    desc: Fail if the committed Swagger documents differ from freshly generated ones
+    vars:
+      CHECK_DIR: "{{.ROOT_DIR}}/bin/swag-check/swagger"
+    cmds:
+      - rm -rf {{.CHECK_DIR}}
+      - go tool swag init --quiet -d ./ -g main.go -o {{.CHECK_DIR}}
+      - diff -u internal/api/swagger/docs.go {{.CHECK_DIR}}/docs.go
+      - diff -u internal/api/swagger/swagger.json {{.CHECK_DIR}}/swagger.json
+      - diff -u internal/api/swagger/swagger.yaml {{.CHECK_DIR}}/swagger.yaml
 
   mocks:
     desc: Generate mocks

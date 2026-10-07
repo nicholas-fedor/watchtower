@@ -77,10 +77,18 @@ Golangci-lint can also be used to format the codebase:
 task fmt
 ```
 
-Swagger annotation comments are formatted separately with the [swag](https://github.com/swaggo/swag) CLI:
+Swagger annotation comments are formatted separately with the [swag](https://github.com/swaggo/swag) CLI, which is pinned as a Go tool in `go.mod`:
 
 ```bash
 task swag:fmt
+```
+
+After changing API annotations, regenerate the Swagger documents in `internal/api/swagger/` and commit them.
+CI fails when the committed documents differ from freshly generated ones, which `task swag:check` reproduces locally:
+
+```bash
+task swag:gen
+task swag:check
 ```
 
 ## Testing
