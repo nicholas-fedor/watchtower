@@ -74,6 +74,11 @@ tasks:
     cmds:
       - golangci-lint fmt --config {{.GOLANGCI_CONFIG}} ./...
 
+  swag:fmt:
+    desc: Format Swagger annotation comments with the swag CLI
+    cmds:
+      - swag fmt -d ./ -g main.go
+
   mocks:
     desc: Generate mocks
     cmds:

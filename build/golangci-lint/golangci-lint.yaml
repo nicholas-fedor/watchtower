@@ -25,7 +25,6 @@ formatters:
     - gofumpt # Enforce a stricter format than gofmt, while being backwards compatible.
     - goimports # Manages Go import lines, adds missing imports, removes unused ones
     - golines # Checks if code is formatted, and fixes long lines.
-    - swaggo # Check if swaggo comments are formatted.
 
   settings:
     gci:

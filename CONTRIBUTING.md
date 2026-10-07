@@ -77,6 +77,12 @@ Golangci-lint can also be used to format the codebase:
 task fmt
 ```
 
+Swagger annotation comments are formatted separately with the [swag](https://github.com/swaggo/swag) CLI:
+
+```bash
+task swag:fmt
+```
+
 ## Testing
 
 ### Mocking
