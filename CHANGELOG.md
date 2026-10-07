@@ -14,6 +14,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Chores
 
+- Resolve existing lint findings by @nicholas-fedor in [#2541](https://github.com/nicholas-fedor/watchtower/pull/2541)
 - Migrate makefile to taskfile by @nicholas-fedor in [#2535](https://github.com/nicholas-fedor/watchtower/pull/2535)
 - Update github.com/azure/go-ansiterm digest to 8c912ac by @renovate[bot] in [#2536](https://github.com/nicholas-fedor/watchtower/pull/2536)
 
