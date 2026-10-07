@@ -21,6 +21,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Chores
 
+- Update module github.com/moby/buildkit to v0.34.0 by @renovate[bot] in [#2565](https://github.com/nicholas-fedor/watchtower/pull/2565)
 - Update actions/upload-artifact action to v7.0.2 by @renovate[bot] in [#2561](https://github.com/nicholas-fedor/watchtower/pull/2561)
 - Restore urfave/cli v2 for swag by @nicholas-fedor in [#2557](https://github.com/nicholas-fedor/watchtower/pull/2557)
 - Update module github.com/urfave/cli/v2 to v3 by @renovate[bot] in [#2549](https://github.com/nicholas-fedor/watchtower/pull/2549)
