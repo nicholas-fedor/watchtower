@@ -6,10 +6,11 @@ import (
 	"testing"
 	"time"
 
-	"github.com/nicholas-fedor/tplprev/internal/notify"
-	"github.com/nicholas-fedor/tplprev/internal/templates"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+
+	"github.com/nicholas-fedor/tplprev/internal/notify"
+	"github.com/nicholas-fedor/tplprev/internal/templates"
 )
 
 func TestRenderDefaultReport(t *testing.T) {
