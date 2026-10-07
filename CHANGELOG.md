@@ -8,6 +8,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- Add golden tests for the cli configuration surface by @nicholas-fedor in [#2543](https://github.com/nicholas-fedor/watchtower/pull/2543)
+
 ### Changed
 
 - Consolidate ci on github actions by @nicholas-fedor in [#2539](https://github.com/nicholas-fedor/watchtower/pull/2539)
