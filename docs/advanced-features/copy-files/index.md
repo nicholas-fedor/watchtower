@@ -166,5 +166,7 @@ If a new image switches to a different user, the file keeps its previous owner a
 !!! Note "Daemons with user namespace remapping"
     A daemon started with [`--userns-remap`](https://docs.docker.com/engine/security/userns-remap/){target="_blank" rel="noopener noreferrer"} reports file owners as host IDs when it reads a file, and rejects those IDs when it writes the file back.
     On these daemons Watchtower asks the Engine to give each copied file to the container's configured user and group instead of the original owner.
+    Mapping that user into the container requires Docker Engine [29.7.0](https://docs.docker.com/engine/release-notes/29/#2970){target="_blank" rel="noopener noreferrer"} or later.
+    Earlier Engines assign the overflow owner `65534:65534` instead.
     A user given by name must exist in the new image.
     A container with no user set receives files as root, so only files owned by root can be copied, and any other owner stops that container's update.
