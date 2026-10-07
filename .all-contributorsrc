@@ -1030,6 +1030,16 @@
       "contributions": [
         "doc"
       ]
+    },
+    {
+      "login": "rooty0",
+      "name": "Stan",
+      "avatar_url": "https://avatars.githubusercontent.com/u/6276644?v=4",
+      "profile": "https://rooty.name",
+      "contributions": [
+        "code",
+        "test"
+      ]
     }
   ],
   "contributorsPerLine": 7,
