@@ -2698,6 +2698,17 @@
   
 </li>
         
+          <li class="md-nav__item">
+  <a href="#file_ownership" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        File Ownership
+      
+    </span>
+  </a>
+  
+</li>
+        
       </ul>
     </nav>
   
@@ -3192,6 +3203,17 @@
   
 </li>
         
+          <li class="md-nav__item">
+  <a href="#file_ownership" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        File Ownership
+      
+    </span>
+  </a>
+  
+</li>
+        
       </ul>
     </nav>
   
@@ -3312,6 +3334,10 @@ Compose writes that file into the mount on every create, and Watchtower now does
 <td>Watchtower creates it with mode <code>0755</code> and writes the file into it.</td>
 </tr>
 <tr>
+<td>File owner and permissions</td>
+<td>The copy keeps the file's numeric UID, GID, and permission bits. See <a href="#file-ownership">File Ownership</a>.</td>
+</tr>
+<tr>
 <td>Container with a writable root filesystem</td>
 <td>Watchtower copies the file, even when the path sits inside a mount.</td>
 </tr>
@@ -3397,6 +3423,10 @@ Use a <a href="https://docs.docker.com/engine/storage/volumes/" rel="noopener no
 <td>The copy into the new container fails</td>
 <td>The Engine refused the write, or the connection failed.</td>
 </tr>
+<tr>
+<td>The daemon remaps user namespaces, the container sets no user, and the file is not owned by root</td>
+<td>The Engine cannot map the file's owner into the new container. See <a href="#file-ownership">File Ownership</a>.</td>
+</tr>
 </tbody>
 </table>
 <h3 id="size_limits">Size Limits<a class="headerlink" href="#size_limits" title="Permanent link">&para;</a></h3>
@@ -3416,6 +3446,19 @@ The first endpoint snapshots labeled files before the old container is removed. 
 <h3 id="missing_parent_directories">Missing Parent Directories<a class="headerlink" href="#missing_parent_directories" title="Permanent link">&para;</a></h3>
 <p>That is the same mechanism <a href="https://docs.docker.com/reference/compose-file/configs/" rel="noopener noreferrer" target="_blank">Docker Compose</a> uses to inject <code>content:</code> and <code>environment:</code> configs.
 Both extract the archive at the container root and name the single member with the full in-container path, so the Engine creates any parent directory the new image does not contain.</p>
+<h3 id="file_ownership">File Ownership<a class="headerlink" href="#file_ownership" title="Permanent link">&para;</a></h3>
+<p>Watchtower writes each file with the numeric UID and GID it had in the old container, and with the same permission bits except setuid, setgid, and sticky.
+The container's <code>user:</code> setting and the image's <code>USER</code> do not change the owner.
+If a new image switches to a different user, the file keeps its previous owner and mode, which can leave it unreadable to that user.</p>
+<div class="admonition note">
+<p class="admonition-title">Daemons with user namespace remapping</p>
+<p>A daemon started with <a href="https://docs.docker.com/engine/security/userns-remap/" rel="noopener noreferrer" target="_blank"><code>--userns-remap</code></a> reports file owners as host IDs when it reads a file, and rejects those IDs when it writes the file back.
+On these daemons Watchtower asks the Engine to give each copied file to the container's configured user and group instead of the original owner.
+Mapping that user into the container requires Docker Engine <a href="https://docs.docker.com/engine/release-notes/29/#2970" rel="noopener noreferrer" target="_blank">29.7.0</a> or later.
+Earlier Engines assign the overflow owner <code>65534:65534</code> instead.
+A user given by name must exist in the new image.
+A container with no user set receives files as root, so only files owned by root can be copied, and any other owner stops that container's update.</p>
+</div>
 
 
 
@@ -3438,7 +3481,7 @@ Both extract the archive at the container root and name the single member with t
     <span class="md-icon" title="Last update">
       <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M21 13.1c-.1 0-.3.1-.4.2l-1 1 2.1 2.1 1-1c.2-.2.2-.6 0-.8l-1.3-1.3c-.1-.1-.2-.2-.4-.2m-1.9 1.8-6.1 6V23h2.1l6.1-6.1zM12.5 7v5.2l4 2.4-1 1L11 13V7zM11 21.9c-5.1-.5-9-4.8-9-9.9C2 6.5 6.5 2 12 2c5.3 0 9.6 4.1 10 9.3-.3-.1-.6-.2-1-.2s-.7.1-1 .2C19.6 7.2 16.2 4 12 4c-4.4 0-8 3.6-8 8 0 4.1 3.1 7.5 7.1 7.9l-.1.2z"/></svg>
     </span>
-    <span class="git-revision-date-localized-plugin git-revision-date-localized-plugin-timeago" title="October 1, 2026 02:40:14 UTC"><span class="timeago" datetime="2026-10-01T02:40:14+00:00" locale="en"></span></span><span class="git-revision-date-localized-plugin git-revision-date-localized-plugin-iso_date" title="October 1, 2026 02:40:14 UTC">2026-10-01</span>
+    <span class="git-revision-date-localized-plugin git-revision-date-localized-plugin-timeago" title="October 7, 2026 08:17:38 UTC"><span class="timeago" datetime="2026-10-07T08:17:38+00:00" locale="en"></span></span><span class="git-revision-date-localized-plugin git-revision-date-localized-plugin-iso_date" title="October 7, 2026 08:17:38 UTC">2026-10-07</span>
   </span>
 
     
