@@ -190,3 +190,69 @@ func (_c *MockArchiveAPI_CopyToContainer_Call) RunAndReturn(run func(ctx context
 	_c.Call.Return(run)
 	return _c
 }
+
+// Info provides a mock function for the type MockArchiveAPI
+func (_mock *MockArchiveAPI) Info(ctx context.Context, options client.InfoOptions) (client.SystemInfoResult, error) {
+	ret := _mock.Called(ctx, options)
+
+	if len(ret) == 0 {
+		panic("no return value specified for Info")
+	}
+
+	var r0 client.SystemInfoResult
+	var r1 error
+	if returnFunc, ok := ret.Get(0).(func(context.Context, client.InfoOptions) (client.SystemInfoResult, error)); ok {
+		return returnFunc(ctx, options)
+	}
+	if returnFunc, ok := ret.Get(0).(func(context.Context, client.InfoOptions) client.SystemInfoResult); ok {
+		r0 = returnFunc(ctx, options)
+	} else {
+		r0 = ret.Get(0).(client.SystemInfoResult)
+	}
+	if returnFunc, ok := ret.Get(1).(func(context.Context, client.InfoOptions) error); ok {
+		r1 = returnFunc(ctx, options)
+	} else {
+		r1 = ret.Error(1)
+	}
+	return r0, r1
+}
+
+// MockArchiveAPI_Info_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'Info'
+type MockArchiveAPI_Info_Call struct {
+	*mock.Call
+}
+
+// Info is a helper method to define mock.On call
+//   - ctx context.Context
+//   - options client.InfoOptions
+func (_e *MockArchiveAPI_Expecter) Info(ctx any, options any) *MockArchiveAPI_Info_Call {
+	return &MockArchiveAPI_Info_Call{Call: _e.mock.On("Info", ctx, options)}
+}
+
+func (_c *MockArchiveAPI_Info_Call) Run(run func(ctx context.Context, options client.InfoOptions)) *MockArchiveAPI_Info_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		var arg0 context.Context
+		if args[0] != nil {
+			arg0 = args[0].(context.Context)
+		}
+		var arg1 client.InfoOptions
+		if args[1] != nil {
+			arg1 = args[1].(client.InfoOptions)
+		}
+		run(
+			arg0,
+			arg1,
+		)
+	})
+	return _c
+}
+
+func (_c *MockArchiveAPI_Info_Call) Return(systemInfoResult client.SystemInfoResult, err error) *MockArchiveAPI_Info_Call {
+	_c.Call.Return(systemInfoResult, err)
+	return _c
+}
+
+func (_c *MockArchiveAPI_Info_Call) RunAndReturn(run func(ctx context.Context, options client.InfoOptions) (client.SystemInfoResult, error)) *MockArchiveAPI_Info_Call {
+	_c.Call.Return(run)
+	return _c
+}
