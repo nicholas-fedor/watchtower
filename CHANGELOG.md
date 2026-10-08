@@ -23,6 +23,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Chores
 
+- Update github/codeql-action action to v4.38.3 by @renovate[bot] in [#2588](https://github.com/nicholas-fedor/watchtower/pull/2588)
 - Update github.com/xrash/smetrics digest to 55b8f29 by @renovate[bot] in [#2574](https://github.com/nicholas-fedor/watchtower/pull/2574)
 - Update module github.com/mattn/go-runewidth to v0.0.31 by @renovate[bot] in [#2575](https://github.com/nicholas-fedor/watchtower/pull/2575)
 - Update module github.com/urfave/cli/v2 to v2.27.7 by @renovate[bot] in [#2562](https://github.com/nicholas-fedor/watchtower/pull/2562)
@@ -47,6 +48,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Tests
 
+- Characterize secret file loading by @nicholas-fedor in [#2586](https://github.com/nicholas-fedor/watchtower/pull/2586)
 - Make cmd and metrics tests safe to shuffle and repeat by @nicholas-fedor in [#2584](https://github.com/nicholas-fedor/watchtower/pull/2584)
 
 ### New Contributors
