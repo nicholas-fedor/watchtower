@@ -67,7 +67,7 @@ jobs:
     runs-on: ubuntu-latest
     env:
       # Packages with known data races. Remove each one as its races are fixed.
-      RACE_EXCLUDE: /cmd$|/internal/actions$|/internal/api$|/pkg/notifications$
+      RACE_EXCLUDE: /internal/actions$
     steps:
       - name: Harden the Runner (Step Security)
         uses: step-security/harden-runner@ccd8616d44fd3846e67624a50d5aad6d37bf2d25 # v2.22.1

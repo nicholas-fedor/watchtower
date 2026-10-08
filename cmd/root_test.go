@@ -808,8 +808,8 @@ func TestUpdateOnStartMultiInstanceScenario(t *testing.T) {
 			filterDesc := "instance1"
 
 			deps := testScheduleDeps(filter, filterDesc, updateLock, updateOnStart1)
-			err = scheduling.RunUpgradesOnSchedule(ctx, deps)
-			assert.NoError(t, err)
+			runErr := scheduling.RunUpgradesOnSchedule(ctx, deps)
+			assert.NoError(t, runErr)
 			completed.Add(1)
 			close(instance1Called)
 		}()
@@ -822,8 +822,8 @@ func TestUpdateOnStartMultiInstanceScenario(t *testing.T) {
 			filterDesc := "instance2"
 
 			deps := testScheduleDeps(filter, filterDesc, updateLock, updateOnStart2)
-			err = scheduling.RunUpgradesOnSchedule(ctx, deps)
-			assert.NoError(t, err)
+			runErr := scheduling.RunUpgradesOnSchedule(ctx, deps)
+			assert.NoError(t, runErr)
 			completed.Add(1)
 			close(instance2Called)
 		}()
