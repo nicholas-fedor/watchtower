@@ -49,6 +49,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Tests
 
+- Characterize image creation time lookups by @nicholas-fedor in [#2591](https://github.com/nicholas-fedor/watchtower/pull/2591)
 - Characterize secret file loading by @nicholas-fedor in [#2586](https://github.com/nicholas-fedor/watchtower/pull/2586)
 - Make cmd and metrics tests safe to shuffle and repeat by @nicholas-fedor in [#2584](https://github.com/nicholas-fedor/watchtower/pull/2584)
 
