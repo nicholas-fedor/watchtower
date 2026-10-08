@@ -21,6 +21,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Chores
 
+- Update step-security/harden-runner action to v2.22.1 by @renovate[bot] in [#2568](https://github.com/nicholas-fedor/watchtower/pull/2568)
+- Update github.com/google/pprof digest to 7bae8d8 by @renovate[bot] in [#2567](https://github.com/nicholas-fedor/watchtower/pull/2567)
 - Update module github.com/moby/buildkit to v0.34.0 by @renovate[bot] in [#2565](https://github.com/nicholas-fedor/watchtower/pull/2565)
 - Update actions/upload-artifact action to v7.0.2 by @renovate[bot] in [#2561](https://github.com/nicholas-fedor/watchtower/pull/2561)
 - Restore urfave/cli v2 for swag by @nicholas-fedor in [#2557](https://github.com/nicholas-fedor/watchtower/pull/2557)
