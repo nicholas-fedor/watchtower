@@ -153,6 +153,7 @@ linters:
     - funcorder # Checks the order of functions, methods, and constructors.
     - gocheckcompilerdirectives # Checks that go compiler directive comments (//go:) are valid.
     - gochecksumtype # Run exhaustiveness checks on Go "sum types".
+    - gocyclo # Computes and checks the cyclomatic complexity of functions. [fast]
     - godoclint # Checks Golang's documentation practice (godoc).
     - godox # Detects usage of FIXME, TODO and other keywords inside comments.
     - gomoddirectives # Manage the use of 'replace', 'retract', and 'excludes' directives in go.mod.
@@ -199,7 +200,6 @@ linters:
     - gochecknoinits # Checks that no init functions are present in Go code.
     - gocognit # Computes and checks the cognitive complexity of functions.
     - goconst # Finds repeated strings that could be replaced by a constant.
-    - gocyclo # Computes and checks the cyclomatic complexity of functions. [fast]
     - gomodguard # Allow and blocklist linter for direct Go module dependencies. This is different from depguard where there are different block types for example version constraints and module recommendations.
     - interfacebloat # A linter that checks the number of methods inside an interface. [fast]
     - ireturn # Accept Interfaces, Return Concrete Types.
@@ -241,6 +241,10 @@ linters:
           disabled: false
           exclude:
             - ".*internal/metrics/.*"
+    gocyclo:
+      # Functions above this complexity are reported. The functions listed under
+      # exclusions are already above it and are excluded until they are split up.
+      min-complexity: 25
     testifylint:
       enable-all: true
     varnamelen:
@@ -314,6 +318,51 @@ linters:
         linters:
           - gosec
         text: "G117"
+      # Functions above the gocyclo threshold today. Remove an entry when its function is split up.
+      - path: "internal/actions/update.go"
+        linters:
+          - gocyclo
+        text: "of func `Update` is high"
+      - path: "internal/actions/update.go"
+        linters:
+          - gocyclo
+        text: "of func `linkedIdentifierMarkedForRestart` is high"
+      - path: "internal/git/project/checkout.go"
+        linters:
+          - gocyclo
+        text: "of func `Checkout` is high"
+      - path: "internal/actions/update.go"
+        linters:
+          - gocyclo
+        text: "of func `restartStaleContainer` is high"
+      - path: "internal/actions/git_compose.go"
+        linters:
+          - gocyclo
+        text: 'of func `\(\*gitSession\)\.applyCompose` is high'
+      - path: "pkg/registry/digest/digest.go"
+        linters:
+          - gocyclo
+        text: "of func `HandleManifestResponse` is high"
+      - path: "pkg/registry/age.go"
+        linters:
+          - gocyclo
+        text: "of func `fetchPlatformManifestWithRetry` is high"
+      - path: "pkg/filters/filters.go"
+        linters:
+          - gocyclo
+        text: "of func `BuildFilter` is high"
+      - path: "pkg/registry/digest/digest.go"
+        linters:
+          - gocyclo
+        text: "of func `fetchDigest` is high"
+      - path: "internal/scheduling/scheduling.go"
+        linters:
+          - gocyclo
+        text: "of func `RunUpgradesOnSchedule` is high"
+      - path: "internal/actions/cleanup.go"
+        linters:
+          - gocyclo
+        text: "of func `getChainedContainers` is high"
     paths:
       - ".*/mocks/.*"
       - ".*/internal/api/swagger/.*"
