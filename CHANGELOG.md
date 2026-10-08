@@ -23,6 +23,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Chores
 
+- Update golang docker tag to v1.27.2 by @renovate[bot] in [#2607](https://github.com/nicholas-fedor/watchtower/pull/2607)
 - Update golang:alpine3.24 docker digest to 738d1cf by @renovate[bot] in [#2606](https://github.com/nicholas-fedor/watchtower/pull/2606)
 - Update go module directive to v1.27.2 by @renovate[bot] in [#2599](https://github.com/nicholas-fedor/watchtower/pull/2599)
 - Update module github.com/docker/go-connections to v0.8.2 by @renovate[bot] in [#2593](https://github.com/nicholas-fedor/watchtower/pull/2593)
@@ -53,6 +54,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Tests
 
+- Characterize preRun by @nicholas-fedor in [#2605](https://github.com/nicholas-fedor/watchtower/pull/2605)
 - Characterize run and runMain by @nicholas-fedor in [#2601](https://github.com/nicholas-fedor/watchtower/pull/2601)
 - Characterize the notify-upgrade command by @nicholas-fedor in [#2597](https://github.com/nicholas-fedor/watchtower/pull/2597)
 - Characterize the self-update orchestrator by @nicholas-fedor in [#2595](https://github.com/nicholas-fedor/watchtower/pull/2595)
