@@ -264,13 +264,8 @@ func TestFetchImageCreationTime_BearerToken(t *testing.T) {
 	setRegistryConfig(t, map[string]any{})
 
 	registry := newFakeRegistry(t)
-	registry.handle("/v2/", func(w http.ResponseWriter, _ *http.Request) {
-		w.Header().Set("WWW-Authenticate",
-			fmt.Sprintf(`Bearer realm="%s/token",service="fake-registry"`, registry.server.URL))
-		w.WriteHeader(http.StatusUnauthorized)
-	})
-	registry.handle("/token", respondWith(http.StatusOK, "application/json",
-		fmt.Sprintf(`{"token":%q}`, fakeBearerToken)))
+	registry.handle("/v2/", bearerChallenge(registry))
+	registry.handle("/token", tokenEndpoint())
 	registry.handle(fakeManifestTagPath, requireBearer(platformIndex()))
 	registry.handle(fakeRepositoryPath+"/manifests/"+fakeRuntimeManifest,
 		requireBearer(singlePlatformManifest(fakeConfigDigest)))
@@ -296,19 +291,14 @@ func TestFetchImageCreationTime_ChallengeHostFallback(t *testing.T) {
 	setRegistryConfig(t, map[string]any{})
 
 	realm := newFakeRegistry(t)
-	realm.handle("/token", respondWith(http.StatusOK, "application/json",
-		fmt.Sprintf(`{"token":%q}`, fakeBearerToken)))
+	realm.handle("/token", tokenEndpoint())
 	realm.handle(fakeManifestTagPath, requireBearer(platformIndex()))
 	realm.handle(fakeRepositoryPath+"/manifests/"+fakeRuntimeManifest,
 		requireBearer(singlePlatformManifest(fakeConfigDigest)))
 	realm.handle(fakeRepositoryPath+"/blobs/"+fakeConfigDigest, requireBearer(configBlob(testCreatedTimestamp)))
 
 	registry := newFakeRegistry(t)
-	registry.handle("/v2/", func(w http.ResponseWriter, _ *http.Request) {
-		w.Header().Set("WWW-Authenticate",
-			fmt.Sprintf(`Bearer realm="%s/token",service="fake-registry"`, realm.server.URL))
-		w.WriteHeader(http.StatusUnauthorized)
-	})
+	registry.handle("/v2/", bearerChallenge(realm))
 
 	created, err := fetchCreated(t, registry, "library/app:1.0")
 	require.NoError(t, err)
@@ -334,13 +324,8 @@ func TestFetchImageCreationTime_PlatformManifestRetry(t *testing.T) {
 	setRegistryConfig(t, map[string]any{})
 
 	registry := newFakeRegistry(t)
-	registry.handle("/v2/", func(w http.ResponseWriter, _ *http.Request) {
-		w.Header().Set("WWW-Authenticate",
-			fmt.Sprintf(`Bearer realm="%s/token",service="fake-registry"`, registry.server.URL))
-		w.WriteHeader(http.StatusUnauthorized)
-	})
-	registry.handle("/token", respondWith(http.StatusOK, "application/json",
-		fmt.Sprintf(`{"token":%q}`, fakeBearerToken)))
+	registry.handle("/v2/", bearerChallenge(registry))
+	registry.handle("/token", tokenEndpoint())
 	registry.handle(fakeManifestTagPath, requireBearer(platformIndex()))
 
 	_, err := fetchCreated(t, registry, "library/app:1.0")
