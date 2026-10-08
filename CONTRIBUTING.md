@@ -96,13 +96,16 @@ task swag:check
 ### Mocking
 
 [Mockery](https://vektra.github.io/mockery/latest/) is used to generate mock implementations of interfaces.
-It is configured using the `build/mockery/mockery.yaml` file.
+It is pinned as a Go tool in `go.mod` and configured using the `build/mockery/mockery.yaml` file.
 
 To generate new mock implementations of Watchtower's interfaces, run the following from the root directory:
 
 ```bash
 task mocks
 ```
+
+`task mocks:check` regenerates the mocks and fails if they differ from the committed ones.
+It leaves the regenerated files in place so you can review and commit them.
 
 ### Executing Unit Tests
 
