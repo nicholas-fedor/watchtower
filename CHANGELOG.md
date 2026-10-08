@@ -18,6 +18,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- Generate the preview copy of the notification templates by @nicholas-fedor in [#2578](https://github.com/nicholas-fedor/watchtower/pull/2578)
 - Consolidate ci on github actions by @nicholas-fedor in [#2539](https://github.com/nicholas-fedor/watchtower/pull/2539)
 
 ### Chores
