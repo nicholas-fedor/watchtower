@@ -1,0 +1,456 @@
+package cmd
+
+import (
+	"context"
+	"errors"
+	"fmt"
+	"os"
+	"os/exec"
+	"strings"
+	"testing"
+	"testing/synctest"
+	"time"
+
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/mock"
+	"github.com/stretchr/testify/require"
+
+	dockerContainer "github.com/moby/moby/api/types/container"
+	dockerImage "github.com/moby/moby/api/types/image"
+
+	appConfig "github.com/nicholas-fedor/watchtower/internal/config"
+	notifyConfig "github.com/nicholas-fedor/watchtower/internal/config/notify"
+	"github.com/nicholas-fedor/watchtower/internal/logging"
+	"github.com/nicholas-fedor/watchtower/pkg/container"
+	mockContainer "github.com/nicholas-fedor/watchtower/pkg/container/mocks"
+	"github.com/nicholas-fedor/watchtower/pkg/notifications"
+	"github.com/nicholas-fedor/watchtower/pkg/types"
+)
+
+// runExitHelperEnv selects a run exit case when the test binary is re-executed
+// as a subprocess. Empty means the parent process.
+const runExitHelperEnv = "WATCHTOWER_CMD_RUN_EXIT_HELPER"
+
+// Container labels used by the run fixtures.
+const (
+	watchtowerLabelKey   = "com.centurylinklabs.watchtower"
+	scopeLabelKey        = "com.centurylinklabs.watchtower.scope"
+	orchestratorLabelKey = "com.centurylinklabs.watchtower.ephemeral-orchestrator"
+)
+
+// errRunTestDocker is returned by the Docker client in the run tests.
+var errRunTestDocker = errors.New("docker daemon error")
+
+// withFilter matches the filter argument of a filtered ListContainers call.
+// The mock records an unfiltered call with the context alone, and mock.Anything
+// would also match that missing argument.
+var withFilter = mock.MatchedBy(func([]types.Filter) bool { return true })
+
+// runTestState is the process state run and runMain read from package
+// variables, set by setRunState.
+type runTestState struct {
+	client    container.Client
+	current   types.Container
+	currentID types.ContainerID
+}
+
+// setRunState sets the package variables run and runMain read, and restores
+// every one of them when the test ends. The Docker readiness sleep is skipped,
+// and the notifier has no services, so it sends nothing.
+func setRunState(t *testing.T, state runTestState) {
+	t.Helper()
+
+	savedCfg := appCfg
+	savedClient := client
+	savedNotifier := notifier
+	savedCurrent := currentWatchtowerContainer
+	savedCurrentID := currentWatchtowerContainerID
+	savedRunUpdates := runUpdatesWithNotifications
+	savedSleep := sleepFunc
+	savedSignalContext := createSignalContext
+
+	t.Cleanup(func() {
+		appCfg = savedCfg
+		client = savedClient
+		notifier = savedNotifier
+		currentWatchtowerContainer = savedCurrent
+		currentWatchtowerContainerID = savedCurrentID
+		runUpdatesWithNotifications = savedRunUpdates
+		sleepFunc = savedSleep
+		createSignalContext = savedSignalContext
+	})
+
+	appCfg = appConfig.Config{}
+	client = state.client
+	currentWatchtowerContainer = state.current
+	currentWatchtowerContainerID = state.currentID
+	sleepFunc = func(time.Duration) {}
+
+	notifier = notifications.NewNotifier(logging.NopLogger(), notifyConfig.Notify{Level: "info"})
+	t.Cleanup(notifier.Close)
+}
+
+// runFixtureContainer returns a running container with the given ID, name,
+// creation time, and labels.
+func runFixtureContainer(id, name, created string, labels map[string]string) types.Container {
+	return container.NewContainer(nil,
+		&dockerContainer.InspectResponse{
+			ID:      id,
+			Name:    name,
+			Image:   "sha256:" + id,
+			Created: created,
+			State:   &dockerContainer.State{Running: true},
+			Config: &dockerContainer.Config{
+				Image:  "nickfedor/watchtower:latest",
+				Labels: labels,
+			},
+			HostConfig: &dockerContainer.HostConfig{},
+		},
+		&dockerImage.InspectResponse{ID: "sha256:" + id},
+	)
+}
+
+// currentWatchtower returns the Watchtower container the tests run as.
+func currentWatchtower() types.Container {
+	return runFixtureContainer("c0c0", "/watchtower", "2026-10-08T12:00:00Z",
+		map[string]string{watchtowerLabelKey: "true"})
+}
+
+// runCalls returns the Docker client calls in the order they were made, each
+// with the container, image, or listing it targeted.
+func runCalls(client *mockContainer.MockClient) []string {
+	calls := make([]string, 0, len(client.Calls))
+
+	for _, call := range client.Calls {
+		entry := call.Method
+
+		switch call.Method {
+		case "ListContainers":
+			if len(call.Arguments) > 1 {
+				entry += " filtered"
+			} else {
+				entry += " all"
+			}
+		case "SetRestartPolicy":
+			entry += " " + containerLabel(call.Arguments.Get(1)) + " " +
+				string(call.Arguments.Get(2).(dockerContainer.RestartPolicy).Name)
+		case "StopAndRemoveContainer":
+			entry += fmt.Sprintf(" %s %s", containerLabel(call.Arguments.Get(1)), call.Arguments.Get(2))
+		case "RemoveImageByID":
+			entry += " " + string(call.Arguments.Get(1).(types.ImageID))
+		}
+
+		calls = append(calls, entry)
+	}
+
+	return calls
+}
+
+// containerLabel names a container argument, or "none" when it is nil.
+func containerLabel(arg any) string {
+	c, ok := arg.(types.Container)
+	if !ok || c == nil {
+		return "none"
+	}
+
+	return strings.TrimPrefix(c.Name(), "/")
+}
+
+// runUntilCanceled runs the command in a synctest bubble until the scheduler
+// is idle, then cancels the process context the way a signal would.
+func runUntilCanceled(t *testing.T, args ...string) {
+	t.Helper()
+
+	cmd := newTestRootCommand(t, args...)
+
+	synctest.Test(t, func(t *testing.T) {
+		cancels := make(chan context.CancelFunc, 1)
+		createSignalContext = func(parent context.Context, _ ...os.Signal) (context.Context, context.CancelFunc) {
+			ctx, cancel := context.WithCancel(parent)
+			cancels <- cancel
+
+			return ctx, cancel
+		}
+
+		done := make(chan struct{})
+
+		go func() {
+			newRunProcess().run(cmd, nil)
+			close(done)
+		}()
+
+		synctest.Wait()
+
+		select {
+		case <-done:
+			require.FailNow(t, "run returned before the scheduler started waiting")
+		default:
+		}
+
+		select {
+		case cancel := <-cancels:
+			cancel()
+		default:
+			require.FailNow(t, "run did not create the process context")
+		}
+
+		<-done
+	})
+}
+
+// newRunProcess returns a process that logs nothing.
+func newRunProcess() *process {
+	return &process{log: logging.NopLogger()}
+}
+
+// TestRun_RunOnce records the Docker calls of a run-once update with no
+// containers to update. The restart policy is disabled at the end whether or
+// not Watchtower runs in a container.
+func TestRun_RunOnce(t *testing.T) {
+	tests := []struct {
+		name    string
+		current types.Container
+		want    []string
+	}{
+		{
+			name: "outside a container",
+			want: []string{"GetVersion", "ListContainers filtered", "SetRestartPolicy none no"},
+		},
+		{
+			name:    "in a container",
+			current: currentWatchtower(),
+			want:    []string{"GetVersion", "ListContainers filtered", "SetRestartPolicy watchtower no"},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			mockClient := mockContainer.NewMockClient(t)
+			mockClient.EXPECT().GetVersion().Return("1.47")
+			mockClient.EXPECT().ListContainers(mock.Anything, withFilter).Return(nil, nil)
+			mockClient.EXPECT().SetRestartPolicy(mock.Anything, mock.Anything, mock.Anything)
+
+			state := runTestState{client: mockClient, current: tt.current}
+			if tt.current != nil {
+				state.currentID = tt.current.ID()
+			}
+
+			setRunState(t, state)
+
+			newRunProcess().run(newTestRootCommand(t, "--run-once"), nil)
+
+			assert.Equal(t, tt.want, runCalls(mockClient))
+		})
+	}
+}
+
+// TestRun_Continuous records the Docker calls of continuous mode from startup
+// until the process context is canceled, including the cleanup of older
+// Watchtower instances and of orchestrator containers.
+func TestRun_Continuous(t *testing.T) {
+	older := runFixtureContainer("01d0", "/watchtower-older", "2026-10-01T12:00:00Z",
+		map[string]string{watchtowerLabelKey: "true"})
+	orchestrator := runFixtureContainer("0c40", "/watchtower-orchestrator", "2026-10-08T11:00:00Z",
+		map[string]string{orchestratorLabelKey: "true", scopeLabelKey: "other"})
+
+	tests := []struct {
+		name string
+		args []string
+		// knownID keeps the current container's ID while leaving the container
+		// itself unknown, as when its lookup failed.
+		knownID bool
+		// uncached runs without a current container, as outside a container or
+		// after a failed lookup.
+		uncached bool
+		setup    func(client *mockContainer.MockClient, current types.Container)
+		want     []string
+	}{
+		{
+			name: "no other containers",
+			setup: func(client *mockContainer.MockClient, current types.Container) {
+				client.EXPECT().ListContainers(mock.Anything, withFilter).Return([]types.Container{current}, nil)
+				client.EXPECT().ListContainers(mock.Anything).Return([]types.Container{current}, nil)
+			},
+			want: []string{"ListContainers filtered", "ListContainers all", "GetVersion"},
+		},
+		{
+			// The removed image is reported to a slice that is then discarded.
+			name: "older instance and its image are removed",
+			args: []string{"--cleanup"},
+			setup: func(client *mockContainer.MockClient, current types.Container) {
+				client.EXPECT().ListContainers(mock.Anything, withFilter).Return([]types.Container{current, older}, nil)
+				client.EXPECT().StopAndRemoveContainer(mock.Anything, older, 10*time.Minute).Return(nil)
+				client.EXPECT().RemoveImageByID(mock.Anything, older.ImageID(), older.ImageName()).Return(nil)
+				client.EXPECT().ListContainers(mock.Anything).Return([]types.Container{current}, nil)
+			},
+			want: []string{
+				"ListContainers filtered",
+				"StopAndRemoveContainer watchtower-older 10m0s",
+				"RemoveImageByID sha256:01d0",
+				"ListContainers all",
+				"GetVersion",
+			},
+		},
+		{
+			// Without the current container, the cleanup cannot tell which
+			// instance to keep, so it removes none of them.
+			name:     "older instance is kept outside a container",
+			args:     []string{"--cleanup"},
+			uncached: true,
+			setup: func(client *mockContainer.MockClient, current types.Container) {
+				client.EXPECT().ListContainers(mock.Anything, withFilter).Return([]types.Container{current, older}, nil)
+				client.EXPECT().ListContainers(mock.Anything).Return([]types.Container{current, older}, nil)
+			},
+			want: []string{"ListContainers filtered", "ListContainers all", "GetVersion"},
+		},
+		{
+			name:     "older instance is kept when the current container lookup failed",
+			args:     []string{"--cleanup"},
+			uncached: true,
+			knownID:  true,
+			setup: func(client *mockContainer.MockClient, current types.Container) {
+				client.EXPECT().ListContainers(mock.Anything, withFilter).Return([]types.Container{current, older}, nil)
+				client.EXPECT().ListContainers(mock.Anything).Return([]types.Container{current, older}, nil)
+			},
+			want: []string{"ListContainers filtered", "ListContainers all", "GetVersion"},
+		},
+		{
+			name: "orchestrator from another scope is removed",
+			args: []string{"--scope", "prod"},
+			setup: func(client *mockContainer.MockClient, current types.Container) {
+				client.EXPECT().ListContainers(mock.Anything, withFilter).Return([]types.Container{current}, nil)
+				client.EXPECT().ListContainers(mock.Anything).Return([]types.Container{current, orchestrator}, nil)
+				client.EXPECT().StopAndRemoveContainer(mock.Anything, orchestrator, time.Duration(0)).Return(nil)
+			},
+			want: []string{
+				"ListContainers filtered",
+				"ListContainers all",
+				"StopAndRemoveContainer watchtower-orchestrator 0s",
+				"GetVersion",
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			current := currentWatchtower()
+
+			mockClient := mockContainer.NewMockClient(t)
+			tt.setup(mockClient, current)
+			mockClient.EXPECT().GetVersion().Return("1.47")
+
+			state := runTestState{client: mockClient, current: current, currentID: current.ID()}
+			if tt.uncached {
+				state.current = nil
+				state.currentID = ""
+			}
+
+			if tt.knownID {
+				state.currentID = current.ID()
+			}
+
+			setRunState(t, state)
+
+			runUntilCanceled(t, tt.args...)
+
+			assert.Equal(t, tt.want, runCalls(mockClient))
+		})
+	}
+}
+
+// TestRun_HealthCheck verifies that the health check mode returns without
+// touching Docker when Watchtower is not the container's main process.
+func TestRun_HealthCheck(t *testing.T) {
+	mockClient := mockContainer.NewMockClient(t)
+	setRunState(t, runTestState{client: mockClient})
+
+	newRunProcess().run(newTestRootCommand(t, "--health-check"), nil)
+
+	assert.Empty(t, runCalls(mockClient))
+}
+
+// TestRun_Exit verifies how run ends the process when it cannot continue, and
+// that the restart policy of the Watchtower container is disabled first.
+func TestRun_Exit(t *testing.T) {
+	if helperCase := os.Getenv(runExitHelperEnv); helperCase != "" {
+		runExitHelper(t, helperCase)
+
+		// Every helper case must end the process. Reaching here means it did not.
+		os.Exit(2)
+	}
+
+	tests := []struct {
+		helperCase string
+		wantOutput string
+	}{
+		{
+			// Loading the configuration rejects the combination, so runMain's own
+			// check for it is never reached through run.
+			helperCase: "rolling-restart-with-monitor-only",
+			wantOutput: "rolling-restart and monitor-only cannot both be enabled",
+		},
+		{helperCase: "rolling-restart-validation-fails", wantOutput: "Rolling restart compatibility validation failed"},
+		{helperCase: "api-without-token", wantOutput: "API setup failed"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.helperCase, func(t *testing.T) {
+			ctx, cancel := context.WithTimeout(t.Context(), 30*time.Second)
+			defer cancel()
+
+			// Codacy: static argv only (os.Args[0] is this test binary).
+			// nosemgrep: go.lang.security.audit.dangerous-exec-command.dangerous-exec-command
+			cmd := exec.CommandContext(ctx, os.Args[0], "-test.run=^TestRun_Exit$", "-test.v=false")
+
+			cmd.Env = append(os.Environ(), runExitHelperEnv+"="+tt.helperCase)
+
+			out, err := cmd.CombinedOutput()
+
+			var exitErr *exec.ExitError
+
+			require.ErrorAs(t, err, &exitErr, "output:\n%s", out)
+			assert.Equal(t, 1, exitErr.ExitCode(), "output:\n%s", out)
+			assert.Contains(t, string(out), tt.wantOutput)
+			assert.Contains(t, string(out), "SetRestartPolicy watchtower no",
+				"the restart policy is disabled before the process ends")
+		})
+	}
+}
+
+// runExitHelper runs the named exit case in the re-executed test binary. The
+// Docker client prints each restart policy change so the parent can check it.
+func runExitHelper(t *testing.T, helperCase string) {
+	t.Helper()
+
+	current := currentWatchtower()
+
+	mockClient := mockContainer.NewMockClient(t)
+	mockClient.EXPECT().GetVersion().Return("1.47").Maybe()
+	mockClient.EXPECT().SetRestartPolicy(mock.Anything, mock.Anything, mock.Anything).
+		Run(func(_ context.Context, c types.Container, policy dockerContainer.RestartPolicy) {
+			fmt.Fprintf(os.Stderr, "SetRestartPolicy %s %s\n", containerLabel(c), policy.Name)
+		})
+
+	var args []string
+
+	switch helperCase {
+	case "rolling-restart-with-monitor-only":
+		args = []string{"--rolling-restart", "--monitor-only"}
+	case "rolling-restart-validation-fails":
+		args = []string{"--rolling-restart"}
+
+		mockClient.EXPECT().ListContainers(mock.Anything, withFilter).Return(nil, errRunTestDocker)
+	case "api-without-token":
+		args = []string{"--http-api-update"}
+
+		mockClient.EXPECT().ListContainers(mock.Anything, withFilter).Return([]types.Container{current}, nil)
+		mockClient.EXPECT().ListContainers(mock.Anything).Return([]types.Container{current}, nil)
+	default:
+		panic("unknown run exit helper case " + helperCase)
+	}
+
+	setRunState(t, runTestState{client: mockClient, current: current, currentID: current.ID()})
+
+	proc := &process{log: logging.New(os.Stderr, logging.InfoLevel)}
+	proc.run(newTestRootCommand(t, args...), nil)
+}
