@@ -5,6 +5,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"io"
 	"os"
 	"os/exec"
@@ -2078,4 +2079,29 @@ func (c *countingRouter) Send(_ string, _ *shoutrrrTypes.Params) []error {
 	c.sends.Add(1)
 
 	return nil
+}
+
+// TestCreateNotifier_InvalidTemplateFallsBackToDefault verifies that a
+// notification template that fails to parse is replaced by the default
+// template, so notifications render as with no template set instead of
+// failing when the first notification is sent.
+func TestCreateNotifier_InvalidTemplateFallsBackToDefault(t *testing.T) {
+	data := goldenFixtures()["full"]
+
+	for _, legacy := range []bool{true, false} {
+		t.Run(fmt.Sprintf("legacy=%t", legacy), func(t *testing.T) {
+			invalid := createNotifier(testLogger(), []string{}, zerolog.TraceLevel, "{{ .Broken", legacy, StaticData{}, false, 0)
+			t.Cleanup(invalid.Close)
+
+			fallback := createNotifier(testLogger(), []string{}, zerolog.TraceLevel, "", legacy, StaticData{}, false, 0)
+			t.Cleanup(fallback.Close)
+
+			want, err := fallback.buildMessage(data)
+			require.NoError(t, err)
+
+			got, err := invalid.buildMessage(data)
+			require.NoError(t, err)
+			assert.Equal(t, want, got)
+		})
+	}
 }
