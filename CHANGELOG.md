@@ -10,6 +10,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Add golden tests for notification batching by @nicholas-fedor in [#2618](https://github.com/nicholas-fedor/watchtower/pull/2618)
 - Add golden tests for http api responses by @nicholas-fedor in [#2572](https://github.com/nicholas-fedor/watchtower/pull/2572)
 - Add golden tests for notification template output by @nicholas-fedor in [#2556](https://github.com/nicholas-fedor/watchtower/pull/2556)
 - Add rooty0 as a contributor for code, and test by @allcontributors[bot] in [#2554](https://github.com/nicholas-fedor/watchtower/pull/2554)
