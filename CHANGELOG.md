@@ -23,6 +23,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Chores
 
+- Update module github.com/moby/moby/client to v0.6.2 by @renovate[bot] in [#2611](https://github.com/nicholas-fedor/watchtower/pull/2611)
+- Update module github.com/docker/cli to v29.9.0+incompatible by @renovate[bot] in [#2612](https://github.com/nicholas-fedor/watchtower/pull/2612)
 - Update golang docker tag to v1.27.2 by @renovate[bot] in [#2607](https://github.com/nicholas-fedor/watchtower/pull/2607)
 - Update golang:alpine3.24 docker digest to 738d1cf by @renovate[bot] in [#2606](https://github.com/nicholas-fedor/watchtower/pull/2606)
 - Update go module directive to v1.27.2 by @renovate[bot] in [#2599](https://github.com/nicholas-fedor/watchtower/pull/2599)
