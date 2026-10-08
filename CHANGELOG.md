@@ -24,6 +24,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Chores
 
+- Enable gocyclo with a complexity limit of 25 by @nicholas-fedor in [#2616](https://github.com/nicholas-fedor/watchtower/pull/2616)
 - Update module github.com/moby/moby/client to v0.6.2 by @renovate[bot] in [#2611](https://github.com/nicholas-fedor/watchtower/pull/2611)
 - Update module github.com/docker/cli to v29.9.0+incompatible by @renovate[bot] in [#2612](https://github.com/nicholas-fedor/watchtower/pull/2612)
 - Update golang docker tag to v1.27.2 by @renovate[bot] in [#2607](https://github.com/nicholas-fedor/watchtower/pull/2607)
