@@ -114,6 +114,13 @@ tasks:
 
   # Template preview module
 
+  tplprev:gen:
+    desc: Regenerate the template preview module's copy of the built-in notification templates
+    env:
+      UPDATE_GOLDEN: "1"
+    cmds:
+      - go test -count=1 -run TestTplprevTemplatesInSync ./pkg/notifications/
+
   tplprev:test:
     desc: Run tplprev module tests
     cmds:

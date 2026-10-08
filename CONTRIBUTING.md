@@ -134,6 +134,10 @@ If the change is intended, regenerate the files and review the diff before commi
 task test:update-golden
 ```
 
+The template preview module in `tools/tplprev` cannot import Watchtower, so it keeps a generated copy of the built-in notification templates.
+A test fails when that copy differs from the templates in `pkg/notifications`.
+After changing a built-in template, regenerate the copy with `task tplprev:gen` (or `task test:update-golden`) and commit it.
+
 ## Building
 
 ### Binary and Archives
