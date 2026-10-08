@@ -45,6 +45,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Match the report methods and json output of watchtower by @nicholas-fedor in [#2580](https://github.com/nicholas-fedor/watchtower/pull/2580)
 - Preserve captured file ownership on inject #2546) by @rooty0 in [#2546](https://github.com/nicholas-fedor/watchtower/pull/2546)
 
+### Tests
+
+- Make cmd and metrics tests safe to shuffle and repeat by @nicholas-fedor in [#2584](https://github.com/nicholas-fedor/watchtower/pull/2584)
+
 ### New Contributors
 
 - @rooty0 made their first contribution in [#2546](https://github.com/nicholas-fedor/watchtower/pull/2546)
