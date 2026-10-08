@@ -207,6 +207,9 @@ func createNotifier(
 	if err != nil {
 		localLog.Error().Err(err).
 			Msg("Could not use configured notification template, falling back to default")
+
+		// An empty template string selects the built-in default, which always parses.
+		tpl, _ = getShoutrrrTemplate(localLog, "", legacy)
 	}
 
 	// Set logger based on stdout flag.
