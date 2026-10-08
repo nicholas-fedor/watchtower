@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/rs/zerolog"
+	"github.com/spf13/viper"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
@@ -52,12 +53,13 @@ func cgroupWithSelf() string {
 
 // setPreRunState prepares the process state preRun reads and writes, and
 // restores it when the test ends. newClient returns client, self container ID
-// detection reads only detection, and the Docker variables preRun sets are
-// restored.
+// detection reads only detection, and the Docker variables and registry TLS
+// settings preRun sets are restored.
 func setPreRunState(t *testing.T, client container.Client, detection selfDetection) {
 	t.Helper()
 
 	setRunState(t, runTestState{})
+	clearRegistryTLSOverrides(t)
 
 	savedNewClient := newClient
 	savedMountinfo := container.ReadMountinfoFunc
@@ -251,6 +253,83 @@ func TestPreRun_Configuration(t *testing.T) {
 	assert.Equal(t, "https://docker.example.com:2376", os.Getenv("DOCKER_HOST"))
 	assert.Equal(t, "1", os.Getenv("DOCKER_TLS_VERIFY"))
 	assert.Equal(t, "1.47", os.Getenv("DOCKER_API_VERSION"))
+}
+
+// TestPreRun_RegistryTLSSettings verifies that the registry TLS settings the
+// registry client reads follow the registry-tls-skip and
+// registry-tls-min-version configuration options, whether set by flag or by
+// environment variable, with a flag taking precedence over its environment
+// variable.
+func TestPreRun_RegistryTLSSettings(t *testing.T) {
+	tests := []struct {
+		name           string
+		args           []string
+		env            map[string]string
+		wantSkip       bool
+		wantMinVersion string
+	}{
+		{
+			// The minimum version flag defaults to TLS1.2, the same minimum the
+			// registry client applies when the setting is empty.
+			name:           "neither set",
+			wantMinVersion: "TLS1.2",
+		},
+		{
+			name:           "flags",
+			args:           []string{"--registry-tls-skip", "--registry-tls-min-version", "TLS1.3"},
+			wantSkip:       true,
+			wantMinVersion: "TLS1.3",
+		},
+		{
+			name: "environment variables",
+			env: map[string]string{
+				"WATCHTOWER_REGISTRY_TLS_SKIP":        "true",
+				"WATCHTOWER_REGISTRY_TLS_MIN_VERSION": "TLS1.3",
+			},
+			wantSkip:       true,
+			wantMinVersion: "TLS1.3",
+		},
+		{
+			name: "flags override environment variables",
+			args: []string{"--registry-tls-skip=false", "--registry-tls-min-version", "TLS1.3"},
+			env: map[string]string{
+				"WATCHTOWER_REGISTRY_TLS_SKIP":        "true",
+				"WATCHTOWER_REGISTRY_TLS_MIN_VERSION": "TLS1.2",
+			},
+			wantSkip:       false,
+			wantMinVersion: "TLS1.3",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			setPreRunState(t, mockContainer.NewMockClient(t), selfDetection{})
+
+			cmd := newTestRootCommand(t, tt.args...)
+
+			for key, value := range tt.env {
+				t.Setenv(key, value)
+			}
+
+			newRunProcess().preRun(cmd, nil)
+
+			assert.Equal(t, tt.wantSkip, viper.GetBool("WATCHTOWER_REGISTRY_TLS_SKIP"))
+			assert.Equal(t, tt.wantMinVersion, viper.GetString("WATCHTOWER_REGISTRY_TLS_MIN_VERSION"))
+		})
+	}
+}
+
+// clearRegistryTLSOverrides clears the registry TLS settings preRun sets on
+// the process-wide Viper instance when the test ends. Only preRun sets them,
+// so clearing them, rather than setting their earlier values, leaves Viper
+// reading them from the environment as before.
+func clearRegistryTLSOverrides(t *testing.T) {
+	t.Helper()
+
+	t.Cleanup(func() {
+		viper.Set("WATCHTOWER_REGISTRY_TLS_SKIP", nil)
+		viper.Set("WATCHTOWER_REGISTRY_TLS_MIN_VERSION", nil)
+	})
 }
 
 // TestPreRun_Exit verifies how preRun ends the process when it cannot or
