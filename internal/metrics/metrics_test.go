@@ -339,24 +339,14 @@ func TestMetrics_Register(t *testing.T) {
 	}{
 		{
 			name: "register metric",
-			m: func() *Metrics {
-				metrics = &Metrics{
-					channel: make(chan *Metric, 10),
-				} // Set global metrics for Register
-
-				return metrics
-			}(),
+			m:    &Metrics{channel: make(chan *Metric, 10)},
 			args: args{
 				metric: &Metric{Scanned: 1, Updated: 2, Failed: 0, Restarted: 0},
 			},
 		},
 		{
 			name: "register nil metric",
-			m: func() *Metrics {
-				metrics = &Metrics{channel: make(chan *Metric, 10)} // Reset global metrics
-
-				return metrics
-			}(),
+			m:    &Metrics{channel: make(chan *Metric, 10)},
 			args: args{
 				metric: nil,
 			},
@@ -458,15 +448,14 @@ func TestMetrics_PriorityOrdering(t *testing.T) {
 }
 
 func TestDefault(t *testing.T) {
-	// Reset metrics to nil to force initialization, but only if not already tested
-	originalMetrics := metrics
-	metrics = nil
-
-	defer func() { metrics = originalMetrics }() // Restore original state after test
-
+	// Default registers its collectors with the process-wide Prometheus
+	// registry, so it initializes once per process. The test neither resets nor
+	// shuts it down, which keeps it valid when the test runs more than once.
 	got := Default()
 
-	t.Cleanup(func() { got.Shutdown() })
+	if again := Default(); again != got {
+		t.Errorf("Default() returned %p, then %p; want the same instance", got, again)
+	}
 
 	tests := []struct {
 		name string
@@ -879,12 +868,11 @@ func TestRegisterScan(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			// Reset metrics and set up a fresh instance
-			metrics = &Metrics{channel: make(chan *Metric, 10)}
-			metrics.RegisterScan(tt.args.metric)
+			m := &Metrics{channel: make(chan *Metric, 10)}
+			m.RegisterScan(tt.args.metric)
 
 			select {
-			case got := <-metrics.channel:
+			case got := <-m.channel:
 				if !reflect.DeepEqual(got, tt.args.metric) {
 					t.Errorf("RegisterScan() enqueued %v, want %v", got, tt.args.metric)
 				}
