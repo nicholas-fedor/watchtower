@@ -1002,38 +1002,6 @@ func TestSetEnvOptStr_Error(t *testing.T) {
 	// To truly test setenv failure, use a system where Setenv fails (e.g., read-only env)
 }
 
-// TestGetSecretFromFile_OpenError tests file opening errors in getSecretFromFile.
-func TestGetSecretFromFile_OpenError(t *testing.T) {
-	cmd := new(cobra.Command)
-
-	SetDefaults()
-	RegisterNotificationFlags(cmd)
-
-	fileName := t.TempDir() + "/nonexistent-file"
-
-	err := cmd.ParseFlags([]string{"--notification-email-server-password", fileName})
-	require.NoError(t, err)
-
-	// Custom getSecret to explicitly hit os.Open failure
-	getSecret := func(flags *pflag.FlagSet, secret string) error {
-		flag := flags.Lookup(secret)
-
-		value := flag.Value.String()
-		if value != "" && true { // Force path without mocking isFilePath
-			_, err := os.Open(value)
-			if err != nil {
-				return fmt.Errorf("%w: %w", errOpenFileFailed, err)
-			}
-		}
-
-		return nil
-	}
-
-	err = getSecret(cmd.PersistentFlags(), "notification-email-server-password")
-	require.Error(t, err)
-	assert.Contains(t, err.Error(), "failed to open secret file")
-}
-
 // TestGetSecretFromFile_SkipCommentsAndEmptyLines verifies that comment and empty
 // lines are skipped when reading notification URLs from a secret file.
 func TestGetSecretFromFile_SkipCommentsAndEmptyLines(t *testing.T) {
