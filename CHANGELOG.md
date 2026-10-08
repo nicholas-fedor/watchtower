@@ -21,6 +21,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Chores
 
+- Update module github.com/urfave/cli/v2 to v2.27.7 by @renovate[bot] in [#2562](https://github.com/nicholas-fedor/watchtower/pull/2562)
 - Generate the swag check copy outside the module by @nicholas-fedor in [#2560](https://github.com/nicholas-fedor/watchtower/pull/2560)
 - Update step-security/harden-runner action to v2.22.1 by @renovate[bot] in [#2568](https://github.com/nicholas-fedor/watchtower/pull/2568)
 - Update github.com/google/pprof digest to 7bae8d8 by @renovate[bot] in [#2567](https://github.com/nicholas-fedor/watchtower/pull/2567)
