@@ -1757,9 +1757,7 @@ func TestLevelToString_WarnMapsToWarning(t *testing.T) {
 func TestRun_EventFieldMapPreservesLargeIntegers(t *testing.T) {
 	t.Parallel()
 
-	var buf bytes.Buffer
-
-	root := zerolog.New(&buf).Level(zerolog.TraceLevel).With().Timestamp().Logger()
+	root := zerolog.New(io.Discard).Level(zerolog.TraceLevel).With().Timestamp().Logger()
 	n := createTestNotifier(
 		[]string{},
 		zerolog.TraceLevel,
@@ -1809,9 +1807,7 @@ func TestRun_EventFieldMapPreservesLargeIntegers(t *testing.T) {
 func TestRun_EventFieldMapPreservesApplicationFields(t *testing.T) {
 	t.Parallel()
 
-	var buf bytes.Buffer
-
-	root := zerolog.New(&buf).Level(zerolog.TraceLevel).With().Timestamp().Logger()
+	root := zerolog.New(io.Discard).Level(zerolog.TraceLevel).With().Timestamp().Logger()
 	n := createTestNotifier(
 		[]string{},
 		zerolog.TraceLevel,
@@ -1877,9 +1873,7 @@ func TestRun_NotifyNoAndFailClosed(t *testing.T) {
 	n.entriesMutex.RUnlock()
 
 	// Real zerolog path: notify=no child must not enqueue.
-	var buf bytes.Buffer
-
-	root := zerolog.New(&buf).Level(zerolog.TraceLevel)
+	root := zerolog.New(io.Discard).Level(zerolog.TraceLevel)
 	n.RegisterHook(&root)
 	// After RegisterHook the worker runs. Still batch via StartNotification.
 	n.StartNotification(true)
@@ -1908,9 +1902,7 @@ func TestRun_NotifyNoAndFailClosed(t *testing.T) {
 func TestRun_ConcurrentEnqueue(t *testing.T) {
 	t.Parallel()
 
-	var buf bytes.Buffer
-
-	root := zerolog.New(&buf).Level(zerolog.TraceLevel)
+	root := zerolog.New(io.Discard).Level(zerolog.TraceLevel)
 	n := createTestNotifier(
 		[]string{},
 		zerolog.TraceLevel,

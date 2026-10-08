@@ -5,6 +5,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"strings"
+	"sync"
 	"testing"
 	"testing/synctest"
 	"time"
@@ -280,8 +281,32 @@ func TestTimeoutMiddleware_Timeout(t *testing.T) {
 	})
 }
 
+// lockedBuffer is a bytes.Buffer that is safe to write from a server goroutine
+// while the test reads it.
+type lockedBuffer struct {
+	mu  sync.Mutex
+	buf bytes.Buffer
+}
+
+// Write appends p to the buffer.
+func (b *lockedBuffer) Write(p []byte) (int, error) {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+
+	return b.buf.Write(p)
+}
+
+// String returns the buffer contents.
+func (b *lockedBuffer) String() string {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+
+	return b.buf.String()
+}
+
 func TestNew_OnListenHook(t *testing.T) {
-	var buf bytes.Buffer
+	// The listen hook logs from the server goroutine while the test polls.
+	var buf lockedBuffer
 
 	logger := zerolog.New(&buf).Level(zerolog.DebugLevel)
 
@@ -297,8 +322,9 @@ func TestNew_OnListenHook(t *testing.T) {
 		})
 	}()
 
+	// Wait for the second of the two listen messages.
 	require.Eventually(t, func() bool {
-		return strings.Contains(buf.String(), "Starting HTTP API server")
+		return strings.Contains(buf.String(), "HTTP API server is enabled")
 	}, 2*time.Second, 50*time.Millisecond)
 
 	output := buf.String()
