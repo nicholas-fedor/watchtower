@@ -9,11 +9,10 @@ vars:
   MKDOCS_CONFIG: build/mkdocs/mkdocs.yaml
   DOCS_VENV: watchtower-docs
   TPLPREV_DIR: tools/tplprev
-  # Packages that cannot run under -count/-shuffle yet: Ginkgo suites reject
-  # -count>1, cmd tests depend on declaration order, and the metrics tests leak
-  # the package singleton between runs. Packages leave this list as they are fixed.
+  # Packages that cannot run under -count yet: Ginkgo suites reject -count>1.
+  # Packages leave this list as their suites are converted.
   REPEAT_EXCLUDE: >-
-    /cmd$|/internal/actions$|/internal/compose$|/internal/logging$|/internal/metrics$|/pkg/container$|/pkg/notifications$|/pkg/registry/auth$|/pkg/registry/digest$|/pkg/registry/manifest$|/pkg/sorter$
+    /internal/actions$|/internal/compose$|/internal/logging$|/pkg/container$|/pkg/notifications$|/pkg/registry/auth$|/pkg/registry/digest$|/pkg/registry/manifest$|/pkg/sorter$
 
 tasks:
   default:
