@@ -94,9 +94,14 @@ tasks:
   swag:check:
     desc: Fail if the committed Swagger documents differ from freshly generated ones
     vars:
-      CHECK_DIR: "{{.ROOT_DIR}}/bin/swag-check/swagger"
+      # The documents are generated outside the module so the copy never becomes
+      # a package that go vet, go test, or golangci-lint pick up.
+      TEMP_DIR:
+        sh: mktemp -d
+      # swag names the generated package after its output directory.
+      CHECK_DIR: "{{.TEMP_DIR}}/swagger"
     cmds:
-      - rm -rf "{{.CHECK_DIR}}"
+      - defer: rm -rf "{{.TEMP_DIR}}"
       - go tool swag init --quiet -d ./ -g main.go -o "{{.CHECK_DIR}}"
       - diff -u internal/api/swagger/docs.go "{{.CHECK_DIR}}/docs.go"
       - diff -u internal/api/swagger/swagger.json "{{.CHECK_DIR}}/swagger.json"
