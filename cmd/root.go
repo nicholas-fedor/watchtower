@@ -94,6 +94,12 @@ var (
 	// The function creates a context that is canceled when the specified signals (SIGINT, SIGTERM) are received.
 	createSignalContext = signal.NotifyContext
 
+	// newClient is a function variable for creating the Docker client, allowing it to be overridden in tests.
+	//
+	// It is initialized to container.NewClient by default. preRun calls it with the resolved client options,
+	// so tests can substitute a mock client without a Docker daemon.
+	newClient = container.NewClient
+
 	// runUpdatesWithNotifications is a function variable for performing container updates and sending notifications.
 	//
 	// It is initialized inside runMain with a closure that executes actions.RunUpdatesWithNotifications,
@@ -229,7 +235,7 @@ func (p *process) preRun(cmd *cobra.Command, _ []string) {
 	}
 
 	// Initialize the Docker client from the resolved ClientOptions projection.
-	client = container.NewClient(p.log, appCfg.ClientOptions())
+	client = newClient(p.log, appCfg.ClientOptions())
 
 	// Check for orchestrator mode early. This is an internal mode where Watchtower
 	// runs as a one-shot orchestrator for self-update.
