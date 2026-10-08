@@ -15,8 +15,12 @@ type containerStatus struct {
 	state                State
 	monitorOnly          bool
 	newContainerID       report.ContainerID
+	gitRepo              string
 	gitRef               string
 	changelog            string
+	source               string
+	imageURL             string
+	documentation        string
 	currentImageVersion  string
 	latestImageVersion   string
 	currentImageRevision string
@@ -63,12 +67,28 @@ func (u *containerStatus) NewContainerID() report.ContainerID {
 	return u.newContainerID
 }
 
+func (u *containerStatus) GitRepo() string {
+	return u.gitRepo
+}
+
 func (u *containerStatus) GitRef() string {
 	return u.gitRef
 }
 
 func (u *containerStatus) Changelog() string {
 	return u.changelog
+}
+
+func (u *containerStatus) Source() string {
+	return u.source
+}
+
+func (u *containerStatus) ImageURL() string {
+	return u.imageURL
+}
+
+func (u *containerStatus) Documentation() string {
+	return u.documentation
 }
 
 func (u *containerStatus) CurrentImageVersion() string {

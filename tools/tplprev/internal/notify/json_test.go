@@ -2,6 +2,10 @@ package notify
 
 import (
 	"encoding/json"
+	"maps"
+	"os"
+	"slices"
+	"strings"
 	"testing"
 	"time"
 
@@ -25,6 +29,8 @@ type stubContainerError struct {
 	image string
 	state string
 	err   string
+	// meta makes each image and Git metadata accessor return its own name.
+	meta bool
 }
 
 func (r stubReport) Scanned() []report.ContainerReport   { return r.scanned }
@@ -45,16 +51,30 @@ func (c stubContainerError) Error() string                      { return c.err }
 func (c stubContainerError) State() string                      { return c.state }
 func (c stubContainerError) IsMonitorOnly() bool                { return false }
 func (c stubContainerError) NewContainerID() report.ContainerID { return "" }
-func (c stubContainerError) GitRef() string                     { return "" }
-func (c stubContainerError) Changelog() string                  { return "" }
+func (c stubContainerError) GitRepo() string                    { return c.metaValue("GitRepo") }
+func (c stubContainerError) GitRef() string                     { return c.metaValue("GitRef") }
+func (c stubContainerError) Changelog() string                  { return c.metaValue("Changelog") }
+func (c stubContainerError) Source() string                     { return c.metaValue("Source") }
+func (c stubContainerError) ImageURL() string                   { return c.metaValue("ImageURL") }
+func (c stubContainerError) Documentation() string              { return c.metaValue("Documentation") }
 
-func (c stubContainerError) CurrentImageVersion() string { return "" }
+func (c stubContainerError) CurrentImageVersion() string { return c.metaValue("CurrentImageVersion") }
 
-func (c stubContainerError) LatestImageVersion() string { return "" }
+func (c stubContainerError) LatestImageVersion() string { return c.metaValue("LatestImageVersion") }
 
-func (c stubContainerError) CurrentImageRevision() string { return "" }
+func (c stubContainerError) CurrentImageRevision() string { return c.metaValue("CurrentImageRevision") }
 
-func (c stubContainerError) LatestImageRevision() string { return "" }
+func (c stubContainerError) LatestImageRevision() string { return c.metaValue("LatestImageRevision") }
+
+// metaValue returns the name of the metadata accessor when meta is set, so a
+// value written under the wrong JSON key is detected, and "" otherwise.
+func (c stubContainerError) metaValue(accessor string) string {
+	if !c.meta {
+		return ""
+	}
+
+	return accessor
+}
 
 func TestDataMarshalJSON(t *testing.T) {
 	t.Parallel()
@@ -135,4 +155,85 @@ func TestDataMarshalJSONNilReport(t *testing.T) {
 	var decoded map[string]any
 	require.NoError(t, json.Unmarshal(bytes, &decoded))
 	assert.Nil(t, decoded["report"])
+}
+
+// TestDataMarshalJSONContainerKeysMatchWatchtower checks that the preview's
+// JSON output can carry the same container keys as Watchtower's. The expected
+// list is generated from Watchtower's JSON output by `task tplprev:gen`.
+func TestDataMarshalJSONContainerKeysMatchWatchtower(t *testing.T) {
+	t.Parallel()
+
+	contents, err := os.ReadFile("testdata/container-json-keys.txt")
+	require.NoError(t, err)
+
+	var want []string
+
+	for line := range strings.Lines(string(contents)) {
+		line = strings.TrimSpace(line)
+		if line != "" && !strings.HasPrefix(line, "#") {
+			want = append(want, line)
+		}
+	}
+
+	full := stubContainerError{
+		id:    "sha256:c79110000000aaaa",
+		name:  "updt1",
+		oldID: "sha256:01d110000000aaaa",
+		newID: "sha256:d0a110000000aaaa",
+		image: "mock/updt1:latest",
+		state: "updated",
+		meta:  true,
+	}
+	failed := stubContainerError{
+		id:    "sha256:c79210000000aaaa",
+		name:  "fail1",
+		image: "mock/fail1:latest",
+		state: "failed",
+		err:   "execution failed",
+	}
+
+	encoded, err := json.Marshal(Data{
+		Report: stubReport{
+			scanned: []report.ContainerReport{full, failed},
+			updated: []report.ContainerReport{full},
+			failed:  []report.ContainerReport{failed},
+		},
+	})
+	require.NoError(t, err)
+
+	var decoded struct {
+		Report map[string][]map[string]any `json:"report"`
+	}
+	require.NoError(t, json.Unmarshal(encoded, &decoded))
+
+	keys := map[string]struct{}{}
+
+	for _, containers := range decoded.Report {
+		for _, container := range containers {
+			for key := range container {
+				keys[key] = struct{}{}
+			}
+		}
+	}
+
+	assert.Equal(t, want, slices.Sorted(maps.Keys(keys)))
+
+	// Each metadata key carries the value of the accessor Watchtower reads it from.
+	require.Len(t, decoded.Report["updated"], 1)
+
+	updated := decoded.Report["updated"][0]
+	for key, accessor := range map[string]string{
+		"gitRepo":              "GitRepo",
+		"gitRef":               "GitRef",
+		"changelog":            "Changelog",
+		"ociSource":            "Source",
+		"imageUrl":             "ImageURL",
+		"documentation":        "Documentation",
+		"currentImageVersion":  "CurrentImageVersion",
+		"latestImageVersion":   "LatestImageVersion",
+		"currentImageRevision": "CurrentImageRevision",
+		"latestImageRevision":  "LatestImageRevision",
+	} {
+		assert.Equal(t, accessor, updated[key], "key %q", key)
+	}
 }
