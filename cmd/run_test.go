@@ -138,6 +138,8 @@ func runCalls(client *mockContainer.MockClient) []string {
 			entry += fmt.Sprintf(" %s %s", containerLabel(call.Arguments.Get(1)), call.Arguments.Get(2))
 		case "RemoveImageByID":
 			entry += " " + string(call.Arguments.Get(1).(types.ImageID))
+		case "GetCurrentWatchtowerContainer":
+			entry += " " + call.Arguments.Get(1).(types.ContainerID).ShortID()
 		}
 
 		calls = append(calls, entry)
