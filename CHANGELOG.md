@@ -18,11 +18,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- Pin mockery as a go tool by @nicholas-fedor in [#2610](https://github.com/nicholas-fedor/watchtower/pull/2610)
 - Generate the preview copy of the notification templates by @nicholas-fedor in [#2578](https://github.com/nicholas-fedor/watchtower/pull/2578)
 - Consolidate ci on github actions by @nicholas-fedor in [#2539](https://github.com/nicholas-fedor/watchtower/pull/2539)
 
 ### Chores
 
+- Update module github.com/moby/moby/client to v0.6.2 by @renovate[bot] in [#2611](https://github.com/nicholas-fedor/watchtower/pull/2611)
 - Update module github.com/docker/cli to v29.9.0+incompatible by @renovate[bot] in [#2612](https://github.com/nicholas-fedor/watchtower/pull/2612)
 - Update golang docker tag to v1.27.2 by @renovate[bot] in [#2607](https://github.com/nicholas-fedor/watchtower/pull/2607)
 - Update golang:alpine3.24 docker digest to 738d1cf by @renovate[bot] in [#2606](https://github.com/nicholas-fedor/watchtower/pull/2606)
