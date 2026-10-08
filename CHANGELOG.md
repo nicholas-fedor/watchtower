@@ -23,6 +23,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Chores
 
+- Update module github.com/prometheus/client_golang to v1.25.0 by @renovate[bot] in [#2589](https://github.com/nicholas-fedor/watchtower/pull/2589)
 - Update github/codeql-action action to v4.38.3 by @renovate[bot] in [#2588](https://github.com/nicholas-fedor/watchtower/pull/2588)
 - Update github.com/xrash/smetrics digest to 55b8f29 by @renovate[bot] in [#2574](https://github.com/nicholas-fedor/watchtower/pull/2574)
 - Update module github.com/mattn/go-runewidth to v0.0.31 by @renovate[bot] in [#2575](https://github.com/nicholas-fedor/watchtower/pull/2575)
