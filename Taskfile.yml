@@ -107,9 +107,21 @@ tasks:
       - diff -u internal/api/swagger/swagger.yaml "{{.CHECK_DIR}}/swagger.yaml"
 
   mocks:
-    desc: Generate mocks
+    desc: Generate mocks with the mockery version pinned in go.mod
     cmds:
-      - mockery --config {{.MOCKERY_CONFIG}}
+      - go tool mockery --config {{.MOCKERY_CONFIG}}
+
+  mocks:check:
+    desc: Regenerate mocks and fail if they differ from the committed ones (review the changes it leaves)
+    cmds:
+      - task: mocks
+      - |
+        changes="$(git status --porcelain --untracked-files=all -- ':(glob)**/mocks/**')"
+        if [ -n "${changes}" ]; then
+          echo "Generated mocks differ from the committed ones. Review and commit these changes:" >&2
+          echo "${changes}" >&2
+          exit 1
+        fi
 
   # Template preview module
 

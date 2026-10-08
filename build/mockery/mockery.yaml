@@ -12,11 +12,10 @@
 ######################################################################################################
 # Mockery Usage                                                                                      #
 #                                                                                                    #
-# Install Mockery:                                                                                   #
-# go install github.com/vektra/mockery/v3@latest                                                     #
+# Mockery is pinned as a Go tool in go.mod, so no separate install is needed.                        #
 #                                                                                                    #
-# Run CLI command from root:                                                                         #
-# mockery                                                                                            #
+# Run from the repository root:                                                                      #
+# task mocks (runs go tool mockery --config build/mockery/mockery.yaml)                              #
 #                                                                                                    #
 # Expected Result:                                                                                   #
 # Mockery will recursively traverse through configured package locations,                            #
