@@ -12,7 +12,6 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/nicholas-fedor/watchtower/internal/flags"
 	"github.com/nicholas-fedor/watchtower/internal/logging"
 	"github.com/nicholas-fedor/watchtower/internal/testutil/golden"
 )
@@ -21,29 +20,12 @@ import (
 const notifyUpgradeFilePattern = "watchtower-notif-urls-*"
 
 // newNotifyUpgradeCommand returns a notify-upgrade command under a new root
-// command with every flag registered, so tests never change the package's
-// root command. Every flag's environment variables are unset for the test so
-// only args configure it.
+// command, configured only by args.
 func newNotifyUpgradeCommand(t *testing.T, args ...string) *cobra.Command {
 	t.Helper()
 
-	for _, flagSpec := range flags.AllSpecs() {
-		for _, key := range flagSpec.EnvKeys {
-			// t.Setenv restores the original value when the test ends.
-			t.Setenv(key, "")
-			require.NoError(t, os.Unsetenv(key))
-		}
-	}
-
-	root := NewRootCommand()
-
-	flags.SetDefaults()
-	flags.RegisterAll(root)
-
 	sub := &cobra.Command{Use: "notify-upgrade"}
-	root.AddCommand(sub)
-
-	require.NoError(t, root.ParseFlags(append([]string{"--log-level", "error"}, args...)))
+	newTestRootCommand(t, args...).AddCommand(sub)
 
 	return sub
 }
