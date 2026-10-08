@@ -32,6 +32,8 @@ var (
 	errWriteTempFile = errors.New("failed to write to output file")
 	// errSyncTempFile indicates a failure to sync the temporary file to disk.
 	errSyncTempFile = errors.New("failed to sync output file")
+	// errCloseTempFile indicates a failure to close the temporary file after writing it.
+	errCloseTempFile = errors.New("failed to close output file")
 )
 
 // init registers the notify-upgrade command with the root command.
@@ -124,7 +126,7 @@ func runNotifyUpgradeE(cmd *cobra.Command, _ []string, log *zerolog.Logger) (*ze
 
 		return log, fmt.Errorf("%w: %w", errCreateTempFile, err)
 	}
-	// Ensure the file is closed after all operations, even on early returns, to prevent resource leaks.
+	// Close the file if writing it fails. Once written, it is closed explicitly before the wait.
 	defer outFile.Close()
 
 	// Log the file path where URLs will be written, providing the user with a concrete reference for later instructions.
@@ -165,6 +167,18 @@ func runNotifyUpgradeE(cmd *cobra.Command, _ []string, log *zerolog.Logger) (*ze
 			Msg("Failed to sync temporary file")
 
 		return log, fmt.Errorf("%w: %w", errSyncTempFile, err)
+	}
+
+	// Close the file before waiting so it can be removed afterwards. Windows does
+	// not allow removing a file that is still open.
+	err = outFile.Close()
+	if err != nil {
+		log.Debug().
+			Err(err).
+			Str("file", outFile.Name()).
+			Msg("Failed to close temporary file")
+
+		return log, fmt.Errorf("%w: %w", errCloseTempFile, err)
 	}
 
 	// Attempt to retrieve the running container's ID to provide precise instructions for copying the file from the container.
