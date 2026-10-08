@@ -1,0 +1,243 @@
+package cmd
+
+import (
+	"os"
+	"path/filepath"
+	"runtime"
+	"testing"
+	"testing/synctest"
+	"time"
+
+	"github.com/spf13/cobra"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
+
+	"github.com/nicholas-fedor/watchtower/internal/flags"
+	"github.com/nicholas-fedor/watchtower/internal/logging"
+	"github.com/nicholas-fedor/watchtower/internal/testutil/golden"
+)
+
+// notifyUpgradeFilePattern matches the environment file notify-upgrade writes.
+const notifyUpgradeFilePattern = "watchtower-notif-urls-*"
+
+// newNotifyUpgradeCommand returns a notify-upgrade command under a new root
+// command with every flag registered, so tests never change the package's
+// root command. Every flag's environment variables are unset for the test so
+// only args configure it.
+func newNotifyUpgradeCommand(t *testing.T, args ...string) *cobra.Command {
+	t.Helper()
+
+	for _, flagSpec := range flags.AllSpecs() {
+		for _, key := range flagSpec.EnvKeys {
+			// t.Setenv restores the original value when the test ends.
+			t.Setenv(key, "")
+			require.NoError(t, os.Unsetenv(key))
+		}
+	}
+
+	root := NewRootCommand()
+
+	flags.SetDefaults()
+	flags.RegisterAll(root)
+
+	sub := &cobra.Command{Use: "notify-upgrade"}
+	root.AddCommand(sub)
+
+	require.NoError(t, root.ParseFlags(append([]string{"--log-level", "error"}, args...)))
+
+	return sub
+}
+
+// notifyUpgradeFiles returns the environment files in the working directory.
+func notifyUpgradeFiles(t *testing.T) []string {
+	t.Helper()
+
+	files, err := filepath.Glob(notifyUpgradeFilePattern)
+	require.NoError(t, err)
+
+	return files
+}
+
+// notifyUpgradeRun is the outcome of running notify-upgrade until its wait
+// times out.
+type notifyUpgradeRun struct {
+	// content is the environment file's content while the command waited.
+	content string
+	// err is the error the command returned.
+	err error
+	// remaining lists the environment files left after the command returned.
+	remaining []string
+}
+
+// runNotifyUpgradeUntilTimeout runs notify-upgrade in a synctest bubble from a
+// new working directory and returns its outcome. The run happens in a subtest
+// so the working directory is restored before the caller compares goldens.
+func runNotifyUpgradeUntilTimeout(t *testing.T, args ...string) notifyUpgradeRun {
+	t.Helper()
+
+	var run notifyUpgradeRun
+
+	t.Run("run", func(t *testing.T) {
+		t.Chdir(t.TempDir())
+
+		cmd := newNotifyUpgradeCommand(t, args...)
+
+		synctest.Test(t, func(t *testing.T) {
+			done := make(chan error, 1)
+
+			go func() {
+				_, err := runNotifyUpgradeE(cmd, nil, logging.NopLogger())
+				done <- err
+			}()
+
+			// The command writes the file and then waits for a signal or timeout.
+			synctest.Wait()
+
+			select {
+			case err := <-done:
+				require.FailNow(t, "notify-upgrade returned before waiting", "error: %v", err)
+			default:
+			}
+
+			files := notifyUpgradeFiles(t)
+			require.Len(t, files, 1, "the command writes one environment file while it waits")
+
+			data, err := os.ReadFile(files[0])
+			require.NoError(t, err)
+
+			run.content = string(data)
+
+			time.Sleep(cleanupTimeout)
+
+			run.err = <-done
+		})
+
+		run.remaining = notifyUpgradeFiles(t)
+	})
+
+	return run
+}
+
+// TestNotifyUpgrade_LegacyNotifiers snapshots the environment file written for
+// every legacy notifier type alongside an existing notification URL, and
+// verifies the file is removed when the command's wait times out. The snapshot
+// records how each legacy setting is converted, including the Slack channel and
+// the Gotify TLS setting.
+func TestNotifyUpgrade_LegacyNotifiers(t *testing.T) {
+	run := runNotifyUpgradeUntilTimeout(t,
+		"--notifications", "email,slack,msteams,gotify",
+		"--notification-url", "discord://token@webhookid",
+		"--notification-email-from", "watchtower@example.com",
+		"--notification-email-to", "admin@example.com",
+		"--notification-email-server", "smtp.example.com",
+		"--notification-email-server-port", "587",
+		"--notification-email-server-user", "mailer",
+		"--notification-email-server-password", "mail-password",
+		"--notification-email-subjecttag", "prod",
+		"--notification-slack-hook-url", "https://hooks.slack.com/services/T00000000/B00000000/XXXXXXXXXXXXXXXXXXXXXXXX",
+		"--notification-slack-identifier", "watchtower-bot",
+		"--notification-slack-icon-emoji", ":whale:",
+		"--notification-slack-channel", "#ops",
+		"--notification-msteams-hook", "https://example.webhook.office.com/webhookb2/aaaa@bbbb/IncomingWebhook/cccc/dddd",
+		"--notification-gotify-url", "https://gotify.example.com",
+		"--notification-gotify-token", "gotify-token",
+		"--notification-gotify-tls-skip-verify",
+	)
+	require.NoError(t, run.err)
+
+	golden.Assert(t, "notify-upgrade-env", []byte(run.content))
+	assert.Empty(t, run.remaining, "the environment file is removed after the wait")
+}
+
+// TestNotifyUpgrade_WithoutLegacyNotifiers records the environment file when
+// no legacy notifier is configured.
+func TestNotifyUpgrade_WithoutLegacyNotifiers(t *testing.T) {
+	tests := []struct {
+		name string
+		args []string
+		want string
+	}{
+		{
+			name: "nothing configured",
+			want: "WATCHTOWER_NOTIFICATION_URL=\n",
+		},
+		{
+			name: "existing notification URLs only",
+			args: []string{
+				"--notification-url", "discord://token@webhookid",
+				"--notification-url", "logger://",
+			},
+			want: "WATCHTOWER_NOTIFICATION_URL=discord://token@webhookid logger://\n",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			run := runNotifyUpgradeUntilTimeout(t, tt.args...)
+			require.NoError(t, run.err)
+			assert.Equal(t, tt.want, run.content)
+			assert.Empty(t, run.remaining)
+		})
+	}
+}
+
+// TestNotifyUpgrade_Failures verifies the errors returned before the command
+// waits, and that no environment file is left behind.
+func TestNotifyUpgrade_Failures(t *testing.T) {
+	tests := []struct {
+		name string
+		args []string
+		// readOnlyDir makes the working directory read-only so the
+		// environment file cannot be created.
+		readOnlyDir bool
+		wantErr     error
+		wantMessage string
+	}{
+		{
+			name:        "invalid log format",
+			args:        []string{"--log-format", "bogus"},
+			wantMessage: "setup logging",
+		},
+		{
+			name: "invalid legacy notifier settings",
+			args: []string{
+				"--notifications", "slack",
+				"--notification-slack-hook-url", "https://hooks.slack.com/services/not-a-token",
+			},
+			wantMessage: "build notification URLs",
+		},
+		{
+			name:        "working directory is not writable",
+			readOnlyDir: true,
+			wantErr:     errCreateTempFile,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			dir := t.TempDir()
+			t.Chdir(dir)
+
+			if tt.readOnlyDir {
+				if runtime.GOOS == "windows" || os.Geteuid() == 0 {
+					t.Skip("needs a directory the current user cannot write to")
+				}
+
+				require.NoError(t, os.Chmod(dir, 0o500))
+				t.Cleanup(func() { _ = os.Chmod(dir, 0o700) })
+			}
+
+			cmd := newNotifyUpgradeCommand(t, tt.args...)
+
+			_, err := runNotifyUpgradeE(cmd, nil, logging.NopLogger())
+			require.Error(t, err)
+
+			if tt.wantErr != nil {
+				require.ErrorIs(t, err, tt.wantErr)
+			}
+
+			assert.Contains(t, err.Error(), tt.wantMessage)
+			assert.Empty(t, notifyUpgradeFiles(t))
+		})
+	}
+}
