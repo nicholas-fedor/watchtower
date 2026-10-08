@@ -3,7 +3,6 @@ package cmd
 import (
 	"os"
 	"os/signal"
-	"syscall"
 	"testing"
 
 	"github.com/nicholas-fedor/watchtower/internal/metrics"
@@ -21,7 +20,7 @@ import (
 // them outside every bubble, whatever order the tests run in.
 func TestMain(m *testing.M) {
 	signals := make(chan os.Signal, 1)
-	signal.Notify(signals, syscall.SIGUSR1)
+	signal.Notify(signals, os.Interrupt)
 	signal.Stop(signals)
 
 	metrics.Default()
