@@ -54,6 +54,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Chores
 
+- Update nicholas-fedor/actionlint-action action to v1.0.19 by @renovate[bot] in [#2672](https://github.com/nicholas-fedor/watchtower/pull/2672)
+- Update github.com/tonistiigi/fsutil digest to 0684b79 by @renovate[bot] in [#2671](https://github.com/nicholas-fedor/watchtower/pull/2671)
 - Update nicholas-fedor/govulncheck-action action to v1.1.0 by @renovate[bot] in [#2667](https://github.com/nicholas-fedor/watchtower/pull/2667)
 - Remove the codacy integration by @nicholas-fedor in [#2665](https://github.com/nicholas-fedor/watchtower/pull/2665)
 - Update nicholas-fedor/govulncheck-action action to v1.0.6 by @renovate[bot] in [#2660](https://github.com/nicholas-fedor/watchtower/pull/2660)
