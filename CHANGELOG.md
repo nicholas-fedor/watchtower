@@ -10,6 +10,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Detect dependency cycles on the graph used for sorting by @nicholas-fedor in [#2674](https://github.com/nicholas-fedor/watchtower/pull/2674)
 - Keep in-flight orchestrators during startup cleanup by @nicholas-fedor in [#2669](https://github.com/nicholas-fedor/watchtower/pull/2669)
 - Keep the partial report when an update fails by @nicholas-fedor in [#2663](https://github.com/nicholas-fedor/watchtower/pull/2663)
 - Run post-check hooks in replacement containers by @nicholas-fedor in [#2659](https://github.com/nicholas-fedor/watchtower/pull/2659)
