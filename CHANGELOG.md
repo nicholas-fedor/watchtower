@@ -44,11 +44,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Continuous Integration
 
+- Use the release environment's docker hub credentials by @nicholas-fedor in [#2647](https://github.com/nicholas-fedor/watchtower/pull/2647)
 - Update the changelog automation by @nicholas-fedor in [#2638](https://github.com/nicholas-fedor/watchtower/pull/2638)
 - Consolidate ci on github actions by @nicholas-fedor in [#2539](https://github.com/nicholas-fedor/watchtower/pull/2539)
 
 ### Chores
 
+- Update module golang.org/x/net to v0.60.0 by @renovate[bot] in [#2649](https://github.com/nicholas-fedor/watchtower/pull/2649)
 - Update module github.com/jedib0t/go-pretty/v6 to v6.8.3 by @renovate[bot] in [#2648](https://github.com/nicholas-fedor/watchtower/pull/2648)
 - Update module github.com/microsoft/go-winio to v0.6.3 by @renovate[bot] in [#2644](https://github.com/nicholas-fedor/watchtower/pull/2644)
 - Update module github.com/huandu/xstrings to v1.6.2 by @renovate[bot] in [#2645](https://github.com/nicholas-fedor/watchtower/pull/2645)
