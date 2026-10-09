@@ -773,8 +773,6 @@ func runProcessFlagAliasesHelper(t *testing.T, caseName string) (string, error) 
 	ctx, cancel := context.WithTimeout(t.Context(), 30*time.Second)
 	defer cancel()
 
-	// Codacy: static argv only (os.Args[0] is this test binary, case names are fixed literals).
-	// nosemgrep: go.lang.security.audit.dangerous-exec-command.dangerous-exec-command
 	cmd := exec.CommandContext(ctx, os.Args[0], "-test.run=^TestProcessFlagAliases_FatalCases$", "-test.v=false")
 
 	cmd.Env = append(os.Environ(), processFlagAliasesHelperEnv+"="+caseName)

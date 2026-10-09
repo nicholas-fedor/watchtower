@@ -8,7 +8,6 @@
 
   [![All Contributors](https://img.shields.io/github/all-contributors/nicholas-fedor/watchtower)](#contributors)
   [![codecov](https://codecov.io/gh/nicholas-fedor/watchtower/branch/main/graph/badge.svg)](https://codecov.io/gh/nicholas-fedor/watchtower)
-  [![Codacy Badge](https://app.codacy.com/project/badge/Grade/1c48cfb7646d4009aa8c6f71287670b8)](https://www.codacy.com/gh/nicholas-fedor/watchtower/dashboard?utm_source=github.com&amp;utm_medium=referral&amp;utm_content=nicholas-fedor/watchtower&amp;utm_campaign=Badge_Grade)
   [![Pulls from DockerHub](https://img.shields.io/docker/pulls/nickfedor/watchtower.svg)](https://hub.docker.com/r/nickfedor/watchtower)
   [![GoDoc](https://godoc.org/github.com/nicholas-fedor/watchtower?status.svg)](https://godoc.org/github.com/nicholas-fedor/watchtower)
   [![Ask DeepWiki](https://deepwiki.com/badge.svg)](https://deepwiki.com/nicholas-fedor/watchtower)
