@@ -373,8 +373,6 @@ func TestPreRun_Exit(t *testing.T) {
 			ctx, cancel := context.WithTimeout(t.Context(), 30*time.Second)
 			defer cancel()
 
-			// Codacy: static argv only (os.Args[0] is this test binary).
-			// nosemgrep: go.lang.security.audit.dangerous-exec-command.dangerous-exec-command
 			cmd := exec.CommandContext(ctx, os.Args[0], "-test.run=^TestPreRun_Exit$", "-test.v=false")
 
 			cmd.Env = append(os.Environ(), preRunExitHelperEnv+"="+tt.helperCase)
