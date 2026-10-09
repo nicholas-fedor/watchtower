@@ -637,24 +637,12 @@ func inspectOldContainer(
 		Str("old_name", oldContainer.Name()).
 		Msg("Inspected old container successfully")
 
-	// Propagate the container chain label to the old container's config.
-	// This intentionally mutates the cached container config in-place so that
-	// StartContainer's GetCreateConfig() will include the label on the new container.
-	//
-	// Note: This mutates the container object retrieved from GetContainer, which
-	// could affect other code paths holding a reference to the same object. This
-	// is safe here because the old container is about to be stopped and removed.
+	// Propagate the container chain label to the old container's config, so
+	// StartContainer's GetCreateConfig() includes the label on the new container.
 	if containerChain != "" {
-		containerInfo := oldContainer.ContainerInfo()
-		if containerInfo != nil && containerInfo.Config != nil {
-			if containerInfo.Config.Labels == nil {
-				containerInfo.Config.Labels = make(map[string]string)
-			}
-
-			// In-place mutation required: StartContainer reads labels from this
-			// config to build the new container. Any other references to this
-			// container object will also see this label after this assignment.
-			containerInfo.Config.Labels[container.ContainerChainLabel] = containerChain
+		concrete, ok := oldContainer.(*container.Container)
+		if ok {
+			concrete.SetLabel(container.ContainerChainLabel, containerChain)
 			clog.Debug().
 				Str("container_chain", containerChain).
 				Msg("Set container chain label on source container config")

@@ -2063,11 +2063,7 @@ func restartStaleContainer(
 					newChain = string(c.ID())
 				}
 
-				if containerInfo.Config.Labels == nil {
-					containerInfo.Config.Labels = make(map[string]string)
-				}
-
-				containerInfo.Config.Labels[container.ContainerChainLabel] = newChain
+				c.SetLabel(container.ContainerChainLabel, newChain)
 				log.Debug().
 					Fields(fields).
 					Str("container_chain", newChain).
