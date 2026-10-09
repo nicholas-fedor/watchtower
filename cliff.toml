@@ -122,11 +122,11 @@ commit_parsers = [
   { message = "^ci(\\(|!|:)", group = "<!-- 7 -->Continuous Integration" },
   { message = "^revert(\\(|!|:)", group = "<!-- 8 -->Reverted" },
   { message = "^chore(\\(|!|:)", group = "<!-- 9 -->Chores" },
-  # Commits that predate Conventional Commits.
+  # Commits that predate Conventional Commits, matched by their whole leading verb.
   { message = "(?i)^bump .* from .* to ", group = "<!-- 9 -->Chores" },
-  { message = "(?i)^(add|support)", group = "<!-- 0 -->Added" },
-  { message = "(?i)^fix", group = "<!-- 1 -->Fixed" },
-  { message = "(?i)^(remove|delete)", group = "<!-- 3 -->Removed" },
+  { message = "(?i)^(add(s|ed|ing)?|support(s|ed|ing)?)\\b", group = "<!-- 0 -->Added" },
+  { message = "(?i)^fix(es|ed|ing)?\\b", group = "<!-- 1 -->Fixed" },
+  { message = "(?i)^(remov(e|es|ed|ing)|delet(e|es|ed|ing))\\b", group = "<!-- 3 -->Removed" },
   { message = "^.*", group = "<!-- 3 -->Changed" },
 ]
 # Exclude commits that are not matched by any commit parser.

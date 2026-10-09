@@ -63,7 +63,8 @@ jobs:
 
       # Requests auto-merge, and merges directly when the repository has
       # auto-merge disabled, so the changelog stays fully automated. The
-      # branch, base and head commit checks keep it from merging anything else.
+      # branch, base and head commit checks keep it from merging anything other
+      # than the commit this run created.
       - name: Merge the Changelog Pull Request
         if: ${{ steps.create_pr.outputs.pull-request-number }}
         env:
@@ -72,6 +73,7 @@ jobs:
           PR_NUMBER: ${{ steps.create_pr.outputs.pull-request-number }}
           EXPECTED_BRANCH: docs/update-changelog
           EXPECTED_BASE: ${{ github.event.repository.default_branch }}
+          EXPECTED_HEAD_SHA: ${{ steps.create_pr.outputs.pull-request-head-sha }}
         run: |
           set -eu
           head_ref="$(gh pr view "$PR_NUMBER" --json headRefName --jq .headRefName)"
@@ -85,7 +87,11 @@ jobs:
             echo "::error::Refusing to merge a pull request into '$base_ref'."
             exit 1
           fi
-          if ! gh pr merge --auto --squash --match-head-commit "$head_sha" "$PR_NUMBER"; then
+          if [ "$head_sha" != "$EXPECTED_HEAD_SHA" ]; then
+            echo "::error::Refusing to merge, because the pull request head changed after this run created it."
+            exit 1
+          fi
+          if ! gh pr merge --auto --squash --match-head-commit "$EXPECTED_HEAD_SHA" "$PR_NUMBER"; then
             echo "Auto-merge is unavailable, so merging the pull request directly"
-            gh pr merge --squash --match-head-commit "$head_sha" "$PR_NUMBER"
+            gh pr merge --squash --match-head-commit "$EXPECTED_HEAD_SHA" "$PR_NUMBER"
           fi
