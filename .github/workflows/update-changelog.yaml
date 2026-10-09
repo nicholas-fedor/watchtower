@@ -12,12 +12,19 @@ on:
 permissions:
   contents: read # Set default read-only permissions
 
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   changelog:
+    name: Generate Changelog
     runs-on: ubuntu-latest
+    # The changelog describes the default branch, so manual runs from other branches do nothing.
+    if: github.ref_name == github.event.repository.default_branch
     permissions:
       contents: write # For committing changelog
-      pull-requests: write # For creating PR
+      pull-requests: write # For creating and merging the PR
     steps:
       - name: Harden the Runner (Step Security)
         uses: step-security/harden-runner@ccd8616d44fd3846e67624a50d5aad6d37bf2d25 # v2.22.1
@@ -54,13 +61,37 @@ jobs:
           body: "Automated changelog update"
           delete-branch: true
 
-      - name: Enable auto-merge
-        if: "${{ steps.create_pr.outputs.pull-request-number }}"
-        run: |
-          pr_number="${{ steps.create_pr.outputs.pull-request-number }}"
-          if ! gh pr merge --auto --squash "$pr_number"; then
-            echo "Auto-merge is unavailable; merging the clean pull request directly"
-            gh pr merge --squash "$pr_number"
-          fi
+      # Requests auto-merge, and merges directly when the repository has
+      # auto-merge disabled, so the changelog stays fully automated. The
+      # branch, base and head commit checks keep it from merging anything other
+      # than the commit this run created.
+      - name: Merge the Changelog Pull Request
+        if: ${{ steps.create_pr.outputs.pull-request-number }}
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_REPO: ${{ github.repository }}
+          PR_NUMBER: ${{ steps.create_pr.outputs.pull-request-number }}
+          EXPECTED_BRANCH: docs/update-changelog
+          EXPECTED_BASE: ${{ github.event.repository.default_branch }}
+          EXPECTED_HEAD_SHA: ${{ steps.create_pr.outputs.pull-request-head-sha }}
+        run: |
+          set -eu
+          head_ref="$(gh pr view "$PR_NUMBER" --json headRefName --jq .headRefName)"
+          base_ref="$(gh pr view "$PR_NUMBER" --json baseRefName --jq .baseRefName)"
+          head_sha="$(gh pr view "$PR_NUMBER" --json headRefOid --jq .headRefOid)"
+          if [ "$head_ref" != "$EXPECTED_BRANCH" ]; then
+            echo "::error::Refusing to merge a pull request from '$head_ref'."
+            exit 1
+          fi
+          if [ "$base_ref" != "$EXPECTED_BASE" ]; then
+            echo "::error::Refusing to merge a pull request into '$base_ref'."
+            exit 1
+          fi
+          if [ "$head_sha" != "$EXPECTED_HEAD_SHA" ]; then
+            echo "::error::Refusing to merge, because the pull request head changed after this run created it."
+            exit 1
+          fi
+          if ! gh pr merge --auto --squash --match-head-commit "$EXPECTED_HEAD_SHA" "$PR_NUMBER"; then
+            echo "Auto-merge is unavailable, so merging the pull request directly"
+            gh pr merge --squash --match-head-commit "$EXPECTED_HEAD_SHA" "$PR_NUMBER"
+          fi
