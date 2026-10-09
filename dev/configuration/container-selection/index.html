@@ -3086,6 +3086,12 @@ Without <code>--label-enable</code>, containers with this label set to <code>fal
 <p>When <code>--label-enable</code> is unset, containers without the <code>com.centurylinklabs.watchtower.enable</code> label or with it set to <code>true</code> are monitored, and those with <code>false</code> are excluded.</p>
 <p>When <code>--label-enable</code> is set, only containers with <code>true</code> are monitored, ignoring those with <code>false</code> or no label.</p>
 </div>
+<div class="admonition warning">
+<p class="admonition-title">Warning</p>
+<ul>
+<li>Dependencies on excluded containers are ignored. See <a href="../../advanced-features/linked-containers/#dependencies_on_unmonitored_containers">Dependencies on Unmonitored Containers</a>.</li>
+</ul>
+</div>
 <h2 id="disable_specific_containers">Disable Specific Containers<a class="headerlink" href="#disable_specific_containers" title="Permanent link">&para;</a></h2>
 <p>Excludes containers by container name from monitoring, even if they have the enable label set to <code>true</code>.</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a>            Argument: --disable-containers, -x
@@ -3096,6 +3102,12 @@ Without <code>--label-enable</code>, containers with this label set to <code>fal
 <div class="admonition note">
 <p class="admonition-title">Note</p>
 <p>Regex patterns are supported. See <a href="../../getting-started/container-selection/#regex_pattern_matching">Regex Pattern Matching</a> for details.</p>
+</div>
+<div class="admonition warning">
+<p class="admonition-title">Warning</p>
+<ul>
+<li>Dependencies on excluded containers are ignored. See <a href="../../advanced-features/linked-containers/#dependencies_on_unmonitored_containers">Dependencies on Unmonitored Containers</a>.</li>
+</ul>
 </div>
 <h2 id="enable_containers_by_label">Enable Containers by Label<a class="headerlink" href="#enable_containers_by_label" title="Permanent link">&para;</a></h2>
 <p>Restricts monitoring to containers that have at least one of the specified label key-value pairs.</p>
@@ -3114,6 +3126,12 @@ Use individual <code>key=value</code> pairs separated by commas.</p>
 <p>A label entry with an empty value (<code>key=</code>) performs a presence check: the label must exist on the container with any value.
 A non-empty value requires an exact match.</p>
 </div>
+<div class="admonition warning">
+<p class="admonition-title">Warning</p>
+<ul>
+<li>Dependencies on excluded containers are ignored. See <a href="../../advanced-features/linked-containers/#dependencies_on_unmonitored_containers">Dependencies on Unmonitored Containers</a>.</li>
+</ul>
+</div>
 <h2 id="disable_containers_by_label">Disable Containers by Label<a class="headerlink" href="#disable_containers_by_label" title="Permanent link">&para;</a></h2>
 <p>Excludes containers that have any of the specified label key-value pairs from monitoring.</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-6-1" name="__codelineno-6-1" href="#__codelineno-6-1"></a>            Argument: --disable-containers-by-label
@@ -3129,6 +3147,12 @@ A non-empty value requires an exact match.</p>
 <p class="admonition-title">Note</p>
 <p>A label entry with an empty value (<code>key=</code>) performs a presence check: the label must exist on the container with any value. A non-empty value requires an exact match.</p>
 </div>
+<div class="admonition warning">
+<p class="admonition-title">Warning</p>
+<ul>
+<li>Dependencies on excluded containers are ignored. See <a href="../../advanced-features/linked-containers/#dependencies_on_unmonitored_containers">Dependencies on Unmonitored Containers</a>.</li>
+</ul>
+</div>
 <h2 id="monitor_specific_images">Monitor Specific Images<a class="headerlink" href="#monitor_specific_images" title="Permanent link">&para;</a></h2>
 <p>Restricts monitoring to containers whose image name matches one of the supplied image name patterns, even if other selection criteria would include them.</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-7-1" name="__codelineno-7-1" href="#__codelineno-7-1"></a>            Argument: --monitor-image-names
@@ -3142,6 +3166,12 @@ A non-empty value requires an exact match.</p>
 Regex patterns are supported and anchored to the <strong>full</strong> image name.
 See <a href="../../getting-started/container-selection/#regex_pattern_matching">Regex Pattern Matching</a>
 for details.</p>
+</div>
+<div class="admonition warning">
+<p class="admonition-title">Warning</p>
+<ul>
+<li>Dependencies on excluded containers are ignored. See <a href="../../advanced-features/linked-containers/#dependencies_on_unmonitored_containers">Dependencies on Unmonitored Containers</a>.</li>
+</ul>
 </div>
 <h2 id="skip_specific_images">Skip Specific Images<a class="headerlink" href="#skip_specific_images" title="Permanent link">&para;</a></h2>
 <p>Excludes containers by image name pattern from monitoring, even if they have the enable label set to <code>true</code>.</p>
@@ -3157,6 +3187,12 @@ Regex patterns are supported and anchored to the <strong>full</strong> image nam
 See <a href="../../getting-started/container-selection/#regex_pattern_matching">Regex Pattern Matching</a>
 for details.</p>
 </div>
+<div class="admonition warning">
+<p class="admonition-title">Warning</p>
+<ul>
+<li>Dependencies on excluded containers are ignored. See <a href="../../advanced-features/linked-containers/#dependencies_on_unmonitored_containers">Dependencies on Unmonitored Containers</a>.</li>
+</ul>
+</div>
 <h2 id="scope_filter">Scope Filter<a class="headerlink" href="#scope_filter" title="Permanent link">&para;</a></h2>
 <p>Monitors containers with a <code>com.centurylinklabs.watchtower.scope</code> label matching the specified value, enabling multiple Watchtower instances.</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-9-1" name="__codelineno-9-1" href="#__codelineno-9-1"></a>            Argument: --scope
@@ -3171,6 +3207,12 @@ Without this flag, Watchtower monitors all containers regardless of scope.</p>
 <p>For self-updates, ensure all Watchtower containers share the same <code>com.centurylinklabs.watchtower.scope</code> label to guarantee cleanup of renamed containers and old images.
 Mismatched labels may prevent detection, leaving resources running.</p>
 <p>See <a href="../../advanced-features/running-multiple-instances/">Running Multiple Instances</a>.</p>
+</div>
+<div class="admonition warning">
+<p class="admonition-title">Warning</p>
+<ul>
+<li>Dependencies on excluded containers are ignored. See <a href="../../advanced-features/linked-containers/#dependencies_on_unmonitored_containers">Dependencies on Unmonitored Containers</a>.</li>
+</ul>
 </div>
 <h2 id="label_precedence">Label Precedence<a class="headerlink" href="#label_precedence" title="Permanent link">&para;</a></h2>
 <p>Allows container labels (e.g., <code>com.centurylinklabs.watchtower.monitor-only</code>, <code>com.centurylinklabs.watchtower.no-pull</code>) to override corresponding flags.</p>
@@ -3227,7 +3269,7 @@ When <a href="../update-behavior/#rolling_restart"><code>rolling-restart</code><
     <span class="md-icon" title="Last update">
       <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M21 13.1c-.1 0-.3.1-.4.2l-1 1 2.1 2.1 1-1c.2-.2.2-.6 0-.8l-1.3-1.3c-.1-.1-.2-.2-.4-.2m-1.9 1.8-6.1 6V23h2.1l6.1-6.1zM12.5 7v5.2l4 2.4-1 1L11 13V7zM11 21.9c-5.1-.5-9-4.8-9-9.9C2 6.5 6.5 2 12 2c5.3 0 9.6 4.1 10 9.3-.3-.1-.6-.2-1-.2s-.7.1-1 .2C19.6 7.2 16.2 4 12 4c-4.4 0-8 3.6-8 8 0 4.1 3.1 7.5 7.1 7.9l-.1.2z"/></svg>
     </span>
-    <span class="git-revision-date-localized-plugin git-revision-date-localized-plugin-timeago" title="September 15, 2026 15:20:27 UTC"><span class="timeago" datetime="2026-09-15T15:20:27+00:00" locale="en"></span></span><span class="git-revision-date-localized-plugin git-revision-date-localized-plugin-iso_date" title="September 15, 2026 15:20:27 UTC">2026-09-15</span>
+    <span class="git-revision-date-localized-plugin git-revision-date-localized-plugin-timeago" title="October 9, 2026 15:51:57 UTC"><span class="timeago" datetime="2026-10-09T15:51:57+00:00" locale="en"></span></span><span class="git-revision-date-localized-plugin git-revision-date-localized-plugin-iso_date" title="October 9, 2026 15:51:57 UTC">2026-10-09</span>
   </span>
 
     

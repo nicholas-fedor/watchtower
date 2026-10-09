@@ -2626,6 +2626,28 @@
   
 </li>
         
+          <li class="md-nav__item">
+  <a href="#restarting_dependent_containers" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Restarting Dependent Containers
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#dependencies_on_unmonitored_containers" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Dependencies on Unmonitored Containers
+      
+    </span>
+  </a>
+  
+</li>
+        
       </ul>
     </nav>
   
@@ -2806,10 +2828,21 @@
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
-  <a href="#updates_failing_due_to_circular_dependencies" class="md-nav__link">
+  <a href="#containers_skipped_due_to_circular_dependencies" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Updates Failing Due to Circular Dependencies
+        Containers Skipped Due to Circular Dependencies
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#ignored_depends-on_entries" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Ignored Depends-On Entries
       
     </span>
   </a>
@@ -3164,6 +3197,28 @@
   
 </li>
         
+          <li class="md-nav__item">
+  <a href="#restarting_dependent_containers" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Restarting Dependent Containers
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#dependencies_on_unmonitored_containers" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Dependencies on Unmonitored Containers
+      
+    </span>
+  </a>
+  
+</li>
+        
       </ul>
     </nav>
   
@@ -3344,10 +3399,21 @@
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
-  <a href="#updates_failing_due_to_circular_dependencies" class="md-nav__link">
+  <a href="#containers_skipped_due_to_circular_dependencies" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Updates Failing Due to Circular Dependencies
+        Containers Skipped Due to Circular Dependencies
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#ignored_depends-on_entries" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Ignored Depends-On Entries
       
     </span>
   </a>
@@ -3444,10 +3510,12 @@ It automatically detects container dependencies through various mechanisms and u
 </code></pre></div>
 <p>This label accepts a comma-separated list of container names that must be available before this container starts.
 This supports referencing containers from other Docker Compose projects or stacks, enabling cross-project dependency management.</p>
+<p>An entry may also name a Docker Compose service, such as <code>db</code> or <code>my-database</code>, or a project-qualified service, such as <code>myproject-db</code>.
+A service name resolves to every replica of that service.</p>
 <div class="admonition warning">
 <p class="admonition-title">Warning</p>
 <p>Use unique, non-ambiguous source container names both in the Docker Compose configuration and when specifying dependencies in the <code>com.centurylinklabs.watchtower.depends-on</code> label to ensure correct dependency resolution and behavior across Docker Compose projects/stacks.
-Ambiguous names can lead to warnings and skipped updates to prevent non-deterministic behavior.</p>
+An entry that names no container, or a service name used by more than one service (such as <code>db</code> in two Compose projects), is ignored and logged as a warning.</p>
 </div>
 <h4 id="docker_compose_depends-on_label">Docker Compose Depends-On Label<a class="headerlink" href="#docker_compose_depends-on_label" title="Permanent link">&para;</a></h4>
 <p>Watchtower automatically recognizes Docker Compose's <code>depends_on</code> relationships:</p>
@@ -3484,13 +3552,13 @@ Ambiguous names can lead to warnings and skipped updates to prevent non-determin
 <p>Watchtower uses topological sorting to determine the correct update order. This algorithm:</p>
 <ul>
 <li>Builds a dependency graph from all detected relationships</li>
-<li>Detects cycles (failing with a circular dependency error)</li>
+<li>Detects cycles and sets aside every container in one</li>
 <li>Produces a linear ordering where dependencies precede dependents</li>
 </ul>
 <div class="admonition warning">
 <p class="admonition-title">Warning</p>
-<p>Circular dependencies between containers will cause the update process to fail with an error.
-Ensure your dependency graph is acyclic.</p>
+<p>Containers in a circular dependency are skipped and reported as skipped, while the rest of the update continues.
+Ensure your dependency graph is acyclic so those containers are updated.</p>
 </div>
 <h3 id="update_order">Update Order<a class="headerlink" href="#update_order" title="Permanent link">&para;</a></h3>
 <p>When updates are needed, Watchtower follows this sequence:</p>
@@ -3505,6 +3573,21 @@ Ensure your dependency graph is acyclic.</p>
 <ul>
 <li>Dependent services are stopped before their dependencies change</li>
 <li>Dependencies are fully restarted before dependents attempt to connect</li>
+</ul>
+<h3 id="restarting_dependent_containers">Restarting Dependent Containers<a class="headerlink" href="#restarting_dependent_containers" title="Permanent link">&para;</a></h3>
+<p>When a container is updated, Watchtower also restarts the containers that depend on it, directly or through other restarted containers, without updating their images.
+Dependents are found with the same dependency graph that orders the update, so the containers restarted and the update order always agree.</p>
+<ul>
+<li>A Watchtower container restarts when a container it depends on restarts, such as a VPN container it shares a network with.</li>
+<li>A container that names a Watchtower container exactly, by container name or ID, restarts when that Watchtower container is updated. The name without its replica number (such as <code>infra-watchtower</code> for <code>infra-watchtower-1</code>) also works when exactly one Watchtower container has it, so it names nothing when the service runs several replicas.</li>
+<li>Containers in a circular dependency are neither updated nor restarted.</li>
+</ul>
+<h3 id="dependencies_on_unmonitored_containers">Dependencies on Unmonitored Containers<a class="headerlink" href="#dependencies_on_unmonitored_containers" title="Permanent link">&para;</a></h3>
+<p>A container that Watchtower does not monitor is left alone, including when a monitored container depends on it.
+Containers are excluded from monitoring by the <a href="../../configuration/container-selection/">container selection</a> options, such as the enable label, the disable lists, image filters, and scopes.</p>
+<ul>
+<li>A dependency on an unmonitored container is ignored when ordering updates and restarting dependents.</li>
+<li>A dependency that names an unmonitored container exactly never resolves to a different, monitored container with a similar name.</li>
 </ul>
 <h2 id="configuration">Configuration<a class="headerlink" href="#configuration" title="Permanent link">&para;</a></h2>
 <h3 id="automatic_detection">Automatic Detection<a class="headerlink" href="#automatic_detection" title="Permanent link">&para;</a></h3>
@@ -3698,12 +3781,18 @@ Ensure your dependency graph is acyclic.</p>
 </div>
 <h2 id="troubleshooting">Troubleshooting<a class="headerlink" href="#troubleshooting" title="Permanent link">&para;</a></h2>
 <h3 id="common_issues">Common Issues<a class="headerlink" href="#common_issues" title="Permanent link">&para;</a></h3>
-<h4 id="updates_failing_due_to_circular_dependencies">Updates Failing Due to Circular Dependencies<a class="headerlink" href="#updates_failing_due_to_circular_dependencies" title="Permanent link">&para;</a></h4>
-<div class="admonition error">
-<p class="admonition-title">Error</p>
-<p>If you see "circular reference detected" errors, check your dependency declarations for cycles.</p>
+<h4 id="containers_skipped_due_to_circular_dependencies">Containers Skipped Due to Circular Dependencies<a class="headerlink" href="#containers_skipped_due_to_circular_dependencies" title="Permanent link">&para;</a></h4>
+<div class="admonition warning">
+<p class="admonition-title">Warning</p>
+<p>If you see "Skipping container update (circular dependency)" warnings, check your dependency declarations for cycles.</p>
 </div>
 <p><strong>Solution</strong>: Review and remove circular dependencies. For example, if A depends on B and B depends on A, remove one of the dependencies or restructure your services.</p>
+<h4 id="ignored_depends-on_entries">Ignored Depends-On Entries<a class="headerlink" href="#ignored_depends-on_entries" title="Permanent link">&para;</a></h4>
+<div class="admonition warning">
+<p class="admonition-title">Warning</p>
+<p>If you see "Ignoring depends-on entry that does not name exactly one container" warnings, the named <code>com.centurylinklabs.watchtower.depends-on</code> entry matched no container, or matched more than one service.</p>
+</div>
+<p><strong>Solution</strong>: Use the exact container name, or a project-qualified service name such as <code>myproject-db</code>.</p>
 <h4 id="containers_not_updating_in_expected_order">Containers Not Updating in Expected Order<a class="headerlink" href="#containers_not_updating_in_expected_order" title="Permanent link">&para;</a></h4>
 <p><strong>Check</strong>:</p>
 <ul>
@@ -3755,7 +3844,7 @@ Ensure your dependency graph is acyclic.</p>
     <span class="md-icon" title="Last update">
       <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M21 13.1c-.1 0-.3.1-.4.2l-1 1 2.1 2.1 1-1c.2-.2.2-.6 0-.8l-1.3-1.3c-.1-.1-.2-.2-.4-.2m-1.9 1.8-6.1 6V23h2.1l6.1-6.1zM12.5 7v5.2l4 2.4-1 1L11 13V7zM11 21.9c-5.1-.5-9-4.8-9-9.9C2 6.5 6.5 2 12 2c5.3 0 9.6 4.1 10 9.3-.3-.1-.6-.2-1-.2s-.7.1-1 .2C19.6 7.2 16.2 4 12 4c-4.4 0-8 3.6-8 8 0 4.1 3.1 7.5 7.1 7.9l-.1.2z"/></svg>
     </span>
-    <span class="git-revision-date-localized-plugin git-revision-date-localized-plugin-timeago" title="July 14, 2026 14:36:11 UTC"><span class="timeago" datetime="2026-07-14T14:36:11+00:00" locale="en"></span></span><span class="git-revision-date-localized-plugin git-revision-date-localized-plugin-iso_date" title="July 14, 2026 14:36:11 UTC">2026-07-14</span>
+    <span class="git-revision-date-localized-plugin git-revision-date-localized-plugin-timeago" title="October 9, 2026 15:51:57 UTC"><span class="timeago" datetime="2026-10-09T15:51:57+00:00" locale="en"></span></span><span class="git-revision-date-localized-plugin git-revision-date-localized-plugin-iso_date" title="October 9, 2026 15:51:57 UTC">2026-10-09</span>
   </span>
 
     
