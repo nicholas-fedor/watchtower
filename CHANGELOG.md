@@ -52,6 +52,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Chores
 
+- Update nicholas-fedor/govulncheck-action action to v1.0.6 by @renovate[bot] in [#2660](https://github.com/nicholas-fedor/watchtower/pull/2660)
 - Update module github.com/knadh/koanf/providers/env to v2 by @renovate[bot] in [#2653](https://github.com/nicholas-fedor/watchtower/pull/2653)
 - Update module github.com/brunoga/deep to v6 by @renovate[bot] in [#2652](https://github.com/nicholas-fedor/watchtower/pull/2652)
 - Update module golang.org/x/net to v0.60.0 by @renovate[bot] in [#2649](https://github.com/nicholas-fedor/watchtower/pull/2649)
