@@ -25,6 +25,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Chores
 
+- Update module github.com/knadh/koanf/parsers/yaml to v1.1.1 by @renovate[bot] in [#2630](https://github.com/nicholas-fedor/watchtower/pull/2630)
 - Update github.com/azure/go-ansiterm digest to e8a9660 by @renovate[bot] in [#2620](https://github.com/nicholas-fedor/watchtower/pull/2620)
 - Update golang.org/x/exp digest to f45ad48 by @renovate[bot] in [#2621](https://github.com/nicholas-fedor/watchtower/pull/2621)
 - Enable gocyclo with a complexity limit of 25 by @nicholas-fedor in [#2616](https://github.com/nicholas-fedor/watchtower/pull/2616)
