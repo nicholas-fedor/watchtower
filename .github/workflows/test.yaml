@@ -65,9 +65,6 @@ jobs:
   race:
     name: Run Tests with the Race Detector
     runs-on: ubuntu-latest
-    env:
-      # Packages with known data races. Remove each one as its races are fixed.
-      RACE_EXCLUDE: /internal/actions$
     steps:
       - name: Harden the Runner (Step Security)
         uses: step-security/harden-runner@ccd8616d44fd3846e67624a50d5aad6d37bf2d25 # v2.22.1
@@ -87,12 +84,4 @@ jobs:
           go-version-file: go.mod
 
       - name: Run Tests with the Race Detector
-        run: |
-          all_packages="$(go list ./...)"
-          packages="$(grep -Ev "${RACE_EXCLUDE}" <<< "${all_packages}")"
-          if [ -z "${packages}" ]; then
-            echo "No packages left to test after applying RACE_EXCLUDE" >&2
-            exit 1
-          fi
-          # shellcheck disable=SC2086
-          go test -race -timeout 120s ${packages}
+        run: go test -race -timeout 120s ./...
