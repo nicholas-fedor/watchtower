@@ -25,6 +25,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Chores
 
+- Update module github.com/knadh/koanf/v2 to v2.3.8 by @renovate[bot] in [#2640](https://github.com/nicholas-fedor/watchtower/pull/2640)
 - Update module github.com/knadh/koanf/providers/posflag to v1.0.2 by @renovate[bot] in [#2635](https://github.com/nicholas-fedor/watchtower/pull/2635)
 - Update github.com/azure/go-ansiterm digest to 65faa4b by @renovate[bot] in [#2634](https://github.com/nicholas-fedor/watchtower/pull/2634)
 - Update module github.com/knadh/koanf/maps to v0.1.3 by @renovate[bot] in [#2629](https://github.com/nicholas-fedor/watchtower/pull/2629)
