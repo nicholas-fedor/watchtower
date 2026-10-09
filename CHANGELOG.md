@@ -25,6 +25,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Chores
 
+- Update module github.com/knadh/koanf/providers/posflag to v1.0.2 by @renovate[bot] in [#2635](https://github.com/nicholas-fedor/watchtower/pull/2635)
 - Update github.com/azure/go-ansiterm digest to 65faa4b by @renovate[bot] in [#2634](https://github.com/nicholas-fedor/watchtower/pull/2634)
 - Update module github.com/knadh/koanf/maps to v0.1.3 by @renovate[bot] in [#2629](https://github.com/nicholas-fedor/watchtower/pull/2629)
 - Update module github.com/knadh/koanf/parsers/yaml to v1.1.1 by @renovate[bot] in [#2630](https://github.com/nicholas-fedor/watchtower/pull/2630)
@@ -57,6 +58,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Stop an old watchtower instance when an update detects it by @nicholas-fedor in [#2633](https://github.com/nicholas-fedor/watchtower/pull/2633)
 - Apply the registry tls flags by @nicholas-fedor in [#2627](https://github.com/nicholas-fedor/watchtower/pull/2627)
 - Fall back to the default template on parse errors by @nicholas-fedor in [#2625](https://github.com/nicholas-fedor/watchtower/pull/2625)
 - Remove the notify-upgrade file on windows by @nicholas-fedor in [#2603](https://github.com/nicholas-fedor/watchtower/pull/2603)
