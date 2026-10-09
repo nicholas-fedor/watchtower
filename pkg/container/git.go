@@ -1,6 +1,10 @@
 package container
 
 import (
+	"maps"
+
+	dockerContainer "github.com/moby/moby/api/types/container"
+
 	"github.com/nicholas-fedor/watchtower/pkg/container/git"
 )
 
@@ -38,11 +42,15 @@ func (c *Container) SetLabel(key, value string) {
 		return
 	}
 
-	if c.containerInfo.Config.Labels == nil {
-		c.containerInfo.Config.Labels = make(map[string]string)
-	}
+	c.replaceInspectLocked(func(info *dockerContainer.InspectResponse) {
+		labels := maps.Clone(info.Config.Labels)
+		if labels == nil {
+			labels = make(map[string]string, 1)
+		}
 
-	c.containerInfo.Config.Labels[key] = value
+		labels[key] = value
+		info.Config.Labels = labels
+	})
 }
 
 // DeleteLabel removes a container config label used on the next create.
@@ -60,11 +68,19 @@ func (c *Container) DeleteLabel(key string) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 
-	if c.containerInfo == nil || c.containerInfo.Config == nil || c.containerInfo.Config.Labels == nil {
+	if c.containerInfo == nil || c.containerInfo.Config == nil {
 		return
 	}
 
-	delete(c.containerInfo.Config.Labels, key)
+	if _, ok := c.containerInfo.Config.Labels[key]; !ok {
+		return
+	}
+
+	c.replaceInspectLocked(func(info *dockerContainer.InspectResponse) {
+		labels := maps.Clone(info.Config.Labels)
+		delete(labels, key)
+		info.Config.Labels = labels
+	})
 }
 
 // ApplyGitStamp writes git-last-commit and git-last-tag onto container create labels.

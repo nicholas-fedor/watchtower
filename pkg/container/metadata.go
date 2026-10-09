@@ -6,6 +6,8 @@ import (
 	"strconv"
 	"time"
 
+	dockerContainer "github.com/moby/moby/api/types/container"
+
 	"github.com/nicholas-fedor/watchtower/internal/util"
 	"github.com/nicholas-fedor/watchtower/pkg/container/git"
 	"github.com/nicholas-fedor/watchtower/pkg/types"
@@ -508,11 +510,13 @@ func (c *Container) GetContainerChain() (string, bool) {
 // Returns:
 //   - bool: True if watchtower label is "true", false otherwise.
 func (c *Container) IsWatchtower() bool {
+	info := c.ContainerInfo()
+
 	clogVal := c.logger().With().
 		Str("container", c.Name()).
 		Logger()
 	clog := &clogVal
-	isWatchtower := ContainsWatchtowerLabel(c.containerInfo.Config.Labels)
+	isWatchtower := ContainsWatchtowerLabel(info.Config.Labels)
 	clog.Debug().
 		Bool("is_watchtower", isWatchtower).
 		Msg("Checked if container is Watchtower")
@@ -525,6 +529,8 @@ func (c *Container) IsWatchtower() bool {
 // Returns:
 //   - string: Signal value, defaulting to "SIGTERM" if unset.
 func (c *Container) StopSignal() string {
+	info := c.ContainerInfo()
+
 	clogVal := c.logger().With().
 		Str("container", c.Name()).
 		Logger()
@@ -542,9 +548,9 @@ func (c *Container) StopSignal() string {
 	}
 
 	// Check Config
-	if c.containerInfo != nil && c.containerInfo.Config != nil &&
-		c.containerInfo.Config.StopSignal != "" {
-		signal = c.containerInfo.Config.StopSignal
+	if info != nil && info.Config != nil &&
+		info.Config.StopSignal != "" {
+		signal = info.Config.StopSignal
 		clog.Debug().
 			Str("signal", signal).
 			Msg("Retrieved stop signal from Config")
@@ -563,15 +569,17 @@ func (c *Container) StopSignal() string {
 // Returns:
 //   - *int: Timeout in seconds if set, nil if unset.
 func (c *Container) StopTimeout() *int {
+	info := c.ContainerInfo()
+
 	clogVal := c.logger().With().
 		Str("container", c.Name()).
 		Logger()
 	clog := &clogVal
 
 	// Check Config
-	if c.containerInfo != nil && c.containerInfo.Config != nil &&
-		c.containerInfo.Config.StopTimeout != nil {
-		timeout := *c.containerInfo.Config.StopTimeout
+	if info != nil && info.Config != nil &&
+		info.Config.StopTimeout != nil {
+		timeout := *info.Config.StopTimeout
 		clog.Debug().
 			Int("timeout", timeout).
 			Msg("Retrieved stop timeout from Config")
@@ -615,12 +623,24 @@ func ContainsWatchtowerLabel(labels map[string]string) bool {
 //   - string: Label value if present.
 //   - bool: True if label exists and is accessible, false otherwise.
 func (c *Container) getRawLabelValue(label string) (string, bool) {
-	if c.containerInfo == nil || c.containerInfo.Config == nil ||
-		c.containerInfo.Config.Labels == nil {
+	return labelValue(c.ContainerInfo(), label)
+}
+
+// labelValue retrieves a raw label value from inspect data.
+//
+// Parameters:
+//   - info: Inspect data, or nil.
+//   - label: The label key to retrieve the value from.
+//
+// Returns:
+//   - string: Label value if present.
+//   - bool: True if label exists and is accessible, false otherwise.
+func labelValue(info *dockerContainer.InspectResponse, label string) (string, bool) {
+	if info == nil || info.Config == nil || info.Config.Labels == nil {
 		return "", false
 	}
 
-	val, ok := c.containerInfo.Config.Labels[label]
+	val, ok := info.Config.Labels[label]
 
 	return val, ok
 }

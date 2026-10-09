@@ -3,6 +3,7 @@ package container
 import (
 	"context"
 	"fmt"
+	"maps"
 	"slices"
 	"strings"
 	"sync"
@@ -213,11 +214,13 @@ func (c *Container) ContainerInfo() *dockerContainer.InspectResponse {
 // Returns:
 //   - types.ContainerID: Container ID.
 func (c *Container) ID() types.ContainerID {
-	if c.containerInfo == nil {
+	info := c.ContainerInfo()
+
+	if info == nil {
 		return ""
 	}
 
-	return types.ContainerID(c.containerInfo.ID)
+	return types.ContainerID(info.ID)
 }
 
 // IsRunning checks if the container is currently running.
@@ -225,11 +228,13 @@ func (c *Container) ID() types.ContainerID {
 // Returns:
 //   - bool: True if running, false otherwise.
 func (c *Container) IsRunning() bool {
-	if c.containerInfo == nil || c.containerInfo.State == nil {
+	info := c.ContainerInfo()
+
+	if info == nil || info.State == nil {
 		return false
 	}
 
-	return c.containerInfo.State.Running
+	return info.State.Running
 }
 
 // IsRestarting checks if the container is currently restarting.
@@ -237,11 +242,13 @@ func (c *Container) IsRunning() bool {
 // Returns:
 //   - bool: True if restarting, false otherwise.
 func (c *Container) IsRestarting() bool {
-	if c.containerInfo == nil || c.containerInfo.State == nil {
+	info := c.ContainerInfo()
+
+	if info == nil || info.State == nil {
 		return false
 	}
 
-	return c.containerInfo.State.Restarting
+	return info.State.Restarting
 }
 
 // IsCreated checks if the container is in the Docker "created" state,
@@ -250,11 +257,13 @@ func (c *Container) IsRestarting() bool {
 // Returns:
 //   - bool: True if the container is in created state, false otherwise.
 func (c *Container) IsCreated() bool {
-	if c.containerInfo == nil || c.containerInfo.State == nil {
+	info := c.ContainerInfo()
+
+	if info == nil || info.State == nil {
 		return false
 	}
 
-	return c.containerInfo.State.Status == dockerContainer.StateCreated
+	return info.State.Status == dockerContainer.StateCreated
 }
 
 // Name returns the normalized name of the container.
@@ -315,7 +324,9 @@ func (c *Container) SetImageName(name string) {
 
 	// Keep Config.Image in sync so GetCreateConfig uses the pinned reference.
 	if c.containerInfo != nil && c.containerInfo.Config != nil {
-		c.containerInfo.Config.Image = normalized
+		c.replaceInspectLocked(func(info *dockerContainer.InspectResponse) {
+			info.Config.Image = normalized
+		})
 	}
 
 	c.imageName = normalized
@@ -395,8 +406,12 @@ func (c *Container) GetCreateConfig() *dockerContainer.Config {
 			config.Cmd = nil
 		}
 	}
-	// Clear HEALTHCHECK if it matches the image default.
+	// Clear HEALTHCHECK if it matches the image default. Work on a copy, as
+	// the health check is shared with the container's inspect data.
 	if config.Healthcheck != nil && imageConfig.Healthcheck != nil {
+		healthcheck := *config.Healthcheck
+		config.Healthcheck = &healthcheck
+
 		if slices.Equal(config.Healthcheck.Test, imageConfig.Healthcheck.Test) {
 			config.Healthcheck.Test = nil
 		}
@@ -436,7 +451,9 @@ func (c *Container) GetCreateConfig() *dockerContainer.Config {
 	config.Volumes = util.StructMapSubtract(config.Volumes, imageConfig.Volumes)
 
 	// Ensure ExposedPorts is initialized before removing image-exposed ports
-	// and adding ports from host config bindings.
+	// and adding ports from host config bindings. Work on a copy, as the map
+	// is shared with the container's inspect data.
+	config.ExposedPorts = maps.Clone(config.ExposedPorts)
 	if config.ExposedPorts == nil {
 		config.ExposedPorts = dockerNetwork.PortSet{}
 	}
@@ -586,28 +603,42 @@ func (c *Container) VerifyConfiguration() error {
 	}
 
 	// Ensure ExposedPorts is initialized if PortBindings exist.
-	if len(c.containerInfo.HostConfig.PortBindings) > 0 &&
-		c.containerInfo.Config.ExposedPorts == nil {
-		c.containerInfo.Config.ExposedPorts = dockerNetwork.PortSet{}
+	initExposed := len(c.containerInfo.HostConfig.PortBindings) > 0 &&
+		c.containerInfo.Config.ExposedPorts == nil
 
-		clog.Debug().Msg("Initialized ExposedPorts due to PortBindings")
-	}
-
-	// Validate port bindings for empty or malformed port values.
+	// Find port bindings with empty port values.
 	// Docker rejects ports with empty port numbers (e.g., "/tcp") with
 	// "invalid port range: value is empty" during ContainerCreate.
+	var emptyPorts []dockerNetwork.Port
+
 	for port := range c.containerInfo.HostConfig.PortBindings {
-		portStr := port.Port()
-
-		// Skip and remove completely empty port entries.
-		if portStr == "" {
-			clog.Warn().Msg("Skipping empty port binding and exposed port")
-
-			delete(c.containerInfo.HostConfig.PortBindings, port)
-			delete(c.containerInfo.Config.ExposedPorts, port)
-
-			continue
+		if port.Port() == "" {
+			emptyPorts = append(emptyPorts, port)
 		}
+	}
+
+	if initExposed || len(emptyPorts) > 0 {
+		c.replaceInspectLocked(func(info *dockerContainer.InspectResponse) {
+			exposed := maps.Clone(info.Config.ExposedPorts)
+			if exposed == nil && initExposed {
+				exposed = dockerNetwork.PortSet{}
+
+				clog.Debug().Msg("Initialized ExposedPorts due to PortBindings")
+			}
+
+			bindings := maps.Clone(info.HostConfig.PortBindings)
+
+			// Skip and remove completely empty port entries.
+			for _, port := range emptyPorts {
+				clog.Warn().Msg("Skipping empty port binding and exposed port")
+
+				delete(bindings, port)
+				delete(exposed, port)
+			}
+
+			info.Config.ExposedPorts = exposed
+			info.HostConfig.PortBindings = bindings
+		})
 	}
 
 	clog.Debug().Msg("Verified container configuration")
@@ -720,6 +751,32 @@ func (c *Container) Links(useComposeDependsOn bool) []string {
 	return filterSelfReferences(links, c.Name())
 }
 
+// replaceInspectLocked replaces the container's inspect data with a copy that
+// change modifies. Inspect data returned earlier by ContainerInfo is never
+// changed, so callers can read it without holding the lock. change receives
+// copies of Config and HostConfig, and must copy any map or slice in them
+// before changing it. The caller must hold c.mu for writing, and the inspect
+// data must not be nil.
+//
+// Parameters:
+//   - change: Modifies the copy of the inspect data.
+func (c *Container) replaceInspectLocked(change func(info *dockerContainer.InspectResponse)) {
+	info := *c.containerInfo
+
+	if info.Config != nil {
+		config := *info.Config
+		info.Config = &config
+	}
+
+	if info.HostConfig != nil {
+		hostConfig := *info.HostConfig
+		info.HostConfig = &hostConfig
+	}
+
+	change(&info)
+	c.containerInfo = &info
+}
+
 // imageNameLocked returns the cached image name. The caller must hold c.mu.
 func (c *Container) imageNameLocked() string {
 	// Re-resolve when inspect data was cleared after construction.
@@ -738,7 +795,9 @@ func (c *Container) imageNameLocked() string {
 //   - string: Image name with a tag (e.g., "alpine:latest").
 func (c *Container) resolveImageName() string {
 	// Prefer the Zodiac label for the image name.
-	imageName, ok := c.getLabelValue(zodiacLabel)
+	// The caller holds c.mu or is constructing the container, so the label
+	// is read from the field rather than through ContainerInfo.
+	imageName, ok := labelValue(c.containerInfo, zodiacLabel)
 	if !ok {
 		if c.containerInfo == nil || c.containerInfo.Config == nil {
 			c.logger().Warn().
@@ -926,6 +985,8 @@ func GetLinksFromWatchtowerLabel(c *Container, clog *zerolog.Logger) []string {
 // Returns:
 //   - []string: List of linked container names, empty if label not present
 func getLinksFromComposeLabel(c *Container, clog *zerolog.Logger) []string {
+	info := c.ContainerInfo()
+
 	composeDependsOnLabelValue := c.getLabelValueOrEmpty(compose.ComposeDependsOnLabel)
 	clog.Debug().
 		Str("label", compose.ComposeDependsOnLabel).
@@ -942,7 +1003,7 @@ func getLinksFromComposeLabel(c *Container, clog *zerolog.Logger) []string {
 
 	services := compose.ParseDependsOnLabel(clog, composeDependsOnLabelValue)
 
-	projectName := compose.GetProjectName(c.containerInfo.Config.Labels)
+	projectName := compose.GetProjectName(info.Config.Labels)
 
 	normalizedLinks := make([]string, 0, len(services))
 	for _, service := range services {
@@ -983,13 +1044,15 @@ func getLinksFromComposeLabel(c *Container, clog *zerolog.Logger) []string {
 // Returns:
 //   - []string: List of linked container names
 func getLinksFromHostConfig(c *Container, clog *zerolog.Logger) []string {
-	if c.containerInfo == nil || c.containerInfo.HostConfig == nil {
+	info := c.ContainerInfo()
+
+	if info == nil || info.HostConfig == nil {
 		return nil
 	}
 
-	projectName := compose.GetProjectName(c.containerInfo.Config.Labels)
+	projectName := compose.GetProjectName(info.Config.Labels)
 
-	hostConfig := c.containerInfo.HostConfig
+	hostConfig := info.HostConfig
 
 	// Pre-allocate for links plus a potential network mode dependency.
 	capacity := len(hostConfig.Links)
@@ -1056,11 +1119,13 @@ func getLinksFromHostConfig(c *Container, clog *zerolog.Logger) []string {
 // Returns:
 //   - []string: Normalized volumes-from container names or IDs.
 func volumesFromLinks(c *Container) []string {
-	if c.containerInfo == nil || c.containerInfo.HostConfig == nil {
+	info := c.ContainerInfo()
+
+	if info == nil || info.HostConfig == nil {
 		return nil
 	}
 
-	specs := c.containerInfo.HostConfig.VolumesFrom
+	specs := info.HostConfig.VolumesFrom
 	if len(specs) == 0 {
 		return nil
 	}
