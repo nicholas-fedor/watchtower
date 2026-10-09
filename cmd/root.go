@@ -10,6 +10,7 @@ import (
 
 	"github.com/rs/zerolog"
 	"github.com/spf13/cobra"
+	"github.com/spf13/viper"
 
 	dockerContainer "github.com/moby/moby/api/types/container"
 
@@ -18,6 +19,7 @@ import (
 	"github.com/nicholas-fedor/watchtower/internal/api/config"
 	"github.com/nicholas-fedor/watchtower/internal/api/handlers/events"
 	appConfig "github.com/nicholas-fedor/watchtower/internal/config"
+	registryConfig "github.com/nicholas-fedor/watchtower/internal/config/registry"
 	"github.com/nicholas-fedor/watchtower/internal/flags"
 	"github.com/nicholas-fedor/watchtower/internal/git"
 	"github.com/nicholas-fedor/watchtower/internal/logging"
@@ -222,6 +224,8 @@ func (p *process) preRun(cmd *cobra.Command, _ []string) {
 	if err != nil {
 		p.log.Fatal().Err(err).Msg("Failed to load configuration")
 	}
+
+	exportRegistrySettings(appCfg.Registry)
 
 	p.log.Debug().
 		Str("scheduleSpec", appCfg.Schedule.Spec).
@@ -891,6 +895,19 @@ func (p *process) logNotify(msg string, err error) {
 	notifier.StartNotification(false)
 	notifier.SendNotification(nil)
 	notifier.Close()
+}
+
+// exportRegistrySettings makes the loaded registry TLS settings visible to the
+// registry client, which reads them from the process-wide Viper instance by
+// their environment variable names. This lets the registry-tls-skip and
+// registry-tls-min-version configuration options take effect, with flags
+// taking precedence over environment variables as for every other setting.
+//
+// Parameters:
+//   - settings: Registry TLS settings from the loaded configuration.
+func exportRegistrySettings(settings registryConfig.Registry) {
+	viper.Set("WATCHTOWER_REGISTRY_TLS_SKIP", settings.TLSSkip)
+	viper.Set("WATCHTOWER_REGISTRY_TLS_MIN_VERSION", settings.TLSMinVersion)
 }
 
 // awaitDockerClient introduces a brief delay to ensure the Docker client is fully initialized.
