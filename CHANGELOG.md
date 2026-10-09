@@ -51,6 +51,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Continuous Integration
 
+- Run the race detector on every package by @nicholas-fedor in [#2696](https://github.com/nicholas-fedor/watchtower/pull/2696)
 - Generate the changelog from the latest default branch by @nicholas-fedor in [#2657](https://github.com/nicholas-fedor/watchtower/pull/2657)
 - Use the release environment's docker hub credentials by @nicholas-fedor in [#2647](https://github.com/nicholas-fedor/watchtower/pull/2647)
 - Update the changelog automation by @nicholas-fedor in [#2638](https://github.com/nicholas-fedor/watchtower/pull/2638)
