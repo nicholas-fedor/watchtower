@@ -937,9 +937,12 @@ func Update(
 	}
 
 	// Run post-check lifecycle hooks if enabled to finalize the update process.
+	// Passing nil lists the containers again, so the hooks run in the
+	// replacements of updated containers rather than in the removed originals
+	// held by the pre-update scan.
 	if config.LifecycleHooks {
 		log.Debug().Msg("Executing post-check lifecycle hooks")
-		lifecycle.ExecutePostChecks(log, ctx, client, config, filteredContainers)
+		lifecycle.ExecutePostChecks(log, ctx, client, config, nil)
 	}
 
 	// Add safeguard delay if Watchtower self-update pull failed
