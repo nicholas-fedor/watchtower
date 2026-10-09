@@ -778,6 +778,13 @@ var _ = ginkgo.Describe("Ephemeral Orchestrator", func() {
 	ginkgo.Describe("RemoveOrphanedOrchestrators", func() {
 		var ctx context.Context
 
+		// orphaned marks an orchestrator as running long past any self-update.
+		orphaned := WithContainerState(dockerContainer.State{
+			Running:   true,
+			Status:    "running",
+			StartedAt: "2000-01-01T00:00:00Z",
+		})
+
 		ginkgo.BeforeEach(func() {
 			ctx = context.Background()
 		})
@@ -826,6 +833,7 @@ var _ = ginkgo.Describe("Ephemeral Orchestrator", func() {
 					WithLabels(map[string]string{
 						OrchestratorLabel: "true",
 					}),
+					orphaned,
 				)
 
 				mockAPIClient := mockContainer.NewMockClient(ginkgo.GinkgoT())
@@ -855,6 +863,7 @@ var _ = ginkgo.Describe("Ephemeral Orchestrator", func() {
 					WithLabels(map[string]string{
 						OrchestratorLabel: "true",
 					}),
+					orphaned,
 				)
 				orch2 := MockContainer(
 					WithID("orch002"),
@@ -862,6 +871,7 @@ var _ = ginkgo.Describe("Ephemeral Orchestrator", func() {
 					WithLabels(map[string]string{
 						OrchestratorLabel: "true",
 					}),
+					orphaned,
 				)
 				regular := MockContainer(
 					WithID("regular1"),
@@ -918,6 +928,7 @@ var _ = ginkgo.Describe("Ephemeral Orchestrator", func() {
 					WithLabels(map[string]string{
 						OrchestratorLabel: "true",
 					}),
+					orphaned,
 				)
 				orch2 := MockContainer(
 					WithID("orch002"),
@@ -925,6 +936,7 @@ var _ = ginkgo.Describe("Ephemeral Orchestrator", func() {
 					WithLabels(map[string]string{
 						OrchestratorLabel: "true",
 					}),
+					orphaned,
 				)
 
 				mockAPIClient := mockContainer.NewMockClient(ginkgo.GinkgoT())
