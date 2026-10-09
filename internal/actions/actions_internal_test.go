@@ -184,11 +184,23 @@ var _ = ginkgo.Describe("restartStaleContainer", func() {
 })
 
 var _ = ginkgo.Describe("handleUpdateResult", func() {
-	ginkgo.It("should return zero metric when error is not nil", func() {
-		mockReport := mockTypes.NewMockReport(ginkgo.GinkgoT())
+	ginkgo.It("should return zero metric when error is not nil and there is no report", func() {
 		err := errors.New("test error")
-		result := handleUpdateResult(testLogger(), mockReport, err, nil)
+		result := handleUpdateResult(testLogger(), nil, err, nil)
 		gomega.Expect(result).To(gomega.Equal(&metrics.Metric{Scanned: 0, Updated: 0, Failed: 0}))
+	})
+
+	ginkgo.It("should return the partial report's counts when error is not nil", func() {
+		mockReport := mockTypes.NewMockReport(ginkgo.GinkgoT())
+		mockReport.EXPECT().Scanned().Return(make([]types.ContainerReport, 3))
+		mockReport.EXPECT().Updated().Return(make([]types.ContainerReport, 1))
+		mockReport.EXPECT().Failed().Return(make([]types.ContainerReport, 2))
+		mockReport.EXPECT().Restarted().Return(nil)
+		mockReport.EXPECT().Skipped().Return(nil)
+
+		err := errors.New("rolling restart canceled")
+		result := handleUpdateResult(testLogger(), mockReport, err, nil)
+		gomega.Expect(result).To(gomega.Equal(&metrics.Metric{Scanned: 3, Updated: 1, Failed: 2}))
 	})
 
 	ginkgo.It("should return zero metric when result is nil", func() {
@@ -207,25 +219,38 @@ var _ = ginkgo.Describe("handleUpdateResult", func() {
 		gomega.Expect(result).To(gomega.BeNil())
 	})
 
-	ginkgo.It("should send notification when error occurs and notifier is provided", func() {
+	ginkgo.It("should send an empty report when error occurs without a report", func() {
 		// Create a mock notifier that tracks if SendNotification was called
 		mockNotifier := mockTypes.NewMockNotifier(ginkgo.GinkgoT())
 		mockNotifier.EXPECT().SendNotification(emptyReport{}).Times(1)
 
 		// Call handleUpdateResult with an error and the mock notifier
-		mockReport := mockTypes.NewMockReport(ginkgo.GinkgoT())
 		err := errors.New("dependency resolution error")
-		result := handleUpdateResult(testLogger(), mockReport, err, mockNotifier)
+		result := handleUpdateResult(testLogger(), nil, err, mockNotifier)
 
 		// Verify we got the expected metric
 		gomega.Expect(result).To(gomega.Equal(&metrics.Metric{Scanned: 0, Updated: 0, Failed: 0}))
 	})
 
+	ginkgo.It("should send the partial report when error occurs after some work", func() {
+		mockReport := mockTypes.NewMockReport(ginkgo.GinkgoT())
+		mockReport.EXPECT().Scanned().Return(nil)
+		mockReport.EXPECT().Updated().Return(nil)
+		mockReport.EXPECT().Failed().Return(nil)
+		mockReport.EXPECT().Restarted().Return(nil)
+		mockReport.EXPECT().Skipped().Return(nil)
+
+		mockNotifier := mockTypes.NewMockNotifier(ginkgo.GinkgoT())
+		mockNotifier.EXPECT().SendNotification(mockReport).Times(1)
+
+		err := errors.New("rolling restart canceled")
+		handleUpdateResult(testLogger(), mockReport, err, mockNotifier)
+	})
+
 	ginkgo.It("should not send notification when error occurs and notifier is nil", func() {
 		// Call handleUpdateResult with an error and nil notifier
-		mockReport := mockTypes.NewMockReport(ginkgo.GinkgoT())
 		err := errors.New("dependency resolution error")
-		result := handleUpdateResult(testLogger(), mockReport, err, nil)
+		result := handleUpdateResult(testLogger(), nil, err, nil)
 
 		// Verify we got the expected metric
 		gomega.Expect(result).To(gomega.Equal(&metrics.Metric{Scanned: 0, Updated: 0, Failed: 0}))

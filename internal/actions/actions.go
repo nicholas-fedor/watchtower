@@ -123,28 +123,9 @@ func RunUpdatesWithNotifications(
 		return &metrics.Metric{}
 	}
 
-	// Process update result, return metric on failure
-	metric := handleUpdateResult(log, result, err, params.Notifier)
-	if metric != nil {
-		if params.EventBroadcaster != nil {
-			errMsg := "unknown error"
-			if err != nil {
-				errMsg = err.Error()
-			}
-
-			params.EventBroadcaster.Publish(events.Event{
-				Type:      "scan_failed",
-				Timestamp: time.Now().UTC(),
-				Data: events.ScanFailedData{
-					Error: errMsg,
-				},
-			})
-		}
-
-		return metric
-	}
-
-	// Perform image cleanup if enabled.
+	// Perform image cleanup if enabled. This runs before the result is checked,
+	// so the old images of containers replaced before an update error are
+	// still removed.
 	cleanedImages := performImageCleanup(log,
 		ctx,
 		params.Client,
@@ -172,6 +153,27 @@ func RunUpdatesWithNotifications(
 				Images: entries,
 			},
 		})
+	}
+
+	// Process update result, return metric on failure
+	metric := handleUpdateResult(log, result, err, params.Notifier)
+	if metric != nil {
+		if params.EventBroadcaster != nil {
+			errMsg := "unknown error"
+			if err != nil {
+				errMsg = err.Error()
+			}
+
+			params.EventBroadcaster.Publish(events.Event{
+				Type:      "scan_failed",
+				Timestamp: time.Now().UTC(),
+				Data: events.ScanFailedData{
+					Error: errMsg,
+				},
+			})
+		}
+
+		return metric
 	}
 
 	// Log update report details for debugging
@@ -234,17 +236,19 @@ func (emptyReport) All() []types.ContainerReport       { return nil }
 // handleUpdateResult processes the result of an update operation and returns an appropriate metric.
 //
 // It checks for errors or nil results, logging accordingly. If an error occurred, it sends a
-// notification via the provided notifier (if not nil) to alert about the failure. On error or
-// nil result, it returns a zero metric to indicate the failure state. On success, it returns nil
-// to indicate continuation of the update process.
+// notification via the provided notifier (if not nil) to alert about the failure. An update that
+// fails partway still returns the report of the work done before the error, so that report is
+// notified and counted. On error or nil result, it returns a non-nil metric to indicate the
+// failure state. On success, it returns nil to indicate continuation of the update process.
 //
 // Parameters:
-//   - result: The report from the update operation.
+//   - result: The report from the update operation. It may be partial when err is non-nil.
 //   - err: Any error encountered during the update.
 //   - notifier: The notification system for sending error alerts. It may be nil.
 //
 // Returns:
-//   - *metrics.Metric: A zero metric if an error occurred or result is nil, nil otherwise.
+//   - *metrics.Metric: On error, the counts of the partial report, or a zero metric when there
+//     is none. A zero metric when result is nil without an error. Nil on success.
 func handleUpdateResult(log *zerolog.Logger, result types.Report, err error, notifier types.Notifier) *metrics.Metric {
 	// Check for errors during update execution
 	if err != nil {
@@ -252,16 +256,18 @@ func handleUpdateResult(log *zerolog.Logger, result types.Report, err error, not
 			Err(err).
 			Msg("Update execution failed")
 
-		// Send notification about the error
-		if notifier != nil {
-			notifier.SendNotification(emptyReport{})
+		// Without a partial report, the notification still carries the error.
+		report := result
+		if report == nil {
+			report = emptyReport{}
 		}
 
-		return &metrics.Metric{
-			Scanned: 0,
-			Updated: 0,
-			Failed:  0,
+		// Send notification about the error
+		if notifier != nil {
+			notifier.SendNotification(report)
 		}
+
+		return metrics.NewMetric(report)
 	}
 
 	// Check if update result is nil
