@@ -38,12 +38,11 @@ func defaultTestUpdateParams(filter types.Filter) types.UpdateParams {
 
 var _ = ginkgo.Describe("Actions", func() {
 	ginkgo.Describe("handleUpdateResult", func() {
-		ginkgo.When("given an error", func() {
+		ginkgo.When("given an error without a report", func() {
 			ginkgo.It("should return a zero metric", func() {
-				result := &mockTypes.MockReport{}
 				err := errors.New("test error")
 
-				metric := handleUpdateResult(testLogger(), result, err, nil)
+				metric := handleUpdateResult(testLogger(), nil, err, nil)
 				gomega.Expect(metric).NotTo(gomega.BeNil())
 				gomega.Expect(metric.Scanned).To(gomega.Equal(0))
 				gomega.Expect(metric.Updated).To(gomega.Equal(0))
