@@ -56,7 +56,7 @@ func BenchmarkNewDependencyGraph(b *testing.B) {
 			b.ReportAllocs()
 
 			for b.Loop() {
-				_, err := NewDependencyGraph(benchLog, containers, true)
+				_, err := NewDependencyGraph(benchLog, containers, nil, true)
 				if err != nil {
 					b.Fatalf("NewDependencyGraph: %v", err)
 				}
@@ -70,7 +70,7 @@ func BenchmarkNewDependencyGraph(b *testing.B) {
 func BenchmarkDependencyGraph_CycleMembers(b *testing.B) {
 	for _, tc := range cycleBenchmarkCases() {
 		b.Run(tc.name, func(b *testing.B) {
-			graph, err := NewDependencyGraph(testLog(), tc.containers(), true)
+			graph, err := NewDependencyGraph(testLog(), tc.containers(), nil, true)
 			if err != nil {
 				b.Fatalf("NewDependencyGraph: %v", err)
 			}
@@ -106,7 +106,7 @@ func BenchmarkDependencyGraph_Sort(b *testing.B) {
 			benchLog := testLog()
 			sorted := make([]types.Container, len(subset))
 
-			graph, err := NewDependencyGraph(benchLog, all, true)
+			graph, err := NewDependencyGraph(benchLog, all, nil, true)
 			if err != nil {
 				b.Fatalf("NewDependencyGraph: %v", err)
 			}
@@ -207,7 +207,7 @@ func BenchmarkScanOrdering(b *testing.B) {
 			b.ReportAllocs()
 
 			for b.Loop() {
-				graph, err := NewDependencyGraph(benchLog, all, true)
+				graph, err := NewDependencyGraph(benchLog, all, nil, true)
 				if err != nil {
 					b.Fatalf("NewDependencyGraph: %v", err)
 				}

@@ -37,9 +37,12 @@ LABEL com.centurylinklabs.watchtower.depends-on="database,redis"
 This label accepts a comma-separated list of container names that must be available before this container starts.
 This supports referencing containers from other Docker Compose projects or stacks, enabling cross-project dependency management.
 
+An entry may also name a Docker Compose service, such as `db` or `my-database`, or a project-qualified service, such as `myproject-db`.
+A service name resolves to every replica of that service.
+
 !!! Warning
     Use unique, non-ambiguous source container names both in the Docker Compose configuration and when specifying dependencies in the `com.centurylinklabs.watchtower.depends-on` label to ensure correct dependency resolution and behavior across Docker Compose projects/stacks.
-    Ambiguous names can lead to warnings and skipped updates to prevent non-deterministic behavior.
+    An entry that names no container, or a service name used by more than one service (such as `db` in two Compose projects), is ignored and logged as a warning.
 
 #### Docker Compose Depends-On Label
 
@@ -90,12 +93,12 @@ docker run --network container:database nginx
 Watchtower uses topological sorting to determine the correct update order. This algorithm:
 
 - Builds a dependency graph from all detected relationships
-- Detects cycles (failing with a circular dependency error)
+- Detects cycles and sets aside every container in one
 - Produces a linear ordering where dependencies precede dependents
 
 !!! Warning
-    Circular dependencies between containers will cause the update process to fail with an error.
-    Ensure your dependency graph is acyclic.
+    Containers in a circular dependency are skipped and reported as skipped, while the rest of the update continues.
+    Ensure your dependency graph is acyclic so those containers are updated.
 
 ### Update Order
 
@@ -111,6 +114,23 @@ This ensures that:
 
 - Dependent services are stopped before their dependencies change
 - Dependencies are fully restarted before dependents attempt to connect
+
+### Restarting Dependent Containers
+
+When a container is updated, Watchtower also restarts the containers that depend on it, directly or through other restarted containers, without updating their images.
+Dependents are found with the same dependency graph that orders the update, so the containers restarted and the update order always agree.
+
+- A Watchtower container restarts when a container it depends on restarts, such as a VPN container it shares a network with.
+- A container that names a Watchtower container exactly, by container name or ID, restarts when that Watchtower container is updated. The name without its replica number (such as `infra-watchtower` for `infra-watchtower-1`) also works when exactly one Watchtower container has it, so it names nothing when the service runs several replicas.
+- Containers in a circular dependency are neither updated nor restarted.
+
+### Dependencies on Unmonitored Containers
+
+A container that Watchtower does not monitor is left alone, including when a monitored container depends on it.
+Containers are excluded from monitoring by the [container selection](../../configuration/container-selection/index.md) options, such as the enable label, the disable lists, image filters, and scopes.
+
+- A dependency on an unmonitored container is ignored when ordering updates and restarting dependents.
+- A dependency that names an unmonitored container exactly never resolves to a different, monitored container with a similar name.
 
 ## Configuration
 
@@ -326,12 +346,19 @@ Containers using `network_mode: service:container`:
 
 ### Common Issues
 
-#### Updates Failing Due to Circular Dependencies
+#### Containers Skipped Due to Circular Dependencies
 
-!!! Error
-    If you see "circular reference detected" errors, check your dependency declarations for cycles.
+!!! Warning
+    If you see "Skipping container update (circular dependency)" warnings, check your dependency declarations for cycles.
 
 **Solution**: Review and remove circular dependencies. For example, if A depends on B and B depends on A, remove one of the dependencies or restructure your services.
+
+#### Ignored Depends-On Entries
+
+!!! Warning
+    If you see "Ignoring depends-on entry that does not name exactly one container" warnings, the named `com.centurylinklabs.watchtower.depends-on` entry matched no container, or matched more than one service.
+
+**Solution**: Use the exact container name, or a project-qualified service name such as `myproject-db`.
 
 #### Containers Not Updating in Expected Order
 

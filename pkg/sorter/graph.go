@@ -2,6 +2,7 @@ package sorter
 
 import (
 	"fmt"
+	"slices"
 
 	"github.com/rs/zerolog"
 
@@ -18,6 +19,12 @@ import (
 // container whichever subset is sorted, and a subset of containers outside
 // every cycle always sorts.
 //
+// Watchtower containers are not part of the graph and are always sorted last,
+// but the graph still records which containers depend on them, and which
+// containers they depend on, for Dependents. A link that names an unmonitored
+// container exactly resolves to nothing, rather than to a different container
+// with a similar name.
+//
 // A graph reflects the labels and host config of its containers when it is
 // built. Build a new graph after they change.
 type DependencyGraph struct {
@@ -28,54 +35,83 @@ type DependencyGraph struct {
 	// dependencies lists, for each container, the identifiers its links
 	// resolve to, in link order. A link to the container itself is left out.
 	dependencies map[types.Container][]string
+	// dependents lists, for each container, the containers whose links name
+	// it: members in the order given, then Watchtower containers.
+	dependents map[types.Container][]types.Container
+	// unresolved lists the depends-on label entries that name no container.
+	unresolved []UnresolvedLink
+}
+
+// UnresolvedLink is a Watchtower depends-on label entry that names no
+// container, or names a service that more than one container could be.
+type UnresolvedLink struct {
+	// Container is the container whose label holds the entry.
+	Container types.Container
+	// Link is the entry, normalized as the dependency resolution reads it.
+	Link string
 }
 
 // NewDependencyGraph builds the dependency graph of containers.
 //
-// Watchtower containers are set aside, as SortByDependencies sets them aside:
-// they are not part of the graph and links never resolve to them.
+// Watchtower containers are set aside, as SortByDependencies sets them aside,
+// so links never resolve to them for ordering. Their own links still resolve,
+// and a link that names one exactly by name, identifier, or ID, or without its
+// replica number when it is the only such Watchtower container and no
+// unmonitored container has that name, makes the linking container one of its
+// dependents.
+//
+// Unmonitored containers are not part of the graph. A link that names one
+// exactly resolves to nothing, so it is not matched to a monitored container
+// instead.
 //
 // Parameters:
 //   - log: Process logger.
-//   - containers: Containers to build the graph of.
+//   - containers: Monitored containers to build the graph of.
+//   - unmonitored: Other containers that links may name.
 //   - useComposeDependsOn: Whether to include Compose depends_on labels as links.
 //
 // Returns:
 //   - *DependencyGraph: The graph.
-//   - error: An IdentifierCollisionError when containers share an identifier.
+//   - error: An IdentifierCollisionError when monitored containers other than
+//     Watchtower containers share an identifier.
 func NewDependencyGraph(
 	log *zerolog.Logger,
-	containers []types.Container,
+	containers, unmonitored []types.Container,
 	useComposeDependsOn bool,
 ) (*DependencyGraph, error) {
-	ordered := make([]types.Container, 0, len(containers))
+	members := make([]types.Container, 0, len(containers))
+	watchtowers := make([]types.Container, 0, 1)
 
 	for _, c := range containers {
-		if !c.IsWatchtower() {
-			ordered = append(ordered, c)
+		if c.IsWatchtower() {
+			watchtowers = append(watchtowers, c)
+		} else {
+			members = append(members, c)
 		}
 	}
 
-	return newDependencyGraph(log, ordered, useComposeDependsOn)
+	return newDependencyGraph(log, members, watchtowers, unmonitored, useComposeDependsOn)
 }
 
-// newDependencyGraph builds the dependency graph of every given container,
-// including Watchtower containers.
+// newDependencyGraph builds the dependency graph of members.
 //
 // Parameters:
 //   - log: Process logger.
-//   - containers: Containers to build the graph of.
+//   - members: Containers of the graph.
+//   - watchtowers: Monitored Watchtower containers, outside the graph.
+//   - unmonitored: Containers that links may name exactly but that are
+//     outside the graph.
 //   - useComposeDependsOn: Whether to include Compose depends_on labels as links.
 //
 // Returns:
 //   - *DependencyGraph: The graph.
-//   - error: An IdentifierCollisionError when containers share an identifier.
+//   - error: An IdentifierCollisionError when members share an identifier.
 func newDependencyGraph(
 	log *zerolog.Logger,
-	containers []types.Container,
+	members, watchtowers, unmonitored []types.Container,
 	useComposeDependsOn bool,
 ) (*DependencyGraph, error) {
-	containerMap, err := identifierIndex(log, containers)
+	containerMap, err := identifierIndex(log, members)
 	if err != nil {
 		return nil, err
 	}
@@ -91,28 +127,50 @@ func newDependencyGraph(
 	// canonical project-service graph keys without inventing extra Kahn nodes.
 	matchIDSet, aliasToCanonical := buildLinkMatchIndexes(log, containerMap)
 
-	dependencies := make(map[types.Container][]string, len(containers))
+	watchtowerExact := exactNames(watchtowers)
 
-	for _, c := range containers {
-		self := identifiers[c]
+	resolver := &linkResolver{
+		matchIDSet:        matchIDSet,
+		aliasToCanonical:  aliasToCanonical,
+		watchtowers:       watchtowerExact,
+		unmonitored:       exactNames(unmonitored),
+		watchtowerAliases: watchtowerAliases(watchtowers, watchtowerExact),
+	}
+
+	graph := &DependencyGraph{
+		containers:   members,
+		identifiers:  identifiers,
+		dependencies: make(map[types.Container][]string, len(members)),
+		dependents:   make(map[types.Container][]types.Container, len(members)),
+	}
+
+	for _, c := range slices.Concat(members, watchtowers) {
+		self, isMember := identifiers[c]
 
 		for _, normalizedLink := range c.Links(useComposeDependsOn) {
-			for _, key := range resolveLinkToCanonicalKeys(normalizedLink, matchIDSet, aliasToCanonical) {
+			keys, watchtower, _ := resolver.resolve(normalizedLink)
+			if watchtower != nil && watchtower != c {
+				graph.addDependent(watchtower, c)
+			}
+
+			for _, key := range keys {
 				if key == self {
 					// Self-reference: skip so the container stays indegree 0 for this link.
 					continue
 				}
 
-				dependencies[c] = append(dependencies[c], key)
+				if isMember {
+					graph.dependencies[c] = append(graph.dependencies[c], key)
+				}
+
+				graph.addDependent(containerMap[key], c)
 			}
 		}
+
+		graph.unresolved = append(graph.unresolved, resolver.unresolvedDependsOn(log, c, self)...)
 	}
 
-	return &DependencyGraph{
-		containers:   containers,
-		identifiers:  identifiers,
-		dependencies: dependencies,
-	}, nil
+	return graph, nil
 }
 
 // CycleMembers returns the containers that are part of a circular dependency.
@@ -155,6 +213,30 @@ func (g *DependencyGraph) CycleMembers() []types.Container {
 	}
 
 	return members
+}
+
+// Dependents returns the containers that depend directly on c: members of the
+// graph in the order they were given, then Watchtower containers. Watchtower
+// containers are included both as c and among the dependents.
+//
+// Parameters:
+//   - c: A monitored container.
+//
+// Returns:
+//   - []types.Container: The containers whose links name c. Nil when none do
+//     or c is not monitored.
+func (g *DependencyGraph) Dependents(c types.Container) []types.Container {
+	return g.dependents[c]
+}
+
+// UnresolvedDependsOn returns the Watchtower depends-on label entries that name
+// no container, or a service that more than one container could be. They are
+// left out of the graph.
+//
+// Returns:
+//   - []UnresolvedLink: The entries, in the order the containers were given.
+func (g *DependencyGraph) UnresolvedDependsOn() []UnresolvedLink {
+	return g.unresolved
 }
 
 // Sort sorts containers in place by the dependencies between them, with
@@ -255,4 +337,17 @@ func (g *DependencyGraph) subgraph(containers []types.Container) (
 	}
 
 	return containerMap, indegree, adjacency, normalizedMap, nil
+}
+
+// addDependent records that dependent depends on target.
+//
+// Parameters:
+//   - target: The container depended on.
+//   - dependent: The container whose link names target.
+func (g *DependencyGraph) addDependent(target, dependent types.Container) {
+	// A container's links are resolved together, so a container already
+	// listed as a dependent of target is the last one listed.
+	if listed := g.dependents[target]; len(listed) == 0 || listed[len(listed)-1] != dependent {
+		g.dependents[target] = append(listed, dependent)
+	}
 }
