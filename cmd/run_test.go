@@ -252,7 +252,12 @@ func TestRun_RunOnce(t *testing.T) {
 func TestRun_Continuous(t *testing.T) {
 	older := runFixtureContainer("01d0", "/watchtower-older", "2026-10-01T12:00:00Z",
 		map[string]string{watchtowerLabelKey: "true"})
-	orchestrator := runFixtureContainer("0c40", "/watchtower-orchestrator", "2026-10-08T11:00:00Z",
+	// The tests run in a synctest bubble, whose clock starts at midnight UTC on
+	// 2000-01-01. One orchestrator was created a minute earlier and may still be
+	// handing off, and the other an hour earlier and is orphaned.
+	inFlight := runFixtureContainer("0c41", "/watchtower-orchestrator-new", "1999-12-31T23:59:00Z",
+		map[string]string{orchestratorLabelKey: "true", scopeLabelKey: "other"})
+	orchestrator := runFixtureContainer("0c40", "/watchtower-orchestrator", "1999-12-31T23:00:00Z",
 		map[string]string{orchestratorLabelKey: "true", scopeLabelKey: "other"})
 
 	tests := []struct {
@@ -317,7 +322,16 @@ func TestRun_Continuous(t *testing.T) {
 			want: []string{"ListContainers filtered", "ListContainers all", "GetVersion"},
 		},
 		{
-			name: "orchestrator from another scope is removed",
+			name: "orchestrator still handing off is kept",
+			args: []string{"--scope", "prod"},
+			setup: func(client *mockContainer.MockClient, current types.Container) {
+				client.EXPECT().ListContainers(mock.Anything, withFilter).Return([]types.Container{current}, nil)
+				client.EXPECT().ListContainers(mock.Anything).Return([]types.Container{current, inFlight}, nil)
+			},
+			want: []string{"ListContainers filtered", "ListContainers all", "GetVersion"},
+		},
+		{
+			name: "orphaned orchestrator from another scope is removed",
 			args: []string{"--scope", "prod"},
 			setup: func(client *mockContainer.MockClient, current types.Container) {
 				client.EXPECT().ListContainers(mock.Anything, withFilter).Return([]types.Container{current}, nil)

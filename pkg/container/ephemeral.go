@@ -33,6 +33,11 @@ const (
 	orchestratorCleanupEnv = "WT_ORCHESTRATOR_CLEANUP"
 	// orchestratorCleanupTimeout is the timeout for cleanup operations on failed orchestrator creation.
 	orchestratorCleanupTimeout = 5 * time.Second
+	// orphanedOrchestratorAge is how long an orchestrator must have been running
+	// before startup cleanup treats it as orphaned. An orchestrator's handoff is
+	// bounded by a 5-minute timeout plus short cleanup steps, so a younger one
+	// may still be replacing a Watchtower container.
+	orphanedOrchestratorAge = 10 * time.Minute
 )
 
 // Docker connection environment variable keys.
@@ -782,7 +787,10 @@ func containsBind(binds []string, bind string) bool {
 // that may have persisted due to crashes or unexpected termination.
 //
 // This is called during startup alongside RemoveExcessWatchtowerInstances to
-// ensure a clean state.
+// ensure a clean state. Only orchestrators running longer than any self-update
+// can take are removed. A younger orchestrator may still be handing off to a
+// new Watchtower, including the instance running this cleanup or an instance
+// in another scope, so it is kept, as is one whose start time cannot be read.
 //
 // Parameters:
 //   - ctx: Context for cancellation and timeout control.
@@ -825,6 +833,18 @@ func RemoveOrphanedOrchestrators(log *zerolog.Logger,
 			continue
 		}
 
+		// Keep orchestrators that may still be running a self-update.
+		started, ok := orchestratorStartTime(containerInfo)
+		if !ok || time.Since(started) < orphanedOrchestratorAge {
+			clog.Debug().
+				Str("container", c.Name()).
+				Str("id", c.ID().ShortID()).
+				Bool("start_time_known", ok).
+				Msg("Skipping ephemeral orchestrator that may still be running a self-update")
+
+			continue
+		}
+
 		clog.Info().
 			Str("container", c.Name()).
 			Str("id", c.ID().ShortID()).
@@ -853,4 +873,29 @@ func RemoveOrphanedOrchestrators(log *zerolog.Logger,
 	}
 
 	return removed, nil
+}
+
+// orchestratorStartTime returns when an orchestrator container started, falling
+// back to its creation time when Docker reports no start time.
+//
+// Parameters:
+//   - info: Inspect data of the orchestrator container.
+//
+// Returns:
+//   - time.Time: The start or creation time.
+//   - bool: False when neither time can be read.
+func orchestratorStartTime(info *dockerContainer.InspectResponse) (time.Time, bool) {
+	if info.State != nil {
+		started, err := time.Parse(time.RFC3339Nano, info.State.StartedAt)
+		if err == nil && !started.IsZero() {
+			return started, true
+		}
+	}
+
+	created, err := time.Parse(time.RFC3339Nano, info.Created)
+	if err == nil && !created.IsZero() {
+		return created, true
+	}
+
+	return time.Time{}, false
 }
