@@ -129,6 +129,32 @@ func (m Progress) UpdateFailed(log *zerolog.Logger, failures map[types.Container
 	}
 }
 
+// UpdateSkipped marks containers as skipped, with the reason for each.
+//
+// Parameters:
+//   - log: Process logger.
+//   - skips: Map of container IDs to skip reasons.
+func (m Progress) UpdateSkipped(log *zerolog.Logger, skips map[types.ContainerID]error) {
+	for containerID, reason := range skips {
+		update, exists := m[containerID]
+		if !exists {
+			log.Debug().
+				Str("container_id", containerID.ShortID()).
+				Msg("Container not found in progress map, cannot mark as skipped")
+
+			continue
+		}
+
+		update.containerError = reason
+		update.state = SkippedState
+		log.Debug().
+			Err(reason).
+			Str("container_id", containerID.ShortID()).
+			Str("name", update.Name()).
+			Msg("Updated container state to skipped")
+	}
+}
+
 // applyReportMeta copies Git and OCI fields onto a scanned container status.
 //
 // Parameters:
