@@ -53,7 +53,7 @@ require (
 	github.com/ProtonMail/go-crypto v1.5.2 // indirect
 	github.com/acarl005/stripansi v0.0.0-20180116102854-5a71ef0e047d // indirect
 	github.com/beorn7/perks v1.0.1 // indirect
-	github.com/brunoga/deep/v6 v6.7.0 // indirect
+	github.com/brunoga/deep v1.3.1 // indirect
 	github.com/buger/goterm v1.0.4 // indirect
 	github.com/cenkalti/backoff/v5 v5.0.3 // indirect
 	github.com/cespare/xxhash/v2 v2.3.0 // indirect
@@ -121,7 +121,7 @@ require (
 	github.com/klauspost/compress v1.20.1 // indirect
 	github.com/knadh/koanf/maps v0.1.3 // indirect
 	github.com/knadh/koanf/parsers/yaml v1.1.1 // indirect
-	github.com/knadh/koanf/providers/env/v2 v2.0.2 // indirect
+	github.com/knadh/koanf/providers/env v1.1.0 // indirect
 	github.com/knadh/koanf/providers/file v1.2.1 // indirect
 	github.com/knadh/koanf/providers/posflag v1.0.2 // indirect
 	github.com/knadh/koanf/providers/structs v1.0.1 // indirect
@@ -168,7 +168,7 @@ require (
 	github.com/swaggo/files/v2 v2.0.2 // indirect
 	github.com/tilt-dev/fsnotify v1.4.8-0.20220602155310-fff9c274a375 // indirect
 	github.com/tinylib/msgp v1.6.5 // indirect
-	github.com/tonistiigi/fsutil v0.0.0-20260819142231-83cac42c1c52 // indirect
+	github.com/tonistiigi/fsutil v0.0.0-20261009090626-0684b79d5f03 // indirect
 	github.com/tonistiigi/go-csvvalue v0.0.0-20240814133006-030d3b2625d0 // indirect
 	github.com/tonistiigi/units v0.0.0-20180711220420-6950e57a87ea // indirect
 	github.com/tonistiigi/vt100 v0.0.0-20240514184818-90bafcd6abab // indirect
