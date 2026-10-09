@@ -134,6 +134,31 @@ func sortByDependencies(log *zerolog.Logger, containers []types.Container, useCo
 		return nil, err
 	}
 
+	return kahnSort(log, containers, containerMap, indegree, adjacency, normalizedMap)
+}
+
+// kahnSort orders the containers of a dependency graph with Kahn's algorithm,
+// dependencies first. Ties are broken in reverse alphabetical order of the
+// container identifiers, so the order is deterministic.
+//
+// Parameters:
+//   - log: Process logger.
+//   - containers: The containers of the graph.
+//   - containerMap: Container for each identifier.
+//   - indegree: Number of dependencies of each identifier. Consumed by the sort.
+//   - adjacency: Dependents of each identifier.
+//   - normalizedMap: Identifier of each container.
+//
+// Returns:
+//   - []types.Container: Sorted list in dependency order (dependencies first).
+//   - error: A CircularReferenceError when not every container can be ordered.
+func kahnSort(log *zerolog.Logger,
+	containers []types.Container,
+	containerMap map[string]types.Container,
+	indegree map[string]int,
+	adjacency map[string][]string,
+	normalizedMap map[types.Container]string,
+) ([]types.Container, error) {
 	// Phase 2: Initialize processing queue with containers that have no dependencies
 	queue := initializeQueue(indegree)
 
@@ -166,7 +191,7 @@ func sortByDependencies(log *zerolog.Logger, containers []types.Container, useCo
 	}
 
 	// Phase 4: Cycle detection
-	err = detectAndReportCycle(log,
+	err := detectAndReportCycle(log,
 		sorted,
 		containers,
 		containerMap,
@@ -215,18 +240,34 @@ func buildDependencyGraph(log *zerolog.Logger,
 	containers []types.Container,
 	useComposeDependsOn bool,
 ) (map[string]types.Container, map[string]int, map[string][]string, map[types.Container]string, error) {
-	containerMap := make(map[string]types.Container)
-	indegree := make(map[string]int)
-	adjacency := make(map[string][]string)
-	normalizedMap := make(map[types.Container]string)
+	g, err := newDependencyGraph(log, containers, useComposeDependsOn)
+	if err != nil {
+		return nil, nil, nil, nil, err
+	}
 
+	return g.subgraph(containers)
+}
+
+// identifierIndex maps each container's normalized dependency identifier to
+// the container.
+//
+// Parameters:
+//   - log: Process logger.
+//   - containers: Containers to index.
+//
+// Returns:
+//   - map[string]types.Container: Container for each normalized identifier.
+//   - error: IdentifierCollisionError if containers share an identifier.
+func identifierIndex(log *zerolog.Logger, containers []types.Container) (map[string]types.Container, error) {
 	// Use temporary map to collect all containers per normalized identifier
-	tempMap := make(map[string][]types.Container)
+	tempMap := make(map[string][]types.Container, len(containers))
 
 	for _, c := range containers {
 		normalizedIdentifier := util.NormalizeContainerName(container.ResolveContainerIdentifier(c))
 		tempMap[normalizedIdentifier] = append(tempMap[normalizedIdentifier], c)
 	}
+
+	index := make(map[string]types.Container, len(tempMap))
 
 	// Check for identifier collisions
 	for identifier, dupContainers := range tempMap {
@@ -237,49 +278,16 @@ func buildDependencyGraph(log *zerolog.Logger,
 				dupContainers,
 			)
 
-			return nil, nil, nil, nil, IdentifierCollisionError{
+			return nil, IdentifierCollisionError{
 				DuplicateIdentifier: identifier,
 				AffectedContainers:  dupContainers,
 			}
 		}
-		// No collision, populate maps
-		containerMap[identifier] = dupContainers[0]
-		indegree[identifier] = 0
-		normalizedMap[dupContainers[0]] = identifier
+
+		index[identifier] = dupContainers[0]
 	}
 
-	// Lookup identifiers for link resolution: canonical keys plus unique bare names.
-	// Docs specify Watchtower depends-on and network_mode targets use container names,
-	// while Compose depends_on uses service names. Aliases bridge those forms to the
-	// canonical project-service graph keys without inventing extra Kahn nodes.
-	// The identifier set is built once and reused for every link in this graph.
-	matchIDSet, aliasToCanonical := buildLinkMatchIndexes(log, containerMap)
-
-	// Build the graph by processing container links (dependencies).
-	// Edges always use canonical identifiers so Kahn's algorithm can traverse them.
-	for _, c := range containers {
-		normalizedIdentifier := normalizedMap[c]
-		// c.Links() already returns normalized container names
-		for _, normalizedLink := range c.Links(useComposeDependsOn) {
-			matchedKeys := resolveLinkToCanonicalKeys(
-				normalizedLink,
-				matchIDSet,
-				aliasToCanonical,
-			)
-
-			for _, key := range matchedKeys {
-				if key == normalizedIdentifier {
-					// Self-reference: skip so the container stays indegree 0 for this link.
-					continue
-				}
-
-				indegree[normalizedIdentifier]++
-				adjacency[key] = append(adjacency[key], normalizedIdentifier)
-			}
-		}
-	}
-
-	return containerMap, indegree, adjacency, normalizedMap, nil
+	return index, nil
 }
 
 // ContainerDependencies maps each container to the containers in the set that it depends on.

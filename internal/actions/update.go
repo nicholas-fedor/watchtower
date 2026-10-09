@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"maps"
 	"slices"
 	"sort"
 	"strings"
@@ -368,19 +369,30 @@ func Update(
 		}
 	}
 
-	// Detect circular dependencies and mark affected containers as skipped.
-	cycles := container.DetectCycles(
-		filteredContainers,
-		config.UseComposeDependsOn,
-	)
-	for _, c := range filteredContainers {
-		if cycles[container.ResolveContainerIdentifier(c)] {
-			progress.AddSkipped(log, c, errCircularDependency, config)
-			log.Warn().
-				Str("container", c.Name()).
-				Str("id", c.ID().ShortID()).
-				Msg("Skipping container update (circular dependency)")
-		}
+	// Build the dependency graph once. The cycle check and every dependency
+	// sort below use it, so each link resolves to the same container
+	// throughout the scan. A graph that cannot be built fails the first sort.
+	graph, graphErr := sorter.NewDependencyGraph(log, filteredContainers, config.UseComposeDependsOn)
+
+	// Skip every container in a circular dependency. Cycle members are also
+	// kept out of the dependency sorts and implicit restarts below, so a cycle
+	// cannot fail the session or be restarted through a link to an updated
+	// container.
+	inCycle := make(map[types.ContainerID]struct{})
+
+	var cycleMembers []types.Container
+	if graphErr == nil {
+		cycleMembers = graph.CycleMembers()
+	}
+
+	for _, c := range cycleMembers {
+		inCycle[c.ID()] = struct{}{}
+
+		progress.AddSkipped(log, c, errCircularDependency, config)
+		log.Warn().
+			Str("container", c.Name()).
+			Str("id", c.ID().ShortID()).
+			Msg("Skipping container update (circular dependency)")
 	}
 
 	// Track containers that fail staleness checks for reporting.
@@ -738,78 +750,54 @@ func Update(
 	}
 
 	// Sort containers by dependencies to ensure correct update and restart order.
-	// A cycle must not be re-derived later, or an unrelated stale container
-	// is pulled into the failed sort and the session aborts.
-	dependenciesSorted := true
+	// Cycle members cannot be ordered, so they are placed after the others.
+	// Every sort keeps only the graph's dependencies between the containers it
+	// sorts, so leaving a container out cannot redirect a link to a different
+	// container and form a cycle that the graph does not have.
+	sortable := make([]types.Container, 0, len(filteredContainers))
+	unsortable := make([]types.Container, 0, len(inCycle))
 
-	err = sorter.SortByDependencies(log,
-		filteredContainers,
-		config.UseComposeDependsOn,
-	)
-	if err != nil {
-		if errors.Is(err, sorter.ErrCircularReference) {
-			dependenciesSorted = false
-
-			circularErr, ok := errors.AsType[sorter.CircularReferenceError](err)
-			if ok {
-				circularName := circularErr.ContainerName
-				// Find the container and mark as skipped.
-				for _, c := range filteredContainers {
-					if c.Name() == circularName {
-						// Only add if not already skipped (e.g., from initial cycle detection)
-						_, exists := (*progress)[c.ID()]
-						if !exists {
-							progress.AddSkipped(log,
-								c,
-								errCircularDependency,
-								config,
-							)
-							log.Warn().
-								Str("container", c.Name()).
-								Str("id", c.ID().ShortID()).
-								Msg("Skipping container update (circular dependency)")
-						}
-
-						break
-					}
-				}
-			}
-			// Skip UpdateImplicitRestart to avoid potential issues with circular dependencies.
+	for _, c := range filteredContainers {
+		if _, skip := inCycle[c.ID()]; skip {
+			unsortable = append(unsortable, c)
 		} else {
-			// Log and return an error if dependency sorting fails for other reasons.
-			log.Debug().
-				Err(err).
-				Msg("Failed to sort containers by dependencies")
-
-			return nil, []types.RemovedImageInfo{}, fmt.Errorf(
-				"%w: %w",
-				errSortDependenciesFailed,
-				err,
-			)
+			sortable = append(sortable, c)
 		}
-	} else {
-		// Mark containers linked to restarting ones for restart without updating.
-		UpdateImplicitRestart(log,
-			allContainers,
-			filteredContainers,
-			config.UseComposeDependsOn,
+	}
+
+	err = graphErr
+	if err == nil {
+		err = graph.Sort(log, sortable)
+	}
+
+	if err != nil {
+		// Log and return an error if dependency sorting fails.
+		log.Debug().
+			Err(err).
+			Msg("Failed to sort containers by dependencies")
+
+		return nil, []types.RemovedImageInfo{}, fmt.Errorf(
+			"%w: %w",
+			errSortDependenciesFailed,
+			err,
 		)
 	}
 
-	// Collect all containers to restart (updates and implicit restarts)
-	var allContainersToRestart []types.Container
+	// Write the order back, with cycle members last.
+	copy(filteredContainers, sortable)
+	copy(filteredContainers[len(sortable):], unsortable)
 
-	for _, c := range filteredContainers {
-		if c.ToRestart() && !c.IsMonitorOnly(config) {
-			allContainersToRestart = append(allContainersToRestart, c)
-		}
-	}
+	// Collect all containers to restart: updates, and containers linked to
+	// restarting ones, which restart without updating.
+	allContainersToRestart := reconcileImplicitRestartsExcluding(log,
+		allContainers,
+		filteredContainers,
+		config,
+		inCycle,
+	)
 
 	// Sort containers to restart by dependencies to ensure correct update and restart order.
-	err = sorter.SortByDependencies(log,
-		allContainersToRestart,
-		config.UseComposeDependsOn,
-	)
+	err = graph.Sort(log, allContainersToRestart)
 	if err != nil {
 		log.Debug().
 			Err(err).
@@ -848,22 +836,20 @@ func Update(
 
 	// A failed Git apply cleared Stale. Recompute linked restarts so those
 	// dependencies are not stopped. Containers that are still stale stay anchors.
-	// Skip the recompute after a cycle. It would mark cycle members for restart
-	// and the later sort would fail the unrelated stale containers too.
-	if dependenciesSorted {
-		allContainersToRestart = reconcileImplicitRestartsExcluding(
-			log,
-			allContainers,
-			filteredContainers,
-			config,
-			gitSession.noRestartBuiltIDs(config),
-		)
-	}
+	// Cycle members stay excluded, as in the first pass.
+	excluded := make(map[types.ContainerID]struct{}, len(inCycle))
+	maps.Copy(excluded, gitSession.noRestartBuiltIDs(config))
+	maps.Copy(excluded, inCycle)
 
-	err = sorter.SortByDependencies(log,
-		allContainersToRestart,
-		config.UseComposeDependsOn,
+	allContainersToRestart = reconcileImplicitRestartsExcluding(
+		log,
+		allContainers,
+		filteredContainers,
+		config,
+		excluded,
 	)
+
+	err = graph.Sort(log, allContainersToRestart)
 	if err != nil {
 		log.Debug().
 			Err(err).

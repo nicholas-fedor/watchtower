@@ -13,6 +13,9 @@ var ErrCircularReference = errors.New("circular reference detected")
 // ErrIdentifierCollision indicates an identifier collision between containers.
 var ErrIdentifierCollision = errors.New("identifier collision detected")
 
+// ErrNotInGraph indicates a container that is not part of a dependency graph.
+var ErrNotInGraph = errors.New("container is not in the dependency graph")
+
 // CircularReferenceError represents a circular dependency error with the container name and cycle path.
 type CircularReferenceError struct {
 	ContainerName string
