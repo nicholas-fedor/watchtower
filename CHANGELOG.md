@@ -49,6 +49,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Chores
 
+- Update module golang.org/x/net to v0.60.0 by @renovate[bot] in [#2649](https://github.com/nicholas-fedor/watchtower/pull/2649)
+- Update module github.com/jedib0t/go-pretty/v6 to v6.8.3 by @renovate[bot] in [#2648](https://github.com/nicholas-fedor/watchtower/pull/2648)
 - Update module github.com/microsoft/go-winio to v0.6.3 by @renovate[bot] in [#2644](https://github.com/nicholas-fedor/watchtower/pull/2644)
 - Update module github.com/huandu/xstrings to v1.6.2 by @renovate[bot] in [#2645](https://github.com/nicholas-fedor/watchtower/pull/2645)
 - Update module github.com/knadh/koanf/providers/structs to v1.0.1 by @renovate[bot] in [#2639](https://github.com/nicholas-fedor/watchtower/pull/2639)
