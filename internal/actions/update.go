@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"maps"
 	"slices"
-	"sort"
 	"strings"
 	"sync"
 	"time"
@@ -18,7 +17,6 @@ import (
 	cerrdefs "github.com/containerd/errdefs"
 	dockerContainer "github.com/moby/moby/api/types/container"
 
-	"github.com/nicholas-fedor/watchtower/internal/compose"
 	"github.com/nicholas-fedor/watchtower/internal/git"
 	"github.com/nicholas-fedor/watchtower/internal/release"
 	"github.com/nicholas-fedor/watchtower/pkg/container"
@@ -369,10 +367,24 @@ func Update(
 		}
 	}
 
-	// Build the dependency graph once. The cycle check and every dependency
-	// sort below use it, so each link resolves to the same container
-	// throughout the scan. A graph that cannot be built fails the first sort.
-	graph, graphErr := sorter.NewDependencyGraph(log, filteredContainers, config.UseComposeDependsOn)
+	// Build the dependency graph once. The cycle check, every dependency sort,
+	// and the implicit restarts below use it, so each link resolves to the same
+	// container throughout the scan. A graph that cannot be built fails the
+	// first sort. Unmonitored containers are passed so that a link naming one
+	// resolves to it, and is left alone, rather than to a monitored container.
+	graph, graphErr := sorter.NewDependencyGraph(log,
+		filteredContainers,
+		unmonitoredContainers(allContainers, filteredContainers),
+		config.UseComposeDependsOn,
+	)
+	if graphErr == nil {
+		for _, link := range graph.UnresolvedDependsOn() {
+			log.Warn().
+				Str("container", link.Container.Name()).
+				Str("depends_on", link.Link).
+				Msg("Ignoring depends-on entry that does not name exactly one container")
+		}
+	}
 
 	// Skip every container in a circular dependency. Cycle members are also
 	// kept out of the dependency sorts and implicit restarts below, so a cycle
@@ -790,6 +802,7 @@ func Update(
 	// Collect all containers to restart: updates, and containers linked to
 	// restarting ones, which restart without updating.
 	allContainersToRestart := reconcileImplicitRestartsExcluding(log,
+		graph,
 		allContainers,
 		filteredContainers,
 		config,
@@ -843,6 +856,7 @@ func Update(
 
 	allContainersToRestart = reconcileImplicitRestartsExcluding(
 		log,
+		graph,
 		allContainers,
 		filteredContainers,
 		config,
@@ -973,154 +987,6 @@ func hasSelfDependency(log *zerolog.Logger, c types.Container) bool {
 	return slices.Contains(links, c.Name())
 }
 
-// UpdateImplicitRestart marks containers linked to restarting ones.
-//
-// It uses a multi-pass algorithm to ensure transitive propagation through the dependency chain,
-// continuing until no more containers are marked for restart.
-//
-// Parameters:
-//   - log: Process logger. Required and must be non-nil. A nil logger panics on the first log call.
-//   - allContainers: Full list of containers being managed.
-//   - containers: Slice of containers to evaluate and potentially mark for restart.
-//   - useComposeDependsOn: Whether to consider Docker Compose depends_on labels.
-//
-// This function mutates the ToRestart / LinkedToRestarting state on containers in place.
-func UpdateImplicitRestart(log *zerolog.Logger, allContainers,
-	containers []types.Container,
-	useComposeDependsOn bool,
-) {
-	updateImplicitRestart(log, allContainers, containers, useComposeDependsOn, nil)
-}
-
-// updateImplicitRestart marks linked containers while honoring excluded identifiers in the lookup index.
-//
-// Parameters:
-//   - log: Process logger. Required and must be non-nil. A nil logger panics on the first log call.
-//   - allContainers: Full list of containers being managed.
-//   - containers: Containers eligible for restart propagation.
-//   - useComposeDependsOn: Whether to consider Docker Compose depends_on labels.
-//   - excluded: Container IDs that must be indexed as non-restarting.
-//
-// This function mutates the ToRestart / LinkedToRestarting state on containers in place.
-func updateImplicitRestart(log *zerolog.Logger, allContainers,
-	containers []types.Container,
-	useComposeDependsOn bool,
-	excluded map[types.ContainerID]struct{},
-) {
-	log.Debug().Msg("Starting UpdateImplicitRestart")
-
-	byID := make(map[types.ContainerID]types.Container, len(allContainers))
-
-	// Key restart tracking by the canonical identifier (ResolveContainerIdentifier)
-	// so that links produced by c.Links() can be matched directly. Also record
-	// the bare Name() and the Docker ID. Inspect stores network_mode as
-	// container:<id> until list rewrite turns that into a name.
-	const restartIndexCapacityFactor = 3
-
-	restartByIdentifier := make(map[string]bool, len(allContainers)*restartIndexCapacityFactor)
-
-	for _, c := range allContainers {
-		byID[c.ID()] = c
-
-		// Fall back through Name then ID to guarantee a non-empty key.
-		resolvedID := container.ResolveContainerIdentifier(c)
-		if resolvedID == "" {
-			resolvedID = c.Name()
-		}
-
-		if resolvedID == "" {
-			resolvedID = string(c.ID())
-		}
-
-		if resolvedID == "" {
-			log.Debug().
-				Str("container_id", string(c.ID())).
-				Msg("Skipping container with empty identifier")
-
-			continue
-		}
-
-		restarting := c.ToRestart()
-		if _, skip := excluded[c.ID()]; skip {
-			restarting = false
-		}
-
-		restartByIdentifier[resolvedID] = restarting
-
-		bareName := c.Name()
-		if bareName != "" && bareName != resolvedID {
-			if _, exists := restartByIdentifier[bareName]; !exists {
-				restartByIdentifier[bareName] = restarting
-			}
-		}
-
-		containerID := string(c.ID())
-		if containerID != "" && containerID != resolvedID && containerID != bareName {
-			if _, exists := restartByIdentifier[containerID]; !exists {
-				restartByIdentifier[containerID] = restarting
-			}
-		}
-	}
-
-	markedContainers := []string{}
-	changed := true
-
-	for changed {
-		changed = false
-
-		for i, c := range containers {
-			if c.ToRestart() {
-				continue // Skip already marked containers.
-			}
-
-			links := c.Links(useComposeDependsOn)
-
-			containerIdentifier := container.ResolveContainerIdentifier(c)
-			log.Debug().
-				Str("container", c.Name()).
-				Str("container_identifier", containerIdentifier).
-				Strs("links", links).
-				Bool("to_restart", c.ToRestart()).
-				Msg("Checking links for container")
-
-			link := linkedIdentifierMarkedForRestart(log,
-				links,
-				restartByIdentifier,
-				c,
-				allContainers,
-			)
-			if link != "" {
-				log.Debug().
-					Str("container", c.Name()).
-					Str("restarting", link).
-					Msg("Marked container as linked to restarting")
-				containers[i].SetLinkedToRestarting(true)
-
-				allContainer, ok := byID[c.ID()]
-				if ok {
-					allContainer.SetLinkedToRestarting(true)
-					resolved := container.ResolveContainerIdentifier(allContainer)
-					restartByIdentifier[resolved] = true
-
-					bareName := allContainer.Name()
-					if bareName != "" && bareName != resolved {
-						restartByIdentifier[bareName] = true
-					}
-
-					restartByIdentifier[string(allContainer.ID())] = true
-				}
-
-				markedContainers = append(markedContainers, c.Name())
-				changed = true
-			}
-		}
-	}
-
-	log.Debug().
-		Strs("marked_containers", markedContainers).
-		Msg("Completed UpdateImplicitRestart")
-}
-
 // noRestartBuiltIDs returns a snapshot of container IDs built during a no-restart update.
 //
 // Parameters:
@@ -1144,28 +1010,11 @@ func (s *gitSession) noRestartBuiltIDs(params types.UpdateParams) map[types.Cont
 	return ids
 }
 
-// reconcileImplicitRestarts clears linked-restart marks and derives them again.
-//
-// Parameters:
-//   - log: Process logger.
-//   - allContainers: Full list of containers being managed.
-//   - containers: Containers eligible for this session.
-//   - params: Update parameters.
-//
-// Returns:
-//   - []types.Container: Containers that should still restart.
-func reconcileImplicitRestarts(
-	log *zerolog.Logger,
-	allContainers, containers []types.Container,
-	params types.UpdateParams,
-) []types.Container {
-	return reconcileImplicitRestartsExcluding(log, allContainers, containers, params, nil)
-}
-
 // reconcileImplicitRestartsExcluding clears linked-restart marks and derives restart candidates while omitting excluded containers.
 //
 // Parameters:
 //   - log: Process logger.
+//   - graph: The scan's dependency graph.
 //   - allContainers: Full list of containers being managed.
 //   - containers: Containers eligible for this session.
 //   - params: Update parameters.
@@ -1175,6 +1024,7 @@ func reconcileImplicitRestarts(
 //   - []types.Container: Containers that should still restart.
 func reconcileImplicitRestartsExcluding(
 	log *zerolog.Logger,
+	graph *sorter.DependencyGraph,
 	allContainers, containers []types.Container,
 	params types.UpdateParams,
 	excluded map[types.ContainerID]struct{},
@@ -1183,21 +1033,7 @@ func reconcileImplicitRestartsExcluding(
 		c.SetLinkedToRestarting(false)
 	}
 
-	restartAll := allContainers
-	restartContainers := containers
-
-	if len(excluded) > 0 {
-		restartContainers = make([]types.Container, 0, len(containers))
-		for _, c := range containers {
-			if _, skip := excluded[c.ID()]; skip {
-				continue
-			}
-
-			restartContainers = append(restartContainers, c)
-		}
-	}
-
-	updateImplicitRestart(log, restartAll, restartContainers, params.UseComposeDependsOn, excluded)
+	markImplicitRestarts(log, graph, allContainers, containers, excluded)
 
 	restart := make([]types.Container, 0, len(containers))
 	for _, c := range containers {
@@ -1269,237 +1105,6 @@ func shouldUpdateContainer(
 	return true
 }
 
-// linkedIdentifierMarkedForRestart returns the identifier of a container in the
-// links list that is marked for restart, or the empty string if none is found.
-//
-// The function attempts an exact match first, then delegates to
-// FindMatchingIdentifiers (exact/replica/service-only strategies) with
-// same-project preference. A hyphenated link is only treated as an explicit
-// project-qualified reference (restricting pure service-only results) when
-// it begins with a known project prefix from the container set. Bare service
-// names, including hyphenated ones, reach the service-only fallback.
-//
-// Parameters:
-//   - links: List of linked container identifiers (from Container.Links()).
-//   - restartByIdentifier: Map of container identifiers to their restart status.
-//   - dependentContainer: The container whose links are being evaluated.
-//   - allContainers: Full list of containers (used for project lookup and resolution).
-//
-// Returns:
-//   - string: Identifier of a restarting linked container, or "" if none found.
-func linkedIdentifierMarkedForRestart(log *zerolog.Logger, links []string,
-	restartByIdentifier map[string]bool,
-	dependentContainer types.Container,
-	allContainers []types.Container,
-) string {
-	// Build a lookup that supports both bare names and ResolveContainerIdentifier
-	// results, since the restart map may be populated with either.
-	idToContainer := make(map[string]types.Container, len(allContainers)+len(allContainers))
-	for _, c := range allContainers {
-		idToContainer[c.Name()] = c
-
-		resolved := container.ResolveContainerIdentifier(c)
-		if resolved != "" && resolved != c.Name() {
-			idToContainer[resolved] = c
-		}
-	}
-
-	dependentProject := getProject(dependentContainer)
-
-	// Collect known projects so we can distinguish bare service-name references
-	// (which may contain hyphens) from explicit project-qualified identifiers
-	// the caller wrote in a label.
-	knownProjects := map[string]bool{}
-
-	for _, c := range allContainers {
-		p := getProject(c)
-		if p != "" {
-			knownProjects[p] = true
-		}
-	}
-
-	log.Debug().
-		Strs("links", links).
-		Interface("restartByIdentifier", restartByIdentifier).
-		Str("dependentProject", dependentProject).
-		Msg("Searching for restarting linked container")
-
-	// Overall strategy per link:
-	//   1. Exact match against the restart map.
-	//   2. Delegate to FindMatchingIdentifiers (exact / replica / service-only).
-	//   3. Among matches, prefer same-project (via labels).
-	//   4. Only treat a hyphenated link as an explicit project-qualified reference
-	//      (and therefore restrict pure service-only resolution) when the link
-	//      begins with a known project prefix. Bare service names are allowed to
-	//      use the service fallback even when they contain hyphens.
-	for _, link := range links {
-		log.Debug().
-			Str("checking_link", link).
-			Msg("Checking link for restarting match")
-
-		// Determine once per link whether it is written as an explicit
-		// project-qualified identifier (starts with a known project- prefix).
-		// Bare service names, even when they contain hyphens, must be allowed
-		// to reach the service-only fallback.
-		isExplicitProjectRef := false
-
-		if strings.Contains(link, "-") {
-			for p := range knownProjects {
-				if strings.HasPrefix(link, p+"-") {
-					isExplicitProjectRef = true
-
-					break
-				}
-			}
-		}
-
-		if restarting, exists := restartByIdentifier[link]; exists {
-			if restarting {
-				log.Debug().
-					Str("found_restarting_identifier", link).
-					Msg("Found restarting linked container via exact match")
-
-				return link
-			}
-
-			// The named container exists and is not restarting. Do not
-			// suffix-match a different container that happens to end with
-			// this name.
-			continue
-		}
-
-		// Collect only the identifiers that are currently marked for restart.
-		// This list is passed to FindMatchingIdentifiers for exact/replica/service matching.
-		restartingNames := make([]string, 0, len(restartByIdentifier))
-		for name, restarting := range restartByIdentifier {
-			if restarting {
-				restartingNames = append(restartingNames, name)
-			}
-		}
-
-		matches := sorter.FindMatchingIdentifiers(link, restartingNames)
-
-		if len(matches) > 0 {
-			dependentProject := getProject(dependentContainer)
-
-			// Prefer any candidate that shares the dependent's project (from labels).
-			for _, matchedID := range matches {
-				matchedContainer, ok := idToContainer[matchedID]
-				if !ok || matchedContainer == nil {
-					continue
-				}
-
-				if getProject(matchedContainer) == dependentProject && dependentProject != "" {
-					log.Debug().
-						Str("link", link).
-						Str("matched", matchedID).
-						Str("reason", "same-project via FindMatchingIdentifiers").
-						Msg("Found restarting linked container")
-
-					return matchedID
-				}
-			}
-
-			// Determine if any match from FindMatchingIdentifiers was an
-			// exact or replica match (vs pure service-only). We are more
-			// permissive with exact/replica results.
-			hasExactOrReplica := false
-
-			for _, matchID := range matches {
-				if matchID == link {
-					hasExactOrReplica = true
-
-					break
-				}
-
-				if strings.HasPrefix(matchID, link+"-") {
-					suffix := matchID[len(link)+1:]
-					if sorter.IsPositiveInteger(suffix) {
-						hasExactOrReplica = true
-
-						break
-					}
-				}
-			}
-
-			// Only treat the link as an explicit project-qualified reference (and
-			// therefore block a pure service-only result) when it starts with a
-			// known project prefix. Bare service names (even hyphenated ones such
-			// as "watchtower-test-database") are permitted to resolve via the
-			// service fallback.
-			if !isExplicitProjectRef || restartByIdentifier[link] || hasExactOrReplica {
-				chosen := matches[0]
-				log.Debug().
-					Str("link", link).
-					Str("matched", chosen).
-					Str("reason", "first match via FindMatchingIdentifiers").
-					Msg("Found restarting linked container")
-
-				return chosen
-			}
-
-			log.Debug().
-				Str("link", link).
-				Msg("Qualified link did not match any restarting candidate")
-		}
-
-		// Skip the bare service-name fallback for links that are explicit
-		// project-qualified references.
-		if isExplicitProjectRef {
-			continue
-		}
-
-		dependentProject := getProject(dependentContainer)
-		linkService := sorter.ExtractServiceName(link)
-
-		// Build the list of currently restarting containers that match on service name alone.
-		var serviceCandidates []string
-
-		for _, name := range restartingNames {
-			if sorter.ExtractServiceName(name) == linkService {
-				serviceCandidates = append(serviceCandidates, name)
-			}
-		}
-
-		if len(serviceCandidates) > 0 {
-			// Prefer a candidate from the same project as the dependent.
-			for _, cand := range serviceCandidates {
-				c, ok := idToContainer[cand]
-				if !ok || c == nil {
-					continue
-				}
-
-				if getProject(c) == dependentProject &&
-					dependentProject != "" {
-					log.Debug().
-						Str("link", link).
-						Str("matched", cand).
-						Str("reason", "same-project service fallback").
-						Msg("Found restarting linked container")
-
-					return cand
-				}
-			}
-
-			// No same-project service match found. Take the first candidate
-			// after sorting for deterministic behavior.
-			sort.Strings(serviceCandidates)
-			chosen := serviceCandidates[0]
-			log.Debug().
-				Str("link", link).
-				Str("matched", chosen).
-				Str("reason", "first service fallback").
-				Msg("Found restarting linked container")
-
-			return chosen
-		}
-	}
-
-	log.Debug().Msg("No restarting linked container found")
-
-	return ""
-}
-
 // logChangelog emits the Changelog notification entry for an updated container.
 //
 // The entry is only produced when the changelog feature is enabled for the
@@ -1533,38 +1138,6 @@ func logChangelog(
 		Str("container", c.Name()).
 		Str("changelog", meta.Changelog).
 		Msg("Changelog")
-}
-
-// getProject extracts the project name from a container's compose project label.
-//
-// Falls back to parsing the leading segment of the container name if no project
-// label is present.
-//
-// Parameters:
-//   - c: Container to inspect.
-//
-// Returns:
-//   - string: Project name, or "" if none can be determined.
-func getProject(c types.Container) string {
-	monitoredContainer, ok := c.(*container.Container)
-	if ok {
-		info := monitoredContainer.ContainerInfo()
-		if info != nil && info.Config != nil {
-			project := compose.GetProjectName(info.Config.Labels)
-			if project != "" {
-				return project
-			}
-		}
-	}
-	// Fallback to parsing from container name
-	containerName := c.Name()
-
-	idx := strings.Index(containerName, "-")
-	if idx > 0 {
-		return containerName[:idx]
-	}
-
-	return ""
 }
 
 // parseReference validates a Docker image reference with logging.

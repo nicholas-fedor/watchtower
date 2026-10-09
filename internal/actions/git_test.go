@@ -26,6 +26,7 @@ import (
 	gitPkg "github.com/nicholas-fedor/watchtower/pkg/container/git"
 	mockContainer "github.com/nicholas-fedor/watchtower/pkg/container/mocks"
 	"github.com/nicholas-fedor/watchtower/pkg/session"
+	"github.com/nicholas-fedor/watchtower/pkg/sorter"
 	"github.com/nicholas-fedor/watchtower/pkg/types"
 )
 
@@ -1743,8 +1744,12 @@ var _ = ginkgo.Describe("gitSession", ginkgo.Label("git-session"), func() {
 			sess := newGitSession(gitTestClient())
 			sess.built[app.ID()] = "sha256:git"
 
+			graph, err := sorter.NewDependencyGraph(log, containers, nil, false)
+			gomega.Expect(err).NotTo(gomega.HaveOccurred())
+
 			got := reconcileImplicitRestartsExcluding(
 				log,
+				graph,
 				containers,
 				containers,
 				types.UpdateParams{NoRestart: true},
@@ -1785,8 +1790,12 @@ var _ = ginkgo.Describe("gitSession", ginkgo.Label("git-session"), func() {
 			serviceMatch.SetStale(true)
 			containers := []types.Container{excluded, serviceMatch, dependent}
 
+			graph, err := sorter.NewDependencyGraph(log, containers, nil, false)
+			gomega.Expect(err).NotTo(gomega.HaveOccurred())
+
 			got := reconcileImplicitRestartsExcluding(
 				log,
+				graph,
 				containers,
 				containers,
 				types.UpdateParams{},

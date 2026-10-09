@@ -240,7 +240,7 @@ func buildDependencyGraph(log *zerolog.Logger,
 	containers []types.Container,
 	useComposeDependsOn bool,
 ) (map[string]types.Container, map[string]int, map[string][]string, map[types.Container]string, error) {
-	g, err := newDependencyGraph(log, containers, useComposeDependsOn)
+	g, err := newDependencyGraph(log, containers, nil, nil, useComposeDependsOn)
 	if err != nil {
 		return nil, nil, nil, nil, err
 	}
@@ -558,11 +558,13 @@ func ExtractServiceName(identifier string) string {
 //  1. Exact match.
 //  2. Replica prefix match: the identifier starts with "<link>-" and the suffix
 //     after the hyphen is a positive integer (Docker Compose replica numbering).
-//  3. Project-qualified suffix match (identifier ends with "-"+link), and for
-//     unhyphenated links only, ExtractServiceName equality on both sides.
-//     This strategy only succeeds when exactly one candidate matches. Multiple
-//     matches (e.g. the same service name in different projects) are treated as
-//     ambiguous and return no results.
+//  3. Project-qualified suffix match (the identifier, without a replica
+//     number, ends with "-"+link), and for unhyphenated links only,
+//     ExtractServiceName equality on both sides. This strategy only succeeds
+//     when every candidate belongs to the same service, and then returns all
+//     of its replicas. Candidates from more than one service (e.g. the same
+//     service name in different projects) are treated as ambiguous and return
+//     no results.
 //
 // Parameters:
 //   - link: Dependency link to resolve (typically from Container.Links()).
@@ -570,7 +572,7 @@ func ExtractServiceName(identifier string) string {
 //
 // Returns:
 //   - []string: Matching identifiers. Returns nil or an empty slice when there
-//     is no match or when the service-only strategy finds multiple candidates.
+//     is no match or when the service-only strategy finds more than one service.
 func FindMatchingIdentifiers(link string, identifiers []string) []string {
 	if link == "" || len(identifiers) == 0 {
 		return nil
@@ -626,32 +628,55 @@ func findMatchingIdentifiersInSet(link string, idSet map[string]bool) []string {
 		return matches
 	}
 
-	// 3. Project-qualified / service-only match (exactly one unambiguous candidate).
-	// Multi-segment links (containing "-") only use the precise "-"+link suffix so
-	// trailing-token ExtractServiceName equality cannot select an unrelated peer
-	// (e.g. link "net-proxy" must not match "myproject-other-proxy").
+	// 3. Project-qualified / service-only match: the link names exactly one
+	// service, and resolves to every replica of it. Candidates from more than
+	// one service are ambiguous and resolve to nothing.
+	// Multi-segment links (containing "-") only use the precise "-"+link suffix,
+	// ignoring a replica number, so trailing-token ExtractServiceName equality
+	// cannot select an unrelated peer (e.g. link "net-proxy" must not match
+	// "myproject-other-proxy").
 	// Unhyphenated bare service names may still match via ExtractServiceName
-	// (e.g. link "db" → "myproject-db").
+	// (e.g. link "db" → "myproject-db" or "myproject-db-1").
 	var serviceMatches []string
 
+	services := make(map[string]bool)
+	serviceSuffix := "-" + link
 	linkHasHyphen := strings.Contains(link, "-")
+
 	for identifier := range idSet {
-		if strings.HasSuffix(identifier, "-"+link) {
-			serviceMatches = append(serviceMatches, identifier)
+		service := replicaService(identifier)
 
-			continue
-		}
-
-		if !linkHasHyphen && ExtractServiceName(identifier) == link {
+		if strings.HasSuffix(identifier, serviceSuffix) || strings.HasSuffix(service, serviceSuffix) ||
+			(!linkHasHyphen && ExtractServiceName(identifier) == link) {
 			serviceMatches = append(serviceMatches, identifier)
+			services[service] = true
 		}
 	}
 
-	if len(serviceMatches) == 1 {
-		matches = append(matches, serviceMatches[0])
+	if len(services) == 1 {
+		sort.Strings(serviceMatches)
+		matches = append(matches, serviceMatches...)
 	}
 
 	return matches
+}
+
+// replicaService returns the service an identifier belongs to: the identifier
+// without a trailing replica number (e.g. "project-db" for "project-db-2").
+//
+// Parameters:
+//   - identifier: A container identifier.
+//
+// Returns:
+//   - string: The identifier without its replica number, or the identifier
+//     itself when it has none.
+func replicaService(identifier string) string {
+	i := strings.LastIndex(identifier, "-")
+	if i > 0 && IsPositiveInteger(identifier[i+1:]) {
+		return identifier[:i]
+	}
+
+	return identifier
 }
 
 // initializeQueue creates the initial processing queue for Kahn's algorithm.

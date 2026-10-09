@@ -35,7 +35,7 @@ func FuzzCycleMembers(f *testing.F) {
 		containers := parseFuzzDependencyData(data)
 
 		for _, useComposeDependsOn := range []bool{true, false} {
-			graph, err := NewDependencyGraph(testLog(), containers, useComposeDependsOn)
+			graph, err := NewDependencyGraph(testLog(), containers, nil, useComposeDependsOn)
 			if err != nil {
 				if !errors.Is(err, ErrIdentifierCollision) {
 					t.Fatalf("unexpected error: %v", err)
@@ -121,6 +121,12 @@ func selfReachable(
 		t.Fatalf("building the graph: %v", err)
 	}
 
+	return reachesItself(containerMap, adjacency)
+}
+
+// reachesItself reports, for each container of a graph, whether it can reach
+// itself by following the graph's edges, with a separate search per container.
+func reachesItself(containerMap map[string]types.Container, adjacency map[string][]string) map[types.ContainerID]bool {
 	reaches := make(map[types.ContainerID]bool, len(containerMap))
 
 	for start, c := range containerMap {
@@ -258,14 +264,17 @@ func generateDeployment(data []byte) []types.Container {
 // The seed corpus is a few short inputs that build mixed deployments. The
 // fuzzer explores identities, link sources, and reference forms from there.
 //
-// For both settings of Compose depends_on, it checks that building the graph
-// fails only on an identifier collision, and that CycleMembers reports
+// Some containers are left unmonitored, chosen from the input. For both
+// settings of Compose depends_on, it checks that building the graph fails only
+// on an identifier collision, and that CycleMembers reports monitored
 // non-Watchtower containers once each, in input order, exactly when they can
-// reach themselves. Sorting the remaining containers, and a subset of them
-// chosen from the input, with the graph must succeed, keep the same
-// containers, put Watchtower containers last, and order every dependency of
-// the whole deployment's graph before its dependents. With no cycle, sorting
-// the whole deployment with the graph must give the same order as
+// reach themselves. Every edge of the graph must be recorded among the
+// dependents, and no unmonitored container may be a dependent or have
+// dependents. Sorting the remaining containers, and a subset of them chosen
+// from the input, with the graph must succeed, keep the same containers, put
+// Watchtower containers last, and order every dependency of the graph before
+// its dependents. With every container monitored and no cycle, sorting the
+// whole deployment with the graph must give the same order as
 // SortByDependencies.
 func FuzzDeploymentGraphs(f *testing.F) {
 	f.Add([]byte{3, 0, 1, 1, 2, 2, 0, 3, 1, 4, 2, 2, 1, 0, 3, 3})
@@ -276,15 +285,27 @@ func FuzzDeploymentGraphs(f *testing.F) {
 	f.Fuzz(func(t *testing.T, data []byte) {
 		containers := generateDeployment(data)
 
-		ordered := make([]types.Container, 0, len(containers))
-		for _, c := range containers {
+		// Leave some containers unmonitored, chosen from the input.
+		monitored := make([]types.Container, 0, len(containers))
+		unmonitored := make([]types.Container, 0, len(containers))
+
+		for i, c := range containers {
+			if len(data) > 0 && data[(i*3+1)%len(data)]&8 == 8 {
+				unmonitored = append(unmonitored, c)
+			} else {
+				monitored = append(monitored, c)
+			}
+		}
+
+		ordered := make([]types.Container, 0, len(monitored))
+		for _, c := range monitored {
 			if !c.IsWatchtower() {
 				ordered = append(ordered, c)
 			}
 		}
 
 		for _, useComposeDependsOn := range []bool{true, false} {
-			graph, err := NewDependencyGraph(testLog(), containers, useComposeDependsOn)
+			graph, err := NewDependencyGraph(testLog(), monitored, unmonitored, useComposeDependsOn)
 			if err != nil {
 				if !errors.Is(err, ErrIdentifierCollision) {
 					t.Fatalf("unexpected error: %v", err)
@@ -301,7 +322,7 @@ func FuzzDeploymentGraphs(f *testing.F) {
 			members := graph.CycleMembers()
 			assertInputOrder(t, ordered, members)
 
-			want := selfReachable(t, ordered, useComposeDependsOn)
+			want := reachesItself(containerMap, adjacency)
 			inCycle := make(map[types.ContainerID]bool, len(members))
 
 			for _, c := range members {
@@ -314,8 +335,10 @@ func FuzzDeploymentGraphs(f *testing.F) {
 				}
 			}
 
-			rest := make([]types.Container, 0, len(containers))
-			for _, c := range containers {
+			assertDependents(t, graph, monitored, unmonitored, containerMap, adjacency)
+
+			rest := make([]types.Container, 0, len(monitored))
+			for _, c := range monitored {
 				if !inCycle[c.ID()] {
 					rest = append(rest, c)
 				}
@@ -339,7 +362,9 @@ func FuzzDeploymentGraphs(f *testing.F) {
 				assertDependencyOrder(t, toSort, sorted, containerMap, adjacency)
 			}
 
-			if len(members) == 0 {
+			// Unmonitored containers change how links resolve, so the order
+			// matches SortByDependencies only when every container is monitored.
+			if len(members) == 0 && len(unmonitored) == 0 {
 				legacy := slices.Clone(containers)
 				fromGraph := slices.Clone(containers)
 
@@ -356,6 +381,44 @@ func FuzzDeploymentGraphs(f *testing.F) {
 			}
 		}
 	})
+}
+
+// assertDependents fails the test unless every edge of the graph between its
+// members is recorded among the dependents, and no unmonitored container is a
+// dependent or has dependents.
+func assertDependents(
+	t *testing.T,
+	graph *DependencyGraph,
+	monitored, unmonitored []types.Container,
+	containerMap map[string]types.Container,
+	adjacency map[string][]string,
+) {
+	t.Helper()
+
+	for dependencyKey, dependentKeys := range adjacency {
+		dependents := graph.Dependents(containerMap[dependencyKey])
+
+		for _, dependentKey := range dependentKeys {
+			if !slices.Contains(dependents, containerMap[dependentKey]) {
+				t.Fatalf("%q depends on %q but is not among its dependents",
+					containerMap[dependentKey].Name(), containerMap[dependencyKey].Name())
+			}
+		}
+	}
+
+	for _, c := range unmonitored {
+		if len(graph.Dependents(c)) > 0 {
+			t.Fatalf("unmonitored container %q has dependents", c.Name())
+		}
+	}
+
+	for _, c := range monitored {
+		for _, dependent := range graph.Dependents(c) {
+			if slices.Contains(unmonitored, dependent) {
+				t.Fatalf("unmonitored container %q is a dependent of %q", dependent.Name(), c.Name())
+			}
+		}
+	}
 }
 
 // assertDependencyOrder fails the test unless sorted holds the same containers

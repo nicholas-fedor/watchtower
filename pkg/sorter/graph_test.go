@@ -151,7 +151,7 @@ func TestDependencyGraph_CycleMembers(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 
-			graph, err := NewDependencyGraph(testLog(), tt.containers, tt.useComposeDependsOn)
+			graph, err := NewDependencyGraph(testLog(), tt.containers, nil, tt.useComposeDependsOn)
 			require.NoError(t, err)
 			assert.Equal(t, tt.want, containerNames(graph.CycleMembers()))
 		})
@@ -171,7 +171,7 @@ func TestNewDependencyGraph_IdentifierCollision(t *testing.T) {
 	_, err := NewDependencyGraph(testLog(), []types.Container{
 		cycleContainer("first", labels),
 		cycleContainer("second", labels),
-	}, false)
+	}, nil, false)
 	require.ErrorIs(t, err, ErrIdentifierCollision)
 }
 
@@ -316,7 +316,7 @@ func TestDependencyGraph_CycleMembersLinkSources(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 
-			graph, err := NewDependencyGraph(testLog(), tt.containers, tt.useComposeDependsOn)
+			graph, err := NewDependencyGraph(testLog(), tt.containers, nil, tt.useComposeDependsOn)
 			require.NoError(t, err)
 			assert.Equal(t, tt.want, containerNames(graph.CycleMembers()))
 		})
@@ -449,7 +449,7 @@ func graphEdges(t *testing.T, containers, all []types.Container, useComposeDepen
 		all = containers
 	}
 
-	graph, err := NewDependencyGraph(testLog(), all, useComposeDependsOn)
+	graph, err := NewDependencyGraph(testLog(), all, nil, useComposeDependsOn)
 	require.NoError(t, err)
 
 	containerMap, _, adjacency, _, err := graph.subgraph(containers)
@@ -483,7 +483,7 @@ func TestDependencyGraph_Sort(t *testing.T) {
 		deployed{name: "c", dependsOn: "db"},
 	)
 
-	graph, err := NewDependencyGraph(testLog(), all, false)
+	graph, err := NewDependencyGraph(testLog(), all, nil, false)
 	require.NoError(t, err)
 
 	tests := []struct {
@@ -514,4 +514,277 @@ func TestDependencyGraph_Sort(t *testing.T) {
 		containers := append(pick(all, "app"), deployed{name: "other"}.container())
 		require.ErrorIs(t, graph.Sort(testLog(), containers), ErrNotInGraph)
 	})
+}
+
+// TestDependencyGraph_ServiceNames verifies that a link naming a Compose
+// service resolves to every replica of exactly one service, whether the name
+// is bare or hyphenated, and that a name matching more than one service,
+// including the linking container's own, resolves to nothing.
+func TestDependencyGraph_ServiceNames(t *testing.T) {
+	t.Parallel()
+
+	replica := func(project, service, number, dependsOn string) deployed {
+		return deployed{
+			name:      project + "-" + service + "-" + number,
+			project:   project,
+			service:   service,
+			number:    number,
+			dependsOn: dependsOn,
+		}
+	}
+
+	tests := []struct {
+		name       string
+		containers []types.Container
+		// want lists the edges as dependent->dependency.
+		want []string
+	}{
+		{
+			name: "hyphenated service in another project",
+			containers: deploy(
+				replica("app1", "foo", "1", "watchtower-test-database"),
+				replica("database1", "watchtower-test-database", "1", ""),
+			),
+			want: []string{"app1-foo-1->database1-watchtower-test-database-1"},
+		},
+		{
+			name: "bare service with two replicas",
+			containers: deploy(
+				deployed{name: "app", dependsOn: "db"},
+				replica("stack", "db", "1", ""),
+				replica("stack", "db", "2", ""),
+			),
+			want: []string{"app->stack-db-1", "app->stack-db-2"},
+		},
+		{
+			name: "hyphenated service with two replicas",
+			containers: deploy(
+				deployed{name: "app", dependsOn: "api-gateway"},
+				replica("edge", "api-gateway", "1", ""),
+				replica("edge", "api-gateway", "2", ""),
+			),
+			want: []string{"app->edge-api-gateway-1", "app->edge-api-gateway-2"},
+		},
+		{
+			name: "project-qualified service with two replicas",
+			containers: deploy(
+				deployed{name: "app", dependsOn: "stack-db"},
+				replica("stack", "db", "1", ""),
+				replica("stack", "db", "2", ""),
+			),
+			want: []string{"app->stack-db-1", "app->stack-db-2"},
+		},
+		{
+			name: "same service in two projects",
+			containers: deploy(
+				deployed{name: "app", dependsOn: "db"},
+				replica("a", "db", "1", ""),
+				replica("b", "db", "1", ""),
+			),
+			want: []string{},
+		},
+		{
+			name: "hyphenated service in two projects",
+			containers: deploy(
+				deployed{name: "app", dependsOn: "api-gateway"},
+				replica("a", "api-gateway", "1", ""),
+				replica("b", "api-gateway", "1", ""),
+			),
+			want: []string{},
+		},
+		{
+			name: "own service and another project's",
+			containers: deploy(
+				replica("a", "api", "1", "api"),
+				replica("b", "api", "1", ""),
+			),
+			want: []string{},
+		},
+		{
+			name: "multi-segment name of another service",
+			containers: deploy(
+				deployed{name: "app", dependsOn: "net-proxy"},
+				replica("edge", "other-proxy", "1", ""),
+			),
+			want: []string{},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			assert.ElementsMatch(t, tt.want, graphEdges(t, tt.containers, nil, false))
+		})
+	}
+}
+
+// TestDependencyGraph_Dependents verifies the containers recorded as depending
+// on each container: Watchtower containers depend on what their links name,
+// containers depend on a Watchtower container only when they name it exactly
+// or as the only replica of its Compose service, and a link that names an
+// unmonitored container exactly names nothing else, not even a Watchtower
+// container known by that replica-free name.
+func TestDependencyGraph_Dependents(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name        string
+		monitored   []types.Container
+		unmonitored []types.Container
+		// useComposeDependsOn includes Compose depends_on labels as links.
+		useComposeDependsOn bool
+		// of names the container whose dependents are checked.
+		of   string
+		want []string
+	}{
+		{
+			name:      "link to a container",
+			monitored: deploy(deployed{name: "app", dependsOn: "db"}, deployed{name: "db"}),
+			of:        "db",
+			want:      []string{"app"},
+		},
+		{
+			name: "Watchtower routed through a VPN container",
+			monitored: deploy(
+				deployed{name: "watchtower", watchtower: true, networkMode: "container:vpn"},
+				deployed{name: "vpn"},
+			),
+			of:   "vpn",
+			want: []string{"watchtower"},
+		},
+		{
+			name: "Watchtower named by name and by ID",
+			monitored: deploy(
+				deployed{name: "watchtower", watchtower: true},
+				deployed{name: "app", dependsOn: "watchtower"},
+				deployed{name: "sidecar", networkMode: "container:" + dockerID("watchtower")},
+			),
+			of:   "watchtower",
+			want: []string{"app", "sidecar"},
+		},
+		{
+			name: "Watchtower named without its replica number",
+			monitored: deploy(
+				deployed{name: "watchtower-1", watchtower: true},
+				deployed{name: "app", dependsOn: "watchtower"},
+			),
+			of:   "watchtower-1",
+			want: []string{"app"},
+		},
+		{
+			name: "Watchtower not named exactly",
+			monitored: deploy(
+				deployed{name: "watchtower-main", watchtower: true},
+				deployed{name: "app", dependsOn: "watchtower"},
+			),
+			of:   "watchtower-main",
+			want: nil,
+		},
+		{
+			name: "Watchtower run by Compose",
+			monitored: deploy(
+				deployed{name: "infra-watchtower-1", project: "infra", service: "watchtower", number: "1", watchtower: true},
+				deployed{name: "infra-app-1", project: "infra", service: "app", number: "1", composeDependsOn: "watchtower"},
+				deployed{name: "tool", dependsOn: "infra-watchtower"},
+				deployed{name: "bare", dependsOn: "watchtower"},
+			),
+			useComposeDependsOn: true,
+			of:                  "infra-watchtower-1",
+			want:                []string{"infra-app-1", "tool"},
+		},
+		{
+			name: "Watchtower replica name taken by an unmonitored container",
+			monitored: deploy(
+				deployed{name: "infra-watchtower-1", project: "infra", service: "watchtower", number: "1", watchtower: true},
+				deployed{name: "app", dependsOn: "infra-watchtower"},
+				deployed{name: "tool", dependsOn: "infra-watchtower-1"},
+			),
+			unmonitored: deploy(deployed{name: "infra-watchtower"}),
+			of:          "infra-watchtower-1",
+			want:        []string{"tool"},
+		},
+		{
+			name: "Watchtower run by Compose with two replicas",
+			monitored: deploy(
+				deployed{name: "infra-watchtower-1", project: "infra", service: "watchtower", number: "1", watchtower: true},
+				deployed{name: "infra-watchtower-2", project: "infra", service: "watchtower", number: "2", watchtower: true},
+				deployed{name: "tool", dependsOn: "infra-watchtower"},
+			),
+			of:   "infra-watchtower-1",
+			want: nil,
+		},
+		{
+			name: "unmonitored container named exactly",
+			monitored: deploy(
+				deployed{name: "app", dependsOn: "db"},
+				deployed{name: "db-1"},
+			),
+			unmonitored: deploy(deployed{name: "db"}),
+			of:          "db-1",
+			want:        nil,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			graph, err := NewDependencyGraph(testLog(), tt.monitored, tt.unmonitored, tt.useComposeDependsOn)
+			require.NoError(t, err)
+
+			of := pick(tt.monitored, tt.of)
+			require.Len(t, of, 1)
+
+			dependents := graph.Dependents(of[0])
+			if tt.want == nil {
+				assert.Empty(t, dependents)
+			} else {
+				assert.Equal(t, tt.want, containerNames(dependents))
+			}
+
+			// Watchtower and unmonitored containers never become ordering edges.
+			containerMap, _, adjacency, _, err := graph.subgraph(graph.containers)
+			require.NoError(t, err)
+
+			for dependency, dependents := range adjacency {
+				for _, dependent := range dependents {
+					assert.False(t, containerMap[dependency].IsWatchtower() || containerMap[dependent].IsWatchtower())
+				}
+			}
+		})
+	}
+}
+
+// TestDependencyGraph_UnresolvedDependsOn verifies that a Watchtower
+// depends-on entry is reported when it names no container or a service that
+// more than one service could be, and is not reported when it names a
+// container, an unmonitored container, a Watchtower container, a unique
+// service, or the labeled container itself.
+func TestDependencyGraph_UnresolvedDependsOn(t *testing.T) {
+	t.Parallel()
+
+	monitored := deploy(
+		deployed{name: "app", dependsOn: "missing,db,api,cache,watchtower,app,legacy"},
+		deployed{name: "watchtower", watchtower: true, dependsOn: "proxy,gone"},
+		deployed{name: "proxy"},
+		deployed{name: "a-db-1", project: "a", service: "db", number: "1"},
+		deployed{name: "b-db-1", project: "b", service: "db", number: "1"},
+		deployed{name: "stack-api-1", project: "stack", service: "api", number: "1"},
+		deployed{name: "stack-api-2", project: "stack", service: "api", number: "2"},
+		deployed{name: "cache"},
+	)
+	unmonitored := deploy(deployed{name: "legacy"})
+
+	graph, err := NewDependencyGraph(testLog(), monitored, unmonitored, false)
+	require.NoError(t, err)
+
+	unresolved := graph.UnresolvedDependsOn()
+
+	got := make([]string, 0, len(unresolved))
+	for _, link := range unresolved {
+		got = append(got, link.Container.Name()+":"+link.Link)
+	}
+
+	assert.ElementsMatch(t, []string{"app:missing", "app:db", "watchtower:gone"}, got)
 }
