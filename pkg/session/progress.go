@@ -129,7 +129,9 @@ func (m Progress) UpdateFailed(log *zerolog.Logger, failures map[types.Container
 	}
 }
 
-// UpdateSkipped marks containers as skipped, with the reason for each.
+// UpdateSkipped marks containers as skipped, with the reason for each. A
+// container already marked as failed keeps its failure and error, so a later
+// phase skipping it cannot hide why it failed.
 //
 // Parameters:
 //   - log: Process logger.
@@ -141,6 +143,16 @@ func (m Progress) UpdateSkipped(log *zerolog.Logger, skips map[types.ContainerID
 			log.Debug().
 				Str("container_id", containerID.ShortID()).
 				Msg("Container not found in progress map, cannot mark as skipped")
+
+			continue
+		}
+
+		if update.state == FailedState {
+			log.Debug().
+				Err(reason).
+				Str("container_id", containerID.ShortID()).
+				Str("name", update.Name()).
+				Msg("Container already failed, keeping its failure")
 
 			continue
 		}

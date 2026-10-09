@@ -2,6 +2,7 @@ package actions
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"testing"
 	"time"
@@ -179,4 +180,36 @@ func TestUpdate_CanceledRecreateFailureIsFailed(t *testing.T) {
 	require.Contains(t, failed, stopped, "the container left stopped is a failure")
 	assert.Len(t, failed, 1)
 	assert.Equal(t, []string{untouched}, reportNames(report.Skipped()))
+}
+
+// TestUpdate_StopFailureStaysFailedWhenCanceled verifies that a container
+// whose stop fails while the update is canceled stays reported as failed with
+// the stop error. The restart phase skips it because it was never stopped, and
+// that skip must not replace the failure.
+func TestUpdate_StopFailureStaysFailedWhenCanceled(t *testing.T) {
+	t.Parallel()
+
+	app := skipTestContainer("a000000000000000000000000000000000000000000000000000000000000000", "app", nil)
+
+	ctx, cancel := context.WithCancel(t.Context())
+	defer cancel()
+
+	client := mockContainer.NewMockClient(t)
+	client.EXPECT().ListContainers(mock.Anything, mock.Anything).Return([]types.Container{app}, nil).Once()
+	client.EXPECT().IsContainerStale(mock.Anything, mock.Anything, mock.Anything).
+		Return(true, types.ImageID("sha256:new"), "", nil)
+	client.EXPECT().GetImageAnnotations(mock.Anything, mock.Anything).Return(oci.Annotations{}).Maybe()
+	client.EXPECT().StopAndRemoveContainer(mock.Anything, app, mock.Anything).
+		RunAndReturn(func(context.Context, types.Container, time.Duration) error {
+			cancel()
+
+			return errors.New("daemon unavailable")
+		}).Once()
+
+	report, _, _ := Update(testLogger(), ctx, client, types.UpdateParams{})
+	require.NotNil(t, report)
+
+	assert.Empty(t, report.Skipped())
+	assert.Equal(t, map[string]string{"app": "failed to stop container: daemon unavailable"},
+		reportErrors(report.Failed()))
 }

@@ -1564,7 +1564,8 @@ func stopContainersInReversedOrder(
 
 // recordRestartOutcomes records the containers whose stop or restart did not
 // succeed: as skipped when the update deliberately left them untouched, and as
-// failed otherwise.
+// failed otherwise. A container that already failed in an earlier phase stays
+// failed, even when a later phase skips it.
 //
 // Parameters:
 //   - log: Process logger.
