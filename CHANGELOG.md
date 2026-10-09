@@ -10,6 +10,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Keep the partial report when an update fails by @nicholas-fedor in [#2663](https://github.com/nicholas-fedor/watchtower/pull/2663)
 - Run post-check hooks in replacement containers by @nicholas-fedor in [#2659](https://github.com/nicholas-fedor/watchtower/pull/2659)
 - Stop an old watchtower instance when an update detects it by @nicholas-fedor in [#2633](https://github.com/nicholas-fedor/watchtower/pull/2633)
 - Apply the registry tls flags by @nicholas-fedor in [#2627](https://github.com/nicholas-fedor/watchtower/pull/2627)
