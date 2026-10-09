@@ -54,6 +54,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Apply the registry tls flags by @nicholas-fedor in [#2627](https://github.com/nicholas-fedor/watchtower/pull/2627)
 - Fall back to the default template on parse errors by @nicholas-fedor in [#2625](https://github.com/nicholas-fedor/watchtower/pull/2625)
 - Remove the notify-upgrade file on windows by @nicholas-fedor in [#2603](https://github.com/nicholas-fedor/watchtower/pull/2603)
 - Fix data races in the test suite by @nicholas-fedor in [#2582](https://github.com/nicholas-fedor/watchtower/pull/2582)
