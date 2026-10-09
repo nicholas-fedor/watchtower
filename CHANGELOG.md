@@ -55,6 +55,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Chores
 
+- Update module golang.org/x/sys to v0.49.0 by @renovate[bot] in [#2677](https://github.com/nicholas-fedor/watchtower/pull/2677)
+- Update github.com/tonistiigi/fsutil digest to c60bd37 by @renovate[bot] in [#2676](https://github.com/nicholas-fedor/watchtower/pull/2676)
 - Update nicholas-fedor/actionlint-action action to v1.0.19 by @renovate[bot] in [#2672](https://github.com/nicholas-fedor/watchtower/pull/2672)
 - Update github.com/tonistiigi/fsutil digest to 0684b79 by @renovate[bot] in [#2671](https://github.com/nicholas-fedor/watchtower/pull/2671)
 - Update nicholas-fedor/govulncheck-action action to v1.1.0 by @renovate[bot] in [#2667](https://github.com/nicholas-fedor/watchtower/pull/2667)
