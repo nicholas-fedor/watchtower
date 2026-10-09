@@ -456,3 +456,52 @@ func runExitHelper(t *testing.T, helperCase string) {
 	proc := &process{log: logging.New(os.Stderr, logging.InfoLevel)}
 	proc.run(newTestRootCommand(t, args...), nil)
 }
+
+// TestRun_OldInstanceStops verifies that continuous mode stops on its own
+// when an update finds that Watchtower runs in an old instance's container,
+// after disabling that container's restart policy, instead of continuing to
+// run until it receives a signal.
+func TestRun_OldInstanceStops(t *testing.T) {
+	oldSelf := runFixtureContainer("01d0", "/watchtower-old-01d0", "2026-10-01T12:00:00Z",
+		map[string]string{watchtowerLabelKey: "true"})
+
+	mockClient := mockContainer.NewMockClient(t)
+	mockClient.EXPECT().ListContainers(mock.Anything, withFilter).Return([]types.Container{oldSelf}, nil)
+	mockClient.EXPECT().ListContainers(mock.Anything).Return([]types.Container{oldSelf}, nil)
+	mockClient.EXPECT().GetVersion().Return("1.47").Maybe()
+	mockClient.EXPECT().SetRestartPolicy(mock.Anything, oldSelf,
+		dockerContainer.RestartPolicy{Name: dockerContainer.RestartPolicyDisabled})
+
+	setRunState(t, runTestState{client: mockClient, current: oldSelf, currentID: oldSelf.ID()})
+
+	cmd := newTestRootCommand(t, "--update-on-start")
+
+	synctest.Test(t, func(t *testing.T) {
+		cancels := make(chan context.CancelFunc, 1)
+		createSignalContext = func(parent context.Context, _ ...os.Signal) (context.Context, context.CancelFunc) {
+			ctx, cancel := context.WithCancel(parent)
+			cancels <- cancel
+
+			return ctx, cancel
+		}
+
+		done := make(chan struct{})
+
+		go func() {
+			newRunProcess().run(cmd, nil)
+			close(done)
+		}()
+
+		synctest.Wait()
+
+		select {
+		case <-done:
+		default:
+			// Stop the process the way a signal would so the test can end.
+			(<-cancels)()
+			<-done
+
+			require.FailNow(t, "run kept running after detecting an old instance")
+		}
+	})
+}
