@@ -105,7 +105,10 @@ func RunUpdatesWithNotifications(
 	)
 	// An old instance stops instead of reporting a failed update, since nothing failed.
 	if errors.Is(err, errOldSelfDetected) {
-		log.Info().Msg("Watchtower is running in an old instance's container, stopping this instance")
+		// Process log only. Nothing failed, so this is not a notification.
+		log.Info().
+			Str("notify", "no").
+			Msg("Watchtower is running in an old instance's container, stopping this instance")
 
 		// End the scan for event subscribers, with nothing scanned.
 		if params.EventBroadcaster != nil {

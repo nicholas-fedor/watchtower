@@ -899,7 +899,7 @@ func Update(
 			progress,
 			gitSession,
 		)
-		progress.UpdateFailed(log, rollingFailed)
+		recordRestartOutcomes(log, progress, rollingFailed)
 
 		if rollingErr != nil {
 			return progress.Report(log), cleanupImageInfos, rollingErr
@@ -920,7 +920,7 @@ func Update(
 			client,
 			config,
 		)
-		progress.UpdateFailed(log, failedStop)
+		recordRestartOutcomes(log, progress, failedStop)
 
 		failedStart = restartContainersInSortedOrder(
 			log,
@@ -933,7 +933,7 @@ func Update(
 			progress,
 			gitSession,
 		)
-		progress.UpdateFailed(log, failedStart)
+		recordRestartOutcomes(log, progress, failedStart)
 	}
 
 	// Run post-check lifecycle hooks if enabled to finalize the update process.
@@ -1377,17 +1377,17 @@ func performRollingRestart(
 				Str("image", c.ImageName()).
 				Str("container_id", c.ID().ShortID()).
 				Msg("Skipped container restart due to context cancellation")
-			failed[c.ID()] = fmt.Errorf("restart skipped: %w", ctx.Err())
+			failed[c.ID()] = skipped(fmt.Errorf("restart skipped: %w", ctx.Err()))
 
 			// Handle remaining containers that were not processed due to cancellation.
 			for j := i + 1; j < len(containers); j++ {
-				skipped := containers[j]
+				untouched := containers[j]
 				log.Info().
-					Str("container", skipped.Name()).
-					Str("image", skipped.ImageName()).
-					Str("container_id", skipped.ID().ShortID()).
+					Str("container", untouched.Name()).
+					Str("image", untouched.ImageName()).
+					Str("container_id", untouched.ID().ShortID()).
 					Msg("Skipped container restart due to context cancellation")
-				failed[skipped.ID()] = fmt.Errorf("restart skipped: %w", ctx.Err())
+				failed[untouched.ID()] = skipped(fmt.Errorf("restart skipped: %w", ctx.Err()))
 			}
 
 			return failed, fmt.Errorf("rolling restart canceled: %w", ctx.Err())
@@ -1518,17 +1518,17 @@ func stopContainersInReversedOrder(
 				Str("image", c.ImageName()).
 				Str("container_id", c.ID().ShortID()).
 				Msg("Skipped container stop due to context cancellation")
-			failed[c.ID()] = fmt.Errorf("stop skipped: %w", ctx.Err())
+			failed[c.ID()] = skipped(fmt.Errorf("stop skipped: %w", ctx.Err()))
 
 			// Handle remaining containers that were not processed due to cancellation.
 			for j := i - 1; j >= 0; j-- {
-				skipped := containers[j]
+				untouched := containers[j]
 				log.Info().
-					Str("container", skipped.Name()).
-					Str("image", skipped.ImageName()).
-					Str("container_id", skipped.ID().ShortID()).
+					Str("container", untouched.Name()).
+					Str("image", untouched.ImageName()).
+					Str("container_id", untouched.ID().ShortID()).
 					Msg("Skipped container stop due to context cancellation")
-				failed[skipped.ID()] = fmt.Errorf("stop skipped: %w", ctx.Err())
+				failed[untouched.ID()] = skipped(fmt.Errorf("stop skipped: %w", ctx.Err()))
 			}
 
 			return failed, stopped
@@ -1560,6 +1560,31 @@ func stopContainersInReversedOrder(
 	}
 
 	return failed, stopped
+}
+
+// recordRestartOutcomes records the containers whose stop or restart did not
+// succeed: as skipped when the update deliberately left them untouched, and as
+// failed otherwise. A container that already failed in an earlier phase stays
+// failed, even when a later phase skips it.
+//
+// Parameters:
+//   - log: Process logger.
+//   - progress: Session progress to update.
+//   - outcomes: The error of each container that was not stopped or restarted.
+func recordRestartOutcomes(log *zerolog.Logger, progress *session.Progress, outcomes map[types.ContainerID]error) {
+	failed := make(map[types.ContainerID]error, len(outcomes))
+	skips := make(map[types.ContainerID]error)
+
+	for id, err := range outcomes {
+		if isSkip(err) {
+			skips[id] = err
+		} else {
+			failed[id] = err
+		}
+	}
+
+	progress.UpdateSkipped(log, skips)
+	progress.UpdateFailed(log, failed)
 }
 
 // stopStaleContainer stops a stale container if eligible.
@@ -1641,7 +1666,7 @@ func stopStaleContainer(
 				Fields(fields).
 				Msg("Skipping container due to pre-update exit code 75")
 
-			return errSkipUpdate
+			return skipped(errSkipUpdate)
 		}
 	}
 
@@ -1805,7 +1830,7 @@ func restartContainersInSortedOrder(
 				Str("image", c.ImageName()).
 				Str("container_id", c.ID().ShortID()).
 				Msg("Skipped container restart due to context cancellation")
-			failed[c.ID()] = fmt.Errorf("restart skipped: %w", ctx.Err())
+			failed[c.ID()] = skipped(fmt.Errorf("restart skipped: %w", ctx.Err()))
 
 			continue
 		}

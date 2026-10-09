@@ -97,11 +97,12 @@ func TestRunUpdatesWithNotifications_UpdateErrorKeepsPartialResults(t *testing.T
 		Update:           types.UpdateParams{RollingRestart: true, Cleanup: true},
 	})
 
-	assert.Equal(t, &metrics.Metric{Scanned: 2, Updated: 1, Failed: 1}, metric)
+	assert.Equal(t, &metrics.Metric{Scanned: 1, Updated: 1, Skipped: 1}, metric)
 
 	require.Len(t, sent, 1, "one notification is sent")
 	require.Len(t, sent[0].Updated(), 1, "the notification reports the replaced container")
-	assert.Len(t, sent[0].Failed(), 1, "the notification reports the container left unprocessed")
+	assert.Len(t, sent[0].Skipped(), 1, "the notification reports the container left unprocessed as skipped")
+	assert.Empty(t, sent[0].Failed())
 
 	updated := sent[0].Updated()[0]
 	assert.Equal(t, []types.ImageID{updated.CurrentImageID()}, removed,

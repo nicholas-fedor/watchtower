@@ -111,7 +111,7 @@ var _ = ginkgo.Describe("the update action", func() {
 		})
 
 		ginkgo.When("preupdate script returns 75", func() {
-			ginkgo.It("should not update those containers and collect no image IDs", func() {
+			ginkgo.It("should skip those containers and collect no image IDs", func() {
 				client := mockActions.CreateMockClient(
 					&mockActions.TestData{
 						Containers: []types.Container{
@@ -149,6 +149,8 @@ var _ = ginkgo.Describe("the update action", func() {
 				)
 				gomega.Expect(err).NotTo(gomega.HaveOccurred())
 				gomega.Expect(report.Updated()).To(gomega.BeEmpty())
+				gomega.Expect(report.Failed()).To(gomega.BeEmpty())
+				gomega.Expect(report.Skipped()).To(gomega.HaveLen(1))
 				gomega.Expect(cleanupImageInfos).To(gomega.BeEmpty())
 				gomega.Expect(client.TestData.TriedToRemoveImageCount.Load()).
 					To(gomega.Equal(int32(0)), "RemoveImageByID should not be called during Update")
