@@ -219,6 +219,36 @@ func TestRunUpgradesOnSchedule_UpdateOnStart(t *testing.T) {
 	}
 }
 
+// TestRunUpgradesOnSchedule_UpdateOnStartSkippedWhenCanceled verifies that the
+// update at startup does not run when the process context is already canceled,
+// for example by a stop signal during startup, so no canceled update is
+// reported as a failure.
+func TestRunUpgradesOnSchedule_UpdateOnStartSkippedWhenCanceled(t *testing.T) {
+	client := mockActions.CreateMockClient(&mockActions.TestData{}, false, false)
+
+	updateCalled := false
+	runUpdatesWithNotifications := func(_ context.Context, _ types.Filter, _ types.UpdateParams) *metrics.Metric {
+		updateCalled = true
+
+		return &metrics.Metric{}
+	}
+
+	ctx, cancel := context.WithCancel(t.Context())
+	cancel()
+
+	deps := testDeps(client, runUpdatesWithNotifications, func(logging.StartupParams) {})
+	deps.UpdateOnStart = true
+
+	err := scheduling.RunUpgradesOnSchedule(ctx, deps)
+	if err != nil {
+		t.Errorf("expected no error, got %v", err)
+	}
+
+	if updateCalled {
+		t.Error("expected the update at startup to be skipped")
+	}
+}
+
 func TestWaitForRunningUpdate_NoUpdateRunning(t *testing.T) {
 	ctx := context.Background()
 

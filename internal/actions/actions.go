@@ -2,6 +2,7 @@ package actions
 
 import (
 	"context"
+	"errors"
 	"strings"
 	"time"
 
@@ -55,6 +56,10 @@ type RunUpdatesWithNotificationsParams struct {
 	EventBroadcaster *events.Broadcaster
 	// Update is the complete update policy for this invocation (filter, cleanup, timeouts, etc.).
 	Update types.UpdateParams
+	// OnOldSelfDetected is called when Watchtower finds that it runs in an old
+	// instance's container, after that container's restart policy is disabled.
+	// The caller should stop the process. Nil means the session simply ends.
+	OnOldSelfDetected func()
 }
 
 // RunUpdatesWithNotifications performs container updates and sends notifications about the results.
@@ -98,6 +103,26 @@ func RunUpdatesWithNotifications(
 		updateConfig,
 		params.GitClient,
 	)
+	// An old instance stops instead of reporting a failed update, since nothing failed.
+	if errors.Is(err, errOldSelfDetected) {
+		log.Info().Msg("Watchtower is running in an old instance's container, stopping this instance")
+
+		// End the scan for event subscribers, with nothing scanned.
+		if params.EventBroadcaster != nil {
+			params.EventBroadcaster.Publish(events.Event{
+				Type:      "scan_completed",
+				Timestamp: time.Now().UTC(),
+				Data:      events.ScanCompletedData{},
+			})
+		}
+
+		if params.OnOldSelfDetected != nil {
+			params.OnOldSelfDetected()
+		}
+
+		return &metrics.Metric{}
+	}
+
 	// Process update result, return metric on failure
 	metric := handleUpdateResult(log, result, err, params.Notifier)
 	if metric != nil {

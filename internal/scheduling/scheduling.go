@@ -282,7 +282,9 @@ func RunUpgradesOnSchedule(ctx context.Context, deps ScheduleDeps) error {
 	}
 
 	// Check if update-on-start is enabled and trigger immediate update if so.
-	if deps.UpdateOnStart {
+	// Skip it when the process is already stopping, so a canceled update is not
+	// reported as a failure.
+	if deps.UpdateOnStart && ctx.Err() == nil {
 		updateFunc(false, false)
 	}
 

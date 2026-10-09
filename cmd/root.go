@@ -596,6 +596,8 @@ func (p *process) runMain(cfg types.RunConfig) int {
 			NotificationReport:           appCfg.Notify.Report,
 			EventBroadcaster:             eventsBroadcaster,
 			Update:                       update,
+			// Stop the process, as a signal would, when this is an old instance.
+			OnOldSelfDetected: stop,
 		})
 	}
 
