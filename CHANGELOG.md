@@ -53,6 +53,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Chores
 
+- Update nicholas-fedor/govulncheck-action action to v1.1.0 by @renovate[bot] in [#2667](https://github.com/nicholas-fedor/watchtower/pull/2667)
 - Remove the codacy integration by @nicholas-fedor in [#2665](https://github.com/nicholas-fedor/watchtower/pull/2665)
 - Update nicholas-fedor/govulncheck-action action to v1.0.6 by @renovate[bot] in [#2660](https://github.com/nicholas-fedor/watchtower/pull/2660)
 - Update module github.com/knadh/koanf/providers/env to v2 by @renovate[bot] in [#2653](https://github.com/nicholas-fedor/watchtower/pull/2653)
