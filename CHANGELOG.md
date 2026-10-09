@@ -56,6 +56,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Chores
 
+- Update module github.com/docker/docker-credential-helpers to v0.9.10 by @renovate[bot] in [#2683](https://github.com/nicholas-fedor/watchtower/pull/2683)
+- Update github.com/tonistiigi/fsutil digest to c1c5bff by @renovate[bot] in [#2682](https://github.com/nicholas-fedor/watchtower/pull/2682)
 - Update module golang.org/x/sys to v0.49.0 by @renovate[bot] in [#2677](https://github.com/nicholas-fedor/watchtower/pull/2677)
 - Update github.com/tonistiigi/fsutil digest to c60bd37 by @renovate[bot] in [#2676](https://github.com/nicholas-fedor/watchtower/pull/2676)
 - Update nicholas-fedor/actionlint-action action to v1.0.19 by @renovate[bot] in [#2672](https://github.com/nicholas-fedor/watchtower/pull/2672)
