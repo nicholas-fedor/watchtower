@@ -148,19 +148,20 @@ func (e *emailTypeNotifier) GetURL(_ *cobra.Command) (string, error) {
 	port := uint16(e.Port)
 
 	conf := &smtp.Config{
-		FromAddress: e.From,
-		FromName:    "Watchtower",
-		ToAddresses: []string{e.To},
-		Port:        port,
-		Host:        e.Server,
-		Username:    e.User,
-		Password:    e.Password,
-		UseStartTLS: !e.tlsSkipVerify,
-		UseHTML:     false,
-		Encryption:  smtp.EncMethods.Auto,
-		Auth:        smtp.AuthTypes.None,
-		ClientHost:  "localhost",
-		Timeout:     defaultTimeout,
+		FromAddress:   e.From,
+		FromName:      "Watchtower",
+		ToAddresses:   []string{e.To},
+		Port:          port,
+		Host:          e.Server,
+		Username:      e.User,
+		Password:      e.Password,
+		UseStartTLS:   true,
+		UseHTML:       false,
+		Encryption:    smtp.EncMethods.Auto,
+		Auth:          smtp.AuthTypes.None,
+		ClientHost:    "localhost",
+		SkipTLSVerify: e.tlsSkipVerify,
+		Timeout:       defaultTimeout,
 	}
 
 	// Enable authentication if credentials provided.
@@ -168,13 +169,6 @@ func (e *emailTypeNotifier) GetURL(_ *cobra.Command) (string, error) {
 		conf.Auth = smtp.AuthTypes.Plain
 
 		clog.Debug().Msg("Using plain authentication")
-	}
-
-	// Disable encryption if TLS verification is skipped.
-	if e.tlsSkipVerify {
-		conf.Encryption = smtp.EncMethods.None
-
-		clog.Debug().Msg("TLS verification skipped")
 	}
 
 	url := conf.GetURL().String()
