@@ -66,3 +66,54 @@ func TestIsMatchesWrappedRateLimit(t *testing.T) {
 	assert.False(t, Is(errors.New("connection refused")))
 	assert.False(t, Is(nil))
 }
+
+// TestIsTokenBucket covers which Retry-After values count as a bucket refill
+// signal rather than a backoff instruction.
+func TestIsTokenBucket(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name string
+		info *Error
+		want bool
+	}{
+		{
+			name: "nil info",
+			info: nil,
+			want: true,
+		},
+		{
+			name: "sub-millisecond with quota",
+			info: &Error{RetryAfter: 331 * time.Microsecond, Allowed: 44000, AllowedWindow: time.Minute},
+			want: true,
+		},
+		{
+			name: "zero with quota",
+			info: &Error{Allowed: 44000, AllowedWindow: time.Minute},
+			want: true,
+		},
+		{
+			name: "at the floor",
+			info: &Error{RetryAfter: minHonorWait},
+			want: false,
+		},
+		{
+			name: "seconds",
+			info: &Error{RetryAfter: 5 * time.Second},
+			want: false,
+		},
+		{
+			name: "beyond the honor window",
+			info: &Error{RetryAfter: 2 * time.Hour},
+			want: false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			assert.Equal(t, tt.want, isTokenBucket(tt.info))
+		})
+	}
+}

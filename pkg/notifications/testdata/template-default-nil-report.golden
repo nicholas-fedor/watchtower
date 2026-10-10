@@ -36,5 +36,6 @@ Skipping Watchtower self-update in run-once mode
 Only checking containers in scope
 Starting HTTP API server
 HTTP API server is enabled
+Registry rate limit retries exhausted. Container failed for this cycle
 Unrecognized message with fields
 Unrecognized message without fields

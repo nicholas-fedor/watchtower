@@ -7,6 +7,10 @@
 // checks cannot dump the advertised budget in a burst.
 // Unauthenticated GHCR traffic is serialized from the first request onto a
 // separate limiter key from [Scope] so anonymous 429s cannot pace authenticated
-// checks. Token-bucket waits retry until the honor window. In-cycle retries are
-// debug. Giving up is a warning.
+// checks. A Retry-After below the floor is a token-bucket signal: it is retried
+// with exponential backoff from the floor toward the honor window for up to the
+// bucket budget, counted from the first throttle. A usable Retry-After is
+// honored as sent for up to the honor window. In-cycle retries are debug. Giving
+// up is a warning only when the registry asked for a wait beyond the honor
+// window.
 package ratelimit

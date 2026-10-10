@@ -307,11 +307,50 @@ Authenticating with a Docker Hub account raises the limit from 100 to 200 pulls,
 
 #### GitHub Container Registry (ghcr.io)
 
-GHCR.io does not publish Docker Hub-style pull quotas. Anonymous pulls of a public org share an undocumented edge token bucket, observed as `allowed: 44000/minute` with a sub-millisecond `retry-after`. That includes `lscr.io/linuxserver/*` images, which Watchtower remaps to `ghcr.io` for digest and auth.
+GHCR does not publish Docker Hub-style pull quotas. Requests for a public org's packages draw from one undocumented token bucket per org, observed as `allowed: 44000/minute` with a sub-millisecond `retry-after`. The same bucket serves `lscr.io/linuxserver/*` images, which Watchtower remaps to `ghcr.io` for digest checks and authentication.
 
-Unauthenticated GHCR checks reuse one anonymous token across public images and run one at a time. Later images in that token lifetime skip the registry challenge. Tiny waits are floored to 100ms and retried for up to 30 seconds. Those retries and the exhaustion of that window stay at debug so they do not become notifications. The container is **failed** for the cycle. A Retry-After longer than 30 seconds is logged as a warning and is not retried until the next run.
+!!! Important "Shared org buckets run dry at the top of every hour"
+    Buckets for popular orgs such as `linuxserver` are observed empty for the first one to two minutes of each hour, when scheduled update tools fire together. A run that starts at `:00` sends its first pulls into that window. See [Scheduling Around the Hour](#scheduling_around_the_hour).
 
-`docker login ghcr.io` (or equivalent credentials in `config.json` / `REPO_USER` and `REPO_PASS`) uses a per-user bucket and restores parallel GHCR checks. Login to `lscr.io` alone does not count. Credential lookup uses `ghcr.io` after the remap.
+##### Handling a 429 Response
+
+Watchtower reads the `retry-after` value of a `429` response and handles it in one of three ways:
+
+| `retry-after`          | Meaning                              | Watchtower response                                                                                                   |
+|------------------------|--------------------------------------|-----------------------------------------------------------------------------------------------------------------------|
+| Below 100ms            | The shared bucket is empty right now | Ignores the value and backs off exponentially from 100ms toward 30 seconds, for up to 3 minutes from the first throttle |
+| 100ms to 30 seconds    | A wait the registry asked for        | Honors the wait as sent, with jitter, for up to 30 seconds                                                            |
+| Longer than 30 seconds | A backoff beyond one cycle           | Logs a warning and leaves the image for the next run                                                                  |
+
+Retries within a cycle are logged at debug so they do not become notifications. When the retry window is exhausted:
+
+- The container is marked **Failed** for the cycle.
+- One warning naming the container is logged and included in log-based notifications.
+- The report notification lists the container under Failed with the registry error.
+
+##### Anonymous and Authenticated Checks
+
+=== "Anonymous"
+
+    - One anonymous token is reused across public images, and later images in that token lifetime skip the registry challenge.
+    - Checks run one at a time so parallel requests cannot drain the shared bucket in a burst.
+    - Every request draws from the org's shared bucket.
+
+=== "Authenticated"
+
+    - `docker login ghcr.io`, or equivalent credentials in `config.json` or `REPO_USER` and `REPO_PASS`, separates your checks from anonymous throttling and restores parallel checks.
+    - Pulls of a public org can still land in that org's shared bucket, so credentials reduce but do not remove top-of-the-hour throttling.
+    - Login to `lscr.io` alone does not count. Credential lookup uses `ghcr.io` after the remap.
+
+##### Scheduling Around the Hour
+
+Schedule Watchtower away from the top of the hour:
+
+```text
+--schedule "0 17 3 * * *"
+```
+
+Interval runs follow the start time, so start Watchtower a few minutes past the hour when polling with `--interval`.
 
 #### Per-Registry Impact Summary
 
@@ -320,7 +359,7 @@ Unauthenticated GHCR checks reuse one anonymous token across public images and r
 | Docker Hub (unauthenticated)    | 100 / 6 hours               | Moderate — may exceed limit with many containers on short intervals |
 | Docker Hub (authenticated free) | 200 / 6 hours               | Low — sufficient for most deployments                               |
 | Docker Hub (paid)               | Unlimited                   | None                                                                |
-| GHCR.io                         | ~44,000 / minute fill rate (small burst, org-scoped when anonymous) | Low — unauthenticated checks are sequential and retry for up to 30s. Authenticate to `ghcr.io` for a per-user bucket and parallel checks. |
+| GHCR.io                         | ~44,000 / minute fill rate (small burst, org-scoped) | Low — checks back off for up to 3 minutes when the org bucket is empty. Authenticate to `ghcr.io` for parallel checks and schedule away from the top of the hour. |
 
 ### Monitor-Only Containers
 

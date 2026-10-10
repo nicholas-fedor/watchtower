@@ -71,6 +71,7 @@ var legacyTemplateMessages = []string{
 	"Only checking containers in scope",
 	"Starting HTTP API server",
 	"HTTP API server is enabled",
+	"Registry rate limit retries exhausted. Container failed for this cycle",
 }
 
 // Disk sizes used by the image-usage budget fixtures, in bytes.
@@ -188,6 +189,12 @@ func goldenEntryData(message string) map[string]any {
 	case "Could not dependency-sort Compose batches. Using the existing container order",
 		"Could not order Compose batches by dependencies. Using first-seen order":
 		return map[string]any{"error": "circular reference detected"}
+	case "Registry rate limit retries exhausted. Container failed for this cycle":
+		return map[string]any{
+			"container": "app",
+			"image":     "org/app:latest",
+			"error":     "image pull: registry rate limited: retry-after 347.256µs allowed 44000 per 1m0s",
+		}
 	case "Only checking containers in scope":
 		return map[string]any{"scope": "production"}
 	case "Starting HTTP API server", "HTTP API server is enabled":
