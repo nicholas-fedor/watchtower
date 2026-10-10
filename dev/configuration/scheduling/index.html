@@ -2907,6 +2907,7 @@
 <ul>
 <li>Cannot be used with the <a href="#interval"><code>interval</code></a> configuration option.</li>
 <li>Requires a time zone set via <code>TZ</code> or a mounted <code>/etc/localtime</code> file. See <a href="#time_zone">Time Zone</a>.</li>
+<li>Shared registry buckets, such as GHCR's for <code>lscr.io/linuxserver/*</code> images, are empty for the first minute or two of every hour. Pick a minute away from <code>:00</code>, for example <code>0 17 3 * * *</code>. See <a href="../../advanced-features/image-cooldown/#github_container_registry_ghcrio">GitHub Container Registry</a>.</li>
 </ul>
 </div>
 <h2 id="interval">Interval<a class="headerlink" href="#interval" title="Permanent link">&para;</a></h2>
@@ -2990,7 +2991,7 @@ If a schedule is configured (via --schedule or --interval), then Watchtower cont
     <span class="md-icon" title="Last update">
       <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M21 13.1c-.1 0-.3.1-.4.2l-1 1 2.1 2.1 1-1c.2-.2.2-.6 0-.8l-1.3-1.3c-.1-.1-.2-.2-.4-.2m-1.9 1.8-6.1 6V23h2.1l6.1-6.1zM12.5 7v5.2l4 2.4-1 1L11 13V7zM11 21.9c-5.1-.5-9-4.8-9-9.9C2 6.5 6.5 2 12 2c5.3 0 9.6 4.1 10 9.3-.3-.1-.6-.2-1-.2s-.7.1-1 .2C19.6 7.2 16.2 4 12 4c-4.4 0-8 3.6-8 8 0 4.1 3.1 7.5 7.1 7.9l-.1.2z"/></svg>
     </span>
-    <span class="git-revision-date-localized-plugin git-revision-date-localized-plugin-timeago" title="July 14, 2026 14:36:11 UTC"><span class="timeago" datetime="2026-07-14T14:36:11+00:00" locale="en"></span></span><span class="git-revision-date-localized-plugin git-revision-date-localized-plugin-iso_date" title="July 14, 2026 14:36:11 UTC">2026-07-14</span>
+    <span class="git-revision-date-localized-plugin git-revision-date-localized-plugin-timeago" title="October 10, 2026 17:48:16 UTC"><span class="timeago" datetime="2026-10-10T17:48:16+00:00" locale="en"></span></span><span class="git-revision-date-localized-plugin git-revision-date-localized-plugin-iso_date" title="October 10, 2026 17:48:16 UTC">2026-10-10</span>
   </span>
 
     

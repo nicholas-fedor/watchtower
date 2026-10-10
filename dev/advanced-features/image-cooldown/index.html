@@ -2607,6 +2607,45 @@
     </span>
   </a>
   
+    <nav class="md-nav" aria-label="GitHub Container Registry (ghcr.io)">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#handling_a_429_response" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Handling a 429 Response
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#anonymous_and_authenticated_checks" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Anonymous and Authenticated Checks
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#scheduling_around_the_hour" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Scheduling Around the Hour
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
 </li>
         
           <li class="md-nav__item">
@@ -3173,6 +3212,45 @@
     </span>
   </a>
   
+    <nav class="md-nav" aria-label="GitHub Container Registry (ghcr.io)">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#handling_a_429_response" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Handling a 429 Response
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#anonymous_and_authenticated_checks" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Anonymous and Authenticated Checks
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#scheduling_around_the_hour" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Scheduling Around the Hour
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
 </li>
         
           <li class="md-nav__item">
@@ -3607,9 +3685,69 @@ The cooldown age check uses <code>GET</code> requests for manifests, which do co
 <p>Users running Watchtower against Docker Hub with many monitored containers or short polling intervals should be aware that each stale image detected during a cooldown window consumes one or two pulls.
 Authenticating with a Docker Hub account raises the limit from 100 to 200 pulls, and paid tiers have unlimited pulls.</p>
 <h4 id="github_container_registry_ghcrio">GitHub Container Registry (ghcr.io)<a class="headerlink" href="#github_container_registry_ghcrio" title="Permanent link">&para;</a></h4>
-<p>GHCR.io does not publish Docker Hub-style pull quotas. Anonymous pulls of a public org share an undocumented edge token bucket, observed as <code>allowed: 44000/minute</code> with a sub-millisecond <code>retry-after</code>. That includes <code>lscr.io/linuxserver/*</code> images, which Watchtower remaps to <code>ghcr.io</code> for digest and auth.</p>
-<p>Unauthenticated GHCR checks reuse one anonymous token across public images and run one at a time. Later images in that token lifetime skip the registry challenge. Tiny waits are floored to 100ms and retried for up to 30 seconds. Those retries and the exhaustion of that window stay at debug so they do not become notifications. The container is <strong>failed</strong> for the cycle. A Retry-After longer than 30 seconds is logged as a warning and is not retried until the next run.</p>
-<p><code>docker login ghcr.io</code> (or equivalent credentials in <code>config.json</code> / <code>REPO_USER</code> and <code>REPO_PASS</code>) uses a per-user bucket and restores parallel GHCR checks. Login to <code>lscr.io</code> alone does not count. Credential lookup uses <code>ghcr.io</code> after the remap.</p>
+<p>GHCR does not publish Docker Hub-style pull quotas. Requests for a public org's packages draw from one undocumented token bucket per org, observed as <code>allowed: 44000/minute</code> with a sub-millisecond <code>retry-after</code>. The same bucket serves <code>lscr.io/linuxserver/*</code> images, which Watchtower remaps to <code>ghcr.io</code> for digest checks and authentication.</p>
+<div class="admonition important">
+<p class="admonition-title">Shared org buckets run dry at the top of every hour</p>
+<p>Buckets for popular orgs such as <code>linuxserver</code> are observed empty for the first one to two minutes of each hour, when scheduled update tools fire together. A run that starts at <code>:00</code> sends its first pulls into that window. See <a href="#scheduling_around_the_hour">Scheduling Around the Hour</a>.</p>
+</div>
+<h5 id="handling_a_429_response">Handling a 429 Response<a class="headerlink" href="#handling_a_429_response" title="Permanent link">&para;</a></h5>
+<p>Watchtower reads the <code>retry-after</code> value of a <code>429</code> response and handles it in one of three ways:</p>
+<table>
+<thead>
+<tr>
+<th><code>retry-after</code></th>
+<th>Meaning</th>
+<th>Watchtower response</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Below 100ms</td>
+<td>The shared bucket is empty right now</td>
+<td>Ignores the value and backs off exponentially from 100ms toward 30 seconds, for up to 3 minutes from the first throttle</td>
+</tr>
+<tr>
+<td>100ms to 30 seconds</td>
+<td>A wait the registry asked for</td>
+<td>Honors the wait as sent, with jitter, for up to 30 seconds</td>
+</tr>
+<tr>
+<td>Longer than 30 seconds</td>
+<td>A backoff beyond one cycle</td>
+<td>Logs a warning and leaves the image for the next run</td>
+</tr>
+</tbody>
+</table>
+<p>Retries within a cycle are logged at debug so they do not become notifications. When the retry window is exhausted:</p>
+<ul>
+<li>The container is marked <strong>Failed</strong> for the cycle.</li>
+<li>One warning naming the container is logged and included in log-based notifications.</li>
+<li>The report notification lists the container under Failed with the registry error.</li>
+</ul>
+<h5 id="anonymous_and_authenticated_checks">Anonymous and Authenticated Checks<a class="headerlink" href="#anonymous_and_authenticated_checks" title="Permanent link">&para;</a></h5>
+<div class="tabbed-set tabbed-alternate" data-tabs="4:2"><input checked="checked" id="__tabbed_4_1" name="__tabbed_4" type="radio" /><input id="__tabbed_4_2" name="__tabbed_4" type="radio" /><div class="tabbed-labels"><label for="__tabbed_4_1">Anonymous</label><label for="__tabbed_4_2">Authenticated</label></div>
+<div class="tabbed-content">
+<div class="tabbed-block">
+<ul>
+<li>One anonymous token is reused across public images, and later images in that token lifetime skip the registry challenge.</li>
+<li>Checks run one at a time so parallel requests cannot drain the shared bucket in a burst.</li>
+<li>Every request draws from the org's shared bucket.</li>
+</ul>
+</div>
+<div class="tabbed-block">
+<ul>
+<li><code>docker login ghcr.io</code>, or equivalent credentials in <code>config.json</code> or <code>REPO_USER</code> and <code>REPO_PASS</code>, separates your checks from anonymous throttling and restores parallel checks.</li>
+<li>Pulls of a public org can still land in that org's shared bucket, so credentials reduce but do not remove top-of-the-hour throttling.</li>
+<li>Login to <code>lscr.io</code> alone does not count. Credential lookup uses <code>ghcr.io</code> after the remap.</li>
+</ul>
+</div>
+</div>
+</div>
+<h5 id="scheduling_around_the_hour">Scheduling Around the Hour<a class="headerlink" href="#scheduling_around_the_hour" title="Permanent link">&para;</a></h5>
+<p>Schedule Watchtower away from the top of the hour:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-10-1" name="__codelineno-10-1" href="#__codelineno-10-1"></a>--schedule "0 17 3 * * *"
+</code></pre></div>
+<p>Interval runs follow the start time, so start Watchtower a few minutes past the hour when polling with <code>--interval</code>.</p>
 <h4 id="per-registry_impact_summary">Per-Registry Impact Summary<a class="headerlink" href="#per-registry_impact_summary" title="Permanent link">&para;</a></h4>
 <table>
 <thead>
@@ -3637,8 +3775,8 @@ Authenticating with a Docker Hub account raises the limit from 100 to 200 pulls,
 </tr>
 <tr>
 <td>GHCR.io</td>
-<td>~44,000 / minute fill rate (small burst, org-scoped when anonymous)</td>
-<td>Low — unauthenticated checks are sequential and retry for up to 30s. Authenticate to <code>ghcr.io</code> for a per-user bucket and parallel checks.</td>
+<td>~44,000 / minute fill rate (small burst, org-scoped)</td>
+<td>Low — checks back off for up to 3 minutes when the org bucket is empty. Authenticate to <code>ghcr.io</code> for parallel checks and schedule away from the top of the hour.</td>
 </tr>
 </tbody>
 </table>
@@ -3652,18 +3790,18 @@ This means containers may update at different times even when using the same ima
 <h2 id="notifications">Notifications<a class="headerlink" href="#notifications" title="Permanent link">&para;</a></h2>
 <p>Watchtower reports the cooldown status in its notifications.
 The output varies depending on the outcome:</p>
-<div class="tabbed-set tabbed-alternate" data-tabs="4:3"><input checked="checked" id="__tabbed_4_1" name="__tabbed_4" type="radio" /><input id="__tabbed_4_2" name="__tabbed_4" type="radio" /><input id="__tabbed_4_3" name="__tabbed_4" type="radio" /><div class="tabbed-labels"><label for="__tabbed_4_1">Image age exceeds cooldown</label><label for="__tabbed_4_2">Image within cooldown</label><label for="__tabbed_4_3">Image age unavailable</label></div>
+<div class="tabbed-set tabbed-alternate" data-tabs="5:3"><input checked="checked" id="__tabbed_5_1" name="__tabbed_5" type="radio" /><input id="__tabbed_5_2" name="__tabbed_5" type="radio" /><input id="__tabbed_5_3" name="__tabbed_5" type="radio" /><div class="tabbed-labels"><label for="__tabbed_5_1">Image age exceeds cooldown</label><label for="__tabbed_5_2">Image within cooldown</label><label for="__tabbed_5_3">Image age unavailable</label></div>
 <div class="tabbed-content">
 <div class="tabbed-block">
-<div class="highlight"><pre><span></span><code><a id="__codelineno-10-1" name="__codelineno-10-1" href="#__codelineno-10-1"></a>nickfedor/watchtower:latest created more than 24 hours ago - eligible for update
+<div class="highlight"><pre><span></span><code><a id="__codelineno-11-1" name="__codelineno-11-1" href="#__codelineno-11-1"></a>nickfedor/watchtower:latest created more than 24 hours ago - eligible for update
 </code></pre></div>
 </div>
 <div class="tabbed-block">
-<div class="highlight"><pre><span></span><code><a id="__codelineno-11-1" name="__codelineno-11-1" href="#__codelineno-11-1"></a>nickfedor/watchtower:latest created less than 24 hours ago - eligible in 18 hours, 23 minutes
+<div class="highlight"><pre><span></span><code><a id="__codelineno-12-1" name="__codelineno-12-1" href="#__codelineno-12-1"></a>nickfedor/watchtower:latest created less than 24 hours ago - eligible in 18 hours, 23 minutes
 </code></pre></div>
 </div>
 <div class="tabbed-block">
-<div class="highlight"><pre><span></span><code><a id="__codelineno-12-1" name="__codelineno-12-1" href="#__codelineno-12-1"></a>nickfedor/watchtower:latest creation time unavailable (cooldown: 24 hours) - deferring update for safety
+<div class="highlight"><pre><span></span><code><a id="__codelineno-13-1" name="__codelineno-13-1" href="#__codelineno-13-1"></a>nickfedor/watchtower:latest creation time unavailable (cooldown: 24 hours) - deferring update for safety
 </code></pre></div>
 </div>
 </div>
@@ -3690,7 +3828,7 @@ The output varies depending on the outcome:</p>
     <span class="md-icon" title="Last update">
       <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M21 13.1c-.1 0-.3.1-.4.2l-1 1 2.1 2.1 1-1c.2-.2.2-.6 0-.8l-1.3-1.3c-.1-.1-.2-.2-.4-.2m-1.9 1.8-6.1 6V23h2.1l6.1-6.1zM12.5 7v5.2l4 2.4-1 1L11 13V7zM11 21.9c-5.1-.5-9-4.8-9-9.9C2 6.5 6.5 2 12 2c5.3 0 9.6 4.1 10 9.3-.3-.1-.6-.2-1-.2s-.7.1-1 .2C19.6 7.2 16.2 4 12 4c-4.4 0-8 3.6-8 8 0 4.1 3.1 7.5 7.1 7.9l-.1.2z"/></svg>
     </span>
-    <span class="git-revision-date-localized-plugin git-revision-date-localized-plugin-timeago" title="October 10, 2026 12:41:03 UTC"><span class="timeago" datetime="2026-10-10T12:41:03+00:00" locale="en"></span></span><span class="git-revision-date-localized-plugin git-revision-date-localized-plugin-iso_date" title="October 10, 2026 12:41:03 UTC">2026-10-10</span>
+    <span class="git-revision-date-localized-plugin git-revision-date-localized-plugin-timeago" title="October 10, 2026 17:48:16 UTC"><span class="timeago" datetime="2026-10-10T17:48:16+00:00" locale="en"></span></span><span class="git-revision-date-localized-plugin git-revision-date-localized-plugin-iso_date" title="October 10, 2026 17:48:16 UTC">2026-10-10</span>
   </span>
 
     
