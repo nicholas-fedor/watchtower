@@ -10,6 +10,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Keep legacy email encrypted when skipping tls verification by @nicholas-fedor in [#2728](https://github.com/nicholas-fedor/watchtower/pull/2728)
 - Defer updates for images created in the future by @nicholas-fedor in [#2726](https://github.com/nicholas-fedor/watchtower/pull/2726)
 - Limit the self-update pull failure delay to run-once mode by @nicholas-fedor in [#2721](https://github.com/nicholas-fedor/watchtower/pull/2721)
 - Fail a manifest retry that asks for another host by @nicholas-fedor in [#2719](https://github.com/nicholas-fedor/watchtower/pull/2719)
