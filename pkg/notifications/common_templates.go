@@ -18,7 +18,8 @@ var commonTemplates = map[string]string{
 	// "Docker image usage exceeds configured maximum" (session blocked by image-usage budget),
 	// "Docker image usage exceeds configured warning threshold" (image-usage budget warning),
 	// "Failed to query Docker image disk usage" (image-usage query failed),
-	// "Docker image usage budget enabled" (startup budget configuration).
+	// "Docker image usage budget enabled" (startup budget configuration),
+	// "Registry rate limit retries exhausted. Container failed for this cycle" (update failed on a registry rate limit).
 	// For unrecognized messages, displays the message with key=value data pairs if Data exists, otherwise just the message.
 	// Expects .Entries []Entry where each Entry has Message string and Data map[string]interface{}.
 	"default-legacy": `
@@ -105,6 +106,8 @@ var commonTemplates = map[string]string{
     Skipped {{with (index $e.Data "container")}}{{.}}{{else}}container{{end}}: invalid git semver policy
 {{- else if eq $msg "Skipped container with an invalid git-host" -}}
     Skipped {{with (index $e.Data "container")}}{{.}}{{else}}container{{end}}: invalid git-host
+{{- else if eq $msg "Registry rate limit retries exhausted. Container failed for this cycle" -}}
+    Update failed for {{with (index $e.Data "container")}}{{.}}{{else}}container{{end}} ({{with (index $e.Data "image")}}{{.}}{{else}}unknown{{end}}){{with (index $e.Data "error")}}: {{.}}{{end}}
 {{- else if $e.Data -}}
     {{- /* For messages with data, show message and key=value pairs */ -}}
     {{$msg}} | {{range $k, $v := $e.Data}}{{$k}}={{$v}} {{end}}

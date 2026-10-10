@@ -260,6 +260,41 @@ var _ = ginkgo.Describe("the client", func() {
 			gomega.Expect(err).To(gomega.HaveOccurred())
 			gomega.Expect(ratelimit.Is(err)).To(gomega.BeTrue())
 		})
+		ginkgo.It("backs off and succeeds when the daemon reports a sub-millisecond retry-after", func() {
+			ratelimit.ResetForTest()
+			defer ratelimit.ResetForTest()
+
+			var pulls atomic.Int32
+
+			mockServer.AllowUnhandledRequests = true
+			mockServer.RouteToHandler("POST", regexp.MustCompile(`/images/create`), func(w http.ResponseWriter, _ *http.Request) {
+				if pulls.Add(1) <= 2 {
+					w.WriteHeader(http.StatusTooManyRequests)
+					_, _ = w.Write([]byte(`{"message":"toomanyrequests: retry-after: 331.163µs, allowed: 44000/minute"}`))
+
+					return
+				}
+
+				w.WriteHeader(http.StatusOK)
+				_, _ = w.Write([]byte(`{"status":"Download complete"}` + "\n"))
+			})
+
+			ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+			defer cancel()
+
+			i := newImageClient(mockClient, testLog())
+
+			started := time.Now()
+			err := i.performImagePull(
+				ctx,
+				"ghcr.io/linuxserver/nginx:latest",
+				dockerClient.ImagePullOptions{},
+			)
+			gomega.Expect(err).NotTo(gomega.HaveOccurred())
+			gomega.Expect(pulls.Load()).To(gomega.Equal(int32(3)))
+			// Two bucket waits of at least 100ms and 150ms separate the three pulls.
+			gomega.Expect(time.Since(started)).To(gomega.BeNumerically(">=", 250*time.Millisecond))
+		})
 	})
 
 	ginkgo.When("the pull slot context is canceled", func() {

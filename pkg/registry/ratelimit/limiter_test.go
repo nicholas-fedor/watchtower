@@ -435,3 +435,15 @@ func TestObserveAnonDoesNotPaceAuth(t *testing.T) {
 	require.NoError(t, Wait(t.Context(), Scope("ghcr.io", true)))
 	assert.Less(t, time.Since(started), 50*time.Millisecond)
 }
+
+// TestResetForTestRestoresRetryBudgets covers the reset returning both retry
+// budgets to their production values.
+func TestResetForTestRestoresRetryBudgets(t *testing.T) {
+	retryElapsed = time.Millisecond
+	bucketRetryElapsed = time.Millisecond
+
+	ResetForTest()
+
+	assert.Equal(t, maxRetryElapsed, retryElapsed)
+	assert.Equal(t, maxBucketRetryElapsed, bucketRetryElapsed)
+}

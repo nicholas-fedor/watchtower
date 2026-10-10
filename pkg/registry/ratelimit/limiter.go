@@ -41,11 +41,12 @@ var (
 // ResetForTest clears per-host cooldown, quota, and serial-slot state.
 //
 // Tests call this so one case cannot leak a cooldown or serial hold into the next.
-// It also restores the production honor window used by [Do] and [DoValue].
+// It also restores the production retry budgets used by [Do] and [DoValue].
 func ResetForTest() {
 	hostsMu.Lock()
 	hostStates = map[string]*hostState{}
 	retryElapsed = maxRetryElapsed
+	bucketRetryElapsed = maxBucketRetryElapsed
 	hostsMu.Unlock()
 
 	serialMu.Lock()

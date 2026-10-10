@@ -14,8 +14,12 @@ import (
 // Do retries operation when the registry returns a 429 that is worth retrying.
 //
 // Permanent errors are not retried. A Retry-After longer than the honor window
-// stops retries so the next Watchtower cycle can try again. Tiny token-bucket
-// waits retry until that same window elapses.
+// stops retries so the next Watchtower cycle can try again. A usable Retry-After
+// is honored as sent for up to the honor window. A token-bucket 429, whose
+// Retry-After is below the floor, is retried with exponential backoff from the
+// floor toward the honor window for up to the bucket budget. Both budgets are
+// counted from the first throttle, so time spent queued on a pull slot or inside
+// a long attempt before that throttle does not consume them.
 //
 // Parameters:
 //   - ctx: Context that bounds the retry loop.
@@ -57,9 +61,9 @@ func DoValue[T any](
 		return zero, fmt.Errorf("rate-limit retry canceled: %w", ctxErr)
 	}
 
-	exp := backoff.NewExponentialBackOff()
-	exp.InitialInterval = minHonorWait
-	exp.MaxInterval = maxHonorWait
+	policy := newBucketPolicy()
+
+	var firstLimitedAt time.Time
 
 	attempt := 0
 	lastHonoredWait := time.Duration(0)
@@ -92,29 +96,45 @@ func DoValue[T any](
 			lastRawRetryAfter = info.RetryAfter
 		}
 
+		now := time.Now()
+		if firstLimitedAt.IsZero() {
+			firstLimitedAt = now
+		}
+
 		wait, giveUp := Decision(info)
+		bucket := isTokenBucket(info)
+		budget := retryElapsed
+
+		if bucket {
+			wait = bucketWait(policy)
+			budget = bucketRetryElapsed
+		} else {
+			wait = jitterWait(wait)
+		}
 
 		attempt++
 		lastHonoredWait = wait
 
-		if giveUp {
+		if giveUp || now.Sub(firstLimitedAt)+wait > budget {
 			return zero, backoff.Permanent(opErr)
 		}
-
-		wait = jitterWait(wait)
 
 		if log != nil {
 			log.Debug().
 				Str("host", host).
+				Bool("token_bucket", bucket).
 				Dur("retry_after", wait).
 				Msg("Registry rate limited. Retrying after delay")
 		}
 
 		return zero, backoff.RetryAfter(wait, opErr)
 	},
-		backoff.WithBackOff(exp),
+		// The budgets are enforced inside the closure from the first throttle, so
+		// the library's elapsed limit is off. RetryAfter resets the policy the
+		// library holds on every retry, which is why the bucket policy lives
+		// outside it.
 		backoff.WithMaxTries(maxRetryAttempts()),
-		backoff.WithMaxElapsedTime(retryElapsed),
+		backoff.WithMaxElapsedTime(0),
 	)
 	if err == nil {
 		return result, nil
@@ -155,15 +175,15 @@ func exhaustionLevel(err error) zerolog.Level {
 	return zerolog.DebugLevel
 }
 
-// maxRetryAttempts is a circuit breaker derived from the elapsed budget.
+// maxRetryAttempts is a circuit breaker derived from the larger retry budget.
 //
-// Token-bucket 429s retry until [retryElapsed], not a fixed handful of tries.
-// This cap only stops a zero-wait loop from spinning.
+// Retries run until their budget elapses, not a fixed handful of tries. This
+// cap only stops a zero-wait loop from spinning.
 //
 // Returns:
 //   - uint: Maximum attempts passed to [backoff.WithMaxTries].
 func maxRetryAttempts() uint {
-	n := retryElapsed/minHonorWait + 1
+	n := max(retryElapsed, bucketRetryElapsed)/minHonorWait + 1
 	if n < 1 {
 		return 1
 	}
@@ -224,4 +244,37 @@ func jitterWait(wait time.Duration) time.Duration {
 
 	//nolint:gosec // Jitter only needs to desynchronize retries, not be cryptographic.
 	return wait + time.Duration(rand.Int64N(int64(spread)+1))
+}
+
+// newBucketPolicy returns the exponential policy that paces token-bucket 429s.
+//
+// Growth starts at minHonorWait and is capped at maxHonorWait. The policy does
+// not randomize, because jitterWait adds equal jitter and keeps the floor and
+// the cap. It is private to one DoValue call: backoff.RetryAfter resets the
+// policy the library holds, so growth has to live on one the library never sees.
+//
+// Returns:
+//   - *backoff.ExponentialBackOff: Reset policy ready for NextBackOff.
+func newBucketPolicy() *backoff.ExponentialBackOff {
+	policy := backoff.NewExponentialBackOff()
+	policy.InitialInterval = minHonorWait
+	policy.MaxInterval = maxHonorWait
+	policy.RandomizationFactor = 0
+	policy.Reset()
+
+	return policy
+}
+
+// bucketWait returns the next jittered token-bucket wait from policy.
+//
+// Equal jitter on the default 1.5 multiplier keeps the sequence monotonic: one
+// step's largest value is the next step's smallest.
+//
+// Parameters:
+//   - policy: Policy from newBucketPolicy. Each call advances it.
+//
+// Returns:
+//   - time.Duration: Wait in [minHonorWait, maxHonorWait], never shorter than the previous call.
+func bucketWait(policy *backoff.ExponentialBackOff) time.Duration {
+	return jitterWait(policy.NextBackOff())
 }

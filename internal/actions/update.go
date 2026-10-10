@@ -624,6 +624,12 @@ func Update(
 				}
 
 				if ratelimit.Is(checkErr) {
+					// One line per container per cycle. Log-based notifications
+					// carry it, and the report template lists the container under
+					// Failed instead.
+					clog.Warn().
+						Err(checkErr).
+						Msg("Registry rate limit retries exhausted. Container failed for this cycle")
 					progress.AddFailed(log, sourceContainer, checkErr, config)
 				} else {
 					progress.AddSkipped(log, sourceContainer, checkErr, config)

@@ -1469,6 +1469,16 @@ func TestDefaultLegacyGitSkipAndComposeMessages(t *testing.T) {
 			data:    map[string]any{"container": "wtgit-app"},
 			want:    "Skipped wtgit-app: invalid git-host",
 		},
+		{
+			name:    "rate limit retries exhausted",
+			message: "Registry rate limit retries exhausted. Container failed for this cycle",
+			data: map[string]any{
+				"container": "sonarr",
+				"error":     "image pull: registry rate limited: retry-after 347.256µs allowed 44000 per 1m0s",
+				"image":     "lscr.io/linuxserver/sonarr:latest",
+			},
+			want: "Update failed for sonarr (lscr.io/linuxserver/sonarr:latest): image pull: registry rate limited: retry-after 347.256µs allowed 44000 per 1m0s",
+		},
 	}
 
 	for _, tc := range cases {

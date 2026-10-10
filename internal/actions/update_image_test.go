@@ -1,12 +1,15 @@
 package actions_test
 
 import (
+	"bytes"
 	"context"
 	"errors"
+	"strings"
 	"time"
 
 	"github.com/onsi/ginkgo/v2"
 	"github.com/onsi/gomega"
+	"github.com/rs/zerolog"
 
 	"github.com/nicholas-fedor/watchtower/internal/actions"
 	mockActions "github.com/nicholas-fedor/watchtower/internal/actions/mocks"
@@ -407,6 +410,59 @@ var _ = ginkgo.Describe("the update action", func() {
 				To(gomega.BeEmpty())
 			gomega.Expect(cleanupImageInfos).
 				To(gomega.BeEmpty())
+		})
+
+		ginkgo.It("logs one notifiable warning per rate-limited container", func() {
+			client = &mockActions.MockClient{
+				TestData: &mockActions.TestData{
+					Containers: []types.Container{
+						mockActions.CreateMockContainer(
+							"rate-limited-container",
+							"/rate-limited-container",
+							"lscr.io/linuxserver/sonarr:latest",
+							time.Now(),
+						),
+					},
+					Staleness: map[string]bool{
+						"rate-limited-container": true,
+					},
+				},
+				Stopped: make(map[string]bool),
+			}
+			client.TestData.IsContainerStaleError = &ratelimit.Error{
+				RetryAfter:    23722 * time.Nanosecond,
+				Allowed:       44000,
+				AllowedWindow: time.Minute,
+				Host:          "ghcr.io",
+			}
+
+			var logs bytes.Buffer
+
+			log := zerolog.New(&logs)
+
+			report, _, err := actions.Update(&log,
+				context.Background(),
+				client,
+				config,
+			)
+			gomega.Expect(err).NotTo(gomega.HaveOccurred())
+			gomega.Expect(report.Failed()).To(gomega.HaveLen(1))
+
+			gomega.Expect(strings.Count(logs.String(), "Registry rate limit retries exhausted")).
+				To(gomega.Equal(1), "One warning per failed container")
+
+			var warning string
+
+			for line := range strings.SplitSeq(strings.TrimSpace(logs.String()), "\n") {
+				if strings.Contains(line, "Registry rate limit retries exhausted") {
+					warning = line
+				}
+			}
+
+			gomega.Expect(warning).To(gomega.ContainSubstring(`"level":"warn"`))
+			gomega.Expect(warning).NotTo(gomega.ContainSubstring(`"notify":"no"`),
+				"The warning must reach log-based notifications")
+			gomega.Expect(warning).To(gomega.ContainSubstring("rate-limited-container"))
 		})
 	})
 })

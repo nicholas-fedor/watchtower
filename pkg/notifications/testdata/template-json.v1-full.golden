@@ -363,6 +363,16 @@
     },
     {
       "data": {
+        "container": "app",
+        "error": "image pull: registry rate limited: retry-after 347.256µs allowed 44000 per 1m0s",
+        "image": "org/app:latest"
+      },
+      "level": "error",
+      "message": "Registry rate limit retries exhausted. Container failed for this cycle",
+      "time": "2026-10-07T12:00:38Z"
+    },
+    {
+      "data": {
         "alpha": "one",
         "beta": 2
       },
