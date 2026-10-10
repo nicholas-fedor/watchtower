@@ -4,12 +4,16 @@ import (
 	"context"
 	"errors"
 	"net/http"
+	"testing"
+	"testing/synctest"
 	"time"
 
 	"github.com/onsi/ginkgo/v2"
 	"github.com/onsi/gomega"
 	"github.com/onsi/gomega/ghttp"
 	"github.com/rs/zerolog"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 
 	dockerClient "github.com/moby/moby/client"
 
@@ -303,3 +307,61 @@ var _ = ginkgo.Describe("CheckLocalImageCooldown", func() {
 		gomega.Expect(err).NotTo(gomega.HaveOccurred())
 	})
 })
+
+// TestEvalImageAge verifies when an image is eligible for an update under a
+// cooldown, including a creation time in the future, which counts as a new
+// image and becomes eligible a cooldown after its creation time.
+func TestEvalImageAge(t *testing.T) {
+	t.Parallel()
+
+	const delay = 24 * time.Hour
+
+	tests := []struct {
+		name string
+		// created is the creation time relative to now.
+		created time.Duration
+		// wantEligibleIn is how long until the image is eligible. Zero means eligible now.
+		wantEligibleIn time.Duration
+	}{
+		{name: "older than the cooldown", created: -48 * time.Hour},
+		{name: "within the cooldown", created: -time.Hour, wantEligibleIn: 23 * time.Hour},
+		{name: "a few minutes in the future", created: 5 * time.Minute, wantEligibleIn: delay + 5*time.Minute},
+		{name: "far in the future", created: 365 * 24 * time.Hour, wantEligibleIn: delay + 365*24*time.Hour},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			synctest.Test(t, func(t *testing.T) {
+				eligible, err := evalImageAge(time.Now().Add(tt.created), delay, nopLog())
+
+				if tt.wantEligibleIn == 0 {
+					require.NoError(t, err)
+					assert.True(t, eligible)
+
+					return
+				}
+
+				assert.False(t, eligible)
+				require.ErrorIs(t, err, ErrImageCooldown)
+
+				cooldownErr, ok := errors.AsType[*CooldownError](err)
+				require.True(t, ok)
+				assert.Equal(t, time.Now().Add(tt.wantEligibleIn), cooldownErr.EligibleAt)
+			})
+		})
+	}
+}
+
+// TestCheckLocalImageCooldown_FutureCreationTime verifies that a local image
+// whose creation time is in the future is held back by the cooldown.
+func TestCheckLocalImageCooldown_FutureCreationTime(t *testing.T) {
+	t.Parallel()
+
+	c := MockContainer(WithImageName("app:latest"))
+	c.imageInfo.Created = time.Now().Add(time.Hour).Format(time.RFC3339Nano)
+
+	err := CheckLocalImageCooldown(c, types.UpdateParams{CooldownDelay: 24 * time.Hour})
+	require.ErrorIs(t, err, ErrImageCooldown)
+}
