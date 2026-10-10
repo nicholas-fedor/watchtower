@@ -1456,7 +1456,7 @@ func makeManifestRequest(
 //
 // Returns:
 //   - string: The extracted digest, or empty for a HEAD request that should fall back to GET.
-//   - error: Non-nil if the retry request fails or asks for yet another host, nil on success.
+//   - error: Non-nil if the retry request fails, or a GET retry asks for yet another host.
 func retryManifestRequest(
 	log *zerolog.Logger,
 	ctx context.Context,
@@ -1499,9 +1499,10 @@ func retryManifestRequest(
 			return handleErr
 		}
 
-		// The request is retried only once. Another retry would otherwise
-		// return an empty digest, which marks the image as out of date.
-		if retry {
+		// The request is retried only once. A HEAD request falls back to GET
+		// with an empty digest. A GET request is the last attempt, and an
+		// empty digest would mark the image as out of date.
+		if retry && method != http.MethodHead {
 			return fmt.Errorf("%w: %s", errUnresolvedManifestRetry, nextURL)
 		}
 
