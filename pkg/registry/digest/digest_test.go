@@ -375,6 +375,63 @@ func TestCompareDigestWithRemote_Retry429DoesNotContinueToNextEndpoint(t *testin
 	assert.Equal(t, int64(0), mirrorHeads.Load())
 }
 
+// TestCompareDigestWithRemote_UnauthorizedOnBothHostsIsError verifies that a
+// registry that rejects the manifest request on both its own host and its
+// token host produces an error, not an empty digest that marks the image as
+// out of date and causes a pull.
+func TestCompareDigestWithRemote_UnauthorizedOnBothHostsIsError(t *testing.T) {
+	ratelimit.ResetForTest()
+	t.Cleanup(ratelimit.ResetForTest)
+
+	viper.Set("WATCHTOWER_REGISTRY_TLS_SKIP", true)
+	t.Cleanup(func() {
+		viper.Set("WATCHTOWER_REGISTRY_TLS_SKIP", false)
+	})
+
+	// The token host issues tokens but rejects manifest requests.
+	tokenHost := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Method == http.MethodGet && r.URL.Path == "/token" {
+			w.Header().Set("Content-Type", "application/json")
+			_, _ = w.Write([]byte(`{"token":"test-token"}`))
+
+			return
+		}
+
+		w.WriteHeader(http.StatusUnauthorized)
+	}))
+	defer tokenHost.Close()
+
+	// The registry sends clients to the token host and rejects manifest requests.
+	registry := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path == "/v2/" || r.URL.Path == "/v2" {
+			w.Header().Set("WWW-Authenticate", fmt.Sprintf(
+				`Bearer realm="%s/token",service="test-service",scope="repository:linuxserver/radarr:pull"`,
+				tokenHost.URL,
+			))
+		}
+
+		w.WriteHeader(http.StatusUnauthorized)
+	}))
+	defer registry.Close()
+
+	host := strings.TrimPrefix(registry.URL, "http://")
+
+	mc := mockTypes.NewMockContainer(t)
+	mc.On("Name").Return("radarr").Maybe()
+	mc.On("HasImageInfo").Return(true).Maybe()
+	mc.On("ImageName").Return(host + "/linuxserver/radarr:latest")
+	mc.On("ImageInfo").Return(&dockerImage.InspectResponse{
+		RepoDigests: []string{
+			host + "/linuxserver/radarr@sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+		},
+	})
+
+	match, remoteDigest, err := CompareDigestWithRemote(testLog(), context.Background(), mc, "")
+	require.ErrorIs(t, err, errUnresolvedManifestRetry)
+	assert.False(t, match)
+	assert.Empty(t, remoteDigest)
+}
+
 // TestCompareDigestWithRemote_LocalOnly404 is a regression test for locally built
 // images (e.g. atlas-badgerdb) that have non-empty registry-less RepoDigests.
 // A HEAD 404 must be treated as up-to-date with no error so callers skip the pull
@@ -1644,6 +1701,8 @@ func TestRetryManifestRequest(t *testing.T) {
 		expected    string
 		wantErr     bool
 		rateLimited bool
+		// wantErrIs, when set, is an error the result must wrap.
+		wantErrIs error
 	}{
 		{
 			name:       "returns digest from successful retry response",
@@ -1728,6 +1787,41 @@ func TestRetryManifestRequest(t *testing.T) {
 			wantErr:     true,
 			rateLimited: true,
 		},
+		{
+			name:        "returns error when the retried GET asks for another host",
+			method:      http.MethodGet,
+			updatedURL:  "https://registry.example.com/v2/manifests/latest",
+			setupClient: unauthorizedManifestClient,
+			wantErr:     true,
+			wantErrIs:   errUnresolvedManifestRetry,
+		},
+		{
+			name:        "returns error when the retried HEAD asks for another host",
+			method:      http.MethodHead,
+			updatedURL:  "https://registry.example.com/v2/manifests/latest",
+			setupClient: unauthorizedManifestClient,
+			wantErr:     true,
+			wantErrIs:   errUnresolvedManifestRetry,
+		},
+		{
+			name:       "returns an empty digest for a failed HEAD so the caller falls back to GET",
+			method:     http.MethodHead,
+			updatedURL: "https://registry.example.com/v2/manifests/latest",
+			setupClient: func(t *testing.T) *mockAuth.MockClient {
+				t.Helper()
+				mc := mockAuth.NewMockClient(t)
+				mc.On("Do", mock.Anything).Return(&http.Response{
+					StatusCode: http.StatusInternalServerError,
+					Status:     "500 Internal Server Error",
+					Header:     http.Header{},
+					Body:       http.NoBody,
+					Request:    &http.Request{URL: mustParseURL("https://registry.example.com/v2/manifests/latest")},
+				}, nil)
+
+				return mc
+			},
+			expected: "",
+		},
 	}
 
 	for _, tt := range tests {
@@ -1753,6 +1847,10 @@ func TestRetryManifestRequest(t *testing.T) {
 				assert.Empty(t, got)
 				assert.Equal(t, tt.rateLimited, ratelimit.Is(err))
 
+				if tt.wantErrIs != nil {
+					require.ErrorIs(t, err, tt.wantErrIs)
+				}
+
 				return
 			}
 
@@ -1760,6 +1858,24 @@ func TestRetryManifestRequest(t *testing.T) {
 			assert.Equal(t, tt.expected, got)
 		})
 	}
+}
+
+// unauthorizedManifestClient returns a registry client that answers every
+// manifest request on the original host with 401, which asks for a retry on
+// the challenge host.
+func unauthorizedManifestClient(t *testing.T) *mockAuth.MockClient {
+	t.Helper()
+
+	mc := mockAuth.NewMockClient(t)
+	mc.On("Do", mock.Anything).Return(&http.Response{
+		StatusCode: http.StatusUnauthorized,
+		Status:     "401 Unauthorized",
+		Header:     http.Header{},
+		Body:       http.NoBody,
+		Request:    &http.Request{URL: mustParseURL("https://registry.example.com/v2/manifests/latest")},
+	}, nil)
+
+	return mc
 }
 
 func mustParseURL(raw string) *url.URL {

@@ -56,6 +56,8 @@ var (
 	errFailedExecuteRequest = errors.New("failed to execute request")
 	// errManifestTooLarge indicates the digest GET fallback body exceeded the size limit.
 	errManifestTooLarge = errors.New("manifest response exceeds size limit")
+	// errUnresolvedManifestRetry indicates the retried manifest request was sent to yet another host.
+	errUnresolvedManifestRetry = errors.New("manifest request still needs another host after retrying")
 )
 
 // localOnlyImageCache records image name+ID pairs previously confirmed as local-only
@@ -1453,8 +1455,8 @@ func makeManifestRequest(
 //   - client: The HTTP client to use for the request.
 //
 // Returns:
-//   - string: The extracted digest.
-//   - error: Non-nil if the retry request fails, nil on success.
+//   - string: The extracted digest, or empty for a HEAD request that should fall back to GET.
+//   - error: Non-nil if the retry request fails or asks for yet another host, nil on success.
 func retryManifestRequest(
 	log *zerolog.Logger,
 	ctx context.Context,
@@ -1484,7 +1486,7 @@ func retryManifestRequest(
 
 		defer func() { _ = resp.Body.Close() }()
 
-		got, _, _, handleErr := HandleManifestResponse(log,
+		got, nextURL, retry, handleErr := HandleManifestResponse(log,
 			resp,
 			method,
 			originalHost,
@@ -1495,6 +1497,12 @@ func retryManifestRequest(
 		)
 		if handleErr != nil {
 			return handleErr
+		}
+
+		// The request is retried only once. Another retry would otherwise
+		// return an empty digest, which marks the image as out of date.
+		if retry {
+			return fmt.Errorf("%w: %s", errUnresolvedManifestRetry, nextURL)
 		}
 
 		digest = got
