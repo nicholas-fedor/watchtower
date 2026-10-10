@@ -317,7 +317,7 @@ func getExcessContainers(log *zerolog.Logger, watchtowerScope string,
 
 	var chainedContainers []types.Container
 	if currentContainer != nil {
-		chainedContainers = getChainedContainers(allContainers, currentContainer)
+		chainedContainers = getChainedContainers(log, allContainers, currentContainer)
 	}
 
 	excessContainers := addExcessContainers(filteredContainers, chainedContainers)
@@ -435,17 +435,19 @@ func getFilteredContainers(log *zerolog.Logger, scope string,
 
 // getChainedContainers retrieves containers linked in a chain based on the current container's chain label.
 //
-// It parses the container chain label from the current container, identifies all linked containers
-// excluding the current one, and returns them as a slice. If the current container has
-// no chain label or an empty chain label, an empty slice is returned.
+// It parses the container chain label from the current container, identifies the linked
+// Watchtower containers excluding the current one, and returns them as a slice. A linked
+// container that is not a Watchtower container is never returned. If the current container
+// has no chain label or an empty chain label, an empty slice is returned.
 //
 // Parameters:
+//   - log: Process logger.
 //   - allContainers: All containers to search for chained containers.
 //   - currentContainer: The current running Watchtower container (nil if not applicable).
 //
 // Returns:
 //   - []types.Container: Slice of chained containers excluding the current one.
-func getChainedContainers(
+func getChainedContainers(log *zerolog.Logger,
 	allContainers []types.Container,
 	currentContainer types.Container,
 ) []types.Container {
@@ -523,22 +525,34 @@ func getChainedContainers(
 		return []types.Container{}
 	}
 
-	// Split the container chain label value into a slice of container IDs.
-	containerChain := strings.Split(chainLabelValue, ",")
-
-	// Create a map of container IDs from the chain for efficient lookup.
+	// Collect the container IDs from the chain for efficient lookup.
 	containerChainMap := make(map[string]struct{})
-	for _, id := range containerChain {
-		containerChainMap[id] = struct{}{}
+
+	for id := range strings.SplitSeq(chainLabelValue, ",") {
+		if id = strings.TrimSpace(id); id != "" {
+			containerChainMap[id] = struct{}{}
+		}
 	}
 
 	// Filter containers that are in the chain, present on the host, and not the effective current.
 	// Chained containers are parent containers that must be removed regardless of scope.
 	for _, c := range allContainers {
 		_, exists := containerChainMap[string(c.ID())]
-		if exists && c.ID() != effectiveCurrent.ID() {
-			chainedContainers = append(chainedContainers, c)
+		if !exists || c.ID() == effectiveCurrent.ID() {
+			continue
 		}
+
+		// Only a Watchtower container can be a replaced instance.
+		if !c.IsWatchtower() {
+			log.Debug().
+				Str("container_id", string(c.ID())).
+				Str("container_name", c.Name()).
+				Msg("Skipping chained container that is not a Watchtower container")
+
+			continue
+		}
+
+		chainedContainers = append(chainedContainers, c)
 	}
 
 	return chainedContainers
