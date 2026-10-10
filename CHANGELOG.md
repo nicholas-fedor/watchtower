@@ -10,6 +10,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Remove only watchtower containers named in the chain label by @nicholas-fedor in [#2715](https://github.com/nicholas-fedor/watchtower/pull/2715)
 - Remove old instance images once per scan by @nicholas-fedor in [#2702](https://github.com/nicholas-fedor/watchtower/pull/2702)
 - Replace inspect data instead of changing it in place by @nicholas-fedor in [#2691](https://github.com/nicholas-fedor/watchtower/pull/2691)
 - Report deliberate skips as skipped instead of failed by @nicholas-fedor in [#2685](https://github.com/nicholas-fedor/watchtower/pull/2685)
