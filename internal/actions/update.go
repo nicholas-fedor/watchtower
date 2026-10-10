@@ -30,7 +30,7 @@ import (
 )
 
 const (
-	// defaultPullFailureDelay defines the default delay duration for failed Watchtower self-update pulls.
+	// defaultPullFailureDelay defines the default delay after a failed Watchtower self-update pull in run-once mode.
 	defaultPullFailureDelay = 5 * time.Minute
 
 	// defaultHealthCheckTimeout defines the default timeout for waiting for container health checks.
@@ -945,9 +945,11 @@ func Update(
 		lifecycle.ExecutePostChecks(log, ctx, client, config, nil)
 	}
 
-	// Add safeguard delay if Watchtower self-update pull failed
-	// to prevent rapid restarts.
-	if watchtowerPullFailed {
+	// A run-once Watchtower exits after the update, and a restart policy can
+	// start it again at once. Delay the exit after a failed self-update pull
+	// to prevent rapid restarts. A continuous Watchtower keeps running, and
+	// its schedule spaces the next attempt.
+	if watchtowerPullFailed && config.RunOnce {
 		delay := config.PullFailureDelay
 		if delay == 0 {
 			delay = defaultPullFailureDelay // Default delay

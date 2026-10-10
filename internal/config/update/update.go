@@ -44,7 +44,7 @@ type Update struct {
 	// EphemeralSelfUpdate uses a short-lived orchestrator container for Watchtower self-update
 	// (--ephemeral-self-update / WATCHTOWER_EPHEMERAL_SELF_UPDATE).
 	EphemeralSelfUpdate bool
-	// PullFailureDelay is the delay after a failed Watchtower self-update pull.
+	// PullFailureDelay is the delay after a failed Watchtower self-update pull in run-once mode.
 	PullFailureDelay time.Duration
 	// DiskSpaceMax is the raw --disk-space-max / WATCHTOWER_DISK_SPACE_MAX value.
 	DiskSpaceMax string

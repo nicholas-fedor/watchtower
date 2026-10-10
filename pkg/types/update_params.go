@@ -17,7 +17,7 @@ type UpdateParams struct {
 	LifecycleHooks      bool                `json:"lifecycle_hooks"`        // Enable lifecycle hooks if true.
 	RollingRestart      bool                `json:"rolling_restart"`        // Use rolling restart if true.
 	LabelPrecedence     bool                `json:"label_precedence"`       // Prioritize labels if true.
-	PullFailureDelay    time.Duration       `json:"pull_failure_delay"`     // Delay after failed self-update pull.
+	PullFailureDelay    time.Duration       `json:"pull_failure_delay"`     // Delay after a failed self-update pull in run-once mode.
 	LifecycleUID        int                 `json:"lifecycle_uid"`          // Default UID for lifecycle hooks.
 	LifecycleGID        int                 `json:"lifecycle_gid"`          // Default GID for lifecycle hooks.
 	CPUCopyMode         string              `json:"cpu_copy_mode"`          // CPU copy mode for container recreation.
