@@ -215,12 +215,12 @@ No image layers are downloaded during this process.
 
 After determining the image age, Watchtower evaluates four outcomes:
 
-| Outcome        | Condition                          | Behavior                                                          |
-|----------------|------------------------------------|-------------------------------------------------------------------|
-| **Proceeding** | Image age > cooldown duration      | The update proceeds normally                                      |
-| **Proceeding** | Image age is negative (clock skew) | The update proceeds with a warning to avoid indefinite deferral   |
-| **Deferring**  | Image age <= cooldown duration     | The update is skipped; the container remains on its current image |
-| **Deferring**  | Image age unavailable              | The update is skipped for safety                                  |
+| Outcome        | Condition                            | Behavior                                                                                 |
+|----------------|--------------------------------------|------------------------------------------------------------------------------------------|
+| **Proceeding** | Image age > cooldown duration        | The update proceeds normally                                                             |
+| **Deferring**  | Image age <= cooldown duration       | The update is skipped and the container remains on its current image                     |
+| **Deferring**  | Image creation time is in the future | The update is skipped with a warning until the cooldown duration after the creation time |
+| **Deferring**  | Image age unavailable                | The update is skipped for safety                                                         |
 
 ```mermaid
 flowchart TD
@@ -231,16 +231,14 @@ flowchart TD
     D -->|No| E[Defer update for safety]
     D -->|Yes| G{Age strictly exceeds cooldown?}
     G -->|Yes| F
-    G -->|No| I{Age is negative?}
-    I -->|Yes| F
-    I -->|No| H[Defer update — within cooldown]
+    G -->|No| H[Defer update — within cooldown]
 
     classDef step fill:#003343,stroke:#000,stroke-width:2px;
     classDef decision fill:#003343,stroke:#000,stroke-width:2px;
     classDef defer fill:#8B0000,stroke:#000,stroke-width:2px;
 
     class A,C,F step
-    class B,D,G,I decision
+    class B,D,G decision
     class E,H defer
 ```
 
@@ -250,7 +248,7 @@ The cooldown feature relies on the `created` field from the image config blob. S
 
 - **Build timestamp, not push timestamp**: The `created` field records when the image was **built**, not when it was pushed to the registry. An image built days ago but only just tagged and pushed will appear old, potentially bypassing the intended cooldown window.
 - **Manipulated timestamps**: A compromised image could include a fabricated creation timestamp, making a freshly published malicious image appear mature. Cooldown is a defense-in-depth measure, not a guarantee of image integrity.
-- **Clock skew**: If the Watchtower host and the registry have significantly different system clocks, age calculations may be inaccurate. NTP synchronization on all involved hosts is recommended to minimize this risk. When the image creation time is in the future (negative age), Watchtower logs a warning and proceeds with the update to avoid indefinite deferral.
+- **Clock skew**: If the Watchtower host and the registry have significantly different system clocks, age calculations may be inaccurate. NTP synchronization on all involved hosts is recommended to minimize this risk. When the image creation time is in the future (negative age), Watchtower logs a warning and treats the image as new, deferring the update until the cooldown duration has passed after the creation time.
 - **Missing `created` field**: Some registries or image build tools may not populate the `created` field. When the field is absent, Watchtower cannot determine the image age and defers the update as a safety measure (see the warning above).
 
 ### Registry Usage Impact

@@ -161,6 +161,9 @@ func fetchImageCreationTime(
 // result and returning (true, nil) when safe to pull or (false, CooldownError)
 // when deferred.
 //
+// A creation time in the future gives no age, so the image counts as new and
+// becomes eligible a cooldown delay after its creation time.
+//
 // Parameters:
 //   - creationTime: The image creation timestamp.
 //   - delay: The cooldown delay to compare against.
@@ -174,8 +177,6 @@ func evalImageAge(creationTime time.Time, delay time.Duration, clog *zerolog.Log
 
 	if imageAge < 0 {
 		logClockSkew(imageAge, delay, clog)
-
-		return true, nil
 	}
 
 	if imageAge <= delay {
@@ -228,7 +229,7 @@ func logClockSkew(imageAge, delay time.Duration, clog *zerolog.Logger) {
 	clog.Warn().
 		Str("image_age", util.FormatDuration(imageAge)).
 		Str("cooldown", util.FormatDuration(delay)).
-		Msg("Image creation time is in the future (possible clock skew) - update available")
+		Msg("Image creation time is in the future (possible clock skew) - treating the image as new")
 }
 
 // CheckLocalImageCooldown applies cooldown-delay using the local image Created time.

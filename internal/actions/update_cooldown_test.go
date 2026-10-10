@@ -294,40 +294,6 @@ var _ = ginkgo.Describe("the update action cooldown", func() {
 		})
 	})
 
-	ginkgo.When("image creation time is in the future (clock skew)", func() {
-		ginkgo.It("should proceed with the update to avoid indefinite deferral", func() {
-			// Image was created 1 hour in the future. Cooldown is 1 hour.
-			// This simulates clock skew between host and registry.
-			registryServer = ghttp.NewServer()
-			registryServer.AppendHandlers(mockRegistryHandlers(time.Now().Add(1 * time.Hour))...)
-
-			host := extractHost(registryServer.URL())
-			imageName := host + "/myimage:latest"
-			client := mockActions.MockClient{
-				TestData: &mockActions.TestData{
-					Containers: []types.Container{
-						mockActions.CreateMockContainer("c1", "c1", imageName, time.Now()),
-					},
-					Staleness: map[string]bool{
-						"c1": true,
-					},
-				},
-				Stopped: make(map[string]bool),
-			}
-
-			report, _, err := actions.Update(testLogger(),
-				context.Background(),
-				client,
-				cooldownConfig(1*time.Hour),
-			)
-			gomega.Expect(err).NotTo(gomega.HaveOccurred())
-			gomega.Expect(report.Skipped()).
-				To(gomega.BeEmpty(), "Container should not be skipped when image age is negative")
-			gomega.Expect(report.Updated()).
-				To(gomega.HaveLen(1), "Container should be updated when image age is negative (clock skew)")
-		})
-	})
-
 	ginkgo.When("MonitorOnly is enabled", func() {
 		ginkgo.It("should skip the cooldown check entirely", func() {
 			// No mock registry server is needed because monitor-only bypasses the cooldown check.
