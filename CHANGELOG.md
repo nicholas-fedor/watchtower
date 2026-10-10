@@ -60,6 +60,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Chores
 
+- Update module golang.org/x/text to v0.43.0 by @renovate[bot] in [#2705](https://github.com/nicholas-fedor/watchtower/pull/2705)
+- Update module golang.org/x/mod to v0.42.0 by @renovate[bot] in [#2704](https://github.com/nicholas-fedor/watchtower/pull/2704)
 - Update module github.com/onsi/ginkgo/v2 to v2.33.1 by @renovate[bot] in [#2700](https://github.com/nicholas-fedor/watchtower/pull/2700)
 - Update golang.org/x/exp digest to ca0d7ba by @renovate[bot] in [#2699](https://github.com/nicholas-fedor/watchtower/pull/2699)
 - Update module golang.org/x/net to v0.61.0 by @renovate[bot] in [#2694](https://github.com/nicholas-fedor/watchtower/pull/2694)
