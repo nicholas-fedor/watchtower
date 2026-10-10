@@ -3488,14 +3488,14 @@ If you rely on cooldown as a supply-chain defense, ensure that no-pull mode is n
 <td>The update proceeds normally</td>
 </tr>
 <tr>
-<td><strong>Proceeding</strong></td>
-<td>Image age is negative (clock skew)</td>
-<td>The update proceeds with a warning to avoid indefinite deferral</td>
+<td><strong>Deferring</strong></td>
+<td>Image age &lt;= cooldown duration</td>
+<td>The update is skipped and the container remains on its current image</td>
 </tr>
 <tr>
 <td><strong>Deferring</strong></td>
-<td>Image age &lt;= cooldown duration</td>
-<td>The update is skipped; the container remains on its current image</td>
+<td>Image creation time is in the future</td>
+<td>The update is skipped with a warning until the cooldown duration after the creation time</td>
 </tr>
 <tr>
 <td><strong>Deferring</strong></td>
@@ -3512,23 +3512,21 @@ If you rely on cooldown as a supply-chain defense, ensure that no-pull mode is n
     D --&gt;|No| E[Defer update for safety]
     D --&gt;|Yes| G{Age strictly exceeds cooldown?}
     G --&gt;|Yes| F
-    G --&gt;|No| I{Age is negative?}
-    I --&gt;|Yes| F
-    I --&gt;|No| H[Defer update — within cooldown]
+    G --&gt;|No| H[Defer update — within cooldown]
 
     classDef step fill:#003343,stroke:#000,stroke-width:2px;
     classDef decision fill:#003343,stroke:#000,stroke-width:2px;
     classDef defer fill:#8B0000,stroke:#000,stroke-width:2px;
 
     class A,C,F step
-    class B,D,G,I decision
+    class B,D,G decision
     class E,H defer</code></pre>
 <h3 id="limitations">Limitations<a class="headerlink" href="#limitations" title="Permanent link">&para;</a></h3>
 <p>The cooldown feature relies on the <code>created</code> field from the image config blob. Several factors can affect the accuracy or availability of this data:</p>
 <ul>
 <li><strong>Build timestamp, not push timestamp</strong>: The <code>created</code> field records when the image was <strong>built</strong>, not when it was pushed to the registry. An image built days ago but only just tagged and pushed will appear old, potentially bypassing the intended cooldown window.</li>
 <li><strong>Manipulated timestamps</strong>: A compromised image could include a fabricated creation timestamp, making a freshly published malicious image appear mature. Cooldown is a defense-in-depth measure, not a guarantee of image integrity.</li>
-<li><strong>Clock skew</strong>: If the Watchtower host and the registry have significantly different system clocks, age calculations may be inaccurate. NTP synchronization on all involved hosts is recommended to minimize this risk. When the image creation time is in the future (negative age), Watchtower logs a warning and proceeds with the update to avoid indefinite deferral.</li>
+<li><strong>Clock skew</strong>: If the Watchtower host and the registry have significantly different system clocks, age calculations may be inaccurate. NTP synchronization on all involved hosts is recommended to minimize this risk. When the image creation time is in the future (negative age), Watchtower logs a warning and treats the image as new, deferring the update until the cooldown duration has passed after the creation time.</li>
 <li><strong>Missing <code>created</code> field</strong>: Some registries or image build tools may not populate the <code>created</code> field. When the field is absent, Watchtower cannot determine the image age and defers the update as a safety measure (see the warning above).</li>
 </ul>
 <h3 id="registry_usage_impact">Registry Usage Impact<a class="headerlink" href="#registry_usage_impact" title="Permanent link">&para;</a></h3>
@@ -3692,7 +3690,7 @@ The output varies depending on the outcome:</p>
     <span class="md-icon" title="Last update">
       <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M21 13.1c-.1 0-.3.1-.4.2l-1 1 2.1 2.1 1-1c.2-.2.2-.6 0-.8l-1.3-1.3c-.1-.1-.2-.2-.4-.2m-1.9 1.8-6.1 6V23h2.1l6.1-6.1zM12.5 7v5.2l4 2.4-1 1L11 13V7zM11 21.9c-5.1-.5-9-4.8-9-9.9C2 6.5 6.5 2 12 2c5.3 0 9.6 4.1 10 9.3-.3-.1-.6-.2-1-.2s-.7.1-1 .2C19.6 7.2 16.2 4 12 4c-4.4 0-8 3.6-8 8 0 4.1 3.1 7.5 7.1 7.9l-.1.2z"/></svg>
     </span>
-    <span class="git-revision-date-localized-plugin git-revision-date-localized-plugin-timeago" title="September 10, 2026 11:59:37 UTC"><span class="timeago" datetime="2026-09-10T11:59:37+00:00" locale="en"></span></span><span class="git-revision-date-localized-plugin git-revision-date-localized-plugin-iso_date" title="September 10, 2026 11:59:37 UTC">2026-09-10</span>
+    <span class="git-revision-date-localized-plugin git-revision-date-localized-plugin-timeago" title="October 10, 2026 12:41:03 UTC"><span class="timeago" datetime="2026-10-10T12:41:03+00:00" locale="en"></span></span><span class="git-revision-date-localized-plugin git-revision-date-localized-plugin-iso_date" title="October 10, 2026 12:41:03 UTC">2026-10-10</span>
   </span>
 
     
