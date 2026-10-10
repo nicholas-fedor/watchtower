@@ -788,7 +788,7 @@ func Update(
 			Err(err).
 			Msg("Failed to sort containers by dependencies")
 
-		return nil, []types.RemovedImageInfo{}, fmt.Errorf(
+		return nil, cleanupImageInfos, fmt.Errorf(
 			"%w: %w",
 			errSortDependenciesFailed,
 			err,
@@ -816,7 +816,7 @@ func Update(
 			Err(err).
 			Msg("Failed to sort all containers to restart by dependencies")
 
-		return nil, []types.RemovedImageInfo{}, fmt.Errorf(
+		return nil, cleanupImageInfos, fmt.Errorf(
 			"%w: %w",
 			errSortDependenciesFailed,
 			err,
@@ -869,7 +869,7 @@ func Update(
 			Err(err).
 			Msg("Failed to sort all containers to restart by dependencies")
 
-		return nil, []types.RemovedImageInfo{}, fmt.Errorf(
+		return nil, cleanupImageInfos, fmt.Errorf(
 			"%w: %w",
 			errSortDependenciesFailed,
 			err,

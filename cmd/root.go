@@ -688,7 +688,7 @@ func (p *process) runMain(cfg types.RunConfig) int {
 		client,
 		appCfg.Update.Cleanup,
 		appCfg.Filter.Scope,
-		&[]types.RemovedImageInfo{},
+		nil, // Remove the images of stopped instances right away.
 		currentWatchtowerContainer,
 	)
 	if err != nil {

@@ -89,9 +89,6 @@ var _ = ginkgo.Describe("CheckForMultipleWatchtowerInstances", func() {
 					ListContainers(mock.Anything, mock.Anything).
 					Return([]types.Container{oldContainer, newContainer}, nil)
 				mockClient.EXPECT().StopAndRemoveContainer(mock.Anything, oldContainer, 10*time.Minute).Return(nil)
-				mockClient.EXPECT().
-					RemoveImageByID(mock.Anything, types.ImageID("watchtower:old"), "watchtower:old").
-					Return(nil)
 
 				var cleanupImageIDs []types.RemovedImageInfo
 
@@ -182,9 +179,6 @@ var _ = ginkgo.Describe("CheckForMultipleWatchtowerInstances", func() {
 				ListContainers(mock.Anything, mock.Anything).
 				Return([]types.Container{oldContainer, newContainer}, nil)
 			mockClient.EXPECT().StopAndRemoveContainer(context.Background(), oldContainer, 10*time.Minute).Return(nil)
-			mockClient.EXPECT().
-				RemoveImageByID(context.Background(), types.ImageID("watchtower:1.11.0"), "watchtower:1.11.0").
-				Return(nil)
 
 			var cleanupImageIDs []types.RemovedImageInfo
 
@@ -542,9 +536,6 @@ var _ = ginkgo.Describe("CheckForMultipleWatchtowerInstances", func() {
 					Return(cerrdefs.ErrNotFound)
 				mockClient.EXPECT().
 					StopAndRemoveContainer(mock.Anything, old2Container, 10*time.Minute).
-					Return(nil)
-				mockClient.EXPECT().
-					RemoveImageByID(mock.Anything, types.ImageID("watchtower:old2"), "watchtower:old2").
 					Return(nil)
 
 				var cleanupImageIDs []types.RemovedImageInfo
@@ -1082,9 +1073,6 @@ var _ = ginkgo.Describe("CheckForMultipleWatchtowerInstances", func() {
 					StopAndRemoveContainer(mock.Anything, referencedContainer, 10*time.Minute).
 					Return(nil).
 					Times(1)
-				mockClient.EXPECT().
-					RemoveImageByID(mock.Anything, types.ImageID("watchtower:old"), "watchtower:old").
-					Return(nil)
 
 				// Cleanup should clean the referenced container as it's a chained parent container
 				var cleanupImageInfos []types.RemovedImageInfo
@@ -1520,7 +1508,7 @@ var _ = ginkgo.Describe("CleanupImages", func() {
 
 var _ = ginkgo.Describe("removeExcessContainers", func() {
 	ginkgo.When("removeImageInfos is nil", func() {
-		ginkgo.It("should use local slice and call RemoveImages with collected infos", func() {
+		ginkgo.It("should remove the images of removed instances right away", func() {
 			mockClient := mockContainer.NewMockClient(ginkgo.GinkgoT())
 
 			excessContainer := createMockContainer(
@@ -1559,54 +1547,8 @@ var _ = ginkgo.Describe("removeExcessContainers", func() {
 			gomega.Expect(err).NotTo(gomega.HaveOccurred())
 			gomega.Expect(removed).To(gomega.Equal(1))
 		})
-	})
 
-	ginkgo.When("removeImageInfos is not nil", func() {
-		ginkgo.It("should append to provided slice and update with RemoveImages result", func() {
-			mockClient := mockContainer.NewMockClient(ginkgo.GinkgoT())
-
-			excessContainer := createMockContainer(
-				"excess",
-				"excess",
-				"image1",
-				true,
-				false,
-				time.Now().Add(-time.Hour),
-				map[string]string{},
-			)
-			currentContainer := createMockContainer(
-				"current",
-				"current",
-				"image2",
-				true,
-				false,
-				time.Now(),
-				map[string]string{},
-			)
-
-			var removeInfos []types.RemovedImageInfo
-
-			mockClient.EXPECT().StopAndRemoveContainer(context.Background(), excessContainer, 10*time.Minute).Return(nil)
-			mockClient.EXPECT().
-				RemoveImageByID(context.Background(), types.ImageID("image1"), "image1:latest").
-				Return(nil)
-
-			removed, err := removeExcessContainers(testLogger(),
-				context.Background(),
-				mockClient,
-				[]types.Container{excessContainer},
-				true,
-				currentContainer,
-				&removeInfos,
-			)
-
-			gomega.Expect(err).NotTo(gomega.HaveOccurred())
-			gomega.Expect(removed).To(gomega.Equal(1))
-			gomega.Expect(removeInfos).To(gomega.HaveLen(1))
-			gomega.Expect(removeInfos[0].ImageID).To(gomega.Equal(types.ImageID("image1")))
-		})
-
-		ginkgo.It("should handle RemoveImages error and update slice with partial results", func() {
+		ginkgo.It("should log RemoveImages errors and still report the removed instances", func() {
 			mockClient := mockContainer.NewMockClient(ginkgo.GinkgoT())
 
 			excessContainer1 := createMockContainer(
@@ -1637,8 +1579,6 @@ var _ = ginkgo.Describe("removeExcessContainers", func() {
 				map[string]string{},
 			)
 
-			var removeInfos []types.RemovedImageInfo
-
 			mockClient.EXPECT().StopAndRemoveContainer(mock.Anything, excessContainer1, 10*time.Minute).Return(nil)
 			mockClient.EXPECT().StopAndRemoveContainer(mock.Anything, excessContainer2, 10*time.Minute).Return(nil)
 			mockClient.EXPECT().
@@ -1654,11 +1594,52 @@ var _ = ginkgo.Describe("removeExcessContainers", func() {
 				[]types.Container{excessContainer1, excessContainer2},
 				true,
 				currentContainer,
-				&removeInfos,
+				nil,
 			)
 
 			gomega.Expect(err).NotTo(gomega.HaveOccurred())
 			gomega.Expect(removed).To(gomega.Equal(2))
+		})
+	})
+
+	ginkgo.When("removeImageInfos is not nil", func() {
+		ginkgo.It("should append to provided slice without removing the images", func() {
+			mockClient := mockContainer.NewMockClient(ginkgo.GinkgoT())
+
+			excessContainer := createMockContainer(
+				"excess",
+				"excess",
+				"image1",
+				true,
+				false,
+				time.Now().Add(-time.Hour),
+				map[string]string{},
+			)
+			currentContainer := createMockContainer(
+				"current",
+				"current",
+				"image2",
+				true,
+				false,
+				time.Now(),
+				map[string]string{},
+			)
+
+			var removeInfos []types.RemovedImageInfo
+
+			mockClient.EXPECT().StopAndRemoveContainer(context.Background(), excessContainer, 10*time.Minute).Return(nil)
+
+			removed, err := removeExcessContainers(testLogger(),
+				context.Background(),
+				mockClient,
+				[]types.Container{excessContainer},
+				true,
+				currentContainer,
+				&removeInfos,
+			)
+
+			gomega.Expect(err).NotTo(gomega.HaveOccurred())
+			gomega.Expect(removed).To(gomega.Equal(1))
 			gomega.Expect(removeInfos).To(gomega.HaveLen(1))
 			gomega.Expect(removeInfos[0].ImageID).To(gomega.Equal(types.ImageID("image1")))
 		})
@@ -2359,7 +2340,7 @@ var _ = ginkgo.Describe("CleanupOldWatchtowerContainers", func() {
 	})
 
 	ginkgo.When("cleanup images is enabled", func() {
-		ginkgo.It("should remove old container and its image", func() {
+		ginkgo.It("should remove old container and collect its image", func() {
 			mockClient := mockContainer.NewMockClient(ginkgo.GinkgoT())
 
 			currentContainer := createMockContainer(
@@ -2390,13 +2371,6 @@ var _ = ginkgo.Describe("CleanupOldWatchtowerContainers", func() {
 				Return([]types.Container{currentContainer, oldContainer}, nil)
 			mockClient.EXPECT().
 				StopAndRemoveContainer(mock.Anything, oldContainer, 10*time.Minute).
-				Return(nil)
-			mockClient.EXPECT().
-				RemoveImageByID(
-					mock.Anything,
-					types.ImageID("watchtower:old"),
-					"watchtower:old",
-				).
 				Return(nil)
 
 			var imageInfos []types.RemovedImageInfo
