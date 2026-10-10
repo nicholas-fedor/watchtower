@@ -464,5 +464,42 @@ var _ = ginkgo.Describe("the update action", func() {
 				"The warning must reach log-based notifications")
 			gomega.Expect(warning).To(gomega.ContainSubstring("rate-limited-container"))
 		})
+
+		ginkgo.It("leaves a long Retry-After to the retry loop's warning", func() {
+			client = &mockActions.MockClient{
+				TestData: &mockActions.TestData{
+					Containers: []types.Container{
+						mockActions.CreateMockContainer(
+							"rate-limited-container",
+							"/rate-limited-container",
+							"lscr.io/linuxserver/sonarr:latest",
+							time.Now(),
+						),
+					},
+					Staleness: map[string]bool{
+						"rate-limited-container": true,
+					},
+				},
+				Stopped: make(map[string]bool),
+			}
+			client.TestData.IsContainerStaleError = &ratelimit.Error{
+				RetryAfter: 2 * time.Hour,
+				Host:       "ghcr.io",
+			}
+
+			var logs bytes.Buffer
+
+			log := zerolog.New(&logs)
+
+			report, _, err := actions.Update(&log,
+				context.Background(),
+				client,
+				config,
+			)
+			gomega.Expect(err).NotTo(gomega.HaveOccurred())
+			gomega.Expect(report.Failed()).To(gomega.HaveLen(1))
+			gomega.Expect(logs.String()).NotTo(gomega.ContainSubstring("Registry rate limit retries exhausted"),
+				"The retry loop already warned about a Retry-After beyond the honor window")
+		})
 	})
 })

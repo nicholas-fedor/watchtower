@@ -5,6 +5,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"strings"
 	"sync/atomic"
 	"testing"
@@ -246,6 +247,38 @@ func TestDoKeepsHonorWindowForUsableRetryAfter(t *testing.T) {
 	assert.GreaterOrEqual(t, attempts.Load(), int32(2))
 	assert.LessOrEqual(t, attempts.Load(), int32(3))
 	assert.Less(t, time.Since(started), time.Second)
+}
+
+// TestExceedsHonorWindow covers which rate limits the retry loop already
+// reports at warn when it stops.
+func TestExceedsHonorWindow(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name string
+		err  error
+		want bool
+	}{
+		{name: "nil", err: nil, want: false},
+		{name: "plain error", err: errors.New("connection refused"), want: false},
+		{name: "bare sentinel", err: ErrRateLimited, want: false},
+		{name: "token bucket", err: &Error{RetryAfter: 347 * time.Microsecond}, want: false},
+		{name: "at the honor window", err: &Error{RetryAfter: maxHonorWait}, want: false},
+		{name: "beyond the honor window", err: &Error{RetryAfter: 2 * time.Hour}, want: true},
+		{
+			name: "wrapped beyond the honor window",
+			err:  fmt.Errorf("image pull: %w", &Error{RetryAfter: 2 * time.Hour}),
+			want: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			assert.Equal(t, tt.want, ExceedsHonorWindow(tt.err))
+		})
+	}
 }
 
 // TestMaxRetryAttemptsDerivesFromLargerBudget covers the spin breaker following

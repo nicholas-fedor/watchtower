@@ -154,12 +154,28 @@ func DoValue[T any](
 	return result, err
 }
 
+// ExceedsHonorWindow reports whether err is a rate limit whose Retry-After is
+// longer than the honor window.
+//
+// [Do] and [DoValue] stop at once on such a limit and log it at warn, so
+// callers use this to avoid warning a second time about the same failure.
+//
+// Parameters:
+//   - err: Error to inspect. May be wrapped.
+//
+// Returns:
+//   - bool: True when err carries a Retry-After beyond the honor window.
+func ExceedsHonorWindow(err error) bool {
+	info, ok := errors.AsType[*Error](err)
+
+	return ok && info != nil && info.RetryAfter > maxHonorWait
+}
+
 // exhaustionLevel chooses the log level when in-cycle 429 retries stop.
 //
 // A Retry-After longer than the honor window is a real registry backoff and
-// is logged at warn. Tiny token-bucket waits that exhaust the retry budget
-// stay at debug so they do not become notifications. The container is still
-// Failed on the session report.
+// is logged at warn. Waits that exhaust a retry budget stay at debug, because
+// the caller reports the failed container once instead.
 //
 // Parameters:
 //   - err: Last rate-limit error from the retry loop.
@@ -167,8 +183,7 @@ func DoValue[T any](
 // Returns:
 //   - zerolog.Level: Warn for long Retry-After, debug otherwise.
 func exhaustionLevel(err error) zerolog.Level {
-	info, ok := errors.AsType[*Error](err)
-	if ok && info != nil && info.RetryAfter > maxHonorWait {
+	if ExceedsHonorWindow(err) {
 		return zerolog.WarnLevel
 	}
 
