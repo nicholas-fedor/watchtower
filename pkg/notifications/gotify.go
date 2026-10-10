@@ -174,16 +174,18 @@ func (n *gotifyTypeNotifier) GetURL(_ *cobra.Command) (string, error) {
 
 	// Configure Gotify settings.
 	config := &gotify.Config{
-		Host:       apiURL.Host,
-		Path:       apiURL.Path,
-		DisableTLS: apiURL.Scheme == "http",
-		Token:      n.gotifyAppToken,
+		Host:               apiURL.Host,
+		Path:               apiURL.Path,
+		DisableTLS:         apiURL.Scheme == "http",
+		InsecureSkipVerify: n.gotifyInsecureSkipVerify,
+		Token:              n.gotifyAppToken,
 	}
 
 	urlStr := config.GetURL().String()
 
 	clog.Debug().
 		Bool("disable_tls", apiURL.Scheme == "http").
+		Bool("insecure_skip_verify", n.gotifyInsecureSkipVerify).
 		Msg("Generated Gotify service URL")
 
 	if clog.GetLevel() <= zerolog.TraceLevel {
