@@ -10,6 +10,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Fail a manifest retry that asks for another host by @nicholas-fedor in [#2719](https://github.com/nicholas-fedor/watchtower/pull/2719)
 - Disable self-updates when watchtower cannot identify its container by @nicholas-fedor in [#2717](https://github.com/nicholas-fedor/watchtower/pull/2717)
 - Remove only watchtower containers named in the chain label by @nicholas-fedor in [#2715](https://github.com/nicholas-fedor/watchtower/pull/2715)
 - Remove old instance images once per scan by @nicholas-fedor in [#2702](https://github.com/nicholas-fedor/watchtower/pull/2702)
