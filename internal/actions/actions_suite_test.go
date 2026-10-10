@@ -179,7 +179,7 @@ var _ = ginkgo.Describe("the actions package", func() {
 				gomega.Expect(client.TestData.TriedToRemoveImageCount.Load()).To(gomega.Equal(int32(0)))
 			})
 
-			ginkgo.It("should collect image IDs and clean up when cleanup is enabled", func() {
+			ginkgo.It("should collect image IDs for the caller to remove when cleanup is enabled", func() {
 				var cleanupImageIDs []types.RemovedImageInfo
 
 				ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
@@ -203,7 +203,7 @@ var _ = ginkgo.Describe("the actions package", func() {
 					To(gomega.ContainElement(gomega.HaveField("ImageID", types.ImageID("watchtower:old"))))
 				gomega.Expect(cleanupImageIDs).To(gomega.HaveLen(1))
 				gomega.Expect(client.TestData.TriedToRemoveImageCount.Load()).
-					To(gomega.Equal(int32(1)), "RemoveImageByID should be called for deferred cleanup")
+					To(gomega.Equal(int32(0)), "the caller removes the collected image")
 			})
 		})
 		ginkgo.When("simulating a self-update with excess Watchtower instances", func() {
@@ -249,7 +249,7 @@ var _ = ginkgo.Describe("the actions package", func() {
 				)
 			})
 
-			ginkgo.It("should stop the old instance and clean up its image", func() {
+			ginkgo.It("should stop the old instance and collect its image", func() {
 				var cleanupImageIDs []types.RemovedImageInfo
 
 				ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
@@ -274,7 +274,7 @@ var _ = ginkgo.Describe("the actions package", func() {
 				gomega.Expect(cleanupImageIDs).
 					To(gomega.HaveLen(1), "cleanupImageIDs should only include old container's image")
 				gomega.Expect(client.TestData.TriedToRemoveImageCount.Load()).
-					To(gomega.Equal(int32(1)), "RemoveImageByID should be called for old image")
+					To(gomega.Equal(int32(0)), "the caller removes the collected image")
 			})
 		})
 

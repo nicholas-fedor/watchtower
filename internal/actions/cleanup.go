@@ -43,7 +43,8 @@ var RemovalRetryDelay = 1 * time.Second
 //   - client: Container client for Docker operations.
 //   - cleanupImages: Remove images if true.
 //   - watchtowerScope: Scope to filter Watchtower containers.
-//   - removeImageInfos: Pointer to slice of images to remove after stopping excess containers.
+//   - removeImageInfos: List that receives the images of removed instances for the caller to remove.
+//     Nil removes them right away.
 //   - currentContainer: The current running Watchtower container.
 //
 // Returns:
@@ -123,7 +124,8 @@ func RemoveExcessWatchtowerInstances(log *zerolog.Logger, ctx context.Context,
 //   - cleanupImages: Remove images if true.
 //   - scope: Scope to filter Watchtower containers (empty for unscoped).
 //   - currentContainerID: ID of the currently running Watchtower container.
-//   - removeImageInfos: Pointer to slice of images to remove after stopping old containers.
+//   - removeImageInfos: List that receives the images of removed instances for the caller to remove.
+//     Nil removes them right away.
 //
 // Returns:
 //   - int: Number of removed old Watchtower containers.
@@ -583,7 +585,8 @@ func addExcessContainers(excessContainers, chainContainers []types.Container) []
 //   - excessWatchtowerContainers: Slice of Watchtower containers to stop and remove.
 //   - cleanupImages: Remove images if true.
 //   - currentContainer: The current running Watchtower container (nil if not applicable).
-//   - removeImageInfos: Pointer to slice of images to remove after stopping excess instances.
+//   - removeImageInfos: List that receives the images of removed instances for the caller to remove.
+//     Nil removes them right away.
 //
 // Returns:
 //   - int: Number of successfully removed containers.
@@ -600,18 +603,12 @@ func removeExcessContainers(log *zerolog.Logger, ctx context.Context,
 		Bool("cleanup_images", cleanupImages).
 		Msg("Starting removal of excess containers")
 
-	localRemoved := []types.RemovedImageInfo{}
-
-	var collectedInfos *[]types.RemovedImageInfo
-	if removeImageInfos != nil {
-		collectedInfos = removeImageInfos
-	} else {
-		collectedInfos = &localRemoved
-	}
+	// collected holds the images of the instances this call removes.
+	var collected []types.RemovedImageInfo
 
 	excessInstancesRemoved := 0
 
-	for _, c := range excessWatchtowerContainers {
+	for i, c := range excessWatchtowerContainers {
 		log.Debug().
 			Str("container_id", string(c.ID())).
 			Str("container_name", c.Name()).
@@ -662,6 +659,12 @@ func removeExcessContainers(log *zerolog.Logger, ctx context.Context,
 				case <-time.After(RemovalRetryDelay):
 					// continue to next retry attempt
 				case <-ctx.Done():
+					// The caller still removes the images of the instances
+					// already removed, except images the remaining ones use.
+					if removeImageInfos != nil {
+						addCollectedImages(removeImageInfos, collected, excessWatchtowerContainers[i:])
+					}
+
 					return excessInstancesRemoved, fmt.Errorf("context canceled during retry delay: %w", ctx.Err())
 				}
 			}
@@ -679,7 +682,7 @@ func removeExcessContainers(log *zerolog.Logger, ctx context.Context,
 					Str("image_name", c.ImageName()).
 					Msg("Collecting image info for deferred removal")
 
-				*collectedInfos = append(*collectedInfos, types.RemovedImageInfo{
+				collected = append(collected, types.RemovedImageInfo{
 					ImageID:       c.ImageID(),
 					ContainerID:   c.ID(),
 					ImageName:     c.ImageName(),
@@ -689,12 +692,18 @@ func removeExcessContainers(log *zerolog.Logger, ctx context.Context,
 		}
 	}
 
+	// Keep every image while an instance is still running. Only the images
+	// of this call are dropped, never the caller's earlier entries.
 	if excessInstancesRemoved < len(excessWatchtowerContainers) {
-		*collectedInfos = nil
+		collected = nil
 	}
 
-	if cleanupImages {
-		removedInfos, err := RemoveImages(log, ctx, client, *collectedInfos)
+	if removeImageInfos != nil {
+		// The caller removes the images, once per image, with the rest of
+		// its cleanup.
+		addCollectedImages(removeImageInfos, collected, nil)
+	} else if len(collected) > 0 {
+		removedInfos, err := RemoveImages(log, ctx, client, deduplicateByImageID(collected))
 		if err != nil {
 			log.Error().
 				Err(err).
@@ -702,10 +711,6 @@ func removeExcessContainers(log *zerolog.Logger, ctx context.Context,
 				Interface("image_infos", removedInfos).
 				Bool("cleanup_images", true).
 				Msg("failed to remove excess images")
-		}
-
-		if removeImageInfos != nil {
-			*removeImageInfos = removedInfos
 		}
 	}
 
@@ -723,6 +728,32 @@ func removeExcessContainers(log *zerolog.Logger, ctx context.Context,
 		Msg("Successfully removed all excess Watchtower containers")
 
 	return excessInstancesRemoved, nil
+}
+
+// addCollectedImages adds collected images to the caller's cleanup list,
+// skipping images that a remaining instance still uses.
+//
+// Parameters:
+//   - removeImageInfos: The caller's cleanup list.
+//   - collected: Images of the instances that were removed.
+//   - remaining: Instances that were not removed.
+func addCollectedImages(
+	removeImageInfos *[]types.RemovedImageInfo,
+	collected []types.RemovedImageInfo,
+	remaining []types.Container,
+) {
+	inUse := make(map[types.ImageID]struct{}, len(remaining))
+	for _, c := range remaining {
+		inUse[c.ImageID()] = struct{}{}
+	}
+
+	for _, info := range collected {
+		if _, used := inUse[info.ImageID]; used {
+			continue
+		}
+
+		addCleanupImageInfo(removeImageInfos, info.ImageID, info.ImageName, info.ContainerName, info.ContainerID)
+	}
 }
 
 // RemoveImages removes specified images and returns successfully removed ones.
