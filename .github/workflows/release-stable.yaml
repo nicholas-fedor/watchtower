@@ -32,6 +32,9 @@ jobs:
       packages: write # For pushing images to registries
       attestations: write # For generating provenance and SBOMs
       id-token: write # For OIDC auth to Docker Hub and GHCR
+    secrets:
+      DOCKERHUB_USERNAME: ${{ secrets.DOCKERHUB_USERNAME }}
+      DOCKERHUB_TOKEN: ${{ secrets.DOCKERHUB_TOKEN }}
     with:
       ENVIRONMENT: CI-Release
       BUILD_TYPE: stable
