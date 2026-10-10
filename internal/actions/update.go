@@ -1814,9 +1814,11 @@ func restartContainersInSortedOrder(
 			}
 		}
 
-		// Skip other Watchtower containers from self-updates
-		if c.IsWatchtower() && config.CurrentContainerID != "" &&
-			c.ID() != config.CurrentContainerID {
+		// Skip other Watchtower containers, and every Watchtower container while
+		// self-updates are disabled. A Watchtower container restarted with a
+		// dependency would otherwise be recreated anyway.
+		if c.IsWatchtower() && (config.SkipSelfUpdate ||
+			config.CurrentContainerID != "" && c.ID() != config.CurrentContainerID) {
 			continue
 		}
 

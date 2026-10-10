@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/rs/zerolog"
+	"github.com/spf13/afero"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 
@@ -77,6 +78,10 @@ var (
 	// to avoid repeated calls to GetCurrentContainerID. If retrieval fails, it is set to an empty string.
 	currentWatchtowerContainerID types.ContainerID
 
+	// currentWatchtowerContainerUnknown is true when Watchtower runs in a container
+	// whose ID could not be determined. Self-updates are then disabled.
+	currentWatchtowerContainerUnknown bool
+
 	// currentWatchtowerContainer holds the current Watchtower container instance.
 	//
 	// It is initialized in preRun by retrieving the container object using the currentWatchtowerContainerID,
@@ -101,6 +106,11 @@ var (
 	// It is initialized to container.NewClient by default. preRun calls it with the resolved client options,
 	// so tests can substitute a mock client without a Docker daemon.
 	newClient = container.NewClient
+
+	// processFs is the filesystem preRun checks for container marker files.
+	//
+	// Tests replace it to control whether Watchtower appears to run in a container.
+	processFs afero.Fs = afero.NewOsFs()
 
 	// runUpdatesWithNotifications is a function variable for performing container updates and sending notifications.
 	//
@@ -302,6 +312,11 @@ func (p *process) preRun(cmd *cobra.Command, _ []string) {
 		}
 	}
 
+	// Without its own ID, Watchtower cannot tell itself apart from other instances.
+	// A host binary has no container ID, so only a containerized run is unknown.
+	currentWatchtowerContainerUnknown = currentWatchtowerContainerID == "" &&
+		container.InContainer(processFs)
+
 	// Check if this is an old Watchtower container that should not run continuously.
 	// exitInvalidWatchtowerRestart calls os.Exit. Keep it in a helper so preRun
 	// defers (for example cancel) are not paired with os.Exit in this function
@@ -320,6 +335,13 @@ func (p *process) preRun(cmd *cobra.Command, _ []string) {
 	// hooked logger so subsequent application logging is captured for notifications.
 	notifier = notifications.NewNotifier(p.log, appCfg.Notify)
 	notifier.RegisterHook(p.log)
+
+	if currentWatchtowerContainerUnknown {
+		p.log.Warn().Msg(
+			"Could not identify Watchtower's own container. " +
+				"Self-updates are disabled and old instances will not be removed",
+		)
+	}
 
 	// Log deprecated notification configuration options, if set.
 	notifications.LogLegacyDeprecationWarnings(p.log, appCfg.Notify.LegacyTypes)
@@ -637,6 +659,7 @@ func (p *process) runMain(cfg types.RunConfig) int {
 
 	baseParams := appCfg.UpdateParams(appConfig.RunOverrides{
 		Filter:             cfg.Filter,
+		SkipSelfUpdate:     currentWatchtowerContainerUnknown,
 		CurrentContainerID: currentWatchtowerContainerID,
 	})
 

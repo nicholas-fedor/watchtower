@@ -65,6 +65,7 @@ func setRunState(t *testing.T, state runTestState) {
 	savedNotifier := notifier
 	savedCurrent := currentWatchtowerContainer
 	savedCurrentID := currentWatchtowerContainerID
+	savedCurrentUnknown := currentWatchtowerContainerUnknown
 	savedRunUpdates := runUpdatesWithNotifications
 	savedSleep := sleepFunc
 	savedSignalContext := createSignalContext
@@ -75,6 +76,7 @@ func setRunState(t *testing.T, state runTestState) {
 		notifier = savedNotifier
 		currentWatchtowerContainer = savedCurrent
 		currentWatchtowerContainerID = savedCurrentID
+		currentWatchtowerContainerUnknown = savedCurrentUnknown
 		runUpdatesWithNotifications = savedRunUpdates
 		sleepFunc = savedSleep
 		createSignalContext = savedSignalContext
@@ -84,6 +86,7 @@ func setRunState(t *testing.T, state runTestState) {
 	client = state.client
 	currentWatchtowerContainer = state.current
 	currentWatchtowerContainerID = state.currentID
+	currentWatchtowerContainerUnknown = false
 	sleepFunc = func(time.Duration) {}
 
 	notifier = notifications.NewNotifier(logging.NopLogger(), notifyConfig.Notify{Level: "info"})
