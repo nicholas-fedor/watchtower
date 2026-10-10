@@ -1757,6 +1757,8 @@ func TestRetryManifestRequest(t *testing.T) {
 		rateLimited bool
 		// wantErrIs, when set, is an error the result must wrap.
 		wantErrIs error
+		// wantErrContains, when set, is text the error must contain.
+		wantErrContains string
 		// challengeHost is the token host. Empty means ghcr.io.
 		challengeHost string
 		// currentURL is the URL the retry runs on. Empty means the original host.
@@ -1853,6 +1855,8 @@ func TestRetryManifestRequest(t *testing.T) {
 			setupClient: unauthorizedManifestClient,
 			wantErr:     true,
 			wantErrIs:   errUnresolvedManifestRetry,
+			// The error names the original-host URL the registry asked for.
+			wantErrContains: "https://registry.example.com/v2/manifests/latest",
 		},
 		{
 			name:          "returns an empty digest when the HEAD retry on a same-host token host asks again",
@@ -1911,6 +1915,10 @@ func TestRetryManifestRequest(t *testing.T) {
 
 				if tt.wantErrIs != nil {
 					require.ErrorIs(t, err, tt.wantErrIs)
+				}
+
+				if tt.wantErrContains != "" {
+					require.ErrorContains(t, err, tt.wantErrContains)
 				}
 
 				return
