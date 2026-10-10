@@ -213,3 +213,36 @@ func TestUpdate_StopFailureStaysFailedWhenCanceled(t *testing.T) {
 	assert.Equal(t, map[string]string{"app": "failed to stop container: daemon unavailable"},
 		reportErrors(report.Failed()))
 }
+
+// TestUpdate_SkipSelfUpdateLeavesDependentWatchtowerRunning verifies that
+// while self-updates are disabled, a Watchtower container is not recreated
+// when a container it depends on is updated. Only the dependency is replaced.
+func TestUpdate_SkipSelfUpdateLeavesDependentWatchtowerRunning(t *testing.T) {
+	t.Parallel()
+
+	app := skipTestContainer("a000000000000000000000000000000000000000000000000000000000000000", "app", nil)
+	watchtower := skipTestContainer("b000000000000000000000000000000000000000000000000000000000000000", "watchtower",
+		map[string]string{
+			"com.centurylinklabs.watchtower":            "true",
+			"com.centurylinklabs.watchtower.depends-on": "app",
+		})
+
+	// The mock fails the test on a second recreation.
+	client := mockContainer.NewMockClient(t)
+	client.EXPECT().ListContainers(mock.Anything, mock.Anything).
+		Return([]types.Container{app, watchtower}, nil).Once()
+	client.EXPECT().IsContainerStale(mock.Anything, app, mock.Anything).
+		Return(true, types.ImageID("sha256:new"), "", nil).Once()
+	client.EXPECT().GetImageAnnotations(mock.Anything, mock.Anything).Return(oci.Annotations{}).Maybe()
+	client.EXPECT().StopAndRemoveContainer(mock.Anything, app, mock.Anything).Return(nil).Once()
+	client.EXPECT().CreateContainer(mock.Anything, app).
+		Return(types.ContainerID("e000000000000000000000000000000000000000000000000000000000000000"), nil).Once()
+	client.EXPECT().StartContainerByID(mock.Anything, mock.Anything).Return(nil).Once()
+	client.EXPECT().GetContainer(mock.Anything, mock.Anything).Return(app, nil).Maybe()
+
+	report, _, err := Update(testLogger(), t.Context(), client, types.UpdateParams{SkipSelfUpdate: true})
+	require.NoError(t, err)
+
+	assert.Equal(t, []string{app.Name()}, reportNames(report.Updated()))
+	assert.Empty(t, report.Failed())
+}

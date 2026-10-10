@@ -735,6 +735,32 @@ func TestRunUpgradesOnSchedule_EphemeralSelfUpdateWithExposedPorts(t *testing.T)
 	)
 }
 
+// TestRunUpgradesOnSchedule_KeepsBaseSkipSelfUpdate verifies that a run cannot
+// enable self-updates that the base parameters disable.
+func TestRunUpgradesOnSchedule_KeepsBaseSkipSelfUpdate(t *testing.T) {
+	client := mockActions.CreateMockClient(&mockActions.TestData{}, false, false)
+
+	var capturedParams types.UpdateParams
+
+	runUpdatesWithNotifications := func(_ context.Context, _ types.Filter, params types.UpdateParams) *metrics.Metric {
+		capturedParams = params
+
+		return &metrics.Metric{Scanned: 1, Updated: 0, Failed: 0}
+	}
+
+	timeoutCtx, timeoutCancel := context.WithTimeout(t.Context(), 10*time.Millisecond)
+	defer timeoutCancel()
+
+	// The run at startup does not skip self-updates on its own.
+	deps := testDeps(client, runUpdatesWithNotifications, func(logging.StartupParams) {})
+	deps.UpdateOnStart = true
+	deps.BaseParams.SkipSelfUpdate = true
+	err := scheduling.RunUpgradesOnSchedule(timeoutCtx, deps)
+	require.NoError(t, err)
+
+	assert.True(t, capturedParams.SkipSelfUpdate)
+}
+
 // TestRunUpgradesOnSchedule_PortConflictGuard_SkipsSelfUpdate verifies that when
 // the Watchtower container has exposed ports and ephemeralSelfUpdate=false, the
 // port-conflict guard forces SkipSelfUpdate to true to prevent the old container

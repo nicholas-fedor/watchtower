@@ -3,10 +3,15 @@ package container
 import (
 	"context"
 	"errors"
+	"io/fs"
 	"os"
+	"testing"
 
 	"github.com/onsi/ginkgo/v2"
 	"github.com/onsi/gomega"
+	"github.com/spf13/afero"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 
 	dockerContainer "github.com/moby/moby/api/types/container"
 	dockerImage "github.com/moby/moby/api/types/image"
@@ -639,3 +644,65 @@ var _ = ginkgo.Describe("GetCurrentContainerID", func() {
 		}, types.ContainerID(""), true, "failed to detect current container ID"),
 	)
 })
+
+// statErrorFs is a filesystem whose Stat fails with err for every path.
+type statErrorFs struct {
+	afero.Fs
+
+	// err is returned by every Stat call.
+	err error
+}
+
+// Stat returns the configured error.
+func (f statErrorFs) Stat(string) (os.FileInfo, error) {
+	return nil, f.err
+}
+
+// TestInContainer verifies that the container marker files decide whether
+// Watchtower runs in a container, and that an unreadable marker counts as
+// present.
+func TestInContainer(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name string
+		// files are created before the check.
+		files []string
+		// statErr, when set, fails every Stat call.
+		statErr error
+		want    bool
+	}{
+		{name: "no marker", want: false},
+		{name: "docker marker", files: []string{"/.dockerenv"}, want: true},
+		{name: "podman marker", files: []string{"/run/.containerenv"}, want: true},
+		{name: "marker cannot be checked", statErr: fs.ErrPermission, want: true},
+		{name: "markers do not exist", statErr: fs.ErrNotExist, want: false},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			fsys := afero.NewMemMapFs()
+			for _, name := range tt.files {
+				require.NoError(t, afero.WriteFile(fsys, name, nil, 0o600))
+			}
+
+			if tt.statErr != nil {
+				fsys = statErrorFs{Fs: fsys, err: tt.statErr}
+			}
+
+			assert.Equal(t, tt.want, InContainer(fsys))
+		})
+	}
+}
+
+// TestInContainer_WrappedNotExist verifies that a wrapped not-exist error
+// still counts as a missing marker.
+func TestInContainer_WrappedNotExist(t *testing.T) {
+	t.Parallel()
+
+	fsys := statErrorFs{Fs: afero.NewMemMapFs(), err: errors.Join(errors.New("stat"), fs.ErrNotExist)}
+
+	assert.False(t, InContainer(fsys))
+}

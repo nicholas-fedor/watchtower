@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/rs/zerolog"
+	"github.com/spf13/afero"
 	"github.com/spf13/viper"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
@@ -38,6 +39,8 @@ type selfDetection struct {
 	mountinfo string
 	cgroup    string
 	hostname  string
+	// marker creates the Docker container marker file.
+	marker bool
 }
 
 // mountinfoWithSelf is a mountinfo file that names the Watchtower container.
@@ -64,12 +67,19 @@ func setPreRunState(t *testing.T, client container.Client, detection selfDetecti
 	savedNewClient := newClient
 	savedMountinfo := container.ReadMountinfoFunc
 	savedCgroup := container.ReadCgroupFunc
+	savedProcessFs := processFs
 
 	t.Cleanup(func() {
 		newClient = savedNewClient
 		container.ReadMountinfoFunc = savedMountinfo
 		container.ReadCgroupFunc = savedCgroup
+		processFs = savedProcessFs
 	})
+
+	processFs = afero.NewMemMapFs()
+	if detection.marker {
+		require.NoError(t, afero.WriteFile(processFs, "/.dockerenv", nil, 0o600))
+	}
 
 	newClient = func(*zerolog.Logger, container.ClientOptions) container.Client { return client }
 	container.ReadMountinfoFunc = readFixture(detection.mountinfo)
@@ -123,7 +133,8 @@ func selfContainer(name, hostname string) types.Container {
 
 // TestPreRun_SelfDetection records how preRun finds the Watchtower container
 // it runs in, and what it keeps when detection or the lookup fails. A process
-// whose detection fails looks the same as one outside a container.
+// in a container whose ID is not known is marked unknown, unlike one outside a
+// container.
 func TestPreRun_SelfDetection(t *testing.T) {
 	tests := []struct {
 		name      string
@@ -133,10 +144,18 @@ func TestPreRun_SelfDetection(t *testing.T) {
 		wantID    types.ContainerID
 		wantName  string
 		wantCalls []string
+		// wantUnknown is whether the own container is marked unknown.
+		wantUnknown bool
 	}{
 		{
 			name:      "outside a container",
 			wantCalls: []string{},
+		},
+		{
+			name:        "detection fails in a container",
+			detection:   selfDetection{marker: true},
+			wantCalls:   []string{},
+			wantUnknown: true,
 		},
 		{
 			name:      "found from mountinfo",
@@ -183,12 +202,13 @@ func TestPreRun_SelfDetection(t *testing.T) {
 		},
 		{
 			name:      "lookup times out and the ID is cleared",
-			detection: selfDetection{mountinfo: mountinfoWithSelf()},
+			detection: selfDetection{mountinfo: mountinfoWithSelf(), marker: true},
 			setup: func(client *mockContainer.MockClient) {
 				client.EXPECT().GetCurrentWatchtowerContainer(mock.Anything, selfID).
 					Return(nil, fmt.Errorf("inspect: %w", context.DeadlineExceeded))
 			},
-			wantCalls: []string{"GetCurrentWatchtowerContainer cccccccccccc"},
+			wantCalls:   []string{"GetCurrentWatchtowerContainer cccccccccccc"},
+			wantUnknown: true,
 		},
 		{
 			name:      "old instance continues in run-once mode",
@@ -218,6 +238,7 @@ func TestPreRun_SelfDetection(t *testing.T) {
 			newRunProcess().preRun(newTestRootCommand(t, tt.args...), nil)
 
 			assert.Equal(t, tt.wantID, currentWatchtowerContainerID)
+			assert.Equal(t, tt.wantUnknown, currentWatchtowerContainerUnknown)
 			assert.Equal(t, tt.wantName, containerName(currentWatchtowerContainer))
 			assert.Equal(t, tt.wantCalls, runCalls(mockClient))
 			assert.Same(t, mockClient, client, "preRun uses the client from newClient")

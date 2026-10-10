@@ -2,13 +2,16 @@ package container
 
 import (
 	"context"
+	"errors"
 	"fmt"
+	"io/fs"
 	"iter"
 	"os"
 	"regexp"
 	"strings"
 
 	"github.com/rs/zerolog"
+	"github.com/spf13/afero"
 
 	"github.com/nicholas-fedor/watchtower/pkg/types"
 )
@@ -31,6 +34,12 @@ var (
 	ReadMountinfoFunc = os.ReadFile
 	ReadCgroupFunc    = os.ReadFile
 )
+
+// containerMarkers are files that container runtimes create inside a container.
+var containerMarkers = []string{
+	"/run/.containerenv", // Podman
+	"/.dockerenv",        // Docker
+}
 
 // IsOldContainer reports whether the container's runtime name (from Name()
 // or raw inspect) indicates a predecessor renamed during Watchtower self-update.
@@ -130,6 +139,28 @@ func GetCurrentContainerID(log *zerolog.Logger, ctx context.Context, client Clie
 		Msg("All container ID detection methods failed")
 
 	return "", fmt.Errorf("failed to detect current container ID: %w", lastErr)
+}
+
+// InContainer reports whether the process runs in a container, based on the
+// marker files that Docker and Podman create.
+//
+// A marker that cannot be checked for a reason other than not existing counts
+// as present, so callers that protect other Watchtower containers fail closed.
+//
+// Parameters:
+//   - fsys: The filesystem to check.
+//
+// Returns:
+//   - bool: True if a container marker exists or cannot be checked.
+func InContainer(fsys afero.Fs) bool {
+	for _, marker := range containerMarkers {
+		_, err := fsys.Stat(marker)
+		if err == nil || !errors.Is(err, fs.ErrNotExist) {
+			return true
+		}
+	}
+
+	return false
 }
 
 // GetContainerIDFromMountinfo retrieves the container ID from /proc/self/mountinfo.
