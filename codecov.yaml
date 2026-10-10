@@ -40,6 +40,8 @@ coverage:
     changes:
       default:
         enabled: true
+        # Report without failing. Main has no uploads between nightlies, so the base can be stale.
+        informational: true
 
 comment:
   # Customize PR comment layout.
