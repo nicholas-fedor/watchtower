@@ -61,6 +61,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Chores
 
+- Skip major updates of indirect go dependencies by @nicholas-fedor in [#2711](https://github.com/nicholas-fedor/watchtower/pull/2711)
 - Update module golang.org/x/text to v0.43.0 by @renovate[bot] in [#2705](https://github.com/nicholas-fedor/watchtower/pull/2705)
 - Update module golang.org/x/mod to v0.42.0 by @renovate[bot] in [#2704](https://github.com/nicholas-fedor/watchtower/pull/2704)
 - Update module github.com/onsi/ginkgo/v2 to v2.33.1 by @renovate[bot] in [#2700](https://github.com/nicholas-fedor/watchtower/pull/2700)
