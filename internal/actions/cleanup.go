@@ -608,7 +608,7 @@ func removeExcessContainers(log *zerolog.Logger, ctx context.Context,
 
 	excessInstancesRemoved := 0
 
-	for _, c := range excessWatchtowerContainers {
+	for i, c := range excessWatchtowerContainers {
 		log.Debug().
 			Str("container_id", string(c.ID())).
 			Str("container_name", c.Name()).
@@ -659,6 +659,12 @@ func removeExcessContainers(log *zerolog.Logger, ctx context.Context,
 				case <-time.After(RemovalRetryDelay):
 					// continue to next retry attempt
 				case <-ctx.Done():
+					// The caller still removes the images of the instances
+					// already removed, except images the remaining ones use.
+					if removeImageInfos != nil {
+						addCollectedImages(removeImageInfos, collected, excessWatchtowerContainers[i:])
+					}
+
 					return excessInstancesRemoved, fmt.Errorf("context canceled during retry delay: %w", ctx.Err())
 				}
 			}
@@ -695,9 +701,7 @@ func removeExcessContainers(log *zerolog.Logger, ctx context.Context,
 	if removeImageInfos != nil {
 		// The caller removes the images, once per image, with the rest of
 		// its cleanup.
-		for _, info := range collected {
-			addCleanupImageInfo(removeImageInfos, info.ImageID, info.ImageName, info.ContainerName, info.ContainerID)
-		}
+		addCollectedImages(removeImageInfos, collected, nil)
 	} else if len(collected) > 0 {
 		removedInfos, err := RemoveImages(log, ctx, client, deduplicateByImageID(collected))
 		if err != nil {
@@ -724,6 +728,32 @@ func removeExcessContainers(log *zerolog.Logger, ctx context.Context,
 		Msg("Successfully removed all excess Watchtower containers")
 
 	return excessInstancesRemoved, nil
+}
+
+// addCollectedImages adds collected images to the caller's cleanup list,
+// skipping images that a remaining instance still uses.
+//
+// Parameters:
+//   - removeImageInfos: The caller's cleanup list.
+//   - collected: Images of the instances that were removed.
+//   - remaining: Instances that were not removed.
+func addCollectedImages(
+	removeImageInfos *[]types.RemovedImageInfo,
+	collected []types.RemovedImageInfo,
+	remaining []types.Container,
+) {
+	inUse := make(map[types.ImageID]struct{}, len(remaining))
+	for _, c := range remaining {
+		inUse[c.ImageID()] = struct{}{}
+	}
+
+	for _, info := range collected {
+		if _, used := inUse[info.ImageID]; used {
+			continue
+		}
+
+		addCleanupImageInfo(removeImageInfos, info.ImageID, info.ImageName, info.ContainerName, info.ContainerID)
+	}
 }
 
 // RemoveImages removes specified images and returns successfully removed ones.

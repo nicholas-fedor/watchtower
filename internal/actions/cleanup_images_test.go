@@ -112,6 +112,53 @@ func TestRemoveExcessContainers_PartialFailureKeepsCallerList(t *testing.T) {
 	})
 }
 
+// TestRemoveExcessContainers_CancelKeepsRemovedInstanceImages verifies that
+// when the cleanup is canceled while retrying an instance, the images of the
+// instances already removed stay on the caller's list, except images that an
+// instance left in place still uses. It runs sequentially because the retries
+// read the RemovalRetryDelay package variable, which the Ginkgo suite sets.
+func TestRemoveExcessContainers_CancelKeepsRemovedInstanceImages(t *testing.T) {
+	synctest.Test(t, func(t *testing.T) {
+		current := cleanupTestWatchtower("c000000000000000000000000000000000000000000000000000000000000000",
+			"watchtower", "org/watchtower:5")
+		removedShared := cleanupTestWatchtower("a000000000000000000000000000000000000000000000000000000000000000",
+			"watchtower-old-a", "org/watchtower:1")
+		removedOwn := cleanupTestWatchtower("b000000000000000000000000000000000000000000000000000000000000000",
+			"watchtower-old-b", "org/watchtower:3")
+		stuck := cleanupTestWatchtower("d000000000000000000000000000000000000000000000000000000000000000",
+			"watchtower-old-d", "org/watchtower:4")
+		pending := cleanupTestWatchtower("e000000000000000000000000000000000000000000000000000000000000000",
+			"watchtower-old-e", "org/watchtower:1")
+
+		ctx, cancel := context.WithCancel(t.Context())
+		defer cancel()
+
+		// The mock fails the test on any image removal.
+		client := mockContainer.NewMockClient(t)
+		client.EXPECT().StopAndRemoveContainer(mock.Anything, removedShared, mock.Anything).Return(nil).Once()
+		client.EXPECT().StopAndRemoveContainer(mock.Anything, removedOwn, mock.Anything).Return(nil).Once()
+		client.EXPECT().StopAndRemoveContainer(mock.Anything, stuck, mock.Anything).
+			RunAndReturn(func(context.Context, types.Container, time.Duration) error {
+				cancel()
+
+				return errors.New("daemon busy")
+			}).Once()
+
+		images := []types.RemovedImageInfo{{ImageID: "org/app:1", ContainerName: "app"}}
+
+		removed, err := removeExcessContainers(testLogger(), ctx, client,
+			[]types.Container{removedShared, removedOwn, stuck, pending}, true, current, &images)
+		require.ErrorIs(t, err, context.Canceled)
+		assert.Equal(t, 2, removed)
+
+		// The pending instance still uses org/watchtower:1.
+		assert.Equal(t, []string{
+			"org/app:1 app",
+			"org/watchtower:3 watchtower-old-b",
+		}, imageEntries(images))
+	})
+}
+
 // TestRemoveExcessContainers_NoCallerListRemovesImages verifies that without
 // a caller list, the images of removed instances are removed right away, once
 // per image.
