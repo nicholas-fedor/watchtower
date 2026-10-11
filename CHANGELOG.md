@@ -70,6 +70,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Chores
 
+- Update dependency python to v3.15.0 by @renovate[bot] in [#2736](https://github.com/nicholas-fedor/watchtower/pull/2736)
+- Update module github.com/fvbommel/sortorder to v1.2.1 by @renovate[bot] in [#2735](https://github.com/nicholas-fedor/watchtower/pull/2735)
 - Update golang:alpine3.24 docker digest to f92b6ef by @renovate[bot] in [#2724](https://github.com/nicholas-fedor/watchtower/pull/2724)
 - Update golang:1.27.2-alpine docker digest to f92b6ef by @renovate[bot] in [#2723](https://github.com/nicholas-fedor/watchtower/pull/2723)
 - Skip major updates of indirect go dependencies by @nicholas-fedor in [#2711](https://github.com/nicholas-fedor/watchtower/pull/2711)
