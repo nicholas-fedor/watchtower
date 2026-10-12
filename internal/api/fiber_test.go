@@ -247,6 +247,8 @@ func TestTimeoutMiddleware(t *testing.T) {
 	assert.Equal(t, http.StatusOK, resp.StatusCode)
 }
 
+// TestTimeoutMiddleware_Timeout verifies that a request whose handler
+// outlasts the timeout gets 503 Service Unavailable, which the API documents.
 func TestTimeoutMiddleware_Timeout(t *testing.T) {
 	const testTimeout = 10 * time.Millisecond
 
@@ -277,7 +279,7 @@ func TestTimeoutMiddleware_Timeout(t *testing.T) {
 	synctest.Test(t, func(t *testing.T) {
 		defer resp.Body.Close()
 
-		assert.Equal(t, http.StatusRequestTimeout, resp.StatusCode)
+		assert.Equal(t, http.StatusServiceUnavailable, resp.StatusCode)
 	})
 }
 
