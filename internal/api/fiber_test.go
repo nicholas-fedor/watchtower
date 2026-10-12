@@ -263,7 +263,9 @@ func TestTimeoutMiddleware_Timeout(t *testing.T) {
 	app.Get("/test", handler, func(c fiber.Ctx) error {
 		<-c.Context().Done()
 
-		return fiber.ErrRequestTimeout
+		// The deadline error counts as a timeout even if the handler returns
+		// before the middleware notices the deadline.
+		return c.Context().Err()
 	})
 
 	req := httptest.NewRequestWithContext(
