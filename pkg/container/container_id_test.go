@@ -3,9 +3,11 @@ package container
 import (
 	"bytes"
 	"context"
+	"encoding/json"
 	"errors"
 	"io/fs"
 	"os"
+	"strings"
 	"testing"
 
 	"github.com/onsi/ginkgo/v2"
@@ -732,4 +734,19 @@ func TestGetCurrentContainerID_FailureLogsAtDebug(t *testing.T) {
 	assert.Empty(t, id)
 	assert.NotContains(t, out.String(), `"level":"error"`)
 	assert.NotContains(t, out.String(), `"level":"warn"`)
+
+	// Find the summary record and check its level.
+	var levels []string
+
+	for line := range strings.Lines(out.String()) {
+		var record map[string]any
+
+		require.NoError(t, json.Unmarshal([]byte(line), &record))
+
+		if record["message"] == "All container ID detection methods failed" {
+			levels = append(levels, record["level"].(string))
+		}
+	}
+
+	assert.Equal(t, []string{"debug"}, levels)
 }
