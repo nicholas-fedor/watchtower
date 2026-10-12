@@ -1,6 +1,7 @@
 package container
 
 import (
+	"bytes"
 	"context"
 	"errors"
 	"io/fs"
@@ -9,6 +10,7 @@ import (
 
 	"github.com/onsi/ginkgo/v2"
 	"github.com/onsi/gomega"
+	"github.com/rs/zerolog"
 	"github.com/spf13/afero"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -705,4 +707,29 @@ func TestInContainer_WrappedNotExist(t *testing.T) {
 	fsys := statErrorFs{Fs: afero.NewMemMapFs(), err: errors.Join(errors.New("stat"), fs.ErrNotExist)}
 
 	assert.False(t, InContainer(fsys))
+}
+
+// TestGetCurrentContainerID_FailureLogsAtDebug verifies that failing to find
+// the container ID is not logged as an error. A Watchtower binary on the host
+// has no container ID, and callers report a missing ID themselves. It replaces
+// the file readers and sets environment variables, so it runs sequentially.
+func TestGetCurrentContainerID_FailureLogsAtDebug(t *testing.T) {
+	t.Setenv("HOSTNAME", "")
+
+	savedMountinfo, savedCgroup := ReadMountinfoFunc, ReadCgroupFunc
+
+	t.Cleanup(func() { ReadMountinfoFunc, ReadCgroupFunc = savedMountinfo, savedCgroup })
+
+	notFound := func(string) ([]byte, error) { return nil, os.ErrNotExist }
+	ReadMountinfoFunc, ReadCgroupFunc = notFound, notFound
+
+	var out bytes.Buffer
+
+	log := zerolog.New(&out).Level(zerolog.TraceLevel)
+
+	id, err := GetCurrentContainerID(&log, t.Context(), nil)
+	require.Error(t, err)
+	assert.Empty(t, id)
+	assert.NotContains(t, out.String(), `"level":"error"`)
+	assert.NotContains(t, out.String(), `"level":"warn"`)
 }
