@@ -3594,10 +3594,6 @@ The value is capped by the configured update API timeout (<code>--http-api-updat
 <td style="text-align: left;">Invalid or missing authentication token</td>
 </tr>
 <tr>
-<td style="text-align: center;">408</td>
-<td style="text-align: left;">Update handler timed out (exceeded configured limit, default 10m)</td>
-</tr>
-<tr>
 <td style="text-align: center;">429</td>
 <td style="text-align: left;">Another update is already in progress (full updates only) or the request was rate limited</td>
 </tr>
@@ -3607,7 +3603,7 @@ The value is capped by the configured update API timeout (<code>--http-api-updat
 </tr>
 <tr>
 <td style="text-align: center;">503</td>
-<td style="text-align: left;">Client cancelled while waiting on update lock (targeted updates only)</td>
+<td style="text-align: left;">Update handler timed out (exceeded configured limit, default 10m), or client cancelled while waiting on update lock (targeted updates only)</td>
 </tr>
 </tbody>
 </table>
@@ -3685,10 +3681,6 @@ The value is capped by the configured update API timeout (<code>--http-api-updat
 <td style="text-align: left;">Invalid or missing authentication token</td>
 </tr>
 <tr>
-<td style="text-align: center;">408</td>
-<td style="text-align: left;">Update handler timed out (exceeded configured limit, default 10m)</td>
-</tr>
-<tr>
 <td style="text-align: center;">429</td>
 <td style="text-align: left;">Another update is already in progress (full updates only) or the request was rate limited</td>
 </tr>
@@ -3698,7 +3690,7 @@ The value is capped by the configured update API timeout (<code>--http-api-updat
 </tr>
 <tr>
 <td style="text-align: center;">503</td>
-<td style="text-align: left;">Client cancelled while waiting on update lock (targeted updates only)</td>
+<td style="text-align: left;">Update handler timed out (exceeded configured limit, default 10m), or client cancelled while waiting on update lock (targeted updates only)</td>
 </tr>
 </tbody>
 </table>
@@ -3757,7 +3749,7 @@ The value is capped by the configured update API timeout (<code>--http-api-updat
 <ul>
 <li>The <code>/v1/update</code> handler has a timeout enforced by Fiber's timeout middleware. The default is 10 minutes.</li>
 <li>The timeout covers the full lifecycle: waiting for the concurrency lock, performing the container update scan, and returning results.</li>
-<li>When the timeout is exceeded, the handler returns HTTP 408 (Request Timeout) and the handler goroutine is abandoned.</li>
+<li>When the timeout is exceeded, the handler returns HTTP 503 (Service Unavailable) and the handler goroutine is abandoned.</li>
 <li>The handler listens on <code>c.Context().Done()</code> for cooperative cancellation — targeted updates waiting for the lock will return HTTP 503 when the request context is cancelled.</li>
 <li>You can override the timeout per request with the <code>?timeout=</code> query parameter, up to the configured maximum.</li>
 </ul>
@@ -3822,7 +3814,7 @@ The value is capped by the configured update API timeout (<code>--http-api-updat
     <span class="md-icon" title="Last update">
       <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M21 13.1c-.1 0-.3.1-.4.2l-1 1 2.1 2.1 1-1c.2-.2.2-.6 0-.8l-1.3-1.3c-.1-.1-.2-.2-.4-.2m-1.9 1.8-6.1 6V23h2.1l6.1-6.1zM12.5 7v5.2l4 2.4-1 1L11 13V7zM11 21.9c-5.1-.5-9-4.8-9-9.9C2 6.5 6.5 2 12 2c5.3 0 9.6 4.1 10 9.3-.3-.1-.6-.2-1-.2s-.7.1-1 .2C19.6 7.2 16.2 4 12 4c-4.4 0-8 3.6-8 8 0 4.1 3.1 7.5 7.1 7.9l-.1.2z"/></svg>
     </span>
-    <span class="git-revision-date-localized-plugin git-revision-date-localized-plugin-timeago" title="July 29, 2026 19:25:00 UTC"><span class="timeago" datetime="2026-07-29T19:25:00+00:00" locale="en"></span></span><span class="git-revision-date-localized-plugin git-revision-date-localized-plugin-iso_date" title="July 29, 2026 19:25:00 UTC">2026-07-29</span>
+    <span class="git-revision-date-localized-plugin git-revision-date-localized-plugin-timeago" title="October 12, 2026 16:35:59 UTC"><span class="timeago" datetime="2026-10-12T16:35:59+00:00" locale="en"></span></span><span class="git-revision-date-localized-plugin git-revision-date-localized-plugin-iso_date" title="October 12, 2026 16:35:59 UTC">2026-10-12</span>
   </span>
 
     
