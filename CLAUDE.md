@@ -94,6 +94,15 @@ Adding or changing an option touches several layers, kept deliberately separate:
 - Domains mirror each other across both trees: docker, client, schedule, mode, update, lifecycle, filter, registry, compat(ibility), api, notify, logging, git.
 - A new flag also changes the golden files in `cmd/testdata/` and `internal/flags/testdata/`, and needs a docs entry under `docs/configuration/`.
 
+### Runtime settings and saved state (`internal/settings`)
+
+`config.Config` stays immutable. The few settings that can change while running (`monitor_only`, `cleanup`, `rolling_restart`, `schedule`) live in a `settings.Store` that layers overrides over the flag-derived defaults:
+
+- The store is opened in `runMain` and applied in exactly one place for updates: the `runUpdatesWithNotifications` closure calls `ApplyTo(params)`, which every path (schedule, `/v1/update`) goes through. API read paths use `apiconfig.BuildUpdateParams(opts)` per request for the same reason; do not hoist that call out of a handler closure.
+- Schedule changes reach the running scheduler through `ScheduleDeps.ScheduleChanges`, which swaps the cron entry in place.
+- `--data-dir` (default `/data`) holds `settings.json` and `history.json`. If the directory is missing or not writable, both fall back to memory only; nothing fails. `--run-once` ignores saved overrides.
+- `/v1/settings` (endpoint name `settings`) exposes the store over GET and PATCH. To make another setting editable: add it to `settings.Values`, the `overrides` struct and its `apply`/`set`, `ApplyTo`, the handler's response, the Settings view in `app.js`, and the docs table. A setting baked into the Docker client at construction (for example include-stopped) cannot be changed this way without reworking the client.
+
 ### Update engine
 
 - `internal/actions` — orchestration. `update.go` is the core scan/stop/start loop: list → filter → staleness check → dependency sort → lifecycle hooks → stop/recreate → cleanup. Also here: Watchtower self-update (`ephemeral.go`, orphan recovery), image cleanup, disk-space guards, Git-driven updates (`git.go`, `git_compose.go`), and implicit restarts of linked containers.
