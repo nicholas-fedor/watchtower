@@ -34,7 +34,7 @@ Go is not installed on the Windows host this fork is developed on; run the toolc
 docker run --rm -v "${PWD}:/src" -v watchtower-gomod:/go/pkg/mod -v watchtower-gocache:/root/.cache/go-build -w /src -e GOFLAGS=-buildvcs=false golang:1.27 go test -count=1 ./...
 ```
 
-The `golangci/golangci-lint` image works the same way for linting. `TestContainerLookupWithTimeoutContext` in `cmd/` already fails on an untouched checkout, so that failure alone does not indicate a regression.
+The `golangci/golangci-lint` image works the same way for linting. `TestContainerLookupWithTimeoutContext` in `cmd/` fails when run this way inside a container, including on an untouched checkout, but passes in GitHub Actions on Linux, Windows and macOS. That failure alone does not indicate a regression; run the `test.yaml` workflow (`gh workflow run test.yaml --ref <branch>`) for the authoritative result.
 
 `golangci-lint` must be installed separately and always needs `--config build/golangci-lint/golangci-lint.yaml`. `swag` and `mockery` are pinned as Go tools in `go.mod` (`go tool swag`, `go tool mockery`).
 
