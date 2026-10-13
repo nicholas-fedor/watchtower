@@ -146,6 +146,7 @@ func requiresToken(opts config.Options) bool {
 		opts.EnableHistoryAPI ||
 		opts.EnableImagesAPI ||
 		opts.EnableConfigAPI ||
+		opts.EnableSettingsAPI ||
 		opts.EnableUIAPI
 }
 

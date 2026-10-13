@@ -15,6 +15,7 @@ The UI has no data of its own. It reads the other HTTP API endpoints, so each pa
 | Update a container     |      `update`       |
 | Scan history           |      `history`      |
 | Settings               |      `config`       |
+| Changing settings      |     `settings`      |
 
 The simplest setup enables everything:
 
@@ -24,6 +25,7 @@ services:
     image: nickfedor/watchtower
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
+      - ./watchtower-data:/data
     ports:
       - 127.0.0.1:8080:8080
     environment:
@@ -35,6 +37,8 @@ services:
 
 !!! Warning
     Enabling the `update` endpoint stops Watchtower's scheduled updates unless [`http-api-periodic-polls`](../../../configuration/scheduling/index.md#http_api_periodic_polls) is also set.
+
+The `/data` volume is optional. With it, settings changed on the page and the scan history survive a restart. Without it, both are kept in memory only.
 
 ## Endpoints
 
@@ -59,6 +63,6 @@ The same guidance that applies to the rest of the HTTP API applies here:
 
 - Never expose the HTTP API (including the web UI) directly to the Internet.
 - Always use TLS, either with [`http-api-tls-cert`](../../../configuration/http-api/index.md#http_api_tls_certificate) or a reverse proxy. Without it, the token and the session cookie cross the network in plain text.
-- Anyone who signs in can update containers when the `update` endpoint is enabled. Leave `update` out of the list for a read-only page.
+- Anyone who signs in can update containers when the `update` endpoint is enabled, and change the schedule and update behavior when `settings` is. Leave both out of the list for a read-only page.
 
 Page loads and API calls count toward [`http-api-rate-limit`](../../../configuration/http-api/index.md#http_api_rate_limit).

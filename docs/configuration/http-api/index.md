@@ -97,6 +97,7 @@ Valid names (case-insensitive):
 | [`history`](../../http-api/endpoints/history/index.md)       | `GET /v1/history`                                                                                     | [`http-api-token`](#http_api_token)               |
 | [`images`](../../http-api/endpoints/images/index.md)         | `GET /v1/images`                                                                                      | [`http-api-token`](#http_api_token)               |
 | [`config`](../../http-api/endpoints/config/index.md)         | `GET /v1/config`                                                                                      | [`http-api-token`](#http_api_token)               |
+| [`settings`](../../http-api/endpoints/settings/index.md)     | `GET /v1/settings`, `PATCH /v1/settings`                                                              | [`http-api-token`](#http_api_token)               |
 | [`events`](../../http-api/endpoints/events/index.md)         | `GET /v1/events`                                                                                      | [`http-api-events-token`](#http_api_events_token) |
 | [`swagger`](../../http-api/endpoints/swagger/index.md)       | `GET /swagger/*`                                                                                      | None                                              |
 | [`ui`](../../http-api/endpoints/ui/index.md)                 | `GET /ui/`, `/ui/assets/*`, `/ui/session`                                                             | [`http-api-token`](#http_api_token) to sign in    |
@@ -111,6 +112,20 @@ Valid names (case-insensitive):
     - The CLI flag can be specified multiple times.
     - Defining the environment variable multiple times will not work (only the last value is used).
     - For environment variables use comma or space-separated values.
+
+## Data Directory
+
+Directory where Watchtower keeps settings changed through the [`settings`](../../http-api/endpoints/settings/index.md) endpoint (`settings.json`) and its scan history (`history.json`).
+
+```text
+            Argument: --data-dir
+Environment Variable: WATCHTOWER_DATA_DIR
+                Type: String
+             Default: /data
+```
+
+!!! Note
+    Mount a volume at this path to keep both across restarts. If the directory is missing or read-only, Watchtower keeps them in memory only and starts fresh each time.
 
 ## HTTP API Rate Limit
 

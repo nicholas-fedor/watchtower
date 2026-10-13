@@ -12,6 +12,9 @@ import (
 // DefaultRateLimit is the static default HTTP API rate limit per minute per IP.
 const DefaultRateLimit = 60
 
+// DefaultDataDir is the static default directory for saved settings and scan history.
+const DefaultDataDir = "/data"
+
 // Specs returns API domain flag metadata with static defaults.
 //
 // Returns:
@@ -24,7 +27,7 @@ func Specs() []spec.FlagSpec {
 			Default:   []string{},
 			EnvKeys:   []string{"WATCHTOWER_HTTP_API_ENDPOINTS"},
 			ListParse: spec.ListCommaOrSpace,
-			Help:      "HTTP API endpoints to enable (health, update, metrics, containers, check, history, images, config, events, swagger, ui), or \"all\". Comma- or space-separated. Empty disables the HTTP API.",
+			Help:      "HTTP API endpoints to enable (health, update, metrics, containers, check, history, images, config, settings, events, swagger, ui), or \"all\". Comma- or space-separated. Empty disables the HTTP API.",
 		},
 
 		{
@@ -129,6 +132,13 @@ func Specs() []spec.FlagSpec {
 			EnvKeys:   []string{"WATCHTOWER_HTTP_API_CORS_ORIGINS"},
 			ListParse: spec.ListCommaOrSpace,
 			Help:      "Comma-separated list of allowed CORS origins for cross-origin requests (e.g. https://app.example.com). If unset, CORS is disabled and only same-origin requests are allowed.",
+		},
+		{
+			Name:    "data-dir",
+			Kind:    spec.KindString,
+			Default: DefaultDataDir,
+			EnvKeys: []string{"WATCHTOWER_DATA_DIR"},
+			Help:    "Directory where Watchtower keeps settings changed through the HTTP API and its scan history. Mount a volume there to keep them across restarts. If the directory is missing or read-only, both are kept in memory only",
 		},
 		{
 			Name:    "http-api-check-timeout",

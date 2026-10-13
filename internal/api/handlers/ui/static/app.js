@@ -29,6 +29,10 @@
     historyProblem: "",
     config: null,
     configProblem: "",
+    settings: null,
+    settingsProblem: "",
+    customSchedule: false,
+    customScheduleDraft: null,
   };
 
   const app = document.getElementById("app");
@@ -46,6 +50,8 @@
 
       if (key === "class") {
         node.className = value;
+      } else if (key === "checked" || key === "selected" || key === "value") {
+        node[key] = value;
       } else if (key.startsWith("on")) {
         node.addEventListener(key.slice(2), value);
       } else if (value === true) {
@@ -122,6 +128,12 @@
     const remove = () => notice.remove();
 
     close.addEventListener("click", remove);
+
+    // A new confirmation replaces earlier ones. Problems stay until dismissed.
+    if (!problem) {
+      notices.querySelectorAll(".notice:not(.notice-problem)").forEach((earlier) => earlier.remove());
+    }
+
     notices.append(notice);
 
     if (!problem) {
@@ -259,6 +271,19 @@
       state.configProblem = "";
     } catch (problem) {
       state.configProblem = problem.message;
+    }
+  }
+
+  async function loadSettings() {
+    if (!feature("settings")) {
+      return;
+    }
+
+    try {
+      state.settings = await request("GET", "/v1/settings");
+      state.settingsProblem = "";
+    } catch (problem) {
+      state.settingsProblem = problem.message;
     }
   }
 
@@ -835,6 +860,71 @@
 
   // Settings view
 
+  const SCHEDULES = [
+    { label: "Every hour", seconds: 3_600 },
+    { label: "Every 6 hours", seconds: 21_600 },
+    { label: "Every 12 hours", seconds: 43_200 },
+    { label: "Every day", seconds: 86_400 },
+    { label: "Every week", seconds: 604_800 },
+  ];
+
+  // Reads the length of an "@every" schedule in seconds, or null for a cron expression.
+  function everySeconds(spec) {
+    const match = /^@every\s+(.+)$/.exec(spec || "");
+
+    if (!match) {
+      return null;
+    }
+
+    const units = { h: 3_600, m: 60, s: 1 };
+    let total = 0;
+    let rest = match[1].trim();
+
+    while (rest) {
+      const part = /^(\d+)([hms])/.exec(rest);
+
+      if (!part) {
+        return null;
+      }
+
+      total += Number(part[1]) * units[part[2]];
+      rest = rest.slice(part[0].length);
+    }
+
+    return total;
+  }
+
+  function scheduleChoice(spec) {
+    if (!spec) {
+      return "off";
+    }
+
+    const seconds = everySeconds(spec);
+    const preset = SCHEDULES.find((item) => item.seconds === seconds);
+
+    return preset ? String(preset.seconds) : "custom";
+  }
+
+  async function changeSettings(changes, focusId) {
+    try {
+      state.settings = await request("PATCH", "/v1/settings", changes);
+      state.customSchedule = false;
+      state.customScheduleDraft = null;
+      await loadConfig();
+      notify(state.settings.saved ? "Settings saved." : "Settings changed until Watchtower restarts.");
+    } catch (problem) {
+      notify(`That change wasn't made. ${capitalise(problem.message)}.`, true);
+    }
+
+    render();
+
+    const focused = focusId && document.getElementById(focusId);
+
+    if (focused) {
+      focused.focus();
+    }
+  }
+
   function setting(name, on, help) {
     return el(
       "li",
@@ -845,45 +935,235 @@
     );
   }
 
+  // A setting that can be switched from this page. `inverted` is for settings
+  // whose stored value is the opposite of how the page words them.
+  function switchSetting(key, name, help, inverted) {
+    const entry = state.settings.settings[key];
+    const on = inverted ? !entry.value : entry.value;
+    const id = `setting-${key}`;
+
+    return el(
+      "li",
+      { class: "setting" },
+      el("label", { class: "setting-name", for: id }, name),
+      el(
+        "span",
+        { class: "setting-value" },
+        el("input", {
+          class: "switch",
+          id,
+          type: "checkbox",
+          role: "switch",
+          checked: on,
+          onchange: (event) => changeSettings({ [key]: inverted ? !event.target.checked : event.target.checked }, id),
+        }),
+      ),
+      el(
+        "span",
+        { class: "setting-help" },
+        help,
+        entry.changed && [
+          " Changed on this page. ",
+          el(
+            "button",
+            { class: "link-button", type: "button", onclick: () => changeSettings({ [key]: null }, id) },
+            "Go back to the startup value",
+          ),
+        ],
+      ),
+    );
+  }
+
+  function scheduleSetting() {
+    const entry = state.settings.settings.schedule;
+    const choice = state.customSchedule ? "custom" : scheduleChoice(entry.value);
+    const selectId = "setting-schedule";
+    const customId = "setting-schedule-custom";
+
+    const select = el(
+      "select",
+      {
+        class: "select",
+        id: selectId,
+        onchange: (event) => {
+          const picked = event.target.value;
+
+          if (picked === "custom") {
+            state.customSchedule = true;
+            render();
+            document.getElementById(customId).focus();
+          } else {
+            changeSettings({ schedule: picked === "off" ? "" : `@every ${Number(picked) / 3_600}h` }, selectId);
+          }
+        },
+      },
+      SCHEDULES.map((item) =>
+        el("option", { value: String(item.seconds), selected: choice === String(item.seconds) }, item.label),
+      ),
+      el("option", { value: "custom", selected: choice === "custom" }, "A custom schedule"),
+      el("option", { value: "off", selected: choice === "off" }, "Never"),
+    );
+
+    const custom =
+      choice === "custom" &&
+      el(
+        "form",
+        {
+          class: "inline-form",
+          onsubmit: (event) => {
+            event.preventDefault();
+            // Kept so a rejected schedule stays in the field to be corrected.
+            state.customScheduleDraft = document.getElementById(customId).value;
+            changeSettings({ schedule: state.customScheduleDraft }, customId);
+          },
+        },
+        el("input", {
+          class: "search",
+          id: customId,
+          type: "text",
+          spellcheck: "false",
+          autocomplete: "off",
+          "aria-label": "Custom schedule",
+          value: state.customScheduleDraft === null ? entry.value : state.customScheduleDraft,
+        }),
+        el("button", { class: "button button-quiet", type: "submit" }, "Save schedule"),
+      );
+
+    return el(
+      "li",
+      { class: "setting setting-wide" },
+      el("label", { class: "setting-name", for: selectId }, "Look for updates"),
+      el("span", { class: "setting-value" }, select),
+      el(
+        "span",
+        { class: "setting-help" },
+        state.settings.schedule_active
+          ? "How often Watchtower checks every container on its own. The first check comes one interval after you change this."
+          : [
+              "Scheduled checks are off because the update endpoint is on without ",
+              code("WATCHTOWER_HTTP_API_PERIODIC_POLLS=true"),
+              ". Watchtower only updates when asked, so this has no effect yet.",
+            ],
+        choice === "custom" && [
+          " A custom schedule is a cron expression with seconds first, such as ",
+          code("0 0 4 * * *"),
+          " for every day at 4:00.",
+        ],
+        entry.changed && [
+          " Changed on this page. ",
+          el(
+            "button",
+            { class: "link-button", type: "button", onclick: () => changeSettings({ schedule: null }, selectId) },
+            "Go back to the startup value",
+          ),
+        ],
+      ),
+      custom,
+    );
+  }
+
   function enableHint(endpoint, extra) {
     return ["To turn it on, add ", code(endpoint), " to ", code("WATCHTOWER_HTTP_API_ENDPOINTS"), ".", extra || ""];
   }
 
   function settingsView() {
     const config = state.config;
+    const editable = feature("settings") && state.settings;
     const sections = [
       el("h1", { class: "title" }, "Settings"),
       el(
         "p",
         { class: "lede" },
-        "How this Watchtower is set up. These come from its flags and environment variables, so change them there and restart.",
+        editable
+          ? "Switches and the schedule can be changed here and take effect straight away. Everything else comes from Watchtower's flags and environment variables."
+          : "How this Watchtower is set up. These come from its flags and environment variables, so change them there and restart.",
       ),
     ];
 
-    if (feature("config") && config) {
+    if (editable && !state.settings.saved) {
+      sections.push(
+        el(
+          "p",
+          { class: "problem" },
+          "Changes made here last until Watchtower restarts. To keep them, mount a folder at ",
+          code("/data"),
+          " in the container, for example ",
+          code("./watchtower-data:/data"),
+          ".",
+        ),
+      );
+    }
+
+    if (feature("settings") && state.settingsProblem) {
+      sections.push(
+        el("p", { class: "blank" }, el("strong", null, "The editable settings didn't load."), state.settingsProblem),
+      );
+    }
+
+    if (editable) {
+      sections.push(
+        el(
+          "section",
+          { class: "section" },
+          el("h2", { class: "section-title" }, "Schedule"),
+          el("ul", { class: "manifest" }, scheduleSetting()),
+        ),
+      );
+    }
+
+    if (editable || (feature("config") && config)) {
+      const rows = [];
+
+      if (editable) {
+        rows.push(
+          switchSetting(
+            "monitor_only",
+            "Apply updates",
+            "When off, Watchtower reports new images but leaves containers alone.",
+            true,
+          ),
+          switchSetting("cleanup", "Remove old images", "Delete the previous image once a container is running the new one."),
+          switchSetting(
+            "rolling_restart",
+            "Rolling restart",
+            "Restart containers one at a time instead of all together. Needs Apply updates to be on.",
+          ),
+        );
+      } else {
+        rows.push(
+          setting(
+            "Apply updates",
+            !config.monitor_only,
+            config.monitor_only
+              ? "Monitor only. Watchtower reports new images but leaves containers alone."
+              : "Watchtower replaces a container when its image has a newer version.",
+          ),
+          setting("Remove old images", config.cleanup, "Delete the previous image once a container is running the new one."),
+          setting("Rolling restart", config.rolling_restart, "Restart containers one at a time instead of all together."),
+        );
+      }
+
+      if (config) {
+        rows.push(
+          setting("Pull new images", !config.no_pull, "Fetch images from the registry before comparing them."),
+          setting("Restart containers", !config.no_restart, "Restart a container after its image is updated."),
+          setting("Lifecycle hooks", config.lifecycle_hooks, "Run the commands set in container labels before and after an update."),
+          setting("Git watching", config.git_enable, "Watch Git repositories as well as image registries."),
+        );
+      }
+
       sections.push(
         el(
           "section",
           { class: "section" },
           el("h2", { class: "section-title" }, "Updating"),
-          el(
-            "ul",
-            { class: "manifest" },
-            setting(
-              "Apply updates",
-              !config.monitor_only,
-              config.monitor_only
-                ? "Monitor only. Watchtower reports new images but leaves containers alone."
-                : "Watchtower replaces a container when its image has a newer version.",
-            ),
-            setting("Pull new images", !config.no_pull, "Fetch images from the registry before comparing them."),
-            setting("Restart containers", !config.no_restart, "Restart a container after its image is updated."),
-            setting("Remove old images", config.cleanup, "Delete the previous image once a container is running the new one."),
-            setting("Rolling restart", config.rolling_restart, "Restart containers one at a time instead of all together."),
-            setting("Lifecycle hooks", config.lifecycle_hooks, "Run the commands set in container labels before and after an update."),
-            setting("Git watching", config.git_enable, "Watch Git repositories as well as image registries."),
-          ),
+          el("ul", { class: "manifest" }, rows),
         ),
+      );
+    }
+
+    if (feature("config") && config) {
+      sections.push(
         el(
           "section",
           { class: "section" },
@@ -921,7 +1201,7 @@
         el(
           "p",
           { class: "lede" },
-          "Watchtower isn't sharing its settings. Add ",
+          "Watchtower isn't sharing the rest of its settings. Add ",
           code("config"),
           " to ",
           code("WATCHTOWER_HTTP_API_ENDPOINTS"),
@@ -965,6 +1245,11 @@
             feature("history") ? "Lists Watchtower's recent scans." : enableHint("history"),
           ),
           setting("Show settings", feature("config"), feature("config") ? "Shows the setup above." : enableHint("config")),
+          setting(
+            "Change settings",
+            feature("settings"),
+            feature("settings") ? "Lets you change the schedule and switches above." : enableHint("settings"),
+          ),
         ),
       ),
     );
@@ -1138,7 +1423,7 @@
   async function start() {
     restoreChecks();
     render();
-    await Promise.all([loadContainers(), loadConfig()]);
+    await Promise.all([loadContainers(), loadConfig(), loadSettings()]);
     render();
 
     if (currentView().draw === historyView) {

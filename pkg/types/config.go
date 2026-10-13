@@ -24,6 +24,8 @@ type RunConfig struct {
 	EnableCheckAPI bool
 	// EnableConfigAPI enables the config API endpoint.
 	EnableConfigAPI bool
+	// EnableSettingsAPI enables the runtime settings API endpoint.
+	EnableSettingsAPI bool
 	// EnableContainersAPI enables the containers API endpoint.
 	EnableContainersAPI bool
 	// EnableEventsAPI enables the events API endpoint.

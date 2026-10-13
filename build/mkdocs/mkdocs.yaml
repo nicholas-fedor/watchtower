@@ -218,6 +218,7 @@ nav:
           - History: http-api/endpoints/history/index.md
           - Images: http-api/endpoints/images/index.md
           - Metrics: http-api/endpoints/metrics/index.md
+          - Settings: http-api/endpoints/settings/index.md
           - Status: http-api/endpoints/status/index.md
           - Swagger UI: http-api/endpoints/swagger/index.md
           - Update: http-api/endpoints/update/index.md

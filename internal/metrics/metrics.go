@@ -2,14 +2,19 @@ package metrics
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
+	"io/fs"
+	"os"
 	"slices"
 	"sync"
 	"time"
 
 	"github.com/prometheus/client_golang/prometheus"
+	"github.com/rs/zerolog"
 
+	"github.com/nicholas-fedor/watchtower/internal/util"
 	"github.com/nicholas-fedor/watchtower/pkg/types"
 )
 
@@ -49,6 +54,9 @@ type Metrics struct {
 	history            []HistoryEntry     // Ring buffer of scan history.
 	historyIdx         int                // Current write position in the ring buffer.
 	historyMu          sync.RWMutex       // Protects history and historyIdx.
+	historyPath        string             // File history is saved to, empty for memory only.
+	historySaveMu      sync.Mutex         // Serializes writes of the history file.
+	historyLog         *zerolog.Logger    // Logger for history file problems.
 	//nolint:containedctx
 	ctx    context.Context    // Context for cancellation.
 	cancel context.CancelFunc // Cancel function for the context.
@@ -356,6 +364,61 @@ func (m *Metrics) RecordCheck(checked, available, failed int) {
 	})
 }
 
+// PersistHistory loads previously saved history from path and saves the
+// history there after every new entry, so it survives restarts.
+// Call it once at startup, before scans begin.
+//
+// Parameters:
+//   - log: Logger for load and save problems. Nil disables logging.
+//   - path: File to keep the history in.
+func (m *Metrics) PersistHistory(log *zerolog.Logger, path string) {
+	if log == nil {
+		nop := zerolog.Nop()
+		log = &nop
+	}
+
+	m.historyMu.Lock()
+	defer m.historyMu.Unlock()
+
+	m.historyLog = log
+	m.historyPath = path
+
+	data, err := os.ReadFile(path)
+	if err != nil {
+		if !errors.Is(err, fs.ErrNotExist) {
+			log.Warn().Err(err).Str("path", path).Msg("Could not read saved scan history, starting empty")
+		}
+
+		return
+	}
+
+	var saved []HistoryEntry
+
+	err = json.Unmarshal(data, &saved)
+	if err != nil {
+		log.Warn().Err(err).Str("path", path).Msg("Saved scan history is not valid JSON, starting empty")
+
+		return
+	}
+
+	slices.SortFunc(saved, func(a, b HistoryEntry) int {
+		return a.Timestamp.Compare(b.Timestamp)
+	})
+
+	if len(saved) > historyBufferSize {
+		saved = saved[len(saved)-historyBufferSize:]
+	}
+
+	// Entries recorded before the file was loaded are newer than anything saved.
+	saved = append(saved, m.history...)
+	if len(saved) > historyBufferSize {
+		saved = saved[len(saved)-historyBufferSize:]
+	}
+
+	m.history = saved
+	m.historyIdx = 0
+}
+
 // GetHistory returns a copy of the history entries, optionally filtered
 // by since/until timestamps and limited to the most recent N entries.
 // The returned slice is sorted by timestamp in ascending order.
@@ -433,15 +496,43 @@ func (m *Metrics) HandleUpdate() {
 }
 
 // appendHistory writes an entry to the ring buffer, overwriting the oldest
-// entry once the buffer is full.
+// entry once the buffer is full, and saves the history when it is persisted.
 func (m *Metrics) appendHistory(entry HistoryEntry) {
 	m.historyMu.Lock()
-	defer m.historyMu.Unlock()
 
 	if len(m.history) < historyBufferSize {
 		m.history = append(m.history, entry)
 	} else {
 		m.history[m.historyIdx] = entry
 		m.historyIdx = (m.historyIdx + 1) % historyBufferSize
+	}
+
+	path := m.historyPath
+	log := m.historyLog
+	snapshot := slices.Clone(m.history)
+
+	m.historyMu.Unlock()
+
+	if path == "" {
+		return
+	}
+
+	slices.SortFunc(snapshot, func(a, b HistoryEntry) int {
+		return a.Timestamp.Compare(b.Timestamp)
+	})
+
+	data, err := json.Marshal(snapshot)
+	if err != nil {
+		log.Error().Err(err).Msg("Could not encode scan history")
+
+		return
+	}
+
+	m.historySaveMu.Lock()
+	defer m.historySaveMu.Unlock()
+
+	err = util.WriteFileAtomic(path, data)
+	if err != nil {
+		log.Error().Err(err).Str("path", path).Msg("Could not save scan history")
 	}
 }

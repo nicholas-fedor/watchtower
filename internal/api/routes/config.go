@@ -11,19 +11,22 @@ import (
 
 func registerConfigRoute(app *fiber.App, auth fiber.Handler, opts apiconfig.Options) {
 	handler := config.New(opts.Logger, func(_ context.Context) (config.ConfigData, error) {
+		// Read the settings per request so run-time changes show up.
+		params := opts.Settings.ApplyTo(opts.BaseParams)
+
 		return config.ConfigData{
-			MonitorOnly:       opts.BaseParams.MonitorOnly,
-			Cleanup:           opts.BaseParams.Cleanup,
-			NoPull:            opts.BaseParams.NoPull,
-			NoRestart:         opts.BaseParams.NoRestart,
-			RollingRestart:    opts.BaseParams.RollingRestart,
+			MonitorOnly:       params.MonitorOnly,
+			Cleanup:           params.Cleanup,
+			NoPull:            params.NoPull,
+			NoRestart:         params.NoRestart,
+			RollingRestart:    params.RollingRestart,
 			IncludeStopped:    opts.IncludeStopped,
 			IncludeRestarting: opts.IncludeRestarting,
-			LifecycleHooks:    opts.BaseParams.LifecycleHooks,
+			LifecycleHooks:    params.LifecycleHooks,
 			LabelEnable:       opts.LabelEnable,
 			FilterDesc:        opts.FilterDesc,
 			Scope:             opts.Scope,
-			GitEnable:         opts.BaseParams.EnableGitMonitoring,
+			GitEnable:         params.EnableGitMonitoring,
 		}, nil
 	})
 	app.Get(handler.Path, auth, apiconfig.TimeoutMiddleware(), handler.Handle)

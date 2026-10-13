@@ -19,6 +19,7 @@ import (
 	"github.com/nicholas-fedor/watchtower/internal/api/config"
 	"github.com/nicholas-fedor/watchtower/internal/api/routes"
 	"github.com/nicholas-fedor/watchtower/internal/metrics"
+	"github.com/nicholas-fedor/watchtower/internal/settings"
 	"github.com/nicholas-fedor/watchtower/internal/testutil/golden"
 	mockContainer "github.com/nicholas-fedor/watchtower/pkg/container/mocks"
 	"github.com/nicholas-fedor/watchtower/pkg/types"
@@ -54,6 +55,8 @@ func newFullSurfaceApp(t *testing.T) *fiber.App {
 		EnableHistoryAPI:    true,
 		EnableImagesAPI:     true,
 		EnableConfigAPI:     true,
+		EnableSettingsAPI:   true,
+		Settings:            settings.Open(nil, "", settings.Values{}, settings.Validators{}),
 		EnableEventsAPI:     true,
 		EnableUIAPI:         true,
 		UnblockHTTPAPI:      true,

@@ -5,6 +5,7 @@ import (
 	"errors"
 	"os"
 	"os/signal"
+	"path/filepath"
 	"syscall"
 	"time"
 
@@ -27,6 +28,8 @@ import (
 	"github.com/nicholas-fedor/watchtower/internal/meta"
 	"github.com/nicholas-fedor/watchtower/internal/metrics"
 	"github.com/nicholas-fedor/watchtower/internal/scheduling"
+	"github.com/nicholas-fedor/watchtower/internal/settings"
+	"github.com/nicholas-fedor/watchtower/internal/util"
 	"github.com/nicholas-fedor/watchtower/pkg/container"
 	"github.com/nicholas-fedor/watchtower/pkg/filters"
 	"github.com/nicholas-fedor/watchtower/pkg/notifications"
@@ -41,6 +44,9 @@ const (
 	// container's restart policy to "no", so a slow or unresponsive
 	// daemon cannot delay shutdown paths.
 	restartPolicyTimeout = 5 * time.Second
+
+	// historyFileName is the scan history file inside the data directory.
+	historyFileName = "history.json"
 
 	// containerLookupTimeout is the maximum duration allowed for current
 	// container ID lookups.
@@ -599,8 +605,45 @@ func (p *process) runMain(cfg types.RunConfig) int {
 	)
 	defer stop()
 
+	// Settings changed at run time (for example from the web UI) are layered
+	// over the flag-derived defaults. A one-off run follows its flags only.
+	dataDir := appCfg.API.DataDir
+	if cfg.RunOnce || !util.UsableDir(dataDir) {
+		dataDir = ""
+	}
+
+	runtimeSettings := settings.Open(
+		p.log,
+		dataDir,
+		settings.Values{
+			MonitorOnly:    appCfg.Update.MonitorOnly,
+			Cleanup:        appCfg.Update.Cleanup,
+			RollingRestart: appCfg.Update.RollingRestart,
+			Schedule:       appCfg.Schedule.Spec,
+		},
+		settings.Validators{
+			Schedule: scheduling.ValidateSpec,
+			RollingRestart: func() error {
+				return actions.ValidateRollingRestartDependencies(
+					p.log,
+					ctx,
+					client,
+					cfg.Filter,
+					appCfg.Update.UseComposeDependsOn,
+				)
+			},
+		},
+	)
+
+	if dataDir != "" {
+		metrics.Default().PersistHistory(p.log, filepath.Join(dataDir, historyFileName))
+
+		p.log.Debug().Str("data_dir", dataDir).Msg("Saving settings changes and scan history")
+	}
+
 	runUpdatesWithNotifications = func(ctx context.Context, filter types.Filter, params types.UpdateParams) *metrics.Metric {
-		update := params
+		// Every update path funnels through here, so this is where run-time settings take effect.
+		update := runtimeSettings.ApplyTo(params)
 		if filter != nil {
 			update.Filter = filter
 		}
@@ -794,6 +837,7 @@ func (p *process) runMain(cfg types.RunConfig) int {
 			RateLimit:                    cfg.APIRateLimit,
 			EnableCheckAPI:               cfg.EnableCheckAPI,
 			EnableConfigAPI:              cfg.EnableConfigAPI,
+			EnableSettingsAPI:            cfg.EnableSettingsAPI,
 			EnableContainersAPI:          cfg.EnableContainersAPI,
 			EnableEventsAPI:              cfg.EnableEventsAPI,
 			EnableHealthAPI:              cfg.EnableHealthAPI,
@@ -816,6 +860,7 @@ func (p *process) runMain(cfg types.RunConfig) int {
 			FilterDesc:                   cfg.FilterDesc,
 			UpdateLock:                   updateLock,
 			BaseParams:                   sharedBase,
+			Settings:                     runtimeSettings,
 			IncludeStopped:               appCfg.Client.IncludeStopped,
 			IncludeRestarting:            appCfg.Client.IncludeRestarting,
 			LabelEnable:                  appCfg.Filter.LabelEnable,
@@ -869,7 +914,8 @@ func (p *process) runMain(cfg types.RunConfig) int {
 		Filter:                     cfg.Filter,
 		FilterDesc:                 cfg.FilterDesc,
 		Lock:                       updateLock,
-		ScheduleSpec:               appCfg.Schedule.Spec,
+		ScheduleSpec:               runtimeSettings.Effective().Schedule,
+		ScheduleChanges:            runtimeSettings.ScheduleChanges(),
 		Startup:                    startupBase,
 		WriteStartupMessage:        logging.WriteStartupMessage,
 		RunUpdate:                  runUpdatesWithNotifications,

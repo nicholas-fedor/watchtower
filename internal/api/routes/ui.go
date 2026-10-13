@@ -24,6 +24,7 @@ func registerUIRoute(app *fiber.App, opts config.Options) {
 			Update:     opts.EnableUpdateAPI,
 			History:    opts.EnableHistoryAPI,
 			Config:     opts.EnableConfigAPI,
+			Settings:   opts.EnableSettingsAPI,
 			Images:     opts.EnableImagesAPI,
 			Metrics:    opts.EnableMetricsAPI,
 			Swagger:    opts.EnableSwaggerAPI,

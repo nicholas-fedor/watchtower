@@ -73,6 +73,10 @@ func ValidateAndRegister(
 		return config.ErrMissingEventBroadcaster
 	}
 
+	if opts.EnableSettingsAPI && opts.Settings == nil {
+		return config.ErrMissingSettingsStore
+	}
+
 	Register(ctx, app, auth, opts)
 
 	return nil
@@ -122,6 +126,10 @@ func Register(
 
 	if opts.EnableConfigAPI {
 		registerConfigRoute(app, auth, opts)
+	}
+
+	if opts.EnableSettingsAPI {
+		registerSettingsRoute(app, auth, opts)
 	}
 
 	if opts.EnableEventsAPI {

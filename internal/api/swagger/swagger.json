@@ -481,6 +481,90 @@
                 ]
             }
         },
+        "/v1/settings": {
+            "get": {
+                "description": "Returns the settings that can be changed at run time, with each one's value, default, and whether it was changed.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "settings"
+                ],
+                "summary": "Get runtime settings",
+                "responses": {
+                    "200": {
+                        "description": "Runtime settings",
+                        "schema": {
+                            "$ref": "#/definitions/settings.Response"
+                        }
+                    },
+                    "401": {
+                        "description": "Missing or invalid API token",
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ]
+            },
+            "patch": {
+                "description": "Changes the named settings: monitor_only, cleanup, rolling_restart (booleans) and schedule (cron). JSON null resets one.",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "settings"
+                ],
+                "summary": "Change runtime settings",
+                "parameters": [
+                    {
+                        "description": "Setting names mapped to new values",
+                        "name": "changes",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": true
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Runtime settings after the change",
+                        "schema": {
+                            "$ref": "#/definitions/settings.Response"
+                        }
+                    },
+                    "400": {
+                        "description": "The change was rejected",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Missing or invalid API token",
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ]
+            }
+        },
         "/v1/status": {
             "get": {
                 "description": "Returns the summary of the most recent Watchtower scan, including counts of scanned, updated, failed, restarted, and skipped containers.",
@@ -685,6 +769,49 @@
                 },
                 "update_source": {
                     "type": "string"
+                }
+            }
+        },
+        "settings.Response": {
+            "type": "object",
+            "properties": {
+                "api_version": {
+                    "description": "APIVersion is the API version of the response.",
+                    "type": "string"
+                },
+                "saved": {
+                    "description": "Saved is true when changes are written to the data directory and survive a restart.",
+                    "type": "boolean"
+                },
+                "schedule_active": {
+                    "description": "ScheduleActive is false when Watchtower only updates on request, so the schedule has no effect.",
+                    "type": "boolean"
+                },
+                "settings": {
+                    "description": "Settings maps each setting name to its state.",
+                    "type": "object",
+                    "additionalProperties": {
+                        "$ref": "#/definitions/settings.Setting"
+                    }
+                },
+                "timestamp": {
+                    "description": "Timestamp is when the response was produced.",
+                    "type": "string"
+                }
+            }
+        },
+        "settings.Setting": {
+            "type": "object",
+            "properties": {
+                "changed": {
+                    "description": "Changed is true when the value was set at run time instead of by a flag.",
+                    "type": "boolean"
+                },
+                "default": {
+                    "description": "Default is the value from flags and environment variables."
+                },
+                "value": {
+                    "description": "Value is the value in force."
                 }
             }
         }

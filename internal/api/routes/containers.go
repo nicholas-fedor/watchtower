@@ -26,8 +26,10 @@ func registerContainersDetailsRoute(app *fiber.App, auth fiber.Handler, opts con
 		return
 	}
 
-	detailsParams := config.BuildUpdateParams(opts)
 	handler := details.New(opts.Logger, func(ctx context.Context, name, image string) ([]details.ContainerDetails, error) {
+		// Built per request so run-time settings changes show up.
+		detailsParams := config.BuildUpdateParams(opts)
+
 		return details.GetContainerDetails(ctx, opts.Client, opts.Filter, name, image, detailsParams)
 	})
 	app.Get(handler.Path, auth, config.TimeoutMiddleware(), handler.Handle)

@@ -477,6 +477,7 @@ func loadAPI(vCfg *viper.Viper, flagSet *pflag.FlagSet) api.API {
 			[]string{"WATCHTOWER_HTTP_API_UPDATE_TIMEOUT"},
 		),
 		UpdateTimeoutChanged: flagChanged(flagSet, "http-api-update-timeout"),
+		DataDir:              vCfg.GetString("data-dir"),
 	}
 }
 

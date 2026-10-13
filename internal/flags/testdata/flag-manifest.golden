@@ -470,6 +470,14 @@
   list-parse: comma-or-space
   hidden: false
   deprecated: ""
+--data-dir
+  shorthand: ""
+  kind: string
+  default: "/data"
+  env: WATCHTOWER_DATA_DIR
+  list-parse: none
+  hidden: false
+  deprecated: ""
 --http-api-check-timeout
   shorthand: ""
   kind: duration

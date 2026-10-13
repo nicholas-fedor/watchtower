@@ -2,7 +2,7 @@
 
 ## Overview
 
-The `/v1/history` endpoint returns historical scan results from an in-memory ring buffer (up to 500 entries).
+The `/v1/history` endpoint returns up to 500 historical scan results. They are saved to `history.json` in the [data directory](../../../configuration/http-api/index.md#data_directory) when one is mounted, and otherwise kept in memory until Watchtower restarts.
 Include `history` in [`http-api-endpoints`](../../../configuration/http-api/index.md#http_api_endpoints) to enable this read-only endpoint.
 
 ## Parameters

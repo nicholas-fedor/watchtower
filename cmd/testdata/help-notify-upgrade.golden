@@ -13,6 +13,7 @@ Global Flags:
       --compose-project stringArray                 Map a Compose project name to a project directory inside Watchtower (name=/path, repeatable)
       --cooldown-delay string                       Minimum time since image creation before allowing updates. Supports h, m, s, d (days), w (weeks), M (months) (e.g., 24h, 3d, 1w, 1M)
       --cpu-copy-mode string                        CPU copy mode for container recreation, used for compatibility with Podman. Options: auto, full, none (default "auto")
+      --data-dir string                             Directory where Watchtower keeps settings changed through the HTTP API and its scan history. Mount a volume there to keep them across restarts. If the directory is missing or read-only, both are kept in memory only (default "/data")
   -d, --debug                                       Enable debug mode with verbose logging
   -x, --disable-containers strings                  Comma-separated list of containers to explicitly exclude from watching.
       --disable-containers-by-label strings         Comma-separated list of key=value label pairs to exclude matching containers from monitoring.
@@ -41,7 +42,7 @@ Global Flags:
       --http-api-check-timeout duration             Maximum duration for the /v1/check API endpoint (e.g. 30s, 2m, 5m). Default: 5m
       --http-api-containers                         Runs Watchtower with the read-only containers API enabled, exposing each watched container's current image digest (DEPRECATED: Use the http-api-endpoints configuration option instead.)
       --http-api-cors-origins strings               Comma-separated list of allowed CORS origins for cross-origin requests (e.g. https://app.example.com). If unset, CORS is disabled and only same-origin requests are allowed.
-      --http-api-endpoints strings                  HTTP API endpoints to enable (health, update, metrics, containers, check, history, images, config, events, swagger, ui), or "all". Comma- or space-separated. Empty disables the HTTP API.
+      --http-api-endpoints strings                  HTTP API endpoints to enable (health, update, metrics, containers, check, history, images, config, settings, events, swagger, ui), or "all". Comma- or space-separated. Empty disables the HTTP API.
       --http-api-events-token string                Sets an authentication token for the events SSE endpoint. Required when the events endpoint is enabled. Supports Bearer header and query parameter access_token (for browser EventSource)
       --http-api-host string                        Host to bind the HTTP API to (default: empty, binds to all interfaces; allows empty or valid IP address)
       --http-api-metrics                            Runs Watchtower with the Prometheus metrics API enabled (DEPRECATED: Use the http-api-endpoints configuration option instead.)

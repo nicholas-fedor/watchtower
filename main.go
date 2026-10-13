@@ -34,6 +34,8 @@
 // @tag.description			Tracked images with digests and container counts
 // @tag.name					config
 // @tag.description			Active Watchtower configuration settings
+// @tag.name					settings
+// @tag.description			Settings that can be changed while Watchtower is running
 // @tag.name					events
 // @tag.description			Real-time operational events via Server-Sent Events
 package main

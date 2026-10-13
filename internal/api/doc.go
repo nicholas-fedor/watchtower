@@ -19,6 +19,8 @@
 //	GET  /v1/history             Historical scan results (requires auth)
 //	GET  /v1/images              Tracked images with digests (requires auth)
 //	GET  /v1/config              Active configuration settings (requires auth)
+//	GET  /v1/settings            Settings changeable at run time (requires auth)
+//	PATCH /v1/settings           Change run-time settings (requires auth)
 //	GET  /v1/events              Real-time events via SSE (requires events token)
 //	GET  /swagger/*              Swagger UI (requires http-api-swagger)
 //

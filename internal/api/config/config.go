@@ -16,6 +16,7 @@ import (
 	"github.com/nicholas-fedor/watchtower/internal/git"
 	"github.com/nicholas-fedor/watchtower/internal/logging"
 	mt "github.com/nicholas-fedor/watchtower/internal/metrics"
+	"github.com/nicholas-fedor/watchtower/internal/settings"
 	"github.com/nicholas-fedor/watchtower/pkg/container"
 	"github.com/nicholas-fedor/watchtower/pkg/types"
 )
@@ -37,6 +38,8 @@ var (
 	ErrMissingEventBroadcaster = errors.New("EventBroadcaster must be provided when events API is enabled")
 	// ErrMissingTLSConfig indicates only one of TLS cert/key was provided.
 	ErrMissingTLSConfig = errors.New("TLS requires both TLS Cert Path and TLS Key Path to be set")
+	// ErrMissingSettingsStore indicates Settings was not provided when the settings API is enabled.
+	ErrMissingSettingsStore = errors.New("settings store must be provided when settings API is enabled")
 	// ErrMissingLogger indicates Options.Logger was nil when an API endpoint is enabled.
 	ErrMissingLogger = errors.New("API Logger must be provided when any HTTP API endpoint is enabled")
 )
@@ -91,6 +94,8 @@ type Options struct {
 	EnableImagesAPI bool
 	// EnableConfigAPI enables the config inspection endpoint.
 	EnableConfigAPI bool
+	// EnableSettingsAPI enables the runtime settings endpoint.
+	EnableSettingsAPI bool
 	// EnableEventsAPI enables the events SSE endpoint.
 	EnableEventsAPI bool
 	// EnableUIAPI enables the built-in web UI under /ui/.
@@ -117,6 +122,9 @@ type Options struct {
 	UpdateLock chan bool
 	// BaseParams is the complete update policy snapshot from config.UpdateParams.
 	BaseParams types.UpdateParams
+	// Settings holds the settings that can change at run time. BuildUpdateParams
+	// layers them over BaseParams. Nil means BaseParams is used as is.
+	Settings *settings.Store
 	// IncludeStopped is exposed on the config API (client list option).
 	IncludeStopped bool
 	// IncludeRestarting is exposed on the config API (client list option).
@@ -162,7 +170,9 @@ type Options struct {
 // BuildUpdateParams returns the complete UpdateParams snapshot for HTTP-triggered updates.
 //
 // Policy fields come only from BaseParams so HTTP, schedule, and run-once paths share the
-// same config.UpdateParams construction. RunOnce is forced false for HTTP sessions.
+// same config.UpdateParams construction, with the runtime Settings layered on top.
+// RunOnce is forced false for HTTP sessions. Call it per request rather than once at
+// registration, so a settings change is seen by the next request.
 //
 // Parameters:
 //   - opts: API configuration options.
@@ -170,7 +180,7 @@ type Options struct {
 // Returns:
 //   - types.UpdateParams: Parameters for the update pipeline.
 func BuildUpdateParams(opts Options) types.UpdateParams {
-	params := opts.BaseParams
+	params := opts.Settings.ApplyTo(opts.BaseParams)
 	params.RunOnce = false
 
 	// Fall back to the process-wide filter when BaseParams did not carry one.

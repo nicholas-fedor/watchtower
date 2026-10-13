@@ -49,4 +49,6 @@ type API struct {
 	UpdateTimeout time.Duration
 	// UpdateTimeoutChanged is true when the update-timeout flag was explicitly set.
 	UpdateTimeoutChanged bool
+	// DataDir is where runtime settings and scan history are saved.
+	DataDir string
 }

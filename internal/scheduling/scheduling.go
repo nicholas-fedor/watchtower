@@ -70,6 +70,9 @@ type ScheduleDeps struct {
 	Lock chan bool
 	// ScheduleSpec is the cron-formatted schedule string for periodic updates.
 	ScheduleSpec string
+	// ScheduleChanges delivers a replacement schedule while the scheduler is
+	// running. An empty value stops periodic updates. Nil disables rescheduling.
+	ScheduleChanges <-chan string
 	// Startup holds resolved values for startup messaging (no flag reads).
 	// Callers must set Filtering, Scope, Client, Notifier, and Version on Startup.
 	// RunUpgradesOnSchedule only applies Sched and UpdateOnStart at send time.
@@ -128,11 +131,7 @@ func RunUpgradesOnSchedule(ctx context.Context, deps ScheduleDeps) error {
 	// Create a new cron scheduler for managing periodic updates.
 	// Configured with optional seconds, skip overlapping runs, and panic recovery.
 	scheduler := cron.New(
-		cron.WithParser(
-			cron.NewParser(
-				cron.SecondOptional|cron.Minute|cron.Hour|cron.Dom|cron.Month|cron.Dow|cron.Descriptor,
-			),
-		),
+		cron.WithParser(newSpecParser()),
 		cron.WithChain(
 			cron.SkipIfStillRunning(cron.DefaultLogger),
 			cron.Recover(cron.DefaultLogger),
@@ -253,15 +252,23 @@ func RunUpgradesOnSchedule(ctx context.Context, deps ScheduleDeps) error {
 	}
 
 	// Add the update function to the cron schedule, handling concurrency and metrics.
-	scheduleSpec := strings.Trim(deps.ScheduleSpec, `"'`)
+	scheduleSpec := normalizeSpec(deps.ScheduleSpec)
+
+	var (
+		entryID   cron.EntryID
+		scheduled bool
+	)
+
 	if scheduleSpec != "" {
-		_, err := scheduler.AddFunc(
+		addedID, err := scheduler.AddFunc(
 			scheduleSpec,
 			scheduledUpdateFunc,
 		)
 		if err != nil {
 			return fmt.Errorf("failed to schedule updates: %w", err)
 		}
+
+		entryID, scheduled = addedID, true
 	}
 
 	// Log startup message with the first scheduled run time.
@@ -299,12 +306,48 @@ func RunUpgradesOnSchedule(ctx context.Context, deps ScheduleDeps) error {
 	interrupt := make(chan os.Signal, 1)
 	signal.Notify(interrupt, os.Interrupt, syscall.SIGTERM)
 
-	// Wait for shutdown signal or context cancellation.
-	select {
-	case <-ctx.Done():
-		log.Debug().Msg("Context canceled, stopping scheduler...")
-	case <-interrupt:
-		log.Debug().Msg("Received interrupt signal, stopping scheduler...")
+	// Wait for a shutdown signal or context cancellation, applying schedule
+	// changes made at run time in the meantime.
+	for waiting := true; waiting; {
+		select {
+		case <-ctx.Done():
+			log.Debug().Msg("Context canceled, stopping scheduler...")
+
+			waiting = false
+		case <-interrupt:
+			log.Debug().Msg("Received interrupt signal, stopping scheduler...")
+
+			waiting = false
+		case newSpec := <-deps.ScheduleChanges:
+			if scheduled {
+				scheduler.Remove(entryID)
+
+				scheduled = false
+			}
+
+			newSpec = normalizeSpec(newSpec)
+			if newSpec == "" {
+				log.Info().Msg("Scheduled updates turned off")
+
+				continue
+			}
+
+			addedID, err := scheduler.AddFunc(newSpec, scheduledUpdateFunc)
+			if err != nil {
+				log.Error().Err(err).Str("schedule", newSpec).Msg("Could not apply the new schedule")
+
+				continue
+			}
+
+			entryID, scheduled = addedID, true
+
+			scheduler.Start()
+
+			log.Info().
+				Str("schedule", newSpec).
+				Time("next_run", scheduler.Entry(entryID).Schedule.Next(time.Now())).
+				Msg("Schedule changed")
+		}
 	}
 
 	// Stop the scheduler and wait for any running update to complete.
@@ -329,6 +372,42 @@ func RunUpgradesOnSchedule(ctx context.Context, deps ScheduleDeps) error {
 	log.Debug().Msg("Scheduler stopped and update completed.")
 
 	return nil
+}
+
+// ValidateSpec reports whether spec is a cron expression the scheduler accepts.
+// An empty spec is valid and means no periodic updates.
+//
+// Parameters:
+//   - spec: Cron expression, with optional seconds field, or a descriptor such as "@every 6h".
+//
+// Returns:
+//   - error: Non-nil if the expression cannot be parsed.
+func ValidateSpec(spec string) error {
+	spec = normalizeSpec(spec)
+	if spec == "" {
+		return nil
+	}
+
+	_, err := newSpecParser().Parse(spec)
+	if err != nil {
+		return fmt.Errorf("invalid schedule %q: %w", spec, err)
+	}
+
+	return nil
+}
+
+// newSpecParser returns the cron parser shared by scheduling and validation:
+// an optional seconds field plus descriptors such as "@every 6h".
+func newSpecParser() cron.Parser {
+	return cron.NewParser(
+		cron.SecondOptional | cron.Minute | cron.Hour | cron.Dom | cron.Month | cron.Dow | cron.Descriptor,
+	)
+}
+
+// normalizeSpec strips the surrounding quotes and spaces that shells and
+// compose files often leave around a schedule.
+func normalizeSpec(spec string) string {
+	return strings.TrimSpace(strings.Trim(strings.TrimSpace(spec), `"'`))
 }
 
 // ShouldExitDueToInvalidRestart determines if the program should exit due to an invalid restart of an old Watchtower container.

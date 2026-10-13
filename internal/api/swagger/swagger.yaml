@@ -60,6 +60,39 @@ definitions:
       update_source:
         type: string
     type: object
+  settings.Response:
+    properties:
+      api_version:
+        description: APIVersion is the API version of the response.
+        type: string
+      saved:
+        description: Saved is true when changes are written to the data directory
+          and survive a restart.
+        type: boolean
+      schedule_active:
+        description: ScheduleActive is false when Watchtower only updates on request,
+          so the schedule has no effect.
+        type: boolean
+      settings:
+        additionalProperties:
+          $ref: '#/definitions/settings.Setting'
+        description: Settings maps each setting name to its state.
+        type: object
+      timestamp:
+        description: Timestamp is when the response was produced.
+        type: string
+    type: object
+  settings.Setting:
+    properties:
+      changed:
+        description: Changed is true when the value was set at run time instead of
+          by a flag.
+        type: boolean
+      default:
+        description: Default is the value from flags and environment variables.
+      value:
+        description: Value is the value in force.
+    type: object
 host: localhost:8080
 info:
   contact:
@@ -382,6 +415,61 @@ paths:
       summary: Prometheus metrics
       tags:
       - metrics
+  /v1/settings:
+    get:
+      description: Returns the settings that can be changed at run time, with each
+        one's value, default, and whether it was changed.
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Runtime settings
+          schema:
+            $ref: '#/definitions/settings.Response'
+        "401":
+          description: Missing or invalid API token
+          schema:
+            type: string
+      security:
+      - BearerAuth: []
+      summary: Get runtime settings
+      tags:
+      - settings
+    patch:
+      consumes:
+      - application/json
+      description: 'Changes the named settings: monitor_only, cleanup, rolling_restart
+        (booleans) and schedule (cron). JSON null resets one.'
+      parameters:
+      - description: Setting names mapped to new values
+        in: body
+        name: changes
+        required: true
+        schema:
+          additionalProperties: true
+          type: object
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Runtime settings after the change
+          schema:
+            $ref: '#/definitions/settings.Response'
+        "400":
+          description: The change was rejected
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "401":
+          description: Missing or invalid API token
+          schema:
+            type: string
+      security:
+      - BearerAuth: []
+      summary: Change runtime settings
+      tags:
+      - settings
   /v1/status:
     get:
       consumes:

@@ -15,7 +15,9 @@ GET     /v1/events               requires-auth
 GET     /v1/history              requires-auth
 GET     /v1/images               requires-auth
 GET     /v1/metrics              requires-auth
+GET     /v1/settings             requires-auth
 GET     /v1/status               requires-auth
+PATCH   /v1/settings             requires-auth
 POST    /ui/session              requires-auth
 POST    /v1/check                requires-auth
 POST    /v1/update               requires-auth

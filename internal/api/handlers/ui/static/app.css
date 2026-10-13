@@ -616,6 +616,74 @@ input {
   color: var(--ink-soft);
 }
 
+.setting-wide {
+  grid-template-columns: minmax(0, 1fr) minmax(11rem, 14rem);
+}
+
+.setting .link-button {
+  padding: 0;
+}
+
+/* A switch is a checkbox drawn as a track and thumb. */
+
+.switch {
+  position: relative;
+  width: 2.9rem;
+  height: 1.6rem;
+  margin: 0;
+  border: 2px solid var(--line-strong);
+  border-radius: 1rem;
+  background: var(--fog);
+  vertical-align: middle;
+  cursor: pointer;
+  appearance: none;
+}
+
+.switch::before {
+  content: "";
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: calc(1.6rem - 8px);
+  height: calc(1.6rem - 8px);
+  border-radius: 50%;
+  background: var(--line-strong);
+  transition: transform 0.12s ease-out;
+}
+
+.switch:checked {
+  border-color: var(--fresh);
+  background: var(--fresh);
+}
+
+.switch:checked::before {
+  background: var(--deck);
+  transform: translateX(1.3rem);
+}
+
+.select {
+  width: 100%;
+  min-height: 2.5rem;
+  padding: 0.35rem 0.6rem;
+  border: 1px solid var(--line-strong);
+  border-radius: 2px;
+  background: var(--deck);
+  color: var(--ink);
+  font: inherit;
+}
+
+.inline-form {
+  grid-column: 1 / -1;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  margin-top: 0.5rem;
+}
+
+.inline-form .search {
+  font-family: var(--font-code);
+}
+
 /* Sign in */
 
 .gate {
@@ -783,8 +851,15 @@ input {
   }
 
   .facts,
-  .scan {
+  .scan,
+  .setting-wide {
     grid-template-columns: minmax(0, 1fr);
+  }
+
+  .setting-wide .setting-value {
+    grid-column: 1;
+    grid-row: auto;
+    text-align: left;
   }
 
   .facts dd {
@@ -795,5 +870,9 @@ input {
 @media (prefers-reduced-motion: reduce) {
   .end-working {
     animation: none;
+  }
+
+  .switch::before {
+    transition: none;
   }
 }
