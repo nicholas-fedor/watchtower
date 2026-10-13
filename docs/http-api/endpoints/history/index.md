@@ -48,6 +48,7 @@ The `/v1/history` endpoint returns a JSON object with scan history entries:
     "entries": [
         {
             "timestamp": "2025-01-20T11:30:45Z",
+            "kind": "scan",
             "scanned": 8,
             "updated": 0,
             "failed": 0,
@@ -60,6 +61,11 @@ The `/v1/history` endpoint returns a JSON object with scan history entries:
     "api_version": "v1"
 }
 ```
+
+Each entry has a `kind`:
+
+- `scan`: an update scan, whether scheduled or started through [`/v1/update`](../update/index.md).
+- `check`: an update availability check started through [`/v1/check`](../check/index.md). No containers are changed, so `updated` and `restarted` are `0`. `scanned` is the number of containers checked, `failed` is the number that could not be checked, and `updates_available` is the number with a newer image.
 
 ## HTTP Status Codes
 

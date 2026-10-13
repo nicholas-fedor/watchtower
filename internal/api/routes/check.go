@@ -2,6 +2,7 @@ package routes
 
 import (
 	"context"
+	"fmt"
 
 	"github.com/gofiber/fiber/v3"
 	"github.com/gofiber/fiber/v3/middleware/timeout"
@@ -34,7 +35,7 @@ func registerCheckRoute(app *fiber.App, auth fiber.Handler, opts config.Options)
 				return imageFilter(c) && containerFilter(c.Name(), true)
 			}
 
-			return check.CheckForUpdates(
+			results, err := check.CheckForUpdates(
 				opts.Logger,
 				ctx,
 				opts.Client,
@@ -42,6 +43,13 @@ func registerCheckRoute(app *fiber.App, auth fiber.Handler, opts config.Options)
 				params,
 				opts.GitClient,
 			)
+			if err != nil {
+				return results, fmt.Errorf("check for updates: %w", err)
+			}
+
+			recordCheck(opts, results)
+
+			return results, nil
 		},
 		checkTimeout,
 		opts.Notifier,
@@ -60,4 +68,30 @@ func registerCheckRoute(app *fiber.App, auth fiber.Handler, opts config.Options)
 			},
 		),
 	)
+}
+
+// recordCheck adds a completed check to the scan history so that checks
+// started from the API or the web UI are visible alongside update scans.
+func recordCheck(opts config.Options, results []check.ContainerCheck) {
+	if opts.DefaultMetrics == nil {
+		return
+	}
+
+	store := opts.DefaultMetrics()
+	if store == nil {
+		return
+	}
+
+	available, failed := 0, 0
+
+	for _, result := range results {
+		switch {
+		case result.Error != "":
+			failed++
+		case result.UpdateAvailable:
+			available++
+		}
+	}
+
+	store.RecordCheck(len(results), available, failed)
 }
