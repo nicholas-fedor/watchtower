@@ -22,6 +22,7 @@ const (
 	EndpointConfig     = "config"
 	EndpointEvents     = "events"
 	EndpointSwagger    = "swagger"
+	EndpointUI         = "ui"
 )
 
 // AllEndpointNames is the ordered list of every known endpoint name.
@@ -36,6 +37,7 @@ var AllEndpointNames = []string{
 	EndpointConfig,
 	EndpointEvents,
 	EndpointSwagger,
+	EndpointUI,
 }
 
 var (
@@ -264,6 +266,7 @@ func SetEndpointConfig(endpointMap EnabledEndpointsMap, cfg *types.RunConfig) {
 	cfg.EnableConfigAPI = endpointMap.Contains(EndpointConfig)
 	cfg.EnableEventsAPI = endpointMap.Contains(EndpointEvents)
 	cfg.EnableSwaggerAPI = endpointMap.Contains(EndpointSwagger)
+	cfg.EnableUIAPI = endpointMap.Contains(EndpointUI)
 }
 
 func allEndpoints() EnabledEndpointsMap {

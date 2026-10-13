@@ -24,7 +24,7 @@ func Specs() []spec.FlagSpec {
 			Default:   []string{},
 			EnvKeys:   []string{"WATCHTOWER_HTTP_API_ENDPOINTS"},
 			ListParse: spec.ListCommaOrSpace,
-			Help:      "HTTP API endpoints to enable (health, update, metrics, containers, check, history, images, config, events, swagger), or \"all\". Comma- or space-separated. Empty disables the HTTP API.",
+			Help:      "HTTP API endpoints to enable (health, update, metrics, containers, check, history, images, config, events, swagger, ui), or \"all\". Comma- or space-separated. Empty disables the HTTP API.",
 		},
 
 		{

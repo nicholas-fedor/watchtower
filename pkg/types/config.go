@@ -38,6 +38,8 @@ type RunConfig struct {
 	EnableMetricsAPI bool
 	// EnableSwaggerAPI enables Swagger UI endpoint.
 	EnableSwaggerAPI bool
+	// EnableUIAPI enables the built-in web UI.
+	EnableUIAPI bool
 	// EnableUpdateAPI enables the update API endpoint.
 	EnableUpdateAPI bool
 	// UnblockHTTPAPI allows periodic polling alongside the HTTP API.

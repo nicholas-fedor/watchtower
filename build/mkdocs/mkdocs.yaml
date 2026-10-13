@@ -221,6 +221,7 @@ nav:
           - Status: http-api/endpoints/status/index.md
           - Swagger UI: http-api/endpoints/swagger/index.md
           - Update: http-api/endpoints/update/index.md
+          - Web UI: http-api/endpoints/ui/index.md
   - Advanced Features:
       - Ephemeral Self-Updates: advanced-features/ephemeral-self-updates/index.md
       - Git Monitoring: advanced-features/git-monitoring/index.md

@@ -37,6 +37,7 @@ Dockerfile text eol=lf
 *.so binary
 *.db binary
 *.sqlite binary
+*.woff2 binary
 
 # Ensure generated Go binaries or test caches are treated as binary
 *.out binary

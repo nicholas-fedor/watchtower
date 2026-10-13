@@ -801,6 +801,7 @@ func (p *process) runMain(cfg types.RunConfig) int {
 			EnableImagesAPI:              cfg.EnableImagesAPI,
 			EnableMetricsAPI:             cfg.EnableMetricsAPI,
 			EnableSwaggerAPI:             cfg.EnableSwaggerAPI,
+			EnableUIAPI:                  cfg.EnableUIAPI,
 			EnableUpdateAPI:              cfg.EnableUpdateAPI,
 			CheckTimeout:                 cfg.CheckAPITimeout,
 			UpdateTimeout:                cfg.UpdateAPITimeout,

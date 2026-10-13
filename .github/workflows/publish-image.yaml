@@ -1,0 +1,84 @@
+---
+name: Publish Container Image
+
+on:
+  workflow_dispatch: {}
+  push:
+    branches:
+      - "**"
+    paths:
+      - cmd/**
+      - internal/**
+      - pkg/**
+      - build/docker/**
+      - go.mod
+      - go.sum
+      - main.go
+      - .github/workflows/publish-image.yaml
+
+permissions:
+  contents: read # Set default read-only permissions
+
+concurrency:
+  group: publish-image-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  publish:
+    name: Build and Push to GHCR
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read # For code checkout
+      packages: write # For pushing the image to ghcr.io
+    steps:
+      - name: Harden the Runner (Step Security)
+        uses: step-security/harden-runner@ccd8616d44fd3846e67624a50d5aad6d37bf2d25 # v2.22.1
+        with:
+          egress-policy: audit
+
+      - name: Checkout Repo
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          # The Dockerfile derives the version from git describe.
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
+
+      - name: Log in to GHCR
+        uses: docker/login-action@dbcb813823bdd20940b903addbd779551569679f # v4.6.0
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build and Push Image
+        env:
+          REPOSITORY: ${{ github.repository }}
+          REF_NAME: ${{ github.ref_name }}
+          DEFAULT_BRANCH: ${{ github.event.repository.default_branch }}
+          COMMIT_SHA: ${{ github.sha }}
+          SERVER_URL: ${{ github.server_url }}
+        run: |
+          image="ghcr.io/${REPOSITORY,,}"
+          short_sha="${COMMIT_SHA::7}"
+
+          # The default branch publishes "latest". Other branches publish a
+          # tag named after the branch so they can be tried without replacing it.
+          if [ "${REF_NAME}" = "${DEFAULT_BRANCH}" ]; then
+            tags=(--tag "${image}:latest" --tag "${image}:sha-${short_sha}")
+          else
+            branch_tag="$(printf '%s' "${REF_NAME}" | tr '[:upper:]' '[:lower:]' | tr -c 'a-z0-9._-' '-')"
+            tags=(--tag "${image}:${branch_tag}")
+          fi
+
+          docker buildx build \
+            --file build/docker/Dockerfile.self-local \
+            --platform linux/amd64 \
+            --label "org.opencontainers.image.source=${SERVER_URL}/${REPOSITORY}" \
+            --label "org.opencontainers.image.url=${SERVER_URL}/${REPOSITORY}" \
+            --label "org.opencontainers.image.revision=${COMMIT_SHA}" \
+            "${tags[@]}" \
+            --push \
+            .

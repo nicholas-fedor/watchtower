@@ -148,7 +148,8 @@ func HTTPAPIEndpointsEnabled(cfg types.RunConfig) bool {
 		cfg.EnableHistoryAPI ||
 		cfg.EnableImagesAPI ||
 		cfg.EnableConfigAPI ||
-		cfg.EnableEventsAPI
+		cfg.EnableEventsAPI ||
+		cfg.EnableUIAPI
 }
 
 // ValidateAPIHost ensures http-api-host is empty (all interfaces) or a valid IP.
