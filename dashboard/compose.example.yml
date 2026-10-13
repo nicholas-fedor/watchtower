@@ -1,0 +1,23 @@
+# Deploy on the same Docker network as your Watchtower container.
+# Use a strong password and keep the API token on the server side.
+services:
+  watchtower-dashboard:
+    build: .
+    container_name: watchtower-dashboard
+    restart: unless-stopped
+    environment:
+      WATCHTOWER_URL: ${WATCHTOWER_URL:-http://watchtower:8080}
+      WATCHTOWER_API_TOKEN: ${WATCHTOWER_API_TOKEN:?set Watchtower API token}
+      DASHBOARD_USER: ${DASHBOARD_USER:-admin}
+      DASHBOARD_PASSWORD: ${DASHBOARD_PASSWORD:?set dashboard password}
+      DASHBOARD_ENABLE_UPDATES: ${DASHBOARD_ENABLE_UPDATES:-false}
+    ports:
+      - "127.0.0.1:8096:8080"
+    networks:
+      - watchtower
+    security_opt:
+      - no-new-privileges:true
+    read_only: true
+networks:
+  watchtower:
+    external: true
