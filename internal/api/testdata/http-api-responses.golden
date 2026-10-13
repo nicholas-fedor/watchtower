@@ -337,6 +337,7 @@ body:
   "entries": [
     {
       "timestamp": "<timestamp>",
+      "kind": "scan",
       "scanned": 5,
       "updated": 2,
       "failed": 1,

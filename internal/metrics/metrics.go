@@ -303,37 +303,57 @@ func (m *Metrics) GetLastScan() *Metric {
 // retained in the in-memory ring buffer.
 const historyBufferSize = 500
 
-// HistoryEntry represents a single scan record in the history ring buffer.
+const (
+	// HistoryKindScan marks an entry recorded by an update scan.
+	HistoryKindScan = "scan"
+	// HistoryKindCheck marks an entry recorded by an update availability check,
+	// which changes no containers.
+	HistoryKindCheck = "check"
+)
+
+// HistoryEntry represents a single scan or check record in the history ring buffer.
 type HistoryEntry struct {
 	Timestamp time.Time `json:"timestamp"`
-	Scanned   int       `json:"scanned"`
-	Updated   int       `json:"updated"`
-	Failed    int       `json:"failed"`
-	Restarted int       `json:"restarted"`
-	Skipped   int       `json:"skipped"`
+	// Kind is HistoryKindScan or HistoryKindCheck.
+	Kind      string `json:"kind"`
+	Scanned   int    `json:"scanned"`
+	Updated   int    `json:"updated"`
+	Failed    int    `json:"failed"`
+	Restarted int    `json:"restarted"`
+	Skipped   int    `json:"skipped"`
+	// UpdatesAvailable counts containers a check found a newer image for.
+	UpdatesAvailable int `json:"updates_available,omitempty"`
 }
 
 // RecordHistory stores a scan result in the ring buffer.
 // When the buffer is full, the oldest entry is overwritten.
 func (m *Metrics) RecordHistory(metric *Metric) {
-	m.historyMu.Lock()
-	defer m.historyMu.Unlock()
-
-	entry := HistoryEntry{
+	m.appendHistory(HistoryEntry{
 		Timestamp: time.Now().UTC(),
+		Kind:      HistoryKindScan,
 		Scanned:   metric.Scanned,
 		Updated:   metric.Updated,
 		Failed:    metric.Failed,
 		Restarted: metric.Restarted,
 		Skipped:   metric.Skipped,
-	}
+	})
+}
 
-	if len(m.history) < historyBufferSize {
-		m.history = append(m.history, entry)
-	} else {
-		m.history[m.historyIdx] = entry
-		m.historyIdx = (m.historyIdx + 1) % historyBufferSize
-	}
+// RecordCheck stores the outcome of an update availability check in the ring
+// buffer. Checks change no containers, so they do not touch the scan gauges.
+//
+// Parameters:
+//   - checked: Number of containers checked.
+//   - available: Number of containers with a newer image available.
+//   - failed: Number of containers that could not be checked.
+func (m *Metrics) RecordCheck(checked, available, failed int) {
+	m.appendHistory(HistoryEntry{
+		Timestamp:        time.Now().UTC(),
+		Kind:             HistoryKindCheck,
+		Scanned:          checked,
+		Failed:           failed,
+		UpdatesAvailable: available,
+	})
 }
 
 // GetHistory returns a copy of the history entries, optionally filtered
@@ -409,5 +429,19 @@ func (m *Metrics) HandleUpdate() {
 		case <-m.ctx.Done():
 			return
 		}
+	}
+}
+
+// appendHistory writes an entry to the ring buffer, overwriting the oldest
+// entry once the buffer is full.
+func (m *Metrics) appendHistory(entry HistoryEntry) {
+	m.historyMu.Lock()
+	defer m.historyMu.Unlock()
+
+	if len(m.history) < historyBufferSize {
+		m.history = append(m.history, entry)
+	} else {
+		m.history[m.historyIdx] = entry
+		m.historyIdx = (m.historyIdx + 1) % historyBufferSize
 	}
 }

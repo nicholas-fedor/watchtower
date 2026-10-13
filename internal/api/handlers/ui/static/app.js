@@ -275,6 +275,7 @@
 
       state.checks = new Map((data.containers || []).map((item) => [cleanName(item.name), item]));
       state.checkedAt = new Date();
+      state.history = null;
       saveChecks();
       await loadContainers();
     } catch (problem) {
@@ -722,7 +723,17 @@
   function scan(entry) {
     const when = new Date(entry.timestamp);
     const scanned = entry.scanned || 0;
-    const parts = [count(scanned, "container") + " scanned"];
+    const check = entry.kind === "check";
+    const waiting = entry.updates_available || 0;
+    const parts = [count(scanned, "container") + (check ? " checked" : " scanned")];
+
+    if (check) {
+      if (waiting) {
+        parts.push(`${count(waiting, "update")} waiting`);
+      } else if (!entry.failed) {
+        parts.push("all up to date");
+      }
+    }
 
     if (entry.updated) {
       parts.push(`${entry.updated} updated`);
@@ -750,9 +761,11 @@
       }
     };
 
-    segment("updated", entry.updated || 0);
+    const changed = check ? waiting : entry.updated || 0;
+
+    segment("updated", changed);
     segment("failed", entry.failed || 0);
-    segment("fresh", Math.max(scanned - (entry.updated || 0) - (entry.failed || 0), 0));
+    segment("fresh", Math.max(scanned - changed - (entry.failed || 0), 0));
 
     return el(
       "li",
@@ -786,7 +799,7 @@
       el(
         "p",
         { class: "lede" },
-        "Every time Watchtower looks for new images. This log is kept in memory, so it starts again when Watchtower restarts.",
+        "Every time Watchtower looks for new images, whether on its schedule or when you check or update from this page. This log is kept in memory, so it starts again when Watchtower restarts.",
       ),
     );
 
@@ -812,7 +825,7 @@
           "p",
           { class: "blank" },
           el("strong", null, "No scans yet."),
-          "The first one appears here after Watchtower's next scheduled run, or after you update a container.",
+          "The first one appears here after you check for updates, update a container, or Watchtower's next scheduled run.",
         ),
       );
     }
