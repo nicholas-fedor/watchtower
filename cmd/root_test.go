@@ -1379,6 +1379,15 @@ func TestContextDeadlineExceededErrorHandling(t *testing.T) {
 // TestContainerLookupWithTimeoutContext verifies that container lookup functions properly
 // handle timeout contexts using synctest.
 func TestContainerLookupWithTimeoutContext(t *testing.T) {
+	origMount := container.ReadMountinfoFunc
+	origCgroup := container.ReadCgroupFunc
+	container.ReadMountinfoFunc = func(string) ([]byte, error) { return nil, os.ErrNotExist }
+	container.ReadCgroupFunc = func(string) ([]byte, error) { return nil, os.ErrNotExist }
+	t.Cleanup(func() {
+		container.ReadMountinfoFunc = origMount
+		container.ReadCgroupFunc = origCgroup
+	})
+
 	// Test case 1: Context deadline exceeded - verify DeadlineExceeded error is propagated
 	t.Run("DeadlineExceeded error is properly propagated", func(t *testing.T) {
 		synctest.Test(t, func(t *testing.T) {

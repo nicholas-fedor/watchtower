@@ -37,6 +37,16 @@ type ContainerDetails struct {
 	Stale bool `json:"stale"`
 	// Scope is the monitoring scope of the container.
 	Scope string `json:"scope"`
+	// Policy is the active per-container update policy ("auto", "monitor_only", "pinned", "update").
+	Policy string `json:"policy,omitempty"`
+	// ComposeProject is the Docker Compose project name if managed by Compose.
+	ComposeProject string `json:"compose_project,omitempty"`
+	// ComposeService is the Docker Compose service name if managed by Compose.
+	ComposeService string `json:"compose_service,omitempty"`
+	// Health is the Docker healthcheck status (healthy, unhealthy, starting, none).
+	Health string `json:"health,omitempty"`
+	// Source is the OCI source repository URL or release notes link.
+	Source string `json:"source,omitempty"`
 }
 
 // GetFunc returns detailed container status for all watched containers.
@@ -178,20 +188,48 @@ func GetContainerDetails(
 
 		scope, _ := c.Scope()
 
-		containerDetails := ContainerDetails{
-			Name:        c.Name(),
-			Image:       c.ImageName(),
-			ImageID:     string(c.ImageID()),
-			Running:     c.IsRunning(),
-			Watchtower:  c.IsWatchtower(),
-			MonitorOnly: c.IsMonitorOnly(params),
-			NoPull:      c.IsNoPull(params),
-			Enabled:     enabled,
-			Stale:       c.IsStale(),
-			Scope:       scope,
+		policy := "auto"
+		if params.ContainerOverrides != nil {
+			if p, ok := params.ContainerOverrides[c.Name()]; ok && p != "" {
+				policy = p
+			}
 		}
 
+		composeProject, _ := c.GetLabel("com.docker.compose.project")
+		composeService, _ := c.GetLabel("com.docker.compose.service")
+
+		var health string
+		if cInfo := c.ContainerInfo(); cInfo != nil && cInfo.State != nil && cInfo.State.Health != nil {
+			health = string(cInfo.State.Health.Status)
+		}
+
+		var source string
 		info := c.ImageInfo()
+		if info != nil && info.Config != nil && info.Config.Labels != nil {
+			source = info.Config.Labels["org.opencontainers.image.source"]
+			if source == "" {
+				source = info.Config.Labels["org.opencontainers.image.url"]
+			}
+		}
+
+		containerDetails := ContainerDetails{
+			Name:           c.Name(),
+			Image:          c.ImageName(),
+			ImageID:        string(c.ImageID()),
+			Running:        c.IsRunning(),
+			Watchtower:     c.IsWatchtower(),
+			MonitorOnly:    c.IsMonitorOnly(params),
+			NoPull:         c.IsNoPull(params),
+			Enabled:        enabled,
+			Stale:          c.IsStale(),
+			Scope:          scope,
+			Policy:         policy,
+			ComposeProject: composeProject,
+			ComposeService: composeService,
+			Health:         health,
+			Source:         source,
+		}
+
 		if info != nil && len(info.RepoDigests) > 0 {
 			_, digest, found := strings.Cut(info.RepoDigests[0], "@")
 			if found {

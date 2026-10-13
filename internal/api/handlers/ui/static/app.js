@@ -25,6 +25,7 @@
     expanded: new Set(),
     search: "",
     waitingOnly: false,
+    groupByCompose: false,
     history: null,
     historyProblem: "",
     config: null,
@@ -389,8 +390,9 @@
 
   function canUpdate(container) {
     const globalMonitor = Boolean(state.config && state.config.monitor_only);
+    const pinned = container.policy === "pinned";
 
-    return feature("update") && !container.monitor_only && !globalMonitor;
+    return feature("update") && !container.monitor_only && !globalMonitor && !pinned;
   }
 
   function waitingContainers() {
@@ -528,7 +530,7 @@
         rows.push(el("dt", null, label), el("dd", null, value));
       }
     };
-    const link = (href) => (/^https?:\/\//.test(href) ? el("a", { href, rel: "noreferrer", target: "_blank" }, href) : href);
+    const link = (href) => (/^https?:\/\//.test(href) ? el("a", { class: "link-subtle", href, rel: "noreferrer", target: "_blank" }, href) : href);
 
     add("Image", code(container.image));
 
@@ -544,10 +546,49 @@
     add("Running digest", container.digest && code(shortDigest(container.digest)));
     add("Newest digest", check.update_available && check.latest_digest && code(shortDigest(check.latest_digest)));
     add("Image ID", container.image_id && code(shortDigest(container.image_id)));
+    if (container.compose_project) {
+      add("Compose stack", `${container.compose_project}${container.compose_service ? ` (${container.compose_service})` : ""}`);
+    }
+    if (container.health) {
+      add("Health", container.health);
+    }
+    const sourceLink = container.source || check.oci_source;
+    if (sourceLink) {
+      add("Release notes / Source", link(sourceLink));
+    }
     add("Changes", check.changelog && link(check.changelog));
-    add("Source", check.oci_source && link(check.oci_source));
     add("Git", check.git_repo && `${check.git_repo}${check.git_ref ? ` at ${check.git_ref}` : ""}`);
     add("Scope", container.scope);
+
+    if (feature("settings")) {
+      const currentPolicy = container.policy || "auto";
+      const policySelect = el(
+        "select",
+        {
+          class: "policy-select",
+          value: currentPolicy,
+          onchange: async (event) => {
+            const nextPolicy = event.target.value;
+            try {
+              await changeSettings({
+                container_overrides: {
+                  [container.name]: nextPolicy,
+                },
+              });
+              await loadContainers();
+              renderManifest();
+            } catch (err) {
+              notify(`Failed to update policy: ${err.message}`, true);
+            }
+          },
+        },
+        el("option", { value: "auto", selected: currentPolicy === "auto" }, "Auto (Global settings)"),
+        el("option", { value: "update", selected: currentPolicy === "update" }, "Always update"),
+        el("option", { value: "monitor_only", selected: currentPolicy === "monitor_only" }, "Monitor only"),
+        el("option", { value: "pinned", selected: currentPolicy === "pinned" }, "Pinned (Lock image)"),
+      );
+      add("Update policy", policySelect);
+    }
 
     const notes = [];
 
@@ -555,7 +596,9 @@
       notes.push("This is Watchtower itself.");
     }
 
-    if (container.monitor_only) {
+    if (container.policy === "pinned") {
+      notes.push("Pinned: This container is locked to its current image and will not be updated.");
+    } else if (container.monitor_only) {
       notes.push("Monitor only: Watchtower reports updates for this container but doesn't apply them.");
     }
 
@@ -581,6 +624,7 @@
     const open = state.expanded.has(container.name);
     const check = state.checks.get(container.name);
     const waiting = status.key === "waiting";
+    const health = container.health ? String(container.health).toLowerCase() : "";
 
     const toggle = el(
       "button",
@@ -603,7 +647,12 @@
       el(
         "span",
         null,
-        el("span", { class: "unit-name" }, container.name),
+        el(
+          "span",
+          { class: "unit-name" },
+          container.name,
+          health && el("span", { class: `badge-health health-${health}` }, health),
+        ),
         el("span", { class: "unit-image" }, container.image),
       ),
       el("span", { class: `unit-state state-${status.key}` }, status.label),
@@ -611,7 +660,9 @@
 
     let action = null;
 
-    if (waiting && canUpdate(container)) {
+    if (container.policy === "pinned") {
+      action = el("span", { class: "setting-off" }, "Pinned");
+    } else if (waiting && canUpdate(container)) {
       action = el(
         "button",
         {
@@ -623,7 +674,7 @@
         },
         "Update",
       );
-    } else if (waiting && check && feature("update")) {
+    } else if (waiting && (check || container.monitor_only) && feature("update")) {
       action = el("span", { class: "setting-off" }, "Monitor only");
     }
 
@@ -672,6 +723,72 @@
       );
     }
 
+    if (state.groupByCompose) {
+      const groups = new Map();
+
+      for (const item of shown) {
+        const project = item.compose_project || "Standalone Containers";
+
+        if (!groups.has(project)) {
+          groups.set(project, []);
+        }
+
+        groups.get(project).push(item);
+      }
+
+      const sortedProjects = [...groups.keys()].sort((a, b) => {
+        if (a === "Standalone Containers") {
+          return 1;
+        }
+
+        if (b === "Standalone Containers") {
+          return -1;
+        }
+
+        return a.localeCompare(b);
+      });
+
+      return el(
+        "div",
+        { id: "manifest" },
+        sortedProjects.map((project) => {
+          const projectContainers = groups.get(project);
+          const updatableInStack = projectContainers.filter((c) => {
+            const status = describe(c);
+
+            return status.key === "waiting" && canUpdate(c);
+          });
+
+          return el(
+            "div",
+            { class: "stack-group" },
+            el(
+              "div",
+              { class: "stack-header" },
+              el("span", { class: "stack-title" }, project),
+              el(
+                "div",
+                { class: "stack-meta" },
+                el("span", { class: "setting-help" }, count(projectContainers.length, "container")),
+                updatableInStack.length > 0 &&
+                  el(
+                    "button",
+                    {
+                      class: "button button-quiet button-sm",
+                      type: "button",
+                      disabled: state.updating.size > 0,
+                      onclick: () => confirmUpdate(updatableInStack),
+                    },
+                    `Update Stack (${updatableInStack.length})`,
+                  ),
+              ),
+            ),
+            el("ul", { class: "manifest" }, projectContainers.map(unit)),
+          );
+        }),
+      );
+    }
+
     return el("ul", { class: "manifest", id: "manifest" }, shown.map(unit));
   }
 
@@ -701,8 +818,9 @@
       );
     }
 
+    const hasCompose = state.containers.some((c) => c.compose_project);
     const toolbar =
-      state.containers.length > SEARCH_THRESHOLD || state.search || state.waitingOnly
+      state.containers.length > SEARCH_THRESHOLD || state.search || state.waitingOnly || hasCompose
         ? el(
             "div",
             { class: "toolbar" },
@@ -717,6 +835,20 @@
                 renderManifest();
               },
             }),
+            hasCompose &&
+              el(
+                "label",
+                { class: "toggle" },
+                el("input", {
+                  type: "checkbox",
+                  checked: state.groupByCompose,
+                  onchange: (event) => {
+                    state.groupByCompose = event.target.checked;
+                    renderManifest();
+                  },
+                }),
+                "Group by Compose stack",
+              ),
             state.checkedAt &&
               el(
                 "label",
@@ -1128,6 +1260,11 @@
             "Rolling restart",
             "Restart containers one at a time instead of all together. Needs Apply updates to be on.",
           ),
+          switchSetting(
+            "auto_rollback",
+            "Automatic rollback",
+            "Revert containers to their previous image if a new image fails to start or crashes.",
+          ),
         );
       } else {
         rows.push(
@@ -1160,6 +1297,52 @@
           el("ul", { class: "manifest" }, rows),
         ),
       );
+
+      if (editable) {
+        sections.push(
+          el(
+            "section",
+            { class: "section" },
+            el("h2", { class: "section-title" }, "Notifications"),
+            el(
+              "ul",
+              { class: "manifest" },
+              el(
+                "li",
+                { class: "setting" },
+                el("span", { class: "setting-name" }, "Test notifications"),
+                el(
+                  "span",
+                  { class: "setting-value" },
+                  el(
+                    "button",
+                    {
+                      class: "button button-quiet",
+                      type: "button",
+                      onclick: async (event) => {
+                        const btn = event.target;
+                        btn.disabled = true;
+                        btn.textContent = "Sending...";
+                        try {
+                          const res = await request("POST", "/v1/settings/test-notification", {});
+                          notify(res && res.message ? res.message : "Test notification sent successfully!");
+                        } catch (err) {
+                          notify(`Test notification failed: ${err.message}`, true);
+                        } finally {
+                          btn.disabled = false;
+                          btn.textContent = "Send test notification";
+                        }
+                      },
+                    },
+                    "Send test notification",
+                  ),
+                ),
+                el("span", { class: "setting-help" }, "Dispatches a test alert through configured Shoutrrr notification URLs."),
+              ),
+            ),
+          ),
+        );
+      }
     }
 
     if (feature("config") && config) {

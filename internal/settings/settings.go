@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"io/fs"
+	"maps"
 	"os"
 	"path/filepath"
 	"strings"
@@ -28,6 +29,10 @@ const (
 	KeyRollingRestart = "rolling_restart"
 	// KeySchedule is the cron expression that decides when scans run.
 	KeySchedule = "schedule"
+	// KeyAutoRollback is the setting that rolls back on start/healthcheck failure.
+	KeyAutoRollback = "auto_rollback"
+	// KeyContainerOverrides maps container names to policy overrides (auto, monitor_only, pinned, update).
+	KeyContainerOverrides = "container_overrides"
 )
 
 var (
@@ -49,6 +54,10 @@ type Values struct {
 	RollingRestart bool
 	// Schedule is the cron expression for periodic scans. Empty disables them.
 	Schedule string
+	// AutoRollback rolls back container to previous image if new image fails to start or healthcheck.
+	AutoRollback bool
+	// ContainerOverrides maps container names to policies ("auto", "monitor_only", "pinned", "update").
+	ContainerOverrides map[string]string
 }
 
 // Validators are optional checks supplied by the composition root.
@@ -61,10 +70,12 @@ type Validators struct {
 
 // overrides is the persisted form: only the settings changed at run time.
 type overrides struct {
-	MonitorOnly    *bool   `json:"monitor_only,omitempty"`
-	Cleanup        *bool   `json:"cleanup,omitempty"`
-	RollingRestart *bool   `json:"rolling_restart,omitempty"`
-	Schedule       *string `json:"schedule,omitempty"`
+	MonitorOnly        *bool             `json:"monitor_only,omitempty"`
+	Cleanup            *bool             `json:"cleanup,omitempty"`
+	RollingRestart     *bool             `json:"rolling_restart,omitempty"`
+	Schedule           *string           `json:"schedule,omitempty"`
+	AutoRollback       *bool             `json:"auto_rollback,omitempty"`
+	ContainerOverrides map[string]string `json:"container_overrides,omitempty"`
 }
 
 // Store holds the defaults from flags and the overrides layered on top.
@@ -145,10 +156,12 @@ func (s *Store) Overridden() map[string]bool {
 	defer s.mu.RUnlock()
 
 	return map[string]bool{
-		KeyMonitorOnly:    s.overrides.MonitorOnly != nil,
-		KeyCleanup:        s.overrides.Cleanup != nil,
-		KeyRollingRestart: s.overrides.RollingRestart != nil,
-		KeySchedule:       s.overrides.Schedule != nil,
+		KeyMonitorOnly:        s.overrides.MonitorOnly != nil,
+		KeyCleanup:            s.overrides.Cleanup != nil,
+		KeyRollingRestart:     s.overrides.RollingRestart != nil,
+		KeySchedule:           s.overrides.Schedule != nil,
+		KeyAutoRollback:       s.overrides.AutoRollback != nil,
+		KeyContainerOverrides: s.overrides.ContainerOverrides != nil,
 	}
 }
 
@@ -163,6 +176,8 @@ func (s *Store) ApplyTo(params types.UpdateParams) types.UpdateParams {
 	params.MonitorOnly = values.MonitorOnly
 	params.Cleanup = values.Cleanup
 	params.RollingRestart = values.RollingRestart
+	params.AutoRollback = values.AutoRollback
+	params.ContainerOverrides = values.ContainerOverrides
 
 	return params
 }
@@ -325,6 +340,14 @@ func (o *overrides) apply(defaults Values) Values {
 		values.Schedule = *o.Schedule
 	}
 
+	if o.AutoRollback != nil {
+		values.AutoRollback = *o.AutoRollback
+	}
+
+	if o.ContainerOverrides != nil {
+		values.ContainerOverrides = maps.Clone(o.ContainerOverrides)
+	}
+
 	return values
 }
 
@@ -337,6 +360,8 @@ func (o *overrides) set(key string, raw json.RawMessage) error {
 		return decode(key, raw, &o.Cleanup)
 	case KeyRollingRestart:
 		return decode(key, raw, &o.RollingRestart)
+	case KeyAutoRollback:
+		return decode(key, raw, &o.AutoRollback)
 	case KeySchedule:
 		err := decode(key, raw, &o.Schedule)
 		if err == nil && o.Schedule != nil {
@@ -345,6 +370,32 @@ func (o *overrides) set(key string, raw json.RawMessage) error {
 		}
 
 		return err
+	case KeyContainerOverrides:
+		if strings.TrimSpace(string(raw)) == "null" {
+			o.ContainerOverrides = nil
+
+			return nil
+		}
+
+		var co map[string]string
+		err := json.Unmarshal(raw, &co)
+		if err != nil {
+			return fmt.Errorf("%w: %s", ErrInvalidValue, key)
+		}
+
+		if o.ContainerOverrides == nil {
+			o.ContainerOverrides = make(map[string]string)
+		}
+
+		for k, v := range co {
+			if v == "" || v == "auto" {
+				delete(o.ContainerOverrides, k)
+			} else {
+				o.ContainerOverrides[k] = v
+			}
+		}
+
+		return nil
 	default:
 		return fmt.Errorf("%w: %s", ErrUnknownSetting, key)
 	}

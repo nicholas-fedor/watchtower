@@ -134,3 +134,21 @@ func TestPatchRejected(t *testing.T) {
 		})
 	}
 }
+
+func TestTestNotificationNoURLs(t *testing.T) {
+	t.Parallel()
+
+	app, _ := newTestApp(t, true)
+	handler := NewWithNotifier(nil, nil, true, nil)
+	app.Post("/v1/settings/test-notification", handler.TestNotification)
+
+	req := httptest.NewRequestWithContext(t.Context(), http.MethodPost, "/v1/settings/test-notification", strings.NewReader(`{}`))
+	req.Header.Set(fiber.HeaderContentType, fiber.MIMEApplicationJSON)
+
+	resp, err := app.Test(req)
+	require.NoError(t, err)
+	defer resp.Body.Close()
+
+	assert.Equal(t, http.StatusBadRequest, resp.StatusCode)
+}
+

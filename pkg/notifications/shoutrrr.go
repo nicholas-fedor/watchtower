@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"net/url"
 	"os"
@@ -1315,3 +1316,39 @@ func sanitizeURLForLogging(rawURL string) string {
 
 	return safeTruncate(sanitized)
 }
+
+// SendTestNotification sends an immediate test notification using either the provided URLs
+// or configured notifier URLs.
+func SendTestNotification(log *zerolog.Logger, urls []string, title, message string) []error {
+	if len(urls) == 0 {
+		return []error{errors.New("no notification URLs specified")}
+	}
+
+	if title == "" {
+		title = "Watchtower Test Notification"
+	}
+
+	if message == "" {
+		message = "This is a test notification from Watchtower. Your alert configuration is working properly."
+	}
+
+	var local zerolog.Logger
+	if log != nil {
+		local = log.With().Str("notify", "no").Logger()
+	} else {
+		local = zerolog.Nop()
+	}
+	logger := newStdLogger(&local, "Shoutrrr: ")
+
+	router, err := shoutrrr.NewSenderWithOptions(logger, shoutrrrTypes.SenderOptions{}, urls...)
+	if err != nil {
+		return []error{err}
+	}
+
+	params := &shoutrrrTypes.Params{
+		"title": title,
+	}
+
+	return router.Send(message, params)
+}
+

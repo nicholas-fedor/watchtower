@@ -15,7 +15,9 @@ func registerSettingsRoute(app *fiber.App, auth fiber.Handler, opts config.Optio
 	// In API-only update mode the scheduler never starts, so the schedule has no effect.
 	scheduleActive := !opts.EnableUpdateAPI || opts.UnblockHTTPAPI
 
-	handler := settings.New(opts.Logger, opts.Settings, scheduleActive)
+	handler := settings.NewWithNotifier(opts.Logger, opts.Settings, scheduleActive, opts.Notifier)
 	app.Get(handler.Path, auth, config.TimeoutMiddleware(), handler.Get)
 	app.Patch(handler.Path, auth, config.TimeoutMiddleware(), handler.Patch)
+	app.Post(handler.Path+"/test-notification", auth, config.TimeoutMiddleware(), handler.TestNotification)
+	app.Post("/v1/notify/test", auth, config.TimeoutMiddleware(), handler.TestNotification)
 }

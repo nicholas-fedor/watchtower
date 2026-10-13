@@ -2242,6 +2242,57 @@ func restartStaleContainer(
 							Msg("Failed to stop failed Watchtower container")
 					}
 				}
+			} else if config.AutoRollback && !sourceContainer.IsWatchtower() && sourceContainer.ImageID() != "" {
+				log.Warn().
+					Fields(fields).
+					Str("failed_id", newContainerID.ShortID()).
+					Str("rollback_image", string(sourceContainer.ImageID())).
+					Msg("New container failed to start; initiating automatic rollback to previous image")
+
+				cleanupCtx, cleanupCancel := context.WithTimeout(
+					context.Background(),
+					restartPolicyTimeout(config.Timeout),
+				)
+				defer cleanupCancel()
+
+				//nolint:contextcheck // fresh context is intentional for cleanup after timeout
+				failedNew, getErr := client.GetContainer(cleanupCtx, newContainerID)
+				if getErr == nil {
+					//nolint:contextcheck // fresh context is intentional for cleanup after timeout
+					_ = client.StopAndRemoveContainer(cleanupCtx, failedNew, config.Timeout)
+				}
+
+				rollbackTarget := &rollbackContainerWrapper{
+					Container:     sourceContainer,
+					rollbackImage: string(sourceContainer.ImageID()),
+				}
+
+				//nolint:contextcheck // Using detached context intentionally
+				rollbackID, createErr := client.CreateContainer(detachedCtx, rollbackTarget)
+				if createErr == nil {
+					if (!config.NoRestart) && (sourceContainer.IsRunning() || config.ReviveStopped) {
+						//nolint:contextcheck // Using detached context intentionally
+						startErr := client.StartContainerByID(detachedCtx, rollbackID)
+						if startErr == nil {
+							log.Info().
+								Fields(fields).
+								Str("rollback_id", rollbackID.ShortID()).
+								Msg("Successfully restored and started container on previous image")
+
+							return rollbackID, renamed, fmt.Errorf("%w: new container failed to start, automatically rolled back to previous image: %w", errStartContainerFailed, err)
+						}
+
+						log.Error().
+							Err(startErr).
+							Fields(fields).
+							Msg("Failed to start rolled-back container")
+					}
+				} else {
+					log.Error().
+						Err(createErr).
+						Fields(fields).
+						Msg("Failed to create container during auto-rollback")
+				}
 			}
 
 			return "",
@@ -2251,6 +2302,52 @@ func restartStaleContainer(
 					errStartContainerFailed,
 					err,
 				)
+		}
+
+		if config.AutoRollback && !sourceContainer.IsWatchtower() && sourceContainer.ImageID() != "" && sourceContainer.IsRunning() {
+			checkCtx, checkCancel := context.WithTimeout(context.Background(), restartPolicyTimeout(config.Timeout))
+			//nolint:contextcheck // fresh context intentional
+			startedContainer, getErr := client.GetContainer(checkCtx, newContainerID)
+			checkCancel()
+			if getErr == nil && startedContainer != nil {
+				info := startedContainer.ContainerInfo()
+				if info != nil && info.State != nil && !info.State.Running && info.State.ExitCode != 0 {
+					log.Warn().
+						Fields(fields).
+						Int("exit_code", info.State.ExitCode).
+						Str("rollback_image", string(sourceContainer.ImageID())).
+						Msg("New container exited immediately with non-zero exit code; initiating automatic rollback")
+
+					cleanupCtx, cleanupCancel := context.WithTimeout(
+						context.Background(),
+						restartPolicyTimeout(config.Timeout),
+					)
+					defer cleanupCancel()
+
+					//nolint:contextcheck // fresh context intentional
+					_ = client.StopAndRemoveContainer(cleanupCtx, startedContainer, config.Timeout)
+
+					rollbackTarget := &rollbackContainerWrapper{
+						Container:     sourceContainer,
+						rollbackImage: string(sourceContainer.ImageID()),
+					}
+
+					//nolint:contextcheck // Using detached context intentionally
+					rollbackID, createErr := client.CreateContainer(detachedCtx, rollbackTarget)
+					if createErr == nil {
+						//nolint:contextcheck // Using detached context intentionally
+						startErr := client.StartContainerByID(detachedCtx, rollbackID)
+						if startErr == nil {
+							log.Info().
+								Fields(fields).
+								Str("rollback_id", rollbackID.ShortID()).
+								Msg("Successfully rolled back crashed container to previous image")
+
+							return rollbackID, renamed, fmt.Errorf("%w: new container crashed (exit code %d), automatically rolled back to previous image", errStartContainerFailed, info.State.ExitCode)
+						}
+					}
+				}
+			}
 		}
 
 		log.Info().
@@ -2327,3 +2424,23 @@ func restartPolicyTimeout(timeout time.Duration) time.Duration {
 
 	return defaultRestartPolicyTimeout
 }
+
+// rollbackContainerWrapper wraps a types.Container to substitute the previous image ID during auto-rollback.
+type rollbackContainerWrapper struct {
+	types.Container
+	rollbackImage string
+}
+
+// GetCreateConfig returns the creation config with the image swapped to the rollback target image.
+func (r *rollbackContainerWrapper) GetCreateConfig() *dockerContainer.Config {
+	cfg := r.Container.GetCreateConfig()
+	if cfg == nil {
+		return &dockerContainer.Config{Image: r.rollbackImage}
+	}
+
+	cloned := *cfg
+	cloned.Image = r.rollbackImage
+
+	return &cloned
+}
+

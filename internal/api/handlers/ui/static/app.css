@@ -876,3 +876,80 @@ input {
     transition: none;
   }
 }
+
+.stack-group {
+  margin-bottom: 2rem;
+}
+
+.stack-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  padding: 0.75rem 1rem;
+  background: var(--fog);
+  border: 1px solid var(--line);
+  border-bottom: 0;
+  border-radius: 4px 4px 0 0;
+}
+
+.stack-title {
+  font-family: var(--font-display);
+  font-size: var(--step-1);
+  font-weight: 600;
+  margin: 0;
+}
+
+.stack-meta {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  font-size: var(--step--1);
+  color: var(--ink-soft);
+}
+
+.badge-health {
+  display: inline-block;
+  padding: 0.15rem 0.45rem;
+  font-size: 0.75rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  border-radius: 2px;
+  line-height: 1;
+}
+
+.health-healthy {
+  background: color-mix(in srgb, var(--fresh) 20%, transparent);
+  color: var(--fresh);
+  border: 1px solid var(--fresh);
+}
+
+.health-unhealthy {
+  background: color-mix(in srgb, var(--failed) 20%, transparent);
+  color: var(--failed);
+  border: 1px solid var(--failed);
+}
+
+.health-starting {
+  background: color-mix(in srgb, var(--waiting) 20%, transparent);
+  color: var(--waiting-text);
+  border: 1px solid var(--waiting);
+}
+
+.link-subtle {
+  color: var(--focus);
+  text-decoration: underline;
+  text-underline-offset: 0.2em;
+}
+
+.policy-select {
+  padding: 0.35rem 0.6rem;
+  border: 1px solid var(--line-strong);
+  border-radius: 2px;
+  background: var(--deck);
+  color: var(--ink);
+  font-family: inherit;
+  font-size: var(--step--1);
+}
+

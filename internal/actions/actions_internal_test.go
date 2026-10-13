@@ -181,6 +181,68 @@ var _ = ginkgo.Describe("restartStaleContainer", func() {
 		gomega.Expect(client.TestData.RenameContainerCount.Load()).To(gomega.Equal(int32(0)))
 		gomega.Expect(client.TestData.LastCleanup).To(gomega.BeTrue())
 	})
+
+	ginkgo.It("should attempt rollback to previous image when start fails and AutoRollback is enabled", func() {
+		client := mockActions.CreateMockClient(
+			&mockActions.TestData{
+				Containers: []types.Container{
+					mockActions.CreateMockContainerWithConfig(
+						"app-1",
+						"/my-app",
+						"my-app:1.0.0",
+						true,
+						false,
+						time.Now(),
+						&dockerContainer.Config{
+							Image:  "my-app:1.0.0",
+							Labels: map[string]string{},
+						},
+					),
+				},
+				StartContainerByIDError: errors.New("simulated start crash"),
+			},
+			false,
+			false,
+		)
+		params := types.UpdateParams{
+			AutoRollback: true,
+		}
+		testContainer := client.TestData.Containers[0]
+		_, _, err := restartStaleContainer(testLogger(), context.Background(), testContainer, client, params)
+		gomega.Expect(err).To(gomega.HaveOccurred())
+		gomega.Expect(client.TestData.CreateContainerCount.Load()).To(gomega.Equal(int32(2)))
+	})
+
+	ginkgo.It("should not attempt rollback when AutoRollback is disabled", func() {
+		client := mockActions.CreateMockClient(
+			&mockActions.TestData{
+				Containers: []types.Container{
+					mockActions.CreateMockContainerWithConfig(
+						"app-1",
+						"/my-app",
+						"my-app:1.0.0",
+						true,
+						false,
+						time.Now(),
+						&dockerContainer.Config{
+							Image:  "my-app:1.0.0",
+							Labels: map[string]string{},
+						},
+					),
+				},
+				StartContainerByIDError: errors.New("simulated start crash"),
+			},
+			false,
+			false,
+		)
+		params := types.UpdateParams{
+			AutoRollback: false,
+		}
+		testContainer := client.TestData.Containers[0]
+		_, _, err := restartStaleContainer(testLogger(), context.Background(), testContainer, client, params)
+		gomega.Expect(err).To(gomega.HaveOccurred())
+		gomega.Expect(client.TestData.CreateContainerCount.Load()).To(gomega.Equal(int32(1)))
+	})
 })
 
 var _ = ginkgo.Describe("handleUpdateResult", func() {

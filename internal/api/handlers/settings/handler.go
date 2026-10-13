@@ -10,6 +10,8 @@ import (
 	"github.com/rs/zerolog"
 
 	runtime "github.com/nicholas-fedor/watchtower/internal/settings"
+	"github.com/nicholas-fedor/watchtower/pkg/notifications"
+	"github.com/nicholas-fedor/watchtower/pkg/types"
 )
 
 // Store is the runtime settings store the handler reads and changes.
@@ -50,12 +52,20 @@ type Response struct {
 	APIVersion string `json:"api_version"`
 }
 
+// TestNotificationRequest is the optional request body for testing notification delivery.
+type TestNotificationRequest struct {
+	URL     string `json:"url"`
+	Title   string `json:"title"`
+	Message string `json:"message"`
+}
+
 // Handler serves the /v1/settings endpoint.
 type Handler struct {
 	log *zerolog.Logger
 
 	store          Store
 	scheduleActive bool
+	notifier       types.Notifier
 	Path           string
 }
 
@@ -66,6 +76,11 @@ type Handler struct {
 //   - store: Runtime settings store.
 //   - scheduleActive: Whether scheduled updates run in this process.
 func New(log *zerolog.Logger, store Store, scheduleActive bool) *Handler {
+	return NewWithNotifier(log, store, scheduleActive, nil)
+}
+
+// NewWithNotifier creates a settings handler with notifier support.
+func NewWithNotifier(log *zerolog.Logger, store Store, scheduleActive bool, notifier types.Notifier) *Handler {
 	if log == nil {
 		nop := zerolog.Nop()
 		log = &nop
@@ -75,6 +90,7 @@ func New(log *zerolog.Logger, store Store, scheduleActive bool) *Handler {
 		log:            log,
 		store:          store,
 		scheduleActive: scheduleActive,
+		notifier:       notifier,
 		Path:           "/v1/settings",
 	}
 }
@@ -175,6 +191,16 @@ func (h *Handler) send(c fiber.Ctx) error {
 				Default: defaults.Schedule,
 				Changed: changed[runtime.KeySchedule],
 			},
+			runtime.KeyAutoRollback: {
+				Value:   values.AutoRollback,
+				Default: defaults.AutoRollback,
+				Changed: changed[runtime.KeyAutoRollback],
+			},
+			runtime.KeyContainerOverrides: {
+				Value:   values.ContainerOverrides,
+				Default: defaults.ContainerOverrides,
+				Changed: changed[runtime.KeyContainerOverrides],
+			},
 		},
 		Saved:          h.store.Persistent(),
 		ScheduleActive: h.scheduleActive,
@@ -186,6 +212,59 @@ func (h *Handler) send(c fiber.Ctx) error {
 	}
 
 	return nil
+}
+
+// TestNotification sends a test notification through configured or requested URLs.
+//
+//	@Summary		Test notification delivery
+//	@Description	Sends an immediate test alert to verify notification services. Optionally accepts a custom URL, title, or message.
+//	@Tags			settings
+//	@Accept			json
+//	@Produce		json
+//	@Param			body	body		TestNotificationRequest	false	"Notification parameters"
+//	@Success		200		{object}	map[string]interface{}	"Notification test result"
+//	@Failure		400		{object}	map[string]interface{}	"No URLs configured or invalid request"
+//	@Failure		502		{object}	map[string]interface{}	"Delivery failed"
+//	@Security		BearerAuth
+//	@Router			/v1/settings/test-notification [post]
+func (h *Handler) TestNotification(c fiber.Ctx) error {
+	var req TestNotificationRequest
+	if len(c.Body()) > 0 {
+		_ = json.Unmarshal(c.Body(), &req)
+	}
+
+	urls := []string{}
+	if req.URL != "" {
+		urls = []string{req.URL}
+	} else if h.notifier != nil {
+		urls = h.notifier.GetURLs()
+	}
+
+	if len(urls) == 0 {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+			"success": false,
+			"error":   "No notification URLs are configured. Set WATCHTOWER_NOTIFICATION_URL or supply a url in the request.",
+		})
+	}
+
+	errs := notifications.SendTestNotification(h.log, urls, req.Title, req.Message)
+	if len(errs) > 0 {
+		errStrs := make([]string, len(errs))
+		for i, err := range errs {
+			errStrs[i] = err.Error()
+		}
+
+		return c.Status(fiber.StatusBadGateway).JSON(fiber.Map{
+			"success": false,
+			"error":   "Failed to deliver notification",
+			"details": errStrs,
+		})
+	}
+
+	return c.Status(fiber.StatusOK).JSON(fiber.Map{
+		"success": true,
+		"message": "Notification sent successfully",
+	})
 }
 
 // sendError writes a 400 response with a JSON error body.

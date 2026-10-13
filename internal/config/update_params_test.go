@@ -51,6 +51,8 @@ func TestUpdateParamsAssignsEveryField(t *testing.T) {
 			PullFailureDelay:    5 * time.Second,
 			DiskSpaceMaxBytes:   40_000_000_000,
 			DiskSpaceWarnBytes:  32_000_000_000,
+			AutoRollback:        true,
+			ContainerOverrides:  map[string]string{"demo": "pinned"},
 		},
 		Lifecycle: lifecycle.Lifecycle{
 			Enabled: true,
@@ -125,6 +127,8 @@ func TestUpdateParamsAssignsEveryField(t *testing.T) {
 	assert.Equal(t, ".", params.GitContext)
 	assert.True(t, params.GitComposeStash)
 	assert.Equal(t, "/compose/demo", params.ComposeProjects["demo"])
+	assert.True(t, params.AutoRollback)
+	assert.Equal(t, map[string]string{"demo": "pinned"}, params.ContainerOverrides)
 
 	// Exhaustiveness: every exported field must be non-zero in this fixture
 	// (Filter is a func; RunOnce and SkipSelfUpdate come from overrides).

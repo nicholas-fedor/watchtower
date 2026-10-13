@@ -146,7 +146,8 @@ body:
       "no_pull": false,
       "enabled": true,
       "stale": false,
-      "scope": "prod"
+      "scope": "prod",
+      "policy": "auto"
     },
     {
       "name": "web-2",
@@ -159,7 +160,8 @@ body:
       "no_pull": false,
       "enabled": true,
       "stale": false,
-      "scope": "prod"
+      "scope": "prod",
+      "policy": "auto"
     },
     {
       "name": "worker",
@@ -172,7 +174,8 @@ body:
       "no_pull": false,
       "enabled": true,
       "stale": false,
-      "scope": ""
+      "scope": "",
+      "policy": "auto"
     },
     {
       "name": "cache",
@@ -185,7 +188,8 @@ body:
       "no_pull": true,
       "enabled": true,
       "stale": false,
-      "scope": ""
+      "scope": "",
+      "policy": "auto"
     },
     {
       "name": "watchtower",
@@ -198,7 +202,8 @@ body:
       "no_pull": false,
       "enabled": true,
       "stale": false,
-      "scope": ""
+      "scope": "",
+      "policy": "auto"
     }
   ],
   "count": 5,
@@ -223,7 +228,8 @@ body:
       "no_pull": true,
       "enabled": true,
       "stale": false,
-      "scope": ""
+      "scope": "",
+      "policy": "auto"
     }
   ],
   "count": 1,

@@ -13,6 +13,11 @@ import (
 	mockTypes "github.com/nicholas-fedor/watchtower/pkg/types/mocks"
 )
 
+func setupMockContainer(container *mockTypes.MockContainer) {
+	container.EXPECT().GetLabel(mock.Anything).Return("", false).Maybe()
+	container.EXPECT().ContainerInfo().Return(nil).Maybe()
+}
+
 func TestGetContainerDetails(t *testing.T) {
 	tests := []struct {
 		name    string
@@ -29,6 +34,7 @@ func TestGetContainerDetails(t *testing.T) {
 				t.Helper()
 				c := mockContainer.NewMockClient(t)
 				container := mockTypes.NewMockContainer(t)
+				setupMockContainer(container)
 				container.EXPECT().Name().Return("test-container")
 				container.EXPECT().ImageName().Return("nginx:latest")
 				container.EXPECT().ImageID().Return(types.ImageID("sha256:abc123"))
@@ -58,6 +64,7 @@ func TestGetContainerDetails(t *testing.T) {
 				t.Helper()
 				c := mockContainer.NewMockClient(t)
 				container := mockTypes.NewMockContainer(t)
+				setupMockContainer(container)
 				container.EXPECT().Name().Return("unlabeled-container")
 				container.EXPECT().ImageName().Return("nginx:latest")
 				container.EXPECT().ImageID().Return(types.ImageID("sha256:abc123"))
@@ -87,6 +94,7 @@ func TestGetContainerDetails(t *testing.T) {
 				t.Helper()
 				c := mockContainer.NewMockClient(t)
 				container := mockTypes.NewMockContainer(t)
+				setupMockContainer(container)
 				container.EXPECT().Name().Return("unlabeled-container")
 				container.EXPECT().ImageName().Return("nginx:latest")
 				container.EXPECT().ImageID().Return(types.ImageID("sha256:abc123"))
@@ -116,6 +124,7 @@ func TestGetContainerDetails(t *testing.T) {
 				t.Helper()
 				c := mockContainer.NewMockClient(t)
 				container := mockTypes.NewMockContainer(t)
+				setupMockContainer(container)
 				container.EXPECT().Name().Return("disabled-container")
 				container.EXPECT().ImageName().Return("nginx:latest")
 				container.EXPECT().ImageID().Return(types.ImageID("sha256:abc123"))

@@ -335,6 +335,17 @@ func (c *Container) GetLabel(label string) (string, bool) {
 // Returns:
 //   - bool: True if monitor-only, false otherwise.
 func (c *Container) IsMonitorOnly(params types.UpdateParams) bool {
+	if params.ContainerOverrides != nil {
+		if policy, ok := params.ContainerOverrides[c.Name()]; ok {
+			switch policy {
+			case "monitor_only", "pinned":
+				return true
+			case "update":
+				return false
+			}
+		}
+	}
+
 	return c.getContainerOrGlobalBool(params.MonitorOnly, monitorOnlyLabel, params.LabelPrecedence)
 }
 

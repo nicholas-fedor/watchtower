@@ -39,4 +39,7 @@ type UpdateParams struct {
 	GitContext          string              `json:"git_context"`            // Default subdirectory of a Git URL context used as the Docker build context.
 	GitComposeStash     bool                `json:"git_compose_stash"`      // Save and restore local Compose project files around checkout.
 	ComposeProjects     map[string]string   `json:"compose_projects"`       // Compose project name to directory inside Watchtower.
+	AutoRollback        bool                `json:"auto_rollback"`          // Roll back to previous image on start or healthcheck failure.
+	ContainerOverrides  map[string]string   `json:"container_overrides,omitempty"` // Per-container policy overrides (auto, monitor_only, pinned, update).
 }
+

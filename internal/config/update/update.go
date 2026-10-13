@@ -56,4 +56,8 @@ type Update struct {
 	// DiskSpaceWarnBytes is the parsed Docker image-usage warning threshold in bytes.
 	// Zero means the warning threshold is unset.
 	DiskSpaceWarnBytes int64
+	// AutoRollback rolls back container to previous image if new image fails to start or healthcheck.
+	AutoRollback bool
+	// ContainerOverrides maps container names to policies ("auto", "monitor_only", "pinned", "update").
+	ContainerOverrides map[string]string
 }
