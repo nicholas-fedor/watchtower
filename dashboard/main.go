@@ -9,6 +9,7 @@ import (
  "log"
  "net/http"
  "net/url"
+ "regexp"
  "os"
  "strings"
  "time"
@@ -46,7 +47,13 @@ func main() {
    if origin:=r.Header.Get("Origin");origin!="" {u,e:=url.Parse(origin);if e!=nil || !strings.EqualFold(u.Host,r.Host) {http.Error(w,"cross-origin request denied",403);return}}
   }
   if route=="update"&&!allowUpdates {http.Error(w,"manual updates disabled by administrator",403);return}
-  target:=base.ResolveReference(&url.URL{Path:path,RawQuery:r.URL.RawQuery})
+  query:=r.URL.Query()
+  if route=="update" {
+    name:=query.Get("name")
+    if name=="" || len(query["name"])!=1 {http.Error(w,"container name required",400);return}
+    query=url.Values{"container":{"^"+regexp.QuoteMeta(name)+"$"}}
+  }
+  target:=base.ResolveReference(&url.URL{Path:path,RawQuery:query.Encode()})
   req,err:=http.NewRequestWithContext(r.Context(),method,target.String(),nil);if err!=nil{http.Error(w,"request failed",500);return}
   req.Header.Set("Authorization","Bearer "+token)
   res,err:=client.Do(req);if err!=nil {log.Printf("upstream request failed: %v",err);http.Error(w,"Watchtower API unavailable",502);return}
