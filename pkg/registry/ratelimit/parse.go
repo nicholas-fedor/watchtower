@@ -44,9 +44,15 @@ func ParseRetryAfterHeader(header string) (time.Duration, bool) {
 	// A value beyond the int64 range fails with ErrRange and returns the nearest
 	// int64, which the checks below handle like any other value. ParseInt reports
 	// ErrRange before it reads the rest of the value, so the value must also be
-	// all digits after its sign.
+	// all digits after one optional sign.
 	seconds, parseErr := strconv.ParseInt(header, 10, 64)
-	overflowed := errors.Is(parseErr, strconv.ErrRange) && strings.TrimLeft(header, "+-0123456789") == ""
+
+	digits := header
+	if digits[0] == '+' || digits[0] == '-' {
+		digits = digits[1:]
+	}
+
+	overflowed := errors.Is(parseErr, strconv.ErrRange) && strings.Trim(digits, "0123456789") == ""
 
 	if parseErr == nil || overflowed {
 		if seconds <= 0 {

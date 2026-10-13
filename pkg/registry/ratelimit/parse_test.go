@@ -93,6 +93,11 @@ func TestParseRetryAfterHeader(t *testing.T) {
 			wantOK: false,
 		},
 		{
+			name:   "seconds beyond int64 with a trailing sign are not a wait",
+			header: "99999999999999999999+1",
+			wantOK: false,
+		},
+		{
 			name:   "seconds beyond int64 with inner whitespace are not a wait",
 			header: "99999999999999999999 1",
 			wantOK: false,
