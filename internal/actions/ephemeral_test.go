@@ -289,6 +289,8 @@ func TestEphemeralSelfUpdate_StoppingContainerLog(t *testing.T) {
 
 				if record["message"] == actions.StoppingContainerMessage {
 					assert.Equal(t, "watchtower", record["container"])
+					assert.Equal(t, source.ID().ShortID(), record["id"])
+					assert.Equal(t, source.ImageID().ShortID(), record["old_image_id"])
 
 					level, ok := record["level"].(string)
 					require.True(t, ok)
