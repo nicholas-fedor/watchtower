@@ -57,7 +57,7 @@ Ginkgo suites reject `-count>1`; that is why they are listed in `REPEAT_EXCLUDE`
 
 ### Container image
 
-`.github/workflows/publish-image.yaml` builds `build/docker/Dockerfile.self-local` and pushes it to `ghcr.io/rpeters1430/watchtower` on every push that touches Go code or the Dockerfile. `main` publishes `latest` and `sha-<short>`; any other branch publishes a tag named after the branch. It builds `linux/amd64` only. The upstream release workflows (`release-*.yaml`, `build.yaml`) target Docker Hub and upstream's secrets and are not what publishes this fork's image.
+`.github/workflows/publish-image.yaml` builds `build/docker/Dockerfile.self-local` and pushes it to `ghcr.io/rpeters1430/watchtower` on every push that touches Go code or the Dockerfile. It builds multi-arch (`linux/amd64` and `linux/arm64`) and always publishes the `latest` tag alongside branch and commit sha tags for convenient server/NAS deployment. The upstream release workflows (`release-*.yaml`, `build.yaml`) target Docker Hub and upstream's secrets and are not what publishes this fork's image.
 
 ## Generated and guarded artifacts
 

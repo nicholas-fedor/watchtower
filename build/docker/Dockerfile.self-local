@@ -1,7 +1,10 @@
 ARG BASE_IMAGE=golang:alpine3.24@sha256:f92b6ef800e499660581efdabdf25d9d817a9d124eaf900924f0504e7e27e12d
 
 # Builder Stage
-FROM ${BASE_IMAGE} AS builder
+FROM --platform=$BUILDPLATFORM ${BASE_IMAGE} AS builder
+
+ARG TARGETOS
+ARG TARGETARCH
 
 RUN apk add --no-cache ca-certificates tzdata git alpine-sdk
 
@@ -14,7 +17,7 @@ RUN go mod download
 
 COPY . /watchtower
 
-RUN CGO_ENABLED=0 GOOS=linux go build \
+RUN CGO_ENABLED=0 GOOS=${TARGETOS:-linux} GOARCH=${TARGETARCH:-amd64} go build \
     -trimpath \
     -a \
     -ldflags "\

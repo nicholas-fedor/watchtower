@@ -1,6 +1,16 @@
 services:
   watchtower:
-    image: nickfedor/watchtower:latest
+    image: ghcr.io/rpeters1430/watchtower:latest
+    container_name: watchtower
     restart: unless-stopped
+    pull_policy: always
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
+    environment:
+      - TZ=America/New_York
+      - WATCHTOWER_CLEANUP=true
+      - WATCHTOWER_LABEL_ENABLE=true
+      - WATCHTOWER_SCHEDULE=0 0 4 * * *
+    labels:
+      - com.centurylinklabs.watchtower.enable=false
+

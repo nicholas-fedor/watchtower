@@ -43,6 +43,11 @@ jobs:
           fetch-depth: 0
           persist-credentials: false
 
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@99012661954931238ded8c8b007157a8430204e1 # v4.4.0
+        with:
+          platforms: linux/amd64,linux/arm64
+
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
 
@@ -63,22 +68,22 @@ jobs:
         run: |
           image="ghcr.io/${REPOSITORY,,}"
           short_sha="${COMMIT_SHA::7}"
+          branch_tag="$(printf '%s' "${REF_NAME}" | tr '[:upper:]' '[:lower:]' | tr -c 'a-z0-9._-' '-')"
 
-          # The default branch publishes "latest". Other branches publish a
-          # tag named after the branch so they can be tried without replacing it.
+          # Always publish "latest" for convenient NAS/server deployment,
+          # alongside branch-specific and commit-sha tags.
+          tags=(--tag "${image}:latest" --tag "${image}:${branch_tag}")
           if [ "${REF_NAME}" = "${DEFAULT_BRANCH}" ]; then
-            tags=(--tag "${image}:latest" --tag "${image}:sha-${short_sha}")
-          else
-            branch_tag="$(printf '%s' "${REF_NAME}" | tr '[:upper:]' '[:lower:]' | tr -c 'a-z0-9._-' '-')"
-            tags=(--tag "${image}:${branch_tag}")
+            tags+=(--tag "${image}:sha-${short_sha}")
           fi
 
           docker buildx build \
             --file build/docker/Dockerfile.self-local \
-            --platform linux/amd64 \
+            --platform linux/amd64,linux/arm64 \
             --label "org.opencontainers.image.source=${SERVER_URL}/${REPOSITORY}" \
             --label "org.opencontainers.image.url=${SERVER_URL}/${REPOSITORY}" \
             --label "org.opencontainers.image.revision=${COMMIT_SHA}" \
             "${tags[@]}" \
             --push \
             .
+
