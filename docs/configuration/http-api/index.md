@@ -99,6 +99,7 @@ Valid names (case-insensitive):
 | [`config`](../../http-api/endpoints/config/index.md)         | `GET /v1/config`                                                                                      | [`http-api-token`](#http_api_token)               |
 | [`events`](../../http-api/endpoints/events/index.md)         | `GET /v1/events`                                                                                      | [`http-api-events-token`](#http_api_events_token) |
 | [`swagger`](../../http-api/endpoints/swagger/index.md)       | `GET /swagger/*`                                                                                      | None                                              |
+| [`ui`](../../http-api/endpoints/ui/index.md)                 | `GET /ui/`, `/ui/assets/*`, `/ui/session`                                                             | [`http-api-token`](#http_api_token) to sign in    |
 
 !!! Warning
     - Protected `/v1/*` endpoints require configuring a [`http-api-token`](#http_api_token).

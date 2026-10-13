@@ -131,4 +131,8 @@ func Register(
 	if opts.EnableSwaggerAPI {
 		registerSwaggerRoute(app, opts)
 	}
+
+	if opts.EnableUIAPI {
+		registerUIRoute(app, opts)
+	}
 }

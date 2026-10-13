@@ -55,6 +55,7 @@ func newFullSurfaceApp(t *testing.T) *fiber.App {
 		EnableImagesAPI:     true,
 		EnableConfigAPI:     true,
 		EnableEventsAPI:     true,
+		EnableUIAPI:         true,
 		UnblockHTTPAPI:      true,
 		NoStartupMessage:    true,
 		Client:              client,
@@ -105,8 +106,10 @@ func TestHTTPAPIRouteTable(t *testing.T) {
 			access = "requires-auth"
 		case status >= http.StatusOK && status < http.StatusMultipleChoices:
 			access = "public"
+		case status == http.StatusFound:
+			access = "redirect"
 		default:
-			t.Errorf("%s %s: unauthenticated request returned %d; expected 401 or a 2xx status",
+			t.Errorf("%s %s: unauthenticated request returned %d; expected 401, 302, or a 2xx status",
 				route.Method, route.Path, status)
 
 			continue

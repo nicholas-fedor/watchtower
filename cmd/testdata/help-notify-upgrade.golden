@@ -41,7 +41,7 @@ Global Flags:
       --http-api-check-timeout duration             Maximum duration for the /v1/check API endpoint (e.g. 30s, 2m, 5m). Default: 5m
       --http-api-containers                         Runs Watchtower with the read-only containers API enabled, exposing each watched container's current image digest (DEPRECATED: Use the http-api-endpoints configuration option instead.)
       --http-api-cors-origins strings               Comma-separated list of allowed CORS origins for cross-origin requests (e.g. https://app.example.com). If unset, CORS is disabled and only same-origin requests are allowed.
-      --http-api-endpoints strings                  HTTP API endpoints to enable (health, update, metrics, containers, check, history, images, config, events, swagger), or "all". Comma- or space-separated. Empty disables the HTTP API.
+      --http-api-endpoints strings                  HTTP API endpoints to enable (health, update, metrics, containers, check, history, images, config, events, swagger, ui), or "all". Comma- or space-separated. Empty disables the HTTP API.
       --http-api-events-token string                Sets an authentication token for the events SSE endpoint. Required when the events endpoint is enabled. Supports Bearer header and query parameter access_token (for browser EventSource)
       --http-api-host string                        Host to bind the HTTP API to (default: empty, binds to all interfaces; allows empty or valid IP address)
       --http-api-metrics                            Runs Watchtower with the Prometheus metrics API enabled (DEPRECATED: Use the http-api-endpoints configuration option instead.)

@@ -93,6 +93,8 @@ type Options struct {
 	EnableConfigAPI bool
 	// EnableEventsAPI enables the events SSE endpoint.
 	EnableEventsAPI bool
+	// EnableUIAPI enables the built-in web UI under /ui/.
+	EnableUIAPI bool
 	// UnblockHTTPAPI keeps scheduled polls running when the HTTP API is enabled.
 	UnblockHTTPAPI bool
 	// NoStartupMessage suppresses startup logs and notifications.

@@ -67,32 +67,15 @@ func GetAPIAddr(host, port string) string {
 // Returns:
 //   - error: Non-nil if route registration or server startup fails.
 func SetupAndStartAPI(ctx context.Context, opts config.Options) error {
-	if !opts.EnableUpdateAPI &&
-		!opts.EnableMetricsAPI &&
-		!opts.EnableContainersAPI &&
-		!opts.EnableCheckAPI &&
-		!opts.EnableSwaggerAPI &&
-		!opts.EnableHealthAPI &&
-		!opts.EnableHistoryAPI &&
-		!opts.EnableImagesAPI &&
-		!opts.EnableConfigAPI &&
-		!opts.EnableEventsAPI {
+	if !anyEndpointEnabled(opts) {
 		return nil
 	}
 
 	address := GetAPIAddr(opts.Host, opts.Port)
 
-	shouldRequireToken := opts.EnableUpdateAPI ||
-		opts.EnableMetricsAPI ||
-		opts.EnableContainersAPI ||
-		opts.EnableCheckAPI ||
-		opts.EnableHistoryAPI ||
-		opts.EnableImagesAPI ||
-		opts.EnableConfigAPI
-
 	shouldRequireEventsToken := opts.EnableEventsAPI
 
-	if shouldRequireToken && opts.Token == "" {
+	if requiresToken(opts) && opts.Token == "" {
 		return config.ErrMissingAPIToken
 	}
 
@@ -143,6 +126,27 @@ func SetupAndStartAPI(ctx context.Context, opts config.Options) error {
 		block,
 		opts.OnUnexpectedServerStop,
 	)
+}
+
+// anyEndpointEnabled reports whether at least one HTTP API endpoint is enabled.
+func anyEndpointEnabled(opts config.Options) bool {
+	return requiresToken(opts) ||
+		opts.EnableSwaggerAPI ||
+		opts.EnableHealthAPI ||
+		opts.EnableEventsAPI
+}
+
+// requiresToken reports whether an enabled endpoint is protected by the API
+// token. The web UI is included because signing in checks that token.
+func requiresToken(opts config.Options) bool {
+	return opts.EnableUpdateAPI ||
+		opts.EnableMetricsAPI ||
+		opts.EnableContainersAPI ||
+		opts.EnableCheckAPI ||
+		opts.EnableHistoryAPI ||
+		opts.EnableImagesAPI ||
+		opts.EnableConfigAPI ||
+		opts.EnableUIAPI
 }
 
 // isCleanServerStop reports whether err is an expected result of a graceful

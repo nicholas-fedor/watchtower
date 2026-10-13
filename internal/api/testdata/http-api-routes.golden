@@ -1,7 +1,13 @@
+DELETE  /ui/session              public
+GET     /                        redirect
 GET     /livez                   public
 GET     /readyz                  public
 GET     /startupz                public
 GET     /swagger/*               public
+GET     /ui                      redirect
+GET     /ui/                     public
+GET     /ui/assets/*             public
+GET     /ui/session              public
 GET     /v1/config               requires-auth
 GET     /v1/containers           requires-auth
 GET     /v1/containers/details   requires-auth
@@ -10,5 +16,6 @@ GET     /v1/history              requires-auth
 GET     /v1/images               requires-auth
 GET     /v1/metrics              requires-auth
 GET     /v1/status               requires-auth
+POST    /ui/session              requires-auth
 POST    /v1/check                requires-auth
 POST    /v1/update               requires-auth
