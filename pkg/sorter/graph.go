@@ -155,7 +155,15 @@ func newDependencyGraph(
 	for _, c := range slices.Concat(members, watchtowers) {
 		self, isMember := identifiers[c]
 
-		for _, normalizedLink := range c.Links(useComposeDependsOn) {
+		links := c.Links(useComposeDependsOn)
+		if len(links) > 0 {
+			log.Debug().
+				Str("container", c.Name()).
+				Strs("links", links).
+				Msg("Found container dependencies")
+		}
+
+		for _, normalizedLink := range links {
 			keys, watchtower, _ := resolver.resolve(c, normalizedLink)
 			if watchtower != nil && watchtower != c {
 				graph.addDependent(watchtower, c)
@@ -175,7 +183,7 @@ func newDependencyGraph(
 			}
 		}
 
-		graph.unresolved = append(graph.unresolved, resolver.unresolvedDependsOn(log, c, self)...)
+		graph.unresolved = append(graph.unresolved, resolver.unresolvedDependsOn(c, self)...)
 	}
 
 	return graph, nil
