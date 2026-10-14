@@ -916,3 +916,18 @@ func TestNewDependencyGraph_LogsDependenciesOnce(t *testing.T) {
 
 	assert.Equal(t, map[string][]string{"app": {"db", "cache"}}, links)
 }
+
+// TestSortByDependencies_DoesNotLogDependencies verifies that sorting a set of
+// containers on its own does not log their dependencies again, since the
+// scan's dependency graph already logs them.
+func TestSortByDependencies_DoesNotLogDependencies(t *testing.T) {
+	t.Parallel()
+
+	var out bytes.Buffer
+
+	log := zerolog.New(&out).Level(zerolog.DebugLevel)
+	containers := []types.Container{dependsOn("app", "db"), dependsOn("db", "")}
+
+	require.NoError(t, SortByDependencies(&log, containers, false))
+	assert.NotContains(t, out.String(), "Found container dependencies")
+}
