@@ -408,7 +408,6 @@ watchtower --debug
 Look for log messages like:
 
 - "Found container dependencies", which lists each container's dependencies once per scan
-- "Completed dependency sort with Watchtower containers last"
 
 ### Debugging Commands
 
