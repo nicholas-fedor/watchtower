@@ -3498,12 +3498,19 @@ It automatically detects container dependencies through various mechanisms and u
 <p>This ensures that dependent services are stopped before their dependencies are updated, and dependencies are available when dependents restart.</p>
 <h2 id="how_it_works">How It Works<a class="headerlink" href="#how_it_works" title="Permanent link">&para;</a></h2>
 <h3 id="dependency_detection">Dependency Detection<a class="headerlink" href="#dependency_detection" title="Permanent link">&para;</a></h3>
-<p>Watchtower detects container dependencies through multiple mechanisms, checked in the following priority order:</p>
+<p>Watchtower detects container dependencies from labels and from each container's Docker configuration.</p>
+<p>Labels are checked in the following priority order, and only the first one present is used:</p>
 <ol>
 <li><strong>Watchtower depends-on label</strong> (<code>com.centurylinklabs.watchtower.depends-on</code>)</li>
 <li><strong>Docker Compose depends_on label</strong> (<code>com.docker.compose.depends_on</code>)</li>
-<li><strong>Docker links and network mode</strong> (legacy Docker linking and <code>network_mode: service:container</code>)</li>
 </ol>
+<p>An empty Watchtower depends-on label counts as absent, so the Docker Compose depends_on label is used instead when Compose detection is enabled.</p>
+<p>The Docker configuration always counts as well, whichever label is present:</p>
+<ul>
+<li><strong>Docker links and network mode</strong> (legacy Docker linking, <code>network_mode: service:&lt;service-name&gt;</code>, and <code>network_mode: container:&lt;name-or-id&gt;</code>)</li>
+<li><strong>Volumes from another container</strong> (<code>volumes_from</code> in Compose, <code>--volumes-from</code> in the Docker CLI)</li>
+</ul>
+<p>A container named by both a label and the Docker configuration is a single dependency.</p>
 <h4 id="watchtower_depends-on_label">Watchtower Depends-On Label<a class="headerlink" href="#watchtower_depends-on_label" title="Permanent link">&para;</a></h4>
 <p>The <code>com.centurylinklabs.watchtower.depends-on</code> label allows explicit declaration of dependencies:</p>
 <div class="highlight"><span class="filename">Explicit dependency declaration</span><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="k">LABEL</span><span class="w"> </span>com.centurylinklabs.watchtower.depends-on<span class="o">=</span><span class="s2">"database,redis"</span>
@@ -3544,13 +3551,15 @@ Use the container name or a project-qualified service name, such as <code>myproj
 <p>Watchtower does not support using this to control implicit restarts, because this is an explicit, opt-in feature that defaults to <code>false</code> when omitted, such as when using the short-form syntax.</p>
 </div>
 <h4 id="docker_links_and_network_mode">Docker Links and Network Mode<a class="headerlink" href="#docker_links_and_network_mode" title="Permanent link">&para;</a></h4>
-<p>For legacy Docker setups using links or <code>network_mode: service:container</code>, Watchtower treats these as implicit dependencies:</p>
+<p>For legacy Docker links, and for containers that use another container's network (<code>network_mode: service:&lt;service-name&gt;</code> or <code>network_mode: container:&lt;name-or-id&gt;</code> in Compose, <code>--network container:&lt;name-or-id&gt;</code> in the Docker CLI), Watchtower treats these as implicit dependencies:</p>
 <div class="highlight"><span class="filename">Legacy Docker linking</span><pre><span></span><code><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a><span class="c"># Container with explicit link</span>
 <a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a>docker<span class="w"> </span>run<span class="w"> </span>--link<span class="w"> </span>database:db<span class="w"> </span>nginx
 <a id="__codelineno-3-3" name="__codelineno-3-3" href="#__codelineno-3-3"></a>
-<a id="__codelineno-3-4" name="__codelineno-3-4" href="#__codelineno-3-4"></a><span class="c"># Container using service network mode</span>
-<a id="__codelineno-3-5" name="__codelineno-3-5" href="#__codelineno-3-5"></a>docker<span class="w"> </span>run<span class="w"> </span>--network<span class="w"> </span>container:database<span class="w"> </span>nginx
+<a id="__codelineno-3-4" name="__codelineno-3-4" href="#__codelineno-3-4"></a><span class="c"># Container using another container's network</span>
+<a id="__codelineno-3-5" name="__codelineno-3-5" href="#__codelineno-3-5"></a>docker<span class="w"> </span>run<span class="w"> </span>--network<span class="w"> </span>container:&lt;name-or-id&gt;<span class="w"> </span>nginx
 </code></pre></div>
+<p>These count as dependencies even when a depends-on or Compose <code>depends_on</code> label names other containers, because the container cannot run without the container whose network it uses.
+The same applies to <code>volumes_from</code> (<code>--volumes-from</code>): the container is always ordered after the container whose volumes it uses.</p>
 <h3 id="topological_sorting">Topological Sorting<a class="headerlink" href="#topological_sorting" title="Permanent link">&para;</a></h3>
 <p>Watchtower uses topological sorting to determine the correct update order. This algorithm:</p>
 <ul>
@@ -3599,7 +3608,8 @@ Containers are excluded from monitoring by the <a href="../../configuration/cont
 <ul>
 <li>Docker Compose <code>depends_on</code> declarations</li>
 <li>Existing Docker links</li>
-<li><code>network_mode: service:container</code> configurations</li>
+<li><code>network_mode: service:&lt;service-name&gt;</code> and <code>network_mode: container:&lt;name-or-id&gt;</code> configurations</li>
+<li><code>volumes_from</code> configurations</li>
 </ul>
 <div class="admonition note">
 <p class="admonition-title">Docker Compose Considerations</p>
@@ -3635,7 +3645,8 @@ Containers are excluded from monitoring by the <a href="../../configuration/cont
 <ul>
 <li>Watchtower's explicit <code>com.centurylinklabs.watchtower.depends-on</code> label</li>
 <li>Legacy Docker links</li>
-<li>Network mode dependencies (<code>network_mode: service:container</code>)</li>
+<li>Network mode dependencies (<code>network_mode: service:&lt;service-name&gt;</code> and <code>network_mode: container:&lt;name-or-id&gt;</code>)</li>
+<li>Volumes from another container (<code>volumes_from</code>)</li>
 </ul>
 <h3 id="explicit_dependencies">Explicit Dependencies<a class="headerlink" href="#explicit_dependencies" title="Permanent link">&para;</a></h3>
 <p>For cases where automatic detection is insufficient, use the Watchtower depends-on label:</p>
@@ -3766,7 +3777,7 @@ Containers are excluded from monitoring by the <a href="../../configuration/cont
 </div>
 </div>
 <h3 id="network_mode_dependencies">Network Mode Dependencies<a class="headerlink" href="#network_mode_dependencies" title="Permanent link">&para;</a></h3>
-<p>Containers using <code>network_mode: service:container</code>:</p>
+<p>Containers using <code>network_mode: service:&lt;service-name&gt;</code>:</p>
 <div class="tabbed-set tabbed-alternate" data-tabs="6:2"><input checked="checked" id="__tabbed_6_1" name="__tabbed_6" type="radio" /><input id="__tabbed_6_2" name="__tabbed_6" type="radio" /><div class="tabbed-labels"><label for="__tabbed_6_1">Docker Compose</label><label for="__tabbed_6_2">Watchtower Behavior</label></div>
 <div class="tabbed-content">
 <div class="tabbed-block">
@@ -3817,9 +3828,7 @@ A recreated container or a restart of Watchtower reports the problem again.</p>
 </code></pre></div>
 <p>Look for log messages like:</p>
 <ul>
-<li>"Retrieved links from watchtower depends-on label"</li>
-<li>"Retrieved links from compose depends-on label"</li>
-<li>"Completed dependency sort"</li>
+<li>"Found container dependencies", which lists each container's dependencies once per scan</li>
 </ul>
 <h3 id="debugging_commands">Debugging Commands<a class="headerlink" href="#debugging_commands" title="Permanent link">&para;</a></h3>
 <p>Enable verbose logging to inspect dependency detection:</p>
@@ -3854,7 +3863,7 @@ A recreated container or a restart of Watchtower reports the problem again.</p>
     <span class="md-icon" title="Last update">
       <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M21 13.1c-.1 0-.3.1-.4.2l-1 1 2.1 2.1 1-1c.2-.2.2-.6 0-.8l-1.3-1.3c-.1-.1-.2-.2-.4-.2m-1.9 1.8-6.1 6V23h2.1l6.1-6.1zM12.5 7v5.2l4 2.4-1 1L11 13V7zM11 21.9c-5.1-.5-9-4.8-9-9.9C2 6.5 6.5 2 12 2c5.3 0 9.6 4.1 10 9.3-.3-.1-.6-.2-1-.2s-.7.1-1 .2C19.6 7.2 16.2 4 12 4c-4.4 0-8 3.6-8 8 0 4.1 3.1 7.5 7.1 7.9l-.1.2z"/></svg>
     </span>
-    <span class="git-revision-date-localized-plugin git-revision-date-localized-plugin-timeago" title="October 13, 2026 18:25:50 UTC"><span class="timeago" datetime="2026-10-13T18:25:50+00:00" locale="en"></span></span><span class="git-revision-date-localized-plugin git-revision-date-localized-plugin-iso_date" title="October 13, 2026 18:25:50 UTC">2026-10-13</span>
+    <span class="git-revision-date-localized-plugin git-revision-date-localized-plugin-timeago" title="October 15, 2026 20:05:23 UTC"><span class="timeago" datetime="2026-10-15T20:05:23+00:00" locale="en"></span></span><span class="git-revision-date-localized-plugin git-revision-date-localized-plugin-iso_date" title="October 15, 2026 20:05:23 UTC">2026-10-15</span>
   </span>
 
     
