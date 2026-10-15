@@ -356,10 +356,11 @@ func listen(ctx context.Context, address, tlsCertPath, tlsKeyPath string) (net.L
 
 // listenNetwork returns the network to bind address on.
 //
-// An IPv6 host binds on "tcp", which covers both address families, so the
-// unspecified address "::" accepts IPv4 and IPv6 clients. Any other host,
-// including an unset one or an IPv4-mapped address, binds on "tcp4" and
-// accepts IPv4 clients only, as Fiber does by default.
+// An IPv6 host binds on "tcp", so the unspecified address "::" accepts IPv6
+// clients, and also IPv4 clients on systems that support IPv4-mapped IPv6
+// addresses, such as Linux, macOS and Windows. Any other host, including an
+// unset one or an IPv4-mapped address, binds on "tcp4" and accepts IPv4
+// clients only, as Fiber does by default.
 //
 // Parameters:
 //   - address: Address to listen on.

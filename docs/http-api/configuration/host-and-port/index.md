@@ -12,7 +12,7 @@ This behavior can be changed by configuring the [HTTP API Host](../../../configu
 Use the [HTTP API Host](../../../configuration/http-api/index.md#http_api_host) configuration option to bind to a specific host interface.
 
 - This must be a valid IP address (IPv4 or IPv6).
-- An IPv6 address binds that address. The unspecified IPv6 address `::` listens on all interfaces over both IPv4 and IPv6.
+- An IPv6 address binds that address. The unspecified IPv6 address `::` listens on all IPv6 interfaces, and also on all IPv4 interfaces on systems that support IPv4-mapped IPv6 addresses, such as Linux, macOS and Windows.
 - If not specified, Watchtower listens on all IPv4 interfaces on the port specified by [HTTP API Port](../../../configuration/http-api/index.md#http_api_port).
 
 !!! Warning "Default bind risk"
@@ -46,7 +46,7 @@ If Watchtower is being run via a Docker container, then the `host:container` por
   --http-api-host=::1 --http-api-port=8080
   ```
 
-- Listen on all IPv4 and IPv6 interfaces on port 8080:
+- Listen on all IPv6 interfaces, and on all IPv4 interfaces where supported, on port 8080:
 
   ```bash
   --http-api-host=:: --http-api-port=8080

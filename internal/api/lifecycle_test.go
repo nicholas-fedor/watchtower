@@ -755,8 +755,9 @@ func TestGetAPIAddr_IPv6(t *testing.T) {
 
 // TestListen_AddressFamilies verifies the address families listen binds for
 // each kind of host. An IPv6 host binds that address, and the unspecified IPv6
-// address accepts IPv4 and IPv6 clients. An unset or IPv4 host stays on IPv4,
-// so the default bind does not start accepting IPv6 clients.
+// address accepts IPv6 clients, and IPv4 clients where the system supports
+// dual-stack listeners. An unset or IPv4 host stays on IPv4, so the default
+// bind does not start accepting IPv6 clients.
 func TestListen_AddressFamilies(t *testing.T) {
 	tests := []struct {
 		name    string
@@ -767,6 +768,9 @@ func TestListen_AddressFamilies(t *testing.T) {
 		wantHost string
 		// reachable lists the loopback hosts that must accept a connection.
 		reachable []string
+		// dualStack also requires IPv4 clients to connect where the system
+		// supports dual-stack listeners.
+		dualStack bool
 		// unreachable lists the loopback hosts that must refuse a connection.
 		unreachable []string
 	}{
@@ -808,7 +812,8 @@ func TestListen_AddressFamilies(t *testing.T) {
 			address:   "[::]:0",
 			needsIPv6: true,
 			wantHost:  "::",
-			reachable: []string{"127.0.0.1", "::1"},
+			reachable: []string{"::1"},
+			dualStack: true,
 		},
 	}
 
@@ -827,9 +832,14 @@ func TestListen_AddressFamilies(t *testing.T) {
 			require.NoError(t, err)
 			assert.Equal(t, tt.wantHost, host)
 
+			reachable := tt.reachable
+			if tt.dualStack && supportsDualStack(t) {
+				reachable = append(reachable, "127.0.0.1")
+			}
+
 			var dialer net.Dialer
 
-			for _, client := range tt.reachable {
+			for _, client := range reachable {
 				conn, err := dialer.DialContext(t.Context(), "tcp", net.JoinHostPort(client, port))
 				if assert.NoError(t, err, "a client on %s could not connect", client) {
 					_ = conn.Close()
@@ -897,6 +907,34 @@ func requireIPv6Loopback(t *testing.T) {
 	}
 
 	_ = ln.Close()
+}
+
+// supportsDualStack reports whether a TCP listener on the unspecified IPv6
+// address also accepts IPv4 clients on this system. OpenBSD and DragonFly BSD,
+// for example, keep such a listener IPv6 only.
+func supportsDualStack(t *testing.T) bool {
+	t.Helper()
+
+	ln, err := listenTCP(t, "[::]:0")
+	if err != nil {
+		return false
+	}
+
+	defer ln.Close()
+
+	_, port, err := net.SplitHostPort(ln.Addr().String())
+	require.NoError(t, err)
+
+	var dialer net.Dialer
+
+	conn, err := dialer.DialContext(t.Context(), "tcp4", net.JoinHostPort("127.0.0.1", port))
+	if err != nil {
+		return false
+	}
+
+	_ = conn.Close()
+
+	return true
 }
 
 // listenTCP binds addr for a test, over the address family of its host.
