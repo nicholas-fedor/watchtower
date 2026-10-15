@@ -2891,18 +2891,19 @@
 
 <h1 id="configuration">Configuration<a class="headerlink" href="#configuration" title="Permanent link">&para;</a></h1>
 <h2 id="overview">Overview<a class="headerlink" href="#overview" title="Permanent link">&para;</a></h2>
-<p>Watchtower defaults to listening on all interfaces on port 8080.
+<p>Watchtower defaults to listening on all IPv4 interfaces on port 8080.
 This behavior can be changed by configuring the <a href="../../../configuration/http-api/#http_api_host">HTTP API Host</a> and <a href="../../../configuration/http-api/#http_api_port">HTTP API Port</a> configuration options</p>
 <h2 id="configuration_options">Configuration Options<a class="headerlink" href="#configuration_options" title="Permanent link">&para;</a></h2>
 <h3 id="http_api_host">HTTP API Host<a class="headerlink" href="#http_api_host" title="Permanent link">&para;</a></h3>
 <p>Use the <a href="../../../configuration/http-api/#http_api_host">HTTP API Host</a> configuration option to bind to a specific host interface.</p>
 <ul>
 <li>This must be a valid IP address (IPv4 or IPv6).</li>
-<li>If not specified, Watchtower listens on all interfaces on the port specified by <a href="../../../configuration/http-api/#http_api_port">HTTP API Port</a>.</li>
+<li>An IPv6 address binds that address. The unspecified IPv6 address <code>::</code> listens on all IPv6 interfaces, and also on all IPv4 interfaces on systems that support IPv4-mapped IPv6 addresses, such as Linux, macOS and Windows.</li>
+<li>If not specified, Watchtower listens on all IPv4 interfaces on the port specified by <a href="../../../configuration/http-api/#http_api_port">HTTP API Port</a>.</li>
 </ul>
 <div class="admonition warning">
 <p class="admonition-title">Default bind risk</p>
-<p>When the host is unset, the HTTP API listens on all network interfaces (<code>0.0.0.0</code>).
+<p>When the host is unset, the HTTP API listens on all IPv4 network interfaces (<code>0.0.0.0</code>).
 This exposes the API to every reachable network.
 Set <a href="../../../configuration/http-api/#http_api_host"><code>http-api-host</code></a> to a loopback or firewall-restricted interface unless the API is protected by an outer network policy (reverse proxy, VPN, etc.).</p>
 </div>
@@ -2911,7 +2912,7 @@ Set <a href="../../../configuration/http-api/#http_api_host"><code>http-api-host
 <p>If Watchtower is being run via a Docker container, then the <code>host:container</code> port mapping can be updated accordingly (e.g. <code>8080:8080</code> -&gt; <code>9000:8080</code>).</p>
 <h2 id="examples">Examples<a class="headerlink" href="#examples" title="Permanent link">&para;</a></h2>
 <ul>
-<li>Listen on all interfaces on port 8080 (default):</li>
+<li>Listen on all IPv4 interfaces on port 8080 (default):</li>
 </ul>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>--http-api-port<span class="o">=</span><span class="m">8080</span>
 </code></pre></div>
@@ -2921,9 +2922,19 @@ Set <a href="../../../configuration/http-api/#http_api_host"><code>http-api-host
 <div class="highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a>--http-api-host<span class="o">=</span><span class="m">127</span>.0.0.1<span class="w"> </span>--http-api-port<span class="o">=</span><span class="m">8080</span>
 </code></pre></div>
 <ul>
+<li>Listen on the IPv6 localhost only on port 8080:</li>
+</ul>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a>--http-api-host<span class="o">=</span>::1<span class="w"> </span>--http-api-port<span class="o">=</span><span class="m">8080</span>
+</code></pre></div>
+<ul>
+<li>Listen on all IPv6 interfaces, and on all IPv4 interfaces where supported, on port 8080:</li>
+</ul>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a>--http-api-host<span class="o">=</span>::<span class="w"> </span>--http-api-port<span class="o">=</span><span class="m">8080</span>
+</code></pre></div>
+<ul>
 <li>Listen on a specific IP and port:</li>
 </ul>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a>--http-api-host<span class="o">=</span><span class="m">192</span>.168.1.100<span class="w"> </span>--http-api-port<span class="o">=</span><span class="m">9090</span>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a>--http-api-host<span class="o">=</span><span class="m">192</span>.168.1.100<span class="w"> </span>--http-api-port<span class="o">=</span><span class="m">9090</span>
 </code></pre></div>
 
 
@@ -2947,7 +2958,7 @@ Set <a href="../../../configuration/http-api/#http_api_host"><code>http-api-host
     <span class="md-icon" title="Last update">
       <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M21 13.1c-.1 0-.3.1-.4.2l-1 1 2.1 2.1 1-1c.2-.2.2-.6 0-.8l-1.3-1.3c-.1-.1-.2-.2-.4-.2m-1.9 1.8-6.1 6V23h2.1l6.1-6.1zM12.5 7v5.2l4 2.4-1 1L11 13V7zM11 21.9c-5.1-.5-9-4.8-9-9.9C2 6.5 6.5 2 12 2c5.3 0 9.6 4.1 10 9.3-.3-.1-.6-.2-1-.2s-.7.1-1 .2C19.6 7.2 16.2 4 12 4c-4.4 0-8 3.6-8 8 0 4.1 3.1 7.5 7.1 7.9l-.1.2z"/></svg>
     </span>
-    <span class="git-revision-date-localized-plugin git-revision-date-localized-plugin-timeago" title="July 14, 2026 14:36:11 UTC"><span class="timeago" datetime="2026-07-14T14:36:11+00:00" locale="en"></span></span><span class="git-revision-date-localized-plugin git-revision-date-localized-plugin-iso_date" title="July 14, 2026 14:36:11 UTC">2026-07-14</span>
+    <span class="git-revision-date-localized-plugin git-revision-date-localized-plugin-timeago" title="October 15, 2026 23:28:33 UTC"><span class="timeago" datetime="2026-10-15T23:28:33+00:00" locale="en"></span></span><span class="git-revision-date-localized-plugin git-revision-date-localized-plugin-iso_date" title="October 15, 2026 23:28:33 UTC">2026-10-15</span>
   </span>
 
     
