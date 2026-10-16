@@ -200,6 +200,14 @@ func RunUpgradesOnSchedule(ctx context.Context, deps ScheduleDeps) error {
 
 		defer lock.Unlock()
 
+		// Shutdown can begin just after the lock is taken. A run started then
+		// would only be canceled and reported as a failed scan.
+		if ctx.Err() != nil {
+			log.Debug().Err(ctx.Err()).Msg("Update skipped: shutting down")
+
+			return
+		}
+
 		params := deps.BaseParams
 		params.RunOnce = false
 		params.SkipSelfUpdate = skipWatchtowerSelfUpdate || deps.BaseParams.SkipSelfUpdate
