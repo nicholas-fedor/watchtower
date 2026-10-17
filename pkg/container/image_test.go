@@ -398,8 +398,9 @@ var _ = ginkgo.Describe("the client", func() {
 
 	ginkgo.When("a host is in rate-limit cooldown", func() {
 		ginkgo.It("does not hold the pull slot during the wait", func() {
+			// An anonymous GHCR pull waits on the anonymous limiter key.
 			limiter := ratelimit.New()
-			limiter.Observe("ghcr.io", &ratelimit.Error{RetryAfter: 800 * time.Millisecond})
+			limiter.Observe(ratelimit.Scope("ghcr.io", false), &ratelimit.Error{RetryAfter: 800 * time.Millisecond})
 
 			mockServer.AllowUnhandledRequests = true
 			mockServer.AppendHandlers(
@@ -438,6 +439,8 @@ var _ = ginkgo.Describe("the client", func() {
 			gomega.Expect(err).NotTo(gomega.HaveOccurred())
 			gomega.Expect(time.Since(started)).To(gomega.BeNumerically("<", 300*time.Millisecond))
 
+			// The ghcr.io pull is still waiting out the cooldown.
+			gomega.Consistently(blocked, 300*time.Millisecond).ShouldNot(gomega.Receive())
 			gomega.Eventually(blocked, 3*time.Second).Should(gomega.Receive(gomega.BeNil()))
 		})
 		ginkgo.It("does not start a queued same-host pull during Retry-After cooldown", func() {
