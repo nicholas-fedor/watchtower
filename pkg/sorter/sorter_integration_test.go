@@ -7,7 +7,6 @@ import (
 
 	dockerContainer "github.com/moby/moby/api/types/container"
 
-	"github.com/nicholas-fedor/watchtower/internal/testutil/logtest"
 	"github.com/nicholas-fedor/watchtower/pkg/sorter"
 	"github.com/nicholas-fedor/watchtower/pkg/types"
 	mockTypes "github.com/nicholas-fedor/watchtower/pkg/types/mocks"
@@ -349,5 +348,5 @@ var _ = ginkgo.Describe("Container Sorting", func() {
 })
 
 func testLog() *zerolog.Logger {
-	return logtest.Nop()
+	return new(zerolog.Nop())
 }

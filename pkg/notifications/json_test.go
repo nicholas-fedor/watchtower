@@ -6,11 +6,11 @@ import (
 
 	"github.com/onsi/ginkgo/v2"
 	"github.com/onsi/gomega"
+	"github.com/rs/zerolog"
 
 	dockerContainer "github.com/moby/moby/api/types/container"
 	dockerImage "github.com/moby/moby/api/types/image"
 
-	"github.com/nicholas-fedor/watchtower/internal/testutil/logtest"
 	"github.com/nicholas-fedor/watchtower/pkg/container"
 	"github.com/nicholas-fedor/watchtower/pkg/session"
 	"github.com/nicholas-fedor/watchtower/pkg/types"
@@ -22,7 +22,7 @@ import (
 // Returns:
 //   - *session.ContainerStatus: Status in the updated state.
 func updatedAppStatus() *session.ContainerStatus {
-	log := logtest.Nop()
+	log := new(zerolog.Nop())
 	app := container.NewContainer(nil,
 		&dockerContainer.InspectResponse{
 			ID:     strings.Repeat("a", 64),

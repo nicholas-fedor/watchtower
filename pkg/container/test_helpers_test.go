@@ -18,12 +18,11 @@ import (
 	dockerNetwork "github.com/moby/moby/api/types/network"
 
 	"github.com/nicholas-fedor/watchtower/internal/logging"
-	"github.com/nicholas-fedor/watchtower/internal/testutil/logtest"
 )
 
 // testLog returns a discarded zerolog logger for tests that do not assert on output.
 func testLog() *zerolog.Logger {
-	return logtest.Nop()
+	return new(zerolog.Nop())
 }
 
 // randomSHA256 returns 64 random hex characters, the form of a SHA-256 digest

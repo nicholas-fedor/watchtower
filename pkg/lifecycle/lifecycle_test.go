@@ -1,10 +1,12 @@
 package lifecycle
 
 import (
+	"bytes"
 	"context"
 	"errors"
 	"testing"
 
+	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
@@ -12,11 +14,22 @@ import (
 	dockerContainer "github.com/moby/moby/api/types/container"
 
 	"github.com/nicholas-fedor/watchtower/internal/logging"
-	"github.com/nicholas-fedor/watchtower/internal/testutil/logtest"
 	"github.com/nicholas-fedor/watchtower/pkg/container"
 	mockContainer "github.com/nicholas-fedor/watchtower/pkg/container/mocks"
 	"github.com/nicholas-fedor/watchtower/pkg/types"
 )
+
+// newDebugLog returns a debug-level logger that writes logfmt lines to the
+// returned buffer, so tests can assert on what was logged.
+//
+// Returns:
+//   - *zerolog.Logger: Logger writing to the returned buffer.
+//   - *bytes.Buffer: Buffer holding the logged lines.
+func newDebugLog() (*zerolog.Logger, *bytes.Buffer) {
+	buf := &bytes.Buffer{}
+
+	return logging.New(logging.LogfmtWriter(buf), logging.DebugLevel), buf
+}
 
 // mockedContainer creates a *container.Container for testing.
 func mockedContainer(options ...func(*container.Container)) *container.Container {
@@ -92,7 +105,7 @@ func TestExecutePreChecks(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			log, logBuf := logtest.New(logging.DebugLevel)
+			log, logBuf := newDebugLog()
 			client := mockContainer.NewMockClient(t)
 			tt.setupClient(client)
 			ExecutePreChecks(log, context.Background(), client, types.UpdateParams{
@@ -142,7 +155,7 @@ func TestExecutePostChecks(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			log, logBuf := logtest.New(logging.DebugLevel)
+			log, logBuf := newDebugLog()
 			client := mockContainer.NewMockClient(t)
 			tt.setupClient(client)
 			ExecutePostChecks(log, context.Background(), client, types.UpdateParams{
@@ -160,7 +173,7 @@ func TestExecutePostChecks(t *testing.T) {
 }
 
 func TestExecutePreChecks_UsesListedContainers(t *testing.T) {
-	log, logBuf := logtest.New(logging.DebugLevel)
+	log, logBuf := newDebugLog()
 	client := mockContainer.NewMockClient(t)
 	listed := []types.Container{
 		mockedContainer(withLabels(map[string]string{
@@ -181,7 +194,7 @@ func TestExecutePreChecks_UsesListedContainers(t *testing.T) {
 }
 
 func TestExecutePostChecks_UsesListedContainers(t *testing.T) {
-	log, logBuf := logtest.New(logging.DebugLevel)
+	log, logBuf := newDebugLog()
 	client := mockContainer.NewMockClient(t)
 	listed := []types.Container{
 		mockedContainer(withLabels(map[string]string{
@@ -202,7 +215,7 @@ func TestExecutePostChecks_UsesListedContainers(t *testing.T) {
 }
 
 func TestExecutePreChecks_EmptyListedDoesNotRelist(t *testing.T) {
-	log, _ := logtest.New(logging.DebugLevel)
+	log, _ := newDebugLog()
 	client := mockContainer.NewMockClient(t)
 	listed := []types.Container{}
 
@@ -216,7 +229,7 @@ func TestExecutePreChecks_EmptyListedDoesNotRelist(t *testing.T) {
 }
 
 func TestExecutePostChecks_EmptyListedDoesNotRelist(t *testing.T) {
-	log, _ := logtest.New(logging.DebugLevel)
+	log, _ := newDebugLog()
 	client := mockContainer.NewMockClient(t)
 	listed := []types.Container{}
 
@@ -280,7 +293,7 @@ func TestExecutePreCheckCommand(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			log, logBuf := logtest.New(logging.DebugLevel)
+			log, logBuf := newDebugLog()
 
 			client := mockContainer.NewMockClient(t)
 			if tt.setupClient != nil {
@@ -347,7 +360,7 @@ func TestExecutePostCheckCommand(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			log, logBuf := logtest.New(logging.DebugLevel)
+			log, logBuf := newDebugLog()
 
 			client := mockContainer.NewMockClient(t)
 			if tt.setupClient != nil {
@@ -464,7 +477,7 @@ func runPreUpdateTest(t *testing.T, tt struct {
 ) {
 	t.Helper()
 
-	log, logBuf := logtest.New(logging.DebugLevel)
+	log, logBuf := newDebugLog()
 
 	client := mockContainer.NewMockClient(t)
 	if tt.setupClient != nil {
@@ -560,7 +573,7 @@ func TestExecutePostUpdateCommand(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			log, logBuf := logtest.New(logging.DebugLevel)
+			log, logBuf := newDebugLog()
 			client := mockContainer.NewMockClient(t)
 			tt.setupClient(client)
 			ExecutePostUpdateCommand(log, context.Background(), client, tt.containerID, 0, 0)
