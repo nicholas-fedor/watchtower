@@ -397,7 +397,7 @@ var _ = ginkgo.Describe("the client", func() {
 	})
 
 	ginkgo.When("a host is in rate-limit cooldown", func() {
-		ginkgo.It("does not hold the pull slot during the wait", func() {
+		ginkgo.It("lets pulls to other registry hosts proceed during the wait", func() {
 			// An anonymous GHCR pull waits on the anonymous limiter key.
 			limiter := ratelimit.New()
 			limiter.Observe(ratelimit.Scope("ghcr.io", false), &ratelimit.Error{RetryAfter: 800 * time.Millisecond})
