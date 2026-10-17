@@ -96,7 +96,7 @@ var _ = ginkgo.Describe("the client", func() {
 				}, nil)
 
 				log, logbuf := captureLog(zerolog.DebugLevel)
-				i := newImageClient(mockClient, log, registryConfig.Registry{})
+				i := newImageClient(mockClient, log, registryConfig.Registry{}, ratelimit.New())
 
 				skip, err := i.shouldSkipPull(context.Background(), noImageInfo, "", strategy)
 				gomega.Expect(err).To(gomega.Succeed())
@@ -113,7 +113,7 @@ var _ = ginkgo.Describe("the client", func() {
 	ginkgo.When("pulling the latest image", func() {
 		ginkgo.When("the image consist of a pinned hash", func() {
 			ginkgo.It("should gracefully fail with a useful message for bare sha256", func() {
-				i := newImageClient(mockClient, testLog(), registryConfig.Registry{})
+				i := newImageClient(mockClient, testLog(), registryConfig.Registry{}, ratelimit.New())
 				pinnedContainer := MockContainer(
 					WithImageName(
 						"sha256:fa5269854a5e615e51a72b17ad3fd1e01268f278a6684c8ed3c5f0cdce3f230b",
@@ -124,7 +124,7 @@ var _ = ginkgo.Describe("the client", func() {
 					To(gomega.MatchError(`image is pinned with sha256, skipping pull`))
 			})
 			ginkgo.It("should gracefully fail for repository-qualified digest", func() {
-				i := newImageClient(mockClient, testLog(), registryConfig.Registry{})
+				i := newImageClient(mockClient, testLog(), registryConfig.Registry{}, ratelimit.New())
 				pinnedContainer := MockContainer(
 					WithImageName(
 						"nginx@sha256:fa5269854a5e615e51a72b17ad3fd1e01268f278a6684c8ed3c5f0cdce3f230b",
@@ -146,7 +146,7 @@ var _ = ginkgo.Describe("the client", func() {
 				),
 			)
 
-			i := newImageClient(mockClient, testLog(), registryConfig.Registry{})
+			i := newImageClient(mockClient, testLog(), registryConfig.Registry{}, ratelimit.New())
 			pullContainer := MockContainer(
 				WithImageName("private-registry.io/app:latest"),
 				WithRepoDigests([]string{"private-registry.io/app@sha256:abc"}),
@@ -174,7 +174,7 @@ var _ = ginkgo.Describe("the client", func() {
 				),
 			)
 
-			i := newImageClient(mockClient, testLog(), registryConfig.Registry{})
+			i := newImageClient(mockClient, testLog(), registryConfig.Registry{}, ratelimit.New())
 			pullContainer := MockContainer(
 				WithImageName("registry.example.com/nonexistent:latest"),
 				WithRepoDigests([]string{"registry.example.com/nonexistent@sha256:def"}),
@@ -201,7 +201,7 @@ var _ = ginkgo.Describe("the client", func() {
 				),
 			)
 
-			i := newImageClient(mockClient, testLog(), registryConfig.Registry{})
+			i := newImageClient(mockClient, testLog(), registryConfig.Registry{}, ratelimit.New())
 			pullContainer := MockContainer(
 				WithImageName("registry.example.com/app:latest"),
 				WithRepoDigests([]string{"registry.example.com/app@sha256:ghi"}),
@@ -230,7 +230,7 @@ var _ = ginkgo.Describe("the client", func() {
 				),
 			)
 
-			i := newImageClient(mockClient, testLog(), registryConfig.Registry{})
+			i := newImageClient(mockClient, testLog(), registryConfig.Registry{}, ratelimit.New())
 			err := i.performImagePull(
 				context.Background(),
 				"registry.example.com/app:latest",
@@ -239,9 +239,6 @@ var _ = ginkgo.Describe("the client", func() {
 			gomega.Expect(err).NotTo(gomega.HaveOccurred())
 		})
 		ginkgo.It("returns a rate-limit error when the stream reports toomanyrequests", func() {
-			ratelimit.ResetForTest()
-			defer ratelimit.ResetForTest()
-
 			mockServer.AllowUnhandledRequests = true
 			mockServer.AppendHandlers(
 				ghttp.CombineHandlers(
@@ -254,7 +251,7 @@ var _ = ginkgo.Describe("the client", func() {
 				),
 			)
 
-			i := newImageClient(mockClient, testLog(), registryConfig.Registry{})
+			i := newImageClient(mockClient, testLog(), registryConfig.Registry{}, ratelimit.New())
 			err := i.performImagePull(
 				context.Background(),
 				"ghcr.io/linuxserver/nginx:latest",
@@ -264,9 +261,6 @@ var _ = ginkgo.Describe("the client", func() {
 			gomega.Expect(ratelimit.Is(err)).To(gomega.BeTrue())
 		})
 		ginkgo.It("returns a rate-limit error when ImagePull fails with toomanyrequests", func() {
-			ratelimit.ResetForTest()
-			defer ratelimit.ResetForTest()
-
 			mockServer.AllowUnhandledRequests = true
 			mockServer.AppendHandlers(
 				ghttp.CombineHandlers(
@@ -278,7 +272,7 @@ var _ = ginkgo.Describe("the client", func() {
 			ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 			defer cancel()
 
-			i := newImageClient(mockClient, testLog(), registryConfig.Registry{})
+			i := newImageClient(mockClient, testLog(), registryConfig.Registry{}, ratelimit.New())
 			err := i.performImagePull(
 				ctx,
 				"ghcr.io/linuxserver/nginx:latest",
@@ -288,9 +282,6 @@ var _ = ginkgo.Describe("the client", func() {
 			gomega.Expect(ratelimit.Is(err)).To(gomega.BeTrue())
 		})
 		ginkgo.It("backs off and succeeds when the daemon reports a sub-millisecond retry-after", func() {
-			ratelimit.ResetForTest()
-			defer ratelimit.ResetForTest()
-
 			var pulls atomic.Int32
 
 			mockServer.AllowUnhandledRequests = true
@@ -309,7 +300,7 @@ var _ = ginkgo.Describe("the client", func() {
 			ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 			defer cancel()
 
-			i := newImageClient(mockClient, testLog(), registryConfig.Registry{})
+			i := newImageClient(mockClient, testLog(), registryConfig.Registry{}, ratelimit.New())
 
 			started := time.Now()
 			err := i.performImagePull(
@@ -340,9 +331,6 @@ var _ = ginkgo.Describe("the client", func() {
 			gomega.Expect(pullSlotFor("ghcr.io")).To(gomega.BeIdenticalTo(ghcr))
 		})
 		ginkgo.It("uses distinct slots for anonymous and authenticated GHCR pulls", func() {
-			ratelimit.ResetForTest()
-			defer ratelimit.ResetForTest()
-
 			anon := ratelimit.Scope("ghcr.io", false)
 			authed := ratelimit.Scope("ghcr.io", true)
 
@@ -377,7 +365,7 @@ var _ = ginkgo.Describe("the client", func() {
 				),
 			)
 
-			i := newImageClient(mockClient, testLog(), registryConfig.Registry{})
+			i := newImageClient(mockClient, testLog(), registryConfig.Registry{}, ratelimit.New())
 
 			ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 			defer cancel()
@@ -410,10 +398,8 @@ var _ = ginkgo.Describe("the client", func() {
 
 	ginkgo.When("a host is in rate-limit cooldown", func() {
 		ginkgo.It("does not hold the pull slot during the wait", func() {
-			ratelimit.ResetForTest()
-			defer ratelimit.ResetForTest()
-
-			ratelimit.Observe("ghcr.io", &ratelimit.Error{RetryAfter: 800 * time.Millisecond})
+			limiter := ratelimit.New()
+			limiter.Observe("ghcr.io", &ratelimit.Error{RetryAfter: 800 * time.Millisecond})
 
 			mockServer.AllowUnhandledRequests = true
 			mockServer.AppendHandlers(
@@ -427,7 +413,7 @@ var _ = ginkgo.Describe("the client", func() {
 				),
 			)
 
-			i := newImageClient(mockClient, testLog(), registryConfig.Registry{})
+			i := newImageClient(mockClient, testLog(), registryConfig.Registry{}, limiter)
 
 			ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 			defer cancel()
@@ -455,9 +441,6 @@ var _ = ginkgo.Describe("the client", func() {
 			gomega.Eventually(blocked, 3*time.Second).Should(gomega.Receive(gomega.BeNil()))
 		})
 		ginkgo.It("does not start a queued same-host pull during Retry-After cooldown", func() {
-			ratelimit.ResetForTest()
-			defer ratelimit.ResetForTest()
-
 			firstEntered := make(chan struct{})
 			releaseFirst := make(chan struct{})
 			secondStarted := make(chan time.Time, 1)
@@ -484,7 +467,7 @@ var _ = ginkgo.Describe("the client", func() {
 				_, _ = w.Write([]byte(`{"status":"Download complete"}` + "\n"))
 			})
 
-			i := newImageClient(mockClient, testLog(), registryConfig.Registry{})
+			i := newImageClient(mockClient, testLog(), registryConfig.Registry{}, ratelimit.New())
 
 			ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 			defer cancel()
@@ -536,7 +519,7 @@ var _ = ginkgo.Describe("the client", func() {
 				),
 			)
 
-			i := newImageClient(mockClient, testLog(), registryConfig.Registry{})
+			i := newImageClient(mockClient, testLog(), registryConfig.Registry{}, ratelimit.New())
 			pullContainer := MockContainer(
 				WithImageName("private-registry.io/app:latest"),
 				WithRepoDigests([]string{"private-registry.io/app@sha256:abc"}),
@@ -562,7 +545,7 @@ var _ = ginkgo.Describe("the client", func() {
 				),
 			)
 
-			i := newImageClient(mockClient, testLog(), registryConfig.Registry{})
+			i := newImageClient(mockClient, testLog(), registryConfig.Registry{}, ratelimit.New())
 			pullContainer := MockContainer(
 				WithImageName("private-registry.io/app:latest"),
 				WithRepoDigests([]string{"private-registry.io/app@sha256:abc"}),
@@ -1052,7 +1035,7 @@ var _ = ginkgo.Describe("the client", func() {
 					),
 				)
 
-				c := &client{log: testLog(), api: mockClient}
+				c := &client{log: testLog(), api: mockClient, RateLimiter: ratelimit.New()}
 
 				log, logbuf := captureLog(zerolog.DebugLevel)
 				c.log = log
@@ -1356,9 +1339,10 @@ var _ = ginkgo.Describe("CheckContainerUpdate", func() {
 
 			// The test registry serves plain HTTP.
 			c := &client{
-				log:      testLog(),
-				api:      mockClient,
-				Registry: registryConfig.Registry{TLSSkip: true},
+				log:         testLog(),
+				api:         mockClient,
+				Registry:    registryConfig.Registry{TLSSkip: true},
+				RateLimiter: ratelimit.New(),
 			}
 
 			available, latestID, latestDigest, err := c.CheckContainerUpdate(
@@ -1402,9 +1386,10 @@ var _ = ginkgo.Describe("CheckContainerUpdate", func() {
 
 			// The test registry serves plain HTTP.
 			c := &client{
-				log:      testLog(),
-				api:      mockClient,
-				Registry: registryConfig.Registry{TLSSkip: true},
+				log:         testLog(),
+				api:         mockClient,
+				Registry:    registryConfig.Registry{TLSSkip: true},
+				RateLimiter: ratelimit.New(),
 			}
 
 			available, latestID, latestDigest, err := c.CheckContainerUpdate(
@@ -1497,7 +1482,7 @@ var _ = ginkgo.Describe("ExtractImageDigest", func() {
 var _ = ginkgo.Describe("IsOutsideCooldown (cooldown gating before pull)", func() {
 	ginkgo.When("no cooldown delay is configured", func() {
 		ginkgo.It("returns true (safe to pull) with no registry calls", func() {
-			i := newImageClient(nil, testLog(), registryConfig.Registry{})
+			i := newImageClient(nil, testLog(), registryConfig.Registry{}, ratelimit.New())
 			c := MockContainer(WithImageName("test:latest"))
 
 			outside, err := i.isOutsideCooldown(
@@ -1510,7 +1495,7 @@ var _ = ginkgo.Describe("IsOutsideCooldown (cooldown gating before pull)", func(
 
 	ginkgo.When("container is monitor-only or no-pull", func() {
 		ginkgo.It("returns true (bypasses cooldown check)", func() {
-			i := newImageClient(nil, testLog(), registryConfig.Registry{})
+			i := newImageClient(nil, testLog(), registryConfig.Registry{}, ratelimit.New())
 			c := MockContainer(WithImageName("test:latest"))
 
 			outside, err := i.isOutsideCooldown(
