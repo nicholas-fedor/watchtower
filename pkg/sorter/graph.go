@@ -77,8 +77,8 @@ type UnresolvedLink struct {
 //
 // Returns:
 //   - *DependencyGraph: The graph.
-//   - error: An identifierCollisionError when monitored containers other than
-//     Watchtower containers share an identifier.
+//   - error: An error naming the identifier and containers when monitored
+//     containers other than Watchtower containers share an identifier.
 func NewDependencyGraph(
 	log *zerolog.Logger,
 	containers, unmonitored []types.Container,
@@ -278,8 +278,8 @@ func (g *DependencyGraph) UnresolvedDependsOn() []UnresolvedLink {
 //     Watchtower container must be in the graph.
 //
 // Returns:
-//   - error: A circularReferenceError when the containers depend on each other
-//     in a cycle, or errNotInGraph for a container outside the graph.
+//   - error: An error naming the cycle when the containers depend on each other
+//     in a cycle, or naming the container when one is outside the graph.
 func (g *DependencyGraph) Sort(log *zerolog.Logger, containers []types.Container) error {
 	ordered := make([]types.Container, 0, len(containers))
 	watchtowers := make([]types.Container, 0, 1)
