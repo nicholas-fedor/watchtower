@@ -44,12 +44,12 @@ type DependencyGraph struct {
 	// it: members in the order given, then Watchtower containers.
 	dependents map[types.Container][]types.Container
 	// unresolved lists the depends-on label entries that name no container.
-	unresolved []UnresolvedLink
+	unresolved []unresolvedLink
 }
 
-// UnresolvedLink is a Watchtower depends-on label entry that names no
+// unresolvedLink is a Watchtower depends-on label entry that names no
 // container.
-type UnresolvedLink struct {
+type unresolvedLink struct {
 	// Container is the container whose label holds the entry.
 	Container types.Container
 	// Link is the entry, normalized as the dependency resolution reads it.
@@ -77,7 +77,7 @@ type UnresolvedLink struct {
 //
 // Returns:
 //   - *DependencyGraph: The graph.
-//   - error: An IdentifierCollisionError when monitored containers other than
+//   - error: An identifierCollisionError when monitored containers other than
 //     Watchtower containers share an identifier.
 func NewDependencyGraph(
 	log *zerolog.Logger,
@@ -119,7 +119,7 @@ func NewDependencyGraph(
 //
 // Returns:
 //   - *DependencyGraph: The graph.
-//   - error: An IdentifierCollisionError when members share an identifier.
+//   - error: An identifierCollisionError when members share an identifier.
 func newDependencyGraph(
 	log *zerolog.Logger,
 	members, watchtowers, unmonitored []types.Container,
@@ -260,8 +260,8 @@ func (g *DependencyGraph) Dependents(c types.Container) []types.Container {
 // no container. They are left out of the graph.
 //
 // Returns:
-//   - []UnresolvedLink: The entries, in the order the containers were given.
-func (g *DependencyGraph) UnresolvedDependsOn() []UnresolvedLink {
+//   - []unresolvedLink: The entries, in the order the containers were given.
+func (g *DependencyGraph) UnresolvedDependsOn() []unresolvedLink {
 	return g.unresolved
 }
 
@@ -278,8 +278,8 @@ func (g *DependencyGraph) UnresolvedDependsOn() []UnresolvedLink {
 //     Watchtower container must be in the graph.
 //
 // Returns:
-//   - error: A CircularReferenceError when the containers depend on each other
-//     in a cycle, or ErrNotInGraph for a container outside the graph.
+//   - error: A circularReferenceError when the containers depend on each other
+//     in a cycle, or errNotInGraph for a container outside the graph.
 func (g *DependencyGraph) Sort(log *zerolog.Logger, containers []types.Container) error {
 	ordered := make([]types.Container, 0, len(containers))
 	watchtowers := make([]types.Container, 0, 1)
@@ -320,8 +320,8 @@ func (g *DependencyGraph) Sort(log *zerolog.Logger, containers []types.Container
 //   - map[string]int: Number of dependencies of each identifier.
 //   - map[string][]string: Dependents of each identifier.
 //   - map[types.Container]string: Identifier of each container.
-//   - error: ErrNotInGraph for a container outside the graph, or an
-//     IdentifierCollisionError for a container given twice.
+//   - error: errNotInGraph for a container outside the graph, or an
+//     identifierCollisionError for a container given twice.
 func (g *DependencyGraph) subgraph(containers []types.Container) (
 	map[string]types.Container, map[string]int, map[string][]string, map[types.Container]string, error,
 ) {
@@ -333,11 +333,11 @@ func (g *DependencyGraph) subgraph(containers []types.Container) (
 	for _, c := range containers {
 		identifier, ok := g.identifiers[c]
 		if !ok {
-			return nil, nil, nil, nil, fmt.Errorf("%w: %s", ErrNotInGraph, c.Name())
+			return nil, nil, nil, nil, fmt.Errorf("%w: %s", errNotInGraph, c.Name())
 		}
 
 		if existing, duplicate := containerMap[identifier]; duplicate {
-			return nil, nil, nil, nil, IdentifierCollisionError{
+			return nil, nil, nil, nil, identifierCollisionError{
 				DuplicateIdentifier: identifier,
 				AffectedContainers:  []types.Container{existing, c},
 			}
