@@ -44,12 +44,12 @@ type DependencyGraph struct {
 	// it: members in the order given, then Watchtower containers.
 	dependents map[types.Container][]types.Container
 	// unresolved lists the depends-on label entries that name no container.
-	unresolved []unresolvedLink
+	unresolved []UnresolvedLink
 }
 
-// unresolvedLink is a Watchtower depends-on label entry that names no
+// UnresolvedLink is a Watchtower depends-on label entry that names no
 // container.
-type unresolvedLink struct {
+type UnresolvedLink struct {
 	// Container is the container whose label holds the entry.
 	Container types.Container
 	// Link is the entry, normalized as the dependency resolution reads it.
@@ -260,8 +260,8 @@ func (g *DependencyGraph) Dependents(c types.Container) []types.Container {
 // no container. They are left out of the graph.
 //
 // Returns:
-//   - []unresolvedLink: The entries, in the order the containers were given.
-func (g *DependencyGraph) UnresolvedDependsOn() []unresolvedLink {
+//   - []UnresolvedLink: The entries, in the order the containers were given.
+func (g *DependencyGraph) UnresolvedDependsOn() []UnresolvedLink {
 	return g.unresolved
 }
 

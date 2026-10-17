@@ -143,14 +143,14 @@ func (r *linkResolver) byProject(c types.Container, link string, keys []string) 
 //   - self: The identifier of c in the graph, or empty when c is not a member.
 //
 // Returns:
-//   - []unresolvedLink: The entries that name no container.
-func (r *linkResolver) unresolvedDependsOn(c types.Container, self string) []unresolvedLink {
+//   - []UnresolvedLink: The entries that name no container.
+func (r *linkResolver) unresolvedDependsOn(c types.Container, self string) []UnresolvedLink {
 	concrete, ok := c.(*container.Container)
 	if !ok {
 		return nil
 	}
 
-	var unresolved []unresolvedLink
+	var unresolved []UnresolvedLink
 
 	for _, link := range container.GetLinksFromWatchtowerLabel(concrete) {
 		if link == c.Name() || (self != "" && link == self) {
@@ -158,7 +158,7 @@ func (r *linkResolver) unresolvedDependsOn(c types.Container, self string) []unr
 		}
 
 		if _, _, named := r.resolve(c, link); !named {
-			unresolved = append(unresolved, unresolvedLink{Container: c, Link: link})
+			unresolved = append(unresolved, UnresolvedLink{Container: c, Link: link})
 		}
 	}
 
