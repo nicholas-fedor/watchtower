@@ -16,6 +16,7 @@ import (
 	dockerCliConfig "github.com/docker/cli/cli/config"
 
 	"github.com/nicholas-fedor/watchtower/internal/logging"
+	"github.com/nicholas-fedor/watchtower/internal/testutil/logtest"
 	"github.com/nicholas-fedor/watchtower/pkg/registry/auth"
 )
 
@@ -583,7 +584,7 @@ func TestEncodedAuth_EnvPartiallySetWithUnconfiguredRegistry(t *testing.T) {
 func TestGetPullOptions_TraceLogsOmitCredentials(t *testing.T) {
 	const secretPass = "super-secret-pull-pass"
 
-	log, logBuf := logging.NewTestLogger(logging.TraceLevel)
+	log, logBuf := logtest.New(logging.TraceLevel)
 
 	// Empty Docker config so encodedAuth falls through to environment credentials.
 	tempDir := t.TempDir()
@@ -614,7 +615,7 @@ func TestEncodedAuth_TraceLogsOmitSecrets(t *testing.T) {
 		secretToken = "super-secret-identity-token"
 	)
 
-	log, logBuf := logging.NewTestLogger(logging.TraceLevel)
+	log, logBuf := logtest.New(logging.TraceLevel)
 
 	t.Run("environment credentials", func(t *testing.T) {
 		logBuf.Reset()

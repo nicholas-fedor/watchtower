@@ -12,6 +12,7 @@ import (
 	dockerContainer "github.com/moby/moby/api/types/container"
 
 	"github.com/nicholas-fedor/watchtower/internal/logging"
+	"github.com/nicholas-fedor/watchtower/internal/testutil/logtest"
 	"github.com/nicholas-fedor/watchtower/pkg/container"
 	mockContainer "github.com/nicholas-fedor/watchtower/pkg/container/mocks"
 	"github.com/nicholas-fedor/watchtower/pkg/types"
@@ -91,7 +92,7 @@ func TestExecutePreChecks(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			log, logBuf := logging.NewTestLogger(logging.DebugLevel)
+			log, logBuf := logtest.New(logging.DebugLevel)
 			client := mockContainer.NewMockClient(t)
 			tt.setupClient(client)
 			ExecutePreChecks(log, context.Background(), client, types.UpdateParams{
@@ -141,7 +142,7 @@ func TestExecutePostChecks(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			log, logBuf := logging.NewTestLogger(logging.DebugLevel)
+			log, logBuf := logtest.New(logging.DebugLevel)
 			client := mockContainer.NewMockClient(t)
 			tt.setupClient(client)
 			ExecutePostChecks(log, context.Background(), client, types.UpdateParams{
@@ -159,7 +160,7 @@ func TestExecutePostChecks(t *testing.T) {
 }
 
 func TestExecutePreChecks_UsesListedContainers(t *testing.T) {
-	log, logBuf := logging.NewTestLogger(logging.DebugLevel)
+	log, logBuf := logtest.New(logging.DebugLevel)
 	client := mockContainer.NewMockClient(t)
 	listed := []types.Container{
 		mockedContainer(withLabels(map[string]string{
@@ -180,7 +181,7 @@ func TestExecutePreChecks_UsesListedContainers(t *testing.T) {
 }
 
 func TestExecutePostChecks_UsesListedContainers(t *testing.T) {
-	log, logBuf := logging.NewTestLogger(logging.DebugLevel)
+	log, logBuf := logtest.New(logging.DebugLevel)
 	client := mockContainer.NewMockClient(t)
 	listed := []types.Container{
 		mockedContainer(withLabels(map[string]string{
@@ -201,7 +202,7 @@ func TestExecutePostChecks_UsesListedContainers(t *testing.T) {
 }
 
 func TestExecutePreChecks_EmptyListedDoesNotRelist(t *testing.T) {
-	log, _ := logging.NewTestLogger(logging.DebugLevel)
+	log, _ := logtest.New(logging.DebugLevel)
 	client := mockContainer.NewMockClient(t)
 	listed := []types.Container{}
 
@@ -215,7 +216,7 @@ func TestExecutePreChecks_EmptyListedDoesNotRelist(t *testing.T) {
 }
 
 func TestExecutePostChecks_EmptyListedDoesNotRelist(t *testing.T) {
-	log, _ := logging.NewTestLogger(logging.DebugLevel)
+	log, _ := logtest.New(logging.DebugLevel)
 	client := mockContainer.NewMockClient(t)
 	listed := []types.Container{}
 
@@ -279,7 +280,7 @@ func TestExecutePreCheckCommand(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			log, logBuf := logging.NewTestLogger(logging.DebugLevel)
+			log, logBuf := logtest.New(logging.DebugLevel)
 
 			client := mockContainer.NewMockClient(t)
 			if tt.setupClient != nil {
@@ -346,7 +347,7 @@ func TestExecutePostCheckCommand(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			log, logBuf := logging.NewTestLogger(logging.DebugLevel)
+			log, logBuf := logtest.New(logging.DebugLevel)
 
 			client := mockContainer.NewMockClient(t)
 			if tt.setupClient != nil {
@@ -463,7 +464,7 @@ func runPreUpdateTest(t *testing.T, tt struct {
 ) {
 	t.Helper()
 
-	log, logBuf := logging.NewTestLogger(logging.DebugLevel)
+	log, logBuf := logtest.New(logging.DebugLevel)
 
 	client := mockContainer.NewMockClient(t)
 	if tt.setupClient != nil {
@@ -559,7 +560,7 @@ func TestExecutePostUpdateCommand(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			log, logBuf := logging.NewTestLogger(logging.DebugLevel)
+			log, logBuf := logtest.New(logging.DebugLevel)
 			client := mockContainer.NewMockClient(t)
 			tt.setupClient(client)
 			ExecutePostUpdateCommand(log, context.Background(), client, tt.containerID, 0, 0)

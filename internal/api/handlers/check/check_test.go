@@ -25,7 +25,7 @@ import (
 	dockerContainer "github.com/moby/moby/api/types/container"
 
 	"github.com/nicholas-fedor/watchtower/internal/git"
-	"github.com/nicholas-fedor/watchtower/internal/logging"
+	"github.com/nicholas-fedor/watchtower/internal/testutil/logtest"
 	wtcontainer "github.com/nicholas-fedor/watchtower/pkg/container"
 	gitPkg "github.com/nicholas-fedor/watchtower/pkg/container/git"
 	mockContainer "github.com/nicholas-fedor/watchtower/pkg/container/mocks"
@@ -35,7 +35,7 @@ import (
 )
 
 // testLogger returns a silent logger for the whole test package.
-func testLogger() *zerolog.Logger { return logging.NopLogger() }
+func testLogger() *zerolog.Logger { return logtest.Nop() }
 
 func TestCheckForUpdates(t *testing.T) {
 	tests := []struct {
