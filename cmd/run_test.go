@@ -4,9 +4,12 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"net"
+	"net/http"
 	"os"
 	"os/exec"
 	"strings"
+	"sync"
 	"testing"
 	"testing/synctest"
 	"time"
@@ -379,6 +382,140 @@ func TestRun_Continuous(t *testing.T) {
 
 			assert.Equal(t, tt.want, runCalls(mockClient))
 		})
+	}
+}
+
+// TestRun_WaitsForAPIDrain verifies that continuous mode with the HTTP API in
+// the background does not return until the API has finished a request it was
+// serving when the process was told to stop. The request lists containers, so
+// it does not hold the update lock that the scheduler also waits for.
+func TestRun_WaitsForAPIDrain(t *testing.T) {
+	current := currentWatchtower()
+
+	entered := make(chan struct{})
+	release := make(chan struct{})
+
+	// Release the request even when the test fails early, so the API and run
+	// do not stay blocked after the test ends.
+	releaseRequest := sync.OnceFunc(func() { close(release) })
+	t.Cleanup(releaseRequest)
+
+	mockClient := mockContainer.NewMockClient(t)
+	// The startup cleanup of older instances lists the containers first.
+	mockClient.EXPECT().ListContainers(mock.Anything, withFilter).Return([]types.Container{current}, nil).Once()
+	mockClient.EXPECT().ListContainers(mock.Anything).Return([]types.Container{current}, nil)
+	// The API request then lists them, and stays open until released.
+	mockClient.EXPECT().ListContainers(mock.Anything, withFilter).
+		RunAndReturn(func(context.Context, ...types.Filter) ([]types.Container, error) {
+			close(entered)
+			<-release
+
+			return []types.Container{}, nil
+		}).Once()
+	mockClient.EXPECT().GetVersion().Return("1.47").Maybe()
+
+	setRunState(t, runTestState{client: mockClient, current: current, currentID: current.ID()})
+
+	cancels := make(chan context.CancelFunc, 1)
+	createSignalContext = func(parent context.Context, _ ...os.Signal) (context.Context, context.CancelFunc) {
+		ctx, cancel := context.WithCancel(parent)
+		cancels <- cancel
+
+		return ctx, cancel
+	}
+
+	var listenConfig net.ListenConfig
+
+	ln, err := listenConfig.Listen(t.Context(), "tcp", "127.0.0.1:0")
+	require.NoError(t, err)
+
+	addr := ln.Addr().String()
+	require.NoError(t, ln.Close())
+
+	_, port, err := net.SplitHostPort(addr)
+	require.NoError(t, err)
+
+	cmd := newTestRootCommand(t,
+		"--http-api-endpoints=containers",
+		"--http-api-periodic-polls",
+		"--http-api-token", "test-token",
+		"--http-api-host", "127.0.0.1",
+		"--http-api-port", port,
+	)
+
+	done := make(chan struct{})
+
+	go func() {
+		defer close(done)
+
+		newRunProcess().run(cmd, nil)
+	}()
+
+	var dialer net.Dialer
+
+	require.Eventually(t, func() bool {
+		conn, dialErr := dialer.DialContext(t.Context(), "tcp", addr)
+		if dialErr != nil {
+			return false
+		}
+
+		_ = conn.Close()
+
+		return true
+	}, 5*time.Second, 20*time.Millisecond, "the HTTP API did not start listening")
+
+	req, err := http.NewRequestWithContext(t.Context(), http.MethodGet, "http://"+addr+"/v1/containers", nil)
+	require.NoError(t, err)
+	req.Header.Set("Authorization", "Bearer test-token")
+
+	statuses := make(chan int, 1)
+
+	go func() {
+		resp, doErr := http.DefaultClient.Do(req)
+		if doErr != nil {
+			statuses <- 0
+
+			return
+		}
+
+		_ = resp.Body.Close()
+		statuses <- resp.StatusCode
+	}()
+
+	select {
+	case <-entered:
+	case <-time.After(5 * time.Second):
+		t.Fatal("the API request did not reach the Docker client")
+	}
+
+	// Stop the process the way a signal would. The scheduler returns, and run
+	// then waits for the API to finish the request.
+	select {
+	case cancel := <-cancels:
+		cancel()
+	default:
+		t.Fatal("run did not create the process context")
+	}
+
+	select {
+	case <-done:
+		t.Fatal("run returned while the HTTP API was still serving a request")
+	case <-time.After(300 * time.Millisecond):
+	}
+
+	releaseRequest()
+
+	select {
+	case status := <-statuses:
+		assert.Equal(t, http.StatusOK, status)
+	case <-time.After(5 * time.Second):
+		t.Fatal("the API request did not finish after it was released")
+	}
+
+	select {
+	case <-done:
+	case <-time.After(10 * time.Second):
+		t.Fatal("run did not return after the HTTP API finished its request")
 	}
 }
 
