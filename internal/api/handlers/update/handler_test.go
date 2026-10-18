@@ -305,9 +305,9 @@ func TestHandler_Handle_PanicRecovery(t *testing.T) {
 
 	assert.Equal(t, http.StatusAccepted, resp.StatusCode)
 
-	time.Sleep(50 * time.Millisecond)
-
-	assert.True(t, lock.TryLock(), "lock was not released after panic")
+	// The async update logs the panic and the lock release before the lock is
+	// free, so the test ends only after those logs.
+	require.Eventually(t, lock.TryLock, 2*time.Second, 10*time.Millisecond, "lock was not released after panic")
 }
 
 func TestExtractImages_Unit(t *testing.T) {
