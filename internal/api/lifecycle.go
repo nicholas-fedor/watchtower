@@ -51,9 +51,11 @@ func GetAPIAddr(host, port string) string {
 // returns after the listen socket is bound so scheduled updates can run
 // concurrently.
 //
-// The server shuts down gracefully when ctx is canceled. The returned channel
-// closes once it has stopped and finished the requests it was serving, so a
-// caller can wait for the drain before the process exits.
+// The server shuts down gracefully when ctx is canceled, waiting up to five
+// seconds for the requests it is serving. The returned channel closes once that
+// shutdown attempt has finished, so a caller can wait for it before the process
+// exits. Requests still running when the five seconds expire may remain active
+// after the channel closes.
 //
 // Parameters:
 //   - ctx: Context for server lifecycle management.
@@ -61,8 +63,9 @@ func GetAPIAddr(host, port string) string {
 //     is enabled. Nil yields config.ErrMissingLogger.
 //
 // Returns:
-//   - <-chan struct{}: Closed once the server has stopped and drained. It is
-//     already closed when no endpoint is enabled, and nil when err is non-nil.
+//   - <-chan struct{}: Closed once the server has stopped and its shutdown
+//     attempt has finished. It is already closed when no endpoint is enabled,
+//     and nil when err is non-nil.
 //   - error: Non-nil if route registration or server startup fails.
 func SetupAndStartAPI(ctx context.Context, opts config.Options) (<-chan struct{}, error) {
 	if !opts.EnableUpdateAPI &&
@@ -230,8 +233,9 @@ func handleUnexpectedServerStop(log *zerolog.Logger, err error, addr string, onU
 //   - onUnexpectedStop: Optional callback when the server exits unexpectedly in non-blocking mode.
 //
 // Returns:
-//   - <-chan struct{}: Closed once the server has stopped, its shutdown has
-//     drained, and any unexpected stop has been handled. Nil when err is non-nil.
+//   - <-chan struct{}: Closed once the server has stopped, its shutdown attempt
+//     has finished, and any unexpected stop has been handled. Nil when err is
+//     non-nil.
 //   - error: Non-nil if the server fails to start or exits with an unexpected error while blocking.
 func runServer(
 	ctx context.Context,

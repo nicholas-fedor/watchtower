@@ -1277,7 +1277,13 @@ func TestSetupAndStartAPI_StoppedAfterDrain(t *testing.T) {
 	}
 
 	releaseHandler()
-	assert.Equal(t, http.StatusOK, <-statuses)
+
+	select {
+	case status := <-statuses:
+		assert.Equal(t, http.StatusOK, status)
+	case <-time.After(5 * time.Second):
+		t.Fatal("the update request did not finish after its handler was released")
+	}
 
 	select {
 	case <-stopped:

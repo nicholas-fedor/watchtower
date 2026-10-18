@@ -888,8 +888,8 @@ func (p *process) runMain(cfg types.RunConfig) int {
 		BaseParams:                 sharedBase,
 	})
 
-	// Stop the HTTP API and let it finish the requests it is serving before
-	// the process exits.
+	// Stop the HTTP API and give it its shutdown grace period to finish the
+	// requests it is serving before the process exits.
 	stop()
 	<-apiStopped
 
