@@ -390,6 +390,10 @@ func TestRun_Continuous(t *testing.T) {
 // serving when the process was told to stop. The request lists containers, so
 // it does not hold the update lock that the scheduler also waits for.
 func TestRun_WaitsForAPIDrain(t *testing.T) {
+	// stopTimeout bounds the wait for run to return after its context is
+	// canceled. It covers the HTTP API's shutdown grace period.
+	const stopTimeout = 10 * time.Second
+
 	current := currentWatchtower()
 
 	entered := make(chan struct{})
@@ -416,12 +420,10 @@ func TestRun_WaitsForAPIDrain(t *testing.T) {
 
 	setRunState(t, runTestState{client: mockClient, current: current, currentID: current.ID()})
 
-	cancels := make(chan context.CancelFunc, 1)
-	createSignalContext = func(parent context.Context, _ ...os.Signal) (context.Context, context.CancelFunc) {
-		ctx, cancel := context.WithCancel(parent)
-		cancels <- cancel
-
-		return ctx, cancel
+	// run's process context, which the test cancels the way a signal would.
+	runCtx, cancelRun := context.WithCancel(context.Background())
+	createSignalContext = func(context.Context, ...os.Signal) (context.Context, context.CancelFunc) {
+		return runCtx, cancelRun
 	}
 
 	var listenConfig net.ListenConfig
@@ -450,6 +452,19 @@ func TestRun_WaitsForAPIDrain(t *testing.T) {
 
 		newRunProcess().run(cmd, nil)
 	}()
+
+	// Stop run before setRunState restores the package state it reads, so a
+	// test that fails early does not leave run behind.
+	t.Cleanup(func() {
+		cancelRun()
+		releaseRequest()
+
+		select {
+		case <-done:
+		case <-time.After(stopTimeout):
+			t.Error("run did not stop during cleanup")
+		}
+	})
 
 	var dialer net.Dialer
 
@@ -490,12 +505,7 @@ func TestRun_WaitsForAPIDrain(t *testing.T) {
 
 	// Stop the process the way a signal would. The scheduler returns, and run
 	// then waits for the API to finish the request.
-	select {
-	case cancel := <-cancels:
-		cancel()
-	default:
-		t.Fatal("run did not create the process context")
-	}
+	cancelRun()
 
 	select {
 	case <-done:
@@ -514,7 +524,7 @@ func TestRun_WaitsForAPIDrain(t *testing.T) {
 
 	select {
 	case <-done:
-	case <-time.After(10 * time.Second):
+	case <-time.After(stopTimeout):
 		t.Fatal("run did not return after the HTTP API finished its request")
 	}
 }
