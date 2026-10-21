@@ -1638,9 +1638,8 @@ func TestRunUpdates(t *testing.T) {
 				}
 			}
 
-			// Total operations should reflect independent scope processing, with at
-			// least 2 containers scanned in total
-			assert.GreaterOrEqual(t, totalScanned, 2)
+			// prod scans my-app and watchtower-prod, and dev scans watchtower-dev
+			assert.Equal(t, 3, totalScanned)
 			// prod updates my-app and watchtower-prod, and dev updates watchtower-dev
 			assert.Equal(t, 3, totalUpdated)
 		})
