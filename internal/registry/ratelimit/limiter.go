@@ -157,9 +157,8 @@ func (l *Limiter) HoldAnonymous(ctx context.Context, host string, authenticated 
 // ends, it is limited to one outstanding token so concurrent waiters cannot
 // dump the advertised budget at once. Without an advertised quota, the host is
 // paced to one request per cooldown, using the latest 429's cooldown, during
-// recovery. Recovery keeps an
-// advertised quota and drops a quota made up from the cooldown. Cooldown time
-// does not accrue tokens.
+// recovery. Recovery keeps an advertised quota and drops a quota made up from
+// the cooldown. Cooldown time does not accrue tokens.
 //
 // Parameters:
 //   - host: Registry host. Empty values are ignored.
