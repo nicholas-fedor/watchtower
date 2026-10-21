@@ -3718,6 +3718,28 @@ Authenticating with a Docker Hub account raises the limit from 100 to 200 pulls,
 </tr>
 </tbody>
 </table>
+<p>After a <code>429</code>, Watchtower also paces later requests to that registry so they cannot empty the bucket again in a burst. Pacing depends on whether the <code>429</code> advertised a rate:</p>
+<table>
+<thead>
+<tr>
+<th><code>429</code> advertised a rate</th>
+<th>For 3 minutes after the wait</th>
+<th>Afterwards</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Yes</td>
+<td>One request at a time, at the advertised rate</td>
+<td>The advertised rate, with bursts up to its budget</td>
+</tr>
+<tr>
+<td>No</td>
+<td>One request per <code>retry-after</code> wait, held between 100ms and 30 seconds, or 100ms when the <code>429</code> sent none</td>
+<td>Not paced</td>
+</tr>
+</tbody>
+</table>
 <p>Retries within a cycle are logged at debug so they do not become notifications. When the retry window is exhausted:</p>
 <ul>
 <li>The container is marked <strong>Failed</strong> for the cycle.</li>
@@ -3828,7 +3850,7 @@ The output varies depending on the outcome:</p>
     <span class="md-icon" title="Last update">
       <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M21 13.1c-.1 0-.3.1-.4.2l-1 1 2.1 2.1 1-1c.2-.2.2-.6 0-.8l-1.3-1.3c-.1-.1-.2-.2-.4-.2m-1.9 1.8-6.1 6V23h2.1l6.1-6.1zM12.5 7v5.2l4 2.4-1 1L11 13V7zM11 21.9c-5.1-.5-9-4.8-9-9.9C2 6.5 6.5 2 12 2c5.3 0 9.6 4.1 10 9.3-.3-.1-.6-.2-1-.2s-.7.1-1 .2C19.6 7.2 16.2 4 12 4c-4.4 0-8 3.6-8 8 0 4.1 3.1 7.5 7.1 7.9l-.1.2z"/></svg>
     </span>
-    <span class="git-revision-date-localized-plugin git-revision-date-localized-plugin-timeago" title="October 10, 2026 17:48:16 UTC"><span class="timeago" datetime="2026-10-10T17:48:16+00:00" locale="en"></span></span><span class="git-revision-date-localized-plugin git-revision-date-localized-plugin-iso_date" title="October 10, 2026 17:48:16 UTC">2026-10-10</span>
+    <span class="git-revision-date-localized-plugin git-revision-date-localized-plugin-timeago" title="October 21, 2026 23:26:43 UTC"><span class="timeago" datetime="2026-10-21T23:26:43+00:00" locale="en"></span></span><span class="git-revision-date-localized-plugin git-revision-date-localized-plugin-iso_date" title="October 21, 2026 23:26:43 UTC">2026-10-21</span>
   </span>
 
     
