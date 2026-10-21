@@ -129,7 +129,7 @@ func TestUpdateAction_Cleanup(t *testing.T) {
 		t.Run("updating a linked container with missing image info", func(t *testing.T) {
 			t.Parallel()
 
-			t.Run("should gracefully fail and collect no image IDs", func(t *testing.T) {
+			t.Run("should update the stale container and collect its image entry", func(t *testing.T) {
 				t.Parallel()
 
 				client := mockActions.CreateMockClient(getLinkedTestData(false), false, false)

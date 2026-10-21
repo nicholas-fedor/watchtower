@@ -558,7 +558,7 @@ func TestWatchtowerContainerHandling(t *testing.T) {
 			assert.Equal(t, "test-scope", containerInfo.Config.Labels["com.centurylinklabs.watchtower.scope"])
 		})
 
-		t.Run("should handle mixed scope inheritance where scope flag conflicts with container label scope", func(t *testing.T) {
+		t.Run("should update Watchtower when the scope filter matches its scope label", func(t *testing.T) {
 			t.Parallel()
 
 			client := mockActions.CreateMockClient(
@@ -647,7 +647,7 @@ func TestWatchtowerContainerHandling(t *testing.T) {
 			assert.Empty(t, cleanupImageInfos)
 		})
 
-		t.Run("should demonstrate explicit scope precedence in self-update scenarios", func(t *testing.T) {
+		t.Run("should keep the label scope on the new container when the filter selects that scope", func(t *testing.T) {
 			t.Parallel()
 
 			client := mockActions.CreateMockClient(
@@ -675,10 +675,7 @@ func TestWatchtowerContainerHandling(t *testing.T) {
 				false,
 				false,
 			)
-			// Even though container has "label-scope", if the filter uses "explicit-scope",
-			// and assuming the explicit scope takes precedence in filter building,
-			// but in this test, we're testing the filter directly
-			// Since the container has "label-scope", FilterByScope("label-scope") will match
+			// The filter selects the scope in the container's label.
 			scopedFilter := filters.FilterByScope(newTestLogger(t), "label-scope", filters.WatchtowerContainersFilter)
 			report, cleanupImageInfos, err := update(newTestLogger(t), t.Context(), client, types.UpdateParams{
 				Cleanup:          true,
@@ -745,7 +742,7 @@ func TestWatchtowerContainerHandling(t *testing.T) {
 				assert.Empty(t, cleanupImageInfos)
 			})
 
-			t.Run("should validate chain boundaries when scopes differ across containers", func(t *testing.T) {
+			t.Run("should extend the chain when the previous container in it has another scope", func(t *testing.T) {
 				t.Parallel()
 
 				client := mockActions.CreateMockClient(
@@ -812,7 +809,7 @@ func TestWatchtowerContainerHandling(t *testing.T) {
 				assert.True(t, strings.HasPrefix(chainLabel, "previous-id-scope-b,"))
 			})
 
-			t.Run("should handle container chains spanning multiple scopes with proper isolation", func(t *testing.T) {
+			t.Run("should extend a chain spanning several scopes when updating in the selected scope", func(t *testing.T) {
 				t.Parallel()
 
 				client := mockActions.CreateMockClient(
@@ -865,7 +862,7 @@ func TestWatchtowerContainerHandling(t *testing.T) {
 				assert.True(t, strings.HasSuffix(chainLabel, string(updatedContainer.ID())))
 			})
 
-			t.Run("should enforce scope boundaries during cross-scope chain scenarios", func(t *testing.T) {
+			t.Run("should extend a chain that holds an ID from another scope", func(t *testing.T) {
 				t.Parallel()
 
 				client := mockActions.CreateMockClient(
