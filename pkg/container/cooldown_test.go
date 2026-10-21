@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"net/http"
 	"net/http/httptest"
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 	"testing/synctest"
@@ -149,8 +151,8 @@ func notFoundRegistry(t *testing.T) string {
 
 // Test_isOutsideCooldown verifies that the cooldown gate lets a pull go ahead
 // when no cooldown is configured, the delay is zero, or the container is
-// monitor-only or no-pull, and that a failure to fetch the image's registry
-// credentials or creation time holds the pull back with a CooldownError.
+// monitor-only or no-pull, and that a failure to fetch the image's creation
+// time holds the pull back with a CooldownError.
 func Test_isOutsideCooldown(t *testing.T) {
 	t.Parallel()
 
@@ -189,25 +191,6 @@ func Test_isOutsideCooldown(t *testing.T) {
 		})
 	}
 
-	t.Run("GetPullOptions fails (registry auth unavailable)", func(t *testing.T) {
-		t.Parallel()
-
-		t.Run("returns false with a CooldownError wrapping the pull options error", func(t *testing.T) {
-			t.Parallel()
-
-			i := newTestImageClient(newImageAPI(t), newTestLogger(t), registryConfig.Registry{}, ratelimit.New())
-
-			outside, err := i.isOutsideCooldown(t.Context(), MockContainer(WithImageName("localhost/unsupported-image-format:latest")), types.UpdateParams{
-				CooldownDelay: 1 * time.Hour,
-			})
-			assert.False(t, outside)
-
-			var cooldownErr *CooldownError
-			require.ErrorAs(t, err, &cooldownErr)
-			assert.NotEmpty(t, cooldownErr.Delay)
-		})
-	})
-
 	t.Run("FetchImageCreationTime fails (registry manifest returns 404)", func(t *testing.T) {
 		t.Parallel()
 
@@ -224,6 +207,37 @@ func Test_isOutsideCooldown(t *testing.T) {
 
 			var cooldownErr *CooldownError
 			require.ErrorAs(t, err, &cooldownErr)
+		})
+	})
+}
+
+// Test_isOutsideCooldown_pullOptionsFailure verifies that when the registry
+// credentials cannot be read, the cooldown gate holds the pull back with a
+// CooldownError for the pull options failure, before any registry request.
+//
+// The test sets environment variables, so it does not run in parallel.
+func Test_isOutsideCooldown_pullOptionsFailure(t *testing.T) {
+	t.Run("GetPullOptions fails (registry auth unavailable)", func(t *testing.T) {
+		t.Run("returns false with a CooldownError wrapping the pull options error", func(t *testing.T) {
+			// A Docker config that cannot be parsed, with no environment
+			// credentials to fall back on, makes the credential lookup fail.
+			configDir := t.TempDir()
+			require.NoError(t, os.WriteFile(filepath.Join(configDir, "config.json"), []byte("{not json"), 0o600))
+			t.Setenv("DOCKER_CONFIG", configDir)
+			t.Setenv("REPO_USER", "")
+			t.Setenv("REPO_PASS", "")
+
+			i := newTestImageClient(newImageAPI(t), newTestLogger(t), registryConfig.Registry{}, ratelimit.New())
+
+			outside, err := i.isOutsideCooldown(t.Context(), MockContainer(WithImageName("registry.example.com/app:latest")), types.UpdateParams{
+				CooldownDelay: 1 * time.Hour,
+			})
+			assert.False(t, outside)
+
+			var cooldownErr *CooldownError
+			require.ErrorAs(t, err, &cooldownErr)
+			assert.NotEmpty(t, cooldownErr.Delay)
+			assert.Contains(t, cooldownErr.Error(), "could not get pull options for")
 		})
 	})
 }
