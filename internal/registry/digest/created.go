@@ -18,7 +18,6 @@ import (
 	registryConfig "github.com/nicholas-fedor/watchtower/internal/config/registry"
 	"github.com/nicholas-fedor/watchtower/internal/meta"
 	"github.com/nicholas-fedor/watchtower/internal/registry/auth"
-	"github.com/nicholas-fedor/watchtower/internal/registry/hosts"
 	"github.com/nicholas-fedor/watchtower/internal/registry/ratelimit"
 	"github.com/nicholas-fedor/watchtower/pkg/types"
 )
@@ -284,7 +283,8 @@ func FetchImageCreationTime(log *zerolog.Logger,
 }
 
 // buildManifestURLForAge constructs the manifest URL for image age checking.
-// It handles scheme selection based on TLS configuration and lscr.io host swapping.
+// It selects the scheme from the TLS settings. The registry host comes from
+// [auth.GetRegistryAddress], which already maps lscr.io to ghcr.io.
 //
 // Parameters:
 //   - container: Container whose image manifest URL to build.
@@ -326,12 +326,6 @@ func buildManifestURLForAge(log *zerolog.Logger,
 	}
 
 	originalHost := parsedURL.Host
-
-	// Handle lscr.io → ghcr.io host swap.
-	if parsedURL.Host == hosts.LSCRRegistryDomain {
-		parsedURL.Host = hosts.GitHubRegistryDomain
-		manifestURLStr = parsedURL.String()
-	}
 
 	if hostOverride != "" {
 		parsedURL.Host = hostOverride
@@ -409,7 +403,7 @@ func fetchManifestAcrossHosts(log *zerolog.Logger,
 		attemptURL.Host = candidate.host
 		attemptManifestURL := attemptURL.String()
 
-		// Skip re-fetching if this is the same URL as the initial manifestURL.
+		// Log the attempt when it goes to a host other than the manifest URL's.
 		if i > 0 || attemptManifestURL != manifestURL {
 			log.Debug().
 				Fields(fields).

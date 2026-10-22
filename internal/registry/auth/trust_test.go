@@ -321,8 +321,6 @@ func TestEncodedAuth_UsesConfigWhenEnvUnset(t *testing.T) {
 		},
 	})
 
-	defer os.Unsetenv("DOCKER_CONFIG")
-
 	t.Setenv("REPO_USER", "")
 	t.Setenv("REPO_PASS", "")
 
@@ -349,8 +347,6 @@ func TestEncodedConfigCredentials_MultipleRegistries(t *testing.T) {
 			"password": "example-pass",
 		},
 	})
-
-	defer os.Unsetenv("DOCKER_CONFIG")
 
 	tests := []struct {
 		name      string
@@ -409,8 +405,6 @@ func TestEncodedAuth_ConfigPreferredOverEnv(t *testing.T) {
 		},
 	})
 
-	defer os.Unsetenv("DOCKER_CONFIG")
-
 	t.Setenv("REPO_USER", "env-user")
 	t.Setenv("REPO_PASS", "env-pass")
 
@@ -433,8 +427,6 @@ func TestEncodedAuth_EnvUsedWhenConfigHasNoRegistryEntry(t *testing.T) {
 		},
 	})
 
-	defer os.Unsetenv("DOCKER_CONFIG")
-
 	t.Setenv("REPO_USER", "env-user")
 	t.Setenv("REPO_PASS", "env-pass")
 
@@ -456,8 +448,6 @@ func TestEncodedConfigCredentials_MultipleImagesSameRegistry(t *testing.T) {
 			"password": "shared-pass",
 		},
 	})
-
-	defer os.Unsetenv("DOCKER_CONFIG")
 
 	imageRefs := []string{
 		"ghcr.io/org/image-a:latest",
@@ -492,8 +482,6 @@ func TestEncodedConfigCredentials_RegistryMissingFromConfig(t *testing.T) {
 		},
 	})
 
-	defer os.Unsetenv("DOCKER_CONFIG")
-
 	credentials, err := encodedConfigCredentials(newTestLogger(t), "ghcr.io/test/image:latest")
 	require.NoError(t, err)
 	assert.Empty(t, credentials)
@@ -503,8 +491,6 @@ func TestEncodedConfigCredentials_RegistryMissingFromConfig(t *testing.T) {
 // an empty `auths` map returns empty credentials without error.
 func TestEncodedConfigCredentials_EmptyAuthsMap(t *testing.T) {
 	writeTestDockerConfig(t, map[string]map[string]string{})
-
-	defer os.Unsetenv("DOCKER_CONFIG")
 
 	credentials, err := encodedConfigCredentials(newTestLogger(t), "ghcr.io/test/image:latest")
 	require.NoError(t, err)
@@ -543,8 +529,6 @@ func TestEncodedAuth_FallsThroughToConfigWhenEnvPartiallySet(t *testing.T) {
 		},
 	})
 
-	defer os.Unsetenv("DOCKER_CONFIG")
-
 	t.Setenv("REPO_USER", "env-only-user")
 	t.Setenv("REPO_PASS", "")
 
@@ -567,8 +551,6 @@ func TestEncodedAuth_EnvPartiallySetWithUnconfiguredRegistry(t *testing.T) {
 			"password": "docker-pass",
 		},
 	})
-
-	defer os.Unsetenv("DOCKER_CONFIG")
 
 	t.Setenv("REPO_USER", "env-only-user")
 	t.Setenv("REPO_PASS", "")
@@ -688,6 +670,9 @@ func resetEncodedAuthCache() {
 	encodedAuthCache.InvalidateAll()
 }
 
+// TestEncodedConfigCredentials_CacheHitAndMtimeInvalidation verifies that
+// cached config credentials are served while config.json keeps its mtime,
+// even when its contents change, and are read again once the mtime changes.
 func TestEncodedConfigCredentials_CacheHitAndMtimeInvalidation(t *testing.T) {
 	resetEncodedAuthCache()
 	t.Cleanup(resetEncodedAuthCache)
@@ -698,15 +683,10 @@ func TestEncodedConfigCredentials_CacheHitAndMtimeInvalidation(t *testing.T) {
 			"password": "cache-pass",
 		},
 	})
-	t.Cleanup(func() { _ = os.RemoveAll(tempDir) })
 
 	first, err := encodedConfigCredentials(newTestLogger(t), "ghcr.io/org/app:latest")
 	require.NoError(t, err)
 	require.NotEmpty(t, first)
-
-	second, err := encodedConfigCredentials(newTestLogger(t), "ghcr.io/org/app:latest")
-	require.NoError(t, err)
-	assert.Equal(t, first, second)
 
 	configPath := filepath.Join(tempDir, "config.json")
 	updated, err := json.Marshal(map[string]any{
@@ -719,10 +699,16 @@ func TestEncodedConfigCredentials_CacheHitAndMtimeInvalidation(t *testing.T) {
 	})
 	require.NoError(t, err)
 
-	// Ensure mtime changes even on coarse filesystems.
-	past := configFileModTime(tempDir) - int64(time.Second)
-	require.NoError(t, os.Chtimes(configPath, time.Unix(0, past), time.Unix(0, past)))
+	// Rewrite the credentials but keep the original mtime, so only a cache
+	// hit returns the first credentials.
+	mtime := time.Unix(0, configFileModTime(tempDir))
+
 	require.NoError(t, os.WriteFile(configPath, updated, 0o600))
+	require.NoError(t, os.Chtimes(configPath, mtime, mtime))
+
+	second, err := encodedConfigCredentials(newTestLogger(t), "ghcr.io/org/app:latest")
+	require.NoError(t, err)
+	assert.Equal(t, first, second, "an unchanged mtime must serve the cached credentials")
 
 	future := time.Now().Add(2 * time.Second)
 	require.NoError(t, os.Chtimes(configPath, future, future))
@@ -770,12 +756,20 @@ func TestEncodedConfigCredentials_FailedLookupNotCached(t *testing.T) {
 }
 
 // writeTestDockerConfig writes a Docker config.json with the given auths map
-// and returns the temp directory path. The caller is responsible for cleanup.
+// into a temporary directory and points DOCKER_CONFIG and HOME at it. The test
+// framework removes the directory and restores both variables when the test
+// ends.
+//
+// Parameters:
+//   - t: Test that owns the directory.
+//   - auths: Registry entries for the config's auths map.
+//
+// Returns:
+//   - string: Path of the directory holding config.json.
 func writeTestDockerConfig(t *testing.T, auths map[string]map[string]string) string {
 	t.Helper()
 
-	tempDir, err := os.MkdirTemp("", "watchtower-test-docker-config")
-	require.NoError(t, err)
+	tempDir := t.TempDir()
 
 	configContent, err := json.Marshal(map[string]any{
 		"auths": auths,
