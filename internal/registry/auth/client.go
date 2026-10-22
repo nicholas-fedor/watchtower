@@ -2,9 +2,11 @@ package auth
 
 import (
 	"crypto/tls"
+	"errors"
 	"fmt"
 	"net"
 	"net/http"
+	"net/url"
 	"strings"
 	"sync"
 	"time"
@@ -85,16 +87,45 @@ type registryClient struct {
 // Parameters:
 //   - request: The HTTP request to execute.
 //
+// The error of a failed request names the last URL requested, which can be a
+// redirect target, so that URL is redacted with [RedactURL].
+//
 // Returns:
 //   - *http.Response: The HTTP response from the registry, if successful.
 //   - error: Non-nil if the request fails, nil otherwise.
 func (r *registryClient) Do(request *http.Request) (*http.Response, error) {
 	response, err := r.client.Do(request)
 	if err != nil {
+		if urlErr, ok := errors.AsType[*url.Error](err); ok {
+			urlErr.URL = RedactURL(urlErr.URL)
+		}
+
 		return nil, fmt.Errorf("failed to execute HTTP request: %w", err)
 	}
 
 	return response, nil
+}
+
+// RedactURL returns rawURL without its query and user information, for logs
+// and errors, since a redirect URL can carry signed query parameters or
+// credentials.
+//
+// Parameters:
+//   - rawURL: URL to redact.
+//
+// Returns:
+//   - string: rawURL without its query and user information, or a placeholder
+//     when it does not parse.
+func RedactURL(rawURL string) string {
+	parsed, err := url.Parse(rawURL)
+	if err != nil {
+		return "<unparseable>"
+	}
+
+	parsed.User = nil
+	parsed.RawQuery = ""
+
+	return parsed.String()
 }
 
 // configureTLS applies the registry TLS settings to a TLS configuration.
