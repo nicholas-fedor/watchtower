@@ -9,6 +9,7 @@ import (
 	"strings"
 	"sync"
 	"testing"
+	"testing/synctest"
 	"time"
 
 	"github.com/rs/zerolog"
@@ -58,14 +59,6 @@ func (f *spyFetcher) FetchDigestForTag(
 	return f.digests[tag], nil
 }
 
-// callCount returns how many candidates the fetcher has served.
-func (f *spyFetcher) callCount() int {
-	f.mu.Lock()
-	defer f.mu.Unlock()
-
-	return len(f.calls)
-}
-
 // newTestLogger returns a logger that writes each event to the test's log, so a
 // failing test shows what it logged.
 //
@@ -112,6 +105,53 @@ func (f *transientThenOKFetcher) FetchDigestForTag(
 	}
 
 	return "", nil
+}
+
+// gatedFetcher holds its first request open until gate closes, so tests can
+// start other lookups while a sweep is in flight. Later requests answer at once.
+type gatedFetcher struct {
+	// gate releases the first request when closed.
+	gate chan struct{}
+	// firstErr, when set, is the error the first request returns.
+	firstErr error
+	// digests maps a tag to the digest returned for it.
+	digests map[string]string
+	// mu guards calls.
+	mu sync.Mutex
+	// calls counts the requests made.
+	calls int
+}
+
+func (f *gatedFetcher) FetchDigestForTag(
+	_ *zerolog.Logger,
+	_ context.Context,
+	_ types.Container,
+	_ string,
+	tag string,
+	_ ...string,
+) (string, error) {
+	f.mu.Lock()
+	f.calls++
+	first := f.calls == 1
+	f.mu.Unlock()
+
+	if first {
+		<-f.gate
+
+		if f.firstErr != nil {
+			return "", f.firstErr
+		}
+	}
+
+	return f.digests[tag], nil
+}
+
+// callCount returns how many requests the fetcher has received.
+func (f *gatedFetcher) callCount() int {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+
+	return f.calls
 }
 
 func TestTagCandidates(t *testing.T) {
@@ -384,30 +424,118 @@ func TestResolveTagNilResolver(t *testing.T) {
 	assert.Empty(t, r.ResolveTag(newTestLogger(t), context.Background(), testContainer(), "", "1.2.3", testDigest))
 }
 
-// One resolver is shared by every parallel staleness worker, so the cache must
-// be safe under concurrent lookups. Run with -race to make this meaningful.
+// One resolver is shared by every parallel staleness worker, so concurrent
+// lookups for one image must be safe and must share a single sweep. The first
+// request is held open until every other lookup is waiting on it, so they join
+// the sweep in flight rather than finding its answer in the cache. Run with
+// -race to make the safety check meaningful.
 func TestResolveTagIsSafeForConcurrentUse(t *testing.T) {
 	t.Parallel()
 
-	fetcher := &spyFetcher{digests: map[string]string{"v1.2.3": testDigest}}
+	synctest.Test(t, func(t *testing.T) {
+		fetcher := &gatedFetcher{gate: make(chan struct{}), digests: map[string]string{"v1.2.3": testDigest}}
+		r := NewResolver(fetcher)
 
-	r := NewResolver(fetcher)
-	ctx := context.Background()
+		var wg sync.WaitGroup
 
-	var wg sync.WaitGroup
+		resolve := func() {
+			wg.Go(func() {
+				assert.Equal(t, "v1.2.3", r.ResolveTag(newTestLogger(t), t.Context(), testContainer(), "", "1.2.3", testDigest))
+			})
+		}
 
-	for range 32 {
+		resolve()
+		synctest.Wait()
+
+		for range 31 {
+			resolve()
+		}
+
+		synctest.Wait()
+		assert.Equal(t, 1, fetcher.callCount(), "the other lookups must wait for the sweep in flight")
+
+		close(fetcher.gate)
+		wg.Wait()
+
+		assert.Equal(t, 1, fetcher.callCount(), "concurrent lookups must share one sweep")
+	})
+}
+
+// A lookup that joined another caller's sweep makes its own attempt when that
+// sweep fails, since the failure may come from the other caller. The caller
+// that ran the failed sweep does not retry, and nothing is cached.
+func TestResolveTagRetriesAfterJoiningFailedSweep(t *testing.T) {
+	t.Parallel()
+
+	synctest.Test(t, func(t *testing.T) {
+		fetcher := &gatedFetcher{
+			gate:     make(chan struct{}),
+			firstErr: errors.New("connection reset"),
+			digests:  map[string]string{"v1.2.3": testDigest},
+		}
+		r := NewResolver(fetcher)
+
+		var (
+			wg             sync.WaitGroup
+			leader, joined string
+		)
+
 		wg.Go(func() {
-			assert.Equal(t, "v1.2.3", r.ResolveTag(newTestLogger(t), ctx, testContainer(), "", "1.2.3", testDigest))
+			leader = r.ResolveTag(newTestLogger(t), t.Context(), testContainer(), "", "1.2.3", testDigest)
 		})
-	}
+		synctest.Wait()
 
-	wg.Wait()
+		wg.Go(func() {
+			joined = r.ResolveTag(newTestLogger(t), t.Context(), testContainer(), "", "1.2.3", testDigest)
+		})
+		synctest.Wait()
 
-	// The cache must collapse the fan-out. The exact count is not deterministic
-	// because several goroutines may reach the fetcher before the first entry is
-	// stored, but it can never be one request per goroutine.
-	assert.Less(t, fetcher.callCount(), 32, "the cache must serve most callers")
+		close(fetcher.gate)
+		wg.Wait()
+
+		assert.Empty(t, leader, "the caller that ran the failed sweep gets no tag")
+		assert.Equal(t, "v1.2.3", joined, "the joined lookup retries on its own")
+		assert.Equal(t, 3, fetcher.callCount(), "two candidates for the failed sweep and one for the retry")
+	})
+}
+
+// A lookup waiting on another caller's sweep returns as soon as its own context
+// ends, while the sweep carries on for the caller that started it.
+func TestResolveTagStopsWaitingWhenItsContextEnds(t *testing.T) {
+	t.Parallel()
+
+	synctest.Test(t, func(t *testing.T) {
+		fetcher := &gatedFetcher{gate: make(chan struct{}), digests: map[string]string{"v1.2.3": testDigest}}
+		r := NewResolver(fetcher)
+
+		var (
+			wg     sync.WaitGroup
+			leader string
+		)
+
+		wg.Go(func() {
+			leader = r.ResolveTag(newTestLogger(t), t.Context(), testContainer(), "", "1.2.3", testDigest)
+		})
+		synctest.Wait()
+
+		ctx, cancel := context.WithCancel(t.Context())
+		waiterDone := make(chan string)
+
+		go func() {
+			waiterDone <- r.ResolveTag(newTestLogger(t), ctx, testContainer(), "", "1.2.3", testDigest)
+		}()
+
+		synctest.Wait()
+
+		cancel()
+		assert.Empty(t, <-waiterDone, "the canceled lookup stops waiting with no tag")
+
+		close(fetcher.gate)
+		wg.Wait()
+
+		assert.Equal(t, "v1.2.3", leader)
+		assert.Equal(t, 1, fetcher.callCount())
+	})
 }
 
 // Concurrent lookups spanning different digests must not cross-contaminate the
