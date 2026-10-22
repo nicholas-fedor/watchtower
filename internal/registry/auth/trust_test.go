@@ -1,4 +1,4 @@
-package registry
+package auth
 
 import (
 	"bytes"
@@ -17,7 +17,6 @@ import (
 	dockerCliConfig "github.com/docker/cli/cli/config"
 
 	"github.com/nicholas-fedor/watchtower/internal/logging"
-	"github.com/nicholas-fedor/watchtower/internal/registry/auth"
 )
 
 // TestEncodedEnvAuth_ReturnsCredentialsWhenSet verifies that encodedEnvAuth
@@ -190,7 +189,7 @@ func TestEncodedConfigCredentials_IdentityToken(t *testing.T) {
 
 	// End-to-end: TransformAuth must produce Basic credentials for the
 	// Authorization header used when exchanging for a registry bearer token.
-	basicEncoded := auth.TransformAuth(newTestLogger(t), credentials)
+	basicEncoded := TransformAuth(newTestLogger(t), credentials)
 	basicDecoded, decodeErr := base64.StdEncoding.DecodeString(basicEncoded)
 	require.NoError(t, decodeErr)
 	assert.Equal(t, ":"+identityToken, string(basicDecoded))
@@ -311,7 +310,7 @@ func TestEncodedConfigCredentials_NoConfigFile(t *testing.T) {
 	assert.Empty(t, credentials)
 }
 
-// TestEncodedAuth_UsesConfigWhenEnvUnset verifies that encodedAuth falls
+// TestEncodedAuth_UsesConfigWhenEnvUnset verifies that EncodedAuth falls
 // through to encodedConfigCredentials when REPO_USER/REPO_PASS are unset
 // and a config file is present.
 func TestEncodedAuth_UsesConfigWhenEnvUnset(t *testing.T) {
@@ -327,7 +326,7 @@ func TestEncodedAuth_UsesConfigWhenEnvUnset(t *testing.T) {
 	t.Setenv("REPO_USER", "")
 	t.Setenv("REPO_PASS", "")
 
-	credentials, err := encodedAuth(newTestLogger(t), "ghcr.io/test/image:latest")
+	credentials, err := EncodedAuth(newTestLogger(t), "ghcr.io/test/image:latest")
 	require.NoError(t, err)
 	assert.NotEmpty(t, credentials)
 
@@ -399,7 +398,7 @@ func TestEncodedConfigCredentials_MultipleRegistries(t *testing.T) {
 	}
 }
 
-// TestEncodedAuth_ConfigPreferredOverEnv verifies that encodedAuth returns
+// TestEncodedAuth_ConfigPreferredOverEnv verifies that EncodedAuth returns
 // Docker config credentials for a registry when both config and REPO_USER/REPO_PASS
 // are set, so env credentials are not sent to every registry.
 func TestEncodedAuth_ConfigPreferredOverEnv(t *testing.T) {
@@ -415,7 +414,7 @@ func TestEncodedAuth_ConfigPreferredOverEnv(t *testing.T) {
 	t.Setenv("REPO_USER", "env-user")
 	t.Setenv("REPO_PASS", "env-pass")
 
-	credentials, err := encodedAuth(newTestLogger(t), "ghcr.io/test/image:latest")
+	credentials, err := EncodedAuth(newTestLogger(t), "ghcr.io/test/image:latest")
 	require.NoError(t, err)
 	assert.NotEmpty(t, credentials)
 
@@ -439,7 +438,7 @@ func TestEncodedAuth_EnvUsedWhenConfigHasNoRegistryEntry(t *testing.T) {
 	t.Setenv("REPO_USER", "env-user")
 	t.Setenv("REPO_PASS", "env-pass")
 
-	credentials, err := encodedAuth(newTestLogger(t), "quay.io/org/app:latest")
+	credentials, err := EncodedAuth(newTestLogger(t), "quay.io/org/app:latest")
 	require.NoError(t, err)
 	assert.NotEmpty(t, credentials)
 
@@ -534,7 +533,7 @@ func TestEncodedConfigCredentials_MalformedConfigJSON(t *testing.T) {
 }
 
 // TestEncodedAuth_FallsThroughToConfigWhenEnvPartiallySet verifies that
-// encodedAuth falls through to encodedConfigCredentials when env vars are
+// EncodedAuth falls through to encodedConfigCredentials when env vars are
 // partially set (one present, one missing) and a valid config file exists.
 func TestEncodedAuth_FallsThroughToConfigWhenEnvPartiallySet(t *testing.T) {
 	writeTestDockerConfig(t, map[string]map[string]string{
@@ -549,7 +548,7 @@ func TestEncodedAuth_FallsThroughToConfigWhenEnvPartiallySet(t *testing.T) {
 	t.Setenv("REPO_USER", "env-only-user")
 	t.Setenv("REPO_PASS", "")
 
-	credentials, err := encodedAuth(newTestLogger(t), "ghcr.io/test/image:latest")
+	credentials, err := EncodedAuth(newTestLogger(t), "ghcr.io/test/image:latest")
 	require.NoError(t, err)
 	assert.NotEmpty(t, credentials)
 
@@ -559,7 +558,7 @@ func TestEncodedAuth_FallsThroughToConfigWhenEnvPartiallySet(t *testing.T) {
 }
 
 // TestEncodedAuth_EnvPartiallySetWithUnconfiguredRegistry verifies that
-// encodedAuth returns empty credentials without error when env vars are
+// EncodedAuth returns empty credentials without error when env vars are
 // partially set and the config file has no entry for the requested registry.
 func TestEncodedAuth_EnvPartiallySetWithUnconfiguredRegistry(t *testing.T) {
 	writeTestDockerConfig(t, map[string]map[string]string{
@@ -574,37 +573,9 @@ func TestEncodedAuth_EnvPartiallySetWithUnconfiguredRegistry(t *testing.T) {
 	t.Setenv("REPO_USER", "env-only-user")
 	t.Setenv("REPO_PASS", "")
 
-	credentials, err := encodedAuth(newTestLogger(t), "ghcr.io/test/image:latest")
+	credentials, err := EncodedAuth(newTestLogger(t), "ghcr.io/test/image:latest")
 	require.NoError(t, err)
 	assert.Empty(t, credentials)
-}
-
-// TestGetPullOptions_TraceLogsOmitCredentials verifies that GetPullOptions trace
-// logging never includes the encoded registry credential payload.
-func TestGetPullOptions_TraceLogsOmitCredentials(t *testing.T) {
-	const secretPass = "super-secret-pull-pass"
-
-	logBuf := &bytes.Buffer{}
-	log := logging.New(logging.LogfmtWriter(logBuf), logging.TraceLevel)
-
-	// Empty Docker config so encodedAuth falls through to environment credentials.
-	tempDir := t.TempDir()
-	t.Setenv("DOCKER_CONFIG", tempDir)
-	t.Setenv("HOME", tempDir)
-	dockerCliConfig.SetDir(tempDir)
-
-	t.Setenv("REPO_USER", "pull-user")
-	t.Setenv("REPO_PASS", secretPass)
-
-	opts, err := GetPullOptions(log, "docker.io/library/alpine:latest")
-	require.NoError(t, err)
-	require.NotEmpty(t, opts.RegistryAuth)
-
-	out := logBuf.String()
-	assert.Contains(t, out, "Retrieved authentication credentials")
-	assert.Contains(t, out, "has_credentials")
-	assert.NotContains(t, out, secretPass)
-	assert.NotContains(t, out, opts.RegistryAuth)
 }
 
 // TestEncodedAuth_TraceLogsOmitSecrets verifies that trace-level credential logs

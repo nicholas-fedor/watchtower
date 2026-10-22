@@ -1,4 +1,4 @@
-package registry
+package digest
 
 import (
 	"context"
@@ -41,17 +41,11 @@ var (
 	errAmbiguousPlatformMatch = errors.New("ambiguous platform match: multiple entries with differing variants")
 	// errMissingTag indicates the image reference does not contain a tag.
 	errMissingTag = errors.New("missing tag in image reference")
-	// errManifestTooLarge indicates the manifest response exceeded the size limit.
-	errManifestTooLarge = errors.New("manifest response exceeds size limit")
 )
 
-// Size limits for registry responses to prevent unbounded memory allocation.
-const (
-	// maxManifestSize is the maximum allowed size for a manifest response body (1 MiB).
-	maxManifestSize = 1 << 20
-	// maxConfigSize is the maximum allowed size for a config blob response body (4 MiB).
-	maxConfigSize = 1 << 22
-)
+// maxConfigSize is the maximum allowed size for a config blob response body
+// (4 MiB), to prevent unbounded memory allocation.
+const maxConfigSize = 1 << 22
 
 // imageIndex represents a multi-platform image index (OCI or Docker manifest list).
 type imageIndex struct {
@@ -347,7 +341,7 @@ func buildManifestURLForAge(log *zerolog.Logger,
 	return manifestURLStr, originalHost, parsedURL, nil
 }
 
-// retryManifestRequest fetches manifest bytes from the registry with host-based retry.
+// fetchManifestAcrossHosts fetches manifest bytes from the registry with host-based retry.
 //
 // It iterates through candidate hosts (primary, challenge, original) and returns the
 // raw response body on the first successful HTTP 200. On 401/404, it advances to the
@@ -370,7 +364,7 @@ func buildManifestURLForAge(log *zerolog.Logger,
 //   - string: The winning host that served the manifest.
 //   - string: The HTTP Content-Type header value from the response.
 //   - error: Non-nil if all hosts fail or body exceeds size limit.
-func retryManifestRequest(log *zerolog.Logger,
+func fetchManifestAcrossHosts(log *zerolog.Logger,
 	ctx context.Context,
 	client auth.Client,
 	limiter *ratelimit.Limiter,
@@ -598,7 +592,7 @@ func fetchManifestForAge(log *zerolog.Logger,
 	targetOS, targetArch, targetVariant, challengeHost, originalHost, limitKey string,
 	fields map[string]any,
 ) (string, string, error) {
-	body, winningHost, contentType, err := retryManifestRequest(log,
+	body, winningHost, contentType, err := fetchManifestAcrossHosts(log,
 		ctx,
 		client,
 		limiter,

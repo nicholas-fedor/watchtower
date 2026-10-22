@@ -1,8 +1,6 @@
 // Package registry resolves the credentials and pull options for an image's
-// registry, and reads image creation times from registries for the image
-// cooldown.
+// registry.
 //
-// Its subpackages authenticate registry requests, compare digests, build
-// manifest URLs, name the registry hosts Watchtower treats specially, and
-// handle registry rate limits.
+// Its subpackages handle registry authentication and credentials, image digests
+// and creation times, manifest URLs, special registry hosts, and rate limits.
 package registry

@@ -1,4 +1,4 @@
-package registry
+package auth
 
 import (
 	"encoding/base64"
@@ -18,8 +18,6 @@ import (
 	dockerConfigConfigfile "github.com/docker/cli/cli/config/configfile"
 	dockerConfigCredentials "github.com/docker/cli/cli/config/credentials"
 	dockerConfig "github.com/docker/cli/cli/config/types"
-
-	"github.com/nicholas-fedor/watchtower/internal/registry/auth"
 )
 
 const (
@@ -130,7 +128,7 @@ func configFileModTime(configDir string) int64 {
 	return info.ModTime().UnixNano()
 }
 
-// encodedAuth attempts to retrieve encoded authentication credentials for a given image name.
+// EncodedAuth attempts to retrieve encoded authentication credentials for a given image name.
 //
 // Per-image Docker config credentials are preferred when present so REPO_USER/REPO_PASS
 // are not sent to every registry. Environment credentials are used when the config has
@@ -143,7 +141,7 @@ func configFileModTime(configDir string) int64 {
 // Returns:
 //   - string: Base64-encoded credentials string if successful, empty if none found.
 //   - error: Non-nil if both methods fail, nil on success or if no credentials are available.
-func encodedAuth(log *zerolog.Logger, imageName string) (string, error) {
+func EncodedAuth(log *zerolog.Logger, imageName string) (string, error) {
 	// Set up logging fields for tracking.
 	fields := map[string]any{
 		"image_ref": imageName,
@@ -249,7 +247,7 @@ func encodedEnvAuth(log *zerolog.Logger) (string, error) {
 //   - error: Non-nil if config loading or address retrieval fails, nil on success or if no auth is found.
 func encodedConfigCredentials(log *zerolog.Logger, imageRef string) (string, error) {
 	// Get the registry server address from the image reference.
-	server, err := auth.GetRegistryAddress(log, imageRef)
+	server, err := GetRegistryAddress(log, imageRef)
 	if err != nil {
 		log.Debug().
 			Err(err).

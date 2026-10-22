@@ -37,7 +37,7 @@ func GetPullOptions(log *zerolog.Logger, imageName string) (dockerClient.ImagePu
 
 	clog.Debug().Msg("Retrieving pull options")
 
-	registryCredentials, err := encodedAuth(log, imageName)
+	registryCredentials, err := auth.EncodedAuth(log, imageName)
 	if err != nil {
 		clog.Debug().
 			Err(err).
