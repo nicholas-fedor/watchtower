@@ -17,6 +17,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- Split the compose package into labels, project, and apply by @nicholas-fedor in [#3061](https://github.com/nicholas-fedor/watchtower/pull/3061)
 - Read container marker and proc files through io/fs by @nicholas-fedor in [#3059](https://github.com/nicholas-fedor/watchtower/pull/3059)
 - Clean up the image creation and credential lookup code by @nicholas-fedor in [#3057](https://github.com/nicholas-fedor/watchtower/pull/3057)
 - Move image creation and credential lookup into digest and auth by @nicholas-fedor in [#3055](https://github.com/nicholas-fedor/watchtower/pull/3055)
