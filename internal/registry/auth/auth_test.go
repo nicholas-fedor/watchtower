@@ -513,21 +513,20 @@ func Test_handleSuccessfulChallenge(t *testing.T) {
 }
 
 // Test_handleBasicAuthChallenge verifies that a Basic challenge returns the
-// credentials as a Basic token, and is rejected without credentials or after a
-// redirect to another host or from HTTPS to HTTP.
+// credentials as a Basic token. It is rejected without credentials, after a
+// redirect to another host, or after a redirect from HTTPS to HTTP.
 func Test_handleBasicAuthChallenge(t *testing.T) {
 	t.Parallel()
 
 	tests := []struct {
-		name           string
-		registryAuth   string
-		redirected     bool
-		redirectHost   string
-		originalHost   string
-		originalScheme string
-		redirectScheme string
-		want           TokenResult
-		wantErr        error
+		name         string
+		registryAuth string
+		redirected   bool
+		redirectHost string
+		originalHost string
+		downgraded   bool
+		want         TokenResult
+		wantErr      error
 	}{
 		{
 			name:         "valid registry auth returns token result",
@@ -549,24 +548,21 @@ func Test_handleBasicAuthChallenge(t *testing.T) {
 			wantErr:      errCrossOriginRedirect,
 		},
 		{
-			name:           "same-host https redirect returns token result",
-			registryAuth:   "dGVzdA==",
-			redirected:     true,
-			redirectHost:   "registry.example.com",
-			originalHost:   "registry.example.com",
-			originalScheme: "https",
-			redirectScheme: "https",
-			want:           TokenResult{Token: "Basic dGVzdA==", Redirected: true, RedirectHost: "registry.example.com"},
+			name:         "same-host https redirect returns token result",
+			registryAuth: "dGVzdA==",
+			redirected:   true,
+			redirectHost: "registry.example.com",
+			originalHost: "registry.example.com",
+			want:         TokenResult{Token: "Basic dGVzdA==", Redirected: true, RedirectHost: "registry.example.com"},
 		},
 		{
-			name:           "same-host https to http downgrade returns error",
-			registryAuth:   "dGVzdA==",
-			redirected:     true,
-			redirectHost:   "registry.example.com",
-			originalHost:   "registry.example.com",
-			originalScheme: "https",
-			redirectScheme: "http",
-			wantErr:        errCrossOriginRedirect,
+			name:         "same-host https to http downgrade returns error",
+			registryAuth: "dGVzdA==",
+			redirected:   true,
+			redirectHost: "registry.example.com",
+			originalHost: "registry.example.com",
+			downgraded:   true,
+			wantErr:      errInsecureChallengeRedirect,
 		},
 	}
 
@@ -574,7 +570,7 @@ func Test_handleBasicAuthChallenge(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 
-			got, err := handleBasicAuthChallenge(newTestLogger(t), tt.registryAuth, tt.redirected, tt.redirectHost, tt.originalHost, tt.originalScheme, tt.redirectScheme)
+			got, err := handleBasicAuthChallenge(newTestLogger(t), tt.registryAuth, tt.redirected, tt.redirectHost, tt.originalHost, tt.downgraded)
 			if tt.wantErr != nil {
 				require.ErrorIs(t, err, tt.wantErr)
 
@@ -612,15 +608,14 @@ func Test_processChallengeResponse(t *testing.T) {
 	resetTokenCache(t)
 
 	tests := []struct {
-		name           string
-		response       challengeResponse
-		registryAuth   string
-		originalHost   string
-		originalScheme string
-		redirectScheme string
-		setupMock      func(*mockAuth.MockClient)
-		want           TokenResult
-		wantErr        error
+		name         string
+		response     challengeResponse
+		registryAuth string
+		originalHost string
+		downgraded   bool
+		setupMock    func(*mockAuth.MockClient)
+		want         TokenResult
+		wantErr      error
 	}{
 		{
 			name: "401 with bearer challenge routes to bearer auth",
@@ -672,11 +667,24 @@ func Test_processChallengeResponse(t *testing.T) {
 				redirected:    true,
 				redirectHost:  "registry.example.com",
 			},
-			registryAuth:   "dGVzdA==",
-			originalHost:   "registry.example.com",
-			originalScheme: "https",
-			redirectScheme: "http",
-			wantErr:        errCrossOriginRedirect,
+			registryAuth: "dGVzdA==",
+			originalHost: "registry.example.com",
+			downgraded:   true,
+			wantErr:      errInsecureChallengeRedirect,
+		},
+		{
+			// The mock expects no request, so a token request fails the test.
+			name: "https to http downgrade with bearer challenge and credentials returns error",
+			response: challengeResponse{
+				statusCode:    http.StatusUnauthorized,
+				wwwAuthHeader: `Bearer realm="https://attacker.example.com/token",service="registry.example.com"`,
+				redirected:    true,
+				redirectHost:  "registry.example.com",
+			},
+			registryAuth: "dXNlcjpwYXNz",
+			originalHost: "registry.example.com",
+			downgraded:   true,
+			wantErr:      errInsecureChallengeRedirect,
 		},
 		{
 			name:     "401 without WWW-Authenticate returns no credentials error",
@@ -714,8 +722,7 @@ func Test_processChallengeResponse(t *testing.T) {
 				tt.response.redirected,
 				tt.response.redirectHost,
 				tt.originalHost,
-				tt.originalScheme,
-				tt.redirectScheme,
+				tt.downgraded,
 				tt.response,
 			)
 			if tt.wantErr != nil {
@@ -732,7 +739,8 @@ func Test_processChallengeResponse(t *testing.T) {
 
 // Test_handleBearerAuth verifies that a Bearer challenge yields the fetched
 // token and the challenge host, and that a failed request or an empty token is
-// an error.
+// an error. After a redirect from HTTPS to HTTP, a challenge with credentials
+// is rejected before any token request, and one without credentials is not.
 //
 // The test resets the shared token cache, so it does not run in parallel.
 func Test_handleBearerAuth(t *testing.T) {
@@ -741,9 +749,14 @@ func Test_handleBearerAuth(t *testing.T) {
 	tests := []struct {
 		name          string
 		wwwAuthHeader string
-		setupMock     func(*mockAuth.MockClient)
-		want          TokenResult
-		wantErr       error
+		registryAuth  string
+		redirected    bool
+		redirectHost  string
+		downgraded    bool
+		// setupMock sets the client's expectations. Nil expects no request.
+		setupMock func(*mockAuth.MockClient)
+		want      TokenResult
+		wantErr   error
 	}{
 		{
 			name:          "successful bearer auth",
@@ -775,14 +788,65 @@ func Test_handleBearerAuth(t *testing.T) {
 			},
 			wantErr: errFailedDecodeResponse,
 		},
+		{
+			name:          "downgrade with credentials returns error without a token request",
+			wwwAuthHeader: `Bearer realm="https://attacker.example.com/token",service="registry.example.com"`,
+			registryAuth:  "dXNlcjpwYXNz",
+			redirected:    true,
+			redirectHost:  "registry.example.com",
+			downgraded:    true,
+			wantErr:       errInsecureChallengeRedirect,
+		},
+		{
+			name:          "downgrade without credentials fetches an anonymous token",
+			wwwAuthHeader: `Bearer realm="https://anonymous.test.com/token",service="anonymous.test.com"`,
+			redirected:    true,
+			redirectHost:  "registry.example.com",
+			downgraded:    true,
+			setupMock: func(client *mockAuth.MockClient) {
+				client.EXPECT().Do(mock.Anything).Return(&http.Response{
+					StatusCode: http.StatusOK,
+					Body:       io.NopCloser(strings.NewReader(`{"token":"anonymous-token"}`)),
+				}, nil).Once()
+			},
+			want: TokenResult{
+				Token:         "Bearer anonymous-token",
+				ChallengeHost: "anonymous.test.com",
+				Redirected:    true,
+				RedirectHost:  "registry.example.com",
+			},
+		},
+		{
+			name:          "cross-origin https redirect with credentials fetches a token",
+			wwwAuthHeader: `Bearer realm="https://ghcr.io/token",service="ghcr.io"`,
+			registryAuth:  "dXNlcjpwYXNz",
+			redirected:    true,
+			redirectHost:  "ghcr.io",
+			setupMock: func(client *mockAuth.MockClient) {
+				client.EXPECT().Do(mock.Anything).Return(&http.Response{
+					StatusCode: http.StatusOK,
+					Body:       io.NopCloser(strings.NewReader(`{"token":"ghcr-token"}`)),
+				}, nil).Once()
+			},
+			want: TokenResult{
+				Token:         "Bearer ghcr-token",
+				ChallengeHost: "ghcr.io",
+				Redirected:    true,
+				RedirectHost:  "ghcr.io",
+			},
+		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			client := mockAuth.NewMockClient(t)
-			tt.setupMock(client)
+			if tt.setupMock != nil {
+				tt.setupMock(client)
+			}
 
-			got, err := handleBearerAuth(newTestLogger(t), t.Context(), tt.wwwAuthHeader, newImageContainer(t, "test/image"), "", client, registryConfig.Registry{}, false, "")
+			got, err := handleBearerAuth(newTestLogger(t), t.Context(), tt.wwwAuthHeader,
+				newImageContainer(t, "test/image"), tt.registryAuth, client, registryConfig.Registry{},
+				tt.redirected, tt.redirectHost, "lscr.io", tt.downgraded)
 			if tt.wantErr != nil {
 				require.ErrorIs(t, err, tt.wantErr)
 
@@ -791,6 +855,124 @@ func Test_handleBearerAuth(t *testing.T) {
 
 			require.NoError(t, err)
 			assert.Equal(t, tt.want, got)
+		})
+	}
+}
+
+// Test_challengeDowngraded verifies that a challenge counts as downgraded when
+// it starts on HTTPS and any request in its redirect chain uses HTTP, including
+// a hop in the middle of a chain that ends on HTTPS.
+func Test_challengeDowngraded(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name      string
+		challenge string
+		// chain lists the request URLs in the order the client sent them.
+		chain []string
+		want  bool
+	}{
+		{name: "no redirect", challenge: "https://registry.example.com/v2/", chain: []string{"https://registry.example.com/v2/"}},
+		{
+			name:      "https redirect to another host",
+			challenge: "https://lscr.io/v2/",
+			chain:     []string{"https://lscr.io/v2/", "https://ghcr.io/v2/"},
+		},
+		{
+			name:      "redirect to http",
+			challenge: "https://registry.example.com/v2/",
+			chain:     []string{"https://registry.example.com/v2/", "http://registry.example.com/v2/"},
+			want:      true,
+		},
+		{
+			name:      "http hop before an https challenge",
+			challenge: "https://registry.example.com/v2/",
+			chain:     []string{"https://registry.example.com/v2/", "http://hop.example.com/v2/", "https://other.example.com/v2/"},
+			want:      true,
+		},
+		{
+			name:      "challenge already on http",
+			challenge: "http://registry.example.com/v2/",
+			chain:     []string{"http://registry.example.com/v2/"},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			assert.Equal(t, tt.want, challengeDowngraded(*mustParseURL(tt.challenge), redirectChain(tt.chain)))
+		})
+	}
+}
+
+// redirectChain builds the requests of a redirect chain as the HTTP client
+// links them, each request after the first pointing to the response that
+// redirected it.
+//
+// Parameters:
+//   - urls: Request URLs in the order the client sent them.
+//
+// Returns:
+//   - *http.Request: The last request in the chain.
+func redirectChain(urls []string) *http.Request {
+	var request *http.Request
+
+	for _, raw := range urls {
+		next := &http.Request{URL: mustParseURL(raw)}
+		if request != nil {
+			next.Response = &http.Response{Request: request}
+		}
+
+		request = next
+	}
+
+	return request
+}
+
+// TestGetToken_bearerChallengeDowngrade runs the challenge exchange against an
+// HTTPS registry that redirects its challenge to plain HTTP. With credentials,
+// GetToken fails before any token request. Without them, it fetches a token.
+//
+// The test resets the shared token cache, so it does not run in parallel.
+func TestGetToken_bearerChallengeDowngrade(t *testing.T) {
+	tests := []struct {
+		name         string
+		registryAuth string
+		wantErr      error
+	}{
+		{name: "with credentials", registryAuth: "dXNlcjpwYXNz", wantErr: errInsecureChallengeRedirect},
+		{name: "without credentials"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			resetTokenCache(t)
+
+			// The registry serves HTTPS and sends the challenge request to a
+			// plain HTTP server, whose challenge names the registry's realm.
+			registry := httpstub.NewTLS(t)
+			plain := httpstub.New(t)
+
+			registry.AppendHandlers(httpstub.RespondWith(http.StatusTemporaryRedirect, "",
+				http.Header{"Location": {plain.URL() + "/v2/"}}))
+			plain.AppendHandlers(challengeHandler(t, http.StatusUnauthorized, bearerChallenge(registry.Addr())))
+
+			if tt.wantErr == nil {
+				registry.AppendHandlers(tokenHandler(t))
+			}
+
+			got, err := GetToken(newTestLogger(t), t.Context(), newImageContainer(t, "test/image"),
+				tt.registryAuth, &registryClient{client: registry.Client()}, registryConfig.Registry{},
+				registry.URL())
+			if tt.wantErr != nil {
+				require.ErrorIs(t, err, tt.wantErr)
+
+				return
+			}
+
+			require.NoError(t, err)
+			assert.Equal(t, "Bearer mock-token", got.Token)
 		})
 	}
 }
