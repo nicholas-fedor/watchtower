@@ -25,6 +25,7 @@ var (
 	errUnsupportedChallenge          = errors.New("unsupported challenge type from registry")
 	errUnexpectedStatus              = errors.New("unexpected status with empty WWW-Authenticate header")
 	errCrossOriginRedirect           = errors.New("cross-origin redirect not allowed for basic auth")
+	errInsecureChallengeRedirect     = errors.New("challenge redirected from https to http, credentials not sent")
 	errInvalidEndpoint               = errors.New("invalid registry endpoint")
 )
 
@@ -259,20 +260,19 @@ func handleSuccessfulChallenge(redirected bool, redirectHost string) TokenResult
 //   - redirected: Whether the challenge request was redirected.
 //   - redirectHost: The final host after redirects.
 //   - originalHost: The original registry host the challenge request was sent to.
-//   - originalScheme: Scheme of the original challenge request.
-//   - redirectScheme: Scheme of the final redirect destination.
+//   - downgraded: Whether an HTTPS challenge request was redirected over HTTP.
 //
 // Returns:
 //   - TokenResult: Result with Basic auth token.
-//   - error: Non-nil if no credentials are provided or a cross-origin redirect is detected.
+//   - error: Non-nil if no credentials are provided, or the challenge was
+//     redirected to another host or over HTTP.
 func handleBasicAuthChallenge(
 	log *zerolog.Logger,
 	registryAuth string,
 	redirected bool,
 	redirectHost string,
 	originalHost string,
-	originalScheme string,
-	redirectScheme string,
+	downgraded bool,
 ) (TokenResult, error) {
 	if registryAuth == "" {
 		log.Debug().Msg("No credentials provided for Basic auth")
@@ -291,24 +291,17 @@ func handleBasicAuthChallenge(
 			Str("redirect_host", redirectHost).
 			Msg("Cross-origin redirect detected. Rejecting Basic auth challenge")
 
-		redirectURL := (&url.URL{Scheme: redirectScheme, Host: redirectHost}).String()
-		originalURL := (&url.URL{Scheme: originalScheme, Host: originalHost}).String()
-
-		return TokenResult{}, fmt.Errorf("%w: %s -> %s", errCrossOriginRedirect, originalURL, redirectURL)
+		return TokenResult{}, fmt.Errorf("%w: %s -> %s", errCrossOriginRedirect, originalHost, redirectHost)
 	}
 
 	// Reject Basic auth when the challenge redirects from HTTPS to HTTP to prevent
 	// credential exposure over an unencrypted connection.
-	if redirected && originalScheme == "https" && redirectScheme == "http" {
+	if downgraded {
 		log.Debug().
-			Str("original_scheme", originalScheme).
-			Str("redirect_scheme", redirectScheme).
+			Str("original_host", originalHost).
 			Msg("HTTPS to HTTP downgrade detected. Rejecting Basic auth challenge")
 
-		redirectURL := (&url.URL{Scheme: redirectScheme, Host: redirectHost}).String()
-		originalURL := (&url.URL{Scheme: originalScheme, Host: originalHost}).String()
-
-		return TokenResult{}, fmt.Errorf("%w: %s -> %s", errCrossOriginRedirect, originalURL, redirectURL)
+		return TokenResult{}, fmt.Errorf("%w: %s", errInsecureChallengeRedirect, originalHost)
 	}
 
 	log.Debug().Msg("Using Basic auth")
@@ -350,8 +343,7 @@ func handleUnsupportedChallenge(log *zerolog.Logger, challenge string) (TokenRes
 //   - redirected: Whether the challenge request was redirected.
 //   - redirectHost: The final host after redirects.
 //   - originalHost: The original registry host the challenge request was sent to.
-//   - originalScheme: The scheme used for the original challenge request.
-//   - redirectScheme: The scheme used for the final redirect destination.
+//   - downgraded: Whether an HTTPS challenge request was redirected over HTTP.
 //   - response: Parsed challenge response data.
 //
 // Returns:
@@ -367,8 +359,7 @@ func processChallengeResponse(
 	redirected bool,
 	redirectHost string,
 	originalHost string,
-	originalScheme string,
-	redirectScheme string,
+	downgraded bool,
 	response challengeResponse,
 ) (TokenResult, error) {
 	// Handle 200 OK response (no auth required).
@@ -407,8 +398,7 @@ func processChallengeResponse(
 			redirected,
 			redirectHost,
 			originalHost,
-			originalScheme,
-			redirectScheme,
+			downgraded,
 		)
 	}
 
@@ -424,6 +414,8 @@ func processChallengeResponse(
 			settings,
 			redirected,
 			redirectHost,
+			originalHost,
+			downgraded,
 		)
 	}
 
@@ -442,6 +434,13 @@ func processChallengeResponse(
 //   - settings: Registry request settings.
 //   - redirected: Whether the challenge request was redirected.
 //   - redirectHost: The final host after redirects.
+//   - originalHost: The original registry host the challenge request was sent to.
+//   - downgraded: Whether an HTTPS challenge request was redirected over HTTP.
+//
+// A challenge that reached Watchtower over HTTP can be rewritten to name any
+// realm, so credentials are not sent after a downgrade. A redirect to another
+// HTTPS host is allowed. The registry vouches for that host as it does for a
+// realm on another host, such as lscr.io sending clients to ghcr.io.
 //
 // Returns:
 //   - TokenResult: Authentication result containing token and redirect info.
@@ -456,8 +455,18 @@ func handleBearerAuth(
 	settings registryConfig.Registry,
 	redirected bool,
 	redirectHost string,
+	originalHost string,
+	downgraded bool,
 ) (TokenResult, error) {
 	log.Debug().Msg("Entering Bearer auth path")
+
+	if downgraded && registryAuth != "" {
+		log.Debug().
+			Str("original_host", originalHost).
+			Msg("HTTPS to HTTP downgrade detected. Rejecting Bearer auth challenge")
+
+		return TokenResult{}, fmt.Errorf("%w: %s", errInsecureChallengeRedirect, originalHost)
+	}
 
 	normalizedRef, err := reference.ParseNormalizedNamed(container.ImageName())
 	if err != nil {
@@ -631,14 +640,10 @@ func GetToken(
 	redirected := response.Request.URL.String() != challengeURL.String()
 
 	// Capture the final host after redirects for use by callers.
-	var (
-		redirectHost   string
-		redirectScheme string
-	)
+	var redirectHost string
 
 	if redirected {
 		redirectHost = response.Request.URL.Host
-		redirectScheme = response.Request.URL.Scheme
 
 		clog.Debug().
 			Str("redirect_host", redirectHost).
@@ -682,8 +687,38 @@ func GetToken(
 		redirected,
 		redirectHost,
 		challengeURL.Host,
-		challengeURL.Scheme,
-		redirectScheme,
+		challengeDowngraded(challengeURL, response.Request),
 		parsedResponse,
 	)
+}
+
+// challengeDowngraded reports whether an HTTPS challenge request passed through
+// plain HTTP on any redirect hop. Anyone on the network can rewrite an HTTP
+// hop's response, including the redirect that leads to the final challenge.
+//
+// Parameters:
+//   - challengeURL: URL the challenge request was first sent to.
+//   - final: Request that produced the final challenge response.
+//
+// Returns:
+//   - bool: True when challengeURL is HTTPS and a request in the redirect
+//     chain used HTTP.
+func challengeDowngraded(challengeURL url.URL, final *http.Request) bool {
+	if !strings.EqualFold(challengeURL.Scheme, "https") {
+		return false
+	}
+
+	for request := final; request != nil && request.URL != nil; {
+		if strings.EqualFold(request.URL.Scheme, "http") {
+			return true
+		}
+
+		if request.Response == nil {
+			return false
+		}
+
+		request = request.Response.Request
+	}
+
+	return false
 }
