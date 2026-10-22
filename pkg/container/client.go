@@ -1537,6 +1537,15 @@ func (c *client) WaitForContainerHealthy(
 			}
 
 			status := inspect.Container.State.Health.Status
+
+			// Some runtimes (e.g., older Podman versions) report a Health object
+			// with an empty or "none" status when no health check is configured.
+			if status == "" || status == dockerContainer.NoHealthcheck {
+				clog.Debug().Msg("No health check configured for container, proceeding")
+
+				return nil
+			}
+
 			clog.Debug().
 				Str("health_status", string(status)).
 				Msg("Checked container health status")

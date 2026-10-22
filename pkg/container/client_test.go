@@ -768,6 +768,36 @@ func TestClient(t *testing.T) {
 			})
 		})
 
+		t.Run("container reports health without a configured health check", func(t *testing.T) {
+			t.Parallel()
+
+			// Some runtimes, such as older Podman versions, report a Health
+			// object for containers without a health check, with an empty
+			// status or Docker's "none" status.
+			for _, status := range []dockerContainer.HealthStatus{"", dockerContainer.NoHealthcheck} {
+				t.Run(fmt.Sprintf("should return immediately for status %q", status), func(t *testing.T) {
+					t.Parallel()
+
+					synctest.Test(t, func(t *testing.T) {
+						api := newDockerAPI(t)
+						api.EXPECT().ContainerInspect(mock.Anything, mockContainerID, dockerClient.ContainerInspectOptions{}).
+							Return(dockerClient.ContainerInspectResult{Container: dockerContainer.InspectResponse{
+								ID: mockContainerID,
+								State: &dockerContainer.State{
+									Status: "running",
+									Health: &dockerContainer.Health{Status: status},
+								},
+								Config: &dockerContainer.Config{},
+							}}, nil).Once()
+
+						err := (&client{log: newTestLogger(t), api: api}).
+							WaitForContainerHealthy(t.Context(), mockContainerID, 5*time.Second)
+						require.NoError(t, err)
+					})
+				})
+			}
+		})
+
 		t.Run("container becomes healthy", func(t *testing.T) {
 			t.Parallel()
 
