@@ -71,6 +71,13 @@ const testIndexBody = `{"schemaVersion":2,"mediaType":"application/vnd.oci.image
 	`1111111111111111111111111111111111111111111111111111111111111111","size":512,` +
 	`"platform":{"architecture":"amd64","os":"linux"}}]}`
 
+// testImageManifestBody is an OCI image manifest without a top-level digest field.
+const testImageManifestBody = `{"schemaVersion":2,"mediaType":"application/vnd.oci.image.manifest.v1+json",` +
+	`"config":{"mediaType":"application/vnd.oci.image.config.v1+json","digest":"sha256:` +
+	`4444444444444444444444444444444444444444444444444444444444444444","size":1024},` +
+	`"layers":[{"mediaType":"application/vnd.oci.image.layer.v1.tar+gzip","digest":"sha256:` +
+	`5555555555555555555555555555555555555555555555555555555555555555","size":2048}]}`
+
 // testManifestListBody is a Docker manifest list as a registry serves it, with
 // indentation and a trailing newline that are part of the hashed bytes.
 const testManifestListBody = `{
@@ -2245,6 +2252,46 @@ func TestExtractGetDigest(t *testing.T) {
 				}
 			},
 			expected: sha256Hex(testManifestListBody),
+		},
+		{
+			name: "computes the digest of an OCI image manifest body without a digest field",
+			setupResp: func() *http.Response {
+				return &http.Response{
+					StatusCode: http.StatusOK,
+					Status:     "200 OK",
+					Header:     http.Header{"Content-Type": []string{"application/vnd.oci.image.manifest.v1+json"}},
+					Body:       io.NopCloser(strings.NewReader(testImageManifestBody)),
+				}
+			},
+			expected: sha256Hex(testImageManifestBody),
+		},
+		{
+			name: "returns error for schema 2 JSON that is not a manifest",
+			setupResp: func() *http.Response {
+				return &http.Response{
+					StatusCode: http.StatusOK,
+					Status:     "200 OK",
+					Header:     http.Header{"Content-Type": []string{"application/json"}},
+					Body:       io.NopCloser(strings.NewReader(`{"schemaVersion": 2, "status": "pending"}`)),
+				}
+			},
+			wantErr:     true,
+			errContains: "empty digest in JSON manifest",
+		},
+		{
+			name: "returns error for a schema 2 manifest without layers",
+			setupResp: func() *http.Response {
+				return &http.Response{
+					StatusCode: http.StatusOK,
+					Status:     "200 OK",
+					Header:     http.Header{"Content-Type": []string{"application/vnd.oci.image.manifest.v1+json"}},
+					Body: io.NopCloser(strings.NewReader(
+						`{"schemaVersion": 2, "config": {"digest": "sha256:3333333333333333333333333333333333333333333333333333333333333333"}}`,
+					)),
+				}
+			},
+			wantErr:     true,
+			errContains: "empty digest in JSON manifest",
 		},
 		{
 			name: "returns error for a schema 1 manifest without a digest field",
