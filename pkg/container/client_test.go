@@ -128,16 +128,31 @@ func expectExec(api *mockContainer.MockAPIClient, tc execCase) {
 //   - api: Mocked Docker API.
 //   - status: Health status the inspect reports.
 func expectHealth(api *mockContainer.MockAPIClient, status dockerContainer.HealthStatus) {
-	state := &dockerContainer.State{Status: "running"}
+	var health *dockerContainer.Health
 	if status != "" {
-		state.Health = &dockerContainer.Health{Status: status}
+		health = &dockerContainer.Health{Status: status}
 	}
 
+	expectHealthcheck(api, health, nil)
+}
+
+// expectHealthcheck expects one inspect of the mock container reporting the
+// given health object and health check configuration.
+//
+// Parameters:
+//   - api: Mocked Docker API.
+//   - health: Health object the inspect reports, or nil for none.
+//   - healthcheck: Health check configuration the inspect reports, or nil for none.
+func expectHealthcheck(
+	api *mockContainer.MockAPIClient,
+	health *dockerContainer.Health,
+	healthcheck *dockerContainer.HealthConfig,
+) {
 	api.EXPECT().ContainerInspect(mock.Anything, mockContainerID, dockerClient.ContainerInspectOptions{}).
 		Return(dockerClient.ContainerInspectResult{Container: dockerContainer.InspectResponse{
 			ID:     mockContainerID,
-			State:  state,
-			Config: &dockerContainer.Config{},
+			State:  &dockerContainer.State{Status: "running", Health: health},
+			Config: &dockerContainer.Config{Healthcheck: healthcheck},
 		}}, nil).Once()
 }
 
@@ -760,6 +775,57 @@ func TestClient(t *testing.T) {
 				synctest.Test(t, func(t *testing.T) {
 					api := newDockerAPI(t)
 					expectHealth(api, "")
+
+					err := (&client{log: newTestLogger(t), api: api}).
+						WaitForContainerHealthy(t.Context(), mockContainerID, 5*time.Second)
+					require.NoError(t, err)
+				})
+			})
+		})
+
+		t.Run("container health check is disabled", func(t *testing.T) {
+			t.Parallel()
+
+			disabled := &dockerContainer.HealthConfig{Test: []string{"NONE"}}
+
+			// Podman reports a health object with an empty status for a
+			// disabled health check, and Docker reports none.
+			tests := []struct {
+				name   string
+				health *dockerContainer.Health
+			}{
+				{name: "should return immediately when Podman reports an empty status", health: &dockerContainer.Health{}},
+				{name: "should return immediately when Docker reports no health"},
+			}
+
+			for _, tt := range tests {
+				t.Run(tt.name, func(t *testing.T) {
+					t.Parallel()
+
+					synctest.Test(t, func(t *testing.T) {
+						api := newDockerAPI(t)
+						expectHealthcheck(api, tt.health, disabled)
+
+						err := (&client{log: newTestLogger(t), api: api}).
+							WaitForContainerHealthy(t.Context(), mockContainerID, 5*time.Second)
+						require.NoError(t, err)
+					})
+				})
+			}
+		})
+
+		t.Run("configured health check has not reported yet", func(t *testing.T) {
+			t.Parallel()
+
+			t.Run("should keep waiting through an empty status", func(t *testing.T) {
+				t.Parallel()
+
+				synctest.Test(t, func(t *testing.T) {
+					configured := &dockerContainer.HealthConfig{Test: []string{"CMD", "/healthcheck"}}
+
+					api := newDockerAPI(t)
+					expectHealthcheck(api, &dockerContainer.Health{}, configured)
+					expectHealthcheck(api, &dockerContainer.Health{Status: dockerContainer.Healthy}, configured)
 
 					err := (&client{log: newTestLogger(t), api: api}).
 						WaitForContainerHealthy(t.Context(), mockContainerID, 5*time.Second)

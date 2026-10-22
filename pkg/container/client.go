@@ -1475,7 +1475,7 @@ func (c *client) GetImageDiskUsage(ctx context.Context) (types.ImageDiskUsage, e
 //
 // Returns:
 //   - error: Non-nil if timeout is reached, container becomes unhealthy, or inspection
-//     fails. nil if healthy or no health check is configured.
+//     fails. nil if healthy, or if no health check is configured or it is disabled.
 func (c *client) WaitForContainerHealthy(
 	ctx context.Context,
 	containerID types.ContainerID,
@@ -1536,6 +1536,15 @@ func (c *client) WaitForContainerHealthy(
 				return nil
 			}
 
+			// Podman reports a health object for a disabled health check, and
+			// its status stays empty because the check never runs. Docker
+			// reports no health object for one.
+			if healthCheckDisabled(inspect.Container.Config) {
+				clog.Debug().Msg("Health check disabled for container, proceeding")
+
+				return nil
+			}
+
 			status := inspect.Container.State.Health.Status
 			clog.Debug().
 				Str("health_status", string(status)).
@@ -1556,6 +1565,19 @@ func (c *client) WaitForContainerHealthy(
 			// Continue polling for "starting" or other statuses
 		}
 	}
+}
+
+// healthCheckDisabled reports whether a container's health check is turned off,
+// which Docker and Podman record as a test of only "NONE".
+//
+// Parameters:
+//   - config: Container configuration from an inspect.
+//
+// Returns:
+//   - bool: True when the health check test is ["NONE"].
+func healthCheckDisabled(config *dockerContainer.Config) bool {
+	return config != nil && config.Healthcheck != nil &&
+		len(config.Healthcheck.Test) == 1 && config.Healthcheck.Test[0] == "NONE"
 }
 
 // logger returns the client's process logger, or a discarded nop if unset.
