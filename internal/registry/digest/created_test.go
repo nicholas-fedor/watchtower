@@ -1,4 +1,4 @@
-package registry
+package digest
 
 import (
 	"context"
@@ -12,7 +12,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
@@ -22,23 +21,6 @@ import (
 	"github.com/nicholas-fedor/watchtower/internal/testutil/httpstub"
 	mockTypes "github.com/nicholas-fedor/watchtower/pkg/types/mocks"
 )
-
-// newTestLogger returns a logger that writes each event to the test's log, so a
-// failing test shows what it logged.
-//
-// Parameters:
-//   - t: Test that receives the log lines.
-//
-// Returns:
-//   - *zerolog.Logger: Logger writing to t.
-func newTestLogger(t *testing.T) *zerolog.Logger {
-	t.Helper()
-
-	// Frame 4 skips zerolog's write path, so each line names the log call.
-	w := zerolog.TestWriter{T: t, Frame: 4}
-
-	return new(zerolog.New(w))
-}
 
 func TestRegistryRateLimitError(t *testing.T) {
 	assert.NoError(t, registryRateLimitError(nil))

@@ -10,6 +10,7 @@ import (
 
 	registryConfig "github.com/nicholas-fedor/watchtower/internal/config/registry"
 	"github.com/nicholas-fedor/watchtower/internal/registry"
+	"github.com/nicholas-fedor/watchtower/internal/registry/digest"
 	"github.com/nicholas-fedor/watchtower/internal/registry/ratelimit"
 	"github.com/nicholas-fedor/watchtower/internal/util"
 	"github.com/nicholas-fedor/watchtower/pkg/types"
@@ -146,7 +147,7 @@ func fetchImageCreationTime(
 		}
 	}
 
-	creationTime, err := registry.FetchImageCreationTime(clog,
+	creationTime, err := digest.FetchImageCreationTime(clog,
 		ctx,
 		sourceContainer,
 		pullOpts.RegistryAuth,

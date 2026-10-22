@@ -1,5 +1,7 @@
 // Package digest fetches image digests from container registries and compares
 // them with local image digests to decide whether a container's image is stale.
+// It also reads an image's creation time from its registry for the image
+// cooldown.
 package digest
 
 import (
@@ -32,7 +34,7 @@ import (
 // allowing Watchtower to compare or fetch it without downloading the full manifest body.
 const ContentDigestHeader = "Docker-Content-Digest"
 
-// maxManifestSize is the maximum allowed size for a digest GET fallback body (1 MiB).
+// maxManifestSize is the maximum allowed size for a manifest response body (1 MiB).
 const maxManifestSize = 1 << 20
 
 // schema2Version is the schemaVersion of OCI and Docker schema 2 manifests and
@@ -75,7 +77,7 @@ var (
 	errFailedCreateRequest = errors.New("failed to create request")
 	// errFailedExecuteRequest indicates a failure to execute an HTTP request to the registry.
 	errFailedExecuteRequest = errors.New("failed to execute request")
-	// errManifestTooLarge indicates the digest GET fallback body exceeded the size limit.
+	// errManifestTooLarge indicates a manifest response body exceeded the size limit.
 	errManifestTooLarge = errors.New("manifest response exceeds size limit")
 	// errUnresolvedManifestRetry indicates the retried manifest request was sent to yet another host.
 	errUnresolvedManifestRetry = errors.New("manifest request still needs another host after retrying")
