@@ -17,6 +17,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- Move image creation and credential lookup into digest and auth by @nicholas-fedor in [#3055](https://github.com/nicholas-fedor/watchtower/pull/3055)
 - Drop the duplicate platform manifest request by @nicholas-fedor in [#3036](https://github.com/nicholas-fedor/watchtower/pull/3036)
 
 ### Chores
