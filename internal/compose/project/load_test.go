@@ -6,6 +6,7 @@ import (
 	"path/filepath"
 	"testing"
 
+	"github.com/compose-spec/compose-go/v2/cli"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -89,4 +90,65 @@ services:
 	require.NoError(t, err)
 	assert.Equal(t, "app:fromdotenv", api.Image)
 	assert.NotContains(t, fmt.Sprint(api.Environment), "supersecret")
+}
+
+// TestLoadChecksOverrideSymlinks verifies that the default override files,
+// which compose-go loads with the default Compose file, get the same symlink
+// check: an override that leads outside the project is rejected, and one that
+// stays inside it is merged.
+func TestLoadChecksOverrideSymlinks(t *testing.T) {
+	t.Parallel()
+
+	const base = "services:\n  api:\n    image: app:base\n"
+
+	for _, name := range cli.DefaultOverrideFileNames {
+		t.Run("rejects "+name+" leading outside the project", func(t *testing.T) {
+			t.Parallel()
+
+			dir := t.TempDir()
+			require.NoError(t, os.WriteFile(filepath.Join(dir, "compose.yaml"), []byte(base), 0o600))
+
+			outside := filepath.Join(t.TempDir(), "outside.yaml")
+			require.NoError(t, os.WriteFile(outside, []byte("services:\n  api:\n    image: app:outside\n"), 0o600))
+			require.NoError(t, os.Symlink(outside, filepath.Join(dir, name)))
+
+			_, err := Load(t.Context(), ProjectRef{Dir: dir, Name: "p"})
+			require.ErrorIs(t, err, errConfigFile)
+		})
+	}
+
+	t.Run("merges an override inside the project", func(t *testing.T) {
+		t.Parallel()
+
+		dir := t.TempDir()
+		require.NoError(t, os.WriteFile(filepath.Join(dir, "compose.yaml"), []byte(base), 0o600))
+		require.NoError(t, os.Mkdir(filepath.Join(dir, "local"), 0o700))
+
+		target := filepath.Join(dir, "local", "override.yaml")
+		require.NoError(t, os.WriteFile(target, []byte("services:\n  api:\n    image: app:override\n"), 0o600))
+		require.NoError(t, os.Symlink(target, filepath.Join(dir, "compose.override.yaml")))
+
+		project, err := Load(t.Context(), ProjectRef{Dir: dir, Name: "p"})
+		require.NoError(t, err)
+
+		api, err := project.GetService("api")
+		require.NoError(t, err)
+		assert.Equal(t, "app:override", api.Image)
+	})
+}
+
+// TestLoadRejectsParentDirectoryProject verifies that a project directory
+// without a Compose file is not loaded from a parent directory's Compose file,
+// which compose-go finds by searching upward.
+func TestLoadRejectsParentDirectoryProject(t *testing.T) {
+	t.Parallel()
+
+	parent := t.TempDir()
+	require.NoError(t, os.WriteFile(filepath.Join(parent, "compose.yaml"), []byte("services:\n  other:\n    image: other:latest\n"), 0o600))
+
+	dir := filepath.Join(parent, "app")
+	require.NoError(t, os.Mkdir(dir, 0o700))
+
+	_, err := Load(t.Context(), ProjectRef{Dir: dir, Name: "p"})
+	require.ErrorIs(t, err, errConfigFile)
 }

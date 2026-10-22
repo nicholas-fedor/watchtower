@@ -6,6 +6,8 @@ import (
 	"path/filepath"
 	"strings"
 
+	"github.com/compose-spec/compose-go/v2/cli"
+
 	composeLabels "github.com/nicholas-fedor/watchtower/internal/compose/labels"
 )
 
@@ -284,14 +286,15 @@ func symlinkEscapes(dir, path string) error {
 //   - dir: Candidate project directory.
 //
 // Returns:
-//   - bool: True when a compose.yaml or docker-compose.yaml is present.
+//   - bool: True when one of the default Compose files is present. Override
+//     files alone do not count.
 func readableProjectDir(dir string) bool {
 	info, err := os.Stat(dir)
 	if err != nil || !info.IsDir() {
 		return false
 	}
 
-	for _, name := range []string{"compose.yaml", "compose.yml", "docker-compose.yaml", "docker-compose.yml"} {
+	for _, name := range cli.DefaultFileNames {
 		if fileExists(filepath.Join(dir, name)) {
 			return true
 		}
