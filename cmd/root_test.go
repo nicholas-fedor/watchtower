@@ -13,12 +13,12 @@ import (
 	"sync/atomic"
 	"syscall"
 	"testing"
+	"testing/fstest"
 	"testing/synctest"
 	"time"
 
 	"github.com/gofiber/fiber/v3"
 	"github.com/rs/zerolog"
-	"github.com/spf13/afero"
 	"github.com/spf13/cobra"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
@@ -1329,7 +1329,7 @@ func TestContainerLookupWithTimeoutContext(t *testing.T) {
 
 			// Call GetCurrentContainerID which internally uses the client
 			// The function will eventually call ListContainers with our expired context
-			_, err := container.GetCurrentContainerID(newTestLogger(t), ctx, afero.NewMemMapFs(), mockClient)
+			_, err := container.GetCurrentContainerID(newTestLogger(t), ctx, fstest.MapFS{}, mockClient)
 
 			// Verify error is propagated
 			require.Error(t, err)
@@ -1360,7 +1360,7 @@ func TestContainerLookupWithTimeoutContext(t *testing.T) {
 			mockClient.EXPECT().ListContainers(ctx).Return(nil, context.Canceled).Once()
 
 			// Call GetCurrentContainerID
-			_, err := container.GetCurrentContainerID(newTestLogger(t), ctx, afero.NewMemMapFs(), mockClient)
+			_, err := container.GetCurrentContainerID(newTestLogger(t), ctx, fstest.MapFS{}, mockClient)
 
 			// Verify error is propagated
 			require.Error(t, err)
@@ -1639,7 +1639,7 @@ func TestRootCommand_ReviveStoppedFlagParsing(t *testing.T) {
 func TestResolveCurrentWatchtowerContainerForFallback(t *testing.T) {
 	t.Run("successful resolution", func(t *testing.T) {
 		// No /proc files, so detection falls back to the hostname.
-		setProcessFs(t, afero.NewMemMapFs())
+		setProcessFs(t, fstest.MapFS{})
 
 		t.Setenv("HOSTNAME", "test-hostname")
 
@@ -1661,7 +1661,7 @@ func TestResolveCurrentWatchtowerContainerForFallback(t *testing.T) {
 
 	t.Run("GetCurrentContainerID returns error", func(t *testing.T) {
 		// No /proc files, so detection falls back to the hostname.
-		setProcessFs(t, afero.NewMemMapFs())
+		setProcessFs(t, fstest.MapFS{})
 
 		t.Setenv("HOSTNAME", "test-hostname")
 
@@ -1676,7 +1676,7 @@ func TestResolveCurrentWatchtowerContainerForFallback(t *testing.T) {
 
 	t.Run("GetCurrentContainerID returns empty string", func(t *testing.T) {
 		// No /proc files, so detection falls back to the hostname.
-		setProcessFs(t, afero.NewMemMapFs())
+		setProcessFs(t, fstest.MapFS{})
 
 		t.Setenv("HOSTNAME", "test-hostname")
 
@@ -1691,7 +1691,7 @@ func TestResolveCurrentWatchtowerContainerForFallback(t *testing.T) {
 
 	t.Run("GetCurrentWatchtowerContainer returns nil", func(t *testing.T) {
 		// No /proc files, so detection falls back to the hostname.
-		setProcessFs(t, afero.NewMemMapFs())
+		setProcessFs(t, fstest.MapFS{})
 
 		t.Setenv("HOSTNAME", "test-hostname")
 

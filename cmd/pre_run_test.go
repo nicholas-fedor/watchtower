@@ -4,14 +4,15 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"io/fs"
 	"os"
 	"os/exec"
 	"strings"
 	"testing"
+	"testing/fstest"
 	"time"
 
 	"github.com/rs/zerolog"
-	"github.com/spf13/afero"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
@@ -67,9 +68,11 @@ func setPreRunState(t *testing.T, client container.Client, detection selfDetecti
 
 	t.Cleanup(func() { newClient = savedNewClient })
 
-	fsys := afero.NewMemMapFs()
+	// io/fs paths are relative to the root, so the absolute paths drop their
+	// leading slash.
+	fsys := fstest.MapFS{}
 	writeFile := func(path, content string) {
-		require.NoError(t, afero.WriteFile(fsys, path, []byte(content), 0o600))
+		fsys[strings.TrimPrefix(path, "/")] = &fstest.MapFile{Data: []byte(content)}
 	}
 
 	if detection.marker {
@@ -104,7 +107,7 @@ func setPreRunState(t *testing.T, client container.Client, detection selfDetecti
 // setProcessFs replaces the filesystem that holds the container marker files
 // and the /proc files read by self container ID detection, and restores it
 // when the test ends.
-func setProcessFs(t *testing.T, fsys afero.Fs) {
+func setProcessFs(t *testing.T, fsys fs.FS) {
 	t.Helper()
 
 	saved := processFs

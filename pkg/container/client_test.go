@@ -19,11 +19,11 @@ import (
 	"slices"
 	"strings"
 	"testing"
+	"testing/fstest"
 	"testing/synctest"
 	"time"
 
 	"github.com/rs/zerolog"
-	"github.com/spf13/afero"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
@@ -636,8 +636,7 @@ func TestClient(t *testing.T) {
 				expectContainerFixtures(t, api, fixtureWatchtower, fixtureRunning, fixtureRestarting)
 
 				// A Docker marker resolves the runtime without an API call.
-				fsys := afero.NewMemMapFs()
-				require.NoError(t, afero.WriteFile(fsys, "/.dockerenv", nil, 0o600))
+				fsys := fstest.MapFS{".dockerenv": {}}
 
 				c := &client{
 					log:               newTestLogger(t),
@@ -880,8 +879,7 @@ func TestClient(t *testing.T) {
 			t.Run("should detect Podman via marker file", func(t *testing.T) {
 				t.Parallel()
 
-				memFs := afero.NewMemMapFs()
-				require.NoError(t, afero.WriteFile(memFs, "/run/.containerenv", []byte{}, 0o644))
+				memFs := fstest.MapFS{"run/.containerenv": {}}
 
 				testClient := &client{
 					log:         newTestLogger(t),
@@ -894,8 +892,7 @@ func TestClient(t *testing.T) {
 			t.Run("should detect Docker via marker file", func(t *testing.T) {
 				t.Parallel()
 
-				memFs := afero.NewMemMapFs()
-				require.NoError(t, afero.WriteFile(memFs, "/.dockerenv", []byte{}, 0o644))
+				memFs := fstest.MapFS{".dockerenv": {}}
 
 				testClient := &client{
 					log:         newTestLogger(t),
@@ -915,12 +912,12 @@ func TestClient(t *testing.T) {
 			markers []string
 			want    containerRuntime
 		}{
-			{title: "should return runtimePodman when Podman marker file exists", markers: []string{"/run/.containerenv"}, want: runtimePodman},
-			{title: "should return runtimeDocker when Docker marker file exists", markers: []string{"/.dockerenv"}, want: runtimeDocker},
+			{title: "should return runtimePodman when Podman marker file exists", markers: []string{"run/.containerenv"}, want: runtimePodman},
+			{title: "should return runtimeDocker when Docker marker file exists", markers: []string{".dockerenv"}, want: runtimeDocker},
 			{title: "should return runtimeUnknown when neither marker file exists", want: runtimeUnknown},
 			{
 				title:   "should return runtimePodman when Podman marker exists alongside Docker marker",
-				markers: []string{"/run/.containerenv", "/.dockerenv"},
+				markers: []string{"run/.containerenv", ".dockerenv"},
 				want:    runtimePodman,
 			},
 		}
@@ -929,9 +926,9 @@ func TestClient(t *testing.T) {
 			t.Run(tt.title, func(t *testing.T) {
 				t.Parallel()
 
-				memFs := afero.NewMemMapFs()
+				memFs := fstest.MapFS{}
 				for _, marker := range tt.markers {
-					require.NoError(t, afero.WriteFile(memFs, marker, []byte{}, 0o644))
+					memFs[marker] = &fstest.MapFile{}
 				}
 
 				// Without a logger, the client logs through a discarding one.
@@ -1462,7 +1459,7 @@ func TestClientEnvironment(t *testing.T) {
 				return &client{
 					log:         newTestLogger(t),
 					api:         api,
-					CPUCopyMode: cpuCopyModeAuto, Fs: afero.NewMemMapFs(),
+					CPUCopyMode: cpuCopyModeAuto, Fs: fstest.MapFS{},
 				}
 			}
 
@@ -1790,8 +1787,8 @@ func TestListContainers_RestartingFilterFollowsRuntime(t *testing.T) {
 		// statuses are the statuses the list request filters by.
 		statuses []string
 	}{
-		{name: "Docker", marker: "/.dockerenv", statuses: []string{"running", "restarting"}},
-		{name: "Podman", marker: "/run/.containerenv", statuses: []string{"running"}},
+		{name: "Docker", marker: ".dockerenv", statuses: []string{"running", "restarting"}},
+		{name: "Podman", marker: "run/.containerenv", statuses: []string{"running"}},
 	}
 
 	for _, tt := range tests {
@@ -1803,8 +1800,7 @@ func TestListContainers_RestartingFilterFollowsRuntime(t *testing.T) {
 				api.EXPECT().ContainerList(mock.Anything, dockerClient.ContainerListOptions{Filters: statusFilters(tt.statuses...)}).
 					Return(dockerClient.ContainerListResult{}, nil).Once()
 
-				fsys := afero.NewMemMapFs()
-				require.NoError(t, afero.WriteFile(fsys, tt.marker, nil, 0o600))
+				fsys := fstest.MapFS{tt.marker: {}}
 
 				c := &client{
 					log:               newTestLogger(t),
@@ -1838,7 +1834,7 @@ func TestGetRuntime_RetriesFailedDetection(t *testing.T) {
 	c := &client{
 		log:         newTestLogger(t),
 		api:         api,
-		CPUCopyMode: cpuCopyModeAuto, Fs: afero.NewMemMapFs(),
+		CPUCopyMode: cpuCopyModeAuto, Fs: fstest.MapFS{},
 	}
 
 	assert.False(t, c.getRuntime(t.Context()), "a failed detection falls back to Docker")
