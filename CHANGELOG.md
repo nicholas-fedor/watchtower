@@ -20,6 +20,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Chores
 
+- Update module github.com/gofiber/contrib/v3/swaggo to v1.0.14 by @renovate[bot] in [#3051](https://github.com/nicholas-fedor/watchtower/pull/3051)
 - Update golang:alpine3.24 docker digest to b8c9b82 by @renovate[bot] in [#3047](https://github.com/nicholas-fedor/watchtower/pull/3047)
 - Update golang:1.27.3-alpine docker digest to b8c9b82 by @renovate[bot] in [#3045](https://github.com/nicholas-fedor/watchtower/pull/3045)
 - Update module github.com/gofiber/contrib/v3/zerolog to v1.1.8 by @renovate[bot] in [#3040](https://github.com/nicholas-fedor/watchtower/pull/3040)
