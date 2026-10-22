@@ -38,6 +38,14 @@ var tlsVersionMap = map[string]uint16{
 	"TLS1.3": tls.VersionTLS13,
 }
 
+// errUnparseableRedirect replaces the client's error for a redirect whose
+// Location header does not parse, which quotes the raw Location.
+var errUnparseableRedirect = errors.New("failed to parse redirect Location header")
+
+// unparseableRedirectPrefix starts the HTTP client's error for a redirect
+// whose Location header does not parse.
+const unparseableRedirectPrefix = "failed to parse Location header"
+
 // Cached clients, one per TLS configuration, so registry requests made with
 // the same settings share one connection pool.
 var (
@@ -88,7 +96,10 @@ type registryClient struct {
 //   - request: The HTTP request to execute.
 //
 // The error of a failed request names the last URL requested, which can be a
-// redirect target, so that URL is redacted with [RedactURL].
+// redirect target, so that URL is redacted with [RedactURL]. The client quotes
+// the raw Location of a redirect it cannot parse, so that error is replaced
+// with errUnparseableRedirect. Other causes stay wrapped, so callers can still
+// tell a canceled or timed-out request apart.
 //
 // Returns:
 //   - *http.Response: The HTTP response from the registry, if successful.
@@ -98,6 +109,10 @@ func (r *registryClient) Do(request *http.Request) (*http.Response, error) {
 	if err != nil {
 		if urlErr, ok := errors.AsType[*url.Error](err); ok {
 			urlErr.URL = RedactURL(urlErr.URL)
+
+			if urlErr.Err != nil && strings.HasPrefix(urlErr.Err.Error(), unparseableRedirectPrefix) {
+				urlErr.Err = errUnparseableRedirect
+			}
 		}
 
 		return nil, fmt.Errorf("failed to execute HTTP request: %w", err)
