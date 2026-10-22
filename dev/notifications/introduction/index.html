@@ -2989,6 +2989,7 @@
 </code></pre></div>
 <p>The format is the same for all services, but the parameters, path, and credentials vary between them.</p>
 <p>The <a href="../../configuration/notifications/#notification_url"><code>NOTIFICATION URL</code></a> configuration option can also reference a file, in which case the contents of the file are used.</p>
+<p>Watchtower checks every notification URL when it starts. If Shoutrrr cannot use a URL, such as one with no host or with a token that is not in the service's format, Watchtower logs <code>Failed to initialize Shoutrrr notifications</code> with an error that names the service and the problem, then exits.</p>
 <h3 id="using_multiple_notification_services">Using Multiple Notification Services<a class="headerlink" href="#using_multiple_notification_services" title="Permanent link">&para;</a></h3>
 <p>Watchtower supports using multiple Shoutrrr URLs to send notifications to multiple notification services.</p>
 <div class="tabbed-set tabbed-alternate" data-tabs="1:2"><input checked="checked" id="__tabbed_1_1" name="__tabbed_1" type="radio" /><input id="__tabbed_1_2" name="__tabbed_1" type="radio" /><div class="tabbed-labels"><label for="__tabbed_1_1">Docker Compose</label><label for="__tabbed_1_2">Docker CLI</label></div>
@@ -3130,7 +3131,7 @@ will cause the last value to overwrite previous ones:</p>
     <span class="md-icon" title="Last update">
       <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M21 13.1c-.1 0-.3.1-.4.2l-1 1 2.1 2.1 1-1c.2-.2.2-.6 0-.8l-1.3-1.3c-.1-.1-.2-.2-.4-.2m-1.9 1.8-6.1 6V23h2.1l6.1-6.1zM12.5 7v5.2l4 2.4-1 1L11 13V7zM11 21.9c-5.1-.5-9-4.8-9-9.9C2 6.5 6.5 2 12 2c5.3 0 9.6 4.1 10 9.3-.3-.1-.6-.2-1-.2s-.7.1-1 .2C19.6 7.2 16.2 4 12 4c-4.4 0-8 3.6-8 8 0 4.1 3.1 7.5 7.1 7.9l-.1.2z"/></svg>
     </span>
-    <span class="git-revision-date-localized-plugin git-revision-date-localized-plugin-timeago" title="July 18, 2026 15:19:32 UTC"><span class="timeago" datetime="2026-07-18T15:19:32+00:00" locale="en"></span></span><span class="git-revision-date-localized-plugin git-revision-date-localized-plugin-iso_date" title="July 18, 2026 15:19:32 UTC">2026-07-18</span>
+    <span class="git-revision-date-localized-plugin git-revision-date-localized-plugin-timeago" title="October 22, 2026 01:03:49 UTC"><span class="timeago" datetime="2026-10-22T01:03:49+00:00" locale="en"></span></span><span class="git-revision-date-localized-plugin git-revision-date-localized-plugin-iso_date" title="October 22, 2026 01:03:49 UTC">2026-10-22</span>
   </span>
 
     
