@@ -3,13 +3,13 @@ package cmd
 import (
 	"context"
 	"errors"
+	"io/fs"
 	"os"
 	"os/signal"
 	"syscall"
 	"time"
 
 	"github.com/rs/zerolog"
-	"github.com/spf13/afero"
 	"github.com/spf13/cobra"
 
 	dockerContainer "github.com/moby/moby/api/types/container"
@@ -116,7 +116,7 @@ var (
 	//
 	// Tests replace it to control whether Watchtower appears to run in a
 	// container and which container ID it detects.
-	processFs afero.Fs = afero.NewOsFs()
+	processFs fs.FS = os.DirFS("/")
 
 	// runUpdatesWithNotifications is a function variable for performing container updates and sending notifications.
 	//

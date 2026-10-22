@@ -10,9 +10,9 @@ import (
 	"os"
 	"strings"
 	"testing"
+	"testing/fstest"
 
 	"github.com/rs/zerolog"
-	"github.com/spf13/afero"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
@@ -26,11 +26,12 @@ import (
 
 const testHostname = "test-hostname"
 
-// writeProcFile writes content to path in fsys, failing the test on error.
-func writeProcFile(t *testing.T, fsys afero.Fs, path, content string) {
+// writeProcFile adds a file with content at the absolute path to fsys, stored
+// relative to the root as io/fs requires.
+func writeProcFile(t *testing.T, fsys fstest.MapFS, path, content string) {
 	t.Helper()
 
-	require.NoError(t, afero.WriteFile(fsys, path, []byte(content), 0o600))
+	fsys[strings.TrimPrefix(path, "/")] = &fstest.MapFile{Data: []byte(content)}
 }
 
 // cgroupFile is the cgroup file self container ID detection reads for this process.
@@ -48,11 +49,11 @@ func TestGetContainerIDFromCgroupFile(t *testing.T) {
 
 		tests := []struct {
 			name    string
-			setup   func(t *testing.T, fsys afero.Fs)
+			setup   func(t *testing.T, fsys fstest.MapFS)
 			want    types.ContainerID
 			wantErr error
 		}{
-			{name: "SuccessWithValidID", setup: func(t *testing.T, fsys afero.Fs) {
+			{name: "SuccessWithValidID", setup: func(t *testing.T, fsys fstest.MapFS) {
 				t.Helper()
 
 				writeProcFile(t, fsys, cgroupFile(),
@@ -62,12 +63,12 @@ func TestGetContainerIDFromCgroupFile(t *testing.T) {
 				"1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef",
 			), wantErr: nil},
 			{name: "FileNotReadable", setup: nil, want: types.ContainerID(""), wantErr: errReadCgroupFile},
-			{name: "NoValidID", setup: func(t *testing.T, fsys afero.Fs) {
+			{name: "NoValidID", setup: func(t *testing.T, fsys fstest.MapFS) {
 				t.Helper()
 
 				writeProcFile(t, fsys, cgroupFile(), "11:perf_event:/user.slice\n10:cpu:/system.slice")
 			}, want: types.ContainerID(""), wantErr: errExtractContainerID},
-			{name: "EmptyFileContent", setup: func(t *testing.T, fsys afero.Fs) {
+			{name: "EmptyFileContent", setup: func(t *testing.T, fsys fstest.MapFS) {
 				t.Helper()
 
 				writeProcFile(t, fsys, cgroupFile(), "")
@@ -80,7 +81,7 @@ func TestGetContainerIDFromCgroupFile(t *testing.T) {
 
 				setup, want, wantErr := tt.setup, tt.want, tt.wantErr
 
-				fsys := afero.NewMemMapFs()
+				fsys := fstest.MapFS{}
 				if setup != nil {
 					setup(t, fsys)
 				}
@@ -164,11 +165,11 @@ func TestGetContainerIDFromMountinfo(t *testing.T) {
 
 		tests := []struct {
 			name    string
-			setup   func(t *testing.T, fsys afero.Fs)
+			setup   func(t *testing.T, fsys fstest.MapFS)
 			want    types.ContainerID
 			wantErr error
 		}{
-			{name: "SuccessWithValidIDInRoot", setup: func(t *testing.T, fsys afero.Fs) {
+			{name: "SuccessWithValidIDInRoot", setup: func(t *testing.T, fsys fstest.MapFS) {
 				t.Helper()
 
 				writeProcFile(t, fsys, "/proc/self/mountinfo",
@@ -177,7 +178,7 @@ func TestGetContainerIDFromMountinfo(t *testing.T) {
 			}, want: types.ContainerID(
 				"1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef",
 			), wantErr: nil},
-			{name: "SuccessWithValidIDInMountPoint", setup: func(t *testing.T, fsys afero.Fs) {
+			{name: "SuccessWithValidIDInMountPoint", setup: func(t *testing.T, fsys fstest.MapFS) {
 				t.Helper()
 
 				writeProcFile(t, fsys, "/proc/self/mountinfo",
@@ -187,12 +188,12 @@ func TestGetContainerIDFromMountinfo(t *testing.T) {
 				"abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567800",
 			), wantErr: nil},
 			{name: "MountinfoFileNotReadable", setup: nil, want: types.ContainerID(""), wantErr: errReadMountinfoFile},
-			{name: "NoValidIDInMountinfo", setup: func(t *testing.T, fsys afero.Fs) {
+			{name: "NoValidIDInMountinfo", setup: func(t *testing.T, fsys fstest.MapFS) {
 				t.Helper()
 
 				writeProcFile(t, fsys, "/proc/self/mountinfo", "36 35 98:0 / rw,relatime shared:1 - overlay ")
 			}, want: types.ContainerID(""), wantErr: errExtractContainerIDFromMountinfo},
-			{name: "EmptyMountinfoFileContent", setup: func(t *testing.T, fsys afero.Fs) {
+			{name: "EmptyMountinfoFileContent", setup: func(t *testing.T, fsys fstest.MapFS) {
 				t.Helper()
 
 				writeProcFile(t, fsys, "/proc/self/mountinfo", "")
@@ -205,7 +206,7 @@ func TestGetContainerIDFromMountinfo(t *testing.T) {
 
 				setup, want, wantErr := tt.setup, tt.want, tt.wantErr
 
-				fsys := afero.NewMemMapFs()
+				fsys := fstest.MapFS{}
 				if setup != nil {
 					setup(t, fsys)
 				}
@@ -598,12 +599,12 @@ func TestGetCurrentContainerID(t *testing.T) {
 	t.Run("should return the correct container ID or error", func(t *testing.T) {
 		tests := []struct {
 			name           string
-			setup          func(t *testing.T, fsys afero.Fs, mockClient *mockContainer.MockClient)
+			setup          func(t *testing.T, fsys fstest.MapFS, mockClient *mockContainer.MockClient)
 			expectedID     types.ContainerID
 			expectError    bool
 			errorSubstring string
 		}{
-			{name: "when cgroup v2 detection succeeds", setup: func(t *testing.T, fsys afero.Fs, mockClient *mockContainer.MockClient) {
+			{name: "when cgroup v2 detection succeeds", setup: func(t *testing.T, fsys fstest.MapFS, mockClient *mockContainer.MockClient) {
 				t.Helper()
 
 				expectedID := types.ContainerID(
@@ -617,7 +618,7 @@ func TestGetCurrentContainerID(t *testing.T) {
 					)+"/resolv.conf /etc/resolv.conf rw,relatime shared:1 - overlay rw,lowerdir=/var/lib/docker/overlay2/l/...,upperdir=/var/lib/docker/overlay2/...,workdir=/var/lib/docker/overlay2/...,\n",
 				)
 			}, expectedID: types.ContainerID("1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef"), expectError: false, errorSubstring: ""},
-			{name: "when cgroup v2 detection fails but cgroup v1 detection succeeds", setup: func(t *testing.T, fsys afero.Fs, mockClient *mockContainer.MockClient) {
+			{name: "when cgroup v2 detection fails but cgroup v1 detection succeeds", setup: func(t *testing.T, fsys fstest.MapFS, mockClient *mockContainer.MockClient) {
 				t.Helper()
 
 				expectedID := types.ContainerID(
@@ -629,7 +630,7 @@ func TestGetCurrentContainerID(t *testing.T) {
 			}, expectedID: types.ContainerID(
 				"abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890",
 			), expectError: false, errorSubstring: ""},
-			{name: "when both cgroup v2 and cgroup v1 detection fail but hostname detection succeeds", setup: func(t *testing.T, fsys afero.Fs, mockClient *mockContainer.MockClient) {
+			{name: "when both cgroup v2 and cgroup v1 detection fail but hostname detection succeeds", setup: func(t *testing.T, fsys fstest.MapFS, mockClient *mockContainer.MockClient) {
 				t.Helper()
 
 				expectedID := types.ContainerID("hostname-container-id")
@@ -653,7 +654,7 @@ func TestGetCurrentContainerID(t *testing.T) {
 					Return([]types.Container{mockContainer}, nil).
 					Times(1)
 			}, expectedID: types.ContainerID("hostname-container-id"), expectError: false, errorSubstring: ""},
-			{name: "when all detection methods fail", setup: func(t *testing.T, fsys afero.Fs, mockClient *mockContainer.MockClient) {
+			{name: "when all detection methods fail", setup: func(t *testing.T, fsys fstest.MapFS, mockClient *mockContainer.MockClient) {
 				t.Helper()
 
 				// No mountinfo or cgroup file, and HOSTNAME is not set, so hostname
@@ -671,7 +672,7 @@ func TestGetCurrentContainerID(t *testing.T) {
 
 				setup, expectedID, expectError, errorSubstring := tt.setup, tt.expectedID, tt.expectError, tt.errorSubstring
 
-				fsys := afero.NewMemMapFs()
+				fsys := fstest.MapFS{}
 				if setup != nil {
 					setup(t, fsys, mockClient)
 				}
@@ -695,14 +696,14 @@ func TestGetCurrentContainerID(t *testing.T) {
 
 // statErrorFs is a filesystem whose Stat fails with err for every path.
 type statErrorFs struct {
-	afero.Fs
+	fs.FS
 
 	// err is returned by every Stat call.
 	err error
 }
 
 // Stat returns the configured error.
-func (f statErrorFs) Stat(string) (os.FileInfo, error) {
+func (f statErrorFs) Stat(string) (fs.FileInfo, error) {
 	return nil, f.err
 }
 
@@ -721,8 +722,8 @@ func TestInContainer(t *testing.T) {
 		want    bool
 	}{
 		{name: "no marker", want: false},
-		{name: "docker marker", files: []string{"/.dockerenv"}, want: true},
-		{name: "podman marker", files: []string{"/run/.containerenv"}, want: true},
+		{name: "docker marker", files: []string{".dockerenv"}, want: true},
+		{name: "podman marker", files: []string{"run/.containerenv"}, want: true},
 		{name: "marker cannot be checked", statErr: fs.ErrPermission, want: true},
 		{name: "markers do not exist", statErr: fs.ErrNotExist, want: false},
 	}
@@ -731,13 +732,14 @@ func TestInContainer(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 
-			fsys := afero.NewMemMapFs()
+			files := fstest.MapFS{}
 			for _, name := range tt.files {
-				require.NoError(t, afero.WriteFile(fsys, name, nil, 0o600))
+				files[name] = &fstest.MapFile{}
 			}
 
+			var fsys fs.FS = files
 			if tt.statErr != nil {
-				fsys = statErrorFs{Fs: fsys, err: tt.statErr}
+				fsys = statErrorFs{FS: files, err: tt.statErr}
 			}
 
 			assert.Equal(t, tt.want, InContainer(fsys))
@@ -750,7 +752,7 @@ func TestInContainer(t *testing.T) {
 func TestInContainer_WrappedNotExist(t *testing.T) {
 	t.Parallel()
 
-	fsys := statErrorFs{Fs: afero.NewMemMapFs(), err: errors.Join(errors.New("stat"), fs.ErrNotExist)}
+	fsys := statErrorFs{FS: fstest.MapFS{}, err: errors.Join(errors.New("stat"), fs.ErrNotExist)}
 
 	assert.False(t, InContainer(fsys))
 }
@@ -766,7 +768,7 @@ func TestGetCurrentContainerID_FailureLogsAtDebug(t *testing.T) {
 
 	log := zerolog.New(&out).Level(zerolog.TraceLevel)
 
-	id, err := GetCurrentContainerID(&log, t.Context(), afero.NewMemMapFs(), nil)
+	id, err := GetCurrentContainerID(&log, t.Context(), fstest.MapFS{}, nil)
 	require.Error(t, err)
 	assert.Empty(t, id)
 	assert.NotContains(t, out.String(), `"level":"error"`)

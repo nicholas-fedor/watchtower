@@ -11,7 +11,6 @@ import (
 	"strings"
 
 	"github.com/rs/zerolog"
-	"github.com/spf13/afero"
 
 	"github.com/nicholas-fedor/watchtower/pkg/types"
 )
@@ -39,10 +38,11 @@ var (
 	containerIDPattern = regexp.MustCompile(`/(?:overlay-)?containers/([a-f0-9]{64})(?:/|$)`)
 )
 
-// containerMarkers are files that container runtimes create inside a container.
+// containerMarkers are files that container runtimes create inside a container,
+// as paths relative to the filesystem root.
 var containerMarkers = []string{
-	"/run/.containerenv", // Podman
-	"/.dockerenv",        // Docker
+	"run/.containerenv", // Podman
+	".dockerenv",        // Docker
 }
 
 // IsOldContainer reports whether the container's runtime name (from Name()
@@ -78,7 +78,8 @@ func IsOldContainer(name string) bool {
 // Parameters:
 //   - log: Process logger.
 //   - ctx: Context for the hostname lookup.
-//   - fsys: Filesystem holding /proc, read by the mountinfo and cgroup methods.
+//   - fsys: Filesystem rooted at "/" holding /proc, read by the mountinfo and
+//     cgroup methods.
 //   - client: Docker client interface for container operations
 //
 // Returns:
@@ -87,7 +88,7 @@ func IsOldContainer(name string) bool {
 func GetCurrentContainerID(
 	log *zerolog.Logger,
 	ctx context.Context,
-	fsys afero.Fs,
+	fsys fs.FS,
 	client Client,
 ) (types.ContainerID, error) {
 	// Collect errors from failed detection attempts for final error reporting
@@ -161,13 +162,13 @@ func GetCurrentContainerID(
 // as present, so callers that protect other Watchtower containers fail closed.
 //
 // Parameters:
-//   - fsys: The filesystem to check.
+//   - fsys: The filesystem to check, rooted at "/".
 //
 // Returns:
 //   - bool: True if a container marker exists or cannot be checked.
-func InContainer(fsys afero.Fs) bool {
+func InContainer(fsys fs.FS) bool {
 	for _, marker := range containerMarkers {
-		_, err := fsys.Stat(marker)
+		_, err := fs.Stat(fsys, marker)
 		if err == nil || !errors.Is(err, fs.ErrNotExist) {
 			return true
 		}
@@ -181,13 +182,13 @@ func InContainer(fsys afero.Fs) bool {
 //
 // Parameters:
 //   - log: Process logger.
-//   - fsys: Filesystem holding /proc.
+//   - fsys: Filesystem rooted at "/" holding /proc.
 //
 // Returns:
 //   - types.ContainerID: The detected container ID.
 //   - error: Non-nil when the file cannot be read or holds no container ID.
-func GetContainerIDFromMountinfo(log *zerolog.Logger, fsys afero.Fs) (types.ContainerID, error) {
-	file, err := afero.ReadFile(fsys, "/proc/self/mountinfo")
+func GetContainerIDFromMountinfo(log *zerolog.Logger, fsys fs.FS) (types.ContainerID, error) {
+	file, err := fs.ReadFile(fsys, "proc/self/mountinfo")
 	if err != nil {
 		log.Debug().
 			Err(err).
@@ -267,15 +268,15 @@ func extractContainerIDFromPath(path string) types.ContainerID {
 //
 // Parameters:
 //   - log: Process logger.
-//   - fsys: Filesystem holding /proc.
+//   - fsys: Filesystem rooted at "/" holding /proc.
 //
 // Returns:
 //   - types.ContainerID: The detected container ID.
 //   - error: Non-nil when the file cannot be read or holds no container ID.
-func GetContainerIDFromCgroupFile(log *zerolog.Logger, fsys afero.Fs) (types.ContainerID, error) {
+func GetContainerIDFromCgroupFile(log *zerolog.Logger, fsys fs.FS) (types.ContainerID, error) {
 	filePath := fmt.Sprintf("/proc/%d/cgroup", os.Getpid())
 
-	file, err := afero.ReadFile(fsys, filePath)
+	file, err := fs.ReadFile(fsys, strings.TrimPrefix(filePath, "/"))
 	if err != nil {
 		log.Debug().
 			Err(err).

@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"io/fs"
 	"os"
 	"strconv"
 	"strings"
@@ -14,7 +15,6 @@ import (
 	"time"
 
 	"github.com/rs/zerolog"
-	"github.com/spf13/afero"
 
 	cerrdefs "github.com/containerd/errdefs"
 	dockerContainer "github.com/moby/moby/api/types/container"
@@ -433,7 +433,9 @@ type ClientOptions struct {
 	DisableMemorySwappiness bool
 	CPUCopyMode             string
 	WarnOnHeadFailed        WarningStrategy
-	Fs                      afero.Fs
+	// Fs is the filesystem rooted at "/" that holds the container runtime
+	// marker files. NewClient uses the host filesystem when it is nil.
+	Fs fs.FS
 	// Registry holds the settings for registry digest and image age requests.
 	Registry registryConfig.Registry
 	// RateLimiter paces image pulls, digest checks, and image age requests per
@@ -468,7 +470,7 @@ func NewClient(log *zerolog.Logger, opts ClientOptions) Client {
 
 	// Set default filesystem if not provided.
 	if opts.Fs == nil {
-		opts.Fs = afero.NewOsFs()
+		opts.Fs = os.DirFS("/")
 	}
 
 	if opts.RateLimiter == nil {
@@ -1644,7 +1646,7 @@ func (c *client) detectRuntime(ctx context.Context) (bool, error) {
 //   - error: Non-nil if checking fails with a non-NotExist error, nil on success.
 func (c *client) detectRuntimeByMarker() (containerRuntime, error) {
 	// Check for Podman marker file
-	_, podmanErr := c.Fs.Stat("/run/.containerenv")
+	_, podmanErr := fs.Stat(c.Fs, "run/.containerenv")
 	if podmanErr == nil {
 		c.logger().Debug().Msg("Detected Podman via marker file /run/.containerenv")
 
@@ -1652,7 +1654,7 @@ func (c *client) detectRuntimeByMarker() (containerRuntime, error) {
 	}
 
 	// Check for Docker marker file
-	_, dockerErr := c.Fs.Stat("/.dockerenv")
+	_, dockerErr := fs.Stat(c.Fs, ".dockerenv")
 	if dockerErr == nil {
 		c.logger().Debug().Msg("Detected Docker via marker file /.dockerenv")
 
