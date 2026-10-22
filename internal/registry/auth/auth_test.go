@@ -931,18 +931,30 @@ func redirectChain(urls []string) *http.Request {
 }
 
 // TestGetToken_bearerChallengeDowngrade runs the challenge exchange against an
-// HTTPS registry that redirects its challenge to plain HTTP. With credentials,
-// GetToken fails before any token request. Without them, it fetches a token.
+// HTTPS registry whose challenge request passes through a plain HTTP server.
+// The chain either ends on that server or returns to the registry over HTTPS.
+// With credentials, GetToken fails before any token request. Without them, it
+// fetches a token.
 //
 // The test resets the shared token cache, so it does not run in parallel.
 func TestGetToken_bearerChallengeDowngrade(t *testing.T) {
 	tests := []struct {
-		name         string
+		name string
+		// backToHTTPS sends the request from the HTTP server back to the
+		// registry, so the final challenge URL is HTTPS.
+		backToHTTPS  bool
 		registryAuth string
 		wantErr      error
 	}{
-		{name: "with credentials", registryAuth: "dXNlcjpwYXNz", wantErr: errInsecureChallengeRedirect},
-		{name: "without credentials"},
+		{name: "challenge on http with credentials", registryAuth: "dXNlcjpwYXNz", wantErr: errInsecureChallengeRedirect},
+		{name: "challenge on http without credentials"},
+		{
+			name:         "http hop before an https challenge with credentials",
+			backToHTTPS:  true,
+			registryAuth: "dXNlcjpwYXNz",
+			wantErr:      errInsecureChallengeRedirect,
+		},
+		{name: "http hop before an https challenge without credentials", backToHTTPS: true},
 	}
 
 	for _, tt := range tests {
@@ -950,13 +962,21 @@ func TestGetToken_bearerChallengeDowngrade(t *testing.T) {
 			resetTokenCache(t)
 
 			// The registry serves HTTPS and sends the challenge request to a
-			// plain HTTP server, whose challenge names the registry's realm.
+			// plain HTTP server. The challenge names the registry's realm.
 			registry := httpstub.NewTLS(t)
 			plain := httpstub.New(t)
 
 			registry.AppendHandlers(httpstub.RespondWith(http.StatusTemporaryRedirect, "",
 				http.Header{"Location": {plain.URL() + "/v2/"}}))
-			plain.AppendHandlers(challengeHandler(t, http.StatusUnauthorized, bearerChallenge(registry.Addr())))
+
+			challenge := challengeHandler(t, http.StatusUnauthorized, bearerChallenge(registry.Addr()))
+			if tt.backToHTTPS {
+				plain.AppendHandlers(httpstub.RespondWith(http.StatusTemporaryRedirect, "",
+					http.Header{"Location": {registry.URL() + "/v2/"}}))
+				registry.AppendHandlers(challenge)
+			} else {
+				plain.AppendHandlers(challenge)
+			}
 
 			if tt.wantErr == nil {
 				registry.AppendHandlers(tokenHandler(t))
