@@ -20,8 +20,10 @@ import (
 	dockerContainer "github.com/moby/moby/api/types/container"
 
 	mockActions "github.com/nicholas-fedor/watchtower/internal/actions/mocks"
-	"github.com/nicholas-fedor/watchtower/internal/compose"
-	mockCompose "github.com/nicholas-fedor/watchtower/internal/compose/mocks"
+	composeApply "github.com/nicholas-fedor/watchtower/internal/compose/apply"
+	mockCompose "github.com/nicholas-fedor/watchtower/internal/compose/apply/mocks"
+	composeLabels "github.com/nicholas-fedor/watchtower/internal/compose/labels"
+	composeProject "github.com/nicholas-fedor/watchtower/internal/compose/project"
 	"github.com/nicholas-fedor/watchtower/internal/git"
 	"github.com/nicholas-fedor/watchtower/internal/git/project"
 	gitPkg "github.com/nicholas-fedor/watchtower/pkg/container/git"
@@ -732,18 +734,18 @@ func Test_gitSession(t *testing.T) {
 			dir := writeComposeProjectDir(t)
 			applier := mockCompose.NewMockApplier(t)
 
-			var got compose.Request
+			var got composeApply.Request
 
 			applier.EXPECT().
 				Apply(mock.Anything, mock.Anything).
-				Run(func(ctx context.Context, req compose.Request) {
+				Run(func(ctx context.Context, req composeApply.Request) {
 					deadline, ok := ctx.Deadline()
 					assert.True(t, ok)
 					assert.LessOrEqual(t, time.Until(deadline), time.Second)
 
 					got = req
 				}).
-				Return([]compose.Container{
+				Return([]composeApply.Container{
 					{Service: "api", ID: "new-api", ImageID: "sha256:api"},
 					{Service: "worker", ID: "new-worker", ImageID: "sha256:worker"},
 				}, nil).
@@ -770,14 +772,14 @@ func Test_gitSession(t *testing.T) {
 			}
 
 			api := gitAssociatedContainer("api", "/api", "webstack-api:latest", map[string]string{
-				gitPkg.ComposeDirLabel:      dir,
-				compose.ComposeProjectLabel: "webstack",
-				compose.ComposeServiceLabel: "api",
+				gitPkg.ComposeDirLabel:            dir,
+				composeLabels.ComposeProjectLabel: "webstack",
+				composeLabels.ComposeServiceLabel: "api",
 			})
 			worker := gitAssociatedContainer("worker", "/worker", "webstack-worker:latest", map[string]string{
-				gitPkg.ComposeDirLabel:      dir,
-				compose.ComposeProjectLabel: "webstack",
-				compose.ComposeServiceLabel: "worker",
+				gitPkg.ComposeDirLabel:            dir,
+				composeLabels.ComposeProjectLabel: "webstack",
+				composeLabels.ComposeServiceLabel: "worker",
 			})
 
 			api.SetStale(true)
@@ -819,14 +821,14 @@ func Test_gitSession(t *testing.T) {
 
 			applier := mockCompose.NewMockApplier(t)
 
-			var requests []compose.Request
+			var requests []composeApply.Request
 
 			applier.EXPECT().
 				Apply(mock.Anything, mock.Anything).
-				RunAndReturn(func(_ context.Context, req compose.Request) ([]compose.Container, error) {
+				RunAndReturn(func(_ context.Context, req composeApply.Request) ([]composeApply.Container, error) {
 					requests = append(requests, req)
 
-					return []compose.Container{{
+					return []composeApply.Container{{
 						Service: req.Services[0],
 						Name:    "/" + req.Ref.Name + "-api",
 						ID:      types.ContainerID("new-" + req.Ref.Name),
@@ -847,16 +849,16 @@ func Test_gitSession(t *testing.T) {
 			}
 
 			alpha := gitAssociatedContainer("alpha", "alpha-api", "alpha:latest", map[string]string{
-				gitPkg.ComposeDirLabel:          dir,
-				compose.ComposeProjectLabel:     "alpha",
-				compose.ComposeServiceLabel:     "api",
-				compose.ComposeConfigFilesLabel: "compose.yaml",
+				gitPkg.ComposeDirLabel:                dir,
+				composeLabels.ComposeProjectLabel:     "alpha",
+				composeLabels.ComposeServiceLabel:     "api",
+				composeLabels.ComposeConfigFilesLabel: "compose.yaml",
 			})
 			beta := gitAssociatedContainer("beta", "beta-api", "beta:latest", map[string]string{
-				gitPkg.ComposeDirLabel:          dir,
-				compose.ComposeProjectLabel:     "beta",
-				compose.ComposeServiceLabel:     "api",
-				compose.ComposeConfigFilesLabel: "override.yml",
+				gitPkg.ComposeDirLabel:                dir,
+				composeLabels.ComposeProjectLabel:     "beta",
+				composeLabels.ComposeServiceLabel:     "api",
+				composeLabels.ComposeConfigFilesLabel: "override.yml",
 			})
 
 			alpha.SetStale(true)
@@ -889,10 +891,10 @@ func Test_gitSession(t *testing.T) {
 
 			applier.EXPECT().
 				Apply(mock.Anything, mock.Anything).
-				RunAndReturn(func(_ context.Context, req compose.Request) ([]compose.Container, error) {
+				RunAndReturn(func(_ context.Context, req composeApply.Request) ([]composeApply.Container, error) {
 					order = append(order, req.Ref.Name)
 
-					return []compose.Container{{
+					return []composeApply.Container{{
 						Service: req.Services[0],
 						Name:    "/" + req.Ref.Name + "-api",
 						ID:      types.ContainerID("new-" + req.Ref.Name),
@@ -908,14 +910,14 @@ func Test_gitSession(t *testing.T) {
 			}
 
 			provider := gitAssociatedContainer("provider", "alpha-api", "alpha:latest", map[string]string{
-				gitPkg.ComposeDirLabel:      dir,
-				compose.ComposeProjectLabel: "alpha",
-				compose.ComposeServiceLabel: "api",
+				gitPkg.ComposeDirLabel:            dir,
+				composeLabels.ComposeProjectLabel: "alpha",
+				composeLabels.ComposeServiceLabel: "api",
 			})
 			dependent := gitAssociatedContainer("dependent", "beta-api", "beta:latest", map[string]string{
 				gitPkg.ComposeDirLabel:                      dir,
-				compose.ComposeProjectLabel:                 "beta",
-				compose.ComposeServiceLabel:                 "api",
+				composeLabels.ComposeProjectLabel:           "beta",
+				composeLabels.ComposeServiceLabel:           "api",
 				"com.centurylinklabs.watchtower.depends-on": "alpha-api",
 			})
 
@@ -944,12 +946,12 @@ func Test_gitSession(t *testing.T) {
 
 			applier.EXPECT().
 				Apply(mock.Anything, mock.Anything).
-				RunAndReturn(func(_ context.Context, req compose.Request) ([]compose.Container, error) {
+				RunAndReturn(func(_ context.Context, req composeApply.Request) ([]composeApply.Container, error) {
 					order = append(order, req.Ref.Name)
 
-					items := make([]compose.Container, 0, len(req.Services))
+					items := make([]composeApply.Container, 0, len(req.Services))
 					for _, service := range req.Services {
-						items = append(items, compose.Container{
+						items = append(items, composeApply.Container{
 							Service: service,
 							Name:    "/" + req.Ref.Name + "-" + service,
 							ID:      types.ContainerID("new-" + req.Ref.Name + "-" + service),
@@ -968,20 +970,20 @@ func Test_gitSession(t *testing.T) {
 			}
 
 			metrics := gitAssociatedContainer("metrics", "beta-metrics", "beta:latest", map[string]string{
-				gitPkg.ComposeDirLabel:      dir,
-				compose.ComposeProjectLabel: "beta",
-				compose.ComposeServiceLabel: "metrics",
+				gitPkg.ComposeDirLabel:            dir,
+				composeLabels.ComposeProjectLabel: "beta",
+				composeLabels.ComposeServiceLabel: "metrics",
 			})
 			dependent := gitAssociatedContainer("dependent", "beta-api", "beta:latest", map[string]string{
 				gitPkg.ComposeDirLabel:                      dir,
-				compose.ComposeProjectLabel:                 "beta",
-				compose.ComposeServiceLabel:                 "api",
+				composeLabels.ComposeProjectLabel:           "beta",
+				composeLabels.ComposeServiceLabel:           "api",
 				"com.centurylinklabs.watchtower.depends-on": "alpha-api",
 			})
 			provider := gitAssociatedContainer("provider", "alpha-api", "alpha:latest", map[string]string{
-				gitPkg.ComposeDirLabel:      dir,
-				compose.ComposeProjectLabel: "alpha",
-				compose.ComposeServiceLabel: "api",
+				gitPkg.ComposeDirLabel:            dir,
+				composeLabels.ComposeProjectLabel: "alpha",
+				composeLabels.ComposeServiceLabel: "api",
 			})
 
 			metrics.SetStale(true)
@@ -1016,10 +1018,10 @@ func Test_gitSession(t *testing.T) {
 			applier := mockCompose.NewMockApplier(t)
 			applier.EXPECT().
 				Apply(mock.Anything, mock.Anything).
-				RunAndReturn(func(context.Context, compose.Request) ([]compose.Container, error) {
+				RunAndReturn(func(context.Context, composeApply.Request) ([]composeApply.Container, error) {
 					time.Sleep(30 * time.Millisecond)
 
-					return []compose.Container{{
+					return []composeApply.Container{{
 						Service: "api",
 						Name:    "/web-api",
 						ID:      "new-api",
@@ -1035,9 +1037,9 @@ func Test_gitSession(t *testing.T) {
 			}
 
 			c := gitAssociatedContainer("api", "web-api", "webstack-api:latest", map[string]string{
-				gitPkg.ComposeDirLabel:      dir,
-				compose.ComposeProjectLabel: "webstack",
-				compose.ComposeServiceLabel: "api",
+				gitPkg.ComposeDirLabel:            dir,
+				composeLabels.ComposeProjectLabel: "webstack",
+				composeLabels.ComposeServiceLabel: "api",
 			})
 			c.SetStale(true)
 			sess.store(c.ID(), git.CheckResult{Stale: true, Commit: "abc"})
@@ -1078,9 +1080,9 @@ func Test_gitSession(t *testing.T) {
 			}
 
 			c := gitAssociatedContainer("api", "web-api", "webstack-api:latest", map[string]string{
-				gitPkg.ComposeDirLabel:      dir,
-				compose.ComposeProjectLabel: "webstack",
-				compose.ComposeServiceLabel: "api",
+				gitPkg.ComposeDirLabel:            dir,
+				composeLabels.ComposeProjectLabel: "webstack",
+				composeLabels.ComposeServiceLabel: "api",
 			})
 			c.SetStale(true)
 			sess.store(c.ID(), git.CheckResult{Stale: true, Commit: "abc"})
@@ -1108,7 +1110,7 @@ func Test_gitSession(t *testing.T) {
 			applier := mockCompose.NewMockApplier(t)
 			applier.EXPECT().
 				Apply(mock.Anything, mock.Anything).
-				Return([]compose.Container{{Service: "api", ID: "new-api", ImageID: "sha256:api"}}, nil).
+				Return([]composeApply.Container{{Service: "api", ID: "new-api", ImageID: "sha256:api"}}, nil).
 				Once()
 
 			sess := newGitSession(gitTestClient(t))
@@ -1118,9 +1120,9 @@ func Test_gitSession(t *testing.T) {
 			}
 
 			c := gitAssociatedContainer("api", "web-1", "webstack-api:latest", map[string]string{
-				gitPkg.ComposeDirLabel:      dir,
-				compose.ComposeProjectLabel: "webstack",
-				compose.ComposeServiceLabel: "api",
+				gitPkg.ComposeDirLabel:            dir,
+				composeLabels.ComposeProjectLabel: "webstack",
+				composeLabels.ComposeServiceLabel: "api",
 			})
 			c.SetStale(true)
 
@@ -1172,8 +1174,8 @@ func Test_gitSession(t *testing.T) {
 			sess.apply = applier
 
 			c := gitAssociatedContainer("api", "/api", "webstack-api:latest", map[string]string{
-				gitPkg.ComposeDirLabel:      missing,
-				compose.ComposeServiceLabel: "api",
+				gitPkg.ComposeDirLabel:            missing,
+				composeLabels.ComposeServiceLabel: "api",
 			})
 			c.SetStale(true)
 			sess.store(c.ID(), git.CheckResult{Stale: true, Commit: "abc"})
@@ -1197,8 +1199,8 @@ func Test_gitSession(t *testing.T) {
 			sess.apply = applier
 
 			c := gitAssociatedContainer("api", "/api", "webstack-api:latest", map[string]string{
-				gitPkg.ComposeDirLabel:      missing,
-				compose.ComposeServiceLabel: "api",
+				gitPkg.ComposeDirLabel:            missing,
+				composeLabels.ComposeServiceLabel: "api",
 			})
 			c.SetStale(true)
 			sess.store(c.ID(), git.CheckResult{Stale: true, Commit: "abc"})
@@ -1221,7 +1223,7 @@ func Test_gitSession(t *testing.T) {
 			assert.Empty(t, sess.applied)
 			require.Len(t, report.Skipped(), 1)
 			assert.Equal(t, c.ID(), report.Skipped()[0].ID())
-			assert.Contains(t, report.Skipped()[0].Error(), compose.ErrProjectDir.Error())
+			assert.Contains(t, report.Skipped()[0].Error(), composeProject.ErrProjectDir.Error())
 			assert.Empty(t, report.Failed())
 			assert.Empty(t, report.Scanned())
 		})
@@ -1258,8 +1260,8 @@ func Test_gitSession(t *testing.T) {
 			}
 
 			c := gitAssociatedContainer("api", "/api", "webstack-api:latest", map[string]string{
-				gitPkg.ComposeDirLabel:      dir,
-				compose.ComposeServiceLabel: "api",
+				gitPkg.ComposeDirLabel:            dir,
+				composeLabels.ComposeServiceLabel: "api",
 			})
 			c.SetStale(true)
 			sess.store(c.ID(), git.CheckResult{Stale: true, Commit: "abc"})
@@ -1279,7 +1281,7 @@ func Test_gitSession(t *testing.T) {
 			applier := mockCompose.NewMockApplier(t)
 			applier.EXPECT().
 				Apply(mock.Anything, mock.Anything).
-				Return([]compose.Container{{Service: "api", Name: "/api", ID: "new-api", ImageID: "sha256:api"}}, nil).
+				Return([]composeApply.Container{{Service: "api", Name: "/api", ID: "new-api", ImageID: "sha256:api"}}, nil).
 				Once()
 
 			sess := newGitSession(git.New(newTestLogger(t), git.Options{Timeout: 10 * time.Millisecond}))
@@ -1291,8 +1293,8 @@ func Test_gitSession(t *testing.T) {
 			}
 
 			c := gitAssociatedContainer("api", "/api", "webstack-api:latest", map[string]string{
-				gitPkg.ComposeDirLabel:      dir,
-				compose.ComposeServiceLabel: "api",
+				gitPkg.ComposeDirLabel:            dir,
+				composeLabels.ComposeServiceLabel: "api",
 			})
 			c.SetStale(true)
 			sess.store(c.ID(), git.CheckResult{Stale: true, Commit: "abc"})
@@ -1312,7 +1314,7 @@ func Test_gitSession(t *testing.T) {
 			applier := mockCompose.NewMockApplier(t)
 			applier.EXPECT().
 				Apply(mock.Anything, mock.Anything).
-				Return([]compose.Container{
+				Return([]composeApply.Container{
 					{Service: "api", Name: "/api", ID: "new-api", ImageID: "sha256:api"},
 					{Service: "api", Name: "/fresh", ID: "new-fresh", ImageID: "sha256:api"},
 				}, context.Canceled).
@@ -1328,12 +1330,12 @@ func Test_gitSession(t *testing.T) {
 			}
 
 			c := gitAssociatedContainer("api", "/api", "webstack-api:latest", map[string]string{
-				gitPkg.ComposeDirLabel:      dir,
-				compose.ComposeServiceLabel: "api",
+				gitPkg.ComposeDirLabel:            dir,
+				composeLabels.ComposeServiceLabel: "api",
 			})
 			fresh := gitAssociatedContainer("fresh", "/fresh", "webstack-api:latest", map[string]string{
-				gitPkg.ComposeDirLabel:      dir,
-				compose.ComposeServiceLabel: "api",
+				gitPkg.ComposeDirLabel:            dir,
+				composeLabels.ComposeServiceLabel: "api",
 			})
 
 			c.SetStale(true)
@@ -1368,7 +1370,7 @@ func Test_gitSession(t *testing.T) {
 			applier := mockCompose.NewMockApplier(t)
 			applier.EXPECT().
 				Apply(mock.Anything, mock.Anything).
-				Return([]compose.Container{{Service: "api", ID: "new-api", ImageID: "sha256:api"}}, nil).
+				Return([]composeApply.Container{{Service: "api", ID: "new-api", ImageID: "sha256:api"}}, nil).
 				Once()
 
 			sess := newGitSession(gitTestClient(t))
@@ -1378,12 +1380,12 @@ func Test_gitSession(t *testing.T) {
 			}
 
 			api := gitAssociatedContainer("api", "/api", "webstack-api:latest", map[string]string{
-				gitPkg.ComposeDirLabel:      dir,
-				compose.ComposeServiceLabel: "api",
+				gitPkg.ComposeDirLabel:            dir,
+				composeLabels.ComposeServiceLabel: "api",
 			})
 			worker := gitAssociatedContainer("worker", "/worker", "webstack-worker:latest", map[string]string{
-				gitPkg.ComposeDirLabel:      dir,
-				compose.ComposeServiceLabel: "worker",
+				gitPkg.ComposeDirLabel:            dir,
+				composeLabels.ComposeServiceLabel: "worker",
 			})
 
 			api.SetStale(true)
@@ -1424,14 +1426,14 @@ func Test_gitSession(t *testing.T) {
 			dir := writeComposeProjectDir(t)
 			applier := mockCompose.NewMockApplier(t)
 
-			var got compose.Request
+			var got composeApply.Request
 
 			applier.EXPECT().
 				Apply(mock.Anything, mock.Anything).
-				Run(func(_ context.Context, req compose.Request) {
+				Run(func(_ context.Context, req composeApply.Request) {
 					got = req
 				}).
-				Return([]compose.Container{{Service: "api", ImageID: "sha256:built"}}, nil).
+				Return([]composeApply.Container{{Service: "api", ImageID: "sha256:built"}}, nil).
 				Once()
 
 			sess := newGitSession(gitTestClient(t))
@@ -1441,8 +1443,8 @@ func Test_gitSession(t *testing.T) {
 			}
 
 			c := gitAssociatedContainer("api", "/api", "webstack-api:latest", map[string]string{
-				gitPkg.ComposeDirLabel:      dir,
-				compose.ComposeServiceLabel: "api",
+				gitPkg.ComposeDirLabel:            dir,
+				composeLabels.ComposeServiceLabel: "api",
 			})
 			c.SetStale(true)
 			sess.store(c.ID(), git.CheckResult{Stale: true, Commit: "abc"})
@@ -1490,8 +1492,8 @@ func Test_gitSession(t *testing.T) {
 			}
 
 			c := gitAssociatedContainer("api", "/api", "webstack-api:latest", map[string]string{
-				gitPkg.ComposeDirLabel:      dir,
-				compose.ComposeServiceLabel: "api",
+				gitPkg.ComposeDirLabel:            dir,
+				composeLabels.ComposeServiceLabel: "api",
 			})
 			c.SetStale(true)
 			sess.store(c.ID(), git.CheckResult{Stale: true, Commit: "abc"})
@@ -1526,12 +1528,12 @@ func Test_gitSession(t *testing.T) {
 			}
 
 			api := gitAssociatedContainer("api", "/api", "webstack-api:latest", map[string]string{
-				gitPkg.ComposeDirLabel:      dir,
-				compose.ComposeServiceLabel: "api",
+				gitPkg.ComposeDirLabel:            dir,
+				composeLabels.ComposeServiceLabel: "api",
 			})
 			worker := gitAssociatedContainer("worker", "/worker", "webstack-worker:latest", map[string]string{
-				gitPkg.ComposeDirLabel:      dir,
-				compose.ComposeServiceLabel: "worker",
+				gitPkg.ComposeDirLabel:            dir,
+				composeLabels.ComposeServiceLabel: "worker",
 			})
 
 			api.SetStale(true)
@@ -1556,14 +1558,14 @@ func Test_gitSession(t *testing.T) {
 			dir := writeComposeProjectDir(t)
 			applier := mockCompose.NewMockApplier(t)
 
-			var got compose.Request
+			var got composeApply.Request
 
 			applier.EXPECT().
 				Apply(mock.Anything, mock.Anything).
-				Run(func(_ context.Context, req compose.Request) {
+				Run(func(_ context.Context, req composeApply.Request) {
 					got = req
 				}).
-				Return([]compose.Container{
+				Return([]composeApply.Container{
 					{Service: "api", ID: "new-api", ImageID: "sha256:api"},
 					{Service: "worker", ID: "new-worker", ImageID: "sha256:worker"},
 				}, nil).
@@ -1576,12 +1578,12 @@ func Test_gitSession(t *testing.T) {
 			}
 
 			api := gitAssociatedContainer("api", "/api", "webstack-api:latest", map[string]string{
-				gitPkg.ComposeDirLabel:      dir,
-				compose.ComposeServiceLabel: "api",
+				gitPkg.ComposeDirLabel:            dir,
+				composeLabels.ComposeServiceLabel: "api",
 			})
 			worker := gitAssociatedContainer("worker", "/worker", "webstack-worker:latest", map[string]string{
-				gitPkg.ComposeDirLabel:      dir,
-				compose.ComposeServiceLabel: "worker",
+				gitPkg.ComposeDirLabel:            dir,
+				composeLabels.ComposeServiceLabel: "worker",
 			})
 
 			api.SetStale(true)
@@ -1606,14 +1608,14 @@ func Test_gitSession(t *testing.T) {
 			dir := writeComposeProjectDir(t)
 			applier := mockCompose.NewMockApplier(t)
 
-			var got compose.Request
+			var got composeApply.Request
 
 			applier.EXPECT().
 				Apply(mock.Anything, mock.Anything).
-				Run(func(_ context.Context, req compose.Request) {
+				Run(func(_ context.Context, req composeApply.Request) {
 					got = req
 				}).
-				Return([]compose.Container{
+				Return([]composeApply.Container{
 					{Service: "api", Name: "/web-1", ID: "new-1", ImageID: "sha256:api"},
 					{Service: "api", Name: "/web-2", ID: "new-2", ImageID: "sha256:api"},
 				}, nil).
@@ -1626,12 +1628,12 @@ func Test_gitSession(t *testing.T) {
 			}
 
 			one := gitAssociatedContainer("api-1", "web-1", "webstack-api:latest", map[string]string{
-				gitPkg.ComposeDirLabel:      dir,
-				compose.ComposeServiceLabel: "api",
+				gitPkg.ComposeDirLabel:            dir,
+				composeLabels.ComposeServiceLabel: "api",
 			})
 			two := gitAssociatedContainer("api-2", "web-2", "webstack-api:latest", map[string]string{
-				gitPkg.ComposeDirLabel:      dir,
-				compose.ComposeServiceLabel: "api",
+				gitPkg.ComposeDirLabel:            dir,
+				composeLabels.ComposeServiceLabel: "api",
 			})
 
 			one.SetStale(true)
@@ -1658,7 +1660,7 @@ func Test_gitSession(t *testing.T) {
 			applier := mockCompose.NewMockApplier(t)
 			applier.EXPECT().
 				Apply(mock.Anything, mock.Anything).
-				Return([]compose.Container{
+				Return([]composeApply.Container{
 					{Service: "api", Name: "/web-1", ID: "new-1", ImageID: "sha256:api"},
 					{Service: "api", Name: "/web-2", ID: "new-2", ImageID: "sha256:api"},
 				}, nil).
@@ -1671,12 +1673,12 @@ func Test_gitSession(t *testing.T) {
 			}
 
 			stale := gitAssociatedContainer("api-1", "web-1", "webstack-api:latest", map[string]string{
-				gitPkg.ComposeDirLabel:      dir,
-				compose.ComposeServiceLabel: "api",
+				gitPkg.ComposeDirLabel:            dir,
+				composeLabels.ComposeServiceLabel: "api",
 			})
 			fresh := gitAssociatedContainer("api-2", "web-2", "webstack-api:latest", map[string]string{
-				gitPkg.ComposeDirLabel:      dir,
-				compose.ComposeServiceLabel: "api",
+				gitPkg.ComposeDirLabel:            dir,
+				composeLabels.ComposeServiceLabel: "api",
 			})
 
 			stale.SetStale(true)
@@ -1712,7 +1714,7 @@ func Test_gitSession(t *testing.T) {
 			applier := mockCompose.NewMockApplier(t)
 			applier.EXPECT().
 				Apply(mock.Anything, mock.Anything).
-				Return([]compose.Container{
+				Return([]composeApply.Container{
 					{Service: "api", Name: "/web-1", ID: "new-1", ImageID: "sha256:api"},
 					{Service: "api", Name: "/web-2", ID: "new-2", ImageID: "sha256:api"},
 				}, nil).
@@ -1725,12 +1727,12 @@ func Test_gitSession(t *testing.T) {
 			}
 
 			stale := gitAssociatedContainer("api-1", "web-1", "webstack-api:latest", map[string]string{
-				gitPkg.ComposeDirLabel:      dir,
-				compose.ComposeServiceLabel: "api",
+				gitPkg.ComposeDirLabel:            dir,
+				composeLabels.ComposeServiceLabel: "api",
 			})
 			fresh := gitAssociatedContainer("api-2", "web-2", "webstack-api:latest", map[string]string{
-				gitPkg.ComposeDirLabel:      dir,
-				compose.ComposeServiceLabel: "api",
+				gitPkg.ComposeDirLabel:            dir,
+				composeLabels.ComposeServiceLabel: "api",
 			})
 
 			stale.SetStale(true)
@@ -1765,7 +1767,7 @@ func Test_gitSession(t *testing.T) {
 			applier := mockCompose.NewMockApplier(t)
 			applier.EXPECT().
 				Apply(mock.Anything, mock.Anything).
-				Return([]compose.Container{
+				Return([]composeApply.Container{
 					{Service: "api", Name: "web-1", ID: "new-1", ImageID: "sha256:api"},
 				}, nil).
 				Once()
@@ -1777,12 +1779,12 @@ func Test_gitSession(t *testing.T) {
 			}
 
 			one := gitAssociatedContainer("api-1", "web-1", "webstack-api:latest", map[string]string{
-				gitPkg.ComposeDirLabel:      dir,
-				compose.ComposeServiceLabel: "api",
+				gitPkg.ComposeDirLabel:            dir,
+				composeLabels.ComposeServiceLabel: "api",
 			})
 			two := gitAssociatedContainer("api-2", "web-2", "webstack-api:latest", map[string]string{
-				gitPkg.ComposeDirLabel:      dir,
-				compose.ComposeServiceLabel: "api",
+				gitPkg.ComposeDirLabel:            dir,
+				composeLabels.ComposeServiceLabel: "api",
 			})
 
 			one.SetStale(true)

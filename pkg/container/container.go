@@ -13,7 +13,7 @@ import (
 	dockerImage "github.com/moby/moby/api/types/image"
 	dockerNetwork "github.com/moby/moby/api/types/network"
 
-	"github.com/nicholas-fedor/watchtower/internal/compose"
+	composeLabels "github.com/nicholas-fedor/watchtower/internal/compose/labels"
 	"github.com/nicholas-fedor/watchtower/internal/util"
 	"github.com/nicholas-fedor/watchtower/pkg/types"
 )
@@ -837,9 +837,9 @@ func ResolveContainerIdentifier(c types.Container) string {
 		return nameOrID(c)
 	}
 
-	projectName := compose.GetProjectName(labels)
-	serviceName := compose.GetServiceName(labels)
-	containerNumber := compose.GetContainerNumber(labels)
+	projectName := composeLabels.GetProjectName(labels)
+	serviceName := composeLabels.GetServiceName(labels)
+	containerNumber := composeLabels.GetContainerNumber(labels)
 
 	// Handle replica containers
 	if projectName != "" && serviceName != "" &&
@@ -935,14 +935,14 @@ func GetLinksFromWatchtowerLabel(c *Container) []string {
 func getLinksFromComposeLabel(c *Container) []string {
 	info := c.ContainerInfo()
 
-	composeDependsOnLabelValue := c.getLabelValueOrEmpty(compose.ComposeDependsOnLabel)
+	composeDependsOnLabelValue := c.getLabelValueOrEmpty(composeLabels.ComposeDependsOnLabel)
 	if composeDependsOnLabelValue == "" {
 		return nil
 	}
 
-	services := compose.ParseDependsOnLabel(c.logger(), composeDependsOnLabelValue)
+	services := composeLabels.ParseDependsOnLabel(c.logger(), composeDependsOnLabelValue)
 
-	projectName := compose.GetProjectName(info.Config.Labels)
+	projectName := composeLabels.GetProjectName(info.Config.Labels)
 
 	normalizedLinks := make([]string, 0, len(services))
 	for _, service := range services {
@@ -992,7 +992,7 @@ func getLinksFromHostConfig(c *Container) []string {
 		labels = info.Config.Labels
 	}
 
-	projectName := compose.GetProjectName(labels)
+	projectName := composeLabels.GetProjectName(labels)
 
 	hostConfig := info.HostConfig
 

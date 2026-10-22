@@ -1,4 +1,4 @@
-package compose
+package labels
 
 import (
 	"encoding/json"

@@ -1,8 +1,7 @@
-package compose
+package apply
 
 import (
 	"context"
-	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
@@ -14,89 +13,9 @@ import (
 
 	composetypes "github.com/compose-spec/compose-go/v2/types"
 
+	composeProject "github.com/nicholas-fedor/watchtower/internal/compose/project"
 	"github.com/nicholas-fedor/watchtower/pkg/types"
 )
-
-// TestLoad verifies that a project loads from its directory's default Compose
-// file, or from explicit files under a given name, and that an empty directory
-// is an error.
-func TestLoad(t *testing.T) {
-	t.Parallel()
-
-	t.Run("empty dir", func(t *testing.T) {
-		t.Parallel()
-
-		_, err := loadProject(t.Context(), ProjectRef{})
-		require.ErrorIs(t, err, errEmptyProjectDir)
-	})
-
-	t.Run("default compose file", func(t *testing.T) {
-		t.Parallel()
-
-		dir := t.TempDir()
-		require.NoError(t, os.WriteFile(filepath.Join(dir, "compose.yaml"), []byte(`
-name: webstack
-services:
-  api:
-    build: ./api
-  db:
-    image: postgres:16
-`), 0o600))
-
-		project, err := loadProject(t.Context(), ProjectRef{Dir: dir})
-		require.NoError(t, err)
-		assert.Equal(t, "webstack", project.Name)
-		assert.ElementsMatch(t, []string{"api", "db"}, project.ServiceNames())
-	})
-
-	t.Run("named project and explicit files", func(t *testing.T) {
-		t.Parallel()
-
-		dir := t.TempDir()
-		path := filepath.Join(dir, "stack.yml")
-		require.NoError(t, os.WriteFile(path, []byte(`
-services:
-  worker:
-    build: ./worker
-`), 0o600))
-
-		project, err := loadProject(t.Context(), ProjectRef{
-			Name:        "jobs",
-			Dir:         dir,
-			ConfigFiles: []string{path},
-		})
-		require.NoError(t, err)
-		assert.Equal(t, "jobs", project.Name)
-		assert.Equal(t, []string{"worker"}, project.ServiceNames())
-	})
-}
-
-// TestLoadIgnoresProcessSecrets verifies that a project interpolates variables
-// from its .env file and not from Watchtower's own environment, so Watchtower's
-// secrets never reach a service.
-//
-// The test sets an environment variable, so it does not run in parallel.
-func TestLoadIgnoresProcessSecrets(t *testing.T) {
-	t.Setenv("WATCHTOWER_GIT_AUTH_TOKEN", "supersecret")
-
-	dir := t.TempDir()
-	require.NoError(t, os.WriteFile(filepath.Join(dir, ".env"), []byte("APP_TAG=fromdotenv\n"), 0o600))
-	require.NoError(t, os.WriteFile(filepath.Join(dir, "compose.yaml"), []byte(`
-services:
-  api:
-    image: app:${APP_TAG}
-    environment:
-      TOKEN: ${WATCHTOWER_GIT_AUTH_TOKEN}
-`), 0o600))
-
-	project, err := loadProject(t.Context(), ProjectRef{Dir: dir, Name: "p"})
-	require.NoError(t, err)
-
-	api, err := project.GetService("api")
-	require.NoError(t, err)
-	assert.Equal(t, "app:fromdotenv", api.Image)
-	assert.NotContains(t, fmt.Sprint(api.Environment), "supersecret")
-}
 
 // TestInjectLabels verifies that labels are merged onto the named service only,
 // that no labels leave the project unchanged, and that a nil project is an
@@ -117,7 +36,7 @@ func TestInjectLabels(t *testing.T) {
 		dir := t.TempDir()
 		require.NoError(t, os.WriteFile(filepath.Join(dir, "compose.yaml"), []byte("services:\n  api:\n    image: app\n"), 0o600))
 
-		project, err := loadProject(t.Context(), ProjectRef{Dir: dir, Name: "p"})
+		project, err := composeProject.Load(t.Context(), composeProject.ProjectRef{Dir: dir, Name: "p"})
 		require.NoError(t, err)
 
 		got, err := injectLabels(project, nil)
@@ -139,7 +58,7 @@ services:
     image: postgres:16
 `), 0o600))
 
-		project, err := loadProject(t.Context(), ProjectRef{Dir: dir, Name: "p"})
+		project, err := composeProject.Load(t.Context(), composeProject.ProjectRef{Dir: dir, Name: "p"})
 		require.NoError(t, err)
 
 		got, err := injectLabels(project, map[string]map[string]string{
@@ -219,7 +138,7 @@ services:
 
 	client := &Client{service: service}
 	containers, err := client.Apply(t.Context(), Request{
-		Ref:      ProjectRef{Dir: dir, Name: "project"},
+		Ref:      composeProject.ProjectRef{Dir: dir, Name: "project"},
 		Services: []string{"app"},
 	})
 	require.NoError(t, err)
@@ -262,13 +181,13 @@ func TestClientApplyRejectsInvalidRequests(t *testing.T) {
 	client := &Client{service: service}
 
 	_, err := client.Apply(t.Context(), Request{
-		Ref:      ProjectRef{},
+		Ref:      composeProject.ProjectRef{},
 		Services: []string{"app"},
 	})
-	require.ErrorIs(t, err, errEmptyProjectDir)
+	require.ErrorIs(t, err, composeProject.ErrEmptyProjectDir)
 
 	_, err = client.Apply(t.Context(), Request{
-		Ref:      ProjectRef{Dir: t.TempDir()},
+		Ref:      composeProject.ProjectRef{Dir: t.TempDir()},
 		Services: nil,
 	})
 	require.ErrorIs(t, err, errNoComposeServices)
@@ -305,7 +224,7 @@ func TestClientApplyStampsComposeIdentity(t *testing.T) {
 
 		client := &Client{service: service}
 		_, err := client.Apply(t.Context(), Request{
-			Ref:      ProjectRef{Dir: dir, Name: "jobs"},
+			Ref:      composeProject.ProjectRef{Dir: dir, Name: "jobs"},
 			Services: []string{"api"},
 			Labels: map[string]map[string]string{
 				"api": {"com.centurylinklabs.watchtower.git-last-commit": "abc"},
@@ -356,7 +275,7 @@ func TestClientApplyStampsComposeIdentity(t *testing.T) {
 
 		client := &Client{service: service}
 		_, err := client.Apply(t.Context(), Request{
-			Ref:       ProjectRef{Dir: dir, Name: "jobs"},
+			Ref:       composeProject.ProjectRef{Dir: dir, Name: "jobs"},
 			Services:  []string{"api"},
 			BuildOnly: true,
 		})
@@ -391,7 +310,7 @@ func TestStampComposeIdentity(t *testing.T) {
 		t.Parallel()
 
 		dir := writeIdentityComposeDir(t)
-		project, err := loadProject(t.Context(), ProjectRef{Dir: dir, Name: "jobs"})
+		project, err := composeProject.Load(t.Context(), composeProject.ProjectRef{Dir: dir, Name: "jobs"})
 		require.NoError(t, err)
 
 		service, err := project.GetService("api")
@@ -483,7 +402,7 @@ func TestScopeComposeProjectRejectsMissingService(t *testing.T) {
 	dir := t.TempDir()
 	require.NoError(t, os.WriteFile(filepath.Join(dir, "compose.yaml"), []byte("services:\n  app:\n    image: app\n"), 0o600))
 
-	project, err := loadProject(t.Context(), ProjectRef{Dir: dir, Name: "project"})
+	project, err := composeProject.Load(t.Context(), composeProject.ProjectRef{Dir: dir, Name: "project"})
 	require.NoError(t, err)
 
 	_, err = scopeComposeProject(project, []string{"missing"})

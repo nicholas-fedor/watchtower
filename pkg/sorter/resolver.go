@@ -3,7 +3,7 @@ package sorter
 import (
 	"slices"
 
-	"github.com/nicholas-fedor/watchtower/internal/compose"
+	composeLabels "github.com/nicholas-fedor/watchtower/internal/compose/labels"
 	"github.com/nicholas-fedor/watchtower/internal/util"
 	"github.com/nicholas-fedor/watchtower/pkg/container"
 	"github.com/nicholas-fedor/watchtower/pkg/types"
@@ -178,7 +178,7 @@ func projectOf(c types.Container) string {
 		return ""
 	}
 
-	return compose.GetProjectName(info.Config.Labels)
+	return composeLabels.GetProjectName(info.Config.Labels)
 }
 
 // serviceOf returns the normalized Compose service of c, or empty when it
@@ -195,7 +195,7 @@ func serviceOf(c types.Container) string {
 		return ""
 	}
 
-	return util.NormalizeContainerName(compose.GetServiceName(info.Config.Labels))
+	return util.NormalizeContainerName(composeLabels.GetServiceName(info.Config.Labels))
 }
 
 // memberProjects maps the identifier of each member with a Compose project

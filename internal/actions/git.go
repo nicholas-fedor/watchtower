@@ -12,7 +12,8 @@ import (
 	"github.com/distribution/reference"
 	"github.com/rs/zerolog"
 
-	"github.com/nicholas-fedor/watchtower/internal/compose"
+	composeApply "github.com/nicholas-fedor/watchtower/internal/compose/apply"
+	composeProject "github.com/nicholas-fedor/watchtower/internal/compose/project"
 	"github.com/nicholas-fedor/watchtower/internal/git"
 	"github.com/nicholas-fedor/watchtower/internal/git/apply"
 	"github.com/nicholas-fedor/watchtower/internal/git/project"
@@ -30,7 +31,7 @@ const gitShortSHALen = 12
 // gitSession holds watcher results for one Update() invocation.
 type gitSession struct {
 	client   *git.Client
-	apply    compose.Applier
+	apply    composeApply.Applier
 	checkout func(ctx context.Context, dir, commit string, opts project.CheckoutOptions) error
 	mu       sync.Mutex
 	results  map[types.ContainerID]git.CheckResult
@@ -46,7 +47,7 @@ type composeMember struct {
 
 // composeBatch is one on-disk Compose project to checkout and apply.
 type composeBatch struct {
-	ref     compose.ProjectRef
+	ref     composeProject.ProjectRef
 	members []composeMember
 }
 
@@ -63,7 +64,7 @@ type composeBatchKey struct {
 //
 // Returns:
 //   - composeBatchKey: Identity derived from the project name, directory, and config files.
-func composeBatchKeyFor(ref compose.ProjectRef) composeBatchKey {
+func composeBatchKeyFor(ref composeProject.ProjectRef) composeBatchKey {
 	return composeBatchKey{
 		name:        ref.Name,
 		dir:         ref.Dir,
@@ -81,7 +82,7 @@ func composeBatchKeyFor(ref compose.ProjectRef) composeBatchKey {
 func newGitSession(client *git.Client) *gitSession {
 	return &gitSession{
 		client:   client,
-		apply:    compose.NewClient(),
+		apply:    composeApply.NewClient(),
 		checkout: project.Checkout,
 		results:  make(map[types.ContainerID]git.CheckResult),
 		built:    make(map[types.ContainerID]types.ImageID),
@@ -236,7 +237,7 @@ func (s *gitSession) prepareRebuilds(
 
 		result, _ := s.result(c.ID())
 
-		ref, err := compose.ResolveProjectDir(containerLabels(c), params.ComposeProjects)
+		ref, err := composeProject.ResolveProjectDir(containerLabels(c), params.ComposeProjects)
 		if err != nil {
 			c.SetStale(false)
 

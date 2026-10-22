@@ -7,7 +7,7 @@ package mocks
 import (
 	"context"
 
-	"github.com/nicholas-fedor/watchtower/internal/compose"
+	"github.com/nicholas-fedor/watchtower/internal/compose/apply"
 	mock "github.com/stretchr/testify/mock"
 )
 
@@ -48,26 +48,26 @@ func (_m *MockApplier) EXPECT() *MockApplier_Expecter {
 }
 
 // Apply provides a mock function for the type MockApplier
-func (_mock *MockApplier) Apply(ctx context.Context, req compose.Request) ([]compose.Container, error) {
+func (_mock *MockApplier) Apply(ctx context.Context, req apply.Request) ([]apply.Container, error) {
 	ret := _mock.Called(ctx, req)
 
 	if len(ret) == 0 {
 		panic("no return value specified for Apply")
 	}
 
-	var r0 []compose.Container
+	var r0 []apply.Container
 	var r1 error
-	if returnFunc, ok := ret.Get(0).(func(context.Context, compose.Request) ([]compose.Container, error)); ok {
+	if returnFunc, ok := ret.Get(0).(func(context.Context, apply.Request) ([]apply.Container, error)); ok {
 		return returnFunc(ctx, req)
 	}
-	if returnFunc, ok := ret.Get(0).(func(context.Context, compose.Request) []compose.Container); ok {
+	if returnFunc, ok := ret.Get(0).(func(context.Context, apply.Request) []apply.Container); ok {
 		r0 = returnFunc(ctx, req)
 	} else {
 		if ret.Get(0) != nil {
-			r0 = ret.Get(0).([]compose.Container)
+			r0 = ret.Get(0).([]apply.Container)
 		}
 	}
-	if returnFunc, ok := ret.Get(1).(func(context.Context, compose.Request) error); ok {
+	if returnFunc, ok := ret.Get(1).(func(context.Context, apply.Request) error); ok {
 		r1 = returnFunc(ctx, req)
 	} else {
 		r1 = ret.Error(1)
@@ -82,20 +82,20 @@ type MockApplier_Apply_Call struct {
 
 // Apply is a helper method to define mock.On call
 //   - ctx context.Context
-//   - req compose.Request
+//   - req apply.Request
 func (_e *MockApplier_Expecter) Apply(ctx any, req any) *MockApplier_Apply_Call {
 	return &MockApplier_Apply_Call{Call: _e.mock.On("Apply", ctx, req)}
 }
 
-func (_c *MockApplier_Apply_Call) Run(run func(ctx context.Context, req compose.Request)) *MockApplier_Apply_Call {
+func (_c *MockApplier_Apply_Call) Run(run func(ctx context.Context, req apply.Request)) *MockApplier_Apply_Call {
 	_c.Call.Run(func(args mock.Arguments) {
 		var arg0 context.Context
 		if args[0] != nil {
 			arg0 = args[0].(context.Context)
 		}
-		var arg1 compose.Request
+		var arg1 apply.Request
 		if args[1] != nil {
-			arg1 = args[1].(compose.Request)
+			arg1 = args[1].(apply.Request)
 		}
 		run(
 			arg0,
@@ -105,12 +105,12 @@ func (_c *MockApplier_Apply_Call) Run(run func(ctx context.Context, req compose.
 	return _c
 }
 
-func (_c *MockApplier_Apply_Call) Return(containers []compose.Container, err error) *MockApplier_Apply_Call {
+func (_c *MockApplier_Apply_Call) Return(containers []apply.Container, err error) *MockApplier_Apply_Call {
 	_c.Call.Return(containers, err)
 	return _c
 }
 
-func (_c *MockApplier_Apply_Call) RunAndReturn(run func(ctx context.Context, req compose.Request) ([]compose.Container, error)) *MockApplier_Apply_Call {
+func (_c *MockApplier_Apply_Call) RunAndReturn(run func(ctx context.Context, req apply.Request) ([]apply.Container, error)) *MockApplier_Apply_Call {
 	_c.Call.Return(run)
 	return _c
 }

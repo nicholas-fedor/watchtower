@@ -15,7 +15,7 @@ import (
 	"github.com/rs/zerolog"
 	"golang.org/x/mod/semver"
 
-	"github.com/nicholas-fedor/watchtower/internal/compose"
+	composeLabels "github.com/nicholas-fedor/watchtower/internal/compose/labels"
 	gitPkg "github.com/nicholas-fedor/watchtower/pkg/container/git"
 	"github.com/nicholas-fedor/watchtower/pkg/types"
 )
@@ -326,10 +326,10 @@ func ApplyStampKeyFrom(c types.Container) ApplyStampKey {
 		return ApplyStampKey{}
 	}
 
-	projectName, _ := c.GetLabel(compose.ComposeProjectLabel)
-	files, _ := c.GetLabel(compose.ComposeConfigFilesLabel)
-	service, _ := c.GetLabel(compose.ComposeServiceLabel)
-	number, _ := c.GetLabel(compose.ComposeContainerNumber)
+	projectName, _ := c.GetLabel(composeLabels.ComposeProjectLabel)
+	files, _ := c.GetLabel(composeLabels.ComposeConfigFilesLabel)
+	service, _ := c.GetLabel(composeLabels.ComposeServiceLabel)
+	number, _ := c.GetLabel(composeLabels.ComposeContainerNumber)
 
 	service = strings.TrimSpace(service)
 	if service == "" {

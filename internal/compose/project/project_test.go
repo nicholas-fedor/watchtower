@@ -1,4 +1,4 @@
-package compose
+package project
 
 import (
 	"os"
@@ -8,6 +8,8 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+
+	composeLabels "github.com/nicholas-fedor/watchtower/internal/compose/labels"
 )
 
 // TestResolveProjectDir verifies how a container's Compose project directory is
@@ -24,9 +26,9 @@ func TestResolveProjectDir(t *testing.T) {
 		other := writeComposeDir(t, "compose.yaml")
 
 		ref, err := ResolveProjectDir(map[string]string{
-			WatchtowerComposeDirLabel: dir,
-			ComposeProjectLabel:       "web",
-			ComposeWorkingDirLabel:    other,
+			composeLabels.WatchtowerComposeDirLabel: dir,
+			composeLabels.ComposeProjectLabel:       "web",
+			composeLabels.ComposeWorkingDirLabel:    other,
 		}, map[string]string{"web": other})
 		require.NoError(t, err)
 		assert.Equal(t, "web", ref.Name)
@@ -39,8 +41,8 @@ func TestResolveProjectDir(t *testing.T) {
 		missing := filepath.Join(t.TempDir(), "missing")
 		dir := writeComposeDir(t, "compose.yaml")
 		_, err := ResolveProjectDir(map[string]string{
-			WatchtowerComposeDirLabel: missing,
-			ComposeProjectLabel:       "web",
+			composeLabels.WatchtowerComposeDirLabel: missing,
+			composeLabels.ComposeProjectLabel:       "web",
 		}, map[string]string{"web": dir})
 		require.ErrorIs(t, err, ErrProjectDir)
 	})
@@ -50,8 +52,8 @@ func TestResolveProjectDir(t *testing.T) {
 
 		dir := writeComposeDir(t, "compose.yaml")
 		ref, err := ResolveProjectDir(map[string]string{
-			ComposeProjectLabel:    "web",
-			ComposeWorkingDirLabel: writeComposeDir(t, "compose.yaml"),
+			composeLabels.ComposeProjectLabel:    "web",
+			composeLabels.ComposeWorkingDirLabel: writeComposeDir(t, "compose.yaml"),
 		}, map[string]string{"web": dir})
 		require.NoError(t, err)
 		assert.Equal(t, dir, ref.Dir)
@@ -62,8 +64,8 @@ func TestResolveProjectDir(t *testing.T) {
 
 		missing := filepath.Join(t.TempDir(), "missing")
 		_, err := ResolveProjectDir(map[string]string{
-			ComposeProjectLabel:    "web",
-			ComposeWorkingDirLabel: writeComposeDir(t, "compose.yaml"),
+			composeLabels.ComposeProjectLabel:    "web",
+			composeLabels.ComposeWorkingDirLabel: writeComposeDir(t, "compose.yaml"),
 		}, map[string]string{"web": missing})
 		require.ErrorIs(t, err, ErrProjectDir)
 	})
@@ -72,7 +74,7 @@ func TestResolveProjectDir(t *testing.T) {
 		t.Parallel()
 
 		ref, err := ResolveProjectDir(map[string]string{
-			ComposeWorkingDirLabel: writeComposeDir(t, "compose.yaml"),
+			composeLabels.ComposeWorkingDirLabel: writeComposeDir(t, "compose.yaml"),
 		}, nil)
 		require.NoError(t, err)
 		assert.Empty(t, ref.Dir)
@@ -91,8 +93,8 @@ func TestResolveProjectDir(t *testing.T) {
 
 		dir := writeComposeDir(t, "compose.yaml")
 		ref, err := ResolveProjectDir(map[string]string{
-			WatchtowerComposeDirLabel: "  ",
-			ComposeProjectLabel:       "web",
+			composeLabels.WatchtowerComposeDirLabel: "  ",
+			composeLabels.ComposeProjectLabel:       "web",
 		}, map[string]string{"web": dir})
 		require.NoError(t, err)
 		assert.Equal(t, dir, ref.Dir)
@@ -113,8 +115,8 @@ func TestResolveProjectDir(t *testing.T) {
 
 		dir := writeComposeDir(t, "compose.yaml")
 		ref, err := ResolveProjectDir(map[string]string{
-			WatchtowerComposeDirLabel: dir,
-			ComposeConfigFilesLabel:   "compose.yaml,  extra.yml, ,",
+			composeLabels.WatchtowerComposeDirLabel: dir,
+			composeLabels.ComposeConfigFilesLabel:   "compose.yaml,  extra.yml, ,",
 		}, nil)
 		require.NoError(t, err)
 		assert.Equal(t, []string{
@@ -129,9 +131,9 @@ func TestResolveProjectDir(t *testing.T) {
 		dir := writeComposeDir(t, "compose.yaml")
 		configFile := filepath.Join(dir, "compose.yaml")
 		ref, err := ResolveProjectDir(map[string]string{
-			WatchtowerComposeDirLabel: dir,
-			ComposeWorkingDirLabel:    filepath.Join(t.TempDir(), "host-project"),
-			ComposeConfigFilesLabel:   configFile,
+			composeLabels.WatchtowerComposeDirLabel: dir,
+			composeLabels.ComposeWorkingDirLabel:    filepath.Join(t.TempDir(), "host-project"),
+			composeLabels.ComposeConfigFilesLabel:   configFile,
 		}, nil)
 		require.NoError(t, err)
 		assert.Equal(t, []string{configFile}, ref.ConfigFiles)
@@ -146,9 +148,9 @@ func TestResolveProjectDir(t *testing.T) {
 		require.NoError(t, os.WriteFile(filepath.Join(mountDir, "overrides", "api.yml"), []byte("services: {}\n"), 0o600))
 
 		ref, err := ResolveProjectDir(map[string]string{
-			WatchtowerComposeDirLabel: mountDir,
-			ComposeWorkingDirLabel:    hostDir,
-			ComposeConfigFilesLabel: strings.Join([]string{
+			composeLabels.WatchtowerComposeDirLabel: mountDir,
+			composeLabels.ComposeWorkingDirLabel:    hostDir,
+			composeLabels.ComposeConfigFilesLabel: strings.Join([]string{
 				filepath.Join(hostDir, "compose.yaml"),
 				filepath.Join(hostDir, "overrides", "api.yml"),
 			}, ","),
@@ -158,7 +160,7 @@ func TestResolveProjectDir(t *testing.T) {
 			filepath.Join(mountDir, "compose.yaml"),
 			filepath.Join(mountDir, "overrides", "api.yml"),
 		}, ref.ConfigFiles)
-		_, err = loadProject(t.Context(), ref)
+		_, err = Load(t.Context(), ref)
 		require.NoError(t, err)
 	})
 
@@ -170,9 +172,9 @@ func TestResolveProjectDir(t *testing.T) {
 		external := filepath.Join(filepath.Dir(hostDir), "external.yml")
 
 		_, err := ResolveProjectDir(map[string]string{
-			WatchtowerComposeDirLabel: mountDir,
-			ComposeWorkingDirLabel:    hostDir,
-			ComposeConfigFilesLabel:   external,
+			composeLabels.WatchtowerComposeDirLabel: mountDir,
+			composeLabels.ComposeWorkingDirLabel:    hostDir,
+			composeLabels.ComposeConfigFilesLabel:   external,
 		}, nil)
 		require.ErrorIs(t, err, errConfigFile)
 	})
@@ -187,9 +189,9 @@ func TestResolveProjectDir(t *testing.T) {
 		require.NoError(t, os.Symlink(outside, filepath.Join(mountDir, "override.yml")))
 
 		_, err := ResolveProjectDir(map[string]string{
-			WatchtowerComposeDirLabel: mountDir,
-			ComposeWorkingDirLabel:    hostDir,
-			ComposeConfigFilesLabel:   filepath.Join(hostDir, "override.yml"),
+			composeLabels.WatchtowerComposeDirLabel: mountDir,
+			composeLabels.ComposeWorkingDirLabel:    hostDir,
+			composeLabels.ComposeConfigFilesLabel:   filepath.Join(hostDir, "override.yml"),
 		}, nil)
 		require.ErrorIs(t, err, errConfigFile)
 	})
@@ -200,14 +202,14 @@ func TestResolveProjectDir(t *testing.T) {
 		dir := writeComposeDir(t, "compose.yaml")
 		outside := filepath.Join(t.TempDir(), "override.yaml")
 		_, err := ResolveProjectDir(map[string]string{
-			WatchtowerComposeDirLabel: dir,
-			ComposeConfigFilesLabel:   "compose.yaml," + outside,
+			composeLabels.WatchtowerComposeDirLabel: dir,
+			composeLabels.ComposeConfigFilesLabel:   "compose.yaml," + outside,
 		}, nil)
 		require.ErrorIs(t, err, errConfigFile)
 
 		_, err = ResolveProjectDir(map[string]string{
-			WatchtowerComposeDirLabel: dir,
-			ComposeConfigFilesLabel:   "../secret.yml",
+			composeLabels.WatchtowerComposeDirLabel: dir,
+			composeLabels.ComposeConfigFilesLabel:   "../secret.yml",
 		}, nil)
 		require.ErrorIs(t, err, errConfigFile)
 	})
@@ -223,12 +225,12 @@ func TestResolveProjectDir(t *testing.T) {
 		require.NoError(t, os.Symlink(outside, link))
 
 		_, err := ResolveProjectDir(map[string]string{
-			WatchtowerComposeDirLabel: dir,
-			ComposeConfigFilesLabel:   "override.yaml",
+			composeLabels.WatchtowerComposeDirLabel: dir,
+			composeLabels.ComposeConfigFilesLabel:   "override.yaml",
 		}, nil)
 		require.ErrorIs(t, err, errConfigFile)
 
-		_, err = loadProject(t.Context(), ProjectRef{Dir: dir, ConfigFiles: []string{link}})
+		_, err = Load(t.Context(), ProjectRef{Dir: dir, ConfigFiles: []string{link}})
 		require.ErrorIs(t, err, errConfigFile)
 	})
 }
@@ -254,7 +256,7 @@ func TestConfigFiles(t *testing.T) {
 		t.Parallel()
 
 		got, err := configFiles(map[string]string{
-			ComposeConfigFilesLabel: "compose.yaml,  nested/app.yml",
+			composeLabels.ComposeConfigFilesLabel: "compose.yaml,  nested/app.yml",
 		}, "/proj")
 		require.NoError(t, err)
 		assert.Equal(t, []string{
@@ -267,12 +269,12 @@ func TestConfigFiles(t *testing.T) {
 		t.Parallel()
 
 		_, err := configFiles(map[string]string{
-			ComposeConfigFilesLabel: "compose.yaml,/abs/file.yml",
+			composeLabels.ComposeConfigFilesLabel: "compose.yaml,/abs/file.yml",
 		}, "/proj")
 		require.ErrorIs(t, err, errConfigFile)
 
 		_, err = configFiles(map[string]string{
-			ComposeConfigFilesLabel: "../secret.yml",
+			composeLabels.ComposeConfigFilesLabel: "../secret.yml",
 		}, "/proj")
 		require.ErrorIs(t, err, errConfigFile)
 	})
@@ -281,7 +283,7 @@ func TestConfigFiles(t *testing.T) {
 		t.Parallel()
 
 		got, err := configFiles(map[string]string{
-			ComposeConfigFilesLabel: ",  ,compose.yaml,",
+			composeLabels.ComposeConfigFilesLabel: ",  ,compose.yaml,",
 		}, "/proj")
 		require.NoError(t, err)
 		assert.Equal(t, []string{projectPath("compose.yaml")}, got)
@@ -327,10 +329,10 @@ func TestReadableProjectDir(t *testing.T) {
 func TestLabelValue(t *testing.T) {
 	t.Parallel()
 
-	assert.Empty(t, labelValue(nil, WatchtowerComposeDirLabel))
-	assert.Empty(t, labelValue(map[string]string{}, WatchtowerComposeDirLabel))
-	assert.Equal(t, "/proj", labelValue(map[string]string{WatchtowerComposeDirLabel: "/proj"}, WatchtowerComposeDirLabel))
-	assert.Equal(t, "/proj", labelValue(map[string]string{WatchtowerComposeDirLabel: "  /proj  "}, WatchtowerComposeDirLabel))
+	assert.Empty(t, labelValue(nil, composeLabels.WatchtowerComposeDirLabel))
+	assert.Empty(t, labelValue(map[string]string{}, composeLabels.WatchtowerComposeDirLabel))
+	assert.Equal(t, "/proj", labelValue(map[string]string{composeLabels.WatchtowerComposeDirLabel: "/proj"}, composeLabels.WatchtowerComposeDirLabel))
+	assert.Equal(t, "/proj", labelValue(map[string]string{composeLabels.WatchtowerComposeDirLabel: "  /proj  "}, composeLabels.WatchtowerComposeDirLabel))
 }
 
 // TestFileExists verifies that only an existing regular file exists.
