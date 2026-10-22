@@ -14,7 +14,7 @@ import (
 	dockerNetwork "github.com/moby/moby/api/types/network"
 	dockerClient "github.com/moby/moby/client"
 
-	"github.com/nicholas-fedor/watchtower/internal/compose"
+	composeLabels "github.com/nicholas-fedor/watchtower/internal/compose/labels"
 	"github.com/nicholas-fedor/watchtower/internal/flags"
 	"github.com/nicholas-fedor/watchtower/pkg/types"
 )
@@ -357,7 +357,7 @@ func syncComposeImageLabel(
 	config *dockerContainer.Config,
 	clientVersion string,
 ) {
-	label := config.Labels[compose.ComposeImageLabel]
+	label := config.Labels[composeLabels.ComposeImageLabel]
 
 	info := sourceContainer.ContainerInfo()
 	if label == "" || info == nil {
@@ -387,7 +387,7 @@ func syncComposeImageLabel(
 
 	// Clone the labels, which may be shared with the source container's inspect data.
 	config.Labels = maps.Clone(config.Labels)
-	config.Labels[compose.ComposeImageLabel] = value
+	config.Labels[composeLabels.ComposeImageLabel] = value
 
 	clog.Debug().
 		Str("old_value", label).
@@ -425,7 +425,7 @@ func resolveComposeImageLabel(
 		return "", false, err
 	}
 
-	value, ok := compose.ImageLabelValue(label, oldImage, newImage)
+	value, ok := composeLabels.ImageLabelValue(label, oldImage, newImage)
 
 	return value, ok, nil
 }

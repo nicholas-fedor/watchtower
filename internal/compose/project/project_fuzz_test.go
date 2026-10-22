@@ -1,4 +1,4 @@
-package compose
+package project
 
 import (
 	"path/filepath"
@@ -7,6 +7,8 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+
+	composeLabels "github.com/nicholas-fedor/watchtower/internal/compose/labels"
 )
 
 // FuzzConfigFiles verifies that a Compose config_files label yields one path
@@ -27,7 +29,7 @@ func FuzzConfigFiles(f *testing.F) {
 		root, err := filepath.Abs("/proj")
 		require.NoError(t, err)
 
-		got, err := configFiles(map[string]string{ComposeConfigFilesLabel: raw}, "/proj")
+		got, err := configFiles(map[string]string{composeLabels.ComposeConfigFilesLabel: raw}, "/proj")
 		if err != nil {
 			assert.ErrorIs(t, err, errConfigFile)
 

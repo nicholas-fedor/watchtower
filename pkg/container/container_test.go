@@ -14,7 +14,7 @@ import (
 	dockerMount "github.com/moby/moby/api/types/mount"
 	dockerNetwork "github.com/moby/moby/api/types/network"
 
-	"github.com/nicholas-fedor/watchtower/internal/compose"
+	composeLabels "github.com/nicholas-fedor/watchtower/internal/compose/labels"
 	"github.com/nicholas-fedor/watchtower/internal/logging"
 	"github.com/nicholas-fedor/watchtower/pkg/types"
 	mockTypes "github.com/nicholas-fedor/watchtower/pkg/types/mocks"
@@ -593,7 +593,7 @@ func TestContainerModel(t *testing.T) {
 					t.Parallel()
 
 					container := MockContainer(WithLabels(map[string]string{
-						compose.ComposeDependsOnLabel: "/postgres,/redis",
+						composeLabels.ComposeDependsOnLabel: "/postgres,/redis",
 					}))
 					links := container.Links(true)
 					assert.Contains(t, links, "postgres")
@@ -1648,8 +1648,8 @@ func TestContainer_Links_DoesNotLog(t *testing.T) {
 		{
 			name: "compose depends_on label",
 			labels: map[string]string{
-				compose.ComposeDependsOnLabel: "db:service_started:false",
-				compose.ComposeProjectLabel:   "shop",
+				composeLabels.ComposeDependsOnLabel: "db:service_started:false",
+				composeLabels.ComposeProjectLabel:   "shop",
 			},
 			useComposeDependsOn: true,
 			want:                []string{"shop-db"},
@@ -1723,8 +1723,8 @@ func TestContainer_Links_HostConfigAlwaysCounts(t *testing.T) {
 		{
 			name: "compose depends_on label and network mode",
 			labels: map[string]string{
-				compose.ComposeDependsOnLabel: "db:service_started:false",
-				compose.ComposeProjectLabel:   "shop",
+				composeLabels.ComposeDependsOnLabel: "db:service_started:false",
+				composeLabels.ComposeProjectLabel:   "shop",
 			},
 			networkMode:         "container:vpn",
 			useComposeDependsOn: true,

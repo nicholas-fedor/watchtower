@@ -9,7 +9,8 @@ import (
 
 	"github.com/rs/zerolog"
 
-	"github.com/nicholas-fedor/watchtower/internal/compose"
+	composeApply "github.com/nicholas-fedor/watchtower/internal/compose/apply"
+	composeLabels "github.com/nicholas-fedor/watchtower/internal/compose/labels"
 	"github.com/nicholas-fedor/watchtower/internal/git"
 	"github.com/nicholas-fedor/watchtower/internal/git/project"
 	"github.com/nicholas-fedor/watchtower/pkg/container"
@@ -57,7 +58,7 @@ func (s *gitSession) applyCompose(
 	for _, member := range batch.members {
 		c := member.container
 
-		name := compose.GetServiceName(containerLabels(c))
+		name := composeLabels.GetServiceName(containerLabels(c))
 		if name == "" {
 			failed[c.ID()] = errGitComposeService
 			c.SetStale(false)
@@ -132,11 +133,11 @@ func (s *gitSession) applyCompose(
 
 	applier := s.apply
 	if applier == nil {
-		applier = compose.NewClient()
+		applier = composeApply.NewClient()
 	}
 
 	applyCtx, cancelApply := s.client.WithTimeout(ctx)
-	applied, err := applier.Apply(applyCtx, compose.Request{
+	applied, err := applier.Apply(applyCtx, composeApply.Request{
 		Ref:       batch.ref,
 		Services:  services,
 		Labels:    labels,
@@ -158,7 +159,7 @@ func (s *gitSession) applyCompose(
 		return
 	}
 
-	appliedByService := make(map[string][]compose.Container, len(applied))
+	appliedByService := make(map[string][]composeApply.Container, len(applied))
 	for _, item := range applied {
 		appliedByService[item.Service] = append(appliedByService[item.Service], item)
 	}
@@ -182,7 +183,7 @@ func (s *gitSession) applyCompose(
 			continue
 		}
 
-		byName := make(map[string]compose.Container, len(items))
+		byName := make(map[string]composeApply.Container, len(items))
 		for _, item := range items {
 			if item.Name != "" {
 				byName[strings.TrimPrefix(item.Name, "/")] = item
@@ -248,7 +249,7 @@ func (s *gitSession) applyCompose(
 //
 // Returns:
 //   - none.
-func logComposeReplaced(log *zerolog.Logger, c types.Container, item compose.Container) {
+func logComposeReplaced(log *zerolog.Logger, c types.Container, item composeApply.Container) {
 	if log == nil || c == nil || item.ID == "" || item.ID == c.ID() {
 		return
 	}
@@ -279,7 +280,7 @@ func logComposeReplaced(log *zerolog.Logger, c types.Container, item compose.Con
 //   - none.
 func (s *gitSession) recordCompose(
 	c types.Container,
-	item compose.Container,
+	item composeApply.Container,
 	params types.UpdateParams,
 	result git.CheckResult,
 	progress *session.Progress,
@@ -358,7 +359,7 @@ func (s *gitSession) recordCompose(
 // Returns:
 //   - none.
 func markComposeResultFailures(
-	items []compose.Container,
+	items []composeApply.Container,
 	progress *session.Progress,
 	failed map[types.ContainerID]error,
 	err error,
@@ -403,7 +404,7 @@ func markComposeResultFailures(
 // Returns:
 //   - none.
 func (s *gitSession) recordComposeReplicas(
-	items []compose.Container,
+	items []composeApply.Container,
 	members []composeMember,
 	params types.UpdateParams,
 	progress *session.Progress,
@@ -633,14 +634,14 @@ func failComposeBatchWithRuntime(
 //   - byName: Results keyed by container name without a leading slash.
 //
 // Returns:
-//   - compose.Container: Matched instance.
+//   - composeApply.Container: Matched instance.
 //   - bool: False when the replica cannot be identified.
 func matchedComposeInstance(
 	c types.Container,
 	members []composeMember,
-	items []compose.Container,
-	byName map[string]compose.Container,
-) (compose.Container, bool) {
+	items []composeApply.Container,
+	byName map[string]composeApply.Container,
+) (composeApply.Container, bool) {
 	if named, ok := byName[strings.TrimPrefix(c.Name(), "/")]; ok {
 		return named, true
 	}
@@ -649,7 +650,7 @@ func matchedComposeInstance(
 		return items[0], true
 	}
 
-	return compose.Container{}, false
+	return composeApply.Container{}, false
 }
 
 // sharedComposeCommit returns the commit every member resolved.

@@ -1,4 +1,4 @@
-package compose
+package apply
 
 import (
 	"context"
@@ -7,13 +7,14 @@ import (
 
 	composetypes "github.com/compose-spec/compose-go/v2/types"
 
+	composeProject "github.com/nicholas-fedor/watchtower/internal/compose/project"
 	"github.com/nicholas-fedor/watchtower/pkg/types"
 )
 
 // Request is one Compose apply for a checked-out project directory.
 type Request struct {
 	// Ref is the resolved project directory and optional compose files.
-	Ref ProjectRef
+	Ref composeProject.ProjectRef
 	// Services are Compose service names to build or recreate.
 	Services []string
 	// Labels are extra service labels merged onto the compose model before apply.

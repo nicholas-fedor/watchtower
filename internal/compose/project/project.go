@@ -1,10 +1,12 @@
-package compose
+package project
 
 import (
 	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
+
+	composeLabels "github.com/nicholas-fedor/watchtower/internal/compose/labels"
 )
 
 // ProjectRef is a Compose project Watchtower can apply.
@@ -31,9 +33,9 @@ type ProjectRef struct {
 //   - ProjectRef: Directory when the user opted in. Dir is empty when they did not.
 //   - error: Non-nil when an opted-in path is not a readable Compose project.
 func ResolveProjectDir(labels, projectDirs map[string]string) (ProjectRef, error) {
-	name := GetProjectName(labels)
+	name := composeLabels.GetProjectName(labels)
 
-	if dir := labelValue(labels, WatchtowerComposeDirLabel); dir != "" {
+	if dir := labelValue(labels, composeLabels.WatchtowerComposeDirLabel); dir != "" {
 		return projectRefOrErr(name, dir, labels)
 	}
 
@@ -100,14 +102,14 @@ func labelValue(labels map[string]string, key string) string {
 //   - []string: Compose file paths, or nil when the label is absent.
 //   - error: errConfigFile when an entry leaves dir.
 func configFiles(labels map[string]string, dir string) ([]string, error) {
-	raw := labelValue(labels, ComposeConfigFilesLabel)
+	raw := labelValue(labels, composeLabels.ComposeConfigFilesLabel)
 	if raw == "" {
 		return nil, nil
 	}
 
 	var out []string
 
-	workingDir := labelValue(labels, ComposeWorkingDirLabel)
+	workingDir := labelValue(labels, composeLabels.ComposeWorkingDirLabel)
 
 	for part := range strings.SplitSeq(raw, ",") {
 		part = strings.TrimSpace(part)

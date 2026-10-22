@@ -1,4 +1,4 @@
-package compose
+package apply
 
 import (
 	"bytes"
@@ -17,6 +17,7 @@ import (
 	composeTypes "github.com/compose-spec/compose-go/v2/types"
 	dockerFlags "github.com/docker/cli/cli/flags"
 
+	composeProject "github.com/nicholas-fedor/watchtower/internal/compose/project"
 	"github.com/nicholas-fedor/watchtower/pkg/types"
 )
 
@@ -45,16 +46,16 @@ func NewClient() *Client {
 //   - error: Non-nil when load or apply fails.
 func (c *Client) Apply(ctx context.Context, req Request) ([]Container, error) {
 	if req.Ref.Dir == "" {
-		return nil, errEmptyProjectDir
+		return nil, composeProject.ErrEmptyProjectDir
 	}
 
 	if len(req.Services) == 0 {
 		return nil, errNoComposeServices
 	}
 
-	project, err := loadProject(ctx, req.Ref)
+	project, err := composeProject.Load(ctx, req.Ref)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("load compose project: %w", err)
 	}
 
 	project, err = scopeComposeProject(project, req.Services)

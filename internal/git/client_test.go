@@ -22,7 +22,7 @@ import (
 	dockerspec "github.com/moby/docker-image-spec/specs-go/v1"
 	dockerImage "github.com/moby/moby/api/types/image"
 
-	"github.com/nicholas-fedor/watchtower/internal/compose"
+	composeLabels "github.com/nicholas-fedor/watchtower/internal/compose/labels"
 	gitPkg "github.com/nicholas-fedor/watchtower/pkg/container/git"
 	"github.com/nicholas-fedor/watchtower/pkg/container/oci"
 	"github.com/nicholas-fedor/watchtower/pkg/types"
@@ -93,14 +93,14 @@ func labeledComposeMember(t *testing.T, project, service, number, dir, files, co
 	t.Helper()
 
 	return labeledContainer(t, map[string]string{
-		gitPkg.RepoLabel:                "https://example.com/org/app.git",
-		gitPkg.RefLabel:                 "main",
-		gitPkg.LastCommitLabel:          commit,
-		gitPkg.ComposeDirLabel:          dir,
-		compose.ComposeProjectLabel:     project,
-		compose.ComposeServiceLabel:     service,
-		compose.ComposeContainerNumber:  number,
-		compose.ComposeConfigFilesLabel: files,
+		gitPkg.RepoLabel:                      "https://example.com/org/app.git",
+		gitPkg.RefLabel:                       "main",
+		gitPkg.LastCommitLabel:                commit,
+		gitPkg.ComposeDirLabel:                dir,
+		composeLabels.ComposeProjectLabel:     project,
+		composeLabels.ComposeServiceLabel:     service,
+		composeLabels.ComposeContainerNumber:  number,
+		composeLabels.ComposeConfigFilesLabel: files,
 	})
 }
 
