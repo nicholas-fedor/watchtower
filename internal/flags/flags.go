@@ -18,9 +18,6 @@ import (
 	"github.com/nicholas-fedor/watchtower/internal/observability/logging"
 )
 
-// DockerAPIMinVersion sets the minimum Docker API version supported by Watchtower.
-const DockerAPIMinVersion string = "1.24"
-
 // Errors for flag and environment configuration.
 var (
 	// errInvalidLogFormat indicates an invalid log format was specified in configuration.

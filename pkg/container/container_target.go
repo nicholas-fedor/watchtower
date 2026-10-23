@@ -15,7 +15,6 @@ import (
 	dockerClient "github.com/moby/moby/client"
 
 	composeLabels "github.com/nicholas-fedor/watchtower/internal/compose/labels"
-	"github.com/nicholas-fedor/watchtower/internal/flags"
 	"github.com/nicholas-fedor/watchtower/pkg/types"
 )
 
@@ -210,7 +209,6 @@ func createTargetContainer(log *zerolog.Logger,
 		networkConfig,
 		sourceContainer.ID(),
 		clientVersion,
-		flags.DockerAPIMinVersion,
 		isHostNetwork,
 	)
 
