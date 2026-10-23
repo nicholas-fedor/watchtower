@@ -50,6 +50,18 @@ func TestParseDiskSpace(t *testing.T) {
 		{name: "invalid unit", input: "5x", wantErr: true},
 		{name: "percent not accepted", input: "80%", wantErr: true},
 		{name: "empty number", input: "GB", wantErr: true},
+		{name: "decimal binary unit", input: "0.5KiB", want: 512},
+		{name: "leading decimal point", input: ".5KB", want: 500},
+		{name: "trailing decimal point", input: "5.KB", want: 5000},
+		{name: "exponent", input: "1.5e3GB", wantErr: true},
+		{name: "exponent without decimal point", input: "1e3", wantErr: true},
+		{name: "hexadecimal float", input: "0x1.8p1KB", wantErr: true},
+		{name: "fraction", input: "3/2GB", wantErr: true},
+		{name: "two decimal points", input: "1.2.3GB", wantErr: true},
+		{name: "lone decimal point", input: ".GB", wantErr: true},
+		{name: "plus sign", input: "+15GB", wantErr: true},
+		{name: "plus sign on a decimal", input: "+1.5GB", wantErr: true},
+		{name: "digit separator", input: "1_000", wantErr: true},
 	}
 
 	for _, tc := range tests {
@@ -58,7 +70,8 @@ func TestParseDiskSpace(t *testing.T) {
 
 			got, err := ParseDiskSpace(tc.input)
 			if tc.wantErr {
-				assert.Error(t, err)
+				require.Error(t, err)
+				assert.Zero(t, got)
 
 				return
 			}
@@ -90,6 +103,12 @@ func TestFormatDiskSpace(t *testing.T) {
 		{name: "exact petabyte", bytes: 1_000_000_000_000_000, want: "1 PB"},
 		{name: "negative gigabyte", bytes: -10_000_000_000, want: "-10 GB"},
 		{name: "min int64", bytes: math.MinInt64, want: "-9223.37 PB"},
+		{name: "rounds up to the next unit", bytes: 999_999, want: "1 MB"},
+		{name: "largest value kept in kilobytes", bytes: 999_994, want: "999.99 KB"},
+		{name: "megabytes round up to a gigabyte", bytes: 999_999_999, want: "1 GB"},
+		{name: "gigabytes round up to a terabyte", bytes: 999_999_999_999, want: "1 TB"},
+		{name: "terabytes round up to a petabyte", bytes: 999_999_999_999_999, want: "1 PB"},
+		{name: "negative value rounds up too", bytes: -999_999, want: "-1 MB"},
 	}
 
 	for _, tc := range tests {
@@ -97,6 +116,48 @@ func TestFormatDiskSpace(t *testing.T) {
 			t.Parallel()
 
 			assert.Equal(t, tc.want, FormatDiskSpace(tc.bytes))
+		})
+	}
+}
+
+// TestParseDiskSpacePercent verifies that a percentage number is digits with
+// at most one decimal point, and that NaN, infinities, signs, and exponents are
+// rejected.
+func TestParseDiskSpacePercent(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		input   string
+		want    float64
+		wantErr bool
+	}{
+		{input: "80", want: 80},
+		{input: "62.5", want: 62.5},
+		{input: " 100 ", want: 100},
+		{input: "0", want: 0},
+		{input: "NaN", wantErr: true},
+		{input: "Inf", wantErr: true},
+		{input: "8e1", wantErr: true},
+		{input: "+80", wantErr: true},
+		{input: "-5", wantErr: true},
+		{input: "0x50p0", wantErr: true},
+		{input: "1.2.3", wantErr: true},
+		{input: "", wantErr: true},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.input, func(t *testing.T) {
+			t.Parallel()
+
+			got, err := ParseDiskSpacePercent(tc.input)
+			if tc.wantErr {
+				require.ErrorIs(t, err, errInvalidDiskSpaceNumber)
+
+				return
+			}
+
+			require.NoError(t, err)
+			assert.InDelta(t, tc.want, got, 0)
 		})
 	}
 }

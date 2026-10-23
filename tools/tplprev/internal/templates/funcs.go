@@ -191,6 +191,9 @@ func int64FromAny(value any) (int64, bool) {
 
 // formatDiskSpaceBytes formats a byte count as a compact decimal size string.
 //
+// A value that rounds to 1000 of its unit uses the next larger unit, so
+// 999,999 bytes is "1 MB" rather than "1000 KB".
+//
 // Parameters:
 //   - bytes: Size in bytes. Negative values are formatted with a leading minus.
 //
@@ -216,19 +219,47 @@ func formatDiskSpaceBytes(bytes int64) string {
 		{"KB", kilobyteMultiplier},
 	}
 
+	// larger is the unit checked before the current one, which is the next
+	// larger unit.
+	larger, hasLarger := units[0], false
+
 	for _, unit := range units {
-		if bytes >= unit.size {
-			if bytes%unit.size == 0 {
-				return strconv.FormatInt(bytes/unit.size, 10) + " " + unit.suffix
-			}
+		if bytes < unit.size {
+			larger, hasLarger = unit, true
 
-			formatted := strconv.FormatFloat(float64(bytes)/float64(unit.size), 'f', 2, 64)
-			formatted = strings.TrimRight(formatted, "0")
-			formatted = strings.TrimRight(formatted, ".")
-
-			return formatted + " " + unit.suffix
+			continue
 		}
+
+		quantity := formatDiskSpaceQuantity(bytes, unit.size)
+
+		// A value below 1000 of its unit can round up to exactly 1000, which
+		// the next larger unit shows as 1.
+		if quantity == "1000" && hasLarger {
+			unit = larger
+			quantity = formatDiskSpaceQuantity(bytes, unit.size)
+		}
+
+		return quantity + " " + unit.suffix
 	}
 
 	return strconv.FormatInt(bytes, 10) + " B"
+}
+
+// formatDiskSpaceQuantity formats bytes as a decimal quantity of the given unit.
+//
+// Parameters:
+//   - bytes: Size in bytes. Must be non-negative.
+//   - size: Unit multiplier in bytes.
+//
+// Returns:
+//   - string: Quantity with up to two decimal places and no trailing zeros.
+func formatDiskSpaceQuantity(bytes, size int64) string {
+	if bytes%size == 0 {
+		return strconv.FormatInt(bytes/size, 10)
+	}
+
+	formatted := strconv.FormatFloat(float64(bytes)/float64(size), 'f', 2, 64)
+	formatted = strings.TrimRight(formatted, "0")
+
+	return strings.TrimRight(formatted, ".")
 }

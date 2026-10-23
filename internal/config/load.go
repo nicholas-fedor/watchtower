@@ -4,7 +4,6 @@ import (
 	"errors"
 	"fmt"
 	"os"
-	"strconv"
 	"strings"
 	"time"
 
@@ -299,11 +298,9 @@ func parseDiskSpaceWarn(raw string, maxBytes int64) (int64, error) {
 			return 0, errDiskSpacePercentWithoutMax
 		}
 
-		pctStr := strings.TrimSpace(strings.TrimSuffix(raw, "%"))
-
-		pct, err := strconv.ParseFloat(pctStr, 64)
+		pct, err := units.ParseDiskSpacePercent(strings.TrimSuffix(raw, "%"))
 		if err != nil {
-			return 0, fmt.Errorf("disk-space-warn: invalid percentage %q: %w", raw, err)
+			return 0, fmt.Errorf("disk-space-warn: %w", err)
 		}
 
 		if pct <= 0 || pct > diskSpacePercentBase {

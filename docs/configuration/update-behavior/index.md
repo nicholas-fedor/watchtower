@@ -59,6 +59,7 @@ Environment Variable: WATCHTOWER_DISK_SPACE_MAX
 
 !!! Note
     - Accepted sizes: bare bytes, decimal `B`/`KB`/`MB`/`GB`/`TB`/`PB`, or binary `KiB`/`MiB`/`GiB`/`TiB`/`PiB`.
+    - A size is a whole or decimal number, such as `40GB` or `1.5TB`.
     - This option cannot be a percentage.
     - Either this option or [`disk-space-warn`](#disk_space_warn) enables the check and updates the Prometheus image-usage gauges.
 
@@ -78,6 +79,7 @@ Environment Variable: WATCHTOWER_DISK_SPACE_WARN
 !!! Note
     - Accepted sizes: bare bytes, decimal `B`/`KB`/`MB`/`GB`/`TB`/`PB`, or binary `KiB`/`MiB`/`GiB`/`TiB`/`PiB`.
     - This option may also be a percent of [`disk-space-max`](#disk_space_max) (for example `80%`).
+    - A size or percentage is a whole or decimal number, such as `1.5TB` or `62.5%`.
     - A percent value requires [`disk-space-max`](#disk_space_max).
     - When both are set, the warn amount must be less than the max.
     - Configuring a warning threshold without a maximum is valid and supported.
