@@ -1,6 +1,7 @@
 package filters
 
 import (
+	"strings"
 	"testing"
 
 	"github.com/rs/zerolog"
@@ -71,6 +72,17 @@ func (c fuzzableContainer) IsWatchtower() bool {
 
 var _ types.FilterableContainer = fuzzableContainer{}
 
+// labelMap turns parsed label pairs into a container's labels. A container
+// holds one value per key, so a later pair replaces an earlier one.
+func labelMap(pairs []labelPair) map[string]string {
+	labels := make(map[string]string, len(pairs))
+	for _, pair := range pairs {
+		labels[pair.key] = pair.value
+	}
+
+	return labels
+}
+
 func FuzzParseLabelPairs(f *testing.F) {
 	f.Add("key=value")
 	f.Add("key=")
@@ -81,9 +93,19 @@ func FuzzParseLabelPairs(f *testing.F) {
 	f.Add("")
 
 	f.Fuzz(func(t *testing.T, input string) {
-		_, err := parseLabelPairs([]string{input})
+		pairs, err := parseLabelPairs([]string{input})
 		if err != nil {
 			return
+		}
+
+		for _, pair := range pairs {
+			if pair.key == "" || pair.key != strings.TrimSpace(pair.key) {
+				t.Fatalf("key %q from %q is empty or untrimmed", pair.key, input)
+			}
+
+			if len(pair.key)+len(pair.value) > maxLabelPairBytes {
+				t.Fatalf("pair from %q exceeds %d bytes", input, maxLabelPairBytes)
+			}
 		}
 	})
 }
@@ -109,7 +131,7 @@ func FuzzFilterByEnabledLabels(f *testing.F) {
 			return
 		}
 
-		c := newFuzzableContainer(containerName, imageName, true, "", false, containerLabels)
+		c := newFuzzableContainer(containerName, imageName, true, "", false, labelMap(containerLabels))
 		filter := filterByEnabledLabels(fuzzLog(), filterLabels, NoFilter)
 		_ = filter(c)
 	})
@@ -136,7 +158,7 @@ func FuzzFilterByDisabledLabels(f *testing.F) {
 			return
 		}
 
-		c := newFuzzableContainer(containerName, imageName, true, "", false, containerLabels)
+		c := newFuzzableContainer(containerName, imageName, true, "", false, labelMap(containerLabels))
 		filter := filterByDisabledLabels(fuzzLog(), filterLabels, NoFilter)
 		_ = filter(c)
 	})

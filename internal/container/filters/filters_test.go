@@ -282,7 +282,7 @@ func TestFilterByNamesRegex(t *testing.T) {
 func TestFilterByEnabledLabelsPresenceCheck(t *testing.T) {
 	t.Parallel()
 
-	filter := filterByEnabledLabels(newTestLogger(t), map[string]string{enableLabelKey: ""}, NoFilter)
+	filter := filterByEnabledLabels(newTestLogger(t), []labelPair{{key: enableLabelKey}}, NoFilter)
 	assert.NotNil(t, filter)
 
 	container := new(mockContainer.FilterableContainer)
@@ -512,7 +512,7 @@ func TestBuildFilterNoneScope(t *testing.T) {
 func TestFilterByDisabledLabelsExactMatch(t *testing.T) {
 	t.Parallel()
 
-	filter := filterByDisabledLabels(newTestLogger(t), map[string]string{enableLabelKey: "false"}, NoFilter)
+	filter := filterByDisabledLabels(newTestLogger(t), []labelPair{{key: enableLabelKey, value: "false"}}, NoFilter)
 	assert.NotNil(t, filter)
 
 	container := new(mockContainer.FilterableContainer)
@@ -806,7 +806,8 @@ func TestBuildFilter(t *testing.T) {
 }
 
 func TestBuildFilterEnableLabel(t *testing.T) {
-	// t.Parallel()
+	t.Parallel()
+
 	names := make([]string, 0, 1)
 	names = append(names, "test")
 
@@ -1165,7 +1166,7 @@ func TestBuildFilterImageNamesWithContainerNames(t *testing.T) {
 func TestFilterByEnabledLabels(t *testing.T) {
 	t.Parallel()
 
-	labels := map[string]string{"Service": "Pelican", "Env": "prod"}
+	labels := []labelPair{{key: "Service", value: "Pelican"}, {key: "Env", value: "prod"}}
 
 	filter := filterByEnabledLabels(newTestLogger(t), labels, NoFilter)
 	assert.NotNil(t, filter)
@@ -1208,7 +1209,7 @@ func TestFilterByEnabledLabels(t *testing.T) {
 func TestFilterByDisabledLabels(t *testing.T) {
 	t.Parallel()
 
-	labels := map[string]string{"Service": "Pelican", "Env": "dev"}
+	labels := []labelPair{{key: "Service", value: "Pelican"}, {key: "Env", value: "dev"}}
 
 	filter := filterByDisabledLabels(newTestLogger(t), labels, NoFilter)
 	assert.NotNil(t, filter)
@@ -1312,32 +1313,42 @@ func TestParseLabelPairs_Valid(t *testing.T) {
 	tests := []struct {
 		name     string
 		input    []string
-		expected map[string]string
+		expected []labelPair
 	}{
 		{
 			name:     "simple pair",
 			input:    []string{"key=value"},
-			expected: map[string]string{"key": "value"},
+			expected: []labelPair{{key: "key", value: "value"}},
 		},
 		{
 			name:     "empty value",
 			input:    []string{"key="},
-			expected: map[string]string{"key": ""},
+			expected: []labelPair{{key: "key"}},
 		},
 		{
 			name:     "multiple pairs",
 			input:    []string{"a=1", "b=2"},
-			expected: map[string]string{"a": "1", "b": "2"},
+			expected: []labelPair{{key: "a", value: "1"}, {key: "b", value: "2"}},
+		},
+		{
+			name:     "repeated key keeps every value in order",
+			input:    []string{"env=prod", "env=staging"},
+			expected: []labelPair{{key: "env", value: "prod"}, {key: "env", value: "staging"}},
 		},
 		{
 			name:     "value with equals",
 			input:    []string{"key=val=ue"},
-			expected: map[string]string{"key": "val=ue"},
+			expected: []labelPair{{key: "key", value: "val=ue"}},
 		},
 		{
 			name:     "whitespace trimmed from key and value",
 			input:    []string{"  key  =  value  "},
-			expected: map[string]string{"key": "value"},
+			expected: []labelPair{{key: "key", value: "value"}},
+		},
+		{
+			name:     "blank entries skipped",
+			input:    []string{"", "  ", "key=value"},
+			expected: []labelPair{{key: "key", value: "value"}},
 		},
 	}
 
@@ -1531,4 +1542,112 @@ func TestFilters_DebugLogging(t *testing.T) {
 	assert.True(t, skipImageFilter(keptImage))
 	keptImage.AssertExpectations(t)
 	assert.Contains(t, logBuf.String(), "Container not skipped by image name patterns")
+}
+
+// TestFilterByLabels_RepeatedKey verifies that every value given for one label
+// key counts, so a container matches when its value equals any of them.
+func TestFilterByLabels_RepeatedKey(t *testing.T) {
+	t.Parallel()
+
+	pairs := []labelPair{{key: "env", value: "prod"}, {key: "env", value: "staging"}}
+
+	tests := []struct {
+		name  string
+		value string
+		has   bool
+		// matched reports whether the container matches a pair.
+		matched bool
+	}{
+		{name: "first value", value: "prod", has: true, matched: true},
+		{name: "second value", value: "staging", has: true, matched: true},
+		{name: "other value", value: "dev", has: true},
+		{name: "label absent"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			newContainer := func() *mockContainer.FilterableContainer {
+				container := new(mockContainer.FilterableContainer)
+				container.On("Name").Return("/app").Maybe()
+				container.On("GetLabel", "env").Return(tt.value, tt.has)
+
+				return container
+			}
+
+			enabled := newContainer()
+			assert.Equal(t, tt.matched, filterByEnabledLabels(newTestLogger(t), pairs, NoFilter)(enabled))
+			enabled.AssertExpectations(t)
+
+			disabled := newContainer()
+			assert.Equal(t, !tt.matched, filterByDisabledLabels(newTestLogger(t), pairs, NoFilter)(disabled))
+			disabled.AssertExpectations(t)
+		})
+	}
+}
+
+// TestBuildFilterLabelDescriptionOrder verifies that the filter description
+// lists label pairs in the order given, including repeated keys.
+func TestBuildFilterLabelDescriptionOrder(t *testing.T) {
+	t.Parallel()
+
+	_, desc, err := BuildFilter(newTestLogger(t), nil, nil, nil, nil,
+		[]string{"b=2", "a=1", "a=3"}, []string{"c=", "d=4"}, false, "none")
+	require.NoError(t, err)
+	assert.Contains(t, desc, `with label b="2" or a="1" or a="3", without label c or d="4", `)
+}
+
+// TestFilters_QuietLoggers verifies that the label, scope, and image filters
+// work with a nil logger or one with debug off, and skip building log
+// context: the mocks expect no Name call, so logging would fail the test.
+func TestFilters_QuietLoggers(t *testing.T) {
+	t.Parallel()
+
+	disabled := zerolog.Nop()
+
+	for name, log := range map[string]*zerolog.Logger{"nil": nil, "debug off": &disabled} {
+		t.Run(name, func(t *testing.T) {
+			t.Parallel()
+
+			labeled := new(mockContainer.FilterableContainer)
+			labeled.On("GetLabel", "env").Return("prod", true)
+			assert.True(t, filterByEnabledLabels(log, []labelPair{{key: "env", value: "prod"}}, NoFilter)(labeled))
+			assert.False(t, filterByDisabledLabels(log, []labelPair{{key: "env"}}, NoFilter)(labeled))
+			labeled.AssertExpectations(t)
+
+			scoped := new(mockContainer.FilterableContainer)
+			scoped.On("Scope").Return("prod", true)
+			assert.True(t, FilterByScope(log, "prod", NoFilter)(scoped))
+			assert.False(t, FilterByScope(log, "dev", NoFilter)(scoped))
+			scoped.AssertExpectations(t)
+
+			imaged := new(mockContainer.FilterableContainer)
+			imaged.On("ImageName").Return("nginx:latest")
+			assert.True(t, FilterByImage(log, []string{"nginx"}, NoFilter)(imaged))
+			assert.False(t, FilterByImage(log, []string{"redis"}, NoFilter)(imaged))
+			imaged.AssertExpectations(t)
+		})
+	}
+}
+
+// TestBuildFilterRepeatedLabelKey verifies that an enabled label option giving
+// one key two values keeps containers with either value.
+func TestBuildFilterRepeatedLabelKey(t *testing.T) {
+	t.Parallel()
+
+	filter, _, err := BuildFilter(newTestLogger(t), nil, nil, nil, nil,
+		[]string{"env=prod", "env=staging"}, nil, false, "none")
+	require.NoError(t, err)
+
+	for _, value := range []string{"prod", "staging"} {
+		container := new(mockContainer.FilterableContainer)
+		container.On("IsWatchtower").Return(false).Maybe()
+		container.On("Name").Return("/app").Maybe()
+		container.On("GetLabel", "env").Return(value, true)
+		container.On("Enabled").Return(false, false).Maybe()
+		container.On("Scope").Return("", false).Maybe()
+		assert.True(t, filter(container), "env=%s", value)
+		container.AssertExpectations(t)
+	}
 }
