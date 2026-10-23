@@ -12,83 +12,90 @@ import (
 	"github.com/nicholas-fedor/watchtower/pkg/types"
 )
 
+// TestValidateUpdateOptions verifies that each update API dependency is
+// required. Every case supplies all the others, so each one fails only on the
+// dependency it leaves out, whatever order the checks run in.
 func TestValidateUpdateOptions(t *testing.T) {
 	testMetrics := metrics.Default()
+
+	runUpdates := func(_ context.Context, _ types.Filter, _ types.UpdateParams) *metrics.Metric {
+		return &metrics.Metric{}
+	}
+	filterByImage := func(_ []string, f types.Filter) types.Filter { return f }
+	defaultMetrics := func() *metrics.Metrics { return testMetrics }
 
 	tests := []struct {
 		name    string
 		opts    Options
-		wantErr bool
+		wantErr error
 	}{
 		{
 			name: "all present",
 			opts: Options{
-				RunUpdatesWithNotifications: func(_ context.Context, _ types.Filter, _ types.UpdateParams) *metrics.Metric {
-					return &metrics.Metric{}
-				},
-				FilterByImage:  func(_ []string, f types.Filter) types.Filter { return f },
-				DefaultMetrics: func() *metrics.Metrics { return testMetrics },
-				UpdateLock:     scheduling.NewUpdateLock(),
+				RunUpdatesWithNotifications: runUpdates,
+				FilterByImage:               filterByImage,
+				DefaultMetrics:              defaultMetrics,
+				UpdateLock:                  scheduling.NewUpdateLock(),
 			},
-			wantErr: false,
+			wantErr: nil,
 		},
 		{
 			name: "missing RunUpdatesWithNotifications",
 			opts: Options{
 				RunUpdatesWithNotifications: nil,
-				FilterByImage:               func(_ []string, f types.Filter) types.Filter { return f },
-				DefaultMetrics:              func() *metrics.Metrics { return testMetrics },
+				FilterByImage:               filterByImage,
+				DefaultMetrics:              defaultMetrics,
+				UpdateLock:                  scheduling.NewUpdateLock(),
 			},
-			wantErr: true,
+			wantErr: errMissingRunUpdatesWithNotifications,
 		},
 		{
 			name: "missing FilterByImage",
 			opts: Options{
-				RunUpdatesWithNotifications: func(_ context.Context, _ types.Filter, _ types.UpdateParams) *metrics.Metric {
-					return &metrics.Metric{}
-				},
-				FilterByImage:  nil,
-				DefaultMetrics: func() *metrics.Metrics { return testMetrics },
+				RunUpdatesWithNotifications: runUpdates,
+				FilterByImage:               nil,
+				DefaultMetrics:              defaultMetrics,
+				UpdateLock:                  scheduling.NewUpdateLock(),
 			},
-			wantErr: true,
+			wantErr: ErrMissingFilterByImage,
 		},
 		{
 			name: "missing DefaultMetrics",
 			opts: Options{
-				RunUpdatesWithNotifications: func(_ context.Context, _ types.Filter, _ types.UpdateParams) *metrics.Metric {
-					return &metrics.Metric{}
-				},
-				FilterByImage:  func(_ []string, f types.Filter) types.Filter { return f },
-				DefaultMetrics: nil,
+				RunUpdatesWithNotifications: runUpdates,
+				FilterByImage:               filterByImage,
+				DefaultMetrics:              nil,
+				UpdateLock:                  scheduling.NewUpdateLock(),
 			},
-			wantErr: true,
+			wantErr: ErrMissingDefaultMetrics,
 		},
 		{
 			name: "missing UpdateLock",
 			opts: Options{
-				RunUpdatesWithNotifications: func(_ context.Context, _ types.Filter, _ types.UpdateParams) *metrics.Metric {
-					return &metrics.Metric{}
-				},
-				FilterByImage:  func(_ []string, f types.Filter) types.Filter { return f },
-				DefaultMetrics: func() *metrics.Metrics { return testMetrics },
+				RunUpdatesWithNotifications: runUpdates,
+				FilterByImage:               filterByImage,
+				DefaultMetrics:              defaultMetrics,
+				UpdateLock:                  nil,
 			},
-			wantErr: true,
+			wantErr: errMissingUpdateLock,
 		},
 		{
 			name:    "all nil",
 			opts:    Options{},
-			wantErr: true,
+			wantErr: errMissingRunUpdatesWithNotifications,
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			err := ValidateUpdateOptions(tt.opts)
-			if tt.wantErr {
-				assert.Error(t, err)
-			} else {
+			if tt.wantErr == nil {
 				assert.NoError(t, err)
+
+				return
 			}
+
+			assert.ErrorIs(t, err, tt.wantErr)
 		})
 	}
 }

@@ -52,6 +52,21 @@ func TestParseAPIEndpoints(t *testing.T) {
 			want:  []string{EndpointHealth, EndpointUpdate, EndpointMetrics},
 		},
 		{
+			name:  "newline-separated single element",
+			input: []string{"health\nmetrics\n"},
+			want:  []string{EndpointHealth, EndpointMetrics},
+		},
+		{
+			name:  "CRLF and tab separators",
+			input: []string{"health\r\n\tupdate,\r\nmetrics"},
+			want:  []string{EndpointHealth, EndpointUpdate, EndpointMetrics},
+		},
+		{
+			name:  "non-ASCII whitespace separator",
+			input: []string{"health\u00a0metrics"},
+			want:  []string{EndpointHealth, EndpointMetrics},
+		},
+		{
 			name:  "duplicates ignored",
 			input: []string{"metrics", "metrics", "health"},
 			want:  []string{EndpointHealth, EndpointMetrics},
@@ -67,8 +82,18 @@ func TestParseAPIEndpoints(t *testing.T) {
 			want:  allEndpointNames,
 		},
 		{
+			name:  "all repeated",
+			input: []string{"all,all", "ALL"},
+			want:  allEndpointNames,
+		},
+		{
 			name:    "all with other names",
 			input:   []string{"all", "metrics"},
+			wantErr: errAllMustBeAlone,
+		},
+		{
+			name:    "all repeated with another name",
+			input:   []string{"all", "all", "metrics"},
 			wantErr: errAllMustBeAlone,
 		},
 		{

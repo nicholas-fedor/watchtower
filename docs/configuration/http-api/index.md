@@ -79,7 +79,7 @@ Selects which HTTP API endpoints to enable.
 ```text
             Argument: --http-api-endpoints
 Environment Variable: WATCHTOWER_HTTP_API_ENDPOINTS
-                Type: String (comma or space separated list)
+                Type: String (comma or whitespace separated list)
              Default: empty (HTTP API disabled)
 ```
 

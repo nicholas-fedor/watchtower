@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"slices"
 	"strings"
+	"unicode"
 )
 
 // Canonical HTTP API endpoint names corresponding to
@@ -66,9 +67,9 @@ func (m EnabledEndpoints) Empty() bool {
 //
 // Filter rules:
 //   - Values may already be split on commas or spaces by flag/env parsing
-//   - Each entry is still trimmed and lowercased
+//   - Each entry is still split on commas and Unicode whitespace, then lowercased
+//   - Duplicates are ignored, including a repeated "all"
 //   - The special value "all" (alone) expands to every known endpoint
-//   - Duplicates are ignored
 //   - An empty list yields an empty set
 //
 // Parameters:
@@ -84,14 +85,12 @@ func parseAPIEndpoints(values []string) (EnabledEndpoints, error) {
 		// Allow a single string that still contains separators (e.g. tests or
 		// callers that have not pre-split).
 		for _, token := range strings.FieldsFunc(part, func(r rune) bool {
-			return r == ',' || r == ' ' || r == '\t'
+			return r == ',' || unicode.IsSpace(r)
 		}) {
-			name := strings.ToLower(strings.TrimSpace(token))
-			if name == "" {
-				continue
+			name := strings.ToLower(token)
+			if !slices.Contains(names, name) {
+				names = append(names, name)
 			}
-
-			names = append(names, name)
 		}
 	}
 
@@ -192,9 +191,10 @@ func formatEndpoints(endpointMap EnabledEndpoints) string {
 // Rules:
 //  1. Parse the allowlist when non-empty (unknown names fail and "all" expands fully).
 //  2. Union with any legacy update/metrics/containers flags (deduplicated).
-//  3. When legacy flags are used, log one deprecation warning with the final
-//     equivalent allowlist value.
-//  4. Empty allowlist and no legacy flags is equivalent to an empty map (API off).
+//  3. Empty allowlist and no legacy flags is equivalent to an empty map (API off).
+//
+// The legacy flags are marked deprecated in their flag specs, so the flag
+// library reports each one that is set.
 //
 // Parameters:
 //   - endpoints: Values from http-api-endpoints.
