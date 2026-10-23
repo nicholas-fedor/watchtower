@@ -61,39 +61,48 @@ func FuzzBroadcasterSubscribePublish(f *testing.F) {
 	})
 }
 
-// FuzzBroadcasterMaxSubscribers verifies that the Broadcaster correctly
-// rejects subscribers when the maximum is reached.
+// FuzzBroadcasterMaxSubscribers verifies that the Broadcaster accepts
+// subscribers up to MaxSubscribers and rejects every one after that, while the
+// accepted subscriptions stay open, and that unsubscribing them all leaves no
+// subscribers.
 func FuzzBroadcasterMaxSubscribers(f *testing.F) {
 	f.Add(50)
-	f.Add(99)
-	f.Add(100)
+	f.Add(MaxSubscribers - 1)
+	f.Add(MaxSubscribers)
+	f.Add(MaxSubscribers + 1)
+	f.Add(2 * MaxSubscribers)
 
 	f.Fuzz(func(t *testing.T, numSubscribers int) {
-		if numSubscribers < 0 {
-			numSubscribers = 0
-		}
-
-		if numSubscribers > 100 {
-			numSubscribers = 100
-		}
+		// Bound the attempts so a run stays quick, while still reaching past
+		// the limit.
+		numSubscribers = min(max(numSubscribers, 0), 3*MaxSubscribers)
 
 		b := NewBroadcaster()
-		successCount := 0
 		rejectCount := 0
+
+		var channels []<-chan Event
 
 		for range numSubscribers {
 			ch, _ := b.SubscribeWithDone()
 			if ch == nil {
 				rejectCount++
-			} else {
-				successCount++
 
-				b.Unsubscribe(ch)
+				continue
 			}
+
+			channels = append(channels, ch)
 		}
 
-		assert.LessOrEqual(t, successCount, MaxSubscribers,
-			"should not exceed max subscribers")
+		wantAccepted := min(numSubscribers, MaxSubscribers)
+		assert.Len(t, channels, wantAccepted, "subscribers up to the limit are accepted")
+		assert.Equal(t, numSubscribers-wantAccepted, rejectCount, "subscribers past the limit are rejected")
+		assert.Equal(t, wantAccepted, b.SubscriberCount())
+
+		for _, ch := range channels {
+			assert.True(t, b.Unsubscribe(ch))
+		}
+
+		assert.Equal(t, 0, b.SubscriberCount(), "all subscribers should be removed")
 	})
 }
 
