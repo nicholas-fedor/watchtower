@@ -14,6 +14,7 @@ import (
 	dockerNetwork "github.com/moby/moby/api/types/network"
 
 	composeLabels "github.com/nicholas-fedor/watchtower/internal/compose/labels"
+	"github.com/nicholas-fedor/watchtower/internal/container/labels"
 	"github.com/nicholas-fedor/watchtower/pkg/types"
 )
 
@@ -401,7 +402,7 @@ func (c *Container) GetCreateConfig() *dockerContainer.Config {
 	config.Env = sliceSubtract(config.Env, imageConfig.Env)
 
 	// Preserve the watchtower label if present, as it may be subtracted as an image default.
-	watchtowerLabelValue, hasWatchtowerLabel := config.Labels[watchtowerLabel]
+	watchtowerLabelValue, hasWatchtowerLabel := config.Labels[labels.Watchtower]
 
 	config.Labels = stringMapSubtract(config.Labels, imageConfig.Labels)
 	if hasWatchtowerLabel {
@@ -409,7 +410,7 @@ func (c *Container) GetCreateConfig() *dockerContainer.Config {
 			config.Labels = make(map[string]string)
 		}
 
-		config.Labels[watchtowerLabel] = watchtowerLabelValue
+		config.Labels[labels.Watchtower] = watchtowerLabelValue
 	}
 
 	config.Volumes = structMapSubtract(config.Volumes, imageConfig.Volumes)
@@ -756,7 +757,7 @@ func (c *Container) resolveImageName() string {
 	// Prefer the Zodiac label for the image name.
 	// The caller holds c.mu or is constructing the container, so the label
 	// is read from the field rather than through ContainerInfo.
-	imageName, ok := labelValue(c.containerInfo, zodiacLabel)
+	imageName, ok := labelValue(c.containerInfo, labels.ZodiacOriginalImage)
 	if !ok {
 		if c.containerInfo == nil || c.containerInfo.Config == nil {
 			c.logger().Warn().
@@ -892,7 +893,7 @@ func nameOrID(c types.Container) string {
 //   - []string: List of all normalized links, including potential self-references, or nil if label not present
 func GetLinksFromWatchtowerLabel(c *Container) []string {
 	// Get the depends-on label value or empty string if not present
-	dependsOnLabelValue := c.getLabelValueOrEmpty(dependsOnLabel)
+	dependsOnLabelValue := c.getLabelValueOrEmpty(labels.DependsOn)
 
 	// If the label is empty, return nil
 	if dependsOnLabelValue == "" {

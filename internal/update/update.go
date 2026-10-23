@@ -18,6 +18,7 @@ import (
 	dockerContainer "github.com/moby/moby/api/types/container"
 
 	"github.com/nicholas-fedor/watchtower/internal/container/filters"
+	"github.com/nicholas-fedor/watchtower/internal/container/labels"
 	"github.com/nicholas-fedor/watchtower/internal/git"
 	"github.com/nicholas-fedor/watchtower/internal/registry/ratelimit"
 	"github.com/nicholas-fedor/watchtower/internal/update/changelog"
@@ -2126,7 +2127,7 @@ func restartStaleContainer(
 					newChain = string(c.ID())
 				}
 
-				c.SetLabel(container.ContainerChainLabel, newChain)
+				c.SetLabel(labels.ContainerChain, newChain)
 				log.Debug().
 					Fields(fields).
 					Str("container_chain", newChain).

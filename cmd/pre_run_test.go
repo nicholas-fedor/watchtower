@@ -20,6 +20,7 @@ import (
 	dockerContainer "github.com/moby/moby/api/types/container"
 	dockerImage "github.com/moby/moby/api/types/image"
 
+	"github.com/nicholas-fedor/watchtower/internal/container/labels"
 	"github.com/nicholas-fedor/watchtower/internal/observability/logging"
 	"github.com/nicholas-fedor/watchtower/internal/settings"
 	"github.com/nicholas-fedor/watchtower/pkg/container"
@@ -517,7 +518,7 @@ func preRunExitHelper(t *testing.T, helperCase string) {
 		// The container's chain lists its own ID, which marks it as the parent
 		// of a newer instance.
 		parent := selfContainer("/watchtower", "")
-		parent.ContainerInfo().Config.Labels[container.ContainerChainLabel] = strings.Repeat("a", 64) + "," + string(selfID)
+		parent.ContainerInfo().Config.Labels[labels.ContainerChain] = strings.Repeat("a", 64) + "," + string(selfID)
 		detection = selfDetection{mountinfo: mountinfoWithSelf()}
 
 		mockClient.EXPECT().GetCurrentWatchtowerContainer(mock.Anything, selfID).Return(parent, nil)

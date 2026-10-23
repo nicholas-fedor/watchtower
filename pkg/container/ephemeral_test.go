@@ -14,6 +14,7 @@ import (
 	dockerContainer "github.com/moby/moby/api/types/container"
 	dockerClient "github.com/moby/moby/client"
 
+	"github.com/nicholas-fedor/watchtower/internal/container/labels"
 	mockContainer "github.com/nicholas-fedor/watchtower/pkg/container/mocks"
 	"github.com/nicholas-fedor/watchtower/pkg/types"
 )
@@ -483,7 +484,7 @@ func TestEphemeralOrchestrator(t *testing.T) {
 				assert.Contains(t, config.Env, "WT_ORCHESTRATOR_CLEANUP=false")
 
 				// Verify the orchestrator label is set but the watchtower label is NOT set.
-				assert.Equal(t, "true", config.Labels[orchestratorLabel])
+				assert.Equal(t, "true", config.Labels[labels.EphemeralOrchestrator])
 				assert.NotContains(t, config.Labels, "com.centurylinklabs.watchtower")
 			})
 		})
@@ -872,7 +873,7 @@ func TestEphemeralOrchestrator(t *testing.T) {
 					WithID("orch123"),
 					WithName("watchtower-orchestrator-abc"),
 					WithLabels(map[string]string{
-						orchestratorLabel: "true",
+						labels.EphemeralOrchestrator: "true",
 					}),
 					orphaned,
 				)
@@ -906,7 +907,7 @@ func TestEphemeralOrchestrator(t *testing.T) {
 					WithID("orch001"),
 					WithName("watchtower-orchestrator-001"),
 					WithLabels(map[string]string{
-						orchestratorLabel: "true",
+						labels.EphemeralOrchestrator: "true",
 					}),
 					orphaned,
 				)
@@ -914,7 +915,7 @@ func TestEphemeralOrchestrator(t *testing.T) {
 					WithID("orch002"),
 					WithName("watchtower-orchestrator-002"),
 					WithLabels(map[string]string{
-						orchestratorLabel: "true",
+						labels.EphemeralOrchestrator: "true",
 					}),
 					orphaned,
 				)
@@ -977,7 +978,7 @@ func TestEphemeralOrchestrator(t *testing.T) {
 					WithID("orch001"),
 					WithName("watchtower-orchestrator-001"),
 					WithLabels(map[string]string{
-						orchestratorLabel: "true",
+						labels.EphemeralOrchestrator: "true",
 					}),
 					orphaned,
 				)
@@ -985,7 +986,7 @@ func TestEphemeralOrchestrator(t *testing.T) {
 					WithID("orch002"),
 					WithName("watchtower-orchestrator-002"),
 					WithLabels(map[string]string{
-						orchestratorLabel: "true",
+						labels.EphemeralOrchestrator: "true",
 					}),
 					orphaned,
 				)

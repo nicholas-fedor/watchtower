@@ -16,6 +16,7 @@ import (
 	"golang.org/x/mod/semver"
 
 	composeLabels "github.com/nicholas-fedor/watchtower/internal/compose/labels"
+	"github.com/nicholas-fedor/watchtower/internal/container/labels"
 	gitPkg "github.com/nicholas-fedor/watchtower/pkg/container/git"
 	"github.com/nicholas-fedor/watchtower/pkg/types"
 )
@@ -319,7 +320,7 @@ func ApplyStampKeyFrom(c types.Container) ApplyStampKey {
 		return ApplyStampKey{}
 	}
 
-	dir, _ := c.GetLabel(gitPkg.ComposeDirLabel)
+	dir, _ := c.GetLabel(labels.ComposeDir)
 
 	dir = strings.TrimSpace(dir)
 	if dir == "" {
@@ -878,7 +879,7 @@ func policyLabelValue(c types.Container) string {
 		return ""
 	}
 
-	val, ok := c.GetLabel(gitPkg.SemverPolicyLabel)
+	val, ok := c.GetLabel(labels.GitSemverPolicy)
 	if !ok {
 		return ""
 	}

@@ -8,6 +8,7 @@ import (
 	dockerspec "github.com/moby/docker-image-spec/specs-go/v1"
 	dockerImage "github.com/moby/moby/api/types/image"
 
+	"github.com/nicholas-fedor/watchtower/internal/container/labels"
 	"github.com/nicholas-fedor/watchtower/pkg/container/oci"
 	typemocks "github.com/nicholas-fedor/watchtower/pkg/types/mocks"
 )
@@ -27,8 +28,8 @@ func TestLastStamp(t *testing.T) {
 		t.Parallel()
 
 		commit, tag := LastStamp(testContainer(t, map[string]string{
-			LastCommitLabel: "  abc123  ",
-			LastTagLabel:    "v1.2.3",
+			labels.GitLastCommit: "  abc123  ",
+			labels.GitLastTag:    "v1.2.3",
 		}, "app:latest"))
 		assert.Equal(t, "abc123", commit)
 		assert.Equal(t, "v1.2.3", tag)
@@ -50,8 +51,8 @@ func TestBaseline(t *testing.T) {
 		t.Parallel()
 
 		commit, tag := Baseline(testContainer(t, map[string]string{
-			LastCommitLabel: "stampsha",
-			LastTagLabel:    "v1.0.0",
+			labels.GitLastCommit: "stampsha",
+			labels.GitLastTag:    "v1.0.0",
 		}, "app:git-aaa111bbbbcc"))
 		assert.Equal(t, "stampsha", commit)
 		assert.Equal(t, "v1.0.0", tag)
@@ -127,8 +128,8 @@ func imageContainer(t *testing.T, imageName, revision, version string) *typemock
 	t.Helper()
 
 	c := typemocks.NewMockContainer(t)
-	c.EXPECT().GetLabel(LastCommitLabel).Return("", false).Maybe()
-	c.EXPECT().GetLabel(LastTagLabel).Return("", false).Maybe()
+	c.EXPECT().GetLabel(labels.GitLastCommit).Return("", false).Maybe()
+	c.EXPECT().GetLabel(labels.GitLastTag).Return("", false).Maybe()
 	c.EXPECT().ImageName().Return(imageName).Maybe()
 
 	if revision == "" && version == "" {

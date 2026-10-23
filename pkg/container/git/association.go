@@ -6,6 +6,7 @@ import (
 
 	"github.com/rs/zerolog"
 
+	"github.com/nicholas-fedor/watchtower/internal/container/labels"
 	"github.com/nicholas-fedor/watchtower/pkg/types"
 )
 
@@ -52,17 +53,17 @@ func ResolveAssociation(c types.Container, params types.UpdateParams) (Associati
 	}
 
 	// Container labels win over --git-image mappings.
-	if repo := label(c, RepoLabel); repo != "" {
+	if repo := label(c, labels.GitRepo); repo != "" {
 		ref, refDefault := sourced(refLabel(c), "", defaultRef(params))
 		policy, policyDefault := sourced(policyLabel(c), "", defaultPolicy(params))
-		dockerfile, dockerfileDefault := sourced(label(c, DockerfileLabel), "", params.GitDockerfile)
-		context, contextDefault := sourced(label(c, ContextLabel), "", params.GitContext)
+		dockerfile, dockerfileDefault := sourced(label(c, labels.GitDockerfile), "", params.GitDockerfile)
+		context, contextDefault := sourced(label(c, labels.GitContext), "", params.GitContext)
 
 		return Association{
 			Repo:                  repo,
 			Ref:                   ref,
 			Policy:                policy,
-			Host:                  label(c, HostLabel),
+			Host:                  label(c, labels.GitHost),
 			Dockerfile:            dockerfile,
 			Context:               context,
 			RefFromDefault:        refDefault,
@@ -79,14 +80,14 @@ func ResolveAssociation(c types.Container, params types.UpdateParams) (Associati
 
 	ref, refDefault := sourced("", mapping.Ref, defaultRef(params))
 	policy, policyDefault := sourced("", mapping.Policy, defaultPolicy(params))
-	dockerfile, dockerfileDefault := sourced(label(c, DockerfileLabel), mapping.Dockerfile, params.GitDockerfile)
-	context, contextDefault := sourced(label(c, ContextLabel), mapping.Context, params.GitContext)
+	dockerfile, dockerfileDefault := sourced(label(c, labels.GitDockerfile), mapping.Dockerfile, params.GitDockerfile)
+	context, contextDefault := sourced(label(c, labels.GitContext), mapping.Context, params.GitContext)
 
 	return Association{
 		Repo:                  mapping.Repo,
 		Ref:                   ref,
 		Policy:                policy,
-		Host:                  label(c, HostLabel),
+		Host:                  label(c, labels.GitHost),
 		Dockerfile:            dockerfile,
 		Context:               context,
 		RefFromDefault:        refDefault,
@@ -169,7 +170,7 @@ func PersistWatch(c types.Container) bool {
 		return false
 	}
 
-	val, ok := c.GetLabel(WatchLabel)
+	val, ok := c.GetLabel(labels.GitWatch)
 	if !ok {
 		return false
 	}
@@ -180,21 +181,6 @@ func PersistWatch(c types.Container) bool {
 	default:
 		return false
 	}
-}
-
-// WatchEnabled reports whether the per-container or process-wide Git watcher is on.
-//
-// A present git-watch label overrides --git-enable. When the label is absent
-// or blank, the process-wide default is used.
-//
-// Parameters:
-//   - c: Container to inspect.
-//   - params: Update parameters with EnableGitMonitoring.
-//
-// Returns:
-//   - bool: True when the watcher should run, ignoring association.
-func WatchEnabled(c types.Container, params types.UpdateParams) bool {
-	return isWatch(c, params)
 }
 
 // label returns the trimmed container label value for key.
@@ -226,7 +212,7 @@ func label(c types.Container, key string) string {
 // Returns:
 //   - string: Ref label value, or empty.
 func refLabel(c types.Container) string {
-	return cmp.Or(label(c, RefLabel), label(c, branchLabel))
+	return cmp.Or(label(c, labels.GitRef), label(c, labels.GitBranch))
 }
 
 // policyLabel returns a valid semver policy from the container label.
@@ -237,7 +223,7 @@ func refLabel(c types.Container) string {
 // Returns:
 //   - string: Canonical policy, or empty when unset or invalid.
 func policyLabel(c types.Container) string {
-	policy := strings.ToLower(label(c, SemverPolicyLabel))
+	policy := strings.ToLower(label(c, labels.GitSemverPolicy))
 	if types.ValidGitPolicy(policy) {
 		return policy
 	}
@@ -270,7 +256,7 @@ func imageMapping(imageName string, images map[string]types.GitImage) types.GitI
 // Returns:
 //   - bool: True when the watcher should run, ignoring association.
 func isWatch(c types.Container, params types.UpdateParams) bool {
-	val, ok := c.GetLabel(WatchLabel)
+	val, ok := c.GetLabel(labels.GitWatch)
 	if !ok || strings.TrimSpace(val) == "" {
 		return params.EnableGitMonitoring
 	}

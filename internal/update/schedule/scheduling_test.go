@@ -20,6 +20,7 @@ import (
 	dockerNetwork "github.com/moby/moby/api/types/network"
 
 	"github.com/nicholas-fedor/watchtower/internal/container/filters"
+	"github.com/nicholas-fedor/watchtower/internal/container/labels"
 	"github.com/nicholas-fedor/watchtower/internal/observability/logging"
 	"github.com/nicholas-fedor/watchtower/internal/observability/metrics"
 	"github.com/nicholas-fedor/watchtower/pkg/container"
@@ -72,9 +73,9 @@ func withPortBindings() testContainerOption {
 
 // createTestContainer creates a *container.Container with specified chain label for testing.
 func createTestContainer(chain string, opts ...testContainerOption) *container.Container {
-	labels := make(map[string]string)
+	containerLabels := make(map[string]string)
 	if chain != "" {
-		labels[container.ContainerChainLabel] = chain
+		containerLabels[labels.ContainerChain] = chain
 	}
 
 	inspectResponse := &dockerContainer.InspectResponse{
@@ -82,7 +83,7 @@ func createTestContainer(chain string, opts ...testContainerOption) *container.C
 		Config: &dockerContainer.Config{
 			Hostname: "test-container",
 			Image:    "test-image",
-			Labels:   labels,
+			Labels:   containerLabels,
 		},
 	}
 

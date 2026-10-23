@@ -10,6 +10,7 @@ import (
 	"github.com/distribution/reference"
 	"github.com/rs/zerolog"
 
+	"github.com/nicholas-fedor/watchtower/internal/container/labels"
 	"github.com/nicholas-fedor/watchtower/pkg/types"
 )
 
@@ -27,10 +28,6 @@ const (
 	// maxLabelPairs is the maximum number of label pairs accepted from user
 	// input, preventing memory exhaustion from unbounded slice lengths.
 	maxLabelPairs = 100
-
-	// enableLabelKey is the Docker label key used by Watchtower to control whether
-	// a container is managed.
-	enableLabelKey = "com.centurylinklabs.watchtower.enable"
 )
 
 var (
@@ -909,7 +906,7 @@ func BuildFilter(log *zerolog.Logger,
 
 	if enableLabel {
 		stringBuilder.WriteString("with label ")
-		stringBuilder.WriteString(enableLabelKey)
+		stringBuilder.WriteString(labels.Enable)
 		stringBuilder.WriteString(`, `)
 	}
 

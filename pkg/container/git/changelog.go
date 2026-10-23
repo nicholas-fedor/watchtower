@@ -6,6 +6,7 @@ import (
 
 	"golang.org/x/mod/semver"
 
+	"github.com/nicholas-fedor/watchtower/internal/container/labels"
 	"github.com/nicholas-fedor/watchtower/pkg/types"
 )
 
@@ -34,13 +35,13 @@ type ChangelogVars struct {
 // Returns:
 //   - string: Changelog URL, or empty when none can be derived.
 func Changelog(c types.Container, repo string, vars ChangelogVars) string {
-	if template := label(c, ChangelogURLLabel); template != "" {
+	if template := label(c, labels.ChangelogURL); template != "" {
 		return applyVars(template, vars)
 	}
 
 	apiOrigin := ""
 	if c != nil {
-		apiOrigin = label(c, HostLabel)
+		apiOrigin = label(c, labels.GitHost)
 	}
 
 	return derivedReleasesURL(repo, apiOrigin, vars.Tag)

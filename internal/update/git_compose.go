@@ -11,6 +11,7 @@ import (
 
 	composeApply "github.com/nicholas-fedor/watchtower/internal/compose/apply"
 	composeLabels "github.com/nicholas-fedor/watchtower/internal/compose/labels"
+	"github.com/nicholas-fedor/watchtower/internal/container/labels"
 	"github.com/nicholas-fedor/watchtower/internal/git"
 	"github.com/nicholas-fedor/watchtower/internal/git/project"
 	"github.com/nicholas-fedor/watchtower/internal/update/state"
@@ -760,11 +761,11 @@ func composeServiceLabels(c types.Container, params types.UpdateParams, result g
 	// changed afterward. A failed apply rejects this stamp so the next check
 	// retries from the previous baseline.
 	out := map[string]string{
-		gitPkg.LastCommitLabel: result.Commit,
+		labels.GitLastCommit: result.Commit,
 	}
 
 	if result.Tag != "" {
-		out[gitPkg.LastTagLabel] = result.Tag
+		out[labels.GitLastTag] = result.Tag
 	}
 
 	assoc, ok := gitPkg.ResolveAssociation(c, params)
@@ -774,38 +775,38 @@ func composeServiceLabels(c types.Container, params types.UpdateParams, result g
 			Commit: result.Commit,
 		}, oci.Annotations{})
 		if meta.GitRepo != "" {
-			out[gitPkg.RepoLabel] = meta.GitRepo
+			out[labels.GitRepo] = meta.GitRepo
 		}
 
 		if assoc.Ref != "" {
-			out[gitPkg.RefLabel] = assoc.Ref
+			out[labels.GitRef] = assoc.Ref
 		}
 
 		if assoc.Policy != "" {
-			out[gitPkg.SemverPolicyLabel] = assoc.Policy
+			out[labels.GitSemverPolicy] = assoc.Policy
 		}
 
 		if assoc.Host != "" {
 			if origin := safeComposeAPIOrigin(assoc.Host); origin != "" {
-				out[gitPkg.HostLabel] = origin
+				out[labels.GitHost] = origin
 			}
 		}
 
 		if assoc.Dockerfile != "" {
-			out[gitPkg.DockerfileLabel] = assoc.Dockerfile
+			out[labels.GitDockerfile] = assoc.Dockerfile
 		}
 
 		if assoc.Context != "" {
-			out[gitPkg.ContextLabel] = assoc.Context
+			out[labels.GitContext] = assoc.Context
 		}
 
 		if gitPkg.PersistWatch(c) {
-			out[gitPkg.WatchLabel] = "true"
+			out[labels.GitWatch] = "true"
 		}
 	}
 
-	if dir, present := c.GetLabel(gitPkg.ComposeDirLabel); present && dir != "" {
-		out[gitPkg.ComposeDirLabel] = dir
+	if dir, present := c.GetLabel(labels.ComposeDir); present && dir != "" {
+		out[labels.ComposeDir] = dir
 	}
 
 	return out

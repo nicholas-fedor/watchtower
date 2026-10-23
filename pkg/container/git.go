@@ -5,6 +5,7 @@ import (
 
 	dockerContainer "github.com/moby/moby/api/types/container"
 
+	"github.com/nicholas-fedor/watchtower/internal/container/labels"
 	"github.com/nicholas-fedor/watchtower/pkg/container/git"
 )
 
@@ -86,11 +87,11 @@ func ApplyGitStamp(c *Container, commit, tag string) {
 		return
 	}
 
-	c.SetLabel(git.LastCommitLabel, commit)
-	c.DeleteLabel(git.LastTagLabel)
+	c.SetLabel(labels.GitLastCommit, commit)
+	c.DeleteLabel(labels.GitLastTag)
 
 	if tag != "" {
-		c.SetLabel(git.LastTagLabel, tag)
+		c.SetLabel(labels.GitLastTag, tag)
 	}
 }
 
@@ -112,43 +113,43 @@ func ApplyGitAssociation(c *Container, assoc gitAssociation, watch bool) {
 
 	repo := redactGitURL(assoc.Repo)
 
-	c.DeleteLabel(git.RepoLabel)
-	c.DeleteLabel(git.RefLabel)
-	c.DeleteLabel(git.SemverPolicyLabel)
-	c.DeleteLabel(git.HostLabel)
-	c.DeleteLabel(git.DockerfileLabel)
-	c.DeleteLabel(git.ContextLabel)
-	c.DeleteLabel(git.WatchLabel)
+	c.DeleteLabel(labels.GitRepo)
+	c.DeleteLabel(labels.GitRef)
+	c.DeleteLabel(labels.GitSemverPolicy)
+	c.DeleteLabel(labels.GitHost)
+	c.DeleteLabel(labels.GitDockerfile)
+	c.DeleteLabel(labels.GitContext)
+	c.DeleteLabel(labels.GitWatch)
 
 	if repo == "" {
 		return
 	}
 
-	c.SetLabel(git.RepoLabel, repo)
+	c.SetLabel(labels.GitRepo, repo)
 
 	if assoc.Ref != "" && !assoc.RefFromDefault {
-		c.SetLabel(git.RefLabel, assoc.Ref)
+		c.SetLabel(labels.GitRef, assoc.Ref)
 	}
 
 	if assoc.Policy != "" && !assoc.PolicyFromDefault {
-		c.SetLabel(git.SemverPolicyLabel, assoc.Policy)
+		c.SetLabel(labels.GitSemverPolicy, assoc.Policy)
 	}
 
 	if assoc.Host != "" {
 		if host := redactGitURL(assoc.Host); host != "" {
-			c.SetLabel(git.HostLabel, host)
+			c.SetLabel(labels.GitHost, host)
 		}
 	}
 
 	if assoc.Dockerfile != "" && !assoc.DockerfileFromDefault {
-		c.SetLabel(git.DockerfileLabel, assoc.Dockerfile)
+		c.SetLabel(labels.GitDockerfile, assoc.Dockerfile)
 	}
 
 	if assoc.Context != "" && !assoc.ContextFromDefault {
-		c.SetLabel(git.ContextLabel, assoc.Context)
+		c.SetLabel(labels.GitContext, assoc.Context)
 	}
 
 	if watch {
-		c.SetLabel(git.WatchLabel, "true")
+		c.SetLabel(labels.GitWatch, "true")
 	}
 }

@@ -15,12 +15,12 @@ import (
 	dockerContainer "github.com/moby/moby/api/types/container"
 	dockerImage "github.com/moby/moby/api/types/image"
 
+	"github.com/nicholas-fedor/watchtower/internal/container/labels"
 	internalGit "github.com/nicholas-fedor/watchtower/internal/git"
 	"github.com/nicholas-fedor/watchtower/internal/update/changelog"
 	mockUpdate "github.com/nicholas-fedor/watchtower/internal/update/mocks"
 	"github.com/nicholas-fedor/watchtower/internal/update/state"
 	"github.com/nicholas-fedor/watchtower/pkg/container"
-	"github.com/nicholas-fedor/watchtower/pkg/container/git"
 	"github.com/nicholas-fedor/watchtower/pkg/container/oci"
 	"github.com/nicholas-fedor/watchtower/pkg/types"
 )
@@ -114,7 +114,7 @@ func TestApplyLatestImageMetadataRecordsVersionWithoutEnabledFeature(t *testing.
 	t.Parallel()
 
 	c := newReportContainer(t, map[string]string{
-		git.RepoLabel: "https://github.com/org/app.git",
+		labels.GitRepo: "https://github.com/org/app.git",
 	}, map[string]string{
 		oci.VersionLabel: "1.2.2",
 	})
@@ -145,8 +145,8 @@ func TestApplyLatestImageMetadataChangelogLabelDoesNotEnableProbe(t *testing.T) 
 	t.Parallel()
 
 	c := newReportContainer(t, map[string]string{
-		git.RepoLabel:         "https://github.com/org/app.git",
-		git.ChangelogURLLabel: "https://example.com/notes/{tag}",
+		labels.GitRepo:      "https://github.com/org/app.git",
+		labels.ChangelogURL: "https://example.com/notes/{tag}",
 	}, nil)
 
 	progress := newProgressWithContainer(t, c)
@@ -172,7 +172,7 @@ func TestApplyLatestImageMetadataResolvesVersionedChangelogWhenEnabled(t *testin
 	t.Parallel()
 
 	c := newReportContainer(t, map[string]string{
-		git.RepoLabel: "https://github.com/org/app.git",
+		labels.GitRepo: "https://github.com/org/app.git",
 	}, nil)
 
 	progress := newProgressWithContainer(t, c)
@@ -199,8 +199,8 @@ func TestApplyLatestImageMetadataEnabledByLabel(t *testing.T) {
 	t.Parallel()
 
 	c := newReportContainer(t, map[string]string{
-		git.RepoLabel:            "https://github.com/org/app.git",
-		git.EnableChangelogLabel: "true",
+		labels.GitRepo:         "https://github.com/org/app.git",
+		labels.EnableChangelog: "true",
 	}, nil)
 
 	progress := newProgressWithContainer(t, c)
@@ -229,7 +229,7 @@ func TestApplyLatestImageMetadataFallsBackWhenProbeMisses(t *testing.T) {
 	t.Parallel()
 
 	c := newReportContainer(t, map[string]string{
-		git.RepoLabel: "https://github.com/org/app.git",
+		labels.GitRepo: "https://github.com/org/app.git",
 	}, nil)
 
 	progress := newProgressWithContainer(t, c)
@@ -261,23 +261,23 @@ func TestLogChangelogOnlyWhenEnabled(t *testing.T) {
 	}{
 		{
 			name:       "disabled",
-			labels:     map[string]string{git.RepoLabel: "https://github.com/org/app.git"},
+			labels:     map[string]string{labels.GitRepo: "https://github.com/org/app.git"},
 			wantEvents: 0,
 		},
 		{
 			name:       "changelog url alone is not enough",
-			labels:     map[string]string{git.ChangelogURLLabel: "https://example.com/notes"},
+			labels:     map[string]string{labels.ChangelogURL: "https://example.com/notes"},
 			wantEvents: 0,
 		},
 		{
 			name:       "global flag",
-			labels:     map[string]string{git.RepoLabel: "https://github.com/org/app.git"},
+			labels:     map[string]string{labels.GitRepo: "https://github.com/org/app.git"},
 			params:     types.UpdateParams{EnableChangelog: true},
 			wantEvents: 1,
 		},
 		{
 			name:       "container label",
-			labels:     map[string]string{git.EnableChangelogLabel: "true"},
+			labels:     map[string]string{labels.EnableChangelog: "true"},
 			wantEvents: 1,
 		},
 	}
@@ -338,8 +338,8 @@ func TestGitRebuildEmitsExactlyOneChangelogEntry(t *testing.T) {
 	t.Parallel()
 
 	c := newReportContainer(t, map[string]string{
-		git.RepoLabel: "https://github.com/org/app.git",
-		git.RefLabel:  "main",
+		labels.GitRepo: "https://github.com/org/app.git",
+		labels.GitRef:  "main",
 	}, nil)
 
 	params := types.UpdateParams{EnableGitMonitoring: true, EnableChangelog: true}

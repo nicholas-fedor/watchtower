@@ -11,6 +11,8 @@ import (
 	dockerContainer "github.com/moby/moby/api/types/container"
 	dockerImage "github.com/moby/moby/api/types/image"
 	dockerNetwork "github.com/moby/moby/api/types/network"
+
+	"github.com/nicholas-fedor/watchtower/internal/container/labels"
 )
 
 // TestContainer_ChangesLeaveEarlierSnapshotsUnchanged verifies that changing a
@@ -139,12 +141,12 @@ func TestContainer_ConcurrentAccess(t *testing.T) {
 	var wg sync.WaitGroup
 
 	for _, work := range []func(int){
-		func(i int) { c.SetLabel(ContainerChainLabel, string(rune('a'+i%26))) },
+		func(i int) { c.SetLabel(labels.ContainerChain, string(rune('a'+i%26))) },
 		func(int) { c.DeleteLabel("missing") },
 		func(int) { c.SetImageName("org/app:2") },
 		func(int) { _ = c.VerifyConfiguration() },
 		func(int) { _ = ResolveContainerIdentifier(c) },
-		func(int) { _ = c.ContainerInfo().Config.Labels[ContainerChainLabel] },
+		func(int) { _ = c.ContainerInfo().Config.Labels[labels.ContainerChain] },
 		func(int) { _ = c.GetCreateConfig() },
 		func(int) { _ = c.GetCreateHostConfig() },
 		func(int) { _, _ = c.GetContainerChain() },

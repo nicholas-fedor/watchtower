@@ -8,58 +8,9 @@ import (
 
 	dockerContainer "github.com/moby/moby/api/types/container"
 
+	"github.com/nicholas-fedor/watchtower/internal/container/labels"
 	"github.com/nicholas-fedor/watchtower/internal/settings/units"
-	"github.com/nicholas-fedor/watchtower/pkg/container/git"
 	"github.com/nicholas-fedor/watchtower/pkg/types"
-)
-
-// Watchtower-specific labels identify containers managed by Watchtower and their configurations.
-const (
-	// watchtowerLabel marks a container as the Watchtower instance itself when set to "true".
-	watchtowerLabel = "com.centurylinklabs.watchtower"
-	// signalLabel specifies a custom stop signal for the container (e.g., "SIGTERM").
-	signalLabel = "com.centurylinklabs.watchtower.stop-signal"
-	// enableLabel indicates whether Watchtower should manage this container (true/false).
-	enableLabel = "com.centurylinklabs.watchtower.enable"
-	// monitorOnlyLabel flags the container for monitoring only, without updates (true/false).
-	monitorOnlyLabel = "com.centurylinklabs.watchtower.monitor-only"
-	// noPullLabel prevents Watchtower from pulling a new image for this container (true/false).
-	noPullLabel = "com.centurylinklabs.watchtower.no-pull"
-	// dependsOnLabel lists container names this container depends on, comma-separated.
-	dependsOnLabel = "com.centurylinklabs.watchtower.depends-on"
-	// ContainerChainLabel accumulates container IDs across Watchtower self-updates, comma-separated.
-	ContainerChainLabel = "com.centurylinklabs.watchtower.container-chain"
-	// zodiacLabel stores the original image name for Zodiac compatibility.
-	zodiacLabel = "com.centurylinklabs.zodiac.original-image"
-	// scope defines a unique monitoring scope for this Watchtower instance.
-	scope = "com.centurylinklabs.watchtower.scope"
-	// orchestratorLabel identifies ephemeral orchestrator containers used during self-update.
-	orchestratorLabel = "com.centurylinklabs.watchtower.ephemeral-orchestrator"
-	// cooldownDelayLabel sets the minimum image age before updating this container.
-	// Accepts duration strings (e.g., "24h", "3d", "1w", "0" to disable).
-	cooldownDelayLabel = "com.centurylinklabs.watchtower.cooldown-delay"
-	// copyFileLabel lists in-container file paths to copy during recreation, comma-separated.
-	copyFileLabel = "com.centurylinklabs.watchtower.copy-file"
-)
-
-// Lifecycle hook labels configure commands executed during container update phases.
-const (
-	// preCheckLabel specifies a command to run before checking for updates.
-	preCheckLabel = "com.centurylinklabs.watchtower.lifecycle.pre-check"
-	// postCheckLabel specifies a command to run after checking for updates.
-	postCheckLabel = "com.centurylinklabs.watchtower.lifecycle.post-check"
-	// preUpdateLabel specifies a command to run before updating the container.
-	preUpdateLabel = "com.centurylinklabs.watchtower.lifecycle.pre-update"
-	// postUpdateLabel specifies a command to run after updating the container.
-	postUpdateLabel = "com.centurylinklabs.watchtower.lifecycle.post-update"
-	// preUpdateTimeoutLabel sets the timeout (in minutes) for the pre-update command.
-	preUpdateTimeoutLabel = "com.centurylinklabs.watchtower.lifecycle.pre-update-timeout"
-	// postUpdateTimeoutLabel sets the timeout (in minutes) for the post-update command.
-	postUpdateTimeoutLabel = "com.centurylinklabs.watchtower.lifecycle.post-update-timeout"
-	// lifecycleUIDLabel specifies the UID to run lifecycle hooks as.
-	lifecycleUIDLabel = "com.centurylinklabs.watchtower.lifecycle.uid"
-	// lifecycleGIDLabel specifies the GID to run lifecycle hooks as.
-	lifecycleGIDLabel = "com.centurylinklabs.watchtower.lifecycle.gid"
 )
 
 // GetLifecyclePreCheckCommand returns the pre-check command from labels.
@@ -67,7 +18,7 @@ const (
 // Returns:
 //   - string: Pre-check command or empty if unset.
 func (c *Container) GetLifecyclePreCheckCommand() string {
-	return c.getLabelValueOrEmpty(preCheckLabel)
+	return c.getLabelValueOrEmpty(labels.LifecyclePreCheck)
 }
 
 // GetLifecyclePostCheckCommand returns the post-check command from labels.
@@ -75,7 +26,7 @@ func (c *Container) GetLifecyclePreCheckCommand() string {
 // Returns:
 //   - string: Post-check command or empty if unset.
 func (c *Container) GetLifecyclePostCheckCommand() string {
-	return c.getLabelValueOrEmpty(postCheckLabel)
+	return c.getLabelValueOrEmpty(labels.LifecyclePostCheck)
 }
 
 // GetLifecyclePreUpdateCommand returns the pre-update command from labels.
@@ -83,7 +34,7 @@ func (c *Container) GetLifecyclePostCheckCommand() string {
 // Returns:
 //   - string: Pre-update command or empty if unset.
 func (c *Container) GetLifecyclePreUpdateCommand() string {
-	return c.getLabelValueOrEmpty(preUpdateLabel)
+	return c.getLabelValueOrEmpty(labels.LifecyclePreUpdate)
 }
 
 // GetLifecyclePostUpdateCommand returns the post-update command from labels.
@@ -91,7 +42,7 @@ func (c *Container) GetLifecyclePreUpdateCommand() string {
 // Returns:
 //   - string: Post-update command or empty if unset.
 func (c *Container) GetLifecyclePostUpdateCommand() string {
-	return c.getLabelValueOrEmpty(postUpdateLabel)
+	return c.getLabelValueOrEmpty(labels.LifecyclePostUpdate)
 }
 
 // PreUpdateTimeout returns the pre-update command timeout in minutes.
@@ -106,12 +57,12 @@ func (c *Container) PreUpdateTimeout() int {
 		Str("container", c.Name()).
 		Logger()
 	clog := &clogVal
-	val := c.getLabelValueOrEmpty(preUpdateTimeoutLabel)
+	val := c.getLabelValueOrEmpty(labels.LifecyclePreUpdateTimeout)
 
 	// Use default if label is unset.
 	if val == "" {
 		clog.Debug().
-			Str("label", preUpdateTimeoutLabel).
+			Str("label", labels.LifecyclePreUpdateTimeout).
 			Msg("Pre-update timeout not set, using default")
 
 		return 1
@@ -122,7 +73,7 @@ func (c *Container) PreUpdateTimeout() int {
 	if err != nil {
 		clog.Warn().
 			Err(err).
-			Str("label", preUpdateTimeoutLabel).
+			Str("label", labels.LifecyclePreUpdateTimeout).
 			Str("value", val).
 			Msg("Invalid pre-update timeout value, using default")
 
@@ -130,7 +81,7 @@ func (c *Container) PreUpdateTimeout() int {
 	}
 
 	clog.Debug().
-		Str("label", preUpdateTimeoutLabel).
+		Str("label", labels.LifecyclePreUpdateTimeout).
 		Int("minutes", minutes).
 		Msg("Retrieved pre-update timeout")
 
@@ -149,12 +100,12 @@ func (c *Container) PostUpdateTimeout() int {
 		Str("container", c.Name()).
 		Logger()
 	clog := &clogVal
-	val := c.getLabelValueOrEmpty(postUpdateTimeoutLabel)
+	val := c.getLabelValueOrEmpty(labels.LifecyclePostUpdateTimeout)
 
 	// Use default if label is unset.
 	if val == "" {
 		clog.Debug().
-			Str("label", postUpdateTimeoutLabel).
+			Str("label", labels.LifecyclePostUpdateTimeout).
 			Msg("Post-update timeout not set, using default")
 
 		return 1
@@ -165,7 +116,7 @@ func (c *Container) PostUpdateTimeout() int {
 	if err != nil {
 		clog.Warn().
 			Err(err).
-			Str("label", postUpdateTimeoutLabel).
+			Str("label", labels.LifecyclePostUpdateTimeout).
 			Str("value", val).
 			Msg("Invalid post-update timeout value, using default")
 
@@ -173,7 +124,7 @@ func (c *Container) PostUpdateTimeout() int {
 	}
 
 	clog.Debug().
-		Str("label", postUpdateTimeoutLabel).
+		Str("label", labels.LifecyclePostUpdateTimeout).
 		Int("minutes", minutes).
 		Msg("Retrieved post-update timeout")
 
@@ -257,7 +208,7 @@ func (c *Container) getLifecycleID(label, idType string) (int, bool) {
 //   - int: UID value if set and valid.
 //   - bool: True if label is present and valid, false otherwise.
 func (c *Container) GetLifecycleUID() (int, bool) {
-	return c.getLifecycleID(lifecycleUIDLabel, "UID")
+	return c.getLifecycleID(labels.LifecycleUID, "UID")
 }
 
 // GetLifecycleGID returns the GID for lifecycle hooks from labels.
@@ -266,7 +217,7 @@ func (c *Container) GetLifecycleUID() (int, bool) {
 //   - int: GID value if set and valid.
 //   - bool: True if label is present and valid, false otherwise.
 func (c *Container) GetLifecycleGID() (int, bool) {
-	return c.getLifecycleID(lifecycleGIDLabel, "GID")
+	return c.getLifecycleID(labels.LifecycleGID, "GID")
 }
 
 // Enabled checks if Watchtower should manage the container.
@@ -279,12 +230,12 @@ func (c *Container) Enabled() (bool, bool) {
 		Str("container", c.Name()).
 		Logger()
 	clog := &clogVal
-	rawBool, ok := c.getLabelValue(enableLabel)
+	rawBool, ok := c.getLabelValue(labels.Enable)
 
 	// Label not set, return default.
 	if !ok {
 		clog.Debug().
-			Str("label", enableLabel).
+			Str("label", labels.Enable).
 			Msg("Enable label not set")
 
 		return false, false
@@ -295,7 +246,7 @@ func (c *Container) Enabled() (bool, bool) {
 	if err != nil {
 		clog.Warn().
 			Err(err).
-			Str("label", enableLabel).
+			Str("label", labels.Enable).
 			Str("value", rawBool).
 			Msg("Invalid enable label value")
 
@@ -303,7 +254,7 @@ func (c *Container) Enabled() (bool, bool) {
 	}
 
 	clog.Debug().
-		Str("label", enableLabel).
+		Str("label", labels.Enable).
 		Bool("value", parsedBool).
 		Msg("Retrieved enable status")
 
@@ -335,7 +286,7 @@ func (c *Container) GetLabel(label string) (string, bool) {
 // Returns:
 //   - bool: True if monitor-only, false otherwise.
 func (c *Container) IsMonitorOnly(params types.UpdateParams) bool {
-	return c.getContainerOrGlobalBool(params.MonitorOnly, monitorOnlyLabel, params.LabelPrecedence)
+	return c.getContainerOrGlobalBool(params.MonitorOnly, labels.MonitorOnly, params.LabelPrecedence)
 }
 
 // IsNoPull determines if image pulls should be skipped.
@@ -348,7 +299,7 @@ func (c *Container) IsMonitorOnly(params types.UpdateParams) bool {
 // Returns:
 //   - bool: True if no-pull, false otherwise.
 func (c *Container) IsNoPull(params types.UpdateParams) bool {
-	return c.getContainerOrGlobalBool(params.NoPull, noPullLabel, params.LabelPrecedence)
+	return c.getContainerOrGlobalBool(params.NoPull, labels.NoPull, params.LabelPrecedence)
 }
 
 // IsChangelogEnabled reports whether the changelog notification line and the
@@ -368,23 +319,9 @@ func (c *Container) IsNoPull(params types.UpdateParams) bool {
 func (c *Container) IsChangelogEnabled(params types.UpdateParams) bool {
 	return c.getContainerOrGlobalBool(
 		params.EnableChangelog,
-		git.EnableChangelogLabel,
+		labels.EnableChangelog,
 		params.LabelPrecedence,
 	)
-}
-
-// IsGitWatch reports whether the Git watcher is on for this container.
-//
-// A present git-watch label overrides --git-enable. When the label is absent
-// the process-wide --git-enable default is used.
-//
-// Parameters:
-//   - params: Update parameters from types.UpdateParams.
-//
-// Returns:
-//   - bool: True when the watcher should run for an associated container.
-func (c *Container) IsGitWatch(params types.UpdateParams) bool {
-	return git.WatchEnabled(c, params)
 }
 
 // CooldownDelay returns the effective cooldown delay for this container.
@@ -399,7 +336,7 @@ func (c *Container) IsGitWatch(params types.UpdateParams) bool {
 // Returns:
 //   - time.Duration: Effective cooldown delay for this container.
 func (c *Container) CooldownDelay(params types.UpdateParams) time.Duration {
-	labelVal, ok := c.getLabelValue(cooldownDelayLabel)
+	labelVal, ok := c.getLabelValue(labels.CooldownDelay)
 	if !ok {
 		// No label set — use global value.
 		return params.CooldownDelay
@@ -415,7 +352,7 @@ func (c *Container) CooldownDelay(params types.UpdateParams) time.Duration {
 		c.logger().Warn().
 			Err(err).
 			Str("container", c.Name()).
-			Str("label", cooldownDelayLabel).
+			Str("label", labels.CooldownDelay).
 			Str("value", labelVal).
 			Msg("Failed to parse cooldown-delay label, using global value")
 
@@ -424,7 +361,7 @@ func (c *Container) CooldownDelay(params types.UpdateParams) time.Duration {
 
 	c.logger().Debug().
 		Str("container", c.Name()).
-		Str("label", cooldownDelayLabel).
+		Str("label", labels.CooldownDelay).
 		Str("value", labelVal).
 		Dur("duration", parsed).
 		Msg("Parsed cooldown-delay label")
@@ -442,18 +379,18 @@ func (c *Container) Scope() (string, bool) {
 		Str("container", c.Name()).
 		Logger()
 	clog := &clogVal
-	rawString, ok := c.getLabelValue(scope)
+	rawString, ok := c.getLabelValue(labels.Scope)
 
 	if !ok {
 		clog.Debug().
-			Str("label", scope).
+			Str("label", labels.Scope).
 			Msg("Scope label not set")
 
 		return "", false
 	}
 
 	clog.Debug().
-		Str("label", scope).
+		Str("label", labels.Scope).
 		Str("value", rawString).
 		Msg("Retrieved scope")
 
@@ -502,7 +439,7 @@ func GetEffectiveScope(container types.Container, currentScope string) (string, 
 //   - string: The label value or empty if absent.
 //   - bool: True if the label is present, false otherwise.
 func (c *Container) GetContainerChain() (string, bool) {
-	return c.getLabelValue(ContainerChainLabel)
+	return c.getLabelValue(labels.ContainerChain)
 }
 
 // IsWatchtower identifies if this is the Watchtower container.
@@ -531,10 +468,10 @@ func (c *Container) StopSignal() string {
 	clog := &clogVal
 
 	// Check label first
-	signal := c.getLabelValueOrEmpty(signalLabel)
+	signal := c.getLabelValueOrEmpty(labels.StopSignal)
 	if signal != "" {
 		clog.Debug().
-			Str("label", signalLabel).
+			Str("label", labels.StopSignal).
 			Str("signal", signal).
 			Msg("Retrieved stop signal from label")
 
@@ -589,16 +526,16 @@ func (c *Container) StopTimeout() *int {
 // containsWatchtowerLabel checks if the container is Watchtower.
 //
 // Parameters:
-//   - labels: Label map to check.
+//   - containerLabels: Label map to check.
 //
 // Returns:
 //   - bool: True if watchtower label is "true", false otherwise.
-func containsWatchtowerLabel(labels map[string]string) bool {
-	if labels == nil {
+func containsWatchtowerLabel(containerLabels map[string]string) bool {
+	if containerLabels == nil {
 		return false
 	}
 
-	val, ok := labels[watchtowerLabel]
+	val, ok := containerLabels[labels.Watchtower]
 
 	return ok && val == "true"
 }

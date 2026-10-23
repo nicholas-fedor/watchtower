@@ -18,6 +18,7 @@ import (
 	dockerContainer "github.com/moby/moby/api/types/container"
 	dockerClient "github.com/moby/moby/client"
 
+	"github.com/nicholas-fedor/watchtower/internal/container/labels"
 	"github.com/nicholas-fedor/watchtower/pkg/types"
 )
 
@@ -181,7 +182,7 @@ func copyFilePaths(c types.Container) ([]string, error) {
 		return nil, nil
 	}
 
-	val, ok := c.GetLabel(copyFileLabel)
+	val, ok := c.GetLabel(labels.CopyFile)
 	if !ok || val == "" {
 		return nil, nil
 	}

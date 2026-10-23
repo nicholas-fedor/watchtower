@@ -24,9 +24,9 @@ import (
 	dockerspec "github.com/moby/docker-image-spec/specs-go/v1"
 	dockerContainer "github.com/moby/moby/api/types/container"
 
+	"github.com/nicholas-fedor/watchtower/internal/container/labels"
 	"github.com/nicholas-fedor/watchtower/internal/git"
 	wtcontainer "github.com/nicholas-fedor/watchtower/pkg/container"
-	gitPkg "github.com/nicholas-fedor/watchtower/pkg/container/git"
 	mockContainer "github.com/nicholas-fedor/watchtower/pkg/container/mocks"
 	"github.com/nicholas-fedor/watchtower/pkg/container/oci"
 	"github.com/nicholas-fedor/watchtower/pkg/types"
@@ -152,7 +152,7 @@ func TestCheckForUpdates_GitNoPullSkipsCheck(t *testing.T) {
 		Config: &dockerContainer.Config{
 			Image: "app:latest",
 			Labels: map[string]string{
-				gitPkg.RepoLabel: "https://git.example.com/org/app.git",
+				labels.GitRepo: "https://git.example.com/org/app.git",
 			},
 		},
 	}, nil)
@@ -180,8 +180,8 @@ func TestCheckForUpdates_GitCommitField(t *testing.T) {
 		Config: &dockerContainer.Config{
 			Image: "app:latest",
 			Labels: map[string]string{
-				gitPkg.RepoLabel: repoDir,
-				gitPkg.RefLabel:  branch,
+				labels.GitRepo: repoDir,
+				labels.GitRef:  branch,
 			},
 		},
 	}, nil)
@@ -338,7 +338,7 @@ func gitContainer(t *testing.T, repo string, imageLabels map[string]string) *wtc
 		Config: &dockerContainer.Config{
 			Image: "app:latest",
 			Labels: map[string]string{
-				gitPkg.RepoLabel: repo,
+				labels.GitRepo: repo,
 			},
 		},
 	}, &image.InspectResponse{
@@ -515,8 +515,8 @@ func TestCheckGitSource(t *testing.T) {
 			Config: &dockerContainer.Config{
 				Image: "app:latest",
 				Labels: map[string]string{
-					gitPkg.RepoLabel: repoDir,
-					gitPkg.RefLabel:  branch,
+					labels.GitRepo: repoDir,
+					labels.GitRef:  branch,
 				},
 			},
 		}, nil)
@@ -566,7 +566,7 @@ func TestCheckGitSource(t *testing.T) {
 
 		repoDir, branch, commit := initCheckGitRepo(t)
 		c := gitContainer(t, repoDir, nil)
-		c.SetLabel(gitPkg.RefLabel, branch)
+		c.SetLabel(labels.GitRef, branch)
 
 		var result ContainerCheck
 
@@ -588,12 +588,12 @@ func TestCheckGitSource(t *testing.T) {
 
 		repoDir, branch, commit := initCheckGitRepoWithTag(t, "v1.2.3")
 		c := gitContainer(t, repoDir, nil)
-		c.SetLabel(gitPkg.RefLabel, branch)
+		c.SetLabel(labels.GitRef, branch)
 		// A semver policy is what makes the check resolve a tag at all.
-		c.SetLabel(gitPkg.SemverPolicyLabel, string(types.GitPolicyPatch))
+		c.SetLabel(labels.GitSemverPolicy, string(types.GitPolicyPatch))
 		// A template makes the tag substitution observable, because a local
 		// repository path has no known host to derive a releases URL from.
-		c.SetLabel(gitPkg.ChangelogURLLabel, "https://example.com/notes/{tag}")
+		c.SetLabel(labels.ChangelogURL, "https://example.com/notes/{tag}")
 
 		var result ContainerCheck
 

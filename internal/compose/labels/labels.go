@@ -28,8 +28,6 @@ const (
 	ComposeWorkingDirLabel = "com.docker.compose.project.working_dir"
 	// ComposeConfigFilesLabel lists compose files Compose used, comma-separated.
 	ComposeConfigFilesLabel = "com.docker.compose.project.config_files"
-	// WatchtowerComposeDirLabel is a path inside Watchtower to the Compose project directory.
-	WatchtowerComposeDirLabel = "com.centurylinklabs.watchtower.compose-dir"
 )
 
 // ParseDependsOnLabel parses the Docker Compose depends_on label value.

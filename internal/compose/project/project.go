@@ -9,6 +9,7 @@ import (
 	"github.com/compose-spec/compose-go/v2/cli"
 
 	composeLabels "github.com/nicholas-fedor/watchtower/internal/compose/labels"
+	"github.com/nicholas-fedor/watchtower/internal/container/labels"
 )
 
 // ProjectRef is a Compose project Watchtower can apply.
@@ -28,22 +29,22 @@ type ProjectRef struct {
 // or has no compose file is an error. Watchtower does not fall back to a Git URL context.
 //
 // Parameters:
-//   - labels: Container labels.
+//   - containerLabels: Container labels.
 //   - projectDirs: Map of Compose project name to a path inside Watchtower.
 //
 // Returns:
 //   - ProjectRef: Directory when the user opted in. Dir is empty when they did not.
 //   - error: Non-nil when an opted-in path is not a readable Compose project.
-func ResolveProjectDir(labels, projectDirs map[string]string) (ProjectRef, error) {
-	name := composeLabels.GetProjectName(labels)
+func ResolveProjectDir(containerLabels, projectDirs map[string]string) (ProjectRef, error) {
+	name := composeLabels.GetProjectName(containerLabels)
 
-	if dir := labelValue(labels, composeLabels.WatchtowerComposeDirLabel); dir != "" {
-		return projectRefOrErr(name, dir, labels)
+	if dir := labelValue(containerLabels, labels.ComposeDir); dir != "" {
+		return projectRefOrErr(name, dir, containerLabels)
 	}
 
 	if name != "" {
 		if dir := strings.TrimSpace(projectDirs[name]); dir != "" {
-			return projectRefOrErr(name, dir, labels)
+			return projectRefOrErr(name, dir, containerLabels)
 		}
 	}
 

@@ -23,7 +23,7 @@ import (
 	dockerImage "github.com/moby/moby/api/types/image"
 
 	composeLabels "github.com/nicholas-fedor/watchtower/internal/compose/labels"
-	gitPkg "github.com/nicholas-fedor/watchtower/pkg/container/git"
+	"github.com/nicholas-fedor/watchtower/internal/container/labels"
 	"github.com/nicholas-fedor/watchtower/pkg/container/oci"
 	"github.com/nicholas-fedor/watchtower/pkg/types"
 	mockTypes "github.com/nicholas-fedor/watchtower/pkg/types/mocks"
@@ -93,10 +93,10 @@ func labeledComposeMember(t *testing.T, project, service, number, dir, files, co
 	t.Helper()
 
 	return labeledContainer(t, map[string]string{
-		gitPkg.RepoLabel:                      "https://example.com/org/app.git",
-		gitPkg.RefLabel:                       "main",
-		gitPkg.LastCommitLabel:                commit,
-		gitPkg.ComposeDirLabel:                dir,
+		labels.GitRepo:                        "https://example.com/org/app.git",
+		labels.GitRef:                         "main",
+		labels.GitLastCommit:                  commit,
+		labels.ComposeDir:                     dir,
 		composeLabels.ComposeProjectLabel:     project,
 		composeLabels.ComposeServiceLabel:     service,
 		composeLabels.ComposeContainerNumber:  number,
@@ -807,9 +807,9 @@ func TestCheckContainer(t *testing.T) {
 		t.Parallel()
 
 		c := labeledContainer(t, map[string]string{
-			gitPkg.RepoLabel:       "https://example.com/org/app.git",
-			gitPkg.RefLabel:        "main",
-			gitPkg.LastCommitLabel: "old",
+			labels.GitRepo:       "https://example.com/org/app.git",
+			labels.GitRef:        "main",
+			labels.GitLastCommit: "old",
 		})
 
 		client := testClient(t, []RemoteRef{{Name: "refs/heads/main", Hash: "newsha"}})
@@ -823,8 +823,8 @@ func TestCheckContainer(t *testing.T) {
 		t.Parallel()
 
 		c := labeledContainer(t, map[string]string{
-			gitPkg.RepoLabel:         "https://example.com/org/app.git",
-			gitPkg.SemverPolicyLabel: "nightly",
+			labels.GitRepo:         "https://example.com/org/app.git",
+			labels.GitSemverPolicy: "nightly",
 		})
 
 		got, err := CheckContainer(t.Context(), testClient(t, nil), c, types.UpdateParams{})
@@ -837,8 +837,8 @@ func TestCheckContainer(t *testing.T) {
 
 		rawHost := "https://user:secret@git.example.com?token=secret=bad"
 		c := labeledContainer(t, map[string]string{
-			gitPkg.RepoLabel: "https://example.com/org/app.git",
-			gitPkg.HostLabel: rawHost,
+			labels.GitRepo: "https://example.com/org/app.git",
+			labels.GitHost: rawHost,
 		})
 
 		got, err := CheckContainer(t.Context(), testClient(t, nil), c, types.UpdateParams{})
@@ -852,8 +852,8 @@ func TestCheckContainer(t *testing.T) {
 		t.Parallel()
 
 		c := labeledContainer(t, map[string]string{
-			gitPkg.RepoLabel: "https://example.com/org/app.git",
-			gitPkg.RefLabel:  "main",
+			labels.GitRepo: "https://example.com/org/app.git",
+			labels.GitRef:  "main",
 		})
 
 		lister := &mutableLister{refs: []RemoteRef{{Name: "refs/heads/main", Hash: "aaa111"}}}
@@ -880,8 +880,8 @@ func TestCheckContainer(t *testing.T) {
 		t.Parallel()
 
 		c := labeledImageContainer(t, map[string]string{
-			gitPkg.RepoLabel: "https://example.com/org/app.git",
-			gitPkg.RefLabel:  "main",
+			labels.GitRepo: "https://example.com/org/app.git",
+			labels.GitRef:  "main",
 		}, "app:latest", ociImage("aaa111", ""))
 
 		client := testClient(t, []RemoteRef{{Name: "refs/heads/main", Hash: "aaa111"}})
@@ -900,8 +900,8 @@ func TestCheckContainer(t *testing.T) {
 		t.Parallel()
 
 		c := labeledImageContainer(t, map[string]string{
-			gitPkg.RepoLabel: "https://example.com/org/app.git",
-			gitPkg.RefLabel:  "main",
+			labels.GitRepo: "https://example.com/org/app.git",
+			labels.GitRef:  "main",
 		}, "app:git-aaa111bbbbcc", nil)
 
 		client := testClient(t, []RemoteRef{{Name: "refs/heads/main", Hash: "aaa111bbbbccdddd"}})
