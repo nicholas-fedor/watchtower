@@ -49,9 +49,9 @@ var (
 	errDiskSpacePercentWithoutMax = errors.New(
 		"disk-space-warn percentage requires disk-space-max",
 	)
-	// errDiskSpacePercentOutOfRange indicates a percentage outside (0, 100].
+	// errDiskSpacePercentOutOfRange indicates a percentage outside (0, 100).
 	errDiskSpacePercentOutOfRange = errors.New(
-		"disk-space percentage must be greater than 0 and at most 100",
+		"disk-space percentage must be greater than 0 and less than 100",
 	)
 	// errDiskSpaceWarnNotBelowMax indicates the warn threshold is not below the max.
 	errDiskSpaceWarnNotBelowMax = errors.New(
@@ -90,16 +90,6 @@ func Load(log *zerolog.Logger, cmd *cobra.Command, args []string) (Config, error
 	cfg.Docker = loadDocker(vCfg)
 	cfg.Client = loadClient(vCfg)
 	cfg.Compatibility = loadCompat(vCfg)
-
-	// Keep client and compat CPU/memory fields aligned for projections.
-	if cfg.Client.CPUCopyMode == "" {
-		cfg.Client.CPUCopyMode = cfg.Compatibility.CPUCopyMode
-	}
-
-	if !cfg.Client.DisableMemorySwappiness {
-		cfg.Client.DisableMemorySwappiness = cfg.Compatibility.DisableMemorySwappiness
-	}
-
 	cfg.Schedule = loadSchedule(vCfg)
 	cfg.Mode = loadMode(vCfg)
 
@@ -118,7 +108,7 @@ func Load(log *zerolog.Logger, cmd *cobra.Command, args []string) (Config, error
 	cfg.Registry = loadRegistry(vCfg)
 	cfg.API = loadAPI(vCfg, flagSet)
 	cfg.Notify = loadNotify(vCfg, flagSet)
-	cfg.Logging = loadLogging(vCfg)
+	cfg.Logging = loadLogging(vCfg, flagSet)
 
 	cfg.Git, err = loadGit(vCfg, flagSet)
 	if err != nil {
@@ -302,7 +292,7 @@ func parseDiskSpaceWarn(raw string, maxBytes int64) (int64, error) {
 			return 0, fmt.Errorf("disk-space-warn: %w", err)
 		}
 
-		if pct <= 0 || pct > diskSpacePercentBase {
+		if pct <= 0 || pct >= diskSpacePercentBase {
 			return 0, errDiskSpacePercentOutOfRange
 		}
 
@@ -538,18 +528,30 @@ func loadNotify(vCfg *viper.Viper, flagSet *pflag.FlagSet) notify.Notify {
 }
 
 // loadLogging reads logging settings from Viper.
-func loadLogging(vCfg *viper.Viper) logging.Logging {
+//
+// NO_COLOR is presence-based and has no Viper environment binding, so NoColor
+// comes from the no-color flag, which ApplyEnvToFlags sets from NO_COLOR.
+//
+// Parameters:
+//   - vCfg: Bound configuration.
+//   - flagSet: Command flag set holding the resolved no-color value.
+//
+// Returns:
+//   - logging.Logging: Logging settings.
+func loadLogging(vCfg *viper.Viper, flagSet *pflag.FlagSet) logging.Logging {
 	format := vCfg.GetString("log-format")
 	if format == "" {
 		format = "auto"
 	}
+
+	noColor, err := flagSet.GetBool("no-color")
 
 	return logging.Logging{
 		Level:   vCfg.GetString("log-level"),
 		Format:  format,
 		Debug:   vCfg.GetBool("debug"),
 		Trace:   vCfg.GetBool("trace"),
-		NoColor: vCfg.GetBool("no-color"),
+		NoColor: err == nil && noColor,
 	}
 }
 

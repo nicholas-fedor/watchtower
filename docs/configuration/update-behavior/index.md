@@ -81,6 +81,7 @@ Environment Variable: WATCHTOWER_DISK_SPACE_WARN
     - This option may also be a percent of [`disk-space-max`](#disk_space_max) (for example `80%`).
     - A size or percentage is a whole or decimal number, such as `1.5TB` or `62.5%`.
     - A percent value requires [`disk-space-max`](#disk_space_max).
+    - A percent value must be greater than 0 and less than 100.
     - When both are set, the warn amount must be less than the max.
     - Configuring a warning threshold without a maximum is valid and supported.
 

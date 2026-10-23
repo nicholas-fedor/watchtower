@@ -15,12 +15,6 @@ type Client struct {
 	// RemoveVolumes removes attached volumes before updating
 	// (--remove-volumes / WATCHTOWER_REMOVE_VOLUMES).
 	RemoveVolumes bool
-	// DisableMemorySwappiness clears memory swappiness when recreating containers
-	// for Podman compatibility (--disable-memory-swappiness).
-	DisableMemorySwappiness bool
-	// CPUCopyMode controls CPU settings when recreating containers
-	// (--cpu-copy-mode / WATCHTOWER_CPU_COPY_MODE: auto, full, none).
-	CPUCopyMode string
 	// WarnOnHeadFailure is the HEAD pull failure warning strategy
 	// (--warn-on-head-failure / WATCHTOWER_WARN_ON_HEAD_FAILURE: always, auto, never).
 	WarnOnHeadFailure string

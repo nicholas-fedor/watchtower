@@ -1,10 +1,49 @@
 package utils
 
 import (
+	"math"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 )
+
+// TestDurationFromSeconds verifies conversion and clamping at both ends of the
+// time.Duration range. float64(math.MaxInt64) rounds up to 2^63, which int64
+// cannot hold, so a product equal to it must clamp rather than convert.
+func TestDurationFromSeconds(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name    string
+		seconds float64
+		want    time.Duration
+	}{
+		{name: "zero", seconds: 0, want: 0},
+		{name: "fractional", seconds: 1.5, want: 1500 * time.Millisecond},
+		{name: "negative", seconds: -2, want: -2 * time.Second},
+		{
+			name:    "product equals 2^63",
+			seconds: float64(math.MaxInt64) / float64(time.Second),
+			want:    time.Duration(math.MaxInt64),
+		},
+		{name: "above range", seconds: 1e10, want: time.Duration(math.MaxInt64)},
+		{
+			name:    "product equals -2^63",
+			seconds: float64(math.MinInt64) / float64(time.Second),
+			want:    time.Duration(math.MinInt64),
+		},
+		{name: "below range", seconds: -1e10, want: time.Duration(math.MinInt64)},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+
+			assert.Equal(t, tc.want, DurationFromSeconds(tc.seconds))
+		})
+	}
+}
 
 // TestIsPureNumeric verifies IsPureNumeric behavior with table-driven cases.
 func TestIsPureNumeric(t *testing.T) {
