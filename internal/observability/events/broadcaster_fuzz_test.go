@@ -92,7 +92,7 @@ func FuzzBroadcasterMaxSubscribers(f *testing.F) {
 			}
 		}
 
-		assert.LessOrEqual(t, successCount, maxSubscribers,
+		assert.LessOrEqual(t, successCount, MaxSubscribers,
 			"should not exceed max subscribers")
 	})
 }
@@ -187,6 +187,6 @@ func FuzzBroadcasterConcurrentSubscribePublishUnsubscribe(f *testing.F) {
 		count := b.SubscriberCount()
 
 		assert.GreaterOrEqual(t, count, 0, "subscriber count should never be negative")
-		assert.LessOrEqual(t, count, maxSubscribers, "subscriber count should not exceed max")
+		assert.LessOrEqual(t, count, MaxSubscribers, "subscriber count should not exceed max")
 	})
 }

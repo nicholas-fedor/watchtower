@@ -8,7 +8,7 @@ import (
 
 	"github.com/nicholas-fedor/watchtower/internal/api/config"
 	"github.com/nicholas-fedor/watchtower/internal/api/handlers/update"
-	mt "github.com/nicholas-fedor/watchtower/internal/metrics"
+	mt "github.com/nicholas-fedor/watchtower/internal/observability/metrics"
 	"github.com/nicholas-fedor/watchtower/pkg/types"
 )
 

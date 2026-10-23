@@ -27,9 +27,9 @@ import (
 	dockerImage "github.com/moby/moby/api/types/image"
 
 	"github.com/nicholas-fedor/watchtower/internal/api/config"
-	"github.com/nicholas-fedor/watchtower/internal/api/handlers/events"
 	"github.com/nicholas-fedor/watchtower/internal/api/routes"
-	"github.com/nicholas-fedor/watchtower/internal/metrics"
+	"github.com/nicholas-fedor/watchtower/internal/observability/events"
+	"github.com/nicholas-fedor/watchtower/internal/observability/metrics"
 	"github.com/nicholas-fedor/watchtower/internal/scheduling"
 	"github.com/nicholas-fedor/watchtower/internal/testutil/golden"
 	"github.com/nicholas-fedor/watchtower/pkg/container"

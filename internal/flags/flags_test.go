@@ -20,7 +20,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/nicholas-fedor/watchtower/internal/logging"
+	"github.com/nicholas-fedor/watchtower/internal/observability/logging"
 )
 
 // processFlagAliasesHelperEnv selects a ProcessFlagAliases fatal case when the
@@ -819,7 +819,7 @@ func runProcessFlagAliasesFatalHelper(caseName string) {
 // TestSetupLogging tests logging setup with various formats and levels.
 //
 // Format writer shape (JSON vs ConsoleWriter pretty/logfmt) is unit-tested in
-// internal/logging/config_test.go. Here we assert SetupLogging integration:
+// internal/observability/logging/config_test.go. Here we assert SetupLogging integration:
 // success/error contracts, applied levels, and that the returned logger accepts
 // write-through without panic. Optional: capture writer output samples per
 // format via injectable writer or subprocess if ConfigureWriter gains a test seam.

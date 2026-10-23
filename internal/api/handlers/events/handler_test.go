@@ -18,6 +18,8 @@ import (
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+
+	observabilityEvents "github.com/nicholas-fedor/watchtower/internal/observability/events"
 )
 
 // newTestLogger returns a logger that writes each event to the test's log, so a
@@ -38,7 +40,7 @@ func newTestLogger(t *testing.T) *zerolog.Logger {
 }
 
 func TestNewHandler(t *testing.T) {
-	b := NewBroadcaster()
+	b := observabilityEvents.NewBroadcaster()
 	h := NewHandler(newTestLogger(t), b, nil)
 	require.NotNil(t, h)
 	assert.Equal(t, "/v1/events", h.Path)
@@ -49,7 +51,7 @@ func TestNewHandler(t *testing.T) {
 }
 
 func TestHandler_Handle_Connects(t *testing.T) {
-	b := NewBroadcaster()
+	b := observabilityEvents.NewBroadcaster()
 	h := NewHandler(newTestLogger(t), b, nil)
 
 	app := fiber.New(fiber.Config{})
@@ -71,9 +73,9 @@ func TestHandler_Handle_Connects(t *testing.T) {
 }
 
 func TestHandler_Handle_MaxSubscribers(t *testing.T) {
-	b := NewBroadcaster()
+	b := observabilityEvents.NewBroadcaster()
 
-	for range maxSubscribers {
+	for range observabilityEvents.MaxSubscribers {
 		ch, _ := b.SubscribeWithDone()
 		assert.NotNil(t, ch, "subscriber channel should not be nil")
 	}
@@ -105,7 +107,7 @@ func TestHandler_Handle_NilBroadcaster(t *testing.T) {
 }
 
 func TestHandler_Handle_ReceivesEvent(t *testing.T) {
-	b := NewBroadcaster()
+	b := observabilityEvents.NewBroadcaster()
 	h := NewHandler(newTestLogger(t), b, nil)
 
 	app := fiber.New(fiber.Config{})
@@ -127,7 +129,7 @@ func TestHandler_Handle_ReceivesEvent(t *testing.T) {
 }
 
 func TestHandler_Handle_ReceivesPublishedEvent(t *testing.T) {
-	b := NewBroadcaster()
+	b := observabilityEvents.NewBroadcaster()
 	h := NewHandler(newTestLogger(t), b, nil)
 
 	subCh, _ := b.SubscribeWithDone()
@@ -149,7 +151,7 @@ func TestHandler_Handle_ReceivesPublishedEvent(t *testing.T) {
 
 	assert.Equal(t, fiber.StatusOK, resp.StatusCode)
 
-	event := Event{Type: "test-event", Data: map[string]string{"key": "value"}}
+	event := observabilityEvents.Event{Type: "test-event", Data: map[string]string{"key": "value"}}
 	b.Publish(event)
 
 	select {
@@ -163,7 +165,7 @@ func TestHandler_Handle_ReceivesPublishedEvent(t *testing.T) {
 }
 
 func TestHandler_Handle_RejectsDisallowedOrigin(t *testing.T) {
-	b := NewBroadcaster()
+	b := observabilityEvents.NewBroadcaster()
 	h := NewHandler(newTestLogger(t), b, []string{"https://allowed.com"})
 
 	app := fiber.New(fiber.Config{})
@@ -187,7 +189,7 @@ func TestHandler_Handle_RejectsDisallowedOrigin(t *testing.T) {
 }
 
 func TestHandler_Handle_AllowsSameOrigin(t *testing.T) {
-	b := NewBroadcaster()
+	b := observabilityEvents.NewBroadcaster()
 	h := NewHandler(newTestLogger(t), b, nil)
 
 	app := fiber.New(fiber.Config{})
@@ -209,7 +211,7 @@ func TestHandler_Handle_AllowsSameOrigin(t *testing.T) {
 }
 
 func TestHandler_Handle_AllowsCORSMatch(t *testing.T) {
-	b := NewBroadcaster()
+	b := observabilityEvents.NewBroadcaster()
 	h := NewHandler(newTestLogger(t), b, []string{"https://app.example.com"})
 
 	app := fiber.New(fiber.Config{})
@@ -266,7 +268,7 @@ func TestIsOriginAllowed(t *testing.T) {
 }
 
 func TestHandler_Handle_AllowsNullOrigin(t *testing.T) {
-	b := NewBroadcaster()
+	b := observabilityEvents.NewBroadcaster()
 	h := NewHandler(newTestLogger(t), b, nil)
 
 	app := fiber.New(fiber.Config{})
@@ -290,7 +292,7 @@ func TestHandler_Handle_AllowsNullOrigin(t *testing.T) {
 }
 
 func TestHandler_Handle_AllowsWildcardCORS(t *testing.T) {
-	b := NewBroadcaster()
+	b := observabilityEvents.NewBroadcaster()
 	h := NewHandler(newTestLogger(t), b, []string{"*"})
 
 	app := fiber.New(fiber.Config{})
@@ -314,10 +316,10 @@ func TestHandler_Handle_AllowsWildcardCORS(t *testing.T) {
 }
 
 func TestHandler_Handle_MaxSubscribersHTTP(t *testing.T) {
-	b := NewBroadcaster()
+	b := observabilityEvents.NewBroadcaster()
 	h := NewHandler(newTestLogger(t), b, nil)
 
-	for range maxSubscribers {
+	for range observabilityEvents.MaxSubscribers {
 		ch, _ := b.SubscribeWithDone()
 		require.NotNil(t, ch, "pre-fill subscriber")
 	}
@@ -341,7 +343,7 @@ func TestHandler_Handle_MaxSubscribersHTTP(t *testing.T) {
 }
 
 func TestHandler_Handle_StreamStaysOpenAndDeliversEvent(t *testing.T) {
-	b := NewBroadcaster()
+	b := observabilityEvents.NewBroadcaster()
 	h := NewHandler(newTestLogger(t), b, nil)
 
 	app := fiber.New(fiber.Config{})
@@ -349,10 +351,10 @@ func TestHandler_Handle_StreamStaysOpenAndDeliversEvent(t *testing.T) {
 
 	go func() {
 		time.Sleep(20 * time.Millisecond)
-		b.Publish(Event{
+		b.Publish(observabilityEvents.Event{
 			Type:      "scan_completed",
 			Timestamp: time.Now().UTC(),
-			Data:      ScanCompletedData{Scanned: 1, Updated: 0, Failed: 0},
+			Data:      observabilityEvents.ScanCompletedData{Scanned: 1, Updated: 0, Failed: 0},
 		})
 	}()
 
@@ -391,7 +393,7 @@ func TestHandler_Handle_StreamStaysOpenAndDeliversEvent(t *testing.T) {
 }
 
 func TestHandler_Handle_OriginCheckPrecedence(t *testing.T) {
-	b := NewBroadcaster()
+	b := observabilityEvents.NewBroadcaster()
 	h := NewHandler(newTestLogger(t), b, nil)
 
 	app := fiber.New(fiber.Config{})
@@ -437,7 +439,7 @@ func TestHandler_Handle_EndsStreamsOnShutdown(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 
-			b := NewBroadcaster()
+			b := observabilityEvents.NewBroadcaster()
 			h := NewHandler(newTestLogger(t), b, nil)
 
 			app := fiber.New(fiber.Config{})
@@ -474,7 +476,7 @@ func TestHandler_Handle_EndsStreamsOnShutdown(t *testing.T) {
 			}
 
 			if tt.stall {
-				b.Publish(Event{Type: stallEventType})
+				b.Publish(observabilityEvents.Event{Type: stallEventType})
 
 				select {
 				case <-listener.writing:

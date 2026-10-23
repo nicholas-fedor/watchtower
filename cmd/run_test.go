@@ -24,7 +24,7 @@ import (
 
 	appConfig "github.com/nicholas-fedor/watchtower/internal/config"
 	notifyConfig "github.com/nicholas-fedor/watchtower/internal/config/notify"
-	"github.com/nicholas-fedor/watchtower/internal/logging"
+	"github.com/nicholas-fedor/watchtower/internal/observability/logging"
 	"github.com/nicholas-fedor/watchtower/internal/registry/ratelimit"
 	"github.com/nicholas-fedor/watchtower/pkg/container"
 	mockContainer "github.com/nicholas-fedor/watchtower/pkg/container/mocks"

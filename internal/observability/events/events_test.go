@@ -146,7 +146,7 @@ func TestBroadcaster_MaxSubscribers(t *testing.T) {
 
 	broadcaster := NewBroadcaster()
 
-	for i := range maxSubscribers {
+	for i := range MaxSubscribers {
 		ch, _ := broadcaster.SubscribeWithDone()
 		require.NotNil(t, ch, "subscriber %d", i)
 	}

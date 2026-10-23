@@ -8,7 +8,7 @@ import (
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/assert"
 
-	mockLogging "github.com/nicholas-fedor/watchtower/internal/logging/mocks"
+	mockLogging "github.com/nicholas-fedor/watchtower/internal/observability/logging/mocks"
 )
 
 // newBufferLogger returns a logger that writes JSON events at level and above

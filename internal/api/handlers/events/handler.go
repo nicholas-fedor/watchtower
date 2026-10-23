@@ -10,6 +10,8 @@ import (
 	"github.com/gofiber/fiber/v3"
 	"github.com/gofiber/fiber/v3/middleware/sse"
 	"github.com/rs/zerolog"
+
+	observabilityEvents "github.com/nicholas-fedor/watchtower/internal/observability/events"
 )
 
 // sseRetryInterval is the reconnect delay for SSE clients.
@@ -20,7 +22,7 @@ type Handler struct {
 	log *zerolog.Logger
 
 	Path           string
-	Broadcaster    *Broadcaster
+	Broadcaster    *observabilityEvents.Broadcaster
 	AllowedOrigins []string
 }
 
@@ -33,7 +35,7 @@ type Handler struct {
 //
 // Returns:
 //   - *Handler: The initialized events handler.
-func NewHandler(log *zerolog.Logger, b *Broadcaster, allowedOrigins []string) *Handler {
+func NewHandler(log *zerolog.Logger, b *observabilityEvents.Broadcaster, allowedOrigins []string) *Handler {
 	if log == nil {
 		nop := zerolog.Nop()
 		log = &nop
@@ -128,7 +130,7 @@ func logSubscriberConnected(log *zerolog.Logger, c fiber.Ctx) {
 //   - <-chan Event: The event channel for receiving SSE events, or nil on failure.
 //   - <-chan struct{}: The done channel closed when the subscriber is unsubscribed.
 //   - error: Non-nil when the broadcaster is nil or the subscriber cap is reached.
-func (h *Handler) subscribe() (<-chan Event, <-chan struct{}, error) {
+func (h *Handler) subscribe() (<-chan observabilityEvents.Event, <-chan struct{}, error) {
 	if h.Broadcaster == nil {
 		return nil, nil, fiber.ErrServiceUnavailable
 	}
@@ -151,7 +153,7 @@ func (h *Handler) subscribe() (<-chan Event, <-chan struct{}, error) {
 //
 // Returns:
 //   - error: Non-nil if the SSE middleware fails to start or the stream errors.
-func (h *Handler) serveStream(c fiber.Ctx, subCh <-chan Event, done <-chan struct{}) error {
+func (h *Handler) serveStream(c fiber.Ctx, subCh <-chan observabilityEvents.Event, done <-chan struct{}) error {
 	// The server closes this channel when it starts shutting down. The stream's
 	// own context does not end then, and its Done channel closes only after a
 	// failed write, so without it a stream would hold the shutdown open until
@@ -185,7 +187,7 @@ func (h *Handler) serveStream(c fiber.Ctx, subCh <-chan Event, done <-chan struc
 // Returns:
 //   - error: Non-nil if a stream write fails. Nil on normal unsubscribe,
 //     stream close, or server shutdown.
-func (h *Handler) dispatchEvents(stream *sse.Stream, subCh <-chan Event, done, shutdown <-chan struct{}) error {
+func (h *Handler) dispatchEvents(stream *sse.Stream, subCh <-chan observabilityEvents.Event, done, shutdown <-chan struct{}) error {
 	for {
 		select {
 		case event, ok := <-subCh:

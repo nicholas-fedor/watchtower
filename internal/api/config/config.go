@@ -12,10 +12,10 @@ import (
 	"github.com/gofiber/fiber/v3/middleware/timeout"
 	"github.com/rs/zerolog"
 
-	"github.com/nicholas-fedor/watchtower/internal/api/handlers/events"
 	"github.com/nicholas-fedor/watchtower/internal/git"
-	"github.com/nicholas-fedor/watchtower/internal/logging"
-	mt "github.com/nicholas-fedor/watchtower/internal/metrics"
+	"github.com/nicholas-fedor/watchtower/internal/observability/events"
+	"github.com/nicholas-fedor/watchtower/internal/observability/logging"
+	mt "github.com/nicholas-fedor/watchtower/internal/observability/metrics"
 	"github.com/nicholas-fedor/watchtower/internal/scheduling"
 	"github.com/nicholas-fedor/watchtower/pkg/container"
 	"github.com/nicholas-fedor/watchtower/pkg/types"

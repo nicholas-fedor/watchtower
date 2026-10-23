@@ -17,7 +17,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/nicholas-fedor/watchtower/internal/logging"
+	"github.com/nicholas-fedor/watchtower/internal/observability/logging"
 )
 
 // secretsFatalHelperEnv selects a GetSecretsFromFiles fatal case when the test

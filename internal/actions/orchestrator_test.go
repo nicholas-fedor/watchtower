@@ -18,7 +18,7 @@ import (
 	dockerContainer "github.com/moby/moby/api/types/container"
 
 	mockActions "github.com/nicholas-fedor/watchtower/internal/actions/mocks"
-	"github.com/nicholas-fedor/watchtower/internal/logging"
+	"github.com/nicholas-fedor/watchtower/internal/observability/logging"
 	mockContainer "github.com/nicholas-fedor/watchtower/pkg/container/mocks"
 	"github.com/nicholas-fedor/watchtower/pkg/types"
 )

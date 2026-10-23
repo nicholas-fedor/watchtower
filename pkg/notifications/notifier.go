@@ -10,7 +10,7 @@ import (
 	"github.com/rs/zerolog"
 
 	notifyConfig "github.com/nicholas-fedor/watchtower/internal/config/notify"
-	"github.com/nicholas-fedor/watchtower/internal/logging"
+	"github.com/nicholas-fedor/watchtower/internal/observability/logging"
 	"github.com/nicholas-fedor/watchtower/pkg/types"
 )
 
