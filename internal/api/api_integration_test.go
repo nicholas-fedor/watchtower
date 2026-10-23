@@ -20,7 +20,7 @@ import (
 	"github.com/nicholas-fedor/watchtower/internal/observability/events"
 	"github.com/nicholas-fedor/watchtower/internal/observability/logging"
 	"github.com/nicholas-fedor/watchtower/internal/observability/metrics"
-	"github.com/nicholas-fedor/watchtower/internal/scheduling"
+	"github.com/nicholas-fedor/watchtower/internal/update/schedule"
 	mockContainer "github.com/nicholas-fedor/watchtower/pkg/container/mocks"
 	"github.com/nicholas-fedor/watchtower/pkg/types"
 )
@@ -102,7 +102,7 @@ func TestIntegration_SetupAndStartAPI_AllAPIs(t *testing.T) {
 	runServerAndShutdown(t, routes.Options{
 		Token:               "test-token",
 		EnableUpdateAPI:     true,
-		UpdateLock:          scheduling.NewUpdateLock(),
+		UpdateLock:          schedule.NewUpdateLock(),
 		EnableMetricsAPI:    true,
 		EnableContainersAPI: true,
 		RateLimit:           60,
@@ -131,7 +131,7 @@ func TestIntegration_SetupAndStartAPI_MissingUpdateDependencies(t *testing.T) {
 			opts: routes.Options{
 				Token:                       "test",
 				EnableUpdateAPI:             true,
-				UpdateLock:                  scheduling.NewUpdateLock(),
+				UpdateLock:                  schedule.NewUpdateLock(),
 				RunUpdatesWithNotifications: nil,
 				FilterByImage:               func(_ []string, f types.Filter) types.Filter { return f },
 				DefaultMetrics:              func() *metrics.Metrics { return helperMetrics },
@@ -143,7 +143,7 @@ func TestIntegration_SetupAndStartAPI_MissingUpdateDependencies(t *testing.T) {
 			opts: routes.Options{
 				Token:           "test",
 				EnableUpdateAPI: true,
-				UpdateLock:      scheduling.NewUpdateLock(),
+				UpdateLock:      schedule.NewUpdateLock(),
 				RunUpdatesWithNotifications: func(_ context.Context, _ types.Filter, _ types.UpdateParams) *metrics.Metric {
 					return &metrics.Metric{}
 				},
@@ -157,7 +157,7 @@ func TestIntegration_SetupAndStartAPI_MissingUpdateDependencies(t *testing.T) {
 			opts: routes.Options{
 				Token:           "test",
 				EnableUpdateAPI: true,
-				UpdateLock:      scheduling.NewUpdateLock(),
+				UpdateLock:      schedule.NewUpdateLock(),
 				RunUpdatesWithNotifications: func(_ context.Context, _ types.Filter, _ types.UpdateParams) *metrics.Metric {
 					return &metrics.Metric{}
 				},
@@ -213,7 +213,7 @@ func TestIntegration_GracefulShutdown_AllAPIs(t *testing.T) {
 		errCh <- startAPI(t, ctx, withTestLogger(t, routes.Options{
 			Token:               "test-token",
 			EnableUpdateAPI:     true,
-			UpdateLock:          scheduling.NewUpdateLock(),
+			UpdateLock:          schedule.NewUpdateLock(),
 			EnableMetricsAPI:    true,
 			EnableContainersAPI: true,
 			RateLimit:           60,
@@ -248,7 +248,7 @@ func TestIntegration_GracefulShutdownTiming(t *testing.T) {
 		errCh <- startAPI(t, ctx, withTestLogger(t, routes.Options{
 			Token:               "test-token",
 			EnableUpdateAPI:     true,
-			UpdateLock:          scheduling.NewUpdateLock(),
+			UpdateLock:          schedule.NewUpdateLock(),
 			EnableMetricsAPI:    true,
 			EnableContainersAPI: true,
 			RateLimit:           60,
@@ -360,7 +360,7 @@ func TestIntegration_EnablementCombinations(t *testing.T) {
 				Token:               "test-token",
 				EventsToken:         "events-token",
 				EnableUpdateAPI:     c.enableUpdateAPI,
-				UpdateLock:          scheduling.NewUpdateLock(),
+				UpdateLock:          schedule.NewUpdateLock(),
 				EnableMetricsAPI:    c.enableMetricsAPI,
 				EnableContainersAPI: c.enableContainersAPI,
 				EnableHistoryAPI:    c.enableHistoryAPI,
@@ -473,7 +473,7 @@ func TestIntegration_CheckDuringUpdate(t *testing.T) {
 	opts := routes.Options{
 		Token:           "test-token",
 		EnableUpdateAPI: true,
-		UpdateLock:      scheduling.NewUpdateLock(),
+		UpdateLock:      schedule.NewUpdateLock(),
 		EnableCheckAPI:  true,
 		UnblockHTTPAPI:  true,
 		Client:          mc,
@@ -548,7 +548,7 @@ func TestIntegration_APIAndScheduling_ConcurrentWithUnblockHTTPAPI(t *testing.T)
 	defer cancel()
 
 	// The API and the scheduler share one update lock, as in production.
-	lock := scheduling.NewUpdateLock()
+	lock := schedule.NewUpdateLock()
 
 	opts := withTestListenAddr(t, routes.Options{
 		Token:            "test-token",
@@ -581,7 +581,7 @@ func TestIntegration_APIAndScheduling_ConcurrentWithUnblockHTTPAPI(t *testing.T)
 	schedCtx, schedCancel := context.WithTimeout(context.Background(), 500*time.Millisecond)
 	defer schedCancel()
 
-	err := scheduling.RunUpgradesOnSchedule(schedCtx, scheduling.ScheduleDeps{
+	err := schedule.RunUpgradesOnSchedule(schedCtx, schedule.ScheduleDeps{
 		Logger:              newTestLogger(t),
 		Filter:              func(_ types.FilterableContainer) bool { return true },
 		Lock:                lock,
@@ -618,7 +618,7 @@ func TestIntegration_UpdateHonorsReviveStoppedAndComposeDependsOn(t *testing.T) 
 	opts := routes.Options{
 		Token:           "test-token",
 		EnableUpdateAPI: true,
-		UpdateLock:      scheduling.NewUpdateLock(),
+		UpdateLock:      schedule.NewUpdateLock(),
 		UnblockHTTPAPI:  true,
 		BaseParams: types.UpdateParams{
 			ReviveStopped:       true,

@@ -12,8 +12,8 @@ import (
 	dockerContainer "github.com/moby/moby/api/types/container"
 	dockerImage "github.com/moby/moby/api/types/image"
 
+	"github.com/nicholas-fedor/watchtower/internal/update/state"
 	"github.com/nicholas-fedor/watchtower/pkg/container"
-	"github.com/nicholas-fedor/watchtower/pkg/session"
 	"github.com/nicholas-fedor/watchtower/pkg/types"
 )
 
@@ -21,8 +21,8 @@ import (
 // running org/app:latest, built the way an update session builds it.
 //
 // Returns:
-//   - *session.ContainerStatus: Status in the updated state.
-func updatedAppStatus() *session.ContainerStatus {
+//   - *state.ContainerStatus: Status in the updated state.
+func updatedAppStatus() *state.ContainerStatus {
 	log := new(zerolog.Nop())
 	app := container.NewContainer(nil,
 		&dockerContainer.InspectResponse{
@@ -34,7 +34,7 @@ func updatedAppStatus() *session.ContainerStatus {
 		&dockerImage.InspectResponse{ID: "sha256:" + strings.Repeat("b", 64)},
 	)
 
-	progress := session.Progress{}
+	progress := state.Progress{}
 	progress.AddScanned(log, app, types.ImageID("sha256:"+strings.Repeat("c", 64)), types.UpdateParams{})
 	progress.MarkForUpdate(log, app.ID())
 
@@ -157,18 +157,18 @@ func TestJSONTemplate(t *testing.T) {
 		"title": "Watchtower updates on Mock"
 }`
 				data := mockDataFromStates(t,
-					session.UpdatedState,
-					session.FreshState,
-					session.FailedState,
-					session.SkippedState,
-					session.UpdatedState,
+					state.UpdatedState,
+					state.FreshState,
+					state.FailedState,
+					state.SkippedState,
+					state.UpdatedState,
 				)
 				assert.JSONEq(t, expected, getTemplatedResult(t, `json.v1`, false, data))
 			})
 			t.Run("should use correct ID types in JSON output", func(t *testing.T) {
 				t.Parallel()
 
-				data := mockDataFromStates(t, session.UpdatedState)
+				data := mockDataFromStates(t, state.UpdatedState)
 				result := getTemplatedResult(t, `json.v1`, false, data)
 
 				// Verify that updated containers use container IDs for the id field, and image IDs for currentImageId and latestImageId
@@ -182,7 +182,7 @@ func TestJSONTemplate(t *testing.T) {
 			t.Run("should include restarted containers in JSON output", func(t *testing.T) {
 				t.Parallel()
 
-				data := mockDataFromStates(t, session.UpdatedState, session.RestartedState)
+				data := mockDataFromStates(t, state.UpdatedState, state.RestartedState)
 				result := getTemplatedResult(t, `json.v1`, false, data)
 
 				// Verify restarted containers are included
@@ -194,7 +194,7 @@ func TestJSONTemplate(t *testing.T) {
 			t.Run("should render restarted containers without errors", func(t *testing.T) {
 				t.Parallel()
 
-				data := mockDataFromStates(t, session.RestartedState)
+				data := mockDataFromStates(t, state.RestartedState)
 				result := getTemplatedResult(t, `json.v1`, false, data)
 				assert.Contains(t, result, `"restarted"`)
 				assert.NotContains(t, result, "Error:")
@@ -205,9 +205,9 @@ func TestJSONTemplate(t *testing.T) {
 
 				// Test mixing different states
 				data := mockDataFromStates(t,
-					session.UpdatedState,
-					session.RestartedState,
-					session.FailedState,
+					state.UpdatedState,
+					state.RestartedState,
+					state.FailedState,
 				)
 				result := getTemplatedResult(t, `json.v1`, false, data)
 
@@ -224,9 +224,9 @@ func TestJSONTemplate(t *testing.T) {
 				t.Parallel()
 
 				data := mockDataFromStates(t,
-					session.RestartedState,
-					session.UpdatedState,
-					session.FailedState,
+					state.RestartedState,
+					state.UpdatedState,
+					state.FailedState,
 				)
 				result := getTemplatedResult(t, `json.v1`, false, data)
 
@@ -241,7 +241,7 @@ func TestJSONTemplate(t *testing.T) {
 			t.Run("should integrate with other notification types in JSON", func(t *testing.T) {
 				t.Parallel()
 
-				data := mockDataFromStates(t, session.RestartedState)
+				data := mockDataFromStates(t, state.RestartedState)
 				// Test that JSON includes all required fields
 				result := getTemplatedResult(t, `json.v1`, false, data)
 
@@ -274,7 +274,7 @@ func TestJSONTemplate(t *testing.T) {
 			t.Run("should validate notification formatting", func(t *testing.T) {
 				t.Parallel()
 
-				data := mockDataFromStates(t, session.RestartedState)
+				data := mockDataFromStates(t, state.RestartedState)
 				result := getTemplatedResult(t, `json.v1`, false, data)
 
 				// Should be valid JSON
@@ -347,7 +347,7 @@ func TestJSONGitAndOCIReportFields(t *testing.T) {
 
 		raw, err := json.Marshal(notificationData{
 			Title: "update", Host: "box",
-			Report: &session.SingleContainerReport{
+			Report: &state.SingleContainerReport{
 				UpdatedReports: []types.ContainerReport{status},
 			},
 		})

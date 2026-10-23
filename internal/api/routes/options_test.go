@@ -8,7 +8,7 @@ import (
 	"github.com/stretchr/testify/assert"
 
 	"github.com/nicholas-fedor/watchtower/internal/observability/metrics"
-	"github.com/nicholas-fedor/watchtower/internal/scheduling"
+	"github.com/nicholas-fedor/watchtower/internal/update/schedule"
 	"github.com/nicholas-fedor/watchtower/pkg/types"
 )
 
@@ -35,7 +35,7 @@ func TestValidateUpdateOptions(t *testing.T) {
 				RunUpdatesWithNotifications: runUpdates,
 				FilterByImage:               filterByImage,
 				DefaultMetrics:              defaultMetrics,
-				UpdateLock:                  scheduling.NewUpdateLock(),
+				UpdateLock:                  schedule.NewUpdateLock(),
 			},
 			wantErr: nil,
 		},
@@ -45,7 +45,7 @@ func TestValidateUpdateOptions(t *testing.T) {
 				RunUpdatesWithNotifications: nil,
 				FilterByImage:               filterByImage,
 				DefaultMetrics:              defaultMetrics,
-				UpdateLock:                  scheduling.NewUpdateLock(),
+				UpdateLock:                  schedule.NewUpdateLock(),
 			},
 			wantErr: errMissingRunUpdatesWithNotifications,
 		},
@@ -55,7 +55,7 @@ func TestValidateUpdateOptions(t *testing.T) {
 				RunUpdatesWithNotifications: runUpdates,
 				FilterByImage:               nil,
 				DefaultMetrics:              defaultMetrics,
-				UpdateLock:                  scheduling.NewUpdateLock(),
+				UpdateLock:                  schedule.NewUpdateLock(),
 			},
 			wantErr: ErrMissingFilterByImage,
 		},
@@ -65,7 +65,7 @@ func TestValidateUpdateOptions(t *testing.T) {
 				RunUpdatesWithNotifications: runUpdates,
 				FilterByImage:               filterByImage,
 				DefaultMetrics:              nil,
-				UpdateLock:                  scheduling.NewUpdateLock(),
+				UpdateLock:                  schedule.NewUpdateLock(),
 			},
 			wantErr: ErrMissingDefaultMetrics,
 		},

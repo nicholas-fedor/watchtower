@@ -14,7 +14,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/nicholas-fedor/watchtower/internal/observability/metrics"
-	"github.com/nicholas-fedor/watchtower/internal/scheduling"
+	"github.com/nicholas-fedor/watchtower/internal/update/schedule"
 )
 
 // maxFuzzQueryLength bounds the encoded query of a fuzzed request, so the request
@@ -139,9 +139,9 @@ func FuzzHandlerNew(f *testing.F) {
 	f.Add(false)
 
 	f.Fuzz(func(t *testing.T, withLock bool) {
-		var lock *scheduling.UpdateLock
+		var lock *schedule.UpdateLock
 		if withLock {
-			lock = scheduling.NewUpdateLock()
+			lock = schedule.NewUpdateLock()
 		}
 
 		h := New(newNopLogger(), func(_ context.Context, _, _ []string) *metrics.Metric {

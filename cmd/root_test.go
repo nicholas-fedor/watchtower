@@ -26,13 +26,13 @@ import (
 
 	dockerContainer "github.com/moby/moby/api/types/container"
 
-	"github.com/nicholas-fedor/watchtower/internal/actions"
 	"github.com/nicholas-fedor/watchtower/internal/api"
-	"github.com/nicholas-fedor/watchtower/internal/api/handlers/update"
+	updateHandler "github.com/nicholas-fedor/watchtower/internal/api/handlers/update"
 	"github.com/nicholas-fedor/watchtower/internal/observability/logging"
 	"github.com/nicholas-fedor/watchtower/internal/observability/metrics"
-	"github.com/nicholas-fedor/watchtower/internal/scheduling"
 	"github.com/nicholas-fedor/watchtower/internal/settings"
+	"github.com/nicholas-fedor/watchtower/internal/update"
+	"github.com/nicholas-fedor/watchtower/internal/update/schedule"
 	"github.com/nicholas-fedor/watchtower/pkg/container"
 	mockContainer "github.com/nicholas-fedor/watchtower/pkg/container/mocks"
 	"github.com/nicholas-fedor/watchtower/pkg/types"
@@ -138,7 +138,7 @@ func TestGetAPIAddr(t *testing.T) {
 // of updateOnStart and scheduled updates in the main application.
 func TestUpdateLockSerialization(t *testing.T) {
 	synctest.Test(t, func(t *testing.T) {
-		updateLock := scheduling.NewUpdateLock()
+		updateLock := schedule.NewUpdateLock()
 
 		// Atomic counters to track concurrent execution and completion
 		var (
@@ -205,7 +205,7 @@ func TestUpdateLockSerialization(t *testing.T) {
 // TestConcurrentScheduledAndFullAPIUpdate verifies that a full API-triggered update (no image params)
 // returns 429 immediately when a scheduled update is in progress, rather than blocking indefinitely.
 func TestConcurrentScheduledAndFullAPIUpdate(t *testing.T) {
-	updateLock := scheduling.NewUpdateLock()
+	updateLock := schedule.NewUpdateLock()
 
 	scheduledStarted := make(chan struct{})
 	scheduledDone := make(chan struct{})
@@ -216,7 +216,7 @@ func TestConcurrentScheduledAndFullAPIUpdate(t *testing.T) {
 		return &metrics.Metric{Scanned: 1, Updated: 1, Failed: 0}
 	}
 
-	handler := update.New(newTestLogger(t), updateFn, updateLock, 5*time.Minute)
+	handler := updateHandler.New(newTestLogger(t), updateFn, updateLock, 5*time.Minute)
 
 	// The scheduled update holds the lock until the API request has been
 	// asserted.
@@ -258,7 +258,7 @@ func TestHandleAsync(t *testing.T) {
 	apiStarted := make(chan struct{})
 	apiCompleted := make(chan struct{})
 
-	updateLock := scheduling.NewUpdateLock()
+	updateLock := schedule.NewUpdateLock()
 
 	scheduledStarted := make(chan struct{})
 	scheduledCompleted := make(chan struct{})
@@ -271,7 +271,7 @@ func TestHandleAsync(t *testing.T) {
 		return &metrics.Metric{Scanned: 1, Updated: 1, Failed: 0}
 	}
 
-	handler := update.New(newTestLogger(t), updateFn, updateLock, 5*time.Minute)
+	handler := updateHandler.New(newTestLogger(t), updateFn, updateLock, 5*time.Minute)
 
 	require.True(t, updateLock.TryLock())
 
@@ -357,12 +357,12 @@ func TestHandleAsync(t *testing.T) {
 func testScheduleDeps(
 	t *testing.T,
 	filter types.Filter,
-	lock *scheduling.UpdateLock,
+	lock *schedule.UpdateLock,
 	updateOnStart bool,
-) scheduling.ScheduleDeps {
+) schedule.ScheduleDeps {
 	t.Helper()
 
-	return scheduling.ScheduleDeps{
+	return schedule.ScheduleDeps{
 		Logger:       newTestLogger(t),
 		Filter:       filter,
 		Lock:         lock,
@@ -412,13 +412,13 @@ func TestUpdateOnStartTriggersImmediateUpdate(t *testing.T) {
 	defer cancel()
 
 	// Create update lock
-	updateLock := scheduling.NewUpdateLock()
+	updateLock := schedule.NewUpdateLock()
 
 	// Call RunUpgradesOnSchedule with a filter that matches no containers
 	filter := types.Filter(func(_ types.FilterableContainer) bool { return false })
 	// The function should trigger immediate update and then start scheduler
 	deps := testScheduleDeps(t, filter, updateLock, true)
-	err = scheduling.RunUpgradesOnSchedule(ctx, deps)
+	err = schedule.RunUpgradesOnSchedule(ctx, deps)
 
 	// Should not return an error (context cancellation is expected)
 	require.NoError(t, err)
@@ -473,13 +473,13 @@ func TestUpdateOnStartIntegratesWithCronScheduling(t *testing.T) {
 		defer cancel()
 
 		// Create update lock
-		updateLock := scheduling.NewUpdateLock()
+		updateLock := schedule.NewUpdateLock()
 
 		// Call RunUpgradesOnSchedule
 		filter := types.Filter(func(_ types.FilterableContainer) bool { return false })
 		startTime := time.Now()
 		deps := testScheduleDeps(t, filter, updateLock, true)
-		err = scheduling.RunUpgradesOnSchedule(ctx, deps)
+		err = schedule.RunUpgradesOnSchedule(ctx, deps)
 
 		// Should not return an error (context cancellation is expected)
 		require.NoError(t, err)
@@ -526,7 +526,7 @@ func TestUpdateOnStartLockingBehavior(t *testing.T) {
 		require.NoError(t, err)
 
 		// Create update lock that's initially unavailable (simulating another update in progress)
-		updateLock := scheduling.NewUpdateLock()
+		updateLock := schedule.NewUpdateLock()
 		require.True(t, updateLock.TryLock())
 
 		// Track if update function was called
@@ -552,7 +552,7 @@ func TestUpdateOnStartLockingBehavior(t *testing.T) {
 		// Call RunUpgradesOnSchedule
 		filter := types.Filter(func(_ types.FilterableContainer) bool { return false })
 		deps := testScheduleDeps(t, filter, updateLock, false)
-		err = scheduling.RunUpgradesOnSchedule(ctx, deps)
+		err = schedule.RunUpgradesOnSchedule(ctx, deps)
 
 		// Should not return an error
 		require.NoError(t, err)
@@ -600,12 +600,12 @@ func TestUpdateOnStartSelfUpdateScenario(t *testing.T) {
 		defer cancel()
 
 		// Create update lock
-		updateLock := scheduling.NewUpdateLock()
+		updateLock := schedule.NewUpdateLock()
 
 		// Call RunUpgradesOnSchedule with a filter that includes containers
 		filter := types.Filter(func(_ types.FilterableContainer) bool { return true })
 		deps := testScheduleDeps(t, filter, updateLock, updateOnStart)
-		err = scheduling.RunUpgradesOnSchedule(ctx, deps)
+		err = schedule.RunUpgradesOnSchedule(ctx, deps)
 
 		// Should not return an error
 		require.NoError(t, err)
@@ -643,7 +643,7 @@ func TestUpdateOnStartMultiInstanceScenario(t *testing.T) {
 		updateOnStart2, _ := cmd2.Flags().GetBool("update-on-start")
 
 		// Shared update lock (simulating shared resource)
-		updateLock := scheduling.NewUpdateLock()
+		updateLock := schedule.NewUpdateLock()
 
 		// Track update calls from both instances
 		updateCallCount := int32(0)
@@ -671,7 +671,7 @@ func TestUpdateOnStartMultiInstanceScenario(t *testing.T) {
 
 			filter := types.Filter(func(_ types.FilterableContainer) bool { return false })
 			deps := testScheduleDeps(t, filter, updateLock, updateOnStart1)
-			runErr := scheduling.RunUpgradesOnSchedule(ctx, deps)
+			runErr := schedule.RunUpgradesOnSchedule(ctx, deps)
 			assert.NoError(t, runErr)
 			completed.Add(1)
 			close(instance1Called)
@@ -683,7 +683,7 @@ func TestUpdateOnStartMultiInstanceScenario(t *testing.T) {
 
 			filter := types.Filter(func(_ types.FilterableContainer) bool { return false })
 			deps := testScheduleDeps(t, filter, updateLock, updateOnStart2)
-			runErr := scheduling.RunUpgradesOnSchedule(ctx, deps)
+			runErr := schedule.RunUpgradesOnSchedule(ctx, deps)
 			assert.NoError(t, runErr)
 			completed.Add(1)
 			close(instance2Called)
@@ -763,7 +763,7 @@ func TestRunUpgradesOnSchedule_ShutdownWaitsForRunningUpdate(t *testing.T) {
 		require.NoError(t, err)
 
 		// Create update lock
-		updateLock := scheduling.NewUpdateLock()
+		updateLock := schedule.NewUpdateLock()
 
 		// Track when shutdown completes
 		shutdownCompleted := make(chan bool, 1)
@@ -791,7 +791,7 @@ func TestRunUpgradesOnSchedule_ShutdownWaitsForRunningUpdate(t *testing.T) {
 			filter := types.Filter(func(_ types.FilterableContainer) bool { return false })
 			// This should start and wait for context cancellation
 			deps := testScheduleDeps(t, filter, updateLock, false)
-			err = scheduling.RunUpgradesOnSchedule(ctx, deps)
+			err = schedule.RunUpgradesOnSchedule(ctx, deps)
 			assert.NoError(t, err)
 
 			shutdownCompleted <- true
@@ -831,7 +831,7 @@ func TestRunUpgradesOnSchedule_ShutdownWaitsForRunningUpdate(t *testing.T) {
 }
 
 // TestValidateRollingRestartDependenciesAcceptsCancelableContext verifies that
-// actions.ValidateRollingRestartDependencies properly accepts and uses a cancelable context.
+// update.ValidateRollingRestartDependencies properly accepts and uses a cancelable context.
 func TestValidateRollingRestartDependenciesAcceptsCancelableContext(t *testing.T) {
 	// Create a mock client
 	mockClient := mockContainer.NewMockClient(t)
@@ -846,7 +846,7 @@ func TestValidateRollingRestartDependenciesAcceptsCancelableContext(t *testing.T
 		// Mock expects ListContainers to be called with the cancelable context
 		mockClient.EXPECT().ListContainers(ctx, mock.Anything, mock.Anything).Return([]types.Container{}, nil).Once()
 
-		err := actions.ValidateRollingRestartDependencies(newTestLogger(t), ctx, mockClient, filter, true)
+		err := update.ValidateRollingRestartDependencies(newTestLogger(t), ctx, mockClient, filter, true)
 
 		require.NoError(t, err)
 		mockClient.AssertExpectations(t)
@@ -862,7 +862,7 @@ func TestValidateRollingRestartDependenciesAcceptsCancelableContext(t *testing.T
 		// Mock expects ListContainers to be called with canceled context
 		mockClient.EXPECT().ListContainers(ctx, mock.Anything, mock.Anything).Return(nil, context.Canceled).Once()
 
-		err := actions.ValidateRollingRestartDependencies(newTestLogger(t), ctx, mockClient, filter, true)
+		err := update.ValidateRollingRestartDependencies(newTestLogger(t), ctx, mockClient, filter, true)
 
 		// The function should return the error from ListContainers
 		require.Error(t, err)
@@ -887,7 +887,7 @@ func TestValidateRollingRestartDependenciesAcceptsCancelableContext(t *testing.T
 		// Mock expects ListContainers to be called with timed out context
 		mockClient.EXPECT().ListContainers(ctx, mock.Anything, mock.Anything).Return(nil, context.DeadlineExceeded).Once()
 
-		err := actions.ValidateRollingRestartDependencies(newTestLogger(t), ctx, mockClient, filter, true)
+		err := update.ValidateRollingRestartDependencies(newTestLogger(t), ctx, mockClient, filter, true)
 
 		// The function should return the error from ListContainers
 		require.Error(t, err)
@@ -925,7 +925,7 @@ func TestEphemeralSelfUpdateExercisesTruePath(t *testing.T) {
 	defer func() { runUpdatesWithNotifications = originalRunUpdatesWithNotifications }()
 
 	// Create update lock
-	updateLock := scheduling.NewUpdateLock()
+	updateLock := schedule.NewUpdateLock()
 
 	// Create a context that shuts down quickly
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Millisecond)
@@ -935,7 +935,7 @@ func TestEphemeralSelfUpdateExercisesTruePath(t *testing.T) {
 	// Call RunUpgradesOnSchedule with ephemeralSelfUpdate=true
 	deps := testScheduleDeps(t, filter, updateLock, true)
 	deps.BaseParams.EphemeralSelfUpdate = true
-	err = scheduling.RunUpgradesOnSchedule(ctx, deps)
+	err = schedule.RunUpgradesOnSchedule(ctx, deps)
 
 	require.NoError(t, err)
 

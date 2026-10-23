@@ -20,7 +20,7 @@ import (
 
 	shoutrrrTypes "github.com/nicholas-fedor/shoutrrr/pkg/types"
 
-	"github.com/nicholas-fedor/watchtower/pkg/session"
+	"github.com/nicholas-fedor/watchtower/internal/update/state"
 	"github.com/nicholas-fedor/watchtower/pkg/types"
 )
 
@@ -651,7 +651,7 @@ func (n *shoutrrrTypeNotifier) Close() {
 }
 
 // singleFocusContainer returns the sole focus container when the report is a
-// session.SingleContainerReport (split path), or false for a full session report.
+// state.SingleContainerReport (split path), or false for a full session report.
 // Type assertion is required because a full report with one update is otherwise
 // indistinguishable from a split single-container report.
 func singleFocusContainer(report types.Report) (types.ContainerReport, bool) {
@@ -659,7 +659,7 @@ func singleFocusContainer(report types.Report) (types.ContainerReport, bool) {
 		return nil, false
 	}
 
-	scr, ok := report.(*session.SingleContainerReport)
+	scr, ok := report.(*state.SingleContainerReport)
 	if !ok {
 		return nil, false
 	}

@@ -6,8 +6,8 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"github.com/nicholas-fedor/watchtower/internal/update/state"
 	"github.com/nicholas-fedor/watchtower/pkg/container"
-	"github.com/nicholas-fedor/watchtower/pkg/session"
 	"github.com/nicholas-fedor/watchtower/pkg/types"
 )
 
@@ -46,7 +46,7 @@ func TestToPorcelainJSON_GitAndOCIFields(t *testing.T) {
 		LatestRevision:  "deadbeef",
 	})
 
-	jsonOut := toPorcelainJSON(&session.SingleContainerReport{
+	jsonOut := toPorcelainJSON(&state.SingleContainerReport{
 		UpdatedReports: []types.ContainerReport{status},
 	})
 	assert.Contains(t, jsonOut, `"git_repo": "https://github.com/org/app.git"`)

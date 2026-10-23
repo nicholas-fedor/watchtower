@@ -29,8 +29,8 @@ import (
 	shoutrrrTypes "github.com/nicholas-fedor/shoutrrr/pkg/types"
 
 	"github.com/nicholas-fedor/watchtower/internal/settings"
+	"github.com/nicholas-fedor/watchtower/internal/update/state"
 	"github.com/nicholas-fedor/watchtower/pkg/container"
-	"github.com/nicholas-fedor/watchtower/pkg/session"
 	"github.com/nicholas-fedor/watchtower/pkg/types"
 )
 
@@ -149,7 +149,7 @@ var mockDataMultipleEntries = notificationData{
 
 var mockDataAllFresh = notificationData{
 	Entries: []*notificationEntry{},
-	Report:  newProgressReport(session.FreshState),
+	Report:  newProgressReport(state.FreshState),
 }
 
 // mockDataFromStates generates mock notification data with specified container states.
@@ -158,7 +158,7 @@ var mockDataAllFresh = notificationData{
 // TODO: Remove legacyMockData reference when legacy notification types are removed.
 //
 //nolint:godox
-func mockDataFromStates(t *testing.T, states ...session.State) notificationData {
+func mockDataFromStates(t *testing.T, states ...state.State) notificationData {
 	t.Helper()
 
 	hostname := "Mock"
@@ -203,50 +203,50 @@ const progressIDLength = 64
 // updated container would reuse the first failed container's ID.
 const maxContainersPerState = 10
 
-// newProgressReport builds a session report with one container for each given
-// state, numbering repeated states so every container has a unique ID and name.
+// newProgressReport builds a report with one container for each given state,
+// numbering repeated states so every container has a unique ID and name.
 //
 // Parameters:
 //   - states: Outcome of each container, in order.
 //
 // Returns:
-//   - types.Report: Report built through session.Progress.
-func newProgressReport(states ...session.State) types.Report {
+//   - types.Report: Report built through state.Progress.
+func newProgressReport(states ...state.State) types.Report {
 	log := new(zerolog.Nop())
 	// Count each state's containers so their IDs and names stay unique.
-	stateNums := make(map[session.State]int)
-	progress := session.Progress{}
+	stateNums := make(map[state.State]int)
+	progress := state.Progress{}
 	failed := make(map[types.ContainerID]error)
 
-	for _, state := range states {
-		index := stateNums[state]
+	for _, outcome := range states {
+		index := stateNums[outcome]
 
-		switch state {
-		case session.SkippedState:
+		switch outcome {
+		case state.SkippedState:
 			c, _ := newProgressContainer(index, skippedIDPrefix, "skip%d")
 			progress.AddSkipped(log, c, errReportSkipped, types.UpdateParams{})
-		case session.FreshState:
+		case state.FreshState:
 			c, _ := newProgressContainer(index, freshIDPrefix, "frsh%d")
 			progress.AddScanned(log, c, c.ImageID(), types.UpdateParams{})
-		case session.UpdatedState:
+		case state.UpdatedState:
 			c, newImage := newProgressContainer(index, updatedIDPrefix, "updt%d")
 			progress.AddScanned(log, c, newImage, types.UpdateParams{})
 			progress.MarkForUpdate(log, c.ID())
-		case session.FailedState:
+		case state.FailedState:
 			c, newImage := newProgressContainer(index, failedIDPrefix, "fail%d")
 			progress.AddScanned(log, c, newImage, types.UpdateParams{})
 
 			failed[c.ID()] = errReportFailed
-		case session.RestartedState:
+		case state.RestartedState:
 			c, _ := newProgressContainer(index, restartedIDPrefix, "rstr%d")
 			progress.AddScanned(log, c, c.ImageID(), types.UpdateParams{})
 			progress.MarkRestarted(log, c.ID())
-		case session.UnknownState, session.ScannedState, session.StaleState:
+		case state.UnknownState, state.ScannedState, state.StaleState:
 			// Reports never end in these intermediate states.
 			continue
 		}
 
-		stateNums[state] = index + 1
+		stateNums[outcome] = index + 1
 	}
 
 	progress.UpdateFailed(log, failed)
@@ -314,7 +314,7 @@ func TestShoutrrr(t *testing.T) {
 			expected := `
 updt1 (mock/updt1:latest): Updated
 `[1:]
-			data := mockDataFromStates(t, session.UpdatedState)
+			data := mockDataFromStates(t, state.UpdatedState)
 			assert.Equal(t, expected, getTemplatedResult(t, `porcelain.v1.summary-no-log`, false, data))
 		})
 	})
@@ -325,7 +325,7 @@ updt1 (mock/updt1:latest): Updated
 		t.Run("should produce valid JSON with container details", func(t *testing.T) {
 			t.Parallel()
 
-			data := mockDataFromStates(t, session.UpdatedState, session.FreshState, session.FailedState)
+			data := mockDataFromStates(t, state.UpdatedState, state.FreshState, state.FailedState)
 			result := getTemplatedResult(t, `porcelain.json`, false, data)
 
 			assert.JSONEq(t, `{
@@ -656,18 +656,18 @@ updt1 (mock/updt1:latest): Updated
 - skip1 (mock/skip1:latest): Skipped: unpossible
 - fail1 (mock/fail1:latest): Failed: accidentally the whole container`
 				data := mockDataFromStates(t,
-					session.UpdatedState,
-					session.FreshState,
-					session.FailedState,
-					session.SkippedState,
-					session.UpdatedState,
+					state.UpdatedState,
+					state.FreshState,
+					state.FailedState,
+					state.SkippedState,
+					state.UpdatedState,
 				)
 				assert.Equal(t, expected, getTemplatedResult(t, ``, false, data))
 			})
 			t.Run("should use image IDs for container update reporting", func(t *testing.T) {
 				t.Parallel()
 
-				data := mockDataFromStates(t, session.UpdatedState)
+				data := mockDataFromStates(t, state.UpdatedState)
 				result := getTemplatedResult(t, ``, false, data)
 
 				// Verify that the result contains image ID formats, not container IDs
@@ -686,7 +686,7 @@ updt1 (mock/updt1:latest): Updated
 				t.Parallel()
 
 				expected := `Watchtower updates on Mock`
-				data := mockDataFromStates(t, session.UpdatedState)
+				data := mockDataFromStates(t, state.UpdatedState)
 				assert.Equal(t, expected, getTemplatedResult(t, `{{ .Title }}`, false, data))
 			})
 		})
@@ -698,7 +698,7 @@ updt1 (mock/updt1:latest): Updated
 				t.Parallel()
 
 				expected := `Mock`
-				data := mockDataFromStates(t, session.UpdatedState)
+				data := mockDataFromStates(t, state.UpdatedState)
 				assert.Equal(t, expected, getTemplatedResult(t, `{{ .Host }}`, false, data))
 			})
 		})
@@ -722,7 +722,7 @@ updt1 (mock/updt1:latest): Updated
 					CurrentRevision: "abc123",
 				})
 
-				report := &session.SingleContainerReport{
+				report := &state.SingleContainerReport{
 					UpdatedReports: []types.ContainerReport{status},
 				}
 
@@ -761,7 +761,7 @@ updt1 (mock/updt1:latest): Updated
 
 					expected := `1 Scanned, 1 Updated, 0 Restarted, 0 Failed, 0 Fresh, 0 Skipped
 - updt1 (mock/updt1:latest): 01d110000000 updated to d0a110000000`
-					data := mockDataFromStates(t, session.UpdatedState)
+					data := mockDataFromStates(t, state.UpdatedState)
 					assert.Equal(t, expected, getTemplatedResult(t, ``, false, data))
 				})
 			})
@@ -773,7 +773,7 @@ updt1 (mock/updt1:latest): Updated
 
 					expected := `1 Scanned, 0 Updated, 0 Restarted, 1 Failed, 0 Fresh, 0 Skipped
 - fail1 (mock/fail1:latest): Failed: accidentally the whole container`
-					data := mockDataFromStates(t, session.FailedState)
+					data := mockDataFromStates(t, state.FailedState)
 					assert.Equal(t, expected, getTemplatedResult(t, ``, false, data))
 				})
 			})
@@ -786,7 +786,7 @@ updt1 (mock/updt1:latest): Updated
 					expected := `2 Scanned, 1 Updated, 1 Restarted, 0 Failed, 0 Fresh, 0 Skipped
 - updt1 (mock/updt1:latest): 01d110000000 updated to d0a110000000
 - rstr1 (mock/rstr1:latest): Restarted`
-					data := mockDataFromStates(t, session.UpdatedState, session.RestartedState)
+					data := mockDataFromStates(t, state.UpdatedState, state.RestartedState)
 					assert.Equal(t, expected, getTemplatedResult(t, ``, false, data))
 				})
 			})
@@ -801,9 +801,9 @@ updt1 (mock/updt1:latest): Updated
 - updt2 (mock/updt2:latest): 01d120000000 updated to d0a120000000
 - rstr1 (mock/rstr1:latest): Restarted`
 					data := mockDataFromStates(t,
-						session.UpdatedState,
-						session.RestartedState,
-						session.UpdatedState,
+						state.UpdatedState,
+						state.RestartedState,
+						state.UpdatedState,
 					)
 					assert.Equal(t, expected, getTemplatedResult(t, ``, false, data))
 				})
@@ -814,7 +814,7 @@ updt1 (mock/updt1:latest): Updated
 				t.Run("should include restarted containers in JSON response", func(t *testing.T) {
 					t.Parallel()
 
-					data := mockDataFromStates(t, session.UpdatedState, session.RestartedState)
+					data := mockDataFromStates(t, state.UpdatedState, state.RestartedState)
 					jsonResult := getTemplatedResult(t, `{{ . | ToJSON }}`, false, data)
 
 					var result map[string]any
@@ -1246,7 +1246,7 @@ Turns out everything is on fire
 					time.Duration(0),
 				)
 
-				mockReport := newProgressReport(session.FailedState)
+				mockReport := newProgressReport(state.FailedState)
 				result := shoutrrr.ShouldSendNotification(mockReport)
 				assert.True(t, result)
 			})
@@ -1264,7 +1264,7 @@ Turns out everything is on fire
 					time.Duration(0),
 				)
 
-				mockReport := newProgressReport(session.FreshState)
+				mockReport := newProgressReport(state.FreshState)
 				result := shoutrrr.ShouldSendNotification(mockReport)
 				assert.False(t, result)
 			})
@@ -1286,7 +1286,7 @@ Turns out everything is on fire
 					time.Duration(0),
 				)
 
-				mockReport := newProgressReport(session.FreshState)
+				mockReport := newProgressReport(state.FreshState)
 				result := shoutrrr.ShouldSendNotification(mockReport)
 				assert.True(t, result)
 			})
@@ -1308,7 +1308,7 @@ Turns out everything is on fire
 					time.Duration(0),
 				)
 
-				mockReport := newProgressReport(session.FreshState)
+				mockReport := newProgressReport(state.FreshState)
 				result := shoutrrr.ShouldSendNotification(mockReport)
 				assert.True(t, result)
 			})
@@ -1330,7 +1330,7 @@ Turns out everything is on fire
 					time.Duration(0),
 				)
 
-				mockReport := newProgressReport(session.FreshState)
+				mockReport := newProgressReport(state.FreshState)
 				result := shoutrrr.ShouldSendNotification(mockReport)
 				assert.True(t, result)
 			})
@@ -1352,7 +1352,7 @@ Turns out everything is on fire
 					time.Duration(0),
 				)
 
-				mockReport := newProgressReport(session.FreshState)
+				mockReport := newProgressReport(state.FreshState)
 				result := shoutrrr.ShouldSendNotification(mockReport)
 				assert.True(t, result)
 			})
@@ -2421,11 +2421,11 @@ func TestSendNotification_SingleFocusKeepsBatchingActive(t *testing.T) {
 		0,
 	)
 
-	full := newProgressReport(session.UpdatedState)
+	full := newProgressReport(state.UpdatedState)
 	require.NotEmpty(t, full.Updated())
 
 	updated := full.Updated()[0]
-	report := &session.SingleContainerReport{
+	report := &state.SingleContainerReport{
 		UpdatedReports: []types.ContainerReport{updated},
 	}
 

@@ -12,8 +12,8 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/nicholas-fedor/watchtower/internal/testutil/golden"
+	"github.com/nicholas-fedor/watchtower/internal/update/state"
 	"github.com/nicholas-fedor/watchtower/pkg/container"
-	"github.com/nicholas-fedor/watchtower/pkg/session"
 	"github.com/nicholas-fedor/watchtower/pkg/types"
 )
 
@@ -249,7 +249,7 @@ func goldenEntries() []*notificationEntry {
 func goldenFullReport() types.Report {
 	nop := zerolog.Nop()
 	log := &nop
-	progress := session.Progress{}
+	progress := state.Progress{}
 	failures := map[types.ContainerID]error{}
 
 	updated, newImage := newProgressContainer(0, updatedIDPrefix, "updt%d")
@@ -308,7 +308,7 @@ func goldenFixtures() map[string]notificationData {
 		"empty": {
 			StaticData: staticData,
 			Entries:    []*notificationEntry{},
-			Report:     session.Progress{}.Report(&nop),
+			Report:     state.Progress{}.Report(&nop),
 		},
 		"nil-report": {
 			StaticData: staticData,

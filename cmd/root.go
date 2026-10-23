@@ -14,7 +14,6 @@ import (
 
 	dockerContainer "github.com/moby/moby/api/types/container"
 
-	"github.com/nicholas-fedor/watchtower/internal/actions"
 	"github.com/nicholas-fedor/watchtower/internal/api"
 	"github.com/nicholas-fedor/watchtower/internal/api/routes"
 	"github.com/nicholas-fedor/watchtower/internal/container/filters"
@@ -24,8 +23,9 @@ import (
 	"github.com/nicholas-fedor/watchtower/internal/observability/logging"
 	"github.com/nicholas-fedor/watchtower/internal/observability/metrics"
 	"github.com/nicholas-fedor/watchtower/internal/registry/ratelimit"
-	"github.com/nicholas-fedor/watchtower/internal/scheduling"
 	"github.com/nicholas-fedor/watchtower/internal/settings"
+	"github.com/nicholas-fedor/watchtower/internal/update"
+	"github.com/nicholas-fedor/watchtower/internal/update/schedule"
 	"github.com/nicholas-fedor/watchtower/pkg/container"
 	"github.com/nicholas-fedor/watchtower/pkg/notifications"
 	"github.com/nicholas-fedor/watchtower/pkg/types"
@@ -119,7 +119,7 @@ var (
 
 	// runUpdatesWithNotifications is a function variable for performing container updates and sending notifications.
 	//
-	// It is initialized inside runMain with a closure that executes actions.RunUpdatesWithNotifications,
+	// It is initialized inside runMain with a closure that executes update.RunUpdatesWithNotifications,
 	// allowing it to be overridden in tests to mock the update process. It takes a context, filter, and update params,
 	// and returns a metric summarizing the update session.
 	runUpdatesWithNotifications func(context.Context, types.Filter, types.UpdateParams) *metrics.Metric
@@ -263,7 +263,7 @@ func (p *process) preRun(cmd *cobra.Command, _ []string) {
 	if appCfg.Mode.SelfUpdateOrchestrator {
 		p.log.Info().Msg("Running in ephemeral self-update orchestrator mode")
 
-		actions.RunOrchestrator(p.log, context.Background(), client)
+		update.RunOrchestrator(p.log, context.Background(), client)
 
 		currentWatchtowerContainer = resolveCurrentWatchtowerContainerForFallback(p.log,
 			context.Background(),
@@ -328,7 +328,7 @@ func (p *process) preRun(cmd *cobra.Command, _ []string) {
 	// exitInvalidWatchtowerRestart calls os.Exit. Keep it in a helper so preRun
 	// defers (for example cancel) are not paired with os.Exit in this function
 	// (gocritic exitAfterDefer).
-	if scheduling.ShouldExitDueToInvalidRestart(
+	if schedule.ShouldExitDueToInvalidRestart(
 		currentWatchtowerContainer,
 		appCfg.Mode.RunOnce,
 	) {
@@ -392,7 +392,7 @@ func exitInvalidWatchtowerRestart(
 		restartPolicyTimeout,
 	)
 
-	recoveredContainer, recovered := actions.TryRecoverOrphanedContainer(
+	recoveredContainer, recovered := update.TryRecoverOrphanedContainer(
 		log,
 		recoverCtx,
 		dockerClient,
@@ -607,16 +607,16 @@ func (p *process) runMain(cfg types.RunConfig) int {
 	defer stop()
 
 	runUpdatesWithNotifications = func(ctx context.Context, filter types.Filter, params types.UpdateParams) *metrics.Metric {
-		update := params
+		runParams := params
 		if filter != nil {
-			update.Filter = filter
+			runParams.Filter = filter
 		}
 
-		if update.CurrentContainerID == "" {
-			update.CurrentContainerID = currentWatchtowerContainerID
+		if runParams.CurrentContainerID == "" {
+			runParams.CurrentContainerID = currentWatchtowerContainerID
 		}
 
-		return actions.RunUpdatesWithNotifications(ctx, actions.RunUpdatesWithNotificationsParams{
+		return update.RunUpdatesWithNotifications(ctx, update.RunUpdatesWithNotificationsParams{
 			Logger:                       p.log,
 			Client:                       client,
 			GitClient:                    gitClient,
@@ -625,7 +625,7 @@ func (p *process) runMain(cfg types.RunConfig) int {
 			NotificationSplitByContainer: appCfg.Notify.SplitByContainer,
 			NotificationReport:           appCfg.Notify.Report,
 			EventBroadcaster:             eventsBroadcaster,
-			Update:                       update,
+			Update:                       runParams,
 			// Stop the process, as a signal would, when this is an old instance.
 			OnOldSelfDetected: stop,
 		})
@@ -634,7 +634,7 @@ func (p *process) runMain(cfg types.RunConfig) int {
 	// If rolling restarts are enabled, validate that the containers being monitored for
 	// updates do not have linked dependencies.
 	if appCfg.Update.RollingRestart {
-		err := actions.ValidateRollingRestartDependencies(
+		err := update.ValidateRollingRestartDependencies(
 			p.log,
 			ctx,
 			client,
@@ -663,7 +663,7 @@ func (p *process) runMain(cfg types.RunConfig) int {
 
 	// Share one update lock between the scheduler and the HTTP API, so their
 	// updates never run at the same time.
-	updateLock := scheduling.NewUpdateLock()
+	updateLock := schedule.NewUpdateLock()
 
 	baseParams := appCfg.UpdateParams(settings.RunOverrides{
 		Filter:             cfg.Filter,
@@ -713,7 +713,7 @@ func (p *process) runMain(cfg types.RunConfig) int {
 	}
 
 	// Check for and cleanup old Watchtower containers within scope.
-	totalRemovedInstances, err := actions.RemoveExcessWatchtowerInstances(
+	totalRemovedInstances, err := update.RemoveExcessWatchtowerInstances(
 		p.log,
 		ctx,
 		client,
@@ -871,7 +871,7 @@ func (p *process) runMain(cfg types.RunConfig) int {
 	// The startup message is skipped here if it was already sent by the HTTP API in blocking mode.
 	startupMessageSent := cfg.EnableUpdateAPI && !cfg.UnblockHTTPAPI
 
-	err = scheduling.RunUpgradesOnSchedule(ctx, scheduling.ScheduleDeps{
+	err = schedule.RunUpgradesOnSchedule(ctx, schedule.ScheduleDeps{
 		Logger:                     p.log,
 		Filter:                     cfg.Filter,
 		Lock:                       updateLock,

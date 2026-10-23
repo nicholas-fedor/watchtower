@@ -67,7 +67,7 @@ packages:
   # Top-level pkg directory, recursively includes all subpackages (e.g., pkg/types, pkg/container)
   github.com/nicholas-fedor/watchtower/pkg: {}
 
-  # Top-level internal directory, recursively includes all subpackages (e.g., internal/actions)
+  # Top-level internal directory, recursively includes all subpackages (e.g., internal/update)
   github.com/nicholas-fedor/watchtower/internal: {}
 
   # The Docker SDK's client, which the container package's tests use in place of a Docker

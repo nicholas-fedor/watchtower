@@ -324,7 +324,7 @@ linters:
           - gosec
         text: "G117"
       # Functions above the gocyclo threshold today. Remove an entry when its function is split up.
-      - path: "internal/actions/update.go"
+      - path: "internal/update/update.go"
         linters:
           - gocyclo
         text: "of func `update` is high"
@@ -332,11 +332,11 @@ linters:
         linters:
           - gocyclo
         text: "of func `Checkout` is high"
-      - path: "internal/actions/update.go"
+      - path: "internal/update/update.go"
         linters:
           - gocyclo
         text: "of func `restartStaleContainer` is high"
-      - path: "internal/actions/git_compose.go"
+      - path: "internal/update/git_compose.go"
         linters:
           - gocyclo
         text: 'of func `\(\*gitSession\)\.applyCompose` is high'
@@ -352,11 +352,11 @@ linters:
         linters:
           - gocyclo
         text: "of func `fetchDigest` is high"
-      - path: "internal/scheduling/scheduling.go"
+      - path: "internal/update/schedule/scheduling.go"
         linters:
           - gocyclo
         text: "of func `RunUpgradesOnSchedule` is high"
-      - path: "internal/actions/cleanup.go"
+      - path: "internal/update/cleanup.go"
         linters:
           - gocyclo
         text: "of func `getChainedContainers` is high"
