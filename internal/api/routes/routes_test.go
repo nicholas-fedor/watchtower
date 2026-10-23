@@ -23,7 +23,7 @@ import (
 
 	"github.com/nicholas-fedor/watchtower/internal/observability/events"
 	"github.com/nicholas-fedor/watchtower/internal/observability/metrics"
-	"github.com/nicholas-fedor/watchtower/internal/scheduling"
+	"github.com/nicholas-fedor/watchtower/internal/update/schedule"
 	mockContainer "github.com/nicholas-fedor/watchtower/pkg/container/mocks"
 	"github.com/nicholas-fedor/watchtower/pkg/types"
 )
@@ -89,7 +89,7 @@ func TestValidateAndRegister(t *testing.T) {
 	baseOpts := func() Options {
 		return Options{
 			EnableUpdateAPI: true,
-			UpdateLock:      scheduling.NewUpdateLock(),
+			UpdateLock:      schedule.NewUpdateLock(),
 			UnblockHTTPAPI:  true,
 			RunUpdatesWithNotifications: func(_ context.Context, _ types.Filter, _ types.UpdateParams) *metrics.Metric {
 				return &metrics.Metric{}

@@ -12,7 +12,7 @@ import (
 
 	"github.com/nicholas-fedor/watchtower/internal/observability/logging"
 	"github.com/nicholas-fedor/watchtower/internal/observability/metrics"
-	"github.com/nicholas-fedor/watchtower/internal/scheduling"
+	"github.com/nicholas-fedor/watchtower/internal/update/schedule"
 	"github.com/nicholas-fedor/watchtower/pkg/types"
 )
 
@@ -22,7 +22,7 @@ func TestRegisterUpdateRoute(t *testing.T) {
 
 	opts := Options{
 		EnableUpdateAPI: true,
-		UpdateLock:      scheduling.NewUpdateLock(),
+		UpdateLock:      schedule.NewUpdateLock(),
 		UnblockHTTPAPI:  true,
 		RunUpdatesWithNotifications: func(_ context.Context, _ types.Filter, _ types.UpdateParams) *metrics.Metric {
 			return &metrics.Metric{}
@@ -75,7 +75,7 @@ func TestRegisterUpdateRoute_BuildsFullUpdateParams(t *testing.T) {
 		},
 		FilterByImage:  func(_ []string, f types.Filter) types.Filter { return f },
 		DefaultMetrics: func() *metrics.Metrics { return testMetrics },
-		UpdateLock:     scheduling.NewUpdateLock(),
+		UpdateLock:     schedule.NewUpdateLock(),
 	}
 
 	registerUpdateRoute(context.Background(), app, auth, opts)
@@ -103,7 +103,7 @@ func TestRegisterUpdateRoute_NilWriteStartupMessage(t *testing.T) {
 
 	opts := Options{
 		EnableUpdateAPI: true,
-		UpdateLock:      scheduling.NewUpdateLock(),
+		UpdateLock:      schedule.NewUpdateLock(),
 		UnblockHTTPAPI:  false,
 		RunUpdatesWithNotifications: func(_ context.Context, _ types.Filter, _ types.UpdateParams) *metrics.Metric {
 			return &metrics.Metric{}
@@ -128,7 +128,7 @@ func TestRegisterUpdateRoute_DoesNotWriteStartupMessage(t *testing.T) {
 	called := false
 	opts := Options{
 		EnableUpdateAPI: true,
-		UpdateLock:      scheduling.NewUpdateLock(),
+		UpdateLock:      schedule.NewUpdateLock(),
 		UnblockHTTPAPI:  false,
 		RunUpdatesWithNotifications: func(_ context.Context, _ types.Filter, _ types.UpdateParams) *metrics.Metric {
 			return &metrics.Metric{}
@@ -151,7 +151,7 @@ func TestRegisterUpdateRoute_TimeoutIsServiceUnavailable(t *testing.T) {
 	app := testApp()
 	auth := testAuthMiddleware()
 
-	lock := scheduling.NewUpdateLock()
+	lock := schedule.NewUpdateLock()
 
 	// The update runs until the test ends, so only the timeout can answer.
 	release := make(chan struct{})

@@ -30,8 +30,8 @@ import (
 	"github.com/nicholas-fedor/watchtower/internal/api/routes"
 	"github.com/nicholas-fedor/watchtower/internal/observability/events"
 	"github.com/nicholas-fedor/watchtower/internal/observability/metrics"
-	"github.com/nicholas-fedor/watchtower/internal/scheduling"
 	"github.com/nicholas-fedor/watchtower/internal/testutil/golden"
+	"github.com/nicholas-fedor/watchtower/internal/update/schedule"
 	"github.com/nicholas-fedor/watchtower/pkg/container"
 	mockContainer "github.com/nicholas-fedor/watchtower/pkg/container/mocks"
 	"github.com/nicholas-fedor/watchtower/pkg/types"
@@ -216,7 +216,7 @@ func fixtureOptions(t *testing.T, client container.Client, store *metrics.Metric
 		Filter:              func(types.FilterableContainer) bool { return true },
 		FilterDesc:          "Checking all containers (except explicitly disabled with label)",
 		IncludeStopped:      true,
-		UpdateLock:          scheduling.NewUpdateLock(),
+		UpdateLock:          schedule.NewUpdateLock(),
 		BaseParams: types.UpdateParams{
 			Cleanup:        true,
 			LifecycleHooks: true,
@@ -498,7 +498,7 @@ func TestHTTPAPIErrorResponses(t *testing.T) {
 	)
 
 	busyOpts := fixtureOptions(t, newFixtureClient(t), newFixtureMetrics(t))
-	busyOpts.UpdateLock = scheduling.NewUpdateLock()
+	busyOpts.UpdateLock = schedule.NewUpdateLock()
 	require.True(t, busyOpts.UpdateLock.TryLock())
 
 	recorder.app = newFixtureApp(t, busyOpts)

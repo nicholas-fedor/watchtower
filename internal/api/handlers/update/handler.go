@@ -10,7 +10,7 @@ import (
 	"github.com/rs/zerolog"
 
 	"github.com/nicholas-fedor/watchtower/internal/observability/metrics"
-	"github.com/nicholas-fedor/watchtower/internal/scheduling"
+	"github.com/nicholas-fedor/watchtower/internal/update/schedule"
 )
 
 // Handler triggers container update scans via HTTP.
@@ -19,7 +19,7 @@ type Handler struct {
 
 	fn         func(ctx context.Context, images, containers []string) *metrics.Metric
 	Path       string
-	lock       *scheduling.UpdateLock
+	lock       *schedule.UpdateLock
 	ctx        context.Context //nolint:containedctx // application-lifetime context owned by Handler
 	maxTimeout time.Duration
 }
@@ -50,7 +50,7 @@ const (
 func New(
 	log *zerolog.Logger,
 	updateFn func(ctx context.Context, images, containers []string) *metrics.Metric,
-	updateLock *scheduling.UpdateLock,
+	updateLock *schedule.UpdateLock,
 	maxTimeout time.Duration,
 	ctx ...context.Context,
 ) *Handler {

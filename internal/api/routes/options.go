@@ -13,7 +13,7 @@ import (
 	"github.com/nicholas-fedor/watchtower/internal/observability/events"
 	"github.com/nicholas-fedor/watchtower/internal/observability/logging"
 	mt "github.com/nicholas-fedor/watchtower/internal/observability/metrics"
-	"github.com/nicholas-fedor/watchtower/internal/scheduling"
+	"github.com/nicholas-fedor/watchtower/internal/update/schedule"
 	"github.com/nicholas-fedor/watchtower/pkg/container"
 	"github.com/nicholas-fedor/watchtower/pkg/types"
 )
@@ -114,7 +114,7 @@ type Options struct {
 	FilterDesc string
 	// UpdateLock serializes update sessions. It must be the lock the scheduler
 	// uses, so API and scheduled updates never run at the same time.
-	UpdateLock *scheduling.UpdateLock
+	UpdateLock *schedule.UpdateLock
 	// BaseParams is the complete update policy snapshot from config.UpdateParams.
 	BaseParams types.UpdateParams
 	// IncludeStopped is exposed on the config API (client list option).
