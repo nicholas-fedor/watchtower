@@ -7,7 +7,7 @@ import (
 	"github.com/spf13/cobra"
 	"github.com/stretchr/testify/require"
 
-	"github.com/nicholas-fedor/watchtower/internal/flags"
+	"github.com/nicholas-fedor/watchtower/internal/settings"
 )
 
 // unsetFlagEnv unsets every flag's environment variables for the test, so
@@ -16,7 +16,7 @@ import (
 func unsetFlagEnv(t *testing.T) {
 	t.Helper()
 
-	for _, flagSpec := range flags.AllSpecs() {
+	for _, flagSpec := range settings.AllSpecs() {
 		for _, key := range flagSpec.EnvKeys {
 			// t.Setenv restores the original value when the test ends.
 			t.Setenv(key, "")
@@ -35,7 +35,7 @@ func newTestRootCommand(t *testing.T, args ...string) *cobra.Command {
 
 	root := NewRootCommand()
 
-	flags.RegisterAll(root)
+	settings.RegisterAll(root)
 
 	require.NoError(t, root.ParseFlags(append([]string{"--log-level", "error"}, args...)))
 

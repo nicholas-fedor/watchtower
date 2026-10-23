@@ -55,7 +55,7 @@ func ConfigureWriter(format string, noColor bool) (io.Writer, error) {
 // usePrettyAuto reports whether auto format should use colorized pretty output.
 //
 // NO_COLOR follows this repo's presence semantics (any set value, including empty
-// string), matching internal/flags ApplyEnvToFlags rather than only non-empty values.
+// string), matching internal/settings ApplyEnvToFlags rather than only non-empty values.
 //
 // Parameters:
 //   - noColor: Explicit --no-color flag value.

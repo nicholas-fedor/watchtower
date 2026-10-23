@@ -13,7 +13,7 @@ import (
 
 	"github.com/rs/zerolog"
 
-	registryConfig "github.com/nicholas-fedor/watchtower/internal/config/registry"
+	registryConfig "github.com/nicholas-fedor/watchtower/internal/settings/config/registry"
 )
 
 // Constants for HTTP client configuration.

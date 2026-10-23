@@ -29,11 +29,10 @@ import (
 	"github.com/nicholas-fedor/watchtower/internal/actions"
 	"github.com/nicholas-fedor/watchtower/internal/api"
 	"github.com/nicholas-fedor/watchtower/internal/api/handlers/update"
-	appconfig "github.com/nicholas-fedor/watchtower/internal/config"
-	"github.com/nicholas-fedor/watchtower/internal/flags"
 	"github.com/nicholas-fedor/watchtower/internal/observability/logging"
 	"github.com/nicholas-fedor/watchtower/internal/observability/metrics"
 	"github.com/nicholas-fedor/watchtower/internal/scheduling"
+	"github.com/nicholas-fedor/watchtower/internal/settings"
 	"github.com/nicholas-fedor/watchtower/pkg/container"
 	mockContainer "github.com/nicholas-fedor/watchtower/pkg/container/mocks"
 	"github.com/nicholas-fedor/watchtower/pkg/types"
@@ -82,12 +81,12 @@ func TestAwaitDockerClient(t *testing.T) {
 func TestLifecycleFlags(t *testing.T) {
 	cmd := &cobra.Command{}
 
-	flags.RegisterAll(cmd)
+	settings.RegisterAll(cmd)
 
 	err := cmd.ParseFlags([]string{"--lifecycle-uid", "1000", "--lifecycle-gid", "1001"})
 	require.NoError(t, err)
 
-	cfg, err := appconfig.Load(newTestLogger(t), cmd, nil)
+	cfg, err := settings.Load(newTestLogger(t), cmd, nil)
 	require.NoError(t, err)
 
 	assert.Equal(t, 1000, cfg.Lifecycle.UID, "lifecycle UID should be set to 1000")
@@ -385,7 +384,7 @@ func testScheduleDeps(
 func TestUpdateOnStartTriggersImmediateUpdate(t *testing.T) {
 	// Create a command with update-on-start flag enabled
 	cmd := &cobra.Command{}
-	flags.RegisterAll(cmd)
+	settings.RegisterAll(cmd)
 	err := cmd.ParseFlags([]string{"--update-on-start", "--no-startup-message"})
 	require.NoError(t, err)
 
@@ -442,7 +441,7 @@ func TestUpdateOnStartIntegratesWithCronScheduling(t *testing.T) {
 	synctest.Test(t, func(t *testing.T) {
 		// Create a command with update-on-start flag enabled and a schedule
 		cmd := &cobra.Command{}
-		flags.RegisterAll(cmd)
+		settings.RegisterAll(cmd)
 		err := cmd.ParseFlags(
 			[]string{"--update-on-start", "--schedule", "@every 1h", "--no-startup-message"},
 		)
@@ -522,7 +521,7 @@ func TestUpdateOnStartLockingBehavior(t *testing.T) {
 	synctest.Test(t, func(t *testing.T) {
 		// Create a command with update-on-start flag enabled
 		cmd := &cobra.Command{}
-		flags.RegisterAll(cmd)
+		settings.RegisterAll(cmd)
 		err := cmd.ParseFlags([]string{"--update-on-start", "--no-startup-message"})
 		require.NoError(t, err)
 
@@ -574,7 +573,7 @@ func TestUpdateOnStartSelfUpdateScenario(t *testing.T) {
 	synctest.Test(t, func(t *testing.T) {
 		// Create a command with update-on-start flag enabled
 		cmd := &cobra.Command{}
-		flags.RegisterAll(cmd)
+		settings.RegisterAll(cmd)
 		err := cmd.ParseFlags([]string{"--update-on-start", "--no-startup-message"})
 		require.NoError(t, err)
 
@@ -630,14 +629,14 @@ func TestUpdateOnStartMultiInstanceScenario(t *testing.T) {
 
 		// Create commands with update-on-start flag enabled
 		cmd1 := &cobra.Command{}
-		flags.RegisterAll(cmd1)
+		settings.RegisterAll(cmd1)
 		err := cmd1.ParseFlags([]string{"--update-on-start", "--no-startup-message"})
 		require.NoError(t, err)
 
 		updateOnStart1, _ := cmd1.Flags().GetBool("update-on-start")
 
 		cmd2 := &cobra.Command{}
-		flags.RegisterAll(cmd2)
+		settings.RegisterAll(cmd2)
 		err = cmd2.ParseFlags([]string{"--update-on-start", "--no-startup-message"})
 		require.NoError(t, err)
 
@@ -759,7 +758,7 @@ func TestRunUpgradesOnSchedule_ShutdownWaitsForRunningUpdate(t *testing.T) {
 	synctest.Test(t, func(t *testing.T) {
 		// Create a command without scheduling to keep test simple
 		cmd := &cobra.Command{}
-		flags.RegisterAll(cmd)
+		settings.RegisterAll(cmd)
 		err := cmd.ParseFlags([]string{"--no-startup-message"})
 		require.NoError(t, err)
 
@@ -902,7 +901,7 @@ func TestValidateRollingRestartDependenciesAcceptsCancelableContext(t *testing.T
 func TestEphemeralSelfUpdateExercisesTruePath(t *testing.T) {
 	// Create a command with update-on-start flag enabled
 	cmd := &cobra.Command{}
-	flags.RegisterAll(cmd)
+	settings.RegisterAll(cmd)
 	err := cmd.ParseFlags([]string{"--update-on-start", "--no-startup-message"})
 	require.NoError(t, err)
 
@@ -1347,7 +1346,7 @@ func TestRootCommand_FlagParsing(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			cmd := NewRootCommand()
-			flags.RegisterAll(cmd)
+			settings.RegisterAll(cmd)
 			cmd.SetArgs(tt.args)
 
 			err := cmd.ParseFlags(tt.args)
@@ -1391,7 +1390,7 @@ func TestRootCommand_HTTPAPIEndpointsFlag(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			cmd := NewRootCommand()
-			flags.RegisterAll(cmd)
+			settings.RegisterAll(cmd)
 			cmd.SetArgs(tt.args)
 
 			err := cmd.ParseFlags(tt.args)
@@ -1433,7 +1432,7 @@ func TestValidateAPIHost(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 
-			err := appconfig.ValidateAPIHost(tt.host)
+			err := settings.ValidateAPIHost(tt.host)
 			if tt.wantErr {
 				assert.Error(t, err)
 			} else {
@@ -1446,21 +1445,21 @@ func TestValidateAPIHost(t *testing.T) {
 func TestAnyHTTPAPIConfig(t *testing.T) {
 	t.Parallel()
 
-	assert.False(t, appconfig.AnyHTTPAPIConfig(types.RunConfig{}))
-	assert.True(t, appconfig.AnyHTTPAPIConfig(types.RunConfig{APIToken: "secret"}))
-	assert.True(t, appconfig.AnyHTTPAPIConfig(types.RunConfig{TLSCertPath: "/cert.pem"}))
-	assert.True(t, appconfig.AnyHTTPAPIConfig(types.RunConfig{CORSAllowedOrigins: []string{"https://app.example.com"}}))
-	assert.True(t, appconfig.AnyHTTPAPIConfig(types.RunConfig{APIHostChanged: true}))
-	assert.True(t, appconfig.AnyHTTPAPIConfig(types.RunConfig{APIPortChanged: true}))
-	assert.True(t, appconfig.AnyHTTPAPIConfig(types.RunConfig{APIRateLimitChanged: true}))
+	assert.False(t, settings.AnyHTTPAPIConfig(types.RunConfig{}))
+	assert.True(t, settings.AnyHTTPAPIConfig(types.RunConfig{APIToken: "secret"}))
+	assert.True(t, settings.AnyHTTPAPIConfig(types.RunConfig{TLSCertPath: "/cert.pem"}))
+	assert.True(t, settings.AnyHTTPAPIConfig(types.RunConfig{CORSAllowedOrigins: []string{"https://app.example.com"}}))
+	assert.True(t, settings.AnyHTTPAPIConfig(types.RunConfig{APIHostChanged: true}))
+	assert.True(t, settings.AnyHTTPAPIConfig(types.RunConfig{APIPortChanged: true}))
+	assert.True(t, settings.AnyHTTPAPIConfig(types.RunConfig{APIRateLimitChanged: true}))
 }
 
 func TestHTTPAPIEndpointsEnabled(t *testing.T) {
 	t.Parallel()
 
-	assert.False(t, appconfig.HTTPAPIEndpointsEnabled(types.RunConfig{}))
-	assert.True(t, appconfig.HTTPAPIEndpointsEnabled(types.RunConfig{EnableHealthAPI: true}))
-	assert.True(t, appconfig.HTTPAPIEndpointsEnabled(types.RunConfig{EnableUpdateAPI: true}))
+	assert.False(t, settings.HTTPAPIEndpointsEnabled(types.RunConfig{}))
+	assert.True(t, settings.HTTPAPIEndpointsEnabled(types.RunConfig{EnableHealthAPI: true}))
+	assert.True(t, settings.HTTPAPIEndpointsEnabled(types.RunConfig{EnableUpdateAPI: true}))
 }
 
 func TestRootCommand_ReviveStoppedFlagParsing(t *testing.T) {
@@ -1484,7 +1483,7 @@ func TestRootCommand_ReviveStoppedFlagParsing(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			cmd := NewRootCommand()
-			flags.RegisterAll(cmd)
+			settings.RegisterAll(cmd)
 			cmd.SetArgs(tt.args)
 
 			err := cmd.ParseFlags(tt.args)

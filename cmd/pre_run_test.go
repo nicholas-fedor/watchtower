@@ -20,8 +20,8 @@ import (
 	dockerContainer "github.com/moby/moby/api/types/container"
 	dockerImage "github.com/moby/moby/api/types/image"
 
-	appConfig "github.com/nicholas-fedor/watchtower/internal/config"
 	"github.com/nicholas-fedor/watchtower/internal/observability/logging"
+	"github.com/nicholas-fedor/watchtower/internal/settings"
 	"github.com/nicholas-fedor/watchtower/pkg/container"
 	mockContainer "github.com/nicholas-fedor/watchtower/pkg/container/mocks"
 	"github.com/nicholas-fedor/watchtower/pkg/types"
@@ -351,7 +351,7 @@ func TestPreRun_RegistryTLSSettings(t *testing.T) {
 
 			assert.Equal(t, tt.wantSkip, clientOptions.Registry.TLSSkip)
 			assert.Equal(t, tt.wantMinVersion, clientOptions.Registry.TLSMinVersion)
-			assert.Equal(t, clientOptions.Registry, appCfg.UpdateParams(appConfig.RunOverrides{}).Registry)
+			assert.Equal(t, clientOptions.Registry, appCfg.UpdateParams(settings.RunOverrides{}).Registry)
 		})
 	}
 }

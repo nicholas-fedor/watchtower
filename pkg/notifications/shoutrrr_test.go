@@ -28,7 +28,7 @@ import (
 	dockerNetwork "github.com/moby/moby/api/types/network"
 	shoutrrrTypes "github.com/nicholas-fedor/shoutrrr/pkg/types"
 
-	"github.com/nicholas-fedor/watchtower/internal/flags"
+	"github.com/nicholas-fedor/watchtower/internal/settings"
 	"github.com/nicholas-fedor/watchtower/pkg/container"
 	"github.com/nicholas-fedor/watchtower/pkg/session"
 	"github.com/nicholas-fedor/watchtower/pkg/types"
@@ -428,7 +428,7 @@ updt1 (mock/updt1:latest): Updated
 				t.Parallel()
 
 				cmd := new(cobra.Command)
-				flags.RegisterAll(cmd)
+				settings.RegisterAll(cmd)
 
 				shoutrrr := createTestNotifier(
 					newTestLogger(t),

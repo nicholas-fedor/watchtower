@@ -17,9 +17,7 @@ import (
 	"github.com/nicholas-fedor/watchtower/internal/actions"
 	"github.com/nicholas-fedor/watchtower/internal/api"
 	"github.com/nicholas-fedor/watchtower/internal/api/config"
-	appConfig "github.com/nicholas-fedor/watchtower/internal/config"
 	"github.com/nicholas-fedor/watchtower/internal/container/filters"
-	"github.com/nicholas-fedor/watchtower/internal/flags"
 	"github.com/nicholas-fedor/watchtower/internal/git"
 	"github.com/nicholas-fedor/watchtower/internal/meta"
 	"github.com/nicholas-fedor/watchtower/internal/observability/events"
@@ -27,6 +25,7 @@ import (
 	"github.com/nicholas-fedor/watchtower/internal/observability/metrics"
 	"github.com/nicholas-fedor/watchtower/internal/registry/ratelimit"
 	"github.com/nicholas-fedor/watchtower/internal/scheduling"
+	"github.com/nicholas-fedor/watchtower/internal/settings"
 	"github.com/nicholas-fedor/watchtower/pkg/container"
 	"github.com/nicholas-fedor/watchtower/pkg/notifications"
 	"github.com/nicholas-fedor/watchtower/pkg/types"
@@ -51,12 +50,12 @@ const (
 )
 
 var (
-	// appCfg is the resolved process configuration from appconfig.Load.
+	// appCfg is the resolved process configuration from settings.Load.
 	//
 	// It is the single source of operational policy for run-once, schedule, and API paths.
-	// Values originate from CLI flags and environment variables registered in internal/flags
+	// Values originate from CLI flags and environment variables registered in internal/settings
 	// and are resolved once at startup (and again in run when positional container names apply).
-	appCfg appConfig.Config
+	appCfg settings.Config
 
 	// client is the Docker client instance used to interact with container operations in Watchtower.
 	//
@@ -146,7 +145,7 @@ type process struct {
 // (e.g., --interval), and notifications (e.g., --notifications), establishing the CLI's configurable
 // parameters before execution begins.
 func init() {
-	flags.RegisterAll(rootCmd)
+	settings.RegisterAll(rootCmd)
 }
 
 // NewRootCommand creates and configures the root command for the Watchtower CLI.
@@ -203,7 +202,7 @@ func (p *process) preRun(cmd *cobra.Command, _ []string) {
 	flagsSet := cmd.PersistentFlags()
 
 	// Bridge environment values onto unset flags so aliases and logging still see them.
-	err := flags.ApplyEnvToFlags(flagsSet, flags.AllSpecs())
+	err := settings.ApplyEnvToFlags(flagsSet, settings.AllSpecs())
 	if err != nil {
 		p.log.Fatal().Err(err).Msg("Failed to apply environment configuration")
 	}
@@ -211,31 +210,31 @@ func (p *process) preRun(cmd *cobra.Command, _ []string) {
 	// Apply format (and pre-alias level) before ProcessFlagAliases so Fatal paths
 	// from porcelain/interval conflicts use the user-selected --log-format rather
 	// than zerolog's default JSON encoding on stderr.
-	p.log, err = flags.SetupLogging(p.log, flagsSet)
+	p.log, err = settings.SetupLogging(p.log, flagsSet)
 	if err != nil {
 		p.log.Fatal().Err(err).Msg("Failed to initialize logging")
 	}
 
 	// Apply porcelain, interval→schedule, and debug/trace log-level aliases.
-	flags.ProcessFlagAliases(p.log, flagsSet)
+	settings.ProcessFlagAliases(p.log, flagsSet)
 
 	// Re-apply after aliases so debug/trace forced log-level values take effect.
-	p.log, err = flags.SetupLogging(p.log, flagsSet)
+	p.log, err = settings.SetupLogging(p.log, flagsSet)
 	if err != nil {
 		p.log.Fatal().Err(err).Msg("Failed to initialize logging")
 	}
 
 	// Expand secrets from files (for example notification URLs and API tokens).
-	flags.GetSecretsFromFiles(p.log, cmd)
+	settings.GetSecretsFromFiles(p.log, cmd)
 
 	// Map Docker connection flags into the process environment for the client stack.
-	err = flags.EnvConfig(p.log, cmd)
+	err = settings.EnvConfig(p.log, cmd)
 	if err != nil {
 		p.log.Fatal().Err(err).Msg("Failed to configure Docker environment")
 	}
 
 	// Load without positional names. run reloads with args for the final filter.
-	appCfg, err = appConfig.Load(p.log, cmd, nil)
+	appCfg, err = settings.Load(p.log, cmd, nil)
 	if err != nil {
 		p.log.Fatal().Err(err).Msg("Failed to load configuration")
 	}
@@ -428,7 +427,7 @@ func (p *process) run(command *cobra.Command, args []string) {
 		Msg("Received positional arguments for container filtering")
 
 	// Reload configuration with positional names so the filter includes them.
-	loaded, err := appConfig.Load(p.log, command, args)
+	loaded, err := settings.Load(p.log, command, args)
 	if err != nil {
 		if currentWatchtowerContainer != nil {
 			setNoRestartPolicyCtx, cancel := context.WithTimeout(
@@ -507,7 +506,7 @@ func (p *process) run(command *cobra.Command, args []string) {
 		return
 	}
 
-	cfg, err := appCfg.BuildRunConfig(appConfig.RunConfigInput{
+	cfg, err := appCfg.BuildRunConfig(settings.RunConfigInput{
 		Command: command,
 		Names:   normalizedContainerNames,
 	})
@@ -516,7 +515,7 @@ func (p *process) run(command *cobra.Command, args []string) {
 	}
 
 	// Warn if HTTP API configuration options are set without an endpoint enabled.
-	if !appConfig.HTTPAPIEndpointsEnabled(cfg) && appConfig.AnyHTTPAPIConfig(cfg) {
+	if !settings.HTTPAPIEndpointsEnabled(cfg) && settings.AnyHTTPAPIConfig(cfg) {
 		p.log.Warn().
 			Msg("HTTP API configuration options are set, but no endpoints are enabled.")
 	}
@@ -666,7 +665,7 @@ func (p *process) runMain(cfg types.RunConfig) int {
 	// updates never run at the same time.
 	updateLock := scheduling.NewUpdateLock()
 
-	baseParams := appCfg.UpdateParams(appConfig.RunOverrides{
+	baseParams := appCfg.UpdateParams(settings.RunOverrides{
 		Filter:             cfg.Filter,
 		SkipSelfUpdate:     currentWatchtowerContainerUnknown,
 		CurrentContainerID: currentWatchtowerContainerID,

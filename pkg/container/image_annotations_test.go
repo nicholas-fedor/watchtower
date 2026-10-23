@@ -11,8 +11,8 @@ import (
 	dockerspec "github.com/moby/docker-image-spec/specs-go/v1"
 	dockerClient "github.com/moby/moby/client"
 
-	registryConfig "github.com/nicholas-fedor/watchtower/internal/config/registry"
 	"github.com/nicholas-fedor/watchtower/internal/registry/ratelimit"
+	registryConfig "github.com/nicholas-fedor/watchtower/internal/settings/config/registry"
 	mockContainer "github.com/nicholas-fedor/watchtower/pkg/container/mocks"
 	"github.com/nicholas-fedor/watchtower/pkg/container/oci"
 )

@@ -22,10 +22,10 @@ import (
 	dockerContainer "github.com/moby/moby/api/types/container"
 	dockerImage "github.com/moby/moby/api/types/image"
 
-	appConfig "github.com/nicholas-fedor/watchtower/internal/config"
-	notifyConfig "github.com/nicholas-fedor/watchtower/internal/config/notify"
 	"github.com/nicholas-fedor/watchtower/internal/observability/logging"
 	"github.com/nicholas-fedor/watchtower/internal/registry/ratelimit"
+	"github.com/nicholas-fedor/watchtower/internal/settings"
+	notifyConfig "github.com/nicholas-fedor/watchtower/internal/settings/config/notify"
 	"github.com/nicholas-fedor/watchtower/pkg/container"
 	mockContainer "github.com/nicholas-fedor/watchtower/pkg/container/mocks"
 	"github.com/nicholas-fedor/watchtower/pkg/notifications"
@@ -89,7 +89,7 @@ func setRunState(t *testing.T, state runTestState) {
 		createSignalContext = savedSignalContext
 	})
 
-	appCfg = appConfig.Config{}
+	appCfg = settings.Config{}
 	client = state.client
 	rateLimiter = ratelimit.New()
 	currentWatchtowerContainer = state.current
