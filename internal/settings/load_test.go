@@ -62,9 +62,8 @@ func TestLoad_DefaultsAndAlignment(t *testing.T) {
 
 	assert.Equal(t, "unix:///var/run/docker.sock", cfg.Docker.Host)
 	assert.False(t, cfg.Docker.TLSVerify)
-	assert.Equal(t, "auto", cfg.Client.CPUCopyMode)
-	assert.False(t, cfg.Client.DisableMemorySwappiness)
 	assert.Equal(t, "auto", cfg.Compatibility.CPUCopyMode)
+	assert.False(t, cfg.Compatibility.DisableMemorySwappiness)
 	assert.Equal(t, 30*time.Second, cfg.Update.StopTimeout)
 	assert.Equal(t, []string{"Foo", "Bar"}, cfg.Filter.Names)
 	assert.NotNil(t, cfg.Filter.Predicate)
@@ -91,15 +90,19 @@ func TestLoad_APIVersionQuotesStripped(t *testing.T) {
 	assert.Equal(t, "1.44", cfg.Docker.APIVersion)
 }
 
-func TestLoad_CompatCopiedOntoClient(t *testing.T) {
+// TestLoad_CompatReachesClientOptions verifies the compatibility flags reach
+// the Docker client options through their single home in Compatibility.
+func TestLoad_CompatReachesClientOptions(t *testing.T) {
 	_, _, cmd := bindLoad(t, "--cpu-copy-mode", "full", "--disable-memory-swappiness")
 
 	cfg, err := Load(newNopLogger(), cmd, nil)
 	require.NoError(t, err)
 	assert.Equal(t, "full", cfg.Compatibility.CPUCopyMode)
-	assert.Equal(t, "full", cfg.Client.CPUCopyMode)
 	assert.True(t, cfg.Compatibility.DisableMemorySwappiness)
-	assert.True(t, cfg.Client.DisableMemorySwappiness)
+
+	opts := cfg.ClientOptions()
+	assert.Equal(t, "full", opts.CPUCopyMode)
+	assert.True(t, opts.DisableMemorySwappiness)
 }
 
 func TestLoad_RollingRestartWithMonitorOnly(t *testing.T) {
@@ -189,7 +192,6 @@ func TestLoadClient(t *testing.T) {
 	assert.True(t, got.ReviveStopped)
 	assert.True(t, got.RemoveVolumes)
 	assert.Equal(t, "always", got.WarnOnHeadFailure)
-	assert.Empty(t, got.CPUCopyMode)
 }
 
 func TestLoadCompat(t *testing.T) {
@@ -505,8 +507,8 @@ func TestLoadNotify(t *testing.T) {
 
 func TestLoadLogging(t *testing.T) {
 	t.Run("explicit format", func(t *testing.T) {
-		vCfg, _, _ := bindLoad(t, "--log-format", "json", "--log-level", "debug", "--debug", "--trace", "--no-color")
-		got := loadLogging(vCfg)
+		vCfg, flagSet, _ := bindLoad(t, "--log-format", "json", "--log-level", "debug", "--debug", "--trace", "--no-color")
+		got := loadLogging(vCfg, flagSet)
 		assert.Equal(t, "json", got.Format)
 		assert.Equal(t, "debug", got.Level)
 		assert.True(t, got.Debug)
@@ -518,9 +520,32 @@ func TestLoadLogging(t *testing.T) {
 		vCfg := viper.New()
 		vCfg.Set("log-format", "")
 		vCfg.Set("log-level", "warn")
-		got := loadLogging(vCfg)
+		got := loadLogging(vCfg, pflag.NewFlagSet("empty", pflag.ContinueOnError))
 		assert.Equal(t, "auto", got.Format)
 		assert.Equal(t, "warn", got.Level)
+		assert.False(t, got.NoColor, "a missing no-color flag must not enable no-color")
+	})
+}
+
+// TestLoad_NoColorFromEnvPresence verifies that Config.Logging.NoColor follows
+// the presence rule for NO_COLOR (https://no-color.org/), where any value,
+// including empty, "0", and "false", disables color, and that a CLI value wins.
+func TestLoad_NoColorFromEnvPresence(t *testing.T) {
+	for _, value := range []string{"", "0", "false", "1"} {
+		t.Run("NO_COLOR="+value, func(t *testing.T) {
+			cfg := newLoadedCommand(t, map[string]string{"NO_COLOR": value})
+			assert.True(t, cfg.Logging.NoColor)
+		})
+	}
+
+	t.Run("unset", func(t *testing.T) {
+		cfg := newLoadedCommand(t, nil)
+		assert.False(t, cfg.Logging.NoColor)
+	})
+
+	t.Run("flag overrides env", func(t *testing.T) {
+		cfg := newLoadedCommand(t, map[string]string{"NO_COLOR": "1"}, "--no-color=false")
+		assert.False(t, cfg.Logging.NoColor)
 	})
 }
 

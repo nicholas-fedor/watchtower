@@ -17,26 +17,9 @@ func (c Config) ClientOptions() container.ClientOptions {
 		IncludeRestarting:       c.Client.IncludeRestarting,
 		ReviveStopped:           c.Client.ReviveStopped,
 		RemoveVolumes:           c.Client.RemoveVolumes,
-		DisableMemorySwappiness: c.Client.DisableMemorySwappiness || c.Compatibility.DisableMemorySwappiness,
-		// Prefer Compatibility, then Client.
-		CPUCopyMode:      firstNonEmpty(c.Compatibility.CPUCopyMode, c.Client.CPUCopyMode),
-		WarnOnHeadFailed: container.WarningStrategy(c.Client.WarnOnHeadFailure),
-		Registry:         c.Registry,
+		DisableMemorySwappiness: c.Compatibility.DisableMemorySwappiness,
+		CPUCopyMode:             c.Compatibility.CPUCopyMode,
+		WarnOnHeadFailed:        container.WarningStrategy(c.Client.WarnOnHeadFailure),
+		Registry:                c.Registry,
 	}
-}
-
-// firstNonEmpty returns a if non-empty, otherwise b.
-//
-// Parameters:
-//   - a: Preferred string.
-//   - b: Fallback string.
-//
-// Returns:
-//   - string: First non-empty value, or empty if both are empty.
-func firstNonEmpty(a, b string) string {
-	if a != "" {
-		return a
-	}
-
-	return b
 }

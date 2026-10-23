@@ -87,6 +87,22 @@ func TestLoad_DiskSpaceValidation(t *testing.T) {
 			},
 			want: errDiskSpacePercentOutOfRange,
 		},
+		{
+			name: "percent at 100",
+			env: map[string]string{
+				"WATCHTOWER_DISK_SPACE_MAX":  "10GB",
+				"WATCHTOWER_DISK_SPACE_WARN": "100%",
+			},
+			want: errDiskSpacePercentOutOfRange,
+		},
+		{
+			name: "percent above 100",
+			env: map[string]string{
+				"WATCHTOWER_DISK_SPACE_MAX":  "10GB",
+				"WATCHTOWER_DISK_SPACE_WARN": "100.5%",
+			},
+			want: errDiskSpacePercentOutOfRange,
+		},
 	}
 
 	for _, tc := range tests {

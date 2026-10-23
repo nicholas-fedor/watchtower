@@ -16,7 +16,6 @@ import (
 	"github.com/rs/zerolog"
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
-	"github.com/spf13/viper"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
@@ -980,12 +979,13 @@ func TestFlagsArePresentInDocumentation(t *testing.T) {
 		}
 	})
 
-	for _, key := range viper.AllKeys() {
-		envKey := strings.ToUpper(key)
-		if !strings.Contains(allDocs, envKey) {
-			if _, found := ignoredEnvs[envKey]; !found {
-				t.Logf("Docs does not mention environment variable %q", envKey)
-				t.Fail()
+	for _, flagSpec := range AllSpecs() {
+		for _, envKey := range flagSpec.EnvKeys {
+			if !strings.Contains(allDocs, envKey) {
+				if _, found := ignoredEnvs[envKey]; !found {
+					t.Logf("Docs does not mention environment variable %q (%q)", envKey, flagSpec.Name)
+					t.Fail()
+				}
 			}
 		}
 	}
@@ -1659,20 +1659,24 @@ func TestNotificationParsingLongURLs(t *testing.T) {
 	assert.Equal(t, []string{longURL}, urls)
 }
 
-// TestNotificationParsingFlagOverridesEnv verifies that flags override environment variables.
+// TestNotificationParsingFlagOverridesEnv verifies that a notifications flag
+// keeps its CLI value after the environment is applied, while the same
+// environment value alone reaches the flag.
 func TestNotificationParsingFlagOverridesEnv(t *testing.T) {
 	t.Setenv("WATCHTOWER_NOTIFICATIONS", "email")
 
-	cmd := new(cobra.Command)
+	envOnly := newTestCommand()
+	parseWithEnv(t, envOnly)
 
-	RegisterAll(cmd)
-
-	err := cmd.ParseFlags([]string{"--notifications", "slack"})
+	notifications, err := envOnly.PersistentFlags().GetStringSlice("notifications")
 	require.NoError(t, err)
+	require.Equal(t, []string{"email"}, notifications, "the environment must apply without a flag")
 
-	notifications, err := cmd.PersistentFlags().GetStringSlice("notifications")
+	cmd := newTestCommand()
+	parseWithEnv(t, cmd, "--notifications", "slack")
+
+	notifications, err = cmd.PersistentFlags().GetStringSlice("notifications")
 	require.NoError(t, err)
-
 	assert.Equal(t, []string{"slack"}, notifications)
 }
 

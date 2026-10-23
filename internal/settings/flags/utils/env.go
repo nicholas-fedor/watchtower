@@ -18,7 +18,7 @@ import (
 func DurationFromSeconds(seconds float64) time.Duration {
 	nanos := seconds * float64(time.Second)
 
-	if nanos > float64(math.MaxInt64) {
+	if nanos >= float64(math.MaxInt64) {
 		return time.Duration(math.MaxInt64)
 	}
 

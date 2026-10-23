@@ -28,7 +28,6 @@ func TestUpdateParamsAssignsEveryField(t *testing.T) {
 	cfg := Config{
 		Client: client.Client{
 			ReviveStopped: true,
-			CPUCopyMode:   "full",
 		},
 		Compatibility: compatibility.Compatibility{
 			CPUCopyMode: "auto",
@@ -41,7 +40,7 @@ func TestUpdateParamsAssignsEveryField(t *testing.T) {
 			NoPull:              true,
 			NoRestart:           true,
 			MonitorOnly:         true,
-			RollingRestart:      false,
+			RollingRestart:      true,
 			StopTimeout:         30 * time.Second,
 			CooldownDelay:       24 * time.Hour,
 			UseComposeDependsOn: true,
@@ -102,7 +101,7 @@ func TestUpdateParamsAssignsEveryField(t *testing.T) {
 	assert.True(t, params.MonitorOnly)
 	assert.True(t, params.NoPull)
 	assert.True(t, params.LifecycleHooks)
-	assert.False(t, params.RollingRestart)
+	assert.True(t, params.RollingRestart)
 	assert.True(t, params.LabelPrecedence)
 	assert.True(t, params.EnableChangelog)
 	assert.Equal(t, 5*time.Second, params.PullFailureDelay)
@@ -141,14 +140,23 @@ func TestUpdateParamsAssignsEveryField(t *testing.T) {
 		fv := val.Field(i)
 
 		switch field.Name {
-		case "RollingRestart":
-			// Intentionally false in fixture to prove false is set, not omitted.
-			assert.False(t, fv.Bool())
 		case "Filter":
 			assert.False(t, fv.IsNil(), "Filter must be assigned")
 		default:
 			assert.False(t, fv.IsZero(), "field %s must be assigned by UpdateParams", field.Name)
 		}
+	}
+}
+
+// TestUpdateParamsRollingRestartFollowsConfig verifies that both values of
+// rolling-restart reach UpdateParams, so neither is hard-coded.
+func TestUpdateParamsRollingRestartFollowsConfig(t *testing.T) {
+	t.Parallel()
+
+	for _, want := range []bool{false, true} {
+		cfg := Config{Update: update.Update{RollingRestart: want}}
+
+		assert.Equal(t, want, cfg.UpdateParams(RunOverrides{}).RollingRestart)
 	}
 }
 
@@ -179,7 +187,6 @@ func TestClientOptionsMapsClientAndCompat(t *testing.T) {
 			ReviveStopped:     true,
 			RemoveVolumes:     true,
 			WarnOnHeadFailure: "always",
-			CPUCopyMode:       "full",
 		},
 		Compatibility: compatibility.Compatibility{
 			DisableMemorySwappiness: true,
@@ -194,12 +201,7 @@ func TestClientOptionsMapsClientAndCompat(t *testing.T) {
 	assert.True(t, opts.ReviveStopped)
 	assert.True(t, opts.RemoveVolumes)
 	assert.True(t, opts.DisableMemorySwappiness)
-	// Compatibility wins over Client when both are non-empty.
 	assert.Equal(t, "auto", opts.CPUCopyMode)
 	assert.Equal(t, "always", string(opts.WarnOnHeadFailed))
 	assert.Equal(t, cfg.Registry, opts.Registry)
-
-	// Client is used when Compatibility is empty.
-	cfg.Compatibility.CPUCopyMode = ""
-	assert.Equal(t, "full", cfg.ClientOptions().CPUCopyMode)
 }
