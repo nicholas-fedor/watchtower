@@ -33,6 +33,9 @@ func TestFormatDiskSpace(t *testing.T) {
 	assert.Equal(t, "unknown", formatDiskSpace(math.NaN()))
 	assert.Equal(t, "unknown", formatDiskSpace(float64(1<<63)))
 	assert.Equal(t, "-9223.37 PB", formatDiskSpace(int64(math.MinInt64)))
+	assert.Equal(t, "1 MB", formatDiskSpace(int64(999_999)))
+	assert.Equal(t, "999.99 KB", formatDiskSpace(int64(999_994)))
+	assert.Equal(t, "1 GB", formatDiskSpace(int64(999_999_999)))
 }
 
 func TestFormatRFC1123(t *testing.T) {

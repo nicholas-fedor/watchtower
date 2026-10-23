@@ -104,10 +104,38 @@ func ParseDiskSpace(size string) (int64, error) {
 	return bytes, nil
 }
 
+// ParseDiskSpacePercent parses the number of a disk-space percentage, such as
+// the "80" of "80%".
+//
+// It accepts the same form as the number of a size, digits with at most one
+// decimal point, so NaN, infinities, signs, and exponents are rejected. The
+// caller checks the range.
+//
+// Parameters:
+//   - value: Percentage number without the "%" sign.
+//
+// Returns:
+//   - float64: Parsed percentage.
+//   - error: Non-nil if the number is not in the accepted form.
+func ParseDiskSpacePercent(value string) (float64, error) {
+	value = strings.TrimSpace(value)
+	if !isDiskSpaceNumber(value) {
+		return 0, fmt.Errorf("invalid percentage %q: %w", value, errInvalidDiskSpaceNumber)
+	}
+
+	percent, err := strconv.ParseFloat(value, 64)
+	if err != nil {
+		return 0, fmt.Errorf("invalid percentage %q: %w", value, errInvalidDiskSpaceNumber)
+	}
+
+	return percent, nil
+}
+
 // scaleDiskSpaceValue converts a numeric size string into bytes using multiplier.
 //
-// Integer values use overflow-checked integer arithmetic.
-// Fractional values use exact rational arithmetic and truncate toward zero to whole bytes.
+// The value must be digits with at most one decimal point. Integer values use
+// overflow-checked integer arithmetic. Fractional values use exact rational
+// arithmetic and truncate toward zero to whole bytes.
 //
 // Parameters:
 //   - valueStr: Numeric portion of the size string.
@@ -118,7 +146,7 @@ func ParseDiskSpace(size string) (int64, error) {
 //   - error: Non-nil if the number is invalid, negative, or overflows int64.
 func scaleDiskSpaceValue(valueStr string, multiplier int64) (int64, error) {
 	valueStr = strings.TrimSpace(valueStr)
-	if valueStr == "" {
+	if !isDiskSpaceNumber(valueStr) {
 		return 0, errInvalidDiskSpaceNumber
 	}
 
@@ -127,6 +155,35 @@ func scaleDiskSpaceValue(valueStr string, multiplier int64) (int64, error) {
 	}
 
 	return scaleIntegerDiskSpace(valueStr, multiplier)
+}
+
+// isDiskSpaceNumber reports whether valueStr is digits with at most one decimal
+// point.
+//
+// The integer and rational parsers also accept signs, exponents, fractions,
+// and hexadecimal floats, which the size format does not allow.
+//
+// Parameters:
+//   - valueStr: Numeric portion of the size string.
+//
+// Returns:
+//   - bool: True when valueStr has at least one digit, at most one decimal
+//     point, and nothing else.
+func isDiskSpaceNumber(valueStr string) bool {
+	digits, points := 0, 0
+
+	for _, r := range valueStr {
+		switch {
+		case r >= '0' && r <= '9':
+			digits++
+		case r == '.':
+			points++
+		default:
+			return false
+		}
+	}
+
+	return digits > 0 && points <= 1
 }
 
 // scaleIntegerDiskSpace parses a whole-number size and multiplies it by the unit.
@@ -221,7 +278,8 @@ func splitDiskSpaceValueAndUnit(size string) (string, string) {
 // Values below 1000 bytes stay in bytes. Larger values use KB, MB, GB, TB, or PB
 // (powers of 1000) to match ParseDiskSpace decimal units. Exact multiples are
 // whole numbers. Other values use up to two decimal places with trailing zeros
-// trimmed.
+// trimmed. A value that rounds to 1000 of its unit uses the next larger unit,
+// so 999,999 bytes is "1 MB" rather than "1000 KB".
 //
 // Parameters:
 //   - bytes: Size in bytes. Negative values are formatted with a leading minus.
@@ -248,32 +306,47 @@ func FormatDiskSpace(bytes int64) string {
 		{"KB", kilobyteMultiplier},
 	}
 
+	// larger is the unit checked before the current one, which is the next
+	// larger unit.
+	larger, hasLarger := units[0], false
+
 	for _, unit := range units {
-		if bytes >= unit.size {
-			return formatDiskSpaceAmount(bytes, unit.size, unit.suffix)
+		if bytes < unit.size {
+			larger, hasLarger = unit, true
+
+			continue
 		}
+
+		quantity := formatDiskSpaceQuantity(bytes, unit.size)
+
+		// A value below 1000 of its unit can round up to exactly 1000, which
+		// the next larger unit shows as 1.
+		if quantity == "1000" && hasLarger {
+			unit = larger
+			quantity = formatDiskSpaceQuantity(bytes, unit.size)
+		}
+
+		return quantity + " " + unit.suffix
 	}
 
 	return strconv.FormatInt(bytes, 10) + " B"
 }
 
-// formatDiskSpaceAmount formats bytes as a decimal quantity of the given unit.
+// formatDiskSpaceQuantity formats bytes as a decimal quantity of the given unit.
 //
 // Parameters:
 //   - bytes: Size in bytes. Must be non-negative.
 //   - size: Unit multiplier in bytes.
-//   - suffix: Unit label such as "GB".
 //
 // Returns:
-//   - string: Quantity and unit separated by a space.
-func formatDiskSpaceAmount(bytes, size int64, suffix string) string {
+//   - string: Quantity with up to two decimal places and no trailing zeros.
+func formatDiskSpaceQuantity(bytes, size int64) string {
 	if bytes%size == 0 {
-		return strconv.FormatInt(bytes/size, 10) + " " + suffix
+		return strconv.FormatInt(bytes/size, 10)
 	}
 
 	formatted := strconv.FormatFloat(float64(bytes)/float64(size), 'f', 2, 64)
 	formatted = strings.TrimRight(formatted, "0")
-	formatted = strings.TrimRight(formatted, ".")
 
-	return formatted + " " + suffix
+	return strings.TrimRight(formatted, ".")
 }
