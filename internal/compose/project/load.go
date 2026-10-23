@@ -3,7 +3,6 @@ package project
 import (
 	"context"
 	"fmt"
-	"path/filepath"
 
 	"github.com/compose-spec/compose-go/v2/cli"
 
@@ -12,7 +11,10 @@ import (
 
 // Load parses a Compose project from an on-disk directory.
 //
-// When ConfigFiles is empty, compose.yaml / docker-compose.yaml in Dir is used.
+// When ConfigFiles is empty, compose-go selects the default Compose file in Dir,
+// together with its default override file, such as compose.override.yaml.
+// Every selected file must stay inside Dir. compose-go searches the parent
+// directories when Dir has no Compose file, and a file found there is rejected.
 // A project .env file is interpolated. The Watchtower process environment is
 // not, so tokens and notification URLs cannot leak into the checked-out project.
 //
@@ -26,11 +28,6 @@ import (
 func Load(ctx context.Context, ref ProjectRef) (*composetypes.Project, error) {
 	if ref.Dir == "" {
 		return nil, ErrEmptyProjectDir
-	}
-
-	err := rejectEscapingConfig(ref.Dir, ref.ConfigFiles)
-	if err != nil {
-		return nil, err
 	}
 
 	opts := []cli.ProjectOptionsFn{
@@ -52,6 +49,11 @@ func Load(ctx context.Context, ref ProjectRef) (*composetypes.Project, error) {
 		return nil, fmt.Errorf("compose project options: %w", err)
 	}
 
+	err = rejectEscapingConfig(ref.Dir, options.ConfigPaths)
+	if err != nil {
+		return nil, err
+	}
+
 	project, err := options.LoadProject(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("parse compose files: %w", err)
@@ -60,27 +62,21 @@ func Load(ctx context.Context, ref ProjectRef) (*composetypes.Project, error) {
 	return project, nil
 }
 
-// rejectEscapingConfig checks compose files again after checkout.
+// rejectEscapingConfig checks the compose files compose-go selected after
+// checkout.
 //
-// A repository can contain a symlink that lexical path checks accepted
-// before the files existed. Default compose filenames are checked when
-// the label did not list files.
+// A repository can contain a symlink that lexical path checks accepted before
+// the files existed, and compose-go can select a file from a parent directory
+// when dir has none.
 //
 // Parameters:
 //   - dir: Project directory.
-//   - files: Explicit compose files, or empty for the defaults.
+//   - files: Compose files compose-go will load.
 //
 // Returns:
-//   - error: errConfigFile when a symlink resolves outside dir.
+//   - error: errConfigFile when a file resolves outside dir.
 func rejectEscapingConfig(dir string, files []string) error {
-	candidates := files
-	if len(candidates) == 0 {
-		for _, name := range []string{"compose.yaml", "compose.yml", "docker-compose.yaml", "docker-compose.yml"} {
-			candidates = append(candidates, filepath.Join(dir, name))
-		}
-	}
-
-	for _, path := range candidates {
+	for _, path := range files {
 		err := symlinkEscapes(dir, path)
 		if err != nil {
 			return err

@@ -322,6 +322,13 @@ func TestReadableProjectDir(t *testing.T) {
 
 		assert.False(t, readableProjectDir(t.TempDir()))
 	})
+
+	// An override file extends a base file, so it does not make a project.
+	t.Run("directory with only an override file", func(t *testing.T) {
+		t.Parallel()
+
+		assert.False(t, readableProjectDir(writeComposeDir(t, "compose.override.yaml")))
+	})
 }
 
 // TestLabelValue verifies that a label's value is trimmed, and empty when the
