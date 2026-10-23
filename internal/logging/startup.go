@@ -6,7 +6,7 @@ import (
 
 	"github.com/rs/zerolog"
 
-	"github.com/nicholas-fedor/watchtower/internal/util"
+	"github.com/nicholas-fedor/watchtower/internal/settings/units"
 	"github.com/nicholas-fedor/watchtower/pkg/types"
 )
 
@@ -214,7 +214,7 @@ func logScheduleInfo(log *zerolog.Logger, info ScheduleInfo) {
 
 	// Log details of the next scheduled run if scheduling is active.
 	if !info.Sched.IsZero() {
-		until := util.FormatDuration(time.Until(info.Sched))
+		until := units.FormatDuration(time.Until(info.Sched))
 		// Example: Next scheduled run: 2025-10-22 00:31:25 MST in 24 hours.
 		log.Info().Msg(
 			"Next scheduled run: " + info.Sched.Format(

@@ -4,7 +4,6 @@ import (
 	"slices"
 
 	composeLabels "github.com/nicholas-fedor/watchtower/internal/compose/labels"
-	"github.com/nicholas-fedor/watchtower/internal/util"
 	"github.com/nicholas-fedor/watchtower/pkg/container"
 	"github.com/nicholas-fedor/watchtower/pkg/types"
 )
@@ -195,7 +194,7 @@ func serviceOf(c types.Container) string {
 		return ""
 	}
 
-	return util.NormalizeContainerName(composeLabels.GetServiceName(info.Config.Labels))
+	return container.NormalizeContainerName(composeLabels.GetServiceName(info.Config.Labels))
 }
 
 // memberProjects maps the identifier of each member with a Compose project
@@ -261,8 +260,8 @@ func projectNames(containers []types.Container) map[string]*matchSet {
 		}
 
 		for _, name := range []string{
-			util.NormalizeContainerName(container.ResolveContainerIdentifier(c)),
-			util.NormalizeContainerName(c.Name()),
+			container.NormalizeContainerName(container.ResolveContainerIdentifier(c)),
+			container.NormalizeContainerName(c.Name()),
 			serviceOf(c),
 		} {
 			if name != "" {
@@ -296,8 +295,8 @@ func exactNames(containers []types.Container) map[string]types.Container {
 
 	for _, c := range containers {
 		for _, name := range []string{
-			util.NormalizeContainerName(container.ResolveContainerIdentifier(c)),
-			util.NormalizeContainerName(c.Name()),
+			container.NormalizeContainerName(container.ResolveContainerIdentifier(c)),
+			container.NormalizeContainerName(c.Name()),
 			string(c.ID()),
 		} {
 			if _, taken := names[name]; name != "" && !taken {
@@ -326,14 +325,14 @@ func watchtowerAliases(watchtowers []types.Container, names map[string]types.Con
 	replicas := make(map[string]int, len(watchtowers))
 
 	for _, c := range watchtowers {
-		identifier := util.NormalizeContainerName(container.ResolveContainerIdentifier(c))
+		identifier := container.NormalizeContainerName(container.ResolveContainerIdentifier(c))
 		if service := replicaService(identifier); service != identifier {
 			replicas[service]++
 		}
 	}
 
 	for _, c := range watchtowers {
-		identifier := util.NormalizeContainerName(container.ResolveContainerIdentifier(c))
+		identifier := container.NormalizeContainerName(container.ResolveContainerIdentifier(c))
 
 		service := replicaService(identifier)
 		if _, taken := names[service]; service != identifier && replicas[service] == 1 && !taken {

@@ -8,7 +8,7 @@ import (
 	dockerContainer "github.com/moby/moby/api/types/container"
 	dockerImage "github.com/moby/moby/api/types/image"
 
-	"github.com/nicholas-fedor/watchtower/internal/util"
+	"github.com/nicholas-fedor/watchtower/pkg/container"
 	"github.com/nicholas-fedor/watchtower/pkg/types"
 )
 
@@ -21,7 +21,7 @@ type SimpleContainer struct {
 }
 
 func (c *SimpleContainer) Name() string {
-	return util.NormalizeContainerName(c.ContainerName)
+	return container.NormalizeContainerName(c.ContainerName)
 }
 
 func (c *SimpleContainer) ID() types.ContainerID {

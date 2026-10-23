@@ -23,8 +23,8 @@ import (
 	dockerNetwork "github.com/moby/moby/api/types/network"
 	dockerClient "github.com/moby/moby/client"
 
+	"github.com/nicholas-fedor/watchtower/internal/container/filters"
 	mockContainer "github.com/nicholas-fedor/watchtower/pkg/container/mocks"
-	"github.com/nicholas-fedor/watchtower/pkg/filters"
 	"github.com/nicholas-fedor/watchtower/pkg/types"
 )
 

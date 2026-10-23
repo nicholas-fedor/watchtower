@@ -30,7 +30,7 @@ type Update struct {
 	StopTimeout time.Duration
 	// CooldownDelay is the minimum age a new image must have before an update is allowed,
 	// reducing risk from freshly pushed images (--cooldown-delay / WATCHTOWER_COOLDOWN_DELAY).
-	// Supports extended units such as d, w, and M via util.ParseDuration.
+	// Supports extended units such as d, w, and M via units.ParseDuration.
 	CooldownDelay time.Duration
 	// UseComposeDependsOn honors Docker Compose depends_on labels for stop/start order
 	// (--use-compose-depends-on / WATCHTOWER_USE_COMPOSE_DEPENDS_ON).

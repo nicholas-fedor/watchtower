@@ -344,7 +344,7 @@ linters:
         linters:
           - gocyclo
         text: "of func `handleManifestResponse` is high"
-      - path: "pkg/filters/filters.go"
+      - path: "internal/container/filters/filters.go"
         linters:
           - gocyclo
         text: "of func `BuildFilter` is high"

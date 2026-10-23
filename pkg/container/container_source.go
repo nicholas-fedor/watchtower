@@ -20,7 +20,6 @@ import (
 	dockerClient "github.com/moby/moby/client"
 	dockerAPIVersion "github.com/moby/moby/client/pkg/versions"
 
-	"github.com/nicholas-fedor/watchtower/internal/util"
 	"github.com/nicholas-fedor/watchtower/pkg/types"
 )
 
@@ -217,7 +216,7 @@ func getSourceContainer(log *zerolog.Logger,
 			if err != nil {
 				clog.Warn().
 					Err(err).
-					Str("container", util.NormalizeContainerName(containerInfo.Name)).
+					Str("container", NormalizeContainerName(containerInfo.Name)).
 					Str("network_container", netContainerID).
 					Msg("Unable to resolve network container")
 			} else {
@@ -225,8 +224,8 @@ func getSourceContainer(log *zerolog.Logger,
 					"container:" + parentResult.Container.Name,
 				)
 				clog.Debug().
-					Str("container", util.NormalizeContainerName(containerInfo.Name)).
-					Str("network_container", util.NormalizeContainerName(parentResult.Container.Name)).
+					Str("container", NormalizeContainerName(containerInfo.Name)).
+					Str("network_container", NormalizeContainerName(parentResult.Container.Name)).
 					Msg("Resolved network container name")
 			}
 		}
@@ -245,7 +244,7 @@ func getSourceContainer(log *zerolog.Logger,
 
 		clog.Debug().
 			Err(err).
-			Str("container", util.NormalizeContainerName(containerInfo.Name)).
+			Str("container", NormalizeContainerName(containerInfo.Name)).
 			Str("image", containerInfo.Image).
 			Msg("Failed to retrieve image info")
 
@@ -281,7 +280,7 @@ func resolveVolumesFrom(
 	}
 
 	rewritten := slices.Clone(containerInfo.HostConfig.VolumesFrom)
-	containerName := util.NormalizeContainerName(containerInfo.Name)
+	containerName := NormalizeContainerName(containerInfo.Name)
 
 	for i, spec := range rewritten {
 		name, mode := parseVolumesFromSpec(spec)
@@ -306,7 +305,7 @@ func resolveVolumesFrom(
 			continue
 		}
 
-		resolved := util.NormalizeContainerName(sourceResult.Container.Name)
+		resolved := NormalizeContainerName(sourceResult.Container.Name)
 		if mode != "" {
 			// Keep :ro/:rw/SELinux flags from the original spec.
 			resolved = resolved + ":" + mode

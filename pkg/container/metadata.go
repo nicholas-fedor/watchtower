@@ -8,7 +8,7 @@ import (
 
 	dockerContainer "github.com/moby/moby/api/types/container"
 
-	"github.com/nicholas-fedor/watchtower/internal/util"
+	"github.com/nicholas-fedor/watchtower/internal/settings/units"
 	"github.com/nicholas-fedor/watchtower/pkg/container/git"
 	"github.com/nicholas-fedor/watchtower/pkg/types"
 )
@@ -410,7 +410,7 @@ func (c *Container) CooldownDelay(params types.UpdateParams) time.Duration {
 		return params.CooldownDelay
 	}
 
-	parsed, err := util.ParseDuration(labelVal)
+	parsed, err := units.ParseDuration(labelVal)
 	if err != nil {
 		c.logger().Warn().
 			Err(err).
