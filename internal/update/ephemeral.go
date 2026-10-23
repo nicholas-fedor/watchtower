@@ -13,6 +13,7 @@ import (
 
 	cerrdefs "github.com/containerd/errdefs"
 
+	"github.com/nicholas-fedor/watchtower/internal/container/labels"
 	"github.com/nicholas-fedor/watchtower/pkg/container"
 	"github.com/nicholas-fedor/watchtower/pkg/types"
 )
@@ -702,7 +703,7 @@ func inspectOldContainer(
 	if containerChain != "" {
 		concrete, ok := oldContainer.(*container.Container)
 		if ok {
-			concrete.SetLabel(container.ContainerChainLabel, containerChain)
+			concrete.SetLabel(labels.ContainerChain, containerChain)
 			clog.Debug().
 				Str("container_chain", containerChain).
 				Msg("Set container chain label on source container config")

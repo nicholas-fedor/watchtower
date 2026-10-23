@@ -15,6 +15,7 @@ import (
 	dockerNetwork "github.com/moby/moby/api/types/network"
 
 	composeLabels "github.com/nicholas-fedor/watchtower/internal/compose/labels"
+	"github.com/nicholas-fedor/watchtower/internal/container/labels"
 	"github.com/nicholas-fedor/watchtower/internal/observability/logging"
 	"github.com/nicholas-fedor/watchtower/pkg/types"
 	mockTypes "github.com/nicholas-fedor/watchtower/pkg/types/mocks"
@@ -1642,7 +1643,7 @@ func TestContainer_Links_DoesNotLog(t *testing.T) {
 	}{
 		{
 			name:   "depends-on label",
-			labels: map[string]string{dependsOnLabel: "db, cache"},
+			labels: map[string]string{labels.DependsOn: "db, cache"},
 			want:   []string{"db", "cache"},
 		},
 		{
@@ -1702,19 +1703,19 @@ func TestContainer_Links_HostConfigAlwaysCounts(t *testing.T) {
 	}{
 		{
 			name:        "depends-on label and network mode",
-			labels:      map[string]string{dependsOnLabel: "db"},
+			labels:      map[string]string{labels.DependsOn: "db"},
 			networkMode: "container:vpn",
 			want:        []string{"db", "vpn"},
 		},
 		{
 			name:   "depends-on label and legacy link",
-			labels: map[string]string{dependsOnLabel: "db"},
+			labels: map[string]string{labels.DependsOn: "db"},
 			links:  []string{"/cache:/app/cache"},
 			want:   []string{"db", "cache"},
 		},
 		{
 			name:        "depends-on label, network mode, legacy link, and volumes-from",
-			labels:      map[string]string{dependsOnLabel: "db"},
+			labels:      map[string]string{labels.DependsOn: "db"},
 			networkMode: "container:vpn",
 			links:       []string{"/cache:/app/cache"},
 			volumesFrom: []string{"data:ro"},
@@ -1732,7 +1733,7 @@ func TestContainer_Links_HostConfigAlwaysCounts(t *testing.T) {
 		},
 		{
 			name:        "network mode naming a label dependency",
-			labels:      map[string]string{dependsOnLabel: "vpn"},
+			labels:      map[string]string{labels.DependsOn: "vpn"},
 			networkMode: "container:vpn",
 			want:        []string{"vpn"},
 		},

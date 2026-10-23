@@ -15,8 +15,8 @@ import (
 	dockerImage "github.com/moby/moby/api/types/image"
 	testifyMock "github.com/stretchr/testify/mock"
 
+	"github.com/nicholas-fedor/watchtower/internal/container/labels"
 	"github.com/nicholas-fedor/watchtower/pkg/container"
-	gitPkg "github.com/nicholas-fedor/watchtower/pkg/container/git"
 	"github.com/nicholas-fedor/watchtower/pkg/container/oci"
 	"github.com/nicholas-fedor/watchtower/pkg/types"
 	mockTypes "github.com/nicholas-fedor/watchtower/pkg/types/mocks"
@@ -1436,7 +1436,7 @@ func TestApplyReportMeta(t *testing.T) {
 		t.Parallel()
 
 		applyReportMeta(nil, reportTestContainer(t, map[string]string{
-			gitPkg.RepoLabel: "https://github.com/org/app.git",
+			labels.GitRepo: "https://github.com/org/app.git",
 		}), types.UpdateParams{})
 	})
 
@@ -1453,8 +1453,8 @@ func TestApplyReportMeta(t *testing.T) {
 		t.Parallel()
 
 		c := reportTestContainer(t, map[string]string{
-			gitPkg.RepoLabel: "https://github.com/org/app.git",
-			gitPkg.RefLabel:  "main",
+			labels.GitRepo: "https://github.com/org/app.git",
+			labels.GitRef:  "main",
 		})
 		got := updateFromContainer(newTestLogger(t), c, "img2", ScannedState, types.UpdateParams{})
 		assert.Equal(t, "https://github.com/org/app.git", got.GitRepo())
@@ -1498,7 +1498,7 @@ func TestProgressSetLatestImageMeta(t *testing.T) {
 		t.Parallel()
 
 		c := reportTestContainer(t, map[string]string{
-			gitPkg.ChangelogURLLabel: "https://example.com/{tag}",
+			labels.ChangelogURL: "https://example.com/{tag}",
 		})
 		meta := Progress{}.SetLatestImageMeta(
 			newTestLogger(t),
@@ -1514,8 +1514,8 @@ func TestProgressSetLatestImageMeta(t *testing.T) {
 		t.Parallel()
 
 		c := reportTestContainer(t, map[string]string{
-			gitPkg.RepoLabel:         "https://github.com/org/app.git",
-			gitPkg.ChangelogURLLabel: "https://example.com/notes/{tag}",
+			labels.GitRepo:      "https://github.com/org/app.git",
+			labels.ChangelogURL: "https://example.com/notes/{tag}",
 		})
 		status := updateFromContainer(newTestLogger(t), c, "img", ScannedState, types.UpdateParams{})
 		progress := Progress{c.ID(): status}
@@ -1534,7 +1534,7 @@ func TestProgressSetLatestImageMeta(t *testing.T) {
 		t.Parallel()
 
 		c := reportTestContainer(t, map[string]string{
-			gitPkg.RepoLabel: "https://github.com/org/app.git",
+			labels.GitRepo: "https://github.com/org/app.git",
 		})
 		status := updateFromContainer(newTestLogger(t), c, "img", ScannedState, types.UpdateParams{})
 		progress := Progress{c.ID(): status}
@@ -1558,7 +1558,7 @@ func TestProgressSetLatestImageMeta(t *testing.T) {
 		t.Parallel()
 
 		c := reportTestContainer(t, map[string]string{
-			gitPkg.RepoLabel: "https://github.com/org/app.git",
+			labels.GitRepo: "https://github.com/org/app.git",
 		})
 		status := updateFromContainer(newTestLogger(t), c, "img", ScannedState, types.UpdateParams{})
 		progress := Progress{c.ID(): status}

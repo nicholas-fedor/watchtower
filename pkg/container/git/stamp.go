@@ -4,6 +4,7 @@ import (
 	"strings"
 	"unicode"
 
+	"github.com/nicholas-fedor/watchtower/internal/container/labels"
 	"github.com/nicholas-fedor/watchtower/pkg/container/oci"
 	"github.com/nicholas-fedor/watchtower/pkg/types"
 )
@@ -27,7 +28,7 @@ func LastStamp(c types.Container) (string, string) {
 		return "", ""
 	}
 
-	return label(c, LastCommitLabel), label(c, LastTagLabel)
+	return label(c, labels.GitLastCommit), label(c, labels.GitLastTag)
 }
 
 // Baseline returns the running revision to compare against a remote tip.

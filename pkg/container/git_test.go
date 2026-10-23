@@ -6,6 +6,7 @@ import (
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/assert"
 
+	"github.com/nicholas-fedor/watchtower/internal/container/labels"
 	"github.com/nicholas-fedor/watchtower/pkg/container/git"
 	"github.com/nicholas-fedor/watchtower/pkg/types"
 )
@@ -23,9 +24,9 @@ func TestGitWrappers(t *testing.T) {
 			t.Parallel()
 
 			c := MockContainer()
-			c.SetLabel(git.RepoLabel, "https://github.com/org/app.git")
+			c.SetLabel(labels.GitRepo, "https://github.com/org/app.git")
 
-			value, ok := c.GetLabel(git.RepoLabel)
+			value, ok := c.GetLabel(labels.GitRepo)
 			assert.True(t, ok)
 			assert.Equal(t, "https://github.com/org/app.git", value)
 		})
@@ -33,10 +34,10 @@ func TestGitWrappers(t *testing.T) {
 		t.Run("overwrites an existing label", func(t *testing.T) {
 			t.Parallel()
 
-			c := MockContainer(WithLabels(map[string]string{git.RepoLabel: "old"}))
-			c.SetLabel(git.RepoLabel, "new")
+			c := MockContainer(WithLabels(map[string]string{labels.GitRepo: "old"}))
+			c.SetLabel(labels.GitRepo, "new")
 
-			value, ok := c.GetLabel(git.RepoLabel)
+			value, ok := c.GetLabel(labels.GitRepo)
 			assert.True(t, ok)
 			assert.Equal(t, "new", value)
 		})
@@ -46,16 +47,16 @@ func TestGitWrappers(t *testing.T) {
 
 			c := MockContainer()
 			c.containerInfo.Config.Labels = nil
-			c.SetLabel(git.RefLabel, "main")
+			c.SetLabel(labels.GitRef, "main")
 
-			assert.Equal(t, "main", c.containerInfo.Config.Labels[git.RefLabel])
+			assert.Equal(t, "main", c.containerInfo.Config.Labels[labels.GitRef])
 		})
 
 		t.Run("is a no-op for a nil receiver or empty key", func(t *testing.T) {
 			t.Parallel()
 
 			var c *Container
-			c.SetLabel(git.RepoLabel, "https://github.com/org/app.git")
+			c.SetLabel(labels.GitRepo, "https://github.com/org/app.git")
 
 			c = MockContainer()
 			c.SetLabel("", "value")
@@ -66,9 +67,9 @@ func TestGitWrappers(t *testing.T) {
 			t.Parallel()
 
 			c := MockContainer()
-			c.SetLabel(git.LastTagLabel, "v1")
-			c.DeleteLabel(git.LastTagLabel)
-			_, ok := c.GetLabel(git.LastTagLabel)
+			c.SetLabel(labels.GitLastTag, "v1")
+			c.DeleteLabel(labels.GitLastTag)
+			_, ok := c.GetLabel(labels.GitLastTag)
 			assert.False(t, ok)
 		})
 
@@ -78,12 +79,12 @@ func TestGitWrappers(t *testing.T) {
 			c := MockContainer()
 			c.containerInfo.Config = nil
 
-			assert.NotPanics(t, func() { c.SetLabel(git.RepoLabel, "https://github.com/org/app.git") })
+			assert.NotPanics(t, func() { c.SetLabel(labels.GitRepo, "https://github.com/org/app.git") })
 
 			c = MockContainer()
 			c.containerInfo = nil
 
-			assert.NotPanics(t, func() { c.SetLabel(git.RepoLabel, "https://github.com/org/app.git") })
+			assert.NotPanics(t, func() { c.SetLabel(labels.GitRepo, "https://github.com/org/app.git") })
 		})
 	})
 
@@ -104,8 +105,8 @@ func TestGitWrappers(t *testing.T) {
 			c := MockContainer(
 				WithImageName("myapp:latest"),
 				WithLabels(map[string]string{
-					git.RepoLabel: "https://github.com/org/from-label.git",
-					git.RefLabel:  "release",
+					labels.GitRepo: "https://github.com/org/from-label.git",
+					labels.GitRef:  "release",
 				}),
 			)
 
@@ -157,8 +158,8 @@ func TestGitWrappers(t *testing.T) {
 			t.Parallel()
 
 			c := MockContainer(WithLabels(map[string]string{
-				watchtowerLabel: "true",
-				git.RepoLabel:   "https://github.com/nicholas-fedor/watchtower.git",
+				labels.Watchtower: "true",
+				labels.GitRepo:    "https://github.com/nicholas-fedor/watchtower.git",
 			}))
 
 			assert.False(t, git.ShouldMonitor(nil, c, types.UpdateParams{EnableGitMonitoring: true}))
@@ -168,7 +169,7 @@ func TestGitWrappers(t *testing.T) {
 			t.Parallel()
 
 			c := MockContainer(WithLabels(map[string]string{
-				git.RepoLabel: "https://github.com/org/app.git",
+				labels.GitRepo: "https://github.com/org/app.git",
 			}))
 
 			assert.True(t, git.ShouldMonitor(nil, c, types.UpdateParams{EnableGitMonitoring: true}))
@@ -178,8 +179,8 @@ func TestGitWrappers(t *testing.T) {
 			t.Parallel()
 
 			c := MockContainer(WithLabels(map[string]string{
-				git.RepoLabel:  "https://github.com/org/app.git",
-				git.WatchLabel: "false",
+				labels.GitRepo:  "https://github.com/org/app.git",
+				labels.GitWatch: "false",
 			}))
 
 			assert.False(t, git.ShouldMonitor(nil, c, types.UpdateParams{EnableGitMonitoring: true}))
@@ -190,7 +191,7 @@ func TestGitWrappers(t *testing.T) {
 
 			c := MockContainer(
 				WithImageName("nginx:latest"),
-				WithLabels(map[string]string{git.WatchLabel: "true"}),
+				WithLabels(map[string]string{labels.GitWatch: "true"}),
 			)
 			nop := zerolog.Nop()
 
@@ -213,8 +214,8 @@ func TestGitWrappers(t *testing.T) {
 			t.Parallel()
 
 			c := MockContainer(WithLabels(map[string]string{
-				git.LastCommitLabel: "abc123",
-				git.LastTagLabel:    "v1.2.3",
+				labels.GitLastCommit: "abc123",
+				labels.GitLastTag:    "v1.2.3",
 			}))
 
 			commit, tag := git.LastStamp(c)
@@ -236,14 +237,14 @@ func TestGitWrappers(t *testing.T) {
 			t.Parallel()
 
 			c := MockContainer()
-			c.SetLabel(git.LastTagLabel, "v0.1.0")
+			c.SetLabel(labels.GitLastTag, "v0.1.0")
 			ApplyGitStamp(c, "abc123", "")
 
-			commit, ok := c.GetLabel(git.LastCommitLabel)
+			commit, ok := c.GetLabel(labels.GitLastCommit)
 			assert.True(t, ok)
 			assert.Equal(t, "abc123", commit)
 
-			_, ok = c.GetLabel(git.LastTagLabel)
+			_, ok = c.GetLabel(labels.GitLastTag)
 			assert.False(t, ok)
 		})
 
@@ -269,7 +270,7 @@ func TestGitWrappers(t *testing.T) {
 
 			c := MockContainer()
 			ApplyGitAssociation(c, gitAssociation{}, true)
-			assert.NotContains(t, c.containerInfo.Config.Labels, git.RepoLabel)
+			assert.NotContains(t, c.containerInfo.Config.Labels, labels.GitRepo)
 		})
 
 		t.Run("persists association labels and watch", func(t *testing.T) {
@@ -286,13 +287,13 @@ func TestGitWrappers(t *testing.T) {
 			}, true)
 
 			assert.Equal(t, map[string]string{
-				git.RepoLabel:         "https://github.com/org/app.git",
-				git.RefLabel:          "main",
-				git.SemverPolicyLabel: types.GitPolicyPatch,
-				git.HostLabel:         "https://git.example.com:3000",
-				git.DockerfileLabel:   "build/docker/Dockerfile",
-				git.ContextLabel:      ".",
-				git.WatchLabel:        "true",
+				labels.GitRepo:         "https://github.com/org/app.git",
+				labels.GitRef:          "main",
+				labels.GitSemverPolicy: types.GitPolicyPatch,
+				labels.GitHost:         "https://git.example.com:3000",
+				labels.GitDockerfile:   "build/docker/Dockerfile",
+				labels.GitContext:      ".",
+				labels.GitWatch:        "true",
 			}, c.containerInfo.Config.Labels)
 		})
 
@@ -302,7 +303,7 @@ func TestGitWrappers(t *testing.T) {
 			c := MockContainer()
 			ApplyGitAssociation(c, gitAssociation{Repo: "../repos/app", Ref: "main"}, true)
 
-			repo, ok := c.GetLabel(git.RepoLabel)
+			repo, ok := c.GetLabel(labels.GitRepo)
 			assert.True(t, ok)
 			assert.Equal(t, "../repos/app", repo)
 		})
@@ -312,13 +313,13 @@ func TestGitWrappers(t *testing.T) {
 
 			sshContainer := MockContainer()
 			ApplyGitAssociation(sshContainer, gitAssociation{Repo: "ssh://git@git.example.com/org/app.git"}, true)
-			sshRepo, ok := sshContainer.GetLabel(git.RepoLabel)
+			sshRepo, ok := sshContainer.GetLabel(labels.GitRepo)
 			assert.True(t, ok)
 			assert.Equal(t, "ssh://git@git.example.com/org/app.git", sshRepo)
 
 			pathContainer := MockContainer()
 			ApplyGitAssociation(pathContainer, gitAssociation{Repo: "/srv/repos/app?release=1"}, true)
-			pathRepo, ok := pathContainer.GetLabel(git.RepoLabel)
+			pathRepo, ok := pathContainer.GetLabel(labels.GitRepo)
 			assert.True(t, ok)
 			assert.Equal(t, "/srv/repos/app?release=1", pathRepo)
 		})
@@ -333,12 +334,12 @@ func TestGitWrappers(t *testing.T) {
 				Ref:  "main",
 			}, true)
 
-			repo, ok := c.GetLabel(git.RepoLabel)
+			repo, ok := c.GetLabel(labels.GitRepo)
 			assert.True(t, ok)
 			assert.Equal(t, "https://github.com/org/app.git#main", repo)
 			assert.NotContains(t, repo, "secret")
 
-			host, ok := c.GetLabel(git.HostLabel)
+			host, ok := c.GetLabel(labels.GitHost)
 			assert.True(t, ok)
 			assert.Equal(t, "https://git.example.com:3000", host)
 			assert.NotContains(t, host, "secret")
@@ -348,11 +349,11 @@ func TestGitWrappers(t *testing.T) {
 			t.Parallel()
 
 			c := MockContainer(WithLabels(map[string]string{
-				git.RepoLabel: "https://user:secret@github.com/org/app.git",
+				labels.GitRepo: "https://user:secret@github.com/org/app.git",
 			}))
 			ApplyGitAssociation(c, gitAssociation{Repo: "://invalid"}, true)
 
-			_, ok := c.GetLabel(git.RepoLabel)
+			_, ok := c.GetLabel(labels.GitRepo)
 			assert.False(t, ok)
 		})
 
@@ -373,7 +374,7 @@ func TestGitWrappers(t *testing.T) {
 			}, false)
 
 			assert.Equal(t, map[string]string{
-				git.RepoLabel: "https://github.com/org/app.git",
+				labels.GitRepo: "https://github.com/org/app.git",
 			}, c.containerInfo.Config.Labels)
 		})
 
@@ -381,12 +382,12 @@ func TestGitWrappers(t *testing.T) {
 			t.Parallel()
 
 			c := MockContainer()
-			c.SetLabel(git.RefLabel, "old")
-			c.SetLabel(git.WatchLabel, "true")
+			c.SetLabel(labels.GitRef, "old")
+			c.SetLabel(labels.GitWatch, "true")
 			ApplyGitAssociation(c, gitAssociation{Repo: "https://github.com/org/app.git"}, false)
 
 			assert.Equal(t, map[string]string{
-				git.RepoLabel: "https://github.com/org/app.git",
+				labels.GitRepo: "https://github.com/org/app.git",
 			}, c.containerInfo.Config.Labels)
 		})
 	})

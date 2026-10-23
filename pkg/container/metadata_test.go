@@ -11,7 +11,7 @@ import (
 
 	dockerContainer "github.com/moby/moby/api/types/container"
 
-	"github.com/nicholas-fedor/watchtower/pkg/container/git"
+	"github.com/nicholas-fedor/watchtower/internal/container/labels"
 	"github.com/nicholas-fedor/watchtower/pkg/types"
 )
 
@@ -28,7 +28,7 @@ func TestContainer_GetLifecyclePreCheckCommand(t *testing.T) {
 					Name: "/test-container",
 					Config: &dockerContainer.Config{
 						Labels: map[string]string{
-							preCheckLabel: "echo pre-check",
+							labels.LifecyclePreCheck: "echo pre-check",
 						},
 					},
 				},
@@ -70,7 +70,7 @@ func TestContainer_GetLifecyclePostCheckCommand(t *testing.T) {
 					Name: "/test-container",
 					Config: &dockerContainer.Config{
 						Labels: map[string]string{
-							postCheckLabel: "echo post-check",
+							labels.LifecyclePostCheck: "echo post-check",
 						},
 					},
 				},
@@ -112,7 +112,7 @@ func TestContainer_GetLifecyclePreUpdateCommand(t *testing.T) {
 					Name: "/test-container",
 					Config: &dockerContainer.Config{
 						Labels: map[string]string{
-							preUpdateLabel: "echo pre-update",
+							labels.LifecyclePreUpdate: "echo pre-update",
 						},
 					},
 				},
@@ -154,7 +154,7 @@ func TestContainer_GetLifecyclePostUpdateCommand(t *testing.T) {
 					Name: "/test-container",
 					Config: &dockerContainer.Config{
 						Labels: map[string]string{
-							postUpdateLabel: "echo post-update",
+							labels.LifecyclePostUpdate: "echo post-update",
 						},
 					},
 				},
@@ -196,7 +196,7 @@ func TestContainer_PreUpdateTimeout(t *testing.T) {
 					Name: "/test-container",
 					Config: &dockerContainer.Config{
 						Labels: map[string]string{
-							preUpdateTimeoutLabel: "5",
+							labels.LifecyclePreUpdateTimeout: "5",
 						},
 					},
 				},
@@ -210,7 +210,7 @@ func TestContainer_PreUpdateTimeout(t *testing.T) {
 					Name: "/test-container",
 					Config: &dockerContainer.Config{
 						Labels: map[string]string{
-							preUpdateTimeoutLabel: "invalid",
+							labels.LifecyclePreUpdateTimeout: "invalid",
 						},
 					},
 				},
@@ -252,7 +252,7 @@ func TestContainer_PostUpdateTimeout(t *testing.T) {
 					Name: "/test-container",
 					Config: &dockerContainer.Config{
 						Labels: map[string]string{
-							postUpdateTimeoutLabel: "10",
+							labels.LifecyclePostUpdateTimeout: "10",
 						},
 					},
 				},
@@ -266,7 +266,7 @@ func TestContainer_PostUpdateTimeout(t *testing.T) {
 					Name: "/test-container",
 					Config: &dockerContainer.Config{
 						Labels: map[string]string{
-							postUpdateTimeoutLabel: "invalid",
+							labels.LifecyclePostUpdateTimeout: "invalid",
 						},
 					},
 				},
@@ -309,7 +309,7 @@ func TestContainer_Enabled(t *testing.T) {
 					Name: "/test-container",
 					Config: &dockerContainer.Config{
 						Labels: map[string]string{
-							enableLabel: "true",
+							labels.Enable: "true",
 						},
 					},
 				},
@@ -324,7 +324,7 @@ func TestContainer_Enabled(t *testing.T) {
 					Name: "/test-container",
 					Config: &dockerContainer.Config{
 						Labels: map[string]string{
-							enableLabel: "false",
+							labels.Enable: "false",
 						},
 					},
 				},
@@ -352,7 +352,7 @@ func TestContainer_Enabled(t *testing.T) {
 					Name: "/test-container",
 					Config: &dockerContainer.Config{
 						Labels: map[string]string{
-							enableLabel: "invalid",
+							labels.Enable: "invalid",
 						},
 					},
 				},
@@ -388,7 +388,7 @@ func TestContainer_IsMonitorOnly(t *testing.T) {
 					Name: "/test-container",
 					Config: &dockerContainer.Config{
 						Labels: map[string]string{
-							monitorOnlyLabel: "true",
+							labels.MonitorOnly: "true",
 						},
 					},
 				},
@@ -408,7 +408,7 @@ func TestContainer_IsMonitorOnly(t *testing.T) {
 					Name: "/test-container",
 					Config: &dockerContainer.Config{
 						Labels: map[string]string{
-							monitorOnlyLabel: "false",
+							labels.MonitorOnly: "false",
 						},
 					},
 				},
@@ -447,46 +447,6 @@ func TestContainer_IsMonitorOnly(t *testing.T) {
 	}
 }
 
-func TestContainer_IsGitWatch(t *testing.T) {
-	t.Parallel()
-
-	tests := []struct {
-		name    string
-		label   string
-		present bool
-		global  bool
-		want    bool
-	}{
-		{name: "missing uses process true", global: true, want: true},
-		{name: "missing uses process false"},
-		{name: "label true", label: "true", present: true, want: true},
-		{name: "label false", label: "false", present: true, global: true},
-		{name: "invalid uses process", label: "maybe", present: true, global: true, want: true},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			t.Parallel()
-
-			labels := map[string]string{}
-			if tt.present {
-				labels[git.WatchLabel] = tt.label
-			}
-
-			c := &Container{
-				containerInfo: &dockerContainer.InspectResponse{
-					Name: "/test-container",
-					Config: &dockerContainer.Config{
-						Labels: labels,
-					},
-				},
-			}
-
-			assert.Equal(t, tt.want, c.IsGitWatch(types.UpdateParams{EnableGitMonitoring: tt.global}))
-		})
-	}
-}
-
 func TestContainer_IsNoPull(t *testing.T) {
 	type args struct {
 		params types.UpdateParams
@@ -505,7 +465,7 @@ func TestContainer_IsNoPull(t *testing.T) {
 					Name: "/test-container",
 					Config: &dockerContainer.Config{
 						Labels: map[string]string{
-							noPullLabel: "true",
+							labels.NoPull: "true",
 						},
 					},
 				},
@@ -525,7 +485,7 @@ func TestContainer_IsNoPull(t *testing.T) {
 					Name: "/test-container",
 					Config: &dockerContainer.Config{
 						Labels: map[string]string{
-							noPullLabel: "false",
+							labels.NoPull: "false",
 						},
 					},
 				},
@@ -578,7 +538,7 @@ func TestContainer_Scope(t *testing.T) {
 					Name: "/test-container",
 					Config: &dockerContainer.Config{
 						Labels: map[string]string{
-							scope: "test-scope",
+							labels.Scope: "test-scope",
 						},
 					},
 				},
@@ -622,7 +582,7 @@ func TestContainer_IsWatchtower(t *testing.T) {
 					Name: "/test-container",
 					Config: &dockerContainer.Config{
 						Labels: map[string]string{
-							watchtowerLabel: "true",
+							labels.Watchtower: "true",
 						},
 					},
 				},
@@ -636,7 +596,7 @@ func TestContainer_IsWatchtower(t *testing.T) {
 					Name: "/test-container",
 					Config: &dockerContainer.Config{
 						Labels: map[string]string{
-							watchtowerLabel: "false",
+							labels.Watchtower: "false",
 						},
 					},
 				},
@@ -689,7 +649,7 @@ func TestContainer_StopSignal(t *testing.T) {
 					Name: "/test-container",
 					Config: &dockerContainer.Config{
 						Labels: map[string]string{
-							signalLabel: "SIGTERM",
+							labels.StopSignal: "SIGTERM",
 						},
 					},
 				},
@@ -801,7 +761,7 @@ func TestContainsWatchtowerLabel(t *testing.T) {
 			name: "WatchtowerTrue",
 			args: args{
 				labels: map[string]string{
-					watchtowerLabel: "true",
+					labels.Watchtower: "true",
 				},
 			},
 			want: true,
@@ -810,7 +770,7 @@ func TestContainsWatchtowerLabel(t *testing.T) {
 			name: "WatchtowerFalse",
 			args: args{
 				labels: map[string]string{
-					watchtowerLabel: "false",
+					labels.Watchtower: "false",
 				},
 			},
 			want: false,
@@ -1057,7 +1017,7 @@ func TestContainer_GetLifecycleUID(t *testing.T) {
 					Name: "/test-container",
 					Config: &dockerContainer.Config{
 						Labels: map[string]string{
-							lifecycleUIDLabel: "1000",
+							labels.LifecycleUID: "1000",
 						},
 					},
 				},
@@ -1085,7 +1045,7 @@ func TestContainer_GetLifecycleUID(t *testing.T) {
 					Name: "/test-container",
 					Config: &dockerContainer.Config{
 						Labels: map[string]string{
-							lifecycleUIDLabel: "invalid",
+							labels.LifecycleUID: "invalid",
 						},
 					},
 				},
@@ -1100,7 +1060,7 @@ func TestContainer_GetLifecycleUID(t *testing.T) {
 					Name: "/test-container",
 					Config: &dockerContainer.Config{
 						Labels: map[string]string{
-							lifecycleUIDLabel: "-1",
+							labels.LifecycleUID: "-1",
 						},
 					},
 				},
@@ -1115,7 +1075,7 @@ func TestContainer_GetLifecycleUID(t *testing.T) {
 					Name: "/test-container",
 					Config: &dockerContainer.Config{
 						Labels: map[string]string{
-							lifecycleUIDLabel: "3000000000",
+							labels.LifecycleUID: "3000000000",
 						},
 					},
 				},
@@ -1147,7 +1107,7 @@ func TestContainer_GetLifecycleGID(t *testing.T) {
 					Name: "/test-container",
 					Config: &dockerContainer.Config{
 						Labels: map[string]string{
-							lifecycleGIDLabel: "1000",
+							labels.LifecycleGID: "1000",
 						},
 					},
 				},
@@ -1175,7 +1135,7 @@ func TestContainer_GetLifecycleGID(t *testing.T) {
 					Name: "/test-container",
 					Config: &dockerContainer.Config{
 						Labels: map[string]string{
-							lifecycleGIDLabel: "invalid",
+							labels.LifecycleGID: "invalid",
 						},
 					},
 				},
@@ -1190,7 +1150,7 @@ func TestContainer_GetLifecycleGID(t *testing.T) {
 					Name: "/test-container",
 					Config: &dockerContainer.Config{
 						Labels: map[string]string{
-							lifecycleGIDLabel: "-100",
+							labels.LifecycleGID: "-100",
 						},
 					},
 				},
@@ -1205,7 +1165,7 @@ func TestContainer_GetLifecycleGID(t *testing.T) {
 					Name: "/test-container",
 					Config: &dockerContainer.Config{
 						Labels: map[string]string{
-							lifecycleGIDLabel: "5000000000",
+							labels.LifecycleGID: "5000000000",
 						},
 					},
 				},
@@ -1335,7 +1295,7 @@ func TestContainer_GetContainerChain(t *testing.T) {
 					Name: "/test-container",
 					Config: &dockerContainer.Config{
 						Labels: map[string]string{
-							ContainerChainLabel: "chain-value",
+							labels.ContainerChain: "chain-value",
 						},
 					},
 				},
@@ -1403,7 +1363,7 @@ func TestGetEffectiveScope(t *testing.T) {
 					Name: "/test-container",
 					Config: &dockerContainer.Config{
 						Labels: map[string]string{
-							scope: "",
+							labels.Scope: "",
 						},
 					},
 				},
@@ -1419,7 +1379,7 @@ func TestGetEffectiveScope(t *testing.T) {
 					Name: "/test-container",
 					Config: &dockerContainer.Config{
 						Labels: map[string]string{
-							scope: "production",
+							labels.Scope: "production",
 						},
 					},
 				},
@@ -1462,17 +1422,17 @@ func TestGetEffectiveScope_NilContainer(t *testing.T) {
 // Returns:
 //   - *Container: A test container with the specified cooldown label configuration.
 func cooldownTestContainer(labelValue *string) *Container {
-	labels := map[string]string{}
+	containerLabels := map[string]string{}
 
 	if labelValue != nil {
-		labels[cooldownDelayLabel] = *labelValue
+		containerLabels[labels.CooldownDelay] = *labelValue
 	}
 
 	return &Container{
 		containerInfo: &dockerContainer.InspectResponse{
 			Name: "/test-container",
 			Config: &dockerContainer.Config{
-				Labels: labels,
+				Labels: containerLabels,
 			},
 		},
 	}
@@ -1587,7 +1547,7 @@ func TestGetEffectiveScope_NoneScopeEdgeCases(t *testing.T) {
 					Name: "/test-container",
 					Config: &dockerContainer.Config{
 						Labels: map[string]string{
-							scope: "none",
+							labels.Scope: "none",
 						},
 					},
 				},
@@ -1604,7 +1564,7 @@ func TestGetEffectiveScope_NoneScopeEdgeCases(t *testing.T) {
 					Name: "/test-container",
 					Config: &dockerContainer.Config{
 						Labels: map[string]string{
-							scope: "none",
+							labels.Scope: "none",
 						},
 					},
 				},
@@ -1636,7 +1596,7 @@ func TestGetEffectiveScope_NoneScopeEdgeCases(t *testing.T) {
 					Name: "/test-container",
 					Config: &dockerContainer.Config{
 						Labels: map[string]string{
-							scope: "", // explicitly empty
+							labels.Scope: "", // explicitly empty
 						},
 					},
 				},
@@ -1653,7 +1613,7 @@ func TestGetEffectiveScope_NoneScopeEdgeCases(t *testing.T) {
 					Name: "/test-container",
 					Config: &dockerContainer.Config{
 						Labels: map[string]string{
-							scope: "none", // transitioning to none
+							labels.Scope: "none", // transitioning to none
 						},
 					},
 				},
@@ -1670,7 +1630,7 @@ func TestGetEffectiveScope_NoneScopeEdgeCases(t *testing.T) {
 					Name: "/test-container",
 					Config: &dockerContainer.Config{
 						Labels: map[string]string{
-							scope: "none",
+							labels.Scope: "none",
 						},
 					},
 				},
@@ -1707,8 +1667,8 @@ func TestContainer_IsWatchtower_DoesNotLog(t *testing.T) {
 		labels map[string]string
 		want   bool
 	}{
-		{name: "label true", labels: map[string]string{watchtowerLabel: "true"}, want: true},
-		{name: "label false", labels: map[string]string{watchtowerLabel: "false"}},
+		{name: "label true", labels: map[string]string{labels.Watchtower: "true"}, want: true},
+		{name: "label false", labels: map[string]string{labels.Watchtower: "false"}},
 		{name: "label missing", labels: map[string]string{}},
 	}
 

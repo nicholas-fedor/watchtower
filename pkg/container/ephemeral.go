@@ -16,6 +16,7 @@ import (
 	dockerNetwork "github.com/moby/moby/api/types/network"
 	dockerClient "github.com/moby/moby/client"
 
+	"github.com/nicholas-fedor/watchtower/internal/container/labels"
 	"github.com/nicholas-fedor/watchtower/pkg/types"
 )
 
@@ -305,7 +306,7 @@ func buildOrchestratorConfig(
 		Env:   env,
 		Labels: map[string]string{
 			// Orchestrator label only — watchtower label omitted to avoid excess instance detection.
-			orchestratorLabel: "true",
+			labels.EphemeralOrchestrator: "true",
 		},
 	}
 }
@@ -884,7 +885,7 @@ func RemoveOrphanedOrchestrators(log *zerolog.Logger,
 		}
 
 		// Check for the orchestrator label.
-		if containerInfo.Config.Labels[orchestratorLabel] != "true" {
+		if containerInfo.Config.Labels[labels.EphemeralOrchestrator] != "true" {
 			continue
 		}
 

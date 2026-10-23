@@ -15,6 +15,7 @@ import (
 	dockerContainer "github.com/moby/moby/api/types/container"
 	dockerImage "github.com/moby/moby/api/types/image"
 
+	"github.com/nicholas-fedor/watchtower/internal/container/labels"
 	mockContainer "github.com/nicholas-fedor/watchtower/pkg/container/mocks"
 	"github.com/nicholas-fedor/watchtower/pkg/types"
 )
@@ -82,7 +83,7 @@ func TestRemoveOrphanedOrchestrators_SkipsInFlight(t *testing.T) {
 			orchestrator := MockContainer(
 				WithID("orch123"),
 				WithName("watchtower-orchestrator"),
-				WithLabels(map[string]string{orchestratorLabel: "true"}),
+				WithLabels(map[string]string{labels.EphemeralOrchestrator: "true"}),
 				WithContainerState(tt.state),
 				func(c *dockerContainer.InspectResponse, _ *dockerImage.InspectResponse) {
 					c.Created = tt.created
@@ -120,7 +121,7 @@ func TestRemoveOrphanedOrchestrators_AlreadyGone(t *testing.T) {
 	orchestrator := MockContainer(
 		WithID("orch123"),
 		WithName("watchtower-orchestrator"),
-		WithLabels(map[string]string{orchestratorLabel: "true"}),
+		WithLabels(map[string]string{labels.EphemeralOrchestrator: "true"}),
 		WithContainerState(dockerContainer.State{
 			Running:   true,
 			StartedAt: time.Now().Add(-time.Hour).UTC().Format(time.RFC3339Nano),

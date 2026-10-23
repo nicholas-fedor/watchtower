@@ -8,6 +8,7 @@ import (
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 
+	"github.com/nicholas-fedor/watchtower/internal/container/labels"
 	"github.com/nicholas-fedor/watchtower/pkg/types"
 	typemocks "github.com/nicholas-fedor/watchtower/pkg/types/mocks"
 )
@@ -27,10 +28,10 @@ func TestResolveAssociation(t *testing.T) {
 		t.Parallel()
 
 		c := testContainer(t, map[string]string{
-			RepoLabel:       "https://github.com/org/from-label.git",
-			RefLabel:        "release",
-			DockerfileLabel: "build/Dockerfile",
-			ContextLabel:    "src",
+			labels.GitRepo:       "https://github.com/org/from-label.git",
+			labels.GitRef:        "release",
+			labels.GitDockerfile: "build/Dockerfile",
+			labels.GitContext:    "src",
 		}, "myapp:latest")
 
 		got, ok := ResolveAssociation(c, types.UpdateParams{
@@ -57,8 +58,8 @@ func TestResolveAssociation(t *testing.T) {
 		t.Parallel()
 
 		c := testContainer(t, map[string]string{
-			RepoLabel: "git@git.example.com:org/app.git",
-			HostLabel: "https://git.example.com:3000",
+			labels.GitRepo: "git@git.example.com:org/app.git",
+			labels.GitHost: "https://git.example.com:3000",
 		}, "myapp:latest")
 
 		got, ok := ResolveAssociation(c, types.UpdateParams{})
@@ -70,7 +71,7 @@ func TestResolveAssociation(t *testing.T) {
 		t.Parallel()
 
 		c := testContainer(t, map[string]string{
-			RepoLabel: "https://github.com/org/app.git",
+			labels.GitRepo: "https://github.com/org/app.git",
 		}, "myapp:latest")
 
 		got, ok := ResolveAssociation(c, types.UpdateParams{})
@@ -85,8 +86,8 @@ func TestResolveAssociation(t *testing.T) {
 		t.Parallel()
 
 		c := testContainer(t, map[string]string{
-			RepoLabel:   "https://github.com/org/app.git",
-			branchLabel: "develop",
+			labels.GitRepo:   "https://github.com/org/app.git",
+			labels.GitBranch: "develop",
 		}, "myapp:latest")
 
 		got, ok := ResolveAssociation(c, types.UpdateParams{})
@@ -98,7 +99,7 @@ func TestResolveAssociation(t *testing.T) {
 		t.Parallel()
 
 		c := testContainer(t, map[string]string{
-			DockerfileLabel: "label.Dockerfile",
+			labels.GitDockerfile: "label.Dockerfile",
 		}, "myapp:latest")
 
 		got, ok := ResolveAssociation(c, types.UpdateParams{
@@ -171,7 +172,7 @@ func TestShouldMonitor(t *testing.T) {
 	t.Run("associated and process watch", func(t *testing.T) {
 		t.Parallel()
 
-		c := testContainer(t, map[string]string{RepoLabel: "https://github.com/org/app.git"}, "myapp:latest")
+		c := testContainer(t, map[string]string{labels.GitRepo: "https://github.com/org/app.git"}, "myapp:latest")
 		assert.True(t, ShouldMonitor(nil, c, types.UpdateParams{EnableGitMonitoring: true}))
 	})
 
@@ -179,8 +180,8 @@ func TestShouldMonitor(t *testing.T) {
 		t.Parallel()
 
 		c := testContainer(t, map[string]string{
-			RepoLabel:  "https://github.com/org/app.git",
-			WatchLabel: "false",
+			labels.GitRepo:  "https://github.com/org/app.git",
+			labels.GitWatch: "false",
 		}, "myapp:latest")
 		assert.False(t, ShouldMonitor(nil, c, types.UpdateParams{EnableGitMonitoring: true}))
 	})
@@ -196,7 +197,7 @@ func TestShouldMonitor(t *testing.T) {
 	t.Run("watch without association", func(t *testing.T) {
 		t.Parallel()
 
-		c := testContainer(t, map[string]string{WatchLabel: "true"}, "nginx:latest")
+		c := testContainer(t, map[string]string{labels.GitWatch: "true"}, "nginx:latest")
 		nop := zerolog.Nop()
 		assert.False(t, ShouldMonitor(&nop, c, types.UpdateParams{}))
 		assert.False(t, ShouldMonitor(nil, c, types.UpdateParams{}))
@@ -206,22 +207,22 @@ func TestShouldMonitor(t *testing.T) {
 func TestLabel(t *testing.T) {
 	t.Parallel()
 
-	assert.Empty(t, label(nil, RepoLabel))
-	assert.Empty(t, label(testContainer(t, nil, "app:latest"), RepoLabel))
+	assert.Empty(t, label(nil, labels.GitRepo))
+	assert.Empty(t, label(testContainer(t, nil, "app:latest"), labels.GitRepo))
 	assert.Equal(t, "https://github.com/org/app.git", label(testContainer(t, map[string]string{
-		RepoLabel: "  https://github.com/org/app.git  ",
-	}, "app:latest"), RepoLabel))
+		labels.GitRepo: "  https://github.com/org/app.git  ",
+	}, "app:latest"), labels.GitRepo))
 }
 
 func TestRefLabel(t *testing.T) {
 	t.Parallel()
 
 	assert.Equal(t, "release", refLabel(testContainer(t, map[string]string{
-		RefLabel:    "release",
-		branchLabel: "ignored",
+		labels.GitRef:    "release",
+		labels.GitBranch: "ignored",
 	}, "app:latest")))
 	assert.Equal(t, "develop", refLabel(testContainer(t, map[string]string{
-		branchLabel: "develop",
+		labels.GitBranch: "develop",
 	}, "app:latest")))
 	assert.Empty(t, refLabel(testContainer(t, nil, "app:latest")))
 }
@@ -230,10 +231,10 @@ func TestPolicyLabel(t *testing.T) {
 	t.Parallel()
 
 	assert.Equal(t, types.GitPolicyPatch, policyLabel(testContainer(t, map[string]string{
-		SemverPolicyLabel: "Patch",
+		labels.GitSemverPolicy: "Patch",
 	}, "app:latest")))
 	assert.Empty(t, policyLabel(testContainer(t, map[string]string{
-		SemverPolicyLabel: "nightly",
+		labels.GitSemverPolicy: "nightly",
 	}, "app:latest")))
 	assert.Empty(t, policyLabel(testContainer(t, nil, "app:latest")))
 }
@@ -273,12 +274,12 @@ func TestPersistWatch(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 
-			labels := map[string]string{}
+			containerLabels := map[string]string{}
 			if tt.present {
-				labels[WatchLabel] = tt.label
+				containerLabels[labels.GitWatch] = tt.label
 			}
 
-			assert.Equal(t, tt.want, PersistWatch(testContainer(t, labels, "app:latest")))
+			assert.Equal(t, tt.want, PersistWatch(testContainer(t, containerLabels, "app:latest")))
 		})
 	}
 
@@ -313,12 +314,12 @@ func TestIsWatch(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 
-			labels := map[string]string{}
+			containerLabels := map[string]string{}
 			if tt.present {
-				labels[WatchLabel] = tt.label
+				containerLabels[labels.GitWatch] = tt.label
 			}
 
-			got := isWatch(testContainer(t, labels, "app:latest"), types.UpdateParams{EnableGitMonitoring: tt.process})
+			got := isWatch(testContainer(t, containerLabels, "app:latest"), types.UpdateParams{EnableGitMonitoring: tt.process})
 			assert.Equal(t, tt.want, got)
 		})
 	}

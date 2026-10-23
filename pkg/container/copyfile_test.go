@@ -22,6 +22,7 @@ import (
 	dockerSystem "github.com/moby/moby/api/types/system"
 	dockerClient "github.com/moby/moby/client"
 
+	"github.com/nicholas-fedor/watchtower/internal/container/labels"
 	mockContainer "github.com/nicholas-fedor/watchtower/pkg/container/mocks"
 	"github.com/nicholas-fedor/watchtower/pkg/types"
 )
@@ -124,7 +125,7 @@ func TestCopyFilePathsFromContainer(t *testing.T) {
 		t.Parallel()
 
 		c := MockContainer(WithLabels(map[string]string{
-			copyFileLabel: "/app/config.yaml",
+			labels.CopyFile: "/app/config.yaml",
 		}))
 		got, err := copyFilePaths(c)
 		require.NoError(t, err)
@@ -135,7 +136,7 @@ func TestCopyFilePathsFromContainer(t *testing.T) {
 		t.Parallel()
 
 		c := MockContainer(WithLabels(map[string]string{
-			copyFileLabel: "../secret",
+			labels.CopyFile: "../secret",
 		}))
 		got, err := copyFilePaths(c)
 		require.ErrorIs(t, err, errCopyFileInvalidPath)
@@ -154,7 +155,7 @@ func TestCopyFilePathsFromContainer(t *testing.T) {
 		t.Parallel()
 
 		c := MockContainer(WithLabels(map[string]string{
-			copyFileLabel: "",
+			labels.CopyFile: "",
 		}))
 		got, err := copyFilePaths(c)
 		require.NoError(t, err)
@@ -367,7 +368,7 @@ func TestSnapshotCopyFiles(t *testing.T) {
 			}, nil)
 
 		c := MockContainer(WithLabels(map[string]string{
-			copyFileLabel: "/app/config.yaml",
+			labels.CopyFile: "/app/config.yaml",
 		}))
 
 		snap, err := snapshotCopyFiles(newTestLogger(t), t.Context(), api, c)
@@ -390,7 +391,7 @@ func TestSnapshotCopyFiles(t *testing.T) {
 			Return(dockerClient.CopyFromContainerResult{}, cerrdefs.ErrNotFound)
 
 		c := MockContainer(WithLabels(map[string]string{
-			copyFileLabel: "/etc/missing.conf",
+			labels.CopyFile: "/etc/missing.conf",
 		}))
 
 		snap, err := snapshotCopyFiles(newTestLogger(t), t.Context(), api, c)
@@ -404,7 +405,7 @@ func TestSnapshotCopyFiles(t *testing.T) {
 		api := mockContainer.NewMockAPIClient(t)
 		c := MockContainer(
 			WithLabels(map[string]string{
-				copyFileLabel: "/app/config.yaml",
+				labels.CopyFile: "/app/config.yaml",
 			}),
 			WithBinds([]string{"/host/config.yaml:/app/config.yaml:ro"}),
 		)
@@ -420,7 +421,7 @@ func TestSnapshotCopyFiles(t *testing.T) {
 		api := mockContainer.NewMockAPIClient(t)
 		c := MockContainer(
 			WithLabels(map[string]string{
-				copyFileLabel: "/etc/searxng/settings.yml",
+				labels.CopyFile: "/etc/searxng/settings.yml",
 			}),
 			WithInspectMounts([]dockerContainer.MountPoint{
 				{Destination: "/etc/searxng", RW: false},
@@ -438,7 +439,7 @@ func TestSnapshotCopyFiles(t *testing.T) {
 		api := mockContainer.NewMockAPIClient(t)
 		c := MockContainer(
 			WithLabels(map[string]string{
-				copyFileLabel: "/etc/searxng/settings.yml",
+				labels.CopyFile: "/etc/searxng/settings.yml",
 			}),
 			WithReadonlyRootfs(true),
 			WithInspectMounts([]dockerContainer.MountPoint{
@@ -469,7 +470,7 @@ func TestSnapshotCopyFiles(t *testing.T) {
 
 		c := MockContainer(
 			WithLabels(map[string]string{
-				copyFileLabel: "/etc/searxng/settings.yml",
+				labels.CopyFile: "/etc/searxng/settings.yml",
 			}),
 			WithInspectMounts([]dockerContainer.MountPoint{
 				{Destination: "/etc/searxng", RW: true},
@@ -500,7 +501,7 @@ func TestSnapshotCopyFiles(t *testing.T) {
 			}, nil)
 
 		c := MockContainer(WithLabels(map[string]string{
-			copyFileLabel: "/app/data",
+			labels.CopyFile: "/app/data",
 		}))
 
 		_, err := snapshotCopyFiles(newTestLogger(t), t.Context(), api, c)
@@ -523,7 +524,7 @@ func TestSnapshotCopyFiles(t *testing.T) {
 			}, nil)
 
 		c := MockContainer(WithLabels(map[string]string{
-			copyFileLabel: "/etc/huge.conf",
+			labels.CopyFile: "/etc/huge.conf",
 		}))
 
 		_, err := snapshotCopyFiles(newTestLogger(t), t.Context(), api, c)
@@ -546,7 +547,7 @@ func TestSnapshotCopyFiles(t *testing.T) {
 			}, nil)
 
 		c := MockContainer(WithLabels(map[string]string{
-			copyFileLabel: "/app/config.yaml",
+			labels.CopyFile: "/app/config.yaml",
 		}))
 
 		_, err := snapshotCopyFiles(newTestLogger(t), t.Context(), api, c)
@@ -568,7 +569,7 @@ func TestSnapshotCopyFiles(t *testing.T) {
 			}, nil)
 
 		c := MockContainer(WithLabels(map[string]string{
-			copyFileLabel: "/app/config.yaml",
+			labels.CopyFile: "/app/config.yaml",
 		}))
 
 		_, err := snapshotCopyFiles(newTestLogger(t), t.Context(), api, c)
@@ -580,7 +581,7 @@ func TestSnapshotCopyFiles(t *testing.T) {
 
 		api := mockContainer.NewMockAPIClient(t)
 		c := MockContainer(WithLabels(map[string]string{
-			copyFileLabel: "relative.conf",
+			labels.CopyFile: "relative.conf",
 		}))
 
 		_, err := snapshotCopyFiles(newTestLogger(t), t.Context(), api, c)
@@ -617,7 +618,7 @@ func TestSnapshotCopyFiles(t *testing.T) {
 		}
 
 		c := MockContainer(WithLabels(map[string]string{
-			copyFileLabel: strings.Join(paths, ","),
+			labels.CopyFile: strings.Join(paths, ","),
 		}))
 
 		_, err := snapshotCopyFiles(newTestLogger(t), t.Context(), api, c)
@@ -1108,7 +1109,7 @@ func TestSnapshotCopyFileErrors(t *testing.T) {
 			Return(dockerClient.CopyFromContainerResult{}, errors.New("denied"))
 
 		c := MockContainer(WithLabels(map[string]string{
-			copyFileLabel: "/app/config.yaml",
+			labels.CopyFile: "/app/config.yaml",
 		}))
 		_, err := snapshotCopyFiles(newTestLogger(t), t.Context(), api, c)
 		require.ErrorIs(t, err, errCopyFileSnapshotFailed)
@@ -1129,7 +1130,7 @@ func TestSnapshotCopyFileErrors(t *testing.T) {
 			}, nil)
 
 		c := MockContainer(WithLabels(map[string]string{
-			copyFileLabel: "/app/config.yaml",
+			labels.CopyFile: "/app/config.yaml",
 		}))
 		_, err := snapshotCopyFiles(newTestLogger(t), t.Context(), api, c)
 		require.ErrorIs(t, err, errCopyFileSymlink)
@@ -1151,7 +1152,7 @@ func TestSnapshotCopyFileErrors(t *testing.T) {
 			}, nil)
 
 		c := MockContainer(WithLabels(map[string]string{
-			copyFileLabel: "/app/config.yaml",
+			labels.CopyFile: "/app/config.yaml",
 		}))
 		_, err := snapshotCopyFiles(newTestLogger(t), t.Context(), api, c)
 		require.ErrorIs(t, err, errCopyFileSnapshotFailed)
@@ -1173,7 +1174,7 @@ func TestSnapshotCopyFileErrors(t *testing.T) {
 			}, nil)
 
 		c := MockContainer(WithLabels(map[string]string{
-			copyFileLabel: "/app/config.yaml",
+			labels.CopyFile: "/app/config.yaml",
 		}))
 		_, err := snapshotCopyFiles(newTestLogger(t), t.Context(), api, c)
 		require.ErrorIs(t, err, errCopyFileTooLarge)
@@ -1210,7 +1211,7 @@ func TestClientCopyFileStore(t *testing.T) {
 
 		cli := &client{log: newTestLogger(t), api: api}
 		source := MockContainer(WithLabels(map[string]string{
-			copyFileLabel: "/app/config.yaml",
+			labels.CopyFile: "/app/config.yaml",
 		}))
 		require.NoError(t, cli.SnapshotCopyFiles(t.Context(), source))
 		require.Contains(t, cli.copyFiles, source.ID())
@@ -1222,7 +1223,7 @@ func TestClientCopyFileStore(t *testing.T) {
 
 		cli := &client{log: newTestLogger(t), api: mockContainer.NewMockAPIClient(t)}
 		err := cli.SnapshotCopyFiles(t.Context(), MockContainer(WithLabels(map[string]string{
-			copyFileLabel: "relative.conf",
+			labels.CopyFile: "relative.conf",
 		})))
 		require.ErrorIs(t, err, errCopyFileInvalidPath)
 	})

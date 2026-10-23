@@ -5,6 +5,7 @@ import (
 
 	"github.com/stretchr/testify/assert"
 
+	"github.com/nicholas-fedor/watchtower/internal/container/labels"
 	"github.com/nicholas-fedor/watchtower/pkg/container/git"
 	"github.com/nicholas-fedor/watchtower/pkg/container/oci"
 	"github.com/nicholas-fedor/watchtower/pkg/types"
@@ -28,9 +29,9 @@ func TestResolveReportMeta(t *testing.T) {
 		c := MockContainer(
 			WithImageName("myapp:latest"),
 			WithLabels(map[string]string{
-				git.RepoLabel:         "https://github.com/org/from-label.git",
-				git.RefLabel:          "release",
-				git.ChangelogURLLabel: "https://example.com/changelog/{tag}",
+				labels.GitRepo:      "https://github.com/org/from-label.git",
+				labels.GitRef:       "release",
+				labels.ChangelogURL: "https://example.com/changelog/{tag}",
 			}),
 			WithImageLabels(map[string]string{
 				oci.SourceLabel: "https://github.com/org/from-oci.git",
@@ -58,7 +59,7 @@ func TestResolveReportMeta(t *testing.T) {
 		c := MockContainer(
 			WithImageName("app:latest"),
 			WithLabels(map[string]string{
-				git.RepoLabel: "../repos/app?release=1",
+				labels.GitRepo: "../repos/app?release=1",
 			}),
 		)
 
@@ -72,8 +73,8 @@ func TestResolveReportMeta(t *testing.T) {
 		c := MockContainer(
 			WithImageName("app:latest"),
 			WithLabels(map[string]string{
-				git.RepoLabel:         "https://user:secret@github.com/org/app.git?access_token=query#main",
-				git.ChangelogURLLabel: "https://example.com/notes?version=2#install",
+				labels.GitRepo:      "https://user:secret@github.com/org/app.git?access_token=query#main",
+				labels.ChangelogURL: "https://example.com/notes?version=2#install",
 			}),
 			WithImageLabels(map[string]string{
 				oci.SourceLabel:        "https://source:source-secret@example.com/org/source.git?token=source-query",
@@ -215,29 +216,29 @@ func TestResolveReportMeta(t *testing.T) {
 		t.Parallel()
 
 		gitlab := MockContainer(WithImageName("app:latest"), WithLabels(map[string]string{
-			git.RepoLabel: "https://gitlab.com/org/app.git",
+			labels.GitRepo: "https://gitlab.com/org/app.git",
 		}))
 		assert.Equal(t, "https://gitlab.com/org/app/-/releases", ResolveReportMeta(gitlab, types.UpdateParams{}, ChangelogVars{}, oci.Annotations{}).Changelog)
 
 		codeberg := MockContainer(WithImageName("app:latest"), WithLabels(map[string]string{
-			git.RepoLabel: "https://codeberg.org/org/app.git",
+			labels.GitRepo: "https://codeberg.org/org/app.git",
 		}))
 		assert.Equal(t, "https://codeberg.org/org/app/releases", ResolveReportMeta(codeberg, types.UpdateParams{}, ChangelogVars{}, oci.Annotations{}).Changelog)
 
 		mappedHost := MockContainer(WithImageName("app:latest"), WithLabels(map[string]string{
-			git.RepoLabel: "git@git.example.com:org/app.git",
-			git.HostLabel: "https://git.example.com:3000/gitea",
+			labels.GitRepo: "git@git.example.com:org/app.git",
+			labels.GitHost: "https://git.example.com:3000/gitea",
 		}))
 		assert.Equal(t, "https://git.example.com:3000/gitea/org/app/releases", ResolveReportMeta(mappedHost, types.UpdateParams{}, ChangelogVars{}, oci.Annotations{}).Changelog)
 
 		ghe := MockContainer(WithImageName("app:latest"), WithLabels(map[string]string{
-			git.RepoLabel: "https://github.company.com/org/app.git",
-			git.HostLabel: "https://github.company.com/github",
+			labels.GitRepo: "https://github.company.com/org/app.git",
+			labels.GitHost: "https://github.company.com/github",
 		}))
 		assert.Equal(t, "https://github.company.com/github/org/app/releases", ResolveReportMeta(ghe, types.UpdateParams{}, ChangelogVars{}, oci.Annotations{}).Changelog)
 
 		nested := MockContainer(WithImageName("app:latest"), WithLabels(map[string]string{
-			git.RepoLabel: "https://gitlab.com/group/sub/repo.git",
+			labels.GitRepo: "https://gitlab.com/group/sub/repo.git",
 		}))
 		assert.Equal(t, "https://gitlab.com/group/sub/repo/-/releases", ResolveReportMeta(nested, types.UpdateParams{}, ChangelogVars{}, oci.Annotations{}).Changelog)
 	})
@@ -281,7 +282,7 @@ func TestResolveReportMeta(t *testing.T) {
 		t.Parallel()
 
 		c := MockContainer(WithImageName("app:latest"), WithLabels(map[string]string{
-			git.RepoLabel: "https://unknown.example/org/app.git",
+			labels.GitRepo: "https://unknown.example/org/app.git",
 		}))
 		assert.Empty(t, ResolveReportMeta(c, types.UpdateParams{}, ChangelogVars{}, oci.Annotations{}).Changelog)
 	})

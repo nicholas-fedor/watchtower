@@ -4,6 +4,8 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+
+	"github.com/nicholas-fedor/watchtower/internal/container/labels"
 )
 
 func TestChangelog(t *testing.T) {
@@ -13,7 +15,7 @@ func TestChangelog(t *testing.T) {
 		t.Parallel()
 
 		c := testContainer(t, map[string]string{
-			ChangelogURLLabel: "https://example.com/notes/{tag}#{commit}",
+			labels.ChangelogURL: "https://example.com/notes/{tag}#{commit}",
 		}, "app:latest")
 		got := Changelog(c, "https://github.com/org/app.git", ChangelogVars{Tag: "v1.2.3", Commit: "abc"})
 		assert.Equal(t, "https://example.com/notes/v1.2.3#abc", got)
@@ -37,7 +39,7 @@ func TestChangelog(t *testing.T) {
 		t.Parallel()
 
 		c := testContainer(t, map[string]string{
-			ChangelogURLLabel: "https://example.com/notes/{tag}",
+			labels.ChangelogURL: "https://example.com/notes/{tag}",
 		}, "app:latest")
 		got := Changelog(c, "https://github.com/org/app.git", ChangelogVars{Tag: "v1.2.3"})
 		assert.Equal(t, "https://example.com/notes/v1.2.3", got)
