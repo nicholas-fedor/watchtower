@@ -3,7 +3,9 @@ package container
 import (
 	"errors"
 	"fmt"
+	"maps"
 	"strconv"
+	"strings"
 	"time"
 
 	dockerContainer "github.com/moby/moby/api/types/container"
@@ -11,6 +13,14 @@ import (
 	"github.com/nicholas-fedor/watchtower/internal/container/labels"
 	"github.com/nicholas-fedor/watchtower/internal/settings/units"
 	"github.com/nicholas-fedor/watchtower/pkg/types"
+)
+
+// Errors for label and scope operations.
+var (
+	// errCurrentContainerNotCached indicates the current container is not cached for scope derivation.
+	errCurrentContainerNotCached = errors.New("current container not cached for scope derivation")
+	// errLabelNotFound indicates a requested label is not present in the container's metadata.
+	errLabelNotFound = errors.New("label not found")
 )
 
 // GetLifecyclePreCheckCommand returns the pre-check command from labels.
@@ -689,4 +699,91 @@ func (c *Container) getContainerOrGlobalBool(
 		Msg("Combined container and global values")
 
 	return result
+}
+
+// SetLabel sets a container config label used on the next create.
+//
+// Parameters:
+//   - key: Label key.
+//   - value: Label value.
+//
+// Returns:
+//   - none.
+func (c *Container) SetLabel(key, value string) {
+	if c == nil || key == "" {
+		return
+	}
+
+	c.mu.Lock()
+	defer c.mu.Unlock()
+
+	if c.containerInfo == nil || c.containerInfo.Config == nil {
+		return
+	}
+
+	c.replaceInspectLocked(func(info *dockerContainer.InspectResponse) {
+		labels := maps.Clone(info.Config.Labels)
+		if labels == nil {
+			labels = make(map[string]string, 1)
+		}
+
+		labels[key] = value
+		info.Config.Labels = labels
+	})
+}
+
+// DeleteLabel removes a container config label used on the next create.
+//
+// Parameters:
+//   - key: Label key.
+//
+// Returns:
+//   - none.
+func (c *Container) DeleteLabel(key string) {
+	if c == nil || key == "" {
+		return
+	}
+
+	c.mu.Lock()
+	defer c.mu.Unlock()
+
+	if c.containerInfo == nil || c.containerInfo.Config == nil {
+		return
+	}
+
+	if _, ok := c.containerInfo.Config.Labels[key]; !ok {
+		return
+	}
+
+	c.replaceInspectLocked(func(info *dockerContainer.InspectResponse) {
+		labels := maps.Clone(info.Config.Labels)
+		delete(labels, key)
+		info.Config.Labels = labels
+	})
+}
+
+// IsWatchtowerParent checks if the current container ID exists in the comma-separated container-chain label values.
+//
+// It handles edge cases like empty chain or invalid IDs by returning false appropriately.
+// The chain values are trimmed of whitespace before comparison.
+//
+// Parameters:
+//   - currentID: The container ID to check for in the chain.
+//   - chain: Comma-separated string of container IDs from the container-chain label.
+//
+// Returns:
+//   - bool: True if currentID is found in the chain, false otherwise.
+func IsWatchtowerParent(currentID types.ContainerID, chain string) bool {
+	if currentID == "" || chain == "" {
+		return false
+	}
+
+	ids := strings.SplitSeq(chain, ",")
+	for id := range ids {
+		if strings.TrimSpace(id) == string(currentID) {
+			return true
+		}
+	}
+
+	return false
 }

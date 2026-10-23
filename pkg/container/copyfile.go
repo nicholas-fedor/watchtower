@@ -44,6 +44,26 @@ const (
 	userNSSecurityOption = "name=userns"
 )
 
+// Errors for copy-file label operations.
+var (
+	// errCopyFileInvalidPath indicates a copy-file label path is not a clean absolute file path.
+	errCopyFileInvalidPath = errors.New("invalid copy-file path")
+	// errCopyFileDirectory indicates a copy-file label path refers to a directory.
+	errCopyFileDirectory = errors.New("copy-file path is a directory")
+	// errCopyFileTooLarge indicates a copy-file label path exceeds the per-file size cap.
+	errCopyFileTooLarge = errors.New("copy-file path exceeds size limit")
+	// errCopyFileSnapshotFailed indicates CopyFromContainer failed for a labeled path.
+	errCopyFileSnapshotFailed = errors.New("failed to snapshot copy-file path")
+	// errCopyFileInjectFailed indicates CopyToContainer failed for a labeled path.
+	errCopyFileInjectFailed = errors.New("failed to copy file into new container")
+	// errCopyFileSymlink indicates a copy-file label path is a symbolic link.
+	errCopyFileSymlink = errors.New("copy-file path is a symbolic link")
+	// errCopyFileUnsafeArchive indicates the copied archive was not a single regular file.
+	errCopyFileUnsafeArchive = errors.New("copy-file archive is not a single regular file")
+	// errCopyFileStoreFull indicates in-flight copy-file snapshots exceed the memory cap.
+	errCopyFileStoreFull = errors.New("copy-file snapshot store exceeds size limit")
+)
+
 // copyFileSkipReason explains why a labeled path is not copied into a replacement.
 type copyFileSkipReason uint8
 
@@ -65,8 +85,6 @@ type CopyFileStore interface {
 	// DiscardCopyFiles drops a leftover snapshot for the source container.
 	DiscardCopyFiles(containerID types.ContainerID)
 }
-
-var _ CopyFileStore = (*client)(nil)
 
 // copyFileEntry is one labeled file captured from a container.
 type copyFileEntry struct {
@@ -858,55 +876,4 @@ func daemonRemapsUserNamespaces(securityOptions []string) bool {
 	}
 
 	return false
-}
-
-// SnapshotCopyFiles captures labeled files before the source is removed.
-//
-// Parameters:
-//   - ctx: Context for cancellation and timeout control.
-//   - source: Source container about to be stopped and removed.
-//
-// Returns:
-//   - error: Non-nil if a labeled path cannot be snapshotted.
-func (c *client) SnapshotCopyFiles(ctx context.Context, source types.Container) error {
-	snapshot, err := snapshotCopyFiles(c.logger(), ctx, c.api, source)
-	if err != nil {
-		return err
-	}
-
-	if snapshot.empty() {
-		return nil
-	}
-
-	return c.copyFiles.store(source.ID(), snapshot)
-}
-
-// injectStoredCopyFiles writes a stored snapshot into a newly created container.
-//
-// Parameters:
-//   - ctx: Context for cancellation and timeout control.
-//   - source: Source container whose snapshot should be injected.
-//   - newID: ID of the replacement container.
-//
-// Returns:
-//   - error: Non-nil if a stored file cannot be written into the new container.
-func (c *client) injectStoredCopyFiles(
-	ctx context.Context,
-	source types.Container,
-	newID types.ContainerID,
-) error {
-	snapshot, ok := c.copyFiles.take(source.ID())
-	if !ok {
-		return nil
-	}
-
-	return injectCopyFiles(c.logger(), ctx, c.api, string(newID), source, snapshot)
-}
-
-// DiscardCopyFiles drops a leftover snapshot for the source container.
-//
-// Parameters:
-//   - containerID: Source container ID whose snapshot should be discarded.
-func (c *client) DiscardCopyFiles(containerID types.ContainerID) {
-	c.copyFiles.take(containerID)
 }

@@ -1,9 +1,11 @@
 package container
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
+	"net/netip"
 	"os"
 	"path/filepath"
 	"testing"
@@ -17,11 +19,15 @@ import (
 	dockerImage "github.com/moby/moby/api/types/image"
 	dockerMount "github.com/moby/moby/api/types/mount"
 	dockerNetwork "github.com/moby/moby/api/types/network"
+	dockerSystem "github.com/moby/moby/api/types/system"
 	dockerClient "github.com/moby/moby/client"
 
 	mockContainer "github.com/nicholas-fedor/watchtower/pkg/container/mocks"
 	"github.com/nicholas-fedor/watchtower/pkg/types"
 )
+
+// testTargetID is the ID the mocked daemon gives a created target container.
+const testTargetID = "new_container_id"
 
 // MockContainerUpdate defines a function to update mock container or image metadata for testing.
 type MockContainerUpdate func(*dockerContainer.InspectResponse, *dockerImage.InspectResponse)
@@ -717,4 +723,152 @@ func expectContainerFixture(t *testing.T, api *mockContainer.MockAPIClient, fixt
 
 	info := readFixture[dockerContainer.InspectResponse](t, "container_"+file+".json")
 	call.Return(dockerClient.ContainerInspectResult{Container: info}, nil).Once()
+}
+
+// expectForceRemove expects the target container to be force-removed with a
+// context that is not canceled, so cleanup survives a canceled parent.
+//
+// Parameters:
+//   - api: Mocked Docker API.
+func expectForceRemove(api *mockContainer.MockAPIClient) {
+	api.EXPECT().
+		ContainerRemove(
+			mock.MatchedBy(func(ctx context.Context) bool { return ctx.Err() == nil }),
+			testTargetID,
+			dockerClient.ContainerRemoveOptions{Force: true},
+		).
+		Return(dockerClient.ContainerRemoveResult{}, nil).Once()
+}
+
+// newRunningSource returns a running source container on the bridge
+// network with a MAC address and a memory swappiness setting.
+func newRunningSource() *Container {
+	var defaultMem int64 = 60
+
+	return MockContainer(
+		WithNetworkMode("bridge"),
+		WithContainerState(dockerContainer.State{Running: true, Status: "running"}),
+		WithNetworkSettings(map[string]*dockerNetwork.EndpointSettings{
+			"bridge": {
+				NetworkID:  "network_bridge_id",
+				IPAddress:  netip.MustParseAddr("172.17.0.2"),
+				MacAddress: dockerNetwork.HardwareAddr("aa:bb:cc:dd:ee:ff"),
+				Aliases:    []string{"test-watchtower"},
+			},
+		}),
+		func(c *dockerContainer.InspectResponse, _ *dockerImage.InspectResponse) {
+			if c.HostConfig == nil {
+				c.HostConfig = &dockerContainer.HostConfig{}
+			}
+
+			c.HostConfig.MemorySwappiness = &defaultMem
+		},
+	)
+}
+
+// newMultiNetworkSource returns a running source container attached
+// to two networks.
+func newMultiNetworkSource() *Container {
+	return MockContainer(
+		WithNetworkMode("bridge"),
+		WithContainerState(dockerContainer.State{Running: true, Status: "running"}),
+		WithNetworks("network1", "network2"),
+	)
+}
+
+func copyFromPath(filePath string) any {
+	return mock.MatchedBy(func(options dockerClient.CopyFromContainerOptions) bool {
+		return options.SourcePath == filePath
+	})
+}
+
+// expectDaemonInfo stubs the single daemon info call made by one injection.
+func expectDaemonInfo(api *mockContainer.MockAPIClient, securityOptions ...string) {
+	api.EXPECT().
+		Info(mock.Anything, dockerClient.InfoOptions{}).
+		Return(dockerClient.SystemInfoResult{
+			Info: dockerSystem.Info{SecurityOptions: securityOptions},
+		}, nil).
+		Once()
+}
+
+func mustFileTar(t *testing.T, name string, body []byte) []byte {
+	t.Helper()
+
+	return mustFileTarWithMode(t, name, body, 0o444)
+}
+
+// expectInfo expects one daemon info request and answers it with info.
+//
+// Parameters:
+//   - api: Mocked Docker API.
+//   - info: Daemon information to answer with.
+func expectInfo(api *mockContainer.MockAPIClient, info dockerSystem.Info) {
+	api.EXPECT().Info(mock.Anything, dockerClient.InfoOptions{}).
+		Return(dockerClient.SystemInfoResult{Info: info}, nil).Once()
+}
+
+// expectServerVersion expects one server version request and answers it with
+// the given components.
+//
+// Parameters:
+//   - api: Mocked Docker API.
+//   - components: Version components the daemon reports.
+func expectServerVersion(api *mockContainer.MockAPIClient, components ...dockerSystem.ComponentVersion) {
+	api.EXPECT().ServerVersion(mock.Anything, dockerClient.ServerVersionOptions{}).
+		Return(dockerClient.ServerVersionResult{Components: components}, nil).Once()
+}
+
+// newImageAPI returns a mock Docker API whose daemon reports no registry mirrors.
+//
+// Parameters:
+//   - t: Test that owns the mock.
+//
+// Returns:
+//   - *mockContainer.MockAPIClient: Mock answering Info with an empty daemon configuration.
+func newImageAPI(t *testing.T) *mockContainer.MockAPIClient {
+	t.Helper()
+
+	api := mockContainer.NewMockAPIClient(t)
+	api.EXPECT().Info(mock.Anything, mock.Anything).Return(dockerClient.SystemInfoResult{}, nil).Maybe()
+
+	return api
+}
+
+// runningImage returns a container that runs imageName with the image ID
+// imageID and the given repo digests.
+//
+// Parameters:
+//   - imageName: Image reference the container runs.
+//   - imageID: ID of the container's image.
+//   - repoDigests: Repo digests of the container's image, or none to keep the default.
+//
+// Returns:
+//   - *Container: The container.
+func runningImage(imageName, imageID string, repoDigests ...string) *Container {
+	options := []MockContainerUpdate{
+		WithImageName(imageName),
+		func(container *dockerContainer.InspectResponse, image *dockerImage.InspectResponse) {
+			container.Image = imageID
+			image.ID = imageID
+		},
+	}
+
+	if repoDigests != nil {
+		options = append(options, WithRepoDigests(repoDigests))
+	}
+
+	return MockContainer(options...)
+}
+
+// inspected returns the inspect result of an image with id and repoDigests.
+//
+// Parameters:
+//   - id: Image ID.
+//   - repoDigests: The image's repo digests.
+//
+// Returns:
+//   - dockerClient.ImageInspectResult: The inspect result.
+func inspected(id string, repoDigests ...string) dockerClient.ImageInspectResult {
+	return dockerClient.ImageInspectResult{ID: id, RepoDigests: repoDigests}
 }

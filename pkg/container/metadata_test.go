@@ -1692,3 +1692,137 @@ func TestContainer_IsWatchtower_DoesNotLog(t *testing.T) {
 		})
 	}
 }
+
+func TestIsWatchtowerParent(t *testing.T) {
+	t.Parallel()
+
+	t.Run("should return false for empty chain", func(t *testing.T) {
+		t.Parallel()
+
+		result := IsWatchtowerParent(types.ContainerID("test-id"), "")
+		assert.False(t, result)
+	})
+
+	t.Run("should return false for empty ID", func(t *testing.T) {
+		t.Parallel()
+
+		result := IsWatchtowerParent(types.ContainerID(""), "id1,id2")
+		assert.False(t, result)
+	})
+
+	t.Run("should return true when ID is at start of chain", func(t *testing.T) {
+		t.Parallel()
+
+		result := IsWatchtowerParent(types.ContainerID("test-id"), "test-id,id2,id3")
+		assert.True(t, result)
+	})
+
+	t.Run("should return true when ID is in middle of chain", func(t *testing.T) {
+		t.Parallel()
+
+		result := IsWatchtowerParent(types.ContainerID("id2"), "id1,id2,id3")
+		assert.True(t, result)
+	})
+
+	t.Run("should return true when ID is at end of chain", func(t *testing.T) {
+		t.Parallel()
+
+		result := IsWatchtowerParent(types.ContainerID("id3"), "id1,id2,id3")
+		assert.True(t, result)
+	})
+
+	t.Run("should return true for single ID chain", func(t *testing.T) {
+		t.Parallel()
+
+		result := IsWatchtowerParent(types.ContainerID("test-id"), "test-id")
+		assert.True(t, result)
+	})
+
+	t.Run("should return false when ID is not in chain", func(t *testing.T) {
+		t.Parallel()
+
+		result := IsWatchtowerParent(types.ContainerID("test-id"), "id1,id2,id3")
+		assert.False(t, result)
+	})
+
+	t.Run("should handle chains with spaces around commas", func(t *testing.T) {
+		t.Parallel()
+
+		result := IsWatchtowerParent(types.ContainerID("id2"), "id1, id2 , id3")
+		assert.True(t, result)
+	})
+}
+
+// TestContainer_SetLabel verifies that SetLabel writes and overwrites labels,
+// creating the labels map when needed, and that DeleteLabel removes labels, with
+// both doing nothing when the container info is missing.
+func TestContainer_SetLabel(t *testing.T) {
+	t.Parallel()
+
+	t.Run("writes a config label", func(t *testing.T) {
+		t.Parallel()
+
+		c := MockContainer()
+		c.SetLabel(labels.GitRepo, "https://github.com/org/app.git")
+
+		value, ok := c.GetLabel(labels.GitRepo)
+		assert.True(t, ok)
+		assert.Equal(t, "https://github.com/org/app.git", value)
+	})
+
+	t.Run("overwrites an existing label", func(t *testing.T) {
+		t.Parallel()
+
+		c := MockContainer(WithLabels(map[string]string{labels.GitRepo: "old"}))
+		c.SetLabel(labels.GitRepo, "new")
+
+		value, ok := c.GetLabel(labels.GitRepo)
+		assert.True(t, ok)
+		assert.Equal(t, "new", value)
+	})
+
+	t.Run("creates the labels map when it is nil", func(t *testing.T) {
+		t.Parallel()
+
+		c := MockContainer()
+		c.containerInfo.Config.Labels = nil
+		c.SetLabel(labels.GitRef, "main")
+
+		assert.Equal(t, "main", c.containerInfo.Config.Labels[labels.GitRef])
+	})
+
+	t.Run("is a no-op for a nil receiver or empty key", func(t *testing.T) {
+		t.Parallel()
+
+		var c *Container
+		c.SetLabel(labels.GitRepo, "https://github.com/org/app.git")
+
+		c = MockContainer()
+		c.SetLabel("", "value")
+		assert.NotContains(t, c.containerInfo.Config.Labels, "")
+	})
+
+	t.Run("removes an existing label", func(t *testing.T) {
+		t.Parallel()
+
+		c := MockContainer()
+		c.SetLabel(labels.GitLastTag, "v1")
+		c.DeleteLabel(labels.GitLastTag)
+		_, ok := c.GetLabel(labels.GitLastTag)
+		assert.False(t, ok)
+	})
+
+	t.Run("is a no-op when container info or config is missing", func(t *testing.T) {
+		t.Parallel()
+
+		c := MockContainer()
+		c.containerInfo.Config = nil
+
+		assert.NotPanics(t, func() { c.SetLabel(labels.GitRepo, "https://github.com/org/app.git") })
+
+		c = MockContainer()
+		c.containerInfo = nil
+
+		assert.NotPanics(t, func() { c.SetLabel(labels.GitRepo, "https://github.com/org/app.git") })
+	})
+}
