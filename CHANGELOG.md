@@ -22,6 +22,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- Dissolve the api config package by @nicholas-fedor in [#3083](https://github.com/nicholas-fedor/watchtower/pull/3083)
 - Merge the config and flags packages into internal/settings by @nicholas-fedor in [#3077](https://github.com/nicholas-fedor/watchtower/pull/3077)
 - Remove the unused minimum Docker API version by @nicholas-fedor in [#3075](https://github.com/nicholas-fedor/watchtower/pull/3075)
 - Move logging, metrics, and the event broadcaster under internal/observability by @nicholas-fedor in [#3071](https://github.com/nicholas-fedor/watchtower/pull/3071)
