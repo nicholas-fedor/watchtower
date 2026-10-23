@@ -10,6 +10,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Consolidate MAC address checks on container recreation by @nicholas-fedor in [#3092](https://github.com/nicholas-fedor/watchtower/pull/3092)
 - Accept repeated all and whitespace in http-api-endpoints by @nicholas-fedor in [#3085](https://github.com/nicholas-fedor/watchtower/pull/3085)
 - Resolve settings edge cases in config loading by @nicholas-fedor in [#3079](https://github.com/nicholas-fedor/watchtower/pull/3079)
 - Reuse collectors the registry already holds by @nicholas-fedor in [#3073](https://github.com/nicholas-fedor/watchtower/pull/3073)
