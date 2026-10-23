@@ -780,6 +780,7 @@ func matchImageAndTag(containerImage, targetImage string) bool {
 // BuildFilter constructs a composite filter for containers.
 //
 // Parameters:
+//   - log: Logger for debug output. May be nil.
 //   - normalizedNames: Normalized container names or regex patterns. When set, only
 //     containers matching these patterns are monitored.
 //   - normalizedDisableNames: Container names or regex patterns to skip. Matching
@@ -818,18 +819,25 @@ func BuildFilter(log *zerolog.Logger,
 		return nil, "", err
 	}
 
-	clogVal := log.With().
-		Strs("names", normalizedNames).
-		Strs("disableNames", normalizedDisableNames).
-		Strs("monitoredImageNamePatterns", monitoredImageNamePatterns).
-		Strs("skippedImageNamePatterns", skippedImageNamePatterns).
-		Strs("enabledLabels", labelPairStrings(enabledLabelPairs)).
-		Strs("disabledLabels", labelPairStrings(disabledLabelPairs)).
-		Bool("enableLabel", enableLabel).
-		Str("scope", scope).
-		Logger()
-	clog := &clogVal
-	clog.Debug().Msg("Building container filter")
+	// The debug context is built only when debug logging is on, so a nil
+	// logger builds the filter without logging.
+	var clog *zerolog.Logger
+
+	if debugEnabled(log) {
+		clogVal := log.With().
+			Strs("names", normalizedNames).
+			Strs("disableNames", normalizedDisableNames).
+			Strs("monitoredImageNamePatterns", monitoredImageNamePatterns).
+			Strs("skippedImageNamePatterns", skippedImageNamePatterns).
+			Strs("enabledLabels", labelPairStrings(enabledLabelPairs)).
+			Strs("disabledLabels", labelPairStrings(disabledLabelPairs)).
+			Bool("enableLabel", enableLabel).
+			Str("scope", scope).
+			Logger()
+		clog = &clogVal
+
+		clog.Debug().Msg("Building container filter")
+	}
 
 	stringBuilder := strings.Builder{}
 	filter := NoFilter
@@ -940,9 +948,11 @@ func BuildFilter(log *zerolog.Logger,
 		filterDesc = strings.TrimSuffix(filterDesc, ", ")
 	}
 
-	clog.Debug().
-		Str("filter_desc", filterDesc).
-		Msg("Filter built")
+	if clog != nil {
+		clog.Debug().
+			Str("filter_desc", filterDesc).
+			Msg("Filter built")
+	}
 
 	return filter, filterDesc, nil
 }

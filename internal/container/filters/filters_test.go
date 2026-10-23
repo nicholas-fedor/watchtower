@@ -1598,9 +1598,10 @@ func TestBuildFilterLabelDescriptionOrder(t *testing.T) {
 	assert.Contains(t, desc, `with label b="2" or a="1" or a="3", without label c or d="4", `)
 }
 
-// TestFilters_QuietLoggers verifies that the label, scope, and image filters
-// work with a nil logger or one with debug off, and skip building log
-// context: the mocks expect no Name call, so logging would fail the test.
+// TestFilters_QuietLoggers verifies that BuildFilter and the label, scope, and
+// image filters work with a nil logger or one with debug off, and that the
+// filters skip building log context. The mocks expect no Name call, so logging
+// would fail the test.
 func TestFilters_QuietLoggers(t *testing.T) {
 	t.Parallel()
 
@@ -1627,6 +1628,18 @@ func TestFilters_QuietLoggers(t *testing.T) {
 			assert.True(t, FilterByImage(log, []string{"nginx"}, NoFilter)(imaged))
 			assert.False(t, FilterByImage(log, []string{"redis"}, NoFilter)(imaged))
 			imaged.AssertExpectations(t)
+
+			filter, desc, err := BuildFilter(log, nil, nil, nil, nil, []string{"env=prod"}, nil, false, "none")
+			require.NoError(t, err)
+			assert.Contains(t, desc, `with label env="prod"`)
+
+			built := new(mockContainer.FilterableContainer)
+			built.On("IsWatchtower").Return(false)
+			built.On("GetLabel", "env").Return("prod", true)
+			built.On("Enabled").Return(false, false)
+			built.On("Scope").Return("", false)
+			assert.True(t, filter(built))
+			built.AssertExpectations(t)
 		})
 	}
 }
