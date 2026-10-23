@@ -10,7 +10,6 @@ import (
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 
-	"github.com/nicholas-fedor/watchtower/internal/api/config"
 	"github.com/nicholas-fedor/watchtower/pkg/container"
 	mockContainer "github.com/nicholas-fedor/watchtower/pkg/container/mocks"
 )
@@ -63,7 +62,7 @@ func TestRegisterHealthRoute(t *testing.T) {
 			app := testApp()
 			client := tt.clientSetup(t)
 
-			opts := config.Options{
+			opts := Options{
 				EnableHealthAPI: true,
 				Client:          client,
 			}

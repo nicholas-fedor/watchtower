@@ -6,7 +6,6 @@ import (
 
 	"github.com/stretchr/testify/assert"
 
-	"github.com/nicholas-fedor/watchtower/internal/api/config"
 	"github.com/nicholas-fedor/watchtower/internal/observability/metrics"
 )
 
@@ -14,7 +13,7 @@ func TestRegisterHistoryRoute(t *testing.T) {
 	app := testApp()
 	auth := testAuthMiddleware()
 
-	opts := config.Options{
+	opts := Options{
 		EnableHistoryAPI: true,
 		DefaultMetrics:   func() *metrics.Metrics { return testMetrics },
 	}

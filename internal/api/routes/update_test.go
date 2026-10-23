@@ -10,7 +10,6 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/nicholas-fedor/watchtower/internal/api/config"
 	"github.com/nicholas-fedor/watchtower/internal/observability/logging"
 	"github.com/nicholas-fedor/watchtower/internal/observability/metrics"
 	"github.com/nicholas-fedor/watchtower/internal/scheduling"
@@ -21,7 +20,7 @@ func TestRegisterUpdateRoute(t *testing.T) {
 	app := testApp()
 	auth := testAuthMiddleware()
 
-	opts := config.Options{
+	opts := Options{
 		EnableUpdateAPI: true,
 		UpdateLock:      scheduling.NewUpdateLock(),
 		UnblockHTTPAPI:  true,
@@ -54,7 +53,7 @@ func TestRegisterUpdateRoute_BuildsFullUpdateParams(t *testing.T) {
 
 	var got types.UpdateParams
 
-	opts := config.Options{
+	opts := Options{
 		EnableUpdateAPI: true,
 		UnblockHTTPAPI:  true,
 		BaseParams: types.UpdateParams{
@@ -83,7 +82,7 @@ func TestRegisterUpdateRoute_BuildsFullUpdateParams(t *testing.T) {
 
 	// Invoke the update pipeline the same way the handler does (via the
 	// registered RunUpdatesWithNotifications closure setup).
-	params := config.BuildUpdateParams(opts)
+	params := BuildUpdateParams(opts)
 	opts.RunUpdatesWithNotifications(context.Background(), opts.Filter, params)
 
 	assert.True(t, got.ReviveStopped)
@@ -102,7 +101,7 @@ func TestRegisterUpdateRoute_NilWriteStartupMessage(t *testing.T) {
 	app := testApp()
 	auth := testAuthMiddleware()
 
-	opts := config.Options{
+	opts := Options{
 		EnableUpdateAPI: true,
 		UpdateLock:      scheduling.NewUpdateLock(),
 		UnblockHTTPAPI:  false,
@@ -127,7 +126,7 @@ func TestRegisterUpdateRoute_DoesNotWriteStartupMessage(t *testing.T) {
 	auth := testAuthMiddleware()
 
 	called := false
-	opts := config.Options{
+	opts := Options{
 		EnableUpdateAPI: true,
 		UpdateLock:      scheduling.NewUpdateLock(),
 		UnblockHTTPAPI:  false,
@@ -159,7 +158,7 @@ func TestRegisterUpdateRoute_TimeoutIsServiceUnavailable(t *testing.T) {
 
 	t.Cleanup(func() { close(release) })
 
-	opts := config.Options{
+	opts := Options{
 		EnableUpdateAPI: true,
 		UnblockHTTPAPI:  true,
 		UpdateTimeout:   20 * time.Millisecond,

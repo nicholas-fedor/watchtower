@@ -16,7 +16,7 @@ import (
 
 	"github.com/nicholas-fedor/watchtower/internal/actions"
 	"github.com/nicholas-fedor/watchtower/internal/api"
-	"github.com/nicholas-fedor/watchtower/internal/api/config"
+	"github.com/nicholas-fedor/watchtower/internal/api/routes"
 	"github.com/nicholas-fedor/watchtower/internal/container/filters"
 	"github.com/nicholas-fedor/watchtower/internal/git"
 	"github.com/nicholas-fedor/watchtower/internal/meta"
@@ -793,7 +793,7 @@ func (p *process) runMain(cfg types.RunConfig) int {
 
 	apiStopped, err := api.SetupAndStartAPI(
 		ctx,
-		config.Options{
+		routes.Options{
 			Logger:                       &apiLog,
 			Host:                         cfg.APIHost,
 			Port:                         cfg.APIPort,

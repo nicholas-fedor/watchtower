@@ -25,7 +25,7 @@ import (
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 
-	"github.com/nicholas-fedor/watchtower/internal/api/config"
+	"github.com/nicholas-fedor/watchtower/internal/api/routes"
 	"github.com/nicholas-fedor/watchtower/internal/observability/events"
 	"github.com/nicholas-fedor/watchtower/internal/observability/logging"
 	"github.com/nicholas-fedor/watchtower/internal/observability/metrics"
@@ -48,7 +48,7 @@ func makeFilter(_ *testing.T) types.Filter {
 }
 
 // withTestLogger injects a discarded logger when opts.Logger is nil.
-func withTestLogger(t *testing.T, opts config.Options) config.Options {
+func withTestLogger(t *testing.T, opts routes.Options) routes.Options {
 	t.Helper()
 
 	if opts.Logger == nil {
@@ -59,7 +59,7 @@ func withTestLogger(t *testing.T, opts config.Options) config.Options {
 }
 
 // withTestListenAddr sets Host/Port so tests bind an ephemeral local port.
-func withTestListenAddr(t *testing.T, opts config.Options) config.Options {
+func withTestListenAddr(t *testing.T, opts routes.Options) routes.Options {
 	t.Helper()
 
 	opts = withTestLogger(t, opts)
@@ -75,7 +75,7 @@ func withTestListenAddr(t *testing.T, opts config.Options) config.Options {
 	return opts
 }
 
-func runServerAndShutdown(t *testing.T, opts config.Options) {
+func runServerAndShutdown(t *testing.T, opts routes.Options) {
 	t.Helper()
 
 	opts = withTestListenAddr(t, opts)
@@ -119,20 +119,20 @@ func TestSetupAndStartAPI(t *testing.T) {
 
 	tests := []struct {
 		name    string
-		opts    config.Options
+		opts    routes.Options
 		wantErr bool
 		errMsg  string
 	}{
 		{
 			name: "no APIs enabled",
-			opts: config.Options{
+			opts: routes.Options{
 				Token: "test-token",
 			},
 			wantErr: false,
 		},
 		{
 			name: "nil RunUpdatesWithNotifications",
-			opts: config.Options{
+			opts: routes.Options{
 				Token:                       "test-token",
 				EnableUpdateAPI:             true,
 				UpdateLock:                  scheduling.NewUpdateLock(),
@@ -145,7 +145,7 @@ func TestSetupAndStartAPI(t *testing.T) {
 		},
 		{
 			name: "nil FilterByImage",
-			opts: config.Options{
+			opts: routes.Options{
 				Token:           "test-token",
 				EnableUpdateAPI: true,
 				UpdateLock:      scheduling.NewUpdateLock(),
@@ -160,7 +160,7 @@ func TestSetupAndStartAPI(t *testing.T) {
 		},
 		{
 			name: "nil DefaultMetrics",
-			opts: config.Options{
+			opts: routes.Options{
 				Token:           "test-token",
 				EnableUpdateAPI: true,
 				UpdateLock:      scheduling.NewUpdateLock(),
@@ -202,7 +202,7 @@ func TestSetupAndStartAPI(t *testing.T) {
 func TestSetupAndStartAPI_FullAPILifecycle(t *testing.T) {
 	testMetrics := metrics.Default()
 
-	opts := withTestListenAddr(t, config.Options{
+	opts := withTestListenAddr(t, routes.Options{
 		Token:       "test-token",
 		EventsToken: "events-token",
 		RateLimit:   60,
@@ -252,14 +252,14 @@ func TestSetupAndStartAPI_NoAPIs(t *testing.T) {
 	ctx, cancel := context.WithCancel(t.Context())
 	defer cancel()
 
-	_, err := SetupAndStartAPI(ctx, config.Options{Token: "test"})
+	_, err := SetupAndStartAPI(ctx, routes.Options{Token: "test"})
 	assert.NoError(t, err)
 }
 
 func TestSetupAndStartAPI_MetricsOnly(t *testing.T) {
 	testMetrics := metrics.Default()
 
-	opts := config.Options{
+	opts := routes.Options{
 		Token:            "test-token",
 		EnableMetricsAPI: true,
 		RateLimit:        60,
@@ -270,7 +270,7 @@ func TestSetupAndStartAPI_MetricsOnly(t *testing.T) {
 }
 
 func TestSetupAndStartAPI_ContainersOnly(t *testing.T) {
-	opts := config.Options{
+	opts := routes.Options{
 		Token:               "test-token",
 		EnableContainersAPI: true,
 		RateLimit:           60,
@@ -284,7 +284,7 @@ func TestSetupAndStartAPI_ContainersOnly(t *testing.T) {
 func TestSetupAndStartAPI_CheckOnly(t *testing.T) {
 	testMetrics := metrics.Default()
 
-	opts := config.Options{
+	opts := routes.Options{
 		Token:          "test-token",
 		EnableCheckAPI: true,
 		RateLimit:      60,
@@ -300,7 +300,7 @@ func TestSetupAndStartAPI_CheckOnly(t *testing.T) {
 func TestSetupAndStartAPI_AllAPIs(t *testing.T) {
 	testMetrics := metrics.Default()
 
-	opts := config.Options{
+	opts := routes.Options{
 		Token:               "test-token",
 		EventsToken:         "events-token",
 		EnableUpdateAPI:     true,
@@ -330,7 +330,7 @@ func TestSetupAndStartAPI_AllAPIs(t *testing.T) {
 func TestIntegration_HealthLiveness_And_Startup(t *testing.T) {
 	testMetrics := metrics.Default()
 
-	opts := withTestListenAddr(t, config.Options{
+	opts := withTestListenAddr(t, routes.Options{
 		Token:            "test-token",
 		EnableMetricsAPI: true,
 		RateLimit:        60,
@@ -358,7 +358,7 @@ func TestIntegration_HealthLiveness_And_Startup(t *testing.T) {
 func TestRegisterUpdateRoute_UnblockHTTPAPI(t *testing.T) {
 	var startupCalled atomic.Int32
 
-	opts := withTestListenAddr(t, config.Options{
+	opts := withTestListenAddr(t, routes.Options{
 		Token:           "test-token",
 		EnableUpdateAPI: true,
 		UpdateLock:      scheduling.NewUpdateLock(),
@@ -405,13 +405,13 @@ func TestSetupAndStartAPI_MissingUpdateDependencies(t *testing.T) {
 
 	tests := []struct {
 		name           string
-		opts           config.Options
+		opts           routes.Options
 		wantErr        string
 		leaveLoggerNil bool
 	}{
 		{
 			name: "missing RunUpdatesWithNotifications",
-			opts: config.Options{
+			opts: routes.Options{
 				Token:                       "test-token",
 				EnableUpdateAPI:             true,
 				UpdateLock:                  scheduling.NewUpdateLock(),
@@ -423,7 +423,7 @@ func TestSetupAndStartAPI_MissingUpdateDependencies(t *testing.T) {
 		},
 		{
 			name: "missing FilterByImage",
-			opts: config.Options{
+			opts: routes.Options{
 				Token:           "test-token",
 				EnableUpdateAPI: true,
 				UpdateLock:      scheduling.NewUpdateLock(),
@@ -437,7 +437,7 @@ func TestSetupAndStartAPI_MissingUpdateDependencies(t *testing.T) {
 		},
 		{
 			name: "missing DefaultMetrics",
-			opts: config.Options{
+			opts: routes.Options{
 				Token:           "test-token",
 				EnableUpdateAPI: true,
 				UpdateLock:      scheduling.NewUpdateLock(),
@@ -451,7 +451,7 @@ func TestSetupAndStartAPI_MissingUpdateDependencies(t *testing.T) {
 		},
 		{
 			name: "missing TLS key",
-			opts: config.Options{
+			opts: routes.Options{
 				Token:            "test-token",
 				EnableMetricsAPI: true,
 				TLSCertPath:      "/path/to/cert.pem",
@@ -462,7 +462,7 @@ func TestSetupAndStartAPI_MissingUpdateDependencies(t *testing.T) {
 		},
 		{
 			name: "missing TLS cert",
-			opts: config.Options{
+			opts: routes.Options{
 				Token:            "test-token",
 				EnableMetricsAPI: true,
 				TLSCertPath:      "",
@@ -473,7 +473,7 @@ func TestSetupAndStartAPI_MissingUpdateDependencies(t *testing.T) {
 		},
 		{
 			name: "missing Logger",
-			opts: config.Options{
+			opts: routes.Options{
 				Token:            "test-token",
 				EnableMetricsAPI: true,
 				DefaultMetrics:   func() *metrics.Metrics { return testMetrics },
@@ -503,7 +503,7 @@ func TestSetupAndStartAPI_MissingUpdateDependencies(t *testing.T) {
 func TestSetupAndStartAPI_AllEndpointsEnableAll(t *testing.T) {
 	testMetrics := metrics.Default()
 
-	opts := withTestListenAddr(t, config.Options{
+	opts := withTestListenAddr(t, routes.Options{
 		Token:            "test-token",
 		EventsToken:      "events-token",
 		RateLimit:        60,
@@ -562,7 +562,7 @@ func TestSetupAndStartAPI_AllEndpointsEnableAll(t *testing.T) {
 func TestRunServer_NonBlockingReturnsAfterBind(t *testing.T) {
 	testMetrics := metrics.Default()
 
-	opts := withTestListenAddr(t, config.Options{
+	opts := withTestListenAddr(t, routes.Options{
 		Token:            "test-token",
 		EnableMetricsAPI: true,
 		RateLimit:        60,
@@ -593,7 +593,7 @@ func TestRunServer_NonBlockingReturnsAfterBind(t *testing.T) {
 func TestRunServer_BlockingUntilCancel(t *testing.T) {
 	testMetrics := metrics.Default()
 
-	opts := withTestListenAddr(t, config.Options{
+	opts := withTestListenAddr(t, routes.Options{
 		Token:           "test-token",
 		EnableUpdateAPI: true,
 		UpdateLock:      scheduling.NewUpdateLock(),
@@ -637,7 +637,7 @@ func TestRunServer_BlockingUntilCancel(t *testing.T) {
 func TestRunServer_UnblockWithUpdateAPI_NonBlocking(t *testing.T) {
 	testMetrics := metrics.Default()
 
-	opts := withTestListenAddr(t, config.Options{
+	opts := withTestListenAddr(t, routes.Options{
 		Token:           "test-token",
 		EnableUpdateAPI: true,
 		UpdateLock:      scheduling.NewUpdateLock(),
@@ -672,7 +672,7 @@ func TestRunServer_UnblockWithUpdateAPI_NonBlocking(t *testing.T) {
 func TestRunServer_BindFailure(t *testing.T) {
 	testMetrics := metrics.Default()
 
-	opts := withTestLogger(t, config.Options{
+	opts := withTestLogger(t, routes.Options{
 		Host:             "127.0.0.1",
 		Port:             "99999", // invalid port
 		Token:            "test-token",
@@ -893,7 +893,7 @@ func TestSetupAndStartAPI_IPv6Host(t *testing.T) {
 	ctx, cancel := context.WithCancel(t.Context())
 	defer cancel()
 
-	opts := withTestLogger(t, config.Options{
+	opts := withTestLogger(t, routes.Options{
 		Host:            host,
 		Port:            port,
 		EnableHealthAPI: true,
@@ -976,7 +976,7 @@ func listenTCP(t *testing.T, addr string) (net.Listener, error) {
 //
 // Returns:
 //   - error: Error from SetupAndStartAPI.
-func startAPI(t *testing.T, ctx context.Context, opts config.Options) error {
+func startAPI(t *testing.T, ctx context.Context, opts routes.Options) error {
 	t.Helper()
 
 	stopped, err := SetupAndStartAPI(ctx, opts)
@@ -1095,11 +1095,11 @@ func TestRunServer_CancelBetweenBindAndServe(t *testing.T) {
 // the startup message is written once the API socket is bound, and not at all
 // when the socket cannot be bound.
 func TestSetupAndStartAPI_StartupMessageAfterBind(t *testing.T) {
-	blockingOpts := func(addr string, startup func(logging.StartupParams)) config.Options {
+	blockingOpts := func(addr string, startup func(logging.StartupParams)) routes.Options {
 		host, port, err := net.SplitHostPort(addr)
 		require.NoError(t, err)
 
-		return withTestLogger(t, config.Options{
+		return withTestLogger(t, routes.Options{
 			Host:            host,
 			Port:            port,
 			Token:           "test-token",
@@ -1211,7 +1211,7 @@ func TestSetupAndStartAPI_TLS(t *testing.T) {
 	ctx, cancel := context.WithCancel(t.Context())
 	defer cancel()
 
-	opts := withTestLogger(t, config.Options{
+	opts := withTestLogger(t, routes.Options{
 		Host:            host,
 		Port:            port,
 		EnableHealthAPI: true,

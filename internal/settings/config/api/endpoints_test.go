@@ -1,12 +1,10 @@
-package config
+package api
 
 import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-
-	"github.com/nicholas-fedor/watchtower/pkg/types"
 )
 
 func TestParseAPIEndpoints(t *testing.T) {
@@ -31,32 +29,32 @@ func TestParseAPIEndpoints(t *testing.T) {
 		{
 			name:  "single",
 			input: []string{"metrics"},
-			want:  []string{endpointMetrics},
+			want:  []string{EndpointMetrics},
 		},
 		{
 			name:  "multiple pre-split",
 			input: []string{"Health", "UPDATE", "metrics"},
-			want:  []string{endpointHealth, endpointUpdate, endpointMetrics},
+			want:  []string{EndpointHealth, EndpointUpdate, EndpointMetrics},
 		},
 		{
 			name:  "comma-separated single element",
 			input: []string{"health,update,metrics"},
-			want:  []string{endpointHealth, endpointUpdate, endpointMetrics},
+			want:  []string{EndpointHealth, EndpointUpdate, EndpointMetrics},
 		},
 		{
 			name:  "space-separated single element",
 			input: []string{"health update metrics"},
-			want:  []string{endpointHealth, endpointUpdate, endpointMetrics},
+			want:  []string{EndpointHealth, EndpointUpdate, EndpointMetrics},
 		},
 		{
 			name:  "mixed separators in one element",
 			input: []string{"health, update metrics"},
-			want:  []string{endpointHealth, endpointUpdate, endpointMetrics},
+			want:  []string{EndpointHealth, EndpointUpdate, EndpointMetrics},
 		},
 		{
 			name:  "duplicates ignored",
 			input: []string{"metrics", "metrics", "health"},
-			want:  []string{endpointHealth, endpointMetrics},
+			want:  []string{EndpointHealth, EndpointMetrics},
 		},
 		{
 			name:  "all alone",
@@ -112,22 +110,22 @@ func TestEndpointsFromLegacyMainFlags(t *testing.T) {
 	t.Parallel()
 
 	endpointMap := parseLegacyOptions(true, true, false)
-	assert.True(t, endpointMap.Contains(endpointUpdate))
-	assert.True(t, endpointMap.Contains(endpointMetrics))
-	assert.False(t, endpointMap.Contains(endpointContainers))
-	assert.False(t, endpointMap.Contains(endpointHealth))
+	assert.True(t, endpointMap.Contains(EndpointUpdate))
+	assert.True(t, endpointMap.Contains(EndpointMetrics))
+	assert.False(t, endpointMap.Contains(EndpointContainers))
+	assert.False(t, endpointMap.Contains(EndpointHealth))
 }
 
 func TestFormatEndpoints(t *testing.T) {
 	t.Parallel()
 
 	assert.Empty(t, formatEndpoints(nil))
-	assert.Empty(t, formatEndpoints(enabledEndpoints{}))
+	assert.Empty(t, formatEndpoints(EnabledEndpoints{}))
 
-	endpointMap := enabledEndpoints{
-		endpointMetrics: {},
-		endpointUpdate:  {},
-		endpointHealth:  {},
+	endpointMap := EnabledEndpoints{
+		EndpointMetrics: {},
+		EndpointUpdate:  {},
+		EndpointHealth:  {},
 	}
 	// Order follows allEndpointNames.
 	assert.Equal(t, "health,update,metrics", formatEndpoints(endpointMap))
@@ -141,9 +139,9 @@ func TestResolveEndpoints(t *testing.T) {
 
 		endpointMap, err := ResolveEndpoints([]string{"health", "metrics"}, false, false, false)
 		require.NoError(t, err)
-		assert.True(t, endpointMap.Contains(endpointHealth))
-		assert.True(t, endpointMap.Contains(endpointMetrics))
-		assert.False(t, endpointMap.Contains(endpointUpdate))
+		assert.True(t, endpointMap.Contains(EndpointHealth))
+		assert.True(t, endpointMap.Contains(EndpointMetrics))
+		assert.False(t, endpointMap.Contains(EndpointUpdate))
 	})
 
 	t.Run("all", func(t *testing.T) {
@@ -159,9 +157,9 @@ func TestResolveEndpoints(t *testing.T) {
 
 		endpointMap, err := ResolveEndpoints(nil, true, false, true)
 		require.NoError(t, err)
-		assert.True(t, endpointMap.Contains(endpointUpdate))
-		assert.True(t, endpointMap.Contains(endpointContainers))
-		assert.False(t, endpointMap.Contains(endpointMetrics))
+		assert.True(t, endpointMap.Contains(EndpointUpdate))
+		assert.True(t, endpointMap.Contains(EndpointContainers))
+		assert.False(t, endpointMap.Contains(EndpointMetrics))
 	})
 
 	t.Run("neither", func(t *testing.T) {
@@ -178,10 +176,10 @@ func TestResolveEndpoints(t *testing.T) {
 		// metrics from allowlist + update from legacy → both; metrics not duplicated.
 		endpointMap, err := ResolveEndpoints([]string{"metrics", "health"}, true, true, false)
 		require.NoError(t, err)
-		assert.True(t, endpointMap.Contains(endpointMetrics))
-		assert.True(t, endpointMap.Contains(endpointHealth))
-		assert.True(t, endpointMap.Contains(endpointUpdate))
-		assert.False(t, endpointMap.Contains(endpointContainers))
+		assert.True(t, endpointMap.Contains(EndpointMetrics))
+		assert.True(t, endpointMap.Contains(EndpointHealth))
+		assert.True(t, endpointMap.Contains(EndpointUpdate))
+		assert.False(t, endpointMap.Contains(EndpointContainers))
 		assert.Len(t, endpointMap, 3)
 	})
 
@@ -191,29 +189,4 @@ func TestResolveEndpoints(t *testing.T) {
 		_, err := ResolveEndpoints([]string{"bogus"}, false, false, false)
 		require.ErrorIs(t, err, errUnknownEndpoint)
 	})
-}
-
-func TestPopulateRouteFlags(t *testing.T) {
-	t.Parallel()
-
-	endpointMap := allEndpoints()
-
-	var cfg types.RunConfig
-	SetEndpointConfig(endpointMap, &cfg)
-	assert.True(t, cfg.EnableHealthAPI)
-	assert.True(t, cfg.EnableUpdateAPI)
-	assert.True(t, cfg.EnableMetricsAPI)
-	assert.True(t, cfg.EnableContainersAPI)
-	assert.True(t, cfg.EnableCheckAPI)
-	assert.True(t, cfg.EnableHistoryAPI)
-	assert.True(t, cfg.EnableImagesAPI)
-	assert.True(t, cfg.EnableConfigAPI)
-	assert.True(t, cfg.EnableEventsAPI)
-	assert.True(t, cfg.EnableSwaggerAPI)
-
-	var empty types.RunConfig
-	SetEndpointConfig(enabledEndpoints{}, &empty)
-	assert.False(t, empty.EnableHealthAPI)
-	assert.False(t, empty.EnableUpdateAPI)
-	assert.False(t, empty.EnableMetricsAPI)
 }

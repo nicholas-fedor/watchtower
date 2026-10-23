@@ -7,8 +7,8 @@ import (
 
 	"github.com/spf13/cobra"
 
-	apiConfig "github.com/nicholas-fedor/watchtower/internal/api/config"
 	"github.com/nicholas-fedor/watchtower/internal/observability/logging"
+	"github.com/nicholas-fedor/watchtower/internal/settings/config/api"
 	"github.com/nicholas-fedor/watchtower/pkg/types"
 )
 
@@ -55,7 +55,7 @@ func (c Config) BuildRunConfig(input RunConfigInput) (types.RunConfig, error) {
 		return types.RunConfig{}, err
 	}
 
-	endpointSet, err := apiConfig.ResolveEndpoints(
+	endpointSet, err := api.ResolveEndpoints(
 		c.API.Endpoints,
 		c.API.LegacyUpdate,
 		c.API.LegacyMetrics,
@@ -94,7 +94,7 @@ func (c Config) BuildRunConfig(input RunConfigInput) (types.RunConfig, error) {
 	}
 
 	// Map resolved endpoint names onto Enable* fields on RunConfig.
-	apiConfig.SetEndpointConfig(endpointSet, &cfg)
+	setEndpointConfig(endpointSet, &cfg)
 
 	return cfg, nil
 }
@@ -168,4 +168,23 @@ func ValidateAPIHost(host string) error {
 	}
 
 	return nil
+}
+
+// setEndpointConfig populates the runtime configuration with the HTTP API
+// Endpoints parsed from the http-api-endpoints configuration option.
+//
+// Parameters:
+//   - endpointMap: Enabled endpoints.
+//   - cfg: RunConfig to update.
+func setEndpointConfig(endpointMap api.EnabledEndpoints, cfg *types.RunConfig) {
+	cfg.EnableHealthAPI = endpointMap.Contains(api.EndpointHealth)
+	cfg.EnableUpdateAPI = endpointMap.Contains(api.EndpointUpdate)
+	cfg.EnableMetricsAPI = endpointMap.Contains(api.EndpointMetrics)
+	cfg.EnableContainersAPI = endpointMap.Contains(api.EndpointContainers)
+	cfg.EnableCheckAPI = endpointMap.Contains(api.EndpointCheck)
+	cfg.EnableHistoryAPI = endpointMap.Contains(api.EndpointHistory)
+	cfg.EnableImagesAPI = endpointMap.Contains(api.EndpointImages)
+	cfg.EnableConfigAPI = endpointMap.Contains(api.EndpointConfig)
+	cfg.EnableEventsAPI = endpointMap.Contains(api.EndpointEvents)
+	cfg.EnableSwaggerAPI = endpointMap.Contains(api.EndpointSwagger)
 }

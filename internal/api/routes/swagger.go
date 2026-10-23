@@ -8,8 +8,6 @@ import (
 	"github.com/swaggo/swag"
 
 	swaggo "github.com/gofiber/contrib/v3/swaggo"
-
-	"github.com/nicholas-fedor/watchtower/internal/api/config"
 )
 
 // registerSwaggerRoute mounts Swagger UI under /swagger/* without API auth.
@@ -19,7 +17,7 @@ import (
 // Parameters:
 //   - app: Fiber application.
 //   - opts: API configuration options (Reserved for future config options).
-func registerSwaggerRoute(app *fiber.App, _ config.Options) {
+func registerSwaggerRoute(app *fiber.App, _ Options) {
 	swaggerUI := swaggo.New(swaggo.Config{
 		Title:                "Watchtower HTTP API",
 		PersistAuthorization: true,

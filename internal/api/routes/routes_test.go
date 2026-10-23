@@ -21,7 +21,6 @@ import (
 
 	fiberRecover "github.com/gofiber/fiber/v3/middleware/recover"
 
-	"github.com/nicholas-fedor/watchtower/internal/api/config"
 	"github.com/nicholas-fedor/watchtower/internal/observability/events"
 	"github.com/nicholas-fedor/watchtower/internal/observability/metrics"
 	"github.com/nicholas-fedor/watchtower/internal/scheduling"
@@ -87,8 +86,8 @@ func testAuthMiddleware() fiber.Handler {
 }
 
 func TestValidateAndRegister(t *testing.T) {
-	baseOpts := func() config.Options {
-		return config.Options{
+	baseOpts := func() Options {
+		return Options{
 			EnableUpdateAPI: true,
 			UpdateLock:      scheduling.NewUpdateLock(),
 			UnblockHTTPAPI:  true,
@@ -102,14 +101,14 @@ func TestValidateAndRegister(t *testing.T) {
 
 	tests := []struct {
 		name    string
-		opts    config.Options
+		opts    Options
 		wantErr bool
 		errMsg  string
 	}{
 		{name: "all valid", opts: baseOpts(), wantErr: false},
 		{
 			name: "missing RunUpdatesWithNotifications",
-			opts: func() config.Options {
+			opts: func() Options {
 				o := baseOpts()
 				o.RunUpdatesWithNotifications = nil
 
@@ -120,7 +119,7 @@ func TestValidateAndRegister(t *testing.T) {
 		},
 		{
 			name: "missing FilterByImage",
-			opts: func() config.Options {
+			opts: func() Options {
 				o := baseOpts()
 				o.FilterByImage = nil
 
@@ -131,7 +130,7 @@ func TestValidateAndRegister(t *testing.T) {
 		},
 		{
 			name: "missing DefaultMetrics for update",
-			opts: func() config.Options {
+			opts: func() Options {
 				o := baseOpts()
 				o.DefaultMetrics = nil
 
@@ -142,7 +141,7 @@ func TestValidateAndRegister(t *testing.T) {
 		},
 		{
 			name: "history without client is valid",
-			opts: config.Options{
+			opts: Options{
 				EnableHistoryAPI: true,
 				DefaultMetrics:   func() *metrics.Metrics { return testMetrics },
 			},
@@ -150,7 +149,7 @@ func TestValidateAndRegister(t *testing.T) {
 		},
 		{
 			name: "history without DefaultMetrics fails",
-			opts: config.Options{
+			opts: Options{
 				EnableHistoryAPI: true,
 				DefaultMetrics:   nil,
 			},
@@ -159,7 +158,7 @@ func TestValidateAndRegister(t *testing.T) {
 		},
 		{
 			name: "metrics without DefaultMetrics fails",
-			opts: config.Options{
+			opts: Options{
 				EnableMetricsAPI: true,
 				DefaultMetrics:   nil,
 			},
@@ -168,7 +167,7 @@ func TestValidateAndRegister(t *testing.T) {
 		},
 		{
 			name: "check without FilterByImage fails",
-			opts: config.Options{
+			opts: Options{
 				EnableCheckAPI: true,
 				FilterByImage:  nil,
 				Client:         mockContainer.NewMockClient(t),
@@ -178,7 +177,7 @@ func TestValidateAndRegister(t *testing.T) {
 		},
 		{
 			name: "check with FilterByImage is valid",
-			opts: config.Options{
+			opts: Options{
 				EnableCheckAPI: true,
 				FilterByImage:  func(_ []string, f types.Filter) types.Filter { return f },
 				Client:         mockContainer.NewMockClient(t),
@@ -187,7 +186,7 @@ func TestValidateAndRegister(t *testing.T) {
 		},
 		{
 			name: "events without EventBroadcaster fails",
-			opts: config.Options{
+			opts: Options{
 				EnableEventsAPI:  true,
 				EventBroadcaster: nil,
 			},
@@ -261,7 +260,7 @@ func TestRegister(t *testing.T) {
 				}
 			}
 
-			opts := config.Options{
+			opts := Options{
 				EnableUpdateAPI:             tt.enableUpdateAPI,
 				UnblockHTTPAPI:              true,
 				RunUpdatesWithNotifications: updateFn,

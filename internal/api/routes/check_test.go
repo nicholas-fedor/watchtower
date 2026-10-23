@@ -7,7 +7,6 @@ import (
 
 	"github.com/stretchr/testify/assert"
 
-	"github.com/nicholas-fedor/watchtower/internal/api/config"
 	"github.com/nicholas-fedor/watchtower/internal/observability/events"
 	"github.com/nicholas-fedor/watchtower/internal/observability/logging"
 	"github.com/nicholas-fedor/watchtower/internal/observability/metrics"
@@ -21,7 +20,7 @@ func TestRegisterCheckRoute(t *testing.T) {
 		app := testApp()
 		auth := testAuthMiddleware()
 
-		opts := config.Options{
+		opts := Options{
 			EnableCheckAPI: true,
 			Client:         nil,
 		}
@@ -41,7 +40,7 @@ func TestRegisterCheckRoute(t *testing.T) {
 		auth := testAuthMiddleware()
 		mockClient := mockContainer.NewMockClient(t)
 
-		opts := config.Options{
+		opts := Options{
 			EnableCheckAPI:   true,
 			Client:           mockClient,
 			FilterByImage:    func(_ []string, f types.Filter) types.Filter { return f },
@@ -68,7 +67,7 @@ func TestRegisterCheckRoute(t *testing.T) {
 func TestRegisterEventsRoute(t *testing.T) {
 	app := testApp()
 
-	opts := config.Options{
+	opts := Options{
 		EnableEventsAPI:    true,
 		EventsToken:        "events-token",
 		CORSAllowedOrigins: []string{"https://example.com"},
@@ -95,7 +94,7 @@ func TestRegisterUpdateRoute_WriteStartupMessage(t *testing.T) {
 	app := testApp()
 	auth := testAuthMiddleware()
 
-	opts := config.Options{
+	opts := Options{
 		EnableUpdateAPI: true,
 		UpdateLock:      scheduling.NewUpdateLock(),
 		UnblockHTTPAPI:  false,
