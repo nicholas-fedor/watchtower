@@ -985,6 +985,46 @@ func Test_getNetworkConfig(t *testing.T) {
 			assert.NotContains(t, config.EndpointsConfig, "bridge")
 		})
 	})
+
+	// A source MAC on a host network or a legacy API version is cleared for
+	// the new container, which is expected, so nothing is logged above debug.
+	t.Run("clears host and legacy MAC addresses without warning", func(t *testing.T) {
+		t.Parallel()
+
+		tests := []struct {
+			name          string
+			networkMode   string
+			network       string
+			clientVersion string
+		}{
+			{name: "host network on a modern API", networkMode: "host", network: "host", clientVersion: "1.50"},
+			{name: "host network on a legacy API", networkMode: "host", network: "host", clientVersion: "1.43"},
+			{name: "bridge network on a legacy API", networkMode: "bridge", network: "bridge", clientVersion: "1.43"},
+		}
+
+		for _, tc := range tests {
+			t.Run(tc.name, func(t *testing.T) {
+				t.Parallel()
+
+				log, logbuf := newCapturedLogger(zerolog.DebugLevel)
+				container := MockContainer(
+					WithNetworkMode(tc.networkMode),
+					WithNetworkSettings(map[string]*dockerNetwork.EndpointSettings{
+						tc.network: {
+							NetworkID:  "network_id",
+							MacAddress: dockerNetwork.HardwareAddr("02:42:ac:11:00:99"),
+						},
+					}),
+				)
+
+				config := getNetworkConfig(log, container, tc.clientVersion)
+
+				assert.Empty(t, config.EndpointsConfig[tc.network].MacAddress)
+				assert.Contains(t, logbuf.String(), "Skipping MAC address validation for host network or legacy API")
+				assert.NotContains(t, logbuf.String(), "level=warn")
+			})
+		}
+	})
 }
 
 // Test_newEmptyNetworkConfig verifies that an empty networking config has a
@@ -1665,147 +1705,42 @@ func Test_onlyGeneratedMacs(t *testing.T) {
 func Test_validateMacAddresses(t *testing.T) {
 	t.Parallel()
 
-	t.Run("with legacy API version (< 1.44)", func(t *testing.T) {
+	// processEndpoint clears MAC addresses for legacy API versions and host
+	// networks, so the validator expects none there and reports no error.
+	t.Run("with legacy API version (< 1.44) or host network mode", func(t *testing.T) {
 		t.Parallel()
 
-		clientVersion := "1.40"
+		tests := []struct {
+			name          string
+			clientVersion string
+			isHostNetwork bool
+		}{
+			{name: "legacy API with bridge network", clientVersion: "1.40", isHostNetwork: false},
+			{name: "legacy API with host network", clientVersion: "1.40", isHostNetwork: true},
+			{name: "modern API with host network", clientVersion: "1.50", isHostNetwork: true},
+		}
 
-		t.Run("and non-host network mode", func(t *testing.T) {
-			t.Parallel()
-
-			isHostNetwork := false
-
-			t.Run("should succeed when no MAC address is present", func(t *testing.T) {
+		for _, tc := range tests {
+			t.Run(tc.name, func(t *testing.T) {
 				t.Parallel()
 
-				container := MockContainer(
-					WithNetworkSettings(map[string]*dockerNetwork.EndpointSettings{
-						"bridge": {
-							NetworkID: "bridge_network_id",
-							IPAddress: netip.MustParseAddr("172.17.0.2"),
-						},
-					}),
-				)
+				log, logbuf := newCapturedLogger(zerolog.DebugLevel)
+				container := MockContainer(WithNetworkSettings(map[string]*dockerNetwork.EndpointSettings{
+					"bridge": {NetworkID: "bridge_network_id"},
+				}))
 				config := &dockerNetwork.NetworkingConfig{
 					EndpointsConfig: map[string]*dockerNetwork.EndpointSettings{
-						"bridge": {
-							NetworkID: "bridge_network_id",
-							IPAddress: netip.MustParseAddr("172.17.0.2"),
-						},
+						"bridge": {NetworkID: "bridge_network_id"},
 					},
 				}
 
-				err := validateMacAddresses(newTestLogger(t), config,
-					container.ID(),
-					clientVersion,
-					isHostNetwork,
-					container,
-				)
+				err := validateMacAddresses(log, config, container.ID(), tc.clientVersion, tc.isHostNetwork, container)
 				require.NoError(t, err)
+				assert.Contains(t, logbuf.String(), "Skipping MAC address validation for host network or legacy API")
+				assert.Contains(t, logbuf.String(), "container="+container.Name())
+				assert.Contains(t, logbuf.String(), "id="+container.ID().ShortID())
 			})
-
-			t.Run("should return error when unexpected MAC address is present", func(t *testing.T) {
-				t.Parallel()
-
-				container := MockContainer(
-					WithNetworkSettings(map[string]*dockerNetwork.EndpointSettings{
-						"bridge": {
-							NetworkID:  "bridge_network_id",
-							MacAddress: dockerNetwork.HardwareAddr("02:42:ac:11:00:02"),
-							IPAddress:  netip.MustParseAddr("172.17.0.2"),
-						},
-					}),
-				)
-				config := &dockerNetwork.NetworkingConfig{
-					EndpointsConfig: map[string]*dockerNetwork.EndpointSettings{
-						"bridge": {
-							NetworkID:  "bridge_network_id",
-							MacAddress: dockerNetwork.HardwareAddr("02:42:ac:11:00:02"),
-							IPAddress:  netip.MustParseAddr("172.17.0.2"),
-						},
-					},
-				}
-
-				err := validateMacAddresses(newTestLogger(t), config,
-					container.ID(),
-					clientVersion,
-					isHostNetwork,
-					container,
-				)
-				require.Error(t, err)
-				require.ErrorContains(t, err, "unexpected MAC address in legacy config")
-				require.ErrorContains(t, err, "API version 1.40")
-			})
-		})
-	})
-
-	t.Run("with host network mode", func(t *testing.T) {
-		t.Parallel()
-
-		isHostNetwork := true
-
-		t.Run("should succeed when no MAC address is present", func(t *testing.T) {
-			t.Parallel()
-
-			container := MockContainer(
-				WithNetworkMode("host"),
-				WithNetworkSettings(map[string]*dockerNetwork.EndpointSettings{
-					"host": {
-						NetworkID: "host_network_id",
-						IPAddress: netip.MustParseAddr("192.168.1.100"),
-					},
-				}),
-			)
-			config := &dockerNetwork.NetworkingConfig{
-				EndpointsConfig: map[string]*dockerNetwork.EndpointSettings{
-					"host": {
-						NetworkID: "host_network_id",
-						IPAddress: netip.MustParseAddr("192.168.1.100"),
-					},
-				},
-			}
-
-			err := validateMacAddresses(newTestLogger(t), config,
-				container.ID(),
-				"1.50",
-				isHostNetwork,
-				container,
-			)
-			require.NoError(t, err)
-		})
-
-		t.Run("should return error when unexpected MAC address is present", func(t *testing.T) {
-			t.Parallel()
-
-			container := MockContainer(
-				WithNetworkMode("host"),
-				WithNetworkSettings(map[string]*dockerNetwork.EndpointSettings{
-					"host": {
-						NetworkID:  "host_network_id",
-						MacAddress: dockerNetwork.HardwareAddr("02:42:ac:11:00:02"),
-						IPAddress:  netip.MustParseAddr("192.168.1.100"),
-					},
-				}),
-			)
-			config := &dockerNetwork.NetworkingConfig{
-				EndpointsConfig: map[string]*dockerNetwork.EndpointSettings{
-					"host": {
-						NetworkID:  "host_network_id",
-						MacAddress: dockerNetwork.HardwareAddr("02:42:ac:11:00:02"),
-						IPAddress:  netip.MustParseAddr("192.168.1.100"),
-					},
-				},
-			}
-
-			err := validateMacAddresses(newTestLogger(t), config,
-				container.ID(),
-				"1.50",
-				isHostNetwork,
-				container,
-			)
-			require.Error(t, err)
-			require.ErrorIs(t, err, errUnexpectedMacInHost)
-		})
+		}
 	})
 
 	t.Run("with modern API version (>= 1.44)", func(t *testing.T) {
@@ -2274,316 +2209,6 @@ func Test_stopSourceContainer(t *testing.T) {
 	})
 }
 
-// Test_debugLogMacAddress verifies the MAC address diagnostics logged for each
-// client version, network mode, and networking config shape.
-func Test_debugLogMacAddress(t *testing.T) {
-	t.Parallel()
-
-	t.Run("with API version < 1.44 and not host network", func(t *testing.T) {
-		t.Parallel()
-
-		t.Run("and MAC address present", func(t *testing.T) {
-			t.Parallel()
-
-			t.Run("should log 'Unexpected MAC address in legacy config'", func(t *testing.T) {
-				t.Parallel()
-
-				config := &dockerNetwork.NetworkingConfig{
-					EndpointsConfig: map[string]*dockerNetwork.EndpointSettings{
-						"bridge": {
-							MacAddress: dockerNetwork.HardwareAddr("02:42:ac:11:00:02"),
-						},
-					},
-				}
-				containerID := types.ContainerID("test-container")
-
-				log, logbuf := newCapturedLogger(zerolog.DebugLevel)
-
-				debugLogMacAddress(log, config,
-					containerID,
-					"1.40",
-					false,
-				)
-
-				assert.Contains(t, logbuf.String(), "Unexpected MAC address in legacy config")
-			})
-		})
-
-		t.Run("and no MAC address present", func(t *testing.T) {
-			t.Parallel()
-
-			t.Run("should log 'No MAC address in legacy config, as expected'", func(t *testing.T) {
-				t.Parallel()
-
-				config := &dockerNetwork.NetworkingConfig{
-					EndpointsConfig: map[string]*dockerNetwork.EndpointSettings{
-						"bridge": {NetworkID: "bridge_network_id"},
-					},
-				}
-				containerID := types.ContainerID("test-container")
-
-				log, logbuf := newCapturedLogger(zerolog.DebugLevel)
-
-				debugLogMacAddress(log, config,
-					containerID,
-					"1.40",
-					false,
-				)
-
-				assert.Contains(t, logbuf.String(), "No MAC address in legacy config, as expected")
-			})
-		})
-	})
-
-	t.Run("with API version just below 1.44 and not host network", func(t *testing.T) {
-		t.Parallel()
-
-		config := &dockerNetwork.NetworkingConfig{
-			EndpointsConfig: map[string]*dockerNetwork.EndpointSettings{
-				"bridge": {NetworkID: "bridge_network_id"},
-			},
-		}
-
-		log, logbuf := newCapturedLogger(zerolog.DebugLevel)
-
-		debugLogMacAddress(log, config, types.ContainerID("test-container"), "1.43", false)
-
-		assert.Contains(t, logbuf.String(), "No MAC address in legacy config, as expected")
-	})
-
-	t.Run("with API version < 1.44 and host network", func(t *testing.T) {
-		t.Parallel()
-
-		config := &dockerNetwork.NetworkingConfig{
-			EndpointsConfig: map[string]*dockerNetwork.EndpointSettings{
-				"host": {NetworkID: "host_network_id"},
-			},
-		}
-
-		log, logbuf := newCapturedLogger(zerolog.DebugLevel)
-
-		debugLogMacAddress(log, config, types.ContainerID("test-container"), "1.40", true)
-
-		assert.Contains(t, logbuf.String(), "No MAC address in host network mode, as expected")
-		assert.NotContains(t, logbuf.String(), "legacy config")
-	})
-
-	t.Run("with modern API version (>= 1.44)", func(t *testing.T) {
-		t.Parallel()
-
-		t.Run("and MAC address present", func(t *testing.T) {
-			t.Parallel()
-
-			t.Run("should log 'Verified MAC address configuration'", func(t *testing.T) {
-				t.Parallel()
-
-				config := &dockerNetwork.NetworkingConfig{
-					EndpointsConfig: map[string]*dockerNetwork.EndpointSettings{
-						"bridge": {
-							MacAddress: dockerNetwork.HardwareAddr("02:42:ac:11:00:02"),
-						},
-					},
-				}
-				containerID := types.ContainerID("test-container")
-
-				log, logbuf := newCapturedLogger(zerolog.DebugLevel)
-
-				debugLogMacAddress(log, config,
-					containerID,
-					"1.50",
-					false,
-				)
-
-				assert.Contains(t, logbuf.String(), "Verified MAC address configuration")
-			})
-
-			t.Run("should log MAC address details for each network", func(t *testing.T) {
-				t.Parallel()
-
-				config := &dockerNetwork.NetworkingConfig{
-					EndpointsConfig: map[string]*dockerNetwork.EndpointSettings{
-						"bridge": {
-							MacAddress: dockerNetwork.HardwareAddr("02:42:ac:11:00:02"),
-						},
-						"custom_network": {
-							MacAddress: dockerNetwork.HardwareAddr("aa:bb:cc:dd:ee:ff"),
-						},
-					},
-				}
-				containerID := types.ContainerID("test-container")
-
-				log, logbuf := newCapturedLogger(zerolog.DebugLevel)
-
-				debugLogMacAddress(log, config,
-					containerID,
-					"1.50",
-					false,
-				)
-
-				assert.Regexp(t, `(?s)Found MAC address in config.*network.*mac_address`, logbuf.String())
-			})
-		})
-
-		t.Run("and no MAC address present", func(t *testing.T) {
-			t.Parallel()
-
-			t.Run("and non-host network mode", func(t *testing.T) {
-				t.Parallel()
-
-				t.Run("should log 'No MAC address found in config'", func(t *testing.T) {
-					t.Parallel()
-
-					config := &dockerNetwork.NetworkingConfig{
-						EndpointsConfig: map[string]*dockerNetwork.EndpointSettings{
-							"bridge": {NetworkID: "bridge_network_id"},
-						},
-					}
-					containerID := types.ContainerID("test-container")
-
-					log, logbuf := newCapturedLogger(zerolog.DebugLevel)
-
-					// 1.44 is the first version without the legacy handling.
-					debugLogMacAddress(log, config, containerID, "1.44", false)
-
-					assert.Contains(t, logbuf.String(), "No MAC address found in config")
-					assert.NotContains(t, logbuf.String(), "legacy config")
-				})
-			})
-
-			t.Run("and host network mode", func(t *testing.T) {
-				t.Parallel()
-
-				t.Run("should log 'No MAC address in host network mode, as expected'", func(t *testing.T) {
-					t.Parallel()
-
-					config := &dockerNetwork.NetworkingConfig{
-						EndpointsConfig: map[string]*dockerNetwork.EndpointSettings{
-							"host": {NetworkID: "host_network_id"},
-						},
-					}
-					containerID := types.ContainerID("test-container")
-
-					log, logbuf := newCapturedLogger(zerolog.DebugLevel)
-
-					debugLogMacAddress(log, config,
-						containerID,
-						"1.50",
-						true,
-					)
-
-					assert.Contains(t, logbuf.String(), "No MAC address in host network mode, as expected")
-				})
-			})
-		})
-	})
-
-	t.Run("with nil network config", func(t *testing.T) {
-		t.Parallel()
-
-		t.Run("should execute without panicking and log appropriate message", func(t *testing.T) {
-			t.Parallel()
-
-			containerID := types.ContainerID("test-container")
-
-			log, logbuf := newCapturedLogger(zerolog.DebugLevel)
-
-			assert.NotPanics(t, func() {
-				debugLogMacAddress(log, nil, containerID, "1.50", false)
-			})
-
-			// Should log that no MAC address was found
-			assert.Contains(t, logbuf.String(), "No MAC address found in config")
-		})
-	})
-
-	t.Run("with empty endpoints config", func(t *testing.T) {
-		t.Parallel()
-
-		t.Run("should log appropriate message for non-host network", func(t *testing.T) {
-			t.Parallel()
-
-			config := &dockerNetwork.NetworkingConfig{
-				EndpointsConfig: map[string]*dockerNetwork.EndpointSettings{},
-			}
-			containerID := types.ContainerID("test-container")
-
-			log, logbuf := newCapturedLogger(zerolog.DebugLevel)
-
-			debugLogMacAddress(log, config, containerID, "1.50", false)
-
-			assert.Contains(t, logbuf.String(), "No MAC address found in config")
-		})
-	})
-
-	t.Run("with multiple networks", func(t *testing.T) {
-		t.Parallel()
-
-		t.Run("should check all networks for MAC addresses", func(t *testing.T) {
-			t.Parallel()
-
-			config := &dockerNetwork.NetworkingConfig{
-				EndpointsConfig: map[string]*dockerNetwork.EndpointSettings{
-					"bridge": {
-						MacAddress: dockerNetwork.HardwareAddr("02:42:ac:11:00:02"),
-					},
-					"custom_network": {NetworkID: "custom_net_id"},
-				},
-			}
-			containerID := types.ContainerID("test-container")
-
-			log, logbuf := newCapturedLogger(zerolog.DebugLevel)
-
-			debugLogMacAddress(log, config, containerID, "1.50", false)
-
-			assert.Regexp(t, `(?s)Found MAC address in config.*Verified MAC address configuration`, logbuf.String())
-		})
-	})
-
-	t.Run("with different client version formats", func(t *testing.T) {
-		t.Parallel()
-
-		t.Run("should handle Podman-style version strings", func(t *testing.T) {
-			t.Parallel()
-
-			config := &dockerNetwork.NetworkingConfig{
-				EndpointsConfig: map[string]*dockerNetwork.EndpointSettings{
-					"bridge": {
-						MacAddress: dockerNetwork.HardwareAddr("02:42:ac:11:00:02"),
-					},
-				},
-			}
-			containerID := types.ContainerID("test-container")
-
-			log, logbuf := newCapturedLogger(zerolog.DebugLevel)
-
-			debugLogMacAddress(log, config, containerID, "4.0.0", false)
-
-			assert.Contains(t, logbuf.String(), "Verified MAC address configuration")
-		})
-
-		t.Run("should handle version strings with patch levels", func(t *testing.T) {
-			t.Parallel()
-
-			config := &dockerNetwork.NetworkingConfig{
-				EndpointsConfig: map[string]*dockerNetwork.EndpointSettings{
-					"bridge": {
-						MacAddress: dockerNetwork.HardwareAddr("02:42:ac:11:00:02"),
-					},
-				},
-			}
-			containerID := types.ContainerID("test-container")
-
-			log, logbuf := newCapturedLogger(zerolog.DebugLevel)
-
-			debugLogMacAddress(log, config, containerID, "1.45.0", false)
-
-			assert.Contains(t, logbuf.String(), "Verified MAC address configuration")
-		})
-	})
-}
-
-// TestIsWatchtowerParent verifies that a container ID is found anywhere in a
-// comma-separated container chain, with or without spaces.
 func TestIsWatchtowerParent(t *testing.T) {
 	t.Parallel()
 

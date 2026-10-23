@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"net/netip"
+	"strings"
 	"testing"
 
 	"github.com/rs/zerolog"
@@ -261,7 +262,7 @@ func TestTargetContainerOperations(t *testing.T) {
 			assert.Contains(t, logOutput.String(), "Disabled memory swappiness for Podman compatibility")
 		})
 
-		t.Run("should log MAC address details", func(t *testing.T) {
+		t.Run("should log MAC address details once", func(t *testing.T) {
 			t.Parallel()
 
 			log, logOutput := newCapturedLogger(zerolog.DebugLevel)
@@ -274,7 +275,9 @@ func TestTargetContainerOperations(t *testing.T) {
 			)
 			require.NoError(t, err)
 			assert.Equal(t, types.ContainerID(testTargetID), newID)
-			assert.Contains(t, logOutput.String(), "Found MAC address in config")
+			assert.Contains(t, logOutput.String(), "MAC address validation passed")
+			assert.Equal(t, 1, strings.Count(logOutput.String(), "mac_address="),
+				"the network config's MAC check runs once per recreation")
 		})
 
 		t.Run("should use full network config for API >= 1.44", func(t *testing.T) {

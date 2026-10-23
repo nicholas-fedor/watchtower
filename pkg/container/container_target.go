@@ -197,21 +197,6 @@ func createTargetContainer(log *zerolog.Logger,
 	// Handle CPU settings based on copy mode.
 	handleCPUSettings(hostConfig, cpuCopyMode, isPodman, clog)
 
-	// Log network details for debugging, including MAC address validation.
-	isHostNetwork := false
-
-	info := sourceContainer.ContainerInfo()
-	if info != nil && info.HostConfig != nil {
-		isHostNetwork = info.HostConfig.NetworkMode.IsHost()
-	}
-
-	debugLogMacAddress(log,
-		networkConfig,
-		sourceContainer.ID(),
-		clientVersion,
-		isHostNetwork,
-	)
-
 	// Determine network config for container creation based on API version.
 	createNetworkConfig := networkConfig
 
