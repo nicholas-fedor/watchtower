@@ -993,8 +993,11 @@ func validateMacAddresses(log *zerolog.Logger,
 	sourceContainer types.Container,
 ) error {
 	// Initialize logger with container and API version context for consistent log messages.
+	// The name and ID fields match the other recreation logs, and the notification
+	// templates read them for the MAC address warnings.
 	clogVal := log.With().
-		Str("container", containerID.ShortID()).
+		Str("container", sourceContainer.Name()).
+		Str("id", containerID.ShortID()).
 		Str("version", clientVersion).
 		Logger()
 	clog := &clogVal
@@ -1049,10 +1052,12 @@ func validateMacAddresses(log *zerolog.Logger,
 		containerState = string(containerInfo.State.Status)
 	}
 
-	// Handle legacy Docker API versions (< 1.44), where MAC address preservation is not fully supported.
-	// In legacy APIs, MAC addresses should not appear in non-host networks, as they are managed differently.
-	if dockerAPIVersion.LessThan(clientVersion, "1.44") {
-		if foundMac && !isHostNetwork {
+	// Handle non-host networks on legacy Docker API versions (< 1.44), where MAC address
+	// preservation is not fully supported. In legacy APIs, MAC addresses should not appear in
+	// non-host networks, as they are managed differently. Host networks follow the host rule
+	// below on every API version.
+	if dockerAPIVersion.LessThan(clientVersion, "1.44") && !isHostNetwork {
+		if foundMac {
 			// Unexpected MAC address in a legacy API is a potential misconfiguration
 			// Log a warning and return an error.
 			clog.Warn().Msg("Unexpected MAC address in legacy config")
@@ -1066,7 +1071,8 @@ func validateMacAddresses(log *zerolog.Logger,
 		return nil
 	}
 
-	// Handle host network mode, where the container uses the host's network stack and should not have its own MAC addresses.
+	// Handle host network mode on any API version, where the container uses the host's network
+	// stack and should not have its own MAC addresses.
 	if isHostNetwork {
 		if foundMac {
 			// MAC addresses in host mode are unexpected and indicate a misconfiguration.
@@ -1139,68 +1145,6 @@ func filterAliases(aliases []string, shortID string) []string {
 	}
 
 	return result
-}
-
-// debugLogMacAddress logs MAC address info for a container's network config.
-//
-// Parameters:
-//   - networkConfig: Network configuration to check.
-//   - containerID: ID of the container.
-//   - clientVersion: API version of the client.
-//   - isHostNetwork: Whether the container uses host network mode.
-func debugLogMacAddress(log *zerolog.Logger,
-	networkConfig *dockerNetwork.NetworkingConfig,
-	containerID types.ContainerID,
-	clientVersion string,
-	isHostNetwork bool,
-) {
-	clogVal := log.With().
-		Str("container", containerID.ShortID()).
-		Str("version", clientVersion).
-		Logger()
-	clog := &clogVal
-
-	// Check for MAC addresses in the config.
-	foundMac := false
-
-	// Iterate through network endpoints to find MAC addresses.
-	if networkConfig != nil {
-		// Iterate through network endpoints to find MAC addresses.
-		for networkName, endpoint := range networkConfig.EndpointsConfig {
-			// Check if the endpoint has a MAC address.
-			if len(endpoint.MacAddress) > 0 {
-				clog.Debug().
-					Str("network", networkName).
-					Str("mac_address", endpoint.MacAddress.String()).
-					Msg("Found MAC address in config")
-
-				// Set flag to indicate MAC address was found.
-				foundMac = true
-			}
-		}
-	}
-
-	// Log based on API version, MAC presence, and network mode.
-	switch {
-	// API < v1.44, MAC present
-	case dockerAPIVersion.LessThan(clientVersion, "1.44") && !isHostNetwork:
-		if foundMac {
-			clog.Debug().Msg("Unexpected MAC address in legacy config")
-
-			return
-		}
-
-		clog.Debug().Msg("No MAC address in legacy config, as expected")
-	// API < v1.44, MAC present
-	case foundMac:
-		clog.Debug().Msg("Verified MAC address configuration")
-	// API >= v1.44, no MAC, non-host network
-	case !isHostNetwork:
-		clog.Debug().Msg("No MAC address found in config")
-	// API >= v1.44, no MAC, host network
-	default:
-		clog.Debug().Msg("No MAC address in host network mode, as expected")
-	}
 }
 
 // IsWatchtowerParent checks if the current container ID exists in the comma-separated container-chain label values.

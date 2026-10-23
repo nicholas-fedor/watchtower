@@ -74,6 +74,8 @@ var legacyTemplateMessages = []string{
 	"Ignoring depends-on entry that names no container",
 	"Skipping container update (self-dependency)",
 	"Skipping container update (circular dependency)",
+	"Unexpected MAC address in host network config",
+	"Unexpected MAC address in legacy config",
 }
 
 // Disk sizes used by the image-usage budget fixtures, in bytes.
@@ -202,6 +204,10 @@ func goldenEntryData(message string) map[string]any {
 	case "Skipping container update (self-dependency)",
 		"Skipping container update (circular dependency)":
 		return map[string]any{"container": "app", "id": "abcdef123456"}
+	case "Unexpected MAC address in host network config":
+		return map[string]any{"container": "app", "id": "abcdef123456", "version": "1.44"}
+	case "Unexpected MAC address in legacy config":
+		return map[string]any{"container": "app", "id": "abcdef123456", "version": "1.43"}
 	case "Only checking containers in scope":
 		return map[string]any{"scope": "production"}
 	case "Starting HTTP API server", "HTTP API server is enabled":

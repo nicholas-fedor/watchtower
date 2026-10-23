@@ -126,6 +126,10 @@ var Templates = map[string]string{
     Skipped {{with (index $e.Data "container")}}{{.}}{{else}}container{{end}}: depends on itself
 {{- else if eq $msg "Skipping container update (circular dependency)" -}}
     Skipped {{with (index $e.Data "container")}}{{.}}{{else}}container{{end}}: circular dependency
+{{- else if eq $msg "Unexpected MAC address in host network config" -}}
+    Unexpected MAC address for {{with (index $e.Data "container")}}{{.}}{{else}}container{{end}} in host network mode
+{{- else if eq $msg "Unexpected MAC address in legacy config" -}}
+    Unexpected MAC address for {{with (index $e.Data "container")}}{{.}}{{else}}container{{end}} on Docker API {{with (index $e.Data "version")}}{{.}}{{else}}below 1.44{{end}}
 {{- else if $e.Data -}}
     {{- /* For messages with data, show message and key=value pairs */ -}}
     {{$msg}} | {{range $k, $v := $e.Data}}{{$k}}={{$v}} {{end}}

@@ -40,5 +40,7 @@ Update failed for app (org/app:latest): image pull: registry rate limited: retry
 Ignored depends-on missing-db for app: no container has that name
 Skipped app: depends on itself
 Skipped app: circular dependency
+Unexpected MAC address for app in host network mode
+Unexpected MAC address for app on Docker API 1.43
 Unrecognized message with fields | alpha=one beta=2 
 Unrecognized message without fields

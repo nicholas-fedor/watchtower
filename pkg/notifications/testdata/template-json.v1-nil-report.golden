@@ -400,6 +400,26 @@
     },
     {
       "data": {
+        "container": "app",
+        "id": "abcdef123456",
+        "version": "1.44"
+      },
+      "level": "error",
+      "message": "Unexpected MAC address in host network config",
+      "time": "2026-10-07T12:00:42Z"
+    },
+    {
+      "data": {
+        "container": "app",
+        "id": "abcdef123456",
+        "version": "1.43"
+      },
+      "level": "debug",
+      "message": "Unexpected MAC address in legacy config",
+      "time": "2026-10-07T12:00:43Z"
+    },
+    {
+      "data": {
         "alpha": "one",
         "beta": 2
       },
