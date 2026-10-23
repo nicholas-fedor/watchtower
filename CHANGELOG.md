@@ -36,6 +36,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Move image creation and credential lookup into digest and auth by @nicholas-fedor in [#3055](https://github.com/nicholas-fedor/watchtower/pull/3055)
 - Drop the duplicate platform manifest request by @nicholas-fedor in [#3036](https://github.com/nicholas-fedor/watchtower/pull/3036)
 
+### Documentation
+
+- Document the health check for Podman by @nicholas-fedor in [#3096](https://github.com/nicholas-fedor/watchtower/pull/3096)
+
 ### Chores
 
 - Update docker/login-action action to v4.7.0 by @renovate[bot] in [#3093](https://github.com/nicholas-fedor/watchtower/pull/3093)
