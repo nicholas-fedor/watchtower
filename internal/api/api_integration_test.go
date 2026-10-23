@@ -15,6 +15,7 @@ import (
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 
+	"github.com/nicholas-fedor/watchtower/internal/api/auth"
 	"github.com/nicholas-fedor/watchtower/internal/api/routes"
 	"github.com/nicholas-fedor/watchtower/internal/observability/events"
 	"github.com/nicholas-fedor/watchtower/internal/observability/logging"
@@ -488,7 +489,7 @@ func TestIntegration_CheckDuringUpdate(t *testing.T) {
 
 	opts = withTestLogger(t, opts)
 
-	authMiddleware := newAPIAuthMiddleware(newTestLogger(t), opts.Token)
+	authMiddleware := auth.NewAPIMiddleware(newTestLogger(t), opts.Token)
 
 	err := routes.ValidateAndRegister(t.Context(), app, authMiddleware, opts)
 	require.NoError(t, err)
@@ -634,7 +635,7 @@ func TestIntegration_UpdateHonorsReviveStoppedAndComposeDependsOn(t *testing.T) 
 		DefaultMetrics: func() *metrics.Metrics { return helperMetrics },
 	}
 
-	authMiddleware := newAPIAuthMiddleware(newTestLogger(t), opts.Token)
+	authMiddleware := auth.NewAPIMiddleware(newTestLogger(t), opts.Token)
 
 	err := routes.ValidateAndRegister(t.Context(), app, authMiddleware, opts)
 	require.NoError(t, err)

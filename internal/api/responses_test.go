@@ -26,6 +26,7 @@ import (
 	dockerContainer "github.com/moby/moby/api/types/container"
 	dockerImage "github.com/moby/moby/api/types/image"
 
+	"github.com/nicholas-fedor/watchtower/internal/api/auth"
 	"github.com/nicholas-fedor/watchtower/internal/api/routes"
 	"github.com/nicholas-fedor/watchtower/internal/observability/events"
 	"github.com/nicholas-fedor/watchtower/internal/observability/metrics"
@@ -236,7 +237,7 @@ func newFixtureApp(t *testing.T, opts routes.Options) *fiber.App {
 
 	app := newApp(opts.Logger, opts.RateLimit, proxyConfig{}, corsConfig{}, opts.NoStartupMessage)
 
-	err := routes.ValidateAndRegister(t.Context(), app, newAPIAuthMiddleware(opts.Logger, opts.Token), opts)
+	err := routes.ValidateAndRegister(t.Context(), app, auth.NewAPIMiddleware(opts.Logger, opts.Token), opts)
 	require.NoError(t, err)
 
 	return app
