@@ -1147,19 +1147,16 @@ func filterAliases(aliases []string, shortID string) []string {
 //   - networkConfig: Network configuration to check.
 //   - containerID: ID of the container.
 //   - clientVersion: API version of the client.
-//   - minSupportedVersion: Minimum API version for MAC preservation.
 //   - isHostNetwork: Whether the container uses host network mode.
 func debugLogMacAddress(log *zerolog.Logger,
 	networkConfig *dockerNetwork.NetworkingConfig,
 	containerID types.ContainerID,
 	clientVersion string,
-	minSupportedVersion string,
 	isHostNetwork bool,
 ) {
 	clogVal := log.With().
 		Str("container", containerID.ShortID()).
 		Str("version", clientVersion).
-		Str("min_version", minSupportedVersion).
 		Logger()
 	clog := &clogVal
 
@@ -1185,15 +1182,6 @@ func debugLogMacAddress(log *zerolog.Logger,
 
 	// Log based on API version, MAC presence, and network mode.
 	switch {
-	// API < v1.44, MAC present
-	case dockerAPIVersion.LessThan(clientVersion, minSupportedVersion):
-		if foundMac {
-			clog.Debug().Msg("Unexpected MAC address in legacy config")
-
-			return
-		}
-
-		clog.Debug().Msg("No MAC address in legacy config, Docker will handle")
 	// API < v1.44, MAC present
 	case dockerAPIVersion.LessThan(clientVersion, "1.44") && !isHostNetwork:
 		if foundMac {
