@@ -3124,7 +3124,9 @@ Use individual <code>key=value</code> pairs separated by commas.</p>
 <div class="admonition note">
 <p class="admonition-title">Note</p>
 <p>A label entry with an empty value (<code>key=</code>) performs a presence check: the label must exist on the container with any value.
-A non-empty value requires an exact match.</p>
+A non-empty value requires an exact match.
+A key can be listed more than once, as in <code>env=prod,env=staging</code>.
+A container then matches when its label has any of those values.</p>
 </div>
 <div class="admonition warning">
 <p class="admonition-title">Warning</p>
@@ -3145,7 +3147,7 @@ A non-empty value requires an exact match.</p>
 </div>
 <div class="admonition note">
 <p class="admonition-title">Note</p>
-<p>A label entry with an empty value (<code>key=</code>) performs a presence check: the label must exist on the container with any value. A non-empty value requires an exact match.</p>
+<p>A label entry with an empty value (<code>key=</code>) performs a presence check: the label must exist on the container with any value. A non-empty value requires an exact match. A key can be listed more than once, as in <code>env=dev,env=test</code>. A container is then excluded when its label has any of those values.</p>
 </div>
 <div class="admonition warning">
 <p class="admonition-title">Warning</p>
@@ -3269,7 +3271,7 @@ When <a href="../update-behavior/#rolling_restart"><code>rolling-restart</code><
     <span class="md-icon" title="Last update">
       <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M21 13.1c-.1 0-.3.1-.4.2l-1 1 2.1 2.1 1-1c.2-.2.2-.6 0-.8l-1.3-1.3c-.1-.1-.2-.2-.4-.2m-1.9 1.8-6.1 6V23h2.1l6.1-6.1zM12.5 7v5.2l4 2.4-1 1L11 13V7zM11 21.9c-5.1-.5-9-4.8-9-9.9C2 6.5 6.5 2 12 2c5.3 0 9.6 4.1 10 9.3-.3-.1-.6-.2-1-.2s-.7.1-1 .2C19.6 7.2 16.2 4 12 4c-4.4 0-8 3.6-8 8 0 4.1 3.1 7.5 7.1 7.9l-.1.2z"/></svg>
     </span>
-    <span class="git-revision-date-localized-plugin git-revision-date-localized-plugin-timeago" title="October 9, 2026 15:51:57 UTC"><span class="timeago" datetime="2026-10-09T15:51:57+00:00" locale="en"></span></span><span class="git-revision-date-localized-plugin git-revision-date-localized-plugin-iso_date" title="October 9, 2026 15:51:57 UTC">2026-10-09</span>
+    <span class="git-revision-date-localized-plugin git-revision-date-localized-plugin-timeago" title="October 23, 2026 02:51:32 UTC"><span class="timeago" datetime="2026-10-23T02:51:32+00:00" locale="en"></span></span><span class="git-revision-date-localized-plugin git-revision-date-localized-plugin-iso_date" title="October 23, 2026 02:51:32 UTC">2026-10-23</span>
   </span>
 
     
