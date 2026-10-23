@@ -12,7 +12,7 @@ import (
 	"github.com/nicholas-fedor/watchtower/internal/registry"
 	"github.com/nicholas-fedor/watchtower/internal/registry/digest"
 	"github.com/nicholas-fedor/watchtower/internal/registry/ratelimit"
-	"github.com/nicholas-fedor/watchtower/internal/util"
+	"github.com/nicholas-fedor/watchtower/internal/settings/units"
 	"github.com/nicholas-fedor/watchtower/pkg/types"
 )
 
@@ -137,11 +137,11 @@ func fetchImageCreationTime(
 			Msg("Failed to get pull options for cooldown check - update check unavailable")
 
 		return time.Time{}, &CooldownError{
-			Delay: util.FormatDuration(delay),
+			Delay: units.FormatDuration(delay),
 			err: fmt.Errorf(
 				"could not get pull options for %s (cooldown: %s): %w",
 				sourceContainer.ImageName(),
-				util.FormatDuration(delay),
+				units.FormatDuration(delay),
 				err,
 			),
 		}
@@ -160,10 +160,10 @@ func fetchImageCreationTime(
 			Msg("Image creation time unavailable - update check unavailable")
 
 		return time.Time{}, &CooldownError{
-			Delay: util.FormatDuration(delay),
+			Delay: units.FormatDuration(delay),
 			err: fmt.Errorf(
 				"could not determine image age (cooldown: %s): %w",
-				util.FormatDuration(delay),
+				units.FormatDuration(delay),
 				err,
 			),
 		}
@@ -196,9 +196,9 @@ func evalImageAge(creationTime time.Time, delay time.Duration, clog *zerolog.Log
 
 	if imageAge <= delay {
 		remaining := delay - imageAge
-		ageStr := util.FormatDuration(imageAge)
-		cooldownStr := util.FormatDuration(delay)
-		remainingStr := util.FormatDuration(remaining)
+		ageStr := units.FormatDuration(imageAge)
+		cooldownStr := units.FormatDuration(delay)
+		remainingStr := units.FormatDuration(remaining)
 		eligibleAt := time.Now().Add(remaining)
 
 		clog.Info().
@@ -230,9 +230,9 @@ func buildCooldownError(imageAge, delay time.Duration, eligibleAt time.Time) *Co
 	remaining := delay - imageAge
 
 	return &CooldownError{
-		Age:        util.FormatDuration(imageAge),
-		Delay:      util.FormatDuration(delay),
-		Remaining:  util.FormatDuration(remaining),
+		Age:        units.FormatDuration(imageAge),
+		Delay:      units.FormatDuration(delay),
+		Remaining:  units.FormatDuration(remaining),
 		EligibleAt: eligibleAt,
 		err:        ErrImageCooldown,
 	}
@@ -242,8 +242,8 @@ func buildCooldownError(imageAge, delay time.Duration, eligibleAt time.Time) *Co
 // indicating possible clock skew between the host and registry.
 func logClockSkew(imageAge, delay time.Duration, clog *zerolog.Logger) {
 	clog.Warn().
-		Str("image_age", util.FormatDuration(imageAge)).
-		Str("cooldown", util.FormatDuration(delay)).
+		Str("image_age", units.FormatDuration(imageAge)).
+		Str("cooldown", units.FormatDuration(delay)).
 		Msg("Image creation time is in the future (possible clock skew) - treating the image as new")
 }
 
@@ -304,7 +304,7 @@ func localImageCreated(c types.Container) (time.Time, bool) {
 // cooldown window and the pull can proceed.
 func logCooldownExceeded(imageAge, delay time.Duration, clog *zerolog.Logger) {
 	clog.Info().
-		Str("image_age", util.FormatDuration(imageAge)).
-		Str("cooldown", util.FormatDuration(delay)).
+		Str("image_age", units.FormatDuration(imageAge)).
+		Str("cooldown", units.FormatDuration(delay)).
 		Msg("Image age exceeds cooldown - eligible for update")
 }

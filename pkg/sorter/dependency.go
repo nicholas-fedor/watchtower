@@ -9,7 +9,6 @@ import (
 
 	"github.com/rs/zerolog"
 
-	"github.com/nicholas-fedor/watchtower/internal/util"
 	"github.com/nicholas-fedor/watchtower/pkg/container"
 	"github.com/nicholas-fedor/watchtower/pkg/types"
 )
@@ -287,7 +286,7 @@ func identifierIndex(log *zerolog.Logger, containers []types.Container) (map[str
 	tempMap := make(map[string][]types.Container, len(containers))
 
 	for _, c := range containers {
-		normalizedIdentifier := util.NormalizeContainerName(container.ResolveContainerIdentifier(c))
+		normalizedIdentifier := container.NormalizeContainerName(container.ResolveContainerIdentifier(c))
 		tempMap[normalizedIdentifier] = append(tempMap[normalizedIdentifier], c)
 	}
 
@@ -423,7 +422,7 @@ func buildLinkMatchIndexes(log *zerolog.Logger,
 			}
 		}
 
-		bareName := util.NormalizeContainerName(c.Name())
+		bareName := container.NormalizeContainerName(c.Name())
 		if bareName == "" || bareName == identifier {
 			continue
 		}

@@ -12,7 +12,6 @@ import (
 
 	dockerContainer "github.com/moby/moby/api/types/container"
 
-	"github.com/nicholas-fedor/watchtower/internal/util"
 	"github.com/nicholas-fedor/watchtower/pkg/container"
 	mockSorter "github.com/nicholas-fedor/watchtower/pkg/sorter/mocks"
 	"github.com/nicholas-fedor/watchtower/pkg/types"
@@ -372,7 +371,7 @@ func isRealCycle(containers []types.Container, circularErr circularReferenceErro
 	containerMap := make(map[string]types.Container)
 
 	for _, c := range containers {
-		normalizedIdentifier := util.NormalizeContainerName(
+		normalizedIdentifier := container.NormalizeContainerName(
 			container.ResolveContainerIdentifier(c),
 		)
 		containerMap[normalizedIdentifier] = c

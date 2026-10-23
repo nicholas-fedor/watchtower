@@ -26,10 +26,11 @@ import (
 	"github.com/nicholas-fedor/watchtower/internal/config/registry"
 	"github.com/nicholas-fedor/watchtower/internal/config/schedule"
 	"github.com/nicholas-fedor/watchtower/internal/config/update"
+	"github.com/nicholas-fedor/watchtower/internal/container/filters"
 	"github.com/nicholas-fedor/watchtower/internal/flags"
 	"github.com/nicholas-fedor/watchtower/internal/flags/spec"
-	"github.com/nicholas-fedor/watchtower/internal/util"
-	"github.com/nicholas-fedor/watchtower/pkg/filters"
+	"github.com/nicholas-fedor/watchtower/internal/settings/units"
+	"github.com/nicholas-fedor/watchtower/pkg/container"
 )
 
 // diskSpacePercentBase is the divisor used to convert a 0-100 percentage into a fraction of max.
@@ -202,7 +203,7 @@ func loadUpdate(log *zerolog.Logger, vCfg *viper.Viper, flagSet *pflag.FlagSet) 
 	var cooldown time.Duration
 
 	if cooldownStr != "" {
-		parsed, err := util.ParseDuration(cooldownStr)
+		parsed, err := units.ParseDuration(cooldownStr)
 		if err != nil {
 			return update.Update{}, fmt.Errorf("cooldown-delay: %w", err)
 		}
@@ -262,7 +263,7 @@ func resolveDiskSpaceThresholds(maxRaw, warnRaw string) (int64, int64, error) {
 		return 0, 0, errDiskSpaceMaxPercent
 	}
 
-	maxBytes, err := util.ParseDiskSpace(maxRaw)
+	maxBytes, err := units.ParseDiskSpace(maxRaw)
 	if err != nil {
 		return 0, 0, fmt.Errorf("disk-space-max: %w", err)
 	}
@@ -312,7 +313,7 @@ func parseDiskSpaceWarn(raw string, maxBytes int64) (int64, error) {
 		return int64(float64(maxBytes) * pct / diskSpacePercentBase), nil
 	}
 
-	warnBytes, err := util.ParseDiskSpace(raw)
+	warnBytes, err := units.ParseDiskSpace(raw)
 	if err != nil {
 		return 0, fmt.Errorf("disk-space-warn: %w", err)
 	}
@@ -363,7 +364,7 @@ func loadFilter(log *zerolog.Logger, vCfg *viper.Viper, flagSet *pflag.FlagSet, 
 	disableContainers := normalizedStringSlice(
 		vCfg, flagSet, "disable-containers",
 		[]string{"WATCHTOWER_DISABLE_CONTAINERS"},
-		util.NormalizeContainerName,
+		container.NormalizeContainerName,
 	)
 
 	monitorImages := normalizedStringSlice(
@@ -394,7 +395,7 @@ func loadFilter(log *zerolog.Logger, vCfg *viper.Viper, flagSet *pflag.FlagSet, 
 
 	names := make([]string, len(args))
 	for i, name := range args {
-		names[i] = util.NormalizeContainerName(name)
+		names[i] = container.NormalizeContainerName(name)
 	}
 
 	predicate, desc, err := filters.BuildFilter(

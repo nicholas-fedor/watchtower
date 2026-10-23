@@ -14,7 +14,6 @@ import (
 	dockerNetwork "github.com/moby/moby/api/types/network"
 
 	composeLabels "github.com/nicholas-fedor/watchtower/internal/compose/labels"
-	"github.com/nicholas-fedor/watchtower/internal/util"
 	"github.com/nicholas-fedor/watchtower/pkg/types"
 )
 
@@ -81,7 +80,7 @@ func NewContainer(
 		LinkedToRestarting: false,
 		Stale:              false,
 		OldImageID:         "",
-		normalizedName:     util.NormalizeContainerName(name),
+		normalizedName:     NormalizeContainerName(name),
 		containerInfo:      containerInfo,
 		imageInfo:          imageInfo,
 		log:                log,
@@ -399,12 +398,12 @@ func (c *Container) GetCreateConfig() *dockerContainer.Config {
 	}
 
 	// Subtract image defaults from config.
-	config.Env = util.SliceSubtract(config.Env, imageConfig.Env)
+	config.Env = sliceSubtract(config.Env, imageConfig.Env)
 
 	// Preserve the watchtower label if present, as it may be subtracted as an image default.
 	watchtowerLabelValue, hasWatchtowerLabel := config.Labels[watchtowerLabel]
 
-	config.Labels = util.StringMapSubtract(config.Labels, imageConfig.Labels)
+	config.Labels = stringMapSubtract(config.Labels, imageConfig.Labels)
 	if hasWatchtowerLabel {
 		if config.Labels == nil {
 			config.Labels = make(map[string]string)
@@ -413,7 +412,7 @@ func (c *Container) GetCreateConfig() *dockerContainer.Config {
 		config.Labels[watchtowerLabel] = watchtowerLabelValue
 	}
 
-	config.Volumes = util.StructMapSubtract(config.Volumes, imageConfig.Volumes)
+	config.Volumes = structMapSubtract(config.Volumes, imageConfig.Volumes)
 
 	// Ensure ExposedPorts is initialized before removing image-exposed ports
 	// and adding ports from host config bindings. Work on a copy, as the map
@@ -501,7 +500,7 @@ func (c *Container) GetCreateHostConfig() *dockerContainer.HostConfig {
 			continue
 		}
 
-		normalizedName := util.NormalizeContainerName(parts[0])
+		normalizedName := NormalizeContainerName(parts[0])
 		alias := parts[1]
 		adjustedLink := fmt.Sprintf("%s:%s", normalizedName, alias)
 		adjusted = append(adjusted, adjustedLink)
@@ -912,7 +911,7 @@ func GetLinksFromWatchtowerLabel(c *Container) []string {
 		}
 
 		// Normalize the link by trimming spaces and removing any leading slashes
-		normalizedLink = util.NormalizeContainerName(strings.TrimSpace(normalizedLink))
+		normalizedLink = NormalizeContainerName(strings.TrimSpace(normalizedLink))
 
 		// Add the normalized link to the result slice
 		normalizedLinks = append(normalizedLinks, normalizedLink)
@@ -946,7 +945,7 @@ func getLinksFromComposeLabel(c *Container) []string {
 
 	normalizedLinks := make([]string, 0, len(services))
 	for _, service := range services {
-		normalizedService := util.NormalizeContainerName(service)
+		normalizedService := NormalizeContainerName(service)
 		// If the project name isn't empty and the service name doesn't have the project name prefix,
 		// then add the project name prefix to the service name.
 		if projectName != "" && !strings.HasPrefix(normalizedService, projectName+"-") {
@@ -1026,7 +1025,7 @@ func getLinksFromHostConfig(c *Container) []string {
 			continue
 		}
 
-		normalizedName := util.NormalizeContainerName(parts[0])
+		normalizedName := NormalizeContainerName(parts[0])
 		if projectName != "" && !strings.HasPrefix(normalizedName, projectName+"-") {
 			normalizedName = projectName + "-" + normalizedName
 		}
@@ -1041,7 +1040,7 @@ func getLinksFromHostConfig(c *Container) []string {
 	// that to container:<name>. Do not prefix either form with this
 	// container's Compose project.
 	if networkMode.IsContainer() {
-		normalizedName := util.NormalizeContainerName(networkMode.ConnectedContainer())
+		normalizedName := NormalizeContainerName(networkMode.ConnectedContainer())
 		normalizedLinks = append(normalizedLinks, normalizedName)
 	}
 
@@ -1078,7 +1077,7 @@ func volumesFromLinks(c *Container) []string {
 			continue
 		}
 
-		links = append(links, util.NormalizeContainerName(name))
+		links = append(links, NormalizeContainerName(name))
 	}
 
 	return links
@@ -1173,4 +1172,81 @@ func isVolumesFromMode(suffix string) bool {
 	}
 
 	return true
+}
+
+// sliceSubtract returns elements in the first slice that are not in the second slice.
+//
+// Parameters:
+//   - slice: Source slice.
+//   - subtractFrom: Slice containing elements to exclude.
+//
+// Returns:
+//   - []string: Slice containing elements unique to the source slice.
+func sliceSubtract(slice, subtractFrom []string) []string {
+	result := []string{}
+
+	for _, element1 := range slice {
+		found := slices.Contains(subtractFrom, element1)
+
+		if !found {
+			result = append(result, element1)
+		}
+	}
+
+	return result
+}
+
+// stringMapSubtract removes matching key-value pairs.
+//
+// Parameters:
+//   - map1: Source map.
+//   - map2: Map to subtract.
+//
+// Returns:
+//   - map[string]string: New map with unique or differing entries.
+func stringMapSubtract(map1, map2 map[string]string) map[string]string {
+	result := map[string]string{}
+
+	for key1, value1 := range map1 {
+		if value2, ok := map2[key1]; ok {
+			if value2 != value1 {
+				result[key1] = value1
+			}
+		} else {
+			result[key1] = value1
+		}
+	}
+
+	return result
+}
+
+// structMapSubtract removes matching keys.
+//
+// Parameters:
+//   - map1: Source map.
+//   - map2: Map to subtract.
+//
+// Returns:
+//   - map[string]struct{}: New map with unique keys.
+func structMapSubtract(map1, map2 map[string]struct{}) map[string]struct{} {
+	result := map[string]struct{}{}
+
+	for key1, value1 := range map1 {
+		if _, ok := map2[key1]; !ok {
+			result[key1] = value1
+		}
+	}
+
+	return result
+}
+
+// NormalizeContainerName trims the leading "/" from container names.
+//
+// Parameters:
+//   - name: Container name, potentially with leading "/".
+//
+// Returns:
+//   - string: Normalized name without leading "/".
+func NormalizeContainerName(name string) string {
+	return strings.TrimLeft(name, "/")
 }

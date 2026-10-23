@@ -1,10 +1,9 @@
-package util
+package units
 
 import (
 	"errors"
 	"fmt"
 	"math"
-	"slices"
 	"strconv"
 	"strings"
 	"time"
@@ -27,72 +26,6 @@ type timeUnit struct {
 	value    int64  // The numeric value of the unit (e.g., 2 for 2 hours)
 	singular string // The singular form of the unit (e.g., "hour")
 	plural   string // The plural form of the unit (e.g., "hours")
-}
-
-// SliceSubtract returns elements in the first slice that are not in the second slice.
-//
-// Parameters:
-//   - slice: Source slice.
-//   - subtractFrom: Slice containing elements to exclude.
-//
-// Returns:
-//   - []string: Slice containing elements unique to the source slice.
-func SliceSubtract(slice, subtractFrom []string) []string {
-	result := []string{}
-
-	for _, element1 := range slice {
-		found := slices.Contains(subtractFrom, element1)
-
-		if !found {
-			result = append(result, element1)
-		}
-	}
-
-	return result
-}
-
-// StringMapSubtract removes matching key-value pairs.
-//
-// Parameters:
-//   - map1: Source map.
-//   - map2: Map to subtract.
-//
-// Returns:
-//   - map[string]string: New map with unique or differing entries.
-func StringMapSubtract(map1, map2 map[string]string) map[string]string {
-	result := map[string]string{}
-
-	for key1, value1 := range map1 {
-		if value2, ok := map2[key1]; ok {
-			if value2 != value1 {
-				result[key1] = value1
-			}
-		} else {
-			result[key1] = value1
-		}
-	}
-
-	return result
-}
-
-// StructMapSubtract removes matching keys.
-//
-// Parameters:
-//   - map1: Source map.
-//   - map2: Map to subtract.
-//
-// Returns:
-//   - map[string]struct{}: New map with unique keys.
-func StructMapSubtract(map1, map2 map[string]struct{}) map[string]struct{} {
-	result := map[string]struct{}{}
-
-	for key1, value1 := range map1 {
-		if _, ok := map2[key1]; !ok {
-			result[key1] = value1
-		}
-	}
-
-	return result
 }
 
 // FormatDuration converts a time.Duration into a human-readable string representation.
@@ -146,7 +79,7 @@ func FormatDuration(duration time.Duration) string {
 	for i, unit := range units {
 		parts = append(
 			parts,
-			FormatTimeUnit(
+			formatTimeUnit(
 				unit.value,
 				unit.singular,
 				unit.plural,
@@ -156,7 +89,7 @@ func FormatDuration(duration time.Duration) string {
 	}
 
 	// Join non-empty parts with spaces for compact output.
-	joined := strings.Join(FilterEmpty(parts), " ")
+	joined := strings.Join(filterEmpty(parts), " ")
 	if joined == "" {
 		return "0 seconds" // Default output when duration is zero or all units are skipped.
 	}
@@ -169,7 +102,7 @@ func FormatDuration(duration time.Duration) string {
 	return joined
 }
 
-// FormatTimeUnit formats a single time unit into a string based on its value and context.
+// formatTimeUnit formats a single time unit into a string based on its value and context.
 //
 // It applies singular or plural grammar, skipping leading zeros unless forced (e.g., for seconds as the last unit),
 // returning an empty string for skippable zeros to maintain a concise output.
@@ -182,7 +115,7 @@ func FormatDuration(duration time.Duration) string {
 //
 // Returns:
 //   - string: The formatted unit (e.g., "1 hour", "2 minutes") or empty string if skipped.
-func FormatTimeUnit(value int64, singular, plural string, forceInclude bool) string {
+func formatTimeUnit(value int64, singular, plural string, forceInclude bool) string {
 	switch {
 	case value == 1:
 		return "1 " + singular
@@ -193,7 +126,7 @@ func FormatTimeUnit(value int64, singular, plural string, forceInclude bool) str
 	}
 }
 
-// FilterEmpty removes empty strings from a slice, returning only non-empty elements.
+// filterEmpty removes empty strings from a slice, returning only non-empty elements.
 //
 // It ensures the final formatted duration string excludes unnecessary parts, maintaining readability
 // by filtering out zero-value units that were not explicitly included.
@@ -203,7 +136,7 @@ func FormatTimeUnit(value int64, singular, plural string, forceInclude bool) str
 //
 // Returns:
 //   - []string: A new slice containing only the non-empty strings from the input.
-func FilterEmpty(parts []string) []string {
+func filterEmpty(parts []string) []string {
 	var filtered []string
 
 	for _, part := range parts {
@@ -213,17 +146,6 @@ func FilterEmpty(parts []string) []string {
 	}
 
 	return filtered
-}
-
-// NormalizeContainerName trims the leading "/" from container names.
-//
-// Parameters:
-//   - name: Container name, potentially with leading "/".
-//
-// Returns:
-//   - string: Normalized name without leading "/".
-func NormalizeContainerName(name string) string {
-	return strings.TrimLeft(name, "/")
 }
 
 // ParseDuration parses a duration string with extended unit support.

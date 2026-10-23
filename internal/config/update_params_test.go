@@ -16,7 +16,7 @@ import (
 	"github.com/nicholas-fedor/watchtower/internal/config/mode"
 	"github.com/nicholas-fedor/watchtower/internal/config/registry"
 	"github.com/nicholas-fedor/watchtower/internal/config/update"
-	"github.com/nicholas-fedor/watchtower/pkg/filters"
+	"github.com/nicholas-fedor/watchtower/internal/container/filters"
 	"github.com/nicholas-fedor/watchtower/pkg/types"
 )
 

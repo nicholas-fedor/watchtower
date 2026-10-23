@@ -1,4 +1,4 @@
-package util
+package units
 
 import (
 	"testing"
@@ -7,49 +7,6 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
-
-// TestSliceSubtract verifies that SliceSubtract correctly removes matching elements.
-// It ensures the result contains only unique elements from the first slice.
-func TestSliceSubtract(t *testing.T) {
-	t.Parallel()
-
-	slice := []string{"a", "b", "c"}
-	subtractFrom := []string{"a", "c"}
-
-	result := SliceSubtract(slice, subtractFrom)
-	assert.Equal(t, []string{"b"}, result)
-	assert.Equal(t, []string{"a", "b", "c"}, slice)
-	assert.Equal(t, []string{"a", "c"}, subtractFrom)
-}
-
-// TestStringMapSubtract verifies that StringMapSubtract removes matching key-value pairs.
-// It ensures the result contains only differing or unique entries from the first map.
-func TestStringMapSubtract(t *testing.T) {
-	t.Parallel()
-
-	map1 := map[string]string{"a": "a", "b": "b", "c": "sea"}
-	map2 := map[string]string{"a": "a", "c": "c"}
-
-	result := StringMapSubtract(map1, map2)
-	assert.Equal(t, map[string]string{"b": "b", "c": "sea"}, result)
-	assert.Equal(t, map[string]string{"a": "a", "b": "b", "c": "sea"}, map1)
-	assert.Equal(t, map[string]string{"a": "a", "c": "c"}, map2)
-}
-
-// TestStructMapSubtract verifies that StructMapSubtract removes matching keys.
-// It ensures the result contains only keys unique to the first map.
-func TestStructMapSubtract(t *testing.T) {
-	t.Parallel()
-
-	emptyStruct := struct{}{}
-	map1 := map[string]struct{}{"a": emptyStruct, "b": emptyStruct, "c": emptyStruct}
-	map2 := map[string]struct{}{"a": emptyStruct, "c": emptyStruct}
-
-	result := StructMapSubtract(map1, map2)
-	assert.Equal(t, map[string]struct{}{"b": emptyStruct}, result)
-	assert.Equal(t, map[string]struct{}{"a": emptyStruct, "b": emptyStruct, "c": emptyStruct}, map1)
-	assert.Equal(t, map[string]struct{}{"a": emptyStruct, "c": emptyStruct}, map2)
-}
 
 // TestFormatDuration_Zero verifies that FormatDuration returns "0 seconds" for zero duration.
 func TestFormatDuration_Zero(t *testing.T) {
@@ -135,13 +92,13 @@ func TestFormatDuration_AllUnits(t *testing.T) {
 func TestFormatTimeUnit_SingleValues(t *testing.T) {
 	t.Parallel()
 
-	result := FormatTimeUnit(1, "hour", "hours", false)
+	result := formatTimeUnit(1, "hour", "hours", false)
 	assert.Equal(t, "1 hour", result)
 
-	result = FormatTimeUnit(1, "minute", "minutes", false)
+	result = formatTimeUnit(1, "minute", "minutes", false)
 	assert.Equal(t, "1 minute", result)
 
-	result = FormatTimeUnit(1, "second", "seconds", false)
+	result = formatTimeUnit(1, "second", "seconds", false)
 	assert.Equal(t, "1 second", result)
 }
 
@@ -149,10 +106,10 @@ func TestFormatTimeUnit_SingleValues(t *testing.T) {
 func TestFormatTimeUnit_PluralValues(t *testing.T) {
 	t.Parallel()
 
-	result := FormatTimeUnit(2, "hour", "hours", false)
+	result := formatTimeUnit(2, "hour", "hours", false)
 	assert.Equal(t, "2 hours", result)
 
-	result = FormatTimeUnit(5, "minute", "minutes", false)
+	result = formatTimeUnit(5, "minute", "minutes", false)
 	assert.Equal(t, "5 minutes", result)
 }
 
@@ -160,7 +117,7 @@ func TestFormatTimeUnit_PluralValues(t *testing.T) {
 func TestFormatTimeUnit_ZeroNotForced(t *testing.T) {
 	t.Parallel()
 
-	result := FormatTimeUnit(0, "hour", "hours", false)
+	result := formatTimeUnit(0, "hour", "hours", false)
 	assert.Empty(t, result)
 }
 
@@ -168,7 +125,7 @@ func TestFormatTimeUnit_ZeroNotForced(t *testing.T) {
 func TestFormatTimeUnit_ZeroForced(t *testing.T) {
 	t.Parallel()
 
-	result := FormatTimeUnit(0, "second", "seconds", true)
+	result := formatTimeUnit(0, "second", "seconds", true)
 	assert.Equal(t, "0 seconds", result)
 }
 
@@ -177,7 +134,7 @@ func TestFilterEmpty_Mixed(t *testing.T) {
 	t.Parallel()
 
 	input := []string{"1 hour", "", "30 minutes", "", "45 seconds"}
-	result := FilterEmpty(input)
+	result := filterEmpty(input)
 	assert.Equal(t, []string{"1 hour", "30 minutes", "45 seconds"}, result)
 }
 
@@ -186,7 +143,7 @@ func TestFilterEmpty_AllEmpty(t *testing.T) {
 	t.Parallel()
 
 	input := []string{"", "", ""}
-	result := FilterEmpty(input)
+	result := filterEmpty(input)
 	assert.Equal(t, []string(nil), result)
 }
 
@@ -195,7 +152,7 @@ func TestFilterEmpty_NoEmpty(t *testing.T) {
 	t.Parallel()
 
 	input := []string{"1 hour", "30 minutes", "45 seconds"}
-	result := FilterEmpty(input)
+	result := filterEmpty(input)
 	assert.Equal(t, []string{"1 hour", "30 minutes", "45 seconds"}, result)
 }
 
@@ -204,56 +161,8 @@ func TestFilterEmpty_EmptyInput(t *testing.T) {
 	t.Parallel()
 
 	input := []string{}
-	result := FilterEmpty(input)
+	result := filterEmpty(input)
 	assert.Equal(t, []string(nil), result)
-}
-
-// TestNormalizeContainerName_WithLeadingSlash verifies that NormalizeContainerName removes leading slash.
-func TestNormalizeContainerName_WithLeadingSlash(t *testing.T) {
-	t.Parallel()
-
-	result := NormalizeContainerName("/test-container")
-	assert.Equal(t, "test-container", result)
-}
-
-// TestNormalizeContainerName_WithoutLeadingSlash verifies that NormalizeContainerName leaves names without leading slash unchanged.
-func TestNormalizeContainerName_WithoutLeadingSlash(t *testing.T) {
-	t.Parallel()
-
-	result := NormalizeContainerName("test-container")
-	assert.Equal(t, "test-container", result)
-}
-
-// TestNormalizeContainerName_EmptyString verifies that NormalizeContainerName handles empty strings.
-func TestNormalizeContainerName_EmptyString(t *testing.T) {
-	t.Parallel()
-
-	result := NormalizeContainerName("")
-	assert.Empty(t, result)
-}
-
-// TestNormalizeContainerName_OnlySlash verifies that NormalizeContainerName handles strings with only a slash.
-func TestNormalizeContainerName_OnlySlash(t *testing.T) {
-	t.Parallel()
-
-	result := NormalizeContainerName("/")
-	assert.Empty(t, result)
-}
-
-// TestNormalizeContainerName_MultipleLeadingSlashes verifies that NormalizeContainerName removes only the first leading slash.
-func TestNormalizeContainerName_MultipleLeadingSlashes(t *testing.T) {
-	t.Parallel()
-
-	result := NormalizeContainerName("//test-container")
-	assert.Equal(t, "test-container", result)
-}
-
-// TestNormalizeContainerName_SlashInMiddle verifies that NormalizeContainerName only removes leading slashes.
-func TestNormalizeContainerName_SlashInMiddle(t *testing.T) {
-	t.Parallel()
-
-	result := NormalizeContainerName("test/container")
-	assert.Equal(t, "test/container", result)
 }
 
 // TestParseDuration verifies the extended duration parser handles standard and extended units.
@@ -296,6 +205,144 @@ func TestParseDuration(t *testing.T) {
 
 			require.NoError(t, err)
 			assert.Equal(t, tc.want, got)
+		})
+	}
+}
+
+func TestFormatDuration(t *testing.T) {
+	tests := []struct {
+		name     string
+		duration time.Duration
+		expected string
+	}{
+		{
+			name:     "zero duration",
+			duration: 0,
+			expected: "0 seconds",
+		},
+		{
+			name:     "only seconds",
+			duration: 45 * time.Second,
+			expected: "45 seconds",
+		},
+		{
+			name:     "minutes and seconds",
+			duration: 2*time.Minute + 30*time.Second,
+			expected: "2 minutes 30 seconds",
+		},
+		{
+			name:     "hours, minutes, seconds",
+			duration: 1*time.Hour + 30*time.Minute + 45*time.Second,
+			expected: "1 hour 30 minutes 45 seconds",
+		},
+		{
+			name:     "single hour",
+			duration: 1 * time.Hour,
+			expected: "1 hour",
+		},
+		{
+			name:     "single minute",
+			duration: 1 * time.Minute,
+			expected: "1 minute",
+		},
+		{
+			name:     "single second",
+			duration: 1 * time.Second,
+			expected: "1 second",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := FormatDuration(tt.duration)
+			assert.Equal(t, tt.expected, result)
+		})
+	}
+}
+
+func TestFormatTimeUnit(t *testing.T) {
+	tests := []struct {
+		name         string
+		value        int64
+		singular     string
+		plural       string
+		forceInclude bool
+		expected     string
+	}{
+		{
+			name:         "zero value not forced",
+			value:        0,
+			singular:     "second",
+			plural:       "seconds",
+			forceInclude: false,
+			expected:     "",
+		},
+		{
+			name:         "zero value forced",
+			value:        0,
+			singular:     "second",
+			plural:       "seconds",
+			forceInclude: true,
+			expected:     "0 seconds",
+		},
+		{
+			name:         "singular value",
+			value:        1,
+			singular:     "hour",
+			plural:       "hours",
+			forceInclude: false,
+			expected:     "1 hour",
+		},
+		{
+			name:         "plural value",
+			value:        5,
+			singular:     "minute",
+			plural:       "minutes",
+			forceInclude: false,
+			expected:     "5 minutes",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := formatTimeUnit(tt.value, tt.singular, tt.plural, tt.forceInclude)
+			assert.Equal(t, tt.expected, result)
+		})
+	}
+}
+
+func TestFilterEmpty(t *testing.T) {
+	tests := []struct {
+		name     string
+		input    []string
+		expected []string
+	}{
+		{
+			name:     "all empty",
+			input:    []string{"", "", ""},
+			expected: nil,
+		},
+		{
+			name:     "all non-empty",
+			input:    []string{"a", "b", "c"},
+			expected: []string{"a", "b", "c"},
+		},
+		{
+			name:     "mixed empty and non-empty",
+			input:    []string{"", "a", "", "b", ""},
+			expected: []string{"a", "b"},
+		},
+		{
+			name:     "empty slice",
+			input:    []string{},
+			expected: nil,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := filterEmpty(tt.input)
+			assert.Equal(t, tt.expected, result)
 		})
 	}
 }

@@ -11,7 +11,7 @@ import (
 	"golang.org/x/text/cases"
 	"golang.org/x/text/language"
 
-	"github.com/nicholas-fedor/watchtower/internal/util"
+	"github.com/nicholas-fedor/watchtower/internal/settings/units"
 )
 
 // templateFuncs defines utility functions for notification templates.
@@ -69,7 +69,7 @@ func formatRFC1123(value string) string {
 
 // formatDiskSpace formats a template value as a human-readable disk size.
 //
-// Numeric values use decimal units from util.FormatDiskSpace. Non-numeric
+// Numeric values use decimal units from units.FormatDiskSpace. Non-numeric
 // values, including nil, return "unknown".
 //
 // Parameters:
@@ -83,7 +83,7 @@ func formatDiskSpace(value any) string {
 		return "unknown"
 	}
 
-	return util.FormatDiskSpace(bytes)
+	return units.FormatDiskSpace(bytes)
 }
 
 // int64FromAny converts common numeric template values to int64.

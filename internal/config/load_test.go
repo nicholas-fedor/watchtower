@@ -271,7 +271,7 @@ func TestLoadUpdate(t *testing.T) {
 	})
 
 	t.Run("negative cooldown", func(t *testing.T) {
-		// util.ParseDuration rejects a leading '-' before loadUpdate can return
+		// units.ParseDuration rejects a leading '-' before loadUpdate can return
 		// errNegativeCooldownDelay.
 		vCfg, flagSet, _ := bindLoad(t, "--cooldown-delay", "-2d")
 		_, err := loadUpdate(newNopLogger(), vCfg, flagSet)
