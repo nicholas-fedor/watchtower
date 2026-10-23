@@ -10,6 +10,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Resolve settings edge cases in config loading by @nicholas-fedor in [#3079](https://github.com/nicholas-fedor/watchtower/pull/3079)
 - Reuse collectors the registry already holds by @nicholas-fedor in [#3073](https://github.com/nicholas-fedor/watchtower/pull/3073)
 - Accept only plain numbers in disk-space sizes and percentages by @nicholas-fedor in [#3069](https://github.com/nicholas-fedor/watchtower/pull/3069)
 - Keep every value given for a repeated label key by @nicholas-fedor in [#3067](https://github.com/nicholas-fedor/watchtower/pull/3067)
