@@ -91,6 +91,8 @@ Environment Variable: WATCHTOWER_ENABLE_CONTAINERS_BY_LABEL
 !!! Note
     A label entry with an empty value (`key=`) performs a presence check: the label must exist on the container with any value.
     A non-empty value requires an exact match.
+    A key can be listed more than once, as in `env=prod,env=staging`.
+    A container then matches when its label has any of those values.
 
 !!! Warning
     - Dependencies on excluded containers are ignored. See [Dependencies on Unmonitored Containers](../../advanced-features/linked-containers/index.md#dependencies_on_unmonitored_containers).
@@ -110,7 +112,7 @@ Environment Variable: WATCHTOWER_DISABLE_CONTAINERS_BY_LABEL
     Values containing commas are not supported. Use individual `key=value` pairs separated by commas.
 
 !!! Note
-    A label entry with an empty value (`key=`) performs a presence check: the label must exist on the container with any value. A non-empty value requires an exact match.
+    A label entry with an empty value (`key=`) performs a presence check: the label must exist on the container with any value. A non-empty value requires an exact match. A key can be listed more than once, as in `env=dev,env=test`. A container is then excluded when its label has any of those values.
 
 !!! Warning
     - Dependencies on excluded containers are ignored. See [Dependencies on Unmonitored Containers](../../advanced-features/linked-containers/index.md#dependencies_on_unmonitored_containers).

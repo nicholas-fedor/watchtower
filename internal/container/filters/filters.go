@@ -50,6 +50,15 @@ var (
 	errLabelPairTooLong = errors.New("label pair exceeds maximum combined length")
 )
 
+// labelPair is one key=value criterion from the enabled or disabled label
+// configuration options.
+type labelPair struct {
+	// key is the label key.
+	key string
+	// value is the required label value, or empty to require only the key.
+	value string
+}
+
 // WatchtowerContainersFilter selects only Watchtower containers.
 //
 // Returns:
@@ -321,7 +330,11 @@ func filterBySkippedImageNamePatterns(log *zerolog.Logger, namePatterns []string
 	}
 }
 
-// parseLabelPairs parses a slice of "key=value" strings into a map.
+// parseLabelPairs parses a slice of "key=value" strings into label pairs, in
+// the order given.
+//
+// A key may appear more than once, and every pair is kept, so a filter can
+// match any of the values given for one key.
 //
 // Values are trimmed of surrounding whitespace for consistency with key
 // trimming. Only the first '=' separates key from value and any additional '='
@@ -334,14 +347,14 @@ func filterBySkippedImageNamePatterns(log *zerolog.Logger, namePatterns []string
 //   - pairs: Raw label pair strings from flag/env input.
 //
 // Returns:
-//   - map[string]string: Parsed label key-value pairs.
+//   - []labelPair: Parsed label pairs.
 //   - error: Non-nil if any pair is malformed or exceeds size limits.
-func parseLabelPairs(pairs []string) (map[string]string, error) {
+func parseLabelPairs(pairs []string) ([]labelPair, error) {
 	if len(pairs) > maxLabelPairs {
 		return nil, fmt.Errorf("%w: %d > %d", errTooManyLabelPairs, len(pairs), maxLabelPairs)
 	}
 
-	result := make(map[string]string)
+	result := make([]labelPair, 0, len(pairs))
 
 	for _, pair := range pairs {
 		pair = strings.TrimSpace(pair)
@@ -365,10 +378,63 @@ func parseLabelPairs(pairs []string) (map[string]string, error) {
 			return nil, fmt.Errorf("%w: key=%q value=%q combined=%d bytes", errLabelPairTooLong, key, value, len(key)+len(value))
 		}
 
-		result[key] = value
+		result = append(result, labelPair{key: key, value: value})
 	}
 
 	return result, nil
+}
+
+// matchLabelPair returns the key of the first label pair the container has.
+//
+// A pair with an empty value requires only the key. A pair with a value
+// requires that exact value.
+//
+// Parameters:
+//   - c: Container to check.
+//   - pairs: Label pairs to check, in order.
+//
+// Returns:
+//   - string: Key of the matching pair.
+//   - bool: True when a pair matches.
+func matchLabelPair(c types.FilterableContainer, pairs []labelPair) (string, bool) {
+	for _, pair := range pairs {
+		labelValue, ok := c.GetLabel(pair.key)
+		if !ok {
+			continue
+		}
+
+		if pair.value != "" && labelValue != pair.value {
+			continue
+		}
+
+		return pair.key, true
+	}
+
+	return "", false
+}
+
+// labelPairStrings formats label pairs as "key=value" strings, or "key" for a
+// pair without a value, for logging.
+//
+// Parameters:
+//   - pairs: Label pairs to format.
+//
+// Returns:
+//   - []string: Formatted pairs, in order.
+func labelPairStrings(pairs []labelPair) []string {
+	formatted := make([]string, 0, len(pairs))
+
+	for _, pair := range pairs {
+		if pair.value == "" {
+			formatted = append(formatted, pair.key)
+
+			continue
+		}
+
+		formatted = append(formatted, pair.key+"="+pair.value)
+	}
+
+	return formatted
 }
 
 // filterByEnabledLabels restricts processing to containers that have at least
@@ -381,41 +447,39 @@ func parseLabelPairs(pairs []string) (map[string]string, error) {
 // an exact match.
 //
 // Parameters:
-//   - labels: Map of label key-value pairs to require.
+//   - log: Logger for debug output. May be nil.
+//   - labels: Label pairs to require, any one of which matches.
 //   - baseFilter: Base filter to chain.
 //
 // Returns:
 //   - types.Filter: Filter function matching labels and applying base filter.
-func filterByEnabledLabels(log *zerolog.Logger, labels map[string]string, baseFilter types.Filter) types.Filter {
+func filterByEnabledLabels(log *zerolog.Logger, labels []labelPair, baseFilter types.Filter) types.Filter {
 	if len(labels) == 0 {
 		return baseFilter
 	}
 
+	formatted := labelPairStrings(labels)
+
 	return func(c types.FilterableContainer) bool {
-		clogVal := log.With().
-			Str("container", c.Name()).
-			Interface("labels", labels).
-			Logger()
-		clog := &clogVal
-
-		for key, expectedValue := range labels {
-			labelValue, ok := c.GetLabel(key)
-			if !ok {
-				continue
+		key, matched := matchLabelPair(c, labels)
+		if matched {
+			if debugEnabled(log) {
+				log.Debug().
+					Str("container", c.Name()).
+					Strs("labels", formatted).
+					Str("matched_label", key).
+					Msg("Container matched enabled label")
 			}
-
-			if expectedValue != "" && labelValue != expectedValue {
-				continue
-			}
-
-			clog.Debug().
-				Str("matched_label", key).
-				Msg("Container matched enabled label")
 
 			return baseFilter(c)
 		}
 
-		clog.Debug().Msg("Container did not match any enabled label")
+		if debugEnabled(log) {
+			log.Debug().
+				Str("container", c.Name()).
+				Strs("labels", formatted).
+				Msg("Container did not match any enabled label")
+		}
 
 		return false
 	}
@@ -431,41 +495,39 @@ func filterByEnabledLabels(log *zerolog.Logger, labels map[string]string, baseFi
 // an exact match.
 //
 // Parameters:
-//   - labels: Map of label key-value pairs to exclude.
+//   - log: Logger for debug output. May be nil.
+//   - labels: Label pairs to exclude, any one of which matches.
 //   - baseFilter: Base filter to chain.
 //
 // Returns:
 //   - types.Filter: Filter function excluding matching labels and applying base filter.
-func filterByDisabledLabels(log *zerolog.Logger, labels map[string]string, baseFilter types.Filter) types.Filter {
+func filterByDisabledLabels(log *zerolog.Logger, labels []labelPair, baseFilter types.Filter) types.Filter {
 	if len(labels) == 0 {
 		return baseFilter
 	}
 
+	formatted := labelPairStrings(labels)
+
 	return func(c types.FilterableContainer) bool {
-		clogVal := log.With().
-			Str("container", c.Name()).
-			Interface("labels", labels).
-			Logger()
-		clog := &clogVal
-
-		for key, expectedValue := range labels {
-			labelValue, ok := c.GetLabel(key)
-			if !ok {
-				continue
+		key, matched := matchLabelPair(c, labels)
+		if matched {
+			if debugEnabled(log) {
+				log.Debug().
+					Str("container", c.Name()).
+					Strs("labels", formatted).
+					Str("matched_label", key).
+					Msg("Container excluded by disabled label")
 			}
-
-			if expectedValue != "" && labelValue != expectedValue {
-				continue
-			}
-
-			clog.Debug().
-				Str("matched_label", key).
-				Msg("Container excluded by disabled label")
 
 			return false
 		}
 
-		clog.Debug().Msg("Container not excluded by disabled labels")
+		if debugEnabled(log) {
+			log.Debug().
+				Str("container", c.Name()).
+				Strs("labels", formatted).
+				Msg("Container not excluded by disabled labels")
+		}
 
 		return baseFilter(c)
 	}
@@ -503,6 +565,7 @@ func filterByEnableLabel(enable bool, baseFilter types.Filter) types.Filter {
 // FilterByScope selects containers in a specific scope.
 //
 // Parameters:
+//   - log: Logger for debug output. May be nil.
 //   - scope: Scope to match.
 //   - baseFilter: Base filter to chain.
 //
@@ -510,28 +573,30 @@ func filterByEnableLabel(enable bool, baseFilter types.Filter) types.Filter {
 //   - types.Filter: Filter function matching scope and applying base filter.
 func FilterByScope(log *zerolog.Logger, scope string, baseFilter types.Filter) types.Filter {
 	return func(c types.FilterableContainer) bool {
-		clogVal := log.With().
-			Str("container", c.Name()).
-			Str("scope", scope).
-			Logger()
-		clog := &clogVal
-
 		containerScope, containerHasScope := c.Scope()
 		if !containerHasScope || containerScope == "" {
 			containerScope = noScope // Default to "none" if unset.
 		}
 
 		if containerScope == scope {
-			clog.Debug().
-				Str("container_scope", containerScope).
-				Msg("Container matched scope")
+			if debugEnabled(log) {
+				log.Debug().
+					Str("container", c.Name()).
+					Str("scope", scope).
+					Str("container_scope", containerScope).
+					Msg("Container matched scope")
+			}
 
 			return baseFilter(c)
 		}
 
-		clog.Debug().
-			Str("container_scope", containerScope).
-			Msg("Container scope mismatch")
+		if debugEnabled(log) {
+			log.Debug().
+				Str("container", c.Name()).
+				Str("scope", scope).
+				Str("container_scope", containerScope).
+				Msg("Container scope mismatch")
+		}
 
 		return false
 	}
@@ -540,6 +605,7 @@ func FilterByScope(log *zerolog.Logger, scope string, baseFilter types.Filter) t
 // FilterByImage selects containers with specific images, optionally including tags.
 //
 // Parameters:
+//   - log: Logger for debug output. May be nil.
 //   - images: List of image names (with optional tags) to match.
 //   - baseFilter: Base filter to chain.
 //
@@ -551,25 +617,27 @@ func FilterByImage(log *zerolog.Logger, images []string, baseFilter types.Filter
 	}
 
 	return func(c types.FilterableContainer) bool {
-		clogVal := log.With().
-			Str("container", c.Name()).
-			Strs("images", images).
-			Logger()
-		clog := &clogVal
-
 		for _, targetImage := range images {
 			if matchImageAndTag(c.ImageName(), targetImage) {
-				clog.Debug().
-					Str("image", c.ImageName()).
-					Msg("Container matched image")
+				if debugEnabled(log) {
+					log.Debug().
+						Str("container", c.Name()).
+						Strs("images", images).
+						Str("image", c.ImageName()).
+						Msg("Container matched image")
+				}
 
 				return baseFilter(c) // Image matches, proceed with base filter.
 			}
 		}
 
-		clog.Debug().
-			Str("image", c.ImageName()).
-			Msg("Container image did not match")
+		if debugEnabled(log) {
+			log.Debug().
+				Str("container", c.Name()).
+				Strs("images", images).
+				Str("image", c.ImageName()).
+				Msg("Container image did not match")
+		}
 
 		return false // No matching image found.
 	}
@@ -712,6 +780,7 @@ func matchImageAndTag(containerImage, targetImage string) bool {
 // BuildFilter constructs a composite filter for containers.
 //
 // Parameters:
+//   - log: Logger for debug output. May be nil.
 //   - normalizedNames: Normalized container names or regex patterns. When set, only
 //     containers matching these patterns are monitored.
 //   - normalizedDisableNames: Container names or regex patterns to skip. Matching
@@ -740,28 +809,35 @@ func BuildFilter(log *zerolog.Logger,
 	enableLabel bool,
 	scope string,
 ) (types.Filter, string, error) {
-	enabledLabelMap, err := parseLabelPairs(enabledLabels)
+	enabledLabelPairs, err := parseLabelPairs(enabledLabels)
 	if err != nil {
 		return nil, "", err
 	}
 
-	disabledLabelMap, err := parseLabelPairs(disabledLabels)
+	disabledLabelPairs, err := parseLabelPairs(disabledLabels)
 	if err != nil {
 		return nil, "", err
 	}
 
-	clogVal := log.With().
-		Strs("names", normalizedNames).
-		Strs("disableNames", normalizedDisableNames).
-		Strs("monitoredImageNamePatterns", monitoredImageNamePatterns).
-		Strs("skippedImageNamePatterns", skippedImageNamePatterns).
-		Interface("enabledLabels", enabledLabelMap).
-		Interface("disabledLabels", disabledLabelMap).
-		Bool("enableLabel", enableLabel).
-		Str("scope", scope).
-		Logger()
-	clog := &clogVal
-	clog.Debug().Msg("Building container filter")
+	// The debug context is built only when debug logging is on, so a nil
+	// logger builds the filter without logging.
+	var clog *zerolog.Logger
+
+	if debugEnabled(log) {
+		clogVal := log.With().
+			Strs("names", normalizedNames).
+			Strs("disableNames", normalizedDisableNames).
+			Strs("monitoredImageNamePatterns", monitoredImageNamePatterns).
+			Strs("skippedImageNamePatterns", skippedImageNamePatterns).
+			Strs("enabledLabels", labelPairStrings(enabledLabelPairs)).
+			Strs("disabledLabels", labelPairStrings(disabledLabelPairs)).
+			Bool("enableLabel", enableLabel).
+			Str("scope", scope).
+			Logger()
+		clog = &clogVal
+
+		clog.Debug().Msg("Building container filter")
+	}
 
 	stringBuilder := strings.Builder{}
 	filter := NoFilter
@@ -769,8 +845,8 @@ func BuildFilter(log *zerolog.Logger,
 	filter = FilterByDisableNames(log, normalizedDisableNames, filter)
 	filter = filterByMonitoredImageNamePatterns(log, monitoredImageNamePatterns, filter)
 	filter = filterBySkippedImageNamePatterns(log, skippedImageNamePatterns, filter)
-	filter = filterByEnabledLabels(log, enabledLabelMap, filter)
-	filter = filterByDisabledLabels(log, disabledLabelMap, filter)
+	filter = filterByEnabledLabels(log, enabledLabelPairs, filter)
+	filter = filterByDisabledLabels(log, disabledLabelPairs, filter)
 	filter = filterByEnableLabel(enableLabel, filter)
 
 	// Add name-based filter description.
@@ -837,51 +913,15 @@ func BuildFilter(log *zerolog.Logger,
 		stringBuilder.WriteString(`, `)
 	}
 
-	if len(enabledLabelMap) > 0 {
+	if len(enabledLabelPairs) > 0 {
 		stringBuilder.WriteString("with label ")
-
-		first := true
-		for key, value := range enabledLabelMap {
-			if !first {
-				stringBuilder.WriteString(" or ")
-			}
-
-			if value == "" {
-				stringBuilder.WriteString(key)
-			} else {
-				stringBuilder.WriteString(key)
-				stringBuilder.WriteString(`="`)
-				stringBuilder.WriteString(value)
-				stringBuilder.WriteString(`"`)
-			}
-
-			first = false
-		}
-
+		writeLabelPairs(&stringBuilder, enabledLabelPairs)
 		stringBuilder.WriteString(`, `)
 	}
 
-	if len(disabledLabelMap) > 0 {
+	if len(disabledLabelPairs) > 0 {
 		stringBuilder.WriteString("without label ")
-
-		first := true
-		for key, value := range disabledLabelMap {
-			if !first {
-				stringBuilder.WriteString(" or ")
-			}
-
-			if value == "" {
-				stringBuilder.WriteString(key)
-			} else {
-				stringBuilder.WriteString(key)
-				stringBuilder.WriteString(`="`)
-				stringBuilder.WriteString(value)
-				stringBuilder.WriteString(`"`)
-			}
-
-			first = false
-		}
-
+		writeLabelPairs(&stringBuilder, disabledLabelPairs)
 		stringBuilder.WriteString(`, `)
 	}
 
@@ -908,9 +948,33 @@ func BuildFilter(log *zerolog.Logger,
 		filterDesc = strings.TrimSuffix(filterDesc, ", ")
 	}
 
-	clog.Debug().
-		Str("filter_desc", filterDesc).
-		Msg("Filter built")
+	if clog != nil {
+		clog.Debug().
+			Str("filter_desc", filterDesc).
+			Msg("Filter built")
+	}
 
 	return filter, filterDesc, nil
+}
+
+// writeLabelPairs writes label pairs for a filter description, in order and
+// joined by "or". A pair with a value is written as key="value".
+//
+// Parameters:
+//   - builder: Description being built.
+//   - pairs: Label pairs to write.
+func writeLabelPairs(builder *strings.Builder, pairs []labelPair) {
+	for i, pair := range pairs {
+		if i > 0 {
+			builder.WriteString(" or ")
+		}
+
+		builder.WriteString(pair.key)
+
+		if pair.value != "" {
+			builder.WriteString(`="`)
+			builder.WriteString(pair.value)
+			builder.WriteString(`"`)
+		}
+	}
 }
