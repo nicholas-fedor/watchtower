@@ -931,10 +931,7 @@ func TestClient(t *testing.T) {
 					memFs[marker] = &fstest.MapFile{}
 				}
 
-				// Without a logger, the client logs through a discarding one.
-				testClient := &client{Fs: memFs}
-
-				result, err := testClient.detectRuntimeByMarker()
+				result, err := detectRuntimeByMarker(newTestLogger(t), memFs)
 				require.NoError(t, err)
 				assert.Equal(t, tt.want, result)
 			})
@@ -950,7 +947,7 @@ func TestClient(t *testing.T) {
 			api := newDockerAPI(t)
 			expectInfo(api, dockerSystem.Info{Name: "podman"})
 
-			result, err := (&client{log: newTestLogger(t), api: api}).detectRuntimeByAPI(t.Context())
+			result, err := detectRuntimeByAPI(newTestLogger(t), t.Context(), api)
 			require.NoError(t, err)
 			assert.True(t, result)
 		})
@@ -961,7 +958,7 @@ func TestClient(t *testing.T) {
 			api := newDockerAPI(t)
 			expectInfo(api, dockerSystem.Info{ServerVersion: "podman/4.0.0"})
 
-			result, err := (&client{log: newTestLogger(t), api: api}).detectRuntimeByAPI(t.Context())
+			result, err := detectRuntimeByAPI(newTestLogger(t), t.Context(), api)
 			require.NoError(t, err)
 			assert.True(t, result)
 		})
@@ -973,7 +970,7 @@ func TestClient(t *testing.T) {
 			expectInfo(api, dockerSystem.Info{Name: "docker", ServerVersion: "20.10.0", OperatingSystem: "linux"})
 			expectServerVersion(api, dockerSystem.ComponentVersion{Name: "Engine", Version: "20.10.0"})
 
-			result, err := (&client{log: newTestLogger(t), api: api}).detectRuntimeByAPI(t.Context())
+			result, err := detectRuntimeByAPI(newTestLogger(t), t.Context(), api)
 			require.NoError(t, err)
 			assert.False(t, result)
 		})
@@ -985,7 +982,7 @@ func TestClient(t *testing.T) {
 			api.EXPECT().Info(mock.Anything, dockerClient.InfoOptions{}).
 				Return(dockerClient.SystemInfoResult{}, daemonError("server error")).Once()
 
-			result, err := (&client{log: newTestLogger(t), api: api}).detectRuntimeByAPI(t.Context())
+			result, err := detectRuntimeByAPI(newTestLogger(t), t.Context(), api)
 			require.Error(t, err)
 			assert.False(t, result)
 		})
@@ -997,7 +994,7 @@ func TestClient(t *testing.T) {
 			expectInfo(api, dockerSystem.Info{})
 			expectServerVersion(api)
 
-			result, err := (&client{log: newTestLogger(t), api: api}).detectRuntimeByAPI(t.Context())
+			result, err := detectRuntimeByAPI(newTestLogger(t), t.Context(), api)
 			require.NoError(t, err)
 			assert.False(t, result)
 		})
@@ -1551,7 +1548,7 @@ func TestClientEnvironment(t *testing.T) {
 					t.Setenv(name, *value)
 				}
 
-				assert.Equal(t, tt.want, (&client{log: newTestLogger(t)}).detectRuntimeByEnv())
+				assert.Equal(t, tt.want, detectRuntimeByEnv(newTestLogger(t)))
 			})
 		}
 	})
@@ -1852,9 +1849,7 @@ func TestDetectRuntimeByEnv_PodmanVariable(t *testing.T) {
 	t.Setenv("CONTAINER", "docker")
 	t.Setenv("container", "podman")
 
-	c := &client{log: newTestLogger(t)}
-
-	assert.True(t, c.detectRuntimeByEnv())
+	assert.True(t, detectRuntimeByEnv(newTestLogger(t)))
 }
 
 // TestDetectRuntimeByAPI verifies which daemon responses identify Podman,
@@ -1916,7 +1911,7 @@ func TestDetectRuntimeByAPI(t *testing.T) {
 					Return(dockerClient.ServerVersionResult{Components: tt.components}, tt.versionErr).Once()
 			}
 
-			got, err := (&client{log: newTestLogger(t), api: api}).detectRuntimeByAPI(t.Context())
+			got, err := detectRuntimeByAPI(newTestLogger(t), t.Context(), api)
 			if tt.wantErr {
 				require.Error(t, err)
 
@@ -2256,4 +2251,19 @@ func TestClientThroughDockerSDK(t *testing.T) {
 		err := newSDKClient(t, server).StopContainer(t.Context(), source, time.Second)
 		require.ErrorContains(t, err, "failed to stop container: Error response from daemon: server error")
 	})
+}
+
+// TestClientLogger verifies that the client logs through its configured logger,
+// and through a discarding logger when it has none or is nil, so methods can log
+// on a client built without one.
+func TestClientLogger(t *testing.T) {
+	t.Parallel()
+
+	log := newTestLogger(t)
+	assert.Same(t, log, (&client{log: log}).logger())
+
+	assert.NotNil(t, (&client{}).logger())
+
+	var nilClient *client
+	assert.NotNil(t, nilClient.logger())
 }

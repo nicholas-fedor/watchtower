@@ -11,6 +11,7 @@ import (
 	"path"
 	"slices"
 	"strings"
+	"sync"
 
 	"github.com/rs/zerolog"
 
@@ -98,6 +99,92 @@ func (s copyFileSnapshot) size() int64 {
 	}
 
 	return total
+}
+
+// pendingCopyFiles holds labeled file snapshots between the stop and create
+// steps of a recreation, keyed by the source container ID, within a total byte
+// cap.
+//
+// The zero value is ready to use.
+type pendingCopyFiles struct {
+	// mu protects snapshots and bytes.
+	mu sync.Mutex
+	// snapshots stores labeled file snapshots keyed by the source container ID.
+	snapshots map[types.ContainerID]copyFileSnapshot
+	// bytes is the total size of archives currently held in snapshots.
+	bytes int64
+}
+
+// store records a snapshot if it fits in the in-flight byte cap.
+//
+// Parameters:
+//   - containerID: Source container ID.
+//   - snapshot: Sanitized archives to hold until inject.
+//
+// Returns:
+//   - error: Non-nil if storing the snapshot would exceed maxCopyFileStoreBytes.
+func (s *pendingCopyFiles) store(
+	containerID types.ContainerID,
+	snapshot copyFileSnapshot,
+) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	if s.snapshots == nil {
+		s.snapshots = make(map[types.ContainerID]copyFileSnapshot)
+	}
+
+	existing, ok := s.snapshots[containerID]
+	if ok {
+		s.bytes -= existing.size()
+	}
+
+	if s.bytes < 0 {
+		s.bytes = 0
+	}
+
+	next := s.bytes + snapshot.size()
+	if next > maxCopyFileStoreBytes {
+		if ok {
+			s.bytes += existing.size()
+		}
+
+		return fmt.Errorf("%w: %d bytes", errCopyFileStoreFull, next)
+	}
+
+	s.snapshots[containerID] = snapshot
+	s.bytes = next
+
+	return nil
+}
+
+// take removes a stored snapshot and subtracts its size.
+//
+// Parameters:
+//   - containerID: Source container ID whose snapshot should be removed.
+//
+// Returns:
+//   - copyFileSnapshot: The removed snapshot when present.
+//   - bool: True when a snapshot was stored for containerID.
+func (s *pendingCopyFiles) take(
+	containerID types.ContainerID,
+) (copyFileSnapshot, bool) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	snapshot, ok := s.snapshots[containerID]
+	if !ok {
+		return copyFileSnapshot{}, false
+	}
+
+	delete(s.snapshots, containerID)
+
+	s.bytes -= snapshot.size()
+	if s.bytes < 0 {
+		s.bytes = 0
+	}
+
+	return snapshot, true
 }
 
 // parseCopyFileLabel splits and validates comma-separated in-container paths.
@@ -791,50 +878,7 @@ func (c *client) SnapshotCopyFiles(ctx context.Context, source types.Container) 
 		return nil
 	}
 
-	return c.storeCopyFileSnapshot(source.ID(), snapshot)
-}
-
-// storeCopyFileSnapshot records a snapshot if it fits in the in-flight byte cap.
-//
-// Parameters:
-//   - containerID: Source container ID.
-//   - snapshot: Sanitized archives to hold until inject.
-//
-// Returns:
-//   - error: Non-nil if storing the snapshot would exceed maxCopyFileStoreBytes.
-func (c *client) storeCopyFileSnapshot(
-	containerID types.ContainerID,
-	snapshot copyFileSnapshot,
-) error {
-	c.copyFileMu.Lock()
-	defer c.copyFileMu.Unlock()
-
-	if c.copyFiles == nil {
-		c.copyFiles = make(map[types.ContainerID]copyFileSnapshot)
-	}
-
-	existing, ok := c.copyFiles[containerID]
-	if ok {
-		c.copyFileBytes -= existing.size()
-	}
-
-	if c.copyFileBytes < 0 {
-		c.copyFileBytes = 0
-	}
-
-	next := c.copyFileBytes + snapshot.size()
-	if next > maxCopyFileStoreBytes {
-		if ok {
-			c.copyFileBytes += existing.size()
-		}
-
-		return fmt.Errorf("%w: %d bytes", errCopyFileStoreFull, next)
-	}
-
-	c.copyFiles[containerID] = snapshot
-	c.copyFileBytes = next
-
-	return nil
+	return c.copyFiles.store(source.ID(), snapshot)
 }
 
 // injectStoredCopyFiles writes a stored snapshot into a newly created container.
@@ -851,10 +895,7 @@ func (c *client) injectStoredCopyFiles(
 	source types.Container,
 	newID types.ContainerID,
 ) error {
-	c.copyFileMu.Lock()
-	snapshot, ok := c.dropCopyFileLocked(source.ID())
-	c.copyFileMu.Unlock()
-
+	snapshot, ok := c.copyFiles.take(source.ID())
 	if !ok {
 		return nil
 	}
@@ -867,34 +908,5 @@ func (c *client) injectStoredCopyFiles(
 // Parameters:
 //   - containerID: Source container ID whose snapshot should be discarded.
 func (c *client) DiscardCopyFiles(containerID types.ContainerID) {
-	c.copyFileMu.Lock()
-	defer c.copyFileMu.Unlock()
-
-	c.dropCopyFileLocked(containerID)
-}
-
-// dropCopyFileLocked removes a stored snapshot and subtracts its size.
-//
-// Parameters:
-//   - containerID: Source container ID whose snapshot should be dropped.
-//
-// Returns:
-//   - copyFileSnapshot: The removed snapshot when present.
-//   - bool: True when a snapshot was stored for containerID.
-func (c *client) dropCopyFileLocked(
-	containerID types.ContainerID,
-) (copyFileSnapshot, bool) {
-	snapshot, ok := c.copyFiles[containerID]
-	if !ok {
-		return copyFileSnapshot{}, false
-	}
-
-	delete(c.copyFiles, containerID)
-
-	c.copyFileBytes -= snapshot.size()
-	if c.copyFileBytes < 0 {
-		c.copyFileBytes = 0
-	}
-
-	return snapshot, true
+	c.copyFiles.take(containerID)
 }

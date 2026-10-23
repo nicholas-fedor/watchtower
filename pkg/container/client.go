@@ -416,12 +416,8 @@ type client struct {
 	// isPodman caches the result of Podman runtime detection.
 	isPodman bool
 
-	// copyFileMu protects copyFiles between stop and create of a recreation.
-	copyFileMu sync.Mutex
-	// copyFiles stores labeled file snapshots keyed by the source container ID.
-	copyFiles map[types.ContainerID]copyFileSnapshot
-	// copyFileBytes is the total size of archives currently held in copyFiles.
-	copyFileBytes int64
+	// copyFiles holds labeled file snapshots between stop and create of a recreation.
+	copyFiles pendingCopyFiles
 }
 
 // ClientOptions configures container management behavior for the Docker client.
@@ -1599,14 +1595,22 @@ func (c *client) logger() *zerolog.Logger {
 // helper indicates Podman/Docker or an error occurs.
 //
 // Parameters:
+//   - log: Logger for detection diagnostics.
 //   - ctx: Context for cancellation and timeout control.
+//   - api: Docker API client for API-based detection.
+//   - fsys: Filesystem rooted at "/" that holds the runtime marker files.
 //
 // Returns:
 //   - bool: True if Podman is detected, false otherwise.
 //   - error: Non-nil if detection fails, nil on success.
-func (c *client) detectRuntime(ctx context.Context) (bool, error) {
+func detectRuntime(
+	log *zerolog.Logger,
+	ctx context.Context,
+	api dockerClient.APIClient,
+	fsys fs.FS,
+) (bool, error) {
 	// Priority 1: Check for marker files (Podman or Docker)
-	runtime, err := c.detectRuntimeByMarker()
+	runtime, err := detectRuntimeByMarker(log, fsys)
 	if err != nil {
 		return false, err
 	}
@@ -1624,12 +1628,12 @@ func (c *client) detectRuntime(ctx context.Context) (bool, error) {
 	}
 
 	// Priority 2: Check CONTAINER environment variable
-	if c.detectRuntimeByEnv() {
+	if detectRuntimeByEnv(log) {
 		return true, nil
 	}
 
 	// Priority 3: API-based detection
-	return c.detectRuntimeByAPI(ctx)
+	return detectRuntimeByAPI(log, ctx, api)
 }
 
 // detectRuntimeByMarker checks for container runtime marker files.
@@ -1639,24 +1643,25 @@ func (c *client) detectRuntime(ctx context.Context) (bool, error) {
 // is returned with details about which path failed.
 //
 // Parameters:
-//   - c: The client instance for filesystem access.
+//   - log: Logger for detection diagnostics.
+//   - fsys: Filesystem rooted at "/" that holds the runtime marker files.
 //
 // Returns:
 //   - containerRuntime: The detected container runtime (runtimePodman, runtimeDocker, or runtimeUnknown).
 //   - error: Non-nil if checking fails with a non-NotExist error, nil on success.
-func (c *client) detectRuntimeByMarker() (containerRuntime, error) {
+func detectRuntimeByMarker(log *zerolog.Logger, fsys fs.FS) (containerRuntime, error) {
 	// Check for Podman marker file
-	_, podmanErr := fs.Stat(c.Fs, "run/.containerenv")
+	_, podmanErr := fs.Stat(fsys, "run/.containerenv")
 	if podmanErr == nil {
-		c.logger().Debug().Msg("Detected Podman via marker file /run/.containerenv")
+		log.Debug().Msg("Detected Podman via marker file /run/.containerenv")
 
 		return runtimePodman, nil
 	}
 
 	// Check for Docker marker file
-	_, dockerErr := fs.Stat(c.Fs, ".dockerenv")
+	_, dockerErr := fs.Stat(fsys, ".dockerenv")
 	if dockerErr == nil {
-		c.logger().Debug().Msg("Detected Docker via marker file /.dockerenv")
+		log.Debug().Msg("Detected Docker via marker file /.dockerenv")
 
 		return runtimeDocker, nil
 	}
@@ -1695,17 +1700,22 @@ func (c *client) detectRuntimeByMarker() (containerRuntime, error) {
 	}
 }
 
+// detectRuntimeByEnv reports whether the environment indicates Podman.
+//
 // It checks if the container environment variable, which Podman sets, or its
 // uppercase form is "podman" or "oci", both of which indicate Podman is the
 // container runtime.
 //
+// Parameters:
+//   - log: Logger for detection diagnostics.
+//
 // Returns:
 //   - bool: True if the environment variable indicates Podman, false otherwise.
-func (c *client) detectRuntimeByEnv() bool {
+func detectRuntimeByEnv(log *zerolog.Logger) bool {
 	for _, key := range []string{"container", "CONTAINER"} {
 		value := os.Getenv(key)
 		if value == "podman" || value == "oci" {
-			c.logger().Debug().
+			log.Debug().
 				Str("variable", key).
 				Msg("Detected Podman via container environment variable")
 
@@ -1724,39 +1734,42 @@ func (c *client) detectRuntimeByEnv() bool {
 // components, where Podman names itself "Podman Engine".
 //
 // Parameters:
+//   - log: Logger for detection diagnostics.
 //   - ctx: Context for cancellation and timeout control.
-//   - c: The client instance for API calls.
+//   - api: Docker API client to query.
 //
 // Returns:
 //   - bool: True if Podman is detected via API, false otherwise.
 //   - error: Non-nil if API call fails, nil on success.
-func (c *client) detectRuntimeByAPI(ctx context.Context) (bool, error) {
-	info, err := c.GetInfo(ctx)
+func detectRuntimeByAPI(log *zerolog.Logger, ctx context.Context, api dockerClient.APIClient) (bool, error) {
+	result, err := api.Info(ctx, dockerClient.InfoOptions{})
 	if err != nil {
-		c.logger().Debug().
+		log.Debug().
 			Err(err).
 			Msg("Failed to get system info for Podman detection, assuming Docker")
 
-		return false, err
+		return false, fmt.Errorf("failed to get system info: %w", err)
 	}
 
+	info := result.Info
+
 	if info.Name == "podman" {
-		c.logger().Debug().Msg("Detected Podman via API Name field")
+		log.Debug().Msg("Detected Podman via API Name field")
 
 		return true, nil
 	}
 
 	if strings.Contains(strings.ToLower(info.ServerVersion), "podman") {
-		c.logger().Debug().Msg("Detected Podman via API ServerVersion field")
+		log.Debug().Msg("Detected Podman via API ServerVersion field")
 
 		return true, nil
 	}
 
 	// The components are informational and not part of the API contract, so
 	// they are checked only after the info fields.
-	version, err := c.api.ServerVersion(ctx, dockerClient.ServerVersionOptions{})
+	version, err := api.ServerVersion(ctx, dockerClient.ServerVersionOptions{})
 	if err != nil {
-		c.logger().Debug().
+		log.Debug().
 			Err(err).
 			Msg("Failed to get server version for Podman detection")
 
@@ -1765,7 +1778,7 @@ func (c *client) detectRuntimeByAPI(ctx context.Context) (bool, error) {
 
 	for _, component := range version.Components {
 		if strings.Contains(strings.ToLower(component.Name), "podman") {
-			c.logger().Debug().
+			log.Debug().
 				Str("component", component.Name).
 				Msg("Detected Podman via API version components")
 
@@ -1773,7 +1786,7 @@ func (c *client) detectRuntimeByAPI(ctx context.Context) (bool, error) {
 		}
 	}
 
-	c.logger().Debug().Msg("No Podman detection criteria met, assuming Docker")
+	log.Debug().Msg("No Podman detection criteria met, assuming Docker")
 
 	return false, nil
 }
@@ -1800,7 +1813,7 @@ func (c *client) getRuntime(ctx context.Context) bool {
 		return c.isPodman
 	}
 
-	isPodman, err := c.detectRuntime(ctx)
+	isPodman, err := detectRuntime(c.logger(), ctx, c.api, c.Fs)
 	if err != nil {
 		c.logger().Debug().
 			Err(err).
