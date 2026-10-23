@@ -16,7 +16,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/nicholas-fedor/watchtower/internal/api/config"
+	"github.com/nicholas-fedor/watchtower/internal/api/routes"
 )
 
 // newTestLogger returns a logger that writes each event to the test's log, so a
@@ -250,7 +250,7 @@ func TestNew(t *testing.T) {
 }
 
 func TestTimeoutMiddleware(t *testing.T) {
-	handler := config.TimeoutMiddleware()
+	handler := routes.TimeoutMiddleware()
 	require.NotNil(t, handler)
 
 	app := fiber.New(fiber.Config{})

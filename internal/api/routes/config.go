@@ -5,11 +5,10 @@ import (
 
 	"github.com/gofiber/fiber/v3"
 
-	apiconfig "github.com/nicholas-fedor/watchtower/internal/api/config"
 	"github.com/nicholas-fedor/watchtower/internal/api/handlers/config"
 )
 
-func registerConfigRoute(app *fiber.App, auth fiber.Handler, opts apiconfig.Options) {
+func registerConfigRoute(app *fiber.App, auth fiber.Handler, opts Options) {
 	handler := config.New(opts.Logger, func(_ context.Context) (config.ConfigData, error) {
 		return config.ConfigData{
 			MonitorOnly:       opts.BaseParams.MonitorOnly,
@@ -26,5 +25,5 @@ func registerConfigRoute(app *fiber.App, auth fiber.Handler, opts apiconfig.Opti
 			GitEnable:         opts.BaseParams.EnableGitMonitoring,
 		}, nil
 	})
-	app.Get(handler.Path, auth, apiconfig.TimeoutMiddleware(), handler.Handle)
+	app.Get(handler.Path, auth, TimeoutMiddleware(), handler.Handle)
 }

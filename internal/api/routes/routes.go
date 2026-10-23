@@ -7,7 +7,6 @@ import (
 
 	"github.com/gofiber/fiber/v3"
 
-	"github.com/nicholas-fedor/watchtower/internal/api/config"
 	_ "github.com/nicholas-fedor/watchtower/internal/api/swagger"
 )
 
@@ -39,22 +38,22 @@ func ValidateAndRegister(
 	ctx context.Context,
 	app *fiber.App,
 	auth fiber.Handler,
-	opts config.Options,
+	opts Options,
 ) error {
 	if opts.EnableUpdateAPI {
-		err := config.ValidateUpdateOptions(opts)
+		err := ValidateUpdateOptions(opts)
 		if err != nil {
 			return fmt.Errorf("update options validation failed: %w", err)
 		}
 	}
 
 	if opts.EnableCheckAPI && opts.FilterByImage == nil {
-		return config.ErrMissingFilterByImage
+		return ErrMissingFilterByImage
 	}
 
 	// Metrics and history read the in-memory metrics store.
 	if (opts.EnableMetricsAPI || opts.EnableHistoryAPI) && opts.DefaultMetrics == nil {
-		return config.ErrMissingDefaultMetrics
+		return ErrMissingDefaultMetrics
 	}
 
 	if opts.EnableCheckAPI && opts.Client == nil {
@@ -70,7 +69,7 @@ func ValidateAndRegister(
 	}
 
 	if opts.EnableEventsAPI && opts.EventBroadcaster == nil {
-		return config.ErrMissingEventBroadcaster
+		return ErrMissingEventBroadcaster
 	}
 
 	registerRoutes(ctx, app, auth, opts)
@@ -89,7 +88,7 @@ func registerRoutes(
 	ctx context.Context,
 	app *fiber.App,
 	auth fiber.Handler,
-	opts config.Options,
+	opts Options,
 ) {
 	if opts.EnableHealthAPI {
 		registerHealthRoute(app, opts)

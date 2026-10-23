@@ -7,7 +7,6 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 
-	"github.com/nicholas-fedor/watchtower/internal/api/config"
 	mockContainer "github.com/nicholas-fedor/watchtower/pkg/container/mocks"
 	"github.com/nicholas-fedor/watchtower/pkg/types"
 )
@@ -17,7 +16,7 @@ func TestRegisterContainersRoute_NilClient(t *testing.T) {
 		app := testApp()
 		auth := testAuthMiddleware()
 
-		opts := config.Options{
+		opts := Options{
 			EnableContainersAPI: true,
 			Client:              nil,
 			UnblockHTTPAPI:      true,
@@ -38,7 +37,7 @@ func TestRegisterContainersRoute_NilClient(t *testing.T) {
 		app := testApp()
 		auth := testAuthMiddleware()
 
-		opts := config.Options{
+		opts := Options{
 			EnableContainersAPI: true,
 			Client:              nil,
 			UnblockHTTPAPI:      true,
@@ -61,7 +60,7 @@ func TestRegisterContainersRoute_NilClient(t *testing.T) {
 		mockClient := mockContainer.NewMockClient(t)
 		mockClient.EXPECT().ListContainers(mock.Anything).Return([]types.Container{}, nil).Maybe()
 
-		opts := config.Options{
+		opts := Options{
 			EnableContainersAPI: true,
 			Client:              mockClient,
 			UnblockHTTPAPI:      true,

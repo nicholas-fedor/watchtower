@@ -9,7 +9,6 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/nicholas-fedor/watchtower/internal/api/config"
 	"github.com/nicholas-fedor/watchtower/internal/observability/events"
 )
 
@@ -89,7 +88,7 @@ func TestExtractEventsToken(t *testing.T) {
 
 func TestRegisterEventsRoute_RejectsMissingToken(t *testing.T) {
 	app := testApp()
-	opts := config.Options{
+	opts := Options{
 		EnableEventsAPI:  true,
 		EventsToken:      "events-secret",
 		EventBroadcaster: events.NewBroadcaster(),
@@ -105,7 +104,7 @@ func TestRegisterEventsRoute_RejectsMissingToken(t *testing.T) {
 
 func TestRegisterEventsRoute_HashCompareRejectsWrongLength(t *testing.T) {
 	app := testApp()
-	opts := config.Options{
+	opts := Options{
 		EnableEventsAPI:  true,
 		EventsToken:      "events-secret",
 		EventBroadcaster: events.NewBroadcaster(),
@@ -123,7 +122,7 @@ func TestRegisterEventsRoute_HashCompareRejectsWrongLength(t *testing.T) {
 
 func TestRegisterEventsRoute_RejectsWrongToken(t *testing.T) {
 	app := testApp()
-	opts := config.Options{
+	opts := Options{
 		EnableEventsAPI:  true,
 		EventsToken:      "events-secret",
 		EventBroadcaster: events.NewBroadcaster(),

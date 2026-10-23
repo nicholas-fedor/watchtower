@@ -12,7 +12,6 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/valyala/fasthttp"
 
-	"github.com/nicholas-fedor/watchtower/internal/api/config"
 	_ "github.com/nicholas-fedor/watchtower/internal/api/swagger"
 )
 
@@ -70,7 +69,7 @@ func TestRewriteSwaggerDocHost_UntrustedForwardedProtoIgnored(t *testing.T) {
 func TestRegisterSwaggerRoute_PublicAccess(t *testing.T) {
 	app := testApp()
 
-	opts := config.Options{EnableSwaggerAPI: true}
+	opts := Options{EnableSwaggerAPI: true}
 	registerSwaggerRoute(app, opts)
 
 	// Unauthenticated UI load → 200 (docs are public; /v1/* still auth-gated)
@@ -84,7 +83,7 @@ func TestRegisterSwaggerRoute_PublicAccess(t *testing.T) {
 func TestRegisterSwaggerRoute_DocJSONRewritesHost(t *testing.T) {
 	app := testApp()
 
-	opts := config.Options{EnableSwaggerAPI: true}
+	opts := Options{EnableSwaggerAPI: true}
 	registerSwaggerRoute(app, opts)
 
 	req := httptest.NewRequestWithContext(

@@ -14,7 +14,6 @@ import (
 	"github.com/gofiber/fiber/v3"
 	"github.com/rs/zerolog"
 
-	"github.com/nicholas-fedor/watchtower/internal/api/config"
 	"github.com/nicholas-fedor/watchtower/internal/api/routes"
 )
 
@@ -60,14 +59,14 @@ func GetAPIAddr(host, port string) string {
 // Parameters:
 //   - ctx: Context for server lifecycle management.
 //   - opts: API configuration options. opts.Logger is required when any endpoint
-//     is enabled. Nil yields config.ErrMissingLogger.
+//     is enabled. Nil yields routes.ErrMissingLogger.
 //
 // Returns:
 //   - <-chan struct{}: Closed once the server has stopped and its shutdown
 //     attempt has finished. It is already closed when no endpoint is enabled,
 //     and nil when err is non-nil.
 //   - error: Non-nil if route registration or server startup fails.
-func SetupAndStartAPI(ctx context.Context, opts config.Options) (<-chan struct{}, error) {
+func SetupAndStartAPI(ctx context.Context, opts routes.Options) (<-chan struct{}, error) {
 	if !opts.EnableUpdateAPI &&
 		!opts.EnableMetricsAPI &&
 		!opts.EnableContainersAPI &&
@@ -94,15 +93,15 @@ func SetupAndStartAPI(ctx context.Context, opts config.Options) (<-chan struct{}
 	shouldRequireEventsToken := opts.EnableEventsAPI
 
 	if shouldRequireToken && opts.Token == "" {
-		return nil, config.ErrMissingAPIToken
+		return nil, routes.ErrMissingAPIToken
 	}
 
 	if shouldRequireEventsToken && opts.EventsToken == "" {
-		return nil, config.ErrMissingEventsAPIToken
+		return nil, routes.ErrMissingEventsAPIToken
 	}
 
 	if opts.Logger == nil {
-		return nil, config.ErrMissingLogger
+		return nil, routes.ErrMissingLogger
 	}
 
 	log := opts.Logger
@@ -128,7 +127,7 @@ func SetupAndStartAPI(ctx context.Context, opts config.Options) (<-chan struct{}
 	tlsCertPath, tlsKeyPath := opts.TLSCertPath, opts.TLSKeyPath
 
 	if (tlsCertPath == "") != (tlsKeyPath == "") {
-		return nil, config.ErrMissingTLSConfig
+		return nil, routes.ErrMissingTLSConfig
 	}
 
 	// Block only in API-only update mode.
@@ -159,7 +158,7 @@ func SetupAndStartAPI(ctx context.Context, opts config.Options) (<-chan struct{}
 //
 // Returns:
 //   - func(): The callback, or nil when no startup message is written here.
-func startupMessageWriter(opts config.Options, block bool) func() {
+func startupMessageWriter(opts routes.Options, block bool) func() {
 	if !block || opts.WriteStartupMessage == nil {
 		return nil
 	}
@@ -171,7 +170,7 @@ func startupMessageWriter(opts config.Options, block bool) func() {
 //
 // Parameters:
 //   - opts: API configuration options with a non-nil WriteStartupMessage.
-func writeStartupMessage(opts config.Options) {
+func writeStartupMessage(opts routes.Options) {
 	startup := opts.Startup
 	startup.Sched = time.Time{}
 	startup.Filtering = opts.FilterDesc

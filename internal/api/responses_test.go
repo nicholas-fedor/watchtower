@@ -26,7 +26,6 @@ import (
 	dockerContainer "github.com/moby/moby/api/types/container"
 	dockerImage "github.com/moby/moby/api/types/image"
 
-	"github.com/nicholas-fedor/watchtower/internal/api/config"
 	"github.com/nicholas-fedor/watchtower/internal/api/routes"
 	"github.com/nicholas-fedor/watchtower/internal/observability/events"
 	"github.com/nicholas-fedor/watchtower/internal/observability/metrics"
@@ -194,10 +193,10 @@ func newFixtureMetrics(t *testing.T) *metrics.Metrics {
 
 // fixtureOptions returns API options with every endpoint enabled, backed by the
 // given Docker client and metrics store. Each update reports the same scan.
-func fixtureOptions(t *testing.T, client container.Client, store *metrics.Metrics) config.Options {
+func fixtureOptions(t *testing.T, client container.Client, store *metrics.Metrics) routes.Options {
 	t.Helper()
 
-	return withTestLogger(t, config.Options{
+	return withTestLogger(t, routes.Options{
 		Token:               fixtureAPIToken,
 		EventsToken:         fixtureEventsToken,
 		RateLimit:           1000,
@@ -232,7 +231,7 @@ func fixtureOptions(t *testing.T, client container.Client, store *metrics.Metric
 
 // newFixtureApp builds the HTTP API from opts the same way SetupAndStartAPI
 // does, without starting a listener.
-func newFixtureApp(t *testing.T, opts config.Options) *fiber.App {
+func newFixtureApp(t *testing.T, opts routes.Options) *fiber.App {
 	t.Helper()
 
 	app := newApp(opts.Logger, opts.RateLimit, proxyConfig{}, corsConfig{}, opts.NoStartupMessage)

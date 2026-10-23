@@ -6,20 +6,19 @@ import (
 	"github.com/gofiber/fiber/v3"
 	"github.com/gofiber/fiber/v3/middleware/timeout"
 
-	"github.com/nicholas-fedor/watchtower/internal/api/config"
 	"github.com/nicholas-fedor/watchtower/internal/api/handlers/update"
 	mt "github.com/nicholas-fedor/watchtower/internal/observability/metrics"
 	"github.com/nicholas-fedor/watchtower/pkg/types"
 )
 
-func registerUpdateRoute(ctx context.Context, app *fiber.App, auth fiber.Handler, opts config.Options) {
+func registerUpdateRoute(ctx context.Context, app *fiber.App, auth fiber.Handler, opts Options) {
 	updateTimeout := opts.UpdateTimeout
 	if updateTimeout <= 0 {
-		updateTimeout = config.DefaultUpdateTimeout
+		updateTimeout = DefaultUpdateTimeout
 	}
 
 	handler := update.New(opts.Logger, func(updateCtx context.Context, images, containers []string) *mt.Metric {
-		params := config.BuildUpdateParams(opts)
+		params := BuildUpdateParams(opts)
 
 		imageFilter := opts.FilterByImage(images, opts.Filter)
 

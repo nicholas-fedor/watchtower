@@ -1,7 +1,4 @@
-// Package config defines the shared configuration types, validation functions,
-// and sentinel errors used across the API packages. It exists to break the
-// import cycle between the top-level api package and the routes subpackage.
-package config
+package routes
 
 import (
 	"context"

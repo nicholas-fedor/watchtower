@@ -15,7 +15,6 @@ import (
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 
-	"github.com/nicholas-fedor/watchtower/internal/api/config"
 	"github.com/nicholas-fedor/watchtower/internal/api/routes"
 	"github.com/nicholas-fedor/watchtower/internal/observability/metrics"
 	"github.com/nicholas-fedor/watchtower/internal/scheduling"
@@ -41,7 +40,7 @@ func newFullSurfaceApp(t *testing.T) *fiber.App {
 	client.EXPECT().ListContainers(mock.Anything, mock.Anything).Return([]types.Container{}, nil).Maybe()
 	client.EXPECT().ListContainers(mock.Anything).Return([]types.Container{}, nil).Maybe()
 
-	opts := withTestLogger(t, config.Options{
+	opts := withTestLogger(t, routes.Options{
 		Token:               "api-token",
 		EventsToken:         "events-token",
 		RateLimit:           1000,

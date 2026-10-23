@@ -5,12 +5,11 @@ import (
 
 	"github.com/gofiber/fiber/v3"
 
-	"github.com/nicholas-fedor/watchtower/internal/api/config"
 	"github.com/nicholas-fedor/watchtower/internal/api/handlers/containers"
 	"github.com/nicholas-fedor/watchtower/internal/api/handlers/containers/details"
 )
 
-func registerContainersRoute(app *fiber.App, auth fiber.Handler, opts config.Options) {
+func registerContainersRoute(app *fiber.App, auth fiber.Handler, opts Options) {
 	if opts.Client == nil {
 		return
 	}
@@ -18,17 +17,17 @@ func registerContainersRoute(app *fiber.App, auth fiber.Handler, opts config.Opt
 	handler := containers.New(opts.Logger, func(ctx context.Context) ([]containers.Status, error) {
 		return containers.ListContainerStatuses(ctx, opts.Client, opts.Filter)
 	})
-	app.Get(handler.Path, auth, config.TimeoutMiddleware(), handler.Handle)
+	app.Get(handler.Path, auth, TimeoutMiddleware(), handler.Handle)
 }
 
-func registerContainersDetailsRoute(app *fiber.App, auth fiber.Handler, opts config.Options) {
+func registerContainersDetailsRoute(app *fiber.App, auth fiber.Handler, opts Options) {
 	if opts.Client == nil {
 		return
 	}
 
-	detailsParams := config.BuildUpdateParams(opts)
+	detailsParams := BuildUpdateParams(opts)
 	handler := details.New(opts.Logger, func(ctx context.Context, name, image string) ([]details.ContainerDetails, error) {
 		return details.GetContainerDetails(ctx, opts.Client, opts.Filter, name, image, detailsParams)
 	})
-	app.Get(handler.Path, auth, config.TimeoutMiddleware(), handler.Handle)
+	app.Get(handler.Path, auth, TimeoutMiddleware(), handler.Handle)
 }

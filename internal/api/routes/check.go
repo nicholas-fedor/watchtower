@@ -6,24 +6,23 @@ import (
 	"github.com/gofiber/fiber/v3"
 	"github.com/gofiber/fiber/v3/middleware/timeout"
 
-	"github.com/nicholas-fedor/watchtower/internal/api/config"
 	"github.com/nicholas-fedor/watchtower/internal/api/handlers/check"
 	"github.com/nicholas-fedor/watchtower/internal/api/handlers/update"
 	"github.com/nicholas-fedor/watchtower/internal/observability/events"
 	"github.com/nicholas-fedor/watchtower/pkg/types"
 )
 
-func registerCheckRoute(app *fiber.App, auth fiber.Handler, opts config.Options) {
+func registerCheckRoute(app *fiber.App, auth fiber.Handler, opts Options) {
 	if opts.Client == nil {
 		return
 	}
 
 	checkTimeout := opts.CheckTimeout
 	if checkTimeout <= 0 {
-		checkTimeout = config.DefaultCheckTimeout
+		checkTimeout = DefaultCheckTimeout
 	}
 
-	params := config.BuildUpdateParams(opts)
+	params := BuildUpdateParams(opts)
 	scanStartedData := events.NewScanStartedData(params)
 
 	handler := check.New(opts.Logger,

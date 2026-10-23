@@ -9,11 +9,10 @@ import (
 	"github.com/gofiber/fiber/v3/extractors"
 	"github.com/gofiber/fiber/v3/middleware/keyauth"
 
-	"github.com/nicholas-fedor/watchtower/internal/api/config"
 	"github.com/nicholas-fedor/watchtower/internal/api/handlers/events"
 )
 
-func registerEventsRoute(app *fiber.App, opts config.Options) {
+func registerEventsRoute(app *fiber.App, opts Options) {
 	handler := events.NewHandler(opts.Logger, opts.EventBroadcaster, opts.CORSAllowedOrigins)
 
 	eventsToken := opts.EventsToken
