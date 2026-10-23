@@ -35,3 +35,19 @@ func TestPopulateRouteFlags(t *testing.T) {
 	assert.False(t, empty.EnableUpdateAPI)
 	assert.False(t, empty.EnableMetricsAPI)
 }
+
+// TestBuildRunConfigMultilineEndpointsEnv verifies that a multiline
+// WATCHTOWER_HTTP_API_ENDPOINTS value, such as a YAML block scalar, enables
+// each listed endpoint. The env list splitter keeps newlines inside a token,
+// so the endpoint parser must split them.
+func TestBuildRunConfigMultilineEndpointsEnv(t *testing.T) {
+	cfg := newLoadedCommand(t, map[string]string{
+		"WATCHTOWER_HTTP_API_ENDPOINTS": "health\nmetrics\n",
+	})
+
+	run, err := cfg.BuildRunConfig(RunConfigInput{})
+	require.NoError(t, err)
+	assert.True(t, run.EnableHealthAPI)
+	assert.True(t, run.EnableMetricsAPI)
+	assert.False(t, run.EnableUpdateAPI)
+}
