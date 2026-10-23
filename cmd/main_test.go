@@ -5,7 +5,7 @@ import (
 	"os/signal"
 	"testing"
 
-	"github.com/nicholas-fedor/watchtower/internal/metrics"
+	"github.com/nicholas-fedor/watchtower/internal/observability/metrics"
 )
 
 // TestMain starts the process-wide goroutines that the code under test starts

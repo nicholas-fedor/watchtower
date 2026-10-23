@@ -15,7 +15,7 @@ import (
 
 	"github.com/nicholas-fedor/watchtower/internal/flags/docker"
 	"github.com/nicholas-fedor/watchtower/internal/flags/schedule"
-	"github.com/nicholas-fedor/watchtower/internal/logging"
+	"github.com/nicholas-fedor/watchtower/internal/observability/logging"
 )
 
 // DockerAPIMinVersion sets the minimum Docker API version supported by Watchtower.

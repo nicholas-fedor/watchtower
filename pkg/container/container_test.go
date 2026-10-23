@@ -15,7 +15,7 @@ import (
 	dockerNetwork "github.com/moby/moby/api/types/network"
 
 	composeLabels "github.com/nicholas-fedor/watchtower/internal/compose/labels"
-	"github.com/nicholas-fedor/watchtower/internal/logging"
+	"github.com/nicholas-fedor/watchtower/internal/observability/logging"
 	"github.com/nicholas-fedor/watchtower/pkg/types"
 	mockTypes "github.com/nicholas-fedor/watchtower/pkg/types/mocks"
 )

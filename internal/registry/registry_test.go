@@ -10,7 +10,7 @@ import (
 
 	dockerCliConfig "github.com/docker/cli/cli/config"
 
-	"github.com/nicholas-fedor/watchtower/internal/logging"
+	"github.com/nicholas-fedor/watchtower/internal/observability/logging"
 	mockTypes "github.com/nicholas-fedor/watchtower/pkg/types/mocks"
 )
 

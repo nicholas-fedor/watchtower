@@ -16,7 +16,7 @@ import (
 
 	dockerCliConfig "github.com/docker/cli/cli/config"
 
-	"github.com/nicholas-fedor/watchtower/internal/logging"
+	"github.com/nicholas-fedor/watchtower/internal/observability/logging"
 )
 
 // TestEncodedEnvAuth_ReturnsCredentialsWhenSet verifies that encodedEnvAuth

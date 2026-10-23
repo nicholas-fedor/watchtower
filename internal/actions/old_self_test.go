@@ -10,7 +10,7 @@ import (
 	dockerContainer "github.com/moby/moby/api/types/container"
 
 	mockActions "github.com/nicholas-fedor/watchtower/internal/actions/mocks"
-	"github.com/nicholas-fedor/watchtower/internal/api/handlers/events"
+	"github.com/nicholas-fedor/watchtower/internal/observability/events"
 	mockContainer "github.com/nicholas-fedor/watchtower/pkg/container/mocks"
 	"github.com/nicholas-fedor/watchtower/pkg/types"
 	mockTypes "github.com/nicholas-fedor/watchtower/pkg/types/mocks"

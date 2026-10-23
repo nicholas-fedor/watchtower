@@ -240,7 +240,7 @@ linters:
           severity: warning
           disabled: false
           exclude:
-            - ".*internal/metrics/.*"
+            - ".*internal/observability/metrics/.*"
     wrapcheck:
       # Constructors that build a new error rather than return one from another call.
       extra-ignore-sigs:

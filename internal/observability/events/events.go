@@ -10,8 +10,8 @@ import (
 const (
 	// subscriberChannelSize is the buffer size for each subscriber channel.
 	subscriberChannelSize = 10
-	// maxSubscribers is the maximum number of concurrent SSE subscribers.
-	maxSubscribers = 100
+	// MaxSubscribers is the maximum number of concurrent SSE subscribers.
+	MaxSubscribers = 100
 )
 
 // Event represents a Watchtower operational event emitted to SSE subscribers.
@@ -102,7 +102,7 @@ type Broadcaster struct {
 // operational events to SSE subscribers.
 func NewBroadcaster() *Broadcaster {
 	return &Broadcaster{
-		subscribers: make([]*subscriber, 0, maxSubscribers),
+		subscribers: make([]*subscriber, 0, MaxSubscribers),
 	}
 }
 
@@ -115,7 +115,7 @@ func (b *Broadcaster) SubscribeWithDone() (<-chan Event, <-chan struct{}) {
 	done := make(chan struct{})
 
 	b.mu.Lock()
-	if len(b.subscribers) >= maxSubscribers {
+	if len(b.subscribers) >= MaxSubscribers {
 		b.mu.Unlock()
 		close(subCh)
 		close(done)

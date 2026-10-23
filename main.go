@@ -42,7 +42,7 @@ import (
 	"os"
 
 	"github.com/nicholas-fedor/watchtower/cmd"
-	"github.com/nicholas-fedor/watchtower/internal/logging"
+	"github.com/nicholas-fedor/watchtower/internal/observability/logging"
 )
 
 // main serves as the entry point for the Watchtower application.
