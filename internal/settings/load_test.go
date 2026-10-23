@@ -539,6 +539,11 @@ func TestLoad_NoColorFromEnvPresence(t *testing.T) {
 	}
 
 	t.Run("unset", func(t *testing.T) {
+		// t.Setenv restores the original NO_COLOR state at cleanup, and
+		// Unsetenv removes it, since even an empty value counts as present.
+		t.Setenv("NO_COLOR", "")
+		require.NoError(t, os.Unsetenv("NO_COLOR"))
+
 		cfg := newLoadedCommand(t, nil)
 		assert.False(t, cfg.Logging.NoColor)
 	})
