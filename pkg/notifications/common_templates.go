@@ -22,9 +22,7 @@ var commonTemplates = map[string]string{
 	// "Registry rate limit retries exhausted. Container failed for this cycle" (update failed on a registry rate limit),
 	// "Ignoring depends-on entry that names no container" (depends-on label entry matched nothing),
 	// "Skipping container update (self-dependency)" (container depends on itself),
-	// "Skipping container update (circular dependency)" (container is in a dependency cycle),
-	// "Unexpected MAC address in host network config" (host-network container carries a MAC address),
-	// "Unexpected MAC address in legacy config" (MAC address on a Docker API version below 1.44).
+	// "Skipping container update (circular dependency)" (container is in a dependency cycle).
 	// For unrecognized messages, displays the message with key=value data pairs if Data exists, otherwise just the message.
 	// Expects .Entries []Entry where each Entry has Message string and Data map[string]interface{}.
 	"default-legacy": `
@@ -119,10 +117,6 @@ var commonTemplates = map[string]string{
     Skipped {{with (index $e.Data "container")}}{{.}}{{else}}container{{end}}: depends on itself
 {{- else if eq $msg "Skipping container update (circular dependency)" -}}
     Skipped {{with (index $e.Data "container")}}{{.}}{{else}}container{{end}}: circular dependency
-{{- else if eq $msg "Unexpected MAC address in host network config" -}}
-    Unexpected MAC address for {{with (index $e.Data "container")}}{{.}}{{else}}container{{end}} in host network mode
-{{- else if eq $msg "Unexpected MAC address in legacy config" -}}
-    Unexpected MAC address for {{with (index $e.Data "container")}}{{.}}{{else}}container{{end}} on Docker API {{with (index $e.Data "version")}}{{.}}{{else}}below 1.44{{end}}
 {{- else if $e.Data -}}
     {{- /* For messages with data, show message and key=value pairs */ -}}
     {{$msg}} | {{range $k, $v := $e.Data}}{{$k}}={{$v}} {{end}}

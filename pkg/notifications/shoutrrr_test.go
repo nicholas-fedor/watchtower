@@ -1897,23 +1897,6 @@ func TestDefaultLegacyGitSkipAndComposeMessages(t *testing.T) {
 			data:    map[string]any{"container": "app", "id": "abcdef123456"},
 			want:    "Skipped app: circular dependency",
 		},
-		{
-			name:    "unexpected MAC address in host network mode",
-			message: "Unexpected MAC address in host network config",
-			data:    map[string]any{"container": "app", "id": "abcdef123456", "version": "1.44"},
-			want:    "Unexpected MAC address for app in host network mode",
-		},
-		{
-			name:    "unexpected MAC address on a legacy API version",
-			message: "Unexpected MAC address in legacy config",
-			data:    map[string]any{"container": "app", "id": "abcdef123456", "version": "1.43"},
-			want:    "Unexpected MAC address for app on Docker API 1.43",
-		},
-		{
-			name:    "unexpected MAC address without fields",
-			message: "Unexpected MAC address in legacy config",
-			want:    "Unexpected MAC address for container on Docker API below 1.44",
-		},
 	}
 
 	for _, tc := range cases {

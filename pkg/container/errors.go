@@ -30,10 +30,6 @@ var (
 	errStopContainerFailed = errors.New("failed to stop container")
 	// errRemoveContainerFailed indicates a failure to remove a container from the host.
 	errRemoveContainerFailed = errors.New("failed to remove container")
-	// errUnexpectedMacInLegacy indicates a MAC address was found in a legacy API configuration where it should not be.
-	errUnexpectedMacInLegacy = errors.New("unexpected MAC address in legacy config")
-	// errUnexpectedMacInHost indicates a MAC address was found in a host network configuration where it should not be.
-	errUnexpectedMacInHost = errors.New("unexpected MAC address in host network config")
 	// errNoMacInNonHost indicates no MAC address was found in a non-host network configuration where one is expected.
 	errNoMacInNonHost = errors.New("no MAC address found in non-host network config")
 	// errNilSourceEndpoint indicates a nil source endpoint was provided.

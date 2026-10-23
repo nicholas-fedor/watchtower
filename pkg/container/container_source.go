@@ -967,11 +967,10 @@ func onlyGeneratedMacs(sourceContainer types.Container, processedConfig *dockerN
 	return hasMac
 }
 
-// validateMacAddresses verifies the presence of MAC addresses in a container's network configuration
-// and logs appropriate messages based on the container's state, network mode, and Docker API version.
-// It ensures that MAC addresses are correctly handled for modern API versions (>= 1.44) and logs
-// warnings for potential issues in running containers while using debug logs for non-critical cases,
-// such as non-running containers (e.g., created or exited states), to reduce user-facing noise.
+// validateMacAddresses verifies the presence of MAC addresses in a container's processed network
+// configuration and logs the result at debug level based on the container's state, network mode,
+// and Docker API version. Only non-host networks on modern API versions (>= 1.44) are checked,
+// since processEndpoint clears MAC addresses for host networks and legacy API versions.
 //
 // Parameters:
 //   - config: The network configuration to validate, containing endpoint settings for each network.
@@ -981,10 +980,9 @@ func onlyGeneratedMacs(sourceContainer types.Container, processedConfig *dockerN
 //   - sourceContainer: The container object, providing access to state (running, created, exited) and metadata.
 //
 // Returns:
-//   - error: Returns a non-nil error (e.g., errNoMacInNonHost, errUnexpectedMacInHost) if validation
-//     detects a critical issue requiring attention, such as unexpected MAC addresses in legacy APIs
-//     or host mode, or missing MAC addresses in running containers with modern APIs. Returns nil
-//     for non-critical cases, such as non-running containers or expected absence of MAC addresses.
+//   - error: errNoMacInNonHost when a running container on a modern API version has no MAC address
+//     in a non-host network that the engine did not generate. Nil for non-running containers, host
+//     networks, legacy API versions, and other expected absences of MAC addresses.
 func validateMacAddresses(log *zerolog.Logger,
 	config *dockerNetwork.NetworkingConfig,
 	containerID types.ContainerID,
@@ -993,8 +991,7 @@ func validateMacAddresses(log *zerolog.Logger,
 	sourceContainer types.Container,
 ) error {
 	// Initialize logger with container and API version context for consistent log messages.
-	// The name and ID fields match the other recreation logs, and the notification
-	// templates read them for the MAC address warnings.
+	// The name and ID fields match the other recreation logs.
 	clogVal := log.With().
 		Str("container", sourceContainer.Name()).
 		Str("id", containerID.ShortID()).
@@ -1014,6 +1011,16 @@ func validateMacAddresses(log *zerolog.Logger,
 		}
 
 		// For non-running containers or host network mode, return nil as no validation is needed.
+		return nil
+	}
+
+	// processEndpoint clears every MAC address for host networks and legacy API
+	// versions (< 1.44), so the processed config carries none in those modes. The
+	// daemon discards endpoint MAC addresses below API 1.44, and accepts a MAC
+	// address only for bridge and user-defined networks.
+	if isHostNetwork || dockerAPIVersion.LessThan(clientVersion, "1.44") {
+		clog.Debug().Msg("Skipping MAC address validation for host network or legacy API")
+
 		return nil
 	}
 
@@ -1050,42 +1057,6 @@ func validateMacAddresses(log *zerolog.Logger,
 	containerState := "unknown"
 	if containerInfo != nil && containerInfo.State != nil {
 		containerState = string(containerInfo.State.Status)
-	}
-
-	// Handle non-host networks on legacy Docker API versions (< 1.44), where MAC address
-	// preservation is not fully supported. In legacy APIs, MAC addresses should not appear in
-	// non-host networks, as they are managed differently. Host networks follow the host rule
-	// below on every API version.
-	if dockerAPIVersion.LessThan(clientVersion, "1.44") && !isHostNetwork {
-		if foundMac {
-			// Unexpected MAC address in a legacy API is a potential misconfiguration
-			// Log a warning and return an error.
-			clog.Warn().Msg("Unexpected MAC address in legacy config")
-
-			return fmt.Errorf("%w: API version %s", errUnexpectedMacInLegacy, clientVersion)
-		}
-		// No MAC address in legacy config is expected.
-		// Log at debug level and return no error.
-		clog.Debug().Msg("No MAC address in legacy API configuration (expected)")
-
-		return nil
-	}
-
-	// Handle host network mode on any API version, where the container uses the host's network
-	// stack and should not have its own MAC addresses.
-	if isHostNetwork {
-		if foundMac {
-			// MAC addresses in host mode are unexpected and indicate a misconfiguration.
-			// Log a warning and return an error.
-			clog.Warn().Msg("Unexpected MAC address in host network config")
-
-			return errUnexpectedMacInHost
-		}
-		// No MAC address in host mode is correct.
-		// Log at debug level and return no error.
-		clog.Debug().Msg("No MAC address in host network mode (expected)")
-
-		return nil
 	}
 
 	// Handle non-host network mode (e.g., bridge, overlay) for modern API versions (>= 1.44).
