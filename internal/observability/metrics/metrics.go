@@ -137,41 +137,85 @@ func NewWithRegistry(registry prometheus.Registerer) (*Metrics, error) {
 		cancel:  cancel,
 	}
 
-	// Register the metrics with the provided registry.
-	// If a metric is already registered, return an error to avoid duplicate collectors.
-	collectors := []prometheus.Collector{
-		metrics.scanned,
-		metrics.updated,
-		metrics.failed,
-		metrics.restarted,
-		metrics.skipped,
-		metrics.restartedTotal,
-		metrics.total,
-		metrics.skippedScans,
-		metrics.failedScans,
-		metrics.dropped,
-		metrics.imageBytes,
-		metrics.imageReclaimable,
-		metrics.diskSpaceMaxBytes,
-		metrics.diskSpaceWarnBytes,
+	// Register the metrics with the provided registry. A collector the registry
+	// already holds is reused, so updates reach the collector it exposes.
+	gauges := []*prometheus.Gauge{
+		&metrics.scanned,
+		&metrics.updated,
+		&metrics.failed,
+		&metrics.restarted,
+		&metrics.skipped,
+		&metrics.imageBytes,
+		&metrics.imageReclaimable,
+		&metrics.diskSpaceMaxBytes,
+		&metrics.diskSpaceWarnBytes,
 	}
 
-	for _, c := range collectors {
-		err := registry.Register(c)
+	for _, gauge := range gauges {
+		registered, err := registerCollector(registry, *gauge)
 		if err != nil {
-			alreadyRegisteredError := &prometheus.AlreadyRegisteredError{}
-			if errors.As(err, &alreadyRegisteredError) {
-				continue
-			}
+			cancel()
 
-			return nil, fmt.Errorf("failed to register metric: %w", err)
+			return nil, err
 		}
+
+		*gauge = registered
+	}
+
+	counters := []*prometheus.Counter{
+		&metrics.restartedTotal,
+		&metrics.total,
+		&metrics.skippedScans,
+		&metrics.failedScans,
+		&metrics.dropped,
+	}
+
+	for _, counter := range counters {
+		registered, err := registerCollector(registry, *counter)
+		if err != nil {
+			cancel()
+
+			return nil, err
+		}
+
+		*counter = registered
 	}
 
 	// Start goroutine to process metrics.
 	go metrics.HandleUpdate()
 
 	return metrics, nil
+}
+
+// registerCollector registers collector with registry.
+//
+// When the registry already holds a collector with the same descriptor and of
+// the same type, that collector is returned instead, so updates reach the one
+// the registry exposes.
+//
+// Parameters:
+//   - registry: Prometheus registerer to register with.
+//   - collector: Collector to register.
+//
+// Returns:
+//   - Collector: The registered collector, or the one the registry already holds.
+//   - error: Non-nil when registration fails and no collector can be reused.
+func registerCollector[Collector prometheus.Collector](
+	registry prometheus.Registerer,
+	collector Collector,
+) (Collector, error) {
+	err := registry.Register(collector)
+	if err == nil {
+		return collector, nil
+	}
+
+	if already, ok := errors.AsType[prometheus.AlreadyRegisteredError](err); ok {
+		if existing, ok := already.ExistingCollector.(Collector); ok {
+			return existing, nil
+		}
+	}
+
+	return collector, fmt.Errorf("failed to register metric: %w", err)
 }
 
 // NewMetric creates a Metric from a scan report.

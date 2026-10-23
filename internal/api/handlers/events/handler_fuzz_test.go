@@ -8,8 +8,10 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-// FuzzIsOriginAllowed verifies that isOriginAllowed never panics and returns
-// a boolean for any combination of origin, host, and allowed origins.
+// FuzzIsOriginAllowed verifies that isOriginAllowed never panics, and that it
+// allows empty and null origins, same-origin requests, and origins the
+// configuration allows, for any combination of origin, host, and allowed
+// origins.
 func FuzzIsOriginAllowed(f *testing.F) {
 	f.Add("https://example.com", "example.com:8080", "https://example.com")
 	f.Add("", "example.com:8080", "")
@@ -25,9 +27,6 @@ func FuzzIsOriginAllowed(f *testing.F) {
 		}
 
 		result := isOriginAllowed(origin, host, allowedOrigins)
-
-		assert.True(t, result == true || result == false,
-			"isOriginAllowed should return a boolean, got %v", result)
 
 		if origin == "" || origin == "null" {
 			assert.True(t, result, "empty or null origin should be allowed")
@@ -77,9 +76,6 @@ func FuzzIsOriginAllowedURLParse(f *testing.F) {
 		}
 
 		result := isOriginAllowed(origin, host, allowedOrigins)
-
-		assert.True(t, result == true || result == false,
-			"isOriginAllowed should return a boolean for origin=%q host=%q, got %v", origin, host, result)
 
 		if origin == "" || origin == "null" {
 			assert.True(t, result, "empty or null origin should always be allowed")

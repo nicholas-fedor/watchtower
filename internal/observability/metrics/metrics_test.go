@@ -1343,3 +1343,56 @@ func collectorValue(t *testing.T, metric prometheus.Metric) float64 {
 
 	return out.GetGauge().GetValue()
 }
+
+// TestNewWithRegistry_ReusesRegisteredCollectors verifies that a second
+// Metrics handler on the same registry reuses the collectors the registry
+// already holds, so its updates appear in what the registry exposes.
+func TestNewWithRegistry_ReusesRegisteredCollectors(t *testing.T) {
+	t.Parallel()
+
+	registry := prometheus.NewRegistry()
+
+	first, err := NewWithRegistry(registry)
+	require.NoError(t, err)
+	t.Cleanup(first.Shutdown)
+
+	second, err := NewWithRegistry(registry)
+	require.NoError(t, err)
+	t.Cleanup(second.Shutdown)
+
+	assert.Same(t, first.imageBytes, second.imageBytes, "gauges are shared")
+	assert.Same(t, first.total, second.total, "counters are shared")
+
+	second.SetImageDiskUsage(1234, 0, 0, 0)
+
+	families, err := registry.Gather()
+	require.NoError(t, err)
+
+	var exposed *dto.MetricFamily
+
+	for _, family := range families {
+		if family.GetName() == "watchtower_docker_images_bytes" {
+			exposed = family
+		}
+	}
+
+	require.NotNil(t, exposed, "the image usage gauge is exposed")
+	assert.InDelta(t, 1234, exposed.GetMetric()[0].GetGauge().GetValue(), 0)
+}
+
+// TestNewWithRegistry_RejectsCollectorOfAnotherType verifies that a collector
+// already registered under one of the metric names, but of another type, is
+// not reused, and that registration fails instead.
+func TestNewWithRegistry_RejectsCollectorOfAnotherType(t *testing.T) {
+	t.Parallel()
+
+	registry := prometheus.NewRegistry()
+	registry.MustRegister(prometheus.NewCounter(prometheus.CounterOpts{
+		Name: "watchtower_docker_images_bytes",
+		Help: "Docker image storage usage in bytes reported by the last disk-space check",
+	}))
+
+	got, err := NewWithRegistry(registry)
+	require.ErrorContains(t, err, "failed to register metric")
+	assert.Nil(t, got)
+}
