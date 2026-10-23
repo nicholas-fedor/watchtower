@@ -105,3 +105,43 @@ Environment Variable: None
 !!! Note
     Intended solely for Docker `HEALTHCHECK`.
     Do not use on the main command line.
+
+#### Health Check with Podman
+
+Podman ignores the `HEALTHCHECK` instruction in the Watchtower image. The image is published in the OCI format, and Podman only reads health checks from images in the Docker format ([containers/podman#18904](https://github.com/containers/podman/issues/18904){target="_blank" rel="noopener noreferrer"}). To enable the health check under Podman, define it in your container configuration, as shown below.
+
+=== "Docker Compose"
+
+    ```yaml
+    services:
+        watchtower:
+            image: nickfedor/watchtower:latest
+            healthcheck:
+                test: ["CMD", "/watchtower", "--health-check"]
+            volumes:
+                - /run/podman/podman.sock:/var/run/docker.sock
+    ```
+
+=== "Podman CLI"
+
+    ```bash
+    podman run -d \
+        --name watchtower \
+        --health-cmd '["/watchtower", "--health-check"]' \
+        -v /run/podman/podman.sock:/var/run/docker.sock \
+        nickfedor/watchtower
+    ```
+
+=== "Quadlet"
+
+    ```ini
+    [Container]
+    Image=docker.io/nickfedor/watchtower:latest
+    HealthCmd=["/watchtower", "--health-check"]
+    Volume=/run/podman/podman.sock:/var/run/docker.sock
+    ```
+
+!!! Note
+    - Use the exec form shown above. Because the image does not include a shell, a shell-form health check, such as `--health-cmd "/watchtower --health-check"` or a `CMD-SHELL` test, always reports the container as unhealthy.
+    - Docker Compose requires `CMD` as the first entry of the `test` list. Without it, Compose fails with the error `healthcheck.test must start either by "CMD", "CMD-SHELL" or "NONE"`.
+    - For rootless Podman, mount the socket from `$XDG_RUNTIME_DIR/podman/podman.sock` instead of `/run/podman/podman.sock`.
