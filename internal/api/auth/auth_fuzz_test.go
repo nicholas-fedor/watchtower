@@ -1,4 +1,4 @@
-package api
+package auth
 
 import (
 	"crypto/sha256"
@@ -72,7 +72,7 @@ func FuzzNewAPIAuthMiddleware(f *testing.F) {
 	f.Add("token-with-special-chars!@#", "Bearer token-with-special-chars!@#")
 
 	f.Fuzz(func(t *testing.T, token, authHeader string) {
-		middleware := newAPIAuthMiddleware(newNopLogger(), token)
+		middleware := NewAPIMiddleware(newNopLogger(), token)
 
 		app := fiber.New(fiber.Config{})
 		app.Get("/test", middleware, func(c fiber.Ctx) error {
@@ -137,7 +137,7 @@ func FuzzAPIAuthMiddleware_CookieFallback(f *testing.F) {
 	f.Add("", "access_token=anything")
 
 	f.Fuzz(func(t *testing.T, token, cookie string) {
-		middleware := newAPIAuthMiddleware(newNopLogger(), token)
+		middleware := NewAPIMiddleware(newNopLogger(), token)
 
 		app := fiber.New(fiber.Config{})
 		app.Get("/test", middleware, func(c fiber.Ctx) error {
@@ -203,7 +203,7 @@ func FuzzAPIAuthMiddleware_HeaderVariations(f *testing.F) {
 	f.Add("secret", "Bearer\tsecret")
 
 	f.Fuzz(func(t *testing.T, token, authHeader string) {
-		middleware := newAPIAuthMiddleware(newNopLogger(), token)
+		middleware := NewAPIMiddleware(newNopLogger(), token)
 
 		app := fiber.New(fiber.Config{})
 		app.Get("/test", middleware, func(c fiber.Ctx) error {
@@ -236,7 +236,7 @@ func FuzzAPIAuthMiddleware_NoPanic(f *testing.F) {
 	f.Add(strings.Repeat("a", 10000), "Bearer "+strings.Repeat("a", 10000))
 
 	f.Fuzz(func(t *testing.T, token, authHeader string) {
-		middleware := newAPIAuthMiddleware(newNopLogger(), token)
+		middleware := NewAPIMiddleware(newNopLogger(), token)
 
 		app := fiber.New(fiber.Config{})
 		app.Get("/test", middleware, func(c fiber.Ctx) error {

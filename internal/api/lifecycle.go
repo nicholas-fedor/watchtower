@@ -14,6 +14,7 @@ import (
 	"github.com/gofiber/fiber/v3"
 	"github.com/rs/zerolog"
 
+	"github.com/nicholas-fedor/watchtower/internal/api/auth"
 	"github.com/nicholas-fedor/watchtower/internal/api/routes"
 )
 
@@ -117,7 +118,7 @@ func SetupAndStartAPI(ctx context.Context, opts routes.Options) (<-chan struct{}
 		}, opts.NoStartupMessage,
 	)
 
-	authMiddleware := newAPIAuthMiddleware(log, opts.Token)
+	authMiddleware := auth.NewAPIMiddleware(log, opts.Token)
 
 	err := routes.ValidateAndRegister(ctx, app, authMiddleware, opts)
 	if err != nil {
