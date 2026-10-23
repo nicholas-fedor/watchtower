@@ -317,43 +317,41 @@ func FuzzStoreCopyFileSnapshot(f *testing.F) {
 			archive = archive[:maxCopyFileStoreBytes+1024]
 		}
 
-		cli := &client{
-			copyFiles: make(map[types.ContainerID]copyFileSnapshot),
-		}
+		cli := &client{}
 		containerID := types.ContainerID(id)
 		snapshot := copyFileSnapshot{files: []copyFileEntry{{
 			target:  "/app/config.yaml",
 			archive: archive,
 		}}}
 
-		err := cli.storeCopyFileSnapshot(containerID, snapshot)
+		err := cli.copyFiles.store(containerID, snapshot)
 		if err != nil {
 			if !errors.Is(err, errCopyFileStoreFull) {
 				t.Fatalf("unexpected error %v", err)
 			}
 
-			if cli.copyFileBytes > maxCopyFileStoreBytes {
-				t.Fatalf("store bytes %d exceed cap after error", cli.copyFileBytes)
+			if cli.copyFiles.bytes > maxCopyFileStoreBytes {
+				t.Fatalf("store bytes %d exceed cap after error", cli.copyFiles.bytes)
 			}
 
 			return
 		}
 
-		if cli.copyFileBytes > maxCopyFileStoreBytes {
-			t.Fatalf("store bytes %d exceed cap", cli.copyFileBytes)
+		if cli.copyFiles.bytes > maxCopyFileStoreBytes {
+			t.Fatalf("store bytes %d exceed cap", cli.copyFiles.bytes)
 		}
 
-		if cli.copyFileBytes != snapshot.size() {
-			t.Fatalf("store bytes %d want %d", cli.copyFileBytes, snapshot.size())
+		if cli.copyFiles.bytes != snapshot.size() {
+			t.Fatalf("store bytes %d want %d", cli.copyFiles.bytes, snapshot.size())
 		}
 
 		cli.DiscardCopyFiles(containerID)
 
-		if cli.copyFileBytes != 0 {
-			t.Fatalf("store bytes %d after discard", cli.copyFileBytes)
+		if cli.copyFiles.bytes != 0 {
+			t.Fatalf("store bytes %d after discard", cli.copyFiles.bytes)
 		}
 
-		if _, ok := cli.copyFiles[containerID]; ok {
+		if _, ok := cli.copyFiles.snapshots[containerID]; ok {
 			t.Fatalf("snapshot still stored for %q", id)
 		}
 	})

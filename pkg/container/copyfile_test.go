@@ -828,16 +828,18 @@ func TestDiscardStoredCopyFiles(t *testing.T) {
 	sourceID := types.ContainerID("source-id")
 	otherID := types.ContainerID("other-id")
 	cli := &client{
-		copyFiles: map[types.ContainerID]copyFileSnapshot{
-			sourceID: {files: []copyFileEntry{{target: "/app/config.yaml"}}},
-			otherID:  {files: []copyFileEntry{{target: "/app/extra.conf"}}},
+		copyFiles: pendingCopyFiles{
+			snapshots: map[types.ContainerID]copyFileSnapshot{
+				sourceID: {files: []copyFileEntry{{target: "/app/config.yaml"}}},
+				otherID:  {files: []copyFileEntry{{target: "/app/extra.conf"}}},
+			},
 		},
 	}
 
 	cli.DiscardCopyFiles(sourceID)
-	assert.NotContains(t, cli.copyFiles, sourceID)
-	require.Contains(t, cli.copyFiles, otherID)
-	assert.Equal(t, "/app/extra.conf", cli.copyFiles[otherID].files[0].target)
+	assert.NotContains(t, cli.copyFiles.snapshots, sourceID)
+	require.Contains(t, cli.copyFiles.snapshots, otherID)
+	assert.Equal(t, "/app/extra.conf", cli.copyFiles.snapshots[otherID].files[0].target)
 
 	cli.DiscardCopyFiles(sourceID)
 }
@@ -1009,25 +1011,25 @@ func TestStoreCopyFileSnapshotCap(t *testing.T) {
 	t.Run("rejects when store is full", func(t *testing.T) {
 		t.Parallel()
 
-		cli := &client{
-			copyFiles:     make(map[types.ContainerID]copyFileSnapshot),
-			copyFileBytes: maxCopyFileStoreBytes,
+		pending := &pendingCopyFiles{
+			snapshots: make(map[types.ContainerID]copyFileSnapshot),
+			bytes:     maxCopyFileStoreBytes,
 		}
-		err := cli.storeCopyFileSnapshot("source-id", copyFileSnapshot{
+		err := pending.store("source-id", copyFileSnapshot{
 			files: []copyFileEntry{{
 				target:  "/app/config.yaml",
 				archive: []byte("tar"),
 			}},
 		})
 		require.ErrorIs(t, err, errCopyFileStoreFull)
-		assert.Empty(t, cli.copyFiles)
-		assert.Equal(t, int64(maxCopyFileStoreBytes), cli.copyFileBytes)
+		assert.Empty(t, pending.snapshots)
+		assert.Equal(t, int64(maxCopyFileStoreBytes), pending.bytes)
 	})
 
 	t.Run("stores and overwrites same id", func(t *testing.T) {
 		t.Parallel()
 
-		cli := &client{}
+		pending := &pendingCopyFiles{}
 		first := copyFileSnapshot{files: []copyFileEntry{{
 			target:  "/app/config.yaml",
 			archive: []byte("first-archive"),
@@ -1037,11 +1039,11 @@ func TestStoreCopyFileSnapshotCap(t *testing.T) {
 			archive: []byte("next"),
 		}}}
 
-		require.NoError(t, cli.storeCopyFileSnapshot("source-id", first))
-		assert.Equal(t, first.size(), cli.copyFileBytes)
-		require.NoError(t, cli.storeCopyFileSnapshot("source-id", second))
-		assert.Equal(t, second.size(), cli.copyFileBytes)
-		assert.Equal(t, []byte("next"), cli.copyFiles["source-id"].files[0].archive)
+		require.NoError(t, pending.store("source-id", first))
+		assert.Equal(t, first.size(), pending.bytes)
+		require.NoError(t, pending.store("source-id", second))
+		assert.Equal(t, second.size(), pending.bytes)
+		assert.Equal(t, []byte("next"), pending.snapshots["source-id"].files[0].archive)
 	})
 
 	t.Run("restores existing snapshot when overwrite exceeds cap", func(t *testing.T) {
@@ -1051,21 +1053,19 @@ func TestStoreCopyFileSnapshotCap(t *testing.T) {
 			target:  "/app/config.yaml",
 			archive: []byte("keep"),
 		}}}
-		cli := &client{
-			copyFiles: map[types.ContainerID]copyFileSnapshot{
-				"source-id": existing,
-			},
-			copyFileBytes: existing.size(),
+		pending := &pendingCopyFiles{
+			snapshots: map[types.ContainerID]copyFileSnapshot{"source-id": existing},
+			bytes:     existing.size(),
 		}
 		tooLarge := copyFileSnapshot{files: []copyFileEntry{{
 			target:  "/app/config.yaml",
 			archive: bytes.Repeat([]byte("x"), int(maxCopyFileStoreBytes)+1),
 		}}}
 
-		err := cli.storeCopyFileSnapshot("source-id", tooLarge)
+		err := pending.store("source-id", tooLarge)
 		require.ErrorIs(t, err, errCopyFileStoreFull)
-		assert.Equal(t, existing.size(), cli.copyFileBytes)
-		assert.Equal(t, []byte("keep"), cli.copyFiles["source-id"].files[0].archive)
+		assert.Equal(t, existing.size(), pending.bytes)
+		assert.Equal(t, []byte("keep"), pending.snapshots["source-id"].files[0].archive)
 	})
 }
 
@@ -1190,7 +1190,7 @@ func TestClientCopyFileStore(t *testing.T) {
 		api := mockContainer.NewMockAPIClient(t)
 		cli := &client{log: newTestLogger(t), api: api}
 		require.NoError(t, cli.SnapshotCopyFiles(t.Context(), MockContainer()))
-		assert.Empty(t, cli.copyFiles)
+		assert.Empty(t, cli.copyFiles.snapshots)
 	})
 
 	t.Run("snapshot stores sanitized file", func(t *testing.T) {
@@ -1214,8 +1214,8 @@ func TestClientCopyFileStore(t *testing.T) {
 			labels.CopyFile: "/app/config.yaml",
 		}))
 		require.NoError(t, cli.SnapshotCopyFiles(t.Context(), source))
-		require.Contains(t, cli.copyFiles, source.ID())
-		assert.Positive(t, cli.copyFileBytes)
+		require.Contains(t, cli.copyFiles.snapshots, source.ID())
+		assert.Positive(t, cli.copyFiles.bytes)
 	})
 
 	t.Run("snapshot invalid label fails", func(t *testing.T) {
@@ -1249,17 +1249,19 @@ func TestClientCopyFileStore(t *testing.T) {
 		cli := &client{
 			log: newTestLogger(t),
 			api: api,
-			copyFiles: map[types.ContainerID]copyFileSnapshot{
-				source.ID(): {files: []copyFileEntry{{
-					target:  "/app/config.yaml",
-					archive: tarBytes,
-				}}},
+			copyFiles: pendingCopyFiles{
+				snapshots: map[types.ContainerID]copyFileSnapshot{
+					source.ID(): {files: []copyFileEntry{{
+						target:  "/app/config.yaml",
+						archive: tarBytes,
+					}}},
+				},
+				bytes: int64(len(tarBytes)),
 			},
-			copyFileBytes: int64(len(tarBytes)),
 		}
 		require.NoError(t, cli.injectStoredCopyFiles(t.Context(), source, "new-id"))
-		assert.Empty(t, cli.copyFiles)
-		assert.Equal(t, int64(0), cli.copyFileBytes)
+		assert.Empty(t, cli.copyFiles.snapshots)
+		assert.Equal(t, int64(0), cli.copyFiles.bytes)
 	})
 
 	t.Run("inject failure still drops snapshot", func(t *testing.T) {
@@ -1275,41 +1277,45 @@ func TestClientCopyFileStore(t *testing.T) {
 		cli := &client{
 			log: newTestLogger(t),
 			api: api,
-			copyFiles: map[types.ContainerID]copyFileSnapshot{
-				source.ID(): {files: []copyFileEntry{{
-					target:  "/app/config.yaml",
-					archive: []byte("tar"),
-				}}},
+			copyFiles: pendingCopyFiles{
+				snapshots: map[types.ContainerID]copyFileSnapshot{
+					source.ID(): {files: []copyFileEntry{{
+						target:  "/app/config.yaml",
+						archive: []byte("tar"),
+					}}},
+				},
+				bytes: 3,
 			},
-			copyFileBytes: 3,
 		}
 		err := cli.injectStoredCopyFiles(t.Context(), source, "new-id")
 		require.ErrorIs(t, err, errCopyFileInjectFailed)
-		assert.Empty(t, cli.copyFiles)
-		assert.Equal(t, int64(0), cli.copyFileBytes)
+		assert.Empty(t, cli.copyFiles.snapshots)
+		assert.Equal(t, int64(0), cli.copyFiles.bytes)
 	})
 
 	t.Run("store clamps negative byte count", func(t *testing.T) {
 		t.Parallel()
 
-		cli := &client{copyFileBytes: -8}
-		require.NoError(t, cli.storeCopyFileSnapshot("source-id", copyFileSnapshot{
+		pending := &pendingCopyFiles{bytes: -8}
+		require.NoError(t, pending.store("source-id", copyFileSnapshot{
 			files: []copyFileEntry{{archive: []byte("tar")}},
 		}))
-		assert.Equal(t, int64(3), cli.copyFileBytes)
+		assert.Equal(t, int64(3), pending.bytes)
 	})
 
 	t.Run("discard clamps negative byte count", func(t *testing.T) {
 		t.Parallel()
 
 		cli := &client{
-			copyFiles: map[types.ContainerID]copyFileSnapshot{
-				"source-id": {files: []copyFileEntry{{archive: []byte("tar")}}},
+			copyFiles: pendingCopyFiles{
+				snapshots: map[types.ContainerID]copyFileSnapshot{
+					"source-id": {files: []copyFileEntry{{archive: []byte("tar")}}},
+				},
 			},
 		}
 		cli.DiscardCopyFiles("source-id")
-		assert.Equal(t, int64(0), cli.copyFileBytes)
-		assert.Empty(t, cli.copyFiles)
+		assert.Equal(t, int64(0), cli.copyFiles.bytes)
+		assert.Empty(t, cli.copyFiles.snapshots)
 	})
 }
 
