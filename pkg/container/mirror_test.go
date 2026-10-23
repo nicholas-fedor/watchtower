@@ -16,8 +16,8 @@ import (
 	dockerSystem "github.com/moby/moby/api/types/system"
 	dockerClient "github.com/moby/moby/client"
 
-	registryConfig "github.com/nicholas-fedor/watchtower/internal/config/registry"
 	"github.com/nicholas-fedor/watchtower/internal/registry/ratelimit"
+	registryConfig "github.com/nicholas-fedor/watchtower/internal/settings/config/registry"
 	mockContainer "github.com/nicholas-fedor/watchtower/pkg/container/mocks"
 )
 

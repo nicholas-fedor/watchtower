@@ -12,9 +12,8 @@ import (
 	"github.com/rs/zerolog"
 	"github.com/spf13/cobra"
 
-	appConfig "github.com/nicholas-fedor/watchtower/internal/config"
-	"github.com/nicholas-fedor/watchtower/internal/flags"
 	"github.com/nicholas-fedor/watchtower/internal/observability/logging"
+	"github.com/nicholas-fedor/watchtower/internal/settings"
 	"github.com/nicholas-fedor/watchtower/pkg/container"
 	"github.com/nicholas-fedor/watchtower/pkg/notifications"
 	"github.com/nicholas-fedor/watchtower/pkg/types"
@@ -78,31 +77,31 @@ func runNotifyUpgrade(cmd *cobra.Command, args []string) {
 //     Non-critical failures (e.g., file removal after timeout) are logged but do not result in an error return.
 func runNotifyUpgradeE(cmd *cobra.Command, _ []string, log *zerolog.Logger) (*zerolog.Logger, error) {
 	// Process flag aliases and expand secrets before resolving configuration.
-	// Use Root().PersistentFlags so env/alias bridging matches config.Load's bind source across subcommands.
+	// Use Root().PersistentFlags so env/alias bridging matches settings.Load's bind source across subcommands.
 	flagSet := cmd.Root().PersistentFlags()
 
-	err := flags.ApplyEnvToFlags(flagSet, flags.AllSpecs())
+	err := settings.ApplyEnvToFlags(flagSet, settings.AllSpecs())
 	if err != nil {
 		return log, fmt.Errorf("apply environment configuration: %w", err)
 	}
 
 	// Format before aliases so Fatal paths use the selected --log-format.
-	log, err = flags.SetupLogging(log, flagSet)
+	log, err = settings.SetupLogging(log, flagSet)
 	if err != nil {
 		return log, fmt.Errorf("setup logging: %w", err)
 	}
 
-	flags.ProcessFlagAliases(log, flagSet)
+	settings.ProcessFlagAliases(log, flagSet)
 
 	// Re-apply after aliases so debug/trace forced log-level values take effect.
-	log, err = flags.SetupLogging(log, flagSet)
+	log, err = settings.SetupLogging(log, flagSet)
 	if err != nil {
 		return log, fmt.Errorf("setup logging: %w", err)
 	}
 
-	flags.GetSecretsFromFiles(log, cmd.Root())
+	settings.GetSecretsFromFiles(log, cmd.Root())
 
-	cfg, loadErr := appConfig.Load(log, cmd.Root(), nil)
+	cfg, loadErr := settings.Load(log, cmd.Root(), nil)
 	if loadErr != nil {
 		return log, fmt.Errorf("load configuration: %w", loadErr)
 	}

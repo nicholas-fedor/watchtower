@@ -9,8 +9,8 @@ import (
 
 	"github.com/rs/zerolog"
 
-	notifyConfig "github.com/nicholas-fedor/watchtower/internal/config/notify"
 	"github.com/nicholas-fedor/watchtower/internal/observability/logging"
+	notifyConfig "github.com/nicholas-fedor/watchtower/internal/settings/config/notify"
 	"github.com/nicholas-fedor/watchtower/pkg/types"
 )
 
@@ -32,7 +32,7 @@ var errUnknownNotificationType = errors.New("unknown notification type")
 //
 // Parameters:
 //   - log: Process logger for configuration-time diagnostics (required and non-nil).
-//   - cfg: Notification settings from config.Load (Config.Notify).
+//   - cfg: Notification settings from settings.Load (Config.Notify).
 //
 // Returns:
 //   - types.Notifier: Configured notifier instance.
@@ -123,7 +123,7 @@ func NewNotifier(log *zerolog.Logger, cfg notifyConfig.Notify) types.Notifier {
 //
 // Parameters:
 //   - log: Logger for legacy notifier construction diagnostics.
-//   - cfg: Notification settings from config.Load (Config.Notify).
+//   - cfg: Notification settings from settings.Load (Config.Notify).
 //
 // Returns:
 //   - []string: Shoutrrr URLs ready for output or notification use.
@@ -320,7 +320,7 @@ func appendLegacyURLs(
 // Returns:
 //   - time.Duration: Selected delay (legacy delay if set, otherwise delaySeconds, otherwise zero).
 //
-// Deprecated: Prefer NewNotifier with Config.Notify from config.Load.
+// Deprecated: Prefer NewNotifier with Config.Notify from settings.Load.
 //
 // TODO: Simplify getDelay to only use configured delay seconds when legacy types are removed.
 //

@@ -24,11 +24,11 @@ import (
 	dockerContainer "github.com/moby/moby/api/types/container"
 	dockerImage "github.com/moby/moby/api/types/image"
 
-	registryConfig "github.com/nicholas-fedor/watchtower/internal/config/registry"
 	"github.com/nicholas-fedor/watchtower/internal/meta"
 	"github.com/nicholas-fedor/watchtower/internal/registry/auth"
 	mockAuth "github.com/nicholas-fedor/watchtower/internal/registry/auth/mocks"
 	"github.com/nicholas-fedor/watchtower/internal/registry/ratelimit"
+	registryConfig "github.com/nicholas-fedor/watchtower/internal/settings/config/registry"
 	"github.com/nicholas-fedor/watchtower/internal/testutil/httpstub"
 	mockTypes "github.com/nicholas-fedor/watchtower/pkg/types/mocks"
 )

@@ -17,9 +17,9 @@ import (
 	"github.com/maypok86/otter/v2/stats"
 	"github.com/rs/zerolog"
 
-	registryConfig "github.com/nicholas-fedor/watchtower/internal/config/registry"
 	"github.com/nicholas-fedor/watchtower/internal/registry/hosts"
 	"github.com/nicholas-fedor/watchtower/internal/registry/ratelimit"
+	registryConfig "github.com/nicholas-fedor/watchtower/internal/settings/config/registry"
 	"github.com/nicholas-fedor/watchtower/pkg/types"
 )
 

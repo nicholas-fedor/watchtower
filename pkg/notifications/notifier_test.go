@@ -16,9 +16,8 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/nicholas-fedor/watchtower/internal/config"
-	notifyConfig "github.com/nicholas-fedor/watchtower/internal/config/notify"
-	"github.com/nicholas-fedor/watchtower/internal/flags"
+	"github.com/nicholas-fedor/watchtower/internal/settings"
+	notifyConfig "github.com/nicholas-fedor/watchtower/internal/settings/config/notify"
 )
 
 // fatalExitMu serializes the tests that replace zerolog.FatalExitFunc, which
@@ -687,7 +686,7 @@ func testURL(t *testing.T, args []string, expectedURL string, expectedDelay time
 
 // loadNotify loads the notification settings from args the way production
 // does, by parsing them into a command with every flag registered and running
-// config.Load.
+// settings.Load.
 //
 // Parameters:
 //   - t: Test that receives the failures.
@@ -699,10 +698,10 @@ func loadNotify(t *testing.T, args []string) notifyConfig.Notify {
 	t.Helper()
 
 	command := &cobra.Command{Use: "watchtower"}
-	flags.RegisterAll(command)
+	settings.RegisterAll(command)
 	require.NoError(t, command.ParseFlags(args))
 
-	cfg, err := config.Load(newTestLogger(t), command, nil)
+	cfg, err := settings.Load(newTestLogger(t), command, nil)
 	require.NoError(t, err)
 
 	return cfg.Notify

@@ -3,7 +3,7 @@ package types
 import (
 	"time"
 
-	registryConfig "github.com/nicholas-fedor/watchtower/internal/config/registry"
+	registryConfig "github.com/nicholas-fedor/watchtower/internal/settings/config/registry"
 )
 
 // UpdateParams defines options for the Update function.

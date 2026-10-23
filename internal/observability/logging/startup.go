@@ -20,7 +20,7 @@ type APIVersionProvider interface {
 
 // StartupParams holds resolved process values for startup messaging.
 //
-// Callers must populate these from config.Load output. Do not read CLI flags here.
+// Callers must populate these from settings.Load output. Do not read CLI flags here.
 // Schedule and mode fields live on the embedded ScheduleInfo (single source of truth).
 type StartupParams struct {
 	// ScheduleInfo holds run-once, update-on-start, HTTP API, and next-run schedule values.
@@ -53,7 +53,7 @@ type StartupParams struct {
 // set NoStartupMessage and return without requiring Logger.
 //
 // Parameters:
-//   - params: Resolved startup messaging inputs from config.Load (no CLI flag reads).
+//   - params: Resolved startup messaging inputs from settings.Load (no CLI flag reads).
 //     When NoStartupMessage is false, Logger must be non-nil and should be the hooked
 //     process logger (after Notifier.RegisterHook) so batching captures startup lines.
 func WriteStartupMessage(params StartupParams) {
@@ -154,7 +154,7 @@ func logNotifierInfo(log *zerolog.Logger, notifierNames []string) {
 
 // ScheduleInfo holds resolved schedule and mode values for startup schedule messaging.
 //
-// Values come from config.Load projections rather than CLI flag reads.
+// Values come from settings.Load projections rather than CLI flag reads.
 type ScheduleInfo struct {
 	// RunOnce indicates a single update run then exit.
 	RunOnce bool
