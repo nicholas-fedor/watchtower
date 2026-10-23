@@ -24,6 +24,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- Move the update engine packages under internal/update by @nicholas-fedor in [#3098](https://github.com/nicholas-fedor/watchtower/pull/3098)
 - Share token authentication between the API and events routes by @nicholas-fedor in [#3087](https://github.com/nicholas-fedor/watchtower/pull/3087)
 - Dissolve the api config package by @nicholas-fedor in [#3083](https://github.com/nicholas-fedor/watchtower/pull/3083)
 - Merge the config and flags packages into internal/settings by @nicholas-fedor in [#3077](https://github.com/nicholas-fedor/watchtower/pull/3077)
