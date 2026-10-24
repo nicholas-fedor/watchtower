@@ -1568,6 +1568,35 @@ func TestContainerModel(t *testing.T) {
 			assert.Equal(t, "rw", hostConfig.Devices[1].CgroupPermissions, "explicit CgroupPermissions must be preserved")
 		})
 
+		t.Run("reduces legacy link aliases to their last path segment", func(t *testing.T) {
+			t.Parallel()
+
+			// Inspect reports a legacy link as /name:/container/alias. Sending the
+			// alias path back makes Docker store it under the new container,
+			// one segment deeper on every recreation.
+			tests := []struct {
+				name string
+				link string
+				want []string
+			}{
+				{name: "inspect form", link: "/cache:/app/cache", want: []string{"cache:cache"}},
+				{name: "form nested by earlier recreations", link: "/cache:/app/app/app/cache", want: []string{"cache:cache"}},
+				{name: "alias path without a leading slash on the name", link: "cache:/app/db", want: []string{"cache:db"}},
+				{name: "plain name and alias", link: "redis:db", want: []string{"redis:db"}},
+				{name: "missing colon", link: "redis", want: []string{}},
+			}
+
+			for _, tt := range tests {
+				t.Run(tt.name, func(t *testing.T) {
+					t.Parallel()
+
+					container := MockContainer(containerfixture.WithLinks([]string{tt.link}))
+
+					assert.Equal(t, tt.want, container.GetCreateHostConfig().Links)
+				})
+			}
+		})
+
 		t.Run("returns a copy of VolumesFrom so create config does not alias inspect data", func(t *testing.T) {
 			t.Parallel()
 
