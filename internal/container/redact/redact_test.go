@@ -1,6 +1,7 @@
 package redact
 
 import (
+	"net/url"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -122,6 +123,179 @@ func TestQueryKeyWords(t *testing.T) {
 			t.Parallel()
 
 			assert.Equal(t, tt.want, queryKeyWords(tt.key))
+		})
+	}
+}
+
+// TestGitURL_Forms verifies which values GitURL keeps as they are and which it
+// rewrites or rejects.
+func TestGitURL_Forms(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name string
+		raw  string
+		want string
+	}{
+		{name: "empty", raw: "", want: ""},
+		{name: "blank", raw: "   ", want: ""},
+		{name: "relative path", raw: "./repos/app", want: "./repos/app"},
+		{name: "home path", raw: "~/repos/app", want: "~/repos/app"},
+		{name: "Windows path", raw: `C:\repos\app`, want: `C:\repos\app`},
+		{name: "unparseable URL", raw: "https://github.com/%zz", want: ""},
+		{name: "URL without a host", raw: "https:///org/app.git", want: ""},
+		{name: "file URL", raw: "file:///srv/repos/app.git", want: "file:///srv/repos/app.git"},
+		{name: "file URL user", raw: "file://user@/srv/repos/app.git", want: "file:///srv/repos/app.git"},
+		{name: "https user without a password", raw: "https://deploy@github.com/org/app.git", want: "https://github.com/org/app.git"},
+		{name: "empty ssh user", raw: "ssh://@github.com/org/app.git", want: "ssh://github.com/org/app.git"},
+		{name: "long hex ssh user", raw: "ssh://0123456789abcdef0123@github.com/org/app.git", want: "ssh://github.com/org/app.git"},
+		{name: "long ssh account name", raw: "ssh://deploy-user-for-ci-builds@github.com/org/app.git", want: "ssh://deploy-user-for-ci-builds@github.com/org/app.git"},
+		{name: "query key with an invalid escape", raw: "https://github.com/org/app.git?%zz=1&ref=main", want: "https://github.com/org/app.git?ref=main"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			assert.Equal(t, tt.want, GitURL(tt.raw))
+		})
+	}
+}
+
+// TestGitURL_MalformedSCPRemotes verifies that SCP-style remotes GitURL cannot
+// split into a user, a host, and a path are rejected rather than stored.
+func TestGitURL_MalformedSCPRemotes(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name string
+		raw  string
+	}{
+		{name: "empty user", raw: "@github.com:org/app.git"},
+		{name: "user with a password", raw: "git:secret@github.com:org/app.git"},
+		{name: "empty host", raw: "git@:org/app.git"},
+		{name: "empty path", raw: "git@github.com:"},
+		{name: "host with a path", raw: "git@github.com/org:app.git"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			assert.Empty(t, GitURL(tt.raw))
+		})
+	}
+}
+
+// TestMetadataURL verifies that URL-like report metadata is redacted like a
+// Git URL, while plain annotation values pass through trimmed.
+func TestMetadataURL(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name string
+		raw  string
+		want string
+	}{
+		{name: "empty", raw: "", want: ""},
+		{name: "blank", raw: "  ", want: ""},
+		{name: "version", raw: " v1.2.3 ", want: "v1.2.3"},
+		{name: "license", raw: "Apache-2.0", want: "Apache-2.0"},
+		{name: "path without userinfo", raw: "team/app", want: "team/app"},
+		{name: "URL with credentials", raw: "https://user:secret@example.com/docs?token=x&lang=en", want: "https://example.com/docs?lang=en"},
+		{name: "SCP-style remote", raw: "git@github.com:org/app.git", want: "git@github.com:org/app.git"},
+		{name: "path with a query", raw: "docs?token=x&lang=en", want: "docs?lang=en"},
+		{name: "userinfo without a scheme", raw: "user:secret@example.com/app", want: ""},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			assert.Equal(t, tt.want, MetadataURL(tt.raw))
+		})
+	}
+}
+
+// TestUserinfo verifies that error text loses the credentials of the remote it
+// quotes, in plain or query-escaped form. Any other URL userinfo in the text is
+// masked too.
+func TestUserinfo(t *testing.T) {
+	t.Parallel()
+
+	const remote = "https://user:secret@github.com/org/app.git"
+
+	redacted := "https://xxxxx:xxxxx@github.com/org/app.git"
+
+	tests := []struct {
+		name   string
+		msg    string
+		remote string
+		want   string
+	}{
+		{
+			name:   "quoted remote",
+			msg:    "clone " + remote + " failed",
+			remote: remote,
+			want:   "clone " + redacted + " failed",
+		},
+		{
+			name:   "query-escaped remote",
+			msg:    "POST /build?remote=" + url.QueryEscape(remote) + ": denied",
+			remote: remote,
+			want:   "POST /build?remote=" + url.QueryEscape(redacted) + ": denied",
+		},
+		{
+			name:   "remote with a user only",
+			msg:    "clone https://token@github.com/org/app.git failed",
+			remote: "https://token@github.com/org/app.git",
+			want:   "clone https://xxxxx:xxxxx@github.com/org/app.git failed",
+		},
+		{
+			name: "other userinfo",
+			msg:  "fetch ssh://deploy:pw@git.example.com/org/app.git failed",
+			want: "fetch ssh://xxxxx:xxxxx@git.example.com/org/app.git failed",
+		},
+		{
+			name: "password containing @",
+			msg:  "fetch https://user:p@ss@git.example.com/org/app.git failed",
+			want: "fetch https://xxxxx:xxxxx@git.example.com/org/app.git failed",
+		},
+		{
+			name: "no credentials",
+			msg:  "build failed: no such file",
+			want: "build failed: no such file",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			assert.Equal(t, tt.want, Userinfo(tt.msg, tt.remote))
+		})
+	}
+}
+
+// TestIsHexString verifies which values count as hexadecimal, including the
+// empty value that callers do not reach through GitURL.
+func TestIsHexString(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		value string
+		want  bool
+	}{
+		{value: "", want: false},
+		{value: "0123456789abcdefABCDEF", want: true},
+		{value: "deadbeefg", want: false},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.value, func(t *testing.T) {
+			t.Parallel()
+
+			assert.Equal(t, tt.want, isHexString(tt.value))
 		})
 	}
 }
