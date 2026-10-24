@@ -24,6 +24,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- Split container files by their destination package by @nicholas-fedor in [#3104](https://github.com/nicholas-fedor/watchtower/pull/3104)
 - Separate copy-file and runtime state from the client by @nicholas-fedor in [#3102](https://github.com/nicholas-fedor/watchtower/pull/3102)
 - Gather the Watchtower label names into one package by @nicholas-fedor in [#3100](https://github.com/nicholas-fedor/watchtower/pull/3100)
 - Move the update engine packages under internal/update by @nicholas-fedor in [#3098](https://github.com/nicholas-fedor/watchtower/pull/3098)
