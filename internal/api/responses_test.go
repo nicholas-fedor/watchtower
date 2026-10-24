@@ -28,11 +28,12 @@ import (
 
 	"github.com/nicholas-fedor/watchtower/internal/api/auth"
 	"github.com/nicholas-fedor/watchtower/internal/api/routes"
+	"github.com/nicholas-fedor/watchtower/internal/container"
 	"github.com/nicholas-fedor/watchtower/internal/observability/events"
 	"github.com/nicholas-fedor/watchtower/internal/observability/metrics"
 	"github.com/nicholas-fedor/watchtower/internal/testutil/golden"
 	"github.com/nicholas-fedor/watchtower/internal/update/schedule"
-	"github.com/nicholas-fedor/watchtower/pkg/container"
+	pkgContainer "github.com/nicholas-fedor/watchtower/pkg/container"
 	mockContainer "github.com/nicholas-fedor/watchtower/pkg/container/mocks"
 	"github.com/nicholas-fedor/watchtower/pkg/types"
 )
@@ -194,7 +195,7 @@ func newFixtureMetrics(t *testing.T) *metrics.Metrics {
 
 // fixtureOptions returns API options with every endpoint enabled, backed by the
 // given Docker client and metrics store. Each update reports the same scan.
-func fixtureOptions(t *testing.T, client container.Client, store *metrics.Metrics) routes.Options {
+func fixtureOptions(t *testing.T, client pkgContainer.Client, store *metrics.Metrics) routes.Options {
 	t.Helper()
 
 	return withTestLogger(t, routes.Options{

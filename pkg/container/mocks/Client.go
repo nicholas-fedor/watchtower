@@ -9,7 +9,7 @@ import (
 	"time"
 
 	"github.com/moby/moby/api/types/container"
-	"github.com/nicholas-fedor/watchtower/pkg/container/oci"
+	"github.com/nicholas-fedor/watchtower/internal/container/oci"
 	"github.com/nicholas-fedor/watchtower/pkg/types"
 	mock "github.com/stretchr/testify/mock"
 )

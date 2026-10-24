@@ -19,11 +19,11 @@ import (
 	dockerContainer "github.com/moby/moby/api/types/container"
 	dockerNetwork "github.com/moby/moby/api/types/network"
 
+	"github.com/nicholas-fedor/watchtower/internal/container"
 	"github.com/nicholas-fedor/watchtower/internal/container/filters"
 	"github.com/nicholas-fedor/watchtower/internal/container/labels"
 	"github.com/nicholas-fedor/watchtower/internal/observability/logging"
 	"github.com/nicholas-fedor/watchtower/internal/observability/metrics"
-	"github.com/nicholas-fedor/watchtower/pkg/container"
 	"github.com/nicholas-fedor/watchtower/pkg/types"
 )
 

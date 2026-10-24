@@ -17,6 +17,7 @@ import (
 	dockerImage "github.com/moby/moby/api/types/image"
 	dockerClient "github.com/moby/moby/client"
 
+	"github.com/nicholas-fedor/watchtower/internal/container"
 	"github.com/nicholas-fedor/watchtower/pkg/types"
 )
 
@@ -225,7 +226,7 @@ func getSourceContainer(log *zerolog.Logger,
 			if err != nil {
 				clog.Warn().
 					Err(err).
-					Str("container", NormalizeContainerName(containerInfo.Name)).
+					Str("container", container.NormalizeContainerName(containerInfo.Name)).
 					Str("network_container", netContainerID).
 					Msg("Unable to resolve network container")
 			} else {
@@ -233,8 +234,8 @@ func getSourceContainer(log *zerolog.Logger,
 					"container:" + parentResult.Container.Name,
 				)
 				clog.Debug().
-					Str("container", NormalizeContainerName(containerInfo.Name)).
-					Str("network_container", NormalizeContainerName(parentResult.Container.Name)).
+					Str("container", container.NormalizeContainerName(containerInfo.Name)).
+					Str("network_container", container.NormalizeContainerName(parentResult.Container.Name)).
 					Msg("Resolved network container name")
 			}
 		}
@@ -253,18 +254,18 @@ func getSourceContainer(log *zerolog.Logger,
 
 		clog.Debug().
 			Err(err).
-			Str("container", NormalizeContainerName(containerInfo.Name)).
+			Str("container", container.NormalizeContainerName(containerInfo.Name)).
 			Str("image", containerInfo.Image).
 			Msg("Failed to retrieve image info")
 
-		return NewContainer(log, containerInfo, nil), nil
+		return container.NewContainer(log, containerInfo, nil), nil
 	}
 
 	clog.Debug().
 		Str("image", containerInfo.Image).
 		Msg("Retrieved container and image info")
 
-	return NewContainer(log, containerInfo, imageInfo), nil
+	return container.NewContainer(log, containerInfo, imageInfo), nil
 }
 
 // resolveImageInspect returns image inspect metadata, using imageCache when set.

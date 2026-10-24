@@ -6,9 +6,9 @@ import (
 	"github.com/stretchr/testify/assert"
 
 	"github.com/nicholas-fedor/watchtower/internal/container/labels"
+	"github.com/nicholas-fedor/watchtower/internal/container/oci"
 	"github.com/nicholas-fedor/watchtower/internal/testutil/containerfixture"
 	"github.com/nicholas-fedor/watchtower/pkg/container/git"
-	"github.com/nicholas-fedor/watchtower/pkg/container/oci"
 	"github.com/nicholas-fedor/watchtower/pkg/types"
 )
 

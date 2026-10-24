@@ -24,11 +24,11 @@ import (
 	dockerspec "github.com/moby/docker-image-spec/specs-go/v1"
 	dockerContainer "github.com/moby/moby/api/types/container"
 
+	"github.com/nicholas-fedor/watchtower/internal/container"
 	"github.com/nicholas-fedor/watchtower/internal/container/labels"
+	"github.com/nicholas-fedor/watchtower/internal/container/oci"
 	"github.com/nicholas-fedor/watchtower/internal/git"
-	wtcontainer "github.com/nicholas-fedor/watchtower/pkg/container"
 	mockContainer "github.com/nicholas-fedor/watchtower/pkg/container/mocks"
-	"github.com/nicholas-fedor/watchtower/pkg/container/oci"
 	"github.com/nicholas-fedor/watchtower/pkg/types"
 	mockTypes "github.com/nicholas-fedor/watchtower/pkg/types/mocks"
 )
@@ -146,7 +146,7 @@ func TestCheckForUpdates_MixedStaleResults(t *testing.T) {
 
 func TestCheckForUpdates_GitNoPullSkipsCheck(t *testing.T) {
 	client := mockContainer.NewMockClient(t)
-	watched := wtcontainer.NewContainer(newTestLogger(t), &dockerContainer.InspectResponse{
+	watched := container.NewContainer(newTestLogger(t), &dockerContainer.InspectResponse{
 		ID:   "app-id",
 		Name: "/app",
 		Config: &dockerContainer.Config{
@@ -174,7 +174,7 @@ func TestCheckForUpdates_GitNoPullSkipsCheck(t *testing.T) {
 // TestCheckForUpdates_GitCommitField verifies that Git results expose the commit separately from the local image ID.
 func TestCheckForUpdates_GitCommitField(t *testing.T) {
 	repoDir, branch, commit := initCheckGitRepo(t)
-	watched := wtcontainer.NewContainer(newTestLogger(t), &dockerContainer.InspectResponse{
+	watched := container.NewContainer(newTestLogger(t), &dockerContainer.InspectResponse{
 		ID:   "app-id",
 		Name: "/app",
 		Config: &dockerContainer.Config{
@@ -326,13 +326,13 @@ func stubContainer(t *testing.T, info *image.InspectResponse) *mockTypes.MockCon
 }
 
 // gitContainer returns a concrete container associated with a Git repository.
-func gitContainer(t *testing.T, repo string, imageLabels map[string]string) *wtcontainer.Container {
+func gitContainer(t *testing.T, repo string, imageLabels map[string]string) *container.Container {
 	t.Helper()
 
 	imageConfig := &dockerspec.DockerOCIImageConfig{}
 	imageConfig.Labels = imageLabels
 
-	return wtcontainer.NewContainer(newTestLogger(t), &dockerContainer.InspectResponse{
+	return container.NewContainer(newTestLogger(t), &dockerContainer.InspectResponse{
 		ID:   "app-id",
 		Name: "/app",
 		Config: &dockerContainer.Config{
@@ -509,7 +509,7 @@ func TestCheckGitSource(t *testing.T) {
 		t.Parallel()
 
 		repoDir, branch, _ := initCheckGitRepo(t)
-		c := wtcontainer.NewContainer(newTestLogger(t), &dockerContainer.InspectResponse{
+		c := container.NewContainer(newTestLogger(t), &dockerContainer.InspectResponse{
 			ID:   "app-id",
 			Name: "/app",
 			Config: &dockerContainer.Config{

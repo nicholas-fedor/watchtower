@@ -17,15 +17,16 @@ import (
 	cerrdefs "github.com/containerd/errdefs"
 	dockerContainer "github.com/moby/moby/api/types/container"
 
+	"github.com/nicholas-fedor/watchtower/internal/container"
 	"github.com/nicholas-fedor/watchtower/internal/container/filters"
 	"github.com/nicholas-fedor/watchtower/internal/container/labels"
+	"github.com/nicholas-fedor/watchtower/internal/container/oci"
 	"github.com/nicholas-fedor/watchtower/internal/git"
 	"github.com/nicholas-fedor/watchtower/internal/registry/ratelimit"
 	"github.com/nicholas-fedor/watchtower/internal/update/changelog"
 	"github.com/nicholas-fedor/watchtower/internal/update/sorter"
 	"github.com/nicholas-fedor/watchtower/internal/update/state"
-	"github.com/nicholas-fedor/watchtower/pkg/container"
-	"github.com/nicholas-fedor/watchtower/pkg/container/oci"
+	pkgContainer "github.com/nicholas-fedor/watchtower/pkg/container"
 	"github.com/nicholas-fedor/watchtower/pkg/lifecycle"
 	"github.com/nicholas-fedor/watchtower/pkg/types"
 )
@@ -130,7 +131,7 @@ func isRecoverableOrphan(
 func TryRecoverOrphanedContainer(
 	log *zerolog.Logger,
 	ctx context.Context,
-	client container.Client,
+	client pkgContainer.Client,
 	currentContainer types.Container,
 ) (types.Container, bool) {
 	if currentContainer == nil {
@@ -206,7 +207,7 @@ func TryRecoverOrphanedContainer(
 func update(
 	log *zerolog.Logger,
 	ctx context.Context,
-	client container.Client,
+	client pkgContainer.Client,
 	config types.UpdateParams,
 	rateLimiter *ratelimit.Limiter,
 	gitClient ...*git.Client,
@@ -606,7 +607,7 @@ func update(
 			resolveLatest := stale && shouldUpdate && !gitWatched && checkErr == nil && verifyErr == nil
 
 			var (
-				changelogVars container.ChangelogVars
+				changelogVars pkgContainer.ChangelogVars
 				latestAnns    oci.Annotations
 			)
 
@@ -640,7 +641,7 @@ func update(
 				// Skip containers with staleness check errors, marking them as skipped.
 				warnGitConfigSkip(log, sourceContainer.Name(), sourceContainer.ImageName(), checkErr)
 
-				if !errors.Is(checkErr, container.ErrImageCooldown) {
+				if !errors.Is(checkErr, pkgContainer.ErrImageCooldown) {
 					parallelStaleCheckFailed++
 				}
 
@@ -662,7 +663,7 @@ func update(
 
 				// Record the cooldown details for reports and notifications. The
 				// *container.CooldownError carries them.
-				cooldownErr, ok := errors.AsType[*container.CooldownError](checkErr)
+				cooldownErr, ok := errors.AsType[*pkgContainer.CooldownError](checkErr)
 				if ok {
 					progress.SetCooldownInfo(log,
 						sourceContainer.ID(),
@@ -671,7 +672,7 @@ func update(
 						cooldownErr.Remaining,
 						cooldownErr.EligibleAt,
 					)
-				} else if errors.Is(checkErr, container.ErrImageCooldown) {
+				} else if errors.Is(checkErr, pkgContainer.ErrImageCooldown) {
 					// Fallback for plain sentinel (keeps basic deferral visible)
 					progress.SetCooldownInfo(log, sourceContainer.ID(), "", "", "", time.Time{})
 				}
@@ -682,7 +683,7 @@ func update(
 				// failure, not a cooldown deferral.
 				if sourceContainer.IsWatchtower() &&
 					!config.SkipSelfUpdate &&
-					!errors.Is(checkErr, container.ErrImageCooldown) {
+					!errors.Is(checkErr, pkgContainer.ErrImageCooldown) {
 					parallelWatchtowerPullFailed = true
 				}
 			case verifyErr != nil:
@@ -692,7 +693,7 @@ func update(
 
 				if sourceContainer.IsWatchtower() &&
 					!config.SkipSelfUpdate &&
-					!errors.Is(verifyErr, container.ErrImageCooldown) {
+					!errors.Is(verifyErr, pkgContainer.ErrImageCooldown) {
 					parallelWatchtowerPullFailed = true
 				}
 			default:
@@ -1179,7 +1180,7 @@ func logChangelog(
 	log *zerolog.Logger,
 	c types.Container,
 	params types.UpdateParams,
-	meta container.ReportMeta,
+	meta pkgContainer.ReportMeta,
 ) {
 	if c == nil || meta.Changelog == "" {
 		return
@@ -1308,7 +1309,7 @@ func isPinned(
 	// Detect digests before parse-fallback.
 	// A repo@sha256 reference must stay pinned even when ParseDockerRef fails
 	// for unrelated reasons.
-	if container.IsImagePinnedByDigest(imageName) {
+	if pkgContainer.IsImagePinnedByDigest(imageName) {
 		if gitSession.watching(log, cont, config) {
 			clog.Debug().Msg("Pinned digest uses Git path because watcher is on")
 
@@ -1344,7 +1345,7 @@ func isPinned(
 			}
 
 			// Fallback name might itself be digest-pinned (unlikely but consistent).
-			if container.IsImagePinnedByDigest(fallbackImage) {
+			if pkgContainer.IsImagePinnedByDigest(fallbackImage) {
 				if gitSession.watching(log, cont, config) {
 					return false, nil
 				}
@@ -1404,7 +1405,7 @@ func performRollingRestart(
 	log *zerolog.Logger,
 	ctx context.Context,
 	containers []types.Container,
-	client container.Client,
+	client pkgContainer.Client,
 	config types.UpdateParams,
 	cleanupImageInfos *[]types.RemovedImageInfo,
 	progress *state.Progress,
@@ -1556,7 +1557,7 @@ func stopContainersInReversedOrder(
 	log *zerolog.Logger,
 	ctx context.Context,
 	containers []types.Container,
-	client container.Client,
+	client pkgContainer.Client,
 	config types.UpdateParams,
 ) (map[types.ContainerID]error, []types.RemovedImageInfo) {
 	failed := make(map[types.ContainerID]error, len(containers))
@@ -1667,7 +1668,7 @@ func stopStaleContainer(
 	log *zerolog.Logger,
 	ctx context.Context,
 	container types.Container,
-	client container.Client,
+	client pkgContainer.Client,
 	config types.UpdateParams,
 ) (bool, error) {
 	fields := map[string]any{
@@ -1786,10 +1787,10 @@ func stopStaleContainer(
 //   - error: Non-nil if a labeled path cannot be snapshotted.
 func snapshotCopyFilesForRecreate(
 	ctx context.Context,
-	client container.Client,
+	client pkgContainer.Client,
 	source types.Container,
 ) error {
-	store, ok := client.(container.CopyFileStore)
+	store, ok := client.(pkgContainer.CopyFileStore)
 	if !ok {
 		return nil
 	}
@@ -1807,8 +1808,8 @@ func snapshotCopyFilesForRecreate(
 // Parameters:
 //   - client: Docker client. No-op unless it implements container.CopyFileStore.
 //   - containerID: Source container ID whose snapshot should be discarded.
-func discardCopyFilesForRecreate(client container.Client, containerID types.ContainerID) {
-	store, ok := client.(container.CopyFileStore)
+func discardCopyFilesForRecreate(client pkgContainer.Client, containerID types.ContainerID) {
+	store, ok := client.(pkgContainer.CopyFileStore)
 	if !ok {
 		return
 	}
@@ -1837,7 +1838,7 @@ func restartContainersInSortedOrder(
 	log *zerolog.Logger,
 	ctx context.Context,
 	containers []types.Container,
-	client container.Client,
+	client pkgContainer.Client,
 	config types.UpdateParams,
 	stoppedImages []types.RemovedImageInfo,
 	cleanupImageInfos *[]types.RemovedImageInfo,
@@ -2008,7 +2009,7 @@ func restartStaleContainer(
 	log *zerolog.Logger,
 	ctx context.Context,
 	sourceContainer types.Container,
-	client container.Client,
+	client pkgContainer.Client,
 	config types.UpdateParams,
 ) (types.ContainerID, bool, error) {
 	// Create a detached context to survive parent context cancellation.

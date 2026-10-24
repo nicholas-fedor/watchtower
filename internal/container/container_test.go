@@ -28,6 +28,20 @@ const testContainerName = "gluetun"
 // webContainerName is used for testing filterSelfReferences scenarios.
 const webContainerName = "web"
 
+// MockContainer builds a Container from containerfixture inspect data, with
+// updates applied in order.
+//
+// Parameters:
+//   - updates: Changes to the container or image inspect data.
+//
+// Returns:
+//   - *Container: Container built from the inspect data.
+func MockContainer(updates ...containerfixture.Update) *Container {
+	containerInfo, imageInfo := containerfixture.Inspect(updates...)
+
+	return NewContainer(nil, containerInfo, imageInfo)
+}
+
 // TestContainerModel verifies the container model: configuration validation,
 // the create and host configuration rebuilt from inspect data, label and
 // metadata reads, the identifier used for dependencies, no-pull settings, and
@@ -1603,7 +1617,7 @@ func TestContainerModel(t *testing.T) {
 
 				spec, wantName, wantMode := tt.spec, tt.wantName, tt.wantMode
 
-				name, mode := parseVolumesFromSpec(spec)
+				name, mode := ParseVolumesFromSpec(spec)
 				assert.Equal(t, wantName, name)
 				assert.Equal(t, wantMode, mode)
 			})

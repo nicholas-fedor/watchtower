@@ -9,6 +9,7 @@ import (
 
 	dockerClient "github.com/moby/moby/client"
 
+	"github.com/nicholas-fedor/watchtower/internal/container/redact"
 	"github.com/nicholas-fedor/watchtower/pkg/types"
 )
 
@@ -47,7 +48,7 @@ func (c *client) BuildRemoteImage(ctx context.Context, remote, dockerfile string
 	}
 
 	clogVal := c.logger().With().
-		Str("remote", redactedRemote(remote)).
+		Str("remote", redact.Remote(remote)).
 		Str("dockerfile", dockerfile).
 		Strs("tags", tags).
 		Logger()

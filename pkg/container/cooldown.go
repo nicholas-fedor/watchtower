@@ -8,6 +8,7 @@ import (
 
 	"github.com/rs/zerolog"
 
+	"github.com/nicholas-fedor/watchtower/internal/container"
 	"github.com/nicholas-fedor/watchtower/internal/registry"
 	"github.com/nicholas-fedor/watchtower/internal/registry/digest"
 	"github.com/nicholas-fedor/watchtower/internal/registry/ratelimit"
@@ -273,8 +274,8 @@ func CheckLocalImageCooldown(c types.Container, params types.UpdateParams) error
 	}
 
 	clog := nopLog()
-	if concrete, isConcrete := c.(*Container); isConcrete {
-		clog = concrete.logger()
+	if concrete, isConcrete := c.(*container.Container); isConcrete {
+		clog = concrete.Logger()
 	}
 
 	_, err := evalImageAge(created, delay, clog)

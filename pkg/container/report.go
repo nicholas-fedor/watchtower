@@ -1,8 +1,9 @@
 package container
 
 import (
+	"github.com/nicholas-fedor/watchtower/internal/container/oci"
+	"github.com/nicholas-fedor/watchtower/internal/container/redact"
 	"github.com/nicholas-fedor/watchtower/pkg/container/git"
-	"github.com/nicholas-fedor/watchtower/pkg/container/oci"
 	"github.com/nicholas-fedor/watchtower/pkg/types"
 )
 
@@ -61,13 +62,13 @@ func ResolveReportMeta(
 	assoc, associated := git.ResolveAssociation(c, params)
 
 	// Report repo may fall back to OCI source. That does not enable the watcher.
-	repo := redactGitURL(assoc.Repo)
+	repo := redact.GitURL(assoc.Repo)
 	if repo == "" {
-		repo = redactGitURL(mapping.Repo)
+		repo = redact.GitURL(mapping.Repo)
 	}
 
 	if repo == "" {
-		repo = redactMetadataURL(anns.Source)
+		repo = redact.MetadataURL(anns.Source)
 	}
 
 	// The ref is the configured Git ref only. An OCI version is reported
@@ -79,22 +80,22 @@ func ResolveReportMeta(
 		ref = mapping.Ref
 	}
 
-	changelog := redactMetadataURL(git.Changelog(c, repo, vars))
+	changelog := redact.MetadataURL(git.Changelog(c, repo, vars))
 	if changelog == "" {
-		changelog = redactMetadataURL(anns.URL)
+		changelog = redact.MetadataURL(anns.URL)
 	}
 
 	if changelog == "" {
-		changelog = redactMetadataURL(anns.Documentation)
+		changelog = redact.MetadataURL(anns.Documentation)
 	}
 
 	return ReportMeta{
 		GitRepo:         repo,
 		GitRef:          ref,
 		Changelog:       changelog,
-		Source:          redactMetadataURL(anns.Source),
-		ImageURL:        redactMetadataURL(anns.URL),
-		Documentation:   redactMetadataURL(anns.Documentation),
+		Source:          redact.MetadataURL(anns.Source),
+		ImageURL:        redact.MetadataURL(anns.URL),
+		Documentation:   redact.MetadataURL(anns.Documentation),
 		CurrentVersion:  cur.Version,
 		LatestVersion:   latest.Version,
 		CurrentRevision: cur.Revision,

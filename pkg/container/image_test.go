@@ -18,6 +18,7 @@ import (
 	dockerImage "github.com/moby/moby/api/types/image"
 	dockerClient "github.com/moby/moby/client"
 
+	"github.com/nicholas-fedor/watchtower/internal/container"
 	"github.com/nicholas-fedor/watchtower/internal/registry/digest"
 	"github.com/nicholas-fedor/watchtower/internal/registry/ratelimit"
 	registryConfig "github.com/nicholas-fedor/watchtower/internal/settings/config/registry"
@@ -206,7 +207,7 @@ func TestImageClient_shouldSkipPull(t *testing.T) {
 			t.Parallel()
 
 			// Without image info the digest check fails before any registry request.
-			noImageInfo := NewContainer(nil, &dockerContainer.InspectResponse{
+			noImageInfo := container.NewContainer(nil, &dockerContainer.InspectResponse{
 				ID:     "container_id",
 				Name:   "kavita",
 				Config: &dockerContainer.Config{Image: "ghcr.io/linuxserver/kavita:latest"},

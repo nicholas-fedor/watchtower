@@ -9,7 +9,7 @@ import (
 	dockerImage "github.com/moby/moby/api/types/image"
 
 	"github.com/nicholas-fedor/watchtower/internal/container/labels"
-	"github.com/nicholas-fedor/watchtower/pkg/container/oci"
+	"github.com/nicholas-fedor/watchtower/internal/container/oci"
 	typemocks "github.com/nicholas-fedor/watchtower/pkg/types/mocks"
 )
 

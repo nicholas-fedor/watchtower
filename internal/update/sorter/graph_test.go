@@ -12,7 +12,7 @@ import (
 
 	dockerContainer "github.com/moby/moby/api/types/container"
 
-	"github.com/nicholas-fedor/watchtower/pkg/container"
+	"github.com/nicholas-fedor/watchtower/internal/container"
 	"github.com/nicholas-fedor/watchtower/pkg/types"
 )
 

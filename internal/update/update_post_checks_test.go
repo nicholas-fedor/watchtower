@@ -11,10 +11,10 @@ import (
 
 	dockerContainer "github.com/moby/moby/api/types/container"
 
+	"github.com/nicholas-fedor/watchtower/internal/container/oci"
 	"github.com/nicholas-fedor/watchtower/internal/registry/ratelimit"
 	mockUpdate "github.com/nicholas-fedor/watchtower/internal/update/mocks"
 	mockContainer "github.com/nicholas-fedor/watchtower/pkg/container/mocks"
-	"github.com/nicholas-fedor/watchtower/pkg/container/oci"
 	"github.com/nicholas-fedor/watchtower/pkg/types"
 )
 

@@ -18,9 +18,11 @@ import (
 
 	cerrdefs "github.com/containerd/errdefs"
 	dockerContainer "github.com/moby/moby/api/types/container"
+	dockerImage "github.com/moby/moby/api/types/image"
 	dockerMount "github.com/moby/moby/api/types/mount"
 	dockerClient "github.com/moby/moby/client"
 
+	"github.com/nicholas-fedor/watchtower/internal/container"
 	"github.com/nicholas-fedor/watchtower/internal/container/labels"
 	"github.com/nicholas-fedor/watchtower/internal/testutil/containerfixture"
 	mockContainer "github.com/nicholas-fedor/watchtower/pkg/container/mocks"
@@ -166,25 +168,22 @@ func TestCopyFilePathsFromContainer(t *testing.T) {
 func TestCopyFileSkipForPath(t *testing.T) {
 	t.Parallel()
 
-	nilHostConfig := func() *Container {
-		c := MockContainer()
-		c.containerInfo.HostConfig = nil
+	withoutHostConfig := func(c *dockerContainer.InspectResponse, _ *dockerImage.InspectResponse) {
+		c.HostConfig = nil
+	}
 
-		return c
-	}()
+	nilHostConfig := MockContainer(withoutHostConfig)
 
-	nilHostConfigWithMount := func() *Container {
-		c := MockContainer(containerfixture.WithInspectMounts([]dockerContainer.MountPoint{
+	nilHostConfigWithMount := MockContainer(
+		containerfixture.WithInspectMounts([]dockerContainer.MountPoint{
 			{Destination: "/etc/searxng", RW: false},
-		}))
-		c.containerInfo.HostConfig = nil
-
-		return c
-	}()
+		}),
+		withoutHostConfig,
+	)
 
 	tests := []struct {
 		name string
-		c    *Container
+		c    *container.Container
 		path string
 		want copyFileSkipReason
 	}{
@@ -312,7 +311,7 @@ func TestCopyFileSkipForPath(t *testing.T) {
 		},
 		{
 			name: "nil inspect",
-			c:    &Container{},
+			c:    &container.Container{},
 			path: "/app/config.yaml",
 			want: copyFileSkipNone,
 		},

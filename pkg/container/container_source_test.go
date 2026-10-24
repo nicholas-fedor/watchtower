@@ -20,6 +20,7 @@ import (
 	dockerImage "github.com/moby/moby/api/types/image"
 	dockerClient "github.com/moby/moby/client"
 
+	"github.com/nicholas-fedor/watchtower/internal/container"
 	"github.com/nicholas-fedor/watchtower/internal/container/filters"
 	"github.com/nicholas-fedor/watchtower/internal/testutil/containerfixture"
 	mockContainer "github.com/nicholas-fedor/watchtower/pkg/container/mocks"
@@ -554,7 +555,7 @@ func Test_stopAndRemoveSourceContainer(t *testing.T) {
 	}
 
 	// running returns a running container with the given updates.
-	running := func(updates ...containerfixture.Update) *Container {
+	running := func(updates ...containerfixture.Update) *container.Container {
 		return MockContainer(append([]containerfixture.Update{containerfixture.WithContainerState(dockerContainer.State{Running: true})}, updates...)...)
 	}
 
@@ -737,7 +738,7 @@ func Test_stopSourceContainer(t *testing.T) {
 	t.Parallel()
 
 	// running returns a running container.
-	running := func() *Container {
+	running := func() *container.Container {
 		return MockContainer(containerfixture.WithContainerState(dockerContainer.State{Running: true}))
 	}
 
@@ -1017,8 +1018,8 @@ func expectStop(api *mockContainer.MockAPIClient, containerID string, timeout in
 
 // stopRemoveContainer returns a container in the given state for the stop and
 // remove tests.
-func stopRemoveContainer(running, autoRemove bool) *Container {
-	return NewContainer(nil, &dockerContainer.InspectResponse{
+func stopRemoveContainer(running, autoRemove bool) *container.Container {
+	return container.NewContainer(nil, &dockerContainer.InspectResponse{
 		ID:         testContainerID,
 		Name:       "/app",
 		State:      &dockerContainer.State{Running: running},

@@ -200,7 +200,7 @@ func TestGitWrappers(t *testing.T) {
 
 			c := MockContainer()
 			ApplyGitAssociation(c, gitAssociation{}, true)
-			assert.NotContains(t, c.containerInfo.Config.Labels, labels.GitRepo)
+			assert.NotContains(t, c.ContainerInfo().Config.Labels, labels.GitRepo)
 		})
 
 		t.Run("persists association labels and watch", func(t *testing.T) {
@@ -224,7 +224,7 @@ func TestGitWrappers(t *testing.T) {
 				labels.GitDockerfile:   "build/docker/Dockerfile",
 				labels.GitContext:      ".",
 				labels.GitWatch:        "true",
-			}, c.containerInfo.Config.Labels)
+			}, c.ContainerInfo().Config.Labels)
 		})
 
 		t.Run("preserves bare local repository paths in labels", func(t *testing.T) {
@@ -305,7 +305,7 @@ func TestGitWrappers(t *testing.T) {
 
 			assert.Equal(t, map[string]string{
 				labels.GitRepo: "https://github.com/org/app.git",
-			}, c.containerInfo.Config.Labels)
+			}, c.ContainerInfo().Config.Labels)
 		})
 
 		t.Run("omits empty optional fields and does not force watch", func(t *testing.T) {
@@ -318,7 +318,7 @@ func TestGitWrappers(t *testing.T) {
 
 			assert.Equal(t, map[string]string{
 				labels.GitRepo: "https://github.com/org/app.git",
-			}, c.containerInfo.Config.Labels)
+			}, c.ContainerInfo().Config.Labels)
 		})
 	})
 }

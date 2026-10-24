@@ -280,8 +280,10 @@ func TestCheckLocalImageCooldown(t *testing.T) {
 	t.Run("defers when the local image is younger than the cooldown", func(t *testing.T) {
 		t.Parallel()
 
-		c := MockContainer(containerfixture.WithImageName("app:latest"))
-		c.imageInfo.Created = time.Now().Add(-time.Hour).Format(time.RFC3339Nano)
+		c := MockContainer(
+			containerfixture.WithImageName("app:latest"),
+			containerfixture.WithImageCreated(time.Now().Add(-time.Hour)),
+		)
 
 		err := CheckLocalImageCooldown(c, types.UpdateParams{CooldownDelay: 24 * time.Hour})
 		require.ErrorIs(t, err, ErrImageCooldown)
@@ -290,8 +292,10 @@ func TestCheckLocalImageCooldown(t *testing.T) {
 	t.Run("allows rebuilds when the local image is older than the cooldown", func(t *testing.T) {
 		t.Parallel()
 
-		c := MockContainer(containerfixture.WithImageName("app:latest"))
-		c.imageInfo.Created = time.Now().Add(-48 * time.Hour).Format(time.RFC3339Nano)
+		c := MockContainer(
+			containerfixture.WithImageName("app:latest"),
+			containerfixture.WithImageCreated(time.Now().Add(-48*time.Hour)),
+		)
 
 		err := CheckLocalImageCooldown(c, types.UpdateParams{CooldownDelay: 24 * time.Hour})
 		require.NoError(t, err)
@@ -395,8 +399,10 @@ func TestEvalImageAge(t *testing.T) {
 func TestCheckLocalImageCooldown_FutureCreationTime(t *testing.T) {
 	t.Parallel()
 
-	c := MockContainer(containerfixture.WithImageName("app:latest"))
-	c.imageInfo.Created = time.Now().Add(time.Hour).Format(time.RFC3339Nano)
+	c := MockContainer(
+		containerfixture.WithImageName("app:latest"),
+		containerfixture.WithImageCreated(time.Now().Add(time.Hour)),
+	)
 
 	err := CheckLocalImageCooldown(c, types.UpdateParams{CooldownDelay: 24 * time.Hour})
 	require.ErrorIs(t, err, ErrImageCooldown)

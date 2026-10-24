@@ -11,13 +11,14 @@ import (
 
 	composeApply "github.com/nicholas-fedor/watchtower/internal/compose/apply"
 	composeLabels "github.com/nicholas-fedor/watchtower/internal/compose/labels"
+	"github.com/nicholas-fedor/watchtower/internal/container"
 	"github.com/nicholas-fedor/watchtower/internal/container/labels"
+	"github.com/nicholas-fedor/watchtower/internal/container/oci"
 	"github.com/nicholas-fedor/watchtower/internal/git"
 	"github.com/nicholas-fedor/watchtower/internal/git/project"
 	"github.com/nicholas-fedor/watchtower/internal/update/state"
-	"github.com/nicholas-fedor/watchtower/pkg/container"
+	pkgContainer "github.com/nicholas-fedor/watchtower/pkg/container"
 	gitPkg "github.com/nicholas-fedor/watchtower/pkg/container/git"
-	"github.com/nicholas-fedor/watchtower/pkg/container/oci"
 	"github.com/nicholas-fedor/watchtower/pkg/types"
 )
 
@@ -293,8 +294,8 @@ func (s *gitSession) recordCompose(
 
 	assoc, _ := gitPkg.ResolveAssociation(c, params)
 	if concrete, ok := c.(*container.Container); ok {
-		container.ApplyGitAssociation(concrete, assoc, gitPkg.PersistWatch(c))
-		container.ApplyGitStamp(concrete, result.Commit, result.Tag)
+		pkgContainer.ApplyGitAssociation(concrete, assoc, gitPkg.PersistWatch(c))
+		pkgContainer.ApplyGitStamp(concrete, result.Commit, result.Tag)
 	}
 
 	s.mu.Lock()
@@ -326,7 +327,7 @@ func (s *gitSession) recordCompose(
 
 	// A Git rebuild has no pulled image, so no latest image annotations are
 	// passed and LatestImageVersion stays empty.
-	meta := progress.SetLatestImageMeta(log, c, params, container.ChangelogVars{
+	meta := progress.SetLatestImageMeta(log, c, params, pkgContainer.ChangelogVars{
 		Tag:    result.Tag,
 		Commit: result.Commit,
 	}, oci.Annotations{})
@@ -470,7 +471,7 @@ func (s *gitSession) recordComposeReplicas(
 			progress.SetLatestImage(log, status.ID(), item.ImageID)
 		}
 
-		meta := container.ResolveReportMeta(representative.container, params, container.ChangelogVars{
+		meta := pkgContainer.ResolveReportMeta(representative.container, params, pkgContainer.ChangelogVars{
 			Tag:    representative.result.Tag,
 			Commit: representative.result.Commit,
 		}, oci.Annotations{})
@@ -770,7 +771,7 @@ func composeServiceLabels(c types.Container, params types.UpdateParams, result g
 
 	assoc, ok := gitPkg.ResolveAssociation(c, params)
 	if ok && assoc.Repo != "" {
-		meta := container.ResolveReportMeta(c, params, container.ChangelogVars{
+		meta := pkgContainer.ResolveReportMeta(c, params, pkgContainer.ChangelogVars{
 			Tag:    result.Tag,
 			Commit: result.Commit,
 		}, oci.Annotations{})

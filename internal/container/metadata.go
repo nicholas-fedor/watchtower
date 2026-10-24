@@ -63,7 +63,7 @@ func (c *Container) GetLifecyclePostUpdateCommand() string {
 // Returns:
 //   - int: Timeout in minutes.
 func (c *Container) PreUpdateTimeout() int {
-	clogVal := c.logger().With().
+	clogVal := c.Logger().With().
 		Str("container", c.Name()).
 		Logger()
 	clog := &clogVal
@@ -106,7 +106,7 @@ func (c *Container) PreUpdateTimeout() int {
 // Returns:
 //   - int: Timeout in minutes.
 func (c *Container) PostUpdateTimeout() int {
-	clogVal := c.logger().With().
+	clogVal := c.Logger().With().
 		Str("container", c.Name()).
 		Logger()
 	clog := &clogVal
@@ -151,7 +151,7 @@ func (c *Container) PostUpdateTimeout() int {
 //   - int: ID value if set and valid.
 //   - bool: True if label is present and valid, false otherwise.
 func (c *Container) getLifecycleID(label, idType string) (int, bool) {
-	clogVal := c.logger().With().
+	clogVal := c.Logger().With().
 		Str("container", c.Name()).
 		Logger()
 	clog := &clogVal
@@ -236,7 +236,7 @@ func (c *Container) GetLifecycleGID() (int, bool) {
 //   - bool: True if enabled, false otherwise.
 //   - bool: True if label is set and valid, false if absent or invalid.
 func (c *Container) Enabled() (bool, bool) {
-	clogVal := c.logger().With().
+	clogVal := c.Logger().With().
 		Str("container", c.Name()).
 		Logger()
 	clog := &clogVal
@@ -359,7 +359,7 @@ func (c *Container) CooldownDelay(params types.UpdateParams) time.Duration {
 
 	parsed, err := units.ParseDuration(labelVal)
 	if err != nil {
-		c.logger().Warn().
+		c.Logger().Warn().
 			Err(err).
 			Str("container", c.Name()).
 			Str("label", labels.CooldownDelay).
@@ -369,7 +369,7 @@ func (c *Container) CooldownDelay(params types.UpdateParams) time.Duration {
 		return params.CooldownDelay
 	}
 
-	c.logger().Debug().
+	c.Logger().Debug().
 		Str("container", c.Name()).
 		Str("label", labels.CooldownDelay).
 		Str("value", labelVal).
@@ -385,7 +385,7 @@ func (c *Container) CooldownDelay(params types.UpdateParams) time.Duration {
 //   - string: Scope value if set, empty otherwise.
 //   - bool: True if label is set, false if absent.
 func (c *Container) Scope() (string, bool) {
-	clogVal := c.logger().With().
+	clogVal := c.Logger().With().
 		Str("container", c.Name()).
 		Logger()
 	clog := &clogVal
@@ -472,7 +472,7 @@ func (c *Container) IsWatchtower() bool {
 func (c *Container) StopSignal() string {
 	info := c.ContainerInfo()
 
-	clogVal := c.logger().With().
+	clogVal := c.Logger().With().
 		Str("container", c.Name()).
 		Logger()
 	clog := &clogVal
@@ -512,7 +512,7 @@ func (c *Container) StopSignal() string {
 func (c *Container) StopTimeout() *int {
 	info := c.ContainerInfo()
 
-	clogVal := c.logger().With().
+	clogVal := c.Logger().With().
 		Str("container", c.Name()).
 		Logger()
 	clog := &clogVal
@@ -626,7 +626,7 @@ func (c *Container) getBoolLabelValue(label string) (bool, error) {
 
 	value, err := strconv.ParseBool(strVal)
 	if err != nil {
-		c.logger().Warn().
+		c.Logger().Warn().
 			Err(err).
 			Str("container", c.Name()).
 			Str("label", label).
@@ -655,7 +655,7 @@ func (c *Container) getContainerOrGlobalBool(
 	label string,
 	contPrecedence bool,
 ) bool {
-	clogVal := c.logger().With().
+	clogVal := c.Logger().With().
 		Str("container", c.Name()).
 		Logger()
 	clog := &clogVal

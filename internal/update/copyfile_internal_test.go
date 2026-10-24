@@ -11,8 +11,9 @@ import (
 
 	cerrdefs "github.com/containerd/errdefs"
 
+	"github.com/nicholas-fedor/watchtower/internal/container"
 	mockUpdate "github.com/nicholas-fedor/watchtower/internal/update/mocks"
-	"github.com/nicholas-fedor/watchtower/pkg/container"
+	pkgContainer "github.com/nicholas-fedor/watchtower/pkg/container"
 	mockContainer "github.com/nicholas-fedor/watchtower/pkg/container/mocks"
 	"github.com/nicholas-fedor/watchtower/pkg/types"
 )
@@ -20,8 +21,8 @@ import (
 // copyFileAwareClient implements container.Client and container.CopyFileStore
 // by composing mockery-generated mocks.
 type copyFileAwareClient struct {
-	container.Client
-	container.CopyFileStore
+	pkgContainer.Client
+	pkgContainer.CopyFileStore
 }
 
 // staleMockContainer returns a stale container for the copy-file recreate tests.

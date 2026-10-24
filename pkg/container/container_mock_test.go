@@ -20,6 +20,7 @@ import (
 	dockerSystem "github.com/moby/moby/api/types/system"
 	dockerClient "github.com/moby/moby/client"
 
+	"github.com/nicholas-fedor/watchtower/internal/container"
 	"github.com/nicholas-fedor/watchtower/internal/testutil/containerfixture"
 	mockContainer "github.com/nicholas-fedor/watchtower/pkg/container/mocks"
 	"github.com/nicholas-fedor/watchtower/pkg/types"
@@ -35,11 +36,11 @@ const testTargetID = "new_container_id"
 //   - updates: Changes to the container or image inspect data.
 //
 // Returns:
-//   - *Container: Container built from the inspect data.
-func MockContainer(updates ...containerfixture.Update) *Container {
+//   - *container.Container: Container built from the inspect data.
+func MockContainer(updates ...containerfixture.Update) *container.Container {
 	containerInfo, imageInfo := containerfixture.Inspect(updates...)
 
-	return NewContainer(nil, containerInfo, imageInfo)
+	return container.NewContainer(nil, containerInfo, imageInfo)
 }
 
 // dockerImageFixture is an image whose inspect response is read from testdata.
@@ -324,7 +325,7 @@ func expectForceRemove(api *mockContainer.MockAPIClient) {
 
 // newRunningSource returns a running source container on the bridge
 // network with a MAC address and a memory swappiness setting.
-func newRunningSource() *Container {
+func newRunningSource() *container.Container {
 	var defaultMem int64 = 60
 
 	return MockContainer(
@@ -350,7 +351,7 @@ func newRunningSource() *Container {
 
 // newMultiNetworkSource returns a running source container attached
 // to two networks.
-func newMultiNetworkSource() *Container {
+func newMultiNetworkSource() *container.Container {
 	return MockContainer(
 		containerfixture.WithNetworkMode("bridge"),
 		containerfixture.WithContainerState(dockerContainer.State{Running: true, Status: "running"}),
@@ -427,7 +428,7 @@ func newImageAPI(t *testing.T) *mockContainer.MockAPIClient {
 //
 // Returns:
 //   - *Container: The container.
-func runningImage(imageName, imageID string, repoDigests ...string) *Container {
+func runningImage(imageName, imageID string, repoDigests ...string) *container.Container {
 	options := []containerfixture.Update{
 		containerfixture.WithImageName(imageName),
 		func(container *dockerContainer.InspectResponse, image *dockerImage.InspectResponse) {

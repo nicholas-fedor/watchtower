@@ -1,4 +1,4 @@
-package container
+package redact
 
 import (
 	"net/url"
@@ -21,7 +21,7 @@ func FuzzRedactedRemote(f *testing.F) {
 	f.Add("https://user:p@ss@github.com/org/app.git")
 
 	f.Fuzz(func(t *testing.T, remote string) {
-		got := redactedRemote(remote)
+		got := Remote(remote)
 
 		parsed, err := url.Parse(remote)
 		if err != nil {

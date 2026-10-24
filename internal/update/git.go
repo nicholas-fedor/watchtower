@@ -14,14 +14,15 @@ import (
 
 	composeApply "github.com/nicholas-fedor/watchtower/internal/compose/apply"
 	composeProject "github.com/nicholas-fedor/watchtower/internal/compose/project"
+	"github.com/nicholas-fedor/watchtower/internal/container"
+	"github.com/nicholas-fedor/watchtower/internal/container/oci"
 	"github.com/nicholas-fedor/watchtower/internal/git"
 	"github.com/nicholas-fedor/watchtower/internal/git/apply"
 	"github.com/nicholas-fedor/watchtower/internal/git/project"
 	"github.com/nicholas-fedor/watchtower/internal/update/sorter"
 	"github.com/nicholas-fedor/watchtower/internal/update/state"
-	"github.com/nicholas-fedor/watchtower/pkg/container"
+	pkgContainer "github.com/nicholas-fedor/watchtower/pkg/container"
 	gitPkg "github.com/nicholas-fedor/watchtower/pkg/container/git"
-	"github.com/nicholas-fedor/watchtower/pkg/container/oci"
 	"github.com/nicholas-fedor/watchtower/pkg/types"
 )
 
@@ -174,7 +175,7 @@ func (s *gitSession) check(
 		return false, c.ImageID(), nil
 	}
 
-	err = container.CheckLocalImageCooldown(c, params)
+	err = pkgContainer.CheckLocalImageCooldown(c, params)
 	if err != nil {
 		return false, "", fmt.Errorf("git cooldown: %w", err)
 	}
@@ -214,7 +215,7 @@ func (s *gitSession) check(
 func (s *gitSession) prepareRebuilds(
 	log *zerolog.Logger,
 	ctx context.Context,
-	docker container.Client,
+	docker pkgContainer.Client,
 	containers []types.Container,
 	params types.UpdateParams,
 	progress *state.Progress,
@@ -476,7 +477,7 @@ func (s *gitSession) needsApply(c types.Container, params types.UpdateParams) bo
 func (s *gitSession) buildOne(
 	log *zerolog.Logger,
 	ctx context.Context,
-	docker container.Client,
+	docker pkgContainer.Client,
 	c types.Container,
 	result git.CheckResult,
 	params types.UpdateParams,
@@ -493,7 +494,7 @@ func (s *gitSession) buildOne(
 	}
 
 	if dockerfile == "" {
-		dockerfile = container.DefaultGitDockerfile
+		dockerfile = pkgContainer.DefaultGitDockerfile
 	}
 
 	remote, err := apply.RemoteContext(assoc.Repo, result.Commit, assoc.Context)
@@ -527,10 +528,10 @@ func (s *gitSession) buildOne(
 	}
 
 	if concrete, ok := c.(*container.Container); ok {
-		container.ApplyGitAssociation(concrete, assoc, gitPkg.PersistWatch(c))
+		pkgContainer.ApplyGitAssociation(concrete, assoc, gitPkg.PersistWatch(c))
 
 		concrete.SetImageName(tag)
-		container.ApplyGitStamp(concrete, result.Commit, result.Tag)
+		pkgContainer.ApplyGitStamp(concrete, result.Commit, result.Tag)
 	}
 
 	s.mu.Lock()
@@ -542,7 +543,7 @@ func (s *gitSession) buildOne(
 		// A Git rebuild has no pulled image, so no latest image annotations are
 		// passed and LatestImageVersion stays empty. The resolved Git tag is the
 		// only new version available for this path.
-		meta := progress.SetLatestImageMeta(log, c, params, container.ChangelogVars{
+		meta := progress.SetLatestImageMeta(log, c, params, pkgContainer.ChangelogVars{
 			Tag:    result.Tag,
 			Commit: result.Commit,
 		}, oci.Annotations{})
@@ -581,7 +582,7 @@ func withGitMeta(
 		return nil
 	}
 
-	meta := container.ResolveReportMeta(c, params, container.ChangelogVars{
+	meta := pkgContainer.ResolveReportMeta(c, params, pkgContainer.ChangelogVars{
 		Tag:    tag,
 		Commit: commit,
 	}, oci.Annotations{})

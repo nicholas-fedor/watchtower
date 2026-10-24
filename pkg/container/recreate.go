@@ -17,6 +17,7 @@ import (
 	dockerClient "github.com/moby/moby/client"
 
 	composeLabels "github.com/nicholas-fedor/watchtower/internal/compose/labels"
+	"github.com/nicholas-fedor/watchtower/internal/container"
 	"github.com/nicholas-fedor/watchtower/pkg/types"
 )
 
@@ -60,10 +61,10 @@ func resolveVolumesFrom(
 	}
 
 	rewritten := slices.Clone(containerInfo.HostConfig.VolumesFrom)
-	containerName := NormalizeContainerName(containerInfo.Name)
+	containerName := container.NormalizeContainerName(containerInfo.Name)
 
 	for i, spec := range rewritten {
-		name, mode := parseVolumesFromSpec(spec)
+		name, mode := container.ParseVolumesFromSpec(spec)
 		if name == "" {
 			continue
 		}
@@ -85,7 +86,7 @@ func resolveVolumesFrom(
 			continue
 		}
 
-		resolved := NormalizeContainerName(sourceResult.Container.Name)
+		resolved := container.NormalizeContainerName(sourceResult.Container.Name)
 		if mode != "" {
 			// Keep :ro/:rw/SELinux flags from the original spec.
 			resolved = resolved + ":" + mode

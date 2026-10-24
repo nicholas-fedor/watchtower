@@ -2,6 +2,7 @@ pkg/notifications/smtp.go     @nicholas-fedor
 pkg/notifications/email.go    @nicholas-fedor
 pkg/notifications/shoutrrr.go @nicholas-fedor
 pkg/container/*               @nicholas-fedor
+internal/container/           @nicholas-fedor
 pkg/api/*                     @nicholas-fedor
 .devbots/*                    @nicholas-fedor
 .github/*                     @nicholas-fedor
