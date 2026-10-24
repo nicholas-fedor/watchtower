@@ -42,10 +42,12 @@ import (
 	"github.com/nicholas-fedor/watchtower/internal/container/oci"
 	"github.com/nicholas-fedor/watchtower/internal/testutil/containerfixture"
 	"github.com/nicholas-fedor/watchtower/internal/testutil/httpstub"
+	"github.com/nicholas-fedor/watchtower/internal/testutil/logcapture"
+	"github.com/nicholas-fedor/watchtower/internal/testutil/modelfixture"
 	"github.com/nicholas-fedor/watchtower/pkg/types"
 )
 
-// mockContainerID is the ID of a container built by MockContainer.
+// mockContainerID is the ID of a container built by modelfixture.Container.
 const mockContainerID = "container_id"
 
 // execCase configures the mocked Docker calls of one ExecuteCommand run.
@@ -309,7 +311,7 @@ func TestClient(t *testing.T) {
 
 		// running returns a running container.
 		running := func() *container.Container {
-			return MockContainer(containerfixture.WithContainerState(dockerContainer.State{Running: true}))
+			return modelfixture.Container(containerfixture.WithContainerState(dockerContainer.State{Running: true}))
 		}
 
 		t.Run("the container still exists after stopping", func(t *testing.T) {
@@ -318,7 +320,7 @@ func TestClient(t *testing.T) {
 			t.Run("should attempt to remove the container", func(t *testing.T) {
 				t.Parallel()
 
-				log, logOutput := newCapturedLogger(zerolog.DebugLevel)
+				log, logOutput := logcapture.New(zerolog.DebugLevel)
 				api := newDockerAPI(t)
 				expectStop(api, mockContainerID, 1, nil)
 				api.EXPECT().ContainerRemove(mock.Anything, mockContainerID, dockerClient.ContainerRemoveOptions{Force: true}).
@@ -400,7 +402,7 @@ func TestClient(t *testing.T) {
 				api.EXPECT().ContainerRemove(mock.Anything, mockContainerID, dockerClient.ContainerRemoveOptions{Force: true}).
 					Return(dockerClient.ContainerRemoveResult{}, nil).Once()
 
-				stopped := MockContainer(containerfixture.WithContainerState(dockerContainer.State{Running: false}))
+				stopped := modelfixture.Container(containerfixture.WithContainerState(dockerContainer.State{Running: false}))
 
 				err := (&client{log: newTestLogger(t), api: api}).StopAndRemoveContainer(t.Context(), stopped, time.Second)
 				require.NoError(t, err)
@@ -418,7 +420,7 @@ func TestClient(t *testing.T) {
 				api := newDockerAPI(t)
 				expectStop(api, mockContainerID, 1, nil)
 
-				source := MockContainer(
+				source := modelfixture.Container(
 					containerfixture.WithContainerState(dockerContainer.State{Running: true}),
 					containerfixture.WithAutoRemove(true),
 				)
@@ -435,7 +437,7 @@ func TestClient(t *testing.T) {
 				api.EXPECT().ContainerRemove(mock.Anything, mockContainerID, dockerClient.ContainerRemoveOptions{Force: true}).
 					Return(dockerClient.ContainerRemoveResult{}, nil).Once()
 
-				source := MockContainer(
+				source := modelfixture.Container(
 					containerfixture.WithContainerState(dockerContainer.State{Running: false, Status: "created"}),
 					containerfixture.WithAutoRemove(true),
 				)
@@ -458,7 +460,7 @@ func TestClient(t *testing.T) {
 				api := newDockerAPI(t)
 				expectStop(api, mockContainerID, 1, nil)
 
-				source := MockContainer(containerfixture.WithContainerState(dockerContainer.State{Running: true}))
+				source := modelfixture.Container(containerfixture.WithContainerState(dockerContainer.State{Running: true}))
 
 				err := (&client{log: newTestLogger(t), api: api}).StopContainer(t.Context(), source, time.Second)
 				require.NoError(t, err)
@@ -473,7 +475,7 @@ func TestClient(t *testing.T) {
 
 				// The mock has no expectations, so any Docker call fails the test.
 				api := mockContainer.NewMockAPIClient(t)
-				source := MockContainer(containerfixture.WithContainerState(dockerContainer.State{Running: false}))
+				source := modelfixture.Container(containerfixture.WithContainerState(dockerContainer.State{Running: false}))
 
 				err := (&client{log: newTestLogger(t), api: api}).StopContainer(t.Context(), source, time.Second)
 				require.NoError(t, err)
@@ -494,7 +496,7 @@ func TestClient(t *testing.T) {
 				api.EXPECT().ContainerRemove(mock.Anything, mockContainerID, dockerClient.ContainerRemoveOptions{Force: true}).
 					Return(dockerClient.ContainerRemoveResult{}, nil).Once()
 
-				err := (&client{log: newTestLogger(t), api: api}).RemoveContainer(t.Context(), MockContainer())
+				err := (&client{log: newTestLogger(t), api: api}).RemoveContainer(t.Context(), modelfixture.Container())
 				require.NoError(t, err)
 			})
 		})
@@ -509,7 +511,7 @@ func TestClient(t *testing.T) {
 				api.EXPECT().ContainerRemove(mock.Anything, mockContainerID, dockerClient.ContainerRemoveOptions{Force: true}).
 					Return(dockerClient.ContainerRemoveResult{}, notFoundError("No such container: "+mockContainerID)).Once()
 
-				err := (&client{log: newTestLogger(t), api: api}).RemoveContainer(t.Context(), MockContainer())
+				err := (&client{log: newTestLogger(t), api: api}).RemoveContainer(t.Context(), modelfixture.Container())
 				require.NoError(t, err)
 			})
 		})
@@ -524,7 +526,7 @@ func TestClient(t *testing.T) {
 				api.EXPECT().ContainerRemove(mock.Anything, mockContainerID, dockerClient.ContainerRemoveOptions{Force: true}).
 					Return(dockerClient.ContainerRemoveResult{}, daemonError("server error")).Once()
 
-				err := (&client{log: newTestLogger(t), api: api}).RemoveContainer(t.Context(), MockContainer())
+				err := (&client{log: newTestLogger(t), api: api}).RemoveContainer(t.Context(), modelfixture.Container())
 				require.ErrorContains(t, err, "failed to remove container")
 			})
 		})
@@ -692,7 +694,7 @@ func TestClient(t *testing.T) {
 				api := newDockerAPI(t)
 				expectMissingImage(api, testContainerID)
 
-				log, logOutput := newCapturedLogger(zerolog.WarnLevel)
+				log, logOutput := logcapture.New(zerolog.WarnLevel)
 				c := &client{log: log, api: api}
 
 				container, err := c.GetContainer(t.Context(), types.ContainerID(testContainerID))
@@ -900,7 +902,7 @@ func TestClient(t *testing.T) {
 				api := newDockerAPI(t)
 				expectExec(api, execCase{containerID: "ex-cont-id", execID: "ex-exec-id", cmd: "exec-cmd"})
 
-				log, logOutput := newCapturedLogger(zerolog.DebugLevel)
+				log, logOutput := logcapture.New(zerolog.DebugLevel)
 				c := &client{log: log, api: api}
 
 				container, err := c.GetContainer(t.Context(), "ex-cont-id")
@@ -917,7 +919,7 @@ func TestClient(t *testing.T) {
 				api := newDockerAPI(t)
 				expectExec(api, execCase{containerID: "ex-cont-id", execID: "ex-exec-id", cmd: "exec-cmd", exitCode: 75})
 
-				log, logOutput := newCapturedLogger(zerolog.DebugLevel)
+				log, logOutput := logcapture.New(zerolog.DebugLevel)
 				c := &client{log: log, api: api}
 
 				container, err := c.GetContainer(t.Context(), "ex-cont-id")
@@ -1093,7 +1095,7 @@ func TestClient(t *testing.T) {
 			api.EXPECT().ContainerList(mock.Anything, mock.Anything).
 				Return(dockerClient.ContainerListResult{}, notFoundError("page not found")).Once()
 
-			log, logOutput := newCapturedLogger(zerolog.WarnLevel)
+			log, logOutput := logcapture.New(zerolog.WarnLevel)
 
 			containers, err := (&client{log: log, api: api}).ListContainers(t.Context(), filters.NoFilter)
 			require.NoError(t, err)
@@ -1197,7 +1199,7 @@ func TestClient(t *testing.T) {
 					Return(dockerClient.ContainerInspectResult{}, notFoundError("No such container: "+ghostID)).Once()
 				expectValid(api, valid2ID, "/valid-container-2", "test-image-2:latest")
 
-				log, logOutput := newCapturedLogger(zerolog.DebugLevel)
+				log, logOutput := logcapture.New(zerolog.DebugLevel)
 
 				containers, err := (&client{log: log, api: api}).ListContainers(t.Context())
 				require.NoError(t, err)
@@ -1383,7 +1385,7 @@ func TestClientEnvironment(t *testing.T) {
 				api.EXPECT().Info(mock.Anything, dockerClient.InfoOptions{}).
 					Return(dockerClient.SystemInfoResult{}, daemonError("server error")).Once()
 
-				log, logOutput := newCapturedLogger(zerolog.DebugLevel)
+				log, logOutput := logcapture.New(zerolog.DebugLevel)
 				testClient := newAutoClient(t, api)
 				testClient.log = log
 
@@ -1563,7 +1565,7 @@ func TestClientSetRestartPolicy(t *testing.T) {
 			expectUpdate(api, dockerContainer.RestartPolicy{Name: dockerContainer.RestartPolicyDisabled}, nil)
 
 			(&client{log: newTestLogger(t), api: api}).
-				SetRestartPolicy(t.Context(), MockContainer(containerfixture.WithID(cid)), dockerContainer.RestartPolicy{})
+				SetRestartPolicy(t.Context(), modelfixture.Container(containerfixture.WithID(cid)), dockerContainer.RestartPolicy{})
 		})
 
 		t.Run("should clear MaximumRetryCount when normalizing an empty name", func(t *testing.T) {
@@ -1573,7 +1575,7 @@ func TestClientSetRestartPolicy(t *testing.T) {
 			expectUpdate(api, dockerContainer.RestartPolicy{Name: dockerContainer.RestartPolicyDisabled}, nil)
 
 			(&client{log: newTestLogger(t), api: api}).
-				SetRestartPolicy(t.Context(), MockContainer(containerfixture.WithID(cid)), dockerContainer.RestartPolicy{MaximumRetryCount: 5})
+				SetRestartPolicy(t.Context(), modelfixture.Container(containerfixture.WithID(cid)), dockerContainer.RestartPolicy{MaximumRetryCount: 5})
 		})
 	})
 
@@ -1587,7 +1589,7 @@ func TestClientSetRestartPolicy(t *testing.T) {
 			expectUpdate(api, dockerContainer.RestartPolicy{Name: dockerContainer.RestartPolicyAlways}, nil)
 
 			(&client{log: newTestLogger(t), api: api}).SetRestartPolicy(
-				t.Context(), MockContainer(containerfixture.WithID(cid)), dockerContainer.RestartPolicy{Name: dockerContainer.RestartPolicyAlways},
+				t.Context(), modelfixture.Container(containerfixture.WithID(cid)), dockerContainer.RestartPolicy{Name: dockerContainer.RestartPolicyAlways},
 			)
 		})
 	})
@@ -1601,10 +1603,10 @@ func TestClientSetRestartPolicy(t *testing.T) {
 			api := newDockerAPI(t)
 			expectUpdate(api, dockerContainer.RestartPolicy{Name: dockerContainer.RestartPolicyDisabled}, daemonError("update failed"))
 
-			log, logOutput := newCapturedLogger(zerolog.DebugLevel)
+			log, logOutput := logcapture.New(zerolog.DebugLevel)
 
 			(&client{log: log, api: api}).SetRestartPolicy(
-				t.Context(), MockContainer(containerfixture.WithID(cid)), dockerContainer.RestartPolicy{Name: dockerContainer.RestartPolicyDisabled},
+				t.Context(), modelfixture.Container(containerfixture.WithID(cid)), dockerContainer.RestartPolicy{Name: dockerContainer.RestartPolicyDisabled},
 			)
 			assert.Contains(t, logOutput.String(), "Failed to set container restart policy")
 		})
@@ -1686,7 +1688,7 @@ func TestStartContainer_StartsCreatedContainer(t *testing.T) {
 
 	const createdID = "created-container-id"
 
-	source := MockContainer(
+	source := modelfixture.Container(
 		containerfixture.WithNetworkMode("bridge"),
 		containerfixture.WithContainerState(dockerContainer.State{Running: true, Status: "running"}),
 	)
@@ -1827,7 +1829,7 @@ func TestClientWrappers(t *testing.T) {
 		api.EXPECT().ContainerRename(mock.Anything, mockContainerID, dockerClient.ContainerRenameOptions{NewName: "new-name"}).
 			Return(dockerClient.ContainerRenameResult{}, nil).Once()
 
-		require.NoError(t, (&client{log: newTestLogger(t), api: api}).RenameContainer(t.Context(), MockContainer(), "new-name"))
+		require.NoError(t, (&client{log: newTestLogger(t), api: api}).RenameContainer(t.Context(), modelfixture.Container(), "new-name"))
 	})
 
 	t.Run("RenameContainer reports a failed rename", func(t *testing.T) {
@@ -1837,7 +1839,7 @@ func TestClientWrappers(t *testing.T) {
 		api.EXPECT().ContainerRename(mock.Anything, mockContainerID, dockerClient.ContainerRenameOptions{NewName: "new-name"}).
 			Return(dockerClient.ContainerRenameResult{}, daemonError("rename failed")).Once()
 
-		err := (&client{log: newTestLogger(t), api: api}).RenameContainer(t.Context(), MockContainer(), "new-name")
+		err := (&client{log: newTestLogger(t), api: api}).RenameContainer(t.Context(), modelfixture.Container(), "new-name")
 		require.ErrorContains(t, err, "rename failed")
 	})
 
@@ -1894,7 +1896,7 @@ func TestClientWrappers(t *testing.T) {
 		api.EXPECT().ContainerStart(mock.Anything, "orchestrator-id", dockerClient.ContainerStartOptions{}).
 			Return(dockerClient.ContainerStartResult{}, nil).Once()
 
-		source := MockContainer(containerfixture.WithID("source123"), containerfixture.WithName("watchtower-source"), containerfixture.WithImageName("watchtower:latest"))
+		source := modelfixture.Container(containerfixture.WithID("source123"), containerfixture.WithName("watchtower-source"), containerfixture.WithImageName("watchtower:latest"))
 
 		id, err := (&client{log: newTestLogger(t), api: api}).
 			CreateEphemeralOrchestrator(t.Context(), source, "watchtower:v2", "chain1", false)
@@ -1989,7 +1991,7 @@ func TestClientThroughDockerSDK(t *testing.T) {
 			httpstub.RespondWithJSONEncoded(t, http.StatusNotFound, map[string]string{"message": "No such container: " + mockContainerID}, nil),
 		))
 
-		require.NoError(t, newSDKClient(t, server).RemoveContainer(t.Context(), MockContainer()))
+		require.NoError(t, newSDKClient(t, server).RemoveContainer(t.Context(), modelfixture.Container()))
 	})
 
 	t.Run("reports a daemon error with its message", func(t *testing.T) {
@@ -2001,7 +2003,7 @@ func TestClientThroughDockerSDK(t *testing.T) {
 			httpstub.RespondWithJSONEncoded(t, http.StatusInternalServerError, map[string]string{"message": "server error"}, nil),
 		))
 
-		source := MockContainer(containerfixture.WithContainerState(dockerContainer.State{Running: true}))
+		source := modelfixture.Container(containerfixture.WithContainerState(dockerContainer.State{Running: true}))
 
 		err := newSDKClient(t, server).StopContainer(t.Context(), source, time.Second)
 		require.ErrorContains(t, err, "failed to stop container: Error response from daemon: server error")

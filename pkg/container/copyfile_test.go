@@ -26,6 +26,7 @@ import (
 	"github.com/nicholas-fedor/watchtower/internal/container/labels"
 	mockContainer "github.com/nicholas-fedor/watchtower/internal/container/mocks"
 	"github.com/nicholas-fedor/watchtower/internal/testutil/containerfixture"
+	"github.com/nicholas-fedor/watchtower/internal/testutil/modelfixture"
 	"github.com/nicholas-fedor/watchtower/pkg/types"
 )
 
@@ -118,7 +119,7 @@ func TestCopyFilePathsFromContainer(t *testing.T) {
 	t.Run("missing label", func(t *testing.T) {
 		t.Parallel()
 
-		got, err := copyFilePaths(MockContainer())
+		got, err := copyFilePaths(modelfixture.Container())
 		require.NoError(t, err)
 		assert.Nil(t, got)
 	})
@@ -126,7 +127,7 @@ func TestCopyFilePathsFromContainer(t *testing.T) {
 	t.Run("reads label", func(t *testing.T) {
 		t.Parallel()
 
-		c := MockContainer(containerfixture.WithLabels(map[string]string{
+		c := modelfixture.Container(containerfixture.WithLabels(map[string]string{
 			labels.CopyFile: "/app/config.yaml",
 		}))
 		got, err := copyFilePaths(c)
@@ -137,7 +138,7 @@ func TestCopyFilePathsFromContainer(t *testing.T) {
 	t.Run("invalid label", func(t *testing.T) {
 		t.Parallel()
 
-		c := MockContainer(containerfixture.WithLabels(map[string]string{
+		c := modelfixture.Container(containerfixture.WithLabels(map[string]string{
 			labels.CopyFile: "../secret",
 		}))
 		got, err := copyFilePaths(c)
@@ -156,7 +157,7 @@ func TestCopyFilePathsFromContainer(t *testing.T) {
 	t.Run("empty label value", func(t *testing.T) {
 		t.Parallel()
 
-		c := MockContainer(containerfixture.WithLabels(map[string]string{
+		c := modelfixture.Container(containerfixture.WithLabels(map[string]string{
 			labels.CopyFile: "",
 		}))
 		got, err := copyFilePaths(c)
@@ -172,9 +173,9 @@ func TestCopyFileSkipForPath(t *testing.T) {
 		c.HostConfig = nil
 	}
 
-	nilHostConfig := MockContainer(withoutHostConfig)
+	nilHostConfig := modelfixture.Container(withoutHostConfig)
 
-	nilHostConfigWithMount := MockContainer(
+	nilHostConfigWithMount := modelfixture.Container(
 		containerfixture.WithInspectMounts([]dockerContainer.MountPoint{
 			{Destination: "/etc/searxng", RW: false},
 		}),
@@ -189,13 +190,13 @@ func TestCopyFileSkipForPath(t *testing.T) {
 	}{
 		{
 			name: "no mounts",
-			c:    MockContainer(),
+			c:    modelfixture.Container(),
 			path: "/app/config.yaml",
 			want: copyFileSkipNone,
 		},
 		{
 			name: "exact inspect mount",
-			c: MockContainer(containerfixture.WithInspectMounts([]dockerContainer.MountPoint{
+			c: modelfixture.Container(containerfixture.WithInspectMounts([]dockerContainer.MountPoint{
 				{Destination: "/app/config.yaml", RW: true},
 			})),
 			path: "/app/config.yaml",
@@ -203,7 +204,7 @@ func TestCopyFileSkipForPath(t *testing.T) {
 		},
 		{
 			name: "writable inspect mount above path",
-			c: MockContainer(containerfixture.WithInspectMounts([]dockerContainer.MountPoint{
+			c: modelfixture.Container(containerfixture.WithInspectMounts([]dockerContainer.MountPoint{
 				{Destination: "/etc/searxng", RW: true},
 			})),
 			path: "/etc/searxng/settings.yml",
@@ -211,7 +212,7 @@ func TestCopyFileSkipForPath(t *testing.T) {
 		},
 		{
 			name: "read-only inspect mount above path",
-			c: MockContainer(containerfixture.WithInspectMounts([]dockerContainer.MountPoint{
+			c: modelfixture.Container(containerfixture.WithInspectMounts([]dockerContainer.MountPoint{
 				{Destination: "/etc/searxng", RW: false},
 			})),
 			path: "/etc/searxng/settings.yml",
@@ -219,7 +220,7 @@ func TestCopyFileSkipForPath(t *testing.T) {
 		},
 		{
 			name: "host config mount target",
-			c: MockContainer(containerfixture.WithMounts([]dockerMount.Mount{
+			c: modelfixture.Container(containerfixture.WithMounts([]dockerMount.Mount{
 				{Target: "/run/secrets"},
 			})),
 			path: "/run/secrets/token",
@@ -227,7 +228,7 @@ func TestCopyFileSkipForPath(t *testing.T) {
 		},
 		{
 			name: "read-only host config mount above path",
-			c: MockContainer(containerfixture.WithMounts([]dockerMount.Mount{
+			c: modelfixture.Container(containerfixture.WithMounts([]dockerMount.Mount{
 				{Target: "/etc/conf", ReadOnly: true},
 			})),
 			path: "/etc/conf/app.conf",
@@ -235,25 +236,25 @@ func TestCopyFileSkipForPath(t *testing.T) {
 		},
 		{
 			name: "bind destination at path",
-			c:    MockContainer(containerfixture.WithBinds([]string{"/host/config.yaml:/app/config.yaml:ro"})),
+			c:    modelfixture.Container(containerfixture.WithBinds([]string{"/host/config.yaml:/app/config.yaml:ro"})),
 			path: "/app/config.yaml",
 			want: copyFileSkipMountedAtPath,
 		},
 		{
 			name: "writable bind above path",
-			c:    MockContainer(containerfixture.WithBinds([]string{"/host/data:/data"})),
+			c:    modelfixture.Container(containerfixture.WithBinds([]string{"/host/data:/data"})),
 			path: "/data/app.db",
 			want: copyFileSkipNone,
 		},
 		{
 			name: "read-only bind above path",
-			c:    MockContainer(containerfixture.WithBinds([]string{"/host/data:/data:ro,z"})),
+			c:    modelfixture.Container(containerfixture.WithBinds([]string{"/host/data:/data:ro,z"})),
 			path: "/data/app.db",
 			want: copyFileSkipReadOnlyMount,
 		},
 		{
 			name: "deeper writable mount shadows read-only mount",
-			c: MockContainer(containerfixture.WithInspectMounts([]dockerContainer.MountPoint{
+			c: modelfixture.Container(containerfixture.WithInspectMounts([]dockerContainer.MountPoint{
 				{Destination: "/data", RW: false},
 				{Destination: "/data/inner", RW: true},
 			})),
@@ -262,7 +263,7 @@ func TestCopyFileSkipForPath(t *testing.T) {
 		},
 		{
 			name: "deeper mount wins regardless of order",
-			c: MockContainer(containerfixture.WithInspectMounts([]dockerContainer.MountPoint{
+			c: modelfixture.Container(containerfixture.WithInspectMounts([]dockerContainer.MountPoint{
 				{Destination: "/data/inner", RW: true},
 				{Destination: "/data", RW: false},
 			})),
@@ -271,25 +272,25 @@ func TestCopyFileSkipForPath(t *testing.T) {
 		},
 		{
 			name: "unrelated bind",
-			c:    MockContainer(containerfixture.WithBinds([]string{"/host/data:/data"})),
+			c:    modelfixture.Container(containerfixture.WithBinds([]string{"/host/data:/data"})),
 			path: "/app/config.yaml",
 			want: copyFileSkipNone,
 		},
 		{
 			name: "malformed bind",
-			c:    MockContainer(containerfixture.WithBinds([]string{"nocolon"})),
+			c:    modelfixture.Container(containerfixture.WithBinds([]string{"nocolon"})),
 			path: "/app/config.yaml",
 			want: copyFileSkipNone,
 		},
 		{
 			name: "read-only rootfs without mount",
-			c:    MockContainer(containerfixture.WithReadonlyRootfs(true)),
+			c:    modelfixture.Container(containerfixture.WithReadonlyRootfs(true)),
 			path: "/app/config.yaml",
 			want: copyFileSkipReadOnlyRootfs,
 		},
 		{
 			name: "read-only rootfs with volume above path",
-			c: MockContainer(
+			c: modelfixture.Container(
 				containerfixture.WithReadonlyRootfs(true),
 				containerfixture.WithInspectMounts([]dockerContainer.MountPoint{
 					{Destination: "/etc/searxng", RW: true},
@@ -300,7 +301,7 @@ func TestCopyFileSkipForPath(t *testing.T) {
 		},
 		{
 			name: "read-only rootfs with mount at path",
-			c: MockContainer(
+			c: modelfixture.Container(
 				containerfixture.WithReadonlyRootfs(true),
 				containerfixture.WithInspectMounts([]dockerContainer.MountPoint{
 					{Destination: "/app/config.yaml", RW: true},
@@ -345,7 +346,7 @@ func TestSnapshotCopyFiles(t *testing.T) {
 		t.Parallel()
 
 		api := mockContainer.NewMockAPIClient(t)
-		snap, err := snapshotCopyFiles(newTestLogger(t), t.Context(), api, MockContainer())
+		snap, err := snapshotCopyFiles(newTestLogger(t), t.Context(), api, modelfixture.Container())
 		require.NoError(t, err)
 		assert.True(t, snap.empty())
 	})
@@ -366,7 +367,7 @@ func TestSnapshotCopyFiles(t *testing.T) {
 				},
 			}, nil)
 
-		c := MockContainer(containerfixture.WithLabels(map[string]string{
+		c := modelfixture.Container(containerfixture.WithLabels(map[string]string{
 			labels.CopyFile: "/app/config.yaml",
 		}))
 
@@ -389,7 +390,7 @@ func TestSnapshotCopyFiles(t *testing.T) {
 			CopyFromContainer(mock.Anything, "container_id", copyFromPath("/etc/missing.conf")).
 			Return(dockerClient.CopyFromContainerResult{}, cerrdefs.ErrNotFound)
 
-		c := MockContainer(containerfixture.WithLabels(map[string]string{
+		c := modelfixture.Container(containerfixture.WithLabels(map[string]string{
 			labels.CopyFile: "/etc/missing.conf",
 		}))
 
@@ -402,7 +403,7 @@ func TestSnapshotCopyFiles(t *testing.T) {
 		t.Parallel()
 
 		api := mockContainer.NewMockAPIClient(t)
-		c := MockContainer(
+		c := modelfixture.Container(
 			containerfixture.WithLabels(map[string]string{
 				labels.CopyFile: "/app/config.yaml",
 			}),
@@ -418,7 +419,7 @@ func TestSnapshotCopyFiles(t *testing.T) {
 		t.Parallel()
 
 		api := mockContainer.NewMockAPIClient(t)
-		c := MockContainer(
+		c := modelfixture.Container(
 			containerfixture.WithLabels(map[string]string{
 				labels.CopyFile: "/etc/searxng/settings.yml",
 			}),
@@ -436,7 +437,7 @@ func TestSnapshotCopyFiles(t *testing.T) {
 		t.Parallel()
 
 		api := mockContainer.NewMockAPIClient(t)
-		c := MockContainer(
+		c := modelfixture.Container(
 			containerfixture.WithLabels(map[string]string{
 				labels.CopyFile: "/etc/searxng/settings.yml",
 			}),
@@ -467,7 +468,7 @@ func TestSnapshotCopyFiles(t *testing.T) {
 				},
 			}, nil)
 
-		c := MockContainer(
+		c := modelfixture.Container(
 			containerfixture.WithLabels(map[string]string{
 				labels.CopyFile: "/etc/searxng/settings.yml",
 			}),
@@ -499,7 +500,7 @@ func TestSnapshotCopyFiles(t *testing.T) {
 				},
 			}, nil)
 
-		c := MockContainer(containerfixture.WithLabels(map[string]string{
+		c := modelfixture.Container(containerfixture.WithLabels(map[string]string{
 			labels.CopyFile: "/app/data",
 		}))
 
@@ -522,7 +523,7 @@ func TestSnapshotCopyFiles(t *testing.T) {
 				},
 			}, nil)
 
-		c := MockContainer(containerfixture.WithLabels(map[string]string{
+		c := modelfixture.Container(containerfixture.WithLabels(map[string]string{
 			labels.CopyFile: "/etc/huge.conf",
 		}))
 
@@ -545,7 +546,7 @@ func TestSnapshotCopyFiles(t *testing.T) {
 				},
 			}, nil)
 
-		c := MockContainer(containerfixture.WithLabels(map[string]string{
+		c := modelfixture.Container(containerfixture.WithLabels(map[string]string{
 			labels.CopyFile: "/app/config.yaml",
 		}))
 
@@ -567,7 +568,7 @@ func TestSnapshotCopyFiles(t *testing.T) {
 				},
 			}, nil)
 
-		c := MockContainer(containerfixture.WithLabels(map[string]string{
+		c := modelfixture.Container(containerfixture.WithLabels(map[string]string{
 			labels.CopyFile: "/app/config.yaml",
 		}))
 
@@ -579,7 +580,7 @@ func TestSnapshotCopyFiles(t *testing.T) {
 		t.Parallel()
 
 		api := mockContainer.NewMockAPIClient(t)
-		c := MockContainer(containerfixture.WithLabels(map[string]string{
+		c := modelfixture.Container(containerfixture.WithLabels(map[string]string{
 			labels.CopyFile: "relative.conf",
 		}))
 
@@ -616,7 +617,7 @@ func TestSnapshotCopyFiles(t *testing.T) {
 			}
 		}
 
-		c := MockContainer(containerfixture.WithLabels(map[string]string{
+		c := modelfixture.Container(containerfixture.WithLabels(map[string]string{
 			labels.CopyFile: strings.Join(paths, ","),
 		}))
 
@@ -637,7 +638,7 @@ func TestInjectCopyFiles(t *testing.T) {
 			t.Context(),
 			api,
 			"new-id",
-			MockContainer(),
+			modelfixture.Container(),
 			copyFileSnapshot{},
 		)
 		require.NoError(t, err)
@@ -665,7 +666,7 @@ func TestInjectCopyFiles(t *testing.T) {
 			t.Context(),
 			api,
 			"new-id",
-			MockContainer(),
+			modelfixture.Container(),
 			copyFileSnapshot{files: []copyFileEntry{{
 				target:  "/app/config.yaml",
 				archive: tarBytes,
@@ -703,7 +704,7 @@ func TestInjectCopyFiles(t *testing.T) {
 			t.Context(),
 			api,
 			"new-id",
-			MockContainer(),
+			modelfixture.Container(),
 			copyFileSnapshot{files: []copyFileEntry{{
 				target:  "/config/config.yml",
 				archive: archive,
@@ -726,7 +727,7 @@ func TestInjectCopyFiles(t *testing.T) {
 			t.Context(),
 			api,
 			"new-id",
-			MockContainer(),
+			modelfixture.Container(),
 			copyFileSnapshot{files: []copyFileEntry{{
 				target:  "/app/config.yaml",
 				archive: []byte("tar"),
@@ -755,7 +756,7 @@ func TestInjectCopyFiles(t *testing.T) {
 			t.Context(),
 			api,
 			"new-id",
-			MockContainer(),
+			modelfixture.Container(),
 			copyFileSnapshot{files: []copyFileEntry{
 				{target: "/app/config.yaml", archive: mustFileTar(t, "config.yaml", []byte("a"))},
 				{target: "/run/secrets/token", archive: mustFileTar(t, "token", []byte("b"))},
@@ -784,7 +785,7 @@ func TestInjectCopyFiles(t *testing.T) {
 			t.Context(),
 			api,
 			"new-id",
-			MockContainer(),
+			modelfixture.Container(),
 			copyFileSnapshot{files: []copyFileEntry{{
 				target:  "/app/config.yaml",
 				archive: mustFileTar(t, "config.yaml", []byte("a")),
@@ -1085,7 +1086,7 @@ func TestSnapshotCopyFileErrors(t *testing.T) {
 			CopyFromContainer(mock.Anything, "container_id", copyFromPath("/app/config.yaml")).
 			Return(dockerClient.CopyFromContainerResult{}, errors.New("denied"))
 
-		c := MockContainer(containerfixture.WithLabels(map[string]string{
+		c := modelfixture.Container(containerfixture.WithLabels(map[string]string{
 			labels.CopyFile: "/app/config.yaml",
 		}))
 		_, err := snapshotCopyFiles(newTestLogger(t), t.Context(), api, c)
@@ -1106,7 +1107,7 @@ func TestSnapshotCopyFileErrors(t *testing.T) {
 				},
 			}, nil)
 
-		c := MockContainer(containerfixture.WithLabels(map[string]string{
+		c := modelfixture.Container(containerfixture.WithLabels(map[string]string{
 			labels.CopyFile: "/app/config.yaml",
 		}))
 		_, err := snapshotCopyFiles(newTestLogger(t), t.Context(), api, c)
@@ -1128,7 +1129,7 @@ func TestSnapshotCopyFileErrors(t *testing.T) {
 				},
 			}, nil)
 
-		c := MockContainer(containerfixture.WithLabels(map[string]string{
+		c := modelfixture.Container(containerfixture.WithLabels(map[string]string{
 			labels.CopyFile: "/app/config.yaml",
 		}))
 		_, err := snapshotCopyFiles(newTestLogger(t), t.Context(), api, c)
@@ -1150,7 +1151,7 @@ func TestSnapshotCopyFileErrors(t *testing.T) {
 				},
 			}, nil)
 
-		c := MockContainer(containerfixture.WithLabels(map[string]string{
+		c := modelfixture.Container(containerfixture.WithLabels(map[string]string{
 			labels.CopyFile: "/app/config.yaml",
 		}))
 		_, err := snapshotCopyFiles(newTestLogger(t), t.Context(), api, c)

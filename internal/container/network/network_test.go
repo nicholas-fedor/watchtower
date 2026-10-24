@@ -1,13 +1,10 @@
 package network
 
 import (
-	"bytes"
 	"encoding/json"
 	"net"
 	"net/netip"
-	"sync"
 	"testing"
-	"time"
 
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/assert"
@@ -17,9 +14,9 @@ import (
 	dockerImage "github.com/moby/moby/api/types/image"
 	dockerNetwork "github.com/moby/moby/api/types/network"
 
-	"github.com/nicholas-fedor/watchtower/internal/container"
-	"github.com/nicholas-fedor/watchtower/internal/observability/logging"
 	"github.com/nicholas-fedor/watchtower/internal/testutil/containerfixture"
+	"github.com/nicholas-fedor/watchtower/internal/testutil/logcapture"
+	"github.com/nicholas-fedor/watchtower/internal/testutil/modelfixture"
 	"github.com/nicholas-fedor/watchtower/pkg/types"
 )
 
@@ -39,7 +36,7 @@ func Test_getNetworkConfig(t *testing.T) {
 		t.Run("should return network config with processed endpoints", func(t *testing.T) {
 			t.Parallel()
 
-			container := MockContainer(
+			container := modelfixture.Container(
 				containerfixture.WithNetworkMode("bridge"),
 				containerfixture.WithNetworkSettings(map[string]*dockerNetwork.EndpointSettings{
 					"bridge": {
@@ -73,7 +70,7 @@ func Test_getNetworkConfig(t *testing.T) {
 		t.Run("should handle multiple networks", func(t *testing.T) {
 			t.Parallel()
 
-			container := MockContainer(
+			container := modelfixture.Container(
 				containerfixture.WithNetworks("bridge", "custom_network"),
 			)
 
@@ -87,7 +84,7 @@ func Test_getNetworkConfig(t *testing.T) {
 		t.Run("should clear engine-generated MAC for running container without validation error", func(t *testing.T) {
 			t.Parallel()
 
-			container := MockContainer(
+			container := modelfixture.Container(
 				containerfixture.WithNetworkMode("bridge"),
 				containerfixture.WithContainerState(dockerContainer.State{Running: true, Status: "running"}),
 				containerfixture.WithNetworkSettings(map[string]*dockerNetwork.EndpointSettings{
@@ -114,7 +111,7 @@ func Test_getNetworkConfig(t *testing.T) {
 		t.Run("should return network config with cleared host-specific settings", func(t *testing.T) {
 			t.Parallel()
 
-			container := MockContainer(
+			container := modelfixture.Container(
 				containerfixture.WithNetworkMode("host"),
 				containerfixture.WithNetworkSettings(map[string]*dockerNetwork.EndpointSettings{
 					"host": {
@@ -147,7 +144,7 @@ func Test_getNetworkConfig(t *testing.T) {
 		t.Run("should clear MAC addresses and IP info", func(t *testing.T) {
 			t.Parallel()
 
-			container := MockContainer(
+			container := modelfixture.Container(
 				containerfixture.WithNetworkSettings(map[string]*dockerNetwork.EndpointSettings{
 					"bridge": {
 						MacAddress: dockerNetwork.HardwareAddr("02:42:ac:11:00:02"),
@@ -172,7 +169,7 @@ func Test_getNetworkConfig(t *testing.T) {
 		t.Run("should return empty network config", func(t *testing.T) {
 			t.Parallel()
 
-			container := MockContainer(
+			container := modelfixture.Container(
 				func(container *dockerContainer.InspectResponse, _ *dockerImage.InspectResponse) {
 					container.NetworkSettings = nil
 				},
@@ -191,7 +188,7 @@ func Test_getNetworkConfig(t *testing.T) {
 		t.Run("should handle MAC address validation for non-running containers", func(t *testing.T) {
 			t.Parallel()
 
-			container := MockContainer(
+			container := modelfixture.Container(
 				containerfixture.WithContainerState(dockerContainer.State{Running: false, Status: "exited"}),
 				containerfixture.WithNetworkSettings(map[string]*dockerNetwork.EndpointSettings{
 					"bridge": {
@@ -213,7 +210,7 @@ func Test_getNetworkConfig(t *testing.T) {
 		t.Run("should preserve custom network configurations", func(t *testing.T) {
 			t.Parallel()
 
-			container := MockContainer(
+			container := modelfixture.Container(
 				containerfixture.WithNetworkSettings(map[string]*dockerNetwork.EndpointSettings{
 					"my_custom_network": {
 						NetworkID:  "custom_net_id",
@@ -242,7 +239,7 @@ func Test_getNetworkConfig(t *testing.T) {
 		t.Run("should handle Podman API version strings", func(t *testing.T) {
 			t.Parallel()
 
-			container := MockContainer(
+			container := modelfixture.Container(
 				containerfixture.WithNetworkSettings(map[string]*dockerNetwork.EndpointSettings{
 					"bridge": {
 						MacAddress: dockerNetwork.HardwareAddr("02:42:ac:11:00:02"),
@@ -265,7 +262,7 @@ func Test_getNetworkConfig(t *testing.T) {
 		t.Run("should skip nil endpoints", func(t *testing.T) {
 			t.Parallel()
 
-			container := MockContainer(
+			container := modelfixture.Container(
 				containerfixture.WithNetworkSettings(map[string]*dockerNetwork.EndpointSettings{
 					"bridge":    nil,
 					"valid_net": {NetworkID: "valid_id"},
@@ -299,8 +296,8 @@ func Test_getNetworkConfig(t *testing.T) {
 			t.Run(tc.name, func(t *testing.T) {
 				t.Parallel()
 
-				log, logbuf := newCapturedLogger(zerolog.DebugLevel)
-				container := MockContainer(
+				log, logbuf := logcapture.New(zerolog.DebugLevel)
+				container := modelfixture.Container(
 					containerfixture.WithNetworkMode(tc.networkMode),
 					containerfixture.WithNetworkSettings(map[string]*dockerNetwork.EndpointSettings{
 						tc.network: {
@@ -890,7 +887,7 @@ func Test_onlyGeneratedMacs(t *testing.T) {
 	t.Run("should return true when all original MACs are engine-generated and all endpoints are covered", func(t *testing.T) {
 		t.Parallel()
 
-		container := MockContainer(
+		container := modelfixture.Container(
 			containerfixture.WithNetworkSettings(map[string]*dockerNetwork.EndpointSettings{
 				"bridge": {
 					NetworkID:  "bridge_network_id",
@@ -913,7 +910,7 @@ func Test_onlyGeneratedMacs(t *testing.T) {
 	t.Run("should return false when a non-nil original endpoint is missing from the processed config", func(t *testing.T) {
 		t.Parallel()
 
-		container := MockContainer(
+		container := modelfixture.Container(
 			containerfixture.WithNetworkSettings(map[string]*dockerNetwork.EndpointSettings{
 				"bridge": {
 					NetworkID:  "bridge_network_id",
@@ -941,7 +938,7 @@ func Test_onlyGeneratedMacs(t *testing.T) {
 	t.Run("should return false when there is a user-configured MAC", func(t *testing.T) {
 		t.Parallel()
 
-		container := MockContainer(
+		container := modelfixture.Container(
 			containerfixture.WithNetworkSettings(map[string]*dockerNetwork.EndpointSettings{
 				"bridge": {
 					NetworkID:  "bridge_network_id",
@@ -964,7 +961,7 @@ func Test_onlyGeneratedMacs(t *testing.T) {
 	t.Run("should return false when there are no MACs at all", func(t *testing.T) {
 		t.Parallel()
 
-		container := MockContainer(
+		container := modelfixture.Container(
 			containerfixture.WithNetworkSettings(map[string]*dockerNetwork.EndpointSettings{
 				"bridge": {
 					NetworkID: "bridge_network_id",
@@ -1017,8 +1014,8 @@ func Test_validateMacAddresses(t *testing.T) {
 			t.Run(tc.name, func(t *testing.T) {
 				t.Parallel()
 
-				log, logbuf := newCapturedLogger(zerolog.DebugLevel)
-				container := MockContainer(containerfixture.WithNetworkSettings(map[string]*dockerNetwork.EndpointSettings{
+				log, logbuf := logcapture.New(zerolog.DebugLevel)
+				container := modelfixture.Container(containerfixture.WithNetworkSettings(map[string]*dockerNetwork.EndpointSettings{
 					"bridge": {NetworkID: "bridge_network_id"},
 				}))
 				config := &dockerNetwork.NetworkingConfig{
@@ -1052,7 +1049,7 @@ func Test_validateMacAddresses(t *testing.T) {
 				t.Run("should succeed when MAC address is present", func(t *testing.T) {
 					t.Parallel()
 
-					container := MockContainer(
+					container := modelfixture.Container(
 						containerfixture.WithContainerState(dockerContainer.State{Running: true, Status: "running"}),
 						containerfixture.WithNetworkSettings(map[string]*dockerNetwork.EndpointSettings{
 							"bridge": {
@@ -1084,7 +1081,7 @@ func Test_validateMacAddresses(t *testing.T) {
 				t.Run("should return error when MAC address is missing", func(t *testing.T) {
 					t.Parallel()
 
-					container := MockContainer(
+					container := modelfixture.Container(
 						containerfixture.WithContainerState(dockerContainer.State{Running: true, Status: "running"}),
 						containerfixture.WithNetworkSettings(map[string]*dockerNetwork.EndpointSettings{
 							"bridge": {
@@ -1115,7 +1112,7 @@ func Test_validateMacAddresses(t *testing.T) {
 				t.Run("should succeed with multiple networks all having MAC addresses", func(t *testing.T) {
 					t.Parallel()
 
-					container := MockContainer(
+					container := modelfixture.Container(
 						containerfixture.WithContainerState(dockerContainer.State{Running: true, Status: "running"}),
 						containerfixture.WithNetworks("bridge", "custom_network"),
 						containerfixture.WithNetworkSettings(map[string]*dockerNetwork.EndpointSettings{
@@ -1158,7 +1155,7 @@ func Test_validateMacAddresses(t *testing.T) {
 				t.Run("should succeed when at least one of multiple networks has MAC address", func(t *testing.T) {
 					t.Parallel()
 
-					container := MockContainer(
+					container := modelfixture.Container(
 						containerfixture.WithContainerState(
 							dockerContainer.State{Running: true, Status: "running"},
 						),
@@ -1205,7 +1202,7 @@ func Test_validateMacAddresses(t *testing.T) {
 				t.Run("should succeed when MAC address is missing (created state)", func(t *testing.T) {
 					t.Parallel()
 
-					container := MockContainer(
+					container := modelfixture.Container(
 						containerfixture.WithContainerState(
 							dockerContainer.State{Running: false, Status: "created"},
 						),
@@ -1237,7 +1234,7 @@ func Test_validateMacAddresses(t *testing.T) {
 				t.Run("should succeed when MAC address is missing (exited state)", func(t *testing.T) {
 					t.Parallel()
 
-					container := MockContainer(
+					container := modelfixture.Container(
 						containerfixture.WithContainerState(dockerContainer.State{Running: false, Status: "exited"}),
 						containerfixture.WithNetworkSettings(map[string]*dockerNetwork.EndpointSettings{
 							"bridge": {
@@ -1273,7 +1270,7 @@ func Test_validateMacAddresses(t *testing.T) {
 		t.Run("should handle empty network configuration", func(t *testing.T) {
 			t.Parallel()
 
-			container := MockContainer(
+			container := modelfixture.Container(
 				containerfixture.WithContainerState(dockerContainer.State{Running: true, Status: "running"}),
 			)
 			config := &dockerNetwork.NetworkingConfig{
@@ -1293,7 +1290,7 @@ func Test_validateMacAddresses(t *testing.T) {
 		t.Run("should handle nil network configuration", func(t *testing.T) {
 			t.Parallel()
 
-			container := MockContainer(
+			container := modelfixture.Container(
 				containerfixture.WithContainerState(dockerContainer.State{Running: true, Status: "running"}),
 			)
 
@@ -1396,72 +1393,6 @@ func Test_filterAliases(t *testing.T) {
 		result := filterAliases(aliases, shortID)
 		assert.Equal(t, []string{"first", "second", "third"}, result)
 	})
-}
-
-// MockContainer builds a Container from containerfixture inspect data, with
-// updates applied in order.
-//
-// Parameters:
-//   - updates: Changes to the container or image inspect data.
-//
-// Returns:
-//   - *container.Container: Container built from the inspect data.
-func MockContainer(updates ...containerfixture.Update) *container.Container {
-	containerInfo, imageInfo := containerfixture.Inspect(updates...)
-
-	return container.NewContainer(nil, containerInfo, imageInfo)
-}
-
-// lockedBuffer is a buffer that is safe for concurrent writes, for logs that
-// goroutines started by a test write while the test reads them.
-type lockedBuffer struct {
-	// mu guards buf.
-	mu sync.Mutex
-	// buf holds the written bytes.
-	buf bytes.Buffer
-}
-
-// Write appends p to the buffer.
-//
-// Parameters:
-//   - p: Bytes to append.
-//
-// Returns:
-//   - int: Number of bytes written.
-//   - error: Always nil.
-func (b *lockedBuffer) Write(p []byte) (int, error) {
-	b.mu.Lock()
-	defer b.mu.Unlock()
-
-	return b.buf.Write(p)
-}
-
-// String returns everything written so far.
-//
-// Returns:
-//   - string: The buffer's contents.
-func (b *lockedBuffer) String() string {
-	b.mu.Lock()
-	defer b.mu.Unlock()
-
-	return b.buf.String()
-}
-
-// newCapturedLogger returns a logfmt logger at level that writes to a buffer the
-// test reads, in the format production logs use.
-//
-// Parameters:
-//   - level: Lowest level the logger writes.
-//
-// Returns:
-//   - *zerolog.Logger: Logger writing to the buffer.
-//   - *lockedBuffer: Buffer holding the logged lines.
-func newCapturedLogger(level zerolog.Level) (*zerolog.Logger, *lockedBuffer) {
-	buf := &lockedBuffer{}
-	w := logging.LogfmtWriter(buf)
-	w.TimeFormat = time.RFC3339
-
-	return new(zerolog.New(w).Level(level).With().Timestamp().Logger()), buf
 }
 
 // newTestLogger returns a logger that writes each event to the test's log, so a

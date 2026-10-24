@@ -18,6 +18,7 @@ import (
 
 	"github.com/nicholas-fedor/watchtower/internal/settings"
 	notifyConfig "github.com/nicholas-fedor/watchtower/internal/settings/config/notify"
+	"github.com/nicholas-fedor/watchtower/internal/testutil/logcapture"
 )
 
 // fatalExitMu serializes the tests that replace zerolog.FatalExitFunc, which
@@ -442,7 +443,7 @@ func TestNotifier(t *testing.T) {
 					"Atesttoken12345",
 				}
 
-				var buf lockedBuffer
+				var buf logcapture.Buffer
 
 				log := zerolog.New(&buf).Level(zerolog.TraceLevel)
 
