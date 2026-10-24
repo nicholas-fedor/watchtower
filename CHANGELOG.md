@@ -45,6 +45,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Document the health check for Podman by @nicholas-fedor in [#3096](https://github.com/nicholas-fedor/watchtower/pull/3096)
 
+### Tests
+
+- Build container test data through a shared fixture package by @nicholas-fedor in [#3108](https://github.com/nicholas-fedor/watchtower/pull/3108)
+
 ### Chores
 
 - Update docker/login-action action to v4.7.0 by @renovate[bot] in [#3093](https://github.com/nicholas-fedor/watchtower/pull/3093)
