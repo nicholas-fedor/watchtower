@@ -50,6 +50,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Tests
 
+- Add direct tests for the redact package by @nicholas-fedor in [#3116](https://github.com/nicholas-fedor/watchtower/pull/3116)
 - Build container test data through a shared fixture package by @nicholas-fedor in [#3108](https://github.com/nicholas-fedor/watchtower/pull/3108)
 
 ### Chores
