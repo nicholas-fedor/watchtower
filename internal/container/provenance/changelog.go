@@ -3,6 +3,7 @@ package provenance
 import (
 	"net/url"
 	"strings"
+	"unicode"
 
 	"golang.org/x/mod/semver"
 
@@ -256,6 +257,18 @@ func safeReleaseTag(tag string) bool {
 	return true
 }
 
+// isUnsafeRepoRune reports whether r is whitespace or an ASCII control
+// character, which a repository path must not carry into a URL.
+//
+// Parameters:
+//   - r: Rune to check.
+//
+// Returns:
+//   - bool: True for whitespace and ASCII control characters.
+func isUnsafeRepoRune(r rune) bool {
+	return unicode.IsSpace(r) || isASCIIControl(r)
+}
+
 // isASCIIControl reports whether r is an ASCII control character.
 //
 // Parameters:
@@ -414,13 +427,18 @@ func splitOwnerRepo(host, path string) (string, string, string, bool) {
 
 // safeRepoPath reports whether a Git path segment can be used in a release URL.
 //
+// The path of a parsed clone URL is already decoded, so a character such as ?
+// or # would change the structure of the derived URL. The check rejects ?, #,
+// %, and \ along with whitespace and ASCII control characters. It also rejects
+// empty, dot, and parent segments.
+//
 // Parameters:
 //   - value: Owner path or repository name.
 //
 // Returns:
-//   - bool: False when value is empty or contains a "." or ".." segment.
+//   - bool: True when value is safe to embed in a release URL.
 func safeRepoPath(value string) bool {
-	if value == "" {
+	if value == "" || strings.ContainsAny(value, "?#%\\") || strings.ContainsFunc(value, isUnsafeRepoRune) {
 		return false
 	}
 
