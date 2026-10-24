@@ -21,6 +21,7 @@ import (
 	"github.com/nicholas-fedor/watchtower/internal/container/filters"
 	"github.com/nicholas-fedor/watchtower/internal/container/labels"
 	"github.com/nicholas-fedor/watchtower/internal/container/oci"
+	"github.com/nicholas-fedor/watchtower/internal/container/provenance"
 	"github.com/nicholas-fedor/watchtower/internal/git"
 	"github.com/nicholas-fedor/watchtower/internal/registry/ratelimit"
 	"github.com/nicholas-fedor/watchtower/internal/update/changelog"
@@ -607,7 +608,7 @@ func update(
 			resolveLatest := stale && shouldUpdate && !gitWatched && checkErr == nil && verifyErr == nil
 
 			var (
-				changelogVars pkgContainer.ChangelogVars
+				changelogVars provenance.ChangelogVars
 				latestAnns    oci.Annotations
 			)
 
@@ -1180,7 +1181,7 @@ func logChangelog(
 	log *zerolog.Logger,
 	c types.Container,
 	params types.UpdateParams,
-	meta pkgContainer.ReportMeta,
+	meta provenance.ReportMeta,
 ) {
 	if c == nil || meta.Changelog == "" {
 		return

@@ -11,9 +11,9 @@ import (
 
 	"github.com/nicholas-fedor/watchtower/internal/container"
 	"github.com/nicholas-fedor/watchtower/internal/container/oci"
+	"github.com/nicholas-fedor/watchtower/internal/container/provenance"
 	"github.com/nicholas-fedor/watchtower/internal/git"
 	pkgContainer "github.com/nicholas-fedor/watchtower/pkg/container"
-	gitPkg "github.com/nicholas-fedor/watchtower/pkg/container/git"
 	"github.com/nicholas-fedor/watchtower/pkg/types"
 )
 
@@ -169,7 +169,7 @@ func applyReportMetadata(c types.Container, params types.UpdateParams, result *C
 		return
 	}
 
-	meta := pkgContainer.ResolveReportMeta(c, params, pkgContainer.ChangelogVars{}, oci.Annotations{})
+	meta := provenance.ResolveReportMeta(c, params, provenance.ChangelogVars{}, oci.Annotations{})
 	result.GitRepo = meta.GitRepo
 	result.GitRef = meta.GitRef
 	result.Changelog = meta.Changelog
@@ -225,7 +225,7 @@ func isGitWatched(
 		return false
 	}
 
-	return gitPkg.ShouldMonitor(log, c, params)
+	return provenance.ShouldMonitor(log, c, params)
 }
 
 // checkGitSource compares the hosted Git ref for a container.
@@ -270,10 +270,10 @@ func checkGitSource(
 	result.GitCommit = checkResult.Commit
 
 	if checkResult.Tag != "" {
-		result.Changelog = pkgContainer.ResolveReportMeta(
+		result.Changelog = provenance.ResolveReportMeta(
 			c,
 			params,
-			pkgContainer.ChangelogVars{
+			provenance.ChangelogVars{
 				Tag:    checkResult.Tag,
 				Commit: checkResult.Commit,
 			},

@@ -13,7 +13,7 @@ import (
 
 	"github.com/go-git/go-git/v5/plumbing/transport"
 
-	gitPkg "github.com/nicholas-fedor/watchtower/pkg/container/git"
+	"github.com/nicholas-fedor/watchtower/internal/container/provenance"
 	"github.com/nicholas-fedor/watchtower/pkg/types"
 )
 
@@ -121,7 +121,7 @@ func (c *Client) listTagsViaAPI(ctx context.Context, repo, apiOrigin string) ([]
 //   - bool: True when an HTTP API should be used.
 func (c *Client) lookupAPI(ctx context.Context, cloneHost, apiOrigin string) (string, url.URL, bool) {
 	if apiOrigin != "" {
-		parsed, err := gitPkg.ParseAPIOrigin(apiOrigin)
+		parsed, err := provenance.ParseAPIOrigin(apiOrigin)
 		if err != nil {
 			return "", url.URL{}, false
 		}

@@ -24,12 +24,12 @@ import (
 	composeLabels "github.com/nicholas-fedor/watchtower/internal/compose/labels"
 	composeProject "github.com/nicholas-fedor/watchtower/internal/compose/project"
 	"github.com/nicholas-fedor/watchtower/internal/container/labels"
+	"github.com/nicholas-fedor/watchtower/internal/container/provenance"
 	"github.com/nicholas-fedor/watchtower/internal/git"
 	"github.com/nicholas-fedor/watchtower/internal/git/project"
 	mockUpdate "github.com/nicholas-fedor/watchtower/internal/update/mocks"
 	"github.com/nicholas-fedor/watchtower/internal/update/sorter"
 	"github.com/nicholas-fedor/watchtower/internal/update/state"
-	gitPkg "github.com/nicholas-fedor/watchtower/pkg/container/git"
 	mockContainer "github.com/nicholas-fedor/watchtower/pkg/container/mocks"
 	"github.com/nicholas-fedor/watchtower/pkg/types"
 )
@@ -411,7 +411,7 @@ func Test_gitSession(t *testing.T) {
 			assert.Empty(t, failed)
 			assert.Contains(t, sess.built, c.ID())
 			assert.True(t, strings.HasPrefix(c.ImageName(), "docker.io/library/myapp:git-"))
-			commit, tag := gitPkg.LastStamp(c)
+			commit, tag := provenance.LastStamp(c)
 			assert.Equal(t, "0123456789abcdef0123456789abcdef01234567", commit)
 			assert.Equal(t, "v1.0.0", tag)
 		})
@@ -481,7 +481,7 @@ func Test_gitSession(t *testing.T) {
 			)
 			require.NoError(t, err)
 
-			assoc, ok := gitPkg.ResolveAssociation(c, types.UpdateParams{EnableGitMonitoring: true})
+			assoc, ok := provenance.ResolveAssociation(c, types.UpdateParams{EnableGitMonitoring: true})
 			assert.True(t, ok)
 			assert.Equal(t, "build/docker/Dockerfile", assoc.Dockerfile)
 			assert.Equal(t, ".", assoc.Context)

@@ -1,4 +1,4 @@
-package git
+package provenance
 
 import (
 	"net/url"

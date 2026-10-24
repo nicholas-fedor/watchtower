@@ -6,7 +6,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/nicholas-fedor/watchtower/pkg/container"
+	"github.com/nicholas-fedor/watchtower/internal/container/provenance"
 	"github.com/nicholas-fedor/watchtower/pkg/types"
 )
 
@@ -391,7 +391,7 @@ func TestContainerStatus_RestartedStateWithMissingData(t *testing.T) {
 
 func TestContainerStatus_SetGitMetadata(t *testing.T) {
 	u := &ContainerStatus{}
-	u.SetGitMetadata(container.ReportMeta{
+	u.SetGitMetadata(provenance.ReportMeta{
 		GitRepo:         "https://github.com/org/app.git",
 		GitRef:          "main",
 		Changelog:       "https://github.com/org/app/releases/tag/v1.2.3",

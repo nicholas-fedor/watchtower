@@ -8,10 +8,10 @@ import (
 
 	"github.com/nicholas-fedor/watchtower/internal/container"
 	"github.com/nicholas-fedor/watchtower/internal/container/oci"
+	"github.com/nicholas-fedor/watchtower/internal/container/provenance"
 	"github.com/nicholas-fedor/watchtower/internal/registry"
 	"github.com/nicholas-fedor/watchtower/internal/update/changelog"
 	"github.com/nicholas-fedor/watchtower/internal/update/state"
-	pkgContainer "github.com/nicholas-fedor/watchtower/pkg/container"
 	"github.com/nicholas-fedor/watchtower/pkg/types"
 )
 
@@ -60,7 +60,7 @@ func resolveLatestImageMeta(
 	c types.Container,
 	config types.UpdateParams,
 	latest latestImageMetadata,
-) (pkgContainer.ChangelogVars, oci.Annotations) {
+) (provenance.ChangelogVars, oci.Annotations) {
 	clogVal := log.With().
 		Str("container", c.Name()).
 		Str("image", c.ImageName()).
@@ -72,10 +72,10 @@ func resolveLatestImageMeta(
 		// The gate is off. Still record the new image's version and revision so
 		// a custom template can print a transition, but never spend a request
 		// to confirm a release tag.
-		return pkgContainer.ChangelogVars{}, latest.annotations
+		return provenance.ChangelogVars{}, latest.annotations
 	}
 
-	return pkgContainer.ChangelogVars{
+	return provenance.ChangelogVars{
 		Tag: resolveReleaseTag(clog, ctx, resolver, c, latest),
 	}, latest.annotations
 }
@@ -101,7 +101,7 @@ func applyLatestImageMeta(
 	progress *state.Progress,
 	c types.Container,
 	config types.UpdateParams,
-	vars pkgContainer.ChangelogVars,
+	vars provenance.ChangelogVars,
 	annotations oci.Annotations,
 ) {
 	if progress == nil || c == nil {

@@ -1,4 +1,4 @@
-package container
+package provenance
 
 import (
 	"testing"
@@ -8,7 +8,6 @@ import (
 	"github.com/nicholas-fedor/watchtower/internal/container/labels"
 	"github.com/nicholas-fedor/watchtower/internal/container/oci"
 	"github.com/nicholas-fedor/watchtower/internal/testutil/containerfixture"
-	"github.com/nicholas-fedor/watchtower/pkg/container/git"
 	"github.com/nicholas-fedor/watchtower/pkg/types"
 )
 
@@ -341,8 +340,8 @@ func TestResolveReportMeta(t *testing.T) {
 		meta := ResolveReportMeta(c, types.UpdateParams{}, ChangelogVars{}, oci.Annotations{})
 		assert.Equal(t, "https://github.com/org/from-oci.git", meta.GitRepo)
 
-		assoc, ok := git.ResolveAssociation(c, types.UpdateParams{})
+		assoc, ok := ResolveAssociation(c, types.UpdateParams{})
 		assert.False(t, ok)
-		assert.Equal(t, git.Association{}, assoc)
+		assert.Equal(t, Association{}, assoc)
 	})
 }

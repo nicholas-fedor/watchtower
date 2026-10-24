@@ -14,11 +14,10 @@ import (
 	"github.com/nicholas-fedor/watchtower/internal/container"
 	"github.com/nicholas-fedor/watchtower/internal/container/labels"
 	"github.com/nicholas-fedor/watchtower/internal/container/oci"
+	"github.com/nicholas-fedor/watchtower/internal/container/provenance"
 	"github.com/nicholas-fedor/watchtower/internal/git"
 	"github.com/nicholas-fedor/watchtower/internal/git/project"
 	"github.com/nicholas-fedor/watchtower/internal/update/state"
-	pkgContainer "github.com/nicholas-fedor/watchtower/pkg/container"
-	gitPkg "github.com/nicholas-fedor/watchtower/pkg/container/git"
 	"github.com/nicholas-fedor/watchtower/pkg/types"
 )
 
@@ -292,10 +291,10 @@ func (s *gitSession) recordCompose(
 		return
 	}
 
-	assoc, _ := gitPkg.ResolveAssociation(c, params)
+	assoc, _ := provenance.ResolveAssociation(c, params)
 	if concrete, ok := c.(*container.Container); ok {
-		pkgContainer.ApplyGitAssociation(concrete, assoc, gitPkg.PersistWatch(c))
-		pkgContainer.ApplyGitStamp(concrete, result.Commit, result.Tag)
+		provenance.ApplyGitAssociation(concrete, assoc, provenance.PersistWatch(c))
+		provenance.ApplyGitStamp(concrete, result.Commit, result.Tag)
 	}
 
 	s.mu.Lock()
@@ -327,7 +326,7 @@ func (s *gitSession) recordCompose(
 
 	// A Git rebuild has no pulled image, so no latest image annotations are
 	// passed and LatestImageVersion stays empty.
-	meta := progress.SetLatestImageMeta(log, c, params, pkgContainer.ChangelogVars{
+	meta := progress.SetLatestImageMeta(log, c, params, provenance.ChangelogVars{
 		Tag:    result.Tag,
 		Commit: result.Commit,
 	}, oci.Annotations{})
@@ -471,7 +470,7 @@ func (s *gitSession) recordComposeReplicas(
 			progress.SetLatestImage(log, status.ID(), item.ImageID)
 		}
 
-		meta := pkgContainer.ResolveReportMeta(representative.container, params, pkgContainer.ChangelogVars{
+		meta := provenance.ResolveReportMeta(representative.container, params, provenance.ChangelogVars{
 			Tag:    representative.result.Tag,
 			Commit: representative.result.Commit,
 		}, oci.Annotations{})
@@ -532,7 +531,7 @@ func (s *gitSession) rejectComposeApply(batch *composeBatch) {
 			continue
 		}
 
-		previousCommit, previousTag := gitPkg.Baseline(member.container)
+		previousCommit, previousTag := provenance.Baseline(member.container)
 		s.client.RejectApply(
 			git.ApplyStampKeyFrom(member.container),
 			member.result.Commit,
@@ -740,7 +739,7 @@ func safeComposeAPIOrigin(raw string) string {
 	parsed.ForceQuery = false
 	parsed.Fragment = ""
 
-	origin, err := gitPkg.ParseAPIOrigin(parsed.String())
+	origin, err := provenance.ParseAPIOrigin(parsed.String())
 	if err != nil {
 		return ""
 	}
@@ -769,9 +768,9 @@ func composeServiceLabels(c types.Container, params types.UpdateParams, result g
 		out[labels.GitLastTag] = result.Tag
 	}
 
-	assoc, ok := gitPkg.ResolveAssociation(c, params)
+	assoc, ok := provenance.ResolveAssociation(c, params)
 	if ok && assoc.Repo != "" {
-		meta := pkgContainer.ResolveReportMeta(c, params, pkgContainer.ChangelogVars{
+		meta := provenance.ResolveReportMeta(c, params, provenance.ChangelogVars{
 			Tag:    result.Tag,
 			Commit: result.Commit,
 		}, oci.Annotations{})
@@ -801,7 +800,7 @@ func composeServiceLabels(c types.Container, params types.UpdateParams, result g
 			out[labels.GitContext] = assoc.Context
 		}
 
-		if gitPkg.PersistWatch(c) {
+		if provenance.PersistWatch(c) {
 			out[labels.GitWatch] = "true"
 		}
 	}

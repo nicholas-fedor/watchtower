@@ -18,6 +18,7 @@ import (
 	dockerClient "github.com/moby/moby/client"
 
 	"github.com/nicholas-fedor/watchtower/internal/container/labels"
+	"github.com/nicholas-fedor/watchtower/internal/container/provenance"
 	"github.com/nicholas-fedor/watchtower/internal/testutil/containerfixture"
 	mockContainer "github.com/nicholas-fedor/watchtower/pkg/container/mocks"
 	"github.com/nicholas-fedor/watchtower/pkg/types"
@@ -39,7 +40,7 @@ func TestClientBuildRemoteImage(t *testing.T) {
 			RemoteContext: remote,
 			Tags:          []string{"app:latest"},
 			Remove:        true,
-			Dockerfile:    DefaultGitDockerfile,
+			Dockerfile:    provenance.DefaultDockerfile,
 		}).Return(dockerClient.ImageBuildResult{Body: io.NopCloser(strings.NewReader(body))}, err).Once()
 	}
 

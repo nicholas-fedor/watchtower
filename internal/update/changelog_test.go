@@ -18,11 +18,11 @@ import (
 	"github.com/nicholas-fedor/watchtower/internal/container"
 	"github.com/nicholas-fedor/watchtower/internal/container/labels"
 	"github.com/nicholas-fedor/watchtower/internal/container/oci"
+	"github.com/nicholas-fedor/watchtower/internal/container/provenance"
 	internalGit "github.com/nicholas-fedor/watchtower/internal/git"
 	"github.com/nicholas-fedor/watchtower/internal/update/changelog"
 	mockUpdate "github.com/nicholas-fedor/watchtower/internal/update/mocks"
 	"github.com/nicholas-fedor/watchtower/internal/update/state"
-	pkgContainer "github.com/nicholas-fedor/watchtower/pkg/container"
 	"github.com/nicholas-fedor/watchtower/pkg/types"
 )
 
@@ -288,7 +288,7 @@ func TestLogChangelogOnlyWhenEnabled(t *testing.T) {
 			t.Parallel()
 
 			c := newReportContainer(t, tt.labels, nil)
-			meta := pkgContainer.ReportMeta{Changelog: "https://example.com/notes"}
+			meta := provenance.ReportMeta{Changelog: "https://example.com/notes"}
 
 			var buf bytes.Buffer
 
@@ -323,8 +323,8 @@ func TestLogChangelogSkipsEmptyURL(t *testing.T) {
 
 	log := zerolog.New(&buf)
 
-	logChangelog(&log, c, types.UpdateParams{EnableChangelog: true}, pkgContainer.ReportMeta{})
-	logChangelog(&log, nil, types.UpdateParams{EnableChangelog: true}, pkgContainer.ReportMeta{
+	logChangelog(&log, c, types.UpdateParams{EnableChangelog: true}, provenance.ReportMeta{})
+	logChangelog(&log, nil, types.UpdateParams{EnableChangelog: true}, provenance.ReportMeta{
 		Changelog: "https://example.com/notes",
 	})
 
