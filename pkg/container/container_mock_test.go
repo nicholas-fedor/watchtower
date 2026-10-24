@@ -368,17 +368,6 @@ func expectInfo(api *mockContainer.MockAPIClient, info dockerSystem.Info) {
 		Return(dockerClient.SystemInfoResult{Info: info}, nil).Once()
 }
 
-// expectServerVersion expects one server version request and answers it with
-// the given components.
-//
-// Parameters:
-//   - api: Mocked Docker API.
-//   - components: Version components the daemon reports.
-func expectServerVersion(api *mockContainer.MockAPIClient, components ...dockerSystem.ComponentVersion) {
-	api.EXPECT().ServerVersion(mock.Anything, dockerClient.ServerVersionOptions{}).
-		Return(dockerClient.ServerVersionResult{Components: components}, nil).Once()
-}
-
 // newImageAPI returns a mock Docker API whose daemon reports no registry mirrors.
 //
 // Parameters:

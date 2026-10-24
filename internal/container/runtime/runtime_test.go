@@ -1,16 +1,20 @@
-package container
+package runtime
 
 import (
+	"errors"
 	"os"
 	"testing"
 	"testing/fstest"
 
+	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 
 	dockerSystem "github.com/moby/moby/api/types/system"
 	dockerClient "github.com/moby/moby/client"
+
+	mockContainer "github.com/nicholas-fedor/watchtower/internal/container/mocks"
 )
 
 // TestDetectRuntimeByEnv_PodmanVariable verifies that the lowercase container
@@ -246,4 +250,71 @@ func TestDetectRuntimeByEnv(t *testing.T) {
 			assert.Equal(t, tt.want, detectRuntimeByEnv(newTestLogger(t)))
 		})
 	}
+}
+
+// daemonError returns an error formatted as the Docker SDK reports a daemon
+// error response.
+//
+// Parameters:
+//   - message: Message the daemon responded with.
+//
+// Returns:
+//   - error: Error with the daemon's message.
+func daemonError(message string) error {
+	return errors.New("Error response from daemon: " + message)
+}
+
+// expectInfo expects one daemon info request and answers it with info.
+//
+// Parameters:
+//   - api: Mocked Docker API.
+//   - info: Daemon information to answer with.
+func expectInfo(api *mockContainer.MockAPIClient, info dockerSystem.Info) {
+	api.EXPECT().Info(mock.Anything, dockerClient.InfoOptions{}).
+		Return(dockerClient.SystemInfoResult{Info: info}, nil).Once()
+}
+
+// newDockerAPI returns a mocked Docker API whose client version is available
+// for diagnostic logs.
+//
+// Parameters:
+//   - t: Test the mock belongs to.
+//
+// Returns:
+//   - *mockContainer.MockAPIClient: Mocked Docker API.
+func newDockerAPI(t *testing.T) *mockContainer.MockAPIClient {
+	t.Helper()
+
+	api := mockContainer.NewMockAPIClient(t)
+	api.EXPECT().ClientVersion().Return("1.47").Maybe()
+
+	return api
+}
+
+// expectServerVersion expects one server version request and answers it with
+// the given components.
+//
+// Parameters:
+//   - api: Mocked Docker API.
+//   - components: Version components the daemon reports.
+func expectServerVersion(api *mockContainer.MockAPIClient, components ...dockerSystem.ComponentVersion) {
+	api.EXPECT().ServerVersion(mock.Anything, dockerClient.ServerVersionOptions{}).
+		Return(dockerClient.ServerVersionResult{Components: components}, nil).Once()
+}
+
+// newTestLogger returns a logger that writes each event to the test's log, so a
+// failing test shows what it logged.
+//
+// Parameters:
+//   - t: Test that receives the log lines.
+//
+// Returns:
+//   - *zerolog.Logger: Logger writing to t.
+func newTestLogger(t *testing.T) *zerolog.Logger {
+	t.Helper()
+
+	// Frame 4 skips zerolog's write path, so each line names the log call.
+	w := zerolog.TestWriter{T: t, Frame: 4}
+
+	return new(zerolog.New(w))
 }
