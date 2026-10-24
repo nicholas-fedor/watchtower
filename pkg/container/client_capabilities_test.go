@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"net/url"
 	"strings"
 	"testing"
 
@@ -84,6 +85,20 @@ func TestClientBuildRemoteImage(t *testing.T) {
 		_, err := (&client{log: newTestLogger(t), api: api}).BuildRemoteImage(t.Context(), remote, "", []string{"app:latest"})
 		require.Error(t, err)
 		assert.NotContains(t, err.Error(), "secret")
+	})
+
+	t.Run("redacts a query-escaped remote from a failed build", func(t *testing.T) {
+		t.Parallel()
+
+		// The client sends the remote as a query parameter, so its error can
+		// echo the request URL with the remote query-escaped.
+		api := newDockerAPI(t)
+		expectBuild(api, "", fmt.Errorf(`Post "http://docker/build?remote=%s": EOF`, url.QueryEscape(remote)))
+
+		_, err := (&client{log: newTestLogger(t), api: api}).BuildRemoteImage(t.Context(), remote, "", []string{"app:latest"})
+		require.Error(t, err)
+		assert.NotContains(t, err.Error(), "secret")
+		assert.Contains(t, err.Error(), url.QueryEscape("https://xxxxx:xxxxx@github.com"))
 	})
 
 	t.Run("rejects an empty remote before calling Docker", func(t *testing.T) {

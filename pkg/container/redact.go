@@ -6,8 +6,14 @@ import (
 	"strings"
 )
 
+// redactedUserinfo replaces the userinfo matched by userinfoInError.
+const redactedUserinfo = "://xxxxx:xxxxx@"
+
 // userinfoInError matches scheme://user@ and scheme://user:password@ in a daemon error.
-var userinfoInError = regexp.MustCompile(`://[^/\s@]+@`)
+//
+// It matches through the last @ before the first /, ?, #, or whitespace, so a
+// password that contains @ is matched whole.
+var userinfoInError = regexp.MustCompile(`://[^/?#\s]+@`)
 
 // redactGitURL removes credentials and sensitive query values from a Git URL.
 //
@@ -43,10 +49,14 @@ func redactGitURL(raw string) string {
 	}
 
 	if parsed.User != nil {
-		if parsed.Scheme == "http" || parsed.Scheme == "https" || parsed.Scheme == "file" {
+		switch {
+		case parsed.Scheme == "http" || parsed.Scheme == "https" || parsed.Scheme == "file",
+			gitUserIsCredential(parsed.User.Username()):
 			parsed.User = nil
-		} else if _, hasPassword := parsed.User.Password(); hasPassword {
-			parsed.User = url.User(parsed.User.Username())
+		default:
+			if _, hasPassword := parsed.User.Password(); hasPassword {
+				parsed.User = url.User(parsed.User.Username())
+			}
 		}
 	}
 
@@ -174,7 +184,7 @@ func redactSCPGitURL(raw string) string {
 	withoutQuery, query, hasQuery := strings.Cut(withoutFragment, "?")
 
 	user, remote, found := strings.Cut(withoutQuery, "@")
-	if !found || user == "" || scpUserIsCredential(user) {
+	if !found || user == "" || gitUserIsCredential(user) {
 		return ""
 	}
 
@@ -203,17 +213,18 @@ func redactSCPGitURL(raw string) string {
 	return sanitized
 }
 
-// scpUserIsCredential reports whether an SCP user is a secret rather than an account name.
+// gitUserIsCredential reports whether the user of a Git URL is a secret rather
+// than an account name.
 //
 // git and other short account names are kept. A token used as the user is not
-// stored on a replacement container.
+// stored on a replacement container, in an SCP-style URL or any other.
 //
 // Parameters:
-//   - user: User component of an SCP URL.
+//   - user: User component of a Git URL.
 //
 // Returns:
 //   - bool: True when the user must not be persisted.
-func scpUserIsCredential(user string) bool {
+func gitUserIsCredential(user string) bool {
 	if user == "" || strings.Contains(user, ":") {
 		return true
 	}
@@ -289,6 +300,9 @@ func redactMetadataURL(raw string) string {
 
 // redactedRemote replaces URL userinfo for logs.
 //
+// A remote that does not parse may still carry credentials, so its userinfo is
+// masked by pattern.
+//
 // Parameters:
 //   - remote: Git context URL that may contain credentials.
 //
@@ -296,7 +310,11 @@ func redactMetadataURL(raw string) string {
 //   - string: Same URL with userinfo replaced by xxxxx.
 func redactedRemote(remote string) string {
 	parsed, err := url.Parse(remote)
-	if err != nil || parsed.User == nil {
+	if err != nil {
+		return userinfoInError.ReplaceAllString(remote, redactedUserinfo)
+	}
+
+	if parsed.User == nil {
 		return remote
 	}
 
@@ -311,6 +329,9 @@ func redactedRemote(remote string) string {
 
 // redactUserinfo replaces the credentialed remote and any leftover userinfo.
 //
+// The build request sends the remote as a query parameter. An error that echoes
+// the request URL carries it query-escaped, so that form is replaced too.
+//
 // Parameters:
 //   - msg: Error text.
 //   - remote: Credentialed Git context URL.
@@ -319,8 +340,10 @@ func redactedRemote(remote string) string {
 //   - string: msg with credentials replaced by xxxxx.
 func redactUserinfo(msg, remote string) string {
 	if remote != "" {
-		msg = strings.ReplaceAll(msg, remote, redactedRemote(remote))
+		redacted := redactedRemote(remote)
+		msg = strings.ReplaceAll(msg, remote, redacted)
+		msg = strings.ReplaceAll(msg, url.QueryEscape(remote), url.QueryEscape(redacted))
 	}
 
-	return userinfoInError.ReplaceAllString(msg, "://xxxxx:xxxxx@")
+	return userinfoInError.ReplaceAllString(msg, redactedUserinfo)
 }

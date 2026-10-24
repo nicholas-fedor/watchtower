@@ -7,8 +7,9 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-// FuzzRedactedRemote verifies credential redaction never panics and that a
-// parseable password is replaced with xxxxx.
+// FuzzRedactedRemote verifies that credential redaction never panics and
+// replaces a parseable password with xxxxx. Any userinfo left in a remote that
+// does not parse must be the redacted form.
 func FuzzRedactedRemote(f *testing.F) {
 	f.Add("https://user:secret@github.com/org/app.git#abc")
 	f.Add("https://github.com/org/app.git")
@@ -16,12 +17,22 @@ func FuzzRedactedRemote(f *testing.F) {
 	f.Add("")
 	f.Add("https://user@github.com/org/app.git")
 	f.Add("https://x-access-token:ghp_xxx@github.com/org/app.git#deadbeef:src")
+	f.Add("https://user:secret@github.com/org/app.git\x7f")
+	f.Add("https://user:p@ss@github.com/org/app.git")
 
 	f.Fuzz(func(t *testing.T, remote string) {
 		got := redactedRemote(remote)
 
 		parsed, err := url.Parse(remote)
-		if err != nil || parsed.User == nil {
+		if err != nil {
+			for _, userinfo := range userinfoInError.FindAllString(got, -1) {
+				assert.Equal(t, redactedUserinfo, userinfo)
+			}
+
+			return
+		}
+
+		if parsed.User == nil {
 			assert.Equal(t, remote, got)
 
 			return

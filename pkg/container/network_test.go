@@ -910,12 +910,12 @@ func Test_onlyGeneratedMacs(t *testing.T) {
 			WithNetworkSettings(map[string]*dockerNetwork.EndpointSettings{
 				"bridge": {
 					NetworkID:  "bridge_network_id",
-					MacAddress: dockerNetwork.HardwareAddr("02:42:ac:11:00:02"),
+					MacAddress: mustParseMAC(t, "02:42:ac:11:00:02"),
 					IPAddress:  netip.MustParseAddr("172.17.0.2"),
 				},
 				"custom": {
 					NetworkID:  "custom_network_id",
-					MacAddress: dockerNetwork.HardwareAddr("02:42:0a:00:00:05"),
+					MacAddress: mustParseMAC(t, "02:42:0a:00:00:05"),
 					IPAddress:  netip.MustParseAddr("10.0.0.5"),
 				},
 			}),
