@@ -17,6 +17,7 @@ import (
 	composeLabels "github.com/nicholas-fedor/watchtower/internal/compose/labels"
 	"github.com/nicholas-fedor/watchtower/internal/container/labels"
 	"github.com/nicholas-fedor/watchtower/internal/observability/logging"
+	"github.com/nicholas-fedor/watchtower/internal/testutil/containerfixture"
 	"github.com/nicholas-fedor/watchtower/pkg/types"
 	mockTypes "github.com/nicholas-fedor/watchtower/pkg/types/mocks"
 )
@@ -40,7 +41,7 @@ func TestContainerModel(t *testing.T) {
 		t.Run("returns an error when image info is nil", func(t *testing.T) {
 			t.Parallel()
 
-			c := MockContainer(WithPortBindings())
+			c := MockContainer(containerfixture.WithPortBindings())
 			c.imageInfo = nil
 			err := c.VerifyConfiguration()
 			assert.Equal(t, errNoImageInfo, err)
@@ -49,7 +50,7 @@ func TestContainerModel(t *testing.T) {
 		t.Run("returns an error when container info is nil", func(t *testing.T) {
 			t.Parallel()
 
-			c := MockContainer(WithPortBindings())
+			c := MockContainer(containerfixture.WithPortBindings())
 			c.containerInfo = nil
 			err := c.VerifyConfiguration()
 			assert.Equal(t, errNoContainerInfo, err)
@@ -58,7 +59,7 @@ func TestContainerModel(t *testing.T) {
 		t.Run("returns an error when config is nil", func(t *testing.T) {
 			t.Parallel()
 
-			c := MockContainer(WithPortBindings())
+			c := MockContainer(containerfixture.WithPortBindings())
 			c.containerInfo.Config = nil
 			err := c.VerifyConfiguration()
 			assert.Equal(t, errInvalidConfig, err)
@@ -67,7 +68,7 @@ func TestContainerModel(t *testing.T) {
 		t.Run("returns an error when host config is nil", func(t *testing.T) {
 			t.Parallel()
 
-			c := MockContainer(WithPortBindings())
+			c := MockContainer(containerfixture.WithPortBindings())
 			c.containerInfo.HostConfig = nil
 			err := c.VerifyConfiguration()
 			assert.Equal(t, errInvalidConfig, err)
@@ -76,7 +77,7 @@ func TestContainerModel(t *testing.T) {
 		t.Run("succeeds with no port bindings", func(t *testing.T) {
 			t.Parallel()
 
-			c := MockContainer(WithPortBindings())
+			c := MockContainer(containerfixture.WithPortBindings())
 			err := c.VerifyConfiguration()
 			require.NoError(t, err)
 		})
@@ -84,7 +85,7 @@ func TestContainerModel(t *testing.T) {
 		t.Run("initializes exposed ports when nil with port bindings", func(t *testing.T) {
 			t.Parallel()
 
-			c := MockContainer(WithPortBindings("80/tcp"))
+			c := MockContainer(containerfixture.WithPortBindings("80/tcp"))
 			c.containerInfo.Config.ExposedPorts = nil
 			require.NoError(t, c.VerifyConfiguration())
 			require.NotNil(t, c.containerInfo.Config.ExposedPorts)
@@ -94,7 +95,7 @@ func TestContainerModel(t *testing.T) {
 		t.Run("succeeds with non-nil exposed ports and port bindings", func(t *testing.T) {
 			t.Parallel()
 
-			c := MockContainer(WithPortBindings("80/tcp"))
+			c := MockContainer(containerfixture.WithPortBindings("80/tcp"))
 			c.containerInfo.Config.ExposedPorts = map[dockerNetwork.Port]struct{}{
 				dockerNetwork.MustParsePort("80/tcp"): {},
 			}
@@ -105,7 +106,7 @@ func TestContainerModel(t *testing.T) {
 		t.Run("removes port bindings with empty port string", func(t *testing.T) {
 			t.Parallel()
 
-			c := MockContainer(WithPortBindings("80/tcp"))
+			c := MockContainer(containerfixture.WithPortBindings("80/tcp"))
 
 			var emptyPort dockerNetwork.Port
 
@@ -130,7 +131,7 @@ func TestContainerModel(t *testing.T) {
 		t.Run("removes port bindings with empty port number", func(t *testing.T) {
 			t.Parallel()
 
-			c := MockContainer(WithPortBindings("80/tcp"))
+			c := MockContainer(containerfixture.WithPortBindings("80/tcp"))
 
 			var malformedPort dockerNetwork.Port
 
@@ -152,7 +153,7 @@ func TestContainerModel(t *testing.T) {
 		t.Run("preserves valid port bindings unchanged", func(t *testing.T) {
 			t.Parallel()
 
-			c := MockContainer(WithPortBindings("8080/tcp", "443/tcp"))
+			c := MockContainer(containerfixture.WithPortBindings("8080/tcp", "443/tcp"))
 			c.containerInfo.Config.ExposedPorts = map[dockerNetwork.Port]struct{}{
 				dockerNetwork.MustParsePort("8080/tcp"): {},
 				dockerNetwork.MustParsePort("443/tcp"):  {},
@@ -181,8 +182,8 @@ func TestContainerModel(t *testing.T) {
 				}
 				for _, healthConfig := range tests {
 					c := MockContainer(
-						WithHealthcheck(healthConfig),
-						WithImageHealthcheck(healthConfig),
+						containerfixture.WithHealthcheck(healthConfig),
+						containerfixture.WithImageHealthcheck(healthConfig),
 					)
 					assert.Equal(t, &dockerContainer.HealthConfig{}, c.GetCreateConfig().Healthcheck)
 				}
@@ -193,14 +194,14 @@ func TestContainerModel(t *testing.T) {
 			t.Parallel()
 
 			c := MockContainer(
-				WithHealthcheck(dockerContainer.HealthConfig{
+				containerfixture.WithHealthcheck(dockerContainer.HealthConfig{
 					Test:        []string{"/usr/bin/sleep", "1s"},
 					Interval:    30,
 					Timeout:     30,
 					StartPeriod: 10,
 					Retries:     2,
 				}),
-				WithImageHealthcheck(dockerContainer.HealthConfig{
+				containerfixture.WithImageHealthcheck(dockerContainer.HealthConfig{
 					Test:        []string{"/usr/bin/sleep", "10s"},
 					Interval:    10,
 					Timeout:     60,
@@ -220,7 +221,7 @@ func TestContainerModel(t *testing.T) {
 		t.Run("handles empty container healthcheck config without panic", func(t *testing.T) {
 			t.Parallel()
 
-			c := MockContainer(WithImageHealthcheck(dockerContainer.HealthConfig{
+			c := MockContainer(containerfixture.WithImageHealthcheck(dockerContainer.HealthConfig{
 				Test:        []string{"/usr/bin/sleep", "10s"},
 				Interval:    10,
 				Timeout:     60,
@@ -233,7 +234,7 @@ func TestContainerModel(t *testing.T) {
 		t.Run("handles empty image healthcheck config without panic", func(t *testing.T) {
 			t.Parallel()
 
-			c := MockContainer(WithHealthcheck(dockerContainer.HealthConfig{
+			c := MockContainer(containerfixture.WithHealthcheck(dockerContainer.HealthConfig{
 				Test:        []string{"/usr/bin/sleep", "1s"},
 				Interval:    30,
 				Timeout:     30,
@@ -256,8 +257,8 @@ func TestContainerModel(t *testing.T) {
 				t.Parallel()
 
 				c := MockContainer(
-					WithUTSMode("host"),
-					WithHostname("test-hostname"),
+					containerfixture.WithUTSMode("host"),
+					containerfixture.WithHostname("test-hostname"),
 				)
 				config := c.GetCreateConfig()
 				assert.Empty(t, config.Hostname, "Hostname should be cleared when UTS mode is set")
@@ -267,8 +268,8 @@ func TestContainerModel(t *testing.T) {
 				t.Parallel()
 
 				c := MockContainer(
-					WithUTSMode(""),
-					WithHostname("test-hostname"),
+					containerfixture.WithUTSMode(""),
+					containerfixture.WithHostname("test-hostname"),
 				)
 				config := c.GetCreateConfig()
 				assert.Equal(t, "test-hostname", config.Hostname, "Hostname should be preserved when UTS mode is empty")
@@ -278,7 +279,7 @@ func TestContainerModel(t *testing.T) {
 		t.Run("uses container config when image config is nil", func(t *testing.T) {
 			t.Parallel()
 
-			c := MockContainer(WithImageName("ghcr.io/home-assistant/home-assistant:latest"))
+			c := MockContainer(containerfixture.WithImageName("ghcr.io/home-assistant/home-assistant:latest"))
 			c.imageInfo.Config = nil
 			c.containerInfo.Config.WorkingDir = "/config"
 			c.containerInfo.Config.Env = []string{"TZ=Europe/Amsterdam"}
@@ -293,7 +294,7 @@ func TestContainerModel(t *testing.T) {
 		t.Run("returns minimal config when containerInfo is nil", func(t *testing.T) {
 			t.Parallel()
 
-			c := MockContainer(WithImageName("test-image"))
+			c := MockContainer(containerfixture.WithImageName("test-image"))
 			c.containerInfo = nil
 			config := c.GetCreateConfig()
 			assert.Equal(t, "unknown:latest", config.Image)
@@ -306,7 +307,7 @@ func TestContainerModel(t *testing.T) {
 
 		// newMetadataContainer returns an enabled Watchtower container.
 		newMetadataContainer := func() *Container {
-			return MockContainer(WithLabels(map[string]string{
+			return MockContainer(containerfixture.WithLabels(map[string]string{
 				"com.centurylinklabs.watchtower.enable": "true",
 				"com.centurylinklabs.watchtower":        "true",
 			}))
@@ -342,7 +343,7 @@ func TestContainerModel(t *testing.T) {
 		t.Run("returns false and true for enabled label when set to false", func(t *testing.T) {
 			t.Parallel()
 
-			container := MockContainer(WithLabels(map[string]string{
+			container := MockContainer(containerfixture.WithLabels(map[string]string{
 				"com.centurylinklabs.watchtower.enable": "false",
 			}))
 			enabled, exists := container.Enabled()
@@ -353,7 +354,7 @@ func TestContainerModel(t *testing.T) {
 		t.Run("returns false and false when enabled label is not set", func(t *testing.T) {
 			t.Parallel()
 
-			container := MockContainer(WithLabels(map[string]string{"lol": "false"}))
+			container := MockContainer(containerfixture.WithLabels(map[string]string{"lol": "false"}))
 			enabled, exists := container.Enabled()
 			assert.False(t, enabled)
 			assert.False(t, exists)
@@ -362,7 +363,7 @@ func TestContainerModel(t *testing.T) {
 		t.Run("returns false and false for invalid enabled label", func(t *testing.T) {
 			t.Parallel()
 
-			container := MockContainer(WithLabels(map[string]string{
+			container := MockContainer(containerfixture.WithLabels(map[string]string{
 				"com.centurylinklabs.watchtower.enable": "falsy",
 			}))
 			enabled, exists := container.Enabled()
@@ -384,7 +385,7 @@ func TestContainerModel(t *testing.T) {
 			t.Run("returns false when Watchtower label is false", func(t *testing.T) {
 				t.Parallel()
 
-				container := MockContainer(WithLabels(map[string]string{
+				container := MockContainer(containerfixture.WithLabels(map[string]string{
 					"com.centurylinklabs.watchtower": "false",
 				}))
 				isWatchtower := container.IsWatchtower()
@@ -394,7 +395,7 @@ func TestContainerModel(t *testing.T) {
 			t.Run("returns false when Watchtower label is not set", func(t *testing.T) {
 				t.Parallel()
 
-				container := MockContainer(WithLabels(map[string]string{"funny.label": "false"}))
+				container := MockContainer(containerfixture.WithLabels(map[string]string{"funny.label": "false"}))
 				isWatchtower := container.IsWatchtower()
 				assert.False(t, isWatchtower)
 			})
@@ -402,7 +403,7 @@ func TestContainerModel(t *testing.T) {
 			t.Run("returns false when no labels are set", func(t *testing.T) {
 				t.Parallel()
 
-				container := MockContainer(WithLabels(map[string]string{}))
+				container := MockContainer(containerfixture.WithLabels(map[string]string{}))
 				isWatchtower := container.IsWatchtower()
 				assert.False(t, isWatchtower)
 			})
@@ -414,7 +415,7 @@ func TestContainerModel(t *testing.T) {
 			t.Run("returns signal when set", func(t *testing.T) {
 				t.Parallel()
 
-				container := MockContainer(WithLabels(map[string]string{
+				container := MockContainer(containerfixture.WithLabels(map[string]string{
 					"com.centurylinklabs.watchtower.stop-signal": "SIGKILL",
 				}))
 				assert.Equal(t, "SIGKILL", container.StopSignal())
@@ -423,7 +424,7 @@ func TestContainerModel(t *testing.T) {
 			t.Run("returns SIGTERM when signal is not set", func(t *testing.T) {
 				t.Parallel()
 
-				container := MockContainer(WithLabels(map[string]string{}))
+				container := MockContainer(containerfixture.WithLabels(map[string]string{}))
 				assert.Equal(t, "SIGTERM", container.StopSignal())
 			})
 		})
@@ -434,7 +435,7 @@ func TestContainerModel(t *testing.T) {
 			t.Run("uses zodiac label when present", func(t *testing.T) {
 				t.Parallel()
 
-				container := MockContainer(WithLabels(map[string]string{
+				container := MockContainer(containerfixture.WithLabels(map[string]string{
 					"com.centurylinklabs.zodiac.original-image": "the-original-image",
 				}))
 				assert.Equal(t, "the-original-image:latest", container.ImageName())
@@ -444,7 +445,7 @@ func TestContainerModel(t *testing.T) {
 				t.Parallel()
 
 				name := "image-name:3"
-				container := MockContainer(WithImageName(name))
+				container := MockContainer(containerfixture.WithImageName(name))
 				assert.Equal(t, name, container.ImageName())
 			})
 
@@ -452,7 +453,7 @@ func TestContainerModel(t *testing.T) {
 				t.Parallel()
 
 				name := "image-name"
-				container := MockContainer(WithImageName(name))
+				container := MockContainer(containerfixture.WithImageName(name))
 				assert.Equal(t, name+":latest", container.ImageName())
 			})
 
@@ -542,7 +543,7 @@ func TestContainerModel(t *testing.T) {
 			t.Run("returns empty string for ImageID when imageInfo is nil", func(t *testing.T) {
 				t.Parallel()
 
-				container := MockContainer(WithPortBindings())
+				container := MockContainer(containerfixture.WithPortBindings())
 				container.imageInfo = nil
 				imageID := container.ImageID()
 				assert.Equal(t, types.ImageID(""), imageID)
@@ -558,7 +559,7 @@ func TestContainerModel(t *testing.T) {
 				t.Run("returns single dependent container", func(t *testing.T) {
 					t.Parallel()
 
-					container := MockContainer(WithLabels(map[string]string{
+					container := MockContainer(containerfixture.WithLabels(map[string]string{
 						"com.docker.compose.depends_on": "postgres",
 					}))
 					links := container.Links(true)
@@ -569,7 +570,7 @@ func TestContainerModel(t *testing.T) {
 				t.Run("returns multiple dependent containers", func(t *testing.T) {
 					t.Parallel()
 
-					container := MockContainer(WithLabels(map[string]string{
+					container := MockContainer(containerfixture.WithLabels(map[string]string{
 						"com.docker.compose.depends_on": "postgres,redis",
 					}))
 					links := container.Links(true)
@@ -581,7 +582,7 @@ func TestContainerModel(t *testing.T) {
 				t.Run("trims whitespace from service names", func(t *testing.T) {
 					t.Parallel()
 
-					container := MockContainer(WithLabels(map[string]string{
+					container := MockContainer(containerfixture.WithLabels(map[string]string{
 						"com.docker.compose.depends_on": " postgres , redis ",
 					}))
 					links := container.Links(true)
@@ -593,7 +594,7 @@ func TestContainerModel(t *testing.T) {
 				t.Run("normalizes container names with slashes", func(t *testing.T) {
 					t.Parallel()
 
-					container := MockContainer(WithLabels(map[string]string{
+					container := MockContainer(containerfixture.WithLabels(map[string]string{
 						composeLabels.ComposeDependsOnLabel: "/postgres,/redis",
 					}))
 					links := container.Links(true)
@@ -604,7 +605,7 @@ func TestContainerModel(t *testing.T) {
 				t.Run("watchtower depends-on label takes precedence over compose depends_on", func(t *testing.T) {
 					t.Parallel()
 
-					container := MockContainer(WithLabels(map[string]string{
+					container := MockContainer(containerfixture.WithLabels(map[string]string{
 						"com.docker.compose.depends_on":             "postgres",
 						"com.centurylinklabs.watchtower.depends-on": "redis",
 					}))
@@ -617,7 +618,7 @@ func TestContainerModel(t *testing.T) {
 				t.Run("returns empty links for blank compose depends-on label", func(t *testing.T) {
 					t.Parallel()
 
-					container := MockContainer(WithLabels(map[string]string{
+					container := MockContainer(containerfixture.WithLabels(map[string]string{
 						"com.docker.compose.depends_on": "",
 					}))
 					assert.Empty(t, container.Links(true))
@@ -626,7 +627,7 @@ func TestContainerModel(t *testing.T) {
 				t.Run("parses colon-separated service:condition:required format", func(t *testing.T) {
 					t.Parallel()
 
-					container := MockContainer(WithLabels(map[string]string{
+					container := MockContainer(containerfixture.WithLabels(map[string]string{
 						"com.docker.compose.depends_on": "postgres:service_started:required,redis:service_healthy",
 					}))
 					links := container.Links(true)
@@ -642,7 +643,7 @@ func TestContainerModel(t *testing.T) {
 				t.Run("returns single dependent container", func(t *testing.T) {
 					t.Parallel()
 
-					container := MockContainer(WithLabels(map[string]string{
+					container := MockContainer(containerfixture.WithLabels(map[string]string{
 						"com.centurylinklabs.watchtower.depends-on": "postgres",
 					}))
 					links := container.Links(true)
@@ -653,7 +654,7 @@ func TestContainerModel(t *testing.T) {
 				t.Run("returns multiple dependent containers", func(t *testing.T) {
 					t.Parallel()
 
-					container := MockContainer(WithLabels(map[string]string{
+					container := MockContainer(containerfixture.WithLabels(map[string]string{
 						"com.centurylinklabs.watchtower.depends-on": "postgres,redis",
 					}))
 					links := container.Links(true)
@@ -665,7 +666,7 @@ func TestContainerModel(t *testing.T) {
 				t.Run("normalizes container names with slashes", func(t *testing.T) {
 					t.Parallel()
 
-					container := MockContainer(WithLabels(map[string]string{
+					container := MockContainer(containerfixture.WithLabels(map[string]string{
 						"com.centurylinklabs.watchtower.depends-on": "/postgres,/redis",
 					}))
 					links := container.Links(true)
@@ -676,7 +677,7 @@ func TestContainerModel(t *testing.T) {
 				t.Run("returns empty links for blank depends-on label", func(t *testing.T) {
 					t.Parallel()
 
-					container := MockContainer(WithLabels(map[string]string{
+					container := MockContainer(containerfixture.WithLabels(map[string]string{
 						"com.centurylinklabs.watchtower.depends-on": "",
 					}))
 					assert.Empty(t, container.Links(true))
@@ -685,7 +686,7 @@ func TestContainerModel(t *testing.T) {
 				t.Run("does not prefix container names with project name for cross-project dependencies", func(t *testing.T) {
 					t.Parallel()
 
-					container := MockContainer(WithLabels(map[string]string{
+					container := MockContainer(containerfixture.WithLabels(map[string]string{
 						"com.docker.compose.project":                "myproject",
 						"com.centurylinklabs.watchtower.depends-on": "otherproject-db,external-service",
 					}))
@@ -700,7 +701,7 @@ func TestContainerModel(t *testing.T) {
 				t.Run("handles cross-project dependencies with single container", func(t *testing.T) {
 					t.Parallel()
 
-					container := MockContainer(WithLabels(map[string]string{
+					container := MockContainer(containerfixture.WithLabels(map[string]string{
 						"com.docker.compose.project":                "webapp",
 						"com.centurylinklabs.watchtower.depends-on": "database",
 					}))
@@ -713,7 +714,7 @@ func TestContainerModel(t *testing.T) {
 				t.Run("supports cross-project dependencies without project labels", func(t *testing.T) {
 					t.Parallel()
 
-					container := MockContainer(WithLabels(map[string]string{
+					container := MockContainer(containerfixture.WithLabels(map[string]string{
 						"com.centurylinklabs.watchtower.depends-on": "standalone-db,external-api",
 					}))
 					links := container.Links(true)
@@ -725,7 +726,7 @@ func TestContainerModel(t *testing.T) {
 				t.Run("handles self-referencing dependencies gracefully", func(t *testing.T) {
 					t.Parallel()
 
-					container := MockContainer(WithLabels(map[string]string{
+					container := MockContainer(containerfixture.WithLabels(map[string]string{
 						"com.centurylinklabs.watchtower.depends-on": "postgres,test-watchtower,redis",
 					}))
 					links := container.Links(true)
@@ -738,7 +739,7 @@ func TestContainerModel(t *testing.T) {
 				t.Run("does not create self-reference when container name matches dependency", func(t *testing.T) {
 					t.Parallel()
 
-					container := MockContainer(WithLabels(map[string]string{
+					container := MockContainer(containerfixture.WithLabels(map[string]string{
 						"com.centurylinklabs.watchtower.depends-on": testContainerName,
 					}))
 					container.containerInfo.Name = testContainerName
@@ -751,7 +752,7 @@ func TestContainerModel(t *testing.T) {
 				t.Run("filters self-references from compose depends-on label", func(t *testing.T) {
 					t.Parallel()
 
-					container := MockContainer(WithLabels(map[string]string{
+					container := MockContainer(containerfixture.WithLabels(map[string]string{
 						"com.docker.compose.depends_on": testContainerName,
 					}))
 					container.containerInfo.Name = testContainerName
@@ -781,7 +782,7 @@ func TestContainerModel(t *testing.T) {
 
 							label, expected := tt.label, tt.expected
 
-							container := MockContainer(WithLabels(map[string]string{
+							container := MockContainer(containerfixture.WithLabels(map[string]string{
 								"com.centurylinklabs.watchtower.depends-on": label,
 							}))
 							links := container.Links(true)
@@ -793,7 +794,7 @@ func TestContainerModel(t *testing.T) {
 				t.Run("normalizes invalid container name dependencies", func(t *testing.T) {
 					t.Parallel()
 
-					container := MockContainer(WithLabels(map[string]string{
+					container := MockContainer(containerfixture.WithLabels(map[string]string{
 						"com.centurylinklabs.watchtower.depends-on": "postgres db, redis",
 					}))
 					links := container.Links(true)
@@ -809,7 +810,7 @@ func TestContainerModel(t *testing.T) {
 					}
 
 					label := strings.Join(deps, ",")
-					container := MockContainer(WithLabels(map[string]string{
+					container := MockContainer(containerfixture.WithLabels(map[string]string{
 						"com.centurylinklabs.watchtower.depends-on": label,
 					}))
 					links := container.Links(true)
@@ -826,7 +827,7 @@ func TestContainerModel(t *testing.T) {
 				t.Run("returns empty links for compose depends-on label", func(t *testing.T) {
 					t.Parallel()
 
-					container := MockContainer(WithLabels(map[string]string{
+					container := MockContainer(containerfixture.WithLabels(map[string]string{
 						"com.docker.compose.depends_on": "postgres,redis",
 					}))
 					links := container.Links(false)
@@ -836,7 +837,7 @@ func TestContainerModel(t *testing.T) {
 				t.Run("still returns links from watchtower depends-on label", func(t *testing.T) {
 					t.Parallel()
 
-					container := MockContainer(WithLabels(map[string]string{
+					container := MockContainer(containerfixture.WithLabels(map[string]string{
 						"com.docker.compose.depends_on":             "postgres",
 						"com.centurylinklabs.watchtower.depends-on": "redis",
 					}))
@@ -849,9 +850,9 @@ func TestContainerModel(t *testing.T) {
 				t.Run("returns links from host config when compose is disabled", func(t *testing.T) {
 					t.Parallel()
 
-					container := MockContainer(WithLabels(map[string]string{
+					container := MockContainer(containerfixture.WithLabels(map[string]string{
 						"com.docker.compose.depends_on": "postgres",
-					}), WithLinks([]string{
+					}), containerfixture.WithLinks([]string{
 						"redis:test-watchtower",
 					}))
 					links := container.Links(false)
@@ -864,7 +865,7 @@ func TestContainerModel(t *testing.T) {
 			t.Run("returns links from host config when depends-on labels are absent", func(t *testing.T) {
 				t.Parallel()
 
-				container := MockContainer(WithLinks([]string{
+				container := MockContainer(containerfixture.WithLinks([]string{
 					"redis:test-watchtower",
 					"postgres:test-watchtower",
 				}))
@@ -880,7 +881,7 @@ func TestContainerModel(t *testing.T) {
 				logOutput := &bytes.Buffer{}
 				w := logging.LogfmtWriter(logOutput)
 				l := zerolog.New(w).Level(zerolog.DebugLevel).With().Timestamp().Logger()
-				container := MockContainer(WithLinks([]string{"invalidlink"}))
+				container := MockContainer(containerfixture.WithLinks([]string{"invalidlink"}))
 				container.log = &l
 				links := container.Links(true)
 				assert.Empty(t, links)
@@ -893,7 +894,7 @@ func TestContainerModel(t *testing.T) {
 				logOutput := &bytes.Buffer{}
 				w := logging.LogfmtWriter(logOutput)
 				l := zerolog.New(w).Level(zerolog.DebugLevel).With().Timestamp().Logger()
-				container := MockContainer(WithLinks([]string{":alias"}))
+				container := MockContainer(containerfixture.WithLinks([]string{":alias"}))
 				container.log = &l
 				links := container.Links(true)
 				assert.Empty(t, links)
@@ -903,7 +904,7 @@ func TestContainerModel(t *testing.T) {
 			t.Run("normalizes container names with leading slashes", func(t *testing.T) {
 				t.Parallel()
 
-				container := MockContainer(WithLinks([]string{"/redis:test-watchtower"}))
+				container := MockContainer(containerfixture.WithLinks([]string{"/redis:test-watchtower"}))
 				links := container.Links(true)
 				assert.Contains(t, links, "redis")
 			})
@@ -912,8 +913,8 @@ func TestContainerModel(t *testing.T) {
 				t.Parallel()
 
 				container := MockContainer(
-					WithLinks([]string{"myproject-redis:test-watchtower"}),
-					WithLabels(map[string]string{"com.docker.compose.project": "myproject"}),
+					containerfixture.WithLinks([]string{"myproject-redis:test-watchtower"}),
+					containerfixture.WithLabels(map[string]string{"com.docker.compose.project": "myproject"}),
 				)
 				links := container.Links(true)
 				assert.Contains(t, links, "myproject-redis")
@@ -922,7 +923,7 @@ func TestContainerModel(t *testing.T) {
 			t.Run("does not prefix when project name is empty", func(t *testing.T) {
 				t.Parallel()
 
-				container := MockContainer(WithLinks([]string{"redis:test-watchtower"}))
+				container := MockContainer(containerfixture.WithLinks([]string{"redis:test-watchtower"}))
 				links := container.Links(true)
 				assert.Contains(t, links, "redis")
 			})
@@ -934,8 +935,8 @@ func TestContainerModel(t *testing.T) {
 					t.Parallel()
 
 					container := MockContainer(
-						WithNetworkMode("container:other"),
-						WithLabels(map[string]string{"com.docker.compose.project": "myproject"}),
+						containerfixture.WithNetworkMode("container:other"),
+						containerfixture.WithLabels(map[string]string{"com.docker.compose.project": "myproject"}),
 					)
 					links := container.Links(true)
 					assert.Contains(t, links, "other")
@@ -948,8 +949,8 @@ func TestContainerModel(t *testing.T) {
 					// The network mode holds a real container name, including when
 					// that container belongs to another Compose project.
 					container := MockContainer(
-						WithNetworkMode("container:gluetun"),
-						WithLabels(map[string]string{"com.docker.compose.project": "qbittorrent"}),
+						containerfixture.WithNetworkMode("container:gluetun"),
+						containerfixture.WithLabels(map[string]string{"com.docker.compose.project": "qbittorrent"}),
 					)
 					links := container.Links(true)
 					assert.ElementsMatch(t, []string{"gluetun"}, links)
@@ -961,8 +962,8 @@ func TestContainerModel(t *testing.T) {
 					// Inspect rewrite stores container: plus the Docker name, which
 					// includes a leading slash.
 					container := MockContainer(
-						WithNetworkMode("container:/gluetun"),
-						WithLabels(map[string]string{"com.docker.compose.project": "qbittorrent"}),
+						containerfixture.WithNetworkMode("container:/gluetun"),
+						containerfixture.WithLabels(map[string]string{"com.docker.compose.project": "qbittorrent"}),
 					)
 					links := container.Links(true)
 					assert.ElementsMatch(t, []string{"gluetun"}, links)
@@ -972,8 +973,8 @@ func TestContainerModel(t *testing.T) {
 					t.Parallel()
 
 					container := MockContainer(
-						WithNetworkMode("container:gluetun-vpn-1"),
-						WithLabels(map[string]string{"com.docker.compose.project": "gluetun"}),
+						containerfixture.WithNetworkMode("container:gluetun-vpn-1"),
+						containerfixture.WithLabels(map[string]string{"com.docker.compose.project": "gluetun"}),
 					)
 					links := container.Links(true)
 					assert.ElementsMatch(t, []string{"gluetun-vpn-1"}, links)
@@ -987,8 +988,8 @@ func TestContainerModel(t *testing.T) {
 					const providerID = "25e75393800b5c450a6841212a3b92ed28fa35414a586dec9f2c8a520d4910c2"
 
 					container := MockContainer(
-						WithNetworkMode("container:"+providerID),
-						WithLabels(map[string]string{"com.docker.compose.project": "qbittorrent"}),
+						containerfixture.WithNetworkMode("container:"+providerID),
+						containerfixture.WithLabels(map[string]string{"com.docker.compose.project": "qbittorrent"}),
 					)
 					links := container.Links(true)
 					assert.ElementsMatch(t, []string{providerID}, links)
@@ -1002,8 +1003,8 @@ func TestContainerModel(t *testing.T) {
 					t.Parallel()
 
 					container := MockContainer(
-						WithVolumesFrom([]string{"app:rw"}),
-						WithLabels(map[string]string{"com.docker.compose.project": "nextcloud"}),
+						containerfixture.WithVolumesFrom([]string{"app:rw"}),
+						containerfixture.WithLabels(map[string]string{"com.docker.compose.project": "nextcloud"}),
 					)
 					links := container.Links(true)
 					assert.ElementsMatch(t, []string{"app"}, links)
@@ -1015,8 +1016,8 @@ func TestContainerModel(t *testing.T) {
 					const appID = "9b738d6a78250d731816cc5020d8cfaf55e605cd510f4d4662688bd9a6c4e0c7"
 
 					container := MockContainer(
-						WithVolumesFrom([]string{appID}),
-						WithLabels(map[string]string{"com.docker.compose.project": "nextcloud"}),
+						containerfixture.WithVolumesFrom([]string{appID}),
+						containerfixture.WithLabels(map[string]string{"com.docker.compose.project": "nextcloud"}),
 					)
 					links := container.Links(true)
 					assert.ElementsMatch(t, []string{appID}, links)
@@ -1026,7 +1027,7 @@ func TestContainerModel(t *testing.T) {
 					t.Parallel()
 
 					container := MockContainer(
-						WithVolumesFrom([]string{"/nextcloud-app:ro"}),
+						containerfixture.WithVolumesFrom([]string{"/nextcloud-app:ro"}),
 					)
 					links := container.Links(true)
 					assert.ElementsMatch(t, []string{"nextcloud-app"}, links)
@@ -1036,7 +1037,7 @@ func TestContainerModel(t *testing.T) {
 					t.Parallel()
 
 					container := MockContainer(
-						WithVolumesFrom([]string{"app:rw", "db:ro"}),
+						containerfixture.WithVolumesFrom([]string{"app:rw", "db:ro"}),
 					)
 					links := container.Links(true)
 					assert.ElementsMatch(t, []string{"app", "db"}, links)
@@ -1046,7 +1047,7 @@ func TestContainerModel(t *testing.T) {
 					t.Parallel()
 
 					container := MockContainer(
-						WithVolumesFrom([]string{"", "app:rw"}),
+						containerfixture.WithVolumesFrom([]string{"", "app:rw"}),
 					)
 					links := container.Links(true)
 					assert.ElementsMatch(t, []string{"app"}, links)
@@ -1056,7 +1057,7 @@ func TestContainerModel(t *testing.T) {
 					t.Parallel()
 
 					container := MockContainer(
-						WithVolumesFrom([]string{"app:latest"}),
+						containerfixture.WithVolumesFrom([]string{"app:latest"}),
 					)
 					links := container.Links(true)
 					assert.ElementsMatch(t, []string{"app:latest"}, links)
@@ -1066,10 +1067,10 @@ func TestContainerModel(t *testing.T) {
 					t.Parallel()
 
 					container := MockContainer(
-						WithLabels(map[string]string{
+						containerfixture.WithLabels(map[string]string{
 							"com.centurylinklabs.watchtower.depends-on": "redis",
 						}),
-						WithVolumesFrom([]string{"app:rw"}),
+						containerfixture.WithVolumesFrom([]string{"app:rw"}),
 					)
 					links := container.Links(true)
 					assert.Equal(t, []string{"redis", "app"}, links)
@@ -1079,10 +1080,10 @@ func TestContainerModel(t *testing.T) {
 					t.Parallel()
 
 					container := MockContainer(
-						WithLabels(map[string]string{
+						containerfixture.WithLabels(map[string]string{
 							"com.docker.compose.depends_on": "postgres",
 						}),
-						WithVolumesFrom([]string{"app:rw"}),
+						containerfixture.WithVolumesFrom([]string{"app:rw"}),
 					)
 					links := container.Links(true)
 					assert.Equal(t, []string{"postgres", "app"}, links)
@@ -1092,10 +1093,10 @@ func TestContainerModel(t *testing.T) {
 					t.Parallel()
 
 					container := MockContainer(
-						WithLabels(map[string]string{
+						containerfixture.WithLabels(map[string]string{
 							"com.centurylinklabs.watchtower.depends-on": "app",
 						}),
-						WithVolumesFrom([]string{"app:rw"}),
+						containerfixture.WithVolumesFrom([]string{"app:rw"}),
 					)
 					links := container.Links(true)
 					assert.Equal(t, []string{"app"}, links)
@@ -1105,9 +1106,9 @@ func TestContainerModel(t *testing.T) {
 					t.Parallel()
 
 					container := MockContainer(
-						WithNetworkMode("container:gluetun"),
-						WithVolumesFrom([]string{"app:rw"}),
-						WithLabels(map[string]string{"com.docker.compose.project": "qbittorrent"}),
+						containerfixture.WithNetworkMode("container:gluetun"),
+						containerfixture.WithVolumesFrom([]string{"app:rw"}),
+						containerfixture.WithLabels(map[string]string{"com.docker.compose.project": "qbittorrent"}),
 					)
 					links := container.Links(true)
 					assert.ElementsMatch(t, []string{"gluetun", "app"}, links)
@@ -1118,7 +1119,7 @@ func TestContainerModel(t *testing.T) {
 		t.Run("returns pre and post update timeout values", func(t *testing.T) {
 			t.Parallel()
 
-			container := MockContainer(WithLabels(map[string]string{
+			container := MockContainer(containerfixture.WithLabels(map[string]string{
 				"com.centurylinklabs.watchtower.lifecycle.pre-update-timeout":  "3",
 				"com.centurylinklabs.watchtower.lifecycle.post-update-timeout": "5",
 			}))
@@ -1133,7 +1134,7 @@ func TestContainerModel(t *testing.T) {
 		t.Run("returns service name when compose service label is present", func(t *testing.T) {
 			t.Parallel()
 
-			container := MockContainer(WithLabels(map[string]string{
+			container := MockContainer(containerfixture.WithLabels(map[string]string{
 				"com.docker.compose.service": "web-service",
 			}))
 			identifier := ResolveContainerIdentifier(container)
@@ -1143,7 +1144,7 @@ func TestContainerModel(t *testing.T) {
 		t.Run("returns container name when compose service label is absent", func(t *testing.T) {
 			t.Parallel()
 
-			container := MockContainer(WithLabels(map[string]string{
+			container := MockContainer(containerfixture.WithLabels(map[string]string{
 				"other.label": "value",
 			}))
 			identifier := ResolveContainerIdentifier(container)
@@ -1153,7 +1154,7 @@ func TestContainerModel(t *testing.T) {
 		t.Run("returns container name when labels are empty", func(t *testing.T) {
 			t.Parallel()
 
-			container := MockContainer(WithLabels(map[string]string{}))
+			container := MockContainer(containerfixture.WithLabels(map[string]string{}))
 			identifier := ResolveContainerIdentifier(container)
 			assert.Equal(t, "test-watchtower", identifier)
 		})
@@ -1161,7 +1162,7 @@ func TestContainerModel(t *testing.T) {
 		t.Run("returns container name when labels are nil", func(t *testing.T) {
 			t.Parallel()
 
-			container := MockContainer(WithLabels(nil))
+			container := MockContainer(containerfixture.WithLabels(nil))
 			identifier := ResolveContainerIdentifier(container)
 			assert.Equal(t, "test-watchtower", identifier)
 		})
@@ -1169,7 +1170,7 @@ func TestContainerModel(t *testing.T) {
 		t.Run("returns service name when compose service label has value", func(t *testing.T) {
 			t.Parallel()
 
-			container := MockContainer(WithLabels(map[string]string{
+			container := MockContainer(containerfixture.WithLabels(map[string]string{
 				"com.docker.compose.service": "api",
 			}))
 			identifier := ResolveContainerIdentifier(container)
@@ -1179,7 +1180,7 @@ func TestContainerModel(t *testing.T) {
 		t.Run("handles multiple labels with service name present", func(t *testing.T) {
 			t.Parallel()
 
-			container := MockContainer(WithLabels(map[string]string{
+			container := MockContainer(containerfixture.WithLabels(map[string]string{
 				"com.docker.compose.service":     "db-service",
 				"com.docker.compose.project":     "myproject",
 				"com.centurylinklabs.watchtower": "true",
@@ -1201,7 +1202,7 @@ func TestContainerModel(t *testing.T) {
 		t.Run("returns container name when ContainerInfo.Config is nil", func(t *testing.T) {
 			t.Parallel()
 
-			container := MockContainer(WithLabels(map[string]string{}))
+			container := MockContainer(containerfixture.WithLabels(map[string]string{}))
 			container.containerInfo.Config = nil
 			identifier := ResolveContainerIdentifier(container)
 			assert.Equal(t, "test-watchtower", identifier)
@@ -1279,7 +1280,7 @@ func TestContainerModel(t *testing.T) {
 
 					name, labels, expected, description := tt.name, tt.labels, tt.expected, tt.description
 
-					container := MockContainer(WithLabels(labels))
+					container := MockContainer(containerfixture.WithLabels(labels))
 					container.containerInfo.Name = name
 					container.normalizedName = name
 					result := ResolveContainerIdentifier(container)
@@ -1419,7 +1420,7 @@ func TestContainerModel(t *testing.T) {
 			t.Run("returns true when no-pull label is true", func(t *testing.T) {
 				t.Parallel()
 
-				c := MockContainer(WithLabels(map[string]string{
+				c := MockContainer(containerfixture.WithLabels(map[string]string{
 					"com.centurylinklabs.watchtower.no-pull": "true",
 				}))
 				assert.True(t, c.IsNoPull(types.UpdateParams{}))
@@ -1428,7 +1429,7 @@ func TestContainerModel(t *testing.T) {
 			t.Run("returns false when no-pull label is false", func(t *testing.T) {
 				t.Parallel()
 
-				c := MockContainer(WithLabels(map[string]string{
+				c := MockContainer(containerfixture.WithLabels(map[string]string{
 					"com.centurylinklabs.watchtower.no-pull": "false",
 				}))
 				assert.False(t, c.IsNoPull(types.UpdateParams{}))
@@ -1437,7 +1438,7 @@ func TestContainerModel(t *testing.T) {
 			t.Run("returns false for invalid no-pull label", func(t *testing.T) {
 				t.Parallel()
 
-				c := MockContainer(WithLabels(map[string]string{
+				c := MockContainer(containerfixture.WithLabels(map[string]string{
 					"com.centurylinklabs.watchtower.no-pull": "maybe",
 				}))
 				assert.False(t, c.IsNoPull(types.UpdateParams{}))
@@ -1446,7 +1447,7 @@ func TestContainerModel(t *testing.T) {
 			t.Run("returns false when no-pull label is unset", func(t *testing.T) {
 				t.Parallel()
 
-				c := MockContainer(WithLabels(map[string]string{}))
+				c := MockContainer(containerfixture.WithLabels(map[string]string{}))
 				assert.False(t, c.IsNoPull(types.UpdateParams{}))
 			})
 		})
@@ -1457,7 +1458,7 @@ func TestContainerModel(t *testing.T) {
 			t.Run("returns true when no-pull label is true", func(t *testing.T) {
 				t.Parallel()
 
-				c := MockContainer(WithLabels(map[string]string{
+				c := MockContainer(containerfixture.WithLabels(map[string]string{
 					"com.centurylinklabs.watchtower.no-pull": "true",
 				}))
 				assert.True(t, c.IsNoPull(types.UpdateParams{NoPull: true}))
@@ -1466,7 +1467,7 @@ func TestContainerModel(t *testing.T) {
 			t.Run("returns true when no-pull label is false", func(t *testing.T) {
 				t.Parallel()
 
-				c := MockContainer(WithLabels(map[string]string{
+				c := MockContainer(containerfixture.WithLabels(map[string]string{
 					"com.centurylinklabs.watchtower.no-pull": "false",
 				}))
 				assert.True(t, c.IsNoPull(types.UpdateParams{NoPull: true}))
@@ -1478,7 +1479,7 @@ func TestContainerModel(t *testing.T) {
 				t.Run("returns true when no-pull label is true", func(t *testing.T) {
 					t.Parallel()
 
-					c := MockContainer(WithLabels(map[string]string{
+					c := MockContainer(containerfixture.WithLabels(map[string]string{
 						"com.centurylinklabs.watchtower.no-pull": "true",
 					}))
 					assert.True(t, c.IsNoPull(types.UpdateParams{LabelPrecedence: true, NoPull: true}))
@@ -1487,7 +1488,7 @@ func TestContainerModel(t *testing.T) {
 				t.Run("returns false when no-pull label is false", func(t *testing.T) {
 					t.Parallel()
 
-					c := MockContainer(WithLabels(map[string]string{
+					c := MockContainer(containerfixture.WithLabels(map[string]string{
 						"com.centurylinklabs.watchtower.no-pull": "false",
 					}))
 					assert.False(t, c.IsNoPull(types.UpdateParams{LabelPrecedence: true, NoPull: true}))
@@ -1511,7 +1512,7 @@ func TestContainerModel(t *testing.T) {
 				},
 			}
 
-			container := MockContainer(WithMounts([]dockerMount.Mount{volumeMount}))
+			container := MockContainer(containerfixture.WithMounts([]dockerMount.Mount{volumeMount}))
 			hostConfig := container.GetCreateHostConfig()
 
 			require.Len(t, hostConfig.Mounts, 1, "Expected exactly one mount")
@@ -1539,7 +1540,7 @@ func TestContainerModel(t *testing.T) {
 				},
 			}
 
-			container := MockContainer(WithDevices(devices))
+			container := MockContainer(containerfixture.WithDevices(devices))
 			hostConfig := container.GetCreateHostConfig()
 
 			require.Len(t, hostConfig.Devices, 2)
@@ -1556,7 +1557,7 @@ func TestContainerModel(t *testing.T) {
 		t.Run("returns a copy of VolumesFrom so create config does not alias inspect data", func(t *testing.T) {
 			t.Parallel()
 
-			container := MockContainer(WithVolumesFrom([]string{"app:rw"}))
+			container := MockContainer(containerfixture.WithVolumesFrom([]string{"app:rw"}))
 			hostConfig := container.GetCreateHostConfig()
 			hostConfig.VolumesFrom[0] = "mutated"
 

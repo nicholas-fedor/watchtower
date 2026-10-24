@@ -16,6 +16,7 @@ import (
 	dockerImage "github.com/moby/moby/api/types/image"
 
 	"github.com/nicholas-fedor/watchtower/internal/container/labels"
+	"github.com/nicholas-fedor/watchtower/internal/testutil/containerfixture"
 	mockContainer "github.com/nicholas-fedor/watchtower/pkg/container/mocks"
 	"github.com/nicholas-fedor/watchtower/pkg/types"
 )
@@ -81,16 +82,16 @@ func TestRemoveOrphanedOrchestrators_SkipsInFlight(t *testing.T) {
 			t.Parallel()
 
 			orchestrator := MockContainer(
-				WithID("orch123"),
-				WithName("watchtower-orchestrator"),
-				WithLabels(map[string]string{labels.EphemeralOrchestrator: "true"}),
-				WithContainerState(tt.state),
+				containerfixture.WithID("orch123"),
+				containerfixture.WithName("watchtower-orchestrator"),
+				containerfixture.WithLabels(map[string]string{labels.EphemeralOrchestrator: "true"}),
+				containerfixture.WithContainerState(tt.state),
 				func(c *dockerContainer.InspectResponse, _ *dockerImage.InspectResponse) {
 					c.Created = tt.created
 				},
 			)
 			// A container without the orchestrator label is never removed.
-			app := MockContainer(WithID("app123"), WithName("app"))
+			app := MockContainer(containerfixture.WithID("app123"), containerfixture.WithName("app"))
 
 			client := mockContainer.NewMockClient(t)
 			client.EXPECT().ListContainers(mock.Anything).
@@ -119,10 +120,10 @@ func TestRemoveOrphanedOrchestrators_AlreadyGone(t *testing.T) {
 	t.Parallel()
 
 	orchestrator := MockContainer(
-		WithID("orch123"),
-		WithName("watchtower-orchestrator"),
-		WithLabels(map[string]string{labels.EphemeralOrchestrator: "true"}),
-		WithContainerState(dockerContainer.State{
+		containerfixture.WithID("orch123"),
+		containerfixture.WithName("watchtower-orchestrator"),
+		containerfixture.WithLabels(map[string]string{labels.EphemeralOrchestrator: "true"}),
+		containerfixture.WithContainerState(dockerContainer.State{
 			Running:   true,
 			StartedAt: time.Now().Add(-time.Hour).UTC().Format(time.RFC3339Nano),
 		}),

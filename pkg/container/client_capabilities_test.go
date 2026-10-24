@@ -18,6 +18,7 @@ import (
 	dockerClient "github.com/moby/moby/client"
 
 	"github.com/nicholas-fedor/watchtower/internal/container/labels"
+	"github.com/nicholas-fedor/watchtower/internal/testutil/containerfixture"
 	mockContainer "github.com/nicholas-fedor/watchtower/pkg/container/mocks"
 	"github.com/nicholas-fedor/watchtower/pkg/types"
 )
@@ -162,7 +163,7 @@ func TestClientCopyFileStore(t *testing.T) {
 			}, nil)
 
 		cli := &client{log: newTestLogger(t), api: api}
-		source := MockContainer(WithLabels(map[string]string{
+		source := MockContainer(containerfixture.WithLabels(map[string]string{
 			labels.CopyFile: "/app/config.yaml",
 		}))
 		require.NoError(t, cli.SnapshotCopyFiles(t.Context(), source))
@@ -174,7 +175,7 @@ func TestClientCopyFileStore(t *testing.T) {
 		t.Parallel()
 
 		cli := &client{log: newTestLogger(t), api: mockContainer.NewMockAPIClient(t)}
-		err := cli.SnapshotCopyFiles(t.Context(), MockContainer(WithLabels(map[string]string{
+		err := cli.SnapshotCopyFiles(t.Context(), MockContainer(containerfixture.WithLabels(map[string]string{
 			labels.CopyFile: "relative.conf",
 		})))
 		require.ErrorIs(t, err, errCopyFileInvalidPath)

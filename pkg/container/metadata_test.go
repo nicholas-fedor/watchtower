@@ -12,6 +12,7 @@ import (
 	dockerContainer "github.com/moby/moby/api/types/container"
 
 	"github.com/nicholas-fedor/watchtower/internal/container/labels"
+	"github.com/nicholas-fedor/watchtower/internal/testutil/containerfixture"
 	"github.com/nicholas-fedor/watchtower/pkg/types"
 )
 
@@ -1773,7 +1774,7 @@ func TestContainer_SetLabel(t *testing.T) {
 	t.Run("overwrites an existing label", func(t *testing.T) {
 		t.Parallel()
 
-		c := MockContainer(WithLabels(map[string]string{labels.GitRepo: "old"}))
+		c := MockContainer(containerfixture.WithLabels(map[string]string{labels.GitRepo: "old"}))
 		c.SetLabel(labels.GitRepo, "new")
 
 		value, ok := c.GetLabel(labels.GitRepo)

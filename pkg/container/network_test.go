@@ -13,6 +13,7 @@ import (
 	dockerImage "github.com/moby/moby/api/types/image"
 	dockerNetwork "github.com/moby/moby/api/types/network"
 
+	"github.com/nicholas-fedor/watchtower/internal/testutil/containerfixture"
 	"github.com/nicholas-fedor/watchtower/pkg/types"
 )
 
@@ -33,8 +34,8 @@ func Test_getNetworkConfig(t *testing.T) {
 			t.Parallel()
 
 			container := MockContainer(
-				WithNetworkMode("bridge"),
-				WithNetworkSettings(map[string]*dockerNetwork.EndpointSettings{
+				containerfixture.WithNetworkMode("bridge"),
+				containerfixture.WithNetworkSettings(map[string]*dockerNetwork.EndpointSettings{
 					"bridge": {
 						NetworkID:  "bridge_network_id",
 						MacAddress: dockerNetwork.HardwareAddr("aa:bb:cc:dd:ee:ff"),
@@ -67,7 +68,7 @@ func Test_getNetworkConfig(t *testing.T) {
 			t.Parallel()
 
 			container := MockContainer(
-				WithNetworks("bridge", "custom_network"),
+				containerfixture.WithNetworks("bridge", "custom_network"),
 			)
 
 			config := getNetworkConfig(newTestLogger(t), container, "1.50")
@@ -81,9 +82,9 @@ func Test_getNetworkConfig(t *testing.T) {
 			t.Parallel()
 
 			container := MockContainer(
-				WithNetworkMode("bridge"),
-				WithContainerState(dockerContainer.State{Running: true, Status: "running"}),
-				WithNetworkSettings(map[string]*dockerNetwork.EndpointSettings{
+				containerfixture.WithNetworkMode("bridge"),
+				containerfixture.WithContainerState(dockerContainer.State{Running: true, Status: "running"}),
+				containerfixture.WithNetworkSettings(map[string]*dockerNetwork.EndpointSettings{
 					"bridge": {
 						NetworkID:  "bridge_network_id",
 						MacAddress: mustParseMAC(t, "02:42:ac:11:00:02"),
@@ -108,8 +109,8 @@ func Test_getNetworkConfig(t *testing.T) {
 			t.Parallel()
 
 			container := MockContainer(
-				WithNetworkMode("host"),
-				WithNetworkSettings(map[string]*dockerNetwork.EndpointSettings{
+				containerfixture.WithNetworkMode("host"),
+				containerfixture.WithNetworkSettings(map[string]*dockerNetwork.EndpointSettings{
 					"host": {
 						MacAddress: dockerNetwork.HardwareAddr("02:42:ac:11:00:02"),
 						IPAddress:  netip.MustParseAddr("192.168.1.100"),
@@ -141,7 +142,7 @@ func Test_getNetworkConfig(t *testing.T) {
 			t.Parallel()
 
 			container := MockContainer(
-				WithNetworkSettings(map[string]*dockerNetwork.EndpointSettings{
+				containerfixture.WithNetworkSettings(map[string]*dockerNetwork.EndpointSettings{
 					"bridge": {
 						MacAddress: dockerNetwork.HardwareAddr("02:42:ac:11:00:02"),
 						IPAddress:  netip.MustParseAddr("172.17.0.2"),
@@ -185,8 +186,8 @@ func Test_getNetworkConfig(t *testing.T) {
 			t.Parallel()
 
 			container := MockContainer(
-				WithContainerState(dockerContainer.State{Running: false, Status: "exited"}),
-				WithNetworkSettings(map[string]*dockerNetwork.EndpointSettings{
+				containerfixture.WithContainerState(dockerContainer.State{Running: false, Status: "exited"}),
+				containerfixture.WithNetworkSettings(map[string]*dockerNetwork.EndpointSettings{
 					"bridge": {
 						// No MAC address for stopped container - this is expected
 					},
@@ -207,7 +208,7 @@ func Test_getNetworkConfig(t *testing.T) {
 			t.Parallel()
 
 			container := MockContainer(
-				WithNetworkSettings(map[string]*dockerNetwork.EndpointSettings{
+				containerfixture.WithNetworkSettings(map[string]*dockerNetwork.EndpointSettings{
 					"my_custom_network": {
 						NetworkID:  "custom_net_id",
 						MacAddress: dockerNetwork.HardwareAddr("aa:bb:cc:dd:ee:ff"),
@@ -236,7 +237,7 @@ func Test_getNetworkConfig(t *testing.T) {
 			t.Parallel()
 
 			container := MockContainer(
-				WithNetworkSettings(map[string]*dockerNetwork.EndpointSettings{
+				containerfixture.WithNetworkSettings(map[string]*dockerNetwork.EndpointSettings{
 					"bridge": {
 						MacAddress: dockerNetwork.HardwareAddr("02:42:ac:11:00:02"),
 					},
@@ -259,7 +260,7 @@ func Test_getNetworkConfig(t *testing.T) {
 			t.Parallel()
 
 			container := MockContainer(
-				WithNetworkSettings(map[string]*dockerNetwork.EndpointSettings{
+				containerfixture.WithNetworkSettings(map[string]*dockerNetwork.EndpointSettings{
 					"bridge":    nil,
 					"valid_net": {NetworkID: "valid_id"},
 				}),
@@ -294,8 +295,8 @@ func Test_getNetworkConfig(t *testing.T) {
 
 				log, logbuf := newCapturedLogger(zerolog.DebugLevel)
 				container := MockContainer(
-					WithNetworkMode(tc.networkMode),
-					WithNetworkSettings(map[string]*dockerNetwork.EndpointSettings{
+					containerfixture.WithNetworkMode(tc.networkMode),
+					containerfixture.WithNetworkSettings(map[string]*dockerNetwork.EndpointSettings{
 						tc.network: {
 							NetworkID:  "network_id",
 							MacAddress: dockerNetwork.HardwareAddr("02:42:ac:11:00:99"),
@@ -884,7 +885,7 @@ func Test_onlyGeneratedMacs(t *testing.T) {
 		t.Parallel()
 
 		container := MockContainer(
-			WithNetworkSettings(map[string]*dockerNetwork.EndpointSettings{
+			containerfixture.WithNetworkSettings(map[string]*dockerNetwork.EndpointSettings{
 				"bridge": {
 					NetworkID:  "bridge_network_id",
 					MacAddress: mustParseMAC(t, "02:42:ac:11:00:02"),
@@ -907,7 +908,7 @@ func Test_onlyGeneratedMacs(t *testing.T) {
 		t.Parallel()
 
 		container := MockContainer(
-			WithNetworkSettings(map[string]*dockerNetwork.EndpointSettings{
+			containerfixture.WithNetworkSettings(map[string]*dockerNetwork.EndpointSettings{
 				"bridge": {
 					NetworkID:  "bridge_network_id",
 					MacAddress: mustParseMAC(t, "02:42:ac:11:00:02"),
@@ -935,7 +936,7 @@ func Test_onlyGeneratedMacs(t *testing.T) {
 		t.Parallel()
 
 		container := MockContainer(
-			WithNetworkSettings(map[string]*dockerNetwork.EndpointSettings{
+			containerfixture.WithNetworkSettings(map[string]*dockerNetwork.EndpointSettings{
 				"bridge": {
 					NetworkID:  "bridge_network_id",
 					MacAddress: dockerNetwork.HardwareAddr("aa:bb:cc:dd:ee:ff"),
@@ -958,7 +959,7 @@ func Test_onlyGeneratedMacs(t *testing.T) {
 		t.Parallel()
 
 		container := MockContainer(
-			WithNetworkSettings(map[string]*dockerNetwork.EndpointSettings{
+			containerfixture.WithNetworkSettings(map[string]*dockerNetwork.EndpointSettings{
 				"bridge": {
 					NetworkID: "bridge_network_id",
 					IPAddress: netip.MustParseAddr("172.17.0.2"),
@@ -1011,7 +1012,7 @@ func Test_validateMacAddresses(t *testing.T) {
 				t.Parallel()
 
 				log, logbuf := newCapturedLogger(zerolog.DebugLevel)
-				container := MockContainer(WithNetworkSettings(map[string]*dockerNetwork.EndpointSettings{
+				container := MockContainer(containerfixture.WithNetworkSettings(map[string]*dockerNetwork.EndpointSettings{
 					"bridge": {NetworkID: "bridge_network_id"},
 				}))
 				config := &dockerNetwork.NetworkingConfig{
@@ -1046,8 +1047,8 @@ func Test_validateMacAddresses(t *testing.T) {
 					t.Parallel()
 
 					container := MockContainer(
-						WithContainerState(dockerContainer.State{Running: true, Status: "running"}),
-						WithNetworkSettings(map[string]*dockerNetwork.EndpointSettings{
+						containerfixture.WithContainerState(dockerContainer.State{Running: true, Status: "running"}),
+						containerfixture.WithNetworkSettings(map[string]*dockerNetwork.EndpointSettings{
 							"bridge": {
 								NetworkID:  "bridge_network_id",
 								MacAddress: dockerNetwork.HardwareAddr("02:42:ac:11:00:02"),
@@ -1078,8 +1079,8 @@ func Test_validateMacAddresses(t *testing.T) {
 					t.Parallel()
 
 					container := MockContainer(
-						WithContainerState(dockerContainer.State{Running: true, Status: "running"}),
-						WithNetworkSettings(map[string]*dockerNetwork.EndpointSettings{
+						containerfixture.WithContainerState(dockerContainer.State{Running: true, Status: "running"}),
+						containerfixture.WithNetworkSettings(map[string]*dockerNetwork.EndpointSettings{
 							"bridge": {
 								NetworkID: "bridge_network_id",
 								IPAddress: netip.MustParseAddr("172.17.0.2"),
@@ -1109,9 +1110,9 @@ func Test_validateMacAddresses(t *testing.T) {
 					t.Parallel()
 
 					container := MockContainer(
-						WithContainerState(dockerContainer.State{Running: true, Status: "running"}),
-						WithNetworks("bridge", "custom_network"),
-						WithNetworkSettings(map[string]*dockerNetwork.EndpointSettings{
+						containerfixture.WithContainerState(dockerContainer.State{Running: true, Status: "running"}),
+						containerfixture.WithNetworks("bridge", "custom_network"),
+						containerfixture.WithNetworkSettings(map[string]*dockerNetwork.EndpointSettings{
 							"bridge": {
 								NetworkID:  "bridge_network_id",
 								MacAddress: dockerNetwork.HardwareAddr("02:42:ac:11:00:02"),
@@ -1152,11 +1153,11 @@ func Test_validateMacAddresses(t *testing.T) {
 					t.Parallel()
 
 					container := MockContainer(
-						WithContainerState(
+						containerfixture.WithContainerState(
 							dockerContainer.State{Running: true, Status: "running"},
 						),
-						WithNetworks("bridge", "custom_network"),
-						WithNetworkSettings(map[string]*dockerNetwork.EndpointSettings{
+						containerfixture.WithNetworks("bridge", "custom_network"),
+						containerfixture.WithNetworkSettings(map[string]*dockerNetwork.EndpointSettings{
 							"bridge": {
 								NetworkID:  "bridge_network_id",
 								MacAddress: dockerNetwork.HardwareAddr("02:42:ac:11:00:02"),
@@ -1199,10 +1200,10 @@ func Test_validateMacAddresses(t *testing.T) {
 					t.Parallel()
 
 					container := MockContainer(
-						WithContainerState(
+						containerfixture.WithContainerState(
 							dockerContainer.State{Running: false, Status: "created"},
 						),
-						WithNetworkSettings(map[string]*dockerNetwork.EndpointSettings{
+						containerfixture.WithNetworkSettings(map[string]*dockerNetwork.EndpointSettings{
 							"bridge": {
 								NetworkID: "bridge_network_id",
 								IPAddress: netip.MustParseAddr("172.17.0.2"),
@@ -1231,8 +1232,8 @@ func Test_validateMacAddresses(t *testing.T) {
 					t.Parallel()
 
 					container := MockContainer(
-						WithContainerState(dockerContainer.State{Running: false, Status: "exited"}),
-						WithNetworkSettings(map[string]*dockerNetwork.EndpointSettings{
+						containerfixture.WithContainerState(dockerContainer.State{Running: false, Status: "exited"}),
+						containerfixture.WithNetworkSettings(map[string]*dockerNetwork.EndpointSettings{
 							"bridge": {
 								NetworkID: "bridge_network_id",
 								IPAddress: netip.MustParseAddr("172.17.0.2"),
@@ -1267,7 +1268,7 @@ func Test_validateMacAddresses(t *testing.T) {
 			t.Parallel()
 
 			container := MockContainer(
-				WithContainerState(dockerContainer.State{Running: true, Status: "running"}),
+				containerfixture.WithContainerState(dockerContainer.State{Running: true, Status: "running"}),
 			)
 			config := &dockerNetwork.NetworkingConfig{
 				EndpointsConfig: map[string]*dockerNetwork.EndpointSettings{},
@@ -1287,7 +1288,7 @@ func Test_validateMacAddresses(t *testing.T) {
 			t.Parallel()
 
 			container := MockContainer(
-				WithContainerState(dockerContainer.State{Running: true, Status: "running"}),
+				containerfixture.WithContainerState(dockerContainer.State{Running: true, Status: "running"}),
 			)
 
 			err := validateMacAddresses(newTestLogger(t), nil,

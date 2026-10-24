@@ -14,14 +14,13 @@ import (
 	"github.com/stretchr/testify/require"
 
 	cerrdefs "github.com/containerd/errdefs"
-	dockerspec "github.com/moby/docker-image-spec/specs-go/v1"
 	dockerContainer "github.com/moby/moby/api/types/container"
 	dockerImage "github.com/moby/moby/api/types/image"
-	dockerMount "github.com/moby/moby/api/types/mount"
 	dockerNetwork "github.com/moby/moby/api/types/network"
 	dockerSystem "github.com/moby/moby/api/types/system"
 	dockerClient "github.com/moby/moby/client"
 
+	"github.com/nicholas-fedor/watchtower/internal/testutil/containerfixture"
 	mockContainer "github.com/nicholas-fedor/watchtower/pkg/container/mocks"
 	"github.com/nicholas-fedor/watchtower/pkg/types"
 )
@@ -29,435 +28,18 @@ import (
 // testTargetID is the ID the mocked daemon gives a created target container.
 const testTargetID = "new_container_id"
 
-// MockContainerUpdate defines a function to update mock container or image metadata for testing.
-type MockContainerUpdate func(*dockerContainer.InspectResponse, *dockerImage.InspectResponse)
-
-// MockContainer creates a mock Container instance with customizable metadata.
+// MockContainer builds a Container from containerfixture inspect data, with
+// updates applied in order.
 //
 // Parameters:
-//   - updates: Optional functions to modify container or image metadata.
+//   - updates: Changes to the container or image inspect data.
 //
 // Returns:
-//   - *Container: A configured mock container instance.
-func MockContainer(updates ...MockContainerUpdate) *Container {
-	// Initialize default container metadata with running state.
-	containerInfo := dockerContainer.InspectResponse{
-		ID:         "container_id",
-		Image:      "image",
-		Name:       "test-watchtower",
-		HostConfig: &dockerContainer.HostConfig{},
-		State: &dockerContainer.State{
-			Running: true,
-			Status:  "running",
-		},
-		Config: &dockerContainer.Config{
-			Labels: map[string]string{},
-		},
-		NetworkSettings: &dockerContainer.NetworkSettings{
-			Networks: map[string]*dockerNetwork.EndpointSettings{},
-		},
-	}
-	// Initialize default image metadata.
-	image := dockerImage.InspectResponse{
-		ID:     "image_id",
-		Config: &dockerspec.DockerOCIImageConfig{},
-	}
+//   - *Container: Container built from the inspect data.
+func MockContainer(updates ...containerfixture.Update) *Container {
+	containerInfo, imageInfo := containerfixture.Inspect(updates...)
 
-	// Apply provided updates to container or image metadata.
-	for _, update := range updates {
-		update(&containerInfo, &image)
-	}
-
-	// Create and return a new Container instance.
-	return NewContainer(nil, &containerInfo, &image)
-}
-
-// WithPortBindings configures port bindings for the mock container.
-//
-// Parameters:
-//   - portBindingSources: List of port binding sources (e.g., "80/tcp").
-//
-// Returns:
-//   - MockContainerUpdate: Function to apply port bindings to container metadata.
-func WithPortBindings(portBindingSources ...string) MockContainerUpdate {
-	return func(container *dockerContainer.InspectResponse, _ *dockerImage.InspectResponse) {
-		portBindings := dockerNetwork.PortMap{}
-
-		for _, pbs := range portBindingSources {
-			port, err := dockerNetwork.ParsePort(pbs)
-			if err != nil {
-				panic(fmt.Sprintf("failed to parse port %s: %v", pbs, err))
-			}
-
-			portBindings[port] = []dockerNetwork.PortBinding{}
-		}
-
-		container.HostConfig.PortBindings = portBindings
-	}
-}
-
-// WithImageName sets the image name for the mock container and image.
-//
-// Parameters:
-//   - name: Image name to set (e.g., "test-image:latest").
-//
-// Returns:
-//   - MockContainerUpdate: Function to set image name in container and image metadata.
-func WithImageName(name string) MockContainerUpdate {
-	return func(c *dockerContainer.InspectResponse, i *dockerImage.InspectResponse) {
-		c.Config.Image = name
-		i.RepoTags = append(i.RepoTags, name)
-	}
-}
-
-// WithRepoDigests sets the RepoDigests for the mock image.
-//
-// Parameters:
-//   - digests: List of repo digests (e.g., ["repo@sha256:abc"]).
-//
-// Returns:
-//   - MockContainerUpdate: Function to set RepoDigests on image metadata.
-func WithRepoDigests(digests []string) MockContainerUpdate {
-	return func(_ *dockerContainer.InspectResponse, i *dockerImage.InspectResponse) {
-		i.RepoDigests = digests
-	}
-}
-
-// WithLinks sets dependency links for the mock container.
-//
-// Parameters:
-//   - links: List of links in "name:alias" format.
-//
-// Returns:
-//   - MockContainerUpdate: Function to set links in container HostConfig.
-func WithLinks(links []string) MockContainerUpdate {
-	return func(c *dockerContainer.InspectResponse, _ *dockerImage.InspectResponse) {
-		c.HostConfig.Links = links
-	}
-}
-
-// WithVolumesFrom sets HostConfig.VolumesFrom for the mock container.
-//
-// Parameters:
-//   - volumesFrom: List of volumes-from specs (name or ID, optional :ro/:rw).
-//
-// Returns:
-//   - MockContainerUpdate: Function to set VolumesFrom in container HostConfig.
-func WithVolumesFrom(volumesFrom []string) MockContainerUpdate {
-	return func(c *dockerContainer.InspectResponse, _ *dockerImage.InspectResponse) {
-		if c.HostConfig == nil {
-			c.HostConfig = &dockerContainer.HostConfig{}
-		}
-
-		c.HostConfig.VolumesFrom = volumesFrom
-	}
-}
-
-// WithLabels sets labels for the mock container.
-//
-// Parameters:
-//   - labels: Map of label key-value pairs.
-//
-// Returns:
-//   - MockContainerUpdate: Function to set labels in container Config.
-func WithLabels(labels map[string]string) MockContainerUpdate {
-	return func(c *dockerContainer.InspectResponse, _ *dockerImage.InspectResponse) {
-		c.Config.Labels = labels
-	}
-}
-
-// WithImageLabels sets labels on the mock image config (OCI annotations).
-func WithImageLabels(labels map[string]string) MockContainerUpdate {
-	return func(_ *dockerContainer.InspectResponse, i *dockerImage.InspectResponse) {
-		if i.Config == nil {
-			i.Config = &dockerspec.DockerOCIImageConfig{}
-		}
-
-		i.Config.Labels = labels
-	}
-}
-
-// WithContainerState sets the state for the mock container.
-//
-// Parameters:
-//   - state: Container state (e.g., running, stopped).
-//
-// Returns:
-//   - MockContainerUpdate: Function to set state in container metadata.
-func WithContainerState(state dockerContainer.State) MockContainerUpdate {
-	return func(cnt *dockerContainer.InspectResponse, _ *dockerImage.InspectResponse) {
-		cnt.State = &state
-	}
-}
-
-// WithHealthcheck sets the healthcheck configuration for the mock container.
-//
-// Parameters:
-//   - healthConfig: Healthcheck configuration to set.
-//
-// Returns:
-//   - MockContainerUpdate: Function to set healthcheck in container Config.
-func WithHealthcheck(healthConfig dockerContainer.HealthConfig) MockContainerUpdate {
-	return func(cnt *dockerContainer.InspectResponse, _ *dockerImage.InspectResponse) {
-		cnt.Config.Healthcheck = &healthConfig
-	}
-}
-
-// WithImageHealthcheck sets the healthcheck configuration for the mock image.
-//
-// Parameters:
-//   - healthConfig: Healthcheck configuration to set.
-//
-// Returns:
-//   - MockContainerUpdate: Function to set healthcheck in image Config.
-func WithImageHealthcheck(healthConfig dockerContainer.HealthConfig) MockContainerUpdate {
-	return func(_ *dockerContainer.InspectResponse, img *dockerImage.InspectResponse) {
-		img.Config.Healthcheck = &healthConfig
-	}
-}
-
-// WithNetworkMode sets the network mode for the mock container.
-//
-// Parameters:
-//   - mode: Network mode (e.g., "bridge", "host").
-//
-// Returns:
-//   - MockContainerUpdate: Function to set network mode in container HostConfig.
-func WithNetworkMode(mode string) MockContainerUpdate {
-	return func(c *dockerContainer.InspectResponse, _ *dockerImage.InspectResponse) {
-		if c.HostConfig == nil {
-			c.HostConfig = &dockerContainer.HostConfig{}
-		}
-
-		c.HostConfig.NetworkMode = dockerContainer.NetworkMode(mode)
-		nopLog().Debug().
-			Str("mode", mode).
-			Bool("is_host", mode == "host").
-			Msg("MockContainer set NetworkMode")
-	}
-}
-
-// WithNetworkSettings sets network settings for the mock container.
-//
-// Parameters:
-//   - networks: Map of network names to endpoint settings.
-//
-// Returns:
-//   - MockContainerUpdate: Function to set network settings in container NetworkSettings.
-func WithNetworkSettings(
-	networks map[string]*dockerNetwork.EndpointSettings,
-) MockContainerUpdate {
-	return func(c *dockerContainer.InspectResponse, _ *dockerImage.InspectResponse) {
-		if c.NetworkSettings == nil {
-			c.NetworkSettings = &dockerContainer.NetworkSettings{}
-		}
-
-		c.NetworkSettings.Networks = networks
-	}
-}
-
-// WithMounts sets mounts for the mock container.
-//
-// Parameters:
-//   - mounts: List of mount configurations.
-//
-// Returns:
-//   - MockContainerUpdate: Function to set mounts in container HostConfig.
-func WithMounts(mounts []dockerMount.Mount) MockContainerUpdate {
-	return func(c *dockerContainer.InspectResponse, _ *dockerImage.InspectResponse) {
-		c.HostConfig.Mounts = mounts
-	}
-}
-
-// WithInspectMounts sets runtime mount points on the mock container inspect response.
-//
-// Parameters:
-//   - mounts: Runtime mount points reported by container inspect.
-//
-// Returns:
-//   - MockContainerUpdate: Function to set inspect Mounts.
-func WithInspectMounts(mounts []dockerContainer.MountPoint) MockContainerUpdate {
-	return func(c *dockerContainer.InspectResponse, _ *dockerImage.InspectResponse) {
-		c.Mounts = mounts
-	}
-}
-
-// WithReadonlyRootfs sets HostConfig.ReadonlyRootfs on the mock container.
-//
-// Parameters:
-//   - readOnly: Whether the container root filesystem is read-only.
-//
-// Returns:
-//   - MockContainerUpdate: Function to set ReadonlyRootfs.
-func WithReadonlyRootfs(readOnly bool) MockContainerUpdate {
-	return func(c *dockerContainer.InspectResponse, _ *dockerImage.InspectResponse) {
-		if c.HostConfig == nil {
-			c.HostConfig = &dockerContainer.HostConfig{}
-		}
-
-		c.HostConfig.ReadonlyRootfs = readOnly
-	}
-}
-
-// WithNetworks adds multiple networks to the mock container.
-//
-// Parameters:
-//   - networkNames: List of network names to add.
-//
-// Returns:
-//   - MockContainerUpdate: Function to add networks to container NetworkSettings.
-func WithNetworks(networkNames ...string) MockContainerUpdate {
-	return func(c *dockerContainer.InspectResponse, _ *dockerImage.InspectResponse) {
-		if c.NetworkSettings == nil {
-			c.NetworkSettings = &dockerContainer.NetworkSettings{}
-		}
-
-		if c.NetworkSettings.Networks == nil {
-			c.NetworkSettings.Networks = make(map[string]*dockerNetwork.EndpointSettings)
-		}
-
-		for _, name := range networkNames {
-			c.NetworkSettings.Networks[name] = &dockerNetwork.EndpointSettings{
-				NetworkID: fmt.Sprintf("network_%s_id", name),
-				Aliases:   []string{c.Name},
-			}
-			nopLog().Debug().
-				Str("container", c.Name).
-				Str("network", name).
-				Msg("MockContainer added network")
-		}
-	}
-}
-
-// WithUTSMode sets the UTS mode for the mock container.
-//
-// Parameters:
-//   - mode: UTS mode to set (e.g., "host").
-//
-// Returns:
-//   - MockContainerUpdate: Function to set UTS mode in container HostConfig.
-func WithUTSMode(mode string) MockContainerUpdate {
-	return func(c *dockerContainer.InspectResponse, _ *dockerImage.InspectResponse) {
-		if c.HostConfig == nil {
-			c.HostConfig = &dockerContainer.HostConfig{}
-		}
-
-		c.HostConfig.UTSMode = dockerContainer.UTSMode(mode)
-	}
-}
-
-// WithHostname sets the hostname for the mock container.
-//
-// Parameters:
-//   - hostname: Hostname to set.
-//
-// Returns:
-//   - MockContainerUpdate: Function to set hostname in container Config.
-func WithHostname(hostname string) MockContainerUpdate {
-	return func(c *dockerContainer.InspectResponse, _ *dockerImage.InspectResponse) {
-		if c.Config == nil {
-			c.Config = &dockerContainer.Config{}
-		}
-
-		c.Config.Hostname = hostname
-	}
-}
-
-// WithAutoRemove sets the AutoRemove flag for the mock container.
-//
-// Parameters:
-//   - autoRemove: Whether to auto-remove the container on stop.
-//
-// Returns:
-//   - MockContainerUpdate: Function to set AutoRemove in container HostConfig.
-func WithAutoRemove(autoRemove bool) MockContainerUpdate {
-	return func(c *dockerContainer.InspectResponse, _ *dockerImage.InspectResponse) {
-		if c.HostConfig == nil {
-			c.HostConfig = &dockerContainer.HostConfig{}
-		}
-
-		c.HostConfig.AutoRemove = autoRemove
-	}
-}
-
-// WithName sets the container name for the mock container.
-//
-// Parameters:
-//   - name: Container name to set (e.g., "my-app").
-//
-// Returns:
-//   - MockContainerUpdate: Function to set the container name in metadata.
-func WithName(name string) MockContainerUpdate {
-	return func(c *dockerContainer.InspectResponse, _ *dockerImage.InspectResponse) {
-		c.Name = name
-	}
-}
-
-// WithID sets the container ID for the mock container.
-//
-// Parameters:
-//   - id: Container ID to set (e.g., "abc123").
-//
-// Returns:
-//   - MockContainerUpdate: Function to set the container ID in metadata.
-func WithID(id string) MockContainerUpdate {
-	return func(c *dockerContainer.InspectResponse, _ *dockerImage.InspectResponse) {
-		c.ID = id
-	}
-}
-
-// WithEnv sets environment variables on the mock container's Config.
-//
-// Parameters:
-//   - env: Environment variables in "KEY=VALUE" format.
-//
-// Returns:
-//   - MockContainerUpdate: Function to set environment variables in container Config.
-func WithEnv(env []string) MockContainerUpdate {
-	return func(c *dockerContainer.InspectResponse, _ *dockerImage.InspectResponse) {
-		if c.Config == nil {
-			c.Config = &dockerContainer.Config{}
-		}
-
-		c.Config.Env = env
-	}
-}
-
-// WithBinds sets bind mounts on the mock container's HostConfig.
-//
-// Parameters:
-//   - binds: Bind mount strings in "host_path:container_path" format.
-//
-// Returns:
-//   - MockContainerUpdate: Function to set bind mounts in container HostConfig.
-func WithBinds(binds []string) MockContainerUpdate {
-	return func(c *dockerContainer.InspectResponse, _ *dockerImage.InspectResponse) {
-		if c.HostConfig == nil {
-			c.HostConfig = &dockerContainer.HostConfig{}
-		}
-
-		c.HostConfig.Binds = binds
-	}
-}
-
-// WithDevices sets device mappings on the mock container's HostConfig.
-//
-// This is primarily used to test device permission normalization (empty
-// CgroupPermissions defaulting to "rwm") for Podman compatibility.
-//
-// Parameters:
-//   - devices: Slice of DeviceMapping structs.
-//
-// Returns:
-//   - MockContainerUpdate: Function to set devices in container HostConfig.
-func WithDevices(devices []dockerContainer.DeviceMapping) MockContainerUpdate {
-	return func(c *dockerContainer.InspectResponse, _ *dockerImage.InspectResponse) {
-		if c.HostConfig == nil {
-			c.HostConfig = &dockerContainer.HostConfig{}
-		}
-
-		c.HostConfig.Devices = devices
-	}
+	return NewContainer(nil, containerInfo, imageInfo)
 }
 
 // dockerImageFixture is an image whose inspect response is read from testdata.
@@ -746,9 +328,9 @@ func newRunningSource() *Container {
 	var defaultMem int64 = 60
 
 	return MockContainer(
-		WithNetworkMode("bridge"),
-		WithContainerState(dockerContainer.State{Running: true, Status: "running"}),
-		WithNetworkSettings(map[string]*dockerNetwork.EndpointSettings{
+		containerfixture.WithNetworkMode("bridge"),
+		containerfixture.WithContainerState(dockerContainer.State{Running: true, Status: "running"}),
+		containerfixture.WithNetworkSettings(map[string]*dockerNetwork.EndpointSettings{
 			"bridge": {
 				NetworkID:  "network_bridge_id",
 				IPAddress:  netip.MustParseAddr("172.17.0.2"),
@@ -770,9 +352,9 @@ func newRunningSource() *Container {
 // to two networks.
 func newMultiNetworkSource() *Container {
 	return MockContainer(
-		WithNetworkMode("bridge"),
-		WithContainerState(dockerContainer.State{Running: true, Status: "running"}),
-		WithNetworks("network1", "network2"),
+		containerfixture.WithNetworkMode("bridge"),
+		containerfixture.WithContainerState(dockerContainer.State{Running: true, Status: "running"}),
+		containerfixture.WithNetworks("network1", "network2"),
 	)
 }
 
@@ -846,8 +428,8 @@ func newImageAPI(t *testing.T) *mockContainer.MockAPIClient {
 // Returns:
 //   - *Container: The container.
 func runningImage(imageName, imageID string, repoDigests ...string) *Container {
-	options := []MockContainerUpdate{
-		WithImageName(imageName),
+	options := []containerfixture.Update{
+		containerfixture.WithImageName(imageName),
 		func(container *dockerContainer.InspectResponse, image *dockerImage.InspectResponse) {
 			container.Image = imageID
 			image.ID = imageID
@@ -855,7 +437,7 @@ func runningImage(imageName, imageID string, repoDigests ...string) *Container {
 	}
 
 	if repoDigests != nil {
-		options = append(options, WithRepoDigests(repoDigests))
+		options = append(options, containerfixture.WithRepoDigests(repoDigests))
 	}
 
 	return MockContainer(options...)

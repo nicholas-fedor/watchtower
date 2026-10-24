@@ -21,6 +21,7 @@ import (
 	"github.com/nicholas-fedor/watchtower/internal/registry/digest"
 	"github.com/nicholas-fedor/watchtower/internal/registry/ratelimit"
 	registryConfig "github.com/nicholas-fedor/watchtower/internal/settings/config/registry"
+	"github.com/nicholas-fedor/watchtower/internal/testutil/containerfixture"
 	"github.com/nicholas-fedor/watchtower/internal/testutil/httpstub"
 	mockContainer "github.com/nicholas-fedor/watchtower/pkg/container/mocks"
 	"github.com/nicholas-fedor/watchtower/pkg/types"
@@ -142,8 +143,8 @@ func waitFor[T any](t *testing.T, ch <-chan T, timeout time.Duration) T {
 func TestImageClient_warnOnHeadFailed(t *testing.T) {
 	t.Parallel()
 
-	containerUnknown := MockContainer(WithImageName("unknown.repo/prefix/imagename:latest"))
-	containerKnown := MockContainer(WithImageName("docker.io/prefix/imagename:latest"))
+	containerUnknown := MockContainer(containerfixture.WithImageName("unknown.repo/prefix/imagename:latest"))
+	containerKnown := MockContainer(containerfixture.WithImageName("docker.io/prefix/imagename:latest"))
 	c := imageClient{}
 
 	t.Run(`warn on head failure is set to "always"`, func(t *testing.T) {
@@ -233,7 +234,7 @@ func TestImageClient_PullImage(t *testing.T) {
 	t.Run("the image consist of a pinned hash", func(t *testing.T) {
 		t.Run("should gracefully fail with a useful message for bare sha256", func(t *testing.T) {
 			i := newTestImageClient(newImageAPI(t), newTestLogger(t), registryConfig.Registry{}, ratelimit.New())
-			pinned := MockContainer(WithImageName("sha256:fa5269854a5e615e51a72b17ad3fd1e01268f278a6684c8ed3c5f0cdce3f230b"))
+			pinned := MockContainer(containerfixture.WithImageName("sha256:fa5269854a5e615e51a72b17ad3fd1e01268f278a6684c8ed3c5f0cdce3f230b"))
 
 			err := i.PullImage(t.Context(), pinned, warnAuto, types.UpdateParams{})
 			require.ErrorIs(t, err, errPinnedImage)
@@ -241,7 +242,7 @@ func TestImageClient_PullImage(t *testing.T) {
 
 		t.Run("should gracefully fail for repository-qualified digest", func(t *testing.T) {
 			i := newTestImageClient(newImageAPI(t), newTestLogger(t), registryConfig.Registry{}, ratelimit.New())
-			pinned := MockContainer(WithImageName("nginx@sha256:fa5269854a5e615e51a72b17ad3fd1e01268f278a6684c8ed3c5f0cdce3f230b"))
+			pinned := MockContainer(containerfixture.WithImageName("nginx@sha256:fa5269854a5e615e51a72b17ad3fd1e01268f278a6684c8ed3c5f0cdce3f230b"))
 
 			err := i.PullImage(t.Context(), pinned, warnAuto, types.UpdateParams{})
 			require.ErrorIs(t, err, errPinnedImage)
@@ -259,7 +260,7 @@ func TestImageClient_PullImage(t *testing.T) {
 			log, logbuf := newCapturedLogger(zerolog.DebugLevel)
 			i := newTestImageClient(api, log, registryConfig.Registry{TLSSkip: true}, ratelimit.New())
 
-			err := i.PullImage(t.Context(), MockContainer(WithImageName(image), WithRepoDigests([]string{image + "@sha256:abc"})), warnAuto, types.UpdateParams{})
+			err := i.PullImage(t.Context(), MockContainer(containerfixture.WithImageName(image), containerfixture.WithRepoDigests([]string{image + "@sha256:abc"})), warnAuto, types.UpdateParams{})
 			require.ErrorIs(t, err, errPullImageUnauthorized)
 			require.ErrorContains(t, err, "authentication required")
 			require.NotErrorIs(t, err, errPullImageFailed)
@@ -279,7 +280,7 @@ func TestImageClient_PullImage(t *testing.T) {
 			log, logbuf := newCapturedLogger(zerolog.DebugLevel)
 			i := newTestImageClient(api, log, registryConfig.Registry{TLSSkip: true}, ratelimit.New())
 
-			err := i.PullImage(t.Context(), MockContainer(WithImageName(image), WithRepoDigests([]string{image + "@sha256:def"})), warnAuto, types.UpdateParams{})
+			err := i.PullImage(t.Context(), MockContainer(containerfixture.WithImageName(image), containerfixture.WithRepoDigests([]string{image + "@sha256:def"})), warnAuto, types.UpdateParams{})
 			require.ErrorIs(t, err, errPullImageNotFound)
 			require.ErrorContains(t, err, "image not found")
 			require.NotErrorIs(t, err, errPullImageFailed)
@@ -298,7 +299,7 @@ func TestImageClient_PullImage(t *testing.T) {
 			log, logbuf := newCapturedLogger(zerolog.DebugLevel)
 			i := newTestImageClient(api, log, registryConfig.Registry{TLSSkip: true}, ratelimit.New())
 
-			err := i.PullImage(t.Context(), MockContainer(WithImageName(image), WithRepoDigests([]string{image + "@sha256:ghi"})), warnAuto, types.UpdateParams{})
+			err := i.PullImage(t.Context(), MockContainer(containerfixture.WithImageName(image), containerfixture.WithRepoDigests([]string{image + "@sha256:ghi"})), warnAuto, types.UpdateParams{})
 			require.ErrorIs(t, err, errPullImageFailed)
 			require.ErrorContains(t, err, "failed to pull image")
 			require.NotErrorIs(t, err, errPullImageUnauthorized)
@@ -317,7 +318,7 @@ func TestImageClient_PullImage(t *testing.T) {
 
 			i := newTestImageClient(api, newTestLogger(t), registryConfig.Registry{TLSSkip: true}, ratelimit.New())
 
-			err := i.PullImage(t.Context(), MockContainer(WithImageName(image), WithRepoDigests([]string{image + "@sha256:abc"})), warnAuto, types.UpdateParams{})
+			err := i.PullImage(t.Context(), MockContainer(containerfixture.WithImageName(image), containerfixture.WithRepoDigests([]string{image + "@sha256:abc"})), warnAuto, types.UpdateParams{})
 			require.ErrorIs(t, err, errPullImageUnauthorized)
 		})
 
@@ -331,7 +332,7 @@ func TestImageClient_PullImage(t *testing.T) {
 
 			i := newTestImageClient(api, newTestLogger(t), registryConfig.Registry{TLSSkip: true}, ratelimit.New())
 
-			err := i.PullImage(t.Context(), MockContainer(WithImageName(image), WithRepoDigests([]string{image + "@sha256:abc"})), warnAuto, types.UpdateParams{})
+			err := i.PullImage(t.Context(), MockContainer(containerfixture.WithImageName(image), containerfixture.WithRepoDigests([]string{image + "@sha256:abc"})), warnAuto, types.UpdateParams{})
 			require.ErrorIs(t, err, errPullImageUnauthorized)
 		})
 	})
@@ -999,7 +1000,7 @@ func TestImageClient_CheckContainerUpdate(t *testing.T) {
 			t.Run(name, func(t *testing.T) {
 				t.Parallel()
 
-				container := MockContainer(WithImageName(ref))
+				container := MockContainer(containerfixture.WithImageName(ref))
 				c := newTestImageClient(newImageAPI(t), newTestLogger(t), registryConfig.Registry{}, ratelimit.New())
 
 				available, latestID, latestDigest, err := c.CheckContainerUpdate(t.Context(), container, types.UpdateParams{})
@@ -1196,7 +1197,7 @@ func TestImageClient_isOutsideCooldown_beforePull(t *testing.T) {
 
 			i := newTestImageClient(nil, newTestLogger(t), registryConfig.Registry{}, ratelimit.New())
 
-			outside, err := i.isOutsideCooldown(t.Context(), MockContainer(WithImageName("test:latest")), types.UpdateParams{})
+			outside, err := i.isOutsideCooldown(t.Context(), MockContainer(containerfixture.WithImageName("test:latest")), types.UpdateParams{})
 			require.NoError(t, err)
 			assert.True(t, outside)
 		})
@@ -1210,7 +1211,7 @@ func TestImageClient_isOutsideCooldown_beforePull(t *testing.T) {
 
 			i := newTestImageClient(nil, newTestLogger(t), registryConfig.Registry{}, ratelimit.New())
 
-			outside, err := i.isOutsideCooldown(t.Context(), MockContainer(WithImageName("test:latest")), types.UpdateParams{
+			outside, err := i.isOutsideCooldown(t.Context(), MockContainer(containerfixture.WithImageName("test:latest")), types.UpdateParams{
 				MonitorOnly:   true,
 				CooldownDelay: 24 * time.Hour,
 			})
