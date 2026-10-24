@@ -11,9 +11,9 @@ import (
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/require"
 
+	"github.com/nicholas-fedor/watchtower/internal/container/provenance"
 	"github.com/nicholas-fedor/watchtower/internal/testutil/golden"
 	"github.com/nicholas-fedor/watchtower/internal/update/state"
-	"github.com/nicholas-fedor/watchtower/pkg/container"
 	"github.com/nicholas-fedor/watchtower/pkg/types"
 )
 
@@ -255,7 +255,7 @@ func goldenFullReport() types.Report {
 	updated, newImage := newProgressContainer(0, updatedIDPrefix, "updt%d")
 	progress.AddScanned(log, updated, newImage, types.UpdateParams{})
 	progress.MarkForUpdate(log, updated.ID())
-	progress[updated.ID()].SetGitMetadata(container.ReportMeta{
+	progress[updated.ID()].SetGitMetadata(provenance.ReportMeta{
 		GitRepo:         "https://github.com/org/app.git",
 		GitRef:          "v1.2.0",
 		Changelog:       "https://github.com/org/app/releases/tag/v1.2.0",

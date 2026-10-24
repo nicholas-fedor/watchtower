@@ -1,17 +1,10 @@
-package container
+package provenance
 
 import (
 	"github.com/nicholas-fedor/watchtower/internal/container"
 	"github.com/nicholas-fedor/watchtower/internal/container/labels"
 	"github.com/nicholas-fedor/watchtower/internal/container/redact"
-	"github.com/nicholas-fedor/watchtower/pkg/container/git"
 )
-
-// DefaultGitDockerfile is used when no Dockerfile path is configured.
-const DefaultGitDockerfile = git.DefaultDockerfile
-
-// gitAssociation is the monitor association for a container.
-type gitAssociation = git.Association
 
 // ApplyGitStamp writes git-last-commit and git-last-tag onto container create labels.
 //
@@ -43,7 +36,7 @@ func ApplyGitStamp(c *container.Container, commit, tag string) {
 //   - assoc: Resolved repo, ref, policy, and build paths.
 //   - watch: When true, persist git-watch=true. False leaves the process-wide
 //     --git-enable default in effect on the replacement.
-func ApplyGitAssociation(c *container.Container, assoc gitAssociation, watch bool) {
+func ApplyGitAssociation(c *container.Container, assoc Association, watch bool) {
 	if c == nil || assoc.Repo == "" {
 		return
 	}

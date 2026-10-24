@@ -29,9 +29,9 @@ import (
 	shoutrrrTypes "github.com/nicholas-fedor/shoutrrr/pkg/types"
 
 	"github.com/nicholas-fedor/watchtower/internal/container"
+	"github.com/nicholas-fedor/watchtower/internal/container/provenance"
 	"github.com/nicholas-fedor/watchtower/internal/settings"
 	"github.com/nicholas-fedor/watchtower/internal/update/state"
-	pkgContainer "github.com/nicholas-fedor/watchtower/pkg/container"
 	"github.com/nicholas-fedor/watchtower/pkg/types"
 )
 
@@ -711,7 +711,7 @@ updt1 (mock/updt1:latest): Updated
 				t.Parallel()
 
 				status := updatedAppStatus()
-				status.SetGitMetadata(pkgContainer.ReportMeta{
+				status.SetGitMetadata(provenance.ReportMeta{
 					GitRepo:         "https://github.com/org/app.git",
 					GitRef:          "v1.2.3",
 					Changelog:       "https://github.com/org/app/releases",

@@ -9,6 +9,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"github.com/nicholas-fedor/watchtower/internal/container/provenance"
 	"github.com/nicholas-fedor/watchtower/pkg/types"
 )
 
@@ -20,7 +21,7 @@ func Test_confinedDockerfile(t *testing.T) {
 
 		got, err := confinedDockerfile("")
 		require.NoError(t, err)
-		assert.Equal(t, DefaultGitDockerfile, got)
+		assert.Equal(t, provenance.DefaultDockerfile, got)
 	})
 
 	t.Run("accepts a nested relative path", func(t *testing.T) {

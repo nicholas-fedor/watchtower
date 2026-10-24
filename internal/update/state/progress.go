@@ -7,7 +7,7 @@ import (
 
 	"github.com/nicholas-fedor/watchtower/internal/container"
 	"github.com/nicholas-fedor/watchtower/internal/container/oci"
-	pkgContainer "github.com/nicholas-fedor/watchtower/pkg/container"
+	"github.com/nicholas-fedor/watchtower/internal/container/provenance"
 	"github.com/nicholas-fedor/watchtower/pkg/types"
 )
 
@@ -183,7 +183,7 @@ func applyReportMeta(status *ContainerStatus, c types.Container, params types.Up
 		return
 	}
 
-	meta := pkgContainer.ResolveReportMeta(c, params, pkgContainer.ChangelogVars{}, oci.Annotations{})
+	meta := provenance.ResolveReportMeta(c, params, provenance.ChangelogVars{}, oci.Annotations{})
 	status.SetGitMetadata(meta)
 }
 
@@ -230,19 +230,19 @@ func (m Progress) SetLatestImageMeta(
 	log *zerolog.Logger,
 	c types.Container,
 	params types.UpdateParams,
-	vars pkgContainer.ChangelogVars,
+	vars provenance.ChangelogVars,
 	latest oci.Annotations,
-) pkgContainer.ReportMeta {
+) provenance.ReportMeta {
 	if c == nil {
-		return pkgContainer.ReportMeta{}
+		return provenance.ReportMeta{}
 	}
 
 	update, exists := m[c.ID()]
 	if !exists {
-		return pkgContainer.ReportMeta{}
+		return provenance.ReportMeta{}
 	}
 
-	meta := pkgContainer.ResolveReportMeta(c, params, vars, latest)
+	meta := provenance.ResolveReportMeta(c, params, vars, latest)
 	update.SetGitMetadata(meta)
 
 	log.Debug().

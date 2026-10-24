@@ -10,6 +10,7 @@ import (
 	"path/filepath"
 	"strings"
 
+	"github.com/nicholas-fedor/watchtower/internal/container/provenance"
 	"github.com/nicholas-fedor/watchtower/internal/container/redact"
 	"github.com/nicholas-fedor/watchtower/pkg/types"
 )
@@ -33,7 +34,7 @@ var (
 func confinedDockerfile(dockerfile string) (string, error) {
 	dockerfile = strings.TrimSpace(dockerfile)
 	if dockerfile == "" {
-		return DefaultGitDockerfile, nil
+		return provenance.DefaultDockerfile, nil
 	}
 
 	cleaned := path.Clean(filepath.ToSlash(dockerfile))

@@ -1,9 +1,8 @@
-package container
+package provenance
 
 import (
 	"github.com/nicholas-fedor/watchtower/internal/container/oci"
 	"github.com/nicholas-fedor/watchtower/internal/container/redact"
-	"github.com/nicholas-fedor/watchtower/pkg/container/git"
 	"github.com/nicholas-fedor/watchtower/pkg/types"
 )
 
@@ -23,9 +22,6 @@ type ReportMeta struct {
 	CurrentRevision string
 	LatestRevision  string
 }
-
-// ChangelogVars substitutes placeholders in an explicit changelog template.
-type ChangelogVars = git.ChangelogVars
 
 // ResolveReportMeta builds notification fields from Git association and OCI annotations.
 //
@@ -59,7 +55,7 @@ func ResolveReportMeta(
 		mapping = params.GitImages[c.ImageName()]
 	}
 
-	assoc, associated := git.ResolveAssociation(c, params)
+	assoc, associated := ResolveAssociation(c, params)
 
 	// Report repo may fall back to OCI source. That does not enable the watcher.
 	repo := redact.GitURL(assoc.Repo)
@@ -80,7 +76,7 @@ func ResolveReportMeta(
 		ref = mapping.Ref
 	}
 
-	changelog := redact.MetadataURL(git.Changelog(c, repo, vars))
+	changelog := redact.MetadataURL(Changelog(c, repo, vars))
 	if changelog == "" {
 		changelog = redact.MetadataURL(anns.URL)
 	}

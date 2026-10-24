@@ -3,7 +3,7 @@ package state
 import (
 	"time"
 
-	"github.com/nicholas-fedor/watchtower/pkg/container"
+	"github.com/nicholas-fedor/watchtower/internal/container/provenance"
 	"github.com/nicholas-fedor/watchtower/pkg/types"
 )
 
@@ -274,7 +274,7 @@ func (u *ContainerStatus) LatestImageVersion() string { return u.latestImageVers
 //
 // Returns:
 //   - none.
-func (u *ContainerStatus) SetGitMetadata(meta container.ReportMeta) {
+func (u *ContainerStatus) SetGitMetadata(meta provenance.ReportMeta) {
 	u.gitRepo = meta.GitRepo
 	u.gitRef = meta.GitRef
 	u.changelog = meta.Changelog

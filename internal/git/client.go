@@ -17,7 +17,7 @@ import (
 
 	composeLabels "github.com/nicholas-fedor/watchtower/internal/compose/labels"
 	"github.com/nicholas-fedor/watchtower/internal/container/labels"
-	gitPkg "github.com/nicholas-fedor/watchtower/pkg/container/git"
+	"github.com/nicholas-fedor/watchtower/internal/container/provenance"
 	"github.com/nicholas-fedor/watchtower/pkg/types"
 )
 
@@ -227,7 +227,7 @@ func CheckContainer(
 	c types.Container,
 	params types.UpdateParams,
 ) (CheckResult, error) {
-	assoc, ok := gitPkg.ResolveAssociation(c, params)
+	assoc, ok := provenance.ResolveAssociation(c, params)
 	if !ok {
 		return CheckResult{}, nil
 	}
@@ -237,13 +237,13 @@ func CheckContainer(
 	}
 
 	if raw := strings.TrimSpace(assoc.Host); raw != "" {
-		_, err := gitPkg.ParseAPIOrigin(raw)
+		_, err := provenance.ParseAPIOrigin(raw)
 		if err != nil {
 			return CheckResult{}, fmt.Errorf("%w: %w", ErrInvalidHost, err)
 		}
 	}
 
-	lastCommit, lastTag := gitPkg.Baseline(c)
+	lastCommit, lastTag := provenance.Baseline(c)
 	if commit, tag, rejected := client.unacceptedBaseline(ApplyStampKeyFrom(c), lastCommit); rejected {
 		lastCommit = commit
 		lastTag = tag

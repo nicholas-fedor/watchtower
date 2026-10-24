@@ -13,8 +13,8 @@ import (
 	dockerImage "github.com/moby/moby/api/types/image"
 
 	"github.com/nicholas-fedor/watchtower/internal/container"
+	"github.com/nicholas-fedor/watchtower/internal/container/provenance"
 	"github.com/nicholas-fedor/watchtower/internal/update/state"
-	pkgContainer "github.com/nicholas-fedor/watchtower/pkg/container"
 	"github.com/nicholas-fedor/watchtower/pkg/types"
 )
 
@@ -300,7 +300,7 @@ func TestJSONGitAndOCIReportFields(t *testing.T) {
 		t.Parallel()
 
 		status := updatedAppStatus()
-		status.SetGitMetadata(pkgContainer.ReportMeta{
+		status.SetGitMetadata(provenance.ReportMeta{
 			GitRepo:         "https://github.com/org/app.git",
 			GitRef:          "main",
 			Changelog:       "https://github.com/org/app/releases",
@@ -344,7 +344,7 @@ func TestJSONGitAndOCIReportFields(t *testing.T) {
 		t.Parallel()
 
 		status := updatedAppStatus()
-		status.SetGitMetadata(pkgContainer.ReportMeta{GitRepo: "https://github.com/org/app.git", GitRef: "main"})
+		status.SetGitMetadata(provenance.ReportMeta{GitRepo: "https://github.com/org/app.git", GitRef: "main"})
 
 		raw, err := json.Marshal(notificationData{
 			Title: "update", Host: "box",

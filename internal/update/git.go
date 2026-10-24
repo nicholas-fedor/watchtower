@@ -16,13 +16,13 @@ import (
 	composeProject "github.com/nicholas-fedor/watchtower/internal/compose/project"
 	"github.com/nicholas-fedor/watchtower/internal/container"
 	"github.com/nicholas-fedor/watchtower/internal/container/oci"
+	"github.com/nicholas-fedor/watchtower/internal/container/provenance"
 	"github.com/nicholas-fedor/watchtower/internal/git"
 	"github.com/nicholas-fedor/watchtower/internal/git/apply"
 	"github.com/nicholas-fedor/watchtower/internal/git/project"
 	"github.com/nicholas-fedor/watchtower/internal/update/sorter"
 	"github.com/nicholas-fedor/watchtower/internal/update/state"
 	pkgContainer "github.com/nicholas-fedor/watchtower/pkg/container"
-	gitPkg "github.com/nicholas-fedor/watchtower/pkg/container/git"
 	"github.com/nicholas-fedor/watchtower/pkg/types"
 )
 
@@ -145,7 +145,7 @@ func (s *gitSession) watching(log *zerolog.Logger, c types.Container, params typ
 		return false
 	}
 
-	return gitPkg.ShouldMonitor(log, c, params)
+	return provenance.ShouldMonitor(log, c, params)
 }
 
 // check runs a Git staleness check and stores the result.
@@ -483,7 +483,7 @@ func (s *gitSession) buildOne(
 	params types.UpdateParams,
 	progress *state.Progress,
 ) error {
-	assoc, associated := gitPkg.ResolveAssociation(c, params)
+	assoc, associated := provenance.ResolveAssociation(c, params)
 	if !associated {
 		return errGitNotAssociated
 	}
@@ -494,7 +494,7 @@ func (s *gitSession) buildOne(
 	}
 
 	if dockerfile == "" {
-		dockerfile = pkgContainer.DefaultGitDockerfile
+		dockerfile = provenance.DefaultDockerfile
 	}
 
 	remote, err := apply.RemoteContext(assoc.Repo, result.Commit, assoc.Context)
@@ -528,10 +528,10 @@ func (s *gitSession) buildOne(
 	}
 
 	if concrete, ok := c.(*container.Container); ok {
-		pkgContainer.ApplyGitAssociation(concrete, assoc, gitPkg.PersistWatch(c))
+		provenance.ApplyGitAssociation(concrete, assoc, provenance.PersistWatch(c))
 
 		concrete.SetImageName(tag)
-		pkgContainer.ApplyGitStamp(concrete, result.Commit, result.Tag)
+		provenance.ApplyGitStamp(concrete, result.Commit, result.Tag)
 	}
 
 	s.mu.Lock()
@@ -543,7 +543,7 @@ func (s *gitSession) buildOne(
 		// A Git rebuild has no pulled image, so no latest image annotations are
 		// passed and LatestImageVersion stays empty. The resolved Git tag is the
 		// only new version available for this path.
-		meta := progress.SetLatestImageMeta(log, c, params, pkgContainer.ChangelogVars{
+		meta := progress.SetLatestImageMeta(log, c, params, provenance.ChangelogVars{
 			Tag:    result.Tag,
 			Commit: result.Commit,
 		}, oci.Annotations{})
@@ -582,7 +582,7 @@ func withGitMeta(
 		return nil
 	}
 
-	meta := pkgContainer.ResolveReportMeta(c, params, pkgContainer.ChangelogVars{
+	meta := provenance.ResolveReportMeta(c, params, provenance.ChangelogVars{
 		Tag:    tag,
 		Commit: commit,
 	}, oci.Annotations{})
@@ -766,7 +766,7 @@ func logFoundGitRevision(log *zerolog.Logger, c types.Container, params types.Up
 		return
 	}
 
-	assoc, _ := gitPkg.ResolveAssociation(c, params)
+	assoc, _ := provenance.ResolveAssociation(c, params)
 
 	ref := tag
 	if ref == "" {

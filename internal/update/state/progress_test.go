@@ -18,7 +18,7 @@ import (
 	"github.com/nicholas-fedor/watchtower/internal/container"
 	"github.com/nicholas-fedor/watchtower/internal/container/labels"
 	"github.com/nicholas-fedor/watchtower/internal/container/oci"
-	pkgContainer "github.com/nicholas-fedor/watchtower/pkg/container"
+	"github.com/nicholas-fedor/watchtower/internal/container/provenance"
 	"github.com/nicholas-fedor/watchtower/pkg/types"
 	mockTypes "github.com/nicholas-fedor/watchtower/pkg/types/mocks"
 )
@@ -1489,10 +1489,10 @@ func TestProgressSetLatestImageMeta(t *testing.T) {
 			newTestLogger(t),
 			nil,
 			types.UpdateParams{},
-			pkgContainer.ChangelogVars{},
+			provenance.ChangelogVars{},
 			oci.Annotations{},
 		)
-		assert.Equal(t, pkgContainer.ReportMeta{}, meta)
+		assert.Equal(t, provenance.ReportMeta{}, meta)
 	})
 
 	t.Run("unknown container", func(t *testing.T) {
@@ -1505,10 +1505,10 @@ func TestProgressSetLatestImageMeta(t *testing.T) {
 			newTestLogger(t),
 			c,
 			types.UpdateParams{},
-			pkgContainer.ChangelogVars{Tag: "v1.0.0"},
+			provenance.ChangelogVars{Tag: "v1.0.0"},
 			oci.Annotations{},
 		)
-		assert.Equal(t, pkgContainer.ReportMeta{}, meta)
+		assert.Equal(t, provenance.ReportMeta{}, meta)
 	})
 
 	t.Run("substitutes new tag", func(t *testing.T) {
@@ -1525,7 +1525,7 @@ func TestProgressSetLatestImageMeta(t *testing.T) {
 			newTestLogger(t),
 			c,
 			types.UpdateParams{},
-			pkgContainer.ChangelogVars{Tag: "v1.2.3", Commit: "deadbeef"},
+			provenance.ChangelogVars{Tag: "v1.2.3", Commit: "deadbeef"},
 			oci.Annotations{},
 		)
 		assert.Equal(t, "https://example.com/notes/v1.2.3", status.Changelog())
@@ -1544,7 +1544,7 @@ func TestProgressSetLatestImageMeta(t *testing.T) {
 			newTestLogger(t),
 			c,
 			types.UpdateParams{},
-			pkgContainer.ChangelogVars{Tag: "v1.2.3"},
+			provenance.ChangelogVars{Tag: "v1.2.3"},
 			oci.Annotations{Version: "1.2.3", Revision: "newrev"},
 		)
 
@@ -1568,7 +1568,7 @@ func TestProgressSetLatestImageMeta(t *testing.T) {
 			newTestLogger(t),
 			c,
 			types.UpdateParams{},
-			pkgContainer.ChangelogVars{Tag: "v9.9.9", Commit: "deadbeef"},
+			provenance.ChangelogVars{Tag: "v9.9.9", Commit: "deadbeef"},
 			oci.Annotations{},
 		)
 
