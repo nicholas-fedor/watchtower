@@ -269,15 +269,6 @@ func TestResolveReportMeta(t *testing.T) {
 		assert.Equal(t, "https://example.com/docs?lang=en#install", meta.Documentation)
 	})
 
-	t.Run("does not persist an SCP URL whose user is a token", func(t *testing.T) {
-		t.Parallel()
-
-		assert.Empty(t, redactGitURL("token@github.com:org/app.git"))
-		assert.Empty(t, redactGitURL("ghp_abcdefghijklmnopqrstuvwxyz@github.com:org/app.git"))
-		assert.Equal(t, "git@github.com:org/app.git", redactGitURL("git@github.com:org/app.git"))
-		assert.Equal(t, "deploy@git.example.com:org/app.git", redactGitURL("deploy@git.example.com:org/app.git"))
-	})
-
 	t.Run("leaves changelog empty for an unknown host without OCI URL fields", func(t *testing.T) {
 		t.Parallel()
 

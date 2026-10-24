@@ -48,22 +48,6 @@ func newTestImageClient(api dockerClient.APIClient, log *zerolog.Logger, setting
 	return client
 }
 
-// newImageAPI returns a mock Docker API whose daemon reports no registry mirrors.
-//
-// Parameters:
-//   - t: Test that owns the mock.
-//
-// Returns:
-//   - *mockContainer.MockAPIClient: Mock answering Info with an empty daemon configuration.
-func newImageAPI(t *testing.T) *mockContainer.MockAPIClient {
-	t.Helper()
-
-	api := mockContainer.NewMockAPIClient(t)
-	api.EXPECT().Info(mock.Anything, mock.Anything).Return(dockerClient.SystemInfoResult{}, nil).Maybe()
-
-	return api
-}
-
 // pullResponse returns a mock image pull response whose progress stream ends with
 // waitErr, nil for a pull that finished.
 //
@@ -125,44 +109,6 @@ func digestRegistry(t *testing.T, remoteDigest string) *httpstub.Server {
 	)
 
 	return server
-}
-
-// runningImage returns a container that runs imageName with the image ID
-// imageID and the given repo digests.
-//
-// Parameters:
-//   - imageName: Image reference the container runs.
-//   - imageID: ID of the container's image.
-//   - repoDigests: Repo digests of the container's image, or none to keep the default.
-//
-// Returns:
-//   - *Container: The container.
-func runningImage(imageName, imageID string, repoDigests ...string) *Container {
-	options := []MockContainerUpdate{
-		WithImageName(imageName),
-		func(container *dockerContainer.InspectResponse, image *dockerImage.InspectResponse) {
-			container.Image = imageID
-			image.ID = imageID
-		},
-	}
-
-	if repoDigests != nil {
-		options = append(options, WithRepoDigests(repoDigests))
-	}
-
-	return MockContainer(options...)
-}
-
-// inspected returns the inspect result of an image with id and repoDigests.
-//
-// Parameters:
-//   - id: Image ID.
-//   - repoDigests: The image's repo digests.
-//
-// Returns:
-//   - dockerClient.ImageInspectResult: The inspect result.
-func inspected(id string, repoDigests ...string) dockerClient.ImageInspectResult {
-	return dockerClient.ImageInspectResult{ID: id, RepoDigests: repoDigests}
 }
 
 // waitFor returns the value ch delivers within timeout, and fails the test when

@@ -1,10 +1,6 @@
 package container
 
 import (
-	"maps"
-
-	dockerContainer "github.com/moby/moby/api/types/container"
-
 	"github.com/nicholas-fedor/watchtower/internal/container/labels"
 	"github.com/nicholas-fedor/watchtower/pkg/container/git"
 )
@@ -14,67 +10,6 @@ const DefaultGitDockerfile = git.DefaultDockerfile
 
 // gitAssociation is the monitor association for a container.
 type gitAssociation = git.Association
-
-// SetLabel sets a container config label used on the next create.
-//
-// Parameters:
-//   - key: Label key.
-//   - value: Label value.
-//
-// Returns:
-//   - none.
-func (c *Container) SetLabel(key, value string) {
-	if c == nil || key == "" {
-		return
-	}
-
-	c.mu.Lock()
-	defer c.mu.Unlock()
-
-	if c.containerInfo == nil || c.containerInfo.Config == nil {
-		return
-	}
-
-	c.replaceInspectLocked(func(info *dockerContainer.InspectResponse) {
-		labels := maps.Clone(info.Config.Labels)
-		if labels == nil {
-			labels = make(map[string]string, 1)
-		}
-
-		labels[key] = value
-		info.Config.Labels = labels
-	})
-}
-
-// DeleteLabel removes a container config label used on the next create.
-//
-// Parameters:
-//   - key: Label key.
-//
-// Returns:
-//   - none.
-func (c *Container) DeleteLabel(key string) {
-	if c == nil || key == "" {
-		return
-	}
-
-	c.mu.Lock()
-	defer c.mu.Unlock()
-
-	if c.containerInfo == nil || c.containerInfo.Config == nil {
-		return
-	}
-
-	if _, ok := c.containerInfo.Config.Labels[key]; !ok {
-		return
-	}
-
-	c.replaceInspectLocked(func(info *dockerContainer.InspectResponse) {
-		labels := maps.Clone(info.Config.Labels)
-		delete(labels, key)
-		info.Config.Labels = labels
-	})
-}
 
 // ApplyGitStamp writes git-last-commit and git-last-tag onto container create labels.
 //

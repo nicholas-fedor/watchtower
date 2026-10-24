@@ -2,6 +2,7 @@ package container
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"path"
 	"runtime"
@@ -11,7 +12,6 @@ import (
 
 	"github.com/rs/zerolog"
 
-	cerrdefs "github.com/containerd/errdefs"
 	dockerContainer "github.com/moby/moby/api/types/container"
 	dockerNetwork "github.com/moby/moby/api/types/network"
 	dockerClient "github.com/moby/moby/client"
@@ -35,11 +35,6 @@ const (
 	orchestratorCleanupEnv = "WT_ORCHESTRATOR_CLEANUP"
 	// orchestratorCleanupTimeout is the timeout for cleanup operations on failed orchestrator creation.
 	orchestratorCleanupTimeout = 5 * time.Second
-	// orphanedOrchestratorAge is how long an orchestrator must have been running
-	// before startup cleanup treats it as orphaned. An orchestrator's handoff is
-	// bounded by a 5-minute timeout plus short cleanup steps, so a younger one
-	// may still be replacing a Watchtower container.
-	orphanedOrchestratorAge = 10 * time.Minute
 )
 
 // Docker connection environment variable keys.
@@ -74,6 +69,14 @@ var remoteDockerSchemes = []string{
 	"ssh://",
 }
 
+// Errors for ephemeral orchestrator operations.
+var (
+	// errEphemeralCreateFailed indicates a failure to create the ephemeral orchestrator container.
+	errEphemeralCreateFailed = errors.New("failed to create ephemeral orchestrator container")
+	// errEphemeralStartFailed indicates a failure to start the ephemeral orchestrator container.
+	errEphemeralStartFailed = errors.New("failed to start ephemeral orchestrator container")
+)
+
 // dockerConnectionConfig holds the Docker connection configuration extracted from
 // a source container's environment variables and bind mounts. This enables the
 // ephemeral orchestrator to maintain the same Docker connection as the source
@@ -96,37 +99,6 @@ type dockerConnectionConfig struct {
 	// CertBinds are additional bind mounts for TLS certificate directories.
 	// Only populated for remote TLS connections where certificates need to be mounted.
 	CertBinds []string
-}
-
-// CreateEphemeralOrchestrator creates a short-lived container that orchestrates
-// the Watchtower self-update transition.
-//
-// The ephemeral container uses the same Watchtower image (already pulled) with
-// the --self-update-orchestrator flag. It is configured with AutoRemove for
-// automatic cleanup and mounts the Docker socket for container management.
-//
-// The ephemeral container does not set the watchtower label
-// (com.centurylinklabs.watchtower = "true") to avoid being detected as an
-// excess Watchtower instance by the scope and filter systems.
-//
-// Parameters:
-//   - ctx: Context for cancellation and timeout control.
-//   - sourceContainer: Current Watchtower container being replaced.
-//   - newImage: Image reference for the new Watchtower container.
-//   - containerChain: Container chain label for lineage tracking.
-//   - cleanup: When true, the orchestrator removes the old image after handoff.
-//
-// Returns:
-//   - types.ContainerID: ID of the ephemeral orchestrator container.
-//   - error: Non-nil if creation or start fails, nil on success.
-func (c *client) CreateEphemeralOrchestrator(
-	ctx context.Context,
-	sourceContainer types.Container,
-	newImage string,
-	containerChain string,
-	cleanup bool,
-) (types.ContainerID, error) {
-	return createEphemeralOrchestrator(c.log, ctx, c.api, sourceContainer, newImage, containerChain, cleanup)
 }
 
 // createEphemeralOrchestrator creates and starts the ephemeral orchestrator for
@@ -837,130 +809,4 @@ func parseBindMount(bind string) (string, string, bool) {
 //   - bool: True if the bind mount is already in the slice.
 func containsBind(binds []string, bind string) bool {
 	return slices.Contains(binds, bind)
-}
-
-// RemoveOrphanedOrchestrators removes any ephemeral orchestrator containers
-// that may have persisted due to crashes or unexpected termination.
-//
-// This is called during startup alongside RemoveExcessWatchtowerInstances to
-// ensure a clean state. Only orchestrators running longer than any self-update
-// can take are removed. A younger orchestrator may still be handing off to a
-// new Watchtower, including the instance running this cleanup or an instance
-// in another scope, so it is kept, as is one whose start time cannot be read.
-//
-// Parameters:
-//   - ctx: Context for cancellation and timeout control.
-//   - client: Container client for Docker operations.
-//
-// Returns:
-//   - int: Number of orphaned orchestrators removed.
-//   - error: Non-nil if listing or removal fails, nil on success.
-func RemoveOrphanedOrchestrators(log *zerolog.Logger,
-	ctx context.Context,
-	client Client,
-) (int, error) {
-	clogVal := log.With().
-		Str("function", "RemoveOrphanedOrchestrators").
-		Logger()
-	clog := &clogVal
-
-	clog.Debug().Msg("Checking for orphaned ephemeral orchestrator containers")
-
-	// List all containers to find orphaned orchestrators.
-	allContainers, err := client.ListContainers(ctx)
-	if err != nil {
-		clog.Error().
-			Err(err).
-			Msg("Failed to list containers for orchestrator cleanup")
-
-		return 0, fmt.Errorf("failed to list containers: %w", err)
-	}
-
-	removed := 0
-
-	for _, c := range allContainers {
-		containerInfo := c.ContainerInfo()
-		if containerInfo == nil || containerInfo.Config == nil {
-			continue
-		}
-
-		// Check for the orchestrator label.
-		if containerInfo.Config.Labels[labels.EphemeralOrchestrator] != "true" {
-			continue
-		}
-
-		// Keep orchestrators that may still be running a self-update.
-		started, ok := orchestratorStartTime(containerInfo)
-		if !ok || time.Since(started) < orphanedOrchestratorAge {
-			clog.Debug().
-				Str("container", c.Name()).
-				Str("id", c.ID().ShortID()).
-				Bool("start_time_known", ok).
-				Msg("Skipping ephemeral orchestrator that may still be running a self-update")
-
-			continue
-		}
-
-		clog.Info().
-			Str("container", c.Name()).
-			Str("id", c.ID().ShortID()).
-			Msg("Removing orphaned ephemeral orchestrator container")
-
-		err := client.StopAndRemoveContainer(ctx, c, 0)
-		if cerrdefs.IsNotFound(err) {
-			clog.Debug().
-				Str("container", c.Name()).
-				Str("id", c.ID().ShortID()).
-				Msg("Orphaned orchestrator container is already gone")
-
-			continue
-		}
-
-		if err != nil {
-			clog.Warn().
-				Err(err).
-				Str("container", c.Name()).
-				Str("id", c.ID().ShortID()).
-				Msg("Failed to remove orphaned orchestrator container")
-
-			continue
-		}
-
-		removed++
-	}
-
-	if removed > 0 {
-		clog.Info().
-			Int("count", removed).
-			Msg("Removed orphaned ephemeral orchestrator containers")
-	} else {
-		clog.Debug().Msg("No orphaned ephemeral orchestrator containers found")
-	}
-
-	return removed, nil
-}
-
-// orchestratorStartTime returns when an orchestrator container started, falling
-// back to its creation time when Docker reports no start time.
-//
-// Parameters:
-//   - info: Inspect data of the orchestrator container.
-//
-// Returns:
-//   - time.Time: The start or creation time.
-//   - bool: False when neither time can be read.
-func orchestratorStartTime(info *dockerContainer.InspectResponse) (time.Time, bool) {
-	if info.State != nil {
-		started, err := time.Parse(time.RFC3339Nano, info.State.StartedAt)
-		if err == nil && !started.IsZero() {
-			return started, true
-		}
-	}
-
-	created, err := time.Parse(time.RFC3339Nano, info.Created)
-	if err == nil && !created.IsZero() {
-		return created, true
-	}
-
-	return time.Time{}, false
 }

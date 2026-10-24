@@ -16,6 +16,9 @@ import (
 	"github.com/nicholas-fedor/watchtower/pkg/types"
 )
 
+// ErrImageCooldown indicates the image is within the configured cooldown window and should not be pulled.
+var ErrImageCooldown = errors.New("image is within cooldown period")
+
 // CooldownError represents a cooldown deferral with human-readable details
 // (age, delay, remaining). It wraps
 // ErrImageCooldown (or a fetch failure) so callers can use errors.Is/As

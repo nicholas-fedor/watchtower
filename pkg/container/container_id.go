@@ -45,27 +45,23 @@ var containerMarkers = []string{
 	".dockerenv",        // Docker
 }
 
-// IsOldContainer reports whether the container's runtime name (from Name()
-// or raw inspect) indicates a predecessor renamed during Watchtower self-update.
-// It trims any leading '/' (as Docker names have) and checks for the
-// WatchtowerOldPrefix convention. Used for disambiguation in hostname
-// fallback, forcing cleanup of old containers, skipping redundant renames,
-// and suppressing notifs for self-cleanup of prior incarnations.
-//
-// Parameters:
-//   - name: The container name (may be empty, with or without leading '/').
-//
-// Returns:
-//   - bool: true if the (normalized) name has the old- prefix.
-func IsOldContainer(name string) bool {
-	if name == "" {
-		return false
-	}
-
-	n := strings.TrimLeft(name, "/")
-
-	return strings.HasPrefix(n, types.WatchtowerOldPrefix)
-}
+// Errors for container ID detection operations.
+var (
+	// errReadMountinfoFile indicates a failure to read the mountinfo file for the current process.
+	errReadMountinfoFile = errors.New("failed to read mountinfo file")
+	// errExtractContainerIDFromMountinfo indicates a failure to extract a container ID from mountinfo data.
+	errExtractContainerIDFromMountinfo = errors.New("failed to extract container ID from mountinfo")
+	// errReadCgroupFile indicates a failure to read the cgroup file for the current process.
+	errReadCgroupFile = errors.New("failed to read cgroup file")
+	// errExtractContainerID indicates a failure to extract a container ID from the cgroup data.
+	errExtractContainerID = errors.New("failed to extract container ID")
+	// errNoValidContainerID indicates no valid Docker container ID was found in the input data.
+	errNoValidContainerID = errors.New("no valid docker container ID found in input")
+	// errContainerIDNotFound indicates the container ID could not be found using hostname matching.
+	errContainerIDNotFound = errors.New("HOSTNAME environment variable is not set")
+	// errNoContainerWithHostname indicates no container was found with the matching hostname.
+	errNoContainerWithHostname = errors.New("no container found with matching hostname")
+)
 
 // GetCurrentContainerID retrieves the current container ID using a fallback strategy.
 // It attempts multiple detection methods in order of preference and reliability.
