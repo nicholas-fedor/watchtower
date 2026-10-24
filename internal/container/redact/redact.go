@@ -3,7 +3,9 @@ package redact
 import (
 	"net/url"
 	"regexp"
+	"slices"
 	"strings"
+	"unicode"
 )
 
 // redactedUserinfo replaces the userinfo matched by userinfoInError.
@@ -147,6 +149,11 @@ func redactQuery(raw string) string {
 
 // isSensitiveQueryKey reports whether a query parameter commonly contains credentials.
 //
+// The key matches when a part between separators names a credential. It also
+// matches when a word of the key does, so accessToken and clientSecret match
+// like access_token and client_secret. Two adjacent words count as one name, so
+// dbPassWord and sshPassPhrase match too.
+//
 // Parameters:
 //   - key: URL query parameter name.
 //
@@ -154,13 +161,15 @@ func redactQuery(raw string) string {
 //   - bool: True when the parameter should be removed.
 func isSensitiveQueryKey(key string) bool {
 	normalized := strings.ToLower(strings.ReplaceAll(key, "-", "_"))
-	parts := strings.FieldsFunc(normalized, func(r rune) bool {
-		return r == '_' || r == '-' || r == '.'
-	})
+	parts := strings.FieldsFunc(normalized, isQueryKeySeparator)
 
-	for _, part := range parts {
-		switch part {
-		case "token", "password", "passwd", "secret", "credential", "credentials", "signature", "sig", "auth", "authorization", "session", "jwt", "bearer":
+	if slices.ContainsFunc(parts, isCredentialWord) {
+		return true
+	}
+
+	words := queryKeyWords(key)
+	for i, word := range words {
+		if isCredentialWord(word) || i > 0 && isCredentialWord(words[i-1]+word) {
 			return true
 		}
 	}
@@ -169,6 +178,80 @@ func isSensitiveQueryKey(key string) bool {
 
 	return strings.Contains(compact, "oauth") || strings.Contains(compact, "apikey") || strings.Contains(compact, "accesskey") || strings.Contains(compact, "privatekey") ||
 		strings.Contains(compact, "authtoken")
+}
+
+// isCredentialWord reports whether a lowercase word of a query parameter name
+// names a credential.
+//
+// Parameters:
+//   - word: Lowercase word or part of the name.
+//
+// Returns:
+//   - bool: True when the word names a credential.
+func isCredentialWord(word string) bool {
+	switch word {
+	case "token", "password", "passwd", "pwd", "passphrase", "secret", "credential", "credentials", "signature", "sig", "auth", "authorization", "session", "jwt", "bearer":
+		return true
+	default:
+		return false
+	}
+}
+
+// queryKeyWords splits a query parameter name into lowercase words at
+// separators and camelCase boundaries.
+//
+// A capital letter starts a word after a lowercase letter or a digit. In a run
+// of capitals, the last one starts a word when a lowercase letter follows it.
+// APIToken splits into api and token.
+//
+// Parameters:
+//   - key: URL query parameter name.
+//
+// Returns:
+//   - []string: Lowercase words of the name.
+func queryKeyWords(key string) []string {
+	runes := []rune(key)
+	words := []string{}
+	start := 0
+
+	for i, char := range runes {
+		if isQueryKeySeparator(char) {
+			if i > start {
+				words = append(words, strings.ToLower(string(runes[start:i])))
+			}
+
+			start = i + 1
+
+			continue
+		}
+
+		if i > start && unicode.IsUpper(char) {
+			prev := runes[i-1]
+			nextIsLower := i+1 < len(runes) && unicode.IsLower(runes[i+1])
+
+			if unicode.IsLower(prev) || unicode.IsDigit(prev) || unicode.IsUpper(prev) && nextIsLower {
+				words = append(words, strings.ToLower(string(runes[start:i])))
+				start = i
+			}
+		}
+	}
+
+	if start < len(runes) {
+		words = append(words, strings.ToLower(string(runes[start:])))
+	}
+
+	return words
+}
+
+// isQueryKeySeparator reports whether r separates words in a query parameter name.
+//
+// Parameters:
+//   - r: Character of the name.
+//
+// Returns:
+//   - bool: True for an underscore, a hyphen, or a dot.
+func isQueryKeySeparator(r rune) bool {
+	return r == '_' || r == '-' || r == '.'
 }
 
 // redactSCPGitURL removes credentials and sensitive query values from an SCP-style Git URL.
