@@ -19,6 +19,7 @@ import (
 
 	"github.com/nicholas-fedor/watchtower/internal/container"
 	"github.com/nicholas-fedor/watchtower/internal/container/filters"
+	containerImage "github.com/nicholas-fedor/watchtower/internal/container/image"
 	"github.com/nicholas-fedor/watchtower/internal/container/labels"
 	"github.com/nicholas-fedor/watchtower/internal/container/oci"
 	"github.com/nicholas-fedor/watchtower/internal/container/provenance"
@@ -642,7 +643,7 @@ func update(
 				// Skip containers with staleness check errors, marking them as skipped.
 				warnGitConfigSkip(log, sourceContainer.Name(), sourceContainer.ImageName(), checkErr)
 
-				if !errors.Is(checkErr, pkgContainer.ErrImageCooldown) {
+				if !errors.Is(checkErr, containerImage.ErrImageCooldown) {
 					parallelStaleCheckFailed++
 				}
 
@@ -664,7 +665,7 @@ func update(
 
 				// Record the cooldown details for reports and notifications. The
 				// *container.CooldownError carries them.
-				cooldownErr, ok := errors.AsType[*pkgContainer.CooldownError](checkErr)
+				cooldownErr, ok := errors.AsType[*containerImage.CooldownError](checkErr)
 				if ok {
 					progress.SetCooldownInfo(log,
 						sourceContainer.ID(),
@@ -673,7 +674,7 @@ func update(
 						cooldownErr.Remaining,
 						cooldownErr.EligibleAt,
 					)
-				} else if errors.Is(checkErr, pkgContainer.ErrImageCooldown) {
+				} else if errors.Is(checkErr, containerImage.ErrImageCooldown) {
 					// Fallback for plain sentinel (keeps basic deferral visible)
 					progress.SetCooldownInfo(log, sourceContainer.ID(), "", "", "", time.Time{})
 				}
@@ -684,7 +685,7 @@ func update(
 				// failure, not a cooldown deferral.
 				if sourceContainer.IsWatchtower() &&
 					!config.SkipSelfUpdate &&
-					!errors.Is(checkErr, pkgContainer.ErrImageCooldown) {
+					!errors.Is(checkErr, containerImage.ErrImageCooldown) {
 					parallelWatchtowerPullFailed = true
 				}
 			case verifyErr != nil:
@@ -694,7 +695,7 @@ func update(
 
 				if sourceContainer.IsWatchtower() &&
 					!config.SkipSelfUpdate &&
-					!errors.Is(verifyErr, pkgContainer.ErrImageCooldown) {
+					!errors.Is(verifyErr, containerImage.ErrImageCooldown) {
 					parallelWatchtowerPullFailed = true
 				}
 			default:
@@ -1310,7 +1311,7 @@ func isPinned(
 	// Detect digests before parse-fallback.
 	// A repo@sha256 reference must stay pinned even when ParseDockerRef fails
 	// for unrelated reasons.
-	if pkgContainer.IsImagePinnedByDigest(imageName) {
+	if containerImage.IsImagePinnedByDigest(imageName) {
 		if gitSession.watching(log, cont, config) {
 			clog.Debug().Msg("Pinned digest uses Git path because watcher is on")
 
@@ -1346,7 +1347,7 @@ func isPinned(
 			}
 
 			// Fallback name might itself be digest-pinned (unlikely but consistent).
-			if pkgContainer.IsImagePinnedByDigest(fallbackImage) {
+			if containerImage.IsImagePinnedByDigest(fallbackImage) {
 				if gitSession.watching(log, cont, config) {
 					return false, nil
 				}

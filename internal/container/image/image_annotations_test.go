@@ -1,4 +1,4 @@
-package container
+package image
 
 import (
 	"fmt"
@@ -56,7 +56,7 @@ func TestImageClientImageAnnotations(t *testing.T) {
 			},
 		})
 
-		got := newImageClient(api, newTestLogger(t), registryConfig.Registry{}, ratelimit.New()).
+		got := NewClient(api, newTestLogger(t), registryConfig.Registry{}, ratelimit.New()).
 			GetImageAnnotations(t.Context(), "app:latest")
 
 		assert.Equal(t, "https://github.com/org/app.git", got.Source)
@@ -73,7 +73,7 @@ func TestImageClientImageAnnotations(t *testing.T) {
 			Labels: map[string]string{"com.centurylinklabs.watchtower": "true"},
 		})
 
-		got := newImageClient(api, newTestLogger(t), registryConfig.Registry{}, ratelimit.New()).
+		got := NewClient(api, newTestLogger(t), registryConfig.Registry{}, ratelimit.New()).
 			GetImageAnnotations(t.Context(), "app:latest")
 
 		assert.Equal(t, oci.Annotations{}, got)
@@ -84,7 +84,7 @@ func TestImageClientImageAnnotations(t *testing.T) {
 
 		api := newAnnotationsAPI(t, nil)
 
-		got := newImageClient(api, newTestLogger(t), registryConfig.Registry{}, ratelimit.New()).
+		got := NewClient(api, newTestLogger(t), registryConfig.Registry{}, ratelimit.New()).
 			GetImageAnnotations(t.Context(), "app:latest")
 
 		assert.Equal(t, oci.Annotations{}, got)
@@ -96,7 +96,7 @@ func TestImageClientImageAnnotations(t *testing.T) {
 		// The mock has no expectations, so an inspect fails the test.
 		api := mockContainer.NewMockAPIClient(t)
 
-		got := newImageClient(api, newTestLogger(t), registryConfig.Registry{}, ratelimit.New()).
+		got := NewClient(api, newTestLogger(t), registryConfig.Registry{}, ratelimit.New()).
 			GetImageAnnotations(t.Context(), "")
 
 		assert.Equal(t, oci.Annotations{}, got)
@@ -109,24 +109,9 @@ func TestImageClientImageAnnotations(t *testing.T) {
 		api.EXPECT().ImageInspect(mock.Anything, "missing:latest").
 			Return(dockerClient.ImageInspectResult{}, fmt.Errorf("no such image: %w", cerrdefs.ErrNotFound)).Once()
 
-		got := newImageClient(api, newTestLogger(t), registryConfig.Registry{}, ratelimit.New()).
+		got := NewClient(api, newTestLogger(t), registryConfig.Registry{}, ratelimit.New()).
 			GetImageAnnotations(t.Context(), "missing:latest")
 
 		assert.Equal(t, oci.Annotations{}, got)
 	})
-}
-
-// TestClientImageAnnotationsDelegates verifies that the client-level delegate
-// reaches the same result as the image client.
-func TestClientImageAnnotationsDelegates(t *testing.T) {
-	t.Parallel()
-
-	api := newAnnotationsAPI(t, &dockerspec.DockerOCIImageConfig{
-		Labels: map[string]string{oci.VersionLabel: "1.2.3"},
-	})
-
-	got := (&client{api: api, log: newTestLogger(t)}).
-		GetImageAnnotations(t.Context(), "app:latest")
-
-	assert.Equal(t, "1.2.3", got.Version)
 }

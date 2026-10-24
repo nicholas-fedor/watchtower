@@ -2,26 +2,13 @@ package container
 
 import (
 	"context"
-	"errors"
 	"fmt"
-	"net/http"
-	"strings"
 
-	dockerClient "github.com/moby/moby/client"
-
-	"github.com/nicholas-fedor/watchtower/internal/container/redact"
+	containerImage "github.com/nicholas-fedor/watchtower/internal/container/image"
 	"github.com/nicholas-fedor/watchtower/pkg/types"
 )
 
 var _ CopyFileStore = (*client)(nil)
-
-// Errors for building images from Git contexts.
-var (
-	// errBuildImageIDMissing indicates a successful-looking build returned no image ID.
-	errBuildImageIDMissing = errors.New("image build did not return an image ID")
-	// errGitRemoteEmpty indicates no clone URL was associated.
-	errGitRemoteEmpty = errors.New("git remote is empty")
-)
 
 // BuildRemoteImage builds an image from a Git URL context.
 //
@@ -37,55 +24,10 @@ var (
 //   - types.ImageID: Built image ID.
 //   - error: Non-nil when the build or inspect fails.
 func (c *client) BuildRemoteImage(ctx context.Context, remote, dockerfile string, tags []string) (types.ImageID, error) {
-	remote = strings.TrimSpace(remote)
-	if remote == "" {
-		return "", errGitRemoteEmpty
-	}
-
-	dockerfile, err := confinedDockerfile(dockerfile)
+	imageID, err := containerImage.BuildFromGit(c.logger(), ctx, c.api, remote, dockerfile, tags)
 	if err != nil {
-		return "", err
+		return "", fmt.Errorf("build image from Git: %w", err)
 	}
-
-	clogVal := c.logger().With().
-		Str("remote", redact.Remote(remote)).
-		Str("dockerfile", dockerfile).
-		Strs("tags", tags).
-		Logger()
-	clog := &clogVal
-
-	result, err := c.api.ImageBuild(ctx, http.NoBody, dockerClient.ImageBuildOptions{
-		RemoteContext: remote,
-		Tags:          tags,
-		Remove:        true,
-		Dockerfile:    dockerfile,
-	})
-	if err != nil {
-		return "", fmt.Errorf("image build: %w", redactBuildError(err, remote))
-	}
-	defer result.Body.Close()
-
-	imageID, err := consumeBuildStream(result.Body)
-	if err != nil {
-		return "", redactBuildError(err, remote)
-	}
-
-	if imageID == "" && len(tags) > 0 {
-		inspected, inspectErr := c.api.ImageInspect(ctx, tags[0])
-		if inspectErr != nil {
-			return "", fmt.Errorf("inspect built image: %w", inspectErr)
-		}
-
-		imageID = types.ImageID(inspected.ID)
-	}
-
-	if imageID == "" {
-		return "", errBuildImageIDMissing
-	}
-
-	clog.Debug().
-		Str("image_id", imageID.ShortID()).
-		Msg("Built image from Git URL context")
 
 	return imageID, nil
 }

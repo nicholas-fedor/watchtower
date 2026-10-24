@@ -14,6 +14,7 @@ import (
 	cerrdefs "github.com/containerd/errdefs"
 
 	"github.com/nicholas-fedor/watchtower/internal/container"
+	containerImage "github.com/nicholas-fedor/watchtower/internal/container/image"
 	"github.com/nicholas-fedor/watchtower/internal/container/labels"
 	pkgContainer "github.com/nicholas-fedor/watchtower/pkg/container"
 	"github.com/nicholas-fedor/watchtower/pkg/types"
@@ -868,7 +869,7 @@ func removeOldImage(
 	switch {
 	case cerrdefs.IsNotFound(err),
 		cerrdefs.IsConflict(err),
-		errors.Is(err, pkgContainer.ErrImageInUse),
+		errors.Is(err, containerImage.ErrImageInUse),
 		errors.Is(err, context.Canceled),
 		errors.Is(err, context.DeadlineExceeded),
 		cleanupCtx.Err() != nil:

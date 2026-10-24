@@ -1,6 +1,7 @@
 package settings
 
 import (
+	containerImage "github.com/nicholas-fedor/watchtower/internal/container/image"
 	"github.com/nicholas-fedor/watchtower/pkg/container"
 )
 
@@ -19,7 +20,7 @@ func (c Config) ClientOptions() container.ClientOptions {
 		RemoveVolumes:           c.Client.RemoveVolumes,
 		DisableMemorySwappiness: c.Compatibility.DisableMemorySwappiness,
 		CPUCopyMode:             c.Compatibility.CPUCopyMode,
-		WarnOnHeadFailed:        container.WarningStrategy(c.Client.WarnOnHeadFailure),
+		WarnOnHeadFailed:        containerImage.WarningStrategy(c.Client.WarnOnHeadFailure),
 		Registry:                c.Registry,
 	}
 }

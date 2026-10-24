@@ -1,4 +1,4 @@
-package container
+package image
 
 import (
 	"context"
@@ -51,6 +51,8 @@ var (
 	ErrImageInUse = errors.New("image is actively used by a container")
 	// errPinnedImage indicates an attempt to pull an immutable (sha256-pinned) image.
 	errPinnedImage = errors.New("image is pinned with sha256, skipping pull")
+	// errInspectImageFailed indicates a failure to inspect an image from the Docker daemon.
+	errInspectImageFailed = errors.New("failed to inspect image")
 	// errPullImageFailed indicates a failure to pull an image from the registry.
 	errPullImageFailed = errors.New("failed to pull image")
 	// errFailedToLoadPullOptions indicates pull options could not be resolved.
@@ -64,6 +66,14 @@ var (
 	// errRemoveImageFailed indicates a failure to remove an image from the Docker host.
 	errRemoveImageFailed = errors.New("failed to remove image")
 )
+
+// nopLog returns a fresh discarded logger for optional construction and fallbacks.
+// Each call allocates a new Nop instance.
+func nopLog() *zerolog.Logger {
+	n := zerolog.Nop()
+
+	return &n
+}
 
 // IsImagePinnedByDigest reports whether imageName is an immutable digest reference.
 //
@@ -108,11 +118,11 @@ func IsImagePinnedByDigest(imageName string) bool {
 //   - "auto" delegates to registry-specific logic (e.g., WarnOnAPIConsumption).
 type WarningStrategy string
 
-// imageClient manages image-related operations for Watchtower.
+// Client manages image-related operations for Watchtower.
 //
 // It uses a Docker API client for image tasks.
-// imageClient performs image inspect, pull, and stale checks.
-type imageClient struct {
+// Client performs image inspect, pull, and stale checks.
+type Client struct {
 	api dockerClient.APIClient
 	log *zerolog.Logger
 	// daemonInfo shares Docker Info and mirrors across check and pull paths.
@@ -121,6 +131,33 @@ type imageClient struct {
 	registrySettings registryConfig.Registry
 	// rateLimiter paces pulls, digest checks, and image age requests per registry host.
 	rateLimiter *ratelimit.Limiter
+}
+
+// NewClient creates a new Client instance.
+//
+// The client shares the process-wide Docker Info cache used for registry mirrors.
+//
+// Parameters:
+//   - api: Docker API used for image operations.
+//   - log: Logger for debug output.
+//   - registrySettings: Settings for registry requests.
+//   - rateLimiter: Rate limiter shared by registry requests. Must not be nil.
+//
+// Returns:
+//   - Client: Initialized client for image operations.
+func NewClient(
+	api dockerClient.APIClient,
+	log *zerolog.Logger,
+	registrySettings registryConfig.Registry,
+	rateLimiter *ratelimit.Limiter,
+) Client {
+	return Client{
+		api:              api,
+		log:              log,
+		daemonInfo:       sharedDaemonInfoCache,
+		registrySettings: registrySettings,
+		rateLimiter:      rateLimiter,
+	}
 }
 
 // IsContainerStale determines if a container's image is outdated.
@@ -140,7 +177,7 @@ type imageClient struct {
 //   - types.ImageID: Latest image ID (or current if not pulled).
 //   - string: Latest registry manifest digest (empty if unavailable).
 //   - error: Non-nil if pull or inspection fails or cooldown defers the update.
-func (c imageClient) IsContainerStale(
+func (c Client) IsContainerStale(
 	ctx context.Context,
 	sourceContainer types.Container,
 	params types.UpdateParams,
@@ -202,7 +239,7 @@ func (c imageClient) IsContainerStale(
 //   - types.ImageID: Latest local image ID when known (empty on remote-only mismatch).
 //   - string: Latest registry manifest digest (empty if unavailable).
 //   - error: Non-nil if the check fails, nil on success.
-func (c imageClient) CheckContainerUpdate(
+func (c Client) CheckContainerUpdate(
 	ctx context.Context,
 	sourceContainer types.Container,
 	params types.UpdateParams,
@@ -289,7 +326,7 @@ func (c imageClient) CheckContainerUpdate(
 //   - types.ImageID: Latest image ID.
 //   - string: Latest registry manifest digest (empty if unavailable).
 //   - error: Non-nil if inspection fails, nil on success.
-func (c imageClient) HasNewImage(
+func (c Client) HasNewImage(
 	ctx context.Context,
 	sourceContainer types.Container,
 ) (bool, types.ImageID, string, error) {
@@ -417,7 +454,7 @@ func ExtractImageDigest(repoDigests []string, imageName string) string {
 // Returns:
 //   - Non-nil error if pull fails or cooldown defers the pull.
 //   - nil on success or skip.
-func (c imageClient) PullImage(
+func (c Client) PullImage(
 	ctx context.Context,
 	sourceContainer types.Container,
 	warnOnHeadFailed WarningStrategy,
@@ -485,7 +522,7 @@ func (c imageClient) PullImage(
 //
 // Returns:
 //   - error: Non-nil if removal fails, nil on success.
-func (c imageClient) RemoveImageByID(ctx context.Context, imageID types.ImageID, imageName string) error {
+func (c Client) RemoveImageByID(ctx context.Context, imageID types.ImageID, imageName string) error {
 	clogVal := c.logger().With().
 		Str("image_id", imageID.ShortID()).
 		Str("image_name", imageName).
@@ -623,7 +660,7 @@ func logImageRemovalDetails(log *zerolog.Logger, items []dockerImage.DeleteRespo
 //
 // Returns:
 //   - oci.Annotations: Annotations from the image config labels, or empty.
-func (c imageClient) GetImageAnnotations(
+func (c Client) GetImageAnnotations(
 	ctx context.Context,
 	imageRef string,
 ) oci.Annotations {
@@ -657,39 +694,12 @@ func (c imageClient) GetImageAnnotations(
 }
 
 // logger returns the image client's logger, or a discarded nop if unset.
-func (c imageClient) logger() *zerolog.Logger {
+func (c Client) logger() *zerolog.Logger {
 	if c.log != nil {
 		return c.log
 	}
 
 	return nopLog()
-}
-
-// newImageClient creates a new imageClient instance.
-//
-// The client shares the process-wide Docker Info cache used for registry mirrors.
-//
-// Parameters:
-//   - api: Docker API used for image operations.
-//   - log: Logger for debug output.
-//   - registrySettings: Settings for registry requests.
-//   - rateLimiter: Rate limiter shared by registry requests. Must not be nil.
-//
-// Returns:
-//   - imageClient: Initialized client for image operations.
-func newImageClient(
-	api dockerClient.APIClient,
-	log *zerolog.Logger,
-	registrySettings registryConfig.Registry,
-	rateLimiter *ratelimit.Limiter,
-) imageClient {
-	return imageClient{
-		api:              api,
-		log:              log,
-		daemonInfo:       sharedDaemonInfoCache,
-		registrySettings: registrySettings,
-		rateLimiter:      rateLimiter,
-	}
 }
 
 // shouldSkipPull determines if an image pull can be skipped.
@@ -705,7 +715,7 @@ func newImageClient(
 // Returns:
 //   - bool: True if pull can be skipped, false otherwise.
 //   - error: Non-nil when a registry rate limit should abort the pull.
-func (c imageClient) shouldSkipPull(
+func (c Client) shouldSkipPull(
 	ctx context.Context,
 	sourceContainer types.Container,
 	registryAuth string,
@@ -789,7 +799,7 @@ func (c imageClient) shouldSkipPull(
 //
 // Returns:
 //   - error: Non-nil if pull or read fails, nil on success.
-func (c imageClient) performImagePull(
+func (c Client) performImagePull(
 	ctx context.Context,
 	imageName string,
 	opts dockerClient.ImagePullOptions,
@@ -951,7 +961,7 @@ func releasePullSlot(host string) {
 //
 // Returns:
 //   - bool: True if a warning should be logged, false otherwise.
-func (c imageClient) warnOnHeadFailed(
+func (c Client) warnOnHeadFailed(
 	sourceContainer types.Container,
 	warnOnHeadFailed WarningStrategy,
 ) bool {
@@ -979,7 +989,7 @@ func (c imageClient) warnOnHeadFailed(
 //   - bool: True if image is stale, false otherwise.
 //   - types.ImageID: Latest image ID.
 //   - error: Non-nil if inspection fails, nil on success.
-func (c imageClient) checkLocalImageStaleness(
+func (c Client) checkLocalImageStaleness(
 	ctx context.Context,
 	sourceContainer types.Container,
 	clog *zerolog.Logger,

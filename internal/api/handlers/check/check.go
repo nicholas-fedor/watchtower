@@ -10,6 +10,7 @@ import (
 	"github.com/rs/zerolog"
 
 	"github.com/nicholas-fedor/watchtower/internal/container"
+	containerImage "github.com/nicholas-fedor/watchtower/internal/container/image"
 	"github.com/nicholas-fedor/watchtower/internal/container/oci"
 	"github.com/nicholas-fedor/watchtower/internal/container/provenance"
 	"github.com/nicholas-fedor/watchtower/internal/git"
@@ -194,7 +195,7 @@ func applyLocalDigest(c types.Container, result *ContainerCheck) {
 		return
 	}
 
-	result.Digest = pkgContainer.ExtractImageDigest(info.RepoDigests, c.ImageName())
+	result.Digest = containerImage.ExtractImageDigest(info.RepoDigests, c.ImageName())
 }
 
 // isGitWatched reports whether a container is checked against its hosted Git

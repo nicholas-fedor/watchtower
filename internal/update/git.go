@@ -15,6 +15,7 @@ import (
 	composeApply "github.com/nicholas-fedor/watchtower/internal/compose/apply"
 	composeProject "github.com/nicholas-fedor/watchtower/internal/compose/project"
 	"github.com/nicholas-fedor/watchtower/internal/container"
+	containerImage "github.com/nicholas-fedor/watchtower/internal/container/image"
 	"github.com/nicholas-fedor/watchtower/internal/container/oci"
 	"github.com/nicholas-fedor/watchtower/internal/container/provenance"
 	"github.com/nicholas-fedor/watchtower/internal/git"
@@ -175,7 +176,7 @@ func (s *gitSession) check(
 		return false, c.ImageID(), nil
 	}
 
-	err = pkgContainer.CheckLocalImageCooldown(c, params)
+	err = containerImage.CheckLocalImageCooldown(c, params)
 	if err != nil {
 		return false, "", fmt.Errorf("git cooldown: %w", err)
 	}
