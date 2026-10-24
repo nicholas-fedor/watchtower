@@ -21,6 +21,7 @@ import (
 	dockerClient "github.com/moby/moby/client"
 
 	"github.com/nicholas-fedor/watchtower/internal/container/filters"
+	"github.com/nicholas-fedor/watchtower/internal/testutil/containerfixture"
 	mockContainer "github.com/nicholas-fedor/watchtower/pkg/container/mocks"
 	"github.com/nicholas-fedor/watchtower/pkg/types"
 )
@@ -553,8 +554,8 @@ func Test_stopAndRemoveSourceContainer(t *testing.T) {
 	}
 
 	// running returns a running container with the given updates.
-	running := func(updates ...MockContainerUpdate) *Container {
-		return MockContainer(append([]MockContainerUpdate{WithContainerState(dockerContainer.State{Running: true})}, updates...)...)
+	running := func(updates ...containerfixture.Update) *Container {
+		return MockContainer(append([]containerfixture.Update{containerfixture.WithContainerState(dockerContainer.State{Running: true})}, updates...)...)
 	}
 
 	t.Run("stopping and removing a running container successfully with removeVolumes=false", func(t *testing.T) {
@@ -627,7 +628,7 @@ func Test_stopAndRemoveSourceContainer(t *testing.T) {
 			api := newDockerAPI(t)
 			expectStop(api, mockContainerID, 10, nil)
 
-			err := stopAndRemoveSourceContainer(newTestLogger(t), t.Context(), api, running(WithAutoRemove(true)), 10*time.Second, true)
+			err := stopAndRemoveSourceContainer(newTestLogger(t), t.Context(), api, running(containerfixture.WithAutoRemove(true)), 10*time.Second, true)
 			require.NoError(t, err)
 		})
 
@@ -639,8 +640,8 @@ func Test_stopAndRemoveSourceContainer(t *testing.T) {
 			expectRemove(api, false, nil)
 
 			container := MockContainer(
-				WithContainerState(dockerContainer.State{Running: false, Status: "created"}),
-				WithAutoRemove(true),
+				containerfixture.WithContainerState(dockerContainer.State{Running: false, Status: "created"}),
+				containerfixture.WithAutoRemove(true),
 			)
 
 			err := stopAndRemoveSourceContainer(newTestLogger(t), t.Context(), api, container, 10*time.Second, false)
@@ -677,7 +678,7 @@ func Test_stopAndRemoveSourceContainer(t *testing.T) {
 			api := newDockerAPI(t)
 			expectRemove(api, true, nil)
 
-			container := MockContainer(WithContainerState(dockerContainer.State{Running: false}))
+			container := MockContainer(containerfixture.WithContainerState(dockerContainer.State{Running: false}))
 
 			err := stopAndRemoveSourceContainer(newTestLogger(t), t.Context(), api, container, 10*time.Second, true)
 			require.NoError(t, err)
@@ -737,7 +738,7 @@ func Test_stopSourceContainer(t *testing.T) {
 
 	// running returns a running container.
 	running := func() *Container {
-		return MockContainer(WithContainerState(dockerContainer.State{Running: true}))
+		return MockContainer(containerfixture.WithContainerState(dockerContainer.State{Running: true}))
 	}
 
 	t.Run("stopping a linked restarting container", func(t *testing.T) {
@@ -810,7 +811,7 @@ func Test_stopSourceContainer(t *testing.T) {
 
 			// The mock has no expectations, so any Docker call fails the test.
 			api := mockContainer.NewMockAPIClient(t)
-			container := MockContainer(WithContainerState(dockerContainer.State{Running: false}))
+			container := MockContainer(containerfixture.WithContainerState(dockerContainer.State{Running: false}))
 
 			err := stopSourceContainer(newTestLogger(t), t.Context(), api, container, 10*time.Second)
 			require.NoError(t, err)

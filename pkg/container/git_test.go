@@ -7,6 +7,7 @@ import (
 	"github.com/stretchr/testify/assert"
 
 	"github.com/nicholas-fedor/watchtower/internal/container/labels"
+	"github.com/nicholas-fedor/watchtower/internal/testutil/containerfixture"
 	"github.com/nicholas-fedor/watchtower/pkg/container/git"
 	"github.com/nicholas-fedor/watchtower/pkg/types"
 )
@@ -32,8 +33,8 @@ func TestGitWrappers(t *testing.T) {
 			t.Parallel()
 
 			c := MockContainer(
-				WithImageName("myapp:latest"),
-				WithLabels(map[string]string{
+				containerfixture.WithImageName("myapp:latest"),
+				containerfixture.WithLabels(map[string]string{
 					labels.GitRepo: "https://github.com/org/from-label.git",
 					labels.GitRef:  "release",
 				}),
@@ -52,7 +53,7 @@ func TestGitWrappers(t *testing.T) {
 		t.Run("uses an exact image mapping when labels are absent", func(t *testing.T) {
 			t.Parallel()
 
-			c := MockContainer(WithImageName("myapp:latest"))
+			c := MockContainer(containerfixture.WithImageName("myapp:latest"))
 
 			assoc, ok := git.ResolveAssociation(c, types.UpdateParams{
 				GitImages: map[string]types.GitImage{
@@ -67,7 +68,7 @@ func TestGitWrappers(t *testing.T) {
 		t.Run("returns false when the container is not associated", func(t *testing.T) {
 			t.Parallel()
 
-			c := MockContainer(WithImageName("nginx:latest"))
+			c := MockContainer(containerfixture.WithImageName("nginx:latest"))
 			assoc, ok := git.ResolveAssociation(c, types.UpdateParams{})
 			assert.False(t, ok)
 			assert.Equal(t, git.Association{}, assoc)
@@ -86,7 +87,7 @@ func TestGitWrappers(t *testing.T) {
 		t.Run("returns false for Watchtower even when associated", func(t *testing.T) {
 			t.Parallel()
 
-			c := MockContainer(WithLabels(map[string]string{
+			c := MockContainer(containerfixture.WithLabels(map[string]string{
 				labels.Watchtower: "true",
 				labels.GitRepo:    "https://github.com/nicholas-fedor/watchtower.git",
 			}))
@@ -97,7 +98,7 @@ func TestGitWrappers(t *testing.T) {
 		t.Run("returns true when associated and monitoring is enabled", func(t *testing.T) {
 			t.Parallel()
 
-			c := MockContainer(WithLabels(map[string]string{
+			c := MockContainer(containerfixture.WithLabels(map[string]string{
 				labels.GitRepo: "https://github.com/org/app.git",
 			}))
 
@@ -107,7 +108,7 @@ func TestGitWrappers(t *testing.T) {
 		t.Run("returns false when the container turns watch off", func(t *testing.T) {
 			t.Parallel()
 
-			c := MockContainer(WithLabels(map[string]string{
+			c := MockContainer(containerfixture.WithLabels(map[string]string{
 				labels.GitRepo:  "https://github.com/org/app.git",
 				labels.GitWatch: "false",
 			}))
@@ -119,8 +120,8 @@ func TestGitWrappers(t *testing.T) {
 			t.Parallel()
 
 			c := MockContainer(
-				WithImageName("nginx:latest"),
-				WithLabels(map[string]string{labels.GitWatch: "true"}),
+				containerfixture.WithImageName("nginx:latest"),
+				containerfixture.WithLabels(map[string]string{labels.GitWatch: "true"}),
 			)
 			nop := zerolog.Nop()
 
@@ -142,7 +143,7 @@ func TestGitWrappers(t *testing.T) {
 		t.Run("reads last-commit and last-tag labels", func(t *testing.T) {
 			t.Parallel()
 
-			c := MockContainer(WithLabels(map[string]string{
+			c := MockContainer(containerfixture.WithLabels(map[string]string{
 				labels.GitLastCommit: "abc123",
 				labels.GitLastTag:    "v1.2.3",
 			}))
@@ -277,7 +278,7 @@ func TestGitWrappers(t *testing.T) {
 		t.Run("removes association labels when a repository cannot be sanitized", func(t *testing.T) {
 			t.Parallel()
 
-			c := MockContainer(WithLabels(map[string]string{
+			c := MockContainer(containerfixture.WithLabels(map[string]string{
 				labels.GitRepo: "https://user:secret@github.com/org/app.git",
 			}))
 			ApplyGitAssociation(c, gitAssociation{Repo: "://invalid"}, true)

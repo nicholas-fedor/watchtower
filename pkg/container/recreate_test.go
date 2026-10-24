@@ -18,12 +18,13 @@ import (
 	dockerClient "github.com/moby/moby/client"
 	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
 
+	"github.com/nicholas-fedor/watchtower/internal/testutil/containerfixture"
 	mockContainer "github.com/nicholas-fedor/watchtower/pkg/container/mocks"
 	"github.com/nicholas-fedor/watchtower/pkg/types"
 )
 
 // WithCPUSettings configures CPU settings for the mock container.
-func WithCPUSettings(nanoCPUs, cpuShares, cpuQuota, cpuPeriod int64, cpusetCpus, cpusetMems string) MockContainerUpdate {
+func WithCPUSettings(nanoCPUs, cpuShares, cpuQuota, cpuPeriod int64, cpusetCpus, cpusetMems string) containerfixture.Update {
 	return func(c *dockerContainer.InspectResponse, _ *dockerImage.InspectResponse) {
 		if c.HostConfig == nil {
 			c.HostConfig = &dockerContainer.HostConfig{}
@@ -380,7 +381,7 @@ func TestRenameTargetContainer(t *testing.T) {
 		api.EXPECT().ContainerRename(mock.Anything, "test-id", dockerClient.ContainerRenameOptions{NewName: "new-name"}).
 			Return(dockerClient.ContainerRenameResult{}, nil).Once()
 
-		err := renameTargetContainer(log, t.Context(), api, MockContainer(WithName("old-name"), WithID("test-id")), "new-name")
+		err := renameTargetContainer(log, t.Context(), api, MockContainer(containerfixture.WithName("old-name"), containerfixture.WithID("test-id")), "new-name")
 		require.NoError(t, err)
 		assert.Contains(t, logOutput.String(), "Renamed container successfully")
 	})
@@ -393,7 +394,7 @@ func TestRenameTargetContainer(t *testing.T) {
 		api.EXPECT().ContainerRename(mock.Anything, "test-id", dockerClient.ContainerRenameOptions{NewName: "new-name"}).
 			Return(dockerClient.ContainerRenameResult{}, errors.New("rename failed")).Once()
 
-		err := renameTargetContainer(log, t.Context(), api, MockContainer(WithName("old-name"), WithID("test-id")), "new-name")
+		err := renameTargetContainer(log, t.Context(), api, MockContainer(containerfixture.WithName("old-name"), containerfixture.WithID("test-id")), "new-name")
 		require.ErrorContains(t, err, "rename failed")
 		assert.Contains(t, logOutput.String(), "Failed to rename container")
 	})
@@ -483,10 +484,10 @@ func TestSyncComposeImageLabel(t *testing.T) {
 
 	// composeContainer builds a source container running oldImageID with
 	// the given Compose image label.
-	composeContainer := func(label string, extra ...MockContainerUpdate) *Container {
-		updates := append([]MockContainerUpdate{
-			WithImageName(imageRef),
-			WithLabels(map[string]string{
+	composeContainer := func(label string, extra ...containerfixture.Update) *Container {
+		updates := append([]containerfixture.Update{
+			containerfixture.WithImageName(imageRef),
+			containerfixture.WithLabels(map[string]string{
 				"com.docker.compose.project": "stack",
 				"com.docker.compose.image":   label,
 			}),
@@ -583,7 +584,7 @@ func TestSyncComposeImageLabel(t *testing.T) {
 		log, _ := newCapturedLogger(zerolog.DebugLevel)
 		api := newLabelAPI(t, nil)
 
-		assert.Empty(t, create(t, log, api, MockContainer(WithImageName(imageRef)), "1.48"))
+		assert.Empty(t, create(t, log, api, MockContainer(containerfixture.WithImageName(imageRef)), "1.48"))
 		assert.NotContains(t, api.created.Labels, "com.docker.compose.image")
 		assert.Empty(t, api.inspected)
 	})

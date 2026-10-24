@@ -14,6 +14,7 @@ import (
 	dockerContainer "github.com/moby/moby/api/types/container"
 	dockerClient "github.com/moby/moby/client"
 
+	"github.com/nicholas-fedor/watchtower/internal/testutil/containerfixture"
 	mockContainer "github.com/nicholas-fedor/watchtower/pkg/container/mocks"
 	"github.com/nicholas-fedor/watchtower/pkg/types"
 )
@@ -47,8 +48,8 @@ func TestStartTargetContainer(t *testing.T) {
 
 		log, logOutput := newCapturedLogger(zerolog.DebugLevel)
 		source := MockContainer(
-			WithNetworkMode("bridge"),
-			WithContainerState(dockerContainer.State{Running: false, Status: "exited"}),
+			containerfixture.WithNetworkMode("bridge"),
+			containerfixture.WithContainerState(dockerContainer.State{Running: false, Status: "exited"}),
 		)
 
 		err := startTargetContainer(t.Context(), mockContainer.NewMockAPIClient(t), log, source, testTargetID, false)

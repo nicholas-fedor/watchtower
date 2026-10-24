@@ -17,6 +17,7 @@ import (
 
 	"github.com/nicholas-fedor/watchtower/internal/registry/ratelimit"
 	registryConfig "github.com/nicholas-fedor/watchtower/internal/settings/config/registry"
+	"github.com/nicholas-fedor/watchtower/internal/testutil/containerfixture"
 	"github.com/nicholas-fedor/watchtower/internal/testutil/httpstub"
 	"github.com/nicholas-fedor/watchtower/pkg/types"
 )
@@ -184,7 +185,7 @@ func Test_isOutsideCooldown(t *testing.T) {
 
 				i := newTestImageClient(newImageAPI(t), newTestLogger(t), registryConfig.Registry{}, ratelimit.New())
 
-				outside, err := i.isOutsideCooldown(t.Context(), MockContainer(WithImageName("test:latest")), tt.params)
+				outside, err := i.isOutsideCooldown(t.Context(), MockContainer(containerfixture.WithImageName("test:latest")), tt.params)
 				require.NoError(t, err)
 				assert.True(t, outside)
 			})
@@ -200,7 +201,7 @@ func Test_isOutsideCooldown(t *testing.T) {
 			// The test registry serves plain HTTP.
 			i := newTestImageClient(newImageAPI(t), newTestLogger(t), registryConfig.Registry{TLSSkip: true}, ratelimit.New())
 
-			outside, err := i.isOutsideCooldown(t.Context(), MockContainer(WithImageName(notFoundRegistry(t)+"/test:latest")), types.UpdateParams{
+			outside, err := i.isOutsideCooldown(t.Context(), MockContainer(containerfixture.WithImageName(notFoundRegistry(t)+"/test:latest")), types.UpdateParams{
 				CooldownDelay: 1 * time.Hour,
 			})
 			assert.False(t, outside)
@@ -229,7 +230,7 @@ func Test_isOutsideCooldown_pullOptionsFailure(t *testing.T) {
 
 			i := newTestImageClient(newImageAPI(t), newTestLogger(t), registryConfig.Registry{}, ratelimit.New())
 
-			outside, err := i.isOutsideCooldown(t.Context(), MockContainer(WithImageName("registry.example.com/app:latest")), types.UpdateParams{
+			outside, err := i.isOutsideCooldown(t.Context(), MockContainer(containerfixture.WithImageName("registry.example.com/app:latest")), types.UpdateParams{
 				CooldownDelay: 1 * time.Hour,
 			})
 			assert.False(t, outside)
@@ -258,8 +259,8 @@ func TestPullImageCooldownGate(t *testing.T) {
 			// ImagePull has no expectation, so a pull fails the test.
 			image := notFoundRegistry(t) + "/test:latest"
 			c := MockContainer(
-				WithImageName(image),
-				WithRepoDigests([]string{image + "@sha256:12345"}),
+				containerfixture.WithImageName(image),
+				containerfixture.WithRepoDigests([]string{image + "@sha256:12345"}),
 			)
 
 			// The test registry serves plain HTTP.
@@ -279,7 +280,7 @@ func TestCheckLocalImageCooldown(t *testing.T) {
 	t.Run("defers when the local image is younger than the cooldown", func(t *testing.T) {
 		t.Parallel()
 
-		c := MockContainer(WithImageName("app:latest"))
+		c := MockContainer(containerfixture.WithImageName("app:latest"))
 		c.imageInfo.Created = time.Now().Add(-time.Hour).Format(time.RFC3339Nano)
 
 		err := CheckLocalImageCooldown(c, types.UpdateParams{CooldownDelay: 24 * time.Hour})
@@ -289,7 +290,7 @@ func TestCheckLocalImageCooldown(t *testing.T) {
 	t.Run("allows rebuilds when the local image is older than the cooldown", func(t *testing.T) {
 		t.Parallel()
 
-		c := MockContainer(WithImageName("app:latest"))
+		c := MockContainer(containerfixture.WithImageName("app:latest"))
 		c.imageInfo.Created = time.Now().Add(-48 * time.Hour).Format(time.RFC3339Nano)
 
 		err := CheckLocalImageCooldown(c, types.UpdateParams{CooldownDelay: 24 * time.Hour})
@@ -327,7 +328,7 @@ func TestIsOutsideCooldown_RegistrySettings(t *testing.T) {
 	}))
 	t.Cleanup(server.Close)
 
-	container := MockContainer(WithImageName(strings.TrimPrefix(server.URL, "http://") + "/org/app:1.0"))
+	container := MockContainer(containerfixture.WithImageName(strings.TrimPrefix(server.URL, "http://") + "/org/app:1.0"))
 	params := types.UpdateParams{CooldownDelay: time.Hour}
 
 	plain := newImageClient(nil, newTestLogger(t), registryConfig.Registry{TLSSkip: true}, ratelimit.New())
@@ -394,7 +395,7 @@ func TestEvalImageAge(t *testing.T) {
 func TestCheckLocalImageCooldown_FutureCreationTime(t *testing.T) {
 	t.Parallel()
 
-	c := MockContainer(WithImageName("app:latest"))
+	c := MockContainer(containerfixture.WithImageName("app:latest"))
 	c.imageInfo.Created = time.Now().Add(time.Hour).Format(time.RFC3339Nano)
 
 	err := CheckLocalImageCooldown(c, types.UpdateParams{CooldownDelay: 24 * time.Hour})

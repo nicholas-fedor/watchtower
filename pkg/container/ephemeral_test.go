@@ -15,6 +15,7 @@ import (
 	dockerClient "github.com/moby/moby/client"
 
 	"github.com/nicholas-fedor/watchtower/internal/container/labels"
+	"github.com/nicholas-fedor/watchtower/internal/testutil/containerfixture"
 	mockContainer "github.com/nicholas-fedor/watchtower/pkg/container/mocks"
 	"github.com/nicholas-fedor/watchtower/pkg/types"
 )
@@ -236,8 +237,8 @@ func TestEphemeralOrchestrator(t *testing.T) {
 				t.Parallel()
 
 				source := MockContainer(
-					WithID("source1"),
-					WithName("watchtower"),
+					containerfixture.WithID("source1"),
+					containerfixture.WithName("watchtower"),
 				)
 
 				config := extractDockerConnectionConfig(source, newTestLogger(t))
@@ -256,12 +257,12 @@ func TestEphemeralOrchestrator(t *testing.T) {
 				t.Parallel()
 
 				source := MockContainer(
-					WithID("source2"),
-					WithName("watchtower"),
-					WithEnv([]string{
+					containerfixture.WithID("source2"),
+					containerfixture.WithName("watchtower"),
+					containerfixture.WithEnv([]string{
 						"DOCKER_HOST=unix:///custom/docker.sock",
 					}),
-					WithBinds([]string{
+					containerfixture.WithBinds([]string{
 						"/var/run/docker.sock:/custom/docker.sock",
 					}),
 				)
@@ -281,12 +282,12 @@ func TestEphemeralOrchestrator(t *testing.T) {
 				t.Parallel()
 
 				source := MockContainer(
-					WithID("source3"),
-					WithName("watchtower"),
-					WithEnv([]string{
+					containerfixture.WithID("source3"),
+					containerfixture.WithName("watchtower"),
+					containerfixture.WithEnv([]string{
 						"DOCKER_HOST=npipe:////./pipe/docker_engine",
 					}),
-					WithBinds([]string{
+					containerfixture.WithBinds([]string{
 						"//./pipe/docker_engine://./pipe/docker_engine",
 					}),
 				)
@@ -306,9 +307,9 @@ func TestEphemeralOrchestrator(t *testing.T) {
 				t.Parallel()
 
 				source := MockContainer(
-					WithID("source4"),
-					WithName("watchtower"),
-					WithEnv([]string{
+					containerfixture.WithID("source4"),
+					containerfixture.WithName("watchtower"),
+					containerfixture.WithEnv([]string{
 						"DOCKER_HOST=tcp://remote-host:2375",
 					}),
 				)
@@ -329,9 +330,9 @@ func TestEphemeralOrchestrator(t *testing.T) {
 				t.Parallel()
 
 				source := MockContainer(
-					WithID("source5"),
-					WithName("watchtower"),
-					WithEnv([]string{
+					containerfixture.WithID("source5"),
+					containerfixture.WithName("watchtower"),
+					containerfixture.WithEnv([]string{
 						"DOCKER_HOST=https://remote-host:2376",
 					}),
 				)
@@ -350,9 +351,9 @@ func TestEphemeralOrchestrator(t *testing.T) {
 				t.Parallel()
 
 				source := MockContainer(
-					WithID("source6"),
-					WithName("watchtower"),
-					WithEnv([]string{
+					containerfixture.WithID("source6"),
+					containerfixture.WithName("watchtower"),
+					containerfixture.WithEnv([]string{
 						"DOCKER_HOST=ssh://user@remote-host",
 					}),
 				)
@@ -371,9 +372,9 @@ func TestEphemeralOrchestrator(t *testing.T) {
 				t.Parallel()
 
 				source := MockContainer(
-					WithID("source7"),
-					WithName("watchtower"),
-					WithEnv([]string{
+					containerfixture.WithID("source7"),
+					containerfixture.WithName("watchtower"),
+					containerfixture.WithEnv([]string{
 						"DOCKER_HOST=tcp://remote:2376",
 						"DOCKER_TLS_VERIFY=1",
 						"DOCKER_CERT_PATH=/certs",
@@ -395,9 +396,9 @@ func TestEphemeralOrchestrator(t *testing.T) {
 				t.Parallel()
 
 				source := MockContainer(
-					WithID("source8"),
-					WithName("watchtower"),
-					WithEnv([]string{
+					containerfixture.WithID("source8"),
+					containerfixture.WithName("watchtower"),
+					containerfixture.WithEnv([]string{
 						"DOCKER_API_VERSION=1.41",
 					}),
 				)
@@ -415,9 +416,9 @@ func TestEphemeralOrchestrator(t *testing.T) {
 				t.Parallel()
 
 				source := MockContainer(
-					WithID("source9"),
-					WithName("watchtower"),
-					WithBinds([]string{
+					containerfixture.WithID("source9"),
+					containerfixture.WithName("watchtower"),
+					containerfixture.WithBinds([]string{
 						"/custom/docker.sock:/var/run/docker.sock",
 						"/data:/data",
 					}),
@@ -437,8 +438,8 @@ func TestEphemeralOrchestrator(t *testing.T) {
 				t.Parallel()
 
 				source := MockContainer(
-					WithID("source10"),
-					WithName("watchtower"),
+					containerfixture.WithID("source10"),
+					containerfixture.WithName("watchtower"),
 				)
 
 				config := extractDockerConnectionConfig(source, newTestLogger(t))
@@ -460,9 +461,9 @@ func TestEphemeralOrchestrator(t *testing.T) {
 				t.Parallel()
 
 				source := MockContainer(
-					WithID("abc123def456"),
-					WithName("watchtower-test"),
-					WithImageName("watchtower:latest"),
+					containerfixture.WithID("abc123def456"),
+					containerfixture.WithName("watchtower-test"),
+					containerfixture.WithImageName("watchtower:latest"),
 				)
 				connConfig := &dockerConnectionConfig{
 					IsLocal:    true,
@@ -496,9 +497,9 @@ func TestEphemeralOrchestrator(t *testing.T) {
 				t.Parallel()
 
 				source := MockContainer(
-					WithID("abc123"),
-					WithName("watchtower"),
-					WithImageName("watchtower:latest"),
+					containerfixture.WithID("abc123"),
+					containerfixture.WithName("watchtower"),
+					containerfixture.WithImageName("watchtower:latest"),
 				)
 
 				config := buildOrchestratorConfig(source, "watchtower:v2", "", nil, true)
@@ -514,9 +515,9 @@ func TestEphemeralOrchestrator(t *testing.T) {
 				t.Parallel()
 
 				source := MockContainer(
-					WithID("abc123"),
-					WithName("watchtower"),
-					WithImageName("watchtower:latest"),
+					containerfixture.WithID("abc123"),
+					containerfixture.WithName("watchtower"),
+					containerfixture.WithImageName("watchtower:latest"),
 				)
 				connConfig := &dockerConnectionConfig{
 					IsLocal:    true,
@@ -536,9 +537,9 @@ func TestEphemeralOrchestrator(t *testing.T) {
 				t.Parallel()
 
 				source := MockContainer(
-					WithID("abc123"),
-					WithName("watchtower"),
-					WithImageName("watchtower:latest"),
+					containerfixture.WithID("abc123"),
+					containerfixture.WithName("watchtower"),
+					containerfixture.WithImageName("watchtower:latest"),
 				)
 				connConfig := &dockerConnectionConfig{
 					Host:       "tcp://remote:2375",
@@ -564,9 +565,9 @@ func TestEphemeralOrchestrator(t *testing.T) {
 				t.Parallel()
 
 				source := MockContainer(
-					WithID("abc123"),
-					WithName("watchtower"),
-					WithImageName("watchtower:latest"),
+					containerfixture.WithID("abc123"),
+					containerfixture.WithName("watchtower"),
+					containerfixture.WithImageName("watchtower:latest"),
 				)
 
 				config := buildOrchestratorConfig(source, "watchtower:v2", "chain1", nil, false)
@@ -712,7 +713,7 @@ func TestEphemeralOrchestrator(t *testing.T) {
 			t.Run("should inherit the source NetworkMode", func(t *testing.T) {
 				t.Parallel()
 
-				source := MockContainer(WithNetworkMode("host"))
+				source := MockContainer(containerfixture.WithNetworkMode("host"))
 				hostConfig := buildOrchestratorHostConfig(nil, source)
 
 				assert.Equal(t, dockerContainer.NetworkMode("host"), hostConfig.NetworkMode)
@@ -733,9 +734,9 @@ func TestEphemeralOrchestrator(t *testing.T) {
 		// newSource returns the Watchtower container being replaced.
 		newSource := func() types.Container {
 			return MockContainer(
-				WithID("source123"),
-				WithName("watchtower-source"),
-				WithImageName("watchtower:latest"),
+				containerfixture.WithID("source123"),
+				containerfixture.WithName("watchtower-source"),
+				containerfixture.WithImageName("watchtower:latest"),
 			)
 		}
 
@@ -813,7 +814,7 @@ func TestEphemeralOrchestrator(t *testing.T) {
 		ctx := context.Background()
 
 		// orphaned marks an orchestrator as running long past any self-update.
-		orphaned := WithContainerState(dockerContainer.State{
+		orphaned := containerfixture.WithContainerState(dockerContainer.State{
 			Running:   true,
 			Status:    "running",
 			StartedAt: "2000-01-01T00:00:00Z",
@@ -844,9 +845,9 @@ func TestEphemeralOrchestrator(t *testing.T) {
 				t.Parallel()
 
 				regularContainer := MockContainer(
-					WithID("regular123"),
-					WithName("regular-container"),
-					WithLabels(map[string]string{
+					containerfixture.WithID("regular123"),
+					containerfixture.WithName("regular-container"),
+					containerfixture.WithLabels(map[string]string{
 						"com.centurylinklabs.watchtower": "true",
 					}),
 				)
@@ -870,9 +871,9 @@ func TestEphemeralOrchestrator(t *testing.T) {
 				t.Parallel()
 
 				orchestrator := MockContainer(
-					WithID("orch123"),
-					WithName("watchtower-orchestrator-abc"),
-					WithLabels(map[string]string{
+					containerfixture.WithID("orch123"),
+					containerfixture.WithName("watchtower-orchestrator-abc"),
+					containerfixture.WithLabels(map[string]string{
 						labels.EphemeralOrchestrator: "true",
 					}),
 					orphaned,
@@ -904,24 +905,24 @@ func TestEphemeralOrchestrator(t *testing.T) {
 				t.Parallel()
 
 				orch1 := MockContainer(
-					WithID("orch001"),
-					WithName("watchtower-orchestrator-001"),
-					WithLabels(map[string]string{
+					containerfixture.WithID("orch001"),
+					containerfixture.WithName("watchtower-orchestrator-001"),
+					containerfixture.WithLabels(map[string]string{
 						labels.EphemeralOrchestrator: "true",
 					}),
 					orphaned,
 				)
 				orch2 := MockContainer(
-					WithID("orch002"),
-					WithName("watchtower-orchestrator-002"),
-					WithLabels(map[string]string{
+					containerfixture.WithID("orch002"),
+					containerfixture.WithName("watchtower-orchestrator-002"),
+					containerfixture.WithLabels(map[string]string{
 						labels.EphemeralOrchestrator: "true",
 					}),
 					orphaned,
 				)
 				regular := MockContainer(
-					WithID("regular1"),
-					WithName("app-container"),
+					containerfixture.WithID("regular1"),
+					containerfixture.WithName("app-container"),
 				)
 
 				mockAPIClient := mockContainer.NewMockClient(t)
@@ -975,17 +976,17 @@ func TestEphemeralOrchestrator(t *testing.T) {
 				t.Parallel()
 
 				orch1 := MockContainer(
-					WithID("orch001"),
-					WithName("watchtower-orchestrator-001"),
-					WithLabels(map[string]string{
+					containerfixture.WithID("orch001"),
+					containerfixture.WithName("watchtower-orchestrator-001"),
+					containerfixture.WithLabels(map[string]string{
 						labels.EphemeralOrchestrator: "true",
 					}),
 					orphaned,
 				)
 				orch2 := MockContainer(
-					WithID("orch002"),
-					WithName("watchtower-orchestrator-002"),
-					WithLabels(map[string]string{
+					containerfixture.WithID("orch002"),
+					containerfixture.WithName("watchtower-orchestrator-002"),
+					containerfixture.WithLabels(map[string]string{
 						labels.EphemeralOrchestrator: "true",
 					}),
 					orphaned,
@@ -1024,8 +1025,8 @@ func TestEphemeralOrchestrator(t *testing.T) {
 				t.Parallel()
 
 				noLabelContainer := MockContainer(
-					WithID("no-label"),
-					WithName("no-label-container"),
+					containerfixture.WithID("no-label"),
+					containerfixture.WithName("no-label-container"),
 				)
 
 				mockAPIClient := mockContainer.NewMockClient(t)
@@ -1146,10 +1147,10 @@ func TestExtractDockerConnectionConfig_DockerHostSocket(t *testing.T) {
 			t.Parallel()
 
 			source := MockContainer(
-				WithID("source"),
-				WithName("watchtower"),
-				WithEnv([]string{"DOCKER_HOST=" + tt.host}),
-				WithBinds(tt.binds),
+				containerfixture.WithID("source"),
+				containerfixture.WithName("watchtower"),
+				containerfixture.WithEnv([]string{"DOCKER_HOST=" + tt.host}),
+				containerfixture.WithBinds(tt.binds),
 			)
 
 			config := extractDockerConnectionConfig(source, newTestLogger(t))

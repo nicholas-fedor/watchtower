@@ -13,6 +13,7 @@ import (
 	dockerNetwork "github.com/moby/moby/api/types/network"
 
 	"github.com/nicholas-fedor/watchtower/internal/container/labels"
+	"github.com/nicholas-fedor/watchtower/internal/testutil/containerfixture"
 )
 
 // TestContainer_ChangesLeaveEarlierSnapshotsUnchanged verifies that changing a
@@ -37,8 +38,8 @@ func TestContainer_ChangesLeaveEarlierSnapshotsUnchanged(t *testing.T) {
 			t.Parallel()
 
 			c := MockContainer(
-				WithLabels(map[string]string{"kept": "value"}),
-				WithImageName("org/app:1"),
+				containerfixture.WithLabels(map[string]string{"kept": "value"}),
+				containerfixture.WithImageName("org/app:1"),
 				// An empty port binding is removed by VerifyConfiguration.
 				func(cnt *dockerContainer.InspectResponse, _ *dockerImage.InspectResponse) {
 					cnt.HostConfig.PortBindings = dockerNetwork.PortMap{
@@ -72,7 +73,7 @@ func TestContainer_ChangesAreVisible(t *testing.T) {
 	t.Parallel()
 
 	c := MockContainer(
-		WithLabels(map[string]string{"removed": "value"}),
+		containerfixture.WithLabels(map[string]string{"removed": "value"}),
 		func(cnt *dockerContainer.InspectResponse, _ *dockerImage.InspectResponse) {
 			cnt.HostConfig.PortBindings = dockerNetwork.PortMap{
 				dockerNetwork.MustParsePort("80/tcp"): nil,
@@ -102,9 +103,9 @@ func TestContainer_GetCreateConfigLeavesInspectDataUnchanged(t *testing.T) {
 
 	health := dockerContainer.HealthConfig{Test: []string{"CMD", "true"}, Retries: 3, Interval: time.Second}
 	c := MockContainer(
-		WithHealthcheck(health),
-		WithImageHealthcheck(health),
-		WithPortBindings("8080/tcp"),
+		containerfixture.WithHealthcheck(health),
+		containerfixture.WithImageHealthcheck(health),
+		containerfixture.WithPortBindings("8080/tcp"),
 		func(cnt *dockerContainer.InspectResponse, img *dockerImage.InspectResponse) {
 			cnt.Config.ExposedPorts = dockerNetwork.PortSet{dockerNetwork.MustParsePort("80/tcp"): {}}
 			img.Config.ExposedPorts = map[string]struct{}{"80/tcp": {}}
@@ -130,10 +131,10 @@ func TestContainer_ConcurrentAccess(t *testing.T) {
 
 	health := dockerContainer.HealthConfig{Test: []string{"CMD", "true"}}
 	c := MockContainer(
-		WithLabels(map[string]string{"com.docker.compose.project": "stack", "com.docker.compose.service": "app"}),
-		WithHealthcheck(health),
-		WithImageHealthcheck(health),
-		WithPortBindings("8080/tcp"),
+		containerfixture.WithLabels(map[string]string{"com.docker.compose.project": "stack", "com.docker.compose.service": "app"}),
+		containerfixture.WithHealthcheck(health),
+		containerfixture.WithImageHealthcheck(health),
+		containerfixture.WithPortBindings("8080/tcp"),
 	)
 
 	const rounds = 200

@@ -6,6 +6,7 @@ import (
 	"github.com/stretchr/testify/assert"
 
 	"github.com/nicholas-fedor/watchtower/internal/container/labels"
+	"github.com/nicholas-fedor/watchtower/internal/testutil/containerfixture"
 	"github.com/nicholas-fedor/watchtower/pkg/container/git"
 	"github.com/nicholas-fedor/watchtower/pkg/container/oci"
 	"github.com/nicholas-fedor/watchtower/pkg/types"
@@ -27,13 +28,13 @@ func TestResolveReportMeta(t *testing.T) {
 		t.Parallel()
 
 		c := MockContainer(
-			WithImageName("myapp:latest"),
-			WithLabels(map[string]string{
+			containerfixture.WithImageName("myapp:latest"),
+			containerfixture.WithLabels(map[string]string{
 				labels.GitRepo:      "https://github.com/org/from-label.git",
 				labels.GitRef:       "release",
 				labels.ChangelogURL: "https://example.com/changelog/{tag}",
 			}),
-			WithImageLabels(map[string]string{
+			containerfixture.WithImageLabels(map[string]string{
 				oci.SourceLabel: "https://github.com/org/from-oci.git",
 			}),
 		)
@@ -57,8 +58,8 @@ func TestResolveReportMeta(t *testing.T) {
 		t.Parallel()
 
 		c := MockContainer(
-			WithImageName("app:latest"),
-			WithLabels(map[string]string{
+			containerfixture.WithImageName("app:latest"),
+			containerfixture.WithLabels(map[string]string{
 				labels.GitRepo: "../repos/app?release=1",
 			}),
 		)
@@ -71,12 +72,12 @@ func TestResolveReportMeta(t *testing.T) {
 		t.Parallel()
 
 		c := MockContainer(
-			WithImageName("app:latest"),
-			WithLabels(map[string]string{
+			containerfixture.WithImageName("app:latest"),
+			containerfixture.WithLabels(map[string]string{
 				labels.GitRepo:      "https://user:secret@github.com/org/app.git?access_token=query#main",
 				labels.ChangelogURL: "https://example.com/notes?version=2#install",
 			}),
-			WithImageLabels(map[string]string{
+			containerfixture.WithImageLabels(map[string]string{
 				oci.SourceLabel:        "https://source:source-secret@example.com/org/source.git?token=source-query",
 				oci.URLLabel:           "https://example.com/image?format=json&author=team#download",
 				oci.DocumentationLabel: "https://example.com/docs?lang=en#install",
@@ -97,8 +98,8 @@ func TestResolveReportMeta(t *testing.T) {
 		t.Parallel()
 
 		c := MockContainer(
-			WithImageName("myapp:latest"),
-			WithImageLabels(map[string]string{
+			containerfixture.WithImageName("myapp:latest"),
+			containerfixture.WithImageLabels(map[string]string{
 				oci.SourceLabel:        "https://github.com/org/from-oci.git",
 				oci.URLLabel:           "https://example.com/image",
 				oci.DocumentationLabel: "https://example.com/docs",
@@ -133,8 +134,8 @@ func TestResolveReportMeta(t *testing.T) {
 		t.Parallel()
 
 		c := MockContainer(
-			WithImageName("app:latest"),
-			WithImageLabels(map[string]string{
+			containerfixture.WithImageName("app:latest"),
+			containerfixture.WithImageLabels(map[string]string{
 				oci.RevisionLabel: "old123",
 				oci.VersionLabel:  "10.11.5",
 			}),
@@ -155,8 +156,8 @@ func TestResolveReportMeta(t *testing.T) {
 		t.Parallel()
 
 		c := MockContainer(
-			WithImageName("app:latest"),
-			WithImageLabels(map[string]string{
+			containerfixture.WithImageName("app:latest"),
+			containerfixture.WithImageLabels(map[string]string{
 				oci.SourceLabel:        "https://github.com/org/old.git",
 				oci.URLLabel:           "https://example.com/old",
 				oci.DocumentationLabel: "https://example.com/old-docs",
@@ -181,8 +182,8 @@ func TestResolveReportMeta(t *testing.T) {
 		t.Parallel()
 
 		c := MockContainer(
-			WithImageName("app:latest"),
-			WithImageLabels(map[string]string{
+			containerfixture.WithImageName("app:latest"),
+			containerfixture.WithImageLabels(map[string]string{
 				oci.SourceLabel: "https://github.com/org/app.git",
 				oci.URLLabel:    "https://example.com/image",
 			}),
@@ -199,8 +200,8 @@ func TestResolveReportMeta(t *testing.T) {
 		t.Parallel()
 
 		c := MockContainer(
-			WithImageName("app:latest"),
-			WithImageLabels(map[string]string{
+			containerfixture.WithImageName("app:latest"),
+			containerfixture.WithImageLabels(map[string]string{
 				oci.SourceLabel:  "https://github.com/org/app.git",
 				oci.VersionLabel: "10.11.6",
 			}),
@@ -215,29 +216,29 @@ func TestResolveReportMeta(t *testing.T) {
 	t.Run("derives changelog URLs for known and mapped hosts", func(t *testing.T) {
 		t.Parallel()
 
-		gitlab := MockContainer(WithImageName("app:latest"), WithLabels(map[string]string{
+		gitlab := MockContainer(containerfixture.WithImageName("app:latest"), containerfixture.WithLabels(map[string]string{
 			labels.GitRepo: "https://gitlab.com/org/app.git",
 		}))
 		assert.Equal(t, "https://gitlab.com/org/app/-/releases", ResolveReportMeta(gitlab, types.UpdateParams{}, ChangelogVars{}, oci.Annotations{}).Changelog)
 
-		codeberg := MockContainer(WithImageName("app:latest"), WithLabels(map[string]string{
+		codeberg := MockContainer(containerfixture.WithImageName("app:latest"), containerfixture.WithLabels(map[string]string{
 			labels.GitRepo: "https://codeberg.org/org/app.git",
 		}))
 		assert.Equal(t, "https://codeberg.org/org/app/releases", ResolveReportMeta(codeberg, types.UpdateParams{}, ChangelogVars{}, oci.Annotations{}).Changelog)
 
-		mappedHost := MockContainer(WithImageName("app:latest"), WithLabels(map[string]string{
+		mappedHost := MockContainer(containerfixture.WithImageName("app:latest"), containerfixture.WithLabels(map[string]string{
 			labels.GitRepo: "git@git.example.com:org/app.git",
 			labels.GitHost: "https://git.example.com:3000/gitea",
 		}))
 		assert.Equal(t, "https://git.example.com:3000/gitea/org/app/releases", ResolveReportMeta(mappedHost, types.UpdateParams{}, ChangelogVars{}, oci.Annotations{}).Changelog)
 
-		ghe := MockContainer(WithImageName("app:latest"), WithLabels(map[string]string{
+		ghe := MockContainer(containerfixture.WithImageName("app:latest"), containerfixture.WithLabels(map[string]string{
 			labels.GitRepo: "https://github.company.com/org/app.git",
 			labels.GitHost: "https://github.company.com/github",
 		}))
 		assert.Equal(t, "https://github.company.com/github/org/app/releases", ResolveReportMeta(ghe, types.UpdateParams{}, ChangelogVars{}, oci.Annotations{}).Changelog)
 
-		nested := MockContainer(WithImageName("app:latest"), WithLabels(map[string]string{
+		nested := MockContainer(containerfixture.WithImageName("app:latest"), containerfixture.WithLabels(map[string]string{
 			labels.GitRepo: "https://gitlab.com/group/sub/repo.git",
 		}))
 		assert.Equal(t, "https://gitlab.com/group/sub/repo/-/releases", ResolveReportMeta(nested, types.UpdateParams{}, ChangelogVars{}, oci.Annotations{}).Changelog)
@@ -247,8 +248,8 @@ func TestResolveReportMeta(t *testing.T) {
 		t.Parallel()
 
 		c := MockContainer(
-			WithImageName("app:latest"),
-			WithImageLabels(map[string]string{
+			containerfixture.WithImageName("app:latest"),
+			containerfixture.WithImageLabels(map[string]string{
 				oci.SourceLabel: "https://github.com/org/old.git",
 			}),
 		)
@@ -272,7 +273,7 @@ func TestResolveReportMeta(t *testing.T) {
 	t.Run("leaves changelog empty for an unknown host without OCI URL fields", func(t *testing.T) {
 		t.Parallel()
 
-		c := MockContainer(WithImageName("app:latest"), WithLabels(map[string]string{
+		c := MockContainer(containerfixture.WithImageName("app:latest"), containerfixture.WithLabels(map[string]string{
 			labels.GitRepo: "https://unknown.example/org/app.git",
 		}))
 		assert.Empty(t, ResolveReportMeta(c, types.UpdateParams{}, ChangelogVars{}, oci.Annotations{}).Changelog)
@@ -282,16 +283,16 @@ func TestResolveReportMeta(t *testing.T) {
 		t.Parallel()
 
 		urlOnly := MockContainer(
-			WithImageName("app:latest"),
-			WithImageLabels(map[string]string{
+			containerfixture.WithImageName("app:latest"),
+			containerfixture.WithImageLabels(map[string]string{
 				oci.URLLabel: "https://example.com/image",
 			}),
 		)
 		assert.Equal(t, "https://example.com/image", ResolveReportMeta(urlOnly, types.UpdateParams{}, ChangelogVars{}, oci.Annotations{}).Changelog)
 
 		docsOnly := MockContainer(
-			WithImageName("app:latest"),
-			WithImageLabels(map[string]string{
+			containerfixture.WithImageName("app:latest"),
+			containerfixture.WithImageLabels(map[string]string{
 				oci.DocumentationLabel: "https://example.com/docs",
 			}),
 		)
@@ -301,7 +302,7 @@ func TestResolveReportMeta(t *testing.T) {
 	t.Run("uses a mapping ref when the container is not watcher-associated", func(t *testing.T) {
 		t.Parallel()
 
-		c := MockContainer(WithImageName("myapp:latest"))
+		c := MockContainer(containerfixture.WithImageName("myapp:latest"))
 
 		meta := ResolveReportMeta(c, types.UpdateParams{
 			GitImages: map[string]types.GitImage{
@@ -316,8 +317,8 @@ func TestResolveReportMeta(t *testing.T) {
 		t.Parallel()
 
 		c := MockContainer(
-			WithImageName("app:latest"),
-			WithImageLabels(map[string]string{
+			containerfixture.WithImageName("app:latest"),
+			containerfixture.WithImageLabels(map[string]string{
 				oci.VersionLabel: "1.4.0",
 			}),
 		)
@@ -331,8 +332,8 @@ func TestResolveReportMeta(t *testing.T) {
 		t.Parallel()
 
 		c := MockContainer(
-			WithImageName("app:latest"),
-			WithImageLabels(map[string]string{
+			containerfixture.WithImageName("app:latest"),
+			containerfixture.WithImageLabels(map[string]string{
 				oci.SourceLabel: "https://github.com/org/from-oci.git",
 			}),
 		)
