@@ -19,6 +19,7 @@ import (
 	dockerAPIVersion "github.com/moby/moby/client/pkg/versions"
 
 	"github.com/nicholas-fedor/watchtower/internal/container"
+	containerImage "github.com/nicholas-fedor/watchtower/internal/container/image"
 	"github.com/nicholas-fedor/watchtower/internal/container/oci"
 	"github.com/nicholas-fedor/watchtower/internal/registry/ratelimit"
 	registryConfig "github.com/nicholas-fedor/watchtower/internal/settings/config/registry"
@@ -419,7 +420,7 @@ type ClientOptions struct {
 	IncludeRestarting       bool
 	DisableMemorySwappiness bool
 	CPUCopyMode             string
-	WarnOnHeadFailed        WarningStrategy
+	WarnOnHeadFailed        containerImage.WarningStrategy
 	// Fs is the filesystem rooted at "/" that holds the container runtime
 	// marker files. NewClient uses the host filesystem when it is nil.
 	Fs fs.FS
@@ -1074,7 +1075,7 @@ func (c *client) IsContainerStale(
 	params types.UpdateParams,
 ) (bool, types.ImageID, string, error) {
 	// Use image client to perform staleness check.
-	imgClient := newImageClient(c.api, c.logger(), c.Registry, c.RateLimiter)
+	imgClient := containerImage.NewClient(c.api, c.logger(), c.Registry, c.RateLimiter)
 
 	stale, newestImage, latestDigest, err := imgClient.IsContainerStale(
 		ctx,
@@ -1088,16 +1089,18 @@ func (c *client) IsContainerStale(
 			Str("container", container.Name()).
 			Str("image", container.ImageName()).
 			Msg("Failed to check container staleness")
-	} else {
-		c.logger().Debug().
-			Str("container", container.Name()).
-			Str("image", container.ImageName()).
-			Bool("stale", stale).
-			Str("newest_image", string(newestImage)).
-			Msg("Checked container staleness")
+
+		return stale, newestImage, latestDigest, fmt.Errorf("check container staleness: %w", err)
 	}
 
-	return stale, newestImage, latestDigest, err
+	c.logger().Debug().
+		Str("container", container.Name()).
+		Str("image", container.ImageName()).
+		Bool("stale", stale).
+		Str("newest_image", string(newestImage)).
+		Msg("Checked container staleness")
+
+	return stale, newestImage, latestDigest, nil
 }
 
 // CheckContainerUpdate reports whether a newer image is available without pulling.
@@ -1117,7 +1120,7 @@ func (c *client) CheckContainerUpdate(
 	container types.Container,
 	params types.UpdateParams,
 ) (bool, types.ImageID, string, error) {
-	imgClient := newImageClient(c.api, c.logger(), c.Registry, c.RateLimiter)
+	imgClient := containerImage.NewClient(c.api, c.logger(), c.Registry, c.RateLimiter)
 
 	available, newestImage, latestDigest, err := imgClient.CheckContainerUpdate(
 		ctx,
@@ -1130,17 +1133,19 @@ func (c *client) CheckContainerUpdate(
 			Str("container", container.Name()).
 			Str("image", container.ImageName()).
 			Msg("Failed to check container for updates")
-	} else {
-		c.logger().Debug().
-			Str("container", container.Name()).
-			Str("image", container.ImageName()).
-			Bool("update_available", available).
-			Str("latest_image_id", string(newestImage)).
-			Str("latest_digest", latestDigest).
-			Msg("Checked container for updates")
+
+		return available, newestImage, latestDigest, fmt.Errorf("check container for updates: %w", err)
 	}
 
-	return available, newestImage, latestDigest, err
+	c.logger().Debug().
+		Str("container", container.Name()).
+		Str("image", container.ImageName()).
+		Bool("update_available", available).
+		Str("latest_image_id", string(newestImage)).
+		Str("latest_digest", latestDigest).
+		Msg("Checked container for updates")
+
+	return available, newestImage, latestDigest, nil
 }
 
 // GetImageAnnotations reads the OCI annotations of an image by reference.
@@ -1152,7 +1157,7 @@ func (c *client) CheckContainerUpdate(
 // Returns:
 //   - oci.Annotations: Annotations from the image config labels, or empty.
 func (c *client) GetImageAnnotations(ctx context.Context, imageRef string) oci.Annotations {
-	imgClient := newImageClient(c.api, c.logger(), c.Registry, c.RateLimiter)
+	imgClient := containerImage.NewClient(c.api, c.logger(), c.Registry, c.RateLimiter)
 
 	return imgClient.GetImageAnnotations(ctx, imageRef)
 }
@@ -1171,7 +1176,7 @@ func (c *client) RemoveImageByID(
 	imageName string,
 ) error {
 	// Use image client to remove the image.
-	imgClient := newImageClient(c.api, c.logger(), c.Registry, c.RateLimiter)
+	imgClient := containerImage.NewClient(c.api, c.logger(), c.Registry, c.RateLimiter)
 
 	err := imgClient.RemoveImageByID(ctx, imageID, imageName)
 	if err != nil {
@@ -1181,7 +1186,7 @@ func (c *client) RemoveImageByID(
 			Str("image_name", imageName).
 			Msg("Failed to remove image")
 
-		return err
+		return fmt.Errorf("remove image: %w", err)
 	}
 
 	c.logger().Debug().

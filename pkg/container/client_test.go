@@ -29,6 +29,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	cerrdefs "github.com/containerd/errdefs"
+	dockerspec "github.com/moby/docker-image-spec/specs-go/v1"
 	dockerContainer "github.com/moby/moby/api/types/container"
 	dockerImage "github.com/moby/moby/api/types/image"
 	dockerSystem "github.com/moby/moby/api/types/system"
@@ -36,7 +37,9 @@ import (
 
 	"github.com/nicholas-fedor/watchtower/internal/container"
 	"github.com/nicholas-fedor/watchtower/internal/container/filters"
+	containerImage "github.com/nicholas-fedor/watchtower/internal/container/image"
 	mockContainer "github.com/nicholas-fedor/watchtower/internal/container/mocks"
+	"github.com/nicholas-fedor/watchtower/internal/container/oci"
 	"github.com/nicholas-fedor/watchtower/internal/testutil/containerfixture"
 	"github.com/nicholas-fedor/watchtower/internal/testutil/httpstub"
 	"github.com/nicholas-fedor/watchtower/pkg/types"
@@ -1717,7 +1720,7 @@ func TestClientWrappers(t *testing.T) {
 		api.EXPECT().ImageInspect(mock.Anything, "test-image:latest").Return(inspected(newImageID), nil).Once()
 
 		stale, latestID, _, err := (&client{log: newTestLogger(t), api: api}).IsContainerStale(
-			t.Context(), runningImage("test-image:latest", currentImageID), types.UpdateParams{NoPull: true},
+			t.Context(), runningImage(currentImageID), types.UpdateParams{NoPull: true},
 		)
 		require.NoError(t, err)
 		assert.True(t, stale)
@@ -1732,7 +1735,7 @@ func TestClientWrappers(t *testing.T) {
 			Return(dockerClient.ImageInspectResult{}, daemonError("inspect failed")).Once()
 
 		_, _, _, err := (&client{log: newTestLogger(t), api: api}).IsContainerStale(
-			t.Context(), runningImage("test-image:latest", "sha256:"+randomSHA256()), types.UpdateParams{NoPull: true},
+			t.Context(), runningImage("sha256:"+randomSHA256()), types.UpdateParams{NoPull: true},
 		)
 		require.Error(t, err)
 	})
@@ -1746,7 +1749,7 @@ func TestClientWrappers(t *testing.T) {
 		api.EXPECT().ImageInspect(mock.Anything, "test-image:latest").Return(inspected(currentImageID), nil).Once()
 
 		available, latestID, _, err := (&client{log: newTestLogger(t), api: api}).CheckContainerUpdate(
-			t.Context(), runningImage("test-image:latest", currentImageID), types.UpdateParams{NoPull: true},
+			t.Context(), runningImage(currentImageID), types.UpdateParams{NoPull: true},
 		)
 		require.NoError(t, err)
 		assert.False(t, available)
@@ -1761,7 +1764,7 @@ func TestClientWrappers(t *testing.T) {
 			Return(dockerClient.ImageInspectResult{}, daemonError("inspect failed")).Once()
 
 		_, _, _, err := (&client{log: newTestLogger(t), api: api}).CheckContainerUpdate(
-			t.Context(), runningImage("test-image:latest", "sha256:"+randomSHA256()), types.UpdateParams{NoPull: true},
+			t.Context(), runningImage("sha256:"+randomSHA256()), types.UpdateParams{NoPull: true},
 		)
 		require.Error(t, err)
 	})
@@ -1793,7 +1796,7 @@ func TestClientWrappers(t *testing.T) {
 			}}, nil).Once()
 
 		err := (&client{log: newTestLogger(t), api: api}).RemoveImageByID(t.Context(), imageID, "test-image:latest")
-		require.ErrorIs(t, err, ErrImageInUse)
+		require.ErrorIs(t, err, containerImage.ErrImageInUse)
 	})
 
 	t.Run("StartContainerByID starts the container", func(t *testing.T) {
@@ -2018,4 +2021,21 @@ func TestClientLogger(t *testing.T) {
 
 	var nilClient *client
 	assert.NotNil(t, nilClient.logger())
+}
+
+// TestClientImageAnnotationsDelegates verifies that the client-level delegate
+// reaches the same result as the image client.
+func TestClientImageAnnotationsDelegates(t *testing.T) {
+	t.Parallel()
+
+	api := mockContainer.NewMockAPIClient(t)
+	api.EXPECT().ImageInspect(mock.Anything, "app:latest").
+		Return(dockerClient.ImageInspectResult{Config: &dockerspec.DockerOCIImageConfig{
+			Labels: map[string]string{oci.VersionLabel: "1.2.3"},
+		}}, nil).Once()
+
+	got := (&client{api: api, log: newTestLogger(t)}).
+		GetImageAnnotations(t.Context(), "app:latest")
+
+	assert.Equal(t, "1.2.3", got.Version)
 }

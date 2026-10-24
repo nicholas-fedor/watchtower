@@ -1,4 +1,4 @@
-package container
+package image
 
 import (
 	"context"
@@ -169,7 +169,7 @@ func Test_imageClient_buildMirrorEndpoints(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			c := imageClient{log: newTestLogger(t)}
+			c := Client{log: newTestLogger(t)}
 			got := c.buildMirrorEndpoints(tt.info, tt.imageRef)
 			assert.Equal(t, tt.want, got)
 		})
@@ -213,7 +213,7 @@ func Test_newImageClient_nilLogger_noMirrors(t *testing.T) {
 		Return(dockerClient.SystemInfoResult{}, nil).
 		Once()
 
-	c := newImageClient(api, nil, registryConfig.Registry{}, ratelimit.New())
+	c := NewClient(api, nil, registryConfig.Registry{}, ratelimit.New())
 
 	assert.NotPanics(t, func() {
 		assert.Nil(t, c.resolveRegistryMirrorConfig(context.Background()))
@@ -231,8 +231,8 @@ func TestResolveRegistryMirrorConfig_CachesInfo(t *testing.T) {
 		Return(mirrorInfoResult(), nil).
 		Once()
 
-	first := newImageClient(api, newTestLogger(t), registryConfig.Registry{}, ratelimit.New())
-	second := newImageClient(api, newTestLogger(t), registryConfig.Registry{}, ratelimit.New())
+	first := NewClient(api, newTestLogger(t), registryConfig.Registry{}, ratelimit.New())
+	second := NewClient(api, newTestLogger(t), registryConfig.Registry{}, ratelimit.New())
 
 	gotFirst := first.resolveRegistryMirrorConfig(context.Background())
 	gotSecond := second.resolveRegistryMirrorConfig(context.Background())
@@ -253,7 +253,7 @@ func TestResolveRegistryMirrorConfig_InfoErrorNotCached(t *testing.T) {
 		Return(dockerClient.SystemInfoResult{}, errors.New("daemon unavailable")).
 		Times(2)
 
-	client := newImageClient(api, newTestLogger(t), registryConfig.Registry{}, ratelimit.New())
+	client := NewClient(api, newTestLogger(t), registryConfig.Registry{}, ratelimit.New())
 
 	assert.Nil(t, client.resolveRegistryMirrorConfig(context.Background()))
 	assert.Nil(t, client.resolveRegistryMirrorConfig(context.Background()))
@@ -270,7 +270,7 @@ func TestResolveRegistryMirrorConfig_NilDaemonInfoUsesShared(t *testing.T) {
 		Return(mirrorInfoResult(), nil).
 		Once()
 
-	client := imageClient{api: api, log: newTestLogger(t)}
+	client := Client{api: api, log: newTestLogger(t)}
 
 	got := client.resolveRegistryMirrorConfig(context.Background())
 	require.NotNil(t, got)
@@ -300,8 +300,8 @@ func TestResolveRegistryMirrorConfig_CoalescesConcurrentFetches(t *testing.T) {
 			}).
 			Once()
 
-		firstClient := newImageClient(api, newTestLogger(t), registryConfig.Registry{}, ratelimit.New())
-		secondClient := newImageClient(api, newTestLogger(t), registryConfig.Registry{}, ratelimit.New())
+		firstClient := NewClient(api, newTestLogger(t), registryConfig.Registry{}, ratelimit.New())
+		secondClient := NewClient(api, newTestLogger(t), registryConfig.Registry{}, ratelimit.New())
 
 		var (
 			wg          sync.WaitGroup

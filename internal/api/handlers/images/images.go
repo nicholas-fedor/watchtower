@@ -9,6 +9,7 @@ import (
 
 	"github.com/distribution/reference"
 
+	containerImage "github.com/nicholas-fedor/watchtower/internal/container/image"
 	"github.com/nicholas-fedor/watchtower/pkg/container"
 	"github.com/nicholas-fedor/watchtower/pkg/types"
 )
@@ -103,7 +104,7 @@ func ListImageStatuses(ctx context.Context, client container.Client, filter type
 		}
 
 		if info := c.ImageInfo(); info != nil {
-			status.Digest = container.ExtractImageDigest(info.RepoDigests, imageName)
+			status.Digest = containerImage.ExtractImageDigest(info.RepoDigests, imageName)
 		}
 
 		imageMap[key] = status

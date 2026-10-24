@@ -1,4 +1,4 @@
-package container
+package image
 
 import (
 	"errors"
@@ -335,13 +335,13 @@ func TestIsOutsideCooldown_RegistrySettings(t *testing.T) {
 	container := MockContainer(containerfixture.WithImageName(strings.TrimPrefix(server.URL, "http://") + "/org/app:1.0"))
 	params := types.UpdateParams{CooldownDelay: time.Hour}
 
-	plain := newImageClient(nil, newTestLogger(t), registryConfig.Registry{TLSSkip: true}, ratelimit.New())
+	plain := NewClient(nil, newTestLogger(t), registryConfig.Registry{TLSSkip: true}, ratelimit.New())
 
 	outside, err := plain.isOutsideCooldown(t.Context(), container, params)
 	require.NoError(t, err)
 	assert.True(t, outside, "an image older than the cooldown was deferred")
 
-	secure := newImageClient(nil, newTestLogger(t), registryConfig.Registry{}, ratelimit.New())
+	secure := NewClient(nil, newTestLogger(t), registryConfig.Registry{}, ratelimit.New())
 
 	outside, err = secure.isOutsideCooldown(t.Context(), container, params)
 	require.Error(t, err, "an HTTPS request reached the plain HTTP registry")

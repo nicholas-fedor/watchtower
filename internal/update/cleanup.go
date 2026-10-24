@@ -13,6 +13,7 @@ import (
 
 	"github.com/nicholas-fedor/watchtower/internal/container"
 	"github.com/nicholas-fedor/watchtower/internal/container/filters"
+	containerImage "github.com/nicholas-fedor/watchtower/internal/container/image"
 	pkgContainer "github.com/nicholas-fedor/watchtower/pkg/container"
 	"github.com/nicholas-fedor/watchtower/pkg/types"
 )
@@ -829,7 +830,7 @@ func removeImages(log *zerolog.Logger, ctx context.Context,
 					Str("image_id", string(imageID)).
 					Str("image_name", image.ImageName).
 					Msg("Image already removed")
-			case cerrdefs.IsConflict(err) || errors.Is(err, pkgContainer.ErrImageInUse):
+			case cerrdefs.IsConflict(err) || errors.Is(err, containerImage.ErrImageInUse):
 				log.Debug().
 					Str("image_id", string(imageID)).
 					Str("image_name", image.ImageName).

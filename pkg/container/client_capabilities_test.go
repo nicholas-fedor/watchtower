@@ -3,10 +3,8 @@ package container
 import (
 	"bytes"
 	"errors"
-	"fmt"
 	"io"
 	"net/http"
-	"net/url"
 	"strings"
 	"testing"
 
@@ -24,93 +22,27 @@ import (
 	"github.com/nicholas-fedor/watchtower/pkg/types"
 )
 
-// TestClientBuildRemoteImage verifies that a remote build sends the Git context,
-// tags, and Dockerfile to Docker, takes the image ID from the build stream or
-// else from an inspect of the first tag, and keeps credentials out of its
-// errors.
+// TestClientBuildRemoteImage verifies that the client builds a remote image
+// through its own Docker API, and says which step failed when the build fails.
 func TestClientBuildRemoteImage(t *testing.T) {
 	t.Parallel()
 
-	const remote = "https://user:secret@github.com/org/app.git#abc"
+	_, err := (&client{log: newTestLogger(t), api: mockContainer.NewMockAPIClient(t)}).
+		BuildRemoteImage(t.Context(), "", "", []string{"app:latest"})
+	require.ErrorContains(t, err, "build image from Git: git remote is empty")
 
-	// expectBuild expects one build of remote tagged app:latest and answers it
-	// with the given stream body.
-	expectBuild := func(api *mockContainer.MockAPIClient, body string, err error) {
-		api.EXPECT().ImageBuild(mock.Anything, http.NoBody, dockerClient.ImageBuildOptions{
-			RemoteContext: remote,
-			Tags:          []string{"app:latest"},
-			Remove:        true,
-			Dockerfile:    provenance.DefaultDockerfile,
-		}).Return(dockerClient.ImageBuildResult{Body: io.NopCloser(strings.NewReader(body))}, err).Once()
-	}
+	api := newDockerAPI(t)
+	api.EXPECT().ImageBuild(mock.Anything, http.NoBody, dockerClient.ImageBuildOptions{
+		RemoteContext: "https://github.com/org/app.git",
+		Tags:          []string{"app:latest"},
+		Remove:        true,
+		Dockerfile:    provenance.DefaultDockerfile,
+	}).Return(dockerClient.ImageBuildResult{Body: io.NopCloser(strings.NewReader(`{"aux":{"ID":"sha256:built"}}`))}, nil).Once()
 
-	t.Run("returns the image ID from the build stream", func(t *testing.T) {
-		t.Parallel()
-
-		api := newDockerAPI(t)
-		expectBuild(api, `{"aux":{"ID":"sha256:built"}}`, nil)
-
-		id, err := (&client{log: newTestLogger(t), api: api}).BuildRemoteImage(t.Context(), remote, "", []string{"app:latest"})
-		require.NoError(t, err)
-		assert.Equal(t, types.ImageID("sha256:built"), id)
-	})
-
-	t.Run("inspects the first tag when the stream has no image ID", func(t *testing.T) {
-		t.Parallel()
-
-		api := newDockerAPI(t)
-		expectBuild(api, `{"stream":"Step 1/1"}`, nil)
-		api.EXPECT().ImageInspect(mock.Anything, "app:latest").Return(inspected("sha256:tagged"), nil).Once()
-
-		id, err := (&client{log: newTestLogger(t), api: api}).BuildRemoteImage(t.Context(), remote, "", []string{"app:latest"})
-		require.NoError(t, err)
-		assert.Equal(t, types.ImageID("sha256:tagged"), id)
-	})
-
-	t.Run("fails when no image ID can be found", func(t *testing.T) {
-		t.Parallel()
-
-		api := newDockerAPI(t)
-		expectBuild(api, `{"stream":"Step 1/1"}`, nil)
-		api.EXPECT().ImageInspect(mock.Anything, "app:latest").Return(inspected(""), nil).Once()
-
-		_, err := (&client{log: newTestLogger(t), api: api}).BuildRemoteImage(t.Context(), remote, "", []string{"app:latest"})
-		require.ErrorIs(t, err, errBuildImageIDMissing)
-	})
-
-	t.Run("redacts credentials from a failed build", func(t *testing.T) {
-		t.Parallel()
-
-		api := newDockerAPI(t)
-		expectBuild(api, "", fmt.Errorf("unable to prepare context: %s", remote))
-
-		_, err := (&client{log: newTestLogger(t), api: api}).BuildRemoteImage(t.Context(), remote, "", []string{"app:latest"})
-		require.Error(t, err)
-		assert.NotContains(t, err.Error(), "secret")
-	})
-
-	t.Run("redacts a query-escaped remote from a failed build", func(t *testing.T) {
-		t.Parallel()
-
-		// The client sends the remote as a query parameter, so its error can
-		// echo the request URL with the remote query-escaped.
-		api := newDockerAPI(t)
-		expectBuild(api, "", fmt.Errorf(`Post "http://docker/build?remote=%s": EOF`, url.QueryEscape(remote)))
-
-		_, err := (&client{log: newTestLogger(t), api: api}).BuildRemoteImage(t.Context(), remote, "", []string{"app:latest"})
-		require.Error(t, err)
-		assert.NotContains(t, err.Error(), "secret")
-		assert.Contains(t, err.Error(), url.QueryEscape("https://xxxxx:xxxxx@github.com"))
-	})
-
-	t.Run("rejects an empty remote before calling Docker", func(t *testing.T) {
-		t.Parallel()
-
-		// The mock has no expectations, so any Docker call fails the test.
-		_, err := (&client{log: newTestLogger(t), api: mockContainer.NewMockAPIClient(t)}).
-			BuildRemoteImage(t.Context(), "", "", []string{"app:latest"})
-		require.ErrorIs(t, err, errGitRemoteEmpty)
-	})
+	id, err := (&client{log: newTestLogger(t), api: api}).
+		BuildRemoteImage(t.Context(), "https://github.com/org/app.git", "", []string{"app:latest"})
+	require.NoError(t, err)
+	assert.Equal(t, types.ImageID("sha256:built"), id)
 }
 
 func TestDiscardStoredCopyFiles(t *testing.T) {

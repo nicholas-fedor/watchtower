@@ -33,6 +33,8 @@ const (
 
 // Errors for creating and renaming replacement containers.
 var (
+	// errInspectImageFailed indicates a failure to inspect an image from the Docker daemon.
+	errInspectImageFailed = errors.New("failed to inspect image")
 	// errCreateContainerFailed indicates a failure to create a new container.
 	errCreateContainerFailed = errors.New("failed to create container")
 	// errRenameContainerFailed indicates a failure to rename an existing container.

@@ -1,4 +1,4 @@
-package container
+package image
 
 import (
 	"context"
@@ -17,7 +17,7 @@ import (
 // daemonInfoTTL is how long a Docker Info and mirrors snapshot is reused.
 const daemonInfoTTL = 5 * time.Minute
 
-// sharedDaemonInfoCache is reused across imageClient instances in one process.
+// sharedDaemonInfoCache is reused across Client instances in one process.
 var sharedDaemonInfoCache = &daemonInfoCache{}
 
 // daemonInfoCache holds one Docker Info snapshot for concurrent check/pull paths.
@@ -45,7 +45,7 @@ type daemonInfoResult struct {
 //
 // Returns:
 //   - *dockerSystem.Info: System info with mirror configuration, or nil if unavailable.
-func (c imageClient) resolveRegistryMirrorConfig(ctx context.Context) *dockerSystem.Info {
+func (c Client) resolveRegistryMirrorConfig(ctx context.Context) *dockerSystem.Info {
 	cache := c.daemonInfo
 	if cache == nil {
 		cache = sharedDaemonInfoCache
@@ -115,7 +115,7 @@ func (c imageClient) resolveRegistryMirrorConfig(ctx context.Context) *dockerSys
 //
 // Returns:
 //   - daemonInfoResult: Snapshot and whether the fetch succeeded.
-func (c imageClient) fetchDaemonInfo(ctx context.Context) daemonInfoResult {
+func (c Client) fetchDaemonInfo(ctx context.Context) daemonInfoResult {
 	info, err := c.api.Info(
 		ctx,
 		dockerClient.InfoOptions{},
@@ -167,7 +167,7 @@ func (c imageClient) fetchDaemonInfo(ctx context.Context) daemonInfoResult {
 //
 // Returns:
 //   - []string: List of host overrides to try. Empty string means use canonical host.
-func (c imageClient) buildMirrorEndpoints(
+func (c Client) buildMirrorEndpoints(
 	info *dockerSystem.Info,
 	imageRef string,
 ) []string {
@@ -213,7 +213,7 @@ func (c imageClient) buildMirrorEndpoints(
 //
 // Returns:
 //   - bool: True when the canonical registry host is Docker Hub.
-func (c imageClient) isDockerHubImage(imageRef string) bool {
+func (c Client) isDockerHubImage(imageRef string) bool {
 	address, err := auth.GetRegistryAddress(c.logger(), imageRef)
 	if err != nil {
 		return false

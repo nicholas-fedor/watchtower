@@ -8,9 +8,9 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/nicholas-fedor/watchtower/internal/container/filters"
+	containerImage "github.com/nicholas-fedor/watchtower/internal/container/image"
 	"github.com/nicholas-fedor/watchtower/internal/registry/ratelimit"
 	mockUpdate "github.com/nicholas-fedor/watchtower/internal/update/mocks"
-	"github.com/nicholas-fedor/watchtower/pkg/container"
 	"github.com/nicholas-fedor/watchtower/pkg/types"
 )
 
@@ -41,7 +41,7 @@ func TestUpdateAction_Cooldown(t *testing.T) {
 					Containers: []types.Container{
 						mockUpdate.CreateMockContainer("c1", "c1", "myimage:latest", time.Now()),
 					},
-					IsContainerStaleError: container.ErrImageCooldown,
+					IsContainerStaleError: containerImage.ErrImageCooldown,
 				},
 				Stopped: make(map[string]bool),
 			}
@@ -154,7 +154,7 @@ func TestUpdateAction_Cooldown(t *testing.T) {
 					Containers: []types.Container{
 						mockUpdate.CreateMockContainer("c1", "c1", "myimage:latest", time.Now()),
 					},
-					IsContainerStaleError: container.ErrImageCooldown,
+					IsContainerStaleError: containerImage.ErrImageCooldown,
 				},
 				Stopped: make(map[string]bool),
 			}

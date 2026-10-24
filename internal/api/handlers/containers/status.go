@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 
+	containerImage "github.com/nicholas-fedor/watchtower/internal/container/image"
 	"github.com/nicholas-fedor/watchtower/pkg/container"
 	"github.com/nicholas-fedor/watchtower/pkg/types"
 )
@@ -88,7 +89,7 @@ func containerToStatus(c types.Container) Status {
 	}
 
 	if info := c.ImageInfo(); info != nil {
-		status.Digest = container.ExtractImageDigest(info.RepoDigests, c.ImageName())
+		status.Digest = containerImage.ExtractImageDigest(info.RepoDigests, c.ImageName())
 	}
 
 	return status

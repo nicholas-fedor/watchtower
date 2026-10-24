@@ -1,4 +1,4 @@
-package container
+package image
 
 import (
 	"context"
@@ -62,7 +62,7 @@ func (e *CooldownError) Is(target error) bool {
 // Returns:
 //   - bool: true if safe to pull/update, false if deferred.
 //   - error: non-nil when deferred (carries CooldownError for details).
-func (c imageClient) isOutsideCooldown(
+func (c Client) isOutsideCooldown(
 	ctx context.Context,
 	sourceContainer types.Container,
 	params types.UpdateParams,

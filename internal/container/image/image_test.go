@@ -1,10 +1,15 @@
-package container
+package image
 
 import (
+	"bytes"
 	"context"
+	"crypto/rand"
+	"crypto/sha256"
+	"encoding/hex"
 	"errors"
 	"fmt"
 	"net/http"
+	"sync"
 	"testing"
 	"time"
 
@@ -20,6 +25,7 @@ import (
 
 	"github.com/nicholas-fedor/watchtower/internal/container"
 	mockContainer "github.com/nicholas-fedor/watchtower/internal/container/mocks"
+	"github.com/nicholas-fedor/watchtower/internal/observability/logging"
 	"github.com/nicholas-fedor/watchtower/internal/registry/digest"
 	"github.com/nicholas-fedor/watchtower/internal/registry/ratelimit"
 	registryConfig "github.com/nicholas-fedor/watchtower/internal/settings/config/registry"
@@ -42,9 +48,9 @@ const rateLimitedMessage = "toomanyrequests: retry-after: 2h, allowed: 44000/min
 //   - limiter: Registry rate limiter.
 //
 // Returns:
-//   - imageClient: Client ready for the test.
-func newTestImageClient(api dockerClient.APIClient, log *zerolog.Logger, settings registryConfig.Registry, limiter *ratelimit.Limiter) imageClient {
-	client := newImageClient(api, log, settings, limiter)
+//   - Client: Client ready for the test.
+func newTestImageClient(api dockerClient.APIClient, log *zerolog.Logger, settings registryConfig.Registry, limiter *ratelimit.Limiter) Client {
+	client := NewClient(api, log, settings, limiter)
 	client.daemonInfo = &daemonInfoCache{}
 
 	return client
@@ -146,7 +152,7 @@ func TestImageClient_warnOnHeadFailed(t *testing.T) {
 
 	containerUnknown := MockContainer(containerfixture.WithImageName("unknown.repo/prefix/imagename:latest"))
 	containerKnown := MockContainer(containerfixture.WithImageName("docker.io/prefix/imagename:latest"))
-	c := imageClient{}
+	c := Client{}
 
 	t.Run(`warn on head failure is set to "always"`, func(t *testing.T) {
 		t.Parallel()
@@ -1220,4 +1226,150 @@ func TestImageClient_isOutsideCooldown_beforePull(t *testing.T) {
 			assert.True(t, outside)
 		})
 	})
+}
+
+// MockContainer builds a Container from containerfixture inspect data, with
+// updates applied in order.
+//
+// Parameters:
+//   - updates: Changes to the container or image inspect data.
+//
+// Returns:
+//   - *container.Container: Container built from the inspect data.
+func MockContainer(updates ...containerfixture.Update) *container.Container {
+	containerInfo, imageInfo := containerfixture.Inspect(updates...)
+
+	return container.NewContainer(nil, containerInfo, imageInfo)
+}
+
+// newImageAPI returns a mock Docker API whose daemon reports no registry mirrors.
+//
+// Parameters:
+//   - t: Test that owns the mock.
+//
+// Returns:
+//   - *mockContainer.MockAPIClient: Mock answering Info with an empty daemon configuration.
+func newImageAPI(t *testing.T) *mockContainer.MockAPIClient {
+	t.Helper()
+
+	api := mockContainer.NewMockAPIClient(t)
+	api.EXPECT().Info(mock.Anything, mock.Anything).Return(dockerClient.SystemInfoResult{}, nil).Maybe()
+
+	return api
+}
+
+// runningImage returns a container that runs imageName with the image ID
+// imageID and the given repo digests.
+//
+// Parameters:
+//   - imageName: Image reference the container runs.
+//   - imageID: ID of the container's image.
+//   - repoDigests: Repo digests of the container's image, or none to keep the default.
+//
+// Returns:
+//   - *Container: The container.
+func runningImage(imageName, imageID string, repoDigests ...string) *container.Container {
+	options := []containerfixture.Update{
+		containerfixture.WithImageName(imageName),
+		func(container *dockerContainer.InspectResponse, image *dockerImage.InspectResponse) {
+			container.Image = imageID
+			image.ID = imageID
+		},
+	}
+
+	if repoDigests != nil {
+		options = append(options, containerfixture.WithRepoDigests(repoDigests))
+	}
+
+	return MockContainer(options...)
+}
+
+// inspected returns the inspect result of an image with id and repoDigests.
+//
+// Parameters:
+//   - id: Image ID.
+//   - repoDigests: The image's repo digests.
+//
+// Returns:
+//   - dockerClient.ImageInspectResult: The inspect result.
+func inspected(id string, repoDigests ...string) dockerClient.ImageInspectResult {
+	return dockerClient.ImageInspectResult{ID: id, RepoDigests: repoDigests}
+}
+
+// lockedBuffer is a buffer that is safe for concurrent writes, for logs that
+// goroutines started by a test write while the test reads them.
+type lockedBuffer struct {
+	// mu guards buf.
+	mu sync.Mutex
+	// buf holds the written bytes.
+	buf bytes.Buffer
+}
+
+// Write appends p to the buffer.
+//
+// Parameters:
+//   - p: Bytes to append.
+//
+// Returns:
+//   - int: Number of bytes written.
+//   - error: Always nil.
+func (b *lockedBuffer) Write(p []byte) (int, error) {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+
+	return b.buf.Write(p)
+}
+
+// String returns everything written so far.
+//
+// Returns:
+//   - string: The buffer's contents.
+func (b *lockedBuffer) String() string {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+
+	return b.buf.String()
+}
+
+// newCapturedLogger returns a logfmt logger at level that writes to a buffer the
+// test reads, in the format production logs use.
+//
+// Parameters:
+//   - level: Lowest level the logger writes.
+//
+// Returns:
+//   - *zerolog.Logger: Logger writing to the buffer.
+//   - *lockedBuffer: Buffer holding the logged lines.
+func newCapturedLogger(level zerolog.Level) (*zerolog.Logger, *lockedBuffer) {
+	buf := &lockedBuffer{}
+	w := logging.LogfmtWriter(buf)
+	w.TimeFormat = time.RFC3339
+
+	return new(zerolog.New(w).Level(level).With().Timestamp().Logger()), buf
+}
+
+// newTestLogger returns a logger that writes each event to the test's log, so a
+// failing test shows what it logged.
+//
+// Parameters:
+//   - t: Test that receives the log lines.
+//
+// Returns:
+//   - *zerolog.Logger: Logger writing to t.
+func newTestLogger(t *testing.T) *zerolog.Logger {
+	t.Helper()
+
+	// Frame 4 skips zerolog's write path, so each line names the log call.
+	w := zerolog.TestWriter{T: t, Frame: 4}
+
+	return new(zerolog.New(w))
+}
+
+// randomSHA256 returns 64 random hex characters, the form of a SHA-256 digest
+// without its "sha256:" prefix, so each test gets unique image IDs and digests.
+func randomSHA256() string {
+	hash := make([]byte, sha256.Size)
+	_, _ = rand.Read(hash)
+
+	return hex.EncodeToString(hash)
 }

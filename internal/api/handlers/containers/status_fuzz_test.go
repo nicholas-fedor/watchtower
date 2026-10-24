@@ -6,7 +6,7 @@ import (
 
 	"github.com/stretchr/testify/assert"
 
-	"github.com/nicholas-fedor/watchtower/pkg/container"
+	containerImage "github.com/nicholas-fedor/watchtower/internal/container/image"
 )
 
 // repoDigestPart returns the digest part of a RepoDigest, after its first @.
@@ -37,7 +37,7 @@ func FuzzExtractDigest(f *testing.F) {
 	f.Add("registry.example.com:5000/org/image@sha256:abcdef1234567890")
 
 	f.Fuzz(func(t *testing.T, repoDigest string) {
-		digest := container.ExtractImageDigest([]string{repoDigest}, "nginx:latest")
+		digest := containerImage.ExtractImageDigest([]string{repoDigest}, "nginx:latest")
 
 		if repoDigest == "" {
 			assert.Empty(t, digest, "empty input should return empty digest")
@@ -62,7 +62,7 @@ func FuzzExtractDigestMultiple(f *testing.F) {
 			digests = strings.Split(digestsStr, ",")
 		}
 
-		result := container.ExtractImageDigest(digests, "nginx:latest")
+		result := containerImage.ExtractImageDigest(digests, "nginx:latest")
 
 		candidates := make([]string, 0, len(digests))
 		for _, d := range digests {

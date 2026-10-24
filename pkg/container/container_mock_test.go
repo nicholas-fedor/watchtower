@@ -418,30 +418,22 @@ func newImageAPI(t *testing.T) *mockContainer.MockAPIClient {
 	return api
 }
 
-// runningImage returns a container that runs imageName with the image ID
-// imageID and the given repo digests.
+// runningImage returns a container that runs test-image:latest with the image
+// ID imageID.
 //
 // Parameters:
-//   - imageName: Image reference the container runs.
 //   - imageID: ID of the container's image.
-//   - repoDigests: Repo digests of the container's image, or none to keep the default.
 //
 // Returns:
-//   - *Container: The container.
-func runningImage(imageName, imageID string, repoDigests ...string) *container.Container {
-	options := []containerfixture.Update{
-		containerfixture.WithImageName(imageName),
+//   - *container.Container: The container.
+func runningImage(imageID string) *container.Container {
+	return MockContainer(
+		containerfixture.WithImageName("test-image:latest"),
 		func(container *dockerContainer.InspectResponse, image *dockerImage.InspectResponse) {
 			container.Image = imageID
 			image.ID = imageID
 		},
-	}
-
-	if repoDigests != nil {
-		options = append(options, containerfixture.WithRepoDigests(repoDigests))
-	}
-
-	return MockContainer(options...)
+	)
 }
 
 // inspected returns the inspect result of an image with id and repoDigests.

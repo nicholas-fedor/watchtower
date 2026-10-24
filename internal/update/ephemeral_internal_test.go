@@ -14,8 +14,8 @@ import (
 	dockerContainer "github.com/moby/moby/api/types/container"
 	dockerNetwork "github.com/moby/moby/api/types/network"
 
+	containerImage "github.com/nicholas-fedor/watchtower/internal/container/image"
 	mockUpdate "github.com/nicholas-fedor/watchtower/internal/update/mocks"
-	"github.com/nicholas-fedor/watchtower/pkg/container"
 	mockContainer "github.com/nicholas-fedor/watchtower/pkg/container/mocks"
 	"github.com/nicholas-fedor/watchtower/pkg/types"
 )
@@ -282,7 +282,7 @@ func Test_orchestrateSelfUpdate(t *testing.T) {
 		client := mockContainer.NewMockClient(t)
 		expectHandoff(client, old)
 		client.EXPECT().RemoveImageByID(mock.Anything, old.ImageID(), "watchtower:v1").
-			Return(container.ErrImageInUse).Once()
+			Return(containerImage.ErrImageInUse).Once()
 
 		err := orchestrateSelfUpdate(newTestLogger(t), t.Context(), client,
 			"wt-old-in-use", "watchtower:v2", "watchtower", "", true)

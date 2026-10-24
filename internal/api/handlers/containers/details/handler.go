@@ -8,6 +8,7 @@ import (
 	"github.com/gofiber/fiber/v3"
 	"github.com/rs/zerolog"
 
+	containerImage "github.com/nicholas-fedor/watchtower/internal/container/image"
 	"github.com/nicholas-fedor/watchtower/pkg/container"
 	"github.com/nicholas-fedor/watchtower/pkg/types"
 )
@@ -192,7 +193,7 @@ func GetContainerDetails(
 
 		info := c.ImageInfo()
 		if info != nil {
-			containerDetails.Digest = container.ExtractImageDigest(info.RepoDigests, containerDetails.Image)
+			containerDetails.Digest = containerImage.ExtractImageDigest(info.RepoDigests, containerDetails.Image)
 		}
 
 		details = append(details, containerDetails)
