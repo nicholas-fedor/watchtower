@@ -18,6 +18,7 @@ import (
 	dockerClient "github.com/moby/moby/client"
 
 	"github.com/nicholas-fedor/watchtower/internal/container"
+	"github.com/nicholas-fedor/watchtower/internal/container/recreate"
 	"github.com/nicholas-fedor/watchtower/pkg/types"
 )
 
@@ -241,7 +242,7 @@ func getSourceContainer(log *zerolog.Logger,
 		}
 
 		// Rewrite volumes-from IDs to names while the source still exists.
-		resolveVolumesFrom(ctx, api, clog, containerInfo)
+		recreate.ResolveVolumesFrom(ctx, api, clog, containerInfo)
 	}
 
 	imageInfo, err := resolveImageInspect(ctx, api, containerInfo.Image, imageCache)

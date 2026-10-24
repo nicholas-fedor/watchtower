@@ -1,4 +1,4 @@
-package container
+package recreate
 
 import (
 	"context"
@@ -18,13 +18,14 @@ import (
 
 	composeLabels "github.com/nicholas-fedor/watchtower/internal/compose/labels"
 	"github.com/nicholas-fedor/watchtower/internal/container"
+	"github.com/nicholas-fedor/watchtower/internal/container/network"
 	"github.com/nicholas-fedor/watchtower/pkg/types"
 )
 
 const (
-	// cleanupTimeout is the timeout for cleanup operations (e.g., container remove).
+	// CleanupTimeout is the timeout for cleanup operations (e.g., container remove).
 	// Using a dedicated timeout ensures cleanup completes even if the parent context is canceled.
-	cleanupTimeout = 10 * time.Second
+	CleanupTimeout = 10 * time.Second
 
 	// manifestsMinAPIVersion is the first Docker API version whose image
 	// inspect reports the image's manifests.
@@ -41,7 +42,7 @@ var (
 	errRenameContainerFailed = errors.New("failed to rename container")
 )
 
-// resolveVolumesFrom rewrites HostConfig.VolumesFrom IDs to live container names.
+// ResolveVolumesFrom rewrites HostConfig.VolumesFrom IDs to live container names.
 //
 // Inspect stores volumes-from as the source container ID. Recreate must use a
 // name so Docker can find the replacement after the source is recreated.
@@ -52,7 +53,7 @@ var (
 //   - api: Docker API client.
 //   - clog: Logger for warn and debug output.
 //   - containerInfo: Inspected container whose HostConfig.VolumesFrom is rewritten.
-func resolveVolumesFrom(
+func ResolveVolumesFrom(
 	ctx context.Context,
 	api dockerClient.APIClient,
 	clog *zerolog.Logger,
@@ -104,7 +105,7 @@ func resolveVolumesFrom(
 	containerInfo.HostConfig.VolumesFrom = rewritten
 }
 
-// createTargetContainer creates a new container based on the source container's
+// CreateTarget creates a new container based on the source container's
 // configuration but does not start it. It applies the provided network configuration,
 // renames the container, and attaches additional networks for legacy API versions.
 //
@@ -121,7 +122,7 @@ func resolveVolumesFrom(
 // Returns:
 //   - types.ContainerID: ID of the new container.
 //   - error: Non-nil if creation fails, nil on success.
-func createTargetContainer(log *zerolog.Logger,
+func CreateTarget(log *zerolog.Logger,
 	ctx context.Context,
 	api dockerClient.APIClient,
 	sourceContainer types.Container,
@@ -160,7 +161,7 @@ func createTargetContainer(log *zerolog.Logger,
 		// Legacy API (< 1.44) with multiple networks: use first network for creation.
 		var firstNetworkName string
 
-		createNetworkConfig = newEmptyNetworkConfig()
+		createNetworkConfig = network.EmptyConfig()
 
 		for name, endpoint := range networkConfig.EndpointsConfig {
 			firstNetworkName = name
@@ -219,7 +220,7 @@ func createTargetContainer(log *zerolog.Logger,
 		// Clean up the created container to avoid orphaned resources
 		cleanupCtx, cancel := context.WithTimeout(
 			context.WithoutCancel(ctx),
-			cleanupTimeout,
+			CleanupTimeout,
 		)
 		defer cancel()
 
@@ -251,7 +252,7 @@ func createTargetContainer(log *zerolog.Logger,
 			// Clean up the created container to avoid orphaned resources.
 			cleanupCtx, cancel := context.WithTimeout(
 				context.WithoutCancel(ctx),
-				cleanupTimeout,
+				CleanupTimeout,
 			)
 			defer cancel()
 
@@ -463,7 +464,7 @@ func attachNetworks(
 	return nil
 }
 
-// renameTargetContainer renames an existing container to the specified target name in Watchtower.
+// RenameTarget renames an existing container to the specified target name in Watchtower.
 //
 // Parameters:
 //   - ctx: Context for cancellation and timeout control.
@@ -473,7 +474,7 @@ func attachNetworks(
 //
 // Returns:
 //   - error: Non-nil if rename fails, nil on success.
-func renameTargetContainer(log *zerolog.Logger,
+func RenameTarget(log *zerolog.Logger,
 	ctx context.Context,
 	api dockerClient.APIClient,
 	targetContainer types.Container,

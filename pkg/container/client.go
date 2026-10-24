@@ -20,7 +20,9 @@ import (
 
 	"github.com/nicholas-fedor/watchtower/internal/container"
 	containerImage "github.com/nicholas-fedor/watchtower/internal/container/image"
+	"github.com/nicholas-fedor/watchtower/internal/container/network"
 	"github.com/nicholas-fedor/watchtower/internal/container/oci"
+	"github.com/nicholas-fedor/watchtower/internal/container/recreate"
 	"github.com/nicholas-fedor/watchtower/internal/registry/ratelimit"
 	registryConfig "github.com/nicholas-fedor/watchtower/internal/settings/config/registry"
 	"github.com/nicholas-fedor/watchtower/pkg/types"
@@ -818,9 +820,9 @@ func (c *client) CreateContainer(ctx context.Context, container types.Container)
 		Str("client_version", clientVersion).
 		Msg("Obtaining source container network configuration")
 
-	networkConfig := getNetworkConfig(c.logger(), container, clientVersion)
+	networkConfig := network.FromContainer(c.logger(), container, clientVersion)
 
-	newID, err := createTargetContainer(c.logger(),
+	newID, err := recreate.CreateTarget(c.logger(),
 		ctx,
 		c.api,
 		container,
@@ -835,7 +837,7 @@ func (c *client) CreateContainer(ctx context.Context, container types.Container)
 			Err(err).
 			Msg("Failed to create new container")
 
-		return "", err
+		return "", fmt.Errorf("create replacement container: %w", err)
 	}
 
 	err = c.injectStoredCopyFiles(ctx, container, newID)
@@ -1040,7 +1042,7 @@ func (c *client) RemoveContainer(ctx context.Context, container types.Container)
 //   - error: Non-nil if rename fails, nil on success.
 func (c *client) RenameContainer(ctx context.Context, container types.Container, newName string) error {
 	// Perform rename using helper function.
-	err := renameTargetContainer(c.logger(), ctx, c.api, container, newName)
+	err := recreate.RenameTarget(c.logger(), ctx, c.api, container, newName)
 	if err != nil {
 		c.logger().Debug().
 			Err(err).
@@ -1048,7 +1050,7 @@ func (c *client) RenameContainer(ctx context.Context, container types.Container,
 			Str("new_name", newName).
 			Msg("Failed to rename container")
 
-		return err
+		return fmt.Errorf("rename container: %w", err)
 	}
 
 	c.logger().Debug().
