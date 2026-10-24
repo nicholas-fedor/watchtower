@@ -2,6 +2,7 @@ package containerfixture
 
 import (
 	"fmt"
+	"slices"
 
 	dockerspec "github.com/moby/docker-image-spec/specs-go/v1"
 	dockerContainer "github.com/moby/moby/api/types/container"
@@ -161,8 +162,8 @@ func WithImageLabels(labels map[string]string) Update {
 
 // WithContainerState sets the state for the mock container.
 //
-// Each Inspect gets its own copy of state, so containers built from one Update
-// do not share it.
+// Each Inspect gets its own copy of state and its health results, so containers
+// built from one Update do not share them.
 //
 // Parameters:
 //   - state: Container state (e.g., running, stopped).
@@ -172,14 +173,15 @@ func WithImageLabels(labels map[string]string) Update {
 func WithContainerState(state dockerContainer.State) Update {
 	return func(cnt *dockerContainer.InspectResponse, _ *dockerImage.InspectResponse) {
 		stateCopy := state
+		stateCopy.Health = copyHealth(state.Health)
 		cnt.State = &stateCopy
 	}
 }
 
 // WithHealthcheck sets the healthcheck configuration for the mock container.
 //
-// Each Inspect gets its own copy of healthConfig, so containers built from one
-// Update do not share it.
+// Each Inspect gets its own copy of healthConfig and its Test command, so
+// containers built from one Update do not share them.
 //
 // Parameters:
 //   - healthConfig: Healthcheck configuration to set.
@@ -188,15 +190,14 @@ func WithContainerState(state dockerContainer.State) Update {
 //   - Update: Function to set healthcheck in container Config.
 func WithHealthcheck(healthConfig dockerContainer.HealthConfig) Update {
 	return func(cnt *dockerContainer.InspectResponse, _ *dockerImage.InspectResponse) {
-		healthCopy := healthConfig
-		cnt.Config.Healthcheck = &healthCopy
+		cnt.Config.Healthcheck = copyHealthConfig(healthConfig)
 	}
 }
 
 // WithImageHealthcheck sets the healthcheck configuration for the mock image.
 //
-// Each Inspect gets its own copy of healthConfig, so images built from one
-// Update do not share it.
+// Each Inspect gets its own copy of healthConfig and its Test command, so images
+// built from one Update do not share them.
 //
 // Parameters:
 //   - healthConfig: Healthcheck configuration to set.
@@ -205,9 +206,46 @@ func WithHealthcheck(healthConfig dockerContainer.HealthConfig) Update {
 //   - Update: Function to set healthcheck in image Config.
 func WithImageHealthcheck(healthConfig dockerContainer.HealthConfig) Update {
 	return func(_ *dockerContainer.InspectResponse, img *dockerImage.InspectResponse) {
-		healthCopy := healthConfig
-		img.Config.Healthcheck = &healthCopy
+		img.Config.Healthcheck = copyHealthConfig(healthConfig)
 	}
+}
+
+// copyHealth copies container health results and each of their log entries.
+//
+// Parameters:
+//   - health: Health results to copy, or nil.
+//
+// Returns:
+//   - *dockerContainer.Health: Independent copy, or nil when health is nil.
+func copyHealth(health *dockerContainer.Health) *dockerContainer.Health {
+	if health == nil {
+		return nil
+	}
+
+	healthCopy := *health
+	healthCopy.Log = slices.Clone(health.Log)
+
+	for i, result := range healthCopy.Log {
+		if result != nil {
+			resultCopy := *result
+			healthCopy.Log[i] = &resultCopy
+		}
+	}
+
+	return &healthCopy
+}
+
+// copyHealthConfig copies a health check configuration and its Test command.
+//
+// Parameters:
+//   - healthConfig: Health check configuration to copy.
+//
+// Returns:
+//   - *dockerContainer.HealthConfig: Independent copy.
+func copyHealthConfig(healthConfig dockerContainer.HealthConfig) *dockerContainer.HealthConfig {
+	healthConfig.Test = slices.Clone(healthConfig.Test)
+
+	return &healthConfig
 }
 
 // WithNetworkMode sets the network mode for the mock container.
