@@ -10,6 +10,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Keep build error causes after redaction by @nicholas-fedor in [#3128](https://github.com/nicholas-fedor/watchtower/pull/3128)
 - Reject unsafe characters in changelog repository paths by @nicholas-fedor in [#3122](https://github.com/nicholas-fedor/watchtower/pull/3122)
 - Stop nesting legacy link names on recreation by @nicholas-fedor in [#3114](https://github.com/nicholas-fedor/watchtower/pull/3114)
 - Redact camelCase credential query parameters by @nicholas-fedor in [#3112](https://github.com/nicholas-fedor/watchtower/pull/3112)
