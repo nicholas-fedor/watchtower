@@ -2,6 +2,7 @@ package redact
 
 import (
 	"net/url"
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -54,5 +55,40 @@ func FuzzRedactedRemote(f *testing.F) {
 
 		assert.Equal(t, "xxxxx", pw)
 		assert.Equal(t, "xxxxx", out.User.Username())
+	})
+}
+
+// FuzzQueryKeyWords verifies that splitting a query parameter name never
+// panics and loses nothing but separators. Each word is non-empty and lowercase
+// with no separators. The words joined in order equal the lowercased name
+// without its separators. The seeds cover separated, camelCase, and acronym
+// names.
+func FuzzQueryKeyWords(f *testing.F) {
+	f.Add("access_token")
+	f.Add("accessToken")
+	f.Add("APIToken")
+	f.Add("client-secret.v2")
+	f.Add("__")
+	f.Add("ÜberToken")
+	f.Add("")
+
+	f.Fuzz(func(t *testing.T, key string) {
+		words := queryKeyWords(key)
+
+		for _, word := range words {
+			assert.NotEmpty(t, word)
+			assert.Equal(t, strings.ToLower(word), word)
+			assert.False(t, strings.ContainsFunc(word, isQueryKeySeparator), word)
+		}
+
+		want := strings.ToLower(strings.Map(func(r rune) rune {
+			if isQueryKeySeparator(r) {
+				return -1
+			}
+
+			return r
+		}, key))
+
+		assert.Equal(t, want, strings.Join(words, ""))
 	})
 }
