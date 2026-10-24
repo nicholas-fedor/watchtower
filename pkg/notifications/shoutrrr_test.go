@@ -31,6 +31,7 @@ import (
 	"github.com/nicholas-fedor/watchtower/internal/container"
 	"github.com/nicholas-fedor/watchtower/internal/container/provenance"
 	"github.com/nicholas-fedor/watchtower/internal/settings"
+	"github.com/nicholas-fedor/watchtower/internal/testutil/logcapture"
 	"github.com/nicholas-fedor/watchtower/internal/update/state"
 	"github.com/nicholas-fedor/watchtower/pkg/types"
 )
@@ -38,41 +39,6 @@ import (
 var allButTrace = zerolog.DebugLevel
 
 const shoutrrrFatalHelperEnv = "WATCHTOWER_SHOUTRRR_FATAL_HELPER"
-
-// lockedBuffer is a buffer that is safe for concurrent writes, for logs that
-// the notifier's goroutines write while the test reads them.
-type lockedBuffer struct {
-	// mu guards buf.
-	mu sync.Mutex
-	// buf holds the written bytes.
-	buf bytes.Buffer
-}
-
-// Write appends p to the buffer.
-//
-// Parameters:
-//   - p: Bytes to append.
-//
-// Returns:
-//   - int: Number of bytes written.
-//   - error: Always nil.
-func (b *lockedBuffer) Write(p []byte) (int, error) {
-	b.mu.Lock()
-	defer b.mu.Unlock()
-
-	return b.buf.Write(p)
-}
-
-// String returns everything written so far.
-//
-// Returns:
-//   - string: The buffer's contents.
-func (b *lockedBuffer) String() string {
-	b.mu.Lock()
-	defer b.mu.Unlock()
-
-	return b.buf.String()
-}
 
 // newTestLogger returns a logger that writes each event to the test's log, so a
 // failing test shows what it logged.
@@ -96,9 +62,9 @@ func newTestLogger(t *testing.T) *zerolog.Logger {
 //
 // Returns:
 //   - *zerolog.Logger: Logger writing to the buffer.
-//   - *lockedBuffer: Buffer holding the log output.
-func newBufferLogger() (*zerolog.Logger, *lockedBuffer) {
-	buf := &lockedBuffer{}
+//   - *logcapture.Buffer: Buffer holding the log output.
+func newBufferLogger() (*zerolog.Logger, *logcapture.Buffer) {
+	buf := &logcapture.Buffer{}
 	// JSON encoding keeps field assertions simple (failure_type, failed_count, etc.).
 	l := zerolog.New(buf).Level(zerolog.TraceLevel).With().Timestamp().Logger()
 

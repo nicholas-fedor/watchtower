@@ -24,6 +24,8 @@ import (
 	"github.com/nicholas-fedor/watchtower/internal/container/filters"
 	mockContainer "github.com/nicholas-fedor/watchtower/internal/container/mocks"
 	"github.com/nicholas-fedor/watchtower/internal/testutil/containerfixture"
+	"github.com/nicholas-fedor/watchtower/internal/testutil/logcapture"
+	"github.com/nicholas-fedor/watchtower/internal/testutil/modelfixture"
 	"github.com/nicholas-fedor/watchtower/pkg/types"
 )
 
@@ -156,7 +158,7 @@ func Test_listSourceContainers(t *testing.T) {
 			expectListed(api, "running")
 			expectMissingImage(api, testContainerID)
 
-			log, logBuf := newCapturedLogger(zerolog.WarnLevel)
+			log, logBuf := logcapture.New(zerolog.WarnLevel)
 			excludeAll := filters.FilterByDisableNames(log, []string{"test-container"}, filters.NoFilter)
 
 			containers, err := listSourceContainers(log, t.Context(), api, ClientOptions{}, excludeAll)
@@ -172,7 +174,7 @@ func Test_listSourceContainers(t *testing.T) {
 			expectListed(api, "running")
 			expectMissingImage(api, testContainerID)
 
-			log, logBuf := newCapturedLogger(zerolog.WarnLevel)
+			log, logBuf := logcapture.New(zerolog.WarnLevel)
 
 			containers, err := listSourceContainers(log, t.Context(), api, ClientOptions{}, nil)
 			require.NoError(t, err)
@@ -556,7 +558,7 @@ func Test_stopAndRemoveSourceContainer(t *testing.T) {
 
 	// running returns a running container with the given updates.
 	running := func(updates ...containerfixture.Update) *container.Container {
-		return MockContainer(append([]containerfixture.Update{containerfixture.WithContainerState(dockerContainer.State{Running: true})}, updates...)...)
+		return modelfixture.Container(append([]containerfixture.Update{containerfixture.WithContainerState(dockerContainer.State{Running: true})}, updates...)...)
 	}
 
 	t.Run("stopping and removing a running container successfully with removeVolumes=false", func(t *testing.T) {
@@ -640,7 +642,7 @@ func Test_stopAndRemoveSourceContainer(t *testing.T) {
 			api := newDockerAPI(t)
 			expectRemove(api, false, nil)
 
-			container := MockContainer(
+			container := modelfixture.Container(
 				containerfixture.WithContainerState(dockerContainer.State{Running: false, Status: "created"}),
 				containerfixture.WithAutoRemove(true),
 			)
@@ -679,7 +681,7 @@ func Test_stopAndRemoveSourceContainer(t *testing.T) {
 			api := newDockerAPI(t)
 			expectRemove(api, true, nil)
 
-			container := MockContainer(containerfixture.WithContainerState(dockerContainer.State{Running: false}))
+			container := modelfixture.Container(containerfixture.WithContainerState(dockerContainer.State{Running: false}))
 
 			err := stopAndRemoveSourceContainer(newTestLogger(t), t.Context(), api, container, 10*time.Second, true)
 			require.NoError(t, err)
@@ -739,7 +741,7 @@ func Test_stopSourceContainer(t *testing.T) {
 
 	// running returns a running container.
 	running := func() *container.Container {
-		return MockContainer(containerfixture.WithContainerState(dockerContainer.State{Running: true}))
+		return modelfixture.Container(containerfixture.WithContainerState(dockerContainer.State{Running: true}))
 	}
 
 	t.Run("stopping a linked restarting container", func(t *testing.T) {
@@ -751,10 +753,10 @@ func Test_stopSourceContainer(t *testing.T) {
 			api := newDockerAPI(t)
 			expectStop(api, mockContainerID, 10, nil)
 
-			container := MockContainer()
+			container := modelfixture.Container()
 			container.SetLinkedToRestarting(true)
 
-			log, logbuf := newCapturedLogger(zerolog.InfoLevel)
+			log, logbuf := logcapture.New(zerolog.InfoLevel)
 
 			err := stopSourceContainer(log, t.Context(), api, container, 10*time.Second)
 			require.NoError(t, err)
@@ -812,7 +814,7 @@ func Test_stopSourceContainer(t *testing.T) {
 
 			// The mock has no expectations, so any Docker call fails the test.
 			api := mockContainer.NewMockAPIClient(t)
-			container := MockContainer(containerfixture.WithContainerState(dockerContainer.State{Running: false}))
+			container := modelfixture.Container(containerfixture.WithContainerState(dockerContainer.State{Running: false}))
 
 			err := stopSourceContainer(newTestLogger(t), t.Context(), api, container, 10*time.Second)
 			require.NoError(t, err)

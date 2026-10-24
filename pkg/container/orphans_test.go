@@ -17,6 +17,7 @@ import (
 
 	"github.com/nicholas-fedor/watchtower/internal/container/labels"
 	"github.com/nicholas-fedor/watchtower/internal/testutil/containerfixture"
+	"github.com/nicholas-fedor/watchtower/internal/testutil/modelfixture"
 	mockContainer "github.com/nicholas-fedor/watchtower/pkg/container/mocks"
 	"github.com/nicholas-fedor/watchtower/pkg/types"
 )
@@ -81,7 +82,7 @@ func TestRemoveOrphanedOrchestrators_SkipsInFlight(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 
-			orchestrator := MockContainer(
+			orchestrator := modelfixture.Container(
 				containerfixture.WithID("orch123"),
 				containerfixture.WithName("watchtower-orchestrator"),
 				containerfixture.WithLabels(map[string]string{labels.EphemeralOrchestrator: "true"}),
@@ -91,7 +92,7 @@ func TestRemoveOrphanedOrchestrators_SkipsInFlight(t *testing.T) {
 				},
 			)
 			// A container without the orchestrator label is never removed.
-			app := MockContainer(containerfixture.WithID("app123"), containerfixture.WithName("app"))
+			app := modelfixture.Container(containerfixture.WithID("app123"), containerfixture.WithName("app"))
 
 			client := mockContainer.NewMockClient(t)
 			client.EXPECT().ListContainers(mock.Anything).
@@ -119,7 +120,7 @@ func TestRemoveOrphanedOrchestrators_SkipsInFlight(t *testing.T) {
 func TestRemoveOrphanedOrchestrators_AlreadyGone(t *testing.T) {
 	t.Parallel()
 
-	orchestrator := MockContainer(
+	orchestrator := modelfixture.Container(
 		containerfixture.WithID("orch123"),
 		containerfixture.WithName("watchtower-orchestrator"),
 		containerfixture.WithLabels(map[string]string{labels.EphemeralOrchestrator: "true"}),

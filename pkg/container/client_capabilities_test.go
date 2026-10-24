@@ -19,6 +19,7 @@ import (
 	mockContainer "github.com/nicholas-fedor/watchtower/internal/container/mocks"
 	"github.com/nicholas-fedor/watchtower/internal/container/provenance"
 	"github.com/nicholas-fedor/watchtower/internal/testutil/containerfixture"
+	"github.com/nicholas-fedor/watchtower/internal/testutil/modelfixture"
 	"github.com/nicholas-fedor/watchtower/pkg/types"
 )
 
@@ -75,7 +76,7 @@ func TestClientCopyFileStore(t *testing.T) {
 
 		api := mockContainer.NewMockAPIClient(t)
 		cli := &client{log: newTestLogger(t), api: api}
-		require.NoError(t, cli.SnapshotCopyFiles(t.Context(), MockContainer()))
+		require.NoError(t, cli.SnapshotCopyFiles(t.Context(), modelfixture.Container()))
 		assert.Empty(t, cli.copyFiles.snapshots)
 	})
 
@@ -96,7 +97,7 @@ func TestClientCopyFileStore(t *testing.T) {
 			}, nil)
 
 		cli := &client{log: newTestLogger(t), api: api}
-		source := MockContainer(containerfixture.WithLabels(map[string]string{
+		source := modelfixture.Container(containerfixture.WithLabels(map[string]string{
 			labels.CopyFile: "/app/config.yaml",
 		}))
 		require.NoError(t, cli.SnapshotCopyFiles(t.Context(), source))
@@ -108,7 +109,7 @@ func TestClientCopyFileStore(t *testing.T) {
 		t.Parallel()
 
 		cli := &client{log: newTestLogger(t), api: mockContainer.NewMockAPIClient(t)}
-		err := cli.SnapshotCopyFiles(t.Context(), MockContainer(containerfixture.WithLabels(map[string]string{
+		err := cli.SnapshotCopyFiles(t.Context(), modelfixture.Container(containerfixture.WithLabels(map[string]string{
 			labels.CopyFile: "relative.conf",
 		})))
 		require.ErrorIs(t, err, errCopyFileInvalidPath)
@@ -118,14 +119,14 @@ func TestClientCopyFileStore(t *testing.T) {
 		t.Parallel()
 
 		cli := &client{log: newTestLogger(t), api: mockContainer.NewMockAPIClient(t)}
-		require.NoError(t, cli.injectStoredCopyFiles(t.Context(), MockContainer(), "new-id"))
+		require.NoError(t, cli.injectStoredCopyFiles(t.Context(), modelfixture.Container(), "new-id"))
 	})
 
 	t.Run("inject writes then drops snapshot", func(t *testing.T) {
 		t.Parallel()
 
 		tarBytes := mustFileTar(t, "config.yaml", []byte("setting=1"))
-		source := MockContainer()
+		source := modelfixture.Container()
 		api := mockContainer.NewMockAPIClient(t)
 		expectDaemonInfo(api)
 		api.EXPECT().
@@ -153,7 +154,7 @@ func TestClientCopyFileStore(t *testing.T) {
 	t.Run("inject failure still drops snapshot", func(t *testing.T) {
 		t.Parallel()
 
-		source := MockContainer()
+		source := modelfixture.Container()
 		api := mockContainer.NewMockAPIClient(t)
 		expectDaemonInfo(api)
 		api.EXPECT().

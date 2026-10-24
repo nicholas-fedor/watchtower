@@ -1,11 +1,9 @@
 package api
 
 import (
-	"bytes"
 	"net/http"
 	"net/http/httptest"
 	"strings"
-	"sync"
 	"testing"
 	"testing/synctest"
 	"time"
@@ -17,6 +15,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/nicholas-fedor/watchtower/internal/api/routes"
+	"github.com/nicholas-fedor/watchtower/internal/testutil/logcapture"
 )
 
 // newTestLogger returns a logger that writes each event to the test's log, so a
@@ -302,32 +301,9 @@ func TestTimeoutMiddleware_Timeout(t *testing.T) {
 	})
 }
 
-// lockedBuffer is a bytes.Buffer that is safe to write from a server goroutine
-// while the test reads it.
-type lockedBuffer struct {
-	mu  sync.Mutex
-	buf bytes.Buffer
-}
-
-// Write appends p to the buffer.
-func (b *lockedBuffer) Write(p []byte) (int, error) {
-	b.mu.Lock()
-	defer b.mu.Unlock()
-
-	return b.buf.Write(p)
-}
-
-// String returns the buffer contents.
-func (b *lockedBuffer) String() string {
-	b.mu.Lock()
-	defer b.mu.Unlock()
-
-	return b.buf.String()
-}
-
 func TestNew_OnListenHook(t *testing.T) {
 	// The listen hook logs from the server goroutine while the test polls.
-	var buf lockedBuffer
+	var buf logcapture.Buffer
 
 	logger := zerolog.New(&buf).Level(zerolog.DebugLevel)
 

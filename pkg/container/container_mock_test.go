@@ -23,25 +23,12 @@ import (
 	"github.com/nicholas-fedor/watchtower/internal/container"
 	mockContainer "github.com/nicholas-fedor/watchtower/internal/container/mocks"
 	"github.com/nicholas-fedor/watchtower/internal/testutil/containerfixture"
+	"github.com/nicholas-fedor/watchtower/internal/testutil/modelfixture"
 	"github.com/nicholas-fedor/watchtower/pkg/types"
 )
 
 // testTargetID is the ID the mocked daemon gives a created target container.
 const testTargetID = "new_container_id"
-
-// MockContainer builds a Container from containerfixture inspect data, with
-// updates applied in order.
-//
-// Parameters:
-//   - updates: Changes to the container or image inspect data.
-//
-// Returns:
-//   - *container.Container: Container built from the inspect data.
-func MockContainer(updates ...containerfixture.Update) *container.Container {
-	containerInfo, imageInfo := containerfixture.Inspect(updates...)
-
-	return container.NewContainer(nil, containerInfo, imageInfo)
-}
 
 // dockerImageFixture is an image whose inspect response is read from testdata.
 type dockerImageFixture struct {
@@ -328,7 +315,7 @@ func expectForceRemove(api *mockContainer.MockAPIClient) {
 func newRunningSource() *container.Container {
 	var defaultMem int64 = 60
 
-	return MockContainer(
+	return modelfixture.Container(
 		containerfixture.WithNetworkMode("bridge"),
 		containerfixture.WithContainerState(dockerContainer.State{Running: true, Status: "running"}),
 		containerfixture.WithNetworkSettings(map[string]*dockerNetwork.EndpointSettings{
@@ -417,7 +404,7 @@ func newImageAPI(t *testing.T) *mockContainer.MockAPIClient {
 // Returns:
 //   - *container.Container: The container.
 func runningImage(imageID string) *container.Container {
-	return MockContainer(
+	return modelfixture.Container(
 		containerfixture.WithImageName("test-image:latest"),
 		func(container *dockerContainer.InspectResponse, image *dockerImage.InspectResponse) {
 			container.Image = imageID

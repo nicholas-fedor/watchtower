@@ -1,14 +1,11 @@
 package recreate
 
 import (
-	"bytes"
 	"context"
 	"errors"
 	"net/netip"
 	"strings"
-	"sync"
 	"testing"
-	"time"
 
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/assert"
@@ -25,8 +22,9 @@ import (
 	"github.com/nicholas-fedor/watchtower/internal/container"
 	mockContainer "github.com/nicholas-fedor/watchtower/internal/container/mocks"
 	"github.com/nicholas-fedor/watchtower/internal/container/network"
-	"github.com/nicholas-fedor/watchtower/internal/observability/logging"
 	"github.com/nicholas-fedor/watchtower/internal/testutil/containerfixture"
+	"github.com/nicholas-fedor/watchtower/internal/testutil/logcapture"
+	"github.com/nicholas-fedor/watchtower/internal/testutil/modelfixture"
 	"github.com/nicholas-fedor/watchtower/pkg/types"
 )
 
@@ -77,7 +75,7 @@ func TestHandleCPUSettings(t *testing.T) {
 	// newHostConfig returns the create host config of a container with
 	// every CPU setting populated.
 	newHostConfig := func() *dockerContainer.HostConfig {
-		return MockContainer(
+		return modelfixture.Container(
 			WithCPUSettings(
 				defaultNanoCPUs,
 				defaultCPUShares,
@@ -92,7 +90,7 @@ func TestHandleCPUSettings(t *testing.T) {
 	t.Run("should strip all CPU settings when mode is 'none'", func(t *testing.T) {
 		t.Parallel()
 
-		log, logOutput := newCapturedLogger()
+		log, logOutput := logcapture.New(zerolog.DebugLevel)
 		hostConfig := newHostConfig()
 
 		handleCPUSettings(hostConfig, "none", false, log)
@@ -108,7 +106,7 @@ func TestHandleCPUSettings(t *testing.T) {
 	t.Run("should preserve all CPU settings when mode is 'full'", func(t *testing.T) {
 		t.Parallel()
 
-		log, logOutput := newCapturedLogger()
+		log, logOutput := logcapture.New(zerolog.DebugLevel)
 		hostConfig := newHostConfig()
 
 		handleCPUSettings(hostConfig, "full", false, log)
@@ -124,7 +122,7 @@ func TestHandleCPUSettings(t *testing.T) {
 	t.Run("should filter NanoCPUs when mode is 'auto' and isPodman is true", func(t *testing.T) {
 		t.Parallel()
 
-		log, logOutput := newCapturedLogger()
+		log, logOutput := logcapture.New(zerolog.DebugLevel)
 		hostConfig := newHostConfig()
 
 		handleCPUSettings(hostConfig, "auto", true, log)
@@ -137,7 +135,7 @@ func TestHandleCPUSettings(t *testing.T) {
 	t.Run("should preserve all CPU settings when mode is 'auto' and isPodman is false", func(t *testing.T) {
 		t.Parallel()
 
-		log, logOutput := newCapturedLogger()
+		log, logOutput := logcapture.New(zerolog.DebugLevel)
 		hostConfig := newHostConfig()
 
 		handleCPUSettings(hostConfig, "auto", false, log)
@@ -149,7 +147,7 @@ func TestHandleCPUSettings(t *testing.T) {
 	t.Run("should default to 'full' mode for unknown CPU copy mode", func(t *testing.T) {
 		t.Parallel()
 
-		log, logOutput := newCapturedLogger()
+		log, logOutput := logcapture.New(zerolog.DebugLevel)
 		hostConfig := newHostConfig()
 
 		handleCPUSettings(hostConfig, "unknown", false, log)
@@ -166,7 +164,7 @@ func TestCreateTargetContainer(t *testing.T) {
 	t.Run("should disable memory swappiness when flag is true", func(t *testing.T) {
 		t.Parallel()
 
-		log, logOutput := newCapturedLogger()
+		log, logOutput := logcapture.New(zerolog.DebugLevel)
 		source := newRunningSource()
 		api := mockContainer.NewMockAPIClient(t)
 
@@ -195,7 +193,7 @@ func TestCreateTargetContainer(t *testing.T) {
 	t.Run("should log MAC address details once", func(t *testing.T) {
 		t.Parallel()
 
-		log, logOutput := newCapturedLogger()
+		log, logOutput := logcapture.New(zerolog.DebugLevel)
 		source := newRunningSource()
 		api := mockContainer.NewMockAPIClient(t)
 		expectCreateAndRename(api, source)
@@ -212,7 +210,7 @@ func TestCreateTargetContainer(t *testing.T) {
 	t.Run("should use full network config for API >= 1.44", func(t *testing.T) {
 		t.Parallel()
 
-		log, logOutput := newCapturedLogger()
+		log, logOutput := logcapture.New(zerolog.DebugLevel)
 		source := newRunningSource()
 		api := mockContainer.NewMockAPIClient(t)
 		expectCreateAndRename(api, source)
@@ -228,7 +226,7 @@ func TestCreateTargetContainer(t *testing.T) {
 	t.Run("should handle ContainerCreate failure", func(t *testing.T) {
 		t.Parallel()
 
-		log, logOutput := newCapturedLogger()
+		log, logOutput := logcapture.New(zerolog.DebugLevel)
 		source := newRunningSource()
 		api := mockContainer.NewMockAPIClient(t)
 		api.EXPECT().ContainerCreate(mock.Anything, mock.Anything).
@@ -244,7 +242,7 @@ func TestCreateTargetContainer(t *testing.T) {
 	t.Run("should log successful container creation", func(t *testing.T) {
 		t.Parallel()
 
-		log, logOutput := newCapturedLogger()
+		log, logOutput := logcapture.New(zerolog.DebugLevel)
 		source := newRunningSource()
 		api := mockContainer.NewMockAPIClient(t)
 		expectCreateAndRename(api, source)
@@ -259,7 +257,7 @@ func TestCreateTargetContainer(t *testing.T) {
 	t.Run("should handle ContainerCreate Conflict error", func(t *testing.T) {
 		t.Parallel()
 
-		log, logOutput := newCapturedLogger()
+		log, logOutput := logcapture.New(zerolog.DebugLevel)
 		source := newRunningSource()
 		api := mockContainer.NewMockAPIClient(t)
 		api.EXPECT().ContainerCreate(mock.Anything, mock.Anything).
@@ -277,7 +275,7 @@ func TestCreateTargetContainer(t *testing.T) {
 	t.Run("should handle ContainerCreate InvalidArgument error", func(t *testing.T) {
 		t.Parallel()
 
-		log, _ := newCapturedLogger()
+		log, _ := logcapture.New(zerolog.DebugLevel)
 		source := newRunningSource()
 		api := mockContainer.NewMockAPIClient(t)
 		api.EXPECT().ContainerCreate(mock.Anything, mock.Anything).
@@ -292,7 +290,7 @@ func TestCreateTargetContainer(t *testing.T) {
 	t.Run("should attach multiple networks for legacy API and handle success", func(t *testing.T) {
 		t.Parallel()
 
-		log, logOutput := newCapturedLogger()
+		log, logOutput := logcapture.New(zerolog.DebugLevel)
 		source := newMultiNetworkSource()
 		api := mockContainer.NewMockAPIClient(t)
 		expectCreateAndRename(api, source)
@@ -312,7 +310,7 @@ func TestCreateTargetContainer(t *testing.T) {
 	t.Run("should attach multiple networks for legacy API and handle failure", func(t *testing.T) {
 		t.Parallel()
 
-		log, logOutput := newCapturedLogger()
+		log, logOutput := logcapture.New(zerolog.DebugLevel)
 		source := newMultiNetworkSource()
 		api := mockContainer.NewMockAPIClient(t)
 		expectCreateAndRename(api, source)
@@ -336,7 +334,7 @@ func TestCreateTargetContainer(t *testing.T) {
 			ctx, cancel := context.WithCancel(t.Context())
 			cancel()
 
-			log, _ := newCapturedLogger()
+			log, _ := logcapture.New(zerolog.DebugLevel)
 			source := newRunningSource()
 			api := mockContainer.NewMockAPIClient(t)
 			api.EXPECT().ContainerCreate(mock.Anything, mock.Anything).
@@ -358,7 +356,7 @@ func TestCreateTargetContainer(t *testing.T) {
 			ctx, cancel := context.WithCancel(t.Context())
 			cancel()
 
-			log, _ := newCapturedLogger()
+			log, _ := logcapture.New(zerolog.DebugLevel)
 			source := newMultiNetworkSource()
 			api := mockContainer.NewMockAPIClient(t)
 			expectCreateAndRename(api, source)
@@ -383,12 +381,12 @@ func TestRenameTargetContainer(t *testing.T) {
 	t.Run("should rename container successfully", func(t *testing.T) {
 		t.Parallel()
 
-		log, logOutput := newCapturedLogger()
+		log, logOutput := logcapture.New(zerolog.DebugLevel)
 		api := mockContainer.NewMockAPIClient(t)
 		api.EXPECT().ContainerRename(mock.Anything, "test-id", dockerClient.ContainerRenameOptions{NewName: "new-name"}).
 			Return(dockerClient.ContainerRenameResult{}, nil).Once()
 
-		err := RenameTarget(log, t.Context(), api, MockContainer(containerfixture.WithName("old-name"), containerfixture.WithID("test-id")), "new-name")
+		err := RenameTarget(log, t.Context(), api, modelfixture.Container(containerfixture.WithName("old-name"), containerfixture.WithID("test-id")), "new-name")
 		require.NoError(t, err)
 		assert.Contains(t, logOutput.String(), "Renamed container successfully")
 	})
@@ -396,12 +394,12 @@ func TestRenameTargetContainer(t *testing.T) {
 	t.Run("should return error when rename fails", func(t *testing.T) {
 		t.Parallel()
 
-		log, logOutput := newCapturedLogger()
+		log, logOutput := logcapture.New(zerolog.DebugLevel)
 		api := mockContainer.NewMockAPIClient(t)
 		api.EXPECT().ContainerRename(mock.Anything, "test-id", dockerClient.ContainerRenameOptions{NewName: "new-name"}).
 			Return(dockerClient.ContainerRenameResult{}, errors.New("rename failed")).Once()
 
-		err := RenameTarget(log, t.Context(), api, MockContainer(containerfixture.WithName("old-name"), containerfixture.WithID("test-id")), "new-name")
+		err := RenameTarget(log, t.Context(), api, modelfixture.Container(containerfixture.WithName("old-name"), containerfixture.WithID("test-id")), "new-name")
 		require.ErrorContains(t, err, "rename failed")
 		assert.Contains(t, logOutput.String(), "Failed to rename container")
 	})
@@ -426,7 +424,7 @@ func TestAttachNetworks(t *testing.T) {
 	t.Run("should attach additional networks successfully", func(t *testing.T) {
 		t.Parallel()
 
-		log, logOutput := newCapturedLogger()
+		log, logOutput := logcapture.New(zerolog.DebugLevel)
 		api := mockContainer.NewMockAPIClient(t)
 		api.EXPECT().NetworkConnect(mock.Anything, "network2", dockerClient.NetworkConnectOptions{
 			Container:      "container-id",
@@ -442,7 +440,7 @@ func TestAttachNetworks(t *testing.T) {
 	t.Run("should return error when network connect fails", func(t *testing.T) {
 		t.Parallel()
 
-		log, logOutput := newCapturedLogger()
+		log, logOutput := logcapture.New(zerolog.DebugLevel)
 		api := mockContainer.NewMockAPIClient(t)
 		api.EXPECT().NetworkConnect(mock.Anything, "network2", mock.Anything).
 			Return(dockerClient.NetworkConnectResult{}, errors.New("connect failed")).Once()
@@ -455,7 +453,7 @@ func TestAttachNetworks(t *testing.T) {
 	t.Run("should skip initial network and only attach additional ones", func(t *testing.T) {
 		t.Parallel()
 
-		log, logOutput := newCapturedLogger()
+		log, logOutput := logcapture.New(zerolog.DebugLevel)
 
 		err := attachNetworks(t.Context(), mockContainer.NewMockAPIClient(t), "container-id",
 			networks("network1"), networks("network1"), log)
@@ -503,7 +501,7 @@ func TestSyncComposeImageLabel(t *testing.T) {
 			},
 		}, extra...)
 
-		return MockContainer(updates...)
+		return modelfixture.Container(updates...)
 	}
 
 	// labelAPI is a mocked Docker API that records the config sent to
@@ -588,10 +586,10 @@ func TestSyncComposeImageLabel(t *testing.T) {
 	t.Run("should leave containers without the label untouched", func(t *testing.T) {
 		t.Parallel()
 
-		log, _ := newCapturedLogger()
+		log, _ := logcapture.New(zerolog.DebugLevel)
 		api := newLabelAPI(t, nil)
 
-		assert.Empty(t, create(t, log, api, MockContainer(containerfixture.WithImageName(imageRef)), "1.48"))
+		assert.Empty(t, create(t, log, api, modelfixture.Container(containerfixture.WithImageName(imageRef)), "1.48"))
 		assert.NotContains(t, api.created.Labels, "com.docker.compose.image")
 		assert.Empty(t, api.inspected)
 	})
@@ -599,7 +597,7 @@ func TestSyncComposeImageLabel(t *testing.T) {
 	t.Run("should create the container with the label pointing at the new image", func(t *testing.T) {
 		t.Parallel()
 
-		log, logOutput := newCapturedLogger()
+		log, logOutput := logcapture.New(zerolog.DebugLevel)
 
 		assert.Equal(t, newImageID, create(t, log, newLabelAPI(t, nil), composeContainer(oldImageID), "1.44"))
 		assert.Contains(t, logOutput.String(), "Updated Compose image label")
@@ -608,7 +606,7 @@ func TestSyncComposeImageLabel(t *testing.T) {
 	t.Run("should pass the client API version through for manifest digest labels", func(t *testing.T) {
 		t.Parallel()
 
-		log, _ := newCapturedLogger()
+		log, _ := logcapture.New(zerolog.DebugLevel)
 		api := newLabelAPI(t, nil)
 
 		assert.Equal(t, newAmd64, create(t, log, api, composeContainer(oldAmd64), "1.48"))
@@ -618,7 +616,7 @@ func TestSyncComposeImageLabel(t *testing.T) {
 	t.Run("should keep a label with no matching value for the new image", func(t *testing.T) {
 		t.Parallel()
 
-		log, logOutput := newCapturedLogger()
+		log, logOutput := logcapture.New(zerolog.DebugLevel)
 
 		assert.Equal(t, "sha256:unknown", create(t, log, newLabelAPI(t, nil), composeContainer("sha256:unknown"), "1.48"))
 		assert.Contains(t, logOutput.String(), "Found no matching value for Compose image label, keeping it unchanged")
@@ -627,7 +625,7 @@ func TestSyncComposeImageLabel(t *testing.T) {
 	t.Run("should keep the label and still create the container when the image inspect fails", func(t *testing.T) {
 		t.Parallel()
 
-		log, logOutput := newCapturedLogger()
+		log, logOutput := logcapture.New(zerolog.DebugLevel)
 
 		assert.Equal(t, oldImageID, create(t, log, newLabelAPI(t, cerrdefs.ErrNotFound), composeContainer(oldImageID), "1.48"))
 		assert.Contains(t, logOutput.String(), "Failed to resolve Compose image label, keeping it unchanged")
@@ -636,7 +634,7 @@ func TestSyncComposeImageLabel(t *testing.T) {
 	t.Run("should not modify the source container's labels", func(t *testing.T) {
 		t.Parallel()
 
-		log, _ := newCapturedLogger()
+		log, _ := logcapture.New(zerolog.DebugLevel)
 		source := composeContainer(oldImageID, func(_ *dockerContainer.InspectResponse, i *dockerImage.InspectResponse) {
 			i.Config = nil
 		})
@@ -648,20 +646,6 @@ func TestSyncComposeImageLabel(t *testing.T) {
 
 // testTargetID is the ID the mocked daemon gives a created target container.
 const testTargetID = "new_container_id"
-
-// MockContainer builds a Container from containerfixture inspect data, with
-// updates applied in order.
-//
-// Parameters:
-//   - updates: Changes to the container or image inspect data.
-//
-// Returns:
-//   - *container.Container: Container built from the inspect data.
-func MockContainer(updates ...containerfixture.Update) *container.Container {
-	containerInfo, imageInfo := containerfixture.Inspect(updates...)
-
-	return container.NewContainer(nil, containerInfo, imageInfo)
-}
 
 // expectForceRemove expects the target container to be force-removed with a
 // context that is not canceled, so cleanup survives a canceled parent.
@@ -683,7 +667,7 @@ func expectForceRemove(api *mockContainer.MockAPIClient) {
 func newRunningSource() *container.Container {
 	var defaultMem int64 = 60
 
-	return MockContainer(
+	return modelfixture.Container(
 		containerfixture.WithNetworkMode("bridge"),
 		containerfixture.WithContainerState(dockerContainer.State{Running: true, Status: "running"}),
 		containerfixture.WithNetworkSettings(map[string]*dockerNetwork.EndpointSettings{
@@ -707,58 +691,9 @@ func newRunningSource() *container.Container {
 // newMultiNetworkSource returns a running source container attached
 // to two networks.
 func newMultiNetworkSource() *container.Container {
-	return MockContainer(
+	return modelfixture.Container(
 		containerfixture.WithNetworkMode("bridge"),
 		containerfixture.WithContainerState(dockerContainer.State{Running: true, Status: "running"}),
 		containerfixture.WithNetworks("network1", "network2"),
 	)
-}
-
-// lockedBuffer is a buffer that is safe for concurrent writes, for logs that
-// goroutines started by a test write while the test reads them.
-type lockedBuffer struct {
-	// mu guards buf.
-	mu sync.Mutex
-	// buf holds the written bytes.
-	buf bytes.Buffer
-}
-
-// Write appends p to the buffer.
-//
-// Parameters:
-//   - p: Bytes to append.
-//
-// Returns:
-//   - int: Number of bytes written.
-//   - error: Always nil.
-func (b *lockedBuffer) Write(p []byte) (int, error) {
-	b.mu.Lock()
-	defer b.mu.Unlock()
-
-	return b.buf.Write(p)
-}
-
-// String returns everything written so far.
-//
-// Returns:
-//   - string: The buffer's contents.
-func (b *lockedBuffer) String() string {
-	b.mu.Lock()
-	defer b.mu.Unlock()
-
-	return b.buf.String()
-}
-
-// newCapturedLogger returns a debug-level logfmt logger that writes to a buffer
-// the test reads, in the format production logs use.
-//
-// Returns:
-//   - *zerolog.Logger: Logger writing to the buffer.
-//   - *lockedBuffer: Buffer holding the logged lines.
-func newCapturedLogger() (*zerolog.Logger, *lockedBuffer) {
-	buf := &lockedBuffer{}
-	w := logging.LogfmtWriter(buf)
-	w.TimeFormat = time.RFC3339
-
-	return new(zerolog.New(w).Level(zerolog.DebugLevel).With().Timestamp().Logger()), buf
 }

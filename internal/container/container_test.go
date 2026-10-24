@@ -31,6 +31,9 @@ const webContainerName = "web"
 // MockContainer builds a Container from containerfixture inspect data, with
 // updates applied in order.
 //
+// Tests in other packages use modelfixture.Container. It imports this package,
+// so these tests keep their own copy to avoid an import cycle.
+//
 // Parameters:
 //   - updates: Changes to the container or image inspect data.
 //

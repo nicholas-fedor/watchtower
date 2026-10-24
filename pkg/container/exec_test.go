@@ -11,6 +11,8 @@ import (
 	"github.com/stretchr/testify/require"
 
 	dockerClient "github.com/moby/moby/client"
+
+	"github.com/nicholas-fedor/watchtower/internal/testutil/modelfixture"
 )
 
 // TestExecuteCommand_TimeoutBoundsOutputCapture verifies that a command's
@@ -36,7 +38,7 @@ func TestExecuteCommand_TimeoutBoundsOutputCapture(t *testing.T) {
 		start := time.Now()
 
 		_, err := (&client{log: newTestLogger(t), api: api}).
-			ExecuteCommand(t.Context(), MockContainer(), "sleep infinity", 1, 0, 0)
+			ExecuteCommand(t.Context(), modelfixture.Container(), "sleep infinity", 1, 0, 0)
 
 		require.ErrorIs(t, err, context.DeadlineExceeded)
 		assert.Equal(t, time.Minute, time.Since(start))

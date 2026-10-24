@@ -20,6 +20,7 @@ import (
 	dockerImage "github.com/moby/moby/api/types/image"
 
 	"github.com/nicholas-fedor/watchtower/internal/testutil/containerfixture"
+	"github.com/nicholas-fedor/watchtower/internal/testutil/modelfixture"
 	mockContainer "github.com/nicholas-fedor/watchtower/pkg/container/mocks"
 	"github.com/nicholas-fedor/watchtower/pkg/types"
 	mockTypes "github.com/nicholas-fedor/watchtower/pkg/types/mocks"
@@ -353,7 +354,7 @@ func TestGetContainerIDFromHostname(t *testing.T) {
 				t.Setenv("HOSTNAME", hostname)
 
 				// Create a mock container with matching hostname
-				mockContainer := MockContainer(
+				mockContainer := modelfixture.Container(
 					containerfixture.WithHostname(hostname),
 					func(c *dockerContainer.InspectResponse, _ *dockerImage.InspectResponse) {
 						c.ID = string(expectedID)
@@ -372,7 +373,7 @@ func TestGetContainerIDFromHostname(t *testing.T) {
 				t.Setenv("HOSTNAME", hostname)
 
 				// Create a mock container with different hostname
-				mockContainer := MockContainer(
+				mockContainer := modelfixture.Container(
 					containerfixture.WithHostname(differentHostname),
 					func(c *dockerContainer.InspectResponse, _ *dockerImage.InspectResponse) {
 						c.ID = "different-container-id"
@@ -411,7 +412,7 @@ func TestGetContainerIDFromHostname(t *testing.T) {
 				mockContainerNilInfo.EXPECT().ContainerInfo().Return(nil)
 
 				expectedID := types.ContainerID("matching-container-id")
-				mockContainerMatching := MockContainer(
+				mockContainerMatching := modelfixture.Container(
 					containerfixture.WithHostname(hostname),
 					func(c *dockerContainer.InspectResponse, _ *dockerImage.InspectResponse) {
 						c.ID = string(expectedID)
@@ -431,14 +432,14 @@ func TestGetContainerIDFromHostname(t *testing.T) {
 				t.Setenv("HOSTNAME", hostname)
 
 				// Create containers: one with nil config, one with matching hostname
-				mockContainerNilConfig := MockContainer(
+				mockContainerNilConfig := modelfixture.Container(
 					func(c *dockerContainer.InspectResponse, _ *dockerImage.InspectResponse) {
 						c.Config = nil
 					},
 				)
 
 				expectedID := types.ContainerID("matching-container-id")
-				mockContainerMatching := MockContainer(
+				mockContainerMatching := modelfixture.Container(
 					containerfixture.WithHostname(hostname),
 					func(c *dockerContainer.InspectResponse, _ *dockerImage.InspectResponse) {
 						c.ID = string(expectedID)
@@ -459,28 +460,28 @@ func TestGetContainerIDFromHostname(t *testing.T) {
 				t.Setenv("HOSTNAME", hostname)
 
 				// Create multiple containers: some with different hostnames, one matching
-				mockContainer1 := MockContainer(
+				mockContainer1 := modelfixture.Container(
 					containerfixture.WithHostname("different-hostname-1"),
 					func(c *dockerContainer.InspectResponse, _ *dockerImage.InspectResponse) {
 						c.ID = "container-1-id"
 					},
 				)
 
-				mockContainer2 := MockContainer(
+				mockContainer2 := modelfixture.Container(
 					containerfixture.WithHostname("different-hostname-2"),
 					func(c *dockerContainer.InspectResponse, _ *dockerImage.InspectResponse) {
 						c.ID = "container-2-id"
 					},
 				)
 
-				mockContainerMatching := MockContainer(
+				mockContainerMatching := modelfixture.Container(
 					containerfixture.WithHostname(hostname),
 					func(c *dockerContainer.InspectResponse, _ *dockerImage.InspectResponse) {
 						c.ID = string(expectedID)
 					},
 				)
 
-				mockContainer3 := MockContainer(
+				mockContainer3 := modelfixture.Container(
 					containerfixture.WithHostname("different-hostname-3"),
 					func(c *dockerContainer.InspectResponse, _ *dockerImage.InspectResponse) {
 						c.ID = "container-3-id"
@@ -500,7 +501,7 @@ func TestGetContainerIDFromHostname(t *testing.T) {
 				t.Setenv("HOSTNAME", hostname)
 
 				// Create a non-Watchtower container with matching hostname (first match)
-				nonWatchtowerContainer := MockContainer(
+				nonWatchtowerContainer := modelfixture.Container(
 					containerfixture.WithHostname(hostname),
 					func(c *dockerContainer.InspectResponse, _ *dockerImage.InspectResponse) {
 						c.ID = "non-watchtower-id"
@@ -508,7 +509,7 @@ func TestGetContainerIDFromHostname(t *testing.T) {
 				)
 
 				// Create a Watchtower container with matching hostname (second match)
-				watchtowerContainer := MockContainer(
+				watchtowerContainer := modelfixture.Container(
 					containerfixture.WithHostname(hostname),
 					containerfixture.WithLabels(map[string]string{
 						"com.centurylinklabs.watchtower": "true",
@@ -531,7 +532,7 @@ func TestGetContainerIDFromHostname(t *testing.T) {
 				t.Setenv("HOSTNAME", hostname)
 
 				// Old first in list (simulates arbitrary daemon order)
-				oldContainer := MockContainer(
+				oldContainer := modelfixture.Container(
 					containerfixture.WithHostname(hostname),
 					containerfixture.WithName("watchtower-old-6bfdffce0700"),
 					containerfixture.WithLabels(map[string]string{
@@ -543,7 +544,7 @@ func TestGetContainerIDFromHostname(t *testing.T) {
 				)
 
 				// Main (non-old) Watchtower
-				mainNamed := MockContainer(
+				mainNamed := modelfixture.Container(
 					containerfixture.WithHostname(hostname),
 					containerfixture.WithName("watchtower"),
 					containerfixture.WithLabels(map[string]string{
@@ -643,7 +644,7 @@ func TestGetCurrentContainerID(t *testing.T) {
 				// No mountinfo or cgroup file, so both cgroup detections fail.
 
 				// Create a mock container with matching hostname
-				mockContainer := MockContainer(
+				mockContainer := modelfixture.Container(
 					containerfixture.WithHostname(hostname),
 					func(c *dockerContainer.InspectResponse, _ *dockerImage.InspectResponse) {
 						c.ID = string(expectedID)

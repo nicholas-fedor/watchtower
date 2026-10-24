@@ -17,6 +17,7 @@ import (
 	"github.com/nicholas-fedor/watchtower/internal/container/labels"
 	mockContainer "github.com/nicholas-fedor/watchtower/internal/container/mocks"
 	"github.com/nicholas-fedor/watchtower/internal/testutil/containerfixture"
+	"github.com/nicholas-fedor/watchtower/internal/testutil/modelfixture"
 	mockPkgContainer "github.com/nicholas-fedor/watchtower/pkg/container/mocks"
 	"github.com/nicholas-fedor/watchtower/pkg/types"
 )
@@ -237,7 +238,7 @@ func TestEphemeralOrchestrator(t *testing.T) {
 			t.Run("should return default local socket config", func(t *testing.T) {
 				t.Parallel()
 
-				source := MockContainer(
+				source := modelfixture.Container(
 					containerfixture.WithID("source1"),
 					containerfixture.WithName("watchtower"),
 				)
@@ -257,7 +258,7 @@ func TestEphemeralOrchestrator(t *testing.T) {
 			t.Run("should detect as local", func(t *testing.T) {
 				t.Parallel()
 
-				source := MockContainer(
+				source := modelfixture.Container(
 					containerfixture.WithID("source2"),
 					containerfixture.WithName("watchtower"),
 					containerfixture.WithEnv([]string{
@@ -282,7 +283,7 @@ func TestEphemeralOrchestrator(t *testing.T) {
 			t.Run("should detect as local", func(t *testing.T) {
 				t.Parallel()
 
-				source := MockContainer(
+				source := modelfixture.Container(
 					containerfixture.WithID("source3"),
 					containerfixture.WithName("watchtower"),
 					containerfixture.WithEnv([]string{
@@ -307,7 +308,7 @@ func TestEphemeralOrchestrator(t *testing.T) {
 			t.Run("should detect as remote", func(t *testing.T) {
 				t.Parallel()
 
-				source := MockContainer(
+				source := modelfixture.Container(
 					containerfixture.WithID("source4"),
 					containerfixture.WithName("watchtower"),
 					containerfixture.WithEnv([]string{
@@ -330,7 +331,7 @@ func TestEphemeralOrchestrator(t *testing.T) {
 			t.Run("should detect as remote", func(t *testing.T) {
 				t.Parallel()
 
-				source := MockContainer(
+				source := modelfixture.Container(
 					containerfixture.WithID("source5"),
 					containerfixture.WithName("watchtower"),
 					containerfixture.WithEnv([]string{
@@ -351,7 +352,7 @@ func TestEphemeralOrchestrator(t *testing.T) {
 			t.Run("should detect as remote", func(t *testing.T) {
 				t.Parallel()
 
-				source := MockContainer(
+				source := modelfixture.Container(
 					containerfixture.WithID("source6"),
 					containerfixture.WithName("watchtower"),
 					containerfixture.WithEnv([]string{
@@ -372,7 +373,7 @@ func TestEphemeralOrchestrator(t *testing.T) {
 			t.Run("should pass through TLS settings", func(t *testing.T) {
 				t.Parallel()
 
-				source := MockContainer(
+				source := modelfixture.Container(
 					containerfixture.WithID("source7"),
 					containerfixture.WithName("watchtower"),
 					containerfixture.WithEnv([]string{
@@ -396,7 +397,7 @@ func TestEphemeralOrchestrator(t *testing.T) {
 			t.Run("should pass through API version", func(t *testing.T) {
 				t.Parallel()
 
-				source := MockContainer(
+				source := modelfixture.Container(
 					containerfixture.WithID("source8"),
 					containerfixture.WithName("watchtower"),
 					containerfixture.WithEnv([]string{
@@ -416,7 +417,7 @@ func TestEphemeralOrchestrator(t *testing.T) {
 			t.Run("should extract socket bind from source", func(t *testing.T) {
 				t.Parallel()
 
-				source := MockContainer(
+				source := modelfixture.Container(
 					containerfixture.WithID("source9"),
 					containerfixture.WithName("watchtower"),
 					containerfixture.WithBinds([]string{
@@ -438,7 +439,7 @@ func TestEphemeralOrchestrator(t *testing.T) {
 			t.Run("should return default config gracefully", func(t *testing.T) {
 				t.Parallel()
 
-				source := MockContainer(
+				source := modelfixture.Container(
 					containerfixture.WithID("source10"),
 					containerfixture.WithName("watchtower"),
 				)
@@ -461,7 +462,7 @@ func TestEphemeralOrchestrator(t *testing.T) {
 			t.Run("should return a config with correct image, command, environment, and labels", func(t *testing.T) {
 				t.Parallel()
 
-				source := MockContainer(
+				source := modelfixture.Container(
 					containerfixture.WithID("abc123def456"),
 					containerfixture.WithName("watchtower-test"),
 					containerfixture.WithImageName("watchtower:latest"),
@@ -497,7 +498,7 @@ func TestEphemeralOrchestrator(t *testing.T) {
 			t.Run("should set WT_ORCHESTRATOR_CLEANUP to true", func(t *testing.T) {
 				t.Parallel()
 
-				source := MockContainer(
+				source := modelfixture.Container(
 					containerfixture.WithID("abc123"),
 					containerfixture.WithName("watchtower"),
 					containerfixture.WithImageName("watchtower:latest"),
@@ -515,7 +516,7 @@ func TestEphemeralOrchestrator(t *testing.T) {
 			t.Run("should include an empty container chain env var", func(t *testing.T) {
 				t.Parallel()
 
-				source := MockContainer(
+				source := modelfixture.Container(
 					containerfixture.WithID("abc123"),
 					containerfixture.WithName("watchtower"),
 					containerfixture.WithImageName("watchtower:latest"),
@@ -537,7 +538,7 @@ func TestEphemeralOrchestrator(t *testing.T) {
 			t.Run("should forward Docker connection environment variables", func(t *testing.T) {
 				t.Parallel()
 
-				source := MockContainer(
+				source := modelfixture.Container(
 					containerfixture.WithID("abc123"),
 					containerfixture.WithName("watchtower"),
 					containerfixture.WithImageName("watchtower:latest"),
@@ -565,7 +566,7 @@ func TestEphemeralOrchestrator(t *testing.T) {
 			t.Run("should not include Docker env vars", func(t *testing.T) {
 				t.Parallel()
 
-				source := MockContainer(
+				source := modelfixture.Container(
 					containerfixture.WithID("abc123"),
 					containerfixture.WithName("watchtower"),
 					containerfixture.WithImageName("watchtower:latest"),
@@ -586,7 +587,7 @@ func TestEphemeralOrchestrator(t *testing.T) {
 		t.Run("should return a host config with AutoRemove", func(t *testing.T) {
 			t.Parallel()
 
-			source := MockContainer()
+			source := modelfixture.Container()
 			hostConfig := buildOrchestratorHostConfig(nil, source)
 
 			require.NotNil(t, hostConfig)
@@ -596,7 +597,7 @@ func TestEphemeralOrchestrator(t *testing.T) {
 		t.Run("should not set port bindings", func(t *testing.T) {
 			t.Parallel()
 
-			source := MockContainer()
+			source := modelfixture.Container()
 			hostConfig := buildOrchestratorHostConfig(nil, source)
 
 			assert.Nil(t, hostConfig.PortBindings)
@@ -605,7 +606,7 @@ func TestEphemeralOrchestrator(t *testing.T) {
 		t.Run("should not set a restart policy", func(t *testing.T) {
 			t.Parallel()
 
-			source := MockContainer()
+			source := modelfixture.Container()
 			hostConfig := buildOrchestratorHostConfig(nil, source)
 
 			assert.Empty(t, hostConfig.RestartPolicy.Name)
@@ -617,7 +618,7 @@ func TestEphemeralOrchestrator(t *testing.T) {
 			t.Run("should return empty binds", func(t *testing.T) {
 				t.Parallel()
 
-				source := MockContainer()
+				source := modelfixture.Container()
 				hostConfig := buildOrchestratorHostConfig(nil, source)
 
 				assert.Empty(t, hostConfig.Binds)
@@ -634,7 +635,7 @@ func TestEphemeralOrchestrator(t *testing.T) {
 					Host:    "tcp://remote:2375",
 					IsLocal: false,
 				}
-				source := MockContainer()
+				source := modelfixture.Container()
 				hostConfig := buildOrchestratorHostConfig(connConfig, source)
 
 				assert.Empty(t, hostConfig.Binds)
@@ -653,7 +654,7 @@ func TestEphemeralOrchestrator(t *testing.T) {
 					IsLocal:    true,
 					SocketBind: "/custom/docker.sock:/var/run/docker.sock",
 				}
-				source := MockContainer()
+				source := modelfixture.Container()
 				hostConfig := buildOrchestratorHostConfig(connConfig, source)
 
 				assert.Equal(t, []string{"/custom/docker.sock:/var/run/docker.sock"}, hostConfig.Binds)
@@ -675,7 +676,7 @@ func TestEphemeralOrchestrator(t *testing.T) {
 						"/host/certs:/certs/cert.pem",
 					},
 				}
-				source := MockContainer()
+				source := modelfixture.Container()
 				hostConfig := buildOrchestratorHostConfig(connConfig, source)
 
 				require.Len(t, hostConfig.Binds, 3)
@@ -700,7 +701,7 @@ func TestEphemeralOrchestrator(t *testing.T) {
 						"/host/certs:/certs",
 					},
 				}
-				source := MockContainer()
+				source := modelfixture.Container()
 				hostConfig := buildOrchestratorHostConfig(connConfig, source)
 
 				assert.Equal(t, []string{"/host/certs:/certs"}, hostConfig.Binds)
@@ -714,7 +715,7 @@ func TestEphemeralOrchestrator(t *testing.T) {
 			t.Run("should inherit the source NetworkMode", func(t *testing.T) {
 				t.Parallel()
 
-				source := MockContainer(containerfixture.WithNetworkMode("host"))
+				source := modelfixture.Container(containerfixture.WithNetworkMode("host"))
 				hostConfig := buildOrchestratorHostConfig(nil, source)
 
 				assert.Equal(t, dockerContainer.NetworkMode("host"), hostConfig.NetworkMode)
@@ -734,7 +735,7 @@ func TestEphemeralOrchestrator(t *testing.T) {
 
 		// newSource returns the Watchtower container being replaced.
 		newSource := func() types.Container {
-			return MockContainer(
+			return modelfixture.Container(
 				containerfixture.WithID("source123"),
 				containerfixture.WithName("watchtower-source"),
 				containerfixture.WithImageName("watchtower:latest"),
@@ -845,7 +846,7 @@ func TestEphemeralOrchestrator(t *testing.T) {
 			t.Run("should return 0 removed and no error", func(t *testing.T) {
 				t.Parallel()
 
-				regularContainer := MockContainer(
+				regularContainer := modelfixture.Container(
 					containerfixture.WithID("regular123"),
 					containerfixture.WithName("regular-container"),
 					containerfixture.WithLabels(map[string]string{
@@ -871,7 +872,7 @@ func TestEphemeralOrchestrator(t *testing.T) {
 			t.Run("should remove the orchestrator and return 1", func(t *testing.T) {
 				t.Parallel()
 
-				orchestrator := MockContainer(
+				orchestrator := modelfixture.Container(
 					containerfixture.WithID("orch123"),
 					containerfixture.WithName("watchtower-orchestrator-abc"),
 					containerfixture.WithLabels(map[string]string{
@@ -905,7 +906,7 @@ func TestEphemeralOrchestrator(t *testing.T) {
 			t.Run("should remove all orchestrators and return the count", func(t *testing.T) {
 				t.Parallel()
 
-				orch1 := MockContainer(
+				orch1 := modelfixture.Container(
 					containerfixture.WithID("orch001"),
 					containerfixture.WithName("watchtower-orchestrator-001"),
 					containerfixture.WithLabels(map[string]string{
@@ -913,7 +914,7 @@ func TestEphemeralOrchestrator(t *testing.T) {
 					}),
 					orphaned,
 				)
-				orch2 := MockContainer(
+				orch2 := modelfixture.Container(
 					containerfixture.WithID("orch002"),
 					containerfixture.WithName("watchtower-orchestrator-002"),
 					containerfixture.WithLabels(map[string]string{
@@ -921,7 +922,7 @@ func TestEphemeralOrchestrator(t *testing.T) {
 					}),
 					orphaned,
 				)
-				regular := MockContainer(
+				regular := modelfixture.Container(
 					containerfixture.WithID("regular1"),
 					containerfixture.WithName("app-container"),
 				)
@@ -976,7 +977,7 @@ func TestEphemeralOrchestrator(t *testing.T) {
 			t.Run("should continue and remove others, returning partial count", func(t *testing.T) {
 				t.Parallel()
 
-				orch1 := MockContainer(
+				orch1 := modelfixture.Container(
 					containerfixture.WithID("orch001"),
 					containerfixture.WithName("watchtower-orchestrator-001"),
 					containerfixture.WithLabels(map[string]string{
@@ -984,7 +985,7 @@ func TestEphemeralOrchestrator(t *testing.T) {
 					}),
 					orphaned,
 				)
-				orch2 := MockContainer(
+				orch2 := modelfixture.Container(
 					containerfixture.WithID("orch002"),
 					containerfixture.WithName("watchtower-orchestrator-002"),
 					containerfixture.WithLabels(map[string]string{
@@ -1025,7 +1026,7 @@ func TestEphemeralOrchestrator(t *testing.T) {
 			t.Run("should skip the container without error", func(t *testing.T) {
 				t.Parallel()
 
-				noLabelContainer := MockContainer(
+				noLabelContainer := modelfixture.Container(
 					containerfixture.WithID("no-label"),
 					containerfixture.WithName("no-label-container"),
 				)
@@ -1147,7 +1148,7 @@ func TestExtractDockerConnectionConfig_DockerHostSocket(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 
-			source := MockContainer(
+			source := modelfixture.Container(
 				containerfixture.WithID("source"),
 				containerfixture.WithName("watchtower"),
 				containerfixture.WithEnv([]string{"DOCKER_HOST=" + tt.host}),

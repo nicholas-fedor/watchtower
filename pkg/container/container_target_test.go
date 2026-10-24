@@ -16,6 +16,8 @@ import (
 
 	mockContainer "github.com/nicholas-fedor/watchtower/internal/container/mocks"
 	"github.com/nicholas-fedor/watchtower/internal/testutil/containerfixture"
+	"github.com/nicholas-fedor/watchtower/internal/testutil/logcapture"
+	"github.com/nicholas-fedor/watchtower/internal/testutil/modelfixture"
 	"github.com/nicholas-fedor/watchtower/pkg/types"
 )
 
@@ -46,8 +48,8 @@ func TestStartTargetContainer(t *testing.T) {
 	t.Run("should skip starting stopped container when reviveStopped is false", func(t *testing.T) {
 		t.Parallel()
 
-		log, logOutput := newCapturedLogger(zerolog.DebugLevel)
-		source := MockContainer(
+		log, logOutput := logcapture.New(zerolog.DebugLevel)
+		source := modelfixture.Container(
 			containerfixture.WithNetworkMode("bridge"),
 			containerfixture.WithContainerState(dockerContainer.State{Running: false, Status: "exited"}),
 		)
@@ -59,7 +61,7 @@ func TestStartTargetContainer(t *testing.T) {
 	t.Run("should handle ContainerStart failure", func(t *testing.T) {
 		t.Parallel()
 
-		log, logOutput := newCapturedLogger(zerolog.DebugLevel)
+		log, logOutput := logcapture.New(zerolog.DebugLevel)
 		api := mockContainer.NewMockAPIClient(t)
 		api.EXPECT().ContainerStart(mock.Anything, testTargetID, dockerClient.ContainerStartOptions{}).
 			Return(dockerClient.ContainerStartResult{}, errors.New("start failed")).Once()
@@ -73,7 +75,7 @@ func TestStartTargetContainer(t *testing.T) {
 	t.Run("should skip cleanup when container is running after start timeout", func(t *testing.T) {
 		t.Parallel()
 
-		log, logOutput := newCapturedLogger(zerolog.DebugLevel)
+		log, logOutput := logcapture.New(zerolog.DebugLevel)
 		api := mockContainer.NewMockAPIClient(t)
 		api.EXPECT().ContainerStart(mock.Anything, testTargetID, dockerClient.ContainerStartOptions{}).
 			Return(dockerClient.ContainerStartResult{}, context.DeadlineExceeded).Once()
@@ -86,7 +88,7 @@ func TestStartTargetContainer(t *testing.T) {
 	t.Run("should skip cleanup when inspect fails after transport error", func(t *testing.T) {
 		t.Parallel()
 
-		log, logOutput := newCapturedLogger(zerolog.DebugLevel)
+		log, logOutput := logcapture.New(zerolog.DebugLevel)
 		api := mockContainer.NewMockAPIClient(t)
 		api.EXPECT().ContainerStart(mock.Anything, testTargetID, dockerClient.ContainerStartOptions{}).
 			Return(dockerClient.ContainerStartResult{}, errors.New("connection reset by peer")).Once()
@@ -100,7 +102,7 @@ func TestStartTargetContainer(t *testing.T) {
 	t.Run("should handle ContainerStart Conflict error", func(t *testing.T) {
 		t.Parallel()
 
-		log, logOutput := newCapturedLogger(zerolog.DebugLevel)
+		log, logOutput := logcapture.New(zerolog.DebugLevel)
 		api := mockContainer.NewMockAPIClient(t)
 		api.EXPECT().ContainerStart(mock.Anything, testTargetID, dockerClient.ContainerStartOptions{}).
 			Return(dockerClient.ContainerStartResult{}, cerrdefs.ErrConflict).Once()
@@ -116,7 +118,7 @@ func TestStartTargetContainer(t *testing.T) {
 	t.Run("should handle ContainerStart NotFound error", func(t *testing.T) {
 		t.Parallel()
 
-		log, _ := newCapturedLogger(zerolog.DebugLevel)
+		log, _ := logcapture.New(zerolog.DebugLevel)
 		api := mockContainer.NewMockAPIClient(t)
 		api.EXPECT().ContainerStart(mock.Anything, testTargetID, dockerClient.ContainerStartOptions{}).
 			Return(dockerClient.ContainerStartResult{}, cerrdefs.ErrNotFound).Once()
@@ -129,7 +131,7 @@ func TestStartTargetContainer(t *testing.T) {
 	t.Run("should log successful container start", func(t *testing.T) {
 		t.Parallel()
 
-		log, logOutput := newCapturedLogger(zerolog.DebugLevel)
+		log, logOutput := logcapture.New(zerolog.DebugLevel)
 		api := mockContainer.NewMockAPIClient(t)
 		api.EXPECT().ContainerStart(mock.Anything, testTargetID, dockerClient.ContainerStartOptions{}).
 			Return(dockerClient.ContainerStartResult{}, nil).Once()
