@@ -18,8 +18,8 @@ import (
 	dockerNetwork "github.com/moby/moby/api/types/network"
 	dockerClient "github.com/moby/moby/client"
 
+	mockContainer "github.com/nicholas-fedor/watchtower/internal/container/mocks"
 	"github.com/nicholas-fedor/watchtower/internal/observability/logging"
-	mockContainer "github.com/nicholas-fedor/watchtower/pkg/container/mocks"
 )
 
 // newTestLogger returns a logger that writes each event to the test's log, so a

@@ -19,12 +19,12 @@ import (
 	dockerClient "github.com/moby/moby/client"
 
 	"github.com/nicholas-fedor/watchtower/internal/container"
+	mockContainer "github.com/nicholas-fedor/watchtower/internal/container/mocks"
 	"github.com/nicholas-fedor/watchtower/internal/registry/digest"
 	"github.com/nicholas-fedor/watchtower/internal/registry/ratelimit"
 	registryConfig "github.com/nicholas-fedor/watchtower/internal/settings/config/registry"
 	"github.com/nicholas-fedor/watchtower/internal/testutil/containerfixture"
 	"github.com/nicholas-fedor/watchtower/internal/testutil/httpstub"
-	mockContainer "github.com/nicholas-fedor/watchtower/pkg/container/mocks"
 	"github.com/nicholas-fedor/watchtower/pkg/types"
 )
 

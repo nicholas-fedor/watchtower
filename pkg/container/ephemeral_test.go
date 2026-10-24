@@ -15,8 +15,9 @@ import (
 	dockerClient "github.com/moby/moby/client"
 
 	"github.com/nicholas-fedor/watchtower/internal/container/labels"
+	mockContainer "github.com/nicholas-fedor/watchtower/internal/container/mocks"
 	"github.com/nicholas-fedor/watchtower/internal/testutil/containerfixture"
-	mockContainer "github.com/nicholas-fedor/watchtower/pkg/container/mocks"
+	mockPkgContainer "github.com/nicholas-fedor/watchtower/pkg/container/mocks"
 	"github.com/nicholas-fedor/watchtower/pkg/types"
 )
 
@@ -826,7 +827,7 @@ func TestEphemeralOrchestrator(t *testing.T) {
 			t.Run("should return 0 removed and no error", func(t *testing.T) {
 				t.Parallel()
 
-				mockAPIClient := mockContainer.NewMockClient(t)
+				mockAPIClient := mockPkgContainer.NewMockClient(t)
 				mockAPIClient.EXPECT().
 					ListContainers(ctx).
 					Return([]types.Container{}, nil)
@@ -852,7 +853,7 @@ func TestEphemeralOrchestrator(t *testing.T) {
 					}),
 				)
 
-				mockAPIClient := mockContainer.NewMockClient(t)
+				mockAPIClient := mockPkgContainer.NewMockClient(t)
 				mockAPIClient.EXPECT().
 					ListContainers(ctx).
 					Return([]types.Container{regularContainer}, nil)
@@ -879,7 +880,7 @@ func TestEphemeralOrchestrator(t *testing.T) {
 					orphaned,
 				)
 
-				mockAPIClient := mockContainer.NewMockClient(t)
+				mockAPIClient := mockPkgContainer.NewMockClient(t)
 				mockAPIClient.EXPECT().
 					ListContainers(ctx).
 					Return([]types.Container{orchestrator}, nil)
@@ -925,7 +926,7 @@ func TestEphemeralOrchestrator(t *testing.T) {
 					containerfixture.WithName("app-container"),
 				)
 
-				mockAPIClient := mockContainer.NewMockClient(t)
+				mockAPIClient := mockPkgContainer.NewMockClient(t)
 				mockAPIClient.EXPECT().
 					ListContainers(ctx).
 					Return([]types.Container{orch1, regular, orch2}, nil)
@@ -957,7 +958,7 @@ func TestEphemeralOrchestrator(t *testing.T) {
 			t.Run("should return an error", func(t *testing.T) {
 				t.Parallel()
 
-				mockAPIClient := mockContainer.NewMockClient(t)
+				mockAPIClient := mockPkgContainer.NewMockClient(t)
 				mockAPIClient.EXPECT().
 					ListContainers(ctx).
 					Return(nil, errors.New("docker daemon unavailable"))
@@ -992,7 +993,7 @@ func TestEphemeralOrchestrator(t *testing.T) {
 					orphaned,
 				)
 
-				mockAPIClient := mockContainer.NewMockClient(t)
+				mockAPIClient := mockPkgContainer.NewMockClient(t)
 				mockAPIClient.EXPECT().
 					ListContainers(ctx).
 					Return([]types.Container{orch1, orch2}, nil)
@@ -1029,7 +1030,7 @@ func TestEphemeralOrchestrator(t *testing.T) {
 					containerfixture.WithName("no-label-container"),
 				)
 
-				mockAPIClient := mockContainer.NewMockClient(t)
+				mockAPIClient := mockPkgContainer.NewMockClient(t)
 				mockAPIClient.EXPECT().
 					ListContainers(ctx).
 					Return([]types.Container{noLabelContainer}, nil)

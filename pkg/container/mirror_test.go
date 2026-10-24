@@ -16,9 +16,9 @@ import (
 	dockerSystem "github.com/moby/moby/api/types/system"
 	dockerClient "github.com/moby/moby/client"
 
+	mockContainer "github.com/nicholas-fedor/watchtower/internal/container/mocks"
 	"github.com/nicholas-fedor/watchtower/internal/registry/ratelimit"
 	registryConfig "github.com/nicholas-fedor/watchtower/internal/settings/config/registry"
-	mockContainer "github.com/nicholas-fedor/watchtower/pkg/container/mocks"
 )
 
 func Test_imageClient_buildMirrorEndpoints(t *testing.T) {
