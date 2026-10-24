@@ -11,10 +11,10 @@ import (
 	dockerspec "github.com/moby/docker-image-spec/specs-go/v1"
 	dockerClient "github.com/moby/moby/client"
 
+	mockContainer "github.com/nicholas-fedor/watchtower/internal/container/mocks"
 	"github.com/nicholas-fedor/watchtower/internal/container/oci"
 	"github.com/nicholas-fedor/watchtower/internal/registry/ratelimit"
 	registryConfig "github.com/nicholas-fedor/watchtower/internal/settings/config/registry"
-	mockContainer "github.com/nicholas-fedor/watchtower/pkg/container/mocks"
 )
 
 // newAnnotationsAPI returns a mocked Docker API that serves imageConfig for one

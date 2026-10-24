@@ -70,14 +70,15 @@ packages:
   # Top-level internal directory, recursively includes all subpackages (e.g., internal/update)
   github.com/nicholas-fedor/watchtower/internal: {}
 
-  # The Docker SDK's client, which the container package's tests use in place of a Docker
+  # The Docker SDK's client, which the container packages' tests use in place of a Docker
   # daemon, and the image pull response a mocked ImagePull returns. Only these interfaces
-  # are generated, into pkg/container/mocks.
+  # are generated. They go into internal/container/mocks, which imports no Watchtower code,
+  # so every container package's tests can import it.
   github.com/moby/moby/client:
     config:
       all: false
       recursive: false
-      dir: pkg/container/mocks
+      dir: internal/container/mocks
     interfaces:
       APIClient: {}
       ImagePullResponse: {}
