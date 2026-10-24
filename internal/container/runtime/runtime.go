@@ -1,4 +1,4 @@
-package container
+package runtime
 
 import (
 	"context"
@@ -25,7 +25,7 @@ const (
 	runtimePodman
 )
 
-// detectRuntime determines the container runtime using multiple detection methods.
+// IsPodman reports whether the container runtime is Podman, using several detection methods.
 //
 // It iterates through detection helpers in priority order, returning as soon as one
 // helper indicates Podman/Docker or an error occurs.
@@ -39,7 +39,7 @@ const (
 // Returns:
 //   - bool: True if Podman is detected, false otherwise.
 //   - error: Non-nil if detection fails, nil on success.
-func detectRuntime(
+func IsPodman(
 	log *zerolog.Logger,
 	ctx context.Context,
 	api dockerClient.APIClient,

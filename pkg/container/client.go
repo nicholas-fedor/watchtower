@@ -23,6 +23,7 @@ import (
 	"github.com/nicholas-fedor/watchtower/internal/container/network"
 	"github.com/nicholas-fedor/watchtower/internal/container/oci"
 	"github.com/nicholas-fedor/watchtower/internal/container/recreate"
+	containerRuntime "github.com/nicholas-fedor/watchtower/internal/container/runtime"
 	"github.com/nicholas-fedor/watchtower/internal/registry/ratelimit"
 	registryConfig "github.com/nicholas-fedor/watchtower/internal/settings/config/registry"
 	"github.com/nicholas-fedor/watchtower/pkg/types"
@@ -1435,7 +1436,7 @@ func (c *client) getRuntime(ctx context.Context) bool {
 		return c.isPodman
 	}
 
-	isPodman, err := detectRuntime(c.logger(), ctx, c.api, c.Fs)
+	isPodman, err := containerRuntime.IsPodman(c.logger(), ctx, c.api, c.Fs)
 	if err != nil {
 		c.logger().Debug().
 			Err(err).
