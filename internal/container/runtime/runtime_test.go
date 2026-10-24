@@ -2,6 +2,7 @@ package runtime
 
 import (
 	"errors"
+	"io/fs"
 	"os"
 	"testing"
 	"testing/fstest"
@@ -16,6 +17,54 @@ import (
 
 	mockContainer "github.com/nicholas-fedor/watchtower/internal/container/mocks"
 )
+
+// deniedFS serves files from a map but denies a stat of the listed paths, as a
+// marker file the process may not read would.
+type deniedFS struct {
+	fstest.MapFS
+
+	// denied holds the paths whose stat fails with fs.ErrPermission.
+	denied map[string]bool
+}
+
+// Stat returns fs.ErrPermission for a denied path and the map's file otherwise.
+//
+// Parameters:
+//   - name: Path to stat.
+//
+// Returns:
+//   - fs.FileInfo: Information about the file.
+//   - error: fs.ErrPermission for a denied path, or the map's error.
+func (f deniedFS) Stat(name string) (fs.FileInfo, error) {
+	if f.denied[name] {
+		return nil, &fs.PathError{Op: "stat", Path: name, Err: fs.ErrPermission}
+	}
+
+	return f.MapFS.Stat(name)
+}
+
+// newDeniedFS returns a filesystem with the given marker files that denies a
+// stat of the denied paths.
+//
+// Parameters:
+//   - markers: Paths of the marker files that exist.
+//   - denied: Paths whose stat fails with fs.ErrPermission.
+//
+// Returns:
+//   - deniedFS: The filesystem.
+func newDeniedFS(markers, denied []string) deniedFS {
+	files := fstest.MapFS{}
+	for _, marker := range markers {
+		files[marker] = &fstest.MapFile{}
+	}
+
+	deniedPaths := map[string]bool{}
+	for _, path := range denied {
+		deniedPaths[path] = true
+	}
+
+	return deniedFS{MapFS: files, denied: deniedPaths}
+}
 
 // TestDetectRuntimeByEnv_PodmanVariable verifies that the lowercase container
 // variable, which Podman sets, identifies Podman. It sets environment
@@ -103,14 +152,19 @@ func TestDetectRuntimeByAPI(t *testing.T) {
 }
 
 // TestDetectRuntimeByMarker verifies which runtime marker files identify Podman
-// or Docker, and that missing markers leave the runtime unknown.
+// or Docker and that missing markers leave the runtime unknown. A marker the
+// process may not read is reported with its path.
 func TestDetectRuntimeByMarker(t *testing.T) {
 	t.Parallel()
 
 	tests := []struct {
 		title   string
 		markers []string
-		want    containerRuntime
+		// denied lists the marker paths whose stat fails with a permission error.
+		denied []string
+		want   containerRuntime
+		// wantErrPaths lists the marker paths a failed check must name.
+		wantErrPaths []string
 	}{
 		{title: "should return runtimePodman when Podman marker file exists", markers: []string{"run/.containerenv"}, want: runtimePodman},
 		{title: "should return runtimeDocker when Docker marker file exists", markers: []string{".dockerenv"}, want: runtimeDocker},
@@ -120,20 +174,113 @@ func TestDetectRuntimeByMarker(t *testing.T) {
 			markers: []string{"run/.containerenv", ".dockerenv"},
 			want:    runtimePodman,
 		},
+		{
+			title:        "should report a Podman marker that cannot be read",
+			denied:       []string{"run/.containerenv"},
+			want:         runtimeUnknown,
+			wantErrPaths: []string{"/run/.containerenv"},
+		},
+		{
+			title:        "should report a Docker marker that cannot be read",
+			denied:       []string{".dockerenv"},
+			want:         runtimeUnknown,
+			wantErrPaths: []string{"/.dockerenv"},
+		},
+		{
+			title:        "should report both markers when neither can be read",
+			denied:       []string{"run/.containerenv", ".dockerenv"},
+			want:         runtimeUnknown,
+			wantErrPaths: []string{"/run/.containerenv", "/.dockerenv"},
+		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.title, func(t *testing.T) {
 			t.Parallel()
 
-			memFs := fstest.MapFS{}
-			for _, marker := range tt.markers {
-				memFs[marker] = &fstest.MapFile{}
+			result, err := detectRuntimeByMarker(newTestLogger(t), newDeniedFS(tt.markers, tt.denied))
+			assert.Equal(t, tt.want, result)
+
+			if tt.wantErrPaths == nil {
+				require.NoError(t, err)
+
+				return
 			}
 
-			result, err := detectRuntimeByMarker(newTestLogger(t), memFs)
+			require.ErrorIs(t, err, fs.ErrPermission)
+
+			for _, path := range tt.wantErrPaths {
+				assert.ErrorContains(t, err, path)
+			}
+		})
+	}
+}
+
+// TestIsPodman verifies the order of the detection steps. A marker file decides
+// before the environment, and the environment decides before the daemon. A
+// marker that cannot be read stops detection with its error. The mocked daemon
+// has no expectations unless a case lists them, so a step that should not run
+// fails the test. The cases set environment variables, so they run
+// sequentially.
+func TestIsPodman(t *testing.T) {
+	tests := []struct {
+		name string
+		fsys fs.FS
+		// containerEnv is the value of the container variable Podman sets.
+		containerEnv string
+		// info, when set, is the daemon info the API step receives.
+		info    *dockerSystem.Info
+		want    bool
+		wantErr bool
+	}{
+		{
+			name:         "a marker that cannot be read stops detection",
+			fsys:         newDeniedFS(nil, []string{"run/.containerenv"}),
+			containerEnv: "podman",
+			wantErr:      true,
+		},
+		{
+			name:         "a Docker marker wins over the Podman environment",
+			fsys:         fstest.MapFS{".dockerenv": &fstest.MapFile{}},
+			containerEnv: "podman",
+			want:         false,
+		},
+		{
+			name:         "the Podman environment skips the daemon",
+			fsys:         fstest.MapFS{},
+			containerEnv: "podman",
+			want:         true,
+		},
+		{
+			name: "the daemon decides without a marker or environment",
+			fsys: fstest.MapFS{},
+			info: &dockerSystem.Info{Name: "podman"},
+			want: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// CONTAINER is set first because Windows treats both names as one
+			// variable, so the lowercase value replaces it there.
+			t.Setenv("CONTAINER", "")
+			t.Setenv("container", tt.containerEnv)
+
+			api := newDockerAPI(t)
+			if tt.info != nil {
+				expectInfo(api, *tt.info)
+			}
+
+			got, err := IsPodman(newTestLogger(t), t.Context(), api, tt.fsys)
+			if tt.wantErr {
+				require.ErrorIs(t, err, fs.ErrPermission)
+				assert.False(t, got)
+
+				return
+			}
+
 			require.NoError(t, err)
-			assert.Equal(t, tt.want, result)
+			assert.Equal(t, tt.want, got)
 		})
 	}
 }

@@ -1681,6 +1681,26 @@ func TestGetRuntime_RetriesFailedDetection(t *testing.T) {
 	assert.True(t, c.getRuntime(t.Context()), "the detection is cached")
 }
 
+// TestGetRuntime_NoFilesystem verifies that a client built without a
+// filesystem detects the runtime from the host's filesystem instead of
+// panicking. The host's marker files decide the result, so only the absence of
+// a panic is checked. It sets environment variables, so it runs sequentially.
+func TestGetRuntime_NoFilesystem(t *testing.T) {
+	t.Setenv("CONTAINER", "")
+	t.Setenv("container", "")
+
+	// The daemon is asked only when the host has no marker file.
+	api := newDockerAPI(t)
+	api.EXPECT().Info(mock.Anything, dockerClient.InfoOptions{}).
+		Return(dockerClient.SystemInfoResult{Info: dockerSystem.Info{Name: "docker"}}, nil).Maybe()
+	api.EXPECT().ServerVersion(mock.Anything, dockerClient.ServerVersionOptions{}).
+		Return(dockerClient.ServerVersionResult{}, nil).Maybe()
+
+	c := &client{log: newTestLogger(t), api: api, CPUCopyMode: cpuCopyModeAuto}
+
+	assert.NotPanics(t, func() { c.getRuntime(t.Context()) })
+}
+
 // TestStartContainer_StartsCreatedContainer verifies that StartContainer starts
 // the container it created, by the ID the create returned, and returns that ID.
 func TestStartContainer_StartsCreatedContainer(t *testing.T) {
