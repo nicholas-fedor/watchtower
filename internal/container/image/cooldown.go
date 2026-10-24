@@ -72,7 +72,7 @@ func (c Client) isOutsideCooldown(
 		return true, nil
 	}
 
-	clogVal := c.log.With().
+	clogVal := c.logger().With().
 		Str("container", sourceContainer.Name()).
 		Str("image", sourceContainer.ImageName()).
 		Logger()

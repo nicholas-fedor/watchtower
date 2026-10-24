@@ -21,6 +21,17 @@ import (
 	"github.com/nicholas-fedor/watchtower/pkg/types"
 )
 
+// redactedError is a build error whose text has its credentials removed.
+//
+// It matches its cause with errors.Is but does not unwrap to it, so the
+// credentialed text cannot be printed from the error chain.
+type redactedError struct {
+	// cause is the original error, which still carries the credentials.
+	cause error
+	// msg is the text of cause with the credentials removed.
+	msg string
+}
+
 // Errors for image builds.
 var (
 	// errImageBuildFailed indicates the daemon reported a build error, or wraps a build error with redacted credentials.
@@ -198,17 +209,38 @@ func auxImageID(aux json.RawMessage) string {
 	return payload.ID
 }
 
+// Error returns the text of the cause with its credentials removed.
+//
+// Returns:
+//   - string: Redacted error text.
+func (e *redactedError) Error() string {
+	return e.msg
+}
+
+// Is reports whether the original cause matches target.
+//
+// Parameters:
+//   - target: Error to match.
+//
+// Returns:
+//   - bool: True when the cause matches target.
+func (e *redactedError) Is(target error) bool {
+	return errors.Is(e.cause, target)
+}
+
 // redactBuildError removes Git credentials from a build error.
 //
 // The Docker daemon receives the credentialed remote and may echo it.
 // The original error is returned unchanged when it contains no userinfo.
+// A redacted error still matches the original cause, and it matches
+// errImageBuildFailed without repeating its text.
 //
 // Parameters:
 //   - err: Build client or stream error.
 //   - remote: Credentialed Git context URL sent to the daemon.
 //
 // Returns:
-//   - error: err, or a new error with userinfo replaced.
+//   - error: err, or an error with userinfo replaced.
 func redactBuildError(err error, remote string) error {
 	if err == nil {
 		return nil
@@ -219,5 +251,10 @@ func redactBuildError(err error, remote string) error {
 		return err
 	}
 
-	return fmt.Errorf("%w: %s", errImageBuildFailed, msg)
+	redacted := &redactedError{cause: err, msg: msg}
+	if errors.Is(err, errImageBuildFailed) {
+		return redacted
+	}
+
+	return fmt.Errorf("%w: %w", errImageBuildFailed, redacted)
 }
