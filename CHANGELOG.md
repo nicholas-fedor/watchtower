@@ -10,6 +10,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Stop nesting legacy link names on recreation by @nicholas-fedor in [#3114](https://github.com/nicholas-fedor/watchtower/pull/3114)
 - Redact camelCase credential query parameters by @nicholas-fedor in [#3112](https://github.com/nicholas-fedor/watchtower/pull/3112)
 - Bound hook output reads by their timeout and close redaction gaps by @nicholas-fedor in [#3106](https://github.com/nicholas-fedor/watchtower/pull/3106)
 - Consolidate MAC address checks on container recreation by @nicholas-fedor in [#3092](https://github.com/nicholas-fedor/watchtower/pull/3092)
