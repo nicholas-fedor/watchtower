@@ -1,9 +1,13 @@
-package container
+package network
 
 import (
+	"bytes"
 	"encoding/json"
+	"net"
 	"net/netip"
+	"sync"
 	"testing"
+	"time"
 
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/assert"
@@ -13,6 +17,8 @@ import (
 	dockerImage "github.com/moby/moby/api/types/image"
 	dockerNetwork "github.com/moby/moby/api/types/network"
 
+	"github.com/nicholas-fedor/watchtower/internal/container"
+	"github.com/nicholas-fedor/watchtower/internal/observability/logging"
 	"github.com/nicholas-fedor/watchtower/internal/testutil/containerfixture"
 	"github.com/nicholas-fedor/watchtower/pkg/types"
 )
@@ -49,7 +55,7 @@ func Test_getNetworkConfig(t *testing.T) {
 				}),
 			)
 
-			config := getNetworkConfig(newTestLogger(t), container, "1.50")
+			config := FromContainer(newTestLogger(t), container, "1.50")
 
 			require.NotNil(t, config)
 			assert.Contains(t, config.EndpointsConfig, "bridge")
@@ -71,7 +77,7 @@ func Test_getNetworkConfig(t *testing.T) {
 				containerfixture.WithNetworks("bridge", "custom_network"),
 			)
 
-			config := getNetworkConfig(newTestLogger(t), container, "1.50")
+			config := FromContainer(newTestLogger(t), container, "1.50")
 
 			require.Len(t, config.EndpointsConfig, 2)
 			assert.Contains(t, config.EndpointsConfig, "bridge")
@@ -93,7 +99,7 @@ func Test_getNetworkConfig(t *testing.T) {
 				}),
 			)
 
-			config := getNetworkConfig(newTestLogger(t), container, "1.50")
+			config := FromContainer(newTestLogger(t), container, "1.50")
 
 			require.NotNil(t, config)
 			assert.Contains(t, config.EndpointsConfig, "bridge")
@@ -123,7 +129,7 @@ func Test_getNetworkConfig(t *testing.T) {
 				}),
 			)
 
-			config := getNetworkConfig(newTestLogger(t), container, "1.50")
+			config := FromContainer(newTestLogger(t), container, "1.50")
 
 			assert.Contains(t, config.EndpointsConfig, "host")
 			endpoint := config.EndpointsConfig["host"]
@@ -151,7 +157,7 @@ func Test_getNetworkConfig(t *testing.T) {
 				}),
 			)
 
-			config := getNetworkConfig(newTestLogger(t), container, "1.40")
+			config := FromContainer(newTestLogger(t), container, "1.40")
 
 			endpoint := config.EndpointsConfig["bridge"]
 			assert.Equal(t, dockerNetwork.HardwareAddr{}, endpoint.MacAddress)
@@ -172,7 +178,7 @@ func Test_getNetworkConfig(t *testing.T) {
 				},
 			)
 
-			config := getNetworkConfig(newTestLogger(t), container, "1.50")
+			config := FromContainer(newTestLogger(t), container, "1.50")
 
 			require.NotNil(t, config)
 			assert.Empty(t, config.EndpointsConfig)
@@ -194,7 +200,7 @@ func Test_getNetworkConfig(t *testing.T) {
 				}),
 			)
 
-			config := getNetworkConfig(newTestLogger(t), container, "1.50")
+			config := FromContainer(newTestLogger(t), container, "1.50")
 
 			require.NotNil(t, config)
 			assert.Contains(t, config.EndpointsConfig, "bridge")
@@ -219,7 +225,7 @@ func Test_getNetworkConfig(t *testing.T) {
 				}),
 			)
 
-			config := getNetworkConfig(newTestLogger(t), container, "1.50")
+			config := FromContainer(newTestLogger(t), container, "1.50")
 
 			endpoint := config.EndpointsConfig["my_custom_network"]
 			assert.Equal(t, "custom_net_id", endpoint.NetworkID)
@@ -245,7 +251,7 @@ func Test_getNetworkConfig(t *testing.T) {
 			)
 
 			// Test with Podman version format
-			config := getNetworkConfig(newTestLogger(t), container, "4.0.0")
+			config := FromContainer(newTestLogger(t), container, "4.0.0")
 
 			endpoint := config.EndpointsConfig["bridge"]
 			// Should preserve MAC for modern versions
@@ -266,7 +272,7 @@ func Test_getNetworkConfig(t *testing.T) {
 				}),
 			)
 
-			config := getNetworkConfig(newTestLogger(t), container, "1.50")
+			config := FromContainer(newTestLogger(t), container, "1.50")
 
 			assert.Contains(t, config.EndpointsConfig, "valid_net")
 			assert.NotContains(t, config.EndpointsConfig, "bridge")
@@ -304,7 +310,7 @@ func Test_getNetworkConfig(t *testing.T) {
 					}),
 				)
 
-				config := getNetworkConfig(log, container, tc.clientVersion)
+				config := FromContainer(log, container, tc.clientVersion)
 
 				assert.Empty(t, config.EndpointsConfig[tc.network].MacAddress)
 				assert.Contains(t, logbuf.String(), "Skipping MAC address validation for host network or legacy API")
@@ -322,14 +328,14 @@ func Test_newEmptyNetworkConfig(t *testing.T) {
 	t.Run("should create a non-nil network config", func(t *testing.T) {
 		t.Parallel()
 
-		config := newEmptyNetworkConfig()
+		config := EmptyConfig()
 		require.NotNil(t, config)
 	})
 
 	t.Run("should initialize EndpointsConfig as an empty map", func(t *testing.T) {
 		t.Parallel()
 
-		config := newEmptyNetworkConfig()
+		config := EmptyConfig()
 		require.NotNil(t, config.EndpointsConfig)
 		assert.Empty(t, config.EndpointsConfig)
 		assert.Equal(t, make(map[string]*dockerNetwork.EndpointSettings), config.EndpointsConfig)
@@ -338,7 +344,7 @@ func Test_newEmptyNetworkConfig(t *testing.T) {
 	t.Run("should return a properly structured NetworkingConfig", func(t *testing.T) {
 		t.Parallel()
 
-		config := newEmptyNetworkConfig()
+		config := EmptyConfig()
 		assert.IsType(t, &dockerNetwork.NetworkingConfig{}, config)
 		assert.IsType(t, make(map[string]*dockerNetwork.EndpointSettings), config.EndpointsConfig)
 	})
@@ -346,7 +352,7 @@ func Test_newEmptyNetworkConfig(t *testing.T) {
 	t.Run("should be ready for use - can add endpoints to the map", func(t *testing.T) {
 		t.Parallel()
 
-		config := newEmptyNetworkConfig()
+		config := EmptyConfig()
 		endpoint := &dockerNetwork.EndpointSettings{
 			NetworkID: "test-network",
 		}
@@ -1390,4 +1396,100 @@ func Test_filterAliases(t *testing.T) {
 		result := filterAliases(aliases, shortID)
 		assert.Equal(t, []string{"first", "second", "third"}, result)
 	})
+}
+
+// MockContainer builds a Container from containerfixture inspect data, with
+// updates applied in order.
+//
+// Parameters:
+//   - updates: Changes to the container or image inspect data.
+//
+// Returns:
+//   - *container.Container: Container built from the inspect data.
+func MockContainer(updates ...containerfixture.Update) *container.Container {
+	containerInfo, imageInfo := containerfixture.Inspect(updates...)
+
+	return container.NewContainer(nil, containerInfo, imageInfo)
+}
+
+// lockedBuffer is a buffer that is safe for concurrent writes, for logs that
+// goroutines started by a test write while the test reads them.
+type lockedBuffer struct {
+	// mu guards buf.
+	mu sync.Mutex
+	// buf holds the written bytes.
+	buf bytes.Buffer
+}
+
+// Write appends p to the buffer.
+//
+// Parameters:
+//   - p: Bytes to append.
+//
+// Returns:
+//   - int: Number of bytes written.
+//   - error: Always nil.
+func (b *lockedBuffer) Write(p []byte) (int, error) {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+
+	return b.buf.Write(p)
+}
+
+// String returns everything written so far.
+//
+// Returns:
+//   - string: The buffer's contents.
+func (b *lockedBuffer) String() string {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+
+	return b.buf.String()
+}
+
+// newCapturedLogger returns a logfmt logger at level that writes to a buffer the
+// test reads, in the format production logs use.
+//
+// Parameters:
+//   - level: Lowest level the logger writes.
+//
+// Returns:
+//   - *zerolog.Logger: Logger writing to the buffer.
+//   - *lockedBuffer: Buffer holding the logged lines.
+func newCapturedLogger(level zerolog.Level) (*zerolog.Logger, *lockedBuffer) {
+	buf := &lockedBuffer{}
+	w := logging.LogfmtWriter(buf)
+	w.TimeFormat = time.RFC3339
+
+	return new(zerolog.New(w).Level(level).With().Timestamp().Logger()), buf
+}
+
+// newTestLogger returns a logger that writes each event to the test's log, so a
+// failing test shows what it logged.
+//
+// Parameters:
+//   - t: Test that receives the log lines.
+//
+// Returns:
+//   - *zerolog.Logger: Logger writing to t.
+func newTestLogger(t *testing.T) *zerolog.Logger {
+	t.Helper()
+
+	// Frame 4 skips zerolog's write path, so each line names the log call.
+	w := zerolog.TestWriter{T: t, Frame: 4}
+
+	return new(zerolog.New(w))
+}
+
+// mustParseMAC returns a 6-byte HardwareAddr as Docker inspect JSON unmarshals it.
+//
+// Tests must not construct HardwareAddr from the colon-separated string bytes.
+// That 17-byte value is not what the Engine API produces.
+func mustParseMAC(t *testing.T, mac string) dockerNetwork.HardwareAddr {
+	t.Helper()
+
+	parsed, err := net.ParseMAC(mac)
+	require.NoError(t, err, "parse MAC %q", mac)
+
+	return dockerNetwork.HardwareAddr(parsed)
 }
