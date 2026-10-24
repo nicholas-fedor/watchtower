@@ -20,10 +20,11 @@ import (
 	dockerContainer "github.com/moby/moby/api/types/container"
 	dockerImage "github.com/moby/moby/api/types/image"
 
+	"github.com/nicholas-fedor/watchtower/internal/container"
 	"github.com/nicholas-fedor/watchtower/internal/container/labels"
 	"github.com/nicholas-fedor/watchtower/internal/observability/logging"
 	"github.com/nicholas-fedor/watchtower/internal/settings"
-	"github.com/nicholas-fedor/watchtower/pkg/container"
+	pkgContainer "github.com/nicholas-fedor/watchtower/pkg/container"
 	mockContainer "github.com/nicholas-fedor/watchtower/pkg/container/mocks"
 	"github.com/nicholas-fedor/watchtower/pkg/types"
 )
@@ -60,7 +61,7 @@ func cgroupWithSelf() string {
 // restores it when the test ends. newClient returns client, self container ID
 // detection reads only detection, and the Docker variables and registry TLS
 // settings preRun sets are restored.
-func setPreRunState(t *testing.T, client container.Client, detection selfDetection) {
+func setPreRunState(t *testing.T, client pkgContainer.Client, detection selfDetection) {
 	t.Helper()
 
 	setRunState(t, runTestState{})
@@ -90,7 +91,7 @@ func setPreRunState(t *testing.T, client container.Client, detection selfDetecti
 
 	setProcessFs(t, fsys)
 
-	newClient = func(*zerolog.Logger, container.ClientOptions) container.Client { return client }
+	newClient = func(*zerolog.Logger, pkgContainer.ClientOptions) pkgContainer.Client { return client }
 
 	for _, key := range []string{"HOSTNAME", "DOCKER_HOST", "DOCKER_TLS_VERIFY", "DOCKER_API_VERSION", "DOCKER_CERT_PATH"} {
 		t.Setenv(key, "")
@@ -334,9 +335,9 @@ func TestPreRun_RegistryTLSSettings(t *testing.T) {
 			mockClient := mockContainer.NewMockClient(t)
 			setPreRunState(t, mockClient, selfDetection{})
 
-			var clientOptions container.ClientOptions
+			var clientOptions pkgContainer.ClientOptions
 
-			newClient = func(_ *zerolog.Logger, opts container.ClientOptions) container.Client {
+			newClient = func(_ *zerolog.Logger, opts pkgContainer.ClientOptions) pkgContainer.Client {
 				clientOptions = opts
 
 				return mockClient

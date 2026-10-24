@@ -214,7 +214,7 @@ func getLinksFromComposeLabel(c *Container) []string {
 		return nil
 	}
 
-	services := composeLabels.ParseDependsOnLabel(c.logger(), composeDependsOnLabelValue)
+	services := composeLabels.ParseDependsOnLabel(c.Logger(), composeDependsOnLabelValue)
 
 	projectName := composeLabels.GetProjectName(info.Config.Labels)
 
@@ -282,7 +282,7 @@ func getLinksFromHostConfig(c *Container) []string {
 
 	for _, link := range hostConfig.Links {
 		if !strings.Contains(link, ":") {
-			c.logger().Warn().
+			c.Logger().Warn().
 				Str("container", c.Name()).
 				Str("link", link).
 				Msg("Invalid link format in host config, expected 'name:alias'")
@@ -292,7 +292,7 @@ func getLinksFromHostConfig(c *Container) []string {
 
 		parts := strings.SplitN(link, ":", linkPartsCount)
 		if len(parts) < 1 || parts[0] == "" {
-			c.logger().Warn().
+			c.Logger().Warn().
 				Str("container", c.Name()).
 				Str("link", link).
 				Msg("Invalid link format in host config, missing container name")
@@ -346,7 +346,7 @@ func volumesFromLinks(c *Container) []string {
 
 	links := make([]string, 0, len(specs))
 	for _, spec := range specs {
-		name, _ := parseVolumesFromSpec(spec)
+		name, _ := ParseVolumesFromSpec(spec)
 		if name == "" {
 			// Skip empty or mode-only specs.
 			continue
@@ -391,7 +391,7 @@ func appendUniqueLinks(links, extra []string) []string {
 	return links
 }
 
-// parseVolumesFromSpec splits a VolumesFrom entry into container identity and mode.
+// ParseVolumesFromSpec splits a VolumesFrom entry into container identity and mode.
 //
 // Docker stores entries as name-or-id, optionally followed by :ro, :rw, or a
 // SELinux :z/:Z flag. A trailing colon suffix is treated as a mode only when
@@ -403,7 +403,7 @@ func appendUniqueLinks(links, extra []string) []string {
 // Returns:
 //   - string: Container name or ID.
 //   - string: Mode suffix without a leading colon, or empty.
-func parseVolumesFromSpec(spec string) (string, string) {
+func ParseVolumesFromSpec(spec string) (string, string) {
 	if spec == "" {
 		return "", ""
 	}

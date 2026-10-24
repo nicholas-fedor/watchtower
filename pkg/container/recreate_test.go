@@ -18,6 +18,7 @@ import (
 	dockerClient "github.com/moby/moby/client"
 	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
 
+	"github.com/nicholas-fedor/watchtower/internal/container"
 	"github.com/nicholas-fedor/watchtower/internal/testutil/containerfixture"
 	mockContainer "github.com/nicholas-fedor/watchtower/pkg/container/mocks"
 	"github.com/nicholas-fedor/watchtower/pkg/types"
@@ -45,7 +46,7 @@ func WithCPUSettings(nanoCPUs, cpuShares, cpuQuota, cpuPeriod int64, cpusetCpus,
 // Parameters:
 //   - api: Mocked Docker API.
 //   - source: Source container whose name the target takes.
-func expectCreateAndRename(api *mockContainer.MockAPIClient, source *Container) {
+func expectCreateAndRename(api *mockContainer.MockAPIClient, source *container.Container) {
 	api.EXPECT().ContainerCreate(mock.Anything, mock.Anything).
 		Return(dockerClient.ContainerCreateResult{ID: testTargetID}, nil).Once()
 	api.EXPECT().
@@ -484,7 +485,7 @@ func TestSyncComposeImageLabel(t *testing.T) {
 
 	// composeContainer builds a source container running oldImageID with
 	// the given Compose image label.
-	composeContainer := func(label string, extra ...containerfixture.Update) *Container {
+	composeContainer := func(label string, extra ...containerfixture.Update) *container.Container {
 		updates := append([]containerfixture.Update{
 			containerfixture.WithImageName(imageRef),
 			containerfixture.WithLabels(map[string]string{
@@ -564,7 +565,7 @@ func TestSyncComposeImageLabel(t *testing.T) {
 
 	// create runs createTargetContainer at the given API version and
 	// returns the label value sent to ContainerCreate.
-	create := func(t *testing.T, log *zerolog.Logger, api *labelAPI, source *Container, clientVersion string) string {
+	create := func(t *testing.T, log *zerolog.Logger, api *labelAPI, source *container.Container, clientVersion string) string {
 		t.Helper()
 
 		networkConfig := &dockerNetwork.NetworkingConfig{EndpointsConfig: map[string]*dockerNetwork.EndpointSettings{}}

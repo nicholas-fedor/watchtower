@@ -12,6 +12,7 @@ import (
 
 	"github.com/rs/zerolog"
 
+	"github.com/nicholas-fedor/watchtower/internal/container"
 	"github.com/nicholas-fedor/watchtower/pkg/types"
 )
 
@@ -399,7 +400,7 @@ func GetContainerIDFromHostname(log *zerolog.Logger, ctx context.Context, client
 					contName = containerInfo.Name
 				}
 
-				isOld := IsOldContainer(contName)
+				isOld := container.IsOldContainer(contName)
 
 				if watchtowerMatch == "" {
 					watchtowerMatch = c.ID()

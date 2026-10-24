@@ -33,7 +33,7 @@ func (c *Container) GetCreateConfig() *dockerContainer.Config {
 	c.mu.RLock()
 	defer c.mu.RUnlock()
 
-	clogVal := c.logger().With().
+	clogVal := c.Logger().With().
 		Str("container", c.Name()).
 		Logger()
 	clog := &clogVal
@@ -163,7 +163,7 @@ func (c *Container) GetCreateHostConfig() *dockerContainer.HostConfig {
 	c.mu.RLock()
 	defer c.mu.RUnlock()
 
-	clogVal := c.logger().With().
+	clogVal := c.Logger().With().
 		Str("container", c.Name()).
 		Logger()
 	clog := &clogVal
@@ -250,7 +250,7 @@ func (c *Container) VerifyConfiguration() error {
 
 	// Check for nil image info.
 	if c.imageInfo == nil {
-		c.logger().Debug().
+		c.Logger().Debug().
 			Str("container", "<unknown>").
 			Msg("No image info available")
 
@@ -259,14 +259,14 @@ func (c *Container) VerifyConfiguration() error {
 
 	// Check for nil container info.
 	if c.containerInfo == nil {
-		c.logger().Debug().
+		c.Logger().Debug().
 			Str("container", "<unknown>").
 			Msg("No container info available")
 
 		return errNoContainerInfo
 	}
 
-	clogVal := c.logger().With().
+	clogVal := c.Logger().With().
 		Str("container", c.Name()).
 		Logger()
 	clog := &clogVal

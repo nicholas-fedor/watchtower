@@ -18,9 +18,10 @@ import (
 	dockerClient "github.com/moby/moby/client"
 	dockerAPIVersion "github.com/moby/moby/client/pkg/versions"
 
+	"github.com/nicholas-fedor/watchtower/internal/container"
+	"github.com/nicholas-fedor/watchtower/internal/container/oci"
 	"github.com/nicholas-fedor/watchtower/internal/registry/ratelimit"
 	registryConfig "github.com/nicholas-fedor/watchtower/internal/settings/config/registry"
-	"github.com/nicholas-fedor/watchtower/pkg/container/oci"
 	"github.com/nicholas-fedor/watchtower/pkg/types"
 )
 
@@ -57,6 +58,14 @@ var (
 	// errRecreateDockerClient indicates failure recreating the Docker client after API version fallback.
 	errRecreateDockerClient = errors.New("failed to recreate Docker client")
 )
+
+// nopLog returns a fresh discarded logger for optional construction and fallbacks.
+// Each call allocates a new Nop instance.
+func nopLog() *zerolog.Logger {
+	n := zerolog.Nop()
+
+	return &n
+}
 
 // Client defines the interface for interacting with the Docker API within Watchtower.
 //
@@ -708,7 +717,7 @@ func (c *client) GetCurrentWatchtowerContainer(
 
 	clog.Debug().Msg("Retrieved minimal container info")
 
-	return NewContainer(c.logger(), &containerInfo.Container, nil), nil
+	return container.NewContainer(c.logger(), &containerInfo.Container, nil), nil
 }
 
 // StopContainer stops a specified container.

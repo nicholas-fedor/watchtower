@@ -15,9 +15,10 @@ import (
 	dockerImage "github.com/moby/moby/api/types/image"
 	testifyMock "github.com/stretchr/testify/mock"
 
+	"github.com/nicholas-fedor/watchtower/internal/container"
 	"github.com/nicholas-fedor/watchtower/internal/container/labels"
-	"github.com/nicholas-fedor/watchtower/pkg/container"
-	"github.com/nicholas-fedor/watchtower/pkg/container/oci"
+	"github.com/nicholas-fedor/watchtower/internal/container/oci"
+	pkgContainer "github.com/nicholas-fedor/watchtower/pkg/container"
 	"github.com/nicholas-fedor/watchtower/pkg/types"
 	mockTypes "github.com/nicholas-fedor/watchtower/pkg/types/mocks"
 )
@@ -1488,10 +1489,10 @@ func TestProgressSetLatestImageMeta(t *testing.T) {
 			newTestLogger(t),
 			nil,
 			types.UpdateParams{},
-			container.ChangelogVars{},
+			pkgContainer.ChangelogVars{},
 			oci.Annotations{},
 		)
-		assert.Equal(t, container.ReportMeta{}, meta)
+		assert.Equal(t, pkgContainer.ReportMeta{}, meta)
 	})
 
 	t.Run("unknown container", func(t *testing.T) {
@@ -1504,10 +1505,10 @@ func TestProgressSetLatestImageMeta(t *testing.T) {
 			newTestLogger(t),
 			c,
 			types.UpdateParams{},
-			container.ChangelogVars{Tag: "v1.0.0"},
+			pkgContainer.ChangelogVars{Tag: "v1.0.0"},
 			oci.Annotations{},
 		)
-		assert.Equal(t, container.ReportMeta{}, meta)
+		assert.Equal(t, pkgContainer.ReportMeta{}, meta)
 	})
 
 	t.Run("substitutes new tag", func(t *testing.T) {
@@ -1524,7 +1525,7 @@ func TestProgressSetLatestImageMeta(t *testing.T) {
 			newTestLogger(t),
 			c,
 			types.UpdateParams{},
-			container.ChangelogVars{Tag: "v1.2.3", Commit: "deadbeef"},
+			pkgContainer.ChangelogVars{Tag: "v1.2.3", Commit: "deadbeef"},
 			oci.Annotations{},
 		)
 		assert.Equal(t, "https://example.com/notes/v1.2.3", status.Changelog())
@@ -1543,7 +1544,7 @@ func TestProgressSetLatestImageMeta(t *testing.T) {
 			newTestLogger(t),
 			c,
 			types.UpdateParams{},
-			container.ChangelogVars{Tag: "v1.2.3"},
+			pkgContainer.ChangelogVars{Tag: "v1.2.3"},
 			oci.Annotations{Version: "1.2.3", Revision: "newrev"},
 		)
 
@@ -1567,7 +1568,7 @@ func TestProgressSetLatestImageMeta(t *testing.T) {
 			newTestLogger(t),
 			c,
 			types.UpdateParams{},
-			container.ChangelogVars{Tag: "v9.9.9", Commit: "deadbeef"},
+			pkgContainer.ChangelogVars{Tag: "v9.9.9", Commit: "deadbeef"},
 			oci.Annotations{},
 		)
 

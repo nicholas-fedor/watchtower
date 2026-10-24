@@ -83,7 +83,7 @@ func NewContainer(
 	}
 	// Cache the resolved image name at construct time.
 	c.imageName = c.resolveImageName()
-	c.logger().Debug().
+	c.Logger().Debug().
 		Str("container", c.Name()).
 		Str("id", c.ID().ShortID()).
 		Str("image", string(c.ImageID())).
@@ -308,6 +308,15 @@ func (c *Container) ImageInfo() *dockerImage.InspectResponse {
 	return c.imageInfo
 }
 
+// Logger returns the container's process logger, or a discarded nop if unset.
+func (c *Container) Logger() *zerolog.Logger {
+	if c != nil && c.log != nil {
+		return c.log
+	}
+
+	return nopLog()
+}
+
 // replaceInspectLocked replaces the container's inspect data with a copy that
 // change modifies. Inspect data returned earlier by ContainerInfo is never
 // changed, so callers can read it without holding the lock. change receives
@@ -357,7 +366,7 @@ func (c *Container) resolveImageName() string {
 	imageName, ok := labelValue(c.containerInfo, labels.ZodiacOriginalImage)
 	if !ok {
 		if c.containerInfo == nil || c.containerInfo.Config == nil {
-			c.logger().Warn().
+			c.Logger().Warn().
 				Str("container", c.Name()).
 				Msg("No container config available, using default image name")
 
@@ -391,15 +400,6 @@ func ensureImageTag(name string) string {
 	}
 
 	return name + ":latest"
-}
-
-// logger returns the container's process logger, or a discarded nop if unset.
-func (c *Container) logger() *zerolog.Logger {
-	if c != nil && c.log != nil {
-		return c.log
-	}
-
-	return nopLog()
 }
 
 // NormalizeContainerName trims the leading "/" from container names.

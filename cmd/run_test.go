@@ -22,11 +22,12 @@ import (
 	dockerContainer "github.com/moby/moby/api/types/container"
 	dockerImage "github.com/moby/moby/api/types/image"
 
+	"github.com/nicholas-fedor/watchtower/internal/container"
 	"github.com/nicholas-fedor/watchtower/internal/observability/logging"
 	"github.com/nicholas-fedor/watchtower/internal/registry/ratelimit"
 	"github.com/nicholas-fedor/watchtower/internal/settings"
 	notifyConfig "github.com/nicholas-fedor/watchtower/internal/settings/config/notify"
-	"github.com/nicholas-fedor/watchtower/pkg/container"
+	pkgContainer "github.com/nicholas-fedor/watchtower/pkg/container"
 	mockContainer "github.com/nicholas-fedor/watchtower/pkg/container/mocks"
 	"github.com/nicholas-fedor/watchtower/pkg/notifications"
 	"github.com/nicholas-fedor/watchtower/pkg/types"
@@ -54,7 +55,7 @@ var withFilter = mock.MatchedBy(func([]types.Filter) bool { return true })
 // runTestState is the process state run and runMain read from package
 // variables, set by setRunState.
 type runTestState struct {
-	client    container.Client
+	client    pkgContainer.Client
 	current   types.Container
 	currentID types.ContainerID
 }

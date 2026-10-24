@@ -1,4 +1,4 @@
-package container
+package redact
 
 import (
 	"net/url"
@@ -15,7 +15,7 @@ const redactedUserinfo = "://xxxxx:xxxxx@"
 // password that contains @ is matched whole.
 var userinfoInError = regexp.MustCompile(`://[^/?#\s]+@`)
 
-// redactGitURL removes credentials and sensitive query values from a Git URL.
+// GitURL removes credentials and sensitive query values from a Git URL.
 //
 // The host, port, path, non-sensitive query, and fragment remain available for identity. An
 // unparseable URL is rejected so metadata cannot accidentally echo a secret.
@@ -25,7 +25,7 @@ var userinfoInError = regexp.MustCompile(`://[^/?#\s]+@`)
 //
 // Returns:
 //   - string: Safe URL, or empty when it cannot be parsed.
-func redactGitURL(raw string) string {
+func GitURL(raw string) string {
 	raw = strings.TrimSpace(raw)
 	if raw == "" {
 		return ""
@@ -272,7 +272,7 @@ func isHexString(value string) bool {
 	return true
 }
 
-// redactMetadataURL sanitizes URL-like report metadata while preserving plain
+// MetadataURL sanitizes URL-like report metadata while preserving plain
 // annotation values.
 //
 // Parameters:
@@ -280,25 +280,25 @@ func isHexString(value string) bool {
 //
 // Returns:
 //   - string: Sanitized URL, or the original plain value.
-func redactMetadataURL(raw string) string {
+func MetadataURL(raw string) string {
 	value := strings.TrimSpace(raw)
 	if value == "" {
 		return ""
 	}
 
 	if strings.Contains(value, "://") || strings.HasPrefix(value, "git@") || strings.Contains(value, "?") {
-		return redactGitURL(value)
+		return GitURL(value)
 	}
 
 	authority, _, _ := strings.Cut(value, "/")
 	if strings.Contains(authority, "@") {
-		return redactGitURL(value)
+		return GitURL(value)
 	}
 
 	return value
 }
 
-// redactedRemote replaces URL userinfo for logs.
+// Remote replaces URL userinfo for logs.
 //
 // A remote that does not parse may still carry credentials, so its userinfo is
 // masked by pattern.
@@ -308,7 +308,7 @@ func redactMetadataURL(raw string) string {
 //
 // Returns:
 //   - string: Same URL with userinfo replaced by xxxxx.
-func redactedRemote(remote string) string {
+func Remote(remote string) string {
 	parsed, err := url.Parse(remote)
 	if err != nil {
 		return userinfoInError.ReplaceAllString(remote, redactedUserinfo)
@@ -327,7 +327,7 @@ func redactedRemote(remote string) string {
 	return parsed.String()
 }
 
-// redactUserinfo replaces the credentialed remote and any leftover userinfo.
+// Userinfo replaces the credentialed remote and any leftover userinfo.
 //
 // The build request sends the remote as a query parameter. An error that echoes
 // the request URL carries it query-escaped, so that form is replaced too.
@@ -338,9 +338,9 @@ func redactedRemote(remote string) string {
 //
 // Returns:
 //   - string: msg with credentials replaced by xxxxx.
-func redactUserinfo(msg, remote string) string {
+func Userinfo(msg, remote string) string {
 	if remote != "" {
-		redacted := redactedRemote(remote)
+		redacted := Remote(remote)
 		msg = strings.ReplaceAll(msg, remote, redacted)
 		msg = strings.ReplaceAll(msg, url.QueryEscape(remote), url.QueryEscape(redacted))
 	}

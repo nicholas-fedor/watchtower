@@ -12,6 +12,7 @@ import (
 	"github.com/spf13/pflag"
 	"github.com/spf13/viper"
 
+	"github.com/nicholas-fedor/watchtower/internal/container"
 	"github.com/nicholas-fedor/watchtower/internal/container/filters"
 	"github.com/nicholas-fedor/watchtower/internal/settings/config/api"
 	"github.com/nicholas-fedor/watchtower/internal/settings/config/client"
@@ -28,7 +29,6 @@ import (
 	"github.com/nicholas-fedor/watchtower/internal/settings/config/update"
 	"github.com/nicholas-fedor/watchtower/internal/settings/flags/spec"
 	"github.com/nicholas-fedor/watchtower/internal/settings/units"
-	"github.com/nicholas-fedor/watchtower/pkg/container"
 )
 
 // diskSpacePercentBase is the divisor used to convert a 0-100 percentage into a fraction of max.

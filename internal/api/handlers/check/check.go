@@ -9,10 +9,11 @@ import (
 	"github.com/gofiber/fiber/v3"
 	"github.com/rs/zerolog"
 
+	"github.com/nicholas-fedor/watchtower/internal/container"
+	"github.com/nicholas-fedor/watchtower/internal/container/oci"
 	"github.com/nicholas-fedor/watchtower/internal/git"
-	"github.com/nicholas-fedor/watchtower/pkg/container"
+	pkgContainer "github.com/nicholas-fedor/watchtower/pkg/container"
 	gitPkg "github.com/nicholas-fedor/watchtower/pkg/container/git"
-	"github.com/nicholas-fedor/watchtower/pkg/container/oci"
 	"github.com/nicholas-fedor/watchtower/pkg/types"
 )
 
@@ -99,7 +100,7 @@ func extractFilterParams(c fiber.Ctx, key string) []string {
 //   - error: Non-nil if listing containers fails.
 func CheckForUpdates(log *zerolog.Logger,
 	ctx context.Context,
-	client container.Client,
+	client pkgContainer.Client,
 	filter types.Filter,
 	params types.UpdateParams,
 	gitClient *git.Client,
@@ -168,7 +169,7 @@ func applyReportMetadata(c types.Container, params types.UpdateParams, result *C
 		return
 	}
 
-	meta := container.ResolveReportMeta(c, params, container.ChangelogVars{}, oci.Annotations{})
+	meta := pkgContainer.ResolveReportMeta(c, params, pkgContainer.ChangelogVars{}, oci.Annotations{})
 	result.GitRepo = meta.GitRepo
 	result.GitRef = meta.GitRef
 	result.Changelog = meta.Changelog
@@ -193,7 +194,7 @@ func applyLocalDigest(c types.Container, result *ContainerCheck) {
 		return
 	}
 
-	result.Digest = container.ExtractImageDigest(info.RepoDigests, c.ImageName())
+	result.Digest = pkgContainer.ExtractImageDigest(info.RepoDigests, c.ImageName())
 }
 
 // isGitWatched reports whether a container is checked against its hosted Git
@@ -269,10 +270,10 @@ func checkGitSource(
 	result.GitCommit = checkResult.Commit
 
 	if checkResult.Tag != "" {
-		result.Changelog = container.ResolveReportMeta(
+		result.Changelog = pkgContainer.ResolveReportMeta(
 			c,
 			params,
-			container.ChangelogVars{
+			pkgContainer.ChangelogVars{
 				Tag:    checkResult.Tag,
 				Commit: checkResult.Commit,
 			},
@@ -299,7 +300,7 @@ func checkGitSource(
 func checkRegistrySource(
 	ctx context.Context,
 	log *zerolog.Logger,
-	client container.Client,
+	client pkgContainer.Client,
 	c types.Container,
 	params types.UpdateParams,
 	result *ContainerCheck,

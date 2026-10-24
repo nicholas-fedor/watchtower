@@ -10,6 +10,7 @@ import (
 	"path/filepath"
 	"strings"
 
+	"github.com/nicholas-fedor/watchtower/internal/container/redact"
 	"github.com/nicholas-fedor/watchtower/pkg/types"
 )
 
@@ -127,7 +128,7 @@ func redactBuildError(err error, remote string) error {
 		return nil
 	}
 
-	msg := redactUserinfo(err.Error(), remote)
+	msg := redact.Userinfo(err.Error(), remote)
 	if msg == err.Error() {
 		return err
 	}

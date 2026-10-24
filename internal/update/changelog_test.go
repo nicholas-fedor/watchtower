@@ -15,13 +15,14 @@ import (
 	dockerContainer "github.com/moby/moby/api/types/container"
 	dockerImage "github.com/moby/moby/api/types/image"
 
+	"github.com/nicholas-fedor/watchtower/internal/container"
 	"github.com/nicholas-fedor/watchtower/internal/container/labels"
+	"github.com/nicholas-fedor/watchtower/internal/container/oci"
 	internalGit "github.com/nicholas-fedor/watchtower/internal/git"
 	"github.com/nicholas-fedor/watchtower/internal/update/changelog"
 	mockUpdate "github.com/nicholas-fedor/watchtower/internal/update/mocks"
 	"github.com/nicholas-fedor/watchtower/internal/update/state"
-	"github.com/nicholas-fedor/watchtower/pkg/container"
-	"github.com/nicholas-fedor/watchtower/pkg/container/oci"
+	pkgContainer "github.com/nicholas-fedor/watchtower/pkg/container"
 	"github.com/nicholas-fedor/watchtower/pkg/types"
 )
 
@@ -287,7 +288,7 @@ func TestLogChangelogOnlyWhenEnabled(t *testing.T) {
 			t.Parallel()
 
 			c := newReportContainer(t, tt.labels, nil)
-			meta := container.ReportMeta{Changelog: "https://example.com/notes"}
+			meta := pkgContainer.ReportMeta{Changelog: "https://example.com/notes"}
 
 			var buf bytes.Buffer
 
@@ -322,8 +323,8 @@ func TestLogChangelogSkipsEmptyURL(t *testing.T) {
 
 	log := zerolog.New(&buf)
 
-	logChangelog(&log, c, types.UpdateParams{EnableChangelog: true}, container.ReportMeta{})
-	logChangelog(&log, nil, types.UpdateParams{EnableChangelog: true}, container.ReportMeta{
+	logChangelog(&log, c, types.UpdateParams{EnableChangelog: true}, pkgContainer.ReportMeta{})
+	logChangelog(&log, nil, types.UpdateParams{EnableChangelog: true}, pkgContainer.ReportMeta{
 		Changelog: "https://example.com/notes",
 	})
 

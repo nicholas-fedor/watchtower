@@ -34,6 +34,7 @@ import (
 	dockerSystem "github.com/moby/moby/api/types/system"
 	dockerClient "github.com/moby/moby/client"
 
+	"github.com/nicholas-fedor/watchtower/internal/container"
 	"github.com/nicholas-fedor/watchtower/internal/container/filters"
 	"github.com/nicholas-fedor/watchtower/internal/testutil/containerfixture"
 	"github.com/nicholas-fedor/watchtower/internal/testutil/httpstub"
@@ -304,7 +305,7 @@ func TestClient(t *testing.T) {
 		t.Parallel()
 
 		// running returns a running container.
-		running := func() *Container {
+		running := func() *container.Container {
 			return MockContainer(containerfixture.WithContainerState(dockerContainer.State{Running: true}))
 		}
 

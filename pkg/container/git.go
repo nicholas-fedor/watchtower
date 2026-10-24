@@ -1,7 +1,9 @@
 package container
 
 import (
+	"github.com/nicholas-fedor/watchtower/internal/container"
 	"github.com/nicholas-fedor/watchtower/internal/container/labels"
+	"github.com/nicholas-fedor/watchtower/internal/container/redact"
 	"github.com/nicholas-fedor/watchtower/pkg/container/git"
 )
 
@@ -17,7 +19,7 @@ type gitAssociation = git.Association
 //   - c: Concrete container whose create labels will be mutated.
 //   - commit: SHA to stamp.
 //   - tag: Tag to stamp. Omitted when empty.
-func ApplyGitStamp(c *Container, commit, tag string) {
+func ApplyGitStamp(c *container.Container, commit, tag string) {
 	if c == nil {
 		return
 	}
@@ -41,12 +43,12 @@ func ApplyGitStamp(c *Container, commit, tag string) {
 //   - assoc: Resolved repo, ref, policy, and build paths.
 //   - watch: When true, persist git-watch=true. False leaves the process-wide
 //     --git-enable default in effect on the replacement.
-func ApplyGitAssociation(c *Container, assoc gitAssociation, watch bool) {
+func ApplyGitAssociation(c *container.Container, assoc gitAssociation, watch bool) {
 	if c == nil || assoc.Repo == "" {
 		return
 	}
 
-	repo := redactGitURL(assoc.Repo)
+	repo := redact.GitURL(assoc.Repo)
 
 	c.DeleteLabel(labels.GitRepo)
 	c.DeleteLabel(labels.GitRef)
@@ -71,7 +73,7 @@ func ApplyGitAssociation(c *Container, assoc gitAssociation, watch bool) {
 	}
 
 	if assoc.Host != "" {
-		if host := redactGitURL(assoc.Host); host != "" {
+		if host := redact.GitURL(assoc.Host); host != "" {
 			c.SetLabel(labels.GitHost, host)
 		}
 	}

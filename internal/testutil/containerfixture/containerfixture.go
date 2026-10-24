@@ -3,6 +3,7 @@ package containerfixture
 import (
 	"fmt"
 	"slices"
+	"time"
 
 	dockerspec "github.com/moby/docker-image-spec/specs-go/v1"
 	dockerContainer "github.com/moby/moby/api/types/container"
@@ -90,6 +91,19 @@ func WithImageName(name string) Update {
 	return func(c *dockerContainer.InspectResponse, i *dockerImage.InspectResponse) {
 		c.Config.Image = name
 		i.RepoTags = append(i.RepoTags, name)
+	}
+}
+
+// WithImageCreated sets the creation time of the mock image.
+//
+// Parameters:
+//   - created: Image creation time.
+//
+// Returns:
+//   - Update: Function to set Created on image metadata.
+func WithImageCreated(created time.Time) Update {
+	return func(_ *dockerContainer.InspectResponse, i *dockerImage.InspectResponse) {
+		i.Created = created.Format(time.RFC3339Nano)
 	}
 }
 
