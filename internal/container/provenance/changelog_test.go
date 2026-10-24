@@ -194,6 +194,13 @@ func TestDerivedReleasesURL(t *testing.T) {
 		},
 		{name: "unknown", repo: "https://git.unknown.example/org/app.git"},
 		{name: "unknown with tag", repo: "https://git.unknown.example/org/app.git", tag: "v1.2.3"},
+		{name: "encoded query in name", repo: "https://github.com/org/app%3Fx=1", tag: "v1.2.3"},
+		{name: "encoded fragment in name", repo: "https://github.com/org/app%23frag"},
+		{name: "encoded newline in owner", repo: "https://github.com/o%0Ag/app"},
+		{name: "encoded space in name", repo: "https://github.com/org/my%20app"},
+		{name: "scp query in name", repo: "git@github.com:org/app?x=1"},
+		{name: "scp fragment in name", repo: "git@github.com:org/app#frag"},
+		{name: "scp backslash in owner", repo: `git@github.com:org\evil/app`},
 		{name: "empty"},
 	}
 
@@ -313,6 +320,14 @@ func TestSplitOwnerRepo(t *testing.T) {
 		{name: "empty path", host: "github.com", path: ""},
 		{name: "dot segment", host: "github.com", path: "org/./app"},
 		{name: "parent segment", host: "github.com", path: "org/../app"},
+		{name: "query in name", host: "github.com", path: "org/app?x=1"},
+		{name: "fragment in owner", host: "github.com", path: "org#f/app"},
+		{name: "percent in name", host: "github.com", path: "org/app%41"},
+		{name: "backslash in owner", host: "github.com", path: `org\evil/app`},
+		{name: "space in name", host: "github.com", path: "org/my app"},
+		{name: "tab in owner", host: "github.com", path: "o\tg/app"},
+		{name: "newline in nested owner", host: "gitlab.com", path: "group/s\nb/app"},
+		{name: "delete character in name", host: "github.com", path: "org/app\x7f"},
 	}
 
 	for _, tt := range tests {

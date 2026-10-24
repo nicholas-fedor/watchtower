@@ -56,7 +56,8 @@ func FuzzApplyVars(f *testing.F) {
 }
 
 // FuzzDerivedReleasesURL verifies release URL derivation never panics and
-// yields an http or https URL that parses and has no dot path segments.
+// yields an http or https URL that parses. The URL has no dot path segments and
+// no query or fragment.
 func FuzzDerivedReleasesURL(f *testing.F) {
 	f.Add("https://github.com/org/app.git", "", "")
 	f.Add("https://gitlab.com/org/app.git", "", "v1.2.3")
@@ -65,6 +66,9 @@ func FuzzDerivedReleasesURL(f *testing.F) {
 	f.Add("https://unknown.example/org/app.git", "", "v1.2.3")
 	f.Add("", "", "")
 	f.Add("gitlAB.Com/0/0", "", "\x01")
+	f.Add("https://github.com/org/app%3Fx=1", "", "v1.2.3")
+	f.Add("git@github.com:org/app#frag", "", "")
+	f.Add("https://github.com/o%0Ag/app", "", "")
 
 	f.Fuzz(func(t *testing.T, repo, extra, tag string) {
 		got := derivedReleasesURL(repo, extra, tag)
@@ -74,9 +78,12 @@ func FuzzDerivedReleasesURL(f *testing.F) {
 
 		assert.True(t, strings.HasPrefix(got, "http://") || strings.HasPrefix(got, "https://"), got)
 
-		// No dot segment may restructure the release path.
+		// No dot segment, query, or fragment may restructure the release path.
 		parsed, err := url.Parse(got)
 		require.NoError(t, err)
+		assert.Empty(t, parsed.RawQuery, got)
+		assert.False(t, parsed.ForceQuery, got)
+		assert.Empty(t, parsed.Fragment, got)
 
 		for segment := range strings.SplitSeq(parsed.Path, "/") {
 			assert.NotEqual(t, ".", segment, got)
