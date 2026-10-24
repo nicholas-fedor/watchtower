@@ -63,10 +63,13 @@ func TestGitURL_SensitiveQueryKeys(t *testing.T) {
 		"pwd",
 		"passphrase",
 		"keyPassphrase",
+		"sshPassPhrase",
+		"dbPassWord",
+		"pass_word",
 		"authToken",
 		"sig",
 	}
-	benign := []string{"author", "authorName", "design", "tokenizer", "format", "lang", "version2"}
+	benign := []string{"author", "authorName", "design", "tokenizer", "passThrough", "format", "lang", "version2"}
 
 	forms := []struct {
 		name   string

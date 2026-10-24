@@ -150,8 +150,9 @@ func redactQuery(raw string) string {
 // isSensitiveQueryKey reports whether a query parameter commonly contains credentials.
 //
 // The key matches when a part between separators names a credential. It also
-// matches when a camelCase word inside a part does, so accessToken and
-// clientSecret match like access_token and client_secret.
+// matches when a word of the key does, so accessToken and clientSecret match
+// like access_token and client_secret. Two adjacent words count as one name, so
+// dbPassWord and sshPassPhrase match too.
 //
 // Parameters:
 //   - key: URL query parameter name.
@@ -162,9 +163,13 @@ func isSensitiveQueryKey(key string) bool {
 	normalized := strings.ToLower(strings.ReplaceAll(key, "-", "_"))
 	parts := strings.FieldsFunc(normalized, isQueryKeySeparator)
 
-	for _, part := range slices.Concat(parts, queryKeyWords(key)) {
-		switch part {
-		case "token", "password", "passwd", "pwd", "passphrase", "secret", "credential", "credentials", "signature", "sig", "auth", "authorization", "session", "jwt", "bearer":
+	if slices.ContainsFunc(parts, isCredentialWord) {
+		return true
+	}
+
+	words := queryKeyWords(key)
+	for i, word := range words {
+		if isCredentialWord(word) || i > 0 && isCredentialWord(words[i-1]+word) {
 			return true
 		}
 	}
@@ -173,6 +178,23 @@ func isSensitiveQueryKey(key string) bool {
 
 	return strings.Contains(compact, "oauth") || strings.Contains(compact, "apikey") || strings.Contains(compact, "accesskey") || strings.Contains(compact, "privatekey") ||
 		strings.Contains(compact, "authtoken")
+}
+
+// isCredentialWord reports whether a lowercase word of a query parameter name
+// names a credential.
+//
+// Parameters:
+//   - word: Lowercase word or part of the name.
+//
+// Returns:
+//   - bool: True when the word names a credential.
+func isCredentialWord(word string) bool {
+	switch word {
+	case "token", "password", "passwd", "pwd", "passphrase", "secret", "credential", "credentials", "signature", "sig", "auth", "authorization", "session", "jwt", "bearer":
+		return true
+	default:
+		return false
+	}
 }
 
 // queryKeyWords splits a query parameter name into lowercase words at
