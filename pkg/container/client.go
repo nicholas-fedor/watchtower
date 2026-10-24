@@ -425,7 +425,7 @@ type ClientOptions struct {
 	CPUCopyMode             string
 	WarnOnHeadFailed        containerImage.WarningStrategy
 	// Fs is the filesystem rooted at "/" that holds the container runtime
-	// marker files. NewClient uses the host filesystem when it is nil.
+	// marker files. The host filesystem is used when it is nil.
 	Fs fs.FS
 	// Registry holds the settings for registry digest and image age requests.
 	Registry registryConfig.Registry
@@ -457,11 +457,6 @@ func NewClient(log *zerolog.Logger, opts ClientOptions) Client {
 		log.Fatal().
 			Err(err).
 			Msg("Failed to initialize Docker client")
-	}
-
-	// Set default filesystem if not provided.
-	if opts.Fs == nil {
-		opts.Fs = os.DirFS("/")
 	}
 
 	if opts.RateLimiter == nil {
@@ -1436,7 +1431,13 @@ func (c *client) getRuntime(ctx context.Context) bool {
 		return c.isPodman
 	}
 
-	isPodman, err := containerRuntime.IsPodman(c.logger(), ctx, c.api, c.Fs)
+	// Without a configured filesystem, the host's holds the marker files.
+	fsys := c.Fs
+	if fsys == nil {
+		fsys = os.DirFS("/")
+	}
+
+	isPodman, err := containerRuntime.IsPodman(c.logger(), ctx, c.api, fsys)
 	if err != nil {
 		c.logger().Debug().
 			Err(err).
