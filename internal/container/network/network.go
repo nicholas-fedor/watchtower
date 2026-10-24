@@ -1,4 +1,4 @@
-package container
+package network
 
 import (
 	"errors"
@@ -22,7 +22,7 @@ var (
 	errNilSourceEndpoint = errors.New("nil source endpoint provided")
 )
 
-// getNetworkConfig extracts and sanitizes the network configuration from a container.
+// FromContainer extracts and sanitizes the network configuration from a container.
 //
 // It handles all network modes, including host, and supports both legacy and modern API versions.
 //
@@ -32,7 +32,7 @@ var (
 //
 // Returns:
 //   - *dockerNetwork.NetworkingConfig: Sanitized network configuration.
-func getNetworkConfig(log *zerolog.Logger,
+func FromContainer(log *zerolog.Logger,
 	sourceContainer types.Container,
 	clientVersion string,
 ) *dockerNetwork.NetworkingConfig {
@@ -44,7 +44,7 @@ func getNetworkConfig(log *zerolog.Logger,
 	clog := &clogVal
 
 	// Initialize default network config
-	config := newEmptyNetworkConfig()
+	config := EmptyConfig()
 
 	clog.Debug().Msg("Initialized empty network configuration")
 
@@ -116,11 +116,11 @@ func getNetworkConfig(log *zerolog.Logger,
 	return config
 }
 
-// newEmptyNetworkConfig creates an empty network configuration.
+// EmptyConfig creates an empty network configuration.
 //
 // Returns:
 //   - *dockerNetwork.NetworkingConfig: Empty configuration with initialized EndpointsConfig.
-func newEmptyNetworkConfig() *dockerNetwork.NetworkingConfig {
+func EmptyConfig() *dockerNetwork.NetworkingConfig {
 	return &dockerNetwork.NetworkingConfig{
 		EndpointsConfig: make(map[string]*dockerNetwork.EndpointSettings),
 	}

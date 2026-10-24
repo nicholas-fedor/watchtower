@@ -5,17 +5,14 @@ import (
 	"crypto/rand"
 	"crypto/sha256"
 	"encoding/hex"
-	"net"
 	"sync"
 	"testing"
 	"time"
 
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/mock"
-	"github.com/stretchr/testify/require"
 
 	dockerContainer "github.com/moby/moby/api/types/container"
-	dockerNetwork "github.com/moby/moby/api/types/network"
 	dockerClient "github.com/moby/moby/client"
 
 	mockContainer "github.com/nicholas-fedor/watchtower/internal/container/mocks"
@@ -46,19 +43,6 @@ func randomSHA256() string {
 	_, _ = rand.Read(hash)
 
 	return hex.EncodeToString(hash)
-}
-
-// mustParseMAC returns a 6-byte HardwareAddr as Docker inspect JSON unmarshals it.
-//
-// Tests must not construct HardwareAddr from the colon-separated string bytes.
-// That 17-byte value is not what the Engine API produces.
-func mustParseMAC(t *testing.T, mac string) dockerNetwork.HardwareAddr {
-	t.Helper()
-
-	parsed, err := net.ParseMAC(mac)
-	require.NoError(t, err, "parse MAC %q", mac)
-
-	return dockerNetwork.HardwareAddr(parsed)
 }
 
 // lockedBuffer is a buffer that is safe for concurrent writes, for logs that

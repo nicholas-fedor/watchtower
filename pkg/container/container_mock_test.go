@@ -349,16 +349,6 @@ func newRunningSource() *container.Container {
 	)
 }
 
-// newMultiNetworkSource returns a running source container attached
-// to two networks.
-func newMultiNetworkSource() *container.Container {
-	return MockContainer(
-		containerfixture.WithNetworkMode("bridge"),
-		containerfixture.WithContainerState(dockerContainer.State{Running: true, Status: "running"}),
-		containerfixture.WithNetworks("network1", "network2"),
-	)
-}
-
 func copyFromPath(filePath string) any {
 	return mock.MatchedBy(func(options dockerClient.CopyFromContainerOptions) bool {
 		return options.SourcePath == filePath
