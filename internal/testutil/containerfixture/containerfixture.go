@@ -161,6 +161,9 @@ func WithImageLabels(labels map[string]string) Update {
 
 // WithContainerState sets the state for the mock container.
 //
+// Each Inspect gets its own copy of state, so containers built from one Update
+// do not share it.
+//
 // Parameters:
 //   - state: Container state (e.g., running, stopped).
 //
@@ -168,11 +171,15 @@ func WithImageLabels(labels map[string]string) Update {
 //   - Update: Function to set state in container metadata.
 func WithContainerState(state dockerContainer.State) Update {
 	return func(cnt *dockerContainer.InspectResponse, _ *dockerImage.InspectResponse) {
-		cnt.State = &state
+		stateCopy := state
+		cnt.State = &stateCopy
 	}
 }
 
 // WithHealthcheck sets the healthcheck configuration for the mock container.
+//
+// Each Inspect gets its own copy of healthConfig, so containers built from one
+// Update do not share it.
 //
 // Parameters:
 //   - healthConfig: Healthcheck configuration to set.
@@ -181,11 +188,15 @@ func WithContainerState(state dockerContainer.State) Update {
 //   - Update: Function to set healthcheck in container Config.
 func WithHealthcheck(healthConfig dockerContainer.HealthConfig) Update {
 	return func(cnt *dockerContainer.InspectResponse, _ *dockerImage.InspectResponse) {
-		cnt.Config.Healthcheck = &healthConfig
+		healthCopy := healthConfig
+		cnt.Config.Healthcheck = &healthCopy
 	}
 }
 
 // WithImageHealthcheck sets the healthcheck configuration for the mock image.
+//
+// Each Inspect gets its own copy of healthConfig, so images built from one
+// Update do not share it.
 //
 // Parameters:
 //   - healthConfig: Healthcheck configuration to set.
@@ -194,7 +205,8 @@ func WithHealthcheck(healthConfig dockerContainer.HealthConfig) Update {
 //   - Update: Function to set healthcheck in image Config.
 func WithImageHealthcheck(healthConfig dockerContainer.HealthConfig) Update {
 	return func(_ *dockerContainer.InspectResponse, img *dockerImage.InspectResponse) {
-		img.Config.Healthcheck = &healthConfig
+		healthCopy := healthConfig
+		img.Config.Healthcheck = &healthCopy
 	}
 }
 
