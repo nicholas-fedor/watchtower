@@ -212,6 +212,25 @@ func Test_isOutsideCooldown(t *testing.T) {
 	})
 }
 
+// TestIsOutsideCooldown_NilLogger verifies that a client built without a
+// logger runs a cooldown check without a nil pointer panic.
+func TestIsOutsideCooldown_NilLogger(t *testing.T) {
+	t.Parallel()
+
+	// The test registry serves plain HTTP.
+	client := NewClient(newImageAPI(t), nil, registryConfig.Registry{TLSSkip: true}, ratelimit.New())
+
+	outside, err := client.isOutsideCooldown(
+		t.Context(),
+		MockContainer(containerfixture.WithImageName(notFoundRegistry(t)+"/test:latest")),
+		types.UpdateParams{CooldownDelay: time.Hour},
+	)
+	assert.False(t, outside)
+
+	var cooldownErr *CooldownError
+	require.ErrorAs(t, err, &cooldownErr)
+}
+
 // Test_isOutsideCooldown_pullOptionsFailure verifies that when the registry
 // credentials cannot be read, the cooldown gate holds the pull back with a
 // CooldownError for the pull options failure, before any registry request.

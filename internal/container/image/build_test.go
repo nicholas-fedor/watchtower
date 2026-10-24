@@ -1,6 +1,7 @@
 package image
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"io"
@@ -112,6 +113,75 @@ func Test_consumeBuildStream(t *testing.T) {
 		id, err := consumeBuildStream(body)
 		require.NoError(t, err)
 		assert.Equal(t, types.ImageID("sha256:last"), id)
+	})
+}
+
+// TestRedactBuildError verifies that a build error whose text carries
+// credentials keeps matching its cause and its build sentinel once redacted.
+// No error reachable through Unwrap may still carry the credentials.
+func TestRedactBuildError(t *testing.T) {
+	t.Parallel()
+
+	const remote = "https://git:secret@github.com/org/app.git#abc"
+
+	// unwrapChain returns err and every error reachable from it through Unwrap.
+	unwrapChain := func(err error) []error {
+		chain := []error{}
+		queue := []error{err}
+
+		for len(queue) > 0 {
+			current := queue[0]
+			queue = queue[1:]
+
+			chain = append(chain, current)
+
+			switch wrapped := current.(type) {
+			case interface{ Unwrap() []error }:
+				queue = append(queue, wrapped.Unwrap()...)
+			case interface{ Unwrap() error }:
+				next := wrapped.Unwrap()
+				if next != nil {
+					queue = append(queue, next)
+				}
+			}
+		}
+
+		return chain
+	}
+
+	t.Run("keeps the cause of a canceled build", func(t *testing.T) {
+		t.Parallel()
+
+		got := redactBuildError(fmt.Errorf("Post %q: %w", remote, context.Canceled), remote)
+
+		require.ErrorIs(t, got, context.Canceled)
+		require.ErrorIs(t, got, errImageBuildFailed)
+		assert.Equal(t, `image build failed: Post "https://xxxxx:xxxxx@github.com/org/app.git#abc": context canceled`, got.Error())
+
+		for _, err := range unwrapChain(got) {
+			assert.NotContains(t, err.Error(), "secret")
+		}
+	})
+
+	t.Run("does not repeat the build failure prefix", func(t *testing.T) {
+		t.Parallel()
+
+		got := redactBuildError(fmt.Errorf("%w: failed %s", errImageBuildFailed, remote), remote)
+
+		require.ErrorIs(t, got, errImageBuildFailed)
+		assert.Equal(t, "image build failed: failed https://xxxxx:xxxxx@github.com/org/app.git#abc", got.Error())
+
+		for _, err := range unwrapChain(got) {
+			assert.NotContains(t, err.Error(), "secret")
+		}
+	})
+
+	t.Run("returns an error without credentials unchanged", func(t *testing.T) {
+		t.Parallel()
+
+		cause := fmt.Errorf("%w: no space left on device", errImageBuildFailed)
+
+		assert.Same(t, cause, redactBuildError(cause, remote))
 	})
 }
 
