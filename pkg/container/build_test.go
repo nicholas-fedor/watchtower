@@ -80,6 +80,11 @@ func Test_consumeBuildStream(t *testing.T) {
 		tokenOnly := redactBuildError(errors.New("clone https://token@github.com/org/app.git failed"), "")
 		assert.NotContains(t, tokenOnly.Error(), "token@")
 		assert.Contains(t, tokenOnly.Error(), "xxxxx:xxxxx@")
+
+		// A password containing @ is redacted whole, not up to its first @.
+		atPassword := redactBuildError(errors.New(`clone "https://user:p@ss@github.com/org/app.git" failed`), "")
+		assert.NotContains(t, atPassword.Error(), "ss@")
+		assert.Contains(t, atPassword.Error(), "https://xxxxx:xxxxx@github.com/org/app.git")
 	})
 
 	t.Run("returns a decode error for invalid JSON", func(t *testing.T) {

@@ -103,7 +103,6 @@ func (c *client) ExecuteCommand(
 	}
 
 	// Create the exec instance using the parent context.
-	// Timeout management is handled by waitForExecOrTimeout.
 	exec, err := c.api.ExecCreate(
 		ctx,
 		string(container.ID()),
@@ -133,8 +132,19 @@ func (c *client) ExecuteCommand(
 		return false, fmt.Errorf("%w: %w", errStartExecFailed, err)
 	}
 
+	// The timeout bounds the whole run of the command, so a command that never
+	// exits stops both reading its output and waiting for its exit code.
+	execCtx := ctx
+
+	if timeout > 0 {
+		var cancel context.CancelFunc
+
+		execCtx, cancel = context.WithTimeout(ctx, time.Duration(timeout)*time.Minute)
+		defer cancel()
+	}
+
 	// Capture output and handle attachment.
-	output, err := c.captureExecOutput(ctx, exec.ID)
+	output, err := c.captureExecOutput(execCtx, exec.ID)
 	if err != nil {
 		clog.Warn().
 			Err(err).
@@ -142,12 +152,7 @@ func (c *client) ExecuteCommand(
 	}
 
 	// Wait for completion and evaluate result.
-	skipUpdate, err := c.waitForExecOrTimeout(
-		ctx,
-		exec.ID,
-		output,
-		timeout,
-	)
+	skipUpdate, err := c.waitForExec(execCtx, exec.ID, output)
 	if err != nil {
 		clog.Debug().
 			Err(err).
@@ -242,22 +247,20 @@ func (c *client) captureExecOutput(ctx context.Context, execID string) (string, 
 	return "", nil
 }
 
-// waitForExecOrTimeout waits for an exec instance to complete or times out.
+// waitForExec waits for an exec instance to complete, or for ctx to end.
 //
 // Parameters:
-//   - ctx: Parent context.
+//   - ctx: Context bounding the wait, including the command's timeout.
 //   - execID: ID of the exec instance.
 //   - execOutput: Captured output for error reporting.
-//   - timeout: Minutes to wait (0 for no timeout).
 //
 // Returns:
 //   - bool: True if updates should be skipped (exit code 75), false otherwise.
-//   - error: Non-nil if inspection fails or command errors, nil on success.
-func (c *client) waitForExecOrTimeout(
+//   - error: Non-nil if inspection fails, the command errors, or ctx ends first.
+func (c *client) waitForExec(
 	ctx context.Context,
 	execID string,
 	execOutput string,
-	timeout int,
 ) (bool, error) {
 	const ExTempFail = 75
 
@@ -266,24 +269,9 @@ func (c *client) waitForExecOrTimeout(
 		Logger()
 	clog := &clogVal
 
-	var execCtx context.Context
-
-	var cancel context.CancelFunc
-
-	// Set up context with timeout if specified.
-	if timeout > 0 {
-		execCtx, cancel = context.WithTimeout(
-			ctx,
-			time.Duration(timeout)*time.Minute,
-		)
-		defer cancel()
-	} else {
-		execCtx = ctx
-	}
-
 	// Poll exec status until completion.
 	for {
-		execInspect, err := c.api.ExecInspect(execCtx, execID, dockerClient.ExecInspectOptions{})
+		execInspect, err := c.api.ExecInspect(ctx, execID, dockerClient.ExecInspectOptions{})
 		if err != nil {
 			clog.Debug().
 				Err(err).
@@ -301,8 +289,8 @@ func (c *client) waitForExecOrTimeout(
 			select {
 			case <-time.After(1 * time.Second):
 				continue
-			case <-execCtx.Done():
-				return false, fmt.Errorf("exec canceled: %w", execCtx.Err())
+			case <-ctx.Done():
+				return false, fmt.Errorf("exec canceled: %w", ctx.Err())
 			}
 		}
 
