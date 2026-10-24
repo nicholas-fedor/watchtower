@@ -28,6 +28,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- Move image management to internal/container/image by @nicholas-fedor in [#3126](https://github.com/nicholas-fedor/watchtower/pull/3126)
 - Move container provenance to internal/container/provenance by @nicholas-fedor in [#3118](https://github.com/nicholas-fedor/watchtower/pull/3118)
 - Move the container model to internal/container by @nicholas-fedor in [#3110](https://github.com/nicholas-fedor/watchtower/pull/3110)
 - Split container files by their destination package by @nicholas-fedor in [#3104](https://github.com/nicholas-fedor/watchtower/pull/3104)
