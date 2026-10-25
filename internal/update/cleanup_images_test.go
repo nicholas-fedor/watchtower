@@ -13,10 +13,10 @@ import (
 
 	dockerContainer "github.com/moby/moby/api/types/container"
 
+	mockContainerClient "github.com/nicholas-fedor/watchtower/internal/container/client/mocks"
 	"github.com/nicholas-fedor/watchtower/internal/observability/events"
 	"github.com/nicholas-fedor/watchtower/internal/registry/ratelimit"
 	mockUpdate "github.com/nicholas-fedor/watchtower/internal/update/mocks"
-	mockContainer "github.com/nicholas-fedor/watchtower/pkg/container/mocks"
 	"github.com/nicholas-fedor/watchtower/pkg/types"
 	mockTypes "github.com/nicholas-fedor/watchtower/pkg/types/mocks"
 )
@@ -83,7 +83,7 @@ func TestRemoveExcessContainers_CallerListCollectsImages(t *testing.T) {
 		"watchtower-old-b", "org/watchtower:1")
 
 	// The mock fails the test on any image removal.
-	client := mockContainer.NewMockClient(t)
+	client := mockContainerClient.NewMockClient(t)
 	client.EXPECT().StopAndRemoveContainer(mock.Anything, mock.Anything, mock.Anything).Return(nil).Times(2)
 
 	images := []types.RemovedImageInfo{
@@ -118,7 +118,7 @@ func TestRemoveExcessContainers_PartialFailureKeepsCallerList(t *testing.T) {
 		stuck := cleanupTestWatchtower("b000000000000000000000000000000000000000000000000000000000000000",
 			"watchtower-old-b", "org/watchtower:1")
 
-		client := mockContainer.NewMockClient(t)
+		client := mockContainerClient.NewMockClient(t)
 		client.EXPECT().StopAndRemoveContainer(mock.Anything, stopped, mock.Anything).Return(nil).Once()
 		client.EXPECT().StopAndRemoveContainer(mock.Anything, stuck, mock.Anything).
 			Return(errors.New("daemon busy")).Times(maxRemovalAttempts)
@@ -157,7 +157,7 @@ func TestRemoveExcessContainers_CancelKeepsRemovedInstanceImages(t *testing.T) {
 		defer cancel()
 
 		// The mock fails the test on any image removal.
-		client := mockContainer.NewMockClient(t)
+		client := mockContainerClient.NewMockClient(t)
 		client.EXPECT().StopAndRemoveContainer(mock.Anything, removedShared, mock.Anything).Return(nil).Once()
 		client.EXPECT().StopAndRemoveContainer(mock.Anything, removedOwn, mock.Anything).Return(nil).Once()
 		client.EXPECT().StopAndRemoveContainer(mock.Anything, stuck, mock.Anything).
@@ -195,7 +195,7 @@ func TestRemoveExcessContainers_NoCallerListRemovesImages(t *testing.T) {
 	old2 := cleanupTestWatchtower("b000000000000000000000000000000000000000000000000000000000000000",
 		"watchtower-old-b", "org/watchtower:1")
 
-	client := mockContainer.NewMockClient(t)
+	client := mockContainerClient.NewMockClient(t)
 	client.EXPECT().StopAndRemoveContainer(mock.Anything, mock.Anything, mock.Anything).Return(nil).Times(2)
 	client.EXPECT().RemoveImageByID(mock.Anything, types.ImageID("org/watchtower:1"), mock.Anything).
 		Return(nil).Once()
@@ -220,7 +220,7 @@ func TestUpdate_OldInstanceImageJoinsSessionCleanup(t *testing.T) {
 		"watchtower-old-a", "org/watchtower:1")
 
 	// The mock fails the test on any image removal.
-	client := mockContainer.NewMockClient(t)
+	client := mockContainerClient.NewMockClient(t)
 	client.EXPECT().ListContainers(mock.Anything, mock.Anything).Return([]types.Container{current, old}, nil)
 	client.EXPECT().StopAndRemoveContainer(mock.Anything, old, mock.Anything).Return(nil).Once()
 	client.EXPECT().IsContainerStale(mock.Anything, mock.Anything, mock.Anything).
@@ -260,7 +260,7 @@ func TestUpdate_SortFailureKeepsOldInstanceImage(t *testing.T) {
 	)
 
 	// The mock fails the test on any image removal.
-	client := mockContainer.NewMockClient(t)
+	client := mockContainerClient.NewMockClient(t)
 	client.EXPECT().ListContainers(mock.Anything, mock.Anything).
 		Return([]types.Container{current, old, app1, app2}, nil)
 	client.EXPECT().StopAndRemoveContainer(mock.Anything, old, mock.Anything).Return(nil).Once()
@@ -288,7 +288,7 @@ func TestRunUpdatesWithNotifications_RemovesOldInstanceImageOnce(t *testing.T) {
 	old := cleanupTestWatchtower("a000000000000000000000000000000000000000000000000000000000000000",
 		"watchtower-old-a", "org/watchtower:1")
 
-	client := mockContainer.NewMockClient(t)
+	client := mockContainerClient.NewMockClient(t)
 	client.EXPECT().ListContainers(mock.Anything, mock.Anything).Return([]types.Container{current, old}, nil)
 	client.EXPECT().StopAndRemoveContainer(mock.Anything, old, mock.Anything).Return(nil).Once()
 	client.EXPECT().IsContainerStale(mock.Anything, mock.Anything, mock.Anything).

@@ -14,10 +14,10 @@ import (
 	dockerContainer "github.com/moby/moby/api/types/container"
 
 	"github.com/nicholas-fedor/watchtower/internal/container"
+	mockContainerClient "github.com/nicholas-fedor/watchtower/internal/container/client/mocks"
 	"github.com/nicholas-fedor/watchtower/internal/container/oci"
 	"github.com/nicholas-fedor/watchtower/internal/registry/ratelimit"
 	mockUpdate "github.com/nicholas-fedor/watchtower/internal/update/mocks"
-	mockContainer "github.com/nicholas-fedor/watchtower/pkg/container/mocks"
 	"github.com/nicholas-fedor/watchtower/pkg/types"
 )
 
@@ -78,7 +78,7 @@ func TestUpdate_ComposeDependencyCycle(t *testing.T) {
 			api := composeContainer("b000000000000000000000000000000000000000000000000000000000000000", "api", "web:service_started:false")
 			app := composeContainer("c000000000000000000000000000000000000000000000000000000000000000", "app", "")
 
-			client := mockContainer.NewMockClient(t)
+			client := mockContainerClient.NewMockClient(t)
 			client.EXPECT().ListContainers(mock.Anything, mock.Anything).
 				Return([]types.Container{web, api, app}, nil).Once()
 			client.EXPECT().IsContainerStale(mock.Anything, mock.Anything, mock.Anything).
@@ -147,7 +147,7 @@ func TestUpdate_LinkToCycleMember(t *testing.T) {
 	c := dependent("c000000000000000000000000000000000000000000000000000000000000000", "c", "db")
 	replica := dependent("d100000000000000000000000000000000000000000000000000000000000000", "db-1", "c")
 
-	client := mockContainer.NewMockClient(t)
+	client := mockContainerClient.NewMockClient(t)
 	client.EXPECT().ListContainers(mock.Anything, mock.Anything).
 		Return([]types.Container{db, e, c, replica}, nil).Once()
 	client.EXPECT().IsContainerStale(mock.Anything, mock.Anything, mock.Anything).
@@ -218,7 +218,7 @@ func TestUpdate_HostConfigDependencyCycle(t *testing.T) {
 	vpn := hostContainer(vpnID, "vpn", &dockerContainer.HostConfig{VolumesFrom: []string{appID + ":ro"}})
 	web := hostContainer(webID, "web", &dockerContainer.HostConfig{})
 
-	client := mockContainer.NewMockClient(t)
+	client := mockContainerClient.NewMockClient(t)
 	client.EXPECT().ListContainers(mock.Anything, mock.Anything).
 		Return([]types.Container{app, vpn, web}, nil).Once()
 	client.EXPECT().IsContainerStale(mock.Anything, mock.Anything, mock.Anything).

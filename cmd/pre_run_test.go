@@ -21,11 +21,11 @@ import (
 	dockerImage "github.com/moby/moby/api/types/image"
 
 	"github.com/nicholas-fedor/watchtower/internal/container"
+	containerClient "github.com/nicholas-fedor/watchtower/internal/container/client"
+	mockContainerClient "github.com/nicholas-fedor/watchtower/internal/container/client/mocks"
 	"github.com/nicholas-fedor/watchtower/internal/container/labels"
 	"github.com/nicholas-fedor/watchtower/internal/observability/logging"
 	"github.com/nicholas-fedor/watchtower/internal/settings"
-	pkgContainer "github.com/nicholas-fedor/watchtower/pkg/container"
-	mockContainer "github.com/nicholas-fedor/watchtower/pkg/container/mocks"
 	"github.com/nicholas-fedor/watchtower/pkg/types"
 )
 
@@ -61,7 +61,7 @@ func cgroupWithSelf() string {
 // restores it when the test ends. newClient returns client, self container ID
 // detection reads only detection, and the Docker variables and registry TLS
 // settings preRun sets are restored.
-func setPreRunState(t *testing.T, client pkgContainer.Client, detection selfDetection) {
+func setPreRunState(t *testing.T, client containerClient.Client, detection selfDetection) {
 	t.Helper()
 
 	setRunState(t, runTestState{})
@@ -91,7 +91,7 @@ func setPreRunState(t *testing.T, client pkgContainer.Client, detection selfDete
 
 	setProcessFs(t, fsys)
 
-	newClient = func(*zerolog.Logger, pkgContainer.ClientOptions) pkgContainer.Client { return client }
+	newClient = func(*zerolog.Logger, containerClient.ClientOptions) containerClient.Client { return client }
 
 	for _, key := range []string{"HOSTNAME", "DOCKER_HOST", "DOCKER_TLS_VERIFY", "DOCKER_API_VERSION", "DOCKER_CERT_PATH"} {
 		t.Setenv(key, "")
@@ -148,7 +148,7 @@ func TestPreRun_SelfDetection(t *testing.T) {
 		name      string
 		args      []string
 		detection selfDetection
-		setup     func(client *mockContainer.MockClient)
+		setup     func(client *mockContainerClient.MockClient)
 		wantID    types.ContainerID
 		wantName  string
 		wantCalls []string
@@ -168,7 +168,7 @@ func TestPreRun_SelfDetection(t *testing.T) {
 		{
 			name:      "found from mountinfo",
 			detection: selfDetection{mountinfo: mountinfoWithSelf()},
-			setup: func(client *mockContainer.MockClient) {
+			setup: func(client *mockContainerClient.MockClient) {
 				client.EXPECT().GetCurrentWatchtowerContainer(mock.Anything, selfID).
 					Return(selfContainer("/watchtower", ""), nil)
 			},
@@ -179,7 +179,7 @@ func TestPreRun_SelfDetection(t *testing.T) {
 		{
 			name:      "found from cgroup",
 			detection: selfDetection{cgroup: cgroupWithSelf()},
-			setup: func(client *mockContainer.MockClient) {
+			setup: func(client *mockContainerClient.MockClient) {
 				client.EXPECT().GetCurrentWatchtowerContainer(mock.Anything, selfID).
 					Return(selfContainer("/watchtower", ""), nil)
 			},
@@ -190,7 +190,7 @@ func TestPreRun_SelfDetection(t *testing.T) {
 		{
 			name:      "found from hostname",
 			detection: selfDetection{hostname: "wt-host"},
-			setup: func(client *mockContainer.MockClient) {
+			setup: func(client *mockContainerClient.MockClient) {
 				self := selfContainer("/watchtower", "wt-host")
 				client.EXPECT().ListContainers(mock.Anything).Return([]types.Container{self}, nil)
 				client.EXPECT().GetCurrentWatchtowerContainer(mock.Anything, selfID).Return(self, nil)
@@ -202,7 +202,7 @@ func TestPreRun_SelfDetection(t *testing.T) {
 		{
 			name:      "lookup fails and the ID is kept",
 			detection: selfDetection{mountinfo: mountinfoWithSelf()},
-			setup: func(client *mockContainer.MockClient) {
+			setup: func(client *mockContainerClient.MockClient) {
 				client.EXPECT().GetCurrentWatchtowerContainer(mock.Anything, selfID).Return(nil, errRunTestDocker)
 			},
 			wantID:    selfID,
@@ -211,7 +211,7 @@ func TestPreRun_SelfDetection(t *testing.T) {
 		{
 			name:      "lookup times out and the ID is cleared",
 			detection: selfDetection{mountinfo: mountinfoWithSelf(), marker: true},
-			setup: func(client *mockContainer.MockClient) {
+			setup: func(client *mockContainerClient.MockClient) {
 				client.EXPECT().GetCurrentWatchtowerContainer(mock.Anything, selfID).
 					Return(nil, fmt.Errorf("inspect: %w", context.DeadlineExceeded))
 			},
@@ -222,7 +222,7 @@ func TestPreRun_SelfDetection(t *testing.T) {
 			name:      "old instance continues in run-once mode",
 			args:      []string{"--run-once"},
 			detection: selfDetection{mountinfo: mountinfoWithSelf()},
-			setup: func(client *mockContainer.MockClient) {
+			setup: func(client *mockContainerClient.MockClient) {
 				client.EXPECT().GetCurrentWatchtowerContainer(mock.Anything, selfID).
 					Return(selfContainer("/watchtower-old-cccccccccccc", ""), nil)
 			},
@@ -234,7 +234,7 @@ func TestPreRun_SelfDetection(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			mockClient := mockContainer.NewMockClient(t)
+			mockClient := mockContainerClient.NewMockClient(t)
 			if tt.setup != nil {
 				tt.setup(mockClient)
 			}
@@ -268,7 +268,7 @@ func containerName(c types.Container) string {
 // the flags and exports the Docker connection settings to the environment,
 // where the Docker client reads them.
 func TestPreRun_Configuration(t *testing.T) {
-	setPreRunState(t, mockContainer.NewMockClient(t), selfDetection{})
+	setPreRunState(t, mockContainerClient.NewMockClient(t), selfDetection{})
 
 	newRunProcess().preRun(newTestRootCommand(t,
 		"--scope", "prod",
@@ -332,12 +332,12 @@ func TestPreRun_RegistryTLSSettings(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			mockClient := mockContainer.NewMockClient(t)
+			mockClient := mockContainerClient.NewMockClient(t)
 			setPreRunState(t, mockClient, selfDetection{})
 
-			var clientOptions pkgContainer.ClientOptions
+			var clientOptions containerClient.ClientOptions
 
-			newClient = func(_ *zerolog.Logger, opts pkgContainer.ClientOptions) pkgContainer.Client {
+			newClient = func(_ *zerolog.Logger, opts containerClient.ClientOptions) containerClient.Client {
 				clientOptions = opts
 
 				return mockClient
@@ -403,7 +403,7 @@ func TestPreRun_PorcelainKeepsExplicitSettings(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			setPreRunState(t, mockContainer.NewMockClient(t), selfDetection{})
+			setPreRunState(t, mockContainerClient.NewMockClient(t), selfDetection{})
 
 			cmd := newTestRootCommand(t, tt.args...)
 
@@ -491,7 +491,7 @@ func TestPreRun_Exit(t *testing.T) {
 func preRunExitHelper(t *testing.T, helperCase string) {
 	t.Helper()
 
-	mockClient := mockContainer.NewMockClient(t)
+	mockClient := mockContainerClient.NewMockClient(t)
 	mockClient.EXPECT().SetRestartPolicy(mock.Anything, mock.Anything, mock.Anything).
 		Run(func(_ context.Context, c types.Container, policy dockerContainer.RestartPolicy) {
 			fmt.Fprintf(os.Stderr, "SetRestartPolicy %s %s\n", containerLabel(c), policy.Name)

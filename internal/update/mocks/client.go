@@ -12,14 +12,14 @@ import (
 	dockerContainer "github.com/moby/moby/api/types/container"
 
 	"github.com/nicholas-fedor/watchtower/internal/container/oci"
-	"github.com/nicholas-fedor/watchtower/pkg/container"
+	containerClient "github.com/nicholas-fedor/watchtower/internal/container/client"
 	"github.com/nicholas-fedor/watchtower/pkg/types"
 )
 
 // MockClient must satisfy the client interface. This mock is hand written
 // rather than generated, so nothing else would report a missing or renamed
 // method until a test happened to pass it where the interface is required.
-var _ container.Client = MockClient{}
+var _ containerClient.Client = MockClient{}
 
 // MockClient is a mock implementation of a Watchtower Client for testing purposes.
 // It simulates container operations with configurable behavior defined by TestData.

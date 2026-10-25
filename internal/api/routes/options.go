@@ -9,12 +9,12 @@ import (
 	"github.com/gofiber/fiber/v3/middleware/timeout"
 	"github.com/rs/zerolog"
 
+	containerClient "github.com/nicholas-fedor/watchtower/internal/container/client"
 	"github.com/nicholas-fedor/watchtower/internal/git"
 	"github.com/nicholas-fedor/watchtower/internal/observability/events"
 	"github.com/nicholas-fedor/watchtower/internal/observability/logging"
 	mt "github.com/nicholas-fedor/watchtower/internal/observability/metrics"
 	"github.com/nicholas-fedor/watchtower/internal/update/schedule"
-	"github.com/nicholas-fedor/watchtower/pkg/container"
 	"github.com/nicholas-fedor/watchtower/pkg/types"
 )
 
@@ -124,7 +124,7 @@ type Options struct {
 	// LabelEnable is exposed on the config API (filter option).
 	LabelEnable bool
 	// Client is the Docker client used by API handlers.
-	Client container.Client
+	Client containerClient.Client
 	// GitClient inspects remotes for Git-watched containers on /v1/check.
 	GitClient *git.Client
 	// Notifier sends update and check status messages.

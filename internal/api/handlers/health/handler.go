@@ -7,7 +7,7 @@ import (
 	"github.com/gofiber/fiber/v3"
 	"github.com/gofiber/fiber/v3/middleware/healthcheck"
 
-	"github.com/nicholas-fedor/watchtower/pkg/container"
+	containerClient "github.com/nicholas-fedor/watchtower/internal/container/client"
 )
 
 const readinessProbeTimeout = 5 * time.Second
@@ -48,7 +48,7 @@ type ReadinessHandler struct {
 // Parameters:
 //   - client: Docker client for the readiness probe. May be nil, in which case
 //     the readiness probe will report unhealthy.
-func NewReadinessHandler(client container.Client) *ReadinessHandler {
+func NewReadinessHandler(client containerClient.Client) *ReadinessHandler {
 	return &ReadinessHandler{
 		Path: healthcheck.ReadinessEndpoint,
 		Probe: func(ctx context.Context) bool {

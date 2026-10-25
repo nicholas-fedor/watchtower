@@ -8,12 +8,12 @@ import (
 
 	"github.com/rs/zerolog"
 
+	containerClient "github.com/nicholas-fedor/watchtower/internal/container/client"
 	"github.com/nicholas-fedor/watchtower/internal/git"
 	"github.com/nicholas-fedor/watchtower/internal/observability/events"
 	"github.com/nicholas-fedor/watchtower/internal/observability/metrics"
 	"github.com/nicholas-fedor/watchtower/internal/registry/ratelimit"
 	"github.com/nicholas-fedor/watchtower/internal/update/state"
-	"github.com/nicholas-fedor/watchtower/pkg/container"
 	"github.com/nicholas-fedor/watchtower/pkg/types"
 )
 
@@ -25,7 +25,7 @@ type RunUpdatesWithNotificationsParams struct {
 	// Logger is the process logger for this update session. Required and must be non-nil.
 	Logger *zerolog.Logger
 	// Client is the Docker client for container operations.
-	Client container.Client
+	Client containerClient.Client
 	// GitClient inspects remotes and clones repositories when the Git watcher is used.
 	GitClient *git.Client
 	// RateLimiter paces the session's registry requests. It must be the limiter
@@ -359,7 +359,7 @@ func startNotifications(log *zerolog.Logger, notifier types.Notifier, notificati
 func executeUpdate(
 	log *zerolog.Logger,
 	ctx context.Context,
-	client container.Client,
+	client containerClient.Client,
 	config types.UpdateParams,
 	rateLimiter *ratelimit.Limiter,
 	gitClient *git.Client,
@@ -394,7 +394,7 @@ func executeUpdate(
 // Returns:
 //   - []types.RemovedImageInfo: Slice of successfully cleaned image info.
 func performImageCleanup(log *zerolog.Logger, ctx context.Context,
-	client container.Client,
+	client containerClient.Client,
 	cleanup bool,
 	cleanupImageInfos []types.RemovedImageInfo,
 	timeout time.Duration,

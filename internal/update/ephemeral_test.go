@@ -16,8 +16,8 @@ import (
 
 	dockerContainer "github.com/moby/moby/api/types/container"
 
+	mockContainerClient "github.com/nicholas-fedor/watchtower/internal/container/client/mocks"
 	mockUpdate "github.com/nicholas-fedor/watchtower/internal/update/mocks"
-	mockContainer "github.com/nicholas-fedor/watchtower/pkg/container/mocks"
 	"github.com/nicholas-fedor/watchtower/pkg/types"
 )
 
@@ -58,10 +58,10 @@ func createDefaultMockContainer(id string, labels map[string]string) types.Conta
 //
 // Returns:
 //   - *mockContainer.MockClient: Mocked container client.
-func expectOrchestrator(t *testing.T, source types.Container, chain string, cleanup bool, err error) *mockContainer.MockClient {
+func expectOrchestrator(t *testing.T, source types.Container, chain string, cleanup bool, err error) *mockContainerClient.MockClient {
 	t.Helper()
 
-	client := mockContainer.NewMockClient(t)
+	client := mockContainerClient.NewMockClient(t)
 	client.EXPECT().
 		CreateEphemeralOrchestrator(mock.Anything, source, "watchtower:latest", chain, cleanup).
 		Return(types.ContainerID("orchestrator-id"), err).Once()
@@ -210,7 +210,7 @@ func TestEphemeralSelfUpdate_StoppingContainerLog(t *testing.T) {
 				"com.centurylinklabs.watchtower": "true",
 			})
 
-			client := mockContainer.NewMockClient(t)
+			client := mockContainerClient.NewMockClient(t)
 			client.EXPECT().
 				CreateEphemeralOrchestrator(mock.Anything, source, mock.Anything, mock.Anything, mock.Anything).
 				Return(types.ContainerID("orchestrator"), tt.createErr).Once()
@@ -267,7 +267,7 @@ func TestEphemeralSelfUpdate_OutlivesCanceledUpdate(t *testing.T) {
 		"com.centurylinklabs.watchtower": "true",
 	})
 
-	client := mockContainer.NewMockClient(t)
+	client := mockContainerClient.NewMockClient(t)
 	client.EXPECT().
 		CreateEphemeralOrchestrator(
 			mock.MatchedBy(func(created context.Context) bool {

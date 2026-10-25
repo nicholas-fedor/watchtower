@@ -14,9 +14,9 @@ import (
 	cerrdefs "github.com/containerd/errdefs"
 
 	"github.com/nicholas-fedor/watchtower/internal/container"
+	containerClient "github.com/nicholas-fedor/watchtower/internal/container/client"
 	containerImage "github.com/nicholas-fedor/watchtower/internal/container/image"
 	"github.com/nicholas-fedor/watchtower/internal/container/labels"
-	pkgContainer "github.com/nicholas-fedor/watchtower/pkg/container"
 	"github.com/nicholas-fedor/watchtower/pkg/types"
 )
 
@@ -94,7 +94,7 @@ var fullContainerIDPattern = regexp.MustCompile(`^[a-f0-9]{64}$`)
 //     removes the old container and, when cleanup is enabled, the old image.
 //   - error: Non-nil if orchestrator creation fails.
 func ephemeralSelfUpdate(log *zerolog.Logger, ctx context.Context,
-	client pkgContainer.Client,
+	client containerClient.Client,
 	sourceContainer types.Container,
 	config types.UpdateParams,
 ) (types.ContainerID, bool, error) {
@@ -214,7 +214,7 @@ func ephemeralSelfUpdate(log *zerolog.Logger, ctx context.Context,
 //   - log: Process logger. Required and must be non-nil. A nil logger panics on the first log call.
 //   - ctx: Context for cancellation and timeouts.
 //   - client: Container client for Docker operations.
-func RunOrchestrator(log *zerolog.Logger, ctx context.Context, client pkgContainer.Client) {
+func RunOrchestrator(log *zerolog.Logger, ctx context.Context, client containerClient.Client) {
 	clogVal := log.With().
 		Str("mode", "orchestrator").
 		Logger()
@@ -365,7 +365,7 @@ func readOrchestratorEnv() (string, string, string, string, bool, error) {
 // Returns:
 //   - error: Non-nil if any step in the orchestration fails.
 func orchestrateSelfUpdate(log *zerolog.Logger, ctx context.Context,
-	client pkgContainer.Client,
+	client containerClient.Client,
 	oldID string,
 	newImage string,
 	originalName string,
@@ -506,7 +506,7 @@ func pinContainerCreateImage(oldContainer types.Container, newImage string, clog
 //   - error: Non-nil if rename fails.
 func renameOldContainerForHandoff(
 	ctx context.Context,
-	client pkgContainer.Client,
+	client containerClient.Client,
 	clog *zerolog.Logger,
 	oldContainer types.Container,
 	originalName string,
@@ -550,7 +550,7 @@ func renameOldContainerForHandoff(
 //   - originalName: Canonical name to restore on the predecessor.
 func restoreAndStartOldContainer(
 	ctx context.Context,
-	client pkgContainer.Client,
+	client containerClient.Client,
 	clog *zerolog.Logger,
 	oldContainer types.Container,
 	originalName string,
@@ -598,7 +598,7 @@ func restoreAndStartOldContainer(
 //   - oldContainer: Stopped predecessor to start.
 func restartOldContainer(
 	ctx context.Context,
-	client pkgContainer.Client,
+	client containerClient.Client,
 	clog *zerolog.Logger,
 	oldContainer types.Container,
 ) {
@@ -624,7 +624,7 @@ func restartOldContainer(
 //   - newContainerID: ID of the failed replacement container to remove.
 func cleanupFailedNewContainer(
 	ctx context.Context,
-	client pkgContainer.Client,
+	client containerClient.Client,
 	clog *zerolog.Logger,
 	newContainerID types.ContainerID,
 ) {
@@ -667,7 +667,7 @@ func cleanupFailedNewContainer(
 //   - error: Non-nil if inspection fails.
 func inspectOldContainer(
 	ctx context.Context,
-	client pkgContainer.Client,
+	client containerClient.Client,
 	clog *zerolog.Logger,
 	oldID string,
 	containerChain string,
@@ -730,7 +730,7 @@ func inspectOldContainer(
 //   - error: Non-nil if stopping fails fatally while the container still runs.
 func stopOldContainer(
 	ctx context.Context,
-	client pkgContainer.Client,
+	client containerClient.Client,
 	clog *zerolog.Logger,
 	oldContainer types.Container,
 ) (bool, error) {
@@ -800,7 +800,7 @@ func stopOldContainer(
 //   - error: Non-nil if removal fails for a reason other than NotFound.
 func removeOldContainer(
 	ctx context.Context,
-	client pkgContainer.Client,
+	client containerClient.Client,
 	clog *zerolog.Logger,
 	oldContainer types.Container,
 ) error {
@@ -839,7 +839,7 @@ func removeOldContainer(
 //   - imageName: Name of the predecessor image captured before create-image pinning.
 func removeOldImage(
 	ctx context.Context,
-	client pkgContainer.Client,
+	client containerClient.Client,
 	clog *zerolog.Logger,
 	imageID types.ImageID,
 	imageName string,
@@ -906,7 +906,7 @@ func removeOldImage(
 //   - error: Non-nil if creation or starting fails.
 func createAndStartNewContainer(
 	ctx context.Context,
-	client pkgContainer.Client,
+	client containerClient.Client,
 	clog *zerolog.Logger,
 	oldContainer types.Container,
 ) (types.ContainerID, error) {
@@ -942,7 +942,7 @@ func createAndStartNewContainer(
 //   - error: Non-nil if the container cannot be verified or started.
 func ensureContainerRunning(
 	ctx context.Context,
-	client pkgContainer.Client,
+	client containerClient.Client,
 	clog *zerolog.Logger,
 	containerID types.ContainerID,
 ) error {

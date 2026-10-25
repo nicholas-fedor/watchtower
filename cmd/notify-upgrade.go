@@ -12,9 +12,9 @@ import (
 	"github.com/rs/zerolog"
 	"github.com/spf13/cobra"
 
+	containerClient "github.com/nicholas-fedor/watchtower/internal/container/client"
 	"github.com/nicholas-fedor/watchtower/internal/observability/logging"
 	"github.com/nicholas-fedor/watchtower/internal/settings"
-	"github.com/nicholas-fedor/watchtower/pkg/container"
 	"github.com/nicholas-fedor/watchtower/pkg/notifications"
 	"github.com/nicholas-fedor/watchtower/pkg/types"
 )
@@ -141,11 +141,11 @@ func runNotifyUpgradeE(cmd *cobra.Command, _ []string, log *zerolog.Logger) (*ze
 
 	var cid types.ContainerID
 
-	cid, err = container.GetContainerIDFromMountinfo(log, processFs)
+	cid, err = containerClient.GetContainerIDFromMountinfo(log, processFs)
 	if err == nil && cid != "" {
 		containerID = cid.ShortID()
 	} else {
-		cid, err = container.GetContainerIDFromCgroupFile(log, processFs)
+		cid, err = containerClient.GetContainerIDFromCgroupFile(log, processFs)
 		if err == nil && cid != "" {
 			containerID = cid.ShortID()
 		}

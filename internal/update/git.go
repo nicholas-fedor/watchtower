@@ -15,6 +15,7 @@ import (
 	composeApply "github.com/nicholas-fedor/watchtower/internal/compose/apply"
 	composeProject "github.com/nicholas-fedor/watchtower/internal/compose/project"
 	"github.com/nicholas-fedor/watchtower/internal/container"
+	containerClient "github.com/nicholas-fedor/watchtower/internal/container/client"
 	containerImage "github.com/nicholas-fedor/watchtower/internal/container/image"
 	"github.com/nicholas-fedor/watchtower/internal/container/oci"
 	"github.com/nicholas-fedor/watchtower/internal/container/provenance"
@@ -23,7 +24,6 @@ import (
 	"github.com/nicholas-fedor/watchtower/internal/git/project"
 	"github.com/nicholas-fedor/watchtower/internal/update/sorter"
 	"github.com/nicholas-fedor/watchtower/internal/update/state"
-	pkgContainer "github.com/nicholas-fedor/watchtower/pkg/container"
 	"github.com/nicholas-fedor/watchtower/pkg/types"
 )
 
@@ -216,7 +216,7 @@ func (s *gitSession) check(
 func (s *gitSession) prepareRebuilds(
 	log *zerolog.Logger,
 	ctx context.Context,
-	docker pkgContainer.Client,
+	docker containerClient.Client,
 	containers []types.Container,
 	params types.UpdateParams,
 	progress *state.Progress,
@@ -478,7 +478,7 @@ func (s *gitSession) needsApply(c types.Container, params types.UpdateParams) bo
 func (s *gitSession) buildOne(
 	log *zerolog.Logger,
 	ctx context.Context,
-	docker pkgContainer.Client,
+	docker containerClient.Client,
 	c types.Container,
 	result git.CheckResult,
 	params types.UpdateParams,

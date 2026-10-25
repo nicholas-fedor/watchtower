@@ -17,6 +17,7 @@ import (
 	"github.com/nicholas-fedor/watchtower/internal/api"
 	"github.com/nicholas-fedor/watchtower/internal/api/routes"
 	"github.com/nicholas-fedor/watchtower/internal/container"
+	containerClient "github.com/nicholas-fedor/watchtower/internal/container/client"
 	"github.com/nicholas-fedor/watchtower/internal/container/filters"
 	"github.com/nicholas-fedor/watchtower/internal/git"
 	"github.com/nicholas-fedor/watchtower/internal/meta"
@@ -27,7 +28,6 @@ import (
 	"github.com/nicholas-fedor/watchtower/internal/settings"
 	"github.com/nicholas-fedor/watchtower/internal/update"
 	"github.com/nicholas-fedor/watchtower/internal/update/schedule"
-	pkgContainer "github.com/nicholas-fedor/watchtower/pkg/container"
 	"github.com/nicholas-fedor/watchtower/pkg/notifications"
 	"github.com/nicholas-fedor/watchtower/pkg/types"
 )
@@ -63,7 +63,7 @@ var (
 	// It provides an interface for listing, stopping, starting, and managing containers, initialized during
 	// the preRun phase with options derived from appCfg.ClientOptions() (DOCKER_HOST, TLS, API version, and
 	// related client flags/environment variables).
-	client pkgContainer.Client
+	client containerClient.Client
 
 	// rateLimiter paces every registry request, so image pulls, digest checks,
 	// image age lookups, and release tag lookups share one budget per registry
@@ -109,7 +109,7 @@ var (
 	//
 	// It is initialized to container.NewClient by default. preRun calls it with the resolved client options,
 	// so tests can substitute a mock client without a Docker daemon.
-	newClient = pkgContainer.NewClient
+	newClient = containerClient.NewClient
 
 	// processFs is the filesystem holding the container marker files and the
 	// /proc files that self container ID detection reads.
@@ -295,7 +295,7 @@ func (p *process) preRun(cmd *cobra.Command, _ []string) {
 	defer cancel()
 
 	// Retrieve and store the current container ID for use throughout the application.
-	currentWatchtowerContainerID, err = pkgContainer.GetCurrentContainerID(p.log, ctx, processFs, client)
+	currentWatchtowerContainerID, err = containerClient.GetCurrentContainerID(p.log, ctx, processFs, client)
 	if err != nil {
 		p.log.Debug().Err(err).Msg("Failed to get current container ID")
 
@@ -323,7 +323,7 @@ func (p *process) preRun(cmd *cobra.Command, _ []string) {
 	// Without its own ID, Watchtower cannot tell itself apart from other instances.
 	// A host binary has no container ID, so only a containerized run is unknown.
 	currentWatchtowerContainerUnknown = currentWatchtowerContainerID == "" &&
-		pkgContainer.InContainer(processFs)
+		containerClient.InContainer(processFs)
 
 	// Check if this is an old Watchtower container that should not run continuously.
 	// exitInvalidWatchtowerRestart calls os.Exit. Keep it in a helper so preRun
@@ -374,7 +374,7 @@ func (p *process) preRun(cmd *cobra.Command, _ []string) {
 //   - watchtowerContainer: Current Watchtower container instance, or nil.
 func exitInvalidWatchtowerRestart(
 	log *zerolog.Logger,
-	dockerClient pkgContainer.Client,
+	dockerClient containerClient.Client,
 	watchtowerContainer types.Container,
 ) {
 	log.Info().
@@ -736,7 +736,7 @@ func (p *process) runMain(cfg types.RunConfig) int {
 	// Check for and cleanup orphaned ephemeral orchestrator containers.
 	// These may persist if the orchestrator crashed or was killed unexpectedly.
 	// With AutoRemove: true, this is a safety net for edge cases.
-	removedOrchestratorCount, orchestratorErr := pkgContainer.RemoveOrphanedOrchestrators(p.log, ctx, client)
+	removedOrchestratorCount, orchestratorErr := containerClient.RemoveOrphanedOrchestrators(p.log, ctx, client)
 	if orchestratorErr != nil {
 		p.log.Warn().
 			Err(orchestratorErr).
@@ -955,11 +955,11 @@ func awaitDockerClient(log *zerolog.Logger) {
 //
 // Returns:
 //   - types.Container: The resolved Watchtower container, or nil if detection fails.
-func resolveCurrentWatchtowerContainerForFallback(log *zerolog.Logger, ctx context.Context, c pkgContainer.Client) types.Container {
+func resolveCurrentWatchtowerContainerForFallback(log *zerolog.Logger, ctx context.Context, c containerClient.Client) types.Container {
 	lookupCtx, cancel := context.WithTimeout(ctx, containerLookupTimeout)
 	defer cancel()
 
-	containerID, err := pkgContainer.GetCurrentContainerID(log, lookupCtx, processFs, c)
+	containerID, err := containerClient.GetCurrentContainerID(log, lookupCtx, processFs, c)
 	if err == nil && containerID != "" {
 		resolvedContainer, _ := c.GetCurrentWatchtowerContainer(lookupCtx, containerID)
 

@@ -17,9 +17,9 @@ import (
 	cerrdefs "github.com/containerd/errdefs"
 	dockerContainer "github.com/moby/moby/api/types/container"
 
+	mockContainerClient "github.com/nicholas-fedor/watchtower/internal/container/client/mocks"
 	"github.com/nicholas-fedor/watchtower/internal/observability/logging"
 	mockUpdate "github.com/nicholas-fedor/watchtower/internal/update/mocks"
-	mockContainer "github.com/nicholas-fedor/watchtower/pkg/container/mocks"
 	"github.com/nicholas-fedor/watchtower/pkg/types"
 )
 
@@ -60,7 +60,7 @@ func orchestratorContainer(id, name string, running bool) types.Container {
 
 // orchestratorCalls returns the Docker client calls in the order they were
 // made, each with the container or image it targeted.
-func orchestratorCalls(client *mockContainer.MockClient) []string {
+func orchestratorCalls(client *mockContainerClient.MockClient) []string {
 	calls := make([]string, 0, len(client.Calls))
 
 	for _, call := range client.Calls {
@@ -206,13 +206,13 @@ func TestOrchestrateSelfUpdate_Handoff(t *testing.T) {
 		oldName      string
 		originalName string
 		cleanup      bool
-		setup        func(client *mockContainer.MockClient, old types.Container)
+		setup        func(client *mockContainerClient.MockClient, old types.Container)
 		wantErr      error
 		wantCalls    []string
 	}{
 		{
 			name: "old container not found",
-			setup: func(client *mockContainer.MockClient, _ types.Container) {
+			setup: func(client *mockContainerClient.MockClient, _ types.Container) {
 				client.EXPECT().GetContainer(mock.Anything, types.ContainerID(orchestratorOldID)).
 					Return(nil, errOrchestratorTestNotFound)
 			},
@@ -221,7 +221,7 @@ func TestOrchestrateSelfUpdate_Handoff(t *testing.T) {
 		},
 		{
 			name: "old container inspect fails",
-			setup: func(client *mockContainer.MockClient, _ types.Container) {
+			setup: func(client *mockContainerClient.MockClient, _ types.Container) {
 				client.EXPECT().GetContainer(mock.Anything, types.ContainerID(orchestratorOldID)).
 					Return(nil, errOrchestratorTestDocker)
 			},
@@ -230,7 +230,7 @@ func TestOrchestrateSelfUpdate_Handoff(t *testing.T) {
 		},
 		{
 			name: "success removes the renamed old container",
-			setup: func(client *mockContainer.MockClient, old types.Container) {
+			setup: func(client *mockContainerClient.MockClient, old types.Container) {
 				expectOldInspect(client, old)
 				client.EXPECT().StopContainer(mock.Anything, old, orchestratorStopTimeout).Return(nil)
 				client.EXPECT().RenameContainer(mock.Anything, old, orchestratorRenamedName[1:]).Return(nil)
@@ -250,7 +250,7 @@ func TestOrchestrateSelfUpdate_Handoff(t *testing.T) {
 		{
 			name:    "success removes the old image when cleanup is set",
 			cleanup: true,
-			setup: func(client *mockContainer.MockClient, old types.Container) {
+			setup: func(client *mockContainerClient.MockClient, old types.Container) {
 				expectOldInspect(client, old)
 				client.EXPECT().StopContainer(mock.Anything, old, orchestratorStopTimeout).Return(nil)
 				client.EXPECT().RenameContainer(mock.Anything, old, orchestratorRenamedName[1:]).Return(nil)
@@ -273,7 +273,7 @@ func TestOrchestrateSelfUpdate_Handoff(t *testing.T) {
 		{
 			name:    "old container already renamed is not renamed again",
 			oldName: orchestratorRenamedName,
-			setup: func(client *mockContainer.MockClient, old types.Container) {
+			setup: func(client *mockContainerClient.MockClient, old types.Container) {
 				expectOldInspect(client, old)
 				client.EXPECT().StopContainer(mock.Anything, old, orchestratorStopTimeout).Return(nil)
 				client.EXPECT().StartContainer(mock.Anything, old).Return(types.ContainerID(orchestratorNewID), nil)
@@ -290,7 +290,7 @@ func TestOrchestrateSelfUpdate_Handoff(t *testing.T) {
 		},
 		{
 			name: "old container gone before stop skips rename and removal",
-			setup: func(client *mockContainer.MockClient, old types.Container) {
+			setup: func(client *mockContainerClient.MockClient, old types.Container) {
 				expectOldInspect(client, old)
 				client.EXPECT().StopContainer(mock.Anything, old, orchestratorStopTimeout).Return(errOrchestratorTestNotFound)
 				client.EXPECT().StartContainer(mock.Anything, old).Return(types.ContainerID(orchestratorNewID), nil)
@@ -305,7 +305,7 @@ func TestOrchestrateSelfUpdate_Handoff(t *testing.T) {
 		},
 		{
 			name: "stop error with the old container already stopped continues",
-			setup: func(client *mockContainer.MockClient, old types.Container) {
+			setup: func(client *mockContainerClient.MockClient, old types.Container) {
 				expectOldInspect(client, old)
 				client.EXPECT().StopContainer(mock.Anything, old, orchestratorStopTimeout).Return(errOrchestratorTestDocker)
 				client.EXPECT().GetContainer(mock.Anything, types.ContainerID(orchestratorOldID)).
@@ -327,7 +327,7 @@ func TestOrchestrateSelfUpdate_Handoff(t *testing.T) {
 		},
 		{
 			name: "stop error with the old container still running stops the handoff",
-			setup: func(client *mockContainer.MockClient, old types.Container) {
+			setup: func(client *mockContainerClient.MockClient, old types.Container) {
 				expectOldInspect(client, old)
 				client.EXPECT().StopContainer(mock.Anything, old, orchestratorStopTimeout).Return(errOrchestratorTestDocker)
 				client.EXPECT().GetContainer(mock.Anything, types.ContainerID(orchestratorOldID)).
@@ -338,7 +338,7 @@ func TestOrchestrateSelfUpdate_Handoff(t *testing.T) {
 		},
 		{
 			name: "rename failure restarts the old container",
-			setup: func(client *mockContainer.MockClient, old types.Container) {
+			setup: func(client *mockContainerClient.MockClient, old types.Container) {
 				expectOldInspect(client, old)
 				client.EXPECT().StopContainer(mock.Anything, old, orchestratorStopTimeout).Return(nil)
 				client.EXPECT().RenameContainer(mock.Anything, old, orchestratorRenamedName[1:]).Return(errOrchestratorTestDocker)
@@ -354,7 +354,7 @@ func TestOrchestrateSelfUpdate_Handoff(t *testing.T) {
 		},
 		{
 			name: "rename failure still reports the rename when the restart fails",
-			setup: func(client *mockContainer.MockClient, old types.Container) {
+			setup: func(client *mockContainerClient.MockClient, old types.Container) {
 				expectOldInspect(client, old)
 				client.EXPECT().StopContainer(mock.Anything, old, orchestratorStopTimeout).Return(nil)
 				client.EXPECT().RenameContainer(mock.Anything, old, orchestratorRenamedName[1:]).Return(errOrchestratorTestDocker)
@@ -371,7 +371,7 @@ func TestOrchestrateSelfUpdate_Handoff(t *testing.T) {
 		},
 		{
 			name: "create failure restores and restarts the old container",
-			setup: func(client *mockContainer.MockClient, old types.Container) {
+			setup: func(client *mockContainerClient.MockClient, old types.Container) {
 				expectOldInspect(client, old)
 				client.EXPECT().StopContainer(mock.Anything, old, orchestratorStopTimeout).Return(nil)
 				client.EXPECT().RenameContainer(mock.Anything, old, orchestratorRenamedName[1:]).Return(nil)
@@ -392,7 +392,7 @@ func TestOrchestrateSelfUpdate_Handoff(t *testing.T) {
 		{
 			name:         "create failure without an original name leaves the old container renamed and stopped",
 			originalName: "-",
-			setup: func(client *mockContainer.MockClient, old types.Container) {
+			setup: func(client *mockContainerClient.MockClient, old types.Container) {
 				expectOldInspect(client, old)
 				client.EXPECT().StopContainer(mock.Anything, old, orchestratorStopTimeout).Return(nil)
 				client.EXPECT().RenameContainer(mock.Anything, old, orchestratorRenamedName[1:]).Return(nil)
@@ -408,7 +408,7 @@ func TestOrchestrateSelfUpdate_Handoff(t *testing.T) {
 		},
 		{
 			name: "create failure stops restoring when the rename back fails",
-			setup: func(client *mockContainer.MockClient, old types.Container) {
+			setup: func(client *mockContainerClient.MockClient, old types.Container) {
 				expectOldInspect(client, old)
 				client.EXPECT().StopContainer(mock.Anything, old, orchestratorStopTimeout).Return(nil)
 				client.EXPECT().RenameContainer(mock.Anything, old, orchestratorRenamedName[1:]).Return(nil)
@@ -426,7 +426,7 @@ func TestOrchestrateSelfUpdate_Handoff(t *testing.T) {
 		},
 		{
 			name: "stopped new container is started",
-			setup: func(client *mockContainer.MockClient, old types.Container) {
+			setup: func(client *mockContainerClient.MockClient, old types.Container) {
 				expectOldInspect(client, old)
 				client.EXPECT().StopContainer(mock.Anything, old, orchestratorStopTimeout).Return(nil)
 				client.EXPECT().RenameContainer(mock.Anything, old, orchestratorRenamedName[1:]).Return(nil)
@@ -449,7 +449,7 @@ func TestOrchestrateSelfUpdate_Handoff(t *testing.T) {
 		},
 		{
 			name: "new container that fails to start is removed and the old one restored",
-			setup: func(client *mockContainer.MockClient, old types.Container) {
+			setup: func(client *mockContainerClient.MockClient, old types.Container) {
 				expectOldInspect(client, old)
 				client.EXPECT().StopContainer(mock.Anything, old, orchestratorStopTimeout).Return(nil)
 				client.EXPECT().RenameContainer(mock.Anything, old, orchestratorRenamedName[1:]).Return(nil)
@@ -477,7 +477,7 @@ func TestOrchestrateSelfUpdate_Handoff(t *testing.T) {
 		},
 		{
 			name: "new container that stops after starting is removed and the old one restored",
-			setup: func(client *mockContainer.MockClient, old types.Container) {
+			setup: func(client *mockContainerClient.MockClient, old types.Container) {
 				expectOldInspect(client, old)
 				client.EXPECT().StopContainer(mock.Anything, old, orchestratorStopTimeout).Return(nil)
 				client.EXPECT().RenameContainer(mock.Anything, old, orchestratorRenamedName[1:]).Return(nil)
@@ -507,7 +507,7 @@ func TestOrchestrateSelfUpdate_Handoff(t *testing.T) {
 		},
 		{
 			name: "failure to remove the old container still succeeds",
-			setup: func(client *mockContainer.MockClient, old types.Container) {
+			setup: func(client *mockContainerClient.MockClient, old types.Container) {
 				expectOldInspect(client, old)
 				client.EXPECT().StopContainer(mock.Anything, old, orchestratorStopTimeout).Return(nil)
 				client.EXPECT().RenameContainer(mock.Anything, old, orchestratorRenamedName[1:]).Return(nil)
@@ -542,7 +542,7 @@ func TestOrchestrateSelfUpdate_Handoff(t *testing.T) {
 			}
 
 			old := orchestratorContainer(orchestratorOldID, oldName, true)
-			client := mockContainer.NewMockClient(t)
+			client := mockContainerClient.NewMockClient(t)
 			tt.setup(client, old)
 
 			err := orchestrateSelfUpdate(newTestLogger(t), t.Context(), client,
@@ -560,13 +560,13 @@ func TestOrchestrateSelfUpdate_Handoff(t *testing.T) {
 
 // expectOldInspect expects the orchestrator's first inspection of the old
 // container.
-func expectOldInspect(client *mockContainer.MockClient, old types.Container) {
+func expectOldInspect(client *mockContainerClient.MockClient, old types.Container) {
 	client.EXPECT().GetContainer(mock.Anything, types.ContainerID(orchestratorOldID)).Return(old, nil).Once()
 }
 
 // expectNewRunning expects one inspection of the new container, reporting it
 // running or stopped, and returns the container it reports.
-func expectNewRunning(client *mockContainer.MockClient, running bool) types.Container {
+func expectNewRunning(client *mockContainerClient.MockClient, running bool) types.Container {
 	newContainer := orchestratorContainer(orchestratorNewID, "/watchtower", running)
 	client.EXPECT().GetContainer(mock.Anything, types.ContainerID(orchestratorNewID)).Return(newContainer, nil).Once()
 
@@ -628,7 +628,7 @@ func runOrchestratorHelper(t *testing.T, helperCase string) {
 	t.Helper()
 
 	log := logging.New(os.Stderr, logging.DebugLevel)
-	client := mockContainer.NewMockClient(t)
+	client := mockContainerClient.NewMockClient(t)
 
 	if helperCase != "missing-env" {
 		t.Setenv("WT_ORCHESTRATOR_OLD_ID", orchestratorOldID)

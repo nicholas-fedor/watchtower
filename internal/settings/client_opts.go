@@ -1,8 +1,8 @@
 package settings
 
 import (
+	containerClient "github.com/nicholas-fedor/watchtower/internal/container/client"
 	containerImage "github.com/nicholas-fedor/watchtower/internal/container/image"
-	"github.com/nicholas-fedor/watchtower/pkg/container"
 )
 
 // ClientOptions builds container.ClientOptions from the resolved Config.
@@ -12,8 +12,8 @@ import (
 //
 // Returns:
 //   - container.ClientOptions: Options for container.NewClient.
-func (c Config) ClientOptions() container.ClientOptions {
-	return container.ClientOptions{
+func (c Config) ClientOptions() containerClient.ClientOptions {
+	return containerClient.ClientOptions{
 		IncludeStopped:          c.Client.IncludeStopped,
 		IncludeRestarting:       c.Client.IncludeRestarting,
 		ReviveStopped:           c.Client.ReviveStopped,

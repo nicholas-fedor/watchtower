@@ -11,8 +11,8 @@ import (
 
 	dockerContainer "github.com/moby/moby/api/types/container"
 
+	mockContainerClient "github.com/nicholas-fedor/watchtower/internal/container/client/mocks"
 	mockUpdate "github.com/nicholas-fedor/watchtower/internal/update/mocks"
-	mockContainer "github.com/nicholas-fedor/watchtower/pkg/container/mocks"
 	"github.com/nicholas-fedor/watchtower/pkg/types"
 )
 
@@ -57,7 +57,7 @@ func recoveryContainer(id, name string, running bool, scope string) types.Contai
 // Parameters:
 //   - client: Mocked container client.
 //   - containers: Containers the listing returns.
-func expectListed(client *mockContainer.MockClient, containers ...types.Container) {
+func expectListed(client *mockContainerClient.MockClient, containers ...types.Container) {
 	client.EXPECT().ListContainers(mock.Anything, mock.Anything).Return(containers, nil).Once()
 }
 
@@ -74,7 +74,7 @@ func TestTryRecoverOrphanedContainer(t *testing.T) {
 		t.Run("should return false without error", func(t *testing.T) {
 			t.Parallel()
 
-			client := mockContainer.NewMockClient(t)
+			client := mockContainerClient.NewMockClient(t)
 			client.EXPECT().ListContainers(mock.Anything, mock.Anything).Return(nil, context.DeadlineExceeded).Once()
 
 			current := mockUpdate.CreateMockContainer("current-id", "watchtower", "watchtower:latest", time.Now())
@@ -96,7 +96,7 @@ func TestTryRecoverOrphanedContainer(t *testing.T) {
 			oldContainer := recoveryContainer("old-id", "watchtower-old-abc123", true, "")
 			current := mockUpdate.CreateMockContainer("current-id", "watchtower", "watchtower:latest", time.Now())
 
-			client := mockContainer.NewMockClient(t)
+			client := mockContainerClient.NewMockClient(t)
 			expectListed(client, oldContainer, current)
 
 			recovered, ok := TryRecoverOrphanedContainer(newTestLogger(t), t.Context(), client, current)
@@ -114,7 +114,7 @@ func TestTryRecoverOrphanedContainer(t *testing.T) {
 			orphaned := recoveryContainer("orphaned-id", "watchtower-xyz", false, "")
 			current := recoveryContainer("current-id", "watchtower-old-abc123", true, "")
 
-			client := mockContainer.NewMockClient(t)
+			client := mockContainerClient.NewMockClient(t)
 			expectListed(client, orphaned, current)
 			client.EXPECT().StartContainerByID(mock.Anything, types.ContainerID("orphaned-id")).Return(nil).Once()
 
@@ -134,7 +134,7 @@ func TestTryRecoverOrphanedContainer(t *testing.T) {
 			orphaned := recoveryContainer("orphaned-id", "watchtower-xyz", false, "")
 			current := recoveryContainer("current-id", "watchtower-old-abc123", true, "")
 
-			client := mockContainer.NewMockClient(t)
+			client := mockContainerClient.NewMockClient(t)
 			expectListed(client, orphaned, current)
 			client.EXPECT().StartContainerByID(mock.Anything, types.ContainerID("orphaned-id")).
 				Return(context.DeadlineExceeded).Once()
@@ -152,7 +152,7 @@ func TestTryRecoverOrphanedContainer(t *testing.T) {
 			t.Parallel()
 
 			// The mock has no expectations, so any client call fails the test.
-			client := mockContainer.NewMockClient(t)
+			client := mockContainerClient.NewMockClient(t)
 
 			var (
 				recovered types.Container
@@ -176,7 +176,7 @@ func TestTryRecoverOrphanedContainer(t *testing.T) {
 			orphaned := recoveryContainer("orphaned-id", "watchtower-xyz", false, "scope-b")
 			current := recoveryContainer("current-id", "watchtower-old-abc123", true, "scope-a")
 
-			client := mockContainer.NewMockClient(t)
+			client := mockContainerClient.NewMockClient(t)
 			expectListed(client, orphaned, current)
 
 			recovered, ok := TryRecoverOrphanedContainer(newTestLogger(t), t.Context(), client, current)
@@ -194,7 +194,7 @@ func TestTryRecoverOrphanedContainer(t *testing.T) {
 			orphaned := recoveryContainer("orphaned-id", "watchtower-xyz", false, "scope-b")
 			current := recoveryContainer("current-id", "watchtower-old-abc123", true, "")
 
-			client := mockContainer.NewMockClient(t)
+			client := mockContainerClient.NewMockClient(t)
 			expectListed(client, orphaned, current)
 
 			recovered, ok := TryRecoverOrphanedContainer(newTestLogger(t), t.Context(), client, current)

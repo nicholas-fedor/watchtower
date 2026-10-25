@@ -9,8 +9,8 @@ import (
 
 	"github.com/distribution/reference"
 
+	containerClient "github.com/nicholas-fedor/watchtower/internal/container/client"
 	containerImage "github.com/nicholas-fedor/watchtower/internal/container/image"
-	"github.com/nicholas-fedor/watchtower/pkg/container"
 	"github.com/nicholas-fedor/watchtower/pkg/types"
 )
 
@@ -58,7 +58,7 @@ func filterImages(statuses []ImageStatus, name, imageID string) []ImageStatus {
 // Returns:
 //   - []ImageStatus: Status for each tracked image, sorted by name and then image ID.
 //   - error: Non-nil if listing containers fails.
-func ListImageStatuses(ctx context.Context, client container.Client, filter types.Filter) ([]ImageStatus, error) {
+func ListImageStatuses(ctx context.Context, client containerClient.Client, filter types.Filter) ([]ImageStatus, error) {
 	var list []types.Container
 
 	var err error
