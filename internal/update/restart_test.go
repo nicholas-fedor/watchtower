@@ -212,7 +212,6 @@ func TestDetachedContext(t *testing.T) {
 	type TestDetachedContextDeadlineCase struct {
 		name            string
 		timeout         time.Duration
-		expectDeadline  bool
 		expectedTimeout time.Duration
 		description     string
 	}
@@ -224,28 +223,24 @@ func TestDetachedContext(t *testing.T) {
 			{
 				name:            "positive timeout above minimum uses configured timeout",
 				timeout:         10 * time.Minute,
-				expectDeadline:  true,
 				expectedTimeout: 10 * time.Minute,
 				description:     "When Timeout exceeds defaultCreateStartTimeout, the detached context uses the configured timeout",
 			},
 			{
 				name:            "positive timeout below minimum creates context with minimum deadline",
 				timeout:         30 * time.Second,
-				expectDeadline:  true,
 				expectedTimeout: defaultCreateStartTimeout,
 				description:     "When Timeout is below defaultCreateStartTimeout, the detached context uses the minimum",
 			},
 			{
 				name:            "zero timeout creates context with minimum deadline",
 				timeout:         0,
-				expectDeadline:  true,
 				expectedTimeout: defaultCreateStartTimeout,
 				description:     "When Timeout is zero, the detached context uses the minimum create/start deadline",
 			},
 			{
 				name:            "negative timeout creates context with minimum deadline",
 				timeout:         -1 * time.Second,
-				expectDeadline:  true,
 				expectedTimeout: defaultCreateStartTimeout,
 				description:     "When Timeout is negative, the detached context uses the minimum create/start deadline",
 			},
@@ -310,8 +305,7 @@ func TestDetachedContext(t *testing.T) {
 				assert.Equal(t, int32(1), client.TestData.SetRestartPolicyCount.Load())
 
 				// Verify CreateContainer and StartContainerByID also use the detached context.
-				// These operations run after the initial rename, so they should share the same
-				// deadline when expectDeadline is true.
+				// Both run under one detached context, so they share its deadline.
 				createCtx := client.TestData.CreateContainerCtx
 				startCtx := client.TestData.StartContainerByIDCtx
 				noRestartCtx := client.TestData.SetRestartPolicyCtx
@@ -320,45 +314,17 @@ func TestDetachedContext(t *testing.T) {
 				require.NotNil(t, startCtx, "StartContainerByID should receive a context")
 				assert.Same(t, startCtx, createCtx, "CreateContainer and StartContainerByID should share the same detached context")
 				assert.Same(t, noRestartCtx, createCtx, "CreateContainer should use the same detached context as SetRestartPolicy")
-
-				if tc.expectDeadline {
-					_, createHasDeadline := createCtx.Deadline()
-					_, startHasDeadline := startCtx.Deadline()
-
-					assert.True(t, createHasDeadline)
-					assert.True(t, startHasDeadline)
-
-					expectedDeadline := time.Now().Add(tc.expectedTimeout)
-					createDeadline, _ := createCtx.Deadline()
-					startDeadline, _ := startCtx.Deadline()
-
-					assert.WithinDuration(t, expectedDeadline, createDeadline, time.Second)
-					assert.WithinDuration(t, expectedDeadline, startDeadline, time.Second)
-				} else {
-					_, createHasDeadline := createCtx.Deadline()
-					_, startHasDeadline := startCtx.Deadline()
-
-					assert.False(t, createHasDeadline)
-					assert.False(t, startHasDeadline)
-				}
-
-				// Verify CreateContainer and StartContainerByID also use the detached context.
-				// These operations run after CreateContainer succeeds, so the same deadline
-				// should apply when expectDeadline is true.
 				assert.Equal(t, int32(1), client.TestData.CreateContainerCount.Load())
 				assert.Equal(t, int32(1), client.TestData.StartContainerCount.Load())
 
-				if tc.expectDeadline {
-					createDeadline, createHasDeadline := client.TestData.CreateContainerCtx.Deadline()
-					assert.True(t, createHasDeadline)
+				expectedDeadline := time.Now().Add(tc.expectedTimeout)
+				createDeadline, createHasDeadline := createCtx.Deadline()
+				startDeadline, startHasDeadline := startCtx.Deadline()
 
-					startDeadline, startHasDeadline := client.TestData.StartContainerByIDCtx.Deadline()
-					assert.True(t, startHasDeadline)
-
-					expectedDeadline := time.Now().Add(tc.expectedTimeout)
-					assert.WithinDuration(t, expectedDeadline, createDeadline, time.Second)
-					assert.WithinDuration(t, expectedDeadline, startDeadline, time.Second)
-				}
+				require.True(t, createHasDeadline)
+				require.True(t, startHasDeadline)
+				assert.WithinDuration(t, expectedDeadline, createDeadline, time.Second)
+				assert.WithinDuration(t, expectedDeadline, startDeadline, time.Second)
 			})
 		}
 	})
@@ -656,7 +622,7 @@ func TestDetachedContext(t *testing.T) {
 			assert.Equal(t, int32(1), client.TestData.RemoveContainerCount.Load())
 		})
 
-		t.Run("cleanup operations complete when parent context is already canceled", func(t *testing.T) {
+		t.Run("rename fails when parent context is already canceled", func(t *testing.T) {
 			t.Parallel()
 
 			// Create a parent context that is already canceled.
@@ -664,7 +630,6 @@ func TestDetachedContext(t *testing.T) {
 			parentCancel() // Cancel immediately before calling restartStaleContainer
 
 			// Create a mock client with a Watchtower container.
-			// Configure StartContainerError to trigger the cleanup path.
 			client := mockUpdate.CreateMockClient(
 				&mockUpdate.TestData{
 					Containers: []types.Container{
@@ -685,7 +650,6 @@ func TestDetachedContext(t *testing.T) {
 					Staleness: map[string]bool{
 						"watchtower": true,
 					},
-					StartContainerError: errors.New("simulated start failure"),
 				},
 				false,
 				false,
@@ -1763,6 +1727,62 @@ func Test_performRollingRestart(t *testing.T) {
 			assert.Equal(t, "container-0", client.TestData.CreateOrder[0])
 			assert.Equal(t, "container-1", client.TestData.CreateOrder[1])
 			assert.Equal(t, "container-2", client.TestData.CreateOrder[2])
+		})
+	})
+
+	t.Run("ephemeral self-update", func(t *testing.T) {
+		t.Parallel()
+
+		t.Run("should not wait for health after the orchestrator handoff", func(t *testing.T) {
+			t.Parallel()
+
+			// The handoff returns no container ID, since the orchestrator
+			// creates the new Watchtower container after this process stops.
+			watchtower := mockUpdate.CreateMockContainerWithConfig(
+				"watchtower",
+				"/watchtower",
+				"watchtower:latest",
+				true,
+				false,
+				time.Now(),
+				&dockerContainer.Config{
+					Labels: map[string]string{
+						"com.centurylinklabs.watchtower": "true",
+					},
+				},
+			)
+			watchtower.SetStale(true)
+
+			client := mockUpdate.CreateMockClient(
+				&mockUpdate.TestData{
+					Containers: []types.Container{watchtower},
+					Staleness:  map[string]bool{"watchtower": true},
+				},
+				false,
+				false,
+			)
+
+			log, logBuf := newCaptureLogger()
+
+			var cleanupImageInfos []types.RemovedImageInfo
+
+			failed, err := performRollingRestart(log,
+				t.Context(),
+				[]types.Container{watchtower},
+				client,
+				types.UpdateParams{RollingRestart: true, EphemeralSelfUpdate: true},
+				&cleanupImageInfos,
+				nil,
+				nil,
+			)
+
+			require.NoError(t, err)
+			assert.Empty(t, failed)
+			assert.Equal(t, int32(0), client.TestData.WaitForContainerHealthyCount.Load())
+
+			for _, entry := range parseJSONLogEntries(logBuf) {
+				assert.NotEqual(t, "Failed to wait for container to become healthy", entry["message"])
+			}
 		})
 	})
 

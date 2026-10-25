@@ -174,19 +174,23 @@ func performRollingRestart(
 					}
 				}
 
-				// Wait for the container to become healthy if it has a health check
-				waitErr := client.WaitForContainerHealthy(
-					ctx,
-					newContainerID,
-					defaultHealthCheckTimeout,
-				)
-				if waitErr != nil {
-					log.Warn().
-						Err(waitErr).
-						Fields(fields).
-						Msg("Failed to wait for container to become healthy")
+				// Wait for the container to become healthy if it has a health check.
+				// An ephemeral self-update returns no container ID, because the
+				// orchestrator creates the new container after this process stops.
+				if newContainerID != "" {
+					waitErr := client.WaitForContainerHealthy(
+						ctx,
+						newContainerID,
+						defaultHealthCheckTimeout,
+					)
+					if waitErr != nil {
+						log.Warn().
+							Err(waitErr).
+							Fields(fields).
+							Msg("Failed to wait for container to become healthy")
 
-					// Don't fail the update, just log the warning
+						// Don't fail the update, just log the warning
+					}
 				}
 
 				if c.IsStale() && !renamed {

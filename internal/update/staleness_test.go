@@ -16,7 +16,9 @@ import (
 )
 
 // Test_shouldUpdateContainer verifies that Watchtower updates only itself among
-// Watchtower containers, within its scope, and leaves other containers alone.
+// Watchtower containers, matched by container ID, and leaves other containers
+// alone. A scope label does not change the result, because the scope filter
+// runs before this check.
 func Test_shouldUpdateContainer(t *testing.T) {
 	t.Parallel()
 
@@ -91,7 +93,7 @@ func Test_shouldUpdateContainer(t *testing.T) {
 		assert.True(t, result)
 	})
 
-	t.Run("should allow self-update of scoped Watchtower container", func(t *testing.T) {
+	t.Run("should allow self-update of current Watchtower container with a scope label", func(t *testing.T) {
 		t.Parallel()
 
 		currentID := currentWatchtowerID
@@ -116,84 +118,7 @@ func Test_shouldUpdateContainer(t *testing.T) {
 		assert.True(t, result)
 	})
 
-	t.Run("should skip other scoped Watchtower containers with same scope from self-updates", func(t *testing.T) {
-		t.Parallel()
-
-		currentID := currentWatchtowerID
-		otherID := otherWatchtowerID
-		container := mockUpdate.CreateMockContainerWithConfig(
-			otherID,
-			"watchtower-other",
-			"watchtower:latest",
-			true,
-			false,
-			time.Now(),
-			&dockerContainer.Config{
-				Labels: map[string]string{
-					"com.centurylinklabs.watchtower":       "true",
-					"com.centurylinklabs.watchtower.scope": "prod",
-				},
-			},
-		)
-		params := types.UpdateParams{
-			CurrentContainerID: types.ContainerID(currentID),
-		}
-		result := shouldUpdateContainer(container, true, params)
-		assert.False(t, result)
-	})
-
-	t.Run("should skip other scoped Watchtower containers with different scopes from self-updates", func(t *testing.T) {
-		t.Parallel()
-
-		currentID := currentWatchtowerID
-		otherID := otherWatchtowerID
-		container := mockUpdate.CreateMockContainerWithConfig(
-			otherID,
-			"watchtower-other",
-			"watchtower:latest",
-			true,
-			false,
-			time.Now(),
-			&dockerContainer.Config{
-				Labels: map[string]string{
-					"com.centurylinklabs.watchtower":       "true",
-					"com.centurylinklabs.watchtower.scope": "dev",
-				},
-			},
-		)
-		params := types.UpdateParams{
-			CurrentContainerID: types.ContainerID(currentID),
-		}
-		result := shouldUpdateContainer(container, true, params)
-		assert.False(t, result)
-	})
-
-	t.Run("should skip unscoped Watchtower containers from scoped self-updates", func(t *testing.T) {
-		t.Parallel()
-
-		currentID := currentWatchtowerID
-		otherID := otherWatchtowerID
-		container := mockUpdate.CreateMockContainerWithConfig(
-			otherID,
-			"watchtower-other",
-			"watchtower:latest",
-			true,
-			false,
-			time.Now(),
-			&dockerContainer.Config{
-				Labels: map[string]string{
-					"com.centurylinklabs.watchtower": "true",
-				},
-			},
-		)
-		params := types.UpdateParams{
-			CurrentContainerID: types.ContainerID(currentID),
-		}
-		result := shouldUpdateContainer(container, true, params)
-		assert.False(t, result)
-	})
-
-	t.Run("should skip scoped Watchtower containers from unscoped self-updates", func(t *testing.T) {
+	t.Run("should skip other Watchtower containers with a scope label from self-updates", func(t *testing.T) {
 		t.Parallel()
 
 		currentID := currentWatchtowerID
@@ -347,6 +272,25 @@ func Test_isPinned(t *testing.T) {
 
 		pinned, err := isPinned(newTestLogger(t), cont, &progress, types.UpdateParams{}, nil)
 		require.Error(t, err)
+		assert.False(t, pinned)
+		assert.Empty(t, progress)
+	})
+
+	t.Run("does not treat a sha256 container name fallback as a digest pin", func(t *testing.T) {
+		t.Parallel()
+
+		// The image name does not parse, so isPinned falls back to the
+		// container name. The fallback sha256:latest is a tag, not a digest.
+		cont := mockUpdate.CreateMockContainer(
+			"sha256-name-id",
+			"/sha256",
+			"Nginx:latest",
+			time.Now(),
+		)
+		progress := state.Progress{}
+
+		pinned, err := isPinned(newTestLogger(t), cont, &progress, types.UpdateParams{}, nil)
+		require.NoError(t, err)
 		assert.False(t, pinned)
 		assert.Empty(t, progress)
 	})

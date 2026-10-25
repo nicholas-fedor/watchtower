@@ -223,24 +223,6 @@ func isPinned(
 				return false, err
 			}
 
-			// Fallback name might itself be digest-pinned (unlikely but consistent).
-			if containerImage.IsImagePinnedByDigest(fallbackImage) {
-				if gitSession.watching(log, cont, config) {
-					return false, nil
-				}
-
-				clog.Debug().
-					Bool("is_digested", true).
-					Msg("Pinned image detected via fallback, marking as scanned")
-				progress.AddScanned(log,
-					cont,
-					cont.ImageID(),
-					config,
-				)
-
-				return true, nil
-			}
-
 			return false, nil
 		}
 
