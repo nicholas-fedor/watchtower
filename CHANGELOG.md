@@ -61,6 +61,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Tests
 
+- Use the generated filterable container mock by @nicholas-fedor in [#3150](https://github.com/nicholas-fedor/watchtower/pull/3150)
 - Check the orchestrator cleanup context by @nicholas-fedor in [#3142](https://github.com/nicholas-fedor/watchtower/pull/3142)
 - Share container and log capture helpers across packages by @nicholas-fedor in [#3134](https://github.com/nicholas-fedor/watchtower/pull/3134)
 - Generate the Docker SDK mocks into internal/container/mocks by @nicholas-fedor in [#3124](https://github.com/nicholas-fedor/watchtower/pull/3124)
