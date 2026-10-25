@@ -35,6 +35,12 @@ const orchestratorCreateTimeout = 60 * time.Second
 // after a handoff, which runs detached from the session context.
 const predecessorImageRemovalTimeout = 30 * time.Second
 
+// orchestratorRecoveryTimeout bounds each recovery helper after a failed
+// handoff. Recovery runs detached from the orchestration context, so it still
+// runs after that context's deadline. The bound covers stopping a failed
+// replacement with orchestratorStopTimeout and the calls around it.
+const orchestratorRecoveryTimeout = 60 * time.Second
+
 // Errors for ephemeral self-update operations in ephemeral.go.
 var (
 	// errEphemeralOrchestratorFailed indicates the ephemeral orchestrator failed.
@@ -547,7 +553,8 @@ func renameOldContainerForHandoff(
 // starts it after a failed create/start so a Watchtower instance remains running.
 //
 // Parameters:
-//   - ctx: Context for cancellation and timeouts.
+//   - ctx: Orchestration context. Its values carry over to recovery, but its
+//     cancellation and deadline do not.
 //   - client: Container client for Docker operations.
 //   - clog: Logger with container context fields.
 //   - oldContainer: Stopped predecessor to restore.
@@ -567,7 +574,10 @@ func restoreAndStartOldContainer(
 		Str("original_name", originalName).
 		Msg("Restoring old Watchtower container after handoff failure")
 
-	err := client.RenameContainer(ctx, oldContainer, originalName)
+	recoveryCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), orchestratorRecoveryTimeout)
+	defer cancel()
+
+	err := client.RenameContainer(recoveryCtx, oldContainer, originalName)
 	if err != nil {
 		clog.Error().
 			Err(err).
@@ -577,7 +587,7 @@ func restoreAndStartOldContainer(
 		return
 	}
 
-	err = client.StartContainerByID(ctx, oldContainer.ID())
+	err = client.StartContainerByID(recoveryCtx, oldContainer.ID())
 	if err != nil {
 		clog.Error().
 			Err(err).
@@ -596,7 +606,8 @@ func restoreAndStartOldContainer(
 // a Watchtower instance remains running under its original name.
 //
 // Parameters:
-//   - ctx: Context for cancellation and timeouts.
+//   - ctx: Orchestration context. Its values carry over to recovery, but its
+//     cancellation and deadline do not.
 //   - client: Container client for Docker operations.
 //   - clog: Logger with container context fields.
 //   - oldContainer: Stopped predecessor to start.
@@ -606,7 +617,10 @@ func restartOldContainer(
 	clog *zerolog.Logger,
 	oldContainer types.Container,
 ) {
-	err := client.StartContainerByID(ctx, oldContainer.ID())
+	recoveryCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), orchestratorRecoveryTimeout)
+	defer cancel()
+
+	err := client.StartContainerByID(recoveryCtx, oldContainer.ID())
 	if err != nil {
 		clog.Error().
 			Err(err).
@@ -622,7 +636,8 @@ func restartOldContainer(
 // verification so the original name can be restored on the predecessor.
 //
 // Parameters:
-//   - ctx: Context for cancellation and timeouts.
+//   - ctx: Orchestration context. Its values carry over to recovery, but its
+//     cancellation and deadline do not.
 //   - client: Container client for Docker operations.
 //   - clog: Logger with container context fields.
 //   - newContainerID: ID of the failed replacement container to remove.
@@ -636,7 +651,10 @@ func cleanupFailedNewContainer(
 		return
 	}
 
-	failedNew, err := client.GetContainer(ctx, newContainerID)
+	recoveryCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), orchestratorRecoveryTimeout)
+	defer cancel()
+
+	failedNew, err := client.GetContainer(recoveryCtx, newContainerID)
 	if err != nil {
 		clog.Debug().
 			Err(err).
@@ -646,7 +664,7 @@ func cleanupFailedNewContainer(
 		return
 	}
 
-	cleanupErr := client.StopAndRemoveContainer(ctx, failedNew, orchestratorStopTimeout)
+	cleanupErr := client.StopAndRemoveContainer(recoveryCtx, failedNew, orchestratorStopTimeout)
 	if cleanupErr != nil && !cerrdefs.IsNotFound(cleanupErr) {
 		clog.Debug().
 			Err(cleanupErr).
