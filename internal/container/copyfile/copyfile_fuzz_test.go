@@ -126,6 +126,7 @@ func FuzzSanitizeCopyFileArchive(f *testing.F) {
 	f.Add(seedCopyFileTar("config.yaml", []byte("x"), 0o644), "../config.yaml")
 	f.Add(seedCopyFileTar("config.yaml", []byte("x"), 0o644), "config.yaml")
 	f.Add(seedCopyFileTar("config.yaml", []byte("x"), 0o644), "/")
+	f.Add(seedCopyFileTar("v1..2.conf", []byte("x"), 0o644), "/app/v1..2.conf")
 
 	f.Fuzz(func(t *testing.T, raw []byte, destPath string) {
 		if len(raw) > maxCopyFileTarBytes*2 {
@@ -152,7 +153,7 @@ func FuzzSanitizeCopyFileArchive(f *testing.F) {
 			t.Fatalf("sanitized name %q want %q", name, destPath)
 		}
 
-		if strings.Contains(name, "..") {
+		if slices.Contains(strings.Split(name, "/"), "..") {
 			t.Fatalf("sanitized name contains parent traversal: %q", name)
 		}
 
