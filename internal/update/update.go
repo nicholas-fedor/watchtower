@@ -19,6 +19,7 @@ import (
 
 	"github.com/nicholas-fedor/watchtower/internal/container"
 	"github.com/nicholas-fedor/watchtower/internal/container/filters"
+	"github.com/nicholas-fedor/watchtower/internal/container/hooks"
 	containerImage "github.com/nicholas-fedor/watchtower/internal/container/image"
 	"github.com/nicholas-fedor/watchtower/internal/container/labels"
 	"github.com/nicholas-fedor/watchtower/internal/container/oci"
@@ -29,7 +30,6 @@ import (
 	"github.com/nicholas-fedor/watchtower/internal/update/sorter"
 	"github.com/nicholas-fedor/watchtower/internal/update/state"
 	pkgContainer "github.com/nicholas-fedor/watchtower/pkg/container"
-	"github.com/nicholas-fedor/watchtower/pkg/lifecycle"
 	"github.com/nicholas-fedor/watchtower/pkg/types"
 )
 
@@ -356,7 +356,7 @@ func update(
 	// Run pre-check lifecycle hooks if enabled to validate the environment before updates.
 	if config.LifecycleHooks {
 		log.Debug().Msg("Executing pre-check lifecycle hooks")
-		lifecycle.ExecutePreChecks(log, ctx, client, config, filteredContainers)
+		hooks.ExecutePreChecks(log, ctx, client, config, filteredContainers)
 	}
 
 	// Prepare a list of container names and images for detailed debugging output.
@@ -973,7 +973,7 @@ func update(
 	// held by the pre-update scan.
 	if config.LifecycleHooks {
 		log.Debug().Msg("Executing post-check lifecycle hooks")
-		lifecycle.ExecutePostChecks(log, ctx, client, config, nil)
+		hooks.ExecutePostChecks(log, ctx, client, config, nil)
 	}
 
 	// A run-once Watchtower exits after the update, and a restart policy can
@@ -1711,7 +1711,7 @@ func stopStaleContainer(
 
 	// Execute pre-update lifecycle hooks if enabled, checking for skip conditions.
 	if config.LifecycleHooks {
-		skipUpdate, err := lifecycle.ExecutePreUpdateCommand(log,
+		skipUpdate, err := hooks.ExecutePreUpdateCommand(log,
 			ctx,
 			client,
 			container,
@@ -2269,7 +2269,7 @@ func restartStaleContainer(
 				Fields(fields).
 				Msg("Executing post-update command")
 			//nolint:contextcheck // Using detached context intentionally to survive parent cancellation
-			lifecycle.ExecutePostUpdateCommand(log,
+			hooks.ExecutePostUpdateCommand(log,
 				detachedCtx,
 				client,
 				newContainerID,
