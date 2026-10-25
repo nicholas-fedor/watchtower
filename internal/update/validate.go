@@ -2,12 +2,23 @@ package update
 
 import (
 	"context"
+	"errors"
 	"fmt"
 
 	"github.com/rs/zerolog"
 
 	containerClient "github.com/nicholas-fedor/watchtower/internal/container/client"
 	"github.com/nicholas-fedor/watchtower/pkg/types"
+)
+
+// Errors for validating the update settings.
+var (
+	// errRollingRestartDependency flags incompatible dependencies for rolling restarts.
+	errRollingRestartDependency = errors.New(
+		"container has dependencies incompatible with rolling restarts",
+	)
+	// errListContainersFailed flags failures in listing containers.
+	errListContainersFailed = errors.New("failed to list containers")
 )
 
 // ValidateRollingRestartDependencies validates the environment for rolling restart updates.

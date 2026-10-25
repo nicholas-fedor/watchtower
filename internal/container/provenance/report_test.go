@@ -1,9 +1,13 @@
 package provenance
 
 import (
+	"bytes"
+	"encoding/json"
 	"testing"
 
+	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 
 	"github.com/nicholas-fedor/watchtower/internal/container/labels"
 	"github.com/nicholas-fedor/watchtower/internal/container/oci"
@@ -345,4 +349,88 @@ func TestResolveReportMeta(t *testing.T) {
 		assert.False(t, ok)
 		assert.Equal(t, Association{}, assoc)
 	})
+}
+
+// The changelog log entry is what makes the legacy notification line appear, and
+// it must only be emitted when the feature is enabled.
+func TestLogChangelogOnlyWhenEnabled(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name       string
+		labels     map[string]string
+		params     types.UpdateParams
+		wantEvents int
+	}{
+		{
+			name:       "disabled",
+			labels:     map[string]string{labels.GitRepo: "https://github.com/org/app.git"},
+			wantEvents: 0,
+		},
+		{
+			name:       "changelog url alone is not enough",
+			labels:     map[string]string{labels.ChangelogURL: "https://example.com/notes"},
+			wantEvents: 0,
+		},
+		{
+			name:       "global flag",
+			labels:     map[string]string{labels.GitRepo: "https://github.com/org/app.git"},
+			params:     types.UpdateParams{EnableChangelog: true},
+			wantEvents: 1,
+		},
+		{
+			name:       "container label",
+			labels:     map[string]string{labels.EnableChangelog: "true"},
+			wantEvents: 1,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			c := modelfixture.Container(containerfixture.WithLabels(tt.labels))
+			meta := ReportMeta{Changelog: "https://example.com/notes"}
+
+			var buf bytes.Buffer
+
+			log := zerolog.New(&buf)
+
+			LogChangelog(&log, c, tt.params, meta)
+
+			events := 0
+
+			for line := range bytes.Lines(buf.Bytes()) {
+				if len(line) == 0 {
+					continue
+				}
+
+				var entry map[string]any
+				require.NoError(t, json.Unmarshal(line, &entry))
+
+				events++
+			}
+
+			assert.Equal(t, tt.wantEvents, events, "log output: %s", buf.String())
+		})
+	}
+}
+
+// TestLogChangelogSkipsEmptyURL verifies that no entry is logged without a
+// resolved changelog URL or a container.
+func TestLogChangelogSkipsEmptyURL(t *testing.T) {
+	t.Parallel()
+
+	c := modelfixture.Container()
+
+	var buf bytes.Buffer
+
+	log := zerolog.New(&buf)
+
+	LogChangelog(&log, c, types.UpdateParams{EnableChangelog: true}, ReportMeta{})
+	LogChangelog(&log, nil, types.UpdateParams{EnableChangelog: true}, ReportMeta{
+		Changelog: "https://example.com/notes",
+	})
+
+	assert.Empty(t, buf.String())
 }

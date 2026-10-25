@@ -1,6 +1,9 @@
 package provenance
 
 import (
+	"github.com/rs/zerolog"
+
+	"github.com/nicholas-fedor/watchtower/internal/container"
 	"github.com/nicholas-fedor/watchtower/internal/container/oci"
 	"github.com/nicholas-fedor/watchtower/internal/container/redact"
 	"github.com/nicholas-fedor/watchtower/pkg/types"
@@ -97,6 +100,41 @@ func ResolveReportMeta(
 		CurrentRevision: cur.Revision,
 		LatestRevision:  latest.Revision,
 	}
+}
+
+// LogChangelog emits the Changelog notification entry for an updated container.
+//
+// The entry is only produced when the changelog feature is enabled for the
+// container and a URL was resolved, so a default session produces no entry at
+// all. The legacy template renders it as a single "Changelog: <url>" line.
+//
+// Parameters:
+//   - log: Process logger.
+//   - c: Container the entry describes.
+//   - params: Update parameters carrying the changelog enable gate.
+//   - meta: Resolved report metadata.
+//
+// Returns:
+//   - none.
+func LogChangelog(
+	log *zerolog.Logger,
+	c types.Container,
+	params types.UpdateParams,
+	meta ReportMeta,
+) {
+	if c == nil || meta.Changelog == "" {
+		return
+	}
+
+	concrete, ok := c.(*container.Container)
+	if !ok || !concrete.IsChangelogEnabled(params) {
+		return
+	}
+
+	log.Info().
+		Str("container", c.Name()).
+		Str("changelog", meta.Changelog).
+		Msg("Changelog")
 }
 
 // preferAnnotations returns the latest image annotations, falling back to the

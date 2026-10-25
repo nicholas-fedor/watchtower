@@ -33,6 +33,41 @@ import (
 	"github.com/nicholas-fedor/watchtower/pkg/types"
 )
 
+// Errors for update operations.
+var (
+	// errSortDependenciesFailed indicates a failure to sort containers by dependencies.
+	errSortDependenciesFailed = errors.New("failed to sort containers by dependencies")
+	// errVerifyConfigFailed indicates a failure to verify container configuration for recreation.
+	errVerifyConfigFailed = errors.New("failed to verify container configuration")
+	// errPreUpdateFailed indicates a failure in the pre-update lifecycle command execution.
+	errPreUpdateFailed = errors.New("pre-update command failed")
+	// errSkipUpdate signals that a container update should be skipped due to a specific condition (e.g., EX_TEMPFAIL).
+	errSkipUpdate = errors.New(
+		"skipping container due to pre-update command exit code 75 (EX_TEMPFAIL)",
+	)
+	// errStopContainerFailed indicates a failure to stop a container during the update process.
+	errStopContainerFailed = errors.New("failed to stop container")
+	// errContainerGone indicates a container no longer existed when the update tried to stop it.
+	errContainerGone = errors.New("container no longer exists")
+	// errStartContainerFailed indicates a failure to start a container after an update.
+	errStartContainerFailed = errors.New("failed to start container")
+	// errCreateContainerFailed indicates a failure to create a container during the update process.
+	errCreateContainerFailed = errors.New("failed to create container")
+	// errParseImageReference indicates a failure to parse a container's image reference.
+	errParseImageReference = errors.New("failed to parse image reference")
+	// errInvalidImageReference indicates an invalid image reference that cannot be processed.
+	errInvalidImageReference = errors.New("invalid image reference")
+	// errCircularDependency indicates a circular dependency between containers.
+	errCircularDependency = errors.New("circular dependency detected")
+	// errSelfDependency indicates a container has a self-dependency.
+	errSelfDependency = errors.New("container has self-dependency")
+	// errRenameWatchtowerFailed indicates a failure to rename the Watchtower container before restarting.
+	errRenameWatchtowerFailed = errors.New("failed to rename Watchtower container")
+	// errOldSelfDetected indicates the current container is an old
+	// Watchtower container that should not be running.
+	errOldSelfDetected = errors.New("current container is an old Watchtower container")
+)
+
 // reportedProblems records the dependency problems already reported as
 // warnings, so a problem that persists across scans notifies only once.
 type reportedProblems struct {
@@ -1162,41 +1197,6 @@ func shouldUpdateContainer(
 	}
 
 	return true
-}
-
-// logChangelog emits the Changelog notification entry for an updated container.
-//
-// The entry is only produced when the changelog feature is enabled for the
-// container and a URL was resolved, so a default session produces no entry at
-// all. The legacy template renders it as a single "Changelog: <url>" line.
-//
-// Parameters:
-//   - log: Process logger.
-//   - c: Container the entry describes.
-//   - params: Update parameters carrying the changelog enable gate.
-//   - meta: Resolved report metadata.
-//
-// Returns:
-//   - none.
-func logChangelog(
-	log *zerolog.Logger,
-	c types.Container,
-	params types.UpdateParams,
-	meta provenance.ReportMeta,
-) {
-	if c == nil || meta.Changelog == "" {
-		return
-	}
-
-	concrete, ok := c.(*container.Container)
-	if !ok || !concrete.IsChangelogEnabled(params) {
-		return
-	}
-
-	log.Info().
-		Str("container", c.Name()).
-		Str("changelog", meta.Changelog).
-		Msg("Changelog")
 }
 
 // parseReference validates a Docker image reference with logging.

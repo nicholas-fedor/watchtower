@@ -21,6 +21,16 @@ import (
 	"github.com/nicholas-fedor/watchtower/pkg/types"
 )
 
+// Errors for rebuilding Compose projects from Git.
+var (
+	// errGitComposeService indicates a Compose project was resolved without a service name.
+	errGitComposeService = errors.New("compose project has no com.docker.compose.service label")
+	// errGitComposeInstance indicates Compose apply did not return the requested service.
+	errGitComposeInstance = errors.New("compose apply did not recreate the service")
+	// errGitComposeCommit indicates stale services in one project resolved different commits.
+	errGitComposeCommit = errors.New("compose project services resolved different commits")
+)
+
 // applyCompose checkouts a Compose project once and applies stale associated services.
 //
 // Parameters:
@@ -331,7 +341,7 @@ func (s *gitSession) recordCompose(
 		Commit: result.Commit,
 	}, oci.Annotations{})
 
-	logChangelog(log, c, params, meta)
+	provenance.LogChangelog(log, c, params, meta)
 
 	if item.ID == "" {
 		return

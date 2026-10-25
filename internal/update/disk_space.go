@@ -2,6 +2,7 @@ package update
 
 import (
 	"context"
+	"errors"
 	"fmt"
 
 	"github.com/rs/zerolog"
@@ -20,6 +21,14 @@ const (
 
 	// msgImageDiskSpaceOK is logged when image usage is below all configured thresholds.
 	msgImageDiskSpaceOK = "Docker image usage within configured budget"
+)
+
+// Errors for Docker image-usage budget checks.
+var (
+	// errImageDiskUsageFailed indicates GET /system/df for images failed.
+	errImageDiskUsageFailed = errors.New("failed to query Docker image disk usage")
+	// errImageDiskSpaceExceeded indicates image usage reached the configured maximum.
+	errImageDiskSpaceExceeded = errors.New("docker image usage exceeds configured maximum")
 )
 
 // checkImageDiskSpace enforces the optional Docker image-usage budget.

@@ -31,6 +31,10 @@ const orchestratorStopTimeout = 30 * time.Second
 // creating the ephemeral orchestrator container.
 const orchestratorCreateTimeout = 60 * time.Second
 
+// predecessorImageRemovalTimeout bounds the removal of the old Watchtower image
+// after a handoff, which runs detached from the session context.
+const predecessorImageRemovalTimeout = 30 * time.Second
+
 // Errors for ephemeral self-update operations in ephemeral.go.
 var (
 	// errEphemeralOrchestratorFailed indicates the ephemeral orchestrator failed.
@@ -857,7 +861,7 @@ func removeOldImage(
 	// image removal after the replacement is already running.
 	cleanupCtx, cancel := context.WithTimeout(
 		context.WithoutCancel(ctx),
-		restartPolicyTimeout(0),
+		predecessorImageRemovalTimeout,
 	)
 	defer cancel()
 

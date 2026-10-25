@@ -30,6 +30,12 @@ import (
 // gitShortSHALen is the number of hex characters used in name:git-<shortsha> tags and notifications.
 const gitShortSHALen = 12
 
+// Errors for rebuilding images from Git.
+var (
+	// errGitNotAssociated indicates a Git rebuild was requested without an association.
+	errGitNotAssociated = errors.New("container is not associated with a Git repository")
+)
+
 // gitSession holds watcher results for one Update() invocation.
 type gitSession struct {
 	client   *git.Client
@@ -549,7 +555,7 @@ func (s *gitSession) buildOne(
 			Commit: result.Commit,
 		}, oci.Annotations{})
 
-		logChangelog(log, c, params, meta)
+		provenance.LogChangelog(log, c, params, meta)
 	}
 
 	withGitMeta(log.Info().

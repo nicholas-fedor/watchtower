@@ -18,7 +18,6 @@ import (
 	"github.com/nicholas-fedor/watchtower/internal/container"
 	"github.com/nicholas-fedor/watchtower/internal/container/labels"
 	"github.com/nicholas-fedor/watchtower/internal/container/oci"
-	"github.com/nicholas-fedor/watchtower/internal/container/provenance"
 	internalGit "github.com/nicholas-fedor/watchtower/internal/git"
 	"github.com/nicholas-fedor/watchtower/internal/update/changelog"
 	mockUpdate "github.com/nicholas-fedor/watchtower/internal/update/mocks"
@@ -249,88 +248,6 @@ func TestApplyLatestImageMetadataFallsBackWhenProbeMisses(t *testing.T) {
 	assert.Equal(t, "https://github.com/org/app/releases", (*progress)[c.ID()].Changelog())
 }
 
-// The changelog log entry is what makes the legacy notification line appear, and
-// it must only be emitted when the feature is enabled.
-func TestLogChangelogOnlyWhenEnabled(t *testing.T) {
-	t.Parallel()
-
-	tests := []struct {
-		name       string
-		labels     map[string]string
-		params     types.UpdateParams
-		wantEvents int
-	}{
-		{
-			name:       "disabled",
-			labels:     map[string]string{labels.GitRepo: "https://github.com/org/app.git"},
-			wantEvents: 0,
-		},
-		{
-			name:       "changelog url alone is not enough",
-			labels:     map[string]string{labels.ChangelogURL: "https://example.com/notes"},
-			wantEvents: 0,
-		},
-		{
-			name:       "global flag",
-			labels:     map[string]string{labels.GitRepo: "https://github.com/org/app.git"},
-			params:     types.UpdateParams{EnableChangelog: true},
-			wantEvents: 1,
-		},
-		{
-			name:       "container label",
-			labels:     map[string]string{labels.EnableChangelog: "true"},
-			wantEvents: 1,
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			t.Parallel()
-
-			c := newReportContainer(t, tt.labels, nil)
-			meta := provenance.ReportMeta{Changelog: "https://example.com/notes"}
-
-			var buf bytes.Buffer
-
-			log := zerolog.New(&buf)
-
-			logChangelog(&log, c, tt.params, meta)
-
-			events := 0
-
-			for line := range bytes.Lines(buf.Bytes()) {
-				if len(line) == 0 {
-					continue
-				}
-
-				var entry map[string]any
-				require.NoError(t, json.Unmarshal(line, &entry))
-
-				events++
-			}
-
-			assert.Equal(t, tt.wantEvents, events, "log output: %s", buf.String())
-		})
-	}
-}
-
-func TestLogChangelogSkipsEmptyURL(t *testing.T) {
-	t.Parallel()
-
-	c := newReportContainer(t, nil, nil)
-
-	var buf bytes.Buffer
-
-	log := zerolog.New(&buf)
-
-	logChangelog(&log, c, types.UpdateParams{EnableChangelog: true}, provenance.ReportMeta{})
-	logChangelog(&log, nil, types.UpdateParams{EnableChangelog: true}, provenance.ReportMeta{
-		Changelog: "https://example.com/notes",
-	})
-
-	assert.Empty(t, buf.String())
-}
-
 // A Git rebuild must produce exactly one Changelog entry, resolved from the Git
 // tag. The registry path is skipped for a Git-watched container, and the second
 // half of this test shows what that skip prevents: the same container driven
@@ -368,7 +285,8 @@ func TestGitRebuildEmitsExactlyOneChangelogEntry(t *testing.T) {
 	)
 	require.NoError(t, err)
 
-	assert.Equal(t, 1, countChangelogEntries(buf.Bytes()), "build path should emit one: %s", buf.String())
+	assert.Equal(t, []string{"https://github.com/org/app/releases/tag/v1.2.3"}, changelogEntries(buf.Bytes()),
+		"build path should emit one versioned entry: %s", buf.String())
 	assert.Equal(t, "https://github.com/org/app/releases/tag/v1.2.3", (*progress)[c.ID()].Changelog())
 
 	// The registry path, if it ran for this container, would add a second entry
@@ -386,14 +304,15 @@ func TestGitRebuildEmitsExactlyOneChangelogEntry(t *testing.T) {
 	)
 	applyLatestImageMeta(&log, progress, c, params, vars, anns)
 
-	assert.Equal(t, 1, countChangelogEntries(buf.Bytes()), "registry path would duplicate: %s", buf.String())
+	assert.Equal(t, []string{"https://github.com/org/app/releases"}, changelogEntries(buf.Bytes()),
+		"registry path would duplicate: %s", buf.String())
 	assert.Equal(t, "https://github.com/org/app/releases", (*progress)[c.ID()].Changelog())
 }
 
-// countChangelogEntries returns how many Changelog notification entries appear
-// in the captured log output.
-func countChangelogEntries(output []byte) int {
-	entries := 0
+// changelogEntries returns the changelog URL of each Changelog notification
+// entry in the captured log output, in order.
+func changelogEntries(output []byte) []string {
+	entries := []string{}
 
 	for line := range bytes.Lines(output) {
 		if len(line) == 0 {
@@ -406,7 +325,8 @@ func countChangelogEntries(output []byte) int {
 		}
 
 		if entry["message"] == "Changelog" {
-			entries++
+			url, _ := entry["changelog"].(string)
+			entries = append(entries, url)
 		}
 	}
 
