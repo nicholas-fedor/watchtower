@@ -1,4 +1,4 @@
-package container
+package ephemeral
 
 import (
 	"context"
@@ -101,7 +101,7 @@ type dockerConnectionConfig struct {
 	CertBinds []string
 }
 
-// createEphemeralOrchestrator creates and starts the ephemeral orchestrator for
+// CreateOrchestrator creates and starts the ephemeral orchestrator for
 // a self-update, and removes it again when it cannot be started.
 //
 // Parameters:
@@ -116,7 +116,7 @@ type dockerConnectionConfig struct {
 // Returns:
 //   - types.ContainerID: ID of the ephemeral orchestrator container.
 //   - error: Non-nil if creation or start fails, nil on success.
-func createEphemeralOrchestrator(
+func CreateOrchestrator(
 	log *zerolog.Logger,
 	ctx context.Context,
 	api dockerClient.APIClient,
