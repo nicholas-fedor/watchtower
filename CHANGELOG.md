@@ -31,6 +31,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- Move lifecycle hooks to internal/container/hooks by @nicholas-fedor in [#3148](https://github.com/nicholas-fedor/watchtower/pull/3148)
 - Move copy-file handling to internal/container/copyfile by @nicholas-fedor in [#3144](https://github.com/nicholas-fedor/watchtower/pull/3144)
 - Move the self-update orchestrator to internal/container/ephemeral by @nicholas-fedor in [#3140](https://github.com/nicholas-fedor/watchtower/pull/3140)
 - Move runtime detection to internal/container/runtime by @nicholas-fedor in [#3136](https://github.com/nicholas-fedor/watchtower/pull/3136)
