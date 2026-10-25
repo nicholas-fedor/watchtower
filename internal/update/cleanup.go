@@ -31,6 +31,14 @@ const maxRemovalAttempts = 30
 // removalRetryDelay sets the delay before retrying removal operations.
 var removalRetryDelay = 1 * time.Second
 
+// Errors for cleaning up Watchtower containers and images.
+var (
+	// errImageRemovalFailed flags failures in image cleanup.
+	errImageRemovalFailed = errors.New("errors occurred during image cleanup")
+	// errStopWatchtowerFailed flags failures in stopping excess Watchtower containers.
+	errStopWatchtowerFailed = errors.New("errors occurred while stopping watchtower containers")
+)
+
 // RemoveExcessWatchtowerInstances ensures a single Watchtower container within the same scope.
 //
 // It identifies multiple Watchtower containers within the same scope, stops all but the current,

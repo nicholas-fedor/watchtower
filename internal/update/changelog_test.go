@@ -18,7 +18,6 @@ import (
 	"github.com/nicholas-fedor/watchtower/internal/container"
 	"github.com/nicholas-fedor/watchtower/internal/container/labels"
 	"github.com/nicholas-fedor/watchtower/internal/container/oci"
-	"github.com/nicholas-fedor/watchtower/internal/container/provenance"
 	internalGit "github.com/nicholas-fedor/watchtower/internal/git"
 	"github.com/nicholas-fedor/watchtower/internal/update/changelog"
 	mockUpdate "github.com/nicholas-fedor/watchtower/internal/update/mocks"
@@ -247,88 +246,6 @@ func TestApplyLatestImageMetadataFallsBackWhenProbeMisses(t *testing.T) {
 	applyLatestImageMeta(newTestLogger(t), progress, c, types.UpdateParams{EnableChangelog: true}, vars, anns)
 
 	assert.Equal(t, "https://github.com/org/app/releases", (*progress)[c.ID()].Changelog())
-}
-
-// The changelog log entry is what makes the legacy notification line appear, and
-// it must only be emitted when the feature is enabled.
-func TestLogChangelogOnlyWhenEnabled(t *testing.T) {
-	t.Parallel()
-
-	tests := []struct {
-		name       string
-		labels     map[string]string
-		params     types.UpdateParams
-		wantEvents int
-	}{
-		{
-			name:       "disabled",
-			labels:     map[string]string{labels.GitRepo: "https://github.com/org/app.git"},
-			wantEvents: 0,
-		},
-		{
-			name:       "changelog url alone is not enough",
-			labels:     map[string]string{labels.ChangelogURL: "https://example.com/notes"},
-			wantEvents: 0,
-		},
-		{
-			name:       "global flag",
-			labels:     map[string]string{labels.GitRepo: "https://github.com/org/app.git"},
-			params:     types.UpdateParams{EnableChangelog: true},
-			wantEvents: 1,
-		},
-		{
-			name:       "container label",
-			labels:     map[string]string{labels.EnableChangelog: "true"},
-			wantEvents: 1,
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			t.Parallel()
-
-			c := newReportContainer(t, tt.labels, nil)
-			meta := provenance.ReportMeta{Changelog: "https://example.com/notes"}
-
-			var buf bytes.Buffer
-
-			log := zerolog.New(&buf)
-
-			logChangelog(&log, c, tt.params, meta)
-
-			events := 0
-
-			for line := range bytes.Lines(buf.Bytes()) {
-				if len(line) == 0 {
-					continue
-				}
-
-				var entry map[string]any
-				require.NoError(t, json.Unmarshal(line, &entry))
-
-				events++
-			}
-
-			assert.Equal(t, tt.wantEvents, events, "log output: %s", buf.String())
-		})
-	}
-}
-
-func TestLogChangelogSkipsEmptyURL(t *testing.T) {
-	t.Parallel()
-
-	c := newReportContainer(t, nil, nil)
-
-	var buf bytes.Buffer
-
-	log := zerolog.New(&buf)
-
-	logChangelog(&log, c, types.UpdateParams{EnableChangelog: true}, provenance.ReportMeta{})
-	logChangelog(&log, nil, types.UpdateParams{EnableChangelog: true}, provenance.ReportMeta{
-		Changelog: "https://example.com/notes",
-	})
-
-	assert.Empty(t, buf.String())
 }
 
 // A Git rebuild must produce exactly one Changelog entry, resolved from the Git

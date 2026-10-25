@@ -110,7 +110,7 @@ func applyLatestImageMeta(
 
 	meta := progress.SetLatestImageMeta(log, c, config, vars, annotations)
 
-	logChangelog(log, c, config, meta)
+	provenance.LogChangelog(log, c, config, meta)
 }
 
 // resolveReleaseTag confirms which release tag matches the pulled image, or
