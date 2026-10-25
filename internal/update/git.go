@@ -877,3 +877,26 @@ func warnGitConfigSkip(log *zerolog.Logger, name, image string, err error) {
 		event.Msg("Skipped container with an invalid git-host")
 	}
 }
+
+// noRestartBuiltIDs returns a snapshot of container IDs built during a no-restart update.
+//
+// Parameters:
+//   - params: Update parameters.
+//
+// Returns:
+//   - map[types.ContainerID]struct{}: Built container IDs, or nil when restart is enabled.
+func (s *gitSession) noRestartBuiltIDs(params types.UpdateParams) map[types.ContainerID]struct{} {
+	if s == nil || !params.NoRestart {
+		return nil
+	}
+
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	ids := make(map[types.ContainerID]struct{}, len(s.built))
+	for id := range s.built {
+		ids[id] = struct{}{}
+	}
+
+	return ids
+}

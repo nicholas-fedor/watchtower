@@ -669,7 +669,7 @@ func TestUpdateAction_ParallelStalenessCheckCancellationPropagation(t *testing.T
 }
 
 // TestEarlyCancellationStopContainers tests that context cancellation is properly handled
-// during the stopContainersInReversedOrder function (lines 998-1040 in update.go).
+// during the stopContainersInReversedOrder function.
 // This test cancels the context AFTER Update starts but WHILE stopContainersInReversedOrder
 // is iterating through containers to stop them.
 func TestEarlyCancellationStopContainers(t *testing.T) {
@@ -729,7 +729,7 @@ func TestEarlyCancellationStopContainers(t *testing.T) {
 }
 
 // TestEarlyCancellationRestartContainers tests that context cancellation is properly handled
-// during the restartContainersInSortedOrder function (lines 1152-1242 in update.go).
+// during the restartContainersInSortedOrder function.
 // This test cancels the context AFTER stop completes but WHILE restartContainersInSortedOrder
 // is iterating through containers to restart them.
 func TestEarlyCancellationRestartContainers(t *testing.T) {

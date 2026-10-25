@@ -90,3 +90,42 @@ func unmonitoredContainers(allContainers, monitored []types.Container) []types.C
 
 	return unmonitored
 }
+
+// reconcileImplicitRestartsExcluding clears linked-restart marks and derives restart candidates while omitting excluded containers.
+//
+// Parameters:
+//   - log: Process logger.
+//   - graph: The scan's dependency graph.
+//   - allContainers: Full list of containers being managed.
+//   - containers: Containers eligible for this session.
+//   - params: Update parameters.
+//   - excluded: Container IDs that must not propagate or receive implicit restarts.
+//
+// Returns:
+//   - []types.Container: Containers that should still restart.
+func reconcileImplicitRestartsExcluding(
+	log *zerolog.Logger,
+	graph *sorter.DependencyGraph,
+	allContainers, containers []types.Container,
+	params types.UpdateParams,
+	excluded map[types.ContainerID]struct{},
+) []types.Container {
+	for _, c := range containers {
+		c.SetLinkedToRestarting(false)
+	}
+
+	markImplicitRestarts(log, graph, allContainers, containers, excluded)
+
+	restart := make([]types.Container, 0, len(containers))
+	for _, c := range containers {
+		if _, skip := excluded[c.ID()]; skip {
+			continue
+		}
+
+		if c.ToRestart() && !c.IsMonitorOnly(params) {
+			restart = append(restart, c)
+		}
+	}
+
+	return restart
+}
