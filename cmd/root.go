@@ -2,7 +2,6 @@ package cmd
 
 import (
 	"context"
-	"errors"
 	"io/fs"
 	"os"
 	"os/signal"
@@ -296,26 +295,25 @@ func (p *process) preRun(cmd *cobra.Command, _ []string) {
 	defer cancel()
 
 	// Retrieve and store the current container ID for use throughout the application.
-	currentWatchtowerContainerID, err = containerClient.GetCurrentContainerID(p.log, ctx, processFs, client)
-	if err != nil {
-		p.log.Debug().Err(err).Msg("Failed to get current container ID")
+	var detectErr, inspectErr error
+
+	currentWatchtowerContainerID, detectErr = containerClient.GetCurrentContainerID(p.log, ctx, processFs, client)
+	if detectErr != nil {
+		p.log.Debug().Err(detectErr).Msg("Failed to get current container ID")
 
 		currentWatchtowerContainerID = ""
 	}
 
-	// Retrieve the current Watchtower container.
+	// Retrieve the current Watchtower container. A failed inspect keeps the
+	// detected ID, so the checks that tell Watchtower apart from other
+	// instances still work.
 	if currentWatchtowerContainerID != "" {
-		currentWatchtowerContainer, err = client.GetCurrentWatchtowerContainer(
+		currentWatchtowerContainer, inspectErr = client.GetCurrentWatchtowerContainer(
 			ctx,
 			currentWatchtowerContainerID,
 		)
-		if err != nil {
-			p.log.Debug().Err(err).Msg("Failed to get the current Watchtower Container")
-
-			// Handle context deadline exceeded or cancellation
-			if errors.Is(err, context.DeadlineExceeded) || errors.Is(err, context.Canceled) {
-				currentWatchtowerContainerID = ""
-			}
+		if inspectErr != nil {
+			p.log.Debug().Err(inspectErr).Msg("Failed to get the current Watchtower Container")
 
 			currentWatchtowerContainer = nil
 		}
@@ -346,9 +344,14 @@ func (p *process) preRun(cmd *cobra.Command, _ []string) {
 	notifier.RegisterHook(p.log)
 
 	if currentWatchtowerContainerUnknown {
-		p.log.Warn().Msg(
+		p.log.Warn().Err(detectErr).Msg(
 			"Could not identify Watchtower's own container. " +
 				"Self-updates are disabled and old instances will not be removed",
+		)
+	} else if inspectErr != nil {
+		p.log.Warn().Err(inspectErr).Msg(
+			"Could not inspect Watchtower's own container. " +
+				"Self-updates are disabled and its scope label is not applied",
 		)
 	}
 
@@ -571,7 +574,7 @@ func (p *process) runMain(cfg types.RunConfig) int {
 			Msg("Incompatible flags: rolling restarts and monitor-only")
 	}
 
-	// Ensure the Docker client is fully initialized before proceeding.
+	// Give a self-updated instance a moment before it lists its predecessors.
 	awaitDockerClient(p.log)
 
 	// Initialize the event broadcaster for SSE subscribers.
@@ -709,11 +712,6 @@ func (p *process) runMain(cfg types.RunConfig) int {
 		return 0 // Exit after successful execution.
 	}
 
-	// Retrieve the current Watchtower container for cleanup operations.
-	if currentWatchtowerContainer == nil && currentWatchtowerContainerID != "" {
-		p.log.Warn().Msg("Current container not cached for cleanup")
-	}
-
 	// Check for and cleanup old Watchtower containers within scope.
 	totalRemovedInstances, err := update.RemoveExcessWatchtowerInstances(
 		p.log,
@@ -767,10 +765,11 @@ func (p *process) runMain(cfg types.RunConfig) int {
 	// Perform this check here rather than inside SetupAndStartAPI so the
 	// warning always appears, even when no HTTP API endpoints are enabled
 	// and SetupAndStartAPI returns early.
-	skipSelfUpdate := currentWatchtowerContainer != nil &&
-		currentWatchtowerContainer.HasExposedPorts() &&
-		!appCfg.Update.EphemeralSelfUpdate
-	if skipSelfUpdate {
+	skipSelfUpdate := selfUpdateBlocked(currentWatchtowerContainer,
+		currentWatchtowerContainerID,
+		appCfg.Update.EphemeralSelfUpdate,
+	)
+	if skipSelfUpdate && currentWatchtowerContainer != nil {
 		p.log.Warn().Msg("Published port detected - self-updates disabled.")
 	}
 
@@ -934,14 +933,39 @@ func (p *process) logNotify(msg string, err error) {
 	notifier.Close()
 }
 
-// awaitDockerClient introduces a brief delay to ensure the Docker client is fully initialized.
+// awaitDockerClient pauses for one second before Watchtower first lists containers.
 //
-// It pauses execution for one second to mitigate potential race conditions during startup,
-// giving the Docker API time to stabilize before Watchtower begins interacting with containers.
+// It guards against a self-update race in which the new instance's first listing of Watchtower
+// containers can come back empty, which leaves the old instance running. Waiting for a daemon
+// that is not serving its API yet happens earlier, when the client is created.
 func awaitDockerClient(log *zerolog.Logger) {
 	log.Debug().
 		Msg("Sleeping for a second to ensure the docker api client has been properly initialized.")
 	sleepFunc(1 * time.Second)
+}
+
+// selfUpdateBlocked reports whether a self-update cannot replace the running
+// Watchtower container safely.
+//
+// A container that publishes host ports keeps them until it stops, so its
+// replacement cannot bind them. An ephemeral self-update stops it first, so
+// the ports do not block it. A container that was detected but could not be
+// inspected blocks every self-update, because its ports are unknown. preRun
+// warns about that case.
+//
+// Parameters:
+//   - current: The running Watchtower container, or nil when it was not inspected.
+//   - currentID: The detected ID of the running Watchtower container, or empty.
+//   - ephemeral: Whether self-updates use an ephemeral orchestrator.
+//
+// Returns:
+//   - bool: True when self-updates must be skipped.
+func selfUpdateBlocked(current types.Container, currentID types.ContainerID, ephemeral bool) bool {
+	if current == nil {
+		return currentID != ""
+	}
+
+	return current.HasExposedPorts() && !ephemeral
 }
 
 // resolveCurrentWatchtowerContainerForFallback resolves the current Watchtower container

@@ -400,6 +400,22 @@
     },
     {
       "data": {
+        "error": "failed to detect current container ID: no container ID in cgroup file"
+      },
+      "level": "error",
+      "message": "Could not identify Watchtower's own container. Self-updates are disabled and old instances will not be removed",
+      "time": "2026-10-07T12:00:42Z"
+    },
+    {
+      "data": {
+        "error": "failed to inspect container: context deadline exceeded"
+      },
+      "level": "debug",
+      "message": "Could not inspect Watchtower's own container. Self-updates are disabled and its scope label is not applied",
+      "time": "2026-10-07T12:00:43Z"
+    },
+    {
+      "data": {
         "alpha": "one",
         "beta": 2
       },

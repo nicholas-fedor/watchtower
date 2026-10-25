@@ -22,7 +22,11 @@ var commonTemplates = map[string]string{
 	// "Registry rate limit retries exhausted. Container failed for this cycle" (update failed on a registry rate limit),
 	// "Ignoring depends-on entry that names no container" (depends-on label entry matched nothing),
 	// "Skipping container update (self-dependency)" (container depends on itself),
-	// "Skipping container update (circular dependency)" (container is in a dependency cycle).
+	// "Skipping container update (circular dependency)" (container is in a dependency cycle),
+	// "Could not identify Watchtower's own container. Self-updates are disabled and old instances will not be removed"
+	// (self-updates disabled at startup),
+	// "Could not inspect Watchtower's own container. Self-updates are disabled and its scope label is not applied"
+	// (own container found but not inspected at startup).
 	// For unrecognized messages, displays the message with key=value data pairs if Data exists, otherwise just the message.
 	// Expects .Entries []Entry where each Entry has Message string and Data map[string]interface{}.
 	"default-legacy": `
@@ -117,6 +121,8 @@ var commonTemplates = map[string]string{
     Skipped {{with (index $e.Data "container")}}{{.}}{{else}}container{{end}}: depends on itself
 {{- else if eq $msg "Skipping container update (circular dependency)" -}}
     Skipped {{with (index $e.Data "container")}}{{.}}{{else}}container{{end}}: circular dependency
+{{- else if or (eq $msg "Could not identify Watchtower's own container. Self-updates are disabled and old instances will not be removed") (eq $msg "Could not inspect Watchtower's own container. Self-updates are disabled and its scope label is not applied") -}}
+    {{$msg}}{{with (index $e.Data "error")}}: {{.}}{{end}}
 {{- else if $e.Data -}}
     {{- /* For messages with data, show message and key=value pairs */ -}}
     {{$msg}} | {{range $k, $v := $e.Data}}{{$k}}={{$v}} {{end}}

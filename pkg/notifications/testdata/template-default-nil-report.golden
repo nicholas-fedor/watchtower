@@ -40,5 +40,7 @@ Registry rate limit retries exhausted. Container failed for this cycle
 Ignoring depends-on entry that names no container
 Skipping container update (self-dependency)
 Skipping container update (circular dependency)
+Could not identify Watchtower's own container. Self-updates are disabled and old instances will not be removed
+Could not inspect Watchtower's own container. Self-updates are disabled and its scope label is not applied
 Unrecognized message with fields
 Unrecognized message without fields

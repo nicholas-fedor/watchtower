@@ -74,6 +74,8 @@ var legacyTemplateMessages = []string{
 	"Ignoring depends-on entry that names no container",
 	"Skipping container update (self-dependency)",
 	"Skipping container update (circular dependency)",
+	"Could not identify Watchtower's own container. Self-updates are disabled and old instances will not be removed",
+	"Could not inspect Watchtower's own container. Self-updates are disabled and its scope label is not applied",
 }
 
 // Disk sizes used by the image-usage budget fixtures, in bytes.
@@ -204,6 +206,10 @@ func goldenEntryData(message string) map[string]any {
 		return map[string]any{"container": "app", "id": "abcdef123456"}
 	case "Only checking containers in scope":
 		return map[string]any{"scope": "production"}
+	case "Could not identify Watchtower's own container. Self-updates are disabled and old instances will not be removed":
+		return map[string]any{"error": "failed to detect current container ID: no container ID in cgroup file"}
+	case "Could not inspect Watchtower's own container. Self-updates are disabled and its scope label is not applied":
+		return map[string]any{"error": "failed to inspect container: context deadline exceeded"}
 	case "Starting HTTP API server", "HTTP API server is enabled":
 		return map[string]any{"host": "0.0.0.0", "port": "8080", "tls": true}
 	default:

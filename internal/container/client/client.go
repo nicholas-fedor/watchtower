@@ -2,15 +2,18 @@ package client
 
 import (
 	"context"
+	"crypto/tls"
 	"errors"
 	"fmt"
 	"io"
 	"io/fs"
+	"net/http"
 	"os"
 	"strings"
 	"sync"
 	"time"
 
+	"github.com/cenkalti/backoff/v7"
 	"github.com/rs/zerolog"
 
 	cerrdefs "github.com/containerd/errdefs"
@@ -36,12 +39,26 @@ const (
 	// CPU copying behavior.
 	cpuCopyModeAuto = "auto"
 
-	// daemonInitTimeout is the default timeout for Docker daemon initialization operations.
-	// This timeout applies to initial connection, ping, API version negotiation, and
-	// server version retrieval during client initialization.
-	// The value is 30 seconds, which should be sufficient for most Docker daemon
-	// initialization scenarios while preventing indefinite hangs.
-	daemonInitTimeout = 30 * time.Second
+	// daemonStartupTimeout bounds the wait for a Docker daemon that is not
+	// serving its API yet. dockerd starts every container that has a restart
+	// policy before it serves its API. Watchtower is one of them, and the
+	// restore can take minutes on a host with many containers.
+	daemonStartupTimeout = 3 * time.Minute
+
+	// daemonWaitNotice is how long the first ping may go unanswered before
+	// Watchtower logs that it is waiting for the daemon.
+	daemonWaitNotice = 10 * time.Second
+
+	// daemonRetryDelay is the first delay before pinging again after a ping
+	// failed without an answer from the daemon.
+	daemonRetryDelay = time.Second
+
+	// daemonMaxRetryDelay caps the delay between pings.
+	daemonMaxRetryDelay = 10 * time.Second
+
+	// daemonRetryBackoff multiplies the delay between pings after each
+	// failed ping.
+	daemonRetryBackoff = 2
 
 	// maxListRetries is the maximum number of retry attempts for transient Docker
 	// connection failures when listing containers.
@@ -484,6 +501,7 @@ func NewClient(log *zerolog.Logger, opts ClientOptions) Client {
 }
 
 // negotiateDockerAPI pings the daemon to validate connectivity and negotiate the API version.
+// It waits for a daemon that is not serving its API yet, up to daemonStartupTimeout.
 //
 // When DOCKER_API_VERSION is incompatible with the server, it recreates the client without a
 // fixed version so negotiation can select a supported API. A fixed version is incompatible when
@@ -503,15 +521,9 @@ func negotiateDockerAPI(
 	log *zerolog.Logger,
 	cli *dockerClient.Client,
 ) (*dockerClient.Client, dockerClient.PingResult, error) {
-	ctx, cancel := context.WithTimeout(
-		context.Background(),
-		daemonInitTimeout,
-	)
-	defer cancel()
-
 	// Ping triggers API version negotiation, or only pings when DOCKER_API_VERSION fixes the
 	// version.
-	result, err := cli.Ping(ctx, dockerClient.PingOptions{NegotiateAPIVersion: true})
+	result, err := pingUntilServing(log, cli)
 
 	// The ping uses the unversioned endpoint, so a daemon older than the fixed version still
 	// answers it. A negotiated version never exceeds the daemon's.
@@ -536,7 +548,7 @@ func negotiateDockerAPI(
 		}
 
 		cli = recreated
-		result, err = cli.Ping(ctx, dockerClient.PingOptions{NegotiateAPIVersion: true})
+		result, err = pingUntilServing(log, cli)
 	}
 
 	if err != nil {
@@ -548,6 +560,142 @@ func negotiateDockerAPI(
 	}
 
 	return cli, result, nil
+}
+
+// pingUntilServing pings the daemon until it answers or daemonStartupTimeout
+// passes. It stops early on an error that waiting cannot fix.
+//
+// A daemon that is restoring its containers holds the connection and answers
+// the queued ping once it serves its API. A ping that fails without an answer
+// is sent again after a delay that grows by daemonRetryBackoff up to
+// daemonMaxRetryDelay.
+//
+// Parameters:
+//   - log: Process logger.
+//   - cli: Docker client to ping.
+//
+// Returns:
+//   - dockerClient.PingResult: Result of the first successful ping.
+//   - error: The last ping error, nil on success.
+func pingUntilServing(log *zerolog.Logger, cli *dockerClient.Client) (dockerClient.PingResult, error) {
+	ctx, cancel := context.WithTimeout(context.Background(), daemonStartupTimeout)
+	defer cancel()
+
+	start := time.Now()
+
+	var (
+		retries    int
+		noticeOnce sync.Once
+	)
+
+	notice := func(err error) {
+		noticeOnce.Do(func() {
+			log.Info().
+				Err(err).
+				Str("timeout", daemonStartupTimeout.String()).
+				Msg("Docker daemon is not answering yet. Waiting for it")
+		})
+	}
+
+	noticeTimer := time.AfterFunc(daemonWaitNotice, func() { notice(nil) })
+	defer noticeTimer.Stop()
+
+	policy := backoff.NewExponentialBackOff()
+	policy.InitialInterval = daemonRetryDelay
+	policy.Multiplier = daemonRetryBackoff
+	policy.MaxInterval = daemonMaxRetryDelay
+	policy.RandomizationFactor = 0
+
+	result, err := backoff.Retry(ctx, func() (dockerClient.PingResult, error) {
+		result, err := cli.Ping(ctx, dockerClient.PingOptions{NegotiateAPIVersion: true})
+		if err == nil {
+			return result, nil
+		}
+
+		err = fmt.Errorf("ping Docker daemon: %w", err)
+		if !daemonNotServing(err) {
+			return result, backoff.Permanent(err)
+		}
+
+		return result, err
+	},
+		backoff.WithBackOff(policy),
+		backoff.WithMaxElapsedTime(daemonStartupTimeout),
+		backoff.WithNotify(func(err error, _ time.Duration) {
+			retries++
+
+			notice(err)
+			log.Debug().
+				Err(err).
+				Int("retry", retries).
+				Msg("Docker daemon is still not answering")
+		}),
+	)
+	if err != nil {
+		// Report the last ping error rather than the retry loop's summary.
+		retryErr := backoff.AsRetryError(err)
+		if retryErr != nil {
+			return result, retryErr.LastErr
+		}
+
+		return result, fmt.Errorf("ping Docker daemon: %w", err)
+	}
+
+	if time.Since(start) >= daemonWaitNotice || retries > 0 {
+		log.Debug().
+			Str("waited", time.Since(start).Round(time.Millisecond).String()).
+			Msg("Docker daemon is serving its API")
+	}
+
+	return result, nil
+}
+
+// daemonNotServing reports whether a startup ping error may pass once the
+// daemon serves its API.
+//
+// It accepts every error isDaemonConnectionError accepts. It also accepts any
+// transport failure, which the Docker client reports as a connection failure.
+// Examples are a name that does not resolve yet, a refused connection, and a
+// missing socket. A 5xx answer counts too, since a socket proxy answers that
+// way while its daemon is down. TLS and certificate errors and other answers
+// never pass, so they end the wait at once.
+//
+// Parameters:
+//   - err: Error from a ping.
+//
+// Returns:
+//   - bool: True when the ping should be sent again.
+func daemonNotServing(err error) bool {
+	if isTLSSetupError(err) {
+		return false
+	}
+
+	return isDaemonConnectionError(err) ||
+		dockerClient.IsErrConnectionFailed(err) ||
+		cerrdefs.IsInternal(err) ||
+		cerrdefs.IsUnavailable(err)
+}
+
+// isTLSSetupError reports whether err comes from a TLS setup that cannot
+// connect to the daemon. Examples are an untrusted certificate, a rejected
+// client certificate, and a server that does not speak TLS.
+//
+// Parameters:
+//   - err: Error to check.
+//
+// Returns:
+//   - bool: True when err is a TLS setup error.
+func isTLSSetupError(err error) bool {
+	var (
+		recordErr tls.RecordHeaderError
+		alertErr  tls.AlertError
+		verifyErr *tls.CertificateVerificationError
+	)
+
+	return errors.Is(err, http.ErrSchemeMismatch) ||
+		errors.As(err, &recordErr) ||
+		errors.As(err, &alertErr) ||
+		errors.As(err, &verifyErr)
 }
 
 // ListContainers retrieves a list of containers, optionally filtered.
