@@ -9,7 +9,7 @@ import (
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 
-	mockContainer "github.com/nicholas-fedor/watchtower/pkg/container/mocks"
+	mockContainerClient "github.com/nicholas-fedor/watchtower/internal/container/client/mocks"
 	"github.com/nicholas-fedor/watchtower/pkg/types"
 	mockTypes "github.com/nicholas-fedor/watchtower/pkg/types/mocks"
 )
@@ -17,7 +17,7 @@ import (
 func TestGetContainerDetails(t *testing.T) {
 	tests := []struct {
 		name    string
-		client  func(t *testing.T) *mockContainer.MockClient
+		client  func(t *testing.T) *mockContainerClient.MockClient
 		filter  types.Filter
 		params  types.UpdateParams
 		wantErr bool
@@ -26,9 +26,9 @@ func TestGetContainerDetails(t *testing.T) {
 	}{
 		{
 			name: "successful list with labeled enabled container",
-			client: func(t *testing.T) *mockContainer.MockClient {
+			client: func(t *testing.T) *mockContainerClient.MockClient {
 				t.Helper()
-				c := mockContainer.NewMockClient(t)
+				c := mockContainerClient.NewMockClient(t)
 				container := mockTypes.NewMockContainer(t)
 				container.EXPECT().Name().Return("test-container")
 				container.EXPECT().ImageName().Return("nginx:latest")
@@ -55,9 +55,9 @@ func TestGetContainerDetails(t *testing.T) {
 		},
 		{
 			name: "unlabeled container is enabled when label-enable is false",
-			client: func(t *testing.T) *mockContainer.MockClient {
+			client: func(t *testing.T) *mockContainerClient.MockClient {
 				t.Helper()
-				c := mockContainer.NewMockClient(t)
+				c := mockContainerClient.NewMockClient(t)
 				container := mockTypes.NewMockContainer(t)
 				container.EXPECT().Name().Return("unlabeled-container")
 				container.EXPECT().ImageName().Return("nginx:latest")
@@ -84,9 +84,9 @@ func TestGetContainerDetails(t *testing.T) {
 		},
 		{
 			name: "unlabeled container is disabled when label-enable is true",
-			client: func(t *testing.T) *mockContainer.MockClient {
+			client: func(t *testing.T) *mockContainerClient.MockClient {
 				t.Helper()
-				c := mockContainer.NewMockClient(t)
+				c := mockContainerClient.NewMockClient(t)
 				container := mockTypes.NewMockContainer(t)
 				container.EXPECT().Name().Return("unlabeled-container")
 				container.EXPECT().ImageName().Return("nginx:latest")
@@ -113,9 +113,9 @@ func TestGetContainerDetails(t *testing.T) {
 		},
 		{
 			name: "labeled false container is disabled when label-enable is false",
-			client: func(t *testing.T) *mockContainer.MockClient {
+			client: func(t *testing.T) *mockContainerClient.MockClient {
 				t.Helper()
-				c := mockContainer.NewMockClient(t)
+				c := mockContainerClient.NewMockClient(t)
 				container := mockTypes.NewMockContainer(t)
 				container.EXPECT().Name().Return("disabled-container")
 				container.EXPECT().ImageName().Return("nginx:latest")
@@ -142,9 +142,9 @@ func TestGetContainerDetails(t *testing.T) {
 		},
 		{
 			name: "digest from the container's repository when the image has several",
-			client: func(t *testing.T) *mockContainer.MockClient {
+			client: func(t *testing.T) *mockContainerClient.MockClient {
 				t.Helper()
-				c := mockContainer.NewMockClient(t)
+				c := mockContainerClient.NewMockClient(t)
 				container := mockTypes.NewMockContainer(t)
 				container.EXPECT().Name().Return("app")
 				container.EXPECT().ImageName().Return("ghcr.io/org/app:latest")
@@ -173,9 +173,9 @@ func TestGetContainerDetails(t *testing.T) {
 		},
 		{
 			name: "client error returns wrapped error",
-			client: func(t *testing.T) *mockContainer.MockClient {
+			client: func(t *testing.T) *mockContainerClient.MockClient {
 				t.Helper()
-				c := mockContainer.NewMockClient(t)
+				c := mockContainerClient.NewMockClient(t)
 				c.EXPECT().ListContainers(mock.Anything).Return(nil, errors.New("connection refused"))
 
 				return c

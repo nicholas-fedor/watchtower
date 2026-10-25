@@ -25,10 +25,10 @@ import (
 	dockerContainer "github.com/moby/moby/api/types/container"
 
 	"github.com/nicholas-fedor/watchtower/internal/container"
+	mockContainerClient "github.com/nicholas-fedor/watchtower/internal/container/client/mocks"
 	"github.com/nicholas-fedor/watchtower/internal/container/labels"
 	"github.com/nicholas-fedor/watchtower/internal/container/oci"
 	"github.com/nicholas-fedor/watchtower/internal/git"
-	mockContainer "github.com/nicholas-fedor/watchtower/pkg/container/mocks"
 	"github.com/nicholas-fedor/watchtower/pkg/types"
 	mockTypes "github.com/nicholas-fedor/watchtower/pkg/types/mocks"
 )
@@ -51,7 +51,7 @@ func newTestLogger(t *testing.T) *zerolog.Logger {
 }
 
 func TestCheckForUpdates_DigestExtraction(t *testing.T) {
-	client := mockContainer.NewMockClient(t)
+	client := mockContainerClient.NewMockClient(t)
 	container := mockTypes.NewMockContainer(t)
 	container.EXPECT().Name().Return("my-app")
 	container.EXPECT().ImageName().Return("nginx:latest")
@@ -70,7 +70,7 @@ func TestCheckForUpdates_DigestExtraction(t *testing.T) {
 }
 
 func TestCheckForUpdates_CheckContainerUpdateError(t *testing.T) {
-	client := mockContainer.NewMockClient(t)
+	client := mockContainerClient.NewMockClient(t)
 	container := mockTypes.NewMockContainer(t)
 	container.EXPECT().Name().Return("my-app")
 	container.EXPECT().ImageName().Return("nginx:latest")
@@ -88,7 +88,7 @@ func TestCheckForUpdates_CheckContainerUpdateError(t *testing.T) {
 }
 
 func TestCheckForUpdates_ParamsPropagation(t *testing.T) {
-	client := mockContainer.NewMockClient(t)
+	client := mockContainerClient.NewMockClient(t)
 	container := mockTypes.NewMockContainer(t)
 	container.EXPECT().Name().Return("my-app")
 	container.EXPECT().ImageName().Return("nginx:latest")
@@ -114,7 +114,7 @@ func TestCheckForUpdates_ParamsPropagation(t *testing.T) {
 }
 
 func TestCheckForUpdates_MixedStaleResults(t *testing.T) {
-	client := mockContainer.NewMockClient(t)
+	client := mockContainerClient.NewMockClient(t)
 	container1 := mockTypes.NewMockContainer(t)
 	container1.EXPECT().Name().Return("app1")
 	container1.EXPECT().ImageName().Return("nginx:latest")
@@ -145,7 +145,7 @@ func TestCheckForUpdates_MixedStaleResults(t *testing.T) {
 }
 
 func TestCheckForUpdates_GitNoPullSkipsCheck(t *testing.T) {
-	client := mockContainer.NewMockClient(t)
+	client := mockContainerClient.NewMockClient(t)
 	watched := container.NewContainer(newTestLogger(t), &dockerContainer.InspectResponse{
 		ID:   "app-id",
 		Name: "/app",
@@ -186,7 +186,7 @@ func TestCheckForUpdates_GitCommitField(t *testing.T) {
 		},
 	}, nil)
 
-	client := mockContainer.NewMockClient(t)
+	client := mockContainerClient.NewMockClient(t)
 	client.EXPECT().ListContainers(mock.Anything, mock.Anything).Return([]types.Container{watched}, nil)
 
 	results, err := CheckForUpdates(newTestLogger(t), t.Context(), client, nil, types.UpdateParams{
@@ -618,7 +618,7 @@ func TestCheckRegistrySource(t *testing.T) {
 	t.Run("an error is reported without update fields", func(t *testing.T) {
 		t.Parallel()
 
-		client := mockContainer.NewMockClient(t)
+		client := mockContainerClient.NewMockClient(t)
 		client.EXPECT().CheckContainerUpdate(mock.Anything, mock.Anything, mock.Anything).
 			Return(false, types.ImageID(""), "", errors.New("registry unreachable"))
 
@@ -637,7 +637,7 @@ func TestCheckRegistrySource(t *testing.T) {
 	t.Run("a newer image populates the update fields", func(t *testing.T) {
 		t.Parallel()
 
-		client := mockContainer.NewMockClient(t)
+		client := mockContainerClient.NewMockClient(t)
 		client.EXPECT().CheckContainerUpdate(mock.Anything, mock.Anything, mock.Anything).
 			Return(true, types.ImageID("sha256:def"), "sha256:def", nil)
 
@@ -656,7 +656,7 @@ func TestCheckRegistrySource(t *testing.T) {
 	t.Run("empty digest and image id are left unset", func(t *testing.T) {
 		t.Parallel()
 
-		client := mockContainer.NewMockClient(t)
+		client := mockContainerClient.NewMockClient(t)
 		client.EXPECT().CheckContainerUpdate(mock.Anything, mock.Anything, mock.Anything).
 			Return(false, types.ImageID(""), "", nil)
 

@@ -9,7 +9,7 @@ import (
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 
-	mockContainer "github.com/nicholas-fedor/watchtower/pkg/container/mocks"
+	mockContainerClient "github.com/nicholas-fedor/watchtower/internal/container/client/mocks"
 	"github.com/nicholas-fedor/watchtower/pkg/types"
 	mockTypes "github.com/nicholas-fedor/watchtower/pkg/types/mocks"
 )
@@ -17,16 +17,16 @@ import (
 func TestListImageStatuses(t *testing.T) {
 	tests := []struct {
 		name    string
-		client  func(t *testing.T) *mockContainer.MockClient
+		client  func(t *testing.T) *mockContainerClient.MockClient
 		filter  types.Filter
 		wantErr bool
 		want    []ImageStatus
 	}{
 		{
 			name: "successful list with single image",
-			client: func(t *testing.T) *mockContainer.MockClient {
+			client: func(t *testing.T) *mockContainerClient.MockClient {
 				t.Helper()
-				c := mockContainer.NewMockClient(t)
+				c := mockContainerClient.NewMockClient(t)
 				container := mockTypes.NewMockContainer(t)
 				container.EXPECT().ImageName().Return("nginx:latest")
 				container.EXPECT().ImageID().Return(types.ImageID("sha256:abc123"))
@@ -42,9 +42,9 @@ func TestListImageStatuses(t *testing.T) {
 		},
 		{
 			name: "multiple containers same image",
-			client: func(t *testing.T) *mockContainer.MockClient {
+			client: func(t *testing.T) *mockContainerClient.MockClient {
 				t.Helper()
-				c := mockContainer.NewMockClient(t)
+				c := mockContainerClient.NewMockClient(t)
 
 				container1 := mockTypes.NewMockContainer(t)
 				container1.EXPECT().ImageName().Return("nginx:latest")
@@ -66,9 +66,9 @@ func TestListImageStatuses(t *testing.T) {
 		},
 		{
 			name: "digest extracted from canonical repo digest",
-			client: func(t *testing.T) *mockContainer.MockClient {
+			client: func(t *testing.T) *mockContainerClient.MockClient {
 				t.Helper()
-				c := mockContainer.NewMockClient(t)
+				c := mockContainerClient.NewMockClient(t)
 				container := mockTypes.NewMockContainer(t)
 				container.EXPECT().ImageName().Return("nginx:latest")
 				container.EXPECT().ImageID().Return(types.ImageID("sha256:abc123"))
@@ -86,9 +86,9 @@ func TestListImageStatuses(t *testing.T) {
 		},
 		{
 			name: "digest extracted from short name repo digest",
-			client: func(t *testing.T) *mockContainer.MockClient {
+			client: func(t *testing.T) *mockContainerClient.MockClient {
 				t.Helper()
-				c := mockContainer.NewMockClient(t)
+				c := mockContainerClient.NewMockClient(t)
 				container := mockTypes.NewMockContainer(t)
 				container.EXPECT().ImageName().Return("myapp:1.0")
 				container.EXPECT().ImageID().Return(types.ImageID("sha256:def456"))
@@ -106,9 +106,9 @@ func TestListImageStatuses(t *testing.T) {
 		},
 		{
 			name: "digest extracted from private registry",
-			client: func(t *testing.T) *mockContainer.MockClient {
+			client: func(t *testing.T) *mockContainerClient.MockClient {
 				t.Helper()
-				c := mockContainer.NewMockClient(t)
+				c := mockContainerClient.NewMockClient(t)
 				container := mockTypes.NewMockContainer(t)
 				container.EXPECT().ImageName().Return("registry.example.com/team/app:v2")
 				container.EXPECT().ImageID().Return(types.ImageID("sha256:ghi789"))
@@ -126,9 +126,9 @@ func TestListImageStatuses(t *testing.T) {
 		},
 		{
 			name: "multiple digests uses first",
-			client: func(t *testing.T) *mockContainer.MockClient {
+			client: func(t *testing.T) *mockContainerClient.MockClient {
 				t.Helper()
-				c := mockContainer.NewMockClient(t)
+				c := mockContainerClient.NewMockClient(t)
 				container := mockTypes.NewMockContainer(t)
 				container.EXPECT().ImageName().Return("nginx:latest")
 				container.EXPECT().ImageID().Return(types.ImageID("sha256:abc123"))
@@ -146,9 +146,9 @@ func TestListImageStatuses(t *testing.T) {
 		},
 		{
 			name: "multiple repositories uses the container's repository",
-			client: func(t *testing.T) *mockContainer.MockClient {
+			client: func(t *testing.T) *mockContainerClient.MockClient {
 				t.Helper()
-				c := mockContainer.NewMockClient(t)
+				c := mockContainerClient.NewMockClient(t)
 				container := mockTypes.NewMockContainer(t)
 				container.EXPECT().ImageName().Return("ghcr.io/org/app:latest")
 				container.EXPECT().ImageID().Return(types.ImageID("sha256:abc123"))
@@ -166,9 +166,9 @@ func TestListImageStatuses(t *testing.T) {
 		},
 		{
 			name: "client error returns wrapped error",
-			client: func(t *testing.T) *mockContainer.MockClient {
+			client: func(t *testing.T) *mockContainerClient.MockClient {
 				t.Helper()
-				c := mockContainer.NewMockClient(t)
+				c := mockContainerClient.NewMockClient(t)
 				c.EXPECT().ListContainers(mock.Anything).Return(nil, errors.New("connection refused"))
 
 				return c
@@ -215,7 +215,7 @@ func TestListImageStatuses_SortsByNameThenImageID(t *testing.T) {
 		return c
 	}
 
-	client := mockContainer.NewMockClient(t)
+	client := mockContainerClient.NewMockClient(t)
 	client.EXPECT().ListContainers(mock.Anything).Return([]types.Container{
 		newContainer("redis:7", "sha256:bbb"),
 		newContainer("nginx:1.27", "sha256:zzz"),
@@ -268,7 +268,7 @@ func TestListImageStatuses_NameForSeveralTags(t *testing.T) {
 				containers = append(containers, c)
 			}
 
-			client := mockContainer.NewMockClient(t)
+			client := mockContainerClient.NewMockClient(t)
 			client.EXPECT().ListContainers(mock.Anything).Return(containers, nil)
 
 			statuses, err := ListImageStatuses(t.Context(), client, nil)

@@ -64,7 +64,7 @@
 # Each entry can carry its own config and interfaces maps, which override the top-level settings.
 # Default: null
 packages:
-  # Top-level pkg directory, recursively includes all subpackages (e.g., pkg/types, pkg/container)
+  # Top-level pkg directory, recursively includes all subpackages (e.g., pkg/types, pkg/notifications)
   github.com/nicholas-fedor/watchtower/pkg: {}
 
   # Top-level internal directory, recursively includes all subpackages (e.g., internal/update)

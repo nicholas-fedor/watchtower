@@ -7,7 +7,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 
-	mockContainer "github.com/nicholas-fedor/watchtower/pkg/container/mocks"
+	mockContainerClient "github.com/nicholas-fedor/watchtower/internal/container/client/mocks"
 	"github.com/nicholas-fedor/watchtower/pkg/types"
 )
 
@@ -57,7 +57,7 @@ func TestRegisterContainersRoute_NilClient(t *testing.T) {
 	t.Run("with client registers routes", func(t *testing.T) {
 		app := testApp()
 		auth := testAuthMiddleware()
-		mockClient := mockContainer.NewMockClient(t)
+		mockClient := mockContainerClient.NewMockClient(t)
 		mockClient.EXPECT().ListContainers(mock.Anything).Return([]types.Container{}, nil).Maybe()
 
 		opts := Options{

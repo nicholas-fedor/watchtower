@@ -18,6 +18,7 @@ import (
 	dockerContainer "github.com/moby/moby/api/types/container"
 
 	"github.com/nicholas-fedor/watchtower/internal/container"
+	containerClient "github.com/nicholas-fedor/watchtower/internal/container/client"
 	"github.com/nicholas-fedor/watchtower/internal/container/filters"
 	"github.com/nicholas-fedor/watchtower/internal/container/hooks"
 	containerImage "github.com/nicholas-fedor/watchtower/internal/container/image"
@@ -29,7 +30,6 @@ import (
 	"github.com/nicholas-fedor/watchtower/internal/update/changelog"
 	"github.com/nicholas-fedor/watchtower/internal/update/sorter"
 	"github.com/nicholas-fedor/watchtower/internal/update/state"
-	pkgContainer "github.com/nicholas-fedor/watchtower/pkg/container"
 	"github.com/nicholas-fedor/watchtower/pkg/types"
 )
 
@@ -133,7 +133,7 @@ func isRecoverableOrphan(
 func TryRecoverOrphanedContainer(
 	log *zerolog.Logger,
 	ctx context.Context,
-	client pkgContainer.Client,
+	client containerClient.Client,
 	currentContainer types.Container,
 ) (types.Container, bool) {
 	if currentContainer == nil {
@@ -209,7 +209,7 @@ func TryRecoverOrphanedContainer(
 func update(
 	log *zerolog.Logger,
 	ctx context.Context,
-	client pkgContainer.Client,
+	client containerClient.Client,
 	config types.UpdateParams,
 	rateLimiter *ratelimit.Limiter,
 	gitClient ...*git.Client,
@@ -1407,7 +1407,7 @@ func performRollingRestart(
 	log *zerolog.Logger,
 	ctx context.Context,
 	containers []types.Container,
-	client pkgContainer.Client,
+	client containerClient.Client,
 	config types.UpdateParams,
 	cleanupImageInfos *[]types.RemovedImageInfo,
 	progress *state.Progress,
@@ -1559,7 +1559,7 @@ func stopContainersInReversedOrder(
 	log *zerolog.Logger,
 	ctx context.Context,
 	containers []types.Container,
-	client pkgContainer.Client,
+	client containerClient.Client,
 	config types.UpdateParams,
 ) (map[types.ContainerID]error, []types.RemovedImageInfo) {
 	failed := make(map[types.ContainerID]error, len(containers))
@@ -1670,7 +1670,7 @@ func stopStaleContainer(
 	log *zerolog.Logger,
 	ctx context.Context,
 	container types.Container,
-	client pkgContainer.Client,
+	client containerClient.Client,
 	config types.UpdateParams,
 ) (bool, error) {
 	fields := map[string]any{
@@ -1789,10 +1789,10 @@ func stopStaleContainer(
 //   - error: Non-nil if a labeled path cannot be snapshotted.
 func snapshotCopyFilesForRecreate(
 	ctx context.Context,
-	client pkgContainer.Client,
+	client containerClient.Client,
 	source types.Container,
 ) error {
-	store, ok := client.(pkgContainer.CopyFileStore)
+	store, ok := client.(containerClient.CopyFileStore)
 	if !ok {
 		return nil
 	}
@@ -1810,8 +1810,8 @@ func snapshotCopyFilesForRecreate(
 // Parameters:
 //   - client: Docker client. No-op unless it implements container.CopyFileStore.
 //   - containerID: Source container ID whose snapshot should be discarded.
-func discardCopyFilesForRecreate(client pkgContainer.Client, containerID types.ContainerID) {
-	store, ok := client.(pkgContainer.CopyFileStore)
+func discardCopyFilesForRecreate(client containerClient.Client, containerID types.ContainerID) {
+	store, ok := client.(containerClient.CopyFileStore)
 	if !ok {
 		return
 	}
@@ -1840,7 +1840,7 @@ func restartContainersInSortedOrder(
 	log *zerolog.Logger,
 	ctx context.Context,
 	containers []types.Container,
-	client pkgContainer.Client,
+	client containerClient.Client,
 	config types.UpdateParams,
 	stoppedImages []types.RemovedImageInfo,
 	cleanupImageInfos *[]types.RemovedImageInfo,
@@ -2011,7 +2011,7 @@ func restartStaleContainer(
 	log *zerolog.Logger,
 	ctx context.Context,
 	sourceContainer types.Container,
-	client pkgContainer.Client,
+	client containerClient.Client,
 	config types.UpdateParams,
 ) (types.ContainerID, bool, error) {
 	// Create a detached context to survive parent context cancellation.

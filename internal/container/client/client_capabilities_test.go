@@ -1,4 +1,4 @@
-package container
+package client
 
 import (
 	"bytes"

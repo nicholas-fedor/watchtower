@@ -10,7 +10,7 @@ import (
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 
-	mockContainer "github.com/nicholas-fedor/watchtower/pkg/container/mocks"
+	mockContainerClient "github.com/nicholas-fedor/watchtower/internal/container/client/mocks"
 	"github.com/nicholas-fedor/watchtower/pkg/types"
 	mockContainerTypes "github.com/nicholas-fedor/watchtower/pkg/types/mocks"
 )
@@ -29,7 +29,7 @@ func TestValidateRollingRestartDependencies(t *testing.T) {
 		t.Run("should return wrapped error", func(t *testing.T) {
 			t.Parallel()
 
-			mockClient := mockContainer.NewMockClient(t)
+			mockClient := mockContainerClient.NewMockClient(t)
 			expectedErr := errors.New("list containers failed")
 			mockClient.EXPECT().ListContainers(mock.Anything, mock.Anything).Return(nil, expectedErr)
 
@@ -46,7 +46,7 @@ func TestValidateRollingRestartDependencies(t *testing.T) {
 		t.Run("should return nil", func(t *testing.T) {
 			t.Parallel()
 
-			mockClient := mockContainer.NewMockClient(t)
+			mockClient := mockContainerClient.NewMockClient(t)
 			mockClient.EXPECT().ListContainers(mock.Anything, mock.Anything).Return([]types.Container{}, nil)
 
 			err := ValidateRollingRestartDependencies(newTestLogger(t), t.Context(), mockClient, filter, true)
@@ -61,7 +61,7 @@ func TestValidateRollingRestartDependencies(t *testing.T) {
 		t.Run("should return nil", func(t *testing.T) {
 			t.Parallel()
 
-			mockClient := mockContainer.NewMockClient(t)
+			mockClient := mockContainerClient.NewMockClient(t)
 			mockContainer1 := mockContainerTypes.NewMockContainer(t)
 			mockContainer2 := mockContainerTypes.NewMockContainer(t)
 
@@ -85,7 +85,7 @@ func TestValidateRollingRestartDependencies(t *testing.T) {
 		t.Run("should return error with container name and links", func(t *testing.T) {
 			t.Parallel()
 
-			mockClient := mockContainer.NewMockClient(t)
+			mockClient := mockContainerClient.NewMockClient(t)
 			mockContainer1 := mockContainerTypes.NewMockContainer(t)
 			mockContainer2 := mockContainerTypes.NewMockContainer(t)
 
@@ -144,7 +144,7 @@ func TestScopeValidationErrorCases(t *testing.T) {
 			t.Parallel()
 
 			// Test that empty scope labels are treated as unscoped
-			mockClient := mockContainer.NewMockClient(t)
+			mockClient := mockContainerClient.NewMockClient(t)
 
 			// Container with no scope label
 			container := mockContainerTypes.NewMockContainer(t)
@@ -180,7 +180,7 @@ func TestScopeValidationErrorCases(t *testing.T) {
 		t.Run("should handle containers with invalid scope label formats", func(t *testing.T) {
 			t.Parallel()
 
-			mockClient := mockContainer.NewMockClient(t)
+			mockClient := mockContainerClient.NewMockClient(t)
 
 			// Container with malformed scope label (e.g., contains special chars)
 			container1 := mockContainerTypes.NewMockContainer(t)
@@ -212,7 +212,7 @@ func TestScopeValidationErrorCases(t *testing.T) {
 		t.Run("should handle scope labels with whitespace and normalization", func(t *testing.T) {
 			t.Parallel()
 
-			mockClient := mockContainer.NewMockClient(t)
+			mockClient := mockContainerClient.NewMockClient(t)
 
 			// Container with scope label containing leading and trailing spaces
 			container := mockContainerTypes.NewMockContainer(t)
@@ -249,7 +249,7 @@ func TestScopeValidationErrorCases(t *testing.T) {
 		t.Run("should handle scope label retrieval errors gracefully", func(t *testing.T) {
 			t.Parallel()
 
-			mockClient := mockContainer.NewMockClient(t)
+			mockClient := mockContainerClient.NewMockClient(t)
 
 			// Container without a scope label
 			container := mockContainerTypes.NewMockContainer(t)
@@ -282,7 +282,7 @@ func TestScopeValidationErrorCases(t *testing.T) {
 		t.Run("should validate scope consistency across operations", func(t *testing.T) {
 			t.Parallel()
 
-			mockClient := mockContainer.NewMockClient(t)
+			mockClient := mockContainerClient.NewMockClient(t)
 
 			// Multiple containers that should have consistent scope behavior
 			container1 := mockContainerTypes.NewMockContainer(t)
@@ -319,7 +319,7 @@ func TestScopeValidationErrorCases(t *testing.T) {
 		t.Run("should handle scope label conflicts during validation", func(t *testing.T) {
 			t.Parallel()
 
-			mockClient := mockContainer.NewMockClient(t)
+			mockClient := mockContainerClient.NewMockClient(t)
 
 			// Container with conflicting scope information
 			container := mockContainerTypes.NewMockContainer(t)

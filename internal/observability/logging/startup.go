@@ -12,7 +12,7 @@ import (
 
 // APIVersionProvider reports the Docker API version for startup messaging.
 //
-// Defined here (rather than depending on pkg/container.Client) so this package
+// Defined here (rather than depending on the container client's Client) so this package
 // stays free of container→flags import cycles when flags configures logging.
 type APIVersionProvider interface {
 	GetVersion() string

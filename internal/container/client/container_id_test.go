@@ -1,4 +1,4 @@
-package container
+package client
 
 import (
 	"bytes"
@@ -19,9 +19,9 @@ import (
 	dockerContainer "github.com/moby/moby/api/types/container"
 	dockerImage "github.com/moby/moby/api/types/image"
 
+	mockContainerClient "github.com/nicholas-fedor/watchtower/internal/container/client/mocks"
 	"github.com/nicholas-fedor/watchtower/internal/testutil/containerfixture"
 	"github.com/nicholas-fedor/watchtower/internal/testutil/modelfixture"
-	mockContainer "github.com/nicholas-fedor/watchtower/pkg/container/mocks"
 	"github.com/nicholas-fedor/watchtower/pkg/types"
 	mockTypes "github.com/nicholas-fedor/watchtower/pkg/types/mocks"
 )
@@ -339,12 +339,12 @@ func TestGetContainerIDFromHostname(t *testing.T) {
 	t.Run("should return the correct container ID or error", func(t *testing.T) {
 		tests := []struct {
 			name           string
-			setup          func(t *testing.T, mockClient *mockContainer.MockClient)
+			setup          func(t *testing.T, mockClient *mockContainerClient.MockClient)
 			want           types.ContainerID
 			wantErr        bool
 			errorSubstring string
 		}{
-			{name: "when a container with matching hostname is found", setup: func(t *testing.T, mockClient *mockContainer.MockClient) {
+			{name: "when a container with matching hostname is found", setup: func(t *testing.T, mockClient *mockContainerClient.MockClient) {
 				t.Helper()
 
 				expectedID := types.ContainerID("hostname-container-id")
@@ -363,7 +363,7 @@ func TestGetContainerIDFromHostname(t *testing.T) {
 
 				mockClient.EXPECT().ListContainers(context.Background()).Return([]types.Container{mockContainer}, nil)
 			}, want: types.ContainerID("hostname-container-id"), wantErr: false, errorSubstring: ""},
-			{name: "when no container with matching hostname is found", setup: func(t *testing.T, mockClient *mockContainer.MockClient) {
+			{name: "when no container with matching hostname is found", setup: func(t *testing.T, mockClient *mockContainerClient.MockClient) {
 				t.Helper()
 
 				hostname := testHostname
@@ -382,12 +382,12 @@ func TestGetContainerIDFromHostname(t *testing.T) {
 
 				mockClient.EXPECT().ListContainers(context.Background()).Return([]types.Container{mockContainer}, nil)
 			}, want: types.ContainerID(""), wantErr: true, errorSubstring: "no container found with matching hostname"},
-			{name: "when HOSTNAME environment variable is not set", setup: func(t *testing.T, mockClient *mockContainer.MockClient) {
+			{name: "when HOSTNAME environment variable is not set", setup: func(t *testing.T, mockClient *mockContainerClient.MockClient) {
 				t.Helper()
 
 				// HOSTNAME is not set.
 			}, want: types.ContainerID(""), wantErr: true, errorSubstring: "HOSTNAME environment variable is not set"},
-			{name: "when container listing fails", setup: func(t *testing.T, mockClient *mockContainer.MockClient) {
+			{name: "when container listing fails", setup: func(t *testing.T, mockClient *mockContainerClient.MockClient) {
 				t.Helper()
 
 				hostname := testHostname
@@ -399,7 +399,7 @@ func TestGetContainerIDFromHostname(t *testing.T) {
 
 				mockClient.EXPECT().ListContainers(context.Background()).Return(nil, expectedError)
 			}, want: types.ContainerID(""), wantErr: true, errorSubstring: "failed to list all containers"},
-			{name: "when container info is nil", setup: func(t *testing.T, mockClient *mockContainer.MockClient) {
+			{name: "when container info is nil", setup: func(t *testing.T, mockClient *mockContainerClient.MockClient) {
 				t.Helper()
 
 				hostname := testHostname
@@ -423,7 +423,7 @@ func TestGetContainerIDFromHostname(t *testing.T) {
 					ListContainers(context.Background()).
 					Return([]types.Container{mockContainerNilInfo, mockContainerMatching}, nil)
 			}, want: types.ContainerID("matching-container-id"), wantErr: false, errorSubstring: ""},
-			{name: "when container config is nil", setup: func(t *testing.T, mockClient *mockContainer.MockClient) {
+			{name: "when container config is nil", setup: func(t *testing.T, mockClient *mockContainerClient.MockClient) {
 				t.Helper()
 
 				hostname := testHostname
@@ -450,7 +450,7 @@ func TestGetContainerIDFromHostname(t *testing.T) {
 					ListContainers(context.Background()).
 					Return([]types.Container{mockContainerNilConfig, mockContainerMatching}, nil)
 			}, want: types.ContainerID("matching-container-id"), wantErr: false, errorSubstring: ""},
-			{name: "when multiple containers exist but only one matches hostname", setup: func(t *testing.T, mockClient *mockContainer.MockClient) {
+			{name: "when multiple containers exist but only one matches hostname", setup: func(t *testing.T, mockClient *mockContainerClient.MockClient) {
 				t.Helper()
 
 				hostname := testHostname
@@ -492,7 +492,7 @@ func TestGetContainerIDFromHostname(t *testing.T) {
 					ListContainers(context.Background()).
 					Return([]types.Container{mockContainer1, mockContainer2, mockContainerMatching, mockContainer3}, nil)
 			}, want: types.ContainerID("matching-container-id"), wantErr: false, errorSubstring: ""},
-			{name: "when multiple containers share hostname but only one is Watchtower", setup: func(t *testing.T, mockClient *mockContainer.MockClient) {
+			{name: "when multiple containers share hostname but only one is Watchtower", setup: func(t *testing.T, mockClient *mockContainerClient.MockClient) {
 				t.Helper()
 
 				hostname := testHostname
@@ -523,7 +523,7 @@ func TestGetContainerIDFromHostname(t *testing.T) {
 					ListContainers(context.Background()).
 					Return([]types.Container{nonWatchtowerContainer, watchtowerContainer}, nil)
 			}, want: types.ContainerID("watchtower-container-id"), wantErr: false, errorSubstring: ""},
-			{name: "when multiple Watchtower containers share hostname, prefer the non-old one", setup: func(t *testing.T, mockClient *mockContainer.MockClient) {
+			{name: "when multiple Watchtower containers share hostname, prefer the non-old one", setup: func(t *testing.T, mockClient *mockContainerClient.MockClient) {
 				t.Helper()
 
 				hostname := testHostname
@@ -567,7 +567,7 @@ func TestGetContainerIDFromHostname(t *testing.T) {
 				t.Setenv("HOSTNAME", "")
 				require.NoError(t, os.Unsetenv("HOSTNAME"))
 
-				mockClient := mockContainer.NewMockClient(t)
+				mockClient := mockContainerClient.NewMockClient(t)
 
 				setup, want, wantErr, errorSubstring := tt.setup, tt.want, tt.wantErr, tt.errorSubstring
 
@@ -601,12 +601,12 @@ func TestGetCurrentContainerID(t *testing.T) {
 	t.Run("should return the correct container ID or error", func(t *testing.T) {
 		tests := []struct {
 			name           string
-			setup          func(t *testing.T, fsys fstest.MapFS, mockClient *mockContainer.MockClient)
+			setup          func(t *testing.T, fsys fstest.MapFS, mockClient *mockContainerClient.MockClient)
 			expectedID     types.ContainerID
 			expectError    bool
 			errorSubstring string
 		}{
-			{name: "when cgroup v2 detection succeeds", setup: func(t *testing.T, fsys fstest.MapFS, mockClient *mockContainer.MockClient) {
+			{name: "when cgroup v2 detection succeeds", setup: func(t *testing.T, fsys fstest.MapFS, mockClient *mockContainerClient.MockClient) {
 				t.Helper()
 
 				expectedID := types.ContainerID(
@@ -620,7 +620,7 @@ func TestGetCurrentContainerID(t *testing.T) {
 					)+"/resolv.conf /etc/resolv.conf rw,relatime shared:1 - overlay rw,lowerdir=/var/lib/docker/overlay2/l/...,upperdir=/var/lib/docker/overlay2/...,workdir=/var/lib/docker/overlay2/...,\n",
 				)
 			}, expectedID: types.ContainerID("1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef"), expectError: false, errorSubstring: ""},
-			{name: "when cgroup v2 detection fails but cgroup v1 detection succeeds", setup: func(t *testing.T, fsys fstest.MapFS, mockClient *mockContainer.MockClient) {
+			{name: "when cgroup v2 detection fails but cgroup v1 detection succeeds", setup: func(t *testing.T, fsys fstest.MapFS, mockClient *mockContainerClient.MockClient) {
 				t.Helper()
 
 				expectedID := types.ContainerID(
@@ -632,7 +632,7 @@ func TestGetCurrentContainerID(t *testing.T) {
 			}, expectedID: types.ContainerID(
 				"abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890",
 			), expectError: false, errorSubstring: ""},
-			{name: "when both cgroup v2 and cgroup v1 detection fail but hostname detection succeeds", setup: func(t *testing.T, fsys fstest.MapFS, mockClient *mockContainer.MockClient) {
+			{name: "when both cgroup v2 and cgroup v1 detection fail but hostname detection succeeds", setup: func(t *testing.T, fsys fstest.MapFS, mockClient *mockContainerClient.MockClient) {
 				t.Helper()
 
 				expectedID := types.ContainerID("hostname-container-id")
@@ -656,7 +656,7 @@ func TestGetCurrentContainerID(t *testing.T) {
 					Return([]types.Container{mockContainer}, nil).
 					Times(1)
 			}, expectedID: types.ContainerID("hostname-container-id"), expectError: false, errorSubstring: ""},
-			{name: "when all detection methods fail", setup: func(t *testing.T, fsys fstest.MapFS, mockClient *mockContainer.MockClient) {
+			{name: "when all detection methods fail", setup: func(t *testing.T, fsys fstest.MapFS, mockClient *mockContainerClient.MockClient) {
 				t.Helper()
 
 				// No mountinfo or cgroup file, and HOSTNAME is not set, so hostname
@@ -670,7 +670,7 @@ func TestGetCurrentContainerID(t *testing.T) {
 				t.Setenv("HOSTNAME", "")
 				require.NoError(t, os.Unsetenv("HOSTNAME"))
 
-				mockClient := mockContainer.NewMockClient(t)
+				mockClient := mockContainerClient.NewMockClient(t)
 
 				setup, expectedID, expectError, errorSubstring := tt.setup, tt.expectedID, tt.expectError, tt.errorSubstring
 

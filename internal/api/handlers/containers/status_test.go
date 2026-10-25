@@ -9,7 +9,7 @@ import (
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 
-	mockContainer "github.com/nicholas-fedor/watchtower/pkg/container/mocks"
+	mockContainerClient "github.com/nicholas-fedor/watchtower/internal/container/client/mocks"
 	"github.com/nicholas-fedor/watchtower/pkg/types"
 	mockTypes "github.com/nicholas-fedor/watchtower/pkg/types/mocks"
 )
@@ -17,7 +17,7 @@ import (
 func TestListContainerStatuses(t *testing.T) {
 	tests := []struct {
 		name    string
-		client  func(t *testing.T) *mockContainer.MockClient
+		client  func(t *testing.T) *mockContainerClient.MockClient
 		filter  types.Filter
 		wantErr bool
 		errMsg  string
@@ -25,9 +25,9 @@ func TestListContainerStatuses(t *testing.T) {
 	}{
 		{
 			name: "successful list with containers",
-			client: func(t *testing.T) *mockContainer.MockClient {
+			client: func(t *testing.T) *mockContainerClient.MockClient {
 				t.Helper()
-				c := mockContainer.NewMockClient(t)
+				c := mockContainerClient.NewMockClient(t)
 				container := mockTypes.NewMockContainer(t)
 				container.EXPECT().Name().Return("test-container")
 				container.EXPECT().ImageName().Return("nginx:latest")
@@ -43,9 +43,9 @@ func TestListContainerStatuses(t *testing.T) {
 		},
 		{
 			name: "successful list without filter",
-			client: func(t *testing.T) *mockContainer.MockClient {
+			client: func(t *testing.T) *mockContainerClient.MockClient {
 				t.Helper()
-				c := mockContainer.NewMockClient(t)
+				c := mockContainerClient.NewMockClient(t)
 				container := mockTypes.NewMockContainer(t)
 				container.EXPECT().Name().Return("test-container")
 				container.EXPECT().ImageName().Return("nginx:latest")
@@ -61,9 +61,9 @@ func TestListContainerStatuses(t *testing.T) {
 		},
 		{
 			name: "client error returns wrapped error",
-			client: func(t *testing.T) *mockContainer.MockClient {
+			client: func(t *testing.T) *mockContainerClient.MockClient {
 				t.Helper()
-				c := mockContainer.NewMockClient(t)
+				c := mockContainerClient.NewMockClient(t)
 				c.EXPECT().ListContainers(mock.Anything).Return(nil, errors.New("connection refused"))
 
 				return c
@@ -74,9 +74,9 @@ func TestListContainerStatuses(t *testing.T) {
 		},
 		{
 			name: "empty container list",
-			client: func(t *testing.T) *mockContainer.MockClient {
+			client: func(t *testing.T) *mockContainerClient.MockClient {
 				t.Helper()
-				c := mockContainer.NewMockClient(t)
+				c := mockContainerClient.NewMockClient(t)
 				c.EXPECT().ListContainers(mock.Anything).Return([]types.Container{}, nil)
 
 				return c
@@ -87,9 +87,9 @@ func TestListContainerStatuses(t *testing.T) {
 		},
 		{
 			name: "non-nil filter is passed through to ListContainers",
-			client: func(t *testing.T) *mockContainer.MockClient {
+			client: func(t *testing.T) *mockContainerClient.MockClient {
 				t.Helper()
-				c := mockContainer.NewMockClient(t)
+				c := mockContainerClient.NewMockClient(t)
 				container := mockTypes.NewMockContainer(t)
 				container.EXPECT().Name().Return("filtered-container")
 				container.EXPECT().ImageName().Return("nginx:latest")

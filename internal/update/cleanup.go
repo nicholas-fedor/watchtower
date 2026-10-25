@@ -12,9 +12,9 @@ import (
 	cerrdefs "github.com/containerd/errdefs"
 
 	"github.com/nicholas-fedor/watchtower/internal/container"
+	containerClient "github.com/nicholas-fedor/watchtower/internal/container/client"
 	"github.com/nicholas-fedor/watchtower/internal/container/filters"
 	containerImage "github.com/nicholas-fedor/watchtower/internal/container/image"
-	pkgContainer "github.com/nicholas-fedor/watchtower/pkg/container"
 	"github.com/nicholas-fedor/watchtower/pkg/types"
 )
 
@@ -53,7 +53,7 @@ var removalRetryDelay = 1 * time.Second
 //   - int: Number of removed Watchtower containers.
 //   - error: Non-nil if removal fails, nil if single instance or successful removal.
 func RemoveExcessWatchtowerInstances(log *zerolog.Logger, ctx context.Context,
-	client pkgContainer.Client,
+	client containerClient.Client,
 	cleanupImages bool,
 	scope string,
 	removeImageInfos *[]types.RemovedImageInfo,
@@ -133,7 +133,7 @@ func RemoveExcessWatchtowerInstances(log *zerolog.Logger, ctx context.Context,
 //   - int: Number of removed old Watchtower containers.
 //   - error: Non-nil if removal fails, nil if none found or successful removal.
 func cleanupOldWatchtowerContainers(log *zerolog.Logger, ctx context.Context,
-	client pkgContainer.Client,
+	client containerClient.Client,
 	cleanupImages bool,
 	scope string,
 	currentContainerID types.ContainerID,
@@ -615,7 +615,7 @@ func addExcessContainers(excessContainers, chainContainers []types.Container) []
 //   - int: Number of successfully removed containers.
 //   - error: Non-nil if any container removal failed or insufficient removals occurred.
 func removeExcessContainers(log *zerolog.Logger, ctx context.Context,
-	client pkgContainer.Client,
+	client containerClient.Client,
 	excessWatchtowerContainers []types.Container,
 	cleanupImages bool,
 	currentContainer types.Container,
@@ -795,7 +795,7 @@ func addCollectedImages(
 //   - []RemovedImageInfo: Slice of successfully removed image info.
 //   - error: Non-nil if any image removal failed, nil otherwise.
 func removeImages(log *zerolog.Logger, ctx context.Context,
-	client pkgContainer.Client,
+	client containerClient.Client,
 	images []types.RemovedImageInfo,
 ) ([]types.RemovedImageInfo, error) {
 	// Return early if no images need removal.

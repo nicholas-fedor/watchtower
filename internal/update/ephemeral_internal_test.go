@@ -14,9 +14,9 @@ import (
 	dockerContainer "github.com/moby/moby/api/types/container"
 	dockerNetwork "github.com/moby/moby/api/types/network"
 
+	mockContainerClient "github.com/nicholas-fedor/watchtower/internal/container/client/mocks"
 	containerImage "github.com/nicholas-fedor/watchtower/internal/container/image"
 	mockUpdate "github.com/nicholas-fedor/watchtower/internal/update/mocks"
-	mockContainer "github.com/nicholas-fedor/watchtower/pkg/container/mocks"
 	"github.com/nicholas-fedor/watchtower/pkg/types"
 )
 
@@ -87,7 +87,7 @@ type handoffCalls struct {
 //
 // Returns:
 //   - handoffCalls: The stop, rename, and start expectations.
-func expectHandoffStart(client *mockContainer.MockClient, old types.Container, startErr error) handoffCalls {
+func expectHandoffStart(client *mockContainerClient.MockClient, old types.Container, startErr error) handoffCalls {
 	client.EXPECT().GetContainer(mock.Anything, old.ID()).Return(old, nil).Once()
 
 	newID := handoffNewID
@@ -112,7 +112,7 @@ func expectHandoffStart(client *mockContainer.MockClient, old types.Container, s
 //
 // Returns:
 //   - *mock.Call: The removal expectation.
-func expectHandoffFinish(client *mockContainer.MockClient, old types.Container) *mock.Call {
+func expectHandoffFinish(client *mockContainerClient.MockClient, old types.Container) *mock.Call {
 	client.EXPECT().GetContainer(mock.Anything, handoffNewID).
 		Return(createEphemeralHandoffContainer(string(handoffNewID), nil), nil).Once()
 
@@ -124,7 +124,7 @@ func expectHandoffFinish(client *mockContainer.MockClient, old types.Container) 
 // Parameters:
 //   - client: Mocked container client.
 //   - old: The Watchtower container being replaced.
-func expectHandoff(client *mockContainer.MockClient, old types.Container) {
+func expectHandoff(client *mockContainerClient.MockClient, old types.Container) {
 	expectHandoffStart(client, old, nil)
 	expectHandoffFinish(client, old)
 }
@@ -142,7 +142,7 @@ func Test_orchestrateSelfUpdate(t *testing.T) {
 		t.Parallel()
 
 		old := createEphemeralHandoffContainer("wt-old-id-ok", nil)
-		client := mockContainer.NewMockClient(t)
+		client := mockContainerClient.NewMockClient(t)
 		calls := expectHandoffStart(client, old, nil)
 		remove := expectHandoffFinish(client, old)
 		mock.InOrder(calls.stop, calls.rename, calls.start, remove)
@@ -165,7 +165,7 @@ func Test_orchestrateSelfUpdate(t *testing.T) {
 		)
 		require.True(t, old.HasExposedPorts())
 
-		client := mockContainer.NewMockClient(t)
+		client := mockContainerClient.NewMockClient(t)
 		calls := expectHandoffStart(client, old, nil)
 		expectHandoffFinish(client, old)
 		mock.InOrder(calls.stop, calls.start)
@@ -181,7 +181,7 @@ func Test_orchestrateSelfUpdate(t *testing.T) {
 		// The old container is still running after the failed stop, so the
 		// handoff ends before any rename or create.
 		old := createEphemeralHandoffContainer("wt-old-stop-fail", nil)
-		client := mockContainer.NewMockClient(t)
+		client := mockContainerClient.NewMockClient(t)
 		client.EXPECT().GetContainer(mock.Anything, old.ID()).Return(old, nil).Twice()
 		client.EXPECT().StopContainer(mock.Anything, old, orchestratorStopTimeout).
 			Return(errors.New("simulated stop failure")).Once()
@@ -197,7 +197,7 @@ func Test_orchestrateSelfUpdate(t *testing.T) {
 		// The predecessor gets its name back and is restarted, and is never
 		// removed.
 		old := createEphemeralHandoffContainer("wt-old-create-fail", nil)
-		client := mockContainer.NewMockClient(t)
+		client := mockContainerClient.NewMockClient(t)
 		calls := expectHandoffStart(client, old, errors.New("simulated create failure"))
 		renameBack := client.EXPECT().RenameContainer(mock.Anything, old, "watchtower").Return(nil).Once()
 		restart := client.EXPECT().StartContainerByID(mock.Anything, old.ID()).Return(nil).Once()
@@ -212,7 +212,7 @@ func Test_orchestrateSelfUpdate(t *testing.T) {
 		t.Parallel()
 
 		old := createEphemeralHandoffContainer("wt-old-pin", nil)
-		client := mockContainer.NewMockClient(t)
+		client := mockContainerClient.NewMockClient(t)
 		calls := expectHandoffStart(client, old, nil)
 		calls.start.Run(func(args mock.Arguments) {
 			created, ok := args.Get(1).(types.Container)
@@ -232,7 +232,7 @@ func Test_orchestrateSelfUpdate(t *testing.T) {
 		const chain = "prev-id,wt-old-chain"
 
 		old := createEphemeralHandoffContainer("wt-old-chain", nil)
-		client := mockContainer.NewMockClient(t)
+		client := mockContainerClient.NewMockClient(t)
 		calls := expectHandoffStart(client, old, nil)
 		calls.start.Run(func(args mock.Arguments) {
 			created, ok := args.Get(1).(types.Container)
@@ -253,7 +253,7 @@ func Test_orchestrateSelfUpdate(t *testing.T) {
 		t.Parallel()
 
 		old := createEphemeralHandoffContainer("wt-old-cleanup", nil)
-		client := mockContainer.NewMockClient(t)
+		client := mockContainerClient.NewMockClient(t)
 		expectHandoff(client, old)
 		client.EXPECT().RemoveImageByID(mock.Anything, old.ImageID(), "watchtower:v1").Return(nil).Once()
 
@@ -267,7 +267,7 @@ func Test_orchestrateSelfUpdate(t *testing.T) {
 
 		// The mock has no image removal expectation, so a removal fails the test.
 		old := createEphemeralHandoffContainer("wt-old-no-cleanup", nil)
-		client := mockContainer.NewMockClient(t)
+		client := mockContainerClient.NewMockClient(t)
 		expectHandoff(client, old)
 
 		err := orchestrateSelfUpdate(newTestLogger(t), t.Context(), client,
@@ -279,7 +279,7 @@ func Test_orchestrateSelfUpdate(t *testing.T) {
 		t.Parallel()
 
 		old := createEphemeralHandoffContainer("wt-old-in-use", nil)
-		client := mockContainer.NewMockClient(t)
+		client := mockContainerClient.NewMockClient(t)
 		expectHandoff(client, old)
 		client.EXPECT().RemoveImageByID(mock.Anything, old.ImageID(), "watchtower:v1").
 			Return(containerImage.ErrImageInUse).Once()
@@ -293,7 +293,7 @@ func Test_orchestrateSelfUpdate(t *testing.T) {
 		t.Parallel()
 
 		old := createEphemeralHandoffContainer("wt-old-missing-image", nil)
-		client := mockContainer.NewMockClient(t)
+		client := mockContainerClient.NewMockClient(t)
 		expectHandoff(client, old)
 		client.EXPECT().RemoveImageByID(mock.Anything, old.ImageID(), "watchtower:v1").
 			Return(cerrdefs.ErrNotFound).Once()

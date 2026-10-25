@@ -7,7 +7,7 @@ import (
 
 	"github.com/rs/zerolog"
 
-	"github.com/nicholas-fedor/watchtower/pkg/container"
+	containerClient "github.com/nicholas-fedor/watchtower/internal/container/client"
 	"github.com/nicholas-fedor/watchtower/pkg/types"
 )
 
@@ -31,7 +31,7 @@ var (
 //   - client: Container client for execution.
 //   - params: Update parameters with filter.
 //   - listed: Already-listed containers from the current scan, or nil.
-func ExecutePreChecks(log *zerolog.Logger, ctx context.Context, client container.Client, params types.UpdateParams, listed []types.Container) {
+func ExecutePreChecks(log *zerolog.Logger, ctx context.Context, client containerClient.Client, params types.UpdateParams, listed []types.Container) {
 	containers, ok := resolveCheckContainers(log, ctx, client, params, listed, "pre-checks")
 	if !ok {
 		// Listing failed. Hooks are skipped for this phase.
@@ -54,7 +54,7 @@ func ExecutePreChecks(log *zerolog.Logger, ctx context.Context, client container
 //   - client: Container client for execution.
 //   - params: Update parameters with filter.
 //   - listed: Already-listed containers from the current scan, or nil.
-func ExecutePostChecks(log *zerolog.Logger, ctx context.Context, client container.Client, params types.UpdateParams, listed []types.Container) {
+func ExecutePostChecks(log *zerolog.Logger, ctx context.Context, client containerClient.Client, params types.UpdateParams, listed []types.Container) {
 	containers, ok := resolveCheckContainers(log, ctx, client, params, listed, "post-checks")
 	if !ok {
 		// Listing failed. Hooks are skipped for this phase.
@@ -82,7 +82,7 @@ func ExecutePostChecks(log *zerolog.Logger, ctx context.Context, client containe
 func resolveCheckContainers(
 	log *zerolog.Logger,
 	ctx context.Context,
-	client container.Client,
+	client containerClient.Client,
 	params types.UpdateParams,
 	listed []types.Container,
 	phase string,
@@ -129,7 +129,7 @@ func resolveCheckContainers(
 //   - container: Container to process.
 //   - uid: Default UID to run command as.
 //   - gid: Default GID to run command as.
-func executePreCheckCommand(log *zerolog.Logger, ctx context.Context, client container.Client, container types.Container, uid, gid int) {
+func executePreCheckCommand(log *zerolog.Logger, ctx context.Context, client containerClient.Client, container types.Container, uid, gid int) {
 	executeCheckCommand(
 		log,
 		ctx,
@@ -151,7 +151,7 @@ func executePreCheckCommand(log *zerolog.Logger, ctx context.Context, client con
 //   - container: Container to process.
 //   - uid: Default UID to run command as.
 //   - gid: Default GID to run command as.
-func executePostCheckCommand(log *zerolog.Logger, ctx context.Context, client container.Client, container types.Container, uid, gid int) {
+func executePostCheckCommand(log *zerolog.Logger, ctx context.Context, client containerClient.Client, container types.Container, uid, gid int) {
 	executeCheckCommand(
 		log,
 		ctx,
@@ -178,7 +178,7 @@ func executePostCheckCommand(log *zerolog.Logger, ctx context.Context, client co
 func executeCheckCommand(
 	log *zerolog.Logger,
 	ctx context.Context,
-	client container.Client,
+	client containerClient.Client,
 	cont types.Container,
 	uid, gid int,
 	command string,
@@ -249,7 +249,7 @@ func executeCheckCommand(
 //   - error: Non-nil if the command failed, nil otherwise.
 func ExecutePreUpdateCommand(log *zerolog.Logger,
 	ctx context.Context,
-	client container.Client,
+	client containerClient.Client,
 	container types.Container,
 	uid int,
 	gid int,
@@ -330,7 +330,7 @@ func ExecutePreUpdateCommand(log *zerolog.Logger,
 //   - gid: GID to run command as.
 func ExecutePostUpdateCommand(log *zerolog.Logger,
 	ctx context.Context,
-	client container.Client,
+	client containerClient.Client,
 	newContainerID types.ContainerID,
 	uid int,
 	gid int,

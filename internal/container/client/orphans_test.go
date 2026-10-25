@@ -1,4 +1,4 @@
-package container
+package client
 
 import (
 	"bytes"
@@ -17,10 +17,10 @@ import (
 	dockerContainer "github.com/moby/moby/api/types/container"
 	dockerImage "github.com/moby/moby/api/types/image"
 
+	mockContainerClient "github.com/nicholas-fedor/watchtower/internal/container/client/mocks"
 	"github.com/nicholas-fedor/watchtower/internal/container/labels"
 	"github.com/nicholas-fedor/watchtower/internal/testutil/containerfixture"
 	"github.com/nicholas-fedor/watchtower/internal/testutil/modelfixture"
-	mockContainer "github.com/nicholas-fedor/watchtower/pkg/container/mocks"
 	"github.com/nicholas-fedor/watchtower/pkg/types"
 )
 
@@ -45,7 +45,7 @@ func TestRemoveOrphanedOrchestrators(t *testing.T) {
 		t.Run("should return 0 removed and no error", func(t *testing.T) {
 			t.Parallel()
 
-			mockAPIClient := mockContainer.NewMockClient(t)
+			mockAPIClient := mockContainerClient.NewMockClient(t)
 			mockAPIClient.EXPECT().
 				ListContainers(ctx).
 				Return([]types.Container{}, nil)
@@ -71,7 +71,7 @@ func TestRemoveOrphanedOrchestrators(t *testing.T) {
 				}),
 			)
 
-			mockAPIClient := mockContainer.NewMockClient(t)
+			mockAPIClient := mockContainerClient.NewMockClient(t)
 			mockAPIClient.EXPECT().
 				ListContainers(ctx).
 				Return([]types.Container{regularContainer}, nil)
@@ -98,7 +98,7 @@ func TestRemoveOrphanedOrchestrators(t *testing.T) {
 				orphaned,
 			)
 
-			mockAPIClient := mockContainer.NewMockClient(t)
+			mockAPIClient := mockContainerClient.NewMockClient(t)
 			mockAPIClient.EXPECT().
 				ListContainers(ctx).
 				Return([]types.Container{orchestrator}, nil)
@@ -144,7 +144,7 @@ func TestRemoveOrphanedOrchestrators(t *testing.T) {
 				containerfixture.WithName("app-container"),
 			)
 
-			mockAPIClient := mockContainer.NewMockClient(t)
+			mockAPIClient := mockContainerClient.NewMockClient(t)
 			mockAPIClient.EXPECT().
 				ListContainers(ctx).
 				Return([]types.Container{orch1, regular, orch2}, nil)
@@ -176,7 +176,7 @@ func TestRemoveOrphanedOrchestrators(t *testing.T) {
 		t.Run("should return an error", func(t *testing.T) {
 			t.Parallel()
 
-			mockAPIClient := mockContainer.NewMockClient(t)
+			mockAPIClient := mockContainerClient.NewMockClient(t)
 			mockAPIClient.EXPECT().
 				ListContainers(ctx).
 				Return(nil, errors.New("docker daemon unavailable"))
@@ -211,7 +211,7 @@ func TestRemoveOrphanedOrchestrators(t *testing.T) {
 				orphaned,
 			)
 
-			mockAPIClient := mockContainer.NewMockClient(t)
+			mockAPIClient := mockContainerClient.NewMockClient(t)
 			mockAPIClient.EXPECT().
 				ListContainers(ctx).
 				Return([]types.Container{orch1, orch2}, nil)
@@ -248,7 +248,7 @@ func TestRemoveOrphanedOrchestrators(t *testing.T) {
 				containerfixture.WithName("no-label-container"),
 			)
 
-			mockAPIClient := mockContainer.NewMockClient(t)
+			mockAPIClient := mockContainerClient.NewMockClient(t)
 			mockAPIClient.EXPECT().
 				ListContainers(ctx).
 				Return([]types.Container{noLabelContainer}, nil)
@@ -333,7 +333,7 @@ func TestRemoveOrphanedOrchestrators_SkipsInFlight(t *testing.T) {
 			// A container without the orchestrator label is never removed.
 			app := modelfixture.Container(containerfixture.WithID("app123"), containerfixture.WithName("app"))
 
-			client := mockContainer.NewMockClient(t)
+			client := mockContainerClient.NewMockClient(t)
 			client.EXPECT().ListContainers(mock.Anything).
 				Return([]types.Container{orchestrator, app}, nil).Once()
 
@@ -369,7 +369,7 @@ func TestRemoveOrphanedOrchestrators_AlreadyGone(t *testing.T) {
 		}),
 	)
 
-	client := mockContainer.NewMockClient(t)
+	client := mockContainerClient.NewMockClient(t)
 	client.EXPECT().ListContainers(mock.Anything).Return([]types.Container{orchestrator}, nil).Once()
 	client.EXPECT().StopAndRemoveContainer(mock.Anything, orchestrator, time.Duration(0)).
 		Return(fmt.Errorf("no such container: %w", cerrdefs.ErrNotFound)).Once()

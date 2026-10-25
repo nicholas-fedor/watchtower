@@ -8,8 +8,8 @@ import (
 	"github.com/gofiber/fiber/v3"
 	"github.com/rs/zerolog"
 
+	containerClient "github.com/nicholas-fedor/watchtower/internal/container/client"
 	containerImage "github.com/nicholas-fedor/watchtower/internal/container/image"
-	"github.com/nicholas-fedor/watchtower/pkg/container"
 	"github.com/nicholas-fedor/watchtower/pkg/types"
 )
 
@@ -136,7 +136,7 @@ func (h *Handler) Handle(c fiber.Ctx) error {
 //   - error: Non-nil if listing containers fails.
 func GetContainerDetails(
 	ctx context.Context,
-	client container.Client,
+	client containerClient.Client,
 	filter types.Filter,
 	nameFilter,
 	imageFilter string,

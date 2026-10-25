@@ -28,13 +28,13 @@ import (
 
 	"github.com/nicholas-fedor/watchtower/internal/api"
 	updateHandler "github.com/nicholas-fedor/watchtower/internal/api/handlers/update"
+	containerClient "github.com/nicholas-fedor/watchtower/internal/container/client"
+	mockContainerClient "github.com/nicholas-fedor/watchtower/internal/container/client/mocks"
 	"github.com/nicholas-fedor/watchtower/internal/observability/logging"
 	"github.com/nicholas-fedor/watchtower/internal/observability/metrics"
 	"github.com/nicholas-fedor/watchtower/internal/settings"
 	"github.com/nicholas-fedor/watchtower/internal/update"
 	"github.com/nicholas-fedor/watchtower/internal/update/schedule"
-	"github.com/nicholas-fedor/watchtower/pkg/container"
-	mockContainer "github.com/nicholas-fedor/watchtower/pkg/container/mocks"
 	"github.com/nicholas-fedor/watchtower/pkg/types"
 	mockTypes "github.com/nicholas-fedor/watchtower/pkg/types/mocks"
 )
@@ -722,7 +722,7 @@ func TestListContainersWithoutFilterIntegration(t *testing.T) {
 	t.Setenv("HOSTNAME", hostname)
 
 	// Create mocks
-	mockClient := mockContainer.NewMockClient(t)
+	mockClient := mockContainerClient.NewMockClient(t)
 	mockContainer := mockTypes.NewMockContainer(t)
 
 	// Set up mock expectations for ListContainers called with context
@@ -741,7 +741,7 @@ func TestListContainersWithoutFilterIntegration(t *testing.T) {
 	mockContainer.EXPECT().ID().Return(expectedID).Once()
 
 	// Execute the function that calls ListContainers with context
-	resultID, err := container.GetContainerIDFromHostname(newTestLogger(t), context.Background(), mockClient)
+	resultID, err := containerClient.GetContainerIDFromHostname(newTestLogger(t), context.Background(), mockClient)
 
 	// Assert results
 	require.NoError(t, err)
@@ -834,7 +834,7 @@ func TestRunUpgradesOnSchedule_ShutdownWaitsForRunningUpdate(t *testing.T) {
 // update.ValidateRollingRestartDependencies properly accepts and uses a cancelable context.
 func TestValidateRollingRestartDependenciesAcceptsCancelableContext(t *testing.T) {
 	// Create a mock client
-	mockClient := mockContainer.NewMockClient(t)
+	mockClient := mockContainerClient.NewMockClient(t)
 
 	// Create a filter that accepts all containers
 	filter := types.Filter(func(_ types.FilterableContainer) bool { return true })
@@ -1171,7 +1171,7 @@ func TestContainerLookupWithTimeoutContext(t *testing.T) {
 			t.Setenv("HOSTNAME", "test-hostname")
 
 			// Create a mock client
-			mockClient := mockContainer.NewMockClient(t)
+			mockClient := mockContainerClient.NewMockClient(t)
 
 			// Create a context that's already timed out
 			ctx, cancel := context.WithTimeout(context.Background(), 0)
@@ -1189,7 +1189,7 @@ func TestContainerLookupWithTimeoutContext(t *testing.T) {
 
 			// Call GetCurrentContainerID which internally uses the client
 			// The function will eventually call ListContainers with our expired context
-			_, err := container.GetCurrentContainerID(newTestLogger(t), ctx, fstest.MapFS{}, mockClient)
+			_, err := containerClient.GetCurrentContainerID(newTestLogger(t), ctx, fstest.MapFS{}, mockClient)
 
 			// Verify error is propagated
 			require.Error(t, err)
@@ -1206,7 +1206,7 @@ func TestContainerLookupWithTimeoutContext(t *testing.T) {
 			t.Setenv("HOSTNAME", "test-hostname")
 
 			// Create a mock client
-			mockClient := mockContainer.NewMockClient(t)
+			mockClient := mockContainerClient.NewMockClient(t)
 
 			ctx, cancel := context.WithCancel(context.Background())
 
@@ -1220,7 +1220,7 @@ func TestContainerLookupWithTimeoutContext(t *testing.T) {
 			mockClient.EXPECT().ListContainers(ctx).Return(nil, context.Canceled).Once()
 
 			// Call GetCurrentContainerID
-			_, err := container.GetCurrentContainerID(newTestLogger(t), ctx, fstest.MapFS{}, mockClient)
+			_, err := containerClient.GetCurrentContainerID(newTestLogger(t), ctx, fstest.MapFS{}, mockClient)
 
 			// Verify error is propagated
 			require.Error(t, err)
@@ -1238,7 +1238,7 @@ func TestGetCurrentWatchtowerContainerWithTimeout(t *testing.T) {
 	t.Run("DeadlineExceeded error is properly handled", func(t *testing.T) {
 		synctest.Test(t, func(t *testing.T) {
 			// Create a mock client
-			mockClient := mockContainer.NewMockClient(t)
+			mockClient := mockContainerClient.NewMockClient(t)
 
 			// Create a context that's already timed out
 			ctx, cancel := context.WithTimeout(context.Background(), 0)
@@ -1271,7 +1271,7 @@ func TestGetCurrentWatchtowerContainerWithTimeout(t *testing.T) {
 	t.Run("Canceled context is properly handled", func(t *testing.T) {
 		synctest.Test(t, func(t *testing.T) {
 			// Create a mock client
-			mockClient := mockContainer.NewMockClient(t)
+			mockClient := mockContainerClient.NewMockClient(t)
 
 			ctx, cancel := context.WithCancel(context.Background())
 
@@ -1504,7 +1504,7 @@ func TestResolveCurrentWatchtowerContainerForFallback(t *testing.T) {
 		t.Setenv("HOSTNAME", "test-hostname")
 
 		mockCnt := mockTypes.NewMockContainer(t)
-		mockClient := mockContainer.NewMockClient(t)
+		mockClient := mockContainerClient.NewMockClient(t)
 
 		mockClient.EXPECT().ListContainers(mock.Anything).Return([]types.Container{mockCnt}, nil).Once()
 		mockCnt.EXPECT().ContainerInfo().Return(&dockerContainer.InspectResponse{
@@ -1525,7 +1525,7 @@ func TestResolveCurrentWatchtowerContainerForFallback(t *testing.T) {
 
 		t.Setenv("HOSTNAME", "test-hostname")
 
-		mockClient := mockContainer.NewMockClient(t)
+		mockClient := mockContainerClient.NewMockClient(t)
 
 		mockClient.EXPECT().ListContainers(mock.Anything).Return(nil, errors.New("list failed")).Once()
 
@@ -1540,7 +1540,7 @@ func TestResolveCurrentWatchtowerContainerForFallback(t *testing.T) {
 
 		t.Setenv("HOSTNAME", "test-hostname")
 
-		mockClient := mockContainer.NewMockClient(t)
+		mockClient := mockContainerClient.NewMockClient(t)
 
 		mockClient.EXPECT().ListContainers(mock.Anything).Return([]types.Container{}, nil).Once()
 
@@ -1556,7 +1556,7 @@ func TestResolveCurrentWatchtowerContainerForFallback(t *testing.T) {
 		t.Setenv("HOSTNAME", "test-hostname")
 
 		mockCnt := mockTypes.NewMockContainer(t)
-		mockClient := mockContainer.NewMockClient(t)
+		mockClient := mockContainerClient.NewMockClient(t)
 
 		mockClient.EXPECT().ListContainers(mock.Anything).Return([]types.Container{mockCnt}, nil).Once()
 		mockCnt.EXPECT().ContainerInfo().Return(&dockerContainer.InspectResponse{

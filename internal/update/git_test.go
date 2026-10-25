@@ -23,6 +23,7 @@ import (
 	mockCompose "github.com/nicholas-fedor/watchtower/internal/compose/apply/mocks"
 	composeLabels "github.com/nicholas-fedor/watchtower/internal/compose/labels"
 	composeProject "github.com/nicholas-fedor/watchtower/internal/compose/project"
+	mockContainerClient "github.com/nicholas-fedor/watchtower/internal/container/client/mocks"
 	"github.com/nicholas-fedor/watchtower/internal/container/labels"
 	"github.com/nicholas-fedor/watchtower/internal/container/provenance"
 	"github.com/nicholas-fedor/watchtower/internal/git"
@@ -30,7 +31,6 @@ import (
 	mockUpdate "github.com/nicholas-fedor/watchtower/internal/update/mocks"
 	"github.com/nicholas-fedor/watchtower/internal/update/sorter"
 	"github.com/nicholas-fedor/watchtower/internal/update/state"
-	mockContainer "github.com/nicholas-fedor/watchtower/pkg/container/mocks"
 	"github.com/nicholas-fedor/watchtower/pkg/types"
 )
 
@@ -69,7 +69,7 @@ func gitTestClient(t *testing.T) *git.Client {
 //
 // Parameters:
 //   - client: Mocked container client.
-func expectGitBuild(client *mockContainer.MockClient) {
+func expectGitBuild(client *mockContainerClient.MockClient) {
 	client.EXPECT().BuildRemoteImage(mock.Anything, mock.Anything, mock.Anything, mock.Anything).RunAndReturn(
 		func(ctx context.Context, _, _ string, tags []string) (types.ImageID, error) {
 			err := ctx.Err()
@@ -307,7 +307,7 @@ func Test_gitSession(t *testing.T) {
 			sess.prepareRebuilds(
 				newTestLogger(t),
 				t.Context(),
-				mockContainer.NewMockClient(t),
+				mockContainerClient.NewMockClient(t),
 				[]types.Container{c},
 				types.UpdateParams{},
 				nil,
@@ -319,7 +319,7 @@ func Test_gitSession(t *testing.T) {
 			sess.prepareRebuilds(
 				newTestLogger(t),
 				t.Context(),
-				mockContainer.NewMockClient(t),
+				mockContainerClient.NewMockClient(t),
 				[]types.Container{c},
 				types.UpdateParams{},
 				nil,
@@ -344,7 +344,7 @@ func Test_gitSession(t *testing.T) {
 			failed := map[types.ContainerID]error{}
 			// The mock has no expectations, so a build or image removal fails
 			// the test.
-			docker := mockContainer.NewMockClient(t)
+			docker := mockContainerClient.NewMockClient(t)
 			sess.prepareRebuilds(newTestLogger(t), t.Context(), docker, []types.Container{fresh, staleNoResult, staleFreshResult}, types.UpdateParams{}, nil, failed)
 
 			assert.Empty(t, failed)
@@ -368,7 +368,7 @@ func Test_gitSession(t *testing.T) {
 			sess.store(noPull.ID(), git.CheckResult{Stale: true, Commit: "abc123abc123"})
 
 			failed := map[types.ContainerID]error{}
-			docker := mockContainer.NewMockClient(t)
+			docker := mockContainerClient.NewMockClient(t)
 			sess.prepareRebuilds(newTestLogger(t), t.Context(), docker, []types.Container{monitor, noPull}, types.UpdateParams{EnableGitMonitoring: true}, nil, failed)
 
 			assert.Empty(t, failed)
@@ -385,7 +385,7 @@ func Test_gitSession(t *testing.T) {
 			sess.store(c.ID(), git.CheckResult{Stale: true, Commit: ""})
 
 			failed := map[types.ContainerID]error{}
-			docker := mockContainer.NewMockClient(t)
+			docker := mockContainerClient.NewMockClient(t)
 			sess.prepareRebuilds(newTestLogger(t), t.Context(), docker, []types.Container{c}, types.UpdateParams{EnableGitMonitoring: true}, nil, failed)
 
 			assert.Contains(t, failed, c.ID())
@@ -402,7 +402,7 @@ func Test_gitSession(t *testing.T) {
 			sess.store(c.ID(), git.CheckResult{Stale: true, Commit: "0123456789abcdef0123456789abcdef01234567", Tag: "v1.0.0"})
 
 			failed := map[types.ContainerID]error{}
-			docker := mockContainer.NewMockClient(t)
+			docker := mockContainerClient.NewMockClient(t)
 			expectGitBuild(docker)
 
 			progress := &state.Progress{}
@@ -425,7 +425,7 @@ func Test_gitSession(t *testing.T) {
 
 			sess := newGitSession(gitTestClient(t))
 			c := mockUpdate.CreateMockContainer("plain", "/plain", "nginx:latest", time.Now())
-			docker := mockContainer.NewMockClient(t)
+			docker := mockContainerClient.NewMockClient(t)
 
 			err := sess.buildOne(newTestLogger(t), t.Context(), docker, c, git.CheckResult{Commit: "abc"}, types.UpdateParams{}, nil)
 			require.ErrorIs(t, err, errGitNotAssociated)
@@ -436,7 +436,7 @@ func Test_gitSession(t *testing.T) {
 
 			sess := newGitSession(gitTestClient(t))
 			c := gitAssociatedContainer("id", "/app", "myapp:latest", nil)
-			docker := mockContainer.NewMockClient(t)
+			docker := mockContainerClient.NewMockClient(t)
 
 			err := sess.buildOne(newTestLogger(t), t.Context(), docker, c, git.CheckResult{Stale: true}, types.UpdateParams{EnableGitMonitoring: true}, nil)
 			require.Error(t, err)
@@ -448,7 +448,7 @@ func Test_gitSession(t *testing.T) {
 
 			sess := newGitSession(gitTestClient(t))
 			c := gitAssociatedContainer("id", "/app", "myapp:latest", nil)
-			docker := mockContainer.NewMockClient(t)
+			docker := mockContainerClient.NewMockClient(t)
 			expectGitBuild(docker)
 
 			ctx, cancel := context.WithCancel(t.Context())
@@ -467,7 +467,7 @@ func Test_gitSession(t *testing.T) {
 				labels.GitDockerfile: "build/docker/Dockerfile",
 				labels.GitContext:    ".",
 			})
-			docker := mockContainer.NewMockClient(t)
+			docker := mockContainerClient.NewMockClient(t)
 			expectGitBuild(docker)
 
 			err := sess.buildOne(
@@ -497,7 +497,7 @@ func Test_gitSession(t *testing.T) {
 			c := gitAssociatedContainer("id", "/app", "myapp:latest", map[string]string{
 				labels.GitWatch: "yes",
 			})
-			docker := mockContainer.NewMockClient(t)
+			docker := mockContainerClient.NewMockClient(t)
 			expectGitBuild(docker)
 
 			err := sess.buildOne(
@@ -525,7 +525,7 @@ func Test_gitSession(t *testing.T) {
 
 			var tags []string
 
-			docker := mockContainer.NewMockClient(t)
+			docker := mockContainerClient.NewMockClient(t)
 			docker.EXPECT().
 				BuildRemoteImage(mock.Anything, mock.Anything, mock.Anything, mock.Anything).
 				Run(func(_ context.Context, _, _ string, got []string) {
@@ -555,7 +555,7 @@ func Test_gitSession(t *testing.T) {
 			commit := "0123456789abcdef0123456789abcdef01234567"
 			c := gitAssociatedContainer("timeout", "/timeout", "myapp:latest", nil)
 
-			docker := mockContainer.NewMockClient(t)
+			docker := mockContainerClient.NewMockClient(t)
 			docker.EXPECT().
 				BuildRemoteImage(mock.Anything, mock.Anything, mock.Anything, mock.Anything).
 				Run(func(ctx context.Context, _, _ string, _ []string) {
@@ -584,7 +584,7 @@ func Test_gitSession(t *testing.T) {
 			c := gitAssociatedContainer("timeout", "/timeout", "myapp:latest", nil)
 			commit := "0123456789abcdef0123456789abcdef01234567"
 
-			docker := mockContainer.NewMockClient(t)
+			docker := mockContainerClient.NewMockClient(t)
 			docker.EXPECT().
 				BuildRemoteImage(mock.Anything, mock.Anything, mock.Anything, mock.Anything).
 				RunAndReturn(func(ctx context.Context, _, _ string, _ []string) (types.ImageID, error) {
@@ -791,7 +791,7 @@ func Test_gitSession(t *testing.T) {
 			sess.store(worker.ID(), result)
 
 			failed := map[types.ContainerID]error{}
-			docker := mockContainer.NewMockClient(t)
+			docker := mockContainerClient.NewMockClient(t)
 			sess.prepareRebuilds(
 				newTestLogger(t),
 				t.Context(),
@@ -870,7 +870,7 @@ func Test_gitSession(t *testing.T) {
 			sess.store(beta.ID(), result)
 
 			failed := map[types.ContainerID]error{}
-			docker := mockContainer.NewMockClient(t)
+			docker := mockContainerClient.NewMockClient(t)
 			sess.prepareRebuilds(newTestLogger(t), t.Context(), docker, []types.Container{alpha, beta}, types.UpdateParams{EnableGitMonitoring: true}, nil, failed)
 
 			assert.Empty(t, failed)
@@ -930,7 +930,7 @@ func Test_gitSession(t *testing.T) {
 			sess.store(dependent.ID(), result)
 
 			failed := map[types.ContainerID]error{}
-			docker := mockContainer.NewMockClient(t)
+			docker := mockContainerClient.NewMockClient(t)
 			sess.prepareRebuilds(newTestLogger(t), t.Context(), docker, []types.Container{dependent, provider}, types.UpdateParams{EnableGitMonitoring: true}, nil, failed)
 
 			assert.Empty(t, failed)
@@ -997,7 +997,7 @@ func Test_gitSession(t *testing.T) {
 			sess.store(provider.ID(), result)
 
 			failed := map[types.ContainerID]error{}
-			docker := mockContainer.NewMockClient(t)
+			docker := mockContainerClient.NewMockClient(t)
 			sess.prepareRebuilds(
 				newTestLogger(t),
 				t.Context(),
@@ -1046,7 +1046,7 @@ func Test_gitSession(t *testing.T) {
 			sess.store(c.ID(), git.CheckResult{Stale: true, Commit: "abc"})
 
 			failed := map[types.ContainerID]error{}
-			docker := mockContainer.NewMockClient(t)
+			docker := mockContainerClient.NewMockClient(t)
 			sess.prepareRebuilds(
 				newTestLogger(t),
 				t.Context(),
@@ -1089,7 +1089,7 @@ func Test_gitSession(t *testing.T) {
 			sess.store(c.ID(), git.CheckResult{Stale: true, Commit: "abc"})
 
 			failed := map[types.ContainerID]error{}
-			docker := mockContainer.NewMockClient(t)
+			docker := mockContainerClient.NewMockClient(t)
 			sess.prepareRebuilds(
 				newTestLogger(t),
 				parent,
@@ -1135,7 +1135,7 @@ func Test_gitSession(t *testing.T) {
 			progress.AddScanned(newTestLogger(t), c, types.ImageID("git:"+result.Commit), params)
 
 			failed := map[types.ContainerID]error{}
-			docker := mockContainer.NewMockClient(t)
+			docker := mockContainerClient.NewMockClient(t)
 			sess.prepareRebuilds(newTestLogger(t), t.Context(), docker, []types.Container{c}, params, progress, failed)
 
 			report := progress.Report(newTestLogger(t))
@@ -1157,7 +1157,7 @@ func Test_gitSession(t *testing.T) {
 			sess.store(c.ID(), git.CheckResult{Stale: true, Commit: "0123456789abcdef0123456789abcdef01234567"})
 
 			failed := map[types.ContainerID]error{}
-			docker := mockContainer.NewMockClient(t)
+			docker := mockContainerClient.NewMockClient(t)
 			expectGitBuild(docker)
 			sess.prepareRebuilds(newTestLogger(t), t.Context(), docker, []types.Container{c}, types.UpdateParams{EnableGitMonitoring: true}, nil, failed)
 
@@ -1182,7 +1182,7 @@ func Test_gitSession(t *testing.T) {
 			sess.store(c.ID(), git.CheckResult{Stale: true, Commit: "abc"})
 
 			failed := map[types.ContainerID]error{}
-			docker := mockContainer.NewMockClient(t)
+			docker := mockContainerClient.NewMockClient(t)
 			sess.prepareRebuilds(newTestLogger(t), t.Context(), docker, []types.Container{c}, types.UpdateParams{EnableGitMonitoring: true}, nil, failed)
 
 			assert.NotContains(t, failed, c.ID())
@@ -1212,7 +1212,7 @@ func Test_gitSession(t *testing.T) {
 			progress.AddScanned(log, c, types.ImageID("git:abc"), params)
 
 			failed := map[types.ContainerID]error{}
-			docker := mockContainer.NewMockClient(t)
+			docker := mockContainerClient.NewMockClient(t)
 			sess.prepareRebuilds(log, t.Context(), docker, []types.Container{c}, params, progress, failed)
 			progress.UpdateFailed(log, failed)
 
@@ -1242,7 +1242,7 @@ func Test_gitSession(t *testing.T) {
 			sess.store(c.ID(), git.CheckResult{Stale: true, Commit: "abc"})
 
 			failed := map[types.ContainerID]error{}
-			docker := mockContainer.NewMockClient(t)
+			docker := mockContainerClient.NewMockClient(t)
 			sess.prepareRebuilds(newTestLogger(t), t.Context(), docker, []types.Container{c}, types.UpdateParams{EnableGitMonitoring: true}, nil, failed)
 
 			require.ErrorIs(t, failed[c.ID()], errGitComposeService)
@@ -1268,7 +1268,7 @@ func Test_gitSession(t *testing.T) {
 			sess.store(c.ID(), git.CheckResult{Stale: true, Commit: "abc"})
 
 			failed := map[types.ContainerID]error{}
-			docker := mockContainer.NewMockClient(t)
+			docker := mockContainerClient.NewMockClient(t)
 			sess.prepareRebuilds(newTestLogger(t), t.Context(), docker, []types.Container{c}, types.UpdateParams{EnableGitMonitoring: true}, nil, failed)
 
 			require.ErrorIs(t, failed[c.ID()], project.ErrDirty)
@@ -1301,7 +1301,7 @@ func Test_gitSession(t *testing.T) {
 			sess.store(c.ID(), git.CheckResult{Stale: true, Commit: "abc"})
 
 			failed := map[types.ContainerID]error{}
-			docker := mockContainer.NewMockClient(t)
+			docker := mockContainerClient.NewMockClient(t)
 			sess.prepareRebuilds(newTestLogger(t), t.Context(), docker, []types.Container{c}, types.UpdateParams{EnableGitMonitoring: true}, nil, failed)
 
 			assert.Empty(t, failed)
@@ -1343,7 +1343,7 @@ func Test_gitSession(t *testing.T) {
 			sess.store(c.ID(), git.CheckResult{Stale: true, Commit: "abc"})
 
 			failed := map[types.ContainerID]error{}
-			docker := mockContainer.NewMockClient(t)
+			docker := mockContainerClient.NewMockClient(t)
 			params := types.UpdateParams{EnableGitMonitoring: true}
 			progress := &state.Progress{}
 			progress.AddScanned(&log, c, types.ImageID("git:new"), params)
@@ -1400,7 +1400,7 @@ func Test_gitSession(t *testing.T) {
 
 			log := zerolog.New(&logs)
 			failed := map[types.ContainerID]error{}
-			docker := mockContainer.NewMockClient(t)
+			docker := mockContainerClient.NewMockClient(t)
 			params := types.UpdateParams{EnableGitMonitoring: true}
 			progress := &state.Progress{}
 			progress.AddScanned(&log, api, types.ImageID("git:abc"), params)
@@ -1451,7 +1451,7 @@ func Test_gitSession(t *testing.T) {
 			sess.store(c.ID(), git.CheckResult{Stale: true, Commit: "abc"})
 
 			failed := map[types.ContainerID]error{}
-			docker := mockContainer.NewMockClient(t)
+			docker := mockContainerClient.NewMockClient(t)
 			params := types.UpdateParams{EnableGitMonitoring: true, NoRestart: true}
 			progress := &state.Progress{}
 			progress.AddScanned(newTestLogger(t), c, types.ImageID("git:abc"), params)
@@ -1503,7 +1503,7 @@ func Test_gitSession(t *testing.T) {
 
 			log := zerolog.New(&logs)
 			failed := map[types.ContainerID]error{}
-			docker := mockContainer.NewMockClient(t)
+			docker := mockContainerClient.NewMockClient(t)
 			params := types.UpdateParams{EnableGitMonitoring: true, NoRestart: true}
 			sess.prepareRebuilds(&log, t.Context(), docker, []types.Container{c}, params, nil, failed)
 
@@ -1543,7 +1543,7 @@ func Test_gitSession(t *testing.T) {
 			sess.store(worker.ID(), git.CheckResult{Stale: true, Commit: "bbb"})
 
 			failed := map[types.ContainerID]error{}
-			docker := mockContainer.NewMockClient(t)
+			docker := mockContainerClient.NewMockClient(t)
 			sess.prepareRebuilds(newTestLogger(t), t.Context(), docker, []types.Container{api, worker}, types.UpdateParams{EnableGitMonitoring: true}, nil, failed)
 
 			assert.False(t, checkedOut)
@@ -1593,7 +1593,7 @@ func Test_gitSession(t *testing.T) {
 			sess.store(worker.ID(), git.CheckResult{Stale: true, Commit: "abc", Tag: "v1.2.4"})
 
 			failed := map[types.ContainerID]error{}
-			docker := mockContainer.NewMockClient(t)
+			docker := mockContainerClient.NewMockClient(t)
 			sess.prepareRebuilds(newTestLogger(t), t.Context(), docker, []types.Container{api, worker}, types.UpdateParams{EnableGitMonitoring: true}, nil, failed)
 
 			assert.Empty(t, failed)
@@ -1645,7 +1645,7 @@ func Test_gitSession(t *testing.T) {
 			sess.store(two.ID(), result)
 
 			failed := map[types.ContainerID]error{}
-			docker := mockContainer.NewMockClient(t)
+			docker := mockContainerClient.NewMockClient(t)
 			sess.prepareRebuilds(newTestLogger(t), t.Context(), docker, []types.Container{one, two}, types.UpdateParams{EnableGitMonitoring: true}, nil, failed)
 
 			assert.Empty(t, failed)
@@ -1693,7 +1693,7 @@ func Test_gitSession(t *testing.T) {
 			progress.AddScanned(newTestLogger(t), fresh, fresh.ImageID(), params)
 
 			failed := map[types.ContainerID]error{}
-			docker := mockContainer.NewMockClient(t)
+			docker := mockContainerClient.NewMockClient(t)
 			sess.prepareRebuilds(newTestLogger(t), t.Context(), docker, []types.Container{stale}, params, progress, failed)
 
 			report := progress.Report(newTestLogger(t))
@@ -1749,7 +1749,7 @@ func Test_gitSession(t *testing.T) {
 
 			log := zerolog.New(&logs)
 			failed := map[types.ContainerID]error{}
-			docker := mockContainer.NewMockClient(t)
+			docker := mockContainerClient.NewMockClient(t)
 			sess.prepareRebuilds(&log, t.Context(), docker, []types.Container{stale}, params, progress, failed)
 
 			report := progress.Report(&log)
@@ -1796,7 +1796,7 @@ func Test_gitSession(t *testing.T) {
 			sess.store(two.ID(), result)
 
 			failed := map[types.ContainerID]error{}
-			docker := mockContainer.NewMockClient(t)
+			docker := mockContainerClient.NewMockClient(t)
 			sess.prepareRebuilds(newTestLogger(t), t.Context(), docker, []types.Container{one, two}, types.UpdateParams{EnableGitMonitoring: true}, nil, failed)
 
 			assert.NotContains(t, failed, one.ID())

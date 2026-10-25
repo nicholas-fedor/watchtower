@@ -11,10 +11,10 @@ import (
 
 	dockerContainer "github.com/moby/moby/api/types/container"
 
+	mockContainerClient "github.com/nicholas-fedor/watchtower/internal/container/client/mocks"
 	"github.com/nicholas-fedor/watchtower/internal/container/oci"
 	"github.com/nicholas-fedor/watchtower/internal/registry/ratelimit"
 	mockUpdate "github.com/nicholas-fedor/watchtower/internal/update/mocks"
-	mockContainer "github.com/nicholas-fedor/watchtower/pkg/container/mocks"
 	"github.com/nicholas-fedor/watchtower/pkg/types"
 )
 
@@ -67,7 +67,7 @@ func TestUpdate_PostChecksTargetCurrentContainers(t *testing.T) {
 			scanned := appContainer(oldID)
 			afterUpdate := scanned
 
-			client := mockContainer.NewMockClient(t)
+			client := mockContainerClient.NewMockClient(t)
 			client.EXPECT().IsContainerStale(mock.Anything, scanned, mock.Anything).
 				Return(tt.stale, types.ImageID("sha256:new"), "", nil).Once()
 
