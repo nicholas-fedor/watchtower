@@ -128,7 +128,7 @@ func TestTryRecoverOrphanedContainer(t *testing.T) {
 	t.Run("start fails for the orphaned container", func(t *testing.T) {
 		t.Parallel()
 
-		t.Run("should continue searching and return false", func(t *testing.T) {
+		t.Run("should return false when no other orphan exists", func(t *testing.T) {
 			t.Parallel()
 
 			orphaned := recoveryContainer("orphaned-id", "watchtower-xyz", false, "")
@@ -142,6 +142,26 @@ func TestTryRecoverOrphanedContainer(t *testing.T) {
 			recovered, ok := TryRecoverOrphanedContainer(newTestLogger(t), t.Context(), client, current)
 			assert.False(t, ok)
 			assert.Nil(t, recovered)
+		})
+
+		t.Run("should start and return the next orphan", func(t *testing.T) {
+			t.Parallel()
+
+			first := recoveryContainer("first-orphan-id", "watchtower-xyz", false, "")
+			second := recoveryContainer("second-orphan-id", "watchtower-abc", false, "")
+			current := recoveryContainer("current-id", "watchtower-old-abc123", true, "")
+
+			client := mockContainerClient.NewMockClient(t)
+			expectListed(client, first, second, current)
+			client.EXPECT().StartContainerByID(mock.Anything, types.ContainerID("first-orphan-id")).
+				Return(context.DeadlineExceeded).Once()
+			client.EXPECT().StartContainerByID(mock.Anything, types.ContainerID("second-orphan-id")).
+				Return(nil).Once()
+
+			recovered, ok := TryRecoverOrphanedContainer(newTestLogger(t), t.Context(), client, current)
+			assert.True(t, ok)
+			require.NotNil(t, recovered)
+			assert.Equal(t, types.ContainerID("second-orphan-id"), recovered.ID())
 		})
 	})
 

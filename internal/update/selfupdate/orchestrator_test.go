@@ -8,6 +8,7 @@ import (
 	"os/exec"
 	"strings"
 	"testing"
+	"testing/synctest"
 	"time"
 
 	"github.com/stretchr/testify/assert"
@@ -571,6 +572,101 @@ func expectNewRunning(client *mockContainerClient.MockClient, running bool) type
 	client.EXPECT().GetContainer(mock.Anything, types.ContainerID(orchestratorNewID)).Return(newContainer, nil).Once()
 
 	return newContainer
+}
+
+// TestOrchestrateSelfUpdate_RecoveryAfterDeadline verifies that the old
+// container is still recovered when the orchestration deadline expires during
+// the failing step. Each case runs in a synctest bubble under the real
+// orchestratorTimeout, and the failing Docker call blocks until that deadline
+// passes. Every recovery call must then receive a live context whose deadline
+// is orchestratorRecoveryTimeout away.
+func TestOrchestrateSelfUpdate_RecoveryAfterDeadline(t *testing.T) {
+	t.Parallel()
+
+	// liveCtx matches a context that is not done and whose deadline is
+	// orchestratorRecoveryTimeout from now. The bubble's clock stands still
+	// while code runs, so the deadline matches exactly.
+	liveCtx := mock.MatchedBy(func(ctx context.Context) bool {
+		deadline, hasDeadline := ctx.Deadline()
+
+		return ctx.Err() == nil && hasDeadline && deadline.Equal(time.Now().Add(orchestratorRecoveryTimeout))
+	})
+
+	tests := []struct {
+		name  string
+		setup func(client *mockContainerClient.MockClient, old types.Container)
+	}{
+		{
+			name: "rename fails at the deadline and the old container is started again",
+			setup: func(client *mockContainerClient.MockClient, old types.Container) {
+				expectOldInspect(client, old)
+				client.EXPECT().StopContainer(mock.Anything, old, orchestratorStopTimeout).Return(nil)
+				client.EXPECT().RenameContainer(mock.Anything, old, orchestratorRenamedName[1:]).
+					RunAndReturn(func(ctx context.Context, _ types.Container, _ string) error {
+						<-ctx.Done()
+
+						return ctx.Err()
+					})
+				client.EXPECT().StartContainerByID(liveCtx, types.ContainerID(orchestratorOldID)).Return(nil)
+			},
+		},
+		{
+			name: "create fails at the deadline and the old container is restored",
+			setup: func(client *mockContainerClient.MockClient, old types.Container) {
+				expectOldInspect(client, old)
+				client.EXPECT().StopContainer(mock.Anything, old, orchestratorStopTimeout).Return(nil)
+				client.EXPECT().RenameContainer(mock.Anything, old, orchestratorRenamedName[1:]).Return(nil)
+				client.EXPECT().StartContainer(mock.Anything, old).
+					RunAndReturn(func(ctx context.Context, _ types.Container) (types.ContainerID, error) {
+						<-ctx.Done()
+
+						return "", ctx.Err()
+					})
+				client.EXPECT().RenameContainer(liveCtx, old, orchestratorOriginalName).Return(nil)
+				client.EXPECT().StartContainerByID(liveCtx, types.ContainerID(orchestratorOldID)).Return(nil)
+			},
+		},
+		{
+			name: "verify fails at the deadline and the new container is removed before the old one is restored",
+			setup: func(client *mockContainerClient.MockClient, old types.Container) {
+				newContainer := orchestratorContainer(orchestratorNewID, "/watchtower", false)
+
+				expectOldInspect(client, old)
+				client.EXPECT().StopContainer(mock.Anything, old, orchestratorStopTimeout).Return(nil)
+				client.EXPECT().RenameContainer(mock.Anything, old, orchestratorRenamedName[1:]).Return(nil)
+				client.EXPECT().StartContainer(mock.Anything, old).Return(types.ContainerID(orchestratorNewID), nil)
+				client.EXPECT().GetContainer(mock.Anything, types.ContainerID(orchestratorNewID)).
+					RunAndReturn(func(ctx context.Context, _ types.ContainerID) (types.Container, error) {
+						<-ctx.Done()
+
+						return nil, ctx.Err()
+					}).Once()
+				client.EXPECT().GetContainer(liveCtx, types.ContainerID(orchestratorNewID)).Return(newContainer, nil).Once()
+				client.EXPECT().StopAndRemoveContainer(liveCtx, newContainer, orchestratorStopTimeout).Return(nil)
+				client.EXPECT().RenameContainer(liveCtx, old, orchestratorOriginalName).Return(nil)
+				client.EXPECT().StartContainerByID(liveCtx, types.ContainerID(orchestratorOldID)).Return(nil)
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			synctest.Test(t, func(t *testing.T) {
+				ctx, cancel := context.WithTimeout(t.Context(), orchestratorTimeout)
+				defer cancel()
+
+				old := orchestratorContainer(orchestratorOldID, orchestratorOldName, true)
+				client := mockContainerClient.NewMockClient(t)
+				tt.setup(client, old)
+
+				err := orchestrateSelfUpdate(newTestLogger(t), ctx, client,
+					orchestratorOldID, orchestratorNewImage, orchestratorOriginalName, "", false)
+				require.ErrorIs(t, err, context.DeadlineExceeded)
+			})
+		})
+	}
 }
 
 // TestRunOrchestrator_Exit verifies how the orchestrator process ends: a
