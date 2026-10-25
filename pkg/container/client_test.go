@@ -1923,6 +1923,21 @@ func TestClientWrappers(t *testing.T) {
 		require.NoError(t, err)
 		assert.Equal(t, types.ContainerID("orchestrator-id"), id)
 	})
+
+	t.Run("CreateEphemeralOrchestrator says which step failed", func(t *testing.T) {
+		t.Parallel()
+
+		api := newDockerAPI(t)
+		api.EXPECT().ContainerCreate(mock.Anything, mock.Anything).
+			Return(dockerClient.ContainerCreateResult{}, daemonError("no such image")).Once()
+
+		source := modelfixture.Container(containerfixture.WithID("source123"), containerfixture.WithName("watchtower-source"), containerfixture.WithImageName("watchtower:latest"))
+
+		id, err := (&client{log: newTestLogger(t), api: api}).
+			CreateEphemeralOrchestrator(t.Context(), source, "watchtower:v2", "chain1", false)
+		require.ErrorContains(t, err, "create ephemeral orchestrator: failed to create ephemeral orchestrator container")
+		assert.Empty(t, id)
+	})
 }
 
 // TestClientThroughDockerSDK runs the client through the real Docker SDK

@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/nicholas-fedor/watchtower/internal/container/ephemeral"
 	containerImage "github.com/nicholas-fedor/watchtower/internal/container/image"
 	"github.com/nicholas-fedor/watchtower/pkg/types"
 )
@@ -111,5 +112,10 @@ func (c *client) CreateEphemeralOrchestrator(
 	containerChain string,
 	cleanup bool,
 ) (types.ContainerID, error) {
-	return createEphemeralOrchestrator(c.log, ctx, c.api, sourceContainer, newImage, containerChain, cleanup)
+	orchestratorID, err := ephemeral.CreateOrchestrator(c.log, ctx, c.api, sourceContainer, newImage, containerChain, cleanup)
+	if err != nil {
+		return "", fmt.Errorf("create ephemeral orchestrator: %w", err)
+	}
+
+	return orchestratorID, nil
 }

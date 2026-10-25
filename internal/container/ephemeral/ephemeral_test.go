@@ -1,12 +1,12 @@
-package container
+package ephemeral
 
 import (
-	"context"
 	"errors"
 	"slices"
 	"strings"
 	"testing"
 
+	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
@@ -18,7 +18,6 @@ import (
 	mockContainer "github.com/nicholas-fedor/watchtower/internal/container/mocks"
 	"github.com/nicholas-fedor/watchtower/internal/testutil/containerfixture"
 	"github.com/nicholas-fedor/watchtower/internal/testutil/modelfixture"
-	mockPkgContainer "github.com/nicholas-fedor/watchtower/pkg/container/mocks"
 	"github.com/nicholas-fedor/watchtower/pkg/types"
 )
 
@@ -36,10 +35,8 @@ func hasPrefixedElement(values []string, prefix string) bool {
 	})
 }
 
-// TestEphemeralOrchestrator verifies the Docker connection settings the
-// self-update orchestrator inherits from the source container, its container
-// and host configuration, its creation and start, and the removal of orphaned
-// orchestrators.
+// TestEphemeralOrchestrator verifies how the self-update orchestrator is built
+// from the source container, and how it is created and started.
 func TestEphemeralOrchestrator(t *testing.T) {
 	t.Parallel()
 
@@ -756,7 +753,7 @@ func TestEphemeralOrchestrator(t *testing.T) {
 				api.EXPECT().ContainerStart(mock.Anything, "orchestrator-id-123", dockerClient.ContainerStartOptions{}).
 					Return(dockerClient.ContainerStartResult{}, nil).Once()
 
-				orchestratorID, err := createEphemeralOrchestrator(
+				orchestratorID, err := CreateOrchestrator(
 					newTestLogger(t), t.Context(), api, newSource(), "watchtower:v2", "chain1", false,
 				)
 
@@ -775,7 +772,7 @@ func TestEphemeralOrchestrator(t *testing.T) {
 				api.EXPECT().ContainerCreate(mock.Anything, createOptions).
 					Return(dockerClient.ContainerCreateResult{}, serverError).Once()
 
-				orchestratorID, err := createEphemeralOrchestrator(
+				orchestratorID, err := CreateOrchestrator(
 					newTestLogger(t), t.Context(), api, newSource(), "watchtower:v2", "chain1", false,
 				)
 
@@ -800,246 +797,12 @@ func TestEphemeralOrchestrator(t *testing.T) {
 				api.EXPECT().ContainerRemove(mock.Anything, "orchestrator-fail-start", dockerClient.ContainerRemoveOptions{Force: true}).
 					Return(dockerClient.ContainerRemoveResult{}, nil).Once()
 
-				orchestratorID, err := createEphemeralOrchestrator(
+				orchestratorID, err := CreateOrchestrator(
 					newTestLogger(t), t.Context(), api, newSource(), "watchtower:v2", "chain1", false,
 				)
 
 				require.ErrorIs(t, err, errEphemeralStartFailed)
 				assert.Empty(t, orchestratorID)
-			})
-		})
-	})
-
-	t.Run("RemoveOrphanedOrchestrators", func(t *testing.T) {
-		t.Parallel()
-
-		ctx := context.Background()
-
-		// orphaned marks an orchestrator as running long past any self-update.
-		orphaned := containerfixture.WithContainerState(dockerContainer.State{
-			Running:   true,
-			Status:    "running",
-			StartedAt: "2000-01-01T00:00:00Z",
-		})
-
-		t.Run("there are no containers", func(t *testing.T) {
-			t.Parallel()
-
-			t.Run("should return 0 removed and no error", func(t *testing.T) {
-				t.Parallel()
-
-				mockAPIClient := mockPkgContainer.NewMockClient(t)
-				mockAPIClient.EXPECT().
-					ListContainers(ctx).
-					Return([]types.Container{}, nil)
-
-				count, err := RemoveOrphanedOrchestrators(newTestLogger(t), ctx, mockAPIClient)
-
-				require.NoError(t, err)
-				assert.Equal(t, 0, count)
-			})
-		})
-
-		t.Run("there are containers but none are orchestrators", func(t *testing.T) {
-			t.Parallel()
-
-			t.Run("should return 0 removed and no error", func(t *testing.T) {
-				t.Parallel()
-
-				regularContainer := modelfixture.Container(
-					containerfixture.WithID("regular123"),
-					containerfixture.WithName("regular-container"),
-					containerfixture.WithLabels(map[string]string{
-						"com.centurylinklabs.watchtower": "true",
-					}),
-				)
-
-				mockAPIClient := mockPkgContainer.NewMockClient(t)
-				mockAPIClient.EXPECT().
-					ListContainers(ctx).
-					Return([]types.Container{regularContainer}, nil)
-
-				count, err := RemoveOrphanedOrchestrators(newTestLogger(t), ctx, mockAPIClient)
-
-				require.NoError(t, err)
-				assert.Equal(t, 0, count)
-			})
-		})
-
-		t.Run("there is an orphaned orchestrator", func(t *testing.T) {
-			t.Parallel()
-
-			t.Run("should remove the orchestrator and return 1", func(t *testing.T) {
-				t.Parallel()
-
-				orchestrator := modelfixture.Container(
-					containerfixture.WithID("orch123"),
-					containerfixture.WithName("watchtower-orchestrator-abc"),
-					containerfixture.WithLabels(map[string]string{
-						labels.EphemeralOrchestrator: "true",
-					}),
-					orphaned,
-				)
-
-				mockAPIClient := mockPkgContainer.NewMockClient(t)
-				mockAPIClient.EXPECT().
-					ListContainers(ctx).
-					Return([]types.Container{orchestrator}, nil)
-				mockAPIClient.EXPECT().
-					StopAndRemoveContainer(
-						ctx,
-						orchestrator,
-						mock.AnythingOfType("time.Duration"),
-					).
-					Return(nil)
-
-				count, err := RemoveOrphanedOrchestrators(newTestLogger(t), ctx, mockAPIClient)
-
-				require.NoError(t, err)
-				assert.Equal(t, 1, count)
-			})
-		})
-
-		t.Run("there are multiple orphaned orchestrators", func(t *testing.T) {
-			t.Parallel()
-
-			t.Run("should remove all orchestrators and return the count", func(t *testing.T) {
-				t.Parallel()
-
-				orch1 := modelfixture.Container(
-					containerfixture.WithID("orch001"),
-					containerfixture.WithName("watchtower-orchestrator-001"),
-					containerfixture.WithLabels(map[string]string{
-						labels.EphemeralOrchestrator: "true",
-					}),
-					orphaned,
-				)
-				orch2 := modelfixture.Container(
-					containerfixture.WithID("orch002"),
-					containerfixture.WithName("watchtower-orchestrator-002"),
-					containerfixture.WithLabels(map[string]string{
-						labels.EphemeralOrchestrator: "true",
-					}),
-					orphaned,
-				)
-				regular := modelfixture.Container(
-					containerfixture.WithID("regular1"),
-					containerfixture.WithName("app-container"),
-				)
-
-				mockAPIClient := mockPkgContainer.NewMockClient(t)
-				mockAPIClient.EXPECT().
-					ListContainers(ctx).
-					Return([]types.Container{orch1, regular, orch2}, nil)
-				mockAPIClient.EXPECT().
-					StopAndRemoveContainer(
-						ctx,
-						orch1,
-						mock.AnythingOfType("time.Duration"),
-					).
-					Return(nil)
-				mockAPIClient.EXPECT().
-					StopAndRemoveContainer(
-						ctx,
-						orch2,
-						mock.AnythingOfType("time.Duration"),
-					).
-					Return(nil)
-
-				count, err := RemoveOrphanedOrchestrators(newTestLogger(t), ctx, mockAPIClient)
-
-				require.NoError(t, err)
-				assert.Equal(t, 2, count)
-			})
-		})
-
-		t.Run("ListContainers fails", func(t *testing.T) {
-			t.Parallel()
-
-			t.Run("should return an error", func(t *testing.T) {
-				t.Parallel()
-
-				mockAPIClient := mockPkgContainer.NewMockClient(t)
-				mockAPIClient.EXPECT().
-					ListContainers(ctx).
-					Return(nil, errors.New("docker daemon unavailable"))
-
-				count, err := RemoveOrphanedOrchestrators(newTestLogger(t), ctx, mockAPIClient)
-
-				require.ErrorContains(t, err, "failed to list containers")
-				assert.Equal(t, 0, count)
-			})
-		})
-
-		t.Run("StopAndRemoveContainer fails for one orchestrator", func(t *testing.T) {
-			t.Parallel()
-
-			t.Run("should continue and remove others, returning partial count", func(t *testing.T) {
-				t.Parallel()
-
-				orch1 := modelfixture.Container(
-					containerfixture.WithID("orch001"),
-					containerfixture.WithName("watchtower-orchestrator-001"),
-					containerfixture.WithLabels(map[string]string{
-						labels.EphemeralOrchestrator: "true",
-					}),
-					orphaned,
-				)
-				orch2 := modelfixture.Container(
-					containerfixture.WithID("orch002"),
-					containerfixture.WithName("watchtower-orchestrator-002"),
-					containerfixture.WithLabels(map[string]string{
-						labels.EphemeralOrchestrator: "true",
-					}),
-					orphaned,
-				)
-
-				mockAPIClient := mockPkgContainer.NewMockClient(t)
-				mockAPIClient.EXPECT().
-					ListContainers(ctx).
-					Return([]types.Container{orch1, orch2}, nil)
-				mockAPIClient.EXPECT().
-					StopAndRemoveContainer(
-						ctx,
-						orch1,
-						mock.AnythingOfType("time.Duration"),
-					).
-					Return(errors.New("removal failed"))
-				mockAPIClient.EXPECT().
-					StopAndRemoveContainer(
-						ctx,
-						orch2,
-						mock.AnythingOfType("time.Duration"),
-					).
-					Return(nil)
-
-				count, err := RemoveOrphanedOrchestrators(newTestLogger(t), ctx, mockAPIClient)
-
-				require.NoError(t, err)
-				assert.Equal(t, 1, count)
-			})
-		})
-
-		t.Run("a container has no orchestrator label", func(t *testing.T) {
-			t.Parallel()
-
-			t.Run("should skip the container without error", func(t *testing.T) {
-				t.Parallel()
-
-				noLabelContainer := modelfixture.Container(
-					containerfixture.WithID("no-label"),
-					containerfixture.WithName("no-label-container"),
-				)
-
-				mockAPIClient := mockPkgContainer.NewMockClient(t)
-				mockAPIClient.EXPECT().
-					ListContainers(ctx).
-					Return([]types.Container{noLabelContainer}, nil)
-
-				count, err := RemoveOrphanedOrchestrators(newTestLogger(t), ctx, mockAPIClient)
-
-				require.NoError(t, err)
-				assert.Equal(t, 0, count)
 			})
 		})
 	})
@@ -1161,4 +924,21 @@ func TestExtractDockerConnectionConfig_DockerHostSocket(t *testing.T) {
 			assert.Equal(t, tt.wantBind, config.SocketBind)
 		})
 	}
+}
+
+// newTestLogger returns a logger that writes each event to the test's log, so a
+// failing test shows what it logged.
+//
+// Parameters:
+//   - t: Test that receives the log lines.
+//
+// Returns:
+//   - *zerolog.Logger: Logger writing to t.
+func newTestLogger(t *testing.T) *zerolog.Logger {
+	t.Helper()
+
+	// Frame 4 skips zerolog's write path, so each line names the log call.
+	w := zerolog.TestWriter{T: t, Frame: 4}
+
+	return new(zerolog.New(w))
 }
