@@ -126,6 +126,7 @@ func FuzzSanitizeCopyFileArchive(f *testing.F) {
 	f.Add(seedCopyFileTar("config.yaml", []byte("x"), 0o644), "../config.yaml")
 	f.Add(seedCopyFileTar("config.yaml", []byte("x"), 0o644), "config.yaml")
 	f.Add(seedCopyFileTar("config.yaml", []byte("x"), 0o644), "/")
+	f.Add(seedCopyFileTar("v1..2.conf", []byte("x"), 0o644), "/app/v1..2.conf")
 
 	f.Fuzz(func(t *testing.T, raw []byte, destPath string) {
 		if len(raw) > maxCopyFileTarBytes*2 {
@@ -152,7 +153,7 @@ func FuzzSanitizeCopyFileArchive(f *testing.F) {
 			t.Fatalf("sanitized name %q want %q", name, destPath)
 		}
 
-		if strings.Contains(name, "..") {
+		if slices.Contains(strings.Split(name, "/"), "..") {
 			t.Fatalf("sanitized name contains parent traversal: %q", name)
 		}
 
@@ -167,7 +168,7 @@ func FuzzSanitizeCopyFileArchive(f *testing.F) {
 }
 
 // FuzzCopyFileTarNameOK verifies tar member name matching never panics and that
-// a true result has no parent traversal and a matching basename.
+// a true result has no ".." path element and a matching basename.
 func FuzzCopyFileTarNameOK(f *testing.F) {
 	f.Add("config.yaml", "config.yaml")
 	f.Add("./config.yaml", "config.yaml")
@@ -177,6 +178,8 @@ func FuzzCopyFileTarNameOK(f *testing.F) {
 	f.Add("config.yaml", "")
 	f.Add("extra.yaml", "config.yaml")
 	f.Add("..", "config.yaml")
+	f.Add("v1..2.conf", "v1..2.conf")
+	f.Add("app/../config.yaml", "config.yaml")
 
 	f.Fuzz(func(t *testing.T, name, base string) {
 		ok := copyFileTarNameOK(name, base)
@@ -184,7 +187,7 @@ func FuzzCopyFileTarNameOK(f *testing.F) {
 			return
 		}
 
-		if name == "" || strings.Contains(name, "..") {
+		if name == "" || slices.Contains(strings.Split(name, "/"), "..") {
 			t.Fatalf("accepted empty or traversal name %q", name)
 		}
 

@@ -384,6 +384,32 @@ func TestSnapshotCopyFiles(t *testing.T) {
 		assert.Equal(t, int64(0o444), mode)
 	})
 
+	t.Run("copies a labeled file with dots in its name", func(t *testing.T) {
+		t.Parallel()
+
+		tarBytes := mustFileTar(t, "v1..2.conf", []byte("setting=1"))
+		api := mockContainer.NewMockAPIClient(t)
+		api.EXPECT().
+			CopyFromContainer(mock.Anything, "container_id", copyFromPath("/app/v1..2.conf")).
+			Return(dockerClient.CopyFromContainerResult{
+				Content: io.NopCloser(bytes.NewReader(tarBytes)),
+				Stat: dockerContainer.PathStat{
+					Name: "v1..2.conf",
+					Size: int64(len("setting=1")),
+					Mode: 0o444,
+				},
+			}, nil)
+
+		c := modelfixture.Container(containerfixture.WithLabels(map[string]string{
+			labels.CopyFile: "/app/v1..2.conf",
+		}))
+
+		snap, err := Capture(newTestLogger(t), t.Context(), api, c)
+		require.NoError(t, err)
+		require.Len(t, snap.files, 1)
+		assert.Equal(t, "/app/v1..2.conf", snap.files[0].target)
+	})
+
 	t.Run("skips missing path", func(t *testing.T) {
 		t.Parallel()
 
@@ -983,6 +1009,40 @@ func TestSanitizeCopyFileArchive(t *testing.T) {
 		assert.Equal(t, "/app/config.yaml", name)
 		assert.Equal(t, []byte("a"), body)
 	})
+}
+
+// TestCopyFileTarNameOK verifies which tar member names match a destination
+// basename. A name with a ".." path element is rejected, but dots inside a file
+// name are allowed.
+func TestCopyFileTarNameOK(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name   string
+		member string
+		base   string
+		want   bool
+	}{
+		{name: "basename", member: "config.yaml", base: "config.yaml", want: true},
+		{name: "current directory prefix", member: "./config.yaml", base: "config.yaml", want: true},
+		{name: "absolute path", member: "/app/config.yaml", base: "config.yaml", want: true},
+		{name: "dots inside the name", member: "v1..2.conf", base: "v1..2.conf", want: true},
+		{name: "trailing dots", member: "config..", base: "config..", want: true},
+		{name: "leading dots", member: "..config", base: "..config", want: true},
+		{name: "parent element before the name", member: "../config.yaml", base: "config.yaml"},
+		{name: "parent element inside the path", member: "app/../config.yaml", base: "config.yaml"},
+		{name: "parent element alone", member: "..", base: ".."},
+		{name: "different basename", member: "extra.yaml", base: "config.yaml"},
+		{name: "empty name", member: "", base: "config.yaml"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			assert.Equal(t, tt.want, copyFileTarNameOK(tt.member, tt.base))
+		})
+	}
 }
 
 func TestStoreCopyFileSnapshotCap(t *testing.T) {
