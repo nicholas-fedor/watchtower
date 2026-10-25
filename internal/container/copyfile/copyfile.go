@@ -705,8 +705,8 @@ func sanitizeCopyFileArchive(raw []byte, destPath string) ([]byte, error) {
 
 // copyFileTarNameOK reports whether a tar member name is the destination basename.
 //
-// A ".." path element is rejected, as validateCopyFilePath does for labels, so
-// a file name that only contains two dots is accepted.
+// A ".." path element is rejected, as validateCopyFilePath does for labels. A
+// file name with consecutive dots inside it, such as v1..2.conf, is accepted.
 //
 // Parameters:
 //   - name: Tar header name.
