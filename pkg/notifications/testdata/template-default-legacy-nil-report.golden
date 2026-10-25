@@ -40,5 +40,7 @@ Update failed for app (org/app:latest): image pull: registry rate limited: retry
 Ignored depends-on missing-db for app: no container has that name
 Skipped app: depends on itself
 Skipped app: circular dependency
+Could not identify Watchtower's own container. Self-updates are disabled and old instances will not be removed: failed to detect current container ID: no container ID in cgroup file
+Could not inspect Watchtower's own container. Self-updates are disabled and its scope label is not applied: failed to inspect container: context deadline exceeded
 Unrecognized message with fields | alpha=one beta=2 
 Unrecognized message without fields

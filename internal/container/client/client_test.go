@@ -18,6 +18,7 @@ import (
 	"path/filepath"
 	"slices"
 	"strings"
+	"syscall"
 	"testing"
 	"testing/fstest"
 	"testing/synctest"
@@ -68,6 +69,29 @@ type execCase struct {
 	user string
 	// exitCode is the exit code the exec reports.
 	exitCode int
+}
+
+// startingDaemon is an [http.RoundTripper] for a Docker daemon that starts
+// serving its API at ready. Before then, a request fails with notReadyErr or
+// gets notReadyStatus when either is set. Otherwise it waits on its context,
+// as on a daemon that is restoring its containers. It is answered at ready if
+// its context is still live.
+type startingDaemon struct {
+	// ready is when the daemon starts serving its API.
+	ready time.Time
+	// notReadyErr is the error of every request before ready. Nil makes those
+	// requests wait instead.
+	notReadyErr error
+	// notReadyStatus answers every request before ready with this status
+	// code instead, as a socket proxy does while the daemon is down.
+	notReadyStatus int
+	// transportErr makes every request fail with it, as a client setting that
+	// can never connect does.
+	transportErr error
+	// status is the status code of every answer once ready. Zero means 200.
+	status int
+	// requests counts the requests the daemon received.
+	requests int
 }
 
 // expectExec expects GetContainer's inspects of the container and its image,
@@ -1333,29 +1357,6 @@ func TestClient(t *testing.T) {
 			}, info)
 		})
 	})
-
-	t.Run("daemonInitTimeout constant", func(t *testing.T) {
-		t.Parallel()
-
-		t.Run("should have a reasonable timeout value of 30 seconds", func(t *testing.T) {
-			t.Parallel()
-
-			assert.Equal(t, 30*time.Second, daemonInitTimeout)
-		})
-
-		t.Run("should not be zero", func(t *testing.T) {
-			t.Parallel()
-
-			assert.Positive(t, daemonInitTimeout)
-		})
-
-		t.Run("should be within reasonable bounds (10s to 5min)", func(t *testing.T) {
-			t.Parallel()
-
-			assert.GreaterOrEqual(t, daemonInitTimeout, 10*time.Second)
-			assert.LessOrEqual(t, daemonInitTimeout, 5*time.Minute)
-		})
-	})
 }
 
 // TestClientEnvironment verifies the client behavior that depends on
@@ -2103,4 +2104,207 @@ func TestClientImageAnnotationsDelegates(t *testing.T) {
 		GetImageAnnotations(t.Context(), "app:latest")
 
 	assert.Equal(t, "1.2.3", got.Version)
+}
+
+// RoundTrip answers a request as the daemon would at the current time.
+func (d *startingDaemon) RoundTrip(req *http.Request) (*http.Response, error) {
+	d.requests++
+
+	if d.transportErr != nil {
+		return nil, d.transportErr
+	}
+
+	status := d.status
+
+	if wait := time.Until(d.ready); wait > 0 {
+		switch {
+		case d.notReadyErr != nil:
+			return nil, d.notReadyErr
+		case d.notReadyStatus != 0:
+			status = d.notReadyStatus
+		default:
+			select {
+			case <-req.Context().Done():
+				return nil, req.Context().Err()
+			case <-time.After(wait):
+			}
+		}
+	}
+
+	if status == 0 {
+		status = http.StatusOK
+	}
+
+	return &http.Response{
+		StatusCode: status,
+		Header:     http.Header{"Api-Version": []string{"1.45"}},
+		Body:       http.NoBody,
+		Request:    req,
+	}, nil
+}
+
+// newStartingDaemonClient returns a Docker client that sends its requests to
+// daemon.
+func newStartingDaemonClient(t *testing.T, daemon *startingDaemon) *dockerClient.Client {
+	t.Helper()
+
+	cli, err := dockerClient.New(
+		dockerClient.WithHost("unix:///var/run/docker.sock"),
+		dockerClient.WithHTTPClient(&http.Client{Transport: daemon}),
+	)
+	require.NoError(t, err)
+
+	return cli
+}
+
+// TestPingUntilServing verifies how client initialization waits for a daemon
+// that is not serving its API yet. A queued ping is answered once the daemon
+// serves. A ping that fails without an answer is sent again after a doubling
+// delay. The wait ends early on an error that waiting cannot fix, and gives up
+// at daemonStartupTimeout. Each case runs in a synctest bubble, so the waits
+// take no real time.
+func TestPingUntilServing(t *testing.T) {
+	t.Parallel()
+
+	// refused is the dial error of a socket that nothing listens on.
+	refused := &net.OpError{Op: "dial", Net: "unix", Err: syscall.ECONNREFUSED}
+
+	tests := []struct {
+		name string
+		// ready is how long after the start the daemon serves its API.
+		ready          time.Duration
+		notReadyErr    error
+		notReadyStatus int
+		transportErr   error
+		status         int
+		// wantWait is how long the wait takes, and wantRequests how many
+		// requests it sends. A ping that gets no answer sends a HEAD and
+		// then a GET.
+		wantWait     time.Duration
+		wantRequests int
+		wantErr      bool
+		wantLog      string
+	}{
+		{
+			name:         "daemon already serving",
+			wantRequests: 1,
+		},
+		{
+			name:         "restoring daemon answers the queued ping",
+			ready:        75 * time.Second,
+			wantWait:     75 * time.Second,
+			wantRequests: 1,
+			wantLog:      "Docker daemon is not answering yet. Waiting for it",
+		},
+		{
+			name:        "refused connection is retried with a doubling delay",
+			ready:       20 * time.Second,
+			notReadyErr: refused,
+			// Pings at 0, 1, 3, 7, and 15 seconds are refused. The delay
+			// caps at 10 seconds before the ping at 25 seconds.
+			wantWait:     25 * time.Second,
+			wantRequests: 11,
+			wantLog:      "Docker daemon is still not answering",
+		},
+		{
+			name:         "missing socket is retried",
+			ready:        20 * time.Second,
+			notReadyErr:  &net.OpError{Op: "dial", Net: "unix", Err: syscall.ENOENT},
+			wantWait:     25 * time.Second,
+			wantRequests: 11,
+		},
+		{
+			name:  "proxy name that does not resolve yet is retried",
+			ready: 20 * time.Second,
+			notReadyErr: &net.OpError{
+				Op:  "dial",
+				Net: "tcp",
+				Err: &net.DNSError{Err: "no such host", Name: "dockerproxy", IsNotFound: true},
+			},
+			wantWait:     25 * time.Second,
+			wantRequests: 11,
+		},
+		{
+			name:         "dropped connection is retried",
+			ready:        20 * time.Second,
+			notReadyErr:  io.EOF,
+			wantWait:     25 * time.Second,
+			wantRequests: 11,
+		},
+		{
+			name:           "proxy that answers 503 is retried",
+			ready:          20 * time.Second,
+			notReadyStatus: http.StatusServiceUnavailable,
+			wantWait:       25 * time.Second,
+			wantRequests:   11,
+		},
+		{
+			name:         "daemon that never serves ends the wait at the timeout",
+			ready:        time.Hour,
+			wantWait:     daemonStartupTimeout,
+			wantRequests: 2,
+			wantErr:      true,
+		},
+		{
+			name:         "daemon that rejects the ping ends the wait at once",
+			status:       http.StatusForbidden,
+			wantRequests: 2,
+			wantErr:      true,
+		},
+		{
+			name:         "TLS client against a plain HTTP daemon ends the wait at once",
+			transportErr: http.ErrSchemeMismatch,
+			wantRequests: 2,
+			wantErr:      true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			synctest.Test(t, func(t *testing.T) {
+				start := time.Now()
+				daemon := &startingDaemon{
+					ready:          start.Add(tt.ready),
+					notReadyErr:    tt.notReadyErr,
+					notReadyStatus: tt.notReadyStatus,
+					transportErr:   tt.transportErr,
+					status:         tt.status,
+				}
+				log, logOutput := logcapture.New(zerolog.DebugLevel)
+
+				result, err := pingUntilServing(log, newStartingDaemonClient(t, daemon))
+
+				assert.Equal(t, tt.wantWait, time.Since(start))
+				assert.Equal(t, tt.wantRequests, daemon.requests)
+				assert.Contains(t, logOutput.String(), tt.wantLog)
+
+				if tt.wantErr {
+					require.Error(t, err)
+
+					return
+				}
+
+				require.NoError(t, err)
+				assert.Equal(t, "1.45", result.APIVersion)
+			})
+		})
+	}
+}
+
+// TestNegotiateDockerAPI_WaitsForDaemon verifies that client initialization
+// negotiates the API version with a daemon that starts serving only after one
+// ping has timed out, as on a host that is still restoring its containers.
+func TestNegotiateDockerAPI_WaitsForDaemon(t *testing.T) {
+	t.Parallel()
+
+	synctest.Test(t, func(t *testing.T) {
+		daemon := &startingDaemon{ready: time.Now().Add(75 * time.Second)}
+
+		cli, result, err := negotiateDockerAPI(newTestLogger(t), newStartingDaemonClient(t, daemon))
+		require.NoError(t, err)
+		assert.Equal(t, "1.45", result.APIVersion)
+		assert.Equal(t, "1.45", cli.ClientVersion())
+	})
 }

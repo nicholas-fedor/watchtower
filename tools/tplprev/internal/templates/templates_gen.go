@@ -126,6 +126,8 @@ var Templates = map[string]string{
     Skipped {{with (index $e.Data "container")}}{{.}}{{else}}container{{end}}: depends on itself
 {{- else if eq $msg "Skipping container update (circular dependency)" -}}
     Skipped {{with (index $e.Data "container")}}{{.}}{{else}}container{{end}}: circular dependency
+{{- else if or (eq $msg "Could not identify Watchtower's own container. Self-updates are disabled and old instances will not be removed") (eq $msg "Could not inspect Watchtower's own container. Self-updates are disabled and its scope label is not applied") -}}
+    {{$msg}}{{with (index $e.Data "error")}}: {{.}}{{end}}
 {{- else if $e.Data -}}
     {{- /* For messages with data, show message and key=value pairs */ -}}
     {{$msg}} | {{range $k, $v := $e.Data}}{{$k}}={{$v}} {{end}}

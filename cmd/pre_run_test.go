@@ -7,6 +7,7 @@ import (
 	"io/fs"
 	"os"
 	"os/exec"
+	"slices"
 	"strings"
 	"testing"
 	"testing/fstest"
@@ -140,9 +141,9 @@ func selfContainer(name, hostname string) types.Container {
 }
 
 // TestPreRun_SelfDetection records how preRun finds the Watchtower container
-// it runs in, and what it keeps when detection or the lookup fails. A process
-// in a container whose ID is not known is marked unknown, unlike one outside a
-// container.
+// it runs in, and what it keeps and warns about when detection or the lookup
+// fails. A process in a container whose ID is not known is marked unknown. A
+// process outside a container is not. A failed lookup keeps the detected ID.
 func TestPreRun_SelfDetection(t *testing.T) {
 	tests := []struct {
 		name      string
@@ -154,6 +155,10 @@ func TestPreRun_SelfDetection(t *testing.T) {
 		wantCalls []string
 		// wantUnknown is whether the own container is marked unknown.
 		wantUnknown bool
+		// wantWarning is the start of the warning preRun logs, and wantError
+		// the error it carries. Empty means neither startup warning is logged.
+		wantWarning string
+		wantError   string
 	}{
 		{
 			name:      "outside a container",
@@ -164,6 +169,8 @@ func TestPreRun_SelfDetection(t *testing.T) {
 			detection:   selfDetection{marker: true},
 			wantCalls:   []string{},
 			wantUnknown: true,
+			wantWarning: "Could not identify Watchtower's own container",
+			wantError:   "failed to detect current container ID",
 		},
 		{
 			name:      "found from mountinfo",
@@ -205,18 +212,22 @@ func TestPreRun_SelfDetection(t *testing.T) {
 			setup: func(client *mockContainerClient.MockClient) {
 				client.EXPECT().GetCurrentWatchtowerContainer(mock.Anything, selfID).Return(nil, errRunTestDocker)
 			},
-			wantID:    selfID,
-			wantCalls: []string{"GetCurrentWatchtowerContainer cccccccccccc"},
+			wantID:      selfID,
+			wantCalls:   []string{"GetCurrentWatchtowerContainer cccccccccccc"},
+			wantWarning: "Could not inspect Watchtower's own container",
+			wantError:   errRunTestDocker.Error(),
 		},
 		{
-			name:      "lookup times out and the ID is cleared",
+			name:      "lookup times out and the ID is kept",
 			detection: selfDetection{mountinfo: mountinfoWithSelf(), marker: true},
 			setup: func(client *mockContainerClient.MockClient) {
 				client.EXPECT().GetCurrentWatchtowerContainer(mock.Anything, selfID).
 					Return(nil, fmt.Errorf("inspect: %w", context.DeadlineExceeded))
 			},
+			wantID:      selfID,
 			wantCalls:   []string{"GetCurrentWatchtowerContainer cccccccccccc"},
-			wantUnknown: true,
+			wantWarning: "Could not inspect Watchtower's own container",
+			wantError:   context.DeadlineExceeded.Error(),
 		},
 		{
 			name:      "old instance continues in run-once mode",
@@ -243,7 +254,19 @@ func TestPreRun_SelfDetection(t *testing.T) {
 
 			fixtureNotifier := notifier
 
-			newRunProcess().preRun(newTestRootCommand(t, tt.args...), nil)
+			readStderr := captureStderr(t)
+			args := slices.Concat(tt.args, []string{"--log-level", "warn", "--log-format", "logfmt"})
+
+			newRunProcess().preRun(newTestRootCommand(t, args...), nil)
+
+			logOutput := readStderr()
+			if tt.wantWarning == "" {
+				assert.NotContains(t, logOutput, "Could not identify Watchtower's own container")
+				assert.NotContains(t, logOutput, "Could not inspect Watchtower's own container")
+			} else {
+				assert.Contains(t, logOutput, tt.wantWarning)
+				assert.Contains(t, logOutput, tt.wantError)
+			}
 
 			assert.Equal(t, tt.wantID, currentWatchtowerContainerID)
 			assert.Equal(t, tt.wantUnknown, currentWatchtowerContainerUnknown)
@@ -252,6 +275,31 @@ func TestPreRun_SelfDetection(t *testing.T) {
 			assert.Same(t, mockClient, client, "preRun uses the client from newClient")
 			assert.NotSame(t, fixtureNotifier, notifier, "preRun creates its own notifier")
 		})
+	}
+}
+
+// captureStderr points [os.Stderr] at a file until the test ends. The logger
+// preRun builds then writes there, and the returned function reads what it
+// wrote. The test must not run in parallel, since [os.Stderr] is process-wide.
+func captureStderr(t *testing.T) func() string {
+	t.Helper()
+
+	file, err := os.CreateTemp(t.TempDir(), "stderr")
+	require.NoError(t, err)
+
+	saved := os.Stderr
+	os.Stderr = file
+
+	t.Cleanup(func() {
+		os.Stderr = saved
+		_ = file.Close()
+	})
+
+	return func() string {
+		data, err := os.ReadFile(file.Name())
+		require.NoError(t, err)
+
+		return string(data)
 	}
 }
 
