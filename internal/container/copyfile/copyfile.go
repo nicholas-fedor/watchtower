@@ -705,15 +705,24 @@ func sanitizeCopyFileArchive(raw []byte, destPath string) ([]byte, error) {
 
 // copyFileTarNameOK reports whether a tar member name is the destination basename.
 //
+// A ".." path element is rejected, as validateCopyFilePath does for labels, so
+// a file name that only contains two dots is accepted.
+//
 // Parameters:
 //   - name: Tar header name.
 //   - base: Expected file basename.
 //
 // Returns:
-//   - bool: True when name has no parent traversal and its base name matches.
+//   - bool: True when name has no ".." path element and its base name matches.
 func copyFileTarNameOK(name, base string) bool {
-	if name == "" || strings.Contains(name, "..") {
+	if name == "" {
 		return false
+	}
+
+	for elem := range strings.SplitSeq(name, "/") {
+		if elem == ".." {
+			return false
+		}
 	}
 
 	return path.Base(path.Clean(name)) == base
