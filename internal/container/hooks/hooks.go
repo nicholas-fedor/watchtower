@@ -1,4 +1,4 @@
-package lifecycle
+package hooks
 
 import (
 	"context"
