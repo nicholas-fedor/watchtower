@@ -33,6 +33,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- Move ephemeral self-update into its own package by @nicholas-fedor in [#3162](https://github.com/nicholas-fedor/watchtower/pull/3162)
 - Split the update engine into files by area by @nicholas-fedor in [#3158](https://github.com/nicholas-fedor/watchtower/pull/3158)
 - Keep update helpers with the code they serve by @nicholas-fedor in [#3156](https://github.com/nicholas-fedor/watchtower/pull/3156)
 - Move the Docker client to internal/container/client by @nicholas-fedor in [#3152](https://github.com/nicholas-fedor/watchtower/pull/3152)
