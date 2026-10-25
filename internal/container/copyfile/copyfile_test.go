@@ -1,4 +1,4 @@
-package container
+package copyfile
 
 import (
 	"archive/tar"
@@ -12,6 +12,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
@@ -20,6 +21,7 @@ import (
 	dockerContainer "github.com/moby/moby/api/types/container"
 	dockerImage "github.com/moby/moby/api/types/image"
 	dockerMount "github.com/moby/moby/api/types/mount"
+	dockerSystem "github.com/moby/moby/api/types/system"
 	dockerClient "github.com/moby/moby/client"
 
 	"github.com/nicholas-fedor/watchtower/internal/container"
@@ -346,9 +348,9 @@ func TestSnapshotCopyFiles(t *testing.T) {
 		t.Parallel()
 
 		api := mockContainer.NewMockAPIClient(t)
-		snap, err := snapshotCopyFiles(newTestLogger(t), t.Context(), api, modelfixture.Container())
+		snap, err := Capture(newTestLogger(t), t.Context(), api, modelfixture.Container())
 		require.NoError(t, err)
-		assert.True(t, snap.empty())
+		assert.True(t, snap.Empty())
 	})
 
 	t.Run("copies labeled file", func(t *testing.T) {
@@ -371,7 +373,7 @@ func TestSnapshotCopyFiles(t *testing.T) {
 			labels.CopyFile: "/app/config.yaml",
 		}))
 
-		snap, err := snapshotCopyFiles(newTestLogger(t), t.Context(), api, c)
+		snap, err := Capture(newTestLogger(t), t.Context(), api, c)
 		require.NoError(t, err)
 		require.Len(t, snap.files, 1)
 		assert.Equal(t, "/app/config.yaml", snap.files[0].target)
@@ -394,9 +396,9 @@ func TestSnapshotCopyFiles(t *testing.T) {
 			labels.CopyFile: "/etc/missing.conf",
 		}))
 
-		snap, err := snapshotCopyFiles(newTestLogger(t), t.Context(), api, c)
+		snap, err := Capture(newTestLogger(t), t.Context(), api, c)
 		require.NoError(t, err)
-		assert.True(t, snap.empty())
+		assert.True(t, snap.Empty())
 	})
 
 	t.Run("skips path a mount provides", func(t *testing.T) {
@@ -410,9 +412,9 @@ func TestSnapshotCopyFiles(t *testing.T) {
 			containerfixture.WithBinds([]string{"/host/config.yaml:/app/config.yaml:ro"}),
 		)
 
-		snap, err := snapshotCopyFiles(newTestLogger(t), t.Context(), api, c)
+		snap, err := Capture(newTestLogger(t), t.Context(), api, c)
 		require.NoError(t, err)
-		assert.True(t, snap.empty())
+		assert.True(t, snap.Empty())
 	})
 
 	t.Run("skips path under read-only mount", func(t *testing.T) {
@@ -428,9 +430,9 @@ func TestSnapshotCopyFiles(t *testing.T) {
 			}),
 		)
 
-		snap, err := snapshotCopyFiles(newTestLogger(t), t.Context(), api, c)
+		snap, err := Capture(newTestLogger(t), t.Context(), api, c)
 		require.NoError(t, err)
-		assert.True(t, snap.empty())
+		assert.True(t, snap.Empty())
 	})
 
 	t.Run("skips path when root filesystem is read-only", func(t *testing.T) {
@@ -447,9 +449,9 @@ func TestSnapshotCopyFiles(t *testing.T) {
 			}),
 		)
 
-		snap, err := snapshotCopyFiles(newTestLogger(t), t.Context(), api, c)
+		snap, err := Capture(newTestLogger(t), t.Context(), api, c)
 		require.NoError(t, err)
-		assert.True(t, snap.empty())
+		assert.True(t, snap.Empty())
 	})
 
 	t.Run("copies path under a directory mount", func(t *testing.T) {
@@ -477,7 +479,7 @@ func TestSnapshotCopyFiles(t *testing.T) {
 			}),
 		)
 
-		snap, err := snapshotCopyFiles(newTestLogger(t), t.Context(), api, c)
+		snap, err := Capture(newTestLogger(t), t.Context(), api, c)
 		require.NoError(t, err)
 		require.Len(t, snap.files, 1)
 
@@ -504,7 +506,7 @@ func TestSnapshotCopyFiles(t *testing.T) {
 			labels.CopyFile: "/app/data",
 		}))
 
-		_, err := snapshotCopyFiles(newTestLogger(t), t.Context(), api, c)
+		_, err := Capture(newTestLogger(t), t.Context(), api, c)
 		require.ErrorIs(t, err, errCopyFileDirectory)
 	})
 
@@ -527,7 +529,7 @@ func TestSnapshotCopyFiles(t *testing.T) {
 			labels.CopyFile: "/etc/huge.conf",
 		}))
 
-		_, err := snapshotCopyFiles(newTestLogger(t), t.Context(), api, c)
+		_, err := Capture(newTestLogger(t), t.Context(), api, c)
 		require.ErrorIs(t, err, errCopyFileTooLarge)
 	})
 
@@ -550,7 +552,7 @@ func TestSnapshotCopyFiles(t *testing.T) {
 			labels.CopyFile: "/app/config.yaml",
 		}))
 
-		_, err := snapshotCopyFiles(newTestLogger(t), t.Context(), api, c)
+		_, err := Capture(newTestLogger(t), t.Context(), api, c)
 		require.ErrorIs(t, err, errCopyFileSymlink)
 	})
 
@@ -572,7 +574,7 @@ func TestSnapshotCopyFiles(t *testing.T) {
 			labels.CopyFile: "/app/config.yaml",
 		}))
 
-		_, err := snapshotCopyFiles(newTestLogger(t), t.Context(), api, c)
+		_, err := Capture(newTestLogger(t), t.Context(), api, c)
 		require.ErrorIs(t, err, errCopyFileSnapshotFailed)
 	})
 
@@ -584,7 +586,7 @@ func TestSnapshotCopyFiles(t *testing.T) {
 			labels.CopyFile: "relative.conf",
 		}))
 
-		_, err := snapshotCopyFiles(newTestLogger(t), t.Context(), api, c)
+		_, err := Capture(newTestLogger(t), t.Context(), api, c)
 		require.ErrorIs(t, err, errCopyFileInvalidPath)
 	})
 
@@ -621,7 +623,7 @@ func TestSnapshotCopyFiles(t *testing.T) {
 			labels.CopyFile: strings.Join(paths, ","),
 		}))
 
-		_, err := snapshotCopyFiles(newTestLogger(t), t.Context(), api, c)
+		_, err := Capture(newTestLogger(t), t.Context(), api, c)
 		require.ErrorIs(t, err, errCopyFileStoreFull)
 	})
 }
@@ -633,13 +635,13 @@ func TestInjectCopyFiles(t *testing.T) {
 		t.Parallel()
 
 		api := mockContainer.NewMockAPIClient(t)
-		err := injectCopyFiles(
+		err := Inject(
 			newTestLogger(t),
 			t.Context(),
 			api,
 			"new-id",
 			modelfixture.Container(),
-			copyFileSnapshot{},
+			Snapshot{},
 		)
 		require.NoError(t, err)
 	})
@@ -661,13 +663,13 @@ func TestInjectCopyFiles(t *testing.T) {
 			}).
 			Return(dockerClient.CopyToContainerResult{}, nil)
 
-		err := injectCopyFiles(
+		err := Inject(
 			newTestLogger(t),
 			t.Context(),
 			api,
 			"new-id",
 			modelfixture.Container(),
-			copyFileSnapshot{files: []copyFileEntry{{
+			Snapshot{files: []copyFileEntry{{
 				target:  "/app/config.yaml",
 				archive: tarBytes,
 			}}},
@@ -699,13 +701,13 @@ func TestInjectCopyFiles(t *testing.T) {
 			}).
 			Return(dockerClient.CopyToContainerResult{}, nil)
 
-		err = injectCopyFiles(
+		err = Inject(
 			newTestLogger(t),
 			t.Context(),
 			api,
 			"new-id",
 			modelfixture.Container(),
-			copyFileSnapshot{files: []copyFileEntry{{
+			Snapshot{files: []copyFileEntry{{
 				target:  "/config/config.yml",
 				archive: archive,
 			}}},
@@ -722,13 +724,13 @@ func TestInjectCopyFiles(t *testing.T) {
 			CopyToContainer(mock.Anything, "new-id", mock.Anything).
 			Return(dockerClient.CopyToContainerResult{}, errors.New("denied"))
 
-		err := injectCopyFiles(
+		err := Inject(
 			newTestLogger(t),
 			t.Context(),
 			api,
 			"new-id",
 			modelfixture.Container(),
-			copyFileSnapshot{files: []copyFileEntry{{
+			Snapshot{files: []copyFileEntry{{
 				target:  "/app/config.yaml",
 				archive: []byte("tar"),
 			}}},
@@ -751,13 +753,13 @@ func TestInjectCopyFiles(t *testing.T) {
 			Return(dockerClient.CopyToContainerResult{}, nil).
 			Twice()
 
-		err := injectCopyFiles(
+		err := Inject(
 			newTestLogger(t),
 			t.Context(),
 			api,
 			"new-id",
 			modelfixture.Container(),
-			copyFileSnapshot{files: []copyFileEntry{
+			Snapshot{files: []copyFileEntry{
 				{target: "/app/config.yaml", archive: mustFileTar(t, "config.yaml", []byte("a"))},
 				{target: "/run/secrets/token", archive: mustFileTar(t, "token", []byte("b"))},
 			}},
@@ -780,13 +782,13 @@ func TestInjectCopyFiles(t *testing.T) {
 			}).
 			Return(dockerClient.CopyToContainerResult{}, nil)
 
-		err := injectCopyFiles(
+		err := Inject(
 			newTestLogger(t),
 			t.Context(),
 			api,
 			"new-id",
 			modelfixture.Container(),
-			copyFileSnapshot{files: []copyFileEntry{{
+			Snapshot{files: []copyFileEntry{{
 				target:  "/app/config.yaml",
 				archive: mustFileTar(t, "config.yaml", []byte("a")),
 			}}},
@@ -989,11 +991,11 @@ func TestStoreCopyFileSnapshotCap(t *testing.T) {
 	t.Run("rejects when store is full", func(t *testing.T) {
 		t.Parallel()
 
-		pending := &pendingCopyFiles{
-			snapshots: make(map[types.ContainerID]copyFileSnapshot),
+		pending := &Pending{
+			snapshots: make(map[types.ContainerID]Snapshot),
 			bytes:     maxCopyFileStoreBytes,
 		}
-		err := pending.store("source-id", copyFileSnapshot{
+		err := pending.Store("source-id", Snapshot{
 			files: []copyFileEntry{{
 				target:  "/app/config.yaml",
 				archive: []byte("tar"),
@@ -1007,19 +1009,19 @@ func TestStoreCopyFileSnapshotCap(t *testing.T) {
 	t.Run("stores and overwrites same id", func(t *testing.T) {
 		t.Parallel()
 
-		pending := &pendingCopyFiles{}
-		first := copyFileSnapshot{files: []copyFileEntry{{
+		pending := &Pending{}
+		first := Snapshot{files: []copyFileEntry{{
 			target:  "/app/config.yaml",
 			archive: []byte("first-archive"),
 		}}}
-		second := copyFileSnapshot{files: []copyFileEntry{{
+		second := Snapshot{files: []copyFileEntry{{
 			target:  "/app/config.yaml",
 			archive: []byte("next"),
 		}}}
 
-		require.NoError(t, pending.store("source-id", first))
+		require.NoError(t, pending.Store("source-id", first))
 		assert.Equal(t, first.size(), pending.bytes)
-		require.NoError(t, pending.store("source-id", second))
+		require.NoError(t, pending.Store("source-id", second))
 		assert.Equal(t, second.size(), pending.bytes)
 		assert.Equal(t, []byte("next"), pending.snapshots["source-id"].files[0].archive)
 	})
@@ -1027,23 +1029,76 @@ func TestStoreCopyFileSnapshotCap(t *testing.T) {
 	t.Run("restores existing snapshot when overwrite exceeds cap", func(t *testing.T) {
 		t.Parallel()
 
-		existing := copyFileSnapshot{files: []copyFileEntry{{
+		existing := Snapshot{files: []copyFileEntry{{
 			target:  "/app/config.yaml",
 			archive: []byte("keep"),
 		}}}
-		pending := &pendingCopyFiles{
-			snapshots: map[types.ContainerID]copyFileSnapshot{"source-id": existing},
+		pending := &Pending{
+			snapshots: map[types.ContainerID]Snapshot{"source-id": existing},
 			bytes:     existing.size(),
 		}
-		tooLarge := copyFileSnapshot{files: []copyFileEntry{{
+		tooLarge := Snapshot{files: []copyFileEntry{{
 			target:  "/app/config.yaml",
 			archive: bytes.Repeat([]byte("x"), int(maxCopyFileStoreBytes)+1),
 		}}}
 
-		err := pending.store("source-id", tooLarge)
+		err := pending.Store("source-id", tooLarge)
 		require.ErrorIs(t, err, errCopyFileStoreFull)
 		assert.Equal(t, existing.size(), pending.bytes)
 		assert.Equal(t, []byte("keep"), pending.snapshots["source-id"].files[0].archive)
+	})
+}
+
+// TestPendingTake verifies that taking a snapshot removes only that
+// container's snapshot, and that taking it again finds nothing.
+func TestPendingTake(t *testing.T) {
+	t.Parallel()
+
+	sourceID := types.ContainerID("source-id")
+	otherID := types.ContainerID("other-id")
+	pending := &Pending{
+		snapshots: map[types.ContainerID]Snapshot{
+			sourceID: {files: []copyFileEntry{{target: "/app/config.yaml"}}},
+			otherID:  {files: []copyFileEntry{{target: "/app/extra.conf"}}},
+		},
+	}
+
+	_, taken := pending.Take(sourceID)
+	assert.True(t, taken)
+	assert.NotContains(t, pending.snapshots, sourceID)
+	require.Contains(t, pending.snapshots, otherID)
+	assert.Equal(t, "/app/extra.conf", pending.snapshots[otherID].files[0].target)
+
+	_, taken = pending.Take(sourceID)
+	assert.False(t, taken)
+}
+
+// TestPendingByteCount verifies that storing and taking snapshots never leave
+// the in-flight byte count negative.
+func TestPendingByteCount(t *testing.T) {
+	t.Parallel()
+
+	t.Run("store clamps negative byte count", func(t *testing.T) {
+		t.Parallel()
+
+		pending := &Pending{bytes: -8}
+		require.NoError(t, pending.Store("source-id", Snapshot{
+			files: []copyFileEntry{{archive: []byte("tar")}},
+		}))
+		assert.Equal(t, int64(3), pending.bytes)
+	})
+
+	t.Run("take clamps negative byte count", func(t *testing.T) {
+		t.Parallel()
+
+		pending := &Pending{
+			snapshots: map[types.ContainerID]Snapshot{
+				"source-id": {files: []copyFileEntry{{archive: []byte("tar")}}},
+			},
+		}
+		pending.Take("source-id")
+		assert.Equal(t, int64(0), pending.bytes)
+		assert.Empty(t, pending.snapshots)
 	})
 }
 
@@ -1089,7 +1144,7 @@ func TestSnapshotCopyFileErrors(t *testing.T) {
 		c := modelfixture.Container(containerfixture.WithLabels(map[string]string{
 			labels.CopyFile: "/app/config.yaml",
 		}))
-		_, err := snapshotCopyFiles(newTestLogger(t), t.Context(), api, c)
+		_, err := Capture(newTestLogger(t), t.Context(), api, c)
 		require.ErrorIs(t, err, errCopyFileSnapshotFailed)
 	})
 
@@ -1110,7 +1165,7 @@ func TestSnapshotCopyFileErrors(t *testing.T) {
 		c := modelfixture.Container(containerfixture.WithLabels(map[string]string{
 			labels.CopyFile: "/app/config.yaml",
 		}))
-		_, err := snapshotCopyFiles(newTestLogger(t), t.Context(), api, c)
+		_, err := Capture(newTestLogger(t), t.Context(), api, c)
 		require.ErrorIs(t, err, errCopyFileSymlink)
 	})
 
@@ -1132,7 +1187,7 @@ func TestSnapshotCopyFileErrors(t *testing.T) {
 		c := modelfixture.Container(containerfixture.WithLabels(map[string]string{
 			labels.CopyFile: "/app/config.yaml",
 		}))
-		_, err := snapshotCopyFiles(newTestLogger(t), t.Context(), api, c)
+		_, err := Capture(newTestLogger(t), t.Context(), api, c)
 		require.ErrorIs(t, err, errCopyFileSnapshotFailed)
 	})
 
@@ -1154,7 +1209,7 @@ func TestSnapshotCopyFileErrors(t *testing.T) {
 		c := modelfixture.Container(containerfixture.WithLabels(map[string]string{
 			labels.CopyFile: "/app/config.yaml",
 		}))
-		_, err := snapshotCopyFiles(newTestLogger(t), t.Context(), api, c)
+		_, err := Capture(newTestLogger(t), t.Context(), api, c)
 		require.ErrorIs(t, err, errCopyFileTooLarge)
 	})
 }
@@ -1203,4 +1258,43 @@ func tarRegularFile(t *testing.T, archive []byte) (string, []byte, int64) {
 	require.ErrorIs(t, err, io.EOF)
 
 	return header.Name, body, header.Mode
+}
+
+func copyFromPath(filePath string) any {
+	return mock.MatchedBy(func(options dockerClient.CopyFromContainerOptions) bool {
+		return options.SourcePath == filePath
+	})
+}
+
+// expectDaemonInfo stubs the single daemon info call made by one injection.
+func expectDaemonInfo(api *mockContainer.MockAPIClient, securityOptions ...string) {
+	api.EXPECT().
+		Info(mock.Anything, dockerClient.InfoOptions{}).
+		Return(dockerClient.SystemInfoResult{
+			Info: dockerSystem.Info{SecurityOptions: securityOptions},
+		}, nil).
+		Once()
+}
+
+func mustFileTar(t *testing.T, name string, body []byte) []byte {
+	t.Helper()
+
+	return mustFileTarWithMode(t, name, body, 0o444)
+}
+
+// newTestLogger returns a logger that writes each event to the test's log, so a
+// failing test shows what it logged.
+//
+// Parameters:
+//   - t: Test that receives the log lines.
+//
+// Returns:
+//   - *zerolog.Logger: Logger writing to t.
+func newTestLogger(t *testing.T) *zerolog.Logger {
+	t.Helper()
+
+	// Frame 4 skips zerolog's write path, so each line names the log call.
+	w := zerolog.TestWriter{T: t, Frame: 4}
+
+	return new(zerolog.New(w))
 }

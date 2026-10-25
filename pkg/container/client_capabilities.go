@@ -4,10 +4,19 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/nicholas-fedor/watchtower/internal/container/copyfile"
 	"github.com/nicholas-fedor/watchtower/internal/container/ephemeral"
 	containerImage "github.com/nicholas-fedor/watchtower/internal/container/image"
 	"github.com/nicholas-fedor/watchtower/pkg/types"
 )
+
+// CopyFileStore captures labeled files around recreate and discards leftovers.
+type CopyFileStore interface {
+	// SnapshotCopyFiles captures labeled files before the source is removed.
+	SnapshotCopyFiles(ctx context.Context, container types.Container) error
+	// DiscardCopyFiles drops a leftover snapshot for the source container.
+	DiscardCopyFiles(containerID types.ContainerID)
+}
 
 var _ CopyFileStore = (*client)(nil)
 
@@ -42,16 +51,21 @@ func (c *client) BuildRemoteImage(ctx context.Context, remote, dockerfile string
 // Returns:
 //   - error: Non-nil if a labeled path cannot be snapshotted.
 func (c *client) SnapshotCopyFiles(ctx context.Context, source types.Container) error {
-	snapshot, err := snapshotCopyFiles(c.logger(), ctx, c.api, source)
+	snapshot, err := copyfile.Capture(c.logger(), ctx, c.api, source)
 	if err != nil {
-		return err
+		return fmt.Errorf("capture copy-file snapshot: %w", err)
 	}
 
-	if snapshot.empty() {
+	if snapshot.Empty() {
 		return nil
 	}
 
-	return c.copyFiles.store(source.ID(), snapshot)
+	err = c.copyFiles.Store(source.ID(), snapshot)
+	if err != nil {
+		return fmt.Errorf("store copy-file snapshot: %w", err)
+	}
+
+	return nil
 }
 
 // injectStoredCopyFiles writes a stored snapshot into a newly created container.
@@ -68,12 +82,17 @@ func (c *client) injectStoredCopyFiles(
 	source types.Container,
 	newID types.ContainerID,
 ) error {
-	snapshot, ok := c.copyFiles.take(source.ID())
+	snapshot, ok := c.copyFiles.Take(source.ID())
 	if !ok {
 		return nil
 	}
 
-	return injectCopyFiles(c.logger(), ctx, c.api, string(newID), source, snapshot)
+	err := copyfile.Inject(c.logger(), ctx, c.api, string(newID), source, snapshot)
+	if err != nil {
+		return fmt.Errorf("inject copy files: %w", err)
+	}
+
+	return nil
 }
 
 // DiscardCopyFiles drops a leftover snapshot for the source container.
@@ -81,7 +100,7 @@ func (c *client) injectStoredCopyFiles(
 // Parameters:
 //   - containerID: Source container ID whose snapshot should be discarded.
 func (c *client) DiscardCopyFiles(containerID types.ContainerID) {
-	c.copyFiles.take(containerID)
+	c.copyFiles.Take(containerID)
 }
 
 // CreateEphemeralOrchestrator creates a short-lived container that orchestrates

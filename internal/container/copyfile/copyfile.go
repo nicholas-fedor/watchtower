@@ -1,4 +1,4 @@
-package container
+package copyfile
 
 import (
 	"archive/tar"
@@ -78,30 +78,22 @@ const (
 	copyFileSkipReadOnlyRootfs
 )
 
-// CopyFileStore captures labeled files around recreate and discards leftovers.
-type CopyFileStore interface {
-	// SnapshotCopyFiles captures labeled files before the source is removed.
-	SnapshotCopyFiles(ctx context.Context, container types.Container) error
-	// DiscardCopyFiles drops a leftover snapshot for the source container.
-	DiscardCopyFiles(containerID types.ContainerID)
-}
-
 // copyFileEntry is one labeled file captured from a container.
 type copyFileEntry struct {
 	target  string
 	archive []byte
 }
 
-// copyFileSnapshot holds tar archives to inject into a replacement container.
-type copyFileSnapshot struct {
+// Snapshot holds tar archives to inject into a replacement container.
+type Snapshot struct {
 	files []copyFileEntry
 }
 
-// empty reports whether the snapshot contains no files.
+// Empty reports whether the snapshot contains no files.
 //
 // Returns:
 //   - bool: True when no files were captured.
-func (s copyFileSnapshot) empty() bool {
+func (s Snapshot) Empty() bool {
 	return len(s.files) == 0
 }
 
@@ -109,7 +101,7 @@ func (s copyFileSnapshot) empty() bool {
 //
 // Returns:
 //   - int64: Sum of stored tar archive lengths.
-func (s copyFileSnapshot) size() int64 {
+func (s Snapshot) size() int64 {
 	var total int64
 
 	for _, file := range s.files {
@@ -119,21 +111,21 @@ func (s copyFileSnapshot) size() int64 {
 	return total
 }
 
-// pendingCopyFiles holds labeled file snapshots between the stop and create
+// Pending holds labeled file snapshots between the stop and create
 // steps of a recreation, keyed by the source container ID, within a total byte
 // cap.
 //
 // The zero value is ready to use.
-type pendingCopyFiles struct {
+type Pending struct {
 	// mu protects snapshots and bytes.
 	mu sync.Mutex
 	// snapshots stores labeled file snapshots keyed by the source container ID.
-	snapshots map[types.ContainerID]copyFileSnapshot
+	snapshots map[types.ContainerID]Snapshot
 	// bytes is the total size of archives currently held in snapshots.
 	bytes int64
 }
 
-// store records a snapshot if it fits in the in-flight byte cap.
+// Store records a snapshot if it fits in the in-flight byte cap.
 //
 // Parameters:
 //   - containerID: Source container ID.
@@ -141,15 +133,15 @@ type pendingCopyFiles struct {
 //
 // Returns:
 //   - error: Non-nil if storing the snapshot would exceed maxCopyFileStoreBytes.
-func (s *pendingCopyFiles) store(
+func (s *Pending) Store(
 	containerID types.ContainerID,
-	snapshot copyFileSnapshot,
+	snapshot Snapshot,
 ) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
 	if s.snapshots == nil {
-		s.snapshots = make(map[types.ContainerID]copyFileSnapshot)
+		s.snapshots = make(map[types.ContainerID]Snapshot)
 	}
 
 	existing, ok := s.snapshots[containerID]
@@ -176,23 +168,23 @@ func (s *pendingCopyFiles) store(
 	return nil
 }
 
-// take removes a stored snapshot and subtracts its size.
+// Take removes a stored snapshot and subtracts its size.
 //
 // Parameters:
 //   - containerID: Source container ID whose snapshot should be removed.
 //
 // Returns:
-//   - copyFileSnapshot: The removed snapshot when present.
+//   - Snapshot: The removed snapshot when present.
 //   - bool: True when a snapshot was stored for containerID.
-func (s *pendingCopyFiles) take(
+func (s *Pending) Take(
 	containerID types.ContainerID,
-) (copyFileSnapshot, bool) {
+) (Snapshot, bool) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
 	snapshot, ok := s.snapshots[containerID]
 	if !ok {
-		return copyFileSnapshot{}, false
+		return Snapshot{}, false
 	}
 
 	delete(s.snapshots, containerID)
@@ -492,7 +484,7 @@ func bindIsReadOnly(bind string) bool {
 	return slices.Contains(strings.Split(parts[bindStringMinParts], ","), bindReadOnlyOption)
 }
 
-// snapshotCopyFiles reads labeled files from the source container into memory.
+// Capture reads labeled files from the source container into memory.
 //
 // Missing paths are skipped. Invalid labels, directories, oversized files, and
 // unexpected copy errors fail the snapshot so the source container is not removed.
@@ -504,21 +496,21 @@ func bindIsReadOnly(bind string) bool {
 //   - source: Source container to copy from.
 //
 // Returns:
-//   - copyFileSnapshot: Captured tar archives keyed by in-container path.
+//   - Snapshot: Captured tar archives keyed by in-container path.
 //   - error: Non-nil if a labeled path cannot be snapshotted.
-func snapshotCopyFiles(
+func Capture(
 	log *zerolog.Logger,
 	ctx context.Context,
 	api dockerClient.APIClient,
 	source types.Container,
-) (copyFileSnapshot, error) {
+) (Snapshot, error) {
 	paths, err := copyFilePaths(source)
 	if err != nil {
-		return copyFileSnapshot{}, err
+		return Snapshot{}, err
 	}
 
 	if len(paths) == 0 {
-		return copyFileSnapshot{}, nil
+		return Snapshot{}, nil
 	}
 
 	clogVal := log.With().
@@ -537,7 +529,7 @@ func snapshotCopyFiles(
 
 		entry, skip, snapErr := snapshotCopyFile(ctx, clog, api, string(source.ID()), filePath)
 		if snapErr != nil {
-			return copyFileSnapshot{}, snapErr
+			return Snapshot{}, snapErr
 		}
 
 		if skip {
@@ -546,14 +538,14 @@ func snapshotCopyFiles(
 
 		next := total + int64(len(entry.archive))
 		if next > maxCopyFileStoreBytes {
-			return copyFileSnapshot{}, fmt.Errorf("%w: %d bytes", errCopyFileStoreFull, next)
+			return Snapshot{}, fmt.Errorf("%w: %d bytes", errCopyFileStoreFull, next)
 		}
 
 		files = append(files, entry)
 		total = next
 	}
 
-	return copyFileSnapshot{files: files}, nil
+	return Snapshot{files: files}, nil
 }
 
 // snapshotCopyFile copies one labeled path from a container into a tar archive.
@@ -770,7 +762,7 @@ func writeSanitizedCopyFileTar(destPath string, body []byte, src *tar.Header) ([
 	return buf.Bytes(), nil
 }
 
-// injectCopyFiles writes a snapshot into a newly created container before start.
+// Inject writes a snapshot into a newly created container before start.
 //
 // The archive is extracted at the container root with the destination as the member name,
 // so a parent directory missing from the new image is created rather than failing the copy.
@@ -787,15 +779,15 @@ func writeSanitizedCopyFileTar(destPath string, body []byte, src *tar.Header) ([
 //
 // Returns:
 //   - error: Non-nil if a file cannot be written into the new container.
-func injectCopyFiles(
+func Inject(
 	log *zerolog.Logger,
 	ctx context.Context,
 	api dockerClient.APIClient,
 	containerID string,
 	source types.Container,
-	snapshot copyFileSnapshot,
+	snapshot Snapshot,
 ) error {
-	if snapshot.empty() {
+	if snapshot.Empty() {
 		return nil
 	}
 

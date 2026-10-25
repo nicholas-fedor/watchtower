@@ -1,4 +1,4 @@
-package container
+package copyfile
 
 import (
 	"archive/tar"
@@ -306,7 +306,7 @@ func FuzzBindIsReadOnly(f *testing.F) {
 }
 
 // FuzzStoreCopyFileSnapshot verifies the in-flight byte cap is never exceeded
-// and that discard returns the store to empty for that id.
+// and that taking the snapshot returns the store to empty for that id.
 func FuzzStoreCopyFileSnapshot(f *testing.F) {
 	f.Add("source-id", []byte("tar"))
 	f.Add("", []byte{})
@@ -317,41 +317,42 @@ func FuzzStoreCopyFileSnapshot(f *testing.F) {
 			archive = archive[:maxCopyFileStoreBytes+1024]
 		}
 
-		cli := &client{}
+		var pending Pending
+
 		containerID := types.ContainerID(id)
-		snapshot := copyFileSnapshot{files: []copyFileEntry{{
+		snapshot := Snapshot{files: []copyFileEntry{{
 			target:  "/app/config.yaml",
 			archive: archive,
 		}}}
 
-		err := cli.copyFiles.store(containerID, snapshot)
+		err := pending.Store(containerID, snapshot)
 		if err != nil {
 			if !errors.Is(err, errCopyFileStoreFull) {
 				t.Fatalf("unexpected error %v", err)
 			}
 
-			if cli.copyFiles.bytes > maxCopyFileStoreBytes {
-				t.Fatalf("store bytes %d exceed cap after error", cli.copyFiles.bytes)
+			if pending.bytes > maxCopyFileStoreBytes {
+				t.Fatalf("store bytes %d exceed cap after error", pending.bytes)
 			}
 
 			return
 		}
 
-		if cli.copyFiles.bytes > maxCopyFileStoreBytes {
-			t.Fatalf("store bytes %d exceed cap", cli.copyFiles.bytes)
+		if pending.bytes > maxCopyFileStoreBytes {
+			t.Fatalf("store bytes %d exceed cap", pending.bytes)
 		}
 
-		if cli.copyFiles.bytes != snapshot.size() {
-			t.Fatalf("store bytes %d want %d", cli.copyFiles.bytes, snapshot.size())
+		if pending.bytes != snapshot.size() {
+			t.Fatalf("store bytes %d want %d", pending.bytes, snapshot.size())
 		}
 
-		cli.DiscardCopyFiles(containerID)
+		pending.Take(containerID)
 
-		if cli.copyFiles.bytes != 0 {
-			t.Fatalf("store bytes %d after discard", cli.copyFiles.bytes)
+		if pending.bytes != 0 {
+			t.Fatalf("store bytes %d after discard", pending.bytes)
 		}
 
-		if _, ok := cli.copyFiles.snapshots[containerID]; ok {
+		if _, ok := pending.snapshots[containerID]; ok {
 			t.Fatalf("snapshot still stored for %q", id)
 		}
 	})

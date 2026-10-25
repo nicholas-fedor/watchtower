@@ -19,6 +19,7 @@ import (
 	dockerAPIVersion "github.com/moby/moby/client/pkg/versions"
 
 	"github.com/nicholas-fedor/watchtower/internal/container"
+	"github.com/nicholas-fedor/watchtower/internal/container/copyfile"
 	containerImage "github.com/nicholas-fedor/watchtower/internal/container/image"
 	"github.com/nicholas-fedor/watchtower/internal/container/network"
 	"github.com/nicholas-fedor/watchtower/internal/container/oci"
@@ -412,7 +413,7 @@ type client struct {
 	isPodman bool
 
 	// copyFiles holds labeled file snapshots between stop and create of a recreation.
-	copyFiles pendingCopyFiles
+	copyFiles copyfile.Pending
 }
 
 // ClientOptions configures container management behavior for the Docker client.

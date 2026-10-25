@@ -2,7 +2,9 @@ package container
 
 import (
 	"bytes"
+	"context"
 	"errors"
+	"fmt"
 	"io"
 	"net/http"
 	"strings"
@@ -15,6 +17,7 @@ import (
 	dockerContainer "github.com/moby/moby/api/types/container"
 	dockerClient "github.com/moby/moby/client"
 
+	"github.com/nicholas-fedor/watchtower/internal/container"
 	"github.com/nicholas-fedor/watchtower/internal/container/labels"
 	mockContainer "github.com/nicholas-fedor/watchtower/internal/container/mocks"
 	"github.com/nicholas-fedor/watchtower/internal/container/provenance"
@@ -46,45 +49,24 @@ func TestClientBuildRemoteImage(t *testing.T) {
 	assert.Equal(t, types.ImageID("sha256:built"), id)
 }
 
-func TestDiscardStoredCopyFiles(t *testing.T) {
-	t.Parallel()
-
-	sourceID := types.ContainerID("source-id")
-	otherID := types.ContainerID("other-id")
-	cli := &client{
-		copyFiles: pendingCopyFiles{
-			snapshots: map[types.ContainerID]copyFileSnapshot{
-				sourceID: {files: []copyFileEntry{{target: "/app/config.yaml"}}},
-				otherID:  {files: []copyFileEntry{{target: "/app/extra.conf"}}},
-			},
-		},
-	}
-
-	cli.DiscardCopyFiles(sourceID)
-	assert.NotContains(t, cli.copyFiles.snapshots, sourceID)
-	require.Contains(t, cli.copyFiles.snapshots, otherID)
-	assert.Equal(t, "/app/extra.conf", cli.copyFiles.snapshots[otherID].files[0].target)
-
-	cli.DiscardCopyFiles(sourceID)
-}
-
+// TestClientCopyFileStore verifies that the client snapshots labeled files
+// before a recreation and injects them into the replacement. The snapshot is
+// dropped whether or not the injection succeeds.
 func TestClientCopyFileStore(t *testing.T) {
 	t.Parallel()
 
-	t.Run("snapshot empty label is a no-op", func(t *testing.T) {
-		t.Parallel()
+	// configSource returns a container whose copy-file label names one file.
+	configSource := func() *container.Container {
+		return modelfixture.Container(containerfixture.WithLabels(map[string]string{
+			labels.CopyFile: "/app/config.yaml",
+		}))
+	}
 
-		api := mockContainer.NewMockAPIClient(t)
-		cli := &client{log: newTestLogger(t), api: api}
-		require.NoError(t, cli.SnapshotCopyFiles(t.Context(), modelfixture.Container()))
-		assert.Empty(t, cli.copyFiles.snapshots)
-	})
-
-	t.Run("snapshot stores sanitized file", func(t *testing.T) {
-		t.Parallel()
+	// expectConfigCopy expects the snapshot of the labeled file.
+	expectConfigCopy := func(t *testing.T, api *mockContainer.MockAPIClient) {
+		t.Helper()
 
 		tarBytes := mustFileTar(t, "config.yaml", []byte("setting=1"))
-		api := mockContainer.NewMockAPIClient(t)
 		api.EXPECT().
 			CopyFromContainer(mock.Anything, "container_id", copyFromPath("/app/config.yaml")).
 			Return(dockerClient.CopyFromContainerResult{
@@ -95,14 +77,32 @@ func TestClientCopyFileStore(t *testing.T) {
 					Mode: 0o444,
 				},
 			}, nil)
+	}
+
+	t.Run("snapshot empty label is a no-op", func(t *testing.T) {
+		t.Parallel()
+
+		cli := &client{log: newTestLogger(t), api: mockContainer.NewMockAPIClient(t)}
+		source := modelfixture.Container()
+		require.NoError(t, cli.SnapshotCopyFiles(t.Context(), source))
+
+		_, stored := cli.copyFiles.Take(source.ID())
+		assert.False(t, stored)
+	})
+
+	t.Run("snapshot stores sanitized file", func(t *testing.T) {
+		t.Parallel()
+
+		api := mockContainer.NewMockAPIClient(t)
+		expectConfigCopy(t, api)
 
 		cli := &client{log: newTestLogger(t), api: api}
-		source := modelfixture.Container(containerfixture.WithLabels(map[string]string{
-			labels.CopyFile: "/app/config.yaml",
-		}))
+		source := configSource()
 		require.NoError(t, cli.SnapshotCopyFiles(t.Context(), source))
-		require.Contains(t, cli.copyFiles.snapshots, source.ID())
-		assert.Positive(t, cli.copyFiles.bytes)
+
+		snapshot, stored := cli.copyFiles.Take(source.ID())
+		require.True(t, stored)
+		assert.False(t, snapshot.Empty())
 	})
 
 	t.Run("snapshot invalid label fails", func(t *testing.T) {
@@ -112,7 +112,39 @@ func TestClientCopyFileStore(t *testing.T) {
 		err := cli.SnapshotCopyFiles(t.Context(), modelfixture.Container(containerfixture.WithLabels(map[string]string{
 			labels.CopyFile: "relative.conf",
 		})))
-		require.ErrorIs(t, err, errCopyFileInvalidPath)
+		require.ErrorContains(t, err, "invalid copy-file path")
+	})
+
+	t.Run("snapshot that overflows the store fails", func(t *testing.T) {
+		t.Parallel()
+
+		// Each container's file is just under the per-file limit, so the
+		// store fills after about 16 of them.
+		body := bytes.Repeat([]byte("x"), 1<<20-1024)
+		tarBytes := mustFileTar(t, "config.yaml", body)
+
+		api := mockContainer.NewMockAPIClient(t)
+		api.EXPECT().
+			CopyFromContainer(mock.Anything, mock.Anything, copyFromPath("/app/config.yaml")).
+			RunAndReturn(func(context.Context, string, dockerClient.CopyFromContainerOptions) (dockerClient.CopyFromContainerResult, error) {
+				return dockerClient.CopyFromContainerResult{
+					Content: io.NopCloser(bytes.NewReader(tarBytes)),
+					Stat:    dockerContainer.PathStat{Name: "config.yaml", Size: int64(len(body)), Mode: 0o444},
+				}, nil
+			})
+
+		cli := &client{log: newTestLogger(t), api: api}
+
+		var err error
+
+		for i := 0; err == nil && i < 32; i++ {
+			err = cli.SnapshotCopyFiles(t.Context(), modelfixture.Container(
+				containerfixture.WithID(fmt.Sprintf("container-%d", i)),
+				containerfixture.WithLabels(map[string]string{labels.CopyFile: "/app/config.yaml"}),
+			))
+		}
+
+		require.ErrorContains(t, err, "store copy-file snapshot")
 	})
 
 	t.Run("inject missing snapshot is a no-op", func(t *testing.T) {
@@ -125,83 +157,56 @@ func TestClientCopyFileStore(t *testing.T) {
 	t.Run("inject writes then drops snapshot", func(t *testing.T) {
 		t.Parallel()
 
-		tarBytes := mustFileTar(t, "config.yaml", []byte("setting=1"))
-		source := modelfixture.Container()
 		api := mockContainer.NewMockAPIClient(t)
+		expectConfigCopy(t, api)
 		expectDaemonInfo(api)
 		api.EXPECT().
 			CopyToContainer(mock.Anything, "new-id", mock.Anything).
 			Return(dockerClient.CopyToContainerResult{}, nil)
 
-		cli := &client{
-			log: newTestLogger(t),
-			api: api,
-			copyFiles: pendingCopyFiles{
-				snapshots: map[types.ContainerID]copyFileSnapshot{
-					source.ID(): {files: []copyFileEntry{{
-						target:  "/app/config.yaml",
-						archive: tarBytes,
-					}}},
-				},
-				bytes: int64(len(tarBytes)),
-			},
-		}
+		cli := &client{log: newTestLogger(t), api: api}
+		source := configSource()
+		require.NoError(t, cli.SnapshotCopyFiles(t.Context(), source))
 		require.NoError(t, cli.injectStoredCopyFiles(t.Context(), source, "new-id"))
-		assert.Empty(t, cli.copyFiles.snapshots)
-		assert.Equal(t, int64(0), cli.copyFiles.bytes)
+
+		_, stored := cli.copyFiles.Take(source.ID())
+		assert.False(t, stored)
 	})
 
 	t.Run("inject failure still drops snapshot", func(t *testing.T) {
 		t.Parallel()
 
-		source := modelfixture.Container()
 		api := mockContainer.NewMockAPIClient(t)
+		expectConfigCopy(t, api)
 		expectDaemonInfo(api)
 		api.EXPECT().
 			CopyToContainer(mock.Anything, "new-id", mock.Anything).
 			Return(dockerClient.CopyToContainerResult{}, errors.New("denied"))
 
-		cli := &client{
-			log: newTestLogger(t),
-			api: api,
-			copyFiles: pendingCopyFiles{
-				snapshots: map[types.ContainerID]copyFileSnapshot{
-					source.ID(): {files: []copyFileEntry{{
-						target:  "/app/config.yaml",
-						archive: []byte("tar"),
-					}}},
-				},
-				bytes: 3,
-			},
-		}
+		cli := &client{log: newTestLogger(t), api: api}
+		source := configSource()
+		require.NoError(t, cli.SnapshotCopyFiles(t.Context(), source))
+
 		err := cli.injectStoredCopyFiles(t.Context(), source, "new-id")
-		require.ErrorIs(t, err, errCopyFileInjectFailed)
-		assert.Empty(t, cli.copyFiles.snapshots)
-		assert.Equal(t, int64(0), cli.copyFiles.bytes)
+		require.ErrorContains(t, err, "failed to copy file into new container")
+
+		_, stored := cli.copyFiles.Take(source.ID())
+		assert.False(t, stored)
 	})
 
-	t.Run("store clamps negative byte count", func(t *testing.T) {
+	t.Run("discard drops the snapshot", func(t *testing.T) {
 		t.Parallel()
 
-		pending := &pendingCopyFiles{bytes: -8}
-		require.NoError(t, pending.store("source-id", copyFileSnapshot{
-			files: []copyFileEntry{{archive: []byte("tar")}},
-		}))
-		assert.Equal(t, int64(3), pending.bytes)
-	})
+		api := mockContainer.NewMockAPIClient(t)
+		expectConfigCopy(t, api)
 
-	t.Run("discard clamps negative byte count", func(t *testing.T) {
-		t.Parallel()
+		cli := &client{log: newTestLogger(t), api: api}
+		source := configSource()
+		require.NoError(t, cli.SnapshotCopyFiles(t.Context(), source))
 
-		cli := &client{
-			copyFiles: pendingCopyFiles{
-				snapshots: map[types.ContainerID]copyFileSnapshot{
-					"source-id": {files: []copyFileEntry{{archive: []byte("tar")}}},
-				},
-			},
-		}
-		cli.DiscardCopyFiles("source-id")
-		assert.Equal(t, int64(0), cli.copyFiles.bytes)
-		assert.Empty(t, cli.copyFiles.snapshots)
+		cli.DiscardCopyFiles(source.ID())
+
+		_, stored := cli.copyFiles.Take(source.ID())
+		assert.False(t, stored)
 	})
 }

@@ -1,6 +1,8 @@
 package container
 
 import (
+	"archive/tar"
+	"bytes"
 	"context"
 	"encoding/json"
 	"errors"
@@ -9,6 +11,7 @@ import (
 	"os"
 	"path/filepath"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
@@ -412,4 +415,25 @@ func runningImage(imageID string) *container.Container {
 //   - dockerClient.ImageInspectResult: The inspect result.
 func inspected(id string, repoDigests ...string) dockerClient.ImageInspectResult {
 	return dockerClient.ImageInspectResult{ID: id, RepoDigests: repoDigests}
+}
+
+func mustFileTarWithMode(t *testing.T, name string, body []byte, mode int64) []byte {
+	t.Helper()
+
+	var buf bytes.Buffer
+
+	tw := tar.NewWriter(&buf)
+	require.NoError(t, tw.WriteHeader(&tar.Header{
+		Typeflag: tar.TypeReg,
+		Name:     name,
+		Size:     int64(len(body)),
+		Mode:     mode,
+		ModTime:  time.Unix(0, 0),
+	}))
+
+	_, err := tw.Write(body)
+	require.NoError(t, err)
+	require.NoError(t, tw.Close())
+
+	return buf.Bytes()
 }
