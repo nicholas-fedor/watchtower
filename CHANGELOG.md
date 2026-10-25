@@ -10,6 +10,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Skip the health wait after an ephemeral self-update handoff by @nicholas-fedor in [#3160](https://github.com/nicholas-fedor/watchtower/pull/3160)
 - Report lifecycle hook failures as what went wrong by @nicholas-fedor in [#3154](https://github.com/nicholas-fedor/watchtower/pull/3154)
 - Allow two dots inside copy-file names by @nicholas-fedor in [#3146](https://github.com/nicholas-fedor/watchtower/pull/3146)
 - Detect the runtime for clients without a filesystem by @nicholas-fedor in [#3138](https://github.com/nicholas-fedor/watchtower/pull/3138)
