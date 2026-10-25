@@ -19,6 +19,28 @@ import (
 	"github.com/nicholas-fedor/watchtower/pkg/types"
 )
 
+// stopContainersTestCase represents a test case for stopContainersInReversedOrder cancellation.
+type stopContainersTestCase struct {
+	name                string
+	numContainers       int
+	cancelAtIndex       int    // Index at which to cancel (from end, -1 means no cancellation)
+	expectedStopped     int    // Number of containers that should be stopped
+	expectedSkipped     int    // Number of containers that should be skipped
+	expectedLogMessages int    // Expected number of log messages for skipped containers
+	description         string // Human-readable description
+}
+
+// rollingRestartTestCase represents a test case for performRollingRestart cancellation.
+type rollingRestartTestCase struct {
+	name                string
+	numContainers       int
+	cancelAtIndex       int    // Index at which to cancel (-1 means no cancellation)
+	expectedProcessed   int    // Number of containers that should be processed
+	expectedSkipped     int    // Number of containers that should be skipped
+	expectedLogMessages int    // Expected number of log messages for skipped containers
+	description         string // Human-readable description
+}
+
 // Test_restartStaleContainer verifies when restarting a stale Watchtower
 // container renames it first, including run-once mode, an existing old name,
 // and an ephemeral self-update handoff.

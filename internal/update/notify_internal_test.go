@@ -438,28 +438,6 @@ func newCaptureLogger() (*zerolog.Logger, *bytes.Buffer) {
 	return &l, buf
 }
 
-// stopContainersTestCase represents a test case for stopContainersInReversedOrder cancellation.
-type stopContainersTestCase struct {
-	name                string
-	numContainers       int
-	cancelAtIndex       int    // Index at which to cancel (from end, -1 means no cancellation)
-	expectedStopped     int    // Number of containers that should be stopped
-	expectedSkipped     int    // Number of containers that should be skipped
-	expectedLogMessages int    // Expected number of log messages for skipped containers
-	description         string // Human-readable description
-}
-
-// rollingRestartTestCase represents a test case for performRollingRestart cancellation.
-type rollingRestartTestCase struct {
-	name                string
-	numContainers       int
-	cancelAtIndex       int    // Index at which to cancel (-1 means no cancellation)
-	expectedProcessed   int    // Number of containers that should be processed
-	expectedSkipped     int    // Number of containers that should be skipped
-	expectedLogMessages int    // Expected number of log messages for skipped containers
-	description         string // Human-readable description
-}
-
 // Test_deduplicateByImageID verifies that cleanup entries keep only the first
 // entry for each image ID, in order.
 func Test_deduplicateByImageID(t *testing.T) {
