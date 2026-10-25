@@ -1,4 +1,4 @@
-package update
+package selfupdate
 
 import (
 	"bytes"
@@ -20,6 +20,23 @@ import (
 	mockUpdate "github.com/nicholas-fedor/watchtower/internal/update/mocks"
 	"github.com/nicholas-fedor/watchtower/pkg/types"
 )
+
+// newTestLogger returns a logger that writes each event to the test's log, so a
+// failing test shows what it logged.
+//
+// Parameters:
+//   - t: Test that receives the log lines.
+//
+// Returns:
+//   - *zerolog.Logger: Logger writing to t.
+func newTestLogger(t *testing.T) *zerolog.Logger {
+	t.Helper()
+
+	// Frame 4 skips zerolog's write path, so each line names the log call.
+	w := zerolog.TestWriter{T: t, Frame: 4}
+
+	return new(zerolog.New(w))
+}
 
 // createDefaultMockContainer wraps mockUpdate.CreateMockContainerWithConfig with
 // common defaults for ephemeral self-update tests. It sets the container to running,
@@ -69,11 +86,11 @@ func expectOrchestrator(t *testing.T, source types.Container, chain string, clea
 	return client
 }
 
-// Test_ephemeralSelfUpdate verifies that an ephemeral self-update only creates
+// TestStartOrchestrator verifies that an ephemeral self-update only creates
 // the orchestrator, passing it the new image, the container chain extended
 // with the source container, and the cleanup setting, and that it reports the
 // source as handed off.
-func Test_ephemeralSelfUpdate(t *testing.T) {
+func TestStartOrchestrator(t *testing.T) {
 	t.Parallel()
 
 	watchtowerLabels := map[string]string{"com.centurylinklabs.watchtower": "true"}
@@ -87,7 +104,7 @@ func Test_ephemeralSelfUpdate(t *testing.T) {
 			source := createDefaultMockContainer("source-123", watchtowerLabels)
 			client := expectOrchestrator(t, source, "source-123", false, nil)
 
-			newID, renamed, err := ephemeralSelfUpdate(newTestLogger(t), t.Context(), client, source, types.UpdateParams{})
+			newID, renamed, err := StartOrchestrator(newTestLogger(t), t.Context(), client, source, types.UpdateParams{})
 			require.NoError(t, err)
 			assert.Empty(t, newID)
 			assert.True(t, renamed)
@@ -103,7 +120,7 @@ func Test_ephemeralSelfUpdate(t *testing.T) {
 			source := createDefaultMockContainer("source-456", watchtowerLabels)
 			client := expectOrchestrator(t, source, "source-456", false, nil)
 
-			newID, renamed, err := ephemeralSelfUpdate(newTestLogger(t), t.Context(), client, source, types.UpdateParams{})
+			newID, renamed, err := StartOrchestrator(newTestLogger(t), t.Context(), client, source, types.UpdateParams{})
 			require.NoError(t, err)
 			assert.Empty(t, newID)
 			assert.True(t, renamed)
@@ -129,7 +146,7 @@ func Test_ephemeralSelfUpdate(t *testing.T) {
 
 			client := expectOrchestrator(t, source, "old-id-1,old-id-2,source-789", false, nil)
 
-			newID, renamed, err := ephemeralSelfUpdate(newTestLogger(t), t.Context(), client, source, types.UpdateParams{})
+			newID, renamed, err := StartOrchestrator(newTestLogger(t), t.Context(), client, source, types.UpdateParams{})
 			require.NoError(t, err)
 			assert.Empty(t, newID)
 			assert.True(t, renamed)
@@ -145,7 +162,7 @@ func Test_ephemeralSelfUpdate(t *testing.T) {
 			source := createDefaultMockContainer("source-err", watchtowerLabels)
 			client := expectOrchestrator(t, source, "source-err", false, errors.New("create failed"))
 
-			_, _, err := ephemeralSelfUpdate(newTestLogger(t), t.Context(), client, source, types.UpdateParams{})
+			_, _, err := StartOrchestrator(newTestLogger(t), t.Context(), client, source, types.UpdateParams{})
 			require.ErrorContains(t, err, "ephemeral orchestrator failed")
 		})
 	})
@@ -159,7 +176,7 @@ func Test_ephemeralSelfUpdate(t *testing.T) {
 			source := createDefaultMockContainer("source-cleanup", watchtowerLabels)
 			client := expectOrchestrator(t, source, "source-cleanup", true, nil)
 
-			_, renamed, err := ephemeralSelfUpdate(newTestLogger(t), t.Context(), client, source, types.UpdateParams{Cleanup: true})
+			_, renamed, err := StartOrchestrator(newTestLogger(t), t.Context(), client, source, types.UpdateParams{Cleanup: true})
 			require.NoError(t, err)
 			assert.True(t, renamed)
 		})
@@ -177,7 +194,7 @@ func Test_ephemeralSelfUpdate(t *testing.T) {
 			source := createDefaultMockContainer("source-async", watchtowerLabels)
 			client := expectOrchestrator(t, source, "source-async", false, nil)
 
-			newID, renamed, err := ephemeralSelfUpdate(newTestLogger(t), t.Context(), client, source, types.UpdateParams{})
+			newID, renamed, err := StartOrchestrator(newTestLogger(t), t.Context(), client, source, types.UpdateParams{})
 			require.NoError(t, err)
 			assert.Empty(t, newID)
 			assert.True(t, renamed)
@@ -219,7 +236,7 @@ func TestEphemeralSelfUpdate_StoppingContainerLog(t *testing.T) {
 
 			log := zerolog.New(&out).Level(zerolog.DebugLevel)
 
-			_, _, err := ephemeralSelfUpdate(&log, t.Context(), client, source, types.UpdateParams{})
+			_, _, err := StartOrchestrator(&log, t.Context(), client, source, types.UpdateParams{})
 			if tt.createErr != nil {
 				require.Error(t, err)
 			} else {
@@ -279,7 +296,7 @@ func TestEphemeralSelfUpdate_OutlivesCanceledUpdate(t *testing.T) {
 		).
 		Return(types.ContainerID("orchestrator-id"), nil).Once()
 
-	_, renamed, err := ephemeralSelfUpdate(newTestLogger(t), ctx, client, source, types.UpdateParams{})
+	_, renamed, err := StartOrchestrator(newTestLogger(t), ctx, client, source, types.UpdateParams{})
 	require.NoError(t, err)
 	assert.True(t, renamed)
 }

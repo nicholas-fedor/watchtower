@@ -25,6 +25,7 @@ import (
 	"github.com/nicholas-fedor/watchtower/internal/git"
 	"github.com/nicholas-fedor/watchtower/internal/registry/ratelimit"
 	"github.com/nicholas-fedor/watchtower/internal/update/changelog"
+	"github.com/nicholas-fedor/watchtower/internal/update/selfupdate"
 	"github.com/nicholas-fedor/watchtower/internal/update/sorter"
 	"github.com/nicholas-fedor/watchtower/internal/update/state"
 	"github.com/nicholas-fedor/watchtower/pkg/types"
@@ -149,7 +150,7 @@ func update(
 					defer recoverCancel()
 
 					//nolint:contextcheck // recoverCtx is intentionally created with timeout and passed to recovery
-					recoveredContainer, recovered := TryRecoverOrphanedContainer(log,
+					recoveredContainer, recovered := selfupdate.TryRecoverOrphanedContainer(log,
 						recoverCtx,
 						client,
 						c,

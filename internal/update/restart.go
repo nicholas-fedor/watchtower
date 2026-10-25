@@ -16,6 +16,7 @@ import (
 	containerClient "github.com/nicholas-fedor/watchtower/internal/container/client"
 	"github.com/nicholas-fedor/watchtower/internal/container/hooks"
 	"github.com/nicholas-fedor/watchtower/internal/container/labels"
+	"github.com/nicholas-fedor/watchtower/internal/update/selfupdate"
 	"github.com/nicholas-fedor/watchtower/internal/update/state"
 	"github.com/nicholas-fedor/watchtower/pkg/types"
 )
@@ -721,7 +722,7 @@ func restartStaleContainer(
 		// Opt-in ephemeral self-update: use a short-lived orchestrator container
 		// to perform the transition atomically. The orchestrator handles stopping
 		// the old container, creating and starting the new one, and cleanup.
-		// ephemeralSelfUpdate returns immediately after starting the orchestrator.
+		// StartOrchestrator returns immediately after starting the orchestrator.
 		// The orchestrator completes the replacement asynchronously. The current
 		// Watchtower process will be stopped by the orchestrator shortly after.
 		if config.EphemeralSelfUpdate {
@@ -729,14 +730,14 @@ func restartStaleContainer(
 				Fields(fields).
 				Msg("Using ephemeral self-update")
 
-			_, renamed, err := ephemeralSelfUpdate(log,
+			_, renamed, err := selfupdate.StartOrchestrator(log,
 				ctx,
 				client,
 				sourceContainer,
 				config,
 			)
 			if err != nil {
-				return "", false, err
+				return "", false, fmt.Errorf("start self-update orchestrator: %w", err)
 			}
 
 			// Skip health check and post-update hooks: the new container's ID is

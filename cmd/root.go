@@ -28,6 +28,7 @@ import (
 	"github.com/nicholas-fedor/watchtower/internal/settings"
 	"github.com/nicholas-fedor/watchtower/internal/update"
 	"github.com/nicholas-fedor/watchtower/internal/update/schedule"
+	"github.com/nicholas-fedor/watchtower/internal/update/selfupdate"
 	"github.com/nicholas-fedor/watchtower/pkg/notifications"
 	"github.com/nicholas-fedor/watchtower/pkg/types"
 )
@@ -264,7 +265,7 @@ func (p *process) preRun(cmd *cobra.Command, _ []string) {
 	if appCfg.Mode.SelfUpdateOrchestrator {
 		p.log.Info().Msg("Running in ephemeral self-update orchestrator mode")
 
-		update.RunOrchestrator(p.log, context.Background(), client)
+		selfupdate.RunOrchestrator(p.log, context.Background(), client)
 
 		currentWatchtowerContainer = resolveCurrentWatchtowerContainerForFallback(p.log,
 			context.Background(),
@@ -393,7 +394,7 @@ func exitInvalidWatchtowerRestart(
 		restartPolicyTimeout,
 	)
 
-	recoveredContainer, recovered := update.TryRecoverOrphanedContainer(
+	recoveredContainer, recovered := selfupdate.TryRecoverOrphanedContainer(
 		log,
 		recoverCtx,
 		dockerClient,

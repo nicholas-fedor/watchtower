@@ -1,4 +1,4 @@
-package update
+package selfupdate
 
 import (
 	"context"
@@ -65,7 +65,7 @@ var (
 // instance writes to WT_ORCHESTRATOR_OLD_ID.
 var fullContainerIDPattern = regexp.MustCompile(`^[a-f0-9]{64}$`)
 
-// ephemeralSelfUpdate performs a self-update using an ephemeral orchestrator container.
+// StartOrchestrator performs a self-update using an ephemeral orchestrator container.
 //
 // Instead of the rename-based approach, this creates a short-lived container that:
 //  1. Inspects the old container's configuration
@@ -97,7 +97,7 @@ var fullContainerIDPattern = regexp.MustCompile(`^[a-f0-9]{64}$`)
 //   - bool: True so the dying process skips image cleanup. The orchestrator
 //     removes the old container and, when cleanup is enabled, the old image.
 //   - error: Non-nil if orchestrator creation fails.
-func ephemeralSelfUpdate(log *zerolog.Logger, ctx context.Context,
+func StartOrchestrator(log *zerolog.Logger, ctx context.Context,
 	client containerClient.Client,
 	sourceContainer types.Container,
 	config types.UpdateParams,
