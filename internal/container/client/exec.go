@@ -151,14 +151,15 @@ func (c *client) ExecuteCommand(
 			Msg("Failed to capture command output")
 	}
 
-	// Wait for completion and evaluate result.
+	// Wait for completion and evaluate result. The error already says whether
+	// the inspect failed, the wait ended, or the command failed.
 	skipUpdate, err := c.waitForExec(execCtx, exec.ID, output)
 	if err != nil {
 		clog.Debug().
 			Err(err).
-			Msg("Failed to inspect exec instance")
+			Msg("Command did not complete successfully")
 
-		return true, fmt.Errorf("%w: %w", errInspectExecFailed, err)
+		return true, err
 	}
 
 	clog.Debug().
