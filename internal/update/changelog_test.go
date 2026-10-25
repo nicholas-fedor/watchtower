@@ -285,7 +285,8 @@ func TestGitRebuildEmitsExactlyOneChangelogEntry(t *testing.T) {
 	)
 	require.NoError(t, err)
 
-	assert.Equal(t, 1, countChangelogEntries(buf.Bytes()), "build path should emit one: %s", buf.String())
+	assert.Equal(t, []string{"https://github.com/org/app/releases/tag/v1.2.3"}, changelogEntries(buf.Bytes()),
+		"build path should emit one versioned entry: %s", buf.String())
 	assert.Equal(t, "https://github.com/org/app/releases/tag/v1.2.3", (*progress)[c.ID()].Changelog())
 
 	// The registry path, if it ran for this container, would add a second entry
@@ -303,14 +304,15 @@ func TestGitRebuildEmitsExactlyOneChangelogEntry(t *testing.T) {
 	)
 	applyLatestImageMeta(&log, progress, c, params, vars, anns)
 
-	assert.Equal(t, 1, countChangelogEntries(buf.Bytes()), "registry path would duplicate: %s", buf.String())
+	assert.Equal(t, []string{"https://github.com/org/app/releases"}, changelogEntries(buf.Bytes()),
+		"registry path would duplicate: %s", buf.String())
 	assert.Equal(t, "https://github.com/org/app/releases", (*progress)[c.ID()].Changelog())
 }
 
-// countChangelogEntries returns how many Changelog notification entries appear
-// in the captured log output.
-func countChangelogEntries(output []byte) int {
-	entries := 0
+// changelogEntries returns the changelog URL of each Changelog notification
+// entry in the captured log output, in order.
+func changelogEntries(output []byte) []string {
+	entries := []string{}
 
 	for line := range bytes.Lines(output) {
 		if len(line) == 0 {
@@ -323,7 +325,8 @@ func countChangelogEntries(output []byte) int {
 		}
 
 		if entry["message"] == "Changelog" {
-			entries++
+			url, _ := entry["changelog"].(string)
+			entries = append(entries, url)
 		}
 	}
 
