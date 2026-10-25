@@ -908,3 +908,29 @@ func containerNames(containers []types.Container) []string {
 
 	return names
 }
+
+// deriveScopeFromCurrentContainer finds the current container by ID in the
+// provided list and returns its scope and whether it was found. Returns ""
+// for unscoped containers (found but no scope) and found=false when the
+// container ID isn't in the list. The caller normalizes "" to "none" for
+// cleanup and skips cleanup when found=false.
+func deriveScopeFromCurrentContainer(log *zerolog.Logger, allContainers []types.Container,
+	currentContainerID types.ContainerID,
+) (string, bool) {
+	for _, c := range allContainers {
+		if c.ID() == currentContainerID {
+			containerScope, containerHasScope := c.Scope()
+			if !containerHasScope || containerScope == "" {
+				return "", true
+			}
+
+			return containerScope, true
+		}
+	}
+
+	log.Debug().
+		Str("current_container_id", string(currentContainerID)).
+		Msg("Current container not found in list")
+
+	return "", false
+}

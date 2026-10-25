@@ -332,7 +332,7 @@ linters:
         linters:
           - gocyclo
         text: "of func `Checkout` is high"
-      - path: "internal/update/update.go"
+      - path: "internal/update/restart.go"
         linters:
           - gocyclo
         text: "of func `restartStaleContainer` is high"
