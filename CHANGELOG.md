@@ -32,6 +32,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- Keep update helpers with the code they serve by @nicholas-fedor in [#3156](https://github.com/nicholas-fedor/watchtower/pull/3156)
 - Move the Docker client to internal/container/client by @nicholas-fedor in [#3152](https://github.com/nicholas-fedor/watchtower/pull/3152)
 - Move lifecycle hooks to internal/container/hooks by @nicholas-fedor in [#3148](https://github.com/nicholas-fedor/watchtower/pull/3148)
 - Move copy-file handling to internal/container/copyfile by @nicholas-fedor in [#3144](https://github.com/nicholas-fedor/watchtower/pull/3144)
