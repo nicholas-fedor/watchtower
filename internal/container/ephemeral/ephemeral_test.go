@@ -1,6 +1,7 @@
 package ephemeral
 
 import (
+	"context"
 	"errors"
 	"slices"
 	"strings"
@@ -787,6 +788,11 @@ func TestEphemeralOrchestrator(t *testing.T) {
 			t.Run("should attempt cleanup and return errEphemeralStartFailed", func(t *testing.T) {
 				t.Parallel()
 
+				// The parent is canceled, as when Watchtower shuts down during
+				// the handoff.
+				ctx, cancel := context.WithCancel(t.Context())
+				cancel()
+
 				api := mockContainer.NewMockAPIClient(t)
 				api.EXPECT().ContainerCreate(mock.Anything, createOptions).
 					Return(dockerClient.ContainerCreateResult{ID: "orchestrator-fail-start"}, nil).Once()
@@ -794,11 +800,14 @@ func TestEphemeralOrchestrator(t *testing.T) {
 					Return(dockerClient.ContainerStartResult{}, serverError).Once()
 				// The created container is removed, with a context of its own so
 				// cleanup survives a canceled parent.
-				api.EXPECT().ContainerRemove(mock.Anything, "orchestrator-fail-start", dockerClient.ContainerRemoveOptions{Force: true}).
-					Return(dockerClient.ContainerRemoveResult{}, nil).Once()
+				api.EXPECT().ContainerRemove(
+					mock.MatchedBy(func(ctx context.Context) bool { return ctx.Err() == nil }),
+					"orchestrator-fail-start",
+					dockerClient.ContainerRemoveOptions{Force: true},
+				).Return(dockerClient.ContainerRemoveResult{}, nil).Once()
 
 				orchestratorID, err := CreateOrchestrator(
-					newTestLogger(t), t.Context(), api, newSource(), "watchtower:v2", "chain1", false,
+					newTestLogger(t), ctx, api, newSource(), "watchtower:v2", "chain1", false,
 				)
 
 				require.ErrorIs(t, err, errEphemeralStartFailed)
