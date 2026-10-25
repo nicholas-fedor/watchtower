@@ -56,6 +56,8 @@ type execCase struct {
 	createErr error
 	// startErr fails the exec start.
 	startErr error
+	// inspectErr fails the exec inspect.
+	inspectErr error
 	// containerID is the container the command runs in.
 	containerID string
 	// execID is the ID of the created exec instance.
@@ -125,7 +127,7 @@ func expectExec(api *mockContainer.MockAPIClient, tc execCase) {
 	api.EXPECT().ExecAttach(mock.Anything, tc.execID, dockerClient.ExecAttachOptions{TTY: true}).
 		Return(dockerClient.ExecAttachResult{}, errors.New("cannot hijack the connection")).Once()
 	api.EXPECT().ExecInspect(mock.Anything, tc.execID, dockerClient.ExecInspectOptions{}).
-		Return(dockerClient.ExecInspectResult{ID: tc.execID, ContainerID: tc.containerID, ExitCode: tc.exitCode}, nil).Once()
+		Return(dockerClient.ExecInspectResult{ID: tc.execID, ContainerID: tc.containerID, ExitCode: tc.exitCode}, tc.inspectErr).Once()
 }
 
 // expectHealth expects one inspect of the mock container reporting the given
@@ -972,6 +974,32 @@ func TestClient(t *testing.T) {
 
 				_, err := run(t, execCase{containerID: "ex-cont-id", execID: "failure-exec-id", cmd: "failure-cmd", exitCode: 1}, 0, 0)
 				require.ErrorContains(t, err, "command execution failed")
+			})
+
+			t.Run("should report the command failure rather than an inspect failure", func(t *testing.T) {
+				t.Parallel()
+
+				_, err := run(t, execCase{containerID: "ex-cont-id", execID: "failure-exec-id", cmd: "failure-cmd", exitCode: 1}, 0, 0)
+				require.ErrorIs(t, err, errCommandFailed)
+				require.NotErrorIs(t, err, errInspectExecFailed)
+				assert.True(t, strings.HasPrefix(err.Error(), "command execution failed with exit code 1"), err.Error())
+			})
+		})
+
+		t.Run("ExecInspect fails", func(t *testing.T) {
+			t.Parallel()
+
+			t.Run("should report the inspect failure once", func(t *testing.T) {
+				t.Parallel()
+
+				_, err := run(t, execCase{
+					containerID: "ex-cont-id",
+					execID:      "inspect-fail-exec-id",
+					cmd:         "inspect-fail-cmd",
+					inspectErr:  daemonError("no such exec instance"),
+				}, 0, 0)
+				require.ErrorIs(t, err, errInspectExecFailed)
+				assert.Equal(t, 1, strings.Count(err.Error(), "failed to inspect exec instance"), err.Error())
 			})
 		})
 
