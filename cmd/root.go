@@ -2,6 +2,7 @@ package cmd
 
 import (
 	"context"
+	"fmt"
 	"io/fs"
 	"os"
 	"os/signal"
@@ -11,6 +12,7 @@ import (
 	"github.com/rs/zerolog"
 	"github.com/spf13/cobra"
 
+	cerrdefs "github.com/containerd/errdefs"
 	dockerContainer "github.com/moby/moby/api/types/container"
 
 	"github.com/nicholas-fedor/watchtower/internal/api"
@@ -46,7 +48,8 @@ const (
 	//
 	// It bounds the Docker API / hostname / mountinfo detection sequence,
 	// so startup cannot hang indefinitely if the daemon or container runtime
-	// metadata is unreachable.
+	// metadata is unreachable. The inspect of the container afterwards bounds
+	// its own retries. In a health check, this timeout bounds them as well.
 	containerLookupTimeout = 5 * time.Second
 )
 
@@ -266,10 +269,10 @@ func (p *process) preRun(cmd *cobra.Command, _ []string) {
 
 		selfupdate.RunOrchestrator(p.log, context.Background(), client)
 
-		currentWatchtowerContainer = resolveCurrentWatchtowerContainerForFallback(p.log,
-			context.Background(),
-			client,
-		)
+		lookupCtx, lookupCancel := context.WithTimeout(context.Background(), containerLookupTimeout)
+		orchestratorID, _ := containerClient.GetCurrentContainerID(p.log, lookupCtx, processFs, client)
+
+		lookupCancel()
 
 		setNoRestartPolicyCtx, cancel := context.WithTimeout(
 			context.Background(),
@@ -277,9 +280,9 @@ func (p *process) preRun(cmd *cobra.Command, _ []string) {
 		)
 		defer cancel()
 
-		client.SetRestartPolicy(
+		_ = client.SetRestartPolicy(
 			setNoRestartPolicyCtx,
-			currentWatchtowerContainer,
+			orchestratorID,
 			dockerContainer.RestartPolicy{Name: dockerContainer.RestartPolicyDisabled},
 		)
 
@@ -304,18 +307,31 @@ func (p *process) preRun(cmd *cobra.Command, _ []string) {
 		currentWatchtowerContainerID = ""
 	}
 
-	// Retrieve the current Watchtower container. A failed inspect keeps the
-	// detected ID, so the checks that tell Watchtower apart from other
-	// instances still work.
+	// Retrieve the current Watchtower container.
+	//
+	// When the daemon has no container with the detected ID, Watchtower has no
+	// container of its own on that daemon.
+	// Detection may have picked the wrong ID, or Watchtower may manage a
+	// different Docker host than the one it runs on. Either way it counts as a
+	// failed detection.
+	//
+	// Another failed inspect keeps the detected ID, so the checks that tell
+	// Watchtower apart from other instances still work.
 	if currentWatchtowerContainerID != "" {
+		// A health check uses none of the container's data, so its inspect
+		// shares the lookup's timeout instead of waiting for every retry.
+		inspectCtx := context.Background()
+		if appCfg.Mode.HealthCheck {
+			inspectCtx = ctx
+		}
+
 		currentWatchtowerContainer, inspectErr = client.GetCurrentWatchtowerContainer(
-			ctx,
+			inspectCtx,
 			currentWatchtowerContainerID,
 		)
-		if inspectErr != nil {
-			p.log.Debug().Err(inspectErr).Msg("Failed to get the current Watchtower Container")
-
-			currentWatchtowerContainer = nil
+		if cerrdefs.IsNotFound(inspectErr) {
+			detectErr, inspectErr = inspectErr, nil
+			currentWatchtowerContainerID = ""
 		}
 	}
 
@@ -343,6 +359,15 @@ func (p *process) preRun(cmd *cobra.Command, _ []string) {
 	notifier = notifications.NewNotifier(p.log, appCfg.Notify)
 	notifier.RegisterHook(p.log)
 
+	// Without the container's labels, a scope set only by its scope label is
+	// unknown. Running without a scope would update containers that belong to
+	// another Watchtower instance, so Watchtower exits instead. A health check
+	// runs no updates, so it continues.
+	if inspectErr != nil && appCfg.Filter.Scope == "" && !appCfg.Mode.HealthCheck {
+		cancel()
+		p.exitUnknownScope(inspectErr)
+	}
+
 	if currentWatchtowerContainerUnknown {
 		p.log.Warn().Err(detectErr).Msg(
 			"Could not identify Watchtower's own container. " +
@@ -350,8 +375,7 @@ func (p *process) preRun(cmd *cobra.Command, _ []string) {
 		)
 	} else if inspectErr != nil {
 		p.log.Warn().Err(inspectErr).Msg(
-			"Could not inspect Watchtower's own container. " +
-				"Self-updates are disabled and its scope label is not applied",
+			"Could not inspect Watchtower's own container. Self-updates are disabled",
 		)
 	}
 
@@ -375,7 +399,8 @@ func (p *process) preRun(cmd *cobra.Command, _ []string) {
 // Parameters:
 //   - log: Process logger.
 //   - dockerClient: Docker client used for recovery and restart-policy updates.
-//   - watchtowerContainer: Current Watchtower container instance, or nil.
+//   - watchtowerContainer: Current Watchtower container instance. The invalid
+//     restart check that leads here requires one.
 func exitInvalidWatchtowerRestart(
 	log *zerolog.Logger,
 	dockerClient containerClient.Client,
@@ -410,15 +435,47 @@ func exitInvalidWatchtowerRestart(
 	}
 
 	// Prevent the old container from being restarted by the runtime after exit.
-	dockerClient.SetRestartPolicy(
+	_ = dockerClient.SetRestartPolicy(
 		exitCtx,
-		watchtowerContainer,
+		watchtowerContainer.ID(),
 		dockerContainer.RestartPolicy{Name: dockerContainer.RestartPolicyDisabled},
 	)
 
 	recoverCancel()
 	exitCancel()
 	os.Exit(0)
+}
+
+// exitUnknownScope ends the process with an error, because Watchtower could
+// not read the scope label of its own container and must not run without it.
+// It first sets the container's restart policy to "no", so the runtime does
+// not start it again. The notification it sends says whether that worked.
+//
+// Kept separate from preRun so os.Exit is not paired with preRun's deferred
+// context cancels (gocritic exitAfterDefer).
+//
+// Parameters:
+//   - err: The error from the last inspect of the current container.
+func (p *process) exitUnknownScope(err error) {
+	setNoRestartPolicyCtx, cancel := context.WithTimeout(context.Background(), restartPolicyTimeout)
+	policyErr := client.SetRestartPolicy(
+		setNoRestartPolicyCtx,
+		currentWatchtowerContainerID,
+		dockerContainer.RestartPolicy{Name: dockerContainer.RestartPolicyDisabled},
+	)
+
+	cancel()
+
+	if policyErr != nil {
+		p.logNotify("Could not inspect Watchtower's own container to read its scope label. "+
+			"Exiting rather than running without a scope, but restarts could not be disabled",
+			fmt.Errorf("%w, and %w", err, policyErr))
+		os.Exit(1)
+	}
+
+	p.logNotify("Could not inspect Watchtower's own container to read its scope label. "+
+		"Exiting with restarts disabled rather than running without a scope", err)
+	os.Exit(1)
 }
 
 // This function bridges configuration loading and the application's primary workflow.
@@ -434,14 +491,14 @@ func (p *process) run(command *cobra.Command, args []string) {
 	// Reload configuration with positional names so the filter includes them.
 	loaded, err := settings.Load(p.log, command, args)
 	if err != nil {
-		if currentWatchtowerContainer != nil {
+		if currentWatchtowerContainerID != "" {
 			setNoRestartPolicyCtx, cancel := context.WithTimeout(
 				context.Background(),
 				restartPolicyTimeout,
 			)
-			client.SetRestartPolicy(
+			_ = client.SetRestartPolicy(
 				setNoRestartPolicyCtx,
-				currentWatchtowerContainer,
+				currentWatchtowerContainerID,
 				dockerContainer.RestartPolicy{Name: dockerContainer.RestartPolicyDisabled},
 			)
 
@@ -480,14 +537,14 @@ func (p *process) run(command *cobra.Command, args []string) {
 			appCfg.Filter.Scope,
 		)
 		if filterErr != nil {
-			if currentWatchtowerContainer != nil {
+			if currentWatchtowerContainerID != "" {
 				setNoRestartPolicyCtx, cancel := context.WithTimeout(
 					context.Background(),
 					restartPolicyTimeout,
 				)
-				client.SetRestartPolicy(
+				_ = client.SetRestartPolicy(
 					setNoRestartPolicyCtx,
-					currentWatchtowerContainer,
+					currentWatchtowerContainerID,
 					dockerContainer.RestartPolicy{Name: dockerContainer.RestartPolicyDisabled},
 				)
 
@@ -562,9 +619,9 @@ func (p *process) runMain(cfg types.RunConfig) int {
 		)
 		defer cancel()
 
-		client.SetRestartPolicy(
+		_ = client.SetRestartPolicy(
 			setNoRestartPolicyCtx,
-			currentWatchtowerContainer,
+			currentWatchtowerContainerID,
 			dockerContainer.RestartPolicy{Name: dockerContainer.RestartPolicyDisabled},
 		)
 
@@ -656,9 +713,9 @@ func (p *process) runMain(cfg types.RunConfig) int {
 			)
 			defer cancel()
 
-			client.SetRestartPolicy(
+			_ = client.SetRestartPolicy(
 				setNoRestartPolicyCtx,
-				currentWatchtowerContainer,
+				currentWatchtowerContainerID,
 				dockerContainer.RestartPolicy{Name: dockerContainer.RestartPolicyDisabled},
 			)
 
@@ -703,9 +760,9 @@ func (p *process) runMain(cfg types.RunConfig) int {
 		)
 		defer cancel()
 
-		client.SetRestartPolicy(
+		_ = client.SetRestartPolicy(
 			setNoRestartPolicyCtx,
-			currentWatchtowerContainer,
+			currentWatchtowerContainerID,
 			dockerContainer.RestartPolicy{Name: dockerContainer.RestartPolicyDisabled},
 		)
 
@@ -859,9 +916,9 @@ func (p *process) runMain(cfg types.RunConfig) int {
 		)
 		defer cancel()
 
-		client.SetRestartPolicy(
+		_ = client.SetRestartPolicy(
 			setNoRestartPolicyCtx,
-			currentWatchtowerContainer,
+			currentWatchtowerContainerID,
 			dockerContainer.RestartPolicy{Name: dockerContainer.RestartPolicyDisabled},
 		)
 
@@ -903,9 +960,9 @@ func (p *process) runMain(cfg types.RunConfig) int {
 		)
 		defer cancel()
 
-		client.SetRestartPolicy(
+		_ = client.SetRestartPolicy(
 			setNoRestartPolicyCtx,
-			currentWatchtowerContainer,
+			currentWatchtowerContainerID,
 			dockerContainer.RestartPolicy{Name: dockerContainer.RestartPolicyDisabled},
 		)
 
@@ -966,30 +1023,4 @@ func selfUpdateBlocked(current types.Container, currentID types.ContainerID, eph
 	}
 
 	return current.HasExposedPorts() && !ephemeral
-}
-
-// resolveCurrentWatchtowerContainerForFallback resolves the current Watchtower container
-// for use in the orchestrator fallback path.
-//
-// It attempts to detect the current container ID and retrieve the container object,
-// returning nil if any step fails.
-//
-// Parameters:
-//   - ctx: Context for cancellation and timeouts.
-//   - c: Container client for Docker API operations.
-//
-// Returns:
-//   - types.Container: The resolved Watchtower container, or nil if detection fails.
-func resolveCurrentWatchtowerContainerForFallback(log *zerolog.Logger, ctx context.Context, c containerClient.Client) types.Container {
-	lookupCtx, cancel := context.WithTimeout(ctx, containerLookupTimeout)
-	defer cancel()
-
-	containerID, err := containerClient.GetCurrentContainerID(log, lookupCtx, processFs, c)
-	if err == nil && containerID != "" {
-		resolvedContainer, _ := c.GetCurrentWatchtowerContainer(lookupCtx, containerID)
-
-		return resolvedContainer
-	}
-
-	return nil
 }

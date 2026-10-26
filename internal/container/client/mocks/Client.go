@@ -1205,9 +1205,20 @@ func (_c *MockClient_RenameContainer_Call) RunAndReturn(run func(ctx context.Con
 }
 
 // SetRestartPolicy provides a mock function for the type MockClient
-func (_mock *MockClient) SetRestartPolicy(ctx context.Context, container1 types.Container, policy container.RestartPolicy) {
-	_mock.Called(ctx, container1, policy)
-	return
+func (_mock *MockClient) SetRestartPolicy(ctx context.Context, containerID types.ContainerID, policy container.RestartPolicy) error {
+	ret := _mock.Called(ctx, containerID, policy)
+
+	if len(ret) == 0 {
+		panic("no return value specified for SetRestartPolicy")
+	}
+
+	var r0 error
+	if returnFunc, ok := ret.Get(0).(func(context.Context, types.ContainerID, container.RestartPolicy) error); ok {
+		r0 = returnFunc(ctx, containerID, policy)
+	} else {
+		r0 = ret.Error(0)
+	}
+	return r0
 }
 
 // MockClient_SetRestartPolicy_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'SetRestartPolicy'
@@ -1217,21 +1228,21 @@ type MockClient_SetRestartPolicy_Call struct {
 
 // SetRestartPolicy is a helper method to define mock.On call
 //   - ctx context.Context
-//   - container1 types.Container
+//   - containerID types.ContainerID
 //   - policy container.RestartPolicy
-func (_e *MockClient_Expecter) SetRestartPolicy(ctx any, container1 any, policy any) *MockClient_SetRestartPolicy_Call {
-	return &MockClient_SetRestartPolicy_Call{Call: _e.mock.On("SetRestartPolicy", ctx, container1, policy)}
+func (_e *MockClient_Expecter) SetRestartPolicy(ctx any, containerID any, policy any) *MockClient_SetRestartPolicy_Call {
+	return &MockClient_SetRestartPolicy_Call{Call: _e.mock.On("SetRestartPolicy", ctx, containerID, policy)}
 }
 
-func (_c *MockClient_SetRestartPolicy_Call) Run(run func(ctx context.Context, container1 types.Container, policy container.RestartPolicy)) *MockClient_SetRestartPolicy_Call {
+func (_c *MockClient_SetRestartPolicy_Call) Run(run func(ctx context.Context, containerID types.ContainerID, policy container.RestartPolicy)) *MockClient_SetRestartPolicy_Call {
 	_c.Call.Run(func(args mock.Arguments) {
 		var arg0 context.Context
 		if args[0] != nil {
 			arg0 = args[0].(context.Context)
 		}
-		var arg1 types.Container
+		var arg1 types.ContainerID
 		if args[1] != nil {
-			arg1 = args[1].(types.Container)
+			arg1 = args[1].(types.ContainerID)
 		}
 		var arg2 container.RestartPolicy
 		if args[2] != nil {
@@ -1246,13 +1257,13 @@ func (_c *MockClient_SetRestartPolicy_Call) Run(run func(ctx context.Context, co
 	return _c
 }
 
-func (_c *MockClient_SetRestartPolicy_Call) Return() *MockClient_SetRestartPolicy_Call {
-	_c.Call.Return()
+func (_c *MockClient_SetRestartPolicy_Call) Return(err error) *MockClient_SetRestartPolicy_Call {
+	_c.Call.Return(err)
 	return _c
 }
 
-func (_c *MockClient_SetRestartPolicy_Call) RunAndReturn(run func(ctx context.Context, container1 types.Container, policy container.RestartPolicy)) *MockClient_SetRestartPolicy_Call {
-	_c.Run(run)
+func (_c *MockClient_SetRestartPolicy_Call) RunAndReturn(run func(ctx context.Context, containerID types.ContainerID, policy container.RestartPolicy) error) *MockClient_SetRestartPolicy_Call {
+	_c.Call.Return(run)
 	return _c
 }
 

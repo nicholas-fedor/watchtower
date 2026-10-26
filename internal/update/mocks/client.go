@@ -11,8 +11,8 @@ import (
 
 	dockerContainer "github.com/moby/moby/api/types/container"
 
-	"github.com/nicholas-fedor/watchtower/internal/container/oci"
 	containerClient "github.com/nicholas-fedor/watchtower/internal/container/client"
+	"github.com/nicholas-fedor/watchtower/internal/container/oci"
 	"github.com/nicholas-fedor/watchtower/pkg/types"
 )
 
@@ -74,7 +74,7 @@ type TestData struct {
 	LastCleanup               bool                          // Last cleanup flag passed to CreateEphemeralOrchestrator.
 	LastStartedContainer      types.Container               // Last container passed to StartContainer.
 	LastStartedContainerID    types.ContainerID             // ID returned by the last successful StartContainer call.
-	SetRestartPolicyContainer types.Container               // Last container passed to SetRestartPolicy.
+	SetRestartPolicyID        types.ContainerID             // Last container ID passed to SetRestartPolicy.
 	SetRestartPolicyCtx       context.Context               // Last context passed to SetRestartPolicy.
 	LastRestartPolicy         dockerContainer.RestartPolicy // Last policy passed to SetRestartPolicy.
 	CreateContainerCtx        context.Context               // Last context passed to CreateContainer.
@@ -386,17 +386,20 @@ func (client MockClient) RenameContainer(ctx context.Context, _ types.Container,
 	return nil
 }
 
-// SetRestartPolicy simulates updating a container's restart policy.
+// SetRestartPolicy simulates updating a container's restart policy. It
+// always succeeds.
 func (client MockClient) SetRestartPolicy(
 	ctx context.Context,
-	container types.Container,
+	containerID types.ContainerID,
 	policy dockerContainer.RestartPolicy,
-) {
+) error {
 	client.TestData.SetRestartPolicyCount.Add(1)
-	client.TestData.SetRestartPolicyContainer = container
+	client.TestData.SetRestartPolicyID = containerID
 	client.TestData.SetRestartPolicyCtx = ctx
 	client.TestData.LastRestartPolicy = policy
 	client.TestData.recordOperation("SetRestartPolicy")
+
+	return nil
 }
 
 // RemoveImageByID increments the count of image removal attempts in TestData.

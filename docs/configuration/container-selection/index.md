@@ -170,7 +170,8 @@ Environment Variable: WATCHTOWER_SCOPE
 
 !!! Note
     Set to `none` to ignore scoped containers.
-    Without this flag, Watchtower monitors all containers regardless of scope.
+    Without this option, Watchtower takes its scope from the `com.centurylinklabs.watchtower.scope` label of its own container.
+    Without that label either, it monitors only containers without a scope, as with `none`.
 
     For self-updates, ensure all Watchtower containers share the same `com.centurylinklabs.watchtower.scope` label to guarantee cleanup of renamed containers and old images.
     Mismatched labels may prevent detection, leaving resources running.

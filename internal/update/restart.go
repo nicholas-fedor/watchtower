@@ -962,9 +962,9 @@ func restartStaleContainer(
 			Msg("Updating restart policy for old Watchtower container")
 
 		//nolint:contextcheck // Using detached context intentionally to survive parent cancellation
-		client.SetRestartPolicy(
+		_ = client.SetRestartPolicy(
 			detachedCtx,
-			sourceContainer,
+			sourceContainer.ID(),
 			dockerContainer.RestartPolicy{Name: dockerContainer.RestartPolicyDisabled},
 		)
 	}
