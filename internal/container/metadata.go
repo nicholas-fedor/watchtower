@@ -787,3 +787,27 @@ func IsWatchtowerParent(currentID types.ContainerID, chain string) bool {
 
 	return false
 }
+
+// IsSuperseded reports whether a container is a Watchtower instance that a
+// self-update has replaced. That is the case for a predecessor renamed with
+// the "watchtower-old-" prefix, and for a container whose chain label lists it
+// as the parent of a newer instance.
+//
+// Parameters:
+//   - container: The running Watchtower container, or nil when it was not inspected.
+//
+// Returns:
+//   - bool: True when the container has been replaced, false otherwise or for nil.
+func IsSuperseded(container types.Container) bool {
+	if container == nil {
+		return false
+	}
+
+	if IsOldContainer(container.Name()) {
+		return true
+	}
+
+	chain, present := container.GetContainerChain()
+
+	return present && IsWatchtowerParent(container.ID(), chain)
+}

@@ -590,11 +590,10 @@ func TestIntegration_APIAndScheduling_ConcurrentWithUnblockHTTPAPI(t *testing.T)
 		RunUpdate: func(_ context.Context, _ types.Filter, _ types.UpdateParams) *metrics.Metric {
 			return &metrics.Metric{}
 		},
-		Notifier:                   nil,
-		UpdateOnStart:              false,
-		SkipFirstRun:               false,
-		CurrentWatchtowerContainer: nil,
-		StartupMessageSent:         true,
+		Notifier:           nil,
+		UpdateOnStart:      false,
+		SkipFirstRun:       false,
+		StartupMessageSent: true,
 		BaseParams: types.UpdateParams{
 			Cleanup:             false,
 			MonitorOnly:         false,

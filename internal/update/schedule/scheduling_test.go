@@ -2,7 +2,6 @@ package schedule
 
 import (
 	"context"
-	"net/netip"
 	"os"
 	"os/signal"
 	"runtime"
@@ -16,12 +15,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	dockerContainer "github.com/moby/moby/api/types/container"
-	dockerNetwork "github.com/moby/moby/api/types/network"
-
-	"github.com/nicholas-fedor/watchtower/internal/container"
 	"github.com/nicholas-fedor/watchtower/internal/container/filters"
-	"github.com/nicholas-fedor/watchtower/internal/container/labels"
 	"github.com/nicholas-fedor/watchtower/internal/observability/logging"
 	"github.com/nicholas-fedor/watchtower/internal/observability/metrics"
 	"github.com/nicholas-fedor/watchtower/pkg/types"
@@ -44,58 +38,8 @@ func newTestLogger(t *testing.T) *zerolog.Logger {
 	return new(zerolog.New(w))
 }
 
-// testContainerOption configures optional fields on the InspectResponse for testing.
-type testContainerOption func(*dockerContainer.InspectResponse)
-
-// withName sets the container runtime name (stored in InspectResponse.Name).
-func withName(name string) testContainerOption {
-	return func(ir *dockerContainer.InspectResponse) {
-		ir.Name = name
-	}
-}
-
-// withPortBindings adds host-bound port bindings to the container, making
-// HasExposedPorts() return true.
-func withPortBindings() testContainerOption {
-	return func(ir *dockerContainer.InspectResponse) {
-		ir.HostConfig = &dockerContainer.HostConfig{
-			PortBindings: dockerNetwork.PortMap{
-				dockerNetwork.MustParsePort("8080/tcp"): {
-					{
-						HostIP:   netip.MustParseAddr("0.0.0.0"),
-						HostPort: dockerNetwork.MustParsePort("8080/tcp").Port(),
-					},
-				},
-			},
-		}
-	}
-}
-
-// createTestContainer creates a *container.Container with specified chain label for testing.
-func createTestContainer(chain string, opts ...testContainerOption) *container.Container {
-	containerLabels := make(map[string]string)
-	if chain != "" {
-		containerLabels[labels.ContainerChain] = chain
-	}
-
-	inspectResponse := &dockerContainer.InspectResponse{
-		ID: "test-container-id",
-		Config: &dockerContainer.Config{
-			Hostname: "test-container",
-			Image:    "test-image",
-			Labels:   containerLabels,
-		},
-	}
-
-	for _, opt := range opts {
-		opt(inspectResponse)
-	}
-
-	return container.NewContainer(nil, inspectResponse, nil)
-}
-
 // testDeps returns ScheduleDeps with common test defaults.
-// Callers override ScheduleSpec, UpdateOnStart, SkipFirstRun, containers, and BaseParams as needed.
+// Callers override fields such as ScheduleSpec, UpdateOnStart, SkipFirstRun, and BaseParams as needed.
 func testDeps(
 	t *testing.T,
 	runUpdate func(context.Context, types.Filter, types.UpdateParams) *metrics.Metric,
@@ -563,77 +507,6 @@ func TestRunUpgradesOnSchedule_MonitorOnlyParameter(t *testing.T) {
 	}
 }
 
-// TestShouldExitDueToInvalidRestart verifies the ShouldExitDueToInvalidRestart function
-// handles various scenarios correctly.
-func TestShouldExitDueToInvalidRestart(t *testing.T) {
-	tests := []struct {
-		name         string
-		container    types.Container
-		runOnceFlag  bool
-		expectedExit bool
-	}{
-		{
-			name:         "no container",
-			container:    nil,
-			runOnceFlag:  false,
-			expectedExit: false,
-		},
-		{
-			name:         "not a watchtower parent",
-			container:    createTestContainer("other-id"),
-			runOnceFlag:  false,
-			expectedExit: false,
-		},
-		{
-			name:         "is watchtower parent but run-once is true",
-			container:    createTestContainer("test-container-id,parent-id"),
-			runOnceFlag:  true,
-			expectedExit: false,
-		},
-		{
-			name:         "is watchtower parent and run-once is false",
-			container:    createTestContainer("test-container-id,parent-id"),
-			runOnceFlag:  false,
-			expectedExit: true,
-		},
-		{
-			name:         "old container with run-once false",
-			container:    createTestContainer("", withName("watchtower-old-abc123")),
-			runOnceFlag:  false,
-			expectedExit: true,
-		},
-		{
-			name:         "old container with run-once true",
-			container:    createTestContainer("", withName("watchtower-old-abc123")),
-			runOnceFlag:  true,
-			expectedExit: false,
-		},
-		{
-			name:         "old container with leading slash",
-			container:    createTestContainer("", withName("/watchtower-old-def456")),
-			runOnceFlag:  false,
-			expectedExit: true,
-		},
-		{
-			name:         "non-old container continues",
-			container:    createTestContainer("", withName("watchtower")),
-			runOnceFlag:  false,
-			expectedExit: false,
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			shouldExit := ShouldExitDueToInvalidRestart(
-				tt.container,
-				tt.runOnceFlag,
-			)
-
-			assert.Equal(t, tt.expectedExit, shouldExit)
-		})
-	}
-}
-
 func TestRunUpgradesOnSchedule_CronWithSeconds(t *testing.T) {
 	ctx := t.Context()
 
@@ -712,46 +585,6 @@ func TestRunUpgradesOnSchedule_SkipFirstRun_True(t *testing.T) {
 	}
 }
 
-func TestRunUpgradesOnSchedule_WatchtowerParent_Skipping(t *testing.T) {
-	ctx := t.Context()
-
-	updateCallCount := 0
-	runUpdatesWithNotifications := func(_ context.Context, _ types.Filter, _ types.UpdateParams) *metrics.Metric {
-		updateCallCount++
-
-		return &metrics.Metric{Scanned: 1, Updated: 0, Failed: 0}
-	}
-
-	writeStartupMessage := func(logging.StartupParams) {}
-
-	// Create a mock Watchtower parent container
-	parentContainer := createTestContainer("test-container-id,parent-id")
-
-	// Use a cron spec that runs every second
-	scheduleSpec := "* * * * * *"
-
-	// Use timeout to allow multiple potential executions
-	timeoutCtx, timeoutCancel := context.WithTimeout(ctx, 2500*time.Millisecond)
-	defer timeoutCancel()
-
-	deps := testDeps(t, runUpdatesWithNotifications, writeStartupMessage)
-	deps.ScheduleSpec = scheduleSpec
-	deps.CurrentWatchtowerContainer = parentContainer
-	err := RunUpgradesOnSchedule(timeoutCtx, deps)
-	// Should complete without error when context times out (clean cancellation)
-	if err != nil {
-		t.Errorf("expected no error, got %v", err)
-	}
-
-	// Should not have executed any updates (parent container skips scheduled updates)
-	if updateCallCount > 0 {
-		t.Errorf(
-			"expected no update calls for Watchtower parent container, got %d",
-			updateCallCount,
-		)
-	}
-}
-
 func TestRunUpgradesOnSchedule_ScheduledRuns_Execution(t *testing.T) {
 	ctx := t.Context()
 
@@ -803,49 +636,6 @@ func TestRunUpgradesOnSchedule_ScheduledRuns_Execution(t *testing.T) {
 	}
 }
 
-// TestRunUpgradesOnSchedule_EphemeralSelfUpdateWithExposedPorts verifies that when
-// ephemeralSelfUpdate=true, the port-conflict guard is bypassed even when the
-// Watchtower container has exposed ports. This allows ephemeral self-updates to
-// proceed because they remove the old container before creating the new one,
-// avoiding port conflicts.
-func TestRunUpgradesOnSchedule_EphemeralSelfUpdateWithExposedPorts(t *testing.T) {
-	ctx := t.Context()
-
-	var capturedParams types.UpdateParams
-
-	runUpdatesWithNotifications := func(_ context.Context, _ types.Filter, params types.UpdateParams) *metrics.Metric {
-		capturedParams = params
-
-		return &metrics.Metric{Scanned: 1, Updated: 0, Failed: 0}
-	}
-
-	writeStartupMessage := func(logging.StartupParams) {}
-
-	// Create a Watchtower container with exposed ports (host-bound port mappings).
-	containerWithPorts := createTestContainer("", withPortBindings())
-
-	require.True(t, containerWithPorts.HasExposedPorts(),
-		"test container should have exposed ports",
-	)
-
-	timeoutCtx, timeoutCancel := context.WithTimeout(ctx, 10*time.Millisecond)
-	defer timeoutCancel()
-
-	deps := testDeps(t, runUpdatesWithNotifications, writeStartupMessage)
-	deps.UpdateOnStart = true
-	deps.CurrentWatchtowerContainer = containerWithPorts
-	deps.BaseParams.EphemeralSelfUpdate = true
-	err := RunUpgradesOnSchedule(timeoutCtx, deps)
-	require.NoError(t, err)
-
-	// With ephemeralSelfUpdate=true, the port-conflict guard should be bypassed,
-	// so SkipSelfUpdate should remain false (self-update is allowed).
-	assert.False(t, capturedParams.SkipSelfUpdate,
-		"self-update should NOT be skipped when ephemeralSelfUpdate=true, "+
-			"even with exposed ports",
-	)
-}
-
 // TestRunUpgradesOnSchedule_KeepsBaseSkipSelfUpdate verifies that a run cannot
 // enable self-updates that the base parameters disable.
 func TestRunUpgradesOnSchedule_KeepsBaseSkipSelfUpdate(t *testing.T) {
@@ -868,105 +658,6 @@ func TestRunUpgradesOnSchedule_KeepsBaseSkipSelfUpdate(t *testing.T) {
 	require.NoError(t, err)
 
 	assert.True(t, capturedParams.SkipSelfUpdate)
-}
-
-// TestRunUpgradesOnSchedule_PortConflictGuard_SkipsSelfUpdate verifies that when
-// the Watchtower container has exposed ports and ephemeralSelfUpdate=false, the
-// port-conflict guard forces SkipSelfUpdate to true to prevent the old container
-// from holding the port while the new container tries to bind it.
-func TestRunUpgradesOnSchedule_PortConflictGuard_SkipsSelfUpdate(t *testing.T) {
-	ctx := t.Context()
-
-	var capturedParams types.UpdateParams
-
-	runUpdatesWithNotifications := func(_ context.Context, _ types.Filter, params types.UpdateParams) *metrics.Metric {
-		capturedParams = params
-
-		return &metrics.Metric{Scanned: 1, Updated: 0, Failed: 0}
-	}
-
-	writeStartupMessage := func(logging.StartupParams) {}
-
-	// Create a Watchtower container with exposed ports (host-bound port mappings).
-	containerWithPorts := createTestContainer("", withPortBindings())
-
-	require.True(t, containerWithPorts.HasExposedPorts(),
-		"test container should have exposed ports",
-	)
-
-	timeoutCtx, timeoutCancel := context.WithTimeout(ctx, 10*time.Millisecond)
-	defer timeoutCancel()
-
-	deps := testDeps(t, runUpdatesWithNotifications, writeStartupMessage)
-	deps.UpdateOnStart = true
-	deps.CurrentWatchtowerContainer = containerWithPorts
-	err := RunUpgradesOnSchedule(timeoutCtx, deps)
-	require.NoError(t, err)
-
-	// With ephemeralSelfUpdate=false and exposed ports, the port-conflict guard
-	// should force SkipSelfUpdate to true to prevent port conflicts.
-	assert.True(t, capturedParams.SkipSelfUpdate,
-		"self-update should be skipped when container has exposed ports "+
-			"and ephemeralSelfUpdate=false",
-	)
-}
-
-// TestRunUpgradesOnSchedule_NoExposedPorts_AllowsSelfUpdate verifies that when
-// the Watchtower container has no exposed ports, the port-conflict guard does
-// not interfere regardless of the ephemeralSelfUpdate setting.
-func TestRunUpgradesOnSchedule_NoExposedPorts_AllowsSelfUpdate(t *testing.T) {
-	tests := []struct {
-		name                string
-		ephemeralSelfUpdate bool
-	}{
-		{
-			name:                "ephemeralSelfUpdate=true",
-			ephemeralSelfUpdate: true,
-		},
-		{
-			name:                "ephemeralSelfUpdate=false",
-			ephemeralSelfUpdate: false,
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			ctx := t.Context()
-
-			var capturedParams types.UpdateParams
-
-			runUpdatesWithNotifications := func(_ context.Context, _ types.Filter, params types.UpdateParams) *metrics.Metric {
-				capturedParams = params
-
-				return &metrics.Metric{Scanned: 1, Updated: 0, Failed: 0}
-			}
-
-			writeStartupMessage := func(logging.StartupParams) {}
-
-			// Create a Watchtower container WITHOUT exposed ports.
-			containerNoPorts := createTestContainer("")
-
-			require.False(t, containerNoPorts.HasExposedPorts(),
-				"test container should not have exposed ports",
-			)
-
-			timeoutCtx, timeoutCancel := context.WithTimeout(ctx, 10*time.Millisecond)
-			defer timeoutCancel()
-
-			deps := testDeps(t, runUpdatesWithNotifications, writeStartupMessage)
-			deps.UpdateOnStart = true
-			deps.CurrentWatchtowerContainer = containerNoPorts
-			deps.BaseParams.EphemeralSelfUpdate = tt.ephemeralSelfUpdate
-			err := RunUpgradesOnSchedule(timeoutCtx, deps)
-			require.NoError(t, err)
-
-			// Without exposed ports, the port-conflict guard should not trigger,
-			// so SkipSelfUpdate should remain false regardless of ephemeralSelfUpdate.
-			assert.False(t, capturedParams.SkipSelfUpdate,
-				"self-update should NOT be skipped when container has no exposed ports",
-			)
-		})
-	}
 }
 
 // TestRunUpgradesOnSchedule_ReviveStoppedPropagation verifies that RunUpgradesOnSchedule
