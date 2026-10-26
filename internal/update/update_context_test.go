@@ -150,8 +150,7 @@ func TestUpdateAction_Context(t *testing.T) {
 
 			require.Error(t, err)
 			assert.Equal(t, int32(1), client.TestData.SetRestartPolicyCount.Load())
-			require.NotNil(t, client.TestData.SetRestartPolicyContainer)
-			assert.Equal(t, types.ContainerID("old-container-id"), client.TestData.SetRestartPolicyContainer.ID())
+			assert.Equal(t, types.ContainerID("old-container-id"), client.TestData.SetRestartPolicyID)
 		})
 
 		t.Run("should proceed normally when current container is not old", func(t *testing.T) {

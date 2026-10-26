@@ -520,33 +520,47 @@ func TestPreRun_Exit(t *testing.T) {
 	tests := []struct {
 		helperCase   string
 		wantExitCode int
-		wantOutput   string
+		wantOutput   []string
 	}{
-		{helperCase: "invalid-log-format", wantExitCode: 1, wantOutput: "Failed to initialize logging"},
-		{helperCase: "invalid-configuration", wantExitCode: 1, wantOutput: "Failed to load configuration"},
+		{helperCase: "invalid-log-format", wantExitCode: 1, wantOutput: []string{"Failed to initialize logging"}},
+		{helperCase: "invalid-configuration", wantExitCode: 1, wantOutput: []string{"Failed to load configuration"}},
 		{
 			// RunOrchestrator always ends the process, so the restart policy
 			// fallback after it in preRun does not run.
 			helperCase:   "orchestrator-without-settings",
 			wantExitCode: 1,
-			wantOutput:   "Failed to read orchestrator environment variables",
+			wantOutput:   []string{"Failed to read orchestrator environment variables"},
 		},
 		{
 			helperCase:   "invalid-restart-of-old-instance",
 			wantExitCode: 0,
-			wantOutput:   "SetRestartPolicy watchtower-old-cccccccccccc no",
+			wantOutput:   []string{"SetRestartPolicy cccccccccccc no"},
 		},
 		{
 			helperCase:   "invalid-restart-of-chain-parent",
 			wantExitCode: 0,
-			wantOutput:   "SetRestartPolicy watchtower no",
+			wantOutput:   []string{"SetRestartPolicy cccccccccccc no"},
 		},
 		{
 			// Without an explicit scope, the scope label is unknown. preRun then
-			// exits rather than running without a scope.
+			// disables the restart policy and exits rather than running without
+			// a scope.
 			helperCase:   "unreadable-scope-label",
 			wantExitCode: 1,
-			wantOutput:   "Could not inspect Watchtower's own container to read its scope label",
+			wantOutput: []string{
+				"SetRestartPolicy cccccccccccc no",
+				"Exiting with restarts disabled rather than running without a scope",
+			},
+		},
+		{
+			// When the restart policy cannot be disabled, preRun still exits, and
+			// its message says that the runtime may start Watchtower again.
+			helperCase:   "unreadable-scope-label-restarts-kept",
+			wantExitCode: 1,
+			wantOutput: []string{
+				"SetRestartPolicy cccccccccccc no",
+				"Exiting rather than running without a scope, but restarts could not be disabled",
+			},
 		},
 	}
 
@@ -573,7 +587,11 @@ func TestPreRun_Exit(t *testing.T) {
 			}
 
 			assert.Equal(t, tt.wantExitCode, exitCode, "output:\n%s", out)
-			assert.Contains(t, string(out), tt.wantOutput)
+
+			for _, want := range tt.wantOutput {
+				assert.Contains(t, string(out), want)
+			}
+
 			assert.NotContains(t, string(out), "PASS", "the helper must end the process")
 		})
 	}
@@ -585,16 +603,19 @@ func TestPreRun_Exit(t *testing.T) {
 func preRunExitHelper(t *testing.T, helperCase string) {
 	t.Helper()
 
-	mockClient := mockContainerClient.NewMockClient(t)
-	mockClient.EXPECT().SetRestartPolicy(mock.Anything, mock.Anything, mock.Anything).
-		Run(func(_ context.Context, c types.Container, policy dockerContainer.RestartPolicy) {
-			fmt.Fprintf(os.Stderr, "SetRestartPolicy %s %s\n", containerLabel(c), policy.Name)
-		}).Maybe()
-
 	var (
 		args      []string
 		detection selfDetection
+		policyErr error
 	)
+
+	mockClient := mockContainerClient.NewMockClient(t)
+	mockClient.EXPECT().SetRestartPolicy(mock.Anything, mock.Anything, mock.Anything).
+		RunAndReturn(func(_ context.Context, id types.ContainerID, policy dockerContainer.RestartPolicy) error {
+			fmt.Fprintf(os.Stderr, "SetRestartPolicy %s %s\n", containerLabel(id), policy.Name)
+
+			return policyErr
+		}).Maybe()
 
 	switch helperCase {
 	case "invalid-log-format":
@@ -618,8 +639,12 @@ func preRunExitHelper(t *testing.T, helperCase string) {
 
 		mockClient.EXPECT().GetCurrentWatchtowerContainer(mock.Anything, selfID).Return(parent, nil)
 		mockClient.EXPECT().ListContainers(mock.Anything, withFilter).Return([]types.Container{parent}, nil).Maybe()
-	case "unreadable-scope-label":
+	case "unreadable-scope-label", "unreadable-scope-label-restarts-kept":
 		detection = selfDetection{mountinfo: mountinfoWithSelf()}
+
+		if helperCase == "unreadable-scope-label-restarts-kept" {
+			policyErr = errRunTestDocker
+		}
 
 		mockClient.EXPECT().GetCurrentWatchtowerContainer(mock.Anything, selfID).Return(nil, errRunTestDocker)
 	default:

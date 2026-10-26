@@ -1559,7 +1559,7 @@ func Test_isDaemonConnectionError(t *testing.T) {
 
 // TestClientSetRestartPolicy verifies the restart policy the client sends to
 // Docker, including the normalization of an empty policy to "no", and that a
-// failed update is logged rather than returned.
+// failed update is logged and returned.
 func TestClientSetRestartPolicy(t *testing.T) {
 	t.Parallel()
 
@@ -1572,7 +1572,7 @@ func TestClientSetRestartPolicy(t *testing.T) {
 			Return(dockerClient.ContainerUpdateResult{}, err).Once()
 	}
 
-	t.Run("the container is nil", func(t *testing.T) {
+	t.Run("the container ID is empty", func(t *testing.T) {
 		t.Parallel()
 
 		t.Run("should short-circuit without calling ContainerUpdate", func(t *testing.T) {
@@ -1580,7 +1580,7 @@ func TestClientSetRestartPolicy(t *testing.T) {
 
 			// The mock has no expectations, so any Docker call fails the test.
 			c := &client{log: newTestLogger(t), api: mockContainer.NewMockAPIClient(t)}
-			c.SetRestartPolicy(t.Context(), nil, dockerContainer.RestartPolicy{})
+			require.NoError(t, c.SetRestartPolicy(t.Context(), "", dockerContainer.RestartPolicy{}))
 		})
 	})
 
@@ -1593,8 +1593,9 @@ func TestClientSetRestartPolicy(t *testing.T) {
 			api := newDockerAPI(t)
 			expectUpdate(api, dockerContainer.RestartPolicy{Name: dockerContainer.RestartPolicyDisabled}, nil)
 
-			(&client{log: newTestLogger(t), api: api}).
-				SetRestartPolicy(t.Context(), modelfixture.Container(containerfixture.WithID(cid)), dockerContainer.RestartPolicy{})
+			err := (&client{log: newTestLogger(t), api: api}).
+				SetRestartPolicy(t.Context(), cid, dockerContainer.RestartPolicy{})
+			require.NoError(t, err)
 		})
 
 		t.Run("should clear MaximumRetryCount when normalizing an empty name", func(t *testing.T) {
@@ -1603,8 +1604,9 @@ func TestClientSetRestartPolicy(t *testing.T) {
 			api := newDockerAPI(t)
 			expectUpdate(api, dockerContainer.RestartPolicy{Name: dockerContainer.RestartPolicyDisabled}, nil)
 
-			(&client{log: newTestLogger(t), api: api}).
-				SetRestartPolicy(t.Context(), modelfixture.Container(containerfixture.WithID(cid)), dockerContainer.RestartPolicy{MaximumRetryCount: 5})
+			err := (&client{log: newTestLogger(t), api: api}).
+				SetRestartPolicy(t.Context(), cid, dockerContainer.RestartPolicy{MaximumRetryCount: 5})
+			require.NoError(t, err)
 		})
 	})
 
@@ -1617,16 +1619,17 @@ func TestClientSetRestartPolicy(t *testing.T) {
 			api := newDockerAPI(t)
 			expectUpdate(api, dockerContainer.RestartPolicy{Name: dockerContainer.RestartPolicyAlways}, nil)
 
-			(&client{log: newTestLogger(t), api: api}).SetRestartPolicy(
-				t.Context(), modelfixture.Container(containerfixture.WithID(cid)), dockerContainer.RestartPolicy{Name: dockerContainer.RestartPolicyAlways},
+			err := (&client{log: newTestLogger(t), api: api}).SetRestartPolicy(
+				t.Context(), cid, dockerContainer.RestartPolicy{Name: dockerContainer.RestartPolicyAlways},
 			)
+			require.NoError(t, err)
 		})
 	})
 
 	t.Run("the container update fails", func(t *testing.T) {
 		t.Parallel()
 
-		t.Run("should log the failure and not panic", func(t *testing.T) {
+		t.Run("should log and return the failure", func(t *testing.T) {
 			t.Parallel()
 
 			api := newDockerAPI(t)
@@ -1634,9 +1637,11 @@ func TestClientSetRestartPolicy(t *testing.T) {
 
 			log, logOutput := logcapture.New(zerolog.DebugLevel)
 
-			(&client{log: log, api: api}).SetRestartPolicy(
-				t.Context(), modelfixture.Container(containerfixture.WithID(cid)), dockerContainer.RestartPolicy{Name: dockerContainer.RestartPolicyDisabled},
+			err := (&client{log: log, api: api}).SetRestartPolicy(
+				t.Context(), cid, dockerContainer.RestartPolicy{Name: dockerContainer.RestartPolicyDisabled},
 			)
+			require.ErrorIs(t, err, errSetRestartPolicyFailed)
+			require.ErrorContains(t, err, "update failed")
 			assert.Contains(t, logOutput.String(), "Failed to set container restart policy")
 		})
 	})

@@ -168,9 +168,9 @@ func update(
 					defer setNoRestartCancel()
 
 					//nolint:contextcheck // setNoRestartCtx is intentionally used for restart policy update
-					client.SetRestartPolicy(
+					_ = client.SetRestartPolicy(
 						setNoRestartCtx,
-						c,
+						c.ID(),
 						dockerContainer.RestartPolicy{Name: dockerContainer.RestartPolicyDisabled},
 					)
 

@@ -160,8 +160,18 @@ func runCalls(client *mockContainerClient.MockClient) []string {
 	return calls
 }
 
-// containerLabel names a container argument, or "none" when it is nil.
+// containerLabel names a container argument by its name, or a container ID
+// argument by its short ID. It returns "none" for a nil container or an empty
+// ID.
 func containerLabel(arg any) string {
+	if id, ok := arg.(types.ContainerID); ok {
+		if id == "" {
+			return "none"
+		}
+
+		return id.ShortID()
+	}
+
 	c, ok := arg.(types.Container)
 	if !ok || c == nil {
 		return "none"
@@ -233,7 +243,7 @@ func TestRun_RunOnce(t *testing.T) {
 		{
 			name:    "in a container",
 			current: currentWatchtower(),
-			want:    []string{"GetVersion", "ListContainers filtered", "SetRestartPolicy watchtower no"},
+			want:    []string{"GetVersion", "ListContainers filtered", "SetRestartPolicy c0c0 no"},
 		},
 	}
 
@@ -242,7 +252,7 @@ func TestRun_RunOnce(t *testing.T) {
 			mockClient := mockContainerClient.NewMockClient(t)
 			mockClient.EXPECT().GetVersion().Return("1.47")
 			mockClient.EXPECT().ListContainers(mock.Anything, withFilter).Return(nil, nil)
-			mockClient.EXPECT().SetRestartPolicy(mock.Anything, mock.Anything, mock.Anything)
+			mockClient.EXPECT().SetRestartPolicy(mock.Anything, mock.Anything, mock.Anything).Return(nil)
 
 			state := runTestState{client: mockClient, current: tt.current}
 			if tt.current != nil {
@@ -581,7 +591,7 @@ func TestRun_Exit(t *testing.T) {
 			require.ErrorAs(t, err, &exitErr, "output:\n%s", out)
 			assert.Equal(t, 1, exitErr.ExitCode(), "output:\n%s", out)
 			assert.Contains(t, string(out), tt.wantOutput)
-			assert.Contains(t, string(out), "SetRestartPolicy watchtower no",
+			assert.Contains(t, string(out), "SetRestartPolicy c0c0 no",
 				"the restart policy is disabled before the process ends")
 		})
 	}
@@ -597,9 +607,9 @@ func runExitHelper(t *testing.T, helperCase string) {
 	mockClient := mockContainerClient.NewMockClient(t)
 	mockClient.EXPECT().GetVersion().Return("1.47").Maybe()
 	mockClient.EXPECT().SetRestartPolicy(mock.Anything, mock.Anything, mock.Anything).
-		Run(func(_ context.Context, c types.Container, policy dockerContainer.RestartPolicy) {
-			fmt.Fprintf(os.Stderr, "SetRestartPolicy %s %s\n", containerLabel(c), policy.Name)
-		})
+		Run(func(_ context.Context, id types.ContainerID, policy dockerContainer.RestartPolicy) {
+			fmt.Fprintf(os.Stderr, "SetRestartPolicy %s %s\n", containerLabel(id), policy.Name)
+		}).Return(nil)
 
 	var args []string
 
@@ -637,8 +647,8 @@ func TestRun_OldInstanceStops(t *testing.T) {
 	mockClient.EXPECT().ListContainers(mock.Anything, withFilter).Return([]types.Container{oldSelf}, nil)
 	mockClient.EXPECT().ListContainers(mock.Anything).Return([]types.Container{oldSelf}, nil)
 	mockClient.EXPECT().GetVersion().Return("1.47").Maybe()
-	mockClient.EXPECT().SetRestartPolicy(mock.Anything, oldSelf,
-		dockerContainer.RestartPolicy{Name: dockerContainer.RestartPolicyDisabled})
+	mockClient.EXPECT().SetRestartPolicy(mock.Anything, oldSelf.ID(),
+		dockerContainer.RestartPolicy{Name: dockerContainer.RestartPolicyDisabled}).Return(nil)
 
 	setRunState(t, runTestState{client: mockClient, current: oldSelf, currentID: oldSelf.ID()})
 

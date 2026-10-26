@@ -39,8 +39,8 @@ func TestRunUpdatesWithNotifications_OldSelfDetected(t *testing.T) {
 
 	client := mockContainerClient.NewMockClient(t)
 	client.EXPECT().ListContainers(mock.Anything, mock.Anything).Return([]types.Container{oldSelf}, nil)
-	client.EXPECT().SetRestartPolicy(mock.Anything, oldSelf,
-		dockerContainer.RestartPolicy{Name: dockerContainer.RestartPolicyDisabled}).Once()
+	client.EXPECT().SetRestartPolicy(mock.Anything, oldSelf.ID(),
+		dockerContainer.RestartPolicy{Name: dockerContainer.RestartPolicyDisabled}).Return(nil).Once()
 
 	// The notifier mock fails the test on any call other than starting the batch.
 	notifier := mockTypes.NewMockNotifier(t)

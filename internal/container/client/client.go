@@ -82,7 +82,7 @@ const (
 // Actual delays are baseListRetryDelay * 2^attempt (5s, 10s).
 var baseListRetryDelay = 5 * time.Second
 
-// Errors for container health operations.
+// Errors for container health and update operations.
 var (
 	// errHealthCheckTimeout indicates that waiting for a container to become healthy timed out.
 	errHealthCheckTimeout = errors.New("timeout waiting for container to become healthy")
@@ -92,6 +92,8 @@ var (
 	errHealthCheckFailed = errors.New("container health check failed")
 	// errRecreateDockerClient indicates failure recreating the Docker client after API version fallback.
 	errRecreateDockerClient = errors.New("failed to recreate Docker client")
+	// errSetRestartPolicyFailed indicates a failure to update a container's restart policy.
+	errSetRestartPolicyFailed = errors.New("failed to set restart policy")
 )
 
 // nopLog returns a fresh discarded logger for optional construction and fallbacks.
@@ -353,18 +355,23 @@ type Client interface {
 	// An empty policy name is treated as no automatic restart (Docker "no").
 	// MaximumRetryCount is cleared in that case because retry counts apply only
 	// to on-failure policies. Only the restart policy is sent to the Engine.
-	// Resource limits are left unchanged. Failures are logged and do not abort
-	// the caller.
+	// Resource limits are left unchanged. An empty containerID does nothing,
+	// as when Watchtower does not run in a container. A failure is also logged
+	// at debug, so a caller that only makes a best effort can discard it.
 	//
 	// Parameters:
 	//   - ctx: Context for cancellation and timeout control.
-	//   - container: Container whose restart policy should be updated.
+	//   - containerID: ID of the container whose restart policy should be updated.
 	//   - policy: Restart policy to apply. Empty Name disables automatic restart.
+	//
+	// Returns:
+	//   - error: Non-nil if the Engine did not apply the policy, nil on success
+	//     or for an empty containerID.
 	SetRestartPolicy(
 		ctx context.Context,
-		container types.Container,
+		containerID types.ContainerID,
 		policy dockerContainer.RestartPolicy,
-	)
+	) error
 
 	// RemoveContainer removes a container from the Docker host.
 	//
@@ -1151,20 +1158,25 @@ func (c *client) StartContainerByID(
 // An empty policy name is treated as no automatic restart (Docker "no").
 // MaximumRetryCount is cleared in that case because retry counts apply only
 // to on-failure policies. Only the restart policy is sent to the Engine.
-// Resource limits are left unchanged. Failures are logged and do not abort
-// the caller.
+// Resource limits are left unchanged. An empty containerID does nothing, as
+// when Watchtower does not run in a container. A failure is also logged at
+// debug, so a caller that only makes a best effort can discard it.
 //
 // Parameters:
 //   - ctx: Context for cancellation and timeout control.
-//   - container: Container whose restart policy should be updated.
+//   - containerID: ID of the container whose restart policy should be updated.
 //   - policy: Restart policy to apply. Empty Name disables automatic restart.
+//
+// Returns:
+//   - error: Non-nil if the Engine did not apply the policy, nil on success or
+//     for an empty containerID.
 func (c *client) SetRestartPolicy(
 	ctx context.Context,
-	container types.Container,
+	containerID types.ContainerID,
 	policy dockerContainer.RestartPolicy,
-) {
-	if container == nil {
-		return
+) error {
+	if containerID == "" {
+		return nil
 	}
 
 	if policy.Name == "" {
@@ -1173,7 +1185,7 @@ func (c *client) SetRestartPolicy(
 	}
 
 	clogVal := c.logger().With().
-		Str("container_id", string(container.ID())).
+		Str("container_id", string(containerID)).
 		Str("restart_policy", string(policy.Name)).
 		Logger()
 	clog := &clogVal
@@ -1182,7 +1194,7 @@ func (c *client) SetRestartPolicy(
 
 	_, err := c.api.ContainerUpdate(
 		ctx,
-		string(container.ID()),
+		string(containerID),
 		dockerClient.ContainerUpdateOptions{
 			RestartPolicy: &policy,
 		},
@@ -1191,7 +1203,11 @@ func (c *client) SetRestartPolicy(
 		clog.Debug().
 			Err(err).
 			Msg("Failed to set container restart policy")
+
+		return fmt.Errorf("%w: %w", errSetRestartPolicyFailed, err)
 	}
+
+	return nil
 }
 
 // RemoveContainer removes a container from the Docker host.
