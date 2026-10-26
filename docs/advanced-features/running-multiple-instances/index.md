@@ -120,7 +120,7 @@ services:
 If Watchtower cannot inspect its own container at startup, then it exits with an error rather than run without a scope.
 
 - Before it exits, it disables its container's restart policy. Start it again once the cause is fixed.
-- If the restart policy cannot be disabled, then the error notification says so. The restart policy may then start Watchtower again.
+- If the restart policy cannot be disabled, then Watchtower reports that as an error too. The restart policy may then start Watchtower again.
 
 !!! Tip
     Setting the [`scope`](../../configuration/container-selection/index.md#scope_filter) configuration option avoids the dependency on the label. The option takes precedence over the label, and `none` counts as a set value.

@@ -354,6 +354,24 @@ func (c *Container) HasExposedPorts() bool {
 	return false
 }
 
+// RestartsAutomatically reports whether the container's restart policy can
+// start it again after it stops, which every policy except "no" can.
+//
+// Without inspect data the policy is unknown, so it reports true.
+//
+// Returns:
+//   - bool: True unless the container's restart policy is known to be "no".
+func (c *Container) RestartsAutomatically() bool {
+	c.mu.RLock()
+	defer c.mu.RUnlock()
+
+	if c.containerInfo == nil || c.containerInfo.HostConfig == nil {
+		return true
+	}
+
+	return !c.containerInfo.HostConfig.RestartPolicy.IsNone()
+}
+
 // sliceSubtract returns elements in the first slice that are not in the second slice.
 //
 // Parameters:

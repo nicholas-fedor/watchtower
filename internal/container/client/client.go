@@ -356,8 +356,7 @@ type Client interface {
 	// MaximumRetryCount is cleared in that case because retry counts apply only
 	// to on-failure policies. Only the restart policy is sent to the Engine.
 	// Resource limits are left unchanged. An empty containerID does nothing,
-	// as when Watchtower does not run in a container. A failure is also logged
-	// at debug, so a caller that only makes a best effort can discard it.
+	// as when Watchtower does not run in a container.
 	//
 	// Parameters:
 	//   - ctx: Context for cancellation and timeout control.
@@ -1159,8 +1158,7 @@ func (c *client) StartContainerByID(
 // MaximumRetryCount is cleared in that case because retry counts apply only
 // to on-failure policies. Only the restart policy is sent to the Engine.
 // Resource limits are left unchanged. An empty containerID does nothing, as
-// when Watchtower does not run in a container. A failure is also logged at
-// debug, so a caller that only makes a best effort can discard it.
+// when Watchtower does not run in a container.
 //
 // Parameters:
 //   - ctx: Context for cancellation and timeout control.
@@ -1200,10 +1198,6 @@ func (c *client) SetRestartPolicy(
 		},
 	)
 	if err != nil {
-		clog.Debug().
-			Err(err).
-			Msg("Failed to set container restart policy")
-
 		return fmt.Errorf("%w: %w", errSetRestartPolicyFailed, err)
 	}
 

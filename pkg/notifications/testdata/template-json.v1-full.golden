@@ -419,15 +419,15 @@
         "error": "failed to inspect container: context deadline exceeded"
       },
       "level": "info",
-      "message": "Could not inspect Watchtower's own container to read its scope label. Exiting with restarts disabled rather than running without a scope",
+      "message": "Could not inspect Watchtower's own container to read its scope label. Exiting rather than running without a scope",
       "time": "2026-10-07T12:00:44Z"
     },
     {
       "data": {
-        "error": "failed to inspect container: context deadline exceeded, and failed to set restart policy: context deadline exceeded"
+        "error": "failed to set restart policy: context deadline exceeded"
       },
       "level": "warning",
-      "message": "Could not inspect Watchtower's own container to read its scope label. Exiting rather than running without a scope, but restarts could not be disabled",
+      "message": "Could not disable Watchtower's restart policy. The runtime may start it again",
       "time": "2026-10-07T12:00:45Z"
     },
     {
