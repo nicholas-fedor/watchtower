@@ -81,6 +81,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Chores
 
+- Update google.golang.org/genproto/googleapis/api digest to 2ffab32 by @renovate[bot] in [#3181](https://github.com/nicholas-fedor/watchtower/pull/3181)
 - Update google.golang.org/genproto/googleapis/rpc digest to 2ffab32 by @renovate[bot] in [#3182](https://github.com/nicholas-fedor/watchtower/pull/3182)
 - Update module github.com/gofiber/utils/v2 to v2.6.3 by @renovate[bot] in [#3177](https://github.com/nicholas-fedor/watchtower/pull/3177)
 - Update dependency python to v3.15.2 by @renovate[bot] in [#3176](https://github.com/nicholas-fedor/watchtower/pull/3176)
