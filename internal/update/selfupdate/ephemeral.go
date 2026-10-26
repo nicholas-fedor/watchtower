@@ -36,9 +36,11 @@ const orchestratorCreateTimeout = 60 * time.Second
 const predecessorImageRemovalTimeout = 30 * time.Second
 
 // orchestratorRecoveryTimeout bounds each recovery helper after a failed
-// handoff. Recovery runs detached from the orchestration context, so it still
-// runs after that context's deadline. The bound covers stopping a failed
-// replacement with orchestratorStopTimeout and the calls around it.
+// handoff.
+//
+// Recovery runs detached from the orchestration context, so it still
+// runs after that context's deadline. The 60 seconds cover the 30 second stop
+// of a failed replacement and the calls around it.
 const orchestratorRecoveryTimeout = 60 * time.Second
 
 // Errors for ephemeral self-update operations in ephemeral.go.

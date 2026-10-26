@@ -11,6 +11,7 @@ import (
 	"github.com/rs/zerolog"
 	"github.com/spf13/cobra"
 
+	cerrdefs "github.com/containerd/errdefs"
 	dockerContainer "github.com/moby/moby/api/types/container"
 
 	"github.com/nicholas-fedor/watchtower/internal/api"
@@ -46,7 +47,8 @@ const (
 	//
 	// It bounds the Docker API / hostname / mountinfo detection sequence,
 	// so startup cannot hang indefinitely if the daemon or container runtime
-	// metadata is unreachable.
+	// metadata is unreachable. The inspect of the container afterwards bounds
+	// its own retries. In a health check, this timeout bounds them as well.
 	containerLookupTimeout = 5 * time.Second
 )
 
@@ -304,18 +306,31 @@ func (p *process) preRun(cmd *cobra.Command, _ []string) {
 		currentWatchtowerContainerID = ""
 	}
 
-	// Retrieve the current Watchtower container. A failed inspect keeps the
-	// detected ID, so the checks that tell Watchtower apart from other
-	// instances still work.
+	// Retrieve the current Watchtower container.
+	//
+	// When the daemon has no container with the detected ID, Watchtower has no
+	// container of its own on that daemon.
+	// Detection may have picked the wrong ID, or Watchtower may manage a
+	// different Docker host than the one it runs on. Either way it counts as a
+	// failed detection.
+	//
+	// Another failed inspect keeps the detected ID, so the checks that tell
+	// Watchtower apart from other instances still work.
 	if currentWatchtowerContainerID != "" {
+		// A health check uses none of the container's data, so its inspect
+		// shares the lookup's timeout instead of waiting for every retry.
+		inspectCtx := context.Background()
+		if appCfg.Mode.HealthCheck {
+			inspectCtx = ctx
+		}
+
 		currentWatchtowerContainer, inspectErr = client.GetCurrentWatchtowerContainer(
-			ctx,
+			inspectCtx,
 			currentWatchtowerContainerID,
 		)
-		if inspectErr != nil {
-			p.log.Debug().Err(inspectErr).Msg("Failed to get the current Watchtower Container")
-
-			currentWatchtowerContainer = nil
+		if cerrdefs.IsNotFound(inspectErr) {
+			detectErr, inspectErr = inspectErr, nil
+			currentWatchtowerContainerID = ""
 		}
 	}
 
@@ -343,6 +358,15 @@ func (p *process) preRun(cmd *cobra.Command, _ []string) {
 	notifier = notifications.NewNotifier(p.log, appCfg.Notify)
 	notifier.RegisterHook(p.log)
 
+	// Without the container's labels, a scope set only by its scope label is
+	// unknown. Running without a scope would update containers that belong to
+	// another Watchtower instance, so Watchtower exits instead. A health check
+	// runs no updates, so it continues.
+	if inspectErr != nil && appCfg.Filter.Scope == "" && !appCfg.Mode.HealthCheck {
+		cancel()
+		p.exitUnknownScope(inspectErr)
+	}
+
 	if currentWatchtowerContainerUnknown {
 		p.log.Warn().Err(detectErr).Msg(
 			"Could not identify Watchtower's own container. " +
@@ -350,8 +374,7 @@ func (p *process) preRun(cmd *cobra.Command, _ []string) {
 		)
 	} else if inspectErr != nil {
 		p.log.Warn().Err(inspectErr).Msg(
-			"Could not inspect Watchtower's own container. " +
-				"Self-updates are disabled and its scope label is not applied",
+			"Could not inspect Watchtower's own container. Self-updates are disabled",
 		)
 	}
 
@@ -419,6 +442,20 @@ func exitInvalidWatchtowerRestart(
 	recoverCancel()
 	exitCancel()
 	os.Exit(0)
+}
+
+// exitUnknownScope sends err as a notification and ends the process, because
+// Watchtower could not read the scope label of its own container.
+//
+// Kept separate from preRun so os.Exit is not paired with preRun's deferred
+// context cancels (gocritic exitAfterDefer).
+//
+// Parameters:
+//   - err: The error from the last inspect of the current container.
+func (p *process) exitUnknownScope(err error) {
+	p.logNotify("Could not inspect Watchtower's own container to read its scope label. "+
+		"Exiting rather than running without a scope", err)
+	os.Exit(1)
 }
 
 // This function bridges configuration loading and the application's primary workflow.

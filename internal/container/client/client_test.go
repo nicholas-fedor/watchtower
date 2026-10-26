@@ -2161,8 +2161,8 @@ func newStartingDaemonClient(t *testing.T, daemon *startingDaemon) *dockerClient
 // that is not serving its API yet. A queued ping is answered once the daemon
 // serves. A ping that fails without an answer is sent again after a doubling
 // delay. The wait ends early on an error that waiting cannot fix, and gives up
-// at daemonStartupTimeout. Each case runs in a synctest bubble, so the waits
-// take no real time.
+// after three minutes. Each case runs in a synctest bubble, so the waits take
+// no real time.
 func TestPingUntilServing(t *testing.T) {
 	t.Parallel()
 
@@ -2307,4 +2307,113 @@ func TestNegotiateDockerAPI_WaitsForDaemon(t *testing.T) {
 		assert.Equal(t, "1.45", result.APIVersion)
 		assert.Equal(t, "1.45", cli.ClientVersion())
 	})
+}
+
+// TestGetCurrentWatchtowerContainer_Retries verifies how the inspect of the
+// running Watchtower container retries. A transient error is tried again
+// after 2 seconds, up to three attempts or until the caller's context ends.
+// Other errors and a container that does not exist end the lookup at once.
+// Each case runs in a synctest bubble, so the delays take no real time.
+func TestGetCurrentWatchtowerContainer_Retries(t *testing.T) {
+	t.Parallel()
+
+	transient := fmt.Errorf("inspect: %w", cerrdefs.ErrUnavailable)
+
+	tests := []struct {
+		name string
+		// deadline bounds the caller's context. Zero leaves it unbounded.
+		deadline time.Duration
+		// results are the inspect results in order. A nil error answers with
+		// the container.
+		results      []error
+		wantErr      error
+		wantAttempts int
+		wantWait     time.Duration
+	}{
+		{
+			name:         "found at once",
+			results:      []error{nil},
+			wantAttempts: 1,
+		},
+		{
+			name:         "found after a transient error",
+			results:      []error{transient, nil},
+			wantAttempts: 2,
+			wantWait:     currentContainerInspectRetryDelay,
+		},
+		{
+			name:         "transient error on every attempt",
+			results:      []error{transient, transient, transient},
+			wantErr:      cerrdefs.ErrUnavailable,
+			wantAttempts: currentContainerInspectAttempts,
+			wantWait:     (currentContainerInspectAttempts - 1) * currentContainerInspectRetryDelay,
+		},
+		{
+			// The deadline passes during the wait before the third attempt.
+			name:         "caller deadline ends the retries",
+			deadline:     currentContainerInspectRetryDelay + time.Second,
+			results:      []error{transient, transient},
+			wantErr:      cerrdefs.ErrUnavailable,
+			wantAttempts: 2,
+			wantWait:     currentContainerInspectRetryDelay + time.Second,
+		},
+		{
+			name:         "container that does not exist is not tried again",
+			results:      []error{notFoundError("No such container")},
+			wantErr:      cerrdefs.ErrNotFound,
+			wantAttempts: 1,
+		},
+		{
+			name:         "error that waiting cannot fix is not tried again",
+			results:      []error{fmt.Errorf("inspect: %w", cerrdefs.ErrPermissionDenied)},
+			wantErr:      cerrdefs.ErrPermissionDenied,
+			wantAttempts: 1,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			synctest.Test(t, func(t *testing.T) {
+				api := newDockerAPI(t)
+
+				for _, result := range tt.results {
+					var inspect dockerClient.ContainerInspectResult
+					if result == nil {
+						inspect.Container = sourceInspect("/watchtower", true, &dockerContainer.HostConfig{})
+					}
+
+					api.EXPECT().ContainerInspect(mock.Anything, testContainerID, dockerClient.ContainerInspectOptions{}).
+						Return(inspect, result).Once()
+				}
+
+				ctx := t.Context()
+
+				if tt.deadline > 0 {
+					var cancel context.CancelFunc
+
+					ctx, cancel = context.WithTimeout(ctx, tt.deadline)
+					defer cancel()
+				}
+
+				start := time.Now()
+
+				current, err := (&client{log: newTestLogger(t), api: api}).GetCurrentWatchtowerContainer(ctx, testContainerID)
+
+				assert.Equal(t, tt.wantWait, time.Since(start))
+				assert.Len(t, api.Calls, tt.wantAttempts)
+
+				if tt.wantErr != nil {
+					require.ErrorIs(t, err, tt.wantErr)
+					assert.Nil(t, current)
+
+					return
+				}
+
+				require.NoError(t, err)
+				assert.Equal(t, types.ContainerID(testContainerID), current.ID())
+			})
+		})
+	}
 }

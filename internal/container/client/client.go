@@ -63,6 +63,19 @@ const (
 	// maxListRetries is the maximum number of retry attempts for transient Docker
 	// connection failures when listing containers.
 	maxListRetries = 3
+
+	// currentContainerInspectAttempts is how many times
+	// [Client.GetCurrentWatchtowerContainer] inspects the container before it
+	// gives up.
+	//
+	// A daemon that has just started serving its API can be slow to answer.
+	currentContainerInspectAttempts = 3
+
+	// currentContainerInspectTimeout bounds each of those inspects.
+	currentContainerInspectTimeout = 5 * time.Second
+
+	// currentContainerInspectRetryDelay is the pause between those inspects.
+	currentContainerInspectRetryDelay = 2 * time.Second
 )
 
 // baseListRetryDelay is the base delay for exponential backoff between retries.
@@ -119,10 +132,12 @@ type Client interface {
 	GetContainer(ctx context.Context, containerID types.ContainerID) (types.Container, error)
 
 	// GetCurrentWatchtowerContainer retrieves minimal container information
-	// for the specified container ID, skipping image inspection.
+	// for the specified container ID, skipping image inspection. A transient
+	// inspect failure is tried again for up to about 20 seconds, or until ctx
+	// ends.
 	//
 	// Parameters:
-	//   - ctx: Context for cancellation and timeout control.
+	//   - ctx: Context for cancellation and timeout control. It bounds the retries.
 	//   - containerID: ID of the container to retrieve.
 	//
 	// Returns:
@@ -501,7 +516,7 @@ func NewClient(log *zerolog.Logger, opts ClientOptions) Client {
 }
 
 // negotiateDockerAPI pings the daemon to validate connectivity and negotiate the API version.
-// It waits for a daemon that is not serving its API yet, up to daemonStartupTimeout.
+// It waits up to three minutes for a daemon that is not serving its API yet.
 //
 // When DOCKER_API_VERSION is incompatible with the server, it recreates the client without a
 // fixed version so negotiation can select a supported API. A fixed version is incompatible when
@@ -562,13 +577,11 @@ func negotiateDockerAPI(
 	return cli, result, nil
 }
 
-// pingUntilServing pings the daemon until it answers or daemonStartupTimeout
-// passes. It stops early on an error that waiting cannot fix.
-//
+// pingUntilServing pings the daemon until it answers, for up to three minutes.
 // A daemon that is restoring its containers holds the connection and answers
 // the queued ping once it serves its API. A ping that fails without an answer
-// is sent again after a delay that grows by daemonRetryBackoff up to
-// daemonMaxRetryDelay.
+// is sent again. The wait ends early on an error that a later ping cannot fix,
+// such as a TLS error or a 4xx answer.
 //
 // Parameters:
 //   - log: Process logger.
@@ -601,9 +614,13 @@ func pingUntilServing(log *zerolog.Logger, cli *dockerClient.Client) (dockerClie
 	defer noticeTimer.Stop()
 
 	policy := backoff.NewExponentialBackOff()
+	// Wait 1 second before the first retry.
 	policy.InitialInterval = daemonRetryDelay
+	// Double the wait after each retry.
 	policy.Multiplier = daemonRetryBackoff
+	// Never wait more than 10 seconds.
 	policy.MaxInterval = daemonMaxRetryDelay
+	// No jitter, since one client has no herd to spread out.
 	policy.RandomizationFactor = 0
 
 	result, err := backoff.Retry(ctx, func() (dockerClient.PingResult, error) {
@@ -613,14 +630,17 @@ func pingUntilServing(log *zerolog.Logger, cli *dockerClient.Client) (dockerClie
 		}
 
 		err = fmt.Errorf("ping Docker daemon: %w", err)
-		if !daemonNotServing(err) {
+		if !isTransientError(err) {
 			return result, backoff.Permanent(err)
 		}
 
 		return result, err
 	},
+		// Wait between pings as configured above.
 		backoff.WithBackOff(policy),
+		// Start no wait that would end after three minutes.
 		backoff.WithMaxElapsedTime(daemonStartupTimeout),
+		// Log each retry, and the first at info.
 		backoff.WithNotify(func(err error, _ time.Duration) {
 			retries++
 
@@ -650,27 +670,31 @@ func pingUntilServing(log *zerolog.Logger, cli *dockerClient.Client) (dockerClie
 	return result, nil
 }
 
-// daemonNotServing reports whether a startup ping error may pass once the
-// daemon serves its API.
+// isTransientError reports whether a Docker API error may pass on a later
+// attempt. That happens once the daemon or a proxy in front of it serves its
+// API.
 //
-// It accepts every error isDaemonConnectionError accepts. It also accepts any
-// transport failure, which the Docker client reports as a connection failure.
+// It accepts the lost connections that the container list retries, such as the
+// Docker client's "Cannot connect" error and an unexpected end of the answer.
+// It also accepts any transport failure, which the Docker client reports as a
+// connection failure.
 // Examples are a name that does not resolve yet, a refused connection, and a
 // missing socket. A 5xx answer counts too, since a socket proxy answers that
-// way while its daemon is down. TLS and certificate errors and other answers
-// never pass, so they end the wait at once.
+// way while its daemon is down, and so does a request that timed out. TLS and
+// certificate errors and other answers never pass.
 //
 // Parameters:
-//   - err: Error from a ping.
+//   - err: Error from a Docker API call.
 //
 // Returns:
-//   - bool: True when the ping should be sent again.
-func daemonNotServing(err error) bool {
+//   - bool: True when the call may succeed if it is sent again.
+func isTransientError(err error) bool {
 	if isTLSSetupError(err) {
 		return false
 	}
 
-	return isDaemonConnectionError(err) ||
+	return errors.Is(err, context.DeadlineExceeded) ||
+		isDaemonConnectionError(err) ||
 		dockerClient.IsErrConnectionFailed(err) ||
 		cerrdefs.IsInternal(err) ||
 		cerrdefs.IsUnavailable(err)
@@ -832,13 +856,17 @@ func (c *client) GetContainer(ctx context.Context, containerID types.ContainerID
 // GetCurrentWatchtowerContainer retrieves container information for the
 // specified container ID, skipping image inspection.
 //
+// A transient failure, such as a timeout, a refused connection, or a 5xx
+// answer, is tried again, so the call can take up to about 20 seconds. ctx can
+// end it sooner. Other failures return at once.
+//
 // Parameters:
-//   - ctx: Context for cancellation and timeout control.
+//   - ctx: Context for cancellation and timeout control that bounds the retries.
 //   - containerID: ID of the container to retrieve.
 //
 // Returns:
 //   - types.Container: Container with imageInfo set to nil.
-//   - error: Non-nil if inspection fails, nil on success.
+//   - error: Non-nil if every inspect fails, nil on success.
 func (c *client) GetCurrentWatchtowerContainer(
 	ctx context.Context,
 	containerID types.ContainerID,
@@ -850,17 +878,50 @@ func (c *client) GetCurrentWatchtowerContainer(
 
 	clog.Debug().Msg("Inspecting current Watchtower container")
 
-	containerInfo, err := c.api.ContainerInspect(
-		ctx,
-		string(containerID),
-		dockerClient.ContainerInspectOptions{},
+	containerInfo, err := backoff.Retry(ctx, func() (dockerClient.ContainerInspectResult, error) {
+		// Give each inspect 5 seconds.
+		attemptCtx, cancel := context.WithTimeout(ctx, currentContainerInspectTimeout)
+		defer cancel()
+
+		result, err := c.api.ContainerInspect(
+			attemptCtx,
+			string(containerID),
+			dockerClient.ContainerInspectOptions{},
+		)
+		if err == nil {
+			return result, nil
+		}
+
+		err = fmt.Errorf("%w: %w", errInspectContainerFailed, err)
+		if !isTransientError(err) {
+			return result, backoff.Permanent(err)
+		}
+
+		return result, err
+	},
+		// Wait 2 seconds between inspects.
+		backoff.WithBackOff(backoff.NewConstantBackOff(currentContainerInspectRetryDelay)),
+		// Inspect at most three times.
+		backoff.WithMaxTries(currentContainerInspectAttempts),
+		// No time limit beyond the tries and ctx.
+		backoff.WithMaxElapsedTime(0),
+		// Log each retry at debug.
+		backoff.WithNotify(func(err error, _ time.Duration) {
+			clog.Debug().Err(err).Msg("Failed to inspect current Watchtower container. Retrying")
+		}),
 	)
 	if err != nil {
+		// Report the last inspect error rather than the retry loop's summary.
+		retryErr := backoff.AsRetryError(err)
+		if retryErr != nil {
+			err = retryErr.LastErr
+		}
+
 		clog.Debug().
 			Err(err).
 			Msg("Failed to inspect current Watchtower container")
 
-		return nil, fmt.Errorf("%w: %w", errInspectContainerFailed, err)
+		return nil, err
 	}
 
 	clog.Debug().Msg("Retrieved minimal container info")

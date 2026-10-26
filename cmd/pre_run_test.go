@@ -18,6 +18,7 @@ import (
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 
+	cerrdefs "github.com/containerd/errdefs"
 	dockerContainer "github.com/moby/moby/api/types/container"
 	dockerImage "github.com/moby/moby/api/types/image"
 
@@ -140,6 +141,21 @@ func selfContainer(name, hostname string) types.Container {
 	)
 }
 
+// Context matchers for the inspect of the current container. withDeadline
+// matches a context that has a deadline, and withoutDeadline one that has not.
+var (
+	withDeadline = mock.MatchedBy(func(ctx context.Context) bool {
+		_, ok := ctx.Deadline()
+
+		return ok
+	})
+	withoutDeadline = mock.MatchedBy(func(ctx context.Context) bool {
+		_, ok := ctx.Deadline()
+
+		return !ok
+	})
+)
+
 // TestPreRun_SelfDetection records how preRun finds the Watchtower container
 // it runs in, and what it keeps and warns about when detection or the lookup
 // fails. A process in a container whose ID is not known is marked unknown. A
@@ -207,10 +223,14 @@ func TestPreRun_SelfDetection(t *testing.T) {
 			wantCalls: []string{"ListContainers all", "GetCurrentWatchtowerContainer cccccccccccc"},
 		},
 		{
-			name:      "lookup fails and the ID is kept",
+			// A scope set explicitly does not depend on the container's label,
+			// so preRun continues without the container. The inspect bounds
+			// its own retries, so preRun passes a context without a deadline.
+			name:      "lookup fails with an explicit scope and the ID is kept",
+			args:      []string{"--scope", "prod"},
 			detection: selfDetection{mountinfo: mountinfoWithSelf()},
 			setup: func(client *mockContainerClient.MockClient) {
-				client.EXPECT().GetCurrentWatchtowerContainer(mock.Anything, selfID).Return(nil, errRunTestDocker)
+				client.EXPECT().GetCurrentWatchtowerContainer(withoutDeadline, selfID).Return(nil, errRunTestDocker)
 			},
 			wantID:      selfID,
 			wantCalls:   []string{"GetCurrentWatchtowerContainer cccccccccccc"},
@@ -218,16 +238,35 @@ func TestPreRun_SelfDetection(t *testing.T) {
 			wantError:   errRunTestDocker.Error(),
 		},
 		{
-			name:      "lookup times out and the ID is kept",
-			detection: selfDetection{mountinfo: mountinfoWithSelf(), marker: true},
+			// A health check runs no updates, so it continues without a scope.
+			// Its inspect shares the lookup's deadline instead of waiting for
+			// every retry.
+			name:      "lookup fails during a health check and the ID is kept",
+			args:      []string{"--health-check"},
+			detection: selfDetection{mountinfo: mountinfoWithSelf()},
 			setup: func(client *mockContainerClient.MockClient) {
-				client.EXPECT().GetCurrentWatchtowerContainer(mock.Anything, selfID).
+				client.EXPECT().GetCurrentWatchtowerContainer(withDeadline, selfID).
 					Return(nil, fmt.Errorf("inspect: %w", context.DeadlineExceeded))
 			},
 			wantID:      selfID,
 			wantCalls:   []string{"GetCurrentWatchtowerContainer cccccccccccc"},
 			wantWarning: "Could not inspect Watchtower's own container",
 			wantError:   context.DeadlineExceeded.Error(),
+		},
+		{
+			// The daemon has no container with the detected ID, so Watchtower
+			// has none of its own there. preRun treats that as a failed
+			// detection and does not try again.
+			name:      "detected ID names no container and is cleared",
+			detection: selfDetection{mountinfo: mountinfoWithSelf(), marker: true},
+			setup: func(client *mockContainerClient.MockClient) {
+				client.EXPECT().GetCurrentWatchtowerContainer(mock.Anything, selfID).
+					Return(nil, fmt.Errorf("inspect: %w", cerrdefs.ErrNotFound))
+			},
+			wantCalls:   []string{"GetCurrentWatchtowerContainer cccccccccccc"},
+			wantUnknown: true,
+			wantWarning: "Could not identify Watchtower's own container",
+			wantError:   cerrdefs.ErrNotFound.Error(),
 		},
 		{
 			name:      "old instance continues in run-once mode",
@@ -502,6 +541,13 @@ func TestPreRun_Exit(t *testing.T) {
 			wantExitCode: 0,
 			wantOutput:   "SetRestartPolicy watchtower no",
 		},
+		{
+			// Without an explicit scope, the scope label is unknown. preRun then
+			// exits rather than running without a scope.
+			helperCase:   "unreadable-scope-label",
+			wantExitCode: 1,
+			wantOutput:   "Could not inspect Watchtower's own container to read its scope label",
+		},
 	}
 
 	for _, tt := range tests {
@@ -572,6 +618,10 @@ func preRunExitHelper(t *testing.T, helperCase string) {
 
 		mockClient.EXPECT().GetCurrentWatchtowerContainer(mock.Anything, selfID).Return(parent, nil)
 		mockClient.EXPECT().ListContainers(mock.Anything, withFilter).Return([]types.Container{parent}, nil).Maybe()
+	case "unreadable-scope-label":
+		detection = selfDetection{mountinfo: mountinfoWithSelf()}
+
+		mockClient.EXPECT().GetCurrentWatchtowerContainer(mock.Anything, selfID).Return(nil, errRunTestDocker)
 	default:
 		panic("unknown preRun exit helper case " + helperCase)
 	}

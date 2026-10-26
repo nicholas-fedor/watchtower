@@ -576,15 +576,15 @@ func expectNewRunning(client *mockContainerClient.MockClient, running bool) type
 
 // TestOrchestrateSelfUpdate_RecoveryAfterDeadline verifies that the old
 // container is still recovered when the orchestration deadline expires during
-// the failing step. Each case runs in a synctest bubble under the real
-// orchestratorTimeout, and the failing Docker call blocks until that deadline
-// passes. Every recovery call must then receive a live context whose deadline
-// is orchestratorRecoveryTimeout away.
+// the failing step. Each case runs in a synctest bubble under the real five
+// minute orchestration timeout. The failing Docker call blocks until that
+// deadline passes. Every recovery call must then receive a live context with
+// a deadline of its own, 60 seconds away.
 func TestOrchestrateSelfUpdate_RecoveryAfterDeadline(t *testing.T) {
 	t.Parallel()
 
-	// liveCtx matches a context that is not done and whose deadline is
-	// orchestratorRecoveryTimeout from now. The bubble's clock stands still
+	// liveCtx matches a context that is not done and whose deadline is the
+	// 60 second recovery timeout from now. The bubble's clock stands still
 	// while code runs, so the deadline matches exactly.
 	liveCtx := mock.MatchedBy(func(ctx context.Context) bool {
 		deadline, hasDeadline := ctx.Deadline()
