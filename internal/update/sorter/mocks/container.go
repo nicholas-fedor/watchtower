@@ -144,3 +144,4 @@ func (c *SimpleContainer) IsCreated() bool                                  { re
 func (c *SimpleContainer) GetCreateConfig() *dockerContainer.Config         { return nil }
 func (c *SimpleContainer) GetCreateHostConfig() *dockerContainer.HostConfig { return nil }
 func (c *SimpleContainer) HasExposedPorts() bool                            { return false }
+func (c *SimpleContainer) RestartsAutomatically() bool                      { return false }

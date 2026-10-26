@@ -42,7 +42,7 @@ Skipping container update (self-dependency)
 Skipping container update (circular dependency)
 Could not identify Watchtower's own container. Self-updates are disabled and old instances will not be removed
 Could not inspect Watchtower's own container. Self-updates are disabled
-Could not inspect Watchtower's own container to read its scope label. Exiting with restarts disabled rather than running without a scope
-Could not inspect Watchtower's own container to read its scope label. Exiting rather than running without a scope, but restarts could not be disabled
+Could not inspect Watchtower's own container to read its scope label. Exiting rather than running without a scope
+Could not disable Watchtower's restart policy. The runtime may start it again
 Unrecognized message with fields
 Unrecognized message without fields

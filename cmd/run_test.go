@@ -103,7 +103,8 @@ func setRunState(t *testing.T, state runTestState) {
 }
 
 // runFixtureContainer returns a running container with the given ID, name,
-// creation time, and labels.
+// creation time, and labels. Its restart policy is "unless-stopped", so
+// disabling its restarts sends a policy update.
 func runFixtureContainer(id, name, created string, labels map[string]string) types.Container {
 	return container.NewContainer(nil,
 		&dockerContainer.InspectResponse{
@@ -116,7 +117,9 @@ func runFixtureContainer(id, name, created string, labels map[string]string) typ
 				Image:  "nickfedor/watchtower:latest",
 				Labels: labels,
 			},
-			HostConfig: &dockerContainer.HostConfig{},
+			HostConfig: &dockerContainer.HostConfig{
+				RestartPolicy: dockerContainer.RestartPolicy{Name: dockerContainer.RestartPolicyUnlessStopped},
+			},
 		},
 		&dockerImage.InspectResponse{ID: "sha256:" + id},
 	)

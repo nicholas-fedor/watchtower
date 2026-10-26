@@ -13,8 +13,6 @@ import (
 	"github.com/rs/zerolog"
 	"golang.org/x/sync/errgroup"
 
-	dockerContainer "github.com/moby/moby/api/types/container"
-
 	"github.com/nicholas-fedor/watchtower/internal/container"
 	containerClient "github.com/nicholas-fedor/watchtower/internal/container/client"
 	"github.com/nicholas-fedor/watchtower/internal/container/filters"
@@ -168,11 +166,7 @@ func update(
 					defer setNoRestartCancel()
 
 					//nolint:contextcheck // setNoRestartCtx is intentionally used for restart policy update
-					_ = client.SetRestartPolicy(
-						setNoRestartCtx,
-						c.ID(),
-						dockerContainer.RestartPolicy{Name: dockerContainer.RestartPolicyDisabled},
-					)
+					disableOldWatchtowerRestarts(log, setNoRestartCtx, c, client)
 
 					return nil, nil, errOldSelfDetected
 				}

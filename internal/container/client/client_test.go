@@ -1559,7 +1559,7 @@ func Test_isDaemonConnectionError(t *testing.T) {
 
 // TestClientSetRestartPolicy verifies the restart policy the client sends to
 // Docker, including the normalization of an empty policy to "no", and that a
-// failed update is logged and returned.
+// failed update is returned.
 func TestClientSetRestartPolicy(t *testing.T) {
 	t.Parallel()
 
@@ -1629,20 +1629,17 @@ func TestClientSetRestartPolicy(t *testing.T) {
 	t.Run("the container update fails", func(t *testing.T) {
 		t.Parallel()
 
-		t.Run("should log and return the failure", func(t *testing.T) {
+		t.Run("should return the failure", func(t *testing.T) {
 			t.Parallel()
 
 			api := newDockerAPI(t)
 			expectUpdate(api, dockerContainer.RestartPolicy{Name: dockerContainer.RestartPolicyDisabled}, daemonError("update failed"))
 
-			log, logOutput := logcapture.New(zerolog.DebugLevel)
-
-			err := (&client{log: log, api: api}).SetRestartPolicy(
+			err := (&client{log: newTestLogger(t), api: api}).SetRestartPolicy(
 				t.Context(), cid, dockerContainer.RestartPolicy{Name: dockerContainer.RestartPolicyDisabled},
 			)
 			require.ErrorIs(t, err, errSetRestartPolicyFailed)
-			require.ErrorContains(t, err, "update failed")
-			assert.Contains(t, logOutput.String(), "Failed to set container restart policy")
+			assert.ErrorContains(t, err, "update failed")
 		})
 	})
 }

@@ -8,12 +8,16 @@ import (
 	"testing"
 	"time"
 
+	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 
 	dockerContainer "github.com/moby/moby/api/types/container"
 	dockerNetwork "github.com/moby/moby/api/types/network"
 
+	mockContainerClient "github.com/nicholas-fedor/watchtower/internal/container/client/mocks"
+	"github.com/nicholas-fedor/watchtower/internal/testutil/logcapture"
 	mockUpdate "github.com/nicholas-fedor/watchtower/internal/update/mocks"
 	"github.com/nicholas-fedor/watchtower/internal/update/state"
 	"github.com/nicholas-fedor/watchtower/pkg/types"
@@ -1913,4 +1917,43 @@ func Test_performRollingRestart(t *testing.T) {
 			assert.Contains(t, containerErr.Error(), "restart skipped")
 		})
 	})
+}
+
+// TestDisableOldWatchtowerRestarts verifies that the restart policy of an old
+// Watchtower container is set to "no", and that a failure is logged only at
+// debug, since an old container that starts again exits on its own.
+func TestDisableOldWatchtowerRestarts(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name      string
+		updateErr error
+		wantLog   bool
+	}{
+		{name: "the update succeeds", wantLog: false},
+		{name: "the update fails", updateErr: errors.New("update refused"), wantLog: true},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			oldContainer := mockUpdate.CreateMockContainer("old-id", "/watchtower-old-000000000000", "nickfedor/watchtower:latest", time.Now())
+
+			client := mockContainerClient.NewMockClient(t)
+			client.EXPECT().SetRestartPolicy(mock.Anything, oldContainer.ID(),
+				dockerContainer.RestartPolicy{Name: dockerContainer.RestartPolicyDisabled}).Return(tt.updateErr).Once()
+
+			log, logOutput := logcapture.New(zerolog.DebugLevel)
+			disableOldWatchtowerRestarts(log, t.Context(), oldContainer, client)
+
+			if tt.wantLog {
+				assert.Contains(t, logOutput.String(), "Failed to disable the restart policy of the old Watchtower container")
+				assert.Contains(t, logOutput.String(), "update refused")
+				assert.Contains(t, logOutput.String(), "level=debug")
+			} else {
+				assert.Empty(t, logOutput.String())
+			}
+		})
+	}
 }

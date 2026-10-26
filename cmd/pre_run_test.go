@@ -121,7 +121,8 @@ func setProcessFs(t *testing.T, fsys fs.FS) {
 }
 
 // selfContainer returns the Watchtower container preRun detects, with the
-// given name and container hostname.
+// given name and container hostname. Its restart policy is "unless-stopped",
+// so disabling its restarts sends a policy update.
 func selfContainer(name, hostname string) types.Container {
 	return container.NewContainer(nil,
 		&dockerContainer.InspectResponse{
@@ -135,7 +136,9 @@ func selfContainer(name, hostname string) types.Container {
 				Image:    "nickfedor/watchtower:latest",
 				Labels:   map[string]string{watchtowerLabelKey: "true"},
 			},
-			HostConfig: &dockerContainer.HostConfig{},
+			HostConfig: &dockerContainer.HostConfig{
+				RestartPolicy: dockerContainer.RestartPolicy{Name: dockerContainer.RestartPolicyUnlessStopped},
+			},
 		},
 		&dockerImage.InspectResponse{ID: "sha256:" + string(selfID)},
 	)
@@ -520,7 +523,8 @@ func TestPreRun_Exit(t *testing.T) {
 	tests := []struct {
 		helperCase   string
 		wantExitCode int
-		wantOutput   []string
+		// wantOutput lists lines the output must contain, in this order.
+		wantOutput []string
 	}{
 		{helperCase: "invalid-log-format", wantExitCode: 1, wantOutput: []string{"Failed to initialize logging"}},
 		{helperCase: "invalid-configuration", wantExitCode: 1, wantOutput: []string{"Failed to load configuration"}},
@@ -549,17 +553,18 @@ func TestPreRun_Exit(t *testing.T) {
 			wantExitCode: 1,
 			wantOutput: []string{
 				"SetRestartPolicy cccccccccccc no",
-				"Exiting with restarts disabled rather than running without a scope",
+				"Exiting rather than running without a scope",
 			},
 		},
 		{
 			// When the restart policy cannot be disabled, preRun still exits, and
-			// its message says that the runtime may start Watchtower again.
+			// it reports that the runtime may start Watchtower again.
 			helperCase:   "unreadable-scope-label-restarts-kept",
 			wantExitCode: 1,
 			wantOutput: []string{
 				"SetRestartPolicy cccccccccccc no",
-				"Exiting rather than running without a scope, but restarts could not be disabled",
+				"Could not disable Watchtower's restart policy. The runtime may start it again",
+				"Exiting rather than running without a scope",
 			},
 		},
 	}
@@ -588,8 +593,15 @@ func TestPreRun_Exit(t *testing.T) {
 
 			assert.Equal(t, tt.wantExitCode, exitCode, "output:\n%s", out)
 
+			// The lines must appear in order, so each search starts after the
+			// previous match.
+			rest := string(out)
+
 			for _, want := range tt.wantOutput {
-				assert.Contains(t, string(out), want)
+				var found bool
+
+				_, rest, found = strings.Cut(rest, want)
+				require.True(t, found, "missing %q after the earlier lines in output:\n%s", want, out)
 			}
 
 			assert.NotContains(t, string(out), "PASS", "the helper must end the process")

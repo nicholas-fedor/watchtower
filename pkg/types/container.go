@@ -53,6 +53,7 @@ type Container interface {
 	GetCreateHostConfig() *dockerContainer.HostConfig // Host creation config.
 	GetContainerChain() (string, bool)                // Container chain label value and presence.
 	HasExposedPorts() bool                            // Exposed ports presence check.
+	RestartsAutomatically() bool                      // Restart policy other than "no".
 }
 
 // ImageID is a hash string for a container image.

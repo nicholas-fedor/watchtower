@@ -28,11 +28,13 @@ import (
 
 	"github.com/nicholas-fedor/watchtower/internal/api"
 	updateHandler "github.com/nicholas-fedor/watchtower/internal/api/handlers/update"
+	"github.com/nicholas-fedor/watchtower/internal/container"
 	containerClient "github.com/nicholas-fedor/watchtower/internal/container/client"
 	mockContainerClient "github.com/nicholas-fedor/watchtower/internal/container/client/mocks"
 	"github.com/nicholas-fedor/watchtower/internal/observability/logging"
 	"github.com/nicholas-fedor/watchtower/internal/observability/metrics"
 	"github.com/nicholas-fedor/watchtower/internal/settings"
+	"github.com/nicholas-fedor/watchtower/internal/testutil/logcapture"
 	"github.com/nicholas-fedor/watchtower/internal/update"
 	"github.com/nicholas-fedor/watchtower/internal/update/schedule"
 	"github.com/nicholas-fedor/watchtower/pkg/types"
@@ -1546,4 +1548,65 @@ func TestSelfUpdateBlocked(t *testing.T) {
 			assert.Equal(t, tt.want, selfUpdateBlocked(current, tt.currentID, tt.ephemeral))
 		})
 	}
+}
+
+// TestDisableRestarts verifies that disableRestarts sets the restart policy of
+// Watchtower's own container to "no" and reports an error only when that
+// fails, since the runtime may then start Watchtower again. A container whose
+// policy is already "no" needs no update. It changes package state, so it does
+// not run in parallel.
+func TestDisableRestarts(t *testing.T) {
+	const wantError = "Could not disable Watchtower's restart policy. The runtime may start it again"
+
+	tests := []struct {
+		name string
+		// current is the inspected Watchtower container, or nil when it was
+		// not inspected.
+		current    types.Container
+		wantUpdate bool
+		updateErr  error
+		wantError  bool
+	}{
+		{name: "the update succeeds", current: currentWatchtower(), wantUpdate: true},
+		{name: "the update fails", current: currentWatchtower(), wantUpdate: true, updateErr: errRunTestDocker, wantError: true},
+		{name: "the container was not inspected", wantUpdate: true},
+		{name: "the policy is already no", current: currentWatchtowerWithoutRestarts(), wantUpdate: false},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			mockClient := mockContainerClient.NewMockClient(t)
+			if tt.wantUpdate {
+				mockClient.EXPECT().SetRestartPolicy(mock.Anything, types.ContainerID("c0c0"),
+					dockerContainer.RestartPolicy{Name: dockerContainer.RestartPolicyDisabled}).
+					Return(tt.updateErr).Once()
+			}
+
+			setRunState(t, runTestState{client: mockClient, current: tt.current, currentID: "c0c0"})
+
+			log, logOutput := logcapture.New(zerolog.ErrorLevel)
+			(&process{log: log}).disableRestarts()
+
+			if tt.wantError {
+				assert.Contains(t, logOutput.String(), wantError)
+				assert.Contains(t, logOutput.String(), errRunTestDocker.Error())
+			} else {
+				assert.Empty(t, logOutput.String())
+			}
+		})
+	}
+}
+
+// currentWatchtowerWithoutRestarts returns the Watchtower container the tests
+// run as, with the restart policy "no".
+func currentWatchtowerWithoutRestarts() types.Container {
+	return container.NewContainer(nil,
+		&dockerContainer.InspectResponse{
+			ID:         "c0c0",
+			Name:       "/watchtower",
+			Config:     &dockerContainer.Config{Labels: map[string]string{watchtowerLabelKey: "true"}},
+			HostConfig: &dockerContainer.HostConfig{},
+		},
+		nil,
+	)
 }
