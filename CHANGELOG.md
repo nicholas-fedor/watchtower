@@ -79,6 +79,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Chores
 
+- Update module github.com/valyala/fasthttp to v1.77.0 by @renovate[bot] in [#3171](https://github.com/nicholas-fedor/watchtower/pull/3171)
 - Update module github.com/molecule-man/go-brrr to v1.3.1 by @renovate[bot] in [#3132](https://github.com/nicholas-fedor/watchtower/pull/3132)
 - Update module github.com/moby/sys/capability to v0.5.0 by @renovate[bot] in [#3120](https://github.com/nicholas-fedor/watchtower/pull/3120)
 - Update docker/login-action action to v4.7.0 by @renovate[bot] in [#3093](https://github.com/nicholas-fedor/watchtower/pull/3093)
