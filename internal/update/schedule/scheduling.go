@@ -15,7 +15,6 @@ import (
 	"github.com/robfig/cron/v3"
 	"github.com/rs/zerolog"
 
-	"github.com/nicholas-fedor/watchtower/internal/container"
 	"github.com/nicholas-fedor/watchtower/internal/observability/logging"
 	"github.com/nicholas-fedor/watchtower/internal/observability/metrics"
 	"github.com/nicholas-fedor/watchtower/pkg/types"
@@ -90,8 +89,6 @@ type ScheduleDeps struct {
 	// SkipFirstRun skips Watchtower self-update on the first scheduled run
 	// (useful after self-update cleanup of old instances).
 	SkipFirstRun bool
-	// CurrentWatchtowerContainer is the running Watchtower container for parent checking.
-	CurrentWatchtowerContainer types.Container
 	// StartupMessageSent is true when the startup message was already sent
 	// (for example by the HTTP API in blocking mode).
 	StartupMessageSent bool
@@ -138,45 +135,10 @@ func RunUpgradesOnSchedule(ctx context.Context, deps ScheduleDeps) error {
 		),
 	)
 
-	// Determine if self-update should be skipped due to exposed port conflicts.
-	// When a port is configured (e.g., HTTP API), the old container holds the port
-	// while the new container tries to bind it, resulting in both containers being stopped.
-	// Ephemeral self-updates are exempt from this restriction because they remove
-	// the old container before creating the new one, avoiding port conflicts.
-	skipSelfUpdateForPorts := deps.CurrentWatchtowerContainer != nil &&
-		deps.CurrentWatchtowerContainer.HasExposedPorts() &&
-		!deps.BaseParams.EphemeralSelfUpdate
-
 	// Define the update function to be used both for scheduled runs and immediate execution.
 	// skipWatchtowerSelfUpdate: whether to skip updating the Watchtower container itself
 	// blocking: whether to wait for the lock (true for scheduled runs, false for immediate runs)
 	updateFunc := func(skipWatchtowerSelfUpdate, blocking bool) {
-		// Skip self-update if the container has exposed ports to prevent port conflicts.
-		// This takes precedence over the skipWatchtowerSelfUpdate parameter.
-		if skipSelfUpdateForPorts {
-			skipWatchtowerSelfUpdate = true
-
-			log.Debug().Msg("Published ports detected - self-update skipped.")
-		}
-
-		// Skip update if this is a Watchtower parent container (from self-update chain)
-		if deps.CurrentWatchtowerContainer != nil {
-			chain, _ := deps.CurrentWatchtowerContainer.GetContainerChain()
-
-			if container.IsWatchtowerParent(deps.CurrentWatchtowerContainer.ID(), chain) {
-				log.Debug().Msg("Skipping scheduled update for Watchtower parent container")
-
-				nextRuns := scheduler.Entries()
-				if len(nextRuns) > 0 {
-					log.Debug().Msg(
-						"Scheduled next run: " + nextRuns[0].Schedule.Next(time.Now()).String(),
-					)
-				}
-
-				return
-			}
-		}
-
 		// Acquire the update lock: blocking waits until shutdown, non-blocking returns if unavailable
 		if blocking {
 			err := lock.Lock(ctx)
@@ -326,38 +288,4 @@ func RunUpgradesOnSchedule(ctx context.Context, deps ScheduleDeps) error {
 	log.Debug().Msg("Scheduler stopped and update completed.")
 
 	return nil
-}
-
-// ShouldExitDueToInvalidRestart determines if the program should exit due to an invalid restart of an old Watchtower container.
-//
-// This function checks two conditions:
-//  1. The current container's name matches the watchtower-old-* prefix, indicating it is
-//     a predecessor renamed during self-update that should not run.
-//  2. The current container is present in the container chain label, indicating it is
-//     an ancestor in the self-update lineage.
-//
-// If either condition is true and runOnce is false, the program should exit
-// to prevent an old Watchtower container from running.
-//
-// Parameters:
-//   - c: The current Watchtower container to check.
-//   - runOnce: Whether the process is in run-once mode.
-//
-// Returns:
-//   - bool: True if the program should exit due to an invalid restart, false otherwise.
-func ShouldExitDueToInvalidRestart(c types.Container, runOnce bool) bool {
-	if c == nil {
-		return false
-	}
-
-	if container.IsOldContainer(c.Name()) && !runOnce {
-		return true
-	}
-
-	chain, present := c.GetContainerChain()
-	if !present {
-		return false
-	}
-
-	return container.IsWatchtowerParent(c.ID(), chain) && !runOnce
 }

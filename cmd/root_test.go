@@ -1498,58 +1498,6 @@ func TestRootCommand_ReviveStoppedFlagParsing(t *testing.T) {
 	}
 }
 
-// TestSelfUpdateBlocked verifies when a self-update cannot replace the running
-// Watchtower container safely. Published host ports block a rename-based
-// self-update but not an ephemeral one. A container that was detected but not
-// inspected blocks both, because its ports are unknown.
-func TestSelfUpdateBlocked(t *testing.T) {
-	t.Parallel()
-
-	tests := []struct {
-		name string
-		// ports is whether the current container publishes host ports. Nil
-		// leaves the current container uninspected.
-		ports     *bool
-		currentID types.ContainerID
-		ephemeral bool
-		want      bool
-	}{
-		{name: "outside a container", want: false},
-		{name: "container without published ports", ports: new(false), currentID: "c0c0", want: false},
-		{name: "container with published ports", ports: new(true), currentID: "c0c0", want: true},
-		{
-			name:      "ephemeral self-update with published ports",
-			ports:     new(true),
-			currentID: "c0c0",
-			ephemeral: true,
-			want:      false,
-		},
-		{name: "detected container that was not inspected", currentID: "c0c0", want: true},
-		{
-			name:      "ephemeral self-update of a detected container that was not inspected",
-			currentID: "c0c0",
-			ephemeral: true,
-			want:      true,
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			t.Parallel()
-
-			var current types.Container
-
-			if tt.ports != nil {
-				mockCurrent := mockTypes.NewMockContainer(t)
-				mockCurrent.EXPECT().HasExposedPorts().Return(*tt.ports).Maybe()
-				current = mockCurrent
-			}
-
-			assert.Equal(t, tt.want, selfUpdateBlocked(current, tt.currentID, tt.ephemeral))
-		})
-	}
-}
-
 // TestDisableRestarts verifies that disableRestarts sets the restart policy of
 // Watchtower's own container to "no" and reports an error only when that
 // fails, since the runtime may then start Watchtower again. A container whose

@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"net"
 	"net/http"
+	"net/netip"
 	"os"
 	"os/exec"
 	"strings"
@@ -21,6 +22,7 @@ import (
 
 	dockerContainer "github.com/moby/moby/api/types/container"
 	dockerImage "github.com/moby/moby/api/types/image"
+	dockerNetwork "github.com/moby/moby/api/types/network"
 
 	"github.com/nicholas-fedor/watchtower/internal/container"
 	containerClient "github.com/nicholas-fedor/watchtower/internal/container/client"
@@ -129,6 +131,33 @@ func runFixtureContainer(id, name, created string, labels map[string]string) typ
 func currentWatchtower() types.Container {
 	return runFixtureContainer("c0c0", "/watchtower", "2026-10-08T12:00:00Z",
 		map[string]string{watchtowerLabelKey: "true"})
+}
+
+// currentWatchtowerWithPorts returns the Watchtower container the tests run
+// as, publishing its port 8080 on the host.
+func currentWatchtowerWithPorts() types.Container {
+	port := dockerNetwork.MustParsePort("8080/tcp")
+
+	return container.NewContainer(nil,
+		&dockerContainer.InspectResponse{
+			ID:      "c0c0",
+			Name:    "/watchtower",
+			Image:   "sha256:c0c0",
+			Created: "2026-10-08T12:00:00Z",
+			State:   &dockerContainer.State{Running: true},
+			Config: &dockerContainer.Config{
+				Image:  "nickfedor/watchtower:latest",
+				Labels: map[string]string{watchtowerLabelKey: "true"},
+			},
+			HostConfig: &dockerContainer.HostConfig{
+				RestartPolicy: dockerContainer.RestartPolicy{Name: dockerContainer.RestartPolicyUnlessStopped},
+				PortBindings: dockerNetwork.PortMap{
+					port: {{HostIP: netip.MustParseAddr("0.0.0.0"), HostPort: port.Port()}},
+				},
+			},
+		},
+		&dockerImage.InspectResponse{ID: "sha256:c0c0"},
+	)
 }
 
 // runCalls returns the Docker client calls in the order they were made, each
@@ -395,6 +424,52 @@ func TestRun_Continuous(t *testing.T) {
 			runUntilCanceled(t, tt.args...)
 
 			assert.Equal(t, tt.want, runCalls(mockClient))
+		})
+	}
+}
+
+// TestRun_PublishedPortsBlockSelfUpdates verifies that continuous mode does
+// not let an update replace a Watchtower container that publishes host ports,
+// unless self-updates are ephemeral. A Watchtower container whose self-update
+// is skipped is never checked for a newer image, so the client mock fails the
+// test if it is checked when it should not be.
+func TestRun_PublishedPortsBlockSelfUpdates(t *testing.T) {
+	tests := []struct {
+		name      string
+		args      []string
+		ports     bool
+		wantCheck bool
+	}{
+		{name: "published ports", ports: true, wantCheck: false},
+		{
+			name:      "published ports with ephemeral self-updates",
+			args:      []string{"--ephemeral-self-update"},
+			ports:     true,
+			wantCheck: true,
+		},
+		{name: "no published ports", ports: false, wantCheck: true},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			current := currentWatchtower()
+			if tt.ports {
+				current = currentWatchtowerWithPorts()
+			}
+
+			mockClient := mockContainerClient.NewMockClient(t)
+			mockClient.EXPECT().ListContainers(mock.Anything, withFilter).Return([]types.Container{current}, nil)
+			mockClient.EXPECT().ListContainers(mock.Anything).Return([]types.Container{current}, nil)
+			mockClient.EXPECT().GetVersion().Return("1.47")
+
+			if tt.wantCheck {
+				mockClient.EXPECT().IsContainerStale(mock.Anything, current, mock.Anything).
+					Return(false, current.ImageID(), "", nil).Once()
+			}
+
+			setRunState(t, runTestState{client: mockClient, current: current, currentID: current.ID()})
+
+			runUntilCanceled(t, append([]string{"--update-on-start"}, tt.args...)...)
 		})
 	}
 }

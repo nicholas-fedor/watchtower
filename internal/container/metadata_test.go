@@ -1754,6 +1754,63 @@ func TestIsWatchtowerParent(t *testing.T) {
 	})
 }
 
+// TestIsSuperseded verifies which running Watchtower containers a self-update
+// has replaced: a predecessor renamed with the "watchtower-old-" prefix, with
+// or without the leading slash Docker reports, and a container whose chain
+// label lists it as a parent.
+func TestIsSuperseded(t *testing.T) {
+	t.Parallel()
+
+	const id = "test-container-id"
+
+	withChain := func(chain string) containerfixture.Update {
+		return containerfixture.WithLabels(map[string]string{labels.ContainerChain: chain})
+	}
+
+	tests := []struct {
+		name      string
+		container types.Container
+		want      bool
+	}{
+		{name: "no container", container: nil, want: false},
+		{
+			name:      "current container",
+			container: MockContainer(containerfixture.WithID(id), containerfixture.WithName("/watchtower")),
+			want:      false,
+		},
+		{
+			name: "chain without the container",
+			container: MockContainer(containerfixture.WithID(id), containerfixture.WithName("/watchtower"),
+				withChain("other-id")),
+			want: false,
+		},
+		{
+			name: "parent in the chain",
+			container: MockContainer(containerfixture.WithID(id), containerfixture.WithName("/watchtower"),
+				withChain(id+",parent-id")),
+			want: true,
+		},
+		{
+			name:      "renamed predecessor",
+			container: MockContainer(containerfixture.WithID(id), containerfixture.WithName("watchtower-old-abc123")),
+			want:      true,
+		},
+		{
+			name:      "renamed predecessor with a leading slash",
+			container: MockContainer(containerfixture.WithID(id), containerfixture.WithName("/watchtower-old-def456")),
+			want:      true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			assert.Equal(t, tt.want, IsSuperseded(tt.container))
+		})
+	}
+}
+
 // TestContainer_SetLabel verifies that SetLabel writes and overwrites labels,
 // creating the labels map when needed, and that DeleteLabel removes labels, with
 // both doing nothing when the container info is missing.

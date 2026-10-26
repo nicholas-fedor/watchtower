@@ -329,13 +329,11 @@ func (p *process) preRun(cmd *cobra.Command, _ []string) {
 		containerClient.InContainer(processFs)
 
 	// Check if this is an old Watchtower container that should not run continuously.
+	// A run-once instance ends after its run, so only a continuous one exits here.
 	// exitInvalidWatchtowerRestart calls os.Exit. Keep it in a helper so preRun
 	// defers (for example cancel) are not paired with os.Exit in this function
 	// (gocritic exitAfterDefer).
-	if schedule.ShouldExitDueToInvalidRestart(
-		currentWatchtowerContainer,
-		appCfg.Mode.RunOnce,
-	) {
+	if !appCfg.Mode.RunOnce && container.IsSuperseded(currentWatchtowerContainer) {
 		// Cancel preRun lookup context before process exit.
 		cancel()
 		p.exitInvalidWatchtowerRestart()
@@ -704,26 +702,23 @@ func (p *process) runMain(cfg types.RunConfig) int {
 		p.log.Debug().Msg("Disabled update-on-start due to cleanup of old Watchtower containers")
 	}
 
-	// Determine whether self-update should be skipped because the running
-	// Watchtower container has published host ports. Docker cannot rebind
-	// an occupied port during container replacement. Ephemeral self-updates
-	// are exempt, because they remove the old container before creating the new
-	// one, so no port conflict occurs.
+	// Skip self-updates when the running container cannot be replaced safely.
+	// A container that could not be inspected was already reported at startup.
 	//
 	// Perform this check here rather than inside SetupAndStartAPI so the
-	// warning always appears, even when no HTTP API endpoints are enabled
-	// and SetupAndStartAPI returns early.
-	skipSelfUpdate := selfUpdateBlocked(currentWatchtowerContainer,
+	// published port warning always appears, even when no HTTP API endpoints
+	// are enabled and SetupAndStartAPI returns early.
+	selfUpdateBlock := selfupdate.Blocked(currentWatchtowerContainer,
 		currentWatchtowerContainerID,
 		appCfg.Update.EphemeralSelfUpdate,
 	)
-	if skipSelfUpdate && currentWatchtowerContainer != nil {
+	if selfUpdateBlock == selfupdate.BlockedByPublishedPorts {
 		p.log.Warn().Msg("Published port detected - self-updates disabled.")
 	}
 
 	// One UpdateParams snapshot for HTTP API and schedule paths.
 	sharedBase := baseParams
-	if skipSelfUpdate {
+	if selfUpdateBlock != selfupdate.NotBlocked {
 		sharedBase.SkipSelfUpdate = true
 	}
 
@@ -809,19 +804,18 @@ func (p *process) runMain(cfg types.RunConfig) int {
 	startupMessageSent := cfg.EnableUpdateAPI && !cfg.UnblockHTTPAPI
 
 	err = schedule.RunUpgradesOnSchedule(ctx, schedule.ScheduleDeps{
-		Logger:                     p.log,
-		Filter:                     cfg.Filter,
-		Lock:                       updateLock,
-		ScheduleSpec:               appCfg.Schedule.Spec,
-		Startup:                    startupBase,
-		WriteStartupMessage:        logging.WriteStartupMessage,
-		RunUpdate:                  runUpdatesWithNotifications,
-		Notifier:                   notifier,
-		UpdateOnStart:              cfg.UpdateOnStart,
-		SkipFirstRun:               cleanupOccurred,
-		CurrentWatchtowerContainer: currentWatchtowerContainer,
-		StartupMessageSent:         startupMessageSent,
-		BaseParams:                 sharedBase,
+		Logger:              p.log,
+		Filter:              cfg.Filter,
+		Lock:                updateLock,
+		ScheduleSpec:        appCfg.Schedule.Spec,
+		Startup:             startupBase,
+		WriteStartupMessage: logging.WriteStartupMessage,
+		RunUpdate:           runUpdatesWithNotifications,
+		Notifier:            notifier,
+		UpdateOnStart:       cfg.UpdateOnStart,
+		SkipFirstRun:        cleanupOccurred,
+		StartupMessageSent:  startupMessageSent,
+		BaseParams:          sharedBase,
 	})
 
 	// Stop the HTTP API and give it its shutdown grace period to finish the
@@ -896,28 +890,4 @@ func awaitDockerClient(log *zerolog.Logger) {
 	log.Debug().
 		Msg("Sleeping for a second to ensure the docker api client has been properly initialized.")
 	sleepFunc(1 * time.Second)
-}
-
-// selfUpdateBlocked reports whether a self-update cannot replace the running
-// Watchtower container safely.
-//
-// A container that publishes host ports keeps them until it stops, so its
-// replacement cannot bind them. An ephemeral self-update stops it first, so
-// the ports do not block it. A container that was detected but could not be
-// inspected blocks every self-update, because its ports are unknown. preRun
-// warns about that case.
-//
-// Parameters:
-//   - current: The running Watchtower container, or nil when it was not inspected.
-//   - currentID: The detected ID of the running Watchtower container, or empty.
-//   - ephemeral: Whether self-updates use an ephemeral orchestrator.
-//
-// Returns:
-//   - bool: True when self-updates must be skipped.
-func selfUpdateBlocked(current types.Container, currentID types.ContainerID, ephemeral bool) bool {
-	if current == nil {
-		return currentID != ""
-	}
-
-	return current.HasExposedPorts() && !ephemeral
 }
