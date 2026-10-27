@@ -86,6 +86,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Chores
 
+- Update step-security/harden-runner action to v2.22.3 by @renovate[bot] in [#3209](https://github.com/nicholas-fedor/watchtower/pull/3209)
 - Update module github.com/gofiber/schema to v1.9.1 by @renovate[bot] in [#3202](https://github.com/nicholas-fedor/watchtower/pull/3202)
 - Update module github.com/grpc-ecosystem/grpc-gateway/v2 to v2.33.0 by @renovate[bot] in [#3199](https://github.com/nicholas-fedor/watchtower/pull/3199)
 - Update module google.golang.org/grpc to v1.85.0 by @renovate[bot] in [#3194](https://github.com/nicholas-fedor/watchtower/pull/3194)
