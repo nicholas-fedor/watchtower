@@ -37,6 +37,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- Derive the old-container cleanup scope in cleanup by @nicholas-fedor in [#3204](https://github.com/nicholas-fedor/watchtower/pull/3204)
 - Move Watchtower cleanup into update/cleanup by @nicholas-fedor in [#3198](https://github.com/nicholas-fedor/watchtower/pull/3198)
 - Warn about invalid git labels in the session check by @nicholas-fedor in [#3196](https://github.com/nicholas-fedor/watchtower/pull/3196)
 - Move Git rebuilds into update/rebuild by @nicholas-fedor in [#3192](https://github.com/nicholas-fedor/watchtower/pull/3192)
