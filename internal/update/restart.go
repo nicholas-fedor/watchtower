@@ -16,6 +16,7 @@ import (
 	containerClient "github.com/nicholas-fedor/watchtower/internal/container/client"
 	"github.com/nicholas-fedor/watchtower/internal/container/hooks"
 	"github.com/nicholas-fedor/watchtower/internal/container/labels"
+	"github.com/nicholas-fedor/watchtower/internal/update/cleanup"
 	"github.com/nicholas-fedor/watchtower/internal/update/rebuild"
 	"github.com/nicholas-fedor/watchtower/internal/update/selfupdate"
 	"github.com/nicholas-fedor/watchtower/internal/update/state"
@@ -197,9 +198,9 @@ func performRollingRestart(
 
 				if c.IsStale() && !renamed {
 					// Only collect cleaned image info for stale containers that were not renamed, as renamed
-					// containers (Watchtower self-updates) are cleaned up by RemoveExcessWatchtowerInstances
+					// containers (Watchtower self-updates) are cleaned up by cleanup.RemoveExcessWatchtowerInstances
 					// in the new container.
-					addCleanupImageInfo(
+					cleanup.AddImage(
 						cleanupImageInfos,
 						c.ImageID(),
 						c.ImageName(),
@@ -619,10 +620,10 @@ func restartContainersInSortedOrder(
 				}
 				// Only collect cleaned image info for stale containers that were
 				// not renamed, as renamed containers (Watchtower self-updates)
-				// are cleaned up by RemoveExcessWatchtowerInstances
+				// are cleaned up by cleanup.RemoveExcessWatchtowerInstances
 				// in the new container.
 				if c.IsStale() && !renamedContainers[c.ID()] {
-					addCleanupImageInfo(
+					cleanup.AddImage(
 						cleanupImageInfos,
 						c.ImageID(),
 						c.ImageName(),
@@ -635,38 +636,6 @@ func restartContainersInSortedOrder(
 	}
 
 	return failed
-}
-
-// addCleanupImageInfo adds cleanup info if not already present.
-//
-// Deduplication is based on the (ImageID, ContainerName) pair so that when
-// notifications are split by container, each container that used the old image
-// receives its own "Removing image" entry.
-//
-// Parameters:
-//   - cleanupImageInfos: Pointer to slice to collect cleaned image info.
-//   - imageID: ID of the image to clean up.
-//   - imageName: Name of the image.
-//   - containerName: Name of the container.
-//   - containerID: ID of the container (optional, pass empty string if not available).
-func addCleanupImageInfo(
-	cleanupImageInfos *[]types.RemovedImageInfo,
-	imageID types.ImageID,
-	imageName, containerName string,
-	containerID types.ContainerID,
-) {
-	for _, existing := range *cleanupImageInfos {
-		if existing.ImageID == imageID && existing.ContainerName == containerName {
-			return
-		}
-	}
-
-	*cleanupImageInfos = append(*cleanupImageInfos, types.RemovedImageInfo{
-		ImageID:       imageID,
-		ContainerID:   containerID,
-		ImageName:     imageName,
-		ContainerName: containerName,
-	})
 }
 
 // restartStaleContainer restarts a stale container.

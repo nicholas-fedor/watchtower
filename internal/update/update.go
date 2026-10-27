@@ -23,6 +23,7 @@ import (
 	"github.com/nicholas-fedor/watchtower/internal/git"
 	"github.com/nicholas-fedor/watchtower/internal/registry/ratelimit"
 	"github.com/nicholas-fedor/watchtower/internal/update/changelog"
+	"github.com/nicholas-fedor/watchtower/internal/update/cleanup"
 	"github.com/nicholas-fedor/watchtower/internal/update/rebuild"
 	"github.com/nicholas-fedor/watchtower/internal/update/selfupdate"
 	"github.com/nicholas-fedor/watchtower/internal/update/sorter"
@@ -185,7 +186,7 @@ func update(
 	// skipped to prevent accidentally removing old containers from other
 	// scoped instances. Unscoped containers ("") are normalized to "none".
 	if config.CurrentContainerID != "" {
-		currentScope, found := deriveScopeFromCurrentContainer(log,
+		currentScope, found := cleanup.ScopeOfCurrentContainer(log,
 			allContainers,
 			config.CurrentContainerID,
 		)
@@ -197,7 +198,7 @@ func update(
 				currentScope = "none"
 			}
 
-			_, cleanupErr := cleanupOldWatchtowerContainers(log,
+			_, cleanupErr := cleanup.RemoveOldWatchtowerContainers(log,
 				ctx,
 				client,
 				config.Cleanup,

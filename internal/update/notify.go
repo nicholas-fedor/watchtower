@@ -13,6 +13,7 @@ import (
 	"github.com/nicholas-fedor/watchtower/internal/observability/events"
 	"github.com/nicholas-fedor/watchtower/internal/observability/metrics"
 	"github.com/nicholas-fedor/watchtower/internal/registry/ratelimit"
+	"github.com/nicholas-fedor/watchtower/internal/update/cleanup"
 	"github.com/nicholas-fedor/watchtower/internal/update/state"
 	"github.com/nicholas-fedor/watchtower/pkg/types"
 )
@@ -387,7 +388,7 @@ func executeUpdate(
 // Parameters:
 //   - ctx: Parent session context. Cancellation is detached for Docker calls.
 //   - client: The Docker client instance used for container operations.
-//   - cleanup: Boolean indicating whether to perform image cleanup.
+//   - enabled: Whether image cleanup is enabled.
 //   - cleanupImageInfos: Slice of cleaned image info to be removed.
 //   - timeout: Bound for detached cleanup Docker calls. Non-positive uses the restart-policy fallback.
 //
@@ -395,18 +396,13 @@ func executeUpdate(
 //   - []types.RemovedImageInfo: Slice of successfully cleaned image info.
 func performImageCleanup(log *zerolog.Logger, ctx context.Context,
 	client containerClient.Client,
-	cleanup bool,
+	enabled bool,
 	cleanupImageInfos []types.RemovedImageInfo,
 	timeout time.Duration,
 ) []types.RemovedImageInfo {
-	if !cleanup || len(cleanupImageInfos) == 0 {
+	if !enabled || len(cleanupImageInfos) == 0 {
 		return []types.RemovedImageInfo{}
 	}
-
-	// Deduplicate by ImageID so each image is only removed once.
-	// This prevents duplicate "Removing image" log entries in non-split notifications
-	// when multiple containers share the same old image.
-	uniqueByImageID := deduplicateByImageID(cleanupImageInfos)
 
 	// Detach from the session context so SIGTERM after self-update cannot
 	// abort leftover image removal.
@@ -416,7 +412,7 @@ func performImageCleanup(log *zerolog.Logger, ctx context.Context,
 	)
 	defer cancel()
 
-	cleaned, err := removeImages(log, cleanupCtx, client, uniqueByImageID)
+	cleaned, err := cleanup.RemoveImages(log, cleanupCtx, client, cleanupImageInfos)
 	if err != nil {
 		log.Warn().
 			Err(err).
@@ -440,29 +436,6 @@ func performImageCleanup(log *zerolog.Logger, ctx context.Context,
 	for _, info := range cleanupImageInfos {
 		if removedIDs[info.ImageID] {
 			result = append(result, info)
-		}
-	}
-
-	return result
-}
-
-// deduplicateByImageID returns a new slice containing only the first occurrence
-// of each ImageID. This is used to ensure each image is removed exactly once
-// even when multiple containers share the same old image.
-//
-// Parameters:
-//   - images: Slice of RemovedImageInfo that may contain duplicate ImageIDs.
-//
-// Returns:
-//   - []types.RemovedImageInfo: Slice with one entry per unique ImageID.
-func deduplicateByImageID(images []types.RemovedImageInfo) []types.RemovedImageInfo {
-	seen := make(map[types.ImageID]bool, len(images))
-	result := make([]types.RemovedImageInfo, 0, len(images))
-
-	for _, img := range images {
-		if !seen[img.ImageID] {
-			seen[img.ImageID] = true
-			result = append(result, img)
 		}
 	}
 
