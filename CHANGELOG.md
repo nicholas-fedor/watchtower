@@ -81,6 +81,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Chores
 
+- Update module github.com/moby/sys/user to v0.5.0 by @renovate[bot] in [#3186](https://github.com/nicholas-fedor/watchtower/pull/3186)
+- Update github.com/tonistiigi/fsutil digest to dd1998d by @renovate[bot] in [#3185](https://github.com/nicholas-fedor/watchtower/pull/3185)
 - Update google.golang.org/genproto/googleapis/api digest to 2ffab32 by @renovate[bot] in [#3181](https://github.com/nicholas-fedor/watchtower/pull/3181)
 - Update google.golang.org/genproto/googleapis/rpc digest to 2ffab32 by @renovate[bot] in [#3182](https://github.com/nicholas-fedor/watchtower/pull/3182)
 - Update module github.com/gofiber/utils/v2 to v2.6.3 by @renovate[bot] in [#3177](https://github.com/nicholas-fedor/watchtower/pull/3177)
