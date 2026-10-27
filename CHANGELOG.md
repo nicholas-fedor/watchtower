@@ -83,6 +83,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Chores
 
+- Update module github.com/grpc-ecosystem/grpc-gateway/v2 to v2.33.0 by @renovate[bot] in [#3199](https://github.com/nicholas-fedor/watchtower/pull/3199)
 - Update module google.golang.org/grpc to v1.85.0 by @renovate[bot] in [#3194](https://github.com/nicholas-fedor/watchtower/pull/3194)
 - Update golang:1.27.3-alpine docker digest to d200d2d by @renovate[bot] in [#3188](https://github.com/nicholas-fedor/watchtower/pull/3188)
 - Update golang:alpine3.24 docker digest to d200d2d by @renovate[bot] in [#3189](https://github.com/nicholas-fedor/watchtower/pull/3189)
