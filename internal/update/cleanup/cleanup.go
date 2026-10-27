@@ -338,19 +338,14 @@ func getFilteredContainers(log *zerolog.Logger, scope string,
 		return []types.Container{}
 	}
 
-	var filter types.Filter
-
-	switch {
-	case scope != "":
-		filter = filters.FilterByScope(log, scope, filters.WatchtowerContainersFilter)
-	default:
-		filter = filters.UnscopedWatchtowerContainersFilter
-	}
+	inScope := filters.FilterByScope(log, scope, filters.NoFilter)
 
 	var filteredContainers []types.Container
 
+	// Check the Watchtower label first so the scope filter's debug lines cover
+	// only Watchtower containers, not every container on the host.
 	for _, c := range allContainers {
-		if filter == nil || filter(c) {
+		if c.IsWatchtower() && inScope(c) {
 			filteredContainers = append(filteredContainers, c)
 		}
 	}

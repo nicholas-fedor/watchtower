@@ -61,18 +61,6 @@ func WatchtowerContainersFilter(c types.FilterableContainer) bool {
 	return c.IsWatchtower()
 }
 
-// UnscopedWatchtowerContainersFilter selects only unscoped Watchtower containers.
-//
-// Returns:
-//   - bool: True if container is Watchtower and has no scope or scope "none", false otherwise.
-func UnscopedWatchtowerContainersFilter(c types.FilterableContainer) bool {
-	if !c.IsWatchtower() {
-		return false
-	}
-
-	return c.NormalizedScope() == labels.NoScope
-}
-
 // excludeOldWatchtowerFilter rejects containers that are old Watchtower
 // containers renamed during self-update (prefixed with "watchtower-old-").
 //
@@ -553,14 +541,20 @@ func filterByEnableLabel(enable bool, baseFilter types.Filter) types.Filter {
 
 // FilterByScope selects containers in a specific scope.
 //
+// An empty scope selects the containers without a scope, the same as "none".
+//
 // Parameters:
 //   - log: Logger for debug output. May be nil.
-//   - scope: Scope to match.
+//   - scope: Scope to match, or empty for the containers without a scope.
 //   - baseFilter: Base filter to chain.
 //
 // Returns:
 //   - types.Filter: Filter function matching scope and applying base filter.
 func FilterByScope(log *zerolog.Logger, scope string, baseFilter types.Filter) types.Filter {
+	if scope == "" {
+		scope = labels.NoScope
+	}
+
 	return func(c types.FilterableContainer) bool {
 		containerScope := c.NormalizedScope()
 
@@ -937,16 +931,14 @@ func BuildFilter(log *zerolog.Logger,
 		stringBuilder.WriteString(`, `)
 	}
 
-	// Keep only containers in the configured scope, and describe it. An empty
-	// configured scope selects the containers without a scope, the same as
-	// "none".
-	if scope == labels.NoScope || scope == "" {
-		filter = FilterByScope(log, labels.NoScope, filter)
+	// Keep only containers in the configured scope. An empty configured scope
+	// selects the containers without a scope, the same as "none".
+	filter = FilterByScope(log, scope, filter)
 
+	// Add scope description.
+	if scope == labels.NoScope || scope == "" {
 		stringBuilder.WriteString(`without a scope`)
 	} else {
-		filter = FilterByScope(log, scope, filter)
-
 		stringBuilder.WriteString(`in scope `)
 		stringBuilder.WriteString(scope)
 	}
