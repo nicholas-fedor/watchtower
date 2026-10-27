@@ -60,6 +60,16 @@ func (c fuzzableContainer) Scope() (string, bool) {
 	return c.scope, c.hasScope
 }
 
+// NormalizedScope returns the scope, or "none" when it is unset or empty, as
+// the container model does.
+func (c fuzzableContainer) NormalizedScope() string {
+	if !c.hasScope || c.scope == "" {
+		return "none"
+	}
+
+	return c.scope
+}
+
 func (c fuzzableContainer) GetLabel(key string) (string, bool) {
 	value, ok := c.labels[key]
 

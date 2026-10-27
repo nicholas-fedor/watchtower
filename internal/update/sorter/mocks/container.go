@@ -9,6 +9,7 @@ import (
 	dockerImage "github.com/moby/moby/api/types/image"
 
 	"github.com/nicholas-fedor/watchtower/internal/container"
+	"github.com/nicholas-fedor/watchtower/internal/container/labels"
 	"github.com/nicholas-fedor/watchtower/pkg/types"
 )
 
@@ -79,7 +80,8 @@ func (c *SimpleContainer) ImageName() string {
 func (c *SimpleContainer) Enabled() (bool, bool)                   { return true, true }
 func (c *SimpleContainer) IsMonitorOnly(_ types.UpdateParams) bool { return false }
 
-func (c *SimpleContainer) Scope() (string, bool) { return "", false }
+func (c *SimpleContainer) Scope() (string, bool)   { return "", false }
+func (c *SimpleContainer) NormalizedScope() string { return labels.NoScope }
 func (c *SimpleContainer) GetLabel(key string) (string, bool) {
 	if c.ContainerInfoField != nil && c.ContainerInfoField.Config != nil && c.ContainerInfoField.Config.Labels != nil {
 		val, ok := c.ContainerInfoField.Config.Labels[key]

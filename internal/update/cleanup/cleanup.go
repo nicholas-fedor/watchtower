@@ -179,7 +179,7 @@ func RemoveOldWatchtowerContainers(log *zerolog.Logger, ctx context.Context,
 		return 0, nil
 	}
 
-	scope := normalizedScope(current)
+	scope := current.NormalizedScope()
 
 	log.Debug().
 		Str("scope", scope).
@@ -205,7 +205,7 @@ func RemoveOldWatchtowerContainers(log *zerolog.Logger, ctx context.Context,
 		}
 
 		// Scope check: only clean up old containers in the same scope
-		containerScope := normalizedScope(c)
+		containerScope := c.NormalizedScope()
 
 		if containerScope != scope {
 			log.Debug().
@@ -235,36 +235,9 @@ func RemoveOldWatchtowerContainers(log *zerolog.Logger, ctx context.Context,
 	var orphanedCreatedContainers []types.Container
 
 	for _, c := range allContainers {
-		if !c.IsWatchtower() {
-			continue
+		if container.IsOrphanedReplacement(c, current) {
+			orphanedCreatedContainers = append(orphanedCreatedContainers, c)
 		}
-
-		if c.ID() == currentContainerID {
-			continue
-		}
-
-		if container.IsOldContainer(c.Name()) {
-			continue
-		}
-
-		if !c.IsCreated() {
-			continue
-		}
-
-		// Scope check: only clean up orphaned containers in the same scope.
-		containerScope := normalizedScope(c)
-
-		if containerScope != scope {
-			log.Debug().
-				Str("container", c.Name()).
-				Str("container_scope", containerScope).
-				Str("current_scope", scope).
-				Msg("Skipping orphaned Watchtower container in different scope")
-
-			continue
-		}
-
-		orphanedCreatedContainers = append(orphanedCreatedContainers, c)
 	}
 
 	oldContainers = append(oldContainers, orphanedCreatedContainers...)
@@ -505,12 +478,12 @@ func getChainedContainers(log *zerolog.Logger,
 //   - types.Container: The first candidate whose chain label lists the predecessor's ID, or nil.
 //   - types.Container: The first candidate in the predecessor's scope, or nil.
 func successorOf(old types.Container, candidates []types.Container) (types.Container, types.Container) {
-	oldScope := normalizedScope(old)
+	oldScope := old.NormalizedScope()
 
 	var firstInScope types.Container
 
 	for _, c := range candidates {
-		if !c.IsWatchtower() || container.IsOldContainer(c.Name()) || normalizedScope(c) != oldScope {
+		if !c.IsWatchtower() || container.IsOldContainer(c.Name()) || c.NormalizedScope() != oldScope {
 			continue
 		}
 
@@ -525,23 +498,6 @@ func successorOf(old types.Container, candidates []types.Container) (types.Conta
 	}
 
 	return nil, firstInScope
-}
-
-// normalizedScope returns a container's scope, or "none" when its scope label
-// is unset or empty.
-//
-// Parameters:
-//   - c: The container.
-//
-// Returns:
-//   - string: The container's scope.
-func normalizedScope(c types.Container) string {
-	scope, ok := c.Scope()
-	if !ok || scope == "" {
-		return "none"
-	}
-
-	return scope
 }
 
 // addExcessContainers combines and deduplicates excess and chain containers for removal.

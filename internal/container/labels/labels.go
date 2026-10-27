@@ -78,3 +78,10 @@ const (
 	// ComposeDir is a path inside Watchtower to the Compose project directory.
 	ComposeDir = "com.centurylinklabs.watchtower.compose-dir"
 )
+
+// Label values with a fixed meaning.
+const (
+	// NoScope is the scope of a container whose scope label is unset, empty, or
+	// set to "none".
+	NoScope = "none"
+)

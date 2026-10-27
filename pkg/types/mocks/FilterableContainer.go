@@ -289,6 +289,50 @@ func (_c *MockFilterableContainer_Name_Call) RunAndReturn(run func() string) *Mo
 	return _c
 }
 
+// NormalizedScope provides a mock function for the type MockFilterableContainer
+func (_mock *MockFilterableContainer) NormalizedScope() string {
+	ret := _mock.Called()
+
+	if len(ret) == 0 {
+		panic("no return value specified for NormalizedScope")
+	}
+
+	var r0 string
+	if returnFunc, ok := ret.Get(0).(func() string); ok {
+		r0 = returnFunc()
+	} else {
+		r0 = ret.Get(0).(string)
+	}
+	return r0
+}
+
+// MockFilterableContainer_NormalizedScope_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'NormalizedScope'
+type MockFilterableContainer_NormalizedScope_Call struct {
+	*mock.Call
+}
+
+// NormalizedScope is a helper method to define mock.On call
+func (_e *MockFilterableContainer_Expecter) NormalizedScope() *MockFilterableContainer_NormalizedScope_Call {
+	return &MockFilterableContainer_NormalizedScope_Call{Call: _e.mock.On("NormalizedScope")}
+}
+
+func (_c *MockFilterableContainer_NormalizedScope_Call) Run(run func()) *MockFilterableContainer_NormalizedScope_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run()
+	})
+	return _c
+}
+
+func (_c *MockFilterableContainer_NormalizedScope_Call) Return(s string) *MockFilterableContainer_NormalizedScope_Call {
+	_c.Call.Return(s)
+	return _c
+}
+
+func (_c *MockFilterableContainer_NormalizedScope_Call) RunAndReturn(run func() string) *MockFilterableContainer_NormalizedScope_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // Scope provides a mock function for the type MockFilterableContainer
 func (_mock *MockFilterableContainer) Scope() (string, bool) {
 	ret := _mock.Called()
