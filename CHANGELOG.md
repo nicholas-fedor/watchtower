@@ -37,6 +37,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- Move Git rebuilds into update/rebuild by @nicholas-fedor in [#3192](https://github.com/nicholas-fedor/watchtower/pull/3192)
 - Consolidate the self-update guards by @nicholas-fedor in [#3175](https://github.com/nicholas-fedor/watchtower/pull/3175)
 - Move ephemeral self-update into its own package by @nicholas-fedor in [#3162](https://github.com/nicholas-fedor/watchtower/pull/3162)
 - Split the update engine into files by area by @nicholas-fedor in [#3158](https://github.com/nicholas-fedor/watchtower/pull/3158)
