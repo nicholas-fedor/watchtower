@@ -273,9 +273,11 @@ func TestRun_RunOnce(t *testing.T) {
 			want: []string{"GetVersion", "ListContainers filtered", "SetRestartPolicy none no"},
 		},
 		{
+			// The old-instance cleanup lists the containers again to find the
+			// current one's scope, and skips when it is not listed.
 			name:    "in a container",
 			current: currentWatchtower(),
-			want:    []string{"GetVersion", "ListContainers filtered", "SetRestartPolicy c0c0 no"},
+			want:    []string{"GetVersion", "ListContainers filtered", "ListContainers filtered", "SetRestartPolicy c0c0 no"},
 		},
 	}
 

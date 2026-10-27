@@ -181,37 +181,18 @@ func update(
 	// Clean up any old Watchtower containers that linger from a previous
 	// self-update. This runs each update cycle to catch containers that the
 	// startup cleanup may have missed (e.g., they were still stopping at startup).
-	// Scope is derived from the current container to avoid crossing scope boundaries.
-	// When the current container isn't found in the list, cleanup is
-	// skipped to prevent accidentally removing old containers from other
-	// scoped instances. Unscoped containers ("") are normalized to "none".
-	if config.CurrentContainerID != "" {
-		currentScope, found := cleanup.ScopeOfCurrentContainer(log,
-			allContainers,
-			config.CurrentContainerID,
-		)
-
-		if !found {
-			log.Debug().Msg("Skipping old container cleanup: current container not found in list")
-		} else {
-			if currentScope == "" {
-				currentScope = "none"
-			}
-
-			_, cleanupErr := cleanup.RemoveOldWatchtowerContainers(log,
-				ctx,
-				client,
-				config.Cleanup,
-				currentScope,
-				config.CurrentContainerID,
-				&cleanupImageInfos,
-			)
-			if cleanupErr != nil {
-				log.Warn().
-					Err(cleanupErr).
-					Msg("Failed to clean up old Watchtower containers, continuing update cycle")
-			}
-		}
+	// It stays within the current container's scope.
+	_, cleanupErr := cleanup.RemoveOldWatchtowerContainers(log,
+		ctx,
+		client,
+		config.Cleanup,
+		config.CurrentContainerID,
+		&cleanupImageInfos,
+	)
+	if cleanupErr != nil {
+		log.Warn().
+			Err(cleanupErr).
+			Msg("Failed to clean up old Watchtower containers, continuing update cycle")
 	}
 
 	// Create a progress tracker for reporting scanned, updated, and skipped containers.
