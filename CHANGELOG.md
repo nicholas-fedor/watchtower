@@ -81,6 +81,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Chores
 
+- Update golang:1.27.3-alpine docker digest to d200d2d by @renovate[bot] in [#3188](https://github.com/nicholas-fedor/watchtower/pull/3188)
 - Update golang:alpine3.24 docker digest to d200d2d by @renovate[bot] in [#3189](https://github.com/nicholas-fedor/watchtower/pull/3189)
 - Update module github.com/moby/sys/user to v0.5.0 by @renovate[bot] in [#3186](https://github.com/nicholas-fedor/watchtower/pull/3186)
 - Update github.com/tonistiigi/fsutil digest to dd1998d by @renovate[bot] in [#3185](https://github.com/nicholas-fedor/watchtower/pull/3185)
