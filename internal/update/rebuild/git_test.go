@@ -1,4 +1,4 @@
-package update
+package rebuild
 
 import (
 	"bytes"
@@ -29,10 +29,26 @@ import (
 	"github.com/nicholas-fedor/watchtower/internal/git"
 	"github.com/nicholas-fedor/watchtower/internal/git/project"
 	mockUpdate "github.com/nicholas-fedor/watchtower/internal/update/mocks"
-	"github.com/nicholas-fedor/watchtower/internal/update/sorter"
 	"github.com/nicholas-fedor/watchtower/internal/update/state"
 	"github.com/nicholas-fedor/watchtower/pkg/types"
 )
+
+// newTestLogger returns a logger that writes each event to the test's log, so a
+// failing test shows what it logged.
+//
+// Parameters:
+//   - t: Test that receives the log lines.
+//
+// Returns:
+//   - *zerolog.Logger: Logger writing to t.
+func newTestLogger(t *testing.T) *zerolog.Logger {
+	t.Helper()
+
+	// Frame 4 skips zerolog's write path, so each line names the log call.
+	w := zerolog.TestWriter{T: t, Frame: 4}
+
+	return new(zerolog.New(w))
+}
 
 // writeComposeProjectDir writes a Compose project with two built services to a
 // temporary directory.
@@ -119,21 +135,21 @@ func gitAssociatedContainer(id, name, image string, extra map[string]string) typ
 	)
 }
 
-// Test_gitSession verifies the Git monitoring session of one update: which
+// TestSession verifies the Git monitoring session of one update: which
 // containers it checks and watches, how it stores results, how it rebuilds
 // stale containers as remote Git builds or Compose applies, which containers
 // it excludes from recreation and restarts, and how it tags rebuilt images.
-func Test_gitSession(t *testing.T) {
+func TestSession(t *testing.T) {
 	t.Parallel()
 
-	t.Run("newGitSession", func(t *testing.T) {
+	t.Run("NewSession", func(t *testing.T) {
 		t.Parallel()
 
 		t.Run("returns empty result and built maps", func(t *testing.T) {
 			t.Parallel()
 
 			client := gitTestClient(t)
-			sess := newGitSession(client)
+			sess := NewSession(client)
 
 			require.NotNil(t, sess)
 			assert.Equal(t, client, sess.client)
@@ -148,7 +164,7 @@ func Test_gitSession(t *testing.T) {
 		t.Run("does nothing when the session is nil", func(t *testing.T) {
 			t.Parallel()
 
-			var sess *gitSession
+			var sess *Session
 
 			sess.store("abc", git.CheckResult{Stale: true, Commit: "deadbeef"})
 			got, ok := sess.result("abc")
@@ -159,7 +175,7 @@ func Test_gitSession(t *testing.T) {
 		t.Run("stores and retrieves a check result", func(t *testing.T) {
 			t.Parallel()
 
-			sess := newGitSession(gitTestClient(t))
+			sess := NewSession(gitTestClient(t))
 			want := git.CheckResult{Stale: true, Commit: "abc123", Tag: "v1.2.3", Kind: "tag", Ref: "v1.2.3"}
 
 			sess.store("c1", want)
@@ -171,67 +187,67 @@ func Test_gitSession(t *testing.T) {
 		t.Run("returns false for an unknown container", func(t *testing.T) {
 			t.Parallel()
 
-			sess := newGitSession(gitTestClient(t))
+			sess := NewSession(gitTestClient(t))
 			_, ok := sess.result("missing")
 			assert.False(t, ok)
 		})
 	})
 
-	t.Run("watching", func(t *testing.T) {
+	t.Run("Watching", func(t *testing.T) {
 		t.Parallel()
 
 		t.Run("is false when the session is nil", func(t *testing.T) {
 			t.Parallel()
 
-			var sess *gitSession
+			var sess *Session
 
 			c := gitAssociatedContainer("id", "/app", "myapp:latest", nil)
 
-			assert.False(t, sess.watching(newTestLogger(t), c, types.UpdateParams{EnableGitMonitoring: true}))
+			assert.False(t, sess.Watching(newTestLogger(t), c, types.UpdateParams{EnableGitMonitoring: true}))
 		})
 
 		t.Run("is false when the client is nil", func(t *testing.T) {
 			t.Parallel()
 
-			sess := &gitSession{}
+			sess := &Session{}
 			c := gitAssociatedContainer("id", "/app", "myapp:latest", nil)
 
-			assert.False(t, sess.watching(newTestLogger(t), c, types.UpdateParams{EnableGitMonitoring: true}))
+			assert.False(t, sess.Watching(newTestLogger(t), c, types.UpdateParams{EnableGitMonitoring: true}))
 		})
 
 		t.Run("is true for an associated container when monitoring is enabled", func(t *testing.T) {
 			t.Parallel()
 
-			sess := newGitSession(gitTestClient(t))
+			sess := NewSession(gitTestClient(t))
 			c := gitAssociatedContainer("id", "/app", "myapp:latest", nil)
 
-			assert.True(t, sess.watching(newTestLogger(t), c, types.UpdateParams{EnableGitMonitoring: true}))
+			assert.True(t, sess.Watching(newTestLogger(t), c, types.UpdateParams{EnableGitMonitoring: true}))
 		})
 
 		t.Run("is false when git-watch is false", func(t *testing.T) {
 			t.Parallel()
 
-			sess := newGitSession(gitTestClient(t))
+			sess := NewSession(gitTestClient(t))
 			c := gitAssociatedContainer("id", "/app", "myapp:latest", map[string]string{
 				labels.GitWatch: "false",
 			})
 
-			assert.False(t, sess.watching(newTestLogger(t), c, types.UpdateParams{EnableGitMonitoring: true}))
+			assert.False(t, sess.Watching(newTestLogger(t), c, types.UpdateParams{EnableGitMonitoring: true}))
 		})
 
 		t.Run("is false for an unassociated container", func(t *testing.T) {
 			t.Parallel()
 
-			sess := newGitSession(gitTestClient(t))
+			sess := NewSession(gitTestClient(t))
 			c := mockUpdate.CreateMockContainer("id", "/app", "myapp:latest", time.Now())
 
-			assert.False(t, sess.watching(newTestLogger(t), c, types.UpdateParams{EnableGitMonitoring: true}))
+			assert.False(t, sess.Watching(newTestLogger(t), c, types.UpdateParams{EnableGitMonitoring: true}))
 		})
 
 		t.Run("is false for Watchtower itself", func(t *testing.T) {
 			t.Parallel()
 
-			sess := newGitSession(gitTestClient(t))
+			sess := NewSession(gitTestClient(t))
 			c := mockUpdate.CreateMockContainerWithConfig(
 				"wt",
 				"/watchtower",
@@ -249,20 +265,20 @@ func Test_gitSession(t *testing.T) {
 				},
 			)
 
-			assert.False(t, sess.watching(newTestLogger(t), c, types.UpdateParams{EnableGitMonitoring: true}))
+			assert.False(t, sess.Watching(newTestLogger(t), c, types.UpdateParams{EnableGitMonitoring: true}))
 		})
 	})
 
-	t.Run("check", func(t *testing.T) {
+	t.Run("Check", func(t *testing.T) {
 		t.Parallel()
 
 		t.Run("treats an unassociated container as fresh and stores the empty result", func(t *testing.T) {
 			t.Parallel()
 
-			sess := newGitSession(gitTestClient(t))
+			sess := NewSession(gitTestClient(t))
 			c := mockUpdate.CreateMockContainer("plain", "/plain", "nginx:latest", time.Now())
 
-			stale, newest, err := sess.check(t.Context(), c, types.UpdateParams{})
+			stale, newest, err := sess.Check(t.Context(), c, types.UpdateParams{})
 			require.NoError(t, err)
 			assert.False(t, stale)
 			assert.Equal(t, c.ImageID(), newest)
@@ -275,7 +291,7 @@ func Test_gitSession(t *testing.T) {
 		t.Run("returns a wrapped error when the remote cannot be listed", func(t *testing.T) {
 			t.Parallel()
 
-			sess := newGitSession(git.New(newTestLogger(t), git.Options{Timeout: 50 * time.Millisecond}))
+			sess := NewSession(git.New(newTestLogger(t), git.Options{Timeout: 50 * time.Millisecond}))
 			c := gitAssociatedContainer("bad", "/bad", "myapp:latest", map[string]string{
 				labels.GitRepo: "https://127.0.0.1:1/org/app.git",
 			})
@@ -283,7 +299,7 @@ func Test_gitSession(t *testing.T) {
 			ctx, cancel := context.WithTimeout(t.Context(), 200*time.Millisecond)
 			defer cancel()
 
-			stale, newest, err := sess.check(ctx, c, types.UpdateParams{
+			stale, newest, err := sess.Check(ctx, c, types.UpdateParams{
 				EnableGitMonitoring: true,
 			})
 			require.Error(t, err)
@@ -293,7 +309,7 @@ func Test_gitSession(t *testing.T) {
 		})
 	})
 
-	t.Run("prepareRebuilds", func(t *testing.T) {
+	t.Run("PrepareRebuilds", func(t *testing.T) {
 		t.Parallel()
 
 		t.Run("returns immediately when the session or client is nil", func(t *testing.T) {
@@ -303,8 +319,8 @@ func Test_gitSession(t *testing.T) {
 			c := gitAssociatedContainer("id", "/app", "myapp:latest", nil)
 			c.SetStale(true)
 
-			var sess *gitSession
-			sess.prepareRebuilds(
+			var sess *Session
+			sess.PrepareRebuilds(
 				newTestLogger(t),
 				t.Context(),
 				mockContainerClient.NewMockClient(t),
@@ -315,8 +331,8 @@ func Test_gitSession(t *testing.T) {
 			)
 			assert.Empty(t, failed)
 
-			sess = &gitSession{results: map[types.ContainerID]git.CheckResult{}}
-			sess.prepareRebuilds(
+			sess = &Session{results: map[types.ContainerID]git.CheckResult{}}
+			sess.PrepareRebuilds(
 				newTestLogger(t),
 				t.Context(),
 				mockContainerClient.NewMockClient(t),
@@ -331,7 +347,7 @@ func Test_gitSession(t *testing.T) {
 		t.Run("skips containers that are not stale or have no stored stale result", func(t *testing.T) {
 			t.Parallel()
 
-			sess := newGitSession(gitTestClient(t))
+			sess := NewSession(gitTestClient(t))
 			sess.apply = mockCompose.NewMockApplier(t)
 			fresh := gitAssociatedContainer("fresh", "/fresh", "myapp:latest", nil)
 			staleNoResult := gitAssociatedContainer("none", "/none", "myapp:latest", nil)
@@ -345,7 +361,7 @@ func Test_gitSession(t *testing.T) {
 			// The mock has no expectations, so a build or image removal fails
 			// the test.
 			docker := mockContainerClient.NewMockClient(t)
-			sess.prepareRebuilds(newTestLogger(t), t.Context(), docker, []types.Container{fresh, staleNoResult, staleFreshResult}, types.UpdateParams{}, nil, failed)
+			sess.PrepareRebuilds(newTestLogger(t), t.Context(), docker, []types.Container{fresh, staleNoResult, staleFreshResult}, types.UpdateParams{}, nil, failed)
 
 			assert.Empty(t, failed)
 		})
@@ -353,7 +369,7 @@ func Test_gitSession(t *testing.T) {
 		t.Run("skips monitor-only and no-pull containers", func(t *testing.T) {
 			t.Parallel()
 
-			sess := newGitSession(gitTestClient(t))
+			sess := NewSession(gitTestClient(t))
 			sess.apply = mockCompose.NewMockApplier(t)
 			monitor := gitAssociatedContainer("mon", "/mon", "myapp:latest", map[string]string{
 				"com.centurylinklabs.watchtower.monitor-only": "true",
@@ -369,7 +385,7 @@ func Test_gitSession(t *testing.T) {
 
 			failed := map[types.ContainerID]error{}
 			docker := mockContainerClient.NewMockClient(t)
-			sess.prepareRebuilds(newTestLogger(t), t.Context(), docker, []types.Container{monitor, noPull}, types.UpdateParams{EnableGitMonitoring: true}, nil, failed)
+			sess.PrepareRebuilds(newTestLogger(t), t.Context(), docker, []types.Container{monitor, noPull}, types.UpdateParams{EnableGitMonitoring: true}, nil, failed)
 
 			assert.Empty(t, failed)
 			assert.Empty(t, sess.built)
@@ -378,7 +394,7 @@ func Test_gitSession(t *testing.T) {
 		t.Run("records a failed build and unmarks the container stale", func(t *testing.T) {
 			t.Parallel()
 
-			sess := newGitSession(gitTestClient(t))
+			sess := NewSession(gitTestClient(t))
 			sess.apply = mockCompose.NewMockApplier(t)
 			c := gitAssociatedContainer("fail", "/fail", "myapp:latest", nil)
 			c.SetStale(true)
@@ -386,7 +402,7 @@ func Test_gitSession(t *testing.T) {
 
 			failed := map[types.ContainerID]error{}
 			docker := mockContainerClient.NewMockClient(t)
-			sess.prepareRebuilds(newTestLogger(t), t.Context(), docker, []types.Container{c}, types.UpdateParams{EnableGitMonitoring: true}, nil, failed)
+			sess.PrepareRebuilds(newTestLogger(t), t.Context(), docker, []types.Container{c}, types.UpdateParams{EnableGitMonitoring: true}, nil, failed)
 
 			assert.Contains(t, failed, c.ID())
 			assert.False(t, c.IsStale())
@@ -395,7 +411,7 @@ func Test_gitSession(t *testing.T) {
 		t.Run("builds a stale associated container", func(t *testing.T) {
 			t.Parallel()
 
-			sess := newGitSession(gitTestClient(t))
+			sess := NewSession(gitTestClient(t))
 			sess.apply = mockCompose.NewMockApplier(t)
 			c := gitAssociatedContainer("ok", "/ok", "myapp:latest", nil)
 			c.SetStale(true)
@@ -406,7 +422,7 @@ func Test_gitSession(t *testing.T) {
 			expectGitBuild(docker)
 
 			progress := &state.Progress{}
-			sess.prepareRebuilds(newTestLogger(t), t.Context(), docker, []types.Container{c}, types.UpdateParams{EnableGitMonitoring: true}, progress, failed)
+			sess.PrepareRebuilds(newTestLogger(t), t.Context(), docker, []types.Container{c}, types.UpdateParams{EnableGitMonitoring: true}, progress, failed)
 
 			assert.Empty(t, failed)
 			assert.Contains(t, sess.built, c.ID())
@@ -423,7 +439,7 @@ func Test_gitSession(t *testing.T) {
 		t.Run("returns errGitNotAssociated when the container has no repo", func(t *testing.T) {
 			t.Parallel()
 
-			sess := newGitSession(gitTestClient(t))
+			sess := NewSession(gitTestClient(t))
 			c := mockUpdate.CreateMockContainer("plain", "/plain", "nginx:latest", time.Now())
 			docker := mockContainerClient.NewMockClient(t)
 
@@ -434,7 +450,7 @@ func Test_gitSession(t *testing.T) {
 		t.Run("returns an error when the commit is empty", func(t *testing.T) {
 			t.Parallel()
 
-			sess := newGitSession(gitTestClient(t))
+			sess := NewSession(gitTestClient(t))
 			c := gitAssociatedContainer("id", "/app", "myapp:latest", nil)
 			docker := mockContainerClient.NewMockClient(t)
 
@@ -446,7 +462,7 @@ func Test_gitSession(t *testing.T) {
 		t.Run("returns an error when the build context is cancelled", func(t *testing.T) {
 			t.Parallel()
 
-			sess := newGitSession(gitTestClient(t))
+			sess := NewSession(gitTestClient(t))
 			c := gitAssociatedContainer("id", "/app", "myapp:latest", nil)
 			docker := mockContainerClient.NewMockClient(t)
 			expectGitBuild(docker)
@@ -459,10 +475,43 @@ func Test_gitSession(t *testing.T) {
 			assert.Contains(t, err.Error(), "build git image:")
 		})
 
+		t.Run("logs exactly one changelog entry resolved from the git tag", func(t *testing.T) {
+			t.Parallel()
+
+			sess := NewSession(gitTestClient(t))
+			c := gitAssociatedContainer("id", "/app", "myapp:latest", nil)
+			docker := mockContainerClient.NewMockClient(t)
+			expectGitBuild(docker)
+
+			params := types.UpdateParams{EnableGitMonitoring: true, EnableChangelog: true}
+			progress := state.Progress{}
+			progress.AddScanned(newTestLogger(t), c, c.ImageID(), params)
+			progress.MarkForUpdate(newTestLogger(t), c.ID())
+
+			var buf bytes.Buffer
+
+			log := zerolog.New(&buf)
+
+			err := sess.buildOne(
+				&log,
+				t.Context(),
+				docker,
+				c,
+				git.CheckResult{Stale: true, Commit: "0123456789abcdef0123456789abcdef01234567", Tag: "v1.2.3"},
+				params,
+				&progress,
+			)
+			require.NoError(t, err)
+
+			assert.Equal(t, 1, strings.Count(buf.String(), `"message":"Changelog"`), buf.String())
+			assert.Contains(t, buf.String(), `"changelog":"https://github.com/org/app/releases/tag/v1.2.3"`)
+			assert.Equal(t, "https://github.com/org/app/releases/tag/v1.2.3", progress[c.ID()].Changelog())
+		})
+
 		t.Run("keeps a nested dockerfile and context on the rebuilt container", func(t *testing.T) {
 			t.Parallel()
 
-			sess := newGitSession(gitTestClient(t))
+			sess := NewSession(gitTestClient(t))
 			c := gitAssociatedContainer("id", "/app", "myapp:latest", map[string]string{
 				labels.GitDockerfile: "build/docker/Dockerfile",
 				labels.GitContext:    ".",
@@ -493,7 +542,7 @@ func Test_gitSession(t *testing.T) {
 		t.Run("persists git-watch only when the source label enabled it", func(t *testing.T) {
 			t.Parallel()
 
-			sess := newGitSession(gitTestClient(t))
+			sess := NewSession(gitTestClient(t))
 			c := gitAssociatedContainer("id", "/app", "myapp:latest", map[string]string{
 				labels.GitWatch: "yes",
 			})
@@ -518,7 +567,7 @@ func Test_gitSession(t *testing.T) {
 		t.Run("does not pass a digest-pinned image as a build tag", func(t *testing.T) {
 			t.Parallel()
 
-			sess := newGitSession(gitTestClient(t))
+			sess := NewSession(gitTestClient(t))
 			image := "ghcr.io/org/app@sha256:" + strings.Repeat("a", 64)
 			commit := "0123456789abcdef0123456789abcdef01234567"
 			c := gitAssociatedContainer("digest", "/digest", image, nil)
@@ -551,7 +600,7 @@ func Test_gitSession(t *testing.T) {
 		t.Run("applies the Git timeout to the URL-context build", func(t *testing.T) {
 			t.Parallel()
 
-			sess := newGitSession(git.New(newTestLogger(t), git.Options{Timeout: 50 * time.Millisecond}))
+			sess := NewSession(git.New(newTestLogger(t), git.Options{Timeout: 50 * time.Millisecond}))
 			commit := "0123456789abcdef0123456789abcdef01234567"
 			c := gitAssociatedContainer("timeout", "/timeout", "myapp:latest", nil)
 
@@ -580,7 +629,7 @@ func Test_gitSession(t *testing.T) {
 		t.Run("keeps a build that returns nil after its timeout elapses", func(t *testing.T) {
 			t.Parallel()
 
-			sess := newGitSession(git.New(newTestLogger(t), git.Options{Timeout: 10 * time.Millisecond}))
+			sess := NewSession(git.New(newTestLogger(t), git.Options{Timeout: 10 * time.Millisecond}))
 			c := gitAssociatedContainer("timeout", "/timeout", "myapp:latest", nil)
 			commit := "0123456789abcdef0123456789abcdef01234567"
 
@@ -609,33 +658,33 @@ func Test_gitSession(t *testing.T) {
 		})
 	})
 
-	t.Run("skipRecreate", func(t *testing.T) {
+	t.Run("SkipRecreate", func(t *testing.T) {
 		t.Parallel()
 
 		t.Run("is false when the session is nil", func(t *testing.T) {
 			t.Parallel()
 
-			var sess *gitSession
+			var sess *Session
 
 			c := gitAssociatedContainer("id", "/app", "myapp:latest", nil)
 
-			assert.False(t, sess.skipRecreate(c, types.UpdateParams{NoRestart: true}))
+			assert.False(t, sess.SkipRecreate(c, types.UpdateParams{NoRestart: true}))
 		})
 
 		t.Run("is false when no-restart is off", func(t *testing.T) {
 			t.Parallel()
 
-			sess := newGitSession(gitTestClient(t))
+			sess := NewSession(gitTestClient(t))
 			c := gitAssociatedContainer("id", "/app", "myapp:latest", nil)
 			sess.built[c.ID()] = "sha256:git"
 
-			assert.False(t, sess.skipRecreate(c, types.UpdateParams{}))
+			assert.False(t, sess.SkipRecreate(c, types.UpdateParams{}))
 		})
 
 		t.Run("is false for Watchtower even when an image was built", func(t *testing.T) {
 			t.Parallel()
 
-			sess := newGitSession(gitTestClient(t))
+			sess := NewSession(gitTestClient(t))
 			c := mockUpdate.CreateMockContainerWithConfig(
 				"wt",
 				"/watchtower",
@@ -652,21 +701,21 @@ func Test_gitSession(t *testing.T) {
 			)
 			sess.built[c.ID()] = "sha256:git"
 
-			assert.False(t, sess.skipRecreate(c, types.UpdateParams{NoRestart: true}))
+			assert.False(t, sess.SkipRecreate(c, types.UpdateParams{NoRestart: true}))
 		})
 
 		t.Run("is true when no-restart is on and this session built the image", func(t *testing.T) {
 			t.Parallel()
 
-			sess := newGitSession(gitTestClient(t))
+			sess := NewSession(gitTestClient(t))
 			c := gitAssociatedContainer("id", "/app", "myapp:latest", nil)
 			sess.built[c.ID()] = "sha256:git"
 
-			assert.True(t, sess.skipRecreate(c, types.UpdateParams{NoRestart: true}))
+			assert.True(t, sess.SkipRecreate(c, types.UpdateParams{NoRestart: true}))
 		})
 	})
 
-	t.Run("excludeNoRestart", func(t *testing.T) {
+	t.Run("ExcludeNoRestart", func(t *testing.T) {
 		t.Parallel()
 
 		t.Run("returns the original list when the session is nil or no-restart is off", func(t *testing.T) {
@@ -675,28 +724,28 @@ func Test_gitSession(t *testing.T) {
 			c := gitAssociatedContainer("id", "/app", "myapp:latest", nil)
 			list := []types.Container{c}
 
-			var sess *gitSession
-			assert.Equal(t, list, sess.excludeNoRestart(list, types.UpdateParams{NoRestart: true}))
+			var sess *Session
+			assert.Equal(t, list, sess.ExcludeNoRestart(list, types.UpdateParams{NoRestart: true}))
 
-			sess = newGitSession(gitTestClient(t))
-			assert.Equal(t, list, sess.excludeNoRestart(list, types.UpdateParams{}))
+			sess = NewSession(gitTestClient(t))
+			assert.Equal(t, list, sess.ExcludeNoRestart(list, types.UpdateParams{}))
 		})
 
 		t.Run("drops containers this session built when no-restart is on", func(t *testing.T) {
 			t.Parallel()
 
-			sess := newGitSession(gitTestClient(t))
+			sess := NewSession(gitTestClient(t))
 			built := gitAssociatedContainer("built", "/built", "myapp:latest", nil)
 			kept := gitAssociatedContainer("kept", "/kept", "other:latest", nil)
 			sess.built[built.ID()] = "sha256:git"
 
-			got := sess.excludeNoRestart([]types.Container{built, kept}, types.UpdateParams{NoRestart: true})
+			got := sess.ExcludeNoRestart([]types.Container{built, kept}, types.UpdateParams{NoRestart: true})
 			require.Len(t, got, 1)
 			assert.Equal(t, kept.ID(), got[0].ID())
 		})
 	})
 
-	t.Run("excludeApplied", func(t *testing.T) {
+	t.Run("ExcludeApplied", func(t *testing.T) {
 		t.Parallel()
 
 		t.Run("returns the original list when the session is nil or nothing was applied", func(t *testing.T) {
@@ -705,24 +754,53 @@ func Test_gitSession(t *testing.T) {
 			c := gitAssociatedContainer("id", "/app", "myapp:latest", nil)
 			list := []types.Container{c}
 
-			var sess *gitSession
-			assert.Equal(t, list, sess.excludeApplied(list))
+			var sess *Session
+			assert.Equal(t, list, sess.ExcludeApplied(list))
 
-			sess = newGitSession(gitTestClient(t))
-			assert.Equal(t, list, sess.excludeApplied(list))
+			sess = NewSession(gitTestClient(t))
+			assert.Equal(t, list, sess.ExcludeApplied(list))
 		})
 
 		t.Run("drops compose-applied containers", func(t *testing.T) {
 			t.Parallel()
 
-			sess := newGitSession(gitTestClient(t))
+			sess := NewSession(gitTestClient(t))
 			applied := gitAssociatedContainer("applied", "/applied", "myapp:latest", nil)
 			kept := gitAssociatedContainer("kept", "/kept", "other:latest", nil)
 			sess.applied[applied.ID()] = struct{}{}
 
-			got := sess.excludeApplied([]types.Container{applied, kept})
+			got := sess.ExcludeApplied([]types.Container{applied, kept})
 			require.Len(t, got, 1)
 			assert.Equal(t, kept.ID(), got[0].ID())
+		})
+	})
+
+	t.Run("NoRestartBuiltIDs", func(t *testing.T) {
+		t.Parallel()
+
+		t.Run("returns nil for a nil session or when restarts are enabled", func(t *testing.T) {
+			t.Parallel()
+
+			var sess *Session
+			assert.Nil(t, sess.NoRestartBuiltIDs(types.UpdateParams{NoRestart: true}))
+
+			sess = NewSession(gitTestClient(t))
+			sess.built["built"] = "sha256:git"
+			assert.Nil(t, sess.NoRestartBuiltIDs(types.UpdateParams{}))
+		})
+
+		t.Run("returns a copy of the built container IDs during a no-restart update", func(t *testing.T) {
+			t.Parallel()
+
+			sess := NewSession(gitTestClient(t))
+			sess.built["built"] = "sha256:git"
+
+			got := sess.NoRestartBuiltIDs(types.UpdateParams{NoRestart: true})
+			assert.Equal(t, map[types.ContainerID]struct{}{"built": {}}, got)
+
+			got["other"] = struct{}{}
+
+			assert.Len(t, sess.built, 1, "the snapshot must not share the session's map")
 		})
 	})
 
@@ -752,7 +830,7 @@ func Test_gitSession(t *testing.T) {
 				}, nil).
 				Once()
 
-			sess := newGitSession(gitTestClient(t))
+			sess := NewSession(gitTestClient(t))
 			sess.apply = applier
 
 			var checkouts int
@@ -792,7 +870,7 @@ func Test_gitSession(t *testing.T) {
 
 			failed := map[types.ContainerID]error{}
 			docker := mockContainerClient.NewMockClient(t)
-			sess.prepareRebuilds(
+			sess.PrepareRebuilds(
 				newTestLogger(t),
 				t.Context(),
 				docker,
@@ -810,7 +888,7 @@ func Test_gitSession(t *testing.T) {
 			assert.Equal(t, result.Commit, got.Labels["api"][labels.GitLastCommit])
 			assert.Contains(t, sess.applied, api.ID())
 			assert.Contains(t, sess.applied, worker.ID())
-			assert.True(t, sess.skipRecreate(api, types.UpdateParams{}))
+			assert.True(t, sess.SkipRecreate(api, types.UpdateParams{}))
 		})
 
 		t.Run("separates projects that share a directory and config identity", func(t *testing.T) {
@@ -838,7 +916,7 @@ func Test_gitSession(t *testing.T) {
 				}).
 				Twice()
 
-			sess := newGitSession(gitTestClient(t))
+			sess := NewSession(gitTestClient(t))
 			sess.apply = applier
 
 			var checkouts int
@@ -871,7 +949,7 @@ func Test_gitSession(t *testing.T) {
 
 			failed := map[types.ContainerID]error{}
 			docker := mockContainerClient.NewMockClient(t)
-			sess.prepareRebuilds(newTestLogger(t), t.Context(), docker, []types.Container{alpha, beta}, types.UpdateParams{EnableGitMonitoring: true}, nil, failed)
+			sess.PrepareRebuilds(newTestLogger(t), t.Context(), docker, []types.Container{alpha, beta}, types.UpdateParams{EnableGitMonitoring: true}, nil, failed)
 
 			assert.Empty(t, failed)
 			assert.Equal(t, 2, checkouts)
@@ -904,7 +982,7 @@ func Test_gitSession(t *testing.T) {
 				}).
 				Twice()
 
-			sess := newGitSession(gitTestClient(t))
+			sess := NewSession(gitTestClient(t))
 			sess.apply = applier
 			sess.checkout = func(context.Context, string, string, project.CheckoutOptions) error {
 				return nil
@@ -931,7 +1009,7 @@ func Test_gitSession(t *testing.T) {
 
 			failed := map[types.ContainerID]error{}
 			docker := mockContainerClient.NewMockClient(t)
-			sess.prepareRebuilds(newTestLogger(t), t.Context(), docker, []types.Container{dependent, provider}, types.UpdateParams{EnableGitMonitoring: true}, nil, failed)
+			sess.PrepareRebuilds(newTestLogger(t), t.Context(), docker, []types.Container{dependent, provider}, types.UpdateParams{EnableGitMonitoring: true}, nil, failed)
 
 			assert.Empty(t, failed)
 			assert.Equal(t, []string{"alpha", "beta"}, order)
@@ -964,7 +1042,7 @@ func Test_gitSession(t *testing.T) {
 				}).
 				Twice()
 
-			sess := newGitSession(gitTestClient(t))
+			sess := NewSession(gitTestClient(t))
 			sess.apply = applier
 			sess.checkout = func(context.Context, string, string, project.CheckoutOptions) error {
 				return nil
@@ -998,7 +1076,7 @@ func Test_gitSession(t *testing.T) {
 
 			failed := map[types.ContainerID]error{}
 			docker := mockContainerClient.NewMockClient(t)
-			sess.prepareRebuilds(
+			sess.PrepareRebuilds(
 				newTestLogger(t),
 				t.Context(),
 				docker,
@@ -1031,7 +1109,7 @@ func Test_gitSession(t *testing.T) {
 				}).
 				Once()
 
-			sess := newGitSession(git.New(newTestLogger(t), git.Options{Timeout: 5 * time.Millisecond}))
+			sess := NewSession(git.New(newTestLogger(t), git.Options{Timeout: 5 * time.Millisecond}))
 			sess.apply = applier
 			sess.checkout = func(context.Context, string, string, project.CheckoutOptions) error {
 				return nil
@@ -1047,7 +1125,7 @@ func Test_gitSession(t *testing.T) {
 
 			failed := map[types.ContainerID]error{}
 			docker := mockContainerClient.NewMockClient(t)
-			sess.prepareRebuilds(
+			sess.PrepareRebuilds(
 				newTestLogger(t),
 				t.Context(),
 				docker,
@@ -1068,7 +1146,7 @@ func Test_gitSession(t *testing.T) {
 			applier := mockCompose.NewMockApplier(t)
 			parent, cancel := context.WithCancel(t.Context())
 
-			sess := newGitSession(gitTestClient(t))
+			sess := NewSession(gitTestClient(t))
 			sess.apply = applier
 			sess.checkout = func(_ context.Context, _, _ string, opts project.CheckoutOptions) error {
 				if opts.Prior != nil {
@@ -1090,7 +1168,7 @@ func Test_gitSession(t *testing.T) {
 
 			failed := map[types.ContainerID]error{}
 			docker := mockContainerClient.NewMockClient(t)
-			sess.prepareRebuilds(
+			sess.PrepareRebuilds(
 				newTestLogger(t),
 				parent,
 				docker,
@@ -1114,7 +1192,7 @@ func Test_gitSession(t *testing.T) {
 				Return([]composeApply.Container{{Service: "api", ID: "new-api", ImageID: "sha256:api"}}, nil).
 				Once()
 
-			sess := newGitSession(gitTestClient(t))
+			sess := NewSession(gitTestClient(t))
 			sess.apply = applier
 			sess.checkout = func(context.Context, string, string, project.CheckoutOptions) error {
 				return nil
@@ -1136,7 +1214,7 @@ func Test_gitSession(t *testing.T) {
 
 			failed := map[types.ContainerID]error{}
 			docker := mockContainerClient.NewMockClient(t)
-			sess.prepareRebuilds(newTestLogger(t), t.Context(), docker, []types.Container{c}, params, progress, failed)
+			sess.PrepareRebuilds(newTestLogger(t), t.Context(), docker, []types.Container{c}, params, progress, failed)
 
 			report := progress.Report(newTestLogger(t))
 
@@ -1149,7 +1227,7 @@ func Test_gitSession(t *testing.T) {
 		t.Run("uses a remote Git build when compose-dir is unset", func(t *testing.T) {
 			t.Parallel()
 
-			sess := newGitSession(gitTestClient(t))
+			sess := NewSession(gitTestClient(t))
 			applier := mockCompose.NewMockApplier(t)
 			sess.apply = applier
 			c := gitAssociatedContainer("ok", "/ok", "myapp:latest", nil)
@@ -1159,7 +1237,7 @@ func Test_gitSession(t *testing.T) {
 			failed := map[types.ContainerID]error{}
 			docker := mockContainerClient.NewMockClient(t)
 			expectGitBuild(docker)
-			sess.prepareRebuilds(newTestLogger(t), t.Context(), docker, []types.Container{c}, types.UpdateParams{EnableGitMonitoring: true}, nil, failed)
+			sess.PrepareRebuilds(newTestLogger(t), t.Context(), docker, []types.Container{c}, types.UpdateParams{EnableGitMonitoring: true}, nil, failed)
 
 			assert.Empty(t, failed)
 			assert.Contains(t, sess.built, c.ID())
@@ -1171,7 +1249,7 @@ func Test_gitSession(t *testing.T) {
 
 			missing := filepath.Join(t.TempDir(), "missing")
 			applier := mockCompose.NewMockApplier(t)
-			sess := newGitSession(gitTestClient(t))
+			sess := NewSession(gitTestClient(t))
 			sess.apply = applier
 
 			c := gitAssociatedContainer("api", "/api", "webstack-api:latest", map[string]string{
@@ -1183,7 +1261,7 @@ func Test_gitSession(t *testing.T) {
 
 			failed := map[types.ContainerID]error{}
 			docker := mockContainerClient.NewMockClient(t)
-			sess.prepareRebuilds(newTestLogger(t), t.Context(), docker, []types.Container{c}, types.UpdateParams{EnableGitMonitoring: true}, nil, failed)
+			sess.PrepareRebuilds(newTestLogger(t), t.Context(), docker, []types.Container{c}, types.UpdateParams{EnableGitMonitoring: true}, nil, failed)
 
 			assert.NotContains(t, failed, c.ID())
 			assert.False(t, c.IsStale())
@@ -1196,7 +1274,7 @@ func Test_gitSession(t *testing.T) {
 
 			missing := filepath.Join(t.TempDir(), "missing")
 			applier := mockCompose.NewMockApplier(t)
-			sess := newGitSession(gitTestClient(t))
+			sess := NewSession(gitTestClient(t))
 			sess.apply = applier
 
 			c := gitAssociatedContainer("api", "/api", "webstack-api:latest", map[string]string{
@@ -1213,7 +1291,7 @@ func Test_gitSession(t *testing.T) {
 
 			failed := map[types.ContainerID]error{}
 			docker := mockContainerClient.NewMockClient(t)
-			sess.prepareRebuilds(log, t.Context(), docker, []types.Container{c}, params, progress, failed)
+			sess.PrepareRebuilds(log, t.Context(), docker, []types.Container{c}, params, progress, failed)
 			progress.UpdateFailed(log, failed)
 
 			report := progress.Report(log)
@@ -1233,7 +1311,7 @@ func Test_gitSession(t *testing.T) {
 			t.Parallel()
 
 			dir := writeComposeProjectDir(t)
-			sess := newGitSession(gitTestClient(t))
+			sess := NewSession(gitTestClient(t))
 			sess.apply = mockCompose.NewMockApplier(t)
 			c := gitAssociatedContainer("api", "/api", "webstack-api:latest", map[string]string{
 				labels.ComposeDir: dir,
@@ -1243,7 +1321,7 @@ func Test_gitSession(t *testing.T) {
 
 			failed := map[types.ContainerID]error{}
 			docker := mockContainerClient.NewMockClient(t)
-			sess.prepareRebuilds(newTestLogger(t), t.Context(), docker, []types.Container{c}, types.UpdateParams{EnableGitMonitoring: true}, nil, failed)
+			sess.PrepareRebuilds(newTestLogger(t), t.Context(), docker, []types.Container{c}, types.UpdateParams{EnableGitMonitoring: true}, nil, failed)
 
 			require.ErrorIs(t, failed[c.ID()], errGitComposeService)
 			assert.False(t, c.IsStale())
@@ -1254,7 +1332,7 @@ func Test_gitSession(t *testing.T) {
 
 			dir := writeComposeProjectDir(t)
 			applier := mockCompose.NewMockApplier(t)
-			sess := newGitSession(gitTestClient(t))
+			sess := NewSession(gitTestClient(t))
 			sess.apply = applier
 			sess.checkout = func(context.Context, string, string, project.CheckoutOptions) error {
 				return project.ErrDirty
@@ -1269,7 +1347,7 @@ func Test_gitSession(t *testing.T) {
 
 			failed := map[types.ContainerID]error{}
 			docker := mockContainerClient.NewMockClient(t)
-			sess.prepareRebuilds(newTestLogger(t), t.Context(), docker, []types.Container{c}, types.UpdateParams{EnableGitMonitoring: true}, nil, failed)
+			sess.PrepareRebuilds(newTestLogger(t), t.Context(), docker, []types.Container{c}, types.UpdateParams{EnableGitMonitoring: true}, nil, failed)
 
 			require.ErrorIs(t, failed[c.ID()], project.ErrDirty)
 			assert.False(t, c.IsStale())
@@ -1285,7 +1363,7 @@ func Test_gitSession(t *testing.T) {
 				Return([]composeApply.Container{{Service: "api", Name: "/api", ID: "new-api", ImageID: "sha256:api"}}, nil).
 				Once()
 
-			sess := newGitSession(git.New(newTestLogger(t), git.Options{Timeout: 10 * time.Millisecond}))
+			sess := NewSession(git.New(newTestLogger(t), git.Options{Timeout: 10 * time.Millisecond}))
 			sess.apply = applier
 			sess.checkout = func(ctx context.Context, _, _ string, _ project.CheckoutOptions) error {
 				<-ctx.Done()
@@ -1302,7 +1380,7 @@ func Test_gitSession(t *testing.T) {
 
 			failed := map[types.ContainerID]error{}
 			docker := mockContainerClient.NewMockClient(t)
-			sess.prepareRebuilds(newTestLogger(t), t.Context(), docker, []types.Container{c}, types.UpdateParams{EnableGitMonitoring: true}, nil, failed)
+			sess.PrepareRebuilds(newTestLogger(t), t.Context(), docker, []types.Container{c}, types.UpdateParams{EnableGitMonitoring: true}, nil, failed)
 
 			assert.Empty(t, failed)
 			assert.Contains(t, sess.applied, c.ID())
@@ -1324,7 +1402,7 @@ func Test_gitSession(t *testing.T) {
 			var logs bytes.Buffer
 
 			log := zerolog.New(&logs)
-			sess := newGitSession(gitTestClient(t))
+			sess := NewSession(gitTestClient(t))
 			sess.apply = applier
 			sess.checkout = func(context.Context, string, string, project.CheckoutOptions) error {
 				return nil
@@ -1348,7 +1426,7 @@ func Test_gitSession(t *testing.T) {
 			progress := &state.Progress{}
 			progress.AddScanned(&log, c, types.ImageID("git:new"), params)
 			progress.AddScanned(&log, fresh, fresh.ImageID(), params)
-			sess.prepareRebuilds(&log, t.Context(), docker, []types.Container{c}, params, progress, failed)
+			sess.PrepareRebuilds(&log, t.Context(), docker, []types.Container{c}, params, progress, failed)
 			progress.UpdateFailed(&log, failed)
 
 			report := progress.Report(&log)
@@ -1374,7 +1452,7 @@ func Test_gitSession(t *testing.T) {
 				Return([]composeApply.Container{{Service: "api", ID: "new-api", ImageID: "sha256:api"}}, nil).
 				Once()
 
-			sess := newGitSession(gitTestClient(t))
+			sess := NewSession(gitTestClient(t))
 			sess.apply = applier
 			sess.checkout = func(context.Context, string, string, project.CheckoutOptions) error {
 				return nil
@@ -1405,7 +1483,7 @@ func Test_gitSession(t *testing.T) {
 			progress := &state.Progress{}
 			progress.AddScanned(&log, api, types.ImageID("git:abc"), params)
 			progress.AddScanned(&log, worker, types.ImageID("git:abc"), params)
-			sess.prepareRebuilds(&log, t.Context(), docker, []types.Container{api, worker}, params, progress, failed)
+			sess.PrepareRebuilds(&log, t.Context(), docker, []types.Container{api, worker}, params, progress, failed)
 			progress.UpdateFailed(&log, failed)
 
 			report := progress.Report(&log)
@@ -1437,7 +1515,7 @@ func Test_gitSession(t *testing.T) {
 				Return([]composeApply.Container{{Service: "api", ImageID: "sha256:built"}}, nil).
 				Once()
 
-			sess := newGitSession(gitTestClient(t))
+			sess := NewSession(gitTestClient(t))
 			sess.apply = applier
 			sess.checkout = func(context.Context, string, string, project.CheckoutOptions) error {
 				return nil
@@ -1455,7 +1533,7 @@ func Test_gitSession(t *testing.T) {
 			params := types.UpdateParams{EnableGitMonitoring: true, NoRestart: true}
 			progress := &state.Progress{}
 			progress.AddScanned(newTestLogger(t), c, types.ImageID("git:abc"), params)
-			sess.prepareRebuilds(
+			sess.PrepareRebuilds(
 				newTestLogger(t),
 				t.Context(),
 				docker,
@@ -1471,7 +1549,7 @@ func Test_gitSession(t *testing.T) {
 			assert.True(t, got.BuildOnly)
 			assert.Empty(t, sess.applied)
 			assert.Equal(t, types.ImageID("sha256:built"), sess.built[c.ID()])
-			assert.True(t, sess.skipRecreate(c, params))
+			assert.True(t, sess.SkipRecreate(c, params))
 			assert.Empty(t, report.Updated())
 			require.Len(t, report.Stale(), 1)
 		})
@@ -1486,7 +1564,7 @@ func Test_gitSession(t *testing.T) {
 				Return(nil, context.Canceled).
 				Once()
 
-			sess := newGitSession(gitTestClient(t))
+			sess := NewSession(gitTestClient(t))
 			sess.apply = applier
 			sess.checkout = func(context.Context, string, string, project.CheckoutOptions) error {
 				return nil
@@ -1505,7 +1583,7 @@ func Test_gitSession(t *testing.T) {
 			failed := map[types.ContainerID]error{}
 			docker := mockContainerClient.NewMockClient(t)
 			params := types.UpdateParams{EnableGitMonitoring: true, NoRestart: true}
-			sess.prepareRebuilds(&log, t.Context(), docker, []types.Container{c}, params, nil, failed)
+			sess.PrepareRebuilds(&log, t.Context(), docker, []types.Container{c}, params, nil, failed)
 
 			require.ErrorIs(t, failed[c.ID()], context.Canceled)
 			assert.Contains(t, failed[c.ID()].Error(), "compose build failed")
@@ -1520,7 +1598,7 @@ func Test_gitSession(t *testing.T) {
 
 			dir := writeComposeProjectDir(t)
 			checkedOut := false
-			sess := newGitSession(gitTestClient(t))
+			sess := NewSession(gitTestClient(t))
 			sess.apply = mockCompose.NewMockApplier(t)
 			sess.checkout = func(context.Context, string, string, project.CheckoutOptions) error {
 				checkedOut = true
@@ -1544,7 +1622,7 @@ func Test_gitSession(t *testing.T) {
 
 			failed := map[types.ContainerID]error{}
 			docker := mockContainerClient.NewMockClient(t)
-			sess.prepareRebuilds(newTestLogger(t), t.Context(), docker, []types.Container{api, worker}, types.UpdateParams{EnableGitMonitoring: true}, nil, failed)
+			sess.PrepareRebuilds(newTestLogger(t), t.Context(), docker, []types.Container{api, worker}, types.UpdateParams{EnableGitMonitoring: true}, nil, failed)
 
 			assert.False(t, checkedOut)
 			require.ErrorIs(t, failed[api.ID()], errGitComposeCommit)
@@ -1572,7 +1650,7 @@ func Test_gitSession(t *testing.T) {
 				}, nil).
 				Once()
 
-			sess := newGitSession(gitTestClient(t))
+			sess := NewSession(gitTestClient(t))
 			sess.apply = applier
 			sess.checkout = func(context.Context, string, string, project.CheckoutOptions) error {
 				return nil
@@ -1594,7 +1672,7 @@ func Test_gitSession(t *testing.T) {
 
 			failed := map[types.ContainerID]error{}
 			docker := mockContainerClient.NewMockClient(t)
-			sess.prepareRebuilds(newTestLogger(t), t.Context(), docker, []types.Container{api, worker}, types.UpdateParams{EnableGitMonitoring: true}, nil, failed)
+			sess.PrepareRebuilds(newTestLogger(t), t.Context(), docker, []types.Container{api, worker}, types.UpdateParams{EnableGitMonitoring: true}, nil, failed)
 
 			assert.Empty(t, failed)
 			assert.Equal(t, "v1.2.3", got.Labels["api"][labels.GitLastTag])
@@ -1622,7 +1700,7 @@ func Test_gitSession(t *testing.T) {
 				}, nil).
 				Once()
 
-			sess := newGitSession(gitTestClient(t))
+			sess := NewSession(gitTestClient(t))
 			sess.apply = applier
 			sess.checkout = func(context.Context, string, string, project.CheckoutOptions) error {
 				return nil
@@ -1646,7 +1724,7 @@ func Test_gitSession(t *testing.T) {
 
 			failed := map[types.ContainerID]error{}
 			docker := mockContainerClient.NewMockClient(t)
-			sess.prepareRebuilds(newTestLogger(t), t.Context(), docker, []types.Container{one, two}, types.UpdateParams{EnableGitMonitoring: true}, nil, failed)
+			sess.PrepareRebuilds(newTestLogger(t), t.Context(), docker, []types.Container{one, two}, types.UpdateParams{EnableGitMonitoring: true}, nil, failed)
 
 			assert.Empty(t, failed)
 			assert.Equal(t, []string{"api"}, got.Services)
@@ -1667,7 +1745,7 @@ func Test_gitSession(t *testing.T) {
 				}, nil).
 				Once()
 
-			sess := newGitSession(gitTestClient(t))
+			sess := NewSession(gitTestClient(t))
 			sess.apply = applier
 			sess.checkout = func(context.Context, string, string, project.CheckoutOptions) error {
 				return nil
@@ -1694,7 +1772,7 @@ func Test_gitSession(t *testing.T) {
 
 			failed := map[types.ContainerID]error{}
 			docker := mockContainerClient.NewMockClient(t)
-			sess.prepareRebuilds(newTestLogger(t), t.Context(), docker, []types.Container{stale}, params, progress, failed)
+			sess.PrepareRebuilds(newTestLogger(t), t.Context(), docker, []types.Container{stale}, params, progress, failed)
 
 			report := progress.Report(newTestLogger(t))
 
@@ -1705,7 +1783,7 @@ func Test_gitSession(t *testing.T) {
 			assert.Empty(t, report.Stale())
 			assert.NotEmpty(t, report.Updated()[0].NewContainerID())
 			assert.NotEmpty(t, report.Updated()[1].NewContainerID())
-			assert.Empty(t, sess.excludeApplied([]types.Container{stale, fresh}))
+			assert.Empty(t, sess.ExcludeApplied([]types.Container{stale, fresh}))
 		})
 
 		t.Run("accepts additional Compose replicas absent from filtered progress", func(t *testing.T) {
@@ -1721,7 +1799,7 @@ func Test_gitSession(t *testing.T) {
 				}, nil).
 				Once()
 
-			sess := newGitSession(gitTestClient(t))
+			sess := NewSession(gitTestClient(t))
 			sess.apply = applier
 			sess.checkout = func(context.Context, string, string, project.CheckoutOptions) error {
 				return nil
@@ -1750,7 +1828,7 @@ func Test_gitSession(t *testing.T) {
 			log := zerolog.New(&logs)
 			failed := map[types.ContainerID]error{}
 			docker := mockContainerClient.NewMockClient(t)
-			sess.prepareRebuilds(&log, t.Context(), docker, []types.Container{stale}, params, progress, failed)
+			sess.PrepareRebuilds(&log, t.Context(), docker, []types.Container{stale}, params, progress, failed)
 
 			report := progress.Report(&log)
 
@@ -1773,7 +1851,7 @@ func Test_gitSession(t *testing.T) {
 				}, nil).
 				Once()
 
-			sess := newGitSession(gitTestClient(t))
+			sess := NewSession(gitTestClient(t))
 			sess.apply = applier
 			sess.checkout = func(context.Context, string, string, project.CheckoutOptions) error {
 				return nil
@@ -1797,7 +1875,7 @@ func Test_gitSession(t *testing.T) {
 
 			failed := map[types.ContainerID]error{}
 			docker := mockContainerClient.NewMockClient(t)
-			sess.prepareRebuilds(newTestLogger(t), t.Context(), docker, []types.Container{one, two}, types.UpdateParams{EnableGitMonitoring: true}, nil, failed)
+			sess.PrepareRebuilds(newTestLogger(t), t.Context(), docker, []types.Container{one, two}, types.UpdateParams{EnableGitMonitoring: true}, nil, failed)
 
 			assert.NotContains(t, failed, one.ID())
 			require.ErrorIs(t, failed[two.ID()], errGitComposeInstance)
@@ -1859,163 +1937,6 @@ func Test_gitSession(t *testing.T) {
 			})
 			got := composeServiceLabels(c, types.UpdateParams{}, git.CheckResult{Commit: "abc"})
 			assert.Equal(t, "true", got[labels.GitWatch])
-		})
-	})
-
-	t.Run("reconcileImplicitRestarts", func(t *testing.T) {
-		t.Parallel()
-
-		t.Run("drops dependents when the anchor apply failed", func(t *testing.T) {
-			t.Parallel()
-
-			log := newTestLogger(t)
-			app := mockUpdate.CreateMockContainerWithLinks(
-				"app",
-				"/app",
-				"app:latest",
-				time.Now(),
-				nil,
-				nil,
-			)
-			db := mockUpdate.CreateMockContainerWithLinks(
-				"db",
-				"/db",
-				"db:latest",
-				time.Now(),
-				[]string{"/app:app"},
-				nil,
-			)
-
-			app.SetStale(true)
-			containers := []types.Container{app, db}
-			updateImplicitRestart(log, containers, containers, false)
-			assert.True(t, db.IsLinkedToRestarting())
-
-			app.SetStale(false)
-
-			got := reconcileImplicitRestarts(log, containers, containers, types.UpdateParams{})
-
-			assert.False(t, db.IsLinkedToRestarting())
-			assert.Empty(t, got)
-		})
-
-		t.Run("keeps dependents when the anchor is still stale", func(t *testing.T) {
-			t.Parallel()
-
-			log := newTestLogger(t)
-			app := mockUpdate.CreateMockContainerWithLinks(
-				"app",
-				"/app",
-				"app:latest",
-				time.Now(),
-				nil,
-				nil,
-			)
-			db := mockUpdate.CreateMockContainerWithLinks(
-				"db",
-				"/db",
-				"db:latest",
-				time.Now(),
-				[]string{"/app:app"},
-				nil,
-			)
-
-			app.SetStale(true)
-			containers := []types.Container{app, db}
-			got := reconcileImplicitRestarts(log, containers, containers, types.UpdateParams{})
-
-			assert.True(t, db.IsLinkedToRestarting())
-			assert.ElementsMatch(t, []types.Container{app, db}, got)
-		})
-
-		t.Run("does not propagate restarts from a no-restart build anchor", func(t *testing.T) {
-			t.Parallel()
-
-			log := newTestLogger(t)
-			app := mockUpdate.CreateMockContainerWithLinks(
-				"app",
-				"/app",
-				"app:latest",
-				time.Now(),
-				nil,
-				nil,
-			)
-			dependent := mockUpdate.CreateMockContainerWithLinks(
-				"dependent",
-				"/dependent",
-				"dependent:latest",
-				time.Now(),
-				[]string{"/app:app"},
-				nil,
-			)
-
-			app.SetStale(true)
-			containers := []types.Container{app, dependent}
-			sess := newGitSession(gitTestClient(t))
-			sess.built[app.ID()] = "sha256:git"
-
-			graph, err := sorter.NewDependencyGraph(log, containers, nil, false)
-			require.NoError(t, err)
-
-			got := reconcileImplicitRestartsExcluding(
-				log,
-				graph,
-				containers,
-				containers,
-				types.UpdateParams{NoRestart: true},
-				sess.noRestartBuiltIDs(types.UpdateParams{NoRestart: true}),
-			)
-
-			assert.False(t, dependent.IsLinkedToRestarting())
-			assert.Empty(t, got)
-		})
-		t.Run("does not fall through from an excluded exact link to a service-name match", func(t *testing.T) {
-			t.Parallel()
-
-			log := newTestLogger(t)
-			excluded := mockUpdate.CreateMockContainerWithLinks(
-				"app",
-				"/app",
-				"app:latest",
-				time.Now(),
-				nil,
-				nil,
-			)
-			serviceMatch := mockUpdate.CreateMockContainerWithLinks(
-				"app-1",
-				"/app-1",
-				"app:latest",
-				time.Now(),
-				nil,
-				nil,
-			)
-			dependent := mockUpdate.CreateMockContainerWithLinks(
-				"dependent",
-				"/dependent",
-				"dependent:latest",
-				time.Now(),
-				[]string{"/app:app"},
-				nil,
-			)
-
-			excluded.SetStale(true)
-			serviceMatch.SetStale(true)
-			containers := []types.Container{excluded, serviceMatch, dependent}
-
-			graph, err := sorter.NewDependencyGraph(log, containers, nil, false)
-			require.NoError(t, err)
-
-			got := reconcileImplicitRestartsExcluding(
-				log,
-				graph,
-				containers,
-				containers,
-				types.UpdateParams{},
-				map[types.ContainerID]struct{}{excluded.ID(): {}},
-			)
-
-			assert.False(t, dependent.IsLinkedToRestarting())
-			assert.ElementsMatch(t, []types.Container{serviceMatch}, got)
 		})
 	})
 
@@ -2082,13 +2003,13 @@ func Test_gitSession(t *testing.T) {
 			var buf bytes.Buffer
 
 			log := zerolog.New(&buf).Level(zerolog.WarnLevel)
-			warnGitConfigSkip(
+			WarnConfigSkip(
 				&log,
 				"app",
 				"app:latest",
 				fmt.Errorf("%w: %w", git.ErrInvalidHost, errors.New("https://user:supersecret@evil.example")),
 			)
-			warnGitConfigSkip(&log, "app", "app:latest", fmt.Errorf("%w: nightly", git.ErrInvalidPolicy))
+			WarnConfigSkip(&log, "app", "app:latest", fmt.Errorf("%w: nightly", git.ErrInvalidPolicy))
 
 			text := buf.String()
 			assert.Contains(t, text, "Skipped container with an invalid git-host")

@@ -7,6 +7,7 @@ import (
 	"encoding/hex"
 	"sort"
 	"testing"
+	"time"
 
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/assert"
@@ -18,6 +19,7 @@ import (
 	"github.com/nicholas-fedor/watchtower/internal/container"
 	mockContainerClient "github.com/nicholas-fedor/watchtower/internal/container/client/mocks"
 	"github.com/nicholas-fedor/watchtower/internal/registry/ratelimit"
+	mockUpdate "github.com/nicholas-fedor/watchtower/internal/update/mocks"
 	"github.com/nicholas-fedor/watchtower/internal/update/sorter"
 	"github.com/nicholas-fedor/watchtower/pkg/types"
 )
@@ -330,6 +332,166 @@ func TestUpdate_WarnsOnUnresolvedDependsOn(t *testing.T) {
 	assert.Contains(t, output.String(),
 		`{"level":"warn","container":"app","depends_on":"missing","message":"Ignoring depends-on entry that names no container"}`)
 	assert.NotContains(t, output.String(), `"depends_on":"db","message":"Ignoring depends-on entry`)
+}
+
+// TestReconcileImplicitRestarts verifies that implicit restarts follow the
+// anchors that still restart. A dependent loses its restart when its anchor is
+// no longer stale or is excluded, and an excluded exact link does not fall
+// through to a service-name match.
+func TestReconcileImplicitRestarts(t *testing.T) {
+	t.Parallel()
+
+	t.Run("drops dependents when the anchor apply failed", func(t *testing.T) {
+		t.Parallel()
+
+		log := newTestLogger(t)
+		app := mockUpdate.CreateMockContainerWithLinks(
+			"app",
+			"/app",
+			"app:latest",
+			time.Now(),
+			nil,
+			nil,
+		)
+		db := mockUpdate.CreateMockContainerWithLinks(
+			"db",
+			"/db",
+			"db:latest",
+			time.Now(),
+			[]string{"/app:app"},
+			nil,
+		)
+
+		app.SetStale(true)
+		containers := []types.Container{app, db}
+		updateImplicitRestart(log, containers, containers, false)
+		assert.True(t, db.IsLinkedToRestarting())
+
+		app.SetStale(false)
+
+		got := reconcileImplicitRestarts(log, containers, containers, types.UpdateParams{})
+
+		assert.False(t, db.IsLinkedToRestarting())
+		assert.Empty(t, got)
+	})
+
+	t.Run("keeps dependents when the anchor is still stale", func(t *testing.T) {
+		t.Parallel()
+
+		log := newTestLogger(t)
+		app := mockUpdate.CreateMockContainerWithLinks(
+			"app",
+			"/app",
+			"app:latest",
+			time.Now(),
+			nil,
+			nil,
+		)
+		db := mockUpdate.CreateMockContainerWithLinks(
+			"db",
+			"/db",
+			"db:latest",
+			time.Now(),
+			[]string{"/app:app"},
+			nil,
+		)
+
+		app.SetStale(true)
+		containers := []types.Container{app, db}
+		got := reconcileImplicitRestarts(log, containers, containers, types.UpdateParams{})
+
+		assert.True(t, db.IsLinkedToRestarting())
+		assert.ElementsMatch(t, []types.Container{app, db}, got)
+	})
+
+	t.Run("does not propagate restarts from a no-restart build anchor", func(t *testing.T) {
+		t.Parallel()
+
+		log := newTestLogger(t)
+		app := mockUpdate.CreateMockContainerWithLinks(
+			"app",
+			"/app",
+			"app:latest",
+			time.Now(),
+			nil,
+			nil,
+		)
+		dependent := mockUpdate.CreateMockContainerWithLinks(
+			"dependent",
+			"/dependent",
+			"dependent:latest",
+			time.Now(),
+			[]string{"/app:app"},
+			nil,
+		)
+
+		app.SetStale(true)
+		containers := []types.Container{app, dependent}
+
+		graph, err := sorter.NewDependencyGraph(log, containers, nil, false)
+		require.NoError(t, err)
+
+		got := reconcileImplicitRestartsExcluding(
+			log,
+			graph,
+			containers,
+			containers,
+			types.UpdateParams{NoRestart: true},
+			// The update excludes the containers Git built without a restart.
+			map[types.ContainerID]struct{}{app.ID(): {}},
+		)
+
+		assert.False(t, dependent.IsLinkedToRestarting())
+		assert.Empty(t, got)
+	})
+	t.Run("does not fall through from an excluded exact link to a service-name match", func(t *testing.T) {
+		t.Parallel()
+
+		log := newTestLogger(t)
+		excluded := mockUpdate.CreateMockContainerWithLinks(
+			"app",
+			"/app",
+			"app:latest",
+			time.Now(),
+			nil,
+			nil,
+		)
+		serviceMatch := mockUpdate.CreateMockContainerWithLinks(
+			"app-1",
+			"/app-1",
+			"app:latest",
+			time.Now(),
+			nil,
+			nil,
+		)
+		dependent := mockUpdate.CreateMockContainerWithLinks(
+			"dependent",
+			"/dependent",
+			"dependent:latest",
+			time.Now(),
+			[]string{"/app:app"},
+			nil,
+		)
+
+		excluded.SetStale(true)
+		serviceMatch.SetStale(true)
+		containers := []types.Container{excluded, serviceMatch, dependent}
+
+		graph, err := sorter.NewDependencyGraph(log, containers, nil, false)
+		require.NoError(t, err)
+
+		got := reconcileImplicitRestartsExcluding(
+			log,
+			graph,
+			containers,
+			containers,
+			types.UpdateParams{},
+			map[types.ContainerID]struct{}{excluded.ID(): {}},
+		)
+
+		assert.False(t, dependent.IsLinkedToRestarting())
+		assert.ElementsMatch(t, []types.Container{serviceMatch}, got)
+	})
 }
 
 // updateImplicitRestart marks the containers that depend on a restarting

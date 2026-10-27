@@ -10,6 +10,7 @@ import (
 
 	"github.com/nicholas-fedor/watchtower/internal/container/filters"
 	containerImage "github.com/nicholas-fedor/watchtower/internal/container/image"
+	"github.com/nicholas-fedor/watchtower/internal/update/rebuild"
 	"github.com/nicholas-fedor/watchtower/internal/update/state"
 	"github.com/nicholas-fedor/watchtower/pkg/types"
 )
@@ -142,7 +143,7 @@ func isPinned(
 	cont types.Container,
 	progress *state.Progress,
 	config types.UpdateParams,
-	gitSession *gitSession,
+	gitSession *rebuild.Session,
 ) (bool, error) {
 	// Set up logging with container and image details for debugging.
 	clogVal := log.With().
@@ -189,7 +190,7 @@ func isPinned(
 	// A repo@sha256 reference must stay pinned even when ParseDockerRef fails
 	// for unrelated reasons.
 	if containerImage.IsImagePinnedByDigest(imageName) {
-		if gitSession.watching(log, cont, config) {
+		if gitSession.Watching(log, cont, config) {
 			clog.Debug().Msg("Pinned digest uses Git path because watcher is on")
 
 			return false, nil

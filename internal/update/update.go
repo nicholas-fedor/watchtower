@@ -23,6 +23,7 @@ import (
 	"github.com/nicholas-fedor/watchtower/internal/git"
 	"github.com/nicholas-fedor/watchtower/internal/registry/ratelimit"
 	"github.com/nicholas-fedor/watchtower/internal/update/changelog"
+	"github.com/nicholas-fedor/watchtower/internal/update/rebuild"
 	"github.com/nicholas-fedor/watchtower/internal/update/selfupdate"
 	"github.com/nicholas-fedor/watchtower/internal/update/sorter"
 	"github.com/nicholas-fedor/watchtower/internal/update/state"
@@ -107,7 +108,7 @@ func update(
 		watcher = gitClient[0]
 	}
 
-	gitSession := newGitSession(watcher)
+	gitSession := rebuild.NewSession(watcher)
 
 	// Initialize logging for the update process start.
 	log.Debug().Msg("Starting container update check")
@@ -429,10 +430,10 @@ func update(
 			case sourceContainer.IsWatchtower() && config.SkipSelfUpdate:
 				stale = false
 				newestImage = sourceContainer.ImageID()
-			case gitSession.watching(log, sourceContainer, config):
+			case gitSession.Watching(log, sourceContainer, config):
 				gitWatched = true
 
-				stale, newestImage, checkErr = gitSession.check(ctx, sourceContainer, config)
+				stale, newestImage, checkErr = gitSession.Check(ctx, sourceContainer, config)
 			default:
 				stale, newestImage, newDigest, checkErr = client.IsContainerStale(
 					ctx,
@@ -447,7 +448,7 @@ func update(
 
 			// Determine if the container should be updated based on staleness and config.
 			shouldUpdate := shouldUpdateContainer(sourceContainer, stale, config)
-			if gitSession.watching(log, sourceContainer, config) && sourceContainer.IsNoPull(config) {
+			if gitSession.Watching(log, sourceContainer, config) && sourceContainer.IsNoPull(config) {
 				shouldUpdate = false
 			}
 
@@ -518,7 +519,7 @@ func update(
 			switch {
 			case checkErr != nil:
 				// Skip containers with staleness check errors, marking them as skipped.
-				warnGitConfigSkip(log, sourceContainer.Name(), sourceContainer.ImageName(), checkErr)
+				rebuild.WarnConfigSkip(log, sourceContainer.Name(), sourceContainer.ImageName(), checkErr)
 
 				if !errors.Is(checkErr, containerImage.ErrImageCooldown) {
 					parallelStaleCheckFailed++
@@ -744,7 +745,7 @@ func update(
 	)
 
 	gitFailed := make(map[types.ContainerID]error)
-	gitSession.prepareRebuilds(
+	gitSession.PrepareRebuilds(
 		log,
 		ctx,
 		client,
@@ -759,7 +760,7 @@ func update(
 	// dependencies are not stopped. Containers that are still stale stay anchors.
 	// Cycle members stay excluded, as in the first pass.
 	excluded := make(map[types.ContainerID]struct{}, len(inCycle))
-	maps.Copy(excluded, gitSession.noRestartBuiltIDs(config))
+	maps.Copy(excluded, gitSession.NoRestartBuiltIDs(config))
 	maps.Copy(excluded, inCycle)
 
 	allContainersToRestart = reconcileImplicitRestartsExcluding(
@@ -785,12 +786,13 @@ func update(
 	}
 
 	// Compose apply already recreated those services. Do not inspect-recreate.
-	allContainersToRestart = gitSession.excludeApplied(allContainersToRestart)
+	allContainersToRestart = gitSession.ExcludeApplied(allContainersToRestart)
 
 	// Git no-restart builds must not enter stop/create.
 	// The default non-rolling path stops first.
-	// skipRecreate after stop would leave the running container deleted.
-	allContainersToRestart = gitSession.excludeNoRestart(
+	// Skipping their recreation only after the stop would leave the running
+	// container deleted.
+	allContainersToRestart = gitSession.ExcludeNoRestart(
 		allContainersToRestart,
 		config,
 	)

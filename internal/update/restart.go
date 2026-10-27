@@ -16,6 +16,7 @@ import (
 	containerClient "github.com/nicholas-fedor/watchtower/internal/container/client"
 	"github.com/nicholas-fedor/watchtower/internal/container/hooks"
 	"github.com/nicholas-fedor/watchtower/internal/container/labels"
+	"github.com/nicholas-fedor/watchtower/internal/update/rebuild"
 	"github.com/nicholas-fedor/watchtower/internal/update/selfupdate"
 	"github.com/nicholas-fedor/watchtower/internal/update/state"
 	"github.com/nicholas-fedor/watchtower/pkg/types"
@@ -83,7 +84,7 @@ func performRollingRestart(
 	config types.UpdateParams,
 	cleanupImageInfos *[]types.RemovedImageInfo,
 	progress *state.Progress,
-	gitSession *gitSession,
+	gitSession *rebuild.Session,
 ) (map[types.ContainerID]error, error) {
 	failed := make(map[types.ContainerID]error, len(containers))
 
@@ -130,7 +131,7 @@ func performRollingRestart(
 			continue
 		}
 
-		if gitSession.skipRecreate(c, config) {
+		if gitSession.SkipRecreate(c, config) {
 			continue
 		}
 
@@ -521,7 +522,7 @@ func restartContainersInSortedOrder(
 	stoppedImages []types.RemovedImageInfo,
 	cleanupImageInfos *[]types.RemovedImageInfo,
 	progress *state.Progress,
-	gitSession *gitSession,
+	gitSession *rebuild.Session,
 ) map[types.ContainerID]error {
 	failed := make(map[types.ContainerID]error, len(containers))
 	// Track renamed containers to skip cleanup.
@@ -535,7 +536,7 @@ func restartContainersInSortedOrder(
 			continue
 		}
 
-		if gitSession.skipRecreate(c, config) {
+		if gitSession.SkipRecreate(c, config) {
 			continue
 		}
 
