@@ -1415,6 +1415,50 @@ func (_c *MockContainer_Name_Call) RunAndReturn(run func() string) *MockContaine
 	return _c
 }
 
+// NormalizedScope provides a mock function for the type MockContainer
+func (_mock *MockContainer) NormalizedScope() string {
+	ret := _mock.Called()
+
+	if len(ret) == 0 {
+		panic("no return value specified for NormalizedScope")
+	}
+
+	var r0 string
+	if returnFunc, ok := ret.Get(0).(func() string); ok {
+		r0 = returnFunc()
+	} else {
+		r0 = ret.Get(0).(string)
+	}
+	return r0
+}
+
+// MockContainer_NormalizedScope_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'NormalizedScope'
+type MockContainer_NormalizedScope_Call struct {
+	*mock.Call
+}
+
+// NormalizedScope is a helper method to define mock.On call
+func (_e *MockContainer_Expecter) NormalizedScope() *MockContainer_NormalizedScope_Call {
+	return &MockContainer_NormalizedScope_Call{Call: _e.mock.On("NormalizedScope")}
+}
+
+func (_c *MockContainer_NormalizedScope_Call) Run(run func()) *MockContainer_NormalizedScope_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run()
+	})
+	return _c
+}
+
+func (_c *MockContainer_NormalizedScope_Call) Return(s string) *MockContainer_NormalizedScope_Call {
+	_c.Call.Return(s)
+	return _c
+}
+
+func (_c *MockContainer_NormalizedScope_Call) RunAndReturn(run func() string) *MockContainer_NormalizedScope_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // PostUpdateTimeout provides a mock function for the type MockContainer
 func (_mock *MockContainer) PostUpdateTimeout() int {
 	ret := _mock.Called()

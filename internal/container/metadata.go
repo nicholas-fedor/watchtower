@@ -407,6 +407,20 @@ func (c *Container) Scope() (string, bool) {
 	return rawString, true
 }
 
+// NormalizedScope returns the container's scope, or [labels.NoScope] when its
+// scope label is unset or empty.
+//
+// Returns:
+//   - string: The container's scope.
+func (c *Container) NormalizedScope() string {
+	scope, ok := c.Scope()
+	if !ok || scope == "" {
+		return labels.NoScope
+	}
+
+	return scope
+}
+
 // GetEffectiveScope determines the effective operational scope by prioritizing explicit scope
 // over scope derived from the container's label. This is crucial for self-update scenarios where
 // a new Watchtower instance needs to inherit the same scope as the instance being replaced
@@ -810,4 +824,26 @@ func IsSuperseded(container types.Container) bool {
 	chain, present := container.GetContainerChain()
 
 	return present && IsWatchtowerParent(container.ID(), chain)
+}
+
+// IsOrphanedReplacement reports whether a container counts as a replacement
+// that an interrupted self-update left in the created state.
+//
+// Any Watchtower container in the created state and in the current container's
+// scope counts, unless it is the current container or a renamed predecessor.
+// One scope runs one Watchtower instance, so such a container is never a separate
+// instance to keep.
+//
+// Parameters:
+//   - candidate: The container to check.
+//   - current: The running Watchtower container.
+//
+// Returns:
+//   - bool: True when the candidate is an orphaned replacement.
+func IsOrphanedReplacement(candidate, current types.Container) bool {
+	return candidate.IsWatchtower() &&
+		candidate.ID() != current.ID() &&
+		!IsOldContainer(candidate.Name()) &&
+		candidate.IsCreated() &&
+		candidate.NormalizedScope() == current.NormalizedScope()
 }

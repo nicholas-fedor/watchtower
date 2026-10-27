@@ -24,6 +24,7 @@ type Container interface {
 	Enabled() (bool, bool)                            // Enabled status and presence.
 	IsMonitorOnly(params UpdateParams) bool           // Monitor-only check.
 	Scope() (string, bool)                            // Scope value and presence.
+	NormalizedScope() string                          // Scope, or "none" when unset or empty.
 	Links(useComposeDependsOn bool) []string          // Dependency links.
 	GetLabel(key string) (string, bool)               // Arbitrary label value lookup.
 	ToRestart() bool                                  // Needs restart check.

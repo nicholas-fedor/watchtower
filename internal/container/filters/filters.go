@@ -15,9 +15,6 @@ import (
 )
 
 const (
-	// noScope is the default scope value when none is specified.
-	noScope = "none"
-
 	// Expected number of parts in a key=value label pair.
 	labelPairPartsCount = 2
 
@@ -73,12 +70,7 @@ func UnscopedWatchtowerContainersFilter(c types.FilterableContainer) bool {
 		return false
 	}
 
-	containerScope, containerHasScope := c.Scope()
-	if !containerHasScope || containerScope == "" {
-		containerScope = noScope
-	}
-
-	return containerScope == noScope
+	return c.NormalizedScope() == labels.NoScope
 }
 
 // excludeOldWatchtowerFilter rejects containers that are old Watchtower
@@ -570,10 +562,7 @@ func filterByEnableLabel(enable bool, baseFilter types.Filter) types.Filter {
 //   - types.Filter: Filter function matching scope and applying base filter.
 func FilterByScope(log *zerolog.Logger, scope string, baseFilter types.Filter) types.Filter {
 	return func(c types.FilterableContainer) bool {
-		containerScope, containerHasScope := c.Scope()
-		if !containerHasScope || containerScope == "" {
-			containerScope = noScope // Default to "none" if unset.
-		}
+		containerScope := c.NormalizedScope()
 
 		if containerScope == scope {
 			if debugEnabled(log) {
@@ -837,15 +826,36 @@ func BuildFilter(log *zerolog.Logger,
 	}
 
 	stringBuilder := strings.Builder{}
+
+	// Each filter wraps the one before it, so a container must pass all of
+	// them. A filter whose option is empty passes every container through.
 	filter := NoFilter
+
+	// Keep only containers whose name matches one of the given names or patterns.
 	filter = FilterByNames(log, normalizedNames, filter)
+
+	// Drop containers whose name matches one of the disabled names or patterns.
 	filter = FilterByDisableNames(log, normalizedDisableNames, filter)
+
+	// Keep only containers whose image matches one of the monitored patterns.
 	filter = filterByMonitoredImageNamePatterns(log, monitoredImageNamePatterns, filter)
+
+	// Drop containers whose image matches one of the skipped patterns.
 	filter = filterBySkippedImageNamePatterns(log, skippedImageNamePatterns, filter)
+
+	// Keep only containers that carry at least one of the enabled label pairs.
 	filter = filterByEnabledLabels(log, enabledLabelPairs, filter)
+
+	// Drop containers that carry any of the disabled label pairs.
 	filter = filterByDisabledLabels(log, disabledLabelPairs, filter)
+
+	// Drop containers whose enable label is false. With label-enable set, also
+	// drop containers that have no enable label. This filter always applies.
 	filter = filterByEnableLabel(enableLabel, filter)
 
+	// The description lists each option that narrows the selection, in the
+	// order the filters above apply them.
+	//
 	// Add name-based filter description.
 	if len(normalizedNames) > 0 {
 		stringBuilder.WriteString("which name matches \"")
@@ -876,6 +886,7 @@ func BuildFilter(log *zerolog.Logger,
 		stringBuilder.WriteString(`", `)
 	}
 
+	// Add monitored-image filter description.
 	if len(monitoredImageNamePatterns) > 0 {
 		stringBuilder.WriteString("which image matches \"")
 
@@ -890,6 +901,7 @@ func BuildFilter(log *zerolog.Logger,
 		stringBuilder.WriteString(`", `)
 	}
 
+	// Add skipped-image filter description.
 	if len(skippedImageNamePatterns) > 0 {
 		stringBuilder.WriteString("whose image is not one of \"")
 
@@ -904,29 +916,35 @@ func BuildFilter(log *zerolog.Logger,
 		stringBuilder.WriteString(`", `)
 	}
 
+	// Add label-enable description.
 	if enableLabel {
 		stringBuilder.WriteString("with label ")
 		stringBuilder.WriteString(labels.Enable)
 		stringBuilder.WriteString(`, `)
 	}
 
+	// Add enabled-label-pair description.
 	if len(enabledLabelPairs) > 0 {
 		stringBuilder.WriteString("with label ")
 		writeLabelPairs(&stringBuilder, enabledLabelPairs)
 		stringBuilder.WriteString(`, `)
 	}
 
+	// Add disabled-label-pair description.
 	if len(disabledLabelPairs) > 0 {
 		stringBuilder.WriteString("without label ")
 		writeLabelPairs(&stringBuilder, disabledLabelPairs)
 		stringBuilder.WriteString(`, `)
 	}
 
-	if scope == noScope || scope == "" {
-		filter = FilterByScope(log, noScope, filter)
+	// Keep only containers in the configured scope, and describe it. An empty
+	// configured scope selects the containers without a scope, the same as
+	// "none".
+	if scope == labels.NoScope || scope == "" {
+		filter = FilterByScope(log, labels.NoScope, filter)
 
 		stringBuilder.WriteString(`without a scope`)
-	} else if scope != "" {
+	} else {
 		filter = FilterByScope(log, scope, filter)
 
 		stringBuilder.WriteString(`in scope `)

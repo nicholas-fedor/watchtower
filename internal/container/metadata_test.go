@@ -1811,6 +1811,109 @@ func TestIsSuperseded(t *testing.T) {
 	}
 }
 
+// TestNormalizedScope verifies that an unset, empty, or "none" scope label is
+// the scope "none", and that any other value is kept.
+func TestNormalizedScope(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name   string
+		labels map[string]string
+		want   string
+	}{
+		{name: "no scope label", labels: map[string]string{}, want: "none"},
+		{name: "empty scope label", labels: map[string]string{labels.Scope: ""}, want: "none"},
+		{name: "none scope label", labels: map[string]string{labels.Scope: "none"}, want: "none"},
+		{name: "named scope", labels: map[string]string{labels.Scope: "prod"}, want: "prod"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			c := MockContainer(containerfixture.WithLabels(tt.labels))
+
+			assert.Equal(t, tt.want, c.NormalizedScope())
+		})
+	}
+}
+
+// TestIsOrphanedReplacement verifies which containers count as replacements
+// that an interrupted self-update left in the created state. Only a created
+// Watchtower container in the current container's scope counts, unless it is
+// the current container or a renamed predecessor. An unset scope label and an
+// empty one are the same scope.
+func TestIsOrphanedReplacement(t *testing.T) {
+	t.Parallel()
+
+	created := containerfixture.WithContainerState(dockerContainer.State{Status: dockerContainer.StateCreated})
+	running := containerfixture.WithContainerState(dockerContainer.State{Status: dockerContainer.StateRunning, Running: true})
+	watchtower := func(scope string) containerfixture.Update {
+		containerLabels := map[string]string{labels.Watchtower: "true"}
+		if scope != "" {
+			containerLabels[labels.Scope] = scope
+		}
+
+		return containerfixture.WithLabels(containerLabels)
+	}
+
+	current := MockContainer(containerfixture.WithID("current"), containerfixture.WithName("/watchtower"), running,
+		watchtower(""))
+
+	tests := []struct {
+		name      string
+		candidate types.Container
+		want      bool
+	}{
+		{
+			name:      "created Watchtower container in the same scope",
+			candidate: MockContainer(containerfixture.WithID("new"), containerfixture.WithName("/watchtower-new"), created, watchtower("")),
+			want:      true,
+		},
+		{
+			name: "empty scope label matches an unset one",
+			candidate: MockContainer(containerfixture.WithID("new"), containerfixture.WithName("/watchtower-new"), created,
+				containerfixture.WithLabels(map[string]string{labels.Watchtower: "true", labels.Scope: ""})),
+			want: true,
+		},
+		{
+			name:      "different scope",
+			candidate: MockContainer(containerfixture.WithID("new"), containerfixture.WithName("/watchtower-new"), created, watchtower("prod")),
+			want:      false,
+		},
+		{
+			name:      "not created",
+			candidate: MockContainer(containerfixture.WithID("new"), containerfixture.WithName("/watchtower-new"), running, watchtower("")),
+			want:      false,
+		},
+		{
+			name: "not a Watchtower container",
+			candidate: MockContainer(containerfixture.WithID("new"), containerfixture.WithName("/app"), created,
+				containerfixture.WithLabels(map[string]string{})),
+			want: false,
+		},
+		{
+			name: "renamed predecessor",
+			candidate: MockContainer(containerfixture.WithID("old"), containerfixture.WithName("/watchtower-old-abc123"), created,
+				watchtower("")),
+			want: false,
+		},
+		{
+			name:      "the current container",
+			candidate: MockContainer(containerfixture.WithID("current"), containerfixture.WithName("/watchtower"), created, watchtower("")),
+			want:      false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			assert.Equal(t, tt.want, IsOrphanedReplacement(tt.candidate, current))
+		})
+	}
+}
+
 // TestContainer_SetLabel verifies that SetLabel writes and overwrites labels,
 // creating the labels map when needed, and that DeleteLabel removes labels, with
 // both doing nothing when the container info is missing.
