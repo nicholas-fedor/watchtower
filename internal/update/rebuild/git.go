@@ -117,7 +117,13 @@ func (s *Session) Watching(log *zerolog.Logger, c types.Container, params types.
 
 // Check runs a Git staleness check and stores the result.
 //
+// An invalid git-semver-policy or git-host label logs a warning, because the
+// update skips that container and nothing else reports it above debug. The
+// warning leaves out the raw git-host value, so a credential in that label is
+// not notified.
+//
 // Parameters:
+//   - log: Logger for the warning about an invalid Git label.
 //   - ctx: Cancellation and timeout.
 //   - c: Associated container.
 //   - params: Update parameters including cooldown.
@@ -127,12 +133,28 @@ func (s *Session) Watching(log *zerolog.Logger, c types.Container, params types.
 //   - types.ImageID: Synthetic Git image id used by the update pipeline.
 //   - error: Non-nil on monitor or cooldown failure.
 func (s *Session) Check(
+	log *zerolog.Logger,
 	ctx context.Context,
 	c types.Container,
 	params types.UpdateParams,
 ) (bool, types.ImageID, error) {
 	result, err := git.CheckContainer(ctx, s.client, c, params)
 	if err != nil {
+		var warning string
+
+		switch {
+		case errors.Is(err, git.ErrInvalidPolicy):
+			warning = "Skipped container with an invalid git semver policy"
+		case errors.Is(err, git.ErrInvalidHost):
+			warning = "Skipped container with an invalid git-host"
+		default:
+			// Other check failures are only returned.
+		}
+
+		if warning != "" {
+			log.Warn().Str("container", c.Name()).Str("image", c.ImageName()).Msg(warning)
+		}
+
 		return false, "", fmt.Errorf("git check: %w", err)
 	}
 
@@ -871,32 +893,4 @@ func shortGitSHA(commit string) string {
 	}
 
 	return commit[:gitShortSHALen]
-}
-
-// WarnConfigSkip logs one warning for a Git label that fails closed.
-//
-// Invalid policy and git-host values are otherwise recorded only at debug.
-// The warning omits the raw git-host value so a credential in that label is not notified.
-//
-// Parameters:
-//   - log: Process logger.
-//   - name: Container name.
-//   - image: Container image name.
-//   - err: Staleness check error.
-//
-// Returns:
-//   - none.
-func WarnConfigSkip(log *zerolog.Logger, name, image string, err error) {
-	if log == nil || err == nil {
-		return
-	}
-
-	event := log.Warn().Str("container", name).Str("image", image)
-
-	switch {
-	case errors.Is(err, git.ErrInvalidPolicy):
-		event.Msg("Skipped container with an invalid git semver policy")
-	case errors.Is(err, git.ErrInvalidHost):
-		event.Msg("Skipped container with an invalid git-host")
-	}
 }

@@ -3,8 +3,6 @@ package rebuild
 import (
 	"bytes"
 	"context"
-	"errors"
-	"fmt"
 	"maps"
 	"os"
 	"path/filepath"
@@ -278,7 +276,7 @@ func TestSession(t *testing.T) {
 			sess := NewSession(gitTestClient(t))
 			c := mockUpdate.CreateMockContainer("plain", "/plain", "nginx:latest", time.Now())
 
-			stale, newest, err := sess.Check(t.Context(), c, types.UpdateParams{})
+			stale, newest, err := sess.Check(newTestLogger(t), t.Context(), c, types.UpdateParams{})
 			require.NoError(t, err)
 			assert.False(t, stale)
 			assert.Equal(t, c.ImageID(), newest)
@@ -299,13 +297,62 @@ func TestSession(t *testing.T) {
 			ctx, cancel := context.WithTimeout(t.Context(), 200*time.Millisecond)
 			defer cancel()
 
-			stale, newest, err := sess.Check(ctx, c, types.UpdateParams{
+			var buf bytes.Buffer
+
+			log := zerolog.New(&buf).Level(zerolog.WarnLevel)
+
+			stale, newest, err := sess.Check(&log, ctx, c, types.UpdateParams{
 				EnableGitMonitoring: true,
 			})
 			require.Error(t, err)
 			assert.Contains(t, err.Error(), "git check:")
 			assert.False(t, stale)
 			assert.Empty(t, newest)
+			assert.Empty(t, buf.String(), "an unreachable remote is not an invalid Git label")
+		})
+
+		t.Run("warns about an invalid git label without its raw value", func(t *testing.T) {
+			t.Parallel()
+
+			tests := []struct {
+				name        string
+				labels      map[string]string
+				wantErr     error
+				wantWarning string
+			}{
+				{
+					name:        "semver policy",
+					labels:      map[string]string{labels.GitSemverPolicy: "nightly"},
+					wantErr:     git.ErrInvalidPolicy,
+					wantWarning: "Skipped container with an invalid git semver policy",
+				},
+				{
+					name:        "git-host",
+					labels:      map[string]string{labels.GitHost: "ftp://user:supersecret@evil.example"},
+					wantErr:     git.ErrInvalidHost,
+					wantWarning: "Skipped container with an invalid git-host",
+				},
+			}
+
+			for _, tt := range tests {
+				t.Run(tt.name, func(t *testing.T) {
+					t.Parallel()
+
+					var buf bytes.Buffer
+
+					log := zerolog.New(&buf).Level(zerolog.WarnLevel)
+					sess := NewSession(gitTestClient(t))
+					c := gitAssociatedContainer("app", "/app", "app:latest", tt.labels)
+
+					_, _, err := sess.Check(&log, t.Context(), c, types.UpdateParams{EnableGitMonitoring: true})
+					require.ErrorIs(t, err, tt.wantErr)
+
+					assert.Contains(t, buf.String(), tt.wantWarning)
+					assert.Contains(t, buf.String(), `"container":"app"`)
+					assert.Contains(t, buf.String(), `"image":"app:latest"`)
+					assert.NotContains(t, buf.String(), "supersecret")
+				})
+			}
 		})
 	})
 
@@ -1997,24 +2044,9 @@ func TestSession(t *testing.T) {
 			}
 		})
 
-		t.Run("notifies invalid git config without the raw host", func(t *testing.T) {
+		t.Run("shortens commits and formats notice paths", func(t *testing.T) {
 			t.Parallel()
 
-			var buf bytes.Buffer
-
-			log := zerolog.New(&buf).Level(zerolog.WarnLevel)
-			WarnConfigSkip(
-				&log,
-				"app",
-				"app:latest",
-				fmt.Errorf("%w: %w", git.ErrInvalidHost, errors.New("https://user:supersecret@evil.example")),
-			)
-			WarnConfigSkip(&log, "app", "app:latest", fmt.Errorf("%w: nightly", git.ErrInvalidPolicy))
-
-			text := buf.String()
-			assert.Contains(t, text, "Skipped container with an invalid git-host")
-			assert.Contains(t, text, "Skipped container with an invalid git semver policy")
-			assert.NotContains(t, text, "supersecret")
 			assert.Equal(t, "7ab67c773bf4", shortGitSHA("7ab67c773bf4bf670a97bc7b03a032a7fbd80892"))
 			assert.Equal(t, "git.example.com/org/watchtower-git-support-test", gitNoticePath("https://git.example.com/org/watchtower-git-support-test.git"))
 			assert.Equal(t, "git.example.com/org/watchtower-git-support-test", gitNoticePath("git@git.example.com:org/watchtower-git-support-test.git"))

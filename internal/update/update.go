@@ -433,7 +433,7 @@ func update(
 			case gitSession.Watching(log, sourceContainer, config):
 				gitWatched = true
 
-				stale, newestImage, checkErr = gitSession.Check(ctx, sourceContainer, config)
+				stale, newestImage, checkErr = gitSession.Check(log, ctx, sourceContainer, config)
 			default:
 				stale, newestImage, newDigest, checkErr = client.IsContainerStale(
 					ctx,
@@ -519,8 +519,6 @@ func update(
 			switch {
 			case checkErr != nil:
 				// Skip containers with staleness check errors, marking them as skipped.
-				rebuild.WarnConfigSkip(log, sourceContainer.Name(), sourceContainer.ImageName(), checkErr)
-
 				if !errors.Is(checkErr, containerImage.ErrImageCooldown) {
 					parallelStaleCheckFailed++
 				}
