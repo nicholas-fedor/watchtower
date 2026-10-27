@@ -356,10 +356,6 @@ linters:
         linters:
           - gocyclo
         text: "of func `RunUpgradesOnSchedule` is high"
-      - path: "internal/update/cleanup.go"
-        linters:
-          - gocyclo
-        text: "of func `getChainedContainers` is high"
     paths:
       - ".*/mocks/.*"
       - ".*/internal/api/swagger/.*"

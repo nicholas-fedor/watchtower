@@ -1,4 +1,4 @@
-package update
+package cleanup
 
 import (
 	"testing"
@@ -136,4 +136,86 @@ func TestRemoveExcessWatchtowerInstances_ChainKeepsOtherContainers(t *testing.T)
 	removed, err := RemoveExcessWatchtowerInstances(newTestLogger(t), t.Context(), client, false, "", nil, current)
 	require.NoError(t, err)
 	assert.Equal(t, 1, removed)
+}
+
+// TestGetChainedContainers_OldCurrent verifies the chained containers when the
+// current container is an old predecessor. Its successor is the non-old
+// Watchtower container in its scope whose chain label lists it, and that
+// successor's chain label names the containers to remove. Without such a
+// successor nothing is removed through the chain.
+func TestGetChainedContainers_OldCurrent(t *testing.T) {
+	t.Parallel()
+
+	const (
+		oldID       = "e000000000000000000000000000000000000000000000000000000000000000"
+		successorID = "f000000000000000000000000000000000000000000000000000000000000000"
+	)
+
+	watchtower := func(id, name, scope, chain string) types.Container {
+		containerLabels := map[string]string{"com.centurylinklabs.watchtower": "true"}
+		if scope != "" {
+			containerLabels["com.centurylinklabs.watchtower.scope"] = scope
+		}
+
+		if chain != "" {
+			containerLabels["com.centurylinklabs.watchtower.container-chain"] = chain
+		}
+
+		return chainTestContainer(id, name, containerLabels)
+	}
+
+	old := watchtower(oldID, "watchtower-old-e00000000000", "", "")
+	oldA := watchtower(chainOldAID, "watchtower-a", "", "")
+
+	tests := []struct {
+		name       string
+		candidates []types.Container
+		want       []types.ContainerID
+	}{
+		{
+			name:       "successor whose chain lists the old container",
+			candidates: []types.Container{watchtower(successorID, "watchtower", "", oldID+","+chainOldAID)},
+			want:       []types.ContainerID{oldID, chainOldAID},
+		},
+		{
+			name: "chain match wins over an earlier container without a chain label",
+			candidates: []types.Container{
+				watchtower(chainOldBID, "watchtower-b", "", ""),
+				watchtower(successorID, "watchtower", "", oldID+","+chainOldAID),
+			},
+			want: []types.ContainerID{oldID, chainOldAID},
+		},
+		{
+			name:       "container without a chain label",
+			candidates: []types.Container{watchtower(successorID, "watchtower", "", "")},
+			want:       []types.ContainerID{},
+		},
+		{
+			name:       "chain that does not list the old container",
+			candidates: []types.Container{watchtower(successorID, "watchtower", "", chainOldAID)},
+			want:       []types.ContainerID{},
+		},
+		{
+			name:       "chain match in another scope",
+			candidates: []types.Container{watchtower(successorID, "watchtower", "other", oldID+","+chainOldAID)},
+			want:       []types.ContainerID{},
+		},
+		{
+			name:       "chain match on another old container",
+			candidates: []types.Container{watchtower(successorID, "watchtower-old-f00000000000", "", oldID+","+chainOldAID)},
+			want:       []types.ContainerID{},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			all := append([]types.Container{old, oldA}, tt.candidates...)
+
+			got := getChainedContainers(newTestLogger(t), all, old)
+
+			assert.Equal(t, tt.want, containerIDs(got))
+		})
+	}
 }

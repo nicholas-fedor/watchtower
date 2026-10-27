@@ -27,6 +27,7 @@ import (
 	"github.com/nicholas-fedor/watchtower/internal/registry/ratelimit"
 	"github.com/nicholas-fedor/watchtower/internal/settings"
 	"github.com/nicholas-fedor/watchtower/internal/update"
+	"github.com/nicholas-fedor/watchtower/internal/update/cleanup"
 	"github.com/nicholas-fedor/watchtower/internal/update/schedule"
 	"github.com/nicholas-fedor/watchtower/internal/update/selfupdate"
 	"github.com/nicholas-fedor/watchtower/pkg/notifications"
@@ -659,7 +660,7 @@ func (p *process) runMain(cfg types.RunConfig) int {
 	}
 
 	// Check for and cleanup old Watchtower containers within scope.
-	totalRemovedInstances, err := update.RemoveExcessWatchtowerInstances(
+	totalRemovedInstances, err := cleanup.RemoveExcessWatchtowerInstances(
 		p.log,
 		ctx,
 		client,
@@ -681,7 +682,7 @@ func (p *process) runMain(cfg types.RunConfig) int {
 	// Check for and cleanup orphaned ephemeral orchestrator containers.
 	// These may persist if the orchestrator crashed or was killed unexpectedly.
 	// With AutoRemove: true, this is a safety net for edge cases.
-	removedOrchestratorCount, orchestratorErr := containerClient.RemoveOrphanedOrchestrators(p.log, ctx, client)
+	removedOrchestratorCount, orchestratorErr := cleanup.RemoveOrphanedOrchestrators(p.log, ctx, client)
 	if orchestratorErr != nil {
 		p.log.Warn().
 			Err(orchestratorErr).
