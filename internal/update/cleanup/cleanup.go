@@ -127,13 +127,17 @@ func RemoveExcessWatchtowerInstances(log *zerolog.Logger, ctx context.Context,
 // images. This ensures that even if an old container survives the initial
 // cleanup (e.g., it was still stopping), it won't persist across update cycles.
 //
+// The scope is read from the current container in the same listing. An unset
+// or empty scope is the scope "none". Nothing is removed when the current
+// container ID is empty or that container is not listed. This keeps the
+// cleanup out of other instances' scopes.
+//
 // Parameters:
 //   - log: Process logger. Required and must be non-nil. A nil logger panics on the first log call.
 //   - ctx: Context for cancellation and timeouts.
 //   - client: Container client for Docker operations.
 //   - cleanupImages: Remove images if true.
-//   - scope: Scope to filter Watchtower containers (empty for unscoped).
-//   - currentContainerID: ID of the currently running Watchtower container.
+//   - currentContainerID: ID of the currently running Watchtower container, or empty.
 //   - removeImageInfos: List that receives the images of removed instances for the caller to remove.
 //     Nil removes them right away.
 //
@@ -143,19 +147,11 @@ func RemoveExcessWatchtowerInstances(log *zerolog.Logger, ctx context.Context,
 func RemoveOldWatchtowerContainers(log *zerolog.Logger, ctx context.Context,
 	client containerClient.Client,
 	cleanupImages bool,
-	scope string,
 	currentContainerID types.ContainerID,
 	removeImageInfos *[]types.RemovedImageInfo,
 ) (int, error) {
-	log.Debug().
-		Str("scope", scope).
-		Str("current_id", string(currentContainerID)).
-		Bool("cleanup_images", cleanupImages).
-		Msg("Checking for old Watchtower containers")
-
-	// Normalize empty scope to "none" for consistent comparison.
-	if scope == "" {
-		scope = "none"
+	if currentContainerID == "" {
+		return 0, nil
 	}
 
 	// List all containers to find old instances
@@ -163,6 +159,33 @@ func RemoveOldWatchtowerContainers(log *zerolog.Logger, ctx context.Context,
 	if err != nil {
 		return 0, fmt.Errorf("failed to list containers: %w", err)
 	}
+
+	// The current container sets the scope to clean up.
+	var current types.Container
+
+	for _, c := range allContainers {
+		if c.ID() == currentContainerID {
+			current = c
+
+			break
+		}
+	}
+
+	if current == nil {
+		log.Debug().
+			Str("current_container_id", string(currentContainerID)).
+			Msg("Skipping old container cleanup: current container not found in list")
+
+		return 0, nil
+	}
+
+	scope := normalizedScope(current)
+
+	log.Debug().
+		Str("scope", scope).
+		Str("current_id", string(currentContainerID)).
+		Bool("cleanup_images", cleanupImages).
+		Msg("Checking for old Watchtower containers")
 
 	// Find old Watchtower containers within the same scope
 	var oldContainers []types.Container
@@ -182,10 +205,7 @@ func RemoveOldWatchtowerContainers(log *zerolog.Logger, ctx context.Context,
 		}
 
 		// Scope check: only clean up old containers in the same scope
-		containerScope, containerHasScope := c.Scope()
-		if !containerHasScope || containerScope == "" {
-			containerScope = "none"
-		}
+		containerScope := normalizedScope(c)
 
 		if containerScope != scope {
 			log.Debug().
@@ -232,10 +252,7 @@ func RemoveOldWatchtowerContainers(log *zerolog.Logger, ctx context.Context,
 		}
 
 		// Scope check: only clean up orphaned containers in the same scope.
-		containerScope, containerHasScope := c.Scope()
-		if !containerHasScope || containerScope == "" {
-			containerScope = "none"
-		}
+		containerScope := normalizedScope(c)
 
 		if containerScope != scope {
 			log.Debug().
@@ -265,24 +282,13 @@ func RemoveOldWatchtowerContainers(log *zerolog.Logger, ctx context.Context,
 		Strs("containers", containerNames(oldContainers)).
 		Msg("Found old or orphaned Watchtower containers, cleaning up")
 
-	// Find the current container in the list so image collection works
-	var currentContainerObj types.Container
-
-	for _, c := range allContainers {
-		if c.ID() == currentContainerID {
-			currentContainerObj = c
-
-			break
-		}
-	}
-
 	// Reuse the existing removal logic for old containers
 	removed, err := removeExcessContainers(log,
 		ctx,
 		client,
 		oldContainers,
 		cleanupImages,
-		currentContainerObj,
+		current,
 		removeImageInfos,
 	)
 	if err != nil {
@@ -929,30 +935,4 @@ func containerNames(containers []types.Container) []string {
 	}
 
 	return names
-}
-
-// ScopeOfCurrentContainer finds the current container by ID in the
-// provided list and returns its scope and whether it was found. Returns ""
-// for unscoped containers (found but no scope) and found=false when the
-// container ID isn't in the list. The caller normalizes "" to "none" for
-// cleanup and skips cleanup when found=false.
-func ScopeOfCurrentContainer(log *zerolog.Logger, allContainers []types.Container,
-	currentContainerID types.ContainerID,
-) (string, bool) {
-	for _, c := range allContainers {
-		if c.ID() == currentContainerID {
-			containerScope, containerHasScope := c.Scope()
-			if !containerHasScope || containerScope == "" {
-				return "", true
-			}
-
-			return containerScope, true
-		}
-	}
-
-	log.Debug().
-		Str("current_container_id", string(currentContainerID)).
-		Msg("Current container not found in list")
-
-	return "", false
 }
