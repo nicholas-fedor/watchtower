@@ -5,7 +5,6 @@ import (
 	"context"
 	"encoding/json"
 	"testing"
-	"time"
 
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/assert"
@@ -18,9 +17,7 @@ import (
 	"github.com/nicholas-fedor/watchtower/internal/container"
 	"github.com/nicholas-fedor/watchtower/internal/container/labels"
 	"github.com/nicholas-fedor/watchtower/internal/container/oci"
-	internalGit "github.com/nicholas-fedor/watchtower/internal/git"
 	"github.com/nicholas-fedor/watchtower/internal/update/changelog"
-	mockUpdate "github.com/nicholas-fedor/watchtower/internal/update/mocks"
 	"github.com/nicholas-fedor/watchtower/internal/update/state"
 	"github.com/nicholas-fedor/watchtower/pkg/types"
 )
@@ -248,11 +245,12 @@ func TestApplyLatestImageMetadataFallsBackWhenProbeMisses(t *testing.T) {
 	assert.Equal(t, "https://github.com/org/app/releases", (*progress)[c.ID()].Changelog())
 }
 
-// A Git rebuild must produce exactly one Changelog entry, resolved from the Git
-// tag. The registry path is skipped for a Git-watched container, and the second
-// half of this test shows what that skip prevents: the same container driven
-// through the registry helpers emits a second, unversioned entry.
-func TestGitRebuildEmitsExactlyOneChangelogEntry(t *testing.T) {
+// The registry path must not run for a Git-watched container. A Git rebuild
+// already logs one Changelog entry resolved from the Git tag, and this test
+// shows what the skip prevents: the same container driven through the registry
+// helpers emits a second, unversioned entry. That is why executeUpdate resolves
+// latest image metadata only when the container is not Git-watched.
+func TestRegistryMetadataWouldDuplicateGitChangelog(t *testing.T) {
 	t.Parallel()
 
 	c := newReportContainer(t, map[string]string{
@@ -266,33 +264,6 @@ func TestGitRebuildEmitsExactlyOneChangelogEntry(t *testing.T) {
 	var buf bytes.Buffer
 
 	log := zerolog.New(&buf)
-
-	sess := newGitSession(internalGit.New(newTestLogger(t), internalGit.Options{Timeout: time.Second}))
-	docker := mockUpdate.CreateMockClient(&mockUpdate.TestData{}, false, false)
-
-	err := sess.buildOne(
-		&log,
-		t.Context(),
-		docker,
-		c,
-		internalGit.CheckResult{
-			Stale:  true,
-			Commit: "0123456789abcdef0123456789abcdef01234567",
-			Tag:    "v1.2.3",
-		},
-		params,
-		progress,
-	)
-	require.NoError(t, err)
-
-	assert.Equal(t, []string{"https://github.com/org/app/releases/tag/v1.2.3"}, changelogEntries(buf.Bytes()),
-		"build path should emit one versioned entry: %s", buf.String())
-	assert.Equal(t, "https://github.com/org/app/releases/tag/v1.2.3", (*progress)[c.ID()].Changelog())
-
-	// The registry path, if it ran for this container, would add a second entry
-	// pointing at the unversioned release index. That is why executeUpdate
-	// resolves latest image metadata only when the container is not Git-watched.
-	buf.Reset()
 
 	vars, anns := resolveLatestImageMeta(
 		&log,

@@ -1,4 +1,4 @@
-package update
+package rebuild
 
 import (
 	"context"
@@ -36,8 +36,8 @@ var (
 	errGitNotAssociated = errors.New("container is not associated with a Git repository")
 )
 
-// gitSession holds watcher results for one Update() invocation.
-type gitSession struct {
+// Session holds watcher results for one Update() invocation.
+type Session struct {
 	client   *git.Client
 	apply    composeApply.Applier
 	checkout func(ctx context.Context, dir, commit string, opts project.CheckoutOptions) error
@@ -80,15 +80,15 @@ func composeBatchKeyFor(ref composeProject.ProjectRef) composeBatchKey {
 	}
 }
 
-// newGitSession constructs an empty session for one Update() call.
+// NewSession constructs an empty session for one Update() call.
 //
 // Parameters:
 //   - client: Git monitor client. May be unused when no container is monitored.
 //
 // Returns:
-//   - *gitSession: Session with empty result and built maps.
-func newGitSession(client *git.Client) *gitSession {
-	return &gitSession{
+//   - *Session: Session with empty result and built maps.
+func NewSession(client *git.Client) *Session {
+	return &Session{
 		client:   client,
 		apply:    composeApply.NewClient(),
 		checkout: project.Checkout,
@@ -98,47 +98,7 @@ func newGitSession(client *git.Client) *gitSession {
 	}
 }
 
-// store records a monitor result for containerID.
-//
-// Parameters:
-//   - containerID: Container identity.
-//   - result: Check outcome from the Git client.
-//
-// Returns:
-//   - none.
-func (s *gitSession) store(containerID types.ContainerID, result git.CheckResult) {
-	if s == nil {
-		return
-	}
-
-	s.mu.Lock()
-	defer s.mu.Unlock()
-
-	s.results[containerID] = result
-}
-
-// result returns the stored check for containerID.
-//
-// Parameters:
-//   - containerID: Container identity.
-//
-// Returns:
-//   - git.CheckResult: Stored result.
-//   - bool: True when a result was stored.
-func (s *gitSession) result(containerID types.ContainerID) (git.CheckResult, bool) {
-	if s == nil {
-		return git.CheckResult{}, false
-	}
-
-	s.mu.Lock()
-	defer s.mu.Unlock()
-
-	result, ok := s.results[containerID]
-
-	return result, ok
-}
-
-// watching reports whether Git monitoring applies to c in this session.
+// Watching reports whether Git monitoring applies to a container in this session.
 //
 // Parameters:
 //   - log: Process logger.
@@ -147,7 +107,7 @@ func (s *gitSession) result(containerID types.ContainerID) (git.CheckResult, boo
 //
 // Returns:
 //   - bool: True when the session should check Git instead of the registry.
-func (s *gitSession) watching(log *zerolog.Logger, c types.Container, params types.UpdateParams) bool {
+func (s *Session) Watching(log *zerolog.Logger, c types.Container, params types.UpdateParams) bool {
 	if s == nil || s.client == nil {
 		return false
 	}
@@ -155,7 +115,7 @@ func (s *gitSession) watching(log *zerolog.Logger, c types.Container, params typ
 	return provenance.ShouldMonitor(log, c, params)
 }
 
-// check runs a Git staleness check and stores the result.
+// Check runs a Git staleness check and stores the result.
 //
 // Parameters:
 //   - ctx: Cancellation and timeout.
@@ -166,7 +126,7 @@ func (s *gitSession) watching(log *zerolog.Logger, c types.Container, params typ
 //   - bool: True when the remote ref has advanced past the known running revision.
 //   - types.ImageID: Synthetic Git image id used by the update pipeline.
 //   - error: Non-nil on monitor or cooldown failure.
-func (s *gitSession) check(
+func (s *Session) Check(
 	ctx context.Context,
 	c types.Container,
 	params types.UpdateParams,
@@ -195,7 +155,7 @@ func (s *gitSession) check(
 	return true, newest, nil
 }
 
-// prepareRebuilds applies stale Git-associated containers.
+// PrepareRebuilds applies stale Git-associated containers.
 //
 // compose-dir or --compose-project selects a local path context. Watchtower
 // checks out the Compose project directory, then runs compose up or compose build.
@@ -219,7 +179,7 @@ func (s *gitSession) check(
 //
 // Returns:
 //   - none.
-func (s *gitSession) prepareRebuilds(
+func (s *Session) PrepareRebuilds(
 	log *zerolog.Logger,
 	ctx context.Context,
 	docker containerClient.Client,
@@ -447,7 +407,163 @@ func orderComposeBatches(
 	return ordered
 }
 
-// needsApply reports whether c is a stale Git-associated container that may be rebuilt.
+// SkipRecreate reports whether recreating a container from its inspect data should be skipped.
+//
+// Compose-applied containers are always skipped. Git URL context builds are
+// skipped only when no-restart is set. Watchtower itself still uses the inspect path.
+//
+// Parameters:
+//   - c: Container to inspect.
+//   - params: Update parameters.
+//
+// Returns:
+//   - bool: True when this session already replaced or must not replace c.
+func (s *Session) SkipRecreate(c types.Container, params types.UpdateParams) bool {
+	if s == nil || c.IsWatchtower() {
+		return false
+	}
+
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	if _, ok := s.applied[c.ID()]; ok {
+		return true
+	}
+
+	if !params.NoRestart {
+		return false
+	}
+
+	_, built := s.built[c.ID()]
+
+	return built
+}
+
+// ExcludeApplied drops containers already recreated by Compose apply.
+//
+// Parameters:
+//   - containers: Full candidate list.
+//
+// Returns:
+//   - []types.Container: Containers that may still use inspect recreate.
+func (s *Session) ExcludeApplied(containers []types.Container) []types.Container {
+	if s == nil {
+		return containers
+	}
+
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	if len(s.applied) == 0 {
+		return containers
+	}
+
+	kept := make([]types.Container, 0, len(containers))
+
+	for _, c := range containers {
+		if _, ok := s.applied[c.ID()]; ok {
+			continue
+		}
+
+		kept = append(kept, c)
+	}
+
+	return kept
+}
+
+// ExcludeNoRestart drops Git-built containers from the recreate list when no-restart is set.
+//
+// Parameters:
+//   - containers: Full candidate list.
+//   - params: Update parameters.
+//
+// Returns:
+//   - []types.Container: Containers that may still be recreated.
+func (s *Session) ExcludeNoRestart(
+	containers []types.Container,
+	params types.UpdateParams,
+) []types.Container {
+	if s == nil || !params.NoRestart {
+		return containers
+	}
+
+	kept := make([]types.Container, 0, len(containers))
+
+	for _, c := range containers {
+		if s.SkipRecreate(c, params) {
+			continue
+		}
+
+		kept = append(kept, c)
+	}
+
+	return kept
+}
+
+// NoRestartBuiltIDs returns a snapshot of container IDs built during a no-restart update.
+//
+// Parameters:
+//   - params: Update parameters.
+//
+// Returns:
+//   - map[types.ContainerID]struct{}: Built container IDs, or nil when restart is enabled.
+func (s *Session) NoRestartBuiltIDs(params types.UpdateParams) map[types.ContainerID]struct{} {
+	if s == nil || !params.NoRestart {
+		return nil
+	}
+
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	ids := make(map[types.ContainerID]struct{}, len(s.built))
+	for id := range s.built {
+		ids[id] = struct{}{}
+	}
+
+	return ids
+}
+
+// store records the Git check result of a container.
+//
+// Parameters:
+//   - containerID: Container identity.
+//   - result: Check outcome from the Git client.
+//
+// Returns:
+//   - none.
+func (s *Session) store(containerID types.ContainerID, result git.CheckResult) {
+	if s == nil {
+		return
+	}
+
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	s.results[containerID] = result
+}
+
+// result returns the stored Git check result of a container.
+//
+// Parameters:
+//   - containerID: Container identity.
+//
+// Returns:
+//   - git.CheckResult: Stored result.
+//   - bool: True when a result was stored.
+func (s *Session) result(containerID types.ContainerID) (git.CheckResult, bool) {
+	if s == nil {
+		return git.CheckResult{}, false
+	}
+
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	result, ok := s.results[containerID]
+
+	return result, ok
+}
+
+// needsApply reports whether a container is a stale Git-associated container that may be rebuilt.
 //
 // Parameters:
 //   - c: Candidate container.
@@ -455,7 +571,7 @@ func orderComposeBatches(
 //
 // Returns:
 //   - bool: True when a Git apply backend should run.
-func (s *gitSession) needsApply(c types.Container, params types.UpdateParams) bool {
+func (s *Session) needsApply(c types.Container, params types.UpdateParams) bool {
 	if c == nil || !c.IsStale() {
 		return false
 	}
@@ -481,7 +597,7 @@ func (s *gitSession) needsApply(c types.Container, params types.UpdateParams) bo
 //
 // Returns:
 //   - error: Non-nil when association, remote URL, or the host build fails.
-func (s *gitSession) buildOne(
+func (s *Session) buildOne(
 	log *zerolog.Logger,
 	ctx context.Context,
 	docker containerClient.Client,
@@ -619,100 +735,7 @@ func withGitMeta(
 	return evt
 }
 
-// skipRecreate reports whether inspect recreate should be skipped for c.
-//
-// Compose-applied containers are always skipped. Git URL context builds are
-// skipped only when no-restart is set. Watchtower itself still uses the inspect path.
-//
-// Parameters:
-//   - c: Container to inspect.
-//   - params: Update parameters.
-//
-// Returns:
-//   - bool: True when this session already replaced or must not replace c.
-func (s *gitSession) skipRecreate(c types.Container, params types.UpdateParams) bool {
-	if s == nil || c.IsWatchtower() {
-		return false
-	}
-
-	s.mu.Lock()
-	defer s.mu.Unlock()
-
-	if _, ok := s.applied[c.ID()]; ok {
-		return true
-	}
-
-	if !params.NoRestart {
-		return false
-	}
-
-	_, built := s.built[c.ID()]
-
-	return built
-}
-
-// excludeApplied drops containers already recreated by Compose apply.
-//
-// Parameters:
-//   - containers: Full candidate list.
-//
-// Returns:
-//   - []types.Container: Containers that may still use inspect recreate.
-func (s *gitSession) excludeApplied(containers []types.Container) []types.Container {
-	if s == nil {
-		return containers
-	}
-
-	s.mu.Lock()
-	defer s.mu.Unlock()
-
-	if len(s.applied) == 0 {
-		return containers
-	}
-
-	kept := make([]types.Container, 0, len(containers))
-
-	for _, c := range containers {
-		if _, ok := s.applied[c.ID()]; ok {
-			continue
-		}
-
-		kept = append(kept, c)
-	}
-
-	return kept
-}
-
-// excludeNoRestart drops Git-built containers from the recreate list when no-restart is set.
-//
-// Parameters:
-//   - containers: Full candidate list.
-//   - params: Update parameters.
-//
-// Returns:
-//   - []types.Container: Containers that may still be recreated.
-func (s *gitSession) excludeNoRestart(
-	containers []types.Container,
-	params types.UpdateParams,
-) []types.Container {
-	if s == nil || !params.NoRestart {
-		return containers
-	}
-
-	kept := make([]types.Container, 0, len(containers))
-
-	for _, c := range containers {
-		if s.skipRecreate(c, params) {
-			continue
-		}
-
-		kept = append(kept, c)
-	}
-
-	return kept
-}
-
-// validDockerTag reports whether imageName is a valid Docker reference without a digest.
+// validDockerTag reports whether an image name is a valid Docker reference without a digest.
 //
 // Parameters:
 //   - imageName: Docker image reference to validate.
@@ -850,7 +873,7 @@ func shortGitSHA(commit string) string {
 	return commit[:gitShortSHALen]
 }
 
-// warnGitConfigSkip logs one warning for a Git label that fails closed.
+// WarnConfigSkip logs one warning for a Git label that fails closed.
 //
 // Invalid policy and git-host values are otherwise recorded only at debug.
 // The warning omits the raw git-host value so a credential in that label is not notified.
@@ -863,7 +886,7 @@ func shortGitSHA(commit string) string {
 //
 // Returns:
 //   - none.
-func warnGitConfigSkip(log *zerolog.Logger, name, image string, err error) {
+func WarnConfigSkip(log *zerolog.Logger, name, image string, err error) {
 	if log == nil || err == nil {
 		return
 	}
@@ -876,27 +899,4 @@ func warnGitConfigSkip(log *zerolog.Logger, name, image string, err error) {
 	case errors.Is(err, git.ErrInvalidHost):
 		event.Msg("Skipped container with an invalid git-host")
 	}
-}
-
-// noRestartBuiltIDs returns a snapshot of container IDs built during a no-restart update.
-//
-// Parameters:
-//   - params: Update parameters.
-//
-// Returns:
-//   - map[types.ContainerID]struct{}: Built container IDs, or nil when restart is enabled.
-func (s *gitSession) noRestartBuiltIDs(params types.UpdateParams) map[types.ContainerID]struct{} {
-	if s == nil || !params.NoRestart {
-		return nil
-	}
-
-	s.mu.Lock()
-	defer s.mu.Unlock()
-
-	ids := make(map[types.ContainerID]struct{}, len(s.built))
-	for id := range s.built {
-		ids[id] = struct{}{}
-	}
-
-	return ids
 }

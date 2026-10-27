@@ -1,4 +1,4 @@
-package update
+package rebuild
 
 import (
 	"context"
@@ -43,7 +43,7 @@ var (
 //
 // Returns:
 //   - none.
-func (s *gitSession) applyCompose(
+func (s *Session) applyCompose(
 	log *zerolog.Logger,
 	ctx context.Context,
 	batch *composeBatch,
@@ -289,7 +289,7 @@ func logComposeReplaced(log *zerolog.Logger, c types.Container, item composeAppl
 //
 // Returns:
 //   - none.
-func (s *gitSession) recordCompose(
+func (s *Session) recordCompose(
 	c types.Container,
 	item composeApply.Container,
 	params types.UpdateParams,
@@ -414,7 +414,7 @@ func markComposeResultFailures(
 //
 // Returns:
 //   - none.
-func (s *gitSession) recordComposeReplicas(
+func (s *Session) recordComposeReplicas(
 	items []composeApply.Container,
 	members []composeMember,
 	params types.UpdateParams,
@@ -506,7 +506,7 @@ func (s *gitSession) recordComposeReplicas(
 //
 // Returns:
 //   - none.
-func (s *gitSession) acceptComposeApply(batch *composeBatch, failed map[types.ContainerID]error) {
+func (s *Session) acceptComposeApply(batch *composeBatch, failed map[types.ContainerID]error) {
 	if s == nil || s.client == nil || batch == nil {
 		return
 	}
@@ -531,7 +531,7 @@ func (s *gitSession) acceptComposeApply(batch *composeBatch, failed map[types.Co
 //
 // Returns:
 //   - none.
-func (s *gitSession) rejectComposeApply(batch *composeBatch) {
+func (s *Session) rejectComposeApply(batch *composeBatch) {
 	if s == nil || s.client == nil || batch == nil {
 		return
 	}
