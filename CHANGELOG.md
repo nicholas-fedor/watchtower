@@ -37,6 +37,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- Split the rebuild package into files by concern by @nicholas-fedor in [#3218](https://github.com/nicholas-fedor/watchtower/pull/3218)
 - Own the Compose applier and mock the Compose SDK by @nicholas-fedor in [#3216](https://github.com/nicholas-fedor/watchtower/pull/3216)
 - Let FilterByScope treat an empty scope as none by @nicholas-fedor in [#3208](https://github.com/nicholas-fedor/watchtower/pull/3208)
 - Share the scope and orphan rules on the container model by @nicholas-fedor in [#3206](https://github.com/nicholas-fedor/watchtower/pull/3206)
