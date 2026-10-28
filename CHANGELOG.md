@@ -86,6 +86,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Chores
 
+- Update github.com/tonistiigi/fsutil digest to ca65610 by @renovate[bot] in [#3213](https://github.com/nicholas-fedor/watchtower/pull/3213)
 - Update module golang.org/x/net to v0.62.0 by @renovate[bot] in [#3210](https://github.com/nicholas-fedor/watchtower/pull/3210)
 - Update step-security/harden-runner action to v2.22.3 by @renovate[bot] in [#3209](https://github.com/nicholas-fedor/watchtower/pull/3209)
 - Update module github.com/gofiber/schema to v1.9.1 by @renovate[bot] in [#3202](https://github.com/nicholas-fedor/watchtower/pull/3202)
