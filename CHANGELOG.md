@@ -37,6 +37,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- Let FilterByScope treat an empty scope as none by @nicholas-fedor in [#3208](https://github.com/nicholas-fedor/watchtower/pull/3208)
 - Share the scope and orphan rules on the container model by @nicholas-fedor in [#3206](https://github.com/nicholas-fedor/watchtower/pull/3206)
 - Derive the old-container cleanup scope in cleanup by @nicholas-fedor in [#3204](https://github.com/nicholas-fedor/watchtower/pull/3204)
 - Move Watchtower cleanup into update/cleanup by @nicholas-fedor in [#3198](https://github.com/nicholas-fedor/watchtower/pull/3198)
