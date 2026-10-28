@@ -128,41 +128,6 @@ func TestWatchtowerContainersFilter(t *testing.T) {
 	container.AssertExpectations(t)
 }
 
-func TestUnscopedWatchtowerContainersFilter(t *testing.T) {
-	t.Parallel()
-
-	// Test unscoped Watchtower container (should pass)
-	unscoped := new(mockTypes.MockFilterableContainer)
-	unscoped.On("IsWatchtower").Return(true)
-	unscoped.On("NormalizedScope").Return("none") // No scope set
-	unscoped.On("Name").Return("/unscoped-watchtower").Maybe()
-	assert.True(t, UnscopedWatchtowerContainersFilter(unscoped))
-	unscoped.AssertExpectations(t)
-
-	// Test explicitly scoped Watchtower container (should fail)
-	scoped := new(mockTypes.MockFilterableContainer)
-	scoped.On("IsWatchtower").Return(true)
-	scoped.On("NormalizedScope").Return("prod") // Has scope
-	scoped.On("Name").Return("/scoped-watchtower").Maybe()
-	assert.False(t, UnscopedWatchtowerContainersFilter(scoped))
-	scoped.AssertExpectations(t)
-
-	// Test none-scoped Watchtower container (should pass)
-	noneScoped := new(mockTypes.MockFilterableContainer)
-	noneScoped.On("IsWatchtower").Return(true)
-	noneScoped.On("NormalizedScope").Return("none") // Explicitly none scope
-	noneScoped.On("Name").Return("/none-scoped-watchtower").Maybe()
-	assert.True(t, UnscopedWatchtowerContainersFilter(noneScoped))
-	noneScoped.AssertExpectations(t)
-
-	// Test non-Watchtower container (should fail)
-	nonWatchtower := new(mockTypes.MockFilterableContainer)
-	nonWatchtower.On("IsWatchtower").Return(false)
-	nonWatchtower.On("Name").Return("/regular-app").Maybe()
-	assert.False(t, UnscopedWatchtowerContainersFilter(nonWatchtower))
-	nonWatchtower.AssertExpectations(t)
-}
-
 func TestNoFilter(t *testing.T) {
 	t.Parallel()
 
@@ -340,6 +305,56 @@ func TestFilterByScope(t *testing.T) {
 	container.AssertExpectations(t)
 
 	assert.False(t, filter(scopeTestContainer("", false)))
+}
+
+// TestFilterByScope_EmptyScope verifies that an empty requested scope selects
+// the containers without a scope, as "none" does, so a Watchtower container
+// filter chained after it keeps only unscoped Watchtower containers.
+func TestFilterByScope_EmptyScope(t *testing.T) {
+	t.Parallel()
+
+	filter := FilterByScope(newTestLogger(t), "", WatchtowerContainersFilter)
+
+	tests := []struct {
+		labels map[string]string
+		name   string
+		want   bool
+	}{
+		{
+			name:   "unscoped Watchtower container",
+			labels: map[string]string{labels.Watchtower: "true"},
+			want:   true,
+		},
+		{
+			name:   "Watchtower container with an empty scope",
+			labels: map[string]string{labels.Watchtower: "true", labels.Scope: ""},
+			want:   true,
+		},
+		{
+			name:   "Watchtower container in scope none",
+			labels: map[string]string{labels.Watchtower: "true", labels.Scope: "none"},
+			want:   true,
+		},
+		{
+			name:   "scoped Watchtower container",
+			labels: map[string]string{labels.Watchtower: "true", labels.Scope: "prod"},
+			want:   false,
+		},
+		{
+			name:   "unscoped container that is not Watchtower",
+			labels: map[string]string{},
+			want:   false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			c := modelfixture.Container(containerfixture.WithLabels(tt.labels))
+			assert.Equal(t, tt.want, filter(c))
+		})
+	}
 }
 
 func TestFilterByNoneScope(t *testing.T) {
