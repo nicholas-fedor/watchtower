@@ -21,6 +21,17 @@ import (
 	"github.com/nicholas-fedor/watchtower/pkg/types"
 )
 
+// composeServices is a batch's members grouped by Compose service, ready to
+// apply.
+type composeServices struct {
+	// names holds the services in the order they were first seen.
+	names []string
+	// labels holds the labels to add to each service.
+	labels map[string]map[string]string
+	// members holds each service's stale containers.
+	members map[string][]composeMember
+}
+
 // Errors for rebuilding Compose projects from Git.
 var (
 	// errGitComposeService indicates a Compose project was resolved without a service name.
@@ -62,9 +73,70 @@ func (s *Session) applyCompose(
 		return
 	}
 
-	services := make([]string, 0, len(batch.members))
-	labels := make(map[string]map[string]string, len(batch.members))
-	byService := make(map[string][]composeMember, len(batch.members))
+	services := groupComposeServices(log, batch, params, failed)
+	if len(services.names) == 0 {
+		return
+	}
+
+	if !s.checkoutCompose(log, ctx, batch, commit, params, failed) {
+		return
+	}
+
+	applied, ok := s.runComposeApply(log, ctx, batch, services, params, progress, failed)
+	if !ok {
+		return
+	}
+
+	s.recordComposeResults(log, services, applied, params, progress, failed)
+
+	if !params.NoRestart {
+		s.acceptComposeApply(batch, failed)
+	}
+
+	if params.NoRestart {
+		log.Info().
+			Str("project", batch.ref.Name).
+			Str("service", strings.Join(services.names, ", ")).
+			Msg("Built Compose project")
+
+		return
+	}
+
+	for _, member := range batch.members {
+		if _, failed := failed[member.container.ID()]; failed {
+			log.Warn().
+				Str("project", batch.ref.Name).
+				Str("service", strings.Join(services.names, ", ")).
+				Msg("Compose apply finished with unconfirmed service results")
+
+			return
+		}
+	}
+}
+
+// groupComposeServices returns a batch's members by Compose service, with the
+// services in the order they are first seen. A member without a Compose service
+// label cannot be applied, so it is recorded as failed and left running.
+//
+// Parameters:
+//   - log: Process logger.
+//   - batch: Containers that share one Compose project identity.
+//   - params: Update parameters.
+//   - failed: Map to record per-container apply errors.
+//
+// Returns:
+//   - composeServices: The services to apply, their labels, and their members.
+func groupComposeServices(
+	log *zerolog.Logger,
+	batch *composeBatch,
+	params types.UpdateParams,
+	failed map[types.ContainerID]error,
+) composeServices {
+	services := composeServices{
+		names:   make([]string, 0, len(batch.members)),
+		labels:  make(map[string]map[string]string, len(batch.members)),
+		members: make(map[string][]composeMember, len(batch.members)),
+	}
 
 	for _, member := range batch.members {
 		c := member.container
@@ -81,18 +153,40 @@ func (s *Session) applyCompose(
 			continue
 		}
 
-		if _, seen := byService[name]; !seen {
-			services = append(services, name)
-			labels[name] = composeServiceLabels(c, params, member.result)
+		if _, seen := services.members[name]; !seen {
+			services.names = append(services.names, name)
+			services.labels[name] = composeServiceLabels(c, params, member.result)
 		}
 
-		byService[name] = append(byService[name], member)
+		services.members[name] = append(services.members[name], member)
 	}
 
-	if len(services) == 0 {
-		return
-	}
+	return services
+}
 
+// checkoutCompose moves the batch's Compose project directory to the commit.
+// When that fails, every member is recorded as failed and the running
+// containers are left as they are. When the parent context ends before the
+// apply starts, the directory is first moved back to its previous revision.
+//
+// Parameters:
+//   - log: Process logger.
+//   - ctx: Cancellation and timeout.
+//   - batch: Containers that share one Compose project identity.
+//   - commit: The commit the stale services resolved.
+//   - params: Update parameters including stash.
+//   - failed: Map to record per-container apply errors.
+//
+// Returns:
+//   - bool: True when the project is at the commit and the apply may start.
+func (s *Session) checkoutCompose(
+	log *zerolog.Logger,
+	ctx context.Context,
+	batch *composeBatch,
+	commit string,
+	params types.UpdateParams,
+	failed map[types.ContainerID]error,
+) bool {
 	checkout := s.checkout
 	if checkout == nil {
 		checkout = project.Checkout
@@ -114,14 +208,14 @@ func (s *Session) applyCompose(
 	}
 
 	checkoutCtx, cancelCheckout := s.client.WithTimeout(ctx)
-	err = checkout(checkoutCtx, batch.ref.Dir, commit, opts)
+	err := checkout(checkoutCtx, batch.ref.Dir, commit, opts)
 
 	cancelCheckout()
 
 	if err != nil {
 		failComposeBatch(log, batch, params, failed, fmt.Errorf("compose checkout: %w", err))
 
-		return
+		return false
 	}
 
 	// A nil checkout error means the worktree is already at the commit.
@@ -139,9 +233,38 @@ func (s *Session) applyCompose(
 
 		failComposeBatch(log, batch, params, failed, cause)
 
-		return
+		return false
 	}
 
+	return true
+}
+
+// runComposeApply runs compose up for the services of the checked-out project,
+// or only compose build during a no-restart update. When that fails, every
+// member is recorded as failed, with the runtime state Compose reported where
+// it recreated containers.
+//
+// Parameters:
+//   - log: Process logger.
+//   - ctx: Cancellation and timeout.
+//   - batch: Containers that share one Compose project identity.
+//   - services: The services to apply and their labels.
+//   - params: Update parameters including no-restart.
+//   - progress: Session progress, or nil.
+//   - failed: Map to record per-container apply errors.
+//
+// Returns:
+//   - []composeApply.Container: The service instances Compose reports after the apply.
+//   - bool: True when the apply succeeded.
+func (s *Session) runComposeApply(
+	log *zerolog.Logger,
+	ctx context.Context,
+	batch *composeBatch,
+	services composeServices,
+	params types.UpdateParams,
+	progress *state.Progress,
+	failed map[types.ContainerID]error,
+) ([]composeApply.Container, bool) {
 	applier := s.apply
 	if applier == nil {
 		applier = composeApply.NewClient()
@@ -150,8 +273,8 @@ func (s *Session) applyCompose(
 	applyCtx, cancelApply := s.client.WithTimeout(ctx)
 	applied, err := applier.Apply(applyCtx, composeApply.Request{
 		Ref:       batch.ref,
-		Services:  services,
-		Labels:    labels,
+		Services:  services.names,
+		Labels:    services.labels,
 		BuildOnly: params.NoRestart,
 	})
 
@@ -167,16 +290,39 @@ func (s *Session) applyCompose(
 
 		failComposeBatchWithRuntime(log, batch, params, failed, applyErr, !params.NoRestart)
 
-		return
+		return nil, false
 	}
 
+	return applied, true
+}
+
+// recordComposeResults matches the instances Compose reports to the members of
+// each service and saves each match to the session and its progress. A member
+// whose service is missing from the result, or that matches no identifiable
+// instance, is marked failed, since its runtime state is unknown.
+//
+// Parameters:
+//   - log: Process logger.
+//   - services: The applied services and their members.
+//   - applied: The service instances Compose reports after the apply.
+//   - params: Update parameters including no-restart.
+//   - progress: Session progress, or nil.
+//   - failed: Map to record per-container apply errors.
+func (s *Session) recordComposeResults(
+	log *zerolog.Logger,
+	services composeServices,
+	applied []composeApply.Container,
+	params types.UpdateParams,
+	progress *state.Progress,
+	failed map[types.ContainerID]error,
+) {
 	appliedByService := make(map[string][]composeApply.Container, len(applied))
 	for _, item := range applied {
 		appliedByService[item.Service] = append(appliedByService[item.Service], item)
 	}
 
-	for _, name := range services {
-		members := byService[name]
+	for _, name := range services.names {
+		members := services.members[name]
 
 		items := appliedByService[name]
 		if len(items) == 0 {
@@ -224,30 +370,6 @@ func (s *Session) applyCompose(
 		}
 
 		s.recordComposeReplicas(items, members, params, progress, log, matched)
-	}
-
-	if !params.NoRestart {
-		s.acceptComposeApply(batch, failed)
-	}
-
-	if params.NoRestart {
-		log.Info().
-			Str("project", batch.ref.Name).
-			Str("service", strings.Join(services, ", ")).
-			Msg("Built Compose project")
-
-		return
-	}
-
-	for _, member := range batch.members {
-		if _, failed := failed[member.container.ID()]; failed {
-			log.Warn().
-				Str("project", batch.ref.Name).
-				Str("service", strings.Join(services, ", ")).
-				Msg("Compose apply finished with unconfirmed service results")
-
-			return
-		}
 	}
 }
 
