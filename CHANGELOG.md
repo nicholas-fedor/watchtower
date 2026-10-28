@@ -37,6 +37,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- Move staleness decisions into update/staleness by @nicholas-fedor in [#3228](https://github.com/nicholas-fedor/watchtower/pull/3228)
 - Split the Compose apply into its phases by @nicholas-fedor in [#3226](https://github.com/nicholas-fedor/watchtower/pull/3226)
 - Own Compose batch grouping and ordering in compose_batches by @nicholas-fedor in [#3220](https://github.com/nicholas-fedor/watchtower/pull/3220)
 - Split the rebuild package into files by concern by @nicholas-fedor in [#3218](https://github.com/nicholas-fedor/watchtower/pull/3218)
