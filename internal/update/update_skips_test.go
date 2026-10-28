@@ -78,7 +78,9 @@ func TestUpdate_PreUpdateExitCode75IsSkipped(t *testing.T) {
 				types.UpdateParams{LifecycleHooks: true, RollingRestart: rolling}, ratelimit.New())
 			require.NoError(t, err)
 
-			assert.Equal(t, map[string]string{"app": errSkipUpdate.Error()}, reportErrors(report.Skipped()))
+			assert.Equal(t, map[string]string{
+				"app": "skipping container due to pre-update command exit code 75 (EX_TEMPFAIL)",
+			}, reportErrors(report.Skipped()))
 			assert.Empty(t, report.Failed())
 			assert.Empty(t, report.Updated())
 		})
@@ -250,7 +252,7 @@ func TestUpdate_ContainerGoneBeforeStopIsSkipped(t *testing.T) {
 
 			skips := reportErrors(report.Skipped())
 			require.Contains(t, skips, "app")
-			assert.Contains(t, skips["app"], errContainerGone.Error())
+			assert.Contains(t, skips["app"], "container no longer exists")
 			assert.Empty(t, report.Failed())
 			assert.Empty(t, report.Updated())
 		})

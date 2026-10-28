@@ -6,5 +6,6 @@
 // replacement, then removes the old container. The package also starts a
 // replacement that an interrupted self-update created but never started.
 //
-// It also decides when a self-update may replace the running container.
+// It also decides when a self-update may replace the running container, and
+// keeps the runtime from starting an old Watchtower container again.
 package selfupdate

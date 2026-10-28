@@ -12,7 +12,7 @@ type UpdateParams struct {
 	Cleanup             bool                    `json:"cleanup"`                // Remove old images if true.
 	NoRestart           bool                    `json:"no_restart"`             // Skip restarts if true.
 	ReviveStopped       bool                    `json:"revive_stopped"`         // Start stopped containers after update if true.
-	Timeout             time.Duration           `json:"timeout"`                // Update timeout.
+	Timeout             time.Duration           `json:"timeout"`                // Container stop timeout before a forced kill.
 	MonitorOnly         bool                    `json:"monitor_only"`           // Monitor without updating if true.
 	NoPull              bool                    `json:"no_pull"`                // Skip image pulls if true.
 	EnableChangelog     bool                    `json:"enable_changelog"`       // Resolve a release-notes link in notifications if true.
@@ -41,4 +41,23 @@ type UpdateParams struct {
 	GitComposeStash     bool                    `json:"git_compose_stash"`      // Save and restore local Compose project files around checkout.
 	ComposeProjects     map[string]string       `json:"compose_projects"`       // Compose project name to directory inside Watchtower.
 	Registry            registryConfig.Registry `json:"-"`                      // Settings for registry requests.
+}
+
+// detachedTimeoutFallback bounds a detached Docker call when no stop timeout is
+// set.
+const detachedTimeoutFallback = 30 * time.Second
+
+// DetachedTimeout returns the bound for a Docker call that runs detached from
+// the update session, such as restoring a container after a failed update or
+// removing old images. It is the container stop timeout when one is set. Without
+// one it is 30 seconds, so the call cannot block indefinitely.
+//
+// Returns:
+//   - time.Duration: The bound for a detached Docker call.
+func (p UpdateParams) DetachedTimeout() time.Duration {
+	if p.Timeout > 0 {
+		return p.Timeout
+	}
+
+	return detachedTimeoutFallback
 }

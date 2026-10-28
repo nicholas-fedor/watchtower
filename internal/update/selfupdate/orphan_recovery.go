@@ -5,6 +5,8 @@ import (
 
 	"github.com/rs/zerolog"
 
+	dockerContainer "github.com/moby/moby/api/types/container"
+
 	"github.com/nicholas-fedor/watchtower/internal/container"
 	containerClient "github.com/nicholas-fedor/watchtower/internal/container/client"
 	"github.com/nicholas-fedor/watchtower/internal/container/filters"
@@ -78,4 +80,35 @@ func TryRecoverOrphanedContainer(
 	}
 
 	return nil, false
+}
+
+// DisableOldRestarts sets the restart policy of an old Watchtower container to
+// "no", so the runtime does not start it again.
+//
+// A failure is logged at debug only. An old Watchtower container that starts
+// again detects that it is old and exits, and the instance that replaced it
+// removes it.
+//
+// Parameters:
+//   - log: Logger for the failure.
+//   - ctx: Context for the restart policy update.
+//   - oldContainer: The old Watchtower container.
+//   - client: Container client for Docker operations.
+func DisableOldRestarts(
+	log *zerolog.Logger,
+	ctx context.Context,
+	oldContainer types.Container,
+	client containerClient.Client,
+) {
+	err := client.SetRestartPolicy(
+		ctx,
+		oldContainer.ID(),
+		dockerContainer.RestartPolicy{Name: dockerContainer.RestartPolicyDisabled},
+	)
+	if err != nil {
+		log.Debug().
+			Err(err).
+			Str("container", oldContainer.Name()).
+			Msg("Failed to disable the restart policy of the old Watchtower container")
+	}
 }

@@ -990,7 +990,7 @@ func TestRunUpdates(t *testing.T) {
 			t.Parallel()
 
 			client := mockUpdate.CreateMockClient(&mockUpdate.TestData{}, false, false)
-			cleanedImages := performImageCleanup(newTestLogger(t), t.Context(), client, false, []types.RemovedImageInfo{}, 0)
+			cleanedImages := performImageCleanup(newTestLogger(t), t.Context(), client, false, []types.RemovedImageInfo{}, time.Minute)
 			assert.Empty(t, cleanedImages)
 		})
 
@@ -1004,7 +1004,7 @@ func TestRunUpdates(t *testing.T) {
 					ImageName:     "test-image:v1.0",
 					ImageID:       types.ImageID("sha256:123"),
 				},
-			}, 0)
+			}, time.Minute)
 			// The function should return the cleaned images when cleanup is enabled
 			require.Len(t, cleanedImages, 1)
 			assert.Equal(t, "test-container", cleanedImages[0].ContainerName)
@@ -1014,7 +1014,7 @@ func TestRunUpdates(t *testing.T) {
 			t.Parallel()
 
 			client := mockUpdate.CreateMockClient(&mockUpdate.TestData{}, false, false)
-			cleanedImages := performImageCleanup(newTestLogger(t), t.Context(), client, true, []types.RemovedImageInfo{}, 0)
+			cleanedImages := performImageCleanup(newTestLogger(t), t.Context(), client, true, []types.RemovedImageInfo{}, time.Minute)
 			// Should return a valid slice even with empty input
 			require.NotNil(t, cleanedImages)
 		})
@@ -1032,7 +1032,7 @@ func TestRunUpdates(t *testing.T) {
 					ImageName:     "test-image:v1.0",
 					ImageID:       types.ImageID("sha256:123"),
 				},
-			}, 0)
+			}, time.Minute)
 			require.Len(t, cleanedImages, 1)
 			assert.Equal(t, int32(1), client.TestData.TriedToRemoveImageCount.Load())
 		})

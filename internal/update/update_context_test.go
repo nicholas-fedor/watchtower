@@ -668,8 +668,8 @@ func TestUpdateAction_ParallelStalenessCheckCancellationPropagation(t *testing.T
 }
 
 // TestEarlyCancellationStopContainers tests that context cancellation is properly handled
-// during the stopContainersInReversedOrder function.
-// This test cancels the context AFTER Update starts but WHILE stopContainersInReversedOrder
+// while the update session stops containers.
+// This test cancels the context AFTER Update starts but WHILE the stop phase
 // is iterating through containers to stop them.
 func TestEarlyCancellationStopContainers(t *testing.T) {
 	synctest.Test(t, func(t *testing.T) {
@@ -704,7 +704,7 @@ func TestEarlyCancellationStopContainers(t *testing.T) {
 
 		// Let the goroutine reach its first blocking point (SimulatedLatency timer
 		// in mock's checkContextCancellation) before canceling.
-		// This should interrupt stopContainersInReversedOrder while it's iterating.
+		// This should interrupt the stop phase while it's iterating.
 		synctest.Wait()
 		cancel()
 
@@ -728,8 +728,8 @@ func TestEarlyCancellationStopContainers(t *testing.T) {
 }
 
 // TestEarlyCancellationRestartContainers tests that context cancellation is properly handled
-// during the restartContainersInSortedOrder function.
-// This test cancels the context AFTER stop completes but WHILE restartContainersInSortedOrder
+// while the update session restarts containers.
+// This test cancels the context AFTER stop completes but WHILE the restart phase
 // is iterating through containers to restart them.
 func TestEarlyCancellationRestartContainers(t *testing.T) {
 	synctest.Test(t, func(t *testing.T) {
