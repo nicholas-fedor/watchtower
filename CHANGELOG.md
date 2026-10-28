@@ -93,6 +93,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Chores
 
+- Update module github.com/vektra/mockery/v3 to v3.9.0 by @renovate[bot] in [#3232](https://github.com/nicholas-fedor/watchtower/pull/3232)
 - Update module github.com/hashicorp/go-uuid to v1.0.4 by @renovate[bot] in [#3224](https://github.com/nicholas-fedor/watchtower/pull/3224)
 - Update module github.com/prometheus/common to v0.73.0 by @renovate[bot] in [#3222](https://github.com/nicholas-fedor/watchtower/pull/3222)
 - Update github.com/tonistiigi/fsutil digest to ca65610 by @renovate[bot] in [#3213](https://github.com/nicholas-fedor/watchtower/pull/3213)
