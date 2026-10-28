@@ -336,7 +336,7 @@ linters:
         linters:
           - gocyclo
         text: "of func `restartStaleContainer` is high"
-      - path: "internal/update/rebuild/git_compose.go"
+      - path: "internal/update/rebuild/compose.go"
         linters:
           - gocyclo
         text: 'of func `\(\*Session\)\.applyCompose` is high'
