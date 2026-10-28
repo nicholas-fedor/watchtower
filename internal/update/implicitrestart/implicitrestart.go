@@ -1,4 +1,4 @@
-package update
+package implicitrestart
 
 import (
 	"github.com/rs/zerolog"
@@ -65,33 +65,12 @@ func markImplicitRestarts(
 	}
 }
 
-// unmonitoredContainers returns the containers of allContainers that are not
-// among the monitored containers.
-//
-// Parameters:
-//   - allContainers: Every listed container.
-//   - monitored: The monitored containers.
-//
-// Returns:
-//   - []types.Container: The other containers, in listed order.
-func unmonitoredContainers(allContainers, monitored []types.Container) []types.Container {
-	isMonitored := make(map[types.ContainerID]bool, len(monitored))
-	for _, c := range monitored {
-		isMonitored[c.ID()] = true
-	}
-
-	unmonitored := make([]types.Container, 0, max(len(allContainers)-len(monitored), 0))
-
-	for _, c := range allContainers {
-		if !isMonitored[c.ID()] {
-			unmonitored = append(unmonitored, c)
-		}
-	}
-
-	return unmonitored
-}
-
-// reconcileImplicitRestartsExcluding clears linked-restart marks and derives restart candidates while omitting excluded containers.
+// Reconcile marks the containers that restart because a container they depend
+// on restarts, and returns every container that should restart. It first
+// clears the marks a previous call left, so it can run again after the set of
+// restarting containers changes. Excluded containers are neither marked nor
+// treated as restarting, and monitor-only containers are left out of the
+// result.
 //
 // Parameters:
 //   - log: Process logger.
@@ -103,7 +82,7 @@ func unmonitoredContainers(allContainers, monitored []types.Container) []types.C
 //
 // Returns:
 //   - []types.Container: Containers that should still restart.
-func reconcileImplicitRestartsExcluding(
+func Reconcile(
 	log *zerolog.Logger,
 	graph *sorter.DependencyGraph,
 	allContainers, containers []types.Container,

@@ -1,7 +1,6 @@
-package update
+package implicitrestart
 
 import (
-	"bytes"
 	"cmp"
 	"crypto/sha256"
 	"encoding/hex"
@@ -11,18 +10,43 @@ import (
 
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 
 	dockerContainer "github.com/moby/moby/api/types/container"
 
 	"github.com/nicholas-fedor/watchtower/internal/container"
-	mockContainerClient "github.com/nicholas-fedor/watchtower/internal/container/client/mocks"
-	"github.com/nicholas-fedor/watchtower/internal/registry/ratelimit"
 	mockUpdate "github.com/nicholas-fedor/watchtower/internal/update/mocks"
 	"github.com/nicholas-fedor/watchtower/internal/update/sorter"
 	"github.com/nicholas-fedor/watchtower/pkg/types"
 )
+
+// testGraph returns the dependency graph of the given containers, all of them
+// monitored.
+func testGraph(t *testing.T, containers []types.Container) *sorter.DependencyGraph {
+	t.Helper()
+
+	graph, err := sorter.NewDependencyGraph(newTestLogger(t), containers, nil, false)
+	require.NoError(t, err)
+
+	return graph
+}
+
+// newTestLogger returns a logger that writes each event to the test's log, so a
+// failing test shows what it logged.
+//
+// Parameters:
+//   - t: Test that receives the log lines.
+//
+// Returns:
+//   - *zerolog.Logger: Logger writing to t.
+func newTestLogger(t *testing.T) *zerolog.Logger {
+	t.Helper()
+
+	// Frame 4 skips zerolog's write path, so each line names the log call.
+	w := zerolog.TestWriter{T: t, Frame: 4}
+
+	return new(zerolog.New(w))
+}
 
 // restartSpec describes a container for the implicit restart tests.
 type restartSpec struct {
@@ -297,43 +321,6 @@ func TestMarkImplicitRestarts(t *testing.T) {
 	}
 }
 
-// TestUpdate_WarnsOnUnresolvedDependsOn verifies that a scan logs a warning for
-// each depends-on entry that names no container, and not for one that names a
-// service shared by several projects.
-func TestUpdate_WarnsOnUnresolvedDependsOn(t *testing.T) {
-	t.Parallel()
-
-	specs := []restartSpec{
-		// Problems are logged at warn once per process, so app needs an ID no
-		// earlier run has seen.
-		{name: "app", id: randomContainerID(t), dependsOn: "db,missing"},
-		{name: "a-db-1", project: "a", service: "db", number: "1"},
-		{name: "b-db-1", project: "b", service: "db", number: "1"},
-	}
-
-	containers := make([]types.Container, 0, len(specs))
-	for _, spec := range specs {
-		containers = append(containers, spec.build())
-	}
-
-	client := mockContainerClient.NewMockClient(t)
-	client.EXPECT().ListContainers(mock.Anything, mock.Anything).Return(containers, nil).Once()
-	client.EXPECT().IsContainerStale(mock.Anything, mock.Anything, mock.Anything).
-		Return(false, types.ImageID(""), "", nil)
-
-	// The update logs from several goroutines, so the buffer is synchronized.
-	var output bytes.Buffer
-
-	log := zerolog.New(zerolog.SyncWriter(&output))
-
-	_, _, err := update(&log, t.Context(), client, types.UpdateParams{}, ratelimit.New())
-	require.NoError(t, err)
-
-	assert.Contains(t, output.String(),
-		`{"level":"warn","container":"app","depends_on":"missing","message":"Ignoring depends-on entry that names no container"}`)
-	assert.NotContains(t, output.String(), `"depends_on":"db","message":"Ignoring depends-on entry`)
-}
-
 // TestReconcileImplicitRestarts verifies that implicit restarts follow the
 // anchors that still restart. A dependent loses its restart when its anchor is
 // no longer stale or is excluded, and an excluded exact link does not fall
@@ -364,12 +351,12 @@ func TestReconcileImplicitRestarts(t *testing.T) {
 
 		app.SetStale(true)
 		containers := []types.Container{app, db}
-		updateImplicitRestart(log, containers, containers, false)
+		markImplicitRestarts(log, testGraph(t, containers), containers, containers, nil)
 		assert.True(t, db.IsLinkedToRestarting())
 
 		app.SetStale(false)
 
-		got := reconcileImplicitRestarts(log, containers, containers, types.UpdateParams{})
+		got := Reconcile(log, testGraph(t, containers), containers, containers, types.UpdateParams{}, nil)
 
 		assert.False(t, db.IsLinkedToRestarting())
 		assert.Empty(t, got)
@@ -398,7 +385,7 @@ func TestReconcileImplicitRestarts(t *testing.T) {
 
 		app.SetStale(true)
 		containers := []types.Container{app, db}
-		got := reconcileImplicitRestarts(log, containers, containers, types.UpdateParams{})
+		got := Reconcile(log, testGraph(t, containers), containers, containers, types.UpdateParams{}, nil)
 
 		assert.True(t, db.IsLinkedToRestarting())
 		assert.ElementsMatch(t, []types.Container{app, db}, got)
@@ -431,7 +418,7 @@ func TestReconcileImplicitRestarts(t *testing.T) {
 		graph, err := sorter.NewDependencyGraph(log, containers, nil, false)
 		require.NoError(t, err)
 
-		got := reconcileImplicitRestartsExcluding(
+		got := Reconcile(
 			log,
 			graph,
 			containers,
@@ -480,7 +467,7 @@ func TestReconcileImplicitRestarts(t *testing.T) {
 		graph, err := sorter.NewDependencyGraph(log, containers, nil, false)
 		require.NoError(t, err)
 
-		got := reconcileImplicitRestartsExcluding(
+		got := Reconcile(
 			log,
 			graph,
 			containers,
@@ -492,55 +479,4 @@ func TestReconcileImplicitRestarts(t *testing.T) {
 		assert.False(t, dependent.IsLinkedToRestarting())
 		assert.ElementsMatch(t, []types.Container{serviceMatch}, got)
 	})
-}
-
-// updateImplicitRestart marks the containers that depend on a restarting
-// container as linked to restarting, as an update scan does. The dependency
-// graph is built from containers, with the rest of allContainers unmonitored.
-//
-// Parameters:
-//   - log: Process logger.
-//   - allContainers: Every listed container.
-//   - containers: The monitored containers, which may be marked.
-//   - useComposeDependsOn: Whether to include Compose depends_on labels as links.
-func updateImplicitRestart(log *zerolog.Logger, allContainers, containers []types.Container, useComposeDependsOn bool) {
-	graph, err := sorter.NewDependencyGraph(log,
-		containers,
-		unmonitoredContainers(allContainers, containers),
-		useComposeDependsOn,
-	)
-	if err != nil {
-		return
-	}
-
-	markImplicitRestarts(log, graph, allContainers, containers, nil)
-}
-
-// reconcileImplicitRestarts clears linked-restart marks and derives them again
-// with a dependency graph built from containers, with the rest of
-// allContainers unmonitored.
-//
-// Parameters:
-//   - log: Process logger.
-//   - allContainers: Every listed container.
-//   - containers: The monitored containers.
-//   - params: Update parameters.
-//
-// Returns:
-//   - []types.Container: Containers that should still restart.
-func reconcileImplicitRestarts(
-	log *zerolog.Logger,
-	allContainers, containers []types.Container,
-	params types.UpdateParams,
-) []types.Container {
-	graph, err := sorter.NewDependencyGraph(log,
-		containers,
-		unmonitoredContainers(allContainers, containers),
-		params.UseComposeDependsOn,
-	)
-	if err != nil {
-		return nil
-	}
-
-	return reconcileImplicitRestartsExcluding(log, graph, allContainers, containers, params, nil)
 }

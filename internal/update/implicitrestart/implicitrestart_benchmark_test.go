@@ -1,4 +1,4 @@
-package update
+package implicitrestart
 
 import (
 	"fmt"
@@ -69,8 +69,8 @@ func BenchmarkImplicitRestarts(b *testing.B) {
 					c.SetStale(i%10 == 5)
 				}
 
-				_ = reconcileImplicitRestartsExcluding(&log, graph, all, all, params, nil)
-				_ = reconcileImplicitRestartsExcluding(&log, graph, all, all, params, nil)
+				_ = Reconcile(&log, graph, all, all, params, nil)
+				_ = Reconcile(&log, graph, all, all, params, nil)
 			}
 		})
 	}

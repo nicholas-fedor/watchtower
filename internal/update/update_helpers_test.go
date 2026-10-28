@@ -3,13 +3,59 @@ package update
 import (
 	"time"
 
+	"github.com/rs/zerolog"
+
 	dockerContainer "github.com/moby/moby/api/types/container"
 	dockerImage "github.com/moby/moby/api/types/image"
 	dockerNetwork "github.com/moby/moby/api/types/network"
 
+	"github.com/nicholas-fedor/watchtower/internal/update/implicitrestart"
 	mockUpdate "github.com/nicholas-fedor/watchtower/internal/update/mocks"
+	"github.com/nicholas-fedor/watchtower/internal/update/sorter"
 	"github.com/nicholas-fedor/watchtower/pkg/types"
 )
+
+// updateImplicitRestart marks the containers that depend on a restarting
+// container as linked to restarting, as an update scan does. The dependency
+// graph is built from containers, with the rest of allContainers unmonitored.
+//
+// Parameters:
+//   - log: Process logger.
+//   - allContainers: Every listed container.
+//   - containers: The monitored containers, which may be marked.
+//   - useComposeDependsOn: Whether to include Compose depends_on labels as links.
+func updateImplicitRestart(log *zerolog.Logger, allContainers, containers []types.Container, useComposeDependsOn bool) {
+	reconcileImplicitRestarts(log, allContainers, containers, types.UpdateParams{UseComposeDependsOn: useComposeDependsOn})
+}
+
+// reconcileImplicitRestarts clears linked-restart marks and derives them again
+// with a dependency graph built from containers, with the rest of
+// allContainers unmonitored.
+//
+// Parameters:
+//   - log: Process logger.
+//   - allContainers: Every listed container.
+//   - containers: The monitored containers.
+//   - params: Update parameters.
+//
+// Returns:
+//   - []types.Container: Containers that should still restart.
+func reconcileImplicitRestarts(
+	log *zerolog.Logger,
+	allContainers, containers []types.Container,
+	params types.UpdateParams,
+) []types.Container {
+	graph, err := sorter.NewDependencyGraph(log,
+		containers,
+		unmonitoredContainers(allContainers, containers),
+		params.UseComposeDependsOn,
+	)
+	if err != nil {
+		return nil
+	}
+
+	return implicitrestart.Reconcile(log, graph, allContainers, containers, params, nil)
+}
 
 func getCommonTestData() *mockUpdate.TestData {
 	return &mockUpdate.TestData{

@@ -24,6 +24,7 @@ import (
 	"github.com/nicholas-fedor/watchtower/internal/registry/ratelimit"
 	"github.com/nicholas-fedor/watchtower/internal/update/changelog"
 	"github.com/nicholas-fedor/watchtower/internal/update/cleanup"
+	"github.com/nicholas-fedor/watchtower/internal/update/implicitrestart"
 	"github.com/nicholas-fedor/watchtower/internal/update/rebuild"
 	"github.com/nicholas-fedor/watchtower/internal/update/selfupdate"
 	"github.com/nicholas-fedor/watchtower/internal/update/sorter"
@@ -686,7 +687,7 @@ func update(
 
 	// Collect all containers to restart: updates, and containers linked to
 	// restarting ones, which restart without updating.
-	allContainersToRestart := reconcileImplicitRestartsExcluding(log,
+	allContainersToRestart := implicitrestart.Reconcile(log,
 		graph,
 		allContainers,
 		filteredContainers,
@@ -739,7 +740,7 @@ func update(
 	maps.Copy(excluded, gitSession.NoRestartBuiltIDs(config))
 	maps.Copy(excluded, inCycle)
 
-	allContainersToRestart = reconcileImplicitRestartsExcluding(
+	allContainersToRestart = implicitrestart.Reconcile(
 		log,
 		graph,
 		allContainers,
@@ -886,6 +887,32 @@ func (r *reportedProblems) level(parts ...string) zerolog.Level {
 	r.seen[key] = struct{}{}
 
 	return zerolog.WarnLevel
+}
+
+// unmonitoredContainers returns the containers of allContainers that are not
+// among the monitored containers.
+//
+// Parameters:
+//   - allContainers: Every listed container.
+//   - monitored: The monitored containers.
+//
+// Returns:
+//   - []types.Container: The other containers, in listed order.
+func unmonitoredContainers(allContainers, monitored []types.Container) []types.Container {
+	isMonitored := make(map[types.ContainerID]bool, len(monitored))
+	for _, c := range monitored {
+		isMonitored[c.ID()] = true
+	}
+
+	unmonitored := make([]types.Container, 0, max(len(allContainers)-len(monitored), 0))
+
+	for _, c := range allContainers {
+		if !isMonitored[c.ID()] {
+			unmonitored = append(unmonitored, c)
+		}
+	}
+
+	return unmonitored
 }
 
 // hasSelfDependency checks if a container has a self-dependency in its Watchtower depends-on label.

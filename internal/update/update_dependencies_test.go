@@ -1,17 +1,24 @@
 package update
 
 import (
+	"bytes"
 	"slices"
 	"testing"
 	"time"
 
+	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 
 	dockerContainer "github.com/moby/moby/api/types/container"
 	dockerNetwork "github.com/moby/moby/api/types/network"
 
+	mockContainerClient "github.com/nicholas-fedor/watchtower/internal/container/client/mocks"
+	"github.com/nicholas-fedor/watchtower/internal/container/labels"
 	"github.com/nicholas-fedor/watchtower/internal/registry/ratelimit"
+	"github.com/nicholas-fedor/watchtower/internal/testutil/containerfixture"
+	"github.com/nicholas-fedor/watchtower/internal/testutil/modelfixture"
 	mockUpdate "github.com/nicholas-fedor/watchtower/internal/update/mocks"
 	"github.com/nicholas-fedor/watchtower/pkg/types"
 )
@@ -2924,4 +2931,58 @@ func TestUpdateAction_Dependencies(t *testing.T) {
 			assert.True(t, webContainer.ToRestart(), "web should be restarted due to transitive dependency on app")
 		})
 	})
+}
+
+// TestUpdate_WarnsOnUnresolvedDependsOn verifies that a scan logs a warning for
+// each depends-on entry that names no container, and not for one that names a
+// service shared by several projects.
+func TestUpdate_WarnsOnUnresolvedDependsOn(t *testing.T) {
+	t.Parallel()
+
+	// Problems are logged at warn once per process, so app needs an ID no
+	// earlier run has seen.
+	containers := []types.Container{
+		modelfixture.Container(
+			containerfixture.WithID(randomContainerID(t)),
+			containerfixture.WithName("/app"),
+			containerfixture.WithLabels(map[string]string{labels.DependsOn: "db,missing"}),
+		),
+		modelfixture.Container(
+			containerfixture.WithID(randomContainerID(t)),
+			containerfixture.WithName("/a-db-1"),
+			containerfixture.WithLabels(composeServiceLabels("a", "db")),
+		),
+		modelfixture.Container(
+			containerfixture.WithID(randomContainerID(t)),
+			containerfixture.WithName("/b-db-1"),
+			containerfixture.WithLabels(composeServiceLabels("b", "db")),
+		),
+	}
+
+	client := mockContainerClient.NewMockClient(t)
+	client.EXPECT().ListContainers(mock.Anything, mock.Anything).Return(containers, nil).Once()
+	client.EXPECT().IsContainerStale(mock.Anything, mock.Anything, mock.Anything).
+		Return(false, types.ImageID(""), "", nil)
+
+	// The update logs from several goroutines, so the buffer is synchronized.
+	var output bytes.Buffer
+
+	log := zerolog.New(zerolog.SyncWriter(&output))
+
+	_, _, err := update(&log, t.Context(), client, types.UpdateParams{}, ratelimit.New())
+	require.NoError(t, err)
+
+	assert.Contains(t, output.String(),
+		`{"level":"warn","container":"app","depends_on":"missing","message":"Ignoring depends-on entry that names no container"}`)
+	assert.NotContains(t, output.String(), `"depends_on":"db","message":"Ignoring depends-on entry`)
+}
+
+// composeServiceLabels returns the Compose labels of the first replica of a
+// service in a project.
+func composeServiceLabels(project, service string) map[string]string {
+	return map[string]string{
+		"com.docker.compose.project":          project,
+		"com.docker.compose.service":          service,
+		"com.docker.compose.container-number": "1",
+	}
 }
