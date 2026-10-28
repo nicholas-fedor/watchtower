@@ -18,7 +18,6 @@ import (
 	dockerContainer "github.com/moby/moby/api/types/container"
 
 	composeApply "github.com/nicholas-fedor/watchtower/internal/compose/apply"
-	mockCompose "github.com/nicholas-fedor/watchtower/internal/compose/apply/mocks"
 	composeLabels "github.com/nicholas-fedor/watchtower/internal/compose/labels"
 	composeProject "github.com/nicholas-fedor/watchtower/internal/compose/project"
 	mockContainerClient "github.com/nicholas-fedor/watchtower/internal/container/client/mocks"
@@ -27,6 +26,7 @@ import (
 	"github.com/nicholas-fedor/watchtower/internal/git"
 	"github.com/nicholas-fedor/watchtower/internal/git/project"
 	mockUpdate "github.com/nicholas-fedor/watchtower/internal/update/mocks"
+	mockRebuild "github.com/nicholas-fedor/watchtower/internal/update/rebuild/mocks"
 	"github.com/nicholas-fedor/watchtower/internal/update/state"
 	"github.com/nicholas-fedor/watchtower/pkg/types"
 )
@@ -395,7 +395,7 @@ func TestSession(t *testing.T) {
 			t.Parallel()
 
 			sess := NewSession(gitTestClient(t))
-			sess.apply = mockCompose.NewMockApplier(t)
+			sess.apply = mockRebuild.NewMockApplier(t)
 			fresh := gitAssociatedContainer("fresh", "/fresh", "myapp:latest", nil)
 			staleNoResult := gitAssociatedContainer("none", "/none", "myapp:latest", nil)
 			staleFreshResult := gitAssociatedContainer("stored", "/stored", "myapp:latest", nil)
@@ -417,7 +417,7 @@ func TestSession(t *testing.T) {
 			t.Parallel()
 
 			sess := NewSession(gitTestClient(t))
-			sess.apply = mockCompose.NewMockApplier(t)
+			sess.apply = mockRebuild.NewMockApplier(t)
 			monitor := gitAssociatedContainer("mon", "/mon", "myapp:latest", map[string]string{
 				"com.centurylinklabs.watchtower.monitor-only": "true",
 			})
@@ -442,7 +442,7 @@ func TestSession(t *testing.T) {
 			t.Parallel()
 
 			sess := NewSession(gitTestClient(t))
-			sess.apply = mockCompose.NewMockApplier(t)
+			sess.apply = mockRebuild.NewMockApplier(t)
 			c := gitAssociatedContainer("fail", "/fail", "myapp:latest", nil)
 			c.SetStale(true)
 			sess.store(c.ID(), git.CheckResult{Stale: true, Commit: ""})
@@ -459,7 +459,7 @@ func TestSession(t *testing.T) {
 			t.Parallel()
 
 			sess := NewSession(gitTestClient(t))
-			sess.apply = mockCompose.NewMockApplier(t)
+			sess.apply = mockRebuild.NewMockApplier(t)
 			c := gitAssociatedContainer("ok", "/ok", "myapp:latest", nil)
 			c.SetStale(true)
 			sess.store(c.ID(), git.CheckResult{Stale: true, Commit: "0123456789abcdef0123456789abcdef01234567", Tag: "v1.0.0"})
@@ -858,7 +858,7 @@ func TestSession(t *testing.T) {
 			t.Parallel()
 
 			dir := writeComposeProjectDir(t)
-			applier := mockCompose.NewMockApplier(t)
+			applier := mockRebuild.NewMockApplier(t)
 
 			var got composeApply.Request
 
@@ -945,7 +945,7 @@ func TestSession(t *testing.T) {
 			override := filepath.Join(dir, "override.yml")
 			require.NoError(t, os.WriteFile(override, []byte("services: {}\n"), 0o600))
 
-			applier := mockCompose.NewMockApplier(t)
+			applier := mockRebuild.NewMockApplier(t)
 
 			var requests []composeApply.Request
 
@@ -1011,7 +1011,7 @@ func TestSession(t *testing.T) {
 			t.Parallel()
 
 			dir := writeComposeProjectDir(t)
-			applier := mockCompose.NewMockApplier(t)
+			applier := mockRebuild.NewMockApplier(t)
 
 			var order []string
 
@@ -1066,7 +1066,7 @@ func TestSession(t *testing.T) {
 			t.Parallel()
 
 			dir := writeComposeProjectDir(t)
-			applier := mockCompose.NewMockApplier(t)
+			applier := mockRebuild.NewMockApplier(t)
 
 			var order []string
 
@@ -1141,7 +1141,7 @@ func TestSession(t *testing.T) {
 			t.Parallel()
 
 			dir := writeComposeProjectDir(t)
-			applier := mockCompose.NewMockApplier(t)
+			applier := mockRebuild.NewMockApplier(t)
 			applier.EXPECT().
 				Apply(mock.Anything, mock.Anything).
 				RunAndReturn(func(context.Context, composeApply.Request) ([]composeApply.Container, error) {
@@ -1190,7 +1190,7 @@ func TestSession(t *testing.T) {
 			t.Parallel()
 
 			dir := writeComposeProjectDir(t)
-			applier := mockCompose.NewMockApplier(t)
+			applier := mockRebuild.NewMockApplier(t)
 			parent, cancel := context.WithCancel(t.Context())
 
 			sess := NewSession(gitTestClient(t))
@@ -1233,7 +1233,7 @@ func TestSession(t *testing.T) {
 			t.Parallel()
 
 			dir := writeComposeProjectDir(t)
-			applier := mockCompose.NewMockApplier(t)
+			applier := mockRebuild.NewMockApplier(t)
 			applier.EXPECT().
 				Apply(mock.Anything, mock.Anything).
 				Return([]composeApply.Container{{Service: "api", ID: "new-api", ImageID: "sha256:api"}}, nil).
@@ -1275,7 +1275,7 @@ func TestSession(t *testing.T) {
 			t.Parallel()
 
 			sess := NewSession(gitTestClient(t))
-			applier := mockCompose.NewMockApplier(t)
+			applier := mockRebuild.NewMockApplier(t)
 			sess.apply = applier
 			c := gitAssociatedContainer("ok", "/ok", "myapp:latest", nil)
 			c.SetStale(true)
@@ -1295,7 +1295,7 @@ func TestSession(t *testing.T) {
 			t.Parallel()
 
 			missing := filepath.Join(t.TempDir(), "missing")
-			applier := mockCompose.NewMockApplier(t)
+			applier := mockRebuild.NewMockApplier(t)
 			sess := NewSession(gitTestClient(t))
 			sess.apply = applier
 
@@ -1320,7 +1320,7 @@ func TestSession(t *testing.T) {
 			t.Parallel()
 
 			missing := filepath.Join(t.TempDir(), "missing")
-			applier := mockCompose.NewMockApplier(t)
+			applier := mockRebuild.NewMockApplier(t)
 			sess := NewSession(gitTestClient(t))
 			sess.apply = applier
 
@@ -1359,7 +1359,7 @@ func TestSession(t *testing.T) {
 
 			dir := writeComposeProjectDir(t)
 			sess := NewSession(gitTestClient(t))
-			sess.apply = mockCompose.NewMockApplier(t)
+			sess.apply = mockRebuild.NewMockApplier(t)
 			c := gitAssociatedContainer("api", "/api", "webstack-api:latest", map[string]string{
 				labels.ComposeDir: dir,
 			})
@@ -1378,7 +1378,7 @@ func TestSession(t *testing.T) {
 			t.Parallel()
 
 			dir := writeComposeProjectDir(t)
-			applier := mockCompose.NewMockApplier(t)
+			applier := mockRebuild.NewMockApplier(t)
 			sess := NewSession(gitTestClient(t))
 			sess.apply = applier
 			sess.checkout = func(context.Context, string, string, project.CheckoutOptions) error {
@@ -1404,7 +1404,7 @@ func TestSession(t *testing.T) {
 			t.Parallel()
 
 			dir := writeComposeProjectDir(t)
-			applier := mockCompose.NewMockApplier(t)
+			applier := mockRebuild.NewMockApplier(t)
 			applier.EXPECT().
 				Apply(mock.Anything, mock.Anything).
 				Return([]composeApply.Container{{Service: "api", Name: "/api", ID: "new-api", ImageID: "sha256:api"}}, nil).
@@ -1437,7 +1437,7 @@ func TestSession(t *testing.T) {
 			t.Parallel()
 
 			dir := writeComposeProjectDir(t)
-			applier := mockCompose.NewMockApplier(t)
+			applier := mockRebuild.NewMockApplier(t)
 			applier.EXPECT().
 				Apply(mock.Anything, mock.Anything).
 				Return([]composeApply.Container{
@@ -1493,7 +1493,7 @@ func TestSession(t *testing.T) {
 			t.Parallel()
 
 			dir := writeComposeProjectDir(t)
-			applier := mockCompose.NewMockApplier(t)
+			applier := mockRebuild.NewMockApplier(t)
 			applier.EXPECT().
 				Apply(mock.Anything, mock.Anything).
 				Return([]composeApply.Container{{Service: "api", ID: "new-api", ImageID: "sha256:api"}}, nil).
@@ -1550,7 +1550,7 @@ func TestSession(t *testing.T) {
 			t.Parallel()
 
 			dir := writeComposeProjectDir(t)
-			applier := mockCompose.NewMockApplier(t)
+			applier := mockRebuild.NewMockApplier(t)
 
 			var got composeApply.Request
 
@@ -1605,7 +1605,7 @@ func TestSession(t *testing.T) {
 			t.Parallel()
 
 			dir := writeComposeProjectDir(t)
-			applier := mockCompose.NewMockApplier(t)
+			applier := mockRebuild.NewMockApplier(t)
 			applier.EXPECT().
 				Apply(mock.Anything, mock.Anything).
 				Return(nil, context.Canceled).
@@ -1646,7 +1646,7 @@ func TestSession(t *testing.T) {
 			dir := writeComposeProjectDir(t)
 			checkedOut := false
 			sess := NewSession(gitTestClient(t))
-			sess.apply = mockCompose.NewMockApplier(t)
+			sess.apply = mockRebuild.NewMockApplier(t)
 			sess.checkout = func(context.Context, string, string, project.CheckoutOptions) error {
 				checkedOut = true
 
@@ -1682,7 +1682,7 @@ func TestSession(t *testing.T) {
 			t.Parallel()
 
 			dir := writeComposeProjectDir(t)
-			applier := mockCompose.NewMockApplier(t)
+			applier := mockRebuild.NewMockApplier(t)
 
 			var got composeApply.Request
 
@@ -1732,7 +1732,7 @@ func TestSession(t *testing.T) {
 			t.Parallel()
 
 			dir := writeComposeProjectDir(t)
-			applier := mockCompose.NewMockApplier(t)
+			applier := mockRebuild.NewMockApplier(t)
 
 			var got composeApply.Request
 
@@ -1783,7 +1783,7 @@ func TestSession(t *testing.T) {
 			t.Parallel()
 
 			dir := writeComposeProjectDir(t)
-			applier := mockCompose.NewMockApplier(t)
+			applier := mockRebuild.NewMockApplier(t)
 			applier.EXPECT().
 				Apply(mock.Anything, mock.Anything).
 				Return([]composeApply.Container{
@@ -1837,7 +1837,7 @@ func TestSession(t *testing.T) {
 			t.Parallel()
 
 			dir := writeComposeProjectDir(t)
-			applier := mockCompose.NewMockApplier(t)
+			applier := mockRebuild.NewMockApplier(t)
 			applier.EXPECT().
 				Apply(mock.Anything, mock.Anything).
 				Return([]composeApply.Container{
@@ -1890,7 +1890,7 @@ func TestSession(t *testing.T) {
 			t.Parallel()
 
 			dir := writeComposeProjectDir(t)
-			applier := mockCompose.NewMockApplier(t)
+			applier := mockRebuild.NewMockApplier(t)
 			applier.EXPECT().
 				Apply(mock.Anything, mock.Anything).
 				Return([]composeApply.Container{

@@ -9,10 +9,12 @@ import (
 
 	"github.com/docker/compose/v5/pkg/api"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 
-	composetypes "github.com/compose-spec/compose-go/v2/types"
+	composeTypes "github.com/compose-spec/compose-go/v2/types"
 
+	mockCompose "github.com/nicholas-fedor/watchtower/internal/compose/apply/mocks"
 	composeProject "github.com/nicholas-fedor/watchtower/internal/compose/project"
 	"github.com/nicholas-fedor/watchtower/pkg/types"
 )
@@ -117,24 +119,22 @@ services:
 `), 0o600))
 
 	var (
-		upProject *composetypes.Project
+		upProject *composeTypes.Project
 		upOptions api.UpOptions
 	)
 
-	service := &composeServiceStub{
-		up: func(_ context.Context, project *composetypes.Project, options api.UpOptions) error {
+	service := mockCompose.NewMockCompose(t)
+	service.EXPECT().Up(mock.Anything, mock.Anything, mock.Anything).
+		RunAndReturn(func(_ context.Context, project *composeTypes.Project, options api.UpOptions) error {
 			upProject = project
 			upOptions = options
 
 			return nil
-		},
-		ps: func(context.Context, string, api.PsOptions) ([]api.ContainerSummary, error) {
-			return []api.ContainerSummary{{Service: "app", Name: "project-app-1", ID: "app-id"}}, nil
-		},
-		images: func(context.Context, string, api.ImagesOptions) (map[string]api.ImageSummary, error) {
-			return map[string]api.ImageSummary{}, nil
-		},
-	}
+		}).Once()
+	service.EXPECT().Ps(mock.Anything, "project", mock.Anything).
+		Return([]api.ContainerSummary{{Service: "app", Name: "project-app-1", ID: "app-id"}}, nil).Once()
+	service.EXPECT().Images(mock.Anything, "project", mock.Anything).
+		Return(map[string]api.ImageSummary{}, nil).Once()
 
 	client := &Client{service: service}
 	containers, err := client.Apply(t.Context(), Request{
@@ -161,24 +161,8 @@ services:
 func TestClientApplyRejectsInvalidRequests(t *testing.T) {
 	t.Parallel()
 
-	service := &composeServiceStub{
-		up: func(context.Context, *composetypes.Project, api.UpOptions) error {
-			t.Fatal("Compose up must not run for invalid requests")
-
-			return nil
-		},
-		ps: func(context.Context, string, api.PsOptions) ([]api.ContainerSummary, error) {
-			t.Fatal("Compose ps must not run for invalid requests")
-
-			return []api.ContainerSummary{}, nil
-		},
-		images: func(context.Context, string, api.ImagesOptions) (map[string]api.ImageSummary, error) {
-			t.Fatal("Compose images must not run for invalid requests")
-
-			return map[string]api.ImageSummary{}, nil
-		},
-	}
-	client := &Client{service: service}
+	// The mock has no expectations, so any Compose call fails the test.
+	client := &Client{service: mockCompose.NewMockCompose(t)}
 
 	_, err := client.Apply(t.Context(), Request{
 		Ref:      composeProject.ProjectRef{},
@@ -203,24 +187,22 @@ func TestClientApplyStampsComposeIdentity(t *testing.T) {
 		t.Parallel()
 
 		var (
-			upProject *composetypes.Project
+			upProject *composeTypes.Project
 			upOptions api.UpOptions
 		)
 
-		service := &composeServiceStub{
-			up: func(_ context.Context, project *composetypes.Project, options api.UpOptions) error {
+		service := mockCompose.NewMockCompose(t)
+		service.EXPECT().Up(mock.Anything, mock.Anything, mock.Anything).
+			RunAndReturn(func(_ context.Context, project *composeTypes.Project, options api.UpOptions) error {
 				upProject = project
 				upOptions = options
 
 				return nil
-			},
-			ps: func(context.Context, string, api.PsOptions) ([]api.ContainerSummary, error) {
-				return []api.ContainerSummary{{Service: "api", Name: "jobs-api-1", ID: "api-id"}}, nil
-			},
-			images: func(context.Context, string, api.ImagesOptions) (map[string]api.ImageSummary, error) {
-				return map[string]api.ImageSummary{}, nil
-			},
-		}
+			}).Once()
+		service.EXPECT().Ps(mock.Anything, "jobs", mock.Anything).
+			Return([]api.ContainerSummary{{Service: "api", Name: "jobs-api-1", ID: "api-id"}}, nil).Once()
+		service.EXPECT().Images(mock.Anything, "jobs", mock.Anything).
+			Return(map[string]api.ImageSummary{}, nil).Once()
 
 		client := &Client{service: service}
 		_, err := client.Apply(t.Context(), Request{
@@ -252,26 +234,18 @@ func TestClientApplyStampsComposeIdentity(t *testing.T) {
 	t.Run("build", func(t *testing.T) {
 		t.Parallel()
 
-		var built *composetypes.Project
+		var built *composeTypes.Project
 
-		service := &composeServiceStub{
-			up: func(context.Context, *composetypes.Project, api.UpOptions) error {
-				t.Fatal("compose up must not run for build-only apply")
-
-				return nil
-			},
-			build: func(_ context.Context, project *composetypes.Project, _ api.BuildOptions) error {
+		// Without an Up expectation, a compose up fails the test.
+		service := mockCompose.NewMockCompose(t)
+		service.EXPECT().Build(mock.Anything, mock.Anything, mock.Anything).
+			RunAndReturn(func(_ context.Context, project *composeTypes.Project, _ api.BuildOptions) error {
 				built = project
 
 				return nil
-			},
-			ps: func(context.Context, string, api.PsOptions) ([]api.ContainerSummary, error) {
-				return []api.ContainerSummary{}, nil
-			},
-			images: func(context.Context, string, api.ImagesOptions) (map[string]api.ImageSummary, error) {
-				return map[string]api.ImageSummary{}, nil
-			},
-		}
+			}).Once()
+		service.EXPECT().Ps(mock.Anything, "jobs", mock.Anything).Return([]api.ContainerSummary{}, nil).Once()
+		service.EXPECT().Images(mock.Anything, "jobs", mock.Anything).Return(map[string]api.ImageSummary{}, nil).Once()
 
 		client := &Client{service: service}
 		_, err := client.Apply(t.Context(), Request{
@@ -298,8 +272,8 @@ func TestStampComposeIdentity(t *testing.T) {
 	t.Run("empty name", func(t *testing.T) {
 		t.Parallel()
 
-		_, err := stampComposeIdentity(&composetypes.Project{
-			Services: composetypes.Services{
+		_, err := stampComposeIdentity(&composeTypes.Project{
+			Services: composeTypes.Services{
 				"api": {Name: "api", Image: "app"},
 			},
 		})
@@ -316,7 +290,7 @@ func TestStampComposeIdentity(t *testing.T) {
 		service, err := project.GetService("api")
 		require.NoError(t, err)
 
-		service.CustomLabels = composetypes.Labels{
+		service.CustomLabels = composeTypes.Labels{
 			"keep-custom":   "yes",
 			api.OneoffLabel: "True",
 		}
@@ -344,7 +318,7 @@ func TestStampComposeIdentity(t *testing.T) {
 //   - t: Test that receives the failures.
 //   - project: Project whose services are checked.
 //   - dir: Working directory the project must have.
-func assertComposeIdentity(t *testing.T, project *composetypes.Project, dir string) {
+func assertComposeIdentity(t *testing.T, project *composeTypes.Project, dir string) {
 	t.Helper()
 
 	require.NotNil(t, project)
@@ -408,39 +382,4 @@ func TestScopeComposeProjectRejectsMissingService(t *testing.T) {
 	_, err = scopeComposeProject(project, []string{"missing"})
 	require.Error(t, err)
 	assert.ErrorContains(t, err, `no such service: missing`)
-}
-
-// composeServiceStub is a Compose service whose Up, Build, Ps, and Images calls
-// run the test's functions. Any other call panics on the nil embedded service.
-type composeServiceStub struct {
-	api.Compose
-
-	// up answers Up.
-	up func(context.Context, *composetypes.Project, api.UpOptions) error
-	// build answers Build.
-	build func(context.Context, *composetypes.Project, api.BuildOptions) error
-	// ps answers Ps.
-	ps func(context.Context, string, api.PsOptions) ([]api.ContainerSummary, error)
-	// images answers Images.
-	images func(context.Context, string, api.ImagesOptions) (map[string]api.ImageSummary, error)
-}
-
-// Up delegates the stubbed Compose up call.
-func (s *composeServiceStub) Up(ctx context.Context, project *composetypes.Project, options api.UpOptions) error {
-	return s.up(ctx, project, options)
-}
-
-// Build delegates the stubbed Compose build call.
-func (s *composeServiceStub) Build(ctx context.Context, project *composetypes.Project, options api.BuildOptions) error {
-	return s.build(ctx, project, options)
-}
-
-// Ps delegates the stubbed Compose ps call.
-func (s *composeServiceStub) Ps(ctx context.Context, projectName string, options api.PsOptions) ([]api.ContainerSummary, error) {
-	return s.ps(ctx, projectName, options)
-}
-
-// Images delegates the stubbed Compose images call.
-func (s *composeServiceStub) Images(ctx context.Context, projectName string, options api.ImagesOptions) (map[string]api.ImageSummary, error) {
-	return s.images(ctx, projectName, options)
 }
