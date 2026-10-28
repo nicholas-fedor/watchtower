@@ -36,10 +36,27 @@ var (
 	errGitNotAssociated = errors.New("container is not associated with a Git repository")
 )
 
+// Applier loads a Compose project and applies selected services.
+type Applier interface {
+	// Apply loads the project, merges Labels, and runs compose up or build.
+	//
+	// Parameters:
+	//   - ctx: Cancellation and timeout.
+	//   - req: Project, services, labels, and build-only flag.
+	//
+	// Returns:
+	//   - []composeApply.Container: Service instances after apply.
+	//   - error: Non-nil when load or apply fails.
+	Apply(ctx context.Context, req composeApply.Request) ([]composeApply.Container, error)
+}
+
+// The Compose client applies the projects that a session checks out.
+var _ Applier = (*composeApply.Client)(nil)
+
 // Session holds watcher results for one Update() invocation.
 type Session struct {
 	client   *git.Client
-	apply    composeApply.Applier
+	apply    Applier
 	checkout func(ctx context.Context, dir, commit string, opts project.CheckoutOptions) error
 	mu       sync.Mutex
 	results  map[types.ContainerID]git.CheckResult

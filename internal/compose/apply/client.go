@@ -27,6 +27,32 @@ type Client struct {
 	service api.Compose
 }
 
+// Request is one Compose apply for a checked-out project directory.
+type Request struct {
+	// Ref is the resolved project directory and optional compose files.
+	Ref composeProject.ProjectRef
+	// Services are Compose service names to build or recreate.
+	Services []string
+	// Labels are extra service labels merged onto the compose model before apply.
+	Labels map[string]map[string]string
+	// BuildOnly builds images and does not recreate running containers.
+	BuildOnly bool
+}
+
+// Container is a running Compose service instance after apply.
+type Container struct {
+	// Service is the Compose service the container belongs to.
+	Service string
+	// Name is the container name from compose ps, used to match replicas.
+	Name string
+	// ID is the container ID that compose ps reports.
+	ID types.ContainerID
+	// ImageID is the ID of the image the container runs, from compose images,
+	// or the container's image reference when that is already an image ID.
+	// It is empty when neither is known.
+	ImageID types.ImageID
+}
+
 // NewClient returns an applier that talks to the Docker daemon on first Apply.
 //
 // Returns:
@@ -113,6 +139,45 @@ func (c *Client) Apply(ctx context.Context, req Request) ([]Container, error) {
 	}
 
 	return listApplied(ctx, svc, project, req.Services)
+}
+
+// injectLabels returns a copy of project with extra labels merged onto named services.
+//
+// Parameters:
+//   - project: Loaded Compose project.
+//   - labels: Service name to label map.
+//
+// Returns:
+//   - *composeTypes.Project: Transformed project.
+//   - error: Non-nil when a transform fails.
+func injectLabels(project *composeTypes.Project, labels map[string]map[string]string) (*composeTypes.Project, error) {
+	if project == nil {
+		return nil, errNilProject
+	}
+
+	if len(labels) == 0 {
+		return project, nil
+	}
+
+	project, err := project.WithServicesTransform(func(name string, service composeTypes.ServiceConfig) (composeTypes.ServiceConfig, error) {
+		extra, ok := labels[name]
+		if !ok || len(extra) == 0 {
+			return service, nil
+		}
+
+		if service.Labels == nil {
+			service.Labels = composeTypes.Labels{}
+		}
+
+		maps.Copy(service.Labels, extra)
+
+		return service, nil
+	})
+	if err != nil {
+		return nil, fmt.Errorf("transform compose services: %w", err)
+	}
+
+	return project, nil
 }
 
 // scopeComposeProject scopes a project to the requested services and their dependencies.
