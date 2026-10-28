@@ -163,7 +163,7 @@ require (
 	github.com/swaggo/files/v2 v2.0.2 // indirect
 	github.com/tilt-dev/fsnotify v1.4.8-0.20220602155310-fff9c274a375 // indirect
 	github.com/tinylib/msgp v1.6.5 // indirect
-	github.com/tonistiigi/fsutil v0.0.0-20261026231930-dd1998d3d732 // indirect
+	github.com/tonistiigi/fsutil v0.0.0-20261027232937-ca65610c2295 // indirect
 	github.com/tonistiigi/go-csvvalue v0.0.0-20240814133006-030d3b2625d0 // indirect
 	github.com/tonistiigi/units v0.0.0-20180711220420-6950e57a87ea // indirect
 	github.com/tonistiigi/vt100 v0.0.0-20240514184818-90bafcd6abab // indirect
