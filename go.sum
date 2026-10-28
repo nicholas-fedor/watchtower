@@ -444,8 +444,8 @@ github.com/valyala/fasthttp v1.77.0 h1:6mxBJdHabRmU4Cmw79Uqhgvjzsp6pjOaQk2t8COfl
 github.com/valyala/fasthttp v1.77.0/go.mod h1:m8oTPC8riDDky07invpl+Gz3RixnAN5BbwyUuVB5H2o=
 github.com/vbatts/tar-split v0.12.3 h1:Cd46rkGXI3Td4yrVNwU8ripbxFaQbmesqhjBUUYAJSw=
 github.com/vbatts/tar-split v0.12.3/go.mod h1:sQOc6OlqGCr7HkGx/IDBeKiTIvqhmj8KffNhEXG4Nq0=
-github.com/vektra/mockery/v3 v3.8.1 h1:TDDa46ooae8DWWR0uCPNyqqDL3uGK0uRvNae0/uotJ8=
-github.com/vektra/mockery/v3 v3.8.1/go.mod h1:1+hDVtNiQfxGv9YhpYmQ1q1Drf7z4w1rUvsAvwe2aIY=
+github.com/vektra/mockery/v3 v3.9.0 h1:BeuKC+6aQBP4cgqIxBsJxUs5F0iThO7+blEWbE5lkKs=
+github.com/vektra/mockery/v3 v3.9.0/go.mod h1:1+hDVtNiQfxGv9YhpYmQ1q1Drf7z4w1rUvsAvwe2aIY=
 github.com/x448/float16 v0.8.4 h1:qLwI1I70+NjRFUR3zs1JPUCgaCXSh3SW62uAKT1mSBM=
 github.com/x448/float16 v0.8.4/go.mod h1:14CWIYCyZA/cWjXOioeEpHeN/83MdbZDRQHoFcYsOfg=
 github.com/xanzy/ssh-agent v0.3.3 h1:+/15pJfg/RsTxqYcX6fHqOXZwwMP+2VyYWJeWM2qQFM=
