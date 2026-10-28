@@ -27,6 +27,7 @@ import (
 	"github.com/nicholas-fedor/watchtower/internal/update/rebuild"
 	"github.com/nicholas-fedor/watchtower/internal/update/selfupdate"
 	"github.com/nicholas-fedor/watchtower/internal/update/sorter"
+	"github.com/nicholas-fedor/watchtower/internal/update/staleness"
 	"github.com/nicholas-fedor/watchtower/internal/update/state"
 	"github.com/nicholas-fedor/watchtower/pkg/types"
 )
@@ -325,7 +326,7 @@ func update(
 		clog := &clogVal
 
 		// Check if the container uses a pinned (digest-based) image to skip updates.
-		isPinnedVal, err := isPinned(log, sourceContainer, progress, config, gitSession)
+		isPinnedVal, err := staleness.IsPinned(log, sourceContainer, progress, config, gitSession)
 		if err != nil {
 			// Log and skip containers with unparsable image references, marking as skipped.
 			clog.Debug().
@@ -429,7 +430,7 @@ func update(
 			}
 
 			// Determine if the container should be updated based on staleness and config.
-			shouldUpdate := shouldUpdateContainer(sourceContainer, stale, config)
+			shouldUpdate := staleness.ShouldUpdate(sourceContainer, stale, config)
 			if gitSession.Watching(log, sourceContainer, config) && sourceContainer.IsNoPull(config) {
 				shouldUpdate = false
 			}
@@ -474,24 +475,19 @@ func update(
 			)
 
 			if resolveLatest {
-				latest := latestImageMetadata{
-					annotations: client.GetImageAnnotations(ctx, sourceContainer.ImageName()),
-					digest:      newDigest,
+				latest := staleness.LatestImage{
+					Annotations: client.GetImageAnnotations(ctx, sourceContainer.ImageName()),
+					Digest:      newDigest,
 				}
 
-				// Bound the whole tag lookup, not just its requests, so an
-				// unresponsive registry cannot stall the session behind it.
-				lookupCtx, cancelLookup := context.WithTimeout(ctx, releaseTagLookupTimeout)
-				changelogVars, latestAnns = resolveLatestImageMeta(
+				changelogVars, latestAnns = staleness.ResolveLatestImageMeta(
 					log,
-					lookupCtx,
+					ctx,
 					tagResolver,
 					sourceContainer,
 					config,
 					latest,
 				)
-
-				cancelLookup()
 			}
 
 			resultMu.Lock()
@@ -578,7 +574,7 @@ func update(
 
 			// Write the pre-resolved metadata now that the session state is locked.
 			if resolveLatest {
-				applyLatestImageMeta(
+				staleness.ApplyLatestImageMeta(
 					clog,
 					progress,
 					sourceContainer,
