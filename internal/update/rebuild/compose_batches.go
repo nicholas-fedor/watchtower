@@ -24,9 +24,23 @@ type composeBatch struct {
 	members []composeMember
 }
 
+// composeBatches collects stale containers into one batch per Compose project,
+// in the order each project is first seen. The zero value is ready to use.
+type composeBatches struct {
+	// byKey finds the batch of a project by its identity.
+	byKey map[composeBatchKey]*composeBatch
+	// firstSeen holds the batches in the order their projects were first seen.
+	firstSeen []*composeBatch
+}
+
+// composeBatchKey identifies one Compose project, so containers of the same
+// project share a batch.
 type composeBatchKey struct {
-	name        string
-	dir         string
+	// name is the Compose project name.
+	name string
+	// dir is the project directory.
+	dir string
+	// configFiles holds the project's config file paths, joined by NUL bytes.
 	configFiles string
 }
 
@@ -76,28 +90,54 @@ func orderedComposeContainers(
 	return ordered
 }
 
-// orderComposeBatches orders project batches by cross-project dependencies.
+// add appends a stale container to the batch of its Compose project, starting
+// a new batch when the project is first seen.
+//
+// Parameters:
+//   - ref: The container's resolved Compose project.
+//   - member: The container and the check result that selected its commit.
+func (b *composeBatches) add(ref composeProject.ProjectRef, member composeMember) {
+	key := composeBatchKeyFor(ref)
+
+	batch, ok := b.byKey[key]
+	if !ok {
+		if b.byKey == nil {
+			b.byKey = make(map[composeBatchKey]*composeBatch)
+		}
+
+		batch = &composeBatch{ref: ref}
+		b.byKey[key] = batch
+		b.firstSeen = append(b.firstSeen, batch)
+	}
+
+	batch.members = append(batch.members, member)
+}
+
+// inDependencyOrder returns the batches ordered by cross-project dependencies.
 //
 // First-seen order is wrong when a project contains both an independent service
 // and a service that depends on another project. A batch runs after every batch
-// that contains a dependency of any of its members. Independent batches keep
-// their relative order. A sort failure leaves the existing order in place.
+// that contains a dependency of any of its members. Dependencies inside one
+// batch add no order. Among batches that are ready together, the one seen first
+// runs first. Batches in a dependency cycle, and batches that depend on one,
+// follow the others in first-seen order. A failed dependency lookup leaves
+// first-seen order in place.
 //
 // Parameters:
 //   - log: Process logger.
-//   - batches: Batches in first-seen order.
 //   - containers: Containers used to resolve dependency links.
 //   - useComposeDependsOn: Whether to include Compose depends_on relationships.
 //
 // Returns:
 //   - []*composeBatch: Batches in dependency order.
-func orderComposeBatches(
+func (b *composeBatches) inDependencyOrder(
 	log *zerolog.Logger,
-	batches []*composeBatch,
 	containers []types.Container,
 	useComposeDependsOn bool,
 ) []*composeBatch {
 	const minBatchesToOrder = 2
+
+	batches := b.firstSeen
 	if len(batches) < minBatchesToOrder {
 		return batches
 	}

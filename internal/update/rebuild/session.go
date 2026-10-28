@@ -119,9 +119,9 @@ func (s *Session) PrepareRebuilds(
 
 	var remote []types.Container
 
+	var batches composeBatches
+
 	ordered := orderedComposeContainers(log, containers, params.UseComposeDependsOn)
-	batches := make(map[composeBatchKey]*composeBatch)
-	orderedBatches := make([]*composeBatch, 0)
 
 	for _, c := range ordered {
 		if !s.needsApply(c, params) {
@@ -153,21 +153,10 @@ func (s *Session) PrepareRebuilds(
 			continue
 		}
 
-		key := composeBatchKeyFor(ref)
-
-		batch, ok := batches[key]
-		if !ok {
-			batch = &composeBatch{ref: ref}
-			batches[key] = batch
-			orderedBatches = append(orderedBatches, batch)
-		}
-
-		batch.members = append(batch.members, composeMember{container: c, result: result})
+		batches.add(ref, composeMember{container: c, result: result})
 	}
 
-	orderedBatches = orderComposeBatches(log, orderedBatches, containers, params.UseComposeDependsOn)
-
-	for _, batch := range orderedBatches {
+	for _, batch := range batches.inDependencyOrder(log, containers, params.UseComposeDependsOn) {
 		s.applyCompose(log, ctx, batch, params, progress, failed)
 	}
 
