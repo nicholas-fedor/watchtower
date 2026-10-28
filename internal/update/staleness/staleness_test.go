@@ -1,9 +1,10 @@
-package update
+package staleness
 
 import (
 	"testing"
 	"time"
 
+	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
@@ -15,11 +16,36 @@ import (
 	mockTypes "github.com/nicholas-fedor/watchtower/pkg/types/mocks"
 )
 
-// Test_shouldUpdateContainer verifies that Watchtower updates only itself among
+// Watchtower container IDs for the self-update cases.
+const (
+	// currentWatchtowerID is the ID of the running Watchtower container.
+	currentWatchtowerID = "current-watchtower-id"
+	// otherWatchtowerID is the ID of another Watchtower instance.
+	otherWatchtowerID = "other-watchtower-id"
+)
+
+// newTestLogger returns a logger that writes each event to the test's log, so a
+// failing test shows what it logged.
+//
+// Parameters:
+//   - t: Test that receives the log lines.
+//
+// Returns:
+//   - *zerolog.Logger: Logger writing to t.
+func newTestLogger(t *testing.T) *zerolog.Logger {
+	t.Helper()
+
+	// Frame 4 skips zerolog's write path, so each line names the log call.
+	w := zerolog.TestWriter{T: t, Frame: 4}
+
+	return new(zerolog.New(w))
+}
+
+// TestShouldUpdate verifies that Watchtower updates only itself among
 // Watchtower containers, matched by container ID, and leaves other containers
 // alone. A scope label does not change the result, because the scope filter
 // runs before this check.
-func Test_shouldUpdateContainer(t *testing.T) {
+func TestShouldUpdate(t *testing.T) {
 	t.Parallel()
 
 	t.Run("should allow self-update of current Watchtower container", func(t *testing.T) {
@@ -42,7 +68,7 @@ func Test_shouldUpdateContainer(t *testing.T) {
 		params := types.UpdateParams{
 			CurrentContainerID: types.ContainerID(currentID),
 		}
-		result := shouldUpdateContainer(container, true, params)
+		result := ShouldUpdate(container, true, params)
 		assert.True(t, result)
 	})
 
@@ -67,7 +93,7 @@ func Test_shouldUpdateContainer(t *testing.T) {
 		params := types.UpdateParams{
 			CurrentContainerID: types.ContainerID(currentID),
 		}
-		result := shouldUpdateContainer(container, true, params)
+		result := ShouldUpdate(container, true, params)
 		assert.False(t, result)
 	})
 
@@ -89,7 +115,7 @@ func Test_shouldUpdateContainer(t *testing.T) {
 		params := types.UpdateParams{
 			CurrentContainerID: types.ContainerID(currentID),
 		}
-		result := shouldUpdateContainer(container, true, params)
+		result := ShouldUpdate(container, true, params)
 		assert.True(t, result)
 	})
 
@@ -114,7 +140,7 @@ func Test_shouldUpdateContainer(t *testing.T) {
 		params := types.UpdateParams{
 			CurrentContainerID: types.ContainerID(currentID),
 		}
-		result := shouldUpdateContainer(container, true, params)
+		result := ShouldUpdate(container, true, params)
 		assert.True(t, result)
 	})
 
@@ -140,7 +166,7 @@ func Test_shouldUpdateContainer(t *testing.T) {
 		params := types.UpdateParams{
 			CurrentContainerID: types.ContainerID(currentID),
 		}
-		result := shouldUpdateContainer(container, true, params)
+		result := ShouldUpdate(container, true, params)
 		assert.False(t, result)
 	})
 
@@ -161,7 +187,7 @@ func Test_shouldUpdateContainer(t *testing.T) {
 		params := types.UpdateParams{
 			NoRestart: true,
 		}
-		result := shouldUpdateContainer(container, true, params)
+		result := ShouldUpdate(container, true, params)
 		assert.True(t, result)
 	})
 
@@ -186,13 +212,13 @@ func Test_shouldUpdateContainer(t *testing.T) {
 			NoRestart:          true,
 			CurrentContainerID: types.ContainerID(currentID),
 		}
-		result := shouldUpdateContainer(container, true, params)
+		result := ShouldUpdate(container, true, params)
 		assert.True(t, result)
 	})
 }
 
-// Test_isPinned verifies which image references count as pinned by digest.
-func Test_isPinned(t *testing.T) {
+// TestIsPinned verifies which image references count as pinned by digest.
+func TestIsPinned(t *testing.T) {
 	t.Parallel()
 
 	// Valid 64-hex digest used by Docker/OCI references.
@@ -228,7 +254,7 @@ func Test_isPinned(t *testing.T) {
 				progress := state.Progress{}
 				params := types.UpdateParams{}
 
-				pinned, err := isPinned(newTestLogger(t), cont, &progress, params, nil)
+				pinned, err := IsPinned(newTestLogger(t), cont, &progress, params, nil)
 				require.NoError(t, err)
 				assert.Equal(t, wantPinned, pinned)
 
@@ -253,7 +279,7 @@ func Test_isPinned(t *testing.T) {
 		)
 		progress := state.Progress{}
 
-		pinned, err := isPinned(newTestLogger(t), cont, &progress, types.UpdateParams{}, nil)
+		pinned, err := IsPinned(newTestLogger(t), cont, &progress, types.UpdateParams{}, nil)
 		require.NoError(t, err)
 		assert.True(t, pinned)
 		require.Len(t, progress, 1)
@@ -270,7 +296,7 @@ func Test_isPinned(t *testing.T) {
 		)
 		progress := state.Progress{}
 
-		pinned, err := isPinned(newTestLogger(t), cont, &progress, types.UpdateParams{}, nil)
+		pinned, err := IsPinned(newTestLogger(t), cont, &progress, types.UpdateParams{}, nil)
 		require.Error(t, err)
 		assert.False(t, pinned)
 		assert.Empty(t, progress)
@@ -279,7 +305,7 @@ func Test_isPinned(t *testing.T) {
 	t.Run("does not treat a sha256 container name fallback as a digest pin", func(t *testing.T) {
 		t.Parallel()
 
-		// The image name does not parse, so isPinned falls back to the
+		// The image name does not parse, so IsPinned falls back to the
 		// container name. The fallback sha256:latest is a tag, not a digest.
 		cont := mockUpdate.CreateMockContainer(
 			"sha256-name-id",
@@ -289,7 +315,7 @@ func Test_isPinned(t *testing.T) {
 		)
 		progress := state.Progress{}
 
-		pinned, err := isPinned(newTestLogger(t), cont, &progress, types.UpdateParams{}, nil)
+		pinned, err := IsPinned(newTestLogger(t), cont, &progress, types.UpdateParams{}, nil)
 		require.NoError(t, err)
 		assert.False(t, pinned)
 		assert.Empty(t, progress)
@@ -307,7 +333,7 @@ func Test_isPinned(t *testing.T) {
 
 		progress := state.Progress{}
 
-		pinned, err := isPinned(newTestLogger(t), cont, &progress, types.UpdateParams{}, nil)
+		pinned, err := IsPinned(newTestLogger(t), cont, &progress, types.UpdateParams{}, nil)
 		require.NoError(t, err)
 		assert.False(t, pinned)
 	})

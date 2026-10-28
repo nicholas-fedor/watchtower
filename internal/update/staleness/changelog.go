@@ -1,4 +1,4 @@
-package update
+package staleness
 
 import (
 	"context"
@@ -22,19 +22,19 @@ import (
 // bounds the whole sweep so two candidates cannot double the wait.
 const releaseTagLookupTimeout = 30 * time.Second
 
-// latestImageMetadata describes a container's new image for report metadata.
+// LatestImage describes a container's new image for report metadata.
 //
 // The annotations come from a local daemon inspect, not a registry request, so
 // gathering them is free of rate-limit cost and always safe to do.
-type latestImageMetadata struct {
-	// annotations are the OCI labels of the newly pulled image.
-	annotations oci.Annotations
-	// digest is the manifest digest of the new image, or empty when the
+type LatestImage struct {
+	// Annotations are the OCI labels of the newly pulled image.
+	Annotations oci.Annotations
+	// Digest is the manifest digest of the new image, or empty when the
 	// staleness check could not determine one.
-	digest string
+	Digest string
 }
 
-// resolveLatestImageMeta computes the report metadata for a container's new
+// ResolveLatestImageMeta computes the report metadata for a container's new
 // image without touching session state.
 //
 // It performs the local image inspect and, only when the changelog feature is
@@ -44,7 +44,8 @@ type latestImageMetadata struct {
 //
 // Parameters:
 //   - log: Process logger.
-//   - ctx: Context for the release tag lookup.
+//   - ctx: Context for the release tag lookup, which is also bounded to 30
+//     seconds.
 //   - resolver: Release tag resolver shared across the session.
 //   - c: Container whose new image is described.
 //   - config: Update parameters carrying the changelog enable gate.
@@ -53,13 +54,13 @@ type latestImageMetadata struct {
 // Returns:
 //   - container.ChangelogVars: Placeholder values to apply.
 //   - oci.Annotations: Annotations of the new image.
-func resolveLatestImageMeta(
+func ResolveLatestImageMeta(
 	log *zerolog.Logger,
 	ctx context.Context,
 	resolver *changelog.Resolver,
 	c types.Container,
 	config types.UpdateParams,
-	latest latestImageMetadata,
+	latest LatestImage,
 ) (provenance.ChangelogVars, oci.Annotations) {
 	clogVal := log.With().
 		Str("container", c.Name()).
@@ -72,18 +73,23 @@ func resolveLatestImageMeta(
 		// The gate is off. Still record the new image's version and revision so
 		// a custom template can print a transition, but never spend a request
 		// to confirm a release tag.
-		return provenance.ChangelogVars{}, latest.annotations
+		return provenance.ChangelogVars{}, latest.Annotations
 	}
 
+	// Bound the whole tag lookup, not just its requests, so an unresponsive
+	// registry cannot stall the session behind it.
+	lookupCtx, cancelLookup := context.WithTimeout(ctx, releaseTagLookupTimeout)
+	defer cancelLookup()
+
 	return provenance.ChangelogVars{
-		Tag: resolveReleaseTag(clog, ctx, resolver, c, latest),
-	}, latest.annotations
+		Tag: resolveReleaseTag(clog, lookupCtx, resolver, c, latest),
+	}, latest.Annotations
 }
 
-// applyLatestImageMeta records pre-resolved new image metadata on a container
+// ApplyLatestImageMeta records pre-resolved new image metadata on a container
 // status and emits the changelog notification entry.
 //
-// Callers must resolve the metadata with resolveLatestImageMeta first, then
+// Callers must resolve the metadata with [ResolveLatestImageMeta] first, then
 // call this while holding whatever lock guards session state.
 //
 // Parameters:
@@ -91,12 +97,12 @@ func resolveLatestImageMeta(
 //   - progress: Session progress map.
 //   - c: Container whose status should be updated.
 //   - config: Update parameters carrying the changelog enable gate.
-//   - vars: Placeholder values from resolveLatestImageMeta.
+//   - vars: Placeholder values from [ResolveLatestImageMeta].
 //   - annotations: Annotations of the new image.
 //
 // Returns:
 //   - none.
-func applyLatestImageMeta(
+func ApplyLatestImageMeta(
 	log *zerolog.Logger,
 	progress *state.Progress,
 	c types.Container,
@@ -133,13 +139,13 @@ func resolveReleaseTag(
 	ctx context.Context,
 	resolver *changelog.Resolver,
 	c types.Container,
-	latest latestImageMetadata,
+	latest LatestImage,
 ) string {
-	version := latest.annotations.Version
-	if version == "" || latest.digest == "" {
+	version := latest.Annotations.Version
+	if version == "" || latest.Digest == "" {
 		clog.Debug().
 			Str("version", version).
-			Str("digest", latest.digest).
+			Str("digest", latest.Digest).
 			Msg("Skipping release tag lookup without an OCI version or new digest")
 
 		return ""
@@ -154,5 +160,5 @@ func resolveReleaseTag(
 		return ""
 	}
 
-	return resolver.ResolveTag(clog, ctx, c, opts.RegistryAuth, version, latest.digest)
+	return resolver.ResolveTag(clog, ctx, c, opts.RegistryAuth, version, latest.Digest)
 }

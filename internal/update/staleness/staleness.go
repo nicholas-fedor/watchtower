@@ -1,4 +1,4 @@
-package update
+package staleness
 
 import (
 	"errors"
@@ -21,14 +21,14 @@ var (
 	errInvalidImageReference = errors.New("invalid image reference")
 )
 
-// shouldUpdateContainer determines if a container should be updated
-// based on its staleness and update parameters.
-//
-// It checks multiple conditions:
-//   - The container must be stale (outdated image)
-//   - The container must not be monitor-only
-//   - Watchtower containers are skipped in run-once mode
-//   - Watchtower self-updates are skipped if SkipSelfUpdate is true
+// ShouldUpdate reports whether a container should be updated. It is false for
+// any of these:
+//   - The container is not stale.
+//   - The container is a renamed old Watchtower instance.
+//   - The container is monitor-only.
+//   - The container is Watchtower, and the update runs once or self-updates are
+//     skipped.
+//   - The container is a Watchtower instance other than the current one.
 //
 // Parameters:
 //   - container: The container to check.
@@ -37,7 +37,7 @@ var (
 //
 // Returns:
 //   - bool: True if the container should be updated, false otherwise.
-func shouldUpdateContainer(
+func ShouldUpdate(
 	container types.Container,
 	stale bool,
 	config types.UpdateParams,
@@ -123,22 +123,25 @@ func parseReference(log *zerolog.Logger, imageName, configImage, fallbackImage s
 	return nil
 }
 
-// isPinned checks if a container's image is pinned by a digest reference.
+// IsPinned reports whether a container's image is pinned by a digest
+// reference, so it is never updated. A pinned container is recorded as scanned
+// in the progress. A pinned container that Git monitoring watches is not
+// treated as pinned, because its updates come from Git.
 //
-// It resolves a usable image name from ImageName(), Config.Image, or a fallback,
-// then delegates pin detection to container.IsImagePinnedByDigest. Pin detection
-// runs before parse-fallback so a digest reference is not replaced by a non-pinned
-// fallback when ParseDockerRef fails. If pinned, it marks the container as scanned.
+// When the image name is unusable, the image from the container's config is
+// used, and then a name derived from the container name.
 //
 // Parameters:
+//   - log: Process logger.
 //   - cont: The container to check for a pinned image.
 //   - progress: The progress tracker to update for scanned or skipped containers.
-//   - params: Update parameters for monitor-only check.
+//   - config: Update parameters for the Git monitoring check and the scanned record.
+//   - gitSession: The session's Git monitoring, which decides whether Git watches the container.
 //
 // Returns:
 //   - bool: True if the image is pinned by digest, false otherwise.
 //   - error: Non-nil if no valid image reference can be resolved, nil on success.
-func isPinned(
+func IsPinned(
 	log *zerolog.Logger,
 	cont types.Container,
 	progress *state.Progress,
@@ -181,7 +184,7 @@ func isPinned(
 		}
 	}
 
-	// If the final imageName is still invalid, skip the container.
+	// If no candidate gives a usable image name, skip the container.
 	if isInvalidImageName(imageName) {
 		return false, errInvalidImageReference
 	}

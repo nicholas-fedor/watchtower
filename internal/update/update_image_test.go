@@ -24,7 +24,7 @@ import (
 func TestUpdateAction_ImageReferences(t *testing.T) {
 	t.Parallel()
 
-	// Tests for image reference handling to cover isPinned functionality
+	// Image reference handling, which decides whether a container is pinned.
 	t.Run("handling different image reference formats", func(t *testing.T) {
 		t.Parallel()
 

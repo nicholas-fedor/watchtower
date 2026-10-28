@@ -38,11 +38,6 @@ func newTestLogger(t *testing.T) *zerolog.Logger {
 	return new(zerolog.New(w))
 }
 
-const (
-	currentWatchtowerID = "current-watchtower-id"
-	otherWatchtowerID   = "other-watchtower-id"
-)
-
 // Test_handleUpdateResult verifies the metric and notification an update
 // result produces, with and without an error or a partial report.
 func Test_handleUpdateResult(t *testing.T) {
