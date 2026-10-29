@@ -106,6 +106,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Chores
 
+- Update module github.com/gofiber/contrib/v3/swaggo to v1.0.15 by @renovate[bot] in [#3257](https://github.com/nicholas-fedor/watchtower/pull/3257)
 - Update module github.com/pandatix/go-abnf to v0.5.2 by @renovate[bot] in [#3252](https://github.com/nicholas-fedor/watchtower/pull/3252)
 - Update module github.com/vektra/mockery/v3 to v3.9.0 by @renovate[bot] in [#3232](https://github.com/nicholas-fedor/watchtower/pull/3232)
 - Update module github.com/hashicorp/go-uuid to v1.0.4 by @renovate[bot] in [#3224](https://github.com/nicholas-fedor/watchtower/pull/3224)
