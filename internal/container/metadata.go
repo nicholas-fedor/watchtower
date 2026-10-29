@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"maps"
+	"math"
 	"strconv"
 	"strings"
 	"time"
@@ -519,11 +520,21 @@ func (c *Container) StopSignal() string {
 	return "SIGTERM"
 }
 
-// StopTimeout returns the container's configured stop timeout in seconds.
+// StopTimeout returns how long a stop waits for the container to exit before
+// killing it.
+//
+// A stop timeout of 0 or more set on the container itself, such as with
+// docker run --stop-timeout, takes precedence. Otherwise the stop waits for
+// fallback. A container stop timeout of -1, which tells Docker to wait
+// indefinitely, also uses fallback, so a stop always ends. A container stop
+// timeout too long for a [time.Duration] saturates at the longest duration.
+//
+// Parameters:
+//   - fallback: How long to wait when the container sets no usable stop timeout.
 //
 // Returns:
-//   - *int: Timeout in seconds if set, nil if unset.
-func (c *Container) StopTimeout() *int {
+//   - time.Duration: How long the stop waits.
+func (c *Container) StopTimeout(fallback time.Duration) time.Duration {
 	info := c.ContainerInfo()
 
 	clogVal := c.Logger().With().
@@ -531,20 +542,26 @@ func (c *Container) StopTimeout() *int {
 		Logger()
 	clog := &clogVal
 
-	// Check Config
-	if info != nil && info.Config != nil &&
-		info.Config.StopTimeout != nil {
-		timeout := *info.Config.StopTimeout
-		clog.Debug().
-			Int("timeout", timeout).
-			Msg("Retrieved stop timeout from Config")
+	if info == nil || info.Config == nil || info.Config.StopTimeout == nil {
+		clog.Debug().Msg("Stop timeout not set in container config")
 
-		return &timeout
+		return fallback
 	}
 
-	clog.Debug().Msg("Stop timeout not set in container config")
+	timeout := *info.Config.StopTimeout
+	clog.Debug().
+		Int("timeout", timeout).
+		Msg("Retrieved stop timeout from Config")
 
-	return nil
+	if timeout < 0 {
+		return fallback
+	}
+
+	if int64(timeout) > math.MaxInt64/int64(time.Second) {
+		return math.MaxInt64
+	}
+
+	return time.Duration(timeout) * time.Second
 }
 
 // containsWatchtowerLabel checks if the container is Watchtower.

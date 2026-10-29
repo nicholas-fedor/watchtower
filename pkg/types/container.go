@@ -30,7 +30,7 @@ type Container interface {
 	ToRestart() bool                                  // Needs restart check.
 	IsWatchtower() bool                               // Watchtower instance check.
 	StopSignal() string                               // Custom stop signal.
-	StopTimeout() *int                                // Custom stop timeout in seconds.
+	StopTimeout(fallback time.Duration) time.Duration // How long a stop waits before killing the container.
 	HasImageInfo() bool                               // Image metadata presence.
 	ImageInfo() *dockerImage.InspectResponse          // Image metadata.
 	GetLifecyclePreCheckCommand() string              // Pre-check command.

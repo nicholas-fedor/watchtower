@@ -2,6 +2,8 @@ package container
 
 import (
 	"bytes"
+	"math"
+	"strconv"
 	"testing"
 	"time"
 
@@ -678,74 +680,73 @@ func TestContainer_StopSignal(t *testing.T) {
 	}
 }
 
-// TestContainer_StopTimeout_WhenSet verifies StopTimeout returns the configured value.
-func TestContainer_StopTimeout_WhenSet(t *testing.T) {
-	timeout60 := 60
-	c := &Container{
-		containerInfo: &dockerContainer.InspectResponse{
-			Name: "/test-container",
-			Config: &dockerContainer.Config{
-				StopTimeout: &timeout60,
-				Labels:      map[string]string{},
+// TestContainer_StopTimeout verifies that a stop timeout of 0 or more set on
+// the container takes precedence, and that a missing timeout, missing inspect
+// data, and a timeout of -1 (wait indefinitely) use the fallback. A stop
+// timeout too long for a duration saturates instead of overflowing.
+func TestContainer_StopTimeout(t *testing.T) {
+	t.Parallel()
+
+	const fallback = 45 * time.Second
+
+	// largestStopTimeout is how long a stop waits for a container stop timeout
+	// of the largest int. A 64-bit int of seconds is too long for a duration,
+	// so it saturates. A 32-bit int of seconds fits.
+	largestStopTimeout := time.Duration(math.MaxInt64)
+	if strconv.IntSize == 32 {
+		largestStopTimeout = math.MaxInt32 * time.Second
+	}
+
+	// withStopTimeout returns a container whose config sets the given stop
+	// timeout in seconds.
+	withStopTimeout := func(seconds int) *Container {
+		return &Container{
+			containerInfo: &dockerContainer.InspectResponse{
+				Name: "/test-container",
+				Config: &dockerContainer.Config{
+					StopTimeout: &seconds,
+					Labels:      map[string]string{},
+				},
 			},
-		},
+		}
 	}
 
-	got := c.StopTimeout()
-	assert.NotNil(t, got)
-	assert.Equal(t, timeout60, *got)
-}
-
-// TestContainer_StopTimeout_WhenSetToZero verifies StopTimeout returns zero when configured as zero.
-func TestContainer_StopTimeout_WhenSetToZero(t *testing.T) {
-	timeout0 := 0
-	c := &Container{
-		containerInfo: &dockerContainer.InspectResponse{
-			Name: "/test-container",
-			Config: &dockerContainer.Config{
-				StopTimeout: &timeout0,
-				Labels:      map[string]string{},
+	tests := []struct {
+		name string
+		c    *Container
+		want time.Duration
+	}{
+		{name: "set", c: withStopTimeout(60), want: time.Minute},
+		{name: "set to zero", c: withStopTimeout(0), want: 0},
+		{name: "set to wait indefinitely", c: withStopTimeout(-1), want: fallback},
+		{name: "set to the largest int", c: withStopTimeout(math.MaxInt), want: largestStopTimeout},
+		{
+			name: "not set",
+			c: &Container{
+				containerInfo: &dockerContainer.InspectResponse{
+					Name:   "/test-container",
+					Config: &dockerContainer.Config{Labels: map[string]string{}},
+				},
 			},
+			want: fallback,
+		},
+		{name: "no inspect data", c: &Container{containerInfo: nil}, want: fallback},
+		{
+			name: "no config",
+			c: &Container{
+				containerInfo: &dockerContainer.InspectResponse{Name: "/test-container", Config: nil},
+			},
+			want: fallback,
 		},
 	}
 
-	got := c.StopTimeout()
-	assert.NotNil(t, got)
-	assert.Equal(t, timeout0, *got)
-}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
 
-// TestContainer_StopTimeout_WhenNotSet verifies StopTimeout returns nil when not configured.
-func TestContainer_StopTimeout_WhenNotSet(t *testing.T) {
-	c := &Container{
-		containerInfo: &dockerContainer.InspectResponse{
-			Name:   "/test-container",
-			Config: &dockerContainer.Config{Labels: map[string]string{}},
-		},
+			assert.Equal(t, tt.want, tt.c.StopTimeout(fallback))
+		})
 	}
-
-	got := c.StopTimeout()
-	assert.Nil(t, got)
-}
-
-// TestContainer_StopTimeout_NilContainerInfo verifies StopTimeout returns nil for nil containerInfo.
-func TestContainer_StopTimeout_NilContainerInfo(t *testing.T) {
-	c := &Container{containerInfo: nil}
-
-	got := c.StopTimeout()
-	assert.Nil(t, got)
-}
-
-// TestContainer_StopTimeout_NilConfig verifies StopTimeout returns nil for nil Config.
-func TestContainer_StopTimeout_NilConfig(t *testing.T) {
-	c := &Container{
-		containerInfo: &dockerContainer.InspectResponse{
-			Name:   "/test-container",
-			Config: nil,
-		},
-	}
-
-	got := c.StopTimeout()
-	assert.Nil(t, got)
 }
 
 func TestContainsWatchtowerLabel(t *testing.T) {

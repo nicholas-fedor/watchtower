@@ -579,58 +579,90 @@ func TestDetachedContext(t *testing.T) {
 
 		// The cleanup stops the failed replacement before removing it, and the
 		// stop alone can wait the full stop timeout. The cleanup context must
-		// outlast that wait, so the remove still has time.
+		// outlast that wait, so the remove still has time. A stop timeout set
+		// on the container takes precedence when it is longer, and the
+		// replacement copies it from the source container.
 		t.Run("allows the stop timeout plus 30 seconds for the stop and remove", func(t *testing.T) {
 			t.Parallel()
 
-			const stopTimeout = 20 * time.Second
-
-			client := mockUpdate.CreateMockClient(
-				&mockUpdate.TestData{
-					Containers: []types.Container{
-						mockUpdate.CreateMockContainerWithConfig(
-							"watchtower-source-id",
-							"/watchtower",
-							"watchtower:latest",
-							true,
-							false,
-							time.Now(),
-							&dockerContainer.Config{
-								Labels: map[string]string{
-									"com.centurylinklabs.watchtower": "true",
-								},
-							},
-						),
-					},
-					Staleness: map[string]bool{
-						"watchtower": true,
-					},
-					StartContainerByIDError: errors.New("simulated start failure"),
+			tests := []struct {
+				name                 string
+				stopTimeout          time.Duration
+				containerStopTimeout *int
+				want                 time.Duration
+			}{
+				{
+					name:        "configured stop timeout",
+					stopTimeout: 20 * time.Second,
+					want:        50 * time.Second,
 				},
-				false,
-				false,
-			)
-
-			params := types.UpdateParams{
-				Timeout: stopTimeout,
-				RunOnce: false,
+				{
+					name:                 "longer container stop timeout",
+					stopTimeout:          20 * time.Second,
+					containerStopTimeout: new(120),
+					want:                 150 * time.Second,
+				},
+				{
+					name:                 "shorter container stop timeout",
+					stopTimeout:          20 * time.Second,
+					containerStopTimeout: new(5),
+					want:                 50 * time.Second,
+				},
 			}
 
-			_, _, err := restartStaleContainer(newTestLogger(t),
-				t.Context(),
-				client.TestData.Containers[0],
-				client,
-				params,
-			)
-			require.Error(t, err)
-			require.Equal(t, int32(1), client.TestData.StopAndRemoveContainerCount.Load())
+			for _, tt := range tests {
+				t.Run(tt.name, func(t *testing.T) {
+					t.Parallel()
 
-			cleanupCtx := client.TestData.StopAndRemoveContainerCtx
-			require.NotNil(t, cleanupCtx, "StopAndRemoveContainer should receive a context")
+					client := mockUpdate.CreateMockClient(
+						&mockUpdate.TestData{
+							Containers: []types.Container{
+								mockUpdate.CreateMockContainerWithConfig(
+									"watchtower-source-id",
+									"/watchtower",
+									"watchtower:latest",
+									true,
+									false,
+									time.Now(),
+									&dockerContainer.Config{
+										Labels: map[string]string{
+											"com.centurylinklabs.watchtower": "true",
+										},
+										StopTimeout: tt.containerStopTimeout,
+									},
+								),
+							},
+							Staleness: map[string]bool{
+								"watchtower": true,
+							},
+							StartContainerByIDError: errors.New("simulated start failure"),
+						},
+						false,
+						false,
+					)
 
-			deadline, hasDeadline := cleanupCtx.Deadline()
-			require.True(t, hasDeadline, "cleanup context should have a deadline for bounded recovery")
-			assert.WithinDuration(t, time.Now().Add(stopTimeout+30*time.Second), deadline, time.Second)
+					params := types.UpdateParams{
+						Timeout: tt.stopTimeout,
+						RunOnce: false,
+					}
+
+					_, _, err := restartStaleContainer(newTestLogger(t),
+						t.Context(),
+						client.TestData.Containers[0],
+						client,
+						params,
+					)
+					require.Error(t, err)
+					require.Equal(t, int32(1), client.TestData.StopAndRemoveContainerCount.Load())
+
+					cleanupCtx := client.TestData.StopAndRemoveContainerCtx
+					require.NotNil(t, cleanupCtx, "StopAndRemoveContainer should receive a context")
+
+					deadline, hasDeadline := cleanupCtx.Deadline()
+					require.True(t, hasDeadline, "cleanup context should have a deadline for bounded recovery")
+					assert.WithinDuration(t, time.Now().Add(tt.want), deadline, time.Second)
+				})
+			}
 		})
 	})
 

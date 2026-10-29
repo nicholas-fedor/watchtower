@@ -135,6 +135,10 @@ Environment Variable: WATCHTOWER_TIMEOUT
     Bare numeric values (e.g., `60` or `1.5`) without a time unit are interpreted as seconds.
     Using a unit suffix (`s`, `m`, etc.) is recommended and required for other time units.
 
+!!! Note
+    A stop timeout set on the container itself takes precedence, such as one set with [`docker run --stop-timeout`](https://docs.docker.com/reference/cli/docker/container/run/#stop-timeout) or the Compose [`stop_grace_period`](https://docs.docker.com/reference/compose-file/services/#stop_grace_period) option.
+    A container stop timeout of `-1`, which tells Docker to wait indefinitely, is ignored in favor of this option.
+
 ## Monitor Only
 
 Monitors for new images, sends notifications, and runs lifecycle hooks without updating containers.

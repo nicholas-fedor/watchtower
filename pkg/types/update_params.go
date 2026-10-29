@@ -60,5 +60,34 @@ const detachedCallBudget = 30 * time.Second
 // Returns:
 //   - time.Duration: The bound for detached Docker calls.
 func (p UpdateParams) DetachedTimeout() time.Duration {
-	return min(max(p.Timeout, 0), math.MaxInt64-detachedCallBudget) + detachedCallBudget
+	return detachedBound(p.Timeout)
+}
+
+// DetachedStopTimeout returns the bound for detached Docker calls that stop
+// container c, such as removing a failed replacement.
+//
+// A stop timeout set on c takes precedence over the configured one, so the stop
+// can wait longer than [UpdateParams.DetachedTimeout] allows for. The bound is
+// the longer of the two stop timeouts plus 30 seconds, so it is never shorter
+// than [UpdateParams.DetachedTimeout].
+//
+// Parameters:
+//   - c: The container the detached calls stop.
+//
+// Returns:
+//   - time.Duration: The bound for the detached calls.
+func (p UpdateParams) DetachedStopTimeout(c Container) time.Duration {
+	return detachedBound(max(p.Timeout, c.StopTimeout(p.Timeout)))
+}
+
+// detachedBound returns a stop timeout plus 30 seconds. A negative stop timeout
+// counts as zero, and the result saturates at the longest duration.
+//
+// Parameters:
+//   - stop: How long a stop may wait.
+//
+// Returns:
+//   - time.Duration: The bound for detached Docker calls around that stop.
+func detachedBound(stop time.Duration) time.Duration {
+	return min(max(stop, 0), math.MaxInt64-detachedCallBudget) + detachedCallBudget
 }
