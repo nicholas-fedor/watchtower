@@ -48,8 +48,6 @@ type Metrics struct {
 	diskSpaceWarnBytes prometheus.Gauge   // Gauge for the configured image-usage warning threshold.
 	stopCh             chan struct{}      // Channel for shutdown signaling.
 	shutdownOnce       sync.Once          // Ensures shutdown is called only once.
-	lastMetric         *Metric            // Last scan metric for status endpoint.
-	lastMetricMu       sync.RWMutex       // Protects lastMetric.
 	history            []HistoryEntry     // Ring buffer of scan history.
 	historyIdx         int                // Current write position in the ring buffer.
 	historyMu          sync.RWMutex       // Protects history and historyIdx.
@@ -325,23 +323,26 @@ func (m *Metrics) Shutdown() {
 	})
 }
 
-// GetLastScan returns a copy of the most recent scan metric, or nil if no scan
-// has completed yet. The returned copy is safe to modify by the caller without
-// affecting the internal metrics state.
+// GetLastScan returns a copy of the most recent scan's history entry, with its
+// counts and the time the scan was recorded, or nil if no scan has completed
+// yet. The returned copy is safe to modify by the caller without affecting the
+// internal metrics state.
 //
 // Returns:
-//   - *Metric: Copy of the last scan metric, or nil.
-func (m *Metrics) GetLastScan() *Metric {
-	m.lastMetricMu.RLock()
-	defer m.lastMetricMu.RUnlock()
+//   - *HistoryEntry: Copy of the last scan's entry, or nil.
+func (m *Metrics) GetLastScan() *HistoryEntry {
+	m.historyMu.RLock()
+	defer m.historyMu.RUnlock()
 
-	if m.lastMetric == nil {
+	if len(m.history) == 0 {
 		return nil
 	}
 
-	metricCopy := *m.lastMetric
+	// The newest entry sits just before the next write position, which stays
+	// at 0 until the buffer is full.
+	last := m.history[(m.historyIdx+len(m.history)-1)%len(m.history)]
 
-	return &metricCopy
+	return &last
 }
 
 // historyBufferSize defines the maximum number of scan history entries
@@ -452,10 +453,6 @@ func (m *Metrics) HandleUpdate() {
 			m.restarted.Set(float64(change.Restarted))
 			m.skipped.Set(float64(change.Skipped))
 			m.restartedTotal.Add(float64(change.Restarted))
-
-			m.lastMetricMu.Lock()
-			m.lastMetric = change
-			m.lastMetricMu.Unlock()
 
 			m.RecordHistory(change)
 		case <-m.stopCh:

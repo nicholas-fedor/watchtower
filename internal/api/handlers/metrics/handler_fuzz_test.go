@@ -21,8 +21,8 @@ func FuzzStatusHandlerHandle(f *testing.F) {
 	f.Add(int64(math.MinInt64), int64(math.MinInt64), int64(math.MinInt64), int64(math.MinInt64), int64(math.MinInt64))
 
 	f.Fuzz(func(t *testing.T, scanned, updated, failed, restarted, skipped int64) {
-		h := NewStatusHandler(newNopLogger(), func() *metrics.Metric {
-			return &metrics.Metric{
+		h := NewStatusHandler(newNopLogger(), func() *metrics.HistoryEntry {
+			return &metrics.HistoryEntry{
 				Scanned:   int(scanned),
 				Updated:   int(updated),
 				Failed:    int(failed),
@@ -51,12 +51,12 @@ func FuzzStatusHandlerNilGetLast(f *testing.F) {
 	f.Add(false)
 
 	f.Fuzz(func(t *testing.T, returnNil bool) {
-		h := NewStatusHandler(newNopLogger(), func() *metrics.Metric {
+		h := NewStatusHandler(newNopLogger(), func() *metrics.HistoryEntry {
 			if returnNil {
 				return nil
 			}
 
-			return &metrics.Metric{Scanned: 1, Updated: 1, Failed: 0, Restarted: 0, Skipped: 0}
+			return &metrics.HistoryEntry{Scanned: 1, Updated: 1, Failed: 0, Restarted: 0, Skipped: 0}
 		})
 
 		require.NotNil(t, h)
