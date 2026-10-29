@@ -1,14 +1,17 @@
 package types
 
 import (
+	"math"
 	"testing"
 	"time"
 
 	"github.com/stretchr/testify/assert"
 )
 
-// TestUpdateParams_DetachedTimeout verifies that a detached Docker call is
-// bounded by the stop timeout when one is set, and by 30 seconds otherwise.
+// TestUpdateParams_DetachedTimeout verifies that detached Docker calls are
+// bounded by the stop timeout plus 30 seconds. A stop timeout of zero or below
+// leaves 30 seconds, and a stop timeout near the longest duration saturates
+// instead of overflowing.
 func TestUpdateParams_DetachedTimeout(t *testing.T) {
 	t.Parallel()
 
@@ -17,9 +20,12 @@ func TestUpdateParams_DetachedTimeout(t *testing.T) {
 		timeout time.Duration
 		want    time.Duration
 	}{
-		{name: "positive timeout", timeout: 2 * time.Minute, want: 2 * time.Minute},
 		{name: "zero timeout", timeout: 0, want: 30 * time.Second},
 		{name: "negative timeout", timeout: -time.Second, want: 30 * time.Second},
+		{name: "short timeout", timeout: time.Second, want: 31 * time.Second},
+		{name: "default timeout", timeout: 30 * time.Second, want: time.Minute},
+		{name: "long timeout", timeout: 10 * time.Minute, want: 10*time.Minute + 30*time.Second},
+		{name: "longest timeout", timeout: math.MaxInt64, want: math.MaxInt64},
 	}
 
 	for _, tt := range tests {

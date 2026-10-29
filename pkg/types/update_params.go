@@ -1,6 +1,7 @@
 package types
 
 import (
+	"math"
 	"time"
 
 	registryConfig "github.com/nicholas-fedor/watchtower/internal/settings/config/registry"
@@ -43,21 +44,21 @@ type UpdateParams struct {
 	Registry            registryConfig.Registry `json:"-"`                      // Settings for registry requests.
 }
 
-// detachedTimeoutFallback bounds a detached Docker call when no stop timeout is
-// set.
-const detachedTimeoutFallback = 30 * time.Second
+// detachedCallBudget is the time a detached Docker call gets beyond the
+// container stop timeout.
+const detachedCallBudget = 30 * time.Second
 
-// DetachedTimeout returns the bound for a Docker call that runs detached from
-// the update session, such as restoring a container after a failed update or
-// removing old images. It is the container stop timeout when one is set. Without
-// one it is 30 seconds, so the call cannot block indefinitely.
+// DetachedTimeout returns the bound for Docker calls that run detached from the
+// update session, such as restoring a container after a failed update or
+// removing old images.
+//
+// The bound is the container stop timeout plus 30 seconds. A detached stop can
+// then wait out the stop timeout and still leave time for the calls after it.
+// A negative stop timeout counts as zero, and the bound saturates at the longest
+// duration rather than overflowing.
 //
 // Returns:
-//   - time.Duration: The bound for a detached Docker call.
+//   - time.Duration: The bound for detached Docker calls.
 func (p UpdateParams) DetachedTimeout() time.Duration {
-	if p.Timeout > 0 {
-		return p.Timeout
-	}
-
-	return detachedTimeoutFallback
+	return min(max(p.Timeout, 0), math.MaxInt64-detachedCallBudget) + detachedCallBudget
 }

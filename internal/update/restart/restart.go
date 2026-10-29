@@ -51,7 +51,7 @@ const (
 	// defaultCreateStartTimeout defines the minimum timeout for container create
 	// and start operations during restart. It guards against slow hosts where
 	// Docker API calls can exceed the bound of other detached calls, which is
-	// the stop timeout or 30 seconds.
+	// the stop timeout plus 30 seconds.
 	defaultCreateStartTimeout = 5 * time.Minute
 )
 
@@ -742,7 +742,8 @@ func restartStaleContainer(
 	// This ensures container cleanup and update operations complete even if the
 	// parent context is canceled during the restart process.
 	// The create and start calls can be slow on busy hosts. They get the stop
-	// timeout when it is longer than 5 minutes, and 5 minutes otherwise.
+	// timeout plus 30 seconds when that is longer than 5 minutes, and 5 minutes
+	// otherwise.
 	detachedTimeout := max(config.DetachedTimeout(), defaultCreateStartTimeout)
 
 	detachedCtx, cancelDetached := context.WithTimeout(

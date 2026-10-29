@@ -253,9 +253,10 @@ func Test_restartStaleContainer(t *testing.T) {
 	})
 }
 
-// DetachedContext specs cover the detached context that restartStaleContainer creates
-// from the Timeout setting. A positive Timeout sets the deadline, and a zero or
-// negative Timeout falls back to a default deadline that prevents indefinite blocking.
+// TestDetachedContext covers the detached contexts that restartStaleContainer
+// creates from the Timeout setting. The create and start calls get the stop
+// timeout plus 30 seconds, with a 5 minute minimum. A zero or negative Timeout
+// counts as zero, so no detached call can block indefinitely.
 func TestDetachedContext(t *testing.T) {
 	t.Parallel()
 
@@ -272,28 +273,28 @@ func TestDetachedContext(t *testing.T) {
 
 		testCases := []TestDetachedContextDeadlineCase{
 			{
-				name:            "positive timeout above minimum uses configured timeout",
+				name:            "positive timeout above minimum uses the stop timeout plus 30 seconds",
 				timeout:         10 * time.Minute,
-				expectedTimeout: 10 * time.Minute,
-				description:     "When Timeout exceeds defaultCreateStartTimeout, the detached context uses the configured timeout",
+				expectedTimeout: 10*time.Minute + 30*time.Second,
+				description:     "When Timeout exceeds the 5 minute minimum, the detached context allows the stop timeout plus 30 seconds",
 			},
 			{
 				name:            "positive timeout below minimum creates context with minimum deadline",
 				timeout:         30 * time.Second,
 				expectedTimeout: defaultCreateStartTimeout,
-				description:     "When Timeout is below defaultCreateStartTimeout, the detached context uses the minimum",
+				description:     "When Timeout plus 30 seconds is below the 5 minute minimum, the detached context uses the minimum",
 			},
 			{
 				name:            "zero timeout creates context with minimum deadline",
 				timeout:         0,
 				expectedTimeout: defaultCreateStartTimeout,
-				description:     "When Timeout is zero, the detached context uses the minimum create/start deadline",
+				description:     "When Timeout is zero, the detached context uses the 5 minute minimum",
 			},
 			{
 				name:            "negative timeout creates context with minimum deadline",
 				timeout:         -1 * time.Second,
 				expectedTimeout: defaultCreateStartTimeout,
-				description:     "When Timeout is negative, the detached context uses the minimum create/start deadline",
+				description:     "When Timeout is negative, the detached context uses the 5 minute minimum",
 			},
 		}
 
@@ -574,6 +575,62 @@ func TestDetachedContext(t *testing.T) {
 			// Assert that the cleanup context has an active deadline (is a bounded timeout context).
 			_, hasDeadline := getCtx.Deadline()
 			assert.True(t, hasDeadline, "cleanup context should have a deadline for bounded recovery")
+		})
+
+		// The cleanup stops the failed replacement before removing it, and the
+		// stop alone can wait the full stop timeout. The cleanup context must
+		// outlast that wait, so the remove still has time.
+		t.Run("allows the stop timeout plus 30 seconds for the stop and remove", func(t *testing.T) {
+			t.Parallel()
+
+			const stopTimeout = 20 * time.Second
+
+			client := mockUpdate.CreateMockClient(
+				&mockUpdate.TestData{
+					Containers: []types.Container{
+						mockUpdate.CreateMockContainerWithConfig(
+							"watchtower-source-id",
+							"/watchtower",
+							"watchtower:latest",
+							true,
+							false,
+							time.Now(),
+							&dockerContainer.Config{
+								Labels: map[string]string{
+									"com.centurylinklabs.watchtower": "true",
+								},
+							},
+						),
+					},
+					Staleness: map[string]bool{
+						"watchtower": true,
+					},
+					StartContainerByIDError: errors.New("simulated start failure"),
+				},
+				false,
+				false,
+			)
+
+			params := types.UpdateParams{
+				Timeout: stopTimeout,
+				RunOnce: false,
+			}
+
+			_, _, err := restartStaleContainer(newTestLogger(t),
+				t.Context(),
+				client.TestData.Containers[0],
+				client,
+				params,
+			)
+			require.Error(t, err)
+			require.Equal(t, int32(1), client.TestData.StopAndRemoveContainerCount.Load())
+
+			cleanupCtx := client.TestData.StopAndRemoveContainerCtx
+			require.NotNil(t, cleanupCtx, "StopAndRemoveContainer should receive a context")
+
+			deadline, hasDeadline := cleanupCtx.Deadline()
+			require.True(t, hasDeadline, "cleanup context should have a deadline for bounded recovery")
+			assert.WithinDuration(t, time.Now().Add(stopTimeout+30*time.Second), deadline, time.Second)
 		})
 	})
 
