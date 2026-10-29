@@ -114,14 +114,17 @@ Environment Variable: WATCHTOWER_GIT_TIMEOUT
              Default: 30s
 ```
 
+Time limits for each step of a Git rebuild:
+
+| Step                                                                                                                                    | Limit       |
+|-----------------------------------------------------------------------------------------------------------------------------------------|-------------|
+| Check a hosted ref for a new commit                                                                                                     | Git timeout |
+| Check out a [local path context](../../advanced-features/git-monitoring/index.md#local_path_context)                                    | Git timeout |
+| Build an image from a [Git URL context](../../advanced-features/git-monitoring/index.md#git_url_context), including the daemon's clone  | 30 minutes  |
+| Apply a Compose project                                                                                                                 | 30 minutes  |
+
 !!! Note
-    The Git timeout bounds these Git operations:
-
-    - each check of a hosted ref
-    - each clone
-    - each checkout of a local path Compose project
-
-    Image builds and Compose applies for a rebuild run Dockerfile steps that can take minutes. Each has its own limit of 30 minutes.
+    Builds and Compose applies run Dockerfile steps that can take minutes, so the Git timeout does not limit them.
 
 ## Git CA Bundle
 
