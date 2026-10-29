@@ -62,7 +62,7 @@ Each event is a Server-Sent Event with an event type and JSON data payload:
 
 ```text
 event: scan_completed
-data: {"type":"scan_completed","timestamp":"2025-01-20T11:30:45Z","data":{"scanned":8,"updated":0}}
+data: {"type":"scan_completed","timestamp":"2025-01-20T11:30:45Z","data":{"scanned":8,"updated":0,"failed":0,"skipped":0}}
 ```
 
 ## HTTP Status Codes
