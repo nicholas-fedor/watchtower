@@ -3,6 +3,7 @@ package container
 import (
 	"bytes"
 	"math"
+	"strconv"
 	"testing"
 	"time"
 
@@ -688,6 +689,14 @@ func TestContainer_StopTimeout(t *testing.T) {
 
 	const fallback = 45 * time.Second
 
+	// largestStopTimeout is how long a stop waits for a container stop timeout
+	// of the largest int. A 64-bit int of seconds is too long for a duration,
+	// so it saturates. A 32-bit int of seconds fits.
+	largestStopTimeout := time.Duration(math.MaxInt64)
+	if strconv.IntSize == 32 {
+		largestStopTimeout = math.MaxInt32 * time.Second
+	}
+
 	// withStopTimeout returns a container whose config sets the given stop
 	// timeout in seconds.
 	withStopTimeout := func(seconds int) *Container {
@@ -710,7 +719,7 @@ func TestContainer_StopTimeout(t *testing.T) {
 		{name: "set", c: withStopTimeout(60), want: time.Minute},
 		{name: "set to zero", c: withStopTimeout(0), want: 0},
 		{name: "set to wait indefinitely", c: withStopTimeout(-1), want: fallback},
-		{name: "set beyond the longest duration", c: withStopTimeout(math.MaxInt), want: math.MaxInt64},
+		{name: "set to the largest int", c: withStopTimeout(math.MaxInt), want: largestStopTimeout},
 		{
 			name: "not set",
 			c: &Container{

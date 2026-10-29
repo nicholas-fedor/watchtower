@@ -5,6 +5,7 @@ import (
 	"errors"
 	"math"
 	"net/netip"
+	"strconv"
 	"testing"
 	"testing/synctest"
 	"time"
@@ -316,6 +317,14 @@ func Test_orchestrateSelfUpdate(t *testing.T) {
 func Test_cleanupFailedNewContainer(t *testing.T) {
 	t.Parallel()
 
+	// largestBound is the bound for a container stop timeout of the largest int.
+	// A 64-bit int of seconds is too long for a duration, so the bound
+	// saturates. A 32-bit int of seconds fits, and the bound adds 30 seconds.
+	largestBound := time.Duration(math.MaxInt64)
+	if strconv.IntSize == 32 {
+		largestBound = math.MaxInt32*time.Second + 30*time.Second
+	}
+
 	tests := []struct {
 		name        string
 		stopTimeout *int
@@ -324,7 +333,7 @@ func Test_cleanupFailedNewContainer(t *testing.T) {
 		{name: "no container stop timeout", stopTimeout: nil, want: time.Minute},
 		{name: "shorter container stop timeout", stopTimeout: new(10), want: time.Minute},
 		{name: "longer container stop timeout", stopTimeout: new(120), want: 150 * time.Second},
-		{name: "container stop timeout beyond the longest duration", stopTimeout: new(math.MaxInt), want: math.MaxInt64},
+		{name: "largest container stop timeout", stopTimeout: new(math.MaxInt), want: largestBound},
 	}
 
 	for _, tt := range tests {
