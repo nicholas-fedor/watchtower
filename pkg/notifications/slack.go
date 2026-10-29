@@ -226,7 +226,7 @@ func (s *slackTypeNotifier) GetURL(_ *cobra.Command) (string, error) {
 //   - webhookID: The webhook ID.
 //   - token: The webhook token.
 //   - ok: False when the path does not have one of those forms or the ID or
-//     token is empty.
+//     token is empty or only whitespace.
 //
 //nolint:nonamedreturns // Same-type returns need names.
 func discordWebhookCredentials(parts []string) (webhookID, token string, ok bool) {
@@ -241,7 +241,7 @@ func discordWebhookCredentials(parts []string) (webhookID, token string, ok bool
 	}
 
 	webhookID, token = path[2], path[3]
-	if webhookID == "" || token == "" {
+	if strings.TrimSpace(webhookID) == "" || strings.TrimSpace(token) == "" {
 		return "", "", false
 	}
 

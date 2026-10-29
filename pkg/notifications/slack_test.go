@@ -94,6 +94,8 @@ func TestSlackTypeNotifier_GetURL_Discord(t *testing.T) {
 		{name: "no slack suffix", hookURL: "https://discord.com/api/webhooks/123/abc", wantErr: true},
 		{name: "empty webhook ID", hookURL: "https://discord.com/api/webhooks//abc/slack", wantErr: true},
 		{name: "empty token", hookURL: "https://discord.com/api/webhooks/123//slack", wantErr: true},
+		{name: "whitespace webhook ID", hookURL: "https://discord.com/api/webhooks/ \t/abc/slack", wantErr: true},
+		{name: "whitespace token", hookURL: "https://discord.com/api/webhooks/123/  /slack", wantErr: true},
 		{name: "not an API path", hookURL: "https://discord.com/x/webhooks/123/abc/slack", wantErr: true},
 		{name: "non-version segment after api", hookURL: "https://discord.com/api/x/webhooks/123/abc/slack", wantErr: true},
 		{name: "extra segments after api", hookURL: "https://discord.com/api/v10/x/webhooks/123/abc/slack", wantErr: true},
