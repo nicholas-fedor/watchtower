@@ -29,7 +29,7 @@ func Specs() []spec.FlagSpec {
 			Kind:    spec.KindString,
 			Default: "info",
 			EnvKeys: []string{"WATCHTOWER_NOTIFICATIONS_LEVEL"},
-			Help:    "The log level used for sending notifications. Possible values: panic, fatal, error, warn, info or debug",
+			Help:    "The log level used for sending notifications. Possible values: panic, fatal, error, warn, info, debug or trace",
 		},
 		{
 			Name:    "notifications-delay",
