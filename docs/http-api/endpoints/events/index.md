@@ -44,23 +44,17 @@ The events endpoint uses a separate token from the main API token to limit blast
 
 ## Supported Events
 
-### Scan Events
+Each event is sent under its type as the SSE event name:
 
-- Started
-- Completed
-- Failed
-
-!!! Note
-    Scan events are broadcasted only for updates (HTTP API or scheduled) or checks (HTTP API).
-
-### Update Events
-
-- Started
-- Completed
-- Failed
+| Event            | Sent                                                     | `data` fields                                                                                                                                                                                                                                    |
+|:-----------------|:---------------------------------------------------------|:-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| `scan_started`   | Before an update session or a check begins               | The update policy as booleans: `cleanup`, `no_restart`, `monitor_only`, `lifecycle_hooks`, `rolling_restart`, `label_precedence`, `no_pull`, `run_once`, `use_compose_depends_on`, `skip_self_update`, `ephemeral_self_update`, `revive_stopped` |
+| `scan_completed` | After an update session or a check ends without an error | `scanned`, `updated`, `failed`, `skipped`                                                                                                                                                                                                        |
+| `scan_failed`    | When an update session or a check ends with an error     | `error`                                                                                                                                                                                                                                          |
+| `image_cleanup`  | After an update session removes old images               | `images`, each with `image_id`, `image_name`, `container_id` and `container_name`                                                                                                                                                                |
 
 !!! Note
-    Update events are broadcasted only for HTTP API or scheduled updates.
+    Update sessions are scheduled runs and [`/v1/update`](../update/index.md) requests. Checks are [`/v1/check`](../check/index.md) requests. A check updates nothing, so it never sends `image_cleanup`, and its `scan_completed` reports `updated` as 0.
 
 ## Event Format
 
