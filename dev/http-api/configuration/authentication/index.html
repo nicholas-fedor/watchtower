@@ -2944,9 +2944,10 @@
 <li><a href="../../endpoints/status/"><code>/v1/status</code></a></li>
 <li><a href="../../endpoints/update/"><code>/v1/update</code></a></li>
 </ul>
-<p>Clients must include the token using the <code>Authorization: Bearer &lt;token&gt;</code> header:</p>
+<p>Clients send the token in the <code>Authorization</code> header, usually as <code>Authorization: Bearer &lt;token&gt;</code>:</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>curl<span class="w"> </span>-H<span class="w"> </span><span class="s2">"Authorization: Bearer your-secure-token"</span><span class="w"> </span>http://localhost:8080/v1/metrics
 </code></pre></div>
+<p>The header may also carry the token on its own, as <code>Authorization: &lt;token&gt;</code>. Swagger UI sends the token this way when you authorize with it.</p>
 <p>Invalid or missing tokens result in <code>401 Unauthorized</code>.
 Failed authentication attempts are logged with the client IP address.</p>
 <p>A cookie-based fallback is also supported for clients that cannot set custom headers.
@@ -2967,9 +2968,10 @@ Prefer header-based <code>Authorization: Bearer</code> auth.</p>
 <h2 id="http_api_events_token">HTTP API Events Token<a class="headerlink" href="#http_api_events_token" title="Permanent link">&para;</a></h2>
 <p>The <a href="../../endpoints/events/"><code>/v1/events</code></a> endpoint uses a separate token set via the <a href="../../../configuration/http-api/#http_api_events_token">HTTP API Events Token</a> configuration option.</p>
 <p>This token is <strong>required</strong> when the <a href="../../endpoints/events/"><code>/v1/events</code></a> endpoint is enabled.</p>
-<p>The events token can be supplied in two ways:</p>
+<p>The events token can be supplied in three ways:</p>
 <ul>
 <li><code>Authorization: Bearer</code> header (recommended for most clients)</li>
+<li><code>Authorization</code> header with the token on its own, as Swagger UI sends it</li>
 <li><code>access_token</code> query parameter (required for browser <code>EventSource</code>, which cannot set custom headers)</li>
 </ul>
 <p>Example using the header:</p>
@@ -3110,7 +3112,7 @@ Prefer header-based <code>Authorization: Bearer</code> auth.</p>
     <span class="md-icon" title="Last update">
       <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M21 13.1c-.1 0-.3.1-.4.2l-1 1 2.1 2.1 1-1c.2-.2.2-.6 0-.8l-1.3-1.3c-.1-.1-.2-.2-.4-.2m-1.9 1.8-6.1 6V23h2.1l6.1-6.1zM12.5 7v5.2l4 2.4-1 1L11 13V7zM11 21.9c-5.1-.5-9-4.8-9-9.9C2 6.5 6.5 2 12 2c5.3 0 9.6 4.1 10 9.3-.3-.1-.6-.2-1-.2s-.7.1-1 .2C19.6 7.2 16.2 4 12 4c-4.4 0-8 3.6-8 8 0 4.1 3.1 7.5 7.1 7.9l-.1.2z"/></svg>
     </span>
-    <span class="git-revision-date-localized-plugin git-revision-date-localized-plugin-timeago" title="July 14, 2026 14:36:11 UTC"><span class="timeago" datetime="2026-07-14T14:36:11+00:00" locale="en"></span></span><span class="git-revision-date-localized-plugin git-revision-date-localized-plugin-iso_date" title="July 14, 2026 14:36:11 UTC">2026-07-14</span>
+    <span class="git-revision-date-localized-plugin git-revision-date-localized-plugin-timeago" title="October 29, 2026 23:08:54 UTC"><span class="timeago" datetime="2026-10-29T23:08:54+00:00" locale="en"></span></span><span class="git-revision-date-localized-plugin git-revision-date-localized-plugin-iso_date" title="October 29, 2026 23:08:54 UTC">2026-10-29</span>
   </span>
 
     
