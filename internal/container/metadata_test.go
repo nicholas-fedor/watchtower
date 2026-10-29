@@ -186,11 +186,10 @@ func TestContainer_GetLifecyclePostUpdateCommand(t *testing.T) {
 	}
 }
 
-// TestContainer_HookTimeouts verifies the pre-update and post-update hook
-// timeout labels. A whole number of 0 or more is used as given, where 0 runs
-// the hook without a timeout. An unset label, a non-numeric value, and a
-// negative value give the 1 minute default, and the invalid values log a
-// warning.
+// TestContainer_HookTimeouts verifies the lifecycle hook timeout labels. A
+// whole number of 0 or more is used as given, where 0 runs the hook without a
+// timeout. An unset label gives the 1 minute default. A non-numeric, empty or
+// negative value also gives the default and logs a warning.
 func TestContainer_HookTimeouts(t *testing.T) {
 	t.Parallel()
 
@@ -200,6 +199,18 @@ func TestContainer_HookTimeouts(t *testing.T) {
 		warning string
 		timeout func(c *Container) int
 	}{
+		{
+			name:    "pre-check",
+			label:   labels.LifecyclePreCheckTimeout,
+			warning: "Invalid pre-check timeout value, using default",
+			timeout: (*Container).PreCheckTimeout,
+		},
+		{
+			name:    "post-check",
+			label:   labels.LifecyclePostCheckTimeout,
+			warning: "Invalid post-check timeout value, using default",
+			timeout: (*Container).PostCheckTimeout,
+		},
 		{
 			name:    "pre-update",
 			label:   labels.LifecyclePreUpdateTimeout,
@@ -224,6 +235,7 @@ func TestContainer_HookTimeouts(t *testing.T) {
 		{name: "zero disables the timeout", value: new("0"), want: 0},
 		{name: "not set", value: nil, want: 1},
 		{name: "not a number", value: new("invalid"), want: 1, wantWarn: true},
+		{name: "empty", value: new(""), want: 1, wantWarn: true},
 		{name: "negative", value: new("-1"), want: 1, wantWarn: true},
 	}
 
@@ -276,6 +288,8 @@ func Test_parseHookTimeout(t *testing.T) {
 		{name: "negative", value: "-1", wantErr: true},
 		{name: "fraction", value: "1.5", wantErr: true},
 		{name: "empty", value: "", wantErr: true},
+		{name: "longest duration", value: "153722867", want: 153722867},
+		{name: "too long for a duration", value: "153722868", wantErr: true},
 	}
 
 	for _, tt := range tests {

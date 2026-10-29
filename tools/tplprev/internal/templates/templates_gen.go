@@ -126,6 +126,10 @@ var Templates = map[string]string{
     Skipped {{with (index $e.Data "container")}}{{.}}{{else}}container{{end}}: depends on itself
 {{- else if eq $msg "Skipping container update (circular dependency)" -}}
     Skipped {{with (index $e.Data "container")}}{{.}}{{else}}container{{end}}: circular dependency
+{{- else if eq $msg "Invalid pre-check timeout value, using default" -}}
+    Invalid pre-check timeout{{with (index $e.Data "value")}} "{{.}}"{{end}} for {{with (index $e.Data "container")}}{{.}}{{else}}container{{end}}. Using the default of 1 minute
+{{- else if eq $msg "Invalid post-check timeout value, using default" -}}
+    Invalid post-check timeout{{with (index $e.Data "value")}} "{{.}}"{{end}} for {{with (index $e.Data "container")}}{{.}}{{else}}container{{end}}. Using the default of 1 minute
 {{- else if eq $msg "Invalid pre-update timeout value, using default" -}}
     Invalid pre-update timeout{{with (index $e.Data "value")}} "{{.}}"{{end}} for {{with (index $e.Data "container")}}{{.}}{{else}}container{{end}}. Using the default of 1 minute
 {{- else if eq $msg "Invalid post-update timeout value, using default" -}}

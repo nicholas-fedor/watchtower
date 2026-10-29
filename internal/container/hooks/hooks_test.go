@@ -262,6 +262,30 @@ func TestExecutePreCheckCommand(t *testing.T) {
 			expectedLogMsg: "Executing pre-check command",
 		},
 		{
+			name: "timeout label",
+			container: mockedContainer(withLabels(map[string]string{
+				"com.centurylinklabs.watchtower.lifecycle.pre-check":         "pre-check",
+				"com.centurylinklabs.watchtower.lifecycle.pre-check-timeout": "5",
+			})),
+			setupClient: func(c *mockContainerClient.MockClient) {
+				c.On("ExecuteCommand", mock.Anything, mock.Anything, "pre-check", 5, 0, 0).
+					Return(true, nil)
+			},
+			expectedLogMsg: "Executing pre-check command",
+		},
+		{
+			name: "zero timeout label runs without a timeout",
+			container: mockedContainer(withLabels(map[string]string{
+				"com.centurylinklabs.watchtower.lifecycle.pre-check":         "pre-check",
+				"com.centurylinklabs.watchtower.lifecycle.pre-check-timeout": "0",
+			})),
+			setupClient: func(c *mockContainerClient.MockClient) {
+				c.On("ExecuteCommand", mock.Anything, mock.Anything, "pre-check", 0, 0, 0).
+					Return(true, nil)
+			},
+			expectedLogMsg: "Executing pre-check command",
+		},
+		{
 			name:           "no command",
 			container:      mockedContainer(),
 			expectedLogMsg: "No pre-check command supplied",
@@ -329,6 +353,30 @@ func TestExecutePostCheckCommand(t *testing.T) {
 			expectedLogMsg: "Executing post-check command",
 		},
 		{
+			name: "timeout label",
+			container: mockedContainer(withLabels(map[string]string{
+				"com.centurylinklabs.watchtower.lifecycle.post-check":         "post-check",
+				"com.centurylinklabs.watchtower.lifecycle.post-check-timeout": "5",
+			})),
+			setupClient: func(c *mockContainerClient.MockClient) {
+				c.On("ExecuteCommand", mock.Anything, mock.Anything, "post-check", 5, 0, 0).
+					Return(true, nil)
+			},
+			expectedLogMsg: "Executing post-check command",
+		},
+		{
+			name: "zero timeout label runs without a timeout",
+			container: mockedContainer(withLabels(map[string]string{
+				"com.centurylinklabs.watchtower.lifecycle.post-check":         "post-check",
+				"com.centurylinklabs.watchtower.lifecycle.post-check-timeout": "0",
+			})),
+			setupClient: func(c *mockContainerClient.MockClient) {
+				c.On("ExecuteCommand", mock.Anything, mock.Anything, "post-check", 0, 0, 0).
+					Return(true, nil)
+			},
+			expectedLogMsg: "Executing post-check command",
+		},
+		{
 			name:           "no command",
 			container:      mockedContainer(),
 			expectedLogMsg: "No post-check command supplied",
@@ -374,6 +422,40 @@ func TestExecutePostCheckCommand(t *testing.T) {
 			assert.Contains(t, output, tt.expectedLogMsg)
 		})
 	}
+}
+
+// TestExecuteCheckCommand_NoCommandSkipsTimeout verifies that a check hook
+// without a command does not read its timeout label. Check hooks run for every
+// filtered container on each scan, so reading the label would log a debug line
+// per container and warn about an invalid timeout for a hook that never runs.
+func TestExecuteCheckCommand_NoCommandSkipsTimeout(t *testing.T) {
+	t.Parallel()
+
+	log, logBuf := newDebugLog()
+	cont := container.NewContainer(log,
+		&dockerContainer.InspectResponse{
+			ID:         "container_id",
+			HostConfig: &dockerContainer.HostConfig{},
+			Name:       "/test-container",
+			State:      &dockerContainer.State{},
+			Config: &dockerContainer.Config{
+				Labels: map[string]string{
+					"com.centurylinklabs.watchtower.lifecycle.pre-check-timeout":  "-1",
+					"com.centurylinklabs.watchtower.lifecycle.post-check-timeout": "-1",
+				},
+			},
+		},
+		nil,
+	)
+	client := mockContainerClient.NewMockClient(t)
+
+	executePreCheckCommand(log, context.Background(), client, cont, 0, 0)
+	executePostCheckCommand(log, context.Background(), client, cont, 0, 0)
+
+	output := logBuf.String()
+	assert.Contains(t, output, "No pre-check command supplied")
+	assert.Contains(t, output, "No post-check command supplied")
+	assert.NotContains(t, output, "timeout")
 }
 
 // TestExecutePreUpdateCommand tests the ExecutePreUpdateCommand function.

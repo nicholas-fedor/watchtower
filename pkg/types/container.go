@@ -46,6 +46,8 @@ type Container interface {
 	CooldownDelay(params UpdateParams) time.Duration  // Effective cooldown delay.
 	SetLinkedToRestarting(status bool)                // Set linked-to-restarting status.
 	IsLinkedToRestarting() bool                       // Linked-to-restarting check.
+	PreCheckTimeout() int                             // Pre-check timeout.
+	PostCheckTimeout() int                            // Post-check timeout.
 	PreUpdateTimeout() int                            // Pre-update timeout.
 	PostUpdateTimeout() int                           // Post-update timeout.
 	IsRestarting() bool                               // Restarting status check.

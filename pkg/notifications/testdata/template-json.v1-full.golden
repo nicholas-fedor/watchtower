@@ -454,6 +454,28 @@
     },
     {
       "data": {
+        "container": "app",
+        "error": "lifecycle hook timeout must be a whole number of minutes of 0 or more: strconv.Atoi: parsing \"1.5\": invalid syntax",
+        "label": "com.centurylinklabs.watchtower.lifecycle.pre-check-timeout",
+        "value": "1.5"
+      },
+      "level": "info",
+      "message": "Invalid pre-check timeout value, using default",
+      "time": "2026-10-07T12:00:48Z"
+    },
+    {
+      "data": {
+        "container": "app",
+        "error": "lifecycle hook timeout must be a whole number of minutes of 0 or more: got -5",
+        "label": "com.centurylinklabs.watchtower.lifecycle.post-check-timeout",
+        "value": "-5"
+      },
+      "level": "warning",
+      "message": "Invalid post-check timeout value, using default",
+      "time": "2026-10-07T12:00:49Z"
+    },
+    {
+      "data": {
         "alpha": "one",
         "beta": 2
       },
