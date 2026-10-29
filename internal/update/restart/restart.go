@@ -942,9 +942,11 @@ func restartStaleContainer(
 					Str("new_id", newContainerID.ShortID()).
 					Msg("Cleaning up failed Watchtower container")
 
+				// The replacement copies the source's configuration, including
+				// a stop timeout set on the container, so its stop waits as long.
 				cleanupCtx, cleanupCancel := context.WithTimeout(
 					context.Background(),
-					config.DetachedTimeout(),
+					config.DetachedStopTimeout(sourceContainer),
 				)
 				defer cleanupCancel()
 

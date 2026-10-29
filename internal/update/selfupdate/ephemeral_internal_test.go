@@ -1,9 +1,11 @@
 package selfupdate
 
 import (
+	"context"
 	"errors"
 	"net/netip"
 	"testing"
+	"testing/synctest"
 	"time"
 
 	"github.com/stretchr/testify/assert"
@@ -302,4 +304,56 @@ func Test_orchestrateSelfUpdate(t *testing.T) {
 			"wt-old-missing-image", "watchtower:v2", "watchtower", "", true)
 		require.NoError(t, err)
 	})
+}
+
+// Test_cleanupFailedNewContainer verifies the bound for removing a replacement
+// that failed verification. The bound is 60 seconds. When the container the
+// replacement was created from sets a stop timeout longer than 30 seconds, the
+// stop waits that long, so the bound is that stop timeout plus 30 seconds.
+func Test_cleanupFailedNewContainer(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name        string
+		stopTimeout *int
+		want        time.Duration
+	}{
+		{name: "no container stop timeout", stopTimeout: nil, want: time.Minute},
+		{name: "shorter container stop timeout", stopTimeout: new(10), want: time.Minute},
+		{name: "longer container stop timeout", stopTimeout: new(120), want: 150 * time.Second},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			synctest.Test(t, func(t *testing.T) {
+				old := mockUpdate.CreateMockContainerWithConfig(
+					"wt-old-id",
+					"/watchtower-old-wt-old-id",
+					"watchtower:v1",
+					true,
+					false,
+					time.Now(),
+					&dockerContainer.Config{Image: "watchtower:v1", StopTimeout: tt.stopTimeout},
+				)
+				failedNew := mockUpdate.CreateMockContainer(string(handoffNewID), "/watchtower", "watchtower:v2", time.Now())
+
+				// boundCtx matches a context whose deadline is the expected bound
+				// from now. The bubble's clock stands still while code runs, so
+				// the deadline matches exactly.
+				boundCtx := mock.MatchedBy(func(ctx context.Context) bool {
+					deadline, hasDeadline := ctx.Deadline()
+
+					return hasDeadline && deadline.Equal(time.Now().Add(tt.want))
+				})
+
+				client := mockContainerClient.NewMockClient(t)
+				client.EXPECT().GetContainer(boundCtx, handoffNewID).Return(failedNew, nil).Once()
+				client.EXPECT().StopAndRemoveContainer(boundCtx, failedNew, orchestratorStopTimeout).Return(nil).Once()
+
+				cleanupFailedNewContainer(t.Context(), client, newTestLogger(t), old, handoffNewID)
+			})
+		})
+	}
 }

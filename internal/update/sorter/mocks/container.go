@@ -101,13 +101,15 @@ func (c *SimpleContainer) StopSignal() string {
 	return "SIGTERM"
 }
 
-// StopTimeout returns the container's configured stop timeout in seconds from ContainerInfoField.
-func (c *SimpleContainer) StopTimeout() *int {
-	if c.ContainerInfoField != nil && c.ContainerInfoField.Config != nil {
-		return c.ContainerInfoField.Config.StopTimeout
+// StopTimeout returns the stop timeout of 0 or more configured in
+// ContainerInfoField, and fallback otherwise.
+func (c *SimpleContainer) StopTimeout(fallback time.Duration) time.Duration {
+	if c.ContainerInfoField != nil && c.ContainerInfoField.Config != nil &&
+		c.ContainerInfoField.Config.StopTimeout != nil && *c.ContainerInfoField.Config.StopTimeout >= 0 {
+		return time.Duration(*c.ContainerInfoField.Config.StopTimeout) * time.Second
 	}
 
-	return nil
+	return fallback
 }
 
 func (c *SimpleContainer) HasImageInfo() bool                               { return false }

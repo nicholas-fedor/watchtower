@@ -35,13 +35,17 @@ const orchestratorCreateTimeout = 60 * time.Second
 // after a handoff, which runs detached from the session context.
 const predecessorImageRemovalTimeout = 30 * time.Second
 
-// orchestratorRecoveryTimeout bounds each recovery helper after a failed
-// handoff.
+// orchestratorRecoveryCallBudget is the time a recovery helper gets for its
+// Docker calls beyond the stop of a failed replacement.
+const orchestratorRecoveryCallBudget = 30 * time.Second
+
+// orchestratorRecoveryTimeout bounds each recovery helper that renames or
+// starts the predecessor after a failed handoff.
 //
-// Recovery runs detached from the orchestration context, so it still
-// runs after that context's deadline. The 60 seconds cover the 30 second stop
-// of a failed replacement and the calls around it.
-const orchestratorRecoveryTimeout = 60 * time.Second
+// Recovery runs detached from the orchestration context, so it still runs
+// after that context's deadline. The 60 seconds match the shortest bound for
+// removing a failed replacement.
+const orchestratorRecoveryTimeout = orchestratorStopTimeout + orchestratorRecoveryCallBudget
 
 // Errors for ephemeral self-update operations in ephemeral.go.
 var (
@@ -447,7 +451,7 @@ func orchestrateSelfUpdate(log *zerolog.Logger, ctx context.Context,
 
 	err = ensureContainerRunning(ctx, client, clog, newContainerID)
 	if err != nil {
-		cleanupFailedNewContainer(ctx, client, clog, newContainerID)
+		cleanupFailedNewContainer(ctx, client, clog, oldContainer, newContainerID)
 
 		if !oldGone {
 			restoreAndStartOldContainer(ctx, client, clog, oldContainer, originalName)
@@ -642,18 +646,28 @@ func restartOldContainer(
 //     cancellation and deadline do not.
 //   - client: Container client for Docker operations.
 //   - clog: Logger with container context fields.
+//   - oldContainer: The container the replacement was created from. The
+//     replacement has its configuration, so its stop waits as long.
 //   - newContainerID: ID of the failed replacement container to remove.
 func cleanupFailedNewContainer(
 	ctx context.Context,
 	client containerClient.Client,
 	clog *zerolog.Logger,
+	oldContainer types.Container,
 	newContainerID types.ContainerID,
 ) {
 	if newContainerID == "" {
 		return
 	}
 
-	recoveryCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), orchestratorRecoveryTimeout)
+	// A stop timeout set on the container takes precedence over the 30 seconds
+	// passed to the stop, so the bound follows the longer of the two.
+	stopTimeout := max(orchestratorStopTimeout, oldContainer.StopTimeout(orchestratorStopTimeout))
+
+	recoveryCtx, cancel := context.WithTimeout(
+		context.WithoutCancel(ctx),
+		stopTimeout+orchestratorRecoveryCallBudget,
+	)
 	defer cancel()
 
 	failedNew, err := client.GetContainer(recoveryCtx, newContainerID)
