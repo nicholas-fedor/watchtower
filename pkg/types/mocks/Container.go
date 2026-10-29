@@ -1459,6 +1459,50 @@ func (_c *MockContainer_NormalizedScope_Call) RunAndReturn(run func() string) *M
 	return _c
 }
 
+// PostCheckTimeout provides a mock function for the type MockContainer
+func (_mock *MockContainer) PostCheckTimeout() int {
+	ret := _mock.Called()
+
+	if len(ret) == 0 {
+		panic("no return value specified for PostCheckTimeout")
+	}
+
+	var r0 int
+	if returnFunc, ok := ret.Get(0).(func() int); ok {
+		r0 = returnFunc()
+	} else {
+		r0 = ret.Get(0).(int)
+	}
+	return r0
+}
+
+// MockContainer_PostCheckTimeout_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'PostCheckTimeout'
+type MockContainer_PostCheckTimeout_Call struct {
+	*mock.Call
+}
+
+// PostCheckTimeout is a helper method to define mock.On call
+func (_e *MockContainer_Expecter) PostCheckTimeout() *MockContainer_PostCheckTimeout_Call {
+	return &MockContainer_PostCheckTimeout_Call{Call: _e.mock.On("PostCheckTimeout")}
+}
+
+func (_c *MockContainer_PostCheckTimeout_Call) Run(run func()) *MockContainer_PostCheckTimeout_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run()
+	})
+	return _c
+}
+
+func (_c *MockContainer_PostCheckTimeout_Call) Return(n int) *MockContainer_PostCheckTimeout_Call {
+	_c.Call.Return(n)
+	return _c
+}
+
+func (_c *MockContainer_PostCheckTimeout_Call) RunAndReturn(run func() int) *MockContainer_PostCheckTimeout_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // PostUpdateTimeout provides a mock function for the type MockContainer
 func (_mock *MockContainer) PostUpdateTimeout() int {
 	ret := _mock.Called()
@@ -1499,6 +1543,50 @@ func (_c *MockContainer_PostUpdateTimeout_Call) Return(n int) *MockContainer_Pos
 }
 
 func (_c *MockContainer_PostUpdateTimeout_Call) RunAndReturn(run func() int) *MockContainer_PostUpdateTimeout_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
+// PreCheckTimeout provides a mock function for the type MockContainer
+func (_mock *MockContainer) PreCheckTimeout() int {
+	ret := _mock.Called()
+
+	if len(ret) == 0 {
+		panic("no return value specified for PreCheckTimeout")
+	}
+
+	var r0 int
+	if returnFunc, ok := ret.Get(0).(func() int); ok {
+		r0 = returnFunc()
+	} else {
+		r0 = ret.Get(0).(int)
+	}
+	return r0
+}
+
+// MockContainer_PreCheckTimeout_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'PreCheckTimeout'
+type MockContainer_PreCheckTimeout_Call struct {
+	*mock.Call
+}
+
+// PreCheckTimeout is a helper method to define mock.On call
+func (_e *MockContainer_Expecter) PreCheckTimeout() *MockContainer_PreCheckTimeout_Call {
+	return &MockContainer_PreCheckTimeout_Call{Call: _e.mock.On("PreCheckTimeout")}
+}
+
+func (_c *MockContainer_PreCheckTimeout_Call) Run(run func()) *MockContainer_PreCheckTimeout_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run()
+	})
+	return _c
+}
+
+func (_c *MockContainer_PreCheckTimeout_Call) Return(n int) *MockContainer_PreCheckTimeout_Call {
+	_c.Call.Return(n)
+	return _c
+}
+
+func (_c *MockContainer_PreCheckTimeout_Call) RunAndReturn(run func() int) *MockContainer_PreCheckTimeout_Call {
 	_c.Call.Return(run)
 	return _c
 }

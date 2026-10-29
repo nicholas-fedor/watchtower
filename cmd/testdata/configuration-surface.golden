@@ -140,9 +140,11 @@ container labels:
   com.centurylinklabs.watchtower.git-watch
   com.centurylinklabs.watchtower.lifecycle.gid
   com.centurylinklabs.watchtower.lifecycle.post-check
+  com.centurylinklabs.watchtower.lifecycle.post-check-timeout
   com.centurylinklabs.watchtower.lifecycle.post-update
   com.centurylinklabs.watchtower.lifecycle.post-update-timeout
   com.centurylinklabs.watchtower.lifecycle.pre-check
+  com.centurylinklabs.watchtower.lifecycle.pre-check-timeout
   com.centurylinklabs.watchtower.lifecycle.pre-update
   com.centurylinklabs.watchtower.lifecycle.pre-update-timeout
   com.centurylinklabs.watchtower.lifecycle.uid

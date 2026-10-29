@@ -80,6 +80,8 @@ var legacyTemplateMessages = []string{
 	"Could not disable Watchtower's restart policy. The runtime may start it again",
 	"Invalid pre-update timeout value, using default",
 	"Invalid post-update timeout value, using default",
+	"Invalid pre-check timeout value, using default",
+	"Invalid post-check timeout value, using default",
 }
 
 // Disk sizes used by the image-usage budget fixtures, in bytes.
@@ -223,6 +225,20 @@ func goldenEntryData(message string) map[string]any {
 			"label":     "com.centurylinklabs.watchtower.lifecycle.pre-update-timeout",
 			"value":     "-1",
 			"error":     "lifecycle hook timeout must be a whole number of minutes of 0 or more: got -1",
+		}
+	case "Invalid pre-check timeout value, using default":
+		return map[string]any{
+			"container": "app",
+			"label":     "com.centurylinklabs.watchtower.lifecycle.pre-check-timeout",
+			"value":     "1.5",
+			"error":     `lifecycle hook timeout must be a whole number of minutes of 0 or more: strconv.Atoi: parsing "1.5": invalid syntax`,
+		}
+	case "Invalid post-check timeout value, using default":
+		return map[string]any{
+			"container": "app",
+			"label":     "com.centurylinklabs.watchtower.lifecycle.post-check-timeout",
+			"value":     "-5",
+			"error":     "lifecycle hook timeout must be a whole number of minutes of 0 or more: got -5",
 		}
 	case "Invalid post-update timeout value, using default":
 		return map[string]any{

@@ -128,6 +128,8 @@ func (c *SimpleContainer) IsNoPull(_ types.UpdateParams) bool               { re
 func (c *SimpleContainer) CooldownDelay(_ types.UpdateParams) time.Duration { return 0 }
 func (c *SimpleContainer) SetLinkedToRestarting(_ bool)                     {}
 func (c *SimpleContainer) IsLinkedToRestarting() bool                       { return false }
+func (c *SimpleContainer) PreCheckTimeout() int                             { return 1 }
+func (c *SimpleContainer) PostCheckTimeout() int                            { return 1 }
 func (c *SimpleContainer) PreUpdateTimeout() int {
 	if c.ContainerInfoField != nil {
 		return 0 // Return 0 to disable timeout when using custom ContainerInfo

@@ -11,9 +11,6 @@ import (
 	"github.com/nicholas-fedor/watchtower/pkg/types"
 )
 
-// checkCommandTimeout is the timeout in minutes for check commands (pre/post check hooks).
-const checkCommandTimeout = 1
-
 // Errors for lifecycle hook execution.
 var (
 	// errPreUpdateFailed indicates a failure in executing the pre-update command.
@@ -138,6 +135,7 @@ func executePreCheckCommand(log *zerolog.Logger, ctx context.Context, client con
 		uid,
 		gid,
 		container.GetLifecyclePreCheckCommand(),
+		container.PreCheckTimeout,
 		"pre-check",
 	)
 }
@@ -160,6 +158,7 @@ func executePostCheckCommand(log *zerolog.Logger, ctx context.Context, client co
 		uid,
 		gid,
 		container.GetLifecyclePostCheckCommand(),
+		container.PostCheckTimeout,
 		"post-check",
 	)
 }
@@ -174,6 +173,8 @@ func executePostCheckCommand(log *zerolog.Logger, ctx context.Context, client co
 //   - uid: Default UID to run command as.
 //   - gid: Default GID to run command as.
 //   - command: Command string from the container labels.
+//   - timeout: Reads the timeout in minutes from the container labels, where
+//     0 means no timeout. It is called only when the command is set.
 //   - phase: Label for logs ("pre-check" or "post-check").
 func executeCheckCommand(
 	log *zerolog.Logger,
@@ -182,6 +183,7 @@ func executeCheckCommand(
 	cont types.Container,
 	uid, gid int,
 	command string,
+	timeout func() int,
 	phase string,
 ) {
 	clogVal := log.With().
@@ -212,16 +214,16 @@ func executeCheckCommand(
 		return
 	}
 
-	// Execute command with fixed short timeout (1 minute).
-	// Check commands are lightweight health checks that should complete quickly,
-	// unlike update commands which may perform complex operations and use configurable timeouts.
+	minutes := timeout()
+
 	clog.Debug().
 		Str("command", command).
+		Int("timeout", minutes).
 		Msg("Executing " + phase + " command")
 
-	_, err := client.ExecuteCommand(ctx, cont, command, checkCommandTimeout, effectiveUID, effectiveGID)
+	_, err := client.ExecuteCommand(ctx, cont, command, minutes, effectiveUID, effectiveGID)
 	if err != nil {
-		// Match historical wording: "Pre-check command failed" / "Post-check command failed".
+		// The failure message names the phase, such as "Pre-check command failed".
 		failedMsg := "Pre-check command failed"
 		if phase == "post-check" {
 			failedMsg = "Post-check command failed"

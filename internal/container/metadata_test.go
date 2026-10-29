@@ -186,11 +186,10 @@ func TestContainer_GetLifecyclePostUpdateCommand(t *testing.T) {
 	}
 }
 
-// TestContainer_HookTimeouts verifies the pre-update and post-update hook
-// timeout labels. A whole number of 0 or more is used as given, where 0 runs
-// the hook without a timeout. An unset label, a non-numeric value, and a
-// negative value give the 1 minute default, and the invalid values log a
-// warning.
+// TestContainer_HookTimeouts verifies the lifecycle hook timeout labels. A
+// whole number of 0 or more is used as given, where 0 runs the hook without a
+// timeout. An unset label, a non-numeric value, and a negative value give the
+// 1 minute default, and the invalid values log a warning.
 func TestContainer_HookTimeouts(t *testing.T) {
 	t.Parallel()
 
@@ -200,6 +199,18 @@ func TestContainer_HookTimeouts(t *testing.T) {
 		warning string
 		timeout func(c *Container) int
 	}{
+		{
+			name:    "pre-check",
+			label:   labels.LifecyclePreCheckTimeout,
+			warning: "Invalid pre-check timeout value, using default",
+			timeout: (*Container).PreCheckTimeout,
+		},
+		{
+			name:    "post-check",
+			label:   labels.LifecyclePostCheckTimeout,
+			warning: "Invalid post-check timeout value, using default",
+			timeout: (*Container).PostCheckTimeout,
+		},
 		{
 			name:    "pre-update",
 			label:   labels.LifecyclePreUpdateTimeout,

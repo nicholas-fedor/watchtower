@@ -39,6 +39,10 @@ const (
 	LifecyclePreUpdate = "com.centurylinklabs.watchtower.lifecycle.pre-update"
 	// LifecyclePostUpdate specifies a command to run after updating the container.
 	LifecyclePostUpdate = "com.centurylinklabs.watchtower.lifecycle.post-update"
+	// LifecyclePreCheckTimeout sets the timeout (in minutes) for the pre-check command.
+	LifecyclePreCheckTimeout = "com.centurylinklabs.watchtower.lifecycle.pre-check-timeout"
+	// LifecyclePostCheckTimeout sets the timeout (in minutes) for the post-check command.
+	LifecyclePostCheckTimeout = "com.centurylinklabs.watchtower.lifecycle.post-check-timeout"
 	// LifecyclePreUpdateTimeout sets the timeout (in minutes) for the pre-update command.
 	LifecyclePreUpdateTimeout = "com.centurylinklabs.watchtower.lifecycle.pre-update-timeout"
 	// LifecyclePostUpdateTimeout sets the timeout (in minutes) for the post-update command.

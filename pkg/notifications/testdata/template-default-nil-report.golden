@@ -46,5 +46,7 @@ Could not inspect Watchtower's own container to read its scope label. Exiting ra
 Could not disable Watchtower's restart policy. The runtime may start it again
 Invalid pre-update timeout value, using default
 Invalid post-update timeout value, using default
+Invalid pre-check timeout value, using default
+Invalid post-check timeout value, using default
 Unrecognized message with fields
 Unrecognized message without fields

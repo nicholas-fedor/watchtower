@@ -46,5 +46,7 @@ Could not inspect Watchtower's own container to read its scope label. Exiting ra
 Could not disable Watchtower's restart policy. The runtime may start it again: failed to set restart policy: context deadline exceeded
 Invalid pre-update timeout "-1" for app. Using the default of 1 minute
 Invalid post-update timeout "soon" for app. Using the default of 1 minute
+Invalid pre-check timeout "1.5" for app. Using the default of 1 minute
+Invalid post-check timeout "-5" for app. Using the default of 1 minute
 Unrecognized message with fields | alpha=one beta=2 
 Unrecognized message without fields
