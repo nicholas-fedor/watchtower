@@ -78,6 +78,8 @@ var legacyTemplateMessages = []string{
 	"Could not inspect Watchtower's own container. Self-updates are disabled",
 	"Could not inspect Watchtower's own container to read its scope label. Exiting rather than running without a scope",
 	"Could not disable Watchtower's restart policy. The runtime may start it again",
+	"Invalid pre-update timeout value, using default",
+	"Invalid post-update timeout value, using default",
 }
 
 // Disk sizes used by the image-usage budget fixtures, in bytes.
@@ -215,6 +217,20 @@ func goldenEntryData(message string) map[string]any {
 		return map[string]any{"error": "failed to inspect container: context deadline exceeded"}
 	case "Could not disable Watchtower's restart policy. The runtime may start it again":
 		return map[string]any{"error": "failed to set restart policy: context deadline exceeded"}
+	case "Invalid pre-update timeout value, using default":
+		return map[string]any{
+			"container": "app",
+			"label":     "com.centurylinklabs.watchtower.lifecycle.pre-update-timeout",
+			"value":     "-1",
+			"error":     "lifecycle hook timeout must be a whole number of minutes of 0 or more: got -1",
+		}
+	case "Invalid post-update timeout value, using default":
+		return map[string]any{
+			"container": "app",
+			"label":     "com.centurylinklabs.watchtower.lifecycle.post-update-timeout",
+			"value":     "soon",
+			"error":     `lifecycle hook timeout must be a whole number of minutes of 0 or more: strconv.Atoi: parsing "soon": invalid syntax`,
+		}
 	case "Starting HTTP API server", "HTTP API server is enabled":
 		return map[string]any{"host": "0.0.0.0", "port": "8080", "tls": true}
 	default:

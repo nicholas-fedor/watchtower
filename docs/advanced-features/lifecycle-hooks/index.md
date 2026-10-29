@@ -114,6 +114,10 @@ By default, hook commands timeout after 1 minute. Override this with timeout lab
     LABEL com.centurylinklabs.watchtower.lifecycle.post-update-timeout="0"
     ```
 
+!!! Note
+    A pre-update or post-update timeout must be a whole number of minutes of 0 or more.
+    Any other value, such as `-1` or `1.5`, logs a warning and uses the 1 minute default.
+
 #### Custom User Execution
 
 By default, hooks run as the monitored container's configured user and group (`uid:gid`).

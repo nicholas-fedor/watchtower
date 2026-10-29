@@ -432,6 +432,28 @@
     },
     {
       "data": {
+        "container": "app",
+        "error": "lifecycle hook timeout must be a whole number of minutes of 0 or more: got -1",
+        "label": "com.centurylinklabs.watchtower.lifecycle.pre-update-timeout",
+        "value": "-1"
+      },
+      "level": "error",
+      "message": "Invalid pre-update timeout value, using default",
+      "time": "2026-10-07T12:00:46Z"
+    },
+    {
+      "data": {
+        "container": "app",
+        "error": "lifecycle hook timeout must be a whole number of minutes of 0 or more: strconv.Atoi: parsing \"soon\": invalid syntax",
+        "label": "com.centurylinklabs.watchtower.lifecycle.post-update-timeout",
+        "value": "soon"
+      },
+      "level": "debug",
+      "message": "Invalid post-update timeout value, using default",
+      "time": "2026-10-07T12:00:47Z"
+    },
+    {
+      "data": {
         "alpha": "one",
         "beta": 2
       },

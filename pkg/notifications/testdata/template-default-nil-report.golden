@@ -44,5 +44,7 @@ Could not identify Watchtower's own container. Self-updates are disabled and old
 Could not inspect Watchtower's own container. Self-updates are disabled
 Could not inspect Watchtower's own container to read its scope label. Exiting rather than running without a scope
 Could not disable Watchtower's restart policy. The runtime may start it again
+Invalid pre-update timeout value, using default
+Invalid post-update timeout value, using default
 Unrecognized message with fields
 Unrecognized message without fields
