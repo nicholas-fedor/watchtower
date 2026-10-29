@@ -3,6 +3,7 @@ package notifications
 import (
 	"errors"
 	"fmt"
+	"net/url"
 	"regexp"
 	"strings"
 
@@ -225,8 +226,9 @@ func (s *slackTypeNotifier) GetURL(_ *cobra.Command) (string, error) {
 // Returns:
 //   - webhookID: The webhook ID.
 //   - token: The webhook token.
-//   - ok: False when the path does not have one of those forms or the ID or
-//     token is empty or only whitespace.
+//   - ok: False when the path does not have one of those forms, or the ID or
+//     token is not a valid path escape or is empty or only whitespace once
+//     decoded.
 //
 //nolint:nonamedreturns // Same-type returns need names.
 func discordWebhookCredentials(parts []string) (webhookID, token string, ok bool) {
@@ -241,11 +243,26 @@ func discordWebhookCredentials(parts []string) (webhookID, token string, ok bool
 	}
 
 	webhookID, token = path[2], path[3]
-	if strings.TrimSpace(webhookID) == "" || strings.TrimSpace(token) == "" {
+	if blankPathSegment(webhookID) || blankPathSegment(token) {
 		return "", "", false
 	}
 
 	return webhookID, token, true
+}
+
+// blankPathSegment reports whether a URL path segment carries no value. That is
+// the case when it is not a valid path escape, or when it is empty or only
+// whitespace once decoded, such as %20.
+//
+// Parameters:
+//   - segment: The raw path segment.
+//
+// Returns:
+//   - bool: True when the segment carries no value.
+func blankPathSegment(segment string) bool {
+	decoded, err := url.PathUnescape(segment)
+
+	return err != nil || strings.TrimSpace(decoded) == ""
 }
 
 // webhookChannel returns the channel for the shoutrrr Slack URL.
