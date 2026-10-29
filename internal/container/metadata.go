@@ -22,6 +22,9 @@ var (
 	errCurrentContainerNotCached = errors.New("current container not cached for scope derivation")
 	// errLabelNotFound indicates a requested label is not present in the container's metadata.
 	errLabelNotFound = errors.New("label not found")
+	// errInvalidHookTimeout indicates a lifecycle hook timeout label is not a
+	// whole number of minutes of 0 or more.
+	errInvalidHookTimeout = errors.New("lifecycle hook timeout must be a whole number of minutes of 0 or more")
 )
 
 // GetLifecyclePreCheckCommand returns the pre-check command from labels.
@@ -58,7 +61,7 @@ func (c *Container) GetLifecyclePostUpdateCommand() string {
 
 // PreUpdateTimeout returns the pre-update command timeout in minutes.
 //
-// It defaults to 1 minute if unset or invalid.
+// It defaults to 1 minute if unset or invalid, including a negative value.
 // 0 allows indefinite execution.
 //
 // Returns:
@@ -80,7 +83,7 @@ func (c *Container) PreUpdateTimeout() int {
 	}
 
 	// Parse timeout value.
-	minutes, err := strconv.Atoi(val)
+	minutes, err := parseHookTimeout(val)
 	if err != nil {
 		clog.Warn().
 			Err(err).
@@ -101,7 +104,7 @@ func (c *Container) PreUpdateTimeout() int {
 
 // PostUpdateTimeout returns the post-update command timeout in minutes.
 //
-// It defaults to 1 minute if unset or invalid.
+// It defaults to 1 minute if unset or invalid, including a negative value.
 // 0 allows indefinite execution.
 //
 // Returns:
@@ -123,7 +126,7 @@ func (c *Container) PostUpdateTimeout() int {
 	}
 
 	// Parse timeout value.
-	minutes, err := strconv.Atoi(val)
+	minutes, err := parseHookTimeout(val)
 	if err != nil {
 		clog.Warn().
 			Err(err).
@@ -579,6 +582,27 @@ func containsWatchtowerLabel(containerLabels map[string]string) bool {
 	val, ok := containerLabels[labels.Watchtower]
 
 	return ok && val == "true"
+}
+
+// parseHookTimeout parses a lifecycle hook timeout label value in minutes.
+//
+// Parameters:
+//   - value: The label value.
+//
+// Returns:
+//   - int: The timeout in minutes, where 0 means no timeout.
+//   - error: Non-nil when value is not a whole number of 0 or more.
+func parseHookTimeout(value string) (int, error) {
+	minutes, err := strconv.Atoi(value)
+	if err != nil {
+		return 0, fmt.Errorf("%w: %w", errInvalidHookTimeout, err)
+	}
+
+	if minutes < 0 {
+		return 0, fmt.Errorf("%w: got %d", errInvalidHookTimeout, minutes)
+	}
+
+	return minutes, nil
 }
 
 // getRawLabelValue retrieves a raw label value.

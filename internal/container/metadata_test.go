@@ -186,113 +186,110 @@ func TestContainer_GetLifecyclePostUpdateCommand(t *testing.T) {
 	}
 }
 
-func TestContainer_PreUpdateTimeout(t *testing.T) {
-	tests := []struct {
-		name string
-		c    *Container
-		want int
+// TestContainer_HookTimeouts verifies the pre-update and post-update hook
+// timeout labels. A whole number of 0 or more is used as given, where 0 runs
+// the hook without a timeout. An unset label, a non-numeric value, and a
+// negative value give the 1 minute default, and the invalid values log a
+// warning.
+func TestContainer_HookTimeouts(t *testing.T) {
+	t.Parallel()
+
+	hooks := []struct {
+		name    string
+		label   string
+		warning string
+		timeout func(c *Container) int
 	}{
 		{
-			name: "ValidTimeout",
-			c: &Container{
-				containerInfo: &dockerContainer.InspectResponse{
-					Name: "/test-container",
-					Config: &dockerContainer.Config{
-						Labels: map[string]string{
-							labels.LifecyclePreUpdateTimeout: "5",
-						},
-					},
-				},
-			},
-			want: 5,
+			name:    "pre-update",
+			label:   labels.LifecyclePreUpdateTimeout,
+			warning: "Invalid pre-update timeout value, using default",
+			timeout: (*Container).PreUpdateTimeout,
 		},
 		{
-			name: "InvalidTimeout",
-			c: &Container{
-				containerInfo: &dockerContainer.InspectResponse{
-					Name: "/test-container",
-					Config: &dockerContainer.Config{
-						Labels: map[string]string{
-							labels.LifecyclePreUpdateTimeout: "invalid",
-						},
-					},
-				},
-			},
-			want: 1,
-		},
-		{
-			name: "TimeoutNotSet",
-			c: &Container{
-				containerInfo: &dockerContainer.InspectResponse{
-					Name: "/test-container",
-					Config: &dockerContainer.Config{
-						Labels: map[string]string{},
-					},
-				},
-			},
-			want: 1,
+			name:    "post-update",
+			label:   labels.LifecyclePostUpdateTimeout,
+			warning: "Invalid post-update timeout value, using default",
+			timeout: (*Container).PostUpdateTimeout,
 		},
 	}
 
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			got := tt.c.PreUpdateTimeout()
-			assert.Equal(t, tt.want, got)
-		})
+	tests := []struct {
+		name     string
+		value    *string
+		want     int
+		wantWarn bool
+	}{
+		{name: "valid", value: new("5"), want: 5},
+		{name: "zero disables the timeout", value: new("0"), want: 0},
+		{name: "not set", value: nil, want: 1},
+		{name: "not a number", value: new("invalid"), want: 1, wantWarn: true},
+		{name: "negative", value: new("-1"), want: 1, wantWarn: true},
+	}
+
+	for _, hook := range hooks {
+		for _, tt := range tests {
+			t.Run(hook.name+" "+tt.name, func(t *testing.T) {
+				t.Parallel()
+
+				containerLabels := map[string]string{}
+				if tt.value != nil {
+					containerLabels[hook.label] = *tt.value
+				}
+
+				var out bytes.Buffer
+
+				log := zerolog.New(&out).Level(zerolog.WarnLevel)
+				c := &Container{
+					containerInfo: &dockerContainer.InspectResponse{
+						Name:   "/test-container",
+						Config: &dockerContainer.Config{Labels: containerLabels},
+					},
+					log: &log,
+				}
+
+				assert.Equal(t, tt.want, hook.timeout(c))
+
+				if tt.wantWarn {
+					assert.Contains(t, out.String(), hook.warning)
+				} else {
+					assert.Empty(t, out.String())
+				}
+			})
+		}
 	}
 }
 
-func TestContainer_PostUpdateTimeout(t *testing.T) {
+// Test_parseHookTimeout verifies that a hook timeout label value must be a
+// whole number of minutes of 0 or more.
+func Test_parseHookTimeout(t *testing.T) {
+	t.Parallel()
+
 	tests := []struct {
-		name string
-		c    *Container
-		want int
+		name    string
+		value   string
+		want    int
+		wantErr bool
 	}{
-		{
-			name: "ValidTimeout",
-			c: &Container{
-				containerInfo: &dockerContainer.InspectResponse{
-					Name: "/test-container",
-					Config: &dockerContainer.Config{
-						Labels: map[string]string{
-							labels.LifecyclePostUpdateTimeout: "10",
-						},
-					},
-				},
-			},
-			want: 10,
-		},
-		{
-			name: "InvalidTimeout",
-			c: &Container{
-				containerInfo: &dockerContainer.InspectResponse{
-					Name: "/test-container",
-					Config: &dockerContainer.Config{
-						Labels: map[string]string{
-							labels.LifecyclePostUpdateTimeout: "invalid",
-						},
-					},
-				},
-			},
-			want: 1,
-		},
-		{
-			name: "TimeoutNotSet",
-			c: &Container{
-				containerInfo: &dockerContainer.InspectResponse{
-					Name: "/test-container",
-					Config: &dockerContainer.Config{
-						Labels: map[string]string{},
-					},
-				},
-			},
-			want: 1,
-		},
+		{name: "positive", value: "10", want: 10},
+		{name: "zero", value: "0", want: 0},
+		{name: "negative", value: "-1", wantErr: true},
+		{name: "fraction", value: "1.5", wantErr: true},
+		{name: "empty", value: "", wantErr: true},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got := tt.c.PostUpdateTimeout()
+			t.Parallel()
+
+			got, err := parseHookTimeout(tt.value)
+			if tt.wantErr {
+				require.ErrorIs(t, err, errInvalidHookTimeout)
+
+				return
+			}
+
+			require.NoError(t, err)
 			assert.Equal(t, tt.want, got)
 		})
 	}
