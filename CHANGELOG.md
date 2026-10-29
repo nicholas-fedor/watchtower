@@ -8,6 +8,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- Support check hook timeout labels by @nicholas-fedor in [#3244](https://github.com/nicholas-fedor/watchtower/pull/3244)
+
 ### Fixed
 
 - Reject negative lifecycle hook timeouts by @nicholas-fedor in [#3242](https://github.com/nicholas-fedor/watchtower/pull/3242)
