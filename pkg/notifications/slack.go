@@ -29,10 +29,6 @@ const slackType = "slack"
 // webhook's own channel.
 const slackWebhookChannel = "webhook"
 
-// discordWebhookMinSegments is the number of path segments, counting the host,
-// in the shortest Discord wrapper URL, discord.com/api/webhooks/<id>/<token>/slack.
-const discordWebhookMinSegments = 6
-
 // slackChannelNotConvertedMessage is logged when a legacy Slack channel cannot
 // be carried into the shoutrrr URL.
 const slackChannelNotConvertedMessage = "Legacy Slack channel is not a channel ID, so the webhook's own channel is used"
@@ -44,6 +40,9 @@ const slackChannelNotConvertedMessage = "Legacy Slack channel is not a channel I
 // shoutrrr Slack URL holds the channel as its host, which can carry an ID but
 // not a #name or @user.
 var slackChannelIDPattern = regexp.MustCompile(`^[CGD][A-Z0-9]{8,}$`)
+
+// discordAPIVersionPattern matches a Discord API version path segment, such as v10.
+var discordAPIVersionPattern = regexp.MustCompile(`^v[0-9]+$`)
 
 // errInvalidDiscordWebhookURL indicates a Discord wrapper hook URL that does
 // not have the form https://discord.com/api/webhooks/<id>/<token>/slack.
@@ -135,8 +134,11 @@ func (s *slackTypeNotifier) GetURL(_ *cobra.Command) (string, error) {
 			Msg("Slack hook URL loaded")
 	}
 
-	// Normalize URL and split parts.
-	trimmedURL := strings.TrimRight(s.HookURL, "/")
+	// Normalize URL and split its path into parts. The query string and fragment
+	// are dropped first, so their contents never count as path segments.
+	trimmedURL, _, _ := strings.Cut(s.HookURL, "?")
+	trimmedURL, _, _ = strings.Cut(trimmedURL, "#")
+	trimmedURL = strings.TrimRight(trimmedURL, "/")
 	trimmedURL = strings.TrimPrefix(trimmedURL, "https://")
 	parts := strings.Split(trimmedURL, "/")
 
@@ -212,30 +214,33 @@ func (s *slackTypeNotifier) GetURL(_ *cobra.Command) (string, error) {
 }
 
 // discordWebhookCredentials returns the webhook ID and token from the path
-// segments of a Discord wrapper hook URL, such as
-// discord.com/api/webhooks/<id>/<token>/slack. A versioned API path, such as
-// /api/v10/webhooks, is accepted, as is a query string after /slack.
+// segments of a Discord wrapper hook URL. The path must be
+// /api/webhooks/<id>/<token>/slack, or /api/<version>/webhooks/<id>/<token>/slack
+// with a version segment such as v10.
 //
 // Parameters:
-//   - parts: The URL split on "/", starting with the host.
+//   - parts: The URL path split on "/", starting with the host, without a query
+//     string or fragment.
 //
 // Returns:
 //   - webhookID: The webhook ID.
 //   - token: The webhook token.
-//   - ok: False when the URL does not have that form or the ID or token is empty.
+//   - ok: False when the path does not have one of those forms or the ID or
+//     token is empty.
 //
 //nolint:nonamedreturns // Same-type returns need names.
 func discordWebhookCredentials(parts []string) (webhookID, token string, ok bool) {
-	if len(parts) < discordWebhookMinSegments || parts[1] != "api" {
+	// Drop the host, then an optional version segment after "api".
+	path := parts[1:]
+	if len(path) == 6 && path[0] == "api" && discordAPIVersionPattern.MatchString(path[1]) {
+		path = append([]string{"api"}, path[2:]...)
+	}
+
+	if len(path) != 5 || path[0] != "api" || path[1] != "webhooks" || path[4] != "slack" {
 		return "", "", false
 	}
 
-	last, _, _ := strings.Cut(parts[len(parts)-1], "?")
-	if last != "slack" || parts[len(parts)-4] != "webhooks" {
-		return "", "", false
-	}
-
-	webhookID, token = parts[len(parts)-3], parts[len(parts)-2]
+	webhookID, token = path[2], path[3]
 	if webhookID == "" || token == "" {
 		return "", "", false
 	}

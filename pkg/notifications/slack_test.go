@@ -68,9 +68,11 @@ func TestSlackTypeNotifier_GetURL_Channel(t *testing.T) {
 
 // TestSlackTypeNotifier_GetURL_Discord verifies that a legacy Slack hook URL
 // pointing at Discord's Slack-compatible endpoint becomes a shoutrrr Discord
-// URL with the webhook ID and token, including a versioned API path and a query
-// string after /slack. A URL without the webhook ID, token or /slack suffix
-// returns an error instead of panicking or building a wrong URL.
+// URL with the webhook ID and token, including a versioned API path, a trailing
+// slash and a query string or fragment, whose contents never count as path
+// segments. A URL without the webhook ID, token or /slack suffix, or with any
+// other segment between /api and /webhooks, returns an error instead of
+// panicking or building a wrong URL.
 func TestSlackTypeNotifier_GetURL_Discord(t *testing.T) {
 	t.Parallel()
 
@@ -84,12 +86,17 @@ func TestSlackTypeNotifier_GetURL_Discord(t *testing.T) {
 		{name: "versioned API path", hookURL: "https://discord.com/api/v10/webhooks/123/abc/slack"},
 		{name: "trailing slash", hookURL: "https://discord.com/api/webhooks/123/abc/slack/"},
 		{name: "query string", hookURL: "https://discord.com/api/webhooks/123/abc/slack?wait=true"},
+		{name: "query string with a slash", hookURL: "https://discord.com/api/webhooks/123/abc/slack?next=a/b"},
+		{name: "trailing slash before a query string", hookURL: "https://discord.com/api/webhooks/123/abc/slack/?wait=true"},
+		{name: "fragment", hookURL: "https://discord.com/api/webhooks/123/abc/slack#top"},
 		{name: "host only", hookURL: "https://discord.com", wantErr: true},
 		{name: "webhooks path only", hookURL: "https://discord.com/api/webhooks", wantErr: true},
 		{name: "no slack suffix", hookURL: "https://discord.com/api/webhooks/123/abc", wantErr: true},
 		{name: "empty webhook ID", hookURL: "https://discord.com/api/webhooks//abc/slack", wantErr: true},
 		{name: "empty token", hookURL: "https://discord.com/api/webhooks/123//slack", wantErr: true},
 		{name: "not an API path", hookURL: "https://discord.com/x/webhooks/123/abc/slack", wantErr: true},
+		{name: "non-version segment after api", hookURL: "https://discord.com/api/x/webhooks/123/abc/slack", wantErr: true},
+		{name: "extra segments after api", hookURL: "https://discord.com/api/v10/x/webhooks/123/abc/slack", wantErr: true},
 	}
 
 	for _, tt := range tests {
