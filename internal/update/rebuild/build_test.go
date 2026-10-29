@@ -5,6 +5,7 @@ import (
 	"context"
 	"strings"
 	"testing"
+	"testing/synctest"
 	"time"
 
 	"github.com/rs/zerolog"
@@ -188,64 +189,68 @@ func TestSession_build(t *testing.T) {
 		assert.NotContains(t, tags[0], "@")
 	})
 
-	t.Run("applies the Git timeout to the URL-context build", func(t *testing.T) {
+	t.Run("bounds the URL-context build by the rebuild timeout, not the Git timeout", func(t *testing.T) {
 		t.Parallel()
 
-		sess := NewSession(git.New(newTestLogger(t), git.Options{Timeout: 50 * time.Millisecond}))
-		commit := "0123456789abcdef0123456789abcdef01234567"
-		c := gitAssociatedContainer("timeout", "/timeout", "myapp:latest", nil)
+		synctest.Test(t, func(t *testing.T) {
+			sess := NewSession(git.New(newTestLogger(t), git.Options{Timeout: 50 * time.Millisecond}))
+			commit := "0123456789abcdef0123456789abcdef01234567"
+			c := gitAssociatedContainer("timeout", "/timeout", "myapp:latest", nil)
 
-		docker := mockContainerClient.NewMockClient(t)
-		docker.EXPECT().
-			BuildRemoteImage(mock.Anything, mock.Anything, mock.Anything, mock.Anything).
-			Run(func(ctx context.Context, _, _ string, _ []string) {
-				deadline, ok := ctx.Deadline()
-				assert.True(t, ok)
-				assert.LessOrEqual(t, time.Until(deadline), 50*time.Millisecond)
-			}).
-			Return(types.ImageID("sha256:built"), nil)
+			docker := mockContainerClient.NewMockClient(t)
+			docker.EXPECT().
+				BuildRemoteImage(mock.Anything, mock.Anything, mock.Anything, mock.Anything).
+				Run(func(ctx context.Context, _, _ string, _ []string) {
+					deadline, ok := ctx.Deadline()
+					assert.True(t, ok)
+					assert.Equal(t, rebuildTimeout, time.Until(deadline))
+				}).
+				Return(types.ImageID("sha256:built"), nil)
 
-		err := sess.build(
-			newTestLogger(t),
-			t.Context(),
-			docker,
-			c,
-			git.CheckResult{Stale: true, Commit: commit},
-			types.UpdateParams{EnableGitMonitoring: true},
-			nil,
-		)
-		require.NoError(t, err)
+			err := sess.build(
+				newTestLogger(t),
+				t.Context(),
+				docker,
+				c,
+				git.CheckResult{Stale: true, Commit: commit},
+				types.UpdateParams{EnableGitMonitoring: true},
+				nil,
+			)
+			require.NoError(t, err)
+		})
 	})
 
 	t.Run("keeps a build that returns nil after its timeout elapses", func(t *testing.T) {
 		t.Parallel()
 
-		sess := NewSession(git.New(newTestLogger(t), git.Options{Timeout: 10 * time.Millisecond}))
-		c := gitAssociatedContainer("timeout", "/timeout", "myapp:latest", nil)
-		commit := "0123456789abcdef0123456789abcdef01234567"
+		synctest.Test(t, func(t *testing.T) {
+			sess := NewSession(gitTestClient(t))
+			c := gitAssociatedContainer("timeout", "/timeout", "myapp:latest", nil)
+			commit := "0123456789abcdef0123456789abcdef01234567"
 
-		docker := mockContainerClient.NewMockClient(t)
-		docker.EXPECT().
-			BuildRemoteImage(mock.Anything, mock.Anything, mock.Anything, mock.Anything).
-			RunAndReturn(func(ctx context.Context, _, _ string, _ []string) (types.ImageID, error) {
-				<-ctx.Done()
+			docker := mockContainerClient.NewMockClient(t)
+			docker.EXPECT().
+				BuildRemoteImage(mock.Anything, mock.Anything, mock.Anything, mock.Anything).
+				RunAndReturn(func(ctx context.Context, _, _ string, _ []string) (types.ImageID, error) {
+					<-ctx.Done()
 
-				return "sha256:built", nil
-			}).
-			Once()
+					return "sha256:built", nil
+				}).
+				Once()
 
-		err := sess.build(
-			newTestLogger(t),
-			t.Context(),
-			docker,
-			c,
-			git.CheckResult{Stale: true, Commit: commit},
-			types.UpdateParams{EnableGitMonitoring: true},
-			nil,
-		)
+			err := sess.build(
+				newTestLogger(t),
+				t.Context(),
+				docker,
+				c,
+				git.CheckResult{Stale: true, Commit: commit},
+				types.UpdateParams{EnableGitMonitoring: true},
+				nil,
+			)
 
-		require.NoError(t, err)
-		assert.Equal(t, types.ImageID("sha256:built"), sess.built[c.ID()])
+			require.NoError(t, err)
+			assert.Equal(t, types.ImageID("sha256:built"), sess.built[c.ID()])
+		})
 	})
 }
 
