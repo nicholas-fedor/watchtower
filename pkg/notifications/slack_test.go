@@ -65,3 +65,67 @@ func TestSlackTypeNotifier_GetURL_Channel(t *testing.T) {
 		})
 	}
 }
+
+// TestSlackTypeNotifier_GetURL_Discord verifies that a legacy Slack hook URL
+// pointing at Discord's Slack-compatible endpoint becomes a shoutrrr Discord
+// URL with the webhook ID and token, including a versioned API path, a trailing
+// slash and a query string or fragment, whose contents never count as path
+// segments. A URL without the webhook ID, token or /slack suffix, or with any
+// other segment between /api and /webhooks, returns an error instead of
+// panicking or building a wrong URL.
+func TestSlackTypeNotifier_GetURL_Discord(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name    string
+		hookURL string
+		wantErr bool
+	}{
+		{name: "discord.com", hookURL: "https://discord.com/api/webhooks/123/abc/slack"},
+		{name: "discordapp.com", hookURL: "https://discordapp.com/api/webhooks/123/abc/slack"},
+		{name: "versioned API path", hookURL: "https://discord.com/api/v10/webhooks/123/abc/slack"},
+		{name: "trailing slash", hookURL: "https://discord.com/api/webhooks/123/abc/slack/"},
+		{name: "query string", hookURL: "https://discord.com/api/webhooks/123/abc/slack?wait=true"},
+		{name: "query string with a slash", hookURL: "https://discord.com/api/webhooks/123/abc/slack?next=a/b"},
+		{name: "trailing slash before a query string", hookURL: "https://discord.com/api/webhooks/123/abc/slack/?wait=true"},
+		{name: "fragment", hookURL: "https://discord.com/api/webhooks/123/abc/slack#top"},
+		{name: "host only", hookURL: "https://discord.com", wantErr: true},
+		{name: "webhooks path only", hookURL: "https://discord.com/api/webhooks", wantErr: true},
+		{name: "no slack suffix", hookURL: "https://discord.com/api/webhooks/123/abc", wantErr: true},
+		{name: "empty webhook ID", hookURL: "https://discord.com/api/webhooks//abc/slack", wantErr: true},
+		{name: "empty token", hookURL: "https://discord.com/api/webhooks/123//slack", wantErr: true},
+		{name: "whitespace webhook ID", hookURL: "https://discord.com/api/webhooks/ \t/abc/slack", wantErr: true},
+		{name: "whitespace token", hookURL: "https://discord.com/api/webhooks/123/  /slack", wantErr: true},
+		{name: "encoded whitespace webhook ID", hookURL: "https://discord.com/api/webhooks/%20%09/abc/slack", wantErr: true},
+		{name: "encoded whitespace token", hookURL: "https://discord.com/api/webhooks/123/%20/slack", wantErr: true},
+		{name: "malformed escape in token", hookURL: "https://discord.com/api/webhooks/123/%zz/slack", wantErr: true},
+		{name: "not an API path", hookURL: "https://discord.com/x/webhooks/123/abc/slack", wantErr: true},
+		{name: "non-version segment after api", hookURL: "https://discord.com/api/x/webhooks/123/abc/slack", wantErr: true},
+		{name: "extra segments after api", hookURL: "https://discord.com/api/v10/x/webhooks/123/abc/slack", wantErr: true},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			log := zerolog.Nop()
+			notifier := &slackTypeNotifier{HookURL: tt.hookURL, log: &log}
+
+			raw, err := notifier.GetURL(nil)
+			if tt.wantErr {
+				require.ErrorIs(t, err, errInvalidDiscordWebhookURL)
+				assert.Empty(t, raw)
+
+				return
+			}
+
+			require.NoError(t, err)
+
+			parsed, err := url.Parse(raw)
+			require.NoError(t, err)
+			assert.Equal(t, "discord", parsed.Scheme)
+			assert.Equal(t, "abc", parsed.User.Username())
+			assert.Equal(t, "123", parsed.Host)
+		})
+	}
+}
