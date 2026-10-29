@@ -10,6 +10,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Bound failed-replacement cleanup by the container stop timeout by @nicholas-fedor in [#3238](https://github.com/nicholas-fedor/watchtower/pull/3238)
 - Give detached Docker calls time beyond the stop timeout by @nicholas-fedor in [#3236](https://github.com/nicholas-fedor/watchtower/pull/3236)
 - Report when Watchtower cannot disable its restart policy on exit by @nicholas-fedor in [#3173](https://github.com/nicholas-fedor/watchtower/pull/3173)
 - Exit instead of running unscoped when the scope label cannot be read by @nicholas-fedor in [#3169](https://github.com/nicholas-fedor/watchtower/pull/3169)
