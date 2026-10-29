@@ -2469,6 +2469,54 @@ func TestSend_CanceledBeforeSend(t *testing.T) {
 	assert.Equal(t, int32(0), router.sends.Load())
 }
 
+// TestSendEntries_EmptyMessageLogsSkipAtDebug verifies that a template that
+// renders an empty message skips the send with a single debug line, whatever
+// the number of notification URLs. With report templates an empty message is
+// the normal result of a scan without changes, so it must not log at info.
+func TestSendEntries_EmptyMessageLogsSkipAtDebug(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name string
+		urls []string
+	}{
+		{name: "one URL", urls: []string{"logger://"}},
+		{name: "two URLs", urls: []string{"logger://", "logger://"}},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			log, buf := newBufferLogger()
+			notifier := &shoutrrrTypeNotifier{
+				Urls:     tt.urls,
+				template: template.Must(template.New("empty").Parse("")),
+				localLog: log,
+			}
+
+			notifier.sendEntries(nil, nil)
+
+			var skips int
+
+			for line := range strings.Lines(buf.String()) {
+				var entry map[string]any
+				require.NoError(t, json.Unmarshal([]byte(line), &entry))
+
+				assert.NotEqual(t, "info", entry["level"], entry["message"])
+
+				if entry["message"] == "Message empty, skipping send" {
+					assert.Equal(t, "debug", entry["level"])
+
+					skips++
+				}
+			}
+
+			assert.Equal(t, 1, skips)
+		})
+	}
+}
+
 // TestEventFieldMap_NilEvent verifies that eventFieldMap reports no fields for
 // a nil event.
 func TestEventFieldMap_NilEvent(t *testing.T) {

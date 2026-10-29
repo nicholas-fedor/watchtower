@@ -1164,8 +1164,6 @@ func (n *shoutrrrTypeNotifier) sendEntries(entries []*notificationEntry, report 
 	if msg == "" {
 		if err != nil {
 			log.Error().Err(err).Msg("Notification template error")
-		} else if len(n.Urls) > 1 {
-			log.Info().Msg("Skipping notification due to empty message")
 		}
 
 		log.Debug().Msg("Message empty, skipping send")
