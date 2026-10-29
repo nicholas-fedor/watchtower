@@ -26,6 +26,7 @@ import (
 	"github.com/nicholas-fedor/watchtower/internal/update/cleanup"
 	"github.com/nicholas-fedor/watchtower/internal/update/implicitrestart"
 	"github.com/nicholas-fedor/watchtower/internal/update/rebuild"
+	"github.com/nicholas-fedor/watchtower/internal/update/restart"
 	"github.com/nicholas-fedor/watchtower/internal/update/selfupdate"
 	"github.com/nicholas-fedor/watchtower/internal/update/sorter"
 	"github.com/nicholas-fedor/watchtower/internal/update/staleness"
@@ -147,7 +148,7 @@ func update(
 
 					recoverCtx, recoverCancel := context.WithTimeout(
 						context.Background(),
-						restartPolicyTimeout(config.Timeout),
+						config.DetachedTimeout(),
 					)
 					defer recoverCancel()
 
@@ -165,12 +166,12 @@ func update(
 
 					setNoRestartCtx, setNoRestartCancel := context.WithTimeout(
 						context.Background(),
-						restartPolicyTimeout(config.Timeout),
+						config.DetachedTimeout(),
 					)
 					defer setNoRestartCancel()
 
 					//nolint:contextcheck // setNoRestartCtx is intentionally used for restart policy update
-					disableOldWatchtowerRestarts(log, setNoRestartCtx, c, client)
+					selfupdate.DisableOldRestarts(log, setNoRestartCtx, c, client)
 
 					return nil, nil, errOldSelfDetected
 				}
@@ -714,13 +715,6 @@ func update(
 		Int("restart_count", len(allContainersToRestart)).
 		Msg("Prepared containers for restart")
 
-	// Perform updates and restarts, either with rolling restarts or in batches.
-	var (
-		failedStop    map[types.ContainerID]error
-		stoppedImages []types.RemovedImageInfo
-		failedStart   map[types.ContainerID]error
-	)
-
 	gitFailed := make(map[types.ContainerID]error)
 	gitSession.PrepareRebuilds(
 		log,
@@ -774,53 +768,19 @@ func update(
 		config,
 	)
 
-	if config.RollingRestart {
-		// Apply rolling restarts for all containers in dependency order.
-		rollingFailed, rollingErr := performRollingRestart(
-			log,
-			ctx,
-			allContainersToRestart,
-			client,
-			config,
-			&cleanupImageInfos,
-			progress,
-			gitSession,
-		)
-		recordRestartOutcomes(log, progress, rollingFailed)
-
-		if rollingErr != nil {
-			return progress.Report(log), cleanupImageInfos, rollingErr
-		}
-	} else {
-		// Mark containers to update for update in progress
-		for _, c := range allContainersToRestart {
-			if c.IsStale() {
-				progress.MarkForUpdate(log, c.ID())
-			}
-		}
-
-		// Stop and restart containers in batches, respecting dependency order.
-		failedStop, stoppedImages = stopContainersInReversedOrder(
-			log,
-			ctx,
-			allContainersToRestart,
-			client,
-			config,
-		)
-		recordRestartOutcomes(log, progress, failedStop)
-
-		failedStart = restartContainersInSortedOrder(
-			log,
-			ctx,
-			allContainersToRestart,
-			client,
-			config,
-			stoppedImages,
-			&cleanupImageInfos,
-			progress,
-			gitSession,
-		)
-		recordRestartOutcomes(log, progress, failedStart)
+	// Perform updates and restarts, either with rolling restarts or in batches.
+	err = restart.Run(
+		log,
+		ctx,
+		allContainersToRestart,
+		client,
+		config,
+		&cleanupImageInfos,
+		progress,
+		gitSession,
+	)
+	if err != nil {
+		return progress.Report(log), cleanupImageInfos, err
 	}
 
 	// Run post-check lifecycle hooks if enabled to finalize the update process.

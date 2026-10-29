@@ -1110,8 +1110,8 @@ func (c *client) StartContainer(ctx context.Context, container types.Container) 
 // Unlike StartContainer, this does not create a new container from a source
 // configuration. It directly starts an existing, already-created container
 // using the Docker API's ContainerStart method. Callers are responsible for
-// checking whether the container should be started (e.g., the ReviveStopped
-// and NoRestart checks in restartStaleContainer).
+// checking whether the container should be started, for example under the
+// revive-stopped and no-restart configuration options.
 //
 // Callers use it to start a created replacement, to recover an orphaned
 // Watchtower container, and, in the ephemeral orchestrator, to start the new

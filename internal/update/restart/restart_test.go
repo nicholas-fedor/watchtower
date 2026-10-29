@@ -1,7 +1,9 @@
-package update
+package restart
 
 import (
+	"bytes"
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"sync"
@@ -10,14 +12,11 @@ import (
 
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 
 	dockerContainer "github.com/moby/moby/api/types/container"
 	dockerNetwork "github.com/moby/moby/api/types/network"
 
-	mockContainerClient "github.com/nicholas-fedor/watchtower/internal/container/client/mocks"
-	"github.com/nicholas-fedor/watchtower/internal/testutil/logcapture"
 	mockUpdate "github.com/nicholas-fedor/watchtower/internal/update/mocks"
 	"github.com/nicholas-fedor/watchtower/internal/update/state"
 	"github.com/nicholas-fedor/watchtower/pkg/types"
@@ -43,6 +42,54 @@ type rollingRestartTestCase struct {
 	expectedSkipped     int    // Number of containers that should be skipped
 	expectedLogMessages int    // Expected number of log messages for skipped containers
 	description         string // Human-readable description
+}
+
+// newTestLogger returns a logger that writes each event to the test's log, so a
+// failing test shows what it logged.
+//
+// Parameters:
+//   - t: Test that receives the log lines.
+//
+// Returns:
+//   - *zerolog.Logger: Logger writing to t.
+func newTestLogger(t *testing.T) *zerolog.Logger {
+	t.Helper()
+
+	// Frame 4 skips zerolog's write path, so each line names the log call.
+	w := zerolog.TestWriter{T: t, Frame: 4}
+
+	return new(zerolog.New(w))
+}
+
+// parseJSONLogEntries parses zerolog JSON lines from a buffer into field maps.
+func parseJSONLogEntries(buf *bytes.Buffer) []map[string]any {
+	var entries []map[string]any
+
+	for line := range bytes.SplitSeq(buf.Bytes(), []byte("\n")) {
+		line = bytes.TrimSpace(line)
+		if len(line) == 0 {
+			continue
+		}
+
+		var m map[string]any
+
+		err := json.Unmarshal(line, &m)
+		if err != nil {
+			continue
+		}
+
+		entries = append(entries, m)
+	}
+
+	return entries
+}
+
+// newCaptureLogger returns a JSON zerolog logger writing to a buffer for assertions.
+func newCaptureLogger() (*zerolog.Logger, *bytes.Buffer) {
+	buf := &bytes.Buffer{}
+	l := zerolog.New(buf).Level(zerolog.DebugLevel).With().Timestamp().Logger()
+
+	return &l, buf
 }
 
 // Test_restartStaleContainer verifies when restarting a stale Watchtower
@@ -1919,41 +1966,72 @@ func Test_performRollingRestart(t *testing.T) {
 	})
 }
 
-// TestDisableOldWatchtowerRestarts verifies that the restart policy of an old
-// Watchtower container is set to "no", and that a failure is logged only at
-// debug, since an old container that starts again exits on its own.
-func TestDisableOldWatchtowerRestarts(t *testing.T) {
+// TestRun verifies that Run records the containers a canceled session left
+// untouched as skipped in both restart modes. Only rolling restarts return the
+// cancellation, because the batch phases report it per container.
+func TestRun(t *testing.T) {
 	t.Parallel()
 
 	tests := []struct {
-		name      string
-		updateErr error
-		wantLog   bool
+		name    string
+		rolling bool
+		wantErr bool
 	}{
-		{name: "the update succeeds", wantLog: false},
-		{name: "the update fails", updateErr: errors.New("update refused"), wantLog: true},
+		{name: "rolling restarts", rolling: true, wantErr: true},
+		{name: "batch restarts", rolling: false, wantErr: false},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 
-			oldContainer := mockUpdate.CreateMockContainer("old-id", "/watchtower-old-000000000000", "nickfedor/watchtower:latest", time.Now())
+			log := newTestLogger(t)
 
-			client := mockContainerClient.NewMockClient(t)
-			client.EXPECT().SetRestartPolicy(mock.Anything, oldContainer.ID(),
-				dockerContainer.RestartPolicy{Name: dockerContainer.RestartPolicyDisabled}).Return(tt.updateErr).Once()
+			c := mockUpdate.CreateMockContainerWithConfig(
+				"container-0",
+				"/container-0",
+				"image-0:latest",
+				true,
+				false,
+				time.Now(),
+				&dockerContainer.Config{
+					Labels:       map[string]string{},
+					ExposedPorts: dockerNetwork.PortSet{},
+				},
+			)
+			c.SetStale(true)
 
-			log, logOutput := logcapture.New(zerolog.DebugLevel)
-			disableOldWatchtowerRestarts(log, t.Context(), oldContainer, client)
+			client := mockUpdate.CreateMockClient(
+				&mockUpdate.TestData{
+					Containers: []types.Container{c},
+					Staleness:  map[string]bool{"container-0": true},
+				},
+				false,
+				false,
+			)
 
-			if tt.wantLog {
-				assert.Contains(t, logOutput.String(), "Failed to disable the restart policy of the old Watchtower container")
-				assert.Contains(t, logOutput.String(), "update refused")
-				assert.Contains(t, logOutput.String(), "level=debug")
+			config := types.UpdateParams{RollingRestart: tt.rolling}
+			progress := state.Progress{}
+			progress.AddScanned(log, c, "sha256:new", config)
+
+			ctx, cancel := context.WithCancel(t.Context())
+			cancel()
+
+			var cleanupImageInfos []types.RemovedImageInfo
+
+			err := Run(log, ctx, []types.Container{c}, client, config, &cleanupImageInfos, &progress, nil)
+			if tt.wantErr {
+				require.ErrorIs(t, err, context.Canceled)
 			} else {
-				assert.Empty(t, logOutput.String())
+				require.NoError(t, err)
 			}
+
+			report := progress.Report(log)
+			require.Len(t, report.Skipped(), 1)
+			assert.Equal(t, "container-0", report.Skipped()[0].Name())
+			assert.Empty(t, report.Failed())
+			assert.Empty(t, report.Updated())
+			assert.Empty(t, cleanupImageInfos)
 		})
 	}
 }

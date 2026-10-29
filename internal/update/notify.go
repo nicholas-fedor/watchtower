@@ -121,7 +121,7 @@ func RunUpdatesWithNotifications(
 		params.Client,
 		updateConfig.Cleanup,
 		cleanupImageInfosPtr,
-		updateConfig.Timeout,
+		updateConfig.DetachedTimeout(),
 	)
 
 	// Publish image cleanup event
@@ -390,7 +390,7 @@ func executeUpdate(
 //   - client: The Docker client instance used for container operations.
 //   - enabled: Whether image cleanup is enabled.
 //   - cleanupImageInfos: Slice of cleaned image info to be removed.
-//   - timeout: Bound for detached cleanup Docker calls. Non-positive uses the restart-policy fallback.
+//   - timeout: Bound for the detached cleanup Docker calls.
 //
 // Returns:
 //   - []types.RemovedImageInfo: Slice of successfully cleaned image info.
@@ -408,7 +408,7 @@ func performImageCleanup(log *zerolog.Logger, ctx context.Context,
 	// abort leftover image removal.
 	cleanupCtx, cancel := context.WithTimeout(
 		context.WithoutCancel(ctx),
-		restartPolicyTimeout(timeout),
+		timeout,
 	)
 	defer cancel()
 

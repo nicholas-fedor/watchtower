@@ -1,4 +1,4 @@
-package update
+package restart
 
 import (
 	"context"
@@ -10,7 +10,6 @@ import (
 	"github.com/rs/zerolog"
 
 	cerrdefs "github.com/containerd/errdefs"
-	dockerContainer "github.com/moby/moby/api/types/container"
 
 	"github.com/nicholas-fedor/watchtower/internal/container"
 	containerClient "github.com/nicholas-fedor/watchtower/internal/container/client"
@@ -49,15 +48,94 @@ const (
 	// defaultHealthCheckTimeout defines the default timeout for waiting for container health checks.
 	defaultHealthCheckTimeout = 5 * time.Minute
 
-	// defaultRestartPolicyTimeout defines the fallback timeout for restart policy
-	// updates when config.Timeout is non-positive.
-	defaultRestartPolicyTimeout = 30 * time.Second
-
 	// defaultCreateStartTimeout defines the minimum timeout for container create
 	// and start operations during restart. It guards against slow hosts where
-	// Docker API calls can exceed the default 30s restart policy timeout.
+	// Docker API calls can exceed the bound of other detached calls, which is
+	// the stop timeout or 30 seconds.
 	defaultCreateStartTimeout = 5 * time.Minute
 )
+
+// Run stops and recreates the containers an update session restarts, and
+// records in progress each container that was not replaced.
+//
+// The containers must be in dependency order. With rolling restarts, each
+// container is stopped and recreated before the next one. Otherwise every
+// stale container is marked for update, then every container stops in reverse
+// order before any is recreated in order. A container the session left
+// untouched on purpose is recorded as skipped. One example is a container whose
+// pre-update hook asked to skip it. Any other failure is recorded as failed.
+// The old images of replaced containers are added to cleanupImageInfos.
+//
+// Parameters:
+//   - log: Session logger.
+//   - ctx: Context for cancellation and timeouts.
+//   - containers: Containers to restart, in dependency order.
+//   - client: Container client for Docker operations.
+//   - config: Update options controlling restart behavior.
+//   - cleanupImageInfos: Images to remove after the session, extended with the
+//     old images of replaced containers.
+//   - progress: Session progress to update.
+//   - gitSession: Git rebuild session that supplies the images built for
+//     Git-watched containers.
+//
+// Returns:
+//   - error: Non-nil when the context is canceled during rolling restarts.
+func Run(
+	log *zerolog.Logger,
+	ctx context.Context,
+	containers []types.Container,
+	client containerClient.Client,
+	config types.UpdateParams,
+	cleanupImageInfos *[]types.RemovedImageInfo,
+	progress *state.Progress,
+	gitSession *rebuild.Session,
+) error {
+	if config.RollingRestart {
+		failed, err := performRollingRestart(
+			log,
+			ctx,
+			containers,
+			client,
+			config,
+			cleanupImageInfos,
+			progress,
+			gitSession,
+		)
+		recordRestartOutcomes(log, progress, failed)
+
+		return err
+	}
+
+	for _, c := range containers {
+		if c.IsStale() {
+			progress.MarkForUpdate(log, c.ID())
+		}
+	}
+
+	failedStop, stoppedImages := stopContainersInReversedOrder(
+		log,
+		ctx,
+		containers,
+		client,
+		config,
+	)
+	recordRestartOutcomes(log, progress, failedStop)
+
+	failedStart := restartContainersInSortedOrder(
+		log,
+		ctx,
+		containers,
+		client,
+		config,
+		stoppedImages,
+		cleanupImageInfos,
+		progress,
+		gitSession,
+	)
+	recordRestartOutcomes(log, progress, failedStart)
+
+	return nil
+}
 
 // performRollingRestart updates containers with rolling restarts.
 //
@@ -663,10 +741,9 @@ func restartStaleContainer(
 	// Create a detached context to survive parent context cancellation.
 	// This ensures container cleanup and update operations complete even if the
 	// parent context is canceled during the restart process.
-	// A finite fallback is applied when config.Timeout is non-positive, and the
-	// create/start phase uses at least defaultCreateStartTimeout to accommodate
-	// slow hosts.
-	detachedTimeout := max(restartPolicyTimeout(config.Timeout), defaultCreateStartTimeout)
+	// The create and start calls can be slow on busy hosts. They get the stop
+	// timeout when it is longer than 5 minutes, and 5 minutes otherwise.
+	detachedTimeout := max(config.DetachedTimeout(), defaultCreateStartTimeout)
 
 	detachedCtx, cancelDetached := context.WithTimeout(
 		context.Background(),
@@ -802,7 +879,7 @@ func restartStaleContainer(
 		if renamed && originalWatchtowerName != "" && sourceContainer.IsWatchtower() {
 			renameBackCtx, renameBackCancel := context.WithTimeout(
 				context.Background(),
-				restartPolicyTimeout(config.Timeout),
+				config.DetachedTimeout(),
 			)
 			defer renameBackCancel()
 
@@ -866,7 +943,7 @@ func restartStaleContainer(
 
 				cleanupCtx, cleanupCancel := context.WithTimeout(
 					context.Background(),
-					restartPolicyTimeout(config.Timeout),
+					config.DetachedTimeout(),
 				)
 				defer cleanupCancel()
 
@@ -932,50 +1009,8 @@ func restartStaleContainer(
 			Msg("Updating restart policy for old Watchtower container")
 
 		//nolint:contextcheck // Using detached context intentionally to survive parent cancellation
-		disableOldWatchtowerRestarts(log, detachedCtx, sourceContainer, client)
+		selfupdate.DisableOldRestarts(log, detachedCtx, sourceContainer, client)
 	}
 
 	return newContainerID, renamed, nil
-}
-
-// restartPolicyTimeout returns the timeout to use for restart policy operations.
-// If the provided timeout is positive, it is returned as-is.
-// Otherwise, a finite fallback is used to prevent indefinite blocking.
-func restartPolicyTimeout(timeout time.Duration) time.Duration {
-	if timeout > 0 {
-		return timeout
-	}
-
-	return defaultRestartPolicyTimeout
-}
-
-// disableOldWatchtowerRestarts sets the restart policy of an old Watchtower
-// container to "no", so the runtime does not start it again.
-//
-// A failure is logged at debug only. An old Watchtower container that starts
-// again detects that it is old and exits, and the instance that replaced it
-// removes it.
-//
-// Parameters:
-//   - log: Logger for the failure.
-//   - ctx: Context for the restart policy update.
-//   - oldContainer: The old Watchtower container.
-//   - client: Container client for Docker operations.
-func disableOldWatchtowerRestarts(
-	log *zerolog.Logger,
-	ctx context.Context,
-	oldContainer types.Container,
-	client containerClient.Client,
-) {
-	err := client.SetRestartPolicy(
-		ctx,
-		oldContainer.ID(),
-		dockerContainer.RestartPolicy{Name: dockerContainer.RestartPolicyDisabled},
-	)
-	if err != nil {
-		log.Debug().
-			Err(err).
-			Str("container", oldContainer.Name()).
-			Msg("Failed to disable the restart policy of the old Watchtower container")
-	}
 }
