@@ -635,12 +635,16 @@ func containsWatchtowerLabel(containerLabels map[string]string) bool {
 
 // parseHookTimeout parses a lifecycle hook timeout label value in minutes.
 //
+// A value too long to express as a [time.Duration], about 292 years, is
+// rejected, since converting it to a duration would overflow.
+//
 // Parameters:
 //   - value: The label value.
 //
 // Returns:
 //   - int: The timeout in minutes, where 0 means no timeout.
-//   - error: Non-nil when value is not a whole number of 0 or more.
+//   - error: Non-nil when value is not a whole number of 0 or more, or is too
+//     long for a duration.
 func parseHookTimeout(value string) (int, error) {
 	minutes, err := strconv.Atoi(value)
 	if err != nil {
@@ -649,6 +653,10 @@ func parseHookTimeout(value string) (int, error) {
 
 	if minutes < 0 {
 		return 0, fmt.Errorf("%w: got %d", errInvalidHookTimeout, minutes)
+	}
+
+	if int64(minutes) > math.MaxInt64/int64(time.Minute) {
+		return 0, fmt.Errorf("%w: %d minutes is too long for a timeout", errInvalidHookTimeout, minutes)
 	}
 
 	return minutes, nil

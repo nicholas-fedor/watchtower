@@ -288,6 +288,8 @@ func Test_parseHookTimeout(t *testing.T) {
 		{name: "negative", value: "-1", wantErr: true},
 		{name: "fraction", value: "1.5", wantErr: true},
 		{name: "empty", value: "", wantErr: true},
+		{name: "longest duration", value: "153722867", want: 153722867},
+		{name: "too long for a duration", value: "153722868", wantErr: true},
 	}
 
 	for _, tt := range tests {
