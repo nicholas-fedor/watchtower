@@ -191,6 +191,14 @@ func executeCheckCommand(
 		Logger()
 	clog := &clogVal
 
+	// Skip if no command is set.
+	if command == "" {
+		clog.Debug().
+			Msg("No " + phase + " command supplied. Skipping")
+
+		return
+	}
+
 	// Determine effective UID/GID: use container labels if set, otherwise use defaults.
 	effectiveUID := uid
 
@@ -204,14 +212,6 @@ func executeCheckCommand(
 	containerGID, ok := cont.GetLifecycleGID()
 	if ok {
 		effectiveGID = containerGID
-	}
-
-	// Skip if no command is set.
-	if command == "" {
-		clog.Debug().
-			Msg("No " + phase + " command supplied. Skipping")
-
-		return
 	}
 
 	minutes := timeout()
@@ -256,11 +256,9 @@ func ExecutePreUpdateCommand(log *zerolog.Logger,
 	uid int,
 	gid int,
 ) (bool, error) {
-	timeout := container.PreUpdateTimeout()
 	command := container.GetLifecyclePreUpdateCommand()
 	clogVal := log.With().
 		Str("container", container.Name()).
-		Int("timeout", timeout).
 		Logger()
 	clog := &clogVal
 
@@ -279,6 +277,11 @@ func ExecutePreUpdateCommand(log *zerolog.Logger,
 
 		return false, nil
 	}
+
+	// Only a hook that runs reads its timeout label, so an invalid label on a
+	// skipped hook logs no warning.
+	timeout := container.PreUpdateTimeout()
+	clogVal = clog.With().Int("timeout", timeout).Logger()
 
 	// Determine effective UID/GID: use container labels if set, otherwise use defaults.
 	effectiveUID := uid
@@ -353,13 +356,23 @@ func ExecutePostUpdateCommand(log *zerolog.Logger,
 		return
 	}
 
-	timeout := newContainer.PostUpdateTimeout()
 	clogVal = log.With().
 		Str("container", newContainer.Name()).
-		Int("timeout", timeout).
 		Logger()
 	clog = &clogVal
 	command := newContainer.GetLifecyclePostUpdateCommand()
+
+	// Skip if no command is set.
+	if len(command) == 0 {
+		clog.Debug().Msg("No post-update command supplied. Skipping")
+
+		return
+	}
+
+	// Only a hook that runs reads its timeout label, so an invalid label on a
+	// skipped hook logs no warning.
+	timeout := newContainer.PostUpdateTimeout()
+	clogVal = clog.With().Int("timeout", timeout).Logger()
 
 	// Determine effective UID/GID: use container labels if set, otherwise use defaults.
 	effectiveUID := uid
@@ -374,13 +387,6 @@ func ExecutePostUpdateCommand(log *zerolog.Logger,
 	containerGID, ok := newContainer.GetLifecycleGID()
 	if ok {
 		effectiveGID = containerGID
-	}
-
-	// Skip if no command is set.
-	if len(command) == 0 {
-		clog.Debug().Msg("No post-update command supplied. Skipping")
-
-		return
 	}
 
 	// Execute command with configured timeout.

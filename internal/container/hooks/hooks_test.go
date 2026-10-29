@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"errors"
+	"maps"
 	"testing"
 
 	"github.com/rs/zerolog"
@@ -424,29 +425,36 @@ func TestExecutePostCheckCommand(t *testing.T) {
 	}
 }
 
-// TestExecuteCheckCommand_NoCommandSkipsTimeout verifies that a check hook
-// without a command does not read its timeout label. Check hooks run for every
-// filtered container on each scan, so reading the label would log a debug line
-// per container and warn about an invalid timeout for a hook that never runs.
-func TestExecuteCheckCommand_NoCommandSkipsTimeout(t *testing.T) {
-	t.Parallel()
-
-	log, logBuf := newDebugLog()
-	cont := container.NewContainer(log,
+// containerWithLabels returns a container that logs to log and carries labels.
+// Its state is running when running is true.
+func containerWithLabels(log *zerolog.Logger, running bool, labels map[string]string) *container.Container {
+	return container.NewContainer(log,
 		&dockerContainer.InspectResponse{
 			ID:         "container_id",
 			HostConfig: &dockerContainer.HostConfig{},
 			Name:       "/test-container",
-			State:      &dockerContainer.State{},
-			Config: &dockerContainer.Config{
-				Labels: map[string]string{
-					"com.centurylinklabs.watchtower.lifecycle.pre-check-timeout":  "-1",
-					"com.centurylinklabs.watchtower.lifecycle.post-check-timeout": "-1",
-				},
-			},
+			State:      &dockerContainer.State{Running: running},
+			Config:     &dockerContainer.Config{Labels: labels},
 		},
 		nil,
 	)
+}
+
+// TestExecuteCheckCommand_NoCommandSkipsLabels verifies that a check hook
+// without a command reads neither its timeout label nor the lifecycle UID and
+// GID labels. Check hooks run for every filtered container on each scan, so
+// reading the labels would log a debug line per container and warn about an
+// invalid label for a hook that never runs.
+func TestExecuteCheckCommand_NoCommandSkipsLabels(t *testing.T) {
+	t.Parallel()
+
+	log, logBuf := newDebugLog()
+	cont := containerWithLabels(log, false, map[string]string{
+		"com.centurylinklabs.watchtower.lifecycle.pre-check-timeout":  "-1",
+		"com.centurylinklabs.watchtower.lifecycle.post-check-timeout": "-1",
+		"com.centurylinklabs.watchtower.lifecycle.uid":                "-5",
+		"com.centurylinklabs.watchtower.lifecycle.gid":                "-5",
+	})
 	client := mockContainerClient.NewMockClient(t)
 
 	executePreCheckCommand(log, context.Background(), client, cont, 0, 0)
@@ -456,6 +464,78 @@ func TestExecuteCheckCommand_NoCommandSkipsTimeout(t *testing.T) {
 	assert.Contains(t, output, "No pre-check command supplied")
 	assert.Contains(t, output, "No post-check command supplied")
 	assert.NotContains(t, output, "timeout")
+	assert.NotContains(t, output, "Invalid")
+}
+
+// TestExecutePreUpdateCommand_SkippedHookReadsNoLabels verifies that a
+// pre-update hook that does not run reads none of its labels. That covers a
+// container without a pre-update command and a stopped container, so an
+// invalid timeout, UID or GID label logs no warning for a hook that never runs.
+func TestExecutePreUpdateCommand_SkippedHookReadsNoLabels(t *testing.T) {
+	t.Parallel()
+
+	invalidLabels := map[string]string{
+		"com.centurylinklabs.watchtower.lifecycle.pre-update-timeout": "-1",
+		"com.centurylinklabs.watchtower.lifecycle.uid":                "-5",
+		"com.centurylinklabs.watchtower.lifecycle.gid":                "-5",
+	}
+
+	tests := []struct {
+		name    string
+		running bool
+		command string
+		wantLog string
+	}{
+		{name: "no command", running: true, wantLog: "No pre-update command supplied"},
+		{name: "stopped container", running: false, command: "pre-update", wantLog: "Container is not running"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			labels := maps.Clone(invalidLabels)
+			if tt.command != "" {
+				labels["com.centurylinklabs.watchtower.lifecycle.pre-update"] = tt.command
+			}
+
+			log, logBuf := newDebugLog()
+			cont := containerWithLabels(log, tt.running, labels)
+			client := mockContainerClient.NewMockClient(t)
+
+			skip, err := ExecutePreUpdateCommand(log, context.Background(), client, cont, 0, 0)
+			require.NoError(t, err)
+			assert.False(t, skip)
+
+			output := logBuf.String()
+			assert.Contains(t, output, tt.wantLog)
+			assert.NotContains(t, output, "timeout")
+			assert.NotContains(t, output, "Invalid")
+		})
+	}
+}
+
+// TestExecutePostUpdateCommand_NoCommandReadsNoLabels verifies that a
+// post-update hook without a command reads none of its labels, so an invalid
+// timeout, UID or GID label logs no warning for a hook that never runs.
+func TestExecutePostUpdateCommand_NoCommandReadsNoLabels(t *testing.T) {
+	t.Parallel()
+
+	log, logBuf := newDebugLog()
+	cont := containerWithLabels(log, true, map[string]string{
+		"com.centurylinklabs.watchtower.lifecycle.post-update-timeout": "-1",
+		"com.centurylinklabs.watchtower.lifecycle.uid":                 "-5",
+		"com.centurylinklabs.watchtower.lifecycle.gid":                 "-5",
+	})
+	client := mockContainerClient.NewMockClient(t)
+	client.EXPECT().GetContainer(mock.Anything, types.ContainerID("test")).Return(cont, nil).Once()
+
+	ExecutePostUpdateCommand(log, context.Background(), client, "test", 0, 0)
+
+	output := logBuf.String()
+	assert.Contains(t, output, "No post-update command supplied")
+	assert.NotContains(t, output, "timeout")
+	assert.NotContains(t, output, "Invalid")
 }
 
 // TestExecutePreUpdateCommand tests the ExecutePreUpdateCommand function.
