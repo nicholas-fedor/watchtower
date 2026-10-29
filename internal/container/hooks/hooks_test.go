@@ -274,6 +274,18 @@ func TestExecutePreCheckCommand(t *testing.T) {
 			expectedLogMsg: "Executing pre-check command",
 		},
 		{
+			name: "zero timeout label runs without a timeout",
+			container: mockedContainer(withLabels(map[string]string{
+				"com.centurylinklabs.watchtower.lifecycle.pre-check":         "pre-check",
+				"com.centurylinklabs.watchtower.lifecycle.pre-check-timeout": "0",
+			})),
+			setupClient: func(c *mockContainerClient.MockClient) {
+				c.On("ExecuteCommand", mock.Anything, mock.Anything, "pre-check", 0, 0, 0).
+					Return(true, nil)
+			},
+			expectedLogMsg: "Executing pre-check command",
+		},
+		{
 			name:           "no command",
 			container:      mockedContainer(),
 			expectedLogMsg: "No pre-check command supplied",
@@ -348,6 +360,18 @@ func TestExecutePostCheckCommand(t *testing.T) {
 			})),
 			setupClient: func(c *mockContainerClient.MockClient) {
 				c.On("ExecuteCommand", mock.Anything, mock.Anything, "post-check", 5, 0, 0).
+					Return(true, nil)
+			},
+			expectedLogMsg: "Executing post-check command",
+		},
+		{
+			name: "zero timeout label runs without a timeout",
+			container: mockedContainer(withLabels(map[string]string{
+				"com.centurylinklabs.watchtower.lifecycle.post-check":         "post-check",
+				"com.centurylinklabs.watchtower.lifecycle.post-check-timeout": "0",
+			})),
+			setupClient: func(c *mockContainerClient.MockClient) {
+				c.On("ExecuteCommand", mock.Anything, mock.Anything, "post-check", 0, 0, 0).
 					Return(true, nil)
 			},
 			expectedLogMsg: "Executing post-check command",
