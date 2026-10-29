@@ -10,6 +10,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Reject negative lifecycle hook timeouts by @nicholas-fedor in [#3242](https://github.com/nicholas-fedor/watchtower/pull/3242)
 - Bound git rebuilds by their own limit, not the git timeout by @nicholas-fedor in [#3240](https://github.com/nicholas-fedor/watchtower/pull/3240)
 - Bound failed-replacement cleanup by the container stop timeout by @nicholas-fedor in [#3238](https://github.com/nicholas-fedor/watchtower/pull/3238)
 - Give detached Docker calls time beyond the stop timeout by @nicholas-fedor in [#3236](https://github.com/nicholas-fedor/watchtower/pull/3236)
