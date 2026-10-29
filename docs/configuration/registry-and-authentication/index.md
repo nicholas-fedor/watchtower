@@ -79,12 +79,12 @@ Sets the minimum TLS version for registry connections, overriding the default (T
 ```text
             Argument: --registry-tls-min-version
 Environment Variable: WATCHTOWER_REGISTRY_TLS_MIN_VERSION
-     Possible Values: TLS1.0, TLS1.1, TLS1.2, TLS1.3
+     Possible Values: TLS1.2, TLS1.3
              Default: TLS1.2
 ```
 
-!!! Warning
-    Using older versions of TLS not recommended for security reasons.
+!!! Note
+    Older versions such as TLS1.0 and TLS1.1 are not accepted. Any other value logs a warning, and Watchtower uses TLS 1.2.
 
 ### Proxy Configuration
 
