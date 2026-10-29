@@ -2,7 +2,7 @@
 
 ## Overview
 
-The `/v1/images/` endpoint lists the images tracked by Watchtower along with their current digests and container counts.
+The `/v1/images` endpoint lists the images tracked by Watchtower along with their current digests and container counts.
 Include `images` in [`http-api-endpoints`](../../../configuration/http-api/index.md#http_api_endpoints) to enable this read-only endpoint.
 
 ## Response Format
