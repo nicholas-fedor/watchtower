@@ -3,6 +3,7 @@ package selfupdate
 import (
 	"context"
 	"errors"
+	"math"
 	"net/netip"
 	"testing"
 	"testing/synctest"
@@ -309,7 +310,9 @@ func Test_orchestrateSelfUpdate(t *testing.T) {
 // Test_cleanupFailedNewContainer verifies the bound for removing a replacement
 // that failed verification. The bound is 60 seconds. When the container the
 // replacement was created from sets a stop timeout longer than 30 seconds, the
-// stop waits that long, so the bound is that stop timeout plus 30 seconds.
+// stop waits that long, so the bound is that stop timeout plus 30 seconds. A
+// stop timeout too long for a duration saturates the bound instead of
+// overflowing it.
 func Test_cleanupFailedNewContainer(t *testing.T) {
 	t.Parallel()
 
@@ -321,6 +324,7 @@ func Test_cleanupFailedNewContainer(t *testing.T) {
 		{name: "no container stop timeout", stopTimeout: nil, want: time.Minute},
 		{name: "shorter container stop timeout", stopTimeout: new(10), want: time.Minute},
 		{name: "longer container stop timeout", stopTimeout: new(120), want: 150 * time.Second},
+		{name: "container stop timeout beyond the longest duration", stopTimeout: new(math.MaxInt), want: math.MaxInt64},
 	}
 
 	for _, tt := range tests {

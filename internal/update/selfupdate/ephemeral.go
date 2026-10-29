@@ -35,17 +35,13 @@ const orchestratorCreateTimeout = 60 * time.Second
 // after a handoff, which runs detached from the session context.
 const predecessorImageRemovalTimeout = 30 * time.Second
 
-// orchestratorRecoveryCallBudget is the time a recovery helper gets for its
-// Docker calls beyond the stop of a failed replacement.
-const orchestratorRecoveryCallBudget = 30 * time.Second
-
 // orchestratorRecoveryTimeout bounds each recovery helper that renames or
 // starts the predecessor after a failed handoff.
 //
 // Recovery runs detached from the orchestration context, so it still runs
 // after that context's deadline. The 60 seconds match the shortest bound for
 // removing a failed replacement.
-const orchestratorRecoveryTimeout = orchestratorStopTimeout + orchestratorRecoveryCallBudget
+const orchestratorRecoveryTimeout = 60 * time.Second
 
 // Errors for ephemeral self-update operations in ephemeral.go.
 var (
@@ -662,11 +658,11 @@ func cleanupFailedNewContainer(
 
 	// A stop timeout set on the container takes precedence over the 30 seconds
 	// passed to the stop, so the bound follows the longer of the two.
-	stopTimeout := max(orchestratorStopTimeout, oldContainer.StopTimeout(orchestratorStopTimeout))
+	stopParams := types.UpdateParams{Timeout: orchestratorStopTimeout}
 
 	recoveryCtx, cancel := context.WithTimeout(
 		context.WithoutCancel(ctx),
-		stopTimeout+orchestratorRecoveryCallBudget,
+		stopParams.DetachedStopTimeout(oldContainer),
 	)
 	defer cancel()
 
