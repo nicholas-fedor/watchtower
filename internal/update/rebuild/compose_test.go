@@ -6,6 +6,7 @@ import (
 	"os"
 	"path/filepath"
 	"testing"
+	"testing/synctest"
 	"time"
 
 	"github.com/rs/zerolog"
@@ -60,7 +61,8 @@ func TestSession_applyCompose(t *testing.T) {
 			Run(func(ctx context.Context, req composeApply.Request) {
 				deadline, ok := ctx.Deadline()
 				assert.True(t, ok)
-				assert.LessOrEqual(t, time.Until(deadline), time.Second)
+				assert.Greater(t, time.Until(deadline), time.Second)
+				assert.LessOrEqual(t, time.Until(deadline), rebuildTimeout)
 
 				got = req
 			}).
@@ -333,50 +335,52 @@ func TestSession_applyCompose(t *testing.T) {
 	t.Run("keeps a Compose apply that returns success after its timeout elapses", func(t *testing.T) {
 		t.Parallel()
 
-		dir := writeComposeProjectDir(t)
-		applier := mockRebuild.NewMockApplier(t)
-		applier.EXPECT().
-			Apply(mock.Anything, mock.Anything).
-			RunAndReturn(func(context.Context, composeApply.Request) ([]composeApply.Container, error) {
-				time.Sleep(30 * time.Millisecond)
+		synctest.Test(t, func(t *testing.T) {
+			dir := writeComposeProjectDir(t)
+			applier := mockRebuild.NewMockApplier(t)
+			applier.EXPECT().
+				Apply(mock.Anything, mock.Anything).
+				RunAndReturn(func(ctx context.Context, _ composeApply.Request) ([]composeApply.Container, error) {
+					<-ctx.Done()
 
-				return []composeApply.Container{{
-					Service: "api",
-					Name:    "/web-api",
-					ID:      "new-api",
-					ImageID: "sha256:api",
-				}}, nil
-			}).
-			Once()
+					return []composeApply.Container{{
+						Service: "api",
+						Name:    "/web-api",
+						ID:      "new-api",
+						ImageID: "sha256:api",
+					}}, nil
+				}).
+				Once()
 
-		sess := NewSession(git.New(newTestLogger(t), git.Options{Timeout: 5 * time.Millisecond}))
-		sess.apply = applier
-		sess.checkout = func(context.Context, string, string, project.CheckoutOptions) error {
-			return nil
-		}
+			sess := NewSession(gitTestClient(t))
+			sess.apply = applier
+			sess.checkout = func(context.Context, string, string, project.CheckoutOptions) error {
+				return nil
+			}
 
-		c := gitAssociatedContainer("api", "web-api", "webstack-api:latest", map[string]string{
-			labels.ComposeDir:                 dir,
-			composeLabels.ComposeProjectLabel: "webstack",
-			composeLabels.ComposeServiceLabel: "api",
+			c := gitAssociatedContainer("api", "web-api", "webstack-api:latest", map[string]string{
+				labels.ComposeDir:                 dir,
+				composeLabels.ComposeProjectLabel: "webstack",
+				composeLabels.ComposeServiceLabel: "api",
+			})
+			c.SetStale(true)
+			sess.store(c.ID(), git.CheckResult{Stale: true, Commit: "abc"})
+
+			failed := map[types.ContainerID]error{}
+			docker := mockContainerClient.NewMockClient(t)
+			sess.PrepareRebuilds(
+				newTestLogger(t),
+				t.Context(),
+				docker,
+				[]types.Container{c},
+				types.UpdateParams{EnableGitMonitoring: true},
+				nil,
+				failed,
+			)
+
+			assert.Empty(t, failed)
+			assert.Contains(t, sess.applied, c.ID())
 		})
-		c.SetStale(true)
-		sess.store(c.ID(), git.CheckResult{Stale: true, Commit: "abc"})
-
-		failed := map[types.ContainerID]error{}
-		docker := mockContainerClient.NewMockClient(t)
-		sess.PrepareRebuilds(
-			newTestLogger(t),
-			t.Context(),
-			docker,
-			[]types.Container{c},
-			types.UpdateParams{EnableGitMonitoring: true},
-			nil,
-			failed,
-		)
-
-		assert.Empty(t, failed)
-		assert.Contains(t, sess.applied, c.ID())
 	})
 
 	t.Run("does not apply after the parent context is canceled during checkout", func(t *testing.T) {

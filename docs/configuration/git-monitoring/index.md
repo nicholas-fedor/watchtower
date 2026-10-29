@@ -114,6 +114,15 @@ Environment Variable: WATCHTOWER_GIT_TIMEOUT
              Default: 30s
 ```
 
+!!! Note
+    The Git timeout bounds these Git operations:
+
+    - each check of a hosted ref
+    - each clone
+    - each checkout of a local path Compose project
+
+    Image builds and Compose applies for a rebuild run Dockerfile steps that can take minutes. Each has its own limit of 30 minutes.
+
 ## Git CA Bundle
 
 Path to a PEM file of extra CA certificates for Git HTTPS.

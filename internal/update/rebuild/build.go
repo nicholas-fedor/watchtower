@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"strings"
+	"time"
 
 	"github.com/distribution/reference"
 	"github.com/rs/zerolog"
@@ -18,6 +19,12 @@ import (
 	"github.com/nicholas-fedor/watchtower/internal/update/state"
 	"github.com/nicholas-fedor/watchtower/pkg/types"
 )
+
+// rebuildTimeout bounds one remote image build or one Compose apply. Both run
+// Dockerfile steps and pulls that can take minutes, so they are not held to the
+// Git timeout, which covers Git network operations. The bound still ends a
+// build or apply that the daemon never finishes.
+const rebuildTimeout = 30 * time.Minute
 
 // Errors for rebuilding images from Git.
 var (
@@ -84,7 +91,7 @@ func (s *Session) build(
 
 	logFoundGitRevision(log, c, params, result.Tag, result.Commit)
 
-	buildCtx, cancel := s.client.WithTimeout(ctx)
+	buildCtx, cancel := context.WithTimeout(ctx, rebuildTimeout)
 	defer cancel()
 
 	imageID, err := docker.BuildRemoteImage(buildCtx, remote, dockerfile, tags)

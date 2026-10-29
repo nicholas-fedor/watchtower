@@ -270,7 +270,7 @@ func (s *Session) runComposeApply(
 		applier = composeApply.NewClient()
 	}
 
-	applyCtx, cancelApply := s.client.WithTimeout(ctx)
+	applyCtx, cancelApply := context.WithTimeout(ctx, rebuildTimeout)
 	applied, err := applier.Apply(applyCtx, composeApply.Request{
 		Ref:       batch.ref,
 		Services:  services.names,
