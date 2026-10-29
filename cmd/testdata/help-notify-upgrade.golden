@@ -99,7 +99,7 @@ Global Flags:
   -n, --notifications strings                       Notification types to send [legacy types (email, slack, msteams, gotify)]. (DEPRECATED: Use --notification-url with the appropriate Shoutrrr URL scheme instead.)
       --notifications-delay int                     Delay before sending notifications, expressed in seconds
       --notifications-hostname string               Custom hostname for notification titles
-      --notifications-level string                  The log level used for sending notifications. Possible values: panic, fatal, error, warn, info or debug (default "info")
+      --notifications-level string                  The log level used for sending notifications. Possible values: panic, fatal, error, warn, info, debug or trace (default "info")
   -P, --porcelain string                            Write session results to stdout using a stable versioned format. Supported values: "v1", "json"
       --registry-tls-min-version string             Minimum TLS version for registry connections (TLS1.2 or TLS1.3); default is TLS1.2 (default "TLS1.2")
       --registry-tls-skip                           Disable TLS verification for registry connections; allows HTTP or insecure TLS registries (use with caution)
