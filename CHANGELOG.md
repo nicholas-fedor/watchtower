@@ -92,6 +92,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Documentation
 
+- Correct the schedule format and registry TLS version values by @nicholas-fedor in [#3254](https://github.com/nicholas-fedor/watchtower/pull/3254)
 - Document the health check for Podman by @nicholas-fedor in [#3096](https://github.com/nicholas-fedor/watchtower/pull/3096)
 
 ### Tests
