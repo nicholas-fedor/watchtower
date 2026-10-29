@@ -1,6 +1,7 @@
 package notifications
 
 import (
+	"errors"
 	"fmt"
 	"regexp"
 	"strings"
@@ -28,6 +29,10 @@ const slackType = "slack"
 // webhook's own channel.
 const slackWebhookChannel = "webhook"
 
+// discordWebhookMinSegments is the number of path segments, counting the host,
+// in the shortest Discord wrapper URL, discord.com/api/webhooks/<id>/<token>/slack.
+const discordWebhookMinSegments = 6
+
 // slackChannelNotConvertedMessage is logged when a legacy Slack channel cannot
 // be carried into the shoutrrr URL.
 const slackChannelNotConvertedMessage = "Legacy Slack channel is not a channel ID, so the webhook's own channel is used"
@@ -39,6 +44,12 @@ const slackChannelNotConvertedMessage = "Legacy Slack channel is not a channel I
 // shoutrrr Slack URL holds the channel as its host, which can carry an ID but
 // not a #name or @user.
 var slackChannelIDPattern = regexp.MustCompile(`^[CGD][A-Z0-9]{8,}$`)
+
+// errInvalidDiscordWebhookURL indicates a Discord wrapper hook URL that does
+// not have the form https://discord.com/api/webhooks/<id>/<token>/slack.
+var errInvalidDiscordWebhookURL = errors.New(
+	"invalid Discord webhook URL, expected https://discord.com/api/webhooks/<id>/<token>/slack",
+)
 
 // slackTypeNotifier handles Slack notifications via webhook.
 //
@@ -133,9 +144,16 @@ func (s *slackTypeNotifier) GetURL(_ *cobra.Command) (string, error) {
 	if parts[0] == "discord.com" || parts[0] == "discordapp.com" {
 		clog.Debug().Msg("Detected a discord slack wrapper URL, using shoutrrr discord service")
 
+		webhookID, token, ok := discordWebhookCredentials(parts)
+		if !ok {
+			clog.Debug().Msg("Discord wrapper URL does not have the expected form")
+
+			return "", errInvalidDiscordWebhookURL
+		}
+
 		conf := &discord.Config{
-			WebhookID:  parts[len(parts)-3],
-			Token:      parts[len(parts)-2],
+			WebhookID:  webhookID,
+			Token:      token,
 			Color:      colorInt,
 			SplitLines: true,
 			Username:   s.Username,
@@ -191,6 +209,38 @@ func (s *slackTypeNotifier) GetURL(_ *cobra.Command) (string, error) {
 	}
 
 	return urlStr, nil
+}
+
+// discordWebhookCredentials returns the webhook ID and token from the path
+// segments of a Discord wrapper hook URL, such as
+// discord.com/api/webhooks/<id>/<token>/slack. A versioned API path, such as
+// /api/v10/webhooks, is accepted, as is a query string after /slack.
+//
+// Parameters:
+//   - parts: The URL split on "/", starting with the host.
+//
+// Returns:
+//   - webhookID: The webhook ID.
+//   - token: The webhook token.
+//   - ok: False when the URL does not have that form or the ID or token is empty.
+//
+//nolint:nonamedreturns // Same-type returns need names.
+func discordWebhookCredentials(parts []string) (webhookID, token string, ok bool) {
+	if len(parts) < discordWebhookMinSegments || parts[1] != "api" {
+		return "", "", false
+	}
+
+	last, _, _ := strings.Cut(parts[len(parts)-1], "?")
+	if last != "slack" || parts[len(parts)-4] != "webhooks" {
+		return "", "", false
+	}
+
+	webhookID, token = parts[len(parts)-3], parts[len(parts)-2]
+	if webhookID == "" || token == "" {
+		return "", "", false
+	}
+
+	return webhookID, token, true
 }
 
 // webhookChannel returns the channel for the shoutrrr Slack URL.
