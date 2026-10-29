@@ -150,7 +150,8 @@ func (c *Container) PostUpdateTimeout() int {
 // hookTimeout reads a lifecycle hook timeout label in minutes.
 //
 // It returns 1 minute when the label is unset. A value that is not a whole
-// number of 0 or more logs a warning and also returns 1 minute.
+// number of 0 or more, including an empty one, logs a warning and also returns
+// 1 minute.
 //
 // Parameters:
 //   - label: The hook's timeout label.
@@ -163,10 +164,10 @@ func (c *Container) hookTimeout(label string, messages hookTimeoutMessages) int 
 		Str("container", c.Name()).
 		Logger()
 	clog := &clogVal
-	val := c.getLabelValueOrEmpty(label)
+	val, ok := c.getLabelValue(label)
 
 	// Use default if label is unset.
-	if val == "" {
+	if !ok {
 		clog.Debug().
 			Str("label", label).
 			Msg(messages.notSet)

@@ -188,8 +188,8 @@ func TestContainer_GetLifecyclePostUpdateCommand(t *testing.T) {
 
 // TestContainer_HookTimeouts verifies the lifecycle hook timeout labels. A
 // whole number of 0 or more is used as given, where 0 runs the hook without a
-// timeout. An unset label, a non-numeric value, and a negative value give the
-// 1 minute default, and the invalid values log a warning.
+// timeout. An unset label gives the 1 minute default. A non-numeric, empty or
+// negative value also gives the default and logs a warning.
 func TestContainer_HookTimeouts(t *testing.T) {
 	t.Parallel()
 
@@ -235,6 +235,7 @@ func TestContainer_HookTimeouts(t *testing.T) {
 		{name: "zero disables the timeout", value: new("0"), want: 0},
 		{name: "not set", value: nil, want: 1},
 		{name: "not a number", value: new("invalid"), want: 1, wantWarn: true},
+		{name: "empty", value: new(""), want: 1, wantWarn: true},
 		{name: "negative", value: new("-1"), want: 1, wantWarn: true},
 	}
 
