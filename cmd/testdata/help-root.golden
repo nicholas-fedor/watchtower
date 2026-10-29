@@ -107,7 +107,7 @@ Flags:
       --notifications-hostname string               Custom hostname for notification titles
       --notifications-level string                  The log level used for sending notifications. Possible values: panic, fatal, error, warn, info or debug (default "info")
   -P, --porcelain string                            Write session results to stdout using a stable versioned format. Supported values: "v1", "json"
-      --registry-tls-min-version string             Minimum TLS version for registry connections (e.g., TLS1.0, TLS1.1, TLS1.2, TLS1.3); default is TLS1.2 (default "TLS1.2")
+      --registry-tls-min-version string             Minimum TLS version for registry connections (TLS1.2 or TLS1.3); default is TLS1.2 (default "TLS1.2")
       --registry-tls-skip                           Disable TLS verification for registry connections; allows HTTP or insecure TLS registries (use with caution)
       --remove-volumes                              Remove attached volumes before updating
       --revive-stopped                              Will also start stopped containers that were updated, if include-stopped is active
