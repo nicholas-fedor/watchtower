@@ -72,9 +72,27 @@ LABEL com.centurylinklabs.watchtower.lifecycle.post-check="echo 'Update cycle co
 
 #### Custom Timeouts
 
-Pre-check and post-check hooks always time out after 1 minute.
+By default, hook commands timeout after 1 minute. Override this with timeout labels:
 
-Pre-update and post-update hooks also time out after 1 minute by default. Override this with timeout labels:
+=== "Pre-check timeout"
+
+    ```dockerfile title="Set pre-check timeout to 5 minutes"
+    LABEL com.centurylinklabs.watchtower.lifecycle.pre-check-timeout="5"
+    ```
+
+    ```dockerfile title="Disable pre-check timeout (run indefinitely)"
+    LABEL com.centurylinklabs.watchtower.lifecycle.pre-check-timeout="0"
+    ```
+
+=== "Post-check timeout"
+
+    ```dockerfile title="Set post-check timeout to 5 minutes"
+    LABEL com.centurylinklabs.watchtower.lifecycle.post-check-timeout="5"
+    ```
+
+    ```dockerfile title="Disable post-check timeout (run indefinitely)"
+    LABEL com.centurylinklabs.watchtower.lifecycle.post-check-timeout="0"
+    ```
 
 === "Pre-update timeout"
 
