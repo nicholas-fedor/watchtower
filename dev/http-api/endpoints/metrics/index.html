@@ -2945,6 +2945,8 @@ Requests with other HTTP methods will receive a <code>405 Method Not Allowed</co
 </tr>
 </tbody>
 </table>
+<p>A scan is skipped when a scheduled run starts while the previous one is still running, or when the update at startup finds another update already running.
+A skipped scan does not change the scan total or the last-scan gauges.</p>
 <p>The four image-usage gauges are updated when <a href="../../../configuration/update-behavior/#disk_space_max"><code>disk-space-max</code></a> or <a href="../../../configuration/update-behavior/#disk_space_warn"><code>disk-space-warn</code></a> are set.
 See <a href="../../../advanced-features/disk-usage-monitor/#metrics">Disk Usage Monitor</a>.</p>
 <h2 id="example_prometheus_scrape_config">Example Prometheus <code>scrape_config</code><a class="headerlink" href="#example_prometheus_scrape_config" title="Permanent link">&para;</a></h2>
@@ -2984,7 +2986,7 @@ This demo is preconfigured with a dashboard, which will look something like this
     <span class="md-icon" title="Last update">
       <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M21 13.1c-.1 0-.3.1-.4.2l-1 1 2.1 2.1 1-1c.2-.2.2-.6 0-.8l-1.3-1.3c-.1-.1-.2-.2-.4-.2m-1.9 1.8-6.1 6V23h2.1l6.1-6.1zM12.5 7v5.2l4 2.4-1 1L11 13V7zM11 21.9c-5.1-.5-9-4.8-9-9.9C2 6.5 6.5 2 12 2c5.3 0 9.6 4.1 10 9.3-.3-.1-.6-.2-1-.2s-.7.1-1 .2C19.6 7.2 16.2 4 12 4c-4.4 0-8 3.6-8 8 0 4.1 3.1 7.5 7.1 7.9l-.1.2z"/></svg>
     </span>
-    <span class="git-revision-date-localized-plugin git-revision-date-localized-plugin-timeago" title="October 15, 2026 01:45:26 UTC"><span class="timeago" datetime="2026-10-15T01:45:26+00:00" locale="en"></span></span><span class="git-revision-date-localized-plugin git-revision-date-localized-plugin-iso_date" title="October 15, 2026 01:45:26 UTC">2026-10-15</span>
+    <span class="git-revision-date-localized-plugin git-revision-date-localized-plugin-timeago" title="October 30, 2026 04:08:52 UTC"><span class="timeago" datetime="2026-10-30T04:08:52+00:00" locale="en"></span></span><span class="git-revision-date-localized-plugin git-revision-date-localized-plugin-iso_date" title="October 30, 2026 04:08:52 UTC">2026-10-30</span>
   </span>
 
     
