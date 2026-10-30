@@ -12,6 +12,7 @@ import (
 	dockerContainer "github.com/moby/moby/api/types/container"
 
 	"github.com/nicholas-fedor/watchtower/internal/container/labels"
+	"github.com/nicholas-fedor/watchtower/internal/observability/logging"
 	"github.com/nicholas-fedor/watchtower/internal/settings/units"
 	"github.com/nicholas-fedor/watchtower/pkg/types"
 )
@@ -70,6 +71,13 @@ var (
 		retrieved: "Retrieved post-update timeout",
 	}
 )
+
+// invalidLabels holds the invalid label values reported during this process,
+// by container ID and label. Labels are read on every scan, hook run or API
+// request, so each invalid value is warned about once and then logged at
+// debug. A container whose labels change is recreated with a new ID, so its
+// labels are reported again.
+var invalidLabels logging.ReportedProblems
 
 // GetLifecyclePreCheckCommand returns the pre-check command from labels.
 //
@@ -177,7 +185,7 @@ func (c *Container) hookTimeout(label string, messages hookTimeoutMessages) int 
 
 	minutes, err := parseHookTimeout(val)
 	if err != nil {
-		clog.Warn().
+		clog.WithLevel(invalidLabels.Level(string(c.ID()), label)).
 			Err(err).
 			Str("label", label).
 			Str("value", val).
@@ -221,7 +229,7 @@ func (c *Container) getLifecycleID(label, idType string) (int, bool) {
 	// Parse ID value.
 	parsedID, err := strconv.Atoi(rawString)
 	if err != nil {
-		clog.Warn().
+		clog.WithLevel(invalidLabels.Level(string(c.ID()), label)).
 			Err(err).
 			Str("label", label).
 			Str("value", rawString).
@@ -232,7 +240,7 @@ func (c *Container) getLifecycleID(label, idType string) (int, bool) {
 
 	// Validate ID range (must be non-negative and within reasonable bounds).
 	if parsedID < 0 {
-		clog.Warn().
+		clog.WithLevel(invalidLabels.Level(string(c.ID()), label)).
 			Str("label", label).
 			Str("value", rawString).
 			Str("id_type", idType).
@@ -245,7 +253,7 @@ func (c *Container) getLifecycleID(label, idType string) (int, bool) {
 	// Check for unreasonably large ID values (greater than 2^31-1).
 	const maxReasonableID = 2147483647 // 2^31-1
 	if parsedID > maxReasonableID {
-		clog.Warn().
+		clog.WithLevel(invalidLabels.Level(string(c.ID()), label)).
 			Str("label", label).
 			Str("value", rawString).
 			Str("id_type", idType).
@@ -307,7 +315,7 @@ func (c *Container) Enabled() (bool, bool) {
 	// Parse enable label value.
 	parsedBool, err := strconv.ParseBool(rawBool)
 	if err != nil {
-		clog.Warn().
+		clog.WithLevel(invalidLabels.Level(string(c.ID()), labels.Enable)).
 			Err(err).
 			Str("label", labels.Enable).
 			Str("value", rawBool).
@@ -412,7 +420,7 @@ func (c *Container) CooldownDelay(params types.UpdateParams) time.Duration {
 
 	parsed, err := units.ParseDuration(labelVal)
 	if err != nil {
-		c.Logger().Warn().
+		c.Logger().WithLevel(invalidLabels.Level(string(c.ID()), labels.CooldownDelay)).
 			Err(err).
 			Str("container", c.Name()).
 			Str("label", labels.CooldownDelay).
@@ -738,13 +746,6 @@ func (c *Container) getBoolLabelValue(label string) (bool, error) {
 
 	value, err := strconv.ParseBool(strVal)
 	if err != nil {
-		c.Logger().Warn().
-			Err(err).
-			Str("container", c.Name()).
-			Str("label", label).
-			Str("value", strVal).
-			Msg("Failed to parse boolean label value")
-
 		return false, fmt.Errorf("%w: %s=%q", err, label, strVal)
 	}
 
@@ -776,7 +777,7 @@ func (c *Container) getContainerOrGlobalBool(
 	contVal, err := c.getBoolLabelValue(label)
 	if err != nil {
 		if !errors.Is(err, errLabelNotFound) {
-			clog.Warn().
+			clog.WithLevel(invalidLabels.Level(string(c.ID()), label)).
 				Err(err).
 				Str("label", label).
 				Msg("Failed to parse label value")

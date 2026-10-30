@@ -92,7 +92,7 @@ Setting the label to `"0"` disables cooldown for that container, even when a glo
 LABEL com.centurylinklabs.watchtower.cooldown-delay="0"
 ```
 
-!!! Note "If a container's cooldown label cannot be parsed as a valid duration, Watchtower falls back to the global cooldown value and logs a warning."
+!!! Note "If a container's cooldown label cannot be parsed as a valid duration, Watchtower falls back to the global cooldown value. It logs a warning the first time it reads the label for that container, and logs later reads at debug level."
 
 !!! Warning "No-Pull Precedence"
     When the [`no-pull`](../../configuration/update-behavior/index.md#disable_image_pulling) configuration option  is enabled globally (or the `com.centurylinklabs.watchtower.no-pull` label is set on a container), Watchtower does not fetch new images from the registry.
