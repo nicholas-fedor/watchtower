@@ -8,6 +8,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"maps"
 	"strconv"
 	"strings"
 	"testing"
@@ -24,6 +25,7 @@ import (
 	"github.com/nicholas-fedor/watchtower/internal/container"
 	mockContainerClient "github.com/nicholas-fedor/watchtower/internal/container/client/mocks"
 	containerImage "github.com/nicholas-fedor/watchtower/internal/container/image"
+	"github.com/nicholas-fedor/watchtower/internal/container/labels"
 	"github.com/nicholas-fedor/watchtower/internal/container/oci"
 	"github.com/nicholas-fedor/watchtower/internal/git"
 	"github.com/nicholas-fedor/watchtower/internal/registry/ratelimit"
@@ -524,9 +526,9 @@ func TestUpdate_DependencyProblemsWarnOnce(t *testing.T) {
 
 // TestUpdate_FailedCheckWarnsOnce verifies that a failed staleness check warns
 // once per container and cause, so a lasting failure reaches notifications on
-// the first scan and is logged at debug on later scans. A check failure whose
-// own code already logged a notification-reachable line, such as a cooldown
-// deferral, a registry rate limit, or an invalid Git label, adds no warning.
+// the first scan and is logged at debug on later scans. A check failure that
+// is reported in a line of its own, such as a cooldown deferral, a registry
+// rate limit, or an invalid Git label, adds no warning.
 func TestUpdate_FailedCheckWarnsOnce(t *testing.T) {
 	t.Parallel()
 
@@ -673,6 +675,71 @@ func TestUpdate_UnrecreatableConfigWarnsOnce(t *testing.T) {
 	}
 
 	assert.Equal(t, [][]string{{"warn"}, {"debug"}}, got)
+}
+
+// TestUpdate_InvalidGitLabelWarnsOnce verifies that a Git-watched container
+// with an invalid git semver policy or git-host label warns on the first scan
+// and logs at debug on the next. The git-host warning leaves out the label's
+// value, since it can hold a credential.
+func TestUpdate_InvalidGitLabelWarnsOnce(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name    string
+		labels  map[string]string
+		message string
+	}{
+		{
+			name:    "git semver policy",
+			labels:  map[string]string{labels.GitSemverPolicy: "nightly"},
+			message: "Skipped container with an invalid git semver policy",
+		},
+		{
+			name:    "git-host",
+			labels:  map[string]string{labels.GitHost: "ftp://user:supersecret@evil.example"},
+			message: "Skipped container with an invalid git-host",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			containerLabels := map[string]string{
+				labels.GitRepo: "https://github.com/org/app.git",
+				labels.GitRef:  "main",
+			}
+			maps.Copy(containerLabels, tt.labels)
+
+			app := skipTestContainer(randomContainerID(t), "app", containerLabels)
+
+			// The label is rejected before any request reaches the remote.
+			gitClient := git.New(newTestLogger(t), git.Options{Timeout: time.Second})
+
+			got := make([][]string, 0, 2)
+
+			for range 2 {
+				client := mockContainerClient.NewMockClient(t)
+				client.EXPECT().ListContainers(mock.Anything, mock.Anything).Return([]types.Container{app}, nil).Once()
+
+				var out bytes.Buffer
+
+				log := zerolog.New(&out).Level(zerolog.DebugLevel)
+
+				report, _, err := update(&log, t.Context(), client,
+					types.UpdateParams{EnableGitMonitoring: true}, ratelimit.New(), gitClient)
+				require.NoError(t, err)
+				require.Len(t, report.Skipped(), 1)
+				assert.NotContains(t, out.String(), "supersecret")
+				// Notification templates name the container from this field.
+				assert.Contains(t, out.String(), `"container":"app","image":"org/app:latest","message":"`+tt.message+`"`)
+
+				got = append(got, messageLevels(t, out.String(), tt.message))
+			}
+
+			assert.Equal(t, [][]string{{"warn"}, {"debug"}}, got)
+		})
+	}
 }
 
 // TestReportedProblems_StartsOverWhenFull verifies that the record of reported

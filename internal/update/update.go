@@ -425,7 +425,7 @@ func update(
 			case gitSession.Watching(log, sourceContainer, config):
 				gitWatched = true
 
-				stale, newestImage, checkErr = gitSession.Check(log, ctx, sourceContainer, config)
+				stale, newestImage, checkErr = gitSession.Check(ctx, sourceContainer, config)
 			default:
 				stale, newestImage, newDigest, checkErr = client.IsContainerStale(
 					ctx,
@@ -534,9 +534,19 @@ func update(
 					// Fallback for plain sentinel (keeps basic deferral visible)
 					progress.AddSkipped(log, sourceContainer, checkErr, config)
 					progress.SetCooldownInfo(log, sourceContainer.ID(), "", "", "", time.Time{})
-				case errors.Is(checkErr, git.ErrInvalidPolicy), errors.Is(checkErr, git.ErrInvalidHost):
-					// The Git check warned about the invalid label.
+				case errors.Is(checkErr, git.ErrInvalidPolicy):
+					// A container's labels cannot change, so the container ID
+					// identifies an invalid label problem.
 					progress.AddSkipped(log, sourceContainer, checkErr, config)
+					clog.WithLevel(scanProblems.level("invalid git semver policy", string(sourceContainer.ID()))).
+						Msg("Skipped container with an invalid git semver policy")
+				case errors.Is(checkErr, git.ErrInvalidHost):
+					// The container ID identifies the problem, as for an invalid
+					// policy. The line carries no error field, so a credential in
+					// the label stays out of log-based notifications.
+					progress.AddSkipped(log, sourceContainer, checkErr, config)
+					clog.WithLevel(scanProblems.level("invalid git-host", string(sourceContainer.ID()))).
+						Msg("Skipped container with an invalid git-host")
 				default:
 					progress.AddSkipped(log, sourceContainer, checkErr, config)
 					clog.WithLevel(scanProblems.level("failed update check", string(sourceContainer.ID()), checkErr.Error())).
