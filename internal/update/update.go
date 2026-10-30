@@ -308,8 +308,12 @@ func update(
 	// Iterate through containers to check staleness and prepare for updates or restarts.
 	for i, sourceContainer := range filteredContainers {
 		// Check for context cancellation to enable faster shutdown during long update cycles.
+		// The containers not yet checked are reported as skipped, so the
+		// partial report does not read as a complete scan.
 		select {
 		case <-ctx.Done():
+			progress.SkipUnrecorded(log, filteredContainers, fmt.Errorf("update skipped: %w", ctx.Err()), config)
+
 			return progress.Report(log), cleanupImageInfos, ctx.Err()
 		default:
 		}
@@ -362,6 +366,8 @@ func update(
 	// Check for context cancellation before launching parallel staleness checks.
 	select {
 	case <-ctx.Done():
+		progress.SkipUnrecorded(log, filteredContainers, fmt.Errorf("update skipped: %w", ctx.Err()), config)
+
 		return progress.Report(log), cleanupImageInfos, ctx.Err()
 	default:
 	}
@@ -614,7 +620,11 @@ func update(
 			Msg("Parallel staleness checks completed with error")
 
 		// Surface context cancellation from parallel workers as the final Update error.
+		// A canceled check records nothing, so its container and those whose
+		// check never ran are reported as skipped.
 		if errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded) {
+			progress.SkipUnrecorded(log, filteredContainers, fmt.Errorf("update skipped: %w", err), config)
+
 			return progress.Report(log), cleanupImageInfos, fmt.Errorf("update canceled: %w", err)
 		}
 	}

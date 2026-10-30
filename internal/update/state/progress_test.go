@@ -668,6 +668,44 @@ func TestProgress_UpdateFailed(t *testing.T) {
 	}
 }
 
+// TestProgress_SkipUnrecorded verifies that only containers without a status
+// are added as skipped with the reason, and that a recorded container keeps its
+// state and error.
+func TestProgress_SkipUnrecorded(t *testing.T) {
+	t.Parallel()
+
+	recorded := mockTypes.NewMockContainer(t)
+	recorded.EXPECT().ID().Return(types.ContainerID("cont1"))
+
+	unrecorded := mockTypes.NewMockContainer(t)
+	unrecorded.EXPECT().ID().Return(types.ContainerID("cont2"))
+	unrecorded.EXPECT().ImageID().Return(types.ImageID("img2"))
+	unrecorded.EXPECT().Name().Return("container2")
+	unrecorded.EXPECT().ImageName().Return("image2:latest")
+	unrecorded.EXPECT().IsMonitorOnly(testifyMock.Anything).Return(false)
+
+	reason := errors.New("update skipped: context canceled")
+	m := Progress{
+		"cont1": &ContainerStatus{state: ScannedState, containerID: "cont1"},
+	}
+
+	m.SkipUnrecorded(newTestLogger(t), []types.Container{recorded, unrecorded}, reason, types.UpdateParams{})
+
+	assert.Equal(t, Progress{
+		"cont1": &ContainerStatus{state: ScannedState, containerID: "cont1"},
+		"cont2": &ContainerStatus{
+			containerID:    "cont2",
+			oldImage:       "img2",
+			newImage:       "img2",
+			containerName:  "container2",
+			imageName:      "image2:latest",
+			containerError: reason,
+			state:          SkippedState,
+			monitorOnly:    false,
+		},
+	}, m)
+}
+
 func TestProgress_Add(t *testing.T) {
 	type args struct {
 		update *ContainerStatus
