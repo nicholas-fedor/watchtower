@@ -3,6 +3,8 @@ package update
 import (
 	"context"
 	"errors"
+	"fmt"
+	"runtime/debug"
 	"strings"
 	"time"
 
@@ -53,6 +55,10 @@ type RunUpdatesWithNotificationsParams struct {
 // It executes the update action with configured parameters, batches notifications, and returns a metric
 // summarizing the session for monitoring purposes, ensuring users are informed of update outcomes.
 //
+// A panic during the session ends it as an update error does. The panic is
+// logged and sent with the session's notification batch. Subscribers get
+// scan_failed, and the returned metric marks a failed scan.
+//
 // Parameters:
 //   - ctx: Context for cancellation and timeouts.
 //   - params: The RunUpdatesWithNotificationsParams struct containing all configuration parameters.
@@ -60,16 +66,24 @@ type RunUpdatesWithNotificationsParams struct {
 //
 // Returns:
 //   - *metrics.Metric: A pointer to a metric object summarizing the update session (scanned, updated, failed counts).
+//
+//nolint:nonamedreturns // The deferred recover sets the result.
 func RunUpdatesWithNotifications(
 	ctx context.Context,
 	params RunUpdatesWithNotificationsParams,
-) *metrics.Metric {
+) (metric *metrics.Metric) {
 	log := params.Logger
 
 	log.Debug().Msg("Starting RunUpdatesWithNotifications")
 
 	// Initiate notification batching.
 	startNotifications(log, params.Notifier, params.NotificationSplitByContainer)
+
+	defer func() {
+		if recovered := recover(); recovered != nil {
+			metric = endPanickedSession(log, params, recovered)
+		}
+	}()
 
 	updateConfig := params.Update
 
@@ -146,7 +160,7 @@ func RunUpdatesWithNotifications(
 	}
 
 	// Process update result, return metric on failure
-	metric := handleUpdateResult(log, result, err, params.Notifier)
+	metric = handleUpdateResult(log, result, err, params.Notifier)
 	if metric != nil {
 		if params.EventBroadcaster != nil {
 			errMsg := "unknown error"
@@ -271,6 +285,51 @@ func handleUpdateResult(log *zerolog.Logger, result types.Report, err error, not
 	}
 
 	return nil
+}
+
+// endPanickedSession ends an update session that panicked, as an update error
+// ends one.
+//
+// The panic value is logged at error, so it reaches notifications. The stack
+// is logged at debug without notifying. The session's notification batch, which
+// holds the panic entry, is then sent with an empty report. Subscribers get
+// scan_failed.
+//
+// Parameters:
+//   - log: Process logger for the session.
+//   - params: The session's parameters, for its notifier and event broadcaster.
+//   - recovered: The value the session panicked with.
+//
+// Returns:
+//   - *metrics.Metric: A metric marking a failed scan with zero counts.
+func endPanickedSession(
+	log *zerolog.Logger,
+	params RunUpdatesWithNotificationsParams,
+	recovered any,
+) *metrics.Metric {
+	panicValue := fmt.Sprint(recovered)
+
+	log.Error().Str("error", panicValue).Msg("Update panicked")
+	log.Debug().
+		Str("notify", "no").
+		Str("stack", string(debug.Stack())).
+		Msg("Stack of the update panic")
+
+	if params.Notifier != nil {
+		params.Notifier.SendNotification(emptyReport{})
+	}
+
+	if params.EventBroadcaster != nil {
+		params.EventBroadcaster.Publish(events.Event{
+			Type:      "scan_failed",
+			Timestamp: time.Now().UTC(),
+			Data: events.ScanFailedData{
+				Error: "update panicked: " + panicValue,
+			},
+		})
+	}
+
+	return &metrics.Metric{ScanFailed: true}
 }
 
 // buildSingleContainerReport creates a SingleContainerReport for a specific updated container.

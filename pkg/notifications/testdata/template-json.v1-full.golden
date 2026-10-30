@@ -468,6 +468,14 @@
     },
     {
       "data": {
+        "error": "runtime error: invalid memory address or nil pointer dereference"
+      },
+      "level": "warning",
+      "message": "Update panicked",
+      "time": "2026-10-07T12:00:49Z"
+    },
+    {
+      "data": {
         "alpha": "one",
         "beta": 2
       },

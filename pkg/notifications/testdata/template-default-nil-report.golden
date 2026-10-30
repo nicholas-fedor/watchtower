@@ -47,5 +47,6 @@ Invalid pre-update timeout value, using default
 Invalid post-update timeout value, using default
 Invalid pre-check timeout value, using default
 Invalid post-check timeout value, using default
+Update panicked
 Unrecognized message with fields
 Unrecognized message without fields

@@ -81,6 +81,7 @@ var legacyTemplateMessages = []string{
 	"Invalid post-update timeout value, using default",
 	"Invalid pre-check timeout value, using default",
 	"Invalid post-check timeout value, using default",
+	"Update panicked",
 }
 
 // Disk sizes used by the image-usage budget fixtures, in bytes.
@@ -216,6 +217,8 @@ func goldenEntryData(message string) map[string]any {
 		return map[string]any{"error": "failed to inspect container: context deadline exceeded"}
 	case "Could not disable Watchtower's restart policy. The runtime may start it again":
 		return map[string]any{"error": "failed to set restart policy: context deadline exceeded"}
+	case "Update panicked":
+		return map[string]any{"error": "runtime error: invalid memory address or nil pointer dereference"}
 	case "Invalid pre-update timeout value, using default":
 		return map[string]any{
 			"container": "app",

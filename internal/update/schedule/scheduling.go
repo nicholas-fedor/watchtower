@@ -8,6 +8,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"runtime/debug"
 	"strings"
 	"sync/atomic"
 	"time"
@@ -86,6 +87,39 @@ func skipIfStillRunning(log *zerolog.Logger) cron.JobWrapper {
 	}
 }
 
+// recoverPanics returns a cron job wrapper that recovers a panic in a
+// scheduled run, so later runs still start on schedule.
+//
+// The update session recovers and notifies its own panics. This wrapper covers
+// the scheduler code around the session, so it logs the panic value and stack
+// at error without notifying.
+//
+// Parameters:
+//   - log: Scheduler logger.
+//
+// Returns:
+//   - cron.JobWrapper: Wrapper for the scheduler's job chain.
+func recoverPanics(log *zerolog.Logger) cron.JobWrapper {
+	return func(job cron.Job) cron.Job {
+		return cron.FuncJob(func() {
+			defer func() {
+				recovered := recover()
+				if recovered == nil {
+					return
+				}
+
+				log.Error().
+					Str("notify", "no").
+					Str("error", fmt.Sprint(recovered)).
+					Str("stack", string(debug.Stack())).
+					Msg("Scheduled run panicked")
+			}()
+
+			job.Run()
+		})
+	}
+}
+
 // ScheduleDeps holds dependencies for scheduled update runs.
 //
 // BaseParams must be a complete types.UpdateParams snapshot from config.UpdateParams
@@ -160,7 +194,7 @@ func RunUpgradesOnSchedule(ctx context.Context, deps ScheduleDeps) error {
 		),
 		cron.WithChain(
 			skipIfStillRunning(log),
-			cron.Recover(cron.DefaultLogger),
+			recoverPanics(log),
 		),
 	)
 
