@@ -337,14 +337,10 @@ func update(
 		// Check if the container uses a pinned (digest-based) image to skip updates.
 		isPinnedVal, err := staleness.IsPinned(log, sourceContainer, progress, config, gitSession)
 		if err != nil {
-			// Skip a container whose image reference cannot be parsed, and warn
-			// once per container and cause, as for a failed staleness check.
-			parseErr := fmt.Errorf("%w: %w", errParseImageReference, err)
-
-			progress.AddSkipped(log, sourceContainer, parseErr, config)
-			clog.WithLevel(scanProblems.level("failed update check", string(sourceContainer.ID()), parseErr.Error())).
-				Err(parseErr).
-				Msg("Could not check container for updates")
+			// A container whose image reference cannot be parsed is reported
+			// as a failed update check.
+			skipFailedUpdateCheck(log, clog, progress, sourceContainer,
+				fmt.Errorf("%w: %w", errParseImageReference, err), config)
 
 			staleCheckFailed++
 
@@ -548,10 +544,7 @@ func update(
 					clog.WithLevel(scanProblems.level("invalid git-host", string(sourceContainer.ID()))).
 						Msg("Skipped container with an invalid git-host")
 				default:
-					progress.AddSkipped(log, sourceContainer, checkErr, config)
-					clog.WithLevel(scanProblems.level("failed update check", string(sourceContainer.ID()), checkErr.Error())).
-						Err(checkErr).
-						Msg("Could not check container for updates")
+					skipFailedUpdateCheck(log, clog, progress, sourceContainer, checkErr, config)
 				}
 
 				// Track if Watchtower self-update pull failed for safeguard.
@@ -871,6 +864,30 @@ func (r *reportedProblems) level(parts ...string) zerolog.Level {
 	r.seen[key] = struct{}{}
 
 	return zerolog.WarnLevel
+}
+
+// skipFailedUpdateCheck records a container whose update check failed as
+// skipped, with the error as the reason. It warns the first time the container
+// fails for that error and logs at debug while the same failure persists.
+//
+// Parameters:
+//   - log: Process logger for the progress record.
+//   - clog: Logger carrying the container and image fields.
+//   - progress: Session progress that records the skip.
+//   - c: Container whose check failed.
+//   - err: Reason the check failed.
+//   - config: Update parameters for the monitor-only check.
+func skipFailedUpdateCheck(
+	log, clog *zerolog.Logger,
+	progress *state.Progress,
+	c types.Container,
+	err error,
+	config types.UpdateParams,
+) {
+	progress.AddSkipped(log, c, err, config)
+	clog.WithLevel(scanProblems.level("failed update check", string(c.ID()), err.Error())).
+		Err(err).
+		Msg("Could not check container for updates")
 }
 
 // unmonitoredContainers returns the containers of allContainers that are not
