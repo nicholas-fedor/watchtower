@@ -12,6 +12,7 @@ import (
 	"github.com/nicholas-fedor/watchtower/internal/registry/ratelimit"
 	mockUpdate "github.com/nicholas-fedor/watchtower/internal/update/mocks"
 	"github.com/nicholas-fedor/watchtower/pkg/types"
+	mockTypes "github.com/nicholas-fedor/watchtower/pkg/types/mocks"
 )
 
 // warnMessages returns the messages of the warn-level entries in buf.
@@ -149,9 +150,11 @@ func TestImageDiskSpaceGate(t *testing.T) {
 }
 
 // TestRunUpdatesWithNotifications_DiskSpaceAbortNotifiesOnce verifies that a
-// session ended by the image disk-space check reaches notifications once. The
-// check's own error line notifies with its sizes or cause. The session's
-// "Update execution failed" line for the same error is logged with notify=no.
+// session ended by the image disk-space check reaches notifications once. Of
+// the error lines logged, only the check's own line, with its sizes or cause,
+// lacks notify=no, so it is the one entry the notifier queues. The session's
+// "Update execution failed" line for the same error is logged with notify=no,
+// and the session's batch is still sent.
 func TestRunUpdatesWithNotifications_DiskSpaceAbortNotifiesOnce(t *testing.T) {
 	t.Parallel()
 
@@ -187,14 +190,21 @@ func TestRunUpdatesWithNotifications_DiskSpaceAbortNotifiesOnce(t *testing.T) {
 			params := defaultTestUpdateParams(filters.NoFilter)
 			params.DiskSpaceMax = 10_000
 
+			notifier := mockTypes.NewMockNotifier(t)
+			notifier.EXPECT().StartNotification(false).Once()
+			notifier.EXPECT().SendNotification(nil).Once()
+
 			metric := RunUpdatesWithNotifications(t.Context(), RunUpdatesWithNotificationsParams{
-				Logger: log,
-				Client: mockUpdate.CreateMockClient(tt.data, false, false),
-				Update: params,
+				Logger:   log,
+				Client:   mockUpdate.CreateMockClient(tt.data, false, false),
+				Notifier: notifier,
+				Update:   params,
 			})
 			assert.True(t, metric.ScanFailed)
 
-			notified := map[string]bool{}
+			// Every error line is listed in order, so a repeated message counts
+			// once per line.
+			var eligible, suppressed []string
 
 			for _, entry := range parseJSONLogEntries(buf) {
 				if entry["level"] != "error" {
@@ -202,13 +212,15 @@ func TestRunUpdatesWithNotifications_DiskSpaceAbortNotifiesOnce(t *testing.T) {
 				}
 
 				message, _ := entry["message"].(string)
-				notified[message] = entry["notify"] != "no"
+				if entry["notify"] == "no" {
+					suppressed = append(suppressed, message)
+				} else {
+					eligible = append(eligible, message)
+				}
 			}
 
-			assert.Equal(t, map[string]bool{
-				tt.message:                true,
-				"Update execution failed": false,
-			}, notified)
+			assert.Equal(t, []string{tt.message}, eligible)
+			assert.Equal(t, []string{"Update execution failed"}, suppressed)
 		})
 	}
 }
