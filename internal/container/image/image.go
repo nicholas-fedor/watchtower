@@ -846,9 +846,11 @@ func (c Client) performImagePull(
 			// Differentiate error types for appropriate logging and handling.
 			// Auth failures and missing images return distinct sentinel errors
 			// so callers can programmatically distinguish error categories.
+			// These lines stay at debug because the update check that called
+			// the pull warns about its failure once.
 			switch {
 			case cerrdefs.IsUnauthorized(err):
-				clog.Warn().
+				clog.Debug().
 					Err(err).
 					Msg("Image pull failed: authentication required")
 

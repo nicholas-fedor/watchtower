@@ -32,6 +32,7 @@ var commonTemplates = map[string]string{
 	// (an exit could not keep the runtime from starting Watchtower again),
 	// "Update panicked" (an update session stopped on a panic),
 	// "Update execution failed" (an update session ended in an error),
+	// "Could not check container for updates" (a container's update check failed),
 	// "Invalid pre-check timeout value, using default", "Invalid post-check timeout value, using default",
 	// "Invalid pre-update timeout value, using default" and
 	// "Invalid post-update timeout value, using default"
@@ -136,6 +137,8 @@ var commonTemplates = map[string]string{
     Invalid pre-update timeout{{with (index $e.Data "value")}} "{{.}}"{{end}} for {{with (index $e.Data "container")}}{{.}}{{else}}container{{end}}. Using the default of 1 minute
 {{- else if eq $msg "Invalid post-update timeout value, using default" -}}
     Invalid post-update timeout{{with (index $e.Data "value")}} "{{.}}"{{end}} for {{with (index $e.Data "container")}}{{.}}{{else}}container{{end}}. Using the default of 1 minute
+{{- else if eq $msg "Could not check container for updates" -}}
+    Could not check {{with (index $e.Data "container")}}{{.}}{{else}}container{{end}} for updates{{with (index $e.Data "error")}}: {{.}}{{end}}
 {{- else if or (eq $msg "Could not identify Watchtower's own container. Self-updates are disabled and old instances will not be removed") (eq $msg "Could not inspect Watchtower's own container. Self-updates are disabled") (eq $msg "Could not inspect Watchtower's own container to read its scope label. Exiting rather than running without a scope") (eq $msg "Could not disable Watchtower's restart policy. The runtime may start it again") (eq $msg "Update panicked") (eq $msg "Update execution failed") -}}
     {{$msg}}{{with (index $e.Data "error")}}: {{.}}{{end}}
 {{- else if $e.Data -}}

@@ -484,6 +484,16 @@
     },
     {
       "data": {
+        "container": "app",
+        "error": "failed to pull image: org/app:latest: unauthorized: authentication required",
+        "image": "org/app:latest"
+      },
+      "level": "debug",
+      "message": "Could not check container for updates",
+      "time": "2026-10-07T12:00:51Z"
+    },
+    {
+      "data": {
         "alpha": "one",
         "beta": 2
       },

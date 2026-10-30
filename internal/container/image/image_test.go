@@ -256,7 +256,7 @@ func TestImageClient_PullImage(t *testing.T) {
 	})
 
 	t.Run("pulling an image that requires authentication", func(t *testing.T) {
-		t.Run("should log at Warn level and return errPullImageUnauthorized for auth failures", func(t *testing.T) {
+		t.Run("should log at Debug level and return errPullImageUnauthorized for auth failures", func(t *testing.T) {
 			image := failingRegistry(t) + "/app:latest"
 
 			api := newImageAPI(t)
@@ -275,8 +275,8 @@ func TestImageClient_PullImage(t *testing.T) {
 			require.ErrorIs(t, err, errPullImageUnauthorized)
 			require.ErrorContains(t, err, "authentication required")
 			require.NotErrorIs(t, err, errPullImageFailed)
-			assert.Contains(t, logbuf.String(), "level=warn")
-			assert.Contains(t, logbuf.String(), "Image pull failed: authentication required")
+			assert.Regexp(t, `level=debug msg="Image pull failed: authentication required"`, logbuf.String())
+			assert.NotContains(t, logbuf.String(), "level=warn")
 		})
 	})
 
