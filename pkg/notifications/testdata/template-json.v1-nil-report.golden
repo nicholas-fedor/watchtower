@@ -476,6 +476,14 @@
     },
     {
       "data": {
+        "error": "failed to list containers: context deadline exceeded"
+      },
+      "level": "error",
+      "message": "Update execution failed",
+      "time": "2026-10-07T12:00:50Z"
+    },
+    {
+      "data": {
         "alpha": "one",
         "beta": 2
       },

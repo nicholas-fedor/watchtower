@@ -48,5 +48,6 @@ Invalid post-update timeout "soon" for app. Using the default of 1 minute
 Invalid pre-check timeout "1.5" for app. Using the default of 1 minute
 Invalid post-check timeout "-5" for app. Using the default of 1 minute
 Update panicked: runtime error: invalid memory address or nil pointer dereference
+Update execution failed: failed to list containers: context deadline exceeded
 Unrecognized message with fields | alpha=one beta=2 
 Unrecognized message without fields

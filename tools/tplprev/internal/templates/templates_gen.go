@@ -132,7 +132,7 @@ var Templates = map[string]string{
     Invalid pre-update timeout{{with (index $e.Data "value")}} "{{.}}"{{end}} for {{with (index $e.Data "container")}}{{.}}{{else}}container{{end}}. Using the default of 1 minute
 {{- else if eq $msg "Invalid post-update timeout value, using default" -}}
     Invalid post-update timeout{{with (index $e.Data "value")}} "{{.}}"{{end}} for {{with (index $e.Data "container")}}{{.}}{{else}}container{{end}}. Using the default of 1 minute
-{{- else if or (eq $msg "Could not identify Watchtower's own container. Self-updates are disabled and old instances will not be removed") (eq $msg "Could not inspect Watchtower's own container. Self-updates are disabled") (eq $msg "Could not inspect Watchtower's own container to read its scope label. Exiting rather than running without a scope") (eq $msg "Could not disable Watchtower's restart policy. The runtime may start it again") (eq $msg "Update panicked") -}}
+{{- else if or (eq $msg "Could not identify Watchtower's own container. Self-updates are disabled and old instances will not be removed") (eq $msg "Could not inspect Watchtower's own container. Self-updates are disabled") (eq $msg "Could not inspect Watchtower's own container to read its scope label. Exiting rather than running without a scope") (eq $msg "Could not disable Watchtower's restart policy. The runtime may start it again") (eq $msg "Update panicked") (eq $msg "Update execution failed") -}}
     {{$msg}}{{with (index $e.Data "error")}}: {{.}}{{end}}
 {{- else if $e.Data -}}
     {{- /* For messages with data, show message and key=value pairs */ -}}
