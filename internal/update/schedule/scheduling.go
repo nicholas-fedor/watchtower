@@ -57,6 +57,35 @@ func waitForRunningUpdate(log *zerolog.Logger, ctx context.Context, lock *Update
 	log.Debug().Msg("Lock check completed.")
 }
 
+// skipIfStillRunning returns a cron job wrapper that skips a scheduled run
+// while the previous one is still running, including while it waits for an
+// update started through the HTTP API.
+//
+// Each skip is logged at debug and counted as a skipped scan.
+//
+// Parameters:
+//   - log: Scheduler logger.
+//
+// Returns:
+//   - cron.JobWrapper: Wrapper for the scheduler's job chain.
+func skipIfStillRunning(log *zerolog.Logger) cron.JobWrapper {
+	return func(job cron.Job) cron.Job {
+		running := make(chan struct{}, 1)
+
+		return cron.FuncJob(func() {
+			select {
+			case running <- struct{}{}:
+				defer func() { <-running }()
+
+				job.Run()
+			default:
+				log.Debug().Msg("Update skipped: the previous scheduled update is still running")
+				metrics.Default().RegisterSkippedScan()
+			}
+		})
+	}
+}
+
 // ScheduleDeps holds dependencies for scheduled update runs.
 //
 // BaseParams must be a complete types.UpdateParams snapshot from config.UpdateParams
@@ -130,7 +159,7 @@ func RunUpgradesOnSchedule(ctx context.Context, deps ScheduleDeps) error {
 			),
 		),
 		cron.WithChain(
-			cron.SkipIfStillRunning(cron.DefaultLogger),
+			skipIfStillRunning(log),
 			cron.Recover(cron.DefaultLogger),
 		),
 	)
@@ -149,6 +178,7 @@ func RunUpgradesOnSchedule(ctx context.Context, deps ScheduleDeps) error {
 			}
 		} else if !lock.TryLock() {
 			log.Debug().Msg("Update skipped: another update is currently running")
+			metrics.Default().RegisterSkippedScan()
 
 			return
 		}
@@ -183,10 +213,7 @@ func RunUpgradesOnSchedule(ctx context.Context, deps ScheduleDeps) error {
 			return
 		}
 
-		metric := deps.RunUpdate(ctx, updateFilter, params)
-		if metric != nil {
-			metrics.Default().RegisterScan(metric)
-		}
+		metrics.Default().RegisterScan(deps.RunUpdate(ctx, updateFilter, params))
 
 		log.Debug().Msg("Update operation completed")
 

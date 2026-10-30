@@ -11,6 +11,8 @@ import (
 	"testing/synctest"
 	"time"
 
+	"github.com/prometheus/client_golang/prometheus"
+	"github.com/robfig/cron/v3"
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -54,6 +56,39 @@ func testDeps(
 		RunUpdate:           runUpdate,
 		BaseParams:          types.UpdateParams{},
 	}
+}
+
+// skippedScansTotal returns the process-wide watchtower_scans_skipped_total
+// counter, which the scheduler records through the default metrics handler.
+// It reports failures with t.Errorf, so it is safe to call from a condition
+// that require.Eventually runs on another goroutine.
+//
+// Parameters:
+//   - t: Test that receives any gather failure.
+//
+// Returns:
+//   - float64: Current counter value, or 0 after a failure.
+func skippedScansTotal(t *testing.T) float64 {
+	t.Helper()
+
+	metrics.Default()
+
+	families, err := prometheus.DefaultGatherer.Gather()
+	if err != nil {
+		t.Errorf("gather metrics: %v", err)
+
+		return 0
+	}
+
+	for _, family := range families {
+		if family.GetName() == "watchtower_scans_skipped_total" {
+			return family.GetMetric()[0].GetCounter().GetValue()
+		}
+	}
+
+	t.Errorf("watchtower_scans_skipped_total is not registered")
+
+	return 0
 }
 
 // TestWaitForRunningUpdate verifies that the shutdown wait takes the update
@@ -135,6 +170,90 @@ func TestWaitForRunningUpdate(t *testing.T) {
 
 			assert.Equal(t, 50*time.Millisecond, time.Since(start))
 		})
+	})
+}
+
+// TestSkipIfStillRunning verifies that a scheduled run that starts while the
+// previous one is still running is skipped and counted as a skipped scan, and
+// that a run after the previous one finishes runs normally. It reads the
+// process-wide skipped scans counter, so it does not run in parallel.
+func TestSkipIfStillRunning(t *testing.T) {
+	before := skippedScansTotal(t)
+
+	started := make(chan struct{})
+	release := make(chan struct{})
+
+	var runs atomic.Int32
+
+	job := skipIfStillRunning(newTestLogger(t))(cron.FuncJob(func() {
+		if runs.Add(1) == 1 {
+			close(started)
+			<-release
+		}
+	}))
+
+	done := make(chan struct{})
+
+	go func() {
+		job.Run()
+		close(done)
+	}()
+
+	<-started
+	job.Run()
+
+	assert.Equal(t, int32(1), runs.Load(), "the overlapping run is skipped")
+	assert.InDelta(t, before+1, skippedScansTotal(t), 0)
+
+	close(release)
+	<-done
+	job.Run()
+
+	assert.Equal(t, int32(2), runs.Load(), "a run after the previous one finishes runs")
+	assert.InDelta(t, before+1, skippedScansTotal(t), 0)
+}
+
+// TestRunUpgradesOnSchedule_OverlappingRunIsSkipped verifies that the
+// scheduler's cron entry skips a run that comes due while the previous
+// scheduled update is still running, so only one update runs, and that the
+// skip is counted as a skipped scan.
+//
+// The first read of the process-wide skipped scans counter creates the default
+// metrics handler outside the synctest bubble. The test reads that counter, so
+// it does not run in parallel.
+func TestRunUpgradesOnSchedule_OverlappingRunIsSkipped(t *testing.T) {
+	before := skippedScansTotal(t)
+
+	synctest.Test(t, func(t *testing.T) {
+		release := make(chan struct{})
+
+		var runs atomic.Int32
+
+		deps := testDeps(t, func(context.Context, types.Filter, types.UpdateParams) *metrics.Metric {
+			runs.Add(1)
+			<-release
+
+			return &metrics.Metric{}
+		}, func(logging.StartupParams) {})
+		deps.ScheduleSpec = "@every 1s"
+
+		ctx, cancel := context.WithCancel(t.Context())
+		done := make(chan error, 1)
+
+		go func() { done <- RunUpgradesOnSchedule(ctx, deps) }()
+
+		// The run at 1 second holds the update, and the run at 2 seconds overlaps it.
+		time.Sleep(2500 * time.Millisecond)
+		synctest.Wait()
+
+		assert.Equal(t, int32(1), runs.Load(), "the overlapping run started an update")
+		assert.InDelta(t, before+1, skippedScansTotal(t), 0)
+
+		cancel()
+		close(release)
+
+		require.NoError(t, <-done)
+		assert.Equal(t, int32(1), runs.Load(), "an update ran after shutdown")
 	})
 }
 
@@ -281,6 +400,45 @@ func TestRunUpgradesOnSchedule_UpdateOnStartSkippedWhenCanceled(t *testing.T) {
 	if updateCalled {
 		t.Error("expected the update at startup to be skipped")
 	}
+}
+
+// TestRunUpgradesOnSchedule_UpdateOnStartSkippedWhileLocked verifies that the
+// update at startup does not wait for an update that already holds the lock,
+// such as one started through the HTTP API, and is counted as a skipped scan.
+// It reads the process-wide skipped scans counter, so it does not run in
+// parallel.
+func TestRunUpgradesOnSchedule_UpdateOnStartSkippedWhileLocked(t *testing.T) {
+	before := skippedScansTotal(t)
+
+	lock := NewUpdateLock()
+	require.True(t, lock.TryLock())
+
+	var updateCalled atomic.Bool
+
+	deps := testDeps(t, func(context.Context, types.Filter, types.UpdateParams) *metrics.Metric {
+		updateCalled.Store(true)
+
+		return &metrics.Metric{}
+	}, func(logging.StartupParams) {})
+	deps.Lock = lock
+	deps.UpdateOnStart = true
+
+	ctx, cancel := context.WithCancel(t.Context())
+	defer cancel()
+
+	errCh := make(chan error, 1)
+
+	go func() { errCh <- RunUpgradesOnSchedule(ctx, deps) }()
+
+	require.Eventually(t, func() bool {
+		return skippedScansTotal(t) == before+1
+	}, 5*time.Second, 10*time.Millisecond)
+
+	lock.Unlock()
+	cancel()
+
+	require.NoError(t, <-errCh)
+	assert.False(t, updateCalled.Load(), "the update at startup is skipped")
 }
 
 func TestRunUpgradesOnSchedule_InvalidCronSpec(t *testing.T) {

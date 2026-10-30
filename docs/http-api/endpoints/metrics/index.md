@@ -34,6 +34,9 @@ To use this feature, set an [API token](../../../configuration/http-api/index.md
 | `watchtower_disk_space_max_bytes`            | Gauge   | Configured Docker image-usage maximum in bytes (0 if unset)                        |
 | `watchtower_disk_space_warn_bytes`           | Gauge   | Configured Docker image-usage warning threshold in bytes (0 if unset)              |
 
+A scan is skipped when a scheduled run starts while the previous one is still running, or when the update at startup finds another update already running.
+A skipped scan does not change the scan total or the last-scan gauges.
+
 The four image-usage gauges are updated when [`disk-space-max`](../../../configuration/update-behavior/index.md#disk_space_max) or [`disk-space-warn`](../../../configuration/update-behavior/index.md#disk_space_warn) are set.
 See [Disk Usage Monitor](../../../advanced-features/disk-usage-monitor/index.md#metrics).
 
