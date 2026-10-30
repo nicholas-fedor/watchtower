@@ -292,7 +292,7 @@ func handleUpdateResult(log *zerolog.Logger, result types.Report, err error, not
 //
 // The panic value is logged at error, so it reaches notifications. The stack
 // is logged at debug without notifying. The session's notification batch, which
-// holds the panic entry, is then sent with an empty report. Subscribers get
+// holds the panic entry, is then sent without a report. Subscribers get
 // scan_failed.
 //
 // Parameters:
@@ -315,8 +315,10 @@ func endPanickedSession(
 		Str("stack", string(debug.Stack())).
 		Msg("Stack of the update panic")
 
+	// Without a report, report templates list the batch's entries, so the
+	// panic entry is in the message. A zero-count report would hide it.
 	if params.Notifier != nil {
-		params.Notifier.SendNotification(emptyReport{})
+		params.Notifier.SendNotification(nil)
 	}
 
 	if params.EventBroadcaster != nil {

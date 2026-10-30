@@ -45,9 +45,10 @@ func defaultTestUpdateParams(filter types.Filter) types.UpdateParams {
 // TestRunUpdatesWithNotifications_PanicEndsSession verifies that a panic during
 // an update session ends it as an update error does. The panic is logged at
 // error without notify=no, so the notification hook takes it. The session's
-// notification batch is sent at once with an empty report. The scan_failed
-// event follows scan_started. The metric marks a failed scan. The stack is
-// logged at debug with notify=no.
+// notification batch is sent at once without a report, so report templates
+// fall back to listing its entries. The scan_failed event follows
+// scan_started. The metric marks a failed scan. The stack is logged at debug
+// with notify=no.
 func TestRunUpdatesWithNotifications_PanicEndsSession(t *testing.T) {
 	t.Parallel()
 
@@ -85,7 +86,7 @@ func TestRunUpdatesWithNotifications_PanicEndsSession(t *testing.T) {
 	assert.Equal(t, &metrics.Metric{ScanFailed: true}, metric)
 
 	require.Len(t, sent, 1, "the session's batch is sent")
-	assert.Empty(t, sent[0].All(), "the batch is sent with an empty report")
+	assert.Nil(t, sent[0], "the batch is sent without a report, so report templates list its entries")
 
 	// Events are published synchronously into the subscriber's buffer.
 	var eventTypes []string
