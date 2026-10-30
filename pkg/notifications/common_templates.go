@@ -154,7 +154,8 @@ var commonTemplates = map[string]string{
 	// Fresh containers (no update needed) show name, image, and state.
 	// Skipped containers show name, image, state, and error reason.
 	// Failed containers show name, image, state, and error details.
-	// If no .Report, falls back to listing all .Entries messages (one per line).
+	// If no .Report, falls back to listing each .Entries message on its own line, followed by
+	// ": <error>" when the entry has an error field.
 	// Expects .Report with Scanned, Updated, Restarted, Failed, Fresh, Skipped slices of containers.
 	// Each container has Name, ImageName, State, Error, CurrentImageID, LatestImageID fields.
 	`default`: `
@@ -184,8 +185,8 @@ var commonTemplates = map[string]string{
 	  {{- end -}}
   {{- end -}}
 {{- else -}}
-  {{- /* Fallback to simple entry messages */ -}}
-  {{range .Entries -}}{{.Message}}{{"\n"}}{{- end -}}
+  {{- /* Fallback to simple entry messages, with the error when the entry has one */ -}}
+  {{range .Entries -}}{{.Message}}{{with index .Data "error"}}: {{.}}{{end}}{{"\n"}}{{- end -}}
 {{- end -}}`,
 
 	// "porcelain.v1.summary-no-log" template provides machine-readable output for scripting/automation.
