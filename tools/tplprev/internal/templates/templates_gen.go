@@ -31,8 +31,8 @@ var Templates = map[string]string{
 	  {{- end -}}
   {{- end -}}
 {{- else -}}
-  {{- /* Fallback to simple entry messages */ -}}
-  {{range .Entries -}}{{.Message}}{{"\n"}}{{- end -}}
+  {{- /* Fallback to simple entry messages, with the error when the entry has one */ -}}
+  {{range .Entries -}}{{.Message}}{{with index .Data "error"}}: {{.}}{{end}}{{"\n"}}{{- end -}}
 {{- end -}}`,
 	"default-legacy": `
 {{- /* Iterate over entries, adding newline between them */ -}}

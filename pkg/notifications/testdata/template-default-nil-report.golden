@@ -6,48 +6,48 @@ Stopping linked container
 Started linked container
 Container updated
 Removing image
-Failed to list containers for image usage check, skipping removal
+Failed to list containers for image usage check, skipping removal: cannot connect to the Docker daemon
 Image is within cooldown period - not eligible for update
 Image age exceeds cooldown - eligible for update
-Image creation time unavailable - update check unavailable
+Image creation time unavailable - update check unavailable: manifest unknown
 Successfully removed all excess Watchtower containers
 Docker image usage budget enabled
 Docker image usage exceeds configured maximum
 Docker image usage exceeds configured warning threshold
-Failed to query Docker image disk usage
+Failed to query Docker image disk usage: daemon disk usage unavailable
 Changelog
 Built image from Git URL context
 Built Compose project
-Git build failed. Leaving running container untouched
-Compose apply failed. Docker Compose may have partially recreated services
+Git build failed. Leaving running container untouched: example failure
+Compose apply failed. Docker Compose may have partially recreated services: example failure
 Compose apply finished with unconfirmed service results
 Compose apply result omitted this service. Runtime state is unknown
 Compose apply did not return an identifiable instance for this replica. Runtime state is unknown
 Compose apply skipped. Container has no compose service label
 Compose batch dependencies are cyclic. Appending unresolved batches in first-seen order
-Compose project directory is not readable. Leaving the running container untouched
-Compose update failed before container replacement
-Could not dependency-sort Compose batches. Using the existing container order
-Could not order Compose batches by dependencies. Using first-seen order
+Compose project directory is not readable. Leaving the running container untouched: example failure
+Compose update failed before container replacement: example failure
+Could not dependency-sort Compose batches. Using the existing container order: circular reference detected
+Could not order Compose batches by dependencies. Using first-seen order: circular reference detected
 Skipped container with an invalid git-host
 Skipped container with an invalid git semver policy
 Skipping Watchtower self-update in run-once mode
 Only checking containers in scope
 Starting HTTP API server
 HTTP API server is enabled
-Registry rate limit retries exhausted. Container failed for this cycle
+Registry rate limit retries exhausted. Container failed for this cycle: image pull: registry rate limited: retry-after 347.256µs allowed 44000 per 1m0s
 Ignoring depends-on entry that names no container
 Skipping container update (self-dependency)
 Skipping container update (circular dependency)
-Could not identify Watchtower's own container. Self-updates are disabled and old instances will not be removed
-Could not inspect Watchtower's own container. Self-updates are disabled
-Could not inspect Watchtower's own container to read its scope label. Exiting rather than running without a scope
-Could not disable Watchtower's restart policy. The runtime may start it again
-Invalid pre-update timeout value, using default
-Invalid post-update timeout value, using default
-Invalid pre-check timeout value, using default
-Invalid post-check timeout value, using default
-Update panicked
-Update execution failed
+Could not identify Watchtower's own container. Self-updates are disabled and old instances will not be removed: failed to detect current container ID: no container ID in cgroup file
+Could not inspect Watchtower's own container. Self-updates are disabled: failed to inspect container: context deadline exceeded
+Could not inspect Watchtower's own container to read its scope label. Exiting rather than running without a scope: failed to inspect container: context deadline exceeded
+Could not disable Watchtower's restart policy. The runtime may start it again: failed to set restart policy: context deadline exceeded
+Invalid pre-update timeout value, using default: lifecycle hook timeout must be a whole number of minutes of 0 or more: got -1
+Invalid post-update timeout value, using default: lifecycle hook timeout must be a whole number of minutes of 0 or more: strconv.Atoi: parsing "soon": invalid syntax
+Invalid pre-check timeout value, using default: lifecycle hook timeout must be a whole number of minutes of 0 or more: strconv.Atoi: parsing "1.5": invalid syntax
+Invalid post-check timeout value, using default: lifecycle hook timeout must be a whole number of minutes of 0 or more: got -5
+Update panicked: runtime error: invalid memory address or nil pointer dereference
+Update execution failed: failed to list containers: context deadline exceeded
 Unrecognized message with fields
 Unrecognized message without fields
