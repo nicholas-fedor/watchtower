@@ -67,10 +67,12 @@ const (
 	maxReportedProblems = 1024
 )
 
-// scanProblems holds the dependency problems and failed update checks reported
-// during this process. Keys include the container ID, so a recreated container
-// is reported again. A container whose labels change is also recreated. A check
-// that fails for a different reason is reported again too.
+// scanProblems holds the problems reported during this process. It records
+// dependency problems and failed update checks. It also records stale
+// containers whose configuration cannot be recreated. Keys include the
+// container ID, so a recreated container is reported again. A container whose
+// labels change is also recreated. A problem with a different cause is reported
+// again too.
 var scanProblems = &reportedProblems{seen: make(map[string]struct{})}
 
 // update scans and updates containers based on parameters.
@@ -454,13 +456,6 @@ func update(
 			// ensure recreation is possible.
 			if checkErr == nil && shouldUpdate {
 				verifyErr = sourceContainer.VerifyConfiguration()
-				if verifyErr != nil {
-					clog.Debug().
-						Err(verifyErr).
-						Str("container_id", sourceContainer.ID().ShortID()).
-						Str("image_id", sourceContainer.ImageID().ShortID()).
-						Msg("Failed to verify container configuration")
-				}
 			}
 
 			// Record the new image's OCI metadata so a notification can describe
@@ -562,6 +557,9 @@ func update(
 				parallelStaleCheckFailed++
 
 				progress.AddSkipped(log, sourceContainer, verifyErr, config)
+				clog.WithLevel(scanProblems.level("unrecreatable configuration", string(sourceContainer.ID()), verifyErr.Error())).
+					Err(verifyErr).
+					Msg("Could not update container. Its configuration cannot be recreated")
 
 				if sourceContainer.IsWatchtower() &&
 					!config.SkipSelfUpdate &&

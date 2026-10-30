@@ -84,6 +84,7 @@ var legacyTemplateMessages = []string{
 	"Update panicked",
 	"Update execution failed",
 	"Could not check container for updates",
+	"Could not update container. Its configuration cannot be recreated",
 }
 
 // Disk sizes used by the image-usage budget fixtures, in bytes.
@@ -223,6 +224,12 @@ func goldenEntryData(message string) map[string]any {
 		return map[string]any{"error": "failed to list containers: context deadline exceeded"}
 	case "Update panicked":
 		return map[string]any{"error": "runtime error: invalid memory address or nil pointer dereference"}
+	case "Could not update container. Its configuration cannot be recreated":
+		return map[string]any{
+			"container": "app",
+			"image":     "org/app:latest",
+			"error":     "no image info available",
+		}
 	case "Could not check container for updates":
 		return map[string]any{
 			"container": "app",

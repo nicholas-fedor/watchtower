@@ -50,5 +50,6 @@ Invalid post-check timeout "-5" for app. Using the default of 1 minute
 Update panicked: runtime error: invalid memory address or nil pointer dereference
 Update execution failed: failed to list containers: context deadline exceeded
 Could not check app for updates: failed to pull image: org/app:latest: unauthorized: authentication required
+Could not update app: no image info available
 Unrecognized message with fields | alpha=one beta=2 
 Unrecognized message without fields

@@ -21,6 +21,7 @@ import (
 	cerrdefs "github.com/containerd/errdefs"
 	dockerContainer "github.com/moby/moby/api/types/container"
 
+	"github.com/nicholas-fedor/watchtower/internal/container"
 	mockContainerClient "github.com/nicholas-fedor/watchtower/internal/container/client/mocks"
 	containerImage "github.com/nicholas-fedor/watchtower/internal/container/image"
 	"github.com/nicholas-fedor/watchtower/internal/container/oci"
@@ -632,6 +633,43 @@ func TestUpdate_UnparsableImageWarnsOnce(t *testing.T) {
 		require.Len(t, report.Skipped(), 1)
 
 		got = append(got, messageLevels(t, out.String(), "Could not check container for updates"))
+	}
+
+	assert.Equal(t, [][]string{{"warn"}, {"debug"}}, got)
+}
+
+// TestUpdate_UnrecreatableConfigWarnsOnce verifies that a stale container whose
+// configuration cannot be recreated is skipped with a warning on the first scan.
+// The second scan logs it at debug, so the blocked update reaches notifications
+// once. The container's image could not be inspected, so it has no image info.
+func TestUpdate_UnrecreatableConfigWarnsOnce(t *testing.T) {
+	t.Parallel()
+
+	// Without image info, VerifyConfiguration rejects the container.
+	app := container.NewContainer(nil, &dockerContainer.InspectResponse{
+		ID:         randomContainerID(t),
+		Name:       "/app",
+		Config:     &dockerContainer.Config{Image: "org/app:latest"},
+		HostConfig: &dockerContainer.HostConfig{},
+	}, nil)
+
+	got := make([][]string, 0, 2)
+
+	for range 2 {
+		client := mockContainerClient.NewMockClient(t)
+		client.EXPECT().ListContainers(mock.Anything, mock.Anything).Return([]types.Container{app}, nil).Once()
+		client.EXPECT().IsContainerStale(mock.Anything, mock.Anything, mock.Anything).
+			Return(true, types.ImageID("sha256:new"), "", nil).Once()
+
+		var out bytes.Buffer
+
+		log := zerolog.New(&out).Level(zerolog.DebugLevel)
+
+		report, _, err := update(&log, t.Context(), client, types.UpdateParams{}, ratelimit.New())
+		require.NoError(t, err)
+		require.Len(t, report.Skipped(), 1)
+
+		got = append(got, messageLevels(t, out.String(), "Could not update container. Its configuration cannot be recreated"))
 	}
 
 	assert.Equal(t, [][]string{{"warn"}, {"debug"}}, got)

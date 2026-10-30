@@ -50,5 +50,6 @@ Invalid post-check timeout value, using default: lifecycle hook timeout must be 
 Update panicked: runtime error: invalid memory address or nil pointer dereference
 Update execution failed: failed to list containers: context deadline exceeded
 Could not check container for updates: failed to pull image: org/app:latest: unauthorized: authentication required
+Could not update container. Its configuration cannot be recreated: no image info available
 Unrecognized message with fields
 Unrecognized message without fields
