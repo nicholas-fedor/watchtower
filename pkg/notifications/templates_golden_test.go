@@ -44,7 +44,6 @@ var legacyTemplateMessages = []string{
 	"Image is within cooldown period - not eligible for update",
 	"Image age exceeds cooldown - eligible for update",
 	"Image creation time unavailable - update check unavailable",
-	"Detected multiple Watchtower instances - initiating cleanup",
 	"Successfully removed all excess Watchtower containers",
 	"Docker image usage budget enabled",
 	"Docker image usage exceeds configured maximum",
@@ -154,8 +153,6 @@ func goldenEntryData(message string) map[string]any {
 			"cooldown": "1d",
 			"error":    "manifest unknown",
 		}
-	case "Detected multiple Watchtower instances - initiating cleanup":
-		return map[string]any{"count": 2}
 	case "Successfully removed all excess Watchtower containers":
 		return map[string]any{"removed_instances": 1}
 	case "Docker image usage budget enabled":

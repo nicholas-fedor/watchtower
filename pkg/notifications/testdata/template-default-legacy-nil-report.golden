@@ -10,7 +10,6 @@ Skipped image cleanup: org/app:latest (01d110000000): cannot connect to the Dock
 org/app:latest created less than 1d ago - eligible in 22h (Thu, 08 Oct 2026 10:00:00 UTC)
 org/app:latest created more than 1d ago - eligible for update
 org/app:latest creation time unavailable (cooldown: 1d) - update check unavailable
-Detected 2 Watchtower instances - initiating cleanup
 Successfully removed 1 old Watchtower container
 Docker image usage budget enabled: maximum 10.74 GB, warning at 8.59 GB
 Docker image usage exceeds configured maximum: 11.81 GB of 10.74 GB used (2.15 GB reclaimable, 3 images)
