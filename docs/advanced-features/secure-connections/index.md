@@ -36,11 +36,12 @@ Environment Variable: DOCKER_TLS_VERIFY
             Argument: --cert-path
 Environment Variable: DOCKER_CERT_PATH
                 Type: String
-             Default: /etc/ssl/docker
+             Default: None
 ```
 
 !!! Notes
     - This specifies the directory where Watchtower's Docker client should find the certificate files within the Watchtower container.
+    - When it is unset, the Docker client loads no certificates from a directory. The examples on this page mount the certificates at `/etc/ssl/docker` and set this option to that path.
     - Docker expects the following filenames:
         - `ca.pem`
         - `cert.pem`
@@ -395,7 +396,7 @@ Possible Solutions:
 
 When [TLS verification](#tls_verification) is enabled and the [Docker host URL](#docker_host_url) is not configured or uses `unix://`,  Watchtower logs the following warning:
 
-!!! Warning "TLS verification is enabled but DOCKER_HOST uses local socket 'unix://'. TLS is not applicable for local sockets; consider disabling TLS verification."
+!!! Warning "TLS verification is enabled but DOCKER_HOST uses local socket 'unix://'. TLS is not applicable for local sockets. Consider disabling TLS verification."
 
 Possible Solutions:
 
