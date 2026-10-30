@@ -226,6 +226,37 @@ func TestUpdate_CanceledScanSkipsUncheckedContainers(t *testing.T) {
 	})
 }
 
+// TestUpdate_CheckTimeoutSkipsOnlyItsContainer verifies that a staleness check
+// failing with a timeout of its own, such as a registry request reaching its
+// client timeout while the scan is still running, skips only that container.
+// The scan keeps checking the other containers and does not end in an error.
+func TestUpdate_CheckTimeoutSkipsOnlyItsContainer(t *testing.T) {
+	t.Parallel()
+
+	slow := skipTestContainer("a000000000000000000000000000000000000000000000000000000000000000", "slow", nil)
+	fresh := skipTestContainer("b000000000000000000000000000000000000000000000000000000000000000", "fresh", nil)
+
+	client := mockContainerClient.NewMockClient(t)
+	client.EXPECT().ListContainers(mock.Anything, mock.Anything).
+		Return([]types.Container{slow, fresh}, nil).Once()
+	client.EXPECT().IsContainerStale(mock.Anything, mock.Anything, mock.Anything).
+		RunAndReturn(func(_ context.Context, c types.Container, _ types.UpdateParams) (bool, types.ImageID, string, error) {
+			if c.Name() == slow.Name() {
+				return false, "", "", fmt.Errorf("could not determine image age: %w", context.DeadlineExceeded)
+			}
+
+			return false, c.ImageID(), "", nil
+		}).Times(2)
+
+	report, _, err := update(newTestLogger(t), t.Context(), client, types.UpdateParams{}, ratelimit.New())
+	require.NoError(t, err)
+
+	assert.Equal(t, map[string]string{
+		"slow": "could not determine image age: context deadline exceeded",
+	}, reportErrors(report.Skipped()))
+	assert.Equal(t, []string{"fresh"}, reportNames(report.Scanned()))
+}
+
 // TestUpdate_CanceledRecreateFailureIsFailed verifies that a container stopped
 // before an update is canceled, whose recreation then fails, is reported as
 // failed even though the failure wraps the cancellation, while the container
