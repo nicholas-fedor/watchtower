@@ -7,6 +7,7 @@ import (
 	"net/http/httptest"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/gofiber/fiber/v3"
 	"github.com/rs/zerolog"
@@ -96,12 +97,12 @@ func TestNew_ReturnsTextContentType(t *testing.T) {
 func TestNewStatusHandler(t *testing.T) {
 	tests := []struct {
 		name    string
-		getLast func() *metrics.Metric
+		getLast func() *metrics.HistoryEntry
 	}{
 		{
 			name: "returns non-nil metric",
-			getLast: func() *metrics.Metric {
-				return &metrics.Metric{Scanned: 5, Updated: 2, Failed: 1, Restarted: 0, Skipped: 2}
+			getLast: func() *metrics.HistoryEntry {
+				return &metrics.HistoryEntry{Scanned: 5, Updated: 2, Failed: 1, Restarted: 0, Skipped: 2}
 			},
 		},
 	}
@@ -116,9 +117,9 @@ func TestNewStatusHandler(t *testing.T) {
 }
 
 func TestStatusHandler_Handle_WithMetric(t *testing.T) {
-	expected := &metrics.Metric{Scanned: 10, Updated: 3, Failed: 1, Restarted: 2, Skipped: 0}
+	expected := &metrics.HistoryEntry{Scanned: 10, Updated: 3, Failed: 1, Restarted: 2, Skipped: 0}
 
-	h := NewStatusHandler(newTestLogger(t), func() *metrics.Metric { return expected })
+	h := NewStatusHandler(newTestLogger(t), func() *metrics.HistoryEntry { return expected })
 	app := fiber.New(fiber.Config{})
 	app.Get("/v1/status", h.Handle)
 
@@ -132,7 +133,7 @@ func TestStatusHandler_Handle_WithMetric(t *testing.T) {
 }
 
 func TestStatusHandler_Handle_NilMetric(t *testing.T) {
-	h := NewStatusHandler(newTestLogger(t), func() *metrics.Metric { return nil })
+	h := NewStatusHandler(newTestLogger(t), func() *metrics.HistoryEntry { return nil })
 	app := fiber.New(fiber.Config{})
 	app.Get("/v1/status", h.Handle)
 
@@ -145,22 +146,48 @@ func TestStatusHandler_Handle_NilMetric(t *testing.T) {
 	assert.Equal(t, http.StatusNoContent, resp.StatusCode)
 }
 
+// TestStatusHandler_Handle_ReportsScanTime verifies that the status timestamp
+// is the time the last scan was recorded, in UTC, rather than the time of the
+// request.
+func TestStatusHandler_Handle_ReportsScanTime(t *testing.T) {
+	t.Parallel()
+
+	scanned := time.Date(2026, 10, 20, 1, 15, 30, 0, time.FixedZone("UTC-7", -7*60*60))
+	h := NewStatusHandler(newTestLogger(t), func() *metrics.HistoryEntry {
+		return &metrics.HistoryEntry{Timestamp: scanned, Scanned: 3}
+	})
+	app := fiber.New(fiber.Config{})
+	app.Get("/v1/status", h.Handle)
+
+	resp, err := app.Test(httptest.NewRequestWithContext(t.Context(), http.MethodGet, "/v1/status", nil))
+	require.NoError(t, err)
+
+	defer resp.Body.Close()
+
+	var got struct {
+		Timestamp string `json:"timestamp"`
+	}
+
+	require.NoError(t, json.NewDecoder(resp.Body).Decode(&got))
+	assert.Equal(t, "2026-10-20T08:15:30Z", got.Timestamp)
+}
+
 // TestStatusHandler_Handle_ScanFailed verifies that the status summary reports
 // a failed scan, and leaves the field out for a successful one.
 func TestStatusHandler_Handle_ScanFailed(t *testing.T) {
 	tests := []struct {
 		name   string
-		metric *metrics.Metric
+		metric *metrics.HistoryEntry
 		// want is the scan_failed value, or nil when the field is absent.
 		want any
 	}{
-		{name: "failed scan", metric: &metrics.Metric{Scanned: 2, ScanFailed: true}, want: true},
-		{name: "successful scan", metric: &metrics.Metric{Scanned: 2}},
+		{name: "failed scan", metric: &metrics.HistoryEntry{Scanned: 2, ScanFailed: true}, want: true},
+		{name: "successful scan", metric: &metrics.HistoryEntry{Scanned: 2}},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			h := NewStatusHandler(newTestLogger(t), func() *metrics.Metric { return tt.metric })
+			h := NewStatusHandler(newTestLogger(t), func() *metrics.HistoryEntry { return tt.metric })
 			app := fiber.New(fiber.Config{})
 			app.Get("/v1/status", h.Handle)
 

@@ -6,6 +6,7 @@ import (
 	"sync"
 	"testing"
 	"testing/synctest"
+	"time"
 
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promauto"
@@ -1327,6 +1328,54 @@ func TestMetrics_FailedScans(t *testing.T) {
 		assert.False(t, history[0].ScanFailed)
 		assert.True(t, history[1].ScanFailed)
 	})
+}
+
+// TestGetLastScan verifies that the last scan is the newest history entry,
+// with the time it was recorded rather than the time it is read, including
+// after the 500-entry ring buffer has wrapped around, and that there is none
+// before the first scan. Each case runs in a synctest bubble, so the clock
+// stands still while scans are recorded and moves a minute before the read.
+func TestGetLastScan(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name  string
+		scans int
+	}{
+		{name: "no scan", scans: 0},
+		{name: "one scan", scans: 1},
+		{name: "buffer not full", scans: 3},
+		{name: "buffer full", scans: historyBufferSize},
+		{name: "buffer wrapped", scans: historyBufferSize + 2},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			synctest.Test(t, func(t *testing.T) {
+				m := &Metrics{}
+				recorded := time.Now().UTC()
+
+				for i := range tt.scans {
+					m.RecordHistory(&Metric{Scanned: i + 1})
+				}
+
+				time.Sleep(time.Minute)
+
+				last := m.GetLastScan()
+				if tt.scans == 0 {
+					assert.Nil(t, last)
+
+					return
+				}
+
+				require.NotNil(t, last)
+				assert.Equal(t, tt.scans, last.Scanned)
+				assert.Equal(t, recorded, last.Timestamp)
+			})
+		})
+	}
 }
 
 // collectorValue returns the current value of a counter or gauge.

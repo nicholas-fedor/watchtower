@@ -57,16 +57,16 @@ type StatusHandler struct {
 	log *zerolog.Logger
 
 	Path    string
-	getLast func() *metrics.Metric
+	getLast func() *metrics.HistoryEntry
 }
 
 // NewStatusHandler creates a new status handler that returns the last scan
 // results as JSON.
 //
 // Parameters:
-//   - getLast: Function that returns the last scan metric, or nil if no scan
-//     has completed.
-func NewStatusHandler(log *zerolog.Logger, getLast func() *metrics.Metric) *StatusHandler {
+//   - getLast: Function that returns the last scan's history entry, or nil if
+//     no scan has completed.
+func NewStatusHandler(log *zerolog.Logger, getLast func() *metrics.HistoryEntry) *StatusHandler {
 	if log == nil {
 		nop := zerolog.Nop()
 		log = &nop
@@ -123,7 +123,7 @@ func (h *StatusHandler) Handle(c fiber.Ctx) error {
 
 	err := c.Status(http.StatusOK).JSON(fiber.Map{
 		"summary":     summary,
-		"timestamp":   time.Now().UTC().Format(time.RFC3339),
+		"timestamp":   last.Timestamp.UTC().Format(time.RFC3339),
 		"api_version": "v1",
 	})
 	if err != nil {
