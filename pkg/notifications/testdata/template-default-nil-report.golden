@@ -49,5 +49,6 @@ Invalid pre-check timeout value, using default: lifecycle hook timeout must be a
 Invalid post-check timeout value, using default: lifecycle hook timeout must be a whole number of minutes of 0 or more: got -5
 Update panicked: runtime error: invalid memory address or nil pointer dereference
 Update execution failed: failed to list containers: context deadline exceeded
+Could not check container for updates: failed to pull image: org/app:latest: unauthorized: authentication required
 Unrecognized message with fields
 Unrecognized message without fields

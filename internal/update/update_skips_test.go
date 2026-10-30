@@ -22,7 +22,9 @@ import (
 	dockerContainer "github.com/moby/moby/api/types/container"
 
 	mockContainerClient "github.com/nicholas-fedor/watchtower/internal/container/client/mocks"
+	containerImage "github.com/nicholas-fedor/watchtower/internal/container/image"
 	"github.com/nicholas-fedor/watchtower/internal/container/oci"
+	"github.com/nicholas-fedor/watchtower/internal/git"
 	"github.com/nicholas-fedor/watchtower/internal/registry/ratelimit"
 	mockUpdate "github.com/nicholas-fedor/watchtower/internal/update/mocks"
 	"github.com/nicholas-fedor/watchtower/pkg/types"
@@ -517,6 +519,122 @@ func TestUpdate_DependencyProblemsWarnOnce(t *testing.T) {
 			assert.Equal(t, repeatLevel("debug", len(scanLevels[0])), scanLevels[1], "the second scan logs at debug")
 		})
 	}
+}
+
+// TestUpdate_FailedCheckWarnsOnce verifies that a failed staleness check warns
+// once per container and cause, so a lasting failure reaches notifications on
+// the first scan and is logged at debug on later scans. A check failure whose
+// own code already logged a notification-reachable line, such as a cooldown
+// deferral, a registry rate limit, or an invalid Git label, adds no warning.
+func TestUpdate_FailedCheckWarnsOnce(t *testing.T) {
+	t.Parallel()
+
+	const message = "Could not check container for updates"
+
+	// Each case returns checkErrs[i] from the check in scan i and lists the
+	// level the warning has in each scan, or none.
+	tests := []struct {
+		name      string
+		checkErrs []error
+		want      [][]string
+	}{
+		{
+			name:      "a lasting failure",
+			checkErrs: []error{errors.New("dial tcp: i/o timeout"), errors.New("dial tcp: i/o timeout")},
+			want:      [][]string{{"warn"}, {"debug"}},
+		},
+		{
+			name:      "a different cause",
+			checkErrs: []error{errors.New("dial tcp: i/o timeout"), errors.New("unauthorized")},
+			want:      [][]string{{"warn"}, {"warn"}},
+		},
+		{
+			name:      "a cooldown deferral",
+			checkErrs: []error{containerImage.ErrImageCooldown, &containerImage.CooldownError{Delay: "1h"}},
+			want:      [][]string{nil, nil},
+		},
+		{
+			name:      "a registry rate limit",
+			checkErrs: []error{&ratelimit.Error{}, &ratelimit.Error{}},
+			want:      [][]string{nil, nil},
+		},
+		{
+			name: "an invalid Git label",
+			checkErrs: []error{
+				fmt.Errorf("git check: %w: weekly", git.ErrInvalidPolicy),
+				fmt.Errorf("git check: %w: bad host", git.ErrInvalidHost),
+			},
+			want: [][]string{nil, nil},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			// A fresh ID per run keeps the process-wide record of reported
+			// problems from carrying over between test runs.
+			app := skipTestContainer(randomContainerID(t), "app", nil)
+
+			got := make([][]string, 0, len(tt.checkErrs))
+
+			for _, checkErr := range tt.checkErrs {
+				client := mockContainerClient.NewMockClient(t)
+				client.EXPECT().ListContainers(mock.Anything, mock.Anything).Return([]types.Container{app}, nil).Once()
+				client.EXPECT().IsContainerStale(mock.Anything, mock.Anything, mock.Anything).
+					Return(false, app.ImageID(), "", checkErr).Once()
+
+				var out bytes.Buffer
+
+				log := zerolog.New(&out).Level(zerolog.DebugLevel)
+
+				_, _, err := update(&log, t.Context(), client, types.UpdateParams{}, ratelimit.New())
+				require.NoError(t, err)
+
+				got = append(got, messageLevels(t, out.String(), message))
+			}
+
+			assert.Equal(t, tt.want, got)
+		})
+	}
+}
+
+// TestUpdate_UnparsableImageWarnsOnce verifies that a container whose image
+// reference cannot be parsed is skipped with a warning on the first scan and
+// logged at debug on later scans, as for a failed staleness check.
+func TestUpdate_UnparsableImageWarnsOnce(t *testing.T) {
+	t.Parallel()
+
+	// Neither the uppercase image name nor the fallback built from the
+	// container name parses as an image reference.
+	app := mockUpdate.CreateMockContainerWithConfig(
+		randomContainerID(t),
+		"/Bad Name",
+		"Org/App:latest",
+		true,
+		false,
+		time.Now(),
+		&dockerContainer.Config{Image: "Org/App:latest"},
+	)
+
+	got := make([][]string, 0, 2)
+
+	for range 2 {
+		client := mockContainerClient.NewMockClient(t)
+		client.EXPECT().ListContainers(mock.Anything, mock.Anything).Return([]types.Container{app}, nil).Once()
+
+		var out bytes.Buffer
+
+		log := zerolog.New(&out).Level(zerolog.DebugLevel)
+
+		report, _, err := update(&log, t.Context(), client, types.UpdateParams{}, ratelimit.New())
+		require.NoError(t, err)
+		require.Len(t, report.Skipped(), 1)
+
+		got = append(got, messageLevels(t, out.String(), "Could not check container for updates"))
+	}
+
+	assert.Equal(t, [][]string{{"warn"}, {"debug"}}, got)
 }
 
 // TestReportedProblems_StartsOverWhenFull verifies that the record of reported

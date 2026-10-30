@@ -49,8 +49,8 @@ var (
 	errOldSelfDetected = errors.New("current container is an old Watchtower container")
 )
 
-// reportedProblems records the dependency problems already reported as
-// warnings, so a problem that persists across scans notifies only once.
+// reportedProblems records the problems already reported as warnings, so a
+// problem that persists across scans notifies only once.
 type reportedProblems struct {
 	// mu guards seen.
 	mu sync.Mutex
@@ -62,15 +62,16 @@ const (
 	// defaultPullFailureDelay defines the default delay after a failed Watchtower self-update pull in run-once mode.
 	defaultPullFailureDelay = 5 * time.Minute
 
-	// maxReportedProblems bounds the dependency problems recorded during a
-	// process, since the containers they name can be removed at any time.
+	// maxReportedProblems bounds the problems recorded during a process,
+	// since the containers they name can be removed at any time.
 	maxReportedProblems = 1024
 )
 
-// dependencyProblems holds the dependency problems reported during this
-// process. Keys include the container ID, so a recreated container, or one
-// whose labels changed, is reported again.
-var dependencyProblems = &reportedProblems{seen: make(map[string]struct{})}
+// scanProblems holds the dependency problems and failed update checks reported
+// during this process. Keys include the container ID, so a recreated container
+// is reported again. A container whose labels change is also recreated. A check
+// that fails for a different reason is reported again too.
+var scanProblems = &reportedProblems{seen: make(map[string]struct{})}
 
 // update scans and updates containers based on parameters.
 //
@@ -247,7 +248,7 @@ func update(
 				errSelfDependency,
 				config,
 			)
-			log.WithLevel(dependencyProblems.level("self-dependency", string(monitoredContainer.ID()))).
+			log.WithLevel(scanProblems.level("self-dependency", string(monitoredContainer.ID()))).
 				Str("container", monitoredContainer.Name()).
 				Str("id", monitoredContainer.ID().ShortID()).
 				Msg("Skipping container update (self-dependency)")
@@ -266,7 +267,7 @@ func update(
 	)
 	if graphErr == nil {
 		for _, link := range graph.UnresolvedDependsOn() {
-			log.WithLevel(dependencyProblems.level("unresolved depends-on", string(link.Container.ID()), link.Link)).
+			log.WithLevel(scanProblems.level("unresolved depends-on", string(link.Container.ID()), link.Link)).
 				Str("container", link.Container.Name()).
 				Str("depends_on", link.Link).
 				Msg("Ignoring depends-on entry that names no container")
@@ -288,7 +289,7 @@ func update(
 		inCycle[c.ID()] = struct{}{}
 
 		progress.AddSkipped(log, c, errCircularDependency, config)
-		log.WithLevel(dependencyProblems.level("circular dependency", string(c.ID()))).
+		log.WithLevel(scanProblems.level("circular dependency", string(c.ID()))).
 			Str("container", c.Name()).
 			Str("id", c.ID().ShortID()).
 			Msg("Skipping container update (circular dependency)")
@@ -334,16 +335,14 @@ func update(
 		// Check if the container uses a pinned (digest-based) image to skip updates.
 		isPinnedVal, err := staleness.IsPinned(log, sourceContainer, progress, config, gitSession)
 		if err != nil {
-			// Log and skip containers with unparsable image references, marking as skipped.
-			clog.Debug().
-				Err(err).
-				Msg("Failed to check pinned image - skipping container")
+			// Skip a container whose image reference cannot be parsed, and warn
+			// once per container and cause, as for a failed staleness check.
+			parseErr := fmt.Errorf("%w: %w", errParseImageReference, err)
 
-			progress.AddSkipped(log,
-				sourceContainer,
-				fmt.Errorf("%w: %w", errParseImageReference, err),
-				config,
-			)
+			progress.AddSkipped(log, sourceContainer, parseErr, config)
+			clog.WithLevel(scanProblems.level("failed update check", string(sourceContainer.ID()), parseErr.Error())).
+				Err(parseErr).
+				Msg("Could not check container for updates")
 
 			staleCheckFailed++
 
@@ -506,7 +505,13 @@ func update(
 					parallelStaleCheckFailed++
 				}
 
-				if ratelimit.Is(checkErr) {
+				cooldownErr, isCooldownError := errors.AsType[*containerImage.CooldownError](checkErr)
+
+				// Each failure gets at most one line that reaches notifications.
+				// A failure that its own check already logged in such a line gets
+				// no second one.
+				switch {
+				case ratelimit.Is(checkErr):
 					// One line per container per cycle. Log-based notifications
 					// carry it, and the report template lists the container under
 					// Failed instead. A Retry-After beyond the honor window was
@@ -518,14 +523,11 @@ func update(
 					}
 
 					progress.AddFailed(log, sourceContainer, checkErr, config)
-				} else {
+				case isCooldownError:
+					// The cooldown check logged the deferral or the failed lookup.
+					// The *image.CooldownError carries the details for reports and
+					// notifications.
 					progress.AddSkipped(log, sourceContainer, checkErr, config)
-				}
-
-				// Record the cooldown details for reports and notifications. The
-				// *container.CooldownError carries them.
-				cooldownErr, ok := errors.AsType[*containerImage.CooldownError](checkErr)
-				if ok {
 					progress.SetCooldownInfo(log,
 						sourceContainer.ID(),
 						cooldownErr.Age,
@@ -533,9 +535,18 @@ func update(
 						cooldownErr.Remaining,
 						cooldownErr.EligibleAt,
 					)
-				} else if errors.Is(checkErr, containerImage.ErrImageCooldown) {
+				case errors.Is(checkErr, containerImage.ErrImageCooldown):
 					// Fallback for plain sentinel (keeps basic deferral visible)
+					progress.AddSkipped(log, sourceContainer, checkErr, config)
 					progress.SetCooldownInfo(log, sourceContainer.ID(), "", "", "", time.Time{})
+				case errors.Is(checkErr, git.ErrInvalidPolicy), errors.Is(checkErr, git.ErrInvalidHost):
+					// The Git check warned about the invalid label.
+					progress.AddSkipped(log, sourceContainer, checkErr, config)
+				default:
+					progress.AddSkipped(log, sourceContainer, checkErr, config)
+					clog.WithLevel(scanProblems.level("failed update check", string(sourceContainer.ID()), checkErr.Error())).
+						Err(checkErr).
+						Msg("Could not check container for updates")
 				}
 
 				// Track if Watchtower self-update pull failed for safeguard.
@@ -824,7 +835,7 @@ func update(
 	return progress.Report(log), cleanupImageInfos, nil
 }
 
-// level records a dependency problem and returns its log level.
+// level records a problem and returns its log level.
 //
 // A new problem gets [zerolog.WarnLevel] and a problem already recorded gets
 // [zerolog.DebugLevel]. When the record is full, it starts over, so each
