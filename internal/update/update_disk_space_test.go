@@ -147,3 +147,68 @@ func TestImageDiskSpaceGate(t *testing.T) {
 		assert.Equal(t, int32(0), client.TestData.ListContainersCount.Load())
 	})
 }
+
+// TestRunUpdatesWithNotifications_DiskSpaceAbortNotifiesOnce verifies that a
+// session ended by the image disk-space check reaches notifications once. The
+// check's own error line notifies with its sizes or cause. The session's
+// "Update execution failed" line for the same error is logged with notify=no.
+func TestRunUpdatesWithNotifications_DiskSpaceAbortNotifiesOnce(t *testing.T) {
+	t.Parallel()
+
+	// Each case is one way the check ends the session, with the message of the
+	// check's own error line.
+	tests := []struct {
+		name    string
+		data    *mockUpdate.TestData
+		message string
+	}{
+		{
+			name: "usage reaches the maximum",
+			data: &mockUpdate.TestData{
+				ImageDiskUsage: types.ImageDiskUsage{TotalSize: 10_000, Reclaimable: 2_000, TotalCount: 4},
+			},
+			message: msgImageDiskSpaceExceeded,
+		},
+		{
+			name: "usage cannot be queried",
+			data: &mockUpdate.TestData{
+				GetImageDiskUsageError: errors.New("df unavailable"),
+			},
+			message: "Failed to query Docker image disk usage",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			log, buf := newCaptureLogger()
+
+			params := defaultTestUpdateParams(filters.NoFilter)
+			params.DiskSpaceMax = 10_000
+
+			metric := RunUpdatesWithNotifications(t.Context(), RunUpdatesWithNotificationsParams{
+				Logger: log,
+				Client: mockUpdate.CreateMockClient(tt.data, false, false),
+				Update: params,
+			})
+			assert.True(t, metric.ScanFailed)
+
+			notified := map[string]bool{}
+
+			for _, entry := range parseJSONLogEntries(buf) {
+				if entry["level"] != "error" {
+					continue
+				}
+
+				message, _ := entry["message"].(string)
+				notified[message] = entry["notify"] != "no"
+			}
+
+			assert.Equal(t, map[string]bool{
+				tt.message:                true,
+				"Update execution failed": false,
+			}, notified)
+		})
+	}
+}
