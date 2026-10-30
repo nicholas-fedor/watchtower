@@ -14,6 +14,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Report the last scan's time as the status timestamp by @nicholas-fedor in [#3266](https://github.com/nicholas-fedor/watchtower/pull/3266)
 - Log empty notification skips at debug only by @nicholas-fedor in [#3250](https://github.com/nicholas-fedor/watchtower/pull/3250)
 - Reject malformed Discord webhook URLs by @nicholas-fedor in [#3248](https://github.com/nicholas-fedor/watchtower/pull/3248)
 - Read lifecycle hook labels only for hooks that run by @nicholas-fedor in [#3246](https://github.com/nicholas-fedor/watchtower/pull/3246)
