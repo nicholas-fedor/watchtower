@@ -14,6 +14,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Show the error cause in the default template's fallback by @nicholas-fedor in [#3292](https://github.com/nicholas-fedor/watchtower/pull/3292)
 - Report the containers a canceled scan never checked as skipped by @nicholas-fedor in [#3290](https://github.com/nicholas-fedor/watchtower/pull/3290)
 - Notify an identifier collision once by @nicholas-fedor in [#3288](https://github.com/nicholas-fedor/watchtower/pull/3288)
 - Notify a disk-space abort once by @nicholas-fedor in [#3286](https://github.com/nicholas-fedor/watchtower/pull/3286)
