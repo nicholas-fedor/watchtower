@@ -1331,8 +1331,10 @@ func TestMetrics_FailedScans(t *testing.T) {
 }
 
 // TestGetLastScan verifies that the last scan is the newest history entry,
-// with the time it was recorded, including after the 500-entry ring buffer
-// has wrapped around, and that there is none before the first scan.
+// with the time it was recorded rather than the time it is read, including
+// after the 500-entry ring buffer has wrapped around, and that there is none
+// before the first scan. Each case runs in a synctest bubble, so the clock
+// stands still while scans are recorded and moves a minute before the read.
 func TestGetLastScan(t *testing.T) {
 	t.Parallel()
 
@@ -1351,23 +1353,27 @@ func TestGetLastScan(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 
-			m := &Metrics{}
-			before := time.Now().UTC()
+			synctest.Test(t, func(t *testing.T) {
+				m := &Metrics{}
+				recorded := time.Now().UTC()
 
-			for i := range tt.scans {
-				m.RecordHistory(&Metric{Scanned: i + 1})
-			}
+				for i := range tt.scans {
+					m.RecordHistory(&Metric{Scanned: i + 1})
+				}
 
-			last := m.GetLastScan()
-			if tt.scans == 0 {
-				assert.Nil(t, last)
+				time.Sleep(time.Minute)
 
-				return
-			}
+				last := m.GetLastScan()
+				if tt.scans == 0 {
+					assert.Nil(t, last)
 
-			require.NotNil(t, last)
-			assert.Equal(t, tt.scans, last.Scanned)
-			assert.WithinRange(t, last.Timestamp, before, time.Now().UTC())
+					return
+				}
+
+				require.NotNil(t, last)
+				assert.Equal(t, tt.scans, last.Scanned)
+				assert.Equal(t, recorded, last.Timestamp)
+			})
 		})
 	}
 }
