@@ -14,6 +14,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Warn once for an invalid Git label by @nicholas-fedor in [#3304](https://github.com/nicholas-fedor/watchtower/pull/3304)
 - Warn once when a stale container's configuration cannot be recreated by @nicholas-fedor in [#3302](https://github.com/nicholas-fedor/watchtower/pull/3302)
 - Warn once when a container's update check fails by @nicholas-fedor in [#3296](https://github.com/nicholas-fedor/watchtower/pull/3296)
 - End a scan only when the scan itself is canceled by @nicholas-fedor in [#3294](https://github.com/nicholas-fedor/watchtower/pull/3294)
