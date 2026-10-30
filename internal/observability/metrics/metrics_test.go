@@ -317,7 +317,7 @@ func TestMetrics_Register(t *testing.T) {
 			},
 		},
 		{
-			name: "register nil metric",
+			name: "nil metric is ignored",
 			m:    &Metrics{channel: make(chan *Metric, 10)},
 			args: args{
 				metric: nil,
@@ -330,11 +330,15 @@ func TestMetrics_Register(t *testing.T) {
 
 			select {
 			case got := <-tt.m.channel:
-				if !reflect.DeepEqual(got, tt.args.metric) {
+				if tt.args.metric == nil {
+					t.Errorf("Metrics.Register() enqueued %v for a nil metric", got)
+				} else if !reflect.DeepEqual(got, tt.args.metric) {
 					t.Errorf("Metrics.Register() enqueued %v, want %v", got, tt.args.metric)
 				}
 			default:
-				t.Errorf("Metrics.Register() did not enqueue metric")
+				if tt.args.metric != nil {
+					t.Errorf("Metrics.Register() did not enqueue metric")
+				}
 			}
 		})
 	}
@@ -833,7 +837,7 @@ func TestRegisterScan(t *testing.T) {
 			},
 		},
 		{
-			name: "register nil metric",
+			name: "nil metric is ignored",
 			args: args{
 				metric: nil,
 			},
@@ -846,11 +850,15 @@ func TestRegisterScan(t *testing.T) {
 
 			select {
 			case got := <-m.channel:
-				if !reflect.DeepEqual(got, tt.args.metric) {
+				if tt.args.metric == nil {
+					t.Errorf("RegisterScan() enqueued %v for a nil metric", got)
+				} else if !reflect.DeepEqual(got, tt.args.metric) {
 					t.Errorf("RegisterScan() enqueued %v, want %v", got, tt.args.metric)
 				}
 			default:
-				t.Errorf("RegisterScan() did not enqueue metric")
+				if tt.args.metric != nil {
+					t.Errorf("RegisterScan() did not enqueue metric")
+				}
 			}
 		})
 	}
@@ -979,7 +987,7 @@ func TestMetrics_HandleUpdate(t *testing.T) {
 	synctest.Test(t, func(t *testing.T) {
 		tests := []struct {
 			name          string
-			metric        *Metric // nil for the "skipped scan" path
+			metric        *Metric
 			expectGauge   float64
 			expectCounter float64
 		}{
@@ -988,12 +996,6 @@ func TestMetrics_HandleUpdate(t *testing.T) {
 				metric:        &Metric{Scanned: 3, Updated: 2, Failed: 1, Restarted: 1, Skipped: 1},
 				expectGauge:   1, // Skipped gauge set from metric
 				expectCounter: 0, // skippedScans not incremented for valid metrics
-			},
-			{
-				name:          "handle nil metric (skipped scan)",
-				metric:        nil,
-				expectGauge:   0, // Skipped gauge reset to 0
-				expectCounter: 1, // skippedScans incremented for skipped scans
 			},
 		}
 
@@ -1327,6 +1329,33 @@ func TestMetrics_FailedScans(t *testing.T) {
 		require.Len(t, history, 2)
 		assert.False(t, history[0].ScanFailed)
 		assert.True(t, history[1].ScanFailed)
+	})
+}
+
+// TestMetrics_RegisterSkippedScan verifies that a skipped scan increments only
+// the skipped scans counter. The scan total, the last-scan gauges, and the
+// history keep the values of the scan before it, since a skipped scan scanned
+// nothing.
+func TestMetrics_RegisterSkippedScan(t *testing.T) {
+	synctest.Test(t, func(t *testing.T) {
+		m, err := NewWithRegistry(prometheus.NewRegistry())
+		require.NoError(t, err)
+
+		defer m.Shutdown()
+
+		m.Register(&Metric{Scanned: 4, Updated: 1, Skipped: 2})
+		synctest.Wait()
+
+		m.RegisterSkippedScan()
+		m.RegisterSkippedScan()
+		synctest.Wait()
+
+		assert.InDelta(t, 2, collectorValue(t, m.skippedScans), 0)
+		assert.InDelta(t, 1, collectorValue(t, m.total), 0)
+		assert.InDelta(t, 4, collectorValue(t, m.scanned), 0)
+		assert.InDelta(t, 1, collectorValue(t, m.updated), 0)
+		assert.InDelta(t, 2, collectorValue(t, m.skipped), 0)
+		assert.Len(t, m.GetHistory(nil, nil, 0), 1)
 	})
 }
 

@@ -239,10 +239,15 @@ func NewMetric(report types.Report) *Metric {
 
 // Register attempts to enqueue a metric for processing.
 // If the channel is full, the metric is dropped and the dropped counter is incremented.
+// A nil metric is ignored.
 //
 // Parameters:
 //   - metric: Metric to register.
 func (m *Metrics) Register(metric *Metric) {
+	if metric == nil {
+		return
+	}
+
 	select {
 	case m.channel <- metric:
 		// Metric sent successfully
@@ -276,6 +281,15 @@ func Default() *Metrics {
 //   - metric: Metric to register.
 func (m *Metrics) RegisterScan(metric *Metric) {
 	m.Register(metric)
+}
+
+// RegisterSkippedScan counts a scan that did not run because another update
+// was still running.
+//
+// A skipped scan scanned nothing, so it leaves the last-scan gauges, the scan
+// history, and the scan total unchanged. It is safe to call concurrently.
+func (m *Metrics) RegisterSkippedScan() {
+	m.skippedScans.Inc()
 }
 
 // RecordImageDiskUsage updates Docker image-usage gauges on the default handler.
@@ -427,18 +441,6 @@ func (m *Metrics) HandleUpdate() {
 				return
 			}
 
-			if change == nil {
-				// Update was skipped and rescheduled
-				m.total.Inc()
-				m.skippedScans.Inc()
-				m.scanned.Set(0)
-				m.updated.Set(0)
-				m.failed.Set(0)
-				m.restarted.Set(0)
-				m.skipped.Set(0)
-
-				continue
-			}
 			// Update metrics with scan results. A failed scan still counts as a
 			// scan, with the counts it reached.
 			m.total.Inc()
