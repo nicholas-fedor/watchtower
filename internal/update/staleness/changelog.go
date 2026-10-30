@@ -52,7 +52,7 @@ type LatestImage struct {
 //   - latest: Annotations and manifest digest of the new image.
 //
 // Returns:
-//   - container.ChangelogVars: Placeholder values to apply.
+//   - provenance.ChangelogVars: Placeholder values to apply.
 //   - oci.Annotations: Annotations of the new image.
 func ResolveLatestImageMeta(
 	log *zerolog.Logger,
