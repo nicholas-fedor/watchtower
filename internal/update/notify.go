@@ -224,26 +224,15 @@ func RunUpdatesWithNotifications(
 	return generateAndLogMetric(log, result)
 }
 
-// emptyReport is a non-nil empty report used when sending notifications about errors.
-// It prevents panics in notifier implementations that may dereference the report.
-type emptyReport struct{}
-
-func (emptyReport) Scanned() []types.ContainerReport   { return nil }
-func (emptyReport) Updated() []types.ContainerReport   { return nil }
-func (emptyReport) Failed() []types.ContainerReport    { return nil }
-func (emptyReport) Skipped() []types.ContainerReport   { return nil }
-func (emptyReport) Stale() []types.ContainerReport     { return nil }
-func (emptyReport) Fresh() []types.ContainerReport     { return nil }
-func (emptyReport) Restarted() []types.ContainerReport { return nil }
-func (emptyReport) All() []types.ContainerReport       { return nil }
-
 // handleUpdateResult processes the result of an update operation and returns an appropriate metric.
 //
 // It checks for errors or nil results, logging accordingly. If an error occurred, it sends a
 // notification via the provided notifier (if not nil) to alert about the failure. An update that
 // fails partway still returns the report of the work done before the error, so that report is
-// notified and counted. On error or nil result, it returns a non-nil metric to indicate the
-// failure state. On success, it returns nil to indicate continuation of the update process.
+// notified and counted. Without a partial report, the notification is sent without a report, so
+// report templates list the queued error entry. On error or nil result, it returns a non-nil
+// metric to indicate the failure state. On success, it returns nil to indicate continuation of
+// the update process.
 //
 // Parameters:
 //   - result: The report from the update operation. It may be partial when err is non-nil.
@@ -260,18 +249,16 @@ func handleUpdateResult(log *zerolog.Logger, result types.Report, err error, not
 			Err(err).
 			Msg("Update execution failed")
 
-		// Without a partial report, the notification still carries the error.
-		report := result
-		if report == nil {
-			report = emptyReport{}
-		}
-
-		// Send notification about the error
+		// A nil result sends the batch without a report, so report templates list its entries.
 		if notifier != nil {
-			notifier.SendNotification(report)
+			notifier.SendNotification(result)
 		}
 
-		metric := metrics.NewMetric(report)
+		if result == nil {
+			return &metrics.Metric{ScanFailed: true}
+		}
+
+		metric := metrics.NewMetric(result)
 		metric.ScanFailed = true
 
 		return metric

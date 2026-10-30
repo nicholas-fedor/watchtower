@@ -86,12 +86,11 @@ func Test_handleUpdateResult(t *testing.T) {
 		assert.Nil(t, result)
 	})
 
-	t.Run("should send an empty report when error occurs without a report", func(t *testing.T) {
+	t.Run("should send no report when error occurs without a report", func(t *testing.T) {
 		t.Parallel()
 
-		// Create a mock notifier that tracks if SendNotification was called
 		mockNotifier := mockTypes.NewMockNotifier(t)
-		mockNotifier.EXPECT().SendNotification(emptyReport{}).Times(1)
+		mockNotifier.EXPECT().SendNotification(nil).Times(1)
 
 		// Call handleUpdateResult with an error and the mock notifier
 		err := errors.New("dependency resolution error")
@@ -118,14 +117,12 @@ func Test_handleUpdateResult(t *testing.T) {
 		handleUpdateResult(newTestLogger(t), mockReport, err, mockNotifier)
 	})
 
-	t.Run("should not send notification when error occurs and notifier is nil", func(t *testing.T) {
+	t.Run("should return a failed zero metric when error occurs and notifier is nil", func(t *testing.T) {
 		t.Parallel()
 
-		// Call handleUpdateResult with an error and nil notifier
 		err := errors.New("dependency resolution error")
 		result := handleUpdateResult(newTestLogger(t), nil, err, nil)
 
-		// Verify we got the expected metric
 		assert.Equal(t, &metrics.Metric{ScanFailed: true}, result)
 	})
 
@@ -338,67 +335,6 @@ func Test_executeUpdate(t *testing.T) {
 		require.NotNil(t, report)
 		require.NotNil(t, cleanupInfos)
 		assert.Equal(t, int32(1), client.TestData.SetRestartPolicyCount.Load())
-	})
-}
-
-// Test_emptyReport verifies that every list of the empty report is nil.
-func Test_emptyReport(t *testing.T) {
-	t.Parallel()
-
-	t.Run("Scanned() should return nil", func(t *testing.T) {
-		t.Parallel()
-
-		report := emptyReport{}
-		assert.Nil(t, report.Scanned())
-	})
-
-	t.Run("Updated() should return nil", func(t *testing.T) {
-		t.Parallel()
-
-		report := emptyReport{}
-		assert.Nil(t, report.Updated())
-	})
-
-	t.Run("Failed() should return nil", func(t *testing.T) {
-		t.Parallel()
-
-		report := emptyReport{}
-		assert.Nil(t, report.Failed())
-	})
-
-	t.Run("Skipped() should return nil", func(t *testing.T) {
-		t.Parallel()
-
-		report := emptyReport{}
-		assert.Nil(t, report.Skipped())
-	})
-
-	t.Run("Stale() should return nil", func(t *testing.T) {
-		t.Parallel()
-
-		report := emptyReport{}
-		assert.Nil(t, report.Stale())
-	})
-
-	t.Run("Fresh() should return nil", func(t *testing.T) {
-		t.Parallel()
-
-		report := emptyReport{}
-		assert.Nil(t, report.Fresh())
-	})
-
-	t.Run("Restarted() should return nil", func(t *testing.T) {
-		t.Parallel()
-
-		report := emptyReport{}
-		assert.Nil(t, report.Restarted())
-	})
-
-	t.Run("All() should return nil", func(t *testing.T) {
-		t.Parallel()
-
-		report := emptyReport{}
-		assert.Nil(t, report.All())
 	})
 }
 
