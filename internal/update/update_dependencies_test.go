@@ -15,12 +15,14 @@ import (
 	dockerNetwork "github.com/moby/moby/api/types/network"
 
 	mockContainerClient "github.com/nicholas-fedor/watchtower/internal/container/client/mocks"
+	"github.com/nicholas-fedor/watchtower/internal/container/filters"
 	"github.com/nicholas-fedor/watchtower/internal/container/labels"
 	"github.com/nicholas-fedor/watchtower/internal/registry/ratelimit"
 	"github.com/nicholas-fedor/watchtower/internal/testutil/containerfixture"
 	"github.com/nicholas-fedor/watchtower/internal/testutil/modelfixture"
 	mockUpdate "github.com/nicholas-fedor/watchtower/internal/update/mocks"
 	"github.com/nicholas-fedor/watchtower/pkg/types"
+	mockTypes "github.com/nicholas-fedor/watchtower/pkg/types/mocks"
 )
 
 // TestUpdateAction_Dependencies verifies that an update stops and starts
@@ -2985,4 +2987,66 @@ func composeServiceLabels(project, service string) map[string]string {
 		"com.docker.compose.service":          service,
 		"com.docker.compose.container-number": "1",
 	}
+}
+
+// TestRunUpdatesWithNotifications_IdentifierCollisionNotifiesOnce verifies
+// that a session ended by an identifier collision in the dependency graph
+// reaches notifications once. The sorter logs the collision only at debug, and
+// the session's "Update execution failed" line, which names both containers,
+// is the one error line without notify=no.
+func TestRunUpdatesWithNotifications_IdentifierCollisionNotifiesOnce(t *testing.T) {
+	t.Parallel()
+
+	// collidingContainer returns a running container named /app with the given ID.
+	collidingContainer := func(id string) types.Container {
+		return mockUpdate.CreateMockContainerWithConfig(
+			id,
+			"/app",
+			"org/app:1",
+			true,
+			false,
+			time.Now(),
+			&dockerContainer.Config{Image: "org/app:1"},
+		)
+	}
+
+	client := mockUpdate.CreateMockClient(&mockUpdate.TestData{
+		Containers: []types.Container{
+			collidingContainer("a000000000000000000000000000000000000000000000000000000000000000"),
+			collidingContainer("b000000000000000000000000000000000000000000000000000000000000000"),
+		},
+	}, false, false)
+
+	notifier := mockTypes.NewMockNotifier(t)
+	notifier.EXPECT().StartNotification(false).Once()
+	notifier.EXPECT().SendNotification(nil).Once()
+
+	log, buf := newCaptureLogger()
+
+	metric := RunUpdatesWithNotifications(t.Context(), RunUpdatesWithNotificationsParams{
+		Logger:   log,
+		Client:   client,
+		Notifier: notifier,
+		Update:   defaultTestUpdateParams(filters.NoFilter),
+	})
+	assert.True(t, metric.ScanFailed)
+
+	// Every line at warn or above that lacks notify=no would reach
+	// notifications, so each one is listed.
+	var eligible []string
+
+	for _, entry := range parseJSONLogEntries(buf) {
+		if entry["level"] != "warn" && entry["level"] != "error" {
+			continue
+		}
+
+		if entry["notify"] == "no" {
+			continue
+		}
+
+		message, _ := entry["message"].(string)
+		eligible = append(eligible, message)
+	}
+
+	require.Equal(t, []string{"Update execution failed"}, eligible)
 }
