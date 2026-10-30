@@ -275,9 +275,8 @@ func TestImageClient_PullImage(t *testing.T) {
 			require.ErrorIs(t, err, errPullImageUnauthorized)
 			require.ErrorContains(t, err, "authentication required")
 			require.NotErrorIs(t, err, errPullImageFailed)
-			assert.Contains(t, logbuf.String(), "level=debug")
+			assert.Regexp(t, `level=debug msg="Image pull failed: authentication required"`, logbuf.String())
 			assert.NotContains(t, logbuf.String(), "level=warn")
-			assert.Contains(t, logbuf.String(), "Image pull failed: authentication required")
 		})
 	})
 
