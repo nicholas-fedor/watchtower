@@ -14,6 +14,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- List update errors in report-mode notifications by @nicholas-fedor in [#3284](https://github.com/nicholas-fedor/watchtower/pull/3284)
 - Recover and notify update panics by @nicholas-fedor in [#3282](https://github.com/nicholas-fedor/watchtower/pull/3282)
 - Count skipped scheduled scans again by @nicholas-fedor in [#3278](https://github.com/nicholas-fedor/watchtower/pull/3278)
 - Report the last scan's time as the status timestamp by @nicholas-fedor in [#3266](https://github.com/nicholas-fedor/watchtower/pull/3266)
