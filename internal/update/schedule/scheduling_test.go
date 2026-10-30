@@ -20,6 +20,7 @@ import (
 	"github.com/nicholas-fedor/watchtower/internal/container/filters"
 	"github.com/nicholas-fedor/watchtower/internal/observability/logging"
 	"github.com/nicholas-fedor/watchtower/internal/observability/metrics"
+	"github.com/nicholas-fedor/watchtower/internal/testutil/logcapture"
 	"github.com/nicholas-fedor/watchtower/pkg/types"
 )
 
@@ -211,6 +212,79 @@ func TestSkipIfStillRunning(t *testing.T) {
 
 	assert.Equal(t, int32(2), runs.Load(), "a run after the previous one finishes runs")
 	assert.InDelta(t, before+1, skippedScansTotal(t), 0)
+}
+
+// TestRecoverPanics verifies that a panic in a scheduled run is recovered and
+// logged through the scheduler's logger in one error line with notify=no. The
+// line carries the panic value and the stack. A run after the panic runs
+// normally.
+func TestRecoverPanics(t *testing.T) {
+	t.Parallel()
+
+	log, output := logcapture.New(zerolog.DebugLevel)
+
+	var runs atomic.Int32
+
+	job := recoverPanics(log)(cron.FuncJob(func() {
+		if runs.Add(1) == 1 {
+			panic("boom")
+		}
+	}))
+
+	require.NotPanics(t, job.Run)
+	job.Run()
+
+	assert.Equal(t, int32(2), runs.Load(), "a run after the panic runs")
+
+	lines := strings.Split(strings.TrimSpace(output.String()), "\n")
+	require.Len(t, lines, 1)
+
+	assert.Contains(t, lines[0], "level=error")
+	assert.Contains(t, lines[0], `msg="Scheduled run panicked"`)
+	assert.Contains(t, lines[0], "error=boom")
+	assert.Contains(t, lines[0], "notify=no")
+	assert.Contains(t, lines[0], "TestRecoverPanics")
+}
+
+// TestRunUpgradesOnSchedule_RecoversPanickingRun verifies that the scheduler's
+// cron entry logs a panicking scheduled run through the scheduler's logger and
+// keeps running, so the next scheduled update still runs.
+//
+// The default metrics handler, which the second run registers its scan with,
+// is created before the synctest bubble.
+func TestRunUpgradesOnSchedule_RecoversPanickingRun(t *testing.T) {
+	metrics.Default()
+
+	synctest.Test(t, func(t *testing.T) {
+		log, output := logcapture.New(zerolog.DebugLevel)
+
+		var runs atomic.Int32
+
+		deps := testDeps(t, func(context.Context, types.Filter, types.UpdateParams) *metrics.Metric {
+			if runs.Add(1) == 1 {
+				panic("boom")
+			}
+
+			return &metrics.Metric{}
+		}, func(logging.StartupParams) {})
+		deps.Logger = log
+		deps.ScheduleSpec = "@every 1s"
+
+		ctx, cancel := context.WithCancel(t.Context())
+		done := make(chan error, 1)
+
+		go func() { done <- RunUpgradesOnSchedule(ctx, deps) }()
+
+		// The run at 1 second panics, and the run at 2 seconds follows it.
+		time.Sleep(2500 * time.Millisecond)
+		synctest.Wait()
+
+		cancel()
+		require.NoError(t, <-done)
+
+		assert.Equal(t, int32(2), runs.Load(), "the run after the panic did not start")
+		assert.Contains(t, output.String(), `msg="Scheduled run panicked" error=boom`)
+	})
 }
 
 // TestRunUpgradesOnSchedule_OverlappingRunIsSkipped verifies that the

@@ -3,19 +3,24 @@ package update
 import (
 	"context"
 	"errors"
+	"strings"
 	"sync"
 	"testing"
 	"time"
 
+	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 
 	dockerContainer "github.com/moby/moby/api/types/container"
 
+	mockContainerClient "github.com/nicholas-fedor/watchtower/internal/container/client/mocks"
 	"github.com/nicholas-fedor/watchtower/internal/container/filters"
+	"github.com/nicholas-fedor/watchtower/internal/observability/events"
 	"github.com/nicholas-fedor/watchtower/internal/observability/metrics"
 	"github.com/nicholas-fedor/watchtower/internal/registry/ratelimit"
+	"github.com/nicholas-fedor/watchtower/internal/testutil/logcapture"
 	mockUpdate "github.com/nicholas-fedor/watchtower/internal/update/mocks"
 	"github.com/nicholas-fedor/watchtower/pkg/types"
 	mockTypes "github.com/nicholas-fedor/watchtower/pkg/types/mocks"
@@ -35,6 +40,80 @@ func defaultTestUpdateParams(filter types.Filter) types.UpdateParams {
 		LifecycleUID: 1000,
 		LifecycleGID: 1001,
 	}
+}
+
+// TestRunUpdatesWithNotifications_PanicEndsSession verifies that a panic during
+// an update session ends it as an update error does. The panic is logged at
+// error without notify=no, so the notification hook takes it. The session's
+// notification batch is sent at once without a report, so report templates
+// fall back to listing its entries. The scan_failed event follows
+// scan_started. The metric marks a failed scan. The stack is logged at debug
+// with notify=no.
+func TestRunUpdatesWithNotifications_PanicEndsSession(t *testing.T) {
+	t.Parallel()
+
+	log, output := logcapture.New(zerolog.DebugLevel)
+
+	client := mockContainerClient.NewMockClient(t)
+	client.EXPECT().ListContainers(mock.Anything, mock.Anything).
+		RunAndReturn(func(context.Context, ...types.Filter) ([]types.Container, error) {
+			panic("boom")
+		}).Once()
+
+	var sent []types.Report
+
+	notifier := mockTypes.NewMockNotifier(t)
+	notifier.EXPECT().StartNotification(false).Once()
+	notifier.EXPECT().SendNotification(mock.Anything).
+		Run(func(report types.Report) { sent = append(sent, report) }).
+		Once()
+
+	broadcaster := events.NewBroadcaster()
+	published, _ := broadcaster.SubscribeWithDone()
+
+	var metric *metrics.Metric
+
+	require.NotPanics(t, func() {
+		metric = RunUpdatesWithNotifications(t.Context(), RunUpdatesWithNotificationsParams{
+			Logger:           log,
+			Client:           client,
+			Notifier:         notifier,
+			EventBroadcaster: broadcaster,
+			Update:           defaultTestUpdateParams(filters.NoFilter),
+		})
+	})
+
+	assert.Equal(t, &metrics.Metric{ScanFailed: true}, metric)
+
+	require.Len(t, sent, 1, "the session's batch is sent")
+	assert.Nil(t, sent[0], "the batch is sent without a report, so report templates list its entries")
+
+	// Events are published synchronously into the subscriber's buffer.
+	var eventTypes []string
+
+	for len(published) > 0 {
+		eventTypes = append(eventTypes, (<-published).Type)
+	}
+
+	assert.Equal(t, []string{"scan_started", "scan_failed"}, eventTypes)
+
+	var panicLine, stackLine string
+
+	for line := range strings.SplitSeq(output.String(), "\n") {
+		switch {
+		case strings.Contains(line, `msg="Update panicked"`):
+			panicLine = line
+		case strings.Contains(line, `msg="Stack of the update panic"`):
+			stackLine = line
+		default:
+		}
+	}
+
+	assert.Contains(t, panicLine, "level=error")
+	assert.Contains(t, panicLine, "error=boom")
+	assert.NotContains(t, panicLine, "notify=no")
+	assert.Contains(t, stackLine, "level=debug")
+	assert.Contains(t, stackLine, "notify=no")
 }
 
 // TestRunUpdates verifies an update run: the metric it records, the reports
