@@ -93,6 +93,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Documentation
 
+- Correct when image cleanup runs and list volumes_from dependencies by @nicholas-fedor in [#3270](https://github.com/nicholas-fedor/watchtower/pull/3270)
 - Correct the macOS install commands and the REPO_PASS secret advice by @nicholas-fedor in [#3268](https://github.com/nicholas-fedor/watchtower/pull/3268)
 - Correct the HTTP API events, images path and token header forms by @nicholas-fedor in [#3264](https://github.com/nicholas-fedor/watchtower/pull/3264)
 - List trace in the notifications-level help and every porcelain field by @nicholas-fedor in [#3256](https://github.com/nicholas-fedor/watchtower/pull/3256)
