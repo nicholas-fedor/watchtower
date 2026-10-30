@@ -14,6 +14,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Notify an identifier collision once by @nicholas-fedor in [#3288](https://github.com/nicholas-fedor/watchtower/pull/3288)
 - Notify a disk-space abort once by @nicholas-fedor in [#3286](https://github.com/nicholas-fedor/watchtower/pull/3286)
 - List update errors in report-mode notifications by @nicholas-fedor in [#3284](https://github.com/nicholas-fedor/watchtower/pull/3284)
 - Recover and notify update panics by @nicholas-fedor in [#3282](https://github.com/nicholas-fedor/watchtower/pull/3282)
