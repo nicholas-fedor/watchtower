@@ -33,7 +33,7 @@ Environment Variable: REPO_PASS
 
     Can be a password or a personal access token for registries requiring 2FA (e.g., Docker Hub).
 
-    Use Docker secrets (e.g., `WATCHTOWER_PASS=/run/secrets/repo_pass`) or environment files to avoid exposing sensitive data in command lines.
+    `REPO_PASS` holds the password itself and cannot point to a file, so a Docker secret path is sent as the password. To keep the password out of command lines, set it in an environment file, or mount a Docker `config.json` and set [`DOCKER_CONFIG`](#docker_config).
 
 ### DOCKER_CONFIG
 

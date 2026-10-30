@@ -43,10 +43,16 @@ The following will download and extract the binary to the current directory:
     curl -L $(curl -s https://api.github.com/repos/nicholas-fedor/watchtower/releases/latest | grep -o 'https://[^"]*linux_amd64[^"]*\.tar\.gz') | tar -xz -C . watchtower && if [ -f ./watchtower ]; then echo "Successfully installed watchtower to current directory"; else echo "Failed to install watchtower"; fi
     ```
 
-=== "macOS (amd64)"
+=== "macOS (Apple Silicon)"
 
     ```bash title="Bash"
-    curl -L $(curl -s https://api.github.com/repos/nicholas-fedor/watchtower/releases/latest | grep -o 'https://[^"]*darwin_amd64[^"]*\.tar\.gz') | tar -xz -C . watchtower && if [ -f ./watchtower ]; then echo "Successfully installed watchtower to current directory"; else echo "Failed to install watchtower"; fi
+    curl -L $(curl -s https://api.github.com/repos/nicholas-fedor/watchtower/releases/latest | grep -o 'https://[^"]*macOS_arm64v8[^"]*\.tar\.gz') | tar -xz -C . watchtower && if [ -f ./watchtower ]; then echo "Successfully installed watchtower to current directory"; else echo "Failed to install watchtower"; fi
+    ```
+
+=== "macOS (Intel)"
+
+    ```bash title="Bash"
+    curl -L $(curl -s https://api.github.com/repos/nicholas-fedor/watchtower/releases/latest | grep -o 'https://[^"]*macOS_amd64[^"]*\.tar\.gz') | tar -xz -C . watchtower && if [ -f ./watchtower ]; then echo "Successfully installed watchtower to current directory"; else echo "Failed to install watchtower"; fi
     ```
 
 !!! Note
