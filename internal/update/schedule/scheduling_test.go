@@ -213,6 +213,50 @@ func TestSkipIfStillRunning(t *testing.T) {
 	assert.InDelta(t, before+1, skippedScansTotal(t), 0)
 }
 
+// TestRunUpgradesOnSchedule_OverlappingRunIsSkipped verifies that the
+// scheduler's cron entry skips a run that comes due while the previous
+// scheduled update is still running, so only one update runs, and that the
+// skip is counted as a skipped scan.
+//
+// The first read of the process-wide skipped scans counter creates the default
+// metrics handler outside the synctest bubble. The test reads that counter, so
+// it does not run in parallel.
+func TestRunUpgradesOnSchedule_OverlappingRunIsSkipped(t *testing.T) {
+	before := skippedScansTotal(t)
+
+	synctest.Test(t, func(t *testing.T) {
+		release := make(chan struct{})
+
+		var runs atomic.Int32
+
+		deps := testDeps(t, func(context.Context, types.Filter, types.UpdateParams) *metrics.Metric {
+			runs.Add(1)
+			<-release
+
+			return &metrics.Metric{}
+		}, func(logging.StartupParams) {})
+		deps.ScheduleSpec = "@every 1s"
+
+		ctx, cancel := context.WithCancel(t.Context())
+		done := make(chan error, 1)
+
+		go func() { done <- RunUpgradesOnSchedule(ctx, deps) }()
+
+		// The run at 1 second holds the update, and the run at 2 seconds overlaps it.
+		time.Sleep(2500 * time.Millisecond)
+		synctest.Wait()
+
+		assert.Equal(t, int32(1), runs.Load(), "the overlapping run started an update")
+		assert.InDelta(t, before+1, skippedScansTotal(t), 0)
+
+		cancel()
+		close(release)
+
+		require.NoError(t, <-done)
+		assert.Equal(t, int32(1), runs.Load(), "an update ran after shutdown")
+	})
+}
+
 // TestRunUpgradesOnSchedule_WaitingRunStopsAtShutdown verifies that a
 // scheduled run waiting for the update lock gives up when the scheduler shuts
 // down, instead of starting an update once the lock comes free.
