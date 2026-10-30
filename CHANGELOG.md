@@ -95,6 +95,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Documentation
 
+- Limit the skipped scan doc to scans the scheduler skips by @nicholas-fedor in [#3280](https://github.com/nicholas-fedor/watchtower/pull/3280)
 - Correct stale comments in the update packages by @nicholas-fedor in [#3276](https://github.com/nicholas-fedor/watchtower/pull/3276)
 - Correct the cert-path default and the quoted local socket TLS warning by @nicholas-fedor in [#3272](https://github.com/nicholas-fedor/watchtower/pull/3272)
 - Correct when image cleanup runs and list volumes_from dependencies by @nicholas-fedor in [#3270](https://github.com/nicholas-fedor/watchtower/pull/3270)
