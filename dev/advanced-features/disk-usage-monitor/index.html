@@ -3060,7 +3060,7 @@ The monitor does not prune unused images.</p>
 See <a href="../../notifications/templates/">Templates</a>.</p>
 <h2 id="interactions">Interactions<a class="headerlink" href="#interactions" title="Permanent link">&para;</a></h2>
 <ul>
-<li><a href="../../configuration/update-behavior/#cleanup_old_images"><code>cleanup</code></a> runs only after a successful session, so a blocked session does not free image space.</li>
+<li><a href="../../configuration/update-behavior/#cleanup_old_images"><code>cleanup</code></a> removes the images a session replaced, even when the session ends in an error. A blocked session replaces nothing, so it does not free image space.</li>
 <li><a href="../../configuration/update-behavior/#remove_anonymous_volumes"><code>remove-volumes</code></a> is unrelated.
   It deletes anonymous volumes when a container is recreated.</li>
 <li><a href="../../configuration/update-behavior/#disable_image_pulling"><code>no-pull</code></a> does not disable the monitor.
@@ -3077,7 +3077,7 @@ See <a href="../../notifications/templates/">Templates</a>.</p>
 <li>The gate cannot reserve space for an incoming pull.</li>
 <li>Reclaimable figures from some compatible runtimes can be overstated when images share layers.</li>
 <li>There is no automatic prune.
-  Use <a href="../../configuration/update-behavior/#cleanup_old_images"><code>cleanup</code></a> after successful updates, or remove unused images yourself.</li>
+  Use <a href="../../configuration/update-behavior/#cleanup_old_images"><code>cleanup</code></a> to remove the images that updates replace, or remove unused images yourself.</li>
 </ul>
 
 
@@ -3101,7 +3101,7 @@ See <a href="../../notifications/templates/">Templates</a>.</p>
     <span class="md-icon" title="Last update">
       <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M21 13.1c-.1 0-.3.1-.4.2l-1 1 2.1 2.1 1-1c.2-.2.2-.6 0-.8l-1.3-1.3c-.1-.1-.2-.2-.4-.2m-1.9 1.8-6.1 6V23h2.1l6.1-6.1zM12.5 7v5.2l4 2.4-1 1L11 13V7zM11 21.9c-5.1-.5-9-4.8-9-9.9C2 6.5 6.5 2 12 2c5.3 0 9.6 4.1 10 9.3-.3-.1-.6-.2-1-.2s-.7.1-1 .2C19.6 7.2 16.2 4 12 4c-4.4 0-8 3.6-8 8 0 4.1 3.1 7.5 7.1 7.9l-.1.2z"/></svg>
     </span>
-    <span class="git-revision-date-localized-plugin git-revision-date-localized-plugin-timeago" title="August 27, 2026 02:39:41 UTC"><span class="timeago" datetime="2026-08-27T02:39:41+00:00" locale="en"></span></span><span class="git-revision-date-localized-plugin git-revision-date-localized-plugin-iso_date" title="August 27, 2026 02:39:41 UTC">2026-08-27</span>
+    <span class="git-revision-date-localized-plugin git-revision-date-localized-plugin-timeago" title="October 30, 2026 02:51:05 UTC"><span class="timeago" datetime="2026-10-30T02:51:05+00:00" locale="en"></span></span><span class="git-revision-date-localized-plugin git-revision-date-localized-plugin-iso_date" title="October 30, 2026 02:51:05 UTC">2026-10-30</span>
   </span>
 
     
