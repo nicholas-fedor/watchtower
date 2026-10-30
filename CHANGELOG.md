@@ -60,6 +60,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- Move the warn-once record to the logging package by @nicholas-fedor in [#3310](https://github.com/nicholas-fedor/watchtower/pull/3310)
 - Share the failed update check warning by @nicholas-fedor in [#3308](https://github.com/nicholas-fedor/watchtower/pull/3308)
 - Remove the dead multiple-instances template case by @nicholas-fedor in [#3274](https://github.com/nicholas-fedor/watchtower/pull/3274)
 - Move restarts into update/restart by @nicholas-fedor in [#3234](https://github.com/nicholas-fedor/watchtower/pull/3234)
