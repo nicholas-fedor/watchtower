@@ -283,11 +283,13 @@ func (m *Metrics) RegisterScan(metric *Metric) {
 	m.Register(metric)
 }
 
-// RegisterSkippedScan counts a scan that did not run because another update
-// was still running.
+// RegisterSkippedScan counts a scan that the scheduler skipped because another
+// update was still running.
 //
-// A skipped scan scanned nothing, so it leaves the last-scan gauges, the scan
-// history, and the scan total unchanged. It is safe to call concurrently.
+// An HTTP API update request turned away for the same reason never started a
+// scan, so it is not counted. A skipped scan scanned nothing, so it leaves the
+// last-scan gauges, the scan history, and the scan total unchanged. It is safe
+// to call concurrently.
 func (m *Metrics) RegisterSkippedScan() {
 	m.skippedScans.Inc()
 }
