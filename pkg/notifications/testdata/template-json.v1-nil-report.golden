@@ -494,6 +494,16 @@
     },
     {
       "data": {
+        "container": "app",
+        "error": "no image info available",
+        "image": "org/app:latest"
+      },
+      "level": "info",
+      "message": "Could not update container. Its configuration cannot be recreated",
+      "time": "2026-10-07T12:00:52Z"
+    },
+    {
+      "data": {
         "alpha": "one",
         "beta": 2
       },
