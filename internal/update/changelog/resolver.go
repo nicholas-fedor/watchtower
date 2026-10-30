@@ -67,11 +67,12 @@ type Fetcher interface {
 
 // Resolver confirms the release tag spelling for a pulled image.
 //
-// Results are cached per process, keyed by registry, repository, and the new
-// image digest, because several containers commonly share one upstream image.
-// A definitive miss is cached too, so a mirror that publishes no versioned tags
-// is not asked twice within a session. Concurrent lookups for one key share a
-// single sweep, since containers that share an image are checked in parallel.
+// Results are cached for the life of the Resolver, keyed by registry,
+// repository, and the new image digest, because several containers commonly
+// share one upstream image. A definitive miss is cached too, so a mirror that
+// publishes no versioned tags is not asked twice. Concurrent lookups for one
+// key share a single sweep, since containers that share an image are checked
+// in parallel.
 //
 // The zero value is not usable.
 // Construct one with NewResolver.
@@ -93,7 +94,7 @@ type cachedAnswer struct {
 	// tag is the confirmed spelling, or empty for a definitive miss.
 	tag string
 	// expires is when a short-lived answer lapses.
-	// A zero value means the answer is final for the process lifetime.
+	// A zero value means the answer is final for the life of the Resolver.
 	expires time.Time
 }
 
