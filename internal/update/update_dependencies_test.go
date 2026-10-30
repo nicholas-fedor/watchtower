@@ -3033,7 +3033,7 @@ func TestRunUpdatesWithNotifications_IdentifierCollisionNotifiesOnce(t *testing.
 
 	// Every line at warn or above that lacks notify=no would reach
 	// notifications, so each one is listed.
-	var eligible []string
+	var eligible []map[string]any
 
 	for _, entry := range parseJSONLogEntries(buf) {
 		if entry["level"] != "warn" && entry["level"] != "error" {
@@ -3044,9 +3044,14 @@ func TestRunUpdatesWithNotifications_IdentifierCollisionNotifiesOnce(t *testing.
 			continue
 		}
 
-		message, _ := entry["message"].(string)
-		eligible = append(eligible, message)
+		eligible = append(eligible, entry)
 	}
 
-	require.Equal(t, []string{"Update execution failed"}, eligible)
+	require.Len(t, eligible, 1)
+	assert.Equal(t, "Update execution failed", eligible[0]["message"])
+
+	errText, ok := eligible[0]["error"].(string)
+	require.True(t, ok, "the error field should be a string")
+	assert.Contains(t, errText, "app (a00000000000)")
+	assert.Contains(t, errText, "app (b00000000000)")
 }
