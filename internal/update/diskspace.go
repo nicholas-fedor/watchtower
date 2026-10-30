@@ -36,7 +36,9 @@ var (
 // When both thresholds are unset the check is skipped. Otherwise it queries
 // image usage once, updates Prometheus gauges, warns when usage reaches the
 // warning threshold, and returns errImageDiskSpaceExceeded when usage reaches
-// the maximum. A daemon query failure is fail-closed.
+// the maximum. A daemon query failure is fail-closed. Both failures are logged
+// at error here, so the session's own failure line for the returned error is
+// kept out of notifications.
 //
 // Parameters:
 //   - log: Session logger.
@@ -60,7 +62,7 @@ func checkImageDiskSpace(
 	if err != nil {
 		log.Error().Err(err).Msg("Failed to query Docker image disk usage")
 
-		return fmt.Errorf("%w: %w", errImageDiskUsageFailed, err)
+		return reportedError{err: fmt.Errorf("%w: %w", errImageDiskUsageFailed, err)}
 	}
 
 	metrics.RecordImageDiskUsage(
@@ -82,12 +84,12 @@ func checkImageDiskSpace(
 	if config.DiskSpaceMax > 0 && usage.TotalSize >= config.DiskSpaceMax {
 		clog.Error().Msg(msgImageDiskSpaceExceeded)
 
-		return fmt.Errorf(
+		return reportedError{err: fmt.Errorf(
 			"%w: usage %d bytes, max %d bytes",
 			errImageDiskSpaceExceeded,
 			usage.TotalSize,
 			config.DiskSpaceMax,
-		)
+		)}
 	}
 
 	if config.DiskSpaceWarn > 0 && usage.TotalSize >= config.DiskSpaceWarn {

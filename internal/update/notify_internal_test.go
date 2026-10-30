@@ -100,6 +100,40 @@ func Test_handleUpdateResult(t *testing.T) {
 		assert.Equal(t, &metrics.Metric{ScanFailed: true}, result)
 	})
 
+	t.Run("should keep the error line out of notifications only when the error is already reported", func(t *testing.T) {
+		t.Parallel()
+
+		// Each case ends a session with an error and no report. Both cases must
+		// still send the batch, since it holds the entry that notifies the cause.
+		tests := []struct {
+			name       string
+			err        error
+			wantNotify any
+		}{
+			{name: "plain error", err: errors.New("list failed"), wantNotify: nil},
+			{name: "reported error", err: reportedError{err: errors.New("list failed")}, wantNotify: "no"},
+		}
+
+		for _, tt := range tests {
+			t.Run(tt.name, func(t *testing.T) {
+				t.Parallel()
+
+				log, buf := newCaptureLogger()
+
+				mockNotifier := mockTypes.NewMockNotifier(t)
+				mockNotifier.EXPECT().SendNotification(nil).Times(1)
+
+				handleUpdateResult(log, nil, tt.err, mockNotifier)
+
+				entries := parseJSONLogEntries(buf)
+				require.Len(t, entries, 1)
+				assert.Equal(t, "Update execution failed", entries[0]["message"])
+				assert.Equal(t, "list failed", entries[0]["error"])
+				assert.Equal(t, tt.wantNotify, entries[0]["notify"])
+			})
+		}
+	})
+
 	t.Run("should send the partial report when error occurs after some work", func(t *testing.T) {
 		t.Parallel()
 

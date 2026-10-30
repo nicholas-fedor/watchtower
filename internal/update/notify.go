@@ -50,6 +50,33 @@ type RunUpdatesWithNotificationsParams struct {
 	OnOldSelfDetected func()
 }
 
+// reportedError marks an update error whose cause a phase has already logged
+// as a notification.
+//
+// The session then logs "Update execution failed" without notifying, so one
+// failure reaches notifications once. The marker does not change the error's
+// text, and errors.Is and errors.As see through it.
+type reportedError struct {
+	// err is the error whose cause was already notified.
+	err error
+}
+
+// Error returns the text of the wrapped error.
+//
+// Returns:
+//   - string: The wrapped error's text.
+func (e reportedError) Error() string {
+	return e.err.Error()
+}
+
+// Unwrap returns the wrapped error.
+//
+// Returns:
+//   - error: The error whose cause was already notified.
+func (e reportedError) Unwrap() error {
+	return e.err
+}
+
 // RunUpdatesWithNotifications performs container updates and sends notifications about the results.
 //
 // It executes the update action with configured parameters, batches notifications, and returns a metric
@@ -230,9 +257,10 @@ func RunUpdatesWithNotifications(
 // notification via the provided notifier (if not nil) to alert about the failure. An update that
 // fails partway still returns the report of the work done before the error, so that report is
 // notified and counted. Without a partial report, the notification is sent without a report, so
-// report templates list the queued error entry. On error or nil result, it returns a non-nil
-// metric to indicate the failure state. On success, it returns nil to indicate continuation of
-// the update process.
+// report templates list the queued error entry. When a phase has already logged the error's cause
+// as a notification, the "Update execution failed" line is logged with notify=no, so the failure
+// is notified once. On error or nil result, it returns a non-nil metric to indicate the failure
+// state. On success, it returns nil to indicate continuation of the update process.
 //
 // Parameters:
 //   - result: The report from the update operation. It may be partial when err is non-nil.
@@ -245,9 +273,12 @@ func RunUpdatesWithNotifications(
 func handleUpdateResult(log *zerolog.Logger, result types.Report, err error, notifier types.Notifier) *metrics.Metric {
 	// Check for errors during update execution
 	if err != nil {
-		log.Error().
-			Err(err).
-			Msg("Update execution failed")
+		event := log.Error().Err(err)
+		if _, reported := errors.AsType[reportedError](err); reported {
+			event = event.Str("notify", "no")
+		}
+
+		event.Msg("Update execution failed")
 
 		// A nil result sends the batch without a report, so report templates list its entries.
 		if notifier != nil {
