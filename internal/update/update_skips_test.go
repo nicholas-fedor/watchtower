@@ -144,6 +144,88 @@ func TestUpdate_CanceledContainersAreSkipped(t *testing.T) {
 	}
 }
 
+// TestUpdate_CanceledScanSkipsUncheckedContainers verifies that a scan canceled
+// before its restart phase reports every container it did not check as
+// skipped, with the cancellation as the reason, so its partial report does not
+// read as a complete scan. A container recorded before the cancellation, such
+// as one on a pinned image, keeps its result.
+func TestUpdate_CanceledScanSkipsUncheckedContainers(t *testing.T) {
+	t.Parallel()
+
+	appA := skipTestContainer("a000000000000000000000000000000000000000000000000000000000000000", "app-a", nil)
+	appB := skipTestContainer("b000000000000000000000000000000000000000000000000000000000000000", "app-b", nil)
+
+	t.Run("canceled before the staleness checks", func(t *testing.T) {
+		t.Parallel()
+
+		ctx, cancel := context.WithCancel(t.Context())
+		defer cancel()
+
+		// Canceling while the containers are listed ends the scan before it
+		// checks any of them.
+		client := mockContainerClient.NewMockClient(t)
+		client.EXPECT().ListContainers(mock.Anything, mock.Anything).
+			RunAndReturn(func(context.Context, ...types.Filter) ([]types.Container, error) {
+				cancel()
+
+				return []types.Container{appA, appB}, nil
+			}).Once()
+
+		report, _, err := update(newTestLogger(t), ctx, client, types.UpdateParams{}, ratelimit.New())
+		require.ErrorIs(t, err, context.Canceled)
+		require.NotNil(t, report)
+
+		assert.Equal(t, map[string]string{
+			"app-a": "update skipped: context canceled",
+			"app-b": "update skipped: context canceled",
+		}, reportErrors(report.Skipped()))
+		assert.Empty(t, report.Scanned())
+	})
+
+	t.Run("canceled during the staleness checks", func(t *testing.T) {
+		t.Parallel()
+
+		pinnedImage := "org/pinned@sha256:1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef"
+		pinned := mockUpdate.CreateMockContainerWithConfig(
+			"c000000000000000000000000000000000000000000000000000000000000000",
+			"/pinned",
+			pinnedImage,
+			true,
+			false,
+			time.Now(),
+			&dockerContainer.Config{Image: pinnedImage},
+		)
+
+		ctx, cancel := context.WithCancel(t.Context())
+		defer cancel()
+
+		client := mockContainerClient.NewMockClient(t)
+		client.EXPECT().ListContainers(mock.Anything, mock.Anything).
+			Return([]types.Container{appA, appB, pinned}, nil).Once()
+
+		// The first check cancels the scan. A check that starts after it
+		// stops at the cancellation without calling Docker.
+		client.EXPECT().IsContainerStale(mock.Anything, mock.Anything, mock.Anything).
+			RunAndReturn(func(ctx context.Context, _ types.Container, _ types.UpdateParams) (bool, types.ImageID, string, error) {
+				cancel()
+
+				return false, "", "", ctx.Err()
+			})
+
+		report, _, err := update(newTestLogger(t), ctx, client, types.UpdateParams{}, ratelimit.New())
+		require.ErrorIs(t, err, context.Canceled)
+		require.NotNil(t, report)
+
+		assert.Equal(t, []string{"pinned"}, reportNames(report.Scanned()), "the pinned container keeps its result")
+		require.Equal(t, []string{"app-a", "app-b"}, reportNames(report.Skipped()))
+
+		for _, skipped := range report.Skipped() {
+			assert.True(t, strings.HasPrefix(skipped.Error(), "update skipped: "), skipped.Error())
+			assert.Contains(t, skipped.Error(), "context canceled")
+		}
+	})
+}
+
 // TestUpdate_CanceledRecreateFailureIsFailed verifies that a container stopped
 // before an update is canceled, whose recreation then fails, is reported as
 // failed even though the failure wraps the cancellation, while the container

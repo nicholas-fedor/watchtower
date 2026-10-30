@@ -53,8 +53,15 @@ func TestUpdateAction_Context(t *testing.T) {
 			// Context cancellation from IsContainerStale is propagated as the
 			// final Update error rather than being swallowed.
 			require.ErrorIs(t, err, context.Canceled)
-			// Workers returning context.Canceled do not add partial results to progress.
-			assert.Empty(t, report.Skipped())
+			// A canceled check records no result, so every container is
+			// reported as skipped with the cancellation as the reason.
+			require.Len(t, report.Skipped(), 3)
+
+			for _, skipped := range report.Skipped() {
+				assert.Equal(t, "update skipped: staleness check canceled: context canceled", skipped.Error())
+			}
+
+			assert.Empty(t, report.Scanned())
 			assert.Empty(t, cleanupImageInfos)
 		})
 

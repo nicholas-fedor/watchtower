@@ -168,6 +168,29 @@ func (m Progress) UpdateSkipped(log *zerolog.Logger, skips map[types.ContainerID
 	}
 }
 
+// SkipUnrecorded adds each container that has no status yet as skipped, with
+// the same reason. A container that already has a status keeps it.
+//
+// Parameters:
+//   - log: Process logger.
+//   - containers: Containers to record.
+//   - reason: Skip reason for each container added.
+//   - params: Update parameters for the monitor-only check.
+func (m Progress) SkipUnrecorded(
+	log *zerolog.Logger,
+	containers []types.Container,
+	reason error,
+	params types.UpdateParams,
+) {
+	for _, c := range containers {
+		if _, exists := m[c.ID()]; exists {
+			continue
+		}
+
+		m.AddSkipped(log, c, reason, params)
+	}
+}
+
 // applyReportMeta copies Git and OCI fields onto a scanned container status.
 //
 // Parameters:
