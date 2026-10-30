@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"maps"
 	"slices"
-	"strings"
 	"sync"
 	"time"
 
@@ -21,6 +20,7 @@ import (
 	"github.com/nicholas-fedor/watchtower/internal/container/oci"
 	"github.com/nicholas-fedor/watchtower/internal/container/provenance"
 	"github.com/nicholas-fedor/watchtower/internal/git"
+	"github.com/nicholas-fedor/watchtower/internal/observability/logging"
 	"github.com/nicholas-fedor/watchtower/internal/registry/ratelimit"
 	"github.com/nicholas-fedor/watchtower/internal/update/changelog"
 	"github.com/nicholas-fedor/watchtower/internal/update/cleanup"
@@ -49,23 +49,8 @@ var (
 	errOldSelfDetected = errors.New("current container is an old Watchtower container")
 )
 
-// reportedProblems records the problems already reported as warnings, so a
-// problem that persists across scans notifies only once.
-type reportedProblems struct {
-	// mu guards seen.
-	mu sync.Mutex
-	// seen holds a key for each reported problem.
-	seen map[string]struct{}
-}
-
-const (
-	// defaultPullFailureDelay defines the default delay after a failed Watchtower self-update pull in run-once mode.
-	defaultPullFailureDelay = 5 * time.Minute
-
-	// maxReportedProblems bounds the problems recorded during a process,
-	// since the containers they name can be removed at any time.
-	maxReportedProblems = 1024
-)
+// defaultPullFailureDelay defines the default delay after a failed Watchtower self-update pull in run-once mode.
+const defaultPullFailureDelay = 5 * time.Minute
 
 // scanProblems holds the problems reported during this process. It records
 // dependency problems and failed update checks. It also records stale
@@ -73,7 +58,7 @@ const (
 // container ID, so a recreated container is reported again. A container whose
 // labels change is also recreated. A problem with a different cause is reported
 // again too.
-var scanProblems = &reportedProblems{seen: make(map[string]struct{})}
+var scanProblems logging.ReportedProblems
 
 // update scans and updates containers based on parameters.
 //
@@ -250,7 +235,7 @@ func update(
 				errSelfDependency,
 				config,
 			)
-			log.WithLevel(scanProblems.level("self-dependency", string(monitoredContainer.ID()))).
+			log.WithLevel(scanProblems.Level("self-dependency", string(monitoredContainer.ID()))).
 				Str("container", monitoredContainer.Name()).
 				Str("id", monitoredContainer.ID().ShortID()).
 				Msg("Skipping container update (self-dependency)")
@@ -269,7 +254,7 @@ func update(
 	)
 	if graphErr == nil {
 		for _, link := range graph.UnresolvedDependsOn() {
-			log.WithLevel(scanProblems.level("unresolved depends-on", string(link.Container.ID()), link.Link)).
+			log.WithLevel(scanProblems.Level("unresolved depends-on", string(link.Container.ID()), link.Link)).
 				Str("container", link.Container.Name()).
 				Str("depends_on", link.Link).
 				Msg("Ignoring depends-on entry that names no container")
@@ -291,7 +276,7 @@ func update(
 		inCycle[c.ID()] = struct{}{}
 
 		progress.AddSkipped(log, c, errCircularDependency, config)
-		log.WithLevel(scanProblems.level("circular dependency", string(c.ID()))).
+		log.WithLevel(scanProblems.Level("circular dependency", string(c.ID()))).
 			Str("container", c.Name()).
 			Str("id", c.ID().ShortID()).
 			Msg("Skipping container update (circular dependency)")
@@ -534,14 +519,14 @@ func update(
 					// A container's labels cannot change, so the container ID
 					// identifies an invalid label problem.
 					progress.AddSkipped(log, sourceContainer, checkErr, config)
-					clog.WithLevel(scanProblems.level("invalid git semver policy", string(sourceContainer.ID()))).
+					clog.WithLevel(scanProblems.Level("invalid git semver policy", string(sourceContainer.ID()))).
 						Msg("Skipped container with an invalid git semver policy")
 				case errors.Is(checkErr, git.ErrInvalidHost):
 					// The container ID identifies the problem, as for an invalid
 					// policy. The line carries no error field, so a credential in
 					// the label stays out of log-based notifications.
 					progress.AddSkipped(log, sourceContainer, checkErr, config)
-					clog.WithLevel(scanProblems.level("invalid git-host", string(sourceContainer.ID()))).
+					clog.WithLevel(scanProblems.Level("invalid git-host", string(sourceContainer.ID()))).
 						Msg("Skipped container with an invalid git-host")
 				default:
 					skipFailedUpdateCheck(log, clog, progress, sourceContainer, checkErr, config)
@@ -560,7 +545,7 @@ func update(
 				parallelStaleCheckFailed++
 
 				progress.AddSkipped(log, sourceContainer, verifyErr, config)
-				clog.WithLevel(scanProblems.level("unrecreatable configuration", string(sourceContainer.ID()), verifyErr.Error())).
+				clog.WithLevel(scanProblems.Level("unrecreatable configuration", string(sourceContainer.ID()), verifyErr.Error())).
 					Err(verifyErr).
 					Msg("Could not update container. Its configuration cannot be recreated")
 
@@ -836,36 +821,6 @@ func update(
 	return progress.Report(log), cleanupImageInfos, nil
 }
 
-// level records a problem and returns its log level.
-//
-// A new problem gets [zerolog.WarnLevel] and a problem already recorded gets
-// [zerolog.DebugLevel]. When the record is full, it starts over, so each
-// problem that persists is reported once more.
-//
-// Parameters:
-//   - parts: The problem kind followed by the values that identify it.
-//
-// Returns:
-//   - zerolog.Level: [zerolog.WarnLevel] for a new problem, otherwise [zerolog.DebugLevel].
-func (r *reportedProblems) level(parts ...string) zerolog.Level {
-	key := strings.Join(parts, "\x00")
-
-	r.mu.Lock()
-	defer r.mu.Unlock()
-
-	if _, seen := r.seen[key]; seen {
-		return zerolog.DebugLevel
-	}
-
-	if len(r.seen) >= maxReportedProblems {
-		clear(r.seen)
-	}
-
-	r.seen[key] = struct{}{}
-
-	return zerolog.WarnLevel
-}
-
 // skipFailedUpdateCheck records a container whose update check failed as
 // skipped, with the error as the reason. It warns the first time the container
 // fails for that error and logs at debug while the same failure persists.
@@ -885,7 +840,7 @@ func skipFailedUpdateCheck(
 	config types.UpdateParams,
 ) {
 	progress.AddSkipped(log, c, err, config)
-	clog.WithLevel(scanProblems.level("failed update check", string(c.ID()), err.Error())).
+	clog.WithLevel(scanProblems.Level("failed update check", string(c.ID()), err.Error())).
 		Err(err).
 		Msg("Could not check container for updates")
 }

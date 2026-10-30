@@ -1,7 +1,3 @@
-// Package logging builds and configures Watchtower's zerolog loggers.
-//
-// It holds no logger state. Callers create a logger and pass it to the
-// subsystems that use it.
 package logging
 
 import (
@@ -9,15 +5,23 @@ import (
 	"fmt"
 	"io"
 	"strings"
+	"sync"
 
 	"github.com/rs/zerolog"
 )
 
-// errUnknownLogLevel is returned by ParseLevel for unrecognized level strings.
-var errUnknownLogLevel = errors.New("unknown log level")
-
 // Level maps to zerolog levels.
 type Level uint8
+
+// ReportedProblems records the problems already reported, so each one is
+// warned about once. Its zero value is ready to use, and it is safe for
+// concurrent use.
+type ReportedProblems struct {
+	// mu guards seen.
+	mu sync.Mutex
+	// seen holds a key for each reported problem.
+	seen map[string]struct{}
+}
 
 // Logging levels ordered from most to least verbose.
 const (
@@ -29,6 +33,13 @@ const (
 	FatalLevel
 	PanicLevel
 )
+
+// maxReportedProblems bounds the problems a record holds, so a long-running
+// process does not grow it without limit.
+const maxReportedProblems = 1024
+
+// errUnknownLogLevel is returned by ParseLevel for unrecognized level strings.
+var errUnknownLogLevel = errors.New("unknown log level")
 
 // toZerologLevel converts a logging.Level to zerolog.Level.
 //
@@ -104,4 +115,33 @@ func ParseLevel(level string) (zerolog.Level, error) {
 	default:
 		return zerolog.NoLevel, fmt.Errorf("%w: %q", errUnknownLogLevel, level)
 	}
+}
+
+// Level records a problem and returns its log level.
+//
+// A record holds up to 1024 problems. When it is full, it starts over, so each
+// problem that persists is reported once more.
+//
+// Parameters:
+//   - parts: The problem kind followed by the values that identify it.
+//
+// Returns:
+//   - zerolog.Level: [zerolog.WarnLevel] for a new problem, otherwise [zerolog.DebugLevel].
+func (r *ReportedProblems) Level(parts ...string) zerolog.Level {
+	key := strings.Join(parts, "\x00")
+
+	r.mu.Lock()
+	defer r.mu.Unlock()
+
+	if _, seen := r.seen[key]; seen {
+		return zerolog.DebugLevel
+	}
+
+	if r.seen == nil || len(r.seen) >= maxReportedProblems {
+		r.seen = make(map[string]struct{})
+	}
+
+	r.seen[key] = struct{}{}
+
+	return zerolog.WarnLevel
 }

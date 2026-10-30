@@ -3,6 +3,7 @@ package logging
 import (
 	"bytes"
 	"encoding/json"
+	"strconv"
 	"testing"
 
 	"github.com/rs/zerolog"
@@ -85,4 +86,25 @@ func TestParseLevel(t *testing.T) {
 			assert.Equal(t, tt.want, got)
 		})
 	}
+}
+
+// TestReportedProblems_StartsOverWhenFull verifies that the record of reported
+// problems stays bounded. Once it is full, a new problem clears it, so earlier
+// problems are reported again.
+func TestReportedProblems_StartsOverWhenFull(t *testing.T) {
+	t.Parallel()
+
+	var problems ReportedProblems
+
+	assert.Equal(t, zerolog.WarnLevel, problems.Level("problem", "first"))
+	assert.Equal(t, zerolog.DebugLevel, problems.Level("problem", "first"))
+
+	for i := 1; i < maxReportedProblems; i++ {
+		problems.Level("problem", strconv.Itoa(i))
+	}
+
+	require.Len(t, problems.seen, maxReportedProblems)
+	assert.Equal(t, zerolog.WarnLevel, problems.Level("problem", "overflow"))
+	assert.Len(t, problems.seen, 1)
+	assert.Equal(t, zerolog.WarnLevel, problems.Level("problem", "first"), "the record started over")
 }

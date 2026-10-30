@@ -9,7 +9,6 @@ import (
 	"errors"
 	"fmt"
 	"maps"
-	"strconv"
 	"strings"
 	"testing"
 	"time"
@@ -740,25 +739,4 @@ func TestUpdate_InvalidGitLabelWarnsOnce(t *testing.T) {
 			assert.Equal(t, [][]string{{"warn"}, {"debug"}}, got)
 		})
 	}
-}
-
-// TestReportedProblems_StartsOverWhenFull verifies that the record of reported
-// problems stays bounded. Once it is full, a new problem clears it, so earlier
-// problems are reported again.
-func TestReportedProblems_StartsOverWhenFull(t *testing.T) {
-	t.Parallel()
-
-	problems := &reportedProblems{seen: make(map[string]struct{})}
-
-	assert.Equal(t, zerolog.WarnLevel, problems.level("problem", "first"))
-	assert.Equal(t, zerolog.DebugLevel, problems.level("problem", "first"))
-
-	for i := 1; i < maxReportedProblems; i++ {
-		problems.level("problem", strconv.Itoa(i))
-	}
-
-	require.Len(t, problems.seen, maxReportedProblems)
-	assert.Equal(t, zerolog.WarnLevel, problems.level("problem", "overflow"))
-	assert.Len(t, problems.seen, 1)
-	assert.Equal(t, zerolog.WarnLevel, problems.level("problem", "first"), "the record started over")
 }
