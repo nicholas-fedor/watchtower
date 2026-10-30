@@ -111,7 +111,7 @@ See [Templates](../../notifications/templates/index.md).
 
 ## Interactions
 
-- [`cleanup`](../../configuration/update-behavior/index.md#cleanup_old_images) runs only after a successful session, so a blocked session does not free image space.
+- [`cleanup`](../../configuration/update-behavior/index.md#cleanup_old_images) removes the images a session replaced, even when the session ends in an error. A blocked session replaces nothing, so it does not free image space.
 - [`remove-volumes`](../../configuration/update-behavior/index.md#remove_anonymous_volumes) is unrelated.
   It deletes anonymous volumes when a container is recreated.
 - [`no-pull`](../../configuration/update-behavior/index.md#disable_image_pulling) does not disable the monitor.
@@ -128,4 +128,4 @@ See [Templates](../../notifications/templates/index.md).
 - The gate cannot reserve space for an incoming pull.
 - Reclaimable figures from some compatible runtimes can be overstated when images share layers.
 - There is no automatic prune.
-  Use [`cleanup`](../../configuration/update-behavior/index.md#cleanup_old_images) after successful updates, or remove unused images yourself.
+  Use [`cleanup`](../../configuration/update-behavior/index.md#cleanup_old_images) to remove the images that updates replace, or remove unused images yourself.
