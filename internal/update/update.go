@@ -433,8 +433,11 @@ func update(
 				)
 			}
 
-			if checkErr != nil && (errors.Is(checkErr, context.Canceled) || errors.Is(checkErr, context.DeadlineExceeded)) {
-				return fmt.Errorf("staleness check canceled: %w", checkErr)
+			// Only the session's own cancellation ends the scan. A check that
+			// fails with a timeout of its own, such as a registry request
+			// reaching its client timeout, is that container's check error.
+			if checkErr != nil && ctx.Err() != nil {
+				return fmt.Errorf("staleness check canceled: %w", ctx.Err())
 			}
 
 			// Determine if the container should be updated based on staleness and config.
@@ -458,12 +461,6 @@ func update(
 						Str("container_id", sourceContainer.ID().ShortID()).
 						Str("image_id", sourceContainer.ImageID().ShortID()).
 						Msg("Failed to verify container configuration")
-				}
-
-				if verifyErr != nil &&
-					(errors.Is(verifyErr, context.Canceled) ||
-						errors.Is(verifyErr, context.DeadlineExceeded)) {
-					return fmt.Errorf("configuration verification canceled: %w", verifyErr)
 				}
 			}
 
@@ -619,14 +616,12 @@ func update(
 			Err(err).
 			Msg("Parallel staleness checks completed with error")
 
-		// Surface context cancellation from parallel workers as the final Update error.
-		// A canceled check records nothing, so its container and those whose
+		// A worker returns an error only when the session is canceled. A
+		// canceled check records nothing, so its container and those whose
 		// check never ran are reported as skipped.
-		if errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded) {
-			progress.SkipUnrecorded(log, filteredContainers, fmt.Errorf("update skipped: %w", err), config)
+		progress.SkipUnrecorded(log, filteredContainers, fmt.Errorf("update skipped: %w", err), config)
 
-			return progress.Report(log), cleanupImageInfos, fmt.Errorf("update canceled: %w", err)
-		}
+		return progress.Report(log), cleanupImageInfos, fmt.Errorf("update canceled: %w", err)
 	}
 
 	// Accumulate parallel results with pre-parallel sequential counts so failures

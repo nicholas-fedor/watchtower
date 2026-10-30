@@ -41,24 +41,23 @@ func TestUpdateAction_Context(t *testing.T) {
 			assert.Empty(t, cleanupImageInfos)
 		})
 
-		t.Run("should handle context cancellation during staleness checking", func(t *testing.T) {
+		t.Run("should keep scanning when checks fail with a cancellation of their own", func(t *testing.T) {
 			t.Parallel()
 
 			client := mockUpdate.CreateMockClient(getCommonTestData(), false, false)
-			// Simulate IsContainerStale error
+			// Every check fails with a cancellation error while the session's
+			// context stays live.
 			client.TestData.IsContainerStaleError = context.Canceled
 
 			report, cleanupImageInfos, err := update(newTestLogger(t), t.Context(), client, types.UpdateParams{Cleanup: true}, ratelimit.New())
 
-			// Context cancellation from IsContainerStale is propagated as the
-			// final Update error rather than being swallowed.
-			require.ErrorIs(t, err, context.Canceled)
-			// A canceled check records no result, so every container is
-			// reported as skipped with the cancellation as the reason.
+			// Only the session's own cancellation ends the scan, so each
+			// container is skipped with its check error instead.
+			require.NoError(t, err)
 			require.Len(t, report.Skipped(), 3)
 
 			for _, skipped := range report.Skipped() {
-				assert.Equal(t, "update skipped: staleness check canceled: context canceled", skipped.Error())
+				assert.Equal(t, "context canceled", skipped.Error())
 			}
 
 			assert.Empty(t, report.Scanned())
