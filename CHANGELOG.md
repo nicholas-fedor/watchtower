@@ -124,6 +124,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Chores
 
+- Update module github.com/prometheus/common to v0.73.1 by @renovate[bot] in [#3298](https://github.com/nicholas-fedor/watchtower/pull/3298)
 - Update module github.com/pandatix/go-abnf to v0.5.3 by @renovate[bot] in [#3262](https://github.com/nicholas-fedor/watchtower/pull/3262)
 - Update module github.com/gofiber/contrib/v3/zerolog to v1.1.9 by @renovate[bot] in [#3258](https://github.com/nicholas-fedor/watchtower/pull/3258)
 - Update module github.com/gofiber/contrib/v3/swaggo to v1.0.15 by @renovate[bot] in [#3257](https://github.com/nicholas-fedor/watchtower/pull/3257)
