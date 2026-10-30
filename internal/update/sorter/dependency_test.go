@@ -2,6 +2,7 @@ package sorter
 
 import (
 	"fmt"
+	"strings"
 	"testing"
 
 	"github.com/rs/zerolog"
@@ -11,6 +12,7 @@ import (
 	dockerContainer "github.com/moby/moby/api/types/container"
 
 	"github.com/nicholas-fedor/watchtower/internal/container"
+	"github.com/nicholas-fedor/watchtower/internal/testutil/logcapture"
 	"github.com/nicholas-fedor/watchtower/pkg/types"
 	mockTypes "github.com/nicholas-fedor/watchtower/pkg/types/mocks"
 )
@@ -1763,6 +1765,35 @@ func TestIdentifierCollisionIssues(t *testing.T) {
 			require.ErrorAs(t, err, &collisionErr)
 		})
 	})
+}
+
+// Test_identifierIndex_CollisionLogsAtDebug verifies that an identifier
+// collision returns an identifierCollisionError and logs only at debug, since
+// every caller reports the returned error itself. The debug line carries the
+// identifier and the error naming both containers.
+func Test_identifierIndex_CollisionLogsAtDebug(t *testing.T) {
+	t.Parallel()
+
+	containers := []types.Container{
+		concreteLinkedContainer("a000000000000000000000000000000000000000000000000000000000000000", "/app", "", "", ""),
+		concreteLinkedContainer("b000000000000000000000000000000000000000000000000000000000000000", "/app", "", "", ""),
+	}
+
+	log, output := logcapture.New(zerolog.DebugLevel)
+
+	index, err := identifierIndex(log, containers)
+	require.Nil(t, index)
+
+	var collisionErr identifierCollisionError
+	require.ErrorAs(t, err, &collisionErr)
+
+	lines := strings.Split(strings.TrimSpace(output.String()), "\n")
+	require.Len(t, lines, 1)
+	assert.Contains(t, lines[0], "level=debug")
+	assert.Contains(t, lines[0], `msg="Identifier collision in the dependency graph"`)
+	assert.Contains(t, lines[0], "identifier=app")
+	assert.Contains(t, lines[0], "app (a00000000000)")
+	assert.Contains(t, lines[0], "app (b00000000000)")
 }
 
 // Test_isPositiveInteger verifies which replica suffixes count as positive

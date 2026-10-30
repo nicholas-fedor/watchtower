@@ -274,6 +274,9 @@ func buildDependencyGraph(log *zerolog.Logger,
 // identifierIndex maps each container's normalized dependency identifier to
 // the container.
 //
+// A collision is logged at debug only. Every caller reports the returned
+// error itself, so logging it at error here would notify it twice.
+//
 // Parameters:
 //   - log: Process logger.
 //   - containers: Containers to index.
@@ -295,16 +298,17 @@ func identifierIndex(log *zerolog.Logger, containers []types.Container) (map[str
 	// Check for identifier collisions
 	for identifier, dupContainers := range tempMap {
 		if len(dupContainers) > 1 {
-			log.Error().Msgf(
-				"Identifier collision detected: '%s' used by multiple containers: %v",
-				identifier,
-				dupContainers,
-			)
-
-			return nil, identifierCollisionError{
+			collision := identifierCollisionError{
 				DuplicateIdentifier: identifier,
 				AffectedContainers:  dupContainers,
 			}
+
+			log.Debug().
+				Str("identifier", identifier).
+				Err(collision).
+				Msg("Identifier collision in the dependency graph")
+
+			return nil, collision
 		}
 
 		index[identifier] = dupContainers[0]
