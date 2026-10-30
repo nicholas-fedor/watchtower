@@ -49,6 +49,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- Remove the dead multiple-instances template case by @nicholas-fedor in [#3274](https://github.com/nicholas-fedor/watchtower/pull/3274)
 - Move restarts into update/restart by @nicholas-fedor in [#3234](https://github.com/nicholas-fedor/watchtower/pull/3234)
 - Move implicit restarts into update/implicitrestart by @nicholas-fedor in [#3230](https://github.com/nicholas-fedor/watchtower/pull/3230)
 - Move staleness decisions into update/staleness by @nicholas-fedor in [#3228](https://github.com/nicholas-fedor/watchtower/pull/3228)
