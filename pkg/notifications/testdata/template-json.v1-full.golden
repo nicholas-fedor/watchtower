@@ -121,28 +121,20 @@
     },
     {
       "data": {
-        "count": 2
-      },
-      "level": "info",
-      "message": "Detected multiple Watchtower instances - initiating cleanup",
-      "time": "2026-10-07T12:00:12Z"
-    },
-    {
-      "data": {
         "removed_instances": 1
       },
-      "level": "warning",
+      "level": "info",
       "message": "Successfully removed all excess Watchtower containers",
-      "time": "2026-10-07T12:00:13Z"
+      "time": "2026-10-07T12:00:12Z"
     },
     {
       "data": {
         "disk_space_max": 10737418240,
         "disk_space_warn": 8589934592
       },
-      "level": "error",
+      "level": "warning",
       "message": "Docker image usage budget enabled",
-      "time": "2026-10-07T12:00:14Z"
+      "time": "2026-10-07T12:00:13Z"
     },
     {
       "data": {
@@ -152,9 +144,9 @@
         "usage": 11811160064,
         "warn": 8589934592
       },
-      "level": "debug",
+      "level": "error",
       "message": "Docker image usage exceeds configured maximum",
-      "time": "2026-10-07T12:00:15Z"
+      "time": "2026-10-07T12:00:14Z"
     },
     {
       "data": {
@@ -164,26 +156,26 @@
         "usage": 9663676416,
         "warn": 8589934592
       },
-      "level": "info",
+      "level": "debug",
       "message": "Docker image usage exceeds configured warning threshold",
-      "time": "2026-10-07T12:00:16Z"
+      "time": "2026-10-07T12:00:15Z"
     },
     {
       "data": {
         "error": "daemon disk usage unavailable"
       },
-      "level": "warning",
+      "level": "info",
       "message": "Failed to query Docker image disk usage",
-      "time": "2026-10-07T12:00:17Z"
+      "time": "2026-10-07T12:00:16Z"
     },
     {
       "data": {
         "changelog": "https://github.com/org/app/releases/tag/v1.2.0",
         "container": "app"
       },
-      "level": "error",
+      "level": "warning",
       "message": "Changelog",
-      "time": "2026-10-07T12:00:18Z"
+      "time": "2026-10-07T12:00:17Z"
     },
     {
       "data": {
@@ -191,18 +183,18 @@
         "image": "org/app:latest",
         "image_id": "b17d10000000"
       },
-      "level": "debug",
+      "level": "error",
       "message": "Built image from Git URL context",
-      "time": "2026-10-07T12:00:19Z"
+      "time": "2026-10-07T12:00:18Z"
     },
     {
       "data": {
         "project": "stack",
         "service": "web"
       },
-      "level": "info",
+      "level": "debug",
       "message": "Built Compose project",
-      "time": "2026-10-07T12:00:20Z"
+      "time": "2026-10-07T12:00:19Z"
     },
     {
       "data": {
@@ -210,9 +202,9 @@
         "error": "example failure",
         "image": "org/app:latest"
       },
-      "level": "warning",
+      "level": "info",
       "message": "Git build failed. Leaving running container untouched",
-      "time": "2026-10-07T12:00:21Z"
+      "time": "2026-10-07T12:00:20Z"
     },
     {
       "data": {
@@ -221,17 +213,27 @@
         "error": "example failure",
         "image": "org/web:latest"
       },
-      "level": "error",
+      "level": "warning",
       "message": "Compose apply failed. Docker Compose may have partially recreated services",
-      "time": "2026-10-07T12:00:22Z"
+      "time": "2026-10-07T12:00:21Z"
     },
     {
       "data": {
         "project": "stack",
         "service": "web, worker"
       },
-      "level": "debug",
+      "level": "error",
       "message": "Compose apply finished with unconfirmed service results",
+      "time": "2026-10-07T12:00:22Z"
+    },
+    {
+      "data": {
+        "container": "stack-web-1",
+        "image": "org/web:latest",
+        "service": "web"
+      },
+      "level": "debug",
+      "message": "Compose apply result omitted this service. Runtime state is unknown",
       "time": "2026-10-07T12:00:23Z"
     },
     {
@@ -241,33 +243,23 @@
         "service": "web"
       },
       "level": "info",
-      "message": "Compose apply result omitted this service. Runtime state is unknown",
-      "time": "2026-10-07T12:00:24Z"
-    },
-    {
-      "data": {
-        "container": "stack-web-1",
-        "image": "org/web:latest",
-        "service": "web"
-      },
-      "level": "warning",
       "message": "Compose apply did not return an identifiable instance for this replica. Runtime state is unknown",
-      "time": "2026-10-07T12:00:25Z"
+      "time": "2026-10-07T12:00:24Z"
     },
     {
       "data": {
         "container": "app",
         "image": "org/app:latest"
       },
-      "level": "error",
+      "level": "warning",
       "message": "Compose apply skipped. Container has no compose service label",
-      "time": "2026-10-07T12:00:26Z"
+      "time": "2026-10-07T12:00:25Z"
     },
     {
       "data": null,
-      "level": "debug",
+      "level": "error",
       "message": "Compose batch dependencies are cyclic. Appending unresolved batches in first-seen order",
-      "time": "2026-10-07T12:00:27Z"
+      "time": "2026-10-07T12:00:26Z"
     },
     {
       "data": {
@@ -275,9 +267,9 @@
         "error": "example failure",
         "image": "org/app:latest"
       },
-      "level": "info",
+      "level": "debug",
       "message": "Compose project directory is not readable. Leaving the running container untouched",
-      "time": "2026-10-07T12:00:28Z"
+      "time": "2026-10-07T12:00:27Z"
     },
     {
       "data": {
@@ -286,8 +278,16 @@
         "error": "example failure",
         "image": "org/web:latest"
       },
-      "level": "warning",
+      "level": "info",
       "message": "Compose update failed before container replacement",
+      "time": "2026-10-07T12:00:28Z"
+    },
+    {
+      "data": {
+        "error": "circular reference detected"
+      },
+      "level": "warning",
+      "message": "Could not dependency-sort Compose batches. Using the existing container order",
       "time": "2026-10-07T12:00:29Z"
     },
     {
@@ -295,15 +295,16 @@
         "error": "circular reference detected"
       },
       "level": "error",
-      "message": "Could not dependency-sort Compose batches. Using the existing container order",
+      "message": "Could not order Compose batches by dependencies. Using first-seen order",
       "time": "2026-10-07T12:00:30Z"
     },
     {
       "data": {
-        "error": "circular reference detected"
+        "container": "app",
+        "image": "org/app:latest"
       },
       "level": "debug",
-      "message": "Could not order Compose batches by dependencies. Using first-seen order",
+      "message": "Skipped container with an invalid git-host",
       "time": "2026-10-07T12:00:31Z"
     },
     {
@@ -312,7 +313,7 @@
         "image": "org/app:latest"
       },
       "level": "info",
-      "message": "Skipped container with an invalid git-host",
+      "message": "Skipped container with an invalid git semver policy",
       "time": "2026-10-07T12:00:32Z"
     },
     {
@@ -321,24 +322,25 @@
         "image": "org/app:latest"
       },
       "level": "warning",
-      "message": "Skipped container with an invalid git semver policy",
-      "time": "2026-10-07T12:00:33Z"
-    },
-    {
-      "data": {
-        "container": "app",
-        "image": "org/app:latest"
-      },
-      "level": "error",
       "message": "Skipping Watchtower self-update in run-once mode",
-      "time": "2026-10-07T12:00:34Z"
+      "time": "2026-10-07T12:00:33Z"
     },
     {
       "data": {
         "scope": "production"
       },
-      "level": "debug",
+      "level": "error",
       "message": "Only checking containers in scope",
+      "time": "2026-10-07T12:00:34Z"
+    },
+    {
+      "data": {
+        "host": "0.0.0.0",
+        "port": "8080",
+        "tls": true
+      },
+      "level": "debug",
+      "message": "Starting HTTP API server",
       "time": "2026-10-07T12:00:35Z"
     },
     {
@@ -348,18 +350,8 @@
         "tls": true
       },
       "level": "info",
-      "message": "Starting HTTP API server",
-      "time": "2026-10-07T12:00:36Z"
-    },
-    {
-      "data": {
-        "host": "0.0.0.0",
-        "port": "8080",
-        "tls": true
-      },
-      "level": "warning",
       "message": "HTTP API server is enabled",
-      "time": "2026-10-07T12:00:37Z"
+      "time": "2026-10-07T12:00:36Z"
     },
     {
       "data": {
@@ -367,17 +359,26 @@
         "error": "image pull: registry rate limited: retry-after 347.256µs allowed 44000 per 1m0s",
         "image": "org/app:latest"
       },
-      "level": "error",
+      "level": "warning",
       "message": "Registry rate limit retries exhausted. Container failed for this cycle",
-      "time": "2026-10-07T12:00:38Z"
+      "time": "2026-10-07T12:00:37Z"
     },
     {
       "data": {
         "container": "app",
         "depends_on": "missing-db"
       },
-      "level": "debug",
+      "level": "error",
       "message": "Ignoring depends-on entry that names no container",
+      "time": "2026-10-07T12:00:38Z"
+    },
+    {
+      "data": {
+        "container": "app",
+        "id": "abcdef123456"
+      },
+      "level": "debug",
+      "message": "Skipping container update (self-dependency)",
       "time": "2026-10-07T12:00:39Z"
     },
     {
@@ -386,24 +387,23 @@
         "id": "abcdef123456"
       },
       "level": "info",
-      "message": "Skipping container update (self-dependency)",
-      "time": "2026-10-07T12:00:40Z"
-    },
-    {
-      "data": {
-        "container": "app",
-        "id": "abcdef123456"
-      },
-      "level": "warning",
       "message": "Skipping container update (circular dependency)",
-      "time": "2026-10-07T12:00:41Z"
+      "time": "2026-10-07T12:00:40Z"
     },
     {
       "data": {
         "error": "failed to detect current container ID: no container ID in cgroup file"
       },
-      "level": "error",
+      "level": "warning",
       "message": "Could not identify Watchtower's own container. Self-updates are disabled and old instances will not be removed",
+      "time": "2026-10-07T12:00:41Z"
+    },
+    {
+      "data": {
+        "error": "failed to inspect container: context deadline exceeded"
+      },
+      "level": "error",
+      "message": "Could not inspect Watchtower's own container. Self-updates are disabled",
       "time": "2026-10-07T12:00:42Z"
     },
     {
@@ -411,24 +411,16 @@
         "error": "failed to inspect container: context deadline exceeded"
       },
       "level": "debug",
-      "message": "Could not inspect Watchtower's own container. Self-updates are disabled",
-      "time": "2026-10-07T12:00:43Z"
-    },
-    {
-      "data": {
-        "error": "failed to inspect container: context deadline exceeded"
-      },
-      "level": "info",
       "message": "Could not inspect Watchtower's own container to read its scope label. Exiting rather than running without a scope",
-      "time": "2026-10-07T12:00:44Z"
+      "time": "2026-10-07T12:00:43Z"
     },
     {
       "data": {
         "error": "failed to set restart policy: context deadline exceeded"
       },
-      "level": "warning",
+      "level": "info",
       "message": "Could not disable Watchtower's restart policy. The runtime may start it again",
-      "time": "2026-10-07T12:00:45Z"
+      "time": "2026-10-07T12:00:44Z"
     },
     {
       "data": {
@@ -437,9 +429,9 @@
         "label": "com.centurylinklabs.watchtower.lifecycle.pre-update-timeout",
         "value": "-1"
       },
-      "level": "error",
+      "level": "warning",
       "message": "Invalid pre-update timeout value, using default",
-      "time": "2026-10-07T12:00:46Z"
+      "time": "2026-10-07T12:00:45Z"
     },
     {
       "data": {
@@ -448,9 +440,9 @@
         "label": "com.centurylinklabs.watchtower.lifecycle.post-update-timeout",
         "value": "soon"
       },
-      "level": "debug",
+      "level": "error",
       "message": "Invalid post-update timeout value, using default",
-      "time": "2026-10-07T12:00:47Z"
+      "time": "2026-10-07T12:00:46Z"
     },
     {
       "data": {
@@ -459,9 +451,9 @@
         "label": "com.centurylinklabs.watchtower.lifecycle.pre-check-timeout",
         "value": "1.5"
       },
-      "level": "info",
+      "level": "debug",
       "message": "Invalid pre-check timeout value, using default",
-      "time": "2026-10-07T12:00:48Z"
+      "time": "2026-10-07T12:00:47Z"
     },
     {
       "data": {
@@ -470,9 +462,9 @@
         "label": "com.centurylinklabs.watchtower.lifecycle.post-check-timeout",
         "value": "-5"
       },
-      "level": "warning",
+      "level": "info",
       "message": "Invalid post-check timeout value, using default",
-      "time": "2026-10-07T12:00:49Z"
+      "time": "2026-10-07T12:00:48Z"
     },
     {
       "data": {

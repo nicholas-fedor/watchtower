@@ -62,8 +62,6 @@ var Templates = map[string]string{
     Changelog: {{with (index $e.Data "changelog")}}{{.}}{{else}}unknown{{end}}
 {{- else if eq $msg "Skipping Watchtower self-update in run-once mode" -}}
     Run once mode: Watchtower self-update skipped
-{{- else if eq $msg "Detected multiple Watchtower instances - initiating cleanup" -}}
-    Detected {{index $e.Data "count"}} Watchtower instances - initiating cleanup
 	{{- else if eq $msg "Successfully removed all excess Watchtower containers" -}}
     Successfully removed {{index $e.Data "removed_instances"}} old Watchtower container{{if ne (index $e.Data "removed_instances") 1}}s{{end}}
 {{- else if eq $msg "Image is within cooldown period - not eligible for update" -}}

@@ -93,7 +93,6 @@ var infoMessages = []string{
 	"Started linked container",
 	"Removing image",
 	"Container updated",
-	"Detected multiple Watchtower instances - initiating cleanup",
 	"Successfully removed all excess Watchtower containers",
 	"Image is within cooldown period - not eligible for update",
 	"Image age exceeds cooldown - eligible for update",

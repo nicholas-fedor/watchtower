@@ -10,7 +10,6 @@ Failed to list containers for image usage check, skipping removal
 Image is within cooldown period - not eligible for update
 Image age exceeds cooldown - eligible for update
 Image creation time unavailable - update check unavailable
-Detected multiple Watchtower instances - initiating cleanup
 Successfully removed all excess Watchtower containers
 Docker image usage budget enabled
 Docker image usage exceeds configured maximum

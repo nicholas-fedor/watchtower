@@ -12,9 +12,8 @@ var commonTemplates = map[string]string{
 	// "Started linked container" (linked container started), "Removing image" (image cleanup completed),
 	// "Failed to list containers for image usage check, skipping removal" (image cleanup skipped),
 	// "Container updated" (update completed),
-	// "Image is within cooldown period - deferring update" (image too new for update), "Image age exceeds cooldown - eligible for update" (image old enough),
+	// "Image is within cooldown period - not eligible for update" (image too new for update), "Image age exceeds cooldown - eligible for update" (image old enough),
 	// "Image creation time unavailable - update check unavailable" (image age could not be determined from registry),
-	// "Detected multiple Watchtower instances - initiating cleanup" (multiple instances detected),
 	// "Docker image usage exceeds configured maximum" (session blocked by image-usage budget),
 	// "Docker image usage exceeds configured warning threshold" (image-usage budget warning),
 	// "Failed to query Docker image disk usage" (image-usage query failed),
@@ -65,8 +64,6 @@ var commonTemplates = map[string]string{
     Changelog: {{with (index $e.Data "changelog")}}{{.}}{{else}}unknown{{end}}
 {{- else if eq $msg "Skipping Watchtower self-update in run-once mode" -}}
     Run once mode: Watchtower self-update skipped
-{{- else if eq $msg "Detected multiple Watchtower instances - initiating cleanup" -}}
-    Detected {{index $e.Data "count"}} Watchtower instances - initiating cleanup
 	{{- else if eq $msg "Successfully removed all excess Watchtower containers" -}}
     Successfully removed {{index $e.Data "removed_instances"}} old Watchtower container{{if ne (index $e.Data "removed_instances") 1}}s{{end}}
 {{- else if eq $msg "Image is within cooldown period - not eligible for update" -}}
