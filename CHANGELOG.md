@@ -14,6 +14,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Recover and notify update panics by @nicholas-fedor in [#3282](https://github.com/nicholas-fedor/watchtower/pull/3282)
 - Count skipped scheduled scans again by @nicholas-fedor in [#3278](https://github.com/nicholas-fedor/watchtower/pull/3278)
 - Report the last scan's time as the status timestamp by @nicholas-fedor in [#3266](https://github.com/nicholas-fedor/watchtower/pull/3266)
 - Log empty notification skips at debug only by @nicholas-fedor in [#3250](https://github.com/nicholas-fedor/watchtower/pull/3250)
