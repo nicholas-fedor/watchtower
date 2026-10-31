@@ -93,7 +93,9 @@ func setPreRunState(t *testing.T, client containerClient.Client, detection selfD
 
 	setProcessFs(t, fsys)
 
-	newClient = func(*zerolog.Logger, containerClient.ClientOptions) containerClient.Client { return client }
+	newClient = func(*zerolog.Logger, containerClient.ClientOptions) (containerClient.Client, error) {
+		return client, nil
+	}
 
 	for _, key := range []string{"HOSTNAME", "DOCKER_HOST", "DOCKER_TLS_VERIFY", "DOCKER_API_VERSION", "DOCKER_CERT_PATH"} {
 		t.Setenv(key, "")
@@ -427,10 +429,10 @@ func TestPreRun_RegistryTLSSettings(t *testing.T) {
 
 			var clientOptions containerClient.ClientOptions
 
-			newClient = func(_ *zerolog.Logger, opts containerClient.ClientOptions) containerClient.Client {
+			newClient = func(_ *zerolog.Logger, opts containerClient.ClientOptions) (containerClient.Client, error) {
 				clientOptions = opts
 
-				return mockClient
+				return mockClient, nil
 			}
 
 			cmd := newTestRootCommand(t, tt.args...)
@@ -525,9 +527,79 @@ func TestPreRun_Exit(t *testing.T) {
 		wantExitCode int
 		// wantOutput lists lines the output must contain, in this order.
 		wantOutput []string
+		// unwantedOutput lists lines the output must not contain.
+		unwantedOutput []string
 	}{
-		{helperCase: "invalid-log-format", wantExitCode: 1, wantOutput: []string{"Failed to initialize logging"}},
-		{helperCase: "invalid-configuration", wantExitCode: 1, wantOutput: []string{"Failed to load configuration"}},
+		{
+			// A configuration error cannot clear itself, so each one disables
+			// the restart policy before Watchtower exits.
+			helperCase:   "invalid-environment",
+			wantExitCode: 1,
+			wantOutput:   []string{"SetRestartPolicy cccccccccccc no", "Failed to apply environment configuration"},
+		},
+		{
+			helperCase:   "invalid-log-format",
+			wantExitCode: 1,
+			wantOutput:   []string{"SetRestartPolicy cccccccccccc no", "Failed to initialize logging"},
+		},
+		{
+			helperCase:   "invalid-configuration",
+			wantExitCode: 1,
+			wantOutput:   []string{"SetRestartPolicy cccccccccccc no", "Failed to load configuration"},
+		},
+		{
+			// An error before the Docker connection flags are mapped still
+			// reaches the daemon the host flag names.
+			helperCase:   "invalid-log-format-with-host-flag",
+			wantExitCode: 1,
+			wantOutput: []string{
+				"newClient DOCKER_HOST=tcp://socket-proxy:2375",
+				"SetRestartPolicy cccccccccccc no",
+				"Failed to initialize logging",
+			},
+		},
+		{
+			// When no Docker client can be created, the failure is reported and
+			// the configuration error is still logged after it.
+			helperCase:   "invalid-configuration-without-docker",
+			wantExitCode: 1,
+			wantOutput: []string{
+				"Could not disable Watchtower's restart policy. The runtime may start it again",
+				"Failed to load configuration",
+			},
+			unwantedOutput: []string{"SetRestartPolicy"},
+		},
+		{
+			// A flag the command line cannot parse is a configuration error
+			// too, so Execute disables the restart policy before it exits.
+			helperCase:   "unknown-flag",
+			wantExitCode: 1,
+			wantOutput:   []string{"SetRestartPolicy cccccccccccc no", "Failed to execute root command"},
+		},
+		{
+			// A subcommand such as notify-upgrade can run inside the main
+			// container, so its failure leaves that container's restarts alone.
+			helperCase:     "subcommand-error",
+			wantExitCode:   1,
+			wantOutput:     []string{"Failed to execute root command"},
+			unwantedOutput: []string{"SetRestartPolicy"},
+		},
+		{
+			// A health check probes the running container, so its configuration
+			// error leaves that container's restart policy alone.
+			helperCase:     "invalid-configuration-in-health-check",
+			wantExitCode:   1,
+			wantOutput:     []string{"Failed to load configuration"},
+			unwantedOutput: []string{"SetRestartPolicy"},
+		},
+		{
+			// A host binary has no restart policy, so a configuration error
+			// exits without contacting the Docker daemon.
+			helperCase:     "invalid-configuration-on-host",
+			wantExitCode:   1,
+			wantOutput:     []string{"Failed to load configuration"},
+			unwantedOutput: []string{"SetRestartPolicy"},
+		},
 		{
 			// RunOrchestrator always ends the process, so the restart policy
 			// fallback after it in preRun does not run.
@@ -604,6 +676,10 @@ func TestPreRun_Exit(t *testing.T) {
 				require.True(t, found, "missing %q after the earlier lines in output:\n%s", want, out)
 			}
 
+			for _, unwanted := range tt.unwantedOutput {
+				assert.NotContains(t, string(out), unwanted, "output:\n%s", out)
+			}
+
 			assert.NotContains(t, string(out), "PASS", "the helper must end the process")
 		})
 	}
@@ -617,9 +693,14 @@ func preRunExitHelper(t *testing.T, helperCase string) {
 
 	var (
 		args      []string
+		env       map[string]string
 		detection selfDetection
 		policyErr error
+		clientErr error
 	)
+
+	// inContainer is the detection of a run inside Watchtower's own container.
+	inContainer := selfDetection{mountinfo: mountinfoWithSelf(), marker: true}
 
 	mockClient := mockContainerClient.NewMockClient(t)
 	mockClient.EXPECT().SetRestartPolicy(mock.Anything, mock.Anything, mock.Anything).
@@ -630,9 +711,28 @@ func preRunExitHelper(t *testing.T, helperCase string) {
 		}).Maybe()
 
 	switch helperCase {
+	case "invalid-environment":
+		env = map[string]string{"WATCHTOWER_HTTP_API_RATE_LIMIT": "many"}
+		detection = inContainer
 	case "invalid-log-format":
 		args = []string{"--log-format", "bogus"}
-	case "invalid-configuration":
+		detection = inContainer
+	case "invalid-configuration", "invalid-configuration-without-docker":
+		args = []string{"--rolling-restart", "--monitor-only"}
+		detection = inContainer
+
+		if helperCase == "invalid-configuration-without-docker" {
+			clientErr = errRunTestDocker
+		}
+	case "invalid-log-format-with-host-flag":
+		args = []string{"--host", "tcp://socket-proxy:2375", "--log-format", "bogus"}
+		detection = inContainer
+	case "invalid-configuration-in-health-check":
+		args = []string{"--health-check", "--rolling-restart", "--monitor-only"}
+		detection = inContainer
+	case "unknown-flag", "subcommand-error":
+		detection = inContainer
+	case "invalid-configuration-on-host":
 		args = []string{"--rolling-restart", "--monitor-only"}
 	case "orchestrator-without-settings":
 		args = []string{"--self-update-orchestrator"}
@@ -665,10 +765,44 @@ func preRunExitHelper(t *testing.T, helperCase string) {
 
 	setPreRunState(t, mockClient, detection)
 
+	// The client factory prints the Docker host it connects to and fails with
+	// clientErr when a case sets it.
+	newClient = func(*zerolog.Logger, containerClient.ClientOptions) (containerClient.Client, error) {
+		fmt.Fprintf(os.Stderr, "newClient DOCKER_HOST=%s\n", os.Getenv("DOCKER_HOST"))
+
+		if clientErr != nil {
+			return nil, clientErr
+		}
+
+		return mockClient, nil
+	}
+
 	for _, key := range []string{"WT_ORCHESTRATOR_OLD_ID", "WT_ORCHESTRATOR_NEW_IMAGE", "WT_ORCHESTRATOR_ORIGINAL_NAME"} {
 		t.Setenv(key, "")
 	}
 
-	proc := &process{log: logging.New(os.Stderr, logging.InfoLevel)}
-	proc.preRun(newTestRootCommand(t, args...), nil)
+	// The test command clears the flag environment, so env is set after it.
+	cmd := newTestRootCommand(t, args...)
+
+	for key, value := range env {
+		t.Setenv(key, value)
+	}
+
+	log := logging.New(os.Stderr, logging.InfoLevel)
+
+	switch helperCase {
+	case "unknown-flag":
+		rootCmd.SetArgs([]string{"--not-a-watchtower-flag"})
+		Execute(log)
+
+		return
+	case "subcommand-error":
+		rootCmd.SetArgs([]string{"notify-upgrade", "--not-a-watchtower-flag"})
+		Execute(log)
+
+		return
+	}
+
+	proc := &process{log: log}
+	proc.preRun(cmd, nil)
 }

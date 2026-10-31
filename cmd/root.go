@@ -2,6 +2,7 @@ package cmd
 
 import (
 	"context"
+	"fmt"
 	"io/fs"
 	"os"
 	"os/signal"
@@ -51,6 +52,10 @@ const (
 	// metadata is unreachable. The inspect of the container afterwards bounds
 	// its own retries. In a health check, this timeout bounds them as well.
 	containerLookupTimeout = 5 * time.Second
+
+	// restartsKeptMessage is logged when Watchtower could not disable its own
+	// restart policy before exiting.
+	restartsKeptMessage = "Could not disable Watchtower's restart policy. The runtime may start it again"
 )
 
 var (
@@ -81,8 +86,9 @@ var (
 
 	// currentWatchtowerContainerID stores the current Watchtower container ID.
 	//
-	// It is initialized once in preRun after the client is set up, and used throughout the application
-	// to avoid repeated calls to GetCurrentContainerID. If retrieval fails, it is set to an empty string.
+	// It is detected in preRun after the client is set up. The rest of the application reads it instead of
+	// calling GetCurrentContainerID again. An exit that runs before that detection detects it for itself.
+	// If retrieval fails, it is set to an empty string.
 	currentWatchtowerContainerID types.ContainerID
 
 	// currentWatchtowerContainerUnknown is true when Watchtower runs in a container
@@ -110,8 +116,9 @@ var (
 
 	// newClient is a function variable for creating the Docker client, allowing it to be overridden in tests.
 	//
-	// It is initialized to container.NewClient by default. preRun calls it with the resolved client options,
-	// so tests can substitute a mock client without a Docker daemon.
+	// It is initialized to [containerClient.NewClient] by default. preRun calls it with the resolved client options.
+	// A configuration error at startup in a container calls it with default options so it can disable restarts.
+	// Tests can substitute a mock client without a Docker daemon.
 	newClient = containerClient.NewClient
 
 	// processFs is the filesystem holding the container marker files and the
@@ -141,6 +148,12 @@ var (
 // parsed. It is never stored as a package-level global.
 type process struct {
 	log *zerolog.Logger
+	// healthCheck reports whether this invocation is a health check, which
+	// must not change the container it probes.
+	healthCheck bool
+	// dockerEnvironmentMapped reports whether startup has mapped the Docker
+	// connection flags into the environment.
+	dockerEnvironmentMapped bool
 }
 
 // init registers command-line flags for the root command during package initialization.
@@ -184,8 +197,15 @@ func Execute(log *zerolog.Logger) {
 	rootCmd.PreRun = proc.preRun
 	rootCmd.Run = proc.run
 
-	err := rootCmd.Execute()
+	executed, err := rootCmd.ExecuteC()
 	if err != nil {
+		// The root command's run cannot fail, so its error is a command line
+		// that does not parse, which no restart can clear. A subcommand's
+		// error leaves the restart policy alone.
+		if executed == rootCmd {
+			proc.exitConfigurationError(rootCmd, err, "Failed to execute root command")
+		}
+
 		// Prefer proc.log so post-SetupLogging errors use the configured format/level.
 		proc.log.Fatal().Err(err).Msg("Failed to execute root command")
 	}
@@ -205,10 +225,14 @@ func Execute(log *zerolog.Logger) {
 func (p *process) preRun(cmd *cobra.Command, _ []string) {
 	flagsSet := cmd.PersistentFlags()
 
+	// The health-check flag has no environment variable, so the parsed flag
+	// is its resolved value before anything else can fail.
+	p.healthCheck, _ = flagsSet.GetBool("health-check")
+
 	// Bridge environment values onto unset flags so aliases and logging still see them.
 	err := settings.ApplyEnvToFlags(flagsSet, settings.AllSpecs())
 	if err != nil {
-		p.log.Fatal().Err(err).Msg("Failed to apply environment configuration")
+		p.exitConfigurationError(cmd, err, "Failed to apply environment configuration")
 	}
 
 	// Apply format (and pre-alias level) before ProcessFlagAliases so Fatal paths
@@ -216,7 +240,7 @@ func (p *process) preRun(cmd *cobra.Command, _ []string) {
 	// than zerolog's default JSON encoding on stderr.
 	p.log, err = settings.SetupLogging(p.log, flagsSet)
 	if err != nil {
-		p.log.Fatal().Err(err).Msg("Failed to initialize logging")
+		p.exitConfigurationError(cmd, err, "Failed to initialize logging")
 	}
 
 	// Apply porcelain, interval→schedule, and debug/trace log-level aliases.
@@ -225,7 +249,7 @@ func (p *process) preRun(cmd *cobra.Command, _ []string) {
 	// Re-apply after aliases so debug/trace forced log-level values take effect.
 	p.log, err = settings.SetupLogging(p.log, flagsSet)
 	if err != nil {
-		p.log.Fatal().Err(err).Msg("Failed to initialize logging")
+		p.exitConfigurationError(cmd, err, "Failed to initialize logging")
 	}
 
 	// Expand secrets from files (for example notification URLs and API tokens).
@@ -234,13 +258,15 @@ func (p *process) preRun(cmd *cobra.Command, _ []string) {
 	// Map Docker connection flags into the process environment for the client stack.
 	err = settings.EnvConfig(p.log, cmd)
 	if err != nil {
-		p.log.Fatal().Err(err).Msg("Failed to configure Docker environment")
+		p.exitConfigurationError(cmd, err, "Failed to configure Docker environment")
 	}
+
+	p.dockerEnvironmentMapped = true
 
 	// Load without positional names. run reloads with args for the final filter.
 	appCfg, err = settings.Load(p.log, cmd, nil)
 	if err != nil {
-		p.log.Fatal().Err(err).Msg("Failed to load configuration")
+		p.exitConfigurationError(cmd, err, "Failed to load configuration")
 	}
 
 	p.log.Debug().
@@ -260,7 +286,11 @@ func (p *process) preRun(cmd *cobra.Command, _ []string) {
 
 	clientOpts := appCfg.ClientOptions()
 	clientOpts.RateLimiter = rateLimiter
-	client = newClient(p.log, clientOpts)
+
+	client, err = newClient(p.log, clientOpts)
+	if err != nil {
+		p.log.Fatal().Err(err).Msg("Failed to initialize Docker client")
+	}
 
 	// Check for orchestrator mode early. This is an internal mode where Watchtower
 	// runs as a one-shot orchestrator for self-update.
@@ -269,10 +299,7 @@ func (p *process) preRun(cmd *cobra.Command, _ []string) {
 
 		selfupdate.RunOrchestrator(p.log, context.Background(), client)
 
-		lookupCtx, lookupCancel := context.WithTimeout(context.Background(), containerLookupTimeout)
-		currentWatchtowerContainerID, _ = containerClient.GetCurrentContainerID(p.log, lookupCtx, processFs, client)
-
-		lookupCancel()
+		p.detectCurrentContainerID()
 		p.disableRestarts()
 
 		p.log.Fatal().
@@ -442,8 +469,7 @@ func (p *process) run(command *cobra.Command, args []string) {
 	// Reload configuration with positional names so the filter includes them.
 	loaded, err := settings.Load(p.log, command, args)
 	if err != nil {
-		p.disableRestarts()
-		p.log.Fatal().Err(err).Msg("Failed to load configuration")
+		p.exitConfigurationError(command, err, "Failed to load configuration")
 	}
 
 	appCfg = loaded
@@ -475,8 +501,7 @@ func (p *process) run(command *cobra.Command, args []string) {
 			appCfg.Filter.Scope,
 		)
 		if filterErr != nil {
-			p.disableRestarts()
-			p.log.Fatal().Err(filterErr).Msg("Failed to build container filter")
+			p.exitConfigurationError(command, filterErr, "Failed to build container filter")
 		}
 
 		appCfg.Filter.Predicate = predicate
@@ -498,7 +523,7 @@ func (p *process) run(command *cobra.Command, args []string) {
 		Names:   normalizedContainerNames,
 	})
 	if err != nil {
-		p.log.Fatal().Err(err).Msg("Failed to build run configuration")
+		p.exitConfigurationError(command, err, "Failed to build run configuration")
 	}
 
 	// Warn if HTTP API configuration options are set without an endpoint enabled.
@@ -854,13 +879,19 @@ func (p *process) logNotify(msg string, err error) {
 
 // disableRestarts sets the restart policy of Watchtower's own container to
 // "no", so the runtime does not start Watchtower again after the process ends.
-// It does nothing when Watchtower does not run in a container, or when the
-// policy of its inspected container is already "no".
+// It does nothing outside a container or in a health check. It also does
+// nothing when the policy of the inspected container is already "no".
 //
 // A failure is logged as an error, because the runtime may then start
 // Watchtower again. Exit paths call it before they report the exit, so a
 // notification that is still collecting entries for the exit includes it.
 func (p *process) disableRestarts() {
+	// A health check probes the running container, so it leaves that
+	// container's restart policy alone.
+	if p.healthCheck {
+		return
+	}
+
 	if currentWatchtowerContainer != nil && !currentWatchtowerContainer.RestartsAutomatically() {
 		return
 	}
@@ -877,9 +908,77 @@ func (p *process) disableRestarts() {
 		dockerContainer.RestartPolicy{Name: dockerContainer.RestartPolicyDisabled},
 	)
 	if err != nil {
-		p.log.Error().Err(err).
-			Msg("Could not disable Watchtower's restart policy. The runtime may start it again")
+		p.log.Error().Err(err).Msg(restartsKeptMessage)
 	}
+}
+
+// exitConfigurationError ends the process for a configuration error found at
+// startup.
+//
+// Restarting cannot clear a configuration error, so it first disables the
+// restart policy of Watchtower's own container. A configuration error can
+// come before startup has created the Docker client, so a container creates
+// one for this. A host binary and a health check have no restart policy to
+// change, so they exit without contacting the daemon.
+//
+// Parameters:
+//   - cmd: The command whose flags hold the Docker connection settings.
+//   - err: The configuration error.
+//   - msg: The message logged at fatal level with the error.
+func (p *process) exitConfigurationError(cmd *cobra.Command, err error, msg string) {
+	if client == nil && !p.healthCheck && containerClient.InContainer(processFs) {
+		connectErr := p.connectForRestartPolicy(cmd)
+		if connectErr != nil {
+			p.log.Error().Err(connectErr).Msg(restartsKeptMessage)
+		}
+	}
+
+	if client != nil {
+		p.disableRestarts()
+	}
+
+	p.log.Fatal().Err(err).Msg(msg)
+}
+
+// connectForRestartPolicy creates the Docker client with default options and
+// detects Watchtower's own container ID, so the restart policy can be changed.
+// The options only affect updates, so the client does not depend on the
+// settings that failed. It maps the Docker connection flags into the
+// environment first when startup has not done so yet.
+//
+// Parameters:
+//   - cmd: The command whose flags hold the Docker connection settings.
+//
+// Returns:
+//   - error: Non-nil when the Docker connection settings are invalid or no
+//     client can be created.
+func (p *process) connectForRestartPolicy(cmd *cobra.Command) error {
+	if !p.dockerEnvironmentMapped {
+		err := settings.EnvConfig(p.log, cmd)
+		if err != nil {
+			return fmt.Errorf("configure Docker environment: %w", err)
+		}
+	}
+
+	created, err := newClient(p.log, containerClient.ClientOptions{})
+	if err != nil {
+		return err
+	}
+
+	client = created
+
+	p.detectCurrentContainerID()
+
+	return nil
+}
+
+// detectCurrentContainerID detects the ID of Watchtower's own container for an
+// exit path, waiting at most 5 seconds. A failed detection leaves the ID empty.
+func (p *process) detectCurrentContainerID() {
+	ctx, cancel := context.WithTimeout(context.Background(), containerLookupTimeout)
+	defer cancel()
+
+	currentWatchtowerContainerID, _ = containerClient.GetCurrentContainerID(p.log, ctx, processFs, client)
 }
 
 // awaitDockerClient pauses for one second before Watchtower first lists containers.

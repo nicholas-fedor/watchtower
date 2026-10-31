@@ -1501,8 +1501,9 @@ func TestRootCommand_ReviveStoppedFlagParsing(t *testing.T) {
 // TestDisableRestarts verifies that disableRestarts sets the restart policy of
 // Watchtower's own container to "no" and reports an error only when that
 // fails, since the runtime may then start Watchtower again. A container whose
-// policy is already "no" needs no update. It changes package state, so it does
-// not run in parallel.
+// policy is already "no" needs no update, and a health check never changes the
+// container it probes. It changes package state, so it does not run in
+// parallel.
 func TestDisableRestarts(t *testing.T) {
 	const wantError = "Could not disable Watchtower's restart policy. The runtime may start it again"
 
@@ -1510,15 +1511,17 @@ func TestDisableRestarts(t *testing.T) {
 		name string
 		// current is the inspected Watchtower container, or nil when it was
 		// not inspected.
-		current    types.Container
-		wantUpdate bool
-		updateErr  error
-		wantError  bool
+		current     types.Container
+		healthCheck bool
+		wantUpdate  bool
+		updateErr   error
+		wantError   bool
 	}{
 		{name: "the update succeeds", current: currentWatchtower(), wantUpdate: true},
 		{name: "the update fails", current: currentWatchtower(), wantUpdate: true, updateErr: errRunTestDocker, wantError: true},
 		{name: "the container was not inspected", wantUpdate: true},
 		{name: "the policy is already no", current: currentWatchtowerWithoutRestarts(), wantUpdate: false},
+		{name: "a health check", current: currentWatchtower(), healthCheck: true, wantUpdate: false},
 	}
 
 	for _, tt := range tests {
@@ -1533,7 +1536,7 @@ func TestDisableRestarts(t *testing.T) {
 			setRunState(t, runTestState{client: mockClient, current: tt.current, currentID: "c0c0"})
 
 			log, logOutput := logcapture.New(zerolog.ErrorLevel)
-			(&process{log: log}).disableRestarts()
+			(&process{log: log, healthCheck: tt.healthCheck}).disableRestarts()
 
 			if tt.wantError {
 				assert.Contains(t, logOutput.String(), wantError)
