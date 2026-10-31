@@ -13,7 +13,6 @@ import (
 	"github.com/spf13/cobra"
 
 	containerClient "github.com/nicholas-fedor/watchtower/internal/container/client"
-	"github.com/nicholas-fedor/watchtower/internal/observability/logging"
 	"github.com/nicholas-fedor/watchtower/internal/settings"
 	"github.com/nicholas-fedor/watchtower/pkg/notifications"
 	"github.com/nicholas-fedor/watchtower/pkg/types"
@@ -35,34 +34,45 @@ var (
 	errCloseTempFile = errors.New("failed to close output file")
 )
 
+// notifyUpgradeCmd is the notify-upgrade subcommand. Execute wires its RunE to
+// the process that runs it.
+var notifyUpgradeCmd = &cobra.Command{
+	Use:   "notify-upgrade",
+	Short: "Upgrade legacy notification configuration to shoutrrr URLs",
+	Long:  "Converts legacy Watchtower notification settings into shoutrrr URL format and writes them to a temporary file.",
+	Args:  cobra.NoArgs, // Enforces no positional arguments for this command.
+}
+
 // init registers the notify-upgrade command with the root command.
-// It follows Cobra's best practice of adding subcommands in an init function,
-// avoiding global variables and ensuring proper command hierarchy setup.
 func init() {
-	rootCmd.AddCommand(&cobra.Command{
-		Use:   "notify-upgrade",
-		Short: "Upgrade legacy notification configuration to shoutrrr URLs",
-		Long:  "Converts legacy Watchtower notification settings into shoutrrr URL format and writes them to a temporary file.",
-		Run:   runNotifyUpgrade,
-		Args:  cobra.NoArgs, // Enforces no positional arguments for this command.
-	})
+	rootCmd.AddCommand(notifyUpgradeCmd)
 }
 
 // runNotifyUpgrade executes the notify-upgrade command.
 //
-// A failure is logged with the logger configured from the command's flags.
-// The process then exits with code 1.
+// The process logger is replaced by the logger configured from the command's
+// flags, so Execute reports a failure with it.
 //
 // Parameters:
 //   - cmd: The notify-upgrade command, providing access to parsed flags.
 //   - args: Positional arguments, none for this command.
-func runNotifyUpgrade(cmd *cobra.Command, args []string) {
-	log := logging.New(os.Stderr, logging.InfoLevel)
+//
+// Returns:
+//   - error: An [exitError] when the upgrade fails.
+func (p *process) runNotifyUpgrade(cmd *cobra.Command, args []string) error {
+	// Execute reports the errors returned from here on. Flag and argument
+	// errors come earlier, so Cobra still prints them with the usage text.
+	cmd.SilenceErrors = true
+	cmd.SilenceUsage = true
 
-	log, err := runNotifyUpgradeE(cmd, args, log)
+	var err error
+
+	p.log, err = runNotifyUpgradeE(cmd, args, p.log)
 	if err != nil {
-		log.Fatal().Err(err).Msg("Notification upgrade failed")
+		return &exitError{err: err, msg: "Notification upgrade failed", code: 1}
 	}
+
+	return nil
 }
 
 // runNotifyUpgradeE performs the core logic for the `notify-upgrade` subcommand, converting legacy Watchtower notification

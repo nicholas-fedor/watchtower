@@ -2,6 +2,7 @@ package cmd
 
 import (
 	"context"
+	"errors"
 	"io/fs"
 	"os"
 	"os/signal"
@@ -52,6 +53,10 @@ const (
 	// its own retries. In a health check, this timeout bounds them as well.
 	containerLookupTimeout = 5 * time.Second
 )
+
+// errSupersededInstance ends a Watchtower instance that runs in an old
+// container, which a newer instance has replaced.
+var errSupersededInstance = errors.New("superseded Watchtower instance")
 
 var (
 	// appCfg is the resolved process configuration from settings.Load.
@@ -130,8 +135,8 @@ var (
 
 	// rootCmd represents the root command for the Watchtower CLI, serving as the entry point for all subcommands.
 	//
-	// It defines the base usage string, short and long descriptions, and assigns lifecycle hooks (PreRun and Run)
-	// to manage setup and execution, initialized with default behavior and configured via flags during runtime.
+	// It defines the base usage string and the short and long descriptions. Execute assigns its lifecycle hooks
+	// (PreRunE and RunE).
 	rootCmd = NewRootCommand()
 )
 
@@ -141,6 +146,42 @@ var (
 // parsed. It is never stored as a package-level global.
 type process struct {
 	log *zerolog.Logger
+}
+
+// exitError is an error that ends the process. Execute reports it and exits
+// with its code.
+type exitError struct {
+	// err is the cause of the exit.
+	err error
+	// msg is the static message Execute logs at fatal level with the cause.
+	// Empty means the failure was already reported, so Execute only exits.
+	msg string
+	// code is the process exit code for a failure that was already reported.
+	code int
+}
+
+// Error returns the message followed by the cause. An empty message or a nil
+// cause is left out.
+//
+// Returns:
+//   - string: The message and the cause.
+func (e *exitError) Error() string {
+	switch {
+	case e.msg == "":
+		return e.err.Error()
+	case e.err == nil:
+		return e.msg
+	default:
+		return e.msg + ": " + e.err.Error()
+	}
+}
+
+// Unwrap returns the cause.
+//
+// Returns:
+//   - error: The cause of the exit.
+func (e *exitError) Unwrap() error {
+	return e.err
 }
 
 // init registers command-line flags for the root command during package initialization.
@@ -157,7 +198,7 @@ func init() {
 // It establishes the base usage string ("watchtower"), a short description summarizing its purpose,
 // and a long description with additional context and a project URL.
 //
-// PreRun and Run are wired in Execute with a logger-capturing process instance so the
+// PreRunE and RunE are wired in Execute with a logger-capturing process instance so the
 // composition root can pass *zerolog.Logger without a package-level global.
 //
 // Returns:
@@ -181,13 +222,43 @@ func NewRootCommand() *cobra.Command {
 //   - log: Process logger from main (reconfigured in preRun from --log-format / --log-level).
 func Execute(log *zerolog.Logger) {
 	proc := &process{log: log}
-	rootCmd.PreRun = proc.preRun
-	rootCmd.Run = proc.run
+	rootCmd.PreRunE = proc.preRun
+	rootCmd.RunE = proc.run
+	notifyUpgradeCmd.RunE = proc.runNotifyUpgrade
 
-	err := rootCmd.Execute()
-	if err != nil {
-		// Prefer proc.log so post-SetupLogging errors use the configured format/level.
-		proc.log.Fatal().Err(err).Msg("Failed to execute root command")
+	proc.exit(rootCmd.Execute())
+}
+
+// exit ends the process for an error that a command returned. It does
+// nothing for nil.
+//
+// An [exitError] with a message is logged at fatal level with its cause. One
+// without a message ends the process with its exit code. Any other error, such
+// as a flag that does not parse, is logged as a failed command. Fatal logs exit
+// with code 1. Logs use the logger the command configured from its flags.
+//
+// Parameters:
+//   - err: The error the command returned.
+func (p *process) exit(err error) {
+	if err == nil {
+		return
+	}
+
+	exitErr, ok := errors.AsType[*exitError](err)
+
+	switch {
+	case !ok:
+		p.log.Fatal().Err(err).Msg("Failed to execute root command")
+	case exitErr.msg != "":
+		p.log.Fatal().Err(exitErr.err).Msg(exitErr.msg)
+	default:
+		if exitErr.code != 0 {
+			p.log.Debug().
+				Int("exit_code", exitErr.code).
+				Msg("Exiting with non-zero status")
+		}
+
+		os.Exit(exitErr.code)
 	}
 }
 
@@ -202,13 +273,21 @@ func Execute(log *zerolog.Logger) {
 //   - cmd: The cobra.Command instance being executed, providing access to parsed flags.
 //   - _: A slice of string arguments (unused here, as container names are applied in run when
 //     reloading configuration for filtering).
-func (p *process) preRun(cmd *cobra.Command, _ []string) {
+//
+// Returns:
+//   - error: An [exitError] when Watchtower must not continue.
+func (p *process) preRun(cmd *cobra.Command, _ []string) error {
+	// Execute reports the errors returned from here on. Flag and argument
+	// errors come earlier, so Cobra still prints them with the usage text.
+	cmd.SilenceErrors = true
+	cmd.SilenceUsage = true
+
 	flagsSet := cmd.PersistentFlags()
 
 	// Bridge environment values onto unset flags so aliases and logging still see them.
 	err := settings.ApplyEnvToFlags(flagsSet, settings.AllSpecs())
 	if err != nil {
-		p.log.Fatal().Err(err).Msg("Failed to apply environment configuration")
+		return &exitError{err: err, msg: "Failed to apply environment configuration", code: 1}
 	}
 
 	// Apply format (and pre-alias level) before ProcessFlagAliases so its errors,
@@ -216,37 +295,37 @@ func (p *process) preRun(cmd *cobra.Command, _ []string) {
 	// rather than zerolog's default JSON encoding on stderr.
 	p.log, err = settings.SetupLogging(p.log, flagsSet)
 	if err != nil {
-		p.log.Fatal().Err(err).Msg("Failed to initialize logging")
+		return &exitError{err: err, msg: "Failed to initialize logging", code: 1}
 	}
 
 	// Apply porcelain, interval→schedule, and debug/trace log-level aliases.
 	err = settings.ProcessFlagAliases(p.log, flagsSet)
 	if err != nil {
-		p.log.Fatal().Err(err).Msg("Invalid configuration")
+		return &exitError{err: err, msg: "Invalid configuration", code: 1}
 	}
 
 	// Re-apply after aliases so debug/trace forced log-level values take effect.
 	p.log, err = settings.SetupLogging(p.log, flagsSet)
 	if err != nil {
-		p.log.Fatal().Err(err).Msg("Failed to initialize logging")
+		return &exitError{err: err, msg: "Failed to initialize logging", code: 1}
 	}
 
 	// Expand secrets from files (for example notification URLs and API tokens).
 	err = settings.GetSecretsFromFiles(p.log, cmd)
 	if err != nil {
-		p.log.Fatal().Err(err).Msg("Failed to load secret from file")
+		return &exitError{err: err, msg: "Failed to load secret from file", code: 1}
 	}
 
 	// Map Docker connection flags into the process environment for the client stack.
 	err = settings.EnvConfig(p.log, cmd)
 	if err != nil {
-		p.log.Fatal().Err(err).Msg("Failed to configure Docker environment")
+		return &exitError{err: err, msg: "Failed to configure Docker environment", code: 1}
 	}
 
 	// Load without positional names. run reloads with args for the final filter.
 	appCfg, err = settings.Load(p.log, cmd, nil)
 	if err != nil {
-		p.log.Fatal().Err(err).Msg("Failed to load configuration")
+		return &exitError{err: err, msg: "Failed to load configuration", code: 1}
 	}
 
 	p.log.Debug().
@@ -269,7 +348,7 @@ func (p *process) preRun(cmd *cobra.Command, _ []string) {
 
 	client, err = newClient(p.log, clientOpts)
 	if err != nil {
-		p.log.Fatal().Err(err).Msg("Failed to initialize Docker client")
+		return &exitError{err: err, msg: "Failed to initialize Docker client", code: 1}
 	}
 
 	// Check for orchestrator mode early. This is an internal mode where Watchtower
@@ -341,13 +420,10 @@ func (p *process) preRun(cmd *cobra.Command, _ []string) {
 
 	// Check if this is an old Watchtower container that should not run continuously.
 	// A run-once instance ends after its run, so only a continuous one exits here.
-	// exitInvalidWatchtowerRestart calls os.Exit. Keep it in a helper so preRun
-	// defers (for example cancel) are not paired with os.Exit in this function
-	// (gocritic exitAfterDefer).
 	if !appCfg.Mode.RunOnce && container.IsSuperseded(currentWatchtowerContainer) {
-		// Cancel preRun lookup context before process exit.
-		cancel()
-		p.exitInvalidWatchtowerRestart()
+		p.stopInvalidWatchtowerRestart()
+
+		return &exitError{err: errSupersededInstance, msg: "", code: 0}
 	}
 
 	// Set up the notification client from loaded process config (appCfg.Notify).
@@ -361,8 +437,12 @@ func (p *process) preRun(cmd *cobra.Command, _ []string) {
 	// another Watchtower instance, so Watchtower exits instead. A health check
 	// runs no updates, so it continues.
 	if inspectErr != nil && appCfg.Filter.Scope == "" && !appCfg.Mode.HealthCheck {
-		cancel()
-		p.exitUnknownScope(inspectErr)
+		// Disable restarts first, so the runtime does not start Watchtower again.
+		p.disableRestarts()
+		p.logNotify("Could not inspect Watchtower's own container to read its scope label. "+
+			"Exiting rather than running without a scope", inspectErr)
+
+		return &exitError{err: inspectErr, msg: "", code: 1}
 	}
 
 	if currentWatchtowerContainerUnknown {
@@ -378,16 +458,15 @@ func (p *process) preRun(cmd *cobra.Command, _ []string) {
 
 	// Log deprecated notification configuration options, if set.
 	notifications.LogLegacyDeprecationWarnings(p.log, appCfg.Notify.LegacyTypes)
+
+	return nil
 }
 
-// exitInvalidWatchtowerRestart recovers any orphaned instance, sets the restart
-// policy of the current Watchtower container to "no", and terminates the
-// process. The invalid restart check that leads here requires a current
-// container.
-//
-// Kept separate from preRun so os.Exit is not paired with preRun's deferred context
-// cancels (gocritic exitAfterDefer).
-func (p *process) exitInvalidWatchtowerRestart() {
+// stopInvalidWatchtowerRestart recovers any orphaned instance and sets the
+// restart policy of the current Watchtower container to "no", so the old
+// instance can exit. The invalid restart check that leads here requires a
+// current container.
+func (p *process) stopInvalidWatchtowerRestart() {
 	p.log.Info().
 		Msg("Detected invalid restart of old Watchtower container, stopping Watchtower container now")
 
@@ -413,24 +492,6 @@ func (p *process) exitInvalidWatchtowerRestart() {
 
 	recoverCancel()
 	p.disableRestarts()
-	os.Exit(0)
-}
-
-// exitUnknownScope ends the process with an error, because Watchtower could
-// not read the scope label of its own container and must not run without it.
-// It first disables the container's restarts, so the runtime does not start it
-// again, and then sends err as a notification.
-//
-// Kept separate from preRun so os.Exit is not paired with preRun's deferred
-// context cancels (gocritic exitAfterDefer).
-//
-// Parameters:
-//   - err: The error from the last inspect of the current container.
-func (p *process) exitUnknownScope(err error) {
-	p.disableRestarts()
-	p.logNotify("Could not inspect Watchtower's own container to read its scope label. "+
-		"Exiting rather than running without a scope", err)
-	os.Exit(1)
 }
 
 // run executes the main Watchtower logic based on parsed command-line flags.
@@ -438,13 +499,15 @@ func (p *process) exitUnknownScope(err error) {
 // It reloads process configuration with positional container names, derives the effective
 // operational scope (including scope persistence across self-updates), handles health-check
 // early exit, builds the HTTP API RunConfig from appCfg, and delegates to runMain for core
-// execution, exiting with a status code based on the outcome (0 for success, non-zero for failure).
-// It bridges configuration loading and the application's primary workflow.
+// execution. It bridges configuration loading and the application's primary workflow.
 //
 // Parameters:
 //   - command: The cobra.Command instance being executed, providing access to parsed flags.
 //   - args: A slice of container names provided as positional arguments, used for filtering.
-func (p *process) run(command *cobra.Command, args []string) {
+//
+// Returns:
+//   - error: An [exitError] when Watchtower cannot continue or its run failed.
+func (p *process) run(command *cobra.Command, args []string) error {
 	p.log.Debug().
 		Strs("positional_args", args).
 		Msg("Received positional arguments for container filtering")
@@ -453,7 +516,8 @@ func (p *process) run(command *cobra.Command, args []string) {
 	loaded, err := settings.Load(p.log, command, args)
 	if err != nil {
 		p.disableRestarts()
-		p.log.Fatal().Err(err).Msg("Failed to load configuration")
+
+		return &exitError{err: err, msg: "Failed to load configuration", code: 1}
 	}
 
 	appCfg = loaded
@@ -486,7 +550,8 @@ func (p *process) run(command *cobra.Command, args []string) {
 		)
 		if filterErr != nil {
 			p.disableRestarts()
-			p.log.Fatal().Err(filterErr).Msg("Failed to build container filter")
+
+			return &exitError{err: filterErr, msg: "Failed to build container filter", code: 1}
 		}
 
 		appCfg.Filter.Predicate = predicate
@@ -496,11 +561,15 @@ func (p *process) run(command *cobra.Command, args []string) {
 	if appCfg.Mode.HealthCheck {
 		if os.Getpid() == 1 {
 			time.Sleep(1 * time.Second)
-			p.log.Fatal().
-				Msg("The health check flag should never be passed to the main watchtower container process")
+
+			return &exitError{
+				err:  nil,
+				msg:  "The health check flag should never be passed to the main watchtower container process",
+				code: 1,
+			}
 		}
 
-		return
+		return nil
 	}
 
 	cfg, err := appCfg.BuildRunConfig(settings.RunConfigInput{
@@ -508,7 +577,7 @@ func (p *process) run(command *cobra.Command, args []string) {
 		Names:   normalizedContainerNames,
 	})
 	if err != nil {
-		p.log.Fatal().Err(err).Msg("Failed to build run configuration")
+		return &exitError{err: err, msg: "Failed to build run configuration", code: 1}
 	}
 
 	// Warn if HTTP API configuration options are set without an endpoint enabled.
@@ -517,14 +586,7 @@ func (p *process) run(command *cobra.Command, args []string) {
 			Msg("HTTP API configuration options are set, but no endpoints are enabled.")
 	}
 
-	// Execute core logic and exit with the returned status code (0 for success, 1 for failure).
-	exitCode := p.runMain(cfg)
-	if exitCode != 0 {
-		p.log.Debug().
-			Int("exit_code", exitCode).
-			Msg("Exiting with non-zero status")
-		os.Exit(exitCode)
-	}
+	return p.runMain(cfg)
 }
 
 // runMain contains the core Watchtower logic after early exits are handled.
@@ -539,21 +601,12 @@ func (p *process) run(command *cobra.Command, args []string) {
 //   - cfg: The RunConfig struct containing filter, API, and mode parameters for this execution.
 //
 // Returns:
-//   - int: An exit code (0 for success, 1 for failure) used to terminate the program.
-func (p *process) runMain(cfg types.RunConfig) int {
+//   - error: An [exitError] for a failure that was already logged and notified.
+func (p *process) runMain(cfg types.RunConfig) error {
 	// Log the container names being processed for debugging visibility.
 	p.log.Debug().
 		Strs("container_names", cfg.Names).
 		Msg("Processing specified containers")
-
-	// Validate flag compatibility to prevent conflicting operational modes.
-	if appCfg.Update.RollingRestart && appCfg.Update.MonitorOnly {
-		p.disableRestarts()
-		p.log.Fatal().
-			Bool("rolling_restart", appCfg.Update.RollingRestart).
-			Bool("monitor_only", appCfg.Update.MonitorOnly).
-			Msg("Incompatible flags: rolling restarts and monitor-only")
-	}
 
 	// Give a self-updated instance a moment before it lists its predecessors.
 	awaitDockerClient(p.log)
@@ -631,7 +684,7 @@ func (p *process) runMain(cfg types.RunConfig) int {
 			p.disableRestarts()
 			p.logNotify("Rolling restart compatibility validation failed", err)
 
-			return 1 // Exit immediately after logging failure
+			return &exitError{err: err, msg: "", code: 1}
 		}
 	}
 
@@ -666,7 +719,7 @@ func (p *process) runMain(cfg types.RunConfig) int {
 		p.disableRestarts()
 		notifier.Close()
 
-		return 0 // Exit after successful execution.
+		return nil
 	}
 
 	// Check for and cleanup old Watchtower containers within scope.
@@ -807,7 +860,7 @@ func (p *process) runMain(cfg types.RunConfig) int {
 		p.disableRestarts()
 		p.logNotify("API setup failed", err)
 
-		return 1 // Exit while indicating failure.
+		return &exitError{err: err, msg: "", code: 1}
 	}
 
 	// Schedule and execute periodic updates, handling errors or shutdown.
@@ -838,10 +891,10 @@ func (p *process) runMain(cfg types.RunConfig) int {
 		p.disableRestarts()
 		p.logNotify("Scheduled upgrades failed", err)
 
-		return 1 // Exit while indicating failure.
+		return &exitError{err: err, msg: "", code: 1}
 	}
 
-	return 0 // Default to success if execution completes without errors.
+	return nil
 }
 
 // logNotify logs an error message and ensures notifications are sent before returning control.
