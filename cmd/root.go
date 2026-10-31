@@ -203,6 +203,10 @@ func Execute(log *zerolog.Logger) {
 		// that does not parse, which no restart can clear. A subcommand's
 		// error leaves the restart policy alone.
 		if executed == rootCmd {
+			// preRun has not run, so it has not recorded the health-check flag
+			// yet. Parsing stops at the first bad flag, so the flag is set when
+			// it comes before that one.
+			proc.healthCheck, _ = rootCmd.PersistentFlags().GetBool("health-check")
 			proc.exitConfigurationError(rootCmd, err, "Failed to execute root command")
 		}
 

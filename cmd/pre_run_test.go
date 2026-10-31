@@ -577,6 +577,14 @@ func TestPreRun_Exit(t *testing.T) {
 			wantOutput:   []string{"SetRestartPolicy cccccccccccc no", "Failed to execute root command"},
 		},
 		{
+			// A health check whose command line does not parse still leaves
+			// the restart policy of the container it probes alone.
+			helperCase:     "unknown-flag-in-health-check",
+			wantExitCode:   1,
+			wantOutput:     []string{"Failed to execute root command"},
+			unwantedOutput: []string{"SetRestartPolicy"},
+		},
+		{
 			// A subcommand such as notify-upgrade can run inside the main
 			// container, so its failure leaves that container's restarts alone.
 			helperCase:     "subcommand-error",
@@ -730,7 +738,7 @@ func preRunExitHelper(t *testing.T, helperCase string) {
 	case "invalid-configuration-in-health-check":
 		args = []string{"--health-check", "--rolling-restart", "--monitor-only"}
 		detection = inContainer
-	case "unknown-flag", "subcommand-error":
+	case "unknown-flag", "unknown-flag-in-health-check", "subcommand-error":
 		detection = inContainer
 	case "invalid-configuration-on-host":
 		args = []string{"--rolling-restart", "--monitor-only"}
@@ -793,6 +801,11 @@ func preRunExitHelper(t *testing.T, helperCase string) {
 	switch helperCase {
 	case "unknown-flag":
 		rootCmd.SetArgs([]string{"--not-a-watchtower-flag"})
+		Execute(log)
+
+		return
+	case "unknown-flag-in-health-check":
+		rootCmd.SetArgs([]string{"--health-check", "--not-a-watchtower-flag"})
 		Execute(log)
 
 		return
