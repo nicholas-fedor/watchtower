@@ -14,6 +14,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Exit with code 1 when the upgrade fails by @nicholas-fedor in [#3330](https://github.com/nicholas-fedor/watchtower/pull/3330)
 - Reject negative duration settings at startup by @nicholas-fedor in [#3324](https://github.com/nicholas-fedor/watchtower/pull/3324)
 - Warn once for an invalid container label by @nicholas-fedor in [#3312](https://github.com/nicholas-fedor/watchtower/pull/3312)
 - Warn once for an invalid Git label by @nicholas-fedor in [#3304](https://github.com/nicholas-fedor/watchtower/pull/3304)
