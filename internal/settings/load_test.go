@@ -150,11 +150,49 @@ func TestLoad_InvalidFilterLabel(t *testing.T) {
 	assert.ErrorContains(t, err, "build filter:")
 }
 
-func TestLoad_NegativeStopTimeout(t *testing.T) {
-	_, _, cmd := bindLoad(t, "--stop-timeout", "-1s")
+// TestLoad_NegativeDurations verifies that a negative value for any duration
+// setting stops Load with an error naming the setting. The value comes from a
+// flag or an environment variable. Environment values cover both a unit
+// suffix and a bare number of seconds. The test runs sequentially because the
+// environment cases set variables.
+func TestLoad_NegativeDurations(t *testing.T) {
+	tests := []struct {
+		name    string
+		setting string
+		args    []string
+		env     map[string]string
+	}{
+		{name: "stop-timeout flag", setting: "stop-timeout", args: []string{"--stop-timeout", "-1s"}},
+		{
+			name:    "stop-timeout env in bare seconds",
+			setting: "stop-timeout",
+			env:     map[string]string{"WATCHTOWER_TIMEOUT": "-10"},
+		},
+		{name: "git-timeout flag", setting: "git-timeout", args: []string{"--git-timeout", "-1m"}},
+		{
+			name:    "git-timeout env",
+			setting: "git-timeout",
+			env:     map[string]string{"WATCHTOWER_GIT_TIMEOUT": "-30s"},
+		},
+		{
+			name:    "http-api-check-timeout flag",
+			setting: "http-api-check-timeout",
+			args:    []string{"--http-api-check-timeout", "-5m"},
+		},
+		{
+			name:    "http-api-update-timeout env in bare seconds",
+			setting: "http-api-update-timeout",
+			env:     map[string]string{"WATCHTOWER_HTTP_API_UPDATE_TIMEOUT": "-600"},
+		},
+	}
 
-	_, err := Load(newNopLogger(), cmd, nil)
-	require.ErrorIs(t, err, errNegativeStopTimeout)
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			_, err := loadWithEnv(t, tt.env, tt.args...)
+			require.ErrorIs(t, err, errNegativeDurationSetting)
+			assert.ErrorContains(t, err, tt.setting+" must be non-negative, got -")
+		})
+	}
 }
 
 func TestLoad_InvalidAndNegativeCooldown(t *testing.T) {
@@ -258,12 +296,6 @@ func TestLoadUpdate(t *testing.T) {
 		assert.Equal(t, 500*time.Millisecond, got.StopTimeout)
 	})
 
-	t.Run("negative timeout", func(t *testing.T) {
-		vCfg, flagSet, _ := bindLoad(t, "--stop-timeout", "-5s")
-		_, err := loadUpdate(newNopLogger(), vCfg, flagSet)
-		require.ErrorIs(t, err, errNegativeStopTimeout)
-	})
-
 	t.Run("invalid cooldown", func(t *testing.T) {
 		vCfg, flagSet, _ := bindLoad(t, "--cooldown-delay", "nope")
 		_, err := loadUpdate(newNopLogger(), vCfg, flagSet)
@@ -272,8 +304,7 @@ func TestLoadUpdate(t *testing.T) {
 	})
 
 	t.Run("negative cooldown", func(t *testing.T) {
-		// units.ParseDuration rejects a leading '-' before loadUpdate can return
-		// errNegativeCooldownDelay.
+		// units.ParseDuration rejects a leading '-'.
 		vCfg, flagSet, _ := bindLoad(t, "--cooldown-delay", "-2d")
 		_, err := loadUpdate(newNopLogger(), vCfg, flagSet)
 		require.Error(t, err)
@@ -398,7 +429,8 @@ func TestLoadAPI(t *testing.T) {
 			"--http-api-check-timeout", "5s", "--http-api-update-timeout", "10s",
 		)
 
-		got := loadAPI(vCfg, flagSet)
+		got, err := loadAPI(vCfg, flagSet)
+		require.NoError(t, err)
 		assert.Equal(t, []string{"health", "update"}, got.Endpoints)
 		assert.True(t, got.LegacyUpdate)
 		assert.True(t, got.LegacyMetrics)
@@ -426,7 +458,8 @@ func TestLoadAPI(t *testing.T) {
 	t.Run("unchanged flags", func(t *testing.T) {
 		vCfg, flagSet, _ := bindLoad(t)
 
-		got := loadAPI(vCfg, flagSet)
+		got, err := loadAPI(vCfg, flagSet)
+		require.NoError(t, err)
 		assert.False(t, got.HostChanged)
 		assert.False(t, got.PortChanged)
 		assert.False(t, got.RateLimitChanged)

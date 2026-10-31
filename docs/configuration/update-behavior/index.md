@@ -122,7 +122,7 @@ Environment Variable: WATCHTOWER_REMOVE_VOLUMES
 
 ## Container Stop Timeout
 
-Sets the timeout (e.g., `30s`) before forcibly stopping a container during updates.
+Sets the timeout (e.g., `30s`) before forcibly stopping a container during updates. Watchtower exits at startup if the value is negative.
 
 ```text
             Argument: --stop-timeout

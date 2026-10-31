@@ -127,7 +127,7 @@ Environment Variable: WATCHTOWER_HTTP_API_RATE_LIMIT
 
 ## HTTP API Check Timeout
 
-Sets the maximum duration for the `/v1/check` API endpoint.
+Sets the maximum duration for the `/v1/check` API endpoint. Watchtower exits at startup if the value is negative.
 
 ```text
             Argument: --http-api-check-timeout
@@ -142,7 +142,7 @@ Environment Variable: WATCHTOWER_HTTP_API_CHECK_TIMEOUT
 
 ## HTTP API Update Timeout
 
-Sets the maximum duration for the `/v1/update` API endpoint.
+Sets the maximum duration for the `/v1/update` API endpoint. Watchtower exits at startup if the value is negative.
 
 ```text
             Argument: --http-api-update-timeout

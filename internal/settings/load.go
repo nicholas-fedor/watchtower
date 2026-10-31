@@ -35,10 +35,6 @@ import (
 const diskSpacePercentBase = 100
 
 var (
-	// errNegativeStopTimeout indicates stop-timeout was set to a negative duration.
-	errNegativeStopTimeout = errors.New("stop-timeout must be non-negative")
-	// errNegativeCooldownDelay indicates cooldown-delay was set to a negative duration.
-	errNegativeCooldownDelay = errors.New("cooldown-delay must be non-negative")
 	// errRollingRestartWithMonitorOnly indicates incompatible rolling-restart and monitor-only flags.
 	errRollingRestartWithMonitorOnly = errors.New(
 		"rolling-restart and monitor-only cannot both be enabled",
@@ -106,7 +102,12 @@ func Load(log *zerolog.Logger, cmd *cobra.Command, args []string) (Config, error
 	}
 
 	cfg.Registry = loadRegistry(vCfg)
-	cfg.API = loadAPI(vCfg, flagSet)
+
+	cfg.API, err = loadAPI(vCfg, flagSet)
+	if err != nil {
+		return Config{}, err
+	}
+
 	cfg.Notify = loadNotify(vCfg, flagSet)
 	cfg.Logging = loadLogging(vCfg, flagSet)
 
@@ -174,10 +175,9 @@ func loadMode(vCfg *viper.Viper) mode.Mode {
 
 // loadUpdate reads update policy settings from Viper.
 func loadUpdate(log *zerolog.Logger, vCfg *viper.Viper, flagSet *pflag.FlagSet) (update.Update, error) {
-	stopTimeout := durationValue(vCfg, flagSet, "stop-timeout", []string{"WATCHTOWER_TIMEOUT"})
-
-	if stopTimeout < 0 {
-		return update.Update{}, errNegativeStopTimeout
+	stopTimeout, err := durationValue(vCfg, flagSet, "stop-timeout", []string{"WATCHTOWER_TIMEOUT"})
+	if err != nil {
+		return update.Update{}, err
 	}
 
 	if stopTimeout > 0 && stopTimeout < time.Second {
@@ -194,10 +194,6 @@ func loadUpdate(log *zerolog.Logger, vCfg *viper.Viper, flagSet *pflag.FlagSet) 
 		parsed, err := units.ParseDuration(cooldownStr)
 		if err != nil {
 			return update.Update{}, fmt.Errorf("cooldown-delay: %w", err)
-		}
-
-		if parsed < 0 {
-			return update.Update{}, errNegativeCooldownDelay
 		}
 
 		cooldown = parsed
@@ -436,7 +432,23 @@ func loadRegistry(vCfg *viper.Viper) registry.Registry {
 }
 
 // loadAPI reads HTTP API settings from Viper.
-func loadAPI(vCfg *viper.Viper, flagSet *pflag.FlagSet) api.API {
+func loadAPI(vCfg *viper.Viper, flagSet *pflag.FlagSet) (api.API, error) {
+	checkTimeout, err := durationValue(
+		vCfg, flagSet, "http-api-check-timeout",
+		[]string{"WATCHTOWER_HTTP_API_CHECK_TIMEOUT"},
+	)
+	if err != nil {
+		return api.API{}, err
+	}
+
+	updateTimeout, err := durationValue(
+		vCfg, flagSet, "http-api-update-timeout",
+		[]string{"WATCHTOWER_HTTP_API_UPDATE_TIMEOUT"},
+	)
+	if err != nil {
+		return api.API{}, err
+	}
+
 	return api.API{
 		Endpoints: stringSliceValue(
 			vCfg, flagSet, "http-api-endpoints",
@@ -468,17 +480,11 @@ func loadAPI(vCfg *viper.Viper, flagSet *pflag.FlagSet) api.API {
 			[]string{"WATCHTOWER_HTTP_API_CORS_ORIGINS"},
 			spec.ListCommaOrSpace,
 		),
-		CheckTimeout: durationValue(
-			vCfg, flagSet, "http-api-check-timeout",
-			[]string{"WATCHTOWER_HTTP_API_CHECK_TIMEOUT"},
-		),
-		CheckTimeoutChanged: flagChanged(flagSet, "http-api-check-timeout"),
-		UpdateTimeout: durationValue(
-			vCfg, flagSet, "http-api-update-timeout",
-			[]string{"WATCHTOWER_HTTP_API_UPDATE_TIMEOUT"},
-		),
+		CheckTimeout:         checkTimeout,
+		CheckTimeoutChanged:  flagChanged(flagSet, "http-api-check-timeout"),
+		UpdateTimeout:        updateTimeout,
 		UpdateTimeoutChanged: flagChanged(flagSet, "http-api-update-timeout"),
-	}
+	}, nil
 }
 
 // loadNotify reads notification settings from Viper.
@@ -576,10 +582,13 @@ func loadGit(vCfg *viper.Viper, flagSet *pflag.FlagSet) (gitConfig.Git, error) {
 		return gitConfig.Git{}, fmt.Errorf("git-image: %w", err)
 	}
 
-	timeout := durationValue(
+	timeout, err := durationValue(
 		vCfg, flagSet, "git-timeout",
 		[]string{"WATCHTOWER_GIT_TIMEOUT"},
 	)
+	if err != nil {
+		return gitConfig.Git{}, err
+	}
 
 	caBundle, err := readOptionalFile(vCfg.GetString("git-ca-bundle"))
 	if err != nil {

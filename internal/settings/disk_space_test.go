@@ -1,14 +1,10 @@
 package settings
 
 import (
-	"io"
 	"testing"
 
-	"github.com/spf13/cobra"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-
-	"github.com/nicholas-fedor/watchtower/internal/observability/logging"
 )
 
 func TestLoad_DiskSpaceThresholds(t *testing.T) {
@@ -107,7 +103,7 @@ func TestLoad_DiskSpaceValidation(t *testing.T) {
 
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
-			_, err := loadDiskSpaceEnv(t, tc.env)
+			_, err := loadWithEnv(t, tc.env)
 			require.Error(t, err)
 			assert.ErrorIs(t, err, tc.want)
 		})
@@ -120,7 +116,7 @@ func TestLoad_DiskSpaceValidation(t *testing.T) {
 func TestLoad_DiskSpaceWarnPercentFormat(t *testing.T) {
 	for _, pct := range []string{"NaN%", "Inf%", "8e1%", "+80%", "0x50p0%", "80.5.1%"} {
 		t.Run(pct, func(t *testing.T) {
-			_, err := loadDiskSpaceEnv(t, map[string]string{
+			_, err := loadWithEnv(t, map[string]string{
 				"WATCHTOWER_DISK_SPACE_MAX":  "10GB",
 				"WATCHTOWER_DISK_SPACE_WARN": pct,
 			})
@@ -133,36 +129,4 @@ func TestLoad_DiskSpaceWarnPercentFormat(t *testing.T) {
 		"WATCHTOWER_DISK_SPACE_WARN": "62.5%",
 	})
 	assert.Equal(t, int64(6_250_000_000), cfg.Update.DiskSpaceWarnBytes)
-}
-
-// loadDiskSpaceEnv loads the configuration from a command registered with
-// every flag and the given environment.
-//
-// Parameters:
-//   - t: Test that owns the environment.
-//   - env: Environment variables to set.
-//
-// Returns:
-//   - Config: Loaded configuration.
-//   - error: The error Load returned.
-func loadDiskSpaceEnv(t *testing.T, env map[string]string) (Config, error) {
-	t.Helper()
-
-	for k, v := range env {
-		t.Setenv(k, v)
-	}
-
-	cmd := &cobra.Command{Use: "watchtower"}
-
-	RegisterAll(cmd)
-	require.NoError(t, cmd.ParseFlags(nil))
-
-	flagSet := cmd.PersistentFlags()
-	require.NoError(t, ApplyEnvToFlags(flagSet, AllSpecs()))
-
-	log := logging.New(io.Discard, logging.InfoLevel)
-	ProcessFlagAliases(log, flagSet)
-	GetSecretsFromFiles(log, cmd)
-
-	return Load(newTestLogger(t), cmd, nil)
 }

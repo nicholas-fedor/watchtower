@@ -105,7 +105,7 @@ Environment Variable: WATCHTOWER_GIT_SSH_KNOWN_HOSTS
 
 ## Git Timeout
 
-Timeout for Git network operations (for example `30s` or `1m`).
+Timeout for Git network operations (for example `30s` or `1m`). Watchtower exits at startup if the value is negative.
 
 ```text
             Argument: --git-timeout
