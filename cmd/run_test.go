@@ -231,7 +231,7 @@ func runUntilCanceled(t *testing.T, args ...string) {
 		done := make(chan struct{})
 
 		go func() {
-			newRunProcess().run(cmd, nil)
+			assert.NoError(t, newRunProcess().run(cmd, nil))
 			close(done)
 		}()
 
@@ -295,7 +295,7 @@ func TestRun_RunOnce(t *testing.T) {
 
 			setRunState(t, state)
 
-			newRunProcess().run(newTestRootCommand(t, "--run-once"), nil)
+			require.NoError(t, newRunProcess().run(newTestRootCommand(t, "--run-once"), nil))
 
 			assert.Equal(t, tt.want, runCalls(mockClient))
 		})
@@ -541,7 +541,7 @@ func TestRun_WaitsForAPIDrain(t *testing.T) {
 	go func() {
 		defer close(done)
 
-		newRunProcess().run(cmd, nil)
+		assert.NoError(t, newRunProcess().run(cmd, nil))
 	}()
 
 	// Stop run before setRunState restores the package state it reads, so a
@@ -626,7 +626,7 @@ func TestRun_HealthCheck(t *testing.T) {
 	mockClient := mockContainerClient.NewMockClient(t)
 	setRunState(t, runTestState{client: mockClient})
 
-	newRunProcess().run(newTestRootCommand(t, "--health-check"), nil)
+	require.NoError(t, newRunProcess().run(newTestRootCommand(t, "--health-check"), nil))
 
 	assert.Empty(t, runCalls(mockClient))
 }
@@ -712,7 +712,7 @@ func runExitHelper(t *testing.T, helperCase string) {
 	setRunState(t, runTestState{client: mockClient, current: current, currentID: current.ID()})
 
 	proc := &process{log: logging.New(os.Stderr, logging.InfoLevel)}
-	proc.run(newTestRootCommand(t, args...), nil)
+	proc.exit(proc.run(newTestRootCommand(t, args...), nil))
 }
 
 // TestRun_OldInstanceStops verifies that continuous mode stops on its own
@@ -746,7 +746,7 @@ func TestRun_OldInstanceStops(t *testing.T) {
 		done := make(chan struct{})
 
 		go func() {
-			newRunProcess().run(cmd, nil)
+			assert.NoError(t, newRunProcess().run(cmd, nil))
 			close(done)
 		}()
 

@@ -29,8 +29,9 @@ var labelPattern = regexp.MustCompile(`^com\.centurylinklabs\.watchtower\.[a-z0-
 // renderHelp returns the help output of cmd as users see it from --help.
 //
 // It reproduces what Cobra and Execute set up before running: the default help
-// and completion subcommands, the --help flag, and a Run handler on the root
-// command, which makes Cobra print the "[flags]" usage line.
+// and completion subcommands, the --help flag, and a RunE handler on the root
+// command and on notify-upgrade. With a handler, Cobra prints the "[flags]"
+// usage line and lists notify-upgrade among the available commands.
 func renderHelp(t *testing.T, root, cmd *cobra.Command) []byte {
 	t.Helper()
 
@@ -38,10 +39,12 @@ func renderHelp(t *testing.T, root, cmd *cobra.Command) []byte {
 	root.InitDefaultCompletionCmd()
 	cmd.InitDefaultHelpFlag()
 
-	if root.Run == nil {
-		root.Run = func(*cobra.Command, []string) {}
+	for _, c := range append([]*cobra.Command{root}, root.Commands()...) {
+		if !c.Runnable() {
+			c.RunE = func(*cobra.Command, []string) error { return nil }
 
-		t.Cleanup(func() { root.Run = nil })
+			t.Cleanup(func() { c.RunE = nil })
+		}
 	}
 
 	var out bytes.Buffer

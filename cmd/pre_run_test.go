@@ -301,7 +301,7 @@ func TestPreRun_SelfDetection(t *testing.T) {
 			readStderr := captureStderr(t)
 			args := slices.Concat(tt.args, []string{"--log-level", "warn", "--log-format", "logfmt"})
 
-			newRunProcess().preRun(newTestRootCommand(t, args...), nil)
+			require.NoError(t, newRunProcess().preRun(newTestRootCommand(t, args...), nil))
 
 			logOutput := readStderr()
 			if tt.wantWarning == "" {
@@ -362,12 +362,12 @@ func containerName(c types.Container) string {
 func TestPreRun_Configuration(t *testing.T) {
 	setPreRunState(t, mockContainerClient.NewMockClient(t), selfDetection{})
 
-	newRunProcess().preRun(newTestRootCommand(t,
+	require.NoError(t, newRunProcess().preRun(newTestRootCommand(t,
 		"--scope", "prod",
 		"--host", "tcp://docker.example.com:2376",
 		"--tlsverify",
 		"--api-version", "1.47",
-	), nil)
+	), nil))
 
 	assert.Equal(t, "prod", appCfg.Filter.Scope)
 	// With TLS verification enabled, a tcp:// host is exported as https://.
@@ -441,7 +441,7 @@ func TestPreRun_RegistryTLSSettings(t *testing.T) {
 				t.Setenv(key, value)
 			}
 
-			newRunProcess().preRun(cmd, nil)
+			require.NoError(t, newRunProcess().preRun(cmd, nil))
 
 			assert.Equal(t, tt.wantSkip, clientOptions.Registry.TLSSkip)
 			assert.Equal(t, tt.wantMinVersion, clientOptions.Registry.TLSMinVersion)
@@ -503,7 +503,7 @@ func TestPreRun_PorcelainKeepsExplicitSettings(t *testing.T) {
 				t.Setenv(key, value)
 			}
 
-			newRunProcess().preRun(cmd, nil)
+			require.NoError(t, newRunProcess().preRun(cmd, nil))
 
 			assert.Equal(t, tt.wantTemplate, appCfg.Notify.Template)
 			assert.Equal(t, tt.wantReport, appCfg.Notify.Report)
@@ -686,5 +686,5 @@ func preRunExitHelper(t *testing.T, helperCase string) {
 	}
 
 	proc := &process{log: logging.New(os.Stderr, logging.InfoLevel)}
-	proc.preRun(newTestRootCommand(t, args...), nil)
+	proc.exit(proc.preRun(newTestRootCommand(t, args...), nil))
 }

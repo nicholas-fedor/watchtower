@@ -1,6 +1,7 @@
 package cmd
 
 import (
+	"bytes"
 	"context"
 	"errors"
 	"fmt"
@@ -1357,6 +1358,106 @@ func TestRootCommand_FlagParsing(t *testing.T) {
 			} else {
 				assert.NoError(t, err)
 			}
+		})
+	}
+}
+
+// TestCommands_ErrorOutput verifies what Cobra prints when a command fails. A
+// flag or argument that does not parse is printed with the usage text, while
+// an error the command returns is left to Execute to report.
+func TestCommands_ErrorOutput(t *testing.T) {
+	tests := []struct {
+		name string
+		args []string
+		// wantOutput lists text Cobra prints. Empty means it prints nothing.
+		wantOutput []string
+		// wantExitError reports whether the command returns an exitError.
+		wantExitError bool
+	}{
+		{
+			name:       "unknown flag",
+			args:       []string{"--bogus"},
+			wantOutput: []string{"Error: unknown flag: --bogus", "Usage:"},
+		},
+		{
+			name:          "root command failure",
+			args:          []string{"--log-format", "bogus"},
+			wantExitError: true,
+		},
+		{
+			name:       "notify-upgrade argument",
+			args:       []string{"notify-upgrade", "extra"},
+			wantOutput: []string{`Error: unknown command "extra" for "watchtower notify-upgrade"`, "Usage:"},
+		},
+		{
+			name:          "notify-upgrade failure",
+			args:          []string{"notify-upgrade", "--log-format", "bogus"},
+			wantExitError: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			unsetFlagEnv(t)
+
+			proc := newRunProcess()
+
+			root := NewRootCommand()
+			settings.RegisterAll(root)
+			root.PreRunE = proc.preRun
+			root.RunE = proc.run
+			root.AddCommand(&cobra.Command{
+				Use:  "notify-upgrade",
+				Args: cobra.NoArgs,
+				RunE: proc.runNotifyUpgrade,
+			})
+
+			var out bytes.Buffer
+
+			root.SetOut(&out)
+			root.SetErr(&out)
+			root.SetArgs(tt.args)
+
+			err := root.Execute()
+			require.Error(t, err)
+
+			_, isExitError := errors.AsType[*exitError](err)
+			assert.Equal(t, tt.wantExitError, isExitError)
+
+			if len(tt.wantOutput) == 0 {
+				assert.Empty(t, out.String())
+			}
+
+			for _, want := range tt.wantOutput {
+				assert.Contains(t, out.String(), want)
+			}
+		})
+	}
+}
+
+// TestExitError_Error verifies the text of an exit error with and without a
+// message and a cause.
+func TestExitError_Error(t *testing.T) {
+	t.Parallel()
+
+	cause := errors.New("cause")
+
+	tests := []struct {
+		name string
+		err  *exitError
+		want string
+	}{
+		{name: "message and cause", err: &exitError{err: cause, msg: "Failed", code: 1}, want: "Failed: cause"},
+		{name: "message only", err: &exitError{err: nil, msg: "Failed", code: 1}, want: "Failed"},
+		{name: "cause only", err: &exitError{err: cause, msg: "", code: 1}, want: "cause"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			assert.Equal(t, tt.want, tt.err.Error())
+			assert.Equal(t, tt.err.err, errors.Unwrap(tt.err))
 		})
 	}
 }

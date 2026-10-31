@@ -16,6 +16,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"github.com/nicholas-fedor/watchtower/internal/observability/logging"
 	"github.com/nicholas-fedor/watchtower/internal/testutil/golden"
 )
 
@@ -241,10 +242,11 @@ func TestRunNotifyUpgrade_ExitsOnFailure(t *testing.T) {
 	if os.Getenv(notifyUpgradeExitHelperEnv) != "" {
 		t.Chdir(t.TempDir())
 
-		runNotifyUpgrade(newNotifyUpgradeCommand(t,
+		proc := &process{log: logging.New(os.Stderr, logging.InfoLevel)}
+		proc.exit(proc.runNotifyUpgrade(newNotifyUpgradeCommand(t,
 			"--notifications", "slack",
 			"--notification-slack-hook-url", "https://hooks.slack.com/services/not-a-token",
-		), nil)
+		), nil))
 
 		// The failure must end the process. Reaching here means it did not.
 		os.Exit(2)
