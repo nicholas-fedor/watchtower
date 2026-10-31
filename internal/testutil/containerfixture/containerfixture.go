@@ -1,6 +1,9 @@
 package containerfixture
 
 import (
+	"crypto/rand"
+	"crypto/sha256"
+	"encoding/hex"
 	"fmt"
 	"slices"
 	"time"
@@ -54,6 +57,21 @@ func Inspect(updates ...Update) (*dockerContainer.InspectResponse, *dockerImage.
 	}
 
 	return &containerInfo, &image
+}
+
+// RandomID returns 64 random hex characters, the form of a Docker container or
+// image ID and of a SHA-256 digest without its "sha256:" prefix. Tests use it
+// when each run needs IDs no earlier run has used, such as with records that
+// last for the whole process.
+//
+// Returns:
+//   - string: A new random ID.
+func RandomID() string {
+	id := make([]byte, sha256.Size)
+	// crypto/rand.Read never returns an error and always fills id.
+	_, _ = rand.Read(id)
+
+	return hex.EncodeToString(id)
 }
 
 // WithPortBindings configures port bindings for the mock container.
