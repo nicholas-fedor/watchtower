@@ -1,4 +1,3 @@
-// Package filter holds container selection inputs and the resolved filter.
 package filter
 
 import "github.com/nicholas-fedor/watchtower/pkg/types"

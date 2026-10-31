@@ -1,4 +1,3 @@
-// Package mode holds process entry-shape settings.
 package mode
 
 // Mode holds how the process enters its main loop.

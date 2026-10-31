@@ -1,4 +1,3 @@
-// Package registry holds the settings for registry requests.
 package registry
 
 // Registry holds the settings for registry requests.

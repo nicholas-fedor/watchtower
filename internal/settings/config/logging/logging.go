@@ -1,4 +1,3 @@
-// Package logging holds console logging settings.
 package logging
 
 // Logging holds log format and level settings.

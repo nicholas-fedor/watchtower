@@ -1,4 +1,3 @@
-// Package compatibility holds runtime compatibility settings (for example Podman).
 package compatibility
 
 // Compatibility holds container recreate compatibility options.
