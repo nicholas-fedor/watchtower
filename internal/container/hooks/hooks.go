@@ -199,20 +199,8 @@ func executeCheckCommand(
 		return
 	}
 
-	// Determine effective UID/GID: use container labels if set, otherwise use defaults.
-	effectiveUID := uid
-
-	containerUID, ok := cont.GetLifecycleUID()
-	if ok {
-		effectiveUID = containerUID
-	}
-
-	effectiveGID := gid
-
-	containerGID, ok := cont.GetLifecycleGID()
-	if ok {
-		effectiveGID = containerGID
-	}
+	// The container's lifecycle labels override the configured user.
+	effectiveUID, effectiveGID := cont.LifecycleUser(uid, gid)
 
 	minutes := timeout()
 
@@ -283,20 +271,8 @@ func ExecutePreUpdateCommand(log *zerolog.Logger,
 	timeout := container.PreUpdateTimeout()
 	clogVal = clog.With().Int("timeout", timeout).Logger()
 
-	// Determine effective UID/GID: use container labels if set, otherwise use defaults.
-	effectiveUID := uid
-
-	containerUID, ok := container.GetLifecycleUID()
-	if ok {
-		effectiveUID = containerUID
-	}
-
-	effectiveGID := gid
-
-	containerGID, ok := container.GetLifecycleGID()
-	if ok {
-		effectiveGID = containerGID
-	}
+	// The container's lifecycle labels override the configured user.
+	effectiveUID, effectiveGID := container.LifecycleUser(uid, gid)
 
 	// Execute command with configured timeout.
 	clog.Debug().
@@ -374,20 +350,8 @@ func ExecutePostUpdateCommand(log *zerolog.Logger,
 	timeout := newContainer.PostUpdateTimeout()
 	clogVal = clog.With().Int("timeout", timeout).Logger()
 
-	// Determine effective UID/GID: use container labels if set, otherwise use defaults.
-	effectiveUID := uid
-
-	containerUID, ok := newContainer.GetLifecycleUID()
-	if ok {
-		effectiveUID = containerUID
-	}
-
-	effectiveGID := gid
-
-	containerGID, ok := newContainer.GetLifecycleGID()
-	if ok {
-		effectiveGID = containerGID
-	}
+	// The container's lifecycle labels override the configured user.
+	effectiveUID, effectiveGID := newContainer.LifecycleUser(uid, gid)
 
 	// Execute command with configured timeout.
 	clog.Debug().

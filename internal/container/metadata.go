@@ -273,22 +273,33 @@ func (c *Container) getLifecycleID(label, idType string) (int, bool) {
 	return parsedID, true
 }
 
-// GetLifecycleUID returns the UID for lifecycle hooks from labels.
+// LifecycleUser returns the UID and GID that lifecycle hooks run as.
+//
+// Each ID comes from its lifecycle label when the label is set to a valid ID,
+// and from its default otherwise. An invalid label logs a warning once per
+// container and label.
+//
+// Parameters:
+//   - defaultUID: UID used when the UID label is unset or invalid.
+//   - defaultGID: GID used when the GID label is unset or invalid.
 //
 // Returns:
-//   - int: UID value if set and valid.
-//   - bool: True if label is present and valid, false otherwise.
-func (c *Container) GetLifecycleUID() (int, bool) {
-	return c.getLifecycleID(labels.LifecycleUID, "UID")
-}
+//   - uid: UID the hooks run as.
+//   - gid: GID the hooks run as.
+//
+//nolint:nonamedreturns // Same-type returns need names.
+func (c *Container) LifecycleUser(defaultUID, defaultGID int) (uid, gid int) {
+	uid, gid = defaultUID, defaultGID
 
-// GetLifecycleGID returns the GID for lifecycle hooks from labels.
-//
-// Returns:
-//   - int: GID value if set and valid.
-//   - bool: True if label is present and valid, false otherwise.
-func (c *Container) GetLifecycleGID() (int, bool) {
-	return c.getLifecycleID(labels.LifecycleGID, "GID")
+	if labelUID, ok := c.getLifecycleID(labels.LifecycleUID, "UID"); ok {
+		uid = labelUID
+	}
+
+	if labelGID, ok := c.getLifecycleID(labels.LifecycleGID, "GID"); ok {
+		gid = labelGID
+	}
+
+	return uid, gid
 }
 
 // Enabled checks if Watchtower should manage the container.

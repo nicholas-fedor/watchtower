@@ -404,59 +404,6 @@ func (_c *MockContainer_GetLabel_Call) RunAndReturn(run func(key string) (string
 	return _c
 }
 
-// GetLifecycleGID provides a mock function for the type MockContainer
-func (_mock *MockContainer) GetLifecycleGID() (int, bool) {
-	ret := _mock.Called()
-
-	if len(ret) == 0 {
-		panic("no return value specified for GetLifecycleGID")
-	}
-
-	var r0 int
-	var r1 bool
-	if returnFunc, ok := ret.Get(0).(func() (int, bool)); ok {
-		return returnFunc()
-	}
-	if returnFunc, ok := ret.Get(0).(func() int); ok {
-		r0 = returnFunc()
-	} else {
-		r0 = ret.Get(0).(int)
-	}
-	if returnFunc, ok := ret.Get(1).(func() bool); ok {
-		r1 = returnFunc()
-	} else {
-		r1 = ret.Get(1).(bool)
-	}
-	return r0, r1
-}
-
-// MockContainer_GetLifecycleGID_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'GetLifecycleGID'
-type MockContainer_GetLifecycleGID_Call struct {
-	*mock.Call
-}
-
-// GetLifecycleGID is a helper method to define mock.On call
-func (_e *MockContainer_Expecter) GetLifecycleGID() *MockContainer_GetLifecycleGID_Call {
-	return &MockContainer_GetLifecycleGID_Call{Call: _e.mock.On("GetLifecycleGID")}
-}
-
-func (_c *MockContainer_GetLifecycleGID_Call) Run(run func()) *MockContainer_GetLifecycleGID_Call {
-	_c.Call.Run(func(args mock.Arguments) {
-		run()
-	})
-	return _c
-}
-
-func (_c *MockContainer_GetLifecycleGID_Call) Return(n int, b bool) *MockContainer_GetLifecycleGID_Call {
-	_c.Call.Return(n, b)
-	return _c
-}
-
-func (_c *MockContainer_GetLifecycleGID_Call) RunAndReturn(run func() (int, bool)) *MockContainer_GetLifecycleGID_Call {
-	_c.Call.Return(run)
-	return _c
-}
-
 // GetLifecyclePostCheckCommand provides a mock function for the type MockContainer
 func (_mock *MockContainer) GetLifecyclePostCheckCommand() string {
 	ret := _mock.Called()
@@ -629,59 +576,6 @@ func (_c *MockContainer_GetLifecyclePreUpdateCommand_Call) Return(s string) *Moc
 }
 
 func (_c *MockContainer_GetLifecyclePreUpdateCommand_Call) RunAndReturn(run func() string) *MockContainer_GetLifecyclePreUpdateCommand_Call {
-	_c.Call.Return(run)
-	return _c
-}
-
-// GetLifecycleUID provides a mock function for the type MockContainer
-func (_mock *MockContainer) GetLifecycleUID() (int, bool) {
-	ret := _mock.Called()
-
-	if len(ret) == 0 {
-		panic("no return value specified for GetLifecycleUID")
-	}
-
-	var r0 int
-	var r1 bool
-	if returnFunc, ok := ret.Get(0).(func() (int, bool)); ok {
-		return returnFunc()
-	}
-	if returnFunc, ok := ret.Get(0).(func() int); ok {
-		r0 = returnFunc()
-	} else {
-		r0 = ret.Get(0).(int)
-	}
-	if returnFunc, ok := ret.Get(1).(func() bool); ok {
-		r1 = returnFunc()
-	} else {
-		r1 = ret.Get(1).(bool)
-	}
-	return r0, r1
-}
-
-// MockContainer_GetLifecycleUID_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'GetLifecycleUID'
-type MockContainer_GetLifecycleUID_Call struct {
-	*mock.Call
-}
-
-// GetLifecycleUID is a helper method to define mock.On call
-func (_e *MockContainer_Expecter) GetLifecycleUID() *MockContainer_GetLifecycleUID_Call {
-	return &MockContainer_GetLifecycleUID_Call{Call: _e.mock.On("GetLifecycleUID")}
-}
-
-func (_c *MockContainer_GetLifecycleUID_Call) Run(run func()) *MockContainer_GetLifecycleUID_Call {
-	_c.Call.Run(func(args mock.Arguments) {
-		run()
-	})
-	return _c
-}
-
-func (_c *MockContainer_GetLifecycleUID_Call) Return(n int, b bool) *MockContainer_GetLifecycleUID_Call {
-	_c.Call.Return(n, b)
-	return _c
-}
-
-func (_c *MockContainer_GetLifecycleUID_Call) RunAndReturn(run func() (int, bool)) *MockContainer_GetLifecycleUID_Call {
 	_c.Call.Return(run)
 	return _c
 }
@@ -1314,6 +1208,72 @@ func (_c *MockContainer_IsWatchtower_Call) Return(b bool) *MockContainer_IsWatch
 }
 
 func (_c *MockContainer_IsWatchtower_Call) RunAndReturn(run func() bool) *MockContainer_IsWatchtower_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
+// LifecycleUser provides a mock function for the type MockContainer
+func (_mock *MockContainer) LifecycleUser(uid int, gid int) (int, int) {
+	ret := _mock.Called(uid, gid)
+
+	if len(ret) == 0 {
+		panic("no return value specified for LifecycleUser")
+	}
+
+	var r0 int
+	var r1 int
+	if returnFunc, ok := ret.Get(0).(func(int, int) (int, int)); ok {
+		return returnFunc(uid, gid)
+	}
+	if returnFunc, ok := ret.Get(0).(func(int, int) int); ok {
+		r0 = returnFunc(uid, gid)
+	} else {
+		r0 = ret.Get(0).(int)
+	}
+	if returnFunc, ok := ret.Get(1).(func(int, int) int); ok {
+		r1 = returnFunc(uid, gid)
+	} else {
+		r1 = ret.Get(1).(int)
+	}
+	return r0, r1
+}
+
+// MockContainer_LifecycleUser_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'LifecycleUser'
+type MockContainer_LifecycleUser_Call struct {
+	*mock.Call
+}
+
+// LifecycleUser is a helper method to define mock.On call
+//   - uid int
+//   - gid int
+func (_e *MockContainer_Expecter) LifecycleUser(uid any, gid any) *MockContainer_LifecycleUser_Call {
+	return &MockContainer_LifecycleUser_Call{Call: _e.mock.On("LifecycleUser", uid, gid)}
+}
+
+func (_c *MockContainer_LifecycleUser_Call) Run(run func(uid int, gid int)) *MockContainer_LifecycleUser_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		var arg0 int
+		if args[0] != nil {
+			arg0 = args[0].(int)
+		}
+		var arg1 int
+		if args[1] != nil {
+			arg1 = args[1].(int)
+		}
+		run(
+			arg0,
+			arg1,
+		)
+	})
+	return _c
+}
+
+func (_c *MockContainer_LifecycleUser_Call) Return(n int, n1 int) *MockContainer_LifecycleUser_Call {
+	_c.Call.Return(n, n1)
+	return _c
+}
+
+func (_c *MockContainer_LifecycleUser_Call) RunAndReturn(run func(uid int, gid int) (int, int)) *MockContainer_LifecycleUser_Call {
 	_c.Call.Return(run)
 	return _c
 }
