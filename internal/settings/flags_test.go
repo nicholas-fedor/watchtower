@@ -2,12 +2,9 @@ package settings
 
 import (
 	"bytes"
-	"context"
 	"errors"
-	"fmt"
 	"io"
 	"os"
-	"os/exec"
 	"regexp"
 	"strings"
 	"testing"
@@ -21,10 +18,6 @@ import (
 
 	"github.com/nicholas-fedor/watchtower/internal/observability/logging"
 )
-
-// processFlagAliasesHelperEnv selects a ProcessFlagAliases fatal case when the
-// test binary is re-executed as a subprocess. Empty means the parent process.
-const processFlagAliasesHelperEnv = "WATCHTOWER_FLAGS_PROCESS_ALIASES_HELPER"
 
 //nolint:godox
 // TODO: Remove and/or update unit testing of deprecated configuration options just before v2 Release.
@@ -711,7 +704,7 @@ func TestProcessFlagAliases(t *testing.T) {
 
 			cmd := newTestCommand()
 			require.NoError(t, cmd.ParseFlags(tc.flags))
-			ProcessFlagAliases(newInfoTestLogger(t), cmd.Flags())
+			require.NoError(t, ProcessFlagAliases(newInfoTestLogger(t), cmd.Flags()))
 
 			if tc.checks != nil {
 				tc.checks(t, cmd.Flags())
@@ -720,99 +713,35 @@ func TestProcessFlagAliases(t *testing.T) {
 	}
 }
 
-// TestProcessFlagAliases_FatalCases covers zerolog.Fatal paths via subprocess.
-// In-process interception is unavailable (Fatal always calls os.Exit).
-func TestProcessFlagAliases_FatalCases(t *testing.T) {
-	if caseName := os.Getenv(processFlagAliasesHelperEnv); caseName != "" {
-		runProcessFlagAliasesFatalHelper(caseName)
-
-		// Fatal paths must exit. Reaching here means the helper did not Fatal.
-		os.Exit(0)
-	}
-
-	cases := []struct {
-		name       string
-		helperCase string
-		wantDiag   string
+// TestProcessFlagAliases_Errors verifies that an invalid porcelain version
+// and an interval set together with a schedule are returned as errors.
+func TestProcessFlagAliases_Errors(t *testing.T) {
+	tests := []struct {
+		name    string
+		flags   []string
+		wantErr error
 	}{
 		{
-			name:       "schedule and interval conflict",
-			helperCase: "schedule-interval-conflict",
-			wantDiag:   "Cannot define both interval and schedule",
+			name:    "schedule and interval conflict",
+			flags:   []string{"--schedule", "@hourly", "--interval", "10"},
+			wantErr: errIntervalAndSchedule,
 		},
 		{
-			name:       "invalid porcelain version",
-			helperCase: "invalid-porcelain",
-			wantDiag:   "Unknown porcelain version, supported: v1, json",
+			name:    "invalid porcelain version",
+			flags:   []string{"--porcelain", "v2"},
+			wantErr: errUnknownPorcelainVersion,
 		},
 	}
 
-	for _, tc := range cases {
-		t.Run(tc.name, func(t *testing.T) {
-			out, err := runProcessFlagAliasesHelper(t, tc.helperCase)
-			require.Error(t, err, "fatal path must exit non-zero; output:\n%s", out)
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			cmd := newTestCommand()
+			require.NoError(t, cmd.ParseFlags(tt.flags))
 
-			var exitErr *exec.ExitError
-			require.ErrorAs(t, err, &exitErr)
-			assert.NotEqual(t, 0, exitErr.ExitCode(), "expected non-zero exit; output:\n%s", out)
-			assert.Contains(t, out, tc.wantDiag)
+			err := ProcessFlagAliases(newInfoTestLogger(t), cmd.Flags())
+			require.ErrorIs(t, err, tt.wantErr)
 		})
 	}
-}
-
-// runProcessFlagAliasesHelper re-executes the test binary for a named fatal case.
-//
-// Parameters:
-//   - t: test handle
-//   - caseName: helper case key (see runProcessFlagAliasesFatalHelper)
-//
-// Returns:
-//   - string: combined stdout/stderr from the child
-//   - error: non-nil when the child exits non-zero or fails to start
-func runProcessFlagAliasesHelper(t *testing.T, caseName string) (string, error) {
-	t.Helper()
-
-	// Match only this test so nested subtests and other packages do not run.
-	ctx, cancel := context.WithTimeout(t.Context(), 30*time.Second)
-	defer cancel()
-
-	cmd := exec.CommandContext(ctx, os.Args[0], "-test.run=^TestProcessFlagAliases_FatalCases$", "-test.v=false")
-
-	cmd.Env = append(os.Environ(), processFlagAliasesHelperEnv+"="+caseName)
-	out, err := cmd.CombinedOutput()
-
-	return string(out), err
-}
-
-// runProcessFlagAliasesFatalHelper executes ProcessFlagAliases for a fatal case
-// in the child process. It always ends in zerolog.Fatal (os.Exit) on success.
-//
-// Parameters:
-//   - caseName: "schedule-interval-conflict" or "invalid-porcelain"
-func runProcessFlagAliasesFatalHelper(caseName string) {
-	cmd := newTestCommand()
-
-	var flagArgs []string
-
-	switch caseName {
-	case "schedule-interval-conflict":
-		flagArgs = []string{"--schedule", "@hourly", "--interval", "10"}
-	case "invalid-porcelain":
-		flagArgs = []string{"--porcelain", "v2"}
-	default:
-		fmt.Fprintf(os.Stderr, "unknown helper case %q\n", caseName)
-		os.Exit(2)
-	}
-
-	err := cmd.ParseFlags(flagArgs)
-	if err != nil {
-		fmt.Fprintf(os.Stderr, "parse flags: %v\n", err)
-		os.Exit(2)
-	}
-
-	// Write diagnostics to stderr so the parent can assert on CombinedOutput.
-	log := zerolog.New(os.Stderr).Level(zerolog.InfoLevel)
-	ProcessFlagAliases(&log, cmd.Flags())
 }
 
 // TestSetupLogging tests logging setup with various formats and levels.
@@ -1227,7 +1156,7 @@ func TestGetSecretsFromFile_PorcelainAppendPreservedWithSecret(t *testing.T) {
 		"--porcelain", "v1",
 	})
 	require.NoError(t, err)
-	ProcessFlagAliases(newInfoTestLogger(t), cmd.PersistentFlags())
+	require.NoError(t, ProcessFlagAliases(newInfoTestLogger(t), cmd.PersistentFlags()))
 
 	urls, err := cmd.PersistentFlags().GetStringArray("notification-url")
 	require.NoError(t, err)
@@ -1307,7 +1236,7 @@ func TestProcessFlagAliases_FlagSetErrors(t *testing.T) {
 
 	defer func() { flag.Value = originalValue }() // Restore original value
 
-	ProcessFlagAliases(log, flags)
+	require.NoError(t, ProcessFlagAliases(log, flags))
 	assert.Contains(
 		t,
 		logOutput.String(),
@@ -1344,7 +1273,7 @@ func testGetSecretsFromFiles(t *testing.T, flagName, expected string, args ...st
 
 	RegisterAll(cmd)
 	parseWithEnv(t, cmd, args...)
-	GetSecretsFromFiles(newInfoTestLogger(t), cmd)
+	require.NoError(t, GetSecretsFromFiles(newInfoTestLogger(t), cmd))
 	flag := cmd.PersistentFlags().Lookup(flagName)
 	require.NotNil(t, flag)
 	value := flag.Value.String()

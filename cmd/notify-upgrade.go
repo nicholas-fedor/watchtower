@@ -91,13 +91,16 @@ func runNotifyUpgradeE(cmd *cobra.Command, _ []string, log *zerolog.Logger) (*ze
 		return log, fmt.Errorf("apply environment configuration: %w", err)
 	}
 
-	// Format before aliases so Fatal paths use the selected --log-format.
+	// Format before aliases so their errors use the selected --log-format.
 	log, err = settings.SetupLogging(log, flagSet)
 	if err != nil {
 		return log, fmt.Errorf("setup logging: %w", err)
 	}
 
-	settings.ProcessFlagAliases(log, flagSet)
+	err = settings.ProcessFlagAliases(log, flagSet)
+	if err != nil {
+		return log, fmt.Errorf("process flag aliases: %w", err)
+	}
 
 	// Re-apply after aliases so debug/trace forced log-level values take effect.
 	log, err = settings.SetupLogging(log, flagSet)
@@ -105,7 +108,10 @@ func runNotifyUpgradeE(cmd *cobra.Command, _ []string, log *zerolog.Logger) (*ze
 		return log, fmt.Errorf("setup logging: %w", err)
 	}
 
-	settings.GetSecretsFromFiles(log, cmd.Root())
+	err = settings.GetSecretsFromFiles(log, cmd.Root())
+	if err != nil {
+		return log, fmt.Errorf("load secrets from files: %w", err)
+	}
 
 	cfg, loadErr := settings.Load(log, cmd.Root(), nil)
 	if loadErr != nil {

@@ -211,16 +211,19 @@ func (p *process) preRun(cmd *cobra.Command, _ []string) {
 		p.log.Fatal().Err(err).Msg("Failed to apply environment configuration")
 	}
 
-	// Apply format (and pre-alias level) before ProcessFlagAliases so Fatal paths
-	// from porcelain/interval conflicts use the user-selected --log-format rather
-	// than zerolog's default JSON encoding on stderr.
+	// Apply format (and pre-alias level) before ProcessFlagAliases so its errors,
+	// such as an interval set with a schedule, use the user-selected --log-format
+	// rather than zerolog's default JSON encoding on stderr.
 	p.log, err = settings.SetupLogging(p.log, flagsSet)
 	if err != nil {
 		p.log.Fatal().Err(err).Msg("Failed to initialize logging")
 	}
 
 	// Apply porcelain, interval→schedule, and debug/trace log-level aliases.
-	settings.ProcessFlagAliases(p.log, flagsSet)
+	err = settings.ProcessFlagAliases(p.log, flagsSet)
+	if err != nil {
+		p.log.Fatal().Err(err).Msg("Invalid configuration")
+	}
 
 	// Re-apply after aliases so debug/trace forced log-level values take effect.
 	p.log, err = settings.SetupLogging(p.log, flagsSet)
@@ -229,7 +232,10 @@ func (p *process) preRun(cmd *cobra.Command, _ []string) {
 	}
 
 	// Expand secrets from files (for example notification URLs and API tokens).
-	settings.GetSecretsFromFiles(p.log, cmd)
+	err = settings.GetSecretsFromFiles(p.log, cmd)
+	if err != nil {
+		p.log.Fatal().Err(err).Msg("Failed to load secret from file")
+	}
 
 	// Map Docker connection flags into the process environment for the client stack.
 	err = settings.EnvConfig(p.log, cmd)
