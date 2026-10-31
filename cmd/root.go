@@ -52,6 +52,10 @@ const (
 	// metadata is unreachable. The inspect of the container afterwards bounds
 	// its own retries. In a health check, this timeout bounds them as well.
 	containerLookupTimeout = 5 * time.Second
+
+	// restartsKeptMessage is logged when Watchtower could not disable its own
+	// restart policy before it exits.
+	restartsKeptMessage = "Could not disable Watchtower's restart policy. The runtime may start it again"
 )
 
 // errSupersededInstance ends a Watchtower instance that runs in an old
@@ -126,6 +130,14 @@ var (
 	// container and which container ID it detects.
 	processFs fs.FS = os.DirFS("/")
 
+	// processID returns the ID of the Watchtower process. Tests replace it to
+	// run as the main process of a container.
+	processID = os.Getpid
+
+	// parentProcessID returns the ID of the Watchtower process's parent. Tests
+	// replace it to run under a container's init process.
+	parentProcessID = os.Getppid
+
 	// runUpdatesWithNotifications is a function variable for performing container updates and sending notifications.
 	//
 	// It is initialized inside runMain with a closure that executes update.RunUpdatesWithNotifications,
@@ -145,7 +157,11 @@ var (
 // The logger is constructed in main and reconfigured in preRun after flags are
 // parsed. It is never stored as a package-level global.
 type process struct {
+	// log is the process logger.
 	log *zerolog.Logger
+	// clientErr is the error from creating the Docker client at startup. An
+	// exit reports it instead of waiting for the daemon again.
+	clientErr error
 }
 
 // exitError is an error that ends the process. Execute reports it and exits
@@ -226,32 +242,27 @@ func Execute(log *zerolog.Logger) {
 	rootCmd.RunE = proc.run
 	notifyUpgradeCmd.RunE = proc.runNotifyUpgrade
 
-	proc.exit(rootCmd.Execute())
+	proc.exit(rootCmd.ExecuteC())
 }
 
-// exit ends the process for an error that a command returned. It does
-// nothing for nil.
+// exit ends the process when a command returns an error.
 //
-// An [exitError] with a message is logged at fatal level with its cause. One
-// without a message ends the process with its exit code. Any other error, such
-// as a flag that does not parse, is logged as a failed command. Fatal logs exit
-// with code 1. Logs use the logger the command configured from its flags.
+// An [exitError] without a message was already reported, so the process only
+// exits with its code. Every other error is logged at fatal level with the
+// logger the command configured, which exits with code 1. A root command
+// failure would happen again on every start, so Watchtower's restarts are
+// disabled before it is logged.
 //
 // Parameters:
+//   - cmd: The command that ran.
 //   - err: The error the command returned.
-func (p *process) exit(err error) {
+func (p *process) exit(cmd *cobra.Command, err error) {
 	if err == nil {
 		return
 	}
 
 	exitErr, ok := errors.AsType[*exitError](err)
-
-	switch {
-	case !ok:
-		p.log.Fatal().Err(err).Msg("Failed to execute root command")
-	case exitErr.msg != "":
-		p.log.Fatal().Err(exitErr.err).Msg(exitErr.msg)
-	default:
+	if ok && exitErr.msg == "" {
 		if exitErr.code != 0 {
 			p.log.Debug().
 				Int("exit_code", exitErr.code).
@@ -260,6 +271,14 @@ func (p *process) exit(err error) {
 
 		os.Exit(exitErr.code)
 	}
+
+	msg, cause := "Failed to execute root command", err
+	if ok {
+		msg, cause = exitErr.msg, exitErr.err
+	}
+
+	p.disableRestartsBeforeExit(cmd)
+	p.log.Fatal().Err(cause).Msg(msg)
 }
 
 // preRun prepares the environment and configuration before the main command execution begins.
@@ -348,6 +367,8 @@ func (p *process) preRun(cmd *cobra.Command, _ []string) error {
 
 	client, err = newClient(p.log, clientOpts)
 	if err != nil {
+		p.clientErr = err
+
 		return &exitError{err: err, msg: "Failed to initialize Docker client", code: 1}
 	}
 
@@ -358,10 +379,7 @@ func (p *process) preRun(cmd *cobra.Command, _ []string) error {
 
 		selfupdate.RunOrchestrator(p.log, context.Background(), client)
 
-		lookupCtx, lookupCancel := context.WithTimeout(context.Background(), containerLookupTimeout)
-		currentWatchtowerContainerID, _ = containerClient.GetCurrentContainerID(p.log, lookupCtx, processFs, client)
-
-		lookupCancel()
+		_ = p.detectCurrentContainerID()
 		p.disableRestarts()
 
 		p.log.Fatal().
@@ -515,8 +533,6 @@ func (p *process) run(command *cobra.Command, args []string) error {
 	// Reload configuration with positional names so the filter includes them.
 	loaded, err := settings.Load(p.log, command, args)
 	if err != nil {
-		p.disableRestarts()
-
 		return &exitError{err: err, msg: "Failed to load configuration", code: 1}
 	}
 
@@ -549,8 +565,6 @@ func (p *process) run(command *cobra.Command, args []string) error {
 			appCfg.Filter.Scope,
 		)
 		if filterErr != nil {
-			p.disableRestarts()
-
 			return &exitError{err: filterErr, msg: "Failed to build container filter", code: 1}
 		}
 
@@ -559,7 +573,7 @@ func (p *process) run(command *cobra.Command, args []string) error {
 	}
 
 	if appCfg.Mode.HealthCheck {
-		if os.Getpid() == 1 {
+		if isContainerMainProcess() {
 			time.Sleep(1 * time.Second)
 
 			return &exitError{
@@ -915,15 +929,19 @@ func (p *process) logNotify(msg string, err error) {
 	notifier.Close()
 }
 
-// disableRestarts sets the restart policy of Watchtower's own container to
-// "no", so the runtime does not start Watchtower again after the process ends.
-// It does nothing when Watchtower does not run in a container, or when the
-// policy of its inspected container is already "no".
+// disableRestarts sets the restart policy of Watchtower's container to "no".
 //
-// A failure is logged as an error, because the runtime may then start
-// Watchtower again. Exit paths call it before they report the exit, so a
-// notification that is still collecting entries for the exit includes it.
+// Only the container's main process changes the policy. A host binary and a
+// command started with docker exec, such as a health check probe, leave it
+// alone. A policy that is already "no" is not updated. A failure is logged as
+// an error, because the runtime may then start Watchtower again. Exit paths
+// call it before they report the exit, so the exit's notification includes
+// that error.
 func (p *process) disableRestarts() {
+	if !isContainerMainProcess() {
+		return
+	}
+
 	if currentWatchtowerContainer != nil && !currentWatchtowerContainer.RestartsAutomatically() {
 		return
 	}
@@ -940,9 +958,95 @@ func (p *process) disableRestarts() {
 		dockerContainer.RestartPolicy{Name: dockerContainer.RestartPolicyDisabled},
 	)
 	if err != nil {
-		p.log.Error().Err(err).
-			Msg("Could not disable Watchtower's restart policy. The runtime may start it again")
+		p.log.Error().Err(err).Msg(restartsKeptMessage)
 	}
+}
+
+// disableRestartsBeforeExit disables Watchtower's restarts when the root command fails.
+//
+// A subcommand's failure leaves them alone, since a subcommand such as
+// notify-upgrade can run inside the main container. Without a Docker client
+// from startup, the container's main process connects with default options,
+// using the connection settings its flags and environment hold. When it
+// cannot connect or find its container, it logs that its restarts stay
+// enabled.
+//
+// Parameters:
+//   - cmd: The command that failed, whose flags hold the Docker connection
+//     settings.
+func (p *process) disableRestartsBeforeExit(cmd *cobra.Command) {
+	if cmd.HasParent() {
+		return
+	}
+
+	if client == nil {
+		// Only the main process changes the restart policy, so only it
+		// connects for that.
+		if !isContainerMainProcess() {
+			return
+		}
+
+		err := p.clientErr
+		if err == nil {
+			// Startup reports the connection settings when it maps them
+			// itself, so this mapping logs nothing.
+			err = settings.EnvConfig(new(zerolog.Nop()), cmd)
+		}
+
+		if err == nil {
+			// The client options only change how updates run.
+			client, err = newClient(p.log, containerClient.ClientOptions{})
+		}
+
+		if err == nil {
+			err = p.detectCurrentContainerID()
+		}
+
+		if err != nil {
+			p.log.Error().Err(err).Msg(restartsKeptMessage)
+
+			return
+		}
+	}
+
+	p.disableRestarts()
+}
+
+// isContainerMainProcess reports whether Watchtower is the main process of its
+// container, whose exit stops the container.
+//
+// The main process is PID 1. When the container is started with an init,
+// such as docker run --init, the init runs as PID 1 and the main process is
+// its child. A command started with docker exec, such as a health check
+// probe, has parent PID 0. A host binary is never PID 1. Its parent PID is 1
+// when an init system such as systemd starts it, so the parent PID counts
+// only in a container.
+//
+// Returns:
+//   - bool: True for the main process of a container.
+func isContainerMainProcess() bool {
+	if processID() == 1 {
+		return true
+	}
+
+	return parentProcessID() == 1 && containerClient.InContainer(processFs)
+}
+
+// detectCurrentContainerID detects the ID of Watchtower's own container for an
+// exit path, waiting at most 5 seconds. A failed detection leaves the ID
+// empty.
+//
+// Returns:
+//   - error: Non-nil when the ID cannot be detected.
+func (p *process) detectCurrentContainerID() error {
+	ctx, cancel := context.WithTimeout(context.Background(), containerLookupTimeout)
+	defer cancel()
+
+	var err error
+
+	currentWatchtowerContainerID, err = containerClient.GetCurrentContainerID(p.log, ctx, processFs, client)
+
+	return err //nolint:wrapcheck // The error already says that the container ID could not be detected.
 }
 
 // awaitDockerClient pauses for one second before Watchtower first lists containers.

@@ -242,11 +242,13 @@ func TestRunNotifyUpgrade_ExitsOnFailure(t *testing.T) {
 	if os.Getenv(notifyUpgradeExitHelperEnv) != "" {
 		t.Chdir(t.TempDir())
 
-		proc := &process{log: logging.New(os.Stderr, logging.InfoLevel)}
-		proc.exit(proc.runNotifyUpgrade(newNotifyUpgradeCommand(t,
+		cmd := newNotifyUpgradeCommand(t,
 			"--notifications", "slack",
 			"--notification-slack-hook-url", "https://hooks.slack.com/services/not-a-token",
-		), nil))
+		)
+
+		proc := &process{log: logging.New(os.Stderr, logging.InfoLevel)}
+		proc.exit(cmd, proc.runNotifyUpgrade(cmd, nil))
 
 		// The failure must end the process. Reaching here means it did not.
 		os.Exit(2)
