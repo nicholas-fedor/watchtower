@@ -32,8 +32,30 @@ func newTestLogger(t *testing.T) *zerolog.Logger {
 	return new(zerolog.New(w))
 }
 
-// newLoadedCommand registers flags, applies env, parses args, and loads config.
+// newLoadedCommand loads the configuration from env and args through the
+// startup steps and fails the test when Load returns an error.
 func newLoadedCommand(t *testing.T, env map[string]string, args ...string) Config {
+	t.Helper()
+
+	cfg, err := loadWithEnv(t, env, args...)
+	require.NoError(t, err)
+
+	return cfg
+}
+
+// loadWithEnv loads the configuration from env and args on a command with
+// every flag registered. It applies the environment, flag aliases and secret
+// files the way startup does before it calls Load.
+//
+// Parameters:
+//   - t: Test that owns the environment.
+//   - env: Environment variables to set.
+//   - args: Command-line arguments to parse.
+//
+// Returns:
+//   - Config: Loaded configuration.
+//   - error: The error Load returned.
+func loadWithEnv(t *testing.T, env map[string]string, args ...string) (Config, error) {
 	t.Helper()
 
 	for k, v := range env {
@@ -52,10 +74,7 @@ func newLoadedCommand(t *testing.T, env map[string]string, args ...string) Confi
 	ProcessFlagAliases(log, flagSet)
 	GetSecretsFromFiles(log, cmd)
 
-	cfg, err := Load(newTestLogger(t), cmd, nil)
-	require.NoError(t, err)
-
-	return cfg
+	return Load(newTestLogger(t), cmd, nil)
 }
 
 func TestLoad_FlagOverridesEnv(t *testing.T) {

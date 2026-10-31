@@ -1,6 +1,7 @@
 package settings
 
 import (
+	"errors"
 	"fmt"
 	"os"
 	"strconv"
@@ -14,10 +15,14 @@ import (
 	"github.com/nicholas-fedor/watchtower/internal/settings/flags/utils"
 )
 
+// errNegativeDurationSetting indicates a duration setting was set to a negative value.
+var errNegativeDurationSetting = errors.New("must be non-negative")
+
 // durationValue reads a duration from Viper with bare-second env support.
 //
 // When the flag was not changed on the CLI and the bound env value is a pure
-// number, it is treated as seconds (legacy WATCHTOWER_TIMEOUT behavior).
+// number, it is treated as seconds (legacy WATCHTOWER_TIMEOUT behavior). A
+// negative value from any source is an error.
 //
 // Parameters:
 //   - vCfg: Bound Viper instance.
@@ -27,16 +32,17 @@ import (
 //
 // Returns:
 //   - time.Duration: Resolved duration.
+//   - error: Wraps errNegativeDurationSetting, naming the setting, when the value is negative.
 func durationValue(
 	vCfg *viper.Viper,
 	flagSet *pflag.FlagSet,
 	name string,
 	envKeys []string,
-) time.Duration {
+) (time.Duration, error) {
 	if flagSet.Changed(name) {
 		d, err := flagSet.GetDuration(name)
 		if err == nil {
-			return d
+			return checkNonNegative(name, d)
 		}
 	}
 
@@ -53,17 +59,18 @@ func durationValue(
 		if utils.IsPureNumeric(raw) {
 			d, err := bareSeconds(raw)
 			if err == nil {
-				return d
+				return checkNonNegative(name, d)
 			}
 
-			// Unparseable bare number (for example out-of-range float): same as
-			// other invalid env values — fall back to the pflag default below.
+			// A bare number that does not parse, such as one beyond the float
+			// range, ends the search. Like any other invalid environment value,
+			// it falls back to the flag default below.
 			break
 		}
 
 		d, err := time.ParseDuration(raw)
 		if err == nil {
-			return d
+			return checkNonNegative(name, d)
 		}
 	}
 
@@ -71,11 +78,30 @@ func durationValue(
 	if envSeen {
 		d, err := flagSet.GetDuration(name)
 		if err == nil {
-			return d
+			return checkNonNegative(name, d)
 		}
 	}
 
-	return vCfg.GetDuration(name)
+	return checkNonNegative(name, vCfg.GetDuration(name))
+}
+
+// checkNonNegative returns a non-negative duration unchanged. When the
+// duration is negative, it returns an error that names the setting and the
+// value.
+//
+// Parameters:
+//   - name: Setting name for the error.
+//   - d: Resolved duration.
+//
+// Returns:
+//   - time.Duration: The duration when it is not negative.
+//   - error: Wraps errNegativeDurationSetting when the duration is negative.
+func checkNonNegative(name string, d time.Duration) (time.Duration, error) {
+	if d < 0 {
+		return 0, fmt.Errorf("%s %w, got %s", name, errNegativeDurationSetting, d)
+	}
+
+	return d, nil
 }
 
 // bareSeconds parses a pure numeric string as seconds.
