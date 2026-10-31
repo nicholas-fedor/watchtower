@@ -479,6 +479,8 @@ type ClientOptions struct {
 // and validates the API version, falling back to autonegotiation if necessary.
 //
 // Parameters:
+//   - ctx: Bounds the wait for a daemon that is not serving its API yet. The wait ends after
+//     three minutes at most.
 //   - log: Process logger.
 //   - opts: Options to customize container management behavior.
 //
@@ -486,14 +488,14 @@ type ClientOptions struct {
 //   - Client: The initialized client. It is nil when the error is not.
 //   - error: Non-nil when the client cannot be built or rebuilt. An unanswered ping is not an
 //     error.
-func NewClient(log *zerolog.Logger, opts ClientOptions) (Client, error) {
+func NewClient(ctx context.Context, log *zerolog.Logger, opts ClientOptions) (Client, error) {
 	// Initialize client from environment. FromEnv reads DOCKER_HOST, DOCKER_TLS_VERIFY,
 	// DOCKER_CERT_PATH, and DOCKER_API_VERSION. When DOCKER_API_VERSION is set, the client
 	// uses that fixed version. Otherwise, it defaults to the maximum supported version
 	// with automatic negotiation enabled.
 	//
-	// Construction does not use a context. A timeout is applied only to the subsequent
-	// ping and API negotiation step.
+	// Construction does not use the context. It bounds only the ping and API negotiation
+	// that follow.
 	cli, err := dockerClient.New(dockerClient.FromEnv)
 	if err != nil {
 		return nil, fmt.Errorf("create Docker client: %w", err)
@@ -503,7 +505,7 @@ func NewClient(log *zerolog.Logger, opts ClientOptions) (Client, error) {
 		opts.RateLimiter = ratelimit.New()
 	}
 
-	cli, result, err := negotiateDockerAPI(log, cli)
+	cli, result, err := negotiateDockerAPI(ctx, log, cli)
 	if err != nil {
 		return nil, err
 	}
@@ -521,7 +523,8 @@ func NewClient(log *zerolog.Logger, opts ClientOptions) (Client, error) {
 }
 
 // negotiateDockerAPI pings the daemon to validate connectivity and negotiate the API version.
-// It waits up to three minutes for a daemon that is not serving its API yet.
+// It waits for a daemon that is not serving its API yet until ctx ends, for three minutes at
+// most.
 //
 // When DOCKER_API_VERSION is incompatible with the server, it recreates the client without a
 // fixed version so negotiation can select a supported API. A fixed version is incompatible when
@@ -530,6 +533,7 @@ func NewClient(log *zerolog.Logger, opts ClientOptions) (Client, error) {
 // deferred until the first API call.
 //
 // Parameters:
+//   - ctx: Bounds the wait for the daemon.
 //   - log: Process logger.
 //   - cli: Docker client created from the environment.
 //
@@ -538,12 +542,13 @@ func NewClient(log *zerolog.Logger, opts ClientOptions) (Client, error) {
 //   - dockerClient.PingResult: Result of a successful ping, or zero when ping failed.
 //   - error: Non-nil only when the client cannot be recreated after an incompatible API version.
 func negotiateDockerAPI(
+	ctx context.Context,
 	log *zerolog.Logger,
 	cli *dockerClient.Client,
 ) (*dockerClient.Client, dockerClient.PingResult, error) {
 	// Ping triggers API version negotiation, or only pings when DOCKER_API_VERSION fixes the
 	// version.
-	result, err := pingUntilServing(log, cli)
+	result, err := pingUntilServing(ctx, log, cli)
 
 	// The ping uses the unversioned endpoint, so a daemon older than the fixed version still
 	// answers it. A negotiated version never exceeds the daemon's.
@@ -568,7 +573,7 @@ func negotiateDockerAPI(
 		}
 
 		cli = recreated
-		result, err = pingUntilServing(log, cli)
+		result, err = pingUntilServing(ctx, log, cli)
 	}
 
 	if err != nil {
@@ -582,24 +587,34 @@ func negotiateDockerAPI(
 	return cli, result, nil
 }
 
-// pingUntilServing pings the daemon until it answers, for up to three minutes.
+// pingUntilServing pings the daemon until it answers, for up to three minutes or until ctx
+// ends.
 // A daemon that is restoring its containers holds the connection and answers
 // the queued ping once it serves its API. A ping that fails without an answer
 // is sent again. The wait ends early on an error that a later ping cannot fix,
 // such as a TLS error or a 4xx answer.
 //
 // Parameters:
+//   - ctx: Bounds the wait for the daemon.
 //   - log: Process logger.
 //   - cli: Docker client to ping.
 //
 // Returns:
 //   - dockerClient.PingResult: Result of the first successful ping.
 //   - error: The last ping error, nil on success.
-func pingUntilServing(log *zerolog.Logger, cli *dockerClient.Client) (dockerClient.PingResult, error) {
-	ctx, cancel := context.WithTimeout(context.Background(), daemonStartupTimeout)
+func pingUntilServing(
+	ctx context.Context,
+	log *zerolog.Logger,
+	cli *dockerClient.Client,
+) (dockerClient.PingResult, error) {
+	ctx, cancel := context.WithTimeout(ctx, daemonStartupTimeout)
 	defer cancel()
 
 	start := time.Now()
+
+	// The caller's deadline can end the wait before three minutes.
+	deadline, _ := ctx.Deadline()
+	timeout := deadline.Sub(start).Round(time.Second)
 
 	var (
 		retries    int
@@ -610,7 +625,7 @@ func pingUntilServing(log *zerolog.Logger, cli *dockerClient.Client) (dockerClie
 		noticeOnce.Do(func() {
 			log.Info().
 				Err(err).
-				Str("timeout", daemonStartupTimeout.String()).
+				Str("timeout", timeout.String()).
 				Msg("Docker daemon is not answering yet. Waiting for it")
 		})
 	}

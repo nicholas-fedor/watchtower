@@ -93,7 +93,7 @@ func setPreRunState(t *testing.T, client containerClient.Client, detection selfD
 
 	setProcessFs(t, fsys)
 
-	newClient = func(*zerolog.Logger, containerClient.ClientOptions) (containerClient.Client, error) {
+	newClient = func(context.Context, *zerolog.Logger, containerClient.ClientOptions) (containerClient.Client, error) {
 		return client, nil
 	}
 
@@ -429,7 +429,7 @@ func TestPreRun_RegistryTLSSettings(t *testing.T) {
 
 			var clientOptions containerClient.ClientOptions
 
-			newClient = func(_ *zerolog.Logger, opts containerClient.ClientOptions) (containerClient.Client, error) {
+			newClient = func(_ context.Context, _ *zerolog.Logger, opts containerClient.ClientOptions) (containerClient.Client, error) {
 				clientOptions = opts
 
 				return mockClient, nil
@@ -551,11 +551,12 @@ func TestPreRun_Exit(t *testing.T) {
 			wantOutput:   []string{"SetRestartPolicy cccccccccccc no", "Failed to load configuration"},
 		},
 		{
-			// The client connects to the daemon that the host flag names.
+			// The client connects to the daemon that the host flag names. The
+			// process is exiting, so it waits only briefly for the daemon.
 			helperCase:   "invalid-log-format-with-host-flag",
 			wantExitCode: 1,
 			wantOutput: []string{
-				"newClient DOCKER_HOST=tcp://socket-proxy:2375",
+				"newClient DOCKER_HOST=tcp://socket-proxy:2375 bounded=true",
 				"SetRestartPolicy cccccccccccc no",
 				"Failed to initialize logging",
 			},
@@ -794,10 +795,12 @@ func preRunExitHelper(t *testing.T, helperCase string) {
 
 	processID = func() int { return pid }
 
-	// The client factory prints the Docker host it connects to. It fails with
-	// clientErr when a case sets it.
-	newClient = func(*zerolog.Logger, containerClient.ClientOptions) (containerClient.Client, error) {
-		fmt.Fprintf(os.Stderr, "newClient DOCKER_HOST=%s\n", os.Getenv("DOCKER_HOST"))
+	// The client factory prints the Docker host it connects to and whether its
+	// wait for the daemon has a deadline. It fails with clientErr when a case
+	// sets it.
+	newClient = func(ctx context.Context, _ *zerolog.Logger, _ containerClient.ClientOptions) (containerClient.Client, error) {
+		_, bounded := ctx.Deadline()
+		fmt.Fprintf(os.Stderr, "newClient DOCKER_HOST=%s bounded=%t\n", os.Getenv("DOCKER_HOST"), bounded)
 
 		if clientErr != nil {
 			return nil, clientErr

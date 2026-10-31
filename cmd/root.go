@@ -365,7 +365,7 @@ func (p *process) preRun(cmd *cobra.Command, _ []string) error {
 	clientOpts := appCfg.ClientOptions()
 	clientOpts.RateLimiter = rateLimiter
 
-	client, err = newClient(p.log, clientOpts)
+	client, err = newClient(context.Background(), p.log, clientOpts)
 	if err != nil {
 		p.clientErr = err
 
@@ -994,8 +994,13 @@ func (p *process) disableRestartsBeforeExit(cmd *cobra.Command) {
 		}
 
 		if err == nil {
-			// The client options only change how updates run.
-			client, err = newClient(p.log, containerClient.ClientOptions{})
+			// The client options only change how updates run. The process is
+			// exiting, so it waits only briefly for a daemon that does not
+			// answer.
+			ctx, cancel := context.WithTimeout(context.Background(), restartPolicyTimeout)
+			client, err = newClient(ctx, p.log, containerClient.ClientOptions{})
+
+			cancel()
 		}
 
 		if err == nil {

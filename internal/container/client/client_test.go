@@ -1431,7 +1431,7 @@ func TestClientEnvironment(t *testing.T) {
 			server := httpstub.New(t)
 			useDockerTLS(t, server, httpstub.NewTLS(t))
 
-			client, err := NewClient(newTestLogger(t), ClientOptions{})
+			client, err := NewClient(t.Context(), newTestLogger(t), ClientOptions{})
 			require.NoError(t, err)
 
 			_, err = client.GetInfo(t.Context())
@@ -1446,7 +1446,7 @@ func TestClientEnvironment(t *testing.T) {
 			t.Setenv("DOCKER_TLS_VERIFY", "")
 			t.Setenv("DOCKER_API_VERSION", "")
 
-			client, err := NewClient(newTestLogger(t), ClientOptions{})
+			client, err := NewClient(t.Context(), newTestLogger(t), ClientOptions{})
 			require.ErrorContains(t, err, "create Docker client")
 			assert.Nil(t, client)
 		})
@@ -1456,7 +1456,7 @@ func TestClientEnvironment(t *testing.T) {
 			server.AppendHandlers(respondToPing(t, http.MethodHead, http.StatusOK, "1.45"))
 			useDockerTLS(t, server, server)
 
-			client, err := NewClient(newTestLogger(t), ClientOptions{})
+			client, err := NewClient(t.Context(), newTestLogger(t), ClientOptions{})
 			require.NoError(t, err)
 			require.NotNil(t, client)
 
@@ -1469,7 +1469,7 @@ func TestClientEnvironment(t *testing.T) {
 			server := httpstub.New(t)
 			useDockerTLS(t, server, httpstub.NewTLS(t))
 
-			assert.NotPanics(t, func() { _, _ = NewClient(newTestLogger(t), ClientOptions{}) })
+			assert.NotPanics(t, func() { _, _ = NewClient(t.Context(), newTestLogger(t), ClientOptions{}) })
 			assert.Empty(t, server.ReceivedRequests(), "no plain HTTP request is sent")
 		})
 
@@ -1478,7 +1478,7 @@ func TestClientEnvironment(t *testing.T) {
 			server.AppendHandlers(respondToPing(t, http.MethodHead, http.StatusOK, "1.45"))
 			useDockerTLS(t, server, server)
 
-			client, err := NewClient(newTestLogger(t), ClientOptions{})
+			client, err := NewClient(t.Context(), newTestLogger(t), ClientOptions{})
 			require.NoError(t, err)
 			assert.Equal(t, "1.45", client.GetVersion())
 		})
@@ -1491,7 +1491,7 @@ func TestClientEnvironment(t *testing.T) {
 			useDockerTLS(t, server, server)
 			t.Setenv("DOCKER_API_VERSION", "1.44")
 
-			client, err := NewClient(newTestLogger(t), ClientOptions{})
+			client, err := NewClient(t.Context(), newTestLogger(t), ClientOptions{})
 			require.NoError(t, err)
 			assert.Equal(t, "1.44", client.GetVersion())
 		})
@@ -1507,7 +1507,7 @@ func TestClientEnvironment(t *testing.T) {
 			useDockerTLS(t, server, server)
 			t.Setenv("DOCKER_API_VERSION", "1.47")
 
-			client, err := NewClient(newTestLogger(t), ClientOptions{})
+			client, err := NewClient(t.Context(), newTestLogger(t), ClientOptions{})
 			require.NoError(t, err)
 			assert.Equal(t, "1.45", client.GetVersion())
 			assert.Len(t, server.ReceivedRequests(), 2)
@@ -1525,7 +1525,7 @@ func TestClientEnvironment(t *testing.T) {
 			useDockerTLS(t, server, server)
 			t.Setenv("DOCKER_API_VERSION", "1.99")
 
-			client, err := NewClient(newTestLogger(t), ClientOptions{})
+			client, err := NewClient(t.Context(), newTestLogger(t), ClientOptions{})
 			require.NoError(t, err)
 			assert.Equal(t, "1.45", client.GetVersion())
 			assert.Len(t, server.ReceivedRequests(), 3)
@@ -2202,6 +2202,8 @@ func TestPingUntilServing(t *testing.T) {
 		notReadyStatus int
 		transportErr   error
 		status         int
+		// callerTimeout bounds the caller's context. Zero leaves it unbounded.
+		callerTimeout time.Duration
 		// wantWait is how long the wait takes, and wantRequests how many
 		// requests it sends. A ping that gets no answer sends a HEAD and
 		// then a GET.
@@ -2271,6 +2273,26 @@ func TestPingUntilServing(t *testing.T) {
 			wantErr:      true,
 		},
 		{
+			name:          "caller's deadline ends the wait early",
+			ready:         time.Hour,
+			callerTimeout: 5 * time.Second,
+			wantWait:      5 * time.Second,
+			wantRequests:  2,
+			wantErr:       true,
+		},
+		{
+			// Pings at 0, 1, and 3 seconds are refused. The next would come
+			// after the caller's deadline.
+			name:          "caller's deadline ends the retries early",
+			ready:         time.Hour,
+			notReadyErr:   refused,
+			callerTimeout: 5 * time.Second,
+			wantWait:      5 * time.Second,
+			wantRequests:  6,
+			wantErr:       true,
+			wantLog:       "timeout=5s",
+		},
+		{
 			name:         "daemon that rejects the ping ends the wait at once",
 			status:       http.StatusForbidden,
 			wantRequests: 2,
@@ -2299,7 +2321,16 @@ func TestPingUntilServing(t *testing.T) {
 				}
 				log, logOutput := logcapture.New(zerolog.DebugLevel)
 
-				result, err := pingUntilServing(log, newStartingDaemonClient(t, daemon))
+				ctx := t.Context()
+
+				if tt.callerTimeout != 0 {
+					var cancel context.CancelFunc
+
+					ctx, cancel = context.WithTimeout(ctx, tt.callerTimeout)
+					defer cancel()
+				}
+
+				result, err := pingUntilServing(ctx, log, newStartingDaemonClient(t, daemon))
 
 				assert.Equal(t, tt.wantWait, time.Since(start))
 				assert.Equal(t, tt.wantRequests, daemon.requests)
@@ -2327,7 +2358,7 @@ func TestNegotiateDockerAPI_WaitsForDaemon(t *testing.T) {
 	synctest.Test(t, func(t *testing.T) {
 		daemon := &startingDaemon{ready: time.Now().Add(75 * time.Second)}
 
-		cli, result, err := negotiateDockerAPI(newTestLogger(t), newStartingDaemonClient(t, daemon))
+		cli, result, err := negotiateDockerAPI(t.Context(), newTestLogger(t), newStartingDaemonClient(t, daemon))
 		require.NoError(t, err)
 		assert.Equal(t, "1.45", result.APIVersion)
 		assert.Equal(t, "1.45", cli.ClientVersion())
