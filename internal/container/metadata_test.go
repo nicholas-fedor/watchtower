@@ -1020,182 +1020,70 @@ func TestContainer_getBoolLabelValue(t *testing.T) {
 	}
 }
 
-func TestContainer_GetLifecycleUID(t *testing.T) {
-	tests := []struct {
-		name  string
-		c     *Container
-		want  int
-		want1 bool
-	}{
-		{
-			name: "UIDSet",
-			c: &Container{
-				containerInfo: &dockerContainer.InspectResponse{
-					Name: "/test-container",
-					Config: &dockerContainer.Config{
-						Labels: map[string]string{
-							labels.LifecycleUID: "1000",
-						},
-					},
-				},
-			},
-			want:  1000,
-			want1: true,
-		},
-		{
-			name: "UIDNotSet",
-			c: &Container{
-				containerInfo: &dockerContainer.InspectResponse{
-					Name: "/test-container",
-					Config: &dockerContainer.Config{
-						Labels: map[string]string{},
-					},
-				},
-			},
-			want:  0,
-			want1: false,
-		},
-		{
-			name: "InvalidUID",
-			c: &Container{
-				containerInfo: &dockerContainer.InspectResponse{
-					Name: "/test-container",
-					Config: &dockerContainer.Config{
-						Labels: map[string]string{
-							labels.LifecycleUID: "invalid",
-						},
-					},
-				},
-			},
-			want:  0,
-			want1: false,
-		},
-		{
-			name: "NegativeUID",
-			c: &Container{
-				containerInfo: &dockerContainer.InspectResponse{
-					Name: "/test-container",
-					Config: &dockerContainer.Config{
-						Labels: map[string]string{
-							labels.LifecycleUID: "-1",
-						},
-					},
-				},
-			},
-			want:  0,
-			want1: false,
-		},
-		{
-			name: "TooLargeUID",
-			c: &Container{
-				containerInfo: &dockerContainer.InspectResponse{
-					Name: "/test-container",
-					Config: &dockerContainer.Config{
-						Labels: map[string]string{
-							labels.LifecycleUID: "3000000000",
-						},
-					},
-				},
-			},
-			want:  0,
-			want1: false,
-		},
-	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			got, got1 := tt.c.GetLifecycleUID()
-			assert.Equal(t, tt.want, got)
-			assert.Equal(t, tt.want1, got1)
-		})
-	}
-}
+// TestContainer_LifecycleUser verifies that each lifecycle hook ID comes from
+// its label when the label holds a valid ID, and from the configured default
+// when the label is unset, not a number, negative or above the maximum.
+func TestContainer_LifecycleUser(t *testing.T) {
+	t.Parallel()
 
-func TestContainer_GetLifecycleGID(t *testing.T) {
+	const (
+		defaultUID = 500
+		defaultGID = 600
+	)
+
 	tests := []struct {
-		name  string
-		c     *Container
-		want  int
-		want1 bool
+		name    string
+		labels  map[string]string
+		wantUID int
+		wantGID int
 	}{
 		{
-			name: "GIDSet",
-			c: &Container{
-				containerInfo: &dockerContainer.InspectResponse{
-					Name: "/test-container",
-					Config: &dockerContainer.Config{
-						Labels: map[string]string{
-							labels.LifecycleGID: "1000",
-						},
-					},
-				},
-			},
-			want:  1000,
-			want1: true,
+			name:    "both labels set",
+			labels:  map[string]string{labels.LifecycleUID: "1000", labels.LifecycleGID: "1001"},
+			wantUID: 1000,
+			wantGID: 1001,
+		},
+		{name: "no labels", labels: map[string]string{}, wantUID: defaultUID, wantGID: defaultGID},
+		{
+			name:    "UID label only",
+			labels:  map[string]string{labels.LifecycleUID: "0"},
+			wantUID: 0,
+			wantGID: defaultGID,
 		},
 		{
-			name: "GIDNotSet",
-			c: &Container{
-				containerInfo: &dockerContainer.InspectResponse{
-					Name: "/test-container",
-					Config: &dockerContainer.Config{
-						Labels: map[string]string{},
-					},
-				},
-			},
-			want:  0,
-			want1: false,
+			name:    "UID that is not a number",
+			labels:  map[string]string{labels.LifecycleUID: "invalid", labels.LifecycleGID: "1001"},
+			wantUID: defaultUID,
+			wantGID: 1001,
 		},
 		{
-			name: "InvalidGID",
-			c: &Container{
-				containerInfo: &dockerContainer.InspectResponse{
-					Name: "/test-container",
-					Config: &dockerContainer.Config{
-						Labels: map[string]string{
-							labels.LifecycleGID: "invalid",
-						},
-					},
-				},
-			},
-			want:  0,
-			want1: false,
+			name:    "negative GID",
+			labels:  map[string]string{labels.LifecycleGID: "-100"},
+			wantUID: defaultUID,
+			wantGID: defaultGID,
 		},
 		{
-			name: "NegativeGID",
-			c: &Container{
-				containerInfo: &dockerContainer.InspectResponse{
-					Name: "/test-container",
-					Config: &dockerContainer.Config{
-						Labels: map[string]string{
-							labels.LifecycleGID: "-100",
-						},
-					},
-				},
-			},
-			want:  0,
-			want1: false,
-		},
-		{
-			name: "TooLargeGID",
-			c: &Container{
-				containerInfo: &dockerContainer.InspectResponse{
-					Name: "/test-container",
-					Config: &dockerContainer.Config{
-						Labels: map[string]string{
-							labels.LifecycleGID: "5000000000",
-						},
-					},
-				},
-			},
-			want:  0,
-			want1: false,
+			name:    "IDs above the maximum",
+			labels:  map[string]string{labels.LifecycleUID: "3000000000", labels.LifecycleGID: "5000000000"},
+			wantUID: defaultUID,
+			wantGID: defaultGID,
 		},
 	}
+
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got, got1 := tt.c.GetLifecycleGID()
-			assert.Equal(t, tt.want, got)
-			assert.Equal(t, tt.want1, got1)
+			t.Parallel()
+
+			c := &Container{
+				containerInfo: &dockerContainer.InspectResponse{
+					Name:   "/test-container",
+					Config: &dockerContainer.Config{Labels: tt.labels},
+				},
+			}
+
+			uid, gid := c.LifecycleUser(defaultUID, defaultGID)
+			assert.Equal(t, tt.wantUID, uid)
+			assert.Equal(t, tt.wantGID, gid)
 		})
 	}
 }
@@ -1331,19 +1219,19 @@ func TestContainer_InvalidLabelsWarnOnce(t *testing.T) {
 			name:    "lifecycle UID that is not a number",
 			labels:  map[string]string{labels.LifecycleUID: "root"},
 			message: "Invalid lifecycle UID value: not a valid integer",
-			read:    func(c *Container) { c.GetLifecycleUID() },
+			read:    func(c *Container) { c.LifecycleUser(0, 0) },
 		},
 		{
 			name:    "negative lifecycle GID",
 			labels:  map[string]string{labels.LifecycleGID: "-1"},
 			message: "Invalid lifecycle GID value: must be non-negative",
-			read:    func(c *Container) { c.GetLifecycleGID() },
+			read:    func(c *Container) { c.LifecycleUser(0, 0) },
 		},
 		{
 			name:    "lifecycle UID above the maximum",
 			labels:  map[string]string{labels.LifecycleUID: "3000000000"},
 			message: aboveMaximumUID,
-			read:    func(c *Container) { c.GetLifecycleUID() },
+			read:    func(c *Container) { c.LifecycleUser(0, 0) },
 		},
 		{
 			name:    "enable label",
@@ -1422,15 +1310,13 @@ func TestContainer_InvalidLabelsWarnOncePerLabel(t *testing.T) {
 			}},
 		},
 	}
-	readUID := func(c *Container) { c.GetLifecycleUID() }
-	readGID := func(c *Container) { c.GetLifecycleGID() }
+	readUser := func(c *Container) { c.LifecycleUser(0, 0) }
 
-	assert.Equal(t, []string{uidWarning}, logcapture.Messages(t, readLabelLogs(c, readUID), "warn"))
-	assert.Equal(t, []string{gidWarning}, logcapture.Messages(t, readLabelLogs(c, readGID), "warn"))
+	assert.Equal(t, []string{uidWarning, gidWarning}, logcapture.Messages(t, readLabelLogs(c, readUser), "warn"))
 
-	laterRead := readLabelLogs(c, readUID)
+	laterRead := readLabelLogs(c, readUser)
 	assert.Empty(t, logcapture.Messages(t, laterRead, "warn"))
-	assert.Contains(t, logcapture.Messages(t, laterRead, "debug"), uidWarning)
+	assert.Subset(t, logcapture.Messages(t, laterRead, "debug"), []string{uidWarning, gidWarning})
 }
 
 // readLabelLogs runs read on c with a debug-level JSON logger and returns

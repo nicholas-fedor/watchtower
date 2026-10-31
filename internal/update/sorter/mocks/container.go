@@ -117,8 +117,7 @@ func (c *SimpleContainer) GetLifecyclePreCheckCommand() string              { re
 func (c *SimpleContainer) GetLifecyclePostCheckCommand() string             { return "" }
 func (c *SimpleContainer) GetLifecyclePreUpdateCommand() string             { return "" }
 func (c *SimpleContainer) GetLifecyclePostUpdateCommand() string            { return "" }
-func (c *SimpleContainer) GetLifecycleUID() (int, bool)                     { return 0, false }
-func (c *SimpleContainer) GetLifecycleGID() (int, bool)                     { return 0, false }
+func (c *SimpleContainer) LifecycleUser(uid, gid int) (int, int)            { return uid, gid }
 func (c *SimpleContainer) GetContainerChain() (string, bool)                { return "", false }
 func (c *SimpleContainer) VerifyConfiguration() error                       { return nil }
 func (c *SimpleContainer) SetStale(_ bool)                                  {}
