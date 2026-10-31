@@ -474,12 +474,9 @@ func (c *Container) Scope() (string, bool) {
 // Returns:
 //   - string: The container's scope.
 func (c *Container) NormalizedScope() string {
-	scope, ok := c.Scope()
-	if !ok || scope == "" {
-		return labels.NoScope
-	}
+	scope, _ := c.Scope()
 
-	return scope
+	return labels.NormalizeScope(scope)
 }
 
 // GetEffectiveScope determines the effective operational scope by prioritizing explicit scope

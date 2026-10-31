@@ -89,3 +89,18 @@ const (
 	// set to "none".
 	NoScope = "none"
 )
+
+// NormalizeScope returns scope, or [NoScope] when scope is empty.
+//
+// Parameters:
+//   - scope: A scope label value or a configured scope.
+//
+// Returns:
+//   - string: The scope, with an empty one as [NoScope].
+func NormalizeScope(scope string) string {
+	if scope == "" {
+		return NoScope
+	}
+
+	return scope
+}

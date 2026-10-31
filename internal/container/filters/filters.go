@@ -551,9 +551,7 @@ func filterByEnableLabel(enable bool, baseFilter types.Filter) types.Filter {
 // Returns:
 //   - types.Filter: Filter function matching scope and applying base filter.
 func FilterByScope(log *zerolog.Logger, scope string, baseFilter types.Filter) types.Filter {
-	if scope == "" {
-		scope = labels.NoScope
-	}
+	scope = labels.NormalizeScope(scope)
 
 	return func(c types.FilterableContainer) bool {
 		containerScope := c.NormalizedScope()
@@ -931,12 +929,12 @@ func BuildFilter(log *zerolog.Logger,
 		stringBuilder.WriteString(`, `)
 	}
 
-	// Keep only containers in the configured scope. An empty configured scope
-	// selects the containers without a scope, the same as "none".
+	// Keep only containers in the configured scope.
+	scope = labels.NormalizeScope(scope)
 	filter = FilterByScope(log, scope, filter)
 
 	// Add scope description.
-	if scope == labels.NoScope || scope == "" {
+	if scope == labels.NoScope {
 		stringBuilder.WriteString(`without a scope`)
 	} else {
 		stringBuilder.WriteString(`in scope `)

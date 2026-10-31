@@ -6,6 +6,7 @@ import (
 
 	"github.com/rs/zerolog"
 
+	"github.com/nicholas-fedor/watchtower/internal/container/labels"
 	"github.com/nicholas-fedor/watchtower/pkg/types"
 )
 
@@ -28,9 +29,9 @@ type fuzzableContainer struct {
 	watchtower bool
 }
 
-func newFuzzableContainer(name, imageName string, enabled bool, scope string, hasScope bool, labels map[string]string) fuzzableContainer {
-	if labels == nil {
-		labels = make(map[string]string)
+func newFuzzableContainer(name, imageName string, enabled bool, scope string, hasScope bool, containerLabels map[string]string) fuzzableContainer {
+	if containerLabels == nil {
+		containerLabels = make(map[string]string)
 	}
 
 	return fuzzableContainer{
@@ -39,7 +40,7 @@ func newFuzzableContainer(name, imageName string, enabled bool, scope string, ha
 		enabled:    enabled,
 		scope:      scope,
 		hasScope:   hasScope,
-		labels:     labels,
+		labels:     containerLabels,
 		watchtower: false,
 	}
 }
@@ -63,11 +64,12 @@ func (c fuzzableContainer) Scope() (string, bool) {
 // NormalizedScope returns the scope, or "none" when it is unset or empty, as
 // the container model does.
 func (c fuzzableContainer) NormalizedScope() string {
-	if !c.hasScope || c.scope == "" {
-		return "none"
+	scope := ""
+	if c.hasScope {
+		scope = c.scope
 	}
 
-	return c.scope
+	return labels.NormalizeScope(scope)
 }
 
 func (c fuzzableContainer) GetLabel(key string) (string, bool) {
@@ -85,12 +87,12 @@ var _ types.FilterableContainer = fuzzableContainer{}
 // labelMap turns parsed label pairs into a container's labels. A container
 // holds one value per key, so a later pair replaces an earlier one.
 func labelMap(pairs []labelPair) map[string]string {
-	labels := make(map[string]string, len(pairs))
+	containerLabels := make(map[string]string, len(pairs))
 	for _, pair := range pairs {
-		labels[pair.key] = pair.value
+		containerLabels[pair.key] = pair.value
 	}
 
-	return labels
+	return containerLabels
 }
 
 func FuzzParseLabelPairs(f *testing.F) {
