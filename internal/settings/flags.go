@@ -40,6 +40,10 @@ var (
 	errInvalidFlagName = errors.New("invalid flag name provided")
 	// errNotSliceValue indicates a flag does not support slice values for appending.
 	errNotSliceValue = errors.New("flag does not support slice values")
+	// errUnknownPorcelainVersion indicates a porcelain version other than v1 or json.
+	errUnknownPorcelainVersion = errors.New("unknown porcelain version, supported: v1, json")
+	// errIntervalAndSchedule indicates that both an interval and a schedule were set.
+	errIntervalAndSchedule = errors.New("cannot define both interval and schedule")
 )
 
 // EnvConfig sets Docker environment variables from flags.
@@ -166,11 +170,14 @@ func setEnvOptBool(log *zerolog.Logger, env string, opt bool) error {
 // GetSecretsFromFiles updates flags with file contents for secrets.
 //
 // Parameters:
-//   - log: Logger for secret-loading diagnostics and fatal failures.
+//   - log: Logger for secret-loading diagnostics.
 //   - rootCmd: Root Cobra command.
 //
+// Returns:
+//   - error: Non-nil when a secret file cannot be loaded, naming its flag.
+//
 //nolint:godox
-func GetSecretsFromFiles(log *zerolog.Logger, rootCmd *cobra.Command) {
+func GetSecretsFromFiles(log *zerolog.Logger, rootCmd *cobra.Command) error {
 	flags := rootCmd.PersistentFlags()
 	secrets := []string{
 		// TODO: Remove just before v2 Release.
@@ -192,12 +199,11 @@ func GetSecretsFromFiles(log *zerolog.Logger, rootCmd *cobra.Command) {
 	for _, secret := range secrets {
 		err := getSecretFromFile(log, flags, secret)
 		if err != nil {
-			log.Fatal().
-				Err(err).
-				Str("flag", secret).
-				Msg("Failed to load secret from file")
+			return fmt.Errorf("%s: %w", secret, err)
 		}
 	}
+
+	return nil
 }
 
 // getSecretFromFile reads file contents into a flag if applicable.
@@ -383,41 +389,40 @@ func isFilePath(path string) bool {
 // Intended production order (see cmd preRun / notify-upgrade):
 //
 //  1. ApplyEnvToFlags (or rely on the bridge inside this function)
-//  2. SetupLogging — apply --log-format (and current level) so Fatal paths here
-//     use the user-selected format rather than zerolog's default JSON encoding
-//  3. ProcessFlagAliases — may force log-level to debug/trace and may Fatal
-//  4. SetupLogging again — re-apply level after alias mutations
+//  2. SetupLogging, which applies --log-format and the current level, so the
+//     caller logs an error from here in the selected format
+//  3. ProcessFlagAliases, which may force the log level to debug or trace
+//  4. SetupLogging again, which applies the level after alias changes
 //  5. GetSecretsFromFiles / EnvConfig / Load
 //
 // Call after Cobra parse. Do not call only after a single post-alias SetupLogging
 // if format-before-fatal matters. Sandwich this between the two SetupLogging calls.
 //
 // Parameters:
-//   - log: Logger for alias diagnostics and fatal configuration errors.
+//   - log: Logger for alias diagnostics.
 //   - flags: Parsed persistent flag set.
-func ProcessFlagAliases(log *zerolog.Logger, flags *pflag.FlagSet) {
+//
+// Returns:
+//   - error: Non-nil when the flags or the environment hold an invalid
+//     configuration.
+func ProcessFlagAliases(log *zerolog.Logger, flags *pflag.FlagSet) error {
 	// Ensure env-sourced values are visible to alias logic via flag Gets.
 	err := ApplyEnvToFlags(flags, AllSpecs())
 	if err != nil {
-		log.Fatal().Err(err).Msg("Failed to apply environment configuration")
+		return fmt.Errorf("apply environment configuration: %w", err)
 	}
 
 	// Handle porcelain mode.
 	porcelain, err := flags.GetString("porcelain")
 	if err != nil {
-		log.Fatal().
-			Err(err).
-			Str("flag", "porcelain").
-			Msg("Failed to get porcelain flag")
+		return fmt.Errorf("read porcelain flag: %w", err)
 	}
 
 	if porcelain != "" {
 		switch porcelain {
 		case "v1", "json":
 		default:
-			log.Fatal().
-				Str("version", porcelain).
-				Msg("Unknown porcelain version, supported: v1, json")
+			return fmt.Errorf("%w: %q", errUnknownPorcelainVersion, porcelain)
 		}
 
 		err := appendFlagValue(log, flags, "notification-url", "logger://")
@@ -454,10 +459,7 @@ func ProcessFlagAliases(log *zerolog.Logger, flags *pflag.FlagSet) {
 	}
 
 	if intervalChanged && scheduleChanged {
-		log.Fatal().
-			Bool("interval", intervalChanged).
-			Bool("schedule", scheduleChanged).
-			Msg("Cannot define both interval and schedule")
+		return errIntervalAndSchedule
 	}
 
 	// Update schedule to match interval or default if needed.
@@ -481,19 +483,31 @@ func ProcessFlagAliases(log *zerolog.Logger, flags *pflag.FlagSet) {
 	}
 
 	// Adjust log level for debug/trace.
-	if flagIsEnabled(log, flags, "debug") {
+	debug, err := flags.GetBool("debug")
+	if err != nil {
+		return fmt.Errorf("read debug flag: %w", err)
+	}
+
+	if debug {
 		err := flags.Set("log-level", "debug")
 		if err != nil {
 			log.Debug().Err(err).Msg("Failed to set debug log level")
 		}
 	}
 
-	if flagIsEnabled(log, flags, "trace") {
+	trace, err := flags.GetBool("trace")
+	if err != nil {
+		return fmt.Errorf("read trace flag: %w", err)
+	}
+
+	if trace {
 		err := flags.Set("log-level", "trace")
 		if err != nil {
 			log.Debug().Err(err).Msg("Failed to set trace log level")
 		}
 	}
+
+	return nil
 }
 
 // SetupLogging configures format and level on the provided logger.
@@ -589,27 +603,6 @@ func SetupLogging(log *zerolog.Logger, flags *pflag.FlagSet) (*zerolog.Logger, e
 		Msg("Configured logging settings")
 
 	return log, nil
-}
-
-// flagIsEnabled checks if a boolean flag is true.
-//
-// Parameters:
-//   - log: Logger for fatal flag retrieval failures.
-//   - flags: Flag set.
-//   - name: Flag name.
-//
-// Returns:
-//   - bool: True if enabled.
-func flagIsEnabled(log *zerolog.Logger, flags *pflag.FlagSet, name string) bool {
-	value, err := flags.GetBool(name)
-	if err != nil {
-		log.Fatal().
-			Err(err).
-			Str("flag", name).
-			Msg("Failed to check flag status")
-	}
-
-	return value
 }
 
 // appendFlagValue appends values to a slice flag.

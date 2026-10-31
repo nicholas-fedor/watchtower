@@ -71,8 +71,8 @@ func loadWithEnv(t *testing.T, env map[string]string, args ...string) (Config, e
 	require.NoError(t, ApplyEnvToFlags(flagSet, AllSpecs()))
 
 	log := logging.New(io.Discard, logging.InfoLevel)
-	ProcessFlagAliases(log, flagSet)
-	GetSecretsFromFiles(log, cmd)
+	require.NoError(t, ProcessFlagAliases(log, flagSet))
+	require.NoError(t, GetSecretsFromFiles(log, cmd))
 
 	return Load(newTestLogger(t), cmd, nil)
 }

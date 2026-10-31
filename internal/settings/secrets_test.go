@@ -1,7 +1,6 @@
 package settings
 
 import (
-	"context"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -16,13 +15,7 @@ import (
 	"github.com/spf13/pflag"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-
-	"github.com/nicholas-fedor/watchtower/internal/observability/logging"
 )
-
-// secretsFatalHelperEnv selects a GetSecretsFromFiles fatal case when the test
-// binary is re-executed as a subprocess. Empty means the parent process.
-const secretsFatalHelperEnv = "WATCHTOWER_FLAGS_SECRETS_FATAL_HELPER"
 
 // newSecretsCommand returns a command with every flag registered, as in
 // production, parsed from args.
@@ -391,7 +384,7 @@ func TestGetSecretsFromFiles_ReadsEverySecret(t *testing.T) {
 		require.NoError(t, flags.Set(flag.Name, writeSecretFile(t, content+"\n")))
 	})
 
-	GetSecretsFromFiles(newInfoTestLogger(t), cmd)
+	require.NoError(t, GetSecretsFromFiles(newInfoTestLogger(t), cmd))
 
 	var read []string
 
@@ -412,31 +405,13 @@ func TestGetSecretsFromFiles_ReadsEverySecret(t *testing.T) {
 	assert.Equal(t, want, read)
 }
 
-// TestGetSecretsFromFiles_FatalOnInvalidSecret verifies that a secret file that
-// fails to load ends the process with a non-zero exit code and names the flag.
-func TestGetSecretsFromFiles_FatalOnInvalidSecret(t *testing.T) {
-	if path := os.Getenv(secretsFatalHelperEnv); path != "" {
-		cmd := newSecretsCommand(t, "--notification-url", path)
-		GetSecretsFromFiles(testLoggerAt(os.Stderr, logging.InfoLevel), cmd)
-
-		// GetSecretsFromFiles must exit. Reaching here means it did not.
-		os.Exit(0)
-	}
-
+// TestGetSecretsFromFiles_InvalidSecret verifies that a secret file that
+// fails to load is returned as an error that names the flag.
+func TestGetSecretsFromFiles_InvalidSecret(t *testing.T) {
 	path := writeSecretFile(t, "not-a-url\n")
+	cmd := newSecretsCommand(t, "--notification-url", path)
 
-	ctx, cancel := context.WithTimeout(t.Context(), 30*time.Second)
-	defer cancel()
-
-	cmd := exec.CommandContext(ctx, os.Args[0], "-test.run=^TestGetSecretsFromFiles_FatalOnInvalidSecret$", "-test.v=false")
-
-	cmd.Env = append(os.Environ(), secretsFatalHelperEnv+"="+path)
-
-	out, err := cmd.CombinedOutput()
-
-	var exitErr *exec.ExitError
-	require.ErrorAs(t, err, &exitErr, "GetSecretsFromFiles must exit; output:\n%s", out)
-	assert.NotEqual(t, 0, exitErr.ExitCode())
-	assert.Contains(t, string(out), "Failed to load secret from file")
-	assert.Contains(t, string(out), "notification-url")
+	err := GetSecretsFromFiles(newInfoTestLogger(t), cmd)
+	require.ErrorIs(t, err, errInvalidSecretURL)
+	assert.ErrorContains(t, err, "notification-url")
 }
