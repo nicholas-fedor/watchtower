@@ -2,8 +2,12 @@ package container
 
 import (
 	"bytes"
+	"crypto/rand"
+	"encoding/hex"
+	"encoding/json"
 	"math"
 	"strconv"
+	"strings"
 	"testing"
 	"time"
 
@@ -252,8 +256,11 @@ func TestContainer_HookTimeouts(t *testing.T) {
 				var out bytes.Buffer
 
 				log := zerolog.New(&out).Level(zerolog.WarnLevel)
+				// A fresh ID keeps the record of reported labels from hiding
+				// this case's warning behind another case or test run.
 				c := &Container{
 					containerInfo: &dockerContainer.InspectResponse{
+						ID:     randomContainerID(t),
 						Name:   "/test-container",
 						Config: &dockerContainer.Config{Labels: containerLabels},
 					},
@@ -1292,6 +1299,189 @@ func TestContainer_getContainerOrGlobalBool(t *testing.T) {
 			assert.Equal(t, tt.want, got)
 		})
 	}
+}
+
+// TestContainer_InvalidLabelsWarnOnce verifies that an invalid label value is
+// logged as a warning, which notifications include, on the first read for a
+// container, and at debug level on later reads. Each label is read on every
+// scan, hook run or API request, so a lasting misconfiguration would otherwise
+// notify every time. Another container with the same label warns again, and a
+// problem is warned about once, not by two log lines.
+func TestContainer_InvalidLabelsWarnOnce(t *testing.T) {
+	t.Parallel()
+
+	// aboveMaximumUID is the warning for a UID of 3000000000. A 64-bit int
+	// holds it, so it fails the range check. It overflows a 32-bit int, so
+	// parsing fails first there.
+	aboveMaximumUID := "Invalid lifecycle UID value: exceeds maximum reasonable value"
+	if strconv.IntSize == 32 {
+		aboveMaximumUID = "Invalid lifecycle UID value: not a valid integer"
+	}
+
+	tests := []struct {
+		name    string
+		labels  map[string]string
+		message string
+		read    func(c *Container)
+	}{
+		{
+			name:    "hook timeout",
+			labels:  map[string]string{labels.LifecyclePreCheckTimeout: "1.5"},
+			message: "Invalid pre-check timeout value, using default",
+			read:    func(c *Container) { c.PreCheckTimeout() },
+		},
+		{
+			name:    "lifecycle UID that is not a number",
+			labels:  map[string]string{labels.LifecycleUID: "root"},
+			message: "Invalid lifecycle UID value: not a valid integer",
+			read:    func(c *Container) { c.GetLifecycleUID() },
+		},
+		{
+			name:    "negative lifecycle GID",
+			labels:  map[string]string{labels.LifecycleGID: "-1"},
+			message: "Invalid lifecycle GID value: must be non-negative",
+			read:    func(c *Container) { c.GetLifecycleGID() },
+		},
+		{
+			name:    "lifecycle UID above the maximum",
+			labels:  map[string]string{labels.LifecycleUID: "3000000000"},
+			message: aboveMaximumUID,
+			read:    func(c *Container) { c.GetLifecycleUID() },
+		},
+		{
+			name:    "enable label",
+			labels:  map[string]string{labels.Enable: "yes please"},
+			message: "Invalid enable label value",
+			read:    func(c *Container) { c.Enabled() },
+		},
+		{
+			name:    "cooldown delay",
+			labels:  map[string]string{labels.CooldownDelay: "soon"},
+			message: "Failed to parse cooldown-delay label, using global value",
+			read:    func(c *Container) { c.CooldownDelay(types.UpdateParams{}) },
+		},
+		{
+			name:    "boolean label",
+			labels:  map[string]string{labels.MonitorOnly: "maybe"},
+			message: "Failed to parse label value",
+			read:    func(c *Container) { c.IsMonitorOnly(types.UpdateParams{}) },
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			// Fresh IDs per run keep the process-wide record of reported
+			// labels from carrying over between test runs.
+			first := &Container{
+				containerInfo: &dockerContainer.InspectResponse{
+					ID:     randomContainerID(t),
+					Name:   "/first",
+					Config: &dockerContainer.Config{Labels: tt.labels},
+				},
+			}
+			second := &Container{
+				containerInfo: &dockerContainer.InspectResponse{
+					ID:     randomContainerID(t),
+					Name:   "/second",
+					Config: &dockerContainer.Config{Labels: tt.labels},
+				},
+			}
+
+			firstRead := readLabelLogs(first, tt.read)
+			assert.Equal(t, []string{tt.message}, messagesAt(t, firstRead, "warn"))
+
+			laterRead := readLabelLogs(first, tt.read)
+			assert.Empty(t, messagesAt(t, laterRead, "warn"))
+			assert.Contains(t, messagesAt(t, laterRead, "debug"), tt.message)
+
+			otherContainer := readLabelLogs(second, tt.read)
+			assert.Equal(t, []string{tt.message}, messagesAt(t, otherContainer, "warn"))
+		})
+	}
+}
+
+// TestContainer_InvalidLabelsWarnOncePerLabel verifies that one container
+// warns about each of its invalid labels, since a reported label does not hide
+// a different one. A label read again after its warning is logged at debug.
+func TestContainer_InvalidLabelsWarnOncePerLabel(t *testing.T) {
+	t.Parallel()
+
+	const (
+		uidWarning = "Invalid lifecycle UID value: not a valid integer"
+		gidWarning = "Invalid lifecycle GID value: not a valid integer"
+	)
+
+	// A fresh ID per run keeps the process-wide record of reported labels
+	// from carrying over between test runs.
+	c := &Container{
+		containerInfo: &dockerContainer.InspectResponse{
+			ID:   randomContainerID(t),
+			Name: "/app",
+			Config: &dockerContainer.Config{Labels: map[string]string{
+				labels.LifecycleUID: "root",
+				labels.LifecycleGID: "wheel",
+			}},
+		},
+	}
+	readUID := func(c *Container) { c.GetLifecycleUID() }
+	readGID := func(c *Container) { c.GetLifecycleGID() }
+
+	assert.Equal(t, []string{uidWarning}, messagesAt(t, readLabelLogs(c, readUID), "warn"))
+	assert.Equal(t, []string{gidWarning}, messagesAt(t, readLabelLogs(c, readGID), "warn"))
+
+	laterRead := readLabelLogs(c, readUID)
+	assert.Empty(t, messagesAt(t, laterRead, "warn"))
+	assert.Contains(t, messagesAt(t, laterRead, "debug"), uidWarning)
+}
+
+// readLabelLogs runs read on c with a debug-level JSON logger and returns
+// what it logged.
+func readLabelLogs(c *Container, read func(c *Container)) string {
+	var out bytes.Buffer
+
+	log := zerolog.New(&out).Level(zerolog.DebugLevel)
+	c.log = &log
+
+	read(c)
+
+	return out.String()
+}
+
+// messagesAt returns the messages of the JSON log lines at the given level, in
+// the order they were logged.
+func messagesAt(t *testing.T, logs, level string) []string {
+	t.Helper()
+
+	var messages []string
+
+	for line := range strings.Lines(logs) {
+		var record map[string]any
+
+		require.NoError(t, json.Unmarshal([]byte(line), &record))
+
+		if record["level"] == level {
+			message, ok := record["message"].(string)
+			require.True(t, ok)
+
+			messages = append(messages, message)
+		}
+	}
+
+	return messages
+}
+
+// randomContainerID returns 64 random hex characters, the form of a Docker
+// container ID.
+func randomContainerID(t *testing.T) string {
+	t.Helper()
+
+	id := make([]byte, 32)
+	_, err := rand.Read(id)
+	require.NoError(t, err)
+
+	return hex.EncodeToString(id)
 }
 
 func TestContainer_GetContainerChain(t *testing.T) {
