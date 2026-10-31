@@ -61,6 +61,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- Give the empty scope rule one owner by @nicholas-fedor in [#3320](https://github.com/nicholas-fedor/watchtower/pull/3320)
 - Move package comments into doc.go files by @nicholas-fedor in [#3314](https://github.com/nicholas-fedor/watchtower/pull/3314)
 - Move the warn-once record to the logging package by @nicholas-fedor in [#3310](https://github.com/nicholas-fedor/watchtower/pull/3310)
 - Share the failed update check warning by @nicholas-fedor in [#3308](https://github.com/nicholas-fedor/watchtower/pull/3308)
