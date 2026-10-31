@@ -1398,25 +1398,12 @@ func TestCommands_ErrorOutput(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			unsetFlagEnv(t)
-
-			proc := newRunProcess()
-
-			root := NewRootCommand()
-			settings.RegisterAll(root)
-			root.PreRunE = proc.preRun
-			root.RunE = proc.run
-			root.AddCommand(&cobra.Command{
-				Use:  "notify-upgrade",
-				Args: cobra.NoArgs,
-				RunE: proc.runNotifyUpgrade,
-			})
+			root := newExecuteCommand(t, newRunProcess(), tt.args...)
 
 			var out bytes.Buffer
 
 			root.SetOut(&out)
 			root.SetErr(&out)
-			root.SetArgs(tt.args)
 
 			err := root.Execute()
 			require.Error(t, err)
@@ -1431,6 +1418,36 @@ func TestCommands_ErrorOutput(t *testing.T) {
 			for _, want := range tt.wantOutput {
 				assert.Contains(t, out.String(), want)
 			}
+		})
+	}
+}
+
+// TestIsContainerMainProcess verifies which processes count as the main
+// process of a container. Processes started with docker exec have parent PID 0,
+// and a host binary can have an init system as its parent.
+func TestIsContainerMainProcess(t *testing.T) {
+	tests := []struct {
+		name        string
+		pid         int
+		ppid        int
+		inContainer bool
+		want        bool
+	}{
+		{name: "PID 1", pid: 1, ppid: 0, inContainer: true, want: true},
+		{name: "child of the container's init", pid: 7, ppid: 1, inContainer: true, want: true},
+		{name: "started with docker exec", pid: 8, ppid: 0, inContainer: true, want: false},
+		{name: "started by another process in the container", pid: 9, ppid: 8, inContainer: true, want: false},
+		{name: "host binary under an init system", pid: 4242, ppid: 1, inContainer: false, want: false},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			setPreRunState(t, nil, selfDetection{marker: tt.inContainer})
+
+			processID = func() int { return tt.pid }
+			parentProcessID = func() int { return tt.ppid }
+
+			assert.Equal(t, tt.want, isContainerMainProcess())
 		})
 	}
 }
@@ -1602,24 +1619,26 @@ func TestRootCommand_ReviveStoppedFlagParsing(t *testing.T) {
 // TestDisableRestarts verifies that disableRestarts sets the restart policy of
 // Watchtower's own container to "no" and reports an error only when that
 // fails, since the runtime may then start Watchtower again. A container whose
-// policy is already "no" needs no update. It changes package state, so it does
+// policy is already "no" needs no update. A process other than the container's
+// main process leaves the policy alone. It changes package state, so it does
 // not run in parallel.
 func TestDisableRestarts(t *testing.T) {
-	const wantError = "Could not disable Watchtower's restart policy. The runtime may start it again"
-
 	tests := []struct {
 		name string
 		// current is the inspected Watchtower container, or nil when it was
 		// not inspected.
-		current    types.Container
+		current types.Container
+		// pid is the process ID Watchtower runs as.
+		pid        int
 		wantUpdate bool
 		updateErr  error
 		wantError  bool
 	}{
-		{name: "the update succeeds", current: currentWatchtower(), wantUpdate: true},
-		{name: "the update fails", current: currentWatchtower(), wantUpdate: true, updateErr: errRunTestDocker, wantError: true},
-		{name: "the container was not inspected", wantUpdate: true},
-		{name: "the policy is already no", current: currentWatchtowerWithoutRestarts(), wantUpdate: false},
+		{name: "the update succeeds", current: currentWatchtower(), pid: 1, wantUpdate: true},
+		{name: "the update fails", current: currentWatchtower(), pid: 1, wantUpdate: true, updateErr: errRunTestDocker, wantError: true},
+		{name: "the container was not inspected", pid: 1, wantUpdate: true},
+		{name: "the policy is already no", current: currentWatchtowerWithoutRestarts(), pid: 1, wantUpdate: false},
+		{name: "not the container's main process", current: currentWatchtower(), pid: 42, wantUpdate: false},
 	}
 
 	for _, tt := range tests {
@@ -1633,11 +1652,13 @@ func TestDisableRestarts(t *testing.T) {
 
 			setRunState(t, runTestState{client: mockClient, current: tt.current, currentID: "c0c0"})
 
+			processID = func() int { return tt.pid }
+
 			log, logOutput := logcapture.New(zerolog.ErrorLevel)
 			(&process{log: log}).disableRestarts()
 
 			if tt.wantError {
-				assert.Contains(t, logOutput.String(), wantError)
+				assert.Contains(t, logOutput.String(), restartsKeptMessage)
 				assert.Contains(t, logOutput.String(), errRunTestDocker.Error())
 			} else {
 				assert.Empty(t, logOutput.String())

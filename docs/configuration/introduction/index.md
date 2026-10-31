@@ -78,6 +78,14 @@ See [Advanced Features → Git Monitoring](../../advanced-features/git-monitorin
 !!! Note
     Regex patterns are supported. See [Regex Pattern Matching](../../getting-started/container-selection/index.md#regex_pattern_matching) for details.
 
+!!! Note "Startup errors"
+    When a configuration option or flag is invalid, Watchtower exits at startup.
+
+    - In a container, Watchtower first sets its restart policy to `no`, so the container does not restart in a loop.
+    - Start the container again once the configuration is fixed.
+    - A `--host` flag after an invalid flag is not read. Watchtower then connects through `DOCKER_HOST` or the default socket.
+    - If Watchtower cannot change its restart policy, it logs an error.
+
 ## General Options
 
 ### Help

@@ -41,3 +41,25 @@ func newTestRootCommand(t *testing.T, args ...string) *cobra.Command {
 
 	return root
 }
+
+// newExecuteCommand returns a new root command with every flag registered and
+// a notify-upgrade subcommand, wired to proc as Execute wires the package's
+// commands and set to parse args. Flag environment variables are unset.
+func newExecuteCommand(t *testing.T, proc *process, args ...string) *cobra.Command {
+	t.Helper()
+
+	unsetFlagEnv(t)
+
+	root := NewRootCommand()
+	settings.RegisterAll(root)
+	root.PreRunE = proc.preRun
+	root.RunE = proc.run
+	root.AddCommand(&cobra.Command{
+		Use:  "notify-upgrade",
+		Args: cobra.NoArgs,
+		RunE: proc.runNotifyUpgrade,
+	})
+	root.SetArgs(args)
+
+	return root
+}
