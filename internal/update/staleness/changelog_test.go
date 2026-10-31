@@ -3,7 +3,6 @@ package staleness
 import (
 	"bytes"
 	"context"
-	"encoding/json"
 	"testing"
 
 	"github.com/rs/zerolog"
@@ -17,6 +16,7 @@ import (
 	"github.com/nicholas-fedor/watchtower/internal/container"
 	"github.com/nicholas-fedor/watchtower/internal/container/labels"
 	"github.com/nicholas-fedor/watchtower/internal/container/oci"
+	"github.com/nicholas-fedor/watchtower/internal/testutil/logcapture"
 	"github.com/nicholas-fedor/watchtower/internal/update/changelog"
 	"github.com/nicholas-fedor/watchtower/internal/update/state"
 	"github.com/nicholas-fedor/watchtower/pkg/types"
@@ -275,26 +275,19 @@ func TestRegistryMetadataWouldDuplicateGitChangelog(t *testing.T) {
 	)
 	ApplyLatestImageMeta(&log, progress, c, params, vars, anns)
 
-	assert.Equal(t, []string{"https://github.com/org/app/releases"}, changelogEntries(buf.Bytes()),
+	assert.Equal(t, []string{"https://github.com/org/app/releases"}, changelogEntries(t, buf.String()),
 		"registry path would duplicate: %s", buf.String())
 	assert.Equal(t, "https://github.com/org/app/releases", (*progress)[c.ID()].Changelog())
 }
 
 // changelogEntries returns the changelog URL of each Changelog notification
 // entry in the captured log output, in order.
-func changelogEntries(output []byte) []string {
+func changelogEntries(t *testing.T, output string) []string {
+	t.Helper()
+
 	entries := []string{}
 
-	for line := range bytes.Lines(output) {
-		if len(line) == 0 {
-			continue
-		}
-
-		var entry map[string]any
-		if json.Unmarshal(line, &entry) != nil {
-			continue
-		}
-
+	for _, entry := range logcapture.Entries[logcapture.Entry](t, output) {
 		if entry["message"] == "Changelog" {
 			url, _ := entry["changelog"].(string)
 			entries = append(entries, url)

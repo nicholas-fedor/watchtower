@@ -1,9 +1,7 @@
 package restart
 
 import (
-	"bytes"
 	"context"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"sync"
@@ -17,6 +15,7 @@ import (
 	dockerContainer "github.com/moby/moby/api/types/container"
 	dockerNetwork "github.com/moby/moby/api/types/network"
 
+	"github.com/nicholas-fedor/watchtower/internal/testutil/logcapture"
 	mockUpdate "github.com/nicholas-fedor/watchtower/internal/update/mocks"
 	"github.com/nicholas-fedor/watchtower/internal/update/state"
 	"github.com/nicholas-fedor/watchtower/pkg/types"
@@ -59,37 +58,6 @@ func newTestLogger(t *testing.T) *zerolog.Logger {
 	w := zerolog.TestWriter{T: t, Frame: 4}
 
 	return new(zerolog.New(w))
-}
-
-// parseJSONLogEntries parses zerolog JSON lines from a buffer into field maps.
-func parseJSONLogEntries(buf *bytes.Buffer) []map[string]any {
-	var entries []map[string]any
-
-	for line := range bytes.SplitSeq(buf.Bytes(), []byte("\n")) {
-		line = bytes.TrimSpace(line)
-		if len(line) == 0 {
-			continue
-		}
-
-		var m map[string]any
-
-		err := json.Unmarshal(line, &m)
-		if err != nil {
-			continue
-		}
-
-		entries = append(entries, m)
-	}
-
-	return entries
-}
-
-// newCaptureLogger returns a JSON zerolog logger writing to a buffer for assertions.
-func newCaptureLogger() (*zerolog.Logger, *bytes.Buffer) {
-	buf := &bytes.Buffer{}
-	l := zerolog.New(buf).Level(zerolog.DebugLevel).With().Timestamp().Logger()
-
-	return &l, buf
 }
 
 // Test_restartStaleContainer verifies when restarting a stale Watchtower
@@ -1003,7 +971,7 @@ func Test_stopContainersInReversedOrder(t *testing.T) {
 				}
 
 				// Set up log capture to verify log messages.
-				log, logBuf := newCaptureLogger()
+				log, logBuf := logcapture.NewJSON(zerolog.DebugLevel)
 
 				// Create context - either canceled or not based on test case.
 				ctx := t.Context()
@@ -1032,7 +1000,7 @@ func Test_stopContainersInReversedOrder(t *testing.T) {
 				// Verify log messages for skipped containers.
 				skippedLogCount := 0
 
-				for _, entry := range parseJSONLogEntries(logBuf) {
+				for _, entry := range logcapture.Entries[logcapture.Entry](t, logBuf.String()) {
 					if entry["message"] == "Skipped container stop due to context cancellation" {
 						skippedLogCount++
 
@@ -1168,7 +1136,7 @@ func Test_stopContainersInReversedOrder(t *testing.T) {
 			)
 
 			// Set up log capture.
-			log, logBuf := newCaptureLogger()
+			log, logBuf := logcapture.NewJSON(zerolog.DebugLevel)
 
 			// Create a canceled context.
 			canceledCtx, cancel := context.WithCancel(t.Context())
@@ -1185,7 +1153,7 @@ func Test_stopContainersInReversedOrder(t *testing.T) {
 			// Verify log entries contain expected container details.
 			loggedNames := make(map[string]bool)
 
-			for _, entry := range parseJSONLogEntries(logBuf) {
+			for _, entry := range logcapture.Entries[logcapture.Entry](t, logBuf.String()) {
 				if entry["message"] == "Skipped container stop due to context cancellation" {
 					containerName, ok := entry["container"]
 					if ok {
@@ -1249,7 +1217,7 @@ func Test_stopContainersInReversedOrder(t *testing.T) {
 			)
 
 			// Set up log capture.
-			log, logBuf := newCaptureLogger()
+			log, logBuf := logcapture.NewJSON(zerolog.DebugLevel)
 
 			// Call with valid context.
 			failed, stopped := stopContainersInReversedOrder(log,
@@ -1264,7 +1232,7 @@ func Test_stopContainersInReversedOrder(t *testing.T) {
 			assert.Empty(t, failed)
 
 			// Verify no "Skipped container stop" log messages.
-			for _, entry := range parseJSONLogEntries(logBuf) {
+			for _, entry := range logcapture.Entries[logcapture.Entry](t, logBuf.String()) {
 				assert.NotEqual(t, "Skipped container stop due to context cancellation", entry["message"])
 			}
 		})
@@ -1512,7 +1480,7 @@ func Test_performRollingRestart(t *testing.T) {
 				}
 
 				// Set up log capture to verify log messages.
-				log, logBuf := newCaptureLogger()
+				log, logBuf := logcapture.NewJSON(zerolog.DebugLevel)
 
 				// Create context - either canceled or not based on test case.
 				ctx := t.Context()
@@ -1551,7 +1519,7 @@ func Test_performRollingRestart(t *testing.T) {
 				// Verify log messages for skipped containers.
 				skippedLogCount := 0
 
-				for _, entry := range parseJSONLogEntries(logBuf) {
+				for _, entry := range logcapture.Entries[logcapture.Entry](t, logBuf.String()) {
 					if entry["message"] == "Skipped container restart due to context cancellation" {
 						skippedLogCount++
 
@@ -1695,7 +1663,7 @@ func Test_performRollingRestart(t *testing.T) {
 			)
 
 			// Set up log capture.
-			log, logBuf := newCaptureLogger()
+			log, logBuf := logcapture.NewJSON(zerolog.DebugLevel)
 
 			// Create a canceled context.
 			canceledCtx, cancel := context.WithCancel(t.Context())
@@ -1717,7 +1685,7 @@ func Test_performRollingRestart(t *testing.T) {
 			// Verify log entries contain expected container details.
 			loggedNames := make(map[string]bool)
 
-			for _, entry := range parseJSONLogEntries(logBuf) {
+			for _, entry := range logcapture.Entries[logcapture.Entry](t, logBuf.String()) {
 				if entry["message"] == "Skipped container restart due to context cancellation" {
 					containerName, ok := entry["container"]
 					if ok {
@@ -1781,7 +1749,7 @@ func Test_performRollingRestart(t *testing.T) {
 			)
 
 			// Set up log capture.
-			log, logBuf := newCaptureLogger()
+			log, logBuf := logcapture.NewJSON(zerolog.DebugLevel)
 
 			// Call with valid context.
 			var cleanupImageInfos []types.RemovedImageInfo
@@ -1801,7 +1769,7 @@ func Test_performRollingRestart(t *testing.T) {
 			require.NoError(t, err)
 
 			// Verify no "Skipped container restart" log messages.
-			for _, entry := range parseJSONLogEntries(logBuf) {
+			for _, entry := range logcapture.Entries[logcapture.Entry](t, logBuf.String()) {
 				assert.NotEqual(t, "Skipped container restart due to context cancellation", entry["message"])
 			}
 		})
@@ -1902,7 +1870,7 @@ func Test_performRollingRestart(t *testing.T) {
 				false,
 			)
 
-			log, logBuf := newCaptureLogger()
+			log, logBuf := logcapture.NewJSON(zerolog.DebugLevel)
 
 			var cleanupImageInfos []types.RemovedImageInfo
 
@@ -1920,7 +1888,7 @@ func Test_performRollingRestart(t *testing.T) {
 			assert.Empty(t, failed)
 			assert.Equal(t, int32(0), client.TestData.WaitForContainerHealthyCount.Load())
 
-			for _, entry := range parseJSONLogEntries(logBuf) {
+			for _, entry := range logcapture.Entries[logcapture.Entry](t, logBuf.String()) {
 				assert.NotEqual(t, "Failed to wait for container to become healthy", entry["message"])
 			}
 		})

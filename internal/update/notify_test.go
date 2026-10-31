@@ -860,10 +860,10 @@ func TestRunUpdates(t *testing.T) {
 			notifier.EXPECT().ShouldSendNotification(mock.Anything).Return(true)
 			notifier.EXPECT().SendNotification(mock.Anything).Return()
 
-			log, buf := newCaptureLogger()
+			log, buf := logcapture.NewJSON(zerolog.DebugLevel)
 			sendSplitNotifications(log, notifier, false, mockReport, []types.RemovedImageInfo{})
 
-			for _, entry := range parseJSONLogEntries(buf) {
+			for _, entry := range logcapture.Entries[logcapture.Entry](t, buf.String()) {
 				assert.NotEqual(t, "Removing image", entry["message"])
 			}
 
@@ -929,7 +929,7 @@ func TestRunUpdates(t *testing.T) {
 				sentFocusNames = append(sentFocusNames, updated[0].Name())
 			}).Times(2)
 
-			log, buf := newCaptureLogger()
+			log, buf := logcapture.NewJSON(zerolog.DebugLevel)
 			sendSplitNotifications(log, notifier, false, mockReport, cleanedImages)
 
 			type cleanupLog struct {
@@ -947,7 +947,7 @@ func TestRunUpdates(t *testing.T) {
 
 			cleanups := make([]cleanupLog, 0)
 
-			for _, entry := range parseJSONLogEntries(buf) {
+			for _, entry := range logcapture.Entries[logcapture.Entry](t, buf.String()) {
 				if entry["message"] != "Removing image" {
 					continue
 				}
@@ -1016,10 +1016,10 @@ func TestRunUpdates(t *testing.T) {
 			notifier.EXPECT().ShouldSendNotification(mock.Anything).Return(true)
 			notifier.EXPECT().SendNotification(mock.Anything).Return()
 
-			log, buf := newCaptureLogger()
+			log, buf := logcapture.NewJSON(zerolog.DebugLevel)
 			sendSplitNotifications(log, notifier, true, mockReport, cleanedImages)
 
-			for _, entry := range parseJSONLogEntries(buf) {
+			for _, entry := range logcapture.Entries[logcapture.Entry](t, buf.String()) {
 				assert.NotEqual(t, "Removing image", entry["message"])
 			}
 
@@ -1178,12 +1178,12 @@ func TestRunUpdates(t *testing.T) {
 			mockReport.EXPECT().Restarted().Return([]types.ContainerReport{})
 			mockReport.EXPECT().Skipped().Return([]types.ContainerReport{})
 
-			log, buf := newCaptureLogger()
+			log, buf := logcapture.NewJSON(zerolog.DebugLevel)
 			_ = generateAndLogMetric(log, mockReport)
 
 			var found bool
 
-			for _, entry := range parseJSONLogEntries(buf) {
+			for _, entry := range logcapture.Entries[logcapture.Entry](t, buf.String()) {
 				if entry["message"] != "Update session completed" {
 					continue
 				}
@@ -1209,7 +1209,7 @@ func TestRunUpdates(t *testing.T) {
 			mockReport.EXPECT().Restarted().Return([]types.ContainerReport{})
 			mockReport.EXPECT().Skipped().Return([]types.ContainerReport{skippedA, skippedB})
 
-			log, buf := newCaptureLogger()
+			log, buf := logcapture.NewJSON(zerolog.DebugLevel)
 			metric := generateAndLogMetric(log, mockReport)
 
 			assert.Equal(t, 2, metric.Skipped)
@@ -1217,7 +1217,7 @@ func TestRunUpdates(t *testing.T) {
 
 			var found bool
 
-			for _, entry := range parseJSONLogEntries(buf) {
+			for _, entry := range logcapture.Entries[logcapture.Entry](t, buf.String()) {
 				if entry["message"] != "Update session completed" {
 					continue
 				}

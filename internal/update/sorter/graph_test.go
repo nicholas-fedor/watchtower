@@ -2,8 +2,6 @@ package sorter
 
 import (
 	"bytes"
-	"encoding/json"
-	"strings"
 	"testing"
 
 	"github.com/rs/zerolog"
@@ -13,6 +11,7 @@ import (
 	dockerContainer "github.com/moby/moby/api/types/container"
 
 	"github.com/nicholas-fedor/watchtower/internal/container"
+	"github.com/nicholas-fedor/watchtower/internal/testutil/logcapture"
 	"github.com/nicholas-fedor/watchtower/pkg/types"
 )
 
@@ -898,15 +897,13 @@ func TestNewDependencyGraph_LogsDependenciesOnce(t *testing.T) {
 
 	links := map[string][]string{}
 
-	for line := range strings.Lines(out.String()) {
-		var record struct {
-			Message   string   `json:"message"`
-			Container string   `json:"container"`
-			Links     []string `json:"links"`
-		}
+	type dependencyEntry struct {
+		Message   string   `json:"message"`
+		Container string   `json:"container"`
+		Links     []string `json:"links"`
+	}
 
-		require.NoError(t, json.Unmarshal([]byte(line), &record))
-
+	for _, record := range logcapture.Entries[dependencyEntry](t, out.String()) {
 		if record.Message == "Found container dependencies" {
 			require.NotContains(t, links, record.Container, "one entry per container")
 

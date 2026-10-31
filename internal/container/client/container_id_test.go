@@ -3,7 +3,6 @@ package client
 import (
 	"bytes"
 	"context"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"io/fs"
@@ -21,6 +20,7 @@ import (
 
 	mockContainerClient "github.com/nicholas-fedor/watchtower/internal/container/client/mocks"
 	"github.com/nicholas-fedor/watchtower/internal/testutil/containerfixture"
+	"github.com/nicholas-fedor/watchtower/internal/testutil/logcapture"
 	"github.com/nicholas-fedor/watchtower/internal/testutil/modelfixture"
 	"github.com/nicholas-fedor/watchtower/pkg/types"
 	mockTypes "github.com/nicholas-fedor/watchtower/pkg/types/mocks"
@@ -777,19 +777,7 @@ func TestGetCurrentContainerID_FailureLogsAtDebug(t *testing.T) {
 	assert.NotContains(t, out.String(), `"level":"warn"`)
 
 	// Find the summary record and check its level.
-	var levels []string
-
-	for line := range strings.Lines(out.String()) {
-		var record map[string]any
-
-		require.NoError(t, json.Unmarshal([]byte(line), &record))
-
-		if record["message"] == "All container ID detection methods failed" {
-			levels = append(levels, record["level"].(string))
-		}
-	}
-
-	assert.Equal(t, []string{"debug"}, levels)
+	assert.Equal(t, []string{"debug"}, logcapture.Levels(t, out.String(), "All container ID detection methods failed"))
 }
 
 // TestParseContainerIDFromMountinfo_Layouts verifies that the container ID is

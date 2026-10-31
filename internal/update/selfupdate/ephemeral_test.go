@@ -3,9 +3,7 @@ package selfupdate
 import (
 	"bytes"
 	"context"
-	"encoding/json"
 	"errors"
-	"strings"
 	"testing"
 	"time"
 
@@ -17,6 +15,7 @@ import (
 	dockerContainer "github.com/moby/moby/api/types/container"
 
 	mockContainerClient "github.com/nicholas-fedor/watchtower/internal/container/client/mocks"
+	"github.com/nicholas-fedor/watchtower/internal/testutil/logcapture"
 	mockUpdate "github.com/nicholas-fedor/watchtower/internal/update/mocks"
 	"github.com/nicholas-fedor/watchtower/pkg/types"
 )
@@ -245,11 +244,7 @@ func TestEphemeralSelfUpdate_StoppingContainerLog(t *testing.T) {
 
 			var levels []string
 
-			for line := range strings.Lines(out.String()) {
-				var record map[string]any
-
-				require.NoError(t, json.Unmarshal([]byte(line), &record))
-
+			for _, record := range logcapture.Entries[logcapture.Entry](t, out.String()) {
 				if record["message"] == "Stopping container" {
 					assert.Equal(t, "watchtower", record["container"])
 					assert.Equal(t, source.ID().ShortID(), record["id"])

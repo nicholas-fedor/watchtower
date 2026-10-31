@@ -19,6 +19,7 @@ import (
 	"github.com/nicholas-fedor/watchtower/internal/container/labels"
 	"github.com/nicholas-fedor/watchtower/internal/registry/ratelimit"
 	"github.com/nicholas-fedor/watchtower/internal/testutil/containerfixture"
+	"github.com/nicholas-fedor/watchtower/internal/testutil/logcapture"
 	"github.com/nicholas-fedor/watchtower/internal/testutil/modelfixture"
 	mockUpdate "github.com/nicholas-fedor/watchtower/internal/update/mocks"
 	"github.com/nicholas-fedor/watchtower/pkg/types"
@@ -3021,7 +3022,7 @@ func TestRunUpdatesWithNotifications_IdentifierCollisionNotifiesOnce(t *testing.
 	notifier.EXPECT().StartNotification(false).Once()
 	notifier.EXPECT().SendNotification(nil).Once()
 
-	log, buf := newCaptureLogger()
+	log, buf := logcapture.NewJSON(zerolog.DebugLevel)
 
 	metric := RunUpdatesWithNotifications(t.Context(), RunUpdatesWithNotificationsParams{
 		Logger:   log,
@@ -3035,7 +3036,7 @@ func TestRunUpdatesWithNotifications_IdentifierCollisionNotifiesOnce(t *testing.
 	// notifications, so each one is listed.
 	var eligible []map[string]any
 
-	for _, entry := range parseJSONLogEntries(buf) {
+	for _, entry := range logcapture.Entries[logcapture.Entry](t, buf.String()) {
 		if entry["level"] != "warn" && entry["level"] != "error" {
 			continue
 		}

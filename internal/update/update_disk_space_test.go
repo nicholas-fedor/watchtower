@@ -1,40 +1,20 @@
 package update
 
 import (
-	"bytes"
 	"errors"
 	"testing"
 
+	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
 	"github.com/nicholas-fedor/watchtower/internal/container/filters"
 	"github.com/nicholas-fedor/watchtower/internal/registry/ratelimit"
+	"github.com/nicholas-fedor/watchtower/internal/testutil/logcapture"
 	mockUpdate "github.com/nicholas-fedor/watchtower/internal/update/mocks"
 	"github.com/nicholas-fedor/watchtower/pkg/types"
 	mockTypes "github.com/nicholas-fedor/watchtower/pkg/types/mocks"
 )
-
-// warnMessages returns the messages of the warn-level entries in buf.
-//
-// Parameters:
-//   - buf: JSON log output from newCaptureLogger.
-//
-// Returns:
-//   - []string: Messages logged at warn level, in order.
-func warnMessages(buf *bytes.Buffer) []string {
-	var messages []string
-
-	for _, entry := range parseJSONLogEntries(buf) {
-		if entry["level"] == "warn" {
-			if message, ok := entry["message"].(string); ok {
-				messages = append(messages, message)
-			}
-		}
-	}
-
-	return messages
-}
 
 // TestImageDiskSpaceGate verifies that an update warns about image disk usage
 // at the warning threshold, blocks at the maximum, and fails closed when the
@@ -87,11 +67,11 @@ func TestImageDiskSpaceGate(t *testing.T) {
 		params.DiskSpaceMax = 10_000
 		params.DiskSpaceWarn = 8_000
 
-		log, buf := newCaptureLogger()
+		log, buf := logcapture.NewJSON(zerolog.DebugLevel)
 
 		_, _, err := update(log, t.Context(), client, params, ratelimit.New())
 		require.NoError(t, err)
-		assert.Contains(t, warnMessages(buf), msgImageDiskSpaceWarn)
+		assert.Contains(t, logcapture.Messages(t, buf.String(), "warn"), msgImageDiskSpaceWarn)
 		assert.Positive(t, client.TestData.ListContainersCount.Load())
 	})
 
@@ -105,11 +85,11 @@ func TestImageDiskSpaceGate(t *testing.T) {
 		params := defaultTestUpdateParams(filters.NoFilter)
 		params.DiskSpaceWarn = 1_000
 
-		log, buf := newCaptureLogger()
+		log, buf := logcapture.NewJSON(zerolog.DebugLevel)
 
 		_, _, err := update(log, t.Context(), client, params, ratelimit.New())
 		require.NoError(t, err)
-		assert.Contains(t, warnMessages(buf), msgImageDiskSpaceWarn)
+		assert.Contains(t, logcapture.Messages(t, buf.String(), "warn"), msgImageDiskSpaceWarn)
 		assert.Positive(t, client.TestData.ListContainersCount.Load())
 	})
 
@@ -185,7 +165,7 @@ func TestRunUpdatesWithNotifications_DiskSpaceAbortNotifiesOnce(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 
-			log, buf := newCaptureLogger()
+			log, buf := logcapture.NewJSON(zerolog.DebugLevel)
 
 			params := defaultTestUpdateParams(filters.NoFilter)
 			params.DiskSpaceMax = 10_000
@@ -206,7 +186,7 @@ func TestRunUpdatesWithNotifications_DiskSpaceAbortNotifiesOnce(t *testing.T) {
 			// once per line.
 			var eligible, suppressed []string
 
-			for _, entry := range parseJSONLogEntries(buf) {
+			for _, entry := range logcapture.Entries[logcapture.Entry](t, buf.String()) {
 				if entry["level"] != "error" {
 					continue
 				}

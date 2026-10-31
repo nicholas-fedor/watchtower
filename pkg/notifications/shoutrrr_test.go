@@ -2499,10 +2499,7 @@ func TestSendEntries_EmptyMessageLogsSkipAtDebug(t *testing.T) {
 
 			var skips int
 
-			for line := range strings.Lines(buf.String()) {
-				var entry map[string]any
-				require.NoError(t, json.Unmarshal([]byte(line), &entry))
-
+			for _, entry := range logcapture.Entries[logcapture.Entry](t, buf.String()) {
 				assert.NotEqual(t, "info", entry["level"], entry["message"])
 
 				if entry["message"] == "Message empty, skipping send" {
