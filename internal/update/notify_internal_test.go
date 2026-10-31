@@ -1,8 +1,6 @@
 package update
 
 import (
-	"bytes"
-	"encoding/json"
 	"errors"
 	"testing"
 	"time"
@@ -16,6 +14,7 @@ import (
 	"github.com/nicholas-fedor/watchtower/internal/container/filters"
 	"github.com/nicholas-fedor/watchtower/internal/observability/metrics"
 	"github.com/nicholas-fedor/watchtower/internal/registry/ratelimit"
+	"github.com/nicholas-fedor/watchtower/internal/testutil/logcapture"
 	mockUpdate "github.com/nicholas-fedor/watchtower/internal/update/mocks"
 	"github.com/nicholas-fedor/watchtower/pkg/types"
 	mockTypes "github.com/nicholas-fedor/watchtower/pkg/types/mocks"
@@ -118,14 +117,14 @@ func Test_handleUpdateResult(t *testing.T) {
 			t.Run(tt.name, func(t *testing.T) {
 				t.Parallel()
 
-				log, buf := newCaptureLogger()
+				log, buf := logcapture.NewJSON(zerolog.DebugLevel)
 
 				mockNotifier := mockTypes.NewMockNotifier(t)
 				mockNotifier.EXPECT().SendNotification(nil).Times(1)
 
 				handleUpdateResult(log, nil, tt.err, mockNotifier)
 
-				entries := parseJSONLogEntries(buf)
+				entries := logcapture.Entries[logcapture.Entry](t, buf.String())
 				require.Len(t, entries, 1)
 				assert.Equal(t, "Update execution failed", entries[0]["message"])
 				assert.Equal(t, "list failed", entries[0]["error"])
@@ -370,35 +369,4 @@ func Test_executeUpdate(t *testing.T) {
 		require.NotNil(t, cleanupInfos)
 		assert.Equal(t, int32(1), client.TestData.SetRestartPolicyCount.Load())
 	})
-}
-
-// parseJSONLogEntries parses zerolog JSON lines from a buffer into field maps.
-func parseJSONLogEntries(buf *bytes.Buffer) []map[string]any {
-	var entries []map[string]any
-
-	for line := range bytes.SplitSeq(buf.Bytes(), []byte("\n")) {
-		line = bytes.TrimSpace(line)
-		if len(line) == 0 {
-			continue
-		}
-
-		var m map[string]any
-
-		err := json.Unmarshal(line, &m)
-		if err != nil {
-			continue
-		}
-
-		entries = append(entries, m)
-	}
-
-	return entries
-}
-
-// newCaptureLogger returns a JSON zerolog logger writing to a buffer for assertions.
-func newCaptureLogger() (*zerolog.Logger, *bytes.Buffer) {
-	buf := &bytes.Buffer{}
-	l := zerolog.New(buf).Level(zerolog.DebugLevel).With().Timestamp().Logger()
-
-	return &l, buf
 }

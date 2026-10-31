@@ -4,10 +4,8 @@ import (
 	"bytes"
 	"crypto/rand"
 	"encoding/hex"
-	"encoding/json"
 	"math"
 	"strconv"
-	"strings"
 	"testing"
 	"time"
 
@@ -19,6 +17,7 @@ import (
 
 	"github.com/nicholas-fedor/watchtower/internal/container/labels"
 	"github.com/nicholas-fedor/watchtower/internal/testutil/containerfixture"
+	"github.com/nicholas-fedor/watchtower/internal/testutil/logcapture"
 	"github.com/nicholas-fedor/watchtower/pkg/types"
 )
 
@@ -1390,14 +1389,14 @@ func TestContainer_InvalidLabelsWarnOnce(t *testing.T) {
 			}
 
 			firstRead := readLabelLogs(first, tt.read)
-			assert.Equal(t, []string{tt.message}, messagesAt(t, firstRead, "warn"))
+			assert.Equal(t, []string{tt.message}, logcapture.Messages(t, firstRead, "warn"))
 
 			laterRead := readLabelLogs(first, tt.read)
-			assert.Empty(t, messagesAt(t, laterRead, "warn"))
-			assert.Contains(t, messagesAt(t, laterRead, "debug"), tt.message)
+			assert.Empty(t, logcapture.Messages(t, laterRead, "warn"))
+			assert.Contains(t, logcapture.Messages(t, laterRead, "debug"), tt.message)
 
 			otherContainer := readLabelLogs(second, tt.read)
-			assert.Equal(t, []string{tt.message}, messagesAt(t, otherContainer, "warn"))
+			assert.Equal(t, []string{tt.message}, logcapture.Messages(t, otherContainer, "warn"))
 		})
 	}
 }
@@ -1428,48 +1427,23 @@ func TestContainer_InvalidLabelsWarnOncePerLabel(t *testing.T) {
 	readUID := func(c *Container) { c.GetLifecycleUID() }
 	readGID := func(c *Container) { c.GetLifecycleGID() }
 
-	assert.Equal(t, []string{uidWarning}, messagesAt(t, readLabelLogs(c, readUID), "warn"))
-	assert.Equal(t, []string{gidWarning}, messagesAt(t, readLabelLogs(c, readGID), "warn"))
+	assert.Equal(t, []string{uidWarning}, logcapture.Messages(t, readLabelLogs(c, readUID), "warn"))
+	assert.Equal(t, []string{gidWarning}, logcapture.Messages(t, readLabelLogs(c, readGID), "warn"))
 
 	laterRead := readLabelLogs(c, readUID)
-	assert.Empty(t, messagesAt(t, laterRead, "warn"))
-	assert.Contains(t, messagesAt(t, laterRead, "debug"), uidWarning)
+	assert.Empty(t, logcapture.Messages(t, laterRead, "warn"))
+	assert.Contains(t, logcapture.Messages(t, laterRead, "debug"), uidWarning)
 }
 
 // readLabelLogs runs read on c with a debug-level JSON logger and returns
 // what it logged.
 func readLabelLogs(c *Container, read func(c *Container)) string {
-	var out bytes.Buffer
-
-	log := zerolog.New(&out).Level(zerolog.DebugLevel)
-	c.log = &log
+	log, out := logcapture.NewJSON(zerolog.DebugLevel)
+	c.log = log
 
 	read(c)
 
 	return out.String()
-}
-
-// messagesAt returns the messages of the JSON log lines at the given level, in
-// the order they were logged.
-func messagesAt(t *testing.T, logs, level string) []string {
-	t.Helper()
-
-	var messages []string
-
-	for line := range strings.Lines(logs) {
-		var record map[string]any
-
-		require.NoError(t, json.Unmarshal([]byte(line), &record))
-
-		if record["level"] == level {
-			message, ok := record["message"].(string)
-			require.True(t, ok)
-
-			messages = append(messages, message)
-		}
-	}
-
-	return messages
 }
 
 // randomContainerID returns 64 random hex characters, the form of a Docker

@@ -2,16 +2,15 @@ package provenance
 
 import (
 	"bytes"
-	"encoding/json"
 	"testing"
 
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
 
 	"github.com/nicholas-fedor/watchtower/internal/container/labels"
 	"github.com/nicholas-fedor/watchtower/internal/container/oci"
 	"github.com/nicholas-fedor/watchtower/internal/testutil/containerfixture"
+	"github.com/nicholas-fedor/watchtower/internal/testutil/logcapture"
 	"github.com/nicholas-fedor/watchtower/internal/testutil/modelfixture"
 	"github.com/nicholas-fedor/watchtower/pkg/types"
 )
@@ -398,20 +397,8 @@ func TestLogChangelogOnlyWhenEnabled(t *testing.T) {
 
 			LogChangelog(&log, c, tt.params, meta)
 
-			events := 0
-
-			for line := range bytes.Lines(buf.Bytes()) {
-				if len(line) == 0 {
-					continue
-				}
-
-				var entry map[string]any
-				require.NoError(t, json.Unmarshal(line, &entry))
-
-				events++
-			}
-
-			assert.Equal(t, tt.wantEvents, events, "log output: %s", buf.String())
+			events := logcapture.Entries[logcapture.Entry](t, buf.String())
+			assert.Len(t, events, tt.wantEvents, "log output: %s", buf.String())
 		})
 	}
 }

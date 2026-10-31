@@ -5,7 +5,6 @@ import (
 	"context"
 	"crypto/rand"
 	"encoding/hex"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"maps"
@@ -28,6 +27,7 @@ import (
 	"github.com/nicholas-fedor/watchtower/internal/container/oci"
 	"github.com/nicholas-fedor/watchtower/internal/git"
 	"github.com/nicholas-fedor/watchtower/internal/registry/ratelimit"
+	"github.com/nicholas-fedor/watchtower/internal/testutil/logcapture"
 	mockUpdate "github.com/nicholas-fedor/watchtower/internal/update/mocks"
 	"github.com/nicholas-fedor/watchtower/pkg/types"
 )
@@ -409,28 +409,6 @@ func TestUpdate_SkipSelfUpdateLeavesDependentWatchtowerRunning(t *testing.T) {
 	assert.Empty(t, report.Failed())
 }
 
-// messageLevels returns the level of each log record with the given message.
-func messageLevels(t *testing.T, logs, message string) []string {
-	t.Helper()
-
-	var levels []string
-
-	for line := range strings.Lines(logs) {
-		var record map[string]any
-
-		require.NoError(t, json.Unmarshal([]byte(line), &record))
-
-		if record["message"] == message {
-			level, ok := record["level"].(string)
-			require.True(t, ok)
-
-			levels = append(levels, level)
-		}
-	}
-
-	return levels
-}
-
 // repeatLevel returns n copies of a log level name.
 func repeatLevel(level string, n int) []string {
 	levels := make([]string, n)
@@ -513,7 +491,7 @@ func TestUpdate_DependencyProblemsWarnOnce(t *testing.T) {
 				_, _, err := update(&log, t.Context(), client, types.UpdateParams{}, ratelimit.New())
 				require.NoError(t, err)
 
-				scanLevels = append(scanLevels, messageLevels(t, out.String(), tt.message))
+				scanLevels = append(scanLevels, logcapture.Levels(t, out.String(), tt.message))
 			}
 
 			require.NotEmpty(t, scanLevels[0])
@@ -593,7 +571,7 @@ func TestUpdate_FailedCheckWarnsOnce(t *testing.T) {
 				_, _, err := update(&log, t.Context(), client, types.UpdateParams{}, ratelimit.New())
 				require.NoError(t, err)
 
-				got = append(got, messageLevels(t, out.String(), message))
+				got = append(got, logcapture.Levels(t, out.String(), message))
 			}
 
 			assert.Equal(t, tt.want, got)
@@ -633,7 +611,7 @@ func TestUpdate_UnparsableImageWarnsOnce(t *testing.T) {
 		require.NoError(t, err)
 		require.Len(t, report.Skipped(), 1)
 
-		got = append(got, messageLevels(t, out.String(), "Could not check container for updates"))
+		got = append(got, logcapture.Levels(t, out.String(), "Could not check container for updates"))
 	}
 
 	assert.Equal(t, [][]string{{"warn"}, {"debug"}}, got)
@@ -670,7 +648,7 @@ func TestUpdate_UnrecreatableConfigWarnsOnce(t *testing.T) {
 		require.NoError(t, err)
 		require.Len(t, report.Skipped(), 1)
 
-		got = append(got, messageLevels(t, out.String(), "Could not update container. Its configuration cannot be recreated"))
+		got = append(got, logcapture.Levels(t, out.String(), "Could not update container. Its configuration cannot be recreated"))
 	}
 
 	assert.Equal(t, [][]string{{"warn"}, {"debug"}}, got)
@@ -733,7 +711,7 @@ func TestUpdate_InvalidGitLabelWarnsOnce(t *testing.T) {
 				// Notification templates name the container from this field.
 				assert.Contains(t, out.String(), `"container":"app","image":"org/app:latest","message":"`+tt.message+`"`)
 
-				got = append(got, messageLevels(t, out.String(), tt.message))
+				got = append(got, logcapture.Levels(t, out.String(), tt.message))
 			}
 
 			assert.Equal(t, [][]string{{"warn"}, {"debug"}}, got)

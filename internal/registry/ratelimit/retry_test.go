@@ -3,10 +3,8 @@ package ratelimit
 import (
 	"bytes"
 	"context"
-	"encoding/json"
 	"errors"
 	"fmt"
-	"strings"
 	"sync/atomic"
 	"testing"
 	"time"
@@ -14,6 +12,8 @@ import (
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+
+	"github.com/nicholas-fedor/watchtower/internal/testutil/logcapture"
 )
 
 // newTestLogger returns a logger that writes each event to the test's log, so a
@@ -344,16 +344,14 @@ func TestBucketWaitGrowsMonotonically(t *testing.T) {
 func loggedRetryWaits(t *testing.T, logs string) []float64 {
 	t.Helper()
 
+	type retryEntry struct {
+		Message    string  `json:"message"`
+		RetryAfter float64 `json:"retry_after"`
+	}
+
 	var waits []float64
 
-	for line := range strings.SplitSeq(strings.TrimSpace(logs), "\n") {
-		var entry struct {
-			Message    string  `json:"message"`
-			RetryAfter float64 `json:"retry_after"`
-		}
-
-		require.NoError(t, json.Unmarshal([]byte(line), &entry))
-
+	for _, entry := range logcapture.Entries[retryEntry](t, logs) {
 		if entry.Message == "Registry rate limited. Retrying after delay" {
 			waits = append(waits, entry.RetryAfter)
 		}
