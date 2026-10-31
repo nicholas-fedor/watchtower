@@ -1,4 +1,3 @@
-// Package notify holds notification settings for the config domain.
 package notify
 
 // Notify holds resolved notification configuration for the process.

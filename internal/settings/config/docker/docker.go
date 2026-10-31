@@ -1,4 +1,3 @@
-// Package docker holds Docker API connection settings.
 package docker
 
 // Docker holds Docker daemon connection settings.

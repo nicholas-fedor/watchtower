@@ -1,4 +1,3 @@
-// Package schedule holds poll interval and cron schedule settings.
 package schedule
 
 // Schedule holds when periodic updates run.
