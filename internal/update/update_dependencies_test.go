@@ -2946,17 +2946,17 @@ func TestUpdate_WarnsOnUnresolvedDependsOn(t *testing.T) {
 	// earlier run has seen.
 	containers := []types.Container{
 		modelfixture.Container(
-			containerfixture.WithID(randomContainerID(t)),
+			containerfixture.WithID(containerfixture.RandomID()),
 			containerfixture.WithName("/app"),
 			containerfixture.WithLabels(map[string]string{labels.DependsOn: "db,missing"}),
 		),
 		modelfixture.Container(
-			containerfixture.WithID(randomContainerID(t)),
+			containerfixture.WithID(containerfixture.RandomID()),
 			containerfixture.WithName("/a-db-1"),
 			containerfixture.WithLabels(composeServiceLabels("a", "db")),
 		),
 		modelfixture.Container(
-			containerfixture.WithID(randomContainerID(t)),
+			containerfixture.WithID(containerfixture.RandomID()),
 			containerfixture.WithName("/b-db-1"),
 			containerfixture.WithLabels(composeServiceLabels("b", "db")),
 		),

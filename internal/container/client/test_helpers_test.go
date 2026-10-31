@@ -1,9 +1,6 @@
 package client
 
 import (
-	"crypto/rand"
-	"crypto/sha256"
-	"encoding/hex"
 	"testing"
 
 	"github.com/rs/zerolog"
@@ -30,15 +27,6 @@ func newTestLogger(t *testing.T) *zerolog.Logger {
 	w := zerolog.TestWriter{T: t, Frame: 4}
 
 	return new(zerolog.New(w))
-}
-
-// randomSHA256 returns 64 random hex characters, the form of a SHA-256 digest
-// without its "sha256:" prefix, so each test gets unique image IDs and digests.
-func randomSHA256() string {
-	hash := make([]byte, sha256.Size)
-	_, _ = rand.Read(hash)
-
-	return hex.EncodeToString(hash)
 }
 
 // expectMissingImage expects the inspect of a running container whose image can

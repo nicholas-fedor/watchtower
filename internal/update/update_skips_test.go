@@ -3,8 +3,6 @@ package update
 import (
 	"bytes"
 	"context"
-	"crypto/rand"
-	"encoding/hex"
 	"errors"
 	"fmt"
 	"maps"
@@ -27,6 +25,7 @@ import (
 	"github.com/nicholas-fedor/watchtower/internal/container/oci"
 	"github.com/nicholas-fedor/watchtower/internal/git"
 	"github.com/nicholas-fedor/watchtower/internal/registry/ratelimit"
+	"github.com/nicholas-fedor/watchtower/internal/testutil/containerfixture"
 	"github.com/nicholas-fedor/watchtower/internal/testutil/logcapture"
 	mockUpdate "github.com/nicholas-fedor/watchtower/internal/update/mocks"
 	"github.com/nicholas-fedor/watchtower/pkg/types"
@@ -419,18 +418,6 @@ func repeatLevel(level string, n int) []string {
 	return levels
 }
 
-// randomContainerID returns a new 64-character container ID. Problems are
-// recorded per process, so each run of a test needs containers not seen before.
-func randomContainerID(t *testing.T) string {
-	t.Helper()
-
-	id := make([]byte, 32)
-	_, err := rand.Read(id)
-	require.NoError(t, err)
-
-	return hex.EncodeToString(id)
-}
-
 // TestUpdate_DependencyProblemsWarnOnce verifies that a dependency problem is
 // logged as a warning, which notifications include, only on the first scan
 // that finds it, and at debug level on later scans.
@@ -447,7 +434,7 @@ func TestUpdate_DependencyProblemsWarnOnce(t *testing.T) {
 		{
 			name: "self-dependency",
 			containers: []types.Container{
-				skipTestContainer(randomContainerID(t), "self",
+				skipTestContainer(containerfixture.RandomID(), "self",
 					map[string]string{dependsOn: "self"}),
 			},
 			message: "Skipping container update (self-dependency)",
@@ -455,7 +442,7 @@ func TestUpdate_DependencyProblemsWarnOnce(t *testing.T) {
 		{
 			name: "depends-on entry that names no container",
 			containers: []types.Container{
-				skipTestContainer(randomContainerID(t), "orphan",
+				skipTestContainer(containerfixture.RandomID(), "orphan",
 					map[string]string{dependsOn: "missing"}),
 			},
 			message: "Ignoring depends-on entry that names no container",
@@ -463,9 +450,9 @@ func TestUpdate_DependencyProblemsWarnOnce(t *testing.T) {
 		{
 			name: "circular dependency",
 			containers: []types.Container{
-				skipTestContainer(randomContainerID(t), "cycle-a",
+				skipTestContainer(containerfixture.RandomID(), "cycle-a",
 					map[string]string{dependsOn: "cycle-b"}),
-				skipTestContainer(randomContainerID(t), "cycle-b",
+				skipTestContainer(containerfixture.RandomID(), "cycle-b",
 					map[string]string{dependsOn: "cycle-a"}),
 			},
 			message: "Skipping container update (circular dependency)",
@@ -554,7 +541,7 @@ func TestUpdate_FailedCheckWarnsOnce(t *testing.T) {
 
 			// A fresh ID per run keeps the process-wide record of reported
 			// problems from carrying over between test runs.
-			app := skipTestContainer(randomContainerID(t), "app", nil)
+			app := skipTestContainer(containerfixture.RandomID(), "app", nil)
 
 			got := make([][]string, 0, len(tt.checkErrs))
 
@@ -588,7 +575,7 @@ func TestUpdate_UnparsableImageWarnsOnce(t *testing.T) {
 	// Neither the uppercase image name nor the fallback built from the
 	// container name parses as an image reference.
 	app := mockUpdate.CreateMockContainerWithConfig(
-		randomContainerID(t),
+		containerfixture.RandomID(),
 		"/Bad Name",
 		"Org/App:latest",
 		true,
@@ -626,7 +613,7 @@ func TestUpdate_UnrecreatableConfigWarnsOnce(t *testing.T) {
 
 	// Without image info, VerifyConfiguration rejects the container.
 	app := container.NewContainer(nil, &dockerContainer.InspectResponse{
-		ID:         randomContainerID(t),
+		ID:         containerfixture.RandomID(),
 		Name:       "/app",
 		Config:     &dockerContainer.Config{Image: "org/app:latest"},
 		HostConfig: &dockerContainer.HostConfig{},
@@ -688,7 +675,7 @@ func TestUpdate_InvalidGitLabelWarnsOnce(t *testing.T) {
 			}
 			maps.Copy(containerLabels, tt.labels)
 
-			app := skipTestContainer(randomContainerID(t), "app", containerLabels)
+			app := skipTestContainer(containerfixture.RandomID(), "app", containerLabels)
 
 			// The label is rejected before any request reaches the remote.
 			gitClient := git.New(newTestLogger(t), git.Options{Timeout: time.Second})

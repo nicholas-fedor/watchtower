@@ -56,3 +56,20 @@ func TestInspect_NilHealthStaysNil(t *testing.T) {
 
 	assert.Nil(t, containerInfo.State.Health)
 }
+
+// TestRandomID verifies that each ID has the 64 lowercase hex characters of a
+// Docker ID and differs from the ones before it.
+func TestRandomID(t *testing.T) {
+	t.Parallel()
+
+	seen := map[string]bool{}
+
+	for range 100 {
+		id := RandomID()
+
+		assert.Regexp(t, `^[0-9a-f]{64}$`, id)
+		assert.False(t, seen[id], "repeated ID %s", id)
+
+		seen[id] = true
+	}
+}

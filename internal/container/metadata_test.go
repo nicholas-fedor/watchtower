@@ -2,8 +2,6 @@ package container
 
 import (
 	"bytes"
-	"crypto/rand"
-	"encoding/hex"
 	"math"
 	"strconv"
 	"testing"
@@ -259,7 +257,7 @@ func TestContainer_HookTimeouts(t *testing.T) {
 				// this case's warning behind another case or test run.
 				c := &Container{
 					containerInfo: &dockerContainer.InspectResponse{
-						ID:     randomContainerID(t),
+						ID:     containerfixture.RandomID(),
 						Name:   "/test-container",
 						Config: &dockerContainer.Config{Labels: containerLabels},
 					},
@@ -1375,14 +1373,14 @@ func TestContainer_InvalidLabelsWarnOnce(t *testing.T) {
 			// labels from carrying over between test runs.
 			first := &Container{
 				containerInfo: &dockerContainer.InspectResponse{
-					ID:     randomContainerID(t),
+					ID:     containerfixture.RandomID(),
 					Name:   "/first",
 					Config: &dockerContainer.Config{Labels: tt.labels},
 				},
 			}
 			second := &Container{
 				containerInfo: &dockerContainer.InspectResponse{
-					ID:     randomContainerID(t),
+					ID:     containerfixture.RandomID(),
 					Name:   "/second",
 					Config: &dockerContainer.Config{Labels: tt.labels},
 				},
@@ -1416,7 +1414,7 @@ func TestContainer_InvalidLabelsWarnOncePerLabel(t *testing.T) {
 	// from carrying over between test runs.
 	c := &Container{
 		containerInfo: &dockerContainer.InspectResponse{
-			ID:   randomContainerID(t),
+			ID:   containerfixture.RandomID(),
 			Name: "/app",
 			Config: &dockerContainer.Config{Labels: map[string]string{
 				labels.LifecycleUID: "root",
@@ -1444,18 +1442,6 @@ func readLabelLogs(c *Container, read func(c *Container)) string {
 	read(c)
 
 	return out.String()
-}
-
-// randomContainerID returns 64 random hex characters, the form of a Docker
-// container ID.
-func randomContainerID(t *testing.T) string {
-	t.Helper()
-
-	id := make([]byte, 32)
-	_, err := rand.Read(id)
-	require.NoError(t, err)
-
-	return hex.EncodeToString(id)
 }
 
 func TestContainer_GetContainerChain(t *testing.T) {

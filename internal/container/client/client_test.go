@@ -1766,8 +1766,8 @@ func TestClientWrappers(t *testing.T) {
 	t.Run("IsContainerStale reports a newer local image", func(t *testing.T) {
 		t.Parallel()
 
-		currentImageID := "sha256:" + randomSHA256()
-		newImageID := "sha256:" + randomSHA256()
+		currentImageID := "sha256:" + containerfixture.RandomID()
+		newImageID := "sha256:" + containerfixture.RandomID()
 
 		api := newImageAPI(t)
 		api.EXPECT().ImageInspect(mock.Anything, "test-image:latest").Return(inspected(newImageID), nil).Once()
@@ -1788,7 +1788,7 @@ func TestClientWrappers(t *testing.T) {
 			Return(dockerClient.ImageInspectResult{}, daemonError("inspect failed")).Once()
 
 		_, _, _, err := (&client{log: newTestLogger(t), api: api}).IsContainerStale(
-			t.Context(), runningImage("sha256:"+randomSHA256()), types.UpdateParams{NoPull: true},
+			t.Context(), runningImage("sha256:"+containerfixture.RandomID()), types.UpdateParams{NoPull: true},
 		)
 		require.Error(t, err)
 	})
@@ -1796,7 +1796,7 @@ func TestClientWrappers(t *testing.T) {
 	t.Run("CheckContainerUpdate checks the local image with no-pull", func(t *testing.T) {
 		t.Parallel()
 
-		currentImageID := "sha256:" + randomSHA256()
+		currentImageID := "sha256:" + containerfixture.RandomID()
 
 		api := newImageAPI(t)
 		api.EXPECT().ImageInspect(mock.Anything, "test-image:latest").Return(inspected(currentImageID), nil).Once()
@@ -1817,7 +1817,7 @@ func TestClientWrappers(t *testing.T) {
 			Return(dockerClient.ImageInspectResult{}, daemonError("inspect failed")).Once()
 
 		_, _, _, err := (&client{log: newTestLogger(t), api: api}).CheckContainerUpdate(
-			t.Context(), runningImage("sha256:"+randomSHA256()), types.UpdateParams{NoPull: true},
+			t.Context(), runningImage("sha256:"+containerfixture.RandomID()), types.UpdateParams{NoPull: true},
 		)
 		require.Error(t, err)
 	})
@@ -1825,7 +1825,7 @@ func TestClientWrappers(t *testing.T) {
 	t.Run("RemoveImageByID removes an unused image", func(t *testing.T) {
 		t.Parallel()
 
-		imageID := types.ImageID("sha256:" + randomSHA256())
+		imageID := types.ImageID("sha256:" + containerfixture.RandomID())
 
 		api := newDockerAPI(t)
 		api.EXPECT().ContainerList(mock.Anything, dockerClient.ContainerListOptions{All: true}).
@@ -1840,7 +1840,7 @@ func TestClientWrappers(t *testing.T) {
 	t.Run("RemoveImageByID reports an image still in use", func(t *testing.T) {
 		t.Parallel()
 
-		imageID := types.ImageID("sha256:" + randomSHA256())
+		imageID := types.ImageID("sha256:" + containerfixture.RandomID())
 
 		api := newDockerAPI(t)
 		api.EXPECT().ContainerList(mock.Anything, dockerClient.ContainerListOptions{All: true}).
