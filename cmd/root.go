@@ -260,7 +260,11 @@ func (p *process) preRun(cmd *cobra.Command, _ []string) {
 
 	clientOpts := appCfg.ClientOptions()
 	clientOpts.RateLimiter = rateLimiter
-	client = newClient(p.log, clientOpts)
+
+	client, err = newClient(p.log, clientOpts)
+	if err != nil {
+		p.log.Fatal().Err(err).Msg("Failed to initialize Docker client")
+	}
 
 	// Check for orchestrator mode early. This is an internal mode where Watchtower
 	// runs as a one-shot orchestrator for self-update.

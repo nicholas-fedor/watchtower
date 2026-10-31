@@ -93,7 +93,9 @@ func setPreRunState(t *testing.T, client containerClient.Client, detection selfD
 
 	setProcessFs(t, fsys)
 
-	newClient = func(*zerolog.Logger, containerClient.ClientOptions) containerClient.Client { return client }
+	newClient = func(*zerolog.Logger, containerClient.ClientOptions) (containerClient.Client, error) {
+		return client, nil
+	}
 
 	for _, key := range []string{"HOSTNAME", "DOCKER_HOST", "DOCKER_TLS_VERIFY", "DOCKER_API_VERSION", "DOCKER_CERT_PATH"} {
 		t.Setenv(key, "")
@@ -427,10 +429,10 @@ func TestPreRun_RegistryTLSSettings(t *testing.T) {
 
 			var clientOptions containerClient.ClientOptions
 
-			newClient = func(_ *zerolog.Logger, opts containerClient.ClientOptions) containerClient.Client {
+			newClient = func(_ *zerolog.Logger, opts containerClient.ClientOptions) (containerClient.Client, error) {
 				clientOptions = opts
 
-				return mockClient
+				return mockClient, nil
 			}
 
 			cmd := newTestRootCommand(t, tt.args...)
@@ -528,6 +530,13 @@ func TestPreRun_Exit(t *testing.T) {
 	}{
 		{helperCase: "invalid-log-format", wantExitCode: 1, wantOutput: []string{"Failed to initialize logging"}},
 		{helperCase: "invalid-configuration", wantExitCode: 1, wantOutput: []string{"Failed to load configuration"}},
+		{
+			// A Docker client that cannot be created ends startup with the
+			// client's error.
+			helperCase:   "docker-client-error",
+			wantExitCode: 1,
+			wantOutput:   []string{"Failed to initialize Docker client", errRunTestDocker.Error()},
+		},
 		{
 			// RunOrchestrator always ends the process, so the restart policy
 			// fallback after it in preRun does not run.
@@ -634,6 +643,7 @@ func preRunExitHelper(t *testing.T, helperCase string) {
 		args = []string{"--log-format", "bogus"}
 	case "invalid-configuration":
 		args = []string{"--rolling-restart", "--monitor-only"}
+	case "docker-client-error":
 	case "orchestrator-without-settings":
 		args = []string{"--self-update-orchestrator"}
 	case "invalid-restart-of-old-instance":
@@ -664,6 +674,12 @@ func preRunExitHelper(t *testing.T, helperCase string) {
 	}
 
 	setPreRunState(t, mockClient, detection)
+
+	if helperCase == "docker-client-error" {
+		newClient = func(*zerolog.Logger, containerClient.ClientOptions) (containerClient.Client, error) {
+			return nil, errRunTestDocker
+		}
+	}
 
 	for _, key := range []string{"WT_ORCHESTRATOR_OLD_ID", "WT_ORCHESTRATOR_NEW_IMAGE", "WT_ORCHESTRATOR_ORIGINAL_NAME"} {
 		t.Setenv(key, "")
