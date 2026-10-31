@@ -220,6 +220,7 @@ docker cp <CONTAINER>:<FILE_PATH> ./watchtower-notifications.env
 
 The temporary file is automatically removed after **5 minutes** or when the container stops, so copy it promptly after generation.
 If you are running `notify-upgrade` as a one-off command (`docker run --rm ...`), the process will wait up to 5 minutes before exiting.
+When the conversion fails, `notify-upgrade` writes no file. It logs the error and exits with code 1.
 
 ## Migration Walkthrough
 

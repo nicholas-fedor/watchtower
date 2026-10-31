@@ -1,8 +1,10 @@
 package cmd
 
 import (
+	"context"
 	"errors"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"runtime"
 	"testing"
@@ -17,8 +19,14 @@ import (
 	"github.com/nicholas-fedor/watchtower/internal/testutil/golden"
 )
 
-// notifyUpgradeFilePattern matches the environment file notify-upgrade writes.
-const notifyUpgradeFilePattern = "watchtower-notif-urls-*"
+// Constants for the notify-upgrade tests.
+const (
+	// notifyUpgradeFilePattern matches the environment file notify-upgrade writes.
+	notifyUpgradeFilePattern = "watchtower-notif-urls-*"
+	// notifyUpgradeExitHelperEnv marks the test binary re-executed to run a
+	// failing notify-upgrade. Empty means the parent process.
+	notifyUpgradeExitHelperEnv = "WATCHTOWER_CMD_NOTIFY_UPGRADE_EXIT_HELPER"
+)
 
 // newNotifyUpgradeCommand returns a notify-upgrade command under a new root
 // command, configured only by args.
@@ -223,6 +231,40 @@ func TestNotifyUpgrade_Failures(t *testing.T) {
 			assert.Empty(t, notifyUpgradeFiles(t))
 		})
 	}
+}
+
+// TestRunNotifyUpgrade_ExitsOnFailure verifies that a failed notify-upgrade
+// ends the process with exit code 1, so scripts and container runtimes can
+// tell that no environment file was produced. The command runs in a
+// re-executed test binary because the failure ends the process.
+func TestRunNotifyUpgrade_ExitsOnFailure(t *testing.T) {
+	if os.Getenv(notifyUpgradeExitHelperEnv) != "" {
+		t.Chdir(t.TempDir())
+
+		runNotifyUpgrade(newNotifyUpgradeCommand(t,
+			"--notifications", "slack",
+			"--notification-slack-hook-url", "https://hooks.slack.com/services/not-a-token",
+		), nil)
+
+		// The failure must end the process. Reaching here means it did not.
+		os.Exit(2)
+	}
+
+	ctx, cancel := context.WithTimeout(t.Context(), 30*time.Second)
+	defer cancel()
+
+	cmd := exec.CommandContext(ctx, os.Args[0], "-test.run=^TestRunNotifyUpgrade_ExitsOnFailure$", "-test.v=false")
+
+	cmd.Env = append(os.Environ(), notifyUpgradeExitHelperEnv+"=1")
+
+	out, err := cmd.CombinedOutput()
+
+	var exitErr *exec.ExitError
+
+	require.ErrorAs(t, err, &exitErr, "output:\n%s", out)
+	assert.Equal(t, 1, exitErr.ExitCode(), "output:\n%s", out)
+	assert.Contains(t, string(out), "Notification upgrade failed")
+	assert.Contains(t, string(out), "build notification URLs")
 }
 
 // TestWriteNotificationEnvFile verifies that the environment file is kept only
