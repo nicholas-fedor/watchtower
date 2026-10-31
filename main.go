@@ -52,5 +52,5 @@ import (
 // and notifications.
 func main() {
 	log := logging.New(os.Stderr, logging.InfoLevel)
-	cmd.Execute(log)
+	cmd.Execute(log, os.Args[1:])
 }

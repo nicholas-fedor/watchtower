@@ -585,6 +585,14 @@ func TestPreRun_Exit(t *testing.T) {
 			unwantedOutput: []string{"SetRestartPolicy"},
 		},
 		{
+			// Parsing stops at the bad flag, so the health-check flag after it
+			// is still found and the probed container is left alone.
+			helperCase:     "unknown-flag-before-health-check",
+			wantExitCode:   1,
+			wantOutput:     []string{"Failed to execute root command"},
+			unwantedOutput: []string{"SetRestartPolicy"},
+		},
+		{
 			// A subcommand such as notify-upgrade can run inside the main
 			// container, so its failure leaves that container's restarts alone.
 			helperCase:     "subcommand-error",
@@ -718,6 +726,15 @@ func preRunExitHelper(t *testing.T, helperCase string) {
 			return policyErr
 		}).Maybe()
 
+	// executeArgs holds the command line of each case that runs Execute
+	// inside Watchtower's container instead of preRun.
+	executeArgs := map[string][]string{
+		"unknown-flag":                     {"--not-a-watchtower-flag"},
+		"unknown-flag-in-health-check":     {"--health-check", "--not-a-watchtower-flag"},
+		"unknown-flag-before-health-check": {"--not-a-watchtower-flag", "--health-check"},
+		"subcommand-error":                 {"notify-upgrade", "--not-a-watchtower-flag"},
+	}
+
 	switch helperCase {
 	case "invalid-environment":
 		env = map[string]string{"WATCHTOWER_HTTP_API_RATE_LIMIT": "many"}
@@ -737,8 +754,6 @@ func preRunExitHelper(t *testing.T, helperCase string) {
 		detection = inContainer
 	case "invalid-configuration-in-health-check":
 		args = []string{"--health-check", "--rolling-restart", "--monitor-only"}
-		detection = inContainer
-	case "unknown-flag", "unknown-flag-in-health-check", "subcommand-error":
 		detection = inContainer
 	case "invalid-configuration-on-host":
 		args = []string{"--rolling-restart", "--monitor-only"}
@@ -768,7 +783,11 @@ func preRunExitHelper(t *testing.T, helperCase string) {
 
 		mockClient.EXPECT().GetCurrentWatchtowerContainer(mock.Anything, selfID).Return(nil, errRunTestDocker)
 	default:
-		panic("unknown preRun exit helper case " + helperCase)
+		if _, ok := executeArgs[helperCase]; !ok {
+			panic("unknown preRun exit helper case " + helperCase)
+		}
+
+		detection = inContainer
 	}
 
 	setPreRunState(t, mockClient, detection)
@@ -798,20 +817,8 @@ func preRunExitHelper(t *testing.T, helperCase string) {
 
 	log := logging.New(os.Stderr, logging.InfoLevel)
 
-	switch helperCase {
-	case "unknown-flag":
-		rootCmd.SetArgs([]string{"--not-a-watchtower-flag"})
-		Execute(log)
-
-		return
-	case "unknown-flag-in-health-check":
-		rootCmd.SetArgs([]string{"--health-check", "--not-a-watchtower-flag"})
-		Execute(log)
-
-		return
-	case "subcommand-error":
-		rootCmd.SetArgs([]string{"notify-upgrade", "--not-a-watchtower-flag"})
-		Execute(log)
+	if executeCaseArgs, ok := executeArgs[helperCase]; ok {
+		Execute(log, executeCaseArgs)
 
 		return
 	}

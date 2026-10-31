@@ -1548,6 +1548,60 @@ func TestDisableRestarts(t *testing.T) {
 	}
 }
 
+// TestHealthCheckInArgs verifies that the health-check flag is found in a
+// command line whatever other flags it holds, including a flag the full
+// command line cannot parse placed before or after it.
+func TestHealthCheckInArgs(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name string
+		args []string
+		want bool
+	}{
+		{name: "no arguments", args: nil, want: false},
+		{name: "health check only", args: []string{"--health-check"}, want: true},
+		{name: "health check before an unknown flag", args: []string{"--health-check", "--bogus"}, want: true},
+		{name: "health check after an unknown flag", args: []string{"--bogus", "--health-check"}, want: true},
+		{name: "health check after a flag with a value", args: []string{"--interval", "30", "--health-check"}, want: true},
+		{name: "health check set to false", args: []string{"--bogus", "--health-check=false"}, want: false},
+		{name: "other flags only", args: []string{"--run-once", "--bogus"}, want: false},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			assert.Equal(t, tt.want, healthCheckInArgs(tt.args))
+		})
+	}
+}
+
+// TestIsHealthCheckProbe verifies that the health-check flag marks a probe
+// only outside PID 1, since PID 1 is the main process of its container.
+func TestIsHealthCheckProbe(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name        string
+		pid         int
+		healthCheck bool
+		want        bool
+	}{
+		{name: "probe process", pid: 42, healthCheck: true, want: true},
+		{name: "main process with the flag", pid: 1, healthCheck: true, want: false},
+		{name: "no flag", pid: 42, healthCheck: false, want: false},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			assert.Equal(t, tt.want, isHealthCheckProbe(tt.healthCheck, tt.pid))
+		})
+	}
+}
+
 // currentWatchtowerWithoutRestarts returns the Watchtower container the tests
 // run as, with the restart policy "no".
 func currentWatchtowerWithoutRestarts() types.Container {

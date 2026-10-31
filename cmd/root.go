@@ -2,6 +2,7 @@ package cmd
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"io/fs"
 	"os"
@@ -11,6 +12,7 @@ import (
 
 	"github.com/rs/zerolog"
 	"github.com/spf13/cobra"
+	"github.com/spf13/pflag"
 
 	cerrdefs "github.com/containerd/errdefs"
 	dockerContainer "github.com/moby/moby/api/types/container"
@@ -57,6 +59,10 @@ const (
 	// restart policy before exiting.
 	restartsKeptMessage = "Could not disable Watchtower's restart policy. The runtime may start it again"
 )
+
+// errHealthCheckOnMainProcess indicates that the health-check flag was passed
+// to the main process of Watchtower's container, which only a probe may get.
+var errHealthCheckOnMainProcess = errors.New("the health-check flag was passed to the main process")
 
 var (
 	// appCfg is the resolved process configuration from settings.Load.
@@ -148,8 +154,9 @@ var (
 // parsed. It is never stored as a package-level global.
 type process struct {
 	log *zerolog.Logger
-	// healthCheck reports whether this invocation is a health check, which
-	// must not change the container it probes.
+	// healthCheck reports whether this invocation is a health check probe,
+	// which must not change the container it probes. The main process of a
+	// container is never a probe.
 	healthCheck bool
 	// dockerEnvironmentMapped reports whether startup has mapped the Docker
 	// connection flags into the environment.
@@ -192,10 +199,12 @@ func NewRootCommand() *cobra.Command {
 //
 // Parameters:
 //   - log: Process logger from main (reconfigured in preRun from --log-format / --log-level).
-func Execute(log *zerolog.Logger) {
+//   - args: Command-line arguments without the program name.
+func Execute(log *zerolog.Logger, args []string) {
 	proc := &process{log: log}
 	rootCmd.PreRun = proc.preRun
 	rootCmd.Run = proc.run
+	rootCmd.SetArgs(args)
 
 	executed, err := rootCmd.ExecuteC()
 	if err != nil {
@@ -203,10 +212,9 @@ func Execute(log *zerolog.Logger) {
 		// that does not parse, which no restart can clear. A subcommand's
 		// error leaves the restart policy alone.
 		if executed == rootCmd {
-			// preRun has not run, so it has not recorded the health-check flag
-			// yet. Parsing stops at the first bad flag, so the flag is set when
-			// it comes before that one.
-			proc.healthCheck, _ = rootCmd.PersistentFlags().GetBool("health-check")
+			// Parsing stopped at the first bad flag before preRun could record
+			// the health-check flag, so the flag is read from the arguments.
+			proc.healthCheck = isHealthCheckProbe(healthCheckInArgs(args), os.Getpid())
 			proc.exitConfigurationError(rootCmd, err, "Failed to execute root command")
 		}
 
@@ -231,7 +239,15 @@ func (p *process) preRun(cmd *cobra.Command, _ []string) {
 
 	// The health-check flag has no environment variable, so the parsed flag
 	// is its resolved value before anything else can fail.
-	p.healthCheck, _ = flagsSet.GetBool("health-check")
+	healthCheck, _ := flagsSet.GetBool("health-check")
+	p.healthCheck = isHealthCheckProbe(healthCheck, os.Getpid())
+
+	// Only a probe may get the health-check flag. The main process would exit
+	// on every start, so this is a configuration error like any other.
+	if healthCheck && !p.healthCheck {
+		p.exitConfigurationError(cmd, errHealthCheckOnMainProcess,
+			"The health check flag should never be passed to the main watchtower container process")
+	}
 
 	// Bridge environment values onto unset flags so aliases and logging still see them.
 	err := settings.ApplyEnvToFlags(flagsSet, settings.AllSpecs())
@@ -513,12 +529,6 @@ func (p *process) run(command *cobra.Command, args []string) {
 	}
 
 	if appCfg.Mode.HealthCheck {
-		if os.Getpid() == 1 {
-			time.Sleep(1 * time.Second)
-			p.log.Fatal().
-				Msg("The health check flag should never be passed to the main watchtower container process")
-		}
-
 		return
 	}
 
@@ -983,6 +993,43 @@ func (p *process) detectCurrentContainerID() {
 	defer cancel()
 
 	currentWatchtowerContainerID, _ = containerClient.GetCurrentContainerID(p.log, ctx, processFs, client)
+}
+
+// isHealthCheckProbe reports whether a process with the given health-check
+// flag and process ID is a health check probe. PID 1 is the main process of
+// its container, so it is never a probe, even with the flag.
+//
+// Parameters:
+//   - healthCheck: The value of the health-check flag.
+//   - pid: The ID of the process.
+//
+// Returns:
+//   - bool: True for a probe process started with the flag.
+func isHealthCheckProbe(healthCheck bool, pid int) bool {
+	return healthCheck && pid != 1
+}
+
+// healthCheckInArgs reports whether a command line sets the health-check flag.
+// It parses that flag alone and treats every other flag as unknown, so it
+// finds the flag even in a command line that does not parse.
+//
+// Parameters:
+//   - args: The command-line arguments without the program name.
+//
+// Returns:
+//   - bool: True when the arguments set the health-check flag.
+func healthCheckInArgs(args []string) bool {
+	flags := pflag.NewFlagSet("health-check", pflag.ContinueOnError)
+	flags.ParseErrorsAllowlist.UnknownFlags = true
+	flags.Usage = func() {}
+
+	healthCheck := flags.Bool("health-check", false, "")
+
+	// Parsing stops at the first error, such as a value the flag cannot
+	// take. A flag read before that error still counts.
+	_ = flags.Parse(args)
+
+	return *healthCheck
 }
 
 // awaitDockerClient pauses for one second before Watchtower first lists containers.
