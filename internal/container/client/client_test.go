@@ -1431,19 +1431,34 @@ func TestClientEnvironment(t *testing.T) {
 			server := httpstub.New(t)
 			useDockerTLS(t, server, httpstub.NewTLS(t))
 
-			_, err := NewClient(newTestLogger(t), ClientOptions{}).GetInfo(t.Context())
+			client, err := NewClient(newTestLogger(t), ClientOptions{})
+			require.NoError(t, err)
+
+			_, err = client.GetInfo(t.Context())
 			require.ErrorContains(t, err, "failed to get system info")
 			assert.Empty(t, server.ReceivedRequests())
 		})
 	})
 
 	t.Run("NewClient", func(t *testing.T) {
+		t.Run("should return an error when DOCKER_HOST cannot be parsed", func(t *testing.T) {
+			t.Setenv("DOCKER_HOST", "tcp://[::1")
+			t.Setenv("DOCKER_TLS_VERIFY", "")
+			t.Setenv("DOCKER_API_VERSION", "")
+
+			client, err := NewClient(newTestLogger(t), ClientOptions{})
+			require.ErrorContains(t, err, "create Docker client")
+			assert.Nil(t, client)
+		})
+
 		t.Run("should successfully connect with TLS when DOCKER_TLS_VERIFY=1 and DOCKER_HOST points to TLS server", func(t *testing.T) {
 			server := httpstub.NewTLS(t)
 			server.AppendHandlers(respondToPing(t, http.MethodHead, http.StatusOK, "1.45"))
 			useDockerTLS(t, server, server)
 
-			require.NotNil(t, NewClient(newTestLogger(t), ClientOptions{}))
+			client, err := NewClient(newTestLogger(t), ClientOptions{})
+			require.NoError(t, err)
+			require.NotNil(t, client)
 
 			requests := server.ReceivedRequests()
 			require.Len(t, requests, 1)
@@ -1454,7 +1469,7 @@ func TestClientEnvironment(t *testing.T) {
 			server := httpstub.New(t)
 			useDockerTLS(t, server, httpstub.NewTLS(t))
 
-			assert.NotPanics(t, func() { NewClient(newTestLogger(t), ClientOptions{}) })
+			assert.NotPanics(t, func() { _, _ = NewClient(newTestLogger(t), ClientOptions{}) })
 			assert.Empty(t, server.ReceivedRequests(), "no plain HTTP request is sent")
 		})
 
@@ -1463,7 +1478,9 @@ func TestClientEnvironment(t *testing.T) {
 			server.AppendHandlers(respondToPing(t, http.MethodHead, http.StatusOK, "1.45"))
 			useDockerTLS(t, server, server)
 
-			assert.Equal(t, "1.45", NewClient(newTestLogger(t), ClientOptions{}).GetVersion())
+			client, err := NewClient(newTestLogger(t), ClientOptions{})
+			require.NoError(t, err)
+			assert.Equal(t, "1.45", client.GetVersion())
 		})
 
 		t.Run("should use forced API version with TLS", func(t *testing.T) {
@@ -1474,7 +1491,9 @@ func TestClientEnvironment(t *testing.T) {
 			useDockerTLS(t, server, server)
 			t.Setenv("DOCKER_API_VERSION", "1.44")
 
-			assert.Equal(t, "1.44", NewClient(newTestLogger(t), ClientOptions{}).GetVersion())
+			client, err := NewClient(newTestLogger(t), ClientOptions{})
+			require.NoError(t, err)
+			assert.Equal(t, "1.44", client.GetVersion())
 		})
 
 		t.Run("should fall back to negotiation when the forced API version is newer than the daemon's", func(t *testing.T) {
@@ -1488,7 +1507,9 @@ func TestClientEnvironment(t *testing.T) {
 			useDockerTLS(t, server, server)
 			t.Setenv("DOCKER_API_VERSION", "1.47")
 
-			assert.Equal(t, "1.45", NewClient(newTestLogger(t), ClientOptions{}).GetVersion())
+			client, err := NewClient(newTestLogger(t), ClientOptions{})
+			require.NoError(t, err)
+			assert.Equal(t, "1.45", client.GetVersion())
 			assert.Len(t, server.ReceivedRequests(), 2)
 		})
 
@@ -1504,7 +1525,9 @@ func TestClientEnvironment(t *testing.T) {
 			useDockerTLS(t, server, server)
 			t.Setenv("DOCKER_API_VERSION", "1.99")
 
-			assert.Equal(t, "1.45", NewClient(newTestLogger(t), ClientOptions{}).GetVersion())
+			client, err := NewClient(newTestLogger(t), ClientOptions{})
+			require.NoError(t, err)
+			assert.Equal(t, "1.45", client.GetVersion())
 			assert.Len(t, server.ReceivedRequests(), 3)
 		})
 	})

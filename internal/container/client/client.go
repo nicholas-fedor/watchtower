@@ -479,11 +479,14 @@ type ClientOptions struct {
 // and validates the API version, falling back to autonegotiation if necessary.
 //
 // Parameters:
+//   - log: Process logger.
 //   - opts: Options to customize container management behavior.
 //
 // Returns:
-//   - Client: Initialized client instance (exits on failure).
-func NewClient(log *zerolog.Logger, opts ClientOptions) Client {
+//   - Client: The initialized client. It is nil when the error is not.
+//   - error: Non-nil when the client cannot be built or rebuilt. An unanswered ping is not an
+//     error.
+func NewClient(log *zerolog.Logger, opts ClientOptions) (Client, error) {
 	// Initialize client from environment. FromEnv reads DOCKER_HOST, DOCKER_TLS_VERIFY,
 	// DOCKER_CERT_PATH, and DOCKER_API_VERSION. When DOCKER_API_VERSION is set, the client
 	// uses that fixed version. Otherwise, it defaults to the maximum supported version
@@ -493,9 +496,7 @@ func NewClient(log *zerolog.Logger, opts ClientOptions) Client {
 	// ping and API negotiation step.
 	cli, err := dockerClient.New(dockerClient.FromEnv)
 	if err != nil {
-		log.Fatal().
-			Err(err).
-			Msg("Failed to initialize Docker client")
+		return nil, fmt.Errorf("create Docker client: %w", err)
 	}
 
 	if opts.RateLimiter == nil {
@@ -504,9 +505,7 @@ func NewClient(log *zerolog.Logger, opts ClientOptions) Client {
 
 	cli, result, err := negotiateDockerAPI(log, cli)
 	if err != nil {
-		log.Fatal().
-			Err(err).
-			Msg("Failed to recreate Docker client")
+		return nil, err
 	}
 
 	log.Debug().
@@ -518,7 +517,7 @@ func NewClient(log *zerolog.Logger, opts ClientOptions) Client {
 		api:           cli,
 		log:           log,
 		ClientOptions: opts,
-	}
+	}, nil
 }
 
 // negotiateDockerAPI pings the daemon to validate connectivity and negotiate the API version.
