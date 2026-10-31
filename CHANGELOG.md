@@ -63,6 +63,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- Return startup errors to a single exit in execute by @nicholas-fedor in [#3335](https://github.com/nicholas-fedor/watchtower/pull/3335)
 - Return flag alias and secret file errors to the caller by @nicholas-fedor in [#3329](https://github.com/nicholas-fedor/watchtower/pull/3329)
 - Return Docker client creation errors to the caller by @nicholas-fedor in [#3327](https://github.com/nicholas-fedor/watchtower/pull/3327)
 - Resolve the lifecycle hook user in the model by @nicholas-fedor in [#3322](https://github.com/nicholas-fedor/watchtower/pull/3322)
