@@ -1,6 +1,7 @@
 package logcapture
 
 import (
+	"errors"
 	"sync"
 	"testing"
 
@@ -88,6 +89,50 @@ func TestEntries(t *testing.T) {
 	assert.Equal(t, []linksEntry{{Message: "first", Links: []string{"db", "cache"}}, {Message: "second"}}, structs)
 
 	assert.Empty(t, Entries[Entry](t, ""))
+}
+
+// failureRecorder records a test failure instead of reporting it, so a test
+// can check that a helper fails its caller. It embeds the real test only to
+// satisfy [testing.TB].
+type failureRecorder struct {
+	testing.TB
+
+	// failed reports whether the helper failed the test.
+	failed bool
+}
+
+// errStoppedHelper is the panic value [failureRecorder.FailNow] stops a helper
+// with.
+var errStoppedHelper = errors.New("helper stopped by FailNow")
+
+// Helper does nothing, since the recorder reports no failure locations.
+func (r *failureRecorder) Helper() {}
+
+// Errorf records the failure and ignores its message.
+func (r *failureRecorder) Errorf(string, ...any) {
+	r.failed = true
+}
+
+// FailNow records the failure and stops the helper with a panic that the
+// test recovers, since a helper must not continue after FailNow.
+func (r *failureRecorder) FailNow() {
+	r.failed = true
+
+	panic(errStoppedHelper)
+}
+
+// TestEntries_MalformedLine verifies that a captured line that is not JSON
+// fails the test rather than being skipped, so a malformed log entry cannot
+// go unnoticed.
+func TestEntries_MalformedLine(t *testing.T) {
+	t.Parallel()
+
+	recorder := &failureRecorder{TB: t}
+
+	assert.PanicsWithValue(t, errStoppedHelper, func() {
+		Entries[Entry](recorder, "{\"message\":\"first\"}\nlevel=warn message=second\n")
+	})
+	assert.True(t, recorder.failed)
 }
 
 // TestLevels verifies that only the entries with the given message report
