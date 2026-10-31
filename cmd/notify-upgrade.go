@@ -48,14 +48,20 @@ func init() {
 	})
 }
 
-// runNotifyUpgrade executes the notify-upgrade command, handling errors gracefully.
-// It wraps the main logic in runNotifyUpgradeE and logs any failures with the reconfigured logger.
+// runNotifyUpgrade executes the notify-upgrade command.
+//
+// A failure is logged with the logger configured from the command's flags.
+// The process then exits with code 1.
+//
+// Parameters:
+//   - cmd: The notify-upgrade command, providing access to parsed flags.
+//   - args: Positional arguments, none for this command.
 func runNotifyUpgrade(cmd *cobra.Command, args []string) {
 	log := logging.New(os.Stderr, logging.InfoLevel)
 
 	log, err := runNotifyUpgradeE(cmd, args, log)
 	if err != nil {
-		log.Error().Err(err).Msg("Notification upgrade failed")
+		log.Fatal().Err(err).Msg("Notification upgrade failed")
 	}
 }
 
