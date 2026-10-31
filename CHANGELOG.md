@@ -139,6 +139,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Chores
 
+- Update module go.yaml.in/yaml/v3 to v3.0.6 by @renovate[bot] in [#3338](https://github.com/nicholas-fedor/watchtower/pull/3338)
 - Update module github.com/pandatix/go-abnf to v0.5.5 by @renovate[bot] in [#3332](https://github.com/nicholas-fedor/watchtower/pull/3332)
 - Update module github.com/pandatix/go-abnf to v0.5.4 by @renovate[bot] in [#3306](https://github.com/nicholas-fedor/watchtower/pull/3306)
 - Update module github.com/gofiber/schema to v1.9.2 by @renovate[bot] in [#3300](https://github.com/nicholas-fedor/watchtower/pull/3300)
