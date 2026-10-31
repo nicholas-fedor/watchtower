@@ -121,6 +121,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Tests
 
+- Share one random ID helper across the container and update tests by @nicholas-fedor in [#3318](https://github.com/nicholas-fedor/watchtower/pull/3318)
 - Share the JSON log capture helpers by @nicholas-fedor in [#3316](https://github.com/nicholas-fedor/watchtower/pull/3316)
 - Use the generated filterable container mock by @nicholas-fedor in [#3150](https://github.com/nicholas-fedor/watchtower/pull/3150)
 - Check the orchestrator cleanup context by @nicholas-fedor in [#3142](https://github.com/nicholas-fedor/watchtower/pull/3142)
