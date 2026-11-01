@@ -1629,7 +1629,9 @@ func TestDisableRestarts(t *testing.T) {
 		// not inspected.
 		current types.Container
 		// pid is the process ID Watchtower runs as.
-		pid        int
+		pid int
+		// unknownID leaves Watchtower's own container ID unknown.
+		unknownID  bool
 		wantUpdate bool
 		updateErr  error
 		wantError  bool
@@ -1639,6 +1641,7 @@ func TestDisableRestarts(t *testing.T) {
 		{name: "the container was not inspected", pid: 1, wantUpdate: true},
 		{name: "the policy is already no", current: currentWatchtowerWithoutRestarts(), pid: 1, wantUpdate: false},
 		{name: "not the container's main process", current: currentWatchtower(), pid: 42, wantUpdate: false},
+		{name: "the container ID is not known", pid: 1, unknownID: true, wantUpdate: false, wantError: true},
 	}
 
 	for _, tt := range tests {
@@ -1650,7 +1653,12 @@ func TestDisableRestarts(t *testing.T) {
 					Return(tt.updateErr).Once()
 			}
 
-			setRunState(t, runTestState{client: mockClient, current: tt.current, currentID: "c0c0"})
+			currentID := types.ContainerID("c0c0")
+			if tt.unknownID {
+				currentID = ""
+			}
+
+			setRunState(t, runTestState{client: mockClient, current: tt.current, currentID: currentID})
 
 			processID = func() int { return tt.pid }
 
@@ -1659,7 +1667,13 @@ func TestDisableRestarts(t *testing.T) {
 
 			if tt.wantError {
 				assert.Contains(t, logOutput.String(), restartsKeptMessage)
-				assert.Contains(t, logOutput.String(), errRunTestDocker.Error())
+
+				wantCause := errRunTestDocker
+				if tt.unknownID {
+					wantCause = errUnknownContainerID
+				}
+
+				assert.Contains(t, logOutput.String(), wantCause.Error())
 			} else {
 				assert.Empty(t, logOutput.String())
 			}

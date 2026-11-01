@@ -58,9 +58,15 @@ const (
 	restartsKeptMessage = "Could not disable Watchtower's restart policy. The runtime may start it again"
 )
 
-// errSupersededInstance ends a Watchtower instance that runs in an old
-// container, which a newer instance has replaced.
-var errSupersededInstance = errors.New("superseded Watchtower instance")
+// Errors for ending Watchtower.
+var (
+	// errSupersededInstance ends a Watchtower instance that runs in an old
+	// container, which a newer instance has replaced.
+	errSupersededInstance = errors.New("superseded Watchtower instance")
+	// errUnknownContainerID indicates that Watchtower does not know the ID of
+	// its own container, so it cannot change the container's restart policy.
+	errUnknownContainerID = errors.New("own container ID is not known")
+)
 
 var (
 	// appCfg is the resolved process configuration from settings.Load.
@@ -933,12 +939,18 @@ func (p *process) logNotify(msg string, err error) {
 //
 // Only the container's main process changes the policy. A host binary and a
 // command started with docker exec, such as a health check probe, leave it
-// alone. A policy that is already "no" is not updated. A failure is logged as
-// an error, because the runtime may then start Watchtower again. Exit paths
-// call it before they report the exit, so the exit's notification includes
-// that error.
+// alone. A policy that is already "no" is not updated. A failure, including a
+// container ID that is not known, is logged as an error, because the runtime
+// may then start Watchtower again. Exit paths call it before they report the
+// exit, so the exit's notification includes that error.
 func (p *process) disableRestarts() {
 	if !isContainerMainProcess() {
+		return
+	}
+
+	if currentWatchtowerContainerID == "" {
+		p.log.Error().Err(errUnknownContainerID).Msg(restartsKeptMessage)
+
 		return
 	}
 
