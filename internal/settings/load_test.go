@@ -189,8 +189,86 @@ func TestLoad_NegativeDurations(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			_, err := loadWithEnv(t, tt.env, tt.args...)
-			require.ErrorIs(t, err, errNegativeDurationSetting)
+			require.ErrorIs(t, err, errNegativeSetting)
 			assert.ErrorContains(t, err, tt.setting+" must be non-negative, got -")
+		})
+	}
+}
+
+// TestLoad_NegativeIntegers verifies that a negative value for an integer
+// setting stops Load with an error naming the setting and the value. The value
+// comes from a flag or an environment variable. Zero is a valid value for each
+// of them. The test runs sequentially because the environment cases set
+// variables.
+func TestLoad_NegativeIntegers(t *testing.T) {
+	tests := []struct {
+		name    string
+		setting string
+		args    []string
+		env     map[string]string
+	}{
+		{name: "notifications-delay flag", setting: "notifications-delay", args: []string{"--notifications-delay", "-5"}},
+		{
+			name:    "notifications-delay env",
+			setting: "notifications-delay",
+			env:     map[string]string{"WATCHTOWER_NOTIFICATIONS_DELAY": "-5"},
+		},
+		{
+			name:    "notification-email-delay env",
+			setting: "notification-email-delay",
+			env:     map[string]string{"WATCHTOWER_NOTIFICATION_EMAIL_DELAY": "-5"},
+		},
+		{name: "http-api-rate-limit flag", setting: "http-api-rate-limit", args: []string{"--http-api-rate-limit", "-1"}},
+		{name: "lifecycle-uid flag", setting: "lifecycle-uid", args: []string{"--lifecycle-uid", "-1"}},
+		{
+			name:    "lifecycle-gid env",
+			setting: "lifecycle-gid",
+			env:     map[string]string{"WATCHTOWER_LIFECYCLE_GID": "-1"},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			_, err := loadWithEnv(t, tt.env, tt.args...)
+			require.ErrorIs(t, err, errNegativeSetting)
+			assert.ErrorContains(t, err, tt.setting+" must be non-negative, got -")
+		})
+	}
+
+	t.Run("zero is accepted", func(t *testing.T) {
+		_, err := loadWithEnv(t, nil,
+			"--notifications-delay", "0",
+			"--notification-email-delay", "0",
+			"--http-api-rate-limit", "0",
+			"--lifecycle-uid", "0",
+			"--lifecycle-gid", "0",
+		)
+		require.NoError(t, err)
+	})
+}
+
+// TestLoad_NonPositiveInterval verifies that a poll interval of zero or less
+// stops Load with an error naming the value, since cron runs an interval
+// below 1 second every second. The interval comes from a flag or an
+// environment variable. The test runs sequentially because the environment
+// case sets a variable.
+func TestLoad_NonPositiveInterval(t *testing.T) {
+	tests := []struct {
+		name string
+		args []string
+		env  map[string]string
+		want string
+	}{
+		{name: "negative flag", args: []string{"--interval", "-5"}, want: "got -5"},
+		{name: "zero flag", args: []string{"--interval", "0"}, want: "got 0"},
+		{name: "negative env", env: map[string]string{"WATCHTOWER_POLL_INTERVAL": "-5"}, want: "got -5"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			_, err := loadWithEnv(t, tt.env, tt.args...)
+			require.ErrorIs(t, err, errNonPositiveInterval)
+			assert.ErrorContains(t, err, tt.want)
 		})
 	}
 }
@@ -243,7 +321,8 @@ func TestLoadCompat(t *testing.T) {
 func TestLoadSchedule(t *testing.T) {
 	vCfg, _, _ := bindLoad(t, "--interval", "120", "--schedule", "0 0 * * *", "--update-on-start")
 
-	got := loadSchedule(vCfg)
+	got, err := loadSchedule(vCfg)
+	require.NoError(t, err)
 	assert.Equal(t, 120, got.IntervalSeconds)
 	assert.Equal(t, "0 0 * * *", got.Spec)
 	assert.True(t, got.UpdateOnStart)
@@ -315,7 +394,8 @@ func TestLoadUpdate(t *testing.T) {
 func TestLoadLifecycle(t *testing.T) {
 	vCfg, _, _ := bindLoad(t, "--enable-lifecycle-hooks", "--lifecycle-uid", "1000", "--lifecycle-gid", "1001")
 
-	got := loadLifecycle(vCfg)
+	got, err := loadLifecycle(vCfg)
+	require.NoError(t, err)
 	assert.True(t, got.Enabled)
 	assert.Equal(t, 1000, got.UID)
 	assert.Equal(t, 1001, got.GID)
@@ -505,7 +585,8 @@ func TestLoadNotify(t *testing.T) {
 		"--notification-gotify-tls-skip-verify",
 	)
 
-	got := loadNotify(vCfg, flagSet)
+	got, err := loadNotify(vCfg, flagSet)
+	require.NoError(t, err)
 	assert.Equal(t, []string{"gotify://example/token"}, got.URLs)
 	assert.Equal(t, []string{"email", "slack"}, got.LegacyTypes)
 	assert.Equal(t, "debug", got.Level)

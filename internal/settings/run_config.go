@@ -44,7 +44,7 @@ func (c Config) BuildRunConfig(input RunConfigInput) (types.RunConfig, error) {
 		apiPort = "8080"
 	}
 
-	// Default rate limit when unset or invalid.
+	// A rate limit of zero means the default. Load rejects a negative one.
 	apiRateLimit := c.API.RateLimit
 	if apiRateLimit <= 0 {
 		apiRateLimit = 60

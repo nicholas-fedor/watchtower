@@ -25,7 +25,7 @@ Environment Variable: WATCHTOWER_SCHEDULE
 
 ## Interval
 
-Sets the interval (in seconds) for polling new images.
+Sets the interval (in seconds) for polling new images. Watchtower exits at startup if the value is zero or negative.
 
 ```text
             Argument: --interval, -i
