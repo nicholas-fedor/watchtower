@@ -63,8 +63,9 @@ type runTestState struct {
 }
 
 // setRunState sets the package variables run and runMain read, and restores
-// every one of them when the test ends. The Docker readiness sleep is skipped,
-// and the notifier has no services, so it sends nothing.
+// every one of them when the test ends. Watchtower runs as the main process of
+// its container. The Docker readiness sleep is skipped. The notifier has no
+// services, so it sends nothing.
 func setRunState(t *testing.T, state runTestState) {
 	t.Helper()
 
@@ -78,6 +79,8 @@ func setRunState(t *testing.T, state runTestState) {
 	savedRunUpdates := runUpdatesWithNotifications
 	savedSleep := sleepFunc
 	savedSignalContext := createSignalContext
+	savedProcessID := processID
+	savedParentProcessID := parentProcessID
 
 	t.Cleanup(func() {
 		appCfg = savedCfg
@@ -90,6 +93,8 @@ func setRunState(t *testing.T, state runTestState) {
 		runUpdatesWithNotifications = savedRunUpdates
 		sleepFunc = savedSleep
 		createSignalContext = savedSignalContext
+		processID = savedProcessID
+		parentProcessID = savedParentProcessID
 	})
 
 	appCfg = settings.Config{}
@@ -99,6 +104,8 @@ func setRunState(t *testing.T, state runTestState) {
 	currentWatchtowerContainerID = state.currentID
 	currentWatchtowerContainerUnknown = false
 	sleepFunc = func(time.Duration) {}
+	processID = func() int { return 1 }
+	parentProcessID = func() int { return 0 }
 
 	notifier = notifications.NewNotifier(new(zerolog.Nop()), notifyConfig.Notify{Level: "info"})
 	t.Cleanup(notifier.Close)
@@ -260,17 +267,20 @@ func newRunProcess() *process {
 }
 
 // TestRun_RunOnce records the Docker calls of a run-once update with no
-// containers to update. The restart policy is disabled at the end whether or
-// not Watchtower runs in a container.
+// containers to update. The restart policy is disabled at the end in a
+// container. A host binary has none to disable.
 func TestRun_RunOnce(t *testing.T) {
 	tests := []struct {
 		name    string
 		current types.Container
-		want    []string
+		// hostBinary runs Watchtower outside a container.
+		hostBinary bool
+		want       []string
 	}{
 		{
-			name: "outside a container",
-			want: []string{"GetVersion", "ListContainers filtered", "SetRestartPolicy none no"},
+			name:       "outside a container",
+			hostBinary: true,
+			want:       []string{"GetVersion", "ListContainers filtered"},
 		},
 		{
 			// The old-instance cleanup lists the containers again to find the
@@ -286,7 +296,7 @@ func TestRun_RunOnce(t *testing.T) {
 			mockClient := mockContainerClient.NewMockClient(t)
 			mockClient.EXPECT().GetVersion().Return("1.47")
 			mockClient.EXPECT().ListContainers(mock.Anything, withFilter).Return(nil, nil)
-			mockClient.EXPECT().SetRestartPolicy(mock.Anything, mock.Anything, mock.Anything).Return(nil)
+			mockClient.EXPECT().SetRestartPolicy(mock.Anything, mock.Anything, mock.Anything).Return(nil).Maybe()
 
 			state := runTestState{client: mockClient, current: tt.current}
 			if tt.current != nil {
@@ -294,6 +304,10 @@ func TestRun_RunOnce(t *testing.T) {
 			}
 
 			setRunState(t, state)
+
+			if tt.hostBinary {
+				processID = func() int { return 4242 }
+			}
 
 			require.NoError(t, newRunProcess().run(newTestRootCommand(t, "--run-once"), nil))
 
@@ -626,6 +640,9 @@ func TestRun_HealthCheck(t *testing.T) {
 	mockClient := mockContainerClient.NewMockClient(t)
 	setRunState(t, runTestState{client: mockClient})
 
+	// A health check probe runs beside the container's main process.
+	processID = func() int { return 42 }
+
 	require.NoError(t, newRunProcess().run(newTestRootCommand(t, "--health-check"), nil))
 
 	assert.Empty(t, runCalls(mockClient))
@@ -650,6 +667,12 @@ func TestRun_Exit(t *testing.T) {
 			// check for it is never reached through run.
 			helperCase: "rolling-restart-with-monitor-only",
 			wantOutput: "rolling-restart and monitor-only cannot both be enabled",
+		},
+		{
+			// The run configuration is checked after the configuration loads.
+			// A failure there happens again on the next start too.
+			helperCase: "invalid-run-configuration",
+			wantOutput: "Failed to build run configuration",
 		},
 		{helperCase: "rolling-restart-validation-fails", wantOutput: "Rolling restart compatibility validation failed"},
 		{helperCase: "api-without-token", wantOutput: "API setup failed"},
@@ -696,6 +719,8 @@ func runExitHelper(t *testing.T, helperCase string) {
 	switch helperCase {
 	case "rolling-restart-with-monitor-only":
 		args = []string{"--rolling-restart", "--monitor-only"}
+	case "invalid-run-configuration":
+		args = []string{"--http-api-host", "not-an-ip"}
 	case "rolling-restart-validation-fails":
 		args = []string{"--rolling-restart"}
 
@@ -711,8 +736,13 @@ func runExitHelper(t *testing.T, helperCase string) {
 
 	setRunState(t, runTestState{client: mockClient, current: current, currentID: current.ID()})
 
+	// Watchtower runs as the main process of its container.
+	processID = func() int { return 1 }
+
+	cmd := newTestRootCommand(t, args...)
+
 	proc := &process{log: logging.New(os.Stderr, logging.InfoLevel)}
-	proc.exit(proc.run(newTestRootCommand(t, args...), nil))
+	proc.exit(cmd, proc.run(cmd, nil))
 }
 
 // TestRun_OldInstanceStops verifies that continuous mode stops on its own

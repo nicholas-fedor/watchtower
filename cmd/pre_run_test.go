@@ -93,7 +93,7 @@ func setPreRunState(t *testing.T, client containerClient.Client, detection selfD
 
 	setProcessFs(t, fsys)
 
-	newClient = func(*zerolog.Logger, containerClient.ClientOptions) (containerClient.Client, error) {
+	newClient = func(context.Context, *zerolog.Logger, containerClient.ClientOptions) (containerClient.Client, error) {
 		return client, nil
 	}
 
@@ -429,7 +429,7 @@ func TestPreRun_RegistryTLSSettings(t *testing.T) {
 
 			var clientOptions containerClient.ClientOptions
 
-			newClient = func(_ *zerolog.Logger, opts containerClient.ClientOptions) (containerClient.Client, error) {
+			newClient = func(_ context.Context, _ *zerolog.Logger, opts containerClient.ClientOptions) (containerClient.Client, error) {
 				clientOptions = opts
 
 				return mockClient, nil
@@ -527,15 +527,95 @@ func TestPreRun_Exit(t *testing.T) {
 		wantExitCode int
 		// wantOutput lists lines the output must contain, in this order.
 		wantOutput []string
+		// unwantedOutput lists text the output must not contain.
+		unwantedOutput []string
+		// wantOnce lists text the output must contain exactly once.
+		wantOnce []string
 	}{
-		{helperCase: "invalid-log-format", wantExitCode: 1, wantOutput: []string{"Failed to initialize logging"}},
-		{helperCase: "invalid-configuration", wantExitCode: 1, wantOutput: []string{"Failed to load configuration"}},
 		{
-			// A Docker client that cannot be created ends startup with the
-			// client's error.
+			// A startup failure happens again on every start, so the main
+			// process disables its restarts before it exits. The Docker client
+			// is created for that when startup has not created it yet.
+			helperCase:   "invalid-environment",
+			wantExitCode: 1,
+			wantOutput:   []string{"SetRestartPolicy cccccccccccc no", "Failed to apply environment configuration"},
+		},
+		{
+			helperCase:   "invalid-log-format",
+			wantExitCode: 1,
+			wantOutput:   []string{"SetRestartPolicy cccccccccccc no", "Failed to initialize logging"},
+		},
+		{
+			helperCase:   "invalid-configuration",
+			wantExitCode: 1,
+			wantOutput:   []string{"SetRestartPolicy cccccccccccc no", "Failed to load configuration"},
+		},
+		{
+			// The client connects to the daemon that the host flag names. The
+			// process is exiting, so it waits only briefly for the daemon.
+			helperCase:   "invalid-log-format-with-host-flag",
+			wantExitCode: 1,
+			wantOutput: []string{
+				"newClient DOCKER_HOST=tcp://socket-proxy:2375 bounded=true",
+				"SetRestartPolicy cccccccccccc no",
+				"Failed to initialize logging",
+			},
+		},
+		{
+			// Without a Docker client, the restart policy cannot be changed, so
+			// Watchtower reports that before the startup failure. Startup
+			// already waited for the daemon, so the exit does not connect
+			// again.
 			helperCase:   "docker-client-error",
 			wantExitCode: 1,
-			wantOutput:   []string{"Failed to initialize Docker client", errRunTestDocker.Error()},
+			wantOutput: []string{
+				restartsKeptMessage,
+				"Failed to initialize Docker client",
+			},
+			unwantedOutput: []string{"SetRestartPolicy"},
+			wantOnce:       []string{"newClient"},
+		},
+		{
+			// Without its own container ID, Watchtower cannot change its
+			// restart policy, so it reports that before the startup failure.
+			helperCase:   "invalid-log-format-without-container-id",
+			wantExitCode: 1,
+			wantOutput: []string{
+				restartsKeptMessage,
+				"Failed to initialize logging",
+			},
+			unwantedOutput: []string{"SetRestartPolicy"},
+		},
+		{
+			// A process other than the main one, such as a health check probe,
+			// leaves the container's restart policy alone.
+			helperCase:     "invalid-configuration-outside-main-process",
+			wantExitCode:   1,
+			wantOutput:     []string{"Failed to load configuration"},
+			unwantedOutput: []string{"newClient", "SetRestartPolicy"},
+		},
+		{
+			// A flag that does not parse fails on every start too.
+			helperCase:   "unknown-flag",
+			wantExitCode: 1,
+			wantOutput:   []string{"SetRestartPolicy cccccccccccc no", "Failed to execute root command"},
+		},
+		{
+			// The flags before the one that does not parse are read.
+			helperCase:   "host-flag-before-unknown-flag",
+			wantExitCode: 1,
+			wantOutput: []string{
+				"newClient DOCKER_HOST=tcp://socket-proxy:2375",
+				"SetRestartPolicy cccccccccccc no",
+				"Failed to execute root command",
+			},
+		},
+		{
+			// A subcommand such as notify-upgrade leaves the restart policy alone.
+			helperCase:     "subcommand-error",
+			wantExitCode:   1,
+			wantOutput:     []string{"Failed to execute root command"},
+			unwantedOutput: []string{"newClient", "SetRestartPolicy", restartsKeptMessage},
 		},
 		{
 			// RunOrchestrator always ends the process, so the restart policy
@@ -572,7 +652,7 @@ func TestPreRun_Exit(t *testing.T) {
 			wantExitCode: 1,
 			wantOutput: []string{
 				"SetRestartPolicy cccccccccccc no",
-				"Could not disable Watchtower's restart policy. The runtime may start it again",
+				restartsKeptMessage,
 				"Exiting rather than running without a scope",
 			},
 		},
@@ -613,6 +693,14 @@ func TestPreRun_Exit(t *testing.T) {
 				require.True(t, found, "missing %q after the earlier lines in output:\n%s", want, out)
 			}
 
+			for _, unwanted := range tt.unwantedOutput {
+				assert.NotContains(t, string(out), unwanted, "output:\n%s", out)
+			}
+
+			for _, once := range tt.wantOnce {
+				assert.Equal(t, 1, strings.Count(string(out), once), "count of %q in output:\n%s", once, out)
+			}
+
 			assert.NotContains(t, string(out), "PASS", "the helper must end the process")
 		})
 	}
@@ -626,9 +714,18 @@ func preRunExitHelper(t *testing.T, helperCase string) {
 
 	var (
 		args      []string
-		detection selfDetection
+		env       map[string]string
 		policyErr error
+		clientErr error
+		// execute runs the whole command tree, as Execute does, instead of
+		// preRun alone.
+		execute bool
 	)
+
+	// Watchtower runs as PID 1, the main process of its own container, unless
+	// a case says otherwise.
+	detection := selfDetection{mountinfo: mountinfoWithSelf(), marker: true}
+	pid := 1
 
 	mockClient := mockContainerClient.NewMockClient(t)
 	mockClient.EXPECT().SetRestartPolicy(mock.Anything, mock.Anything, mock.Anything).
@@ -639,13 +736,34 @@ func preRunExitHelper(t *testing.T, helperCase string) {
 		}).Maybe()
 
 	switch helperCase {
+	case "invalid-environment":
+		env = map[string]string{"WATCHTOWER_HTTP_API_RATE_LIMIT": "many"}
 	case "invalid-log-format":
 		args = []string{"--log-format", "bogus"}
 	case "invalid-configuration":
 		args = []string{"--rolling-restart", "--monitor-only"}
+	case "invalid-log-format-without-container-id":
+		args = []string{"--log-format", "bogus"}
+		detection = selfDetection{}
+	case "invalid-log-format-with-host-flag":
+		args = []string{"--host", "tcp://socket-proxy:2375", "--log-format", "bogus"}
+	case "invalid-configuration-outside-main-process":
+		args = []string{"--rolling-restart", "--monitor-only"}
+		pid = 42
 	case "docker-client-error":
+		clientErr = errRunTestDocker
+	case "unknown-flag":
+		args = []string{"--not-a-watchtower-flag"}
+		execute = true
+	case "host-flag-before-unknown-flag":
+		args = []string{"--host", "tcp://socket-proxy:2375", "--not-a-watchtower-flag"}
+		execute = true
+	case "subcommand-error":
+		args = []string{"notify-upgrade", "--not-a-watchtower-flag"}
+		execute = true
 	case "orchestrator-without-settings":
 		args = []string{"--self-update-orchestrator"}
+		detection = selfDetection{}
 	case "invalid-restart-of-old-instance":
 		old := selfContainer("/watchtower-old-cccccccccccc", "")
 		detection = selfDetection{mountinfo: mountinfoWithSelf()}
@@ -675,10 +793,20 @@ func preRunExitHelper(t *testing.T, helperCase string) {
 
 	setPreRunState(t, mockClient, detection)
 
-	if helperCase == "docker-client-error" {
-		newClient = func(*zerolog.Logger, containerClient.ClientOptions) (containerClient.Client, error) {
-			return nil, errRunTestDocker
+	processID = func() int { return pid }
+
+	// The client factory prints the Docker host it connects to and whether its
+	// wait for the daemon has a deadline. It fails with clientErr when a case
+	// sets it.
+	newClient = func(ctx context.Context, _ *zerolog.Logger, _ containerClient.ClientOptions) (containerClient.Client, error) {
+		_, bounded := ctx.Deadline()
+		fmt.Fprintf(os.Stderr, "newClient DOCKER_HOST=%s bounded=%t\n", os.Getenv("DOCKER_HOST"), bounded)
+
+		if clientErr != nil {
+			return nil, clientErr
 		}
+
+		return mockClient, nil
 	}
 
 	for _, key := range []string{"WT_ORCHESTRATOR_OLD_ID", "WT_ORCHESTRATOR_NEW_IMAGE", "WT_ORCHESTRATOR_ORIGINAL_NAME"} {
@@ -686,5 +814,19 @@ func preRunExitHelper(t *testing.T, helperCase string) {
 	}
 
 	proc := &process{log: logging.New(os.Stderr, logging.InfoLevel)}
-	proc.exit(proc.preRun(newTestRootCommand(t, args...), nil))
+
+	if execute {
+		proc.exit(newExecuteCommand(t, proc, args...).ExecuteC())
+
+		return
+	}
+
+	// The test command clears the flag environment, so env is set after it.
+	cmd := newTestRootCommand(t, args...)
+
+	for key, value := range env {
+		t.Setenv(key, value)
+	}
+
+	proc.exit(cmd, proc.preRun(cmd, nil))
 }
