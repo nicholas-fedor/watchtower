@@ -14,6 +14,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Reject invalid integer settings at startup by @nicholas-fedor in [#3345](https://github.com/nicholas-fedor/watchtower/pull/3345)
 - Disable restarts before exiting on startup errors by @nicholas-fedor in [#3337](https://github.com/nicholas-fedor/watchtower/pull/3337)
 - Exit with code 1 when the upgrade fails by @nicholas-fedor in [#3330](https://github.com/nicholas-fedor/watchtower/pull/3330)
 - Reject negative duration settings at startup by @nicholas-fedor in [#3324](https://github.com/nicholas-fedor/watchtower/pull/3324)
