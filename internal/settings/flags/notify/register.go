@@ -6,8 +6,13 @@ import (
 	"github.com/nicholas-fedor/watchtower/internal/settings/flags/spec"
 )
 
-// defaultEmailServerPort is the static default SMTP port.
-const defaultEmailServerPort = 25
+// Constants for the legacy email server port.
+const (
+	// defaultEmailServerPort is the static default SMTP port.
+	defaultEmailServerPort = 25
+	// maxPort is the highest TCP port, since a port is a 16-bit number.
+	maxPort = 65535
+)
 
 // Specs returns notify domain flag metadata with static defaults.
 //
@@ -140,6 +145,7 @@ func Specs() []spec.FlagSpec {
 			Name:       "notification-email-server-port",
 			Kind:       spec.KindInt,
 			Default:    defaultEmailServerPort,
+			Max:        maxPort,
 			EnvKeys:    []string{"WATCHTOWER_NOTIFICATION_EMAIL_SERVER_PORT"},
 			Deprecated: "Use --notification-url with an smtp:// URL.",
 			Help:       "SMTP server port to send notification emails through",

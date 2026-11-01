@@ -1,7 +1,6 @@
 package settings
 
 import (
-	"errors"
 	"fmt"
 	"os"
 	"strconv"
@@ -15,46 +14,62 @@ import (
 	"github.com/nicholas-fedor/watchtower/internal/settings/flags/utils"
 )
 
-// Errors for setting values that are out of range.
-var (
-	// errNegativeSetting indicates a duration or integer setting was set to a
-	// negative value.
-	errNegativeSetting = errors.New("must be non-negative")
-	// errNonPositiveInterval indicates a poll interval of zero or less seconds.
-	errNonPositiveInterval = errors.New("interval must be positive")
-)
+// checkRanges returns an error for the first integer or duration setting whose
+// value is outside the range its spec allows.
+//
+// Parameters:
+//   - vCfg: Bound Viper instance.
+//   - flagSet: Parsed flag set.
+//   - specs: Specs of every setting.
+//
+// Returns:
+//   - error: The spec's range error, naming the setting and its value.
+func checkRanges(vCfg *viper.Viper, flagSet *pflag.FlagSet, specs []spec.FlagSpec) error {
+	for _, flagSpec := range specs {
+		var err error
+
+		switch flagSpec.Kind {
+		case spec.KindInt:
+			err = flagSpec.CheckInt(vCfg.GetInt(flagSpec.Name))
+		case spec.KindDuration:
+			err = flagSpec.CheckDuration(durationValue(vCfg, flagSet, flagSpec.Name))
+		case spec.KindBool, spec.KindString, spec.KindStringSlice, spec.KindStringArray:
+		default:
+		}
+
+		if err != nil {
+			return err //nolint:wrapcheck // The spec's error already names the setting and its value.
+		}
+	}
+
+	return nil
+}
 
 // durationValue reads a duration from Viper with bare-second env support.
 //
 // When the flag was not changed on the CLI and the bound env value is a pure
-// number, it is treated as seconds (legacy WATCHTOWER_TIMEOUT behavior). A
-// negative value from any source is an error.
+// number, it is treated as seconds (legacy WATCHTOWER_TIMEOUT behavior).
 //
 // Parameters:
 //   - vCfg: Bound Viper instance.
 //   - flagSet: Parsed flag set (for Changed checks).
-//   - name: Flag name.
-//   - envKeys: Environment keys bound to this flag.
+//   - name: Flag name. Its spec lists the environment keys to read.
 //
 // Returns:
 //   - time.Duration: Resolved duration.
-//   - error: Wraps errNegativeSetting, naming the setting, when the value is negative.
-func durationValue(
-	vCfg *viper.Viper,
-	flagSet *pflag.FlagSet,
-	name string,
-	envKeys []string,
-) (time.Duration, error) {
+func durationValue(vCfg *viper.Viper, flagSet *pflag.FlagSet, name string) time.Duration {
 	if flagSet.Changed(name) {
 		d, err := flagSet.GetDuration(name)
 		if err == nil {
-			return checkNonNegative(name, d)
+			return d
 		}
 	}
 
 	envSeen := false
 
-	for _, envKey := range envKeys {
+	flagSpec, _ := specNamed(name)
+
+	for _, envKey := range flagSpec.EnvKeys {
 		raw := strings.TrimSpace(os.Getenv(envKey))
 		if raw == "" {
 			continue
@@ -65,7 +80,7 @@ func durationValue(
 		if utils.IsPureNumeric(raw) {
 			d, err := bareSeconds(raw)
 			if err == nil {
-				return checkNonNegative(name, d)
+				return d
 			}
 
 			// A bare number that does not parse, such as one beyond the float
@@ -76,7 +91,7 @@ func durationValue(
 
 		d, err := time.ParseDuration(raw)
 		if err == nil {
-			return checkNonNegative(name, d)
+			return d
 		}
 	}
 
@@ -84,42 +99,11 @@ func durationValue(
 	if envSeen {
 		d, err := flagSet.GetDuration(name)
 		if err == nil {
-			return checkNonNegative(name, d)
+			return d
 		}
 	}
 
-	return checkNonNegative(name, vCfg.GetDuration(name))
-}
-
-// intValue reads an integer setting from Viper. A negative value is an error.
-//
-// Parameters:
-//   - vCfg: Bound Viper instance.
-//   - name: Flag name.
-//
-// Returns:
-//   - int: Resolved value.
-//   - error: Wraps errNegativeSetting, naming the setting, when the value is negative.
-func intValue(vCfg *viper.Viper, name string) (int, error) {
-	return checkNonNegative(name, vCfg.GetInt(name))
-}
-
-// checkNonNegative returns a value that is not negative unchanged. When the
-// value is negative, it returns an error that names the setting and the value.
-//
-// Parameters:
-//   - name: Setting name for the error.
-//   - value: Resolved value.
-//
-// Returns:
-//   - T: The value when it is not negative.
-//   - error: Wraps errNegativeSetting when the value is negative.
-func checkNonNegative[T int | time.Duration](name string, value T) (T, error) {
-	if value < 0 {
-		return 0, fmt.Errorf("%s %w, got %v", name, errNegativeSetting, value)
-	}
-
-	return value, nil
+	return vCfg.GetDuration(name)
 }
 
 // bareSeconds parses a pure numeric string as seconds.

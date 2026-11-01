@@ -74,6 +74,7 @@
   shorthand: "i"
   kind: int
   default: 86400
+  min: 1
   env: WATCHTOWER_POLL_INTERVAL
   list-parse: none
   hidden: false
@@ -250,6 +251,7 @@
   shorthand: ""
   kind: int
   default: 0
+  min: 0
   env: WATCHTOWER_LIFECYCLE_UID
   list-parse: none
   hidden: false
@@ -258,6 +260,7 @@
   shorthand: ""
   kind: int
   default: 0
+  min: 0
   env: WATCHTOWER_LIFECYCLE_GID
   list-parse: none
   hidden: false
@@ -426,6 +429,7 @@
   shorthand: ""
   kind: int
   default: 60
+  min: 0
   env: WATCHTOWER_HTTP_API_RATE_LIMIT
   list-parse: none
   hidden: false
@@ -506,6 +510,7 @@
   shorthand: ""
   kind: int
   default: 0
+  min: 0
   env: WATCHTOWER_NOTIFICATIONS_DELAY
   list-parse: none
   hidden: false
@@ -602,6 +607,7 @@
   shorthand: ""
   kind: int
   default: 0
+  min: 0
   env: WATCHTOWER_NOTIFICATION_EMAIL_DELAY
   list-parse: none
   hidden: false
@@ -618,6 +624,8 @@
   shorthand: ""
   kind: int
   default: 25
+  min: 0
+  max: 65535
   env: WATCHTOWER_NOTIFICATION_EMAIL_SERVER_PORT
   list-parse: none
   hidden: false

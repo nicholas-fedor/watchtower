@@ -42,6 +42,24 @@ func RegisterAll(rootCmd *cobra.Command) {
 	git.Register(rootCmd)
 }
 
+// specNamed returns the spec of the setting with the given flag name.
+//
+// Parameters:
+//   - name: Flag name.
+//
+// Returns:
+//   - spec.FlagSpec: The setting's spec.
+//   - bool: False when no setting has the name.
+func specNamed(name string) (spec.FlagSpec, bool) {
+	for _, flagSpec := range AllSpecs() {
+		if flagSpec.Name == name {
+			return flagSpec, true
+		}
+	}
+
+	return spec.FlagSpec{}, false
+}
+
 // AllSpecs returns aggregated FlagSpec rows from every domain.
 //
 // Returns:

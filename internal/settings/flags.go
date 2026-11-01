@@ -685,13 +685,12 @@ func setFlagIfDefault(log *zerolog.Logger, flags *pflag.FlagSet, name, value str
 // Returns:
 //   - bool: True if one of the flag's environment variables is set.
 func setByEnv(name string) bool {
-	for _, flagSpec := range AllSpecs() {
-		if flagSpec.Name == name {
-			_, ok := firstEnv(flagSpec.EnvKeys)
-
-			return ok
-		}
+	flagSpec, ok := specNamed(name)
+	if !ok {
+		return false
 	}
 
-	return false
+	_, ok = firstEnv(flagSpec.EnvKeys)
+
+	return ok
 }
