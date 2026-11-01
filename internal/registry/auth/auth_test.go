@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"net/url"
 	"strings"
+	"syscall"
 	"testing"
 
 	"github.com/distribution/reference"
@@ -1298,14 +1299,12 @@ func TestGetToken_connectionFailures(t *testing.T) {
 	t.Run("closed registry", func(t *testing.T) {
 		t.Parallel()
 
-		server := httpstub.New(t)
-		image := registryImage(server)
-		server.Close()
-
+		image := refusedAddr + "/test/image:latest"
 		settings := registryConfig.Registry{TLSSkip: true}
 
-		got, err := GetToken(newTestLogger(t), t.Context(), newImageContainer(t, image), testBasicAuth, NewAuthClient(nil, settings), settings, "")
+		got, err := GetToken(newTestLogger(t), t.Context(), newImageContainer(t, image), testBasicAuth, &registryClient{client: refusingClient()}, settings, "")
 		require.ErrorIs(t, err, errFailedExecuteChallengeRequest)
+		require.ErrorIs(t, err, syscall.ECONNREFUSED)
 		assert.Empty(t, got.Token)
 	})
 
