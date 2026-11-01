@@ -266,7 +266,7 @@ Environment Variable: WATCHTOWER_NOTIFICATION_EMAIL_SUBJECTTAG
 
 #### Email Server Port
 
-The port the SMTP server listens on.
+The port the SMTP server listens on. Watchtower exits at startup if the value is outside 0 to 65535.
 
 ```text
             Argument: --notification-email-server-port

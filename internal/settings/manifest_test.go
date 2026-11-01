@@ -59,6 +59,15 @@ func TestFlagManifest(t *testing.T) {
 		fmt.Fprintf(&builder, "  shorthand: %q\n", flagSpec.Shorthand)
 		fmt.Fprintf(&builder, "  kind: %s\n", kind)
 		fmt.Fprintf(&builder, "  default: %s\n", formatDefault(flagSpec.Default))
+
+		if flagSpec.Kind == spec.KindInt {
+			fmt.Fprintf(&builder, "  min: %d\n", flagSpec.Min)
+
+			if flagSpec.Max != 0 {
+				fmt.Fprintf(&builder, "  max: %d\n", flagSpec.Max)
+			}
+		}
+
 		fmt.Fprintf(&builder, "  env: %s\n", envKeys)
 		fmt.Fprintf(&builder, "  list-parse: %s\n", listParse)
 		fmt.Fprintf(&builder, "  hidden: %t\n", flagSpec.Hidden)

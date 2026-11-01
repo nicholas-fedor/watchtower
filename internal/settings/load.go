@@ -76,9 +76,16 @@ func Load(log *zerolog.Logger, cmd *cobra.Command, args []string) (Config, error
 
 	vCfg := viper.New()
 
-	err := BindAll(vCfg, flagSet, AllSpecs())
+	specs := AllSpecs()
+
+	err := BindAll(vCfg, flagSet, specs)
 	if err != nil {
 		return Config{}, fmt.Errorf("bind configuration: %w", err)
+	}
+
+	err = checkRanges(vCfg, flagSet, specs)
+	if err != nil {
+		return Config{}, err
 	}
 
 	cfg := Config{}
@@ -87,11 +94,7 @@ func Load(log *zerolog.Logger, cmd *cobra.Command, args []string) (Config, error
 	cfg.Client = loadClient(vCfg)
 	cfg.Compatibility = loadCompat(vCfg)
 
-	cfg.Schedule, err = loadSchedule(vCfg)
-	if err != nil {
-		return Config{}, err
-	}
-
+	cfg.Schedule = loadSchedule(vCfg)
 	cfg.Mode = loadMode(vCfg)
 
 	cfg.Update, err = loadUpdate(log, vCfg, flagSet)
@@ -99,10 +102,7 @@ func Load(log *zerolog.Logger, cmd *cobra.Command, args []string) (Config, error
 		return Config{}, err
 	}
 
-	cfg.Lifecycle, err = loadLifecycle(vCfg)
-	if err != nil {
-		return Config{}, err
-	}
+	cfg.Lifecycle = loadLifecycle(vCfg)
 
 	cfg.Filter, err = loadFilter(log, vCfg, flagSet, args)
 	if err != nil {
@@ -111,16 +111,8 @@ func Load(log *zerolog.Logger, cmd *cobra.Command, args []string) (Config, error
 
 	cfg.Registry = loadRegistry(vCfg)
 
-	cfg.API, err = loadAPI(vCfg, flagSet)
-	if err != nil {
-		return Config{}, err
-	}
-
-	cfg.Notify, err = loadNotify(vCfg, flagSet)
-	if err != nil {
-		return Config{}, err
-	}
-
+	cfg.API = loadAPI(vCfg, flagSet)
+	cfg.Notify = loadNotify(vCfg, flagSet)
 	cfg.Logging = loadLogging(vCfg, flagSet)
 
 	cfg.Git, err = loadGit(vCfg, flagSet)
@@ -165,19 +157,13 @@ func loadCompat(vCfg *viper.Viper) compatibility.Compatibility {
 	}
 }
 
-// loadSchedule reads schedule settings from Viper. An interval of zero or
-// less is an error, because cron runs a delay below 1 second every second.
-func loadSchedule(vCfg *viper.Viper) (schedule.Schedule, error) {
-	interval := vCfg.GetInt("interval")
-	if interval <= 0 {
-		return schedule.Schedule{}, fmt.Errorf("%w, got %d", errNonPositiveInterval, interval)
-	}
-
+// loadSchedule reads schedule settings from Viper.
+func loadSchedule(vCfg *viper.Viper) schedule.Schedule {
 	return schedule.Schedule{
-		IntervalSeconds: interval,
+		IntervalSeconds: vCfg.GetInt("interval"),
 		Spec:            vCfg.GetString("schedule"),
 		UpdateOnStart:   vCfg.GetBool("update-on-start"),
-	}, nil
+	}
 }
 
 // loadMode reads process mode settings from Viper.
@@ -193,10 +179,7 @@ func loadMode(vCfg *viper.Viper) mode.Mode {
 
 // loadUpdate reads update policy settings from Viper.
 func loadUpdate(log *zerolog.Logger, vCfg *viper.Viper, flagSet *pflag.FlagSet) (update.Update, error) {
-	stopTimeout, err := durationValue(vCfg, flagSet, "stop-timeout", []string{"WATCHTOWER_TIMEOUT"})
-	if err != nil {
-		return update.Update{}, err
-	}
+	stopTimeout := durationValue(vCfg, flagSet, "stop-timeout")
 
 	if stopTimeout > 0 && stopTimeout < time.Second {
 		log.Warn().
@@ -321,24 +304,13 @@ func parseDiskSpaceWarn(raw string, maxBytes int64) (int64, error) {
 	return warnBytes, nil
 }
 
-// loadLifecycle reads lifecycle hook settings from Viper. A negative UID or
-// GID is an error.
-func loadLifecycle(vCfg *viper.Viper) (lifecycle.Lifecycle, error) {
-	uid, err := intValue(vCfg, "lifecycle-uid")
-	if err != nil {
-		return lifecycle.Lifecycle{}, err
-	}
-
-	gid, err := intValue(vCfg, "lifecycle-gid")
-	if err != nil {
-		return lifecycle.Lifecycle{}, err
-	}
-
+// loadLifecycle reads lifecycle hook settings from Viper.
+func loadLifecycle(vCfg *viper.Viper) lifecycle.Lifecycle {
 	return lifecycle.Lifecycle{
 		Enabled: vCfg.GetBool("enable-lifecycle-hooks"),
-		UID:     uid,
-		GID:     gid,
-	}, nil
+		UID:     vCfg.GetInt("lifecycle-uid"),
+		GID:     vCfg.GetInt("lifecycle-gid"),
+	}
 }
 
 // normalizedStringSlice loads a comma- or space-separated list flag/env value
@@ -461,28 +433,7 @@ func loadRegistry(vCfg *viper.Viper) registry.Registry {
 }
 
 // loadAPI reads HTTP API settings from Viper.
-func loadAPI(vCfg *viper.Viper, flagSet *pflag.FlagSet) (api.API, error) {
-	checkTimeout, err := durationValue(
-		vCfg, flagSet, "http-api-check-timeout",
-		[]string{"WATCHTOWER_HTTP_API_CHECK_TIMEOUT"},
-	)
-	if err != nil {
-		return api.API{}, err
-	}
-
-	updateTimeout, err := durationValue(
-		vCfg, flagSet, "http-api-update-timeout",
-		[]string{"WATCHTOWER_HTTP_API_UPDATE_TIMEOUT"},
-	)
-	if err != nil {
-		return api.API{}, err
-	}
-
-	rateLimit, err := intValue(vCfg, "http-api-rate-limit")
-	if err != nil {
-		return api.API{}, err
-	}
-
+func loadAPI(vCfg *viper.Viper, flagSet *pflag.FlagSet) api.API {
 	return api.API{
 		Endpoints: stringSliceValue(
 			vCfg, flagSet, "http-api-endpoints",
@@ -499,7 +450,7 @@ func loadAPI(vCfg *viper.Viper, flagSet *pflag.FlagSet) (api.API, error) {
 		Token:            vCfg.GetString("http-api-token"),
 		EventsToken:      vCfg.GetString("http-api-events-token"),
 		PeriodicPolls:    vCfg.GetBool("http-api-periodic-polls"),
-		RateLimit:        rateLimit,
+		RateLimit:        vCfg.GetInt("http-api-rate-limit"),
 		RateLimitChanged: flagChanged(flagSet, "http-api-rate-limit"),
 		TLSCert:          vCfg.GetString("http-api-tls-cert"),
 		TLSKey:           vCfg.GetString("http-api-tls-key"),
@@ -514,26 +465,15 @@ func loadAPI(vCfg *viper.Viper, flagSet *pflag.FlagSet) (api.API, error) {
 			[]string{"WATCHTOWER_HTTP_API_CORS_ORIGINS"},
 			spec.ListCommaOrSpace,
 		),
-		CheckTimeout:         checkTimeout,
+		CheckTimeout:         durationValue(vCfg, flagSet, "http-api-check-timeout"),
 		CheckTimeoutChanged:  flagChanged(flagSet, "http-api-check-timeout"),
-		UpdateTimeout:        updateTimeout,
+		UpdateTimeout:        durationValue(vCfg, flagSet, "http-api-update-timeout"),
 		UpdateTimeoutChanged: flagChanged(flagSet, "http-api-update-timeout"),
-	}, nil
+	}
 }
 
-// loadNotify reads notification settings from Viper. A negative delay is an
-// error.
-func loadNotify(vCfg *viper.Viper, flagSet *pflag.FlagSet) (notify.Notify, error) {
-	delay, err := intValue(vCfg, "notifications-delay")
-	if err != nil {
-		return notify.Notify{}, err
-	}
-
-	emailDelay, err := intValue(vCfg, "notification-email-delay")
-	if err != nil {
-		return notify.Notify{}, err
-	}
-
+// loadNotify reads notification settings from Viper.
+func loadNotify(vCfg *viper.Viper, flagSet *pflag.FlagSet) notify.Notify {
 	return notify.Notify{
 		URLs: stringSliceValue(
 			vCfg, flagSet, "notification-url",
@@ -552,7 +492,7 @@ func loadNotify(vCfg *viper.Viper, flagSet *pflag.FlagSet) (notify.Notify, error
 		SplitByContainer: vCfg.GetBool("notification-split-by-container"),
 		SkipTitle:        vCfg.GetBool("notification-skip-title"),
 		LogStdout:        vCfg.GetBool("notification-log-stdout"),
-		DelaySeconds:     delay,
+		DelaySeconds:     vCfg.GetInt("notifications-delay"),
 		Hostname:         vCfg.GetString("notifications-hostname"),
 		TitleTag:         vCfg.GetString("notification-title-tag"),
 		EmailSubjectTag:  vCfg.GetString("notification-email-subjecttag"),
@@ -564,7 +504,7 @@ func loadNotify(vCfg *viper.Viper, flagSet *pflag.FlagSet) (notify.Notify, error
 			EmailPassword:       vCfg.GetString("notification-email-server-password"),
 			EmailPort:           vCfg.GetInt("notification-email-server-port"),
 			EmailTLSSkipVerify:  vCfg.GetBool("notification-email-server-tls-skip-verify"),
-			EmailDelay:          emailDelay,
+			EmailDelay:          vCfg.GetInt("notification-email-delay"),
 			SlackHookURL:        vCfg.GetString("notification-slack-hook-url"),
 			SlackIdentifier:     vCfg.GetString("notification-slack-identifier"),
 			SlackChannel:        vCfg.GetString("notification-slack-channel"),
@@ -575,7 +515,7 @@ func loadNotify(vCfg *viper.Viper, flagSet *pflag.FlagSet) (notify.Notify, error
 			GotifyToken:         vCfg.GetString("notification-gotify-token"),
 			GotifyTLSSkipVerify: vCfg.GetBool("notification-gotify-tls-skip-verify"),
 		},
-	}, nil
+	}
 }
 
 // loadLogging reads logging settings from Viper.
@@ -627,14 +567,6 @@ func loadGit(vCfg *viper.Viper, flagSet *pflag.FlagSet) (gitConfig.Git, error) {
 		return gitConfig.Git{}, fmt.Errorf("git-image: %w", err)
 	}
 
-	timeout, err := durationValue(
-		vCfg, flagSet, "git-timeout",
-		[]string{"WATCHTOWER_GIT_TIMEOUT"},
-	)
-	if err != nil {
-		return gitConfig.Git{}, err
-	}
-
 	caBundle, err := readOptionalFile(vCfg.GetString("git-ca-bundle"))
 	if err != nil {
 		return gitConfig.Git{}, fmt.Errorf("git-ca-bundle: %w", err)
@@ -655,7 +587,7 @@ func loadGit(vCfg *viper.Viper, flagSet *pflag.FlagSet) (gitConfig.Git, error) {
 		Enable:          vCfg.GetBool("git-enable"),
 		DefaultRef:      gitConfig.DefaultRef,
 		SemverPolicy:    gitConfig.DefaultPolicy,
-		Timeout:         timeout,
+		Timeout:         durationValue(vCfg, flagSet, "git-timeout"),
 		Token:           vCfg.GetString("git-auth-token"),
 		Username:        vCfg.GetString("git-username"),
 		Password:        vCfg.GetString("git-password"),

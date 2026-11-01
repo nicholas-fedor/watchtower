@@ -10,8 +10,16 @@ import (
 	"github.com/nicholas-fedor/watchtower/internal/settings/flags/utils"
 )
 
-// errUnsupportedFlagKind indicates a FlagSpec kind is not supported for registration.
-var errUnsupportedFlagKind = errors.New("unsupported flag kind")
+// Errors for specs that cannot be registered.
+var (
+	// errUnsupportedFlagKind indicates a FlagSpec kind is not supported for registration.
+	errUnsupportedFlagKind = errors.New("unsupported flag kind")
+	// errRangeOnNonInteger indicates a minimum or maximum on a setting that is
+	// not an integer.
+	errRangeOnNonInteger = errors.New("range declared on a non-integer setting")
+	// errDefaultOutOfRange indicates a default outside the range a spec declares.
+	errDefaultOutOfRange = errors.New("default out of range")
+)
 
 // register registers pflags from FlagSpec rows using static defaults only.
 //
@@ -56,8 +64,14 @@ func MustRegister(flagSet *pflag.FlagSet, specs []FlagSpec) {
 //   - flagSpec: Flag specification to register.
 //
 // Returns:
-//   - error: Non-nil when the kind is unsupported or MarkHidden fails.
+//   - error: Non-nil when the kind is unsupported, the range is invalid, or
+//     MarkHidden fails.
 func registerOne(flagSet *pflag.FlagSet, flagSpec FlagSpec) error {
+	err := checkRangeDeclaration(flagSpec)
+	if err != nil {
+		return err
+	}
+
 	switch flagSpec.Kind {
 	case KindBool:
 		registerBool(flagSet, flagSpec)
@@ -80,10 +94,38 @@ func registerOne(flagSet *pflag.FlagSet, flagSpec FlagSpec) error {
 	}
 
 	if flagSpec.Hidden {
-		err := flagSet.MarkHidden(flagSpec.Name)
+		err = flagSet.MarkHidden(flagSpec.Name)
 		if err != nil {
 			return fmt.Errorf("hide %s: %w", flagSpec.Name, err)
 		}
+	}
+
+	return nil
+}
+
+// checkRangeDeclaration checks that a spec declares a range only for an
+// integer setting. It also checks that an integer default is within its
+// range.
+//
+// Parameters:
+//   - flagSpec: Flag specification to check.
+//
+// Returns:
+//   - error: Wraps errRangeOnNonInteger or errDefaultOutOfRange.
+func checkRangeDeclaration(flagSpec FlagSpec) error {
+	if flagSpec.Kind != KindInt {
+		if flagSpec.Min != 0 || flagSpec.Max != 0 {
+			return fmt.Errorf("%w: %s", errRangeOnNonInteger, flagSpec.Name)
+		}
+
+		return nil
+	}
+
+	def, _ := flagSpec.Default.(int)
+
+	err := flagSpec.CheckInt(def)
+	if err != nil {
+		return fmt.Errorf("%w: %w", errDefaultOutOfRange, err)
 	}
 
 	return nil

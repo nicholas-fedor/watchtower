@@ -20,8 +20,10 @@ func Specs() []spec.FlagSpec {
 			Shorthand: "i",
 			Kind:      spec.KindInt,
 			Default:   DefaultPollIntervalSeconds,
-			EnvKeys:   []string{"WATCHTOWER_POLL_INTERVAL"},
-			Help:      "Poll interval (in seconds)",
+			// Cron runs an interval below 1 second every second.
+			Min:     1,
+			EnvKeys: []string{"WATCHTOWER_POLL_INTERVAL"},
+			Help:    "Poll interval (in seconds)",
 		},
 		{
 			Name:      "schedule",
