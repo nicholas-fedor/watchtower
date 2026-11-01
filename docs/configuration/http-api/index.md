@@ -113,7 +113,7 @@ Valid names (case-insensitive):
 
 ## HTTP API Rate Limit
 
-Sets the maximum number of API requests allowed per minute per IP address.
+Sets the maximum number of API requests allowed per minute per IP address. Watchtower exits at startup if the value is negative.
 
 ```text
             Argument: --http-api-rate-limit

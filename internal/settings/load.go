@@ -86,7 +86,12 @@ func Load(log *zerolog.Logger, cmd *cobra.Command, args []string) (Config, error
 	cfg.Docker = loadDocker(vCfg)
 	cfg.Client = loadClient(vCfg)
 	cfg.Compatibility = loadCompat(vCfg)
-	cfg.Schedule = loadSchedule(vCfg)
+
+	cfg.Schedule, err = loadSchedule(vCfg)
+	if err != nil {
+		return Config{}, err
+	}
+
 	cfg.Mode = loadMode(vCfg)
 
 	cfg.Update, err = loadUpdate(log, vCfg, flagSet)
@@ -94,7 +99,10 @@ func Load(log *zerolog.Logger, cmd *cobra.Command, args []string) (Config, error
 		return Config{}, err
 	}
 
-	cfg.Lifecycle = loadLifecycle(vCfg)
+	cfg.Lifecycle, err = loadLifecycle(vCfg)
+	if err != nil {
+		return Config{}, err
+	}
 
 	cfg.Filter, err = loadFilter(log, vCfg, flagSet, args)
 	if err != nil {
@@ -108,7 +116,11 @@ func Load(log *zerolog.Logger, cmd *cobra.Command, args []string) (Config, error
 		return Config{}, err
 	}
 
-	cfg.Notify = loadNotify(vCfg, flagSet)
+	cfg.Notify, err = loadNotify(vCfg, flagSet)
+	if err != nil {
+		return Config{}, err
+	}
+
 	cfg.Logging = loadLogging(vCfg, flagSet)
 
 	cfg.Git, err = loadGit(vCfg, flagSet)
@@ -153,13 +165,19 @@ func loadCompat(vCfg *viper.Viper) compatibility.Compatibility {
 	}
 }
 
-// loadSchedule reads schedule settings from Viper.
-func loadSchedule(vCfg *viper.Viper) schedule.Schedule {
+// loadSchedule reads schedule settings from Viper. An interval of zero or
+// less is an error, because cron runs a delay below 1 second every second.
+func loadSchedule(vCfg *viper.Viper) (schedule.Schedule, error) {
+	interval := vCfg.GetInt("interval")
+	if interval <= 0 {
+		return schedule.Schedule{}, fmt.Errorf("%w, got %d", errNonPositiveInterval, interval)
+	}
+
 	return schedule.Schedule{
-		IntervalSeconds: vCfg.GetInt("interval"),
+		IntervalSeconds: interval,
 		Spec:            vCfg.GetString("schedule"),
 		UpdateOnStart:   vCfg.GetBool("update-on-start"),
-	}
+	}, nil
 }
 
 // loadMode reads process mode settings from Viper.
@@ -303,13 +321,24 @@ func parseDiskSpaceWarn(raw string, maxBytes int64) (int64, error) {
 	return warnBytes, nil
 }
 
-// loadLifecycle reads lifecycle hook settings from Viper.
-func loadLifecycle(vCfg *viper.Viper) lifecycle.Lifecycle {
+// loadLifecycle reads lifecycle hook settings from Viper. A negative UID or
+// GID is an error.
+func loadLifecycle(vCfg *viper.Viper) (lifecycle.Lifecycle, error) {
+	uid, err := intValue(vCfg, "lifecycle-uid")
+	if err != nil {
+		return lifecycle.Lifecycle{}, err
+	}
+
+	gid, err := intValue(vCfg, "lifecycle-gid")
+	if err != nil {
+		return lifecycle.Lifecycle{}, err
+	}
+
 	return lifecycle.Lifecycle{
 		Enabled: vCfg.GetBool("enable-lifecycle-hooks"),
-		UID:     vCfg.GetInt("lifecycle-uid"),
-		GID:     vCfg.GetInt("lifecycle-gid"),
-	}
+		UID:     uid,
+		GID:     gid,
+	}, nil
 }
 
 // normalizedStringSlice loads a comma- or space-separated list flag/env value
@@ -449,6 +478,11 @@ func loadAPI(vCfg *viper.Viper, flagSet *pflag.FlagSet) (api.API, error) {
 		return api.API{}, err
 	}
 
+	rateLimit, err := intValue(vCfg, "http-api-rate-limit")
+	if err != nil {
+		return api.API{}, err
+	}
+
 	return api.API{
 		Endpoints: stringSliceValue(
 			vCfg, flagSet, "http-api-endpoints",
@@ -465,7 +499,7 @@ func loadAPI(vCfg *viper.Viper, flagSet *pflag.FlagSet) (api.API, error) {
 		Token:            vCfg.GetString("http-api-token"),
 		EventsToken:      vCfg.GetString("http-api-events-token"),
 		PeriodicPolls:    vCfg.GetBool("http-api-periodic-polls"),
-		RateLimit:        vCfg.GetInt("http-api-rate-limit"),
+		RateLimit:        rateLimit,
 		RateLimitChanged: flagChanged(flagSet, "http-api-rate-limit"),
 		TLSCert:          vCfg.GetString("http-api-tls-cert"),
 		TLSKey:           vCfg.GetString("http-api-tls-key"),
@@ -487,8 +521,19 @@ func loadAPI(vCfg *viper.Viper, flagSet *pflag.FlagSet) (api.API, error) {
 	}, nil
 }
 
-// loadNotify reads notification settings from Viper.
-func loadNotify(vCfg *viper.Viper, flagSet *pflag.FlagSet) notify.Notify {
+// loadNotify reads notification settings from Viper. A negative delay is an
+// error.
+func loadNotify(vCfg *viper.Viper, flagSet *pflag.FlagSet) (notify.Notify, error) {
+	delay, err := intValue(vCfg, "notifications-delay")
+	if err != nil {
+		return notify.Notify{}, err
+	}
+
+	emailDelay, err := intValue(vCfg, "notification-email-delay")
+	if err != nil {
+		return notify.Notify{}, err
+	}
+
 	return notify.Notify{
 		URLs: stringSliceValue(
 			vCfg, flagSet, "notification-url",
@@ -507,7 +552,7 @@ func loadNotify(vCfg *viper.Viper, flagSet *pflag.FlagSet) notify.Notify {
 		SplitByContainer: vCfg.GetBool("notification-split-by-container"),
 		SkipTitle:        vCfg.GetBool("notification-skip-title"),
 		LogStdout:        vCfg.GetBool("notification-log-stdout"),
-		DelaySeconds:     vCfg.GetInt("notifications-delay"),
+		DelaySeconds:     delay,
 		Hostname:         vCfg.GetString("notifications-hostname"),
 		TitleTag:         vCfg.GetString("notification-title-tag"),
 		EmailSubjectTag:  vCfg.GetString("notification-email-subjecttag"),
@@ -519,7 +564,7 @@ func loadNotify(vCfg *viper.Viper, flagSet *pflag.FlagSet) notify.Notify {
 			EmailPassword:       vCfg.GetString("notification-email-server-password"),
 			EmailPort:           vCfg.GetInt("notification-email-server-port"),
 			EmailTLSSkipVerify:  vCfg.GetBool("notification-email-server-tls-skip-verify"),
-			EmailDelay:          vCfg.GetInt("notification-email-delay"),
+			EmailDelay:          emailDelay,
 			SlackHookURL:        vCfg.GetString("notification-slack-hook-url"),
 			SlackIdentifier:     vCfg.GetString("notification-slack-identifier"),
 			SlackChannel:        vCfg.GetString("notification-slack-channel"),
@@ -530,7 +575,7 @@ func loadNotify(vCfg *viper.Viper, flagSet *pflag.FlagSet) notify.Notify {
 			GotifyToken:         vCfg.GetString("notification-gotify-token"),
 			GotifyTLSSkipVerify: vCfg.GetBool("notification-gotify-tls-skip-verify"),
 		},
-	}
+	}, nil
 }
 
 // loadLogging reads logging settings from Viper.

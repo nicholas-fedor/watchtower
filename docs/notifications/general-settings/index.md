@@ -28,7 +28,7 @@ Environment Variable: WATCHTOWER_NOTIFICATIONS_HOSTNAME
 
 ## Delay
 
-Delay before sending notifications expressed in seconds.
+Delay before sending notifications expressed in seconds. Watchtower exits at startup if the value is negative.
 
 ```text
             Argument: --notifications-delay

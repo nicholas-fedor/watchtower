@@ -112,7 +112,7 @@ Environment Variable: WATCHTOWER_NOTIFICATIONS_HOSTNAME
 
 ## Notifications Delay
 
-Delay before sending notifications, expressed in seconds.
+Delay before sending notifications, expressed in seconds. Watchtower exits at startup if the value is negative.
 
 ```text
             Argument: --notifications-delay
@@ -277,7 +277,7 @@ Environment Variable: WATCHTOWER_NOTIFICATION_EMAIL_SERVER_PORT
 
 #### Email Delay
 
-The delay (in seconds) between sending notifications if multiple containers are updated at once.
+The delay (in seconds) between sending notifications if multiple containers are updated at once. Watchtower exits at startup if the value is negative.
 
 ```text
             Argument: --notification-email-delay
