@@ -30,10 +30,6 @@ const (
 	// request when keep-alives are enabled.
 	idleTimeout = 30 * time.Second
 
-	// defaultRateLimitPerMinute is the fallback rate limit when a
-	// non-positive value is provided.
-	defaultRateLimitPerMinute = 60
-
 	// corsMaxAge is the maximum duration (in seconds) that browsers may cache
 	// CORS preflight results.
 	corsMaxAge = 3600
@@ -67,8 +63,8 @@ type corsConfig struct {
 //
 // Parameters:
 //   - log: Logger for Fiber middleware and server lifecycle messages.
-//   - rateLimitPerMinute: Maximum requests per minute per IP. Values <= 0 fall
-//     back to defaultRateLimitPerMinute (60).
+//   - rateLimitPerMinute: Maximum requests per minute per IP. It must be at
+//     least 1, which loading the configuration guarantees.
 //   - proxyCfg: Reverse proxy configuration.
 //   - corsCfg: CORS middleware configuration.
 //   - noStartupMessage: When true, suppresses the HTTP API startup log entries.
@@ -82,11 +78,6 @@ func newApp(
 	corsCfg corsConfig,
 	noStartupMessage bool,
 ) *fiber.App {
-	rateLimit := rateLimitPerMinute
-	if rateLimit <= 0 {
-		rateLimit = defaultRateLimitPerMinute
-	}
-
 	// WriteTimeout stays unset because a server-wide write deadline would cut
 	// off event streams and long synchronous updates. Route timeouts bound
 	// each handler instead.
@@ -174,7 +165,7 @@ func newApp(
 			Level: compress.LevelBestSpeed,
 		}),
 		limiter.New(limiter.Config{
-			Max:               rateLimit,
+			Max:               rateLimitPerMinute,
 			Expiration:        time.Minute,
 			LimiterMiddleware: limiter.SlidingWindow{},
 			KeyGenerator:      func(c fiber.Ctx) string { return c.IP() },

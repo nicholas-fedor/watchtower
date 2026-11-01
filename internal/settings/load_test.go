@@ -238,6 +238,14 @@ func TestLoad_SettingRanges(t *testing.T) {
 	}
 }
 
+// TestLoad_ZeroRateLimit verifies that an HTTP API rate limit of zero stops
+// Load. Zero has no defined meaning. The rate limiter would replace it with
+// its own default of 5 requests per minute.
+func TestLoad_ZeroRateLimit(t *testing.T) {
+	_, err := loadWithEnv(t, nil, "--http-api-rate-limit", "0")
+	require.ErrorContains(t, err, "http-api-rate-limit must be at least 1, got 0")
+}
+
 func TestLoad_InvalidAndNegativeCooldown(t *testing.T) {
 	t.Run("invalid duration", func(t *testing.T) {
 		_, _, cmd := bindLoad(t, "--cooldown-delay", "not-a-duration")

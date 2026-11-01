@@ -202,18 +202,6 @@ func TestNew(t *testing.T) {
 			wantNil:            false,
 		},
 		{
-			name:               "zero rate limit falls back to default",
-			log:                newTestLogger(t),
-			rateLimitPerMinute: 0,
-			wantNil:            false,
-		},
-		{
-			name:               "negative rate limit falls back to default",
-			log:                newTestLogger(t),
-			rateLimitPerMinute: -1,
-			wantNil:            false,
-		},
-		{
 			name:               "custom rate limit",
 			log:                newTestLogger(t),
 			rateLimitPerMinute: 120,

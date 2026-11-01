@@ -28,8 +28,8 @@ type RunConfigInput struct {
 
 // BuildRunConfig projects Config into types.RunConfig for process orchestration.
 //
-// It applies API port and rate-limit defaults, validates the API host, resolves
-// endpoint enablement from cfg.API, and returns a complete RunConfig snapshot.
+// It applies the API port default and validates the API host. It resolves
+// endpoint enablement from cfg.API and returns a complete RunConfig snapshot.
 //
 // Parameters:
 //   - input: Runtime inputs (command pointer and normalized names).
@@ -42,12 +42,6 @@ func (c Config) BuildRunConfig(input RunConfigInput) (types.RunConfig, error) {
 	apiPort := c.API.Port
 	if apiPort == "" {
 		apiPort = "8080"
-	}
-
-	// A rate limit of zero means the default. Load rejects a negative one.
-	apiRateLimit := c.API.RateLimit
-	if apiRateLimit <= 0 {
-		apiRateLimit = 60
 	}
 
 	err := ValidateAPIHost(c.API.Host)
@@ -85,7 +79,7 @@ func (c Config) BuildRunConfig(input RunConfigInput) (types.RunConfig, error) {
 		APIHostChanged:          c.API.HostChanged,
 		APIPort:                 apiPort,
 		APIPortChanged:          c.API.PortChanged,
-		APIRateLimit:            apiRateLimit,
+		APIRateLimit:            c.API.RateLimit,
 		APIRateLimitChanged:     c.API.RateLimitChanged,
 		CheckAPITimeout:         c.API.CheckTimeout,
 		CheckAPITimeoutChanged:  c.API.CheckTimeoutChanged,
