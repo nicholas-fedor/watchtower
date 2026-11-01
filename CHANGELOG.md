@@ -143,6 +143,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Chores
 
+- Update module github.com/cenkalti/backoff/v7 to v7.0.3 by @renovate[bot] in [#3348](https://github.com/nicholas-fedor/watchtower/pull/3348)
 - Update module go.yaml.in/yaml/v4 to v4.0.0-rc.7 by @renovate[bot] in [#3339](https://github.com/nicholas-fedor/watchtower/pull/3339)
 - Update module go.yaml.in/yaml/v3 to v3.0.6 by @renovate[bot] in [#3338](https://github.com/nicholas-fedor/watchtower/pull/3338)
 - Update module github.com/pandatix/go-abnf to v0.5.5 by @renovate[bot] in [#3332](https://github.com/nicholas-fedor/watchtower/pull/3332)
