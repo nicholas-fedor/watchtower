@@ -3,6 +3,7 @@ package lifecycle
 import (
 	"github.com/spf13/cobra"
 
+	"github.com/nicholas-fedor/watchtower/internal/container/labels"
 	"github.com/nicholas-fedor/watchtower/internal/settings/flags/spec"
 )
 
@@ -23,6 +24,7 @@ func Specs() []spec.FlagSpec {
 			Name:    "lifecycle-uid",
 			Kind:    spec.KindInt,
 			Default: 0,
+			Max:     labels.MaxLifecycleID,
 			EnvKeys: []string{"WATCHTOWER_LIFECYCLE_UID"},
 			Help:    "Default UID to run lifecycle hooks as (can be overridden by container labels)",
 		},
@@ -30,6 +32,7 @@ func Specs() []spec.FlagSpec {
 			Name:    "lifecycle-gid",
 			Kind:    spec.KindInt,
 			Default: 0,
+			Max:     labels.MaxLifecycleID,
 			EnvKeys: []string{"WATCHTOWER_LIFECYCLE_GID"},
 			Help:    "Default GID to run lifecycle hooks as (can be overridden by container labels)",
 		},

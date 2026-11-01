@@ -252,6 +252,7 @@
   kind: int
   default: 0
   min: 0
+  max: 2147483647
   env: WATCHTOWER_LIFECYCLE_UID
   list-parse: none
   hidden: false
@@ -261,6 +262,7 @@
   kind: int
   default: 0
   min: 0
+  max: 2147483647
   env: WATCHTOWER_LIFECYCLE_GID
   list-parse: none
   hidden: false

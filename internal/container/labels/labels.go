@@ -1,5 +1,7 @@
 package labels
 
+import "math"
+
 // Watchtower labels identify the containers Watchtower manages and configure how it updates them.
 const (
 	// Watchtower marks a container as the Watchtower instance itself when set to "true".
@@ -88,6 +90,13 @@ const (
 	// NoScope is the scope of a container whose scope label is unset, empty, or
 	// set to "none".
 	NoScope = "none"
+)
+
+// Limits on label values.
+const (
+	// MaxLifecycleID is the highest UID or GID that lifecycle hooks can run as.
+	// The container runtime rejects a larger numeric ID.
+	MaxLifecycleID = math.MaxInt32
 )
 
 // NormalizeScope returns scope, or [NoScope] when scope is empty.

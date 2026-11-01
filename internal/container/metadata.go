@@ -250,15 +250,13 @@ func (c *Container) getLifecycleID(label, idType string) (int, bool) {
 		return 0, false
 	}
 
-	// Check for unreasonably large ID values (greater than 2^31-1).
-	const maxReasonableID = 2147483647 // 2^31-1
-	if parsedID > maxReasonableID {
+	if parsedID > labels.MaxLifecycleID {
 		clog.WithLevel(invalidLabels.Level(string(c.ID()), label)).
 			Str("label", label).
 			Str("value", rawString).
 			Str("id_type", idType).
 			Int("id", parsedID).
-			Int("max", maxReasonableID).
+			Int("max", labels.MaxLifecycleID).
 			Msg(fmt.Sprintf("Invalid lifecycle %s value: exceeds maximum reasonable value", idType))
 
 		return 0, false
