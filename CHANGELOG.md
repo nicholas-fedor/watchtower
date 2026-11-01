@@ -14,6 +14,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Reject lifecycle UIDs and GIDs above 2147483647 by @nicholas-fedor in [#3353](https://github.com/nicholas-fedor/watchtower/pull/3353)
 - Reject an HTTP API rate limit of zero at startup by @nicholas-fedor in [#3351](https://github.com/nicholas-fedor/watchtower/pull/3351)
 - Check every numeric setting's range at startup by @nicholas-fedor in [#3347](https://github.com/nicholas-fedor/watchtower/pull/3347)
 - Reject invalid integer settings at startup by @nicholas-fedor in [#3345](https://github.com/nicholas-fedor/watchtower/pull/3345)
