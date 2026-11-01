@@ -4,8 +4,10 @@ import (
 	"bytes"
 	"context"
 	"crypto/tls"
+	"net"
 	"net/http"
 	"sync"
+	"syscall"
 	"testing"
 
 	"github.com/rs/zerolog"
@@ -15,6 +17,34 @@ import (
 	registryConfig "github.com/nicholas-fedor/watchtower/internal/settings/config/registry"
 	"github.com/nicholas-fedor/watchtower/internal/testutil/httpstub"
 )
+
+// refusedAddr is the address of a registry that refuses every connection. The
+// name is under the reserved .test domain and is never resolved.
+const refusedAddr = "refused.registry.test:5000"
+
+// refusingClient returns an HTTP client whose connections to refusedAddr fail,
+// as they would to a registry that is not listening. It connects to other
+// addresses directly. A closed test server is not used for this, since a
+// server that another test starts in parallel can get its port.
+//
+// Returns:
+//   - *http.Client: Client whose connections to refusedAddr fail.
+func refusingClient() *http.Client {
+	dialer := &net.Dialer{}
+
+	transport := http.DefaultTransport.(*http.Transport).Clone()
+	// A proxy from the environment would receive the connection instead.
+	transport.Proxy = nil
+	transport.DialContext = func(ctx context.Context, network, addr string) (net.Conn, error) {
+		if addr == refusedAddr {
+			return nil, &net.OpError{Op: "dial", Net: network, Err: syscall.ECONNREFUSED}
+		}
+
+		return dialer.DialContext(ctx, network, addr)
+	}
+
+	return &http.Client{Transport: transport}
+}
 
 // mustNewRequest creates an HTTP GET request with the test's context and fails
 // the test on error.
@@ -59,10 +89,8 @@ func Test_registryClient_Do(t *testing.T) {
 	t.Run("request failure returns error", func(t *testing.T) {
 		t.Parallel()
 
-		server := httpstub.New(t)
-		server.Close()
-
-		resp, err := (&registryClient{client: server.Client()}).Do(mustNewRequest(t, server.URL()+"/v2/")) //nolint:bodyclose // The request fails, so there is no response.
+		resp, err := (&registryClient{client: refusingClient()}).Do(mustNewRequest(t, "http://"+refusedAddr+"/v2/")) //nolint:bodyclose // The request fails, so there is no response.
+		require.ErrorIs(t, err, syscall.ECONNREFUSED)
 		require.ErrorContains(t, err, "failed to execute HTTP request")
 		assert.Nil(t, resp)
 	})
@@ -70,15 +98,13 @@ func Test_registryClient_Do(t *testing.T) {
 	t.Run("request failure leaves the redirect target's query out of the error", func(t *testing.T) {
 		t.Parallel()
 
-		target := httpstub.New(t)
-		target.Close()
-
 		server := httpstub.New(t)
 		server.AppendHandlers(httpstub.RespondWith(http.StatusTemporaryRedirect, "",
-			http.Header{"Location": {target.URL() + "/blob?sig=secret"}}))
+			http.Header{"Location": {"http://" + refusedAddr + "/blob?sig=secret"}}))
 
-		resp, err := (&registryClient{client: server.Client()}).Do(mustNewRequest(t, server.URL()+"/v2/")) //nolint:bodyclose // The request fails, so there is no response.
-		require.ErrorContains(t, err, target.URL()+"/blob")
+		resp, err := (&registryClient{client: refusingClient()}).Do(mustNewRequest(t, server.URL()+"/v2/")) //nolint:bodyclose // The request fails, so there is no response.
+		require.ErrorIs(t, err, syscall.ECONNREFUSED)
+		require.ErrorContains(t, err, "http://"+refusedAddr+"/blob")
 		assert.NotContains(t, err.Error(), "sig=secret")
 		assert.Nil(t, resp)
 	})
