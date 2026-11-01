@@ -429,7 +429,7 @@
   shorthand: ""
   kind: int
   default: 60
-  min: 0
+  min: 1
   env: WATCHTOWER_HTTP_API_RATE_LIMIT
   list-parse: none
   hidden: false

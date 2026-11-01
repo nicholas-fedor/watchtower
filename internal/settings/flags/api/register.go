@@ -89,6 +89,8 @@ func Specs() []spec.FlagSpec {
 			Name:    "http-api-rate-limit",
 			Kind:    spec.KindInt,
 			Default: defaultRateLimit,
+			// The rate limiter replaces zero with its own default of 5.
+			Min:     1,
 			EnvKeys: []string{"WATCHTOWER_HTTP_API_RATE_LIMIT"},
 			Help:    "Maximum authentication requests per minute per IP address for the HTTP API (default: 60)",
 		},
