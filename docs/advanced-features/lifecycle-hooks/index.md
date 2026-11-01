@@ -125,7 +125,8 @@ By default, hooks run as the monitored container's configured user and group (`u
 Both global and individual, container-specific uid/gid configurations are supported.
 
 !!! Note
-    Container labels take precedence over global flags/variables.
+    - Container labels take precedence over global flags/variables.
+    - A UID or GID label outside 0 to 2147483647 logs a warning. The hook then uses the global UID or GID. Without one, it runs as the container's configured user.
 
 === "Global Configuration"
 

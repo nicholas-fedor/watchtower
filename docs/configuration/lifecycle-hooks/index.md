@@ -14,7 +14,7 @@ Environment Variable: WATCHTOWER_LIFECYCLE_HOOKS
 
 ## Lifecycle UID
 
-Sets the default user ID to run lifecycle hooks as when no container-specific UID is specified. Watchtower exits at startup if the value is negative.
+Sets the default user ID to run lifecycle hooks as when no container-specific UID is specified. The value must be from 0 to 2147483647, the highest ID the container runtime accepts. Watchtower exits at startup if it is outside that range.
 
 ```text
             Argument: --lifecycle-uid
@@ -30,7 +30,7 @@ Environment Variable: WATCHTOWER_LIFECYCLE_UID
 
 ## Lifecycle GID
 
-Sets the default group ID to run lifecycle hooks as when no container-specific GID is specified. Watchtower exits at startup if the value is negative.
+Sets the default group ID to run lifecycle hooks as when no container-specific GID is specified. The value must be from 0 to 2147483647, the highest ID the container runtime accepts. Watchtower exits at startup if it is outside that range.
 
 ```text
             Argument: --lifecycle-gid
