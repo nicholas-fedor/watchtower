@@ -3,7 +3,7 @@ package notify
 // Notify holds resolved notification configuration for the process.
 //
 // Values come from CLI flags and environment variables. Pass this value to
-// notifications.NewNotifier to build the client used for update status messages.
+// notify.NewNotifier to build the client used for update status messages.
 type Notify struct {
 	// URLs are Shoutrrr notification service URLs (--notification-url / WATCHTOWER_NOTIFICATION_URL).
 	URLs []string

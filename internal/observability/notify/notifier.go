@@ -36,7 +36,7 @@ var errUnknownNotificationType = errors.New("unknown notification type")
 //   - types.Notifier: Configured notifier instance.
 func NewNotifier(log *zerolog.Logger, cfg notifyConfig.Notify) types.Notifier {
 	if log == nil {
-		panic("notifications.NewNotifier: log is required")
+		panic("notify: log is required")
 	}
 
 	// Parse the notification log level from resolved configuration.
