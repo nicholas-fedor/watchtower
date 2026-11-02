@@ -38,7 +38,6 @@ var legacyTemplateMessages = []string{
 	"Started new container",
 	"Stopping linked container",
 	"Started linked container",
-	"Container updated",
 	"Removing image",
 	"Failed to list containers for image usage check, skipping removal",
 	"Image is within cooldown period - not eligible for update",
@@ -122,13 +121,6 @@ func goldenEntryData(message string) map[string]any {
 		return map[string]any{"container": "app", "id": "c79110000000"}
 	case "Started new container", "Started linked container":
 		return map[string]any{"container": "app", "new_id": "d0a110000000"}
-	case "Container updated":
-		return map[string]any{
-			"container": "app",
-			"image":     "org/app:latest",
-			"old_id":    "01d110000000",
-			"new_id":    "d0a110000000",
-		}
 	case "Removing image":
 		return map[string]any{
 			"container_name": "app",

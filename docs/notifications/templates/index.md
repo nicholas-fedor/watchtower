@@ -380,7 +380,6 @@ Results are cached per session, so sibling containers on the same image only pay
 When the option is enabled and a URL resolves, the `default-legacy` notification gains one line per updated container:
 
 ```text
-Updated container: /app (org/app:latest): abcdef12 updated to 34567890
 Changelog: https://github.com/org/app/releases/tag/v1.2.3
 ```
 
