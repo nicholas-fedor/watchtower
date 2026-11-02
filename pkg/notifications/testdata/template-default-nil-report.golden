@@ -4,7 +4,6 @@ Stopping container
 Started new container
 Stopping linked container
 Started linked container
-Container updated
 Removing image
 Failed to list containers for image usage check, skipping removal: cannot connect to the Docker daemon
 Image is within cooldown period - not eligible for update

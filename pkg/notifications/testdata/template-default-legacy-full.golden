@@ -4,7 +4,6 @@ Stopped stale container: app (c79110000000)
 Started new container: app (d0a110000000)
 Stopped linked container: app (c79110000000)
 Started linked container: app (d0a110000000)
-Updated container: app (org/app:latest): 01d110000000 updated to d0a110000000
 Cleaned up old image: org/app:latest (01d110000000)
 Skipped image cleanup: org/app:latest (01d110000000): cannot connect to the Docker daemon
 org/app:latest created less than 1d ago - eligible in 22h (Thu, 08 Oct 2026 10:00:00 UTC)

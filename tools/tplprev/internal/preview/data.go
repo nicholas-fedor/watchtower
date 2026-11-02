@@ -235,13 +235,6 @@ func (p *PreviewData) dataForMessage(msg, name, image string) map[string]any {
 			"image_id":   oldID,
 			"error":      "cannot verify image usage",
 		}
-	case "Container updated":
-		return map[string]any{
-			"container": name,
-			"image":     image,
-			"old_id":    oldID,
-			"new_id":    newID,
-		}
 	case "Successfully removed all excess Watchtower containers":
 		return map[string]any{"removed_instances": previewRemovedInstances}
 	case "Image is within cooldown period - not eligible for update":
