@@ -191,8 +191,6 @@ func TestProcessSendErrors(t *testing.T) {
 	})
 }
 
-// TestSlowNotificationNotSent verifies that a message is not reported as sent
-// while the router is still sending it.
 // TestProcessSendErrors_RedactsURLs verifies that a failed send logs the
 // service URL as its scheme only, in every failure category. Some services
 // carry their credential in the host, such as an IFTTT key or a Pushbullet
@@ -249,6 +247,8 @@ func TestProcessSendErrors_RedactsURLs(t *testing.T) {
 	}
 }
 
+// TestSlowNotificationNotSent verifies that a message is not reported as sent
+// while the router is still sending it.
 func TestSlowNotificationNotSent(t *testing.T) {
 	synctest.Test(t, func(t *testing.T) {
 		shoutrrr, blockingRouter, err := sendNotificationsWithBlockingRouter(t)
