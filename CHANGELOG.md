@@ -68,6 +68,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- Move service URL redaction to the redact package by @nicholas-fedor in [#3357](https://github.com/nicholas-fedor/watchtower/pull/3357)
 - Drop the unused command from legacy GetURL by @nicholas-fedor in [#3355](https://github.com/nicholas-fedor/watchtower/pull/3355)
 - Return startup errors to a single exit in execute by @nicholas-fedor in [#3335](https://github.com/nicholas-fedor/watchtower/pull/3335)
 - Return flag alias and secret file errors to the caller by @nicholas-fedor in [#3329](https://github.com/nicholas-fedor/watchtower/pull/3329)
