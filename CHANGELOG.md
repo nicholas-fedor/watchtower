@@ -69,6 +69,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- Render messages through a template type by @nicholas-fedor in [#3369](https://github.com/nicholas-fedor/watchtower/pull/3369)
 - Share the log messages notification templates match by @nicholas-fedor in [#3367](https://github.com/nicholas-fedor/watchtower/pull/3367)
 - Remove the dead container-updated template case by @nicholas-fedor in [#3365](https://github.com/nicholas-fedor/watchtower/pull/3365)
 - Split the Shoutrrr notifier into files by concern by @nicholas-fedor in [#3363](https://github.com/nicholas-fedor/watchtower/pull/3363)
