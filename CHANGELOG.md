@@ -69,6 +69,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- Remove the dead container-updated template case by @nicholas-fedor in [#3365](https://github.com/nicholas-fedor/watchtower/pull/3365)
 - Split the Shoutrrr notifier into files by concern by @nicholas-fedor in [#3363](https://github.com/nicholas-fedor/watchtower/pull/3363)
 - Move service URL redaction to the redact package by @nicholas-fedor in [#3357](https://github.com/nicholas-fedor/watchtower/pull/3357)
 - Drop the unused command from legacy GetURL by @nicholas-fedor in [#3355](https://github.com/nicholas-fedor/watchtower/pull/3355)
