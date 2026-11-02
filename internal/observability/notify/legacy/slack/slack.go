@@ -1,4 +1,4 @@
-package notifications
+package slack
 
 import (
 	"errors"
@@ -8,23 +8,25 @@ import (
 	"strings"
 
 	"github.com/nicholas-fedor/shoutrrr/pkg/services/chat/discord"
-	"github.com/nicholas-fedor/shoutrrr/pkg/services/chat/slack"
 	"github.com/rs/zerolog"
 
+	shoutrrrSlack "github.com/nicholas-fedor/shoutrrr/pkg/services/chat/slack"
+
 	"github.com/nicholas-fedor/watchtower/internal/container/redact"
+	"github.com/nicholas-fedor/watchtower/internal/observability/notify/legacy"
 	notifyConfig "github.com/nicholas-fedor/watchtower/internal/settings/config/notify"
 	"github.com/nicholas-fedor/watchtower/pkg/types"
 )
 
-// slackType is the identifier for Slack notifications.
+// Type is the identifier for Slack notifications.
 //
 // Deprecated: Legacy slack notification type is deprecated.
 // Use --notification-url with a slack:// or discord:// URL instead.
 //
-// TODO: Remove slackType constant for the v2 release.
+// TODO: Remove Type constant for the v2 release.
 //
 //nolint:godox
-const slackType = "slack"
+const Type = "slack"
 
 // slackWebhookChannel is the shoutrrr Slack channel that posts to the
 // webhook's own channel.
@@ -70,11 +72,11 @@ type slackTypeNotifier struct {
 	log       *zerolog.Logger
 }
 
-// newSlackNotifier creates a Slack notifier from resolved legacy settings.
+// New creates a Slack notifier from resolved legacy settings.
 //
 // Parameters:
 //   - log: Logger for configuration diagnostics and fatal validation errors.
-//   - legacy: Deprecated Slack/Discord webhook settings (from process config or flags).
+//   - cfg: Deprecated Slack/Discord webhook settings (from process config or flags).
 //
 // Returns:
 //   - types.ConvertibleNotifier: New Slack notifier instance.
@@ -82,15 +84,15 @@ type slackTypeNotifier struct {
 // Deprecated: Legacy slack notifier is deprecated.
 // Use --notification-url with a slack:// or discord:// URL instead.
 //
-// TODO: Remove newSlackNotifier for the v2 release.
+// TODO: Remove New for the v2 release.
 //
 //nolint:godox
-func newSlackNotifier(log *zerolog.Logger, legacy notifyConfig.Legacy) types.ConvertibleNotifier {
-	hookURL := legacy.SlackHookURL
-	userName := legacy.SlackIdentifier
-	channel := legacy.SlackChannel
-	emoji := legacy.SlackIconEmoji
-	iconURL := legacy.SlackIconURL
+func New(log *zerolog.Logger, cfg notifyConfig.Legacy) types.ConvertibleNotifier {
+	hookURL := cfg.SlackHookURL
+	userName := cfg.SlackIdentifier
+	channel := cfg.SlackChannel
+	emoji := cfg.SlackIconEmoji
+	iconURL := cfg.SlackIconURL
 
 	if hookURL == "" {
 		log.Fatal().Msg("Slack hook URL is empty.")
@@ -154,7 +156,7 @@ func (s *slackTypeNotifier) GetURL() (string, error) {
 		conf := &discord.Config{
 			WebhookID:  webhookID,
 			Token:      token,
-			Color:      colorInt,
+			Color:      legacy.ColorInt,
 			SplitLines: true,
 			Username:   s.Username,
 		}
@@ -179,9 +181,9 @@ func (s *slackTypeNotifier) GetURL() (string, error) {
 	webhookToken := strings.Replace(s.HookURL, "https://hooks.slack.com/services/", "", 1)
 
 	// Configure Slack settings.
-	conf := &slack.Config{
+	conf := &shoutrrrSlack.Config{
 		BotName: s.Username,
-		Color:   colorHex,
+		Color:   legacy.ColorHex,
 		Channel: s.webhookChannel(),
 	}
 

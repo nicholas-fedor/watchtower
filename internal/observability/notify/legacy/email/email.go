@@ -1,4 +1,4 @@
-package notifications
+package email
 
 import (
 	"errors"
@@ -13,15 +13,15 @@ import (
 	"github.com/nicholas-fedor/watchtower/pkg/types"
 )
 
-// emailType is the identifier for email notifications.
+// Type is the identifier for email notifications.
 //
 // Deprecated: Legacy email notification type is deprecated.
 // Use --notification-url with an smtp:// URL instead.
 //
-// TODO: Remove emailType constant for the v2 release.
+// TODO: Remove Type constant for the v2 release.
 //
 //nolint:godox
-const emailType = "email"
+const Type = "email"
 
 // defaultTimeout is the default duration for SMTP operations.
 const defaultTimeout = 10 * time.Second
@@ -49,11 +49,11 @@ type emailTypeNotifier struct {
 	log                    *zerolog.Logger
 }
 
-// newEmailNotifier creates an email notifier from resolved legacy settings.
+// New creates an email notifier from resolved legacy settings.
 //
 // Parameters:
 //   - log: Logger for configuration diagnostics and fatal validation errors.
-//   - legacy: Deprecated email SMTP settings (from process config or flags).
+//   - cfg: Deprecated email SMTP settings (from process config or flags).
 //
 // Returns:
 //   - types.ConvertibleNotifier: New email notifier instance.
@@ -61,30 +61,30 @@ type emailTypeNotifier struct {
 // Deprecated: Legacy email notifier is deprecated.
 // Use --notification-url with an smtp:// URL instead.
 //
-// TODO: Remove newEmailNotifier for the v2 release.
+// TODO: Remove New for the v2 release.
 //
 //nolint:godox
-func newEmailNotifier(log *zerolog.Logger, legacy notifyConfig.Legacy) types.ConvertibleNotifier {
-	if legacy.EmailFrom == "" {
+func New(log *zerolog.Logger, cfg notifyConfig.Legacy) types.ConvertibleNotifier {
+	if cfg.EmailFrom == "" {
 		log.Fatal().Msg("Email from address is empty.")
 	}
 
-	if legacy.EmailTo == "" {
+	if cfg.EmailTo == "" {
 		log.Fatal().Msg("Email to address is empty.")
 	}
 
-	if legacy.EmailServer == "" {
+	if cfg.EmailServer == "" {
 		log.Fatal().Msg("Email server is empty.")
 	}
 
-	from := legacy.EmailFrom
-	to := legacy.EmailTo //nolint:varnamelen
-	server := legacy.EmailServer
-	user := legacy.EmailUser
-	password := legacy.EmailPassword
-	port := legacy.EmailPort
-	tlsSkipVerify := legacy.EmailTLSSkipVerify
-	delay := legacy.EmailDelay
+	from := cfg.EmailFrom
+	to := cfg.EmailTo //nolint:varnamelen
+	server := cfg.EmailServer
+	user := cfg.EmailUser
+	password := cfg.EmailPassword
+	port := cfg.EmailPort
+	tlsSkipVerify := cfg.EmailTLSSkipVerify
+	delay := cfg.EmailDelay
 
 	clog := log.With().
 		Str("from", from).

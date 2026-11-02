@@ -1,4 +1,4 @@
-package notifications
+package msteams
 
 import (
 	"errors"
@@ -9,19 +9,20 @@ import (
 	"github.com/rs/zerolog"
 
 	"github.com/nicholas-fedor/watchtower/internal/container/redact"
+	"github.com/nicholas-fedor/watchtower/internal/observability/notify/legacy"
 	notifyConfig "github.com/nicholas-fedor/watchtower/internal/settings/config/notify"
 	"github.com/nicholas-fedor/watchtower/pkg/types"
 )
 
-// msTeamsType is the identifier for Microsoft Teams notifications.
+// Type is the identifier for Microsoft Teams notifications.
 //
 // Deprecated: Legacy msteams notification type is deprecated.
 // Use --notification-url with a teams:// URL instead.
 //
-// TODO: Remove msTeamsType constant for the v2 release.
+// TODO: Remove Type constant for the v2 release.
 //
 //nolint:godox
-const msTeamsType = "msteams"
+const Type = "msteams"
 
 // Errors for Microsoft Teams notification configuration.
 var (
@@ -42,11 +43,11 @@ type msTeamsTypeNotifier struct {
 	log        *zerolog.Logger
 }
 
-// newMsTeamsNotifier creates a Teams notifier from resolved legacy settings.
+// New creates a Teams notifier from resolved legacy settings.
 //
 // Parameters:
 //   - log: Logger for configuration diagnostics and fatal validation errors.
-//   - legacy: Deprecated MSTeams webhook settings (from process config or flags).
+//   - cfg: Deprecated MSTeams webhook settings (from process config or flags).
 //
 // Returns:
 //   - types.ConvertibleNotifier: New Teams notifier instance.
@@ -54,11 +55,11 @@ type msTeamsTypeNotifier struct {
 // Deprecated: Legacy msteams notifier is deprecated.
 // Use --notification-url with a teams:// URL instead.
 //
-// TODO: Remove newMsTeamsNotifier for the v2 release.
+// TODO: Remove New for the v2 release.
 //
 //nolint:godox
-func newMsTeamsNotifier(log *zerolog.Logger, legacy notifyConfig.Legacy) types.ConvertibleNotifier {
-	webHookURL := legacy.MSTeamsHook
+func New(log *zerolog.Logger, cfg notifyConfig.Legacy) types.ConvertibleNotifier {
+	webHookURL := cfg.MSTeamsHook
 	clog := log.With().Str("url", redact.ServiceURL(webHookURL)).Logger()
 
 	if len(webHookURL) == 0 {
@@ -101,7 +102,7 @@ func (n *msTeamsTypeNotifier) GetURL() (string, error) {
 	// Create Teams config with the full webhook URL as the host.
 	config := &teams.Config{
 		Host:  n.webHookURL,
-		Color: colorHex,
+		Color: legacy.ColorHex,
 	}
 
 	urlStr := config.GetURL().String()

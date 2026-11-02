@@ -1,5 +1,4 @@
 pkg/notifications/smtp.go     @nicholas-fedor
-pkg/notifications/email.go    @nicholas-fedor
 pkg/notifications/            @nicholas-fedor
 internal/observability/notify/ @nicholas-fedor
 internal/container/           @nicholas-fedor

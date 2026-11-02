@@ -1,4 +1,4 @@
-package notifications
+package email
 
 import (
 	"net/url"
