@@ -28,10 +28,10 @@ import (
 	containerClient "github.com/nicholas-fedor/watchtower/internal/container/client"
 	mockContainerClient "github.com/nicholas-fedor/watchtower/internal/container/client/mocks"
 	"github.com/nicholas-fedor/watchtower/internal/observability/logging"
+	"github.com/nicholas-fedor/watchtower/internal/observability/notify"
 	"github.com/nicholas-fedor/watchtower/internal/registry/ratelimit"
 	"github.com/nicholas-fedor/watchtower/internal/settings"
 	notifyConfig "github.com/nicholas-fedor/watchtower/internal/settings/config/notify"
-	"github.com/nicholas-fedor/watchtower/pkg/notifications"
 	"github.com/nicholas-fedor/watchtower/pkg/types"
 )
 
@@ -107,7 +107,7 @@ func setRunState(t *testing.T, state runTestState) {
 	processID = func() int { return 1 }
 	parentProcessID = func() int { return 0 }
 
-	notifier = notifications.NewNotifier(new(zerolog.Nop()), notifyConfig.Notify{Level: "info"})
+	notifier = notify.NewNotifier(new(zerolog.Nop()), notifyConfig.Notify{Level: "info"})
 	t.Cleanup(notifier.Close)
 }
 
