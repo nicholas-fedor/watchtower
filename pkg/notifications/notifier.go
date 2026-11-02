@@ -9,6 +9,7 @@ import (
 
 	"github.com/rs/zerolog"
 
+	"github.com/nicholas-fedor/watchtower/internal/container/redact"
 	"github.com/nicholas-fedor/watchtower/internal/observability/logging"
 	notifyConfig "github.com/nicholas-fedor/watchtower/internal/settings/config/notify"
 	"github.com/nicholas-fedor/watchtower/pkg/types"
@@ -99,7 +100,7 @@ func NewNotifier(log *zerolog.Logger, cfg notifyConfig.Notify) types.Notifier {
 
 	if clog.GetLevel() <= zerolog.TraceLevel {
 		clog.Trace().
-			Strs("urls", redactServiceURLs(urls)).
+			Strs("urls", redact.ServiceURLs(urls)).
 			Msg("Notifier Shoutrrr URLs loaded")
 	}
 
@@ -298,7 +299,7 @@ func appendLegacyURLs(
 
 		clog.Trace().
 			Str("type", notificationType).
-			Str("url", redactServiceURL(shoutrrrURL)).
+			Str("url", redact.ServiceURL(shoutrrrURL)).
 			Msg("Created Shoutrrr URL from legacy notifier")
 	}
 

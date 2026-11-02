@@ -430,3 +430,50 @@ func Userinfo(msg, remote string) string {
 
 	return userinfoInError.ReplaceAllString(msg, redactedUserinfo)
 }
+
+// ServiceURL returns a summary of a notification service URL that leaves out
+// its credentials.
+//
+// The scheme stays, so operators can see the service type. The user
+// information, host, path and query, which often hold tokens, are replaced.
+//
+// Parameters:
+//   - raw: Full service or webhook URL that may embed credentials.
+//
+// Returns:
+//   - string: The scheme followed by "://[redacted]", such as
+//     "slack://[redacted]". It is "[redacted]" when raw does not parse or has
+//     no scheme. It is empty when raw is empty.
+func ServiceURL(raw string) string {
+	if raw == "" {
+		return ""
+	}
+
+	parsed, err := url.Parse(raw)
+	if err != nil || parsed.Scheme == "" {
+		return "[redacted]"
+	}
+
+	return parsed.Scheme + "://[redacted]"
+}
+
+// ServiceURLs applies [ServiceURL] to each URL in urls.
+//
+// Parameters:
+//   - urls: Full service URLs that may embed credentials.
+//
+// Returns:
+//   - []string: Redacted summaries in the same order. It is nil when urls is
+//     empty.
+func ServiceURLs(urls []string) []string {
+	if len(urls) == 0 {
+		return nil
+	}
+
+	out := make([]string, len(urls))
+	for i, raw := range urls {
+		out[i] = ServiceURL(raw)
+	}
+
+	return out
+}
