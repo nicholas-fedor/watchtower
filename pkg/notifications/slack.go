@@ -10,7 +10,6 @@ import (
 	"github.com/nicholas-fedor/shoutrrr/pkg/services/chat/discord"
 	"github.com/nicholas-fedor/shoutrrr/pkg/services/chat/slack"
 	"github.com/rs/zerolog"
-	"github.com/spf13/cobra"
 
 	notifyConfig "github.com/nicholas-fedor/watchtower/internal/settings/config/notify"
 	"github.com/nicholas-fedor/watchtower/pkg/types"
@@ -116,16 +115,13 @@ func newSlackNotifier(log *zerolog.Logger, legacy notifyConfig.Legacy) types.Con
 
 // GetURL generates the Slack webhook URL for the notifier.
 //
-// Parameters:
-//   - c: Cobra command (unused here).
-//
 // Returns:
 //   - string: Service URL (Slack or Discord).
 //   - error: Non-nil if token parsing fails, nil on success.
 //
 // Deprecated: This method is part of the legacy slack notifier and will be removed
 // for the v2 release. Use --notification-url with a slack:// URL instead.
-func (s *slackTypeNotifier) GetURL(_ *cobra.Command) (string, error) {
+func (s *slackTypeNotifier) GetURL() (string, error) {
 	clog := s.log
 	clog.Debug().Msg("Generating Slack service URL")
 

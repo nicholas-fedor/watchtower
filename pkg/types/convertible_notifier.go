@@ -1,10 +1,6 @@
 package types
 
-import (
-	"time"
-
-	"github.com/spf13/cobra"
-)
+import "time"
 
 // ConvertibleNotifier defines a notifier that generates a shoutrrr URL.
 //
@@ -17,13 +13,10 @@ import (
 type ConvertibleNotifier interface {
 	// GetURL creates a shoutrrr URL from configuration.
 	//
-	// Parameters:
-	//   - c: Cobra command with flags.
-	//
 	// Returns:
 	//   - string: Generated URL.
 	//   - error: Non-nil if URL creation fails, nil on success.
-	GetURL(c *cobra.Command) (string, error)
+	GetURL() (string, error)
 }
 
 // DelayNotifier defines a notifier with a delay before sending.

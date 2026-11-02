@@ -5,7 +5,6 @@
 package mocks
 
 import (
-	"github.com/spf13/cobra"
 	mock "github.com/stretchr/testify/mock"
 )
 
@@ -46,8 +45,8 @@ func (_m *MockConvertibleNotifier) EXPECT() *MockConvertibleNotifier_Expecter {
 }
 
 // GetURL provides a mock function for the type MockConvertibleNotifier
-func (_mock *MockConvertibleNotifier) GetURL(c *cobra.Command) (string, error) {
-	ret := _mock.Called(c)
+func (_mock *MockConvertibleNotifier) GetURL() (string, error) {
+	ret := _mock.Called()
 
 	if len(ret) == 0 {
 		panic("no return value specified for GetURL")
@@ -55,16 +54,16 @@ func (_mock *MockConvertibleNotifier) GetURL(c *cobra.Command) (string, error) {
 
 	var r0 string
 	var r1 error
-	if returnFunc, ok := ret.Get(0).(func(*cobra.Command) (string, error)); ok {
-		return returnFunc(c)
+	if returnFunc, ok := ret.Get(0).(func() (string, error)); ok {
+		return returnFunc()
 	}
-	if returnFunc, ok := ret.Get(0).(func(*cobra.Command) string); ok {
-		r0 = returnFunc(c)
+	if returnFunc, ok := ret.Get(0).(func() string); ok {
+		r0 = returnFunc()
 	} else {
 		r0 = ret.Get(0).(string)
 	}
-	if returnFunc, ok := ret.Get(1).(func(*cobra.Command) error); ok {
-		r1 = returnFunc(c)
+	if returnFunc, ok := ret.Get(1).(func() error); ok {
+		r1 = returnFunc()
 	} else {
 		r1 = ret.Error(1)
 	}
@@ -77,20 +76,13 @@ type MockConvertibleNotifier_GetURL_Call struct {
 }
 
 // GetURL is a helper method to define mock.On call
-//   - c *cobra.Command
-func (_e *MockConvertibleNotifier_Expecter) GetURL(c any) *MockConvertibleNotifier_GetURL_Call {
-	return &MockConvertibleNotifier_GetURL_Call{Call: _e.mock.On("GetURL", c)}
+func (_e *MockConvertibleNotifier_Expecter) GetURL() *MockConvertibleNotifier_GetURL_Call {
+	return &MockConvertibleNotifier_GetURL_Call{Call: _e.mock.On("GetURL")}
 }
 
-func (_c *MockConvertibleNotifier_GetURL_Call) Run(run func(c *cobra.Command)) *MockConvertibleNotifier_GetURL_Call {
+func (_c *MockConvertibleNotifier_GetURL_Call) Run(run func()) *MockConvertibleNotifier_GetURL_Call {
 	_c.Call.Run(func(args mock.Arguments) {
-		var arg0 *cobra.Command
-		if args[0] != nil {
-			arg0 = args[0].(*cobra.Command)
-		}
-		run(
-			arg0,
-		)
+		run()
 	})
 	return _c
 }
@@ -100,7 +92,7 @@ func (_c *MockConvertibleNotifier_GetURL_Call) Return(s string, err error) *Mock
 	return _c
 }
 
-func (_c *MockConvertibleNotifier_GetURL_Call) RunAndReturn(run func(c *cobra.Command) (string, error)) *MockConvertibleNotifier_GetURL_Call {
+func (_c *MockConvertibleNotifier_GetURL_Call) RunAndReturn(run func() (string, error)) *MockConvertibleNotifier_GetURL_Call {
 	_c.Call.Return(run)
 	return _c
 }

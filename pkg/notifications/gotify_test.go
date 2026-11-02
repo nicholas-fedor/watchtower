@@ -36,7 +36,7 @@ func TestGotifyTypeNotifier_GetURL_TLSSkipVerify(t *testing.T) {
 				log:                      &log,
 			}
 
-			raw, err := notifier.GetURL(nil)
+			raw, err := notifier.GetURL()
 			require.NoError(t, err)
 
 			parsed, err := url.Parse(raw)

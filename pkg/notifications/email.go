@@ -7,7 +7,6 @@ import (
 
 	"github.com/nicholas-fedor/shoutrrr/pkg/services/email/smtp"
 	"github.com/rs/zerolog"
-	"github.com/spf13/cobra"
 
 	notifyConfig "github.com/nicholas-fedor/watchtower/internal/settings/config/notify"
 	"github.com/nicholas-fedor/watchtower/pkg/types"
@@ -119,16 +118,13 @@ func newEmailNotifier(log *zerolog.Logger, legacy notifyConfig.Legacy) types.Con
 
 // GetURL generates the SMTP URL from the notifier's configuration.
 //
-// Parameters:
-//   - c: Cobra command (unused here).
-//
 // Returns:
 //   - string: SMTP URL.
 //   - error: Non-nil if port is invalid, nil on success.
 //
 // Deprecated: This method is part of the legacy email notifier and will be removed
 // for the v2 release. Use --notification-url with an smtp:// URL instead.
-func (e *emailTypeNotifier) GetURL(_ *cobra.Command) (string, error) {
+func (e *emailTypeNotifier) GetURL() (string, error) {
 	clog := e.log.With().
 		Str("from", e.From).
 		Str("to", e.To).

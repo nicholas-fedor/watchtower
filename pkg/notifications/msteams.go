@@ -7,7 +7,6 @@ import (
 
 	"github.com/nicholas-fedor/shoutrrr/pkg/services/chat/teams"
 	"github.com/rs/zerolog"
-	"github.com/spf13/cobra"
 
 	notifyConfig "github.com/nicholas-fedor/watchtower/internal/settings/config/notify"
 	"github.com/nicholas-fedor/watchtower/pkg/types"
@@ -70,16 +69,13 @@ func newMsTeamsNotifier(log *zerolog.Logger, legacy notifyConfig.Legacy) types.C
 
 // GetURL generates the Teams service URL from the notifier's webhook.
 //
-// Parameters:
-//   - c: Cobra command (unused here).
-//
 // Returns:
 //   - string: Teams service URL.
 //   - error: Non-nil if parsing fails, nil on success.
 //
 // Deprecated: This method is part of the legacy msteams notifier and will be removed
 // for the v2 release. Use --notification-url with a teams:// URL instead.
-func (n *msTeamsTypeNotifier) GetURL(_ *cobra.Command) (string, error) {
+func (n *msTeamsTypeNotifier) GetURL() (string, error) {
 	clog := n.log
 	clog.Debug().Msg("Generating Microsoft Teams service URL")
 
