@@ -48,7 +48,7 @@ func TestSlackTypeNotifier_GetURL_Channel(t *testing.T) {
 				log:     &log,
 			}
 
-			raw, err := notifier.GetURL(nil)
+			raw, err := notifier.GetURL()
 			require.NoError(t, err)
 
 			parsed, err := url.Parse(raw)
@@ -111,7 +111,7 @@ func TestSlackTypeNotifier_GetURL_Discord(t *testing.T) {
 			log := zerolog.Nop()
 			notifier := &slackTypeNotifier{HookURL: tt.hookURL, log: &log}
 
-			raw, err := notifier.GetURL(nil)
+			raw, err := notifier.GetURL()
 			if tt.wantErr {
 				require.ErrorIs(t, err, errInvalidDiscordWebhookURL)
 				assert.Empty(t, raw)

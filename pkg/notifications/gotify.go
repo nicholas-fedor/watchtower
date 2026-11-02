@@ -7,7 +7,6 @@ import (
 
 	"github.com/nicholas-fedor/shoutrrr/pkg/services/push/gotify"
 	"github.com/rs/zerolog"
-	"github.com/spf13/cobra"
 
 	notifyConfig "github.com/nicholas-fedor/watchtower/internal/settings/config/notify"
 	"github.com/nicholas-fedor/watchtower/pkg/types"
@@ -145,16 +144,13 @@ func requireGotifyURL(log *zerolog.Logger, gotifyURL string) string {
 
 // GetURL generates the Gotify service URL from the notifier's configuration.
 //
-// Parameters:
-//   - c: Cobra command (unused here).
-//
 // Returns:
 //   - string: Gotify service URL.
 //   - error: Non-nil if URL parsing fails, nil on success.
 //
 // Deprecated: This method is part of the legacy gotify notifier and will be removed
 // for the v2 release. Use --notification-url with a gotify:// URL instead.
-func (n *gotifyTypeNotifier) GetURL(_ *cobra.Command) (string, error) {
+func (n *gotifyTypeNotifier) GetURL() (string, error) {
 	clog := n.log
 	clog.Debug().Msg("Generating Gotify service URL")
 

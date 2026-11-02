@@ -153,7 +153,7 @@ func BuildURLs(log *zerolog.Logger, cfg notifyConfig.Notify) ([]string, error) {
 
 		legacyNotifier := ctor(log, cfg.Legacy)
 
-		shoutrrrURL, err := legacyNotifier.GetURL(nil)
+		shoutrrrURL, err := legacyNotifier.GetURL()
 		if err != nil {
 			return nil, fmt.Errorf("create %q notification config: %w", notificationType, err)
 		}
@@ -276,7 +276,7 @@ func appendLegacyURLs(
 		legacyNotifier := ctor(log, legacy)
 
 		// Generate shoutrrr URL from legacy notifier.
-		shoutrrrURL, err := legacyNotifier.GetURL(nil)
+		shoutrrrURL, err := legacyNotifier.GetURL()
 		if err != nil {
 			clog.Fatal().
 				Err(err).
