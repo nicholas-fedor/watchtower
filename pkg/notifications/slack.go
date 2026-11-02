@@ -11,6 +11,7 @@ import (
 	"github.com/nicholas-fedor/shoutrrr/pkg/services/chat/slack"
 	"github.com/rs/zerolog"
 
+	"github.com/nicholas-fedor/watchtower/internal/container/redact"
 	notifyConfig "github.com/nicholas-fedor/watchtower/internal/settings/config/notify"
 	"github.com/nicholas-fedor/watchtower/pkg/types"
 )
@@ -96,7 +97,7 @@ func newSlackNotifier(log *zerolog.Logger, legacy notifyConfig.Legacy) types.Con
 	}
 
 	log.Debug().
-		Str("hook_url", redactServiceURL(hookURL)).
+		Str("hook_url", redact.ServiceURL(hookURL)).
 		Str("username", userName).
 		Str("channel", channel).
 		Str("emoji", emoji).
@@ -127,7 +128,7 @@ func (s *slackTypeNotifier) GetURL() (string, error) {
 
 	if clog.GetLevel() <= zerolog.TraceLevel {
 		clog.Trace().
-			Str("hook_url", redactServiceURL(s.HookURL)).
+			Str("hook_url", redact.ServiceURL(s.HookURL)).
 			Msg("Slack hook URL loaded")
 	}
 
@@ -165,7 +166,7 @@ func (s *slackTypeNotifier) GetURL() (string, error) {
 		urlStr := conf.GetURL().String()
 		if clog.GetLevel() <= zerolog.TraceLevel {
 			clog.Trace().
-				Str("service_url", redactServiceURL(urlStr)).
+				Str("service_url", redact.ServiceURL(urlStr)).
 				Msg("Generated Discord service URL")
 		} else {
 			clog.Debug().Msg("Generated Discord service URL")
@@ -201,7 +202,7 @@ func (s *slackTypeNotifier) GetURL() (string, error) {
 	urlStr := conf.GetURL().String()
 	if clog.GetLevel() <= zerolog.TraceLevel {
 		clog.Trace().
-			Str("service_url", redactServiceURL(urlStr)).
+			Str("service_url", redact.ServiceURL(urlStr)).
 			Msg("Generated Slack service URL")
 	} else {
 		clog.Debug().Msg("Generated Slack service URL")

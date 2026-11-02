@@ -8,6 +8,7 @@ import (
 	"github.com/nicholas-fedor/shoutrrr/pkg/services/email/smtp"
 	"github.com/rs/zerolog"
 
+	"github.com/nicholas-fedor/watchtower/internal/container/redact"
 	notifyConfig "github.com/nicholas-fedor/watchtower/internal/settings/config/notify"
 	"github.com/nicholas-fedor/watchtower/pkg/types"
 )
@@ -176,7 +177,7 @@ func (e *emailTypeNotifier) GetURL() (string, error) {
 
 	if clog.GetLevel() <= zerolog.TraceLevel {
 		clog.Trace().
-			Str("url", redactServiceURL(url)).
+			Str("url", redact.ServiceURL(url)).
 			Msg("Generated SMTP URL")
 	}
 

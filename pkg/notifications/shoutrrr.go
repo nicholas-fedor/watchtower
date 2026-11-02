@@ -20,6 +20,7 @@ import (
 
 	shoutrrrTypes "github.com/nicholas-fedor/shoutrrr/pkg/types"
 
+	"github.com/nicholas-fedor/watchtower/internal/container/redact"
 	"github.com/nicholas-fedor/watchtower/internal/update/state"
 	"github.com/nicholas-fedor/watchtower/pkg/types"
 )
@@ -166,7 +167,7 @@ func (n *shoutrrrTypeNotifier) RegisterHook(log *zerolog.Logger) {
 		n.localLog = &local
 
 		n.localLog.Debug().
-			Strs("urls", redactServiceURLs(n.Urls)).
+			Strs("urls", redact.ServiceURLs(n.Urls)).
 			Msg("Added Shoutrrr notifier as zerolog hook, starting notification goroutine")
 
 		// Send using a separate goroutine to avoid blocking the main process.

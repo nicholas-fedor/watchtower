@@ -8,6 +8,7 @@ import (
 	"github.com/nicholas-fedor/shoutrrr/pkg/services/push/gotify"
 	"github.com/rs/zerolog"
 
+	"github.com/nicholas-fedor/watchtower/internal/container/redact"
 	notifyConfig "github.com/nicholas-fedor/watchtower/internal/settings/config/notify"
 	"github.com/nicholas-fedor/watchtower/pkg/types"
 )
@@ -60,7 +61,7 @@ func newGotifyNotifier(log *zerolog.Logger, legacy notifyConfig.Legacy) types.Co
 	skipVerify := legacy.GotifyTLSSkipVerify
 
 	clog := log.With().
-		Str("url", redactServiceURL(apiURL)).
+		Str("url", redact.ServiceURL(apiURL)).
 		Bool("skip_verify", skipVerify).
 		Logger()
 	clog.Debug().Msg("Initializing Gotify notifier")
@@ -117,7 +118,7 @@ func requireGotifyToken(log *zerolog.Logger, gotifyToken string) string {
 func requireGotifyURL(log *zerolog.Logger, gotifyURL string) string {
 	clog := log.With().
 		Str("flag", "notification-gotify-url").
-		Str("url", redactServiceURL(gotifyURL)).
+		Str("url", redact.ServiceURL(gotifyURL)).
 		Logger()
 
 	// Fatal error if URL is missing.
@@ -156,7 +157,7 @@ func (n *gotifyTypeNotifier) GetURL() (string, error) {
 
 	if clog.GetLevel() <= zerolog.TraceLevel {
 		clog.Trace().
-			Str("url", redactServiceURL(n.gotifyURL)).
+			Str("url", redact.ServiceURL(n.gotifyURL)).
 			Msg("Gotify API URL loaded")
 	}
 
@@ -186,7 +187,7 @@ func (n *gotifyTypeNotifier) GetURL() (string, error) {
 
 	if clog.GetLevel() <= zerolog.TraceLevel {
 		clog.Trace().
-			Str("service_url", redactServiceURL(urlStr)).
+			Str("service_url", redact.ServiceURL(urlStr)).
 			Msg("Generated Gotify service URL")
 	}
 

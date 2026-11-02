@@ -8,6 +8,7 @@ import (
 	"github.com/nicholas-fedor/shoutrrr/pkg/services/chat/teams"
 	"github.com/rs/zerolog"
 
+	"github.com/nicholas-fedor/watchtower/internal/container/redact"
 	notifyConfig "github.com/nicholas-fedor/watchtower/internal/settings/config/notify"
 	"github.com/nicholas-fedor/watchtower/pkg/types"
 )
@@ -58,7 +59,7 @@ type msTeamsTypeNotifier struct {
 //nolint:godox
 func newMsTeamsNotifier(log *zerolog.Logger, legacy notifyConfig.Legacy) types.ConvertibleNotifier {
 	webHookURL := legacy.MSTeamsHook
-	clog := log.With().Str("url", redactServiceURL(webHookURL)).Logger()
+	clog := log.With().Str("url", redact.ServiceURL(webHookURL)).Logger()
 
 	if len(webHookURL) == 0 {
 		clog.Fatal().Msg("Microsoft Teams webhook URL is empty")
@@ -81,7 +82,7 @@ func (n *msTeamsTypeNotifier) GetURL() (string, error) {
 
 	if clog.GetLevel() <= zerolog.TraceLevel {
 		clog.Trace().
-			Str("url", redactServiceURL(n.webHookURL)).
+			Str("url", redact.ServiceURL(n.webHookURL)).
 			Msg("Microsoft Teams webhook URL loaded")
 	}
 
@@ -106,7 +107,7 @@ func (n *msTeamsTypeNotifier) GetURL() (string, error) {
 	urlStr := config.GetURL().String()
 	if clog.GetLevel() <= zerolog.TraceLevel {
 		clog.Trace().
-			Str("service_url", redactServiceURL(urlStr)).
+			Str("service_url", redact.ServiceURL(urlStr)).
 			Msg("Generated Microsoft Teams service URL")
 	} else {
 		clog.Debug().Msg("Generated Microsoft Teams service URL")

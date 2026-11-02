@@ -299,3 +299,45 @@ func TestIsHexString(t *testing.T) {
 		})
 	}
 }
+
+// TestServiceURL verifies that a notification service URL keeps only its
+// scheme wherever its credentials sit. A value without a usable scheme is
+// replaced whole.
+func TestServiceURL(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name string
+		raw  string
+		want string
+	}{
+		{name: "empty", raw: "", want: ""},
+		{name: "credentials in the userinfo", raw: "smtp://user:secret@mail.example.com:587/?from=a@example.com", want: "smtp://[redacted]"},
+		{name: "token in the path", raw: "https://hooks.slack.com/services/T000/B000/XXXX", want: "https://[redacted]"},
+		{name: "token in the query", raw: "gotify://gotify.example.com/?token=secret", want: "gotify://[redacted]"},
+		{name: "token as the host", raw: "telegram://123456:secret@telegram?chats=1", want: "telegram://[redacted]"},
+		{name: "no scheme", raw: "hooks.slack.com/services/T000/B000/XXXX", want: "[redacted]"},
+		{name: "does not parse", raw: "slack://token\x7f", want: "[redacted]"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			assert.Equal(t, tt.want, ServiceURL(tt.raw))
+		})
+	}
+}
+
+// TestServiceURLs verifies that each URL is redacted in place, so the summaries
+// line up with the configured URLs. No URLs give nil.
+func TestServiceURLs(t *testing.T) {
+	t.Parallel()
+
+	assert.Nil(t, ServiceURLs(nil))
+	assert.Nil(t, ServiceURLs([]string{}))
+	assert.Equal(t,
+		[]string{"slack://[redacted]", "", "logger://[redacted]"},
+		ServiceURLs([]string{"slack://token@channel", "", "logger://"}),
+	)
+}
