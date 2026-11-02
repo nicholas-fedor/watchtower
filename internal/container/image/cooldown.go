@@ -9,6 +9,7 @@ import (
 	"github.com/rs/zerolog"
 
 	"github.com/nicholas-fedor/watchtower/internal/container"
+	"github.com/nicholas-fedor/watchtower/internal/observability/logging"
 	"github.com/nicholas-fedor/watchtower/internal/registry"
 	"github.com/nicholas-fedor/watchtower/internal/registry/digest"
 	"github.com/nicholas-fedor/watchtower/internal/registry/ratelimit"
@@ -161,7 +162,7 @@ func fetchImageCreationTime(
 	if err != nil {
 		clog.Info().
 			Err(err).
-			Msg("Image creation time unavailable - update check unavailable")
+			Msg(logging.CooldownUnavailable)
 
 		return time.Time{}, &CooldownError{
 			Delay: units.FormatDuration(delay),
@@ -210,7 +211,7 @@ func evalImageAge(creationTime time.Time, delay time.Duration, clog *zerolog.Log
 			Str("cooldown", cooldownStr).
 			Str("eligible_in", remainingStr).
 			Str("eligible_at", eligibleAt.Format(time.RFC3339)).
-			Msg("Image is within cooldown period - not eligible for update")
+			Msg(logging.WithinCooldown)
 
 		return false, buildCooldownError(imageAge, delay, eligibleAt)
 	}
@@ -310,5 +311,5 @@ func logCooldownExceeded(imageAge, delay time.Duration, clog *zerolog.Logger) {
 	clog.Info().
 		Str("image_age", units.FormatDuration(imageAge)).
 		Str("cooldown", units.FormatDuration(delay)).
-		Msg("Image age exceeds cooldown - eligible for update")
+		Msg(logging.CooldownElapsed)
 }

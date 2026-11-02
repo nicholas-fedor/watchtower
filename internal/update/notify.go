@@ -13,6 +13,7 @@ import (
 	containerClient "github.com/nicholas-fedor/watchtower/internal/container/client"
 	"github.com/nicholas-fedor/watchtower/internal/git"
 	"github.com/nicholas-fedor/watchtower/internal/observability/events"
+	"github.com/nicholas-fedor/watchtower/internal/observability/logging"
 	"github.com/nicholas-fedor/watchtower/internal/observability/metrics"
 	"github.com/nicholas-fedor/watchtower/internal/registry/ratelimit"
 	"github.com/nicholas-fedor/watchtower/internal/update/cleanup"
@@ -278,7 +279,7 @@ func handleUpdateResult(log *zerolog.Logger, result types.Report, err error, not
 			event = event.Str("notify", "no")
 		}
 
-		event.Msg("Update execution failed")
+		event.Msg(logging.UpdateFailed)
 
 		// A nil result sends the batch without a report, so report templates list its entries.
 		if notifier != nil {
@@ -327,7 +328,7 @@ func endPanickedSession(
 ) *metrics.Metric {
 	panicValue := fmt.Sprint(recovered)
 
-	log.Error().Str("error", panicValue).Msg("Update panicked")
+	log.Error().Str("error", panicValue).Msg(logging.UpdatePanicked)
 	log.Debug().
 		Str("notify", "no").
 		Str("stack", string(debug.Stack())).
@@ -672,7 +673,7 @@ func sendSplitNotifications(log *zerolog.Logger, notifier types.Notifier,
 				Str("container_name", img.ContainerName).
 				Str("image_name", img.ImageName).
 				Str("image_id", img.ImageID.ShortID()).
-				Msg("Removing image")
+				Msg(logging.RemovingImage)
 		}
 
 		updatedNames := make([]string, 0, len(result.Updated()))

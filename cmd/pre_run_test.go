@@ -569,7 +569,7 @@ func TestPreRun_Exit(t *testing.T) {
 			helperCase:   "docker-client-error",
 			wantExitCode: 1,
 			wantOutput: []string{
-				restartsKeptMessage,
+				logging.RestartsKept,
 				"Failed to initialize Docker client",
 			},
 			unwantedOutput: []string{"SetRestartPolicy"},
@@ -581,7 +581,7 @@ func TestPreRun_Exit(t *testing.T) {
 			helperCase:   "invalid-log-format-without-container-id",
 			wantExitCode: 1,
 			wantOutput: []string{
-				restartsKeptMessage,
+				logging.RestartsKept,
 				"Failed to initialize logging",
 			},
 			unwantedOutput: []string{"SetRestartPolicy"},
@@ -615,7 +615,7 @@ func TestPreRun_Exit(t *testing.T) {
 			helperCase:     "subcommand-error",
 			wantExitCode:   1,
 			wantOutput:     []string{"Failed to execute root command"},
-			unwantedOutput: []string{"newClient", "SetRestartPolicy", restartsKeptMessage},
+			unwantedOutput: []string{"newClient", "SetRestartPolicy", logging.RestartsKept},
 		},
 		{
 			// RunOrchestrator always ends the process, so the restart policy
@@ -652,7 +652,7 @@ func TestPreRun_Exit(t *testing.T) {
 			wantExitCode: 1,
 			wantOutput: []string{
 				"SetRestartPolicy cccccccccccc no",
-				restartsKeptMessage,
+				logging.RestartsKept,
 				"Exiting rather than running without a scope",
 			},
 		},

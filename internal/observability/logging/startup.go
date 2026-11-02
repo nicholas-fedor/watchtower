@@ -81,7 +81,7 @@ func WriteStartupMessage(params StartupParams) {
 		startupLog.Info().
 			Int64("disk_space_max", params.DiskSpaceMaxBytes).
 			Int64("disk_space_warn", params.DiskSpaceWarnBytes).
-			Msg("Docker image usage budget enabled")
+			Msg(ImageUsageBudgetEnabled)
 	}
 
 	// Log details about configured notifiers or lack thereof.
@@ -96,7 +96,7 @@ func WriteStartupMessage(params StartupParams) {
 	if params.Scope != "" {
 		startupLog.Info().
 			Str("scope", params.Scope).
-			Msg("Only checking containers in scope")
+			Msg(ScopedToContainers)
 	} else {
 		startupLog.Debug().Msg(params.Filtering)
 	}

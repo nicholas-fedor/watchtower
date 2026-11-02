@@ -1666,7 +1666,7 @@ func TestDisableRestarts(t *testing.T) {
 			(&process{log: log}).disableRestarts()
 
 			if tt.wantError {
-				assert.Contains(t, logOutput.String(), restartsKeptMessage)
+				assert.Contains(t, logOutput.String(), logging.RestartsKept)
 
 				wantCause := errRunTestDocker
 				if tt.unknownID {

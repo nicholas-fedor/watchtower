@@ -238,7 +238,7 @@ func update(
 			log.WithLevel(scanProblems.Level("self-dependency", string(monitoredContainer.ID()))).
 				Str("container", monitoredContainer.Name()).
 				Str("id", monitoredContainer.ID().ShortID()).
-				Msg("Skipping container update (self-dependency)")
+				Msg(logging.SelfDependency)
 		}
 	}
 
@@ -257,7 +257,7 @@ func update(
 			log.WithLevel(scanProblems.Level("unresolved depends-on", string(link.Container.ID()), link.Link)).
 				Str("container", link.Container.Name()).
 				Str("depends_on", link.Link).
-				Msg("Ignoring depends-on entry that names no container")
+				Msg(logging.UnresolvedDependsOn)
 		}
 	}
 
@@ -279,7 +279,7 @@ func update(
 		log.WithLevel(scanProblems.Level("circular dependency", string(c.ID()))).
 			Str("container", c.Name()).
 			Str("id", c.ID().ShortID()).
-			Msg("Skipping container update (circular dependency)")
+			Msg(logging.CircularDependency)
 	}
 
 	// Track containers that fail staleness checks for reporting.
@@ -430,7 +430,7 @@ func update(
 
 			// Log when skipping Watchtower self-update in run-once mode.
 			if stale && sourceContainer.IsWatchtower() && config.RunOnce {
-				clog.Info().Msg("Skipping Watchtower self-update in run-once mode")
+				clog.Info().Msg(logging.SelfUpdateSkippedRunOnce)
 			}
 
 			// Verify the container's configuration if it's slated for update to
@@ -495,7 +495,7 @@ func update(
 					if !ratelimit.ExceedsHonorWindow(checkErr) {
 						clog.Warn().
 							Err(checkErr).
-							Msg("Registry rate limit retries exhausted. Container failed for this cycle")
+							Msg(logging.RateLimitRetriesExhausted)
 					}
 
 					progress.AddFailed(log, sourceContainer, checkErr, config)
@@ -520,14 +520,14 @@ func update(
 					// identifies an invalid label problem.
 					progress.AddSkipped(log, sourceContainer, checkErr, config)
 					clog.WithLevel(scanProblems.Level("invalid git semver policy", string(sourceContainer.ID()))).
-						Msg("Skipped container with an invalid git semver policy")
+						Msg(logging.InvalidGitSemverPolicy)
 				case errors.Is(checkErr, git.ErrInvalidHost):
 					// The container ID identifies the problem, as for an invalid
 					// policy. The line carries no error field, so a credential in
 					// the label stays out of log-based notifications.
 					progress.AddSkipped(log, sourceContainer, checkErr, config)
 					clog.WithLevel(scanProblems.Level("invalid git-host", string(sourceContainer.ID()))).
-						Msg("Skipped container with an invalid git-host")
+						Msg(logging.InvalidGitHost)
 				default:
 					skipFailedUpdateCheck(log, clog, progress, sourceContainer, checkErr, config)
 				}
@@ -547,7 +547,7 @@ func update(
 				progress.AddSkipped(log, sourceContainer, verifyErr, config)
 				clog.WithLevel(scanProblems.Level("unrecreatable configuration", string(sourceContainer.ID()), verifyErr.Error())).
 					Err(verifyErr).
-					Msg("Could not update container. Its configuration cannot be recreated")
+					Msg(logging.ConfigNotRecreatable)
 
 				if sourceContainer.IsWatchtower() &&
 					!config.SkipSelfUpdate &&
@@ -842,7 +842,7 @@ func skipFailedUpdateCheck(
 	progress.AddSkipped(log, c, err, config)
 	clog.WithLevel(scanProblems.Level("failed update check", string(c.ID()), err.Error())).
 		Err(err).
-		Msg("Could not check container for updates")
+		Msg(logging.UpdateCheckFailed)
 }
 
 // unmonitoredContainers returns the containers of allContainers that are not

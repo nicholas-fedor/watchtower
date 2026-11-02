@@ -1,5 +1,7 @@
 package notifications
 
+import "github.com/nicholas-fedor/watchtower/internal/observability/logging"
+
 // deduplicateEntries removes duplicate log entries that occur when multiple containers
 // share the same image. This applies to grouped (non-split) notifications only.
 //
@@ -32,22 +34,22 @@ func deduplicateEntries(entries []*notificationEntry) []*notificationEntry {
 		var key dedupKey
 
 		switch entry.Message {
-		case "Found new image":
+		case logging.FoundNewImage:
 			// Deduplicate by image name and new image ID.
 			image, _ := entry.Data["image"].(string)
 			newID, _ := entry.Data["new_id"].(string)
 			key = dedupKey{message: entry.Message, data: image + "\x00" + newID}
-		case "Found new Git revision":
+		case logging.FoundNewGitRevision:
 			revision, _ := entry.Data["revision"].(string)
 			shortCommit, _ := entry.Data["short_commit"].(string)
 			key = dedupKey{message: entry.Message, data: revision + "\x00" + shortCommit}
-		case "Removing image":
+		case logging.RemovingImage:
 			// Deduplicate by image ID.
 			imageID, _ := entry.Data["image_id"].(string)
 			key = dedupKey{message: entry.Message, data: imageID}
-		case "Image is within cooldown period - not eligible for update",
-			"Image age exceeds cooldown - eligible for update",
-			"Image creation time unavailable - update check unavailable":
+		case logging.WithinCooldown,
+			logging.CooldownElapsed,
+			logging.CooldownUnavailable:
 			// Deduplicate by image name — multiple containers may share the same image.
 			image, _ := entry.Data["image"].(string)
 			key = dedupKey{message: entry.Message, data: image}

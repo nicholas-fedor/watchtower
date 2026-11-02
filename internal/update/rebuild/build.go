@@ -16,6 +16,7 @@ import (
 	"github.com/nicholas-fedor/watchtower/internal/container/provenance"
 	"github.com/nicholas-fedor/watchtower/internal/git"
 	"github.com/nicholas-fedor/watchtower/internal/git/apply"
+	"github.com/nicholas-fedor/watchtower/internal/observability/logging"
 	"github.com/nicholas-fedor/watchtower/internal/update/state"
 	"github.com/nicholas-fedor/watchtower/pkg/types"
 )
@@ -128,7 +129,7 @@ func (s *Session) build(
 		Str("image", familiarImage(tag)).
 		Str("image_id", imageID.ShortID()),
 		c, params, result.Tag, result.Commit).
-		Msg("Built image from Git URL context")
+		Msg(logging.BuiltGitImage)
 
 	return nil
 }

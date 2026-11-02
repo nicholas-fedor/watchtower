@@ -9,6 +9,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/nicholas-fedor/watchtower/internal/container/filters"
+	"github.com/nicholas-fedor/watchtower/internal/observability/logging"
 	"github.com/nicholas-fedor/watchtower/internal/registry/ratelimit"
 	"github.com/nicholas-fedor/watchtower/internal/testutil/logcapture"
 	mockUpdate "github.com/nicholas-fedor/watchtower/internal/update/mocks"
@@ -71,7 +72,7 @@ func TestImageDiskSpaceGate(t *testing.T) {
 
 		_, _, err := update(log, t.Context(), client, params, ratelimit.New())
 		require.NoError(t, err)
-		assert.Contains(t, logcapture.Messages(t, buf.String(), "warn"), msgImageDiskSpaceWarn)
+		assert.Contains(t, logcapture.Messages(t, buf.String(), "warn"), logging.ImageUsageExceedsWarning)
 		assert.Positive(t, client.TestData.ListContainersCount.Load())
 	})
 
@@ -89,7 +90,7 @@ func TestImageDiskSpaceGate(t *testing.T) {
 
 		_, _, err := update(log, t.Context(), client, params, ratelimit.New())
 		require.NoError(t, err)
-		assert.Contains(t, logcapture.Messages(t, buf.String(), "warn"), msgImageDiskSpaceWarn)
+		assert.Contains(t, logcapture.Messages(t, buf.String(), "warn"), logging.ImageUsageExceedsWarning)
 		assert.Positive(t, client.TestData.ListContainersCount.Load())
 	})
 
@@ -150,14 +151,14 @@ func TestRunUpdatesWithNotifications_DiskSpaceAbortNotifiesOnce(t *testing.T) {
 			data: &mockUpdate.TestData{
 				ImageDiskUsage: types.ImageDiskUsage{TotalSize: 10_000, Reclaimable: 2_000, TotalCount: 4},
 			},
-			message: msgImageDiskSpaceExceeded,
+			message: logging.ImageUsageExceedsMaximum,
 		},
 		{
 			name: "usage cannot be queried",
 			data: &mockUpdate.TestData{
 				GetImageDiskUsageError: errors.New("df unavailable"),
 			},
-			message: "Failed to query Docker image disk usage",
+			message: logging.ImageDiskUsageQueryFailed,
 		},
 	}
 
@@ -200,7 +201,7 @@ func TestRunUpdatesWithNotifications_DiskSpaceAbortNotifiesOnce(t *testing.T) {
 			}
 
 			assert.Equal(t, []string{tt.message}, eligible)
-			assert.Equal(t, []string{"Update execution failed"}, suppressed)
+			assert.Equal(t, []string{logging.UpdateFailed}, suppressed)
 		})
 	}
 }

@@ -52,10 +52,6 @@ const (
 	// metadata is unreachable. The inspect of the container afterwards bounds
 	// its own retries. In a health check, this timeout bounds them as well.
 	containerLookupTimeout = 5 * time.Second
-
-	// restartsKeptMessage is logged when Watchtower could not disable its own
-	// restart policy before it exits.
-	restartsKeptMessage = "Could not disable Watchtower's restart policy. The runtime may start it again"
 )
 
 // Errors for ending Watchtower.
@@ -463,21 +459,15 @@ func (p *process) preRun(cmd *cobra.Command, _ []string) error {
 	if inspectErr != nil && appCfg.Filter.Scope == "" && !appCfg.Mode.HealthCheck {
 		// Disable restarts first, so the runtime does not start Watchtower again.
 		p.disableRestarts()
-		p.logNotify("Could not inspect Watchtower's own container to read its scope label. "+
-			"Exiting rather than running without a scope", inspectErr)
+		p.logNotify(logging.ScopeLabelUnreadable, inspectErr)
 
 		return &exitError{err: inspectErr, msg: "", code: 1}
 	}
 
 	if currentWatchtowerContainerUnknown {
-		p.log.Warn().Err(detectErr).Msg(
-			"Could not identify Watchtower's own container. " +
-				"Self-updates are disabled and old instances will not be removed",
-		)
+		p.log.Warn().Err(detectErr).Msg(logging.SelfUnidentified)
 	} else if inspectErr != nil {
-		p.log.Warn().Err(inspectErr).Msg(
-			"Could not inspect Watchtower's own container. Self-updates are disabled",
-		)
+		p.log.Warn().Err(inspectErr).Msg(logging.SelfUninspected)
 	}
 
 	// Log deprecated notification configuration options, if set.
@@ -949,7 +939,7 @@ func (p *process) disableRestarts() {
 	}
 
 	if currentWatchtowerContainerID == "" {
-		p.log.Error().Err(errUnknownContainerID).Msg(restartsKeptMessage)
+		p.log.Error().Err(errUnknownContainerID).Msg(logging.RestartsKept)
 
 		return
 	}
@@ -970,7 +960,7 @@ func (p *process) disableRestarts() {
 		dockerContainer.RestartPolicy{Name: dockerContainer.RestartPolicyDisabled},
 	)
 	if err != nil {
-		p.log.Error().Err(err).Msg(restartsKeptMessage)
+		p.log.Error().Err(err).Msg(logging.RestartsKept)
 	}
 }
 
@@ -1020,7 +1010,7 @@ func (p *process) disableRestartsBeforeExit(cmd *cobra.Command) {
 		}
 
 		if err != nil {
-			p.log.Error().Err(err).Msg(restartsKeptMessage)
+			p.log.Error().Err(err).Msg(logging.RestartsKept)
 
 			return
 		}

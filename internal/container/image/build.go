@@ -18,6 +18,7 @@ import (
 
 	"github.com/nicholas-fedor/watchtower/internal/container/provenance"
 	"github.com/nicholas-fedor/watchtower/internal/container/redact"
+	"github.com/nicholas-fedor/watchtower/internal/observability/logging"
 	"github.com/nicholas-fedor/watchtower/pkg/types"
 )
 
@@ -114,7 +115,7 @@ func BuildFromGit(
 
 	clog.Debug().
 		Str("image_id", imageID.ShortID()).
-		Msg("Built image from Git URL context")
+		Msg(logging.BuiltGitImage)
 
 	return imageID, nil
 }

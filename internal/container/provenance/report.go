@@ -6,6 +6,7 @@ import (
 	"github.com/nicholas-fedor/watchtower/internal/container"
 	"github.com/nicholas-fedor/watchtower/internal/container/oci"
 	"github.com/nicholas-fedor/watchtower/internal/container/redact"
+	"github.com/nicholas-fedor/watchtower/internal/observability/logging"
 	"github.com/nicholas-fedor/watchtower/pkg/types"
 )
 
@@ -134,7 +135,7 @@ func LogChangelog(
 	log.Info().
 		Str("container", c.Name()).
 		Str("changelog", meta.Changelog).
-		Msg("Changelog")
+		Msg(logging.Changelog)
 }
 
 // preferAnnotations returns the latest image annotations, falling back to the
