@@ -1,5 +1,5 @@
-// Package redact removes credentials from Git URLs, notification service URLs
-// and the error text that quotes them.
+// Package redact removes credentials from Git URLs and the error text that
+// quotes them. It also reduces notification service URLs to their scheme.
 //
 // Watchtower stores redacted URLs on the containers it creates and in its
 // reports. Error and log text gets the same treatment, so a credential in a Git
