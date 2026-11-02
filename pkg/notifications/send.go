@@ -5,6 +5,7 @@ import (
 	"time"
 
 	"github.com/nicholas-fedor/watchtower/internal/container/redact"
+	"github.com/nicholas-fedor/watchtower/internal/observability/notify/format"
 	"github.com/nicholas-fedor/watchtower/pkg/types"
 )
 
@@ -258,10 +259,10 @@ func (n *shoutrrrTypeNotifier) send(msg string) {
 // Parameters:
 //   - entries: Log entries to send.
 //   - report: Optional scan report.
-func (n *shoutrrrTypeNotifier) sendEntries(entries []*notificationEntry, report types.Report) {
+func (n *shoutrrrTypeNotifier) sendEntries(entries []*format.Entry, report types.Report) {
 	log := n.ll()
 
-	msg, err := n.template.render(log, notificationData{n.data, entries, report})
+	msg, err := n.template.Render(log, format.Data{StaticData: n.data, Entries: entries, Report: report})
 	if err != nil {
 		log.Debug().
 			Err(err).

@@ -5,6 +5,8 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+
+	"github.com/nicholas-fedor/watchtower/internal/observability/notify/format"
 )
 
 // TestDeduplicateEntries verifies that grouped notifications drop
@@ -16,14 +18,14 @@ func TestDeduplicateEntries(t *testing.T) {
 	t.Run("should return empty slice for empty input", func(t *testing.T) {
 		t.Parallel()
 
-		result := deduplicateEntries([]*notificationEntry{})
+		result := deduplicateEntries([]*format.Entry{})
 		assert.Empty(t, result)
 	})
 
 	t.Run("should return single entry unchanged", func(t *testing.T) {
 		t.Parallel()
 
-		entries := []*notificationEntry{
+		entries := []*format.Entry{
 			{Message: "Found new image", Data: map[string]any{"image": "nginx:latest", "new_id": "abc123"}},
 		}
 		result := deduplicateEntries(entries)
@@ -33,7 +35,7 @@ func TestDeduplicateEntries(t *testing.T) {
 	t.Run("should deduplicate 'Found new image' entries with same image and new ID", func(t *testing.T) {
 		t.Parallel()
 
-		entries := []*notificationEntry{
+		entries := []*format.Entry{
 			{Message: "Found new image", Data: map[string]any{"container": "app-a", "image": "nginx:latest", "new_id": "abc123"}},
 			{Message: "Found new image", Data: map[string]any{"container": "app-b", "image": "nginx:latest", "new_id": "abc123"}},
 		}
@@ -45,7 +47,7 @@ func TestDeduplicateEntries(t *testing.T) {
 	t.Run("should keep 'Found new image' entries with different images", func(t *testing.T) {
 		t.Parallel()
 
-		entries := []*notificationEntry{
+		entries := []*format.Entry{
 			{Message: "Found new image", Data: map[string]any{"image": "nginx:latest", "new_id": "abc123"}},
 			{Message: "Found new image", Data: map[string]any{"image": "redis:latest", "new_id": "def456"}},
 		}
@@ -56,7 +58,7 @@ func TestDeduplicateEntries(t *testing.T) {
 	t.Run("should keep 'Found new image' entries with same image but different new IDs", func(t *testing.T) {
 		t.Parallel()
 
-		entries := []*notificationEntry{
+		entries := []*format.Entry{
 			{Message: "Found new image", Data: map[string]any{"image": "nginx:latest", "new_id": "abc123"}},
 			{Message: "Found new image", Data: map[string]any{"image": "nginx:latest", "new_id": "def456"}},
 		}
@@ -67,7 +69,7 @@ func TestDeduplicateEntries(t *testing.T) {
 	t.Run("should deduplicate 'Removing image' entries with same image ID", func(t *testing.T) {
 		t.Parallel()
 
-		entries := []*notificationEntry{
+		entries := []*format.Entry{
 			{Message: "Removing image", Data: map[string]any{"container_name": "app-a", "image_id": "sha256:abc"}},
 			{Message: "Removing image", Data: map[string]any{"container_name": "app-b", "image_id": "sha256:abc"}},
 		}
@@ -79,7 +81,7 @@ func TestDeduplicateEntries(t *testing.T) {
 	t.Run("should not deduplicate other message types", func(t *testing.T) {
 		t.Parallel()
 
-		entries := []*notificationEntry{
+		entries := []*format.Entry{
 			{Message: "Stopping container", Data: map[string]any{"container": "app-a"}},
 			{Message: "Stopping container", Data: map[string]any{"container": "app-b"}},
 		}
@@ -90,7 +92,7 @@ func TestDeduplicateEntries(t *testing.T) {
 	t.Run("should handle mixed entry types correctly", func(t *testing.T) {
 		t.Parallel()
 
-		entries := []*notificationEntry{
+		entries := []*format.Entry{
 			{Message: "Found new image", Data: map[string]any{"image": "nginx:latest", "new_id": "abc123"}},
 			{Message: "Stopping container", Data: map[string]any{"container": "app-a"}},
 			{Message: "Found new image", Data: map[string]any{"image": "nginx:latest", "new_id": "abc123"}},

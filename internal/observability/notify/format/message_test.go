@@ -1,17 +1,106 @@
-package notifications
+package format
 
 import (
 	"encoding/json"
 	"strings"
 	"testing"
 
+	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
 	"github.com/nicholas-fedor/watchtower/internal/container/provenance"
+	"github.com/nicholas-fedor/watchtower/internal/testutil/reportfixture"
 	"github.com/nicholas-fedor/watchtower/internal/update/state"
 	"github.com/nicholas-fedor/watchtower/pkg/types"
 )
+
+// newTestLogger returns a logger that writes each event to the test's log, so a
+// failing test shows what it logged.
+//
+// Parameters:
+//   - t: Test that receives the log lines.
+//
+// Returns:
+//   - *zerolog.Logger: Logger writing to t.
+func newTestLogger(t *testing.T) *zerolog.Logger {
+	t.Helper()
+
+	// Frame 4 skips zerolog's write path, so each line names the log call.
+	w := zerolog.TestWriter{T: t, Frame: 4}
+
+	return new(zerolog.New(w))
+}
+
+// TODO: Remove legacyMockData when legacy notification types are removed.
+//
+//nolint:godox
+var legacyMockData = Data{
+	Entries: []*Entry{
+		{
+			Level:   "info",
+			Message: "foo Bar",
+		},
+	},
+}
+
+var mockDataMultipleEntries = Data{
+	Entries: []*Entry{
+		{
+			Level:   "info",
+			Message: "The situation is under control",
+		},
+		{
+			Level:   "warning",
+			Message: "All the smoke might be covering up some problems",
+		},
+		{
+			Level:   "error",
+			Message: "Turns out everything is on fire",
+		},
+	},
+}
+
+var mockDataAllFresh = Data{
+	Entries: []*Entry{},
+	Report:  reportfixture.Report(state.FreshState),
+}
+
+// mockDataFromStates generates mock notification data with specified container states.
+// It includes legacy log entries and static data for testing purposes.
+//
+// TODO: Remove legacyMockData reference when legacy notification types are removed.
+//
+//nolint:godox
+func mockDataFromStates(t *testing.T, states ...state.State) Data {
+	t.Helper()
+
+	return Data{
+		Entries: legacyMockData.Entries,
+		Report:  reportfixture.Report(states...),
+		Title:   "Watchtower updates on Mock",
+		Host:    "Mock",
+	}
+}
+
+// getTemplatedResult generates a templated message for testing.
+// It builds and returns the message string, expecting no errors.
+//
+// TODO: Remove legacy parameter when legacy notification types are removed.
+//
+//nolint:godox
+func getTemplatedResult(t *testing.T, tplString string, legacy bool, data Data) string {
+	t.Helper()
+
+	log := newTestLogger(t)
+
+	tpl, err := New(log, tplString, legacy)
+	require.NoError(t, err)
+	msg, err := tpl.Render(log, data)
+	require.NoError(t, err)
+
+	return msg
+}
 
 // TestRender_CommonTemplateName verifies that naming a built-in template formats
 // messages with it.
@@ -87,18 +176,18 @@ func TestRender_LegacyTemplates(t *testing.T) {
 		t.Run("should format the messages using the default template", func(t *testing.T) {
 			t.Parallel()
 
-			entries := []*notificationEntry{
+			entries := []*Entry{
 				{Message: "foo bar"},
 			}
 
-			s := getTemplatedResult(t, "", true, notificationData{Entries: entries})
+			s := getTemplatedResult(t, "", true, Data{Entries: entries})
 			assert.Equal(t, "foo bar", s)
 		})
 
 		t.Run("should format image usage-check skips without dumping raw fields", func(t *testing.T) {
 			t.Parallel()
 
-			entries := []*notificationEntry{
+			entries := []*Entry{
 				{
 					Message: "Failed to list containers for image usage check, skipping removal",
 					Data: map[string]any{
@@ -109,7 +198,7 @@ func TestRender_LegacyTemplates(t *testing.T) {
 				},
 			}
 
-			s := getTemplatedResult(t, "", true, notificationData{Entries: entries})
+			s := getTemplatedResult(t, "", true, Data{Entries: entries})
 			assert.Equal(t, "Skipped image cleanup: ghcr.io/amir20/dtop:latest (769846626f2f): "+
 				`Get "http://socket-proxy-write:2375/v1.55/containers/json?all=1": terminated signal received`, s)
 			assert.NotContains(t, s, " | ")
@@ -118,7 +207,7 @@ func TestRender_LegacyTemplates(t *testing.T) {
 		t.Run("should format Docker image usage budget messages without dumping raw fields", func(t *testing.T) {
 			t.Parallel()
 
-			entries := []*notificationEntry{
+			entries := []*Entry{
 				{
 					Message: "Docker image usage exceeds configured maximum",
 					Data: map[string]any{
@@ -161,7 +250,7 @@ func TestRender_LegacyTemplates(t *testing.T) {
 				},
 			}
 
-			s := getTemplatedResult(t, "", true, notificationData{Entries: entries})
+			s := getTemplatedResult(t, "", true, Data{Entries: entries})
 			assert.Contains(t, s, "Docker image usage exceeds configured maximum: 10 KB of 10 KB used (2 KB reclaimable, 4 images)")
 			assert.Contains(t, s, "Docker image usage exceeds configured warning threshold: 8 KB of 8 KB used (2 KB reclaimable, 4 images)")
 			assert.Contains(t, s, "Failed to query Docker image disk usage: df unavailable")
@@ -178,14 +267,14 @@ func TestRender_LegacyTemplates(t *testing.T) {
 			t.Parallel()
 
 			tplString := `{{range .}}{{.Level}}: {{.Message}}{{println}}{{end}}`
-			entries := []*notificationEntry{
+			entries := []*Entry{
 				{
 					Level:   "info",
 					Message: "foo bar",
 				},
 			}
 
-			s := getTemplatedResult(t, tplString, true, notificationData{Entries: entries})
+			s := getTemplatedResult(t, tplString, true, Data{Entries: entries})
 			assert.Equal(t, "info: foo bar\n", s)
 		})
 	})
@@ -330,7 +419,7 @@ func TestRender_ReportTemplates(t *testing.T) {
 				t,
 				`{{ range .Report.Updated }}{{ .Name }} {{ .Changelog }}{{ if .Source }} ({{ .Source }}){{ end }} repo={{ .GitRepo }}{{ end }}`,
 				false,
-				notificationData{Report: report},
+				Data{Report: report},
 			)
 			assert.Equal(t, "app https://github.com/org/app/releases (https://github.com/org/app) repo=https://github.com/org/app.git", got)
 		})
@@ -452,7 +541,7 @@ Turns out everything is on fire
 func TestDefaultLegacyGitMessages(t *testing.T) {
 	t.Parallel()
 
-	got := getTemplatedResult(t, "default-legacy", true, notificationData{Entries: []*notificationEntry{
+	got := getTemplatedResult(t, "default-legacy", true, Data{Entries: []*Entry{
 		{
 			Message: "Found new Git revision",
 			Data: map[string]any{
@@ -557,8 +646,8 @@ func TestDefaultLegacyGitSkipAndComposeMessages(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
 
-			got := getTemplatedResult(t, "default-legacy", true, notificationData{
-				Entries: []*notificationEntry{{Message: tc.message, Data: tc.data}},
+			got := getTemplatedResult(t, "default-legacy", true, Data{
+				Entries: []*Entry{{Message: tc.message, Data: tc.data}},
 			})
 			assert.Equal(t, tc.want, strings.TrimSpace(got))
 			assert.NotContains(t, got, "|")

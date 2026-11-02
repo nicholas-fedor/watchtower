@@ -13,6 +13,7 @@ import (
 
 	shoutrrrTypes "github.com/nicholas-fedor/shoutrrr/pkg/types"
 
+	"github.com/nicholas-fedor/watchtower/internal/observability/notify/format"
 	"github.com/nicholas-fedor/watchtower/internal/testutil/logcapture"
 )
 
@@ -36,7 +37,7 @@ func TestProcessSendErrors(t *testing.T) {
 			[]string{"logger://"},
 			allButTrace,
 			true,
-			StaticData{},
+			format.StaticData{},
 			false,
 			time.Duration(0),
 		)
@@ -64,7 +65,7 @@ func TestProcessSendErrors(t *testing.T) {
 			[]string{"logger://"},
 			allButTrace,
 			true,
-			StaticData{},
+			format.StaticData{},
 			false,
 			time.Duration(0),
 		)
@@ -92,7 +93,7 @@ func TestProcessSendErrors(t *testing.T) {
 			[]string{"logger://"},
 			allButTrace,
 			true,
-			StaticData{},
+			format.StaticData{},
 			false,
 			time.Duration(0),
 		)
@@ -120,7 +121,7 @@ func TestProcessSendErrors(t *testing.T) {
 			[]string{"logger://"},
 			allButTrace,
 			true,
-			StaticData{},
+			format.StaticData{},
 			false,
 			time.Duration(0),
 		)
@@ -148,7 +149,7 @@ func TestProcessSendErrors(t *testing.T) {
 			[]string{"logger://"},
 			allButTrace,
 			true,
-			StaticData{},
+			format.StaticData{},
 			false,
 			time.Duration(0),
 		)
@@ -176,7 +177,7 @@ func TestProcessSendErrors(t *testing.T) {
 			[]string{"logger://", "logger://"},
 			allButTrace,
 			true,
-			StaticData{},
+			format.StaticData{},
 			false,
 			time.Duration(0),
 		)
@@ -235,7 +236,7 @@ func TestProcessSendErrors_RedactsURLs(t *testing.T) {
 			t.Parallel()
 
 			log, logBuffer := newBufferLogger()
-			notifier := createTestNotifier(log, []string{"logger://"}, allButTrace, true, StaticData{}, false, 0)
+			notifier := createTestNotifier(log, []string{"logger://"}, allButTrace, true, format.StaticData{}, false, 0)
 			notifier.Urls = []string{tt.url}
 
 			processSendErrors(notifier, []error{tt.err})
@@ -318,7 +319,7 @@ func TestGracefulTerminationNotificationGoroutine(t *testing.T) {
 			[]string{"logger://"},
 			allButTrace,
 			true,
-			StaticData{},
+			format.StaticData{},
 			true, // stdout
 			time.Duration(0),
 		)
@@ -393,7 +394,7 @@ func TestContextCancellationIndependentOfStopChannel(t *testing.T) {
 			[]string{"logger://"},
 			allButTrace,
 			true,
-			StaticData{},
+			format.StaticData{},
 			true, // stdout
 			time.Duration(0),
 		)
@@ -499,7 +500,7 @@ func TestSendEntries_EmptyMessageLogsSkipAtDebug(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 
-			tpl, err := newMessageTemplate(newTestLogger(t), "{{- /* renders nothing */ -}}", false)
+			tpl, err := format.New(newTestLogger(t), "{{- /* renders nothing */ -}}", false)
 			require.NoError(t, err)
 
 			log, buf := newBufferLogger()

@@ -9,6 +9,8 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"github.com/nicholas-fedor/watchtower/internal/observability/notify/format"
+	"github.com/nicholas-fedor/watchtower/internal/testutil/reportfixture"
 	"github.com/nicholas-fedor/watchtower/internal/update/state"
 	"github.com/nicholas-fedor/watchtower/pkg/types"
 )
@@ -31,7 +33,7 @@ func TestSendNotification_Batching(t *testing.T) {
 				[]string{"logger://"},
 				allButTrace,
 				true,
-				StaticData{},
+				format.StaticData{},
 				false,
 				time.Duration(0),
 			)
@@ -54,7 +56,7 @@ func TestSendNotification_Batching(t *testing.T) {
 				[]string{"logger://"},
 				allButTrace,
 				true,
-				StaticData{},
+				format.StaticData{},
 				false,
 				time.Duration(0),
 			)
@@ -89,12 +91,12 @@ func TestShouldSendNotification(t *testing.T) {
 				[]string{"logger://"},
 				zerolog.ErrorLevel,
 				false,
-				StaticData{},
+				format.StaticData{},
 				false,
 				time.Duration(0),
 			)
 
-			mockReport := newProgressReport(state.FailedState)
+			mockReport := reportfixture.Report(state.FailedState)
 			result := shoutrrr.ShouldSendNotification(mockReport)
 			assert.True(t, result)
 		})
@@ -107,12 +109,12 @@ func TestShouldSendNotification(t *testing.T) {
 				[]string{"logger://"},
 				zerolog.ErrorLevel,
 				false,
-				StaticData{},
+				format.StaticData{},
 				false,
 				time.Duration(0),
 			)
 
-			mockReport := newProgressReport(state.FreshState)
+			mockReport := reportfixture.Report(state.FreshState)
 			result := shoutrrr.ShouldSendNotification(mockReport)
 			assert.False(t, result)
 		})
@@ -129,12 +131,12 @@ func TestShouldSendNotification(t *testing.T) {
 				[]string{"logger://"},
 				zerolog.WarnLevel,
 				false,
-				StaticData{},
+				format.StaticData{},
 				false,
 				time.Duration(0),
 			)
 
-			mockReport := newProgressReport(state.FreshState)
+			mockReport := reportfixture.Report(state.FreshState)
 			result := shoutrrr.ShouldSendNotification(mockReport)
 			assert.True(t, result)
 		})
@@ -151,12 +153,12 @@ func TestShouldSendNotification(t *testing.T) {
 				[]string{"logger://"},
 				zerolog.InfoLevel,
 				false,
-				StaticData{},
+				format.StaticData{},
 				false,
 				time.Duration(0),
 			)
 
-			mockReport := newProgressReport(state.FreshState)
+			mockReport := reportfixture.Report(state.FreshState)
 			result := shoutrrr.ShouldSendNotification(mockReport)
 			assert.True(t, result)
 		})
@@ -173,12 +175,12 @@ func TestShouldSendNotification(t *testing.T) {
 				[]string{"logger://"},
 				zerolog.DebugLevel,
 				false,
-				StaticData{},
+				format.StaticData{},
 				false,
 				time.Duration(0),
 			)
 
-			mockReport := newProgressReport(state.FreshState)
+			mockReport := reportfixture.Report(state.FreshState)
 			result := shoutrrr.ShouldSendNotification(mockReport)
 			assert.True(t, result)
 		})
@@ -195,12 +197,12 @@ func TestShouldSendNotification(t *testing.T) {
 				[]string{"logger://"},
 				zerolog.TraceLevel,
 				false,
-				StaticData{},
+				format.StaticData{},
 				false,
 				time.Duration(0),
 			)
 
-			mockReport := newProgressReport(state.FreshState)
+			mockReport := reportfixture.Report(state.FreshState)
 			result := shoutrrr.ShouldSendNotification(mockReport)
 			assert.True(t, result)
 		})
@@ -217,7 +219,7 @@ func TestShouldSendNotification(t *testing.T) {
 				[]string{"logger://"},
 				zerolog.ErrorLevel,
 				false,
-				StaticData{},
+				format.StaticData{},
 				false,
 				time.Duration(0),
 			)
@@ -237,12 +239,12 @@ func TestSendNotification_SingleFocusKeepsBatchingActive(t *testing.T) {
 		[]string{"logger://"},
 		zerolog.InfoLevel,
 		true,
-		StaticData{},
+		format.StaticData{},
 		false,
 		0,
 	)
 
-	full := newProgressReport(state.UpdatedState)
+	full := reportfixture.Report(state.UpdatedState)
 	require.NotEmpty(t, full.Updated())
 
 	updated := full.Updated()[0]
@@ -252,7 +254,7 @@ func TestSendNotification_SingleFocusKeepsBatchingActive(t *testing.T) {
 
 	n.StartNotification(true)
 	n.entriesMutex.Lock()
-	n.entries = []*notificationEntry{
+	n.entries = []*format.Entry{
 		{
 			Message: "Found new image",
 			Data:    map[string]any{"container": updated.Name()},

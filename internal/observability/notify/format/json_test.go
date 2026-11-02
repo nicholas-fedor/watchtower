@@ -1,4 +1,4 @@
-package notifications
+package format
 
 import (
 	"encoding/json"
@@ -258,8 +258,8 @@ func TestJSONTemplate(t *testing.T) {
 				t.Parallel()
 
 				// Test with empty report
-				data := notificationData{
-					Entries: []*notificationEntry{},
+				data := Data{
+					Entries: []*Entry{},
 					Report:  nil,
 					Title:   "Test Title",
 					Host:    "Test Host",
@@ -346,7 +346,7 @@ func TestJSONGitAndOCIReportFields(t *testing.T) {
 		status := updatedAppStatus()
 		status.SetGitMetadata(provenance.ReportMeta{GitRepo: "https://github.com/org/app.git", GitRef: "main"})
 
-		raw, err := json.Marshal(notificationData{
+		raw, err := json.Marshal(Data{
 			Title: "update", Host: "box",
 			Report: &state.SingleContainerReport{
 				UpdatedReports: []types.ContainerReport{status},

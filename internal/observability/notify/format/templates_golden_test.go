@@ -1,4 +1,4 @@
-package notifications
+package format
 
 import (
 	"errors"
@@ -14,6 +14,7 @@ import (
 	"github.com/nicholas-fedor/watchtower/internal/container/provenance"
 	"github.com/nicholas-fedor/watchtower/internal/observability/logging"
 	"github.com/nicholas-fedor/watchtower/internal/testutil/golden"
+	"github.com/nicholas-fedor/watchtower/internal/testutil/reportfixture"
 	"github.com/nicholas-fedor/watchtower/internal/update/state"
 	"github.com/nicholas-fedor/watchtower/pkg/types"
 )
@@ -266,13 +267,13 @@ func goldenEntryData(message string) map[string]any {
 
 // goldenEntries returns one log entry per specially formatted message, plus an
 // unrecognized message with and without data, to cover the template fallbacks.
-func goldenEntries() []*notificationEntry {
+func goldenEntries() []*Entry {
 	levels := []string{"info", "warning", "error", "debug"}
 
-	entries := make([]*notificationEntry, 0, len(legacyTemplateMessages)+2)
+	entries := make([]*Entry, 0, len(legacyTemplateMessages)+2)
 
 	for i, message := range legacyTemplateMessages {
-		entries = append(entries, &notificationEntry{
+		entries = append(entries, &Entry{
 			Message: message,
 			Data:    goldenEntryData(message),
 			Time:    goldenEntryTime.Add(time.Duration(i) * time.Second),
@@ -281,13 +282,13 @@ func goldenEntries() []*notificationEntry {
 	}
 
 	entries = append(entries,
-		&notificationEntry{
+		&Entry{
 			Message: "Unrecognized message with fields",
 			Data:    map[string]any{"alpha": "one", "beta": 2},
 			Time:    goldenEntryTime.Add(time.Hour),
 			Level:   "info",
 		},
-		&notificationEntry{
+		&Entry{
 			Message: "Unrecognized message without fields",
 			Time:    goldenEntryTime.Add(2 * time.Hour),
 			Level:   "warning",
@@ -305,7 +306,7 @@ func goldenFullReport() types.Report {
 	progress := state.Progress{}
 	failures := map[types.ContainerID]error{}
 
-	updated, newImage := newProgressContainer(0, updatedIDPrefix, "updt%d")
+	updated, newImage := reportfixture.Container(0, state.UpdatedState)
 	progress.AddScanned(log, updated, newImage, types.UpdateParams{})
 	progress.MarkForUpdate(log, updated.ID())
 	progress[updated.ID()].SetGitMetadata(provenance.ReportMeta{
@@ -321,21 +322,21 @@ func goldenFullReport() types.Report {
 		LatestRevision:  "2222222222222222222222222222222222222222",
 	})
 
-	secondUpdated, secondImage := newProgressContainer(1, updatedIDPrefix, "updt%d")
+	secondUpdated, secondImage := reportfixture.Container(1, state.UpdatedState)
 	progress.AddScanned(log, secondUpdated, secondImage, types.UpdateParams{})
 	progress.MarkForUpdate(log, secondUpdated.ID())
 
-	fresh, _ := newProgressContainer(0, freshIDPrefix, "frsh%d")
+	fresh, _ := reportfixture.Container(0, state.FreshState)
 	progress.AddScanned(log, fresh, fresh.ImageID(), types.UpdateParams{})
 
-	failed, failedImage := newProgressContainer(0, failedIDPrefix, "fail%d")
+	failed, failedImage := reportfixture.Container(0, state.FailedState)
 	progress.AddScanned(log, failed, failedImage, types.UpdateParams{})
 	failures[failed.ID()] = errGoldenFailure
 
-	skipped, _ := newProgressContainer(0, skippedIDPrefix, "skip%d")
+	skipped, _ := reportfixture.Container(0, state.SkippedState)
 	progress.AddSkipped(log, skipped, errGoldenSkipped, types.UpdateParams{})
 
-	restarted, _ := newProgressContainer(0, restartedIDPrefix, "rstr%d")
+	restarted, _ := reportfixture.Container(0, state.RestartedState)
 	progress.AddScanned(log, restarted, restarted.ImageID(), types.UpdateParams{})
 	progress.MarkRestarted(log, restarted.ID())
 
@@ -345,14 +346,14 @@ func goldenFullReport() types.Report {
 }
 
 // goldenFixtures returns the notification data each built-in template is rendered against.
-func goldenFixtures() map[string]notificationData {
+func goldenFixtures() map[string]Data {
 	nop := zerolog.Nop()
 	staticData := StaticData{
-		Title: getTitle(&nop, goldenHost, ""),
+		Title: "Watchtower updates on " + goldenHost,
 		Host:  goldenHost,
 	}
 
-	return map[string]notificationData{
+	return map[string]Data{
 		"full": {
 			StaticData: staticData,
 			Entries:    goldenEntries(),
@@ -360,7 +361,7 @@ func goldenFixtures() map[string]notificationData {
 		},
 		"empty": {
 			StaticData: staticData,
-			Entries:    []*notificationEntry{},
+			Entries:    []*Entry{},
 			Report:     state.Progress{}.Report(&nop),
 		},
 		"nil-report": {
@@ -384,12 +385,12 @@ func TestBuiltInTemplateOutput(t *testing.T) {
 	for _, templateName := range slices.Sorted(maps.Keys(commonTemplates)) {
 		legacy := templateName == "default-legacy"
 
-		tpl, err := newMessageTemplate(&nop, templateName, legacy)
+		tpl, err := New(&nop, templateName, legacy)
 		require.NoError(t, err, "template %q", templateName)
 
 		for _, fixtureName := range slices.Sorted(maps.Keys(fixtures)) {
 			t.Run(templateName+"/"+fixtureName, func(t *testing.T) {
-				output, err := tpl.render(&nop, fixtures[fixtureName])
+				output, err := tpl.Render(&nop, fixtures[fixtureName])
 				if err != nil {
 					output = "error: " + err.Error()
 				}

@@ -160,7 +160,7 @@ task test:update-golden
 ```
 
 The template preview module in `tools/tplprev` cannot import Watchtower, so it keeps a generated copy of the built-in notification templates, along with generated lists of the container report methods templates can call and the container keys in the JSON output.
-A test fails when these copies differ from `pkg/notifications`, and the preview module's own tests check its report type and JSON output against the lists.
+A test fails when these copies differ from the originals in `internal/observability/notify/format`, and the preview module's own tests check its report type and JSON output against the lists.
 After changing a built-in template, the container report, or the JSON output, regenerate the copies with `task tplprev:gen` (or `task test:update-golden`), update the preview module to match, and commit both.
 
 ## Building

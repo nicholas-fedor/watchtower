@@ -1,4 +1,4 @@
-package notifications
+package format
 
 // commonTemplates defines a map of predefined notification templates for different output formats.
 // Each template is a Go template string that formats container update information.

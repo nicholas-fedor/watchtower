@@ -14,6 +14,7 @@ import (
 	shoutrrrTypes "github.com/nicholas-fedor/shoutrrr/pkg/types"
 
 	"github.com/nicholas-fedor/watchtower/internal/container/redact"
+	"github.com/nicholas-fedor/watchtower/internal/observability/notify/format"
 )
 
 // shoutrrrType is the identifier for Shoutrrr notifications.
@@ -46,15 +47,15 @@ type router interface {
 type shoutrrrTypeNotifier struct {
 	Urls         []string              // Notification service URLs.
 	Router       router                // Router for sending messages.
-	entries      []*notificationEntry  // Queued log entries.
+	entries      []*format.Entry       // Queued log entries.
 	entriesMutex sync.RWMutex          // Mutex for thread-safe access to entries.
 	logLevel     zerolog.Level         // Minimum log level for notifications.
-	template     *messageTemplate      // Template for message formatting.
+	template     *format.Template      // Template for message formatting.
 	messages     chan string           // Channel for message queuing.
 	done         chan struct{}         // Signal for send completion.
 	stop         chan struct{}         // Channel for stopping the notifier.
 	params       *shoutrrrTypes.Params // Notification parameters.
-	data         StaticData            // Static notification data.
+	data         format.StaticData     // Static notification data.
 	//nolint:containedctx
 	ctx    context.Context    // Context for cancellation.
 	cancel context.CancelFunc // Cancel function for the context.
@@ -167,7 +168,7 @@ func createNotifier(
 	level zerolog.Level,
 	tplString string,
 	legacy bool,
-	data StaticData,
+	data format.StaticData,
 	stdout bool,
 	delay time.Duration,
 ) *shoutrrrTypeNotifier {
@@ -176,12 +177,12 @@ func createNotifier(
 	localLog := &local
 
 	// Parse or fallback to default template.
-	tpl, err := newMessageTemplate(localLog, tplString, legacy)
+	tpl, err := format.New(localLog, tplString, legacy)
 	if err != nil {
 		localLog.Error().Err(err).
 			Msg("Could not use configured notification template, falling back to default")
 
-		tpl = defaultMessageTemplate(legacy)
+		tpl = format.Default(legacy)
 	}
 
 	// Set logger based on stdout flag.
@@ -222,15 +223,15 @@ func createNotifier(
 		stop: make(
 			chan struct{},
 		), // Channel for stopping the notifier.
-		logLevel: level,                                                 // Minimum log level for notifications.
-		template: tpl,                                                   // Template for message formatting.
-		data:     data,                                                  // Static notification data.
-		params:   params,                                                // Notification parameters.
-		ctx:      ctx,                                                   // Context for cancellation.
-		cancel:   cancel,                                                // Cancel function for the context.
-		delay:    delay,                                                 // Delay between sends.
-		entries:  make([]*notificationEntry, 0, initialEntriesCapacity), // Queued log entries.
-		localLog: localLog,                                              // Loop-safe internal logger.
+		logLevel: level,                                            // Minimum log level for notifications.
+		template: tpl,                                              // Template for message formatting.
+		data:     data,                                             // Static notification data.
+		params:   params,                                           // Notification parameters.
+		ctx:      ctx,                                              // Context for cancellation.
+		cancel:   cancel,                                           // Cancel function for the context.
+		delay:    delay,                                            // Delay between sends.
+		entries:  make([]*format.Entry, 0, initialEntriesCapacity), // Queued log entries.
+		localLog: localLog,                                         // Loop-safe internal logger.
 	}
 }
 

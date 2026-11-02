@@ -6,8 +6,6 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
-	"strconv"
-	"strings"
 	"sync/atomic"
 	"testing"
 	"testing/synctest"
@@ -17,15 +15,12 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	dockerContainer "github.com/moby/moby/api/types/container"
-	dockerImage "github.com/moby/moby/api/types/image"
-	dockerNetwork "github.com/moby/moby/api/types/network"
 	shoutrrrTypes "github.com/nicholas-fedor/shoutrrr/pkg/types"
 
-	"github.com/nicholas-fedor/watchtower/internal/container"
+	"github.com/nicholas-fedor/watchtower/internal/observability/notify/format"
 	"github.com/nicholas-fedor/watchtower/internal/testutil/logcapture"
+	"github.com/nicholas-fedor/watchtower/internal/testutil/reportfixture"
 	"github.com/nicholas-fedor/watchtower/internal/update/state"
-	"github.com/nicholas-fedor/watchtower/pkg/types"
 )
 
 var allButTrace = zerolog.DebugLevel
@@ -70,192 +65,11 @@ func createTestNotifier(
 	urls []string,
 	level zerolog.Level,
 	legacy bool,
-	data StaticData,
+	data format.StaticData,
 	stdout bool,
 	delay time.Duration,
 ) *shoutrrrTypeNotifier {
 	return createNotifier(log, urls, level, "", legacy, data, stdout, delay)
-}
-
-// TODO: Remove legacyMockData when legacy notification types are removed.
-//
-//nolint:godox
-var legacyMockData = notificationData{
-	Entries: []*notificationEntry{
-		{
-			Level:   "info",
-			Message: "foo Bar",
-		},
-	},
-}
-
-var mockDataMultipleEntries = notificationData{
-	Entries: []*notificationEntry{
-		{
-			Level:   "info",
-			Message: "The situation is under control",
-		},
-		{
-			Level:   "warning",
-			Message: "All the smoke might be covering up some problems",
-		},
-		{
-			Level:   "error",
-			Message: "Turns out everything is on fire",
-		},
-	},
-}
-
-var mockDataAllFresh = notificationData{
-	Entries: []*notificationEntry{},
-	Report:  newProgressReport(state.FreshState),
-}
-
-// mockDataFromStates generates mock notification data with specified container states.
-// It includes legacy log entries and static data for testing purposes.
-//
-// TODO: Remove legacyMockData reference when legacy notification types are removed.
-//
-//nolint:godox
-func mockDataFromStates(t *testing.T, states ...state.State) notificationData {
-	t.Helper()
-
-	hostname := "Mock"
-	prefix := ""
-
-	return notificationData{
-		Entries: legacyMockData.Entries,
-		Report:  newProgressReport(states...),
-		Title:   getTitle(newTestLogger(t), hostname, prefix),
-		Host:    hostname,
-	}
-}
-
-// Error values recorded on the skipped and failed containers of a progress report.
-var (
-	// errReportSkipped is the reason recorded for a skipped container.
-	errReportSkipped = errors.New("unpossible")
-	// errReportFailed is the error recorded for a failed container.
-	errReportFailed = errors.New("accidentally the whole container")
-)
-
-// Container ID prefixes that keep the containers of each state in a progress
-// report distinct, such as "c7941..." for the first skipped container.
-const (
-	// updatedIDPrefix prefixes updated containers.
-	updatedIDPrefix = 11
-	// failedIDPrefix prefixes failed containers.
-	failedIDPrefix = 21
-	// freshIDPrefix prefixes fresh containers.
-	freshIDPrefix = 31
-	// skippedIDPrefix prefixes skipped containers.
-	skippedIDPrefix = 41
-	// restartedIDPrefix prefixes restarted containers.
-	restartedIDPrefix = 51
-)
-
-// progressIDLength is the length of a full container or image ID.
-const progressIDLength = 64
-
-// maxContainersPerState is the number of containers of one state that keep
-// unique IDs. The ID prefixes of the states are ten apart, so the eleventh
-// updated container would reuse the first failed container's ID.
-const maxContainersPerState = 10
-
-// newProgressReport builds a report with one container for each given state,
-// numbering repeated states so every container has a unique ID and name.
-//
-// Parameters:
-//   - states: Outcome of each container, in order.
-//
-// Returns:
-//   - types.Report: Report built through state.Progress.
-func newProgressReport(states ...state.State) types.Report {
-	log := new(zerolog.Nop())
-	// Count each state's containers so their IDs and names stay unique.
-	stateNums := make(map[state.State]int)
-	progress := state.Progress{}
-	failed := make(map[types.ContainerID]error)
-
-	for _, outcome := range states {
-		index := stateNums[outcome]
-
-		switch outcome {
-		case state.SkippedState:
-			c, _ := newProgressContainer(index, skippedIDPrefix, "skip%d")
-			progress.AddSkipped(log, c, errReportSkipped, types.UpdateParams{})
-		case state.FreshState:
-			c, _ := newProgressContainer(index, freshIDPrefix, "frsh%d")
-			progress.AddScanned(log, c, c.ImageID(), types.UpdateParams{})
-		case state.UpdatedState:
-			c, newImage := newProgressContainer(index, updatedIDPrefix, "updt%d")
-			progress.AddScanned(log, c, newImage, types.UpdateParams{})
-			progress.MarkForUpdate(log, c.ID())
-		case state.FailedState:
-			c, newImage := newProgressContainer(index, failedIDPrefix, "fail%d")
-			progress.AddScanned(log, c, newImage, types.UpdateParams{})
-
-			failed[c.ID()] = errReportFailed
-		case state.RestartedState:
-			c, _ := newProgressContainer(index, restartedIDPrefix, "rstr%d")
-			progress.AddScanned(log, c, c.ImageID(), types.UpdateParams{})
-			progress.MarkRestarted(log, c.ID())
-		case state.UnknownState, state.ScannedState, state.StaleState:
-			// Reports never end in these intermediate states.
-			continue
-		}
-
-		stateNums[outcome] = index + 1
-	}
-
-	progress.UpdateFailed(log, failed)
-
-	return progress.Report(log)
-}
-
-// newProgressContainer builds a running container for a progress report, with
-// an ID and image IDs derived from idPrefix and index, and a name from
-// nameFormat and index. It panics when index is maxContainersPerState or more.
-//
-// Parameters:
-//   - index: Zero-based position of the container among its state's containers.
-//   - idPrefix: Digits that start the container's ID after "c79".
-//   - nameFormat: Name format with one %d verb for the one-based position.
-//
-// Returns:
-//   - types.Container: Container running image mock/<name>:latest.
-//   - types.ImageID: ID of the newer image the container can move to.
-func newProgressContainer(index, idPrefix int, nameFormat string) (types.Container, types.ImageID) {
-	if index >= maxContainersPerState {
-		panic(fmt.Sprintf("newProgressContainer: index %d would reuse another state's container ID", index))
-	}
-
-	indexStr := strconv.Itoa(idPrefix + index)
-	// Pad the ID with zeros to full length, after the "c79" prefix.
-	idSuffix := indexStr + strings.Repeat("0", progressIDLength-3-len(indexStr))
-	name := fmt.Sprintf(nameFormat, index+1)
-	oldImageID := "01d" + idSuffix
-	imageName := fmt.Sprintf("mock/%s:latest", name)
-
-	inspect := dockerContainer.InspectResponse{
-		ID:      "c79" + idSuffix,
-		Image:   oldImageID,
-		Name:    name,
-		State:   &dockerContainer.State{Running: true},
-		Created: time.Now().Format(time.RFC3339Nano),
-		HostConfig: &dockerContainer.HostConfig{
-			PortBindings: dockerNetwork.PortMap{},
-		},
-		Config: &dockerContainer.Config{Image: imageName},
-	}
-	imageInfo := dockerImage.InspectResponse{
-		ID: oldImageID,
-		RepoDigests: []string{
-			fmt.Sprintf("%s@sha256:%s", oldImageID, strings.ReplaceAll(oldImageID, ":", "_")),
-		},
-	}
-
-	return container.NewContainer(nil, &inspect, &imageInfo), types.ImageID("d0a" + idSuffix)
 }
 
 // mockRouter implements the router interface for testing error scenarios.
@@ -304,7 +118,7 @@ func sendNotificationsWithBlockingRouter(t *testing.T) (*shoutrrrTypeNotifier, *
 		ctx:    ctx,
 	}
 
-	tpl, err := newMessageTemplate(newTestLogger(t), "", legacy)
+	tpl, err := format.New(newTestLogger(t), "", legacy)
 	if err != nil {
 		cancel()
 
@@ -322,7 +136,7 @@ func sendNotificationsWithBlockingRouter(t *testing.T) (*shoutrrrTypeNotifier, *
 		delay:    time.Duration(0),
 	}
 
-	entry := &notificationEntry{
+	entry := &format.Entry{
 		Message: "foo bar",
 	}
 
@@ -337,25 +151,6 @@ func sendNotificationsWithBlockingRouter(t *testing.T) (*shoutrrrTypeNotifier, *
 	shoutrrr.SendNotification(nil)
 
 	return shoutrrr, router, nil
-}
-
-// getTemplatedResult generates a templated message for testing.
-// It builds and returns the message string, expecting no errors.
-//
-// TODO: Remove legacy parameter when legacy notification types are removed.
-//
-//nolint:godox
-func getTemplatedResult(t *testing.T, tplString string, legacy bool, data notificationData) string {
-	t.Helper()
-
-	log := newTestLogger(t)
-
-	tpl, err := newMessageTemplate(log, tplString, legacy)
-	require.NoError(t, err)
-	msg, err := tpl.render(log, data)
-	require.NoError(t, err)
-
-	return msg
 }
 
 // TestRegisterHook verifies that RegisterHook starts the notifier
@@ -375,7 +170,7 @@ func TestRegisterHook(t *testing.T) {
 				[]string{},
 				level,
 				true,
-				StaticData{},
+				format.StaticData{},
 				false,
 				time.Second,
 			)
@@ -401,7 +196,7 @@ func TestRegisterHook(t *testing.T) {
 				[]string{},
 				level,
 				true,
-				StaticData{},
+				format.StaticData{},
 				false,
 				time.Second,
 			)
@@ -424,7 +219,7 @@ func TestCreateNotifier_EmptyTitle(t *testing.T) {
 	t.Run("should not have set the title param", func(t *testing.T) {
 		t.Parallel()
 
-		shoutrrr := createTestNotifier(newTestLogger(t), []string{"logger://"}, allButTrace, true, StaticData{
+		shoutrrr := createTestNotifier(newTestLogger(t), []string{"logger://"}, allButTrace, true, format.StaticData{
 			Host:  "test.host",
 			Title: "",
 		}, false, time.Second)
@@ -449,7 +244,7 @@ func TestClose(t *testing.T) {
 				[]string{"logger://"},
 				allButTrace,
 				true,
-				StaticData{},
+				format.StaticData{},
 				false,
 				time.Duration(0),
 			)
@@ -477,7 +272,7 @@ func TestClose(t *testing.T) {
 				[]string{"logger://"},
 				allButTrace,
 				true,
-				StaticData{},
+				format.StaticData{},
 				false,
 				time.Duration(0),
 			)
@@ -501,7 +296,7 @@ func TestClose(t *testing.T) {
 				[]string{"logger://"},
 				allButTrace,
 				true,
-				StaticData{},
+				format.StaticData{},
 				false,
 				time.Duration(0),
 			)
@@ -516,7 +311,7 @@ func TestClose(t *testing.T) {
 			shoutrrr.SendNotification(nil)
 
 			// Fire should still work (but may not send if channel is closed)
-			entry := &notificationEntry{Message: "test"}
+			entry := &format.Entry{Message: "test"}
 			shoutrrr.Run(nil, zerolog.InfoLevel, entry.Message)
 
 			err := error(nil)
@@ -537,7 +332,7 @@ func TestClose(t *testing.T) {
 				[]string{"logger://"},
 				allButTrace,
 				true,
-				StaticData{},
+				format.StaticData{},
 				false,
 				time.Duration(0),
 			)
@@ -673,7 +468,7 @@ func TestGracePeriodAllowsInFlightMessages(t *testing.T) {
 			ctx:        ctx,
 		}
 
-		tpl, err := newMessageTemplate(newTestLogger(t), "", true)
+		tpl, err := format.New(newTestLogger(t), "", true)
 		if err != nil {
 			cancel()
 			t.Fatal(err)
@@ -743,7 +538,7 @@ func TestCloseWithNoGoroutine(t *testing.T) {
 		[]string{"logger://"},
 		allButTrace,
 		true,
-		StaticData{},
+		format.StaticData{},
 		false,
 		time.Duration(0),
 	)
@@ -783,7 +578,7 @@ func TestCreateNotifier_FatalsOnBadURL(t *testing.T) {
 			zerolog.InfoLevel,
 			"",
 			true,
-			StaticData{},
+			format.StaticData{},
 			false,
 			0,
 		)
@@ -819,7 +614,7 @@ func TestCreateNotifier_AcceptsGotifyURLFromFileExpansion(t *testing.T) {
 		[]string{"gotify://gotify.example.com/Atoken123456789"},
 		zerolog.InfoLevel,
 		true,
-		StaticData{},
+		format.StaticData{},
 		false,
 		0,
 	)
@@ -842,20 +637,33 @@ func (c *countingRouter) Send(_ string, _ *shoutrrrTypes.Params) []error {
 // template, so notifications render as with no template set instead of
 // failing when the first notification is sent.
 func TestCreateNotifier_InvalidTemplateFallsBackToDefault(t *testing.T) {
-	data := goldenFixtures()["full"]
+	data := format.Data{
+		Host: "test.host", Title: "Watchtower updates on test.host",
+		Entries: []*format.Entry{
+			{Level: "info", Message: "Found new image", Data: map[string]any{"image": "mock/updt1:latest"}},
+			{Level: "warning", Message: "Could not check container for updates"},
+		},
+		Report: reportfixture.Report(
+			state.UpdatedState,
+			state.FailedState,
+			state.SkippedState,
+			state.FreshState,
+			state.RestartedState,
+		),
+	}
 
 	for _, legacy := range []bool{true, false} {
 		t.Run(fmt.Sprintf("legacy=%t", legacy), func(t *testing.T) {
-			invalid := createNotifier(newTestLogger(t), []string{}, zerolog.TraceLevel, "{{ .Broken", legacy, StaticData{}, false, 0)
+			invalid := createNotifier(newTestLogger(t), []string{}, zerolog.TraceLevel, "{{ .Broken", legacy, format.StaticData{}, false, 0)
 			t.Cleanup(invalid.Close)
 
-			fallback := createNotifier(newTestLogger(t), []string{}, zerolog.TraceLevel, "", legacy, StaticData{}, false, 0)
+			fallback := createNotifier(newTestLogger(t), []string{}, zerolog.TraceLevel, "", legacy, format.StaticData{}, false, 0)
 			t.Cleanup(fallback.Close)
 
-			want, err := fallback.template.render(fallback.ll(), data)
+			want, err := fallback.template.Render(fallback.ll(), data)
 			require.NoError(t, err)
 
-			got, err := invalid.template.render(invalid.ll(), data)
+			got, err := invalid.template.Render(invalid.ll(), data)
 			require.NoError(t, err)
 			assert.Equal(t, want, got)
 		})

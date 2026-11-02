@@ -16,6 +16,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"github.com/nicholas-fedor/watchtower/internal/observability/notify/format"
 	"github.com/nicholas-fedor/watchtower/internal/settings"
 	notifyConfig "github.com/nicholas-fedor/watchtower/internal/settings/config/notify"
 	"github.com/nicholas-fedor/watchtower/internal/testutil/logcapture"
@@ -716,8 +717,8 @@ func loadNotify(t *testing.T, args []string) notifyConfig.Notify {
 //   - args: CLI flags to parse.
 //
 // Returns:
-//   - StaticData: Host and title for notification templates.
-func templateDataFromFlags(t *testing.T, args []string) StaticData {
+//   - format.StaticData: Host and title for notification templates.
+func templateDataFromFlags(t *testing.T, args []string) format.StaticData {
 	t.Helper()
 
 	cfg := loadNotify(t, args)

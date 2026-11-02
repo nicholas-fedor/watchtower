@@ -6,27 +6,32 @@ import (
 	"slices"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/require"
 
+	"github.com/nicholas-fedor/watchtower/internal/observability/notify/format"
 	"github.com/nicholas-fedor/watchtower/internal/testutil/golden"
 	"github.com/nicholas-fedor/watchtower/internal/update/state"
 	"github.com/nicholas-fedor/watchtower/pkg/types"
 	mockTypes "github.com/nicholas-fedor/watchtower/pkg/types/mocks"
 )
 
+// batchEntryTime is the fixed timestamp of every batched log entry.
+var batchEntryTime = time.Date(2026, time.October, 7, 12, 0, 0, 0, time.UTC)
+
 // batchEntries returns the entries one update session queues when two
 // containers, web1 and web2, share an image and a third, db, uses its own.
 // Each entry carries the fields its emitting code attaches.
-func batchEntries() []*notificationEntry {
-	entry := func(message string, data map[string]any) *notificationEntry {
-		return &notificationEntry{Message: message, Data: data, Time: goldenEntryTime, Level: "info"}
+func batchEntries() []*format.Entry {
+	entry := func(message string, data map[string]any) *format.Entry {
+		return &format.Entry{Message: message, Data: data, Time: batchEntryTime, Level: "info"}
 	}
 
 	sharedImage := map[string]any{"image": "org/web:1.0", "new_id": "aaa111111111"}
 
-	return []*notificationEntry{
+	return []*format.Entry{
 		entry("Only checking containers in scope", map[string]any{"scope": "production"}),
 		entry("Image is within cooldown period - not eligible for update",
 			map[string]any{"image": "org/web:1.0", "cooldown": "1d", "eligible_in": "2h", "eligible_at": "2026-10-07T14:00:00Z"}),
@@ -61,10 +66,10 @@ func withContainer(data map[string]any, container string) map[string]any {
 // newBatchingNotifier returns a legacy-template notifier whose worker never
 // starts, so every message it renders stays in its message channel, with
 // entries already queued as during a batch.
-func newBatchingNotifier(t *testing.T, entries []*notificationEntry) *shoutrrrTypeNotifier {
+func newBatchingNotifier(t *testing.T, entries []*format.Entry) *shoutrrrTypeNotifier {
 	t.Helper()
 
-	notifier := createTestNotifier(newTestLogger(t), []string{}, zerolog.TraceLevel, true, StaticData{}, false, 0)
+	notifier := createTestNotifier(newTestLogger(t), []string{}, zerolog.TraceLevel, true, format.StaticData{}, false, 0)
 	t.Cleanup(notifier.Close)
 
 	notifier.entries = entries

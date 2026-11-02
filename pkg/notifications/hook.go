@@ -2,6 +2,8 @@ package notifications
 
 import (
 	"github.com/rs/zerolog"
+
+	"github.com/nicholas-fedor/watchtower/internal/observability/notify/format"
 )
 
 // Run implements the [zerolog.Hook] interface for *shoutrrrTypeNotifier.
@@ -60,11 +62,11 @@ func (n *shoutrrrTypeNotifier) Run(event *zerolog.Event, level zerolog.Level, me
 	// notify is an internal control field, not template data.
 	delete(fields, "notify")
 
-	entry := &notificationEntry{
+	entry := &format.Entry{
 		Message: message,
 		Data:    fields,
 		Time:    timestamp,
-		Level:   levelToString(level),
+		Level:   format.LevelString(level),
 	}
 
 	// Hold the mutex only for queue mutation. Log and send outside the lock.
@@ -87,7 +89,7 @@ func (n *shoutrrrTypeNotifier) Run(event *zerolog.Event, level zerolog.Level, me
 			Str("message", entry.Message).
 			Str("entry_level", entry.Level).
 			Int("entries_count", entriesCount).
-			Bool("legacy_template", n.template.legacy).
+			Bool("legacy_template", n.template.Legacy()).
 			Msg("Log entry queued for batching")
 
 		return
@@ -97,7 +99,7 @@ func (n *shoutrrrTypeNotifier) Run(event *zerolog.Event, level zerolog.Level, me
 	n.ll().Debug().
 		Str("message", entry.Message).
 		Str("entry_level", entry.Level).
-		Bool("legacy_template", n.template.legacy).
+		Bool("legacy_template", n.template.Legacy()).
 		Msg("Log entry sent immediately (not batching)")
-	n.sendEntries([]*notificationEntry{entry}, nil)
+	n.sendEntries([]*format.Entry{entry}, nil)
 }
