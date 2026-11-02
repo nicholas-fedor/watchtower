@@ -3,6 +3,7 @@ package notifications
 import (
 	"github.com/rs/zerolog"
 
+	"github.com/nicholas-fedor/watchtower/internal/observability/notify/format"
 	"github.com/nicholas-fedor/watchtower/internal/update/state"
 	"github.com/nicholas-fedor/watchtower/pkg/types"
 )
@@ -16,7 +17,7 @@ import (
 func (n *shoutrrrTypeNotifier) StartNotification(suppressSummary bool) {
 	n.entriesMutex.Lock()
 
-	var toSend []*notificationEntry
+	var toSend []*format.Entry
 	// Capture residual entries to send after unlock when not suppressed.
 	if len(n.entries) > 0 && !suppressSummary {
 		toSend = n.entries
@@ -26,7 +27,7 @@ func (n *shoutrrrTypeNotifier) StartNotification(suppressSummary bool) {
 	preResetCount := len(n.entries)
 
 	// Reset the entries slice to an empty slice with initial capacity for new batching.
-	n.entries = make([]*notificationEntry, 0, initialEntriesCapacity)
+	n.entries = make([]*format.Entry, 0, initialEntriesCapacity)
 
 	n.entriesMutex.Unlock()
 
@@ -35,7 +36,7 @@ func (n *shoutrrrTypeNotifier) StartNotification(suppressSummary bool) {
 	}
 
 	n.ll().Debug().
-		Bool("legacy_template", n.template.legacy).
+		Bool("legacy_template", n.template.Legacy()).
 		Bool("receiving", n.receiving.Load()).
 		Int("entries_count", preResetCount).
 		Bool("suppress_summary", suppressSummary).
@@ -55,14 +56,14 @@ func (n *shoutrrrTypeNotifier) StartNotification(suppressSummary bool) {
 func (n *shoutrrrTypeNotifier) SendNotification(report types.Report) {
 	n.entriesMutex.Lock()
 
-	var entries []*notificationEntry
+	var entries []*format.Entry
 
 	focus, ok := singleFocusContainer(report)
 	if ok {
 		// Keep non-nil empty slices so Run continues treating batching as active
 		// when every queued entry matched the focus.
-		matched := make([]*notificationEntry, 0)
-		rest := make([]*notificationEntry, 0)
+		matched := make([]*format.Entry, 0)
+		rest := make([]*format.Entry, 0)
 
 		for _, e := range n.entries {
 			if entryMatchesFocus(e, focus) {
@@ -83,7 +84,7 @@ func (n *shoutrrrTypeNotifier) SendNotification(report types.Report) {
 
 	n.ll().Debug().
 		Int("entries_count", len(entries)).
-		Bool("legacy_template", n.template.legacy).
+		Bool("legacy_template", n.template.Legacy()).
 		Bool("report_available", report != nil).
 		Msg("SendNotification called - sending queued entries and report")
 
@@ -126,7 +127,7 @@ func FlushSplitByContainer(notifier types.Notifier) {
 		return
 	}
 
-	byContainer := make(map[string][]*notificationEntry)
+	byContainer := make(map[string][]*format.Entry)
 
 	for _, entry := range entries {
 		container, _ := entry.Data["container"].(string)
@@ -183,7 +184,7 @@ func singleFocusContainer(report types.Report) (types.ContainerReport, bool) {
 }
 
 // entryMatchesFocus reports whether a queued entry belongs to the focus container.
-func entryMatchesFocus(entry *notificationEntry, focus types.ContainerReport) bool {
+func entryMatchesFocus(entry *format.Entry, focus types.ContainerReport) bool {
 	if entry == nil || focus == nil {
 		return false
 	}

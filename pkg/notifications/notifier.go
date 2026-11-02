@@ -11,6 +11,7 @@ import (
 
 	"github.com/nicholas-fedor/watchtower/internal/container/redact"
 	"github.com/nicholas-fedor/watchtower/internal/observability/logging"
+	"github.com/nicholas-fedor/watchtower/internal/observability/notify/format"
 	notifyConfig "github.com/nicholas-fedor/watchtower/internal/settings/config/notify"
 	"github.com/nicholas-fedor/watchtower/pkg/types"
 )
@@ -175,8 +176,8 @@ func BuildURLs(log *zerolog.Logger, cfg notifyConfig.Notify) ([]string, error) {
 //   - skipTitle: When true, title is left empty.
 //
 // Returns:
-//   - StaticData: Host and title for notification templates.
-func templateData(log *zerolog.Logger, hostname, titleTag, emailSubjectTag string, skipTitle bool) StaticData {
+//   - format.StaticData: Host and title for notification templates.
+func templateData(log *zerolog.Logger, hostname, titleTag, emailSubjectTag string, skipTitle bool) format.StaticData {
 	clog := log.With().Str("hostname_flag", hostname).Logger()
 	clog.Debug().Msg("Retrieving template data")
 
@@ -207,7 +208,7 @@ func templateData(log *zerolog.Logger, hostname, titleTag, emailSubjectTag strin
 		Str("title", title).
 		Msg("Populated template data")
 
-	return StaticData{
+	return format.StaticData{
 		Host:  hostname,
 		Title: title,
 	}

@@ -1,4 +1,4 @@
-package notifications
+package format
 
 import (
 	"bytes"
@@ -10,14 +10,14 @@ import (
 	"github.com/nicholas-fedor/watchtower/pkg/types"
 )
 
-// messageTemplate is a parsed notification template. Its legacy flag decides
+// Template is a parsed notification template. Its legacy flag decides
 // whether it renders the log entries alone or the full notification data.
-type messageTemplate struct {
+type Template struct {
 	parsed *template.Template // Parsed template.
 	legacy bool               // Renders the log entries alone if true.
 }
 
-// newMessageTemplate parses a notification template.
+// New parses a notification template.
 //
 // A built-in template name selects that template. An empty string selects the
 // default template, which is the default legacy template when legacy is true.
@@ -28,11 +28,11 @@ type messageTemplate struct {
 //   - legacy: Render the log entries alone if true.
 //
 // Returns:
-//   - *messageTemplate: Parsed template.
+//   - *Template: Parsed template.
 //   - error: Non-nil if parsing fails, nil on success.
-func newMessageTemplate(log *zerolog.Logger, tplString string, legacy bool) (*messageTemplate, error) {
+func New(log *zerolog.Logger, tplString string, legacy bool) (*Template, error) {
 	if tplString == "" {
-		return defaultMessageTemplate(legacy), nil
+		return Default(legacy), nil
 	}
 
 	// Use common template if specified.
@@ -49,19 +49,18 @@ func newMessageTemplate(log *zerolog.Logger, tplString string, legacy bool) (*me
 		return nil, fmt.Errorf("failed to parse template: %w", err)
 	}
 
-	return &messageTemplate{parsed: tpl, legacy: legacy}, nil
+	return &Template{parsed: tpl, legacy: legacy}, nil
 }
 
-// defaultMessageTemplate returns the built-in default template. It is the
-// default legacy template when legacy is true. The built-in templates always
-// parse.
+// Default returns the built-in default template. With legacy set, it returns
+// the default legacy template. The built-in templates always parse.
 //
 // Parameters:
 //   - legacy: Render the log entries alone if true.
 //
 // Returns:
-//   - *messageTemplate: The default template.
-func defaultMessageTemplate(legacy bool) *messageTemplate {
+//   - *Template: The default template.
+func Default(legacy bool) *Template {
 	key := "default"
 	if legacy {
 		key = "default-legacy"
@@ -69,10 +68,18 @@ func defaultMessageTemplate(legacy bool) *messageTemplate {
 
 	tpl := template.Must(template.New("").Funcs(templateFuncs).Parse(commonTemplates[key]))
 
-	return &messageTemplate{parsed: tpl, legacy: legacy}
+	return &Template{parsed: tpl, legacy: legacy}
 }
 
-// render builds a notification message from data.
+// Legacy reports whether the template renders the log entries alone.
+//
+// Returns:
+//   - bool: True for a legacy template.
+func (m *Template) Legacy() bool {
+	return m.legacy
+}
+
+// Render builds a notification message from data.
 //
 // A legacy template receives the log entries alone. Any other template
 // receives the full data, including the report.
@@ -84,7 +91,7 @@ func defaultMessageTemplate(legacy bool) *messageTemplate {
 // Returns:
 //   - string: Rendered message.
 //   - error: Non-nil if templating fails, nil on success.
-func (m *messageTemplate) render(log *zerolog.Logger, data notificationData) (string, error) {
+func (m *Template) Render(log *zerolog.Logger, data Data) (string, error) {
 	var body bytes.Buffer
 
 	dataSource := any(data)

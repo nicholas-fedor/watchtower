@@ -145,7 +145,7 @@ tasks:
     env:
       UPDATE_GOLDEN: "1"
     cmds:
-      - go test -count=1 -run 'TestTplprev(TemplatesInSync|ReportContractInSync)$' ./pkg/notifications/
+      - go test -count=1 -run 'TestTplprev(TemplatesInSync|ReportContractInSync)$' ./internal/observability/notify/format/
 
   tplprev:test:
     desc: Run tplprev module tests

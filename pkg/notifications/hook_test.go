@@ -7,6 +7,8 @@ import (
 
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/require"
+
+	"github.com/nicholas-fedor/watchtower/internal/observability/notify/format"
 )
 
 // TestRun_EventFieldMapPreservesLargeIntegers ensures large integer fields such as
@@ -20,7 +22,7 @@ func TestRun_EventFieldMapPreservesLargeIntegers(t *testing.T) {
 		[]string{},
 		zerolog.TraceLevel,
 		true,
-		StaticData{},
+		format.StaticData{},
 		false,
 		0,
 	)
@@ -35,7 +37,7 @@ func TestRun_EventFieldMapPreservesLargeIntegers(t *testing.T) {
 		Msg("cleanup summary")
 
 	n.entriesMutex.RLock()
-	entries := append([]*notificationEntry(nil), n.entries...)
+	entries := append([]*format.Entry(nil), n.entries...)
 	n.entriesMutex.RUnlock()
 
 	require.Len(t, entries, 1)
@@ -48,7 +50,13 @@ func TestRun_EventFieldMapPreservesLargeIntegers(t *testing.T) {
 	// Template must render the exact decimal digits (no scientific notation).
 	const tpl = `{{ range .Entries }}{{ index .Data "removed_orchestrators" }}{{ end }}`
 
-	rendered := getTemplatedResult(t, tpl, false, notificationData{Entries: entries})
+	log := newTestLogger(t)
+
+	tmpl, err := format.New(log, tpl, false)
+	require.NoError(t, err)
+
+	rendered, err := tmpl.Render(log, format.Data{Entries: entries})
+	require.NoError(t, err)
 	require.Equal(t, "9007199254740993", rendered)
 
 	n.Close()
@@ -56,7 +64,7 @@ func TestRun_EventFieldMapPreservesLargeIntegers(t *testing.T) {
 
 // TestRun_EventFieldMapPreservesApplicationFields verifies eventFieldMap through
 // the notification emission path: a known application field on a zerolog event
-// is retained on notificationEntry.Data. Guards against silent drops when
+// is retained on the entry's Data. Guards against silent drops when
 // parsing Event.buf fails (fail-closed would leave the queue empty).
 func TestRun_EventFieldMapPreservesApplicationFields(t *testing.T) {
 	t.Parallel()
@@ -67,7 +75,7 @@ func TestRun_EventFieldMapPreservesApplicationFields(t *testing.T) {
 		[]string{},
 		zerolog.TraceLevel,
 		true,
-		StaticData{},
+		format.StaticData{},
 		false,
 		0,
 	)
@@ -86,7 +94,7 @@ func TestRun_EventFieldMapPreservesApplicationFields(t *testing.T) {
 		Msg(wantMsg)
 
 	n.entriesMutex.RLock()
-	entries := append([]*notificationEntry(nil), n.entries...)
+	entries := append([]*format.Entry(nil), n.entries...)
 	n.entriesMutex.RUnlock()
 
 	require.Len(t, entries, 1, "event must be retained when Event.buf parses successfully")
@@ -115,12 +123,12 @@ func TestRun_NotifyNoAndFailClosed(t *testing.T) {
 		[]string{},
 		zerolog.TraceLevel,
 		true,
-		StaticData{},
+		format.StaticData{},
 		false,
 		0,
 	)
 	// Enable batching without starting the worker goroutine.
-	n.entries = make([]*notificationEntry, 0, initialEntriesCapacity)
+	n.entries = make([]*format.Entry, 0, initialEntriesCapacity)
 
 	// Fail-closed: nil event must not enqueue.
 	n.Run(nil, zerolog.InfoLevel, "should not queue")
@@ -164,7 +172,7 @@ func TestRun_ConcurrentEnqueue(t *testing.T) {
 		[]string{},
 		zerolog.TraceLevel,
 		true,
-		StaticData{},
+		format.StaticData{},
 		false,
 		0,
 	)

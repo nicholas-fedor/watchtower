@@ -1,4 +1,4 @@
-package notifications
+package format
 
 import (
 	"go/ast"
@@ -15,7 +15,7 @@ import (
 
 // loggedMessagesFile is the source file that declares the log messages the
 // built-in templates match, relative to this package.
-const loggedMessagesFile = "../../internal/observability/logging/messages.go"
+const loggedMessagesFile = "../../logging/messages.go"
 
 // templateMessageCase matches a template case on a log message, such as
 // eq $msg "Found new image". It captures the message.

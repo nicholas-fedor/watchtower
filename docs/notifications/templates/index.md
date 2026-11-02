@@ -67,7 +67,7 @@ Environment Variable: WATCHTOWER_NOTIFICATION_REPORT
              Default: false
 ```
 
-The template is a [Go template](https://golang.org/pkg/text/template/){target="_blank" rel="noopener noreferrer"} that processes either a list of log entries (`Message`, `Data`, `Level`, `Time`) captured from [zerolog](https://pkg.go.dev/github.com/rs/zerolog){target="_blank" rel="noopener noreferrer"} events or a `notifications.Data` struct, depending on the [`notification-report`](#notification_report) configuration option.
+The template is a [Go template](https://golang.org/pkg/text/template/){target="_blank" rel="noopener noreferrer"} that processes either a list of log entries (`Message`, `Data`, `Level`, `Time`) captured from [zerolog](https://pkg.go.dev/github.com/rs/zerolog){target="_blank" rel="noopener noreferrer"} events or a `format.Data` struct, depending on the [`notification-report`](#notification_report) configuration option.
 
 ## Simple Templates
 
@@ -111,7 +111,7 @@ Simple templates are used when the [`notification-report`](#notification_report)
 The [Template Preview Tool](../template-preview/index.md) uses the same template root as Watchtower:
 
 - Report toggle off (legacy mode): the root is the log entry slice. Range over `.`, the same as the default simple template above.
-- Report toggle on (report mode): the root is a `notifications.Data` value. Range over `.Entries` (and use `.Report` for session results).
+- Report toggle on (report mode): the root is a `format.Data` value. Range over `.Entries` (and use `.Report` for session results).
 
 !!! Note
     The example below is for report mode. With the report toggle off, use `range .` instead of `range .Entries`.
@@ -154,7 +154,7 @@ Found new image: repo/image:latest (abcdef123456)
 
 ## Report Templates
 
-When the [`notification-report`](#notification_report) configuration option is set, the template processes a `notifications.Data` struct containing a session report and log entries.
+When the [`notification-report`](#notification_report) configuration option is set, the template processes a `format.Data` struct containing a session report and log entries.
 
 ```go title="Default Report Template"
 {{- if .Report -}}
@@ -423,4 +423,4 @@ Use the [Template Preview Tool](../template-preview/index.md) to test your templ
 ## Additional Resources
 
 - For detailed template syntax, refer to the [Go Template documentation](https://golang.org/pkg/text/template/){target="_blank" rel="noopener noreferrer"}.
-- For log entry fields, each entry exposes `Message`, `Data` (map of structured fields), `Level`, and `Time` (see `pkg/notifications` notification entries and [zerolog](https://pkg.go.dev/github.com/rs/zerolog){target="_blank" rel="noopener noreferrer"}).
+- For log entry fields, each entry exposes `Message`, `Data` (map of structured fields), `Level`, and `Time` (see the `Entry` type in `internal/observability/notify/format` and [zerolog](https://pkg.go.dev/github.com/rs/zerolog){target="_blank" rel="noopener noreferrer"}).

@@ -1,6 +1,9 @@
 package notifications
 
-import "github.com/nicholas-fedor/watchtower/internal/observability/logging"
+import (
+	"github.com/nicholas-fedor/watchtower/internal/observability/logging"
+	"github.com/nicholas-fedor/watchtower/internal/observability/notify/format"
+)
 
 // deduplicateEntries removes duplicate log entries that occur when multiple containers
 // share the same image. This applies to grouped (non-split) notifications only.
@@ -16,8 +19,8 @@ import "github.com/nicholas-fedor/watchtower/internal/observability/logging"
 //   - entries: Log entries that may contain duplicates.
 //
 // Returns:
-//   - []*notificationEntry: Deduplicated entries preserving original order.
-func deduplicateEntries(entries []*notificationEntry) []*notificationEntry {
+//   - []*format.Entry: Deduplicated entries preserving original order.
+func deduplicateEntries(entries []*format.Entry) []*format.Entry {
 	if len(entries) <= 1 {
 		return entries
 	}
@@ -28,7 +31,7 @@ func deduplicateEntries(entries []*notificationEntry) []*notificationEntry {
 	}
 
 	seen := make(map[dedupKey]bool)
-	result := make([]*notificationEntry, 0, len(entries))
+	result := make([]*format.Entry, 0, len(entries))
 
 	for _, entry := range entries {
 		var key dedupKey

@@ -1,4 +1,4 @@
-package notifications
+package format
 
 import (
 	"strings"
@@ -13,8 +13,8 @@ var testFuzzLog = func() *zerolog.Logger {
 	return &l
 }()
 
-// FuzzNewMessageTemplate fuzzes newMessageTemplate to ensure robust parsing of template strings.
-func FuzzNewMessageTemplate(f *testing.F) {
+// FuzzNew fuzzes New to ensure robust parsing of template strings.
+func FuzzNew(f *testing.F) {
 	// Add seeded inputs with valid templates, malformed syntax, and edge cases
 	f.Add("{{.}}")
 	f.Add("{{range .}}{{.Message}}{{end}}")
@@ -26,7 +26,7 @@ func FuzzNewMessageTemplate(f *testing.F) {
 	f.Fuzz(func(_ *testing.T, tplString string) {
 		//nolint:godox
 		// TODO: Remove legacy mode fuzzing when legacy notification types are removed.
-		_, _ = newMessageTemplate(testFuzzLog, tplString, true)
-		_, _ = newMessageTemplate(testFuzzLog, tplString, false)
+		_, _ = New(testFuzzLog, tplString, true)
+		_, _ = New(testFuzzLog, tplString, false)
 	})
 }
