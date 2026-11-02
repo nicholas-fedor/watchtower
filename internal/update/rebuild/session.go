@@ -12,6 +12,7 @@ import (
 	"github.com/nicholas-fedor/watchtower/internal/container/provenance"
 	"github.com/nicholas-fedor/watchtower/internal/git"
 	"github.com/nicholas-fedor/watchtower/internal/git/project"
+	"github.com/nicholas-fedor/watchtower/internal/observability/logging"
 	"github.com/nicholas-fedor/watchtower/internal/update/state"
 	"github.com/nicholas-fedor/watchtower/pkg/types"
 )
@@ -142,7 +143,7 @@ func (s *Session) PrepareRebuilds(
 				Err(err).
 				Str("container", c.Name()).
 				Str("image", c.ImageName()).
-				Msg("Compose project directory is not readable. Leaving the running container untouched")
+				Msg(logging.ComposeDirUnreadable)
 
 			continue
 		}
@@ -172,7 +173,7 @@ func (s *Session) PrepareRebuilds(
 				Str("container", c.Name()).
 				Str("image", c.ImageName()),
 				c, params, result.Tag, result.Commit).
-				Msg("Git build failed. Leaving running container untouched")
+				Msg(logging.GitBuildFailed)
 		}
 	}
 }

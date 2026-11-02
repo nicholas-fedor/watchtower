@@ -17,6 +17,7 @@ import (
 	containerClient "github.com/nicholas-fedor/watchtower/internal/container/client"
 	containerImage "github.com/nicholas-fedor/watchtower/internal/container/image"
 	"github.com/nicholas-fedor/watchtower/internal/container/labels"
+	"github.com/nicholas-fedor/watchtower/internal/observability/logging"
 	"github.com/nicholas-fedor/watchtower/pkg/types"
 )
 
@@ -173,7 +174,7 @@ func StartOrchestrator(log *zerolog.Logger, ctx context.Context,
 		Str("container", sourceContainer.Name()).
 		Str("id", sourceContainer.ID().ShortID()).
 		Str("old_image_id", sourceContainer.ImageID().ShortID()).
-		Msg("Stopping container")
+		Msg(logging.StoppingContainer)
 	log.Info().Msg("Starting new Watchtower container")
 
 	// Log that the orchestrator has been started. The orchestrator ID identifies
@@ -473,7 +474,7 @@ func orchestrateSelfUpdate(log *zerolog.Logger, ctx context.Context,
 	// can consume the correct "new_id" field.
 	clog.Info().
 		Str("new_id", newContainerID.ShortID()).
-		Msg("Started new container")
+		Msg(logging.StartedNewContainer)
 
 	return nil
 }

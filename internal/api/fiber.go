@@ -14,6 +14,8 @@ import (
 
 	fiberZerolog "github.com/gofiber/contrib/v3/zerolog"
 	fiberRecover "github.com/gofiber/fiber/v3/middleware/recover"
+
+	"github.com/nicholas-fedor/watchtower/internal/observability/logging"
 )
 
 const (
@@ -185,13 +187,13 @@ func newApp(
 				Str("host", data.Host).
 				Str("port", data.Port).
 				Bool("tls", data.TLS).
-				Msg("Starting HTTP API server")
+				Msg(logging.StartingAPIServer)
 
 			log.Info().
 				Str("host", data.Host).
 				Str("port", data.Port).
 				Bool("tls", data.TLS).
-				Msg("HTTP API server is enabled")
+				Msg(logging.APIServerEnabled)
 		}
 
 		return nil

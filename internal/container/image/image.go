@@ -16,6 +16,7 @@ import (
 	dockerClient "github.com/moby/moby/client"
 
 	"github.com/nicholas-fedor/watchtower/internal/container/oci"
+	"github.com/nicholas-fedor/watchtower/internal/observability/logging"
 	"github.com/nicholas-fedor/watchtower/internal/registry"
 	"github.com/nicholas-fedor/watchtower/internal/registry/auth"
 	"github.com/nicholas-fedor/watchtower/internal/registry/digest"
@@ -308,7 +309,7 @@ func (c Client) CheckContainerUpdate(
 	clog.Info().
 		Str("new_id", types.ImageID(remoteDigest).ShortID()).
 		Str("latest_digest", remoteDigest).
-		Msg("Found new image")
+		Msg(logging.FoundNewImage)
 
 	return true, "", remoteDigest, nil
 }
@@ -373,7 +374,7 @@ func (c Client) HasNewImage(
 
 	clog.Info().
 		Str("new_id", newImageID.ShortID()).
-		Msg("Found new image")
+		Msg(logging.FoundNewImage)
 
 	return true,
 		newImageID,
@@ -544,7 +545,7 @@ func (c Client) RemoveImageByID(ctx context.Context, imageID types.ImageID, imag
 
 		clog.Warn().
 			Err(err).
-			Msg("Failed to list containers for image usage check, skipping removal")
+			Msg(logging.ImageUsageCheckFailed)
 
 		return fmt.Errorf("cannot verify image usage: %w", err)
 	}
@@ -562,7 +563,7 @@ func (c Client) RemoveImageByID(ctx context.Context, imageID types.ImageID, imag
 
 	clog.Info().
 		Str("notify", "yes").
-		Msg("Removing image")
+		Msg(logging.RemovingImage)
 
 	// Perform image removal with force and pruning.
 	items, err := c.api.ImageRemove(

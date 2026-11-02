@@ -19,6 +19,7 @@ import (
 
 	"github.com/nicholas-fedor/watchtower/internal/container"
 	"github.com/nicholas-fedor/watchtower/internal/container/recreate"
+	"github.com/nicholas-fedor/watchtower/internal/observability/logging"
 	"github.com/nicholas-fedor/watchtower/pkg/types"
 )
 
@@ -411,9 +412,9 @@ func stopSourceContainer(log *zerolog.Logger,
 	}
 
 	// Log the stop attempt with the signal and configured timeout for clarity.
-	message := "Stopping container"
+	message := logging.StoppingContainer
 	if sourceContainer.IsLinkedToRestarting() {
-		message = "Stopping linked container"
+		message = logging.StoppingLinkedContainer
 	}
 
 	clog.Info().

@@ -9,6 +9,7 @@ import (
 
 	"github.com/nicholas-fedor/watchtower/internal/container/oci"
 	"github.com/nicholas-fedor/watchtower/internal/container/provenance"
+	"github.com/nicholas-fedor/watchtower/internal/observability/logging"
 	"github.com/nicholas-fedor/watchtower/pkg/types"
 )
 
@@ -98,7 +99,7 @@ func logFoundGitRevision(log *zerolog.Logger, c types.Container, params types.Up
 		Str("container", c.Name()).
 		Str("revision", identity).
 		Str("short_commit", shortGitSHA(commit)).
-		Msg("Found new Git revision")
+		Msg(logging.FoundNewGitRevision)
 }
 
 // gitNoticePath returns the host and repository path used in a notification.

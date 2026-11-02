@@ -10,6 +10,7 @@ import (
 	dockerClient "github.com/moby/moby/client"
 
 	"github.com/nicholas-fedor/watchtower/internal/container/recreate"
+	"github.com/nicholas-fedor/watchtower/internal/observability/logging"
 	"github.com/nicholas-fedor/watchtower/pkg/types"
 )
 
@@ -67,9 +68,9 @@ func startTargetContainer(
 		return fmt.Errorf("%w: %w", errStartContainerFailed, err)
 	}
 
-	message := "Started new container"
+	message := logging.StartedNewContainer
 	if sourceContainer.IsLinkedToRestarting() {
-		message = "Started linked container"
+		message = logging.StartedLinkedContainer
 	}
 
 	clog.Debug().

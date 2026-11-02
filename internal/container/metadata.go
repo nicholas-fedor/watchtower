@@ -49,25 +49,25 @@ var (
 	// preCheckTimeoutMessages are the log messages for the pre-check timeout label.
 	preCheckTimeoutMessages = hookTimeoutMessages{
 		notSet:    "Pre-check timeout not set, using default",
-		invalid:   "Invalid pre-check timeout value, using default",
+		invalid:   logging.InvalidPreCheckTimeout,
 		retrieved: "Retrieved pre-check timeout",
 	}
 	// postCheckTimeoutMessages are the log messages for the post-check timeout label.
 	postCheckTimeoutMessages = hookTimeoutMessages{
 		notSet:    "Post-check timeout not set, using default",
-		invalid:   "Invalid post-check timeout value, using default",
+		invalid:   logging.InvalidPostCheckTimeout,
 		retrieved: "Retrieved post-check timeout",
 	}
 	// preUpdateTimeoutMessages are the log messages for the pre-update timeout label.
 	preUpdateTimeoutMessages = hookTimeoutMessages{
 		notSet:    "Pre-update timeout not set, using default",
-		invalid:   "Invalid pre-update timeout value, using default",
+		invalid:   logging.InvalidPreUpdateTimeout,
 		retrieved: "Retrieved pre-update timeout",
 	}
 	// postUpdateTimeoutMessages are the log messages for the post-update timeout label.
 	postUpdateTimeoutMessages = hookTimeoutMessages{
 		notSet:    "Post-update timeout not set, using default",
-		invalid:   "Invalid post-update timeout value, using default",
+		invalid:   logging.InvalidPostUpdateTimeout,
 		retrieved: "Retrieved post-update timeout",
 	}
 )

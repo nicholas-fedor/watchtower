@@ -15,6 +15,7 @@ import (
 	containerClient "github.com/nicholas-fedor/watchtower/internal/container/client"
 	"github.com/nicholas-fedor/watchtower/internal/container/filters"
 	containerImage "github.com/nicholas-fedor/watchtower/internal/container/image"
+	"github.com/nicholas-fedor/watchtower/internal/observability/logging"
 	"github.com/nicholas-fedor/watchtower/pkg/types"
 )
 
@@ -676,7 +677,7 @@ func removeExcessContainers(log *zerolog.Logger, ctx context.Context,
 
 	log.Info().
 		Int("removed_instances", excessInstancesRemoved).
-		Msg("Successfully removed all excess Watchtower containers")
+		Msg(logging.ExcessInstancesRemoved)
 
 	return excessInstancesRemoved, nil
 }

@@ -17,6 +17,7 @@ import (
 	"github.com/nicholas-fedor/watchtower/internal/container/provenance"
 	"github.com/nicholas-fedor/watchtower/internal/git"
 	"github.com/nicholas-fedor/watchtower/internal/git/project"
+	"github.com/nicholas-fedor/watchtower/internal/observability/logging"
 	"github.com/nicholas-fedor/watchtower/internal/update/state"
 	"github.com/nicholas-fedor/watchtower/pkg/types"
 )
@@ -97,7 +98,7 @@ func (s *Session) applyCompose(
 		log.Info().
 			Str("project", batch.ref.Name).
 			Str("service", strings.Join(services.names, ", ")).
-			Msg("Built Compose project")
+			Msg(logging.BuiltComposeProject)
 
 		return
 	}
@@ -107,7 +108,7 @@ func (s *Session) applyCompose(
 			log.Warn().
 				Str("project", batch.ref.Name).
 				Str("service", strings.Join(services.names, ", ")).
-				Msg("Compose apply finished with unconfirmed service results")
+				Msg(logging.ComposeApplyUnconfirmed)
 
 			return
 		}
@@ -148,7 +149,7 @@ func groupComposeServices(
 			log.Warn().
 				Str("container", c.Name()).
 				Str("image", c.ImageName()).
-				Msg("Compose apply skipped. Container has no compose service label")
+				Msg(logging.ComposeApplySkipped)
 
 			continue
 		}
@@ -334,7 +335,7 @@ func (s *Session) recordComposeResults(
 					Str("container", c.Name()).
 					Str("image", c.ImageName()).
 					Str("service", name).
-					Msg("Compose apply result omitted this service. Runtime state is unknown")
+					Msg(logging.ComposeServiceOmitted)
 			}
 
 			continue
@@ -360,7 +361,7 @@ func (s *Session) recordComposeResults(
 					Str("container", c.Name()).
 					Str("image", c.ImageName()).
 					Str("service", name).
-					Msg("Compose apply did not return an identifiable instance for this replica. Runtime state is unknown")
+					Msg(logging.ComposeReplicaUnidentified)
 
 				continue
 			}
@@ -391,12 +392,12 @@ func logComposeReplaced(log *zerolog.Logger, c types.Container, item composeAppl
 	log.Info().
 		Str("container", name).
 		Str("id", c.ID().ShortID()).
-		Msg("Stopping container")
+		Msg(logging.StoppingContainer)
 	log.Info().
 		Str("container", name).
 		Str("image", c.ImageName()).
 		Str("new_id", item.ID.ShortID()).
-		Msg("Started new container")
+		Msg(logging.StartedNewContainer)
 }
 
 // recordCompose records a successful Compose apply for one container.
@@ -730,9 +731,9 @@ func failComposeBatchWithRuntime(
 	err error,
 	runtimeMayHaveChanged bool,
 ) {
-	message := "Compose update failed before container replacement"
+	message := logging.ComposeUpdateFailed
 	if runtimeMayHaveChanged {
-		message = "Compose apply failed. Docker Compose may have partially recreated services"
+		message = logging.ComposeApplyFailed
 	}
 
 	for _, member := range batch.members {

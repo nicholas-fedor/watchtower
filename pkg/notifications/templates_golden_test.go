@@ -12,6 +12,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/nicholas-fedor/watchtower/internal/container/provenance"
+	"github.com/nicholas-fedor/watchtower/internal/observability/logging"
 	"github.com/nicholas-fedor/watchtower/internal/testutil/golden"
 	"github.com/nicholas-fedor/watchtower/internal/update/state"
 	"github.com/nicholas-fedor/watchtower/pkg/types"
@@ -32,58 +33,58 @@ var (
 // legacyTemplateMessages lists every log message the default-legacy template
 // formats specially, so each of its branches appears in the golden output.
 var legacyTemplateMessages = []string{
-	"Found new image",
-	"Found new Git revision",
-	"Stopping container",
-	"Started new container",
-	"Stopping linked container",
-	"Started linked container",
-	"Removing image",
-	"Failed to list containers for image usage check, skipping removal",
-	"Image is within cooldown period - not eligible for update",
-	"Image age exceeds cooldown - eligible for update",
-	"Image creation time unavailable - update check unavailable",
-	"Successfully removed all excess Watchtower containers",
-	"Docker image usage budget enabled",
-	"Docker image usage exceeds configured maximum",
-	"Docker image usage exceeds configured warning threshold",
-	"Failed to query Docker image disk usage",
-	"Changelog",
-	"Built image from Git URL context",
-	"Built Compose project",
-	"Git build failed. Leaving running container untouched",
-	"Compose apply failed. Docker Compose may have partially recreated services",
-	"Compose apply finished with unconfirmed service results",
-	"Compose apply result omitted this service. Runtime state is unknown",
-	"Compose apply did not return an identifiable instance for this replica. Runtime state is unknown",
-	"Compose apply skipped. Container has no compose service label",
-	"Compose batch dependencies are cyclic. Appending unresolved batches in first-seen order",
-	"Compose project directory is not readable. Leaving the running container untouched",
-	"Compose update failed before container replacement",
-	"Could not dependency-sort Compose batches. Using the existing container order",
-	"Could not order Compose batches by dependencies. Using first-seen order",
-	"Skipped container with an invalid git-host",
-	"Skipped container with an invalid git semver policy",
-	"Skipping Watchtower self-update in run-once mode",
-	"Only checking containers in scope",
-	"Starting HTTP API server",
-	"HTTP API server is enabled",
-	"Registry rate limit retries exhausted. Container failed for this cycle",
-	"Ignoring depends-on entry that names no container",
-	"Skipping container update (self-dependency)",
-	"Skipping container update (circular dependency)",
-	"Could not identify Watchtower's own container. Self-updates are disabled and old instances will not be removed",
-	"Could not inspect Watchtower's own container. Self-updates are disabled",
-	"Could not inspect Watchtower's own container to read its scope label. Exiting rather than running without a scope",
-	"Could not disable Watchtower's restart policy. The runtime may start it again",
-	"Invalid pre-update timeout value, using default",
-	"Invalid post-update timeout value, using default",
-	"Invalid pre-check timeout value, using default",
-	"Invalid post-check timeout value, using default",
-	"Update panicked",
-	"Update execution failed",
-	"Could not check container for updates",
-	"Could not update container. Its configuration cannot be recreated",
+	logging.FoundNewImage,
+	logging.FoundNewGitRevision,
+	logging.StoppingContainer,
+	logging.StartedNewContainer,
+	logging.StoppingLinkedContainer,
+	logging.StartedLinkedContainer,
+	logging.RemovingImage,
+	logging.ImageUsageCheckFailed,
+	logging.WithinCooldown,
+	logging.CooldownElapsed,
+	logging.CooldownUnavailable,
+	logging.ExcessInstancesRemoved,
+	logging.ImageUsageBudgetEnabled,
+	logging.ImageUsageExceedsMaximum,
+	logging.ImageUsageExceedsWarning,
+	logging.ImageDiskUsageQueryFailed,
+	logging.Changelog,
+	logging.BuiltGitImage,
+	logging.BuiltComposeProject,
+	logging.GitBuildFailed,
+	logging.ComposeApplyFailed,
+	logging.ComposeApplyUnconfirmed,
+	logging.ComposeServiceOmitted,
+	logging.ComposeReplicaUnidentified,
+	logging.ComposeApplySkipped,
+	logging.ComposeBatchesCyclic,
+	logging.ComposeDirUnreadable,
+	logging.ComposeUpdateFailed,
+	logging.ComposeBatchSortFailed,
+	logging.ComposeBatchOrderFailed,
+	logging.InvalidGitHost,
+	logging.InvalidGitSemverPolicy,
+	logging.SelfUpdateSkippedRunOnce,
+	logging.ScopedToContainers,
+	logging.StartingAPIServer,
+	logging.APIServerEnabled,
+	logging.RateLimitRetriesExhausted,
+	logging.UnresolvedDependsOn,
+	logging.SelfDependency,
+	logging.CircularDependency,
+	logging.SelfUnidentified,
+	logging.SelfUninspected,
+	logging.ScopeLabelUnreadable,
+	logging.RestartsKept,
+	logging.InvalidPreUpdateTimeout,
+	logging.InvalidPostUpdateTimeout,
+	logging.InvalidPreCheckTimeout,
+	logging.InvalidPostCheckTimeout,
+	logging.UpdatePanicked,
+	logging.UpdateFailed,
+	logging.UpdateCheckFailed,
+	logging.ConfigNotRecreatable,
 }
 
 // Disk sizes used by the image-usage budget fixtures, in bytes.
@@ -109,31 +110,31 @@ func goldenEntryData(message string) map[string]any {
 	}
 
 	switch message {
-	case "Found new image":
+	case logging.FoundNewImage:
 		return map[string]any{"container": "app", "image": "org/app:latest", "new_id": "d0a110000000"}
-	case "Found new Git revision":
+	case logging.FoundNewGitRevision:
 		return map[string]any{
 			"container":    "app",
 			"revision":     "github.com/org/app@v1.2.0",
 			"short_commit": "0123456",
 		}
-	case "Stopping container", "Stopping linked container":
+	case logging.StoppingContainer, logging.StoppingLinkedContainer:
 		return map[string]any{"container": "app", "id": "c79110000000"}
-	case "Started new container", "Started linked container":
+	case logging.StartedNewContainer, logging.StartedLinkedContainer:
 		return map[string]any{"container": "app", "new_id": "d0a110000000"}
-	case "Removing image":
+	case logging.RemovingImage:
 		return map[string]any{
 			"container_name": "app",
 			"image_name":     "org/app:latest",
 			"image_id":       "01d110000000",
 		}
-	case "Failed to list containers for image usage check, skipping removal":
+	case logging.ImageUsageCheckFailed:
 		return map[string]any{
 			"image_name": "org/app:latest",
 			"image_id":   "01d110000000",
 			"error":      "cannot connect to the Docker daemon",
 		}
-	case "Image is within cooldown period - not eligible for update":
+	case logging.WithinCooldown:
 		return map[string]any{
 			"image":       "org/app:latest",
 			"image_age":   "2h",
@@ -141,122 +142,122 @@ func goldenEntryData(message string) map[string]any {
 			"eligible_in": "22h",
 			"eligible_at": "2026-10-08T10:00:00Z",
 		}
-	case "Image age exceeds cooldown - eligible for update":
+	case logging.CooldownElapsed:
 		return map[string]any{"image": "org/app:latest", "image_age": "2d", "cooldown": "1d"}
-	case "Image creation time unavailable - update check unavailable":
+	case logging.CooldownUnavailable:
 		return map[string]any{
 			"image":    "org/app:latest",
 			"cooldown": "1d",
 			"error":    "manifest unknown",
 		}
-	case "Successfully removed all excess Watchtower containers":
+	case logging.ExcessInstancesRemoved:
 		return map[string]any{"removed_instances": 1}
-	case "Docker image usage budget enabled":
+	case logging.ImageUsageBudgetEnabled:
 		return map[string]any{"disk_space_max": goldenDiskMax, "disk_space_warn": goldenDiskWarn}
-	case "Docker image usage exceeds configured maximum":
+	case logging.ImageUsageExceedsMaximum:
 		return diskUsage(int64(11 << 30))
-	case "Docker image usage exceeds configured warning threshold":
+	case logging.ImageUsageExceedsWarning:
 		return diskUsage(int64(9 << 30))
-	case "Failed to query Docker image disk usage":
+	case logging.ImageDiskUsageQueryFailed:
 		return map[string]any{"error": "daemon disk usage unavailable"}
-	case "Changelog":
+	case logging.Changelog:
 		return map[string]any{
 			"container": "app",
 			"changelog": "https://github.com/org/app/releases/tag/v1.2.0",
 		}
-	case "Built image from Git URL context":
+	case logging.BuiltGitImage:
 		return map[string]any{"container": "app", "image": "org/app:latest", "image_id": "b17d10000000"}
-	case "Built Compose project":
+	case logging.BuiltComposeProject:
 		return map[string]any{"project": "stack", "service": "web"}
-	case "Compose apply finished with unconfirmed service results":
+	case logging.ComposeApplyUnconfirmed:
 		return map[string]any{"project": "stack", "service": "web, worker"}
-	case "Compose apply result omitted this service. Runtime state is unknown",
-		"Compose apply did not return an identifiable instance for this replica. Runtime state is unknown":
+	case logging.ComposeServiceOmitted,
+		logging.ComposeReplicaUnidentified:
 		return map[string]any{"container": "stack-web-1", "image": "org/web:latest", "service": "web"}
-	case "Git build failed. Leaving running container untouched",
-		"Compose project directory is not readable. Leaving the running container untouched":
+	case logging.GitBuildFailed,
+		logging.ComposeDirUnreadable:
 		return map[string]any{"container": "app", "image": "org/app:latest", "error": "example failure"}
-	case "Compose apply failed. Docker Compose may have partially recreated services",
-		"Compose update failed before container replacement":
+	case logging.ComposeApplyFailed,
+		logging.ComposeUpdateFailed:
 		return map[string]any{
 			"container": "stack-web-1",
 			"image":     "org/web:latest",
 			"dir":       "/srv/stack",
 			"error":     "example failure",
 		}
-	case "Compose apply skipped. Container has no compose service label",
-		"Skipped container with an invalid git-host",
-		"Skipped container with an invalid git semver policy",
-		"Skipping Watchtower self-update in run-once mode":
+	case logging.ComposeApplySkipped,
+		logging.InvalidGitHost,
+		logging.InvalidGitSemverPolicy,
+		logging.SelfUpdateSkippedRunOnce:
 		return map[string]any{"container": "app", "image": "org/app:latest"}
-	case "Could not dependency-sort Compose batches. Using the existing container order",
-		"Could not order Compose batches by dependencies. Using first-seen order":
+	case logging.ComposeBatchSortFailed,
+		logging.ComposeBatchOrderFailed:
 		return map[string]any{"error": "circular reference detected"}
-	case "Registry rate limit retries exhausted. Container failed for this cycle":
+	case logging.RateLimitRetriesExhausted:
 		return map[string]any{
 			"container": "app",
 			"image":     "org/app:latest",
 			"error":     "image pull: registry rate limited: retry-after 347.256µs allowed 44000 per 1m0s",
 		}
-	case "Ignoring depends-on entry that names no container":
+	case logging.UnresolvedDependsOn:
 		return map[string]any{"container": "app", "depends_on": "missing-db"}
-	case "Skipping container update (self-dependency)",
-		"Skipping container update (circular dependency)":
+	case logging.SelfDependency,
+		logging.CircularDependency:
 		return map[string]any{"container": "app", "id": "abcdef123456"}
-	case "Only checking containers in scope":
+	case logging.ScopedToContainers:
 		return map[string]any{"scope": "production"}
-	case "Could not identify Watchtower's own container. Self-updates are disabled and old instances will not be removed":
+	case logging.SelfUnidentified:
 		return map[string]any{"error": "failed to detect current container ID: no container ID in cgroup file"}
-	case "Could not inspect Watchtower's own container. Self-updates are disabled",
-		"Could not inspect Watchtower's own container to read its scope label. Exiting rather than running without a scope":
+	case logging.SelfUninspected,
+		logging.ScopeLabelUnreadable:
 		return map[string]any{"error": "failed to inspect container: context deadline exceeded"}
-	case "Could not disable Watchtower's restart policy. The runtime may start it again":
+	case logging.RestartsKept:
 		return map[string]any{"error": "failed to set restart policy: context deadline exceeded"}
-	case "Update execution failed":
+	case logging.UpdateFailed:
 		return map[string]any{"error": "failed to list containers: context deadline exceeded"}
-	case "Update panicked":
+	case logging.UpdatePanicked:
 		return map[string]any{"error": "runtime error: invalid memory address or nil pointer dereference"}
-	case "Could not update container. Its configuration cannot be recreated":
+	case logging.ConfigNotRecreatable:
 		return map[string]any{
 			"container": "app",
 			"image":     "org/app:latest",
 			"error":     "no image info available",
 		}
-	case "Could not check container for updates":
+	case logging.UpdateCheckFailed:
 		return map[string]any{
 			"container": "app",
 			"image":     "org/app:latest",
 			"error":     "failed to pull image: org/app:latest: unauthorized: authentication required",
 		}
-	case "Invalid pre-update timeout value, using default":
+	case logging.InvalidPreUpdateTimeout:
 		return map[string]any{
 			"container": "app",
 			"label":     "com.centurylinklabs.watchtower.lifecycle.pre-update-timeout",
 			"value":     "-1",
 			"error":     "lifecycle hook timeout must be a whole number of minutes of 0 or more: got -1",
 		}
-	case "Invalid pre-check timeout value, using default":
+	case logging.InvalidPreCheckTimeout:
 		return map[string]any{
 			"container": "app",
 			"label":     "com.centurylinklabs.watchtower.lifecycle.pre-check-timeout",
 			"value":     "1.5",
 			"error":     `lifecycle hook timeout must be a whole number of minutes of 0 or more: strconv.Atoi: parsing "1.5": invalid syntax`,
 		}
-	case "Invalid post-check timeout value, using default":
+	case logging.InvalidPostCheckTimeout:
 		return map[string]any{
 			"container": "app",
 			"label":     "com.centurylinklabs.watchtower.lifecycle.post-check-timeout",
 			"value":     "-5",
 			"error":     "lifecycle hook timeout must be a whole number of minutes of 0 or more: got -5",
 		}
-	case "Invalid post-update timeout value, using default":
+	case logging.InvalidPostUpdateTimeout:
 		return map[string]any{
 			"container": "app",
 			"label":     "com.centurylinklabs.watchtower.lifecycle.post-update-timeout",
 			"value":     "soon",
 			"error":     `lifecycle hook timeout must be a whole number of minutes of 0 or more: strconv.Atoi: parsing "soon": invalid syntax`,
 		}
-	case "Starting HTTP API server", "HTTP API server is enabled":
+	case logging.StartingAPIServer, logging.APIServerEnabled:
 		return map[string]any{"host": "0.0.0.0", "port": "8080", "tls": true}
 	default:
 		return nil

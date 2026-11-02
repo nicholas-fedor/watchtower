@@ -8,6 +8,7 @@ import (
 
 	composeProject "github.com/nicholas-fedor/watchtower/internal/compose/project"
 	"github.com/nicholas-fedor/watchtower/internal/git"
+	"github.com/nicholas-fedor/watchtower/internal/observability/logging"
 	"github.com/nicholas-fedor/watchtower/internal/update/sorter"
 	"github.com/nicholas-fedor/watchtower/pkg/types"
 )
@@ -82,7 +83,7 @@ func orderedComposeContainers(
 	if err != nil {
 		log.Warn().
 			Err(err).
-			Msg("Could not dependency-sort Compose batches. Using the existing container order")
+			Msg(logging.ComposeBatchSortFailed)
 
 		return slices.Clone(containers)
 	}
@@ -146,7 +147,7 @@ func (b *composeBatches) inDependencyOrder(
 	if err != nil {
 		log.Warn().
 			Err(err).
-			Msg("Could not order Compose batches by dependencies. Using first-seen order")
+			Msg(logging.ComposeBatchOrderFailed)
 
 		return batches
 	}
@@ -218,7 +219,7 @@ func (b *composeBatches) inDependencyOrder(
 	}
 
 	log.Warn().
-		Msg("Compose batch dependencies are cyclic. Appending unresolved batches in first-seen order")
+		Msg(logging.ComposeBatchesCyclic)
 
 	for i, batch := range batches {
 		if indegree[i] > 0 {
