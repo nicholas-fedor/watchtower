@@ -24,10 +24,5 @@ func TestLevelToString_WarnMapsToWarning(t *testing.T) {
 			{Level: levelToString(zerolog.WarnLevel), Message: "caution"},
 		},
 	}
-	notifier, err := createNotifierWithTemplate(t, tpl, false)
-	require.NoError(t, err)
-
-	result, err := notifier.buildMessage(data)
-	require.NoError(t, err)
-	require.Equal(t, "hit", result)
+	require.Equal(t, "hit", getTemplatedResult(t, tpl, false, data))
 }

@@ -6,10 +6,10 @@ import (
 	"fmt"
 	"testing"
 	"testing/synctest"
-	"text/template"
 	"time"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 
 	shoutrrrTypes "github.com/nicholas-fedor/shoutrrr/pkg/types"
 
@@ -499,10 +499,13 @@ func TestSendEntries_EmptyMessageLogsSkipAtDebug(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 
+			tpl, err := newMessageTemplate(newTestLogger(t), "{{- /* renders nothing */ -}}", false)
+			require.NoError(t, err)
+
 			log, buf := newBufferLogger()
 			notifier := &shoutrrrTypeNotifier{
 				Urls:     tt.urls,
-				template: template.Must(template.New("empty").Parse("")),
+				template: tpl,
 				localLog: log,
 			}
 

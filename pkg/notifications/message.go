@@ -10,21 +10,85 @@ import (
 	"github.com/nicholas-fedor/watchtower/pkg/types"
 )
 
-// buildMessage constructs a notification message from data.
+// messageTemplate is a parsed notification template. Its legacy flag decides
+// whether it renders the log entries alone or the full notification data.
+type messageTemplate struct {
+	parsed *template.Template // Parsed template.
+	legacy bool               // Renders the log entries alone if true.
+}
+
+// newMessageTemplate parses a notification template.
+//
+// A built-in template name selects that template. An empty string selects the
+// default template, which is the default legacy template when legacy is true.
 //
 // Parameters:
+//   - log: Logger for diagnostics.
+//   - tplString: Template text or built-in template name.
+//   - legacy: Render the log entries alone if true.
+//
+// Returns:
+//   - *messageTemplate: Parsed template.
+//   - error: Non-nil if parsing fails, nil on success.
+func newMessageTemplate(log *zerolog.Logger, tplString string, legacy bool) (*messageTemplate, error) {
+	if tplString == "" {
+		return defaultMessageTemplate(legacy), nil
+	}
+
+	// Use common template if specified.
+	builtin, found := commonTemplates[tplString]
+	if found {
+		log.Debug().Str("template", tplString).Msg("Using common template")
+		tplString = builtin
+	}
+
+	tpl, err := template.New("").Funcs(templateFuncs).Parse(tplString)
+	if err != nil {
+		log.Debug().Err(err).Msg("Parse failed")
+
+		return nil, fmt.Errorf("failed to parse template: %w", err)
+	}
+
+	return &messageTemplate{parsed: tpl, legacy: legacy}, nil
+}
+
+// defaultMessageTemplate returns the built-in default template. It is the
+// default legacy template when legacy is true. The built-in templates always
+// parse.
+//
+// Parameters:
+//   - legacy: Render the log entries alone if true.
+//
+// Returns:
+//   - *messageTemplate: The default template.
+func defaultMessageTemplate(legacy bool) *messageTemplate {
+	key := "default"
+	if legacy {
+		key = "default-legacy"
+	}
+
+	tpl := template.Must(template.New("").Funcs(templateFuncs).Parse(commonTemplates[key]))
+
+	return &messageTemplate{parsed: tpl, legacy: legacy}
+}
+
+// render builds a notification message from data.
+//
+// A legacy template receives the log entries alone. Any other template
+// receives the full data, including the report.
+//
+// Parameters:
+//   - log: Logger for diagnostics.
 //   - data: Notification data.
 //
 // Returns:
 //   - string: Rendered message.
 //   - error: Non-nil if templating fails, nil on success.
-func (n *shoutrrrTypeNotifier) buildMessage(data notificationData) (string, error) {
-	log := n.ll()
-
+func (m *messageTemplate) render(log *zerolog.Logger, data notificationData) (string, error) {
 	var body bytes.Buffer
 
 	dataSource := any(data)
-	if n.legacyTemplate {
+	if m.legacy {
 		dataSource = data.Entries // Use entries only for legacy mode.
 	}
 
@@ -33,7 +97,7 @@ func (n *shoutrrrTypeNotifier) buildMessage(data notificationData) (string, erro
 
 	if log.GetLevel() <= zerolog.DebugLevel {
 		log.Debug().
-			Bool("legacy_template", n.legacyTemplate).
+			Bool("legacy_template", m.legacy).
 			Int("entries_count", len(data.Entries)).
 			Int("container_count", reportCategoryCount(data.Report)).
 			Bool("report_available", reportAvailable).
@@ -41,12 +105,12 @@ func (n *shoutrrrTypeNotifier) buildMessage(data notificationData) (string, erro
 	}
 
 	// Execute template with data.
-	err := n.template.Execute(&body, dataSource)
+	err := m.parsed.Execute(&body, dataSource)
 	if err != nil {
 		log.Debug().
 			Err(err).
-			Bool("legacy_template", n.legacyTemplate).
-			Str("template_name", n.template.Name()).
+			Bool("legacy_template", m.legacy).
+			Str("template_name", m.parsed.Name()).
 			Msg("Template execution failed")
 
 		return "", fmt.Errorf("failed to execute template: %w", err)
@@ -57,8 +121,8 @@ func (n *shoutrrrTypeNotifier) buildMessage(data notificationData) (string, erro
 	// Log template processing result
 	log.Debug().
 		Int("msg_length", len(msg)).
-		Bool("legacy_template", n.legacyTemplate).
-		Str("template_name", n.template.Name()).
+		Bool("legacy_template", m.legacy).
+		Str("template_name", m.parsed.Name()).
 		Int("entries_count", len(data.Entries)).
 		Msg("Template processing completed successfully")
 
@@ -88,51 +152,4 @@ func reportCategoryCount(report types.Report) int {
 		len(report.Stale()) +
 		len(report.Fresh()) +
 		len(report.Restarted())
-}
-
-// getShoutrrrTemplate retrieves or generates a template.
-//
-// Parameters:
-//   - log: Logger for diagnostics.
-//   - tplString: Template string.
-//   - legacy: Use legacy mode if true.
-//
-// Returns:
-//   - *template.Template: Parsed or default template.
-//   - error: Non-nil if parsing fails, nil on success.
-func getShoutrrrTemplate(log *zerolog.Logger, tplString string, legacy bool) (*template.Template, error) {
-	tplBase := template.New("").Funcs(templateFuncs)
-
-	// Use common template if specified.
-	builtin, found := commonTemplates[tplString]
-	if found {
-		log.Debug().Str("template", tplString).Msg("Using common template")
-		tplString = builtin
-	}
-
-	var tpl *template.Template
-
-	var err error
-
-	// Parse provided template or use default based on presence of tplString.
-	switch {
-	case tplString != "":
-		// Parse provided template if non-empty.
-		tpl, err = tplBase.Parse(tplString)
-		if err != nil {
-			log.Debug().Err(err).Msg("Parse failed")
-
-			return nil, fmt.Errorf("failed to parse template: %w", err)
-		}
-	default:
-		// Fall back to default template.
-		key := "default"
-		if legacy {
-			key = "default-legacy"
-		}
-
-		tpl = template.Must(tplBase.Parse(commonTemplates[key]))
-	}
-
-	return tpl, nil
 }

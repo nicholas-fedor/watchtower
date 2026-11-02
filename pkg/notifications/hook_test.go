@@ -48,11 +48,7 @@ func TestRun_EventFieldMapPreservesLargeIntegers(t *testing.T) {
 	// Template must render the exact decimal digits (no scientific notation).
 	const tpl = `{{ range .Entries }}{{ index .Data "removed_orchestrators" }}{{ end }}`
 
-	notifier, err := createNotifierWithTemplate(t, tpl, false)
-	require.NoError(t, err)
-
-	rendered, err := notifier.buildMessage(notificationData{Entries: entries})
-	require.NoError(t, err)
+	rendered := getTemplatedResult(t, tpl, false, notificationData{Entries: entries})
 	require.Equal(t, "9007199254740993", rendered)
 
 	n.Close()

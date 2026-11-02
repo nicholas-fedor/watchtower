@@ -11,7 +11,6 @@ import (
 	"sync/atomic"
 	"testing"
 	"testing/synctest"
-	"text/template"
 	"time"
 
 	"github.com/rs/zerolog"
@@ -305,7 +304,7 @@ func sendNotificationsWithBlockingRouter(t *testing.T) (*shoutrrrTypeNotifier, *
 		ctx:    ctx,
 	}
 
-	tpl, err := getShoutrrrTemplate(newTestLogger(t), "", legacy)
+	tpl, err := newMessageTemplate(newTestLogger(t), "", legacy)
 	if err != nil {
 		cancel()
 
@@ -313,15 +312,14 @@ func sendNotificationsWithBlockingRouter(t *testing.T) (*shoutrrrTypeNotifier, *
 	}
 
 	shoutrrr := &shoutrrrTypeNotifier{
-		template:       tpl,
-		messages:       make(chan string, 1),
-		done:           make(chan struct{}),
-		Router:         router,
-		legacyTemplate: legacy,
-		params:         &shoutrrrTypes.Params{},
-		ctx:            ctx,
-		cancel:         cancel,
-		delay:          time.Duration(0),
+		template: tpl,
+		messages: make(chan string, 1),
+		done:     make(chan struct{}),
+		Router:   router,
+		params:   &shoutrrrTypes.Params{},
+		ctx:      ctx,
+		cancel:   cancel,
+		delay:    time.Duration(0),
 	}
 
 	entry := &notificationEntry{
@@ -341,37 +339,6 @@ func sendNotificationsWithBlockingRouter(t *testing.T) (*shoutrrrTypeNotifier, *
 	return shoutrrr, router, nil
 }
 
-// createNotifierWithTemplate creates a notifier with a specified template for testing.
-// It returns the notifier and an error, falling back to a default template if parsing fails.
-//
-// TODO: Remove legacy parameter and default-legacy fallback when legacy notification types are removed.
-//
-//nolint:godox
-func createNotifierWithTemplate(t *testing.T, tplString string, legacy bool) (*shoutrrrTypeNotifier, error) {
-	t.Helper()
-
-	tpl, err := getShoutrrrTemplate(newTestLogger(t), tplString, legacy)
-	if err != nil {
-		_ = err // template construction error ignored for this helper
-
-		tplBase := template.New("").Funcs(templateFuncs)
-
-		defaultKey := "default"
-		if legacy {
-			defaultKey = "default-legacy"
-		}
-
-		tpl = template.Must(tplBase.Parse(commonTemplates[defaultKey]))
-		// Do not reset err.
-		// Keep it to indicate the original parsing failure.
-	}
-
-	return &shoutrrrTypeNotifier{
-		template:       tpl,
-		legacyTemplate: legacy,
-	}, err
-}
-
 // getTemplatedResult generates a templated message for testing.
 // It builds and returns the message string, expecting no errors.
 //
@@ -381,9 +348,11 @@ func createNotifierWithTemplate(t *testing.T, tplString string, legacy bool) (*s
 func getTemplatedResult(t *testing.T, tplString string, legacy bool, data notificationData) string {
 	t.Helper()
 
-	notifier, err := createNotifierWithTemplate(t, tplString, legacy)
+	log := newTestLogger(t)
+
+	tpl, err := newMessageTemplate(log, tplString, legacy)
 	require.NoError(t, err)
-	msg, err := notifier.buildMessage(data)
+	msg, err := tpl.render(log, data)
 	require.NoError(t, err)
 
 	return msg
@@ -704,24 +673,23 @@ func TestGracePeriodAllowsInFlightMessages(t *testing.T) {
 			ctx:        ctx,
 		}
 
-		tpl, err := getShoutrrrTemplate(newTestLogger(t), "", true)
+		tpl, err := newMessageTemplate(newTestLogger(t), "", true)
 		if err != nil {
 			cancel()
 			t.Fatal(err)
 		}
 
 		shoutrrr := &shoutrrrTypeNotifier{
-			template:       tpl,
-			messages:       make(chan string, 1),
-			done:           make(chan struct{}),
-			stop:           make(chan struct{}),
-			Router:         controlledR,
-			legacyTemplate: true,
-			params:         &shoutrrrTypes.Params{},
-			ctx:            ctx,
-			cancel:         cancel,
-			delay:          time.Duration(0),
-			receiving:      atomic.Bool{},
+			template:  tpl,
+			messages:  make(chan string, 1),
+			done:      make(chan struct{}),
+			stop:      make(chan struct{}),
+			Router:    controlledR,
+			params:    &shoutrrrTypes.Params{},
+			ctx:       ctx,
+			cancel:    cancel,
+			delay:     time.Duration(0),
+			receiving: atomic.Bool{},
 		}
 		shoutrrr.receiving.Store(true)
 
@@ -884,10 +852,10 @@ func TestCreateNotifier_InvalidTemplateFallsBackToDefault(t *testing.T) {
 			fallback := createNotifier(newTestLogger(t), []string{}, zerolog.TraceLevel, "", legacy, StaticData{}, false, 0)
 			t.Cleanup(fallback.Close)
 
-			want, err := fallback.buildMessage(data)
+			want, err := fallback.template.render(fallback.ll(), data)
 			require.NoError(t, err)
 
-			got, err := invalid.buildMessage(data)
+			got, err := invalid.template.render(invalid.ll(), data)
 			require.NoError(t, err)
 			assert.Equal(t, want, got)
 		})

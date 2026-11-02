@@ -87,7 +87,7 @@ func (n *shoutrrrTypeNotifier) Run(event *zerolog.Event, level zerolog.Level, me
 			Str("message", entry.Message).
 			Str("entry_level", entry.Level).
 			Int("entries_count", entriesCount).
-			Bool("legacy_template", n.legacyTemplate).
+			Bool("legacy_template", n.template.legacy).
 			Msg("Log entry queued for batching")
 
 		return
@@ -97,7 +97,7 @@ func (n *shoutrrrTypeNotifier) Run(event *zerolog.Event, level zerolog.Level, me
 	n.ll().Debug().
 		Str("message", entry.Message).
 		Str("entry_level", entry.Level).
-		Bool("legacy_template", n.legacyTemplate).
+		Bool("legacy_template", n.template.legacy).
 		Msg("Log entry sent immediately (not batching)")
 	n.sendEntries([]*notificationEntry{entry}, nil)
 }
