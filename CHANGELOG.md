@@ -156,6 +156,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Chores
 
+- Update module connectrpc.com/connect to v1.21.1 by @renovate[bot] in [#3384](https://github.com/nicholas-fedor/watchtower/pull/3384)
 - Update module github.com/docker/compose/v5 to v5.7.0 by @renovate[bot] in [#3380](https://github.com/nicholas-fedor/watchtower/pull/3380)
 - Update module go.yaml.in/yaml/v4 to v4.0.0-rc.9 by @renovate[bot] in [#3379](https://github.com/nicholas-fedor/watchtower/pull/3379)
 - Update module go.yaml.in/yaml/v2 to v2.4.5 by @renovate[bot] in [#3375](https://github.com/nicholas-fedor/watchtower/pull/3375)
