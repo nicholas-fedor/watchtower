@@ -12,17 +12,13 @@ import (
 	"github.com/nicholas-fedor/watchtower/internal/container/redact"
 	"github.com/nicholas-fedor/watchtower/internal/observability/logging"
 	"github.com/nicholas-fedor/watchtower/internal/observability/notify/format"
+	"github.com/nicholas-fedor/watchtower/internal/observability/notify/legacy/email"
+	"github.com/nicholas-fedor/watchtower/internal/observability/notify/legacy/gotify"
+	"github.com/nicholas-fedor/watchtower/internal/observability/notify/legacy/msteams"
+	"github.com/nicholas-fedor/watchtower/internal/observability/notify/legacy/slack"
 	notifyConfig "github.com/nicholas-fedor/watchtower/internal/settings/config/notify"
 	"github.com/nicholas-fedor/watchtower/pkg/types"
 )
-
-// colorHex is the default notification color used for services that support it
-// (formatted as a CSS hex string).
-const colorHex = "#406170"
-
-// colorInt is the default notification color used for services that support it
-// (as an int value).
-const colorInt = 0x406170
 
 // errUnknownNotificationType indicates an unsupported legacy notification type name.
 var errUnknownNotificationType = errors.New("unknown notification type")
@@ -221,11 +217,13 @@ type legacyNotifierCtor func(log *zerolog.Logger, legacy notifyConfig.Legacy) ty
 
 // legacyNotifierCtors maps legacy notification type names to constructors.
 // shoutrrr is omitted so those entries are skipped during append.
+//
+//nolint:staticcheck // SA1019: legacy notification types until v2.
 var legacyNotifierCtors = map[string]legacyNotifierCtor{
-	emailType:   newEmailNotifier,
-	slackType:   newSlackNotifier,
-	msTeamsType: newMsTeamsNotifier,
-	gotifyType:  newGotifyNotifier,
+	email.Type:   email.New,
+	slack.Type:   slack.New,
+	msteams.Type: msteams.New,
+	gotify.Type:  gotify.New,
 }
 
 // appendLegacyURLs adds shoutrrr URLs from legacy notification type names.
@@ -404,7 +402,7 @@ func getTitle(log *zerolog.Logger, hostname, tag string) string {
 func LogLegacyDeprecationWarnings(log *zerolog.Logger, notificationTypes []string) {
 	for _, notificationType := range notificationTypes {
 		switch notificationType {
-		case emailType, slackType, msTeamsType, gotifyType:
+		case email.Type, slack.Type, msteams.Type, gotify.Type: //nolint:staticcheck // SA1019: legacy notification types until v2.
 			log.Warn().
 				Msgf("Using deprecated legacy %s notification configuration. "+
 					"Use the notification-url configuration option instead.",

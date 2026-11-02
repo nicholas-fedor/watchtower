@@ -1,27 +1,28 @@
-package notifications
+package gotify
 
 import (
 	"fmt"
 	"net/url"
 	"strings"
 
-	"github.com/nicholas-fedor/shoutrrr/pkg/services/push/gotify"
 	"github.com/rs/zerolog"
+
+	shoutrrrGotify "github.com/nicholas-fedor/shoutrrr/pkg/services/push/gotify"
 
 	"github.com/nicholas-fedor/watchtower/internal/container/redact"
 	notifyConfig "github.com/nicholas-fedor/watchtower/internal/settings/config/notify"
 	"github.com/nicholas-fedor/watchtower/pkg/types"
 )
 
-// gotifyType is the identifier for Gotify notifications.
+// Type is the identifier for Gotify notifications.
 //
 // Deprecated: Legacy gotify notification type is deprecated.
 // Use --notification-url with a gotify:// URL instead.
 //
-// TODO: Remove gotifyType constant for the v2 release.
+// TODO: Remove Type constant for the v2 release.
 //
 //nolint:godox
-const gotifyType = "gotify"
+const Type = "gotify"
 
 // gotifyTypeNotifier handles Gotify notifications.
 //
@@ -40,11 +41,11 @@ type gotifyTypeNotifier struct {
 	log                      *zerolog.Logger
 }
 
-// newGotifyNotifier creates a Gotify notifier from resolved legacy settings.
+// New creates a Gotify notifier from resolved legacy settings.
 //
 // Parameters:
 //   - log: Logger for configuration diagnostics and fatal validation errors.
-//   - legacy: Deprecated Gotify server settings (from process config or flags).
+//   - cfg: Deprecated Gotify server settings (from process config or flags).
 //
 // Returns:
 //   - types.ConvertibleNotifier: New Gotify notifier instance.
@@ -52,13 +53,13 @@ type gotifyTypeNotifier struct {
 // Deprecated: Legacy gotify notifier is deprecated.
 // Use --notification-url with a gotify:// URL instead.
 //
-// TODO: Remove newGotifyNotifier for the v2 release.
+// TODO: Remove New for the v2 release.
 //
 //nolint:godox
-func newGotifyNotifier(log *zerolog.Logger, legacy notifyConfig.Legacy) types.ConvertibleNotifier {
-	apiURL := requireGotifyURL(log, legacy.GotifyURL)
-	token := requireGotifyToken(log, legacy.GotifyToken)
-	skipVerify := legacy.GotifyTLSSkipVerify
+func New(log *zerolog.Logger, cfg notifyConfig.Legacy) types.ConvertibleNotifier {
+	apiURL := requireGotifyURL(log, cfg.GotifyURL)
+	token := requireGotifyToken(log, cfg.GotifyToken)
+	skipVerify := cfg.GotifyTLSSkipVerify
 
 	clog := log.With().
 		Str("url", redact.ServiceURL(apiURL)).
@@ -170,7 +171,7 @@ func (n *gotifyTypeNotifier) GetURL() (string, error) {
 	}
 
 	// Configure Gotify settings.
-	config := &gotify.Config{
+	config := &shoutrrrGotify.Config{
 		Host:               apiURL.Host,
 		Path:               apiURL.Path,
 		DisableTLS:         apiURL.Scheme == "http",

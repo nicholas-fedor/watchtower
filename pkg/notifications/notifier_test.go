@@ -17,6 +17,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/nicholas-fedor/watchtower/internal/observability/notify/format"
+	"github.com/nicholas-fedor/watchtower/internal/observability/notify/legacy"
 	"github.com/nicholas-fedor/watchtower/internal/settings"
 	notifyConfig "github.com/nicholas-fedor/watchtower/internal/settings/config/notify"
 	"github.com/nicholas-fedor/watchtower/internal/testutil/logcapture"
@@ -195,7 +196,7 @@ func TestNotifier(t *testing.T) {
 
 			channel := "123456789"
 			token := "abvsihdbau"
-			color := colorInt
+			color := legacy.ColorInt
 			username := "containrrrbot"
 			iconURL := "https://github.com/nicholas-fedor/watchtower/blob/main/watchtower-sq180.png"
 			expected := fmt.Sprintf(
@@ -280,7 +281,7 @@ func TestNotifier(t *testing.T) {
 			tokenA := "AAAAAAAAA"
 			tokenB := "BBBBBBBBB"
 			tokenC := "123456789123456789123456"
-			color := url.QueryEscape(colorHex)
+			color := url.QueryEscape(legacy.ColorHex)
 			iconURL := "https://github.com/nicholas-fedor/watchtower/blob/main/watchtower-sq180.png"
 			iconEmoji := "whale"
 
@@ -469,7 +470,7 @@ func TestNotifier(t *testing.T) {
 			t.Run("should return the expected URL", func(t *testing.T) {
 				t.Parallel()
 
-				color := url.QueryEscape(colorHex)
+				color := url.QueryEscape(legacy.ColorHex)
 
 				// Power Automate workflow incoming webhook URL.
 				hookURL := "https://default.environment.api.powerplatform.com/powerautomate/automations/direct/workflows/abc123/triggers/manual/paths/invoke?api-version=1&sp=%2Ftriggers%2Fmanual%2Frun&sv=1.0&sig=XXXXXXXX"
