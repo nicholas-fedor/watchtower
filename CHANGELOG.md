@@ -155,6 +155,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Chores
 
+- Update module github.com/docker/compose/v5 to v5.7.0 by @renovate[bot] in [#3380](https://github.com/nicholas-fedor/watchtower/pull/3380)
+- Update module go.yaml.in/yaml/v4 to v4.0.0-rc.9 by @renovate[bot] in [#3379](https://github.com/nicholas-fedor/watchtower/pull/3379)
 - Update module go.yaml.in/yaml/v2 to v2.4.5 by @renovate[bot] in [#3375](https://github.com/nicholas-fedor/watchtower/pull/3375)
 - Update module go.yaml.in/yaml/v4 to v4.0.0-rc.8 by @renovate[bot] in [#3359](https://github.com/nicholas-fedor/watchtower/pull/3359)
 - Update module github.com/cenkalti/backoff/v7 to v7.0.3 by @renovate[bot] in [#3348](https://github.com/nicholas-fedor/watchtower/pull/3348)
