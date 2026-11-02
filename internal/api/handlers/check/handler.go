@@ -9,7 +9,7 @@ import (
 	"github.com/rs/zerolog"
 
 	"github.com/nicholas-fedor/watchtower/internal/observability/events"
-	"github.com/nicholas-fedor/watchtower/pkg/notifications"
+	"github.com/nicholas-fedor/watchtower/internal/observability/notify"
 	"github.com/nicholas-fedor/watchtower/pkg/types"
 )
 
@@ -136,7 +136,7 @@ func (h *Handler) Handle(c fiber.Ctx) error {
 
 		defer func() {
 			if h.splitByContainer {
-				notifications.FlushSplitByContainer(h.notifier)
+				notify.FlushSplitByContainer(h.notifier)
 				h.notifier.StartNotification(true)
 			} else {
 				h.notifier.SendNotification(nil)

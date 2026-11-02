@@ -25,13 +25,13 @@ import (
 	"github.com/nicholas-fedor/watchtower/internal/observability/events"
 	"github.com/nicholas-fedor/watchtower/internal/observability/logging"
 	"github.com/nicholas-fedor/watchtower/internal/observability/metrics"
+	"github.com/nicholas-fedor/watchtower/internal/observability/notify"
 	"github.com/nicholas-fedor/watchtower/internal/registry/ratelimit"
 	"github.com/nicholas-fedor/watchtower/internal/settings"
 	"github.com/nicholas-fedor/watchtower/internal/update"
 	"github.com/nicholas-fedor/watchtower/internal/update/cleanup"
 	"github.com/nicholas-fedor/watchtower/internal/update/schedule"
 	"github.com/nicholas-fedor/watchtower/internal/update/selfupdate"
-	"github.com/nicholas-fedor/watchtower/pkg/notifications"
 	"github.com/nicholas-fedor/watchtower/pkg/types"
 )
 
@@ -86,7 +86,7 @@ var (
 
 	// notifier is the notification system instance responsible for sending update status messages to configured channels.
 	//
-	// It is initialized in preRun from appCfg.Notify via notifications.NewNotifier, supporting
+	// It is initialized in preRun from appCfg.Notify via notify.NewNotifier, supporting
 	// Shoutrrr URLs and (deprecated) legacy types such as email, Slack, or MSTeams.
 	notifier types.Notifier
 
@@ -449,7 +449,7 @@ func (p *process) preRun(cmd *cobra.Command, _ []string) error {
 	// Set up the notification client from loaded process config (appCfg.Notify).
 	// RegisterHook attaches the notifier to p.log and updates p.log in place to the
 	// hooked logger so subsequent application logging is captured for notifications.
-	notifier = notifications.NewNotifier(p.log, appCfg.Notify)
+	notifier = notify.NewNotifier(p.log, appCfg.Notify)
 	notifier.RegisterHook(p.log)
 
 	// Without the container's labels, a scope set only by its scope label is
@@ -471,7 +471,7 @@ func (p *process) preRun(cmd *cobra.Command, _ []string) error {
 	}
 
 	// Log deprecated notification configuration options, if set.
-	notifications.LogLegacyDeprecationWarnings(p.log, appCfg.Notify.LegacyTypes)
+	notify.LogLegacyDeprecationWarnings(p.log, appCfg.Notify.LegacyTypes)
 
 	return nil
 }

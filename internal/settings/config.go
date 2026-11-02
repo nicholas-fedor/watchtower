@@ -42,7 +42,7 @@ type Config struct {
 	Compatibility compatibility.Compatibility
 	// API holds HTTP API transport, auth, and endpoint settings.
 	API api.API
-	// Notify holds notification URLs and related options for notifications.NewNotifier.
+	// Notify holds notification URLs and related options for notify.NewNotifier.
 	Notify notify.Notify
 	// Logging holds console log format and level settings.
 	Logging logging.Logging

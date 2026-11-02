@@ -1,4 +1,4 @@
-package notifications
+package notify
 
 import (
 	"github.com/rs/zerolog"

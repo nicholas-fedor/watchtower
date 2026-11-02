@@ -13,8 +13,8 @@ import (
 	"github.com/spf13/cobra"
 
 	containerClient "github.com/nicholas-fedor/watchtower/internal/container/client"
+	"github.com/nicholas-fedor/watchtower/internal/observability/notify"
 	"github.com/nicholas-fedor/watchtower/internal/settings"
-	"github.com/nicholas-fedor/watchtower/pkg/notifications"
 	"github.com/nicholas-fedor/watchtower/pkg/types"
 )
 
@@ -128,7 +128,7 @@ func runNotifyUpgradeE(cmd *cobra.Command, _ []string, log *zerolog.Logger) (*ze
 		return log, fmt.Errorf("load configuration: %w", loadErr)
 	}
 
-	urls, buildErr := notifications.BuildURLs(log, cfg.Notify)
+	urls, buildErr := notify.BuildURLs(log, cfg.Notify)
 	if buildErr != nil {
 		return log, fmt.Errorf("build notification URLs: %w", buildErr)
 	}
