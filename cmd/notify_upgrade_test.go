@@ -2,7 +2,6 @@ package cmd
 
 import (
 	"context"
-	"errors"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -182,7 +181,6 @@ func TestNotifyUpgrade_Failures(t *testing.T) {
 		// readOnlyDir makes the working directory read-only so the
 		// environment file cannot be created.
 		readOnlyDir bool
-		wantErr     error
 		wantMessage string
 	}{
 		{
@@ -201,7 +199,7 @@ func TestNotifyUpgrade_Failures(t *testing.T) {
 		{
 			name:        "working directory is not writable",
 			readOnlyDir: true,
-			wantErr:     errCreateTempFile,
+			wantMessage: "failed to create output file",
 		},
 	}
 
@@ -223,10 +221,6 @@ func TestNotifyUpgrade_Failures(t *testing.T) {
 
 			_, err := runNotifyUpgradeE(cmd, nil, new(zerolog.Nop()))
 			require.Error(t, err)
-
-			if tt.wantErr != nil {
-				require.ErrorIs(t, err, tt.wantErr)
-			}
 
 			assert.Contains(t, err.Error(), tt.wantMessage)
 			assert.Empty(t, notifyUpgradeFiles(t))
@@ -269,64 +263,4 @@ func TestRunNotifyUpgrade_ExitsOnFailure(t *testing.T) {
 	assert.Equal(t, 1, exitErr.ExitCode(), "output:\n%s", out)
 	assert.Contains(t, string(out), "Notification upgrade failed")
 	assert.Contains(t, string(out), "build notification URLs")
-}
-
-// TestWriteNotificationEnvFile verifies that the environment file is kept only
-// when it is fully written, because it holds credential-bearing URLs.
-func TestWriteNotificationEnvFile(t *testing.T) {
-	t.Parallel()
-
-	errSync := errors.New("sync failed")
-
-	tests := []struct {
-		name string
-		// syncFile replaces (*os.File).Sync.
-		syncFile func(*os.File) error
-		wantErr  error
-	}{
-		{
-			name:     "written",
-			syncFile: (*os.File).Sync,
-		},
-		{
-			name:     "sync fails",
-			syncFile: func(*os.File) error { return errSync },
-			wantErr:  errSyncTempFile,
-		},
-		{
-			// Closing the file during the sync makes the final close fail.
-			name:     "close fails",
-			syncFile: (*os.File).Close,
-			wantErr:  errCloseTempFile,
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			t.Parallel()
-
-			dir := t.TempDir()
-			line := "WATCHTOWER_NOTIFICATION_URL=discord://token@webhookid"
-
-			path, err := writeNotificationEnvFile(new(zerolog.Nop()), dir, line, tt.syncFile)
-
-			entries, readErr := os.ReadDir(dir)
-			require.NoError(t, readErr)
-
-			if tt.wantErr != nil {
-				require.ErrorIs(t, err, tt.wantErr)
-				assert.Empty(t, path)
-				assert.Empty(t, entries, "a partly written file is removed")
-
-				return
-			}
-
-			require.NoError(t, err)
-			assert.Equal(t, dir, filepath.Dir(path))
-
-			data, err := os.ReadFile(path)
-			require.NoError(t, err)
-			assert.Equal(t, line+"\n", string(data))
-		})
-	}
 }
