@@ -1447,6 +1447,62 @@ Turns out everything is on fire
 
 // TestSlowNotificationNotSent verifies that a message is not reported as sent
 // while the router is still sending it.
+// TestProcessSendErrors_RedactsURLs verifies that a failed send logs the
+// service URL as its scheme only, in every failure category. Some services
+// carry their credential in the host, such as an IFTTT key or a Pushbullet
+// token, so keeping the host would write it to the log.
+func TestProcessSendErrors_RedactsURLs(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name    string
+		url     string
+		err     error
+		wantURL string
+	}{
+		{
+			name:    "authentication failure",
+			url:     "ifttt://iftttsecretkey/?events=deploy",
+			err:     errors.New("unauthorized"),
+			wantURL: "ifttt://[redacted]",
+		},
+		{
+			name:    "network failure",
+			url:     "pushbullet://pushbulletsecrettoken/device",
+			err:     errors.New("connection refused"),
+			wantURL: "pushbullet://[redacted]",
+		},
+		{
+			name:    "rate limit",
+			url:     "notifiarr://notifiarrsecretkey?channel=1",
+			err:     errors.New("too many requests"),
+			wantURL: "notifiarr://[redacted]",
+		},
+		{
+			name:    "unknown failure",
+			url:     "wecom://wecomsecretkey",
+			err:     errors.New("unexpected response"),
+			wantURL: "wecom://[redacted]",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			log, logBuffer := newBufferLogger()
+			notifier := createTestNotifier(log, []string{"logger://"}, allButTrace, true, StaticData{}, false, 0)
+			notifier.Urls = []string{tt.url}
+
+			processSendErrors(notifier, []error{tt.err})
+
+			output := logBuffer.String()
+			assert.Contains(t, output, `"url":"`+tt.wantURL+`"`)
+			assert.NotContains(t, output, "secret")
+		})
+	}
+}
+
 func TestSlowNotificationNotSent(t *testing.T) {
 	synctest.Test(t, func(t *testing.T) {
 		shoutrrr, blockingRouter, err := sendNotificationsWithBlockingRouter(t)

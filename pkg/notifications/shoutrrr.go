@@ -5,7 +5,6 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"net/url"
 	"os"
 	"reflect"
 	"strings"
@@ -32,9 +31,6 @@ const shoutrrrType = "shoutrrr"
 //
 // It sets a reasonable default for expected log entry batch sizes.
 const initialEntriesCapacity = 10
-
-// maxURLLengthForLogging defines the maximum length of URLs displayed in logs to avoid exposing sensitive information.
-const maxURLLengthForLogging = 50
 
 // messageChannelBufferSize defines the buffer size for the notification message channel.
 const messageChannelBufferSize = 1000
@@ -293,7 +289,7 @@ func processSendErrors(notifier *shoutrrrTypeNotifier, errs []error) {
 		if err != nil {
 			failureCount++
 			scheme := getScheme(notifier.Urls[i])
-			sanitizedURL := sanitizeURLForLogging(notifier.Urls[i])
+			sanitizedURL := redact.ServiceURL(notifier.Urls[i])
 
 			// Diagnostic logging: Categorize failure types
 			errStr := err.Error()
@@ -1262,55 +1258,4 @@ func getShoutrrrTemplate(log *zerolog.Logger, tplString string, legacy bool) (*t
 	}
 
 	return tpl, nil
-}
-
-// safeTruncate truncates a string to a maximum length for logging, appending "..." if truncated.
-// Uses rune-aware truncation to avoid breaking UTF-8 sequences.
-// If the string is shorter than or equal to maxURLLengthForLogging, returns it unchanged.
-//
-// Parameters:
-//   - s: String to truncate.
-//
-// Returns:
-//   - string: Truncated string or original if no truncation needed.
-func safeTruncate(s string) string {
-	runes := []rune(s)
-	if len(runes) <= maxURLLengthForLogging {
-		return s
-	}
-
-	return string(runes[:maxURLLengthForLogging]) + "..."
-}
-
-// sanitizeURLForLogging removes credentials and query parameters from URLs before truncating.
-// Falls back to safeTruncate on parse errors to ensure safe logging.
-//
-// Parameters:
-//   - rawURL: URL string to sanitize.
-//
-// Returns:
-//   - string: Sanitized and truncated URL safe for logging.
-func sanitizeURLForLogging(rawURL string) string {
-	parsedURL, err := url.Parse(rawURL)
-	if err != nil {
-		// Fallback to safe truncation if URL parsing fails
-		return safeTruncate(rawURL)
-	}
-
-	// Remove user info (credentials)
-	parsedURL.User = nil
-
-	// Remove query parameters
-	parsedURL.RawQuery = ""
-	parsedURL.Fragment = ""
-
-	// Remove path and opaque data (tokens/webhook IDs often live here)
-	parsedURL.Path = ""
-	parsedURL.RawPath = ""
-	parsedURL.Opaque = ""
-
-	// Reconstruct the URL without sensitive parts
-	sanitized := parsedURL.String()
-
-	return safeTruncate(sanitized)
 }
