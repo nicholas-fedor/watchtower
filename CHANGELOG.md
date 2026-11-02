@@ -69,6 +69,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- Move the notifier to internal/observability/notify by @nicholas-fedor in [#3377](https://github.com/nicholas-fedor/watchtower/pull/3377)
 - Move legacy notifiers to notify/legacy by @nicholas-fedor in [#3373](https://github.com/nicholas-fedor/watchtower/pull/3373)
 - Move templates and their data to notify/format by @nicholas-fedor in [#3371](https://github.com/nicholas-fedor/watchtower/pull/3371)
 - Render messages through a template type by @nicholas-fedor in [#3369](https://github.com/nicholas-fedor/watchtower/pull/3369)
