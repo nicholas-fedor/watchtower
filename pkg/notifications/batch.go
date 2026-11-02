@@ -35,7 +35,7 @@ func (n *shoutrrrTypeNotifier) StartNotification(suppressSummary bool) {
 	}
 
 	n.ll().Debug().
-		Bool("legacy_template", n.legacyTemplate).
+		Bool("legacy_template", n.template.legacy).
 		Bool("receiving", n.receiving.Load()).
 		Int("entries_count", preResetCount).
 		Bool("suppress_summary", suppressSummary).
@@ -83,7 +83,7 @@ func (n *shoutrrrTypeNotifier) SendNotification(report types.Report) {
 
 	n.ll().Debug().
 		Int("entries_count", len(entries)).
-		Bool("legacy_template", n.legacyTemplate).
+		Bool("legacy_template", n.template.legacy).
 		Bool("report_available", report != nil).
 		Msg("SendNotification called - sending queued entries and report")
 

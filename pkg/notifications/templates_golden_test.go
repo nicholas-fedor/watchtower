@@ -384,14 +384,12 @@ func TestBuiltInTemplateOutput(t *testing.T) {
 	for _, templateName := range slices.Sorted(maps.Keys(commonTemplates)) {
 		legacy := templateName == "default-legacy"
 
-		tpl, err := getShoutrrrTemplate(&nop, templateName, legacy)
+		tpl, err := newMessageTemplate(&nop, templateName, legacy)
 		require.NoError(t, err, "template %q", templateName)
-
-		notifier := &shoutrrrTypeNotifier{template: tpl, legacyTemplate: legacy}
 
 		for _, fixtureName := range slices.Sorted(maps.Keys(fixtures)) {
 			t.Run(templateName+"/"+fixtureName, func(t *testing.T) {
-				output, err := notifier.buildMessage(fixtures[fixtureName])
+				output, err := tpl.render(&nop, fixtures[fixtureName])
 				if err != nil {
 					output = "error: " + err.Error()
 				}

@@ -1,27 +1,21 @@
 package notifications
 
 import (
-	"bytes"
 	"encoding/json"
 	"strings"
 	"testing"
-	"text/template"
-	"time"
 
-	"github.com/rs/zerolog"
-	"github.com/spf13/cobra"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
 	"github.com/nicholas-fedor/watchtower/internal/container/provenance"
-	"github.com/nicholas-fedor/watchtower/internal/settings"
 	"github.com/nicholas-fedor/watchtower/internal/update/state"
 	"github.com/nicholas-fedor/watchtower/pkg/types"
 )
 
-// TestBuildMessage_CommonTemplateName verifies that naming a built-in template formats
+// TestRender_CommonTemplateName verifies that naming a built-in template formats
 // messages with it.
-func TestBuildMessage_CommonTemplateName(t *testing.T) {
+func TestRender_CommonTemplateName(t *testing.T) {
 	t.Parallel()
 
 	t.Run("should format using that template", func(t *testing.T) {
@@ -35,9 +29,9 @@ updt1 (mock/updt1:latest): Updated
 	})
 }
 
-// TestBuildMessage_PorcelainJSON verifies that the porcelain JSON template renders
+// TestRender_PorcelainJSON verifies that the porcelain JSON template renders
 // valid JSON with each container's details.
-func TestBuildMessage_PorcelainJSON(t *testing.T) {
+func TestRender_PorcelainJSON(t *testing.T) {
 	t.Parallel()
 
 	t.Run("should produce valid JSON with container details", func(t *testing.T) {
@@ -78,13 +72,13 @@ func TestBuildMessage_PorcelainJSON(t *testing.T) {
 	})
 }
 
-// TestBuildMessage_LegacyTemplates verifies how the legacy templates format log
+// TestRender_LegacyTemplates verifies how the legacy templates format log
 // entries, with the default template or a custom one.
 //
 // TODO: Remove these tests when legacy notification types are removed.
 //
 //nolint:godox
-func TestBuildMessage_LegacyTemplates(t *testing.T) {
+func TestRender_LegacyTemplates(t *testing.T) {
 	t.Parallel()
 
 	t.Run("no custom template is provided", func(t *testing.T) {
@@ -93,39 +87,17 @@ func TestBuildMessage_LegacyTemplates(t *testing.T) {
 		t.Run("should format the messages using the default template", func(t *testing.T) {
 			t.Parallel()
 
-			cmd := new(cobra.Command)
-			settings.RegisterAll(cmd)
-
-			shoutrrr := createTestNotifier(
-				newTestLogger(t),
-				[]string{},
-				zerolog.TraceLevel,
-				true,
-				StaticData{},
-				false,
-				time.Second,
-			)
 			entries := []*notificationEntry{
 				{Message: "foo bar"},
 			}
 
-			s, err := shoutrrr.buildMessage(notificationData{Entries: entries})
-			require.NoError(t, err)
+			s := getTemplatedResult(t, "", true, notificationData{Entries: entries})
 			assert.Equal(t, "foo bar", s)
 		})
 
 		t.Run("should format image usage-check skips without dumping raw fields", func(t *testing.T) {
 			t.Parallel()
 
-			shoutrrr := createTestNotifier(
-				newTestLogger(t),
-				[]string{},
-				zerolog.TraceLevel,
-				true,
-				StaticData{},
-				false,
-				time.Second,
-			)
 			entries := []*notificationEntry{
 				{
 					Message: "Failed to list containers for image usage check, skipping removal",
@@ -137,8 +109,7 @@ func TestBuildMessage_LegacyTemplates(t *testing.T) {
 				},
 			}
 
-			s, err := shoutrrr.buildMessage(notificationData{Entries: entries})
-			require.NoError(t, err)
+			s := getTemplatedResult(t, "", true, notificationData{Entries: entries})
 			assert.Equal(t, "Skipped image cleanup: ghcr.io/amir20/dtop:latest (769846626f2f): "+
 				`Get "http://socket-proxy-write:2375/v1.55/containers/json?all=1": terminated signal received`, s)
 			assert.NotContains(t, s, " | ")
@@ -147,15 +118,6 @@ func TestBuildMessage_LegacyTemplates(t *testing.T) {
 		t.Run("should format Docker image usage budget messages without dumping raw fields", func(t *testing.T) {
 			t.Parallel()
 
-			shoutrrr := createTestNotifier(
-				newTestLogger(t),
-				[]string{},
-				zerolog.TraceLevel,
-				true,
-				StaticData{},
-				false,
-				time.Second,
-			)
 			entries := []*notificationEntry{
 				{
 					Message: "Docker image usage exceeds configured maximum",
@@ -199,8 +161,7 @@ func TestBuildMessage_LegacyTemplates(t *testing.T) {
 				},
 			}
 
-			s, err := shoutrrr.buildMessage(notificationData{Entries: entries})
-			require.NoError(t, err)
+			s := getTemplatedResult(t, "", true, notificationData{Entries: entries})
 			assert.Contains(t, s, "Docker image usage exceeds configured maximum: 10 KB of 10 KB used (2 KB reclaimable, 4 images)")
 			assert.Contains(t, s, "Docker image usage exceeds configured warning threshold: 8 KB of 8 KB used (2 KB reclaimable, 4 images)")
 			assert.Contains(t, s, "Failed to query Docker image disk usage: df unavailable")
@@ -217,14 +178,6 @@ func TestBuildMessage_LegacyTemplates(t *testing.T) {
 			t.Parallel()
 
 			tplString := `{{range .}}{{.Level}}: {{.Message}}{{println}}{{end}}`
-			tpl, err := getShoutrrrTemplate(newTestLogger(t), tplString, true)
-			require.NoError(t, err)
-
-			shoutrrr := &shoutrrrTypeNotifier{
-				template:       tpl,
-				legacyTemplate: true,
-			}
-
 			entries := []*notificationEntry{
 				{
 					Level:   "info",
@@ -232,8 +185,7 @@ func TestBuildMessage_LegacyTemplates(t *testing.T) {
 				},
 			}
 
-			s, err := shoutrrr.buildMessage(notificationData{Entries: entries})
-			require.NoError(t, err)
+			s := getTemplatedResult(t, tplString, true, notificationData{Entries: entries})
 			assert.Equal(t, "info: foo bar\n", s)
 		})
 	})
@@ -249,26 +201,6 @@ func TestBuildMessage_LegacyTemplates(t *testing.T) {
 
 				assert.Empty(t, getTemplatedResult(t, ``, true, mockDataAllFresh))
 			})
-		})
-	})
-
-	t.Run("given an invalid custom template", func(t *testing.T) {
-		t.Parallel()
-
-		t.Run("should format the messages using the default template", func(t *testing.T) {
-			t.Parallel()
-
-			invNotif, err := createNotifierWithTemplate(t, `{{ intentionalSyntaxError`, true)
-			require.Error(t, err)
-			invMsg, err := invNotif.buildMessage(legacyMockData)
-			require.NoError(t, err)
-
-			defNotif, err := createNotifierWithTemplate(t, ``, true)
-			require.NoError(t, err)
-			defMsg, err := defNotif.buildMessage(legacyMockData)
-			require.NoError(t, err)
-
-			assert.Equal(t, defMsg, invMsg)
 		})
 	})
 
@@ -306,9 +238,9 @@ func TestBuildMessage_LegacyTemplates(t *testing.T) {
 	})
 }
 
-// TestBuildMessage_ReportTemplates verifies how report templates format a session
+// TestRender_ReportTemplates verifies how report templates format a session
 // report and its log entries.
-func TestBuildMessage_ReportTemplates(t *testing.T) {
+func TestRender_ReportTemplates(t *testing.T) {
 	t.Parallel()
 
 	t.Run("no custom template is provided", func(t *testing.T) {
@@ -394,16 +326,13 @@ func TestBuildMessage_ReportTemplates(t *testing.T) {
 				UpdatedReports: []types.ContainerReport{status},
 			}
 
-			tpl, err := template.New("git").Parse(
+			got := getTemplatedResult(
+				t,
 				`{{ range .Report.Updated }}{{ .Name }} {{ .Changelog }}{{ if .Source }} ({{ .Source }}){{ end }} repo={{ .GitRepo }}{{ end }}`,
+				false,
+				notificationData{Report: report},
 			)
-			require.NoError(t, err)
-
-			var buf bytes.Buffer
-
-			err = tpl.Execute(&buf, notificationData{Report: report})
-			require.NoError(t, err)
-			assert.Equal(t, "app https://github.com/org/app/releases (https://github.com/org/app) repo=https://github.com/org/app.git", buf.String())
+			assert.Equal(t, "app https://github.com/org/app/releases (https://github.com/org/app) repo=https://github.com/org/app.git", got)
 		})
 	})
 
@@ -523,11 +452,7 @@ Turns out everything is on fire
 func TestDefaultLegacyGitMessages(t *testing.T) {
 	t.Parallel()
 
-	tpl := template.Must(template.New("git").Funcs(templateFuncs).Parse(commonTemplates["default-legacy"]))
-
-	var buf bytes.Buffer
-
-	err := tpl.Execute(&buf, []*notificationEntry{
+	got := getTemplatedResult(t, "default-legacy", true, notificationData{Entries: []*notificationEntry{
 		{
 			Message: "Found new Git revision",
 			Data: map[string]any{
@@ -550,22 +475,19 @@ func TestDefaultLegacyGitMessages(t *testing.T) {
 			Message: "Started new container",
 			Data:    map[string]any{"container": "wtgit-semver", "new_id": "0f492bb11f3b"},
 		},
-	})
-	require.NoError(t, err)
+	}})
 	assert.Equal(t, strings.Join([]string{
 		"Found new Git revision: git.example.com/org/watchtower-git-support-test@v1.2.1 (7ab67c773bf4)",
 		"Built image: wtgit-semver:git-7ab67c773bf4 (27c196745ab8)",
 		"Stopped stale container: wtgit-semver (76caeb3ef2ce)",
 		"Started new container: wtgit-semver (0f492bb11f3b)",
-	}, "\n"), strings.TrimSpace(buf.String()))
+	}, "\n"), strings.TrimSpace(got))
 }
 
 // TestDefaultLegacyGitSkipAndComposeMessages verifies how the default legacy
 // template renders Git skip and Compose messages.
 func TestDefaultLegacyGitSkipAndComposeMessages(t *testing.T) {
 	t.Parallel()
-
-	tpl := template.Must(template.New("git").Funcs(templateFuncs).Parse(commonTemplates["default-legacy"]))
 
 	cases := []struct {
 		name    string
@@ -635,12 +557,11 @@ func TestDefaultLegacyGitSkipAndComposeMessages(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
 
-			var buf bytes.Buffer
-
-			err := tpl.Execute(&buf, []*notificationEntry{{Message: tc.message, Data: tc.data}})
-			require.NoError(t, err)
-			assert.Equal(t, tc.want, strings.TrimSpace(buf.String()))
-			assert.NotContains(t, buf.String(), "|")
+			got := getTemplatedResult(t, "default-legacy", true, notificationData{
+				Entries: []*notificationEntry{{Message: tc.message, Data: tc.data}},
+			})
+			assert.Equal(t, tc.want, strings.TrimSpace(got))
+			assert.NotContains(t, got, "|")
 		})
 	}
 }

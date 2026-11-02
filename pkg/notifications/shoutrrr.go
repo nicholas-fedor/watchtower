@@ -6,7 +6,6 @@ import (
 	"strings"
 	"sync"
 	"sync/atomic"
-	"text/template"
 	"time"
 
 	"github.com/nicholas-fedor/shoutrrr"
@@ -45,18 +44,17 @@ type router interface {
 // Uses mutex for thread-safe access to entries and sync.Once for idempotent operations.
 // Implements zerolog.Hook so log events are pushed via Run.
 type shoutrrrTypeNotifier struct {
-	Urls           []string              // Notification service URLs.
-	Router         router                // Router for sending messages.
-	entries        []*notificationEntry  // Queued log entries.
-	entriesMutex   sync.RWMutex          // Mutex for thread-safe access to entries.
-	logLevel       zerolog.Level         // Minimum log level for notifications.
-	template       *template.Template    // Template for message formatting.
-	messages       chan string           // Channel for message queuing.
-	done           chan struct{}         // Signal for send completion.
-	stop           chan struct{}         // Channel for stopping the notifier.
-	legacyTemplate bool                  // Use legacy log-only template if true.
-	params         *shoutrrrTypes.Params // Notification parameters.
-	data           StaticData            // Static notification data.
+	Urls         []string              // Notification service URLs.
+	Router       router                // Router for sending messages.
+	entries      []*notificationEntry  // Queued log entries.
+	entriesMutex sync.RWMutex          // Mutex for thread-safe access to entries.
+	logLevel     zerolog.Level         // Minimum log level for notifications.
+	template     *messageTemplate      // Template for message formatting.
+	messages     chan string           // Channel for message queuing.
+	done         chan struct{}         // Signal for send completion.
+	stop         chan struct{}         // Channel for stopping the notifier.
+	params       *shoutrrrTypes.Params // Notification parameters.
+	data         StaticData            // Static notification data.
 	//nolint:containedctx
 	ctx    context.Context    // Context for cancellation.
 	cancel context.CancelFunc // Cancel function for the context.
@@ -178,13 +176,12 @@ func createNotifier(
 	localLog := &local
 
 	// Parse or fallback to default template.
-	tpl, err := getShoutrrrTemplate(localLog, tplString, legacy)
+	tpl, err := newMessageTemplate(localLog, tplString, legacy)
 	if err != nil {
 		localLog.Error().Err(err).
 			Msg("Could not use configured notification template, falling back to default")
 
-		// An empty template string selects the built-in default, which always parses.
-		tpl, _ = getShoutrrrTemplate(localLog, "", legacy)
+		tpl = defaultMessageTemplate(legacy)
 	}
 
 	// Set logger based on stdout flag.
@@ -225,16 +222,15 @@ func createNotifier(
 		stop: make(
 			chan struct{},
 		), // Channel for stopping the notifier.
-		logLevel:       level,                                                 // Minimum log level for notifications.
-		template:       tpl,                                                   // Template for message formatting.
-		legacyTemplate: legacy,                                                // Use legacy log-only template if true.
-		data:           data,                                                  // Static notification data.
-		params:         params,                                                // Notification parameters.
-		ctx:            ctx,                                                   // Context for cancellation.
-		cancel:         cancel,                                                // Cancel function for the context.
-		delay:          delay,                                                 // Delay between sends.
-		entries:        make([]*notificationEntry, 0, initialEntriesCapacity), // Queued log entries.
-		localLog:       localLog,                                              // Loop-safe internal logger.
+		logLevel: level,                                                 // Minimum log level for notifications.
+		template: tpl,                                                   // Template for message formatting.
+		data:     data,                                                  // Static notification data.
+		params:   params,                                                // Notification parameters.
+		ctx:      ctx,                                                   // Context for cancellation.
+		cancel:   cancel,                                                // Cancel function for the context.
+		delay:    delay,                                                 // Delay between sends.
+		entries:  make([]*notificationEntry, 0, initialEntriesCapacity), // Queued log entries.
+		localLog: localLog,                                              // Loop-safe internal logger.
 	}
 }
 

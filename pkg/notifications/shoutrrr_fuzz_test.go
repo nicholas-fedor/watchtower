@@ -13,8 +13,8 @@ var testFuzzLog = func() *zerolog.Logger {
 	return &l
 }()
 
-// FuzzGetShoutrrrTemplate fuzzes the getShoutrrrTemplate function to ensure robust parsing of template strings.
-func FuzzGetShoutrrrTemplate(f *testing.F) {
+// FuzzNewMessageTemplate fuzzes newMessageTemplate to ensure robust parsing of template strings.
+func FuzzNewMessageTemplate(f *testing.F) {
 	// Add seeded inputs with valid templates, malformed syntax, and edge cases
 	f.Add("{{.}}")
 	f.Add("{{range .}}{{.Message}}{{end}}")
@@ -26,7 +26,7 @@ func FuzzGetShoutrrrTemplate(f *testing.F) {
 	f.Fuzz(func(_ *testing.T, tplString string) {
 		//nolint:godox
 		// TODO: Remove legacy mode fuzzing when legacy notification types are removed.
-		_, _ = getShoutrrrTemplate(testFuzzLog, tplString, true)
-		_, _ = getShoutrrrTemplate(testFuzzLog, tplString, false)
+		_, _ = newMessageTemplate(testFuzzLog, tplString, true)
+		_, _ = newMessageTemplate(testFuzzLog, tplString, false)
 	})
 }

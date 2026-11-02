@@ -261,7 +261,7 @@ func (n *shoutrrrTypeNotifier) send(msg string) {
 func (n *shoutrrrTypeNotifier) sendEntries(entries []*notificationEntry, report types.Report) {
 	log := n.ll()
 
-	msg, err := n.buildMessage(notificationData{n.data, entries, report})
+	msg, err := n.template.render(log, notificationData{n.data, entries, report})
 	if err != nil {
 		log.Debug().
 			Err(err).
