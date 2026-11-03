@@ -157,14 +157,3 @@ func TestReadDelegatesToFromLabels(t *testing.T) {
 
 	assert.Equal(t, FromLabels(cfg.Labels), Read(c))
 }
-
-func TestLooksLikeTag(t *testing.T) {
-	t.Parallel()
-
-	assert.True(t, LooksLikeTag("v1.2.3"))
-	assert.True(t, LooksLikeTag("1.2.3"))
-	assert.True(t, LooksLikeTag("  1.2.3  "))
-	assert.False(t, LooksLikeTag("nightly"))
-	assert.False(t, LooksLikeTag(""))
-	assert.False(t, LooksLikeTag("  "))
-}

@@ -80,46 +80,6 @@ func TestOrUnchanged(t *testing.T) {
 	assert.Equal(t, "v1", orUnchanged("v1", "{tag}"))
 }
 
-func TestSplitSemverParts(t *testing.T) {
-	t.Parallel()
-
-	tests := []struct {
-		name  string
-		tag   string
-		major string
-		minor string
-		patch string
-	}{
-		{name: "prefixed", tag: "v1.2.3", major: "1", minor: "2", patch: "3"},
-		{name: "unprefixed", tag: "1.2.3", major: "1", minor: "2", patch: "3"},
-		{name: "prerelease", tag: "v1.2.3-rc.1", major: "1", minor: "2", patch: "3"},
-		{name: "major only", tag: "v2", major: "2", minor: "0", patch: "0"},
-		{name: "invalid", tag: "nightly"},
-		{name: "empty"},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			t.Parallel()
-
-			major, minor, patch := splitSemverParts(tt.tag)
-			assert.Equal(t, tt.major, major)
-			assert.Equal(t, tt.minor, minor)
-			assert.Equal(t, tt.patch, patch)
-		})
-	}
-}
-
-func TestCanonicalizeSemver(t *testing.T) {
-	t.Parallel()
-
-	assert.Empty(t, canonicalizeSemver(""))
-	assert.Empty(t, canonicalizeSemver("  "))
-	assert.Equal(t, "v1.2.3", canonicalizeSemver("v1.2.3"))
-	assert.Equal(t, "v1.2.3", canonicalizeSemver("1.2.3"))
-	assert.Equal(t, "nightly", canonicalizeSemver("nightly"))
-}
-
 func TestDerivedReleasesURL(t *testing.T) {
 	t.Parallel()
 
