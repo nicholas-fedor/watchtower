@@ -162,6 +162,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Chores
 
+- Update module github.com/gofiber/schema to v1.9.3 by @renovate[bot] in [#3401](https://github.com/nicholas-fedor/watchtower/pull/3401)
 - Update github.com/tonistiigi/fsutil digest to e075fd9 by @renovate[bot] in [#3396](https://github.com/nicholas-fedor/watchtower/pull/3396)
 - Update github/codeql-action action to v4.39.2 by @renovate[bot] in [#3397](https://github.com/nicholas-fedor/watchtower/pull/3397)
 - Update module connectrpc.com/connect to v1.21.1 by @renovate[bot] in [#3384](https://github.com/nicholas-fedor/watchtower/pull/3384)
