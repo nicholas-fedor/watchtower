@@ -220,7 +220,7 @@ func (c *Client) Clone(ctx context.Context, repo string, rev CheckResult) (strin
 //
 // Returns:
 //   - CheckResult: Empty result when the container is not associated.
-//   - error: Non-nil on monitor failure.
+//   - error: Wraps [semver.ErrInvalidPolicy] or [provenance.ErrInvalidHost] for an invalid label. Non-nil on monitor failure.
 func CheckContainer(
 	ctx context.Context,
 	client *Client,
@@ -236,10 +236,10 @@ func CheckContainer(
 		return CheckResult{}, fmt.Errorf("%w: %s", semver.ErrInvalidPolicy, assoc.InvalidPolicy)
 	}
 
-	if raw := strings.TrimSpace(assoc.Host); raw != "" {
-		_, err := provenance.ParseAPIOrigin(raw)
+	if assoc.Host != "" {
+		_, err := provenance.ParseAPIOrigin(assoc.Host)
 		if err != nil {
-			return CheckResult{}, fmt.Errorf("%w: %w", ErrInvalidHost, err)
+			return CheckResult{}, err //nolint:wrapcheck // ParseAPIOrigin's error already names the invalid git-host.
 		}
 	}
 

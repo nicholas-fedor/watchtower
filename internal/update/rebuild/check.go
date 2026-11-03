@@ -13,7 +13,8 @@ import (
 //
 // An invalid git-semver-policy or git-host label returns an error matching
 // [github.com/nicholas-fedor/watchtower/internal/git/semver.ErrInvalidPolicy]
-// or [git.ErrInvalidHost]. The caller reports it.
+// or [github.com/nicholas-fedor/watchtower/internal/container/provenance.ErrInvalidHost].
+// The caller reports it.
 //
 // Parameters:
 //   - ctx: Cancellation and timeout.

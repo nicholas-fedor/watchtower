@@ -23,6 +23,7 @@ import (
 	containerImage "github.com/nicholas-fedor/watchtower/internal/container/image"
 	"github.com/nicholas-fedor/watchtower/internal/container/labels"
 	"github.com/nicholas-fedor/watchtower/internal/container/oci"
+	"github.com/nicholas-fedor/watchtower/internal/container/provenance"
 	"github.com/nicholas-fedor/watchtower/internal/git"
 	"github.com/nicholas-fedor/watchtower/internal/git/semver"
 	"github.com/nicholas-fedor/watchtower/internal/registry/ratelimit"
@@ -530,7 +531,7 @@ func TestUpdate_FailedCheckWarnsOnce(t *testing.T) {
 			name: "an invalid Git label",
 			checkErrs: []error{
 				fmt.Errorf("git check: %w: weekly", semver.ErrInvalidPolicy),
-				fmt.Errorf("git check: %w: bad host", git.ErrInvalidHost),
+				fmt.Errorf("git check: %w: bad host", provenance.ErrInvalidHost),
 			},
 			want: [][]string{nil, nil},
 		},
