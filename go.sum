@@ -149,8 +149,8 @@ github.com/fsnotify/fsnotify v1.10.1 h1:b0/UzAf9yR5rhf3RPm9gf3ehBPpf0oZKIjtpKrx5
 github.com/fsnotify/fsnotify v1.10.1/go.mod h1:TLheqan6HD6GBK6PrDWyDPBaEV8LspOxvPSjC+bVfgo=
 github.com/fvbommel/sortorder v1.2.1 h1:ASc85RbthwLEqzuiCk7WQQiopfyGWQiEYZVJ3Qa4A+U=
 github.com/fvbommel/sortorder v1.2.1/go.mod h1:LbhO04ijZIeUuvz9B9BkI/qYrpZZEn1gWhxv4QjUKVs=
-github.com/fxamacker/cbor/v2 v2.9.6 h1:NHZPxuUjJXQjX9itA785y/5NKSlI4HQ+S7noZsmI7hs=
-github.com/fxamacker/cbor/v2 v2.9.6/go.mod h1:4EaZp6ClVunETjQ4GHmGNzysDK91Lr+r6Yz6tJqzVCw=
+github.com/fxamacker/cbor/v2 v2.10.0 h1:HVF3T5vYwLqO81ebPirWEPNv2SMrUMD3HLnKgEr6uWE=
+github.com/fxamacker/cbor/v2 v2.10.0/go.mod h1:uSwlToFuT9BZAKRxxVm3qQC8DR4tlWl7D6pf20iRYH4=
 github.com/gliderlabs/ssh v0.3.8 h1:a4YXD1V7xMF9g5nTkdfnja3Sxy1PVDCj1Zg4Wb8vY6c=
 github.com/gliderlabs/ssh v0.3.8/go.mod h1:xYoytBv1sV0aL3CavoDuJIQNURXkkfPA/wxQ1pL1fAU=
 github.com/go-git/gcfg v1.5.1-0.20230307220236-3a3c6141e376 h1:+zs/tPmkDkHx3U66DAb0lQFJrpS6731Oaa12ikc+DiI=
@@ -203,8 +203,8 @@ github.com/gofiber/fiber/v3 v3.6.1 h1:wYjbgqpJm6VErIVLSGzGpX7lLZyTNgElsj8nQ1i+iF
 github.com/gofiber/fiber/v3 v3.6.1/go.mod h1:+nxjBal3gw0EPf3gqK5EmtxaxTL01+zbSTagFletlDI=
 github.com/gofiber/schema v1.9.2 h1:Gzw2PF1K5DpWgG2L51/9t9dkmxw4kqK6auKMvgD9mIU=
 github.com/gofiber/schema v1.9.2/go.mod h1:219nYAgzIEBWl/aHCyhQtFoXBvfLjsC6+FI3DUN1+Ck=
-github.com/gofiber/utils/v2 v2.6.3 h1:VlnOB89rFnonlXoYOkESOkXtIkAw4CBBwpBHu+/a/YQ=
-github.com/gofiber/utils/v2 v2.6.3/go.mod h1:Mq3OXwyBPxORb3jPafy6Swki4/TJJW9TDPHeerXkXpg=
+github.com/gofiber/utils/v2 v2.6.4 h1:VsC3hEFZXk2JO6I/+FZ1OdZzMX4COPgwwrFaDAey3+o=
+github.com/gofiber/utils/v2 v2.6.4/go.mod h1:SpYvWEQlYmZzzpuSfQX0gUiPSoxpOKldiEmVDzdl8Ds=
 github.com/gofrs/flock v0.13.1 h1:jjREztyBeSKBZYAC+mgc1laB+xsgy4kYMf3FbKF2UBo=
 github.com/gofrs/flock v0.13.1/go.mod h1:sf4BFiHwnvgxa25DlQoDqXQnwRMEOwqxRq37P6MzzmE=
 github.com/golang-jwt/jwt/v5 v5.3.1 h1:kYf81DTWFe7t+1VvL7eS+jKFVWaUnK9cB1qbwn63YCY=
