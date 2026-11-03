@@ -40,6 +40,7 @@ func TestSelectTag(t *testing.T) {
 		{name: "major", lastTag: "v1.2.3", tags: tags, policy: PolicyMajor, want: "v2.0.0", ok: true},
 		{name: "already latest major", lastTag: "v2.0.0", tags: tags, policy: PolicyMajor},
 		{name: "only non-semver", lastTag: "v1.0.0", tags: []string{"nightly", "foo"}, policy: PolicyPatch},
+		{name: "unknown policy without last tag", lastTag: "", tags: tags, policy: "nightly"},
 		{name: "no last tag picks highest", lastTag: "", tags: tags, policy: PolicyMajor, want: "v2.0.0", ok: true},
 		{name: "invalid last tag treated as empty", lastTag: "nightly", tags: tags, policy: PolicyMajor, want: "v2.0.0", ok: true},
 		{name: "unprefixed last tag", lastTag: "1.2.3", tags: tags, policy: PolicyPatch, want: "v1.2.4", ok: true},
@@ -65,7 +66,8 @@ func TestSelectTag(t *testing.T) {
 }
 
 // TestHighestRelease verifies which tag wins. Non-semver tags and
-// pre-releases are skipped. The first of two equal tags is kept.
+// pre-releases are skipped. Of equal tags, the name that sorts first is kept
+// whatever the input order, because ls-remote lists tags in map order.
 func TestHighestRelease(t *testing.T) {
 	t.Parallel()
 
@@ -80,8 +82,10 @@ func TestHighestRelease(t *testing.T) {
 		{name: "non-semver tags skipped", tags: []string{"latest", "nightly", "v1.0.0"}, want: "v1.0.0"},
 		{name: "pre-release skipped", tags: []string{"v1.0.0", "v2.0.0-rc.1"}, want: "v1.0.0"},
 		{name: "only pre-release and non-semver", tags: []string{"v2.0.0-rc.1", "latest"}},
-		{name: "first equal tag kept", tags: []string{"1.2.3", "v1.2.3"}, want: "1.2.3"},
+		{name: "equal tags keep lowest name", tags: []string{"1.2.3", "v1.2.3"}, want: "1.2.3"},
+		{name: "equal tags keep lowest name reversed", tags: []string{"v1.2.3", "1.2.3"}, want: "1.2.3"},
 		{name: "build metadata compares equal", tags: []string{"v1.2.3+a", "v1.2.3+b"}, want: "v1.2.3+a"},
+		{name: "build metadata compares equal reversed", tags: []string{"v1.2.3+b", "v1.2.3+a"}, want: "v1.2.3+a"},
 	}
 
 	for _, tt := range tests {

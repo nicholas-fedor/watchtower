@@ -46,8 +46,8 @@ func ValidPolicy(policy string) bool {
 // SelectTag returns the highest policy-allowed tag newer than lastTag.
 //
 // Non-semver tags and pre-releases are ignored. Build metadata does not
-// affect ordering. An empty policy and the none policy select nothing. When no tag
-// qualifies, it returns an empty name and false.
+// affect ordering. The none policy and unknown policies select nothing. When
+// no tag qualifies, it returns an empty name and false.
 //
 // Parameters:
 //   - lastTag: Last observed tag (empty selects the highest allowed tag).
@@ -58,7 +58,7 @@ func ValidPolicy(policy string) bool {
 //   - string: Selected tag name as advertised by the remote.
 //   - bool: True when a newer allowed tag exists.
 func SelectTag(lastTag string, tags []string, policy string) (string, bool) {
-	if policy == "" || policy == PolicyNone {
+	if policy == PolicyNone || !ValidPolicy(policy) {
 		return "", false
 	}
 
@@ -80,10 +80,11 @@ func SelectTag(lastTag string, tags []string, policy string) (string, bool) {
 //
 // Tags are compared as semantic versions, with or without a leading v.
 // Non-semver tags and pre-releases are skipped. Build metadata does not affect
-// ordering. Of tags that compare equal, the first one wins.
+// ordering. Of tags that compare equal, the name that sorts first wins. The
+// result therefore does not depend on the order of tags.
 //
 // Parameters:
-//   - tags: Tag names in the order to consider them.
+//   - tags: Tag names in any order.
 //
 // Returns:
 //   - string: The highest release tag as given. It is empty when there is none.
@@ -97,7 +98,12 @@ func HighestRelease(tags []string) string {
 			continue
 		}
 
-		if bestCanon == "" || semver.Compare(canon, bestCanon) > 0 {
+		order := 1
+		if bestCanon != "" {
+			order = semver.Compare(canon, bestCanon)
+		}
+
+		if order > 0 || (order == 0 && tag < bestName) {
 			bestCanon = canon
 			bestName = tag
 		}
