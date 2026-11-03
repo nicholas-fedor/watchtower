@@ -14,6 +14,56 @@ import (
 	typemocks "github.com/nicholas-fedor/watchtower/pkg/types/mocks"
 )
 
+// TestAssociation_Validate verifies that an invalid policy or git-host label
+// is reported with its own error and that the policy label is checked first.
+func TestAssociation_Validate(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name    string
+		assoc   Association
+		wantErr error
+		wantMsg string
+	}{
+		{name: "no labels", assoc: Association{Policy: semver.PolicyNone}},
+		{name: "valid host", assoc: Association{Host: "https://git.example.com:3000"}},
+		{
+			name:    "invalid policy",
+			assoc:   Association{Policy: semver.PolicyNone, invalidPolicy: "nightly"},
+			wantErr: semver.ErrInvalidPolicy,
+			wantMsg: "invalid git semver policy: nightly",
+		},
+		{
+			name:    "invalid host",
+			assoc:   Association{Host: "ftp://git.example.com"},
+			wantErr: ErrInvalidHost,
+			wantMsg: "invalid git-host: scheme must be http or https",
+		},
+		{
+			name:    "invalid policy reported before invalid host",
+			assoc:   Association{Host: "ftp://git.example.com", invalidPolicy: "nightly"},
+			wantErr: semver.ErrInvalidPolicy,
+			wantMsg: "invalid git semver policy: nightly",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			err := tt.assoc.Validate()
+			if tt.wantErr == nil {
+				require.NoError(t, err)
+
+				return
+			}
+
+			require.ErrorIs(t, err, tt.wantErr)
+			require.EqualError(t, err, tt.wantMsg)
+		})
+	}
+}
+
 func TestResolveAssociation(t *testing.T) {
 	t.Parallel()
 
@@ -107,7 +157,7 @@ func TestResolveAssociation(t *testing.T) {
 		got, ok := ResolveAssociation(c, types.UpdateParams{})
 		require.True(t, ok)
 		assert.Equal(t, semver.PolicyNone, got.Policy)
-		assert.Equal(t, "Nightly", got.InvalidPolicy)
+		assert.Equal(t, "Nightly", got.invalidPolicy)
 	})
 
 	t.Run("invalid policy label on a mapped image is recorded", func(t *testing.T) {
@@ -124,7 +174,7 @@ func TestResolveAssociation(t *testing.T) {
 		})
 		require.True(t, ok)
 		assert.Equal(t, semver.PolicyMinor, got.Policy)
-		assert.Equal(t, "nightly", got.InvalidPolicy)
+		assert.Equal(t, "nightly", got.invalidPolicy)
 	})
 
 	t.Run("image mapping", func(t *testing.T) {
