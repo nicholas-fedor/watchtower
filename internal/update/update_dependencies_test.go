@@ -21,6 +21,7 @@ import (
 	"github.com/nicholas-fedor/watchtower/internal/testutil/containerfixture"
 	"github.com/nicholas-fedor/watchtower/internal/testutil/logcapture"
 	"github.com/nicholas-fedor/watchtower/internal/testutil/modelfixture"
+	"github.com/nicholas-fedor/watchtower/internal/update/cleanup"
 	mockUpdate "github.com/nicholas-fedor/watchtower/internal/update/mocks"
 	"github.com/nicholas-fedor/watchtower/pkg/types"
 	mockTypes "github.com/nicholas-fedor/watchtower/pkg/types/mocks"
@@ -107,9 +108,9 @@ func TestUpdateAction_Dependencies(t *testing.T) {
 
 			// Verify that all containers were updated (dependencies were handled correctly)
 			require.Len(t, cleanupImageInfos, 3)
-			assert.True(t, slices.ContainsFunc(cleanupImageInfos, func(info types.RemovedImageInfo) bool { return info.ImageID == types.ImageID("fake-image-a:latest") }))
-			assert.True(t, slices.ContainsFunc(cleanupImageInfos, func(info types.RemovedImageInfo) bool { return info.ImageID == types.ImageID("fake-image-b:latest") }))
-			assert.True(t, slices.ContainsFunc(cleanupImageInfos, func(info types.RemovedImageInfo) bool { return info.ImageID == types.ImageID("fake-image-c:latest") }))
+			assert.True(t, slices.ContainsFunc(cleanupImageInfos, func(info cleanup.RemovedImageInfo) bool { return info.ImageID == types.ImageID("fake-image-a:latest") }))
+			assert.True(t, slices.ContainsFunc(cleanupImageInfos, func(info cleanup.RemovedImageInfo) bool { return info.ImageID == types.ImageID("fake-image-b:latest") }))
+			assert.True(t, slices.ContainsFunc(cleanupImageInfos, func(info cleanup.RemovedImageInfo) bool { return info.ImageID == types.ImageID("fake-image-c:latest") }))
 		})
 	})
 
@@ -884,7 +885,7 @@ func TestUpdateAction_Dependencies(t *testing.T) {
 
 			// Verify that the container was updated
 			require.Len(t, cleanupImageInfos, 1)
-			assert.True(t, slices.ContainsFunc(cleanupImageInfos, func(info types.RemovedImageInfo) bool { return info.ImageID == types.ImageID("dep-image:latest") }))
+			assert.True(t, slices.ContainsFunc(cleanupImageInfos, func(info cleanup.RemovedImageInfo) bool { return info.ImageID == types.ImageID("dep-image:latest") }))
 		})
 	})
 
@@ -979,7 +980,7 @@ func TestUpdateAction_Dependencies(t *testing.T) {
 
 			// Verify that base container was updated
 			require.Len(t, cleanupImageInfos, 1)
-			assert.True(t, slices.ContainsFunc(cleanupImageInfos, func(info types.RemovedImageInfo) bool { return info.ImageID == types.ImageID("image-d:latest") }))
+			assert.True(t, slices.ContainsFunc(cleanupImageInfos, func(info cleanup.RemovedImageInfo) bool { return info.ImageID == types.ImageID("image-d:latest") }))
 		})
 	})
 
@@ -1068,7 +1069,7 @@ func TestUpdateAction_Dependencies(t *testing.T) {
 
 			// Verify that the container was updated
 			require.Len(t, cleanupImageInfos, 1)
-			assert.True(t, slices.ContainsFunc(cleanupImageInfos, func(info types.RemovedImageInfo) bool { return info.ImageID == types.ImageID("dep-image:latest") }))
+			assert.True(t, slices.ContainsFunc(cleanupImageInfos, func(info cleanup.RemovedImageInfo) bool { return info.ImageID == types.ImageID("dep-image:latest") }))
 		})
 	})
 
@@ -1180,7 +1181,7 @@ func TestUpdateAction_Dependencies(t *testing.T) {
 
 			// Verify that base container was updated
 			require.Len(t, cleanupImageInfos, 1)
-			assert.True(t, slices.ContainsFunc(cleanupImageInfos, func(info types.RemovedImageInfo) bool { return info.ImageID == types.ImageID("image-e:latest") }))
+			assert.True(t, slices.ContainsFunc(cleanupImageInfos, func(info cleanup.RemovedImageInfo) bool { return info.ImageID == types.ImageID("image-e:latest") }))
 		})
 	})
 
@@ -1241,7 +1242,7 @@ func TestUpdateAction_Dependencies(t *testing.T) {
 
 			// Verify that base container was updated
 			require.Len(t, cleanupImageInfos, 1)
-			assert.True(t, slices.ContainsFunc(cleanupImageInfos, func(info types.RemovedImageInfo) bool { return info.ImageID == types.ImageID("image-b:latest") }))
+			assert.True(t, slices.ContainsFunc(cleanupImageInfos, func(info cleanup.RemovedImageInfo) bool { return info.ImageID == types.ImageID("image-b:latest") }))
 		})
 	})
 
@@ -2048,9 +2049,9 @@ func TestUpdateAction_Dependencies(t *testing.T) {
 
 			// Verify cleanup for updated containers
 			require.Len(t, cleanupImageInfos, 3)
-			assert.True(t, slices.ContainsFunc(cleanupImageInfos, func(info types.RemovedImageInfo) bool { return info.ContainerName == "b-service1" }))
-			assert.True(t, slices.ContainsFunc(cleanupImageInfos, func(info types.RemovedImageInfo) bool { return info.ContainerName == "c-service2" }))
-			assert.True(t, slices.ContainsFunc(cleanupImageInfos, func(info types.RemovedImageInfo) bool { return info.ContainerName == "d-service3" }))
+			assert.True(t, slices.ContainsFunc(cleanupImageInfos, func(info cleanup.RemovedImageInfo) bool { return info.ContainerName == "b-service1" }))
+			assert.True(t, slices.ContainsFunc(cleanupImageInfos, func(info cleanup.RemovedImageInfo) bool { return info.ContainerName == "c-service2" }))
+			assert.True(t, slices.ContainsFunc(cleanupImageInfos, func(info cleanup.RemovedImageInfo) bool { return info.ContainerName == "d-service3" }))
 		})
 	})
 

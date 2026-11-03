@@ -19,6 +19,19 @@ import (
 	"github.com/nicholas-fedor/watchtower/pkg/types"
 )
 
+// RemovedImageInfo represents information about an image that was cleaned up during update operations.
+// It tracks the image ID, container ID, image name, and the container that was using the old image before cleanup.
+type RemovedImageInfo struct {
+	// ImageID is the ID of the image that was cleaned up.
+	ImageID types.ImageID `json:"image_id"`
+	// ContainerID is the ID of the container that was using this image.
+	ContainerID types.ContainerID `json:"container_id"`
+	// ImageName is the name/tag of the image that was cleaned up.
+	ImageName string `json:"image_name"`
+	// ContainerName is the name of the container that was using this image before the update.
+	ContainerName string `json:"container_name"`
+}
+
 // stopContainerTimeout sets the container stop timeout.
 const stopContainerTimeout = 10 * time.Minute
 
@@ -65,7 +78,7 @@ func RemoveExcessWatchtowerInstances(log *zerolog.Logger, ctx context.Context,
 	client containerClient.Client,
 	cleanupImages bool,
 	scope string,
-	removeImageInfos *[]types.RemovedImageInfo,
+	removeImageInfos *[]RemovedImageInfo,
 	currentContainer types.Container,
 ) (int, error) {
 	log.Debug().
@@ -149,7 +162,7 @@ func RemoveOldWatchtowerContainers(log *zerolog.Logger, ctx context.Context,
 	client containerClient.Client,
 	cleanupImages bool,
 	currentContainerID types.ContainerID,
-	removeImageInfos *[]types.RemovedImageInfo,
+	removeImageInfos *[]RemovedImageInfo,
 ) (int, error) {
 	if currentContainerID == "" {
 		return 0, nil
@@ -548,7 +561,7 @@ func removeExcessContainers(log *zerolog.Logger, ctx context.Context,
 	excessWatchtowerContainers []types.Container,
 	cleanupImages bool,
 	currentContainer types.Container,
-	removeImageInfos *[]types.RemovedImageInfo,
+	removeImageInfos *[]RemovedImageInfo,
 ) (int, error) {
 	log.Debug().
 		Int("excess_count", len(excessWatchtowerContainers)).
@@ -556,7 +569,7 @@ func removeExcessContainers(log *zerolog.Logger, ctx context.Context,
 		Msg("Starting removal of excess containers")
 
 	// collected holds the images of the instances this call removes.
-	var collected []types.RemovedImageInfo
+	var collected []RemovedImageInfo
 
 	excessInstancesRemoved := 0
 
@@ -634,7 +647,7 @@ func removeExcessContainers(log *zerolog.Logger, ctx context.Context,
 					Str("image_name", c.ImageName()).
 					Msg("Collecting image info for deferred removal")
 
-				collected = append(collected, types.RemovedImageInfo{
+				collected = append(collected, RemovedImageInfo{
 					ImageID:       c.ImageID(),
 					ContainerID:   c.ID(),
 					ImageName:     c.ImageName(),
@@ -690,8 +703,8 @@ func removeExcessContainers(log *zerolog.Logger, ctx context.Context,
 //   - collected: Images of the instances that were removed.
 //   - remaining: Instances that were not removed.
 func addCollectedImages(
-	removeImageInfos *[]types.RemovedImageInfo,
-	collected []types.RemovedImageInfo,
+	removeImageInfos *[]RemovedImageInfo,
+	collected []RemovedImageInfo,
 	remaining []types.Container,
 ) {
 	inUse := make(map[types.ImageID]struct{}, len(remaining))
@@ -721,7 +734,7 @@ func addCollectedImages(
 //   - containerName: Name of the container.
 //   - containerID: ID of the container (optional, pass empty string if not available).
 func AddImage(
-	cleanupImageInfos *[]types.RemovedImageInfo,
+	cleanupImageInfos *[]RemovedImageInfo,
 	imageID types.ImageID,
 	imageName, containerName string,
 	containerID types.ContainerID,
@@ -732,7 +745,7 @@ func AddImage(
 		}
 	}
 
-	*cleanupImageInfos = append(*cleanupImageInfos, types.RemovedImageInfo{
+	*cleanupImageInfos = append(*cleanupImageInfos, RemovedImageInfo{
 		ImageID:       imageID,
 		ContainerID:   containerID,
 		ImageName:     imageName,
@@ -748,10 +761,10 @@ func AddImage(
 //   - images: Slice of RemovedImageInfo that may contain duplicate ImageIDs.
 //
 // Returns:
-//   - []types.RemovedImageInfo: Slice with one entry per unique ImageID.
-func deduplicateByImageID(images []types.RemovedImageInfo) []types.RemovedImageInfo {
+//   - []RemovedImageInfo: Slice with one entry per unique ImageID.
+func deduplicateByImageID(images []RemovedImageInfo) []RemovedImageInfo {
 	seen := make(map[types.ImageID]bool, len(images))
-	result := make([]types.RemovedImageInfo, 0, len(images))
+	result := make([]RemovedImageInfo, 0, len(images))
 
 	for _, img := range images {
 		if !seen[img.ImageID] {
@@ -780,20 +793,20 @@ func deduplicateByImageID(images []types.RemovedImageInfo) []types.RemovedImageI
 //   - error: Non-nil if any image removal failed, nil otherwise.
 func RemoveImages(log *zerolog.Logger, ctx context.Context,
 	client containerClient.Client,
-	images []types.RemovedImageInfo,
-) ([]types.RemovedImageInfo, error) {
+	images []RemovedImageInfo,
+) ([]RemovedImageInfo, error) {
 	// Return early if no images need removal.
 	if len(images) == 0 {
 		log.Debug().Msg("No images provided for removal, skipping")
 
-		return []types.RemovedImageInfo{}, nil
+		return []RemovedImageInfo{}, nil
 	}
 
 	// Remove each image once, even when several containers used it, so a
 	// shared image logs one removal entry.
 	images = deduplicateByImageID(images)
 
-	removed := []types.RemovedImageInfo{}
+	removed := []RemovedImageInfo{}
 
 	var removalErrors []error
 
@@ -849,7 +862,7 @@ func RemoveImages(log *zerolog.Logger, ctx context.Context,
 				Msg("Removed old image")
 			removed = append(
 				removed,
-				types.RemovedImageInfo{
+				RemovedImageInfo{
 					ImageID:       imageID,
 					ContainerID:   image.ContainerID,
 					ImageName:     image.ImageName,

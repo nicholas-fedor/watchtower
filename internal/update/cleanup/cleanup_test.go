@@ -73,7 +73,7 @@ func TestRemoveExcessWatchtowerInstances(t *testing.T) {
 				ListContainers(mock.Anything, mock.Anything).
 				Return([]types.Container{mockContainer}, nil)
 
-			var cleanupImageInfo []types.RemovedImageInfo
+			var cleanupImageInfo []RemovedImageInfo
 
 			cleanupOccurred, err := RemoveExcessWatchtowerInstances(newTestLogger(t),
 				t.Context(),
@@ -122,7 +122,7 @@ func TestRemoveExcessWatchtowerInstances(t *testing.T) {
 				Return([]types.Container{oldContainer, newContainer}, nil)
 			mockClient.EXPECT().StopAndRemoveContainer(mock.Anything, oldContainer, 10*time.Minute).Return(nil)
 
-			var cleanupImageIDs []types.RemovedImageInfo
+			var cleanupImageIDs []RemovedImageInfo
 
 			cleanupOccurred, err := RemoveExcessWatchtowerInstances(newTestLogger(t),
 				t.Context(),
@@ -165,7 +165,7 @@ func TestRemoveExcessWatchtowerInstances(t *testing.T) {
 				ListContainers(mock.Anything, mock.Anything).
 				Return([]types.Container{scopedOldContainer}, nil)
 
-			var cleanupImageIDs []types.RemovedImageInfo
+			var cleanupImageIDs []RemovedImageInfo
 
 			cleanupOccurred, err := RemoveExcessWatchtowerInstances(newTestLogger(t),
 				t.Context(),
@@ -216,7 +216,7 @@ func TestRemoveExcessWatchtowerInstances(t *testing.T) {
 				Return([]types.Container{oldContainer, newContainer}, nil)
 			mockClient.EXPECT().StopAndRemoveContainer(t.Context(), oldContainer, 10*time.Minute).Return(nil)
 
-			var cleanupImageIDs []types.RemovedImageInfo
+			var cleanupImageIDs []RemovedImageInfo
 
 			cleanupOccurred, err := RemoveExcessWatchtowerInstances(newTestLogger(t),
 				t.Context(),
@@ -229,7 +229,7 @@ func TestRemoveExcessWatchtowerInstances(t *testing.T) {
 
 			require.NoError(t, err)
 			assert.Equal(t, 1, cleanupOccurred)
-			assert.True(t, slices.ContainsFunc(cleanupImageIDs, func(info types.RemovedImageInfo) bool { return info.ImageID == types.ImageID("watchtower:1.11.0") }))
+			assert.True(t, slices.ContainsFunc(cleanupImageIDs, func(info RemovedImageInfo) bool { return info.ImageID == types.ImageID("watchtower:1.11.0") }))
 			require.Len(t, cleanupImageIDs, 1)
 		})
 
@@ -255,7 +255,7 @@ func TestRemoveExcessWatchtowerInstances(t *testing.T) {
 				ListContainers(mock.Anything, mock.Anything).
 				Return([]types.Container{scopedContainer}, nil)
 
-			var cleanupImageIDs []types.RemovedImageInfo
+			var cleanupImageIDs []RemovedImageInfo
 
 			cleanupOccurred, err := RemoveExcessWatchtowerInstances(newTestLogger(t),
 				t.Context(),
@@ -308,7 +308,7 @@ func TestRemoveExcessWatchtowerInstances(t *testing.T) {
 				Return([]types.Container{oldContainer, newContainer}, nil)
 			mockClient.EXPECT().StopAndRemoveContainer(t.Context(), oldContainer, 10*time.Minute).Return(nil)
 
-			var cleanupImageIDs []types.RemovedImageInfo
+			var cleanupImageIDs []RemovedImageInfo
 
 			cleanupOccurred, err := RemoveExcessWatchtowerInstances(newTestLogger(t),
 				t.Context(),
@@ -335,7 +335,7 @@ func TestRemoveExcessWatchtowerInstances(t *testing.T) {
 
 			mockClient.EXPECT().ListContainers(mock.Anything, mock.Anything).Return([]types.Container{}, nil)
 
-			var cleanupImageIDs []types.RemovedImageInfo
+			var cleanupImageIDs []RemovedImageInfo
 
 			cleanupOccurred, err := RemoveExcessWatchtowerInstances(newTestLogger(t),
 				t.Context(),
@@ -389,7 +389,7 @@ func TestRemoveExcessWatchtowerInstances(t *testing.T) {
 					Return(errors.New("stop container failed")).
 					Times(maxRemovalAttempts)
 
-				var cleanupImageIDs []types.RemovedImageInfo
+				var cleanupImageIDs []RemovedImageInfo
 
 				cleanupOccurred, err := RemoveExcessWatchtowerInstances(newTestLogger(t),
 					t.Context(),
@@ -457,7 +457,7 @@ func TestRemoveExcessWatchtowerInstances(t *testing.T) {
 					Times(maxRemovalAttempts)
 				mockClient.EXPECT().StopAndRemoveContainer(mock.Anything, old2Container, 10*time.Minute).Return(nil)
 
-				var cleanupImageIDs []types.RemovedImageInfo
+				var cleanupImageIDs []RemovedImageInfo
 
 				cleanupOccurred, err := RemoveExcessWatchtowerInstances(newTestLogger(t),
 					t.Context(),
@@ -527,7 +527,7 @@ func TestRemoveExcessWatchtowerInstances(t *testing.T) {
 					StopAndRemoveContainer(mock.Anything, old2Container, 10*time.Minute).
 					Return(nil)
 
-				var cleanupImageIDs []types.RemovedImageInfo
+				var cleanupImageIDs []RemovedImageInfo
 
 				cleanupOccurred, err := RemoveExcessWatchtowerInstances(newTestLogger(t),
 					t.Context(),
@@ -593,7 +593,7 @@ func TestRemoveExcessWatchtowerInstances(t *testing.T) {
 				StopAndRemoveContainer(mock.Anything, old2Container, 10*time.Minute).
 				Return(nil)
 
-			var cleanupImageIDs []types.RemovedImageInfo
+			var cleanupImageIDs []RemovedImageInfo
 
 			cleanupOccurred, err := RemoveExcessWatchtowerInstances(newTestLogger(t),
 				t.Context(),
@@ -606,7 +606,7 @@ func TestRemoveExcessWatchtowerInstances(t *testing.T) {
 
 			require.NoError(t, err)
 			assert.Equal(t, 2, cleanupOccurred)
-			assert.True(t, slices.ContainsFunc(cleanupImageIDs, func(info types.RemovedImageInfo) bool { return info.ImageID == types.ImageID("watchtower:old2") }))
+			assert.True(t, slices.ContainsFunc(cleanupImageIDs, func(info RemovedImageInfo) bool { return info.ImageID == types.ImageID("watchtower:old2") }))
 			require.Len(t, cleanupImageIDs, 1)
 		})
 	})
@@ -647,7 +647,7 @@ func TestRemoveExcessWatchtowerInstances(t *testing.T) {
 				Return([]types.Container{oldContainer, newContainer}, nil)
 			mockClient.EXPECT().StopAndRemoveContainer(mock.Anything, oldContainer, 10*time.Minute).Return(nil)
 
-			var cleanupImageIDs []types.RemovedImageInfo
+			var cleanupImageIDs []RemovedImageInfo
 
 			cleanupOccurred, err := RemoveExcessWatchtowerInstances(newTestLogger(t),
 				t.Context(),
@@ -696,7 +696,7 @@ func TestRemoveExcessWatchtowerInstances(t *testing.T) {
 				Return([]types.Container{oldContainer, newContainer}, nil)
 			mockClient.EXPECT().StopAndRemoveContainer(t.Context(), oldContainer, 10*time.Minute).Return(nil)
 
-			var cleanupImageIDs []types.RemovedImageInfo
+			var cleanupImageIDs []RemovedImageInfo
 
 			cleanupOccurred, err := RemoveExcessWatchtowerInstances(newTestLogger(t),
 				t.Context(),
@@ -758,7 +758,7 @@ func TestRemoveExcessWatchtowerInstances(t *testing.T) {
 				Return(nil).
 				Times(1)
 
-			var cleanupImageInfos []types.RemovedImageInfo
+			var cleanupImageInfos []RemovedImageInfo
 
 			cleanupOccurred, err := RemoveExcessWatchtowerInstances(newTestLogger(t),
 				t.Context(),
@@ -816,7 +816,7 @@ func TestRemoveExcessWatchtowerInstances(t *testing.T) {
 				Return(nil).
 				Times(1)
 
-			var cleanupImageInfos []types.RemovedImageInfo
+			var cleanupImageInfos []RemovedImageInfo
 
 			// Belt case: current detection selected the old predecessor.
 			cleanupOccurred, err := RemoveExcessWatchtowerInstances(newTestLogger(t),
@@ -895,7 +895,7 @@ func TestRemoveExcessWatchtowerInstances(t *testing.T) {
 				Return(nil).
 				Times(1)
 
-			var cleanupImageInfos []types.RemovedImageInfo
+			var cleanupImageInfos []RemovedImageInfo
 
 			cleanupOccurred, err := RemoveExcessWatchtowerInstances(newTestLogger(t),
 				t.Context(),
@@ -956,7 +956,7 @@ func TestRemoveExcessWatchtowerInstances(t *testing.T) {
 				Times(1)
 			// Should not clean up different scope container
 
-			var cleanupImageInfos []types.RemovedImageInfo
+			var cleanupImageInfos []RemovedImageInfo
 
 			cleanupOccurred, err := RemoveExcessWatchtowerInstances(newTestLogger(t),
 				t.Context(),
@@ -1018,7 +1018,7 @@ func TestRemoveExcessWatchtowerInstances(t *testing.T) {
 				Return(nil).
 				Times(1)
 
-			var cleanupImageInfos []types.RemovedImageInfo
+			var cleanupImageInfos []RemovedImageInfo
 
 			cleanupOccurred, err := RemoveExcessWatchtowerInstances(newTestLogger(t),
 				t.Context(),
@@ -1079,7 +1079,7 @@ func TestRemoveExcessWatchtowerInstances(t *testing.T) {
 
 			// Test cleanup without scope filter - should clean chained container only
 			// Note: unscoped filter excludes containers with scopes, so only chained container is cleaned
-			var cleanupImageInfos []types.RemovedImageInfo
+			var cleanupImageInfos []RemovedImageInfo
 
 			cleanupOccurred, err := RemoveExcessWatchtowerInstances(newTestLogger(t),
 				t.Context(),
@@ -1139,7 +1139,7 @@ func TestRemoveExcessWatchtowerInstances(t *testing.T) {
 				Times(1)
 
 			// Cleanup should clean the referenced container as it's a chained parent container
-			var cleanupImageInfos []types.RemovedImageInfo
+			var cleanupImageInfos []RemovedImageInfo
 
 			cleanupOccurred, err := RemoveExcessWatchtowerInstances(newTestLogger(t),
 				t.Context(),
@@ -1216,7 +1216,7 @@ func TestRemoveExcessWatchtowerInstances(t *testing.T) {
 					StopAndRemoveContainer(mock.Anything, container2, 10*time.Minute).
 					Return(errors.New("container stop failed"))
 
-				var cleanupImageInfos []types.RemovedImageInfo
+				var cleanupImageInfos []RemovedImageInfo
 
 				cleanupOccurred, err := RemoveExcessWatchtowerInstances(newTestLogger(t),
 					t.Context(),
@@ -1292,7 +1292,7 @@ func TestRemoveExcessWatchtowerInstances(t *testing.T) {
 					StopAndRemoveContainer(mock.Anything, stopErrorContainer, 10*time.Minute).
 					Return(errors.New("stop failed"))
 
-				var cleanupImageInfos []types.RemovedImageInfo
+				var cleanupImageInfos []RemovedImageInfo
 
 				cleanupOccurred, err := RemoveExcessWatchtowerInstances(newTestLogger(t),
 					t.Context(),
@@ -1367,7 +1367,7 @@ func TestRemoveExcessWatchtowerInstances(t *testing.T) {
 					StopAndRemoveContainer(mock.Anything, failureContainer, 10*time.Minute).
 					Return(errors.New("interruption error"))
 
-				var cleanupImageInfos []types.RemovedImageInfo
+				var cleanupImageInfos []RemovedImageInfo
 
 				cleanupOccurred, err := RemoveExcessWatchtowerInstances(newTestLogger(t),
 					t.Context(),
@@ -1427,7 +1427,7 @@ func TestRemoveExcessWatchtowerInstances(t *testing.T) {
 					StopAndRemoveContainer(mock.Anything, scopeAContainer, 10*time.Minute).
 					Return(errors.New("scope-a failure"))
 
-				var cleanupImageInfos []types.RemovedImageInfo
+				var cleanupImageInfos []RemovedImageInfo
 
 				cleanupOccurred, err := RemoveExcessWatchtowerInstances(newTestLogger(t),
 					t.Context(),
@@ -1492,7 +1492,7 @@ func TestRemoveExcessWatchtowerInstances_ScopeAndCurrentContainer(t *testing.T) 
 			false,
 		)
 
-		var cleanupImageInfos []types.RemovedImageInfo
+		var cleanupImageInfos []RemovedImageInfo
 
 		cleanupOccurred, err := RemoveExcessWatchtowerInstances(newTestLogger(t),
 			t.Context(),
@@ -1543,7 +1543,7 @@ func TestRemoveExcessWatchtowerInstances_ScopeAndCurrentContainer(t *testing.T) 
 			false,
 		)
 
-		var cleanupImageInfos []types.RemovedImageInfo
+		var cleanupImageInfos []RemovedImageInfo
 
 		cleanupOccurred, err := RemoveExcessWatchtowerInstances(newTestLogger(t),
 			t.Context(),
@@ -1581,7 +1581,7 @@ func TestRemoveImages(t *testing.T) {
 
 		mockClient := mockContainerClient.NewMockClient(t)
 
-		cleanedImages := []types.RemovedImageInfo{
+		cleanedImages := []RemovedImageInfo{
 			{ImageID: "image1"},
 			{ImageID: "image2"},
 			{ImageID: ""}, // empty ID should be skipped
@@ -1602,7 +1602,7 @@ func TestRemoveImages(t *testing.T) {
 
 		mockClient := mockContainerClient.NewMockClient(t)
 
-		cleanedImages := []types.RemovedImageInfo{
+		cleanedImages := []RemovedImageInfo{
 			{ImageID: "image1"},
 			{ImageID: "image2"},
 		}
@@ -1624,7 +1624,7 @@ func TestRemoveImages(t *testing.T) {
 
 		mockClient := mockContainerClient.NewMockClient(t)
 
-		cleanedImages := []types.RemovedImageInfo{
+		cleanedImages := []RemovedImageInfo{
 			{ImageID: "image1"},
 			{ImageID: "image2"},
 		}
@@ -1645,7 +1645,7 @@ func TestRemoveImages(t *testing.T) {
 
 		mockClient := mockContainerClient.NewMockClient(t)
 
-		cleanedImages := []types.RemovedImageInfo{
+		cleanedImages := []RemovedImageInfo{
 			{ImageID: "image1", ImageName: "image1"},
 			{ImageID: "image2", ImageName: "image2"},
 		}
@@ -1666,7 +1666,7 @@ func TestRemoveImages(t *testing.T) {
 
 		mockClient := mockContainerClient.NewMockClient(t)
 
-		cleanedImages := []types.RemovedImageInfo{
+		cleanedImages := []RemovedImageInfo{
 			{ImageID: "image1", ImageName: "image1"},
 		}
 
@@ -1687,7 +1687,7 @@ func TestRemoveImages(t *testing.T) {
 
 		mockClient := mockContainerClient.NewMockClient(t)
 
-		cleanedImages := []types.RemovedImageInfo{
+		cleanedImages := []RemovedImageInfo{
 			{ImageID: "image1", ImageName: "image1"},
 			{ImageID: "image2", ImageName: "image2"},
 		}
@@ -1838,7 +1838,7 @@ func Test_removeExcessContainers(t *testing.T) {
 				map[string]string{},
 			)
 
-			var removeInfos []types.RemovedImageInfo
+			var removeInfos []RemovedImageInfo
 
 			mockClient.EXPECT().StopAndRemoveContainer(t.Context(), excessContainer, 10*time.Minute).Return(nil)
 
@@ -1885,7 +1885,7 @@ func Test_removeExcessContainers(t *testing.T) {
 				map[string]string{},
 			)
 
-			var removeInfos []types.RemovedImageInfo
+			var removeInfos []RemovedImageInfo
 
 			mockClient.EXPECT().StopAndRemoveContainer(mock.Anything, excessContainer, 10*time.Minute).Return(nil)
 			// No RemoveImageByID expected
@@ -2188,14 +2188,14 @@ func Test_deduplicateByImageID(t *testing.T) {
 	t.Run("should return empty slice for empty input", func(t *testing.T) {
 		t.Parallel()
 
-		result := deduplicateByImageID([]types.RemovedImageInfo{})
+		result := deduplicateByImageID([]RemovedImageInfo{})
 		assert.Empty(t, result)
 	})
 
 	t.Run("should return all entries when all ImageIDs are unique", func(t *testing.T) {
 		t.Parallel()
 
-		images := []types.RemovedImageInfo{
+		images := []RemovedImageInfo{
 			{ImageID: types.ImageID("sha256:aaa"), ContainerName: "container-a"},
 			{ImageID: types.ImageID("sha256:bbb"), ContainerName: "container-b"},
 		}
@@ -2209,7 +2209,7 @@ func Test_deduplicateByImageID(t *testing.T) {
 	t.Run("should keep only first occurrence when ImageIDs are duplicated", func(t *testing.T) {
 		t.Parallel()
 
-		images := []types.RemovedImageInfo{
+		images := []RemovedImageInfo{
 			{ImageID: types.ImageID("sha256:aaa"), ContainerName: "container-a"},
 			{ImageID: types.ImageID("sha256:aaa"), ContainerName: "container-b"},
 		}
@@ -2223,7 +2223,7 @@ func Test_deduplicateByImageID(t *testing.T) {
 	t.Run("should handle mixed unique and duplicate ImageIDs", func(t *testing.T) {
 		t.Parallel()
 
-		images := []types.RemovedImageInfo{
+		images := []RemovedImageInfo{
 			{ImageID: types.ImageID("sha256:aaa"), ContainerName: "container-a"},
 			{ImageID: types.ImageID("sha256:bbb"), ContainerName: "container-b"},
 			{ImageID: types.ImageID("sha256:aaa"), ContainerName: "container-c"},
@@ -2753,7 +2753,7 @@ func TestRemoveOldWatchtowerContainers(t *testing.T) {
 				StopAndRemoveContainer(mock.Anything, oldContainer, 10*time.Minute).
 				Return(nil)
 
-			var imageInfos []types.RemovedImageInfo
+			var imageInfos []RemovedImageInfo
 
 			removed, err := RemoveOldWatchtowerContainers(newTestLogger(t),
 				t.Context(),
@@ -3093,7 +3093,7 @@ func TestRemoveExcessWatchtowerInstances_RunningInstances(t *testing.T) {
 				false,
 			)
 
-			var cleanupImageIDs []types.RemovedImageInfo
+			var cleanupImageIDs []RemovedImageInfo
 
 			ctx, cancel := context.WithTimeout(t.Context(), 5*time.Second)
 			defer cancel()
@@ -3141,7 +3141,7 @@ func TestRemoveExcessWatchtowerInstances_RunningInstances(t *testing.T) {
 				false,
 			)
 
-			var cleanupImageIDs []types.RemovedImageInfo
+			var cleanupImageIDs []RemovedImageInfo
 
 			ctx, cancel := context.WithTimeout(t.Context(), 5*time.Second)
 			defer cancel()
@@ -3210,7 +3210,7 @@ func TestRemoveExcessWatchtowerInstances_RunningInstances(t *testing.T) {
 
 			client := newClient()
 
-			var cleanupImageIDs []types.RemovedImageInfo
+			var cleanupImageIDs []RemovedImageInfo
 
 			ctx, cancel := context.WithTimeout(t.Context(), 5*time.Second)
 			defer cancel()
@@ -3236,7 +3236,7 @@ func TestRemoveExcessWatchtowerInstances_RunningInstances(t *testing.T) {
 
 			client := newClient()
 
-			var cleanupImageIDs []types.RemovedImageInfo
+			var cleanupImageIDs []RemovedImageInfo
 
 			ctx, cancel := context.WithTimeout(t.Context(), 5*time.Second)
 			defer cancel()
@@ -3307,7 +3307,7 @@ func TestRemoveExcessWatchtowerInstances_RunningInstances(t *testing.T) {
 
 			client := newClient()
 
-			var cleanupImageIDs []types.RemovedImageInfo
+			var cleanupImageIDs []RemovedImageInfo
 
 			ctx, cancel := context.WithTimeout(t.Context(), 5*time.Second)
 			defer cancel()
@@ -3396,7 +3396,7 @@ func TestRemoveExcessWatchtowerInstances_RunningInstances(t *testing.T) {
 
 			client := newClient()
 
-			var cleanupImageIDs []types.RemovedImageInfo
+			var cleanupImageIDs []RemovedImageInfo
 
 			ctx, cancel := context.WithTimeout(t.Context(), 5*time.Second)
 			defer cancel()
@@ -3427,7 +3427,7 @@ func TestRemoveExcessWatchtowerInstances_RunningInstances(t *testing.T) {
 
 			client := newClient()
 
-			var cleanupImageIDs []types.RemovedImageInfo
+			var cleanupImageIDs []RemovedImageInfo
 
 			ctx, cancel := context.WithTimeout(t.Context(), 5*time.Second)
 			defer cancel()

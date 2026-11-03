@@ -21,7 +21,6 @@ import (
 
 	mockAuth "github.com/nicholas-fedor/watchtower/internal/registry/auth/mocks"
 	registryConfig "github.com/nicholas-fedor/watchtower/internal/settings/config/registry"
-	"github.com/nicholas-fedor/watchtower/pkg/types"
 )
 
 // maxFuzzTokenResponseSize is the largest token response body that
@@ -42,7 +41,7 @@ func expectedToken(body []byte) (string, error) {
 		return "", errFailedDecodeResponse
 	}
 
-	var response types.TokenResponse
+	var response TokenResponse
 
 	err := json.Unmarshal(body, &response)
 	if err != nil {
@@ -152,7 +151,7 @@ func FuzzTransformAuth(f *testing.F) {
 			decoded, err = base64.URLEncoding.DecodeString(input)
 		}
 
-		var credentials types.RegistryCredentials
+		var credentials RegistryCredentials
 		if input != "" && err == nil && json.Unmarshal(decoded, &credentials) == nil {
 			password := credentials.Password
 			if password == "" {
@@ -188,7 +187,7 @@ func FuzzTransformAuthRoundTrip(f *testing.F) {
 			t.Skip("credentials are not valid UTF-8")
 		}
 
-		raw, err := json.Marshal(types.RegistryCredentials{Username: username, Password: password})
+		raw, err := json.Marshal(RegistryCredentials{Username: username, Password: password})
 		require.NoError(t, err)
 
 		encoding := base64.StdEncoding
@@ -299,7 +298,7 @@ func FuzzComputeTokenExpiry(f *testing.F) {
 		}
 
 		before := time.Now()
-		got := computeTokenExpiry(newNopLogger(), &types.TokenResponse{ExpiresIn: expiresIn, IssuedAt: issuedAt})
+		got := computeTokenExpiry(newNopLogger(), &TokenResponse{ExpiresIn: expiresIn, IssuedAt: issuedAt})
 		after := time.Now()
 
 		issued, err := time.Parse(time.RFC3339, issuedAt)

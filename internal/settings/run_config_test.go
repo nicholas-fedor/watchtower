@@ -7,7 +7,6 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/nicholas-fedor/watchtower/internal/settings/config/api"
-	"github.com/nicholas-fedor/watchtower/pkg/types"
 )
 
 func TestPopulateRouteFlags(t *testing.T) {
@@ -16,7 +15,7 @@ func TestPopulateRouteFlags(t *testing.T) {
 	endpointMap, err := api.ResolveEndpoints([]string{"all"}, false, false, false)
 	require.NoError(t, err)
 
-	var cfg types.RunConfig
+	var cfg RunConfig
 	setEndpointConfig(endpointMap, &cfg)
 	assert.True(t, cfg.EnableHealthAPI)
 	assert.True(t, cfg.EnableUpdateAPI)
@@ -29,7 +28,7 @@ func TestPopulateRouteFlags(t *testing.T) {
 	assert.True(t, cfg.EnableEventsAPI)
 	assert.True(t, cfg.EnableSwaggerAPI)
 
-	var empty types.RunConfig
+	var empty RunConfig
 	setEndpointConfig(api.EnabledEndpoints{}, &empty)
 	assert.False(t, empty.EnableHealthAPI)
 	assert.False(t, empty.EnableUpdateAPI)

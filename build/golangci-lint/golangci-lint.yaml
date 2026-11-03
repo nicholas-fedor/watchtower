@@ -315,14 +315,6 @@ linters:
         linters:
           - gosec
         text: "G117"
-      - path: "pkg/types/config.go"
-        linters:
-          - gosec
-        text: "G117"
-      - path: "pkg/types/registry_credentials.go"
-        linters:
-          - gosec
-        text: "G117"
       # Functions above the gocyclo threshold today. Remove an entry when its function is split up.
       - path: "internal/update/update.go"
         linters:

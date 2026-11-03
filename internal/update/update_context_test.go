@@ -14,6 +14,7 @@ import (
 	dockerContainer "github.com/moby/moby/api/types/container"
 
 	"github.com/nicholas-fedor/watchtower/internal/registry/ratelimit"
+	"github.com/nicholas-fedor/watchtower/internal/update/cleanup"
 	mockUpdate "github.com/nicholas-fedor/watchtower/internal/update/mocks"
 	"github.com/nicholas-fedor/watchtower/pkg/types"
 )
@@ -391,7 +392,7 @@ func runErrorPropagationTest(
 	errorToReturn error,
 	containerStaleness map[string]bool,
 	targetOperation string,
-) (types.Report, []types.RemovedImageInfo, error) {
+) (types.Report, []cleanup.RemovedImageInfo, error) {
 	t.Helper()
 
 	testData := getCommonTestData()
@@ -698,7 +699,7 @@ func TestEarlyCancellationStopContainers(t *testing.T) {
 
 		var (
 			report            types.Report
-			cleanupImageInfos []types.RemovedImageInfo
+			cleanupImageInfos []cleanup.RemovedImageInfo
 			err               error
 		)
 
@@ -759,7 +760,7 @@ func TestEarlyCancellationRestartContainers(t *testing.T) {
 
 		var (
 			report            types.Report
-			cleanupImageInfos []types.RemovedImageInfo
+			cleanupImageInfos []cleanup.RemovedImageInfo
 			err               error
 		)
 

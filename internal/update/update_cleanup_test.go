@@ -14,6 +14,7 @@ import (
 	mockContainerClient "github.com/nicholas-fedor/watchtower/internal/container/client/mocks"
 	"github.com/nicholas-fedor/watchtower/internal/observability/events"
 	"github.com/nicholas-fedor/watchtower/internal/registry/ratelimit"
+	"github.com/nicholas-fedor/watchtower/internal/update/cleanup"
 	mockUpdate "github.com/nicholas-fedor/watchtower/internal/update/mocks"
 	"github.com/nicholas-fedor/watchtower/pkg/types"
 	mockTypes "github.com/nicholas-fedor/watchtower/pkg/types/mocks"
@@ -37,7 +38,7 @@ func cleanupTestWatchtower(id, name, image string) types.Container {
 }
 
 // imageEntries returns the image and container name of each entry.
-func imageEntries(infos []types.RemovedImageInfo) []string {
+func imageEntries(infos []cleanup.RemovedImageInfo) []string {
 	entries := make([]string, 0, len(infos))
 	for _, info := range infos {
 		entries = append(entries, string(info.ImageID)+" "+info.ContainerName)
@@ -47,7 +48,7 @@ func imageEntries(infos []types.RemovedImageInfo) []string {
 }
 
 // removedImageIDs returns the image ID of each entry.
-func removedImageIDs(infos []types.RemovedImageInfo) []types.ImageID {
+func removedImageIDs(infos []cleanup.RemovedImageInfo) []types.ImageID {
 	ids := make([]types.ImageID, 0, len(infos))
 	for _, info := range infos {
 		ids = append(ids, info.ImageID)
@@ -57,7 +58,7 @@ func removedImageIDs(infos []types.RemovedImageInfo) []types.ImageID {
 }
 
 // removedContainerNames returns the container name of each entry.
-func removedContainerNames(infos []types.RemovedImageInfo) []string {
+func removedContainerNames(infos []cleanup.RemovedImageInfo) []string {
 	names := make([]string, 0, len(infos))
 	for _, info := range infos {
 		names = append(names, info.ContainerName)

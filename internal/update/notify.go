@@ -435,7 +435,7 @@ func startNotifications(log *zerolog.Logger, notifier types.Notifier, notificati
 //
 // Returns:
 //   - types.Report: Results of the update operation.
-//   - []types.RemovedImageInfo: Images eligible for cleanup.
+//   - []cleanup.RemovedImageInfo: Images eligible for cleanup.
 //   - error: Non-nil when Update fails.
 func executeUpdate(
 	log *zerolog.Logger,
@@ -444,7 +444,7 @@ func executeUpdate(
 	config types.UpdateParams,
 	rateLimiter *ratelimit.Limiter,
 	gitClient *git.Client,
-) (types.Report, []types.RemovedImageInfo, error) {
+) (types.Report, []cleanup.RemovedImageInfo, error) {
 	// Log before calling the Update function
 	log.Debug().Msg("About to call Update function")
 
@@ -473,15 +473,15 @@ func executeUpdate(
 //   - timeout: Bound for the detached cleanup Docker calls.
 //
 // Returns:
-//   - []types.RemovedImageInfo: Slice of successfully cleaned image info.
+//   - []cleanup.RemovedImageInfo: Slice of successfully cleaned image info.
 func performImageCleanup(log *zerolog.Logger, ctx context.Context,
 	client containerClient.Client,
 	enabled bool,
-	cleanupImageInfos []types.RemovedImageInfo,
+	cleanupImageInfos []cleanup.RemovedImageInfo,
 	timeout time.Duration,
-) []types.RemovedImageInfo {
+) []cleanup.RemovedImageInfo {
 	if !enabled || len(cleanupImageInfos) == 0 {
-		return []types.RemovedImageInfo{}
+		return []cleanup.RemovedImageInfo{}
 	}
 
 	// Detach from the session context so SIGTERM after self-update cannot
@@ -500,7 +500,7 @@ func performImageCleanup(log *zerolog.Logger, ctx context.Context,
 	}
 
 	if len(cleaned) == 0 {
-		return []types.RemovedImageInfo{}
+		return []cleanup.RemovedImageInfo{}
 	}
 
 	// Build a set of successfully removed image IDs.
@@ -512,7 +512,7 @@ func performImageCleanup(log *zerolog.Logger, ctx context.Context,
 	// Expand to include all container associations for each removed image.
 	// This ensures split-by-container notifications report cleanup for every
 	// container that used the old image, not just the one that triggered removal.
-	result := make([]types.RemovedImageInfo, 0, len(cleanupImageInfos))
+	result := make([]cleanup.RemovedImageInfo, 0, len(cleanupImageInfos))
 	for _, info := range cleanupImageInfos {
 		if removedIDs[info.ImageID] {
 			result = append(result, info)
@@ -560,7 +560,7 @@ func logUpdateReport(log *zerolog.Logger, result types.Report) {
 func sendNotifications(log *zerolog.Logger, notifier types.Notifier,
 	notificationSplitByContainer, notificationReport bool,
 	result types.Report,
-	cleanedImages []types.RemovedImageInfo,
+	cleanedImages []cleanup.RemovedImageInfo,
 ) {
 	// Check if notifier is available
 	if notifier != nil {
@@ -593,7 +593,7 @@ func sendNotifications(log *zerolog.Logger, notifier types.Notifier,
 func sendSplitNotifications(log *zerolog.Logger, notifier types.Notifier,
 	notificationReport bool,
 	result types.Report,
-	cleanedImages []types.RemovedImageInfo,
+	cleanedImages []cleanup.RemovedImageInfo,
 ) {
 	// Map to track notified container IDs to prevent duplicate notifications.
 	// Key is the full container ID string for uniqueness, value is boolean indicating

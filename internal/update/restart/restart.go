@@ -87,7 +87,7 @@ func Run(
 	containers []types.Container,
 	client containerClient.Client,
 	config types.UpdateParams,
-	cleanupImageInfos *[]types.RemovedImageInfo,
+	cleanupImageInfos *[]cleanup.RemovedImageInfo,
 	progress *state.Progress,
 	gitSession *rebuild.Session,
 ) error {
@@ -162,7 +162,7 @@ func performRollingRestart(
 	containers []types.Container,
 	client containerClient.Client,
 	config types.UpdateParams,
-	cleanupImageInfos *[]types.RemovedImageInfo,
+	cleanupImageInfos *[]cleanup.RemovedImageInfo,
 	progress *state.Progress,
 	gitSession *rebuild.Session,
 ) (map[types.ContainerID]error, error) {
@@ -311,16 +311,16 @@ func performRollingRestart(
 //
 // Returns:
 //   - map[types.ContainerID]error: Map of container IDs to errors for failed stops.
-//   - []types.RemovedImageInfo: Slice of cleaned image info for stopped containers.
+//   - []cleanup.RemovedImageInfo: Slice of cleaned image info for stopped containers.
 func stopContainersInReversedOrder(
 	log *zerolog.Logger,
 	ctx context.Context,
 	containers []types.Container,
 	client containerClient.Client,
 	config types.UpdateParams,
-) (map[types.ContainerID]error, []types.RemovedImageInfo) {
+) (map[types.ContainerID]error, []cleanup.RemovedImageInfo) {
 	failed := make(map[types.ContainerID]error, len(containers))
-	stopped := make([]types.RemovedImageInfo, 0, len(containers))
+	stopped := make([]cleanup.RemovedImageInfo, 0, len(containers))
 
 	// Stop containers in reverse order to avoid breaking dependencies.
 	for i, v := range slices.Backward(containers) {
@@ -362,7 +362,7 @@ func stopContainersInReversedOrder(
 		} else if stoppedNow {
 			stopped = append(
 				stopped,
-				types.RemovedImageInfo{
+				cleanup.RemovedImageInfo{
 					ImageID:       c.ImageID(),
 					ContainerID:   c.ID(),
 					ImageName:     c.ImageName(),
@@ -599,8 +599,8 @@ func restartContainersInSortedOrder(
 	containers []types.Container,
 	client containerClient.Client,
 	config types.UpdateParams,
-	stoppedImages []types.RemovedImageInfo,
-	cleanupImageInfos *[]types.RemovedImageInfo,
+	stoppedImages []cleanup.RemovedImageInfo,
+	cleanupImageInfos *[]cleanup.RemovedImageInfo,
 	progress *state.Progress,
 	gitSession *rebuild.Session,
 ) map[types.ContainerID]error {
