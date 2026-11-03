@@ -7,6 +7,7 @@ import (
 	"github.com/rs/zerolog"
 
 	"github.com/nicholas-fedor/watchtower/internal/container/labels"
+	"github.com/nicholas-fedor/watchtower/internal/git/semver"
 	"github.com/nicholas-fedor/watchtower/pkg/types"
 )
 
@@ -224,7 +225,7 @@ func refLabel(c types.Container) string {
 //   - string: Canonical policy, or empty when unset or invalid.
 func policyLabel(c types.Container) string {
 	policy := strings.ToLower(label(c, labels.GitSemverPolicy))
-	if types.ValidGitPolicy(policy) {
+	if semver.ValidPolicy(policy) {
 		return policy
 	}
 
@@ -295,9 +296,9 @@ func defaultRef(params types.UpdateParams) string {
 // Returns:
 //   - string: Canonical policy.
 func defaultPolicy(params types.UpdateParams) string {
-	if types.ValidGitPolicy(params.GitSemverPolicy) {
+	if semver.ValidPolicy(params.GitSemverPolicy) {
 		return params.GitSemverPolicy
 	}
 
-	return types.GitPolicyNone
+	return semver.PolicyNone
 }

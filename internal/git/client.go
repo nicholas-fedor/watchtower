@@ -18,6 +18,7 @@ import (
 	composeLabels "github.com/nicholas-fedor/watchtower/internal/compose/labels"
 	"github.com/nicholas-fedor/watchtower/internal/container/labels"
 	"github.com/nicholas-fedor/watchtower/internal/container/provenance"
+	gitSemver "github.com/nicholas-fedor/watchtower/internal/git/semver"
 	"github.com/nicholas-fedor/watchtower/pkg/types"
 )
 
@@ -161,14 +162,14 @@ func (c *Client) Check(ctx context.Context, req CheckRequest) (CheckResult, erro
 	defer cancel()
 
 	req.Ref = cmpOr(req.Ref, "main")
-	req.Policy = cmpOr(req.Policy, types.GitPolicyNone)
+	req.Policy = cmpOr(req.Policy, gitSemver.PolicyNone)
 
 	err := validateRef(req.Ref)
 	if err != nil {
 		return CheckResult{}, err
 	}
 
-	if req.Policy != types.GitPolicyNone {
+	if req.Policy != gitSemver.PolicyNone {
 		return c.checkTagPolicy(ctx, req)
 	}
 
@@ -232,7 +233,7 @@ func CheckContainer(
 		return CheckResult{}, nil
 	}
 
-	if raw := strings.TrimSpace(policyLabelValue(c)); raw != "" && !types.ValidGitPolicy(strings.ToLower(raw)) {
+	if raw := strings.TrimSpace(policyLabelValue(c)); raw != "" && !gitSemver.ValidPolicy(strings.ToLower(raw)) {
 		return CheckResult{}, fmt.Errorf("%w: %s", ErrInvalidPolicy, raw)
 	}
 
@@ -521,7 +522,7 @@ func (c *Client) checkTagPolicy(ctx context.Context, req CheckRequest) (CheckRes
 			return c.checkExactRef(ctx, CheckRequest{
 				Repo:       req.Repo,
 				Ref:        req.Ref,
-				Policy:     types.GitPolicyNone,
+				Policy:     gitSemver.PolicyNone,
 				Host:       req.Host,
 				LastCommit: req.LastCommit,
 			})

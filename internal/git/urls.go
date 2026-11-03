@@ -8,7 +8,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/nicholas-fedor/watchtower/pkg/types"
+	"github.com/nicholas-fedor/watchtower/internal/git/provider"
 )
 
 // applyAuth sets Bearer or basic credentials on req.
@@ -35,12 +35,12 @@ func (c *Client) applyAuth(req *http.Request, cloneHost string) {
 	if c.opts.Token != "" {
 		scheme := "Bearer"
 
-		kind := types.ResolveGitHostKind(cloneHost, c.opts.Hosts)
+		kind := provider.ResolveHostKind(cloneHost, c.opts.Hosts)
 		if kind == "" && isGiteaAPIPath(req.URL.Path) {
-			kind = types.GitHostGitea
+			kind = provider.Gitea
 		}
 
-		if kind == types.GitHostGitea {
+		if kind == provider.Gitea {
 			scheme = "token"
 		}
 

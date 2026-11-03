@@ -1,13 +1,13 @@
-package types
+package provider
 
 import (
 	"strings"
 	"testing"
 )
 
-// FuzzCanonicalGitHostKind verifies provider names never panic and only
+// FuzzCanonicalHostKind verifies provider names never panic and only
 // collapse to github, gitlab, gitea, or empty.
-func FuzzCanonicalGitHostKind(f *testing.F) {
+func FuzzCanonicalHostKind(f *testing.F) {
 	f.Add("github")
 	f.Add("GitHub")
 	f.Add("gitlab")
@@ -18,17 +18,17 @@ func FuzzCanonicalGitHostKind(f *testing.F) {
 	f.Add("  GITEA  ")
 
 	f.Fuzz(func(t *testing.T, kind string) {
-		got := canonicalGitHostKind(kind)
+		got := canonicalHostKind(kind)
 		switch got {
-		case "", GitHostGitHub, GitHostGitLab, GitHostGitea:
+		case "", GitHub, GitLab, Gitea:
 		default:
 			t.Fatalf("unexpected kind %q", got)
 		}
 	})
 }
 
-// FuzzResolveGitHostKind verifies hostname classification never panics.
-func FuzzResolveGitHostKind(f *testing.F) {
+// FuzzResolveHostKind verifies hostname classification never panics.
+func FuzzResolveHostKind(f *testing.F) {
 	f.Add("github.com", "")
 	f.Add("gitlab.com", "")
 	f.Add("codeberg.org", "")
@@ -43,9 +43,9 @@ func FuzzResolveGitHostKind(f *testing.F) {
 			extra = map[string]string{strings.ToLower(strings.TrimSpace(host)): extraKind}
 		}
 
-		got := ResolveGitHostKind(host, extra)
+		got := ResolveHostKind(host, extra)
 		switch got {
-		case "", GitHostGitHub, GitHostGitLab, GitHostGitea:
+		case "", GitHub, GitLab, Gitea:
 		default:
 			t.Fatalf("unexpected kind %q", got)
 		}

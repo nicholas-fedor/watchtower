@@ -13,7 +13,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/nicholas-fedor/watchtower/pkg/types"
+	"github.com/nicholas-fedor/watchtower/internal/git/provider"
 )
 
 func TestApplyAuth(t *testing.T) {
@@ -89,7 +89,7 @@ func TestApplyAuth(t *testing.T) {
 
 		(&Client{opts: Options{
 			Token: "secret",
-			Hosts: map[string]string{"git.example.com": types.GitHostGitea},
+			Hosts: map[string]string{"git.example.com": provider.Gitea},
 		}}).applyAuth(req, "git.example.com")
 		assert.Empty(t, req.Header.Get("Authorization"))
 	})
@@ -133,7 +133,7 @@ func TestApplyAuthProviderSchemes(t *testing.T) {
 			name:      "self-hosted gitea",
 			cloneHost: "git.example.com",
 			path:      "/api",
-			hosts:     map[string]string{"git.example.com": types.GitHostGitea},
+			hosts:     map[string]string{"git.example.com": provider.Gitea},
 			want:      "token tok",
 		},
 		{name: "gitea api path", cloneHost: "git.example.com", path: "/api/v1/version", want: "token tok"},

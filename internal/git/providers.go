@@ -14,7 +14,7 @@ import (
 	"github.com/go-git/go-git/v5/plumbing/transport"
 
 	"github.com/nicholas-fedor/watchtower/internal/container/provenance"
-	"github.com/nicholas-fedor/watchtower/pkg/types"
+	"github.com/nicholas-fedor/watchtower/internal/git/provider"
 )
 
 const (
@@ -47,7 +47,7 @@ func (c *Client) resolveViaAPI(ctx context.Context, repo, ref, apiOrigin string)
 	}
 
 	switch kind {
-	case types.GitHostGitHub:
+	case provider.GitHub:
 		resolved, found, err := c.githubRef(ctx, host, origin, owner, name, "heads/"+ref)
 		if err != nil || found {
 			if found {
@@ -63,9 +63,9 @@ func (c *Client) resolveViaAPI(ctx context.Context, repo, ref, apiOrigin string)
 		}
 
 		return resolved, found, err
-	case types.GitHostGitLab:
+	case provider.GitLab:
 		return c.gitlabRef(ctx, host, origin, owner, name, ref)
-	case types.GitHostGitea:
+	case provider.Gitea:
 		return c.giteaRef(ctx, host, origin, owner, name, ref)
 	default:
 		return resolvedRef{}, false, nil
@@ -94,11 +94,11 @@ func (c *Client) listTagsViaAPI(ctx context.Context, repo, apiOrigin string) ([]
 	}
 
 	switch kind {
-	case types.GitHostGitHub:
+	case provider.GitHub:
 		return c.githubTags(ctx, host, origin, owner, name)
-	case types.GitHostGitLab:
+	case provider.GitLab:
 		return c.gitlabTags(ctx, host, origin, owner, name)
-	case types.GitHostGitea:
+	case provider.Gitea:
 		return c.giteaTags(ctx, host, origin, owner, name)
 	default:
 		return nil, false, nil
@@ -132,7 +132,7 @@ func (c *Client) lookupAPI(ctx context.Context, cloneHost, apiOrigin string) (st
 			return "", url.URL{}, false
 		}
 
-		kind := types.ResolveGitHostKind(parsed.Hostname(), c.opts.Hosts)
+		kind := provider.ResolveHostKind(parsed.Hostname(), c.opts.Hosts)
 		if kind == "" {
 			kind = c.detectKind(ctx, parsed, cloneHost)
 		}
@@ -144,7 +144,7 @@ func (c *Client) lookupAPI(ctx context.Context, cloneHost, apiOrigin string) (st
 		return kind, parsed, true
 	}
 
-	kind := types.ResolveGitHostKind(cloneHost, nil)
+	kind := provider.ResolveHostKind(cloneHost, nil)
 	if kind == "" {
 		return "", url.URL{}, false
 	}

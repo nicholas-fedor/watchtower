@@ -7,6 +7,7 @@ import (
 	"github.com/stretchr/testify/assert"
 
 	"github.com/nicholas-fedor/watchtower/internal/container/labels"
+	"github.com/nicholas-fedor/watchtower/internal/git/semver"
 	"github.com/nicholas-fedor/watchtower/internal/testutil/containerfixture"
 	"github.com/nicholas-fedor/watchtower/internal/testutil/modelfixture"
 	"github.com/nicholas-fedor/watchtower/pkg/types"
@@ -210,7 +211,7 @@ func TestGitWrappers(t *testing.T) {
 			ApplyGitAssociation(c, Association{
 				Repo:       "https://github.com/org/app.git",
 				Ref:        "main",
-				Policy:     types.GitPolicyPatch,
+				Policy:     semver.PolicyPatch,
 				Host:       "https://git.example.com:3000",
 				Dockerfile: "build/docker/Dockerfile",
 				Context:    ".",
@@ -219,7 +220,7 @@ func TestGitWrappers(t *testing.T) {
 			assert.Equal(t, map[string]string{
 				labels.GitRepo:         "https://github.com/org/app.git",
 				labels.GitRef:          "main",
-				labels.GitSemverPolicy: types.GitPolicyPatch,
+				labels.GitSemverPolicy: semver.PolicyPatch,
 				labels.GitHost:         "https://git.example.com:3000",
 				labels.GitDockerfile:   "build/docker/Dockerfile",
 				labels.GitContext:      ".",
@@ -294,7 +295,7 @@ func TestGitWrappers(t *testing.T) {
 			ApplyGitAssociation(c, Association{
 				Repo:                  "https://github.com/org/app.git",
 				Ref:                   "main",
-				Policy:                types.GitPolicyNone,
+				Policy:                semver.PolicyNone,
 				Dockerfile:            "Dockerfile",
 				Context:               ".",
 				RefFromDefault:        true,

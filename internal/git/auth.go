@@ -8,7 +8,7 @@ import (
 	gitHTTP "github.com/go-git/go-git/v5/plumbing/transport/http"
 	gitSSH "github.com/go-git/go-git/v5/plumbing/transport/ssh"
 
-	"github.com/nicholas-fedor/watchtower/pkg/types"
+	"github.com/nicholas-fedor/watchtower/internal/git/provider"
 )
 
 const (
@@ -192,7 +192,7 @@ func (c *Client) credentialHostTrusted(repo string) bool {
 		return false
 	}
 
-	return types.ResolveGitHostKind(host, c.opts.Hosts) != ""
+	return provider.ResolveHostKind(host, c.opts.Hosts) != ""
 }
 
 // httpsRemote reports whether repo is an HTTPS Git URL.
@@ -251,12 +251,12 @@ func tokenUsername(repo string, extra map[string]string) string {
 		return tokenUserGit
 	}
 
-	switch types.ResolveGitHostKind(host, extra) {
-	case types.GitHostGitHub:
+	switch provider.ResolveHostKind(host, extra) {
+	case provider.GitHub:
 		return tokenUserGitHub
-	case types.GitHostGitLab:
+	case provider.GitLab:
 		return tokenUserGitLab
-	case types.GitHostGitea:
+	case provider.Gitea:
 		return tokenUserGitea
 	default:
 		return tokenUserGit

@@ -6,6 +6,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"github.com/nicholas-fedor/watchtower/internal/git/semver"
 	"github.com/nicholas-fedor/watchtower/pkg/types"
 )
 
@@ -36,7 +37,7 @@ func TestParseImageMapping(t *testing.T) {
 			mapping: types.GitImage{
 				Repo:   "https://github.com/org/app.git",
 				Ref:    "release",
-				Policy: types.GitPolicyMinor,
+				Policy: semver.PolicyMinor,
 			},
 		},
 		{
@@ -66,7 +67,7 @@ func TestParseImageMapping(t *testing.T) {
 			mapping: types.GitImage{
 				Repo:   "git@github.com:org/app.git",
 				Ref:    "main",
-				Policy: types.GitPolicyPatch,
+				Policy: semver.PolicyPatch,
 			},
 		},
 		{
@@ -147,12 +148,12 @@ func TestParseImageMappings(t *testing.T) {
 		assert.Equal(t, types.GitImage{
 			Repo:   "https://github.com/org/app.git",
 			Ref:    "dev",
-			Policy: types.GitPolicyPatch,
+			Policy: semver.PolicyPatch,
 		}, got["myapp:latest"])
 		assert.Equal(t, types.GitImage{
 			Repo:   "https://gitlab.com/org/other.git",
 			Ref:    DefaultRef,
-			Policy: types.GitPolicyMajor,
+			Policy: semver.PolicyMajor,
 		}, got["other:v1"])
 	})
 

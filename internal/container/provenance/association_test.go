@@ -9,6 +9,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/nicholas-fedor/watchtower/internal/container/labels"
+	"github.com/nicholas-fedor/watchtower/internal/git/semver"
 	"github.com/nicholas-fedor/watchtower/pkg/types"
 	typemocks "github.com/nicholas-fedor/watchtower/pkg/types/mocks"
 )
@@ -36,7 +37,7 @@ func TestResolveAssociation(t *testing.T) {
 
 		got, ok := ResolveAssociation(c, types.UpdateParams{
 			GitDefaultRef:   "main",
-			GitSemverPolicy: types.GitPolicyPatch,
+			GitSemverPolicy: semver.PolicyPatch,
 			GitDockerfile:   "Dockerfile",
 			GitContext:      ".",
 			GitImages: map[string]types.GitImage{
@@ -47,7 +48,7 @@ func TestResolveAssociation(t *testing.T) {
 		assert.Equal(t, Association{
 			Repo:              "https://github.com/org/from-label.git",
 			Ref:               "release",
-			Policy:            types.GitPolicyPatch,
+			Policy:            semver.PolicyPatch,
 			Dockerfile:        "build/Dockerfile",
 			Context:           "src",
 			PolicyFromDefault: true,
@@ -77,7 +78,7 @@ func TestResolveAssociation(t *testing.T) {
 		got, ok := ResolveAssociation(c, types.UpdateParams{})
 		require.True(t, ok)
 		assert.Equal(t, "main", got.Ref)
-		assert.Equal(t, types.GitPolicyNone, got.Policy)
+		assert.Equal(t, semver.PolicyNone, got.Policy)
 		assert.Empty(t, got.Dockerfile)
 		assert.Empty(t, got.Context)
 	})
@@ -107,7 +108,7 @@ func TestResolveAssociation(t *testing.T) {
 				"myapp:latest": {
 					Repo:       "https://github.com/org/mapped.git",
 					Ref:        "v1",
-					Policy:     types.GitPolicyMinor,
+					Policy:     semver.PolicyMinor,
 					Dockerfile: "map.Dockerfile",
 					Context:    "app",
 				},
@@ -117,7 +118,7 @@ func TestResolveAssociation(t *testing.T) {
 		assert.Equal(t, Association{
 			Repo:       "https://github.com/org/mapped.git",
 			Ref:        "v1",
-			Policy:     types.GitPolicyMinor,
+			Policy:     semver.PolicyMinor,
 			Dockerfile: "label.Dockerfile",
 			Context:    "app",
 		}, got)
@@ -129,7 +130,7 @@ func TestResolveAssociation(t *testing.T) {
 		c := testContainer(t, nil, "myapp:latest")
 		got, ok := ResolveAssociation(c, types.UpdateParams{
 			GitDefaultRef:   "trunk",
-			GitSemverPolicy: types.GitPolicyMajor,
+			GitSemverPolicy: semver.PolicyMajor,
 			GitDockerfile:   "ci/Dockerfile",
 			GitContext:      "docker",
 			GitImages: map[string]types.GitImage{
@@ -140,7 +141,7 @@ func TestResolveAssociation(t *testing.T) {
 		assert.Equal(t, Association{
 			Repo:                  "https://github.com/org/mapped.git",
 			Ref:                   "trunk",
-			Policy:                types.GitPolicyMajor,
+			Policy:                semver.PolicyMajor,
 			Dockerfile:            "ci/Dockerfile",
 			Context:               "docker",
 			RefFromDefault:        true,
@@ -230,7 +231,7 @@ func TestRefLabel(t *testing.T) {
 func TestPolicyLabel(t *testing.T) {
 	t.Parallel()
 
-	assert.Equal(t, types.GitPolicyPatch, policyLabel(testContainer(t, map[string]string{
+	assert.Equal(t, semver.PolicyPatch, policyLabel(testContainer(t, map[string]string{
 		labels.GitSemverPolicy: "Patch",
 	}, "app:latest")))
 	assert.Empty(t, policyLabel(testContainer(t, map[string]string{
@@ -335,9 +336,9 @@ func TestDefaultRef(t *testing.T) {
 func TestDefaultPolicy(t *testing.T) {
 	t.Parallel()
 
-	assert.Equal(t, types.GitPolicyNone, defaultPolicy(types.UpdateParams{}))
-	assert.Equal(t, types.GitPolicyMinor, defaultPolicy(types.UpdateParams{GitSemverPolicy: types.GitPolicyMinor}))
-	assert.Equal(t, types.GitPolicyNone, defaultPolicy(types.UpdateParams{GitSemverPolicy: "nightly"}))
+	assert.Equal(t, semver.PolicyNone, defaultPolicy(types.UpdateParams{}))
+	assert.Equal(t, semver.PolicyMinor, defaultPolicy(types.UpdateParams{GitSemverPolicy: semver.PolicyMinor}))
+	assert.Equal(t, semver.PolicyNone, defaultPolicy(types.UpdateParams{GitSemverPolicy: "nightly"}))
 }
 
 // testContainer returns a container whose labels and image name are fixed.

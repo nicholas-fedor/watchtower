@@ -16,7 +16,7 @@ import (
 	gitHTTP "github.com/go-git/go-git/v5/plumbing/transport/http"
 	gitSSH "github.com/go-git/go-git/v5/plumbing/transport/ssh"
 
-	"github.com/nicholas-fedor/watchtower/pkg/types"
+	"github.com/nicholas-fedor/watchtower/internal/git/provider"
 )
 
 func TestAuthMethod(t *testing.T) {
@@ -30,7 +30,7 @@ func TestAuthMethod(t *testing.T) {
 			Username:   "user",
 			Password:   "pw",
 			SSHKeyPath: filepath.Join(t.TempDir(), "missing"),
-			Hosts:      map[string]string{"git.example.com": types.GitHostGitea},
+			Hosts:      map[string]string{"git.example.com": provider.Gitea},
 		}}
 
 		got, err := client.authMethod("https://git.example.com/org/app.git")
@@ -61,7 +61,7 @@ func TestAuthMethod(t *testing.T) {
 		client := &Client{opts: Options{
 			Username: "octocat",
 			Password: "pw",
-			Hosts:    map[string]string{"git.example.com": types.GitHostGitea},
+			Hosts:    map[string]string{"git.example.com": provider.Gitea},
 		}}
 		got, err := client.authMethod("https://git.example.com/org/app.git")
 		require.NoError(t, err)
@@ -77,7 +77,7 @@ func TestAuthMethod(t *testing.T) {
 
 		client := &Client{opts: Options{
 			Username: "octocat",
-			Hosts:    map[string]string{"git.example.com": types.GitHostGitea},
+			Hosts:    map[string]string{"git.example.com": provider.Gitea},
 		}}
 		got, err := client.authMethod("https://git.example.com/org/app.git")
 		require.NoError(t, err)
@@ -93,7 +93,7 @@ func TestAuthMethod(t *testing.T) {
 
 		client := &Client{opts: Options{
 			Password: "pw",
-			Hosts:    map[string]string{"git.example.com": types.GitHostGitea},
+			Hosts:    map[string]string{"git.example.com": provider.Gitea},
 		}}
 		got, err := client.authMethod("https://git.example.com/org/app.git")
 		require.NoError(t, err)
@@ -119,7 +119,7 @@ func TestAuthMethod(t *testing.T) {
 		client := &Client{opts: Options{
 			Username: "octocat",
 			Password: "pw",
-			Hosts:    map[string]string{"git.example.com": types.GitHostGitea},
+			Hosts:    map[string]string{"git.example.com": provider.Gitea},
 		}}
 		got, err := client.authMethod("http://git.example.com/org/app.git")
 		require.NoError(t, err)
@@ -295,7 +295,7 @@ func TestBuildAuth(t *testing.T) {
 			name: "token on extra gitea host",
 			client: &Client{opts: Options{
 				Token: "tok",
-				Hosts: map[string]string{"git.example.com": types.GitHostGitea},
+				Hosts: map[string]string{"git.example.com": provider.Gitea},
 			}},
 			repo:     "https://git.example.com/org/app.git",
 			username: tokenUserGitea,
@@ -306,7 +306,7 @@ func TestBuildAuth(t *testing.T) {
 			client: &Client{opts: Options{
 				Username: "octocat",
 				Password: "pw",
-				Hosts:    map[string]string{"git.example.com": types.GitHostGitea},
+				Hosts:    map[string]string{"git.example.com": provider.Gitea},
 			}},
 			repo:     "https://git.example.com/org/app.git",
 			username: "octocat",
@@ -316,7 +316,7 @@ func TestBuildAuth(t *testing.T) {
 			name: "password without username defaults to git",
 			client: &Client{opts: Options{
 				Password: "pw",
-				Hosts:    map[string]string{"git.example.com": types.GitHostGitea},
+				Hosts:    map[string]string{"git.example.com": provider.Gitea},
 			}},
 			repo:     "https://git.example.com/org/app.git",
 			username: tokenUserGit,
@@ -332,7 +332,7 @@ func TestBuildAuth(t *testing.T) {
 			name: "plaintext http is anonymous",
 			client: &Client{opts: Options{
 				Token: "tok",
-				Hosts: map[string]string{"git.example.com": types.GitHostGitea},
+				Hosts: map[string]string{"git.example.com": provider.Gitea},
 			}},
 			repo:     "http://git.example.com/org/app.git",
 			username: tokenUserGit,
@@ -371,25 +371,25 @@ func TestTokenUsername(t *testing.T) {
 		{
 			name:  "extra gitea host",
 			repo:  "https://git.example.com/org/app.git",
-			extra: map[string]string{"git.example.com": types.GitHostGitea},
+			extra: map[string]string{"git.example.com": provider.Gitea},
 			want:  tokenUserGitea,
 		},
 		{
 			name:  "extra gitlab host",
 			repo:  "https://gitlab.internal/group/app.git",
-			extra: map[string]string{"gitlab.internal": types.GitHostGitLab},
+			extra: map[string]string{"gitlab.internal": provider.GitLab},
 			want:  tokenUserGitLab,
 		},
 		{
 			name:  "extra github host",
 			repo:  "https://github.company.com/org/app.git",
-			extra: map[string]string{"github.company.com": types.GitHostGitHub},
+			extra: map[string]string{"github.company.com": provider.GitHub},
 			want:  tokenUserGitHub,
 		},
 		{
 			name:  "forgejo maps to gitea username",
 			repo:  "https://forgejo.example.com/org/app.git",
-			extra: map[string]string{"forgejo.example.com": types.GitHostForgejo},
+			extra: map[string]string{"forgejo.example.com": provider.Forgejo},
 			want:  tokenUserGitea,
 		},
 		{name: "ssh github url", repo: "git@github.com:org/app.git", want: tokenUserGitHub},

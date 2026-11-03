@@ -15,11 +15,11 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"github.com/nicholas-fedor/watchtower/internal/git/semver"
 	"github.com/nicholas-fedor/watchtower/internal/settings/config/git"
 	"github.com/nicholas-fedor/watchtower/internal/settings/config/registry"
 	"github.com/nicholas-fedor/watchtower/internal/settings/config/update"
 	"github.com/nicholas-fedor/watchtower/internal/settings/flags/spec"
-	"github.com/nicholas-fedor/watchtower/pkg/types"
 )
 
 // newNopLogger returns a discarded logger for Load and validate tests.
@@ -674,7 +674,7 @@ func TestLoadGit(t *testing.T) {
 		assert.True(t, got.InsecureSkipTLS)
 		assert.Equal(t, "build/docker/Dockerfile", got.Dockerfile)
 		assert.Equal(t, ".", got.Context)
-		assert.Equal(t, types.GitPolicyMinor, got.Images["myapp:latest"].Policy)
+		assert.Equal(t, semver.PolicyMinor, got.Images["myapp:latest"].Policy)
 		assert.True(t, got.ComposeStash)
 		assert.Equal(t, "/srv/web", got.ComposeProjects["web"])
 	})
