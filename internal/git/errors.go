@@ -19,8 +19,6 @@ var (
 	errAuthFailed = errors.New("git authorization failed")
 	// errRepoNotFound indicates the remote repository does not exist.
 	errRepoNotFound = errors.New("git repository not found")
-	// ErrInvalidPolicy indicates a git-semver-policy label is not none/patch/minor/major.
-	ErrInvalidPolicy = errors.New("invalid git semver policy")
 	// ErrInvalidHost indicates a git-host label is not an HTTP base URL.
 	ErrInvalidHost = errors.New("invalid git-host")
 	// errRepositoryOperation identifies a sanitized remote operation failure.

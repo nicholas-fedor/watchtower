@@ -12,7 +12,8 @@ import (
 // Check runs a Git staleness check and stores the result.
 //
 // An invalid git-semver-policy or git-host label returns an error matching
-// [git.ErrInvalidPolicy] or [git.ErrInvalidHost], and the caller reports it.
+// [github.com/nicholas-fedor/watchtower/internal/git/semver.ErrInvalidPolicy]
+// or [git.ErrInvalidHost]. The caller reports it.
 //
 // Parameters:
 //   - ctx: Cancellation and timeout.

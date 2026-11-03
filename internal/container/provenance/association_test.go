@@ -96,6 +96,37 @@ func TestResolveAssociation(t *testing.T) {
 		assert.Equal(t, "develop", got.Ref)
 	})
 
+	t.Run("invalid policy label falls back and is recorded", func(t *testing.T) {
+		t.Parallel()
+
+		c := testContainer(t, map[string]string{
+			labels.GitRepo:         "https://github.com/org/app.git",
+			labels.GitSemverPolicy: " Nightly ",
+		}, "myapp:latest")
+
+		got, ok := ResolveAssociation(c, types.UpdateParams{})
+		require.True(t, ok)
+		assert.Equal(t, semver.PolicyNone, got.Policy)
+		assert.Equal(t, "Nightly", got.InvalidPolicy)
+	})
+
+	t.Run("invalid policy label on a mapped image is recorded", func(t *testing.T) {
+		t.Parallel()
+
+		c := testContainer(t, map[string]string{
+			labels.GitSemverPolicy: "nightly",
+		}, "myapp:latest")
+
+		got, ok := ResolveAssociation(c, types.UpdateParams{
+			GitImages: map[string]types.GitImage{
+				"myapp:latest": {Repo: "https://github.com/org/mapped.git", Policy: semver.PolicyMinor},
+			},
+		})
+		require.True(t, ok)
+		assert.Equal(t, semver.PolicyMinor, got.Policy)
+		assert.Equal(t, "nightly", got.InvalidPolicy)
+	})
+
 	t.Run("image mapping", func(t *testing.T) {
 		t.Parallel()
 
@@ -228,18 +259,6 @@ func TestRefLabel(t *testing.T) {
 	assert.Empty(t, refLabel(testContainer(t, nil, "app:latest")))
 }
 
-func TestPolicyLabel(t *testing.T) {
-	t.Parallel()
-
-	assert.Equal(t, semver.PolicyPatch, policyLabel(testContainer(t, map[string]string{
-		labels.GitSemverPolicy: "Patch",
-	}, "app:latest")))
-	assert.Empty(t, policyLabel(testContainer(t, map[string]string{
-		labels.GitSemverPolicy: "nightly",
-	}, "app:latest")))
-	assert.Empty(t, policyLabel(testContainer(t, nil, "app:latest")))
-}
-
 func TestImageMapping(t *testing.T) {
 	t.Parallel()
 
@@ -338,6 +357,7 @@ func TestDefaultPolicy(t *testing.T) {
 
 	assert.Equal(t, semver.PolicyNone, defaultPolicy(types.UpdateParams{}))
 	assert.Equal(t, semver.PolicyMinor, defaultPolicy(types.UpdateParams{GitSemverPolicy: semver.PolicyMinor}))
+	assert.Equal(t, semver.PolicyMajor, defaultPolicy(types.UpdateParams{GitSemverPolicy: " Major "}))
 	assert.Equal(t, semver.PolicyNone, defaultPolicy(types.UpdateParams{GitSemverPolicy: "nightly"}))
 }
 
