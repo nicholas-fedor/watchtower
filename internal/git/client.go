@@ -13,12 +13,11 @@ import (
 	"unicode"
 
 	"github.com/rs/zerolog"
-	"golang.org/x/mod/semver"
 
 	composeLabels "github.com/nicholas-fedor/watchtower/internal/compose/labels"
 	"github.com/nicholas-fedor/watchtower/internal/container/labels"
 	"github.com/nicholas-fedor/watchtower/internal/container/provenance"
-	gitSemver "github.com/nicholas-fedor/watchtower/internal/git/semver"
+	"github.com/nicholas-fedor/watchtower/internal/git/semver"
 	"github.com/nicholas-fedor/watchtower/pkg/types"
 )
 
@@ -162,14 +161,14 @@ func (c *Client) Check(ctx context.Context, req CheckRequest) (CheckResult, erro
 	defer cancel()
 
 	req.Ref = cmpOr(req.Ref, "main")
-	req.Policy = cmpOr(req.Policy, gitSemver.PolicyNone)
+	req.Policy = cmpOr(req.Policy, semver.PolicyNone)
 
 	err := validateRef(req.Ref)
 	if err != nil {
 		return CheckResult{}, err
 	}
 
-	if req.Policy != gitSemver.PolicyNone {
+	if req.Policy != semver.PolicyNone {
 		return c.checkTagPolicy(ctx, req)
 	}
 
@@ -233,7 +232,7 @@ func CheckContainer(
 		return CheckResult{}, nil
 	}
 
-	if raw := strings.TrimSpace(policyLabelValue(c)); raw != "" && !gitSemver.ValidPolicy(strings.ToLower(raw)) {
+	if raw := strings.TrimSpace(policyLabelValue(c)); raw != "" && !semver.ValidPolicy(strings.ToLower(raw)) {
 		return CheckResult{}, fmt.Errorf("%w: %s", ErrInvalidPolicy, raw)
 	}
 
@@ -502,7 +501,7 @@ func (c *Client) checkTagPolicy(ctx context.Context, req CheckRequest) (CheckRes
 		byName[tag.Name] = tag.Hash
 	}
 
-	lastTag := baselineTag(req.LastTag)
+	lastTag := semver.Baseline(req.LastTag)
 	inferred := false
 	// An empty or non-semver stamp still names a release when the commit
 	// matches that tag. Use the tag so patch and minor do not jump to the
@@ -515,14 +514,14 @@ func (c *Client) checkTagPolicy(ctx context.Context, req CheckRequest) (CheckRes
 	}
 
 	if lastTag == "" && req.LastCommit == "" {
-		selected, ok := selectTag("", names, req.Policy)
+		selected, ok := semver.SelectTag("", names, req.Policy)
 		if !ok {
 			// No usable semver tags. Observe the configured ref without
 			// treating the missing baseline as a reason to rebuild.
 			return c.checkExactRef(ctx, CheckRequest{
 				Repo:       req.Repo,
 				Ref:        req.Ref,
-				Policy:     gitSemver.PolicyNone,
+				Policy:     semver.PolicyNone,
 				Host:       req.Host,
 				LastCommit: req.LastCommit,
 			})
@@ -537,7 +536,7 @@ func (c *Client) checkTagPolicy(ctx context.Context, req CheckRequest) (CheckRes
 		}, nil
 	}
 
-	selected, ok := selectTag(lastTag, names, req.Policy)
+	selected, ok := semver.SelectTag(lastTag, names, req.Policy)
 	if !ok {
 		if inferred {
 			return CheckResult{
@@ -741,26 +740,15 @@ func (c *Client) remember(repo, ref, policy, commit, tag string) {
 // Returns:
 //   - string: Matching tag name, or empty.
 func tagForCommit(byName map[string]string, commit string) string {
-	bestName := ""
-	bestCanon := ""
+	var matches []string
 
 	for name, hash := range byName {
-		if !sameRevision(commit, hash) {
-			continue
-		}
-
-		canon := canonicalize(name)
-		if !semver.IsValid(canon) || semver.Prerelease(canon) != "" {
-			continue
-		}
-
-		if bestCanon == "" || semver.Compare(canon, bestCanon) > 0 {
-			bestCanon = canon
-			bestName = name
+		if sameRevision(commit, hash) {
+			matches = append(matches, name)
 		}
 	}
 
-	return bestName
+	return semver.HighestRelease(matches)
 }
 
 // tagName returns the resolved name when the ref is a tag.

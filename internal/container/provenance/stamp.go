@@ -6,6 +6,7 @@ import (
 
 	"github.com/nicholas-fedor/watchtower/internal/container/labels"
 	"github.com/nicholas-fedor/watchtower/internal/container/oci"
+	"github.com/nicholas-fedor/watchtower/internal/git/semver"
 	"github.com/nicholas-fedor/watchtower/pkg/types"
 )
 
@@ -68,10 +69,7 @@ func imageRevision(c types.Container) (string, string) {
 	ann := oci.Read(c)
 	commit := strings.TrimSpace(ann.Revision)
 
-	tag := ""
-	if oci.LooksLikeTag(ann.Version) {
-		tag = strings.TrimSpace(ann.Version)
-	}
+	tag := semver.Baseline(ann.Version)
 
 	if commit == "" {
 		commit = gitSHAFromRef(c.ImageName())

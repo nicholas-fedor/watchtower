@@ -5,16 +5,10 @@ import (
 	"strings"
 	"unicode"
 
-	"golang.org/x/mod/semver"
-
 	"github.com/nicholas-fedor/watchtower/internal/container/labels"
 	"github.com/nicholas-fedor/watchtower/internal/git/provider"
+	"github.com/nicholas-fedor/watchtower/internal/git/semver"
 	"github.com/nicholas-fedor/watchtower/pkg/types"
-)
-
-const (
-	semverPartCount = 3
-	patchIndex      = 2
 )
 
 // ChangelogVars substitutes placeholders in an explicit changelog template.
@@ -58,7 +52,7 @@ func Changelog(c types.Container, repo string, vars ChangelogVars) string {
 // Returns:
 //   - string: Template after substitution.
 func applyVars(template string, vars ChangelogVars) string {
-	major, minor, patch := splitSemverParts(vars.Tag)
+	major, minor, patch := semver.Parts(vars.Tag)
 
 	replacer := strings.NewReplacer(
 		"{major}", orUnchanged(major, "{major}"),
@@ -85,64 +79,6 @@ func orUnchanged(value, placeholder string) string {
 	}
 
 	return value
-}
-
-// splitSemverParts returns major, minor, and patch from a tag.
-//
-// Parameters:
-//   - tag: Version tag, with or without a v prefix.
-//
-// Returns:
-//   - string: Major component, or empty.
-//   - string: Minor component, or empty.
-//   - string: Patch component without prerelease suffix, or empty.
-func splitSemverParts(tag string) (string, string, string) {
-	canonical := canonicalizeSemver(tag)
-	if !semver.IsValid(canonical) {
-		return "", "", ""
-	}
-
-	trimmed := strings.TrimPrefix(semver.Canonical(canonical), "v")
-	parts := strings.SplitN(trimmed, ".", semverPartCount)
-
-	major, minor, patch := "", "", ""
-	if len(parts) > 0 {
-		major = parts[0]
-	}
-
-	if len(parts) > 1 {
-		minor = parts[1]
-	}
-
-	if len(parts) > patchIndex {
-		patch, _, _ = strings.Cut(parts[patchIndex], "-")
-	}
-
-	return major, minor, patch
-}
-
-// canonicalizeSemver returns a semver string golang.org/x/mod/semver accepts.
-//
-// Parameters:
-//   - tag: Raw tag.
-//
-// Returns:
-//   - string: Tag, optionally prefixed with v, or the original string if invalid.
-func canonicalizeSemver(tag string) string {
-	tag = strings.TrimSpace(tag)
-	if tag == "" {
-		return ""
-	}
-
-	if semver.IsValid(tag) {
-		return tag
-	}
-
-	if semver.IsValid("v" + tag) {
-		return "v" + tag
-	}
-
-	return tag
 }
 
 // derivedReleasesURL builds a product-specific releases URL for a clone URL.
