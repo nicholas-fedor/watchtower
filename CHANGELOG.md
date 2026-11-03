@@ -161,6 +161,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Chores
 
+- Update github.com/tonistiigi/fsutil digest to e075fd9 by @renovate[bot] in [#3396](https://github.com/nicholas-fedor/watchtower/pull/3396)
+- Update github/codeql-action action to v4.39.2 by @renovate[bot] in [#3397](https://github.com/nicholas-fedor/watchtower/pull/3397)
 - Update module connectrpc.com/connect to v1.21.1 by @renovate[bot] in [#3384](https://github.com/nicholas-fedor/watchtower/pull/3384)
 - Update module github.com/docker/compose/v5 to v5.7.0 by @renovate[bot] in [#3380](https://github.com/nicholas-fedor/watchtower/pull/3380)
 - Update module go.yaml.in/yaml/v4 to v4.0.0-rc.9 by @renovate[bot] in [#3379](https://github.com/nicholas-fedor/watchtower/pull/3379)
