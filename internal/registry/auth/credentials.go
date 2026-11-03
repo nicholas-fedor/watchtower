@@ -6,9 +6,17 @@ import (
 	"fmt"
 
 	"github.com/rs/zerolog"
-
-	"github.com/nicholas-fedor/watchtower/pkg/types"
 )
+
+// RegistryCredentials holds registry authentication material.
+//
+// Username/Password cover classic Basic auth. IdentityToken covers cloud
+// helpers (for example ECR) that store a short-lived token without a password.
+type RegistryCredentials struct {
+	Username      string `json:"username"`                // Registry username.
+	Password      string `json:"password"`                // Registry token or password.
+	IdentityToken string `json:"identitytoken,omitempty"` // OAuth/identity token from a credential helper.
+}
 
 // TransformAuth converts a base64-encoded JSON object into a base64-encoded
 // "username:password" string.
@@ -42,7 +50,7 @@ func TransformAuth(log *zerolog.Logger, registryAuth string) string {
 		return registryAuth
 	}
 
-	credentials := &types.RegistryCredentials{}
+	credentials := &RegistryCredentials{}
 
 	err = json.Unmarshal(b, credentials)
 	if err != nil {

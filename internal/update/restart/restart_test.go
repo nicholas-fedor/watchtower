@@ -16,6 +16,7 @@ import (
 	dockerNetwork "github.com/moby/moby/api/types/network"
 
 	"github.com/nicholas-fedor/watchtower/internal/testutil/logcapture"
+	"github.com/nicholas-fedor/watchtower/internal/update/cleanup"
 	mockUpdate "github.com/nicholas-fedor/watchtower/internal/update/mocks"
 	"github.com/nicholas-fedor/watchtower/internal/update/state"
 	"github.com/nicholas-fedor/watchtower/pkg/types"
@@ -1336,7 +1337,7 @@ func TestRestartContainersInSortedOrderCancelRecovery(t *testing.T) {
 		)
 
 		// Pretend the stop phase already removed all three.
-		stoppedImages := []types.RemovedImageInfo{
+		stoppedImages := []cleanup.RemovedImageInfo{
 			{ContainerID: containers[0].ID(), ImageID: containers[0].ImageID(), ImageName: containers[0].ImageName(), ContainerName: containers[0].Name()},
 			{ContainerID: containers[1].ID(), ImageID: containers[1].ImageID(), ImageName: containers[1].ImageName(), ContainerName: containers[1].Name()},
 			{ContainerID: containers[2].ID(), ImageID: containers[2].ImageID(), ImageName: containers[2].ImageName(), ContainerName: containers[2].Name()},
@@ -1347,7 +1348,7 @@ func TestRestartContainersInSortedOrderCancelRecovery(t *testing.T) {
 
 		progress := state.Progress{}
 
-		var cleanup []types.RemovedImageInfo
+		var cleanup []cleanup.RemovedImageInfo
 
 		failed := restartContainersInSortedOrder(newTestLogger(t),
 			ctx,
@@ -1493,7 +1494,7 @@ func Test_performRollingRestart(t *testing.T) {
 				}
 
 				// Call performRollingRestart.
-				var cleanupImageInfos []types.RemovedImageInfo
+				var cleanupImageInfos []cleanup.RemovedImageInfo
 
 				failed, err := performRollingRestart(log,
 					ctx,
@@ -1588,7 +1589,7 @@ func Test_performRollingRestart(t *testing.T) {
 			cancel()
 
 			// Call performRollingRestart.
-			var cleanupImageInfos []types.RemovedImageInfo
+			var cleanupImageInfos []cleanup.RemovedImageInfo
 
 			failed, err := performRollingRestart(newTestLogger(t),
 				canceledCtx,
@@ -1670,7 +1671,7 @@ func Test_performRollingRestart(t *testing.T) {
 			cancel()
 
 			// Call performRollingRestart.
-			var cleanupImageInfos []types.RemovedImageInfo
+			var cleanupImageInfos []cleanup.RemovedImageInfo
 
 			_, _ = performRollingRestart(log,
 				canceledCtx,
@@ -1752,7 +1753,7 @@ func Test_performRollingRestart(t *testing.T) {
 			log, logBuf := logcapture.NewJSON(zerolog.DebugLevel)
 
 			// Call with valid context.
-			var cleanupImageInfos []types.RemovedImageInfo
+			var cleanupImageInfos []cleanup.RemovedImageInfo
 
 			failed, err := performRollingRestart(log,
 				t.Context(),
@@ -1818,7 +1819,7 @@ func Test_performRollingRestart(t *testing.T) {
 			)
 
 			// Call with valid context.
-			var cleanupImageInfos []types.RemovedImageInfo
+			var cleanupImageInfos []cleanup.RemovedImageInfo
 
 			_, _ = performRollingRestart(newTestLogger(t),
 				t.Context(),
@@ -1872,7 +1873,7 @@ func Test_performRollingRestart(t *testing.T) {
 
 			log, logBuf := logcapture.NewJSON(zerolog.DebugLevel)
 
-			var cleanupImageInfos []types.RemovedImageInfo
+			var cleanupImageInfos []cleanup.RemovedImageInfo
 
 			failed, err := performRollingRestart(log,
 				t.Context(),
@@ -1931,7 +1932,7 @@ func Test_performRollingRestart(t *testing.T) {
 			cancel()
 
 			// Call performRollingRestart.
-			var cleanupImageInfos []types.RemovedImageInfo
+			var cleanupImageInfos []cleanup.RemovedImageInfo
 
 			failed, err := performRollingRestart(newTestLogger(t),
 				canceledCtx,
@@ -1993,7 +1994,7 @@ func Test_performRollingRestart(t *testing.T) {
 			defer cancel()
 
 			// Call performRollingRestart.
-			var cleanupImageInfos []types.RemovedImageInfo
+			var cleanupImageInfos []cleanup.RemovedImageInfo
 
 			failed, err := performRollingRestart(newTestLogger(t),
 				deadlineCtx,
@@ -2074,7 +2075,7 @@ func TestRun(t *testing.T) {
 			ctx, cancel := context.WithCancel(t.Context())
 			cancel()
 
-			var cleanupImageInfos []types.RemovedImageInfo
+			var cleanupImageInfos []cleanup.RemovedImageInfo
 
 			err := Run(log, ctx, []types.Container{c}, client, config, &cleanupImageInfos, &progress, nil)
 			if tt.wantErr {

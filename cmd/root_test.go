@@ -1565,21 +1565,21 @@ func TestValidateAPIHost(t *testing.T) {
 func TestAnyHTTPAPIConfig(t *testing.T) {
 	t.Parallel()
 
-	assert.False(t, settings.AnyHTTPAPIConfig(types.RunConfig{}))
-	assert.True(t, settings.AnyHTTPAPIConfig(types.RunConfig{APIToken: "secret"}))
-	assert.True(t, settings.AnyHTTPAPIConfig(types.RunConfig{TLSCertPath: "/cert.pem"}))
-	assert.True(t, settings.AnyHTTPAPIConfig(types.RunConfig{CORSAllowedOrigins: []string{"https://app.example.com"}}))
-	assert.True(t, settings.AnyHTTPAPIConfig(types.RunConfig{APIHostChanged: true}))
-	assert.True(t, settings.AnyHTTPAPIConfig(types.RunConfig{APIPortChanged: true}))
-	assert.True(t, settings.AnyHTTPAPIConfig(types.RunConfig{APIRateLimitChanged: true}))
+	assert.False(t, settings.AnyHTTPAPIConfig(settings.RunConfig{}))
+	assert.True(t, settings.AnyHTTPAPIConfig(settings.RunConfig{APIToken: "secret"}))
+	assert.True(t, settings.AnyHTTPAPIConfig(settings.RunConfig{TLSCertPath: "/cert.pem"}))
+	assert.True(t, settings.AnyHTTPAPIConfig(settings.RunConfig{CORSAllowedOrigins: []string{"https://app.example.com"}}))
+	assert.True(t, settings.AnyHTTPAPIConfig(settings.RunConfig{APIHostChanged: true}))
+	assert.True(t, settings.AnyHTTPAPIConfig(settings.RunConfig{APIPortChanged: true}))
+	assert.True(t, settings.AnyHTTPAPIConfig(settings.RunConfig{APIRateLimitChanged: true}))
 }
 
 func TestHTTPAPIEndpointsEnabled(t *testing.T) {
 	t.Parallel()
 
-	assert.False(t, settings.HTTPAPIEndpointsEnabled(types.RunConfig{}))
-	assert.True(t, settings.HTTPAPIEndpointsEnabled(types.RunConfig{EnableHealthAPI: true}))
-	assert.True(t, settings.HTTPAPIEndpointsEnabled(types.RunConfig{EnableUpdateAPI: true}))
+	assert.False(t, settings.HTTPAPIEndpointsEnabled(settings.RunConfig{}))
+	assert.True(t, settings.HTTPAPIEndpointsEnabled(settings.RunConfig{EnableHealthAPI: true}))
+	assert.True(t, settings.HTTPAPIEndpointsEnabled(settings.RunConfig{EnableUpdateAPI: true}))
 }
 
 func TestRootCommand_ReviveStoppedFlagParsing(t *testing.T) {

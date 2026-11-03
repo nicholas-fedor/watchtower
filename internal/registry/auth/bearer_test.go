@@ -20,7 +20,6 @@ import (
 	"github.com/nicholas-fedor/watchtower/internal/registry/ratelimit"
 	registryConfig "github.com/nicholas-fedor/watchtower/internal/settings/config/registry"
 	"github.com/nicholas-fedor/watchtower/internal/testutil/httpstub"
-	"github.com/nicholas-fedor/watchtower/pkg/types"
 )
 
 // testAnonymousGHCRToken is the shared anonymous GHCR token that
@@ -165,27 +164,27 @@ func Test_computeTokenExpiry(t *testing.T) {
 
 	tests := []struct {
 		name string
-		args *types.TokenResponse
+		args *TokenResponse
 		want time.Time
 	}{
 		{
 			name: "uses expires_in when provided",
-			args: &types.TokenResponse{ExpiresIn: 3600},
+			args: &TokenResponse{ExpiresIn: 3600},
 			want: truncatedToSeconds.Add(3600 * time.Second),
 		},
 		{
 			name: "falls back to default TTL when expires_in is negative",
-			args: &types.TokenResponse{ExpiresIn: -1},
+			args: &TokenResponse{ExpiresIn: -1},
 			want: truncatedToSeconds.Add(defaultTokenTTL),
 		},
 		{
 			name: "uses issued_at with default TTL when expires_in is zero",
-			args: &types.TokenResponse{IssuedAt: now.Add(-5 * time.Minute).Truncate(time.Second).Format(time.RFC3339)},
+			args: &TokenResponse{IssuedAt: now.Add(-5 * time.Minute).Truncate(time.Second).Format(time.RFC3339)},
 			want: now.Add(-5 * time.Minute).Truncate(time.Second).Add(defaultTokenTTL),
 		},
 		{
 			name: "uses issued_at with expires_in when both are provided",
-			args: &types.TokenResponse{
+			args: &TokenResponse{
 				ExpiresIn: 3600,
 				IssuedAt:  now.Add(-10 * time.Minute).Truncate(time.Second).Format(time.RFC3339),
 			},
@@ -193,22 +192,22 @@ func Test_computeTokenExpiry(t *testing.T) {
 		},
 		{
 			name: "falls back to default TTL when both are missing",
-			args: &types.TokenResponse{},
+			args: &TokenResponse{},
 			want: truncatedToSeconds.Add(defaultTokenTTL),
 		},
 		{
 			name: "falls back to default TTL when issued_at is invalid",
-			args: &types.TokenResponse{IssuedAt: "not-a-date"},
+			args: &TokenResponse{IssuedAt: "not-a-date"},
 			want: truncatedToSeconds.Add(defaultTokenTTL),
 		},
 		{
 			name: "caps an expires_in too long for a duration",
-			args: &types.TokenResponse{ExpiresIn: math.MaxInt},
+			args: &TokenResponse{ExpiresIn: math.MaxInt},
 			want: truncatedToSeconds.Add(longestLifetime),
 		},
 		{
 			name: "caps an expires_in too long for a duration after issued_at",
-			args: &types.TokenResponse{ExpiresIn: math.MaxInt, IssuedAt: issuedAt.Format(time.RFC3339)},
+			args: &TokenResponse{ExpiresIn: math.MaxInt, IssuedAt: issuedAt.Format(time.RFC3339)},
 			want: issuedAt.Add(longestLifetime),
 		},
 	}

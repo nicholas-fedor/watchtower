@@ -612,7 +612,7 @@ func (p *process) run(command *cobra.Command, args []string) error {
 //
 // Returns:
 //   - error: An [exitError] for a failure that was already logged and notified.
-func (p *process) runMain(cfg types.RunConfig) error {
+func (p *process) runMain(cfg settings.RunConfig) error {
 	// Log the container names being processed for debugging visibility.
 	p.log.Debug().
 		Strs("container_names", cfg.Names).

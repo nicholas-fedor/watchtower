@@ -20,7 +20,6 @@ import (
 	"github.com/nicholas-fedor/watchtower/internal/registry/hosts"
 	"github.com/nicholas-fedor/watchtower/internal/registry/ratelimit"
 	registryConfig "github.com/nicholas-fedor/watchtower/internal/settings/config/registry"
-	"github.com/nicholas-fedor/watchtower/pkg/types"
 )
 
 // Errors for authentication operations.
@@ -52,6 +51,14 @@ var (
 	tokenCache     *otter.Cache[string, tokenCacheEntry]
 	tokenCacheOnce sync.Once
 )
+
+// TokenResponse holds a registry authentication token response.
+type TokenResponse struct {
+	Token       string `json:"token"`        // Authentication token.
+	AccessToken string `json:"access_token"` // Alternative authentication token.
+	ExpiresIn   int    `json:"expires_in"`   // Token lifetime in seconds.
+	IssuedAt    string `json:"issued_at"`    // Token issuance time in RFC3339 format.
+}
 
 // tokenCacheEntry stores a bearer token and its absolute expiry time.
 type tokenCacheEntry struct {
@@ -544,7 +551,7 @@ func readBearerTokenWithExpiry(log *zerolog.Logger, body io.Reader, imageName st
 		return "", time.Time{}, fmt.Errorf("%w: bearer token response exceeds %d bytes", errFailedDecodeResponse, maxBearerTokenResponseSize)
 	}
 
-	tokenResponse := &types.TokenResponse{}
+	tokenResponse := &TokenResponse{}
 
 	err = json.Unmarshal(b, tokenResponse)
 	if err != nil {
@@ -585,7 +592,7 @@ func readBearerTokenWithExpiry(log *zerolog.Logger, body io.Reader, imageName st
 //
 // Returns:
 //   - time.Time: The absolute expiry time for the token.
-func computeTokenExpiry(log *zerolog.Logger, tokenResponse *types.TokenResponse) time.Time {
+func computeTokenExpiry(log *zerolog.Logger, tokenResponse *TokenResponse) time.Time {
 	now := time.Now()
 	lifetime := tokenLifetime(tokenResponse.ExpiresIn)
 

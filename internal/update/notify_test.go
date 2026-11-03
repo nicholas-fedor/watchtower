@@ -21,6 +21,7 @@ import (
 	"github.com/nicholas-fedor/watchtower/internal/observability/metrics"
 	"github.com/nicholas-fedor/watchtower/internal/registry/ratelimit"
 	"github.com/nicholas-fedor/watchtower/internal/testutil/logcapture"
+	"github.com/nicholas-fedor/watchtower/internal/update/cleanup"
 	mockUpdate "github.com/nicholas-fedor/watchtower/internal/update/mocks"
 	"github.com/nicholas-fedor/watchtower/pkg/types"
 	mockTypes "github.com/nicholas-fedor/watchtower/pkg/types/mocks"
@@ -545,7 +546,7 @@ func TestRunUpdates(t *testing.T) {
 			t.Parallel()
 
 			mockReport := mockTypes.NewMockReport(t)
-			sendNotifications(newTestLogger(t), nil, false, false, mockReport, []types.RemovedImageInfo{})
+			sendNotifications(newTestLogger(t), nil, false, false, mockReport, []cleanup.RemovedImageInfo{})
 			// No expectations since notifier is nil
 		})
 
@@ -556,7 +557,7 @@ func TestRunUpdates(t *testing.T) {
 			notifier := mockTypes.NewMockNotifier(t)
 			notifier.EXPECT().ShouldSendNotification(mockReport).Return(true)
 			notifier.EXPECT().SendNotification(mockReport).Return()
-			sendNotifications(newTestLogger(t), notifier, false, false, mockReport, []types.RemovedImageInfo{})
+			sendNotifications(newTestLogger(t), notifier, false, false, mockReport, []cleanup.RemovedImageInfo{})
 			notifier.AssertExpectations(t)
 		})
 
@@ -575,7 +576,7 @@ func TestRunUpdates(t *testing.T) {
 			mockReport.EXPECT().Skipped().Return([]types.ContainerReport{})
 			mockReport.EXPECT().Fresh().Return([]types.ContainerReport{})
 
-			sendNotifications(newTestLogger(t), notifier, true, false, mockReport, []types.RemovedImageInfo{})
+			sendNotifications(newTestLogger(t), notifier, true, false, mockReport, []cleanup.RemovedImageInfo{})
 			notifier.AssertExpectations(t)
 		})
 	})
@@ -606,7 +607,7 @@ func TestRunUpdates(t *testing.T) {
 			notifier.EXPECT().ShouldSendNotification(mock.Anything).Return(true)
 			notifier.EXPECT().SendNotification(mock.Anything).Return()
 
-			sendSplitNotifications(newTestLogger(t), notifier, true, mockReport, []types.RemovedImageInfo{})
+			sendSplitNotifications(newTestLogger(t), notifier, true, mockReport, []cleanup.RemovedImageInfo{})
 
 			notifier.AssertExpectations(t)
 		})
@@ -626,7 +627,7 @@ func TestRunUpdates(t *testing.T) {
 			mockReport.EXPECT().Fresh().Return([]types.ContainerReport{})
 
 			// With empty results, no notifications should be sent
-			sendSplitNotifications(newTestLogger(t), notifier, true, mockReport, []types.RemovedImageInfo{})
+			sendSplitNotifications(newTestLogger(t), notifier, true, mockReport, []cleanup.RemovedImageInfo{})
 			notifier.AssertExpectations(t)
 		})
 
@@ -653,7 +654,7 @@ func TestRunUpdates(t *testing.T) {
 			notifier.EXPECT().ShouldSendNotification(mock.Anything).Return(true)
 			notifier.EXPECT().SendNotification(mock.Anything).Return()
 
-			sendSplitNotifications(newTestLogger(t), notifier, false, mockReport, []types.RemovedImageInfo{})
+			sendSplitNotifications(newTestLogger(t), notifier, false, mockReport, []cleanup.RemovedImageInfo{})
 			notifier.AssertExpectations(t)
 		})
 
@@ -679,7 +680,7 @@ func TestRunUpdates(t *testing.T) {
 			notifier.EXPECT().ShouldSendNotification(mock.Anything).Return(true)
 			notifier.EXPECT().SendNotification(mock.Anything).Return()
 
-			sendSplitNotifications(newTestLogger(t), notifier, true, mockReport, []types.RemovedImageInfo{})
+			sendSplitNotifications(newTestLogger(t), notifier, true, mockReport, []cleanup.RemovedImageInfo{})
 			notifier.AssertExpectations(t)
 		})
 
@@ -703,7 +704,7 @@ func TestRunUpdates(t *testing.T) {
 			notifier := mockTypes.NewMockNotifier(t)
 			// No SendNotification should be called due to empty name
 
-			sendSplitNotifications(newTestLogger(t), notifier, true, mockReport, []types.RemovedImageInfo{})
+			sendSplitNotifications(newTestLogger(t), notifier, true, mockReport, []cleanup.RemovedImageInfo{})
 			notifier.AssertExpectations(t)
 		})
 
@@ -730,7 +731,7 @@ func TestRunUpdates(t *testing.T) {
 			notifier.EXPECT().ShouldSendNotification(mock.Anything).Return(true)
 			notifier.EXPECT().SendNotification(mock.Anything).Return()
 
-			sendSplitNotifications(newTestLogger(t), notifier, true, mockReport, []types.RemovedImageInfo{})
+			sendSplitNotifications(newTestLogger(t), notifier, true, mockReport, []cleanup.RemovedImageInfo{})
 			notifier.AssertExpectations(t)
 		})
 
@@ -757,7 +758,7 @@ func TestRunUpdates(t *testing.T) {
 			notifier.EXPECT().ShouldSendNotification(mock.Anything).Return(true)
 			notifier.EXPECT().SendNotification(mock.Anything).Return()
 
-			sendSplitNotifications(newTestLogger(t), notifier, false, mockReport, []types.RemovedImageInfo{})
+			sendSplitNotifications(newTestLogger(t), notifier, false, mockReport, []cleanup.RemovedImageInfo{})
 			notifier.AssertExpectations(t)
 		})
 
@@ -784,7 +785,7 @@ func TestRunUpdates(t *testing.T) {
 			notifier.EXPECT().ShouldSendNotification(mock.Anything).Return(true)
 			notifier.EXPECT().SendNotification(mock.Anything).Return()
 
-			sendSplitNotifications(newTestLogger(t), notifier, false, mockReport, []types.RemovedImageInfo{})
+			sendSplitNotifications(newTestLogger(t), notifier, false, mockReport, []cleanup.RemovedImageInfo{})
 			notifier.AssertExpectations(t)
 		})
 
@@ -812,7 +813,7 @@ func TestRunUpdates(t *testing.T) {
 			notifier.EXPECT().ShouldSendNotification(mock.Anything).Return(true)
 			notifier.EXPECT().SendNotification(mock.Anything).Return()
 
-			sendSplitNotifications(newTestLogger(t), notifier, false, mockReport, []types.RemovedImageInfo{})
+			sendSplitNotifications(newTestLogger(t), notifier, false, mockReport, []cleanup.RemovedImageInfo{})
 			notifier.AssertExpectations(t)
 		})
 
@@ -833,7 +834,7 @@ func TestRunUpdates(t *testing.T) {
 			notifier := mockTypes.NewMockNotifier(t)
 			// No SendNotification should be called since all lists are empty
 
-			sendSplitNotifications(newTestLogger(t), notifier, true, mockReport, []types.RemovedImageInfo{})
+			sendSplitNotifications(newTestLogger(t), notifier, true, mockReport, []cleanup.RemovedImageInfo{})
 			notifier.AssertExpectations(t)
 		})
 
@@ -861,7 +862,7 @@ func TestRunUpdates(t *testing.T) {
 			notifier.EXPECT().SendNotification(mock.Anything).Return()
 
 			log, buf := logcapture.NewJSON(zerolog.DebugLevel)
-			sendSplitNotifications(log, notifier, false, mockReport, []types.RemovedImageInfo{})
+			sendSplitNotifications(log, notifier, false, mockReport, []cleanup.RemovedImageInfo{})
 
 			for _, entry := range logcapture.Entries[logcapture.Entry](t, buf.String()) {
 				assert.NotEqual(t, "Removing image", entry["message"])
@@ -875,7 +876,7 @@ func TestRunUpdates(t *testing.T) {
 
 			imageA := types.ImageID("sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa")
 			imageB := types.ImageID("sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb")
-			cleanedImages := []types.RemovedImageInfo{
+			cleanedImages := []cleanup.RemovedImageInfo{
 				{
 					ImageID:       imageA,
 					ImageName:     "nginx:old",
@@ -987,7 +988,7 @@ func TestRunUpdates(t *testing.T) {
 		t.Run("should not emit cleanup logs in report mode", func(t *testing.T) {
 			t.Parallel()
 
-			cleanedImages := []types.RemovedImageInfo{
+			cleanedImages := []cleanup.RemovedImageInfo{
 				{
 					ImageID:       types.ImageID("sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"),
 					ImageName:     "nginx:old",
@@ -1056,7 +1057,7 @@ func TestRunUpdates(t *testing.T) {
 				notifier.EXPECT().ShouldSendNotification(mock.Anything).Return(false)
 				// With notification level set to error and no errors, no notification should be sent
 
-				sendSplitNotifications(newTestLogger(t), notifier, true, mockReport, []types.RemovedImageInfo{})
+				sendSplitNotifications(newTestLogger(t), notifier, true, mockReport, []cleanup.RemovedImageInfo{})
 				notifier.AssertExpectations(t)
 			})
 		})
@@ -1069,7 +1070,7 @@ func TestRunUpdates(t *testing.T) {
 			t.Parallel()
 
 			client := mockUpdate.CreateMockClient(&mockUpdate.TestData{}, false, false)
-			cleanedImages := performImageCleanup(newTestLogger(t), t.Context(), client, false, []types.RemovedImageInfo{}, time.Minute)
+			cleanedImages := performImageCleanup(newTestLogger(t), t.Context(), client, false, []cleanup.RemovedImageInfo{}, time.Minute)
 			assert.Empty(t, cleanedImages)
 		})
 
@@ -1077,7 +1078,7 @@ func TestRunUpdates(t *testing.T) {
 			t.Parallel()
 
 			client := mockUpdate.CreateMockClient(&mockUpdate.TestData{}, false, false)
-			cleanedImages := performImageCleanup(newTestLogger(t), t.Context(), client, true, []types.RemovedImageInfo{
+			cleanedImages := performImageCleanup(newTestLogger(t), t.Context(), client, true, []cleanup.RemovedImageInfo{
 				{
 					ContainerName: "test-container",
 					ImageName:     "test-image:v1.0",
@@ -1093,7 +1094,7 @@ func TestRunUpdates(t *testing.T) {
 			t.Parallel()
 
 			client := mockUpdate.CreateMockClient(&mockUpdate.TestData{}, false, false)
-			cleanedImages := performImageCleanup(newTestLogger(t), t.Context(), client, true, []types.RemovedImageInfo{}, time.Minute)
+			cleanedImages := performImageCleanup(newTestLogger(t), t.Context(), client, true, []cleanup.RemovedImageInfo{}, time.Minute)
 			// Should return a valid slice even with empty input
 			require.NotNil(t, cleanedImages)
 		})
@@ -1105,7 +1106,7 @@ func TestRunUpdates(t *testing.T) {
 			ctx, cancel := context.WithCancel(t.Context())
 			cancel()
 
-			cleanedImages := performImageCleanup(newTestLogger(t), ctx, client, true, []types.RemovedImageInfo{
+			cleanedImages := performImageCleanup(newTestLogger(t), ctx, client, true, []cleanup.RemovedImageInfo{
 				{
 					ContainerName: "test-container",
 					ImageName:     "test-image:v1.0",

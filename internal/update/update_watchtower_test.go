@@ -15,6 +15,7 @@ import (
 
 	"github.com/nicholas-fedor/watchtower/internal/container/filters"
 	"github.com/nicholas-fedor/watchtower/internal/registry/ratelimit"
+	"github.com/nicholas-fedor/watchtower/internal/update/cleanup"
 	mockUpdate "github.com/nicholas-fedor/watchtower/internal/update/mocks"
 	"github.com/nicholas-fedor/watchtower/pkg/types"
 )
@@ -1166,7 +1167,7 @@ func TestPullFailureDelayContextCancellation(t *testing.T) {
 
 		var (
 			report            types.Report
-			cleanupImageInfos []types.RemovedImageInfo
+			cleanupImageInfos []cleanup.RemovedImageInfo
 			err               error
 		)
 

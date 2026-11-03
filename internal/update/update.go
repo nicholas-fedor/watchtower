@@ -78,7 +78,7 @@ var scanProblems logging.ReportedProblems
 //
 // Returns:
 //   - types.Report: Session report summarizing scanned, updated, and failed containers.
-//   - []types.RemovedImageInfo: Slice of cleaned image info to clean up after updates.
+//   - []cleanup.RemovedImageInfo: Slice of cleaned image info to clean up after updates.
 //   - error: Non-nil if listing or sorting fails, nil on success.
 func update(
 	log *zerolog.Logger,
@@ -87,7 +87,7 @@ func update(
 	config types.UpdateParams,
 	rateLimiter *ratelimit.Limiter,
 	gitClient ...*git.Client,
-) (types.Report, []types.RemovedImageInfo, error) {
+) (types.Report, []cleanup.RemovedImageInfo, error) {
 	// Check for context cancellation early
 	select {
 	case <-ctx.Done():
@@ -120,7 +120,7 @@ func update(
 	}
 
 	// Initialize a slice to collect cleaned image info for cleanup after updates.
-	cleanupImageInfos := []types.RemovedImageInfo{}
+	cleanupImageInfos := []cleanup.RemovedImageInfo{}
 
 	// Self-check: if the current container is an old Watchtower container,
 	// update its restart policy to "no" and exit to prevent Docker from

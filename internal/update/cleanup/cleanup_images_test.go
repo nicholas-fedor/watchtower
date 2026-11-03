@@ -36,7 +36,7 @@ func cleanupTestWatchtower(id, name, image string) types.Container {
 }
 
 // imageEntries returns the image and container name of each entry.
-func imageEntries(infos []types.RemovedImageInfo) []string {
+func imageEntries(infos []RemovedImageInfo) []string {
 	entries := make([]string, 0, len(infos))
 	for _, info := range infos {
 		entries = append(entries, string(info.ImageID)+" "+info.ContainerName)
@@ -46,7 +46,7 @@ func imageEntries(infos []types.RemovedImageInfo) []string {
 }
 
 // removedImageIDs returns the image ID of each entry.
-func removedImageIDs(infos []types.RemovedImageInfo) []types.ImageID {
+func removedImageIDs(infos []RemovedImageInfo) []types.ImageID {
 	ids := make([]types.ImageID, 0, len(infos))
 	for _, info := range infos {
 		ids = append(ids, info.ImageID)
@@ -73,7 +73,7 @@ func TestRemoveExcessContainers_CallerListCollectsImages(t *testing.T) {
 	client := mockContainerClient.NewMockClient(t)
 	client.EXPECT().StopAndRemoveContainer(mock.Anything, mock.Anything, mock.Anything).Return(nil).Times(2)
 
-	images := []types.RemovedImageInfo{
+	images := []RemovedImageInfo{
 		{ImageID: "org/app:1", ContainerName: "app"},
 		{ImageID: "org/watchtower:1", ContainerName: "watchtower-old-a"},
 	}
@@ -110,7 +110,7 @@ func TestRemoveExcessContainers_PartialFailureKeepsCallerList(t *testing.T) {
 		client.EXPECT().StopAndRemoveContainer(mock.Anything, stuck, mock.Anything).
 			Return(errors.New("daemon busy")).Times(maxRemovalAttempts)
 
-		images := []types.RemovedImageInfo{{ImageID: "org/app:1", ContainerName: "app"}}
+		images := []RemovedImageInfo{{ImageID: "org/app:1", ContainerName: "app"}}
 
 		removed, err := removeExcessContainers(newTestLogger(t), t.Context(), client,
 			[]types.Container{stopped, stuck}, true, current, &images)
@@ -154,7 +154,7 @@ func TestRemoveExcessContainers_CancelKeepsRemovedInstanceImages(t *testing.T) {
 				return errors.New("daemon busy")
 			}).Once()
 
-		images := []types.RemovedImageInfo{{ImageID: "org/app:1", ContainerName: "app"}}
+		images := []RemovedImageInfo{{ImageID: "org/app:1", ContainerName: "app"}}
 
 		removed, err := removeExcessContainers(newTestLogger(t), ctx, client,
 			[]types.Container{removedShared, removedOwn, stuck, pending}, true, current, &images)
