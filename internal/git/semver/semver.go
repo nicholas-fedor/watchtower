@@ -1,6 +1,7 @@
 package semver
 
 import (
+	"errors"
 	"slices"
 	"strings"
 
@@ -27,6 +28,10 @@ const (
 	patchIndex = 2
 )
 
+// ErrInvalidPolicy indicates a semver policy that is not none, patch, minor,
+// or major.
+var ErrInvalidPolicy = errors.New("invalid git semver policy")
+
 // ValidPolicy reports whether policy is one of none, patch, minor, or major.
 //
 // Parameters:
@@ -41,6 +46,24 @@ func ValidPolicy(policy string) bool {
 	default:
 		return false
 	}
+}
+
+// ParsePolicy returns the policy that raw names.
+//
+// Matching ignores surrounding whitespace and letter case.
+//
+// Parameters:
+//   - raw: Policy name as written in a label or setting.
+//
+// Returns:
+//   - string: The policy in lower case. It is empty when raw names no policy.
+func ParsePolicy(raw string) string {
+	policy := strings.ToLower(strings.TrimSpace(raw))
+	if !ValidPolicy(policy) {
+		return ""
+	}
+
+	return policy
 }
 
 // SelectTag returns the highest policy-allowed tag newer than lastTag.

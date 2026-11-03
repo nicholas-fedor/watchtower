@@ -830,7 +830,21 @@ func TestCheckContainer(t *testing.T) {
 		})
 
 		got, err := CheckContainer(t.Context(), testClient(t, nil), c, types.UpdateParams{})
-		require.ErrorIs(t, err, ErrInvalidPolicy)
+		require.ErrorIs(t, err, semver.ErrInvalidPolicy)
+		require.EqualError(t, err, "invalid git semver policy: nightly")
+		assert.Equal(t, CheckResult{}, got)
+	})
+
+	t.Run("invalid policy label on a mapped image is fail-closed", func(t *testing.T) {
+		t.Parallel()
+
+		c := labeledContainer(t, map[string]string{labels.GitSemverPolicy: "nightly"})
+		params := types.UpdateParams{GitImages: map[string]types.GitImage{
+			"app:latest": {Repo: "https://example.com/org/app.git", Policy: semver.PolicyPatch},
+		}}
+
+		got, err := CheckContainer(t.Context(), testClient(t, nil), c, params)
+		require.ErrorIs(t, err, semver.ErrInvalidPolicy)
 		assert.Equal(t, CheckResult{}, got)
 	})
 

@@ -232,8 +232,8 @@ func CheckContainer(
 		return CheckResult{}, nil
 	}
 
-	if raw := strings.TrimSpace(policyLabelValue(c)); raw != "" && !semver.ValidPolicy(strings.ToLower(raw)) {
-		return CheckResult{}, fmt.Errorf("%w: %s", ErrInvalidPolicy, raw)
+	if assoc.InvalidPolicy != "" {
+		return CheckResult{}, fmt.Errorf("%w: %s", semver.ErrInvalidPolicy, assoc.InvalidPolicy)
 	}
 
 	if raw := strings.TrimSpace(assoc.Host); raw != "" {
@@ -854,24 +854,4 @@ func isHexSHA(s string) bool {
 	}
 
 	return true
-}
-
-// policyLabelValue returns the raw git-semver-policy label, or empty.
-//
-// Parameters:
-//   - c: Container to inspect.
-//
-// Returns:
-//   - string: Raw label value, or empty when unset.
-func policyLabelValue(c types.Container) string {
-	if c == nil {
-		return ""
-	}
-
-	val, ok := c.GetLabel(labels.GitSemverPolicy)
-	if !ok {
-		return ""
-	}
-
-	return val
 }

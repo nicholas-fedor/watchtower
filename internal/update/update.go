@@ -20,6 +20,7 @@ import (
 	"github.com/nicholas-fedor/watchtower/internal/container/oci"
 	"github.com/nicholas-fedor/watchtower/internal/container/provenance"
 	"github.com/nicholas-fedor/watchtower/internal/git"
+	"github.com/nicholas-fedor/watchtower/internal/git/semver"
 	"github.com/nicholas-fedor/watchtower/internal/observability/logging"
 	"github.com/nicholas-fedor/watchtower/internal/registry/ratelimit"
 	"github.com/nicholas-fedor/watchtower/internal/update/changelog"
@@ -515,7 +516,7 @@ func update(
 					// Fallback for plain sentinel (keeps basic deferral visible)
 					progress.AddSkipped(log, sourceContainer, checkErr, config)
 					progress.SetCooldownInfo(log, sourceContainer.ID(), "", "", "", time.Time{})
-				case errors.Is(checkErr, git.ErrInvalidPolicy):
+				case errors.Is(checkErr, semver.ErrInvalidPolicy):
 					// A container's labels cannot change, so the container ID
 					// identifies an invalid label problem.
 					progress.AddSkipped(log, sourceContainer, checkErr, config)

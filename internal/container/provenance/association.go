@@ -23,6 +23,10 @@ type Association struct {
 	Dockerfile string
 	Context    string
 
+	// InvalidPolicy is the git-semver-policy label value when it names no
+	// policy. Policy then holds the mapping or default policy instead.
+	InvalidPolicy string
+
 	// RefFromDefault is true when Ref came from the process default, not a
 	// label or image mapping. ApplyGitAssociation does not persist those values.
 	RefFromDefault bool
@@ -53,10 +57,18 @@ func ResolveAssociation(c types.Container, params types.UpdateParams) (Associati
 		return Association{}, false
 	}
 
+	rawPolicy := label(c, labels.GitSemverPolicy)
+	labelPolicy := semver.ParsePolicy(rawPolicy)
+
+	invalidPolicy := ""
+	if labelPolicy == "" {
+		invalidPolicy = rawPolicy
+	}
+
 	// Container labels win over --git-image mappings.
 	if repo := label(c, labels.GitRepo); repo != "" {
 		ref, refDefault := sourced(refLabel(c), "", defaultRef(params))
-		policy, policyDefault := sourced(policyLabel(c), "", defaultPolicy(params))
+		policy, policyDefault := sourced(labelPolicy, "", defaultPolicy(params))
 		dockerfile, dockerfileDefault := sourced(label(c, labels.GitDockerfile), "", params.GitDockerfile)
 		context, contextDefault := sourced(label(c, labels.GitContext), "", params.GitContext)
 
@@ -67,6 +79,7 @@ func ResolveAssociation(c types.Container, params types.UpdateParams) (Associati
 			Host:                  label(c, labels.GitHost),
 			Dockerfile:            dockerfile,
 			Context:               context,
+			InvalidPolicy:         invalidPolicy,
 			RefFromDefault:        refDefault,
 			PolicyFromDefault:     policyDefault,
 			DockerfileFromDefault: dockerfileDefault,
@@ -91,6 +104,7 @@ func ResolveAssociation(c types.Container, params types.UpdateParams) (Associati
 		Host:                  label(c, labels.GitHost),
 		Dockerfile:            dockerfile,
 		Context:               context,
+		InvalidPolicy:         invalidPolicy,
 		RefFromDefault:        refDefault,
 		PolicyFromDefault:     policyDefault,
 		DockerfileFromDefault: dockerfileDefault,
@@ -216,22 +230,6 @@ func refLabel(c types.Container) string {
 	return cmp.Or(label(c, labels.GitRef), label(c, labels.GitBranch))
 }
 
-// policyLabel returns a valid semver policy from the container label.
-//
-// Parameters:
-//   - c: Container to inspect.
-//
-// Returns:
-//   - string: Canonical policy, or empty when unset or invalid.
-func policyLabel(c types.Container) string {
-	policy := strings.ToLower(label(c, labels.GitSemverPolicy))
-	if semver.ValidPolicy(policy) {
-		return policy
-	}
-
-	return ""
-}
-
 // imageMapping returns the git-image mapping for an exact ImageName() key.
 //
 // Parameters:
@@ -288,7 +286,8 @@ func defaultRef(params types.UpdateParams) string {
 	return "main"
 }
 
-// defaultPolicy returns the process default semver policy, or none.
+// defaultPolicy returns the process default semver policy, or none when the
+// default names no policy.
 //
 // Parameters:
 //   - params: Update parameters.
@@ -296,9 +295,5 @@ func defaultRef(params types.UpdateParams) string {
 // Returns:
 //   - string: Canonical policy.
 func defaultPolicy(params types.UpdateParams) string {
-	if semver.ValidPolicy(params.GitSemverPolicy) {
-		return params.GitSemverPolicy
-	}
-
-	return semver.PolicyNone
+	return cmp.Or(semver.ParsePolicy(params.GitSemverPolicy), semver.PolicyNone)
 }

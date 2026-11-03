@@ -20,8 +20,6 @@ const (
 var (
 	// ErrInvalidGitImage indicates a --git-image value could not be parsed.
 	ErrInvalidGitImage = errors.New("invalid --git-image value")
-	// errInvalidGitPolicy indicates a semver policy is not none/patch/minor/major.
-	errInvalidGitPolicy = errors.New("invalid git semver policy")
 	// ErrInvalidComposeProject indicates a --compose-project value is not name=/path.
 	ErrInvalidComposeProject = errors.New("invalid --compose-project value")
 )
@@ -95,12 +93,12 @@ func parseImageMapping(raw string) (string, types.GitImage, error) {
 	policy := DefaultPolicy
 
 	if at := strings.LastIndex(rest, "@"); at >= 0 {
-		maybePolicy := strings.ToLower(strings.TrimSpace(rest[at+1:]))
-		if semver.ValidPolicy(maybePolicy) {
-			policy = maybePolicy
+		suffix := strings.TrimSpace(rest[at+1:])
+		if parsed := semver.ParsePolicy(suffix); parsed != "" {
+			policy = parsed
 			rest = rest[:at]
-		} else if isPolicyToken(maybePolicy) {
-			return "", types.GitImage{}, fmt.Errorf("%w: %q", errInvalidGitPolicy, maybePolicy)
+		} else if isPolicyToken(suffix) {
+			return "", types.GitImage{}, fmt.Errorf("%w: %q", semver.ErrInvalidPolicy, suffix)
 		}
 	}
 

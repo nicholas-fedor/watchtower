@@ -14,11 +14,12 @@ func TestParseImageMapping(t *testing.T) {
 	t.Parallel()
 
 	tests := []struct {
-		name    string
-		raw     string
-		image   string
-		mapping types.GitImage
-		wantErr error
+		name       string
+		raw        string
+		image      string
+		mapping    types.GitImage
+		wantErr    error
+		wantErrMsg string
 	}{
 		{
 			name:  "repo only uses defaults",
@@ -33,6 +34,16 @@ func TestParseImageMapping(t *testing.T) {
 		{
 			name:  "ref and policy",
 			raw:   "myapp:latest=https://github.com/org/app.git#release@minor",
+			image: "myapp:latest",
+			mapping: types.GitImage{
+				Repo:   "https://github.com/org/app.git",
+				Ref:    "release",
+				Policy: semver.PolicyMinor,
+			},
+		},
+		{
+			name:  "policy in mixed case with spaces",
+			raw:   "myapp:latest=https://github.com/org/app.git#release@ Minor ",
 			image: "myapp:latest",
 			mapping: types.GitImage{
 				Repo:   "https://github.com/org/app.git",
@@ -98,7 +109,13 @@ func TestParseImageMapping(t *testing.T) {
 		{
 			name:    "unknown policy token",
 			raw:     "myapp:latest=https://github.com/org/app.git@latest",
-			wantErr: errInvalidGitPolicy,
+			wantErr: semver.ErrInvalidPolicy,
+		},
+		{
+			name:       "unknown policy token is quoted as written",
+			raw:        "myapp:latest=https://github.com/org/app.git@ Latest",
+			wantErr:    semver.ErrInvalidPolicy,
+			wantErrMsg: `invalid git semver policy: "Latest"`,
 		},
 	}
 
@@ -109,6 +126,10 @@ func TestParseImageMapping(t *testing.T) {
 			image, mapping, err := parseImageMapping(tt.raw)
 			if tt.wantErr != nil {
 				require.ErrorIs(t, err, tt.wantErr)
+
+				if tt.wantErrMsg != "" {
+					require.EqualError(t, err, tt.wantErrMsg)
+				}
 
 				return
 			}

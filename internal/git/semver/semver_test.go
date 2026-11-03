@@ -18,6 +18,34 @@ func TestValidPolicy(t *testing.T) {
 	assert.False(t, ValidPolicy("nightly"))
 }
 
+// TestParsePolicy verifies that a policy name is matched without regard to
+// case or surrounding whitespace and that any other value names no policy.
+func TestParsePolicy(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name string
+		raw  string
+		want string
+	}{
+		{name: "lower case", raw: "patch", want: PolicyPatch},
+		{name: "mixed case", raw: "Minor", want: PolicyMinor},
+		{name: "surrounding whitespace", raw: "  major  ", want: PolicyMajor},
+		{name: "none", raw: "NONE", want: PolicyNone},
+		{name: "empty"},
+		{name: "blank", raw: "   "},
+		{name: "unknown", raw: "nightly"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			assert.Equal(t, tt.want, ParsePolicy(tt.raw))
+		})
+	}
+}
+
 // TestSelectTag verifies which tag each policy selects from a remote list,
 // including unprefixed, pre-release and non-semver tags.
 func TestSelectTag(t *testing.T) {
