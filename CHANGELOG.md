@@ -14,6 +14,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Stop repeating the git-host error prefix by @nicholas-fedor in [#3399](https://github.com/nicholas-fedor/watchtower/pull/3399)
 - Pick equal release tags by name by @nicholas-fedor in [#3392](https://github.com/nicholas-fedor/watchtower/pull/3392)
 - Keep tokens out of notification send-failure logs by @nicholas-fedor in [#3361](https://github.com/nicholas-fedor/watchtower/pull/3361)
 - Reject lifecycle UIDs and GIDs above 2147483647 by @nicholas-fedor in [#3353](https://github.com/nicholas-fedor/watchtower/pull/3353)
