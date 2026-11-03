@@ -836,6 +836,7 @@ That container is skipped for the session.
 `patch`, `minor`, and `major` consider release tags only.
 A pre-release such as `v1.2.4-rc.1` is ignored.
 Build metadata (`v1.2.3+sha`) does not change the comparison.
+When release tags compare equal, such as `v1.2.3` and `1.2.3` or `v1.2.3+a` and `v1.2.3+b`, Watchtower uses the tag whose name sorts first.
 A pre-release baseline still advances to the later release (`v1.2.3-rc.1` to `v1.2.3`).
 
 ### Per-Image Mapping

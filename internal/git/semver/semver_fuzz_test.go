@@ -1,6 +1,7 @@
 package semver
 
 import (
+	"slices"
 	"strings"
 	"testing"
 
@@ -38,7 +39,8 @@ func FuzzSelectTag(f *testing.F) {
 }
 
 // FuzzHighestRelease verifies that the result is empty or a release tag from
-// the list and that no release tag in the list is higher. Seeds cover
+// the list and that no release tag in the list is higher. It also verifies
+// that reversing the list does not change the result. Seeds cover
 // prefixed, unprefixed, pre-release, build metadata and non-semver tags.
 func FuzzHighestRelease(f *testing.F) {
 	f.Add("v1.2.3\nv2.0.0\nv1.10.0")
@@ -53,6 +55,10 @@ func FuzzHighestRelease(f *testing.F) {
 
 		got := HighestRelease(tags)
 		best := canonicalize(got)
+
+		reversed := slices.Clone(tags)
+		slices.Reverse(reversed)
+		assert.Equal(t, got, HighestRelease(reversed), "result depends on tag order")
 
 		if got != "" {
 			assert.Contains(t, tags, got)
