@@ -6,6 +6,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/nicholas-fedor/watchtower/internal/git/semver"
 	"github.com/nicholas-fedor/watchtower/pkg/types"
 )
 
@@ -13,7 +14,7 @@ const (
 	// DefaultRef is used when a mapping or label omits a Git ref.
 	DefaultRef = "main"
 	// DefaultPolicy is used when a mapping or label omits a semver policy.
-	DefaultPolicy = types.GitPolicyNone
+	DefaultPolicy = semver.PolicyNone
 )
 
 var (
@@ -95,7 +96,7 @@ func parseImageMapping(raw string) (string, types.GitImage, error) {
 
 	if at := strings.LastIndex(rest, "@"); at >= 0 {
 		maybePolicy := strings.ToLower(strings.TrimSpace(rest[at+1:]))
-		if types.ValidGitPolicy(maybePolicy) {
+		if semver.ValidPolicy(maybePolicy) {
 			policy = maybePolicy
 			rest = rest[:at]
 		} else if isPolicyToken(maybePolicy) {

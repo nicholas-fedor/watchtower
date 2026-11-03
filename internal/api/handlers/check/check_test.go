@@ -29,6 +29,7 @@ import (
 	"github.com/nicholas-fedor/watchtower/internal/container/labels"
 	"github.com/nicholas-fedor/watchtower/internal/container/oci"
 	"github.com/nicholas-fedor/watchtower/internal/git"
+	"github.com/nicholas-fedor/watchtower/internal/git/semver"
 	"github.com/nicholas-fedor/watchtower/pkg/types"
 	mockTypes "github.com/nicholas-fedor/watchtower/pkg/types/mocks"
 )
@@ -590,7 +591,7 @@ func TestCheckGitSource(t *testing.T) {
 		c := gitContainer(t, repoDir, nil)
 		c.SetLabel(labels.GitRef, branch)
 		// A semver policy is what makes the check resolve a tag at all.
-		c.SetLabel(labels.GitSemverPolicy, string(types.GitPolicyPatch))
+		c.SetLabel(labels.GitSemverPolicy, string(semver.PolicyPatch))
 		// A template makes the tag substitution observable, because a local
 		// repository path has no known host to derive a releases URL from.
 		c.SetLabel(labels.ChangelogURL, "https://example.com/notes/{tag}")

@@ -8,6 +8,7 @@ import (
 	"golang.org/x/mod/semver"
 
 	"github.com/nicholas-fedor/watchtower/internal/container/labels"
+	"github.com/nicholas-fedor/watchtower/internal/git/provider"
 	"github.com/nicholas-fedor/watchtower/pkg/types"
 )
 
@@ -162,7 +163,7 @@ func derivedReleasesURL(repo, apiOrigin, tag string) string {
 		return ""
 	}
 
-	cloneKind := types.ResolveGitHostKind(host, nil)
+	cloneKind := provider.ResolveHostKind(host, nil)
 	kind := cloneKind
 	base := "https://" + host
 
@@ -213,13 +214,13 @@ func derivedReleasesURL(repo, apiOrigin, tag string) string {
 //   - string: Path suffix beginning with a slash, or empty for an unknown provider.
 func releaseTagSuffix(kind, tag string) string {
 	switch kind {
-	case types.GitHostGitHub, types.GitHostGitea:
+	case provider.GitHub, provider.Gitea:
 		if safeReleaseTag(tag) {
 			return "/releases/tag/" + tag
 		}
 
 		return "/releases"
-	case types.GitHostGitLab:
+	case provider.GitLab:
 		if safeReleaseTag(tag) {
 			return "/-/releases/" + tag
 		}
@@ -316,12 +317,12 @@ func changelogProvider(pathPrefix, known string) string {
 	}
 
 	switch prefix {
-	case types.GitHostGitHub:
-		return types.GitHostGitHub
-	case types.GitHostGitLab:
-		return types.GitHostGitLab
-	case types.GitHostGitea, types.GitHostForgejo, "codeberg":
-		return types.GitHostGitea
+	case provider.GitHub:
+		return provider.GitHub
+	case provider.GitLab:
+		return provider.GitLab
+	case provider.Gitea, provider.Forgejo, "codeberg":
+		return provider.Gitea
 	default:
 		return ""
 	}

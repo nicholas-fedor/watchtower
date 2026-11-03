@@ -7,7 +7,7 @@ import (
 
 	"github.com/stretchr/testify/assert"
 
-	"github.com/nicholas-fedor/watchtower/pkg/types"
+	"github.com/nicholas-fedor/watchtower/internal/git/semver"
 )
 
 // FuzzParseImageMapping verifies --git-image values never panic and that a
@@ -39,7 +39,7 @@ func FuzzParseImageMapping(f *testing.F) {
 
 		assert.NotEmpty(t, image)
 		assert.NotEmpty(t, mapping.Repo)
-		assert.True(t, types.ValidGitPolicy(mapping.Policy), "policy %q", mapping.Policy)
+		assert.True(t, semver.ValidPolicy(mapping.Policy), "policy %q", mapping.Policy)
 		assert.NotEmpty(t, mapping.Ref)
 	})
 }

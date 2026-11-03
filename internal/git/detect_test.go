@@ -13,7 +13,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/nicholas-fedor/watchtower/pkg/types"
+	"github.com/nicholas-fedor/watchtower/internal/git/provider"
 )
 
 func TestClassifyHosts(t *testing.T) {
@@ -52,13 +52,13 @@ func TestClassifyHosts(t *testing.T) {
 
 		client := newDetectClient(t, mux)
 		client.opts.Hosts = map[string]string{
-			"git.example.com": types.GitHostGitea,
-			"other.example":   types.GitHostGitLab,
+			"git.example.com": provider.Gitea,
+			"other.example":   provider.GitLab,
 		}
 
 		got := client.ClassifyHosts(t.Context(), []url.URL{httpsOrigin("git.example.com")})
-		assert.Equal(t, types.GitHostGitea, got["git.example.com"])
-		assert.Equal(t, types.GitHostGitLab, got["other.example"])
+		assert.Equal(t, provider.Gitea, got["git.example.com"])
+		assert.Equal(t, provider.GitLab, got["other.example"])
 	})
 
 	t.Run("unclassified when no fingerprint matches", func(t *testing.T) {
@@ -83,7 +83,7 @@ func TestDetectKind(t *testing.T) {
 		})
 
 		client := newDetectClient(t, mux)
-		assert.Equal(t, types.GitHostGitea, client.detectKind(t.Context(), httpsOrigin("git.example.com"), ""))
+		assert.Equal(t, provider.Gitea, client.detectKind(t.Context(), httpsOrigin("git.example.com"), ""))
 	})
 
 	t.Run("gitlab metadata", func(t *testing.T) {
@@ -95,7 +95,7 @@ func TestDetectKind(t *testing.T) {
 		})
 
 		client := newDetectClient(t, mux)
-		assert.Equal(t, types.GitHostGitLab, client.detectKind(t.Context(), httpsOrigin("gitlab.internal"), ""))
+		assert.Equal(t, provider.GitLab, client.detectKind(t.Context(), httpsOrigin("gitlab.internal"), ""))
 	})
 
 	t.Run("gitlab version path after metadata 404", func(t *testing.T) {
@@ -107,7 +107,7 @@ func TestDetectKind(t *testing.T) {
 		})
 
 		client := newDetectClient(t, mux)
-		assert.Equal(t, types.GitHostGitLab, client.detectKind(t.Context(), httpsOrigin("gitlab.internal"), ""))
+		assert.Equal(t, provider.GitLab, client.detectKind(t.Context(), httpsOrigin("gitlab.internal"), ""))
 	})
 
 	t.Run("github headers", func(t *testing.T) {
@@ -120,7 +120,7 @@ func TestDetectKind(t *testing.T) {
 		})
 
 		client := newDetectClient(t, mux)
-		assert.Equal(t, types.GitHostGitHub, client.detectKind(t.Context(), httpsOrigin("github.company.com"), ""))
+		assert.Equal(t, provider.GitHub, client.detectKind(t.Context(), httpsOrigin("github.company.com"), ""))
 	})
 
 	t.Run("401 with matching body still classifies", func(t *testing.T) {
@@ -133,7 +133,7 @@ func TestDetectKind(t *testing.T) {
 		})
 
 		client := newDetectClient(t, mux)
-		assert.Equal(t, types.GitHostGitea, client.detectKind(t.Context(), httpsOrigin("git.example.com"), ""))
+		assert.Equal(t, provider.Gitea, client.detectKind(t.Context(), httpsOrigin("git.example.com"), ""))
 	})
 
 	t.Run("unusable status is skipped", func(t *testing.T) {

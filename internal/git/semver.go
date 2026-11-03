@@ -5,7 +5,7 @@ import (
 
 	"golang.org/x/mod/semver"
 
-	"github.com/nicholas-fedor/watchtower/pkg/types"
+	gitSemver "github.com/nicholas-fedor/watchtower/internal/git/semver"
 )
 
 // selectTag returns the highest policy-allowed tag newer than lastTag.
@@ -22,7 +22,7 @@ import (
 //   - string: Selected tag name as advertised by the remote.
 //   - bool: True when a newer allowed tag exists.
 func selectTag(lastTag string, tags []string, policy string) (string, bool) {
-	if policy == "" || policy == types.GitPolicyNone {
+	if policy == "" || policy == gitSemver.PolicyNone {
 		return "", false
 	}
 
@@ -76,11 +76,11 @@ func allowedBump(current, candidate, policy string) bool {
 	}
 
 	switch policy {
-	case types.GitPolicyPatch:
+	case gitSemver.PolicyPatch:
 		return semver.MajorMinor(current) == semver.MajorMinor(candidate)
-	case types.GitPolicyMinor:
+	case gitSemver.PolicyMinor:
 		return semver.Major(current) == semver.Major(candidate)
-	case types.GitPolicyMajor:
+	case gitSemver.PolicyMajor:
 		return true
 	default:
 		return false

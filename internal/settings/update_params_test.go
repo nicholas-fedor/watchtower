@@ -9,6 +9,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/nicholas-fedor/watchtower/internal/container/filters"
+	"github.com/nicholas-fedor/watchtower/internal/git/semver"
 	"github.com/nicholas-fedor/watchtower/internal/settings/config/client"
 	"github.com/nicholas-fedor/watchtower/internal/settings/config/compatibility"
 	"github.com/nicholas-fedor/watchtower/internal/settings/config/filter"
@@ -74,7 +75,7 @@ func TestUpdateParamsAssignsEveryField(t *testing.T) {
 				"myapp:latest": {
 					Repo:   "https://github.com/org/app.git",
 					Ref:    "main",
-					Policy: types.GitPolicyMinor,
+					Policy: semver.PolicyMinor,
 				},
 			},
 		},
@@ -122,7 +123,7 @@ func TestUpdateParamsAssignsEveryField(t *testing.T) {
 	assert.Equal(t, types.GitImage{
 		Repo:   "https://github.com/org/app.git",
 		Ref:    "main",
-		Policy: types.GitPolicyMinor,
+		Policy: semver.PolicyMinor,
 	}, params.GitImages["myapp:latest"])
 	assert.Equal(t, "build/docker/Dockerfile", params.GitDockerfile)
 	assert.Equal(t, ".", params.GitContext)

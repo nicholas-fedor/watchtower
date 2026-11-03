@@ -11,8 +11,8 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"github.com/nicholas-fedor/watchtower/internal/git/semver"
 	"github.com/nicholas-fedor/watchtower/internal/observability/logging"
-	"github.com/nicholas-fedor/watchtower/pkg/types"
 )
 
 // newTestLogger returns a logger that writes each event to the test's log, so a
@@ -283,5 +283,5 @@ func TestLoad_GitEnvImageAndEnable(t *testing.T) {
 
 	assert.True(t, cfg.Git.Enable)
 	assert.Equal(t, "develop", cfg.Git.Images["myapp:latest"].Ref)
-	assert.Equal(t, types.GitPolicyPatch, cfg.Git.Images["myapp:latest"].Policy)
+	assert.Equal(t, semver.PolicyPatch, cfg.Git.Images["myapp:latest"].Policy)
 }

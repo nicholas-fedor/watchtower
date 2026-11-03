@@ -14,7 +14,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/nicholas-fedor/watchtower/pkg/types"
+	"github.com/nicholas-fedor/watchtower/internal/git/provider"
 )
 
 func TestResolveViaAPI(t *testing.T) {
@@ -93,7 +93,7 @@ func TestResolveViaAPI(t *testing.T) {
 		})
 
 		client := newDetectClient(t, mux)
-		client.opts.Hosts = map[string]string{"gitlab.internal": types.GitHostGitLab}
+		client.opts.Hosts = map[string]string{"gitlab.internal": provider.GitLab}
 
 		resolved, found, err := client.resolveViaAPI(t.Context(), "https://gitlab.internal/group/app.git", "main", "https://gitlab.internal")
 		require.NoError(t, err)
@@ -113,7 +113,7 @@ func TestResolveViaAPI(t *testing.T) {
 		})
 
 		client := newDetectClient(t, mux)
-		client.opts.Hosts = map[string]string{"git.example.com": types.GitHostGitea}
+		client.opts.Hosts = map[string]string{"git.example.com": provider.Gitea}
 
 		resolved, found, err := client.resolveViaAPI(t.Context(), "https://git.example.com/org/app.git", "main", "https://git.example.com")
 		require.NoError(t, err)
@@ -198,7 +198,7 @@ func TestListTagsViaAPI(t *testing.T) {
 		})
 
 		client := newDetectClient(t, mux)
-		client.opts.Hosts = map[string]string{"code.local": types.GitHostGitea}
+		client.opts.Hosts = map[string]string{"code.local": provider.Gitea}
 
 		tags, used, err := client.listTagsViaAPI(t.Context(), "https://code.local/org/app.git", "https://code.local")
 		require.NoError(t, err)
