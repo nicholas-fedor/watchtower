@@ -522,7 +522,7 @@ func update(
 					progress.AddSkipped(log, sourceContainer, checkErr, config)
 					clog.WithLevel(scanProblems.Level("invalid git semver policy", string(sourceContainer.ID()))).
 						Msg(logging.InvalidGitSemverPolicy)
-				case errors.Is(checkErr, git.ErrInvalidHost):
+				case errors.Is(checkErr, provenance.ErrInvalidHost):
 					// The container ID identifies the problem, as for an invalid
 					// policy. The line carries no error field, so a credential in
 					// the label stays out of log-based notifications.

@@ -25,6 +25,7 @@ import (
 	composeLabels "github.com/nicholas-fedor/watchtower/internal/compose/labels"
 	"github.com/nicholas-fedor/watchtower/internal/container/labels"
 	"github.com/nicholas-fedor/watchtower/internal/container/oci"
+	"github.com/nicholas-fedor/watchtower/internal/container/provenance"
 	"github.com/nicholas-fedor/watchtower/internal/git/provider"
 	"github.com/nicholas-fedor/watchtower/internal/git/semver"
 	"github.com/nicholas-fedor/watchtower/pkg/types"
@@ -858,7 +859,8 @@ func TestCheckContainer(t *testing.T) {
 		})
 
 		got, err := CheckContainer(t.Context(), testClient(t, nil), c, types.UpdateParams{})
-		require.ErrorIs(t, err, ErrInvalidHost)
+		require.ErrorIs(t, err, provenance.ErrInvalidHost)
+		require.EqualError(t, err, "invalid git-host: host=type mappings are not supported")
 		assert.NotContains(t, err.Error(), "secret")
 		assert.NotContains(t, err.Error(), rawHost)
 		assert.Equal(t, CheckResult{}, got)

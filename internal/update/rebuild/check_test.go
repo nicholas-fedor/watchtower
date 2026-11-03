@@ -9,6 +9,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/nicholas-fedor/watchtower/internal/container/labels"
+	"github.com/nicholas-fedor/watchtower/internal/container/provenance"
 	"github.com/nicholas-fedor/watchtower/internal/git"
 	mockUpdate "github.com/nicholas-fedor/watchtower/internal/update/mocks"
 	"github.com/nicholas-fedor/watchtower/pkg/types"
@@ -53,5 +54,19 @@ func TestSession_Check(t *testing.T) {
 		assert.Contains(t, err.Error(), "git check:")
 		assert.False(t, stale)
 		assert.Empty(t, newest)
+	})
+
+	t.Run("names an invalid git-host once", func(t *testing.T) {
+		t.Parallel()
+
+		sess := NewSession(gitTestClient(t))
+		c := gitAssociatedContainer("bad-host", "/bad-host", "myapp:latest", map[string]string{
+			labels.GitRepo: "https://git.example.com/org/app.git",
+			labels.GitHost: "ftp://git.example.com",
+		})
+
+		_, _, err := sess.Check(t.Context(), c, types.UpdateParams{EnableGitMonitoring: true})
+		require.ErrorIs(t, err, provenance.ErrInvalidHost)
+		require.EqualError(t, err, "git check: invalid git-host: scheme must be http or https")
 	})
 }

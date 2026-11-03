@@ -8,8 +8,8 @@ import (
 	"strings"
 )
 
-// errInvalidHost indicates a git-host label is not an HTTP base URL.
-var errInvalidHost = errors.New("invalid git-host")
+// ErrInvalidHost indicates a git-host label is not an HTTP base URL.
+var ErrInvalidHost = errors.New("invalid git-host")
 
 // ParseAPIOrigin parses a git-host label as an HTTP API base URL.
 //
@@ -21,15 +21,15 @@ var errInvalidHost = errors.New("invalid git-host")
 //
 // Returns:
 //   - url.URL: Scheme, host[:port], and optional path prefix.
-//   - error: Non-nil when the value is empty or not an HTTP URL.
+//   - error: Wraps [ErrInvalidHost] when the value is empty or not an HTTP URL.
 func ParseAPIOrigin(raw string) (url.URL, error) {
 	raw = strings.TrimSpace(raw)
 	if raw == "" {
-		return url.URL{}, fmt.Errorf("%w: empty value", errInvalidHost)
+		return url.URL{}, fmt.Errorf("%w: empty value", ErrInvalidHost)
 	}
 
 	if strings.Contains(raw, "=") {
-		return url.URL{}, fmt.Errorf("%w: host=type mappings are not supported", errInvalidHost)
+		return url.URL{}, fmt.Errorf("%w: host=type mappings are not supported", ErrInvalidHost)
 	}
 
 	if !strings.Contains(raw, "://") {
@@ -38,15 +38,15 @@ func ParseAPIOrigin(raw string) (url.URL, error) {
 
 	parsed, err := url.Parse(raw)
 	if err != nil {
-		return url.URL{}, fmt.Errorf("%w: malformed URL", errInvalidHost)
+		return url.URL{}, fmt.Errorf("%w: malformed URL", ErrInvalidHost)
 	}
 
 	if parsed.Hostname() == "" {
-		return url.URL{}, fmt.Errorf("%w: missing hostname", errInvalidHost)
+		return url.URL{}, fmt.Errorf("%w: missing hostname", ErrInvalidHost)
 	}
 
 	if parsed.Scheme != "http" && parsed.Scheme != "https" {
-		return url.URL{}, fmt.Errorf("%w: scheme must be http or https", errInvalidHost)
+		return url.URL{}, fmt.Errorf("%w: scheme must be http or https", ErrInvalidHost)
 	}
 
 	parsed.User = nil
