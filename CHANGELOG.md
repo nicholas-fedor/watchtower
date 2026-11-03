@@ -70,6 +70,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- Parse semver policy values in one place by @nicholas-fedor in [#3394](https://github.com/nicholas-fedor/watchtower/pull/3394)
 - Move tag selection to internal/git/semver by @nicholas-fedor in [#3390](https://github.com/nicholas-fedor/watchtower/pull/3390)
 - Move git vocabulary out of pkg/types by @nicholas-fedor in [#3388](https://github.com/nicholas-fedor/watchtower/pull/3388)
 - Move single-consumer types out of pkg/types by @nicholas-fedor in [#3386](https://github.com/nicholas-fedor/watchtower/pull/3386)
