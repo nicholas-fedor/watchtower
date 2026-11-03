@@ -2102,18 +2102,19 @@ func TestClientErrorsNamedOnce(t *testing.T) {
 	t.Run("stop and remove", func(t *testing.T) {
 		t.Parallel()
 
-		for _, clientErr := range []string{
+		for _, text := range []string{
 			"failed to stop container: daemon unavailable",
 			"failed to remove container: daemon unavailable",
 		} {
-			t.Run(clientErr, func(t *testing.T) {
+			t.Run(text, func(t *testing.T) {
 				t.Parallel()
 
+				clientErr := errors.New(text)
 				source := staleMockContainer()
 				client := mockContainerClient.NewMockClient(t)
 				client.EXPECT().
 					StopAndRemoveContainer(mock.Anything, source, time.Second).
-					Return(errors.New(clientErr))
+					Return(clientErr)
 
 				stopped, err := stopStaleContainer(
 					newTestLogger(t),
@@ -2122,7 +2123,8 @@ func TestClientErrorsNamedOnce(t *testing.T) {
 					client,
 					types.UpdateParams{Timeout: time.Second},
 				)
-				require.EqualError(t, err, clientErr)
+				require.ErrorIs(t, err, clientErr)
+				require.EqualError(t, err, text)
 				assert.False(t, stopped)
 			})
 		}
@@ -2131,21 +2133,24 @@ func TestClientErrorsNamedOnce(t *testing.T) {
 	t.Run("create", func(t *testing.T) {
 		t.Parallel()
 
-		clientErr := "create replacement container: failed to create container: daemon unavailable"
+		text := "create replacement container: failed to create container: daemon unavailable"
+		clientErr := errors.New(text)
 		source := staleMockContainer()
 		client := mockContainerClient.NewMockClient(t)
 		client.EXPECT().
 			CreateContainer(mock.Anything, source).
-			Return("", errors.New(clientErr))
+			Return("", clientErr)
 
 		_, _, err := restartStaleContainer(newTestLogger(t), t.Context(), source, client, types.UpdateParams{})
-		require.EqualError(t, err, clientErr)
+		require.ErrorIs(t, err, clientErr)
+		require.EqualError(t, err, text)
 	})
 
 	t.Run("start", func(t *testing.T) {
 		t.Parallel()
 
-		clientErr := "failed to start container abc123: daemon unavailable"
+		text := "failed to start container abc123: daemon unavailable"
+		clientErr := errors.New(text)
 		source := staleMockContainer()
 		client := mockContainerClient.NewMockClient(t)
 		client.EXPECT().
@@ -2153,7 +2158,7 @@ func TestClientErrorsNamedOnce(t *testing.T) {
 			Return(types.ContainerID("abc123"), nil)
 		client.EXPECT().
 			StartContainerByID(mock.Anything, types.ContainerID("abc123")).
-			Return(errors.New(clientErr))
+			Return(clientErr)
 
 		_, _, err := restartStaleContainer(
 			newTestLogger(t),
@@ -2162,6 +2167,7 @@ func TestClientErrorsNamedOnce(t *testing.T) {
 			client,
 			types.UpdateParams{ReviveStopped: true},
 		)
-		require.EqualError(t, err, clientErr)
+		require.ErrorIs(t, err, clientErr)
+		require.EqualError(t, err, text)
 	})
 }

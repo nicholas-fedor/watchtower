@@ -35,7 +35,7 @@ func TestValidateRollingRestartDependencies(t *testing.T) {
 
 			err := ValidateRollingRestartDependencies(newTestLogger(t), t.Context(), mockClient, filter, true)
 
-			require.ErrorIs(t, err, clientErr)
+			require.Same(t, clientErr, err)
 			require.EqualError(t, err, "failed to list containers: daemon unavailable")
 		})
 	})
