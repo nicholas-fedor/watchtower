@@ -2,6 +2,7 @@ package provenance
 
 import (
 	"cmp"
+	"fmt"
 	"strings"
 
 	"github.com/rs/zerolog"
@@ -23,9 +24,9 @@ type Association struct {
 	Dockerfile string
 	Context    string
 
-	// InvalidPolicy is the git-semver-policy label value when it names no
+	// invalidPolicy is the git-semver-policy label value when it names no
 	// policy. Policy then holds the mapping or default policy instead.
-	InvalidPolicy string
+	invalidPolicy string
 
 	// RefFromDefault is true when Ref came from the process default, not a
 	// label or image mapping. ApplyGitAssociation does not persist those values.
@@ -36,6 +37,29 @@ type Association struct {
 	DockerfileFromDefault bool
 	// ContextFromDefault is true when Context came from the process default.
 	ContextFromDefault bool
+}
+
+// Validate reports an invalid git-semver-policy or git-host label.
+//
+// The policy label is checked first. A policy label that names no policy is
+// invalid even when an image mapping supplies the policy.
+//
+// Returns:
+//   - error: Wraps [semver.ErrInvalidPolicy] or [ErrInvalidHost]. It is nil
+//     when both labels are valid or unset.
+func (a Association) Validate() error {
+	if a.invalidPolicy != "" {
+		return fmt.Errorf("%w: %s", semver.ErrInvalidPolicy, a.invalidPolicy)
+	}
+
+	if a.Host != "" {
+		_, err := ParseAPIOrigin(a.Host)
+		if err != nil {
+			return err
+		}
+	}
+
+	return nil
 }
 
 // ResolveAssociation returns the monitor association for a container.
@@ -79,7 +103,7 @@ func ResolveAssociation(c types.Container, params types.UpdateParams) (Associati
 			Host:                  label(c, labels.GitHost),
 			Dockerfile:            dockerfile,
 			Context:               context,
-			InvalidPolicy:         invalidPolicy,
+			invalidPolicy:         invalidPolicy,
 			RefFromDefault:        refDefault,
 			PolicyFromDefault:     policyDefault,
 			DockerfileFromDefault: dockerfileDefault,
@@ -104,7 +128,7 @@ func ResolveAssociation(c types.Container, params types.UpdateParams) (Associati
 		Host:                  label(c, labels.GitHost),
 		Dockerfile:            dockerfile,
 		Context:               context,
-		InvalidPolicy:         invalidPolicy,
+		invalidPolicy:         invalidPolicy,
 		RefFromDefault:        refDefault,
 		PolicyFromDefault:     policyDefault,
 		DockerfileFromDefault: dockerfileDefault,

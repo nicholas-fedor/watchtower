@@ -232,15 +232,9 @@ func CheckContainer(
 		return CheckResult{}, nil
 	}
 
-	if assoc.InvalidPolicy != "" {
-		return CheckResult{}, fmt.Errorf("%w: %s", semver.ErrInvalidPolicy, assoc.InvalidPolicy)
-	}
-
-	if assoc.Host != "" {
-		_, err := provenance.ParseAPIOrigin(assoc.Host)
-		if err != nil {
-			return CheckResult{}, err //nolint:wrapcheck // ParseAPIOrigin's error already names the invalid git-host.
-		}
+	err := assoc.Validate()
+	if err != nil {
+		return CheckResult{}, err //nolint:wrapcheck // Validate's error already names the invalid label.
 	}
 
 	lastCommit, lastTag := provenance.Baseline(c)
