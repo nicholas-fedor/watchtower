@@ -10,11 +10,13 @@ import (
 
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 
 	dockerContainer "github.com/moby/moby/api/types/container"
 	dockerNetwork "github.com/moby/moby/api/types/network"
 
+	mockContainerClient "github.com/nicholas-fedor/watchtower/internal/container/client/mocks"
 	"github.com/nicholas-fedor/watchtower/internal/testutil/logcapture"
 	"github.com/nicholas-fedor/watchtower/internal/update/cleanup"
 	mockUpdate "github.com/nicholas-fedor/watchtower/internal/update/mocks"
@@ -423,8 +425,7 @@ func TestDetachedContext(t *testing.T) {
 			parentCancel()
 			wg.Wait()
 
-			require.Error(t, err)
-			assert.Contains(t, err.Error(), "failed to create container")
+			require.EqualError(t, err, "simulated create failure")
 			assert.False(t, renamed, "name should be restored after create failure")
 			assert.Equal(t, int32(2), client.TestData.RenameContainerCount.Load())
 			require.Len(t, client.TestData.RenameTargets, 2)
@@ -520,8 +521,7 @@ func TestDetachedContext(t *testing.T) {
 			parentCancel()
 			wg.Wait()
 
-			require.Error(t, err)
-			assert.Contains(t, err.Error(), "failed to start container")
+			require.EqualError(t, err, "simulated start failure")
 			assert.True(t, renamed)
 			assert.Equal(t, int32(1), client.TestData.CreateContainerCount.Load())
 			assert.NotEmpty(t, client.TestData.LastCreatedContainerID)
@@ -721,8 +721,7 @@ func TestDetachedContext(t *testing.T) {
 			// The operation should fail due to StartContainerByID error, but the
 			// cleanup (StopAndRemoveContainer) should have been attempted
 			// using the detached context, which survives parent cancellation.
-			require.Error(t, err)
-			assert.Contains(t, err.Error(), "failed to start container")
+			require.EqualError(t, err, "simulated start failure")
 			assert.True(t, renamed)
 
 			// Verify that RemoveContainer was called during cleanup.
@@ -2092,4 +2091,77 @@ func TestRun(t *testing.T) {
 			assert.Empty(t, cleanupImageInfos)
 		})
 	}
+}
+
+// TestClientErrorsNamedOnce verifies that a failed stop, remove, create or
+// start reports the container client's error as it is. The client's error
+// already names the step, so the restart adds no second prefix.
+func TestClientErrorsNamedOnce(t *testing.T) {
+	t.Parallel()
+
+	t.Run("stop and remove", func(t *testing.T) {
+		t.Parallel()
+
+		for _, clientErr := range []string{
+			"failed to stop container: daemon unavailable",
+			"failed to remove container: daemon unavailable",
+		} {
+			t.Run(clientErr, func(t *testing.T) {
+				t.Parallel()
+
+				source := staleMockContainer()
+				client := mockContainerClient.NewMockClient(t)
+				client.EXPECT().
+					StopAndRemoveContainer(mock.Anything, source, time.Second).
+					Return(errors.New(clientErr))
+
+				stopped, err := stopStaleContainer(
+					newTestLogger(t),
+					t.Context(),
+					source,
+					client,
+					types.UpdateParams{Timeout: time.Second},
+				)
+				require.EqualError(t, err, clientErr)
+				assert.False(t, stopped)
+			})
+		}
+	})
+
+	t.Run("create", func(t *testing.T) {
+		t.Parallel()
+
+		clientErr := "create replacement container: failed to create container: daemon unavailable"
+		source := staleMockContainer()
+		client := mockContainerClient.NewMockClient(t)
+		client.EXPECT().
+			CreateContainer(mock.Anything, source).
+			Return("", errors.New(clientErr))
+
+		_, _, err := restartStaleContainer(newTestLogger(t), t.Context(), source, client, types.UpdateParams{})
+		require.EqualError(t, err, clientErr)
+	})
+
+	t.Run("start", func(t *testing.T) {
+		t.Parallel()
+
+		clientErr := "failed to start container abc123: daemon unavailable"
+		source := staleMockContainer()
+		client := mockContainerClient.NewMockClient(t)
+		client.EXPECT().
+			CreateContainer(mock.Anything, source).
+			Return(types.ContainerID("abc123"), nil)
+		client.EXPECT().
+			StartContainerByID(mock.Anything, types.ContainerID("abc123")).
+			Return(errors.New(clientErr))
+
+		_, _, err := restartStaleContainer(
+			newTestLogger(t),
+			t.Context(),
+			source,
+			client,
+			types.UpdateParams{ReviveStopped: true},
+		)
+		require.EqualError(t, err, clientErr)
+	})
 }

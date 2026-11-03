@@ -26,17 +26,17 @@ func TestValidateRollingRestartDependencies(t *testing.T) {
 	t.Run("ListContainers fails", func(t *testing.T) {
 		t.Parallel()
 
-		t.Run("should return wrapped error", func(t *testing.T) {
+		t.Run("should return the client's error as it is", func(t *testing.T) {
 			t.Parallel()
 
 			mockClient := mockContainerClient.NewMockClient(t)
-			expectedErr := errors.New("list containers failed")
-			mockClient.EXPECT().ListContainers(mock.Anything, mock.Anything).Return(nil, expectedErr)
+			clientErr := errors.New("failed to list containers: daemon unavailable")
+			mockClient.EXPECT().ListContainers(mock.Anything, mock.Anything).Return(nil, clientErr)
 
 			err := ValidateRollingRestartDependencies(newTestLogger(t), t.Context(), mockClient, filter, true)
 
-			require.Error(t, err)
-			require.ErrorContains(t, err, "list containers failed")
+			require.ErrorIs(t, err, clientErr)
+			require.EqualError(t, err, "failed to list containers: daemon unavailable")
 		})
 	})
 
