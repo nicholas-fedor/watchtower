@@ -3,6 +3,7 @@ package notify
 import (
 	"bytes"
 	"fmt"
+	"io"
 	"net/url"
 	"os"
 	"path/filepath"
@@ -15,6 +16,8 @@ import (
 	"github.com/spf13/cobra"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+
+	shoutrrrTypes "github.com/nicholas-fedor/shoutrrr/pkg/types"
 
 	"github.com/nicholas-fedor/watchtower/internal/observability/notify/format"
 	"github.com/nicholas-fedor/watchtower/internal/observability/notify/legacy"
@@ -676,12 +679,12 @@ func TestNewNotifier_SetupErrors(t *testing.T) {
 	}
 }
 
-// TestBuildURLs_RejectsURLsThatShoutrrrRejects verifies that BuildURLs fails for
-// a configured or converted URL that Shoutrrr rejects when it reads it. The
-// error names the service and never contains the URL. A configured URL is named
-// by its position, counting from 1. A converted URL is named by its legacy
-// notification type.
-func TestBuildURLs_RejectsURLsThatShoutrrrRejects(t *testing.T) {
+// TestRejectsURLsThatShoutrrrRejects verifies that BuildURLs and NewNotifier
+// fail with the same error for a configured or converted URL that Shoutrrr
+// rejects when it reads it. The error names the service and never contains the
+// URL. A configured URL is named by its position, counting from 1. A converted
+// URL is named by its legacy notification type.
+func TestRejectsURLsThatShoutrrrRejects(t *testing.T) {
 	t.Parallel()
 
 	tests := []struct {
@@ -694,6 +697,34 @@ func TestBuildURLs_RejectsURLsThatShoutrrrRejects(t *testing.T) {
 			name:   "configured Discord URL with a non-numeric webhook ID",
 			cfg:    notifyConfig.Notify{URLs: []string{"logger://", "discord://secrettoken@notanumber"}},
 			source: "notification URL 2: discord:",
+		},
+		{
+			name:   "configured URL with an invalid escape",
+			cfg:    notifyConfig.Notify{URLs: []string{"discord://secrettoken@123456/%zz"}},
+			source: "notification URL 1: failed to parse URL",
+		},
+		{
+			name:   "configured URL with an invalid port",
+			cfg:    notifyConfig.Notify{URLs: []string{"discord://123456:secrettoken/hook"}},
+			source: "notification URL 1: failed to parse URL",
+		},
+		{
+			name: "legacy email server with an invalid port",
+			cfg: notifyConfig.Notify{
+				LegacyTypes: []string{"email"},
+				Legacy: notifyConfig.Legacy{
+					EmailFrom:   "watchtower@example.com",
+					EmailTo:     "admin@example.com",
+					EmailServer: "smtp.example.com:secrettoken",
+					EmailPort:   25,
+				},
+			},
+			source: `check "email" notification URL: failed to parse URL`,
+		},
+		{
+			name:   "configured docker-secret file path instead of a URL",
+			cfg:    notifyConfig.Notify{URLs: []string{"logger://", "docker-secret:/run/secrets/secrettoken"}},
+			source: "notification URL 2:",
 		},
 		{
 			name: "legacy Discord wrapper with a non-numeric webhook ID",
@@ -723,12 +754,108 @@ func TestBuildURLs_RejectsURLsThatShoutrrrRejects(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 
-			urls, err := BuildURLs(nil, tt.cfg)
-			require.ErrorContains(t, err, tt.source)
-			assert.NotContains(t, err.Error(), "secrettoken")
-			assert.Nil(t, urls)
+			t.Run("BuildURLs", func(t *testing.T) {
+				t.Parallel()
+
+				urls, err := BuildURLs(nil, tt.cfg)
+				require.ErrorContains(t, err, tt.source)
+				assert.NotContains(t, err.Error(), "secrettoken")
+				assert.Nil(t, urls)
+			})
+
+			t.Run("NewNotifier", func(t *testing.T) {
+				t.Parallel()
+
+				cfg := tt.cfg
+				cfg.Level = "info"
+
+				notifier, err := NewNotifier(newTestLogger(t), cfg)
+				require.ErrorContains(t, err, tt.source)
+				assert.NotContains(t, err.Error(), "secrettoken")
+				assert.Nil(t, notifier)
+			})
 		})
 	}
+}
+
+// TestNewSender_AcceptsGotifyURLFromFileExpansion verifies that newSender
+// accepts a valid Gotify URL matching expanded secret content.
+func TestNewSender_AcceptsGotifyURLFromFileExpansion(t *testing.T) {
+	t.Parallel()
+
+	cfg := notifyConfig.Notify{URLs: []string{"gotify://gotify.example.com/Atoken123456789"}}
+
+	sender, urls, _, err := newSender(newTestLogger(t), cfg)
+	require.NoError(t, err)
+	assert.NotNil(t, sender)
+	assert.Equal(t, cfg.URLs, urls)
+}
+
+// TestNewSender_LogsShoutrrrRecordsAtTheirLevel verifies that newSender gives
+// Shoutrrr a loop-safe logger. A Shoutrrr warning is a warn entry that is not
+// notified. The logger service's text is still logged without a level. Both
+// messages start with the Shoutrrr prefix.
+func TestNewSender_LogsShoutrrrRecordsAtTheirLevel(t *testing.T) {
+	t.Parallel()
+
+	// entry holds the fields of a log entry that the sender's logger decides.
+	type entry struct {
+		Level   string `json:"level"`
+		Message string `json:"message"`
+		Notify  string `json:"notify"`
+	}
+
+	log, buf := logcapture.NewJSON(zerolog.InfoLevel)
+
+	sender, _, _, err := newSender(log, notifyConfig.Notify{URLs: []string{"logger://", newGenericWebhookURL(t)}})
+	require.NoError(t, err)
+
+	for _, err := range sender.Send("Found new image", &shoutrrrTypes.Params{}) {
+		require.NoError(t, err)
+	}
+
+	assert.ElementsMatch(t, []entry{
+		{Level: "", Message: "Shoutrrr: Found new image", Notify: "no"},
+		{Level: "warn", Message: "Shoutrrr: sending without TLS", Notify: "no"},
+	}, logcapture.Entries[entry](t, buf.String()))
+}
+
+// TestNewSender_PrintsLoggerTextToStdout verifies that with LogStdout set, the
+// logger service's text goes to standard output without the Shoutrrr prefix.
+// Only Shoutrrr's own records reach the Watchtower log.
+//
+// It replaces os.Stdout. It does not run in parallel for that reason.
+func TestNewSender_PrintsLoggerTextToStdout(t *testing.T) {
+	reader, writer, err := os.Pipe()
+	require.NoError(t, err)
+
+	stdout := os.Stdout
+	os.Stdout = writer
+
+	t.Cleanup(func() { os.Stdout = stdout })
+
+	log, buf := logcapture.NewJSON(zerolog.InfoLevel)
+
+	sender, _, _, err := newSender(log, notifyConfig.Notify{URLs: []string{"logger://", newGenericWebhookURL(t)}, LogStdout: true})
+	require.NoError(t, err)
+
+	for _, err := range sender.Send("Found new image", &shoutrrrTypes.Params{}) {
+		require.NoError(t, err)
+	}
+
+	os.Stdout = stdout
+
+	require.NoError(t, writer.Close())
+
+	printed, err := io.ReadAll(reader)
+	require.NoError(t, err)
+	require.NoError(t, reader.Close())
+
+	assert.Equal(t, "Found new image\n", string(printed))
+
+	logs := buf.String()
+	assert.Equal(t, []string{"Shoutrrr: sending without TLS"}, logcapture.Messages(t, logs, "warn"))
+	assert.NotContains(t, logs, "Found new image")
 }
 
 // TestBuildURLs_LogsShoutrrrWarnings verifies that the warnings Shoutrrr logs

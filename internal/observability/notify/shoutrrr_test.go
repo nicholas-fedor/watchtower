@@ -2,8 +2,6 @@ package notify
 
 import (
 	"fmt"
-	"io"
-	"os"
 	"slices"
 	"sync"
 	"testing"
@@ -17,6 +15,7 @@ import (
 	shoutrrrTypes "github.com/nicholas-fedor/shoutrrr/pkg/types"
 
 	"github.com/nicholas-fedor/watchtower/internal/observability/notify/format"
+	notifyConfig "github.com/nicholas-fedor/watchtower/internal/settings/config/notify"
 	"github.com/nicholas-fedor/watchtower/internal/testutil/logcapture"
 	"github.com/nicholas-fedor/watchtower/internal/testutil/reportfixture"
 	"github.com/nicholas-fedor/watchtower/internal/update/state"
@@ -55,9 +54,10 @@ func newBufferLogger() (*zerolog.Logger, *logcapture.Buffer) {
 	return &l, buf
 }
 
-// createTestNotifier builds a notifier with the default template and fails the
-// test when createNotifier returns an error. Pass a custom template to
-// createNotifier directly when a test needs one.
+// createTestNotifier builds a notifier with the default template, sending to
+// urls through a sender built as NewNotifier builds it. It fails the test when
+// Shoutrrr rejects a URL. Pass a custom template to createNotifier directly
+// when a test needs one.
 func createTestNotifier(
 	t *testing.T,
 	log *zerolog.Logger,
@@ -65,15 +65,14 @@ func createTestNotifier(
 	level zerolog.Level,
 	legacy bool,
 	data format.StaticData,
-	stdout bool,
 	delay time.Duration,
 ) *shoutrrrTypeNotifier {
 	t.Helper()
 
-	notifier, err := createNotifier(log, urls, level, "", legacy, data, stdout, delay)
+	sender, added, _, err := newSender(log, notifyConfig.Notify{URLs: urls})
 	require.NoError(t, err)
 
-	return notifier
+	return createNotifier(log, sender, added, level, "", legacy, data, delay)
 }
 
 // mockRouter implements the router interface for testing error scenarios.
@@ -160,7 +159,7 @@ func sendNotificationsWithBlockingRouter(t *testing.T) (*shoutrrrTypeNotifier, *
 		sent:   make(chan struct{}, 1),
 	}
 
-	shoutrrr := createTestNotifier(t, newTestLogger(t), []string{}, allButTrace, true, format.StaticData{}, false, 0)
+	shoutrrr := createTestNotifier(t, newTestLogger(t), []string{}, allButTrace, true, format.StaticData{}, 0)
 	shoutrrr.Router = router
 	shoutrrr.RegisterHook(newTestLogger(t))
 
@@ -194,7 +193,6 @@ func TestRegisterHook(t *testing.T) {
 				level,
 				true,
 				format.StaticData{},
-				false,
 				time.Second,
 			)
 			assert.False(t, shoutrrr.receiving.Load())
@@ -221,7 +219,6 @@ func TestRegisterHook(t *testing.T) {
 				level,
 				true,
 				format.StaticData{},
-				false,
 				time.Second,
 			)
 			log := newTestLogger(t)
@@ -246,7 +243,7 @@ func TestCreateNotifier_EmptyTitle(t *testing.T) {
 		shoutrrr := createTestNotifier(t, newTestLogger(t), []string{"logger://"}, allButTrace, true, format.StaticData{
 			Host:  "test.host",
 			Title: "",
-		}, false, time.Second)
+		}, time.Second)
 		_, found := shoutrrr.params.Title()
 		assert.False(t, found)
 	})
@@ -270,7 +267,6 @@ func TestClose(t *testing.T) {
 				allButTrace,
 				true,
 				format.StaticData{},
-				false,
 				time.Duration(0),
 			)
 			shoutrrr.RegisterHook(newTestLogger(t))
@@ -299,7 +295,6 @@ func TestClose(t *testing.T) {
 				allButTrace,
 				true,
 				format.StaticData{},
-				false,
 				time.Duration(0),
 			)
 			// Note: Not calling RegisterHook(), so no goroutine is started
@@ -324,7 +319,6 @@ func TestClose(t *testing.T) {
 				allButTrace,
 				true,
 				format.StaticData{},
-				false,
 				time.Duration(0),
 			)
 			shoutrrr.RegisterHook(newTestLogger(t))
@@ -361,7 +355,6 @@ func TestClose(t *testing.T) {
 				allButTrace,
 				true,
 				format.StaticData{},
-				false,
 				time.Duration(0),
 			)
 			shoutrrr.RegisterHook(newTestLogger(t))
@@ -447,7 +440,7 @@ func TestClose_SkipsSendDelay(t *testing.T) {
 		queued := queuedMessages(5)
 
 		router := &recordingRouter{}
-		notifier := createTestNotifier(t, newTestLogger(t), []string{}, allButTrace, true, format.StaticData{}, false, time.Minute)
+		notifier := createTestNotifier(t, newTestLogger(t), []string{}, allButTrace, true, format.StaticData{}, time.Minute)
 		notifier.Router = router
 		notifier.RegisterHook(newTestLogger(t))
 
@@ -475,7 +468,7 @@ func TestClose_SendAfterCloseIsDropped(t *testing.T) {
 	t.Parallel()
 
 	log, buf := newBufferLogger()
-	notifier := createTestNotifier(t, log, []string{}, allButTrace, true, format.StaticData{}, false, 0)
+	notifier := createTestNotifier(t, log, []string{}, allButTrace, true, format.StaticData{}, 0)
 	notifier.Close()
 
 	require.NotPanics(t, func() {
@@ -503,7 +496,7 @@ func TestClose_ConcurrentSendDoesNotPanic(t *testing.T) {
 
 	for range rounds {
 		log := zerolog.Nop()
-		notifier := createTestNotifier(t, &log, []string{}, allButTrace, true, format.StaticData{}, false, 0)
+		notifier := createTestNotifier(t, &log, []string{}, allButTrace, true, format.StaticData{}, 0)
 		notifier.Router = &recordingRouter{}
 		notifier.RegisterHook(&log)
 
@@ -533,7 +526,7 @@ func TestClose_SendPastClosedCheckDoesNotPanic(t *testing.T) {
 	t.Parallel()
 
 	log := zerolog.Nop()
-	notifier := createTestNotifier(t, &log, []string{}, allButTrace, true, format.StaticData{}, false, 0)
+	notifier := createTestNotifier(t, &log, []string{}, allButTrace, true, format.StaticData{}, 0)
 	notifier.Router = &recordingRouter{}
 	notifier.RegisterHook(&log)
 	notifier.Close()
@@ -561,46 +554,6 @@ func TestLL_WithoutLogger(t *testing.T) {
 	}
 }
 
-// TestCreateNotifier_RejectsBadURL verifies that createNotifier returns
-// Shoutrrr's error for a docker-secret file path given instead of a URL. The
-// error names the URL's position and never contains the URL.
-func TestCreateNotifier_RejectsBadURL(t *testing.T) {
-	t.Parallel()
-
-	log := zerolog.Nop()
-
-	notifier, err := createNotifier(
-		&log,
-		[]string{"logger://", "docker-secret:/run/secrets/my_url"},
-		zerolog.InfoLevel,
-		"",
-		true,
-		format.StaticData{},
-		false,
-		0,
-	)
-	require.ErrorContains(t, err, "URL 1")
-	assert.NotContains(t, err.Error(), "my_url")
-	assert.Nil(t, notifier)
-}
-
-// TestCreateNotifier_AcceptsGotifyURLFromFileExpansion verifies that createNotifier
-// succeeds when given a valid Gotify URL matching expanded secret content.
-func TestCreateNotifier_AcceptsGotifyURLFromFileExpansion(t *testing.T) {
-	notifier := createTestNotifier(
-		t,
-		newTestLogger(t),
-		[]string{"gotify://gotify.example.com/Atoken123456789"},
-		zerolog.InfoLevel,
-		true,
-		format.StaticData{},
-		false,
-		0,
-	)
-
-	require.NotNil(t, notifier)
-}
-
 // TestCreateNotifier_InvalidTemplateFallsBackToDefault verifies that a
 // notification template that fails to parse is replaced by the default
 // template, so notifications render as with no template set instead of
@@ -623,11 +576,10 @@ func TestCreateNotifier_InvalidTemplateFallsBackToDefault(t *testing.T) {
 
 	for _, legacy := range []bool{true, false} {
 		t.Run(fmt.Sprintf("legacy=%t", legacy), func(t *testing.T) {
-			invalid, err := createNotifier(newTestLogger(t), []string{}, zerolog.TraceLevel, "{{ .Broken", legacy, format.StaticData{}, false, 0)
-			require.NoError(t, err)
+			invalid := createNotifier(newTestLogger(t), &mockRouter{}, []string{}, zerolog.TraceLevel, "{{ .Broken", legacy, format.StaticData{}, 0)
 			t.Cleanup(invalid.Close)
 
-			fallback := createTestNotifier(t, newTestLogger(t), []string{}, zerolog.TraceLevel, legacy, format.StaticData{}, false, 0)
+			fallback := createNotifier(newTestLogger(t), &mockRouter{}, []string{}, zerolog.TraceLevel, "", legacy, format.StaticData{}, 0)
 			t.Cleanup(fallback.Close)
 
 			want, err := fallback.template.Render(fallback.ll(), data)
@@ -638,89 +590,4 @@ func TestCreateNotifier_InvalidTemplateFallsBackToDefault(t *testing.T) {
 			assert.Equal(t, want, got)
 		})
 	}
-}
-
-// TestCreateNotifier_LogsShoutrrrRecordsAtTheirLevel verifies that the
-// notifier gives Shoutrrr its loop-safe logger. A Shoutrrr warning is a warn
-// entry that is not notified. The logger service's text is still logged
-// without a level. Both messages start with the Shoutrrr prefix.
-func TestCreateNotifier_LogsShoutrrrRecordsAtTheirLevel(t *testing.T) {
-	t.Parallel()
-
-	// entry holds the fields of a log entry that the notifier decides.
-	type entry struct {
-		Level   string `json:"level"`
-		Message string `json:"message"`
-		Notify  string `json:"notify"`
-	}
-
-	log, buf := logcapture.NewJSON(zerolog.InfoLevel)
-
-	notifier := createTestNotifier(
-		t,
-		log,
-		[]string{"logger://", newGenericWebhookURL(t)},
-		zerolog.InfoLevel,
-		false,
-		format.StaticData{},
-		false,
-		0,
-	)
-	t.Cleanup(notifier.Close)
-
-	for _, err := range notifier.Router.Send("Found new image", notifier.params) {
-		require.NoError(t, err)
-	}
-
-	assert.ElementsMatch(t, []entry{
-		{Level: "", Message: "Shoutrrr: Found new image", Notify: "no"},
-		{Level: "warn", Message: "Shoutrrr: sending without TLS", Notify: "no"},
-	}, logcapture.Entries[entry](t, buf.String()))
-}
-
-// TestCreateNotifier_PrintsLoggerTextToStdout verifies that with stdout set,
-// the logger service's text goes to standard output without the Shoutrrr
-// prefix. Only Shoutrrr's own records reach the Watchtower log.
-//
-// It replaces os.Stdout. It does not run in parallel for that reason.
-func TestCreateNotifier_PrintsLoggerTextToStdout(t *testing.T) {
-	reader, writer, err := os.Pipe()
-	require.NoError(t, err)
-
-	stdout := os.Stdout
-	os.Stdout = writer
-
-	t.Cleanup(func() { os.Stdout = stdout })
-
-	log, buf := logcapture.NewJSON(zerolog.InfoLevel)
-
-	notifier := createTestNotifier(
-		t,
-		log,
-		[]string{"logger://", newGenericWebhookURL(t)},
-		zerolog.InfoLevel,
-		false,
-		format.StaticData{},
-		true,
-		0,
-	)
-	t.Cleanup(notifier.Close)
-
-	for _, err := range notifier.Router.Send("Found new image", notifier.params) {
-		require.NoError(t, err)
-	}
-
-	os.Stdout = stdout
-
-	require.NoError(t, writer.Close())
-
-	printed, err := io.ReadAll(reader)
-	require.NoError(t, err)
-	require.NoError(t, reader.Close())
-
-	assert.Equal(t, "Found new image\n", string(printed))
-
-	logs := buf.String()
-	assert.Equal(t, []string{"Shoutrrr: sending without TLS"}, logcapture.Messages(t, logs, "warn"))
-	assert.NotContains(t, logs, "Found new image")
 }

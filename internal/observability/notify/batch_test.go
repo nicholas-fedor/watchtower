@@ -35,7 +35,6 @@ func TestSendNotification_Batching(t *testing.T) {
 				allButTrace,
 				true,
 				format.StaticData{},
-				false,
 				time.Duration(0),
 			)
 			shoutrrr.StartNotification(false)
@@ -59,7 +58,6 @@ func TestSendNotification_Batching(t *testing.T) {
 				allButTrace,
 				true,
 				format.StaticData{},
-				false,
 				time.Duration(0),
 			)
 
@@ -95,7 +93,6 @@ func TestShouldSendNotification(t *testing.T) {
 				zerolog.ErrorLevel,
 				false,
 				format.StaticData{},
-				false,
 				time.Duration(0),
 			)
 
@@ -114,7 +111,6 @@ func TestShouldSendNotification(t *testing.T) {
 				zerolog.ErrorLevel,
 				false,
 				format.StaticData{},
-				false,
 				time.Duration(0),
 			)
 
@@ -137,7 +133,6 @@ func TestShouldSendNotification(t *testing.T) {
 				zerolog.WarnLevel,
 				false,
 				format.StaticData{},
-				false,
 				time.Duration(0),
 			)
 
@@ -160,7 +155,6 @@ func TestShouldSendNotification(t *testing.T) {
 				zerolog.InfoLevel,
 				false,
 				format.StaticData{},
-				false,
 				time.Duration(0),
 			)
 
@@ -183,7 +177,6 @@ func TestShouldSendNotification(t *testing.T) {
 				zerolog.DebugLevel,
 				false,
 				format.StaticData{},
-				false,
 				time.Duration(0),
 			)
 
@@ -206,7 +199,6 @@ func TestShouldSendNotification(t *testing.T) {
 				zerolog.TraceLevel,
 				false,
 				format.StaticData{},
-				false,
 				time.Duration(0),
 			)
 
@@ -229,7 +221,6 @@ func TestShouldSendNotification(t *testing.T) {
 				zerolog.ErrorLevel,
 				false,
 				format.StaticData{},
-				false,
 				time.Duration(0),
 			)
 
@@ -250,7 +241,6 @@ func TestSendNotification_SingleFocusKeepsBatchingActive(t *testing.T) {
 		zerolog.InfoLevel,
 		true,
 		format.StaticData{},
-		false,
 		0,
 	)
 

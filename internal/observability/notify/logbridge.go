@@ -11,12 +11,12 @@ import (
 	shoutrrrTypes "github.com/nicholas-fedor/shoutrrr/pkg/types"
 )
 
-// shoutrrrLogHandler is the slog handler behind the logger the notifier gives
-// Shoutrrr.
+// shoutrrrLogHandler is the slog handler behind the logger Watchtower gives the
+// Shoutrrr sender.
 //
 // Shoutrrr logs its own records with the call that logs them as
 // their source. It logs the logger service's notification text without one.
-// A record with a source goes to the notifier's logger at its own level. Text
+// A record with a source goes to the records logger at its own level. Text
 // goes to the text logger unchanged. Shoutrrr's records then never mix with
 // notification output written to stdout.
 type shoutrrrLogHandler struct {
@@ -31,7 +31,7 @@ const shoutrrrLogPrefix = "Shoutrrr: "
 // shoutrrrLogHandler routes the records of the Shoutrrr logger.
 var _ slog.Handler = (*shoutrrrLogHandler)(nil)
 
-// newShoutrrrLogger returns the logger the notifier gives the Shoutrrr sender.
+// newShoutrrrLogger returns the logger Watchtower gives the Shoutrrr sender.
 //
 // Parameters:
 //   - records: Logger that receives Shoutrrr's records at their level.

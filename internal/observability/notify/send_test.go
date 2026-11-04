@@ -35,7 +35,6 @@ func TestProcessSendErrors(t *testing.T) {
 			allButTrace,
 			true,
 			format.StaticData{},
-			false,
 			time.Duration(0),
 		)
 		shoutrrr.Router = mockRouter
@@ -64,7 +63,6 @@ func TestProcessSendErrors(t *testing.T) {
 			allButTrace,
 			true,
 			format.StaticData{},
-			false,
 			time.Duration(0),
 		)
 		shoutrrr.Router = mockRouter
@@ -93,7 +91,6 @@ func TestProcessSendErrors(t *testing.T) {
 			allButTrace,
 			true,
 			format.StaticData{},
-			false,
 			time.Duration(0),
 		)
 		shoutrrr.Router = mockRouter
@@ -122,7 +119,6 @@ func TestProcessSendErrors(t *testing.T) {
 			allButTrace,
 			true,
 			format.StaticData{},
-			false,
 			time.Duration(0),
 		)
 		shoutrrr.Router = mockRouter
@@ -151,7 +147,6 @@ func TestProcessSendErrors(t *testing.T) {
 			allButTrace,
 			true,
 			format.StaticData{},
-			false,
 			time.Duration(0),
 		)
 		shoutrrr.Router = mockRouter
@@ -180,7 +175,6 @@ func TestProcessSendErrors(t *testing.T) {
 			allButTrace,
 			true,
 			format.StaticData{},
-			false,
 			time.Duration(0),
 		)
 		shoutrrr.Router = mockRouter
@@ -238,7 +232,7 @@ func TestProcessSendErrors_RedactsURLs(t *testing.T) {
 			t.Parallel()
 
 			log, logBuffer := newBufferLogger()
-			notifier := createTestNotifier(t, log, []string{"logger://"}, allButTrace, true, format.StaticData{}, false, 0)
+			notifier := createTestNotifier(t, log, []string{"logger://"}, allButTrace, true, format.StaticData{}, 0)
 			notifier.Urls = []string{tt.url}
 
 			processSendErrors(notifier, []error{tt.err})
@@ -283,7 +277,7 @@ func TestSendNotifications_SendsQueuedMessagesAfterStop(t *testing.T) {
 	queued := queuedMessages(64)
 
 	router := &recordingRouter{}
-	notifier := createTestNotifier(t, newTestLogger(t), []string{}, allButTrace, true, format.StaticData{}, false, 0)
+	notifier := createTestNotifier(t, newTestLogger(t), []string{}, allButTrace, true, format.StaticData{}, 0)
 	notifier.Router = router
 
 	for _, message := range queued {

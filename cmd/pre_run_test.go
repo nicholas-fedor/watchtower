@@ -642,6 +642,7 @@ func TestPreRun_Exit(t *testing.T) {
 			wantOutput: []string{
 				"SetRestartPolicy cccccccccccc no",
 				"Failed to initialize notifications",
+				"notification URL 1: discord:",
 			},
 			unwantedOutput: []string{"secrettoken"},
 		},

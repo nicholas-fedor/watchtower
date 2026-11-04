@@ -89,11 +89,13 @@ func (n *msTeamsTypeNotifier) GetURL() (string, error) {
 	}
 
 	// Validate the webhook URL is parseable and absolute.
+	// A parse error quotes the URL, which carries the webhook's credentials.
+	// Neither the log nor the returned error includes it.
 	parsed, err := url.Parse(n.webHookURL)
 	if err != nil {
-		clog.Debug().Err(err).Msg("Failed to parse Microsoft Teams webhook URL")
+		clog.Debug().Msg("Failed to parse Microsoft Teams webhook URL")
 
-		return "", fmt.Errorf("%w: %w", errParseWebhookFailed, err)
+		return "", errParseWebhookFailed
 	}
 
 	if parsed.Scheme != "https" || parsed.Host == "" {

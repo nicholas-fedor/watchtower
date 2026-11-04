@@ -24,7 +24,6 @@ func TestRun_EventFieldMapPreservesLargeIntegers(t *testing.T) {
 		zerolog.TraceLevel,
 		true,
 		format.StaticData{},
-		false,
 		0,
 	)
 	n.RegisterHook(&root)
@@ -78,7 +77,6 @@ func TestRun_EventFieldMapPreservesApplicationFields(t *testing.T) {
 		zerolog.TraceLevel,
 		true,
 		format.StaticData{},
-		false,
 		0,
 	)
 	n.RegisterHook(&root)
@@ -127,7 +125,6 @@ func TestRun_NotifyNoAndFailClosed(t *testing.T) {
 		zerolog.TraceLevel,
 		true,
 		format.StaticData{},
-		false,
 		0,
 	)
 	// Enable batching without starting the worker goroutine.
@@ -177,7 +174,6 @@ func TestRun_ConcurrentEnqueue(t *testing.T) {
 		zerolog.TraceLevel,
 		true,
 		format.StaticData{},
-		false,
 		0,
 	)
 	n.RegisterHook(&root)
