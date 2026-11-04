@@ -14,6 +14,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Check upgraded notification urls with shoutrrr by @nicholas-fedor in [#3419](https://github.com/nicholas-fedor/watchtower/pull/3419)
 - Stop panicking and waiting out delays after close by @nicholas-fedor in [#3417](https://github.com/nicholas-fedor/watchtower/pull/3417)
 - Log shoutrrr records at their own level by @nicholas-fedor in [#3415](https://github.com/nicholas-fedor/watchtower/pull/3415)
 - Stop repeating container client error prefixes by @nicholas-fedor in [#3406](https://github.com/nicholas-fedor/watchtower/pull/3406)
