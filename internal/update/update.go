@@ -208,7 +208,7 @@ func update(
 	// Run pre-check lifecycle hooks if enabled to validate the environment before updates.
 	if config.LifecycleHooks {
 		log.Debug().Msg("Executing pre-check lifecycle hooks")
-		hooks.ExecutePreChecks(log, ctx, client, config, filteredContainers)
+		hooks.ExecutePreChecks(log, ctx, client, config.Filter, config.LifecycleUID, config.LifecycleGID, filteredContainers)
 	}
 
 	// Prepare a list of container names and images for detailed debugging output.
@@ -792,7 +792,15 @@ func update(
 	// held by the pre-update scan.
 	if config.LifecycleHooks {
 		log.Debug().Msg("Executing post-check lifecycle hooks")
-		hooks.ExecutePostChecks(log, ctx, client, config, nil)
+		hooks.ExecutePostChecks(
+			log,
+			ctx,
+			client,
+			config.Filter,
+			config.LifecycleUID,
+			config.LifecycleGID,
+			nil,
+		)
 	}
 
 	// A run-once Watchtower exits after the update, and a restart policy can
