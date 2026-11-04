@@ -3,6 +3,7 @@ package notify
 import (
 	"errors"
 	"fmt"
+	"iter"
 	"os"
 	"strings"
 	"time"
@@ -22,6 +23,14 @@ import (
 	notifyConfig "github.com/nicholas-fedor/watchtower/internal/settings/config/notify"
 	"github.com/nicholas-fedor/watchtower/pkg/types"
 )
+
+// legacyURL is a Shoutrrr URL converted from a legacy notification type.
+type legacyURL struct {
+	notificationType string // Legacy notification type the URL came from.
+	url              string // Converted Shoutrrr URL.
+	//nolint:staticcheck // SA1019: legacy ConvertibleNotifier until v2.
+	notifier types.ConvertibleNotifier // Legacy notifier that built the URL.
+}
 
 // errUnknownNotificationType indicates an unsupported legacy notification type name.
 var errUnknownNotificationType = errors.New("unknown notification type")
@@ -75,7 +84,32 @@ func NewNotifier(log *zerolog.Logger, cfg notifyConfig.Notify) types.Notifier {
 
 	// Start from configured Shoutrrr URLs, then append any legacy type URLs.
 	urls := append([]string(nil), cfg.URLs...)
-	urls, legacyDelay := appendLegacyURLs(log, urls, cfg.LegacyTypes, cfg.Legacy)
+	legacyDelay := time.Duration(0)
+
+	for legacy, err := range convertLegacyNotifiers(log, cfg.LegacyTypes, cfg.Legacy) {
+		if err != nil {
+			msg := "Failed to create notification config"
+			if errors.Is(err, errUnknownNotificationType) {
+				msg = "Unknown notification type"
+			}
+
+			clog.Fatal().Err(err).Msg(msg)
+		}
+
+		urls = append(urls, legacy.url)
+
+		// A legacy notifier with its own delay sets the notification delay.
+		//nolint:staticcheck // SA1019: legacy DelayNotifier until v2.
+		delayNotifier, ok := legacy.notifier.(types.DelayNotifier)
+		if ok {
+			legacyDelay = delayNotifier.GetDelay()
+			clog.Debug().
+				Str("type", legacy.notificationType).
+				Dur("delay", legacyDelay).
+				Msg("Retrieved delay from legacy notifier")
+		}
+	}
+
 	delay := getDelay(log, cfg.DelaySeconds, legacyDelay)
 
 	// Use report template when enabled, otherwise use legacy template.
@@ -121,8 +155,9 @@ func NewNotifier(log *zerolog.Logger, cfg notifyConfig.Notify) types.Notifier {
 //
 // It returns configured URLs plus any legacy Shoutrrr URLs generated from deprecated
 // notification types. Shoutrrr reads every URL as it does when Watchtower starts.
-// A URL it rejects fails the call. Errors are returned instead of causing a fatal
-// exit.
+// A URL it rejects fails the call. Conversion and URL errors are returned. A
+// legacy notifier whose required setting is empty still exits the process
+// itself, such as for an empty Slack hook URL.
 //
 // Parameters:
 //   - log: Logger for legacy notifier construction diagnostics and Shoutrrr's
@@ -163,29 +198,18 @@ func BuildURLs(log *zerolog.Logger, cfg notifyConfig.Notify) ([]string, error) {
 
 	urls := append([]string(nil), cfg.URLs...)
 
-	for _, notificationType := range cfg.LegacyTypes {
-		if notificationType == shoutrrrType {
-			continue
-		}
-
-		ctor, ok := legacyNotifierCtors[notificationType]
-		if !ok {
-			return nil, fmt.Errorf("%w: %q", errUnknownNotificationType, notificationType)
-		}
-
-		legacyNotifier := ctor(log, cfg.Legacy)
-
-		shoutrrrURL, err := legacyNotifier.GetURL()
+	// Each converted URL is checked before the next legacy notifier is built.
+	for legacy, err := range convertLegacyNotifiers(log, cfg.LegacyTypes, cfg.Legacy) {
 		if err != nil {
-			return nil, fmt.Errorf("create %q notification config: %w", notificationType, err)
+			return nil, err
 		}
 
-		err = sender.AddService(shoutrrrURL)
+		err = sender.AddService(legacy.url)
 		if err != nil {
-			return nil, fmt.Errorf("check %q notification URL: %w", notificationType, err)
+			return nil, fmt.Errorf("check %q notification URL: %w", legacy.notificationType, err)
 		}
 
-		urls = append(urls, shoutrrrURL)
+		urls = append(urls, legacy.url)
 	}
 
 	return urls, nil
@@ -245,7 +269,7 @@ func templateData(log *zerolog.Logger, hostname, titleTag, emailSubjectTag strin
 type legacyNotifierCtor func(log *zerolog.Logger, legacy notifyConfig.Legacy) types.ConvertibleNotifier
 
 // legacyNotifierCtors maps legacy notification type names to constructors.
-// shoutrrr is omitted so those entries are skipped during append.
+// The shoutrrr type has no entry. The conversion skips it before the lookup.
 //
 //nolint:staticcheck // SA1019: legacy notification types until v2.
 var legacyNotifierCtors = map[string]legacyNotifierCtor{
@@ -255,88 +279,70 @@ var legacyNotifierCtors = map[string]legacyNotifierCtor{
 	gotify.Type:  gotify.New,
 }
 
-// appendLegacyURLs adds shoutrrr URLs from legacy notification type names.
+// convertLegacyNotifiers converts legacy notification types to Shoutrrr URLs,
+// one type at a time and in order. Each legacy notifier is built only when the
+// caller asks for the next URL. A caller that stops at a URL or an error builds
+// no later notifier.
 //
 // Parameters:
-//   - log: Logger for diagnostics and fatal errors.
-//   - urls: Initial URL list.
-//   - notificationTypes: Legacy type names (email, slack, msteams, gotify).
+//   - log: Logger for diagnostics and the legacy notifiers' own checks.
+//   - notificationTypes: Legacy type names (email, slack, msteams, gotify). The
+//     shoutrrr type is skipped.
 //   - legacy: Per-type settings for deprecated notifiers.
 //
 // Returns:
-//   - []string: Updated URL list including generated Shoutrrr URLs.
-//   - time.Duration: Delay reported by a legacy DelayNotifier, or zero.
+//   - iter.Seq2[legacyURL, error]: Each converted URL with its type and
+//     notifier. An unknown type yields an error that names the type and ends
+//     the sequence. So does a notifier that cannot generate its URL.
 //
 // Deprecated: Legacy notification types are deprecated.
 // Use --notification-url instead.
 //
-// TODO: Remove appendLegacyURLs for the v2 release.
+// TODO: Remove convertLegacyNotifiers for the v2 release.
 //
 //nolint:godox
-func appendLegacyURLs(
+func convertLegacyNotifiers(
 	log *zerolog.Logger,
-	urls []string,
 	notificationTypes []string,
 	legacy notifyConfig.Legacy,
-) ([]string, time.Duration) {
-	clog := log.With().Str("function", "appendLegacyURLs").Logger()
-	clog.Debug().Msg("Appending legacy notification URLs")
+) iter.Seq2[legacyURL, error] {
+	return func(yield func(legacyURL, error) bool) {
+		clog := log.With().Str("function", "convertLegacyNotifiers").Logger()
+		clog.Debug().
+			Strs("types", notificationTypes).
+			Msg("Processing legacy notification types")
 
-	clog.Debug().
-		Strs("types", notificationTypes).
-		Msg("Processing legacy notification types")
+		for _, notificationType := range notificationTypes {
+			if notificationType == shoutrrrType {
+				continue
+			}
 
-	legacyDelay := time.Duration(0)
+			ctor, ok := legacyNotifierCtors[notificationType]
+			if !ok {
+				yield(legacyURL{}, fmt.Errorf("%w: %q", errUnknownNotificationType, notificationType))
 
-	for _, notificationType := range notificationTypes {
-		if notificationType == shoutrrrType {
-			continue
-		}
+				return
+			}
 
-		ctor, ok := legacyNotifierCtors[notificationType]
-		if !ok {
-			clog.Fatal().
+			legacyNotifier := ctor(log, legacy)
+
+			shoutrrrURL, err := legacyNotifier.GetURL()
+			if err != nil {
+				yield(legacyURL{}, fmt.Errorf("create %q notification config: %w", notificationType, err))
+
+				return
+			}
+
+			clog.Trace().
 				Str("type", notificationType).
-				Msg("Unknown notification type")
+				Str("url", redact.ServiceURL(shoutrrrURL)).
+				Msg("Created Shoutrrr URL from legacy notifier")
 
-			continue
+			if !yield(legacyURL{notificationType: notificationType, url: shoutrrrURL, notifier: legacyNotifier}, nil) {
+				return
+			}
 		}
-
-		legacyNotifier := ctor(log, legacy)
-
-		// Generate shoutrrr URL from legacy notifier.
-		shoutrrrURL, err := legacyNotifier.GetURL()
-		if err != nil {
-			clog.Fatal().
-				Err(err).
-				Str("type", notificationType).
-				Msg("Failed to create notification config")
-		}
-
-		urls = append(urls, shoutrrrURL)
-
-		// Check for delay if supported.
-		delayNotifier, ok := legacyNotifier.(types.DelayNotifier)
-		if ok {
-			legacyDelay = delayNotifier.GetDelay()
-			clog.Debug().
-				Str("type", notificationType).
-				Dur("delay", legacyDelay).
-				Msg("Retrieved delay from legacy notifier")
-		}
-
-		clog.Trace().
-			Str("type", notificationType).
-			Str("url", redact.ServiceURL(shoutrrrURL)).
-			Msg("Created Shoutrrr URL from legacy notifier")
 	}
-
-	clog.Debug().
-		Int("url_count", len(urls)).
-		Dur("delay", legacyDelay).
-		Msg("Completed legacy URL appending")
-
-	return urls, legacyDelay
 }
 
 // getDelay selects the notification delay from a legacy value or configured seconds.

@@ -387,7 +387,7 @@ func TestNotifier(t *testing.T) {
 			t.Run("should return the expected URL", func(t *testing.T) {
 				t.Parallel()
 
-				token := "aaa"
+				token := "Aaaaaaaaaaaaaaa"
 				host := "shoutrrr.local"
 
 				expectedOutput := fmt.Sprintf("gotify://%s/%s?title=", host, token)
@@ -613,6 +613,30 @@ func TestNotifier(t *testing.T) {
 			})
 		})
 	})
+
+	t.Run("a legacy notification type cannot be converted", func(t *testing.T) {
+		t.Parallel()
+
+		t.Run("should fatal for an unknown type", func(t *testing.T) {
+			t.Parallel()
+
+			expectNewNotifierFatal(t, []string{
+				"--notifications",
+				"carrier-pigeon",
+			}, "Unknown notification type")
+		})
+
+		t.Run("should fatal when the notifier cannot build its URL", func(t *testing.T) {
+			t.Parallel()
+
+			expectNewNotifierFatal(t, []string{
+				"--notifications",
+				"slack",
+				"--notification-slack-hook-url",
+				"https://discord.com/api/webhooks/123/abc",
+			}, "Failed to create notification config")
+		})
+	})
 }
 
 // TestBuildURLs_RejectsURLsThatShoutrrrRejects verifies that BuildURLs fails for
@@ -675,6 +699,80 @@ func TestBuildURLs_LogsShoutrrrWarnings(t *testing.T) {
 	assert.Equal(t, cfg.URLs, urls)
 	assert.Contains(t, buf.String(), `"level":"warn"`)
 	assert.Contains(t, buf.String(), "insecureskipverify")
+}
+
+// TestBuildURLs_ConversionErrors verifies that BuildURLs returns an error that
+// names the legacy type for an unknown type and for a legacy notifier that
+// cannot generate its URL.
+func TestBuildURLs_ConversionErrors(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name    string
+		cfg     notifyConfig.Notify
+		wantErr string
+	}{
+		{
+			name:    "unknown type",
+			cfg:     notifyConfig.Notify{LegacyTypes: []string{"carrier-pigeon"}},
+			wantErr: `unknown notification type: "carrier-pigeon"`,
+		},
+		{
+			name: "notifier cannot generate its URL",
+			cfg: notifyConfig.Notify{
+				LegacyTypes: []string{"slack"},
+				Legacy:      notifyConfig.Legacy{SlackHookURL: "https://discord.com/api/webhooks/123/abc"},
+			},
+			wantErr: `create "slack" notification config`,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			urls, err := BuildURLs(nil, tt.cfg)
+			require.ErrorContains(t, err, tt.wantErr)
+			assert.Nil(t, urls)
+		})
+	}
+}
+
+// TestBuildURLs_StopsAtTheFirstRejectedURL verifies that BuildURLs checks each
+// converted URL before it builds the next legacy notifier. Shoutrrr rejects the
+// Slack hook's Discord URL. The email notifier is then never built, which would
+// exit the process for its empty settings. The test replaces zerolog's fatal
+// exit and holds the lock the other fatal tests share.
+func TestBuildURLs_StopsAtTheFirstRejectedURL(t *testing.T) {
+	t.Parallel()
+
+	fatalExitMu.Lock()
+	defer fatalExitMu.Unlock()
+
+	oldFatalExit := zerolog.FatalExitFunc
+	defer func() { zerolog.FatalExitFunc = oldFatalExit }()
+
+	zerolog.FatalExitFunc = func() {
+		panic("fatal exit")
+	}
+
+	cfg := notifyConfig.Notify{
+		LegacyTypes: []string{"slack", "email"},
+		Legacy: notifyConfig.Legacy{
+			SlackHookURL: "https://discord.com/api/webhooks/notanumber/secrettoken/slack",
+		},
+	}
+
+	var (
+		urls []string
+		err  error
+	)
+
+	require.NotPanics(t, func() {
+		urls, err = BuildURLs(nil, cfg)
+	})
+	require.ErrorContains(t, err, `check "slack" notification URL`)
+	assert.Nil(t, urls)
 }
 
 // expectNewNotifierFatal runs NewNotifier under a temporary FatalExitFunc
@@ -742,11 +840,12 @@ func testURL(t *testing.T, args []string, expectedURL string, expectedDelay time
 
 	cfg := loadNotify(t, args)
 
-	urls, legacyDelay := appendLegacyURLs(newTestLogger(t), []string{}, cfg.LegacyTypes, cfg.Legacy)
-	delay := getDelay(newTestLogger(t), cfg.DelaySeconds, legacyDelay)
+	notifier, ok := NewNotifier(newTestLogger(t), cfg).(*shoutrrrTypeNotifier)
+	require.True(t, ok)
+	t.Cleanup(notifier.Close)
 
-	assert.Contains(t, urls, expectedURL)
-	assert.Equal(t, expectedDelay, delay)
+	assert.Contains(t, notifier.Urls, expectedURL)
+	assert.Equal(t, expectedDelay, notifier.delay)
 }
 
 // loadNotify loads the notification settings from args the way production
