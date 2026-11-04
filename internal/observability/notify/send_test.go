@@ -2,7 +2,6 @@ package notify
 
 import (
 	"errors"
-	"fmt"
 	"testing"
 	"testing/synctest"
 	"time"
@@ -275,21 +274,21 @@ func TestSlowNotificationSent(t *testing.T) {
 func TestSendNotifications_SendsQueuedMessagesAfterStop(t *testing.T) {
 	t.Parallel()
 
-	const queued = 64
+	queued := queuedMessages(64)
 
-	router := &countingRouter{}
+	router := &recordingRouter{}
 	notifier := createTestNotifier(newTestLogger(t), []string{}, allButTrace, true, format.StaticData{}, false, 0)
 	notifier.Router = router
 
-	for i := range queued {
-		notifier.messages <- fmt.Sprintf("message %d", i)
+	for _, message := range queued {
+		notifier.messages <- message
 	}
 
 	close(notifier.stop)
 
 	sendNotifications(notifier)
 
-	assert.Equal(t, int32(queued), router.sends.Load())
+	assert.Equal(t, queued, router.sent())
 }
 
 // TestSendEntries_EmptyMessageLogsSkipAtDebug verifies that a template that

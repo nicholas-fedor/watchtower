@@ -7,7 +7,8 @@ import (
 	"io"
 	"os"
 	"os/exec"
-	"sync/atomic"
+	"slices"
+	"sync"
 	"testing"
 	"testing/synctest"
 	"time"
@@ -95,6 +96,49 @@ func (b blockingRouter) Send(_ string, _ *shoutrrrTypes.Params) []error {
 	b.sent <- struct{}{}
 
 	return nil
+}
+
+// recordingRouter records each message it is asked to send, in order. It is
+// safe for concurrent use.
+type recordingRouter struct {
+	mu       sync.Mutex
+	messages []string
+}
+
+func (r *recordingRouter) Send(message string, _ *shoutrrrTypes.Params) []error {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+
+	r.messages = append(r.messages, message)
+
+	return nil
+}
+
+// sent returns the messages sent so far, in the order they were sent.
+//
+// Returns:
+//   - []string: A copy of the sent messages.
+func (r *recordingRouter) sent() []string {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+
+	return slices.Clone(r.messages)
+}
+
+// queuedMessages returns count numbered messages, as tests queue them.
+//
+// Parameters:
+//   - count: Number of messages.
+//
+// Returns:
+//   - []string: Messages "message 0" through "message count-1".
+func queuedMessages(count int) []string {
+	messages := make([]string, count)
+	for i := range messages {
+		messages[i] = fmt.Sprintf("message %d", i)
+	}
+
+	return messages
 }
 
 // sendNotificationsWithBlockingRouter returns a notifier whose worker is
@@ -388,19 +432,19 @@ func TestClose_WaitsForInFlightSend(t *testing.T) {
 	})
 }
 
-// TestClose_SkipsSendDelay verifies that Close sends every queued message
-// without waiting the configured delay between them.
+// TestClose_SkipsSendDelay verifies that Close sends every queued message, in
+// queue order, without waiting the configured delay between them.
 func TestClose_SkipsSendDelay(t *testing.T) {
 	synctest.Test(t, func(t *testing.T) {
-		const queued = 5
+		queued := queuedMessages(5)
 
-		router := &countingRouter{}
+		router := &recordingRouter{}
 		notifier := createTestNotifier(newTestLogger(t), []string{}, allButTrace, true, format.StaticData{}, false, time.Minute)
 		notifier.Router = router
 		notifier.RegisterHook(newTestLogger(t))
 
-		for i := range queued {
-			notifier.messages <- fmt.Sprintf("message %d", i)
+		for _, message := range queued {
+			notifier.messages <- message
 		}
 
 		// Let the worker take a message and start waiting the delay.
@@ -411,7 +455,7 @@ func TestClose_SkipsSendDelay(t *testing.T) {
 		notifier.Close()
 
 		assert.Zero(t, time.Since(start))
-		assert.Equal(t, int32(queued), router.sends.Load())
+		assert.Equal(t, queued, router.sent())
 	})
 }
 
@@ -432,6 +476,44 @@ func TestClose_SendAfterCloseIsDropped(t *testing.T) {
 
 	assert.Empty(t, notifier.messages)
 	assert.Contains(t, logcapture.Messages(t, buf.String(), "debug"), "Notifier closed, skipping send")
+}
+
+// TestClose_ConcurrentSendDoesNotPanic verifies that sendEntries running while
+// Close shuts the worker down never panics. The test cannot force a send
+// between the closed check and the enqueue. It repeats the race many times
+// instead.
+func TestClose_ConcurrentSendDoesNotPanic(t *testing.T) {
+	t.Parallel()
+
+	const (
+		rounds  = 50
+		senders = 4
+		sends   = 10
+	)
+
+	entries := []*format.Entry{{Level: "info", Message: "late"}}
+
+	for range rounds {
+		log := zerolog.Nop()
+		notifier := createTestNotifier(&log, []string{}, allButTrace, true, format.StaticData{}, false, 0)
+		notifier.Router = &recordingRouter{}
+		notifier.RegisterHook(&log)
+
+		var wg sync.WaitGroup
+
+		for range senders {
+			wg.Go(func() {
+				assert.NotPanics(t, func() {
+					for range sends {
+						notifier.sendEntries(entries, nil)
+					}
+				})
+			})
+		}
+
+		notifier.Close()
+		wg.Wait()
+	}
 }
 
 // TestLL_WithoutLogger verifies that a notifier without its loop-safe logger,
@@ -503,16 +585,6 @@ func TestCreateNotifier_AcceptsGotifyURLFromFileExpansion(t *testing.T) {
 	)
 
 	require.NotNil(t, notifier)
-}
-
-type countingRouter struct {
-	sends atomic.Int32
-}
-
-func (c *countingRouter) Send(_ string, _ *shoutrrrTypes.Params) []error {
-	c.sends.Add(1)
-
-	return nil
 }
 
 // TestCreateNotifier_InvalidTemplateFallsBackToDefault verifies that a
