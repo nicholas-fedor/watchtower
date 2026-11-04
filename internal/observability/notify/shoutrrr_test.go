@@ -669,3 +669,40 @@ func TestCreateNotifier_InvalidTemplateFallsBackToDefault(t *testing.T) {
 		})
 	}
 }
+
+// TestCreateNotifier_LogsShoutrrrRecordsAtTheirLevel verifies that the
+// notifier gives Shoutrrr its loop-safe logger. A Shoutrrr warning is a warn
+// entry that is not notified. The logger service's text is still logged
+// without a level. Both messages start with the Shoutrrr prefix.
+func TestCreateNotifier_LogsShoutrrrRecordsAtTheirLevel(t *testing.T) {
+	t.Parallel()
+
+	// entry holds the fields of a log entry that the notifier decides.
+	type entry struct {
+		Level   string `json:"level"`
+		Message string `json:"message"`
+		Notify  string `json:"notify"`
+	}
+
+	log, buf := logcapture.NewJSON(zerolog.InfoLevel)
+
+	notifier := createTestNotifier(
+		log,
+		[]string{"logger://", newGenericWebhookURL(t)},
+		zerolog.InfoLevel,
+		false,
+		format.StaticData{},
+		false,
+		0,
+	)
+	t.Cleanup(notifier.Close)
+
+	for _, err := range notifier.Router.Send("Found new image", notifier.params) {
+		require.NoError(t, err)
+	}
+
+	assert.ElementsMatch(t, []entry{
+		{Level: "", Message: "Shoutrrr: Found new image", Notify: "no"},
+		{Level: "warn", Message: "Shoutrrr: sending without TLS", Notify: "no"},
+	}, logcapture.Entries[entry](t, buf.String()))
+}
