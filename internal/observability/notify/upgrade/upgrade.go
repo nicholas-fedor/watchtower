@@ -25,8 +25,10 @@ var (
 )
 
 // WriteEnvFile writes the notification URLs from cfg, including those converted
-// from legacy notification types, to a new temporary file in dir. The file holds
-// one WATCHTOWER_NOTIFICATION_URL line with the URLs separated by spaces.
+// from legacy notification types, to a new temporary file in dir.
+//
+// The file holds one WATCHTOWER_NOTIFICATION_URL line with the URLs separated
+// by spaces. A URL that Shoutrrr rejects fails the call before any file is written.
 //
 // Parameters:
 //   - log: Logger for the notification types found, the file path and failures.
