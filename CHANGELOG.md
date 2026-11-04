@@ -164,6 +164,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Chores
 
+- Update module github.com/nicholas-fedor/shoutrrr to v0.23.0 by @renovate[bot] in [#3411](https://github.com/nicholas-fedor/watchtower/pull/3411)
 - Update module github.com/moby/buildkit to v0.34.2 by @renovate[bot] in [#3409](https://github.com/nicholas-fedor/watchtower/pull/3409)
 - Update module github.com/docker/cli to v29.9.3+incompatible by @renovate[bot] in [#3408](https://github.com/nicholas-fedor/watchtower/pull/3408)
 - Update module github.com/gofiber/schema to v1.9.3 by @renovate[bot] in [#3401](https://github.com/nicholas-fedor/watchtower/pull/3401)
