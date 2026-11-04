@@ -668,6 +668,18 @@ func TestBuildURLs_RejectsURLsThatShoutrrrRejects(t *testing.T) {
 			},
 			source: `check "slack" notification URL: discord:`,
 		},
+		{
+			name: "legacy Discord wrapper rejected after a valid Gotify type",
+			cfg: notifyConfig.Notify{
+				LegacyTypes: []string{"gotify", "slack"},
+				Legacy: notifyConfig.Legacy{
+					GotifyURL:    "https://gotify.example.com",
+					GotifyToken:  "Aaaaaaaaaaaaaaa",
+					SlackHookURL: "https://discord.com/api/webhooks/notanumber/secrettoken/slack",
+				},
+			},
+			source: `check "slack" notification URL: discord:`,
+		},
 	}
 
 	for _, tt := range tests {
