@@ -155,6 +155,8 @@ func (n *shoutrrrTypeNotifier) RegisterHook(log *zerolog.Logger) {
 //
 // Returns:
 //   - *shoutrrrTypeNotifier: Initialized notifier.
+//   - error: Shoutrrr's error when it rejects a URL. It names the URL's
+//     position and service.
 func createNotifier(
 	log *zerolog.Logger,
 	urls []string,
@@ -164,7 +166,7 @@ func createNotifier(
 	data format.StaticData,
 	stdout bool,
 	delay time.Duration,
-) *shoutrrrTypeNotifier {
+) (*shoutrrrTypeNotifier, error) {
 	// Child logger that must never re-enter the notification hook.
 	local := log.With().Str("notify", "no").Logger()
 	localLog := &local
@@ -195,7 +197,7 @@ func createNotifier(
 		urls...,
 	)
 	if err != nil {
-		localLog.Fatal().Err(err).Msg("Failed to initialize Shoutrrr notifications")
+		return nil, err //nolint:wrapcheck // Shoutrrr's error names the URL's position and service.
 	}
 
 	// Set params with title if provided.
@@ -225,7 +227,7 @@ func createNotifier(
 		delay:    delay,                                            // Delay between sends.
 		entries:  make([]*format.Entry, 0, initialEntriesCapacity), // Queued log entries.
 		localLog: localLog,                                         // Loop-safe internal logger.
-	}
+	}, nil
 }
 
 // Close gracefully shuts down the Shoutrrr notifier.

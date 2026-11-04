@@ -635,6 +635,17 @@ func TestPreRun_Exit(t *testing.T) {
 			wantOutput:   []string{"SetRestartPolicy cccccccccccc no"},
 		},
 		{
+			// A notification URL that Shoutrrr rejects fails on every start,
+			// so the main process disables its restarts before it exits.
+			helperCase:   "rejected-notification-url",
+			wantExitCode: 1,
+			wantOutput: []string{
+				"SetRestartPolicy cccccccccccc no",
+				"Failed to initialize notifications",
+			},
+			unwantedOutput: []string{"secrettoken"},
+		},
+		{
 			// Without an explicit scope, the scope label is unknown. preRun then
 			// disables the restart policy and exits rather than running without
 			// a scope.
@@ -779,6 +790,11 @@ func preRunExitHelper(t *testing.T, helperCase string) {
 
 		mockClient.EXPECT().GetCurrentWatchtowerContainer(mock.Anything, selfID).Return(parent, nil)
 		mockClient.EXPECT().ListContainers(mock.Anything, withFilter).Return([]types.Container{parent}, nil).Maybe()
+	case "rejected-notification-url":
+		args = []string{"--notification-url", "discord://secrettoken@notanumber"}
+		detection = selfDetection{mountinfo: mountinfoWithSelf()}
+
+		mockClient.EXPECT().GetCurrentWatchtowerContainer(mock.Anything, selfID).Return(selfContainer("/watchtower", ""), nil)
 	case "unreadable-scope-label", "unreadable-scope-label-restarts-kept":
 		detection = selfDetection{mountinfo: mountinfoWithSelf()}
 

@@ -5,9 +5,9 @@ import (
 	"fmt"
 	"net/url"
 	"os"
+	"path/filepath"
 	"slices"
 	"strings"
-	"sync"
 	"testing"
 	"time"
 
@@ -23,14 +23,10 @@ import (
 	"github.com/nicholas-fedor/watchtower/internal/testutil/logcapture"
 )
 
-// fatalExitMu serializes the tests that replace zerolog.FatalExitFunc, which
-// is process-wide.
-var fatalExitMu sync.Mutex
-
 // TestNotifier verifies the notifier that NewNotifier builds from the
 // notification settings: its services, title, delay, and the shoutrrr URLs of
-// the legacy notifiers, and that a legacy email notifier without a required
-// setting is fatal.
+// the legacy notifiers. It also verifies that NewNotifier returns an error for
+// a legacy notifier that cannot be converted.
 func TestNotifier(t *testing.T) {
 	t.Parallel()
 
@@ -43,10 +39,11 @@ func TestNotifier(t *testing.T) {
 			t.Run("should configure no services", func(t *testing.T) {
 				t.Parallel()
 
-				notifier := NewNotifier(newTestLogger(t), loadNotify(t, []string{
+				notifier, err := NewNotifier(newTestLogger(t), loadNotify(t, []string{
 					"--notifications",
 					"shoutrrr",
 				}))
+				require.NoError(t, err)
 
 				assert.Empty(t, notifier.GetNames())
 			})
@@ -175,12 +172,13 @@ func TestNotifier(t *testing.T) {
 				require.NoError(t, err)
 				tmpFile.Close()
 
-				notifier := NewNotifier(newTestLogger(t), loadNotify(t, []string{
+				notifier, err := NewNotifier(newTestLogger(t), loadNotify(t, []string{
 					"--notification-url",
 					"logger://",
 					"--notification-template-file",
 					tmpFile.Name(),
 				}))
+				require.NoError(t, err)
 				require.NotNil(t, notifier)
 				assert.Contains(t, notifier.GetNames(), "logger")
 			})
@@ -365,13 +363,13 @@ func TestNotifier(t *testing.T) {
 		t.Run("the hook URL is empty", func(t *testing.T) {
 			t.Parallel()
 
-			t.Run("should fatal with a clear missing argument message", func(t *testing.T) {
+			t.Run("should return an error with a clear missing argument message", func(t *testing.T) {
 				t.Parallel()
 
-				expectNewNotifierFatal(t, []string{
+				expectNewNotifierError(t, []string{
 					"--notifications",
 					"slack",
-				}, "Failed to create notification config", `create "slack" notification config: the notification-slack-hook-url configuration option is empty`)
+				}, `create "slack" notification config: the notification-slack-hook-url configuration option is empty`)
 			})
 		})
 	})
@@ -419,7 +417,9 @@ func TestNotifier(t *testing.T) {
 					"Atesttoken12345",
 					"--notification-gotify-tls-skip-verify",
 				}
-				notifier := NewNotifier(newTestLogger(t), loadNotify(t, args))
+				notifier, err := NewNotifier(newTestLogger(t), loadNotify(t, args))
+				require.NoError(t, err)
+
 				names := notifier.GetNames()
 				assert.Contains(t, names, "gotify")
 
@@ -449,7 +449,8 @@ func TestNotifier(t *testing.T) {
 
 				log := zerolog.New(&buf).Level(zerolog.TraceLevel)
 
-				notifier := NewNotifier(&log, loadNotify(t, args))
+				notifier, err := NewNotifier(&log, loadNotify(t, args))
+				require.NoError(t, err)
 				assert.Contains(t, notifier.GetNames(), "gotify")
 
 				out := buf.String()
@@ -573,43 +574,43 @@ func TestNotifier(t *testing.T) {
 		t.Run("a required field is empty", func(t *testing.T) {
 			t.Parallel()
 
-			t.Run("should fatal when the from address is empty", func(t *testing.T) {
+			t.Run("should return an error when the from address is empty", func(t *testing.T) {
 				t.Parallel()
 
-				expectNewNotifierFatal(t, []string{
+				expectNewNotifierError(t, []string{
 					"--notifications",
 					"email",
 					"--notification-email-to",
 					"to@example.com",
 					"--notification-email-server",
 					"mail.example.com",
-				}, "Failed to create notification config", `create "email" notification config: the notification-email-from configuration option is empty`)
+				}, `create "email" notification config: the notification-email-from configuration option is empty`)
 			})
 
-			t.Run("should fatal when the to address is empty", func(t *testing.T) {
+			t.Run("should return an error when the to address is empty", func(t *testing.T) {
 				t.Parallel()
 
-				expectNewNotifierFatal(t, []string{
+				expectNewNotifierError(t, []string{
 					"--notifications",
 					"email",
 					"--notification-email-from",
 					"from@example.com",
 					"--notification-email-server",
 					"mail.example.com",
-				}, "Failed to create notification config", `create "email" notification config: the notification-email-to configuration option is empty`)
+				}, `create "email" notification config: the notification-email-to configuration option is empty`)
 			})
 
-			t.Run("should fatal when the server is empty", func(t *testing.T) {
+			t.Run("should return an error when the server is empty", func(t *testing.T) {
 				t.Parallel()
 
-				expectNewNotifierFatal(t, []string{
+				expectNewNotifierError(t, []string{
 					"--notifications",
 					"email",
 					"--notification-email-from",
 					"from@example.com",
 					"--notification-email-to",
 					"to@example.com",
-				}, "Failed to create notification config", `create "email" notification config: the notification-email-server configuration option is empty`)
+				}, `create "email" notification config: the notification-email-server configuration option is empty`)
 			})
 		})
 	})
@@ -617,27 +618,62 @@ func TestNotifier(t *testing.T) {
 	t.Run("a legacy notification type cannot be converted", func(t *testing.T) {
 		t.Parallel()
 
-		t.Run("should fatal for an unknown type", func(t *testing.T) {
+		t.Run("should return an error for an unknown type", func(t *testing.T) {
 			t.Parallel()
 
-			expectNewNotifierFatal(t, []string{
+			expectNewNotifierError(t, []string{
 				"--notifications",
 				"carrier-pigeon",
-			}, "Unknown notification type", `unknown notification type: "carrier-pigeon"`)
+			}, `unknown notification type: "carrier-pigeon"`)
 		})
 
-		t.Run("should fatal when the notifier cannot build its URL", func(t *testing.T) {
+		t.Run("should return an error when the notifier cannot build its URL", func(t *testing.T) {
 			t.Parallel()
 
-			expectNewNotifierFatal(t, []string{
+			expectNewNotifierError(t, []string{
 				"--notifications",
 				"slack",
 				"--notification-slack-hook-url",
 				"https://discord.com/api/webhooks/123/abc",
-			}, "Failed to create notification config",
-				`create "slack" notification config: invalid Discord webhook URL, expected https://discord.com/api/webhooks/<id>/<token>/slack`)
+			}, `create "slack" notification config: invalid Discord webhook URL, expected https://discord.com/api/webhooks/<id>/<token>/slack`)
 		})
 	})
+}
+
+// TestNewNotifier_SetupErrors verifies that NewNotifier returns an error
+// instead of a notifier when the notifications level is invalid or the
+// template file cannot be read.
+func TestNewNotifier_SetupErrors(t *testing.T) {
+	t.Parallel()
+
+	missingTemplate := filepath.Join(t.TempDir(), "missing.tpl")
+
+	tests := []struct {
+		name    string
+		cfg     notifyConfig.Notify
+		wantErr string
+	}{
+		{
+			name:    "invalid notifications level",
+			cfg:     notifyConfig.Notify{Level: "loud"},
+			wantErr: `parse notifications level: unknown log level: "loud"`,
+		},
+		{
+			name:    "unreadable template file",
+			cfg:     notifyConfig.Notify{Level: "info", TemplateFile: missingTemplate},
+			wantErr: "read notification template file: open " + missingTemplate,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			notifier, err := NewNotifier(newTestLogger(t), tt.cfg)
+			require.ErrorContains(t, err, tt.wantErr)
+			assert.Nil(t, notifier)
+		})
+	}
 }
 
 // TestBuildURLs_RejectsURLsThatShoutrrrRejects verifies that BuildURLs fails for
@@ -804,42 +840,19 @@ func TestBuildURLs_StopsAtTheFirstRejectedURL(t *testing.T) {
 	assert.Nil(t, urls)
 }
 
-// expectNewNotifierFatal runs NewNotifier under a temporary FatalExitFunc
-// that panics instead of os.Exit, captures buffer-backed fatal log output, and
-// restores the previous exit callback.
+// expectNewNotifierError builds a notifier from args and requires NewNotifier
+// to return the given error and no notifier.
 //
 // Parameters:
 //   - t: Test that receives the failures.
-//   - args: CLI flags to load before constructing the notifier
-//   - wantMsg: exact fatal message text expected in the log output
-//   - wantErr: exact error text expected in the fatal log entry
-func expectNewNotifierFatal(t *testing.T, args []string, wantMsg, wantErr string) {
+//   - args: CLI flags to load before constructing the notifier.
+//   - wantErr: Exact error text NewNotifier must return.
+func expectNewNotifierError(t *testing.T, args []string, wantErr string) {
 	t.Helper()
 
-	fatalExitMu.Lock()
-	defer fatalExitMu.Unlock()
-
-	oldFatalExit := zerolog.FatalExitFunc
-	defer func() { zerolog.FatalExitFunc = oldFatalExit }()
-
-	var buf bytes.Buffer
-
-	log := zerolog.New(&buf).Level(zerolog.FatalLevel)
-
-	zerolog.FatalExitFunc = func() {
-		panic("fatal exit")
-	}
-
-	cfg := loadNotify(t, args)
-
-	assert.PanicsWithValue(t, "fatal exit", func() {
-		NewNotifier(&log, cfg)
-	})
-
-	entries := logcapture.Entries[logcapture.Entry](t, buf.String())
-	require.Len(t, entries, 1)
-	assert.Equal(t, wantMsg, entries[0]["message"])
-	assert.Equal(t, wantErr, entries[0]["error"])
+	notifier, err := NewNotifier(newTestLogger(t), loadNotify(t, args))
+	require.EqualError(t, err, wantErr)
+	assert.Nil(t, notifier)
 }
 
 // TODO: Remove buildExpectedURL helper when legacy notification tests are removed.
@@ -872,7 +885,10 @@ func testURL(t *testing.T, args []string, expectedURL string, expectedDelay time
 
 	cfg := loadNotify(t, args)
 
-	notifier, ok := NewNotifier(newTestLogger(t), cfg).(*shoutrrrTypeNotifier)
+	created, err := NewNotifier(newTestLogger(t), cfg)
+	require.NoError(t, err)
+
+	notifier, ok := created.(*shoutrrrTypeNotifier)
 	require.True(t, ok)
 	t.Cleanup(notifier.Close)
 

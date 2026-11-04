@@ -46,7 +46,10 @@ var errUnknownNotificationType = errors.New("unknown notification type")
 //
 // Returns:
 //   - types.Notifier: Configured notifier instance.
-func NewNotifier(log *zerolog.Logger, cfg notifyConfig.Notify) types.Notifier {
+//   - error: Non-nil when the notifications level is invalid or the template
+//     file cannot be read. Also non-nil when a legacy notification type cannot
+//     be converted or Shoutrrr rejects a URL.
+func NewNotifier(log *zerolog.Logger, cfg notifyConfig.Notify) (types.Notifier, error) {
 	if log == nil {
 		panic("notify: log is required")
 	}
@@ -58,7 +61,7 @@ func NewNotifier(log *zerolog.Logger, cfg notifyConfig.Notify) types.Notifier {
 
 	logLevel, err := logging.ParseLevel(cfg.Level)
 	if err != nil {
-		clog.Fatal().Err(err).Msg("Invalid notifications log level")
+		return nil, fmt.Errorf("parse notifications level: %w", err)
 	}
 
 	// Prefer template file contents when set. Otherwise use the inline template string.
@@ -67,10 +70,7 @@ func NewNotifier(log *zerolog.Logger, cfg notifyConfig.Notify) types.Notifier {
 	if cfg.TemplateFile != "" {
 		content, readErr := os.ReadFile(cfg.TemplateFile)
 		if readErr != nil {
-			clog.Fatal().
-				Err(readErr).
-				Str("file", cfg.TemplateFile).
-				Msg("Failed to read notification template file")
+			return nil, fmt.Errorf("read notification template file: %w", readErr)
 		}
 
 		tplString = string(content)
@@ -88,12 +88,7 @@ func NewNotifier(log *zerolog.Logger, cfg notifyConfig.Notify) types.Notifier {
 
 	for legacy, err := range convertLegacyNotifiers(log, cfg.LegacyTypes, cfg.Legacy) {
 		if err != nil {
-			msg := "Failed to create notification config"
-			if errors.Is(err, errUnknownNotificationType) {
-				msg = "Unknown notification type"
-			}
-
-			clog.Fatal().Err(err).Msg(msg)
+			return nil, err
 		}
 
 		urls = append(urls, legacy.url)
@@ -138,7 +133,7 @@ func NewNotifier(log *zerolog.Logger, cfg notifyConfig.Notify) types.Notifier {
 			Msg("Notifier Shoutrrr URLs loaded")
 	}
 
-	return createNotifier(
+	notifier, err := createNotifier(
 		log,
 		urls,
 		logLevel,
@@ -148,6 +143,11 @@ func NewNotifier(log *zerolog.Logger, cfg notifyConfig.Notify) types.Notifier {
 		cfg.LogStdout,
 		delay,
 	)
+	if err != nil {
+		return nil, err
+	}
+
+	return notifier, nil
 }
 
 // BuildURLs builds Shoutrrr notification URLs from resolved notification settings
