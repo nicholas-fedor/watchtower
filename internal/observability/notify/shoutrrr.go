@@ -1,14 +1,11 @@
 package notify
 
 import (
-	"io"
-	"os"
 	"strings"
 	"sync"
 	"sync/atomic"
 	"time"
 
-	"github.com/nicholas-fedor/shoutrrr"
 	"github.com/rs/zerolog"
 
 	shoutrrrTypes "github.com/nicholas-fedor/shoutrrr/pkg/types"
@@ -144,29 +141,27 @@ func (n *shoutrrrTypeNotifier) RegisterHook(log *zerolog.Logger) {
 // createNotifier initializes a Shoutrrr notifier.
 //
 // Parameters:
-//   - log: Process logger for config-time logs and Shoutrrr's log records.
+//   - log: Process logger for config-time logs.
+//   - sender: Router that sends to every service in urls, in the same order.
 //   - urls: Service URLs.
 //   - level: Minimum log level for notifications.
 //   - tplString: Template string.
 //   - legacy: Use legacy template if true.
 //   - data: Static notification data.
-//   - stdout: Print the logger service's text to stdout if true.
 //   - delay: Delay between sends.
 //
 // Returns:
 //   - *shoutrrrTypeNotifier: Initialized notifier.
-//   - error: Shoutrrr's error when it rejects a URL. It names the URL's
-//     position and service.
 func createNotifier(
 	log *zerolog.Logger,
+	sender router,
 	urls []string,
 	level zerolog.Level,
 	tplString string,
 	legacy bool,
 	data format.StaticData,
-	stdout bool,
 	delay time.Duration,
-) (*shoutrrrTypeNotifier, error) {
+) *shoutrrrTypeNotifier {
 	// Child logger that must never re-enter the notification hook.
 	local := log.With().Str("notify", "no").Logger()
 	localLog := &local
@@ -180,26 +175,6 @@ func createNotifier(
 		tpl = format.Default(legacy)
 	}
 
-	// Shoutrrr's records go to the loop-safe logger at their level. The logger
-	// service's text goes to stdout when stdout is set. Otherwise it goes to the
-	// same logger without a level.
-	var text io.Writer = localLog
-
-	prefix := shoutrrrLogPrefix
-	if stdout {
-		text, prefix = os.Stdout, ""
-	}
-
-	// Initialize sender with default options.
-	router, err := shoutrrr.NewSenderWithOptions(
-		newShoutrrrLogger(localLog, text, prefix),
-		shoutrrrTypes.SenderOptions{},
-		urls...,
-	)
-	if err != nil {
-		return nil, err //nolint:wrapcheck // Shoutrrr's error names the URL's position and service.
-	}
-
 	// Set params with title if provided.
 	params := &shoutrrrTypes.Params{}
 	if data.Title != "" {
@@ -208,7 +183,7 @@ func createNotifier(
 
 	return &shoutrrrTypeNotifier{
 		Urls:   urls,   // Notification service URLs.
-		Router: router, // Router for sending messages.
+		Router: sender, // Router for sending messages.
 		messages: make(
 			chan string,
 			messageChannelBufferSize,
@@ -227,7 +202,7 @@ func createNotifier(
 		delay:    delay,                                            // Delay between sends.
 		entries:  make([]*format.Entry, 0, initialEntriesCapacity), // Queued log entries.
 		localLog: localLog,                                         // Loop-safe internal logger.
-	}, nil
+	}
 }
 
 // Close gracefully shuts down the Shoutrrr notifier.

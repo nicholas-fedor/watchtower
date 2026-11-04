@@ -127,3 +127,24 @@ func TestNew(t *testing.T) {
 		})
 	}
 }
+
+// TestGetURL_MalformedServerURLIsNotQuoted verifies that GetURL rejects a
+// server URL that does not parse without quoting it. The URL can carry
+// credentials. Neither the error nor the debug log may contain it.
+func TestGetURL_MalformedServerURLIsNotQuoted(t *testing.T) {
+	t.Parallel()
+
+	log, buf := logcapture.NewJSON(zerolog.DebugLevel)
+
+	notifier, err := New(log, notifyConfig.Legacy{
+		GotifyURL:   "https://gotify.example.com:secrettoken",
+		GotifyToken: "Aaaaaaaaaaaaaaa",
+	})
+	require.NoError(t, err)
+
+	shoutrrrURL, err := notifier.GetURL()
+	require.ErrorIs(t, err, errInvalidURL)
+	assert.NotContains(t, err.Error(), "secrettoken")
+	assert.Empty(t, shoutrrrURL)
+	assert.NotContains(t, buf.String(), "secrettoken")
+}

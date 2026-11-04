@@ -8,6 +8,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	notifyConfig "github.com/nicholas-fedor/watchtower/internal/settings/config/notify"
+	"github.com/nicholas-fedor/watchtower/internal/testutil/logcapture"
 )
 
 // TestNew verifies that New rejects settings without a webhook URL and builds
@@ -51,4 +52,24 @@ func TestNew(t *testing.T) {
 			assert.NotNil(t, notifier)
 		})
 	}
+}
+
+// TestGetURL_MalformedWebhookURLIsNotQuoted verifies that GetURL rejects a
+// webhook URL that does not parse without quoting it. The URL carries the
+// webhook's credentials. Neither the error nor the debug log may contain it.
+func TestGetURL_MalformedWebhookURLIsNotQuoted(t *testing.T) {
+	t.Parallel()
+
+	log, buf := logcapture.NewJSON(zerolog.DebugLevel)
+
+	notifier, err := New(log, notifyConfig.Legacy{
+		MSTeamsHook: "https://example.webhook.office.com/webhookb2/secrettoken%zz",
+	})
+	require.NoError(t, err)
+
+	shoutrrrURL, err := notifier.GetURL()
+	require.ErrorIs(t, err, errParseWebhookFailed)
+	assert.NotContains(t, err.Error(), "secrettoken")
+	assert.Empty(t, shoutrrrURL)
+	assert.NotContains(t, buf.String(), "secrettoken")
 }

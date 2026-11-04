@@ -3,6 +3,7 @@ package notify
 import (
 	"errors"
 	"fmt"
+	"io"
 	"iter"
 	"os"
 	"strings"
@@ -11,6 +12,7 @@ import (
 	"github.com/nicholas-fedor/shoutrrr"
 	"github.com/rs/zerolog"
 
+	shoutrrrRouter "github.com/nicholas-fedor/shoutrrr/pkg/router"
 	shoutrrrTypes "github.com/nicholas-fedor/shoutrrr/pkg/types"
 
 	"github.com/nicholas-fedor/watchtower/internal/container/redact"
@@ -82,17 +84,14 @@ func NewNotifier(log *zerolog.Logger, cfg notifyConfig.Notify) (types.Notifier, 
 
 	data := templateData(log, cfg.Hostname, cfg.TitleTag, cfg.EmailSubjectTag, cfg.SkipTitle)
 
-	// Start from configured Shoutrrr URLs, then append any legacy type URLs.
-	urls := append([]string(nil), cfg.URLs...)
+	sender, urls, converted, err := newSender(log, cfg)
+	if err != nil {
+		return nil, err
+	}
+
 	legacyDelay := time.Duration(0)
 
-	for legacy, err := range convertLegacyNotifiers(log, cfg.LegacyTypes, cfg.Legacy) {
-		if err != nil {
-			return nil, err
-		}
-
-		urls = append(urls, legacy.url)
-
+	for _, legacy := range converted {
 		// A legacy notifier with its own delay sets the notification delay.
 		//nolint:staticcheck // SA1019: legacy DelayNotifier until v2.
 		delayNotifier, ok := legacy.notifier.(types.DelayNotifier)
@@ -133,21 +132,16 @@ func NewNotifier(log *zerolog.Logger, cfg notifyConfig.Notify) (types.Notifier, 
 			Msg("Notifier Shoutrrr URLs loaded")
 	}
 
-	notifier, err := createNotifier(
+	return createNotifier(
 		log,
+		sender,
 		urls,
 		logLevel,
 		tplString,
 		legacyTemplate,
 		data,
-		cfg.LogStdout,
 		delay,
-	)
-	if err != nil {
-		return nil, err
-	}
-
-	return notifier, nil
+	), nil
 }
 
 // BuildURLs builds Shoutrrr notification URLs from resolved notification settings
@@ -176,38 +170,9 @@ func BuildURLs(log *zerolog.Logger, cfg notifyConfig.Notify) ([]string, error) {
 		log = &nop
 	}
 
-	// Adding a URL to the sender reads it and logs Shoutrrr's warnings, such as
-	// a deprecated key. It opens no connection. Services connect on their
-	// first send.
-	sender, err := shoutrrr.NewSenderWithOptions(
-		newShoutrrrLogger(log, log, shoutrrrLogPrefix),
-		shoutrrrTypes.SenderOptions{},
-	)
+	_, urls, _, err := newSender(log, cfg)
 	if err != nil {
-		return nil, fmt.Errorf("create notification sender: %w", err)
-	}
-
-	for i, rawURL := range cfg.URLs {
-		err = sender.AddService(rawURL)
-		if err != nil {
-			return nil, fmt.Errorf("notification URL %d: %w", i+1, err)
-		}
-	}
-
-	urls := append([]string(nil), cfg.URLs...)
-
-	// Each converted URL is checked before the next legacy notifier is built.
-	for legacy, err := range convertLegacyNotifiers(log, cfg.LegacyTypes, cfg.Legacy) {
-		if err != nil {
-			return nil, err
-		}
-
-		err = sender.AddService(legacy.url)
-		if err != nil {
-			return nil, fmt.Errorf("check %q notification URL: %w", legacy.notificationType, err)
-		}
-
-		urls = append(urls, legacy.url)
+		return nil, err
 	}
 
 	return urls, nil
@@ -348,6 +313,79 @@ func convertLegacyNotifiers(
 			}
 		}
 	}
+}
+
+// newSender creates a Shoutrrr sender for the notification settings. It adds
+// the configured URLs, then converts each legacy notification type and adds
+// its URL before it builds the next one. Adding a URL makes Shoutrrr read it
+// and log its warnings, such as one for a deprecated key. It opens no
+// connection. Services connect on their first send.
+//
+// Shoutrrr's log records go to log at their level, never re-entering the
+// notification hook. The text that the logger service prints goes to stdout
+// when cfg.LogStdout is true. Otherwise it goes to log without a level.
+//
+// Parameters:
+//   - log: Logger for Shoutrrr's records and text. Legacy notifier
+//     construction logs its diagnostics here too.
+//   - cfg: Notification settings from settings.Load (Config.Notify).
+//
+// Returns:
+//   - *shoutrrrRouter.ServiceRouter: The sender.
+//   - []string: The URLs the sender sends to, in its order: the configured
+//     URLs, then the converted URLs.
+//   - []legacyURL: The converted legacy notifiers, in type order.
+//   - error: Non-nil when a legacy type cannot be converted or Shoutrrr rejects
+//     a URL. A rejected configured URL is named by its position, counting from
+//     1. A rejected converted URL is named by its legacy type. The error never
+//     contains the URL.
+func newSender(
+	log *zerolog.Logger,
+	cfg notifyConfig.Notify,
+) (*shoutrrrRouter.ServiceRouter, []string, []legacyURL, error) {
+	local := log.With().Str("notify", "no").Logger()
+
+	var text io.Writer = &local
+
+	prefix := shoutrrrLogPrefix
+	if cfg.LogStdout {
+		text, prefix = os.Stdout, ""
+	}
+
+	sender, err := shoutrrr.NewSenderWithOptions(
+		newShoutrrrLogger(&local, text, prefix),
+		shoutrrrTypes.SenderOptions{},
+	)
+	if err != nil {
+		return nil, nil, nil, fmt.Errorf("create notification sender: %w", err)
+	}
+
+	for i, rawURL := range cfg.URLs {
+		err = sender.AddService(rawURL)
+		if err != nil {
+			return nil, nil, nil, fmt.Errorf("notification URL %d: %w", i+1, err)
+		}
+	}
+
+	urls := append([]string(nil), cfg.URLs...)
+
+	var converted []legacyURL
+
+	for legacy, err := range convertLegacyNotifiers(log, cfg.LegacyTypes, cfg.Legacy) {
+		if err != nil {
+			return nil, nil, nil, err
+		}
+
+		err = sender.AddService(legacy.url)
+		if err != nil {
+			return nil, nil, nil, fmt.Errorf("check %q notification URL: %w", legacy.notificationType, err)
+		}
+
+		urls = append(urls, legacy.url)
+		converted = append(converted, legacy)
+	}
+
+	return sender, urls, converted, nil
 }
 
 // getDelay selects the notification delay from a legacy value or configured seconds.

@@ -2,7 +2,6 @@ package gotify
 
 import (
 	"errors"
-	"fmt"
 	"net/url"
 	"strings"
 
@@ -29,6 +28,8 @@ const Type = "gotify"
 var (
 	// errEmptyURL indicates that no Gotify server URL is set.
 	errEmptyURL = errors.New("the notification-gotify-url configuration option is empty")
+	// errInvalidURL indicates a server URL that does not parse.
+	errInvalidURL = errors.New("the notification-gotify-url configuration option is not a valid URL")
 	// errURLScheme indicates a Gotify server URL that is not an HTTP or HTTPS URL.
 	errURLScheme = errors.New(`the notification-gotify-url configuration option must start with "http://" or "https://"`)
 	// errEmptyToken indicates that no Gotify application token is set.
@@ -161,11 +162,13 @@ func (n *gotifyTypeNotifier) GetURL() (string, error) {
 	}
 
 	// Parse the API URL.
+	// A parse error quotes the URL, which can carry credentials. Neither the
+	// log nor the returned error includes it.
 	apiURL, err := url.Parse(n.gotifyURL)
 	if err != nil {
-		clog.Debug().Err(err).Msg("Failed to parse Gotify URL")
+		clog.Debug().Msg("Failed to parse Gotify URL")
 
-		return "", fmt.Errorf("failed to generate Gotify URL: %w", err)
+		return "", errInvalidURL
 	}
 
 	// Configure Gotify settings.
