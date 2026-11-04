@@ -99,12 +99,13 @@ func TestCheckForUpdates_ParamsPropagation(t *testing.T) {
 	container.EXPECT().ImageInfo().Return(nil)
 	client.EXPECT().ListContainers(mock.Anything, mock.Anything).Return([]types.Container{container}, nil)
 	client.EXPECT().CheckContainerUpdate(mock.Anything, mock.Anything, mock.MatchedBy(func(p updateConfig.Policy) bool {
-		return p.MonitorOnly && p.NoPull && p.LabelPrecedence && p.CooldownDelay == 5*time.Minute
+		return p.MonitorOnly && p.NoPull && p.EnableChangelog && p.LabelPrecedence && p.CooldownDelay == 5*time.Minute
 	})).Return(true, types.ImageID("sha256:new"), "sha256:newdigest", nil)
 
 	params := types.UpdateParams{
 		MonitorOnly:     true,
 		NoPull:          true,
+		EnableChangelog: true,
 		LabelPrecedence: true,
 		CooldownDelay:   5 * time.Minute,
 	}

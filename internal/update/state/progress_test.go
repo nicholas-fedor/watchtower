@@ -19,6 +19,7 @@ import (
 	"github.com/nicholas-fedor/watchtower/internal/container/labels"
 	"github.com/nicholas-fedor/watchtower/internal/container/oci"
 	"github.com/nicholas-fedor/watchtower/internal/container/provenance"
+	updateConfig "github.com/nicholas-fedor/watchtower/internal/settings/config/update"
 	"github.com/nicholas-fedor/watchtower/pkg/types"
 	mockTypes "github.com/nicholas-fedor/watchtower/pkg/types/mocks"
 )
@@ -123,14 +124,14 @@ func TestUpdateFromContainer(t *testing.T) {
 					mock.EXPECT().Name().Return("container3")
 					mock.EXPECT().ImageName().Return("image3:latest")
 					mock.EXPECT().
-						IsMonitorOnly(testifyMock.Anything).
+						IsMonitorOnly(updateConfig.Policy{MonitorOnly: true}).
 						Return(true)
 
 					return mock
 				}(),
 				newImage: "img4",
 				state:    ScannedState,
-				params:   types.UpdateParams{},
+				params:   types.UpdateParams{Policy: updateConfig.Policy{MonitorOnly: true}},
 			},
 			want: &ContainerStatus{
 				containerID:    "cont3",
