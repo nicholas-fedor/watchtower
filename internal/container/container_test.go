@@ -270,27 +270,32 @@ func TestContainerModel(t *testing.T) {
 		t.Run("UTS mode hostname handling", func(t *testing.T) {
 			t.Parallel()
 
-			t.Run("clears hostname when UTS mode is non-empty", func(t *testing.T) {
-				t.Parallel()
+			// A hostname is rejected for a UTS namespace the container shares.
+			// Docker reports a private namespace as an empty mode. Podman
+			// reports it as "private".
+			tests := []struct {
+				name         string
+				utsMode      string
+				wantHostname string
+			}{
+				{name: "clears hostname for the host UTS namespace", utsMode: "host", wantHostname: ""},
+				{name: "clears hostname for another container's UTS namespace", utsMode: "container:0123456789ab", wantHostname: ""},
+				{name: "clears hostname for a UTS namespace path", utsMode: "ns:/proc/1234/ns/uts", wantHostname: ""},
+				{name: "keeps hostname when UTS mode is empty", utsMode: "", wantHostname: "test-hostname"},
+				{name: "keeps hostname for Podman's private UTS namespace", utsMode: "private", wantHostname: "test-hostname"},
+			}
 
-				c := MockContainer(
-					containerfixture.WithUTSMode("host"),
-					containerfixture.WithHostname("test-hostname"),
-				)
-				config := c.GetCreateConfig()
-				assert.Empty(t, config.Hostname, "Hostname should be cleared when UTS mode is set")
-			})
+			for _, tt := range tests {
+				t.Run(tt.name, func(t *testing.T) {
+					t.Parallel()
 
-			t.Run("preserves hostname when UTS mode is empty", func(t *testing.T) {
-				t.Parallel()
-
-				c := MockContainer(
-					containerfixture.WithUTSMode(""),
-					containerfixture.WithHostname("test-hostname"),
-				)
-				config := c.GetCreateConfig()
-				assert.Equal(t, "test-hostname", config.Hostname, "Hostname should be preserved when UTS mode is empty")
-			})
+					c := MockContainer(
+						containerfixture.WithUTSMode(tt.utsMode),
+						containerfixture.WithHostname("test-hostname"),
+					)
+					assert.Equal(t, tt.wantHostname, c.GetCreateConfig().Hostname)
+				})
+			}
 		})
 
 		t.Run("uses container config when image config is nil", func(t *testing.T) {
@@ -306,6 +311,28 @@ func TestContainerModel(t *testing.T) {
 			assert.Equal(t, "ghcr.io/home-assistant/home-assistant:latest", config.Image)
 			assert.Equal(t, "/config", config.WorkingDir)
 			assert.Equal(t, []string{"TZ=Europe/Amsterdam"}, config.Env)
+		})
+
+		t.Run("keeps hostname without host config or image config", func(t *testing.T) {
+			t.Parallel()
+
+			c := MockContainer(containerfixture.WithHostname("test-hostname"))
+			c.containerInfo.HostConfig = nil
+			c.imageInfo.Config = nil
+
+			assert.Equal(t, "test-hostname", c.GetCreateConfig().Hostname)
+		})
+
+		t.Run("clears hostname for a shared namespace when image config is nil", func(t *testing.T) {
+			t.Parallel()
+
+			c := MockContainer(
+				containerfixture.WithUTSMode("host"),
+				containerfixture.WithHostname("test-hostname"),
+			)
+			c.imageInfo.Config = nil
+
+			assert.Empty(t, c.GetCreateConfig().Hostname)
 		})
 
 		t.Run("returns minimal config when containerInfo is nil", func(t *testing.T) {

@@ -48,6 +48,21 @@ func (c *Container) GetCreateConfig() *dockerContainer.Config {
 	config := *c.containerInfo.Config
 	hostConfig := c.containerInfo.HostConfig
 
+	if hostConfig != nil {
+		if hostConfig.NetworkMode.IsContainer() {
+			config.Hostname = "" // Clear hostname for container network mode.
+		}
+
+		// A hostname is rejected for a UTS namespace the container shares.
+		// Docker shares only the host's namespace. Podman also shares another
+		// container's namespace or one given by path. Only a private namespace
+		// keeps the hostname. Docker reports a private namespace as an empty
+		// mode. Podman reports it as "private".
+		if hostConfig.UTSMode != "" && hostConfig.UTSMode != "private" {
+			config.Hostname = ""
+		}
+	}
+
 	// Handle missing image info, including a nil image Config. The containerd
 	// image store can return image inspect with Config unset.
 	if c.imageInfo == nil || c.imageInfo.Config == nil {
@@ -66,14 +81,6 @@ func (c *Container) GetCreateConfig() *dockerContainer.Config {
 
 	if config.User == imageConfig.User {
 		config.User = ""
-	}
-
-	if hostConfig.NetworkMode.IsContainer() {
-		config.Hostname = "" // Clear hostname for container network mode.
-	}
-
-	if hostConfig.UTSMode != "" {
-		config.Hostname = "" // Clear hostname for UTS mode.
 	}
 
 	if slices.Equal(config.Entrypoint, imageConfig.Entrypoint) {

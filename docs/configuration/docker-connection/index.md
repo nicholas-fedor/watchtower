@@ -114,3 +114,13 @@ docker run -d \
     nickfedor/watchtower \
     --cpu-copy-mode none
 ```
+
+## Recreating Containers on Podman
+
+Watchtower talks to Podman through its Docker-compatible API. It recreates a container from what that API reports. A setting the API does not carry is lost on recreation.
+
+- **Timezone and umask**: Podman's `--tz` and `--umask` exist only in Podman's own API. A recreated container uses the image's timezone. Its processes run with the OCI runtime's default umask, normally `0022`.
+- **Log driver**: the Docker-compatible API reports a `k8s-file` log driver as `json-file` and leaves out its options, such as `max-size`. A recreated container uses `json-file` without those options. Its log size limit falls back to `log_size_max` in `containers.conf`, which is unlimited by default.
+- **Podman metadata**: fields such as `CreateCommand` and the systemd notify mode are not part of the Docker API. A recreated container does not have them.
+
+To keep these settings, set them where Watchtower does not need to copy them. For example, set the timezone through the `TZ` environment variable. Watchtower keeps the variable on recreation. It takes effect when the image or application reads it. Or manage the container with a Podman Quadlet or systemd unit and let Podman's own auto-update restart it.
