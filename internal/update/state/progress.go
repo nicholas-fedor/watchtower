@@ -206,7 +206,7 @@ func applyReportMeta(status *ContainerStatus, c types.Container, params types.Up
 		return
 	}
 
-	meta := provenance.ResolveReportMeta(c, params, provenance.ChangelogVars{}, oci.Annotations{})
+	meta := provenance.ResolveReportMeta(c, params.Git, provenance.ChangelogVars{}, oci.Annotations{})
 	status.SetGitMetadata(meta)
 }
 
@@ -265,7 +265,7 @@ func (m Progress) SetLatestImageMeta(
 		return provenance.ReportMeta{}
 	}
 
-	meta := provenance.ResolveReportMeta(c, params, vars, latest)
+	meta := provenance.ResolveReportMeta(c, params.Git, vars, latest)
 	update.SetGitMetadata(meta)
 
 	log.Debug().

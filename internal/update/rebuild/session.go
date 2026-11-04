@@ -77,7 +77,7 @@ func (s *Session) Watching(log *zerolog.Logger, c types.Container, params types.
 		return false
 	}
 
-	return provenance.ShouldMonitor(log, c, params)
+	return provenance.ShouldMonitor(log, c, params.Git)
 }
 
 // PrepareRebuilds applies stale Git-associated containers.

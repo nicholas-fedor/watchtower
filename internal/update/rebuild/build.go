@@ -56,7 +56,7 @@ func (s *Session) build(
 	params types.UpdateParams,
 	progress *state.Progress,
 ) error {
-	assoc, associated := provenance.ResolveAssociation(c, params)
+	assoc, associated := provenance.ResolveAssociation(c, params.Git)
 	if !associated {
 		return errGitNotAssociated
 	}

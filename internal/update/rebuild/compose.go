@@ -424,7 +424,7 @@ func (s *Session) recordCompose(
 		return
 	}
 
-	assoc, _ := provenance.ResolveAssociation(c, params)
+	assoc, _ := provenance.ResolveAssociation(c, params.Git)
 	if concrete, ok := c.(*container.Container); ok {
 		provenance.ApplyGitAssociation(concrete, assoc, provenance.PersistWatch(c))
 		provenance.ApplyGitStamp(concrete, result.Commit, result.Tag)
@@ -603,7 +603,7 @@ func (s *Session) recordComposeReplicas(
 			progress.SetLatestImage(log, status.ID(), item.ImageID)
 		}
 
-		meta := provenance.ResolveReportMeta(representative.container, params, provenance.ChangelogVars{
+		meta := provenance.ResolveReportMeta(representative.container, params.Git, provenance.ChangelogVars{
 			Tag:    representative.result.Tag,
 			Commit: representative.result.Commit,
 		}, oci.Annotations{})
@@ -901,9 +901,9 @@ func composeServiceLabels(c types.Container, params types.UpdateParams, result g
 		out[labels.GitLastTag] = result.Tag
 	}
 
-	assoc, ok := provenance.ResolveAssociation(c, params)
+	assoc, ok := provenance.ResolveAssociation(c, params.Git)
 	if ok && assoc.Repo != "" {
-		meta := provenance.ResolveReportMeta(c, params, provenance.ChangelogVars{
+		meta := provenance.ResolveReportMeta(c, params.Git, provenance.ChangelogVars{
 			Tag:    result.Tag,
 			Commit: result.Commit,
 		}, oci.Annotations{})

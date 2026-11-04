@@ -116,17 +116,17 @@ func TestUpdateParamsAssignsEveryField(t *testing.T) {
 	assert.Equal(t, 24*time.Hour, params.CooldownDelay)
 	assert.Equal(t, int64(40_000_000_000), params.DiskSpaceMax)
 	assert.Equal(t, int64(32_000_000_000), params.DiskSpaceWarn)
-	assert.True(t, params.EnableGitMonitoring)
-	assert.Equal(t, git.DefaultRef, params.GitDefaultRef)
-	assert.Equal(t, git.DefaultPolicy, params.GitSemverPolicy)
+	assert.True(t, params.Git.Enable)
+	assert.Equal(t, git.DefaultRef, params.Git.DefaultRef)
+	assert.Equal(t, git.DefaultPolicy, params.Git.SemverPolicy)
 	assert.Equal(t, 30*time.Second, params.GitTimeout)
 	assert.Equal(t, git.Image{
 		Repo:   "https://github.com/org/app.git",
 		Ref:    "main",
 		Policy: semver.PolicyMinor,
-	}, params.GitImages["myapp:latest"])
-	assert.Equal(t, "build/docker/Dockerfile", params.GitDockerfile)
-	assert.Equal(t, ".", params.GitContext)
+	}, params.Git.Images["myapp:latest"])
+	assert.Equal(t, "build/docker/Dockerfile", params.Git.Dockerfile)
+	assert.Equal(t, ".", params.Git.Context)
 	assert.Equal(t, cfg.Registry, params.Registry)
 	assert.True(t, params.GitComposeStash)
 	assert.Equal(t, "/compose/demo", params.ComposeProjects["demo"])

@@ -5,6 +5,7 @@ import (
 
 	"github.com/stretchr/testify/assert"
 
+	gitConfig "github.com/nicholas-fedor/watchtower/internal/settings/config/git"
 	"github.com/nicholas-fedor/watchtower/pkg/types"
 )
 
@@ -26,5 +27,5 @@ func Test_withGitMeta(t *testing.T) {
 
 	c := gitAssociatedContainer("id", "/app", "myapp:latest", nil)
 
-	assert.Nil(t, withGitMeta(nil, c, types.UpdateParams{EnableGitMonitoring: true}, "v1.0.0", "0123456789abcdef"))
+	assert.Nil(t, withGitMeta(nil, c, types.UpdateParams{Git: gitConfig.Defaults{Enable: true}}, "v1.0.0", "0123456789abcdef"))
 }
