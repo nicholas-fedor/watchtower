@@ -449,7 +449,11 @@ func (p *process) preRun(cmd *cobra.Command, _ []string) error {
 	// Set up the notification client from loaded process config (appCfg.Notify).
 	// RegisterHook attaches the notifier to p.log and updates p.log in place to the
 	// hooked logger so subsequent application logging is captured for notifications.
-	notifier = notify.NewNotifier(p.log, appCfg.Notify)
+	notifier, err = notify.NewNotifier(p.log, appCfg.Notify)
+	if err != nil {
+		return &exitError{err: err, msg: "Failed to initialize notifications", code: 1}
+	}
+
 	notifier.RegisterHook(p.log)
 
 	// Without the container's labels, a scope set only by its scope label is

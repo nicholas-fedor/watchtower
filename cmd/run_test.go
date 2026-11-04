@@ -107,7 +107,10 @@ func setRunState(t *testing.T, state runTestState) {
 	processID = func() int { return 1 }
 	parentProcessID = func() int { return 0 }
 
-	notifier = notify.NewNotifier(new(zerolog.Nop()), notifyConfig.Notify{Level: "info"})
+	created, err := notify.NewNotifier(new(zerolog.Nop()), notifyConfig.Notify{Level: "info"})
+	require.NoError(t, err)
+
+	notifier = created
 	t.Cleanup(notifier.Close)
 }
 

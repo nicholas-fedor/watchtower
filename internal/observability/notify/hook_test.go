@@ -18,6 +18,7 @@ func TestRun_EventFieldMapPreservesLargeIntegers(t *testing.T) {
 
 	root := zerolog.New(io.Discard).Level(zerolog.TraceLevel).With().Timestamp().Logger()
 	n := createTestNotifier(
+		t,
 		newTestLogger(t),
 		[]string{},
 		zerolog.TraceLevel,
@@ -71,6 +72,7 @@ func TestRun_EventFieldMapPreservesApplicationFields(t *testing.T) {
 
 	root := zerolog.New(io.Discard).Level(zerolog.TraceLevel).With().Timestamp().Logger()
 	n := createTestNotifier(
+		t,
 		newTestLogger(t),
 		[]string{},
 		zerolog.TraceLevel,
@@ -119,6 +121,7 @@ func TestRun_NotifyNoAndFailClosed(t *testing.T) {
 	t.Parallel()
 
 	n := createTestNotifier(
+		t,
 		newTestLogger(t),
 		[]string{},
 		zerolog.TraceLevel,
@@ -168,6 +171,7 @@ func TestRun_ConcurrentEnqueue(t *testing.T) {
 
 	root := zerolog.New(io.Discard).Level(zerolog.TraceLevel)
 	n := createTestNotifier(
+		t,
 		newTestLogger(t),
 		[]string{},
 		zerolog.TraceLevel,

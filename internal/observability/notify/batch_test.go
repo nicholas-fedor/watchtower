@@ -29,6 +29,7 @@ func TestSendNotification_Batching(t *testing.T) {
 			log, logBuffer := newBufferLogger()
 
 			shoutrrr := createTestNotifier(
+				t,
 				log,
 				[]string{"logger://"},
 				allButTrace,
@@ -52,6 +53,7 @@ func TestSendNotification_Batching(t *testing.T) {
 			log, logBuffer := newBufferLogger()
 
 			shoutrrr := createTestNotifier(
+				t,
 				log,
 				[]string{"logger://"},
 				allButTrace,
@@ -87,6 +89,7 @@ func TestShouldSendNotification(t *testing.T) {
 			t.Parallel()
 
 			shoutrrr := createTestNotifier(
+				t,
 				newTestLogger(t),
 				[]string{"logger://"},
 				zerolog.ErrorLevel,
@@ -105,6 +108,7 @@ func TestShouldSendNotification(t *testing.T) {
 			t.Parallel()
 
 			shoutrrr := createTestNotifier(
+				t,
 				newTestLogger(t),
 				[]string{"logger://"},
 				zerolog.ErrorLevel,
@@ -127,6 +131,7 @@ func TestShouldSendNotification(t *testing.T) {
 			t.Parallel()
 
 			shoutrrr := createTestNotifier(
+				t,
 				newTestLogger(t),
 				[]string{"logger://"},
 				zerolog.WarnLevel,
@@ -149,6 +154,7 @@ func TestShouldSendNotification(t *testing.T) {
 			t.Parallel()
 
 			shoutrrr := createTestNotifier(
+				t,
 				newTestLogger(t),
 				[]string{"logger://"},
 				zerolog.InfoLevel,
@@ -171,6 +177,7 @@ func TestShouldSendNotification(t *testing.T) {
 			t.Parallel()
 
 			shoutrrr := createTestNotifier(
+				t,
 				newTestLogger(t),
 				[]string{"logger://"},
 				zerolog.DebugLevel,
@@ -193,6 +200,7 @@ func TestShouldSendNotification(t *testing.T) {
 			t.Parallel()
 
 			shoutrrr := createTestNotifier(
+				t,
 				newTestLogger(t),
 				[]string{"logger://"},
 				zerolog.TraceLevel,
@@ -215,6 +223,7 @@ func TestShouldSendNotification(t *testing.T) {
 			t.Parallel()
 
 			shoutrrr := createTestNotifier(
+				t,
 				newTestLogger(t),
 				[]string{"logger://"},
 				zerolog.ErrorLevel,
@@ -235,6 +244,7 @@ func TestShouldSendNotification(t *testing.T) {
 // empty slice so subsequent Run calls continue batching.
 func TestSendNotification_SingleFocusKeepsBatchingActive(t *testing.T) {
 	n := createTestNotifier(
+		t,
 		newTestLogger(t),
 		[]string{"logger://"},
 		zerolog.InfoLevel,
