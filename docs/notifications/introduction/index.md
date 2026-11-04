@@ -26,7 +26,7 @@ Watchtower checks every notification URL when it starts.
     - The error gives the URL's position, counting from 1. For a URL converted from a legacy notification type, it gives that type instead.
     - The error usually names the service and the problem. It cannot name the service when the URL has no scheme or does not parse. The same holds for a URL that ends in an empty `#` fragment.
     - The error never contains the URL.
-    - As with any other [startup error](../../configuration/introduction/index.md#overview), Watchtower first sets its container's restart policy to `no`. The container then does not restart in a loop.
+    - In a container, Watchtower first sets its restart policy to `no`, as with any other [startup error](../../configuration/introduction/index.md#overview). The container then does not restart in a loop.
     - If Watchtower cannot find its container or change the policy, it logs an error and still exits with code 1. The container can then restart in a loop.
 
 ### Using Multiple Notification Services
