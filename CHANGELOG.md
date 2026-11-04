@@ -164,6 +164,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Chores
 
+- Update module github.com/moby/buildkit to v0.34.2 by @renovate[bot] in [#3409](https://github.com/nicholas-fedor/watchtower/pull/3409)
+- Update module github.com/docker/cli to v29.9.3+incompatible by @renovate[bot] in [#3408](https://github.com/nicholas-fedor/watchtower/pull/3408)
 - Update module github.com/gofiber/schema to v1.9.3 by @renovate[bot] in [#3401](https://github.com/nicholas-fedor/watchtower/pull/3401)
 - Update github.com/tonistiigi/fsutil digest to e075fd9 by @renovate[bot] in [#3396](https://github.com/nicholas-fedor/watchtower/pull/3396)
 - Update github/codeql-action action to v4.39.2 by @renovate[bot] in [#3397](https://github.com/nicholas-fedor/watchtower/pull/3397)
