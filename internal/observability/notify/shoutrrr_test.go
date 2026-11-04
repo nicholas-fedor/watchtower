@@ -7,7 +7,8 @@ import (
 	"io"
 	"os"
 	"os/exec"
-	"sync/atomic"
+	"slices"
+	"sync"
 	"testing"
 	"testing/synctest"
 	"time"
@@ -85,73 +86,91 @@ func (m *mockRouter) Send(_ string, _ *shoutrrrTypes.Params) []error {
 // blockingRouter simulates a notification router with blocking behavior for testing.
 // It waits for an unlock signal before sending and signals completion via a channel.
 type blockingRouter struct {
-	unlock chan bool
-	sent   chan bool
-	ctx    context.Context //nolint:containedctx
+	unlock chan struct{}
+	sent   chan struct{}
 }
 
 func (b blockingRouter) Send(_ string, _ *shoutrrrTypes.Params) []error {
-	select {
-	case <-b.unlock:
-		b.sent <- true
-	case <-b.ctx.Done():
-		// canceled, don't send
-	}
+	<-b.unlock
+
+	b.sent <- struct{}{}
 
 	return nil
 }
 
-// sendNotificationsWithBlockingRouter creates a notifier with a blocking router for testing.
-// It queues a message and returns the notifier and router to verify notification delays.
+// recordingRouter records each message it is asked to send, in order. It is
+// safe for concurrent use.
+type recordingRouter struct {
+	mu       sync.Mutex
+	messages []string
+}
+
+func (r *recordingRouter) Send(message string, _ *shoutrrrTypes.Params) []error {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+
+	r.messages = append(r.messages, message)
+
+	return nil
+}
+
+// sent returns the messages sent so far, in the order they were sent.
 //
-// TODO: Remove legacy template usage when legacy notification types are removed.
+// Returns:
+//   - []string: A copy of the sent messages.
+func (r *recordingRouter) sent() []string {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+
+	return slices.Clone(r.messages)
+}
+
+// queuedMessages returns count numbered messages, as tests queue them.
 //
-//nolint:godox
-func sendNotificationsWithBlockingRouter(t *testing.T) (*shoutrrrTypeNotifier, *blockingRouter, error) {
+// Parameters:
+//   - count: Number of messages.
+//
+// Returns:
+//   - []string: Messages "message 0" through "message count-1".
+func queuedMessages(count int) []string {
+	messages := make([]string, count)
+	for i := range messages {
+		messages[i] = fmt.Sprintf("message %d", i)
+	}
+
+	return messages
+}
+
+// sendNotificationsWithBlockingRouter returns a notifier whose worker is
+// sending one message through a blocking router, with the router.
+//
+// Parameters:
+//   - t: Test that owns the notifier.
+//
+// Returns:
+//   - *shoutrrrTypeNotifier: Notifier with a running worker.
+//   - *blockingRouter: Router the worker is blocked in until unlocked.
+func sendNotificationsWithBlockingRouter(t *testing.T) (*shoutrrrTypeNotifier, *blockingRouter) {
 	t.Helper()
 
-	legacy := true
-	ctx, cancel := context.WithCancel(context.Background())
-
 	router := &blockingRouter{
-		unlock: make(chan bool, 1),
-		sent:   make(chan bool, 1),
-		ctx:    ctx,
+		unlock: make(chan struct{}, 1),
+		sent:   make(chan struct{}, 1),
 	}
 
-	tpl, err := format.New(newTestLogger(t), "", legacy)
-	if err != nil {
-		cancel()
-
-		return nil, nil, err
-	}
-
-	shoutrrr := &shoutrrrTypeNotifier{
-		template: tpl,
-		messages: make(chan string, 1),
-		done:     make(chan struct{}),
-		Router:   router,
-		params:   &shoutrrrTypes.Params{},
-		ctx:      ctx,
-		cancel:   cancel,
-		delay:    time.Duration(0),
-	}
-
-	entry := &format.Entry{
-		Message: "foo bar",
-	}
-
-	go sendNotifications(shoutrrr)
+	shoutrrr := createTestNotifier(newTestLogger(t), []string{}, allButTrace, true, format.StaticData{}, false, 0)
+	shoutrrr.Router = router
+	shoutrrr.RegisterHook(newTestLogger(t))
 
 	shoutrrr.StartNotification(false)
 	// Enqueue directly: Run(nil, ...) is fail-closed (cannot parse notify field).
 	// These tests exercise the send worker, not hook field extraction.
 	shoutrrr.entriesMutex.Lock()
-	shoutrrr.entries = append(shoutrrr.entries, entry)
+	shoutrrr.entries = append(shoutrrr.entries, &format.Entry{Message: "foo bar"})
 	shoutrrr.entriesMutex.Unlock()
 	shoutrrr.SendNotification(nil)
 
-	return shoutrrr, router, nil
+	return shoutrrr, router
 }
 
 // TestRegisterHook verifies that RegisterHook starts the notifier
@@ -364,205 +383,173 @@ func TestClose(t *testing.T) {
 	})
 }
 
-// TestShutdownGracePeriodConstant verifies that the shutdownGracePeriod constant is set to 50ms.
-func TestShutdownGracePeriodConstant(t *testing.T) {
-	expectedGracePeriod := 50 * time.Millisecond
-	if shutdownGracePeriod != expectedGracePeriod {
-		t.Fatalf("expected shutdownGracePeriod to be %v, got %v", expectedGracePeriod, shutdownGracePeriod)
-	}
-}
-
-// TestCloseDoesNotHangWithBlockingRouter verifies that Close() completes without hanging
-// when the router is blocked. This tests that the context cancellation properly unblocks
-// the send call.
-func TestCloseDoesNotHangWithBlockingRouter(t *testing.T) {
+// TestClose_WaitsForInFlightSend verifies that Close waits for the message the
+// worker is sending. The message is not reported as sent while the router is
+// still sending it. The send finishes before Close returns.
+func TestClose_WaitsForInFlightSend(t *testing.T) {
 	synctest.Test(t, func(t *testing.T) {
-		// Create a notifier with a blocking router
-		shoutrrr, blockingRouter, err := sendNotificationsWithBlockingRouter(t)
-		if err != nil {
-			t.Fatal(err)
-		}
+		shoutrrr, router := sendNotificationsWithBlockingRouter(t)
 
-		// Wait for goroutine to be blocked
+		// Wait for the worker to block in Send.
 		synctest.Wait()
 
-		// Verify router is blocked (not yet sent)
 		select {
-		case <-blockingRouter.sent:
-			t.Fatal("message should not have been sent yet")
+		case <-router.sent:
+			t.Fatal("message reported as sent while the router is still sending")
 		default:
-			// Good - router is blocked
 		}
 
-		// Close should complete without hanging - use a goroutine since it may block briefly
-		closeDone := make(chan error, 1)
+		closed := make(chan struct{})
 
 		go func() {
 			shoutrrr.Close()
-
-			closeDone <- nil
+			close(closed)
 		}()
 
-		// Wait for Close to complete (should be fast with synctest)
-		select {
-		case <-closeDone:
-			// Good - Close completed
-			t.Log("Close() completed successfully")
-		case <-time.After(2 * time.Second):
-			t.Fatal("Close() hung - context cancellation did not unblock the goroutine")
-		}
-
-		// Verify context was canceled
-		select {
-		case <-shoutrrr.ctx.Done():
-			t.Log("Context was canceled")
-		default:
-			t.Fatal("expected context to be canceled")
-		}
-
-		// Clean up: unlock the router so the goroutine can exit gracefully
-		blockingRouter.unlock <- true
-
-		// Wait for the done channel to be signaled
 		synctest.Wait()
 
 		select {
-		case <-shoutrrr.done:
-			t.Log("Done channel was signaled")
+		case <-closed:
+			t.Fatal("Close returned while a send was in progress")
 		default:
-			t.Fatal("expected done channel to be signaled")
+		}
+
+		router.unlock <- struct{}{}
+
+		synctest.Wait()
+
+		select {
+		case <-closed:
+		default:
+			t.Fatal("Close did not return after the send finished")
+		}
+
+		select {
+		case <-router.sent:
+		default:
+			t.Fatal("expected the message to be sent")
 		}
 	})
 }
 
-// controlledRouter simulates a router that can be controlled via channels for testing.
-// It waits for a continue signal before sending, allowing deterministic testing.
-type controlledRouter struct {
-	continueCh chan struct{}
-	sent       chan bool
-	ctx        context.Context //nolint:containedctx
-}
-
-func (c *controlledRouter) Send(_ string, _ *shoutrrrTypes.Params) []error {
-	// Signal that we're waiting
-	// Wait for continue signal or context cancellation
-	select {
-	case <-c.continueCh:
-		c.sent <- true
-	case <-c.ctx.Done():
-		// canceled, don't send
-	}
-
-	return nil
-}
-
-// TestGracePeriodAllowsInFlightMessages verifies that in-flight messages have time to complete
-// before context is canceled during the shutdown grace period.
-func TestGracePeriodAllowsInFlightMessages(t *testing.T) {
+// TestClose_SkipsSendDelay verifies that Close sends every queued message, in
+// queue order, without waiting the configured delay between them.
+func TestClose_SkipsSendDelay(t *testing.T) {
 	synctest.Test(t, func(t *testing.T) {
-		// Create a controlled router
-		ctx, cancel := context.WithCancel(context.Background())
+		queued := queuedMessages(5)
 
-		controlledR := &controlledRouter{
-			continueCh: make(chan struct{}, 1),
-			sent:       make(chan bool, 1),
-			ctx:        ctx,
+		router := &recordingRouter{}
+		notifier := createTestNotifier(newTestLogger(t), []string{}, allButTrace, true, format.StaticData{}, false, time.Minute)
+		notifier.Router = router
+		notifier.RegisterHook(newTestLogger(t))
+
+		for _, message := range queued {
+			notifier.messages <- message
 		}
 
-		tpl, err := format.New(newTestLogger(t), "", true)
-		if err != nil {
-			cancel()
-			t.Fatal(err)
-		}
-
-		shoutrrr := &shoutrrrTypeNotifier{
-			template:  tpl,
-			messages:  make(chan string, 1),
-			done:      make(chan struct{}),
-			stop:      make(chan struct{}),
-			Router:    controlledR,
-			params:    &shoutrrrTypes.Params{},
-			ctx:       ctx,
-			cancel:    cancel,
-			delay:     time.Duration(0),
-			receiving: atomic.Bool{},
-		}
-		shoutrrr.receiving.Store(true)
-
-		// Start the notification goroutine
-		go sendNotifications(shoutrrr)
-
-		// Queue a message
-		shoutrrr.messages <- "test message"
-
-		// Wait for goroutine to be blocked in router.Send
+		// Let the worker take a message and start waiting the delay.
 		synctest.Wait()
 
-		// Now call Close - this should trigger the grace period wait
-		// We let it proceed by signaling continueCh in a separate goroutine
-		go func() {
-			// Wait a bit to simulate the grace period passing
-			synctest.Wait()
-			// Then allow the message to be sent
-			controlledR.continueCh <- struct{}{}
-		}()
+		start := time.Now()
 
-		// Close should complete
-		shoutrrr.Close()
+		notifier.Close()
 
-		// Wait for done channel
-		synctest.Wait()
-
-		// Note: Close() already waits for done channel internally (line 500 in shoutrrr.go)
-		// so we don't need to wait for it here. Instead, we verify the message was sent.
-
-		// Verify the message was actually sent by checking controlledR.sent
-		timeout := 2 * time.Second
-		select {
-		case sent := <-controlledR.sent:
-			if !sent {
-				t.Fatal("expected message to be sent during grace period")
-			}
-
-			t.Log("Message was successfully sent during grace period")
-		case <-time.After(timeout):
-			t.Fatalf("expected sent channel to be signaled within %v timeout", timeout)
-		}
+		assert.Zero(t, time.Since(start))
+		assert.Equal(t, queued, router.sent())
 	})
 }
 
-// TestCloseWithNoGoroutine verifies that Close() works correctly when the
-// notification goroutine was never started.
-func TestCloseWithNoGoroutine(t *testing.T) {
-	shoutrrr := createTestNotifier(
-		newTestLogger(t),
-		[]string{"logger://"},
-		allButTrace,
-		true,
-		format.StaticData{},
-		false,
-		time.Duration(0),
+// TestClose_SendAfterCloseIsDropped verifies that a message sent after Close
+// is dropped instead of panicking or reaching the queue. The entry renders a
+// message. The send then reaches the closed check rather than the
+// empty-message skip.
+func TestClose_SendAfterCloseIsDropped(t *testing.T) {
+	t.Parallel()
+
+	log, buf := newBufferLogger()
+	notifier := createTestNotifier(log, []string{}, allButTrace, true, format.StaticData{}, false, 0)
+	notifier.Close()
+
+	require.NotPanics(t, func() {
+		notifier.sendEntries([]*format.Entry{{Level: "info", Message: "late"}}, nil)
+	})
+
+	assert.Empty(t, notifier.messages)
+	assert.Contains(t, logcapture.Messages(t, buf.String(), "debug"), "Notifier closed, skipping send")
+}
+
+// TestClose_ConcurrentSendDoesNotPanic verifies that sendEntries running while
+// Close shuts the worker down never panics. The test cannot force a send
+// between the closed check and the enqueue. It repeats the race many times
+// instead.
+func TestClose_ConcurrentSendDoesNotPanic(t *testing.T) {
+	t.Parallel()
+
+	const (
+		rounds  = 50
+		senders = 4
+		sends   = 10
 	)
-	// Note: Not calling RegisterHook(), so no goroutine is started
 
-	// Close should complete immediately without blocking
-	// Use goroutine+channel+select pattern to avoid flaky wall-clock timing.
-	// Close() has a shutdownGracePeriod (50ms) wait, so we use 1s timeout
-	// which is comfortably larger than 2x shutdownGracePeriod.
-	closeDone := make(chan struct{})
+	entries := []*format.Entry{{Level: "info", Message: "late"}}
 
-	go func() {
-		shoutrrr.Close()
+	for range rounds {
+		log := zerolog.Nop()
+		notifier := createTestNotifier(&log, []string{}, allButTrace, true, format.StaticData{}, false, 0)
+		notifier.Router = &recordingRouter{}
+		notifier.RegisterHook(&log)
 
-		closeDone <- struct{}{}
-	}()
+		var wg sync.WaitGroup
 
-	// Select with timeout - Close() should complete within reasonable time
-	select {
-	case <-closeDone:
-		t.Log("Close() completed successfully with no goroutine")
-	case <-time.After(1 * time.Second):
-		t.Fatalf("Close() took too long without goroutine (timeout exceeded)")
+		for range senders {
+			wg.Go(func() {
+				assert.NotPanics(t, func() {
+					for range sends {
+						notifier.sendEntries(entries, nil)
+					}
+				})
+			})
+		}
+
+		notifier.Close()
+		wg.Wait()
+	}
+}
+
+// TestClose_SendPastClosedCheckDoesNotPanic verifies that a sender does not
+// panic when it read the notifier as open before Close ran and queues its
+// message after Close returns. Clearing the closed flag after Close gives the
+// sender the state it would have seen, without pausing it inside sendEntries.
+// The message stays in the queue that no worker reads.
+func TestClose_SendPastClosedCheckDoesNotPanic(t *testing.T) {
+	t.Parallel()
+
+	log := zerolog.Nop()
+	notifier := createTestNotifier(&log, []string{}, allButTrace, true, format.StaticData{}, false, 0)
+	notifier.Router = &recordingRouter{}
+	notifier.RegisterHook(&log)
+	notifier.Close()
+
+	notifier.closed.Store(false)
+
+	require.NotPanics(t, func() {
+		notifier.sendEntries([]*format.Entry{{Level: "info", Message: "late"}}, nil)
+	})
+
+	assert.Len(t, notifier.messages, 1)
+}
+
+// TestLL_WithoutLogger verifies that a notifier without its loop-safe logger,
+// or a nil notifier, logs to a discarding logger instead of panicking.
+func TestLL_WithoutLogger(t *testing.T) {
+	t.Parallel()
+
+	var nilNotifier *shoutrrrTypeNotifier
+
+	for _, notifier := range []*shoutrrrTypeNotifier{nilNotifier, {}} {
+		log := notifier.ll()
+		require.NotNil(t, log)
+		assert.Equal(t, zerolog.Disabled, log.GetLevel())
 	}
 }
 
@@ -621,16 +608,6 @@ func TestCreateNotifier_AcceptsGotifyURLFromFileExpansion(t *testing.T) {
 	)
 
 	require.NotNil(t, notifier)
-}
-
-type countingRouter struct {
-	sends atomic.Int32
-}
-
-func (c *countingRouter) Send(_ string, _ *shoutrrrTypes.Params) []error {
-	c.sends.Add(1)
-
-	return nil
 }
 
 // TestCreateNotifier_InvalidTemplateFallsBackToDefault verifies that a

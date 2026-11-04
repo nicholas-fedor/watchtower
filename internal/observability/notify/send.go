@@ -132,22 +132,11 @@ func sendNotifications(notifier *shoutrrrTypeNotifier) {
 
 			log.Debug().Str("message", msg).Msg("Sending notification")
 
-			// Only delay if a positive delay is configured.
-			// Use a context-aware select to allow interruption when the context is canceled.
-			if notifier.delay > 0 {
-				timer := time.NewTimer(notifier.delay)
-
-				select {
-				case <-timer.C:
-					// Delay completed normally - stop the timer
-					timer.Stop()
-				case <-notifier.ctx.Done():
-					// Context canceled - stop the timer and return early
-					timer.Stop()
-					log.Debug().Msg("Context canceled during delay, skipping send")
-
-					return
-				}
+			// Wait the configured delay before sending a message taken from the
+			// queue. A stop signal ends the wait. Shutdown sends without the delay.
+			select {
+			case <-time.After(notifier.delay):
+			case <-notifier.stop:
 			}
 
 			// Diagnostic logging: Log attempt details before sending
@@ -164,7 +153,7 @@ func sendNotifications(notifier *shoutrrrTypeNotifier) {
 				Str("notification_type", shoutrrrType).
 				Msg("Calling Router.Send with message")
 
-			notifier.send(msg)
+			processSendErrors(notifier, notifier.Router.Send(msg, notifier.params))
 		case <-notifier.stop:
 			// Shutdown mode: drain all remaining messages from the channel
 			log.Debug().Msg("Shutdown signal received, draining remaining messages without delay")
@@ -198,7 +187,7 @@ func sendNotifications(notifier *shoutrrrTypeNotifier) {
 						Str("notification_type", shoutrrrType).
 						Msg("Calling Router.Send with message during shutdown")
 
-					notifier.send(msg)
+					processSendErrors(notifier, notifier.Router.Send(msg, notifier.params))
 				default:
 					// Channel is empty, all messages drained
 					log.Debug().Msg("All remaining messages drained during shutdown")
@@ -206,50 +195,6 @@ func sendNotifications(notifier *shoutrrrTypeNotifier) {
 					return
 				}
 			}
-		case <-notifier.ctx.Done():
-			// Context canceled
-			log.Debug().Msg("Context canceled, stopping notification goroutine")
-
-			return
-		}
-	}
-}
-
-// send sends a message via the notification router.
-//
-// Cancellation before Send skips the delivery. An in-flight Send is abandoned
-// after shutdownGracePeriod so Close cannot block indefinitely.
-//
-// Parameters:
-//   - msg: Message to send.
-func (n *shoutrrrTypeNotifier) send(msg string) {
-	// Skip delivery when Close already canceled the worker.
-	select {
-	case <-n.ctx.Done():
-		n.ll().Debug().Err(n.ctx.Err()).Msg("Notification send canceled")
-
-		return
-	default:
-	}
-
-	errsCh := make(chan []error, 1)
-
-	go func() {
-		errsCh <- n.Router.Send(msg, n.params)
-	}()
-
-	select {
-	case errs := <-errsCh:
-		processSendErrors(n, errs)
-	case <-n.ctx.Done():
-		timer := time.NewTimer(shutdownGracePeriod)
-		defer timer.Stop()
-
-		select {
-		case errs := <-errsCh:
-			processSendErrors(n, errs)
-		case <-timer.C:
-			n.ll().Debug().Err(n.ctx.Err()).Msg("Notification send canceled")
 		}
 	}
 }
@@ -284,47 +229,31 @@ func (n *shoutrrrTypeNotifier) sendEntries(entries []*format.Entry, report types
 		return
 	}
 
-	// Use select with non-blocking send to coordinate with shutdown.
-	// This ensures we can't enqueue messages after shutdown has begun.
+	// The worker sends nothing queued after Close. Skip the message.
+	if n.closed.Load() {
+		log.Debug().
+			Int("entries_count", len(entries)).
+			Int("msg_length", len(msg)).
+			Str("channel_status", "closed").
+			Msg("Notifier closed, skipping send")
+
+		return
+	}
+
+	// Enqueue without blocking so a full queue never stalls the caller.
 	select {
 	case n.messages <- msg:
-		// Message sent successfully to channel
 		log.Debug().
 			Int("entries_count", len(entries)).
 			Int("msg_length", len(msg)).
 			Str("channel_status", "sent").
 			Msg("Successfully sent message to notification channel")
 	default:
-		// Non-blocking send failed - check if closed or done before returning.
-		// This check is done AFTER the send attempt to catch the race condition
-		// where Close() signaled stop but sendEntries was already in progress.
-		if n.closed.Load() {
-			log.Debug().
-				Int("entries_count", len(entries)).
-				Int("msg_length", len(msg)).
-				Str("channel_status", "closed").
-				Msg("Notifier closed, skipping send")
-
-			return
-		}
-
-		// Check if worker goroutine has exited
-		select {
-		case <-n.done:
-			log.Debug().
-				Int("entries_count", len(entries)).
-				Int("msg_length", len(msg)).
-				Str("channel_status", "worker_done").
-				Msg("Worker goroutine done, skipping send")
-
-			return
-		default:
-			// Channel is full (not closed, not done), apply backpressure
-			log.Debug().
-				Int("entries_count", len(entries)).
-				Int("msg_length", len(msg)).
-				Str("channel_status", "full").
-				Msg("Channel full, skipping send (backpressure)")
-		}
+		// The channel is full. Apply backpressure.
+		log.Debug().
+			Int("entries_count", len(entries)).
+			Int("msg_length", len(msg)).
+			Str("channel_status", "full").
+			Msg("Channel full, skipping send (backpressure)")
 	}
 }

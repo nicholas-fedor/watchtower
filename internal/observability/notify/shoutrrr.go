@@ -1,7 +1,6 @@
 package notify
 
 import (
-	"context"
 	"io"
 	"os"
 	"strings"
@@ -29,10 +28,6 @@ const initialEntriesCapacity = 10
 // messageChannelBufferSize defines the buffer size for the notification message channel.
 const messageChannelBufferSize = 1000
 
-// shutdownGracePeriod defines the time to wait for in-flight messages to complete during shutdown.
-// This allows error logging to complete before canceling the context.
-const shutdownGracePeriod = 50 * time.Millisecond
-
 // router defines the interface for sending Shoutrrr notifications.
 //
 // It abstracts the underlying service implementation.
@@ -57,9 +52,6 @@ type shoutrrrTypeNotifier struct {
 	stop         chan struct{}         // Channel for stopping the notifier.
 	params       *shoutrrrTypes.Params // Notification parameters.
 	data         format.StaticData     // Static notification data.
-	//nolint:containedctx
-	ctx    context.Context    // Context for cancellation.
-	cancel context.CancelFunc // Cancel function for the context.
 	// These fields must only be accessed via sync/atomic (e.g., atomic.Load/atomic.Store) to avoid data races.
 	receiving atomic.Bool   // Tracks if receiving logs.
 	delay     time.Duration // Delay between sends.
@@ -212,9 +204,6 @@ func createNotifier(
 		params.SetTitle(data.Title)
 	}
 
-	// Create context for cancellation
-	ctx, cancel := context.WithCancel(context.Background())
-
 	return &shoutrrrTypeNotifier{
 		Urls:   urls,   // Notification service URLs.
 		Router: router, // Router for sending messages.
@@ -233,8 +222,6 @@ func createNotifier(
 		template: tpl,                                              // Template for message formatting.
 		data:     data,                                             // Static notification data.
 		params:   params,                                           // Notification parameters.
-		ctx:      ctx,                                              // Context for cancellation.
-		cancel:   cancel,                                           // Cancel function for the context.
 		delay:    delay,                                            // Delay between sends.
 		entries:  make([]*format.Entry, 0, initialEntriesCapacity), // Queued log entries.
 		localLog: localLog,                                         // Loop-safe internal logger.
@@ -243,40 +230,32 @@ func createNotifier(
 
 // Close gracefully shuts down the Shoutrrr notifier.
 //
-// It signals the notification goroutine to stop, waits for in-flight messages
-// to complete within the grace period, cancels the context to unblock pending sends,
-// and ensures the goroutine has finished before returning.
+// It signals the notification goroutine to stop and waits for it to send every
+// queued message, including one it is sending. These sends skip the configured
+// delay. Each send is bounded by its service's time budget in Shoutrrr. Close
+// returns at once when no goroutine was started. Messages sent after Close are
+// dropped.
 func (n *shoutrrrTypeNotifier) Close() {
 	log := n.ll()
 
 	n.closeOnce.Do(func() {
 		n.closed.Store(true)
 
-		// If no worker goroutine exists, skip waiting and cancel immediately.
+		// Without a worker goroutine there is nothing to wait for.
 		if !n.receiving.Load() {
-			log.Debug().Msg("No notification worker running, canceling context immediately")
-			n.cancel()
+			log.Debug().Msg("No notification worker running")
 
 			return
 		}
 
 		// Signal goroutine to stop processing new messages.
-		if n.stop != nil {
-			log.Debug().Msg("Closing stop channel to signal shutdown")
-			close(n.stop)
-		}
+		log.Debug().Msg("Closing stop channel to signal shutdown")
+		close(n.stop)
 
-		// Wait for the worker goroutine to exit by waiting on n.done channel.
+		// Wait for the worker goroutine to exit. The messages channel stays
+		// open, because a concurrent sendEntries may still enqueue to it.
 		log.Debug().Msg("Waiting for the notification goroutine to finish")
 		<-n.done
-
-		// Only AFTER the worker has exited, close n.messages channel.
-		log.Debug().Msg("Closing messages channel after worker exit")
-		close(n.messages)
-
-		// Cancel context to unblock any pending operations.
-		log.Debug().Msg("Canceling notification context to unblock pending sends")
-		n.cancel()
 	})
 }
 
