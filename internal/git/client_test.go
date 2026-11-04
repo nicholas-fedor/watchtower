@@ -28,6 +28,7 @@ import (
 	"github.com/nicholas-fedor/watchtower/internal/container/provenance"
 	"github.com/nicholas-fedor/watchtower/internal/git/provider"
 	"github.com/nicholas-fedor/watchtower/internal/git/semver"
+	gitConfig "github.com/nicholas-fedor/watchtower/internal/settings/config/git"
 	"github.com/nicholas-fedor/watchtower/pkg/types"
 	mockTypes "github.com/nicholas-fedor/watchtower/pkg/types/mocks"
 )
@@ -840,7 +841,7 @@ func TestCheckContainer(t *testing.T) {
 		t.Parallel()
 
 		c := labeledContainer(t, map[string]string{labels.GitSemverPolicy: "nightly"})
-		params := types.UpdateParams{GitImages: map[string]types.GitImage{
+		params := types.UpdateParams{GitImages: map[string]gitConfig.Image{
 			"app:latest": {Repo: "https://example.com/org/app.git", Policy: semver.PolicyPatch},
 		}}
 

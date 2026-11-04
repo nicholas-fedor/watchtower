@@ -7,7 +7,6 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/nicholas-fedor/watchtower/internal/git/semver"
-	"github.com/nicholas-fedor/watchtower/pkg/types"
 )
 
 func TestParseImageMapping(t *testing.T) {
@@ -17,7 +16,7 @@ func TestParseImageMapping(t *testing.T) {
 		name       string
 		raw        string
 		image      string
-		mapping    types.GitImage
+		mapping    Image
 		wantErr    error
 		wantErrMsg string
 	}{
@@ -25,7 +24,7 @@ func TestParseImageMapping(t *testing.T) {
 			name:  "repo only uses defaults",
 			raw:   "myapp:latest=https://github.com/org/app.git",
 			image: "myapp:latest",
-			mapping: types.GitImage{
+			mapping: Image{
 				Repo:   "https://github.com/org/app.git",
 				Ref:    DefaultRef,
 				Policy: DefaultPolicy,
@@ -35,7 +34,7 @@ func TestParseImageMapping(t *testing.T) {
 			name:  "ref and policy",
 			raw:   "myapp:latest=https://github.com/org/app.git#release@minor",
 			image: "myapp:latest",
-			mapping: types.GitImage{
+			mapping: Image{
 				Repo:   "https://github.com/org/app.git",
 				Ref:    "release",
 				Policy: semver.PolicyMinor,
@@ -45,7 +44,7 @@ func TestParseImageMapping(t *testing.T) {
 			name:  "policy in mixed case with spaces",
 			raw:   "myapp:latest=https://github.com/org/app.git#release@ Minor ",
 			image: "myapp:latest",
-			mapping: types.GitImage{
+			mapping: Image{
 				Repo:   "https://github.com/org/app.git",
 				Ref:    "release",
 				Policy: semver.PolicyMinor,
@@ -55,7 +54,7 @@ func TestParseImageMapping(t *testing.T) {
 			name:  "empty hash ref falls back to default",
 			raw:   "app:v1=https://git.example.com/org/app.git#",
 			image: "app:v1",
-			mapping: types.GitImage{
+			mapping: Image{
 				Repo:   "https://git.example.com/org/app.git",
 				Ref:    DefaultRef,
 				Policy: DefaultPolicy,
@@ -65,7 +64,7 @@ func TestParseImageMapping(t *testing.T) {
 			name:  "ssh userinfo is not a policy",
 			raw:   "app:latest=git@github.com:org/app.git",
 			image: "app:latest",
-			mapping: types.GitImage{
+			mapping: Image{
 				Repo:   "git@github.com:org/app.git",
 				Ref:    DefaultRef,
 				Policy: DefaultPolicy,
@@ -75,7 +74,7 @@ func TestParseImageMapping(t *testing.T) {
 			name:  "ssh repo with ref and policy",
 			raw:   "app:latest=git@github.com:org/app.git#main@patch",
 			image: "app:latest",
-			mapping: types.GitImage{
+			mapping: Image{
 				Repo:   "git@github.com:org/app.git",
 				Ref:    "main",
 				Policy: semver.PolicyPatch,
@@ -166,12 +165,12 @@ func TestParseImageMappings(t *testing.T) {
 			"myapp:latest=https://github.com/org/app.git#dev@patch",
 		})
 		require.NoError(t, err)
-		assert.Equal(t, types.GitImage{
+		assert.Equal(t, Image{
 			Repo:   "https://github.com/org/app.git",
 			Ref:    "dev",
 			Policy: semver.PolicyPatch,
 		}, got["myapp:latest"])
-		assert.Equal(t, types.GitImage{
+		assert.Equal(t, Image{
 			Repo:   "https://gitlab.com/org/other.git",
 			Ref:    DefaultRef,
 			Policy: semver.PolicyMajor,

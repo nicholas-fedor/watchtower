@@ -9,6 +9,7 @@ import (
 
 	"github.com/nicholas-fedor/watchtower/internal/container/labels"
 	"github.com/nicholas-fedor/watchtower/internal/git/semver"
+	gitConfig "github.com/nicholas-fedor/watchtower/internal/settings/config/git"
 	"github.com/nicholas-fedor/watchtower/pkg/types"
 )
 
@@ -261,10 +262,10 @@ func refLabel(c types.Container) string {
 //   - images: Process-wide mappings.
 //
 // Returns:
-//   - types.GitImage: Zero value when no exact key exists.
-func imageMapping(imageName string, images map[string]types.GitImage) types.GitImage {
+//   - gitConfig.Image: Zero value when no exact key exists.
+func imageMapping(imageName string, images map[string]gitConfig.Image) gitConfig.Image {
 	if images == nil || imageName == "" {
-		return types.GitImage{}
+		return gitConfig.Image{}
 	}
 
 	return images[imageName]

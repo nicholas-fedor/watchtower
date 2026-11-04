@@ -71,7 +71,7 @@ func TestUpdateParamsAssignsEveryField(t *testing.T) {
 			Context:         ".",
 			ComposeStash:    true,
 			ComposeProjects: map[string]string{"demo": "/compose/demo"},
-			Images: map[string]types.GitImage{
+			Images: map[string]git.Image{
 				"myapp:latest": {
 					Repo:   "https://github.com/org/app.git",
 					Ref:    "main",
@@ -120,7 +120,7 @@ func TestUpdateParamsAssignsEveryField(t *testing.T) {
 	assert.Equal(t, git.DefaultRef, params.GitDefaultRef)
 	assert.Equal(t, git.DefaultPolicy, params.GitSemverPolicy)
 	assert.Equal(t, 30*time.Second, params.GitTimeout)
-	assert.Equal(t, types.GitImage{
+	assert.Equal(t, git.Image{
 		Repo:   "https://github.com/org/app.git",
 		Ref:    "main",
 		Policy: semver.PolicyMinor,

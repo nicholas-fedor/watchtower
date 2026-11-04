@@ -8,6 +8,7 @@ import (
 
 	"github.com/nicholas-fedor/watchtower/internal/container/labels"
 	"github.com/nicholas-fedor/watchtower/internal/git/semver"
+	gitConfig "github.com/nicholas-fedor/watchtower/internal/settings/config/git"
 	"github.com/nicholas-fedor/watchtower/internal/testutil/containerfixture"
 	"github.com/nicholas-fedor/watchtower/internal/testutil/modelfixture"
 	"github.com/nicholas-fedor/watchtower/pkg/types"
@@ -42,7 +43,7 @@ func TestGitWrappers(t *testing.T) {
 			)
 
 			assoc, ok := ResolveAssociation(c, types.UpdateParams{
-				GitImages: map[string]types.GitImage{
+				GitImages: map[string]gitConfig.Image{
 					"myapp:latest": {Repo: "https://github.com/org/from-map.git", Ref: "mapped"},
 				},
 			})
@@ -57,7 +58,7 @@ func TestGitWrappers(t *testing.T) {
 			c := modelfixture.Container(containerfixture.WithImageName("myapp:latest"))
 
 			assoc, ok := ResolveAssociation(c, types.UpdateParams{
-				GitImages: map[string]types.GitImage{
+				GitImages: map[string]gitConfig.Image{
 					"myapp:latest": {Repo: "https://github.com/org/mapped.git", Ref: "v1"},
 				},
 			})
