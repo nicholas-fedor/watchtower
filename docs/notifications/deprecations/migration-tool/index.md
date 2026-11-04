@@ -220,7 +220,7 @@ docker cp <CONTAINER>:<FILE_PATH> ./watchtower-notifications.env
 
 The temporary file is automatically removed after **5 minutes** or when the container stops, so copy it promptly after generation.
 If you are running `notify-upgrade` as a one-off command (`docker run --rm ...`), the process will wait up to 5 minutes before exiting.
-Before it writes the file, `notify-upgrade` checks every URL with Shoutrrr, as Watchtower does at startup. If Shoutrrr rejects a URL, such as a Discord webhook whose ID is not a number, `notify-upgrade` writes no file. Its error names the service but not the URL. It gives a notification URL's position, counting from 1. For a URL converted from a legacy notification type, it names that type instead. Shoutrrr's warnings about a URL, such as a deprecated key, appear in the log.
+Before it writes the file, `notify-upgrade` checks every URL with Shoutrrr, as Watchtower does at startup. If Shoutrrr rejects a URL, such as a Discord webhook whose ID is not a number, `notify-upgrade` writes no file. Its error never contains the URL. It usually names the service. It cannot when the URL has no scheme or does not parse. The same holds for a URL that ends in an empty `#` fragment. The error gives a notification URL's position, counting from 1. For a URL converted from a legacy notification type, it names that type instead. Shoutrrr's warnings about a URL, such as a deprecated key, appear in the log.
 When the conversion fails, `notify-upgrade` logs the error and exits with code 1. It removes any file it started to write. If it logs "Failed to remove temporary file" instead, delete the file named in that warning yourself, because it can hold your notification credentials.
 
 ## Migration Walkthrough
