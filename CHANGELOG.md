@@ -75,6 +75,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- Convert legacy notifiers in one place by @nicholas-fedor in [#3421](https://github.com/nicholas-fedor/watchtower/pull/3421)
 - Set the legacy gotify tls skip through skiptlsverify by @nicholas-fedor in [#3413](https://github.com/nicholas-fedor/watchtower/pull/3413)
 - Validate git labels in the association by @nicholas-fedor in [#3404](https://github.com/nicholas-fedor/watchtower/pull/3404)
 - Parse semver policy values in one place by @nicholas-fedor in [#3394](https://github.com/nicholas-fedor/watchtower/pull/3394)
