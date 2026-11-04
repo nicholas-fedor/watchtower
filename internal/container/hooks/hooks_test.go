@@ -75,17 +75,41 @@ var (
 	errNotFound      = errors.New("not found")
 )
 
-// rejectAll is a filter that rejects every container. The check-hook tests
-// pass it so they can tell the supplied filter apart from any other.
-func rejectAll(types.FilterableContainer) bool { return false }
+// acceptNamed is a filter that accepts only the container named "accepted".
+// The check-hook tests pass it so they can tell the supplied filter apart from
+// any filter that accepts or rejects every container.
+func acceptNamed(c types.FilterableContainer) bool { return c.Name() == "accepted" }
 
-// assertFilterReached verifies that the filter captured from ListContainers is
-// the rejecting filter the test passed to the hook.
-func assertFilterReached(t *testing.T, captured []types.Filter) {
+// namedContainer returns a stopped container without labels named name. A
+// container fixes its name when it is built. Renaming it afterwards has no
+// effect on Name.
+func namedContainer(name string) *container.Container {
+	return container.NewContainer(nil,
+		&dockerContainer.InspectResponse{
+			ID:         "container_id",
+			HostConfig: &dockerContainer.HostConfig{},
+			Name:       "/" + name,
+			State:      &dockerContainer.State{Running: false},
+			Config:     &dockerContainer.Config{Labels: map[string]string{}},
+		},
+		nil,
+	)
+}
+
+// assertFilterReached verifies that ListContainers received exactly one filter
+// and that it decides like want for a container that want accepts and one it
+// rejects.
+func assertFilterReached(t *testing.T, captured []types.Filter, want types.Filter) {
 	t.Helper()
 
 	require.Len(t, captured, 1, "ListContainers should receive the hook's filter")
-	assert.False(t, captured[0](mockedContainer()), "the captured filter should reject a container")
+
+	for _, fixture := range []types.FilterableContainer{
+		namedContainer("accepted"),
+		namedContainer("rejected"),
+	} {
+		assert.Equal(t, want(fixture), captured[0](fixture), "filter result for %s", fixture.Name())
+	}
 }
 
 // TestExecutePreChecks verifies that ExecutePreChecks lists containers with
@@ -129,9 +153,9 @@ func TestExecutePreChecks(t *testing.T) {
 			tt.setupClient(client, func(args mock.Arguments) {
 				captured, _ = args.Get(1).([]types.Filter)
 			})
-			ExecutePreChecks(log, context.Background(), client, rejectAll, 1000, 1001, nil)
+			ExecutePreChecks(log, context.Background(), client, acceptNamed, 1000, 1001, nil)
 
-			assertFilterReached(t, captured)
+			assertFilterReached(t, captured, acceptNamed)
 
 			output := logBuf.String()
 			assert.NotEmpty(t, output, "expected log output")
@@ -183,9 +207,9 @@ func TestExecutePostChecks(t *testing.T) {
 			tt.setupClient(client, func(args mock.Arguments) {
 				captured, _ = args.Get(1).([]types.Filter)
 			})
-			ExecutePostChecks(log, context.Background(), client, rejectAll, 1000, 1001, nil)
+			ExecutePostChecks(log, context.Background(), client, acceptNamed, 1000, 1001, nil)
 
-			assertFilterReached(t, captured)
+			assertFilterReached(t, captured, acceptNamed)
 
 			output := logBuf.String()
 			assert.NotEmpty(t, output, "expected log output")
