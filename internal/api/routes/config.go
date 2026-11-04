@@ -22,7 +22,7 @@ func registerConfigRoute(app *fiber.App, auth fiber.Handler, opts Options) {
 			LabelEnable:       opts.LabelEnable,
 			FilterDesc:        opts.FilterDesc,
 			Scope:             opts.Scope,
-			GitEnable:         opts.BaseParams.EnableGitMonitoring,
+			GitEnable:         opts.BaseParams.Git.Enable,
 		}, nil
 	})
 	app.Get(handler.Path, auth, TimeoutMiddleware(), handler.Handle)

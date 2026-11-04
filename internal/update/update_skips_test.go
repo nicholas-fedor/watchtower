@@ -27,6 +27,7 @@ import (
 	"github.com/nicholas-fedor/watchtower/internal/git"
 	"github.com/nicholas-fedor/watchtower/internal/git/semver"
 	"github.com/nicholas-fedor/watchtower/internal/registry/ratelimit"
+	gitConfig "github.com/nicholas-fedor/watchtower/internal/settings/config/git"
 	"github.com/nicholas-fedor/watchtower/internal/testutil/containerfixture"
 	"github.com/nicholas-fedor/watchtower/internal/testutil/logcapture"
 	mockUpdate "github.com/nicholas-fedor/watchtower/internal/update/mocks"
@@ -693,7 +694,7 @@ func TestUpdate_InvalidGitLabelWarnsOnce(t *testing.T) {
 				log := zerolog.New(&out).Level(zerolog.DebugLevel)
 
 				report, _, err := update(&log, t.Context(), client,
-					types.UpdateParams{EnableGitMonitoring: true}, ratelimit.New(), gitClient)
+					types.UpdateParams{Git: gitConfig.Defaults{Enable: true}}, ratelimit.New(), gitClient)
 				require.NoError(t, err)
 				require.Len(t, report.Skipped(), 1)
 				assert.NotContains(t, out.String(), "supersecret")

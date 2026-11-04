@@ -30,6 +30,7 @@ import (
 	"github.com/nicholas-fedor/watchtower/internal/container/oci"
 	"github.com/nicholas-fedor/watchtower/internal/git"
 	"github.com/nicholas-fedor/watchtower/internal/git/semver"
+	gitConfig "github.com/nicholas-fedor/watchtower/internal/settings/config/git"
 	"github.com/nicholas-fedor/watchtower/pkg/types"
 	mockTypes "github.com/nicholas-fedor/watchtower/pkg/types/mocks"
 )
@@ -161,8 +162,10 @@ func TestCheckForUpdates_GitNoPullSkipsCheck(t *testing.T) {
 
 	gitClient := git.New(newTestLogger(t), git.Options{Timeout: time.Millisecond})
 	results, err := CheckForUpdates(newTestLogger(t), t.Context(), client, nil, types.UpdateParams{
-		EnableGitMonitoring: true,
-		NoPull:              true,
+		NoPull: true,
+		Git: gitConfig.Defaults{
+			Enable: true,
+		},
 	}, gitClient)
 	require.NoError(t, err)
 	require.Len(t, results, 1)
@@ -191,7 +194,9 @@ func TestCheckForUpdates_GitCommitField(t *testing.T) {
 	client.EXPECT().ListContainers(mock.Anything, mock.Anything).Return([]types.Container{watched}, nil)
 
 	results, err := CheckForUpdates(newTestLogger(t), t.Context(), client, nil, types.UpdateParams{
-		EnableGitMonitoring: true,
+		Git: gitConfig.Defaults{
+			Enable: true,
+		},
 	}, git.New(newTestLogger(t), git.Options{Timeout: time.Second}))
 	require.NoError(t, err)
 	require.Len(t, results, 1)
@@ -467,14 +472,14 @@ func TestIsGitWatched(t *testing.T) {
 		{
 			name:      "no git client falls back to the registry",
 			container: gitContainer(t, "https://github.com/org/app.git", nil),
-			params:    types.UpdateParams{EnableGitMonitoring: true},
+			params:    types.UpdateParams{Git: gitConfig.Defaults{Enable: true}},
 			gitClient: nil,
 			want:      false,
 		},
 		{
 			name:      "stubbed container has no labels to watch",
 			container: stubContainer(t, nil),
-			params:    types.UpdateParams{EnableGitMonitoring: true},
+			params:    types.UpdateParams{Git: gitConfig.Defaults{Enable: true}},
 			gitClient: gitClient,
 			want:      false,
 		},
@@ -488,7 +493,7 @@ func TestIsGitWatched(t *testing.T) {
 		{
 			name:      "associated container with monitoring enabled",
 			container: gitContainer(t, "https://github.com/org/app.git", nil),
-			params:    types.UpdateParams{EnableGitMonitoring: true},
+			params:    types.UpdateParams{Git: gitConfig.Defaults{Enable: true}},
 			gitClient: gitClient,
 			want:      true,
 		},
@@ -528,7 +533,7 @@ func TestCheckGitSource(t *testing.T) {
 			t.Context(),
 			newTestLogger(t),
 			c,
-			types.UpdateParams{EnableGitMonitoring: true, NoPull: true},
+			types.UpdateParams{NoPull: true, Git: gitConfig.Defaults{Enable: true}},
 			git.New(newTestLogger(t), git.Options{Timeout: time.Second}),
 			&result,
 		)
@@ -551,7 +556,7 @@ func TestCheckGitSource(t *testing.T) {
 			t.Context(),
 			newTestLogger(t),
 			c,
-			types.UpdateParams{EnableGitMonitoring: true},
+			types.UpdateParams{Git: gitConfig.Defaults{Enable: true}},
 			git.New(newTestLogger(t), git.Options{Timeout: time.Second}),
 			&result,
 		)
@@ -575,7 +580,7 @@ func TestCheckGitSource(t *testing.T) {
 			t.Context(),
 			newTestLogger(t),
 			c,
-			types.UpdateParams{EnableGitMonitoring: true},
+			types.UpdateParams{Git: gitConfig.Defaults{Enable: true}},
 			git.New(newTestLogger(t), git.Options{Timeout: time.Second}),
 			&result,
 		)
@@ -602,7 +607,7 @@ func TestCheckGitSource(t *testing.T) {
 			t.Context(),
 			newTestLogger(t),
 			c,
-			types.UpdateParams{EnableGitMonitoring: true},
+			types.UpdateParams{Git: gitConfig.Defaults{Enable: true}},
 			git.New(newTestLogger(t), git.Options{Timeout: time.Second}),
 			&result,
 		)

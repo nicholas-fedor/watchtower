@@ -36,7 +36,7 @@ type ReportMeta struct {
 //
 // Parameters:
 //   - c: Container to inspect.
-//   - params: Update parameters with image mappings and host classifications.
+//   - defaults: Git settings with image mappings and defaults.
 //   - vars: Optional new-version values for changelog placeholders.
 //   - latest: OCI annotations from a newly pulled image, or empty for none.
 //
@@ -44,7 +44,7 @@ type ReportMeta struct {
 //   - ReportMeta: Resolved metadata. Empty strings when unknown.
 func ResolveReportMeta(
 	c types.Container,
-	params types.UpdateParams,
+	defaults gitConfig.Defaults,
 	vars ChangelogVars,
 	latest oci.Annotations,
 ) ReportMeta {
@@ -56,11 +56,11 @@ func ResolveReportMeta(
 	anns := preferAnnotations(latest, cur)
 	mapping := gitConfig.Image{}
 
-	if params.GitImages != nil {
-		mapping = params.GitImages[c.ImageName()]
+	if defaults.Images != nil {
+		mapping = defaults.Images[c.ImageName()]
 	}
 
-	assoc, associated := ResolveAssociation(c, params)
+	assoc, associated := ResolveAssociation(c, defaults)
 
 	// Report repo may fall back to OCI source. That does not enable the watcher.
 	repo := redact.GitURL(assoc.Repo)

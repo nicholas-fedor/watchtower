@@ -170,7 +170,7 @@ func applyReportMetadata(c types.Container, params types.UpdateParams, result *C
 		return
 	}
 
-	meta := provenance.ResolveReportMeta(c, params, provenance.ChangelogVars{}, oci.Annotations{})
+	meta := provenance.ResolveReportMeta(c, params.Git, provenance.ChangelogVars{}, oci.Annotations{})
 	result.GitRepo = meta.GitRepo
 	result.GitRef = meta.GitRef
 	result.Changelog = meta.Changelog
@@ -226,7 +226,7 @@ func isGitWatched(
 		return false
 	}
 
-	return provenance.ShouldMonitor(log, c, params)
+	return provenance.ShouldMonitor(log, c, params.Git)
 }
 
 // checkGitSource compares the hosted Git ref for a container.
@@ -273,7 +273,7 @@ func checkGitSource(
 	if checkResult.Tag != "" {
 		result.Changelog = provenance.ResolveReportMeta(
 			c,
-			params,
+			params.Git,
 			provenance.ChangelogVars{
 				Tag:    checkResult.Tag,
 				Commit: checkResult.Commit,

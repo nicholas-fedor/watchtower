@@ -841,9 +841,13 @@ func TestCheckContainer(t *testing.T) {
 		t.Parallel()
 
 		c := labeledContainer(t, map[string]string{labels.GitSemverPolicy: "nightly"})
-		params := types.UpdateParams{GitImages: map[string]gitConfig.Image{
-			"app:latest": {Repo: "https://example.com/org/app.git", Policy: semver.PolicyPatch},
-		}}
+		params := types.UpdateParams{
+			Git: gitConfig.Defaults{
+				Images: map[string]gitConfig.Image{
+					"app:latest": {Repo: "https://example.com/org/app.git", Policy: semver.PolicyPatch},
+				},
+			},
+		}
 
 		got, err := CheckContainer(t.Context(), testClient(t, nil), c, params)
 		require.ErrorIs(t, err, semver.ErrInvalidPolicy)

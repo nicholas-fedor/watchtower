@@ -25,7 +25,7 @@ func TestResolveReportMeta(t *testing.T) {
 	t.Run("returns empty metadata for a nil container", func(t *testing.T) {
 		t.Parallel()
 
-		assert.Equal(t, ReportMeta{}, ResolveReportMeta(nil, types.UpdateParams{}, ChangelogVars{}, oci.Annotations{}))
+		assert.Equal(t, ReportMeta{}, ResolveReportMeta(nil, gitConfig.Defaults{}, ChangelogVars{}, oci.Annotations{}))
 	})
 
 	t.Run("prefers a git-repo label over mapping and OCI source", func(t *testing.T) {
@@ -43,8 +43,8 @@ func TestResolveReportMeta(t *testing.T) {
 			}),
 		)
 
-		meta := ResolveReportMeta(c, types.UpdateParams{
-			GitImages: map[string]gitConfig.Image{
+		meta := ResolveReportMeta(c, gitConfig.Defaults{
+			Images: map[string]gitConfig.Image{
 				"myapp:latest": {
 					Repo: "https://github.com/org/from-map.git",
 					Ref:  "mapped",
@@ -68,7 +68,7 @@ func TestResolveReportMeta(t *testing.T) {
 			}),
 		)
 
-		meta := ResolveReportMeta(c, types.UpdateParams{}, ChangelogVars{}, oci.Annotations{})
+		meta := ResolveReportMeta(c, gitConfig.Defaults{}, ChangelogVars{}, oci.Annotations{})
 		assert.Equal(t, "../repos/app?release=1", meta.GitRepo)
 	})
 
@@ -88,7 +88,7 @@ func TestResolveReportMeta(t *testing.T) {
 			}),
 		)
 
-		meta := ResolveReportMeta(c, types.UpdateParams{}, ChangelogVars{}, oci.Annotations{})
+		meta := ResolveReportMeta(c, gitConfig.Defaults{}, ChangelogVars{}, oci.Annotations{})
 		assert.Equal(t, "https://github.com/org/app.git#main", meta.GitRepo)
 		assert.NotContains(t, meta.GitRepo, "secret")
 		assert.NotContains(t, meta.GitRepo, "query")
@@ -112,8 +112,8 @@ func TestResolveReportMeta(t *testing.T) {
 			}),
 		)
 
-		mapped := ResolveReportMeta(c, types.UpdateParams{
-			GitImages: map[string]gitConfig.Image{
+		mapped := ResolveReportMeta(c, gitConfig.Defaults{
+			Images: map[string]gitConfig.Image{
 				"myapp:latest": {Repo: "https://github.com/org/from-map.git", Ref: "mapped"},
 			},
 		}, ChangelogVars{}, oci.Annotations{})
@@ -121,7 +121,7 @@ func TestResolveReportMeta(t *testing.T) {
 		assert.Equal(t, "mapped", mapped.GitRef)
 		assert.Equal(t, "https://github.com/org/from-map/releases", mapped.Changelog)
 
-		ociOnly := ResolveReportMeta(c, types.UpdateParams{}, ChangelogVars{}, oci.Annotations{})
+		ociOnly := ResolveReportMeta(c, gitConfig.Defaults{}, ChangelogVars{}, oci.Annotations{})
 		assert.Equal(t, "https://github.com/org/from-oci.git", ociOnly.GitRepo)
 		assert.Empty(t, ociOnly.GitRef)
 		assert.Equal(t, "https://github.com/org/from-oci/releases", ociOnly.Changelog)
@@ -145,7 +145,7 @@ func TestResolveReportMeta(t *testing.T) {
 			}),
 		)
 
-		meta := ResolveReportMeta(c, types.UpdateParams{}, ChangelogVars{}, oci.Annotations{
+		meta := ResolveReportMeta(c, gitConfig.Defaults{}, ChangelogVars{}, oci.Annotations{
 			Revision: "new456",
 			Version:  "10.11.6",
 		})
@@ -168,7 +168,7 @@ func TestResolveReportMeta(t *testing.T) {
 			}),
 		)
 
-		meta := ResolveReportMeta(c, types.UpdateParams{}, ChangelogVars{}, oci.Annotations{
+		meta := ResolveReportMeta(c, gitConfig.Defaults{}, ChangelogVars{}, oci.Annotations{
 			Source:        "https://github.com/org/new.git",
 			URL:           "https://example.com/new",
 			Documentation: "https://example.com/new-docs",
@@ -193,7 +193,7 @@ func TestResolveReportMeta(t *testing.T) {
 			}),
 		)
 
-		meta := ResolveReportMeta(c, types.UpdateParams{}, ChangelogVars{}, oci.Annotations{Version: "1.0.0"})
+		meta := ResolveReportMeta(c, gitConfig.Defaults{}, ChangelogVars{}, oci.Annotations{Version: "1.0.0"})
 
 		assert.Equal(t, "https://github.com/org/app.git", meta.Source)
 		assert.Equal(t, "https://example.com/image", meta.ImageURL)
@@ -211,7 +211,7 @@ func TestResolveReportMeta(t *testing.T) {
 			}),
 		)
 
-		meta := ResolveReportMeta(c, types.UpdateParams{}, ChangelogVars{Tag: "v10.11.6"}, oci.Annotations{
+		meta := ResolveReportMeta(c, gitConfig.Defaults{}, ChangelogVars{Tag: "v10.11.6"}, oci.Annotations{
 			Version: "10.11.6",
 		})
 		assert.Equal(t, "https://github.com/org/app/releases/tag/v10.11.6", meta.Changelog)
@@ -223,29 +223,29 @@ func TestResolveReportMeta(t *testing.T) {
 		gitlab := modelfixture.Container(containerfixture.WithImageName("app:latest"), containerfixture.WithLabels(map[string]string{
 			labels.GitRepo: "https://gitlab.com/org/app.git",
 		}))
-		assert.Equal(t, "https://gitlab.com/org/app/-/releases", ResolveReportMeta(gitlab, types.UpdateParams{}, ChangelogVars{}, oci.Annotations{}).Changelog)
+		assert.Equal(t, "https://gitlab.com/org/app/-/releases", ResolveReportMeta(gitlab, gitConfig.Defaults{}, ChangelogVars{}, oci.Annotations{}).Changelog)
 
 		codeberg := modelfixture.Container(containerfixture.WithImageName("app:latest"), containerfixture.WithLabels(map[string]string{
 			labels.GitRepo: "https://codeberg.org/org/app.git",
 		}))
-		assert.Equal(t, "https://codeberg.org/org/app/releases", ResolveReportMeta(codeberg, types.UpdateParams{}, ChangelogVars{}, oci.Annotations{}).Changelog)
+		assert.Equal(t, "https://codeberg.org/org/app/releases", ResolveReportMeta(codeberg, gitConfig.Defaults{}, ChangelogVars{}, oci.Annotations{}).Changelog)
 
 		mappedHost := modelfixture.Container(containerfixture.WithImageName("app:latest"), containerfixture.WithLabels(map[string]string{
 			labels.GitRepo: "git@git.example.com:org/app.git",
 			labels.GitHost: "https://git.example.com:3000/gitea",
 		}))
-		assert.Equal(t, "https://git.example.com:3000/gitea/org/app/releases", ResolveReportMeta(mappedHost, types.UpdateParams{}, ChangelogVars{}, oci.Annotations{}).Changelog)
+		assert.Equal(t, "https://git.example.com:3000/gitea/org/app/releases", ResolveReportMeta(mappedHost, gitConfig.Defaults{}, ChangelogVars{}, oci.Annotations{}).Changelog)
 
 		ghe := modelfixture.Container(containerfixture.WithImageName("app:latest"), containerfixture.WithLabels(map[string]string{
 			labels.GitRepo: "https://github.company.com/org/app.git",
 			labels.GitHost: "https://github.company.com/github",
 		}))
-		assert.Equal(t, "https://github.company.com/github/org/app/releases", ResolveReportMeta(ghe, types.UpdateParams{}, ChangelogVars{}, oci.Annotations{}).Changelog)
+		assert.Equal(t, "https://github.company.com/github/org/app/releases", ResolveReportMeta(ghe, gitConfig.Defaults{}, ChangelogVars{}, oci.Annotations{}).Changelog)
 
 		nested := modelfixture.Container(containerfixture.WithImageName("app:latest"), containerfixture.WithLabels(map[string]string{
 			labels.GitRepo: "https://gitlab.com/group/sub/repo.git",
 		}))
-		assert.Equal(t, "https://gitlab.com/group/sub/repo/-/releases", ResolveReportMeta(nested, types.UpdateParams{}, ChangelogVars{}, oci.Annotations{}).Changelog)
+		assert.Equal(t, "https://gitlab.com/group/sub/repo/-/releases", ResolveReportMeta(nested, gitConfig.Defaults{}, ChangelogVars{}, oci.Annotations{}).Changelog)
 	})
 
 	t.Run("redacts credentials from the new image's annotations", func(t *testing.T) {
@@ -258,7 +258,7 @@ func TestResolveReportMeta(t *testing.T) {
 			}),
 		)
 
-		meta := ResolveReportMeta(c, types.UpdateParams{}, ChangelogVars{}, oci.Annotations{
+		meta := ResolveReportMeta(c, gitConfig.Defaults{}, ChangelogVars{}, oci.Annotations{
 			Source:        "https://newuser:newscret@github.com/org/new.git?token=query#main",
 			URL:           "https://example.com/image?signature=abc&format=json",
 			Documentation: "https://example.com/docs?lang=en#install",
@@ -280,7 +280,7 @@ func TestResolveReportMeta(t *testing.T) {
 		c := modelfixture.Container(containerfixture.WithImageName("app:latest"), containerfixture.WithLabels(map[string]string{
 			labels.GitRepo: "https://unknown.example/org/app.git",
 		}))
-		assert.Empty(t, ResolveReportMeta(c, types.UpdateParams{}, ChangelogVars{}, oci.Annotations{}).Changelog)
+		assert.Empty(t, ResolveReportMeta(c, gitConfig.Defaults{}, ChangelogVars{}, oci.Annotations{}).Changelog)
 	})
 
 	t.Run("falls back to OCI URL then documentation for changelog", func(t *testing.T) {
@@ -292,7 +292,7 @@ func TestResolveReportMeta(t *testing.T) {
 				oci.URLLabel: "https://example.com/image",
 			}),
 		)
-		assert.Equal(t, "https://example.com/image", ResolveReportMeta(urlOnly, types.UpdateParams{}, ChangelogVars{}, oci.Annotations{}).Changelog)
+		assert.Equal(t, "https://example.com/image", ResolveReportMeta(urlOnly, gitConfig.Defaults{}, ChangelogVars{}, oci.Annotations{}).Changelog)
 
 		docsOnly := modelfixture.Container(
 			containerfixture.WithImageName("app:latest"),
@@ -300,7 +300,7 @@ func TestResolveReportMeta(t *testing.T) {
 				oci.DocumentationLabel: "https://example.com/docs",
 			}),
 		)
-		assert.Equal(t, "https://example.com/docs", ResolveReportMeta(docsOnly, types.UpdateParams{}, ChangelogVars{}, oci.Annotations{}).Changelog)
+		assert.Equal(t, "https://example.com/docs", ResolveReportMeta(docsOnly, gitConfig.Defaults{}, ChangelogVars{}, oci.Annotations{}).Changelog)
 	})
 
 	t.Run("uses a mapping ref when the container is not watcher-associated", func(t *testing.T) {
@@ -308,8 +308,8 @@ func TestResolveReportMeta(t *testing.T) {
 
 		c := modelfixture.Container(containerfixture.WithImageName("myapp:latest"))
 
-		meta := ResolveReportMeta(c, types.UpdateParams{
-			GitImages: map[string]gitConfig.Image{
+		meta := ResolveReportMeta(c, gitConfig.Defaults{
+			Images: map[string]gitConfig.Image{
 				"myapp:latest": {Ref: "from-map"},
 			},
 		}, ChangelogVars{}, oci.Annotations{})
@@ -327,7 +327,7 @@ func TestResolveReportMeta(t *testing.T) {
 			}),
 		)
 
-		meta := ResolveReportMeta(c, types.UpdateParams{}, ChangelogVars{}, oci.Annotations{})
+		meta := ResolveReportMeta(c, gitConfig.Defaults{}, ChangelogVars{}, oci.Annotations{})
 		assert.Empty(t, meta.GitRef)
 		assert.Equal(t, "1.4.0", meta.CurrentVersion)
 	})
@@ -342,10 +342,10 @@ func TestResolveReportMeta(t *testing.T) {
 			}),
 		)
 
-		meta := ResolveReportMeta(c, types.UpdateParams{}, ChangelogVars{}, oci.Annotations{})
+		meta := ResolveReportMeta(c, gitConfig.Defaults{}, ChangelogVars{}, oci.Annotations{})
 		assert.Equal(t, "https://github.com/org/from-oci.git", meta.GitRepo)
 
-		assoc, ok := ResolveAssociation(c, types.UpdateParams{})
+		assoc, ok := ResolveAssociation(c, gitConfig.Defaults{})
 		assert.False(t, ok)
 		assert.Equal(t, Association{}, assoc)
 	})

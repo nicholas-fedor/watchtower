@@ -227,7 +227,7 @@ func CheckContainer(
 	c types.Container,
 	params types.UpdateParams,
 ) (CheckResult, error) {
-	assoc, ok := provenance.ResolveAssociation(c, params)
+	assoc, ok := provenance.ResolveAssociation(c, params.Git)
 	if !ok {
 		return CheckResult{}, nil
 	}

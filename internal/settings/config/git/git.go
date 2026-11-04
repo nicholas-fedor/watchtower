@@ -38,14 +38,29 @@ type Image struct {
 	Context string `json:"context,omitempty"`
 }
 
-// Git holds process-wide Git metadata and watcher settings.
-type Git struct {
+// Defaults holds the credential-free Git settings that decide whether and how
+// a container is associated with a Git repository. Settings without
+// credentials can be passed to the update packages.
+type Defaults struct {
 	// Enable is the process-wide watcher default (--git-enable / WATCHTOWER_GIT_ENABLE).
 	Enable bool
 	// DefaultRef is the ref used when a mapping or label omits one.
 	DefaultRef string
 	// SemverPolicy is the semver policy used when a mapping or label omits one.
 	SemverPolicy string
+	// Images maps exact image names (including tag) to Git associations.
+	Images map[string]Image
+	// Dockerfile is the process-wide default Dockerfile path relative to the build context.
+	Dockerfile string
+	// Context is the process-wide default subdirectory of a Git URL context used as the Docker build context.
+	Context string
+}
+
+// Git holds process-wide Git metadata and watcher settings.
+type Git struct {
+	// Defaults holds the credential-free association settings.
+	Defaults
+
 	// Timeout is the Git network timeout (--git-timeout / WATCHTOWER_GIT_TIMEOUT).
 	Timeout time.Duration
 	// Token is the HTTPS auth token. Never projected onto UpdateParams.
@@ -62,12 +77,6 @@ type Git struct {
 	CABundle []byte
 	// InsecureSkipTLS skips TLS verification for Git HTTPS.
 	InsecureSkipTLS bool
-	// Dockerfile is the process-wide default Dockerfile path relative to the build context.
-	Dockerfile string
-	// Context is the process-wide default subdirectory of a Git URL context used as the Docker build context.
-	Context string
-	// Images maps exact image names (including tag) to Git associations.
-	Images map[string]Image
 	// ComposeStash saves and restores local Compose project files around checkout.
 	ComposeStash bool
 	// ComposeProjects maps Compose project name to a directory inside Watchtower.

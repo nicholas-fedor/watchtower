@@ -37,7 +37,7 @@ func withGitMeta(
 		return nil
 	}
 
-	meta := provenance.ResolveReportMeta(c, params, provenance.ChangelogVars{
+	meta := provenance.ResolveReportMeta(c, params.Git, provenance.ChangelogVars{
 		Tag:    tag,
 		Commit: commit,
 	}, oci.Annotations{})
@@ -83,7 +83,7 @@ func logFoundGitRevision(log *zerolog.Logger, c types.Container, params types.Up
 		return
 	}
 
-	assoc, _ := provenance.ResolveAssociation(c, params)
+	assoc, _ := provenance.ResolveAssociation(c, params.Git)
 
 	ref := tag
 	if ref == "" {

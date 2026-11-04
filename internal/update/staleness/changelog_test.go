@@ -16,6 +16,7 @@ import (
 	"github.com/nicholas-fedor/watchtower/internal/container"
 	"github.com/nicholas-fedor/watchtower/internal/container/labels"
 	"github.com/nicholas-fedor/watchtower/internal/container/oci"
+	gitConfig "github.com/nicholas-fedor/watchtower/internal/settings/config/git"
 	"github.com/nicholas-fedor/watchtower/internal/testutil/logcapture"
 	"github.com/nicholas-fedor/watchtower/internal/update/changelog"
 	"github.com/nicholas-fedor/watchtower/internal/update/state"
@@ -258,7 +259,7 @@ func TestRegistryMetadataWouldDuplicateGitChangelog(t *testing.T) {
 		labels.GitRef:  "main",
 	}, nil)
 
-	params := types.UpdateParams{EnableGitMonitoring: true, EnableChangelog: true}
+	params := types.UpdateParams{EnableChangelog: true, Git: gitConfig.Defaults{Enable: true}}
 	progress := newProgressWithContainer(t, c)
 
 	var buf bytes.Buffer

@@ -11,6 +11,7 @@ import (
 	"github.com/nicholas-fedor/watchtower/internal/container/labels"
 	"github.com/nicholas-fedor/watchtower/internal/container/provenance"
 	"github.com/nicholas-fedor/watchtower/internal/git"
+	gitConfig "github.com/nicholas-fedor/watchtower/internal/settings/config/git"
 	mockUpdate "github.com/nicholas-fedor/watchtower/internal/update/mocks"
 	"github.com/nicholas-fedor/watchtower/pkg/types"
 )
@@ -48,7 +49,9 @@ func TestSession_Check(t *testing.T) {
 		defer cancel()
 
 		stale, newest, err := sess.Check(ctx, c, types.UpdateParams{
-			EnableGitMonitoring: true,
+			Git: gitConfig.Defaults{
+				Enable: true,
+			},
 		})
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "git check:")
@@ -65,7 +68,7 @@ func TestSession_Check(t *testing.T) {
 			labels.GitHost: "ftp://git.example.com",
 		})
 
-		_, _, err := sess.Check(t.Context(), c, types.UpdateParams{EnableGitMonitoring: true})
+		_, _, err := sess.Check(t.Context(), c, types.UpdateParams{Git: gitConfig.Defaults{Enable: true}})
 		require.ErrorIs(t, err, provenance.ErrInvalidHost)
 		require.EqualError(t, err, "git check: invalid git-host: scheme must be http or https")
 	})
