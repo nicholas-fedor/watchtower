@@ -35,10 +35,10 @@ const Type = "gotify"
 //
 //nolint:godox
 type gotifyTypeNotifier struct {
-	gotifyURL                string // Gotify server URL.
-	gotifyAppToken           string // Gotify application token.
-	gotifyInsecureSkipVerify bool   // Skip TLS verification if true.
-	log                      *zerolog.Logger
+	gotifyURL           string // Gotify server URL.
+	gotifyAppToken      string // Gotify application token.
+	gotifySkipTLSVerify bool   // Skip TLS verification if true.
+	log                 *zerolog.Logger
 }
 
 // New creates a Gotify notifier from resolved legacy settings.
@@ -74,10 +74,10 @@ func New(log *zerolog.Logger, cfg notifyConfig.Legacy) types.ConvertibleNotifier
 	}
 
 	return &gotifyTypeNotifier{
-		gotifyURL:                apiURL,
-		gotifyAppToken:           token,
-		gotifyInsecureSkipVerify: skipVerify,
-		log:                      log,
+		gotifyURL:           apiURL,
+		gotifyAppToken:      token,
+		gotifySkipTLSVerify: skipVerify,
+		log:                 log,
 	}
 }
 
@@ -172,18 +172,18 @@ func (n *gotifyTypeNotifier) GetURL() (string, error) {
 
 	// Configure Gotify settings.
 	config := &shoutrrrGotify.Config{
-		Host:               apiURL.Host,
-		Path:               apiURL.Path,
-		DisableTLS:         apiURL.Scheme == "http",
-		InsecureSkipVerify: n.gotifyInsecureSkipVerify,
-		Token:              n.gotifyAppToken,
+		Host:          apiURL.Host,
+		Path:          apiURL.Path,
+		DisableTLS:    apiURL.Scheme == "http",
+		SkipTLSVerify: n.gotifySkipTLSVerify,
+		Token:         n.gotifyAppToken,
 	}
 
 	urlStr := config.GetURL().String()
 
 	clog.Debug().
 		Bool("disable_tls", apiURL.Scheme == "http").
-		Bool("insecure_skip_verify", n.gotifyInsecureSkipVerify).
+		Bool("skip_tls_verify", n.gotifySkipTLSVerify).
 		Msg("Generated Gotify service URL")
 
 	if clog.GetLevel() <= zerolog.TraceLevel {

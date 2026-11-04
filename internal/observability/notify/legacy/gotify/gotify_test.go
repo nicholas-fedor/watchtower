@@ -17,7 +17,7 @@ func TestGotifyTypeNotifier_GetURL_TLSSkipVerify(t *testing.T) {
 	tests := []struct {
 		name       string
 		skipVerify bool
-		// wantSkip is the expected insecureskipverify value, empty when absent.
+		// wantSkip is the expected skiptlsverify value, empty when absent.
 		wantSkip string
 	}{
 		{name: "verification on", skipVerify: false, wantSkip: ""},
@@ -30,10 +30,10 @@ func TestGotifyTypeNotifier_GetURL_TLSSkipVerify(t *testing.T) {
 
 			log := zerolog.Nop()
 			notifier := &gotifyTypeNotifier{
-				gotifyURL:                "https://gotify.example.com",
-				gotifyAppToken:           "Aaaaaaaaaaaaaaa",
-				gotifyInsecureSkipVerify: tt.skipVerify,
-				log:                      &log,
+				gotifyURL:           "https://gotify.example.com",
+				gotifyAppToken:      "Aaaaaaaaaaaaaaa",
+				gotifySkipTLSVerify: tt.skipVerify,
+				log:                 &log,
 			}
 
 			raw, err := notifier.GetURL()
@@ -42,7 +42,7 @@ func TestGotifyTypeNotifier_GetURL_TLSSkipVerify(t *testing.T) {
 			parsed, err := url.Parse(raw)
 			require.NoError(t, err)
 
-			assert.Equal(t, tt.wantSkip, parsed.Query().Get("insecureskipverify"))
+			assert.Equal(t, tt.wantSkip, parsed.Query().Get("skiptlsverify"))
 			assert.Equal(t, "gotify.example.com", parsed.Host)
 		})
 	}
