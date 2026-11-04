@@ -75,31 +75,70 @@ var (
 	errNotFound      = errors.New("not found")
 )
 
-// TestExecutePreChecks tests the ExecutePreChecks function.
+// acceptNamed is a filter that accepts only the container named "accepted".
+// The check-hook tests pass it so they can tell the supplied filter apart from
+// any filter that accepts or rejects every container.
+func acceptNamed(c types.FilterableContainer) bool { return c.Name() == "accepted" }
+
+// namedContainer returns a stopped container without labels named name. A
+// container fixes its name when it is built. Renaming it afterwards has no
+// effect on Name.
+func namedContainer(name string) *container.Container {
+	return container.NewContainer(nil,
+		&dockerContainer.InspectResponse{
+			ID:         "container_id",
+			HostConfig: &dockerContainer.HostConfig{},
+			Name:       "/" + name,
+			State:      &dockerContainer.State{Running: false},
+			Config:     &dockerContainer.Config{Labels: map[string]string{}},
+		},
+		nil,
+	)
+}
+
+// assertFilterReached verifies that ListContainers received exactly one filter
+// and that it decides like want for a container that want accepts and one it
+// rejects.
+func assertFilterReached(t *testing.T, captured []types.Filter, want types.Filter) {
+	t.Helper()
+
+	require.Len(t, captured, 1, "ListContainers should receive the hook's filter")
+
+	for _, fixture := range []types.FilterableContainer{
+		namedContainer("accepted"),
+		namedContainer("rejected"),
+	} {
+		assert.Equal(t, want(fixture), captured[0](fixture), "filter result for %s", fixture.Name())
+	}
+}
+
+// TestExecutePreChecks verifies that ExecutePreChecks lists containers with
+// the supplied filter and runs each pre-check command with the supplied
+// default UID and GID.
 func TestExecutePreChecks(t *testing.T) {
 	tests := []struct {
 		name           string
-		setupClient    func(*mockContainerClient.MockClient)
+		setupClient    func(c *mockContainerClient.MockClient, capture func(mock.Arguments))
 		expectedLogMsg string
 	}{
 		{
 			name: "successful execution",
-			setupClient: func(c *mockContainerClient.MockClient) {
-				c.On("ListContainers", mock.Anything, mock.Anything).Return([]types.Container{
+			setupClient: func(c *mockContainerClient.MockClient, capture func(mock.Arguments)) {
+				c.On("ListContainers", mock.Anything, mock.Anything).Run(capture).Return([]types.Container{
 					mockedContainer(withLabels(map[string]string{
 						"com.centurylinklabs.watchtower.lifecycle.pre-check": "pre-check",
 					})),
 					mockedContainer(),
 				}, nil)
-				c.On("ExecuteCommand", mock.Anything, mock.Anything, "pre-check", 1, 0, 0).
+				c.On("ExecuteCommand", mock.Anything, mock.Anything, "pre-check", 1, 1000, 1001).
 					Return(true, nil)
 			},
 			expectedLogMsg: "Listing containers for pre-checks",
 		},
 		{
 			name: "listing error",
-			setupClient: func(c *mockContainerClient.MockClient) {
-				c.On("ListContainers", mock.Anything, mock.Anything).Return(nil, errListingFailed)
+			setupClient: func(c *mockContainerClient.MockClient, capture func(mock.Arguments)) {
+				c.On("ListContainers", mock.Anything, mock.Anything).Run(capture).Return(nil, errListingFailed)
 			},
 			expectedLogMsg: "Listing containers for pre-checks",
 		},
@@ -108,13 +147,15 @@ func TestExecutePreChecks(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			log, logBuf := newDebugLog()
 			client := mockContainerClient.NewMockClient(t)
-			tt.setupClient(client)
-			ExecutePreChecks(log, context.Background(), client, types.UpdateParams{
-				Filter:         func(types.FilterableContainer) bool { return true },
-				LifecycleHooks: true,
-				LifecycleUID:   0,
-				LifecycleGID:   0,
-			}, nil)
+
+			var captured []types.Filter
+
+			tt.setupClient(client, func(args mock.Arguments) {
+				captured, _ = args.Get(1).([]types.Filter)
+			})
+			ExecutePreChecks(log, context.Background(), client, acceptNamed, 1000, 1001, nil)
+
+			assertFilterReached(t, captured, acceptNamed)
 
 			output := logBuf.String()
 			assert.NotEmpty(t, output, "expected log output")
@@ -125,31 +166,33 @@ func TestExecutePreChecks(t *testing.T) {
 	}
 }
 
-// TestExecutePostChecks tests the ExecutePostChecks function.
+// TestExecutePostChecks verifies that ExecutePostChecks lists containers with
+// the supplied filter and runs each post-check command with the supplied
+// default UID and GID.
 func TestExecutePostChecks(t *testing.T) {
 	tests := []struct {
 		name           string
-		setupClient    func(*mockContainerClient.MockClient)
+		setupClient    func(c *mockContainerClient.MockClient, capture func(mock.Arguments))
 		expectedLogMsg string
 	}{
 		{
 			name: "successful execution",
-			setupClient: func(c *mockContainerClient.MockClient) {
-				c.On("ListContainers", mock.Anything, mock.Anything).Return([]types.Container{
+			setupClient: func(c *mockContainerClient.MockClient, capture func(mock.Arguments)) {
+				c.On("ListContainers", mock.Anything, mock.Anything).Run(capture).Return([]types.Container{
 					mockedContainer(withLabels(map[string]string{
 						"com.centurylinklabs.watchtower.lifecycle.post-check": "post-check",
 					})),
 					mockedContainer(),
 				}, nil)
-				c.On("ExecuteCommand", mock.Anything, mock.Anything, "post-check", 1, 0, 0).
+				c.On("ExecuteCommand", mock.Anything, mock.Anything, "post-check", 1, 1000, 1001).
 					Return(true, nil)
 			},
 			expectedLogMsg: "Listing containers for post-checks",
 		},
 		{
 			name: "listing error",
-			setupClient: func(c *mockContainerClient.MockClient) {
-				c.On("ListContainers", mock.Anything, mock.Anything).Return(nil, errListingFailed)
+			setupClient: func(c *mockContainerClient.MockClient, capture func(mock.Arguments)) {
+				c.On("ListContainers", mock.Anything, mock.Anything).Run(capture).Return(nil, errListingFailed)
 			},
 			expectedLogMsg: "Listing containers for post-checks",
 		},
@@ -158,13 +201,15 @@ func TestExecutePostChecks(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			log, logBuf := newDebugLog()
 			client := mockContainerClient.NewMockClient(t)
-			tt.setupClient(client)
-			ExecutePostChecks(log, context.Background(), client, types.UpdateParams{
-				Filter:         func(types.FilterableContainer) bool { return true },
-				LifecycleHooks: true,
-				LifecycleUID:   0,
-				LifecycleGID:   0,
-			}, nil)
+
+			var captured []types.Filter
+
+			tt.setupClient(client, func(args mock.Arguments) {
+				captured, _ = args.Get(1).([]types.Filter)
+			})
+			ExecutePostChecks(log, context.Background(), client, acceptNamed, 1000, 1001, nil)
+
+			assertFilterReached(t, captured, acceptNamed)
 
 			output := logBuf.String()
 			assert.NotEmpty(t, output, "expected log output")
@@ -185,10 +230,7 @@ func TestExecutePreChecks_UsesListedContainers(t *testing.T) {
 	client.On("ExecuteCommand", mock.Anything, mock.Anything, "pre-check", 1, 0, 0).
 		Return(true, nil)
 
-	ExecutePreChecks(log, context.Background(), client, types.UpdateParams{
-		Filter:         func(types.FilterableContainer) bool { return true },
-		LifecycleHooks: true,
-	}, listed)
+	ExecutePreChecks(log, context.Background(), client, func(types.FilterableContainer) bool { return true }, 0, 0, listed)
 
 	client.AssertNotCalled(t, "ListContainers", mock.Anything, mock.Anything)
 	assert.Contains(t, logBuf.String(), "Found containers for pre-checks")
@@ -206,10 +248,7 @@ func TestExecutePostChecks_UsesListedContainers(t *testing.T) {
 	client.On("ExecuteCommand", mock.Anything, mock.Anything, "post-check", 1, 0, 0).
 		Return(true, nil)
 
-	ExecutePostChecks(log, context.Background(), client, types.UpdateParams{
-		Filter:         func(types.FilterableContainer) bool { return true },
-		LifecycleHooks: true,
-	}, listed)
+	ExecutePostChecks(log, context.Background(), client, func(types.FilterableContainer) bool { return true }, 0, 0, listed)
 
 	client.AssertNotCalled(t, "ListContainers", mock.Anything, mock.Anything)
 	assert.Contains(t, logBuf.String(), "Found containers for post-checks")
@@ -220,10 +259,7 @@ func TestExecutePreChecks_EmptyListedDoesNotRelist(t *testing.T) {
 	client := mockContainerClient.NewMockClient(t)
 	listed := []types.Container{}
 
-	ExecutePreChecks(log, context.Background(), client, types.UpdateParams{
-		Filter:         func(types.FilterableContainer) bool { return true },
-		LifecycleHooks: true,
-	}, listed)
+	ExecutePreChecks(log, context.Background(), client, func(types.FilterableContainer) bool { return true }, 0, 0, listed)
 
 	client.AssertNotCalled(t, "ListContainers", mock.Anything, mock.Anything)
 	client.AssertNotCalled(t, "ExecuteCommand", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything)
@@ -234,10 +270,7 @@ func TestExecutePostChecks_EmptyListedDoesNotRelist(t *testing.T) {
 	client := mockContainerClient.NewMockClient(t)
 	listed := []types.Container{}
 
-	ExecutePostChecks(log, context.Background(), client, types.UpdateParams{
-		Filter:         func(types.FilterableContainer) bool { return true },
-		LifecycleHooks: true,
-	}, listed)
+	ExecutePostChecks(log, context.Background(), client, func(types.FilterableContainer) bool { return true }, 0, 0, listed)
 
 	client.AssertNotCalled(t, "ListContainers", mock.Anything, mock.Anything)
 	client.AssertNotCalled(t, "ExecuteCommand", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything)

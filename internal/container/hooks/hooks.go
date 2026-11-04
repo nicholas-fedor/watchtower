@@ -26,17 +26,26 @@ var (
 //   - log: Logger for debug output.
 //   - ctx: Context for cancellation and timeout.
 //   - client: Container client for execution.
-//   - params: Update parameters with filter.
+//   - filter: Container filter applied when listed is nil.
+//   - uid: Default UID for hooks without a lifecycle UID label.
+//   - gid: Default GID for hooks without a lifecycle GID label.
 //   - listed: Already-listed containers from the current scan, or nil.
-func ExecutePreChecks(log *zerolog.Logger, ctx context.Context, client containerClient.Client, params types.UpdateParams, listed []types.Container) {
-	containers, ok := resolveCheckContainers(log, ctx, client, params, listed, "pre-checks")
+func ExecutePreChecks(
+	log *zerolog.Logger,
+	ctx context.Context,
+	client containerClient.Client,
+	filter types.Filter,
+	uid, gid int,
+	listed []types.Container,
+) {
+	containers, ok := resolveCheckContainers(log, ctx, client, filter, listed, "pre-checks")
 	if !ok {
 		// Listing failed. Hooks are skipped for this phase.
 		return
 	}
 
 	for _, currentContainer := range containers {
-		executePreCheckCommand(log, ctx, client, currentContainer, params.LifecycleUID, params.LifecycleGID)
+		executePreCheckCommand(log, ctx, client, currentContainer, uid, gid)
 	}
 }
 
@@ -49,17 +58,26 @@ func ExecutePreChecks(log *zerolog.Logger, ctx context.Context, client container
 //   - log: Logger for debug output.
 //   - ctx: Context for cancellation and timeout.
 //   - client: Container client for execution.
-//   - params: Update parameters with filter.
+//   - filter: Container filter applied when listed is nil.
+//   - uid: Default UID for hooks without a lifecycle UID label.
+//   - gid: Default GID for hooks without a lifecycle GID label.
 //   - listed: Already-listed containers from the current scan, or nil.
-func ExecutePostChecks(log *zerolog.Logger, ctx context.Context, client containerClient.Client, params types.UpdateParams, listed []types.Container) {
-	containers, ok := resolveCheckContainers(log, ctx, client, params, listed, "post-checks")
+func ExecutePostChecks(
+	log *zerolog.Logger,
+	ctx context.Context,
+	client containerClient.Client,
+	filter types.Filter,
+	uid, gid int,
+	listed []types.Container,
+) {
+	containers, ok := resolveCheckContainers(log, ctx, client, filter, listed, "post-checks")
 	if !ok {
 		// Listing failed. Hooks are skipped for this phase.
 		return
 	}
 
 	for _, currentContainer := range containers {
-		executePostCheckCommand(log, ctx, client, currentContainer, params.LifecycleUID, params.LifecycleGID)
+		executePostCheckCommand(log, ctx, client, currentContainer, uid, gid)
 	}
 }
 
@@ -69,7 +87,7 @@ func ExecutePostChecks(log *zerolog.Logger, ctx context.Context, client containe
 //   - log: Logger for debug output.
 //   - ctx: Context for cancellation and timeout.
 //   - client: Container client for listing when listed is empty.
-//   - params: Update parameters whose filter is applied to a fresh list.
+//   - filter: Container filter applied to a fresh list.
 //   - listed: Already-listed containers from the current scan, or nil.
 //   - phase: Log label for the pre-check or post-check phase.
 //
@@ -80,12 +98,12 @@ func resolveCheckContainers(
 	log *zerolog.Logger,
 	ctx context.Context,
 	client containerClient.Client,
-	params types.UpdateParams,
+	filter types.Filter,
 	listed []types.Container,
 	phase string,
 ) ([]types.Container, bool) {
 	clogVal := log.With().
-		Str("filter", fmt.Sprintf("%v", params.Filter)).
+		Str("filter", fmt.Sprintf("%v", filter)).
 		Logger()
 	clog := &clogVal
 
@@ -101,7 +119,7 @@ func resolveCheckContainers(
 	// Fetch containers using the provided filter.
 	clog.Debug().Msg("Listing containers for " + phase)
 
-	containers, err := client.ListContainers(ctx, params.Filter)
+	containers, err := client.ListContainers(ctx, filter)
 	if err != nil {
 		clog.Debug().
 			Err(err).
