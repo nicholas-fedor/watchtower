@@ -7,6 +7,7 @@ import (
 	"github.com/nicholas-fedor/watchtower/internal/container/oci"
 	"github.com/nicholas-fedor/watchtower/internal/container/redact"
 	"github.com/nicholas-fedor/watchtower/internal/observability/logging"
+	gitConfig "github.com/nicholas-fedor/watchtower/internal/settings/config/git"
 	"github.com/nicholas-fedor/watchtower/pkg/types"
 )
 
@@ -53,7 +54,7 @@ func ResolveReportMeta(
 
 	cur := oci.Read(c)
 	anns := preferAnnotations(latest, cur)
-	mapping := types.GitImage{}
+	mapping := gitConfig.Image{}
 
 	if params.GitImages != nil {
 		mapping = params.GitImages[c.ImageName()]

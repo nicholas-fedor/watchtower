@@ -7,7 +7,6 @@ import (
 	"time"
 
 	"github.com/nicholas-fedor/watchtower/internal/git/semver"
-	"github.com/nicholas-fedor/watchtower/pkg/types"
 )
 
 const (
@@ -23,6 +22,21 @@ var (
 	// ErrInvalidComposeProject indicates a --compose-project value is not name=/path.
 	ErrInvalidComposeProject = errors.New("invalid --compose-project value")
 )
+
+// Image is a non-secret Git association for one image, set with the
+// git-image configuration option.
+type Image struct {
+	// Repo is the Git repository URL.
+	Repo string `json:"repo"`
+	// Ref is the branch or tag to follow.
+	Ref string `json:"ref"`
+	// Policy is the semver policy for release tags.
+	Policy string `json:"policy"`
+	// Dockerfile is the Dockerfile path relative to the build context.
+	Dockerfile string `json:"dockerfile,omitempty"`
+	// Context is the subdirectory of the repository used as the build context.
+	Context string `json:"context,omitempty"`
+}
 
 // Git holds process-wide Git metadata and watcher settings.
 type Git struct {
@@ -53,7 +67,7 @@ type Git struct {
 	// Context is the process-wide default subdirectory of a Git URL context used as the Docker build context.
 	Context string
 	// Images maps exact image names (including tag) to Git associations.
-	Images map[string]types.GitImage
+	Images map[string]Image
 	// ComposeStash saves and restores local Compose project files around checkout.
 	ComposeStash bool
 	// ComposeProjects maps Compose project name to a directory inside Watchtower.
@@ -72,22 +86,22 @@ type Git struct {
 //   - image: Exact image name including tag.
 //   - mapping: Parsed repo, ref, and policy.
 //   - error: Non-nil when the value is malformed or the policy is unknown.
-func parseImageMapping(raw string) (string, types.GitImage, error) {
+func parseImageMapping(raw string) (string, Image, error) {
 	raw = strings.TrimSpace(raw)
 	if raw == "" {
-		return "", types.GitImage{}, fmt.Errorf("%w: empty value", ErrInvalidGitImage)
+		return "", Image{}, fmt.Errorf("%w: empty value", ErrInvalidGitImage)
 	}
 
 	image, rest, ok := strings.Cut(raw, "=")
 	if !ok {
-		return "", types.GitImage{}, fmt.Errorf("%w: %q (want image=repo[#ref][@policy])", ErrInvalidGitImage, raw)
+		return "", Image{}, fmt.Errorf("%w: %q (want image=repo[#ref][@policy])", ErrInvalidGitImage, raw)
 	}
 
 	image = strings.TrimSpace(image)
 	rest = strings.TrimSpace(rest)
 
 	if image == "" || rest == "" {
-		return "", types.GitImage{}, fmt.Errorf("%w: %q (want image=repo[#ref][@policy])", ErrInvalidGitImage, raw)
+		return "", Image{}, fmt.Errorf("%w: %q (want image=repo[#ref][@policy])", ErrInvalidGitImage, raw)
 	}
 
 	policy := DefaultPolicy
@@ -98,7 +112,7 @@ func parseImageMapping(raw string) (string, types.GitImage, error) {
 			policy = parsed
 			rest = rest[:at]
 		} else if isPolicyToken(suffix) {
-			return "", types.GitImage{}, fmt.Errorf("%w: %q", semver.ErrInvalidPolicy, suffix)
+			return "", Image{}, fmt.Errorf("%w: %q", semver.ErrInvalidPolicy, suffix)
 		}
 	}
 
@@ -114,10 +128,10 @@ func parseImageMapping(raw string) (string, types.GitImage, error) {
 
 	repo := strings.TrimSpace(rest)
 	if repo == "" {
-		return "", types.GitImage{}, fmt.Errorf("%w: %q (empty repo)", ErrInvalidGitImage, raw)
+		return "", Image{}, fmt.Errorf("%w: %q (empty repo)", ErrInvalidGitImage, raw)
 	}
 
-	return image, types.GitImage{
+	return image, Image{
 		Repo:   repo,
 		Ref:    ref,
 		Policy: policy,
@@ -132,14 +146,14 @@ func parseImageMapping(raw string) (string, types.GitImage, error) {
 //   - values: Raw mapping strings.
 //
 // Returns:
-//   - map[string]types.GitImage: Image name to mapping.
+//   - map[string]Image: Image name to mapping.
 //   - error: Non-nil when any value is invalid.
-func ParseImageMappings(values []string) (map[string]types.GitImage, error) {
+func ParseImageMappings(values []string) (map[string]Image, error) {
 	if len(values) == 0 {
-		return map[string]types.GitImage{}, nil
+		return map[string]Image{}, nil
 	}
 
-	images := make(map[string]types.GitImage, len(values))
+	images := make(map[string]Image, len(values))
 
 	for _, raw := range values {
 		raw = strings.TrimSpace(raw)

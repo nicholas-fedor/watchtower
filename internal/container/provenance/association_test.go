@@ -10,6 +10,7 @@ import (
 
 	"github.com/nicholas-fedor/watchtower/internal/container/labels"
 	"github.com/nicholas-fedor/watchtower/internal/git/semver"
+	gitConfig "github.com/nicholas-fedor/watchtower/internal/settings/config/git"
 	"github.com/nicholas-fedor/watchtower/pkg/types"
 	typemocks "github.com/nicholas-fedor/watchtower/pkg/types/mocks"
 )
@@ -90,7 +91,7 @@ func TestResolveAssociation(t *testing.T) {
 			GitSemverPolicy: semver.PolicyPatch,
 			GitDockerfile:   "Dockerfile",
 			GitContext:      ".",
-			GitImages: map[string]types.GitImage{
+			GitImages: map[string]gitConfig.Image{
 				"myapp:latest": {Repo: "https://github.com/org/from-map.git", Ref: "mapped"},
 			},
 		})
@@ -168,7 +169,7 @@ func TestResolveAssociation(t *testing.T) {
 		}, "myapp:latest")
 
 		got, ok := ResolveAssociation(c, types.UpdateParams{
-			GitImages: map[string]types.GitImage{
+			GitImages: map[string]gitConfig.Image{
 				"myapp:latest": {Repo: "https://github.com/org/mapped.git", Policy: semver.PolicyMinor},
 			},
 		})
@@ -185,7 +186,7 @@ func TestResolveAssociation(t *testing.T) {
 		}, "myapp:latest")
 
 		got, ok := ResolveAssociation(c, types.UpdateParams{
-			GitImages: map[string]types.GitImage{
+			GitImages: map[string]gitConfig.Image{
 				"myapp:latest": {
 					Repo:       "https://github.com/org/mapped.git",
 					Ref:        "v1",
@@ -214,7 +215,7 @@ func TestResolveAssociation(t *testing.T) {
 			GitSemverPolicy: semver.PolicyMajor,
 			GitDockerfile:   "ci/Dockerfile",
 			GitContext:      "docker",
-			GitImages: map[string]types.GitImage{
+			GitImages: map[string]gitConfig.Image{
 				"myapp:latest": {Repo: "https://github.com/org/mapped.git"},
 			},
 		})
@@ -312,14 +313,14 @@ func TestRefLabel(t *testing.T) {
 func TestImageMapping(t *testing.T) {
 	t.Parallel()
 
-	images := map[string]types.GitImage{
+	images := map[string]gitConfig.Image{
 		"myapp:latest": {Repo: "https://github.com/org/app.git"},
 	}
 
 	assert.Equal(t, images["myapp:latest"], imageMapping("myapp:latest", images))
-	assert.Equal(t, types.GitImage{}, imageMapping("other:latest", images))
-	assert.Equal(t, types.GitImage{}, imageMapping("myapp:latest", nil))
-	assert.Equal(t, types.GitImage{}, imageMapping("", images))
+	assert.Equal(t, gitConfig.Image{}, imageMapping("other:latest", images))
+	assert.Equal(t, gitConfig.Image{}, imageMapping("myapp:latest", nil))
+	assert.Equal(t, gitConfig.Image{}, imageMapping("", images))
 }
 
 func TestPersistWatch(t *testing.T) {

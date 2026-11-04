@@ -9,6 +9,7 @@ import (
 
 	"github.com/nicholas-fedor/watchtower/internal/container/labels"
 	"github.com/nicholas-fedor/watchtower/internal/container/oci"
+	gitConfig "github.com/nicholas-fedor/watchtower/internal/settings/config/git"
 	"github.com/nicholas-fedor/watchtower/internal/testutil/containerfixture"
 	"github.com/nicholas-fedor/watchtower/internal/testutil/logcapture"
 	"github.com/nicholas-fedor/watchtower/internal/testutil/modelfixture"
@@ -43,7 +44,7 @@ func TestResolveReportMeta(t *testing.T) {
 		)
 
 		meta := ResolveReportMeta(c, types.UpdateParams{
-			GitImages: map[string]types.GitImage{
+			GitImages: map[string]gitConfig.Image{
 				"myapp:latest": {
 					Repo: "https://github.com/org/from-map.git",
 					Ref:  "mapped",
@@ -112,7 +113,7 @@ func TestResolveReportMeta(t *testing.T) {
 		)
 
 		mapped := ResolveReportMeta(c, types.UpdateParams{
-			GitImages: map[string]types.GitImage{
+			GitImages: map[string]gitConfig.Image{
 				"myapp:latest": {Repo: "https://github.com/org/from-map.git", Ref: "mapped"},
 			},
 		}, ChangelogVars{}, oci.Annotations{})
@@ -308,7 +309,7 @@ func TestResolveReportMeta(t *testing.T) {
 		c := modelfixture.Container(containerfixture.WithImageName("myapp:latest"))
 
 		meta := ResolveReportMeta(c, types.UpdateParams{
-			GitImages: map[string]types.GitImage{
+			GitImages: map[string]gitConfig.Image{
 				"myapp:latest": {Ref: "from-map"},
 			},
 		}, ChangelogVars{}, oci.Annotations{})
