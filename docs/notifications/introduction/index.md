@@ -18,7 +18,7 @@ The format is the same for all services, but the parameters, path, and credentia
 
 The [`NOTIFICATION URL`](../../configuration/notifications/index.md#notification_url) configuration option can also reference a file, in which case the contents of the file are used.
 
-Watchtower checks every notification URL when it starts. If Shoutrrr cannot use a URL, such as one with no host or with a token that is not in the service's format, Watchtower logs `Failed to initialize notifications` with an error that names the service and the problem, then exits. As with any other [startup error](../../configuration/introduction/index.md#overview), Watchtower first sets the container's restart policy to `no`. The container then does not restart in a loop.
+Watchtower checks every notification URL when it starts. If Shoutrrr cannot use a URL, such as one with no host or with a token that is not in the service's format, Watchtower logs `Failed to initialize notifications` with an error that names the service and the problem, then exits. As with any other [startup error](../../configuration/introduction/index.md#overview), Watchtower first finds its own container and sets its restart policy to `no`, which keeps the container from restarting in a loop. If Watchtower cannot find its container or change the policy, it logs an error and still exits with code 1. The container's restart policy can then restart it in a loop.
 
 ### Using Multiple Notification Services
 
