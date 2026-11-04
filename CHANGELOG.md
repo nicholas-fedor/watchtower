@@ -18,6 +18,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Pass git defaults instead of update params by @nicholas-fedor in [#3432](https://github.com/nicholas-fedor/watchtower/pull/3432)
 - Move GitImage to settings/config/git by @nicholas-fedor in [#3430](https://github.com/nicholas-fedor/watchtower/pull/3430)
 
+### Chores
+
+- Update github/codeql-action action to v4.39.3 by @renovate[bot] in [#3436](https://github.com/nicholas-fedor/watchtower/pull/3436)
+
 ## [1.24.0] - 2026-11-04
 
 ### Added
