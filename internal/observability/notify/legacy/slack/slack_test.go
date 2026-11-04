@@ -8,6 +8,8 @@ import (
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+
+	notifyConfig "github.com/nicholas-fedor/watchtower/internal/settings/config/notify"
 )
 
 // TestSlackTypeNotifier_GetURL_Channel verifies that a legacy Slack channel
@@ -126,6 +128,47 @@ func TestSlackTypeNotifier_GetURL_Discord(t *testing.T) {
 			assert.Equal(t, "discord", parsed.Scheme)
 			assert.Equal(t, "abc", parsed.User.Username())
 			assert.Equal(t, "123", parsed.Host)
+		})
+	}
+}
+
+// TestNew verifies that New rejects settings without a hook URL and builds a
+// notifier when one is set.
+func TestNew(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name    string
+		cfg     notifyConfig.Legacy
+		wantErr error
+	}{
+		{
+			name: "hook URL",
+			cfg:  notifyConfig.Legacy{SlackHookURL: "https://hooks.slack.com/services/AAA/BBB/CCC"},
+		},
+		{
+			name:    "no hook URL",
+			cfg:     notifyConfig.Legacy{},
+			wantErr: errEmptyHookURL,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			log := zerolog.Nop()
+			notifier, err := New(&log, tt.cfg)
+
+			if tt.wantErr != nil {
+				require.ErrorIs(t, err, tt.wantErr)
+				assert.Nil(t, notifier)
+
+				return
+			}
+
+			require.NoError(t, err)
+			assert.NotNil(t, notifier)
 		})
 	}
 }

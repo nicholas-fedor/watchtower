@@ -371,7 +371,7 @@ func TestNotifier(t *testing.T) {
 				expectNewNotifierFatal(t, []string{
 					"--notifications",
 					"slack",
-				}, "Slack hook URL is empty.")
+				}, "Failed to create notification config", `create "slack" notification config: the notification-slack-hook-url configuration option is empty`)
 			})
 		})
 	})
@@ -583,7 +583,7 @@ func TestNotifier(t *testing.T) {
 					"to@example.com",
 					"--notification-email-server",
 					"mail.example.com",
-				}, "Email from address is empty.")
+				}, "Failed to create notification config", `create "email" notification config: the notification-email-from configuration option is empty`)
 			})
 
 			t.Run("should fatal when the to address is empty", func(t *testing.T) {
@@ -596,7 +596,7 @@ func TestNotifier(t *testing.T) {
 					"from@example.com",
 					"--notification-email-server",
 					"mail.example.com",
-				}, "Email to address is empty.")
+				}, "Failed to create notification config", `create "email" notification config: the notification-email-to configuration option is empty`)
 			})
 
 			t.Run("should fatal when the server is empty", func(t *testing.T) {
@@ -609,7 +609,7 @@ func TestNotifier(t *testing.T) {
 					"from@example.com",
 					"--notification-email-to",
 					"to@example.com",
-				}, "Email server is empty.")
+				}, "Failed to create notification config", `create "email" notification config: the notification-email-server configuration option is empty`)
 			})
 		})
 	})
@@ -623,7 +623,7 @@ func TestNotifier(t *testing.T) {
 			expectNewNotifierFatal(t, []string{
 				"--notifications",
 				"carrier-pigeon",
-			}, "Unknown notification type")
+			}, "Unknown notification type", `unknown notification type: "carrier-pigeon"`)
 		})
 
 		t.Run("should fatal when the notifier cannot build its URL", func(t *testing.T) {
@@ -634,7 +634,8 @@ func TestNotifier(t *testing.T) {
 				"slack",
 				"--notification-slack-hook-url",
 				"https://discord.com/api/webhooks/123/abc",
-			}, "Failed to create notification config")
+			}, "Failed to create notification config",
+				`create "slack" notification config: invalid Discord webhook URL, expected https://discord.com/api/webhooks/<id>/<token>/slack`)
 		})
 	})
 }
@@ -714,8 +715,9 @@ func TestBuildURLs_LogsShoutrrrWarnings(t *testing.T) {
 }
 
 // TestBuildURLs_ConversionErrors verifies that BuildURLs returns an error that
-// names the legacy type for an unknown type and for a legacy notifier that
-// cannot generate its URL.
+// names the legacy type when a type cannot be converted. That covers an
+// unknown type and a missing required setting. It also covers a legacy
+// notifier that cannot generate its URL.
 func TestBuildURLs_ConversionErrors(t *testing.T) {
 	t.Parallel()
 
@@ -735,7 +737,12 @@ func TestBuildURLs_ConversionErrors(t *testing.T) {
 				LegacyTypes: []string{"slack"},
 				Legacy:      notifyConfig.Legacy{SlackHookURL: "https://discord.com/api/webhooks/123/abc"},
 			},
-			wantErr: `create "slack" notification config`,
+			wantErr: `create "slack" notification config: invalid Discord webhook URL`,
+		},
+		{
+			name:    "missing required setting",
+			cfg:     notifyConfig.Notify{LegacyTypes: []string{"slack"}},
+			wantErr: `create "slack" notification config: the notification-slack-hook-url configuration option is empty`,
 		},
 	}
 
@@ -780,21 +787,10 @@ func TestBuildURLs_ConvertsEveryLegacyType(t *testing.T) {
 
 // TestBuildURLs_StopsAtTheFirstRejectedURL verifies that BuildURLs checks each
 // converted URL before it builds the next legacy notifier. Shoutrrr rejects the
-// Slack hook's Discord URL. The email notifier is then never built, which would
-// exit the process for its empty settings. The test replaces zerolog's fatal
-// exit and holds the lock the other fatal tests share.
+// Slack hook's Discord URL. The email notifier, whose settings are all empty,
+// would return its own error if it were built first.
 func TestBuildURLs_StopsAtTheFirstRejectedURL(t *testing.T) {
 	t.Parallel()
-
-	fatalExitMu.Lock()
-	defer fatalExitMu.Unlock()
-
-	oldFatalExit := zerolog.FatalExitFunc
-	defer func() { zerolog.FatalExitFunc = oldFatalExit }()
-
-	zerolog.FatalExitFunc = func() {
-		panic("fatal exit")
-	}
 
 	cfg := notifyConfig.Notify{
 		LegacyTypes: []string{"slack", "email"},
@@ -803,14 +799,7 @@ func TestBuildURLs_StopsAtTheFirstRejectedURL(t *testing.T) {
 		},
 	}
 
-	var (
-		urls []string
-		err  error
-	)
-
-	require.NotPanics(t, func() {
-		urls, err = BuildURLs(nil, cfg)
-	})
+	urls, err := BuildURLs(nil, cfg)
 	require.ErrorContains(t, err, `check "slack" notification URL`)
 	assert.Nil(t, urls)
 }
@@ -823,7 +812,8 @@ func TestBuildURLs_StopsAtTheFirstRejectedURL(t *testing.T) {
 //   - t: Test that receives the failures.
 //   - args: CLI flags to load before constructing the notifier
 //   - wantMsg: exact fatal message text expected in the log output
-func expectNewNotifierFatal(t *testing.T, args []string, wantMsg string) {
+//   - wantErr: exact error text expected in the fatal log entry
+func expectNewNotifierFatal(t *testing.T, args []string, wantMsg, wantErr string) {
 	t.Helper()
 
 	fatalExitMu.Lock()
@@ -846,8 +836,10 @@ func expectNewNotifierFatal(t *testing.T, args []string, wantMsg string) {
 		NewNotifier(&log, cfg)
 	})
 
-	out := buf.String()
-	assert.Contains(t, out, `"message":"`+wantMsg+`"`, "expected exact fatal message %q in output:\n%s", wantMsg, out)
+	entries := logcapture.Entries[logcapture.Entry](t, buf.String())
+	require.Len(t, entries, 1)
+	assert.Equal(t, wantMsg, entries[0]["message"])
+	assert.Equal(t, wantErr, entries[0]["error"])
 }
 
 // TODO: Remove buildExpectedURL helper when legacy notification tests are removed.

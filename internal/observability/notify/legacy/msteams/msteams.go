@@ -28,6 +28,8 @@ const Type = "msteams"
 var (
 	// errParseWebhookFailed indicates a failure to parse the Microsoft Teams webhook URL.
 	errParseWebhookFailed = errors.New("failed to parse Microsoft Teams webhook URL")
+	// errEmptyWebhookURL indicates that no Microsoft Teams webhook URL is set.
+	errEmptyWebhookURL = errors.New("the notification-msteams-hook configuration option is empty")
 )
 
 // msTeamsTypeNotifier handles Microsoft Teams notifications via webhook.
@@ -46,11 +48,12 @@ type msTeamsTypeNotifier struct {
 // New creates a Teams notifier from resolved legacy settings.
 //
 // Parameters:
-//   - log: Logger for configuration diagnostics and fatal validation errors.
+//   - log: Logger for configuration diagnostics.
 //   - cfg: Deprecated MSTeams webhook settings (from process config or flags).
 //
 // Returns:
 //   - types.ConvertibleNotifier: New Teams notifier instance.
+//   - error: Non-nil when the webhook URL is empty.
 //
 // Deprecated: Legacy msteams notifier is deprecated.
 // Use --notification-url with a teams:// URL instead.
@@ -58,15 +61,13 @@ type msTeamsTypeNotifier struct {
 // TODO: Remove New for the v2 release.
 //
 //nolint:godox
-func New(log *zerolog.Logger, cfg notifyConfig.Legacy) types.ConvertibleNotifier {
+func New(log *zerolog.Logger, cfg notifyConfig.Legacy) (types.ConvertibleNotifier, error) {
 	webHookURL := cfg.MSTeamsHook
-	clog := log.With().Str("url", redact.ServiceURL(webHookURL)).Logger()
-
-	if len(webHookURL) == 0 {
-		clog.Fatal().Msg("Microsoft Teams webhook URL is empty")
+	if webHookURL == "" {
+		return nil, errEmptyWebhookURL
 	}
 
-	return &msTeamsTypeNotifier{webHookURL: webHookURL, log: log}
+	return &msTeamsTypeNotifier{webHookURL: webHookURL, log: log}, nil
 }
 
 // GetURL generates the Teams service URL from the notifier's webhook.
