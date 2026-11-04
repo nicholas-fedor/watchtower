@@ -12,6 +12,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Keep the hostname of podman containers on recreation by @nicholas-fedor in [#3428](https://github.com/nicholas-fedor/watchtower/pull/3428)
 
+### Changed
+
+- Move GitImage to settings/config/git by @nicholas-fedor in [#3430](https://github.com/nicholas-fedor/watchtower/pull/3430)
+
 ## [1.24.0] - 2026-11-04
 
 ### Added
