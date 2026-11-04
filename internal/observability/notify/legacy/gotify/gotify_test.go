@@ -94,6 +94,11 @@ func TestNew(t *testing.T) {
 			cfg:     notifyConfig.Legacy{GotifyURL: "http://gotify.example.com"},
 			wantErr: errEmptyToken,
 		},
+		{
+			name:    "neither URL nor token",
+			cfg:     notifyConfig.Legacy{},
+			wantErr: errEmptyToken,
+		},
 	}
 
 	for _, tt := range tests {
