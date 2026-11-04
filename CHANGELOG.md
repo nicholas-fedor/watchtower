@@ -14,6 +14,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Report rejected notification urls the same way at startup by @nicholas-fedor in [#3427](https://github.com/nicholas-fedor/watchtower/pull/3427)
+- Exit through startup's exit path when notifications fail to initialize by @nicholas-fedor in [#3425](https://github.com/nicholas-fedor/watchtower/pull/3425)
 - Return errors for missing legacy notifier settings by @nicholas-fedor in [#3423](https://github.com/nicholas-fedor/watchtower/pull/3423)
 - Check upgraded notification urls with shoutrrr by @nicholas-fedor in [#3419](https://github.com/nicholas-fedor/watchtower/pull/3419)
 - Stop panicking and waiting out delays after close by @nicholas-fedor in [#3417](https://github.com/nicholas-fedor/watchtower/pull/3417)
