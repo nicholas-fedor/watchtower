@@ -2123,7 +2123,7 @@ func TestClientErrorsNamedOnce(t *testing.T) {
 					client,
 					types.UpdateParams{Timeout: time.Second},
 				)
-				require.ErrorIs(t, err, clientErr)
+				require.Same(t, clientErr, err)
 				require.EqualError(t, err, text)
 				assert.False(t, stopped)
 			})
@@ -2142,7 +2142,7 @@ func TestClientErrorsNamedOnce(t *testing.T) {
 			Return("", clientErr)
 
 		_, _, err := restartStaleContainer(newTestLogger(t), t.Context(), source, client, types.UpdateParams{})
-		require.ErrorIs(t, err, clientErr)
+		require.Same(t, clientErr, err)
 		require.EqualError(t, err, text)
 	})
 
@@ -2167,7 +2167,7 @@ func TestClientErrorsNamedOnce(t *testing.T) {
 			client,
 			types.UpdateParams{ReviveStopped: true},
 		)
-		require.ErrorIs(t, err, clientErr)
+		require.Same(t, clientErr, err)
 		require.EqualError(t, err, text)
 	})
 }
