@@ -516,6 +516,29 @@ func TestClose_ConcurrentSendDoesNotPanic(t *testing.T) {
 	}
 }
 
+// TestClose_SendPastClosedCheckDoesNotPanic verifies that a sender does not
+// panic when it read the notifier as open before Close ran and queues its
+// message after Close returns. Clearing the closed flag after Close gives the
+// sender the state it would have seen, without pausing it inside sendEntries.
+// The message stays in the queue that no worker reads.
+func TestClose_SendPastClosedCheckDoesNotPanic(t *testing.T) {
+	t.Parallel()
+
+	log := zerolog.Nop()
+	notifier := createTestNotifier(&log, []string{}, allButTrace, true, format.StaticData{}, false, 0)
+	notifier.Router = &recordingRouter{}
+	notifier.RegisterHook(&log)
+	notifier.Close()
+
+	notifier.closed.Store(false)
+
+	require.NotPanics(t, func() {
+		notifier.sendEntries([]*format.Entry{{Level: "info", Message: "late"}}, nil)
+	})
+
+	assert.Len(t, notifier.messages, 1)
+}
+
 // TestLL_WithoutLogger verifies that a notifier without its loop-safe logger,
 // or a nil notifier, logs to a discarding logger instead of panicking.
 func TestLL_WithoutLogger(t *testing.T) {
