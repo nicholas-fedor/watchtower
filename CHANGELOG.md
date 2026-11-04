@@ -14,6 +14,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- Pass the update policy instead of update params by @nicholas-fedor in [#3442](https://github.com/nicholas-fedor/watchtower/pull/3442)
 - Pass the filter and default user to check hooks by @nicholas-fedor in [#3434](https://github.com/nicholas-fedor/watchtower/pull/3434)
 - Pass git defaults instead of update params by @nicholas-fedor in [#3432](https://github.com/nicholas-fedor/watchtower/pull/3432)
 - Move GitImage to settings/config/git by @nicholas-fedor in [#3430](https://github.com/nicholas-fedor/watchtower/pull/3430)
