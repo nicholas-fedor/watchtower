@@ -8,6 +8,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- Keep the hostname of podman containers on recreation by @nicholas-fedor in [#3428](https://github.com/nicholas-fedor/watchtower/pull/3428)
+
+## [1.24.0] - 2026-11-04
+
 ### Added
 
 - Support check hook timeout labels by @nicholas-fedor in [#3244](https://github.com/nicholas-fedor/watchtower/pull/3244)
@@ -4271,7 +4277,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## Compare Releases
 
-- [unreleased](https://github.com/nicholas-fedor/watchtower/compare/v1.23.2...HEAD)
+- [unreleased](https://github.com/nicholas-fedor/watchtower/compare/v1.24.0...HEAD)
+- [1.24.0](https://github.com/nicholas-fedor/watchtower/compare/v1.23.2...v1.24.0)
 - [1.23.2](https://github.com/nicholas-fedor/watchtower/compare/v1.23.1...v1.23.2)
 - [1.23.1](https://github.com/nicholas-fedor/watchtower/compare/v1.23.0...v1.23.1)
 - [1.23.0](https://github.com/nicholas-fedor/watchtower/compare/v1.22.3...v1.23.0)
