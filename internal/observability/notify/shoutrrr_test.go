@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"io"
 	"os"
 	"os/exec"
 	"sync/atomic"
@@ -705,4 +706,50 @@ func TestCreateNotifier_LogsShoutrrrRecordsAtTheirLevel(t *testing.T) {
 		{Level: "", Message: "Shoutrrr: Found new image", Notify: "no"},
 		{Level: "warn", Message: "Shoutrrr: sending without TLS", Notify: "no"},
 	}, logcapture.Entries[entry](t, buf.String()))
+}
+
+// TestCreateNotifier_PrintsLoggerTextToStdout verifies that with stdout set,
+// the logger service's text goes to standard output without the Shoutrrr
+// prefix. Only Shoutrrr's own records reach the Watchtower log.
+//
+// It replaces os.Stdout. It does not run in parallel for that reason.
+func TestCreateNotifier_PrintsLoggerTextToStdout(t *testing.T) {
+	reader, writer, err := os.Pipe()
+	require.NoError(t, err)
+
+	stdout := os.Stdout
+	os.Stdout = writer
+
+	t.Cleanup(func() { os.Stdout = stdout })
+
+	log, buf := logcapture.NewJSON(zerolog.InfoLevel)
+
+	notifier := createTestNotifier(
+		log,
+		[]string{"logger://", newGenericWebhookURL(t)},
+		zerolog.InfoLevel,
+		false,
+		format.StaticData{},
+		true,
+		0,
+	)
+	t.Cleanup(notifier.Close)
+
+	for _, err := range notifier.Router.Send("Found new image", notifier.params) {
+		require.NoError(t, err)
+	}
+
+	os.Stdout = stdout
+
+	require.NoError(t, writer.Close())
+
+	printed, err := io.ReadAll(reader)
+	require.NoError(t, err)
+	require.NoError(t, reader.Close())
+
+	assert.Equal(t, "Found new image\n", string(printed))
+
+	logs := buf.String()
+	assert.Equal(t, []string{"Shoutrrr: sending without TLS"}, logcapture.Messages(t, logs, "warn"))
+	assert.NotContains(t, logs, "Found new image")
 }

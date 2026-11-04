@@ -98,6 +98,23 @@ func TestNewShoutrrrLogger(t *testing.T) {
 	}
 }
 
+// TestShoutrrrLogHandler_DropsInfoRecordsBelowLevel verifies that an info
+// record with a source is dropped when the records logger is at the error
+// level. The handler accepts the info level for the logger service's text, so
+// the records logger must still filter Shoutrrr's own info records.
+func TestShoutrrrLogHandler_DropsInfoRecordsBelowLevel(t *testing.T) {
+	t.Parallel()
+
+	records, recordsBuf := logcapture.NewJSON(zerolog.ErrorLevel)
+	textBuf := &logcapture.Buffer{}
+
+	logger := newShoutrrrLogger(records, textBuf, "").Slog()
+	logger.Info("response received", "status", 204)
+
+	assert.Empty(t, recordsBuf.String())
+	assert.Empty(t, textBuf.String())
+}
+
 // TestShoutrrrLogHandler_WithGroup verifies that a group nests the attributes
 // of the records the handler logs, as slog's groups do.
 func TestShoutrrrLogHandler_WithGroup(t *testing.T) {
