@@ -30,6 +30,12 @@ const defaultTimeout = 10 * time.Second
 var (
 	// errInvalidPortRange indicates that the specified SMTP port is outside the valid range (0-65535).
 	errInvalidPortRange = errors.New("port out of valid range (0-65535)")
+	// errEmptyFrom indicates that no sender address is set.
+	errEmptyFrom = errors.New("the notification-email-from configuration option is empty")
+	// errEmptyTo indicates that no recipient address is set.
+	errEmptyTo = errors.New("the notification-email-to configuration option is empty")
+	// errEmptyServer indicates that no SMTP server is set.
+	errEmptyServer = errors.New("the notification-email-server configuration option is empty")
 )
 
 // emailTypeNotifier handles email notifications via SMTP.
@@ -52,11 +58,13 @@ type emailTypeNotifier struct {
 // New creates an email notifier from resolved legacy settings.
 //
 // Parameters:
-//   - log: Logger for configuration diagnostics and fatal validation errors.
+//   - log: Logger for configuration diagnostics.
 //   - cfg: Deprecated email SMTP settings (from process config or flags).
 //
 // Returns:
 //   - types.ConvertibleNotifier: New email notifier instance.
+//   - error: Non-nil when a required setting is empty: the from address, the
+//     to address or the server.
 //
 // Deprecated: Legacy email notifier is deprecated.
 // Use --notification-url with an smtp:// URL instead.
@@ -64,17 +72,17 @@ type emailTypeNotifier struct {
 // TODO: Remove New for the v2 release.
 //
 //nolint:godox
-func New(log *zerolog.Logger, cfg notifyConfig.Legacy) types.ConvertibleNotifier {
+func New(log *zerolog.Logger, cfg notifyConfig.Legacy) (types.ConvertibleNotifier, error) {
 	if cfg.EmailFrom == "" {
-		log.Fatal().Msg("Email from address is empty.")
+		return nil, errEmptyFrom
 	}
 
 	if cfg.EmailTo == "" {
-		log.Fatal().Msg("Email to address is empty.")
+		return nil, errEmptyTo
 	}
 
 	if cfg.EmailServer == "" {
-		log.Fatal().Msg("Email server is empty.")
+		return nil, errEmptyServer
 	}
 
 	from := cfg.EmailFrom
@@ -114,7 +122,7 @@ func New(log *zerolog.Logger, cfg notifyConfig.Legacy) types.ConvertibleNotifier
 		tlsSkipVerify: tlsSkipVerify,
 		delay:         time.Duration(delay) * time.Second,
 		log:           log,
-	}
+	}, nil
 }
 
 // GetURL generates the SMTP URL from the notifier's configuration.

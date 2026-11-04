@@ -197,6 +197,11 @@ func TestNotifyUpgrade_Failures(t *testing.T) {
 			wantMessage: "build notification URLs",
 		},
 		{
+			name:        "legacy notifier without its required setting",
+			args:        []string{"--notifications", "slack"},
+			wantMessage: `create "slack" notification config: the notification-slack-hook-url configuration option is empty`,
+		},
+		{
 			name:        "working directory is not writable",
 			readOnlyDir: true,
 			wantMessage: "failed to create output file",

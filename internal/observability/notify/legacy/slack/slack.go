@@ -47,6 +47,9 @@ var slackChannelIDPattern = regexp.MustCompile(`^[CGD][A-Z0-9]{8,}$`)
 // discordAPIVersionPattern matches a Discord API version path segment, such as v10.
 var discordAPIVersionPattern = regexp.MustCompile(`^v[0-9]+$`)
 
+// errEmptyHookURL indicates that no Slack hook URL is set.
+var errEmptyHookURL = errors.New("the notification-slack-hook-url configuration option is empty")
+
 // errInvalidDiscordWebhookURL indicates a Discord wrapper hook URL that does
 // not have the form https://discord.com/api/webhooks/<id>/<token>/slack.
 var errInvalidDiscordWebhookURL = errors.New(
@@ -75,11 +78,12 @@ type slackTypeNotifier struct {
 // New creates a Slack notifier from resolved legacy settings.
 //
 // Parameters:
-//   - log: Logger for configuration diagnostics and fatal validation errors.
+//   - log: Logger for configuration diagnostics.
 //   - cfg: Deprecated Slack/Discord webhook settings (from process config or flags).
 //
 // Returns:
 //   - types.ConvertibleNotifier: New Slack notifier instance.
+//   - error: Non-nil when the hook URL is empty.
 //
 // Deprecated: Legacy slack notifier is deprecated.
 // Use --notification-url with a slack:// or discord:// URL instead.
@@ -87,7 +91,7 @@ type slackTypeNotifier struct {
 // TODO: Remove New for the v2 release.
 //
 //nolint:godox
-func New(log *zerolog.Logger, cfg notifyConfig.Legacy) types.ConvertibleNotifier {
+func New(log *zerolog.Logger, cfg notifyConfig.Legacy) (types.ConvertibleNotifier, error) {
 	hookURL := cfg.SlackHookURL
 	userName := cfg.SlackIdentifier
 	channel := cfg.SlackChannel
@@ -95,7 +99,7 @@ func New(log *zerolog.Logger, cfg notifyConfig.Legacy) types.ConvertibleNotifier
 	iconURL := cfg.SlackIconURL
 
 	if hookURL == "" {
-		log.Fatal().Msg("Slack hook URL is empty.")
+		return nil, errEmptyHookURL
 	}
 
 	log.Debug().
@@ -113,7 +117,7 @@ func New(log *zerolog.Logger, cfg notifyConfig.Legacy) types.ConvertibleNotifier
 		IconEmoji: emoji,
 		IconURL:   iconURL,
 		log:       log,
-	}
+	}, nil
 }
 
 // GetURL generates the Slack webhook URL for the notifier.

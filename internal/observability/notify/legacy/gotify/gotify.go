@@ -1,6 +1,7 @@
 package gotify
 
 import (
+	"errors"
 	"fmt"
 	"net/url"
 	"strings"
@@ -24,6 +25,16 @@ import (
 //nolint:godox
 const Type = "gotify"
 
+// Errors for Gotify notification configuration.
+var (
+	// errEmptyURL indicates that no Gotify server URL is set.
+	errEmptyURL = errors.New("the notification-gotify-url configuration option is empty")
+	// errURLScheme indicates a Gotify server URL that is not an HTTP or HTTPS URL.
+	errURLScheme = errors.New(`the notification-gotify-url configuration option must start with "http://" or "https://"`)
+	// errEmptyToken indicates that no Gotify application token is set.
+	errEmptyToken = errors.New("the notification-gotify-token configuration option is empty")
+)
+
 // gotifyTypeNotifier handles Gotify notifications.
 //
 // It configures URL, token, and TLS settings.
@@ -44,11 +55,13 @@ type gotifyTypeNotifier struct {
 // New creates a Gotify notifier from resolved legacy settings.
 //
 // Parameters:
-//   - log: Logger for configuration diagnostics and fatal validation errors.
+//   - log: Logger for configuration diagnostics.
 //   - cfg: Deprecated Gotify server settings (from process config or flags).
 //
 // Returns:
 //   - types.ConvertibleNotifier: New Gotify notifier instance.
+//   - error: Non-nil when the server URL is empty or not an HTTP or HTTPS URL.
+//     Also non-nil when the token is empty.
 //
 // Deprecated: Legacy gotify notifier is deprecated.
 // Use --notification-url with a gotify:// URL instead.
@@ -56,10 +69,20 @@ type gotifyTypeNotifier struct {
 // TODO: Remove New for the v2 release.
 //
 //nolint:godox
-func New(log *zerolog.Logger, cfg notifyConfig.Legacy) types.ConvertibleNotifier {
-	apiURL := requireGotifyURL(log, cfg.GotifyURL)
-	token := requireGotifyToken(log, cfg.GotifyToken)
+func New(log *zerolog.Logger, cfg notifyConfig.Legacy) (types.ConvertibleNotifier, error) {
+	apiURL := cfg.GotifyURL
+	token := cfg.GotifyToken
 	skipVerify := cfg.GotifyTLSSkipVerify
+
+	// Check the token first so a rejected configuration logs no URL warning.
+	if token == "" {
+		return nil, errEmptyToken
+	}
+
+	err := validateGotifyURL(log, apiURL)
+	if err != nil {
+		return nil, err
+	}
 
 	clog := log.With().
 		Str("url", redact.ServiceURL(apiURL)).
@@ -78,59 +101,34 @@ func New(log *zerolog.Logger, cfg notifyConfig.Legacy) types.ConvertibleNotifier
 		gotifyAppToken:      token,
 		gotifySkipTLSVerify: skipVerify,
 		log:                 log,
-	}
+	}, nil
 }
 
-// requireGotifyToken validates a Gotify token.
+// validateGotifyURL checks a Gotify server URL. It warns when the URL uses
+// plain HTTP.
 //
 // Parameters:
-//   - log: Logger for fatal validation errors.
-//   - gotifyToken: Token value from resolved configuration or flags.
-//
-// Returns:
-//   - string: Token value (fatal if empty).
-//
-// Deprecated: This function is part of the legacy gotify notifier and will be removed
-// for the v2 release. Use --notification-url with a gotify:// URL instead.
-func requireGotifyToken(log *zerolog.Logger, gotifyToken string) string {
-	clog := log.With().Str("flag", "notification-gotify-token").Logger()
-
-	// Fatal error if token is missing.
-	if len(gotifyToken) < 1 {
-		clog.Fatal().Msg("Gotify token is empty.")
-	}
-
-	clog.Debug().Int("token_length", len(gotifyToken)).Msg("Retrieved Gotify token")
-
-	return gotifyToken
-}
-
-// requireGotifyURL validates a Gotify URL.
-//
-// Parameters:
-//   - log: Logger for fatal validation errors.
+//   - log: Logger for diagnostics.
 //   - gotifyURL: URL value from resolved configuration or flags.
 //
 // Returns:
-//   - string: Validated URL (fatal if empty or malformed).
+//   - error: Non-nil when the URL is empty or not an HTTP or HTTPS URL.
 //
 // Deprecated: This function is part of the legacy gotify notifier and will be removed
 // for the v2 release. Use --notification-url with a gotify:// URL instead.
-func requireGotifyURL(log *zerolog.Logger, gotifyURL string) string {
+func validateGotifyURL(log *zerolog.Logger, gotifyURL string) error {
+	if gotifyURL == "" {
+		return errEmptyURL
+	}
+
+	if !strings.HasPrefix(gotifyURL, "http://") && !strings.HasPrefix(gotifyURL, "https://") {
+		return errURLScheme
+	}
+
 	clog := log.With().
 		Str("flag", "notification-gotify-url").
 		Str("url", redact.ServiceURL(gotifyURL)).
 		Logger()
-
-	// Fatal error if URL is missing.
-	if len(gotifyURL) < 1 {
-		clog.Fatal().Msg("Gotify URL is empty")
-	}
-
-	// Validate URL scheme.
-	if !strings.HasPrefix(gotifyURL, "http://") && !strings.HasPrefix(gotifyURL, "https://") {
-		clog.Fatal().Msg("Gotify URL must start with \"http://\" or \"https://\"")
-	}
 
 	// Warn if using insecure HTTP.
 	if strings.HasPrefix(gotifyURL, "http://") {
@@ -141,7 +139,7 @@ func requireGotifyURL(log *zerolog.Logger, gotifyURL string) string {
 		Str("scheme", strings.Split(gotifyURL, ":")[0]).
 		Msg("Validated Gotify URL")
 
-	return gotifyURL
+	return nil
 }
 
 // GetURL generates the Gotify service URL from the notifier's configuration.

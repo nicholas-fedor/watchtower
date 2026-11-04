@@ -7,6 +7,8 @@ import (
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+
+	notifyConfig "github.com/nicholas-fedor/watchtower/internal/settings/config/notify"
 )
 
 // TestGotifyTypeNotifier_GetURL_TLSSkipVerify verifies that skipping TLS
@@ -44,6 +46,62 @@ func TestGotifyTypeNotifier_GetURL_TLSSkipVerify(t *testing.T) {
 
 			assert.Equal(t, tt.wantSkip, parsed.Query().Get("skiptlsverify"))
 			assert.Equal(t, "gotify.example.com", parsed.Host)
+		})
+	}
+}
+
+// TestNew verifies that New builds a notifier from a valid server URL and
+// token. It rejects an empty or non-HTTP server URL. It also rejects an empty
+// token.
+func TestNew(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name    string
+		cfg     notifyConfig.Legacy
+		wantErr error
+	}{
+		{
+			name: "HTTPS URL and token",
+			cfg:  notifyConfig.Legacy{GotifyURL: "https://gotify.example.com", GotifyToken: "Aaaaaaaaaaaaaaa"},
+		},
+		{
+			name: "HTTP URL and token",
+			cfg:  notifyConfig.Legacy{GotifyURL: "http://gotify.example.com", GotifyToken: "Aaaaaaaaaaaaaaa"},
+		},
+		{
+			name:    "no URL",
+			cfg:     notifyConfig.Legacy{GotifyToken: "Aaaaaaaaaaaaaaa"},
+			wantErr: errEmptyURL,
+		},
+		{
+			name:    "URL without a scheme",
+			cfg:     notifyConfig.Legacy{GotifyURL: "gotify.example.com", GotifyToken: "Aaaaaaaaaaaaaaa"},
+			wantErr: errURLScheme,
+		},
+		{
+			name:    "no token",
+			cfg:     notifyConfig.Legacy{GotifyURL: "https://gotify.example.com"},
+			wantErr: errEmptyToken,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			log := zerolog.Nop()
+			notifier, err := New(&log, tt.cfg)
+
+			if tt.wantErr != nil {
+				require.ErrorIs(t, err, tt.wantErr)
+				assert.Nil(t, notifier)
+
+				return
+			}
+
+			require.NoError(t, err)
+			assert.NotNil(t, notifier)
 		})
 	}
 }
