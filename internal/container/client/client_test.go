@@ -41,6 +41,7 @@ import (
 	containerImage "github.com/nicholas-fedor/watchtower/internal/container/image"
 	mockContainer "github.com/nicholas-fedor/watchtower/internal/container/mocks"
 	"github.com/nicholas-fedor/watchtower/internal/container/oci"
+	updateConfig "github.com/nicholas-fedor/watchtower/internal/settings/config/update"
 	"github.com/nicholas-fedor/watchtower/internal/testutil/containerfixture"
 	"github.com/nicholas-fedor/watchtower/internal/testutil/httpstub"
 	"github.com/nicholas-fedor/watchtower/internal/testutil/logcapture"
@@ -1796,7 +1797,7 @@ func TestClientWrappers(t *testing.T) {
 		api.EXPECT().ImageInspect(mock.Anything, "test-image:latest").Return(inspected(newImageID), nil).Once()
 
 		stale, latestID, _, err := (&client{log: newTestLogger(t), api: api}).IsContainerStale(
-			t.Context(), runningImage(currentImageID), types.UpdateParams{NoPull: true},
+			t.Context(), runningImage(currentImageID), updateConfig.Policy{NoPull: true},
 		)
 		require.NoError(t, err)
 		assert.True(t, stale)
@@ -1811,7 +1812,7 @@ func TestClientWrappers(t *testing.T) {
 			Return(dockerClient.ImageInspectResult{}, daemonError("inspect failed")).Once()
 
 		_, _, _, err := (&client{log: newTestLogger(t), api: api}).IsContainerStale(
-			t.Context(), runningImage("sha256:"+containerfixture.RandomID()), types.UpdateParams{NoPull: true},
+			t.Context(), runningImage("sha256:"+containerfixture.RandomID()), updateConfig.Policy{NoPull: true},
 		)
 		require.Error(t, err)
 	})
@@ -1825,7 +1826,7 @@ func TestClientWrappers(t *testing.T) {
 		api.EXPECT().ImageInspect(mock.Anything, "test-image:latest").Return(inspected(currentImageID), nil).Once()
 
 		available, latestID, _, err := (&client{log: newTestLogger(t), api: api}).CheckContainerUpdate(
-			t.Context(), runningImage(currentImageID), types.UpdateParams{NoPull: true},
+			t.Context(), runningImage(currentImageID), updateConfig.Policy{NoPull: true},
 		)
 		require.NoError(t, err)
 		assert.False(t, available)
@@ -1840,7 +1841,7 @@ func TestClientWrappers(t *testing.T) {
 			Return(dockerClient.ImageInspectResult{}, daemonError("inspect failed")).Once()
 
 		_, _, _, err := (&client{log: newTestLogger(t), api: api}).CheckContainerUpdate(
-			t.Context(), runningImage("sha256:"+containerfixture.RandomID()), types.UpdateParams{NoPull: true},
+			t.Context(), runningImage("sha256:"+containerfixture.RandomID()), updateConfig.Policy{NoPull: true},
 		)
 		require.Error(t, err)
 	})

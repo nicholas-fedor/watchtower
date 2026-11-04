@@ -9,6 +9,7 @@ import (
 
 	"github.com/moby/moby/api/types/container"
 	"github.com/moby/moby/api/types/image"
+	"github.com/nicholas-fedor/watchtower/internal/settings/config/update"
 	"github.com/nicholas-fedor/watchtower/pkg/types"
 	mock "github.com/stretchr/testify/mock"
 )
@@ -96,16 +97,16 @@ func (_c *MockContainer_ContainerInfo_Call) RunAndReturn(run func() *container.I
 }
 
 // CooldownDelay provides a mock function for the type MockContainer
-func (_mock *MockContainer) CooldownDelay(params types.UpdateParams) time.Duration {
-	ret := _mock.Called(params)
+func (_mock *MockContainer) CooldownDelay(policy update.Policy) time.Duration {
+	ret := _mock.Called(policy)
 
 	if len(ret) == 0 {
 		panic("no return value specified for CooldownDelay")
 	}
 
 	var r0 time.Duration
-	if returnFunc, ok := ret.Get(0).(func(types.UpdateParams) time.Duration); ok {
-		r0 = returnFunc(params)
+	if returnFunc, ok := ret.Get(0).(func(update.Policy) time.Duration); ok {
+		r0 = returnFunc(policy)
 	} else {
 		r0 = ret.Get(0).(time.Duration)
 	}
@@ -118,16 +119,16 @@ type MockContainer_CooldownDelay_Call struct {
 }
 
 // CooldownDelay is a helper method to define mock.On call
-//   - params types.UpdateParams
-func (_e *MockContainer_Expecter) CooldownDelay(params any) *MockContainer_CooldownDelay_Call {
-	return &MockContainer_CooldownDelay_Call{Call: _e.mock.On("CooldownDelay", params)}
+//   - policy update.Policy
+func (_e *MockContainer_Expecter) CooldownDelay(policy any) *MockContainer_CooldownDelay_Call {
+	return &MockContainer_CooldownDelay_Call{Call: _e.mock.On("CooldownDelay", policy)}
 }
 
-func (_c *MockContainer_CooldownDelay_Call) Run(run func(params types.UpdateParams)) *MockContainer_CooldownDelay_Call {
+func (_c *MockContainer_CooldownDelay_Call) Run(run func(policy update.Policy)) *MockContainer_CooldownDelay_Call {
 	_c.Call.Run(func(args mock.Arguments) {
-		var arg0 types.UpdateParams
+		var arg0 update.Policy
 		if args[0] != nil {
-			arg0 = args[0].(types.UpdateParams)
+			arg0 = args[0].(update.Policy)
 		}
 		run(
 			arg0,
@@ -141,7 +142,7 @@ func (_c *MockContainer_CooldownDelay_Call) Return(duration time.Duration) *Mock
 	return _c
 }
 
-func (_c *MockContainer_CooldownDelay_Call) RunAndReturn(run func(params types.UpdateParams) time.Duration) *MockContainer_CooldownDelay_Call {
+func (_c *MockContainer_CooldownDelay_Call) RunAndReturn(run func(policy update.Policy) time.Duration) *MockContainer_CooldownDelay_Call {
 	_c.Call.Return(run)
 	return _c
 }
@@ -935,16 +936,16 @@ func (_c *MockContainer_IsLinkedToRestarting_Call) RunAndReturn(run func() bool)
 }
 
 // IsMonitorOnly provides a mock function for the type MockContainer
-func (_mock *MockContainer) IsMonitorOnly(params types.UpdateParams) bool {
-	ret := _mock.Called(params)
+func (_mock *MockContainer) IsMonitorOnly(policy update.Policy) bool {
+	ret := _mock.Called(policy)
 
 	if len(ret) == 0 {
 		panic("no return value specified for IsMonitorOnly")
 	}
 
 	var r0 bool
-	if returnFunc, ok := ret.Get(0).(func(types.UpdateParams) bool); ok {
-		r0 = returnFunc(params)
+	if returnFunc, ok := ret.Get(0).(func(update.Policy) bool); ok {
+		r0 = returnFunc(policy)
 	} else {
 		r0 = ret.Get(0).(bool)
 	}
@@ -957,16 +958,16 @@ type MockContainer_IsMonitorOnly_Call struct {
 }
 
 // IsMonitorOnly is a helper method to define mock.On call
-//   - params types.UpdateParams
-func (_e *MockContainer_Expecter) IsMonitorOnly(params any) *MockContainer_IsMonitorOnly_Call {
-	return &MockContainer_IsMonitorOnly_Call{Call: _e.mock.On("IsMonitorOnly", params)}
+//   - policy update.Policy
+func (_e *MockContainer_Expecter) IsMonitorOnly(policy any) *MockContainer_IsMonitorOnly_Call {
+	return &MockContainer_IsMonitorOnly_Call{Call: _e.mock.On("IsMonitorOnly", policy)}
 }
 
-func (_c *MockContainer_IsMonitorOnly_Call) Run(run func(params types.UpdateParams)) *MockContainer_IsMonitorOnly_Call {
+func (_c *MockContainer_IsMonitorOnly_Call) Run(run func(policy update.Policy)) *MockContainer_IsMonitorOnly_Call {
 	_c.Call.Run(func(args mock.Arguments) {
-		var arg0 types.UpdateParams
+		var arg0 update.Policy
 		if args[0] != nil {
-			arg0 = args[0].(types.UpdateParams)
+			arg0 = args[0].(update.Policy)
 		}
 		run(
 			arg0,
@@ -980,22 +981,22 @@ func (_c *MockContainer_IsMonitorOnly_Call) Return(b bool) *MockContainer_IsMoni
 	return _c
 }
 
-func (_c *MockContainer_IsMonitorOnly_Call) RunAndReturn(run func(params types.UpdateParams) bool) *MockContainer_IsMonitorOnly_Call {
+func (_c *MockContainer_IsMonitorOnly_Call) RunAndReturn(run func(policy update.Policy) bool) *MockContainer_IsMonitorOnly_Call {
 	_c.Call.Return(run)
 	return _c
 }
 
 // IsNoPull provides a mock function for the type MockContainer
-func (_mock *MockContainer) IsNoPull(params types.UpdateParams) bool {
-	ret := _mock.Called(params)
+func (_mock *MockContainer) IsNoPull(policy update.Policy) bool {
+	ret := _mock.Called(policy)
 
 	if len(ret) == 0 {
 		panic("no return value specified for IsNoPull")
 	}
 
 	var r0 bool
-	if returnFunc, ok := ret.Get(0).(func(types.UpdateParams) bool); ok {
-		r0 = returnFunc(params)
+	if returnFunc, ok := ret.Get(0).(func(update.Policy) bool); ok {
+		r0 = returnFunc(policy)
 	} else {
 		r0 = ret.Get(0).(bool)
 	}
@@ -1008,16 +1009,16 @@ type MockContainer_IsNoPull_Call struct {
 }
 
 // IsNoPull is a helper method to define mock.On call
-//   - params types.UpdateParams
-func (_e *MockContainer_Expecter) IsNoPull(params any) *MockContainer_IsNoPull_Call {
-	return &MockContainer_IsNoPull_Call{Call: _e.mock.On("IsNoPull", params)}
+//   - policy update.Policy
+func (_e *MockContainer_Expecter) IsNoPull(policy any) *MockContainer_IsNoPull_Call {
+	return &MockContainer_IsNoPull_Call{Call: _e.mock.On("IsNoPull", policy)}
 }
 
-func (_c *MockContainer_IsNoPull_Call) Run(run func(params types.UpdateParams)) *MockContainer_IsNoPull_Call {
+func (_c *MockContainer_IsNoPull_Call) Run(run func(policy update.Policy)) *MockContainer_IsNoPull_Call {
 	_c.Call.Run(func(args mock.Arguments) {
-		var arg0 types.UpdateParams
+		var arg0 update.Policy
 		if args[0] != nil {
-			arg0 = args[0].(types.UpdateParams)
+			arg0 = args[0].(update.Policy)
 		}
 		run(
 			arg0,
@@ -1031,7 +1032,7 @@ func (_c *MockContainer_IsNoPull_Call) Return(b bool) *MockContainer_IsNoPull_Ca
 	return _c
 }
 
-func (_c *MockContainer_IsNoPull_Call) RunAndReturn(run func(params types.UpdateParams) bool) *MockContainer_IsNoPull_Call {
+func (_c *MockContainer_IsNoPull_Call) RunAndReturn(run func(policy update.Policy) bool) *MockContainer_IsNoPull_Call {
 	_c.Call.Return(run)
 	return _c
 }

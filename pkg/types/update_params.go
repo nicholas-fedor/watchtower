@@ -6,21 +6,20 @@ import (
 
 	gitConfig "github.com/nicholas-fedor/watchtower/internal/settings/config/git"
 	registryConfig "github.com/nicholas-fedor/watchtower/internal/settings/config/registry"
+	updateConfig "github.com/nicholas-fedor/watchtower/internal/settings/config/update"
 )
 
 // UpdateParams defines options for the Update function.
 type UpdateParams struct {
+	updateConfig.Policy // Settings that a container's labels can override.
+
 	Filter              Filter                  `json:"-"`                      // Container filter.
 	Cleanup             bool                    `json:"cleanup"`                // Remove old images if true.
 	NoRestart           bool                    `json:"no_restart"`             // Skip restarts if true.
 	ReviveStopped       bool                    `json:"revive_stopped"`         // Start stopped containers after update if true.
 	Timeout             time.Duration           `json:"timeout"`                // Container stop timeout before a forced kill.
-	MonitorOnly         bool                    `json:"monitor_only"`           // Monitor without updating if true.
-	NoPull              bool                    `json:"no_pull"`                // Skip image pulls if true.
-	EnableChangelog     bool                    `json:"enable_changelog"`       // Resolve a release-notes link in notifications if true.
 	LifecycleHooks      bool                    `json:"lifecycle_hooks"`        // Enable lifecycle hooks if true.
 	RollingRestart      bool                    `json:"rolling_restart"`        // Use rolling restart if true.
-	LabelPrecedence     bool                    `json:"label_precedence"`       // Prioritize labels if true.
 	PullFailureDelay    time.Duration           `json:"pull_failure_delay"`     // Delay after a failed self-update pull in run-once mode.
 	LifecycleUID        int                     `json:"lifecycle_uid"`          // Default UID for lifecycle hooks.
 	LifecycleGID        int                     `json:"lifecycle_gid"`          // Default GID for lifecycle hooks.
@@ -29,7 +28,6 @@ type UpdateParams struct {
 	UseComposeDependsOn bool                    `json:"use_compose_depends_on"` // Enable Docker Compose depends_on label processing.
 	SkipSelfUpdate      bool                    `json:"skip_self_update"`       // Skip Watchtower self-update if true.
 	EphemeralSelfUpdate bool                    `json:"ephemeral_self_update"`  // Use ephemeral container for self-update if true.
-	CooldownDelay       time.Duration           `json:"cooldown_delay"`         // Minimum time since image creation before allowing updates.
 	LabelEnable         bool                    `json:"label_enable"`           // Require enable label for monitoring.
 	DiskSpaceMax        int64                   `json:"disk_space_max"`         // Block session when Docker image usage reaches this many bytes. Zero disables the block gate.
 	DiskSpaceWarn       int64                   `json:"disk_space_warn"`        // Warn when Docker image usage reaches this many bytes. Zero disables the warning.

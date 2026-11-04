@@ -464,7 +464,7 @@ func (s *Session) recordCompose(
 		Commit: result.Commit,
 	}, oci.Annotations{})
 
-	provenance.LogChangelog(log, c, params, meta)
+	provenance.LogChangelog(log, c, params.Policy, meta)
 
 	if item.ID == "" {
 		return

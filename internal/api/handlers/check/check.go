@@ -255,11 +255,11 @@ func checkGitSource(
 	result.UpdateSource = "git"
 
 	// no-pull skips the Git rebuild. Report the same skip here.
-	if c.IsNoPull(params) {
+	if c.IsNoPull(params.Policy) {
 		return
 	}
 
-	checkResult, err := git.CheckContainer(ctx, gitClient, c, params)
+	checkResult, err := git.CheckContainer(ctx, gitClient, c, params.Git)
 	if err != nil {
 		result.Error = err.Error()
 		logCheckFailure(log, c, err, "Failed to check container Git source")
@@ -308,7 +308,7 @@ func checkRegistrySource(
 ) {
 	result.UpdateSource = "registry"
 
-	available, latestID, latestDigest, err := client.CheckContainerUpdate(ctx, c, params)
+	available, latestID, latestDigest, err := client.CheckContainerUpdate(ctx, c, params.Policy)
 	if err != nil {
 		result.Error = err.Error()
 		logCheckFailure(log, c, err, "Failed to check container for updates")

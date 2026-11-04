@@ -30,7 +30,7 @@ func (s *Session) Check(
 	c types.Container,
 	params types.UpdateParams,
 ) (bool, types.ImageID, error) {
-	result, err := git.CheckContainer(ctx, s.client, c, params)
+	result, err := git.CheckContainer(ctx, s.client, c, params.Git)
 	if err != nil {
 		return false, "", fmt.Errorf("git check: %w", err)
 	}
@@ -41,7 +41,7 @@ func (s *Session) Check(
 		return false, c.ImageID(), nil
 	}
 
-	err = containerImage.CheckLocalImageCooldown(c, params)
+	err = containerImage.CheckLocalImageCooldown(c, params.Policy)
 	if err != nil {
 		return false, "", fmt.Errorf("git cooldown: %w", err)
 	}

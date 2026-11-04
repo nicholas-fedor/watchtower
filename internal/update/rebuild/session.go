@@ -352,5 +352,5 @@ func (s *Session) needsApply(c types.Container, params types.UpdateParams) bool 
 		return false
 	}
 
-	return !c.IsNoPull(params) && !c.IsMonitorOnly(params)
+	return !c.IsNoPull(params.Policy) && !c.IsMonitorOnly(params.Policy)
 }

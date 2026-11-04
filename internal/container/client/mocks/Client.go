@@ -10,6 +10,7 @@ import (
 
 	"github.com/moby/moby/api/types/container"
 	"github.com/nicholas-fedor/watchtower/internal/container/oci"
+	"github.com/nicholas-fedor/watchtower/internal/settings/config/update"
 	"github.com/nicholas-fedor/watchtower/pkg/types"
 	mock "github.com/stretchr/testify/mock"
 )
@@ -129,8 +130,8 @@ func (_c *MockClient_BuildRemoteImage_Call) RunAndReturn(run func(ctx context.Co
 }
 
 // CheckContainerUpdate provides a mock function for the type MockClient
-func (_mock *MockClient) CheckContainerUpdate(ctx context.Context, container types.Container, params types.UpdateParams) (bool, types.ImageID, string, error) {
-	ret := _mock.Called(ctx, container, params)
+func (_mock *MockClient) CheckContainerUpdate(ctx context.Context, container types.Container, policy update.Policy) (bool, types.ImageID, string, error) {
+	ret := _mock.Called(ctx, container, policy)
 
 	if len(ret) == 0 {
 		panic("no return value specified for CheckContainerUpdate")
@@ -140,26 +141,26 @@ func (_mock *MockClient) CheckContainerUpdate(ctx context.Context, container typ
 	var r1 types.ImageID
 	var r2 string
 	var r3 error
-	if returnFunc, ok := ret.Get(0).(func(context.Context, types.Container, types.UpdateParams) (bool, types.ImageID, string, error)); ok {
-		return returnFunc(ctx, container, params)
+	if returnFunc, ok := ret.Get(0).(func(context.Context, types.Container, update.Policy) (bool, types.ImageID, string, error)); ok {
+		return returnFunc(ctx, container, policy)
 	}
-	if returnFunc, ok := ret.Get(0).(func(context.Context, types.Container, types.UpdateParams) bool); ok {
-		r0 = returnFunc(ctx, container, params)
+	if returnFunc, ok := ret.Get(0).(func(context.Context, types.Container, update.Policy) bool); ok {
+		r0 = returnFunc(ctx, container, policy)
 	} else {
 		r0 = ret.Get(0).(bool)
 	}
-	if returnFunc, ok := ret.Get(1).(func(context.Context, types.Container, types.UpdateParams) types.ImageID); ok {
-		r1 = returnFunc(ctx, container, params)
+	if returnFunc, ok := ret.Get(1).(func(context.Context, types.Container, update.Policy) types.ImageID); ok {
+		r1 = returnFunc(ctx, container, policy)
 	} else {
 		r1 = ret.Get(1).(types.ImageID)
 	}
-	if returnFunc, ok := ret.Get(2).(func(context.Context, types.Container, types.UpdateParams) string); ok {
-		r2 = returnFunc(ctx, container, params)
+	if returnFunc, ok := ret.Get(2).(func(context.Context, types.Container, update.Policy) string); ok {
+		r2 = returnFunc(ctx, container, policy)
 	} else {
 		r2 = ret.Get(2).(string)
 	}
-	if returnFunc, ok := ret.Get(3).(func(context.Context, types.Container, types.UpdateParams) error); ok {
-		r3 = returnFunc(ctx, container, params)
+	if returnFunc, ok := ret.Get(3).(func(context.Context, types.Container, update.Policy) error); ok {
+		r3 = returnFunc(ctx, container, policy)
 	} else {
 		r3 = ret.Error(3)
 	}
@@ -174,12 +175,12 @@ type MockClient_CheckContainerUpdate_Call struct {
 // CheckContainerUpdate is a helper method to define mock.On call
 //   - ctx context.Context
 //   - container types.Container
-//   - params types.UpdateParams
-func (_e *MockClient_Expecter) CheckContainerUpdate(ctx any, container any, params any) *MockClient_CheckContainerUpdate_Call {
-	return &MockClient_CheckContainerUpdate_Call{Call: _e.mock.On("CheckContainerUpdate", ctx, container, params)}
+//   - policy update.Policy
+func (_e *MockClient_Expecter) CheckContainerUpdate(ctx any, container any, policy any) *MockClient_CheckContainerUpdate_Call {
+	return &MockClient_CheckContainerUpdate_Call{Call: _e.mock.On("CheckContainerUpdate", ctx, container, policy)}
 }
 
-func (_c *MockClient_CheckContainerUpdate_Call) Run(run func(ctx context.Context, container types.Container, params types.UpdateParams)) *MockClient_CheckContainerUpdate_Call {
+func (_c *MockClient_CheckContainerUpdate_Call) Run(run func(ctx context.Context, container types.Container, policy update.Policy)) *MockClient_CheckContainerUpdate_Call {
 	_c.Call.Run(func(args mock.Arguments) {
 		var arg0 context.Context
 		if args[0] != nil {
@@ -189,9 +190,9 @@ func (_c *MockClient_CheckContainerUpdate_Call) Run(run func(ctx context.Context
 		if args[1] != nil {
 			arg1 = args[1].(types.Container)
 		}
-		var arg2 types.UpdateParams
+		var arg2 update.Policy
 		if args[2] != nil {
-			arg2 = args[2].(types.UpdateParams)
+			arg2 = args[2].(update.Policy)
 		}
 		run(
 			arg0,
@@ -207,7 +208,7 @@ func (_c *MockClient_CheckContainerUpdate_Call) Return(b bool, imageID types.Ima
 	return _c
 }
 
-func (_c *MockClient_CheckContainerUpdate_Call) RunAndReturn(run func(ctx context.Context, container types.Container, params types.UpdateParams) (bool, types.ImageID, string, error)) *MockClient_CheckContainerUpdate_Call {
+func (_c *MockClient_CheckContainerUpdate_Call) RunAndReturn(run func(ctx context.Context, container types.Container, policy update.Policy) (bool, types.ImageID, string, error)) *MockClient_CheckContainerUpdate_Call {
 	_c.Call.Return(run)
 	return _c
 }
@@ -810,8 +811,8 @@ func (_c *MockClient_GetVersion_Call) RunAndReturn(run func() string) *MockClien
 }
 
 // IsContainerStale provides a mock function for the type MockClient
-func (_mock *MockClient) IsContainerStale(ctx context.Context, container types.Container, params types.UpdateParams) (bool, types.ImageID, string, error) {
-	ret := _mock.Called(ctx, container, params)
+func (_mock *MockClient) IsContainerStale(ctx context.Context, container types.Container, policy update.Policy) (bool, types.ImageID, string, error) {
+	ret := _mock.Called(ctx, container, policy)
 
 	if len(ret) == 0 {
 		panic("no return value specified for IsContainerStale")
@@ -821,26 +822,26 @@ func (_mock *MockClient) IsContainerStale(ctx context.Context, container types.C
 	var r1 types.ImageID
 	var r2 string
 	var r3 error
-	if returnFunc, ok := ret.Get(0).(func(context.Context, types.Container, types.UpdateParams) (bool, types.ImageID, string, error)); ok {
-		return returnFunc(ctx, container, params)
+	if returnFunc, ok := ret.Get(0).(func(context.Context, types.Container, update.Policy) (bool, types.ImageID, string, error)); ok {
+		return returnFunc(ctx, container, policy)
 	}
-	if returnFunc, ok := ret.Get(0).(func(context.Context, types.Container, types.UpdateParams) bool); ok {
-		r0 = returnFunc(ctx, container, params)
+	if returnFunc, ok := ret.Get(0).(func(context.Context, types.Container, update.Policy) bool); ok {
+		r0 = returnFunc(ctx, container, policy)
 	} else {
 		r0 = ret.Get(0).(bool)
 	}
-	if returnFunc, ok := ret.Get(1).(func(context.Context, types.Container, types.UpdateParams) types.ImageID); ok {
-		r1 = returnFunc(ctx, container, params)
+	if returnFunc, ok := ret.Get(1).(func(context.Context, types.Container, update.Policy) types.ImageID); ok {
+		r1 = returnFunc(ctx, container, policy)
 	} else {
 		r1 = ret.Get(1).(types.ImageID)
 	}
-	if returnFunc, ok := ret.Get(2).(func(context.Context, types.Container, types.UpdateParams) string); ok {
-		r2 = returnFunc(ctx, container, params)
+	if returnFunc, ok := ret.Get(2).(func(context.Context, types.Container, update.Policy) string); ok {
+		r2 = returnFunc(ctx, container, policy)
 	} else {
 		r2 = ret.Get(2).(string)
 	}
-	if returnFunc, ok := ret.Get(3).(func(context.Context, types.Container, types.UpdateParams) error); ok {
-		r3 = returnFunc(ctx, container, params)
+	if returnFunc, ok := ret.Get(3).(func(context.Context, types.Container, update.Policy) error); ok {
+		r3 = returnFunc(ctx, container, policy)
 	} else {
 		r3 = ret.Error(3)
 	}
@@ -855,12 +856,12 @@ type MockClient_IsContainerStale_Call struct {
 // IsContainerStale is a helper method to define mock.On call
 //   - ctx context.Context
 //   - container types.Container
-//   - params types.UpdateParams
-func (_e *MockClient_Expecter) IsContainerStale(ctx any, container any, params any) *MockClient_IsContainerStale_Call {
-	return &MockClient_IsContainerStale_Call{Call: _e.mock.On("IsContainerStale", ctx, container, params)}
+//   - policy update.Policy
+func (_e *MockClient_Expecter) IsContainerStale(ctx any, container any, policy any) *MockClient_IsContainerStale_Call {
+	return &MockClient_IsContainerStale_Call{Call: _e.mock.On("IsContainerStale", ctx, container, policy)}
 }
 
-func (_c *MockClient_IsContainerStale_Call) Run(run func(ctx context.Context, container types.Container, params types.UpdateParams)) *MockClient_IsContainerStale_Call {
+func (_c *MockClient_IsContainerStale_Call) Run(run func(ctx context.Context, container types.Container, policy update.Policy)) *MockClient_IsContainerStale_Call {
 	_c.Call.Run(func(args mock.Arguments) {
 		var arg0 context.Context
 		if args[0] != nil {
@@ -870,9 +871,9 @@ func (_c *MockClient_IsContainerStale_Call) Run(run func(ctx context.Context, co
 		if args[1] != nil {
 			arg1 = args[1].(types.Container)
 		}
-		var arg2 types.UpdateParams
+		var arg2 update.Policy
 		if args[2] != nil {
-			arg2 = args[2].(types.UpdateParams)
+			arg2 = args[2].(update.Policy)
 		}
 		run(
 			arg0,
@@ -888,7 +889,7 @@ func (_c *MockClient_IsContainerStale_Call) Return(b bool, imageID types.ImageID
 	return _c
 }
 
-func (_c *MockClient_IsContainerStale_Call) RunAndReturn(run func(ctx context.Context, container types.Container, params types.UpdateParams) (bool, types.ImageID, string, error)) *MockClient_IsContainerStale_Call {
+func (_c *MockClient_IsContainerStale_Call) RunAndReturn(run func(ctx context.Context, container types.Container, policy update.Policy) (bool, types.ImageID, string, error)) *MockClient_IsContainerStale_Call {
 	_c.Call.Return(run)
 	return _c
 }

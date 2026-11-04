@@ -38,7 +38,7 @@ func updateFromContainer(log *zerolog.Logger,
 		imageName:      container.ImageName(),
 		containerError: nil,
 		state:          state,
-		monitorOnly:    container.IsMonitorOnly(params),
+		monitorOnly:    container.IsMonitorOnly(params.Policy),
 		newContainerID: "",
 	}
 	applyReportMeta(update, container, params)

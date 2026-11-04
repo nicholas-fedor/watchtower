@@ -412,7 +412,7 @@ func update(
 				stale, newestImage, newDigest, checkErr = client.IsContainerStale(
 					ctx,
 					sourceContainer,
-					config,
+					config.Policy,
 				)
 			}
 
@@ -425,7 +425,7 @@ func update(
 
 			// Determine if the container should be updated based on staleness and config.
 			shouldUpdate := staleness.ShouldUpdate(sourceContainer, stale, config)
-			if gitSession.Watching(log, sourceContainer, config) && sourceContainer.IsNoPull(config) {
+			if gitSession.Watching(log, sourceContainer, config) && sourceContainer.IsNoPull(config.Policy) {
 				shouldUpdate = false
 			}
 

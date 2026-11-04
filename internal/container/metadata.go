@@ -13,6 +13,7 @@ import (
 
 	"github.com/nicholas-fedor/watchtower/internal/container/labels"
 	"github.com/nicholas-fedor/watchtower/internal/observability/logging"
+	updateConfig "github.com/nicholas-fedor/watchtower/internal/settings/config/update"
 	"github.com/nicholas-fedor/watchtower/internal/settings/units"
 	"github.com/nicholas-fedor/watchtower/pkg/types"
 )
@@ -358,73 +359,73 @@ func (c *Container) GetLabel(label string) (string, bool) {
 
 // IsMonitorOnly determines if the container is monitor-only.
 //
-// It uses UpdateParams.MonitorOnly and label precedence.
+// It uses Policy.MonitorOnly and label precedence.
 //
 // Parameters:
-//   - params: Update parameters from types.UpdateParams.
+//   - policy: Update policy.
 //
 // Returns:
 //   - bool: True if monitor-only, false otherwise.
-func (c *Container) IsMonitorOnly(params types.UpdateParams) bool {
-	return c.getContainerOrGlobalBool(params.MonitorOnly, labels.MonitorOnly, params.LabelPrecedence)
+func (c *Container) IsMonitorOnly(policy updateConfig.Policy) bool {
+	return c.getContainerOrGlobalBool(policy.MonitorOnly, labels.MonitorOnly, policy.LabelPrecedence)
 }
 
 // IsNoPull determines if image pulls should be skipped.
 //
-// It uses UpdateParams.NoPull and label precedence.
+// It uses Policy.NoPull and label precedence.
 //
 // Parameters:
-//   - params: Update parameters from types.UpdateParams.
+//   - policy: Update policy.
 //
 // Returns:
 //   - bool: True if no-pull, false otherwise.
-func (c *Container) IsNoPull(params types.UpdateParams) bool {
-	return c.getContainerOrGlobalBool(params.NoPull, labels.NoPull, params.LabelPrecedence)
+func (c *Container) IsNoPull(policy updateConfig.Policy) bool {
+	return c.getContainerOrGlobalBool(policy.NoPull, labels.NoPull, policy.LabelPrecedence)
 }
 
 // IsChangelogEnabled reports whether the changelog notification line and the
 // versioned release link are enabled for this container.
 //
-// It uses UpdateParams.EnableChangelog and label precedence, with the same two
+// It uses Policy.EnableChangelog and label precedence, with the same two
 // sources no-pull uses. A changelog-url label is a value, not a switch, so it
 // never enables the feature on its own.
 // A user who authorizes the extra
 // registry request must say so explicitly.
 //
 // Parameters:
-//   - params: Update parameters from types.UpdateParams.
+//   - policy: Update policy.
 //
 // Returns:
 //   - bool: True when the changelog feature is enabled.
-func (c *Container) IsChangelogEnabled(params types.UpdateParams) bool {
+func (c *Container) IsChangelogEnabled(policy updateConfig.Policy) bool {
 	return c.getContainerOrGlobalBool(
-		params.EnableChangelog,
+		policy.EnableChangelog,
 		labels.EnableChangelog,
-		params.LabelPrecedence,
+		policy.LabelPrecedence,
 	)
 }
 
 // CooldownDelay returns the effective cooldown delay for this container.
 //
 // If the container has the cooldown-delay label set, its value is used (parsed
-// as a duration string). Otherwise, the global CooldownDelay from UpdateParams
+// as a duration string). Otherwise, the global CooldownDelay from the policy
 // is used. Setting the label to "0" disables cooldown for this container.
 //
 // Parameters:
-//   - params: Update parameters from types.UpdateParams.
+//   - policy: Update policy.
 //
 // Returns:
 //   - time.Duration: Effective cooldown delay for this container.
-func (c *Container) CooldownDelay(params types.UpdateParams) time.Duration {
+func (c *Container) CooldownDelay(policy updateConfig.Policy) time.Duration {
 	labelVal, ok := c.getLabelValue(labels.CooldownDelay)
 	if !ok {
 		// No label set — use global value.
-		return params.CooldownDelay
+		return policy.CooldownDelay
 	}
 
 	if labelVal == "" {
 		// Label present but empty — use global value.
-		return params.CooldownDelay
+		return policy.CooldownDelay
 	}
 
 	parsed, err := units.ParseDuration(labelVal)
@@ -436,7 +437,7 @@ func (c *Container) CooldownDelay(params types.UpdateParams) time.Duration {
 			Str("value", labelVal).
 			Msg("Failed to parse cooldown-delay label, using global value")
 
-		return params.CooldownDelay
+		return policy.CooldownDelay
 	}
 
 	c.Logger().Debug().

@@ -14,6 +14,7 @@ import (
 	dockerContainer "github.com/moby/moby/api/types/container"
 
 	"github.com/nicholas-fedor/watchtower/internal/container/labels"
+	updateConfig "github.com/nicholas-fedor/watchtower/internal/settings/config/update"
 	"github.com/nicholas-fedor/watchtower/internal/testutil/containerfixture"
 	"github.com/nicholas-fedor/watchtower/internal/testutil/logcapture"
 	"github.com/nicholas-fedor/watchtower/pkg/types"
@@ -390,7 +391,7 @@ func TestContainer_Enabled(t *testing.T) {
 
 func TestContainer_IsMonitorOnly(t *testing.T) {
 	type args struct {
-		params types.UpdateParams
+		policy updateConfig.Policy
 	}
 
 	tests := []struct {
@@ -412,7 +413,7 @@ func TestContainer_IsMonitorOnly(t *testing.T) {
 				},
 			},
 			args: args{
-				params: types.UpdateParams{
+				policy: updateConfig.Policy{
 					MonitorOnly:     false,
 					LabelPrecedence: true,
 				},
@@ -432,7 +433,7 @@ func TestContainer_IsMonitorOnly(t *testing.T) {
 				},
 			},
 			args: args{
-				params: types.UpdateParams{
+				policy: updateConfig.Policy{
 					MonitorOnly:     true,
 					LabelPrecedence: false,
 				},
@@ -450,7 +451,7 @@ func TestContainer_IsMonitorOnly(t *testing.T) {
 				},
 			},
 			args: args{
-				params: types.UpdateParams{
+				policy: updateConfig.Policy{
 					MonitorOnly: false,
 				},
 			},
@@ -459,7 +460,7 @@ func TestContainer_IsMonitorOnly(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got := tt.c.IsMonitorOnly(tt.args.params)
+			got := tt.c.IsMonitorOnly(tt.args.policy)
 			assert.Equal(t, tt.want, got)
 		})
 	}
@@ -467,7 +468,7 @@ func TestContainer_IsMonitorOnly(t *testing.T) {
 
 func TestContainer_IsNoPull(t *testing.T) {
 	type args struct {
-		params types.UpdateParams
+		policy updateConfig.Policy
 	}
 
 	tests := []struct {
@@ -489,7 +490,7 @@ func TestContainer_IsNoPull(t *testing.T) {
 				},
 			},
 			args: args{
-				params: types.UpdateParams{
+				policy: updateConfig.Policy{
 					NoPull:          false,
 					LabelPrecedence: true,
 				},
@@ -509,7 +510,7 @@ func TestContainer_IsNoPull(t *testing.T) {
 				},
 			},
 			args: args{
-				params: types.UpdateParams{
+				policy: updateConfig.Policy{
 					NoPull:          true,
 					LabelPrecedence: false,
 				},
@@ -527,7 +528,7 @@ func TestContainer_IsNoPull(t *testing.T) {
 				},
 			},
 			args: args{
-				params: types.UpdateParams{
+				policy: updateConfig.Policy{
 					NoPull: false,
 				},
 			},
@@ -536,7 +537,7 @@ func TestContainer_IsNoPull(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got := tt.c.IsNoPull(tt.args.params)
+			got := tt.c.IsNoPull(tt.args.policy)
 			assert.Equal(t, tt.want, got)
 		})
 	}
@@ -1243,13 +1244,13 @@ func TestContainer_InvalidLabelsWarnOnce(t *testing.T) {
 			name:    "cooldown delay",
 			labels:  map[string]string{labels.CooldownDelay: "soon"},
 			message: "Failed to parse cooldown-delay label, using global value",
-			read:    func(c *Container) { c.CooldownDelay(types.UpdateParams{}) },
+			read:    func(c *Container) { c.CooldownDelay(updateConfig.Policy{}) },
 		},
 		{
 			name:    "boolean label",
 			labels:  map[string]string{labels.MonitorOnly: "maybe"},
 			message: "Failed to parse label value",
-			read:    func(c *Container) { c.IsMonitorOnly(types.UpdateParams{}) },
+			read:    func(c *Container) { c.IsMonitorOnly(updateConfig.Policy{}) },
 		},
 	}
 
@@ -1489,7 +1490,7 @@ func cooldownTestContainer(labelValue *string) *Container {
 
 func TestContainer_CooldownDelay(t *testing.T) {
 	type args struct {
-		params types.UpdateParams
+		policy updateConfig.Policy
 	}
 
 	strPtr := func(s string) *string { return &s }
@@ -1504,7 +1505,7 @@ func TestContainer_CooldownDelay(t *testing.T) {
 			name: "NoLabelUsesGlobal",
 			c:    cooldownTestContainer(nil),
 			args: args{
-				params: types.UpdateParams{
+				policy: updateConfig.Policy{
 					CooldownDelay: 10 * time.Minute,
 				},
 			},
@@ -1514,7 +1515,7 @@ func TestContainer_CooldownDelay(t *testing.T) {
 			name: "LabelOverridesGlobal",
 			c:    cooldownTestContainer(strPtr("24h")),
 			args: args{
-				params: types.UpdateParams{
+				policy: updateConfig.Policy{
 					CooldownDelay: 10 * time.Minute,
 				},
 			},
@@ -1524,7 +1525,7 @@ func TestContainer_CooldownDelay(t *testing.T) {
 			name: "LabelZeroDisables",
 			c:    cooldownTestContainer(strPtr("0")),
 			args: args{
-				params: types.UpdateParams{
+				policy: updateConfig.Policy{
 					CooldownDelay: 10 * time.Minute,
 				},
 			},
@@ -1534,7 +1535,7 @@ func TestContainer_CooldownDelay(t *testing.T) {
 			name: "ExtendedUnitsDays",
 			c:    cooldownTestContainer(strPtr("3d")),
 			args: args{
-				params: types.UpdateParams{
+				policy: updateConfig.Policy{
 					CooldownDelay: 10 * time.Minute,
 				},
 			},
@@ -1544,7 +1545,7 @@ func TestContainer_CooldownDelay(t *testing.T) {
 			name: "InvalidLabelFallsBackToGlobal",
 			c:    cooldownTestContainer(strPtr("invalid")),
 			args: args{
-				params: types.UpdateParams{
+				policy: updateConfig.Policy{
 					CooldownDelay: 10 * time.Minute,
 				},
 			},
@@ -1554,7 +1555,7 @@ func TestContainer_CooldownDelay(t *testing.T) {
 			name: "EmptyLabelFallsBackToGlobal",
 			c:    cooldownTestContainer(strPtr("")),
 			args: args{
-				params: types.UpdateParams{
+				policy: updateConfig.Policy{
 					CooldownDelay: 10 * time.Minute,
 				},
 			},
@@ -1564,7 +1565,7 @@ func TestContainer_CooldownDelay(t *testing.T) {
 			name: "NegativeLabelFallsBackToGlobal",
 			c:    cooldownTestContainer(strPtr("-1h")),
 			args: args{
-				params: types.UpdateParams{
+				policy: updateConfig.Policy{
 					CooldownDelay: 10 * time.Minute,
 				},
 			},
@@ -1573,7 +1574,7 @@ func TestContainer_CooldownDelay(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got := tt.c.CooldownDelay(tt.args.params)
+			got := tt.c.CooldownDelay(tt.args.policy)
 			assert.Equal(t, tt.want, got)
 		})
 	}

@@ -69,7 +69,7 @@ func ResolveLatestImageMeta(
 	clog := &clogVal
 
 	concrete, ok := c.(*container.Container)
-	if !ok || !concrete.IsChangelogEnabled(config) {
+	if !ok || !concrete.IsChangelogEnabled(config.Policy) {
 		// The gate is off. Still record the new image's version and revision so
 		// a custom template can print a transition, but never spend a request
 		// to confirm a release tag.
@@ -116,7 +116,7 @@ func ApplyLatestImageMeta(
 
 	meta := progress.SetLatestImageMeta(log, c, config, vars, annotations)
 
-	provenance.LogChangelog(log, c, config, meta)
+	provenance.LogChangelog(log, c, config.Policy, meta)
 }
 
 // resolveReleaseTag confirms which release tag matches the pulled image, or

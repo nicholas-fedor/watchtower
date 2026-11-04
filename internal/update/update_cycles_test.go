@@ -17,6 +17,7 @@ import (
 	mockContainerClient "github.com/nicholas-fedor/watchtower/internal/container/client/mocks"
 	"github.com/nicholas-fedor/watchtower/internal/container/oci"
 	"github.com/nicholas-fedor/watchtower/internal/registry/ratelimit"
+	updateConfig "github.com/nicholas-fedor/watchtower/internal/settings/config/update"
 	mockUpdate "github.com/nicholas-fedor/watchtower/internal/update/mocks"
 	"github.com/nicholas-fedor/watchtower/pkg/types"
 )
@@ -151,7 +152,7 @@ func TestUpdate_LinkToCycleMember(t *testing.T) {
 	client.EXPECT().ListContainers(mock.Anything, mock.Anything).
 		Return([]types.Container{db, e, c, replica}, nil).Once()
 	client.EXPECT().IsContainerStale(mock.Anything, mock.Anything, mock.Anything).
-		RunAndReturn(func(_ context.Context, ct types.Container, _ types.UpdateParams) (bool, types.ImageID, string, error) {
+		RunAndReturn(func(_ context.Context, ct types.Container, _ updateConfig.Policy) (bool, types.ImageID, string, error) {
 			return ct.Name() == "c", types.ImageID("sha256:new"), "", nil
 		})
 	client.EXPECT().GetImageAnnotations(mock.Anything, mock.Anything).Return(oci.Annotations{}).Maybe()

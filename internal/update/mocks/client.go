@@ -12,6 +12,7 @@ import (
 
 	containerClient "github.com/nicholas-fedor/watchtower/internal/container/client"
 	"github.com/nicholas-fedor/watchtower/internal/container/oci"
+	updateConfig "github.com/nicholas-fedor/watchtower/internal/settings/config/update"
 	"github.com/nicholas-fedor/watchtower/pkg/types"
 )
 
@@ -493,7 +494,7 @@ func (client MockClient) ExecuteCommand(
 func (client MockClient) IsContainerStale(
 	ctx context.Context,
 	container types.Container,
-	_ types.UpdateParams,
+	_ updateConfig.Policy,
 ) (bool, types.ImageID, string, error) {
 	client.TestData.IsContainerStaleCount.Add(1)
 
@@ -518,9 +519,9 @@ func (client MockClient) IsContainerStale(
 func (client MockClient) CheckContainerUpdate(
 	ctx context.Context,
 	container types.Container,
-	params types.UpdateParams,
+	policy updateConfig.Policy,
 ) (bool, types.ImageID, string, error) {
-	return client.IsContainerStale(ctx, container, params)
+	return client.IsContainerStale(ctx, container, policy)
 }
 
 // GetImageAnnotations returns the annotations configured for an image reference.

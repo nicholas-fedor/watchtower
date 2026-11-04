@@ -28,6 +28,7 @@ import (
 	"github.com/nicholas-fedor/watchtower/internal/git/semver"
 	"github.com/nicholas-fedor/watchtower/internal/registry/ratelimit"
 	gitConfig "github.com/nicholas-fedor/watchtower/internal/settings/config/git"
+	updateConfig "github.com/nicholas-fedor/watchtower/internal/settings/config/update"
 	"github.com/nicholas-fedor/watchtower/internal/testutil/containerfixture"
 	"github.com/nicholas-fedor/watchtower/internal/testutil/logcapture"
 	mockUpdate "github.com/nicholas-fedor/watchtower/internal/update/mocks"
@@ -212,7 +213,7 @@ func TestUpdate_CanceledScanSkipsUncheckedContainers(t *testing.T) {
 		// The first check cancels the scan. A check that starts after it
 		// stops at the cancellation without calling Docker.
 		client.EXPECT().IsContainerStale(mock.Anything, mock.Anything, mock.Anything).
-			RunAndReturn(func(ctx context.Context, _ types.Container, _ types.UpdateParams) (bool, types.ImageID, string, error) {
+			RunAndReturn(func(ctx context.Context, _ types.Container, _ updateConfig.Policy) (bool, types.ImageID, string, error) {
 				cancel()
 
 				return false, "", "", ctx.Err()
@@ -246,7 +247,7 @@ func TestUpdate_CheckTimeoutSkipsOnlyItsContainer(t *testing.T) {
 	client.EXPECT().ListContainers(mock.Anything, mock.Anything).
 		Return([]types.Container{slow, fresh}, nil).Once()
 	client.EXPECT().IsContainerStale(mock.Anything, mock.Anything, mock.Anything).
-		RunAndReturn(func(_ context.Context, c types.Container, _ types.UpdateParams) (bool, types.ImageID, string, error) {
+		RunAndReturn(func(_ context.Context, c types.Container, _ updateConfig.Policy) (bool, types.ImageID, string, error) {
 			if c.Name() == slow.Name() {
 				return false, "", "", fmt.Errorf("could not determine image age: %w", context.DeadlineExceeded)
 			}

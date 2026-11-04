@@ -22,6 +22,7 @@ import (
 	"github.com/nicholas-fedor/watchtower/internal/registry/digest"
 	"github.com/nicholas-fedor/watchtower/internal/registry/ratelimit"
 	registryConfig "github.com/nicholas-fedor/watchtower/internal/settings/config/registry"
+	updateConfig "github.com/nicholas-fedor/watchtower/internal/settings/config/update"
 	"github.com/nicholas-fedor/watchtower/pkg/types"
 )
 
@@ -170,7 +171,7 @@ func NewClient(
 // Parameters:
 //   - ctx: Context for operation control.
 //   - sourceContainer: Container to check.
-//   - params: Update parameters (e.g., NoPull flag, cooldown delay).
+//   - policy: Update policy for the no-pull and cooldown checks.
 //   - warnOnHeadFailed: Strategy for logging warnings on HEAD request failures.
 //
 // Returns:
@@ -181,7 +182,7 @@ func NewClient(
 func (c Client) IsContainerStale(
 	ctx context.Context,
 	sourceContainer types.Container,
-	params types.UpdateParams,
+	policy updateConfig.Policy,
 	warnOnHeadFailed WarningStrategy,
 ) (bool, types.ImageID, string, error) {
 	clogVal := c.logger().With().
@@ -191,11 +192,11 @@ func (c Client) IsContainerStale(
 	clog := &clogVal
 
 	// Skip pull if NoPull is enabled.
-	if sourceContainer.IsNoPull(params) {
+	if sourceContainer.IsNoPull(policy) {
 		return c.checkLocalImageStaleness(ctx, sourceContainer, clog)
 	}
 
-	err := c.PullImage(ctx, sourceContainer, warnOnHeadFailed, params)
+	err := c.PullImage(ctx, sourceContainer, warnOnHeadFailed, policy)
 	if err != nil {
 		if errors.Is(err, ErrImageCooldown) {
 			clog.Debug().
@@ -233,7 +234,7 @@ func (c Client) IsContainerStale(
 // Parameters:
 //   - ctx: Context for operation control.
 //   - sourceContainer: Container to check.
-//   - params: Update parameters (NoPull, LabelPrecedence).
+//   - policy: Update policy (NoPull, LabelPrecedence).
 //
 // Returns:
 //   - bool: True if an update is available, false otherwise.
@@ -243,7 +244,7 @@ func (c Client) IsContainerStale(
 func (c Client) CheckContainerUpdate(
 	ctx context.Context,
 	sourceContainer types.Container,
-	params types.UpdateParams,
+	policy updateConfig.Policy,
 ) (bool, types.ImageID, string, error) {
 	clogVal := c.logger().With().
 		Str("container", sourceContainer.Name()).
@@ -252,7 +253,7 @@ func (c Client) CheckContainerUpdate(
 	clog := &clogVal
 
 	// Respect no-pull: monitor local image cache only.
-	if sourceContainer.IsNoPull(params) {
+	if sourceContainer.IsNoPull(policy) {
 		return c.checkLocalImageStaleness(ctx, sourceContainer, clog)
 	}
 
@@ -450,7 +451,7 @@ func ExtractImageDigest(repoDigests []string, imageName string) string {
 //   - ctx: Context for operation control.
 //   - sourceContainer: Container whose image to pull.
 //   - warnOnHeadFailed: Strategy for logging warnings on HEAD request failures.
-//   - params: Update parameters (for per-container cooldown via label or global).
+//   - policy: Update policy (for per-container cooldown via label or global).
 //
 // Returns:
 //   - Non-nil error if pull fails or cooldown defers the pull.
@@ -459,7 +460,7 @@ func (c Client) PullImage(
 	ctx context.Context,
 	sourceContainer types.Container,
 	warnOnHeadFailed WarningStrategy,
-	params types.UpdateParams,
+	policy updateConfig.Policy,
 ) error {
 	clogVal := c.logger().With().
 		Str("container", sourceContainer.Name()).
@@ -503,7 +504,7 @@ func (c Client) PullImage(
 
 	// Perform cooldown check to prevent downloading images that are still
 	// inside the cooldown window.
-	_, cooldownErr := c.isOutsideCooldown(ctx, sourceContainer, params)
+	_, cooldownErr := c.isOutsideCooldown(ctx, sourceContainer, policy)
 	if cooldownErr != nil {
 		return cooldownErr
 	}

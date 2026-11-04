@@ -73,22 +73,22 @@ func TestCheckContainer_RejectedComposeStampRetries(t *testing.T) {
 	client.RejectApply(ApplyStampKeyFrom(worker), current, otherPrevious, "")
 	client.RejectApply(ApplyStampKeyFrom(other), current, previous, "")
 
-	got, err := CheckContainer(t.Context(), client, api, types.UpdateParams{})
+	got, err := CheckContainer(t.Context(), client, api, gitConfig.Defaults{})
 	require.NoError(t, err)
 	assert.True(t, got.Stale)
 	assert.Equal(t, current, got.Commit)
 
 	client.AcceptApply(ApplyStampKeyFrom(api), current)
 
-	got, err = CheckContainer(t.Context(), client, api, types.UpdateParams{})
+	got, err = CheckContainer(t.Context(), client, api, gitConfig.Defaults{})
 	require.NoError(t, err)
 	assert.False(t, got.Stale)
 
-	got, err = CheckContainer(t.Context(), client, worker, types.UpdateParams{})
+	got, err = CheckContainer(t.Context(), client, worker, gitConfig.Defaults{})
 	require.NoError(t, err)
 	assert.True(t, got.Stale)
 
-	got, err = CheckContainer(t.Context(), client, other, types.UpdateParams{})
+	got, err = CheckContainer(t.Context(), client, other, gitConfig.Defaults{})
 	require.NoError(t, err)
 	assert.True(t, got.Stale)
 }
@@ -802,7 +802,7 @@ func TestCheckContainer(t *testing.T) {
 		c.EXPECT().GetLabel(mock.Anything).Return("", false)
 		c.EXPECT().ImageName().Return("nginx:latest")
 
-		got, err := CheckContainer(t.Context(), testClient(t, nil), c, types.UpdateParams{})
+		got, err := CheckContainer(t.Context(), testClient(t, nil), c, gitConfig.Defaults{})
 		require.NoError(t, err)
 		assert.Equal(t, CheckResult{}, got)
 	})
@@ -817,7 +817,7 @@ func TestCheckContainer(t *testing.T) {
 		})
 
 		client := testClient(t, []RemoteRef{{Name: "refs/heads/main", Hash: "newsha"}})
-		got, err := CheckContainer(t.Context(), client, c, types.UpdateParams{})
+		got, err := CheckContainer(t.Context(), client, c, gitConfig.Defaults{})
 		require.NoError(t, err)
 		assert.True(t, got.Stale)
 		assert.Equal(t, "newsha", got.Commit)
@@ -831,7 +831,7 @@ func TestCheckContainer(t *testing.T) {
 			labels.GitSemverPolicy: "nightly",
 		})
 
-		got, err := CheckContainer(t.Context(), testClient(t, nil), c, types.UpdateParams{})
+		got, err := CheckContainer(t.Context(), testClient(t, nil), c, gitConfig.Defaults{})
 		require.ErrorIs(t, err, semver.ErrInvalidPolicy)
 		require.EqualError(t, err, "invalid git semver policy: nightly")
 		assert.Equal(t, CheckResult{}, got)
@@ -841,15 +841,13 @@ func TestCheckContainer(t *testing.T) {
 		t.Parallel()
 
 		c := labeledContainer(t, map[string]string{labels.GitSemverPolicy: "nightly"})
-		params := types.UpdateParams{
-			Git: gitConfig.Defaults{
-				Images: map[string]gitConfig.Image{
-					"app:latest": {Repo: "https://example.com/org/app.git", Policy: semver.PolicyPatch},
-				},
+		defaults := gitConfig.Defaults{
+			Images: map[string]gitConfig.Image{
+				"app:latest": {Repo: "https://example.com/org/app.git", Policy: semver.PolicyPatch},
 			},
 		}
 
-		got, err := CheckContainer(t.Context(), testClient(t, nil), c, params)
+		got, err := CheckContainer(t.Context(), testClient(t, nil), c, defaults)
 		require.ErrorIs(t, err, semver.ErrInvalidPolicy)
 		assert.Equal(t, CheckResult{}, got)
 	})
@@ -863,7 +861,7 @@ func TestCheckContainer(t *testing.T) {
 			labels.GitHost: rawHost,
 		})
 
-		got, err := CheckContainer(t.Context(), testClient(t, nil), c, types.UpdateParams{})
+		got, err := CheckContainer(t.Context(), testClient(t, nil), c, gitConfig.Defaults{})
 		require.ErrorIs(t, err, provenance.ErrInvalidHost)
 		require.EqualError(t, err, "invalid git-host: host=type mappings are not supported")
 		assert.NotContains(t, err.Error(), "secret")
@@ -883,17 +881,17 @@ func TestCheckContainer(t *testing.T) {
 		client := testClient(t, nil)
 		client.lister = lister
 
-		first, err := CheckContainer(t.Context(), client, c, types.UpdateParams{})
+		first, err := CheckContainer(t.Context(), client, c, gitConfig.Defaults{})
 		require.NoError(t, err)
 		assert.False(t, first.Stale)
 		assert.Equal(t, "aaa111", first.Commit)
 
-		second, err := CheckContainer(t.Context(), client, c, types.UpdateParams{})
+		second, err := CheckContainer(t.Context(), client, c, gitConfig.Defaults{})
 		require.NoError(t, err)
 		assert.False(t, second.Stale)
 
 		lister.refs = []RemoteRef{{Name: "refs/heads/main", Hash: "bbb222"}}
-		third, err := CheckContainer(t.Context(), client, c, types.UpdateParams{})
+		third, err := CheckContainer(t.Context(), client, c, gitConfig.Defaults{})
 		require.NoError(t, err)
 		assert.True(t, third.Stale)
 		assert.Equal(t, "bbb222", third.Commit)
@@ -908,12 +906,12 @@ func TestCheckContainer(t *testing.T) {
 		}, "app:latest", ociImage("aaa111", ""))
 
 		client := testClient(t, []RemoteRef{{Name: "refs/heads/main", Hash: "aaa111"}})
-		got, err := CheckContainer(t.Context(), client, c, types.UpdateParams{})
+		got, err := CheckContainer(t.Context(), client, c, gitConfig.Defaults{})
 		require.NoError(t, err)
 		assert.False(t, got.Stale)
 
 		staleClient := testClient(t, []RemoteRef{{Name: "refs/heads/main", Hash: "bbb222"}})
-		stale, err := CheckContainer(t.Context(), staleClient, c, types.UpdateParams{})
+		stale, err := CheckContainer(t.Context(), staleClient, c, gitConfig.Defaults{})
 		require.NoError(t, err)
 		assert.True(t, stale.Stale)
 		assert.Equal(t, "bbb222", stale.Commit)
@@ -928,7 +926,7 @@ func TestCheckContainer(t *testing.T) {
 		}, "app:git-aaa111bbbbcc", nil)
 
 		client := testClient(t, []RemoteRef{{Name: "refs/heads/main", Hash: "aaa111bbbbccdddd"}})
-		got, err := CheckContainer(t.Context(), client, c, types.UpdateParams{})
+		got, err := CheckContainer(t.Context(), client, c, gitConfig.Defaults{})
 		require.NoError(t, err)
 		assert.False(t, got.Stale)
 	})

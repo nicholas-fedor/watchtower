@@ -54,7 +54,7 @@ func ShouldUpdate(
 	}
 
 	// Skip monitor-only containers
-	if container.IsMonitorOnly(config) {
+	if container.IsMonitorOnly(config.Policy) {
 		return false
 	}
 

@@ -30,6 +30,7 @@ import (
 	containerRuntime "github.com/nicholas-fedor/watchtower/internal/container/runtime"
 	"github.com/nicholas-fedor/watchtower/internal/registry/ratelimit"
 	registryConfig "github.com/nicholas-fedor/watchtower/internal/settings/config/registry"
+	updateConfig "github.com/nicholas-fedor/watchtower/internal/settings/config/update"
 	"github.com/nicholas-fedor/watchtower/pkg/types"
 )
 
@@ -211,7 +212,7 @@ type Client interface {
 	// Parameters:
 	//   - ctx: Context for cancellation and timeout control.
 	//   - container: Container to check.
-	//   - params: Update parameters for staleness check.
+	//   - policy: Update policy for staleness check.
 	//
 	// Returns:
 	//   - bool: True if image is stale, false otherwise.
@@ -221,7 +222,7 @@ type Client interface {
 	IsContainerStale(
 		ctx context.Context,
 		container types.Container,
-		params types.UpdateParams,
+		policy updateConfig.Policy,
 	) (bool, types.ImageID, string, error)
 
 	// CheckContainerUpdate reports whether a newer image is available without
@@ -231,7 +232,7 @@ type Client interface {
 	// Parameters:
 	//   - ctx: Context for cancellation and timeout control.
 	//   - container: Container to check.
-	//   - params: Update parameters (NoPull, LabelPrecedence).
+	//   - policy: Update policy (NoPull, LabelPrecedence).
 	//
 	// Returns:
 	//   - bool: True if an update is available, false otherwise.
@@ -241,7 +242,7 @@ type Client interface {
 	CheckContainerUpdate(
 		ctx context.Context,
 		container types.Container,
-		params types.UpdateParams,
+		policy updateConfig.Policy,
 	) (bool, types.ImageID, string, error)
 
 	// GetImageAnnotations reads the OCI annotations of an image by reference.
@@ -1295,7 +1296,7 @@ func (c *client) RenameContainer(ctx context.Context, container types.Container,
 //
 // Parameters:
 //   - container: Container to check.
-//   - params: Update parameters for staleness check.
+//   - policy: Update policy for staleness check.
 //
 // Returns:
 //   - bool: True if stale, false otherwise.
@@ -1304,7 +1305,7 @@ func (c *client) RenameContainer(ctx context.Context, container types.Container,
 func (c *client) IsContainerStale(
 	ctx context.Context,
 	container types.Container,
-	params types.UpdateParams,
+	policy updateConfig.Policy,
 ) (bool, types.ImageID, string, error) {
 	// Use image client to perform staleness check.
 	imgClient := containerImage.NewClient(c.api, c.logger(), c.Registry, c.RateLimiter)
@@ -1312,7 +1313,7 @@ func (c *client) IsContainerStale(
 	stale, newestImage, latestDigest, err := imgClient.IsContainerStale(
 		ctx,
 		container,
-		params,
+		policy,
 		c.WarnOnHeadFailed,
 	)
 	if err != nil {
@@ -1340,7 +1341,7 @@ func (c *client) IsContainerStale(
 // Parameters:
 //   - ctx: Context for cancellation and timeout control.
 //   - container: Container to check.
-//   - params: Update parameters (NoPull, LabelPrecedence).
+//   - policy: Update policy (NoPull, LabelPrecedence).
 //
 // Returns:
 //   - bool: True if an update is available, false otherwise.
@@ -1350,14 +1351,14 @@ func (c *client) IsContainerStale(
 func (c *client) CheckContainerUpdate(
 	ctx context.Context,
 	container types.Container,
-	params types.UpdateParams,
+	policy updateConfig.Policy,
 ) (bool, types.ImageID, string, error) {
 	imgClient := containerImage.NewClient(c.api, c.logger(), c.Registry, c.RateLimiter)
 
 	available, newestImage, latestDigest, err := imgClient.CheckContainerUpdate(
 		ctx,
 		container,
-		params,
+		policy,
 	)
 	if err != nil {
 		c.logger().Debug().

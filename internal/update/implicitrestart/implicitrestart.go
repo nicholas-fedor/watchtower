@@ -101,7 +101,7 @@ func Reconcile(
 			continue
 		}
 
-		if c.ToRestart() && !c.IsMonitorOnly(params) {
+		if c.ToRestart() && !c.IsMonitorOnly(params.Policy) {
 			restart = append(restart, c)
 		}
 	}

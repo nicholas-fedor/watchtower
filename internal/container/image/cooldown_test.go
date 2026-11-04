@@ -17,10 +17,10 @@ import (
 
 	"github.com/nicholas-fedor/watchtower/internal/registry/ratelimit"
 	registryConfig "github.com/nicholas-fedor/watchtower/internal/settings/config/registry"
+	updateConfig "github.com/nicholas-fedor/watchtower/internal/settings/config/update"
 	"github.com/nicholas-fedor/watchtower/internal/testutil/containerfixture"
 	"github.com/nicholas-fedor/watchtower/internal/testutil/httpstub"
 	"github.com/nicholas-fedor/watchtower/internal/testutil/modelfixture"
-	"github.com/nicholas-fedor/watchtower/pkg/types"
 )
 
 func TestCooldownError(t *testing.T) {
@@ -161,19 +161,19 @@ func Test_isOutsideCooldown(t *testing.T) {
 	tests := []struct {
 		// when describes the configuration, and it the expected result.
 		when, it string
-		params   types.UpdateParams
+		policy   updateConfig.Policy
 	}{
-		{when: "no cooldown delay is configured", it: "returns true with no registry calls", params: types.UpdateParams{}},
-		{when: "cooldown delay is zero", it: "returns true immediately", params: types.UpdateParams{CooldownDelay: 0}},
+		{when: "no cooldown delay is configured", it: "returns true with no registry calls", policy: updateConfig.Policy{}},
+		{when: "cooldown delay is zero", it: "returns true immediately", policy: updateConfig.Policy{CooldownDelay: 0}},
 		{
 			when:   "container is monitor-only",
 			it:     "returns true and bypasses the cooldown check",
-			params: types.UpdateParams{MonitorOnly: true, CooldownDelay: 24 * time.Hour},
+			policy: updateConfig.Policy{MonitorOnly: true, CooldownDelay: 24 * time.Hour},
 		},
 		{
 			when:   "container has no-pull enabled",
 			it:     "returns true and bypasses the cooldown check",
-			params: types.UpdateParams{NoPull: true, CooldownDelay: 24 * time.Hour},
+			policy: updateConfig.Policy{NoPull: true, CooldownDelay: 24 * time.Hour},
 		},
 	}
 
@@ -186,7 +186,7 @@ func Test_isOutsideCooldown(t *testing.T) {
 
 				i := newTestImageClient(newImageAPI(t), newTestLogger(t), registryConfig.Registry{}, ratelimit.New())
 
-				outside, err := i.isOutsideCooldown(t.Context(), modelfixture.Container(containerfixture.WithImageName("test:latest")), tt.params)
+				outside, err := i.isOutsideCooldown(t.Context(), modelfixture.Container(containerfixture.WithImageName("test:latest")), tt.policy)
 				require.NoError(t, err)
 				assert.True(t, outside)
 			})
@@ -202,7 +202,7 @@ func Test_isOutsideCooldown(t *testing.T) {
 			// The test registry serves plain HTTP.
 			i := newTestImageClient(newImageAPI(t), newTestLogger(t), registryConfig.Registry{TLSSkip: true}, ratelimit.New())
 
-			outside, err := i.isOutsideCooldown(t.Context(), modelfixture.Container(containerfixture.WithImageName(notFoundRegistry(t)+"/test:latest")), types.UpdateParams{
+			outside, err := i.isOutsideCooldown(t.Context(), modelfixture.Container(containerfixture.WithImageName(notFoundRegistry(t)+"/test:latest")), updateConfig.Policy{
 				CooldownDelay: 1 * time.Hour,
 			})
 			assert.False(t, outside)
@@ -224,7 +224,7 @@ func TestIsOutsideCooldown_NilLogger(t *testing.T) {
 	outside, err := client.isOutsideCooldown(
 		t.Context(),
 		modelfixture.Container(containerfixture.WithImageName(notFoundRegistry(t)+"/test:latest")),
-		types.UpdateParams{CooldownDelay: time.Hour},
+		updateConfig.Policy{CooldownDelay: time.Hour},
 	)
 	assert.False(t, outside)
 
@@ -250,7 +250,7 @@ func Test_isOutsideCooldown_pullOptionsFailure(t *testing.T) {
 
 			i := newTestImageClient(newImageAPI(t), newTestLogger(t), registryConfig.Registry{}, ratelimit.New())
 
-			outside, err := i.isOutsideCooldown(t.Context(), modelfixture.Container(containerfixture.WithImageName("registry.example.com/app:latest")), types.UpdateParams{
+			outside, err := i.isOutsideCooldown(t.Context(), modelfixture.Container(containerfixture.WithImageName("registry.example.com/app:latest")), updateConfig.Policy{
 				CooldownDelay: 1 * time.Hour,
 			})
 			assert.False(t, outside)
@@ -286,7 +286,7 @@ func TestPullImageCooldownGate(t *testing.T) {
 			// The test registry serves plain HTTP.
 			i := newTestImageClient(newImageAPI(t), newTestLogger(t), registryConfig.Registry{TLSSkip: true}, ratelimit.New())
 
-			err := i.PullImage(t.Context(), c, warnAuto, types.UpdateParams{CooldownDelay: 1 * time.Hour})
+			err := i.PullImage(t.Context(), c, warnAuto, updateConfig.Policy{CooldownDelay: 1 * time.Hour})
 
 			var cooldownErr *CooldownError
 			require.ErrorAs(t, err, &cooldownErr)
@@ -305,7 +305,7 @@ func TestCheckLocalImageCooldown(t *testing.T) {
 			containerfixture.WithImageCreated(time.Now().Add(-time.Hour)),
 		)
 
-		err := CheckLocalImageCooldown(c, types.UpdateParams{CooldownDelay: 24 * time.Hour})
+		err := CheckLocalImageCooldown(c, updateConfig.Policy{CooldownDelay: 24 * time.Hour})
 		require.ErrorIs(t, err, ErrImageCooldown)
 	})
 
@@ -317,7 +317,7 @@ func TestCheckLocalImageCooldown(t *testing.T) {
 			containerfixture.WithImageCreated(time.Now().Add(-48*time.Hour)),
 		)
 
-		err := CheckLocalImageCooldown(c, types.UpdateParams{CooldownDelay: 24 * time.Hour})
+		err := CheckLocalImageCooldown(c, updateConfig.Policy{CooldownDelay: 24 * time.Hour})
 		require.NoError(t, err)
 	})
 }
@@ -353,17 +353,17 @@ func TestIsOutsideCooldown_RegistrySettings(t *testing.T) {
 	t.Cleanup(server.Close)
 
 	container := modelfixture.Container(containerfixture.WithImageName(strings.TrimPrefix(server.URL, "http://") + "/org/app:1.0"))
-	params := types.UpdateParams{CooldownDelay: time.Hour}
+	policy := updateConfig.Policy{CooldownDelay: time.Hour}
 
 	plain := NewClient(nil, newTestLogger(t), registryConfig.Registry{TLSSkip: true}, ratelimit.New())
 
-	outside, err := plain.isOutsideCooldown(t.Context(), container, params)
+	outside, err := plain.isOutsideCooldown(t.Context(), container, policy)
 	require.NoError(t, err)
 	assert.True(t, outside, "an image older than the cooldown was deferred")
 
 	secure := NewClient(nil, newTestLogger(t), registryConfig.Registry{}, ratelimit.New())
 
-	outside, err = secure.isOutsideCooldown(t.Context(), container, params)
+	outside, err = secure.isOutsideCooldown(t.Context(), container, policy)
 	require.Error(t, err, "an HTTPS request reached the plain HTTP registry")
 	assert.False(t, outside)
 }
@@ -424,6 +424,6 @@ func TestCheckLocalImageCooldown_FutureCreationTime(t *testing.T) {
 		containerfixture.WithImageCreated(time.Now().Add(time.Hour)),
 	)
 
-	err := CheckLocalImageCooldown(c, types.UpdateParams{CooldownDelay: 24 * time.Hour})
+	err := CheckLocalImageCooldown(c, updateConfig.Policy{CooldownDelay: 24 * time.Hour})
 	require.ErrorIs(t, err, ErrImageCooldown)
 }

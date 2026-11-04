@@ -31,6 +31,7 @@ import (
 	"github.com/nicholas-fedor/watchtower/internal/git"
 	"github.com/nicholas-fedor/watchtower/internal/git/semver"
 	gitConfig "github.com/nicholas-fedor/watchtower/internal/settings/config/git"
+	updateConfig "github.com/nicholas-fedor/watchtower/internal/settings/config/update"
 	"github.com/nicholas-fedor/watchtower/pkg/types"
 	mockTypes "github.com/nicholas-fedor/watchtower/pkg/types/mocks"
 )
@@ -97,7 +98,7 @@ func TestCheckForUpdates_ParamsPropagation(t *testing.T) {
 	container.EXPECT().ImageID().Return(types.ImageID("sha256:abc"))
 	container.EXPECT().ImageInfo().Return(nil)
 	client.EXPECT().ListContainers(mock.Anything, mock.Anything).Return([]types.Container{container}, nil)
-	client.EXPECT().CheckContainerUpdate(mock.Anything, mock.Anything, mock.MatchedBy(func(p types.UpdateParams) bool {
+	client.EXPECT().CheckContainerUpdate(mock.Anything, mock.Anything, mock.MatchedBy(func(p updateConfig.Policy) bool {
 		return p.MonitorOnly && p.NoPull && p.LabelPrecedence && p.CooldownDelay == 5*time.Minute
 	})).Return(true, types.ImageID("sha256:new"), "sha256:newdigest", nil)
 
