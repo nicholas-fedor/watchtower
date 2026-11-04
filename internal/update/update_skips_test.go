@@ -332,7 +332,7 @@ func TestUpdate_StopFailureStaysFailedWhenCanceled(t *testing.T) {
 		RunAndReturn(func(context.Context, types.Container, time.Duration) error {
 			cancel()
 
-			return errors.New("daemon unavailable")
+			return errors.New("failed to stop container: daemon unavailable")
 		}).Once()
 
 	report, _, _ := update(newTestLogger(t), ctx, client, types.UpdateParams{}, ratelimit.New())

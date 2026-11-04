@@ -17,8 +17,6 @@ var (
 	errRollingRestartDependency = errors.New(
 		"container has dependencies incompatible with rolling restarts",
 	)
-	// errListContainersFailed flags failures in listing containers.
-	errListContainersFailed = errors.New("failed to list containers")
 )
 
 // ValidateRollingRestartDependencies validates the environment for rolling restart updates.
@@ -53,7 +51,7 @@ func ValidateRollingRestartDependencies(
 			Err(err).
 			Msg("Failed to list containers")
 
-		return fmt.Errorf("%w: %w", errListContainersFailed, err)
+		return err //nolint:wrapcheck // The client's error already names the failed listing.
 	}
 
 	// If there's no containers, then log and return nil.

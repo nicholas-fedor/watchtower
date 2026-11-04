@@ -33,14 +33,8 @@ var (
 	errSkipUpdate = errors.New(
 		"skipping container due to pre-update command exit code 75 (EX_TEMPFAIL)",
 	)
-	// errStopContainerFailed indicates a failure to stop a container during the update process.
-	errStopContainerFailed = errors.New("failed to stop container")
 	// errContainerGone indicates a container no longer existed when the update tried to stop it.
 	errContainerGone = errors.New("container no longer exists")
-	// errStartContainerFailed indicates a failure to start a container after an update.
-	errStartContainerFailed = errors.New("failed to start container")
-	// errCreateContainerFailed indicates a failure to create a container during the update process.
-	errCreateContainerFailed = errors.New("failed to create container")
 	// errRenameWatchtowerFailed indicates a failure to rename the Watchtower container before restarting.
 	errRenameWatchtowerFailed = errors.New("failed to rename Watchtower container")
 )
@@ -529,7 +523,7 @@ func stopStaleContainer(
 			Fields(fields).
 			Msg("Failed to stop container")
 
-		return false, fmt.Errorf("%w: %w", errStopContainerFailed, err)
+		return false, err //nolint:wrapcheck // The client's error already names the failed stop or removal.
 	}
 
 	return true, nil
@@ -907,13 +901,7 @@ func restartStaleContainer(
 			}
 		}
 
-		return "",
-			renamed,
-			fmt.Errorf(
-				"%w: %w",
-				errCreateContainerFailed,
-				err,
-			)
+		return "", renamed, err //nolint:wrapcheck // The client's error already names the failed create.
 	}
 
 	// Start the new container based on restart settings:
@@ -976,13 +964,7 @@ func restartStaleContainer(
 				}
 			}
 
-			return "",
-				renamed,
-				fmt.Errorf(
-					"%w: %w",
-					errStartContainerFailed,
-					err,
-				)
+			return "", renamed, err //nolint:wrapcheck // The client's error already names the failed start.
 		}
 
 		log.Info().
