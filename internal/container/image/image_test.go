@@ -23,6 +23,7 @@ import (
 	"github.com/nicholas-fedor/watchtower/internal/registry/digest"
 	"github.com/nicholas-fedor/watchtower/internal/registry/ratelimit"
 	registryConfig "github.com/nicholas-fedor/watchtower/internal/settings/config/registry"
+	updateConfig "github.com/nicholas-fedor/watchtower/internal/settings/config/update"
 	"github.com/nicholas-fedor/watchtower/internal/testutil/containerfixture"
 	"github.com/nicholas-fedor/watchtower/internal/testutil/httpstub"
 	"github.com/nicholas-fedor/watchtower/internal/testutil/logcapture"
@@ -239,7 +240,7 @@ func TestImageClient_PullImage(t *testing.T) {
 			i := newTestImageClient(newImageAPI(t), newTestLogger(t), registryConfig.Registry{}, ratelimit.New())
 			pinned := modelfixture.Container(containerfixture.WithImageName("sha256:fa5269854a5e615e51a72b17ad3fd1e01268f278a6684c8ed3c5f0cdce3f230b"))
 
-			err := i.PullImage(t.Context(), pinned, warnAuto, types.UpdateParams{})
+			err := i.PullImage(t.Context(), pinned, warnAuto, updateConfig.Policy{})
 			require.ErrorIs(t, err, errPinnedImage)
 		})
 
@@ -247,7 +248,7 @@ func TestImageClient_PullImage(t *testing.T) {
 			i := newTestImageClient(newImageAPI(t), newTestLogger(t), registryConfig.Registry{}, ratelimit.New())
 			pinned := modelfixture.Container(containerfixture.WithImageName("nginx@sha256:fa5269854a5e615e51a72b17ad3fd1e01268f278a6684c8ed3c5f0cdce3f230b"))
 
-			err := i.PullImage(t.Context(), pinned, warnAuto, types.UpdateParams{})
+			err := i.PullImage(t.Context(), pinned, warnAuto, updateConfig.Policy{})
 			require.ErrorIs(t, err, errPinnedImage)
 		})
 	})
@@ -267,7 +268,7 @@ func TestImageClient_PullImage(t *testing.T) {
 				t.Context(),
 				modelfixture.Container(containerfixture.WithImageName(image), containerfixture.WithRepoDigests([]string{image + "@sha256:abc"})),
 				warnAuto,
-				types.UpdateParams{},
+				updateConfig.Policy{},
 			)
 			require.ErrorIs(t, err, errPullImageUnauthorized)
 			require.ErrorContains(t, err, "authentication required")
@@ -292,7 +293,7 @@ func TestImageClient_PullImage(t *testing.T) {
 				t.Context(),
 				modelfixture.Container(containerfixture.WithImageName(image), containerfixture.WithRepoDigests([]string{image + "@sha256:def"})),
 				warnAuto,
-				types.UpdateParams{},
+				updateConfig.Policy{},
 			)
 			require.ErrorIs(t, err, errPullImageNotFound)
 			require.ErrorContains(t, err, "image not found")
@@ -316,7 +317,7 @@ func TestImageClient_PullImage(t *testing.T) {
 				t.Context(),
 				modelfixture.Container(containerfixture.WithImageName(image), containerfixture.WithRepoDigests([]string{image + "@sha256:ghi"})),
 				warnAuto,
-				types.UpdateParams{},
+				updateConfig.Policy{},
 			)
 			require.ErrorIs(t, err, errPullImageFailed)
 			require.ErrorContains(t, err, "failed to pull image")
@@ -340,7 +341,7 @@ func TestImageClient_PullImage(t *testing.T) {
 				t.Context(),
 				modelfixture.Container(containerfixture.WithImageName(image), containerfixture.WithRepoDigests([]string{image + "@sha256:abc"})),
 				warnAuto,
-				types.UpdateParams{},
+				updateConfig.Policy{},
 			)
 			require.ErrorIs(t, err, errPullImageUnauthorized)
 		})
@@ -359,7 +360,7 @@ func TestImageClient_PullImage(t *testing.T) {
 				t.Context(),
 				modelfixture.Container(containerfixture.WithImageName(image), containerfixture.WithRepoDigests([]string{image + "@sha256:abc"})),
 				warnAuto,
-				types.UpdateParams{},
+				updateConfig.Policy{},
 			)
 			require.ErrorIs(t, err, errPullImageUnauthorized)
 		})
@@ -741,7 +742,7 @@ func TestImageClient_IsContainerStale_noPull(t *testing.T) {
 			log, logbuf := logcapture.New(zerolog.DebugLevel)
 			c := newTestImageClient(api, log, registryConfig.Registry{}, ratelimit.New())
 
-			stale, latestID, _, err := c.IsContainerStale(t.Context(), runningImage("test-image:latest", currentImageID), types.UpdateParams{NoPull: true}, "")
+			stale, latestID, _, err := c.IsContainerStale(t.Context(), runningImage("test-image:latest", currentImageID), updateConfig.Policy{NoPull: true}, "")
 			require.NoError(t, err)
 			assert.False(t, stale)
 			assert.Equal(t, types.ImageID(currentImageID), latestID)
@@ -765,7 +766,7 @@ func TestImageClient_IsContainerStale_noPull(t *testing.T) {
 			log, logbuf := logcapture.New(zerolog.DebugLevel)
 			c := newTestImageClient(api, log, registryConfig.Registry{}, ratelimit.New())
 
-			stale, latestID, _, err := c.IsContainerStale(t.Context(), runningImage("test-image:latest", currentImageID), types.UpdateParams{NoPull: true}, "")
+			stale, latestID, _, err := c.IsContainerStale(t.Context(), runningImage("test-image:latest", currentImageID), updateConfig.Policy{NoPull: true}, "")
 			require.NoError(t, err)
 			assert.True(t, stale)
 			assert.Equal(t, types.ImageID(newImageID), latestID)
@@ -789,7 +790,7 @@ func TestImageClient_IsContainerStale_noPull(t *testing.T) {
 
 			c := newTestImageClient(api, newTestLogger(t), registryConfig.Registry{}, ratelimit.New())
 
-			stale, latestID, latestDigest, err := c.IsContainerStale(t.Context(), runningImage("test-image:latest", currentImageID), types.UpdateParams{NoPull: true}, "")
+			stale, latestID, latestDigest, err := c.IsContainerStale(t.Context(), runningImage("test-image:latest", currentImageID), updateConfig.Policy{NoPull: true}, "")
 			require.NoError(t, err)
 			assert.True(t, stale)
 			assert.Equal(t, newImageID, string(latestID))
@@ -811,7 +812,7 @@ func TestImageClient_IsContainerStale_noPull(t *testing.T) {
 
 			c := newTestImageClient(api, newTestLogger(t), registryConfig.Registry{}, ratelimit.New())
 
-			stale, latestID, latestDigest, err := c.IsContainerStale(t.Context(), runningImage("test-image:latest", currentImageID), types.UpdateParams{NoPull: true}, "")
+			stale, latestID, latestDigest, err := c.IsContainerStale(t.Context(), runningImage("test-image:latest", currentImageID), updateConfig.Policy{NoPull: true}, "")
 			require.NoError(t, err)
 			assert.True(t, stale)
 			assert.Equal(t, newImageID, string(latestID))
@@ -833,7 +834,7 @@ func TestImageClient_IsContainerStale_noPull(t *testing.T) {
 
 			c := newTestImageClient(api, newTestLogger(t), registryConfig.Registry{}, ratelimit.New())
 
-			stale, latestID, latestDigest, err := c.IsContainerStale(t.Context(), runningImage("test-image:latest", currentImageID), types.UpdateParams{NoPull: true}, "")
+			stale, latestID, latestDigest, err := c.IsContainerStale(t.Context(), runningImage("test-image:latest", currentImageID), updateConfig.Policy{NoPull: true}, "")
 			require.NoError(t, err)
 			assert.True(t, stale)
 			assert.Equal(t, newImageID, string(latestID))
@@ -856,7 +857,7 @@ func TestImageClient_IsContainerStale_noPull(t *testing.T) {
 			log, logbuf := logcapture.New(zerolog.DebugLevel)
 			c := newTestImageClient(api, log, registryConfig.Registry{}, ratelimit.New())
 
-			stale, latestID, _, err := c.IsContainerStale(t.Context(), runningImage("test-image:latest", currentImageID), types.UpdateParams{NoPull: true}, "")
+			stale, latestID, _, err := c.IsContainerStale(t.Context(), runningImage("test-image:latest", currentImageID), updateConfig.Policy{NoPull: true}, "")
 			require.Error(t, err)
 			assert.False(t, stale)
 			assert.Equal(t, types.ImageID(currentImageID), latestID)
@@ -886,7 +887,7 @@ func TestImageClient_IsContainerStale_noPull(t *testing.T) {
 
 			c := newTestImageClient(api, newTestLogger(t), registryConfig.Registry{}, ratelimit.New())
 
-			_, _, _, err := c.IsContainerStale(ctx, runningImage("test-image:latest", currentImageID), types.UpdateParams{NoPull: true}, "")
+			_, _, _, err := c.IsContainerStale(ctx, runningImage("test-image:latest", currentImageID), updateConfig.Policy{NoPull: true}, "")
 			require.ErrorIs(t, err, context.Canceled)
 		})
 	})
@@ -916,7 +917,7 @@ func TestImageClient_IsContainerStale_pull(t *testing.T) {
 
 			c := newTestImageClient(api, newTestLogger(t), registryConfig.Registry{TLSSkip: true}, ratelimit.New())
 
-			stale, latestID, latestDigest, err := c.IsContainerStale(t.Context(), runningImage(image, currentImageID, registry.Addr()+"/test/image@"+localDigest), types.UpdateParams{}, "")
+			stale, latestID, latestDigest, err := c.IsContainerStale(t.Context(), runningImage(image, currentImageID, registry.Addr()+"/test/image@"+localDigest), updateConfig.Policy{}, "")
 			require.NoError(t, err)
 			assert.True(t, stale)
 			assert.Equal(t, newImageID, string(latestID))
@@ -940,7 +941,7 @@ func TestImageClient_IsContainerStale_pull(t *testing.T) {
 			log, logbuf := logcapture.New(zerolog.DebugLevel)
 			c := newTestImageClient(api, log, registryConfig.Registry{TLSSkip: true}, ratelimit.New())
 
-			stale, latestID, latestDigest, err := c.IsContainerStale(t.Context(), runningImage(image, currentImageID, registry.Addr()+"/test/image@"+localDigest), types.UpdateParams{}, "")
+			stale, latestID, latestDigest, err := c.IsContainerStale(t.Context(), runningImage(image, currentImageID, registry.Addr()+"/test/image@"+localDigest), updateConfig.Policy{}, "")
 			require.NoError(t, err)
 			assert.False(t, stale)
 			assert.Equal(t, types.ImageID(currentImageID), latestID)
@@ -962,7 +963,7 @@ func TestImageClient_IsContainerStale_pull(t *testing.T) {
 			log, logbuf := logcapture.New(zerolog.DebugLevel)
 			c := newTestImageClient(api, log, registryConfig.Registry{}, ratelimit.New())
 
-			stale, latestID, latestDigest, err := c.IsContainerStale(t.Context(), runningImage("registry.example.com/app:latest", currentImageID, []string{}...), types.UpdateParams{}, "")
+			stale, latestID, latestDigest, err := c.IsContainerStale(t.Context(), runningImage("registry.example.com/app:latest", currentImageID, []string{}...), updateConfig.Policy{}, "")
 			require.NoError(t, err)
 			assert.True(t, stale)
 			assert.Equal(t, newerLocalImageID, string(latestID))
@@ -1031,7 +1032,7 @@ func TestImageClient_CheckContainerUpdate(t *testing.T) {
 				container := modelfixture.Container(containerfixture.WithImageName(ref))
 				c := newTestImageClient(newImageAPI(t), newTestLogger(t), registryConfig.Registry{}, ratelimit.New())
 
-				available, latestID, latestDigest, err := c.CheckContainerUpdate(t.Context(), container, types.UpdateParams{})
+				available, latestID, latestDigest, err := c.CheckContainerUpdate(t.Context(), container, updateConfig.Policy{})
 				require.NoError(t, err)
 				assert.False(t, available)
 				assert.Equal(t, string(container.ImageID()), string(latestID))
@@ -1053,7 +1054,7 @@ func TestImageClient_CheckContainerUpdate(t *testing.T) {
 
 			c := newTestImageClient(api, newTestLogger(t), registryConfig.Registry{}, ratelimit.New())
 
-			available, latestID, _, err := c.CheckContainerUpdate(t.Context(), runningImage("test-image:latest", currentImageID), types.UpdateParams{NoPull: true})
+			available, latestID, _, err := c.CheckContainerUpdate(t.Context(), runningImage("test-image:latest", currentImageID), updateConfig.Policy{NoPull: true})
 			require.NoError(t, err)
 			assert.False(t, available)
 			assert.Equal(t, types.ImageID(currentImageID), latestID)
@@ -1069,7 +1070,7 @@ func TestImageClient_CheckContainerUpdate(t *testing.T) {
 			currentImageID := "sha256:" + containerfixture.RandomID()
 			c := newTestImageClient(newImageAPI(t), newTestLogger(t), registryConfig.Registry{}, ratelimit.New())
 
-			available, latestID, latestDigest, err := c.CheckContainerUpdate(t.Context(), runningImage("local-build:latest", currentImageID, []string{}...), types.UpdateParams{})
+			available, latestID, latestDigest, err := c.CheckContainerUpdate(t.Context(), runningImage("local-build:latest", currentImageID, []string{}...), updateConfig.Policy{})
 			require.NoError(t, err)
 			assert.False(t, available)
 			assert.Equal(t, types.ImageID(currentImageID), latestID)
@@ -1092,7 +1093,7 @@ func TestImageClient_CheckContainerUpdate(t *testing.T) {
 			// The test registry serves plain HTTP.
 			c := newTestImageClient(newImageAPI(t), newTestLogger(t), registryConfig.Registry{TLSSkip: true}, ratelimit.New())
 
-			available, latestID, latestDigest, err := c.CheckContainerUpdate(t.Context(), runningImage(image, currentImageID, registry.Addr()+"/test/image@"+localDigest), types.UpdateParams{})
+			available, latestID, latestDigest, err := c.CheckContainerUpdate(t.Context(), runningImage(image, currentImageID, registry.Addr()+"/test/image@"+localDigest), updateConfig.Policy{})
 			require.NoError(t, err)
 			assert.False(t, available)
 			assert.Equal(t, types.ImageID(currentImageID), latestID)
@@ -1113,7 +1114,7 @@ func TestImageClient_CheckContainerUpdate(t *testing.T) {
 			// The test registry serves plain HTTP.
 			c := newTestImageClient(newImageAPI(t), newTestLogger(t), registryConfig.Registry{TLSSkip: true}, ratelimit.New())
 
-			available, latestID, latestDigest, err := c.CheckContainerUpdate(t.Context(), runningImage(image, currentImageID, registry.Addr()+"/test/image@"+localDigest), types.UpdateParams{})
+			available, latestID, latestDigest, err := c.CheckContainerUpdate(t.Context(), runningImage(image, currentImageID, registry.Addr()+"/test/image@"+localDigest), updateConfig.Policy{})
 			require.NoError(t, err)
 			assert.True(t, available)
 			assert.Equal(t, types.ImageID(""), latestID)
@@ -1225,7 +1226,7 @@ func TestImageClient_isOutsideCooldown_beforePull(t *testing.T) {
 
 			i := newTestImageClient(nil, newTestLogger(t), registryConfig.Registry{}, ratelimit.New())
 
-			outside, err := i.isOutsideCooldown(t.Context(), modelfixture.Container(containerfixture.WithImageName("test:latest")), types.UpdateParams{})
+			outside, err := i.isOutsideCooldown(t.Context(), modelfixture.Container(containerfixture.WithImageName("test:latest")), updateConfig.Policy{})
 			require.NoError(t, err)
 			assert.True(t, outside)
 		})
@@ -1239,7 +1240,7 @@ func TestImageClient_isOutsideCooldown_beforePull(t *testing.T) {
 
 			i := newTestImageClient(nil, newTestLogger(t), registryConfig.Registry{}, ratelimit.New())
 
-			outside, err := i.isOutsideCooldown(t.Context(), modelfixture.Container(containerfixture.WithImageName("test:latest")), types.UpdateParams{
+			outside, err := i.isOutsideCooldown(t.Context(), modelfixture.Container(containerfixture.WithImageName("test:latest")), updateConfig.Policy{
 				MonitorOnly:   true,
 				CooldownDelay: 24 * time.Hour,
 			})

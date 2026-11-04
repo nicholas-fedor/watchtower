@@ -10,10 +10,10 @@ import (
 	"github.com/nicholas-fedor/watchtower/internal/container/labels"
 	"github.com/nicholas-fedor/watchtower/internal/container/oci"
 	gitConfig "github.com/nicholas-fedor/watchtower/internal/settings/config/git"
+	updateConfig "github.com/nicholas-fedor/watchtower/internal/settings/config/update"
 	"github.com/nicholas-fedor/watchtower/internal/testutil/containerfixture"
 	"github.com/nicholas-fedor/watchtower/internal/testutil/logcapture"
 	"github.com/nicholas-fedor/watchtower/internal/testutil/modelfixture"
-	"github.com/nicholas-fedor/watchtower/pkg/types"
 )
 
 // TestResolveReportMeta verifies the report metadata for a container: its Git
@@ -359,7 +359,7 @@ func TestLogChangelogOnlyWhenEnabled(t *testing.T) {
 	tests := []struct {
 		name       string
 		labels     map[string]string
-		params     types.UpdateParams
+		policy     updateConfig.Policy
 		wantEvents int
 	}{
 		{
@@ -375,7 +375,7 @@ func TestLogChangelogOnlyWhenEnabled(t *testing.T) {
 		{
 			name:       "global flag",
 			labels:     map[string]string{labels.GitRepo: "https://github.com/org/app.git"},
-			params:     types.UpdateParams{EnableChangelog: true},
+			policy:     updateConfig.Policy{EnableChangelog: true},
 			wantEvents: 1,
 		},
 		{
@@ -396,7 +396,7 @@ func TestLogChangelogOnlyWhenEnabled(t *testing.T) {
 
 			log := zerolog.New(&buf)
 
-			LogChangelog(&log, c, tt.params, meta)
+			LogChangelog(&log, c, tt.policy, meta)
 
 			events := logcapture.Entries[logcapture.Entry](t, buf.String())
 			assert.Len(t, events, tt.wantEvents, "log output: %s", buf.String())
@@ -415,8 +415,8 @@ func TestLogChangelogSkipsEmptyURL(t *testing.T) {
 
 	log := zerolog.New(&buf)
 
-	LogChangelog(&log, c, types.UpdateParams{EnableChangelog: true}, ReportMeta{})
-	LogChangelog(&log, nil, types.UpdateParams{EnableChangelog: true}, ReportMeta{
+	LogChangelog(&log, c, updateConfig.Policy{EnableChangelog: true}, ReportMeta{})
+	LogChangelog(&log, nil, updateConfig.Policy{EnableChangelog: true}, ReportMeta{
 		Changelog: "https://example.com/notes",
 	})
 

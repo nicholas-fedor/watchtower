@@ -17,6 +17,7 @@ import (
 	composeLabels "github.com/nicholas-fedor/watchtower/internal/compose/labels"
 	"github.com/nicholas-fedor/watchtower/internal/container/labels"
 	"github.com/nicholas-fedor/watchtower/internal/observability/logging"
+	updateConfig "github.com/nicholas-fedor/watchtower/internal/settings/config/update"
 	"github.com/nicholas-fedor/watchtower/internal/testutil/containerfixture"
 	"github.com/nicholas-fedor/watchtower/pkg/types"
 	mockTypes "github.com/nicholas-fedor/watchtower/pkg/types/mocks"
@@ -1482,7 +1483,7 @@ func TestContainerModel(t *testing.T) {
 				c := MockContainer(containerfixture.WithLabels(map[string]string{
 					"com.centurylinklabs.watchtower.no-pull": "true",
 				}))
-				assert.True(t, c.IsNoPull(types.UpdateParams{}))
+				assert.True(t, c.IsNoPull(updateConfig.Policy{}))
 			})
 
 			t.Run("returns false when no-pull label is false", func(t *testing.T) {
@@ -1491,7 +1492,7 @@ func TestContainerModel(t *testing.T) {
 				c := MockContainer(containerfixture.WithLabels(map[string]string{
 					"com.centurylinklabs.watchtower.no-pull": "false",
 				}))
-				assert.False(t, c.IsNoPull(types.UpdateParams{}))
+				assert.False(t, c.IsNoPull(updateConfig.Policy{}))
 			})
 
 			t.Run("returns false for invalid no-pull label", func(t *testing.T) {
@@ -1500,14 +1501,14 @@ func TestContainerModel(t *testing.T) {
 				c := MockContainer(containerfixture.WithLabels(map[string]string{
 					"com.centurylinklabs.watchtower.no-pull": "maybe",
 				}))
-				assert.False(t, c.IsNoPull(types.UpdateParams{}))
+				assert.False(t, c.IsNoPull(updateConfig.Policy{}))
 			})
 
 			t.Run("returns false when no-pull label is unset", func(t *testing.T) {
 				t.Parallel()
 
 				c := MockContainer(containerfixture.WithLabels(map[string]string{}))
-				assert.False(t, c.IsNoPull(types.UpdateParams{}))
+				assert.False(t, c.IsNoPull(updateConfig.Policy{}))
 			})
 		})
 
@@ -1520,7 +1521,7 @@ func TestContainerModel(t *testing.T) {
 				c := MockContainer(containerfixture.WithLabels(map[string]string{
 					"com.centurylinklabs.watchtower.no-pull": "true",
 				}))
-				assert.True(t, c.IsNoPull(types.UpdateParams{NoPull: true}))
+				assert.True(t, c.IsNoPull(updateConfig.Policy{NoPull: true}))
 			})
 
 			t.Run("returns true when no-pull label is false", func(t *testing.T) {
@@ -1529,7 +1530,7 @@ func TestContainerModel(t *testing.T) {
 				c := MockContainer(containerfixture.WithLabels(map[string]string{
 					"com.centurylinklabs.watchtower.no-pull": "false",
 				}))
-				assert.True(t, c.IsNoPull(types.UpdateParams{NoPull: true}))
+				assert.True(t, c.IsNoPull(updateConfig.Policy{NoPull: true}))
 			})
 
 			t.Run("label-take-precedence is true", func(t *testing.T) {
@@ -1541,7 +1542,7 @@ func TestContainerModel(t *testing.T) {
 					c := MockContainer(containerfixture.WithLabels(map[string]string{
 						"com.centurylinklabs.watchtower.no-pull": "true",
 					}))
-					assert.True(t, c.IsNoPull(types.UpdateParams{LabelPrecedence: true, NoPull: true}))
+					assert.True(t, c.IsNoPull(updateConfig.Policy{LabelPrecedence: true, NoPull: true}))
 				})
 
 				t.Run("returns false when no-pull label is false", func(t *testing.T) {
@@ -1550,7 +1551,7 @@ func TestContainerModel(t *testing.T) {
 					c := MockContainer(containerfixture.WithLabels(map[string]string{
 						"com.centurylinklabs.watchtower.no-pull": "false",
 					}))
-					assert.False(t, c.IsNoPull(types.UpdateParams{LabelPrecedence: true, NoPull: true}))
+					assert.False(t, c.IsNoPull(updateConfig.Policy{LabelPrecedence: true, NoPull: true}))
 				})
 			})
 		})

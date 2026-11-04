@@ -8,6 +8,7 @@ import (
 	"github.com/nicholas-fedor/watchtower/internal/container/redact"
 	"github.com/nicholas-fedor/watchtower/internal/observability/logging"
 	gitConfig "github.com/nicholas-fedor/watchtower/internal/settings/config/git"
+	updateConfig "github.com/nicholas-fedor/watchtower/internal/settings/config/update"
 	"github.com/nicholas-fedor/watchtower/pkg/types"
 )
 
@@ -113,7 +114,7 @@ func ResolveReportMeta(
 // Parameters:
 //   - log: Process logger.
 //   - c: Container the entry describes.
-//   - params: Update parameters carrying the changelog enable gate.
+//   - policy: Update policy carrying the changelog enable gate.
 //   - meta: Resolved report metadata.
 //
 // Returns:
@@ -121,7 +122,7 @@ func ResolveReportMeta(
 func LogChangelog(
 	log *zerolog.Logger,
 	c types.Container,
-	params types.UpdateParams,
+	policy updateConfig.Policy,
 	meta ReportMeta,
 ) {
 	if c == nil || meta.Changelog == "" {
@@ -129,7 +130,7 @@ func LogChangelog(
 	}
 
 	concrete, ok := c.(*container.Container)
-	if !ok || !concrete.IsChangelogEnabled(params) {
+	if !ok || !concrete.IsChangelogEnabled(policy) {
 		return
 	}
 

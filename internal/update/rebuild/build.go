@@ -121,7 +121,7 @@ func (s *Session) build(
 			Commit: result.Commit,
 		}, oci.Annotations{})
 
-		provenance.LogChangelog(log, c, params, meta)
+		provenance.LogChangelog(log, c, params.Policy, meta)
 	}
 
 	withGitMeta(log.Info().

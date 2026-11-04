@@ -9,6 +9,7 @@ import (
 
 	"github.com/nicholas-fedor/watchtower/internal/container"
 	"github.com/nicholas-fedor/watchtower/internal/container/labels"
+	updateConfig "github.com/nicholas-fedor/watchtower/internal/settings/config/update"
 	"github.com/nicholas-fedor/watchtower/pkg/types"
 )
 
@@ -76,8 +77,8 @@ func (c *SimpleContainer) ImageName() string {
 	return "test-image"
 }
 
-func (c *SimpleContainer) Enabled() (bool, bool)                   { return true, true }
-func (c *SimpleContainer) IsMonitorOnly(_ types.UpdateParams) bool { return false }
+func (c *SimpleContainer) Enabled() (bool, bool)                    { return true, true }
+func (c *SimpleContainer) IsMonitorOnly(_ updateConfig.Policy) bool { return false }
 
 func (c *SimpleContainer) Scope() (string, bool)   { return "", false }
 func (c *SimpleContainer) NormalizedScope() string { return labels.NoScope }
@@ -111,23 +112,23 @@ func (c *SimpleContainer) StopTimeout(fallback time.Duration) time.Duration {
 	return fallback
 }
 
-func (c *SimpleContainer) HasImageInfo() bool                               { return false }
-func (c *SimpleContainer) ImageInfo() *dockerImage.InspectResponse          { return nil }
-func (c *SimpleContainer) GetLifecyclePreCheckCommand() string              { return "" }
-func (c *SimpleContainer) GetLifecyclePostCheckCommand() string             { return "" }
-func (c *SimpleContainer) GetLifecyclePreUpdateCommand() string             { return "" }
-func (c *SimpleContainer) GetLifecyclePostUpdateCommand() string            { return "" }
-func (c *SimpleContainer) LifecycleUser(uid, gid int) (int, int)            { return uid, gid }
-func (c *SimpleContainer) GetContainerChain() (string, bool)                { return "", false }
-func (c *SimpleContainer) VerifyConfiguration() error                       { return nil }
-func (c *SimpleContainer) SetStale(_ bool)                                  {}
-func (c *SimpleContainer) IsStale() bool                                    { return false }
-func (c *SimpleContainer) IsNoPull(_ types.UpdateParams) bool               { return false }
-func (c *SimpleContainer) CooldownDelay(_ types.UpdateParams) time.Duration { return 0 }
-func (c *SimpleContainer) SetLinkedToRestarting(_ bool)                     {}
-func (c *SimpleContainer) IsLinkedToRestarting() bool                       { return false }
-func (c *SimpleContainer) PreCheckTimeout() int                             { return 1 }
-func (c *SimpleContainer) PostCheckTimeout() int                            { return 1 }
+func (c *SimpleContainer) HasImageInfo() bool                                { return false }
+func (c *SimpleContainer) ImageInfo() *dockerImage.InspectResponse           { return nil }
+func (c *SimpleContainer) GetLifecyclePreCheckCommand() string               { return "" }
+func (c *SimpleContainer) GetLifecyclePostCheckCommand() string              { return "" }
+func (c *SimpleContainer) GetLifecyclePreUpdateCommand() string              { return "" }
+func (c *SimpleContainer) GetLifecyclePostUpdateCommand() string             { return "" }
+func (c *SimpleContainer) LifecycleUser(uid, gid int) (int, int)             { return uid, gid }
+func (c *SimpleContainer) GetContainerChain() (string, bool)                 { return "", false }
+func (c *SimpleContainer) VerifyConfiguration() error                        { return nil }
+func (c *SimpleContainer) SetStale(_ bool)                                   {}
+func (c *SimpleContainer) IsStale() bool                                     { return false }
+func (c *SimpleContainer) IsNoPull(_ updateConfig.Policy) bool               { return false }
+func (c *SimpleContainer) CooldownDelay(_ updateConfig.Policy) time.Duration { return 0 }
+func (c *SimpleContainer) SetLinkedToRestarting(_ bool)                      {}
+func (c *SimpleContainer) IsLinkedToRestarting() bool                        { return false }
+func (c *SimpleContainer) PreCheckTimeout() int                              { return 1 }
+func (c *SimpleContainer) PostCheckTimeout() int                             { return 1 }
 func (c *SimpleContainer) PreUpdateTimeout() int {
 	if c.ContainerInfoField != nil {
 		return 0 // Return 0 to disable timeout when using custom ContainerInfo

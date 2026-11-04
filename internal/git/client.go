@@ -18,10 +18,11 @@ import (
 	"github.com/nicholas-fedor/watchtower/internal/container/labels"
 	"github.com/nicholas-fedor/watchtower/internal/container/provenance"
 	"github.com/nicholas-fedor/watchtower/internal/git/semver"
+	gitConfig "github.com/nicholas-fedor/watchtower/internal/settings/config/git"
 	"github.com/nicholas-fedor/watchtower/pkg/types"
 )
 
-// Options configures a Git watcher client. Credentials stay here, not on UpdateParams.
+// Options configures a Git watcher client. Credentials stay here, not on [gitConfig.Defaults].
 type Options struct {
 	Token           string
 	Username        string
@@ -216,7 +217,7 @@ func (c *Client) Clone(ctx context.Context, repo string, rev CheckResult) (strin
 //   - ctx: Cancellation and timeout.
 //   - client: Git monitor client.
 //   - c: Container to inspect.
-//   - params: Update parameters with mappings and defaults.
+//   - defaults: Git settings with mappings and defaults.
 //
 // Returns:
 //   - CheckResult: Empty result when the container is not associated.
@@ -225,9 +226,9 @@ func CheckContainer(
 	ctx context.Context,
 	client *Client,
 	c types.Container,
-	params types.UpdateParams,
+	defaults gitConfig.Defaults,
 ) (CheckResult, error) {
-	assoc, ok := provenance.ResolveAssociation(c, params.Git)
+	assoc, ok := provenance.ResolveAssociation(c, defaults)
 	if !ok {
 		return CheckResult{}, nil
 	}

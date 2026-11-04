@@ -3,6 +3,7 @@ package changelog
 import (
 	dockerContainer "github.com/moby/moby/api/types/container"
 
+	updateConfig "github.com/nicholas-fedor/watchtower/internal/settings/config/update"
 	"github.com/nicholas-fedor/watchtower/pkg/types"
 )
 
@@ -40,4 +41,4 @@ func (c stubContainer) ContainerInfo() *dockerContainer.InspectResponse {
 
 func (c stubContainer) HasImageInfo() bool { return false }
 
-func (c stubContainer) IsNoPull(_ types.UpdateParams) bool { return false }
+func (c stubContainer) IsNoPull(_ updateConfig.Policy) bool { return false }

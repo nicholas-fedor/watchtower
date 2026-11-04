@@ -14,6 +14,7 @@ import (
 	"github.com/nicholas-fedor/watchtower/internal/registry/digest"
 	"github.com/nicholas-fedor/watchtower/internal/registry/ratelimit"
 	registryConfig "github.com/nicholas-fedor/watchtower/internal/settings/config/registry"
+	updateConfig "github.com/nicholas-fedor/watchtower/internal/settings/config/update"
 	"github.com/nicholas-fedor/watchtower/internal/settings/units"
 	"github.com/nicholas-fedor/watchtower/pkg/types"
 )
@@ -58,7 +59,7 @@ func (e *CooldownError) Is(target error) bool {
 // Parameters:
 //   - ctx: Context for cancellation and timeouts.
 //   - sourceContainer: Container whose image age to evaluate.
-//   - params: Update parameters (global cooldown + LabelPrecedence).
+//   - policy: Update policy with the global cooldown, no-pull and monitor-only settings.
 //
 // Returns:
 //   - bool: true if safe to pull/update, false if deferred.
@@ -66,9 +67,9 @@ func (e *CooldownError) Is(target error) bool {
 func (c Client) isOutsideCooldown(
 	ctx context.Context,
 	sourceContainer types.Container,
-	params types.UpdateParams,
+	policy updateConfig.Policy,
 ) (bool, error) {
-	delay, skip := shouldCheckCooldown(sourceContainer, params)
+	delay, skip := shouldCheckCooldown(sourceContainer, policy)
 	if skip {
 		return true, nil
 	}
@@ -99,14 +100,14 @@ func (c Client) isOutsideCooldown(
 //
 // Parameters:
 //   - sourceContainer: Container to evaluate.
-//   - params: Update parameters (global cooldown + LabelPrecedence).
+//   - policy: Update policy with the global cooldown, no-pull and monitor-only settings.
 //
 // Returns:
 //   - time.Duration: The effective cooldown delay (0 if skipped).
 //   - bool: True if the cooldown check should be skipped entirely.
-func shouldCheckCooldown(sourceContainer types.Container, params types.UpdateParams) (time.Duration, bool) {
-	delay := sourceContainer.CooldownDelay(params)
-	if delay <= 0 || sourceContainer.IsNoPull(params) || sourceContainer.IsMonitorOnly(params) {
+func shouldCheckCooldown(sourceContainer types.Container, policy updateConfig.Policy) (time.Duration, bool) {
+	delay := sourceContainer.CooldownDelay(policy)
+	if delay <= 0 || sourceContainer.IsNoPull(policy) || sourceContainer.IsMonitorOnly(policy) {
 		return 0, true
 	}
 
@@ -259,12 +260,12 @@ func logClockSkew(imageAge, delay time.Duration, clog *zerolog.Logger) {
 //
 // Parameters:
 //   - c: Container whose local image age is evaluated.
-//   - params: Update parameters (global cooldown and label override).
+//   - policy: Update policy (global cooldown and label override).
 //
 // Returns:
 //   - error: Non-nil CooldownError when the image is inside the cooldown window.
-func CheckLocalImageCooldown(c types.Container, params types.UpdateParams) error {
-	delay, skip := shouldCheckCooldown(c, params)
+func CheckLocalImageCooldown(c types.Container, policy updateConfig.Policy) error {
+	delay, skip := shouldCheckCooldown(c, policy)
 	if skip {
 		return nil
 	}
