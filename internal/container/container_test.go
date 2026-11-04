@@ -276,6 +276,7 @@ func TestContainerModel(t *testing.T) {
 			tests := []struct {
 				name         string
 				utsMode      string
+				networkMode  string
 				wantHostname string
 			}{
 				{name: "clears hostname for the host UTS namespace", utsMode: "host", wantHostname: ""},
@@ -283,6 +284,7 @@ func TestContainerModel(t *testing.T) {
 				{name: "clears hostname for a UTS namespace path", utsMode: "ns:/proc/1234/ns/uts", wantHostname: ""},
 				{name: "keeps hostname when UTS mode is empty", utsMode: "", wantHostname: "test-hostname"},
 				{name: "keeps hostname for Podman's private UTS namespace", utsMode: "private", wantHostname: "test-hostname"},
+				{name: "clears hostname for a private UTS namespace in another container's network", utsMode: "private", networkMode: "container:0123456789ab", wantHostname: ""},
 			}
 
 			for _, tt := range tests {
@@ -291,6 +293,7 @@ func TestContainerModel(t *testing.T) {
 
 					c := MockContainer(
 						containerfixture.WithUTSMode(tt.utsMode),
+						containerfixture.WithNetworkMode(tt.networkMode),
 						containerfixture.WithHostname("test-hostname"),
 					)
 					assert.Equal(t, tt.wantHostname, c.GetCreateConfig().Hostname)
@@ -333,6 +336,18 @@ func TestContainerModel(t *testing.T) {
 			c.imageInfo.Config = nil
 
 			assert.Empty(t, c.GetCreateConfig().Hostname)
+		})
+
+		t.Run("keeps hostname for a private namespace when image config is nil", func(t *testing.T) {
+			t.Parallel()
+
+			c := MockContainer(
+				containerfixture.WithUTSMode("private"),
+				containerfixture.WithHostname("test-hostname"),
+			)
+			c.imageInfo.Config = nil
+
+			assert.Equal(t, "test-hostname", c.GetCreateConfig().Hostname)
 		})
 
 		t.Run("returns minimal config when containerInfo is nil", func(t *testing.T) {
