@@ -21,6 +21,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Chores
 
+- Update google.golang.org/genproto/googleapis/api digest to d1e00e9 by @renovate[bot] in [#3444](https://github.com/nicholas-fedor/watchtower/pull/3444)
 - Update sigstore/cosign-installer action to v4.1.3 by @renovate[bot] in [#3439](https://github.com/nicholas-fedor/watchtower/pull/3439)
 - Update module go.yaml.in/yaml/v4 to v4.0.0 by @renovate[bot] in [#3437](https://github.com/nicholas-fedor/watchtower/pull/3437)
 - Update github/codeql-action action to v4.39.3 by @renovate[bot] in [#3436](https://github.com/nicholas-fedor/watchtower/pull/3436)
