@@ -88,7 +88,8 @@ func TestRemoveEnvFile(t *testing.T) {
 }
 
 // TestWriteEnvFile_URLs verifies that the configured URLs are written on one
-// line, separated by spaces. An unknown legacy notification type fails before
+// line, separated by spaces. Settings whose URLs cannot be built, such as an
+// unknown legacy notification type or a URL that Shoutrrr rejects, fail before
 // any file is written.
 func TestWriteEnvFile_URLs(t *testing.T) {
 	t.Parallel()
@@ -108,18 +109,27 @@ func TestWriteEnvFile_URLs(t *testing.T) {
 		assert.Equal(t, "WATCHTOWER_NOTIFICATION_URL=logger:// generic://example.com/hook\n", string(data))
 	})
 
-	t.Run("unknown legacy type", func(t *testing.T) {
-		t.Parallel()
+	failures := []struct {
+		name string
+		cfg  notifyConfig.Notify
+	}{
+		{name: "unknown legacy type", cfg: notifyConfig.Notify{LegacyTypes: []string{"carrier-pigeon"}}},
+		{name: "URL that Shoutrrr rejects", cfg: notifyConfig.Notify{URLs: []string{"discord://token@notanumber"}}},
+	}
 
-		dir := t.TempDir()
-		cfg := notifyConfig.Notify{LegacyTypes: []string{"carrier-pigeon"}}
+	for _, tt := range failures {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
 
-		path, err := WriteEnvFile(new(zerolog.Nop()), dir, cfg)
-		require.ErrorContains(t, err, "build notification URLs")
-		assert.Empty(t, path)
+			dir := t.TempDir()
 
-		entries, err := os.ReadDir(dir)
-		require.NoError(t, err)
-		assert.Empty(t, entries)
-	})
+			path, err := WriteEnvFile(new(zerolog.Nop()), dir, tt.cfg)
+			require.ErrorContains(t, err, "build notification URLs")
+			assert.Empty(t, path)
+
+			entries, err := os.ReadDir(dir)
+			require.NoError(t, err)
+			assert.Empty(t, entries)
+		})
+	}
 }

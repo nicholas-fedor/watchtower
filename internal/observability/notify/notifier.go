@@ -7,7 +7,10 @@ import (
 	"strings"
 	"time"
 
+	"github.com/nicholas-fedor/shoutrrr"
 	"github.com/rs/zerolog"
+
+	shoutrrrTypes "github.com/nicholas-fedor/shoutrrr/pkg/types"
 
 	"github.com/nicholas-fedor/watchtower/internal/container/redact"
 	"github.com/nicholas-fedor/watchtower/internal/observability/logging"
@@ -117,16 +120,19 @@ func NewNotifier(log *zerolog.Logger, cfg notifyConfig.Notify) types.Notifier {
 // without initializing a notifier.
 //
 // It returns configured URLs plus any legacy Shoutrrr URLs generated from deprecated
-// notification types. Errors are returned instead of causing a fatal exit.
+// notification types. Shoutrrr reads every URL as it does when Watchtower starts.
+// A URL it rejects fails the call. Errors are returned instead of causing a fatal
+// exit.
 //
 // Parameters:
-//   - log: Logger for legacy notifier construction diagnostics.
+//   - log: Logger for legacy notifier construction diagnostics and Shoutrrr's
+//     warnings about the URLs.
 //   - cfg: Notification settings from settings.Load (Config.Notify).
 //
 // Returns:
 //   - []string: Shoutrrr URLs ready for output or notification use.
-//   - error: Non-nil if an unknown legacy notification type is specified or if
-//     a legacy notifier fails to generate its URL.
+//   - error: Non-nil when Shoutrrr rejects a URL. Also non-nil when a legacy
+//     notification type is unknown or its notifier cannot generate a URL.
 //
 // TODO: Remove BuildURLs after the v2 release.
 //
@@ -135,6 +141,24 @@ func BuildURLs(log *zerolog.Logger, cfg notifyConfig.Notify) ([]string, error) {
 	if log == nil {
 		nop := zerolog.Nop()
 		log = &nop
+	}
+
+	// Adding a URL to the sender reads it and logs Shoutrrr's warnings, such as
+	// a deprecated key. It opens no connection. Services connect on their
+	// first send.
+	sender, err := shoutrrr.NewSenderWithOptions(
+		newShoutrrrLogger(log, log, shoutrrrLogPrefix),
+		shoutrrrTypes.SenderOptions{},
+	)
+	if err != nil {
+		return nil, fmt.Errorf("create notification sender: %w", err)
+	}
+
+	for i, rawURL := range cfg.URLs {
+		err = sender.AddService(rawURL)
+		if err != nil {
+			return nil, fmt.Errorf("notification URL %d: %w", i+1, err)
+		}
 	}
 
 	urls := append([]string(nil), cfg.URLs...)
@@ -154,6 +178,11 @@ func BuildURLs(log *zerolog.Logger, cfg notifyConfig.Notify) ([]string, error) {
 		shoutrrrURL, err := legacyNotifier.GetURL()
 		if err != nil {
 			return nil, fmt.Errorf("create %q notification config: %w", notificationType, err)
+		}
+
+		err = sender.AddService(shoutrrrURL)
+		if err != nil {
+			return nil, fmt.Errorf("check %q notification URL: %w", notificationType, err)
 		}
 
 		urls = append(urls, shoutrrrURL)

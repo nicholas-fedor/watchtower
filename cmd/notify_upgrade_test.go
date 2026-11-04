@@ -117,7 +117,7 @@ func runNotifyUpgradeUntilTimeout(t *testing.T, args ...string) notifyUpgradeRun
 func TestNotifyUpgrade_LegacyNotifiers(t *testing.T) {
 	run := runNotifyUpgradeUntilTimeout(t,
 		"--notifications", "email,slack,msteams,gotify",
-		"--notification-url", "discord://token@webhookid",
+		"--notification-url", "discord://token@123456789012345678",
 		"--notification-email-from", "watchtower@example.com",
 		"--notification-email-to", "admin@example.com",
 		"--notification-email-server", "smtp.example.com",
@@ -129,9 +129,9 @@ func TestNotifyUpgrade_LegacyNotifiers(t *testing.T) {
 		"--notification-slack-identifier", "watchtower-bot",
 		"--notification-slack-icon-emoji", ":whale:",
 		"--notification-slack-channel", "#ops",
-		"--notification-msteams-hook", "https://example.webhook.office.com/webhookb2/aaaa@bbbb/IncomingWebhook/cccc/dddd",
+		"--notification-msteams-hook", "https://prod-00.westus.logic.azure.com:443/workflows/abc123/triggers/manual/paths/invoke?api-version=2016-06-01",
 		"--notification-gotify-url", "https://gotify.example.com",
-		"--notification-gotify-token", "gotify-token",
+		"--notification-gotify-token", "Agotifytoken123",
 		"--notification-gotify-tls-skip-verify",
 	)
 	require.NoError(t, run.err)
@@ -155,10 +155,10 @@ func TestNotifyUpgrade_WithoutLegacyNotifiers(t *testing.T) {
 		{
 			name: "existing notification URLs only",
 			args: []string{
-				"--notification-url", "discord://token@webhookid",
+				"--notification-url", "discord://token@123456789012345678",
 				"--notification-url", "logger://",
 			},
-			want: "WATCHTOWER_NOTIFICATION_URL=discord://token@webhookid logger://\n",
+			want: "WATCHTOWER_NOTIFICATION_URL=discord://token@123456789012345678 logger://\n",
 		},
 	}
 

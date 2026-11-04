@@ -615,6 +615,68 @@ func TestNotifier(t *testing.T) {
 	})
 }
 
+// TestBuildURLs_RejectsURLsThatShoutrrrRejects verifies that BuildURLs fails for
+// a configured or converted URL that Shoutrrr rejects when it reads it. The
+// error names the service and never contains the URL. A configured URL is named
+// by its position, counting from 1. A converted URL is named by its legacy
+// notification type.
+func TestBuildURLs_RejectsURLsThatShoutrrrRejects(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name string
+		cfg  notifyConfig.Notify
+		// source is the part of the error that names the URL and its service.
+		source string
+	}{
+		{
+			name:   "configured Discord URL with a non-numeric webhook ID",
+			cfg:    notifyConfig.Notify{URLs: []string{"logger://", "discord://secrettoken@notanumber"}},
+			source: "notification URL 2: discord:",
+		},
+		{
+			name: "legacy Discord wrapper with a non-numeric webhook ID",
+			cfg: notifyConfig.Notify{
+				LegacyTypes: []string{"slack"},
+				Legacy: notifyConfig.Legacy{
+					SlackHookURL: "https://discord.com/api/webhooks/notanumber/secrettoken/slack",
+				},
+			},
+			source: `check "slack" notification URL: discord:`,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			urls, err := BuildURLs(nil, tt.cfg)
+			require.ErrorContains(t, err, tt.source)
+			assert.NotContains(t, err.Error(), "secrettoken")
+			assert.Nil(t, urls)
+		})
+	}
+}
+
+// TestBuildURLs_LogsShoutrrrWarnings verifies that the warnings Shoutrrr logs
+// while it reads a URL, such as one for a deprecated key, reach BuildURLs' logger.
+func TestBuildURLs_LogsShoutrrrWarnings(t *testing.T) {
+	t.Parallel()
+
+	var buf bytes.Buffer
+
+	log := zerolog.New(&buf)
+	cfg := notifyConfig.Notify{
+		URLs: []string{"gotify://gotify.example.com/Agotifytoken123?insecureskipverify=yes"},
+	}
+
+	urls, err := BuildURLs(&log, cfg)
+	require.NoError(t, err)
+	assert.Equal(t, cfg.URLs, urls)
+	assert.Contains(t, buf.String(), `"level":"warn"`)
+	assert.Contains(t, buf.String(), "insecureskipverify")
+}
+
 // expectNewNotifierFatal runs NewNotifier under a temporary FatalExitFunc
 // that panics instead of os.Exit, captures buffer-backed fatal log output, and
 // restores the previous exit callback.
