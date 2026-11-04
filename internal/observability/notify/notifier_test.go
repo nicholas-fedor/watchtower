@@ -738,6 +738,34 @@ func TestBuildURLs_ConversionErrors(t *testing.T) {
 	}
 }
 
+// TestBuildURLs_ConvertsEveryLegacyType verifies that BuildURLs converts every
+// legacy type, not only the first one. It returns the configured URLs followed
+// by the converted URLs in type order.
+func TestBuildURLs_ConvertsEveryLegacyType(t *testing.T) {
+	t.Parallel()
+
+	cfg := notifyConfig.Notify{
+		URLs:        []string{"logger://"},
+		LegacyTypes: []string{"slack", "gotify"},
+		Legacy: notifyConfig.Legacy{
+			SlackHookURL: "https://discord.com/api/webhooks/123456789/abc/slack",
+			GotifyURL:    "https://gotify.example.com",
+			GotifyToken:  "Aaaaaaaaaaaaaaa",
+		},
+	}
+
+	urls, err := BuildURLs(nil, cfg)
+	require.NoError(t, err)
+	assert.Equal(t, []string{
+		"logger://",
+		fmt.Sprintf(
+			"discord://abc@123456789?color=0x%x&colordebug=0x0&colorerror=0x0&colorinfo=0x0&colorwarn=0x0",
+			legacy.ColorInt,
+		),
+		"gotify://gotify.example.com/Aaaaaaaaaaaaaaa?title=",
+	}, urls)
+}
+
 // TestBuildURLs_StopsAtTheFirstRejectedURL verifies that BuildURLs checks each
 // converted URL before it builds the next legacy notifier. Shoutrrr rejects the
 // Slack hook's Discord URL. The email notifier is then never built, which would
