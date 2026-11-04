@@ -76,6 +76,10 @@ Environment Variable: WATCHTOWER_NOTIFICATION_LOG_STDOUT
              Default: false
 ```
 
+!!! Note
+    Only the `logger://` output goes to stdout.
+    Shoutrrr's own messages, such as a warning that a service sends without TLS, go to Watchtower's log at their level.
+
 ## Split by Container
 
 Send separate notifications for each updated container instead of grouping them.

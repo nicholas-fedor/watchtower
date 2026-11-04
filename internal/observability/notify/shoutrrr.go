@@ -2,6 +2,7 @@ package notify
 
 import (
 	"context"
+	"io"
 	"os"
 	"strings"
 	"sync"
@@ -151,13 +152,13 @@ func (n *shoutrrrTypeNotifier) RegisterHook(log *zerolog.Logger) {
 // createNotifier initializes a Shoutrrr notifier.
 //
 // Parameters:
-//   - log: Process logger for config-time logs and the Shoutrrr stdlog bridge.
+//   - log: Process logger for config-time logs and Shoutrrr's log records.
 //   - urls: Service URLs.
 //   - level: Minimum log level for notifications.
 //   - tplString: Template string.
 //   - legacy: Use legacy template if true.
 //   - data: Static notification data.
-//   - stdout: Log to stdout if true.
+//   - stdout: Print the logger service's text to stdout if true.
 //   - delay: Delay between sends.
 //
 // Returns:
@@ -185,17 +186,22 @@ func createNotifier(
 		tpl = format.Default(legacy)
 	}
 
-	// Set logger based on stdout flag.
-	var logger shoutrrrTypes.StdLogger
+	// Shoutrrr's records go to the loop-safe logger at their level. The logger
+	// service's text goes to stdout when stdout is set. Otherwise it goes to the
+	// same logger without a level.
+	var text io.Writer = localLog
+
+	prefix := shoutrrrLogPrefix
 	if stdout {
-		logger = newStdLogger(os.Stdout, "")
-	} else {
-		// Bridge shoutrrr's stdlib logger into the process zerolog (notify=no).
-		logger = newStdLogger(localLog, "Shoutrrr: ")
+		text, prefix = os.Stdout, ""
 	}
 
 	// Initialize sender with default options.
-	router, err := shoutrrr.NewSenderWithOptions(logger, shoutrrrTypes.SenderOptions{}, urls...)
+	router, err := shoutrrr.NewSenderWithOptions(
+		newShoutrrrLogger(localLog, text, prefix),
+		shoutrrrTypes.SenderOptions{},
+		urls...,
+	)
 	if err != nil {
 		localLog.Fatal().Err(err).Msg("Failed to initialize Shoutrrr notifications")
 	}
