@@ -22,9 +22,11 @@ import (
 	"github.com/nicholas-fedor/watchtower/internal/observability/metrics"
 	"github.com/nicholas-fedor/watchtower/internal/registry/ratelimit"
 	"github.com/nicholas-fedor/watchtower/internal/testutil/logcapture"
+	"github.com/nicholas-fedor/watchtower/internal/testutil/reportfixture"
 	"github.com/nicholas-fedor/watchtower/internal/update/cleanup"
 	mockUpdate "github.com/nicholas-fedor/watchtower/internal/update/mocks"
 	updateParams "github.com/nicholas-fedor/watchtower/internal/update/params"
+	"github.com/nicholas-fedor/watchtower/internal/update/state"
 	"github.com/nicholas-fedor/watchtower/pkg/types"
 	mockTypes "github.com/nicholas-fedor/watchtower/pkg/types/mocks"
 )
@@ -456,6 +458,7 @@ func TestRunUpdates(t *testing.T) {
 			result := buildSingleContainerReport(mockContainerReport, mockReport)
 
 			require.NotNil(t, result)
+			assert.Same(t, mockContainerReport, result.Focus)
 			require.Len(t, result.UpdatedReports, 1)
 			assert.Same(t, mockContainerReport, result.UpdatedReports[0])
 			require.Len(t, result.ScannedReports, 1)
@@ -485,6 +488,7 @@ func TestRunUpdates(t *testing.T) {
 			result := buildSingleRestartedContainerReport(mockContainerReport, mockReport)
 
 			require.NotNil(t, result)
+			assert.Same(t, mockContainerReport, result.Focus)
 			require.Len(t, result.RestartedReports, 1)
 			assert.Empty(t, result.RestartedReports[0].Error())
 			require.Len(t, result.ScannedReports, 1)
@@ -2143,4 +2147,37 @@ func Test_newScanMetric(t *testing.T) {
 			assert.Equal(t, tt.want, newScanMetric(report))
 		})
 	}
+}
+
+// Test_notifySkippedCooldownContainers verifies that a cooldown-skipped
+// container gets a notification that names it as the focus. The report also
+// lists the session's single updated container for context, which must not be
+// taken for the notification's subject.
+func Test_notifySkippedCooldownContainers(t *testing.T) {
+	t.Parallel()
+
+	session := reportfixture.Report(state.UpdatedState, state.SkippedState)
+	skipped := session.Skipped()[0]
+
+	status, ok := skipped.(*state.ContainerStatus)
+	require.True(t, ok)
+	status.SetCooldownInfo("1 hour", "24 hours", "23 hours", time.Now().Add(23*time.Hour))
+
+	notifier := mockTypes.NewMockNotifier(t)
+	notifier.EXPECT().ShouldSendNotification(mock.Anything).Return(true).Once()
+
+	var sent types.Report
+
+	notifier.EXPECT().SendNotification(mock.Anything).
+		Run(func(report types.Report) { sent = report }).Once()
+
+	notified := make(map[string]bool)
+	notifySkippedCooldownContainers(newTestLogger(t), notifier, notified, session)
+
+	single, ok := sent.(*state.SingleContainerReport)
+	require.True(t, ok)
+	assert.Same(t, skipped, single.Focus)
+	assert.Equal(t, []types.ContainerReport{skipped}, single.SkippedReports)
+	assert.Equal(t, session.Updated(), single.UpdatedReports)
+	assert.True(t, notified[string(skipped.ID())])
 }

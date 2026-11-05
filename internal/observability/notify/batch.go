@@ -45,11 +45,11 @@ func (n *shoutrrrTypeNotifier) StartNotification(suppressSummary bool) {
 
 // SendNotification sends queued messages with a report.
 //
-// When the report focuses on a single container (exactly one container across
-// Updated/Restarted, or a single Skipped/Stale focus with no updates), matching
-// queued entries are filtered out of the queue and sent with that report. This
-// supports --notification-split-by-container without exposing entry state.
-// Otherwise the entire queue is drained and sent.
+// A split report names the container it is about in its Focus field. For such
+// a report, the queued entries that match the focus container are taken out of
+// the queue and sent with it. This supports the notification-split-by-container
+// configuration option without exposing entry state. Otherwise the entire
+// queue is drained and sent.
 //
 // Parameters:
 //   - report: Scan report to include.
@@ -58,15 +58,14 @@ func (n *shoutrrrTypeNotifier) SendNotification(report types.Report) {
 
 	var entries []*format.Entry
 
-	focus, ok := singleFocusContainer(report)
-	if ok {
+	if split, ok := report.(*state.SingleContainerReport); ok && split.Focus != nil {
 		// Keep non-nil empty slices so Run continues treating batching as active
 		// when every queued entry matched the focus.
 		matched := make([]*format.Entry, 0)
 		rest := make([]*format.Entry, 0)
 
 		for _, e := range n.entries {
-			if entryMatchesFocus(e, focus) {
+			if entryMatchesFocus(e, split.Focus) {
 				matched = append(matched, e)
 			} else {
 				rest = append(rest, e)
@@ -148,39 +147,6 @@ func FlushSplitByContainer(notifier types.Notifier) {
 			shoutrrr.sendEntries(containerEntries, nil)
 		}
 	}
-}
-
-// singleFocusContainer returns the sole focus container when the report is a
-// state.SingleContainerReport (split path), or false for a full session report.
-// Type assertion is required because a full report with one update is otherwise
-// indistinguishable from a split single-container report.
-func singleFocusContainer(report types.Report) (types.ContainerReport, bool) {
-	if report == nil {
-		return nil, false
-	}
-
-	scr, ok := report.(*state.SingleContainerReport)
-	if !ok {
-		return nil, false
-	}
-
-	if len(scr.UpdatedReports) == 1 {
-		return scr.UpdatedReports[0], true
-	}
-
-	if len(scr.RestartedReports) == 1 {
-		return scr.RestartedReports[0], true
-	}
-
-	if len(scr.SkippedReports) == 1 {
-		return scr.SkippedReports[0], true
-	}
-
-	if len(scr.StaleReports) == 1 {
-		return scr.StaleReports[0], true
-	}
-
-	return nil, false
 }
 
 // entryMatchesFocus reports whether a queued entry belongs to the focus container.

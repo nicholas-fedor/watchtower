@@ -21,19 +21,24 @@ type report struct {
 
 // SingleContainerReport implements types.Report for individual container notifications.
 //
-// This struct is used when notification splitting by container is enabled (--notification-split-by-container).
+// This struct is used when the notification-split-by-container configuration option is enabled.
 // Unlike the standard report which groups all containers from a session, SingleContainerReport focuses
-// on a specific container while providing context from all other containers in the session.
-// This allows notifications to be sent separately for each updated or restarted container while maintaining
-// awareness of the overall session state (failed, skipped, stale, fresh containers).
+// on a specific container while providing context from other containers in the session.
+// This allows notifications to be sent separately for each updated, restarted or cooldown-skipped container
+// while maintaining awareness of the overall session state.
+//
+// Focus names the container the notification is about. The category lists
+// also carry other containers of the session as context. The focus cannot be
+// read from them.
 type SingleContainerReport struct {
-	UpdatedReports   []types.ContainerReport // Primary container(s) that were updated in this notification
-	RestartedReports []types.ContainerReport // Primary container(s) that were restarted in this notification
-	ScannedReports   []types.ContainerReport // All containers scanned during the session (for context)
-	FailedReports    []types.ContainerReport // All containers that failed to update (for context)
-	SkippedReports   []types.ContainerReport // All containers that were skipped (for context)
-	StaleReports     []types.ContainerReport // All containers with stale images (for context)
-	FreshReports     []types.ContainerReport // All containers with fresh images (for context)
+	Focus            types.ContainerReport   // Container the notification is about
+	UpdatedReports   []types.ContainerReport // Updated containers
+	RestartedReports []types.ContainerReport // Restarted containers
+	ScannedReports   []types.ContainerReport // Containers scanned during the session
+	FailedReports    []types.ContainerReport // Containers that failed to update
+	SkippedReports   []types.ContainerReport // Skipped containers
+	StaleReports     []types.ContainerReport // Containers with stale images
+	FreshReports     []types.ContainerReport // Containers with fresh images
 }
 
 // sortableContainers implements sort.Interface for reports.

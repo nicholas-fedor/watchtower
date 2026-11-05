@@ -249,6 +249,7 @@ func TestSendNotification_SingleFocusKeepsBatchingActive(t *testing.T) {
 
 	updated := full.Updated()[0]
 	report := &state.SingleContainerReport{
+		Focus:          updated,
 		UpdatedReports: []types.ContainerReport{updated},
 	}
 
@@ -272,4 +273,78 @@ func TestSendNotification_SingleFocusKeepsBatchingActive(t *testing.T) {
 	require.Empty(t, entries)
 
 	n.Close()
+}
+
+// TestSendNotification_CooldownFocusWithOneContextContainer verifies that a
+// split notification for a cooldown-skipped container sends that container's
+// queued entries. The report also lists the session's updated and restarted
+// containers for context. One of those lists holds exactly one container, which
+// must not be taken for the notification's subject.
+func TestSendNotification_CooldownFocusWithOneContextContainer(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name    string
+		context state.State
+		// contextOf returns the context container's category in the session.
+		contextOf func(types.Report) []types.ContainerReport
+	}{
+		{
+			name:      "one updated container in the session",
+			context:   state.UpdatedState,
+			contextOf: types.Report.Updated,
+		},
+		{
+			name:      "one restarted container in the session",
+			context:   state.RestartedState,
+			contextOf: types.Report.Restarted,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			session := reportfixture.Report(tt.context, state.SkippedState)
+			skipped := session.Skipped()[0]
+
+			require.Len(t, tt.contextOf(session), 1)
+			other := tt.contextOf(session)[0]
+
+			// The cooldown path names the skipped container as the focus and
+			// lists the session's updated and restarted containers as context.
+			report := &state.SingleContainerReport{
+				Focus:            skipped,
+				SkippedReports:   []types.ContainerReport{skipped},
+				UpdatedReports:   session.Updated(),
+				RestartedReports: session.Restarted(),
+			}
+
+			otherEntry := &format.Entry{
+				Message: "Found new image",
+				Data:    map[string]any{"container": other.Name()},
+			}
+			n := newBatchingNotifier(t, []*format.Entry{
+				otherEntry,
+				{
+					Message: "Skipping update during cooldown",
+					Data:    map[string]any{"container": skipped.Name()},
+				},
+			})
+
+			n.SendNotification(report)
+
+			n.entriesMutex.RLock()
+			remaining := n.entries
+			n.entriesMutex.RUnlock()
+
+			assert.Equal(t, []*format.Entry{otherEntry}, remaining,
+				"only the skipped container's entry is sent with its notification")
+
+			sent := sentMessages(n)
+			require.Len(t, sent, 1)
+			assert.Contains(t, sent[0], "Skipping update during cooldown")
+			assert.NotContains(t, sent[0], "Found new image")
+		})
+	}
 }
