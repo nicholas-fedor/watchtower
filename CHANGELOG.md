@@ -10,6 +10,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- List monitor-only containers as stale in split notifications by @nicholas-fedor in [#3458](https://github.com/nicholas-fedor/watchtower/pull/3458)
 - Send split notifications with their own container's entries by @nicholas-fedor in [#3456](https://github.com/nicholas-fedor/watchtower/pull/3456)
 - Keep the hostname of podman containers on recreation by @nicholas-fedor in [#3428](https://github.com/nicholas-fedor/watchtower/pull/3428)
 
