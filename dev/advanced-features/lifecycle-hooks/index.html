@@ -2627,6 +2627,17 @@
 </li>
         
           <li class="md-nav__item">
+  <a href="#hook_output_and_security" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Hook Output and Security
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
   <a href="#environment_variables" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -3188,6 +3199,17 @@
 </li>
         
           <li class="md-nav__item">
+  <a href="#hook_output_and_security" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Hook Output and Security
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
   <a href="#environment_variables" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -3564,11 +3586,69 @@ Any other value, such as <code>-1</code> or <code>1.5</code>, logs a warning and
 <h3 id="docker_api_integration">Docker API Integration<a class="headerlink" href="#docker_api_integration" title="Permanent link">&para;</a></h3>
 <p>Lifecycle hooks utilize Docker's exec API through the following sequence:</p>
 <ol>
-<li><strong>Exec Creation</strong>: <code>ContainerExecCreate</code> creates an exec instance with the specified command</li>
-<li><strong>Exec Start</strong>: <code>ContainerExecStart</code> begins execution of the command</li>
-<li><strong>Output Capture</strong>: <code>ContainerExecAttach</code> captures stdout/stderr output</li>
-<li><strong>Status Monitoring</strong>: <code>ContainerExecInspect</code> monitors execution status and exit codes</li>
+<li><strong>Exec Creation</strong>: <code>ExecCreate</code> creates an exec instance with the specified command</li>
+<li><strong>Exec Start and Output Capture</strong>: <code>ExecAttach</code> starts the command and reads its stdout and stderr output to the end</li>
+<li><strong>Status Monitoring</strong>: <code>ExecInspect</code> monitors execution status and exit codes</li>
 </ol>
+<h3 id="hook_output_and_security">Hook Output and Security<a class="headerlink" href="#hook_output_and_security" title="Permanent link">&para;</a></h3>
+<p>A hook runs inside the container. Its output therefore comes from whatever runs there, which may be a compromised application or a third-party image. Watchtower treats the output as untrusted text:</p>
+<ul>
+<li>It reads the whole output. A command that prints a lot never blocks.</li>
+<li>It keeps only the last 2 KiB. A leading <code>…</code> marks output whose beginning was dropped.</li>
+<li>Before the text is logged or sent, it removes:<ul>
+<li>Terminal escape sequences, such as colours, cursor movement, window titles, clipboard writes and hyperlinks</li>
+<li>Control characters other than newlines, tabs and carriage returns</li>
+<li>Invisible Unicode format characters, such as bidirectional text controls, zero-width characters and tag characters</li>
+</ul>
+</li>
+<li>A carriage return directly before a newline is dropped. Any other carriage return becomes a newline, as do the Unicode line and paragraph separators.</li>
+<li>It replaces the user information of URLs, such as the <code>user:token</code> in <code>https://user:token@host</code>, with <code>xxxxx</code>. Query values such as <code>?token=…</code> stay as printed.</li>
+<li>It puts the output on one line, joining its lines with <code>|</code>. No line of hook output can then pass for one of Watchtower's own notification lines.</li>
+<li>The output never changes what Watchtower does. Only the exit code decides whether the update continues, is skipped or fails.</li>
+</ul>
+<p>The kept output goes to these places:</p>
+<table>
+<thead>
+<tr>
+<th>Hook</th>
+<th>When the command succeeds</th>
+<th>When the command fails</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Pre-update</td>
+<td>The debug log, in the "Executed command" line</td>
+<td>The error-level "Could not update container" log line and the notifications that carry it. The failed container's error in report templates such as <code>default</code>, <code>json.v1</code> and the porcelain formats.</td>
+</tr>
+<tr>
+<td>Pre-check, post-check</td>
+<td>The debug log, in the "Executed command" line</td>
+<td>The debug log only</td>
+</tr>
+<tr>
+<td>Post-update</td>
+<td>The debug log, in the "Executed command" line</td>
+<td>The debug log only</td>
+</tr>
+</tbody>
+</table>
+<p>The HTTP API and its event stream do not include hook output.</p>
+<div class="admonition warning">
+<p class="admonition-title">Keep secrets out of hook output</p>
+<p>Notification services are third parties. Debug logs are often shipped to other systems. Apart from the user information of URLs, Watchtower sends hook output as the command printed it. It does not try to recognize other secrets. The replacement runs on the kept 2 KiB. When the cut falls inside a URL, a fragment such as <code>token@host</code> can remain. Guessing from names and formats would hide ordinary output and still miss real secrets.</p>
+<p>A failing pre-update hook that prints credentials, for example through <code>set -x</code>, <code>env</code> or <code>curl -v</code>, can send them to every notification service. Write verbose output to a file inside the container or to <code>/dev/null</code>. Print only a short reason when the command fails.</p>
+</div>
+<div class="admonition note">
+<p class="admonition-title">Markup, mentions and look-alike characters</p>
+<p>Watchtower does not escape the text for each notification service. A service may act on markup or mentions in it:</p>
+<ul>
+<li>Discord parses <code>@everyone</code> in a message.</li>
+<li>Email sent with Shoutrrr's <code>usehtml</code> option renders the text as HTML.</li>
+<li>Telegram's HTML and Markdown parse modes format it.</li>
+</ul>
+<p>Characters that look alike, such as a Cyrillic <code>а</code> in place of a Latin <code>a</code>, stay as written, since removing them would break text in other languages.</p>
+</div>
 <h3 id="environment_variables">Environment Variables<a class="headerlink" href="#environment_variables" title="Permanent link">&para;</a></h3>
 <p>Lifecycle hook commands receive container metadata via the <code>WT_CONTAINER</code> environment variable containing a JSON object with the following fields:</p>
 <table>
@@ -4196,7 +4276,7 @@ Any other value, such as <code>-1</code> or <code>1.5</code>, logs a warning and
 <ul>
 <li>"Executing pre-check command"</li>
 <li>"Executing pre-update command"</li>
-<li>"Command output captured"</li>
+<li>"Executed command"</li>
 <li>"Command execution failed"</li>
 </ul>
 
@@ -4221,7 +4301,7 @@ Any other value, such as <code>-1</code> or <code>1.5</code>, logs a warning and
     <span class="md-icon" title="Last update">
       <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M21 13.1c-.1 0-.3.1-.4.2l-1 1 2.1 2.1 1-1c.2-.2.2-.6 0-.8l-1.3-1.3c-.1-.1-.2-.2-.4-.2m-1.9 1.8-6.1 6V23h2.1l6.1-6.1zM12.5 7v5.2l4 2.4-1 1L11 13V7zM11 21.9c-5.1-.5-9-4.8-9-9.9C2 6.5 6.5 2 12 2c5.3 0 9.6 4.1 10 9.3-.3-.1-.6-.2-1-.2s-.7.1-1 .2C19.6 7.2 16.2 4 12 4c-4.4 0-8 3.6-8 8 0 4.1 3.1 7.5 7.1 7.9l-.1.2z"/></svg>
     </span>
-    <span class="git-revision-date-localized-plugin git-revision-date-localized-plugin-timeago" title="November 1, 2026 23:17:30 UTC"><span class="timeago" datetime="2026-11-01T23:17:30+00:00" locale="en"></span></span><span class="git-revision-date-localized-plugin git-revision-date-localized-plugin-iso_date" title="November 1, 2026 23:17:30 UTC">2026-11-01</span>
+    <span class="git-revision-date-localized-plugin git-revision-date-localized-plugin-timeago" title="November 5, 2026 16:58:38 UTC"><span class="timeago" datetime="2026-11-05T16:58:38+00:00" locale="en"></span></span><span class="git-revision-date-localized-plugin git-revision-date-localized-plugin-iso_date" title="November 5, 2026 16:58:38 UTC">2026-11-05</span>
   </span>
 
     
