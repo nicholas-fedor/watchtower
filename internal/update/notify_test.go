@@ -150,11 +150,11 @@ func TestRunUpdatesWithNotifications_PanicEndsSession(t *testing.T) {
 	// Without a report, report templates list the batch's entries. The mock
 	// fails the test on any SendNotification call.
 	notifier := mockUpdate.NewMockNotifier(t)
-	// The session's deferred Discard runs after the panic's Flush.
+	// The session starts its batch before the panic's Flush. Its deferred end
+	// runs after it.
 	mock.InOrder(
-		notifier.EXPECT().StartNotification(false).Once(),
+		expectSessionBatch(t, notifier, "Flush"),
 		notifier.EXPECT().Flush().Once(),
-		notifier.EXPECT().Discard().Once(),
 	)
 
 	broadcaster := events.NewBroadcaster()
@@ -324,9 +324,8 @@ func TestRunUpdates(t *testing.T) {
 				// The session ends its batch after its split notification.
 				notifier.EXPECT().ShouldSendNotification(mock.Anything).Return(true)
 				mock.InOrder(
-					notifier.EXPECT().StartNotification(true).Once(),
+					expectSessionBatch(t, notifier, "SendNotification"),
 					notifier.EXPECT().SendNotification(mock.Anything).Once(),
-					notifier.EXPECT().Discard().Once(),
 				)
 
 				params := RunUpdatesWithNotificationsParams{
@@ -497,34 +496,6 @@ func TestRunUpdates(t *testing.T) {
 			require.NotNil(t, cleanupImages)
 			// For this mock configuration, we expect no error
 			require.NoError(t, err)
-		})
-	})
-
-	t.Run("startNotifications", func(t *testing.T) {
-		t.Parallel()
-
-		t.Run("should start notification when notifier is provided", func(t *testing.T) {
-			t.Parallel()
-
-			notifier := mockUpdate.NewMockNotifier(t)
-			notifier.EXPECT().StartNotification(false).Return()
-			startNotifications(newTestLogger(t), notifier, false)
-			notifier.AssertExpectations(t)
-		})
-
-		t.Run("should not panic when notifier is nil", func(t *testing.T) {
-			t.Parallel()
-
-			startNotifications(newTestLogger(t), nil, false)
-		})
-
-		t.Run("should start notification with split enabled", func(t *testing.T) {
-			t.Parallel()
-
-			notifier := mockUpdate.NewMockNotifier(t)
-			notifier.EXPECT().StartNotification(true).Return()
-			startNotifications(newTestLogger(t), notifier, true)
-			notifier.AssertExpectations(t)
 		})
 	})
 

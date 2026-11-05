@@ -17,11 +17,6 @@ import (
 // shoutrrrType is the identifier for Shoutrrr notifications.
 const shoutrrrType = "shoutrrr"
 
-// initialEntriesCapacity defines the initial capacity for the entries slice in the Shoutrrr notifier.
-//
-// It sets a reasonable default for expected log entry batch sizes.
-const initialEntriesCapacity = 10
-
 // messageChannelBufferSize defines the buffer size for the notification message channel.
 const messageChannelBufferSize = 1000
 
@@ -52,12 +47,14 @@ type Notifier struct {
 	// Still inherits hooks. Run short-circuits on notify=no (and fail-closed parse)
 	// before taking entriesMutex, so internal logs never re-enter the queue or deadlock.
 	// Concurrent application Logs are serialized only by entriesMutex on queue access.
-	localLog     *zerolog.Logger
+	localLog *zerolog.Logger
+	// batch holds the queued log entries of the open batch. Nil when log
+	// entries are sent as they are logged.
+	batch        *batch
 	data         format.StaticData // Static notification data.
 	urls         []string          // Notification service URLs.
-	entries      []*format.Entry   // Queued log entries.
 	delay        time.Duration     // Delay between sends.
-	entriesMutex sync.RWMutex      // Mutex for thread-safe access to entries.
+	entriesMutex sync.RWMutex      // Guards batch and its entries.
 	hookOnce     sync.Once         // Ensures RegisterHook executes only once.
 	closeOnce    sync.Once         // Ensures Close executes only once.
 	// extractWarnOnce ensures the eventFieldMap failure warning is emitted only once.
@@ -66,6 +63,9 @@ type Notifier struct {
 	receiving atomic.Bool // Tracks if receiving logs.
 	// These fields must only be accessed via sync/atomic (e.g., atomic.Load/atomic.Store) to avoid data races.
 	closed atomic.Bool // Tracks if the notifier is closed.
+
+	// splitByContainer sends a check request's notifications one per container.
+	splitByContainer bool
 
 	logLevel zerolog.Level // Minimum log level for notifications.
 }
@@ -189,13 +189,14 @@ func createNotifier(
 		stop: make(
 			chan struct{},
 		), // Channel for stopping the notifier.
-		logLevel: level,                                            // Minimum log level for notifications.
-		template: tpl,                                              // Template for message formatting.
-		data:     data,                                             // Static notification data.
-		params:   params,                                           // Notification parameters.
-		delay:    delay,                                            // Delay between sends.
-		entries:  make([]*format.Entry, 0, initialEntriesCapacity), // Queued log entries.
-		localLog: localLog,                                         // Loop-safe internal logger.
+		logLevel: level,    // Minimum log level for notifications.
+		template: tpl,      // Template for message formatting.
+		data:     data,     // Static notification data.
+		params:   params,   // Notification parameters.
+		delay:    delay,    // Delay between sends.
+		localLog: localLog, // Loop-safe internal logger.
+		// The lines logged before the startup message are queued until it.
+		batch: &batch{},
 	}
 }
 

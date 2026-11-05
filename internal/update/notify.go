@@ -24,19 +24,17 @@ import (
 
 // Notifier sends the notifications of an update session.
 type Notifier interface {
-	// StartNotification starts collecting log entries for a notification.
-	// When suppressSummary is true, entries collected before it are dropped
-	// instead of sent.
-	StartNotification(suppressSummary bool)
+	// StartNotification starts collecting log entries for the session's
+	// notifications. Entries an earlier owner left collected, such as a check
+	// request's, are sent first. The returned end drops what no notification
+	// took, unless the batch has already ended.
+	StartNotification() func()
 	// SendNotification sends the collected entries with report. A split
 	// report's notification carries only its container's entries.
 	SendNotification(report types.Report)
 	// Flush sends the collected entries without a report. Later entries are
-	// sent as they are logged until the next StartNotification.
+	// sent as they are logged until the next batch opens.
 	Flush()
-	// Discard drops the collected entries without sending them. Later entries
-	// are sent as they are logged until the next StartNotification.
-	Discard()
 	// ShouldSendNotification reports whether report is worth a notification at
 	// the configured notifications level.
 	ShouldSendNotification(report types.Report) bool
@@ -125,15 +123,12 @@ func RunUpdatesWithNotifications(
 
 	log.Debug().Msg("Starting RunUpdatesWithNotifications")
 
-	// Initiate notification batching.
-	startNotifications(log, params.Notifier, params.NotificationSplitByContainer)
-
 	// The session owns its batch and ends it on every return. Deferred before
-	// the recover, this runs after a panicked session's flush. It drops the
-	// entries no notification took. In split mode those include the image-level
-	// removal lines. The split path sends them per container.
+	// the recover, the end runs after a panicked session's flush. It drops the
+	// entries no notification took. In split mode those include the
+	// image-level removal lines. The split path sends them per container.
 	if params.Notifier != nil {
-		defer params.Notifier.Discard()
+		defer params.Notifier.StartNotification()()
 	}
 
 	defer func() {
@@ -376,23 +371,6 @@ func endPanickedSession(
 	}
 
 	return &metrics.Metric{ScanFailed: true}
-}
-
-// startNotifications initiates notification batching if a notifier is provided.
-//
-// It starts the notification process to group update messages, or logs a debug message
-// if no notifier is available. When notifications are split by container, it suppresses
-// the summary notification to prevent unwanted duplicates.
-//
-// Parameters:
-//   - notifier: The notification system instance for sending update status messages.
-//   - notificationSplitByContainer: Boolean flag indicating whether notifications are split by container.
-func startNotifications(log *zerolog.Logger, notifier Notifier, notificationSplitByContainer bool) {
-	if notifier != nil {
-		notifier.StartNotification(notificationSplitByContainer)
-	} else {
-		log.Debug().Msg("Notifier is nil, skipping notification batching")
-	}
 }
 
 // executeUpdate performs the container update operation and handles errors.

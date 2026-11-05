@@ -1,6 +1,8 @@
 package notify
 
 import (
+	"sync"
+
 	"github.com/rs/zerolog"
 
 	"github.com/nicholas-fedor/watchtower/internal/observability/notify/format"
@@ -8,39 +10,113 @@ import (
 	"github.com/nicholas-fedor/watchtower/pkg/types"
 )
 
-// StartNotification begins queuing messages for batching.
+// batch holds the log entries queued for one owner's notification.
 //
-// It sends any existing queued entries before resetting the entries slice to ensure a fresh queue for each run.
-// When suppressSummary is true, skip sending queued entries.
-// sendEntries is invoked only after releasing entriesMutex so template work and
-// internal logging never hold the queue lock (avoids re-entrant hook deadlocks).
-func (n *Notifier) StartNotification(suppressSummary bool) {
+// An update session, the startup message or a check request owns a batch. It
+// holds the pointer to its batch. It can then tell whether the batch is still
+// the notifier's open one.
+type batch struct {
+	entries []*format.Entry // Queued log entries.
+	// holders counts the check requests that hold the batch open. It is zero
+	// for the batch of an update session or of startup. A check batch that
+	// ended keeps a count of one. It is then still known as a check's.
+	holders int
+}
+
+// StartNotification opens the batch of an update session or of startup.
+//
+// Log entries are then queued until the batch is sent. A batch an earlier owner
+// left open is sent first, without a report. Its entries are either the lines
+// logged before startup or the lines of check requests that this batch takes
+// over. Those are sent as the checks' release would send them. The checks'
+// release then sends nothing.
+//
+// Returns:
+//   - func(): Ends the batch without sending it, if it is still open. Entries
+//     no notification took are dropped. Calling it again has no effect.
+func (n *Notifier) StartNotification() func() {
+	owned := &batch{}
+
 	n.entriesMutex.Lock()
-
-	var toSend []*format.Entry
-	// Capture residual entries to send after unlock when not suppressed.
-	if len(n.entries) > 0 && !suppressSummary {
-		toSend = n.entries
-	}
-
-	// Capture the count before resetting the slice.
-	preResetCount := len(n.entries)
-
-	// Reset the entries slice to an empty slice with initial capacity for new batching.
-	n.entries = make([]*format.Entry, 0, initialEntriesCapacity)
-
+	earlier := n.batch
+	n.batch = owned
 	n.entriesMutex.Unlock()
 
-	if len(toSend) > 0 {
-		n.sendEntries(toSend, nil)
+	// Sending after unlock keeps template work and internal logging outside the
+	// queue lock.
+	if earlier != nil {
+		n.sendEnded(earlier)
 	}
 
-	n.ll().Debug().
-		Bool("legacy_template", n.template.Legacy()).
-		Bool("receiving", n.receiving.Load()).
-		Int("entries_count", preResetCount).
-		Bool("suppress_summary", suppressSummary).
-		Msg("StartNotification called - batching mode enabled")
+	return func() {
+		dropped, ok := n.takeBatch(owned)
+		if ok && len(dropped) > 0 {
+			n.ll().Debug().
+				Int("entries_count", len(dropped)).
+				Msg("Discarded queued entries")
+		}
+	}
+}
+
+// HoldNotifications holds back the log entries of a check request.
+//
+// Checks that overlap share one batch. Each check's release sends the entries
+// queued so far without a report. No entry then waits longer than the check
+// that is running when it is logged. The batch closes when the last check ends.
+// Entries are sent in one notification by default. With the
+// notification-split-by-container configuration option they are sent one per
+// container. Entries that name no container then go together. During an update
+// session or startup the check's entries join that batch instead. Its owner
+// decides what to send. A split update session sends only the entries that
+// name a container it reports. When a session takes the checks' batch over,
+// release sends nothing.
+//
+// Returns:
+//   - func(): Ends the check's hold on its batch. Calling it again has no
+//     effect.
+func (n *Notifier) HoldNotifications() func() {
+	n.entriesMutex.Lock()
+	defer n.entriesMutex.Unlock()
+
+	held := n.batch
+
+	switch {
+	case held == nil:
+		held = &batch{}
+		n.batch = held
+	case held.holders == 0:
+		// The batch of an update session or of startup. Its owner sends it.
+		return func() {}
+	default:
+		// Another check's batch. It stays open until every check holding it
+		// ends.
+	}
+
+	held.holders++
+
+	return sync.OnceFunc(func() {
+		n.entriesMutex.Lock()
+
+		if n.batch != held {
+			n.entriesMutex.Unlock()
+
+			return
+		}
+
+		queued := held.entries
+		held.entries = nil
+
+		// The batch stays open for the checks that still hold it.
+		if held.holders > 1 {
+			held.holders--
+		} else {
+			n.batch = nil
+		}
+
+		n.entriesMutex.Unlock()
+
+		n.sendCheckEntries(queued)
+	})
 }
 
 // SendNotification sends queued messages with a report.
@@ -61,88 +137,39 @@ func (n *Notifier) SendNotification(report types.Report) {
 		return
 	}
 
-	n.entriesMutex.Lock()
-
-	// Keep rest non-nil so Run continues treating batching as active when
-	// every queued entry matched the focus.
 	var matched []*format.Entry
 
-	rest := make([]*format.Entry, 0, len(n.entries))
+	n.entriesMutex.Lock()
 
-	for _, e := range n.entries {
-		if entryMatchesFocus(e, split.Focus) {
-			matched = append(matched, e)
-		} else {
-			rest = append(rest, e)
+	// The batch stays open for the session's other split notifications.
+	if n.batch != nil {
+		rest := make([]*format.Entry, 0, len(n.batch.entries))
+
+		for _, e := range n.batch.entries {
+			if entryMatchesFocus(e, split.Focus) {
+				matched = append(matched, e)
+			} else {
+				rest = append(rest, e)
+			}
 		}
-	}
 
-	n.entries = rest
+		n.batch.entries = rest
+	}
 
 	n.entriesMutex.Unlock()
 
 	n.sendDeduplicated(matched, report)
 }
 
-// Flush sends every queued message without a report and empties the queue.
+// Flush sends every queued message in one notification without a report and
+// ends the open batch.
 //
 // Report templates then list the queued messages themselves. Callers use it
 // when no scan produced a report, such as for the startup message. An empty
-// queue sends nothing, since templates such as json.v1 would still render a
-// document. Messages logged after it are sent one at a time until the next
-// [Notifier.StartNotification].
+// queue sends nothing. Messages logged after it are sent one at a time until
+// the next batch opens.
 func (n *Notifier) Flush() {
-	entries := n.takeEntries()
-	if len(entries) == 0 {
-		return
-	}
-
-	n.sendDeduplicated(entries, nil)
-}
-
-// FlushSplitByContainer takes every entry out of the queue and sends one
-// notification for each container the entries name. Entries that name no
-// container are sent together.
-//
-// The check API calls it for the notification-split-by-container configuration
-// option, since a check has no report that names a container.
-func (n *Notifier) FlushSplitByContainer() {
-	entries := n.takeEntries()
-	byContainer := make(map[string][]*format.Entry)
-
-	for _, entry := range entries {
-		container, _ := entry.Data["container"].(string)
-		if container == "" {
-			name, ok := entry.Data["container_name"].(string)
-			if ok && name != "" {
-				container = name
-			} else {
-				container = "unknown"
-			}
-		}
-
-		byContainer[container] = append(byContainer[container], entry)
-	}
-
-	for _, containerEntries := range byContainer {
-		n.sendEntries(containerEntries, nil)
-	}
-}
-
-// Discard empties the queue without sending it and ends batching.
-//
-// An update session calls it when it ends, after whatever it sent. The entries
-// that no notification took are dropped. Messages logged after it are sent one
-// at a time until the next [Notifier.StartNotification].
-func (n *Notifier) Discard() {
-	dropped := n.takeEntries()
-	if len(dropped) == 0 {
-		return
-	}
-
-	n.ll().Debug().
-		Int("entries_count", len(dropped)).
-		Msg("Discarded queued entries")
+	n.sendWithoutReport(n.takeEntries())
 }
 
 // entryMatchesFocus reports whether a queued entry belongs to the focus container.
@@ -192,19 +219,118 @@ func (n *Notifier) ShouldSendNotification(report types.Report) bool {
 	return true
 }
 
-// takeEntries empties the queue and ends batching, since the hook batches
-// only while the queue is non-nil.
+// takeEntries ends the open batch, whoever owns it.
 //
 // Returns:
-//   - []*format.Entry: The entries that were queued.
+//   - []*format.Entry: The entries that were queued. Nil when no batch is open.
 func (n *Notifier) takeEntries() []*format.Entry {
 	n.entriesMutex.Lock()
 	defer n.entriesMutex.Unlock()
 
-	entries := n.entries
-	n.entries = nil
+	open := n.batch
+	n.batch = nil
 
-	return entries
+	if open == nil {
+		return nil
+	}
+
+	return open.entries
+}
+
+// takeBatch ends owned if it is still the open batch.
+//
+// Parameters:
+//   - owned: The batch its owner opened.
+//
+// Returns:
+//   - []*format.Entry: The entries owned holds.
+//   - bool: True when owned was still open. False when another owner took the
+//     batch over or owned already ended.
+func (n *Notifier) takeBatch(owned *batch) ([]*format.Entry, bool) {
+	n.entriesMutex.Lock()
+	defer n.entriesMutex.Unlock()
+
+	if n.batch != owned {
+		return nil, false
+	}
+
+	n.batch = nil
+
+	return owned.entries, true
+}
+
+// sendEnded sends the entries of a batch that ended without a report.
+//
+// A check request's batch is sent as its checks would send it. Any other batch
+// is sent in one notification.
+//
+// Parameters:
+//   - ended: A batch that is no longer the open one.
+func (n *Notifier) sendEnded(ended *batch) {
+	if ended.holders > 0 {
+		n.sendCheckEntries(ended.entries)
+
+		return
+	}
+
+	n.sendWithoutReport(ended.entries)
+}
+
+// sendCheckEntries sends the entries of check requests without a report.
+//
+// They go out one notification per container with the
+// notification-split-by-container configuration option. Otherwise they go out
+// in one notification.
+//
+// Parameters:
+//   - entries: Entries taken out of a check's batch.
+func (n *Notifier) sendCheckEntries(entries []*format.Entry) {
+	if n.splitByContainer {
+		n.sendByContainer(entries)
+
+		return
+	}
+
+	n.sendWithoutReport(entries)
+}
+
+// sendWithoutReport sends entries in one notification without a report.
+//
+// Report templates then list the entries themselves. No entries send nothing,
+// since templates such as json.v1 would still render a document.
+//
+// Parameters:
+//   - entries: Entries taken out of the queue.
+func (n *Notifier) sendWithoutReport(entries []*format.Entry) {
+	if len(entries) == 0 {
+		return
+	}
+
+	n.sendDeduplicated(entries, nil)
+}
+
+// sendByContainer sends one notification without a report for each container
+// the entries name. Entries that name no container are sent together.
+//
+// Parameters:
+//   - entries: Entries taken out of the queue.
+func (n *Notifier) sendByContainer(entries []*format.Entry) {
+	byContainer := make(map[string][]*format.Entry)
+
+	// Entries that name no container share the empty key. No container name
+	// can take it.
+	for _, entry := range entries {
+		container, _ := entry.Data["container"].(string)
+		if container == "" {
+			container, _ = entry.Data["container_name"].(string)
+		}
+
+		byContainer[container] = append(byContainer[container], entry)
+	}
+
+	for _, containerEntries := range byContainer {
+		n.sendDeduplicated(containerEntries, nil)
+	}
 }
 
 // sendDeduplicated sends entries with report after dropping repeated messages.

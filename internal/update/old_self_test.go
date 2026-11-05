@@ -45,8 +45,7 @@ func TestRunUpdatesWithNotifications_OldSelfDetected(t *testing.T) {
 	// The notifier mock fails the test on any call other than starting the
 	// batch and ending it without sending.
 	notifier := mockUpdate.NewMockNotifier(t)
-	notifier.EXPECT().StartNotification(false).Once()
-	notifier.EXPECT().Discard().Once()
+	expectSessionBatch(t, notifier)
 
 	broadcaster := events.NewBroadcaster()
 	published, _ := broadcaster.SubscribeWithDone()

@@ -3,7 +3,9 @@ package notify
 import (
 	"fmt"
 	"io"
+	"slices"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -42,7 +44,7 @@ func TestNotifier_FlushBatching(t *testing.T) {
 			)
 			// With the worker running, a message that Flush sent would reach the log.
 			shoutrrr.RegisterHook(log)
-			shoutrrr.StartNotification(false)
+			shoutrrr.StartNotification()
 			shoutrrr.Flush()
 			shoutrrr.Close()
 			assert.NotContains(t, logBuffer.String(), `Shoutrrr:`)
@@ -69,7 +71,7 @@ func TestNotifier_FlushBatching(t *testing.T) {
 			shoutrrr.RegisterHook(log)
 			defer shoutrrr.Close()
 
-			shoutrrr.StartNotification(false)
+			shoutrrr.StartNotification()
 			log.Info().Msg("This log message is sponsored by ContainrrrVPN")
 			shoutrrr.Flush()
 			require.Eventually(t, func() bool {
@@ -235,9 +237,9 @@ func TestShouldSendNotification(t *testing.T) {
 	})
 }
 
-// TestSendNotification_SingleFocusKeepsBatchingActive verifies that when every
-// queued entry matches the single-container focus, n.entries remains a non-nil
-// empty slice so subsequent Run calls continue batching.
+// TestSendNotification_SingleFocusKeepsBatchingActive verifies that a split
+// notification that takes every queued entry leaves batching on, since the
+// session's other split notifications follow.
 func TestSendNotification_SingleFocusKeepsBatchingActive(t *testing.T) {
 	n := createTestNotifier(
 		t,
@@ -258,9 +260,9 @@ func TestSendNotification_SingleFocusKeepsBatchingActive(t *testing.T) {
 		UpdatedReports: []types.ContainerReport{updated},
 	}
 
-	n.StartNotification(true)
+	n.StartNotification()
 	n.entriesMutex.Lock()
-	n.entries = []*format.Entry{
+	n.batch.entries = []*format.Entry{
 		{
 			Message: "Found new image",
 			Data:    map[string]any{"container": updated.Name()},
@@ -271,11 +273,11 @@ func TestSendNotification_SingleFocusKeepsBatchingActive(t *testing.T) {
 	n.SendNotification(report)
 
 	n.entriesMutex.RLock()
-	entries := n.entries
+	open := n.batch
 	n.entriesMutex.RUnlock()
 
-	require.NotNil(t, entries, "batching slice must remain non-nil after single-focus drain")
-	require.Empty(t, entries)
+	require.NotNil(t, open, "the batch stays open after a split notification")
+	assert.Empty(t, open.entries)
 
 	n.Close()
 }
@@ -333,7 +335,7 @@ func TestSendNotification_CooldownFocusWithOneContextContainer(t *testing.T) {
 			n.SendNotification(report)
 
 			n.entriesMutex.RLock()
-			remaining := n.entries
+			remaining := n.batch.entries
 			n.entriesMutex.RUnlock()
 
 			assert.Equal(t, []*format.Entry{otherEntry}, remaining,
@@ -365,11 +367,11 @@ func TestNotifier_Flush(t *testing.T) {
 	n.Flush()
 
 	n.entriesMutex.RLock()
-	remaining := n.entries
+	open := n.batch
 	n.entriesMutex.RUnlock()
 
-	// A nil queue ends batching, so later messages are sent as they are logged.
-	assert.Nil(t, remaining)
+	// No batch is open. Later messages are sent as they are logged.
+	assert.Nil(t, open)
 
 	sent := sentMessages(n)
 	assert.Equal(t, []string{
@@ -392,43 +394,298 @@ func TestNotifier_FlushEmptyQueue(t *testing.T) {
 				n := createNotifier(newTestLogger(t), nil, nil, zerolog.ErrorLevel, tpl, legacy, format.StaticData{}, 0)
 				t.Cleanup(n.Close)
 
-				n.StartNotification(false)
+				n.StartNotification()
 				n.Flush()
 
 				n.entriesMutex.RLock()
-				remaining := n.entries
+				open := n.batch
 				n.entriesMutex.RUnlock()
 
-				assert.Nil(t, remaining)
+				assert.Nil(t, open)
 				assert.Empty(t, sentMessages(n))
 			})
 		}
 	}
 }
 
-// TestNotifier_Discard verifies that Discard empties the queue without sending
-// it and ends batching. A line logged afterwards is sent at once instead of
-// waiting in the queue.
-func TestNotifier_Discard(t *testing.T) {
+// TestNotifier_StartNotification_End verifies that ending a session's batch
+// drops the entries no notification took and ends batching. A line logged
+// afterwards is sent at once instead of waiting in the queue.
+func TestNotifier_StartNotification_End(t *testing.T) {
 	t.Parallel()
 
-	n := newBatchingNotifier(t, []*format.Entry{
-		{Message: logging.RemovingImage, Data: map[string]any{"image_id": "01d111111111"}},
-	})
+	n, hooked := newIdleNotifier(t)
 
-	n.Discard()
+	end := n.StartNotification()
+
+	hooked.Warn().Str("image_id", "01d111111111").Msg(logging.RemovingImage)
+
+	end()
 
 	n.entriesMutex.RLock()
-	remaining := n.entries
+	open := n.batch
 	n.entriesMutex.RUnlock()
 
-	assert.Nil(t, remaining)
+	assert.Nil(t, open)
 	assert.Empty(t, sentMessages(n))
 
-	hooked := zerolog.New(io.Discard).Hook(n)
 	hooked.Warn().Msg("Logged after the session")
 
 	assert.Equal(t, []string{"Logged after the session"}, sentMessages(n))
+}
+
+// newIdleNotifier returns a notifier that is not batching and a logger hooked
+// to it. A line logged through that logger is sent at once.
+func newIdleNotifier(t *testing.T) (*Notifier, zerolog.Logger) {
+	t.Helper()
+
+	n := newBatchingNotifier(t, nil)
+	n.batch = nil
+
+	return n, zerolog.New(io.Discard).Hook(n)
+}
+
+// TestNotifier_StartNotification verifies that starting a batch first sends
+// the lines an earlier owner queued, without a report. Those are either the
+// lines logged before startup or the lines of a check whose batch is taken
+// over.
+func TestNotifier_StartNotification(t *testing.T) {
+	t.Parallel()
+
+	n := newBatchingNotifier(t, nil)
+	hooked := zerolog.New(io.Discard).Hook(n)
+
+	// The notifier batches from its creation until the startup message.
+	hooked.Warn().Msg("Logged before startup")
+	require.Empty(t, sentMessages(n))
+
+	n.StartNotification()
+	assert.Equal(t, []string{"Logged before startup"}, sentMessages(n))
+
+	hooked.Warn().Msg("Logged during startup")
+	assert.Empty(t, sentMessages(n))
+
+	n.Flush()
+	assert.Equal(t, []string{"Logged during startup"}, sentMessages(n))
+}
+
+// TestNotifier_HoldNotifications verifies how a check request's batch
+// overlaps the batches of update sessions and other checks. Overlapping checks
+// share one batch. Each check's release sends the lines queued so far. The
+// last one closes the batch. A check during a session joins the session's
+// batch. An update session that starts during a check
+// takes the batch over and first sends the check's queued lines. Every line is
+// sent exactly once.
+func TestNotifier_HoldNotifications(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		// run logs the lines and drives the batches.
+		run  func(n *Notifier, hooked zerolog.Logger) []string
+		name string
+		// want is every message sent, in order.
+		want []string
+	}{
+		{
+			name: "check sends its lines when it ends",
+			run: func(n *Notifier, hooked zerolog.Logger) []string {
+				release := n.HoldNotifications()
+
+				hooked.Warn().Msg("Check line")
+
+				queued := sentMessages(n)
+
+				release()
+				hooked.Warn().Msg("After the check")
+
+				return append(queued, sentMessages(n)...)
+			},
+			want: []string{"Check line", "After the check"},
+		},
+		{
+			name: "check sends one notification per container when split",
+			run: func(n *Notifier, hooked zerolog.Logger) []string {
+				n.splitByContainer = true
+				release := n.HoldNotifications()
+
+				hooked.Warn().Str("container", "app2").Msg("Check line")
+				hooked.Warn().Str("container", "app1").Msg("Check line")
+
+				release()
+
+				// Containers are sent in map order.
+				sent := sentMessages(n)
+				slices.Sort(sent)
+
+				return sent
+			},
+			want: []string{"Check line | container=app1 ", "Check line | container=app2 "},
+		},
+		{
+			name: "check during a session joins its batch",
+			run: func(n *Notifier, hooked zerolog.Logger) []string {
+				n.StartNotification()
+
+				release := n.HoldNotifications()
+
+				hooked.Warn().Msg("Check line")
+				release()
+
+				queued := sentMessages(n)
+
+				hooked.Warn().Msg("Session line")
+				n.Flush()
+
+				return append(queued, sentMessages(n)...)
+			},
+			want: []string{"Check line\nSession line"},
+		},
+		{
+			name: "session starting during a check takes its batch over",
+			run: func(n *Notifier, hooked zerolog.Logger) []string {
+				release := n.HoldNotifications()
+
+				hooked.Warn().Msg("Check line before the session")
+
+				n.StartNotification()
+				hooked.Warn().Msg("Line during the session")
+				release()
+
+				queued := sentMessages(n)
+
+				n.Flush()
+
+				return append(queued, sentMessages(n)...)
+			},
+			want: []string{"Check line before the session", "Line during the session"},
+		},
+		{
+			name: "check after a session's send keeps its batch when the session ends",
+			run: func(n *Notifier, hooked zerolog.Logger) []string {
+				end := n.StartNotification()
+
+				hooked.Warn().Msg("Session line")
+				n.Flush()
+
+				release := n.HoldNotifications()
+
+				hooked.Warn().Msg("Check line")
+
+				end()
+				release()
+
+				return sentMessages(n)
+			},
+			want: []string{"Session line", "Check line"},
+		},
+		{
+			name: "second check joins the first",
+			run: func(n *Notifier, hooked zerolog.Logger) []string {
+				first := n.HoldNotifications()
+				second := n.HoldNotifications()
+
+				hooked.Warn().Msg("Check line")
+
+				second()
+
+				queued := sentMessages(n)
+
+				first()
+
+				return append(queued, sentMessages(n)...)
+			},
+			want: []string{"Check line"},
+		},
+		{
+			name: "each overlapping check sends the lines queued when it ends",
+			run: func(n *Notifier, hooked zerolog.Logger) []string {
+				first := n.HoldNotifications()
+				second := n.HoldNotifications()
+
+				hooked.Warn().Msg("First check line")
+				first()
+
+				hooked.Warn().Msg("Second check line one")
+				hooked.Warn().Msg("Second check line two")
+				second()
+
+				return sentMessages(n)
+			},
+			want: []string{"First check line", "Second check line one\nSecond check line two"},
+		},
+		{
+			name: "session taking a check's batch over sends it per container when split",
+			run: func(n *Notifier, hooked zerolog.Logger) []string {
+				n.splitByContainer = true
+				release := n.HoldNotifications()
+
+				hooked.Warn().Str("container", "app2").Msg("Check line")
+				hooked.Warn().Str("container", "app1").Msg("Check line")
+
+				n.StartNotification()
+				release()
+
+				// Containers are sent in map order.
+				sent := sentMessages(n)
+				slices.Sort(sent)
+
+				return sent
+			},
+			want: []string{"Check line | container=app1 ", "Check line | container=app2 "},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			n, hooked := newIdleNotifier(t)
+
+			assert.Equal(t, tt.want, tt.run(n, hooked))
+		})
+	}
+}
+
+// TestNotifier_HoldNotifications_Concurrent verifies that every line logged by
+// concurrent check requests and an update session is sent exactly once,
+// whichever batch it joins.
+func TestNotifier_HoldNotifications_Concurrent(t *testing.T) {
+	t.Parallel()
+
+	const checks = 16
+
+	n, hooked := newIdleNotifier(t)
+
+	var wg sync.WaitGroup
+
+	for check := range checks {
+		wg.Go(func() {
+			release := n.HoldNotifications()
+
+			hooked.Warn().Msgf("Check line %d", check)
+			release()
+		})
+	}
+
+	n.StartNotification()
+	hooked.Warn().Msg("Session line")
+	n.Flush()
+
+	wg.Wait()
+
+	lines := make([]string, 0, checks+1)
+	for _, message := range sentMessages(n) {
+		lines = append(lines, strings.Split(message, "\n")...)
+	}
+
+	want := make([]string, 0, checks+1)
+	want = append(want, "Session line")
+
+	for check := range checks {
+		want = append(want, fmt.Sprintf("Check line %d", check))
+	}
+
+	assert.ElementsMatch(t, want, lines)
 }
 
 // TestSendNotification_FailedFocusCarriesFailure verifies that a failure line travels with its split notification.

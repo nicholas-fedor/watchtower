@@ -171,8 +171,7 @@ func TestRunUpdatesWithNotifications_DiskSpaceAbortNotifiesOnce(t *testing.T) {
 			params.DiskSpaceMax = 10_000
 
 			notifier := mockUpdate.NewMockNotifier(t)
-			notifier.EXPECT().StartNotification(false).Once()
-			notifier.EXPECT().Discard().Once()
+			expectSessionBatch(t, notifier)
 			notifier.EXPECT().Flush().Once()
 
 			metric := RunUpdatesWithNotifications(t.Context(), RunUpdatesWithNotificationsParams{
