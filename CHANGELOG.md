@@ -17,6 +17,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- Replace the shared notifier interface with consumer ports by @nicholas-fedor in [#3462](https://github.com/nicholas-fedor/watchtower/pull/3462)
 - Build the scan metric in the update session by @nicholas-fedor in [#3454](https://github.com/nicholas-fedor/watchtower/pull/3454)
 - Move UpdateParams to update/params by @nicholas-fedor in [#3452](https://github.com/nicholas-fedor/watchtower/pull/3452)
 - Build the scan_started payload from UpdateParams by @nicholas-fedor in [#3450](https://github.com/nicholas-fedor/watchtower/pull/3450)
