@@ -15,12 +15,12 @@ import (
 
 // Handler triggers container update scans via HTTP.
 type Handler struct {
+	ctx context.Context //nolint:containedctx // application-lifetime context owned by Handler
 	log *zerolog.Logger
 
 	fn         func(ctx context.Context, images, containers []string) *metrics.Metric
-	Path       string
 	lock       *schedule.UpdateLock
-	ctx        context.Context //nolint:containedctx // application-lifetime context owned by Handler
+	Path       string
 	maxTimeout time.Duration
 }
 

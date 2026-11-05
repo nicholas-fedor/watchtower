@@ -34,6 +34,10 @@ const (
 
 // Error is a registry 429 with the wait and quota the registry advertised.
 type Error struct {
+	// Host is the registry host that produced the limit when known.
+	Host string
+	// Message is the raw registry or Docker-stream text.
+	Message string
 	// StatusCode is the HTTP status when the limit came from an HTTP response.
 	StatusCode int
 	// RetryAfter is the wait parsed from Retry-After or the response body.
@@ -42,10 +46,6 @@ type Error struct {
 	Allowed int
 	// AllowedWindow is the period for Allowed. Zero when the registry omitted it.
 	AllowedWindow time.Duration
-	// Host is the registry host that produced the limit when known.
-	Host string
-	// Message is the raw registry or Docker-stream text.
-	Message string
 }
 
 // Error describes the rate limit for logs and error wrapping.

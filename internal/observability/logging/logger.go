@@ -17,10 +17,10 @@ type Level uint8
 // warned about once. Its zero value is ready to use, and it is safe for
 // concurrent use.
 type ReportedProblems struct {
-	// mu guards seen.
-	mu sync.Mutex
 	// seen holds a key for each reported problem.
 	seen map[string]struct{}
+	// mu guards seen.
+	mu sync.Mutex
 }
 
 // Logging levels ordered from most to least verbose.

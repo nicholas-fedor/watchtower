@@ -62,19 +62,19 @@ func sanitizeRemoteError(err error) error {
 
 // CheckoutOptions controls how a project worktree is moved to a commit.
 type CheckoutOptions struct {
-	// Stash saves local changes, checks out the commit, then writes those files back.
-	Stash bool
 	// AuthFor returns fetch credentials for the origin URL. Nil is anonymous fetch.
 	AuthFor func(repoURL string) (transport.AuthMethod, error)
 	// restore replaces restoreSaved. Tests use it to fail a restore. Nil uses restoreSaved.
 	restore func(root string, saved []savedFile) error
-	// CABundle is extra PEM CAs for HTTPS fetch.
-	CABundle []byte
-	// InsecureSkipTLS skips TLS verification for HTTPS fetch.
-	InsecureSkipTLS bool
 	// Prior, when non-nil, receives the HEAD hash from before checkout.
 	// The caller uses it to restore the worktree when it will not apply.
 	Prior *string
+	// CABundle is extra PEM CAs for HTTPS fetch.
+	CABundle []byte
+	// Stash saves local changes, checks out the commit, then writes those files back.
+	Stash bool
+	// InsecureSkipTLS skips TLS verification for HTTPS fetch.
+	InsecureSkipTLS bool
 }
 
 // savedFile is a local file restored after checkout when Stash is set.

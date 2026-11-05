@@ -47,10 +47,10 @@ var (
 //
 //nolint:godox
 type gotifyTypeNotifier struct {
+	log                 *zerolog.Logger
 	gotifyURL           string // Gotify server URL.
 	gotifyAppToken      string // Gotify application token.
 	gotifySkipTLSVerify bool   // Skip TLS verification if true.
-	log                 *zerolog.Logger
 }
 
 // New creates a Gotify notifier from resolved legacy settings.

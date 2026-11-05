@@ -15,22 +15,22 @@ import (
 
 // Handler serves the /v1/check endpoint.
 type Handler struct {
-	log *zerolog.Logger
+	// notifier batches log entries during the check to suppress immediate notifications.
+	notifier types.Notifier
+	log      *zerolog.Logger
 
 	// check is the function that checks container update availability.
 	check CheckFunc
+	// eventBroadcaster publishes SSE events for check runs.
+	eventBroadcaster *events.Broadcaster
 	// Path is the HTTP route path for the check endpoint.
 	Path string
 	// maxTimeout bounds the optional per-request ?timeout= query parameter.
 	maxTimeout time.Duration
-	// notifier batches log entries during the check to suppress immediate notifications.
-	notifier types.Notifier
-	// splitByContainer sends per-container notifications when true.
-	splitByContainer bool
-	// eventBroadcaster publishes SSE events for check runs.
-	eventBroadcaster *events.Broadcaster
 	// scanStartedData carries redacted policy flags reused for every scan_started event.
 	scanStartedData events.ScanStartedData
+	// splitByContainer sends per-container notifications when true.
+	splitByContainer bool
 }
 
 // New creates a new check handler backed by the given check function.

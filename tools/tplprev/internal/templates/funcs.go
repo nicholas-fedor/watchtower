@@ -10,10 +10,9 @@ import (
 	"text/template"
 	"time"
 
+	"github.com/nicholas-fedor/tplprev/internal/report"
 	"golang.org/x/text/cases"
 	"golang.org/x/text/language"
-
-	"github.com/nicholas-fedor/tplprev/internal/report"
 )
 
 const (

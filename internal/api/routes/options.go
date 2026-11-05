@@ -57,6 +57,10 @@ const (
 
 // Options holds transport and runtime configuration for SetupAndStartAPI.
 type Options struct {
+	// Client is the Docker client used by API handlers.
+	Client containerClient.Client
+	// Notifier sends update and check status messages.
+	Notifier types.Notifier
 	// Logger is the zerolog logger for the HTTP API server and middleware.
 	// Required when any HTTP API endpoint is enabled.
 	// SetupAndStartAPI returns ErrMissingLogger if it is nil.
@@ -64,6 +68,27 @@ type Options struct {
 	// request/auth logs must not trigger notification hooks.
 	// New also attaches notify=no on request and rate-limit log paths.
 	Logger *zerolog.Logger
+	// Filter is the process-wide container filter predicate.
+	Filter types.Filter
+	// UpdateLock serializes update sessions. It must be the lock the scheduler
+	// uses, so API and scheduled updates never run at the same time.
+	UpdateLock *schedule.UpdateLock
+	// GitClient inspects remotes for Git-watched containers on /v1/check.
+	GitClient *git.Client
+	// RunUpdatesWithNotifications runs the scan-and-update pipeline for HTTP update requests.
+	RunUpdatesWithNotifications func(context.Context, types.Filter, types.UpdateParams) *mt.Metric
+	// FilterByImage builds an image-scoped filter for update and check requests.
+	FilterByImage func([]string, types.Filter) types.Filter
+	// DefaultMetrics returns the process metrics store.
+	DefaultMetrics func() *mt.Metrics
+	// WriteStartupMessage writes the blocking-mode startup message when the update API starts.
+	WriteStartupMessage func(logging.StartupParams)
+	// EventBroadcaster publishes action events to SSE subscribers.
+	EventBroadcaster *events.Broadcaster
+	// OnUnexpectedServerStop is invoked when the HTTP server exits with an
+	// unexpected error while running in non-blocking mode. Callers typically
+	// cancel the process context so scheduling shuts down with the API.
+	OnUnexpectedServerStop func(error)
 	// Host is the HTTP bind host (empty means all interfaces).
 	Host string
 	// Port is the HTTP bind port.
@@ -72,8 +97,34 @@ type Options struct {
 	Token string
 	// EventsToken authenticates the events SSE endpoint.
 	EventsToken string
+	// TLSCertPath is the path to the TLS certificate file.
+	TLSCertPath string
+	// TLSKeyPath is the path to the TLS key file.
+	TLSKeyPath string
+	// ProxyHeader is the header used for the real client IP behind a reverse proxy.
+	ProxyHeader string
+	// FilterDesc is a human-readable description of the filter for startup messaging.
+	FilterDesc string
+	// Scope limits operations to containers matching this Watchtower scope.
+	Scope string
+	// Version is the Watchtower version string used in startup messaging.
+	Version string
+	// CORSAllowedOrigins lists allowed CORS origins.
+	CORSAllowedOrigins []string
+	// TrustedProxies lists trusted proxy IPs or CIDRs.
+	TrustedProxies []string
+	// Startup holds resolved values for blocking-mode startup messaging.
+	Startup logging.StartupParams
+	// BaseParams is the complete update policy snapshot from config.UpdateParams.
+	BaseParams types.UpdateParams
 	// RateLimit is the maximum authentication requests per minute per IP.
 	RateLimit int
+	// CheckTimeout is the maximum duration for the /v1/check API endpoint.
+	// If zero, DefaultCheckTimeout is used.
+	CheckTimeout time.Duration
+	// UpdateTimeout is the maximum duration for the /v1/update API endpoint.
+	// If zero, DefaultUpdateTimeout is used.
+	UpdateTimeout time.Duration
 	// EnableUpdateAPI enables the /v1/update endpoint.
 	EnableUpdateAPI bool
 	// EnableMetricsAPI enables the metrics endpoint.
@@ -98,65 +149,14 @@ type Options struct {
 	UnblockHTTPAPI bool
 	// NoStartupMessage suppresses startup logs and notifications.
 	NoStartupMessage bool
-	// TLSCertPath is the path to the TLS certificate file.
-	TLSCertPath string
-	// TLSKeyPath is the path to the TLS key file.
-	TLSKeyPath string
-	// CORSAllowedOrigins lists allowed CORS origins.
-	CORSAllowedOrigins []string
-	// TrustedProxies lists trusted proxy IPs or CIDRs.
-	TrustedProxies []string
-	// ProxyHeader is the header used for the real client IP behind a reverse proxy.
-	ProxyHeader string
-	// Filter is the process-wide container filter predicate.
-	Filter types.Filter
-	// FilterDesc is a human-readable description of the filter for startup messaging.
-	FilterDesc string
-	// UpdateLock serializes update sessions. It must be the lock the scheduler
-	// uses, so API and scheduled updates never run at the same time.
-	UpdateLock *schedule.UpdateLock
-	// BaseParams is the complete update policy snapshot from config.UpdateParams.
-	BaseParams types.UpdateParams
 	// IncludeStopped is exposed on the config API (client list option).
 	IncludeStopped bool
 	// IncludeRestarting is exposed on the config API (client list option).
 	IncludeRestarting bool
 	// LabelEnable is exposed on the config API (filter option).
 	LabelEnable bool
-	// Client is the Docker client used by API handlers.
-	Client containerClient.Client
-	// GitClient inspects remotes for Git-watched containers on /v1/check.
-	GitClient *git.Client
-	// Notifier sends update and check status messages.
-	Notifier types.Notifier
 	// NotificationSplitByContainer sends one notification per updated container when true.
 	NotificationSplitByContainer bool
-	// Scope limits operations to containers matching this Watchtower scope.
-	Scope string
-	// Version is the Watchtower version string used in startup messaging.
-	Version string
-	// Startup holds resolved values for blocking-mode startup messaging.
-	Startup logging.StartupParams
-	// RunUpdatesWithNotifications runs the scan-and-update pipeline for HTTP update requests.
-	RunUpdatesWithNotifications func(context.Context, types.Filter, types.UpdateParams) *mt.Metric
-	// FilterByImage builds an image-scoped filter for update and check requests.
-	FilterByImage func([]string, types.Filter) types.Filter
-	// DefaultMetrics returns the process metrics store.
-	DefaultMetrics func() *mt.Metrics
-	// WriteStartupMessage writes the blocking-mode startup message when the update API starts.
-	WriteStartupMessage func(logging.StartupParams)
-	// EventBroadcaster publishes action events to SSE subscribers.
-	EventBroadcaster *events.Broadcaster
-	// OnUnexpectedServerStop is invoked when the HTTP server exits with an
-	// unexpected error while running in non-blocking mode. Callers typically
-	// cancel the process context so scheduling shuts down with the API.
-	OnUnexpectedServerStop func(error)
-	// CheckTimeout is the maximum duration for the /v1/check API endpoint.
-	// If zero, DefaultCheckTimeout is used.
-	CheckTimeout time.Duration
-	// UpdateTimeout is the maximum duration for the /v1/update API endpoint.
-	// If zero, DefaultUpdateTimeout is used.
-	UpdateTimeout time.Duration
 }
 
 // BuildUpdateParams returns the complete UpdateParams snapshot for HTTP-triggered updates.

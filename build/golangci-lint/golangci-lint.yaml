@@ -142,7 +142,6 @@ linters:
     - dogsled # Checks assignments with too many blank identifiers (e.g. x, _, _, _, := f()).
     - dupl # Detects duplicate fragments of code.
     - durationcheck # Check for two durations multiplied together.
-    - embeddedstructfieldcheck # Embedded types should be at the top of the field list of a struct, and there must be an empty line separating embedded fields from regular fields.
     - errchkjson # Checks types passed to the json encoding functions. Reports unsupported types and reports occurrences where the check for the returned error can be omitted.
     - errname # Checks that sentinel errors are prefixed with the `Err` and error types are suffixed with the `Error`.
     - errcheck # Errcheck is a program for checking for unchecked errors in Go code. These unchecked errors can be critical bugs in some cases.
@@ -193,6 +192,7 @@ linters:
     - arangolint # Opinionated best practices for arangodb client.
     - cyclop # Checks function and package cyclomatic complexity.
     - depguard # Checks if package imports are in a list of acceptable packages.
+    - embeddedstructfieldcheck # Embedded types should be at the top of the field list of a struct. Disabled because betteralign decides field order.
     - exhaustruct # Checks if all structure fields are initialized.
     - funlen # Checks for long functions.
     - ginkgolinter # Enforces standards of using ginkgo and gomega.

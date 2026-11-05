@@ -117,12 +117,12 @@ func (s Snapshot) size() int64 {
 //
 // The zero value is ready to use.
 type Pending struct {
-	// mu protects snapshots and bytes.
-	mu sync.Mutex
 	// snapshots stores labeled file snapshots keyed by the source container ID.
 	snapshots map[types.ContainerID]Snapshot
 	// bytes is the total size of archives currently held in snapshots.
 	bytes int64
+	// mu protects snapshots and bytes.
+	mu sync.Mutex
 }
 
 // Store records a snapshot if it fits in the in-flight byte cap.

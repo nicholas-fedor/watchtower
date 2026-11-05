@@ -47,12 +47,12 @@ var (
 //
 //nolint:godox
 type emailTypeNotifier struct {
+	log                    *zerolog.Logger
 	From, To               string        // Sender and recipient email addresses.
 	Server, User, Password string        // SMTP server details.
 	Port                   int           // SMTP server port.
-	tlsSkipVerify          bool          // Skip TLS verification if true.
 	delay                  time.Duration // Delay for batching notifications.
-	log                    *zerolog.Logger
+	tlsSkipVerify          bool          // Skip TLS verification if true.
 }
 
 // New creates an email notifier from resolved legacy settings.

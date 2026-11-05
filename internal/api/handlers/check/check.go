@@ -22,16 +22,15 @@ import (
 //
 // This endpoint never pulls an image, so the latest* fields are always empty.
 type ContainerCheck struct {
+	Timestamp            time.Time `json:"timestamp"`
 	Name                 string    `json:"name"`
 	Image                string    `json:"image"`
 	ImageID              string    `json:"image_id"`
 	Digest               string    `json:"digest"`
-	UpdateAvailable      bool      `json:"update_available"`
 	LatestImageID        string    `json:"latest_image_id"`
 	GitCommit            string    `json:"git_commit,omitempty"`
 	LatestDigest         string    `json:"latest_digest"`
 	Error                string    `json:"error,omitempty"`
-	Timestamp            time.Time `json:"timestamp"`
 	UpdateSource         string    `json:"update_source,omitempty"`
 	GitRepo              string    `json:"git_repo,omitempty"`
 	GitRef               string    `json:"git_ref,omitempty"`
@@ -43,16 +42,17 @@ type ContainerCheck struct {
 	CurrentImageRevision string    `json:"current_revision,omitempty"`
 	LatestImageVersion   string    `json:"latest_image_version,omitempty"`
 	LatestImageRevision  string    `json:"latest_revision,omitempty"`
+	UpdateAvailable      bool      `json:"update_available"`
 }
 
 // CheckResponse is the response returned by POST /v1/check.
 //
 // Parameters/returns are documented by the handler's Swagger annotations.
 type CheckResponse struct {
-	Containers []ContainerCheck `json:"containers"`
-	Count      int              `json:"count"`
 	Timestamp  string           `json:"timestamp"`
 	APIVersion string           `json:"api_version"`
+	Containers []ContainerCheck `json:"containers"`
+	Count      int              `json:"count"`
 }
 
 // CheckFunc performs the update availability check for all watched containers.

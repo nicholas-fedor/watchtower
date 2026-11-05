@@ -15,8 +15,9 @@ import (
 type Handler struct {
 	log *zerolog.Logger
 
-	Path    string
 	getHist func(*time.Time, *time.Time, int) []metrics.HistoryEntry
+
+	Path string
 }
 
 // New creates a new history handler backed by the given function.

@@ -30,8 +30,23 @@ type Policy struct {
 
 // Update holds the process-wide container update settings.
 type Update struct {
+	// DiskSpaceMax is the raw --disk-space-max / WATCHTOWER_DISK_SPACE_MAX value.
+	DiskSpaceMax string
+	// DiskSpaceWarn is the raw --disk-space-warn / WATCHTOWER_DISK_SPACE_WARN value.
+	DiskSpaceWarn string
 	// Policy holds the settings that a container's labels can override.
 	Policy
+	// StopTimeout is the maximum duration for container stop before a forceful kill
+	// (--stop-timeout / WATCHTOWER_TIMEOUT).
+	StopTimeout time.Duration
+	// PullFailureDelay is the delay after a failed Watchtower self-update pull in run-once mode.
+	PullFailureDelay time.Duration
+	// DiskSpaceMaxBytes is the parsed Docker image-usage block threshold in bytes.
+	// Zero means the block gate is unset.
+	DiskSpaceMaxBytes int64
+	// DiskSpaceWarnBytes is the parsed Docker image-usage warning threshold in bytes.
+	// Zero means the warning threshold is unset.
+	DiskSpaceWarnBytes int64
 
 	// Cleanup removes previously used images after updating
 	// (--cleanup / WATCHTOWER_CLEANUP).
@@ -42,25 +57,10 @@ type Update struct {
 	// RollingRestart updates containers sequentially rather than all at once
 	// (--rolling-restart / WATCHTOWER_ROLLING_RESTART).
 	RollingRestart bool
-	// StopTimeout is the maximum duration for container stop before a forceful kill
-	// (--stop-timeout / WATCHTOWER_TIMEOUT).
-	StopTimeout time.Duration
 	// UseComposeDependsOn honors Docker Compose depends_on labels for stop/start order
 	// (--use-compose-depends-on / WATCHTOWER_USE_COMPOSE_DEPENDS_ON).
 	UseComposeDependsOn bool
 	// EphemeralSelfUpdate uses a short-lived orchestrator container for Watchtower self-update
 	// (--ephemeral-self-update / WATCHTOWER_EPHEMERAL_SELF_UPDATE).
 	EphemeralSelfUpdate bool
-	// PullFailureDelay is the delay after a failed Watchtower self-update pull in run-once mode.
-	PullFailureDelay time.Duration
-	// DiskSpaceMax is the raw --disk-space-max / WATCHTOWER_DISK_SPACE_MAX value.
-	DiskSpaceMax string
-	// DiskSpaceWarn is the raw --disk-space-warn / WATCHTOWER_DISK_SPACE_WARN value.
-	DiskSpaceWarn string
-	// DiskSpaceMaxBytes is the parsed Docker image-usage block threshold in bytes.
-	// Zero means the block gate is unset.
-	DiskSpaceMaxBytes int64
-	// DiskSpaceWarnBytes is the parsed Docker image-usage warning threshold in bytes.
-	// Zero means the warning threshold is unset.
-	DiskSpaceWarnBytes int64
 }

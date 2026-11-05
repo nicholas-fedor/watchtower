@@ -23,6 +23,8 @@ type ContainerDetails struct {
 	ImageID string `json:"image_id"`
 	// Digest is the registry manifest digest (sha256:...).
 	Digest string `json:"digest"`
+	// Scope is the monitoring scope of the container.
+	Scope string `json:"scope"`
 	// Running indicates whether the container is currently running.
 	Running bool `json:"running"`
 	// Watchtower indicates whether this is the Watchtower container itself.
@@ -35,8 +37,6 @@ type ContainerDetails struct {
 	Enabled bool `json:"enabled"`
 	// Stale indicates whether the container's image is outdated.
 	Stale bool `json:"stale"`
-	// Scope is the monitoring scope of the container.
-	Scope string `json:"scope"`
 }
 
 // GetFunc returns detailed container status for all watched containers.

@@ -14,7 +14,6 @@ type porcelainContainer struct {
 	ImageID              string `json:"image_id"`
 	LatestImageID        string `json:"latest_image_id"`
 	State                string `json:"state"`
-	UpdateAvailable      bool   `json:"update_available"`
 	Error                string `json:"error,omitempty"`
 	GitRepo              string `json:"git_repo,omitempty"`
 	GitRef               string `json:"git_ref,omitempty"`
@@ -26,6 +25,7 @@ type porcelainContainer struct {
 	LatestImageVersion   string `json:"latest_image_version,omitempty"`
 	CurrentImageRevision string `json:"current_revision,omitempty"`
 	LatestImageRevision  string `json:"latest_revision,omitempty"`
+	UpdateAvailable      bool   `json:"update_available"`
 }
 
 // porcelainReport is the top-level JSON structure for --porcelain json.

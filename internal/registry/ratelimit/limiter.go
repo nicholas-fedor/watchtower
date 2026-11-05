@@ -14,22 +14,22 @@ import (
 type hostState struct {
 	// cooldownUntil is when the next request to this host may proceed.
 	cooldownUntil time.Time
+	// recoverAt is when the pacing that follows a 429 ends. Zero when the host
+	// is not recovering from a throttle.
+	recoverAt time.Time
+	// lastRefill is when tokens were last replenished.
+	lastRefill time.Time
 	// allowed is the advertised fill rate numerator. Zero when unknown.
 	allowed int
 	// window is the period for allowed. Zero when unknown.
 	window time.Duration
 	// burst is the maximum tokens held. Zero uses the advertised allowance.
 	burst int
-	// recoverAt is when the pacing that follows a 429 ends. Zero when the host
-	// is not recovering from a throttle.
-	recoverAt time.Time
+	// tokens is the remaining budget in the current window.
+	tokens float64
 	// synthesized reports that allowed and window come from a cooldown rather
 	// than a quota the registry advertised.
 	synthesized bool
-	// tokens is the remaining budget in the current window.
-	tokens float64
-	// lastRefill is when tokens were last replenished.
-	lastRefill time.Time
 }
 
 // Limiter paces registry requests per host and retries the ones a registry
@@ -40,18 +40,18 @@ type hostState struct {
 // go through the same Limiter, so a process uses one Limiter for all of its
 // registry traffic.
 type Limiter struct {
-	// hostsMu guards hostStates.
-	hostsMu sync.Mutex
 	// hostStates holds the cooldown and token budget of each host.
 	hostStates map[string]*hostState
-	// serialMu guards serialSlots.
-	serialMu sync.Mutex
 	// serialSlots holds the one-at-a-time slot of each serialized limiter key.
 	serialSlots map[string]chan struct{}
 	// retryElapsed bounds how long one operation keeps honoring a usable Retry-After.
 	retryElapsed time.Duration
 	// bucketRetryElapsed bounds how long one operation keeps retrying token-bucket 429s.
 	bucketRetryElapsed time.Duration
+	// hostsMu guards hostStates.
+	hostsMu sync.Mutex
+	// serialMu guards serialSlots.
+	serialMu sync.Mutex
 }
 
 const (

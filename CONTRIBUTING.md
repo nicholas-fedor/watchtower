@@ -63,6 +63,13 @@ task lint
 ```
 
 This runs Golangci-lint with the project configuration and applies automatic fixes where possible (for example, `modernize` rewrites).
+It also checks struct field order with [betteralign](https://github.com/dkorunic/betteralign), which can be installed with:
+
+```bash
+go install github.com/dkorunic/betteralign/cmd/betteralign@latest
+```
+
+A struct whose field order must stay fixed, such as one that mirrors an external binary layout, opts out with a `// betteralign:ignore` comment on its opening-brace line.
 To check for issues without modifying any files, run:
 
 ```bash
@@ -71,7 +78,7 @@ task lint:check
 
 ## Formatting
 
-Golangci-lint can also be used to format the codebase:
+The following task formats the codebase with Golangci-lint and orders struct fields with betteralign to reduce padding:
 
 ```bash
 task fmt

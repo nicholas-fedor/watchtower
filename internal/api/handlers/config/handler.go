@@ -11,6 +11,10 @@ import (
 
 // ConfigData represents the active Watchtower configuration exposed via the API.
 type ConfigData struct {
+	// FilterDesc is a human-readable description of the applied filter.
+	FilterDesc string `json:"filter_desc"`
+	// Scope is the monitoring scope.
+	Scope string `json:"scope"`
 	// MonitorOnly indicates whether Watchtower is in monitor-only mode.
 	MonitorOnly bool `json:"monitor_only"`
 	// Cleanup indicates whether old images are removed after updating.
@@ -29,10 +33,6 @@ type ConfigData struct {
 	LifecycleHooks bool `json:"lifecycle_hooks"`
 	// LabelEnable indicates whether label-based enabling is active.
 	LabelEnable bool `json:"label_enable"`
-	// FilterDesc is a human-readable description of the applied filter.
-	FilterDesc string `json:"filter_desc"`
-	// Scope is the monitoring scope.
-	Scope string `json:"scope"`
 	// GitEnable is the process-wide Git watcher default.
 	GitEnable bool `json:"git_enable"`
 }

@@ -22,11 +22,11 @@ var sharedDaemonInfoCache = &daemonInfoCache{}
 
 // daemonInfoCache holds one Docker Info snapshot for concurrent check/pull paths.
 type daemonInfoCache struct {
-	mu       sync.Mutex
-	info     *dockerSystem.Info
 	expires  time.Time
-	fetched  bool
+	info     *dockerSystem.Info
 	inflight chan struct{}
+	mu       sync.Mutex
+	fetched  bool
 }
 
 // daemonInfoResult is the outcome of one Docker Info fetch.

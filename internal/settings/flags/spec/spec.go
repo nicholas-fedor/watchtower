@@ -47,30 +47,30 @@ const (
 // Default must be the static default (not env-baked). EnvKeys lists explicit
 // environment variable names (supports irregular mappings).
 type FlagSpec struct {
+	// Default is the static default value.
+	Default any
 	// Name is the long flag name (e.g. "stop-timeout").
 	Name string
 	// Shorthand is an optional single-letter flag.
 	Shorthand string
+	// Help is the flag help text.
+	Help string
+	// Deprecated is a non-empty migration hint when the flag is deprecated.
+	Deprecated string
+	// EnvKeys are environment variable names bound to this flag.
+	EnvKeys []string
 	// Kind selects the pflag type.
 	Kind FlagKind
-	// Default is the static default value.
-	Default any
 	// Min is the smallest value an integer setting accepts. The zero value
 	// rejects negative values.
 	Min int
 	// Max is the largest value an integer setting accepts. The zero value sets
 	// no upper bound.
 	Max int
-	// EnvKeys are environment variable names bound to this flag.
-	EnvKeys []string
-	// Help is the flag help text.
-	Help string
-	// Deprecated is a non-empty migration hint when the flag is deprecated.
-	Deprecated string
-	// Hidden hides the flag from help when true.
-	Hidden bool
 	// ListParse selects multi-value parsing for string list kinds.
 	ListParse ListParseKind
+	// Hidden hides the flag from help when true.
+	Hidden bool
 }
 
 // Errors for setting values outside their range.

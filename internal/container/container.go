@@ -33,18 +33,18 @@ func nopLog() *zerolog.Logger {
 //
 
 type Container struct {
-	mu                 sync.RWMutex                     // Protects concurrent access to mutable fields
-	LinkedToRestarting bool                             // Indicates if linked to a restarting container
-	Stale              bool                             // Marks the container as having an outdated image
-	OldImageID         types.ImageID                    // Stores the image ID before update for cleanup tracking
-	normalizedName     string                           // Cached normalized container name
-	imageName          string                           // Cached resolved image name with tag
-	containerInfo      *dockerContainer.InspectResponse // Docker container metadata
-	imageInfo          *dockerImage.InspectResponse     // Docker image metadata
+	containerInfo *dockerContainer.InspectResponse // Docker container metadata
+	imageInfo     *dockerImage.InspectResponse     // Docker image metadata
 	// log is the process logger for operational Warn/Error/Debug on this instance.
 	// Set at construction (client list/get). Nil falls back to nopLog() so interface
 	// methods never panic. Production paths always set a real logger.
-	log *zerolog.Logger
+	log                *zerolog.Logger
+	OldImageID         types.ImageID // Stores the image ID before update for cleanup tracking
+	normalizedName     string        // Cached normalized container name
+	imageName          string        // Cached resolved image name with tag
+	mu                 sync.RWMutex  // Protects concurrent access to mutable fields
+	LinkedToRestarting bool          // Indicates if linked to a restarting container
+	Stale              bool          // Marks the container as having an outdated image
 }
 
 // NewContainer creates a new Container instance with the specified metadata.

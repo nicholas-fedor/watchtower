@@ -26,24 +26,25 @@ type StartupParams struct {
 	// ScheduleInfo holds run-once, update-on-start, HTTP API, and next-run schedule values.
 	ScheduleInfo
 
-	// Logger is the zerolog logger used for startup messages. Required when NoStartupMessage is false.
-	Logger *zerolog.Logger
-	// NoStartupMessage suppresses all startup logs and notifications when true.
-	NoStartupMessage bool
-	// Filtering is a human-readable description of the container filter.
-	Filtering string
-	// Scope is the operational scope name, or empty when unset.
-	Scope string
 	// Client is the Docker client used for API version reporting.
 	Client APIVersionProvider
 	// Notifier sends batched startup messages when not suppressed.
 	Notifier types.Notifier
+
+	// Logger is the zerolog logger used for startup messages. Required when NoStartupMessage is false.
+	Logger *zerolog.Logger
+	// Filtering is a human-readable description of the container filter.
+	Filtering string
+	// Scope is the operational scope name, or empty when unset.
+	Scope string
 	// Version is the Watchtower version string.
 	Version string
 	// DiskSpaceMaxBytes is the parsed Docker image-usage block threshold, or 0 if unset.
 	DiskSpaceMaxBytes int64
 	// DiskSpaceWarnBytes is the parsed Docker image-usage warning threshold, or 0 if unset.
 	DiskSpaceWarnBytes int64
+	// NoStartupMessage suppresses all startup logs and notifications when true.
+	NoStartupMessage bool
 }
 
 // WriteStartupMessage logs or notifies startup information from resolved configuration.
@@ -156,16 +157,16 @@ func logNotifierInfo(log *zerolog.Logger, notifierNames []string) {
 //
 // Values come from settings.Load projections rather than CLI flag reads.
 type ScheduleInfo struct {
-	// RunOnce indicates a single update run then exit.
-	RunOnce bool
+	// Sched is the time of the first scheduled run, or zero if none.
+	Sched time.Time
 	// UpdateOnStart is the effective update-on-start value, or nil when unset or false.
 	UpdateOnStart *bool
+	// RunOnce indicates a single update run then exit.
+	RunOnce bool
 	// HTTPAPIUpdate is true when the HTTP update API is enabled.
 	HTTPAPIUpdate bool
 	// HTTPAPIPeriodicPolls is true when scheduled polls run with the HTTP API.
 	HTTPAPIPeriodicPolls bool
-	// Sched is the time of the first scheduled run, or zero if none.
-	Sched time.Time
 }
 
 // logScheduleInfo logs information about the scheduling or run mode configuration.

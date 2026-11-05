@@ -26,29 +26,29 @@ import (
 // Update carries the full types.UpdateParams snapshot from config.UpdateParams
 // (or an equivalent complete construction).
 type RunUpdatesWithNotificationsParams struct {
-	// Logger is the process logger for this update session. Required and must be non-nil.
-	Logger *zerolog.Logger
 	// Client is the Docker client for container operations.
 	Client containerClient.Client
+	// Notifier sends update status messages to configured channels.
+	Notifier types.Notifier
+	// Logger is the process logger for this update session. Required and must be non-nil.
+	Logger *zerolog.Logger
 	// GitClient inspects remotes and clones repositories when the Git watcher is used.
 	GitClient *git.Client
 	// RateLimiter paces the session's registry requests. It must be the limiter
 	// Client uses, so release tag lookups share the client's registry budget.
 	RateLimiter *ratelimit.Limiter
-	// Notifier sends update status messages to configured channels.
-	Notifier types.Notifier
-	// NotificationSplitByContainer enables a separate notification per updated container.
-	NotificationSplitByContainer bool
-	// NotificationReport enables report-based notification templates.
-	NotificationReport bool
 	// EventBroadcaster publishes SSE events during the update session.
 	EventBroadcaster *events.Broadcaster
-	// Update is the complete update policy for this invocation (filter, cleanup, timeouts, etc.).
-	Update types.UpdateParams
 	// OnOldSelfDetected is called when Watchtower finds that it runs in an old
 	// instance's container, after that container's restart policy is disabled.
 	// The caller should stop the process. Nil means the session simply ends.
 	OnOldSelfDetected func()
+	// Update is the complete update policy for this invocation (filter, cleanup, timeouts, etc.).
+	Update types.UpdateParams
+	// NotificationSplitByContainer enables a separate notification per updated container.
+	NotificationSplitByContainer bool
+	// NotificationReport enables report-based notification templates.
+	NotificationReport bool
 }
 
 // reportedError marks an update error whose cause a phase has already logged
@@ -727,15 +727,15 @@ func sendSplitNotifications(log *zerolog.Logger, notifier types.Notifier,
 
 // notifyContainersParams groups inputs for notifyContainers.
 type notifyContainersParams struct {
-	log           *zerolog.Logger
 	notifier      types.Notifier
-	notified      map[string]bool
-	reports       []types.ContainerReport
 	result        types.Report
-	category      string
-	logBeforeSend bool
+	log           *zerolog.Logger
+	notified      map[string]bool
 	include       func(types.ContainerReport) bool
 	buildReport   func(types.ContainerReport, types.Report) *state.SingleContainerReport
+	category      string
+	reports       []types.ContainerReport
+	logBeforeSend bool
 }
 
 // notifyContainers sends per-container notifications for a report collection.

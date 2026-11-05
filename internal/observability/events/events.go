@@ -16,9 +16,9 @@ const (
 
 // Event represents a Watchtower operational event emitted to SSE subscribers.
 type Event struct {
-	Type      string    `json:"type"`
 	Timestamp time.Time `json:"timestamp"`
 	Data      any       `json:"data"`
+	Type      string    `json:"type"`
 }
 
 // ScanStartedData carries redacted scan policy flags for SSE subscribers.
@@ -94,8 +94,8 @@ type subscriber struct {
 
 // Broadcaster manages SSE subscriber registration and event distribution.
 type Broadcaster struct {
-	mu          sync.RWMutex
 	subscribers []*subscriber
+	mu          sync.RWMutex
 }
 
 // NewBroadcaster creates a new event broadcaster for distributing Watchtower

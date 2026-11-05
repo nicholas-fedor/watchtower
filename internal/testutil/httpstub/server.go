@@ -23,16 +23,16 @@ type Server struct {
 	tb testing.TB
 	// testServer is the underlying server.
 	testServer *httptest.Server
-	// mu guards the fields below.
-	mu sync.Mutex
 	// handlers holds the appended handlers in the order they answer requests.
 	handlers []http.HandlerFunc
-	// calls counts the appended handlers that have answered a request.
-	calls int
 	// routes holds the handlers that answer every request matching their route.
 	routes []route
 	// requests holds every request the server received, in arrival order.
 	requests []*http.Request
+	// calls counts the appended handlers that have answered a request.
+	calls int
+	// mu guards the fields below.
+	mu sync.Mutex
 	// allowUnhandled answers unhandled requests with 500 instead of failing
 	// the test.
 	allowUnhandled bool
@@ -40,12 +40,12 @@ type Server struct {
 
 // route is a handler for every request with a given method and path.
 type route struct {
-	// method is the request method the route matches.
-	method string
 	// path matches the request path.
 	path PathMatcher
 	// handler answers the matching requests.
 	handler http.HandlerFunc
+	// method is the request method the route matches.
+	method string
 }
 
 // New starts a server that serves HTTP and closes it when the test ends.

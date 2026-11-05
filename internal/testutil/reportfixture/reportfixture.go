@@ -20,8 +20,8 @@ import (
 
 // containerKind is how the containers of one state are numbered and named.
 type containerKind struct {
-	idPrefix   int    // Digits that start the container's ID after "c79".
 	nameFormat string // Name format with one %d verb for the one-based position.
+	idPrefix   int    // Digits that start the container's ID after "c79".
 }
 
 // Container ID prefixes of each state, ten apart so each state's containers

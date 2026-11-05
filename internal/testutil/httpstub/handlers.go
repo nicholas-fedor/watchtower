@@ -21,11 +21,11 @@ const jsonContentType = "application/json"
 
 // PathMatcher matches a request path for VerifyRequest and RouteToHandler.
 type PathMatcher struct {
+	// match reports whether a request path matches.
+	match func(path string) bool
 	// desc describes the expected path in failure messages, and identifies the
 	// matcher when a route replaces another.
 	desc string
-	// match reports whether a request path matches.
-	match func(path string) bool
 }
 
 // Path matches a request path equal to path.

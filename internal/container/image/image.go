@@ -129,10 +129,10 @@ type Client struct {
 	log *zerolog.Logger
 	// daemonInfo shares Docker Info and mirrors across check and pull paths.
 	daemonInfo *daemonInfoCache
-	// registrySettings holds the settings for registry requests.
-	registrySettings registryConfig.Registry
 	// rateLimiter paces pulls, digest checks, and image age requests per registry host.
 	rateLimiter *ratelimit.Limiter
+	// registrySettings holds the settings for registry requests.
+	registrySettings registryConfig.Registry
 }
 
 // NewClient creates a new Client instance.

@@ -288,8 +288,8 @@ func update(
 
 	// Prepare containers for staleness checks, skipping already-processed ones.
 	type checkTask struct {
-		index     int
 		container types.Container
+		index     int
 	}
 
 	var checkTasks []checkTask

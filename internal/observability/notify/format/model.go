@@ -27,8 +27,8 @@ type Entry struct {
 type Data struct {
 	StaticData
 
-	Entries []*Entry
 	Report  types.Report
+	Entries []*Entry
 }
 
 // LevelString converts a zerolog level to the legacy template string.

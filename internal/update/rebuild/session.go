@@ -36,13 +36,13 @@ var _ Applier = (*composeApply.Client)(nil)
 
 // Session holds watcher results for one Update() invocation.
 type Session struct {
-	client   *git.Client
 	apply    Applier
+	client   *git.Client
 	checkout func(ctx context.Context, dir, commit string, opts project.CheckoutOptions) error
-	mu       sync.Mutex
 	results  map[types.ContainerID]git.CheckResult
 	built    map[types.ContainerID]types.ImageID
 	applied  map[types.ContainerID]struct{}
+	mu       sync.Mutex
 }
 
 // NewSession constructs an empty session for one Update() call.

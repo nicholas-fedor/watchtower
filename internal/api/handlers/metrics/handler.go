@@ -56,8 +56,9 @@ func (h *Handler) Handle(c fiber.Ctx) error {
 type StatusHandler struct {
 	log *zerolog.Logger
 
-	Path    string
 	getLast func() *metrics.HistoryEntry
+
+	Path string
 }
 
 // NewStatusHandler creates a new status handler that returns the last scan

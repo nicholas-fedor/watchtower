@@ -24,15 +24,15 @@ import (
 
 // Options configures a Git watcher client. Credentials stay here, not on [gitConfig.Defaults].
 type Options struct {
+	Hosts           map[string]string
 	Token           string
 	Username        string
 	Password        string
 	SSHKeyPath      string
 	SSHKnownHosts   string
-	Timeout         time.Duration
 	CABundle        []byte
+	Timeout         time.Duration
 	InsecureSkipTLS bool
-	Hosts           map[string]string
 }
 
 // CheckRequest is a remote staleness query for one associated container.
@@ -47,24 +47,24 @@ type CheckRequest struct {
 
 // CheckResult is the outcome of a remote Git check.
 type CheckResult struct {
-	Stale  bool
 	Commit string
 	Tag    string
 	Kind   string
 	// Ref is the branch or tag name used to clone (empty when unknown).
-	Ref string
+	Ref   string
+	Stale bool
 }
 
 // Client inspects remotes and clones repositories for Git-sourced updates.
 type Client struct {
-	log      *zerolog.Logger
-	opts     Options
-	http     *http.Client
 	lister   RefLister
+	log      *zerolog.Logger
+	http     *http.Client
 	origins  map[string]url.URL
-	mu       sync.Mutex
 	seen     map[string]seenStamp
 	rejected map[string]rejectedApply
+	opts     Options
+	mu       sync.Mutex
 }
 
 // seenStamp is a remote tip observed without rebuilding the running container.

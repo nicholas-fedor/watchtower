@@ -38,26 +38,12 @@ type router interface {
 // Uses mutex for thread-safe access to entries and sync.Once for idempotent operations.
 // Implements zerolog.Hook so log events are pushed via Run.
 type shoutrrrTypeNotifier struct {
-	Urls         []string              // Notification service URLs.
-	Router       router                // Router for sending messages.
-	entries      []*format.Entry       // Queued log entries.
-	entriesMutex sync.RWMutex          // Mutex for thread-safe access to entries.
-	logLevel     zerolog.Level         // Minimum log level for notifications.
-	template     *format.Template      // Template for message formatting.
-	messages     chan string           // Channel for message queuing.
-	done         chan struct{}         // Signal for send completion.
-	stop         chan struct{}         // Channel for stopping the notifier.
-	params       *shoutrrrTypes.Params // Notification parameters.
-	data         format.StaticData     // Static notification data.
-	// These fields must only be accessed via sync/atomic (e.g., atomic.Load/atomic.Store) to avoid data races.
-	receiving atomic.Bool   // Tracks if receiving logs.
-	delay     time.Duration // Delay between sends.
-	hookOnce  sync.Once     // Ensures RegisterHook executes only once.
-	closeOnce sync.Once     // Ensures Close executes only once.
-	// extractWarnOnce ensures the eventFieldMap failure warning is emitted only once.
-	extractWarnOnce sync.Once // Guards the first extraction failure warning.
-	// These fields must only be accessed via sync/atomic (e.g., atomic.Load/atomic.Store) to avoid data races.
-	closed atomic.Bool // Tracks if the notifier is closed.
+	Router   router                // Router for sending messages.
+	template *format.Template      // Template for message formatting.
+	messages chan string           // Channel for message queuing.
+	done     chan struct{}         // Signal for send completion.
+	stop     chan struct{}         // Channel for stopping the notifier.
+	params   *shoutrrrTypes.Params // Notification parameters.
 
 	// localLog is a child logger with notify=no for internal logging (loop prevention).
 	// Initialized at create time from the process logger and rebound in RegisterHook
@@ -65,7 +51,22 @@ type shoutrrrTypeNotifier struct {
 	// Still inherits hooks. Run short-circuits on notify=no (and fail-closed parse)
 	// before taking entriesMutex, so internal logs never re-enter the queue or deadlock.
 	// Concurrent application Logs are serialized only by entriesMutex on queue access.
-	localLog *zerolog.Logger
+	localLog     *zerolog.Logger
+	data         format.StaticData // Static notification data.
+	Urls         []string          // Notification service URLs.
+	entries      []*format.Entry   // Queued log entries.
+	delay        time.Duration     // Delay between sends.
+	entriesMutex sync.RWMutex      // Mutex for thread-safe access to entries.
+	hookOnce     sync.Once         // Ensures RegisterHook executes only once.
+	closeOnce    sync.Once         // Ensures Close executes only once.
+	// extractWarnOnce ensures the eventFieldMap failure warning is emitted only once.
+	extractWarnOnce sync.Once // Guards the first extraction failure warning.
+	// These fields must only be accessed via sync/atomic (e.g., atomic.Load/atomic.Store) to avoid data races.
+	receiving atomic.Bool // Tracks if receiving logs.
+	// These fields must only be accessed via sync/atomic (e.g., atomic.Load/atomic.Store) to avoid data races.
+	closed atomic.Bool // Tracks if the notifier is closed.
+
+	logLevel zerolog.Level // Minimum log level for notifications.
 }
 
 // getScheme extracts the scheme from a Shoutrrr URL.
