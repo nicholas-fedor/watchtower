@@ -2984,7 +2984,7 @@
 Shoutrrr's own messages, such as a warning that a service sends without TLS, go to Watchtower's log at their level.</p>
 </div>
 <h2 id="split_by_container">Split by Container<a class="headerlink" href="#split_by_container" title="Permanent link">&para;</a></h2>
-<p>Send separate notifications for each updated container instead of grouping them.</p>
+<p>Send a separate notification for each container instead of grouping them.</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-6-1" name="__codelineno-6-1" href="#__codelineno-6-1"></a>            Argument: --notification-split-by-container
 <a id="__codelineno-6-2" name="__codelineno-6-2" href="#__codelineno-6-2"></a>Environment Variable: WATCHTOWER_NOTIFICATION_SPLIT_BY_CONTAINER
 <a id="__codelineno-6-3" name="__codelineno-6-3" href="#__codelineno-6-3"></a>                Type: Boolean
@@ -2994,7 +2994,13 @@ Shoutrrr's own messages, such as a warning that a service sends without TLS, go 
 <p class="admonition-title">Note</p>
 <ul>
 <li>By default, notifications are grouped for all updated containers in a single session.</li>
-<li>When split notifications is enabled, a separate notification is sent for each container update event.</li>
+<li>When split notifications is enabled, a separate notification is sent for each of these containers:<ul>
+<li>a container that was updated or restarted</li>
+<li>a container whose update failed</li>
+<li>a monitor-only container with a newer image</li>
+<li>a container skipped during its update cooldown</li>
+</ul>
+</li>
 </ul>
 </div>
 
@@ -3019,7 +3025,7 @@ Shoutrrr's own messages, such as a warning that a service sends without TLS, go 
     <span class="md-icon" title="Last update">
       <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M21 13.1c-.1 0-.3.1-.4.2l-1 1 2.1 2.1 1-1c.2-.2.2-.6 0-.8l-1.3-1.3c-.1-.1-.2-.2-.4-.2m-1.9 1.8-6.1 6V23h2.1l6.1-6.1zM12.5 7v5.2l4 2.4-1 1L11 13V7zM11 21.9c-5.1-.5-9-4.8-9-9.9C2 6.5 6.5 2 12 2c5.3 0 9.6 4.1 10 9.3-.3-.1-.6-.2-1-.2s-.7.1-1 .2C19.6 7.2 16.2 4 12 4c-4.4 0-8 3.6-8 8 0 4.1 3.1 7.5 7.1 7.9l-.1.2z"/></svg>
     </span>
-    <span class="git-revision-date-localized-plugin git-revision-date-localized-plugin-timeago" title="November 4, 2026 03:39:09 UTC"><span class="timeago" datetime="2026-11-04T03:39:09+00:00" locale="en"></span></span><span class="git-revision-date-localized-plugin git-revision-date-localized-plugin-iso_date" title="November 4, 2026 03:39:09 UTC">2026-11-04</span>
+    <span class="git-revision-date-localized-plugin git-revision-date-localized-plugin-timeago" title="November 5, 2026 12:32:43 UTC"><span class="timeago" datetime="2026-11-05T12:32:43+00:00" locale="en"></span></span><span class="git-revision-date-localized-plugin git-revision-date-localized-plugin-iso_date" title="November 5, 2026 12:32:43 UTC">2026-11-05</span>
   </span>
 
     
