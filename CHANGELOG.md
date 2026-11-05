@@ -10,6 +10,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Name a failed pre-update command once in its error by @nicholas-fedor in [#3471](https://github.com/nicholas-fedor/watchtower/pull/3471)
 - Capture lifecycle hook output safely by @nicholas-fedor in [#3466](https://github.com/nicholas-fedor/watchtower/pull/3466)
 - Send split notifications for failed updates by @nicholas-fedor in [#3464](https://github.com/nicholas-fedor/watchtower/pull/3464)
 - Give every split notification report the same session context by @nicholas-fedor in [#3460](https://github.com/nicholas-fedor/watchtower/pull/3460)
