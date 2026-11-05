@@ -96,7 +96,7 @@ func Specs() []spec.FlagSpec {
 			Kind:    spec.KindBool,
 			Default: false,
 			EnvKeys: []string{"WATCHTOWER_NOTIFICATION_SPLIT_BY_CONTAINER"},
-			Help:    "Send separate notifications for each updated container instead of grouping them",
+			Help:    "Send a separate notification for each container instead of grouping them",
 		},
 
 		{

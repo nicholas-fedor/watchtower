@@ -97,7 +97,7 @@ Flags:
       --notification-slack-icon-emoji string        An emoji code string to use in place of the default icon (DEPRECATED: Use --notification-url with a slack:// or discord:// URL.)
       --notification-slack-icon-url string          An icon image URL string to use in place of the default icon (DEPRECATED: Use --notification-url with a slack:// or discord:// URL.)
       --notification-slack-identifier string        A string which will be used to identify the messages coming from this watchtower instance (default "watchtower") (DEPRECATED: Use --notification-url with a slack:// or discord:// URL.)
-      --notification-split-by-container             Send separate notifications for each updated container instead of grouping them
+      --notification-split-by-container             Send a separate notification for each container instead of grouping them
       --notification-template string                The shoutrrr text/template for the messages
       --notification-template-file string           Path to a file containing the Shoutrrr text/template for the messages
       --notification-title-tag string               Title prefix tag for notifications

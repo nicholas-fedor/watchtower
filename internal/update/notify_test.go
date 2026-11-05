@@ -2082,43 +2082,81 @@ func TestSendSplitNotifications_CooldownSkipped(t *testing.T) {
 	}
 }
 
-// TestSendSplitNotifications_MonitorOnlyStale verifies that a split
-// notification for a monitor-only container with a newer image lists the
-// container as stale, as the session report does, in both split modes. The
-// container is the notification's focus. The default template lists it as
-// stale and does not report it as updated.
-func TestSendSplitNotifications_MonitorOnlyStale(t *testing.T) {
+// TestSendSplitNotifications_OwnNotification verifies that stale and failed containers get their own notification.
+//
+// The stale container is monitor-only with a newer image. Each row runs in both
+// modes. The notification's report is the one NewSingleContainerReport builds
+// for that container. The default template lists the container under its own
+// state and reports nothing as updated.
+func TestSendSplitNotifications_OwnNotification(t *testing.T) {
 	t.Parallel()
 
-	for _, notificationReport := range []bool{true, false} {
-		t.Run(fmt.Sprintf("notification report %t", notificationReport), func(t *testing.T) {
-			t.Parallel()
+	tests := []struct {
+		// focusOf returns the session category that holds the container.
+		focusOf func(types.Report) []types.ContainerReport
+		// want returns the lines the rendered notification must contain.
+		want func(focus types.ContainerReport) []string
+		name string
+		// states are the session's containers. Each one gets a notification.
+		states []state.State
+		// index is the position of the container's notification among the sent ones.
+		index int
+	}{
+		{
+			name:    "monitor-only container with a newer image",
+			states:  []state.State{state.StaleState},
+			focusOf: types.Report.Stale,
+			index:   0,
+			want: func(focus types.ContainerReport) []string {
+				return []string{"0 Updated", "- " + focus.Name() + " (" + focus.ImageName() + "): Stale"}
+			},
+		},
+		{
+			name:    "failed container after an updated one",
+			states:  []state.State{state.UpdatedState, state.FailedState},
+			focusOf: types.Report.Failed,
+			index:   1,
+			want: func(focus types.ContainerReport) []string {
+				return []string{
+					"0 Updated",
+					"1 Failed",
+					"- " + focus.Name() + " (" + focus.ImageName() + "): Failed: " + focus.Error(),
+				}
+			},
+		},
+	}
 
-			log := newTestLogger(t)
+	for _, tt := range tests {
+		for _, notificationReport := range []bool{true, false} {
+			t.Run(fmt.Sprintf("%s notification report %t", tt.name, notificationReport), func(t *testing.T) {
+				t.Parallel()
 
-			session := reportfixture.Report(state.StaleState)
-			monitored := session.Stale()[0]
+				log := newTestLogger(t)
 
-			notifier := mockUpdate.NewMockNotifier(t)
-			notifier.EXPECT().ShouldSendNotification(mock.Anything).Return(true).Once()
+				session := reportfixture.Report(tt.states...)
+				focus := tt.focusOf(session)[0]
 
-			var sent types.Report
+				notifier := mockUpdate.NewMockNotifier(t)
+				notifier.EXPECT().ShouldSendNotification(mock.Anything).Return(true).Times(len(tt.states))
 
-			notifier.EXPECT().SendNotification(mock.Anything).
-				Run(func(report types.Report) { sent = report }).Once()
+				var sent []types.Report
 
-			sendSplitNotifications(log, notifier, notificationReport, session, nil)
+				notifier.EXPECT().SendNotification(mock.Anything).
+					Run(func(report types.Report) { sent = append(sent, report) }).Times(len(tt.states))
 
-			single, ok := sent.(*state.SingleContainerReport)
-			require.True(t, ok)
-			assert.Same(t, monitored, single.Focus)
-			assert.Equal(t, state.NewSingleContainerReport(monitored, session), single)
+				sendSplitNotifications(log, notifier, notificationReport, session, nil)
 
-			rendered, err := format.Default(false).Render(log, format.Data{Report: sent})
-			require.NoError(t, err)
-			assert.Contains(t, rendered, "0 Updated")
-			assert.NotContains(t, rendered, "updated to")
-			assert.Contains(t, rendered, "- "+monitored.Name()+" ("+monitored.ImageName()+"): Stale")
-		})
+				require.Len(t, sent, len(tt.states))
+				assert.Equal(t, state.NewSingleContainerReport(focus, session), sent[tt.index])
+
+				rendered, err := format.Default(false).Render(log, format.Data{Report: sent[tt.index]})
+				require.NoError(t, err)
+				assert.NotContains(t, rendered, "updated to")
+
+				for _, line := range tt.want(focus) {
+					assert.Contains(t, rendered, line)
+				}
+			})
+		}
 	}
 }

@@ -44,6 +44,9 @@ const (
 	// RateLimitRetriesExhausted is logged when a container's update check
 	// fails after every registry rate limit retry.
 	RateLimitRetriesExhausted = "Registry rate limit retries exhausted. Container failed for this cycle"
+	// ContainerUpdateFailed is logged when a container's stop, recreation or
+	// pre-update command fails while it is being updated.
+	ContainerUpdateFailed = "Could not update container"
 	// SelfUpdateSkippedRunOnce is logged when a run-once session leaves
 	// Watchtower's own container alone.
 	SelfUpdateSkippedRunOnce = "Skipping Watchtower self-update in run-once mode"

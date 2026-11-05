@@ -123,7 +123,7 @@ func (m Progress) UpdateFailed(log *zerolog.Logger, failures map[types.Container
 
 		update.containerError = err
 		update.state = FailedState
-		log.Warn().
+		log.Debug().
 			Err(err).
 			Str("container_id", containerID.ShortID()).
 			Str("name", update.Name()).

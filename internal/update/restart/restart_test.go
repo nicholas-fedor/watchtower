@@ -17,7 +17,9 @@ import (
 	dockerNetwork "github.com/moby/moby/api/types/network"
 
 	mockContainerClient "github.com/nicholas-fedor/watchtower/internal/container/client/mocks"
+	"github.com/nicholas-fedor/watchtower/internal/observability/logging"
 	"github.com/nicholas-fedor/watchtower/internal/testutil/logcapture"
+	"github.com/nicholas-fedor/watchtower/internal/testutil/reportfixture"
 	"github.com/nicholas-fedor/watchtower/internal/update/cleanup"
 	mockUpdate "github.com/nicholas-fedor/watchtower/internal/update/mocks"
 	updateParams "github.com/nicholas-fedor/watchtower/internal/update/params"
@@ -2171,4 +2173,49 @@ func TestClientErrorsNamedOnce(t *testing.T) {
 		require.Same(t, clientErr, err)
 		require.EqualError(t, err, text)
 	})
+}
+
+// TestRecordRestartOutcomes verifies that a failed restart is recorded and reported once.
+//
+// The failure is logged at error level with its container, image and error. A
+// deliberate skip is recorded as skipped and logs no failure.
+func TestRecordRestartOutcomes(t *testing.T) {
+	t.Parallel()
+
+	log, logBuf := logcapture.NewJSON(zerolog.DebugLevel)
+	nop := zerolog.Nop()
+
+	failing, failingImage := reportfixture.Container(0, state.FailedState)
+	skipping, skippingImage := reportfixture.Container(0, state.SkippedState)
+
+	progress := state.Progress{}
+	progress.AddScanned(&nop, failing, failingImage, updateParams.Params{})
+	progress.AddScanned(&nop, skipping, skippingImage, updateParams.Params{})
+
+	errFailed := errors.New("pre-update command failed: exit code 1")
+
+	recordRestartOutcomes(log, &progress, map[types.ContainerID]error{
+		failing.ID():  errFailed,
+		skipping.ID(): skipped(errors.New("pre-update command asked to skip")),
+	})
+
+	report := progress.Report(&nop)
+	require.Len(t, report.Failed(), 1)
+	assert.Equal(t, failing.ID(), report.Failed()[0].ID())
+	require.Len(t, report.Skipped(), 1)
+	assert.Equal(t, skipping.ID(), report.Skipped()[0].ID())
+
+	var failures []logcapture.Entry
+
+	for _, entry := range logcapture.Entries[logcapture.Entry](t, logBuf.String()) {
+		if entry["message"] == logging.ContainerUpdateFailed {
+			failures = append(failures, entry)
+		}
+	}
+
+	require.Len(t, failures, 1)
+	assert.Equal(t, "error", failures[0]["level"])
+	assert.Equal(t, failing.Name(), failures[0]["container"])
+	assert.Equal(t, failing.ImageName(), failures[0]["image"])
+	assert.Equal(t, errFailed.Error(), failures[0]["error"])
 }

@@ -374,3 +374,29 @@ func TestNotifier_Flush(t *testing.T) {
 		"Found new image: mock/app:latest (sha256:new)\nStopped stale container: app1 (unknown)",
 	}, sent)
 }
+
+// TestSendNotification_FailedFocusCarriesFailure verifies that a failure line travels with its split notification.
+//
+// With the legacy template the notification names the container and image and
+// gives the failure's cause.
+func TestSendNotification_FailedFocusCarriesFailure(t *testing.T) {
+	t.Parallel()
+
+	session := reportfixture.Report(state.FailedState)
+	failed := session.Failed()[0]
+
+	n := newBatchingNotifier(t, []*format.Entry{{
+		Message: logging.ContainerUpdateFailed,
+		Data: map[string]any{
+			"container": failed.Name(),
+			"image":     failed.ImageName(),
+			"error":     "pre-update command failed: exit code 1",
+		},
+	}})
+
+	n.SendNotification(state.NewSingleContainerReport(failed, session))
+
+	assert.Equal(t, []string{
+		"Update failed for " + failed.Name() + " (" + failed.ImageName() + "): pre-update command failed: exit code 1",
+	}, sentMessages(n))
+}

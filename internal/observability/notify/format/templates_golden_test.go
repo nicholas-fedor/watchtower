@@ -72,6 +72,7 @@ var legacyTemplateMessages = []string{
 	logging.StartingAPIServer,
 	logging.APIServerEnabled,
 	logging.RateLimitRetriesExhausted,
+	logging.ContainerUpdateFailed,
 	logging.UnresolvedDependsOn,
 	logging.SelfDependency,
 	logging.CircularDependency,
@@ -200,6 +201,12 @@ func goldenEntryData(message string) map[string]any {
 			"container": "app",
 			"image":     "org/app:latest",
 			"error":     "image pull: registry rate limited: retry-after 347.256µs allowed 44000 per 1m0s",
+		}
+	case logging.ContainerUpdateFailed:
+		return map[string]any{
+			"container": "app",
+			"image":     "org/app:latest",
+			"error":     "pre-update command failed: exit code 1",
 		}
 	case logging.UnresolvedDependsOn:
 		return map[string]any{"container": "app", "depends_on": "missing-db"}
