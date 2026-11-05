@@ -227,30 +227,22 @@ func RunUpdatesWithNotifications(
 		cleanedImages,
 	)
 
-	// Publish scan completed event
-	if params.EventBroadcaster != nil {
-		scanned, updated, failed, skipped := 0, 0, 0, 0
-		if result != nil {
-			scanned = len(result.Scanned())
-			updated = len(result.Updated())
-			failed = len(result.Failed())
-			skipped = len(result.Skipped())
-		}
+	metric = generateAndLogMetric(log, result)
 
+	if params.EventBroadcaster != nil {
 		params.EventBroadcaster.Publish(events.Event{
 			Type:      "scan_completed",
 			Timestamp: time.Now().UTC(),
 			Data: events.ScanCompletedData{
-				Scanned: scanned,
-				Updated: updated,
-				Failed:  failed,
-				Skipped: skipped,
+				Scanned: metric.Scanned,
+				Updated: metric.Updated,
+				Failed:  metric.Failed,
+				Skipped: metric.Skipped,
 			},
 		})
 	}
 
-	// Generate and return metric summarizing the session
-	return generateAndLogMetric(log, result)
+	return metric
 }
 
 // handleUpdateResult processes the result of an update operation and returns an appropriate metric.
@@ -291,7 +283,7 @@ func handleUpdateResult(log *zerolog.Logger, result types.Report, err error, not
 			return &metrics.Metric{ScanFailed: true}
 		}
 
-		metric := metrics.NewMetric(result)
+		metric := newScanMetric(result)
 		metric.ScanFailed = true
 
 		return metric
@@ -848,7 +840,7 @@ func notifySkippedCooldownContainers(
 // Returns:
 //   - *metrics.Metric: A pointer to a metric object summarizing the update session.
 func generateAndLogMetric(log *zerolog.Logger, result types.Report) *metrics.Metric {
-	metricResults := metrics.NewMetric(result)
+	metricResults := newScanMetric(result)
 
 	// Process log only. Session content was already notified via sendNotifications.
 	log.Info().
@@ -860,4 +852,21 @@ func generateAndLogMetric(log *zerolog.Logger, result types.Report) *metrics.Met
 		Msg("Update session completed")
 
 	return metricResults
+}
+
+// newScanMetric counts the containers in each category of a session report.
+//
+// Parameters:
+//   - report: The session report. It must not be nil.
+//
+// Returns:
+//   - *metrics.Metric: The session's counts, with ScanFailed unset.
+func newScanMetric(report types.Report) *metrics.Metric {
+	return &metrics.Metric{
+		Scanned:   len(report.Scanned()),
+		Updated:   len(report.Updated()),
+		Failed:    len(report.Failed()),
+		Restarted: len(report.Restarted()),
+		Skipped:   len(report.Skipped()),
+	}
 }
