@@ -1,6 +1,7 @@
 package state
 
 import (
+	"slices"
 	"sort"
 
 	"github.com/rs/zerolog"
@@ -24,12 +25,12 @@ type report struct {
 // This struct is used when the notification-split-by-container configuration option is enabled.
 // Unlike the standard report which groups all containers from a session, SingleContainerReport focuses
 // on a specific container while providing context from other containers in the session.
-// This allows notifications to be sent separately for each updated, restarted or cooldown-skipped container
-// while maintaining awareness of the overall session state.
+// This allows notifications to be sent separately for each updated, restarted, monitor-only stale or
+// cooldown-skipped container while maintaining awareness of the overall session state.
 //
 // Focus names the container the notification is about. The category lists
 // also carry other containers of the session as context. The focus cannot be
-// read from them.
+// read from them. [NewSingleContainerReport] builds the report from a session.
 type SingleContainerReport struct {
 	Focus            types.ContainerReport   // Container the notification is about
 	UpdatedReports   []types.ContainerReport // Updated containers
@@ -280,10 +281,49 @@ func (s sortableContainers) Less(i, j int) bool {
 	return s[i].ID() < s[j].ID()
 }
 
+// NewSingleContainerReport builds the split notification report for one
+// container of a session.
+//
+// The updated and restarted lists say what happened to focus. Each holds focus
+// when the session lists it there and is empty otherwise. The scanned, failed,
+// skipped, stale and fresh lists are the session's, the same context for every
+// split notification of the session. They include focus when the session lists
+// it in one of them.
+//
+// Parameters:
+//   - focus: The container the notification is about.
+//   - session: The full session report.
+//
+// Returns:
+//   - *SingleContainerReport: The report about focus with session context.
+func NewSingleContainerReport(focus types.ContainerReport, session types.Report) *SingleContainerReport {
+	report := &SingleContainerReport{
+		Focus:          focus,
+		ScannedReports: session.Scanned(),
+		FailedReports:  session.Failed(),
+		SkippedReports: session.Skipped(),
+		StaleReports:   session.Stale(),
+		FreshReports:   session.Fresh(),
+	}
+
+	// The session already sorted focus into one category.
+	switch {
+	case slices.Contains(session.Updated(), focus):
+		report.UpdatedReports = []types.ContainerReport{focus}
+	case slices.Contains(session.Restarted(), focus):
+		report.RestartedReports = []types.ContainerReport{focus}
+	default:
+		// Focus is not updated or restarted. The session's context lists hold it
+		// when the session lists it at all.
+	}
+
+	return report
+}
+
 // Scanned returns scanned containers.
 func (r *SingleContainerReport) Scanned() []types.ContainerReport { return r.ScannedReports }
 
-// Updated returns updated containers (only one for split notifications).
+// Updated returns updated containers (at most the focus for split notifications).
 func (r *SingleContainerReport) Updated() []types.ContainerReport { return r.UpdatedReports }
 
 // Failed returns failed containers.

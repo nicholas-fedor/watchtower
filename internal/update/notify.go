@@ -346,86 +346,6 @@ func endPanickedSession(
 	return &metrics.Metric{ScanFailed: true}
 }
 
-// buildSingleContainerReport creates a SingleContainerReport for a specific updated container.
-//
-// It populates the report with the updated container as the primary item and includes
-// all other session results (scanned, failed, skipped, stale, fresh) for comprehensive context.
-//
-// Parameters:
-//   - updatedContainer: The container that was updated.
-//   - result: The full session report containing all container statuses.
-//
-// Returns:
-//   - *state.SingleContainerReport: A report focused on the updated container with full session context.
-func buildSingleContainerReport(
-	updatedContainer types.ContainerReport,
-	result types.Report,
-) *state.SingleContainerReport {
-	return &state.SingleContainerReport{
-		Focus:          updatedContainer,
-		UpdatedReports: []types.ContainerReport{updatedContainer},
-		ScannedReports: result.Scanned(),
-		FailedReports:  result.Failed(),
-		SkippedReports: result.Skipped(),
-		StaleReports:   result.Stale(),
-		FreshReports:   result.Fresh(),
-	}
-}
-
-// buildSingleRestartedContainerReport creates a SingleContainerReport for a specific restarted container.
-//
-// It populates the report with the restarted container as the primary item and includes
-// all other session results (scanned, failed, skipped, stale, fresh) for comprehensive context.
-//
-// Parameters:
-//   - restartedContainer: The container that was restarted.
-//   - result: The full session report containing all container statuses.
-//
-// Returns:
-//   - *state.SingleContainerReport: A report focused on the restarted container with full session context.
-func buildSingleRestartedContainerReport(
-	restartedContainer types.ContainerReport,
-	result types.Report,
-) *state.SingleContainerReport {
-	return &state.SingleContainerReport{
-		Focus:            restartedContainer,
-		RestartedReports: []types.ContainerReport{restartedContainer},
-		ScannedReports:   result.Scanned(),
-		FailedReports:    result.Failed(),
-		SkippedReports:   result.Skipped(),
-		StaleReports:     result.Stale(),
-		FreshReports:     result.Fresh(),
-	}
-}
-
-// buildSingleStaleContainerReport creates a SingleContainerReport for a
-// monitor-only container with a newer image.
-//
-// The container is not updated, which keeps it out of the updated list. It
-// stays in the session's stale list, as in the full session report. It is also
-// the report's focus. The scanned, failed, skipped and fresh lists come from
-// the session.
-//
-// Parameters:
-//   - staleContainer: The monitor-only container with a newer image.
-//   - result: The full session report containing all container statuses.
-//
-// Returns:
-//   - *state.SingleContainerReport: A report focused on the stale container with session context.
-func buildSingleStaleContainerReport(
-	staleContainer types.ContainerReport,
-	result types.Report,
-) *state.SingleContainerReport {
-	return &state.SingleContainerReport{
-		Focus:          staleContainer,
-		ScannedReports: result.Scanned(),
-		FailedReports:  result.Failed(),
-		SkippedReports: result.Skipped(),
-		StaleReports:   result.Stale(),
-		FreshReports:   result.Fresh(),
-	}
-}
-
 // startNotifications initiates notification batching if a notifier is provided.
 //
 // It starts the notification process to group update messages, or logs a debug message
@@ -598,10 +518,13 @@ func sendNotifications(log *zerolog.Logger, notifier types.Notifier,
 
 // sendSplitNotifications handles sending notifications when split by container is enabled.
 //
-// It processes updated containers and sends either report-based or filtered entry notifications
-// based on the notificationReport flag, skipping invalid containers.
-// In both modes it also sends notifications for monitor-only containers from
-// the stale list.
+// It sends one notification for each of these containers:
+//   - an updated or restarted container
+//   - a monitor-only container with a newer image
+//   - a container skipped during its update cooldown
+//
+// The notificationReport flag picks report-based or filtered entry
+// notifications. Invalid containers are skipped.
 // To prevent duplicate notifications for the same container, a map is used to track
 // which container IDs have already been notified during this notification session.
 // This tracking mechanism ensures that even if a container appears in multiple lists
@@ -634,53 +557,15 @@ func sendSplitNotifications(log *zerolog.Logger, notifier types.Notifier,
 		Int("scanned_count", len(result.Scanned())).
 		Msg("Split notifications: container counts by category")
 
-	if notificationReport {
-		// Log updated containers for debugging
-		updatedNames := make([]string, 0, len(result.Updated()))
-		for _, report := range result.Updated() {
-			updatedNames = append(updatedNames, report.Name())
-		}
+	updatedNames := make([]string, 0, len(result.Updated()))
+	for _, report := range result.Updated() {
+		updatedNames = append(updatedNames, report.Name())
+	}
 
+	if notificationReport {
 		log.Debug().
 			Strs("updated_containers", updatedNames).
 			Msg("Split notifications: sending report notifications for updated containers")
-
-		notifyContainers(notifyContainersParams{
-			log:           log,
-			notifier:      notifier,
-			notified:      notified,
-			reports:       result.Updated(),
-			result:        result,
-			category:      "updated",
-			logBeforeSend: false,
-			include:       func(r types.ContainerReport) bool { return true },
-			buildReport:   buildSingleContainerReport,
-		})
-		notifyContainers(notifyContainersParams{
-			log:           log,
-			notifier:      notifier,
-			notified:      notified,
-			reports:       result.Restarted(),
-			result:        result,
-			category:      "restarted",
-			logBeforeSend: false,
-			include:       func(r types.ContainerReport) bool { return true },
-			buildReport:   buildSingleRestartedContainerReport,
-		})
-		notifyContainers(notifyContainersParams{
-			log:           log,
-			notifier:      notifier,
-			notified:      notified,
-			reports:       result.Stale(),
-			result:        result,
-			category:      "stale",
-			logBeforeSend: false,
-			include:       func(r types.ContainerReport) bool { return r.IsMonitorOnly() },
-			buildReport:   buildSingleStaleContainerReport,
-		})
-
-		// Cooldown-skipped containers use a different report shape and stay inline.
-		notifySkippedCooldownContainers(log, notifier, notified, result)
 	} else {
 		// Log-mode split: hook-captured entries are filtered by container inside
 		// SendNotification when the report is a SingleContainerReport.
@@ -698,50 +583,40 @@ func sendSplitNotifications(log *zerolog.Logger, notifier types.Notifier,
 				Msg(logging.RemovingImage)
 		}
 
-		updatedNames := make([]string, 0, len(result.Updated()))
-		for _, report := range result.Updated() {
-			updatedNames = append(updatedNames, report.Name())
-		}
-
 		log.Debug().
 			Strs("updated_containers", updatedNames).
 			Msg("Split notifications: sending per-container notifications (log mode)")
+	}
 
-		notifyContainers(notifyContainersParams{
-			log:           log,
-			notifier:      notifier,
-			notified:      notified,
-			reports:       result.Updated(),
-			result:        result,
-			category:      "updated",
-			logBeforeSend: true,
-			include:       func(r types.ContainerReport) bool { return true },
-			buildReport:   buildSingleContainerReport,
-		})
-		notifyContainers(notifyContainersParams{
-			log:           log,
-			notifier:      notifier,
-			notified:      notified,
-			reports:       result.Restarted(),
-			result:        result,
-			category:      "restarted",
-			logBeforeSend: true,
-			include:       func(r types.ContainerReport) bool { return true },
-			buildReport:   buildSingleRestartedContainerReport,
-		})
-		notifyContainers(notifyContainersParams{
-			log:           log,
-			notifier:      notifier,
-			notified:      notified,
-			reports:       result.Stale(),
-			result:        result,
-			category:      "monitor-only stale",
-			logBeforeSend: true,
-			include:       func(r types.ContainerReport) bool { return r.IsMonitorOnly() },
-			buildReport:   buildSingleStaleContainerReport,
-		})
+	// inCooldown reports whether a skipped container waits out its update cooldown.
+	inCooldown := func(r types.ContainerReport) bool {
+		status, ok := r.(*state.ContainerStatus)
 
-		notifySkippedCooldownContainers(log, notifier, notified, result)
+		return ok && status.CooldownDelay() != ""
+	}
+
+	passes := []struct {
+		include  func(types.ContainerReport) bool
+		category string
+		reports  []types.ContainerReport
+	}{
+		{include: nil, category: "updated", reports: result.Updated()},
+		{include: nil, category: "restarted", reports: result.Restarted()},
+		{include: types.ContainerReport.IsMonitorOnly, category: "monitor-only stale", reports: result.Stale()},
+		{include: inCooldown, category: "cooldown-skipped", reports: result.Skipped()},
+	}
+
+	for _, pass := range passes {
+		notifyContainers(notifyContainersParams{
+			log:           log,
+			notifier:      notifier,
+			notified:      notified,
+			reports:       pass.reports,
+			result:        result,
+			category:      pass.category,
+			logBeforeSend: !notificationReport,
+			include:       pass.include,
+		})
 	}
 
 	log.Debug().Msg("Finished sending notifications")
@@ -754,7 +629,6 @@ type notifyContainersParams struct {
 	log           *zerolog.Logger
 	notified      map[string]bool
 	include       func(types.ContainerReport) bool
-	buildReport   func(types.ContainerReport, types.Report) *state.SingleContainerReport
 	category      string
 	reports       []types.ContainerReport
 	logBeforeSend bool
@@ -763,7 +637,8 @@ type notifyContainersParams struct {
 // notifyContainers sends per-container notifications for a report collection.
 //
 // It applies nil and empty-name filtering, container-ID de-duplication via notified,
-// optional category eligibility (include), and ShouldSendNotification before send.
+// optional category eligibility (include, nil for every container), and
+// ShouldSendNotification before send.
 //
 // Parameters:
 //   - params: Named inputs for the category-specific notification pass.
@@ -783,7 +658,7 @@ func notifyContainers(params notifyContainersParams) {
 			continue
 		}
 
-		if !params.include(report) {
+		if params.include != nil && !params.include(report) {
 			continue
 		}
 
@@ -799,58 +674,12 @@ func notifyContainers(params notifyContainersParams) {
 				Msg("Sending individual notification for " + params.category + " container")
 		}
 
-		singleContainerReport := params.buildReport(report, params.result)
+		singleContainerReport := state.NewSingleContainerReport(report, params.result)
 		if params.notifier.ShouldSendNotification(singleContainerReport) {
 			params.notifier.SendNotification(singleContainerReport)
 		}
 
 		params.notified[containerID] = true
-	}
-}
-
-// notifySkippedCooldownContainers sends notifications for cooldown-skipped containers.
-//
-// Parameters:
-//   - log: Logger (unused currently, reserved for consistency with sibling helpers).
-//   - notifier: Notification client.
-//   - notified: Map of container IDs already notified in this session.
-//   - result: Full session report.
-func notifySkippedCooldownContainers(
-	_ *zerolog.Logger,
-	notifier types.Notifier,
-	notified map[string]bool,
-	result types.Report,
-) {
-	for _, report := range result.Skipped() {
-		if report == nil {
-			continue
-		}
-
-		containerStatus, ok := report.(*state.ContainerStatus)
-		if !ok || containerStatus.CooldownDelay() == "" {
-			continue
-		}
-
-		containerID := string(report.ID())
-		if notified[containerID] {
-			continue
-		}
-
-		singleSkippedReport := &state.SingleContainerReport{
-			Focus:            report,
-			SkippedReports:   []types.ContainerReport{report},
-			ScannedReports:   result.Scanned(),
-			UpdatedReports:   result.Updated(),
-			RestartedReports: result.Restarted(),
-			FailedReports:    result.Failed(),
-			StaleReports:     result.Stale(),
-			FreshReports:     result.Fresh(),
-		}
-		if notifier.ShouldSendNotification(singleSkippedReport) {
-			notifier.SendNotification(singleSkippedReport)
-		}
-
-		notified[containerID] = true
 	}
 }
 
