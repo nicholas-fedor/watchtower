@@ -36,7 +36,7 @@ type Notify struct {
 	// Report enables report-based notification templates
 	// (--notification-report / WATCHTOWER_NOTIFICATION_REPORT).
 	Report bool
-	// SplitByContainer sends a separate notification for each updated container
+	// SplitByContainer sends a separate notification for each container
 	// (--notification-split-by-container / WATCHTOWER_NOTIFICATION_SPLIT_BY_CONTAINER).
 	SplitByContainer bool
 	// SkipTitle omits the title parameter for services that support it

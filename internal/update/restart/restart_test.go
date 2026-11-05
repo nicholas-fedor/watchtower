@@ -17,7 +17,9 @@ import (
 	dockerNetwork "github.com/moby/moby/api/types/network"
 
 	mockContainerClient "github.com/nicholas-fedor/watchtower/internal/container/client/mocks"
+	"github.com/nicholas-fedor/watchtower/internal/observability/logging"
 	"github.com/nicholas-fedor/watchtower/internal/testutil/logcapture"
+	"github.com/nicholas-fedor/watchtower/internal/testutil/reportfixture"
 	"github.com/nicholas-fedor/watchtower/internal/update/cleanup"
 	mockUpdate "github.com/nicholas-fedor/watchtower/internal/update/mocks"
 	updateParams "github.com/nicholas-fedor/watchtower/internal/update/params"
@@ -2171,4 +2173,56 @@ func TestClientErrorsNamedOnce(t *testing.T) {
 		require.Same(t, clientErr, err)
 		require.EqualError(t, err, text)
 	})
+}
+
+// TestRecordRestartOutcomes verifies that each failed restart is recorded and reported once.
+//
+// Each failure is logged at error level with its container, image and error,
+// in container ID order. With five failures, an unsorted map order fails most
+// runs. A deliberate skip is recorded as skipped and logs no failure.
+func TestRecordRestartOutcomes(t *testing.T) {
+	t.Parallel()
+
+	log, logBuf := logcapture.NewJSON(zerolog.DebugLevel)
+	nop := zerolog.Nop()
+
+	const failures = 5
+
+	progress := state.Progress{}
+	outcomes := make(map[types.ContainerID]error, failures+1)
+	wantNames := make([]string, 0, failures)
+
+	for index := range failures {
+		failing, newImage := reportfixture.Container(index, state.FailedState)
+		progress.AddScanned(&nop, failing, newImage, updateParams.Params{})
+		outcomes[failing.ID()] = fmt.Errorf("pre-update command failed: exit code %d", index+1)
+		wantNames = append(wantNames, failing.Name())
+	}
+
+	skipping, skippingImage := reportfixture.Container(0, state.SkippedState)
+	progress.AddScanned(&nop, skipping, skippingImage, updateParams.Params{})
+	outcomes[skipping.ID()] = skipped(errors.New("pre-update command asked to skip"))
+
+	recordRestartOutcomes(log, &progress, outcomes)
+
+	report := progress.Report(&nop)
+	assert.Len(t, report.Failed(), len(wantNames))
+	require.Len(t, report.Skipped(), 1)
+	assert.Equal(t, skipping.ID(), report.Skipped()[0].ID())
+
+	var gotNames []string
+
+	for _, entry := range logcapture.Entries[logcapture.Entry](t, logBuf.String()) {
+		if entry["message"] != logging.ContainerUpdateFailed {
+			continue
+		}
+
+		gotNames = append(gotNames, entry["container"].(string))
+
+		assert.Equal(t, "error", entry["level"])
+		assert.Equal(t, "mock/"+entry["container"].(string)+":latest", entry["image"])
+		assert.Contains(t, entry["error"], "pre-update command failed")
+	}
+
+	assert.Equal(t, wantNames, gotNames, "one line per failure, in container ID order")
 }

@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"maps"
 	"slices"
 	"time"
 
@@ -374,10 +375,13 @@ func stopContainersInReversedOrder(
 	return failed, stopped
 }
 
-// recordRestartOutcomes records the containers whose stop or restart did not
-// succeed: as skipped when the update deliberately left them untouched, and as
-// failed otherwise. A container that already failed in an earlier phase stays
-// failed, even when a later phase skips it.
+// recordRestartOutcomes records each container whose stop or restart did not succeed.
+//
+// A container the update deliberately left untouched is recorded as skipped
+// and any other as failed. A container that failed in an earlier phase stays
+// failed when a later phase skips it. Each failure is logged once at error
+// level as "Could not update container" with the container, its image and the
+// error. That line is the failure's only report to notifications.
 //
 // Parameters:
 //   - log: Process logger.
@@ -397,6 +401,22 @@ func recordRestartOutcomes(log *zerolog.Logger, progress *state.Progress, outcom
 
 	progress.UpdateSkipped(log, skips)
 	progress.UpdateFailed(log, failed)
+
+	// The restart steps log their own failures at debug. This line reports
+	// each failure, in container ID order so notifications list them the same
+	// way every time.
+	for _, containerID := range slices.Sorted(maps.Keys(failed)) {
+		status, ok := (*progress)[containerID]
+		if !ok {
+			continue
+		}
+
+		log.Error().
+			Err(failed[containerID]).
+			Str("container", status.Name()).
+			Str("image", status.ImageName()).
+			Msg(logging.ContainerUpdateFailed)
+	}
 }
 
 // stopStaleContainer stops and removes a container that is marked for restart.
@@ -519,7 +539,7 @@ func stopStaleContainer(
 			return false, skipped(fmt.Errorf("%w: %w", errContainerGone, err))
 		}
 
-		log.Error().
+		log.Debug().
 			Err(err).
 			Fields(fields).
 			Msg("Failed to stop container")

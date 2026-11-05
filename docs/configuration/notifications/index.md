@@ -36,7 +36,7 @@ Configures the notification service URL(s).
 
 ## Notification Split by Container
 
-Send separate notifications for each updated container instead of grouping them.
+Send a separate notification for each container instead of grouping them.
 
 ```text
             Argument: --notification-split-by-container
@@ -47,7 +47,7 @@ Environment Variable: WATCHTOWER_NOTIFICATION_SPLIT_BY_CONTAINER
 
 !!! Note
     When disabled (default), notifications are grouped for all updated containers in a single session.
-    When enabled, a separate notification is sent for each container update.
+    When enabled, a separate notification is sent for each container that needs one. See [Split by Container](../../notifications/general-settings/index.md#split_by_container) for the containers that get one.
 
 ## Notification Template
 

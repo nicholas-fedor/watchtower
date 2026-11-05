@@ -18,6 +18,7 @@ var commonTemplates = map[string]string{
 	// "Failed to query Docker image disk usage" (image-usage query failed),
 	// "Docker image usage budget enabled" (startup budget configuration),
 	// "Registry rate limit retries exhausted. Container failed for this cycle" (update failed on a registry rate limit),
+	// "Could not update container" (update failed after its check),
 	// "Ignoring depends-on entry that names no container" (depends-on label entry matched nothing),
 	// "Skipping container update (self-dependency)" (container depends on itself),
 	// "Skipping container update (circular dependency)" (container is in a dependency cycle),
@@ -120,7 +121,7 @@ var commonTemplates = map[string]string{
     Skipped {{with (index $e.Data "container")}}{{.}}{{else}}container{{end}}: invalid git semver policy
 {{- else if eq $msg "Skipped container with an invalid git-host" -}}
     Skipped {{with (index $e.Data "container")}}{{.}}{{else}}container{{end}}: invalid git-host
-{{- else if eq $msg "Registry rate limit retries exhausted. Container failed for this cycle" -}}
+{{- else if or (eq $msg "Registry rate limit retries exhausted. Container failed for this cycle") (eq $msg "Could not update container") -}}
     Update failed for {{with (index $e.Data "container")}}{{.}}{{else}}container{{end}} ({{with (index $e.Data "image")}}{{.}}{{else}}unknown{{end}}){{with (index $e.Data "error")}}: {{.}}{{end}}
 {{- else if eq $msg "Ignoring depends-on entry that names no container" -}}
     Ignored depends-on {{with (index $e.Data "depends_on")}}{{.}}{{else}}entry{{end}} for {{with (index $e.Data "container")}}{{.}}{{else}}container{{end}}: no container has that name

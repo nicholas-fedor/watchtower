@@ -63,7 +63,7 @@ type RunUpdatesWithNotificationsParams struct {
 	OnOldSelfDetected func()
 	// Update is the complete update policy for this invocation (filter, cleanup, timeouts, etc.).
 	Update updateParams.Params
-	// NotificationSplitByContainer enables a separate notification per updated container.
+	// NotificationSplitByContainer enables a separate notification for each container.
 	NotificationSplitByContainer bool
 	// NotificationReport enables report-based notification templates.
 	NotificationReport bool
@@ -517,7 +517,7 @@ func logUpdateReport(log *zerolog.Logger, result types.Report) {
 //
 // Parameters:
 //   - notifier: The notification system instance for sending update status messages.
-//   - notificationSplitByContainer: Boolean flag enabling separate notifications for each updated container.
+//   - notificationSplitByContainer: Boolean flag enabling a separate notification for each container.
 //   - notificationReport: Boolean flag enabling report-based notifications.
 //   - result: The report containing the results of the update operation.
 //   - cleanedImages: Slice of successfully cleaned image info.
@@ -541,6 +541,7 @@ func sendNotifications(log *zerolog.Logger, notifier Notifier,
 //
 // It sends one notification for each of these containers:
 //   - an updated or restarted container
+//   - a container whose update failed
 //   - a monitor-only container with a newer image
 //   - a container skipped during its update cooldown
 //
@@ -578,16 +579,7 @@ func sendSplitNotifications(log *zerolog.Logger, notifier Notifier,
 		Int("scanned_count", len(result.Scanned())).
 		Msg("Split notifications: container counts by category")
 
-	updatedNames := make([]string, 0, len(result.Updated()))
-	for _, report := range result.Updated() {
-		updatedNames = append(updatedNames, report.Name())
-	}
-
-	if notificationReport {
-		log.Debug().
-			Strs("updated_containers", updatedNames).
-			Msg("Split notifications: sending report notifications for updated containers")
-	} else {
+	if !notificationReport {
 		// Log-mode split: hook-captured entries are filtered by container inside
 		// SendNotification when the report is a SingleContainerReport.
 		//
@@ -603,10 +595,6 @@ func sendSplitNotifications(log *zerolog.Logger, notifier Notifier,
 				Str("image_id", img.ImageID.ShortID()).
 				Msg(logging.RemovingImage)
 		}
-
-		log.Debug().
-			Strs("updated_containers", updatedNames).
-			Msg("Split notifications: sending per-container notifications (log mode)")
 	}
 
 	// inCooldown reports whether a skipped container waits out its update cooldown.
@@ -623,6 +611,7 @@ func sendSplitNotifications(log *zerolog.Logger, notifier Notifier,
 	}{
 		{include: nil, category: "updated", reports: result.Updated()},
 		{include: nil, category: "restarted", reports: result.Restarted()},
+		{include: nil, category: "failed", reports: result.Failed()},
 		{include: types.ContainerReport.IsMonitorOnly, category: "monitor-only stale", reports: result.Stale()},
 		{include: inCooldown, category: "cooldown-skipped", reports: result.Skipped()},
 	}
