@@ -1,7 +1,6 @@
 package client
 
 import (
-	"bytes"
 	"context"
 	"encoding/json"
 	"errors"
@@ -10,14 +9,46 @@ import (
 	"strconv"
 	"strings"
 	"time"
+	"unicode"
+	"unicode/utf8"
 
 	dockerClient "github.com/moby/moby/client"
 
+	"github.com/nicholas-fedor/watchtower/internal/container/redact"
 	"github.com/nicholas-fedor/watchtower/pkg/types"
 )
 
-// maxExecOutputSize is the maximum captured exec stdout/stderr size (1 MiB).
-const maxExecOutputSize = 1 << 20
+// tailBuffer is an [io.Writer] that keeps the last bytes written to it.
+type tailBuffer struct {
+	data    []byte // The kept bytes, at most limit of them.
+	limit   int    // How many of the last bytes to keep, at least 4 to hold any character.
+	dropped bool   // Whether earlier bytes were dropped.
+}
+
+// maxExecOutput is how much of the end of a command's output is kept (2 KiB).
+//
+// The end is where a failure is usually explained. The output reaches logs and
+// notifications. The limit keeps a noisy or hostile command from flooding them.
+const maxExecOutput = 2 << 10
+
+// droppedOutputMarker starts output whose beginning was dropped.
+const droppedOutputMarker = "…"
+
+// Parts of terminal escape sequences.
+const (
+	// escape is ESC. It starts 7-bit terminal escape sequences.
+	escape = '\x1b'
+	// c1Offset is what a C1 control adds to its 7-bit introducer, as CSI is '[' plus 0x40.
+	c1Offset = 0x40
+	// lastIntermediateByte is the highest intermediate byte of an escape sequence.
+	lastIntermediateByte = 0x2f
+	// lastParameterByte is the highest parameter byte of a CSI sequence.
+	lastParameterByte = 0x3f
+	// stringTerminator is ESC \. It ends OSC, DCS, SOS, PM and APC strings.
+	stringTerminator = "\x1b\\"
+	// c1StringTerminator is the 8-bit form of the string terminator.
+	c1StringTerminator = "\u009c"
+)
 
 // Errors for executing commands in containers.
 var (
@@ -25,8 +56,6 @@ var (
 	errCreateExecFailed = errors.New("failed to create exec instance")
 	// errStartExecFailed indicates a failure to start an exec instance in a container.
 	errStartExecFailed = errors.New("failed to start exec instance")
-	// errAttachExecFailed indicates a failure to attach to an exec instance for output capture.
-	errAttachExecFailed = errors.New("failed to attach to exec instance")
 	// errReadExecOutputFailed indicates a failure to read output from an exec instance.
 	errReadExecOutputFailed = errors.New("failed to read exec output")
 	// errInspectExecFailed indicates a failure to inspect an exec instance's status.
@@ -36,6 +65,11 @@ var (
 )
 
 // ExecuteCommand runs a command inside a container and evaluates its result.
+//
+// The command's output is written inside the container and is untrusted text.
+// When the command exits with a code other than 0 or 75, the error ends with
+// the end of that output, made printable. The timeout bounds the whole run of
+// the command, from its start to its exit.
 //
 // Parameters:
 //   - ctx: Context for cancellation and timeout control.
@@ -116,24 +150,7 @@ func (c *client) ExecuteCommand(
 		return false, fmt.Errorf("%w: %w", errCreateExecFailed, err)
 	}
 
-	// Start the exec instance.
-	clog.Debug().
-		Str("exec_id", exec.ID).
-		Msg("Starting exec instance")
-
-	execStartCheck := dockerClient.ExecStartOptions{Detach: true, TTY: true}
-
-	_, err = c.api.ExecStart(ctx, exec.ID, execStartCheck)
-	if err != nil {
-		clog.Debug().
-			Err(err).
-			Msg("Failed to start exec instance")
-
-		return false, fmt.Errorf("%w: %w", errStartExecFailed, err)
-	}
-
-	// The timeout bounds the whole run of the command, so a command that never
-	// exits stops both reading its output and waiting for its exit code.
+	// The timeout bounds the attach, the output read and the exit wait.
 	execCtx := ctx
 
 	if timeout > 0 {
@@ -143,8 +160,21 @@ func (c *client) ExecuteCommand(
 		defer cancel()
 	}
 
-	// Capture output and handle attachment.
-	output, err := c.captureExecOutput(execCtx, exec.ID)
+	// ExecAttach starts the exec and streams its output.
+	clog.Debug().
+		Str("exec_id", exec.ID).
+		Msg("Starting exec instance")
+
+	attached, err := c.api.ExecAttach(execCtx, exec.ID, dockerClient.ExecAttachOptions{TTY: true})
+	if err != nil {
+		clog.Debug().
+			Err(err).
+			Msg("Failed to start exec instance")
+
+		return false, fmt.Errorf("%w: %w", errStartExecFailed, err)
+	}
+
+	output, err := readExecOutput(execCtx, attached)
 	if err != nil {
 		clog.Warn().
 			Err(err).
@@ -171,81 +201,71 @@ func (c *client) ExecuteCommand(
 	return skipUpdate, nil
 }
 
-// captureExecOutput attaches to an exec instance and captures its output.
+// Write keeps the end of written and of what was written before.
 //
 // Parameters:
-//   - ctx: Context for lifecycle control.
-//   - execID: ID of the exec instance.
+//   - written: Bytes to write.
 //
 // Returns:
-//   - string: Captured output if successful.
-//   - error: Non-nil if attachment or reading fails, nil on success.
-func (c *client) captureExecOutput(ctx context.Context, execID string) (string, error) {
-	clogVal := c.logger().With().
-		Str("exec_id", execID).
-		Logger()
-	clog := &clogVal
+//   - int: Always len(written).
+//   - error: Always nil.
+func (b *tailBuffer) Write(written []byte) (int, error) {
+	b.data = append(b.data, written...)
 
-	// Attach to the exec instance for output.
-	clog.Debug().Msg("Attaching to exec instance")
-
-	response, err := c.api.ExecAttach(
-		ctx,
-		execID,
-		dockerClient.ExecAttachOptions{TTY: true},
-	)
-	if err != nil {
-		clog.Debug().
-			Err(err).
-			Msg("Failed to attach to exec instance")
-
-		return "", fmt.Errorf("%w: %w", errAttachExecFailed, err)
+	// The kept bytes start on a whole character. A character split by the trim
+	// is dropped.
+	if len(b.data) > b.limit {
+		b.data = append(b.data[:0], lastCharacters(b.data, b.limit)...)
+		b.dropped = true
 	}
 
+	return len(written), nil
+}
+
+// readExecOutput reads the output of a started exec instance and closes its stream.
+//
+// The whole output is read. A command never blocks on a full stream. Its end is
+// kept, made printable, redacted and put on one line. A leading "…" marks a
+// dropped beginning.
+//
+// Parameters:
+//   - ctx: Context bounding the read.
+//   - response: The attach result that streams the exec's output.
+//
+// Returns:
+//   - string: The kept output as one printable, redacted line.
+//   - error: Non-nil if reading fails or ctx ends first, nil on success.
+func readExecOutput(ctx context.Context, response dockerClient.ExecAttachResult) (string, error) {
 	defer response.Close()
 
-	// Read output into a buffer with timeout and a size cap.
-	var writer bytes.Buffer
-
+	kept := tailBuffer{data: nil, limit: maxExecOutput, dropped: false}
 	done := make(chan error, 1)
 
+	// When ctx ends first, the deferred Close closes the stream. That ends a
+	// read that is still blocked.
 	go func() {
-		_, err := io.Copy(
-			&writer,
-			io.LimitReader(
-				response.Reader,
-				maxExecOutputSize,
-			),
-		)
+		_, err := io.Copy(&kept, response.Reader)
 		done <- err
 	}()
 
 	select {
 	case err := <-done:
 		if err != nil {
-			clog.Debug().
-				Err(err).
-				Msg("Failed to read exec output")
-
 			return "", fmt.Errorf("%w: %w", errReadExecOutputFailed, err)
 		}
 	case <-ctx.Done():
-		response.Close()
-
 		return "", fmt.Errorf("%w: %w", errReadExecOutputFailed, ctx.Err())
 	}
 
-	// Return trimmed output if any was captured.
-	if writer.Len() > 0 {
-		output := strings.TrimSpace(writer.String())
-		clog.Debug().
-			Str("output", output).
-			Msg("Captured exec output")
-
-		return output, nil
+	// Credentials are found after cleaning. An escape sequence then cannot hide
+	// a header or variable name. Lines are joined last, since header lines are
+	// matched one at a time.
+	output := oneLine(redact.Text(printableOutput(string(kept.data))))
+	if kept.dropped {
+		output = droppedOutputMarker + output
 	}
 
-	return "", nil
+	return output, nil
 }
 
 // waitForExec waits for an exec instance to complete, or for ctx to end.
@@ -295,25 +315,17 @@ func (c *client) waitForExec(
 			}
 		}
 
-		// Log output if present.
-		if len(execOutput) > 0 {
-			clog.Debug().
-				Int("output_length", len(execOutput)).
-				Msg("Command output captured")
-		}
-
 		// Handle specific exit codes.
 		if execInspect.ExitCode == ExTempFail {
 			return true, nil // Skip updates on temporary failure.
 		}
 
 		if execInspect.ExitCode > 0 {
-			err := fmt.Errorf(
-				"%w with exit code %d: %s",
-				errCommandFailed,
-				execInspect.ExitCode,
-				execOutput,
-			)
+			err := fmt.Errorf("%w with exit code %d", errCommandFailed, execInspect.ExitCode)
+			if execOutput != "" {
+				err = fmt.Errorf("%w: %s", err, execOutput)
+			}
+
 			clog.Debug().
 				Err(err).
 				Msg("Command execution failed")
@@ -325,6 +337,160 @@ func (c *client) waitForExec(
 	}
 
 	return false, nil
+}
+
+// lastCharacters returns the end of text, at most limit bytes, starting on a whole character.
+//
+// Parameters:
+//   - text: Bytes to shorten.
+//   - limit: Most bytes to return.
+//
+// Returns:
+//   - []byte: text when it fits within limit. Otherwise its last bytes without a partial first character.
+func lastCharacters(text []byte, limit int) []byte {
+	if len(text) <= limit {
+		return text
+	}
+
+	start := len(text) - limit
+	for start < len(text) && !utf8.RuneStart(text[start]) {
+		start++
+	}
+
+	return text[start:]
+}
+
+// printableOutput removes from command output what could change how a terminal or notification shows it.
+//
+// Output written inside a container is untrusted. Terminal escape sequences
+// could retitle or reprogram a terminal that shows the text. Invisible format
+// characters could hide text or make it read differently than it is. Removed:
+//   - terminal escape sequences in 7-bit and 8-bit form, such as colours,
+//     window titles and clipboard writes
+//   - control characters other than newline and tab
+//   - Unicode format characters, such as bidirectional controls, zero-width
+//     characters and tag characters
+//
+// A lone carriage return becomes a newline. One before a newline is dropped.
+// Invalid UTF-8 becomes U+FFFD.
+//
+// Parameters:
+//   - raw: Output as the command wrote it.
+//
+// Returns:
+//   - string: The printable text.
+func printableOutput(raw string) string {
+	var out strings.Builder
+
+	out.Grow(len(raw))
+
+	for index := 0; index < len(raw); {
+		char, size := utf8.DecodeRuneInString(raw[index:])
+		index += size
+
+		switch {
+		case char == '\r':
+			if !strings.HasPrefix(raw[index:], "\n") {
+				out.WriteByte('\n')
+			}
+		case char == escape || (char >= 0x80 && char <= 0x9f):
+			index = escapeSequenceEnd(raw, index, char)
+		case (unicode.IsControl(char) && char != '\n' && char != '\t') || unicode.Is(unicode.Cf, char):
+			// Dropped.
+		default:
+			out.WriteRune(char)
+		}
+	}
+
+	return out.String()
+}
+
+// oneLine joins the non-blank lines of text with " | ".
+//
+// Notifications put each log entry on a line of its own. Output kept on one
+// line cannot start a line that reads like another Watchtower message.
+//
+// Parameters:
+//   - text: Text that may span lines.
+//
+// Returns:
+//   - string: The lines, each trimmed, joined on one line.
+func oneLine(text string) string {
+	var lines []string
+
+	for line := range strings.Lines(text) {
+		if trimmed := strings.TrimSpace(line); trimmed != "" {
+			lines = append(lines, trimmed)
+		}
+	}
+
+	return strings.Join(lines, " | ")
+}
+
+// escapeSequenceEnd returns where the escape sequence that introducer starts ends in raw.
+//
+// Parameters:
+//   - raw: Text that holds the sequence.
+//   - index: Position just after the introducer.
+//   - introducer: ESC or an 8-bit C1 control.
+//
+// Returns:
+//   - int: Position just after the sequence. The end of raw when it is unterminated.
+func escapeSequenceEnd(raw string, index int, introducer rune) int {
+	// The sequence's kind is its 7-bit introducer, such as '[' for CSI. A C1
+	// control is the 7-bit introducer plus 0x40.
+	kind := introducer - c1Offset
+
+	if introducer == escape {
+		kind = escape
+
+		if index < len(raw) && raw[index] >= '@' && raw[index] <= '_' {
+			kind = rune(raw[index])
+			index++
+		}
+	}
+
+	// The highest parameter or intermediate byte. A final byte above it ends
+	// the sequence.
+	last := byte(lastIntermediateByte)
+
+	switch kind {
+	case '[':
+		// CSI, such as a colour, also takes parameter bytes.
+		last = lastParameterByte
+	case ']', 'P', 'X', '^', '_':
+		// OSC, DCS, SOS, PM and APC strings end with BEL, ESC \ or the 8-bit
+		// string terminator.
+		for index < len(raw) {
+			switch {
+			case raw[index] == '\a':
+				return index + 1
+			case strings.HasPrefix(raw[index:], stringTerminator):
+				return index + len(stringTerminator)
+			case strings.HasPrefix(raw[index:], c1StringTerminator):
+				return index + len(c1StringTerminator)
+			default:
+				index++
+			}
+		}
+
+		return index
+	case escape:
+		// Other escape sequences take intermediate bytes.
+	default:
+		// Other C1 controls stand alone.
+		return index
+	}
+
+	for index < len(raw) && raw[index] >= 0x20 && raw[index] <= last {
+		index++
+	}
+
+	if index < len(raw) && raw[index] > last && raw[index] <= 0x7e {
+		index++
+	}
+
+	return index
 }
 
 // generateContainerMetadata creates a JSON-formatted string of container metadata.

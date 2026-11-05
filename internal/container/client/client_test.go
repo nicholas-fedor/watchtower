@@ -56,8 +56,8 @@ const mockContainerID = "container_id"
 type execCase struct {
 	// createErr fails the exec create.
 	createErr error
-	// startErr fails the exec start.
-	startErr error
+	// attachErr fails the attach that starts the exec.
+	attachErr error
 	// inspectErr fails the exec inspect.
 	inspectErr error
 	// containerID is the container the command runs in.
@@ -68,6 +68,8 @@ type execCase struct {
 	cmd string
 	// user is the exec user the command is expected to run as.
 	user string
+	// output is what the command writes before it exits.
+	output string
 	// exitCode is the exit code the exec reports.
 	exitCode int
 }
@@ -95,16 +97,23 @@ type startingDaemon struct {
 	requests int
 }
 
-// expectExec expects GetContainer's inspects of the container and its image,
-// then the exec create, start, attach, and inspect of an ExecuteCommand run,
-// stopping after a configured failure.
+// expectExec expects the Docker calls of an ExecuteCommand run, stopping after a configured failure.
 //
-// The attach fails, so the run continues without captured output.
+// The calls are, in order:
+//   - GetContainer's inspects of the container and its image
+//   - the exec create
+//   - the attach that starts the exec and streams its output
+//   - the exec inspect
+//
+// Any other exec call fails the test.
 //
 // Parameters:
+//   - t: Test the attach connection belongs to.
 //   - api: Mocked Docker API.
 //   - tc: The run to expect.
-func expectExec(api *mockContainer.MockAPIClient, tc execCase) {
+func expectExec(t *testing.T, api *mockContainer.MockAPIClient, tc execCase) {
+	t.Helper()
+
 	const imageName = "test-image:latest"
 
 	api.EXPECT().ContainerInspect(mock.Anything, tc.containerID, dockerClient.ContainerInspectOptions{}).
@@ -140,17 +149,18 @@ func expectExec(api *mockContainer.MockAPIClient, tc execCase) {
 		return
 	}
 
-	// ExecStart must detach, or the daemon blocks until the command finishes
-	// and the attach that follows fails with "exec command is already running".
-	api.EXPECT().ExecStart(mock.Anything, tc.execID, dockerClient.ExecStartOptions{Detach: true, TTY: true}).
-		Return(dockerClient.ExecStartResult{}, tc.startErr).Once()
-
-	if tc.startErr != nil {
-		return
+	attached := dockerClient.ExecAttachResult{}
+	if tc.attachErr == nil {
+		attached = newExecOutput(t, func(conn net.Conn) { _, _ = io.WriteString(conn, tc.output) })
 	}
 
 	api.EXPECT().ExecAttach(mock.Anything, tc.execID, dockerClient.ExecAttachOptions{TTY: true}).
-		Return(dockerClient.ExecAttachResult{}, errors.New("cannot hijack the connection")).Once()
+		Return(attached, tc.attachErr).Once()
+
+	if tc.attachErr != nil {
+		return
+	}
+
 	api.EXPECT().ExecInspect(mock.Anything, tc.execID, dockerClient.ExecInspectOptions{}).
 		Return(dockerClient.ExecInspectResult{ID: tc.execID, ContainerID: tc.containerID, ExitCode: tc.exitCode}, tc.inspectErr).Once()
 }
@@ -927,7 +937,7 @@ func TestClient(t *testing.T) {
 				t.Parallel()
 
 				api := newDockerAPI(t)
-				expectExec(api, execCase{containerID: "ex-cont-id", execID: "ex-exec-id", cmd: "exec-cmd"})
+				expectExec(t, api, execCase{containerID: "ex-cont-id", execID: "ex-exec-id", cmd: "exec-cmd"})
 
 				log, logOutput := logcapture.New(zerolog.DebugLevel)
 				c := &client{log: log, api: api}
@@ -944,7 +954,7 @@ func TestClient(t *testing.T) {
 				t.Parallel()
 
 				api := newDockerAPI(t)
-				expectExec(api, execCase{containerID: "ex-cont-id", execID: "ex-exec-id", cmd: "exec-cmd", exitCode: 75})
+				expectExec(t, api, execCase{containerID: "ex-cont-id", execID: "ex-exec-id", cmd: "exec-cmd", exitCode: 75})
 
 				log, logOutput := logcapture.New(zerolog.DebugLevel)
 				c := &client{log: log, api: api}
@@ -969,7 +979,7 @@ func TestClient(t *testing.T) {
 			t.Helper()
 
 			api := newDockerAPI(t)
-			expectExec(api, tc)
+			expectExec(t, api, tc)
 
 			c := &client{log: newTestLogger(t), api: api}
 
@@ -994,11 +1004,66 @@ func TestClient(t *testing.T) {
 		t.Run("command exits with non-zero code", func(t *testing.T) {
 			t.Parallel()
 
-			t.Run("should return error", func(t *testing.T) {
+			// Output written inside the container is untrusted. Its text
+			// reaches the error without escape sequences or control characters.
+			t.Run("should end the error with the printable output", func(t *testing.T) {
 				t.Parallel()
 
-				_, err := run(t, execCase{containerID: "ex-cont-id", execID: "failure-exec-id", cmd: "failure-cmd", exitCode: 1}, 0, 0)
-				require.ErrorContains(t, err, "command execution failed")
+				_, err := run(t, execCase{
+					containerID: "ex-cont-id",
+					execID:      "failure-exec-id",
+					cmd:         "failure-cmd",
+					output:      "\x1b]0;owned\a\x1b[31mfailed\x1b[0m\r\nsee \u202elog\r\n",
+					exitCode:    1,
+				}, 0, 0)
+				require.EqualError(t, err, "command execution failed with exit code 1: failed | see log")
+			})
+
+			// Each notification entry is a line of its own. Output kept on one
+			// line cannot add a line that reads like a Watchtower message.
+			t.Run("should keep the output on one line", func(t *testing.T) {
+				t.Parallel()
+
+				_, err := run(t, execCase{
+					containerID: "ex-cont-id",
+					execID:      "failure-exec-id",
+					cmd:         "failure-cmd",
+					output:      "backup failed\n\nStarted new container: db (abc123)\n",
+					exitCode:    1,
+				}, 0, 0)
+				require.EqualError(t, err,
+					"command execution failed with exit code 1: backup failed | Started new container: db (abc123)")
+			})
+
+			t.Run("should redact credentials in the output", func(t *testing.T) {
+				t.Parallel()
+
+				_, err := run(t, execCase{
+					containerID: "ex-cont-id",
+					execID:      "failure-exec-id",
+					cmd:         "failure-cmd",
+					output:      "> Authorization: Bearer abc.def\nAPI_TOKEN=ghp_abc\nclone https://bot:ghp_abc@github.com/org/app.git failed\n",
+					exitCode:    1,
+				}, 0, 0)
+				require.EqualError(t, err, "command execution failed with exit code 1: "+
+					"> Authorization: xxxxx | API_TOKEN=xxxxx | clone https://xxxxx:xxxxx@github.com/org/app.git failed")
+			})
+
+			// Empty output adds nothing to the error. Neither does output that
+			// cleaning empties.
+			t.Run("should end the error at the exit code when there is no output", func(t *testing.T) {
+				t.Parallel()
+
+				for _, output := range []string{"", "\x1b[0m\r\n"} {
+					_, err := run(t, execCase{
+						containerID: "ex-cont-id",
+						execID:      "failure-exec-id",
+						cmd:         "failure-cmd",
+						output:      output,
+						exitCode:    1,
+					}, 0, 0)
+					require.EqualError(t, err, "command execution failed with exit code 1")
+				}
 			})
 
 			t.Run("should report the command failure rather than an inspect failure", func(t *testing.T) {
@@ -1043,9 +1108,11 @@ func TestClient(t *testing.T) {
 			})
 		})
 
-		t.Run("ExecStart fails", func(t *testing.T) {
+		t.Run("exec cannot start", func(t *testing.T) {
 			t.Parallel()
 
+			// The attach starts the exec. A failed attach means the command never
+			// ran. That must not be taken for a command that exited with 0.
 			t.Run("should return error containing 'failed to start exec'", func(t *testing.T) {
 				t.Parallel()
 
@@ -1053,7 +1120,7 @@ func TestClient(t *testing.T) {
 					containerID: "ex-cont-id",
 					execID:      "start-fail-exec-id",
 					cmd:         "start-fail-cmd",
-					startErr:    daemonError("exec start failed"),
+					attachErr:   daemonError("exec start failed"),
 				}, 0, 0)
 				require.ErrorContains(t, err, "failed to start exec")
 			})
@@ -1075,38 +1142,10 @@ func TestClient(t *testing.T) {
 				assert.False(t, skipUpdate)
 			})
 		})
-
-		t.Run("ExecStart is called", func(t *testing.T) {
-			t.Parallel()
-
-			t.Run("should use Detach true to prevent blocking on command execution", func(t *testing.T) {
-				t.Parallel()
-
-				// expectExec matches only an ExecStart with Detach: true.
-				skipUpdate, err := run(t, execCase{
-					containerID: "detach-test-cont-id",
-					execID:      "detach-test-exec-id",
-					cmd:         "detach-test-cmd",
-				}, 0, 0)
-				require.NoError(t, err)
-				assert.False(t, skipUpdate)
-			})
-		})
 	})
 
-	t.Run("captureExecOutput", func(t *testing.T) {
+	t.Run("readExecOutput", func(t *testing.T) {
 		t.Parallel()
-
-		t.Run("should return error when attach fails", func(t *testing.T) {
-			t.Parallel()
-
-			api := newDockerAPI(t)
-			api.EXPECT().ExecAttach(mock.Anything, "exec-id", dockerClient.ExecAttachOptions{TTY: true}).
-				Return(dockerClient.ExecAttachResult{}, daemonError("attach failed")).Once()
-
-			_, err := (&client{log: newTestLogger(t), api: api}).captureExecOutput(t.Context(), "exec-id")
-			require.ErrorContains(t, err, "failed to attach")
-		})
 
 		t.Run("should handle context cancellation", func(t *testing.T) {
 			t.Parallel()
@@ -1114,27 +1153,71 @@ func TestClient(t *testing.T) {
 			ctx, cancel := context.WithCancel(t.Context())
 			cancel()
 
-			// The output never arrives, so only the cancellation ends the read.
-			api := newDockerAPI(t)
-			api.EXPECT().ExecAttach(mock.Anything, "exec-id", dockerClient.ExecAttachOptions{TTY: true}).
-				Return(newExecOutput(t, nil), nil).Once()
-
-			_, err := (&client{log: newTestLogger(t), api: api}).captureExecOutput(ctx, "exec-id")
+			// The output never arrives. Only the cancellation ends the read.
+			_, err := readExecOutput(ctx, newExecOutput(t, nil))
 			require.ErrorIs(t, err, context.Canceled)
 		})
 
-		t.Run("should truncate output that exceeds the size cap", func(t *testing.T) {
+		// Cancelling while a command still writes ends the read and closes the
+		// stream. The writer's next write then fails instead of blocking.
+		t.Run("should stop reading when cancelled mid-stream", func(t *testing.T) {
 			t.Parallel()
 
-			api := newDockerAPI(t)
-			api.EXPECT().ExecAttach(mock.Anything, "exec-id", dockerClient.ExecAttachOptions{TTY: true}).
-				Return(newExecOutput(t, func(conn net.Conn) {
-					_, _ = io.WriteString(conn, strings.Repeat("x", maxExecOutputSize+4096))
-				}), nil).Once()
+			ctx, cancel := context.WithCancel(t.Context())
+			writerDone := make(chan struct{})
 
-			out, err := (&client{log: newTestLogger(t), api: api}).captureExecOutput(t.Context(), "exec-id")
+			output := newExecOutput(t, func(conn net.Conn) {
+				defer close(writerDone)
+
+				chunk := []byte(strings.Repeat("x", 512))
+
+				_, err := conn.Write(chunk)
+				if err != nil {
+					return
+				}
+
+				cancel()
+
+				for err == nil {
+					_, err = conn.Write(chunk)
+				}
+			})
+
+			_, err := readExecOutput(ctx, output)
+			require.ErrorIs(t, err, context.Canceled)
+
+			select {
+			case <-writerDone:
+			case <-time.After(5 * time.Second):
+				t.Fatal("the writer stayed blocked after the read ended")
+			}
+		})
+
+		// The command's whole write succeeds only if all of it is read. A
+		// stream closed at the limit would fail it.
+		t.Run("should read the whole output and keep its last 2 KiB", func(t *testing.T) {
+			t.Parallel()
+
+			writeErr := make(chan error, 1)
+			output := newExecOutput(t, func(conn net.Conn) {
+				_, err := io.WriteString(conn, strings.Repeat("x", 4*maxExecOutput)+"the end")
+				writeErr <- err
+			})
+
+			out, err := readExecOutput(t.Context(), output)
 			require.NoError(t, err)
-			assert.Len(t, out, maxExecOutputSize)
+			assert.Equal(t, droppedOutputMarker+strings.Repeat("x", maxExecOutput-len("the end"))+"the end", out)
+			require.NoError(t, <-writeErr)
+		})
+
+		t.Run("should not mark output that was kept whole", func(t *testing.T) {
+			t.Parallel()
+
+			out, err := readExecOutput(t.Context(), newExecOutput(t, func(conn net.Conn) {
+				_, _ = io.WriteString(conn, strings.Repeat("x", maxExecOutput))
+			}))
+			require.NoError(t, err)
+			assert.Equal(t, strings.Repeat("x", maxExecOutput), out)
 		})
 	})
 

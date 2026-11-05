@@ -341,3 +341,35 @@ func TestServiceURLs(t *testing.T) {
 		ServiceURLs([]string{"slack://token@channel", "", "logger://"}),
 	)
 }
+
+// TestText verifies that credentials commonly printed by commands are replaced,
+// and that other text is left alone.
+func TestText(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name string
+		text string
+		want string
+	}{
+		{name: "plain text", text: "pull failed: connection refused", want: "pull failed: connection refused"},
+		{name: "URL user information", text: "fatal: https://bot:ghp_abc@github.com/org/app.git not found", want: "fatal: https://xxxxx:xxxxx@github.com/org/app.git not found"},
+		{name: "curl request header", text: "> Authorization: Bearer abc.def\n> Accept: */*", want: "> Authorization: xxxxx\n> Accept: */*"},
+		{name: "proxy authorization header", text: "Proxy-Authorization: Basic dXNlcjpwYXNz", want: "Proxy-Authorization: xxxxx"},
+		{name: "cookie headers", text: "< Set-Cookie: sid=abc; Path=/\nCookie: sid=abc", want: "< Set-Cookie: xxxxx\nCookie: xxxxx"},
+		{name: "API key header", text: "X-Api-Key: 12345", want: "X-Api-Key: xxxxx"},
+		{name: "ordinary header", text: "Content-Type: text/plain", want: "Content-Type: text/plain"},
+		{name: "environment listing", text: "HOME=/root\nDB_PASSWORD=hunter2\nGITHUB_TOKEN=ghp_abc", want: "HOME=/root\nDB_PASSWORD=xxxxx\nGITHUB_TOKEN=xxxxx"},
+		{name: "query string", text: "GET /v1?access_token=abc&page=2", want: "GET /v1?access_token=xxxxx&page=2"},
+		{name: "JSON field", text: `{"user":"bot","password":"p@ss\"word","id":1}`, want: `{"user":"bot","password":"xxxxx","id":1}`},
+		{name: "look-alike names", text: "tokenizer=bpe\nauthor: jane", want: "tokenizer=bpe\nauthor: jane"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			assert.Equal(t, tt.want, Text(tt.text))
+		})
+	}
+}

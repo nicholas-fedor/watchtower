@@ -11,11 +11,26 @@ import (
 // redactedUserinfo replaces the userinfo matched by userinfoInError.
 const redactedUserinfo = "://xxxxx:xxxxx@"
 
+// redactedValue replaces the value of a credential found in text.
+const redactedValue = "xxxxx"
+
 // userinfoInError matches scheme://user@ and scheme://user:password@ in a daemon error.
 //
 // It matches through the last @ before the first /, ?, #, or whitespace, so a
 // password that contains @ is matched whole.
 var userinfoInError = regexp.MustCompile(`://[^/?#\s]+@`)
+
+// Patterns for named values in command output. Group 1 is everything before
+// the value. Group 2 is the name.
+var (
+	// headerLine matches a "Name: value" line, such as the request headers
+	// curl -v prints after "> ".
+	headerLine = regexp.MustCompile(`(?m)^([ \t]*[<>]?[ \t]*([A-Za-z][A-Za-z0-9_-]*)[ \t]*:[ \t]*)\S.*$`)
+	// assignment matches name=value, as in an environment listing or a query string.
+	assignment = regexp.MustCompile(`(([A-Za-z_][A-Za-z0-9_.-]*)=)[^\s&;,'"]+`)
+	// jsonField matches "name": "value" in JSON.
+	jsonField = regexp.MustCompile(`("([A-Za-z_][A-Za-z0-9_.-]*)"[ \t]*:[ \t]*")(?:[^"\\]|\\.)*`)
+)
 
 // GitURL removes credentials and sensitive query values from a Git URL.
 //
@@ -190,7 +205,7 @@ func isSensitiveQueryKey(key string) bool {
 //   - bool: True when the word names a credential.
 func isCredentialWord(word string) bool {
 	switch word {
-	case "token", "password", "passwd", "pwd", "passphrase", "secret", "credential", "credentials", "signature", "sig", "auth", "authorization", "session", "jwt", "bearer":
+	case "token", "password", "passwd", "pwd", "passphrase", "secret", "credential", "credentials", "signature", "sig", "auth", "authorization", "session", "jwt", "bearer", "cookie":
 		return true
 	default:
 		return false
@@ -429,6 +444,38 @@ func Userinfo(msg, remote string) string {
 	}
 
 	return userinfoInError.ReplaceAllString(msg, redactedUserinfo)
+}
+
+// Text replaces credentials that commonly appear in command output.
+//
+// It catches what tools print by habit, not every secret:
+//   - user information in URLs, such as https://user:token@host
+//   - the value of a header line with a credential-like name, such as curl's
+//     "> Authorization: Bearer ..." or "Cookie: ..."
+//   - the value of name=value with a credential-like name, such as an
+//     environment listing's "DB_PASSWORD=..." or a query's "token=..."
+//   - the value of a JSON field with a credential-like name
+//
+// Parameters:
+//   - text: Command output.
+//
+// Returns:
+//   - string: text with those values replaced by xxxxx.
+func Text(text string) string {
+	text = userinfoInError.ReplaceAllString(text, redactedUserinfo)
+
+	for _, pattern := range []*regexp.Regexp{headerLine, assignment, jsonField} {
+		text = pattern.ReplaceAllStringFunc(text, func(match string) string {
+			parts := pattern.FindStringSubmatch(match)
+			if !isSensitiveQueryKey(parts[2]) {
+				return match
+			}
+
+			return parts[1] + redactedValue
+		})
+	}
+
+	return text
 }
 
 // ServiceURL returns a summary of a notification service URL that leaves out

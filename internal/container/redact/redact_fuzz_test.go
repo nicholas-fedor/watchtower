@@ -4,6 +4,7 @@ import (
 	"net/url"
 	"strings"
 	"testing"
+	"unicode"
 
 	"github.com/stretchr/testify/assert"
 )
@@ -90,5 +91,45 @@ func FuzzQueryKeyWords(f *testing.F) {
 		}, key))
 
 		assert.Equal(t, want, strings.Join(words, ""))
+	})
+}
+
+// FuzzText verifies that redacting command output never panics and changes
+// nothing on a second pass. A credential value written as a header line,
+// name=value pair, JSON field or URL password is always replaced.
+//
+// The seed corpus covers plain text, each credential form and values with
+// quotes, equals signs and at signs. The regression seed under testdata/fuzz is
+// a value with a form feed. No credential form can carry one.
+func FuzzText(f *testing.F) {
+	for _, seed := range []string{"plain", "abc123", `p@ss"w=rd`, "ghp_abc", ""} {
+		f.Add("prefix line", seed)
+	}
+
+	f.Fuzz(func(t *testing.T, text, secret string) {
+		once := Text(text)
+		if twice := Text(once); twice != once {
+			t.Fatalf("second pass changed %q to %q", once, twice)
+		}
+
+		// A value that redaction can recognize is one word without quotes,
+		// separators, whitespace or control characters. Shorter values could
+		// appear inside "xxxxx" itself.
+		if len(secret) < 6 || strings.ContainsAny(secret, "\"'\\&;,@/:?#=xX") ||
+			strings.ContainsFunc(secret, func(char rune) bool { return unicode.IsSpace(char) || unicode.IsControl(char) }) {
+			return
+		}
+
+		for _, form := range []string{
+			"Authorization: Bearer " + secret,
+			"> X-Auth-Token: " + secret,
+			"DB_PASSWORD=" + secret,
+			`{"secret": "` + secret + `"}`,
+			"https://bot:" + secret + "@example.com/repo.git",
+		} {
+			if out := Text(text + "\n" + form); strings.Contains(out, secret) && !strings.Contains(text, secret) {
+				t.Fatalf("%q kept the credential: %q", form, out)
+			}
+		}
 	})
 }

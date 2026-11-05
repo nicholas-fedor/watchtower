@@ -166,10 +166,56 @@ Both global and individual, container-specific uid/gid configurations are suppor
 
 Lifecycle hooks utilize Docker's exec API through the following sequence:
 
-1. **Exec Creation**: `ContainerExecCreate` creates an exec instance with the specified command
-2. **Exec Start**: `ContainerExecStart` begins execution of the command
-3. **Output Capture**: `ContainerExecAttach` captures stdout/stderr output
-4. **Status Monitoring**: `ContainerExecInspect` monitors execution status and exit codes
+1. **Exec Creation**: `ExecCreate` creates an exec instance with the specified command
+2. **Exec Start and Output Capture**: `ExecAttach` starts the command and reads its stdout and stderr output to the end
+3. **Status Monitoring**: `ExecInspect` monitors execution status and exit codes
+
+### Hook Output and Security
+
+A hook runs inside the container. Its output therefore comes from whatever runs there, which may be a compromised application or a third-party image. Watchtower treats the output as untrusted text:
+
+- It reads the whole output. A command that prints a lot never blocks.
+- It keeps only the last 2 KiB. A leading `…` marks output whose beginning was dropped.
+- Before the text is logged or sent, it removes:
+    - Terminal escape sequences, such as colours, cursor movement, window titles, clipboard writes and hyperlinks
+    - Control characters other than newlines, tabs and carriage returns
+    - Invisible Unicode format characters, such as bidirectional text controls, zero-width characters and tag characters
+- A carriage return directly before a newline is dropped. Any other carriage return becomes a newline.
+- It replaces common forms of credentials with `xxxxx`:
+    - Passwords and tokens in URLs, such as `https://user:token@host`
+    - Header lines with a credential-like name, such as `Authorization`, `Cookie` or `X-Api-Key`, including the request headers `curl -v` prints
+    - `NAME=value` pairs with a credential-like name, such as `DB_PASSWORD=…` in an environment listing or `token=…` in a query string
+    - JSON fields with a credential-like name, such as `"password": "…"`
+- It puts the output on one line, joining its lines with ` | `. No line of hook output can then pass for one of Watchtower's own notification lines.
+- The output never changes what Watchtower does. Only the exit code decides whether the update continues, is skipped or fails.
+
+The kept output goes to these places:
+
+| Hook                  | When the command succeeds                     | When the command fails                                                                                                                                                                              |
+|-----------------------|-----------------------------------------------|-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| Pre-update            | The debug log, in the "Executed command" line | The error-level "Could not update container" log line and the notifications that carry it. The failed container's error in report templates such as `default`, `json.v1` and the porcelain formats. |
+| Pre-check, post-check | The debug log, in the "Executed command" line | The debug log only                                                                                                                                                                                  |
+| Post-update           | The debug log, in the "Executed command" line | The debug log only                                                                                                                                                                                  |
+
+The HTTP API and its event stream do not include hook output.
+
+!!! Warning "Keep secrets out of hook output"
+    Notification services are third parties. Debug logs are often shipped to other systems. Redaction catches the common forms above. It cannot recognize every secret. These can still pass:
+
+    - a secret under an ordinary name
+    - a secret split across lines
+    - a secret cut at the start of the kept 2 KiB
+
+    A failing pre-update hook that prints credentials, for example through `set -x`, `env` or `curl -v`, can send them to every notification service. Write verbose output to a file inside the container or to `/dev/null`. Print only a short reason when the command fails.
+
+!!! Note "Markup, mentions and look-alike characters"
+    Watchtower does not escape the text for each notification service. A service may act on markup or mentions in it:
+
+    - Discord parses `@everyone` in a message.
+    - Email sent with Shoutrrr's `usehtml` option renders the text as HTML.
+    - Telegram's HTML and Markdown parse modes format it.
+
+    Characters that look alike, such as a Cyrillic `а` in place of a Latin `a`, stay as written, since removing them would break text in other languages.
 
 ### Environment Variables
 
@@ -739,5 +785,5 @@ Look for log messages containing:
 
 - "Executing pre-check command"
 - "Executing pre-update command"
-- "Command output captured"
+- "Executed command"
 - "Command execution failed"
