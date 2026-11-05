@@ -34,6 +34,9 @@ type Notifier interface {
 	// Flush sends the collected entries without a report. Later entries are
 	// sent as they are logged until the next StartNotification.
 	Flush()
+	// Discard drops the collected entries without sending them. Later entries
+	// are sent as they are logged until the next StartNotification.
+	Discard()
 	// ShouldSendNotification reports whether report is worth a notification at
 	// the configured notifications level.
 	ShouldSendNotification(report types.Report) bool
@@ -124,6 +127,14 @@ func RunUpdatesWithNotifications(
 
 	// Initiate notification batching.
 	startNotifications(log, params.Notifier, params.NotificationSplitByContainer)
+
+	// The session owns its batch and ends it on every return. Deferred before
+	// the recover, this runs after a panicked session's flush. It drops the
+	// entries no notification took. In split mode those include the image-level
+	// removal lines. The split path sends them per container.
+	if params.Notifier != nil {
+		defer params.Notifier.Discard()
+	}
 
 	defer func() {
 		if recovered := recover(); recovered != nil {
@@ -510,10 +521,9 @@ func logUpdateReport(log *zerolog.Logger, result types.Report) {
 
 // sendNotifications handles sending notifications about update results.
 //
-// It supports both grouped and per-container notifications based on configuration flags,
-// including complex logic for splitting notifications by container. The non-split path
-// sends notifications asynchronously using a goroutine with proper synchronization
-// to ensure the notification completes before the notifier is closed.
+// It supports both grouped and per-container notifications based on configuration flags.
+// A grouped report below the notifications level is not sent. The lines the
+// session queued are then sent without it.
 //
 // Parameters:
 //   - notifier: The notification system instance for sending update status messages.
@@ -526,14 +536,19 @@ func sendNotifications(log *zerolog.Logger, notifier Notifier,
 	result types.Report,
 	cleanedImages []cleanup.RemovedImageInfo,
 ) {
-	// Check if notifier is available
-	if notifier != nil {
-		// Check if notifications should be split by container
-		if notificationSplitByContainer {
-			sendSplitNotifications(log, notifier, notificationReport, result, cleanedImages)
-		} else if notifier.ShouldSendNotification(result) {
-			notifier.SendNotification(result)
-		}
+	if notifier == nil {
+		return
+	}
+
+	switch {
+	case notificationSplitByContainer:
+		sendSplitNotifications(log, notifier, notificationReport, result, cleanedImages)
+	case notifier.ShouldSendNotification(result):
+		notifier.SendNotification(result)
+	default:
+		// The report is below the notifications level.
+		// Lines the session queued at that level are still sent without it.
+		notifier.Flush()
 	}
 }
 

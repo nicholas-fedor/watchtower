@@ -1,6 +1,8 @@
 package notify
 
 import (
+	"fmt"
+	"io"
 	"strings"
 	"testing"
 	"time"
@@ -373,6 +375,60 @@ func TestNotifier_Flush(t *testing.T) {
 	assert.Equal(t, []string{
 		"Found new image: mock/app:latest (sha256:new)\nStopped stale container: app1 (unknown)",
 	}, sent)
+}
+
+// TestNotifier_FlushEmptyQueue verifies that Flush sends nothing when nothing
+// is queued, with every built-in template, and still ends batching. The JSON
+// and porcelain templates render a document even without entries. Flush would
+// otherwise send it as an empty notification.
+func TestNotifier_FlushEmptyQueue(t *testing.T) {
+	t.Parallel()
+
+	for _, tpl := range []string{"", "json.v1", "porcelain.json", "porcelain.v1.summary-no-log"} {
+		for _, legacy := range []bool{true, false} {
+			t.Run(fmt.Sprintf("%q legacy %t", tpl, legacy), func(t *testing.T) {
+				t.Parallel()
+
+				n := createNotifier(newTestLogger(t), nil, nil, zerolog.ErrorLevel, tpl, legacy, format.StaticData{}, 0)
+				t.Cleanup(n.Close)
+
+				n.StartNotification(false)
+				n.Flush()
+
+				n.entriesMutex.RLock()
+				remaining := n.entries
+				n.entriesMutex.RUnlock()
+
+				assert.Nil(t, remaining)
+				assert.Empty(t, sentMessages(n))
+			})
+		}
+	}
+}
+
+// TestNotifier_Discard verifies that Discard empties the queue without sending
+// it and ends batching. A line logged afterwards is sent at once instead of
+// waiting in the queue.
+func TestNotifier_Discard(t *testing.T) {
+	t.Parallel()
+
+	n := newBatchingNotifier(t, []*format.Entry{
+		{Message: logging.RemovingImage, Data: map[string]any{"image_id": "01d111111111"}},
+	})
+
+	n.Discard()
+
+	n.entriesMutex.RLock()
+	remaining := n.entries
+	n.entriesMutex.RUnlock()
+
+	assert.Nil(t, remaining)
+	assert.Empty(t, sentMessages(n))
+
+	hooked := zerolog.New(io.Discard).Hook(n)
+	hooked.Warn().Msg("Logged after the session")
+
+	assert.Equal(t, []string{"Logged after the session"}, sentMessages(n))
 }
 
 // TestSendNotification_FailedFocusCarriesFailure verifies that a failure line travels with its split notification.

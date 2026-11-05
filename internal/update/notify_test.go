@@ -150,8 +150,12 @@ func TestRunUpdatesWithNotifications_PanicEndsSession(t *testing.T) {
 	// Without a report, report templates list the batch's entries. The mock
 	// fails the test on any SendNotification call.
 	notifier := mockUpdate.NewMockNotifier(t)
-	notifier.EXPECT().StartNotification(false).Once()
-	notifier.EXPECT().Flush().Once()
+	// The session's deferred Discard runs after the panic's Flush.
+	mock.InOrder(
+		notifier.EXPECT().StartNotification(false).Once(),
+		notifier.EXPECT().Flush().Once(),
+		notifier.EXPECT().Discard().Once(),
+	)
 
 	broadcaster := events.NewBroadcaster()
 	published, _ := broadcaster.SubscribeWithDone()
@@ -317,9 +321,13 @@ func TestRunUpdates(t *testing.T) {
 				)
 
 				notifier := mockUpdate.NewMockNotifier(t)
-				notifier.EXPECT().StartNotification(true).Return()
+				// The session ends its batch after its split notification.
 				notifier.EXPECT().ShouldSendNotification(mock.Anything).Return(true)
-				notifier.EXPECT().SendNotification(mock.Anything).Return()
+				mock.InOrder(
+					notifier.EXPECT().StartNotification(true).Once(),
+					notifier.EXPECT().SendNotification(mock.Anything).Once(),
+					notifier.EXPECT().Discard().Once(),
+				)
 
 				params := RunUpdatesWithNotificationsParams{
 					Logger:                       newTestLogger(t),
@@ -583,6 +591,20 @@ func TestRunUpdates(t *testing.T) {
 			notifier.EXPECT().SendNotification(mockReport).Return()
 			sendNotifications(newTestLogger(t), notifier, false, false, mockReport, []cleanup.RemovedImageInfo{})
 			notifier.AssertExpectations(t)
+		})
+
+		// A report below the notifications level, such as one without failures
+		// at the error level, is not sent. The batch still ends. Its queued
+		// lines are sent without the report instead of waiting for the next
+		// session.
+		t.Run("should flush the batch when the report is below the notifications level", func(t *testing.T) {
+			t.Parallel()
+
+			mockReport := mockTypes.NewMockReport(t)
+			notifier := mockUpdate.NewMockNotifier(t)
+			notifier.EXPECT().ShouldSendNotification(mockReport).Return(false)
+			notifier.EXPECT().Flush().Once()
+			sendNotifications(newTestLogger(t), notifier, false, false, mockReport, []cleanup.RemovedImageInfo{})
 		})
 
 		t.Run("should call sendSplitNotifications when split is true", func(t *testing.T) {

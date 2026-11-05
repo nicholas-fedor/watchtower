@@ -45,6 +45,39 @@ func (_m *MockNotifier) EXPECT() *MockNotifier_Expecter {
 	return &MockNotifier_Expecter{mock: &_m.Mock}
 }
 
+// Discard provides a mock function for the type MockNotifier
+func (_mock *MockNotifier) Discard() {
+	_mock.Called()
+	return
+}
+
+// MockNotifier_Discard_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'Discard'
+type MockNotifier_Discard_Call struct {
+	*mock.Call
+}
+
+// Discard is a helper method to define mock.On call
+func (_e *MockNotifier_Expecter) Discard() *MockNotifier_Discard_Call {
+	return &MockNotifier_Discard_Call{Call: _e.mock.On("Discard")}
+}
+
+func (_c *MockNotifier_Discard_Call) Run(run func()) *MockNotifier_Discard_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run()
+	})
+	return _c
+}
+
+func (_c *MockNotifier_Discard_Call) Return() *MockNotifier_Discard_Call {
+	_c.Call.Return()
+	return _c
+}
+
+func (_c *MockNotifier_Discard_Call) RunAndReturn(run func()) *MockNotifier_Discard_Call {
+	_c.Run(run)
+	return _c
+}
+
 // Flush provides a mock function for the type MockNotifier
 func (_mock *MockNotifier) Flush() {
 	_mock.Called()

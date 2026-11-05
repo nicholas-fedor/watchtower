@@ -141,8 +141,7 @@ func (h *Handler) Handle(c fiber.Ctx) error {
 		}
 	}
 
-	// Suppress notifications during the check to prevent log entries from
-	// triggering immediate notifications. The notifier is reset after the check.
+	// Hold back the check's log entries and send them when it ends.
 	if h.notifier != nil {
 		h.notifier.StartNotification(true)
 
@@ -152,8 +151,6 @@ func (h *Handler) Handle(c fiber.Ctx) error {
 			} else {
 				h.notifier.Flush()
 			}
-
-			h.notifier.StartNotification(false)
 		}()
 	}
 

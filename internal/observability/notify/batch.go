@@ -87,11 +87,17 @@ func (n *Notifier) SendNotification(report types.Report) {
 // Flush sends every queued message without a report and empties the queue.
 //
 // Report templates then list the queued messages themselves. Callers use it
-// when no scan produced a report, such as for the startup message. Messages
-// logged after it are sent one at a time until the next
+// when no scan produced a report, such as for the startup message. An empty
+// queue sends nothing, since templates such as json.v1 would still render a
+// document. Messages logged after it are sent one at a time until the next
 // [Notifier.StartNotification].
 func (n *Notifier) Flush() {
-	n.sendDeduplicated(n.takeEntries(), nil)
+	entries := n.takeEntries()
+	if len(entries) == 0 {
+		return
+	}
+
+	n.sendDeduplicated(entries, nil)
 }
 
 // FlushSplitByContainer takes every entry out of the queue and sends one
@@ -121,6 +127,22 @@ func (n *Notifier) FlushSplitByContainer() {
 	for _, containerEntries := range byContainer {
 		n.sendEntries(containerEntries, nil)
 	}
+}
+
+// Discard empties the queue without sending it and ends batching.
+//
+// An update session calls it when it ends, after whatever it sent. The entries
+// that no notification took are dropped. Messages logged after it are sent one
+// at a time until the next [Notifier.StartNotification].
+func (n *Notifier) Discard() {
+	dropped := n.takeEntries()
+	if len(dropped) == 0 {
+		return
+	}
+
+	n.ll().Debug().
+		Int("entries_count", len(dropped)).
+		Msg("Discarded queued entries")
 }
 
 // entryMatchesFocus reports whether a queued entry belongs to the focus container.
