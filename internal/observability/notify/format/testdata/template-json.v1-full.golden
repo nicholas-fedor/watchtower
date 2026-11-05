@@ -591,6 +591,14 @@
         "latestImageId": "01d510000000",
         "name": "rstr1",
         "state": "Restarted"
+      },
+      {
+        "currentImageId": "01d610000000",
+        "id": "c79610000000",
+        "imageName": "mock/stal1:latest",
+        "latestImageId": "d0a610000000",
+        "name": "stal1",
+        "state": "Stale"
       }
     ],
     "skipped": [
@@ -604,7 +612,16 @@
         "state": "Skipped"
       }
     ],
-    "stale": [],
+    "stale": [
+      {
+        "currentImageId": "01d610000000",
+        "id": "c79610000000",
+        "imageName": "mock/stal1:latest",
+        "latestImageId": "d0a610000000",
+        "name": "stal1",
+        "state": "Stale"
+      }
+    ],
     "updated": [
       {
         "changelog": "https://github.com/org/app/releases/tag/v1.2.0",

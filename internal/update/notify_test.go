@@ -2132,8 +2132,8 @@ func Test_notifySkippedCooldownContainers(t *testing.T) {
 // TestSendSplitNotifications_MonitorOnlyStale verifies that a split
 // notification for a monitor-only container with a newer image lists the
 // container as stale, as the session report does, in both split modes. The
-// container is the notification's focus. The default template does not report
-// it as updated.
+// container is the notification's focus. The default template lists it as
+// stale and does not report it as updated.
 func TestSendSplitNotifications_MonitorOnlyStale(t *testing.T) {
 	t.Parallel()
 
@@ -2143,16 +2143,8 @@ func TestSendSplitNotifications_MonitorOnlyStale(t *testing.T) {
 
 			log := newTestLogger(t)
 
-			container, newImage := reportfixture.Container(0, state.UpdatedState)
-			progress := state.Progress{}
-			progress.AddScanned(log, container, newImage, updateParams.Params{MonitorOnly: true})
-
-			session := progress.Report(log)
-			require.Empty(t, session.Updated())
-			require.Len(t, session.Stale(), 1)
-
+			session := reportfixture.Report(state.StaleState)
 			monitored := session.Stale()[0]
-			require.True(t, monitored.IsMonitorOnly())
 
 			notifier := mockTypes.NewMockNotifier(t)
 			notifier.EXPECT().ShouldSendNotification(mock.Anything).Return(true).Once()
@@ -2174,6 +2166,7 @@ func TestSendSplitNotifications_MonitorOnlyStale(t *testing.T) {
 			require.NoError(t, err)
 			assert.Contains(t, rendered, "0 Updated")
 			assert.NotContains(t, rendered, "updated to")
+			assert.Contains(t, rendered, "- "+monitored.Name()+" ("+monitored.ImageName()+"): Stale")
 		})
 	}
 }

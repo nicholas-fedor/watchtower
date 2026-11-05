@@ -341,6 +341,9 @@ func goldenFullReport() types.Report {
 	progress.AddScanned(log, restarted, restarted.ImageID(), updateParams.Params{})
 	progress.MarkRestarted(log, restarted.ID())
 
+	stale, staleImage := reportfixture.Container(0, state.StaleState)
+	progress.AddScanned(log, stale, staleImage, updateParams.Params{MonitorOnly: true})
+
 	progress.UpdateFailed(log, failures)
 
 	return progress.Report(log)
