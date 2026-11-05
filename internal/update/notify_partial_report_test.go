@@ -18,7 +18,6 @@ import (
 	mockUpdate "github.com/nicholas-fedor/watchtower/internal/update/mocks"
 	updateParams "github.com/nicholas-fedor/watchtower/internal/update/params"
 	"github.com/nicholas-fedor/watchtower/pkg/types"
-	mockTypes "github.com/nicholas-fedor/watchtower/pkg/types/mocks"
 )
 
 // TestRunUpdatesWithNotifications_UpdateErrorKeepsPartialResults verifies
@@ -81,7 +80,7 @@ func TestRunUpdatesWithNotifications_UpdateErrorKeepsPartialResults(t *testing.T
 
 	var sent []types.Report
 
-	notifier := mockTypes.NewMockNotifier(t)
+	notifier := mockUpdate.NewMockNotifier(t)
 	notifier.EXPECT().StartNotification(false).Once()
 	notifier.EXPECT().SendNotification(mock.Anything).
 		Run(func(report types.Report) { sent = append(sent, report) }).

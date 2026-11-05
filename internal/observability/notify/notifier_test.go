@@ -426,7 +426,7 @@ func TestNotifier(t *testing.T) {
 				names := notifier.GetNames()
 				assert.Contains(t, names, "gotify")
 
-				urls := notifier.GetURLs()
+				urls := notifier.urls
 				assert.True(
 					t,
 					slices.ContainsFunc(urls, func(u string) bool { return strings.Contains(u, "gotify://gotify.example.com/Atesttoken12345") }),
@@ -1012,14 +1012,11 @@ func testURL(t *testing.T, args []string, expectedURL string, expectedDelay time
 
 	cfg := loadNotify(t, args)
 
-	created, err := NewNotifier(newTestLogger(t), cfg)
+	notifier, err := NewNotifier(newTestLogger(t), cfg)
 	require.NoError(t, err)
-
-	notifier, ok := created.(*shoutrrrTypeNotifier)
-	require.True(t, ok)
 	t.Cleanup(notifier.Close)
 
-	assert.Contains(t, notifier.Urls, expectedURL)
+	assert.Contains(t, notifier.urls, expectedURL)
 	assert.Equal(t, expectedDelay, notifier.delay)
 }
 

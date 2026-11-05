@@ -7,6 +7,7 @@ import (
 
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/mock"
 
 	mockLogging "github.com/nicholas-fedor/watchtower/internal/observability/logging/mocks"
 )
@@ -133,6 +134,31 @@ func TestWriteStartupMessage(t *testing.T) {
 				Version:   "v1.0.0",
 			})
 		})
+	})
+
+	// The startup lines are collected from the start and sent as one
+	// notification, which names the configured services.
+	t.Run("should send the startup message as one notification", func(t *testing.T) {
+		t.Parallel()
+
+		log, buffer := newBufferLogger(zerolog.InfoLevel)
+		notifier := mockLogging.NewMockStartupNotifier(t)
+
+		mock.InOrder(
+			notifier.EXPECT().StartNotification(false).Once(),
+			notifier.EXPECT().GetNames().Return([]string{"slack", "gotify"}).Once(),
+			notifier.EXPECT().Flush().Once(),
+		)
+
+		WriteStartupMessage(StartupParams{
+			Notifier:  notifier,
+			Logger:    log,
+			Filtering: "Watching all containers",
+			Client:    newVersionProvider(t),
+			Version:   "v1.0.0",
+		})
+
+		assert.Contains(t, buffer.String(), "Using notifications: slack, gotify")
 	})
 
 	t.Run("should not panic when Logger is nil but NoStartupMessage is set", func(t *testing.T) {

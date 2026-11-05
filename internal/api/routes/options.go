@@ -9,6 +9,7 @@ import (
 	"github.com/gofiber/fiber/v3/middleware/timeout"
 	"github.com/rs/zerolog"
 
+	"github.com/nicholas-fedor/watchtower/internal/api/handlers/check"
 	containerClient "github.com/nicholas-fedor/watchtower/internal/container/client"
 	"github.com/nicholas-fedor/watchtower/internal/git"
 	"github.com/nicholas-fedor/watchtower/internal/observability/events"
@@ -60,8 +61,9 @@ const (
 type Options struct {
 	// Client is the Docker client used by API handlers.
 	Client containerClient.Client
-	// Notifier sends update and check status messages.
-	Notifier types.Notifier
+	// Notifier holds back the notifications of a check request and sends them
+	// when it ends.
+	Notifier check.Notifier
 	// Logger is the zerolog logger for the HTTP API server and middleware.
 	// Required when any HTTP API endpoint is enabled.
 	// SetupAndStartAPI returns ErrMissingLogger if it is nil.

@@ -14,7 +14,6 @@ import (
 	mockUpdate "github.com/nicholas-fedor/watchtower/internal/update/mocks"
 	updateParams "github.com/nicholas-fedor/watchtower/internal/update/params"
 	"github.com/nicholas-fedor/watchtower/pkg/types"
-	mockTypes "github.com/nicholas-fedor/watchtower/pkg/types/mocks"
 )
 
 // TestRunUpdatesWithNotifications_OldSelfDetected verifies that when the
@@ -44,7 +43,7 @@ func TestRunUpdatesWithNotifications_OldSelfDetected(t *testing.T) {
 		dockerContainer.RestartPolicy{Name: dockerContainer.RestartPolicyDisabled}).Return(nil).Once()
 
 	// The notifier mock fails the test on any call other than starting the batch.
-	notifier := mockTypes.NewMockNotifier(t)
+	notifier := mockUpdate.NewMockNotifier(t)
 	notifier.EXPECT().StartNotification(false).Once()
 
 	broadcaster := events.NewBroadcaster()

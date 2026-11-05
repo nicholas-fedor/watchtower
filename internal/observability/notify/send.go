@@ -14,19 +14,19 @@ import (
 // Parameters:
 //   - notifier: Notifier instance.
 //   - errs: Errors returned from router send.
-func processSendErrors(notifier *shoutrrrTypeNotifier, errs []error) {
+func processSendErrors(notifier *Notifier, errs []error) {
 	log := notifier.ll()
 	failureCount := 0
 
 	var authFailures, networkFailures, rateLimitFailures int
 
 	for i, err := range errs {
-		// Index guard against potential errs/Urls length mismatch
-		if i >= len(notifier.Urls) {
+		// Index guard against potential errs/urls length mismatch
+		if i >= len(notifier.urls) {
 			log.Error().
 				Err(err).
 				Int("index", i).
-				Int("urls_length", len(notifier.Urls)).
+				Int("urls_length", len(notifier.urls)).
 				Int("errs_length", len(errs)).
 				Str("failure_type", "index_mismatch").
 				Msg("Error index out of bounds for URLs slice")
@@ -37,8 +37,8 @@ func processSendErrors(notifier *shoutrrrTypeNotifier, errs []error) {
 		// Increment failure count and prepare URL details for logging on notification failure.
 		if err != nil {
 			failureCount++
-			scheme := getScheme(notifier.Urls[i])
-			sanitizedURL := redact.ServiceURL(notifier.Urls[i])
+			scheme := getScheme(notifier.urls[i])
+			sanitizedURL := redact.ServiceURL(notifier.urls[i])
 
 			// Diagnostic logging: Categorize failure types
 			errStr := err.Error()
@@ -98,16 +98,16 @@ func processSendErrors(notifier *shoutrrrTypeNotifier, errs []error) {
 	// Diagnostic logging: Summary with categorized failures
 	if failureCount > 0 {
 		log.Warn().
-			Int("total_urls", len(notifier.Urls)).
+			Int("total_urls", len(notifier.urls)).
 			Int("failed_count", failureCount).
-			Int("success_count", len(notifier.Urls)-failureCount).
+			Int("success_count", len(notifier.urls)-failureCount).
 			Int("auth_failures", authFailures).
 			Int("network_failures", networkFailures).
 			Int("rate_limit_failures", rateLimitFailures).
 			Msg("Notification send completed with failures")
-	} else if len(notifier.Urls) > 0 {
+	} else if len(notifier.urls) > 0 {
 		log.Debug().
-			Int("total_urls", len(notifier.Urls)).
+			Int("total_urls", len(notifier.urls)).
 			Msg("Notification send completed successfully")
 	}
 }
@@ -116,7 +116,7 @@ func processSendErrors(notifier *shoutrrrTypeNotifier, errs []error) {
 //
 // Parameters:
 //   - notifier: Notifier instance.
-func sendNotifications(notifier *shoutrrrTypeNotifier) {
+func sendNotifications(notifier *Notifier) {
 	log := notifier.ll()
 	defer func() { notifier.done <- struct{}{} }()
 
@@ -127,7 +127,7 @@ func sendNotifications(notifier *shoutrrrTypeNotifier) {
 			log.Trace().
 				Int("msg_length", len(msg)).
 				Str("notification_type", shoutrrrType).
-				Int("total_urls", len(notifier.Urls)).
+				Int("total_urls", len(notifier.urls)).
 				Msg("Notification goroutine received message from channel")
 
 			log.Debug().Str("message", msg).Msg("Sending notification")
@@ -141,7 +141,7 @@ func sendNotifications(notifier *shoutrrrTypeNotifier) {
 
 			// Diagnostic logging: Log attempt details before sending
 			log.Trace().
-				Int("total_urls", len(notifier.Urls)).
+				Int("total_urls", len(notifier.urls)).
 				Str("delay", notifier.delay.String()).
 				Int("msg_length", len(msg)).
 				Msg("Attempting to send notification to configured services")
@@ -149,11 +149,11 @@ func sendNotifications(notifier *shoutrrrTypeNotifier) {
 			// Log before calling Router.Send
 			log.Trace().
 				Int("msg_length", len(msg)).
-				Int("total_urls", len(notifier.Urls)).
+				Int("total_urls", len(notifier.urls)).
 				Str("notification_type", shoutrrrType).
 				Msg("Calling Router.Send with message")
 
-			processSendErrors(notifier, notifier.Router.Send(msg, notifier.params))
+			processSendErrors(notifier, notifier.sender.Send(msg, notifier.params))
 		case <-notifier.stop:
 			// Shutdown mode: drain all remaining messages from the channel
 			log.Debug().Msg("Shutdown signal received, draining remaining messages without delay")
@@ -165,7 +165,7 @@ func sendNotifications(notifier *shoutrrrTypeNotifier) {
 					log.Trace().
 						Int("msg_length", len(msg)).
 						Str("notification_type", shoutrrrType).
-						Int("total_urls", len(notifier.Urls)).
+						Int("total_urls", len(notifier.urls)).
 						Bool("shutdown_mode", true).
 						Msg("Processing remaining notification message during shutdown")
 
@@ -175,7 +175,7 @@ func sendNotifications(notifier *shoutrrrTypeNotifier) {
 
 					// Diagnostic logging: Log attempt details before sending
 					log.Trace().
-						Int("total_urls", len(notifier.Urls)).
+						Int("total_urls", len(notifier.urls)).
 						Str("delay", notifier.delay.String()).
 						Int("msg_length", len(msg)).
 						Msg("Attempting to send notification to configured services during shutdown")
@@ -183,11 +183,11 @@ func sendNotifications(notifier *shoutrrrTypeNotifier) {
 					// Log before calling Router.Send
 					log.Trace().
 						Int("msg_length", len(msg)).
-						Int("total_urls", len(notifier.Urls)).
+						Int("total_urls", len(notifier.urls)).
 						Str("notification_type", shoutrrrType).
 						Msg("Calling Router.Send with message during shutdown")
 
-					processSendErrors(notifier, notifier.Router.Send(msg, notifier.params))
+					processSendErrors(notifier, notifier.sender.Send(msg, notifier.params))
 				default:
 					// Channel is empty, all messages drained
 					log.Debug().Msg("All remaining messages drained during shutdown")
@@ -204,7 +204,7 @@ func sendNotifications(notifier *shoutrrrTypeNotifier) {
 // Parameters:
 //   - entries: Log entries to send.
 //   - report: Optional scan report.
-func (n *shoutrrrTypeNotifier) sendEntries(entries []*format.Entry, report types.Report) {
+func (n *Notifier) sendEntries(entries []*format.Entry, report types.Report) {
 	log := n.ll()
 
 	msg, err := n.template.Render(log, format.Data{StaticData: n.data, Entries: entries, Report: report})

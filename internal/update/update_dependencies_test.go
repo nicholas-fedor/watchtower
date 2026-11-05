@@ -25,7 +25,6 @@ import (
 	mockUpdate "github.com/nicholas-fedor/watchtower/internal/update/mocks"
 	updateParams "github.com/nicholas-fedor/watchtower/internal/update/params"
 	"github.com/nicholas-fedor/watchtower/pkg/types"
-	mockTypes "github.com/nicholas-fedor/watchtower/pkg/types/mocks"
 )
 
 // TestUpdateAction_Dependencies verifies that an update stops and starts
@@ -3020,9 +3019,9 @@ func TestRunUpdatesWithNotifications_IdentifierCollisionNotifiesOnce(t *testing.
 		},
 	}, false, false)
 
-	notifier := mockTypes.NewMockNotifier(t)
+	notifier := mockUpdate.NewMockNotifier(t)
 	notifier.EXPECT().StartNotification(false).Once()
-	notifier.EXPECT().SendNotification(nil).Once()
+	notifier.EXPECT().Flush().Once()
 
 	log, buf := logcapture.NewJSON(zerolog.DebugLevel)
 

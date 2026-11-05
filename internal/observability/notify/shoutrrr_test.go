@@ -66,7 +66,7 @@ func createTestNotifier(
 	legacy bool,
 	data format.StaticData,
 	delay time.Duration,
-) *shoutrrrTypeNotifier {
+) *Notifier {
 	t.Helper()
 
 	sender, added, _, err := newSender(log, notifyConfig.Notify{URLs: urls})
@@ -149,9 +149,9 @@ func queuedMessages(count int) []string {
 //   - t: Test that owns the notifier.
 //
 // Returns:
-//   - *shoutrrrTypeNotifier: Notifier with a running worker.
+//   - *Notifier: Notifier with a running worker.
 //   - *blockingRouter: Router the worker is blocked in until unlocked.
-func sendNotificationsWithBlockingRouter(t *testing.T) (*shoutrrrTypeNotifier, *blockingRouter) {
+func sendNotificationsWithBlockingRouter(t *testing.T) (*Notifier, *blockingRouter) {
 	t.Helper()
 
 	router := &blockingRouter{
@@ -160,7 +160,7 @@ func sendNotificationsWithBlockingRouter(t *testing.T) (*shoutrrrTypeNotifier, *
 	}
 
 	shoutrrr := createTestNotifier(t, newTestLogger(t), []string{}, allButTrace, true, format.StaticData{}, 0)
-	shoutrrr.Router = router
+	shoutrrr.sender = router
 	shoutrrr.RegisterHook(newTestLogger(t))
 
 	shoutrrr.StartNotification(false)
@@ -441,7 +441,7 @@ func TestClose_SkipsSendDelay(t *testing.T) {
 
 		router := &recordingRouter{}
 		notifier := createTestNotifier(t, newTestLogger(t), []string{}, allButTrace, true, format.StaticData{}, time.Minute)
-		notifier.Router = router
+		notifier.sender = router
 		notifier.RegisterHook(newTestLogger(t))
 
 		for _, message := range queued {
@@ -497,7 +497,7 @@ func TestClose_ConcurrentSendDoesNotPanic(t *testing.T) {
 	for range rounds {
 		log := zerolog.Nop()
 		notifier := createTestNotifier(t, &log, []string{}, allButTrace, true, format.StaticData{}, 0)
-		notifier.Router = &recordingRouter{}
+		notifier.sender = &recordingRouter{}
 		notifier.RegisterHook(&log)
 
 		var wg sync.WaitGroup
@@ -527,7 +527,7 @@ func TestClose_SendPastClosedCheckDoesNotPanic(t *testing.T) {
 
 	log := zerolog.Nop()
 	notifier := createTestNotifier(t, &log, []string{}, allButTrace, true, format.StaticData{}, 0)
-	notifier.Router = &recordingRouter{}
+	notifier.sender = &recordingRouter{}
 	notifier.RegisterHook(&log)
 	notifier.Close()
 
@@ -545,9 +545,9 @@ func TestClose_SendPastClosedCheckDoesNotPanic(t *testing.T) {
 func TestLL_WithoutLogger(t *testing.T) {
 	t.Parallel()
 
-	var nilNotifier *shoutrrrTypeNotifier
+	var nilNotifier *Notifier
 
-	for _, notifier := range []*shoutrrrTypeNotifier{nilNotifier, {}} {
+	for _, notifier := range []*Notifier{nilNotifier, {}} {
 		log := notifier.ll()
 		require.NotNil(t, log)
 		assert.Equal(t, zerolog.Disabled, log.GetLevel())

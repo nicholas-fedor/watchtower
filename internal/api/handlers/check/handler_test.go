@@ -10,8 +10,10 @@ import (
 
 	"github.com/gofiber/fiber/v3"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 
+	mockCheck "github.com/nicholas-fedor/watchtower/internal/api/handlers/check/mocks"
 	"github.com/nicholas-fedor/watchtower/internal/observability/events"
 )
 
@@ -340,4 +342,68 @@ func TestHandler_Handle_EmitsEvents(t *testing.T) {
 
 		assert.Equal(t, http.StatusOK, resp.StatusCode)
 	})
+}
+
+// TestHandler_Handle_Notifications verifies that a check holds back the
+// notifications its log lines would send until it ends. It then sends them in
+// one notification. With the notification-split-by-container configuration
+// option it sends one notification per container instead. Afterwards the
+// notifier collects entries again.
+func TestHandler_Handle_Notifications(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		// expect sets the notifier calls the check must make, in order.
+		expect           func(notifier *mockCheck.MockNotifier)
+		name             string
+		splitByContainer bool
+	}{
+		{
+			name: "sends the held entries in one notification",
+			expect: func(notifier *mockCheck.MockNotifier) {
+				mock.InOrder(
+					notifier.EXPECT().StartNotification(true).Once(),
+					notifier.EXPECT().Flush().Once(),
+					notifier.EXPECT().StartNotification(false).Once(),
+				)
+			},
+		},
+		{
+			name:             "sends one notification per container when split",
+			splitByContainer: true,
+			expect: func(notifier *mockCheck.MockNotifier) {
+				mock.InOrder(
+					notifier.EXPECT().StartNotification(true).Once(),
+					notifier.EXPECT().FlushSplitByContainer().Once(),
+					notifier.EXPECT().StartNotification(false).Once(),
+				)
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			notifier := mockCheck.NewMockNotifier(t)
+			tt.expect(notifier)
+
+			h := New(newTestLogger(t),
+				func(_ context.Context, _, _ []string) ([]ContainerCheck, error) {
+					return []ContainerCheck{{Name: "c1"}}, nil
+				},
+				5*time.Minute, notifier, tt.splitByContainer, nil, events.ScanStartedData{},
+			)
+			app := fiber.New(fiber.Config{})
+			app.Post("/v1/check", h.Handle)
+
+			req := httptest.NewRequestWithContext(t.Context(), http.MethodPost, "/v1/check", nil)
+			resp, err := app.Test(req)
+			require.NoError(t, err)
+
+			defer resp.Body.Close()
+
+			assert.Equal(t, http.StatusOK, resp.StatusCode)
+		})
+	}
 }

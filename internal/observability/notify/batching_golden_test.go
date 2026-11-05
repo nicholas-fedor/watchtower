@@ -66,7 +66,7 @@ func withContainer(data map[string]any, container string) map[string]any {
 // newBatchingNotifier returns a legacy-template notifier whose worker never
 // starts, so every message it renders stays in its message channel, with
 // entries already queued as during a batch.
-func newBatchingNotifier(t *testing.T, entries []*format.Entry) *shoutrrrTypeNotifier {
+func newBatchingNotifier(t *testing.T, entries []*format.Entry) *Notifier {
 	t.Helper()
 
 	notifier := createTestNotifier(t, newTestLogger(t), []string{}, zerolog.TraceLevel, true, format.StaticData{}, 0)
@@ -78,7 +78,7 @@ func newBatchingNotifier(t *testing.T, entries []*format.Entry) *shoutrrrTypeNot
 }
 
 // sentMessages drains the messages the notifier rendered.
-func sentMessages(notifier *shoutrrrTypeNotifier) []string {
+func sentMessages(notifier *Notifier) []string {
 	var messages []string
 
 	for {
@@ -109,7 +109,7 @@ func TestNotificationBatching(t *testing.T) {
 	out.WriteString("=== grouped\n")
 
 	grouped := newBatchingNotifier(t, batchEntries())
-	grouped.SendNotification(nil)
+	grouped.Flush()
 	writeMessages(&out, sentMessages(grouped))
 
 	out.WriteString("\n=== focused on web1\n")
@@ -135,7 +135,7 @@ func TestNotificationBatching(t *testing.T) {
 	out.WriteString("\n=== split by container (sorted)\n")
 
 	split := newBatchingNotifier(t, batchEntries())
-	FlushSplitByContainer(split)
+	split.FlushSplitByContainer()
 
 	messages := sentMessages(split)
 	slices.Sort(messages)

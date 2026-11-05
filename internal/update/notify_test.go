@@ -147,13 +147,11 @@ func TestRunUpdatesWithNotifications_PanicEndsSession(t *testing.T) {
 			panic("boom")
 		}).Once()
 
-	var sent []types.Report
-
-	notifier := mockTypes.NewMockNotifier(t)
+	// Without a report, report templates list the batch's entries. The mock
+	// fails the test on any SendNotification call.
+	notifier := mockUpdate.NewMockNotifier(t)
 	notifier.EXPECT().StartNotification(false).Once()
-	notifier.EXPECT().SendNotification(mock.Anything).
-		Run(func(report types.Report) { sent = append(sent, report) }).
-		Once()
+	notifier.EXPECT().Flush().Once()
 
 	broadcaster := events.NewBroadcaster()
 	published, _ := broadcaster.SubscribeWithDone()
@@ -171,9 +169,6 @@ func TestRunUpdatesWithNotifications_PanicEndsSession(t *testing.T) {
 	})
 
 	assert.Equal(t, &metrics.Metric{ScanFailed: true}, metric)
-
-	require.Len(t, sent, 1, "the session's batch is sent")
-	assert.Nil(t, sent[0], "the batch is sent without a report, so report templates list its entries")
 
 	// Events are published synchronously into the subscriber's buffer.
 	var eventTypes []string
@@ -321,7 +316,7 @@ func TestRunUpdates(t *testing.T) {
 					false,
 				)
 
-				notifier := mockTypes.NewMockNotifier(t)
+				notifier := mockUpdate.NewMockNotifier(t)
 				notifier.EXPECT().StartNotification(true).Return()
 				notifier.EXPECT().ShouldSendNotification(mock.Anything).Return(true)
 				notifier.EXPECT().SendNotification(mock.Anything).Return()
@@ -503,7 +498,7 @@ func TestRunUpdates(t *testing.T) {
 		t.Run("should start notification when notifier is provided", func(t *testing.T) {
 			t.Parallel()
 
-			notifier := mockTypes.NewMockNotifier(t)
+			notifier := mockUpdate.NewMockNotifier(t)
 			notifier.EXPECT().StartNotification(false).Return()
 			startNotifications(newTestLogger(t), notifier, false)
 			notifier.AssertExpectations(t)
@@ -518,7 +513,7 @@ func TestRunUpdates(t *testing.T) {
 		t.Run("should start notification with split enabled", func(t *testing.T) {
 			t.Parallel()
 
-			notifier := mockTypes.NewMockNotifier(t)
+			notifier := mockUpdate.NewMockNotifier(t)
 			notifier.EXPECT().StartNotification(true).Return()
 			startNotifications(newTestLogger(t), notifier, true)
 			notifier.AssertExpectations(t)
@@ -583,7 +578,7 @@ func TestRunUpdates(t *testing.T) {
 			t.Parallel()
 
 			mockReport := mockTypes.NewMockReport(t)
-			notifier := mockTypes.NewMockNotifier(t)
+			notifier := mockUpdate.NewMockNotifier(t)
 			notifier.EXPECT().ShouldSendNotification(mockReport).Return(true)
 			notifier.EXPECT().SendNotification(mockReport).Return()
 			sendNotifications(newTestLogger(t), notifier, false, false, mockReport, []cleanup.RemovedImageInfo{})
@@ -594,7 +589,7 @@ func TestRunUpdates(t *testing.T) {
 			t.Parallel()
 
 			mockReport := mockTypes.NewMockReport(t)
-			notifier := mockTypes.NewMockNotifier(t)
+			notifier := mockUpdate.NewMockNotifier(t)
 
 			// Set up mock expectations for split notification behavior
 			mockReport.EXPECT().Updated().Return([]types.ContainerReport{})
@@ -632,7 +627,7 @@ func TestRunUpdates(t *testing.T) {
 			mockReport.EXPECT().Fresh().Return([]types.ContainerReport{})
 
 			// Mock the SendNotification call
-			notifier := mockTypes.NewMockNotifier(t)
+			notifier := mockUpdate.NewMockNotifier(t)
 			notifier.EXPECT().ShouldSendNotification(mock.Anything).Return(true)
 			notifier.EXPECT().SendNotification(mock.Anything).Return()
 
@@ -645,7 +640,7 @@ func TestRunUpdates(t *testing.T) {
 			t.Parallel()
 
 			mockReport := mockTypes.NewMockReport(t)
-			notifier := mockTypes.NewMockNotifier(t)
+			notifier := mockUpdate.NewMockNotifier(t)
 
 			mockReport.EXPECT().Updated().Return([]types.ContainerReport{})
 			mockReport.EXPECT().Restarted().Return([]types.ContainerReport{})
@@ -679,7 +674,7 @@ func TestRunUpdates(t *testing.T) {
 			mockReport.EXPECT().Skipped().Return([]types.ContainerReport{})
 			mockReport.EXPECT().Fresh().Return([]types.ContainerReport{})
 
-			notifier := mockTypes.NewMockNotifier(t)
+			notifier := mockUpdate.NewMockNotifier(t)
 			notifier.EXPECT().ShouldSendNotification(mock.Anything).Return(true)
 			notifier.EXPECT().SendNotification(mock.Anything).Return()
 
@@ -705,7 +700,7 @@ func TestRunUpdates(t *testing.T) {
 			mockReport.EXPECT().Skipped().Return([]types.ContainerReport{})
 			mockReport.EXPECT().Fresh().Return([]types.ContainerReport{})
 
-			notifier := mockTypes.NewMockNotifier(t)
+			notifier := mockUpdate.NewMockNotifier(t)
 			notifier.EXPECT().ShouldSendNotification(mock.Anything).Return(true)
 			notifier.EXPECT().SendNotification(mock.Anything).Return()
 
@@ -730,7 +725,7 @@ func TestRunUpdates(t *testing.T) {
 			mockReport.EXPECT().Skipped().Return([]types.ContainerReport{})
 			mockReport.EXPECT().Fresh().Return([]types.ContainerReport{})
 
-			notifier := mockTypes.NewMockNotifier(t)
+			notifier := mockUpdate.NewMockNotifier(t)
 			// No SendNotification should be called due to empty name
 
 			sendSplitNotifications(newTestLogger(t), notifier, true, mockReport, []cleanup.RemovedImageInfo{})
@@ -756,7 +751,7 @@ func TestRunUpdates(t *testing.T) {
 			mockReport.EXPECT().Skipped().Return([]types.ContainerReport{})
 			mockReport.EXPECT().Fresh().Return([]types.ContainerReport{})
 
-			notifier := mockTypes.NewMockNotifier(t)
+			notifier := mockUpdate.NewMockNotifier(t)
 			notifier.EXPECT().ShouldSendNotification(mock.Anything).Return(true)
 			notifier.EXPECT().SendNotification(mock.Anything).Return()
 
@@ -783,7 +778,7 @@ func TestRunUpdates(t *testing.T) {
 			mockReport.EXPECT().Skipped().Return([]types.ContainerReport{})
 			mockReport.EXPECT().Fresh().Return([]types.ContainerReport{})
 
-			notifier := mockTypes.NewMockNotifier(t)
+			notifier := mockUpdate.NewMockNotifier(t)
 			notifier.EXPECT().ShouldSendNotification(mock.Anything).Return(true)
 			notifier.EXPECT().SendNotification(mock.Anything).Return()
 
@@ -805,7 +800,7 @@ func TestRunUpdates(t *testing.T) {
 			mockReport.EXPECT().Skipped().Return([]types.ContainerReport{})
 			mockReport.EXPECT().Fresh().Return([]types.ContainerReport{})
 
-			notifier := mockTypes.NewMockNotifier(t)
+			notifier := mockUpdate.NewMockNotifier(t)
 			// No SendNotification should be called since all lists are empty
 
 			sendSplitNotifications(newTestLogger(t), notifier, true, mockReport, []cleanup.RemovedImageInfo{})
@@ -831,7 +826,7 @@ func TestRunUpdates(t *testing.T) {
 			mockReport.EXPECT().Skipped().Return([]types.ContainerReport{}).Maybe()
 			mockReport.EXPECT().Fresh().Return([]types.ContainerReport{}).Maybe()
 
-			notifier := mockTypes.NewMockNotifier(t)
+			notifier := mockUpdate.NewMockNotifier(t)
 			notifier.EXPECT().ShouldSendNotification(mock.Anything).Return(true)
 			notifier.EXPECT().SendNotification(mock.Anything).Return()
 
@@ -896,7 +891,7 @@ func TestRunUpdates(t *testing.T) {
 			// Split path sends one SingleContainerReport-focused notification per updated container.
 			var sentFocusNames []string
 
-			notifier := mockTypes.NewMockNotifier(t)
+			notifier := mockUpdate.NewMockNotifier(t)
 			notifier.EXPECT().ShouldSendNotification(mock.Anything).Return(true).Times(2)
 			notifier.EXPECT().SendNotification(mock.Anything).Run(func(report types.Report) {
 				updated := report.Updated()
@@ -987,7 +982,7 @@ func TestRunUpdates(t *testing.T) {
 			mockReport.EXPECT().Skipped().Return([]types.ContainerReport{}).Maybe()
 			mockReport.EXPECT().Fresh().Return([]types.ContainerReport{}).Maybe()
 
-			notifier := mockTypes.NewMockNotifier(t)
+			notifier := mockUpdate.NewMockNotifier(t)
 			notifier.EXPECT().ShouldSendNotification(mock.Anything).Return(true)
 			notifier.EXPECT().SendNotification(mock.Anything).Return()
 
@@ -1027,7 +1022,7 @@ func TestRunUpdates(t *testing.T) {
 				mockReport.EXPECT().Skipped().Return([]types.ContainerReport{})
 				mockReport.EXPECT().Fresh().Return([]types.ContainerReport{})
 
-				notifier := mockTypes.NewMockNotifier(t)
+				notifier := mockUpdate.NewMockNotifier(t)
 				notifier.EXPECT().ShouldSendNotification(mock.Anything).Return(false)
 				// With notification level set to error and no errors, no notification should be sent
 
@@ -2061,7 +2056,7 @@ func TestSendSplitNotifications_CooldownSkipped(t *testing.T) {
 			require.True(t, ok)
 			status.SetCooldownInfo("1 hour", "24 hours", "23 hours", time.Now().Add(23*time.Hour))
 
-			notifier := mockTypes.NewMockNotifier(t)
+			notifier := mockUpdate.NewMockNotifier(t)
 			notifier.EXPECT().ShouldSendNotification(mock.Anything).Return(true)
 
 			var sent []*state.SingleContainerReport
@@ -2104,7 +2099,7 @@ func TestSendSplitNotifications_MonitorOnlyStale(t *testing.T) {
 			session := reportfixture.Report(state.StaleState)
 			monitored := session.Stale()[0]
 
-			notifier := mockTypes.NewMockNotifier(t)
+			notifier := mockUpdate.NewMockNotifier(t)
 			notifier.EXPECT().ShouldSendNotification(mock.Anything).Return(true).Once()
 
 			var sent types.Report

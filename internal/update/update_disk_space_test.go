@@ -14,7 +14,6 @@ import (
 	"github.com/nicholas-fedor/watchtower/internal/testutil/logcapture"
 	mockUpdate "github.com/nicholas-fedor/watchtower/internal/update/mocks"
 	"github.com/nicholas-fedor/watchtower/pkg/types"
-	mockTypes "github.com/nicholas-fedor/watchtower/pkg/types/mocks"
 )
 
 // TestImageDiskSpaceGate verifies that an update warns about image disk usage
@@ -171,9 +170,9 @@ func TestRunUpdatesWithNotifications_DiskSpaceAbortNotifiesOnce(t *testing.T) {
 			params := defaultTestUpdateParams(filters.NoFilter)
 			params.DiskSpaceMax = 10_000
 
-			notifier := mockTypes.NewMockNotifier(t)
+			notifier := mockUpdate.NewMockNotifier(t)
 			notifier.EXPECT().StartNotification(false).Once()
-			notifier.EXPECT().SendNotification(nil).Once()
+			notifier.EXPECT().Flush().Once()
 
 			metric := RunUpdatesWithNotifications(t.Context(), RunUpdatesWithNotificationsParams{
 				Logger:   log,

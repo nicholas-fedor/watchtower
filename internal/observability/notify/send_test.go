@@ -37,7 +37,7 @@ func TestProcessSendErrors(t *testing.T) {
 			format.StaticData{},
 			time.Duration(0),
 		)
-		shoutrrr.Router = mockRouter
+		shoutrrr.sender = mockRouter
 		shoutrrr.RegisterHook(log)
 		shoutrrr.StartNotification(false)
 		log.Info().Msg("test message")
@@ -65,7 +65,7 @@ func TestProcessSendErrors(t *testing.T) {
 			format.StaticData{},
 			time.Duration(0),
 		)
-		shoutrrr.Router = mockRouter
+		shoutrrr.sender = mockRouter
 		shoutrrr.RegisterHook(log)
 		shoutrrr.StartNotification(false)
 		log.Info().Msg("test message")
@@ -93,7 +93,7 @@ func TestProcessSendErrors(t *testing.T) {
 			format.StaticData{},
 			time.Duration(0),
 		)
-		shoutrrr.Router = mockRouter
+		shoutrrr.sender = mockRouter
 		shoutrrr.RegisterHook(log)
 		shoutrrr.StartNotification(false)
 		log.Info().Msg("test message")
@@ -121,7 +121,7 @@ func TestProcessSendErrors(t *testing.T) {
 			format.StaticData{},
 			time.Duration(0),
 		)
-		shoutrrr.Router = mockRouter
+		shoutrrr.sender = mockRouter
 		shoutrrr.RegisterHook(log)
 		shoutrrr.StartNotification(false)
 		log.Info().Msg("test message")
@@ -149,7 +149,7 @@ func TestProcessSendErrors(t *testing.T) {
 			format.StaticData{},
 			time.Duration(0),
 		)
-		shoutrrr.Router = mockRouter
+		shoutrrr.sender = mockRouter
 		shoutrrr.RegisterHook(log)
 		shoutrrr.StartNotification(false)
 		log.Info().Msg("test message")
@@ -177,7 +177,7 @@ func TestProcessSendErrors(t *testing.T) {
 			format.StaticData{},
 			time.Duration(0),
 		)
-		shoutrrr.Router = mockRouter
+		shoutrrr.sender = mockRouter
 		shoutrrr.RegisterHook(log)
 		shoutrrr.StartNotification(false)
 		log.Info().Msg("test message")
@@ -233,7 +233,7 @@ func TestProcessSendErrors_RedactsURLs(t *testing.T) {
 
 			log, logBuffer := newBufferLogger()
 			notifier := createTestNotifier(t, log, []string{"logger://"}, allButTrace, true, format.StaticData{}, 0)
-			notifier.Urls = []string{tt.url}
+			notifier.urls = []string{tt.url}
 
 			processSendErrors(notifier, []error{tt.err})
 
@@ -278,7 +278,7 @@ func TestSendNotifications_SendsQueuedMessagesAfterStop(t *testing.T) {
 
 	router := &recordingRouter{}
 	notifier := createTestNotifier(t, newTestLogger(t), []string{}, allButTrace, true, format.StaticData{}, 0)
-	notifier.Router = router
+	notifier.sender = router
 
 	for _, message := range queued {
 		notifier.messages <- message
@@ -314,8 +314,8 @@ func TestSendEntries_EmptyMessageLogsSkipAtDebug(t *testing.T) {
 			require.NoError(t, err)
 
 			log, buf := newBufferLogger()
-			notifier := &shoutrrrTypeNotifier{
-				Urls:     tt.urls,
+			notifier := &Notifier{
+				urls:     tt.urls,
 				template: tpl,
 				localLog: log,
 			}

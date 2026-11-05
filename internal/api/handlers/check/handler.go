@@ -9,14 +9,26 @@ import (
 	"github.com/rs/zerolog"
 
 	"github.com/nicholas-fedor/watchtower/internal/observability/events"
-	"github.com/nicholas-fedor/watchtower/internal/observability/notify"
-	"github.com/nicholas-fedor/watchtower/pkg/types"
 )
+
+// Notifier holds back notifications while a check runs and sends them after it.
+type Notifier interface {
+	// StartNotification starts collecting log entries for a notification.
+	// When suppressSummary is true, entries collected before it are dropped
+	// instead of sent.
+	StartNotification(suppressSummary bool)
+	// Flush sends the collected entries without a report. Later entries are
+	// sent as they are logged until the next StartNotification.
+	Flush()
+	// FlushSplitByContainer sends one notification for each container the
+	// collected entries name.
+	FlushSplitByContainer()
+}
 
 // Handler serves the /v1/check endpoint.
 type Handler struct {
 	// notifier batches log entries during the check to suppress immediate notifications.
-	notifier types.Notifier
+	notifier Notifier
 	log      *zerolog.Logger
 
 	// check is the function that checks container update availability.
@@ -48,7 +60,7 @@ func New(
 	log *zerolog.Logger,
 	check CheckFunc,
 	maxTimeout time.Duration,
-	notifier types.Notifier,
+	notifier Notifier,
 	splitByContainer bool,
 	eventBroadcaster *events.Broadcaster,
 	scanStartedData events.ScanStartedData,
@@ -136,10 +148,9 @@ func (h *Handler) Handle(c fiber.Ctx) error {
 
 		defer func() {
 			if h.splitByContainer {
-				notify.FlushSplitByContainer(h.notifier)
-				h.notifier.StartNotification(true)
+				h.notifier.FlushSplitByContainer()
 			} else {
-				h.notifier.SendNotification(nil)
+				h.notifier.Flush()
 			}
 
 			h.notifier.StartNotification(false)

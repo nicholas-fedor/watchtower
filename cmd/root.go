@@ -89,7 +89,7 @@ var (
 	//
 	// It is initialized in preRun from appCfg.Notify via notify.NewNotifier, supporting
 	// Shoutrrr URLs and (deprecated) legacy types such as email, Slack, or MSTeams.
-	notifier types.Notifier
+	notifier *notify.Notifier
 
 	// currentWatchtowerContainerID stores the current Watchtower container ID.
 	//
@@ -925,8 +925,7 @@ func (p *process) logNotify(msg string, err error) {
 	}
 
 	p.log.Error().Err(err).Msg(msg)
-	notifier.StartNotification(false)
-	notifier.SendNotification(nil)
+	notifier.Flush()
 	notifier.Close()
 }
 
