@@ -14,7 +14,7 @@ import (
 // Errors for lifecycle hook execution.
 var (
 	// errPreUpdateFailed indicates a failure in executing the pre-update command.
-	errPreUpdateFailed = errors.New("pre-update command execution failed")
+	errPreUpdateFailed = errors.New("pre-update command failed")
 )
 
 // ExecutePreChecks runs pre-check lifecycle hooks for filtered containers.
@@ -303,12 +303,8 @@ func ExecutePreUpdateCommand(log *zerolog.Logger,
 			Err(err).
 			Msg("Pre-update command failed")
 
-		return true, fmt.Errorf(
-			"%w for container %s: %w",
-			errPreUpdateFailed,
-			container.Name(),
-			err,
-		)
+		// The callers report the error with the container's name.
+		return true, fmt.Errorf("%w: %w", errPreUpdateFailed, err)
 	}
 
 	clog.Debug().
