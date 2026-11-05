@@ -18,6 +18,7 @@ import (
 	"github.com/nicholas-fedor/watchtower/internal/git"
 	"github.com/nicholas-fedor/watchtower/internal/git/project"
 	"github.com/nicholas-fedor/watchtower/internal/observability/logging"
+	updateParams "github.com/nicholas-fedor/watchtower/internal/update/params"
 	"github.com/nicholas-fedor/watchtower/internal/update/state"
 	"github.com/nicholas-fedor/watchtower/pkg/types"
 )
@@ -59,7 +60,7 @@ func (s *Session) applyCompose(
 	log *zerolog.Logger,
 	ctx context.Context,
 	batch *composeBatch,
-	params types.UpdateParams,
+	params updateParams.Params,
 	progress *state.Progress,
 	failed map[types.ContainerID]error,
 ) {
@@ -130,7 +131,7 @@ func (s *Session) applyCompose(
 func groupComposeServices(
 	log *zerolog.Logger,
 	batch *composeBatch,
-	params types.UpdateParams,
+	params updateParams.Params,
 	failed map[types.ContainerID]error,
 ) composeServices {
 	services := composeServices{
@@ -185,7 +186,7 @@ func (s *Session) checkoutCompose(
 	ctx context.Context,
 	batch *composeBatch,
 	commit string,
-	params types.UpdateParams,
+	params updateParams.Params,
 	failed map[types.ContainerID]error,
 ) bool {
 	checkout := s.checkout
@@ -262,7 +263,7 @@ func (s *Session) runComposeApply(
 	ctx context.Context,
 	batch *composeBatch,
 	services composeServices,
-	params types.UpdateParams,
+	params updateParams.Params,
 	progress *state.Progress,
 	failed map[types.ContainerID]error,
 ) ([]composeApply.Container, bool) {
@@ -313,7 +314,7 @@ func (s *Session) recordComposeResults(
 	log *zerolog.Logger,
 	services composeServices,
 	applied []composeApply.Container,
-	params types.UpdateParams,
+	params updateParams.Params,
 	progress *state.Progress,
 	failed map[types.ContainerID]error,
 ) {
@@ -415,7 +416,7 @@ func logComposeReplaced(log *zerolog.Logger, c types.Container, item composeAppl
 func (s *Session) recordCompose(
 	c types.Container,
 	item composeApply.Container,
-	params types.UpdateParams,
+	params updateParams.Params,
 	result git.CheckResult,
 	progress *state.Progress,
 	log *zerolog.Logger,
@@ -540,7 +541,7 @@ func markComposeResultFailures(
 func (s *Session) recordComposeReplicas(
 	items []composeApply.Container,
 	members []composeMember,
-	params types.UpdateParams,
+	params updateParams.Params,
 	progress *state.Progress,
 	log *zerolog.Logger,
 	matched map[types.ContainerID]struct{},
@@ -682,7 +683,7 @@ func (s *Session) rejectComposeApply(batch *composeBatch) {
 //
 // Returns:
 //   - error: Failure annotated as a Compose build or apply error.
-func composeApplyError(params types.UpdateParams, err error) error {
+func composeApplyError(params updateParams.Params, err error) error {
 	if params.NoRestart {
 		return fmt.Errorf("compose build failed: %w", err)
 	}
@@ -704,7 +705,7 @@ func composeApplyError(params types.UpdateParams, err error) error {
 func failComposeBatch(
 	log *zerolog.Logger,
 	batch *composeBatch,
-	params types.UpdateParams,
+	params updateParams.Params,
 	failed map[types.ContainerID]error,
 	err error,
 ) {
@@ -726,7 +727,7 @@ func failComposeBatch(
 func failComposeBatchWithRuntime(
 	log *zerolog.Logger,
 	batch *composeBatch,
-	params types.UpdateParams,
+	params updateParams.Params,
 	failed map[types.ContainerID]error,
 	err error,
 	runtimeMayHaveChanged bool,
@@ -889,7 +890,7 @@ func safeComposeAPIOrigin(raw string) string {
 //
 // Returns:
 //   - map[string]string: Labels merged into the compose service.
-func composeServiceLabels(c types.Container, params types.UpdateParams, result git.CheckResult) map[string]string {
+func composeServiceLabels(c types.Container, params updateParams.Params, result git.CheckResult) map[string]string {
 	// The commit is written at create time because container labels cannot be
 	// changed afterward. A failed apply rejects this stamp so the next check
 	// retries from the previous baseline.

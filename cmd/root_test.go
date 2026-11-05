@@ -37,6 +37,7 @@ import (
 	"github.com/nicholas-fedor/watchtower/internal/settings"
 	"github.com/nicholas-fedor/watchtower/internal/testutil/logcapture"
 	"github.com/nicholas-fedor/watchtower/internal/update"
+	updateParams "github.com/nicholas-fedor/watchtower/internal/update/params"
 	"github.com/nicholas-fedor/watchtower/internal/update/schedule"
 	"github.com/nicholas-fedor/watchtower/pkg/types"
 	mockTypes "github.com/nicholas-fedor/watchtower/pkg/types/mocks"
@@ -378,7 +379,7 @@ func testScheduleDeps(
 		WriteStartupMessage: logging.WriteStartupMessage,
 		RunUpdate:           runUpdatesWithNotifications,
 		UpdateOnStart:       updateOnStart,
-		BaseParams:          types.UpdateParams{},
+		BaseParams:          updateParams.Params{},
 	}
 }
 
@@ -397,7 +398,7 @@ func TestUpdateOnStartTriggersImmediateUpdate(t *testing.T) {
 
 	// Mock the update function to signal when called
 	originalRunUpdatesWithNotifications := runUpdatesWithNotifications
-	runUpdatesWithNotifications = func(_ context.Context, _ types.Filter, _ types.UpdateParams) *metrics.Metric {
+	runUpdatesWithNotifications = func(_ context.Context, _ types.Filter, _ updateParams.Params) *metrics.Metric {
 		atomic.AddInt32(&updateCallCount, 1)
 
 		select {
@@ -456,7 +457,7 @@ func TestUpdateOnStartIntegratesWithCronScheduling(t *testing.T) {
 
 		// Mock the update function
 		originalRunUpdatesWithNotifications := runUpdatesWithNotifications
-		runUpdatesWithNotifications = func(_ context.Context, _ types.Filter, _ types.UpdateParams) *metrics.Metric {
+		runUpdatesWithNotifications = func(_ context.Context, _ types.Filter, _ updateParams.Params) *metrics.Metric {
 			callTime := time.Now()
 
 			atomic.AddInt32(&updateCallCount, 1)
@@ -537,7 +538,7 @@ func TestUpdateOnStartLockingBehavior(t *testing.T) {
 
 		// Mock the update function
 		originalRunUpdatesWithNotifications := runUpdatesWithNotifications
-		runUpdatesWithNotifications = func(_ context.Context, _ types.Filter, _ types.UpdateParams) *metrics.Metric {
+		runUpdatesWithNotifications = func(_ context.Context, _ types.Filter, _ updateParams.Params) *metrics.Metric {
 			select {
 			case updateCalled <- true:
 			default:
@@ -587,7 +588,7 @@ func TestUpdateOnStartSelfUpdateScenario(t *testing.T) {
 
 		// Mock the update function
 		originalRunUpdatesWithNotifications := runUpdatesWithNotifications
-		runUpdatesWithNotifications = func(_ context.Context, _ types.Filter, _ types.UpdateParams) *metrics.Metric {
+		runUpdatesWithNotifications = func(_ context.Context, _ types.Filter, _ updateParams.Params) *metrics.Metric {
 			select {
 			case updateCalled <- true:
 			default:
@@ -658,7 +659,7 @@ func TestUpdateOnStartMultiInstanceScenario(t *testing.T) {
 
 		// Mock the update function
 		originalRunUpdatesWithNotifications := runUpdatesWithNotifications
-		runUpdatesWithNotifications = func(_ context.Context, _ types.Filter, _ types.UpdateParams) *metrics.Metric {
+		runUpdatesWithNotifications = func(_ context.Context, _ types.Filter, _ updateParams.Params) *metrics.Metric {
 			atomic.AddInt32(&updateCallCount, 1)
 			synctest.Wait() // Simulate update work
 
@@ -777,7 +778,7 @@ func TestRunUpgradesOnSchedule_ShutdownWaitsForRunningUpdate(t *testing.T) {
 
 		// Mock runUpdatesWithNotifications to simulate a long-running update
 		originalRunUpdatesWithNotifications := runUpdatesWithNotifications
-		runUpdatesWithNotifications = func(_ context.Context, _ types.Filter, _ types.UpdateParams) *metrics.Metric {
+		runUpdatesWithNotifications = func(_ context.Context, _ types.Filter, _ updateParams.Params) *metrics.Metric {
 			// Signal that we're in the update
 			synctest.Wait() // Simulate update work
 
@@ -914,7 +915,7 @@ func TestEphemeralSelfUpdateExercisesTruePath(t *testing.T) {
 
 	// Mock the update function
 	originalRunUpdatesWithNotifications := runUpdatesWithNotifications
-	runUpdatesWithNotifications = func(_ context.Context, _ types.Filter, _ types.UpdateParams) *metrics.Metric {
+	runUpdatesWithNotifications = func(_ context.Context, _ types.Filter, _ updateParams.Params) *metrics.Metric {
 		atomic.AddInt32(&updateCallCount, 1)
 
 		select {

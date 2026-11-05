@@ -23,19 +23,20 @@ import (
 	"github.com/nicholas-fedor/watchtower/internal/testutil/logcapture"
 	"github.com/nicholas-fedor/watchtower/internal/update/cleanup"
 	mockUpdate "github.com/nicholas-fedor/watchtower/internal/update/mocks"
+	updateParams "github.com/nicholas-fedor/watchtower/internal/update/params"
 	"github.com/nicholas-fedor/watchtower/pkg/types"
 	mockTypes "github.com/nicholas-fedor/watchtower/pkg/types/mocks"
 )
 
-// defaultTestUpdateParams returns a complete UpdateParams snapshot for tests.
+// defaultTestUpdateParams returns a complete [updateParams.Params] snapshot for tests.
 //
 // Parameters:
 //   - filter: Container filter for the update session.
 //
 // Returns:
-//   - types.UpdateParams: Policy values matching the previous test defaults.
-func defaultTestUpdateParams(filter types.Filter) types.UpdateParams {
-	return types.UpdateParams{
+//   - updateParams.Params: The default policy for tests that set none of their own.
+func defaultTestUpdateParams(filter types.Filter) updateParams.Params {
+	return updateParams.Params{
 		Filter:       filter,
 		Timeout:      time.Minute,
 		LifecycleUID: 1000,
@@ -435,7 +436,7 @@ func TestRunUpdates(t *testing.T) {
 				false,
 			)
 
-			config := types.UpdateParams{
+			config := updateParams.Params{
 				Filter:           filters.NoFilter,
 				Cleanup:          false,
 				NoRestart:        false,

@@ -16,6 +16,7 @@ import (
 	"github.com/nicholas-fedor/watchtower/internal/registry/ratelimit"
 	"github.com/nicholas-fedor/watchtower/internal/update/cleanup"
 	mockUpdate "github.com/nicholas-fedor/watchtower/internal/update/mocks"
+	updateParams "github.com/nicholas-fedor/watchtower/internal/update/params"
 	"github.com/nicholas-fedor/watchtower/pkg/types"
 )
 
@@ -35,7 +36,7 @@ func TestUpdateAction_Context(t *testing.T) {
 			canceledCtx, cancel := context.WithCancel(t.Context())
 			cancel() // Cancel the context immediately
 
-			report, cleanupImageInfos, err := update(newTestLogger(t), canceledCtx, client, types.UpdateParams{Cleanup: true}, ratelimit.New())
+			report, cleanupImageInfos, err := update(newTestLogger(t), canceledCtx, client, updateParams.Params{Cleanup: true}, ratelimit.New())
 
 			require.ErrorIs(t, err, context.Canceled)
 			assert.Nil(t, report)
@@ -50,7 +51,7 @@ func TestUpdateAction_Context(t *testing.T) {
 			// context stays live.
 			client.TestData.IsContainerStaleError = context.Canceled
 
-			report, cleanupImageInfos, err := update(newTestLogger(t), t.Context(), client, types.UpdateParams{Cleanup: true}, ratelimit.New())
+			report, cleanupImageInfos, err := update(newTestLogger(t), t.Context(), client, updateParams.Params{Cleanup: true}, ratelimit.New())
 
 			// Only the session's own cancellation ends the scan, so each
 			// container is skipped with its check error instead.
@@ -81,7 +82,7 @@ func TestUpdateAction_Context(t *testing.T) {
 			client.TestData.StopContainerError = context.Canceled
 			client.TestData.StopContainerFailCount = 1 // Fail the first stop attempt
 
-			report, cleanupImageInfos, err := update(newTestLogger(t), t.Context(), client, types.UpdateParams{Cleanup: true}, ratelimit.New())
+			report, cleanupImageInfos, err := update(newTestLogger(t), t.Context(), client, updateParams.Params{Cleanup: true}, ratelimit.New())
 
 			// Should still attempt to process and return a report
 			require.NoError(t, err)
@@ -118,7 +119,7 @@ func TestUpdateAction_Context(t *testing.T) {
 			}
 			client := mockUpdate.CreateMockClient(testData, false, false)
 
-			report, cleanupImageInfos, err := update(newTestLogger(t), t.Context(), client, types.UpdateParams{
+			report, cleanupImageInfos, err := update(newTestLogger(t), t.Context(), client, updateParams.Params{
 				Cleanup:            true,
 				CurrentContainerID: "old-container-id",
 			}, ratelimit.New())
@@ -150,7 +151,7 @@ func TestUpdateAction_Context(t *testing.T) {
 			}
 			client := mockUpdate.CreateMockClient(testData, false, false)
 
-			_, _, err := update(newTestLogger(t), t.Context(), client, types.UpdateParams{
+			_, _, err := update(newTestLogger(t), t.Context(), client, updateParams.Params{
 				Cleanup:            true,
 				CurrentContainerID: "old-container-id",
 			}, ratelimit.New())
@@ -174,7 +175,7 @@ func TestUpdateAction_Context(t *testing.T) {
 			}
 			client := mockUpdate.CreateMockClient(testData, false, false)
 
-			report, _, err := update(newTestLogger(t), t.Context(), client, types.UpdateParams{
+			report, _, err := update(newTestLogger(t), t.Context(), client, updateParams.Params{
 				Cleanup:            true,
 				CurrentContainerID: "current-id",
 			}, ratelimit.New())
@@ -191,7 +192,7 @@ func TestUpdateAction_Context(t *testing.T) {
 			}
 			client := mockUpdate.CreateMockClient(testData, false, false)
 
-			report, _, err := update(newTestLogger(t), t.Context(), client, types.UpdateParams{
+			report, _, err := update(newTestLogger(t), t.Context(), client, updateParams.Params{
 				Cleanup: true,
 			}, ratelimit.New())
 
@@ -211,7 +212,7 @@ func TestUpdateAction_HandleTimeout(t *testing.T) {
 		ctx, cancel := context.WithDeadline(t.Context(), pastDeadline)
 		defer cancel()
 
-		report, cleanupImageInfos, err := update(newTestLogger(t), ctx, client, types.UpdateParams{Cleanup: true}, ratelimit.New())
+		report, cleanupImageInfos, err := update(newTestLogger(t), ctx, client, updateParams.Params{Cleanup: true}, ratelimit.New())
 
 		synctest.Wait()
 
@@ -241,7 +242,7 @@ func TestUpdateAction_EarlyCancellationCheck(t *testing.T) {
 		canceledCtx, cancel := context.WithCancel(t.Context())
 		cancel() // Cancel the context immediately
 
-		report, cleanupImageInfos, err := update(newTestLogger(t), canceledCtx, client, types.UpdateParams{Cleanup: true}, ratelimit.New())
+		report, cleanupImageInfos, err := update(newTestLogger(t), canceledCtx, client, updateParams.Params{Cleanup: true}, ratelimit.New())
 
 		synctest.Wait()
 
@@ -284,7 +285,7 @@ func TestUpdateAction_MidOperationCancellationCheck(t *testing.T) {
 		go func() {
 			defer close(done)
 
-			report, _, err = update(newTestLogger(t), ctx, client, types.UpdateParams{Cleanup: true}, ratelimit.New())
+			report, _, err = update(newTestLogger(t), ctx, client, updateParams.Params{Cleanup: true}, ratelimit.New())
 		}()
 
 		// Let the goroutine reach its first blocking point (SimulatedLatency timer
@@ -334,7 +335,7 @@ func TestUpdateAction_ContextCancellationStartContainer(t *testing.T) {
 
 		client := mockUpdate.CreateMockClientWithContext(canceledCtx, testData, false, false)
 
-		_, _, err := update(newTestLogger(t), canceledCtx, client, types.UpdateParams{Cleanup: true}, ratelimit.New())
+		_, _, err := update(newTestLogger(t), canceledCtx, client, updateParams.Params{Cleanup: true}, ratelimit.New())
 
 		synctest.Wait()
 
@@ -366,7 +367,7 @@ func TestUpdateAction_ContextTimeoutDuringProcessing(t *testing.T) {
 		// Capture start time to verify the call completes within a reasonable bound
 		start := time.Now()
 
-		report, _, err := update(newTestLogger(t), shortCtx, client, types.UpdateParams{Cleanup: true}, ratelimit.New())
+		report, _, err := update(newTestLogger(t), shortCtx, client, updateParams.Params{Cleanup: true}, ratelimit.New())
 
 		synctest.Wait()
 
@@ -410,7 +411,7 @@ func runErrorPropagationTest(
 		client.TestData.StartContainerError = errorToReturn
 	}
 
-	report, cleanupImageInfos, err := update(newTestLogger(t), t.Context(), client, types.UpdateParams{Cleanup: true}, ratelimit.New())
+	report, cleanupImageInfos, err := update(newTestLogger(t), t.Context(), client, updateParams.Params{Cleanup: true}, ratelimit.New())
 
 	return report, cleanupImageInfos, err
 }
@@ -592,7 +593,7 @@ func TestUpdateAction_ContextEdgeCases(t *testing.T) {
 
 				client := mockUpdate.CreateMockClientWithContext(ctx, testData, false, false)
 
-				report, cleanupImageInfos, err := update(newTestLogger(t), ctx, client, types.UpdateParams{Cleanup: true}, ratelimit.New())
+				report, cleanupImageInfos, err := update(newTestLogger(t), ctx, client, updateParams.Params{Cleanup: true}, ratelimit.New())
 
 				synctest.Wait()
 
@@ -654,7 +655,7 @@ func TestUpdateAction_ParallelStalenessCheckCancellationPropagation(t *testing.T
 		go func() {
 			defer close(done)
 
-			_, _, err = update(newTestLogger(t), ctx, client, types.UpdateParams{Cleanup: true}, ratelimit.New())
+			_, _, err = update(newTestLogger(t), ctx, client, updateParams.Params{Cleanup: true}, ratelimit.New())
 		}()
 
 		synctest.Wait()
@@ -706,7 +707,7 @@ func TestEarlyCancellationStopContainers(t *testing.T) {
 		go func() {
 			defer close(done)
 
-			report, cleanupImageInfos, err = update(newTestLogger(t), ctx, client, types.UpdateParams{Cleanup: true}, ratelimit.New())
+			report, cleanupImageInfos, err = update(newTestLogger(t), ctx, client, updateParams.Params{Cleanup: true}, ratelimit.New())
 		}()
 
 		// Let the goroutine reach its first blocking point (SimulatedLatency timer
@@ -767,7 +768,7 @@ func TestEarlyCancellationRestartContainers(t *testing.T) {
 		go func() {
 			defer close(done)
 
-			report, cleanupImageInfos, err = update(newTestLogger(t), ctx, client, types.UpdateParams{Cleanup: true}, ratelimit.New())
+			report, cleanupImageInfos, err = update(newTestLogger(t), ctx, client, updateParams.Params{Cleanup: true}, ratelimit.New())
 		}()
 
 		// Let the goroutine reach its first blocking point (SimulatedLatency timer

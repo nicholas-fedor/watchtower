@@ -16,6 +16,7 @@ import (
 	"github.com/nicholas-fedor/watchtower/internal/registry/ratelimit"
 	"github.com/nicholas-fedor/watchtower/internal/testutil/logcapture"
 	mockUpdate "github.com/nicholas-fedor/watchtower/internal/update/mocks"
+	updateParams "github.com/nicholas-fedor/watchtower/internal/update/params"
 	"github.com/nicholas-fedor/watchtower/pkg/types"
 	mockTypes "github.com/nicholas-fedor/watchtower/pkg/types/mocks"
 )
@@ -205,7 +206,7 @@ func Test_executeUpdate(t *testing.T) {
 			false,
 			false,
 		)
-		config := types.UpdateParams{
+		config := updateParams.Params{
 			Filter: filters.NoFilter,
 		}
 		report, cleanupInfos, err := executeUpdate(newTestLogger(t),
@@ -228,7 +229,7 @@ func Test_executeUpdate(t *testing.T) {
 			false,
 			false,
 		)
-		config := types.UpdateParams{
+		config := updateParams.Params{
 			Filter: filters.NoFilter,
 		}
 		report, cleanupInfos, err := executeUpdate(newTestLogger(t),
@@ -266,7 +267,7 @@ func Test_executeUpdate(t *testing.T) {
 			false,
 			false,
 		)
-		config := types.UpdateParams{
+		config := updateParams.Params{
 			Filter: filters.NoFilter,
 		}
 		report, cleanupInfos, err := executeUpdate(newTestLogger(t),
@@ -309,7 +310,7 @@ func Test_executeUpdate(t *testing.T) {
 			false,
 			false,
 		)
-		config := types.UpdateParams{
+		config := updateParams.Params{
 			Filter:  filters.NoFilter,
 			RunOnce: true,
 		}
@@ -354,7 +355,7 @@ func Test_executeUpdate(t *testing.T) {
 			false,
 			false,
 		)
-		config := types.UpdateParams{
+		config := updateParams.Params{
 			Filter: filters.NoFilter,
 		}
 		report, cleanupInfos, err := executeUpdate(newTestLogger(t),

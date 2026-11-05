@@ -14,6 +14,7 @@ import (
 	dockerNetwork "github.com/moby/moby/api/types/network"
 
 	"github.com/nicholas-fedor/watchtower/internal/container"
+	updateParams "github.com/nicholas-fedor/watchtower/internal/update/params"
 	"github.com/nicholas-fedor/watchtower/internal/update/state"
 	"github.com/nicholas-fedor/watchtower/pkg/types"
 )
@@ -87,22 +88,22 @@ func Report(states ...state.State) types.Report {
 		switch outcome {
 		case state.SkippedState:
 			c, _ := Container(index, outcome)
-			progress.AddSkipped(log, c, errSkipped, types.UpdateParams{})
+			progress.AddSkipped(log, c, errSkipped, updateParams.Params{})
 		case state.FreshState:
 			c, _ := Container(index, outcome)
-			progress.AddScanned(log, c, c.ImageID(), types.UpdateParams{})
+			progress.AddScanned(log, c, c.ImageID(), updateParams.Params{})
 		case state.UpdatedState:
 			c, newImage := Container(index, outcome)
-			progress.AddScanned(log, c, newImage, types.UpdateParams{})
+			progress.AddScanned(log, c, newImage, updateParams.Params{})
 			progress.MarkForUpdate(log, c.ID())
 		case state.FailedState:
 			c, newImage := Container(index, outcome)
-			progress.AddScanned(log, c, newImage, types.UpdateParams{})
+			progress.AddScanned(log, c, newImage, updateParams.Params{})
 
 			failed[c.ID()] = errFailed
 		case state.RestartedState:
 			c, _ := Container(index, outcome)
-			progress.AddScanned(log, c, c.ImageID(), types.UpdateParams{})
+			progress.AddScanned(log, c, c.ImageID(), updateParams.Params{})
 			progress.MarkRestarted(log, c.ID())
 		case state.UnknownState, state.ScannedState, state.StaleState:
 			// Reports never end in these intermediate states.

@@ -23,6 +23,7 @@ import (
 	"github.com/nicholas-fedor/watchtower/internal/testutil/modelfixture"
 	"github.com/nicholas-fedor/watchtower/internal/update/cleanup"
 	mockUpdate "github.com/nicholas-fedor/watchtower/internal/update/mocks"
+	updateParams "github.com/nicholas-fedor/watchtower/internal/update/params"
 	"github.com/nicholas-fedor/watchtower/pkg/types"
 	mockTypes "github.com/nicholas-fedor/watchtower/pkg/types/mocks"
 )
@@ -101,7 +102,7 @@ func TestUpdateAction_Dependencies(t *testing.T) {
 				false,
 			)
 
-			report, cleanupImageInfos, err := update(newTestLogger(t), t.Context(), client, types.UpdateParams{Cleanup: true}, ratelimit.New())
+			report, cleanupImageInfos, err := update(newTestLogger(t), t.Context(), client, updateParams.Params{Cleanup: true}, ratelimit.New())
 
 			require.NoError(t, err)
 			require.Len(t, report.Updated(), 3)
@@ -464,7 +465,7 @@ func TestUpdateAction_Dependencies(t *testing.T) {
 				false,
 				false,
 			)
-			report, cleanupImageInfos, err := update(newTestLogger(t), t.Context(), client, types.UpdateParams{Cleanup: true}, ratelimit.New())
+			report, cleanupImageInfos, err := update(newTestLogger(t), t.Context(), client, updateParams.Params{Cleanup: true}, ratelimit.New())
 
 			require.NoError(t, err)
 			require.Len(t, report.Updated(), 1)
@@ -702,7 +703,7 @@ func TestUpdateAction_Dependencies(t *testing.T) {
 				false,
 				false,
 			)
-			report, cleanupImageInfos, err := update(newTestLogger(t), t.Context(), client, types.UpdateParams{Cleanup: true}, ratelimit.New())
+			report, cleanupImageInfos, err := update(newTestLogger(t), t.Context(), client, updateParams.Params{Cleanup: true}, ratelimit.New())
 
 			require.NoError(t, err)
 			require.Len(t, report.Updated(), 3)
@@ -772,7 +773,7 @@ func TestUpdateAction_Dependencies(t *testing.T) {
 				false,
 				false,
 			)
-			report, cleanupImageInfos, err := update(newTestLogger(t), t.Context(), client, types.UpdateParams{Cleanup: true}, ratelimit.New())
+			report, cleanupImageInfos, err := update(newTestLogger(t), t.Context(), client, updateParams.Params{Cleanup: true}, ratelimit.New())
 
 			require.NoError(t, err)
 			require.Len(t, report.Updated(), 1)
@@ -835,7 +836,7 @@ func TestUpdateAction_Dependencies(t *testing.T) {
 				false,
 			)
 
-			report, cleanupImageInfos, err := update(newTestLogger(t), t.Context(), client, types.UpdateParams{Cleanup: true}, ratelimit.New())
+			report, cleanupImageInfos, err := update(newTestLogger(t), t.Context(), client, updateParams.Params{Cleanup: true}, ratelimit.New())
 
 			require.NoError(t, err, "Circular dependencies should not cause an error")
 			require.Len(t, report.Skipped(), 2, "Both containers should be skipped due to circular dependency")
@@ -878,7 +879,7 @@ func TestUpdateAction_Dependencies(t *testing.T) {
 				false,
 			)
 
-			report, cleanupImageInfos, err := update(newTestLogger(t), t.Context(), client, types.UpdateParams{Cleanup: true}, ratelimit.New())
+			report, cleanupImageInfos, err := update(newTestLogger(t), t.Context(), client, updateParams.Params{Cleanup: true}, ratelimit.New())
 
 			require.NoError(t, err, "Non-existent dependencies should not cause errors")
 			require.Len(t, report.Updated(), 1, "Dependent container should still be updated")
@@ -973,7 +974,7 @@ func TestUpdateAction_Dependencies(t *testing.T) {
 				false,
 			)
 
-			report, cleanupImageInfos, err := update(newTestLogger(t), t.Context(), client, types.UpdateParams{Cleanup: true}, ratelimit.New())
+			report, cleanupImageInfos, err := update(newTestLogger(t), t.Context(), client, updateParams.Params{Cleanup: true}, ratelimit.New())
 
 			require.NoError(t, err)
 			require.Len(t, report.Updated(), 1) // Only base container D is stale and updated
@@ -1019,7 +1020,7 @@ func TestUpdateAction_Dependencies(t *testing.T) {
 				false,
 			)
 
-			report, cleanupImageInfos, err := update(newTestLogger(t), t.Context(), client, types.UpdateParams{Cleanup: true}, ratelimit.New())
+			report, cleanupImageInfos, err := update(newTestLogger(t), t.Context(), client, updateParams.Params{Cleanup: true}, ratelimit.New())
 
 			require.NoError(t, err, "Self-dependency should not cause an error")
 			require.Len(t, report.Skipped(), 1, "Self-dependent container should be skipped")
@@ -1062,7 +1063,7 @@ func TestUpdateAction_Dependencies(t *testing.T) {
 				false,
 			)
 
-			report, cleanupImageInfos, err := update(newTestLogger(t), t.Context(), client, types.UpdateParams{Cleanup: true}, ratelimit.New())
+			report, cleanupImageInfos, err := update(newTestLogger(t), t.Context(), client, updateParams.Params{Cleanup: true}, ratelimit.New())
 
 			require.NoError(t, err, "Malformed names should not cause errors")
 			require.Len(t, report.Updated(), 1, "Dependent container should still be updated")
@@ -1174,7 +1175,7 @@ func TestUpdateAction_Dependencies(t *testing.T) {
 				false,
 			)
 
-			report, cleanupImageInfos, err := update(newTestLogger(t), t.Context(), client, types.UpdateParams{Cleanup: true}, ratelimit.New())
+			report, cleanupImageInfos, err := update(newTestLogger(t), t.Context(), client, updateParams.Params{Cleanup: true}, ratelimit.New())
 
 			require.NoError(t, err)
 			require.Len(t, report.Updated(), 1) // Only base container E is stale and updated
@@ -1235,7 +1236,7 @@ func TestUpdateAction_Dependencies(t *testing.T) {
 				false,
 			)
 
-			report, cleanupImageInfos, err := update(newTestLogger(t), t.Context(), client, types.UpdateParams{Cleanup: true}, ratelimit.New())
+			report, cleanupImageInfos, err := update(newTestLogger(t), t.Context(), client, updateParams.Params{Cleanup: true}, ratelimit.New())
 
 			require.NoError(t, err, "Mixed valid/invalid dependencies should not cause errors")
 			require.Len(t, report.Updated(), 1, "Only stale container should be updated")
@@ -1360,7 +1361,7 @@ func TestUpdateAction_Dependencies(t *testing.T) {
 				false,
 			)
 
-			report, cleanupImageInfos, err := update(newTestLogger(t), t.Context(), client, types.UpdateParams{
+			report, cleanupImageInfos, err := update(newTestLogger(t), t.Context(), client, updateParams.Params{
 				Cleanup:        true,
 				RollingRestart: true,
 			}, ratelimit.New())
@@ -1424,7 +1425,7 @@ func TestUpdateAction_Dependencies(t *testing.T) {
 				false,
 			)
 
-			report, cleanupImageInfos, err := update(newTestLogger(t), t.Context(), client, types.UpdateParams{Cleanup: true}, ratelimit.New())
+			report, cleanupImageInfos, err := update(newTestLogger(t), t.Context(), client, updateParams.Params{Cleanup: true}, ratelimit.New())
 
 			require.NoError(t, err)
 			require.Len(t, report.Updated(), 1)
@@ -1480,7 +1481,7 @@ func TestUpdateAction_Dependencies(t *testing.T) {
 				false,
 			)
 
-			report, cleanupImageInfos, err := update(newTestLogger(t), t.Context(), client, types.UpdateParams{Cleanup: true}, ratelimit.New())
+			report, cleanupImageInfos, err := update(newTestLogger(t), t.Context(), client, updateParams.Params{Cleanup: true}, ratelimit.New())
 
 			require.NoError(t, err)
 			require.Len(t, report.Updated(), 1)
@@ -1577,7 +1578,7 @@ func TestUpdateAction_Dependencies(t *testing.T) {
 				false,
 			)
 
-			report, cleanupImageInfos, err := update(newTestLogger(t), t.Context(), client, types.UpdateParams{Cleanup: true}, ratelimit.New())
+			report, cleanupImageInfos, err := update(newTestLogger(t), t.Context(), client, updateParams.Params{Cleanup: true}, ratelimit.New())
 
 			require.NoError(t, err)
 			require.Len(t, report.Updated(), 1)
@@ -1680,7 +1681,7 @@ func TestUpdateAction_Dependencies(t *testing.T) {
 				false,
 			)
 
-			report, cleanupImageInfos, err := update(newTestLogger(t), t.Context(), client, types.UpdateParams{Cleanup: true}, ratelimit.New())
+			report, cleanupImageInfos, err := update(newTestLogger(t), t.Context(), client, updateParams.Params{Cleanup: true}, ratelimit.New())
 
 			require.NoError(t, err)
 			require.Len(t, report.Updated(), 1)
@@ -1839,7 +1840,7 @@ func TestUpdateAction_Dependencies(t *testing.T) {
 				false,
 			)
 
-			report, cleanupImageInfos, err := update(newTestLogger(t), t.Context(), client, types.UpdateParams{Cleanup: true}, ratelimit.New())
+			report, cleanupImageInfos, err := update(newTestLogger(t), t.Context(), client, updateParams.Params{Cleanup: true}, ratelimit.New())
 
 			require.NoError(t, err)
 			require.Len(t, report.Updated(), 1) // Only database is stale
@@ -1940,7 +1941,7 @@ func TestUpdateAction_Dependencies(t *testing.T) {
 				false,
 			)
 
-			report, cleanupImageInfos, err := update(newTestLogger(t), t.Context(), client, types.UpdateParams{Cleanup: true, RollingRestart: true}, ratelimit.New())
+			report, cleanupImageInfos, err := update(newTestLogger(t), t.Context(), client, updateParams.Params{Cleanup: true, RollingRestart: true}, ratelimit.New())
 
 			require.NoError(t, err)
 			require.Len(t, report.Updated(), 4)
@@ -2035,7 +2036,7 @@ func TestUpdateAction_Dependencies(t *testing.T) {
 				false,
 			)
 
-			report, cleanupImageInfos, err := update(newTestLogger(t), t.Context(), client, types.UpdateParams{Cleanup: true}, ratelimit.New())
+			report, cleanupImageInfos, err := update(newTestLogger(t), t.Context(), client, updateParams.Params{Cleanup: true}, ratelimit.New())
 
 			require.NoError(t, err)
 			require.Len(t, report.Updated(), 3)
@@ -2064,7 +2065,7 @@ func TestUpdateAction_Dependencies(t *testing.T) {
 			testData := getNetworkModeTestData()
 			client := mockUpdate.CreateMockClient(testData, false, false)
 
-			report, cleanupImageInfos, err := update(newTestLogger(t), t.Context(), client, types.UpdateParams{Cleanup: true}, ratelimit.New())
+			report, cleanupImageInfos, err := update(newTestLogger(t), t.Context(), client, updateParams.Params{Cleanup: true}, ratelimit.New())
 
 			require.NoError(t, err)
 			require.Len(t, report.Updated(), 1)
@@ -2087,7 +2088,7 @@ func TestUpdateAction_Dependencies(t *testing.T) {
 			testData := getComposeDependsOnWithNetworkModeTestData()
 			client := mockUpdate.CreateMockClient(testData, false, false)
 
-			report, cleanupImageInfos, err := update(newTestLogger(t), t.Context(), client, types.UpdateParams{Cleanup: true}, ratelimit.New())
+			report, cleanupImageInfos, err := update(newTestLogger(t), t.Context(), client, updateParams.Params{Cleanup: true}, ratelimit.New())
 
 			require.NoError(t, err)
 			require.Len(t, report.Updated(), 1)
@@ -2171,7 +2172,7 @@ func TestUpdateAction_Dependencies(t *testing.T) {
 				false,
 			)
 
-			report, _, err := update(newTestLogger(t), t.Context(), client, types.UpdateParams{Cleanup: true}, ratelimit.New())
+			report, _, err := update(newTestLogger(t), t.Context(), client, updateParams.Params{Cleanup: true}, ratelimit.New())
 
 			require.NoError(t, err)
 			require.Len(t, report.Updated(), 1)
@@ -2237,7 +2238,7 @@ func TestUpdateAction_Dependencies(t *testing.T) {
 				false,
 			)
 
-			report, _, err := update(newTestLogger(t), t.Context(), client, types.UpdateParams{Cleanup: true}, ratelimit.New())
+			report, _, err := update(newTestLogger(t), t.Context(), client, updateParams.Params{Cleanup: true}, ratelimit.New())
 
 			require.NoError(t, err)
 			require.Len(t, report.Updated(), 1)
@@ -2303,7 +2304,7 @@ func TestUpdateAction_Dependencies(t *testing.T) {
 				false,
 			)
 
-			report, _, err := update(newTestLogger(t), t.Context(), client, types.UpdateParams{Cleanup: true}, ratelimit.New())
+			report, _, err := update(newTestLogger(t), t.Context(), client, updateParams.Params{Cleanup: true}, ratelimit.New())
 
 			require.NoError(t, err)
 			require.Len(t, report.Updated(), 1)
@@ -2373,7 +2374,7 @@ func TestUpdateAction_Dependencies(t *testing.T) {
 				false,
 			)
 
-			report, _, err := update(newTestLogger(t), t.Context(), client, types.UpdateParams{Cleanup: true}, ratelimit.New())
+			report, _, err := update(newTestLogger(t), t.Context(), client, updateParams.Params{Cleanup: true}, ratelimit.New())
 
 			require.NoError(t, err)
 			require.Len(t, report.Updated(), 1)
@@ -2458,7 +2459,7 @@ func TestUpdateAction_Dependencies(t *testing.T) {
 				false,
 			)
 
-			report, _, err := update(newTestLogger(t), t.Context(), client, types.UpdateParams{Cleanup: true}, ratelimit.New())
+			report, _, err := update(newTestLogger(t), t.Context(), client, updateParams.Params{Cleanup: true}, ratelimit.New())
 
 			require.NoError(t, err)
 			require.Len(t, report.Updated(), 1)
@@ -2528,7 +2529,7 @@ func TestUpdateAction_Dependencies(t *testing.T) {
 				false,
 			)
 
-			report, cleanupImageInfos, err := update(newTestLogger(t), t.Context(), client, types.UpdateParams{Cleanup: true}, ratelimit.New())
+			report, cleanupImageInfos, err := update(newTestLogger(t), t.Context(), client, updateParams.Params{Cleanup: true}, ratelimit.New())
 
 			require.NoError(t, err)
 			require.Len(t, report.Updated(), 1)
@@ -2604,7 +2605,7 @@ func TestUpdateAction_Dependencies(t *testing.T) {
 				false,
 			)
 
-			report, cleanupImageInfos, err := update(newTestLogger(t), t.Context(), client, types.UpdateParams{Cleanup: true}, ratelimit.New())
+			report, cleanupImageInfos, err := update(newTestLogger(t), t.Context(), client, updateParams.Params{Cleanup: true}, ratelimit.New())
 
 			require.NoError(t, err)
 			require.Len(t, report.Updated(), 2)
@@ -2682,7 +2683,7 @@ func TestUpdateAction_Dependencies(t *testing.T) {
 				false,
 			)
 
-			report, cleanupImageInfos, err := update(newTestLogger(t), t.Context(), client, types.UpdateParams{Cleanup: true}, ratelimit.New())
+			report, cleanupImageInfos, err := update(newTestLogger(t), t.Context(), client, updateParams.Params{Cleanup: true}, ratelimit.New())
 
 			require.NoError(t, err)
 			require.Len(t, report.Updated(), 1)
@@ -2761,7 +2762,7 @@ func TestUpdateAction_Dependencies(t *testing.T) {
 				false,
 			)
 
-			report, cleanupImageInfos, err := update(newTestLogger(t), t.Context(), client, types.UpdateParams{Cleanup: true}, ratelimit.New())
+			report, cleanupImageInfos, err := update(newTestLogger(t), t.Context(), client, updateParams.Params{Cleanup: true}, ratelimit.New())
 
 			require.NoError(t, err)
 			require.Len(t, report.Updated(), 1)
@@ -2837,7 +2838,7 @@ func TestUpdateAction_Dependencies(t *testing.T) {
 				false,
 			)
 
-			report, cleanupImageInfos, err := update(newTestLogger(t), t.Context(), client, types.UpdateParams{Cleanup: true}, ratelimit.New())
+			report, cleanupImageInfos, err := update(newTestLogger(t), t.Context(), client, updateParams.Params{Cleanup: true}, ratelimit.New())
 
 			require.NoError(t, err)
 			require.Len(t, report.Updated(), 1)
@@ -2920,7 +2921,7 @@ func TestUpdateAction_Dependencies(t *testing.T) {
 				false,
 			)
 
-			report, cleanupImageInfos, err := update(newTestLogger(t), t.Context(), client, types.UpdateParams{Cleanup: true}, ratelimit.New())
+			report, cleanupImageInfos, err := update(newTestLogger(t), t.Context(), client, updateParams.Params{Cleanup: true}, ratelimit.New())
 
 			require.NoError(t, err)
 			require.Len(t, report.Updated(), 1)
@@ -2973,7 +2974,7 @@ func TestUpdate_WarnsOnUnresolvedDependsOn(t *testing.T) {
 
 	log := zerolog.New(zerolog.SyncWriter(&output))
 
-	_, _, err := update(&log, t.Context(), client, types.UpdateParams{}, ratelimit.New())
+	_, _, err := update(&log, t.Context(), client, updateParams.Params{}, ratelimit.New())
 	require.NoError(t, err)
 
 	assert.Contains(t, output.String(),

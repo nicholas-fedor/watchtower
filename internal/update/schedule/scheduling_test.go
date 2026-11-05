@@ -21,6 +21,7 @@ import (
 	"github.com/nicholas-fedor/watchtower/internal/observability/logging"
 	"github.com/nicholas-fedor/watchtower/internal/observability/metrics"
 	"github.com/nicholas-fedor/watchtower/internal/testutil/logcapture"
+	updateParams "github.com/nicholas-fedor/watchtower/internal/update/params"
 	"github.com/nicholas-fedor/watchtower/pkg/types"
 )
 
@@ -45,7 +46,7 @@ func newTestLogger(t *testing.T) *zerolog.Logger {
 // Callers override fields such as ScheduleSpec, UpdateOnStart, SkipFirstRun, and BaseParams as needed.
 func testDeps(
 	t *testing.T,
-	runUpdate func(context.Context, types.Filter, types.UpdateParams) *metrics.Metric,
+	runUpdate func(context.Context, types.Filter, updateParams.Params) *metrics.Metric,
 	writeStartup func(logging.StartupParams),
 ) ScheduleDeps {
 	t.Helper()
@@ -55,7 +56,7 @@ func testDeps(
 		Filter:              filters.NoFilter,
 		WriteStartupMessage: writeStartup,
 		RunUpdate:           runUpdate,
-		BaseParams:          types.UpdateParams{},
+		BaseParams:          updateParams.Params{},
 	}
 }
 
@@ -260,7 +261,7 @@ func TestRunUpgradesOnSchedule_RecoversPanickingRun(t *testing.T) {
 
 		var runs atomic.Int32
 
-		deps := testDeps(t, func(context.Context, types.Filter, types.UpdateParams) *metrics.Metric {
+		deps := testDeps(t, func(context.Context, types.Filter, updateParams.Params) *metrics.Metric {
 			if runs.Add(1) == 1 {
 				panic("boom")
 			}
@@ -303,7 +304,7 @@ func TestRunUpgradesOnSchedule_OverlappingRunIsSkipped(t *testing.T) {
 
 		var runs atomic.Int32
 
-		deps := testDeps(t, func(context.Context, types.Filter, types.UpdateParams) *metrics.Metric {
+		deps := testDeps(t, func(context.Context, types.Filter, updateParams.Params) *metrics.Metric {
 			runs.Add(1)
 			<-release
 
@@ -338,7 +339,7 @@ func TestRunUpgradesOnSchedule_WaitingRunStopsAtShutdown(t *testing.T) {
 	synctest.Test(t, func(t *testing.T) {
 		var updated atomic.Bool
 
-		deps := testDeps(t, func(context.Context, types.Filter, types.UpdateParams) *metrics.Metric {
+		deps := testDeps(t, func(context.Context, types.Filter, updateParams.Params) *metrics.Metric {
 			updated.Store(true)
 
 			return &metrics.Metric{}
@@ -370,7 +371,7 @@ func TestRunUpgradesOnSchedule_WaitingRunStopsAtShutdown(t *testing.T) {
 func TestRunUpgradesOnSchedule_EmptySchedule(t *testing.T) {
 	ctx := t.Context()
 
-	runUpdatesWithNotifications := func(_ context.Context, _ types.Filter, _ types.UpdateParams) *metrics.Metric {
+	runUpdatesWithNotifications := func(_ context.Context, _ types.Filter, _ updateParams.Params) *metrics.Metric {
 		return &metrics.Metric{Scanned: 1, Updated: 0, Failed: 0}
 	}
 
@@ -391,7 +392,7 @@ func TestRunUpgradesOnSchedule_EmptySchedule(t *testing.T) {
 func TestRunUpgradesOnSchedule_StartupMessageSuppressed(t *testing.T) {
 	ctx := t.Context()
 
-	runUpdatesWithNotifications := func(_ context.Context, _ types.Filter, _ types.UpdateParams) *metrics.Metric {
+	runUpdatesWithNotifications := func(_ context.Context, _ types.Filter, _ updateParams.Params) *metrics.Metric {
 		return &metrics.Metric{Scanned: 1, Updated: 0, Failed: 0}
 	}
 
@@ -423,7 +424,7 @@ func TestRunUpgradesOnSchedule_UpdateOnStart(t *testing.T) {
 	ctx := t.Context()
 
 	updateCalled := false
-	runUpdatesWithNotifications := func(_ context.Context, _ types.Filter, _ types.UpdateParams) *metrics.Metric {
+	runUpdatesWithNotifications := func(_ context.Context, _ types.Filter, _ updateParams.Params) *metrics.Metric {
 		updateCalled = true
 
 		return &metrics.Metric{Scanned: 1, Updated: 1, Failed: 0}
@@ -454,7 +455,7 @@ func TestRunUpgradesOnSchedule_UpdateOnStart(t *testing.T) {
 // reported as a failure.
 func TestRunUpgradesOnSchedule_UpdateOnStartSkippedWhenCanceled(t *testing.T) {
 	updateCalled := false
-	runUpdatesWithNotifications := func(_ context.Context, _ types.Filter, _ types.UpdateParams) *metrics.Metric {
+	runUpdatesWithNotifications := func(_ context.Context, _ types.Filter, _ updateParams.Params) *metrics.Metric {
 		updateCalled = true
 
 		return &metrics.Metric{}
@@ -489,7 +490,7 @@ func TestRunUpgradesOnSchedule_UpdateOnStartSkippedWhileLocked(t *testing.T) {
 
 	var updateCalled atomic.Bool
 
-	deps := testDeps(t, func(context.Context, types.Filter, types.UpdateParams) *metrics.Metric {
+	deps := testDeps(t, func(context.Context, types.Filter, updateParams.Params) *metrics.Metric {
 		updateCalled.Store(true)
 
 		return &metrics.Metric{}
@@ -518,7 +519,7 @@ func TestRunUpgradesOnSchedule_UpdateOnStartSkippedWhileLocked(t *testing.T) {
 func TestRunUpgradesOnSchedule_InvalidCronSpec(t *testing.T) {
 	ctx := t.Context()
 
-	runUpdatesWithNotifications := func(_ context.Context, _ types.Filter, _ types.UpdateParams) *metrics.Metric {
+	runUpdatesWithNotifications := func(_ context.Context, _ types.Filter, _ updateParams.Params) *metrics.Metric {
 		return &metrics.Metric{Scanned: 0, Updated: 0, Failed: 0}
 	}
 
@@ -579,7 +580,7 @@ func TestRunUpgradesOnSchedule_QuotedScheduleSpec(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			ctx := t.Context()
 
-			runUpdatesWithNotifications := func(_ context.Context, _ types.Filter, _ types.UpdateParams) *metrics.Metric {
+			runUpdatesWithNotifications := func(_ context.Context, _ types.Filter, _ updateParams.Params) *metrics.Metric {
 				return &metrics.Metric{Scanned: 0, Updated: 0, Failed: 0}
 			}
 
@@ -609,7 +610,7 @@ func TestRunUpgradesOnSchedule_QuotedScheduleSpec(t *testing.T) {
 func TestRunUpgradesOnSchedule_ContextCancellation(t *testing.T) {
 	ctx := t.Context()
 
-	runUpdatesWithNotifications := func(_ context.Context, _ types.Filter, _ types.UpdateParams) *metrics.Metric {
+	runUpdatesWithNotifications := func(_ context.Context, _ types.Filter, _ updateParams.Params) *metrics.Metric {
 		return &metrics.Metric{Scanned: 0, Updated: 0, Failed: 0}
 	}
 
@@ -644,7 +645,7 @@ func TestRunUpgradesOnSchedule_StopsOnlyOnCancellation(t *testing.T) {
 	signal.Notify(interrupts, os.Interrupt)
 	t.Cleanup(func() { signal.Stop(interrupts) })
 
-	runUpdatesWithNotifications := func(_ context.Context, _ types.Filter, _ types.UpdateParams) *metrics.Metric {
+	runUpdatesWithNotifications := func(_ context.Context, _ types.Filter, _ updateParams.Params) *metrics.Metric {
 		return &metrics.Metric{}
 	}
 
@@ -705,9 +706,9 @@ func TestRunUpgradesOnSchedule_MonitorOnlyParameter(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			ctx := t.Context()
 
-			var capturedParams types.UpdateParams
+			var capturedParams updateParams.Params
 
-			runUpdatesWithNotifications := func(_ context.Context, _ types.Filter, params types.UpdateParams) *metrics.Metric {
+			runUpdatesWithNotifications := func(_ context.Context, _ types.Filter, params updateParams.Params) *metrics.Metric {
 				capturedParams = params
 
 				return &metrics.Metric{Scanned: 1, Updated: 0, Failed: 0}
@@ -743,7 +744,7 @@ func TestRunUpgradesOnSchedule_CronWithSeconds(t *testing.T) {
 	ctx := t.Context()
 
 	updateCallCount := 0
-	runUpdatesWithNotifications := func(_ context.Context, _ types.Filter, _ types.UpdateParams) *metrics.Metric {
+	runUpdatesWithNotifications := func(_ context.Context, _ types.Filter, _ updateParams.Params) *metrics.Metric {
 		updateCallCount++
 
 		return &metrics.Metric{Scanned: 1, Updated: 0, Failed: 0}
@@ -775,9 +776,9 @@ func TestRunUpgradesOnSchedule_CronWithSeconds(t *testing.T) {
 func TestRunUpgradesOnSchedule_SkipFirstRun_True(t *testing.T) {
 	ctx := t.Context()
 
-	var capturedParams []types.UpdateParams
+	var capturedParams []updateParams.Params
 
-	runUpdatesWithNotifications := func(_ context.Context, _ types.Filter, params types.UpdateParams) *metrics.Metric {
+	runUpdatesWithNotifications := func(_ context.Context, _ types.Filter, params updateParams.Params) *metrics.Metric {
 		capturedParams = append(capturedParams, params)
 
 		return &metrics.Metric{Scanned: 1, Updated: 0, Failed: 0}
@@ -822,7 +823,7 @@ func TestRunUpgradesOnSchedule_ScheduledRuns_Execution(t *testing.T) {
 
 	var executionTimes []time.Time
 
-	runUpdatesWithNotifications := func(_ context.Context, _ types.Filter, _ types.UpdateParams) *metrics.Metric {
+	runUpdatesWithNotifications := func(_ context.Context, _ types.Filter, _ updateParams.Params) *metrics.Metric {
 		executionTimes = append(executionTimes, time.Now())
 
 		return &metrics.Metric{Scanned: 1, Updated: 0, Failed: 0}
@@ -871,9 +872,9 @@ func TestRunUpgradesOnSchedule_ScheduledRuns_Execution(t *testing.T) {
 // TestRunUpgradesOnSchedule_KeepsBaseSkipSelfUpdate verifies that a run cannot
 // enable self-updates that the base parameters disable.
 func TestRunUpgradesOnSchedule_KeepsBaseSkipSelfUpdate(t *testing.T) {
-	var capturedParams types.UpdateParams
+	var capturedParams updateParams.Params
 
-	runUpdatesWithNotifications := func(_ context.Context, _ types.Filter, params types.UpdateParams) *metrics.Metric {
+	runUpdatesWithNotifications := func(_ context.Context, _ types.Filter, params updateParams.Params) *metrics.Metric {
 		capturedParams = params
 
 		return &metrics.Metric{Scanned: 1, Updated: 0, Failed: 0}
@@ -893,7 +894,7 @@ func TestRunUpgradesOnSchedule_KeepsBaseSkipSelfUpdate(t *testing.T) {
 }
 
 // TestRunUpgradesOnSchedule_ReviveStoppedPropagation verifies that RunUpgradesOnSchedule
-// passes the ReviveStopped flag through UpdateParams to the update function.
+// passes the ReviveStopped flag through [updateParams.Params] to the update function.
 func TestRunUpgradesOnSchedule_ReviveStoppedPropagation(t *testing.T) {
 	tests := []struct {
 		name           string
@@ -916,9 +917,9 @@ func TestRunUpgradesOnSchedule_ReviveStoppedPropagation(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			ctx := t.Context()
 
-			var capturedParams types.UpdateParams
+			var capturedParams updateParams.Params
 
-			runUpdatesWithNotifications := func(_ context.Context, _ types.Filter, params types.UpdateParams) *metrics.Metric {
+			runUpdatesWithNotifications := func(_ context.Context, _ types.Filter, params updateParams.Params) *metrics.Metric {
 				capturedParams = params
 
 				return &metrics.Metric{Scanned: 1, Updated: 0, Failed: 0}
@@ -936,13 +937,13 @@ func TestRunUpgradesOnSchedule_ReviveStoppedPropagation(t *testing.T) {
 			require.NoError(t, err)
 
 			assert.Equal(t, tt.expectSelected, capturedParams.ReviveStopped,
-				"ReviveStopped should be %v in UpdateParams", tt.expectSelected)
+				"ReviveStopped should be %v in updateParams.Params", tt.expectSelected)
 		})
 	}
 }
 
 // TestRunUpgradesOnSchedule_UseComposeDependsOnPropagation verifies that
-// RunUpgradesOnSchedule passes UseComposeDependsOn through UpdateParams so
+// RunUpgradesOnSchedule passes UseComposeDependsOn through [updateParams.Params] so
 // scheduled cycles honor Compose depends_on the same way as --run-once.
 func TestRunUpgradesOnSchedule_UseComposeDependsOnPropagation(t *testing.T) {
 	tests := []struct {
@@ -966,9 +967,9 @@ func TestRunUpgradesOnSchedule_UseComposeDependsOnPropagation(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			ctx := t.Context()
 
-			var capturedParams types.UpdateParams
+			var capturedParams updateParams.Params
 
-			runUpdatesWithNotifications := func(_ context.Context, _ types.Filter, params types.UpdateParams) *metrics.Metric {
+			runUpdatesWithNotifications := func(_ context.Context, _ types.Filter, params updateParams.Params) *metrics.Metric {
 				capturedParams = params
 
 				return &metrics.Metric{Scanned: 1, Updated: 0, Failed: 0}
@@ -986,7 +987,7 @@ func TestRunUpgradesOnSchedule_UseComposeDependsOnPropagation(t *testing.T) {
 			require.NoError(t, err)
 
 			assert.Equal(t, tt.expectSelected, capturedParams.UseComposeDependsOn,
-				"UseComposeDependsOn should be %v in UpdateParams", tt.expectSelected)
+				"UseComposeDependsOn should be %v in updateParams.Params", tt.expectSelected)
 			assert.False(t, capturedParams.RunOnce,
 				"scheduled updates must keep RunOnce=false")
 		})

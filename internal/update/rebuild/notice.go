@@ -10,6 +10,7 @@ import (
 	"github.com/nicholas-fedor/watchtower/internal/container/oci"
 	"github.com/nicholas-fedor/watchtower/internal/container/provenance"
 	"github.com/nicholas-fedor/watchtower/internal/observability/logging"
+	updateParams "github.com/nicholas-fedor/watchtower/internal/update/params"
 	"github.com/nicholas-fedor/watchtower/pkg/types"
 )
 
@@ -30,7 +31,7 @@ const gitShortSHALen = 12
 func withGitMeta(
 	evt *zerolog.Event,
 	c types.Container,
-	params types.UpdateParams,
+	params updateParams.Params,
 	tag, commit string,
 ) *zerolog.Event {
 	if evt == nil {
@@ -78,7 +79,7 @@ func withGitMeta(
 //
 // Returns:
 //   - none.
-func logFoundGitRevision(log *zerolog.Logger, c types.Container, params types.UpdateParams, tag, commit string) {
+func logFoundGitRevision(log *zerolog.Logger, c types.Container, params updateParams.Params, tag, commit string) {
 	if log == nil || c == nil {
 		return
 	}

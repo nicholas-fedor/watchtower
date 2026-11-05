@@ -11,6 +11,7 @@ import (
 
 	"github.com/nicholas-fedor/watchtower/internal/registry/ratelimit"
 	mockUpdate "github.com/nicholas-fedor/watchtower/internal/update/mocks"
+	updateParams "github.com/nicholas-fedor/watchtower/internal/update/params"
 	"github.com/nicholas-fedor/watchtower/pkg/types"
 )
 
@@ -61,7 +62,7 @@ func TestUpdateAction_MonitorOnly(t *testing.T) {
 					"test-container-01": true,
 					"test-container-02": true,
 				}
-				report, cleanupImageInfos, err := update(newTestLogger(t), t.Context(), client, types.UpdateParams{Cleanup: true}, ratelimit.New())
+				report, cleanupImageInfos, err := update(newTestLogger(t), t.Context(), client, updateParams.Params{Cleanup: true}, ratelimit.New())
 
 				require.NoError(t, err)
 				require.Len(t, report.Updated(), 1)
@@ -101,7 +102,7 @@ func TestUpdateAction_MonitorOnly(t *testing.T) {
 					"test-container-01": true,
 					"test-container-02": true,
 				}
-				report, cleanupImageInfos, err := update(newTestLogger(t), t.Context(), client, types.UpdateParams{Cleanup: true, MonitorOnly: true}, ratelimit.New())
+				report, cleanupImageInfos, err := update(newTestLogger(t), t.Context(), client, updateParams.Params{Cleanup: true, MonitorOnly: true}, ratelimit.New())
 
 				require.NoError(t, err)
 				assert.Empty(t, report.Updated())
@@ -139,7 +140,7 @@ func TestUpdateAction_MonitorOnly(t *testing.T) {
 					client.TestData.Staleness = map[string]bool{
 						"test-container-02": true,
 					}
-					report, cleanupImageInfos, err := update(newTestLogger(t), t.Context(), client, types.UpdateParams{
+					report, cleanupImageInfos, err := update(newTestLogger(t), t.Context(), client, updateParams.Params{
 						Cleanup:         true,
 						MonitorOnly:     true,
 						LabelPrecedence: true,
@@ -179,7 +180,7 @@ func TestUpdateAction_MonitorOnly(t *testing.T) {
 					client.TestData.Staleness = map[string]bool{
 						"test-container-02": true,
 					}
-					report, cleanupImageInfos, err := update(newTestLogger(t), t.Context(), client, types.UpdateParams{
+					report, cleanupImageInfos, err := update(newTestLogger(t), t.Context(), client, updateParams.Params{
 						Cleanup:         true,
 						MonitorOnly:     true,
 						LabelPrecedence: true,
@@ -211,7 +212,7 @@ func TestUpdateAction_MonitorOnly(t *testing.T) {
 					client.TestData.Staleness = map[string]bool{
 						"test-container-01": true,
 					}
-					report, cleanupImageInfos, err := update(newTestLogger(t), t.Context(), client, types.UpdateParams{
+					report, cleanupImageInfos, err := update(newTestLogger(t), t.Context(), client, updateParams.Params{
 						Cleanup:         true,
 						MonitorOnly:     true,
 						LabelPrecedence: true,

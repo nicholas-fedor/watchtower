@@ -13,7 +13,7 @@ import (
 	"github.com/nicholas-fedor/watchtower/internal/git"
 	gitConfig "github.com/nicholas-fedor/watchtower/internal/settings/config/git"
 	mockUpdate "github.com/nicholas-fedor/watchtower/internal/update/mocks"
-	"github.com/nicholas-fedor/watchtower/pkg/types"
+	updateParams "github.com/nicholas-fedor/watchtower/internal/update/params"
 )
 
 // TestSession_Check verifies the Git staleness check. It checks the result the
@@ -27,7 +27,7 @@ func TestSession_Check(t *testing.T) {
 		sess := NewSession(gitTestClient(t))
 		c := mockUpdate.CreateMockContainer("plain", "/plain", "nginx:latest", time.Now())
 
-		stale, newest, err := sess.Check(t.Context(), c, types.UpdateParams{})
+		stale, newest, err := sess.Check(t.Context(), c, updateParams.Params{})
 		require.NoError(t, err)
 		assert.False(t, stale)
 		assert.Equal(t, c.ImageID(), newest)
@@ -48,7 +48,7 @@ func TestSession_Check(t *testing.T) {
 		ctx, cancel := context.WithTimeout(t.Context(), 200*time.Millisecond)
 		defer cancel()
 
-		stale, newest, err := sess.Check(ctx, c, types.UpdateParams{
+		stale, newest, err := sess.Check(ctx, c, updateParams.Params{
 			Git: gitConfig.Defaults{
 				Enable: true,
 			},
@@ -68,7 +68,7 @@ func TestSession_Check(t *testing.T) {
 			labels.GitHost: "ftp://git.example.com",
 		})
 
-		_, _, err := sess.Check(t.Context(), c, types.UpdateParams{Git: gitConfig.Defaults{Enable: true}})
+		_, _, err := sess.Check(t.Context(), c, updateParams.Params{Git: gitConfig.Defaults{Enable: true}})
 		require.ErrorIs(t, err, provenance.ErrInvalidHost)
 		require.EqualError(t, err, "git check: invalid git-host: scheme must be http or https")
 	})

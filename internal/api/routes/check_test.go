@@ -11,6 +11,7 @@ import (
 	"github.com/nicholas-fedor/watchtower/internal/observability/events"
 	"github.com/nicholas-fedor/watchtower/internal/observability/logging"
 	"github.com/nicholas-fedor/watchtower/internal/observability/metrics"
+	updateParams "github.com/nicholas-fedor/watchtower/internal/update/params"
 	"github.com/nicholas-fedor/watchtower/internal/update/schedule"
 	"github.com/nicholas-fedor/watchtower/pkg/types"
 )
@@ -98,7 +99,7 @@ func TestRegisterUpdateRoute_WriteStartupMessage(t *testing.T) {
 		EnableUpdateAPI: true,
 		UpdateLock:      schedule.NewUpdateLock(),
 		UnblockHTTPAPI:  false,
-		RunUpdatesWithNotifications: func(_ context.Context, _ types.Filter, _ types.UpdateParams) *metrics.Metric {
+		RunUpdatesWithNotifications: func(_ context.Context, _ types.Filter, _ updateParams.Params) *metrics.Metric {
 			return &metrics.Metric{}
 		},
 		FilterByImage:  func(_ []string, f types.Filter) types.Filter { return f },

@@ -20,6 +20,7 @@ import (
 	"github.com/nicholas-fedor/watchtower/internal/testutil/logcapture"
 	"github.com/nicholas-fedor/watchtower/internal/update/cleanup"
 	mockUpdate "github.com/nicholas-fedor/watchtower/internal/update/mocks"
+	updateParams "github.com/nicholas-fedor/watchtower/internal/update/params"
 	"github.com/nicholas-fedor/watchtower/internal/update/state"
 	"github.com/nicholas-fedor/watchtower/pkg/types"
 )
@@ -96,7 +97,7 @@ func Test_restartStaleContainer(t *testing.T) {
 			false,
 			false,
 		)
-		params := types.UpdateParams{
+		params := updateParams.Params{
 			RunOnce: true,
 		}
 		testContainer := client.TestData.Containers[0]
@@ -134,7 +135,7 @@ func Test_restartStaleContainer(t *testing.T) {
 			false,
 			false,
 		)
-		params := types.UpdateParams{
+		params := updateParams.Params{
 			RunOnce: false,
 		}
 		testContainer := client.TestData.Containers[0]
@@ -172,7 +173,7 @@ func Test_restartStaleContainer(t *testing.T) {
 			false,
 			false,
 		)
-		params := types.UpdateParams{
+		params := updateParams.Params{
 			RunOnce: false,
 		}
 		testContainer := client.TestData.Containers[0]
@@ -210,7 +211,7 @@ func Test_restartStaleContainer(t *testing.T) {
 			false,
 			false,
 		)
-		params := types.UpdateParams{
+		params := updateParams.Params{
 			EphemeralSelfUpdate: true,
 			Cleanup:             true,
 		}
@@ -302,7 +303,7 @@ func TestDetachedContext(t *testing.T) {
 
 				// Configure params with the test timeout value.
 				// RunOnce is false to enable the rename path which uses the detached context.
-				params := types.UpdateParams{
+				params := updateParams.Params{
 					Timeout: tc.timeout,
 					RunOnce: false,
 				}
@@ -384,7 +385,7 @@ func TestDetachedContext(t *testing.T) {
 				false,
 			)
 
-			params := types.UpdateParams{
+			params := updateParams.Params{
 				Timeout: 0,
 				RunOnce: false,
 			}
@@ -480,7 +481,7 @@ func TestDetachedContext(t *testing.T) {
 				false,
 			)
 
-			params := types.UpdateParams{
+			params := updateParams.Params{
 				Timeout: 0,
 				RunOnce: false,
 			}
@@ -610,7 +611,7 @@ func TestDetachedContext(t *testing.T) {
 						false,
 					)
 
-					params := types.UpdateParams{
+					params := updateParams.Params{
 						Timeout: tt.stopTimeout,
 						RunOnce: false,
 					}
@@ -674,7 +675,7 @@ func TestDetachedContext(t *testing.T) {
 				false,
 			)
 
-			params := types.UpdateParams{
+			params := updateParams.Params{
 				Timeout: 0, // Fallback deadline applied to detached context
 				RunOnce: false,
 			}
@@ -763,7 +764,7 @@ func TestDetachedContext(t *testing.T) {
 				false,
 			)
 
-			params := types.UpdateParams{
+			params := updateParams.Params{
 				Timeout: 0, // Fallback deadline applied to detached context
 				RunOnce: false,
 			}
@@ -824,7 +825,7 @@ func TestDetachedContext(t *testing.T) {
 			)
 
 			// Use a timeout of 0 to create a detached context with the fallback deadline.
-			params := types.UpdateParams{
+			params := updateParams.Params{
 				Timeout: 0,
 				RunOnce: false,
 			}
@@ -988,7 +989,7 @@ func Test_stopContainersInReversedOrder(t *testing.T) {
 					ctx,
 					containers,
 					client,
-					types.UpdateParams{},
+					updateParams.Params{},
 				)
 
 				// Verify the number of stopped containers.
@@ -1073,7 +1074,7 @@ func Test_stopContainersInReversedOrder(t *testing.T) {
 				canceledCtx,
 				containers,
 				client,
-				types.UpdateParams{},
+				updateParams.Params{},
 			)
 
 			// All 4 containers should be in failed map (containers 0, 1, 2, 3).
@@ -1147,7 +1148,7 @@ func Test_stopContainersInReversedOrder(t *testing.T) {
 				canceledCtx,
 				containers,
 				client,
-				types.UpdateParams{},
+				updateParams.Params{},
 			)
 
 			// Verify log entries contain expected container details.
@@ -1224,7 +1225,7 @@ func Test_stopContainersInReversedOrder(t *testing.T) {
 				t.Context(),
 				containers,
 				client,
-				types.UpdateParams{},
+				updateParams.Params{},
 			)
 
 			// All containers should be stopped, none failed.
@@ -1283,7 +1284,7 @@ func Test_stopContainersInReversedOrder(t *testing.T) {
 				t.Context(),
 				containers,
 				client,
-				types.UpdateParams{},
+				updateParams.Params{},
 			)
 
 			// Verify stop order is reverse (container-2, container-1, container-0).
@@ -1353,7 +1354,7 @@ func TestRestartContainersInSortedOrderCancelRecovery(t *testing.T) {
 			ctx,
 			containers,
 			client,
-			types.UpdateParams{Timeout: 0},
+			updateParams.Params{Timeout: 0},
 			stoppedImages,
 			&cleanup,
 			&progress,
@@ -1499,7 +1500,7 @@ func Test_performRollingRestart(t *testing.T) {
 					ctx,
 					containers,
 					client,
-					types.UpdateParams{},
+					updateParams.Params{},
 					&cleanupImageInfos,
 					nil, // progress is not needed for this test
 					nil,
@@ -1594,7 +1595,7 @@ func Test_performRollingRestart(t *testing.T) {
 				canceledCtx,
 				containers,
 				client,
-				types.UpdateParams{},
+				updateParams.Params{},
 				&cleanupImageInfos,
 				nil,
 				nil,
@@ -1676,7 +1677,7 @@ func Test_performRollingRestart(t *testing.T) {
 				canceledCtx,
 				containers,
 				client,
-				types.UpdateParams{},
+				updateParams.Params{},
 				&cleanupImageInfos,
 				nil,
 				nil,
@@ -1758,7 +1759,7 @@ func Test_performRollingRestart(t *testing.T) {
 				t.Context(),
 				containers,
 				client,
-				types.UpdateParams{},
+				updateParams.Params{},
 				&cleanupImageInfos,
 				nil,
 				nil,
@@ -1824,7 +1825,7 @@ func Test_performRollingRestart(t *testing.T) {
 				t.Context(),
 				containers,
 				client,
-				types.UpdateParams{},
+				updateParams.Params{},
 				&cleanupImageInfos,
 				nil,
 				nil,
@@ -1878,7 +1879,7 @@ func Test_performRollingRestart(t *testing.T) {
 				t.Context(),
 				[]types.Container{watchtower},
 				client,
-				types.UpdateParams{RollingRestart: true, EphemeralSelfUpdate: true},
+				updateParams.Params{RollingRestart: true, EphemeralSelfUpdate: true},
 				&cleanupImageInfos,
 				nil,
 				nil,
@@ -1937,7 +1938,7 @@ func Test_performRollingRestart(t *testing.T) {
 				canceledCtx,
 				containers,
 				client,
-				types.UpdateParams{},
+				updateParams.Params{},
 				&cleanupImageInfos,
 				nil,
 				nil,
@@ -1999,7 +2000,7 @@ func Test_performRollingRestart(t *testing.T) {
 				deadlineCtx,
 				containers,
 				client,
-				types.UpdateParams{},
+				updateParams.Params{},
 				&cleanupImageInfos,
 				nil,
 				nil,
@@ -2067,7 +2068,7 @@ func TestRun(t *testing.T) {
 				false,
 			)
 
-			config := types.UpdateParams{RollingRestart: tt.rolling}
+			config := updateParams.Params{RollingRestart: tt.rolling}
 			progress := state.Progress{}
 			progress.AddScanned(log, c, "sha256:new", config)
 
@@ -2121,7 +2122,7 @@ func TestClientErrorsNamedOnce(t *testing.T) {
 					t.Context(),
 					source,
 					client,
-					types.UpdateParams{Timeout: time.Second},
+					updateParams.Params{Timeout: time.Second},
 				)
 				require.Same(t, clientErr, err)
 				require.EqualError(t, err, text)
@@ -2141,7 +2142,7 @@ func TestClientErrorsNamedOnce(t *testing.T) {
 			CreateContainer(mock.Anything, source).
 			Return("", clientErr)
 
-		_, _, err := restartStaleContainer(newTestLogger(t), t.Context(), source, client, types.UpdateParams{})
+		_, _, err := restartStaleContainer(newTestLogger(t), t.Context(), source, client, updateParams.Params{})
 		require.Same(t, clientErr, err)
 		require.EqualError(t, err, text)
 	})
@@ -2165,7 +2166,7 @@ func TestClientErrorsNamedOnce(t *testing.T) {
 			t.Context(),
 			source,
 			client,
-			types.UpdateParams{ReviveStopped: true},
+			updateParams.Params{ReviveStopped: true},
 		)
 		require.Same(t, clientErr, err)
 		require.EqualError(t, err, text)

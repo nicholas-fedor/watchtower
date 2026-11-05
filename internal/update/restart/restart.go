@@ -17,6 +17,7 @@ import (
 	"github.com/nicholas-fedor/watchtower/internal/container/labels"
 	"github.com/nicholas-fedor/watchtower/internal/observability/logging"
 	"github.com/nicholas-fedor/watchtower/internal/update/cleanup"
+	updateParams "github.com/nicholas-fedor/watchtower/internal/update/params"
 	"github.com/nicholas-fedor/watchtower/internal/update/rebuild"
 	"github.com/nicholas-fedor/watchtower/internal/update/selfupdate"
 	"github.com/nicholas-fedor/watchtower/internal/update/state"
@@ -80,7 +81,7 @@ func Run(
 	ctx context.Context,
 	containers []types.Container,
 	client containerClient.Client,
-	config types.UpdateParams,
+	config updateParams.Params,
 	cleanupImageInfos *[]cleanup.RemovedImageInfo,
 	progress *state.Progress,
 	gitSession *rebuild.Session,
@@ -155,7 +156,7 @@ func performRollingRestart(
 	ctx context.Context,
 	containers []types.Container,
 	client containerClient.Client,
-	config types.UpdateParams,
+	config updateParams.Params,
 	cleanupImageInfos *[]cleanup.RemovedImageInfo,
 	progress *state.Progress,
 	gitSession *rebuild.Session,
@@ -311,7 +312,7 @@ func stopContainersInReversedOrder(
 	ctx context.Context,
 	containers []types.Container,
 	client containerClient.Client,
-	config types.UpdateParams,
+	config updateParams.Params,
 ) (map[types.ContainerID]error, []cleanup.RemovedImageInfo) {
 	failed := make(map[types.ContainerID]error, len(containers))
 	stopped := make([]cleanup.RemovedImageInfo, 0, len(containers))
@@ -422,7 +423,7 @@ func stopStaleContainer(
 	ctx context.Context,
 	container types.Container,
 	client containerClient.Client,
-	config types.UpdateParams,
+	config updateParams.Params,
 ) (bool, error) {
 	fields := map[string]any{
 		"container": container.Name(),
@@ -592,7 +593,7 @@ func restartContainersInSortedOrder(
 	ctx context.Context,
 	containers []types.Container,
 	client containerClient.Client,
-	config types.UpdateParams,
+	config updateParams.Params,
 	stoppedImages []cleanup.RemovedImageInfo,
 	cleanupImageInfos *[]cleanup.RemovedImageInfo,
 	progress *state.Progress,
@@ -731,7 +732,7 @@ func restartStaleContainer(
 	ctx context.Context,
 	sourceContainer types.Container,
 	client containerClient.Client,
-	config types.UpdateParams,
+	config updateParams.Params,
 ) (types.ContainerID, bool, error) {
 	// Create a detached context to survive parent context cancellation.
 	// This ensures container cleanup and update operations complete even if the

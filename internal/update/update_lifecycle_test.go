@@ -14,6 +14,7 @@ import (
 	"github.com/nicholas-fedor/watchtower/internal/registry/ratelimit"
 	"github.com/nicholas-fedor/watchtower/internal/update/cleanup"
 	mockUpdate "github.com/nicholas-fedor/watchtower/internal/update/mocks"
+	updateParams "github.com/nicholas-fedor/watchtower/internal/update/params"
 	"github.com/nicholas-fedor/watchtower/pkg/types"
 )
 
@@ -58,7 +59,7 @@ func TestUpdateAction_LifecycleHooks(t *testing.T) {
 				client.TestData.Staleness = map[string]bool{
 					"test-container-02": true,
 				}
-				report, cleanupImageInfos, err := update(newTestLogger(t), t.Context(), client, types.UpdateParams{
+				report, cleanupImageInfos, err := update(newTestLogger(t), t.Context(), client, updateParams.Params{
 					Cleanup:        true,
 					LifecycleHooks: true,
 				}, ratelimit.New())
@@ -101,7 +102,7 @@ func TestUpdateAction_LifecycleHooks(t *testing.T) {
 				client.TestData.Staleness = map[string]bool{
 					"test-container-uid-gid": true,
 				}
-				report, cleanupImageInfos, err := update(newTestLogger(t), t.Context(), client, types.UpdateParams{
+				report, cleanupImageInfos, err := update(newTestLogger(t), t.Context(), client, updateParams.Params{
 					Cleanup:        true,
 					LifecycleHooks: true,
 					LifecycleUID:   1000,
@@ -150,7 +151,7 @@ func TestUpdateAction_LifecycleHooks(t *testing.T) {
 				client.TestData.Staleness = map[string]bool{
 					"test-container-02": true,
 				}
-				report, cleanupImageInfos, err := update(newTestLogger(t), t.Context(), client, types.UpdateParams{
+				report, cleanupImageInfos, err := update(newTestLogger(t), t.Context(), client, updateParams.Params{
 					Cleanup:        true,
 					LifecycleHooks: true,
 				}, ratelimit.New())
@@ -196,7 +197,7 @@ func TestUpdateAction_LifecycleHooks(t *testing.T) {
 				client.TestData.Staleness = map[string]bool{
 					"test-container-02": true,
 				}
-				report, cleanupImageInfos, err := update(newTestLogger(t), t.Context(), client, types.UpdateParams{
+				report, cleanupImageInfos, err := update(newTestLogger(t), t.Context(), client, updateParams.Params{
 					Cleanup:        true,
 					LifecycleHooks: true,
 				}, ratelimit.New())
@@ -241,7 +242,7 @@ func TestUpdateAction_LifecycleHooks(t *testing.T) {
 				client.TestData.Staleness = map[string]bool{
 					"test-container-02": true,
 				}
-				report, cleanupImageInfos, err := update(newTestLogger(t), t.Context(), client, types.UpdateParams{
+				report, cleanupImageInfos, err := update(newTestLogger(t), t.Context(), client, updateParams.Params{
 					Cleanup:        true,
 					LifecycleHooks: true,
 				}, ratelimit.New())
@@ -286,7 +287,7 @@ func TestUpdateAction_LifecycleHooks(t *testing.T) {
 				client.TestData.Staleness = map[string]bool{
 					"test-container-02": true,
 				}
-				report, cleanupImageInfos, err := update(newTestLogger(t), t.Context(), client, types.UpdateParams{
+				report, cleanupImageInfos, err := update(newTestLogger(t), t.Context(), client, updateParams.Params{
 					Cleanup:        true,
 					LifecycleHooks: true,
 				}, ratelimit.New())

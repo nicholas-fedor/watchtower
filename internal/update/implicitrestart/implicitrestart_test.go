@@ -16,6 +16,7 @@ import (
 
 	"github.com/nicholas-fedor/watchtower/internal/container"
 	mockUpdate "github.com/nicholas-fedor/watchtower/internal/update/mocks"
+	updateParams "github.com/nicholas-fedor/watchtower/internal/update/params"
 	"github.com/nicholas-fedor/watchtower/internal/update/sorter"
 	"github.com/nicholas-fedor/watchtower/pkg/types"
 )
@@ -356,7 +357,7 @@ func TestReconcileImplicitRestarts(t *testing.T) {
 
 		app.SetStale(false)
 
-		got := Reconcile(log, testGraph(t, containers), containers, containers, types.UpdateParams{}, nil)
+		got := Reconcile(log, testGraph(t, containers), containers, containers, updateParams.Params{}, nil)
 
 		assert.False(t, db.IsLinkedToRestarting())
 		assert.Empty(t, got)
@@ -385,7 +386,7 @@ func TestReconcileImplicitRestarts(t *testing.T) {
 
 		app.SetStale(true)
 		containers := []types.Container{app, db}
-		got := Reconcile(log, testGraph(t, containers), containers, containers, types.UpdateParams{}, nil)
+		got := Reconcile(log, testGraph(t, containers), containers, containers, updateParams.Params{}, nil)
 
 		assert.True(t, db.IsLinkedToRestarting())
 		assert.ElementsMatch(t, []types.Container{app, db}, got)
@@ -423,7 +424,7 @@ func TestReconcileImplicitRestarts(t *testing.T) {
 			graph,
 			containers,
 			containers,
-			types.UpdateParams{NoRestart: true},
+			updateParams.Params{NoRestart: true},
 			// The update excludes the containers Git built without a restart.
 			map[types.ContainerID]struct{}{app.ID(): {}},
 		)
@@ -472,7 +473,7 @@ func TestReconcileImplicitRestarts(t *testing.T) {
 			graph,
 			containers,
 			containers,
-			types.UpdateParams{},
+			updateParams.Params{},
 			map[types.ContainerID]struct{}{excluded.ID(): {}},
 		)
 

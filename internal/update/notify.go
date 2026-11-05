@@ -17,14 +17,15 @@ import (
 	"github.com/nicholas-fedor/watchtower/internal/observability/metrics"
 	"github.com/nicholas-fedor/watchtower/internal/registry/ratelimit"
 	"github.com/nicholas-fedor/watchtower/internal/update/cleanup"
+	updateParams "github.com/nicholas-fedor/watchtower/internal/update/params"
 	"github.com/nicholas-fedor/watchtower/internal/update/state"
 	"github.com/nicholas-fedor/watchtower/pkg/types"
 )
 
 // RunUpdatesWithNotificationsParams holds runtime dependencies and update policy.
 //
-// Update carries the full types.UpdateParams snapshot from config.UpdateParams
-// (or an equivalent complete construction).
+// Update carries a complete [updateParams.Params] snapshot built from the
+// process configuration.
 type RunUpdatesWithNotificationsParams struct {
 	// Client is the Docker client for container operations.
 	Client containerClient.Client
@@ -44,7 +45,7 @@ type RunUpdatesWithNotificationsParams struct {
 	// The caller should stop the process. Nil means the session simply ends.
 	OnOldSelfDetected func()
 	// Update is the complete update policy for this invocation (filter, cleanup, timeouts, etc.).
-	Update types.UpdateParams
+	Update updateParams.Params
 	// NotificationSplitByContainer enables a separate notification per updated container.
 	NotificationSplitByContainer bool
 	// NotificationReport enables report-based notification templates.
@@ -115,7 +116,7 @@ func RunUpdatesWithNotifications(
 
 	updateConfig := params.Update
 
-	// Publish redacted policy flags only to avoid UpdateParams leaking internal IDs.
+	// Publish redacted policy flags only to avoid updateParams.Params leaking internal IDs.
 	if params.EventBroadcaster != nil {
 		params.EventBroadcaster.Publish(events.Event{
 			Type:      "scan_started",
@@ -441,7 +442,7 @@ func executeUpdate(
 	log *zerolog.Logger,
 	ctx context.Context,
 	client containerClient.Client,
-	config types.UpdateParams,
+	config updateParams.Params,
 	rateLimiter *ratelimit.Limiter,
 	gitClient *git.Client,
 ) (types.Report, []cleanup.RemovedImageInfo, error) {

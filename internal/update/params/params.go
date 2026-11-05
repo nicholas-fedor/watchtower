@@ -1,4 +1,4 @@
-package types
+package params
 
 import (
 	"math"
@@ -8,13 +8,14 @@ import (
 	gitConfig "github.com/nicholas-fedor/watchtower/internal/settings/config/git"
 	registryConfig "github.com/nicholas-fedor/watchtower/internal/settings/config/registry"
 	updateConfig "github.com/nicholas-fedor/watchtower/internal/settings/config/update"
+	"github.com/nicholas-fedor/watchtower/pkg/types"
 )
 
-// UpdateParams defines options for the Update function.
-type UpdateParams struct {
-	Filter              Filter                  // Container filter.
+// Params holds the settings that one update run applies to the containers it checks.
+type Params struct {
+	Filter              types.Filter            // Container filter.
 	ComposeProjects     map[string]string       // Compose project name to directory inside Watchtower.
-	CurrentContainerID  ContainerID             // ID of the current container being updated.
+	CurrentContainerID  types.ContainerID       // ID of the current container being updated.
 	Git                 gitConfig.Defaults      // Credential-free Git association settings.
 	Registry            registryConfig.Registry // Settings for registry requests.
 	updateConfig.Policy                         // Settings that a container's labels can override.
@@ -53,7 +54,7 @@ const detachedCallBudget = 30 * time.Second
 //
 // Returns:
 //   - time.Duration: The bound for detached Docker calls.
-func (p UpdateParams) DetachedTimeout() time.Duration {
+func (p Params) DetachedTimeout() time.Duration {
 	return detachedBound(p.Timeout)
 }
 
@@ -61,16 +62,16 @@ func (p UpdateParams) DetachedTimeout() time.Duration {
 // container c, such as removing a failed replacement.
 //
 // A stop timeout set on c takes precedence over the configured one, so the stop
-// can wait longer than [UpdateParams.DetachedTimeout] allows for. The bound is
+// can wait longer than [Params.DetachedTimeout] allows for. The bound is
 // the longer of the two stop timeouts plus 30 seconds, so it is never shorter
-// than [UpdateParams.DetachedTimeout].
+// than [Params.DetachedTimeout].
 //
 // Parameters:
 //   - c: The container the detached calls stop.
 //
 // Returns:
 //   - time.Duration: The bound for the detached calls.
-func (p UpdateParams) DetachedStopTimeout(c Container) time.Duration {
+func (p Params) DetachedStopTimeout(c types.Container) time.Duration {
 	return detachedBound(max(p.Timeout, c.StopTimeout(p.Timeout)))
 }
 
@@ -79,7 +80,7 @@ func (p UpdateParams) DetachedStopTimeout(c Container) time.Duration {
 //
 // Returns:
 //   - events.ScanStartedData: The published update settings.
-func (p UpdateParams) ScanStartedData() events.ScanStartedData {
+func (p Params) ScanStartedData() events.ScanStartedData {
 	return events.ScanStartedData{
 		Cleanup:             p.Cleanup,
 		NoRestart:           p.NoRestart,

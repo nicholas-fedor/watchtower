@@ -32,6 +32,7 @@ import (
 	"github.com/nicholas-fedor/watchtower/internal/git/semver"
 	gitConfig "github.com/nicholas-fedor/watchtower/internal/settings/config/git"
 	updateConfig "github.com/nicholas-fedor/watchtower/internal/settings/config/update"
+	updateParams "github.com/nicholas-fedor/watchtower/internal/update/params"
 	"github.com/nicholas-fedor/watchtower/pkg/types"
 	mockTypes "github.com/nicholas-fedor/watchtower/pkg/types/mocks"
 )
@@ -66,7 +67,7 @@ func TestCheckForUpdates_DigestExtraction(t *testing.T) {
 	client.EXPECT().CheckContainerUpdate(mock.Anything, mock.Anything, mock.Anything).
 		Return(false, types.ImageID("sha256:abc"), "", nil)
 
-	results, err := CheckForUpdates(newTestLogger(t), t.Context(), client, nil, types.UpdateParams{}, nil)
+	results, err := CheckForUpdates(newTestLogger(t), t.Context(), client, nil, updateParams.Params{}, nil)
 	require.NoError(t, err)
 	require.Len(t, results, 1)
 	assert.Equal(t, "sha256:digest123", results[0].Digest)
@@ -83,7 +84,7 @@ func TestCheckForUpdates_CheckContainerUpdateError(t *testing.T) {
 	client.EXPECT().CheckContainerUpdate(mock.Anything, mock.Anything, mock.Anything).
 		Return(false, types.ImageID(""), "", errors.New("registry unavailable"))
 
-	results, err := CheckForUpdates(newTestLogger(t), t.Context(), client, nil, types.UpdateParams{}, nil)
+	results, err := CheckForUpdates(newTestLogger(t), t.Context(), client, nil, updateParams.Params{}, nil)
 	require.NoError(t, err)
 	require.Len(t, results, 1)
 	assert.Equal(t, "registry unavailable", results[0].Error)
@@ -102,7 +103,7 @@ func TestCheckForUpdates_ParamsPropagation(t *testing.T) {
 		return p.MonitorOnly && p.NoPull && p.EnableChangelog && p.LabelPrecedence && p.CooldownDelay == 5*time.Minute
 	})).Return(true, types.ImageID("sha256:new"), "sha256:newdigest", nil)
 
-	params := types.UpdateParams{
+	params := updateParams.Params{
 		MonitorOnly:     true,
 		NoPull:          true,
 		EnableChangelog: true,
@@ -137,7 +138,7 @@ func TestCheckForUpdates_MixedStaleResults(t *testing.T) {
 	client.EXPECT().CheckContainerUpdate(mock.Anything, container2, mock.Anything).
 		Return(false, types.ImageID("sha256:def"), "", nil)
 
-	results, err := CheckForUpdates(newTestLogger(t), t.Context(), client, nil, types.UpdateParams{}, nil)
+	results, err := CheckForUpdates(newTestLogger(t), t.Context(), client, nil, updateParams.Params{}, nil)
 	require.NoError(t, err)
 	require.Len(t, results, 2)
 	assert.True(t, results[0].UpdateAvailable)
@@ -163,7 +164,7 @@ func TestCheckForUpdates_GitNoPullSkipsCheck(t *testing.T) {
 	client.EXPECT().ListContainers(mock.Anything, mock.Anything).Return([]types.Container{watched}, nil)
 
 	gitClient := git.New(newTestLogger(t), git.Options{Timeout: time.Millisecond})
-	results, err := CheckForUpdates(newTestLogger(t), t.Context(), client, nil, types.UpdateParams{
+	results, err := CheckForUpdates(newTestLogger(t), t.Context(), client, nil, updateParams.Params{
 		NoPull: true,
 		Git: gitConfig.Defaults{
 			Enable: true,
@@ -195,7 +196,7 @@ func TestCheckForUpdates_GitCommitField(t *testing.T) {
 	client := mockContainerClient.NewMockClient(t)
 	client.EXPECT().ListContainers(mock.Anything, mock.Anything).Return([]types.Container{watched}, nil)
 
-	results, err := CheckForUpdates(newTestLogger(t), t.Context(), client, nil, types.UpdateParams{
+	results, err := CheckForUpdates(newTestLogger(t), t.Context(), client, nil, updateParams.Params{
 		Git: gitConfig.Defaults{
 			Enable: true,
 		},
@@ -386,7 +387,7 @@ func TestApplyReportMetadata(t *testing.T) {
 		})
 
 		var result ContainerCheck
-		applyReportMetadata(c, types.UpdateParams{}, &result)
+		applyReportMetadata(c, updateParams.Params{}, &result)
 
 		assert.Equal(t, "https://github.com/org/app.git", result.GitRepo)
 		assert.Equal(t, "https://github.com/org/app/releases", result.Changelog)
@@ -404,7 +405,7 @@ func TestApplyReportMetadata(t *testing.T) {
 		c := stubContainer(t, nil)
 
 		result := ContainerCheck{}
-		applyReportMetadata(c, types.UpdateParams{}, &result)
+		applyReportMetadata(c, updateParams.Params{}, &result)
 
 		assert.Empty(t, result.GitRepo)
 		assert.Empty(t, result.GitRef)
@@ -467,35 +468,35 @@ func TestIsGitWatched(t *testing.T) {
 	tests := []struct {
 		name      string
 		container types.Container
-		params    types.UpdateParams
+		params    updateParams.Params
 		gitClient *git.Client
 		want      bool
 	}{
 		{
 			name:      "no git client falls back to the registry",
 			container: gitContainer(t, "https://github.com/org/app.git", nil),
-			params:    types.UpdateParams{Git: gitConfig.Defaults{Enable: true}},
+			params:    updateParams.Params{Git: gitConfig.Defaults{Enable: true}},
 			gitClient: nil,
 			want:      false,
 		},
 		{
 			name:      "stubbed container has no labels to watch",
 			container: stubContainer(t, nil),
-			params:    types.UpdateParams{Git: gitConfig.Defaults{Enable: true}},
+			params:    updateParams.Params{Git: gitConfig.Defaults{Enable: true}},
 			gitClient: gitClient,
 			want:      false,
 		},
 		{
 			name:      "git monitoring disabled",
 			container: gitContainer(t, "https://github.com/org/app.git", nil),
-			params:    types.UpdateParams{},
+			params:    updateParams.Params{},
 			gitClient: gitClient,
 			want:      false,
 		},
 		{
 			name:      "associated container with monitoring enabled",
 			container: gitContainer(t, "https://github.com/org/app.git", nil),
-			params:    types.UpdateParams{Git: gitConfig.Defaults{Enable: true}},
+			params:    updateParams.Params{Git: gitConfig.Defaults{Enable: true}},
 			gitClient: gitClient,
 			want:      true,
 		},
@@ -535,7 +536,7 @@ func TestCheckGitSource(t *testing.T) {
 			t.Context(),
 			newTestLogger(t),
 			c,
-			types.UpdateParams{NoPull: true, Git: gitConfig.Defaults{Enable: true}},
+			updateParams.Params{NoPull: true, Git: gitConfig.Defaults{Enable: true}},
 			git.New(newTestLogger(t), git.Options{Timeout: time.Second}),
 			&result,
 		)
@@ -558,7 +559,7 @@ func TestCheckGitSource(t *testing.T) {
 			t.Context(),
 			newTestLogger(t),
 			c,
-			types.UpdateParams{Git: gitConfig.Defaults{Enable: true}},
+			updateParams.Params{Git: gitConfig.Defaults{Enable: true}},
 			git.New(newTestLogger(t), git.Options{Timeout: time.Second}),
 			&result,
 		)
@@ -582,7 +583,7 @@ func TestCheckGitSource(t *testing.T) {
 			t.Context(),
 			newTestLogger(t),
 			c,
-			types.UpdateParams{Git: gitConfig.Defaults{Enable: true}},
+			updateParams.Params{Git: gitConfig.Defaults{Enable: true}},
 			git.New(newTestLogger(t), git.Options{Timeout: time.Second}),
 			&result,
 		)
@@ -609,7 +610,7 @@ func TestCheckGitSource(t *testing.T) {
 			t.Context(),
 			newTestLogger(t),
 			c,
-			types.UpdateParams{Git: gitConfig.Defaults{Enable: true}},
+			updateParams.Params{Git: gitConfig.Defaults{Enable: true}},
 			git.New(newTestLogger(t), git.Options{Timeout: time.Second}),
 			&result,
 		)
@@ -633,7 +634,7 @@ func TestCheckRegistrySource(t *testing.T) {
 		c := stubContainer(t, nil)
 
 		var result ContainerCheck
-		checkRegistrySource(t.Context(), newTestLogger(t), client, c, types.UpdateParams{}, &result)
+		checkRegistrySource(t.Context(), newTestLogger(t), client, c, updateParams.Params{}, &result)
 
 		assert.Equal(t, "registry", result.UpdateSource)
 		assert.Equal(t, "registry unreachable", result.Error)
@@ -652,7 +653,7 @@ func TestCheckRegistrySource(t *testing.T) {
 		c := stubContainer(t, nil)
 
 		var result ContainerCheck
-		checkRegistrySource(t.Context(), newTestLogger(t), client, c, types.UpdateParams{}, &result)
+		checkRegistrySource(t.Context(), newTestLogger(t), client, c, updateParams.Params{}, &result)
 
 		assert.Equal(t, "registry", result.UpdateSource)
 		assert.True(t, result.UpdateAvailable)
@@ -671,7 +672,7 @@ func TestCheckRegistrySource(t *testing.T) {
 		c := stubContainer(t, nil)
 
 		var result ContainerCheck
-		checkRegistrySource(t.Context(), newTestLogger(t), client, c, types.UpdateParams{}, &result)
+		checkRegistrySource(t.Context(), newTestLogger(t), client, c, updateParams.Params{}, &result)
 
 		assert.Equal(t, "registry", result.UpdateSource)
 		assert.False(t, result.UpdateAvailable)

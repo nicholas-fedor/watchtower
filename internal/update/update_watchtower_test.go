@@ -17,6 +17,7 @@ import (
 	"github.com/nicholas-fedor/watchtower/internal/registry/ratelimit"
 	"github.com/nicholas-fedor/watchtower/internal/update/cleanup"
 	mockUpdate "github.com/nicholas-fedor/watchtower/internal/update/mocks"
+	updateParams "github.com/nicholas-fedor/watchtower/internal/update/params"
 	"github.com/nicholas-fedor/watchtower/pkg/types"
 )
 
@@ -56,7 +57,7 @@ func TestWatchtowerContainerHandling(t *testing.T) {
 				false,
 				false,
 			)
-			report, cleanupImageInfos, err := update(newTestLogger(t), t.Context(), client, types.UpdateParams{
+			report, cleanupImageInfos, err := update(newTestLogger(t), t.Context(), client, updateParams.Params{
 				Cleanup:          true,
 				Filter:           filters.WatchtowerContainersFilter,
 				PullFailureDelay: 10 * time.Millisecond,
@@ -100,7 +101,7 @@ func TestWatchtowerContainerHandling(t *testing.T) {
 				false,
 				false,
 			)
-			report, cleanupImageInfos, err := update(newTestLogger(t), t.Context(), client, types.UpdateParams{
+			report, cleanupImageInfos, err := update(newTestLogger(t), t.Context(), client, updateParams.Params{
 				Cleanup:             true,
 				EphemeralSelfUpdate: true,
 				Filter:              filters.WatchtowerContainersFilter,
@@ -143,7 +144,7 @@ func TestWatchtowerContainerHandling(t *testing.T) {
 				false,
 				false,
 			)
-			config := types.UpdateParams{
+			config := updateParams.Params{
 				Cleanup:   true,
 				NoRestart: true,
 				Filter:    filters.WatchtowerContainersFilter,
@@ -182,7 +183,7 @@ func TestWatchtowerContainerHandling(t *testing.T) {
 				false,
 				false,
 			)
-			report, cleanupImageInfos, err := update(newTestLogger(t), t.Context(), client, types.UpdateParams{
+			report, cleanupImageInfos, err := update(newTestLogger(t), t.Context(), client, updateParams.Params{
 				Cleanup:   true,
 				NoRestart: true,
 				Filter:    filters.NoFilter,
@@ -221,7 +222,7 @@ func TestWatchtowerContainerHandling(t *testing.T) {
 				false,
 				false,
 			)
-			report, cleanupImageInfos, err := update(newTestLogger(t), t.Context(), client, types.UpdateParams{
+			report, cleanupImageInfos, err := update(newTestLogger(t), t.Context(), client, updateParams.Params{
 				Cleanup: true,
 				Filter:  filters.NoFilter,
 			}, ratelimit.New())
@@ -259,7 +260,7 @@ func TestWatchtowerContainerHandling(t *testing.T) {
 				false,
 				false,
 			)
-			report, cleanupImageInfos, err := update(newTestLogger(t), t.Context(), client, types.UpdateParams{
+			report, cleanupImageInfos, err := update(newTestLogger(t), t.Context(), client, updateParams.Params{
 				Cleanup:       true,
 				Filter:        filters.NoFilter,
 				ReviveStopped: true,
@@ -300,7 +301,7 @@ func TestWatchtowerContainerHandling(t *testing.T) {
 				false,
 				false,
 			)
-			config := types.UpdateParams{
+			config := updateParams.Params{
 				Cleanup: true,
 				RunOnce: true,
 				Filter:  filters.WatchtowerContainersFilter,
@@ -343,7 +344,7 @@ func TestWatchtowerContainerHandling(t *testing.T) {
 				false,
 				false,
 			)
-			report, cleanupImageInfos, err := update(newTestLogger(t), t.Context(), client, types.UpdateParams{
+			report, cleanupImageInfos, err := update(newTestLogger(t), t.Context(), client, updateParams.Params{
 				Cleanup:          true,
 				Filter:           filters.WatchtowerContainersFilter,
 				PullFailureDelay: 10 * time.Millisecond,
@@ -390,7 +391,7 @@ func TestWatchtowerContainerHandling(t *testing.T) {
 				false,
 				false,
 			)
-			report, cleanupImageInfos, err := update(newTestLogger(t), t.Context(), client, types.UpdateParams{
+			report, cleanupImageInfos, err := update(newTestLogger(t), t.Context(), client, updateParams.Params{
 				Cleanup:          true,
 				Filter:           filters.WatchtowerContainersFilter,
 				PullFailureDelay: 10 * time.Millisecond,
@@ -435,7 +436,7 @@ func TestWatchtowerContainerHandling(t *testing.T) {
 				false,
 				false,
 			)
-			report, cleanupImageInfos, err := update(newTestLogger(t), t.Context(), client, types.UpdateParams{
+			report, cleanupImageInfos, err := update(newTestLogger(t), t.Context(), client, updateParams.Params{
 				Cleanup:          true,
 				Filter:           filters.WatchtowerContainersFilter,
 				PullFailureDelay: 10 * time.Millisecond,
@@ -486,7 +487,7 @@ func TestWatchtowerContainerHandling(t *testing.T) {
 				"container-scope",
 				filters.WatchtowerContainersFilter,
 			)
-			report, cleanupImageInfos, err := update(newTestLogger(t), t.Context(), client, types.UpdateParams{
+			report, cleanupImageInfos, err := update(newTestLogger(t), t.Context(), client, updateParams.Params{
 				Cleanup:          true,
 				Filter:           scopedFilter,
 				PullFailureDelay: 10 * time.Millisecond,
@@ -530,7 +531,7 @@ func TestWatchtowerContainerHandling(t *testing.T) {
 				"different-scope",
 				filters.WatchtowerContainersFilter,
 			)
-			report, cleanupImageInfos, err := update(newTestLogger(t), t.Context(), client, types.UpdateParams{
+			report, cleanupImageInfos, err := update(newTestLogger(t), t.Context(), client, updateParams.Params{
 				Cleanup:          true,
 				Filter:           scopedFilter,
 				PullFailureDelay: 10 * time.Millisecond,
@@ -572,7 +573,7 @@ func TestWatchtowerContainerHandling(t *testing.T) {
 			)
 			// The filter selects the scope in the container's label.
 			scopedFilter := filters.FilterByScope(newTestLogger(t), "label-scope", filters.WatchtowerContainersFilter)
-			report, cleanupImageInfos, err := update(newTestLogger(t), t.Context(), client, types.UpdateParams{
+			report, cleanupImageInfos, err := update(newTestLogger(t), t.Context(), client, updateParams.Params{
 				Cleanup:          true,
 				Filter:           scopedFilter,
 				PullFailureDelay: 10 * time.Millisecond,
@@ -625,7 +626,7 @@ func TestWatchtowerContainerHandling(t *testing.T) {
 					"scope-b",
 					filters.WatchtowerContainersFilter,
 				)
-				report, cleanupImageInfos, err := update(newTestLogger(t), t.Context(), client, types.UpdateParams{
+				report, cleanupImageInfos, err := update(newTestLogger(t), t.Context(), client, updateParams.Params{
 					Cleanup:          true,
 					Filter:           scopedFilter,
 					PullFailureDelay: 10 * time.Millisecond,
@@ -687,7 +688,7 @@ func TestWatchtowerContainerHandling(t *testing.T) {
 					"scope-a",
 					filters.WatchtowerContainersFilter,
 				)
-				report, cleanupImageInfos, err := update(newTestLogger(t), t.Context(), client, types.UpdateParams{
+				report, cleanupImageInfos, err := update(newTestLogger(t), t.Context(), client, updateParams.Params{
 					Cleanup:          true,
 					Filter:           scopedFilter,
 					PullFailureDelay: 10 * time.Millisecond,
@@ -739,7 +740,7 @@ func TestWatchtowerContainerHandling(t *testing.T) {
 					"scope-c",
 					filters.WatchtowerContainersFilter,
 				)
-				report, cleanupImageInfos, err := update(newTestLogger(t), t.Context(), client, types.UpdateParams{
+				report, cleanupImageInfos, err := update(newTestLogger(t), t.Context(), client, updateParams.Params{
 					Cleanup:          true,
 					Filter:           scopedFilter,
 					PullFailureDelay: 10 * time.Millisecond,
@@ -789,7 +790,7 @@ func TestWatchtowerContainerHandling(t *testing.T) {
 				)
 				// Filter for scope-x
 				scopedFilter := filters.FilterByScope(newTestLogger(t), "scope-x", filters.WatchtowerContainersFilter)
-				report, cleanupImageInfos, err := update(newTestLogger(t), t.Context(), client, types.UpdateParams{
+				report, cleanupImageInfos, err := update(newTestLogger(t), t.Context(), client, updateParams.Params{
 					Cleanup:          true,
 					Filter:           scopedFilter,
 					PullFailureDelay: 10 * time.Millisecond,
@@ -852,7 +853,7 @@ func TestWatchtowerContainerHandling(t *testing.T) {
 				false,
 				false,
 			)
-			report, cleanupImageInfos, err := update(newTestLogger(t), t.Context(), client, types.UpdateParams{
+			report, cleanupImageInfos, err := update(newTestLogger(t), t.Context(), client, updateParams.Params{
 				Cleanup:          true,
 				SkipSelfUpdate:   true,
 				Filter:           filters.NoFilter,
@@ -893,7 +894,7 @@ func TestWatchtowerContainerHandling(t *testing.T) {
 				false,
 				false,
 			)
-			report, cleanupImageInfos, err := update(newTestLogger(t), t.Context(), client, types.UpdateParams{
+			report, cleanupImageInfos, err := update(newTestLogger(t), t.Context(), client, updateParams.Params{
 				Cleanup:          true,
 				SkipSelfUpdate:   true,
 				Filter:           filters.WatchtowerContainersFilter,
@@ -937,7 +938,7 @@ func TestWatchtowerContainerHandling(t *testing.T) {
 			// Simulate pull failure by setting an error on IsContainerStale
 			client.TestData.IsContainerStaleError = errors.New("failed to pull image")
 
-			report, cleanupImageInfos, err := update(newTestLogger(t), t.Context(), client, types.UpdateParams{
+			report, cleanupImageInfos, err := update(newTestLogger(t), t.Context(), client, updateParams.Params{
 				Cleanup:          true,
 				SkipSelfUpdate:   true,
 				Filter:           filters.WatchtowerContainersFilter,
@@ -993,7 +994,7 @@ func TestWatchtowerContainerHandling(t *testing.T) {
 				false,
 				false,
 			)
-			report, cleanupImageInfos, err := update(newTestLogger(t), t.Context(), client, types.UpdateParams{
+			report, cleanupImageInfos, err := update(newTestLogger(t), t.Context(), client, updateParams.Params{
 				Cleanup:          true,
 				SkipSelfUpdate:   true,
 				Filter:           filters.NoFilter,
@@ -1041,7 +1042,7 @@ func TestWatchtowerContainerHandling(t *testing.T) {
 
 			// Note: PullFailureDelay is tested via synctest in TestSafeguardDelay
 			// This test verifies that the staleness check is called and fails
-			report, cleanupImageInfos, err := update(newTestLogger(t), t.Context(), client, types.UpdateParams{
+			report, cleanupImageInfos, err := update(newTestLogger(t), t.Context(), client, updateParams.Params{
 				Cleanup:          true,
 				SkipSelfUpdate:   false,
 				Filter:           filters.WatchtowerContainersFilter,
@@ -1111,7 +1112,7 @@ func TestSafeguardDelay(t *testing.T) {
 
 				start := time.Now()
 
-				report, cleanupImageInfos, err := update(newTestLogger(t), t.Context(), client, types.UpdateParams{
+				report, cleanupImageInfos, err := update(newTestLogger(t), t.Context(), client, updateParams.Params{
 					Cleanup:          true,
 					Filter:           filters.WatchtowerContainersFilter,
 					PullFailureDelay: delay,
@@ -1174,7 +1175,7 @@ func TestPullFailureDelayContextCancellation(t *testing.T) {
 		go func() {
 			defer close(done)
 
-			report, cleanupImageInfos, err = update(newTestLogger(t), ctx, client, types.UpdateParams{
+			report, cleanupImageInfos, err = update(newTestLogger(t), ctx, client, updateParams.Params{
 				Cleanup:          true,
 				Filter:           filters.WatchtowerContainersFilter,
 				PullFailureDelay: 100 * time.Millisecond,

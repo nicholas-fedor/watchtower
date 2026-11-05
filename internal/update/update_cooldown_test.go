@@ -11,12 +11,13 @@ import (
 	containerImage "github.com/nicholas-fedor/watchtower/internal/container/image"
 	"github.com/nicholas-fedor/watchtower/internal/registry/ratelimit"
 	mockUpdate "github.com/nicholas-fedor/watchtower/internal/update/mocks"
+	updateParams "github.com/nicholas-fedor/watchtower/internal/update/params"
 	"github.com/nicholas-fedor/watchtower/pkg/types"
 )
 
-// cooldownConfig returns a base UpdateParams with CooldownDelay and standard settings.
-func cooldownConfig(cooldownDelay time.Duration) types.UpdateParams {
-	return types.UpdateParams{
+// cooldownConfig returns a base [updateParams.Params] with CooldownDelay and standard settings.
+func cooldownConfig(cooldownDelay time.Duration) updateParams.Params {
+	return updateParams.Params{
 		Cleanup:       true,
 		Filter:        filters.NoFilter,
 		CooldownDelay: cooldownDelay,

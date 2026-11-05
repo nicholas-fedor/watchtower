@@ -20,6 +20,7 @@ import (
 	mockContainerClient "github.com/nicholas-fedor/watchtower/internal/container/client/mocks"
 	"github.com/nicholas-fedor/watchtower/internal/observability/metrics"
 	"github.com/nicholas-fedor/watchtower/internal/testutil/golden"
+	updateParams "github.com/nicholas-fedor/watchtower/internal/update/params"
 	"github.com/nicholas-fedor/watchtower/internal/update/schedule"
 	"github.com/nicholas-fedor/watchtower/pkg/types"
 )
@@ -60,7 +61,7 @@ func newFullSurfaceApp(t *testing.T) *fiber.App {
 		NoStartupMessage:    true,
 		Client:              client,
 		Filter:              makeFilter(t),
-		RunUpdatesWithNotifications: func(context.Context, types.Filter, types.UpdateParams) *metrics.Metric {
+		RunUpdatesWithNotifications: func(context.Context, types.Filter, updateParams.Params) *metrics.Metric {
 			return &metrics.Metric{}
 		},
 		FilterByImage:    func(_ []string, filter types.Filter) types.Filter { return filter },

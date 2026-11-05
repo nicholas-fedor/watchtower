@@ -26,6 +26,7 @@ import (
 	"github.com/nicholas-fedor/watchtower/internal/update/changelog"
 	"github.com/nicholas-fedor/watchtower/internal/update/cleanup"
 	"github.com/nicholas-fedor/watchtower/internal/update/implicitrestart"
+	updateParams "github.com/nicholas-fedor/watchtower/internal/update/params"
 	"github.com/nicholas-fedor/watchtower/internal/update/rebuild"
 	"github.com/nicholas-fedor/watchtower/internal/update/restart"
 	"github.com/nicholas-fedor/watchtower/internal/update/selfupdate"
@@ -73,7 +74,7 @@ var scanProblems logging.ReportedProblems
 //   - log: Process logger. Required and must be non-nil. A nil logger panics on the first log call.
 //   - ctx: Context for cancellation and timeouts.
 //   - client: Container client for interacting with Docker API.
-//   - config: UpdateParams specifying behavior like cleanup, restart, and filtering.
+//   - config: updateParams.Params specifying behavior like cleanup, restart, and filtering.
 //   - rateLimiter: Rate limiter shared by registry requests. Must not be nil.
 //   - gitClient: Git monitor client. Nil when Git monitoring is unused.
 //
@@ -85,7 +86,7 @@ func update(
 	log *zerolog.Logger,
 	ctx context.Context,
 	client containerClient.Client,
-	config types.UpdateParams,
+	config updateParams.Params,
 	rateLimiter *ratelimit.Limiter,
 	gitClient ...*git.Client,
 ) (types.Report, []cleanup.RemovedImageInfo, error) {
@@ -846,7 +847,7 @@ func skipFailedUpdateCheck(
 	progress *state.Progress,
 	c types.Container,
 	err error,
-	config types.UpdateParams,
+	config updateParams.Params,
 ) {
 	progress.AddSkipped(log, c, err, config)
 	clog.WithLevel(scanProblems.Level("failed update check", string(c.ID()), err.Error())).

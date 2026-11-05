@@ -1,4 +1,4 @@
-package types
+package params
 
 import (
 	"math"
@@ -9,13 +9,14 @@ import (
 
 	"github.com/nicholas-fedor/watchtower/internal/observability/events"
 	updateConfig "github.com/nicholas-fedor/watchtower/internal/settings/config/update"
+	"github.com/nicholas-fedor/watchtower/pkg/types"
 )
 
 // stopTimeoutContainer is a container whose only behavior is its stop timeout.
 // Calling any other method panics.
 type stopTimeoutContainer struct {
 	// Container leaves every other method unimplemented.
-	Container
+	types.Container
 
 	// own is the stop timeout set on the container, or nil when it sets none.
 	own *time.Duration
@@ -31,11 +32,11 @@ func (c stopTimeoutContainer) StopTimeout(fallback time.Duration) time.Duration 
 	return fallback
 }
 
-// TestUpdateParams_DetachedTimeout verifies that detached Docker calls are
+// TestParams_DetachedTimeout verifies that detached Docker calls are
 // bounded by the stop timeout plus 30 seconds. A stop timeout of zero or below
 // leaves 30 seconds, and a stop timeout near the longest duration saturates
 // instead of overflowing.
-func TestUpdateParams_DetachedTimeout(t *testing.T) {
+func TestParams_DetachedTimeout(t *testing.T) {
 	t.Parallel()
 
 	tests := []struct {
@@ -55,15 +56,15 @@ func TestUpdateParams_DetachedTimeout(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 
-			assert.Equal(t, tt.want, UpdateParams{Timeout: tt.timeout}.DetachedTimeout())
+			assert.Equal(t, tt.want, Params{Timeout: tt.timeout}.DetachedTimeout())
 		})
 	}
 }
 
-// TestUpdateParams_DetachedStopTimeout verifies that the bound for detached
+// TestParams_DetachedStopTimeout verifies that the bound for detached
 // calls that stop a container follows the longer of the configured stop timeout
 // and the container's own, plus 30 seconds.
-func TestUpdateParams_DetachedStopTimeout(t *testing.T) {
+func TestParams_DetachedStopTimeout(t *testing.T) {
 	t.Parallel()
 
 	tests := []struct {
@@ -82,75 +83,75 @@ func TestUpdateParams_DetachedStopTimeout(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 
-			got := UpdateParams{Timeout: tt.timeout}.DetachedStopTimeout(stopTimeoutContainer{own: tt.own})
+			got := Params{Timeout: tt.timeout}.DetachedStopTimeout(stopTimeoutContainer{own: tt.own})
 			assert.Equal(t, tt.want, got)
 		})
 	}
 }
 
-// TestUpdateParams_ScanStartedData checks that each published setting reaches
+// TestParams_ScanStartedData checks that each published setting reaches
 // its own payload field. Flags the event does not publish leave the payload
 // empty.
-func TestUpdateParams_ScanStartedData(t *testing.T) {
+func TestParams_ScanStartedData(t *testing.T) {
 	t.Parallel()
 
 	tests := []struct {
 		name   string
-		params UpdateParams
+		params Params
 		want   events.ScanStartedData
 	}{
-		{name: "no settings", params: UpdateParams{}, want: events.ScanStartedData{}},
-		{name: "cleanup", params: UpdateParams{Cleanup: true}, want: events.ScanStartedData{Cleanup: true}},
-		{name: "no restart", params: UpdateParams{NoRestart: true}, want: events.ScanStartedData{NoRestart: true}},
+		{name: "no settings", params: Params{}, want: events.ScanStartedData{}},
+		{name: "cleanup", params: Params{Cleanup: true}, want: events.ScanStartedData{Cleanup: true}},
+		{name: "no restart", params: Params{NoRestart: true}, want: events.ScanStartedData{NoRestart: true}},
 		{
 			name:   "monitor only",
-			params: UpdateParams{Policy: updateConfig.Policy{MonitorOnly: true}},
+			params: Params{Policy: updateConfig.Policy{MonitorOnly: true}},
 			want:   events.ScanStartedData{MonitorOnly: true},
 		},
 		{
 			name:   "lifecycle hooks",
-			params: UpdateParams{LifecycleHooks: true},
+			params: Params{LifecycleHooks: true},
 			want:   events.ScanStartedData{LifecycleHooks: true},
 		},
 		{
 			name:   "rolling restart",
-			params: UpdateParams{RollingRestart: true},
+			params: Params{RollingRestart: true},
 			want:   events.ScanStartedData{RollingRestart: true},
 		},
 		{
 			name:   "label precedence",
-			params: UpdateParams{Policy: updateConfig.Policy{LabelPrecedence: true}},
+			params: Params{Policy: updateConfig.Policy{LabelPrecedence: true}},
 			want:   events.ScanStartedData{LabelPrecedence: true},
 		},
 		{
 			name:   "no pull",
-			params: UpdateParams{Policy: updateConfig.Policy{NoPull: true}},
+			params: Params{Policy: updateConfig.Policy{NoPull: true}},
 			want:   events.ScanStartedData{NoPull: true},
 		},
-		{name: "run once", params: UpdateParams{RunOnce: true}, want: events.ScanStartedData{RunOnce: true}},
+		{name: "run once", params: Params{RunOnce: true}, want: events.ScanStartedData{RunOnce: true}},
 		{
 			name:   "compose depends on",
-			params: UpdateParams{UseComposeDependsOn: true},
+			params: Params{UseComposeDependsOn: true},
 			want:   events.ScanStartedData{UseComposeDependsOn: true},
 		},
 		{
 			name:   "skip self-update",
-			params: UpdateParams{SkipSelfUpdate: true},
+			params: Params{SkipSelfUpdate: true},
 			want:   events.ScanStartedData{SkipSelfUpdate: true},
 		},
 		{
 			name:   "ephemeral self-update",
-			params: UpdateParams{EphemeralSelfUpdate: true},
+			params: Params{EphemeralSelfUpdate: true},
 			want:   events.ScanStartedData{EphemeralSelfUpdate: true},
 		},
 		{
 			name:   "revive stopped",
-			params: UpdateParams{ReviveStopped: true},
+			params: Params{ReviveStopped: true},
 			want:   events.ScanStartedData{ReviveStopped: true},
 		},
 		{
 			name: "unpublished flags",
-			params: UpdateParams{
+			params: Params{
 				Policy:          updateConfig.Policy{EnableChangelog: true},
 				LabelEnable:     true,
 				GitComposeStash: true,

@@ -8,7 +8,7 @@ import (
 	"golang.org/x/mod/semver"
 )
 
-// Git semver-policy names used by labels, --git-image mappings, and UpdateParams.
+// Git semver-policy names used by labels, --git-image mappings, and the update params.
 const (
 	// PolicyNone follows a single branch or tag ref without advancing tags.
 	PolicyNone = "none"

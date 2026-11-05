@@ -11,6 +11,7 @@ import (
 	dockerContainer "github.com/moby/moby/api/types/container"
 
 	mockUpdate "github.com/nicholas-fedor/watchtower/internal/update/mocks"
+	updateParams "github.com/nicholas-fedor/watchtower/internal/update/params"
 	"github.com/nicholas-fedor/watchtower/internal/update/state"
 	"github.com/nicholas-fedor/watchtower/pkg/types"
 	mockTypes "github.com/nicholas-fedor/watchtower/pkg/types/mocks"
@@ -65,7 +66,7 @@ func TestShouldUpdate(t *testing.T) {
 				},
 			},
 		)
-		params := types.UpdateParams{
+		params := updateParams.Params{
 			CurrentContainerID: types.ContainerID(currentID),
 		}
 		result := ShouldUpdate(container, true, params)
@@ -90,7 +91,7 @@ func TestShouldUpdate(t *testing.T) {
 				},
 			},
 		)
-		params := types.UpdateParams{
+		params := updateParams.Params{
 			CurrentContainerID: types.ContainerID(currentID),
 		}
 		result := ShouldUpdate(container, true, params)
@@ -112,7 +113,7 @@ func TestShouldUpdate(t *testing.T) {
 				Labels: map[string]string{},
 			},
 		)
-		params := types.UpdateParams{
+		params := updateParams.Params{
 			CurrentContainerID: types.ContainerID(currentID),
 		}
 		result := ShouldUpdate(container, true, params)
@@ -137,7 +138,7 @@ func TestShouldUpdate(t *testing.T) {
 				},
 			},
 		)
-		params := types.UpdateParams{
+		params := updateParams.Params{
 			CurrentContainerID: types.ContainerID(currentID),
 		}
 		result := ShouldUpdate(container, true, params)
@@ -163,7 +164,7 @@ func TestShouldUpdate(t *testing.T) {
 				},
 			},
 		)
-		params := types.UpdateParams{
+		params := updateParams.Params{
 			CurrentContainerID: types.ContainerID(currentID),
 		}
 		result := ShouldUpdate(container, true, params)
@@ -184,7 +185,7 @@ func TestShouldUpdate(t *testing.T) {
 				Labels: map[string]string{},
 			},
 		)
-		params := types.UpdateParams{
+		params := updateParams.Params{
 			NoRestart: true,
 		}
 		result := ShouldUpdate(container, true, params)
@@ -208,7 +209,7 @@ func TestShouldUpdate(t *testing.T) {
 				},
 			},
 		)
-		params := types.UpdateParams{
+		params := updateParams.Params{
 			NoRestart:          true,
 			CurrentContainerID: types.ContainerID(currentID),
 		}
@@ -252,7 +253,7 @@ func TestIsPinned(t *testing.T) {
 					time.Now(),
 				)
 				progress := state.Progress{}
-				params := types.UpdateParams{}
+				params := updateParams.Params{}
 
 				pinned, err := IsPinned(newTestLogger(t), cont, &progress, params, nil)
 				require.NoError(t, err)
@@ -279,7 +280,7 @@ func TestIsPinned(t *testing.T) {
 		)
 		progress := state.Progress{}
 
-		pinned, err := IsPinned(newTestLogger(t), cont, &progress, types.UpdateParams{}, nil)
+		pinned, err := IsPinned(newTestLogger(t), cont, &progress, updateParams.Params{}, nil)
 		require.NoError(t, err)
 		assert.True(t, pinned)
 		require.Len(t, progress, 1)
@@ -296,7 +297,7 @@ func TestIsPinned(t *testing.T) {
 		)
 		progress := state.Progress{}
 
-		pinned, err := IsPinned(newTestLogger(t), cont, &progress, types.UpdateParams{}, nil)
+		pinned, err := IsPinned(newTestLogger(t), cont, &progress, updateParams.Params{}, nil)
 		require.Error(t, err)
 		assert.False(t, pinned)
 		assert.Empty(t, progress)
@@ -315,7 +316,7 @@ func TestIsPinned(t *testing.T) {
 		)
 		progress := state.Progress{}
 
-		pinned, err := IsPinned(newTestLogger(t), cont, &progress, types.UpdateParams{}, nil)
+		pinned, err := IsPinned(newTestLogger(t), cont, &progress, updateParams.Params{}, nil)
 		require.NoError(t, err)
 		assert.False(t, pinned)
 		assert.Empty(t, progress)
@@ -333,7 +334,7 @@ func TestIsPinned(t *testing.T) {
 
 		progress := state.Progress{}
 
-		pinned, err := IsPinned(newTestLogger(t), cont, &progress, types.UpdateParams{}, nil)
+		pinned, err := IsPinned(newTestLogger(t), cont, &progress, updateParams.Params{}, nil)
 		require.NoError(t, err)
 		assert.False(t, pinned)
 	})

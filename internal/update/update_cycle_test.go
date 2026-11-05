@@ -12,6 +12,7 @@ import (
 
 	"github.com/nicholas-fedor/watchtower/internal/registry/ratelimit"
 	mockUpdate "github.com/nicholas-fedor/watchtower/internal/update/mocks"
+	updateParams "github.com/nicholas-fedor/watchtower/internal/update/params"
 	"github.com/nicholas-fedor/watchtower/pkg/types"
 )
 
@@ -73,7 +74,7 @@ func TestUpdateAction_StaleContainerBesideCycle(t *testing.T) {
 			false,
 		)
 
-		report, _, err := update(newTestLogger(t), t.Context(), client, types.UpdateParams{Cleanup: true}, ratelimit.New())
+		report, _, err := update(newTestLogger(t), t.Context(), client, updateParams.Params{Cleanup: true}, ratelimit.New())
 
 		require.NoError(t, err)
 		require.Len(t, report.Updated(), 1)

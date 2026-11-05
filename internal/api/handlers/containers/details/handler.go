@@ -10,6 +10,7 @@ import (
 
 	containerClient "github.com/nicholas-fedor/watchtower/internal/container/client"
 	containerImage "github.com/nicholas-fedor/watchtower/internal/container/image"
+	updateParams "github.com/nicholas-fedor/watchtower/internal/update/params"
 	"github.com/nicholas-fedor/watchtower/pkg/types"
 )
 
@@ -140,7 +141,7 @@ func GetContainerDetails(
 	filter types.Filter,
 	nameFilter,
 	imageFilter string,
-	params types.UpdateParams,
+	params updateParams.Params,
 ) ([]ContainerDetails, error) {
 	var list []types.Container
 

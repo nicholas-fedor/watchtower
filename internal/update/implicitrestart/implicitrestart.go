@@ -3,6 +3,7 @@ package implicitrestart
 import (
 	"github.com/rs/zerolog"
 
+	updateParams "github.com/nicholas-fedor/watchtower/internal/update/params"
 	"github.com/nicholas-fedor/watchtower/internal/update/sorter"
 	"github.com/nicholas-fedor/watchtower/pkg/types"
 )
@@ -86,7 +87,7 @@ func Reconcile(
 	log *zerolog.Logger,
 	graph *sorter.DependencyGraph,
 	allContainers, containers []types.Container,
-	params types.UpdateParams,
+	params updateParams.Params,
 	excluded map[types.ContainerID]struct{},
 ) []types.Container {
 	for _, c := range containers {

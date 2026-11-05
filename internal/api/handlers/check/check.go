@@ -15,6 +15,7 @@ import (
 	"github.com/nicholas-fedor/watchtower/internal/container/oci"
 	"github.com/nicholas-fedor/watchtower/internal/container/provenance"
 	"github.com/nicholas-fedor/watchtower/internal/git"
+	updateParams "github.com/nicholas-fedor/watchtower/internal/update/params"
 	"github.com/nicholas-fedor/watchtower/pkg/types"
 )
 
@@ -103,7 +104,7 @@ func CheckForUpdates(log *zerolog.Logger,
 	ctx context.Context,
 	client containerClient.Client,
 	filter types.Filter,
-	params types.UpdateParams,
+	params updateParams.Params,
 	gitClient *git.Client,
 ) ([]ContainerCheck, error) {
 	containers, err := client.ListContainers(ctx, filter)
@@ -165,7 +166,7 @@ func newContainerCheck(c types.Container, now time.Time) ContainerCheck {
 //
 // Returns:
 //   - none.
-func applyReportMetadata(c types.Container, params types.UpdateParams, result *ContainerCheck) {
+func applyReportMetadata(c types.Container, params updateParams.Params, result *ContainerCheck) {
 	if _, concrete := c.(*container.Container); !concrete {
 		return
 	}
@@ -215,7 +216,7 @@ func applyLocalDigest(c types.Container, result *ContainerCheck) {
 func isGitWatched(
 	log *zerolog.Logger,
 	c types.Container,
-	params types.UpdateParams,
+	params updateParams.Params,
 	gitClient *git.Client,
 ) bool {
 	if gitClient == nil {
@@ -248,7 +249,7 @@ func checkGitSource(
 	ctx context.Context,
 	log *zerolog.Logger,
 	c types.Container,
-	params types.UpdateParams,
+	params updateParams.Params,
 	gitClient *git.Client,
 	result *ContainerCheck,
 ) {
@@ -303,7 +304,7 @@ func checkRegistrySource(
 	log *zerolog.Logger,
 	client containerClient.Client,
 	c types.Container,
-	params types.UpdateParams,
+	params updateParams.Params,
 	result *ContainerCheck,
 ) {
 	result.UpdateSource = "registry"

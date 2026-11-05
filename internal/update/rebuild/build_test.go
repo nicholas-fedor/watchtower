@@ -19,6 +19,7 @@ import (
 	"github.com/nicholas-fedor/watchtower/internal/git"
 	gitConfig "github.com/nicholas-fedor/watchtower/internal/settings/config/git"
 	mockUpdate "github.com/nicholas-fedor/watchtower/internal/update/mocks"
+	updateParams "github.com/nicholas-fedor/watchtower/internal/update/params"
 	"github.com/nicholas-fedor/watchtower/internal/update/state"
 	"github.com/nicholas-fedor/watchtower/pkg/types"
 )
@@ -36,7 +37,7 @@ func TestSession_build(t *testing.T) {
 		c := mockUpdate.CreateMockContainer("plain", "/plain", "nginx:latest", time.Now())
 		docker := mockContainerClient.NewMockClient(t)
 
-		err := sess.build(newTestLogger(t), t.Context(), docker, c, git.CheckResult{Commit: "abc"}, types.UpdateParams{}, nil)
+		err := sess.build(newTestLogger(t), t.Context(), docker, c, git.CheckResult{Commit: "abc"}, updateParams.Params{}, nil)
 		require.ErrorIs(t, err, errGitNotAssociated)
 	})
 
@@ -47,7 +48,7 @@ func TestSession_build(t *testing.T) {
 		c := gitAssociatedContainer("id", "/app", "myapp:latest", nil)
 		docker := mockContainerClient.NewMockClient(t)
 
-		err := sess.build(newTestLogger(t), t.Context(), docker, c, git.CheckResult{Stale: true}, types.UpdateParams{Git: gitConfig.Defaults{Enable: true}}, nil)
+		err := sess.build(newTestLogger(t), t.Context(), docker, c, git.CheckResult{Stale: true}, updateParams.Params{Git: gitConfig.Defaults{Enable: true}}, nil)
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "git remote context:")
 	})
@@ -63,7 +64,7 @@ func TestSession_build(t *testing.T) {
 		ctx, cancel := context.WithCancel(t.Context())
 		cancel()
 
-		err := sess.build(newTestLogger(t), ctx, docker, c, git.CheckResult{Stale: true, Commit: "abc123abc123"}, types.UpdateParams{Git: gitConfig.Defaults{Enable: true}}, nil)
+		err := sess.build(newTestLogger(t), ctx, docker, c, git.CheckResult{Stale: true, Commit: "abc123abc123"}, updateParams.Params{Git: gitConfig.Defaults{Enable: true}}, nil)
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "build git image:")
 	})
@@ -76,7 +77,7 @@ func TestSession_build(t *testing.T) {
 		docker := mockContainerClient.NewMockClient(t)
 		expectGitBuild(docker)
 
-		params := types.UpdateParams{EnableChangelog: true, Git: gitConfig.Defaults{Enable: true}}
+		params := updateParams.Params{EnableChangelog: true, Git: gitConfig.Defaults{Enable: true}}
 		progress := state.Progress{}
 		progress.AddScanned(newTestLogger(t), c, c.ImageID(), params)
 		progress.MarkForUpdate(newTestLogger(t), c.ID())
@@ -118,7 +119,7 @@ func TestSession_build(t *testing.T) {
 			docker,
 			c,
 			git.CheckResult{Stale: true, Commit: "ffffffffffffffffffffffffffffffffffffffff"},
-			types.UpdateParams{Git: gitConfig.Defaults{Enable: true}},
+			updateParams.Params{Git: gitConfig.Defaults{Enable: true}},
 			nil,
 		)
 		require.NoError(t, err)
@@ -148,7 +149,7 @@ func TestSession_build(t *testing.T) {
 			docker,
 			c,
 			git.CheckResult{Stale: true, Commit: "ffffffffffffffffffffffffffffffffffffffff"},
-			types.UpdateParams{},
+			updateParams.Params{},
 			nil,
 		)
 		require.NoError(t, err)
@@ -181,7 +182,7 @@ func TestSession_build(t *testing.T) {
 			docker,
 			c,
 			git.CheckResult{Stale: true, Commit: commit},
-			types.UpdateParams{Git: gitConfig.Defaults{Enable: true}},
+			updateParams.Params{Git: gitConfig.Defaults{Enable: true}},
 			nil,
 		)
 		require.NoError(t, err)
@@ -214,7 +215,7 @@ func TestSession_build(t *testing.T) {
 				docker,
 				c,
 				git.CheckResult{Stale: true, Commit: commit},
-				types.UpdateParams{Git: gitConfig.Defaults{Enable: true}},
+				updateParams.Params{Git: gitConfig.Defaults{Enable: true}},
 				nil,
 			)
 			require.NoError(t, err)
@@ -245,7 +246,7 @@ func TestSession_build(t *testing.T) {
 				docker,
 				c,
 				git.CheckResult{Stale: true, Commit: commit},
-				types.UpdateParams{Git: gitConfig.Defaults{Enable: true}},
+				updateParams.Params{Git: gitConfig.Defaults{Enable: true}},
 				nil,
 			)
 

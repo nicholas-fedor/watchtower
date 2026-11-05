@@ -10,6 +10,7 @@ import (
 
 	"github.com/nicholas-fedor/watchtower/internal/container/filters"
 	containerImage "github.com/nicholas-fedor/watchtower/internal/container/image"
+	updateParams "github.com/nicholas-fedor/watchtower/internal/update/params"
 	"github.com/nicholas-fedor/watchtower/internal/update/rebuild"
 	"github.com/nicholas-fedor/watchtower/internal/update/state"
 	"github.com/nicholas-fedor/watchtower/pkg/types"
@@ -40,7 +41,7 @@ var (
 func ShouldUpdate(
 	container types.Container,
 	stale bool,
-	config types.UpdateParams,
+	config updateParams.Params,
 ) bool {
 	// Must be stale to update
 	if !stale {
@@ -145,7 +146,7 @@ func IsPinned(
 	log *zerolog.Logger,
 	cont types.Container,
 	progress *state.Progress,
-	config types.UpdateParams,
+	config updateParams.Params,
 	gitSession *rebuild.Session,
 ) (bool, error) {
 	// Set up logging with container and image details for debugging.
