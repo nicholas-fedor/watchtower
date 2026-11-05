@@ -362,6 +362,7 @@ func buildSingleContainerReport(
 	result types.Report,
 ) *state.SingleContainerReport {
 	return &state.SingleContainerReport{
+		Focus:          updatedContainer,
 		UpdatedReports: []types.ContainerReport{updatedContainer},
 		ScannedReports: result.Scanned(),
 		FailedReports:  result.Failed(),
@@ -387,6 +388,7 @@ func buildSingleRestartedContainerReport(
 	result types.Report,
 ) *state.SingleContainerReport {
 	return &state.SingleContainerReport{
+		Focus:            restartedContainer,
 		RestartedReports: []types.ContainerReport{restartedContainer},
 		ScannedReports:   result.Scanned(),
 		FailedReports:    result.Failed(),
@@ -808,6 +810,7 @@ func notifySkippedCooldownContainers(
 		}
 
 		singleSkippedReport := &state.SingleContainerReport{
+			Focus:            report,
 			SkippedReports:   []types.ContainerReport{report},
 			ScannedReports:   result.Scanned(),
 			UpdatedReports:   result.Updated(),

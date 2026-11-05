@@ -119,7 +119,10 @@ func TestNotificationBatching(t *testing.T) {
 	focus.EXPECT().ImageName().Return("org/web:1.0").Maybe()
 
 	focused := newBatchingNotifier(t, batchEntries())
-	focused.SendNotification(&state.SingleContainerReport{UpdatedReports: []types.ContainerReport{focus}})
+	focused.SendNotification(&state.SingleContainerReport{
+		Focus:          focus,
+		UpdatedReports: []types.ContainerReport{focus},
+	})
 	writeMessages(&out, sentMessages(focused))
 
 	out.WriteString("--- still queued\n")
