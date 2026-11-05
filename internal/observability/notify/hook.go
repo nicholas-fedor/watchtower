@@ -23,8 +23,8 @@ import (
 // Events below the configured notification level are ignored.
 //
 // Only zerolog events on the hooked process logger are captured. Domain producers
-// such as the container client ("Found new image", "Removing image") log through the process
-// logger from NewClient so log-mode notifications receive them. Report-mode
+// such as the container client ("Found new image") and image cleanup ("Removing image")
+// log through the process logger so log-mode notifications receive them. Report-mode
 // notifications (--notification-report) render from types.Report.
 //
 // Parameters:

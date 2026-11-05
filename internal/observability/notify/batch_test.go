@@ -409,29 +409,59 @@ func TestNotifier_FlushEmptyQueue(t *testing.T) {
 }
 
 // TestNotifier_StartNotification_End verifies that ending a session's batch
-// drops the entries no notification took and ends batching. A line logged
-// afterwards is sent at once instead of waiting in the queue.
+// sends the lines no notification took without a report. It also ends
+// batching. A line logged afterwards is sent at once.
 func TestNotifier_StartNotification_End(t *testing.T) {
 	t.Parallel()
 
-	n, hooked := newIdleNotifier(t)
+	tests := []struct {
+		name             string
+		want             []string
+		splitByContainer bool
+	}{
+		{
+			name:             "split by container",
+			splitByContainer: true,
+			want:             []string{"Container warning | container=app1 ", "Session error\nSession info"},
+		},
+		{
+			name: "grouped",
+			want: []string{"Container warning | container=app1 \nSession error\nSession info"},
+		},
+	}
 
-	end := n.StartNotification()
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
 
-	hooked.Warn().Str("image_id", "01d111111111").Msg(logging.RemovingImage)
+			n, hooked := newIdleNotifier(t)
+			n.splitByContainer = tt.splitByContainer
 
-	end()
+			end := n.StartNotification()
 
-	n.entriesMutex.RLock()
-	open := n.batch
-	n.entriesMutex.RUnlock()
+			hooked.Warn().Str("container", "app1").Msg("Container warning")
+			hooked.Error().Msg("Session error")
+			hooked.Info().Msg("Session info")
 
-	assert.Nil(t, open)
-	assert.Empty(t, sentMessages(n))
+			end()
 
-	hooked.Warn().Msg("Logged after the session")
+			n.entriesMutex.RLock()
+			open := n.batch
+			n.entriesMutex.RUnlock()
 
-	assert.Equal(t, []string{"Logged after the session"}, sentMessages(n))
+			assert.Nil(t, open)
+
+			// Containers are sent in map order.
+			sent := sentMessages(n)
+			slices.Sort(sent)
+
+			assert.Equal(t, tt.want, sent)
+
+			hooked.Warn().Msg("Logged after the session")
+
+			assert.Equal(t, []string{"Logged after the session"}, sentMessages(n))
+		})
+	}
 }
 
 // newIdleNotifier returns a notifier that is not batching and a logger hooked

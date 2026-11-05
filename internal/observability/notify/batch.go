@@ -32,8 +32,9 @@ type batch struct {
 // release then sends nothing.
 //
 // Returns:
-//   - func(): Ends the batch without sending it, if it is still open. Entries
-//     no notification took are dropped. Calling it again has no effect.
+//   - func(): Ends the batch, if it is still open. The entries no notification
+//     took are sent without a report, as a check request's entries are.
+//     Calling it again has no effect.
 func (n *Notifier) StartNotification() func() {
 	owned := &batch{}
 
@@ -49,11 +50,8 @@ func (n *Notifier) StartNotification() func() {
 	}
 
 	return func() {
-		dropped, ok := n.takeBatch(owned)
-		if ok && len(dropped) > 0 {
-			n.ll().Debug().
-				Int("entries_count", len(dropped)).
-				Msg("Discarded queued entries")
+		if left, ok := n.takeBatch(owned); ok {
+			n.sendUnreported(left)
 		}
 	}
 }
@@ -67,9 +65,8 @@ func (n *Notifier) StartNotification() func() {
 // notification-split-by-container configuration option they are sent one per
 // container. Entries that name no container then go together. During an update
 // session or startup the check's entries join that batch instead. Its owner
-// decides what to send. A split update session sends only the entries that
-// name a container it reports. When a session takes the checks' batch over,
-// release sends nothing.
+// sends them. When a session takes the checks' batch over, release sends
+// nothing.
 //
 // Returns:
 //   - func(): Ends the check's hold on its batch. Calling it again has no
@@ -115,7 +112,7 @@ func (n *Notifier) HoldNotifications() func() {
 
 		n.entriesMutex.Unlock()
 
-		n.sendCheckEntries(queued)
+		n.sendUnreported(queued)
 	})
 }
 
@@ -268,7 +265,7 @@ func (n *Notifier) takeBatch(owned *batch) ([]*format.Entry, bool) {
 //   - ended: A batch that is no longer the open one.
 func (n *Notifier) sendEnded(ended *batch) {
 	if ended.holders > 0 {
-		n.sendCheckEntries(ended.entries)
+		n.sendUnreported(ended.entries)
 
 		return
 	}
@@ -276,15 +273,15 @@ func (n *Notifier) sendEnded(ended *batch) {
 	n.sendWithoutReport(ended.entries)
 }
 
-// sendCheckEntries sends the entries of check requests without a report.
+// sendUnreported sends entries that no report carries.
 //
 // They go out one notification per container with the
 // notification-split-by-container configuration option. Otherwise they go out
 // in one notification.
 //
 // Parameters:
-//   - entries: Entries taken out of a check's batch.
-func (n *Notifier) sendCheckEntries(entries []*format.Entry) {
+//   - entries: Entries taken out of a batch.
+func (n *Notifier) sendUnreported(entries []*format.Entry) {
 	if n.splitByContainer {
 		n.sendByContainer(entries)
 

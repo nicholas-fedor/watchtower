@@ -899,6 +899,11 @@ func removeOldImage(
 
 	err := client.RemoveImageByID(cleanupCtx, imageID, imageName)
 	if err == nil {
+		clog.Info().
+			Str("image_id", imageID.ShortID()).
+			Str("image_name", imageName).
+			Msg(logging.RemovingImage)
+
 		return
 	}
 

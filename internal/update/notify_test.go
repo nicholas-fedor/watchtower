@@ -549,7 +549,7 @@ func TestRunUpdates(t *testing.T) {
 			t.Parallel()
 
 			mockReport := mockTypes.NewMockReport(t)
-			sendNotifications(newTestLogger(t), nil, false, false, mockReport, []cleanup.RemovedImageInfo{})
+			sendNotifications(newTestLogger(t), nil, false, false, mockReport)
 			// No expectations since notifier is nil
 		})
 
@@ -560,7 +560,7 @@ func TestRunUpdates(t *testing.T) {
 			notifier := mockUpdate.NewMockNotifier(t)
 			notifier.EXPECT().ShouldSendNotification(mockReport).Return(true)
 			notifier.EXPECT().SendNotification(mockReport).Return()
-			sendNotifications(newTestLogger(t), notifier, false, false, mockReport, []cleanup.RemovedImageInfo{})
+			sendNotifications(newTestLogger(t), notifier, false, false, mockReport)
 			notifier.AssertExpectations(t)
 		})
 
@@ -575,7 +575,7 @@ func TestRunUpdates(t *testing.T) {
 			notifier := mockUpdate.NewMockNotifier(t)
 			notifier.EXPECT().ShouldSendNotification(mockReport).Return(false)
 			notifier.EXPECT().Flush().Once()
-			sendNotifications(newTestLogger(t), notifier, false, false, mockReport, []cleanup.RemovedImageInfo{})
+			sendNotifications(newTestLogger(t), notifier, false, false, mockReport)
 		})
 
 		t.Run("should call sendSplitNotifications when split is true", func(t *testing.T) {
@@ -593,7 +593,7 @@ func TestRunUpdates(t *testing.T) {
 			mockReport.EXPECT().Skipped().Return([]types.ContainerReport{})
 			mockReport.EXPECT().Fresh().Return([]types.ContainerReport{})
 
-			sendNotifications(newTestLogger(t), notifier, true, false, mockReport, []cleanup.RemovedImageInfo{})
+			sendNotifications(newTestLogger(t), notifier, true, false, mockReport)
 			notifier.AssertExpectations(t)
 		})
 	})
@@ -624,7 +624,7 @@ func TestRunUpdates(t *testing.T) {
 			notifier.EXPECT().ShouldSendNotification(mock.Anything).Return(true)
 			notifier.EXPECT().SendNotification(mock.Anything).Return()
 
-			sendSplitNotifications(newTestLogger(t), notifier, true, mockReport, []cleanup.RemovedImageInfo{})
+			sendSplitNotifications(newTestLogger(t), notifier, true, mockReport)
 
 			notifier.AssertExpectations(t)
 		})
@@ -644,7 +644,7 @@ func TestRunUpdates(t *testing.T) {
 			mockReport.EXPECT().Fresh().Return([]types.ContainerReport{})
 
 			// With empty results, no notifications should be sent
-			sendSplitNotifications(newTestLogger(t), notifier, true, mockReport, []cleanup.RemovedImageInfo{})
+			sendSplitNotifications(newTestLogger(t), notifier, true, mockReport)
 			notifier.AssertExpectations(t)
 		})
 
@@ -671,7 +671,7 @@ func TestRunUpdates(t *testing.T) {
 			notifier.EXPECT().ShouldSendNotification(mock.Anything).Return(true)
 			notifier.EXPECT().SendNotification(mock.Anything).Return()
 
-			sendSplitNotifications(newTestLogger(t), notifier, false, mockReport, []cleanup.RemovedImageInfo{})
+			sendSplitNotifications(newTestLogger(t), notifier, false, mockReport)
 			notifier.AssertExpectations(t)
 		})
 
@@ -697,7 +697,7 @@ func TestRunUpdates(t *testing.T) {
 			notifier.EXPECT().ShouldSendNotification(mock.Anything).Return(true)
 			notifier.EXPECT().SendNotification(mock.Anything).Return()
 
-			sendSplitNotifications(newTestLogger(t), notifier, true, mockReport, []cleanup.RemovedImageInfo{})
+			sendSplitNotifications(newTestLogger(t), notifier, true, mockReport)
 			notifier.AssertExpectations(t)
 		})
 
@@ -721,7 +721,7 @@ func TestRunUpdates(t *testing.T) {
 			notifier := mockUpdate.NewMockNotifier(t)
 			// No SendNotification should be called due to empty name
 
-			sendSplitNotifications(newTestLogger(t), notifier, true, mockReport, []cleanup.RemovedImageInfo{})
+			sendSplitNotifications(newTestLogger(t), notifier, true, mockReport)
 			notifier.AssertExpectations(t)
 		})
 
@@ -748,7 +748,7 @@ func TestRunUpdates(t *testing.T) {
 			notifier.EXPECT().ShouldSendNotification(mock.Anything).Return(true)
 			notifier.EXPECT().SendNotification(mock.Anything).Return()
 
-			sendSplitNotifications(newTestLogger(t), notifier, false, mockReport, []cleanup.RemovedImageInfo{})
+			sendSplitNotifications(newTestLogger(t), notifier, false, mockReport)
 			notifier.AssertExpectations(t)
 		})
 
@@ -775,7 +775,7 @@ func TestRunUpdates(t *testing.T) {
 			notifier.EXPECT().ShouldSendNotification(mock.Anything).Return(true)
 			notifier.EXPECT().SendNotification(mock.Anything).Return()
 
-			sendSplitNotifications(newTestLogger(t), notifier, false, mockReport, []cleanup.RemovedImageInfo{})
+			sendSplitNotifications(newTestLogger(t), notifier, false, mockReport)
 			notifier.AssertExpectations(t)
 		})
 
@@ -796,196 +796,7 @@ func TestRunUpdates(t *testing.T) {
 			notifier := mockUpdate.NewMockNotifier(t)
 			// No SendNotification should be called since all lists are empty
 
-			sendSplitNotifications(newTestLogger(t), notifier, true, mockReport, []cleanup.RemovedImageInfo{})
-			notifier.AssertExpectations(t)
-		})
-
-		t.Run("should emit no cleanup logs when cleanedImages is empty in log mode", func(t *testing.T) {
-			t.Parallel()
-
-			mockReport := mockTypes.NewMockReport(t)
-			mockContainer := mockTypes.NewMockContainerReport(t)
-
-			mockContainer.EXPECT().ID().Return(types.ContainerID("id-a")).Maybe()
-			mockContainer.EXPECT().Name().Return("container-a").Maybe()
-			mockContainer.EXPECT().ImageName().Return("nginx:latest").Maybe()
-			mockContainer.EXPECT().Error().Return("").Maybe()
-
-			mockReport.EXPECT().Updated().Return([]types.ContainerReport{mockContainer})
-			mockReport.EXPECT().Restarted().Return([]types.ContainerReport{})
-			mockReport.EXPECT().Stale().Return([]types.ContainerReport{})
-			mockReport.EXPECT().Scanned().Return([]types.ContainerReport{mockContainer}).Maybe()
-			mockReport.EXPECT().Failed().Return([]types.ContainerReport{}).Maybe()
-			mockReport.EXPECT().Skipped().Return([]types.ContainerReport{}).Maybe()
-			mockReport.EXPECT().Fresh().Return([]types.ContainerReport{}).Maybe()
-
-			notifier := mockUpdate.NewMockNotifier(t)
-			notifier.EXPECT().ShouldSendNotification(mock.Anything).Return(true)
-			notifier.EXPECT().SendNotification(mock.Anything).Return()
-
-			log, buf := logcapture.NewJSON(zerolog.DebugLevel)
-			sendSplitNotifications(log, notifier, false, mockReport, []cleanup.RemovedImageInfo{})
-
-			for _, entry := range logcapture.Entries[logcapture.Entry](t, buf.String()) {
-				assert.NotEqual(t, "Removing image", entry["message"])
-			}
-
-			notifier.AssertExpectations(t)
-		})
-
-		t.Run("should emit container-scoped cleanup fields for each cleanedImages entry in log mode", func(t *testing.T) {
-			t.Parallel()
-
-			imageA := types.ImageID("sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa")
-			imageB := types.ImageID("sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb")
-			cleanedImages := []cleanup.RemovedImageInfo{
-				{
-					ImageID:       imageA,
-					ImageName:     "nginx:old",
-					ContainerName: "container-a",
-					ContainerID:   types.ContainerID("id-a"),
-				},
-				{
-					ImageID:       imageB,
-					ImageName:     "redis:old",
-					ContainerName: "container-a",
-					ContainerID:   types.ContainerID("id-a"),
-				},
-				{
-					ImageID:       imageA,
-					ImageName:     "nginx:old",
-					ContainerName: "container-b",
-					ContainerID:   types.ContainerID("id-b"),
-				},
-			}
-
-			mockReport := mockTypes.NewMockReport(t)
-			containerA := mockTypes.NewMockContainerReport(t)
-			containerB := mockTypes.NewMockContainerReport(t)
-
-			containerA.EXPECT().ID().Return(types.ContainerID("id-a")).Maybe()
-			containerA.EXPECT().Name().Return("container-a").Maybe()
-			containerA.EXPECT().ImageName().Return("nginx:latest").Maybe()
-			containerA.EXPECT().Error().Return("").Maybe()
-
-			containerB.EXPECT().ID().Return(types.ContainerID("id-b")).Maybe()
-			containerB.EXPECT().Name().Return("container-b").Maybe()
-			containerB.EXPECT().ImageName().Return("nginx:latest").Maybe()
-			containerB.EXPECT().Error().Return("").Maybe()
-
-			mockReport.EXPECT().Updated().Return([]types.ContainerReport{containerA, containerB})
-			mockReport.EXPECT().Restarted().Return([]types.ContainerReport{})
-			mockReport.EXPECT().Stale().Return([]types.ContainerReport{})
-			mockReport.EXPECT().Scanned().Return([]types.ContainerReport{containerA, containerB}).Maybe()
-			mockReport.EXPECT().Failed().Return([]types.ContainerReport{}).Maybe()
-			mockReport.EXPECT().Skipped().Return([]types.ContainerReport{}).Maybe()
-			mockReport.EXPECT().Fresh().Return([]types.ContainerReport{}).Maybe()
-
-			// Split path sends one SingleContainerReport-focused notification per updated container.
-			var sentFocusNames []string
-
-			notifier := mockUpdate.NewMockNotifier(t)
-			notifier.EXPECT().ShouldSendNotification(mock.Anything).Return(true).Times(2)
-			notifier.EXPECT().SendNotification(mock.Anything).Run(func(report types.Report) {
-				updated := report.Updated()
-				require.Len(t, updated, 1)
-				sentFocusNames = append(sentFocusNames, updated[0].Name())
-			}).Times(2)
-
-			log, buf := logcapture.NewJSON(zerolog.DebugLevel)
-			sendSplitNotifications(log, notifier, false, mockReport, cleanedImages)
-
-			type cleanupLog struct {
-				containerName string
-				imageName     string
-				imageID       string
-				notify        string
-			}
-
-			asString := func(v any) string {
-				s, _ := v.(string)
-
-				return s
-			}
-
-			cleanups := make([]cleanupLog, 0)
-
-			for _, entry := range logcapture.Entries[logcapture.Entry](t, buf.String()) {
-				if entry["message"] != "Removing image" {
-					continue
-				}
-
-				cleanups = append(cleanups, cleanupLog{
-					containerName: asString(entry["container_name"]),
-					imageName:     asString(entry["image_name"]),
-					imageID:       asString(entry["image_id"]),
-					notify:        asString(entry["notify"]),
-				})
-			}
-
-			assert.ElementsMatch(t, []cleanupLog{
-				{
-					containerName: "container-a",
-					imageName:     "nginx:old",
-					imageID:       imageA.ShortID(),
-					notify:        "yes",
-				},
-				{
-					containerName: "container-a",
-					imageName:     "redis:old",
-					imageID:       imageB.ShortID(),
-					notify:        "yes",
-				},
-				{
-					containerName: "container-b",
-					imageName:     "nginx:old",
-					imageID:       imageA.ShortID(),
-					notify:        "yes",
-				},
-			}, cleanups)
-			assert.ElementsMatch(t, []string{"container-a", "container-b"}, sentFocusNames)
-			notifier.AssertExpectations(t)
-		})
-
-		t.Run("should not emit cleanup logs in report mode", func(t *testing.T) {
-			t.Parallel()
-
-			cleanedImages := []cleanup.RemovedImageInfo{
-				{
-					ImageID:       types.ImageID("sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"),
-					ImageName:     "nginx:old",
-					ContainerName: "container-a",
-					ContainerID:   types.ContainerID("id-a"),
-				},
-			}
-
-			mockReport := mockTypes.NewMockReport(t)
-			mockContainer := mockTypes.NewMockContainerReport(t)
-
-			mockContainer.EXPECT().ID().Return(types.ContainerID("id-a")).Maybe()
-			mockContainer.EXPECT().Name().Return("container-a").Maybe()
-			mockContainer.EXPECT().ImageName().Return("nginx:latest").Maybe()
-			mockContainer.EXPECT().Error().Return("").Maybe()
-
-			mockReport.EXPECT().Updated().Return([]types.ContainerReport{mockContainer})
-			mockReport.EXPECT().Restarted().Return([]types.ContainerReport{})
-			mockReport.EXPECT().Stale().Return([]types.ContainerReport{})
-			mockReport.EXPECT().Scanned().Return([]types.ContainerReport{mockContainer}).Maybe()
-			mockReport.EXPECT().Failed().Return([]types.ContainerReport{}).Maybe()
-			mockReport.EXPECT().Skipped().Return([]types.ContainerReport{}).Maybe()
-			mockReport.EXPECT().Fresh().Return([]types.ContainerReport{}).Maybe()
-
-			notifier := mockUpdate.NewMockNotifier(t)
-			notifier.EXPECT().ShouldSendNotification(mock.Anything).Return(true)
-			notifier.EXPECT().SendNotification(mock.Anything).Return()
-
-			log, buf := logcapture.NewJSON(zerolog.DebugLevel)
-			sendSplitNotifications(log, notifier, true, mockReport, cleanedImages)
-
-			for _, entry := range logcapture.Entries[logcapture.Entry](t, buf.String()) {
-				assert.NotEqual(t, "Removing image", entry["message"])
-			}
-
+			sendSplitNotifications(newTestLogger(t), notifier, true, mockReport)
 			notifier.AssertExpectations(t)
 		})
 	})
@@ -1019,7 +830,7 @@ func TestRunUpdates(t *testing.T) {
 				notifier.EXPECT().ShouldSendNotification(mock.Anything).Return(false)
 				// With notification level set to error and no errors, no notification should be sent
 
-				sendSplitNotifications(newTestLogger(t), notifier, true, mockReport, []cleanup.RemovedImageInfo{})
+				sendSplitNotifications(newTestLogger(t), notifier, true, mockReport)
 				notifier.AssertExpectations(t)
 			})
 		})
@@ -2061,7 +1872,7 @@ func TestSendSplitNotifications_CooldownSkipped(t *testing.T) {
 				sent = append(sent, single)
 			})
 
-			sendSplitNotifications(newTestLogger(t), notifier, notificationReport, session, nil)
+			sendSplitNotifications(newTestLogger(t), notifier, notificationReport, session)
 
 			// One notification each for the updated, restarted and cooldown containers.
 			require.Len(t, sent, 3)
@@ -2137,7 +1948,7 @@ func TestSendSplitNotifications_OwnNotification(t *testing.T) {
 				notifier.EXPECT().SendNotification(mock.Anything).
 					Run(func(report types.Report) { sent = append(sent, report) }).Times(len(tt.states))
 
-				sendSplitNotifications(log, notifier, notificationReport, session, nil)
+				sendSplitNotifications(log, notifier, notificationReport, session)
 
 				require.Len(t, sent, len(tt.states))
 				assert.Equal(t, state.NewSingleContainerReport(focus, session), sent[tt.index])

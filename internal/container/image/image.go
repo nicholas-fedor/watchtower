@@ -562,8 +562,10 @@ func (c Client) RemoveImageByID(ctx context.Context, imageID types.ImageID, imag
 		}
 	}
 
-	clog.Info().
-		Str("notify", "yes").
+	// Callers log a successful removal for notifications, where they can name
+	// the containers that used the image.
+	clog.Debug().
+		Str("notify", "no").
 		Msg(logging.RemovingImage)
 
 	// Perform image removal with force and pruning.

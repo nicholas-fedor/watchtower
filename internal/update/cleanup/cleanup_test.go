@@ -21,6 +21,8 @@ import (
 
 	"github.com/nicholas-fedor/watchtower/internal/container"
 	mockContainerClient "github.com/nicholas-fedor/watchtower/internal/container/client/mocks"
+	"github.com/nicholas-fedor/watchtower/internal/observability/logging"
+	"github.com/nicholas-fedor/watchtower/internal/testutil/logcapture"
 	mockUpdate "github.com/nicholas-fedor/watchtower/internal/update/mocks"
 	"github.com/nicholas-fedor/watchtower/pkg/types"
 )
@@ -1595,6 +1597,51 @@ func TestRemoveImages(t *testing.T) {
 		require.Len(t, cleaned, 2)
 		assert.Equal(t, types.ImageID("image1"), cleaned[0].ImageID)
 		assert.Equal(t, types.ImageID("image2"), cleaned[1].ImageID)
+	})
+
+	// Each container that used a removed image gets its own line and its own
+	// returned entry. A split notification for that container then carries the
+	// line. A failed removal logs and returns none.
+	t.Run("should log the removal once for each container that used the image", func(t *testing.T) {
+		t.Parallel()
+
+		log, logs := logcapture.NewJSON(zerolog.InfoLevel)
+		mockClient := mockContainerClient.NewMockClient(t)
+
+		images := []RemovedImageInfo{
+			{ImageID: "sha256:0123456789abcdef", ImageName: "org/app:1", ContainerName: "app-a"},
+			{ImageID: "sha256:0123456789abcdef", ImageName: "org/app:1", ContainerName: "app-b"},
+			{ImageID: "sha256:fedcba9876543210", ImageName: "org/db:2", ContainerName: "db"},
+		}
+
+		mockClient.EXPECT().RemoveImageByID(mock.Anything, types.ImageID("sha256:0123456789abcdef"), "org/app:1").
+			Return(nil).Once()
+		mockClient.EXPECT().RemoveImageByID(mock.Anything, types.ImageID("sha256:fedcba9876543210"), "org/db:2").
+			Return(errors.New("image removal failed")).Once()
+
+		removed, err := RemoveImages(log, t.Context(), mockClient, images)
+		require.Error(t, err)
+		assert.Equal(t, images[:2], removed)
+
+		type entry struct {
+			Message       string `json:"message"`
+			ContainerName string `json:"container_name"`
+			ImageName     string `json:"image_name"`
+			ImageID       string `json:"image_id"`
+		}
+
+		var removals []entry
+
+		for _, logged := range logcapture.Entries[entry](t, logs.String()) {
+			if logged.Message == logging.RemovingImage {
+				removals = append(removals, logged)
+			}
+		}
+
+		assert.Equal(t, []entry{
+			{Message: logging.RemovingImage, ContainerName: "app-a", ImageName: "org/app:1", ImageID: "0123456789ab"},
+			{Message: logging.RemovingImage, ContainerName: "app-b", ImageName: "org/app:1", ImageID: "0123456789ab"},
+		}, removals)
 	})
 
 	t.Run("should return error when image removal fails", func(t *testing.T) {
