@@ -181,7 +181,7 @@ A hook runs inside the container. Its output therefore comes from whatever runs 
     - Control characters other than newlines, tabs and carriage returns
     - Invisible Unicode format characters, such as bidirectional text controls, zero-width characters and tag characters
 - A carriage return directly before a newline is dropped. Any other carriage return becomes a newline, as do the Unicode line and paragraph separators.
-- It replaces passwords and tokens in URLs, such as `https://user:token@host`, with `xxxxx`.
+- It replaces the user information of URLs, such as the `user:token` in `https://user:token@host`, with `xxxxx`. Query values such as `?token=…` stay as printed.
 - It puts the output on one line, joining its lines with ` | `. No line of hook output can then pass for one of Watchtower's own notification lines.
 - The output never changes what Watchtower does. Only the exit code decides whether the update continues, is skipped or fails.
 
@@ -196,7 +196,7 @@ The kept output goes to these places:
 The HTTP API and its event stream do not include hook output.
 
 !!! Warning "Keep secrets out of hook output"
-    Notification services are third parties. Debug logs are often shipped to other systems. Apart from passwords and tokens in URLs, Watchtower sends hook output as the command printed it. It does not try to recognize other secrets. Guessing from names and formats would hide ordinary output and still miss real secrets.
+    Notification services are third parties. Debug logs are often shipped to other systems. Apart from the user information of URLs, Watchtower sends hook output as the command printed it. It does not try to recognize other secrets. The replacement runs on the kept 2 KiB. When the cut falls inside a URL, a fragment such as `token@host` can remain. Guessing from names and formats would hide ordinary output and still miss real secrets.
 
     A failing pre-update hook that prints credentials, for example through `set -x`, `env` or `curl -v`, can send them to every notification service. Write verbose output to a file inside the container or to `/dev/null`. Print only a short reason when the command fails.
 
