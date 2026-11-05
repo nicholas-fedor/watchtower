@@ -17,6 +17,7 @@ import (
 
 	mockContainerClient "github.com/nicholas-fedor/watchtower/internal/container/client/mocks"
 	"github.com/nicholas-fedor/watchtower/internal/container/filters"
+	"github.com/nicholas-fedor/watchtower/internal/container/labels"
 	"github.com/nicholas-fedor/watchtower/internal/observability/events"
 	"github.com/nicholas-fedor/watchtower/internal/observability/metrics"
 	"github.com/nicholas-fedor/watchtower/internal/registry/ratelimit"
@@ -46,18 +47,40 @@ func defaultTestUpdateParams(filter types.Filter) updateParams.Params {
 
 // TestRunUpdatesWithNotifications_ScanCompletedCounts verifies that the
 // scan_completed event carries the same counts as the metric the session
-// returns. One of the two scanned containers is stale. The scanned and updated
-// counts then differ, which catches a count taken from the wrong field.
+// returns. The session skips two containers in a dependency cycle, fails to
+// recreate one stale container and finds two fresh ones. Every count then has
+// its own value, which catches a count taken from the wrong field.
 func TestRunUpdatesWithNotifications_ScanCompletedCounts(t *testing.T) {
 	t.Parallel()
+
+	// cycleMember returns a stale container that depends on the other member
+	// of a two-container cycle. The session skips both members.
+	cycleMember := func(name, dependsOn string) types.Container {
+		return mockUpdate.CreateMockContainerWithConfig(
+			name,
+			"/"+name,
+			"image:latest",
+			true,
+			false,
+			time.Now(),
+			&dockerContainer.Config{
+				Image:  "image:latest",
+				Labels: map[string]string{labels.DependsOn: dependsOn},
+			},
+		)
+	}
 
 	client := mockUpdate.CreateMockClient(
 		&mockUpdate.TestData{
 			Containers: []types.Container{
-				mockUpdate.CreateMockContainer("stale", "stale", "image:latest", time.Now()),
-				mockUpdate.CreateMockContainer("fresh", "fresh", "image:latest", time.Now()),
+				cycleMember("cycle-a", "cycle-b"),
+				cycleMember("cycle-b", "cycle-a"),
+				mockUpdate.CreateMockContainer("broken", "broken", "image:latest", time.Now()),
+				mockUpdate.CreateMockContainer("fresh-a", "fresh-a", "image:latest", time.Now()),
+				mockUpdate.CreateMockContainer("fresh-b", "fresh-b", "image:latest", time.Now()),
 			},
-			Staleness: map[string]bool{"stale": true, "fresh": false},
+			Staleness:            map[string]bool{"broken": true, "fresh-a": false, "fresh-b": false},
+			CreateContainerError: errors.New("create failed"),
 		},
 		false,
 		false,
@@ -73,8 +96,6 @@ func TestRunUpdatesWithNotifications_ScanCompletedCounts(t *testing.T) {
 		Update:           defaultTestUpdateParams(filters.NoFilter),
 	})
 	require.NotNil(t, metric)
-	assert.Equal(t, 2, metric.Scanned)
-	assert.Equal(t, 1, metric.Updated)
 
 	// Events are published synchronously into the subscriber's buffer.
 	var received []events.Event
@@ -85,6 +106,7 @@ func TestRunUpdatesWithNotifications_ScanCompletedCounts(t *testing.T) {
 
 	require.Len(t, received, 2)
 	assert.Equal(t, "scan_completed", received[1].Type)
+	assert.Equal(t, events.ScanCompletedData{Scanned: 3, Updated: 0, Failed: 1, Skipped: 2}, received[1].Data)
 	assert.Equal(t, events.ScanCompletedData{
 		Scanned: metric.Scanned,
 		Updated: metric.Updated,
