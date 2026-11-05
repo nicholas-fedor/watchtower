@@ -19,12 +19,13 @@ type APIVersionProvider interface {
 
 // StartupNotifier sends the startup message as one notification.
 type StartupNotifier interface {
-	// StartNotification starts collecting log entries for a notification.
-	// When suppressSummary is true, entries collected before it are dropped
-	// instead of sent.
-	StartNotification(suppressSummary bool)
+	// StartNotification starts collecting log entries for the startup message.
+	// Entries collected before it, such as the lines logged before startup,
+	// are sent first. Startup ends the batch with Flush. It does not use the
+	// returned end.
+	StartNotification() func()
 	// Flush sends the collected entries without a report. Later entries are
-	// sent as they are logged until the next StartNotification.
+	// sent as they are logged until the next batch opens.
 	Flush()
 	// GetNames returns the names of the configured notification services.
 	GetNames() []string
@@ -70,8 +71,13 @@ type StartupParams struct {
 //     When NoStartupMessage is false, Logger must be non-nil and should be the hooked
 //     process logger (after Notifier.RegisterHook) so batching captures startup lines.
 func WriteStartupMessage(params StartupParams) {
-	// If startup messages are suppressed, skip all logging and notifier batching.
+	// If startup messages are suppressed, skip all startup logging. The lines
+	// collected before startup are still sent. That ends their batch.
 	if params.NoStartupMessage {
+		if params.Notifier != nil {
+			params.Notifier.Flush()
+		}
+
 		return
 	}
 
@@ -143,7 +149,7 @@ func WriteStartupMessage(params StartupParams) {
 //   - *zerolog.Logger: The logger to use for writing startup messages.
 func setupStartupLogger(log *zerolog.Logger, notifier StartupNotifier) *zerolog.Logger {
 	if notifier != nil {
-		notifier.StartNotification(false)
+		notifier.StartNotification()
 	}
 
 	return log

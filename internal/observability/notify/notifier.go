@@ -132,7 +132,7 @@ func NewNotifier(log *zerolog.Logger, cfg notifyConfig.Notify) (*Notifier, error
 			Msg("Notifier Shoutrrr URLs loaded")
 	}
 
-	return createNotifier(
+	notifier := createNotifier(
 		log,
 		sender,
 		urls,
@@ -141,7 +141,10 @@ func NewNotifier(log *zerolog.Logger, cfg notifyConfig.Notify) (*Notifier, error
 		legacyTemplate,
 		data,
 		delay,
-	), nil
+	)
+	notifier.splitByContainer = cfg.SplitByContainer
+
+	return notifier, nil
 }
 
 // BuildURLs builds Shoutrrr notification URLs from resolved notification settings

@@ -42,7 +42,6 @@ func registerCheckRoute(app *fiber.App, auth fiber.Handler, opts Options) {
 		},
 		checkTimeout,
 		opts.Notifier,
-		opts.NotificationSplitByContainer,
 		opts.EventBroadcaster,
 		params.ScanStartedData(),
 	)

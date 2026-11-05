@@ -39,7 +39,7 @@ func TestProcessSendErrors(t *testing.T) {
 		)
 		shoutrrr.sender = mockRouter
 		shoutrrr.RegisterHook(log)
-		shoutrrr.StartNotification(false)
+		shoutrrr.StartNotification()
 		log.Info().Msg("test message")
 		shoutrrr.SendNotification(nil)
 
@@ -67,7 +67,7 @@ func TestProcessSendErrors(t *testing.T) {
 		)
 		shoutrrr.sender = mockRouter
 		shoutrrr.RegisterHook(log)
-		shoutrrr.StartNotification(false)
+		shoutrrr.StartNotification()
 		log.Info().Msg("test message")
 		shoutrrr.SendNotification(nil)
 
@@ -95,7 +95,7 @@ func TestProcessSendErrors(t *testing.T) {
 		)
 		shoutrrr.sender = mockRouter
 		shoutrrr.RegisterHook(log)
-		shoutrrr.StartNotification(false)
+		shoutrrr.StartNotification()
 		log.Info().Msg("test message")
 		shoutrrr.SendNotification(nil)
 
@@ -123,7 +123,7 @@ func TestProcessSendErrors(t *testing.T) {
 		)
 		shoutrrr.sender = mockRouter
 		shoutrrr.RegisterHook(log)
-		shoutrrr.StartNotification(false)
+		shoutrrr.StartNotification()
 		log.Info().Msg("test message")
 		shoutrrr.SendNotification(nil)
 
@@ -151,7 +151,7 @@ func TestProcessSendErrors(t *testing.T) {
 		)
 		shoutrrr.sender = mockRouter
 		shoutrrr.RegisterHook(log)
-		shoutrrr.StartNotification(false)
+		shoutrrr.StartNotification()
 		log.Info().Msg("test message")
 		shoutrrr.SendNotification(nil)
 
@@ -179,7 +179,7 @@ func TestProcessSendErrors(t *testing.T) {
 		)
 		shoutrrr.sender = mockRouter
 		shoutrrr.RegisterHook(log)
-		shoutrrr.StartNotification(false)
+		shoutrrr.StartNotification()
 		log.Info().Msg("test message")
 		shoutrrr.SendNotification(nil)
 

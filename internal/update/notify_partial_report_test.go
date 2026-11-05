@@ -81,8 +81,7 @@ func TestRunUpdatesWithNotifications_UpdateErrorKeepsPartialResults(t *testing.T
 	var sent []types.Report
 
 	notifier := mockUpdate.NewMockNotifier(t)
-	notifier.EXPECT().StartNotification(false).Once()
-	notifier.EXPECT().Discard().Once()
+	expectSessionBatch(t, notifier)
 	notifier.EXPECT().SendNotification(mock.Anything).
 		Run(func(report types.Report) { sent = append(sent, report) }).
 		Once()

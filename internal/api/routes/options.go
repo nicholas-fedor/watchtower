@@ -158,8 +158,6 @@ type Options struct {
 	IncludeRestarting bool
 	// LabelEnable is exposed on the config API (filter option).
 	LabelEnable bool
-	// NotificationSplitByContainer sends a separate notification for each container when true.
-	NotificationSplitByContainer bool
 }
 
 // BuildUpdateParams returns the complete [updateParams.Params] snapshot for HTTP-triggered updates.

@@ -150,12 +150,9 @@ func TestRunUpdatesWithNotifications_PanicEndsSession(t *testing.T) {
 	// Without a report, report templates list the batch's entries. The mock
 	// fails the test on any SendNotification call.
 	notifier := mockUpdate.NewMockNotifier(t)
-	// The session's deferred Discard runs after the panic's Flush.
-	mock.InOrder(
-		notifier.EXPECT().StartNotification(false).Once(),
-		notifier.EXPECT().Flush().Once(),
-		notifier.EXPECT().Discard().Once(),
-	)
+	// The session's deferred end runs after the panic's Flush.
+	notifier.EXPECT().Flush().Once()
+	expectSessionBatch(t, notifier, "Flush")
 
 	broadcaster := events.NewBroadcaster()
 	published, _ := broadcaster.SubscribeWithDone()
@@ -323,11 +320,8 @@ func TestRunUpdates(t *testing.T) {
 				notifier := mockUpdate.NewMockNotifier(t)
 				// The session ends its batch after its split notification.
 				notifier.EXPECT().ShouldSendNotification(mock.Anything).Return(true)
-				mock.InOrder(
-					notifier.EXPECT().StartNotification(true).Once(),
-					notifier.EXPECT().SendNotification(mock.Anything).Once(),
-					notifier.EXPECT().Discard().Once(),
-				)
+				notifier.EXPECT().SendNotification(mock.Anything).Once()
+				expectSessionBatch(t, notifier, "SendNotification")
 
 				params := RunUpdatesWithNotificationsParams{
 					Logger:                       newTestLogger(t),
@@ -497,34 +491,6 @@ func TestRunUpdates(t *testing.T) {
 			require.NotNil(t, cleanupImages)
 			// For this mock configuration, we expect no error
 			require.NoError(t, err)
-		})
-	})
-
-	t.Run("startNotifications", func(t *testing.T) {
-		t.Parallel()
-
-		t.Run("should start notification when notifier is provided", func(t *testing.T) {
-			t.Parallel()
-
-			notifier := mockUpdate.NewMockNotifier(t)
-			notifier.EXPECT().StartNotification(false).Return()
-			startNotifications(newTestLogger(t), notifier, false)
-			notifier.AssertExpectations(t)
-		})
-
-		t.Run("should not panic when notifier is nil", func(t *testing.T) {
-			t.Parallel()
-
-			startNotifications(newTestLogger(t), nil, false)
-		})
-
-		t.Run("should start notification with split enabled", func(t *testing.T) {
-			t.Parallel()
-
-			notifier := mockUpdate.NewMockNotifier(t)
-			notifier.EXPECT().StartNotification(true).Return()
-			startNotifications(newTestLogger(t), notifier, true)
-			notifier.AssertExpectations(t)
 		})
 	})
 

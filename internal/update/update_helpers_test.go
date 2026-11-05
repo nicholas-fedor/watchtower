@@ -1,9 +1,11 @@
 package update
 
 import (
+	"testing"
 	"time"
 
 	"github.com/rs/zerolog"
+	"github.com/stretchr/testify/assert"
 
 	dockerContainer "github.com/moby/moby/api/types/container"
 	dockerImage "github.com/moby/moby/api/types/image"
@@ -497,4 +499,25 @@ func getComposeDependsOnWithNetworkModeTestData() *mockUpdate.TestData {
 		Staleness:  map[string]bool{staleContainer.Name(): true, dependentContainer.Name(): false},
 		Containers: []types.Container{staleContainer, dependentContainer},
 	}
+}
+
+// expectSessionBatch expects an update session to open its notification batch
+// once and to end it once before the test ends.
+//
+// Each method named in sentFirst must have been called once when the batch
+// ends, since the session ends its batch after it sends.
+func expectSessionBatch(t *testing.T, notifier *mockUpdate.MockNotifier, sentFirst ...string) {
+	t.Helper()
+
+	var ended int
+
+	notifier.EXPECT().StartNotification().Return(func() {
+		ended++
+
+		for _, method := range sentFirst {
+			notifier.AssertNumberOfCalls(t, method, 1)
+		}
+	}).Once()
+
+	t.Cleanup(func() { assert.Equal(t, 1, ended, "the session ends its batch once") })
 }

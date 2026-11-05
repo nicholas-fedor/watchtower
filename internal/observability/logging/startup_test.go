@@ -145,7 +145,7 @@ func TestWriteStartupMessage(t *testing.T) {
 		notifier := mockLogging.NewMockStartupNotifier(t)
 
 		mock.InOrder(
-			notifier.EXPECT().StartNotification(false).Once(),
+			notifier.EXPECT().StartNotification().Return(func() {}).Once(),
 			notifier.EXPECT().GetNames().Return([]string{"slack", "gotify"}).Once(),
 			notifier.EXPECT().Flush().Once(),
 		)
@@ -159,6 +159,20 @@ func TestWriteStartupMessage(t *testing.T) {
 		})
 
 		assert.Contains(t, buffer.String(), "Using notifications: slack, gotify")
+	})
+
+	// The notifier collects the lines logged before startup. Without a startup
+	// message they are sent on their own. That ends the collection.
+	t.Run("should send the lines logged before startup when the message is suppressed", func(t *testing.T) {
+		t.Parallel()
+
+		notifier := mockLogging.NewMockStartupNotifier(t)
+		notifier.EXPECT().Flush().Once()
+
+		WriteStartupMessage(StartupParams{
+			Notifier:         notifier,
+			NoStartupMessage: true,
+		})
 	})
 
 	t.Run("should not panic when Logger is nil but NoStartupMessage is set", func(t *testing.T) {

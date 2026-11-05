@@ -72,13 +72,13 @@ func (n *Notifier) Run(event *zerolog.Event, level zerolog.Level, message string
 	// Hold the mutex only for queue mutation. Log and send outside the lock.
 	// Concurrent Runs from different goroutines are fine — they serialize here only.
 	n.entriesMutex.Lock()
-	batching := n.entries != nil
+	batching := n.batch != nil
 
 	var entriesCount int
 
 	if batching {
-		n.entries = append(n.entries, entry)
-		entriesCount = len(n.entries)
+		n.batch.entries = append(n.batch.entries, entry)
+		entriesCount = len(n.batch.entries)
 	}
 	n.entriesMutex.Unlock()
 

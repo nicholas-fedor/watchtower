@@ -13,16 +13,11 @@ import (
 
 // Notifier holds back notifications while a check runs and sends them after it.
 type Notifier interface {
-	// StartNotification starts collecting log entries for a notification.
-	// When suppressSummary is true, entries collected before it are dropped
-	// instead of sent.
-	StartNotification(suppressSummary bool)
-	// Flush sends the collected entries without a report. Later entries are
-	// sent as they are logged until the next StartNotification.
-	Flush()
-	// FlushSplitByContainer sends one notification for each container the
-	// collected entries name.
-	FlushSplitByContainer()
+	// HoldNotifications holds back the check's log entries. The returned
+	// release ends the hold. Overlapping checks send their entries together
+	// when the last one ends. During an update session the entries go out
+	// with the session's notifications instead.
+	HoldNotifications() func()
 }
 
 // Handler serves the /v1/check endpoint.
@@ -41,8 +36,6 @@ type Handler struct {
 	maxTimeout time.Duration
 	// scanStartedData carries redacted policy flags reused for every scan_started event.
 	scanStartedData events.ScanStartedData
-	// splitByContainer sends per-container notifications when true.
-	splitByContainer bool
 }
 
 // New creates a new check handler backed by the given check function.
@@ -52,7 +45,6 @@ type Handler struct {
 //   - maxTimeout: Maximum allowed per-request timeout, used to bound the ?timeout= query parameter.
 //   - notifier: Optional notification system instance. When provided, notification batching is enabled
 //     during the check to prevent log entries from triggering immediate notifications.
-//   - splitByContainer: When true, notifications are split by container instead of being grouped.
 //   - eventBroadcaster: Optional SSE broadcaster. When provided, scan_started, scan_completed,
 //     and scan_failed events are emitted during check runs.
 //   - scanStartedData: Pre-built redacted policy flags for the scan_started event.
@@ -61,7 +53,6 @@ func New(
 	check CheckFunc,
 	maxTimeout time.Duration,
 	notifier Notifier,
-	splitByContainer bool,
 	eventBroadcaster *events.Broadcaster,
 	scanStartedData events.ScanStartedData,
 ) *Handler {
@@ -76,7 +67,6 @@ func New(
 		Path:             "/v1/check",
 		maxTimeout:       maxTimeout,
 		notifier:         notifier,
-		splitByContainer: splitByContainer,
 		eventBroadcaster: eventBroadcaster,
 		scanStartedData:  scanStartedData,
 	}
@@ -143,15 +133,7 @@ func (h *Handler) Handle(c fiber.Ctx) error {
 
 	// Hold back the check's log entries and send them when it ends.
 	if h.notifier != nil {
-		h.notifier.StartNotification(true)
-
-		defer func() {
-			if h.splitByContainer {
-				h.notifier.FlushSplitByContainer()
-			} else {
-				h.notifier.Flush()
-			}
-		}()
+		defer h.notifier.HoldNotifications()()
 	}
 
 	// Notify SSE subscribers that the check scan is starting.

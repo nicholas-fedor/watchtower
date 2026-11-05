@@ -44,108 +44,48 @@ func (_m *MockNotifier) EXPECT() *MockNotifier_Expecter {
 	return &MockNotifier_Expecter{mock: &_m.Mock}
 }
 
-// Flush provides a mock function for the type MockNotifier
-func (_mock *MockNotifier) Flush() {
-	_mock.Called()
-	return
-}
+// HoldNotifications provides a mock function for the type MockNotifier
+func (_mock *MockNotifier) HoldNotifications() func() {
+	ret := _mock.Called()
 
-// MockNotifier_Flush_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'Flush'
-type MockNotifier_Flush_Call struct {
-	*mock.Call
-}
+	if len(ret) == 0 {
+		panic("no return value specified for HoldNotifications")
+	}
 
-// Flush is a helper method to define mock.On call
-func (_e *MockNotifier_Expecter) Flush() *MockNotifier_Flush_Call {
-	return &MockNotifier_Flush_Call{Call: _e.mock.On("Flush")}
-}
-
-func (_c *MockNotifier_Flush_Call) Run(run func()) *MockNotifier_Flush_Call {
-	_c.Call.Run(func(args mock.Arguments) {
-		run()
-	})
-	return _c
-}
-
-func (_c *MockNotifier_Flush_Call) Return() *MockNotifier_Flush_Call {
-	_c.Call.Return()
-	return _c
-}
-
-func (_c *MockNotifier_Flush_Call) RunAndReturn(run func()) *MockNotifier_Flush_Call {
-	_c.Run(run)
-	return _c
-}
-
-// FlushSplitByContainer provides a mock function for the type MockNotifier
-func (_mock *MockNotifier) FlushSplitByContainer() {
-	_mock.Called()
-	return
-}
-
-// MockNotifier_FlushSplitByContainer_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'FlushSplitByContainer'
-type MockNotifier_FlushSplitByContainer_Call struct {
-	*mock.Call
-}
-
-// FlushSplitByContainer is a helper method to define mock.On call
-func (_e *MockNotifier_Expecter) FlushSplitByContainer() *MockNotifier_FlushSplitByContainer_Call {
-	return &MockNotifier_FlushSplitByContainer_Call{Call: _e.mock.On("FlushSplitByContainer")}
-}
-
-func (_c *MockNotifier_FlushSplitByContainer_Call) Run(run func()) *MockNotifier_FlushSplitByContainer_Call {
-	_c.Call.Run(func(args mock.Arguments) {
-		run()
-	})
-	return _c
-}
-
-func (_c *MockNotifier_FlushSplitByContainer_Call) Return() *MockNotifier_FlushSplitByContainer_Call {
-	_c.Call.Return()
-	return _c
-}
-
-func (_c *MockNotifier_FlushSplitByContainer_Call) RunAndReturn(run func()) *MockNotifier_FlushSplitByContainer_Call {
-	_c.Run(run)
-	return _c
-}
-
-// StartNotification provides a mock function for the type MockNotifier
-func (_mock *MockNotifier) StartNotification(suppressSummary bool) {
-	_mock.Called(suppressSummary)
-	return
-}
-
-// MockNotifier_StartNotification_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'StartNotification'
-type MockNotifier_StartNotification_Call struct {
-	*mock.Call
-}
-
-// StartNotification is a helper method to define mock.On call
-//   - suppressSummary bool
-func (_e *MockNotifier_Expecter) StartNotification(suppressSummary any) *MockNotifier_StartNotification_Call {
-	return &MockNotifier_StartNotification_Call{Call: _e.mock.On("StartNotification", suppressSummary)}
-}
-
-func (_c *MockNotifier_StartNotification_Call) Run(run func(suppressSummary bool)) *MockNotifier_StartNotification_Call {
-	_c.Call.Run(func(args mock.Arguments) {
-		var arg0 bool
-		if args[0] != nil {
-			arg0 = args[0].(bool)
+	var r0 func()
+	if returnFunc, ok := ret.Get(0).(func() func()); ok {
+		r0 = returnFunc()
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(func())
 		}
-		run(
-			arg0,
-		)
+	}
+	return r0
+}
+
+// MockNotifier_HoldNotifications_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'HoldNotifications'
+type MockNotifier_HoldNotifications_Call struct {
+	*mock.Call
+}
+
+// HoldNotifications is a helper method to define mock.On call
+func (_e *MockNotifier_Expecter) HoldNotifications() *MockNotifier_HoldNotifications_Call {
+	return &MockNotifier_HoldNotifications_Call{Call: _e.mock.On("HoldNotifications")}
+}
+
+func (_c *MockNotifier_HoldNotifications_Call) Run(run func()) *MockNotifier_HoldNotifications_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run()
 	})
 	return _c
 }
 
-func (_c *MockNotifier_StartNotification_Call) Return() *MockNotifier_StartNotification_Call {
-	_c.Call.Return()
+func (_c *MockNotifier_HoldNotifications_Call) Return(fn func()) *MockNotifier_HoldNotifications_Call {
+	_c.Call.Return(fn)
 	return _c
 }
 
-func (_c *MockNotifier_StartNotification_Call) RunAndReturn(run func(suppressSummary bool)) *MockNotifier_StartNotification_Call {
-	_c.Run(run)
+func (_c *MockNotifier_HoldNotifications_Call) RunAndReturn(run func() func()) *MockNotifier_HoldNotifications_Call {
+	_c.Call.Return(run)
 	return _c
 }

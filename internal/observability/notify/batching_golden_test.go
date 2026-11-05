@@ -72,7 +72,7 @@ func newBatchingNotifier(t *testing.T, entries []*format.Entry) *Notifier {
 	notifier := createTestNotifier(t, newTestLogger(t), []string{}, zerolog.TraceLevel, true, format.StaticData{}, 0)
 	t.Cleanup(notifier.Close)
 
-	notifier.entries = entries
+	notifier.batch = &batch{entries: entries}
 
 	return notifier
 }
@@ -127,7 +127,7 @@ func TestNotificationBatching(t *testing.T) {
 
 	out.WriteString("--- still queued\n")
 
-	for _, entry := range focused.entries {
+	for _, entry := range focused.batch.entries {
 		fmt.Fprintf(&out, "%s %v\n", entry.Message, entry.Data)
 	}
 
@@ -135,13 +135,13 @@ func TestNotificationBatching(t *testing.T) {
 	out.WriteString("\n=== split by container (sorted)\n")
 
 	split := newBatchingNotifier(t, batchEntries())
-	split.FlushSplitByContainer()
+	split.sendByContainer(split.takeEntries())
 
 	messages := sentMessages(split)
 	slices.Sort(messages)
 	writeMessages(&out, messages)
 
-	require.Empty(t, split.entries, "splitting by container empties the queue")
+	require.Nil(t, split.batch, "splitting by container ends the batch")
 
 	golden.Assert(t, "notification-batching", []byte(out.String()))
 }

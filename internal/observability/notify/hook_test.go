@@ -27,7 +27,7 @@ func TestRun_EventFieldMapPreservesLargeIntegers(t *testing.T) {
 		0,
 	)
 	n.RegisterHook(&root)
-	n.StartNotification(true)
+	n.StartNotification()
 
 	// Value exceeds float64 exact-integer range (2^53) so json.Unmarshal float path would corrupt it.
 	const largeCount int64 = 9007199254740993
@@ -37,7 +37,7 @@ func TestRun_EventFieldMapPreservesLargeIntegers(t *testing.T) {
 		Msg("cleanup summary")
 
 	n.entriesMutex.RLock()
-	entries := append([]*format.Entry(nil), n.entries...)
+	entries := append([]*format.Entry(nil), n.batch.entries...)
 	n.entriesMutex.RUnlock()
 
 	require.Len(t, entries, 1)
@@ -80,7 +80,7 @@ func TestRun_EventFieldMapPreservesApplicationFields(t *testing.T) {
 		0,
 	)
 	n.RegisterHook(&root)
-	n.StartNotification(true)
+	n.StartNotification()
 
 	const (
 		wantContainer = "app-container-1"
@@ -94,7 +94,7 @@ func TestRun_EventFieldMapPreservesApplicationFields(t *testing.T) {
 		Msg(wantMsg)
 
 	n.entriesMutex.RLock()
-	entries := append([]*format.Entry(nil), n.entries...)
+	entries := append([]*format.Entry(nil), n.batch.entries...)
 	n.entriesMutex.RUnlock()
 
 	require.Len(t, entries, 1, "event must be retained when Event.buf parses successfully")
@@ -127,26 +127,23 @@ func TestRun_NotifyNoAndFailClosed(t *testing.T) {
 		format.StaticData{},
 		0,
 	)
-	// Enable batching without starting the worker goroutine.
-	n.entries = make([]*format.Entry, 0, initialEntriesCapacity)
-
 	// Fail-closed: nil event must not enqueue.
 	n.Run(nil, zerolog.InfoLevel, "should not queue")
 	n.entriesMutex.RLock()
-	require.Empty(t, n.entries)
+	require.Empty(t, n.batch.entries)
 	n.entriesMutex.RUnlock()
 
 	// Real zerolog path: notify=no child must not enqueue.
 	root := zerolog.New(io.Discard).Level(zerolog.TraceLevel)
 	n.RegisterHook(&root)
 	// After RegisterHook the worker runs. Still batch via StartNotification.
-	n.StartNotification(true)
+	n.StartNotification()
 
 	noLog := root.With().Str("notify", "no").Logger()
 	noLog.Info().Msg("internal must not notify")
 
 	n.entriesMutex.RLock()
-	require.Empty(t, n.entries, "notify=no events must not be queued")
+	require.Empty(t, n.batch.entries, "notify=no events must not be queued")
 	n.entriesMutex.RUnlock()
 
 	// Application log without notify=no should enqueue.
@@ -154,7 +151,7 @@ func TestRun_NotifyNoAndFailClosed(t *testing.T) {
 
 	// Allow hook to run synchronously (hooks run in emitting goroutine).
 	n.entriesMutex.RLock()
-	count := len(n.entries)
+	count := len(n.batch.entries)
 	n.entriesMutex.RUnlock()
 	require.Equal(t, 1, count, "app log without notify=no should queue")
 
@@ -177,7 +174,7 @@ func TestRun_ConcurrentEnqueue(t *testing.T) {
 		0,
 	)
 	n.RegisterHook(&root)
-	n.StartNotification(true)
+	n.StartNotification()
 
 	const workers = 32
 
@@ -195,7 +192,7 @@ func TestRun_ConcurrentEnqueue(t *testing.T) {
 	wg.Wait()
 
 	n.entriesMutex.RLock()
-	count := len(n.entries)
+	count := len(n.batch.entries)
 	n.entriesMutex.RUnlock()
 	require.Equal(t, workers, count, "every concurrent log must enqueue")
 
