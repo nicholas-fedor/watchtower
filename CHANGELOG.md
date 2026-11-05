@@ -33,6 +33,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Chores
 
+- Update golang:alpine3.24 docker digest to fa48812 by @renovate[bot] in [#3481](https://github.com/nicholas-fedor/watchtower/pull/3481)
+- Update golang:1.27.3-alpine docker digest to fa48812 by @renovate[bot] in [#3480](https://github.com/nicholas-fedor/watchtower/pull/3480)
 - Update docker/login-action action to v4.8.0 by @renovate[bot] in [#3475](https://github.com/nicholas-fedor/watchtower/pull/3475)
 - Update module github.com/gofiber/contrib/v3/zerolog to v1.1.10 by @renovate[bot] in [#3469](https://github.com/nicholas-fedor/watchtower/pull/3469)
 - Update module github.com/gofiber/contrib/v3/swaggo to v1.0.16 by @renovate[bot] in [#3468](https://github.com/nicholas-fedor/watchtower/pull/3468)
