@@ -185,7 +185,7 @@ A hook runs inside the container. Its output therefore comes from whatever runs 
     - Passwords and tokens in URLs, such as `https://user:token@host`
     - Header lines with a credential-like name, such as `Authorization`, `Cookie` or `X-Api-Key`, including the request headers `curl -v` prints
     - `NAME=value` pairs with a credential-like name, such as `DB_PASSWORD=…` in an environment listing or `token=…` in a query string. A quoted value is replaced whole. An unquoted value at the start of a line runs to the end of the line.
-    - JSON fields with a credential-like name, such as `"password": "…"`
+    - JSON fields with a credential-like name and a string or number value, such as `"password": "…"` or `"token": 123456`
 - It puts the output on one line, joining its lines with ` | `. No line of hook output can then pass for one of Watchtower's own notification lines.
 - The output never changes what Watchtower does. Only the exit code decides whether the update continues, is skipped or fails.
 

@@ -29,6 +29,10 @@ var (
 	// jsonField matches "name": "value" in JSON. Group 1 is everything before
 	// the value. Group 2 is the name.
 	jsonField = regexp.MustCompile(`("([A-Za-z_][A-Za-z0-9_.-]*)"[ \t]*:[ \t]*")(?:[^"\\]|\\.)*`)
+	// jsonNumber matches "name": number in JSON, since a PIN or a numeric key
+	// may be written without quotes. Group 1 is everything before the value.
+	// Group 2 is the name.
+	jsonNumber = regexp.MustCompile(`("([A-Za-z_][A-Za-z0-9_.-]*)"[ \t]*:[ \t]*)-?[0-9]+(?:\.[0-9]+)?(?:[eE][+-]?[0-9]+)?`)
 	// assignmentName matches the name and equals sign of name=value. Group 1 is
 	// the name.
 	assignmentName = regexp.MustCompile(`([A-Za-z_][A-Za-z0-9_.-]*)=`)
@@ -464,7 +468,7 @@ func Userinfo(msg, remote string) string {
 //     "> Authorization: Bearer ..." or "Cookie: ..."
 //   - the value of name=value with a credential-like name, such as an
 //     environment listing's "DB_PASSWORD=..." or a query's "token=..."
-//   - the value of a JSON field with a credential-like name
+//   - the string or number value of a JSON field with a credential-like name
 //
 // A quoted name=value value is replaced with its quotes. An unquoted value
 // that starts its line, as in an environment listing, runs to the end of the
@@ -476,7 +480,7 @@ func Userinfo(msg, remote string) string {
 // Returns:
 //   - string: text with those values replaced by xxxxx.
 func Text(text string) string {
-	for _, pattern := range []*regexp.Regexp{headerLine, jsonField} {
+	for _, pattern := range []*regexp.Regexp{headerLine, jsonField, jsonNumber} {
 		text = pattern.ReplaceAllStringFunc(text, func(match string) string {
 			parts := pattern.FindStringSubmatch(match)
 			if !isSensitiveQueryKey(parts[2]) {

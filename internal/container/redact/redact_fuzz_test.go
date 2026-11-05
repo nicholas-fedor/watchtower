@@ -100,14 +100,15 @@ func FuzzQueryKeyWords(f *testing.F) {
 //   - a header line
 //   - a name=value pair, quoted, listed with spaces, escaped or after another
 //     pair
-//   - a JSON field, also after a URL
+//   - a JSON string field, also after a URL
+//   - a JSON number field, when the value is digits alone
 //   - a URL password
 //
-// The seed corpus covers plain text and values with quotes, equals signs and
-// at signs. The regression seed under testdata/fuzz is
-// a value with a form feed. No credential form can carry one.
+// The seed corpus covers plain text, digits and values with quotes, equals
+// signs and at signs. The regression seed under testdata/fuzz is a value with
+// a form feed. No credential form can carry one.
 func FuzzText(f *testing.F) {
-	for _, seed := range []string{"plain", "abc123", `p@ss"w=rd`, "ghp_abc", ""} {
+	for _, seed := range []string{"plain", "abc123", "123456789", `p@ss"w=rd`, "ghp_abc", ""} {
 		f.Add("prefix line", seed)
 	}
 
@@ -125,7 +126,7 @@ func FuzzText(f *testing.F) {
 			return
 		}
 
-		for _, form := range []string{
+		forms := []string{
 			"Authorization: Bearer " + secret,
 			"> X-Auth-Token: " + secret,
 			"DB_PASSWORD=" + secret,
@@ -137,7 +138,14 @@ func FuzzText(f *testing.F) {
 			`{"secret": "` + secret + `"}`,
 			`{"url":"https://example.com","password":"p@` + secret + `"}`,
 			"https://bot:" + secret + "@example.com/repo.git",
-		} {
+		}
+
+		// A value of digits alone can also be a JSON number.
+		if strings.Trim(secret, "0123456789") == "" {
+			forms = append(forms, `{"token": `+secret+`}`)
+		}
+
+		for _, form := range forms {
 			if out := Text(text + "\n" + form); strings.Contains(out, secret) && !strings.Contains(text, secret) {
 				t.Fatalf("%q kept the credential: %q", form, out)
 			}

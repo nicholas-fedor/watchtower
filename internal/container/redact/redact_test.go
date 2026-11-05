@@ -371,6 +371,8 @@ func TestText(t *testing.T) {
 		{name: "value with equals signs", text: "x TOKEN=YWJj=ZA== done", want: "x TOKEN=xxxxx done"},
 		{name: "empty value", text: "x TOKEN= done", want: "x TOKEN= done"},
 		{name: "JSON field", text: `{"user":"bot","password":"p@ss\"word","id":1}`, want: `{"user":"bot","password":"xxxxx","id":1}`},
+		{name: "JSON number", text: `{"token":123456789}`, want: `{"token":xxxxx}`},
+		{name: "JSON number with fraction and exponent", text: `{"id":42,"secret": -1.5e3,"ok":true}`, want: `{"id":42,"secret": xxxxx,"ok":true}`},
 		{
 			name: "JSON field after a URL",
 			text: `{"url":"https://bot:ghp_abc@github.com","password":"p@ss"}`,
