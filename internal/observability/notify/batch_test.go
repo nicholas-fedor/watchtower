@@ -378,9 +378,9 @@ func TestNotifier_Flush(t *testing.T) {
 }
 
 // TestNotifier_FlushEmptyQueue verifies that Flush sends nothing when nothing
-// is queued, with every built-in template. The JSON and porcelain templates
-// render a document even without entries. Flush would otherwise send it as an
-// empty notification.
+// is queued, with every built-in template, and still ends batching. The JSON
+// and porcelain templates render a document even without entries. Flush would
+// otherwise send it as an empty notification.
 func TestNotifier_FlushEmptyQueue(t *testing.T) {
 	t.Parallel()
 
@@ -395,6 +395,11 @@ func TestNotifier_FlushEmptyQueue(t *testing.T) {
 				n.StartNotification(false)
 				n.Flush()
 
+				n.entriesMutex.RLock()
+				remaining := n.entries
+				n.entriesMutex.RUnlock()
+
+				assert.Nil(t, remaining)
 				assert.Empty(t, sentMessages(n))
 			})
 		}
