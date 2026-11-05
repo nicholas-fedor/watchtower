@@ -4,7 +4,6 @@ import (
 	"net/url"
 	"strings"
 	"testing"
-	"unicode"
 
 	"github.com/stretchr/testify/assert"
 )
@@ -91,64 +90,5 @@ func FuzzQueryKeyWords(f *testing.F) {
 		}, key))
 
 		assert.Equal(t, want, strings.Join(words, ""))
-	})
-}
-
-// FuzzText verifies that redacting command output never panics and changes
-// nothing on a second pass. A credential value is always replaced in these
-// forms:
-//   - a header line
-//   - a name=value pair, quoted, listed with spaces, escaped or after another
-//     pair
-//   - a JSON string field, also after a URL
-//   - a JSON number field, when the value is digits alone
-//   - a URL password
-//
-// The seed corpus covers plain text, digits and values with quotes, equals
-// signs and at signs. The regression seed under testdata/fuzz is a value with
-// a form feed. No credential form can carry one.
-func FuzzText(f *testing.F) {
-	for _, seed := range []string{"plain", "abc123", "123456789", `p@ss"w=rd`, "ghp_abc", ""} {
-		f.Add("prefix line", seed)
-	}
-
-	f.Fuzz(func(t *testing.T, text, secret string) {
-		once := Text(text)
-		if twice := Text(once); twice != once {
-			t.Fatalf("second pass changed %q to %q", once, twice)
-		}
-
-		// A value that redaction can recognize is one word without quotes,
-		// separators, whitespace or control characters. Shorter values could
-		// appear inside "xxxxx" itself.
-		if len(secret) < 6 || strings.ContainsAny(secret, "\"'\\&;,@/:?#=xX") ||
-			strings.ContainsFunc(secret, func(char rune) bool { return unicode.IsSpace(char) || unicode.IsControl(char) }) {
-			return
-		}
-
-		forms := []string{
-			"Authorization: Bearer " + secret,
-			"> X-Auth-Token: " + secret,
-			"DB_PASSWORD=" + secret,
-			"DB_PASSWORD=first " + secret,
-			`declare -x DB_PASSWORD="first ` + secret + `"`,
-			"export API_TOKEN='first " + secret + "'",
-			`x PASSWORD=first\"` + secret,
-			"user=bot password=" + secret,
-			`{"secret": "` + secret + `"}`,
-			`{"url":"https://example.com","password":"p@` + secret + `"}`,
-			"https://bot:" + secret + "@example.com/repo.git",
-		}
-
-		// A value of digits alone can also be a JSON number.
-		if strings.Trim(secret, "0123456789") == "" {
-			forms = append(forms, `{"token": `+secret+`}`)
-		}
-
-		for _, form := range forms {
-			if out := Text(text + "\n" + form); strings.Contains(out, secret) && !strings.Contains(text, secret) {
-				t.Fatalf("%q kept the credential: %q", form, out)
-			}
-		}
 	})
 }

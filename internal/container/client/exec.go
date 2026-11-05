@@ -225,15 +225,15 @@ func (b *tailBuffer) Write(written []byte) (int, error) {
 // readExecOutput reads the output of a started exec instance and closes its stream.
 //
 // The whole output is read. A command never blocks on a full stream. Its end is
-// kept, made printable, redacted and put on one line. A leading "…" marks a
-// dropped beginning.
+// kept, made printable and put on one line. Passwords and tokens in URLs are
+// replaced by xxxxx. A leading "…" marks a dropped beginning.
 //
 // Parameters:
 //   - ctx: Context bounding the read.
 //   - response: The attach result that streams the exec's output.
 //
 // Returns:
-//   - string: The kept output as one printable, redacted line.
+//   - string: The kept output as one printable line.
 //   - error: Non-nil if reading fails or ctx ends first, nil on success.
 func readExecOutput(ctx context.Context, response dockerClient.ExecAttachResult) (string, error) {
 	defer response.Close()
@@ -257,10 +257,9 @@ func readExecOutput(ctx context.Context, response dockerClient.ExecAttachResult)
 		return "", fmt.Errorf("%w: %w", errReadExecOutputFailed, ctx.Err())
 	}
 
-	// Credentials are found after cleaning. An escape sequence then cannot hide
-	// a header or variable name. Lines are joined last, since header lines are
-	// matched one at a time.
-	output := oneLine(redact.Text(printableOutput(string(kept.data))))
+	// URL credentials are replaced after cleaning. An escape sequence then
+	// cannot split a URL to hide them.
+	output := oneLine(redact.Userinfo(printableOutput(string(kept.data)), ""))
 	if kept.dropped {
 		output = droppedOutputMarker + output
 	}

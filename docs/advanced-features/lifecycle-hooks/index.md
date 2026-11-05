@@ -181,11 +181,7 @@ A hook runs inside the container. Its output therefore comes from whatever runs 
     - Control characters other than newlines, tabs and carriage returns
     - Invisible Unicode format characters, such as bidirectional text controls, zero-width characters and tag characters
 - A carriage return directly before a newline is dropped. Any other carriage return becomes a newline, as do the Unicode line and paragraph separators.
-- It replaces common forms of credentials with `xxxxx`:
-    - Passwords and tokens in URLs, such as `https://user:token@host`
-    - Header lines with a credential-like name, such as `Authorization`, `Cookie` or `X-Api-Key`, including the request headers `curl -v` prints
-    - `NAME=value` pairs with a credential-like name, such as `DB_PASSWORD=…` in an environment listing or `token=…` in a query string. A quoted value is replaced whole. An unquoted value at the start of a line runs to the end of the line.
-    - JSON fields with a credential-like name and a string or number value, such as `"password": "…"` or `"token": 123456`
+- It replaces passwords and tokens in URLs, such as `https://user:token@host`, with `xxxxx`.
 - It puts the output on one line, joining its lines with ` | `. No line of hook output can then pass for one of Watchtower's own notification lines.
 - The output never changes what Watchtower does. Only the exit code decides whether the update continues, is skipped or fails.
 
@@ -200,12 +196,7 @@ The kept output goes to these places:
 The HTTP API and its event stream do not include hook output.
 
 !!! Warning "Keep secrets out of hook output"
-    Notification services are third parties. Debug logs are often shipped to other systems. Redaction catches the common forms above. It cannot recognize every secret. These can still pass:
-
-    - a secret under an ordinary name
-    - an unquoted secret with spaces in the middle of a line, which keeps the words after the first space
-    - a secret split across lines
-    - a secret cut at the start of the kept 2 KiB
+    Notification services are third parties. Debug logs are often shipped to other systems. Apart from passwords and tokens in URLs, Watchtower sends hook output as the command printed it. It does not try to recognize other secrets. Guessing from names and formats would hide ordinary output and still miss real secrets.
 
     A failing pre-update hook that prints credentials, for example through `set -x`, `env` or `curl -v`, can send them to every notification service. Write verbose output to a file inside the container or to `/dev/null`. Print only a short reason when the command fails.
 

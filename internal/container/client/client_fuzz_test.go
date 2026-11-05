@@ -172,7 +172,7 @@ func FuzzTailBuffer(f *testing.F) {
 // line and paragraph separators.
 //
 // The seed corpus covers empty output, several lines, escape sequences,
-// invalid UTF-8, credentials and output past the 2 KiB limit.
+// invalid UTF-8, a credentialed URL and output past the 2 KiB limit.
 func FuzzReadExecOutput(f *testing.F) {
 	for _, seed := range []string{
 		"",
@@ -180,7 +180,7 @@ func FuzzReadExecOutput(f *testing.F) {
 		"line one" + string(rune(0x2028)) + "line two",
 		"\x1b]0;title\a\x1b[31mred\x1b[0m\r100%",
 		"a\xffb\xc0\x9b",
-		"> Authorization: Bearer abc\nTOKEN=xyz",
+		"clone https://bot:ghp_abc@github.com/org/app.git failed",
 		strings.Repeat("x", 3000) + "\nend",
 	} {
 		f.Add([]byte(seed))

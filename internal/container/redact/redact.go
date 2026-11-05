@@ -11,41 +11,11 @@ import (
 // redactedUserinfo replaces the userinfo matched by userinfoInError.
 const redactedUserinfo = "://xxxxx:xxxxx@"
 
-// redactedValue replaces the value of a credential found in text.
-const redactedValue = "xxxxx"
-
 // userinfoInError matches scheme://user@ and scheme://user:password@ in a daemon error.
 //
 // It matches through the last @ before the first /, ?, #, or whitespace, so a
 // password that contains @ is matched whole.
 var userinfoInError = regexp.MustCompile(`://[^/?#\s]+@`)
-
-// Patterns for named values in command output.
-var (
-	// headerLine matches a "Name: value" line, such as the request headers
-	// curl -v prints after "> ". Group 1 is everything before the value. Group
-	// 2 is the name.
-	headerLine = regexp.MustCompile(`(?m)^([ \t]*[<>]?[ \t]*([A-Za-z][A-Za-z0-9_-]*)[ \t]*:[ \t]*)\S.*$`)
-	// jsonField matches "name": "value" in JSON. The name may start with a
-	// digit, as in 2fa_token. Group 1 is everything before the value. Group 2
-	// is the name.
-	jsonField = regexp.MustCompile(`("([A-Za-z0-9_][A-Za-z0-9_.-]*)"\s*:\s*")(?:[^"\\]|\\.)*`)
-	// jsonNumber matches "name": number in JSON, since a PIN or a numeric key
-	// may be written without quotes. Group 1 is everything before the value.
-	// Group 2 is the name.
-	jsonNumber = regexp.MustCompile(`("([A-Za-z0-9_][A-Za-z0-9_.-]*)"\s*:\s*)-?[0-9]+(?:\.[0-9]+)?(?:[eE][+-]?[0-9]+)?`)
-	// assignmentName matches the name and equals sign of name=value. Group 1 is
-	// the name.
-	assignmentName = regexp.MustCompile(`([A-Za-z_][A-Za-z0-9_.-]*)=`)
-	// quotedValue matches a quoted value at the start of text. In double
-	// quotes a backslash escapes the next character. An unterminated value
-	// runs to the end of its line.
-	quotedValue = regexp.MustCompile(`^(?:"(?:[^"\\\n]|\\.)*"?|'[^'\n]*'?)`)
-	// unquotedValue matches an unquoted value at the start of text. It ends at
-	// whitespace, a quote, &, ; or a comma. A backslash escapes the next
-	// character.
-	unquotedValue = regexp.MustCompile(`^(?:[^\s&;,'"\\]|\\.)*`)
-)
 
 // GitURL removes credentials and sensitive query values from a Git URL.
 //
@@ -213,17 +183,14 @@ func isSensitiveQueryKey(key string) bool {
 // isCredentialWord reports whether a lowercase word of a query parameter name
 // names a credential.
 //
-// Digits at the end of the word are ignored. pin2 and token1 match like pin and
-// token.
-//
 // Parameters:
 //   - word: Lowercase word or part of the name.
 //
 // Returns:
 //   - bool: True when the word names a credential.
 func isCredentialWord(word string) bool {
-	switch strings.TrimRight(word, "0123456789") {
-	case "token", "password", "passwd", "pwd", "passphrase", "secret", "credential", "credentials", "signature", "sig", "auth", "authorization", "session", "jwt", "bearer", "cookie", "pin":
+	switch word {
+	case "token", "password", "passwd", "pwd", "passphrase", "secret", "credential", "credentials", "signature", "sig", "auth", "authorization", "session", "jwt", "bearer":
 		return true
 	default:
 		return false
@@ -449,8 +416,9 @@ func Remote(remote string) string {
 // the request URL carries it query-escaped, so that form is replaced too.
 //
 // Parameters:
-//   - msg: Error text.
-//   - remote: Credentialed Git context URL.
+//   - msg: Error text or command output.
+//   - remote: Credentialed Git context URL. Empty when msg quotes no known
+//     remote.
 //
 // Returns:
 //   - string: msg with credentials replaced by xxxxx.
@@ -462,94 +430,6 @@ func Userinfo(msg, remote string) string {
 	}
 
 	return userinfoInError.ReplaceAllString(msg, redactedUserinfo)
-}
-
-// Text replaces credentials that commonly appear in command output.
-//
-// It catches what tools print by habit, not every secret:
-//   - user information in URLs, such as https://user:token@host
-//   - the value of a header line with a credential-like name, such as curl's
-//     "> Authorization: Bearer ..." or "Cookie: ..."
-//   - the value of name=value with a credential-like name, such as an
-//     environment listing's "DB_PASSWORD=..." or a query's "token=..."
-//   - the string or number value of a JSON field with a credential-like name
-//
-// A quoted name=value value is replaced with its quotes. An unquoted value
-// that starts its line, as in an environment listing, runs to the end of the
-// line. Inside a line it ends at whitespace.
-//
-// Parameters:
-//   - text: Command output.
-//
-// Returns:
-//   - string: text with those values replaced by xxxxx.
-func Text(text string) string {
-	for _, pattern := range []*regexp.Regexp{headerLine, jsonField, jsonNumber} {
-		text = pattern.ReplaceAllStringFunc(text, func(match string) string {
-			parts := pattern.FindStringSubmatch(match)
-			if !isSensitiveQueryKey(parts[2]) {
-				return match
-			}
-
-			return parts[1] + redactedValue
-		})
-	}
-
-	// User information is matched last. Its pattern runs to the last @ before
-	// a slash or whitespace. Matched first, it could swallow a later field's
-	// name with part of its value.
-	return userinfoInError.ReplaceAllString(redactAssignments(text), redactedUserinfo)
-}
-
-// redactAssignments replaces the values of name=value pairs with a
-// credential-like name.
-//
-// The value of a name that is not credential-like is searched too. A later
-// pair on the same line is then still found.
-//
-// Parameters:
-//   - text: Command output.
-//
-// Returns:
-//   - string: text with those values replaced by xxxxx.
-func redactAssignments(text string) string {
-	var out strings.Builder
-
-	kept := 0
-
-	for _, match := range assignmentName.FindAllStringSubmatchIndex(text, -1) {
-		start, valueStart := match[0], match[1]
-		if start < kept || !isSensitiveQueryKey(text[match[2]:match[3]]) {
-			continue
-		}
-
-		rest := text[valueStart:]
-		lineStart := strings.LastIndexByte(text[:start], '\n') + 1
-
-		value := quotedValue.FindString(rest)
-
-		switch {
-		case value != "":
-		case strings.TrimLeft(text[lineStart:start], " \t") == "":
-			// A value in an environment listing may hold spaces.
-			value, _, _ = strings.Cut(rest, "\n")
-		default:
-			value = unquotedValue.FindString(rest)
-		}
-
-		if value == "" {
-			continue
-		}
-
-		out.WriteString(text[kept:valueStart])
-		out.WriteString(redactedValue)
-
-		kept = valueStart + len(value)
-	}
-
-	out.WriteString(text[kept:])
-
-	return out.String()
 }
 
 // ServiceURL returns a summary of a notification service URL that leaves out

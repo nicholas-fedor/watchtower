@@ -1035,18 +1035,18 @@ func TestClient(t *testing.T) {
 					"command execution failed with exit code 1: backup failed | Started new container: db (abc123)")
 			})
 
-			t.Run("should redact credentials in the output", func(t *testing.T) {
+			t.Run("should replace URL credentials in the output", func(t *testing.T) {
 				t.Parallel()
 
 				_, err := run(t, execCase{
 					containerID: "ex-cont-id",
 					execID:      "failure-exec-id",
 					cmd:         "failure-cmd",
-					output:      "> Authorization: Bearer abc.def\nAPI_TOKEN=ghp_abc\nclone https://bot:ghp_abc@github.com/org/app.git failed\n",
+					output:      "clone https://bot:ghp_abc@github.com/org/app.git failed\n",
 					exitCode:    1,
 				}, 0, 0)
-				require.EqualError(t, err, "command execution failed with exit code 1: "+
-					"> Authorization: xxxxx | API_TOKEN=xxxxx | clone https://xxxxx:xxxxx@github.com/org/app.git failed")
+				require.EqualError(t, err,
+					"command execution failed with exit code 1: clone https://xxxxx:xxxxx@github.com/org/app.git failed")
 			})
 
 			// Empty output adds nothing to the error. Neither does output that

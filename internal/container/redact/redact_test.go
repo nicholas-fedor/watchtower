@@ -69,13 +69,8 @@ func TestGitURL_SensitiveQueryKeys(t *testing.T) {
 		"pass_word",
 		"authToken",
 		"sig",
-		"pin",
-		"simPin",
-		"pin2",
-		"password2",
-		"apiToken1",
 	}
-	benign := []string{"author", "authorName", "design", "tokenizer", "passThrough", "format", "lang", "version2", "pinned", "spinner"}
+	benign := []string{"author", "authorName", "design", "tokenizer", "passThrough", "format", "lang", "version2"}
 
 	forms := []struct {
 		name   string
@@ -345,62 +340,4 @@ func TestServiceURLs(t *testing.T) {
 		[]string{"slack://[redacted]", "", "logger://[redacted]"},
 		ServiceURLs([]string{"slack://token@channel", "", "logger://"}),
 	)
-}
-
-// TestText verifies that credentials commonly printed by commands are replaced,
-// and that other text is left alone.
-func TestText(t *testing.T) {
-	t.Parallel()
-
-	tests := []struct {
-		name string
-		text string
-		want string
-	}{
-		{name: "plain text", text: "pull failed: connection refused", want: "pull failed: connection refused"},
-		{name: "URL user information", text: "fatal: https://bot:ghp_abc@github.com/org/app.git not found", want: "fatal: https://xxxxx:xxxxx@github.com/org/app.git not found"},
-		{name: "curl request header", text: "> Authorization: Bearer abc.def\n> Accept: */*", want: "> Authorization: xxxxx\n> Accept: */*"},
-		{name: "proxy authorization header", text: "Proxy-Authorization: Basic dXNlcjpwYXNz", want: "Proxy-Authorization: xxxxx"},
-		{name: "cookie headers", text: "< Set-Cookie: sid=abc; Path=/\nCookie: sid=abc", want: "< Set-Cookie: xxxxx\nCookie: xxxxx"},
-		{name: "API key header", text: "X-Api-Key: 12345", want: "X-Api-Key: xxxxx"},
-		{name: "ordinary header", text: "Content-Type: text/plain", want: "Content-Type: text/plain"},
-		{name: "environment listing", text: "HOME=/root\nDB_PASSWORD=hunter2\nGITHUB_TOKEN=ghp_abc", want: "HOME=/root\nDB_PASSWORD=xxxxx\nGITHUB_TOKEN=xxxxx"},
-		{name: "query string", text: "GET /v1?access_token=abc&page=2", want: "GET /v1?access_token=xxxxx&page=2"},
-		{name: "listed value with spaces", text: "DB_PASSWORD=correct horse battery\nHOME=/root", want: "DB_PASSWORD=xxxxx\nHOME=/root"},
-		{name: "inline value ends at whitespace", text: "using token=abc failed", want: "using token=xxxxx failed"},
-		{name: "double-quoted value", text: `declare -x DB_PASSWORD="a \"b\" c" PATH="/bin"`, want: `declare -x DB_PASSWORD=xxxxx PATH="/bin"`},
-		{name: "single-quoted value", text: "+ export API_TOKEN='a b'", want: "+ export API_TOKEN=xxxxx"},
-		{name: "unterminated quote", text: "x SECRET=\"a b\nnext", want: "x SECRET=xxxxx\nnext"},
-		{name: "escaped quote in unquoted value", text: `x PASSWORD=ab\"cd done`, want: "x PASSWORD=xxxxx done"},
-		{name: "later pair on the same line", text: "user=bot password=hunter2", want: "user=bot password=xxxxx"},
-		{name: "value with equals signs", text: "x TOKEN=YWJj=ZA== done", want: "x TOKEN=xxxxx done"},
-		{name: "empty value", text: "x TOKEN= done", want: "x TOKEN= done"},
-		{name: "JSON field", text: `{"user":"bot","password":"p@ss\"word","id":1}`, want: `{"user":"bot","password":"xxxxx","id":1}`},
-		{name: "JSON number", text: `{"token":123456789}`, want: `{"token":xxxxx}`},
-		{name: "JSON PIN", text: `{"pin":123456,"pinned":true}`, want: `{"pin":xxxxx,"pinned":true}`},
-		{name: "numbered JSON PIN", text: `{"pin2":1234,"version2":3}`, want: `{"pin2":xxxxx,"version2":3}`},
-		{name: "numbered PIN assignment", text: "SIM_PIN2=1234\nVERSION2=3", want: "SIM_PIN2=xxxxx\nVERSION2=3"},
-		{name: "JSON names starting with a digit", text: `{"2fa_token":123456,"2fa_secret":"abc"}`, want: `{"2fa_token":xxxxx,"2fa_secret":"xxxxx"}`},
-		{
-			name: "JSON whitespace around the colon",
-			text: "{\n  \"password\"\n  :\n  \"abc\",\n  \"token\"\n  :\n  123\n}",
-			want: "{\n  \"password\"\n  :\n  \"xxxxx\",\n  \"token\"\n  :\n  xxxxx\n}",
-		},
-		{name: "JSON number with fraction and exponent", text: `{"id":42,"secret": -1.5e3,"ok":true}`, want: `{"id":42,"secret": xxxxx,"ok":true}`},
-		{
-			name: "JSON field after a URL",
-			text: `{"url":"https://bot:ghp_abc@github.com","password":"p@ss"}`,
-			want: `{"url":"https://xxxxx:xxxxx@github.com","password":"xxxxx"}`,
-		},
-		{name: "JSON field after a URL without user information", text: `{"url":"https://github.com","token":"a@b"}`, want: `{"url":"https://github.com","token":"xxxxx"}`},
-		{name: "look-alike names", text: "tokenizer=bpe\nauthor: jane", want: "tokenizer=bpe\nauthor: jane"},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			t.Parallel()
-
-			assert.Equal(t, tt.want, Text(tt.text))
-		})
-	}
 }
