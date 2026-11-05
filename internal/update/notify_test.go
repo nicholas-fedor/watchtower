@@ -44,6 +44,55 @@ func defaultTestUpdateParams(filter types.Filter) updateParams.Params {
 	}
 }
 
+// TestRunUpdatesWithNotifications_ScanCompletedCounts verifies that the
+// scan_completed event carries the same counts as the metric the session
+// returns. One of the two scanned containers is stale. The scanned and updated
+// counts then differ, which catches a count taken from the wrong field.
+func TestRunUpdatesWithNotifications_ScanCompletedCounts(t *testing.T) {
+	t.Parallel()
+
+	client := mockUpdate.CreateMockClient(
+		&mockUpdate.TestData{
+			Containers: []types.Container{
+				mockUpdate.CreateMockContainer("stale", "stale", "image:latest", time.Now()),
+				mockUpdate.CreateMockContainer("fresh", "fresh", "image:latest", time.Now()),
+			},
+			Staleness: map[string]bool{"stale": true, "fresh": false},
+		},
+		false,
+		false,
+	)
+
+	broadcaster := events.NewBroadcaster()
+	published, _ := broadcaster.SubscribeWithDone()
+
+	metric := RunUpdatesWithNotifications(t.Context(), RunUpdatesWithNotificationsParams{
+		Logger:           newTestLogger(t),
+		Client:           client,
+		EventBroadcaster: broadcaster,
+		Update:           defaultTestUpdateParams(filters.NoFilter),
+	})
+	require.NotNil(t, metric)
+	assert.Equal(t, 2, metric.Scanned)
+	assert.Equal(t, 1, metric.Updated)
+
+	// Events are published synchronously into the subscriber's buffer.
+	var received []events.Event
+
+	for len(published) > 0 {
+		received = append(received, <-published)
+	}
+
+	require.Len(t, received, 2)
+	assert.Equal(t, "scan_completed", received[1].Type)
+	assert.Equal(t, events.ScanCompletedData{
+		Scanned: metric.Scanned,
+		Updated: metric.Updated,
+		Failed:  metric.Failed,
+		Skipped: metric.Skipped,
+	}, received[1].Data)
+}
+
 // TestRunUpdatesWithNotifications_PanicEndsSession verifies that a panic during
 // an update session ends it as an update error does. The panic is logged at
 // error without notify=no, so the notification hook takes it. The session's
@@ -1122,53 +1171,6 @@ func TestRunUpdates(t *testing.T) {
 	t.Run("generateAndLogMetric", func(t *testing.T) {
 		t.Parallel()
 
-		t.Run("should generate metric from report", func(t *testing.T) {
-			t.Parallel()
-
-			mockReport := mockTypes.NewMockReport(t)
-
-			mockContainer1 := mockTypes.NewMockContainerReport(t)
-			mockContainer2 := mockTypes.NewMockContainerReport(t)
-			mockContainer3 := mockTypes.NewMockContainerReport(t)
-			mockContainer4 := mockTypes.NewMockContainerReport(t)
-
-			mockReport.EXPECT().
-				Scanned().
-				Return([]types.ContainerReport{mockContainer1, mockContainer2})
-			mockReport.EXPECT().Updated().Return([]types.ContainerReport{mockContainer3})
-			mockReport.EXPECT().Failed().Return([]types.ContainerReport{mockContainer4})
-			mockReport.EXPECT().Restarted().Return([]types.ContainerReport{})
-			mockReport.EXPECT().Skipped().Return([]types.ContainerReport{})
-
-			metric := generateAndLogMetric(newTestLogger(t), mockReport)
-
-			require.NotNil(t, metric)
-			assert.Equal(t, 2, metric.Scanned)
-			assert.Equal(t, 1, metric.Updated)
-			assert.Equal(t, 1, metric.Failed)
-			assert.Equal(t, 0, metric.Restarted)
-		})
-
-		t.Run("should handle empty report gracefully", func(t *testing.T) {
-			t.Parallel()
-
-			mockReport := mockTypes.NewMockReport(t)
-
-			mockReport.EXPECT().Scanned().Return([]types.ContainerReport{})
-			mockReport.EXPECT().Updated().Return([]types.ContainerReport{})
-			mockReport.EXPECT().Failed().Return([]types.ContainerReport{})
-			mockReport.EXPECT().Restarted().Return([]types.ContainerReport{})
-			mockReport.EXPECT().Skipped().Return([]types.ContainerReport{})
-
-			metric := generateAndLogMetric(newTestLogger(t), mockReport)
-
-			require.NotNil(t, metric)
-			assert.Equal(t, 0, metric.Scanned)
-			assert.Equal(t, 0, metric.Updated)
-			assert.Equal(t, 0, metric.Failed)
-			assert.Equal(t, 0, metric.Restarted)
-		})
-
 		t.Run("should log session completion with notify=no so it is not sent as a notification", func(t *testing.T) {
 			t.Parallel()
 
@@ -2053,4 +2055,60 @@ func TestRunUpdates(t *testing.T) {
 			})
 		})
 	})
+}
+
+// Test_newScanMetric checks that each report category reaches its own metric
+// count. The categories have distinct sizes to catch a count taken from the
+// wrong category. Nil category lists count as zero.
+func Test_newScanMetric(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name                                         string
+		scanned, updated, failed, restarted, skipped []types.ContainerReport
+		want                                         *metrics.Metric
+	}{
+		{
+			name:      "empty report",
+			scanned:   []types.ContainerReport{},
+			updated:   []types.ContainerReport{},
+			failed:    []types.ContainerReport{},
+			restarted: []types.ContainerReport{},
+			skipped:   []types.ContainerReport{},
+			want:      &metrics.Metric{},
+		},
+		{
+			name:      "nil categories",
+			scanned:   nil,
+			updated:   nil,
+			failed:    nil,
+			restarted: nil,
+			skipped:   nil,
+			want:      &metrics.Metric{},
+		},
+		{
+			name:      "each category counted",
+			scanned:   make([]types.ContainerReport, 10),
+			updated:   make([]types.ContainerReport, 3),
+			failed:    make([]types.ContainerReport, 2),
+			restarted: make([]types.ContainerReport, 4),
+			skipped:   make([]types.ContainerReport, 1),
+			want:      &metrics.Metric{Scanned: 10, Updated: 3, Failed: 2, Restarted: 4, Skipped: 1},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			report := mockTypes.NewMockReport(t)
+			report.EXPECT().Scanned().Return(tt.scanned)
+			report.EXPECT().Updated().Return(tt.updated)
+			report.EXPECT().Failed().Return(tt.failed)
+			report.EXPECT().Restarted().Return(tt.restarted)
+			report.EXPECT().Skipped().Return(tt.skipped)
+
+			assert.Equal(t, tt.want, newScanMetric(report))
+		})
+	}
 }

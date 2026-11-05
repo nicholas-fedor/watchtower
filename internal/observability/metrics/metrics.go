@@ -9,8 +9,6 @@ import (
 	"time"
 
 	"github.com/prometheus/client_golang/prometheus"
-
-	"github.com/nicholas-fedor/watchtower/pkg/types"
 )
 
 var metrics *Metrics
@@ -214,27 +212,6 @@ func registerCollector[Collector prometheus.Collector](
 	}
 
 	return collector, fmt.Errorf("failed to register metric: %w", err)
-}
-
-// NewMetric creates a Metric from a scan report.
-//
-// Parameters:
-//   - report: Scan report from types.Report.
-//
-// Returns:
-//   - *Metric: New metric instance.
-func NewMetric(report types.Report) *Metric {
-	if report == nil {
-		panic("NewMetric: report is nil")
-	}
-
-	return &Metric{
-		Scanned:   len(report.Scanned()),
-		Updated:   len(report.Updated()), // Only count actually updated containers.
-		Failed:    len(report.Failed()),
-		Restarted: len(report.Restarted()),
-		Skipped:   len(report.Skipped()),
-	}
 }
 
 // Register attempts to enqueue a metric for processing.

@@ -16,7 +16,6 @@ import (
 
 	"github.com/nicholas-fedor/watchtower/internal/container"
 	"github.com/nicholas-fedor/watchtower/internal/container/filters"
-	"github.com/nicholas-fedor/watchtower/internal/observability/metrics"
 	"github.com/nicholas-fedor/watchtower/internal/registry/ratelimit"
 	mockUpdate "github.com/nicholas-fedor/watchtower/internal/update/mocks"
 	updateParams "github.com/nicholas-fedor/watchtower/internal/update/params"
@@ -428,14 +427,11 @@ func TestUpdateAction_Restarts(t *testing.T) {
 
 			require.NoError(t, err)
 
-			// Generate metrics from the report
-			metric := metrics.NewMetric(report)
+			metric := newScanMetric(report)
 
-			// Verify metrics include both updated and restarted containers
 			assert.Equal(t, 1, metric.Updated)
+			assert.Equal(t, 1, metric.Restarted)
 			assert.Equal(t, 2, metric.Scanned)
-			// Note: restarted containers are not counted separately in metrics,
-			// they are included in scanned but not in updated
 		})
 	})
 
