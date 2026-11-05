@@ -416,8 +416,9 @@ func Remote(remote string) string {
 // the request URL carries it query-escaped, so that form is replaced too.
 //
 // Parameters:
-//   - msg: Error text.
-//   - remote: Credentialed Git context URL.
+//   - msg: Error text or command output.
+//   - remote: Credentialed Git context URL. Empty when msg quotes no known
+//     remote.
 //
 // Returns:
 //   - string: msg with credentials replaced by xxxxx.
