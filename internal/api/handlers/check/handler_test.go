@@ -347,8 +347,8 @@ func TestHandler_Handle_EmitsEvents(t *testing.T) {
 // TestHandler_Handle_Notifications verifies that a check holds back the
 // notifications its log lines would send until it ends. It then sends them in
 // one notification. With the notification-split-by-container configuration
-// option it sends one notification per container instead. Afterwards the
-// notifier collects entries again.
+// option it sends one notification per container instead. It does not start a
+// new batch afterwards.
 func TestHandler_Handle_Notifications(t *testing.T) {
 	t.Parallel()
 
@@ -364,7 +364,6 @@ func TestHandler_Handle_Notifications(t *testing.T) {
 				mock.InOrder(
 					notifier.EXPECT().StartNotification(true).Once(),
 					notifier.EXPECT().Flush().Once(),
-					notifier.EXPECT().StartNotification(false).Once(),
 				)
 			},
 		},
@@ -375,7 +374,6 @@ func TestHandler_Handle_Notifications(t *testing.T) {
 				mock.InOrder(
 					notifier.EXPECT().StartNotification(true).Once(),
 					notifier.EXPECT().FlushSplitByContainer().Once(),
-					notifier.EXPECT().StartNotification(false).Once(),
 				)
 			},
 		},

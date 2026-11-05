@@ -42,9 +42,11 @@ func TestRunUpdatesWithNotifications_OldSelfDetected(t *testing.T) {
 	client.EXPECT().SetRestartPolicy(mock.Anything, oldSelf.ID(),
 		dockerContainer.RestartPolicy{Name: dockerContainer.RestartPolicyDisabled}).Return(nil).Once()
 
-	// The notifier mock fails the test on any call other than starting the batch.
+	// The notifier mock fails the test on any call other than starting the
+	// batch and ending it without sending.
 	notifier := mockUpdate.NewMockNotifier(t)
 	notifier.EXPECT().StartNotification(false).Once()
+	notifier.EXPECT().Discard().Once()
 
 	broadcaster := events.NewBroadcaster()
 	published, _ := broadcaster.SubscribeWithDone()
