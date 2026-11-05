@@ -6,6 +6,7 @@ import (
 
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/mock"
 
 	dockerContainer "github.com/moby/moby/api/types/container"
 	dockerImage "github.com/moby/moby/api/types/image"
@@ -506,18 +507,22 @@ func getComposeDependsOnWithNetworkModeTestData() *mockUpdate.TestData {
 //
 // Each method named in sentFirst must have been called once when the batch
 // ends, since the session ends its batch after it sends.
-func expectSessionBatch(t *testing.T, notifier *mockUpdate.MockNotifier, sentFirst ...string) {
+//
+// Returns:
+//   - *mock.Call: The expected start, for ordering it before the sends with
+//     [mock.InOrder].
+func expectSessionBatch(t *testing.T, notifier *mockUpdate.MockNotifier, sentFirst ...string) *mock.Call {
 	t.Helper()
 
 	var ended int
 
-	notifier.EXPECT().StartNotification().Return(func() {
+	t.Cleanup(func() { assert.Equal(t, 1, ended, "the session ends its batch once") })
+
+	return notifier.EXPECT().StartNotification().Return(func() {
 		ended++
 
 		for _, method := range sentFirst {
 			notifier.AssertNumberOfCalls(t, method, 1)
 		}
 	}).Once()
-
-	t.Cleanup(func() { assert.Equal(t, 1, ended, "the session ends its batch once") })
 }

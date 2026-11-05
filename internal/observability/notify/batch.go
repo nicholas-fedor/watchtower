@@ -19,7 +19,7 @@ type batch struct {
 	entries []*format.Entry // Queued log entries.
 	// holders counts the check requests that hold the batch open. It is zero
 	// for the batch of an update session or of startup. A check batch that
-	// ended keeps a count of one.
+	// ended keeps a count of one. It is then still known as a check's.
 	holders int
 }
 
@@ -60,9 +60,11 @@ func (n *Notifier) StartNotification() func() {
 
 // HoldNotifications holds back the log entries of a check request.
 //
-// Checks that overlap share one batch. The last of them to end sends its
-// entries without a report. It sends them in one notification by default. With
-// the notification-split-by-container configuration option it sends one per
+// Checks that overlap share one batch. Each check's release sends the entries
+// queued so far without a report. No entry then waits longer than the check
+// that is running when it is logged. The batch closes when the last check ends.
+// Entries are sent in one notification by default. With the
+// notification-split-by-container configuration option they are sent one per
 // container. Entries that name no container then go together. During an update
 // session or startup the check's entries join that batch instead. Its owner
 // decides what to send. A split update session sends only the entries that
@@ -101,19 +103,19 @@ func (n *Notifier) HoldNotifications() func() {
 			return
 		}
 
-		// The last check keeps its count. The ended batch is then still known
-		// as a check's.
+		queued := held.entries
+		held.entries = nil
+
+		// The batch stays open for the checks that still hold it.
 		if held.holders > 1 {
 			held.holders--
-			n.entriesMutex.Unlock()
-
-			return
+		} else {
+			n.batch = nil
 		}
 
-		n.batch = nil
 		n.entriesMutex.Unlock()
 
-		n.sendEnded(held)
+		n.sendCheckEntries(queued)
 	})
 }
 
@@ -259,20 +261,37 @@ func (n *Notifier) takeBatch(owned *batch) ([]*format.Entry, bool) {
 
 // sendEnded sends the entries of a batch that ended without a report.
 //
-// A check request's batch is sent one notification per container with the
-// notification-split-by-container configuration option. Any other batch is
-// sent in one notification.
+// A check request's batch is sent as its checks would send it. Any other batch
+// is sent in one notification.
 //
 // Parameters:
 //   - ended: A batch that is no longer the open one.
 func (n *Notifier) sendEnded(ended *batch) {
-	if ended.holders > 0 && n.splitByContainer {
-		n.sendByContainer(ended.entries)
+	if ended.holders > 0 {
+		n.sendCheckEntries(ended.entries)
 
 		return
 	}
 
 	n.sendWithoutReport(ended.entries)
+}
+
+// sendCheckEntries sends the entries of check requests without a report.
+//
+// They go out one notification per container with the
+// notification-split-by-container configuration option. Otherwise they go out
+// in one notification.
+//
+// Parameters:
+//   - entries: Entries taken out of a check's batch.
+func (n *Notifier) sendCheckEntries(entries []*format.Entry) {
+	if n.splitByContainer {
+		n.sendByContainer(entries)
+
+		return
+	}
+
+	n.sendWithoutReport(entries)
 }
 
 // sendWithoutReport sends entries in one notification without a report.
@@ -298,22 +317,19 @@ func (n *Notifier) sendWithoutReport(entries []*format.Entry) {
 func (n *Notifier) sendByContainer(entries []*format.Entry) {
 	byContainer := make(map[string][]*format.Entry)
 
+	// Entries that name no container share the empty key. No container name
+	// can take it.
 	for _, entry := range entries {
 		container, _ := entry.Data["container"].(string)
 		if container == "" {
-			name, ok := entry.Data["container_name"].(string)
-			if ok && name != "" {
-				container = name
-			} else {
-				container = "unknown"
-			}
+			container, _ = entry.Data["container_name"].(string)
 		}
 
 		byContainer[container] = append(byContainer[container], entry)
 	}
 
 	for _, containerEntries := range byContainer {
-		n.sendEntries(containerEntries, nil)
+		n.sendDeduplicated(containerEntries, nil)
 	}
 }
 

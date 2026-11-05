@@ -14,9 +14,9 @@ import (
 // Notifier holds back notifications while a check runs and sends them after it.
 type Notifier interface {
 	// HoldNotifications holds back the check's log entries. The returned
-	// release ends the hold. Overlapping checks send their entries together
-	// when the last one ends. During an update session the entries go out
-	// with the session's notifications instead.
+	// release ends the hold and sends the entries queued so far, including
+	// those of overlapping checks. During an update session the entries go
+	// out with the session's notifications instead.
 	HoldNotifications() func()
 }
 

@@ -46,4 +46,3 @@ Cleaned up old image: org/web:1.0 (01d111111111)
 --- message 4
 Only checking containers in scope: production
 org/web:1.0 created less than 1d ago - eligible in 2h (Wed, 07 Oct 2026 14:00:00 UTC)
-org/web:1.0 created less than 1d ago - eligible in 2h (Wed, 07 Oct 2026 14:00:00 UTC)

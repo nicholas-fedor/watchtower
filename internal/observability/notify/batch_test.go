@@ -471,8 +471,9 @@ func TestNotifier_StartNotification(t *testing.T) {
 
 // TestNotifier_HoldNotifications verifies how a check request's batch
 // overlaps the batches of update sessions and other checks. Overlapping checks
-// share one batch. The last of them to end sends it. A check during a session
-// joins the session's batch. An update session that starts during a check
+// share one batch. Each check's release sends the lines queued so far. The
+// last one closes the batch. A check during a session joins the session's
+// batch. An update session that starts during a check
 // takes the batch over and first sends the check's queued lines. Every line is
 // sent exactly once.
 func TestNotifier_HoldNotifications(t *testing.T) {
@@ -596,7 +597,7 @@ func TestNotifier_HoldNotifications(t *testing.T) {
 			want: []string{"Check line"},
 		},
 		{
-			name: "overlapping checks send together when the last ends",
+			name: "each overlapping check sends the lines queued when it ends",
 			run: func(n *Notifier, hooked zerolog.Logger) []string {
 				first := n.HoldNotifications()
 				second := n.HoldNotifications()
@@ -604,14 +605,13 @@ func TestNotifier_HoldNotifications(t *testing.T) {
 				hooked.Warn().Msg("First check line")
 				first()
 
-				queued := sentMessages(n)
-
-				hooked.Warn().Msg("Second check line")
+				hooked.Warn().Msg("Second check line one")
+				hooked.Warn().Msg("Second check line two")
 				second()
 
-				return append(queued, sentMessages(n)...)
+				return sentMessages(n)
 			},
-			want: []string{"First check line\nSecond check line"},
+			want: []string{"First check line", "Second check line one\nSecond check line two"},
 		},
 		{
 			name: "session taking a check's batch over sends it per container when split",

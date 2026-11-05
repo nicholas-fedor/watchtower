@@ -150,9 +150,12 @@ func TestRunUpdatesWithNotifications_PanicEndsSession(t *testing.T) {
 	// Without a report, report templates list the batch's entries. The mock
 	// fails the test on any SendNotification call.
 	notifier := mockUpdate.NewMockNotifier(t)
-	// The session's deferred end runs after the panic's Flush.
-	notifier.EXPECT().Flush().Once()
-	expectSessionBatch(t, notifier, "Flush")
+	// The session starts its batch before the panic's Flush. Its deferred end
+	// runs after it.
+	mock.InOrder(
+		expectSessionBatch(t, notifier, "Flush"),
+		notifier.EXPECT().Flush().Once(),
+	)
 
 	broadcaster := events.NewBroadcaster()
 	published, _ := broadcaster.SubscribeWithDone()
@@ -320,8 +323,10 @@ func TestRunUpdates(t *testing.T) {
 				notifier := mockUpdate.NewMockNotifier(t)
 				// The session ends its batch after its split notification.
 				notifier.EXPECT().ShouldSendNotification(mock.Anything).Return(true)
-				notifier.EXPECT().SendNotification(mock.Anything).Once()
-				expectSessionBatch(t, notifier, "SendNotification")
+				mock.InOrder(
+					expectSessionBatch(t, notifier, "SendNotification"),
+					notifier.EXPECT().SendNotification(mock.Anything).Once(),
+				)
 
 				params := RunUpdatesWithNotificationsParams{
 					Logger:                       newTestLogger(t),

@@ -345,33 +345,48 @@ func TestHandler_Handle_EmitsEvents(t *testing.T) {
 
 // TestHandler_Handle_Notifications verifies that a check holds back the
 // notifications its log lines would send until it ends. It then releases them
-// once.
+// once, also when the check fails.
 func TestHandler_Handle_Notifications(t *testing.T) {
 	t.Parallel()
 
-	var released int
-
-	notifier := mockCheck.NewMockNotifier(t)
-	notifier.EXPECT().HoldNotifications().Return(func() { released++ }).Once()
-
-	// The check runs while the notifier holds entries back.
-	check := func(_ context.Context, _, _ []string) ([]ContainerCheck, error) {
-		notifier.AssertNumberOfCalls(t, "HoldNotifications", 1)
-		assert.Zero(t, released, "the check's entries are released after it")
-
-		return []ContainerCheck{{Name: "c1"}}, nil
+	tests := []struct {
+		err        error
+		name       string
+		wantStatus int
+	}{
+		{name: "check succeeds", wantStatus: http.StatusOK},
+		{name: "check fails", err: errors.New("docker error"), wantStatus: http.StatusInternalServerError},
 	}
 
-	h := New(newTestLogger(t), check, 5*time.Minute, notifier, nil, events.ScanStartedData{})
-	app := fiber.New(fiber.Config{})
-	app.Post("/v1/check", h.Handle)
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
 
-	req := httptest.NewRequestWithContext(t.Context(), http.MethodPost, "/v1/check", nil)
-	resp, err := app.Test(req)
-	require.NoError(t, err)
+			var released int
 
-	defer resp.Body.Close()
+			notifier := mockCheck.NewMockNotifier(t)
+			notifier.EXPECT().HoldNotifications().Return(func() { released++ }).Once()
 
-	assert.Equal(t, http.StatusOK, resp.StatusCode)
-	assert.Equal(t, 1, released, "the check releases its entries once")
+			// The check runs while the notifier holds entries back.
+			check := func(_ context.Context, _, _ []string) ([]ContainerCheck, error) {
+				notifier.AssertNumberOfCalls(t, "HoldNotifications", 1)
+				assert.Zero(t, released, "the check's entries are released after it")
+
+				return []ContainerCheck{{Name: "c1"}}, tt.err
+			}
+
+			h := New(newTestLogger(t), check, 5*time.Minute, notifier, nil, events.ScanStartedData{})
+			app := fiber.New(fiber.Config{})
+			app.Post("/v1/check", h.Handle)
+
+			req := httptest.NewRequestWithContext(t.Context(), http.MethodPost, "/v1/check", nil)
+			resp, err := app.Test(req)
+			require.NoError(t, err)
+
+			defer resp.Body.Close()
+
+			assert.Equal(t, tt.wantStatus, resp.StatusCode)
+			assert.Equal(t, 1, released, "the check releases its entries once")
+		})
+	}
 }
