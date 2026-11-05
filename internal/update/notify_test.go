@@ -47,14 +47,15 @@ func defaultTestUpdateParams(filter types.Filter) updateParams.Params {
 
 // TestRunUpdatesWithNotifications_ScanCompletedCounts verifies that the
 // scan_completed event carries the same counts as the metric the session
-// returns. The session skips two containers in a dependency cycle, fails to
-// recreate one stale container and finds two fresh ones. Every count then has
-// its own value, which catches a count taken from the wrong field.
+// returns. The session skips three containers in a dependency cycle and finds
+// one fresh container. Of three stale containers, two fail to stop and one is
+// recreated. Every count then has its own value, which catches a count taken
+// from the wrong field.
 func TestRunUpdatesWithNotifications_ScanCompletedCounts(t *testing.T) {
 	t.Parallel()
 
-	// cycleMember returns a stale container that depends on the other member
-	// of a two-container cycle. The session skips both members.
+	// cycleMember returns a stale container that depends on the next member
+	// of a three-container cycle. The session skips every member.
 	cycleMember := func(name, dependsOn string) types.Container {
 		return mockUpdate.CreateMockContainerWithConfig(
 			name,
@@ -74,13 +75,21 @@ func TestRunUpdatesWithNotifications_ScanCompletedCounts(t *testing.T) {
 		&mockUpdate.TestData{
 			Containers: []types.Container{
 				cycleMember("cycle-a", "cycle-b"),
-				cycleMember("cycle-b", "cycle-a"),
-				mockUpdate.CreateMockContainer("broken", "broken", "image:latest", time.Now()),
-				mockUpdate.CreateMockContainer("fresh-a", "fresh-a", "image:latest", time.Now()),
-				mockUpdate.CreateMockContainer("fresh-b", "fresh-b", "image:latest", time.Now()),
+				cycleMember("cycle-b", "cycle-c"),
+				cycleMember("cycle-c", "cycle-a"),
+				mockUpdate.CreateMockContainer("stale-a", "stale-a", "image:latest", time.Now()),
+				mockUpdate.CreateMockContainer("stale-b", "stale-b", "image:latest", time.Now()),
+				mockUpdate.CreateMockContainer("stale-c", "stale-c", "image:latest", time.Now()),
+				mockUpdate.CreateMockContainer("fresh", "fresh", "image:latest", time.Now()),
 			},
-			Staleness:            map[string]bool{"broken": true, "fresh-a": false, "fresh-b": false},
-			CreateContainerError: errors.New("create failed"),
+			Staleness: map[string]bool{
+				"stale-a": true,
+				"stale-b": true,
+				"stale-c": true,
+				"fresh":   false,
+			},
+			StopContainerError:     errors.New("stop failed"),
+			StopContainerFailCount: 2,
 		},
 		false,
 		false,
@@ -96,6 +105,7 @@ func TestRunUpdatesWithNotifications_ScanCompletedCounts(t *testing.T) {
 		Update:           defaultTestUpdateParams(filters.NoFilter),
 	})
 	require.NotNil(t, metric)
+	assert.Equal(t, 1, metric.Updated)
 
 	// Events are published synchronously into the subscriber's buffer.
 	var received []events.Event
@@ -106,7 +116,7 @@ func TestRunUpdatesWithNotifications_ScanCompletedCounts(t *testing.T) {
 
 	require.Len(t, received, 2)
 	assert.Equal(t, "scan_completed", received[1].Type)
-	assert.Equal(t, events.ScanCompletedData{Scanned: 3, Updated: 0, Failed: 1, Skipped: 2}, received[1].Data)
+	assert.Equal(t, events.ScanCompletedData{Scanned: 4, Updated: 1, Failed: 2, Skipped: 3}, received[1].Data)
 	assert.Equal(t, events.ScanCompletedData{
 		Scanned: metric.Scanned,
 		Updated: metric.Updated,
