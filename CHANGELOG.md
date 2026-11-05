@@ -14,6 +14,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- Build the scan metric in the update session by @nicholas-fedor in [#3454](https://github.com/nicholas-fedor/watchtower/pull/3454)
 - Move UpdateParams to update/params by @nicholas-fedor in [#3452](https://github.com/nicholas-fedor/watchtower/pull/3452)
 - Build the scan_started payload from UpdateParams by @nicholas-fedor in [#3450](https://github.com/nicholas-fedor/watchtower/pull/3450)
 - Pass the update policy instead of update params by @nicholas-fedor in [#3442](https://github.com/nicholas-fedor/watchtower/pull/3442)
