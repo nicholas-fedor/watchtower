@@ -372,7 +372,8 @@ func lastCharacters(text []byte, limit int) []byte {
 //     characters and tag characters
 //
 // A lone carriage return becomes a newline. One before a newline is dropped.
-// Invalid UTF-8 becomes U+FFFD.
+// The Unicode line and paragraph separators also become newlines, since some
+// services show them as line breaks. Invalid UTF-8 becomes U+FFFD.
 //
 // Parameters:
 //   - raw: Output as the command wrote it.
@@ -393,6 +394,8 @@ func printableOutput(raw string) string {
 			if !strings.HasPrefix(raw[index:], "\n") {
 				out.WriteByte('\n')
 			}
+		case unicode.In(char, unicode.Zl, unicode.Zp):
+			out.WriteByte('\n')
 		case char == escape || (char >= 0x80 && char <= 0x9f):
 			index = escapeSequenceEnd(raw, index, char)
 		case (unicode.IsControl(char) && char != '\n' && char != '\t') || unicode.Is(unicode.Cf, char):

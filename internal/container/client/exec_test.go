@@ -12,36 +12,70 @@ import (
 
 	dockerClient "github.com/moby/moby/client"
 
+	mockContainer "github.com/nicholas-fedor/watchtower/internal/container/mocks"
 	"github.com/nicholas-fedor/watchtower/internal/testutil/modelfixture"
 )
 
 // TestExecuteCommand_TimeoutBoundsOutputCapture verifies that a command's
-// timeout also ends the read of its output, so a hook that never exits or closes
-// its output stops at the timeout instead of blocking the update.
+// timeout bounds starting the command and reading its output. The command
+// stops at the timeout instead of blocking the update when the daemon never
+// answers the attach. It also stops when the hook never exits or closes its
+// output.
 func TestExecuteCommand_TimeoutBoundsOutputCapture(t *testing.T) {
 	t.Parallel()
 
-	synctest.Test(t, func(t *testing.T) {
-		const execID = "hanging-exec-id"
+	const execID = "hanging-exec-id"
 
-		api := newDockerAPI(t)
-		api.EXPECT().ExecCreate(mock.Anything, mockContainerID, mock.Anything).
-			Return(dockerClient.ExecCreateResult{ID: execID}, nil).Once()
-		// The attach starts the exec. Its output never arrives and the stream
-		// never closes.
-		api.EXPECT().ExecAttach(mock.Anything, execID, dockerClient.ExecAttachOptions{TTY: true}).
-			Return(newExecOutput(t, nil), nil).Once()
-		api.EXPECT().ExecInspect(mock.Anything, execID, dockerClient.ExecInspectOptions{}).
-			Return(dockerClient.ExecInspectResult{ID: execID, Running: true}, nil).Once()
+	tests := []struct {
+		expect func(t *testing.T, api *mockContainer.MockAPIClient)
+		name   string
+	}{
+		{
+			name: "attach never answers",
+			expect: func(_ *testing.T, api *mockContainer.MockAPIClient) {
+				api.EXPECT().ExecAttach(mock.Anything, execID, dockerClient.ExecAttachOptions{TTY: true}).
+					RunAndReturn(func(ctx context.Context, _ string, _ dockerClient.ExecAttachOptions) (dockerClient.ExecAttachResult, error) {
+						<-ctx.Done()
 
-		start := time.Now()
+						return dockerClient.ExecAttachResult{}, ctx.Err()
+					}).Once()
+			},
+		},
+		{
+			name: "output never ends",
+			expect: func(t *testing.T, api *mockContainer.MockAPIClient) {
+				t.Helper()
 
-		_, err := (&client{log: newTestLogger(t), api: api}).
-			ExecuteCommand(t.Context(), modelfixture.Container(), "sleep infinity", 1, 0, 0)
+				// The attach starts the exec. Its output never arrives and the
+				// stream never closes.
+				api.EXPECT().ExecAttach(mock.Anything, execID, dockerClient.ExecAttachOptions{TTY: true}).
+					Return(newExecOutput(t, nil), nil).Once()
+				api.EXPECT().ExecInspect(mock.Anything, execID, dockerClient.ExecInspectOptions{}).
+					Return(dockerClient.ExecInspectResult{ID: execID, Running: true}, nil).Once()
+			},
+		},
+	}
 
-		require.ErrorIs(t, err, context.DeadlineExceeded)
-		assert.Equal(t, time.Minute, time.Since(start))
-	})
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			synctest.Test(t, func(t *testing.T) {
+				api := newDockerAPI(t)
+				api.EXPECT().ExecCreate(mock.Anything, mockContainerID, mock.Anything).
+					Return(dockerClient.ExecCreateResult{ID: execID}, nil).Once()
+				tt.expect(t, api)
+
+				start := time.Now()
+
+				_, err := (&client{log: newTestLogger(t), api: api}).
+					ExecuteCommand(t.Context(), modelfixture.Container(), "sleep infinity", 1, 0, 0)
+
+				require.ErrorIs(t, err, context.DeadlineExceeded)
+				assert.Equal(t, time.Minute, time.Since(start))
+			})
+		})
+	}
 }
 
 // TestTailBuffer verifies that the buffer keeps only the last bytes written to
@@ -126,6 +160,11 @@ func TestPrintableOutput(t *testing.T) {
 		{name: "newline and tab", raw: "a\tb\nc", want: "a\tb\nc"},
 		{name: "carriage return before newline", raw: "a\r\nb", want: "a\nb"},
 		{name: "lone carriage return", raw: "10%\r100%", want: "10%\n100%"},
+		{
+			name: "line and paragraph separators",
+			raw:  "a" + string(rune(0x2028)) + "b" + string(rune(0x2029)) + "c",
+			want: "a\nb\nc",
+		},
 		{name: "colour", raw: "\x1b[1;31mred\x1b[0m", want: "red"},
 		{name: "cursor movement", raw: "\x1b[2K\x1b[1Gdone", want: "done"},
 		{name: "window title ended by BEL", raw: "\x1b]0;title\atext", want: "text"},

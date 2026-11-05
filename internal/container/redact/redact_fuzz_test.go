@@ -95,11 +95,16 @@ func FuzzQueryKeyWords(f *testing.F) {
 }
 
 // FuzzText verifies that redacting command output never panics and changes
-// nothing on a second pass. A credential value written as a header line,
-// name=value pair, JSON field or URL password is always replaced.
+// nothing on a second pass. A credential value is always replaced in these
+// forms:
+//   - a header line
+//   - a name=value pair, quoted, listed with spaces, escaped or after another
+//     pair
+//   - a JSON field, also after a URL
+//   - a URL password
 //
-// The seed corpus covers plain text, each credential form and values with
-// quotes, equals signs and at signs. The regression seed under testdata/fuzz is
+// The seed corpus covers plain text and values with quotes, equals signs and
+// at signs. The regression seed under testdata/fuzz is
 // a value with a form feed. No credential form can carry one.
 func FuzzText(f *testing.F) {
 	for _, seed := range []string{"plain", "abc123", `p@ss"w=rd`, "ghp_abc", ""} {
@@ -124,7 +129,13 @@ func FuzzText(f *testing.F) {
 			"Authorization: Bearer " + secret,
 			"> X-Auth-Token: " + secret,
 			"DB_PASSWORD=" + secret,
+			"DB_PASSWORD=first " + secret,
+			`declare -x DB_PASSWORD="first ` + secret + `"`,
+			"export API_TOKEN='first " + secret + "'",
+			`x PASSWORD=first\"` + secret,
+			"user=bot password=" + secret,
 			`{"secret": "` + secret + `"}`,
+			`{"url":"https://example.com","password":"p@` + secret + `"}`,
 			"https://bot:" + secret + "@example.com/repo.git",
 		} {
 			if out := Text(text + "\n" + form); strings.Contains(out, secret) && !strings.Contains(text, secret) {

@@ -361,7 +361,22 @@ func TestText(t *testing.T) {
 		{name: "ordinary header", text: "Content-Type: text/plain", want: "Content-Type: text/plain"},
 		{name: "environment listing", text: "HOME=/root\nDB_PASSWORD=hunter2\nGITHUB_TOKEN=ghp_abc", want: "HOME=/root\nDB_PASSWORD=xxxxx\nGITHUB_TOKEN=xxxxx"},
 		{name: "query string", text: "GET /v1?access_token=abc&page=2", want: "GET /v1?access_token=xxxxx&page=2"},
+		{name: "listed value with spaces", text: "DB_PASSWORD=correct horse battery\nHOME=/root", want: "DB_PASSWORD=xxxxx\nHOME=/root"},
+		{name: "inline value ends at whitespace", text: "using token=abc failed", want: "using token=xxxxx failed"},
+		{name: "double-quoted value", text: `declare -x DB_PASSWORD="a \"b\" c" PATH="/bin"`, want: `declare -x DB_PASSWORD=xxxxx PATH="/bin"`},
+		{name: "single-quoted value", text: "+ export API_TOKEN='a b'", want: "+ export API_TOKEN=xxxxx"},
+		{name: "unterminated quote", text: "x SECRET=\"a b\nnext", want: "x SECRET=xxxxx\nnext"},
+		{name: "escaped quote in unquoted value", text: `x PASSWORD=ab\"cd done`, want: "x PASSWORD=xxxxx done"},
+		{name: "later pair on the same line", text: "user=bot password=hunter2", want: "user=bot password=xxxxx"},
+		{name: "value with equals signs", text: "x TOKEN=YWJj=ZA== done", want: "x TOKEN=xxxxx done"},
+		{name: "empty value", text: "x TOKEN= done", want: "x TOKEN= done"},
 		{name: "JSON field", text: `{"user":"bot","password":"p@ss\"word","id":1}`, want: `{"user":"bot","password":"xxxxx","id":1}`},
+		{
+			name: "JSON field after a URL",
+			text: `{"url":"https://bot:ghp_abc@github.com","password":"p@ss"}`,
+			want: `{"url":"https://xxxxx:xxxxx@github.com","password":"xxxxx"}`,
+		},
+		{name: "JSON field after a URL without user information", text: `{"url":"https://github.com","token":"a@b"}`, want: `{"url":"https://github.com","token":"xxxxx"}`},
 		{name: "look-alike names", text: "tokenizer=bpe\nauthor: jane", want: "tokenizer=bpe\nauthor: jane"},
 	}
 

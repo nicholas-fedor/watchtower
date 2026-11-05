@@ -20,16 +20,26 @@ const redactedValue = "xxxxx"
 // password that contains @ is matched whole.
 var userinfoInError = regexp.MustCompile(`://[^/?#\s]+@`)
 
-// Patterns for named values in command output. Group 1 is everything before
-// the value. Group 2 is the name.
+// Patterns for named values in command output.
 var (
 	// headerLine matches a "Name: value" line, such as the request headers
-	// curl -v prints after "> ".
+	// curl -v prints after "> ". Group 1 is everything before the value. Group
+	// 2 is the name.
 	headerLine = regexp.MustCompile(`(?m)^([ \t]*[<>]?[ \t]*([A-Za-z][A-Za-z0-9_-]*)[ \t]*:[ \t]*)\S.*$`)
-	// assignment matches name=value, as in an environment listing or a query string.
-	assignment = regexp.MustCompile(`(([A-Za-z_][A-Za-z0-9_.-]*)=)[^\s&;,'"]+`)
-	// jsonField matches "name": "value" in JSON.
+	// jsonField matches "name": "value" in JSON. Group 1 is everything before
+	// the value. Group 2 is the name.
 	jsonField = regexp.MustCompile(`("([A-Za-z_][A-Za-z0-9_.-]*)"[ \t]*:[ \t]*")(?:[^"\\]|\\.)*`)
+	// assignmentName matches the name and equals sign of name=value. Group 1 is
+	// the name.
+	assignmentName = regexp.MustCompile(`([A-Za-z_][A-Za-z0-9_.-]*)=`)
+	// quotedValue matches a quoted value at the start of text. In double
+	// quotes a backslash escapes the next character. An unterminated value
+	// runs to the end of its line.
+	quotedValue = regexp.MustCompile(`^(?:"(?:[^"\\\n]|\\.)*"?|'[^'\n]*'?)`)
+	// unquotedValue matches an unquoted value at the start of text. It ends at
+	// whitespace, a quote, &, ; or a comma. A backslash escapes the next
+	// character.
+	unquotedValue = regexp.MustCompile(`^(?:[^\s&;,'"\\]|\\.)*`)
 )
 
 // GitURL removes credentials and sensitive query values from a Git URL.
@@ -456,15 +466,17 @@ func Userinfo(msg, remote string) string {
 //     environment listing's "DB_PASSWORD=..." or a query's "token=..."
 //   - the value of a JSON field with a credential-like name
 //
+// A quoted name=value value is replaced with its quotes. An unquoted value
+// that starts its line, as in an environment listing, runs to the end of the
+// line. Inside a line it ends at whitespace.
+//
 // Parameters:
 //   - text: Command output.
 //
 // Returns:
 //   - string: text with those values replaced by xxxxx.
 func Text(text string) string {
-	text = userinfoInError.ReplaceAllString(text, redactedUserinfo)
-
-	for _, pattern := range []*regexp.Regexp{headerLine, assignment, jsonField} {
+	for _, pattern := range []*regexp.Regexp{headerLine, jsonField} {
 		text = pattern.ReplaceAllStringFunc(text, func(match string) string {
 			parts := pattern.FindStringSubmatch(match)
 			if !isSensitiveQueryKey(parts[2]) {
@@ -475,7 +487,61 @@ func Text(text string) string {
 		})
 	}
 
-	return text
+	// User information is matched last. Its pattern runs to the last @ before
+	// a slash or whitespace. Matched first, it could swallow a later field's
+	// name with part of its value.
+	return userinfoInError.ReplaceAllString(redactAssignments(text), redactedUserinfo)
+}
+
+// redactAssignments replaces the values of name=value pairs with a
+// credential-like name.
+//
+// The value of a name that is not credential-like is searched too. A later
+// pair on the same line is then still found.
+//
+// Parameters:
+//   - text: Command output.
+//
+// Returns:
+//   - string: text with those values replaced by xxxxx.
+func redactAssignments(text string) string {
+	var out strings.Builder
+
+	kept := 0
+
+	for _, match := range assignmentName.FindAllStringSubmatchIndex(text, -1) {
+		start, valueStart := match[0], match[1]
+		if start < kept || !isSensitiveQueryKey(text[match[2]:match[3]]) {
+			continue
+		}
+
+		rest := text[valueStart:]
+		lineStart := strings.LastIndexByte(text[:start], '\n') + 1
+
+		value := quotedValue.FindString(rest)
+
+		switch {
+		case value != "":
+		case strings.TrimLeft(text[lineStart:start], " \t") == "":
+			// A value in an environment listing may hold spaces.
+			value, _, _ = strings.Cut(rest, "\n")
+		default:
+			value = unquotedValue.FindString(rest)
+		}
+
+		if value == "" {
+			continue
+		}
+
+		out.WriteString(text[kept:valueStart])
+		out.WriteString(redactedValue)
+
+		kept = valueStart + len(value)
+	}
+
+	out.WriteString(text[kept:])
+
+	return out.String()
 }
 
 // ServiceURL returns a summary of a notification service URL that leaves out

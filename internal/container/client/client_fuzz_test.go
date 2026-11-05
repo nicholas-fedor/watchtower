@@ -12,8 +12,9 @@ import (
 // FuzzPrintableOutput checks the invariants of cleaned command output.
 //
 // The output is valid UTF-8. It has no control characters other than newline
-// and tab. It has no Unicode format characters. Cleaning it again changes
-// nothing. Printable input comes back unchanged.
+// and tab. It has no Unicode format characters or line and paragraph
+// separators. Cleaning it again changes nothing. Printable input comes back
+// unchanged.
 //
 // The seed corpus covers plain text, ANSI colours, window titles, clipboard
 // writes, hyperlinks, device control strings, 8-bit introducers, carriage
@@ -166,8 +167,9 @@ func FuzzTailBuffer(f *testing.F) {
 
 // FuzzReadExecOutput checks the output a hook's stream turns into.
 //
-// The output is valid UTF-8 on one line. It has no control characters other
-// than tab and no Unicode format characters, whatever the command wrote.
+// The output is valid UTF-8 on one line, whatever the command wrote. It has no
+// control characters other than tab. It has no Unicode format characters or
+// line and paragraph separators.
 //
 // The seed corpus covers empty output, several lines, escape sequences,
 // invalid UTF-8, credentials and output past the 2 KiB limit.
@@ -175,6 +177,7 @@ func FuzzReadExecOutput(f *testing.F) {
 	for _, seed := range []string{
 		"",
 		"line one\nline two\r\n",
+		"line one" + string(rune(0x2028)) + "line two",
 		"\x1b]0;title\a\x1b[31mred\x1b[0m\r100%",
 		"a\xffb\xc0\x9b",
 		"> Authorization: Bearer abc\nTOKEN=xyz",
@@ -209,8 +212,9 @@ func FuzzReadExecOutput(f *testing.F) {
 //   - char: Character to check.
 //
 // Returns:
-//   - bool: True for a Unicode format character or a control character other
-//     than newline and tab.
+//   - bool: True for a Unicode format character, a line or paragraph separator,
+//     or a control character other than newline and tab.
 func needsCleaning(char rune) bool {
-	return (unicode.IsControl(char) && char != '\n' && char != '\t') || unicode.Is(unicode.Cf, char)
+	return (unicode.IsControl(char) && char != '\n' && char != '\t') ||
+		unicode.In(char, unicode.Cf, unicode.Zl, unicode.Zp)
 }
