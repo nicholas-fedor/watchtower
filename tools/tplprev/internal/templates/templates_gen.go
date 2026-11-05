@@ -17,6 +17,10 @@ var Templates = map[string]string{
       {{- range .Restarted}}
 - {{.Name}} ({{.ImageName}}): {{.State}}
       {{- end -}}
+      {{- /* List stale containers (newer image not applied) */ -}}
+      {{- range .Stale}}
+- {{.Name}} ({{.ImageName}}): {{.State}}
+      {{- end -}}
       {{- /* List fresh containers (no update needed) */ -}}
       {{- range .Fresh}}
 - {{.Name}} ({{.ImageName}}): {{.State}}

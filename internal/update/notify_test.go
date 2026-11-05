@@ -3,6 +3,7 @@ package update
 import (
 	"context"
 	"errors"
+	"fmt"
 	"strings"
 	"sync"
 	"testing"
@@ -20,6 +21,7 @@ import (
 	"github.com/nicholas-fedor/watchtower/internal/container/labels"
 	"github.com/nicholas-fedor/watchtower/internal/observability/events"
 	"github.com/nicholas-fedor/watchtower/internal/observability/metrics"
+	"github.com/nicholas-fedor/watchtower/internal/observability/notify/format"
 	"github.com/nicholas-fedor/watchtower/internal/registry/ratelimit"
 	"github.com/nicholas-fedor/watchtower/internal/testutil/logcapture"
 	"github.com/nicholas-fedor/watchtower/internal/testutil/reportfixture"
@@ -794,33 +796,6 @@ func TestRunUpdates(t *testing.T) {
 			notifier.AssertExpectations(t)
 		})
 
-		t.Run("should handle monitor-only containers in stale list when notificationReport is true", func(t *testing.T) {
-			t.Parallel()
-
-			mockReport := mockTypes.NewMockReport(t)
-			mockContainer := mockTypes.NewMockContainerReport(t)
-
-			mockContainer.EXPECT().ID().Return(types.ContainerID("stale-id"))
-			mockContainer.EXPECT().Name().Return("stale-container")
-			mockContainer.EXPECT().IsMonitorOnly().Return(true)
-			mockContainer.EXPECT().Error().Return("")
-
-			mockReport.EXPECT().Updated().Return([]types.ContainerReport{})
-			mockReport.EXPECT().Restarted().Return([]types.ContainerReport{})
-			mockReport.EXPECT().Stale().Return([]types.ContainerReport{mockContainer})
-			mockReport.EXPECT().Scanned().Return([]types.ContainerReport{mockContainer})
-			mockReport.EXPECT().Failed().Return([]types.ContainerReport{})
-			mockReport.EXPECT().Skipped().Return([]types.ContainerReport{})
-			mockReport.EXPECT().Fresh().Return([]types.ContainerReport{})
-
-			notifier := mockTypes.NewMockNotifier(t)
-			notifier.EXPECT().ShouldSendNotification(mock.Anything).Return(true)
-			notifier.EXPECT().SendNotification(mock.Anything).Return()
-
-			sendSplitNotifications(newTestLogger(t), notifier, true, mockReport, []cleanup.RemovedImageInfo{})
-			notifier.AssertExpectations(t)
-		})
-
 		t.Run("should handle restarted containers when notificationReport is false", func(t *testing.T) {
 			t.Parallel()
 
@@ -862,34 +837,6 @@ func TestRunUpdates(t *testing.T) {
 			mockReport.EXPECT().Updated().Return([]types.ContainerReport{})
 			mockReport.EXPECT().Restarted().Return([]types.ContainerReport{mockContainer})
 			mockReport.EXPECT().Stale().Return([]types.ContainerReport{})
-			mockReport.EXPECT().Scanned().Return([]types.ContainerReport{mockContainer})
-			mockReport.EXPECT().Failed().Return([]types.ContainerReport{})
-			mockReport.EXPECT().Skipped().Return([]types.ContainerReport{})
-			mockReport.EXPECT().Fresh().Return([]types.ContainerReport{})
-
-			notifier := mockTypes.NewMockNotifier(t)
-			notifier.EXPECT().ShouldSendNotification(mock.Anything).Return(true)
-			notifier.EXPECT().SendNotification(mock.Anything).Return()
-
-			sendSplitNotifications(newTestLogger(t), notifier, false, mockReport, []cleanup.RemovedImageInfo{})
-			notifier.AssertExpectations(t)
-		})
-
-		t.Run("should handle monitor-only containers when notificationReport is false", func(t *testing.T) {
-			t.Parallel()
-
-			mockReport := mockTypes.NewMockReport(t)
-			mockContainer := mockTypes.NewMockContainerReport(t)
-
-			mockContainer.EXPECT().ID().Return(types.ContainerID("monitor-id"))
-			mockContainer.EXPECT().Name().Return("monitor-container")
-			mockContainer.EXPECT().ImageName().Return("monitor-image:latest")
-			mockContainer.EXPECT().IsMonitorOnly().Return(true)
-			mockContainer.EXPECT().Error().Return("")
-
-			mockReport.EXPECT().Updated().Return([]types.ContainerReport{})
-			mockReport.EXPECT().Restarted().Return([]types.ContainerReport{})
-			mockReport.EXPECT().Stale().Return([]types.ContainerReport{mockContainer})
 			mockReport.EXPECT().Scanned().Return([]types.ContainerReport{mockContainer})
 			mockReport.EXPECT().Failed().Return([]types.ContainerReport{})
 			mockReport.EXPECT().Skipped().Return([]types.ContainerReport{})
@@ -2180,4 +2127,46 @@ func Test_notifySkippedCooldownContainers(t *testing.T) {
 	assert.Equal(t, []types.ContainerReport{skipped}, single.SkippedReports)
 	assert.Equal(t, session.Updated(), single.UpdatedReports)
 	assert.True(t, notified[string(skipped.ID())])
+}
+
+// TestSendSplitNotifications_MonitorOnlyStale verifies that a split
+// notification for a monitor-only container with a newer image lists the
+// container as stale, as the session report does, in both split modes. The
+// container is the notification's focus. The default template lists it as
+// stale and does not report it as updated.
+func TestSendSplitNotifications_MonitorOnlyStale(t *testing.T) {
+	t.Parallel()
+
+	for _, notificationReport := range []bool{true, false} {
+		t.Run(fmt.Sprintf("notification report %t", notificationReport), func(t *testing.T) {
+			t.Parallel()
+
+			log := newTestLogger(t)
+
+			session := reportfixture.Report(state.StaleState)
+			monitored := session.Stale()[0]
+
+			notifier := mockTypes.NewMockNotifier(t)
+			notifier.EXPECT().ShouldSendNotification(mock.Anything).Return(true).Once()
+
+			var sent types.Report
+
+			notifier.EXPECT().SendNotification(mock.Anything).
+				Run(func(report types.Report) { sent = report }).Once()
+
+			sendSplitNotifications(log, notifier, notificationReport, session, nil)
+
+			single, ok := sent.(*state.SingleContainerReport)
+			require.True(t, ok)
+			assert.Same(t, monitored, single.Focus)
+			assert.Empty(t, single.UpdatedReports)
+			assert.Equal(t, session.Stale(), single.StaleReports)
+
+			rendered, err := format.Default(false).Render(log, format.Data{Report: sent})
+			require.NoError(t, err)
+			assert.Contains(t, rendered, "0 Updated")
+			assert.NotContains(t, rendered, "updated to")
+			assert.Contains(t, rendered, "- "+monitored.Name()+" ("+monitored.ImageName()+"): Stale")
+		})
+	}
 }

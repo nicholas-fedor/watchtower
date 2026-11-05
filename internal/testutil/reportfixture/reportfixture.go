@@ -38,6 +38,8 @@ const (
 	skippedIDPrefix = 41
 	// restartedIDPrefix prefixes restarted containers.
 	restartedIDPrefix = 51
+	// staleIDPrefix prefixes stale containers.
+	staleIDPrefix = 61
 )
 
 // idLength is the length of a full container or image ID.
@@ -55,6 +57,7 @@ var containerKinds = map[state.State]containerKind{
 	state.FreshState:     {idPrefix: freshIDPrefix, nameFormat: "frsh%d"},
 	state.SkippedState:   {idPrefix: skippedIDPrefix, nameFormat: "skip%d"},
 	state.RestartedState: {idPrefix: restartedIDPrefix, nameFormat: "rstr%d"},
+	state.StaleState:     {idPrefix: staleIDPrefix, nameFormat: "stal%d"},
 }
 
 // Error values recorded on the skipped and failed containers of a report.
@@ -68,7 +71,8 @@ var (
 // Report builds a report with one container for each given state, numbering
 // repeated states so every container has a unique ID and name. A skipped
 // container records "unpossible" as its reason. A failed container records
-// "accidentally the whole container" as its error.
+// "accidentally the whole container" as its error. A stale container is
+// monitor-only and has a newer image.
 //
 // Parameters:
 //   - states: Outcome of each container, in order.
@@ -105,7 +109,10 @@ func Report(states ...state.State) types.Report {
 			c, _ := Container(index, outcome)
 			progress.AddScanned(log, c, c.ImageID(), updateParams.Params{})
 			progress.MarkRestarted(log, c.ID())
-		case state.UnknownState, state.ScannedState, state.StaleState:
+		case state.StaleState:
+			c, newImage := Container(index, outcome)
+			progress.AddScanned(log, c, newImage, updateParams.Params{MonitorOnly: true})
+		case state.UnknownState, state.ScannedState:
 			// Reports never end in these intermediate states.
 			continue
 		}

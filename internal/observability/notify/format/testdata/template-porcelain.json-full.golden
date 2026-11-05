@@ -59,6 +59,14 @@
       "latest_image_id": "01d510000000",
       "state": "Restarted",
       "update_available": false
+    },
+    {
+      "name": "stal1",
+      "image": "mock/stal1:latest",
+      "image_id": "01d610000000",
+      "latest_image_id": "d0a610000000",
+      "state": "Stale",
+      "update_available": true
     }
   ]
 }

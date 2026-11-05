@@ -398,6 +398,34 @@ func buildSingleRestartedContainerReport(
 	}
 }
 
+// buildSingleStaleContainerReport creates a SingleContainerReport for a
+// monitor-only container with a newer image.
+//
+// The container is not updated, which keeps it out of the updated list. It
+// stays in the session's stale list, as in the full session report. It is also
+// the report's focus. The scanned, failed, skipped and fresh lists come from
+// the session.
+//
+// Parameters:
+//   - staleContainer: The monitor-only container with a newer image.
+//   - result: The full session report containing all container statuses.
+//
+// Returns:
+//   - *state.SingleContainerReport: A report focused on the stale container with session context.
+func buildSingleStaleContainerReport(
+	staleContainer types.ContainerReport,
+	result types.Report,
+) *state.SingleContainerReport {
+	return &state.SingleContainerReport{
+		Focus:          staleContainer,
+		ScannedReports: result.Scanned(),
+		FailedReports:  result.Failed(),
+		SkippedReports: result.Skipped(),
+		StaleReports:   result.Stale(),
+		FreshReports:   result.Fresh(),
+	}
+}
+
 // startNotifications initiates notification batching if a notifier is provided.
 //
 // It starts the notification process to group update messages, or logs a debug message
@@ -572,8 +600,8 @@ func sendNotifications(log *zerolog.Logger, notifier types.Notifier,
 //
 // It processes updated containers and sends either report-based or filtered entry notifications
 // based on the notificationReport flag, skipping invalid containers.
-// When notificationReport is true, it also sends notifications for monitor-only
-// containers from the stale list.
+// In both modes it also sends notifications for monitor-only containers from
+// the stale list.
 // To prevent duplicate notifications for the same container, a map is used to track
 // which container IDs have already been notified during this notification session.
 // This tracking mechanism ensures that even if a container appears in multiple lists
@@ -639,7 +667,6 @@ func sendSplitNotifications(log *zerolog.Logger, notifier types.Notifier,
 			include:       func(r types.ContainerReport) bool { return true },
 			buildReport:   buildSingleRestartedContainerReport,
 		})
-		// Monitor-only containers appear in Stale when notificationReport is true.
 		notifyContainers(notifyContainersParams{
 			log:           log,
 			notifier:      notifier,
@@ -649,7 +676,7 @@ func sendSplitNotifications(log *zerolog.Logger, notifier types.Notifier,
 			category:      "stale",
 			logBeforeSend: false,
 			include:       func(r types.ContainerReport) bool { return r.IsMonitorOnly() },
-			buildReport:   buildSingleContainerReport,
+			buildReport:   buildSingleStaleContainerReport,
 		})
 
 		// Cooldown-skipped containers use a different report shape and stay inline.
@@ -711,7 +738,7 @@ func sendSplitNotifications(log *zerolog.Logger, notifier types.Notifier,
 			category:      "monitor-only stale",
 			logBeforeSend: true,
 			include:       func(r types.ContainerReport) bool { return r.IsMonitorOnly() },
-			buildReport:   buildSingleContainerReport,
+			buildReport:   buildSingleStaleContainerReport,
 		})
 
 		notifySkippedCooldownContainers(log, notifier, notified, result)

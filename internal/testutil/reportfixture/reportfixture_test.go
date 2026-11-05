@@ -22,6 +22,7 @@ func TestReport(t *testing.T) {
 		state.FreshState,
 		state.SkippedState,
 		state.RestartedState,
+		state.StaleState,
 	)
 
 	assert.Len(t, report.Updated(), 2)
@@ -29,6 +30,8 @@ func TestReport(t *testing.T) {
 	assert.Len(t, report.Fresh(), 1)
 	assert.Len(t, report.Skipped(), 1)
 	assert.Len(t, report.Restarted(), 1)
+	require.Len(t, report.Stale(), 1)
+	assert.True(t, report.Stale()[0].IsMonitorOnly())
 
 	ids := map[types.ContainerID]bool{}
 	for _, c := range report.All() {
@@ -53,5 +56,5 @@ func TestContainer(t *testing.T) {
 	assert.Equal(t, "d0a11", string(newImage)[:5])
 
 	assert.Panics(t, func() { Container(maxContainersPerState, state.UpdatedState) })
-	assert.Panics(t, func() { Container(0, state.StaleState) })
+	assert.Panics(t, func() { Container(0, state.ScannedState) })
 }

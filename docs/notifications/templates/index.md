@@ -156,7 +156,7 @@ Found new image: repo/image:latest (abcdef123456)
 
 When the [`notification-report`](#notification_report) configuration option is set, the template processes a `format.Data` struct containing a session report and log entries.
 
-```go title="Default Report Template"
+```go title="Example Report Template"
 {{- if .Report -}}
   {{- with .Report -}}
     {{len .Scanned}} Scanned, {{len .Updated}} Updated, {{len .Restarted}} Restarted, {{len .Failed}} Failed
@@ -186,7 +186,8 @@ Logs:
 {{- end -}}
 ```
 
-- This template generates a summary of container statuses (scanned, updated, failed, etc.) followed by logs, used for notifications like email or Slack messages.
+- This example generates a summary of container statuses followed by logs, for notifications such as email or Slack messages.
+- The built-in `default` report template lists each container by its status instead of the logs. A container with a newer image that Watchtower did not apply is listed as `Stale`. Examples are a monitor-only container and a skipped Watchtower self-update.
 
 ### Example Usage
 <!-- markdownlint-disable -->
@@ -286,7 +287,6 @@ Logs:
 
 ## Git and OCI report fields
 
-Default templates are unchanged.
 Custom report templates can use these fields on each container.
 They are populated even when Git monitoring is off.
 
@@ -325,7 +325,7 @@ Because the two versions are separate fields, a template can print the transitio
 https://github.com/org/app/releases/tag/v1.2.3
 ```
 
-The built-in `default` report template is unchanged and still prints image IDs, the ref, and the changelog on an updated container when they are set:
+The built-in `default` report template prints image IDs, the ref, and the changelog on an updated container when they are set:
 
 ```text
 - /app (myapp:latest): abcdef12 updated to 34567890 ref v1.2.4 https://github.com/org/app/releases

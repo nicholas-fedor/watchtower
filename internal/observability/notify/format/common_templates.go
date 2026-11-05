@@ -155,12 +155,14 @@ var commonTemplates = map[string]string{
 	// If .Report exists, displays counts of scanned/updated/failed containers, then lists details for each category.
 	// Updated containers show name, image, and old/new image IDs.
 	// Restarted containers show name, image, and state.
+	// Stale containers have a newer image that was not applied, such as a
+	// monitor-only container. They show name, image, and state.
 	// Fresh containers (no update needed) show name, image, and state.
 	// Skipped containers show name, image, state, and error reason.
 	// Failed containers show name, image, state, and error details.
 	// If no .Report, falls back to listing each .Entries message on its own line, followed by
 	// ": <error>" when the entry has an error field.
-	// Expects .Report with Scanned, Updated, Restarted, Failed, Fresh, Skipped slices of containers.
+	// Expects .Report with Scanned, Updated, Restarted, Stale, Failed, Fresh, Skipped slices of containers.
 	// Each container has Name, ImageName, State, Error, CurrentImageID, LatestImageID fields.
 	`default`: `
 {{- if .Report -}}
@@ -173,6 +175,10 @@ var commonTemplates = map[string]string{
       {{- end -}}
       {{- /* List restarted containers */ -}}
       {{- range .Restarted}}
+- {{.Name}} ({{.ImageName}}): {{.State}}
+      {{- end -}}
+      {{- /* List stale containers (newer image not applied) */ -}}
+      {{- range .Stale}}
 - {{.Name}} ({{.ImageName}}): {{.State}}
       {{- end -}}
       {{- /* List fresh containers (no update needed) */ -}}
