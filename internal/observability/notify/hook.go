@@ -6,7 +6,7 @@ import (
 	"github.com/nicholas-fedor/watchtower/internal/observability/notify/format"
 )
 
-// Run implements the [zerolog.Hook] interface for *shoutrrrTypeNotifier.
+// Run implements the [zerolog.Hook] interface for *Notifier.
 //
 // It queues or immediately sends log events as notifications.
 //
@@ -31,7 +31,7 @@ import (
 //   - event: Zerolog event (fields are read from the in-progress JSON buffer).
 //   - level: Event level.
 //   - message: Log message.
-func (n *shoutrrrTypeNotifier) Run(event *zerolog.Event, level zerolog.Level, message string) {
+func (n *Notifier) Run(event *zerolog.Event, level zerolog.Level, message string) {
 	if n.closed.Load() {
 		return
 	}

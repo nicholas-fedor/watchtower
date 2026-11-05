@@ -177,7 +177,6 @@ func writeStartupMessage(opts routes.Options) {
 	startup.Filtering = opts.FilterDesc
 	startup.Scope = opts.Scope
 	startup.Client = opts.Client
-	startup.Notifier = opts.Notifier
 	startup.Version = opts.Version
 	opts.WriteStartupMessage(startup)
 }

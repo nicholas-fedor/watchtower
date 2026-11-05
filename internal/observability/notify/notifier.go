@@ -47,11 +47,11 @@ var errUnknownNotificationType = errors.New("unknown notification type")
 //   - cfg: Notification settings from settings.Load (Config.Notify).
 //
 // Returns:
-//   - types.Notifier: Configured notifier instance.
+//   - *Notifier: Configured notifier.
 //   - error: Non-nil when the notifications level is invalid or the template
 //     file cannot be read. Also non-nil when a legacy notification type cannot
 //     be converted or Shoutrrr rejects a URL.
-func NewNotifier(log *zerolog.Logger, cfg notifyConfig.Notify) (types.Notifier, error) {
+func NewNotifier(log *zerolog.Logger, cfg notifyConfig.Notify) (*Notifier, error) {
 	if log == nil {
 		panic("notify: log is required")
 	}

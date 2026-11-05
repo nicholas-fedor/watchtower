@@ -22,6 +22,23 @@ import (
 	"github.com/nicholas-fedor/watchtower/pkg/types"
 )
 
+// Notifier sends the notifications of an update session.
+type Notifier interface {
+	// StartNotification starts collecting log entries for a notification.
+	// When suppressSummary is true, entries collected before it are dropped
+	// instead of sent.
+	StartNotification(suppressSummary bool)
+	// SendNotification sends the collected entries with report. A split
+	// report's notification carries only its container's entries.
+	SendNotification(report types.Report)
+	// Flush sends the collected entries without a report. Later entries are
+	// sent as they are logged until the next StartNotification.
+	Flush()
+	// ShouldSendNotification reports whether report is worth a notification at
+	// the configured notifications level.
+	ShouldSendNotification(report types.Report) bool
+}
+
 // RunUpdatesWithNotificationsParams holds runtime dependencies and update policy.
 //
 // Update carries a complete [updateParams.Params] snapshot built from the
@@ -30,7 +47,7 @@ type RunUpdatesWithNotificationsParams struct {
 	// Client is the Docker client for container operations.
 	Client containerClient.Client
 	// Notifier sends update status messages to configured channels.
-	Notifier types.Notifier
+	Notifier Notifier
 	// Logger is the process logger for this update session. Required and must be non-nil.
 	Logger *zerolog.Logger
 	// GitClient inspects remotes and clones repositories when the Git watcher is used.
@@ -264,7 +281,7 @@ func RunUpdatesWithNotifications(
 // Returns:
 //   - *metrics.Metric: A metric marked as a failed scan, with the counts of the partial report
 //     on error, or zero counts when there is no report. Nil on success.
-func handleUpdateResult(log *zerolog.Logger, result types.Report, err error, notifier types.Notifier) *metrics.Metric {
+func handleUpdateResult(log *zerolog.Logger, result types.Report, err error, notifier Notifier) *metrics.Metric {
 	// Check for errors during update execution
 	if err != nil {
 		event := log.Error().Err(err)
@@ -274,13 +291,17 @@ func handleUpdateResult(log *zerolog.Logger, result types.Report, err error, not
 
 		event.Msg(logging.UpdateFailed)
 
-		// A nil result sends the batch without a report, so report templates list its entries.
-		if notifier != nil {
-			notifier.SendNotification(result)
+		if result == nil {
+			// Without a report, report templates list the batch's entries.
+			if notifier != nil {
+				notifier.Flush()
+			}
+
+			return &metrics.Metric{ScanFailed: true}
 		}
 
-		if result == nil {
-			return &metrics.Metric{ScanFailed: true}
+		if notifier != nil {
+			notifier.SendNotification(result)
 		}
 
 		metric := newScanMetric(result)
@@ -330,7 +351,7 @@ func endPanickedSession(
 	// Without a report, report templates list the batch's entries, so the
 	// panic entry is in the message. A zero-count report would hide it.
 	if params.Notifier != nil {
-		params.Notifier.SendNotification(nil)
+		params.Notifier.Flush()
 	}
 
 	if params.EventBroadcaster != nil {
@@ -355,7 +376,7 @@ func endPanickedSession(
 // Parameters:
 //   - notifier: The notification system instance for sending update status messages.
 //   - notificationSplitByContainer: Boolean flag indicating whether notifications are split by container.
-func startNotifications(log *zerolog.Logger, notifier types.Notifier, notificationSplitByContainer bool) {
+func startNotifications(log *zerolog.Logger, notifier Notifier, notificationSplitByContainer bool) {
 	if notifier != nil {
 		notifier.StartNotification(notificationSplitByContainer)
 	} else {
@@ -500,7 +521,7 @@ func logUpdateReport(log *zerolog.Logger, result types.Report) {
 //   - notificationReport: Boolean flag enabling report-based notifications.
 //   - result: The report containing the results of the update operation.
 //   - cleanedImages: Slice of successfully cleaned image info.
-func sendNotifications(log *zerolog.Logger, notifier types.Notifier,
+func sendNotifications(log *zerolog.Logger, notifier Notifier,
 	notificationSplitByContainer, notificationReport bool,
 	result types.Report,
 	cleanedImages []cleanup.RemovedImageInfo,
@@ -536,7 +557,7 @@ func sendNotifications(log *zerolog.Logger, notifier types.Notifier,
 //   - notificationReport: Boolean flag enabling report-based notifications.
 //   - result: The report containing the results of the update operation.
 //   - cleanedImages: Slice of successfully cleaned image info.
-func sendSplitNotifications(log *zerolog.Logger, notifier types.Notifier,
+func sendSplitNotifications(log *zerolog.Logger, notifier Notifier,
 	notificationReport bool,
 	result types.Report,
 	cleanedImages []cleanup.RemovedImageInfo,
@@ -624,7 +645,7 @@ func sendSplitNotifications(log *zerolog.Logger, notifier types.Notifier,
 
 // notifyContainersParams groups inputs for notifyContainers.
 type notifyContainersParams struct {
-	notifier      types.Notifier
+	notifier      Notifier
 	result        types.Report
 	log           *zerolog.Logger
 	notified      map[string]bool

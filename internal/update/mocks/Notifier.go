@@ -6,7 +6,6 @@ package mocks
 
 import (
 	"github.com/nicholas-fedor/watchtower/pkg/types"
-	"github.com/rs/zerolog"
 	mock "github.com/stretchr/testify/mock"
 )
 
@@ -46,167 +45,35 @@ func (_m *MockNotifier) EXPECT() *MockNotifier_Expecter {
 	return &MockNotifier_Expecter{mock: &_m.Mock}
 }
 
-// Close provides a mock function for the type MockNotifier
-func (_mock *MockNotifier) Close() {
+// Flush provides a mock function for the type MockNotifier
+func (_mock *MockNotifier) Flush() {
 	_mock.Called()
 	return
 }
 
-// MockNotifier_Close_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'Close'
-type MockNotifier_Close_Call struct {
+// MockNotifier_Flush_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'Flush'
+type MockNotifier_Flush_Call struct {
 	*mock.Call
 }
 
-// Close is a helper method to define mock.On call
-func (_e *MockNotifier_Expecter) Close() *MockNotifier_Close_Call {
-	return &MockNotifier_Close_Call{Call: _e.mock.On("Close")}
+// Flush is a helper method to define mock.On call
+func (_e *MockNotifier_Expecter) Flush() *MockNotifier_Flush_Call {
+	return &MockNotifier_Flush_Call{Call: _e.mock.On("Flush")}
 }
 
-func (_c *MockNotifier_Close_Call) Run(run func()) *MockNotifier_Close_Call {
+func (_c *MockNotifier_Flush_Call) Run(run func()) *MockNotifier_Flush_Call {
 	_c.Call.Run(func(args mock.Arguments) {
 		run()
 	})
 	return _c
 }
 
-func (_c *MockNotifier_Close_Call) Return() *MockNotifier_Close_Call {
+func (_c *MockNotifier_Flush_Call) Return() *MockNotifier_Flush_Call {
 	_c.Call.Return()
 	return _c
 }
 
-func (_c *MockNotifier_Close_Call) RunAndReturn(run func()) *MockNotifier_Close_Call {
-	_c.Run(run)
-	return _c
-}
-
-// GetNames provides a mock function for the type MockNotifier
-func (_mock *MockNotifier) GetNames() []string {
-	ret := _mock.Called()
-
-	if len(ret) == 0 {
-		panic("no return value specified for GetNames")
-	}
-
-	var r0 []string
-	if returnFunc, ok := ret.Get(0).(func() []string); ok {
-		r0 = returnFunc()
-	} else {
-		if ret.Get(0) != nil {
-			r0 = ret.Get(0).([]string)
-		}
-	}
-	return r0
-}
-
-// MockNotifier_GetNames_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'GetNames'
-type MockNotifier_GetNames_Call struct {
-	*mock.Call
-}
-
-// GetNames is a helper method to define mock.On call
-func (_e *MockNotifier_Expecter) GetNames() *MockNotifier_GetNames_Call {
-	return &MockNotifier_GetNames_Call{Call: _e.mock.On("GetNames")}
-}
-
-func (_c *MockNotifier_GetNames_Call) Run(run func()) *MockNotifier_GetNames_Call {
-	_c.Call.Run(func(args mock.Arguments) {
-		run()
-	})
-	return _c
-}
-
-func (_c *MockNotifier_GetNames_Call) Return(strings []string) *MockNotifier_GetNames_Call {
-	_c.Call.Return(strings)
-	return _c
-}
-
-func (_c *MockNotifier_GetNames_Call) RunAndReturn(run func() []string) *MockNotifier_GetNames_Call {
-	_c.Call.Return(run)
-	return _c
-}
-
-// GetURLs provides a mock function for the type MockNotifier
-func (_mock *MockNotifier) GetURLs() []string {
-	ret := _mock.Called()
-
-	if len(ret) == 0 {
-		panic("no return value specified for GetURLs")
-	}
-
-	var r0 []string
-	if returnFunc, ok := ret.Get(0).(func() []string); ok {
-		r0 = returnFunc()
-	} else {
-		if ret.Get(0) != nil {
-			r0 = ret.Get(0).([]string)
-		}
-	}
-	return r0
-}
-
-// MockNotifier_GetURLs_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'GetURLs'
-type MockNotifier_GetURLs_Call struct {
-	*mock.Call
-}
-
-// GetURLs is a helper method to define mock.On call
-func (_e *MockNotifier_Expecter) GetURLs() *MockNotifier_GetURLs_Call {
-	return &MockNotifier_GetURLs_Call{Call: _e.mock.On("GetURLs")}
-}
-
-func (_c *MockNotifier_GetURLs_Call) Run(run func()) *MockNotifier_GetURLs_Call {
-	_c.Call.Run(func(args mock.Arguments) {
-		run()
-	})
-	return _c
-}
-
-func (_c *MockNotifier_GetURLs_Call) Return(strings []string) *MockNotifier_GetURLs_Call {
-	_c.Call.Return(strings)
-	return _c
-}
-
-func (_c *MockNotifier_GetURLs_Call) RunAndReturn(run func() []string) *MockNotifier_GetURLs_Call {
-	_c.Call.Return(run)
-	return _c
-}
-
-// RegisterHook provides a mock function for the type MockNotifier
-func (_mock *MockNotifier) RegisterHook(log *zerolog.Logger) {
-	_mock.Called(log)
-	return
-}
-
-// MockNotifier_RegisterHook_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'RegisterHook'
-type MockNotifier_RegisterHook_Call struct {
-	*mock.Call
-}
-
-// RegisterHook is a helper method to define mock.On call
-//   - log *zerolog.Logger
-func (_e *MockNotifier_Expecter) RegisterHook(log any) *MockNotifier_RegisterHook_Call {
-	return &MockNotifier_RegisterHook_Call{Call: _e.mock.On("RegisterHook", log)}
-}
-
-func (_c *MockNotifier_RegisterHook_Call) Run(run func(log *zerolog.Logger)) *MockNotifier_RegisterHook_Call {
-	_c.Call.Run(func(args mock.Arguments) {
-		var arg0 *zerolog.Logger
-		if args[0] != nil {
-			arg0 = args[0].(*zerolog.Logger)
-		}
-		run(
-			arg0,
-		)
-	})
-	return _c
-}
-
-func (_c *MockNotifier_RegisterHook_Call) Return() *MockNotifier_RegisterHook_Call {
-	_c.Call.Return()
-	return _c
-}
-
-func (_c *MockNotifier_RegisterHook_Call) RunAndReturn(run func(log *zerolog.Logger)) *MockNotifier_RegisterHook_Call {
+func (_c *MockNotifier_Flush_Call) RunAndReturn(run func()) *MockNotifier_Flush_Call {
 	_c.Run(run)
 	return _c
 }

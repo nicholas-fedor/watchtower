@@ -117,6 +117,12 @@ func recoverPanics(log *zerolog.Logger) cron.JobWrapper {
 	}
 }
 
+// Notifier is the notification system the scheduler closes when it stops.
+type Notifier interface {
+	// Close sends the messages waiting to be sent and stops the notifier.
+	Close()
+}
+
 // ScheduleDeps holds dependencies for scheduled update runs.
 //
 // BaseParams must be a complete [updateParams.Params] snapshot built from the
@@ -125,7 +131,7 @@ func recoverPanics(log *zerolog.Logger) cron.JobWrapper {
 // A tick can disable self-updates, but never enables them when BaseParams disables them.
 type ScheduleDeps struct {
 	// Notifier is closed on schedule shutdown. Prefer Startup.Notifier for messaging.
-	Notifier types.Notifier
+	Notifier Notifier
 	// Logger is the process logger for scheduled runs. Required and must be non-nil.
 	Logger *zerolog.Logger
 	// Filter determines which containers are updated.

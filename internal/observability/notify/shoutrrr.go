@@ -32,13 +32,14 @@ type router interface {
 	Send(message string, params *shoutrrrTypes.Params) []error
 }
 
-// shoutrrrTypeNotifier manages Shoutrrr notifications.
+// Notifier sends notifications through Shoutrrr.
 //
-// It handles queuing, templating, and sending with delay.
-// Uses mutex for thread-safe access to entries and sync.Once for idempotent operations.
-// Implements zerolog.Hook so log events are pushed via Run.
-type shoutrrrTypeNotifier struct {
-	Router   router                // Router for sending messages.
+// It receives log events as a [zerolog.Hook] and queues them. A send renders
+// the queued events with the notification template and delivers the message
+// after the configured delay. Once [Notifier.RegisterHook] has returned, its
+// methods are safe for concurrent use. [NewNotifier] builds it.
+type Notifier struct {
+	sender   router                // Router for sending messages.
 	template *format.Template      // Template for message formatting.
 	messages chan string           // Channel for message queuing.
 	done     chan struct{}         // Signal for send completion.
@@ -53,7 +54,7 @@ type shoutrrrTypeNotifier struct {
 	// Concurrent application Logs are serialized only by entriesMutex on queue access.
 	localLog     *zerolog.Logger
 	data         format.StaticData // Static notification data.
-	Urls         []string          // Notification service URLs.
+	urls         []string          // Notification service URLs.
 	entries      []*format.Entry   // Queued log entries.
 	delay        time.Duration     // Delay between sends.
 	entriesMutex sync.RWMutex      // Mutex for thread-safe access to entries.
@@ -89,21 +90,13 @@ func getScheme(url string) string {
 //
 // Returns:
 //   - []string: List of schemes from URLs.
-func (n *shoutrrrTypeNotifier) GetNames() []string {
-	names := make([]string, len(n.Urls))
-	for i, u := range n.Urls {
+func (n *Notifier) GetNames() []string {
+	names := make([]string, len(n.urls))
+	for i, u := range n.urls {
 		names[i] = getScheme(u)
 	}
 
 	return names
-}
-
-// GetURLs returns the configured service URLs.
-//
-// Returns:
-//   - []string: List of URLs.
-func (n *shoutrrrTypeNotifier) GetURLs() []string {
-	return n.Urls
 }
 
 // RegisterHook attaches this notifier as a zerolog.Hook on the given logger instance.
@@ -115,7 +108,7 @@ func (n *shoutrrrTypeNotifier) GetURLs() []string {
 //
 // Parameters:
 //   - log: Process logger pointer. Replaced with the hooked instance.
-func (n *shoutrrrTypeNotifier) RegisterHook(log *zerolog.Logger) {
+func (n *Notifier) RegisterHook(log *zerolog.Logger) {
 	if log == nil {
 		return
 	}
@@ -131,7 +124,7 @@ func (n *shoutrrrTypeNotifier) RegisterHook(log *zerolog.Logger) {
 		n.localLog = &local
 
 		n.localLog.Debug().
-			Strs("urls", redact.ServiceURLs(n.Urls)).
+			Strs("urls", redact.ServiceURLs(n.urls)).
 			Msg("Added Shoutrrr notifier as zerolog hook, starting notification goroutine")
 
 		// Send using a separate goroutine to avoid blocking the main process.
@@ -152,7 +145,7 @@ func (n *shoutrrrTypeNotifier) RegisterHook(log *zerolog.Logger) {
 //   - delay: Delay between sends.
 //
 // Returns:
-//   - *shoutrrrTypeNotifier: Initialized notifier.
+//   - *Notifier: Initialized notifier.
 func createNotifier(
 	log *zerolog.Logger,
 	sender router,
@@ -162,7 +155,7 @@ func createNotifier(
 	legacy bool,
 	data format.StaticData,
 	delay time.Duration,
-) *shoutrrrTypeNotifier {
+) *Notifier {
 	// Child logger that must never re-enter the notification hook.
 	local := log.With().Str("notify", "no").Logger()
 	localLog := &local
@@ -182,9 +175,9 @@ func createNotifier(
 		params.SetTitle(data.Title)
 	}
 
-	return &shoutrrrTypeNotifier{
-		Urls:   urls,   // Notification service URLs.
-		Router: sender, // Router for sending messages.
+	return &Notifier{
+		urls:   urls,   // Notification service URLs.
+		sender: sender, // Router for sending messages.
 		messages: make(
 			chan string,
 			messageChannelBufferSize,
@@ -213,7 +206,7 @@ func createNotifier(
 // delay. Each send is bounded by its service's time budget in Shoutrrr. Close
 // returns at once when no goroutine was started. Messages sent after Close are
 // dropped.
-func (n *shoutrrrTypeNotifier) Close() {
+func (n *Notifier) Close() {
 	log := n.ll()
 
 	n.closeOnce.Do(func() {
@@ -241,7 +234,7 @@ func (n *shoutrrrTypeNotifier) Close() {
 //
 // Returns:
 //   - *zerolog.Logger: Child logger with notify=no, or a nop logger when unset.
-func (n *shoutrrrTypeNotifier) ll() *zerolog.Logger {
+func (n *Notifier) ll() *zerolog.Logger {
 	if n != nil && n.localLog != nil {
 		return n.localLog
 	}

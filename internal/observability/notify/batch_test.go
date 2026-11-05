@@ -9,15 +9,16 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"github.com/nicholas-fedor/watchtower/internal/observability/logging"
 	"github.com/nicholas-fedor/watchtower/internal/observability/notify/format"
 	"github.com/nicholas-fedor/watchtower/internal/testutil/reportfixture"
 	"github.com/nicholas-fedor/watchtower/internal/update/state"
 	"github.com/nicholas-fedor/watchtower/pkg/types"
 )
 
-// TestSendNotification_Batching verifies that SendNotification sends a
-// batch only when it holds at least one message.
-func TestSendNotification_Batching(t *testing.T) {
+// TestNotifier_FlushBatching verifies that Flush sends a batch only when it
+// holds at least one message.
+func TestNotifier_FlushBatching(t *testing.T) {
 	t.Parallel()
 
 	t.Run("no messages are queued", func(t *testing.T) {
@@ -37,8 +38,10 @@ func TestSendNotification_Batching(t *testing.T) {
 				format.StaticData{},
 				time.Duration(0),
 			)
+			// With the worker running, a message that Flush sent would reach the log.
+			shoutrrr.RegisterHook(log)
 			shoutrrr.StartNotification(false)
-			shoutrrr.SendNotification(nil)
+			shoutrrr.Flush()
 			shoutrrr.Close()
 			assert.NotContains(t, logBuffer.String(), `Shoutrrr:`)
 		})
@@ -66,7 +69,7 @@ func TestSendNotification_Batching(t *testing.T) {
 
 			shoutrrr.StartNotification(false)
 			log.Info().Msg("This log message is sponsored by ContainrrrVPN")
-			shoutrrr.SendNotification(nil)
+			shoutrrr.Flush()
 			require.Eventually(t, func() bool {
 				return strings.Contains(logBuffer.String(), `Shoutrrr: This log message is sponsored by ContainrrrVPN`)
 			}, 5*time.Second, 10*time.Millisecond)
@@ -340,4 +343,34 @@ func TestSendNotification_CooldownFocusWithOneContextContainer(t *testing.T) {
 			assert.NotContains(t, sent[0], "Found new image")
 		})
 	}
+}
+
+// TestNotifier_Flush verifies that Flush sends every queued entry in one
+// notification without a report and empties the queue. Two containers that
+// share an image each log "Found new image". The notification carries that
+// message once.
+func TestNotifier_Flush(t *testing.T) {
+	t.Parallel()
+
+	foundNewImage := map[string]any{"image": "mock/app:latest", "new_id": "sha256:new"}
+
+	n := newBatchingNotifier(t, []*format.Entry{
+		{Message: logging.FoundNewImage, Data: withContainer(foundNewImage, "app1")},
+		{Message: logging.FoundNewImage, Data: withContainer(foundNewImage, "app2")},
+		{Message: logging.StoppingContainer, Data: map[string]any{"container": "app1"}},
+	})
+
+	n.Flush()
+
+	n.entriesMutex.RLock()
+	remaining := n.entries
+	n.entriesMutex.RUnlock()
+
+	// A nil queue ends batching, so later messages are sent as they are logged.
+	assert.Nil(t, remaining)
+
+	sent := sentMessages(n)
+	assert.Equal(t, []string{
+		"Found new image: mock/app:latest (sha256:new)\nStopped stale container: app1 (unknown)",
+	}, sent)
 }

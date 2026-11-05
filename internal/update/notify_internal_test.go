@@ -89,8 +89,8 @@ func Test_handleUpdateResult(t *testing.T) {
 	t.Run("should send no report when error occurs without a report", func(t *testing.T) {
 		t.Parallel()
 
-		mockNotifier := mockTypes.NewMockNotifier(t)
-		mockNotifier.EXPECT().SendNotification(nil).Times(1)
+		mockNotifier := mockUpdate.NewMockNotifier(t)
+		mockNotifier.EXPECT().Flush().Times(1)
 
 		// Call handleUpdateResult with an error and the mock notifier
 		err := errors.New("dependency resolution error")
@@ -120,8 +120,8 @@ func Test_handleUpdateResult(t *testing.T) {
 
 				log, buf := logcapture.NewJSON(zerolog.DebugLevel)
 
-				mockNotifier := mockTypes.NewMockNotifier(t)
-				mockNotifier.EXPECT().SendNotification(nil).Times(1)
+				mockNotifier := mockUpdate.NewMockNotifier(t)
+				mockNotifier.EXPECT().Flush().Times(1)
 
 				handleUpdateResult(log, nil, tt.err, mockNotifier)
 
@@ -144,7 +144,7 @@ func Test_handleUpdateResult(t *testing.T) {
 		mockReport.EXPECT().Restarted().Return(nil)
 		mockReport.EXPECT().Skipped().Return(nil)
 
-		mockNotifier := mockTypes.NewMockNotifier(t)
+		mockNotifier := mockUpdate.NewMockNotifier(t)
 		mockNotifier.EXPECT().SendNotification(mockReport).Times(1)
 
 		err := errors.New("rolling restart canceled")
@@ -164,7 +164,7 @@ func Test_handleUpdateResult(t *testing.T) {
 		t.Parallel()
 
 		// Create a mock notifier with no expectations (will fail if any method is called)
-		mockNotifier := mockTypes.NewMockNotifier(t)
+		mockNotifier := mockUpdate.NewMockNotifier(t)
 
 		// Call handleUpdateResult without an error
 		mockReport := mockTypes.NewMockReport(t)

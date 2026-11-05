@@ -14,7 +14,7 @@ import (
 // When suppressSummary is true, skip sending queued entries.
 // sendEntries is invoked only after releasing entriesMutex so template work and
 // internal logging never hold the queue lock (avoids re-entrant hook deadlocks).
-func (n *shoutrrrTypeNotifier) StartNotification(suppressSummary bool) {
+func (n *Notifier) StartNotification(suppressSummary bool) {
 	n.entriesMutex.Lock()
 
 	var toSend []*format.Entry
@@ -49,83 +49,59 @@ func (n *shoutrrrTypeNotifier) StartNotification(suppressSummary bool) {
 // a report, the queued entries that match the focus container are taken out of
 // the queue and sent with it. This supports the notification-split-by-container
 // configuration option without exposing entry state. Otherwise the entire
-// queue is drained and sent.
+// queue is drained and sent. [Notifier.Flush] sends without a report.
 //
 // Parameters:
 //   - report: Scan report to include.
-func (n *shoutrrrTypeNotifier) SendNotification(report types.Report) {
+func (n *Notifier) SendNotification(report types.Report) {
+	split, ok := report.(*state.SingleContainerReport)
+	if !ok || split.Focus == nil {
+		n.sendDeduplicated(n.takeEntries(), report)
+
+		return
+	}
+
 	n.entriesMutex.Lock()
 
-	var entries []*format.Entry
+	// Keep rest non-nil so Run continues treating batching as active when
+	// every queued entry matched the focus.
+	var matched []*format.Entry
 
-	if split, ok := report.(*state.SingleContainerReport); ok && split.Focus != nil {
-		// Keep non-nil empty slices so Run continues treating batching as active
-		// when every queued entry matched the focus.
-		matched := make([]*format.Entry, 0)
-		rest := make([]*format.Entry, 0)
+	rest := make([]*format.Entry, 0, len(n.entries))
 
-		for _, e := range n.entries {
-			if entryMatchesFocus(e, split.Focus) {
-				matched = append(matched, e)
-			} else {
-				rest = append(rest, e)
-			}
+	for _, e := range n.entries {
+		if entryMatchesFocus(e, split.Focus) {
+			matched = append(matched, e)
+		} else {
+			rest = append(rest, e)
 		}
-
-		n.entries = rest
-		entries = matched
-	} else {
-		entries = n.entries
-		n.entries = nil // Clear the queue after copying to prevent re-sending
 	}
+
+	n.entries = rest
 
 	n.entriesMutex.Unlock()
 
-	n.ll().Debug().
-		Int("entries_count", len(entries)).
-		Bool("legacy_template", n.template.Legacy()).
-		Bool("report_available", report != nil).
-		Msg("SendNotification called - sending queued entries and report")
-
-	// Deduplicate entries to prevent repeated messages when multiple containers
-	// share the same image (e.g., two containers using nginx:latest will both
-	// log "Found new image" but only one notification should be sent).
-	entries = deduplicateEntries(entries)
-
-	n.sendEntries(entries, report)
+	n.sendDeduplicated(matched, report)
 }
 
-// FlushSplitByContainer sends one notification per distinct container value in the
-// queued entries, then clears the queue.
+// Flush sends every queued message without a report and empties the queue.
 //
-// Used by the check API split path. This is intentionally a package-level helper
-// (not on types.Notifier): the only production Notifier is *shoutrrrTypeNotifier.
-// Adding a split method to the interface would force every mock or stub to implement
-// it. Non-shoutrrr values fall back to a single SendNotification(nil).
+// Report templates then list the queued messages themselves. Callers use it
+// when no scan produced a report, such as for the startup message. Messages
+// logged after it are sent one at a time until the next
+// [Notifier.StartNotification].
+func (n *Notifier) Flush() {
+	n.sendDeduplicated(n.takeEntries(), nil)
+}
+
+// FlushSplitByContainer takes every entry out of the queue and sends one
+// notification for each container the entries name. Entries that name no
+// container are sent together.
 //
-// Parameters:
-//   - notifier: Active notifier instance (typically *shoutrrrTypeNotifier).
-func FlushSplitByContainer(notifier types.Notifier) {
-	if notifier == nil {
-		return
-	}
-
-	shoutrrr, ok := notifier.(*shoutrrrTypeNotifier)
-	if !ok {
-		notifier.SendNotification(nil)
-
-		return
-	}
-
-	shoutrrr.entriesMutex.Lock()
-	entries := shoutrrr.entries
-	shoutrrr.entries = nil
-	shoutrrr.entriesMutex.Unlock()
-
-	if len(entries) == 0 {
-		return
-	}
-
+// The check API calls it for the notification-split-by-container configuration
+// option, since a check has no report that names a container.
+func (n *Notifier) FlushSplitByContainer() {
+	entries := n.takeEntries()
 	byContainer := make(map[string][]*format.Entry)
 
 	for _, entry := range entries {
@@ -143,9 +119,7 @@ func FlushSplitByContainer(notifier types.Notifier) {
 	}
 
 	for _, containerEntries := range byContainer {
-		if len(containerEntries) > 0 {
-			shoutrrr.sendEntries(containerEntries, nil)
-		}
+		n.sendEntries(containerEntries, nil)
 	}
 }
 
@@ -186,7 +160,7 @@ func entryMatchesFocus(entry *format.Entry, focus types.ContainerReport) bool {
 //
 // Returns:
 //   - bool: True if notification should be sent, false otherwise.
-func (n *shoutrrrTypeNotifier) ShouldSendNotification(report types.Report) bool {
+func (n *Notifier) ShouldSendNotification(report types.Report) bool {
 	if report != nil && n.logLevel == zerolog.ErrorLevel {
 		if len(report.Failed()) == 0 {
 			return false
@@ -194,4 +168,37 @@ func (n *shoutrrrTypeNotifier) ShouldSendNotification(report types.Report) bool 
 	}
 
 	return true
+}
+
+// takeEntries empties the queue and ends batching, since the hook batches
+// only while the queue is non-nil.
+//
+// Returns:
+//   - []*format.Entry: The entries that were queued.
+func (n *Notifier) takeEntries() []*format.Entry {
+	n.entriesMutex.Lock()
+	defer n.entriesMutex.Unlock()
+
+	entries := n.entries
+	n.entries = nil
+
+	return entries
+}
+
+// sendDeduplicated sends entries with report after dropping repeated messages.
+//
+// Containers that share an image each log "Found new image". One notification
+// carries that message once.
+//
+// Parameters:
+//   - entries: Entries taken out of the queue.
+//   - report: Scan report to include. It may be nil.
+func (n *Notifier) sendDeduplicated(entries []*format.Entry, report types.Report) {
+	n.ll().Debug().
+		Int("entries_count", len(entries)).
+		Bool("legacy_template", n.template.Legacy()).
+		Bool("report_available", report != nil).
+		Msg("Sending queued entries and report")
+
+	n.sendEntries(deduplicateEntries(entries), report)
 }

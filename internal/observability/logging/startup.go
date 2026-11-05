@@ -7,7 +7,6 @@ import (
 	"github.com/rs/zerolog"
 
 	"github.com/nicholas-fedor/watchtower/internal/settings/units"
-	"github.com/nicholas-fedor/watchtower/pkg/types"
 )
 
 // APIVersionProvider reports the Docker API version for startup messaging.
@@ -16,6 +15,19 @@ import (
 // stays free of container→flags import cycles when flags configures logging.
 type APIVersionProvider interface {
 	GetVersion() string
+}
+
+// StartupNotifier sends the startup message as one notification.
+type StartupNotifier interface {
+	// StartNotification starts collecting log entries for a notification.
+	// When suppressSummary is true, entries collected before it are dropped
+	// instead of sent.
+	StartNotification(suppressSummary bool)
+	// Flush sends the collected entries without a report. Later entries are
+	// sent as they are logged until the next StartNotification.
+	Flush()
+	// GetNames returns the names of the configured notification services.
+	GetNames() []string
 }
 
 // StartupParams holds resolved process values for startup messaging.
@@ -29,7 +41,7 @@ type StartupParams struct {
 	// Client is the Docker client used for API version reporting.
 	Client APIVersionProvider
 	// Notifier sends batched startup messages when not suppressed.
-	Notifier types.Notifier
+	Notifier StartupNotifier
 
 	// Logger is the zerolog logger used for startup messages. Required when NoStartupMessage is false.
 	Logger *zerolog.Logger
@@ -107,7 +119,7 @@ func WriteStartupMessage(params StartupParams) {
 
 	// Send batched notifications if not suppressed, ensuring startup info reaches users.
 	if params.Notifier != nil {
-		params.Notifier.SendNotification(nil)
+		params.Notifier.Flush()
 	}
 
 	// Warn about trace-level logging if enabled, as it may expose sensitive data.
@@ -121,7 +133,7 @@ func WriteStartupMessage(params StartupParams) {
 //
 // Callers that suppress startup messages must return before invoking this helper.
 // When notifier is non-nil, StartNotification batches subsequent startup lines for
-// a single SendNotification.
+// a single Flush.
 //
 // Parameters:
 //   - log: The zerolog logger used for startup messages.
@@ -129,7 +141,7 @@ func WriteStartupMessage(params StartupParams) {
 //
 // Returns:
 //   - *zerolog.Logger: The logger to use for writing startup messages.
-func setupStartupLogger(log *zerolog.Logger, notifier types.Notifier) *zerolog.Logger {
+func setupStartupLogger(log *zerolog.Logger, notifier StartupNotifier) *zerolog.Logger {
 	if notifier != nil {
 		notifier.StartNotification(false)
 	}
