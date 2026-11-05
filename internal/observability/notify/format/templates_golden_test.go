@@ -15,6 +15,7 @@ import (
 	"github.com/nicholas-fedor/watchtower/internal/observability/logging"
 	"github.com/nicholas-fedor/watchtower/internal/testutil/golden"
 	"github.com/nicholas-fedor/watchtower/internal/testutil/reportfixture"
+	updateParams "github.com/nicholas-fedor/watchtower/internal/update/params"
 	"github.com/nicholas-fedor/watchtower/internal/update/state"
 	"github.com/nicholas-fedor/watchtower/pkg/types"
 )
@@ -307,7 +308,7 @@ func goldenFullReport() types.Report {
 	failures := map[types.ContainerID]error{}
 
 	updated, newImage := reportfixture.Container(0, state.UpdatedState)
-	progress.AddScanned(log, updated, newImage, types.UpdateParams{})
+	progress.AddScanned(log, updated, newImage, updateParams.Params{})
 	progress.MarkForUpdate(log, updated.ID())
 	progress[updated.ID()].SetGitMetadata(provenance.ReportMeta{
 		GitRepo:         "https://github.com/org/app.git",
@@ -323,21 +324,21 @@ func goldenFullReport() types.Report {
 	})
 
 	secondUpdated, secondImage := reportfixture.Container(1, state.UpdatedState)
-	progress.AddScanned(log, secondUpdated, secondImage, types.UpdateParams{})
+	progress.AddScanned(log, secondUpdated, secondImage, updateParams.Params{})
 	progress.MarkForUpdate(log, secondUpdated.ID())
 
 	fresh, _ := reportfixture.Container(0, state.FreshState)
-	progress.AddScanned(log, fresh, fresh.ImageID(), types.UpdateParams{})
+	progress.AddScanned(log, fresh, fresh.ImageID(), updateParams.Params{})
 
 	failed, failedImage := reportfixture.Container(0, state.FailedState)
-	progress.AddScanned(log, failed, failedImage, types.UpdateParams{})
+	progress.AddScanned(log, failed, failedImage, updateParams.Params{})
 	failures[failed.ID()] = errGoldenFailure
 
 	skipped, _ := reportfixture.Container(0, state.SkippedState)
-	progress.AddSkipped(log, skipped, errGoldenSkipped, types.UpdateParams{})
+	progress.AddSkipped(log, skipped, errGoldenSkipped, updateParams.Params{})
 
 	restarted, _ := reportfixture.Container(0, state.RestartedState)
-	progress.AddScanned(log, restarted, restarted.ImageID(), types.UpdateParams{})
+	progress.AddScanned(log, restarted, restarted.ImageID(), updateParams.Params{})
 	progress.MarkRestarted(log, restarted.ID())
 
 	progress.UpdateFailed(log, failures)

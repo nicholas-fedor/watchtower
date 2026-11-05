@@ -7,6 +7,7 @@ import (
 
 	"github.com/rs/zerolog"
 
+	updateParams "github.com/nicholas-fedor/watchtower/internal/update/params"
 	"github.com/nicholas-fedor/watchtower/internal/update/sorter"
 	"github.com/nicholas-fedor/watchtower/pkg/types"
 )
@@ -51,7 +52,7 @@ func benchmarkComposeHost(stacks int) []types.Container {
 // for ordering.
 func BenchmarkImplicitRestarts(b *testing.B) {
 	log := zerolog.New(io.Discard).Level(zerolog.InfoLevel)
-	params := types.UpdateParams{}
+	params := updateParams.Params{}
 
 	for _, stacks := range []int{2, 10, 70} {
 		all := benchmarkComposeHost(stacks)

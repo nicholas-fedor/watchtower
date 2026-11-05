@@ -11,6 +11,7 @@ import (
 	"github.com/nicholas-fedor/watchtower/internal/container/provenance"
 	"github.com/nicholas-fedor/watchtower/internal/registry"
 	"github.com/nicholas-fedor/watchtower/internal/update/changelog"
+	updateParams "github.com/nicholas-fedor/watchtower/internal/update/params"
 	"github.com/nicholas-fedor/watchtower/internal/update/state"
 	"github.com/nicholas-fedor/watchtower/pkg/types"
 )
@@ -59,7 +60,7 @@ func ResolveLatestImageMeta(
 	ctx context.Context,
 	resolver *changelog.Resolver,
 	c types.Container,
-	config types.UpdateParams,
+	config updateParams.Params,
 	latest LatestImage,
 ) (provenance.ChangelogVars, oci.Annotations) {
 	clogVal := log.With().
@@ -106,7 +107,7 @@ func ApplyLatestImageMeta(
 	log *zerolog.Logger,
 	progress *state.Progress,
 	c types.Container,
-	config types.UpdateParams,
+	config updateParams.Params,
 	vars provenance.ChangelogVars,
 	annotations oci.Annotations,
 ) {

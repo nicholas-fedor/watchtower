@@ -63,17 +63,17 @@ type Git struct {
 
 	// ComposeProjects maps Compose project name to a directory inside Watchtower.
 	ComposeProjects map[string]string
-	// Token is the HTTPS auth token. Never projected onto UpdateParams.
+	// Token is the HTTPS auth token. Never projected onto the update params.
 	Token string
-	// Username is the basic-auth username. Never projected onto UpdateParams.
+	// Username is the basic-auth username. Never projected onto the update params.
 	Username string
-	// Password is the basic-auth password. Never projected onto UpdateParams.
+	// Password is the basic-auth password. Never projected onto the update params.
 	Password string
-	// SSHKeyPath is the path to an SSH private key. Never projected onto UpdateParams.
+	// SSHKeyPath is the path to an SSH private key. Never projected onto the update params.
 	SSHKeyPath string
-	// SSHKnownHosts is the path to an SSH known_hosts file. Never projected onto UpdateParams.
+	// SSHKnownHosts is the path to an SSH known_hosts file. Never projected onto the update params.
 	SSHKnownHosts string
-	// CABundle is the PEM CA bundle for Git HTTPS. Never projected onto UpdateParams.
+	// CABundle is the PEM CA bundle for Git HTTPS. Never projected onto the update params.
 	CABundle []byte
 
 	// Timeout is the Git network timeout (--git-timeout / WATCHTOWER_GIT_TIMEOUT).

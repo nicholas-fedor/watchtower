@@ -22,7 +22,8 @@ import (
 )
 
 // TestUpdateParamsAssignsEveryField ensures UpdateParams sets every exported
-// field on types.UpdateParams so scheduled and run-once paths cannot omit policy.
+// field of the params it returns so scheduled and run-once paths cannot omit
+// policy.
 func TestUpdateParamsAssignsEveryField(t *testing.T) {
 	t.Parallel()
 

@@ -19,6 +19,7 @@ import (
 	gitConfig "github.com/nicholas-fedor/watchtower/internal/settings/config/git"
 	"github.com/nicholas-fedor/watchtower/internal/testutil/logcapture"
 	"github.com/nicholas-fedor/watchtower/internal/update/changelog"
+	updateParams "github.com/nicholas-fedor/watchtower/internal/update/params"
 	"github.com/nicholas-fedor/watchtower/internal/update/state"
 	"github.com/nicholas-fedor/watchtower/pkg/types"
 )
@@ -72,7 +73,7 @@ func newProgressWithContainer(t *testing.T, c *container.Container) *state.Progr
 	t.Helper()
 
 	progress := state.Progress{}
-	progress.AddScanned(newTestLogger(t), c, c.ImageID(), types.UpdateParams{})
+	progress.AddScanned(newTestLogger(t), c, c.ImageID(), updateParams.Params{})
 	progress.MarkForUpdate(newTestLogger(t), c.ID())
 
 	return &progress
@@ -125,10 +126,10 @@ func TestApplyLatestImageMetadataRecordsVersionWithoutEnabledFeature(t *testing.
 		context.Background(),
 		changelog.NewResolver(panickingFetcher{t}),
 		c,
-		types.UpdateParams{},
+		updateParams.Params{},
 		LatestImage{Annotations: client.annotations, Digest: newDigest},
 	)
-	ApplyLatestImageMeta(newTestLogger(t), progress, c, types.UpdateParams{}, vars, anns)
+	ApplyLatestImageMeta(newTestLogger(t), progress, c, updateParams.Params{}, vars, anns)
 
 	status := (*progress)[c.ID()]
 	assert.Equal(t, "1.2.2", status.CurrentImageVersion())
@@ -155,10 +156,10 @@ func TestApplyLatestImageMetadataChangelogLabelDoesNotEnableProbe(t *testing.T) 
 		context.Background(),
 		changelog.NewResolver(panickingFetcher{t}),
 		c,
-		types.UpdateParams{},
+		updateParams.Params{},
 		LatestImage{Annotations: client.annotations, Digest: newDigest},
 	)
-	ApplyLatestImageMeta(newTestLogger(t), progress, c, types.UpdateParams{}, vars, anns)
+	ApplyLatestImageMeta(newTestLogger(t), progress, c, updateParams.Params{}, vars, anns)
 
 	status := (*progress)[c.ID()]
 	// The label still populates the changelog. An unfilled {tag} placeholder is
@@ -182,10 +183,10 @@ func TestApplyLatestImageMetadataResolvesVersionedChangelogWhenEnabled(t *testin
 		context.Background(),
 		changelog.NewResolver(fetcher),
 		c,
-		types.UpdateParams{EnableChangelog: true},
+		updateParams.Params{EnableChangelog: true},
 		LatestImage{Annotations: client.annotations, Digest: newDigest},
 	)
-	ApplyLatestImageMeta(newTestLogger(t), progress, c, types.UpdateParams{EnableChangelog: true}, vars, anns)
+	ApplyLatestImageMeta(newTestLogger(t), progress, c, updateParams.Params{EnableChangelog: true}, vars, anns)
 
 	status := (*progress)[c.ID()]
 	assert.Equal(t, "https://github.com/org/app/releases/tag/v1.2.3", status.Changelog())
@@ -210,10 +211,10 @@ func TestApplyLatestImageMetadataEnabledByLabel(t *testing.T) {
 		context.Background(),
 		changelog.NewResolver(fetcher),
 		c,
-		types.UpdateParams{},
+		updateParams.Params{},
 		LatestImage{Annotations: client.annotations, Digest: newDigest},
 	)
-	ApplyLatestImageMeta(newTestLogger(t), progress, c, types.UpdateParams{}, vars, anns)
+	ApplyLatestImageMeta(newTestLogger(t), progress, c, updateParams.Params{}, vars, anns)
 
 	assert.Equal(
 		t,
@@ -238,10 +239,10 @@ func TestApplyLatestImageMetadataFallsBackWhenProbeMisses(t *testing.T) {
 		context.Background(),
 		changelog.NewResolver(&missFetcher{}),
 		c,
-		types.UpdateParams{EnableChangelog: true},
+		updateParams.Params{EnableChangelog: true},
 		LatestImage{Annotations: client.annotations, Digest: newDigest},
 	)
-	ApplyLatestImageMeta(newTestLogger(t), progress, c, types.UpdateParams{EnableChangelog: true}, vars, anns)
+	ApplyLatestImageMeta(newTestLogger(t), progress, c, updateParams.Params{EnableChangelog: true}, vars, anns)
 
 	assert.Equal(t, "https://github.com/org/app/releases", (*progress)[c.ID()].Changelog())
 }
@@ -259,7 +260,7 @@ func TestRegistryMetadataWouldDuplicateGitChangelog(t *testing.T) {
 		labels.GitRef:  "main",
 	}, nil)
 
-	params := types.UpdateParams{EnableChangelog: true, Git: gitConfig.Defaults{Enable: true}}
+	params := updateParams.Params{EnableChangelog: true, Git: gitConfig.Defaults{Enable: true}}
 	progress := newProgressWithContainer(t, c)
 
 	var buf bytes.Buffer

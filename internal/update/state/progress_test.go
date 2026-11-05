@@ -20,6 +20,7 @@ import (
 	"github.com/nicholas-fedor/watchtower/internal/container/oci"
 	"github.com/nicholas-fedor/watchtower/internal/container/provenance"
 	updateConfig "github.com/nicholas-fedor/watchtower/internal/settings/config/update"
+	updateParams "github.com/nicholas-fedor/watchtower/internal/update/params"
 	"github.com/nicholas-fedor/watchtower/pkg/types"
 	mockTypes "github.com/nicholas-fedor/watchtower/pkg/types/mocks"
 )
@@ -46,7 +47,7 @@ func TestUpdateFromContainer(t *testing.T) {
 		container types.Container
 		newImage  types.ImageID
 		state     State
-		params    types.UpdateParams
+		params    updateParams.Params
 	}
 
 	tests := []struct {
@@ -71,7 +72,7 @@ func TestUpdateFromContainer(t *testing.T) {
 				}(),
 				newImage: "img2",
 				state:    ScannedState,
-				params:   types.UpdateParams{},
+				params:   updateParams.Params{},
 			},
 			want: &ContainerStatus{
 				containerID:    "cont1",
@@ -101,7 +102,7 @@ func TestUpdateFromContainer(t *testing.T) {
 				}(),
 				newImage: "",
 				state:    UnknownState,
-				params:   types.UpdateParams{},
+				params:   updateParams.Params{},
 			},
 			want: &ContainerStatus{
 				containerID:    "",
@@ -131,7 +132,7 @@ func TestUpdateFromContainer(t *testing.T) {
 				}(),
 				newImage: "img4",
 				state:    ScannedState,
-				params:   types.UpdateParams{Policy: updateConfig.Policy{MonitorOnly: true}},
+				params:   updateParams.Params{Policy: updateConfig.Policy{MonitorOnly: true}},
 			},
 			want: &ContainerStatus{
 				containerID:    "cont3",
@@ -161,7 +162,7 @@ func TestUpdateFromContainer(t *testing.T) {
 				}(),
 				newImage: "",
 				state:    UnknownState,
-				params:   types.UpdateParams{},
+				params:   updateParams.Params{},
 			},
 			want: &ContainerStatus{
 				containerID:    "",
@@ -214,7 +215,7 @@ func TestProgress_AddSkipped(t *testing.T) {
 	type args struct {
 		container types.Container
 		err       error
-		params    types.UpdateParams
+		params    updateParams.Params
 	}
 
 	tests := []struct {
@@ -240,7 +241,7 @@ func TestProgress_AddSkipped(t *testing.T) {
 					return mock
 				}(),
 				err:    errors.New("skipped due to policy"),
-				params: types.UpdateParams{},
+				params: updateParams.Params{},
 			},
 			want: Progress{
 				"cont1": &ContainerStatus{
@@ -272,7 +273,7 @@ func TestProgress_AddSkipped(t *testing.T) {
 					return mock
 				}(),
 				err:    nil,
-				params: types.UpdateParams{},
+				params: updateParams.Params{},
 			},
 			want: Progress{
 				"cont2": &ContainerStatus{
@@ -304,7 +305,7 @@ func TestProgress_AddSkipped(t *testing.T) {
 					return mock
 				}(),
 				err:    errors.New("monitor-only skipped"),
-				params: types.UpdateParams{},
+				params: updateParams.Params{},
 			},
 			want: Progress{
 				"cont3": &ContainerStatus{
@@ -372,7 +373,7 @@ func TestProgress_AddFailed(t *testing.T) {
 
 	progress := Progress{}
 	failErr := errors.New("registry rate limited")
-	progress.AddFailed(newTestLogger(t), mock, failErr, types.UpdateParams{})
+	progress.AddFailed(newTestLogger(t), mock, failErr, updateParams.Params{})
 
 	got := progress["cont1"]
 	if got == nil {
@@ -392,7 +393,7 @@ func TestProgress_AddScanned(t *testing.T) {
 	type args struct {
 		container types.Container
 		newImage  types.ImageID
-		params    types.UpdateParams
+		params    updateParams.Params
 	}
 
 	tests := []struct {
@@ -418,7 +419,7 @@ func TestProgress_AddScanned(t *testing.T) {
 					return mock
 				}(),
 				newImage: "img2",
-				params:   types.UpdateParams{},
+				params:   updateParams.Params{},
 			},
 			want: Progress{
 				"cont1": &ContainerStatus{
@@ -450,7 +451,7 @@ func TestProgress_AddScanned(t *testing.T) {
 					return mock
 				}(),
 				newImage: "img2",
-				params:   types.UpdateParams{},
+				params:   updateParams.Params{},
 			},
 			want: Progress{
 				"cont2": &ContainerStatus{
@@ -482,7 +483,7 @@ func TestProgress_AddScanned(t *testing.T) {
 					return mock
 				}(),
 				newImage: "img4",
-				params:   types.UpdateParams{},
+				params:   updateParams.Params{},
 			},
 			want: Progress{
 				"cont3": &ContainerStatus{
@@ -690,7 +691,7 @@ func TestProgress_SkipUnrecorded(t *testing.T) {
 		"cont1": &ContainerStatus{state: ScannedState, containerID: "cont1"},
 	}
 
-	m.SkipUnrecorded(newTestLogger(t), []types.Container{recorded, unrecorded}, reason, types.UpdateParams{})
+	m.SkipUnrecorded(newTestLogger(t), []types.Container{recorded, unrecorded}, reason, updateParams.Params{})
 
 	assert.Equal(t, Progress{
 		"cont1": &ContainerStatus{state: ScannedState, containerID: "cont1"},
@@ -1134,7 +1135,7 @@ func TestProgress_MarkRestarted_AddSkipped_Integration(t *testing.T) {
 		IsMonitorOnly(testifyMock.Anything).
 		Return(false)
 
-	m.AddSkipped(newTestLogger(t), mock, errors.New("skipped after restart"), types.UpdateParams{})
+	m.AddSkipped(newTestLogger(t), mock, errors.New("skipped after restart"), updateParams.Params{})
 
 	if m["cont1"].state != SkippedState {
 		t.Errorf("Expected state SkippedState after AddSkipped, got %v", m["cont1"].state)
@@ -1477,7 +1478,7 @@ func TestApplyReportMeta(t *testing.T) {
 
 		applyReportMeta(nil, reportTestContainer(t, map[string]string{
 			labels.GitRepo: "https://github.com/org/app.git",
-		}), types.UpdateParams{})
+		}), updateParams.Params{})
 	})
 
 	t.Run("skips mock containers", func(t *testing.T) {
@@ -1485,7 +1486,7 @@ func TestApplyReportMeta(t *testing.T) {
 
 		mock := mockTypes.NewMockContainer(t)
 		status := &ContainerStatus{}
-		applyReportMeta(status, mock, types.UpdateParams{})
+		applyReportMeta(status, mock, updateParams.Params{})
 		assert.Empty(t, status.GitRepo())
 	})
 
@@ -1496,7 +1497,7 @@ func TestApplyReportMeta(t *testing.T) {
 			labels.GitRepo: "https://github.com/org/app.git",
 			labels.GitRef:  "main",
 		})
-		got := updateFromContainer(newTestLogger(t), c, "img2", ScannedState, types.UpdateParams{})
+		got := updateFromContainer(newTestLogger(t), c, "img2", ScannedState, updateParams.Params{})
 		assert.Equal(t, "https://github.com/org/app.git", got.GitRepo())
 		assert.Equal(t, "main", got.GitRef())
 		assert.Equal(t, "https://github.com/org/app/releases", got.Changelog())
@@ -1527,7 +1528,7 @@ func TestProgressSetLatestImageMeta(t *testing.T) {
 		meta := Progress{}.SetLatestImageMeta(
 			newTestLogger(t),
 			nil,
-			types.UpdateParams{},
+			updateParams.Params{},
 			provenance.ChangelogVars{},
 			oci.Annotations{},
 		)
@@ -1543,7 +1544,7 @@ func TestProgressSetLatestImageMeta(t *testing.T) {
 		meta := Progress{}.SetLatestImageMeta(
 			newTestLogger(t),
 			c,
-			types.UpdateParams{},
+			updateParams.Params{},
 			provenance.ChangelogVars{Tag: "v1.0.0"},
 			oci.Annotations{},
 		)
@@ -1557,13 +1558,13 @@ func TestProgressSetLatestImageMeta(t *testing.T) {
 			labels.GitRepo:      "https://github.com/org/app.git",
 			labels.ChangelogURL: "https://example.com/notes/{tag}",
 		})
-		status := updateFromContainer(newTestLogger(t), c, "img", ScannedState, types.UpdateParams{})
+		status := updateFromContainer(newTestLogger(t), c, "img", ScannedState, updateParams.Params{})
 		progress := Progress{c.ID(): status}
 
 		progress.SetLatestImageMeta(
 			newTestLogger(t),
 			c,
-			types.UpdateParams{},
+			updateParams.Params{},
 			provenance.ChangelogVars{Tag: "v1.2.3", Commit: "deadbeef"},
 			oci.Annotations{},
 		)
@@ -1576,13 +1577,13 @@ func TestProgressSetLatestImageMeta(t *testing.T) {
 		c := reportTestContainer(t, map[string]string{
 			labels.GitRepo: "https://github.com/org/app.git",
 		})
-		status := updateFromContainer(newTestLogger(t), c, "img", ScannedState, types.UpdateParams{})
+		status := updateFromContainer(newTestLogger(t), c, "img", ScannedState, updateParams.Params{})
 		progress := Progress{c.ID(): status}
 
 		meta := progress.SetLatestImageMeta(
 			newTestLogger(t),
 			c,
-			types.UpdateParams{},
+			updateParams.Params{},
 			provenance.ChangelogVars{Tag: "v1.2.3"},
 			oci.Annotations{Version: "1.2.3", Revision: "newrev"},
 		)
@@ -1600,13 +1601,13 @@ func TestProgressSetLatestImageMeta(t *testing.T) {
 		c := reportTestContainer(t, map[string]string{
 			labels.GitRepo: "https://github.com/org/app.git",
 		})
-		status := updateFromContainer(newTestLogger(t), c, "img", ScannedState, types.UpdateParams{})
+		status := updateFromContainer(newTestLogger(t), c, "img", ScannedState, updateParams.Params{})
 		progress := Progress{c.ID(): status}
 
 		progress.SetLatestImageMeta(
 			newTestLogger(t),
 			c,
-			types.UpdateParams{},
+			updateParams.Params{},
 			provenance.ChangelogVars{Tag: "v9.9.9", Commit: "deadbeef"},
 			oci.Annotations{},
 		)

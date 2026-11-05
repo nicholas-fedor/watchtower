@@ -8,6 +8,7 @@ import (
 	"github.com/nicholas-fedor/watchtower/internal/container"
 	"github.com/nicholas-fedor/watchtower/internal/container/oci"
 	"github.com/nicholas-fedor/watchtower/internal/container/provenance"
+	updateParams "github.com/nicholas-fedor/watchtower/internal/update/params"
 	"github.com/nicholas-fedor/watchtower/pkg/types"
 )
 
@@ -28,7 +29,7 @@ func updateFromContainer(log *zerolog.Logger,
 	container types.Container,
 	newImage types.ImageID,
 	state State,
-	params types.UpdateParams,
+	params updateParams.Params,
 ) *ContainerStatus {
 	update := &ContainerStatus{
 		containerID:    container.ID(),
@@ -57,7 +58,7 @@ func updateFromContainer(log *zerolog.Logger,
 //   - container: Container to add.
 //   - err: Skip reason error.
 //   - params: Update parameters for monitor-only check.
-func (m Progress) AddSkipped(log *zerolog.Logger, container types.Container, err error, params types.UpdateParams) {
+func (m Progress) AddSkipped(log *zerolog.Logger, container types.Container, err error, params updateParams.Params) {
 	update := updateFromContainer(log, container, container.ImageID(), SkippedState, params)
 	update.containerError = err
 	m.Add(log, update)
@@ -75,7 +76,7 @@ func (m Progress) AddSkipped(log *zerolog.Logger, container types.Container, err
 //   - container: Container to add.
 //   - err: Failure reason error.
 //   - params: Update parameters for monitor-only check.
-func (m Progress) AddFailed(log *zerolog.Logger, container types.Container, err error, params types.UpdateParams) {
+func (m Progress) AddFailed(log *zerolog.Logger, container types.Container, err error, params updateParams.Params) {
 	update := updateFromContainer(log, container, container.ImageID(), FailedState, params)
 	update.containerError = err
 	m.Add(log, update)
@@ -95,7 +96,7 @@ func (m Progress) AddFailed(log *zerolog.Logger, container types.Container, err 
 func (m Progress) AddScanned(log *zerolog.Logger,
 	container types.Container,
 	newImage types.ImageID,
-	params types.UpdateParams,
+	params updateParams.Params,
 ) {
 	m.Add(log, updateFromContainer(log, container, newImage, ScannedState, params))
 	log.Debug().
@@ -180,7 +181,7 @@ func (m Progress) SkipUnrecorded(
 	log *zerolog.Logger,
 	containers []types.Container,
 	reason error,
-	params types.UpdateParams,
+	params updateParams.Params,
 ) {
 	for _, c := range containers {
 		if _, exists := m[c.ID()]; exists {
@@ -197,7 +198,7 @@ func (m Progress) SkipUnrecorded(
 //   - status: Status to update.
 //   - c: Source container.
 //   - params: Update parameters used to resolve report metadata.
-func applyReportMeta(status *ContainerStatus, c types.Container, params types.UpdateParams) {
+func applyReportMeta(status *ContainerStatus, c types.Container, params updateParams.Params) {
 	if status == nil {
 		return
 	}
@@ -252,7 +253,7 @@ func (m Progress) SetLatestImage(log *zerolog.Logger, containerID types.Containe
 func (m Progress) SetLatestImageMeta(
 	log *zerolog.Logger,
 	c types.Container,
-	params types.UpdateParams,
+	params updateParams.Params,
 	vars provenance.ChangelogVars,
 	latest oci.Annotations,
 ) provenance.ReportMeta {

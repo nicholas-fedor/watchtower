@@ -17,6 +17,7 @@ import (
 	updateConfig "github.com/nicholas-fedor/watchtower/internal/settings/config/update"
 	"github.com/nicholas-fedor/watchtower/internal/update/cleanup"
 	mockUpdate "github.com/nicholas-fedor/watchtower/internal/update/mocks"
+	updateParams "github.com/nicholas-fedor/watchtower/internal/update/params"
 	"github.com/nicholas-fedor/watchtower/pkg/types"
 	mockTypes "github.com/nicholas-fedor/watchtower/pkg/types/mocks"
 )
@@ -89,7 +90,7 @@ func TestUpdateAction_Cleanup(t *testing.T) {
 					"test-container-02": true,
 					"test-container-03": true,
 				}
-				report, cleanupImageInfos, err := update(newTestLogger(t), t.Context(), client, types.UpdateParams{Cleanup: true}, ratelimit.New())
+				report, cleanupImageInfos, err := update(newTestLogger(t), t.Context(), client, updateParams.Params{Cleanup: true}, ratelimit.New())
 
 				require.NoError(t, err)
 				require.Len(t, report.Updated(), 3)
@@ -128,7 +129,7 @@ func TestUpdateAction_Cleanup(t *testing.T) {
 					"test-container-03":     true,
 					"unique-test-container": true,
 				}
-				report, cleanupImageInfos, err := update(newTestLogger(t), t.Context(), client, types.UpdateParams{Cleanup: true}, ratelimit.New())
+				report, cleanupImageInfos, err := update(newTestLogger(t), t.Context(), client, updateParams.Params{Cleanup: true}, ratelimit.New())
 
 				require.NoError(t, err)
 				require.Len(t, report.Updated(), 4)
@@ -148,7 +149,7 @@ func TestUpdateAction_Cleanup(t *testing.T) {
 
 				client := mockUpdate.CreateMockClient(getLinkedTestData(true), false, false)
 				client.TestData.Staleness["test-container-01"] = true
-				report, cleanupImageInfos, err := update(newTestLogger(t), t.Context(), client, types.UpdateParams{Cleanup: true}, ratelimit.New())
+				report, cleanupImageInfos, err := update(newTestLogger(t), t.Context(), client, updateParams.Params{Cleanup: true}, ratelimit.New())
 
 				require.NoError(t, err)
 				require.Len(t, report.Updated(), 1)
@@ -170,7 +171,7 @@ func TestUpdateAction_Cleanup(t *testing.T) {
 					"test-container-02": true,
 					"test-container-03": true,
 				}
-				report, cleanupImageInfos, err := update(newTestLogger(t), t.Context(), client, types.UpdateParams{Cleanup: true, RollingRestart: true}, ratelimit.New())
+				report, cleanupImageInfos, err := update(newTestLogger(t), t.Context(), client, updateParams.Params{Cleanup: true, RollingRestart: true}, ratelimit.New())
 
 				require.NoError(t, err)
 				require.Len(t, report.Updated(), 3)
@@ -190,7 +191,7 @@ func TestUpdateAction_Cleanup(t *testing.T) {
 
 				client := mockUpdate.CreateMockClient(getLinkedTestData(false), false, false)
 				client.TestData.Staleness["test-container-01"] = true
-				report, cleanupImageInfos, err := update(newTestLogger(t), t.Context(), client, types.UpdateParams{Cleanup: true}, ratelimit.New())
+				report, cleanupImageInfos, err := update(newTestLogger(t), t.Context(), client, updateParams.Params{Cleanup: true}, ratelimit.New())
 
 				require.NoError(t, err)
 				require.Len(t, report.Updated(), 1)
@@ -226,7 +227,7 @@ func TestUpdate_OldInstanceImageJoinsSessionCleanup(t *testing.T) {
 		}).Maybe()
 
 	_, cleanup, err := update(newTestLogger(t), t.Context(), client,
-		types.UpdateParams{Cleanup: true, CurrentContainerID: currentID}, ratelimit.New())
+		updateParams.Params{Cleanup: true, CurrentContainerID: currentID}, ratelimit.New())
 	require.NoError(t, err)
 
 	assert.Equal(t, []string{"org/watchtower:1 watchtower-old-a"}, imageEntries(cleanup))
@@ -267,7 +268,7 @@ func TestUpdate_SortFailureKeepsOldInstanceImage(t *testing.T) {
 		}).Maybe()
 
 	_, cleanup, err := update(newTestLogger(t), t.Context(), client,
-		types.UpdateParams{Cleanup: true, CurrentContainerID: currentID}, ratelimit.New())
+		updateParams.Params{Cleanup: true, CurrentContainerID: currentID}, ratelimit.New())
 	require.ErrorIs(t, err, errSortDependenciesFailed)
 
 	assert.Equal(t, []string{"org/watchtower:1 watchtower-old-a"}, imageEntries(cleanup))
@@ -307,7 +308,7 @@ func TestRunUpdatesWithNotifications_RemovesOldInstanceImageOnce(t *testing.T) {
 		Client:           client,
 		Notifier:         notifier,
 		EventBroadcaster: broadcaster,
-		Update:           types.UpdateParams{Cleanup: true, CurrentContainerID: currentID},
+		Update:           updateParams.Params{Cleanup: true, CurrentContainerID: currentID},
 	})
 
 	// Events are published synchronously into the subscriber's buffer.

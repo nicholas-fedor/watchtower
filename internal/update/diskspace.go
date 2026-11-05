@@ -10,7 +10,7 @@ import (
 	containerClient "github.com/nicholas-fedor/watchtower/internal/container/client"
 	"github.com/nicholas-fedor/watchtower/internal/observability/logging"
 	"github.com/nicholas-fedor/watchtower/internal/observability/metrics"
-	"github.com/nicholas-fedor/watchtower/pkg/types"
+	updateParams "github.com/nicholas-fedor/watchtower/internal/update/params"
 )
 
 // msgImageDiskSpaceOK is logged when image usage is below all configured thresholds.
@@ -45,7 +45,7 @@ func checkImageDiskSpace(
 	log *zerolog.Logger,
 	ctx context.Context,
 	client containerClient.Client,
-	config types.UpdateParams,
+	config updateParams.Params,
 ) error {
 	if config.DiskSpaceMax == 0 && config.DiskSpaceWarn == 0 {
 		return nil

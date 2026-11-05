@@ -14,6 +14,7 @@ import (
 
 	"github.com/nicholas-fedor/watchtower/internal/container"
 	"github.com/nicholas-fedor/watchtower/internal/container/provenance"
+	updateParams "github.com/nicholas-fedor/watchtower/internal/update/params"
 	"github.com/nicholas-fedor/watchtower/internal/update/state"
 	"github.com/nicholas-fedor/watchtower/pkg/types"
 )
@@ -36,7 +37,7 @@ func updatedAppStatus() *state.ContainerStatus {
 	)
 
 	progress := state.Progress{}
-	progress.AddScanned(log, app, types.ImageID("sha256:"+strings.Repeat("c", 64)), types.UpdateParams{})
+	progress.AddScanned(log, app, types.ImageID("sha256:"+strings.Repeat("c", 64)), updateParams.Params{})
 	progress.MarkForUpdate(log, app.ID())
 
 	return progress[app.ID()]

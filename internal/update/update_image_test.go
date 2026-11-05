@@ -16,6 +16,7 @@ import (
 	"github.com/nicholas-fedor/watchtower/internal/registry/ratelimit"
 	"github.com/nicholas-fedor/watchtower/internal/update/cleanup"
 	mockUpdate "github.com/nicholas-fedor/watchtower/internal/update/mocks"
+	updateParams "github.com/nicholas-fedor/watchtower/internal/update/params"
 	"github.com/nicholas-fedor/watchtower/pkg/types"
 )
 
@@ -30,7 +31,7 @@ func TestUpdateAction_ImageReferences(t *testing.T) {
 		t.Parallel()
 
 		// config is the update configuration every case runs with.
-		config := types.UpdateParams{
+		config := updateParams.Params{
 			Cleanup: true,
 			Filter:  filters.NoFilter,
 		}

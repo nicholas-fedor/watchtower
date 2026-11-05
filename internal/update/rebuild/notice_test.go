@@ -6,7 +6,7 @@ import (
 	"github.com/stretchr/testify/assert"
 
 	gitConfig "github.com/nicholas-fedor/watchtower/internal/settings/config/git"
-	"github.com/nicholas-fedor/watchtower/pkg/types"
+	updateParams "github.com/nicholas-fedor/watchtower/internal/update/params"
 )
 
 // Test_noticeFormatting verifies how rebuild notices shorten commits and format
@@ -27,5 +27,5 @@ func Test_withGitMeta(t *testing.T) {
 
 	c := gitAssociatedContainer("id", "/app", "myapp:latest", nil)
 
-	assert.Nil(t, withGitMeta(nil, c, types.UpdateParams{Git: gitConfig.Defaults{Enable: true}}, "v1.0.0", "0123456789abcdef"))
+	assert.Nil(t, withGitMeta(nil, c, updateParams.Params{Git: gitConfig.Defaults{Enable: true}}, "v1.0.0", "0123456789abcdef"))
 }

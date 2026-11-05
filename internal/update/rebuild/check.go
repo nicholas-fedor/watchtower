@@ -6,6 +6,7 @@ import (
 
 	containerImage "github.com/nicholas-fedor/watchtower/internal/container/image"
 	"github.com/nicholas-fedor/watchtower/internal/git"
+	updateParams "github.com/nicholas-fedor/watchtower/internal/update/params"
 	"github.com/nicholas-fedor/watchtower/pkg/types"
 )
 
@@ -28,7 +29,7 @@ import (
 func (s *Session) Check(
 	ctx context.Context,
 	c types.Container,
-	params types.UpdateParams,
+	params updateParams.Params,
 ) (bool, types.ImageID, error) {
 	result, err := git.CheckContainer(ctx, s.client, c, params.Git)
 	if err != nil {

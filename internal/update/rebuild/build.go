@@ -17,6 +17,7 @@ import (
 	"github.com/nicholas-fedor/watchtower/internal/git"
 	"github.com/nicholas-fedor/watchtower/internal/git/apply"
 	"github.com/nicholas-fedor/watchtower/internal/observability/logging"
+	updateParams "github.com/nicholas-fedor/watchtower/internal/update/params"
 	"github.com/nicholas-fedor/watchtower/internal/update/state"
 	"github.com/nicholas-fedor/watchtower/pkg/types"
 )
@@ -53,7 +54,7 @@ func (s *Session) build(
 	docker containerClient.Client,
 	c types.Container,
 	result git.CheckResult,
-	params types.UpdateParams,
+	params updateParams.Params,
 	progress *state.Progress,
 ) error {
 	assoc, associated := provenance.ResolveAssociation(c, params.Git)

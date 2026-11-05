@@ -15,6 +15,7 @@ import (
 	"github.com/nicholas-fedor/watchtower/internal/container/oci"
 	"github.com/nicholas-fedor/watchtower/internal/registry/ratelimit"
 	mockUpdate "github.com/nicholas-fedor/watchtower/internal/update/mocks"
+	updateParams "github.com/nicholas-fedor/watchtower/internal/update/params"
 	"github.com/nicholas-fedor/watchtower/pkg/types"
 )
 
@@ -97,7 +98,7 @@ func TestUpdate_PostChecksTargetCurrentContainers(t *testing.T) {
 				}).
 				Return(false, nil)
 
-			_, _, err := update(newTestLogger(t), t.Context(), client, types.UpdateParams{LifecycleHooks: true}, ratelimit.New())
+			_, _, err := update(newTestLogger(t), t.Context(), client, updateParams.Params{LifecycleHooks: true}, ratelimit.New())
 			require.NoError(t, err)
 
 			assert.Equal(t, []types.ContainerID{tt.wantTarget}, targets)

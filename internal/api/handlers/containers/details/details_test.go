@@ -10,6 +10,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	mockContainerClient "github.com/nicholas-fedor/watchtower/internal/container/client/mocks"
+	updateParams "github.com/nicholas-fedor/watchtower/internal/update/params"
 	"github.com/nicholas-fedor/watchtower/pkg/types"
 	mockTypes "github.com/nicholas-fedor/watchtower/pkg/types/mocks"
 )
@@ -19,7 +20,7 @@ func TestGetContainerDetails(t *testing.T) {
 		name    string
 		client  func(t *testing.T) *mockContainerClient.MockClient
 		filter  types.Filter
-		params  types.UpdateParams
+		params  updateParams.Params
 		wantErr bool
 		wantLen int
 		want    func(t *testing.T, details []ContainerDetails)
@@ -45,7 +46,7 @@ func TestGetContainerDetails(t *testing.T) {
 
 				return c
 			},
-			params:  types.UpdateParams{},
+			params:  updateParams.Params{},
 			wantErr: false,
 			wantLen: 1,
 			want: func(t *testing.T, details []ContainerDetails) {
@@ -74,7 +75,7 @@ func TestGetContainerDetails(t *testing.T) {
 
 				return c
 			},
-			params:  types.UpdateParams{LabelEnable: false},
+			params:  updateParams.Params{LabelEnable: false},
 			wantErr: false,
 			wantLen: 1,
 			want: func(t *testing.T, details []ContainerDetails) {
@@ -103,7 +104,7 @@ func TestGetContainerDetails(t *testing.T) {
 
 				return c
 			},
-			params:  types.UpdateParams{LabelEnable: true},
+			params:  updateParams.Params{LabelEnable: true},
 			wantErr: false,
 			wantLen: 1,
 			want: func(t *testing.T, details []ContainerDetails) {
@@ -132,7 +133,7 @@ func TestGetContainerDetails(t *testing.T) {
 
 				return c
 			},
-			params:  types.UpdateParams{LabelEnable: false},
+			params:  updateParams.Params{LabelEnable: false},
 			wantErr: false,
 			wantLen: 1,
 			want: func(t *testing.T, details []ContainerDetails) {
@@ -163,7 +164,7 @@ func TestGetContainerDetails(t *testing.T) {
 
 				return c
 			},
-			params:  types.UpdateParams{},
+			params:  updateParams.Params{},
 			wantErr: false,
 			wantLen: 1,
 			want: func(t *testing.T, details []ContainerDetails) {
@@ -181,7 +182,7 @@ func TestGetContainerDetails(t *testing.T) {
 				return c
 			},
 			filter:  nil,
-			params:  types.UpdateParams{},
+			params:  updateParams.Params{},
 			wantErr: true,
 		},
 	}

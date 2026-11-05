@@ -12,6 +12,7 @@ import (
 
 	"github.com/nicholas-fedor/watchtower/internal/observability/logging"
 	"github.com/nicholas-fedor/watchtower/internal/observability/metrics"
+	updateParams "github.com/nicholas-fedor/watchtower/internal/update/params"
 	"github.com/nicholas-fedor/watchtower/internal/update/schedule"
 	"github.com/nicholas-fedor/watchtower/pkg/types"
 )
@@ -24,7 +25,7 @@ func TestRegisterUpdateRoute(t *testing.T) {
 		EnableUpdateAPI: true,
 		UpdateLock:      schedule.NewUpdateLock(),
 		UnblockHTTPAPI:  true,
-		RunUpdatesWithNotifications: func(_ context.Context, _ types.Filter, _ types.UpdateParams) *metrics.Metric {
+		RunUpdatesWithNotifications: func(_ context.Context, _ types.Filter, _ updateParams.Params) *metrics.Metric {
 			return &metrics.Metric{}
 		},
 		FilterByImage:  func(_ []string, f types.Filter) types.Filter { return f },
@@ -51,12 +52,12 @@ func TestRegisterUpdateRoute_BuildsFullUpdateParams(t *testing.T) {
 	app := testApp()
 	auth := testAuthMiddleware()
 
-	var got types.UpdateParams
+	var got updateParams.Params
 
 	opts := Options{
 		EnableUpdateAPI: true,
 		UnblockHTTPAPI:  true,
-		BaseParams: types.UpdateParams{
+		BaseParams: updateParams.Params{
 			Cleanup:             true,
 			ReviveStopped:       true,
 			UseComposeDependsOn: true,
@@ -68,7 +69,7 @@ func TestRegisterUpdateRoute_BuildsFullUpdateParams(t *testing.T) {
 			SkipSelfUpdate:      true,
 		},
 		Filter: func(_ types.FilterableContainer) bool { return true },
-		RunUpdatesWithNotifications: func(_ context.Context, _ types.Filter, params types.UpdateParams) *metrics.Metric {
+		RunUpdatesWithNotifications: func(_ context.Context, _ types.Filter, params updateParams.Params) *metrics.Metric {
 			got = params
 
 			return &metrics.Metric{}
@@ -105,7 +106,7 @@ func TestRegisterUpdateRoute_NilWriteStartupMessage(t *testing.T) {
 		EnableUpdateAPI: true,
 		UpdateLock:      schedule.NewUpdateLock(),
 		UnblockHTTPAPI:  false,
-		RunUpdatesWithNotifications: func(_ context.Context, _ types.Filter, _ types.UpdateParams) *metrics.Metric {
+		RunUpdatesWithNotifications: func(_ context.Context, _ types.Filter, _ updateParams.Params) *metrics.Metric {
 			return &metrics.Metric{}
 		},
 		FilterByImage:       func(_ []string, f types.Filter) types.Filter { return f },
@@ -130,7 +131,7 @@ func TestRegisterUpdateRoute_DoesNotWriteStartupMessage(t *testing.T) {
 		EnableUpdateAPI: true,
 		UpdateLock:      schedule.NewUpdateLock(),
 		UnblockHTTPAPI:  false,
-		RunUpdatesWithNotifications: func(_ context.Context, _ types.Filter, _ types.UpdateParams) *metrics.Metric {
+		RunUpdatesWithNotifications: func(_ context.Context, _ types.Filter, _ updateParams.Params) *metrics.Metric {
 			return &metrics.Metric{}
 		},
 		FilterByImage:  func(_ []string, f types.Filter) types.Filter { return f },
@@ -162,7 +163,7 @@ func TestRegisterUpdateRoute_TimeoutIsServiceUnavailable(t *testing.T) {
 		EnableUpdateAPI: true,
 		UnblockHTTPAPI:  true,
 		UpdateTimeout:   20 * time.Millisecond,
-		RunUpdatesWithNotifications: func(context.Context, types.Filter, types.UpdateParams) *metrics.Metric {
+		RunUpdatesWithNotifications: func(context.Context, types.Filter, updateParams.Params) *metrics.Metric {
 			<-release
 
 			return &metrics.Metric{}

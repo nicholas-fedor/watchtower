@@ -30,6 +30,7 @@ import (
 	"github.com/nicholas-fedor/watchtower/internal/settings"
 	"github.com/nicholas-fedor/watchtower/internal/update"
 	"github.com/nicholas-fedor/watchtower/internal/update/cleanup"
+	updateParams "github.com/nicholas-fedor/watchtower/internal/update/params"
 	"github.com/nicholas-fedor/watchtower/internal/update/schedule"
 	"github.com/nicholas-fedor/watchtower/internal/update/selfupdate"
 	"github.com/nicholas-fedor/watchtower/pkg/types"
@@ -145,7 +146,7 @@ var (
 	// It is initialized inside runMain with a closure that executes update.RunUpdatesWithNotifications,
 	// allowing it to be overridden in tests to mock the update process. It takes a context, filter, and update params,
 	// and returns a metric summarizing the update session.
-	runUpdatesWithNotifications func(context.Context, types.Filter, types.UpdateParams) *metrics.Metric
+	runUpdatesWithNotifications func(context.Context, types.Filter, updateParams.Params) *metrics.Metric
 
 	// rootCmd represents the root command for the Watchtower CLI, serving as the entry point for all subcommands.
 	//
@@ -609,7 +610,7 @@ func (p *process) run(command *cobra.Command, args []string) error {
 // cleans up excess Watchtower instances, sets up the HTTP API when endpoints are enabled,
 // and schedules periodic updates while managing context and concurrency for graceful shutdown.
 // Update policy is taken from appCfg.UpdateParams so run-once, schedule, and API paths share
-// a complete types.UpdateParams snapshot.
+// a complete [updateParams.Params] snapshot.
 //
 // Parameters:
 //   - cfg: The RunConfig struct containing filter, API, and mode parameters for this execution.
@@ -637,7 +638,7 @@ func (p *process) runMain(cfg settings.RunConfig) error {
 	// Parameters:
 	//   - ctx: Context for cancellation and timeouts.
 	//   - filter: The types.Filter determining which containers are targeted for updates.
-	//   - params: The types.UpdateParams struct containing update configuration parameters.
+	//   - params: The updateParams.Params struct containing update configuration parameters.
 	//
 	// Returns:
 	//   - *metrics.Metric: A pointer to a metric object summarizing the update session (scanned, updated, failed counts).
@@ -659,7 +660,7 @@ func (p *process) runMain(cfg settings.RunConfig) error {
 	)
 	defer stop()
 
-	runUpdatesWithNotifications = func(ctx context.Context, filter types.Filter, params types.UpdateParams) *metrics.Metric {
+	runUpdatesWithNotifications = func(ctx context.Context, filter types.Filter, params updateParams.Params) *metrics.Metric {
 		runParams := params
 		if filter != nil {
 			runParams.Filter = filter
@@ -794,7 +795,7 @@ func (p *process) runMain(cfg settings.RunConfig) error {
 		p.log.Warn().Msg("Published port detected - self-updates disabled.")
 	}
 
-	// One UpdateParams snapshot for HTTP API and schedule paths.
+	// One updateParams.Params snapshot for HTTP API and schedule paths.
 	sharedBase := baseParams
 	if selfUpdateBlock != selfupdate.NotBlocked {
 		sharedBase.SkipSelfUpdate = true

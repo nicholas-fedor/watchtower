@@ -8,6 +8,7 @@ import (
 	"github.com/stretchr/testify/assert"
 
 	"github.com/nicholas-fedor/watchtower/internal/observability/metrics"
+	updateParams "github.com/nicholas-fedor/watchtower/internal/update/params"
 	"github.com/nicholas-fedor/watchtower/internal/update/schedule"
 	"github.com/nicholas-fedor/watchtower/pkg/types"
 )
@@ -18,7 +19,7 @@ import (
 func TestValidateUpdateOptions(t *testing.T) {
 	testMetrics := metrics.Default()
 
-	runUpdates := func(_ context.Context, _ types.Filter, _ types.UpdateParams) *metrics.Metric {
+	runUpdates := func(_ context.Context, _ types.Filter, _ updateParams.Params) *metrics.Metric {
 		return &metrics.Metric{}
 	}
 	filterByImage := func(_ []string, f types.Filter) types.Filter { return f }
@@ -104,7 +105,7 @@ func TestBuildUpdateParams(t *testing.T) {
 	t.Parallel()
 
 	opts := Options{
-		BaseParams: types.UpdateParams{
+		BaseParams: updateParams.Params{
 			Cleanup:             true,
 			NoRestart:           true,
 			ReviveStopped:       true,

@@ -11,6 +11,7 @@ import (
 
 	"github.com/nicholas-fedor/watchtower/internal/update/implicitrestart"
 	mockUpdate "github.com/nicholas-fedor/watchtower/internal/update/mocks"
+	updateParams "github.com/nicholas-fedor/watchtower/internal/update/params"
 	"github.com/nicholas-fedor/watchtower/internal/update/sorter"
 	"github.com/nicholas-fedor/watchtower/pkg/types"
 )
@@ -25,7 +26,7 @@ import (
 //   - containers: The monitored containers, which may be marked.
 //   - useComposeDependsOn: Whether to include Compose depends_on labels as links.
 func updateImplicitRestart(log *zerolog.Logger, allContainers, containers []types.Container, useComposeDependsOn bool) {
-	reconcileImplicitRestarts(log, allContainers, containers, types.UpdateParams{UseComposeDependsOn: useComposeDependsOn})
+	reconcileImplicitRestarts(log, allContainers, containers, updateParams.Params{UseComposeDependsOn: useComposeDependsOn})
 }
 
 // reconcileImplicitRestarts clears linked-restart marks and derives them again
@@ -43,7 +44,7 @@ func updateImplicitRestart(log *zerolog.Logger, allContainers, containers []type
 func reconcileImplicitRestarts(
 	log *zerolog.Logger,
 	allContainers, containers []types.Container,
-	params types.UpdateParams,
+	params updateParams.Params,
 ) []types.Container {
 	graph, err := sorter.NewDependencyGraph(log,
 		containers,

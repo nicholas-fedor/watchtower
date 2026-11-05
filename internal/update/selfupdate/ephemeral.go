@@ -18,6 +18,7 @@ import (
 	containerImage "github.com/nicholas-fedor/watchtower/internal/container/image"
 	"github.com/nicholas-fedor/watchtower/internal/container/labels"
 	"github.com/nicholas-fedor/watchtower/internal/observability/logging"
+	updateParams "github.com/nicholas-fedor/watchtower/internal/update/params"
 	"github.com/nicholas-fedor/watchtower/pkg/types"
 )
 
@@ -109,7 +110,7 @@ var fullContainerIDPattern = regexp.MustCompile(`^[a-f0-9]{64}$`)
 func StartOrchestrator(log *zerolog.Logger, ctx context.Context,
 	client containerClient.Client,
 	sourceContainer types.Container,
-	config types.UpdateParams,
+	config updateParams.Params,
 ) (types.ContainerID, bool, error) {
 	clogVal := log.With().
 		Str("container", sourceContainer.Name()).
@@ -659,7 +660,7 @@ func cleanupFailedNewContainer(
 
 	// A stop timeout set on the container takes precedence over the 30 seconds
 	// passed to the stop, so the bound follows the longer of the two.
-	stopParams := types.UpdateParams{Timeout: orchestratorStopTimeout}
+	stopParams := updateParams.Params{Timeout: orchestratorStopTimeout}
 
 	recoveryCtx, cancel := context.WithTimeout(
 		context.WithoutCancel(ctx),

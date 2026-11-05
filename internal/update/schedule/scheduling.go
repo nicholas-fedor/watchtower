@@ -14,6 +14,7 @@ import (
 
 	"github.com/nicholas-fedor/watchtower/internal/observability/logging"
 	"github.com/nicholas-fedor/watchtower/internal/observability/metrics"
+	updateParams "github.com/nicholas-fedor/watchtower/internal/update/params"
 	"github.com/nicholas-fedor/watchtower/pkg/types"
 )
 
@@ -118,8 +119,8 @@ func recoverPanics(log *zerolog.Logger) cron.JobWrapper {
 
 // ScheduleDeps holds dependencies for scheduled update runs.
 //
-// BaseParams must be a complete types.UpdateParams snapshot from config.UpdateParams
-// (or an equivalent full construction).
+// BaseParams must be a complete [updateParams.Params] snapshot built from the
+// process configuration.
 // Each tick copies BaseParams and applies only per-run fields such as SkipSelfUpdate.
 // A tick can disable self-updates, but never enables them when BaseParams disables them.
 type ScheduleDeps struct {
@@ -136,7 +137,7 @@ type ScheduleDeps struct {
 	// WriteStartupMessage writes the startup message with scheduling information.
 	WriteStartupMessage func(logging.StartupParams)
 	// RunUpdate performs container updates and sends notifications.
-	RunUpdate func(context.Context, types.Filter, types.UpdateParams) *metrics.Metric
+	RunUpdate func(context.Context, types.Filter, updateParams.Params) *metrics.Metric
 	// ScheduleSpec is the cron-formatted schedule string for periodic updates.
 	ScheduleSpec string
 	// Startup holds resolved values for startup messaging (no flag reads).
@@ -145,8 +146,8 @@ type ScheduleDeps struct {
 	Startup logging.StartupParams
 	// BaseParams is the complete update policy snapshot for every scheduled tick.
 	// Must include Cleanup, MonitorOnly, UseComposeDependsOn, ReviveStopped, and
-	// all other process-wide UpdateParams fields.
-	BaseParams types.UpdateParams
+	// all other process-wide [updateParams.Params] fields.
+	BaseParams updateParams.Params
 	// UpdateOnStart triggers an immediate update before the scheduler starts.
 	UpdateOnStart bool
 	// SkipFirstRun skips Watchtower self-update on the first scheduled run

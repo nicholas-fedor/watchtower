@@ -14,6 +14,7 @@ import (
 	"github.com/nicholas-fedor/watchtower/internal/observability/events"
 	"github.com/nicholas-fedor/watchtower/internal/observability/logging"
 	mt "github.com/nicholas-fedor/watchtower/internal/observability/metrics"
+	updateParams "github.com/nicholas-fedor/watchtower/internal/update/params"
 	"github.com/nicholas-fedor/watchtower/internal/update/schedule"
 	"github.com/nicholas-fedor/watchtower/pkg/types"
 )
@@ -76,7 +77,7 @@ type Options struct {
 	// GitClient inspects remotes for Git-watched containers on /v1/check.
 	GitClient *git.Client
 	// RunUpdatesWithNotifications runs the scan-and-update pipeline for HTTP update requests.
-	RunUpdatesWithNotifications func(context.Context, types.Filter, types.UpdateParams) *mt.Metric
+	RunUpdatesWithNotifications func(context.Context, types.Filter, updateParams.Params) *mt.Metric
 	// FilterByImage builds an image-scoped filter for update and check requests.
 	FilterByImage func([]string, types.Filter) types.Filter
 	// DefaultMetrics returns the process metrics store.
@@ -115,8 +116,8 @@ type Options struct {
 	TrustedProxies []string
 	// Startup holds resolved values for blocking-mode startup messaging.
 	Startup logging.StartupParams
-	// BaseParams is the complete update policy snapshot from config.UpdateParams.
-	BaseParams types.UpdateParams
+	// BaseParams is the complete update policy snapshot built from the process configuration.
+	BaseParams updateParams.Params
 	// RateLimit is the maximum authentication requests per minute per IP.
 	RateLimit int
 	// CheckTimeout is the maximum duration for the /v1/check API endpoint.
@@ -159,17 +160,17 @@ type Options struct {
 	NotificationSplitByContainer bool
 }
 
-// BuildUpdateParams returns the complete UpdateParams snapshot for HTTP-triggered updates.
+// BuildUpdateParams returns the complete [updateParams.Params] snapshot for HTTP-triggered updates.
 //
 // Policy fields come only from BaseParams so HTTP, schedule, and run-once paths share the
-// same config.UpdateParams construction. RunOnce is forced false for HTTP sessions.
+// same snapshot of the process configuration. RunOnce is forced false for HTTP sessions.
 //
 // Parameters:
 //   - opts: API configuration options.
 //
 // Returns:
-//   - types.UpdateParams: Parameters for the update pipeline.
-func BuildUpdateParams(opts Options) types.UpdateParams {
+//   - updateParams.Params: Parameters for the update pipeline.
+func BuildUpdateParams(opts Options) updateParams.Params {
 	params := opts.BaseParams
 	params.RunOnce = false
 

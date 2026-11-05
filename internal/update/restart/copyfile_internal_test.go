@@ -15,6 +15,7 @@ import (
 	containerClient "github.com/nicholas-fedor/watchtower/internal/container/client"
 	mockContainerClient "github.com/nicholas-fedor/watchtower/internal/container/client/mocks"
 	mockUpdate "github.com/nicholas-fedor/watchtower/internal/update/mocks"
+	updateParams "github.com/nicholas-fedor/watchtower/internal/update/params"
 	"github.com/nicholas-fedor/watchtower/pkg/types"
 )
 
@@ -127,7 +128,7 @@ func TestStopStaleContainerCopyFile(t *testing.T) {
 			t.Context(),
 			source,
 			client,
-			types.UpdateParams{Timeout: time.Second},
+			updateParams.Params{Timeout: time.Second},
 		)
 		require.NoError(t, err)
 		assert.True(t, stopped)
@@ -147,7 +148,7 @@ func TestStopStaleContainerCopyFile(t *testing.T) {
 			t.Context(),
 			source,
 			client,
-			types.UpdateParams{Timeout: time.Second},
+			updateParams.Params{Timeout: time.Second},
 		)
 		require.Error(t, err)
 	})
@@ -170,7 +171,7 @@ func TestStopStaleContainerCopyFile(t *testing.T) {
 			t.Context(),
 			source,
 			client,
-			types.UpdateParams{Timeout: time.Second},
+			updateParams.Params{Timeout: time.Second},
 		)
 		require.Error(t, err)
 	})
@@ -193,7 +194,7 @@ func TestStopStaleContainerCopyFile(t *testing.T) {
 			t.Context(),
 			source,
 			client,
-			types.UpdateParams{Timeout: time.Second},
+			updateParams.Params{Timeout: time.Second},
 		)
 		assert.False(t, stopped)
 		assert.True(t, isSkip(err))

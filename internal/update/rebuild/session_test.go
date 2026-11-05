@@ -23,6 +23,7 @@ import (
 	"github.com/nicholas-fedor/watchtower/internal/git"
 	gitConfig "github.com/nicholas-fedor/watchtower/internal/settings/config/git"
 	mockUpdate "github.com/nicholas-fedor/watchtower/internal/update/mocks"
+	updateParams "github.com/nicholas-fedor/watchtower/internal/update/params"
 	mockRebuild "github.com/nicholas-fedor/watchtower/internal/update/rebuild/mocks"
 	"github.com/nicholas-fedor/watchtower/internal/update/state"
 	"github.com/nicholas-fedor/watchtower/pkg/types"
@@ -179,7 +180,7 @@ func TestSession_Watching(t *testing.T) {
 
 		c := gitAssociatedContainer("id", "/app", "myapp:latest", nil)
 
-		assert.False(t, sess.Watching(newTestLogger(t), c, types.UpdateParams{Git: gitConfig.Defaults{Enable: true}}))
+		assert.False(t, sess.Watching(newTestLogger(t), c, updateParams.Params{Git: gitConfig.Defaults{Enable: true}}))
 	})
 
 	t.Run("is false when the client is nil", func(t *testing.T) {
@@ -188,7 +189,7 @@ func TestSession_Watching(t *testing.T) {
 		sess := &Session{}
 		c := gitAssociatedContainer("id", "/app", "myapp:latest", nil)
 
-		assert.False(t, sess.Watching(newTestLogger(t), c, types.UpdateParams{Git: gitConfig.Defaults{Enable: true}}))
+		assert.False(t, sess.Watching(newTestLogger(t), c, updateParams.Params{Git: gitConfig.Defaults{Enable: true}}))
 	})
 
 	t.Run("is true for an associated container when monitoring is enabled", func(t *testing.T) {
@@ -197,7 +198,7 @@ func TestSession_Watching(t *testing.T) {
 		sess := NewSession(gitTestClient(t))
 		c := gitAssociatedContainer("id", "/app", "myapp:latest", nil)
 
-		assert.True(t, sess.Watching(newTestLogger(t), c, types.UpdateParams{Git: gitConfig.Defaults{Enable: true}}))
+		assert.True(t, sess.Watching(newTestLogger(t), c, updateParams.Params{Git: gitConfig.Defaults{Enable: true}}))
 	})
 
 	t.Run("is false when git-watch is false", func(t *testing.T) {
@@ -208,7 +209,7 @@ func TestSession_Watching(t *testing.T) {
 			labels.GitWatch: "false",
 		})
 
-		assert.False(t, sess.Watching(newTestLogger(t), c, types.UpdateParams{Git: gitConfig.Defaults{Enable: true}}))
+		assert.False(t, sess.Watching(newTestLogger(t), c, updateParams.Params{Git: gitConfig.Defaults{Enable: true}}))
 	})
 
 	t.Run("is false for an unassociated container", func(t *testing.T) {
@@ -217,7 +218,7 @@ func TestSession_Watching(t *testing.T) {
 		sess := NewSession(gitTestClient(t))
 		c := mockUpdate.CreateMockContainer("id", "/app", "myapp:latest", time.Now())
 
-		assert.False(t, sess.Watching(newTestLogger(t), c, types.UpdateParams{Git: gitConfig.Defaults{Enable: true}}))
+		assert.False(t, sess.Watching(newTestLogger(t), c, updateParams.Params{Git: gitConfig.Defaults{Enable: true}}))
 	})
 
 	t.Run("is false for Watchtower itself", func(t *testing.T) {
@@ -241,7 +242,7 @@ func TestSession_Watching(t *testing.T) {
 			},
 		)
 
-		assert.False(t, sess.Watching(newTestLogger(t), c, types.UpdateParams{Git: gitConfig.Defaults{Enable: true}}))
+		assert.False(t, sess.Watching(newTestLogger(t), c, updateParams.Params{Git: gitConfig.Defaults{Enable: true}}))
 	})
 }
 
@@ -264,7 +265,7 @@ func TestSession_PrepareRebuilds(t *testing.T) {
 			t.Context(),
 			mockContainerClient.NewMockClient(t),
 			[]types.Container{c},
-			types.UpdateParams{},
+			updateParams.Params{},
 			nil,
 			failed,
 		)
@@ -276,7 +277,7 @@ func TestSession_PrepareRebuilds(t *testing.T) {
 			t.Context(),
 			mockContainerClient.NewMockClient(t),
 			[]types.Container{c},
-			types.UpdateParams{},
+			updateParams.Params{},
 			nil,
 			failed,
 		)
@@ -300,7 +301,7 @@ func TestSession_PrepareRebuilds(t *testing.T) {
 		// The mock has no expectations, so a build or image removal fails
 		// the test.
 		docker := mockContainerClient.NewMockClient(t)
-		sess.PrepareRebuilds(newTestLogger(t), t.Context(), docker, []types.Container{fresh, staleNoResult, staleFreshResult}, types.UpdateParams{}, nil, failed)
+		sess.PrepareRebuilds(newTestLogger(t), t.Context(), docker, []types.Container{fresh, staleNoResult, staleFreshResult}, updateParams.Params{}, nil, failed)
 
 		assert.Empty(t, failed)
 	})
@@ -324,7 +325,7 @@ func TestSession_PrepareRebuilds(t *testing.T) {
 
 		failed := map[types.ContainerID]error{}
 		docker := mockContainerClient.NewMockClient(t)
-		sess.PrepareRebuilds(newTestLogger(t), t.Context(), docker, []types.Container{monitor, noPull}, types.UpdateParams{Git: gitConfig.Defaults{Enable: true}}, nil, failed)
+		sess.PrepareRebuilds(newTestLogger(t), t.Context(), docker, []types.Container{monitor, noPull}, updateParams.Params{Git: gitConfig.Defaults{Enable: true}}, nil, failed)
 
 		assert.Empty(t, failed)
 		assert.Empty(t, sess.built)
@@ -341,7 +342,7 @@ func TestSession_PrepareRebuilds(t *testing.T) {
 
 		failed := map[types.ContainerID]error{}
 		docker := mockContainerClient.NewMockClient(t)
-		sess.PrepareRebuilds(newTestLogger(t), t.Context(), docker, []types.Container{c}, types.UpdateParams{Git: gitConfig.Defaults{Enable: true}}, nil, failed)
+		sess.PrepareRebuilds(newTestLogger(t), t.Context(), docker, []types.Container{c}, updateParams.Params{Git: gitConfig.Defaults{Enable: true}}, nil, failed)
 
 		assert.Contains(t, failed, c.ID())
 		assert.False(t, c.IsStale())
@@ -361,7 +362,7 @@ func TestSession_PrepareRebuilds(t *testing.T) {
 		expectGitBuild(docker)
 
 		progress := &state.Progress{}
-		sess.PrepareRebuilds(newTestLogger(t), t.Context(), docker, []types.Container{c}, types.UpdateParams{Git: gitConfig.Defaults{Enable: true}}, progress, failed)
+		sess.PrepareRebuilds(newTestLogger(t), t.Context(), docker, []types.Container{c}, updateParams.Params{Git: gitConfig.Defaults{Enable: true}}, progress, failed)
 
 		assert.Empty(t, failed)
 		assert.Contains(t, sess.built, c.ID())
@@ -389,7 +390,7 @@ func TestSession_PrepareRebuilds(t *testing.T) {
 
 		failed := map[types.ContainerID]error{}
 		docker := mockContainerClient.NewMockClient(t)
-		sess.PrepareRebuilds(newTestLogger(t), t.Context(), docker, []types.Container{c}, types.UpdateParams{Git: gitConfig.Defaults{Enable: true}}, nil, failed)
+		sess.PrepareRebuilds(newTestLogger(t), t.Context(), docker, []types.Container{c}, updateParams.Params{Git: gitConfig.Defaults{Enable: true}}, nil, failed)
 
 		assert.NotContains(t, failed, c.ID())
 		assert.False(t, c.IsStale())
@@ -412,7 +413,7 @@ func TestSession_PrepareRebuilds(t *testing.T) {
 		c.SetStale(true)
 		sess.store(c.ID(), git.CheckResult{Stale: true, Commit: "abc"})
 
-		params := types.UpdateParams{Git: gitConfig.Defaults{Enable: true}}
+		params := updateParams.Params{Git: gitConfig.Defaults{Enable: true}}
 		log := newTestLogger(t)
 		progress := &state.Progress{}
 		progress.AddScanned(log, c, types.ImageID("git:abc"), params)
@@ -448,7 +449,7 @@ func TestSession_SkipRecreate(t *testing.T) {
 
 		c := gitAssociatedContainer("id", "/app", "myapp:latest", nil)
 
-		assert.False(t, sess.SkipRecreate(c, types.UpdateParams{NoRestart: true}))
+		assert.False(t, sess.SkipRecreate(c, updateParams.Params{NoRestart: true}))
 	})
 
 	t.Run("is false when no-restart is off", func(t *testing.T) {
@@ -458,7 +459,7 @@ func TestSession_SkipRecreate(t *testing.T) {
 		c := gitAssociatedContainer("id", "/app", "myapp:latest", nil)
 		sess.built[c.ID()] = "sha256:git"
 
-		assert.False(t, sess.SkipRecreate(c, types.UpdateParams{}))
+		assert.False(t, sess.SkipRecreate(c, updateParams.Params{}))
 	})
 
 	t.Run("is false for Watchtower even when an image was built", func(t *testing.T) {
@@ -481,7 +482,7 @@ func TestSession_SkipRecreate(t *testing.T) {
 		)
 		sess.built[c.ID()] = "sha256:git"
 
-		assert.False(t, sess.SkipRecreate(c, types.UpdateParams{NoRestart: true}))
+		assert.False(t, sess.SkipRecreate(c, updateParams.Params{NoRestart: true}))
 	})
 
 	t.Run("is true when no-restart is on and this session built the image", func(t *testing.T) {
@@ -491,7 +492,7 @@ func TestSession_SkipRecreate(t *testing.T) {
 		c := gitAssociatedContainer("id", "/app", "myapp:latest", nil)
 		sess.built[c.ID()] = "sha256:git"
 
-		assert.True(t, sess.SkipRecreate(c, types.UpdateParams{NoRestart: true}))
+		assert.True(t, sess.SkipRecreate(c, updateParams.Params{NoRestart: true}))
 	})
 }
 
@@ -507,10 +508,10 @@ func TestSession_ExcludeNoRestart(t *testing.T) {
 		list := []types.Container{c}
 
 		var sess *Session
-		assert.Equal(t, list, sess.ExcludeNoRestart(list, types.UpdateParams{NoRestart: true}))
+		assert.Equal(t, list, sess.ExcludeNoRestart(list, updateParams.Params{NoRestart: true}))
 
 		sess = NewSession(gitTestClient(t))
-		assert.Equal(t, list, sess.ExcludeNoRestart(list, types.UpdateParams{}))
+		assert.Equal(t, list, sess.ExcludeNoRestart(list, updateParams.Params{}))
 	})
 
 	t.Run("drops containers this session built when no-restart is on", func(t *testing.T) {
@@ -521,7 +522,7 @@ func TestSession_ExcludeNoRestart(t *testing.T) {
 		kept := gitAssociatedContainer("kept", "/kept", "other:latest", nil)
 		sess.built[built.ID()] = "sha256:git"
 
-		got := sess.ExcludeNoRestart([]types.Container{built, kept}, types.UpdateParams{NoRestart: true})
+		got := sess.ExcludeNoRestart([]types.Container{built, kept}, updateParams.Params{NoRestart: true})
 		require.Len(t, got, 1)
 		assert.Equal(t, kept.ID(), got[0].ID())
 	})
@@ -568,11 +569,11 @@ func TestSession_NoRestartBuiltIDs(t *testing.T) {
 		t.Parallel()
 
 		var sess *Session
-		assert.Nil(t, sess.NoRestartBuiltIDs(types.UpdateParams{NoRestart: true}))
+		assert.Nil(t, sess.NoRestartBuiltIDs(updateParams.Params{NoRestart: true}))
 
 		sess = NewSession(gitTestClient(t))
 		sess.built["built"] = "sha256:git"
-		assert.Nil(t, sess.NoRestartBuiltIDs(types.UpdateParams{}))
+		assert.Nil(t, sess.NoRestartBuiltIDs(updateParams.Params{}))
 	})
 
 	t.Run("returns a copy of the built container IDs during a no-restart update", func(t *testing.T) {
@@ -581,7 +582,7 @@ func TestSession_NoRestartBuiltIDs(t *testing.T) {
 		sess := NewSession(gitTestClient(t))
 		sess.built["built"] = "sha256:git"
 
-		got := sess.NoRestartBuiltIDs(types.UpdateParams{NoRestart: true})
+		got := sess.NoRestartBuiltIDs(updateParams.Params{NoRestart: true})
 		assert.Equal(t, map[types.ContainerID]struct{}{"built": {}}, got)
 
 		got["other"] = struct{}{}

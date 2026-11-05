@@ -13,6 +13,7 @@ import (
 	"github.com/nicholas-fedor/watchtower/internal/git"
 	"github.com/nicholas-fedor/watchtower/internal/git/project"
 	"github.com/nicholas-fedor/watchtower/internal/observability/logging"
+	updateParams "github.com/nicholas-fedor/watchtower/internal/update/params"
 	"github.com/nicholas-fedor/watchtower/internal/update/state"
 	"github.com/nicholas-fedor/watchtower/pkg/types"
 )
@@ -72,7 +73,7 @@ func NewSession(client *git.Client) *Session {
 //
 // Returns:
 //   - bool: True when the session should check Git instead of the registry.
-func (s *Session) Watching(log *zerolog.Logger, c types.Container, params types.UpdateParams) bool {
+func (s *Session) Watching(log *zerolog.Logger, c types.Container, params updateParams.Params) bool {
 	if s == nil || s.client == nil {
 		return false
 	}
@@ -110,7 +111,7 @@ func (s *Session) PrepareRebuilds(
 	ctx context.Context,
 	docker containerClient.Client,
 	containers []types.Container,
-	params types.UpdateParams,
+	params updateParams.Params,
 	progress *state.Progress,
 	failed map[types.ContainerID]error,
 ) {
@@ -189,7 +190,7 @@ func (s *Session) PrepareRebuilds(
 //
 // Returns:
 //   - bool: True when this session already replaced or must not replace c.
-func (s *Session) SkipRecreate(c types.Container, params types.UpdateParams) bool {
+func (s *Session) SkipRecreate(c types.Container, params updateParams.Params) bool {
 	if s == nil || c.IsWatchtower() {
 		return false
 	}
@@ -252,7 +253,7 @@ func (s *Session) ExcludeApplied(containers []types.Container) []types.Container
 //   - []types.Container: Containers that may still be recreated.
 func (s *Session) ExcludeNoRestart(
 	containers []types.Container,
-	params types.UpdateParams,
+	params updateParams.Params,
 ) []types.Container {
 	if s == nil || !params.NoRestart {
 		return containers
@@ -278,7 +279,7 @@ func (s *Session) ExcludeNoRestart(
 //
 // Returns:
 //   - map[types.ContainerID]struct{}: Built container IDs, or nil when restart is enabled.
-func (s *Session) NoRestartBuiltIDs(params types.UpdateParams) map[types.ContainerID]struct{} {
+func (s *Session) NoRestartBuiltIDs(params updateParams.Params) map[types.ContainerID]struct{} {
 	if s == nil || !params.NoRestart {
 		return nil
 	}
@@ -342,7 +343,7 @@ func (s *Session) result(containerID types.ContainerID) (git.CheckResult, bool) 
 //
 // Returns:
 //   - bool: True when a Git apply backend should run.
-func (s *Session) needsApply(c types.Container, params types.UpdateParams) bool {
+func (s *Session) needsApply(c types.Container, params updateParams.Params) bool {
 	if c == nil || !c.IsStale() {
 		return false
 	}
