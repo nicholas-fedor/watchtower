@@ -213,13 +213,16 @@ func isSensitiveQueryKey(key string) bool {
 // isCredentialWord reports whether a lowercase word of a query parameter name
 // names a credential.
 //
+// Digits at the end of the word are ignored. pin2 and token1 match like pin and
+// token.
+//
 // Parameters:
 //   - word: Lowercase word or part of the name.
 //
 // Returns:
 //   - bool: True when the word names a credential.
 func isCredentialWord(word string) bool {
-	switch word {
+	switch strings.TrimRight(word, "0123456789") {
 	case "token", "password", "passwd", "pwd", "passphrase", "secret", "credential", "credentials", "signature", "sig", "auth", "authorization", "session", "jwt", "bearer", "cookie", "pin":
 		return true
 	default:

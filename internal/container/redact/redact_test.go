@@ -71,6 +71,9 @@ func TestGitURL_SensitiveQueryKeys(t *testing.T) {
 		"sig",
 		"pin",
 		"simPin",
+		"pin2",
+		"password2",
+		"apiToken1",
 	}
 	benign := []string{"author", "authorName", "design", "tokenizer", "passThrough", "format", "lang", "version2", "pinned", "spinner"}
 
@@ -375,6 +378,8 @@ func TestText(t *testing.T) {
 		{name: "JSON field", text: `{"user":"bot","password":"p@ss\"word","id":1}`, want: `{"user":"bot","password":"xxxxx","id":1}`},
 		{name: "JSON number", text: `{"token":123456789}`, want: `{"token":xxxxx}`},
 		{name: "JSON PIN", text: `{"pin":123456,"pinned":true}`, want: `{"pin":xxxxx,"pinned":true}`},
+		{name: "numbered JSON PIN", text: `{"pin2":1234,"version2":3}`, want: `{"pin2":xxxxx,"version2":3}`},
+		{name: "numbered PIN assignment", text: "SIM_PIN2=1234\nVERSION2=3", want: "SIM_PIN2=xxxxx\nVERSION2=3"},
 		{name: "JSON names starting with a digit", text: `{"2fa_token":123456,"2fa_secret":"abc"}`, want: `{"2fa_token":xxxxx,"2fa_secret":"xxxxx"}`},
 		{
 			name: "JSON whitespace around the colon",
