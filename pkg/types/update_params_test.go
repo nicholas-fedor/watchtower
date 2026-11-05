@@ -6,6 +6,9 @@ import (
 	"time"
 
 	"github.com/stretchr/testify/assert"
+
+	"github.com/nicholas-fedor/watchtower/internal/observability/events"
+	updateConfig "github.com/nicholas-fedor/watchtower/internal/settings/config/update"
 )
 
 // stopTimeoutContainer is a container whose only behavior is its stop timeout.
@@ -81,6 +84,86 @@ func TestUpdateParams_DetachedStopTimeout(t *testing.T) {
 
 			got := UpdateParams{Timeout: tt.timeout}.DetachedStopTimeout(stopTimeoutContainer{own: tt.own})
 			assert.Equal(t, tt.want, got)
+		})
+	}
+}
+
+// TestUpdateParams_ScanStartedData checks that each published setting reaches
+// its own payload field. Flags the event does not publish leave the payload
+// empty.
+func TestUpdateParams_ScanStartedData(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name   string
+		params UpdateParams
+		want   events.ScanStartedData
+	}{
+		{name: "no settings", params: UpdateParams{}, want: events.ScanStartedData{}},
+		{name: "cleanup", params: UpdateParams{Cleanup: true}, want: events.ScanStartedData{Cleanup: true}},
+		{name: "no restart", params: UpdateParams{NoRestart: true}, want: events.ScanStartedData{NoRestart: true}},
+		{
+			name:   "monitor only",
+			params: UpdateParams{Policy: updateConfig.Policy{MonitorOnly: true}},
+			want:   events.ScanStartedData{MonitorOnly: true},
+		},
+		{
+			name:   "lifecycle hooks",
+			params: UpdateParams{LifecycleHooks: true},
+			want:   events.ScanStartedData{LifecycleHooks: true},
+		},
+		{
+			name:   "rolling restart",
+			params: UpdateParams{RollingRestart: true},
+			want:   events.ScanStartedData{RollingRestart: true},
+		},
+		{
+			name:   "label precedence",
+			params: UpdateParams{Policy: updateConfig.Policy{LabelPrecedence: true}},
+			want:   events.ScanStartedData{LabelPrecedence: true},
+		},
+		{
+			name:   "no pull",
+			params: UpdateParams{Policy: updateConfig.Policy{NoPull: true}},
+			want:   events.ScanStartedData{NoPull: true},
+		},
+		{name: "run once", params: UpdateParams{RunOnce: true}, want: events.ScanStartedData{RunOnce: true}},
+		{
+			name:   "compose depends on",
+			params: UpdateParams{UseComposeDependsOn: true},
+			want:   events.ScanStartedData{UseComposeDependsOn: true},
+		},
+		{
+			name:   "skip self-update",
+			params: UpdateParams{SkipSelfUpdate: true},
+			want:   events.ScanStartedData{SkipSelfUpdate: true},
+		},
+		{
+			name:   "ephemeral self-update",
+			params: UpdateParams{EphemeralSelfUpdate: true},
+			want:   events.ScanStartedData{EphemeralSelfUpdate: true},
+		},
+		{
+			name:   "revive stopped",
+			params: UpdateParams{ReviveStopped: true},
+			want:   events.ScanStartedData{ReviveStopped: true},
+		},
+		{
+			name: "unpublished flags",
+			params: UpdateParams{
+				Policy:          updateConfig.Policy{EnableChangelog: true},
+				LabelEnable:     true,
+				GitComposeStash: true,
+			},
+			want: events.ScanStartedData{},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			assert.Equal(t, tt.want, tt.params.ScanStartedData())
 		})
 	}
 }

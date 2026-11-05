@@ -638,12 +638,12 @@ func TestHTTPAPIEventStream(t *testing.T) {
 	checkEvents := readSSEEvents(t, stream, 2)
 
 	session := []events.Event{
-		{Type: "scan_started", Data: events.NewScanStartedData(types.UpdateParams{
+		{Type: "scan_started", Data: types.UpdateParams{
 			Cleanup:             true,
 			LifecycleHooks:      true,
 			RunOnce:             true,
 			UseComposeDependsOn: true,
-		})},
+		}.ScanStartedData()},
 		{Type: "scan_failed", Data: events.ScanFailedData{Error: "failed to list containers"}},
 		{Type: "image_cleanup", Data: events.ImageCleanupData{Images: []events.ImageCleanupEntry{{
 			ImageID:       "sha256:" + fixtureID("a"),

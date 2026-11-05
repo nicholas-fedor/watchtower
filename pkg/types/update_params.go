@@ -4,6 +4,7 @@ import (
 	"math"
 	"time"
 
+	"github.com/nicholas-fedor/watchtower/internal/observability/events"
 	gitConfig "github.com/nicholas-fedor/watchtower/internal/settings/config/git"
 	registryConfig "github.com/nicholas-fedor/watchtower/internal/settings/config/registry"
 	updateConfig "github.com/nicholas-fedor/watchtower/internal/settings/config/update"
@@ -11,30 +12,30 @@ import (
 
 // UpdateParams defines options for the Update function.
 type UpdateParams struct {
-	Filter              Filter                  `json:"-"`                    // Container filter.
-	ComposeProjects     map[string]string       `json:"compose_projects"`     // Compose project name to directory inside Watchtower.
-	CurrentContainerID  ContainerID             `json:"current_container_id"` // ID of the current container being updated.
-	Git                 gitConfig.Defaults      `json:"git"`                  // Credential-free Git association settings.
-	Registry            registryConfig.Registry `json:"-"`                    // Settings for registry requests.
+	Filter              Filter                  // Container filter.
+	ComposeProjects     map[string]string       // Compose project name to directory inside Watchtower.
+	CurrentContainerID  ContainerID             // ID of the current container being updated.
+	Git                 gitConfig.Defaults      // Credential-free Git association settings.
+	Registry            registryConfig.Registry // Settings for registry requests.
 	updateConfig.Policy                         // Settings that a container's labels can override.
-	Timeout             time.Duration           `json:"timeout"`                // Container stop timeout before a forced kill.
-	PullFailureDelay    time.Duration           `json:"pull_failure_delay"`     // Delay after a failed self-update pull in run-once mode.
-	LifecycleUID        int                     `json:"lifecycle_uid"`          // Default UID for lifecycle hooks.
-	LifecycleGID        int                     `json:"lifecycle_gid"`          // Default GID for lifecycle hooks.
-	DiskSpaceMax        int64                   `json:"disk_space_max"`         // Block session when Docker image usage reaches this many bytes. Zero disables the block gate.
-	DiskSpaceWarn       int64                   `json:"disk_space_warn"`        // Warn when Docker image usage reaches this many bytes. Zero disables the warning.
-	GitTimeout          time.Duration           `json:"git_timeout"`            // Git network timeout.
-	Cleanup             bool                    `json:"cleanup"`                // Remove old images if true.
-	NoRestart           bool                    `json:"no_restart"`             // Skip restarts if true.
-	ReviveStopped       bool                    `json:"revive_stopped"`         // Start stopped containers after update if true.
-	LifecycleHooks      bool                    `json:"lifecycle_hooks"`        // Enable lifecycle hooks if true.
-	RollingRestart      bool                    `json:"rolling_restart"`        // Use rolling restart if true.
-	RunOnce             bool                    `json:"run_once"`               // Run once mode if true.
-	UseComposeDependsOn bool                    `json:"use_compose_depends_on"` // Enable Docker Compose depends_on label processing.
-	SkipSelfUpdate      bool                    `json:"skip_self_update"`       // Skip Watchtower self-update if true.
-	EphemeralSelfUpdate bool                    `json:"ephemeral_self_update"`  // Use ephemeral container for self-update if true.
-	LabelEnable         bool                    `json:"label_enable"`           // Require enable label for monitoring.
-	GitComposeStash     bool                    `json:"git_compose_stash"`      // Save and restore local Compose project files around checkout.
+	Timeout             time.Duration           // Container stop timeout before a forced kill.
+	PullFailureDelay    time.Duration           // Delay after a failed self-update pull in run-once mode.
+	LifecycleUID        int                     // Default UID for lifecycle hooks.
+	LifecycleGID        int                     // Default GID for lifecycle hooks.
+	DiskSpaceMax        int64                   // Block session when Docker image usage reaches this many bytes. Zero disables the block gate.
+	DiskSpaceWarn       int64                   // Warn when Docker image usage reaches this many bytes. Zero disables the warning.
+	GitTimeout          time.Duration           // Git network timeout.
+	Cleanup             bool                    // Remove old images if true.
+	NoRestart           bool                    // Skip restarts if true.
+	ReviveStopped       bool                    // Start stopped containers after update if true.
+	LifecycleHooks      bool                    // Enable lifecycle hooks if true.
+	RollingRestart      bool                    // Use rolling restart if true.
+	RunOnce             bool                    // Run once mode if true.
+	UseComposeDependsOn bool                    // Enable Docker Compose depends_on label processing.
+	SkipSelfUpdate      bool                    // Skip Watchtower self-update if true.
+	EphemeralSelfUpdate bool                    // Use ephemeral container for self-update if true.
+	LabelEnable         bool                    // Require enable label for monitoring.
+	GitComposeStash     bool                    // Save and restore local Compose project files around checkout.
 }
 
 // detachedCallBudget is the time a detached Docker call gets beyond the
@@ -71,6 +72,28 @@ func (p UpdateParams) DetachedTimeout() time.Duration {
 //   - time.Duration: The bound for the detached calls.
 func (p UpdateParams) DetachedStopTimeout(c Container) time.Duration {
 	return detachedBound(max(p.Timeout, c.StopTimeout(p.Timeout)))
+}
+
+// ScanStartedData returns the payload of the scan_started event. It copies only
+// the update flags the event publishes and leaves out every other setting.
+//
+// Returns:
+//   - events.ScanStartedData: The published update settings.
+func (p UpdateParams) ScanStartedData() events.ScanStartedData {
+	return events.ScanStartedData{
+		Cleanup:             p.Cleanup,
+		NoRestart:           p.NoRestart,
+		MonitorOnly:         p.MonitorOnly,
+		LifecycleHooks:      p.LifecycleHooks,
+		RollingRestart:      p.RollingRestart,
+		LabelPrecedence:     p.LabelPrecedence,
+		NoPull:              p.NoPull,
+		RunOnce:             p.RunOnce,
+		UseComposeDependsOn: p.UseComposeDependsOn,
+		SkipSelfUpdate:      p.SkipSelfUpdate,
+		EphemeralSelfUpdate: p.EphemeralSelfUpdate,
+		ReviveStopped:       p.ReviveStopped,
+	}
 }
 
 // detachedBound returns a stop timeout plus 30 seconds. A negative stop timeout
