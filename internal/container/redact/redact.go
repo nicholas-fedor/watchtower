@@ -26,13 +26,14 @@ var (
 	// curl -v prints after "> ". Group 1 is everything before the value. Group
 	// 2 is the name.
 	headerLine = regexp.MustCompile(`(?m)^([ \t]*[<>]?[ \t]*([A-Za-z][A-Za-z0-9_-]*)[ \t]*:[ \t]*)\S.*$`)
-	// jsonField matches "name": "value" in JSON. Group 1 is everything before
-	// the value. Group 2 is the name.
-	jsonField = regexp.MustCompile(`("([A-Za-z_][A-Za-z0-9_.-]*)"[ \t]*:[ \t]*")(?:[^"\\]|\\.)*`)
+	// jsonField matches "name": "value" in JSON. The name may start with a
+	// digit, as in 2fa_token. Group 1 is everything before the value. Group 2
+	// is the name.
+	jsonField = regexp.MustCompile(`("([A-Za-z0-9_][A-Za-z0-9_.-]*)"\s*:\s*")(?:[^"\\]|\\.)*`)
 	// jsonNumber matches "name": number in JSON, since a PIN or a numeric key
 	// may be written without quotes. Group 1 is everything before the value.
 	// Group 2 is the name.
-	jsonNumber = regexp.MustCompile(`("([A-Za-z_][A-Za-z0-9_.-]*)"[ \t]*:[ \t]*)-?[0-9]+(?:\.[0-9]+)?(?:[eE][+-]?[0-9]+)?`)
+	jsonNumber = regexp.MustCompile(`("([A-Za-z0-9_][A-Za-z0-9_.-]*)"\s*:\s*)-?[0-9]+(?:\.[0-9]+)?(?:[eE][+-]?[0-9]+)?`)
 	// assignmentName matches the name and equals sign of name=value. Group 1 is
 	// the name.
 	assignmentName = regexp.MustCompile(`([A-Za-z_][A-Za-z0-9_.-]*)=`)
@@ -219,7 +220,7 @@ func isSensitiveQueryKey(key string) bool {
 //   - bool: True when the word names a credential.
 func isCredentialWord(word string) bool {
 	switch word {
-	case "token", "password", "passwd", "pwd", "passphrase", "secret", "credential", "credentials", "signature", "sig", "auth", "authorization", "session", "jwt", "bearer", "cookie":
+	case "token", "password", "passwd", "pwd", "passphrase", "secret", "credential", "credentials", "signature", "sig", "auth", "authorization", "session", "jwt", "bearer", "cookie", "pin":
 		return true
 	default:
 		return false

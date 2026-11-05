@@ -69,8 +69,10 @@ func TestGitURL_SensitiveQueryKeys(t *testing.T) {
 		"pass_word",
 		"authToken",
 		"sig",
+		"pin",
+		"simPin",
 	}
-	benign := []string{"author", "authorName", "design", "tokenizer", "passThrough", "format", "lang", "version2"}
+	benign := []string{"author", "authorName", "design", "tokenizer", "passThrough", "format", "lang", "version2", "pinned", "spinner"}
 
 	forms := []struct {
 		name   string
@@ -372,6 +374,13 @@ func TestText(t *testing.T) {
 		{name: "empty value", text: "x TOKEN= done", want: "x TOKEN= done"},
 		{name: "JSON field", text: `{"user":"bot","password":"p@ss\"word","id":1}`, want: `{"user":"bot","password":"xxxxx","id":1}`},
 		{name: "JSON number", text: `{"token":123456789}`, want: `{"token":xxxxx}`},
+		{name: "JSON PIN", text: `{"pin":123456,"pinned":true}`, want: `{"pin":xxxxx,"pinned":true}`},
+		{name: "JSON names starting with a digit", text: `{"2fa_token":123456,"2fa_secret":"abc"}`, want: `{"2fa_token":xxxxx,"2fa_secret":"xxxxx"}`},
+		{
+			name: "JSON whitespace around the colon",
+			text: "{\n  \"password\"\n  :\n  \"abc\",\n  \"token\"\n  :\n  123\n}",
+			want: "{\n  \"password\"\n  :\n  \"xxxxx\",\n  \"token\"\n  :\n  xxxxx\n}",
+		},
 		{name: "JSON number with fraction and exponent", text: `{"id":42,"secret": -1.5e3,"ok":true}`, want: `{"id":42,"secret": xxxxx,"ok":true}`},
 		{
 			name: "JSON field after a URL",
