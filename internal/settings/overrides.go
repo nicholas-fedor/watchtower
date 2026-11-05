@@ -9,10 +9,10 @@ import "github.com/nicholas-fedor/watchtower/pkg/types"
 type RunOverrides struct {
 	// Filter replaces Config.Filter.Predicate when non-nil.
 	Filter types.Filter
+	// CurrentContainerID is the running Watchtower container ID when known.
+	CurrentContainerID types.ContainerID
 	// RunOnce marks a one-shot update session.
 	RunOnce bool
 	// SkipSelfUpdate disables Watchtower self-update for this invocation.
 	SkipSelfUpdate bool
-	// CurrentContainerID is the running Watchtower container ID when known.
-	CurrentContainerID types.ContainerID
 }

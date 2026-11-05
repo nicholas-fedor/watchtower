@@ -6,7 +6,6 @@
       "image_id": "01d110000000",
       "latest_image_id": "d0a110000000",
       "state": "Updated",
-      "update_available": true,
       "git_repo": "https://github.com/org/app.git",
       "git_ref": "v1.2.0",
       "changelog": "https://github.com/org/app/releases/tag/v1.2.0",
@@ -16,7 +15,8 @@
       "current_image_version": "1.1.0",
       "latest_image_version": "1.2.0",
       "current_revision": "1111111111111111111111111111111111111111",
-      "latest_revision": "2222222222222222222222222222222222222222"
+      "latest_revision": "2222222222222222222222222222222222222222",
+      "update_available": true
     },
     {
       "name": "updt2",
@@ -32,8 +32,8 @@
       "image_id": "01d210000000",
       "latest_image_id": "d0a210000000",
       "state": "Failed",
-      "update_available": true,
-      "error": "pull access denied for org/fail1"
+      "error": "pull access denied for org/fail1",
+      "update_available": true
     },
     {
       "name": "frsh1",
@@ -49,8 +49,8 @@
       "image_id": "01d410000000",
       "latest_image_id": "01d410000000",
       "state": "Skipped",
-      "update_available": false,
-      "error": "container is not running"
+      "error": "container is not running",
+      "update_available": false
     },
     {
       "name": "rstr1",

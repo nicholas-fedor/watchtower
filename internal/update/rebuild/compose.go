@@ -25,12 +25,12 @@ import (
 // composeServices is a batch's members grouped by Compose service, ready to
 // apply.
 type composeServices struct {
-	// names holds the services in the order they were first seen.
-	names []string
 	// labels holds the labels to add to each service.
 	labels map[string]map[string]string
 	// members holds each service's stale containers.
 	members map[string][]composeMember
+	// names holds the services in the order they were first seen.
+	names []string
 }
 
 // Errors for rebuilding Compose projects from Git.

@@ -78,19 +78,24 @@ tasks:
       - go vet ./...
 
   lint:
-    desc: Run golangci-lint and apply automatic fixes
+    desc: Run golangci-lint with automatic fixes and check struct field order with betteralign
     cmds:
       - golangci-lint run --fix --config {{.GOLANGCI_CONFIG}} ./...
+      - betteralign ./...
 
   lint:check:
-    desc: Run golangci-lint without modifying files
+    desc: Run golangci-lint without modifying files and check struct field order with betteralign
     cmds:
       - golangci-lint run --fix=false --config {{.GOLANGCI_CONFIG}} ./...
+      - betteralign ./...
 
   fmt:
-    desc: Format the codebase
+    desc: Format the codebase and order struct fields with betteralign
+    # betteralign exits non-zero after applying changes. The second run then
+    # fails the task only for structs it could not reorder.
     cmds:
       - golangci-lint fmt --config {{.GOLANGCI_CONFIG}} ./...
+      - betteralign -apply ./... || betteralign ./...
 
   swag:fmt:
     desc: Format Swagger annotation comments with the swag CLI

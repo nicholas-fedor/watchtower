@@ -31,7 +31,6 @@ type Metric struct {
 
 // Metrics handles processing and exposing scan metrics.
 type Metrics struct {
-	channel            chan *Metric       // Channel for queuing metrics.
 	scanned            prometheus.Gauge   // Gauge for scanned containers.
 	updated            prometheus.Gauge   // Gauge for updated containers.
 	failed             prometheus.Gauge   // Gauge for failed containers.
@@ -46,14 +45,15 @@ type Metrics struct {
 	imageReclaimable   prometheus.Gauge   // Gauge for reclaimable Docker image bytes.
 	diskSpaceMaxBytes  prometheus.Gauge   // Gauge for the configured image-usage maximum.
 	diskSpaceWarnBytes prometheus.Gauge   // Gauge for the configured image-usage warning threshold.
-	stopCh             chan struct{}      // Channel for shutdown signaling.
-	shutdownOnce       sync.Once          // Ensures shutdown is called only once.
-	history            []HistoryEntry     // Ring buffer of scan history.
-	historyIdx         int                // Current write position in the ring buffer.
-	historyMu          sync.RWMutex       // Protects history and historyIdx.
 	//nolint:containedctx
-	ctx    context.Context    // Context for cancellation.
-	cancel context.CancelFunc // Cancel function for the context.
+	ctx          context.Context    // Context for cancellation.
+	channel      chan *Metric       // Channel for queuing metrics.
+	stopCh       chan struct{}      // Channel for shutdown signaling.
+	cancel       context.CancelFunc // Cancel function for the context.
+	history      []HistoryEntry     // Ring buffer of scan history.
+	historyIdx   int                // Current write position in the ring buffer.
+	historyMu    sync.RWMutex       // Protects history and historyIdx.
+	shutdownOnce sync.Once          // Ensures shutdown is called only once.
 }
 
 // NewWithRegistry creates a new Metrics handler with a custom Prometheus registry.

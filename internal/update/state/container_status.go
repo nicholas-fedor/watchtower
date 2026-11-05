@@ -37,19 +37,17 @@ type State int
 //
 //nolint:errname // ContainerStatus is not an error type, it contains an error field.
 type ContainerStatus struct {
+	cooldownEligibleAt   time.Time         // Time when the container becomes eligible for update.
+	containerError       error             // Error encountered, if any.
 	containerID          types.ContainerID // Container ID.
 	oldImage             types.ImageID     // Original image ID.
 	newImage             types.ImageID     // Latest image ID.
 	containerName        string            // Container name.
 	imageName            string            // Image name with tag.
-	containerError       error             // Error encountered, if any.
-	state                State             // Current state.
-	monitorOnly          bool              // Monitor-only flag.
 	newContainerID       types.ContainerID // New container ID after update.
 	cooldownAge          string            // Human-readable image age (e.g., "47 days, 11 hours").
 	cooldownDelay        string            // Human-readable cooldown duration (e.g., "24 hours").
 	cooldownRemaining    string            // Human-readable remaining time (empty if passed).
-	cooldownEligibleAt   time.Time         // Time when the container becomes eligible for update.
 	gitRepo              string            // Resolved Git repository URL.
 	gitRef               string            // Resolved Git ref.
 	changelog            string            // Changelog or releases URL.
@@ -60,6 +58,8 @@ type ContainerStatus struct {
 	latestImageVersion   string            // OCI version annotation of the new image.
 	currentImageRevision string            // OCI revision annotation of the running image.
 	latestImageRevision  string            // OCI revision annotation of the new image.
+	state                State             // Current state.
+	monitorOnly          bool              // Monitor-only flag.
 }
 
 // ID returns the container ID.

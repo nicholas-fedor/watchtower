@@ -17,10 +17,10 @@ import (
 // Buffer is a buffer that is safe for concurrent writes, for logs that
 // goroutines started by a test write while the test reads them.
 type Buffer struct {
-	// mu guards buf.
-	mu sync.Mutex
 	// buf holds the written bytes.
 	buf bytes.Buffer
+	// mu guards buf.
+	mu sync.Mutex
 }
 
 // Entry is one JSON log entry decoded into its fields, keyed by field name.

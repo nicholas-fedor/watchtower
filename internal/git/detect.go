@@ -16,16 +16,16 @@ const probeBodyLimit = 64 << 10
 
 // knownAPI is a confirmed REST fingerprint for one hosted Git product.
 type knownAPI struct {
+	match func(apiProbe) bool
 	kind  string
 	paths [][]string
-	match func(apiProbe) bool
 }
 
 // apiProbe is the closed HTTP result of one fingerprint request.
 type apiProbe struct {
-	Status int
 	Header http.Header
 	Body   []byte
+	Status int
 }
 
 // knownAPIs is the canonical map of product → version/metadata endpoints.

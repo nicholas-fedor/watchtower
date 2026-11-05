@@ -41,8 +41,8 @@ var (
 //
 //nolint:godox
 type msTeamsTypeNotifier struct {
-	webHookURL string
 	log        *zerolog.Logger
+	webHookURL string
 }
 
 // New creates a Teams notifier from resolved legacy settings.

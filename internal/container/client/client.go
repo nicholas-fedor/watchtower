@@ -439,10 +439,13 @@ type Client interface {
 //
 // It wraps the Docker API client and applies custom behavior via ClientOptions.
 type client struct {
-	ClientOptions
-
 	api dockerClient.APIClient
 	log *zerolog.Logger
+
+	// copyFiles holds labeled file snapshots between stop and create of a recreation.
+	copyFiles copyfile.Pending
+
+	ClientOptions
 
 	// runtimeMu protects the cached runtime detection result.
 	runtimeMu sync.Mutex
@@ -450,28 +453,25 @@ type client struct {
 	runtimeDetected bool
 	// isPodman caches the result of Podman runtime detection.
 	isPodman bool
-
-	// copyFiles holds labeled file snapshots between stop and create of a recreation.
-	copyFiles copyfile.Pending
 }
 
 // ClientOptions configures container management behavior for the Docker client.
 type ClientOptions struct {
+	// Fs is the filesystem rooted at "/" that holds the container runtime
+	// marker files. The host filesystem is used when it is nil.
+	Fs fs.FS
+	// RateLimiter paces image pulls, digest checks, and image age requests per
+	// registry host. NewClient creates one when it is nil.
+	RateLimiter      *ratelimit.Limiter
+	CPUCopyMode      string
+	WarnOnHeadFailed containerImage.WarningStrategy
+	// Registry holds the settings for registry digest and image age requests.
+	Registry                registryConfig.Registry
 	RemoveVolumes           bool
 	IncludeStopped          bool
 	ReviveStopped           bool
 	IncludeRestarting       bool
 	DisableMemorySwappiness bool
-	CPUCopyMode             string
-	WarnOnHeadFailed        containerImage.WarningStrategy
-	// Fs is the filesystem rooted at "/" that holds the container runtime
-	// marker files. The host filesystem is used when it is nil.
-	Fs fs.FS
-	// Registry holds the settings for registry digest and image age requests.
-	Registry registryConfig.Registry
-	// RateLimiter paces image pulls, digest checks, and image age requests per
-	// registry host. NewClient creates one when it is nil.
-	RateLimiter *ratelimit.Limiter
 }
 
 // NewClient initializes a new Client instance for Docker API interactions.

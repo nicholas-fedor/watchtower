@@ -38,8 +38,8 @@ func (h *LivenessHandler) Handle(c fiber.Ctx) error {
 
 // ReadinessHandler serves the /readyz endpoint.
 type ReadinessHandler struct {
-	Path  string
 	Probe func(ctx context.Context) bool
+	Path  string
 }
 
 // NewReadinessHandler creates a new readiness handler that checks Docker client

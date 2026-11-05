@@ -43,10 +43,10 @@ const shutdownGracePeriod = 5 * time.Second
 
 // proxyConfig holds configuration for reverse proxy support.
 type proxyConfig struct {
-	// TrustedProxies is a list of trusted proxy IPs/CIDRs.
-	TrustedProxies []string
 	// ProxyHeader is the header for the real client IP (e.g. X-Forwarded-For).
 	ProxyHeader string
+	// TrustedProxies is a list of trusted proxy IPs/CIDRs.
+	TrustedProxies []string
 }
 
 // corsConfig holds configuration for CORS middleware.

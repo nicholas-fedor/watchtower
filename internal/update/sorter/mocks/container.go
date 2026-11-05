@@ -15,10 +15,10 @@ import (
 
 // SimpleContainer implements a minimal Container interface for benchmarking.
 type SimpleContainer struct {
+	ContainerInfoField *dockerContainer.InspectResponse
 	ContainerName      string
 	ContainerID        types.ContainerID
 	ContainerLinks     []string
-	ContainerInfoField *dockerContainer.InspectResponse
 }
 
 func (c *SimpleContainer) Name() string {

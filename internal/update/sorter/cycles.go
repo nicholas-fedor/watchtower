@@ -13,10 +13,10 @@ type cycleFinder struct {
 	lowLink map[string]int
 	// onStack reports whether a node is on the stack of the current search.
 	onStack map[string]bool
-	// stack holds the nodes visited but not yet assigned to a component.
-	stack []string
 	// inCycle records the nodes found on a cycle.
 	inCycle map[string]bool
+	// stack holds the nodes visited but not yet assigned to a component.
+	stack []string
 }
 
 // visit searches the graph depth-first from node and records the members of

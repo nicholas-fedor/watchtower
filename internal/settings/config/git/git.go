@@ -42,18 +42,18 @@ type Image struct {
 // a container is associated with a Git repository. Settings without
 // credentials can be passed to the update packages.
 type Defaults struct {
-	// Enable is the process-wide watcher default (--git-enable / WATCHTOWER_GIT_ENABLE).
-	Enable bool
+	// Images maps exact image names (including tag) to Git associations.
+	Images map[string]Image
 	// DefaultRef is the ref used when a mapping or label omits one.
 	DefaultRef string
 	// SemverPolicy is the semver policy used when a mapping or label omits one.
 	SemverPolicy string
-	// Images maps exact image names (including tag) to Git associations.
-	Images map[string]Image
 	// Dockerfile is the process-wide default Dockerfile path relative to the build context.
 	Dockerfile string
 	// Context is the process-wide default subdirectory of a Git URL context used as the Docker build context.
 	Context string
+	// Enable is the process-wide watcher default (--git-enable / WATCHTOWER_GIT_ENABLE).
+	Enable bool
 }
 
 // Git holds process-wide Git metadata and watcher settings.
@@ -61,8 +61,8 @@ type Git struct {
 	// Defaults holds the credential-free association settings.
 	Defaults
 
-	// Timeout is the Git network timeout (--git-timeout / WATCHTOWER_GIT_TIMEOUT).
-	Timeout time.Duration
+	// ComposeProjects maps Compose project name to a directory inside Watchtower.
+	ComposeProjects map[string]string
 	// Token is the HTTPS auth token. Never projected onto UpdateParams.
 	Token string
 	// Username is the basic-auth username. Never projected onto UpdateParams.
@@ -75,12 +75,13 @@ type Git struct {
 	SSHKnownHosts string
 	// CABundle is the PEM CA bundle for Git HTTPS. Never projected onto UpdateParams.
 	CABundle []byte
+
+	// Timeout is the Git network timeout (--git-timeout / WATCHTOWER_GIT_TIMEOUT).
+	Timeout time.Duration
 	// InsecureSkipTLS skips TLS verification for Git HTTPS.
 	InsecureSkipTLS bool
 	// ComposeStash saves and restores local Compose project files around checkout.
 	ComposeStash bool
-	// ComposeProjects maps Compose project name to a directory inside Watchtower.
-	ComposeProjects map[string]string
 }
 
 // parseImageMapping parses one --git-image value of the form image=repo[#ref][@policy].

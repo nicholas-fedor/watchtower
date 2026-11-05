@@ -125,21 +125,21 @@ type WTContainer struct {
 }
 
 type SynoAuthResponse struct {
-	Success bool `json:"success"`
-	Data    struct {
+	Data struct {
 		SID       string `json:"sid"`
 		SynoToken string `json:"synotoken"`
 	} `json:"data"`
+	Success bool `json:"success"`
 }
 
 type SynoAPIResponse struct {
-	Success bool          `json:"success"`
 	Error   SynologyError `json:"error,omitzero"`
+	Success bool          `json:"success"`
 }
 
 type SynologyError struct {
-	Code int    `json:"code"`
 	Text string `json:"text"`
+	Code int    `json:"code"`
 }
 
 func (e SynologyError) Error() string {

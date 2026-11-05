@@ -41,6 +41,8 @@ body:
 {
   "api_version": "v1",
   "config": {
+    "filter_desc": "Checking all containers (except explicitly disabled with label)",
+    "scope": "",
     "monitor_only": false,
     "cleanup": true,
     "no_pull": false,
@@ -50,8 +52,6 @@ body:
     "include_restarting": false,
     "lifecycle_hooks": true,
     "label_enable": false,
-    "filter_desc": "Checking all containers (except explicitly disabled with label)",
-    "scope": "",
     "git_enable": false
   },
   "timestamp": "<timestamp>"
@@ -140,65 +140,65 @@ body:
       "image": "nginx:1.27",
       "image_id": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
       "digest": "sha256:dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+      "scope": "prod",
       "running": true,
       "watchtower": false,
       "monitor_only": false,
       "no_pull": false,
       "enabled": true,
-      "stale": false,
-      "scope": "prod"
+      "stale": false
     },
     {
       "name": "web-2",
       "image": "nginx:1.27",
       "image_id": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
       "digest": "sha256:dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+      "scope": "prod",
       "running": true,
       "watchtower": false,
       "monitor_only": false,
       "no_pull": false,
       "enabled": true,
-      "stale": false,
-      "scope": "prod"
+      "stale": false
     },
     {
       "name": "worker",
       "image": "ghcr.io/org/worker:latest",
       "image_id": "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
       "digest": "sha256:ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+      "scope": "",
       "running": true,
       "watchtower": false,
       "monitor_only": true,
       "no_pull": false,
       "enabled": true,
-      "stale": false,
-      "scope": ""
+      "stale": false
     },
     {
       "name": "cache",
       "image": "redis:7",
       "image_id": "",
       "digest": "",
+      "scope": "",
       "running": false,
       "watchtower": false,
       "monitor_only": false,
       "no_pull": true,
       "enabled": true,
-      "stale": false,
-      "scope": ""
+      "stale": false
     },
     {
       "name": "watchtower",
       "image": "nickfedor/watchtower:latest",
       "image_id": "sha256:cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
       "digest": "sha256:9999999999999999999999999999999999999999999999999999999999999999",
+      "scope": "",
       "running": true,
       "watchtower": true,
       "monitor_only": false,
       "no_pull": false,
       "enabled": true,
-      "stale": false,
-      "scope": ""
+      "stale": false
     }
   ],
   "count": 5,
@@ -217,13 +217,13 @@ body:
       "image": "redis:7",
       "image_id": "",
       "digest": "",
+      "scope": "",
       "running": false,
       "watchtower": false,
       "monitor_only": false,
       "no_pull": true,
       "enabled": true,
-      "stale": false,
-      "scope": ""
+      "stale": false
     }
   ],
   "count": 1,
@@ -352,67 +352,67 @@ status: 200
 header: Content-Type: application/json; charset=utf-8
 body:
 {
+  "timestamp": "<timestamp>",
+  "api_version": "v1",
   "containers": [
     {
+      "timestamp": "<timestamp>",
       "name": "web",
       "image": "nginx:1.27",
       "image_id": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
       "digest": "sha256:dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
-      "update_available": true,
       "latest_image_id": "sha256:7777777777777777777777777777777777777777777777777777777777777777",
       "latest_digest": "sha256:8888888888888888888888888888888888888888888888888888888888888888",
-      "timestamp": "<timestamp>",
-      "update_source": "registry"
+      "update_source": "registry",
+      "update_available": true
     },
     {
+      "timestamp": "<timestamp>",
       "name": "web-2",
       "image": "nginx:1.27",
       "image_id": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
       "digest": "sha256:dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
-      "update_available": true,
       "latest_image_id": "sha256:7777777777777777777777777777777777777777777777777777777777777777",
       "latest_digest": "sha256:8888888888888888888888888888888888888888888888888888888888888888",
-      "timestamp": "<timestamp>",
-      "update_source": "registry"
+      "update_source": "registry",
+      "update_available": true
     },
     {
+      "timestamp": "<timestamp>",
       "name": "worker",
       "image": "ghcr.io/org/worker:latest",
       "image_id": "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
       "digest": "sha256:ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
-      "update_available": false,
       "latest_image_id": "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
       "latest_digest": "",
-      "timestamp": "<timestamp>",
-      "update_source": "registry"
+      "update_source": "registry",
+      "update_available": false
     },
     {
+      "timestamp": "<timestamp>",
       "name": "cache",
       "image": "redis:7",
       "image_id": "",
       "digest": "",
-      "update_available": false,
       "latest_image_id": "",
       "latest_digest": "",
       "error": "registry returned 503 Service Unavailable",
-      "timestamp": "<timestamp>",
-      "update_source": "registry"
+      "update_source": "registry",
+      "update_available": false
     },
     {
+      "timestamp": "<timestamp>",
       "name": "watchtower",
       "image": "nickfedor/watchtower:latest",
       "image_id": "sha256:cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
       "digest": "sha256:9999999999999999999999999999999999999999999999999999999999999999",
-      "update_available": false,
       "latest_image_id": "sha256:cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
       "latest_digest": "",
-      "timestamp": "<timestamp>",
-      "update_source": "registry"
+      "update_source": "registry",
+      "update_available": false
     }
   ],
-  "count": 5,
-  "timestamp": "<timestamp>",
-  "api_version": "v1"
+  "count": 5
 }
 
 === POST /v1/check?container=web
@@ -420,22 +420,22 @@ status: 200
 header: Content-Type: application/json; charset=utf-8
 body:
 {
+  "timestamp": "<timestamp>",
+  "api_version": "v1",
   "containers": [
     {
+      "timestamp": "<timestamp>",
       "name": "web",
       "image": "nginx:1.27",
       "image_id": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
       "digest": "sha256:dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
-      "update_available": true,
       "latest_image_id": "sha256:7777777777777777777777777777777777777777777777777777777777777777",
       "latest_digest": "sha256:8888888888888888888888888888888888888888888888888888888888888888",
-      "timestamp": "<timestamp>",
-      "update_source": "registry"
+      "update_source": "registry",
+      "update_available": true
     }
   ],
-  "count": 1,
-  "timestamp": "<timestamp>",
-  "api_version": "v1"
+  "count": 1
 }
 
 === POST /v1/update?async=true

@@ -23,9 +23,9 @@ var (
 
 // timeUnit represents a single unit of time (hours, minutes, or seconds) with its value and labels.
 type timeUnit struct {
-	value    int64  // The numeric value of the unit (e.g., 2 for 2 hours)
 	singular string // The singular form of the unit (e.g., "hour")
 	plural   string // The plural form of the unit (e.g., "hours")
+	value    int64  // The numeric value of the unit (e.g., 2 for 2 hours)
 }
 
 // FormatDuration converts a time.Duration into a human-readable string representation.
@@ -66,12 +66,12 @@ func FormatDuration(duration time.Duration) string {
 
 	// Define units with calculated values, preserving order for display.
 	units := []timeUnit{
-		{months, "month", "months"},
-		{weeks, "week", "weeks"},
-		{remainingAfterWeeks, "day", "days"},
-		{hours, "hour", "hours"},
-		{int64(math.Mod(duration.Minutes(), minutesPerHour)), "minute", "minutes"},
-		{int64(math.Mod(duration.Seconds(), secondsPerMinute)), "second", "seconds"},
+		{value: months, singular: "month", plural: "months"},
+		{value: weeks, singular: "week", plural: "weeks"},
+		{value: remainingAfterWeeks, singular: "day", plural: "days"},
+		{value: hours, singular: "hour", plural: "hours"},
+		{value: int64(math.Mod(duration.Minutes(), minutesPerHour)), singular: "minute", plural: "minutes"},
+		{value: int64(math.Mod(duration.Seconds(), secondsPerMinute)), singular: "second", plural: "seconds"},
 	}
 
 	parts := make([]string, 0, timeUnitCount)

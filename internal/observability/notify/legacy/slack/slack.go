@@ -67,12 +67,12 @@ var errInvalidDiscordWebhookURL = errors.New(
 //
 //nolint:godox
 type slackTypeNotifier struct {
+	log       *zerolog.Logger
 	HookURL   string // Slack webhook URL.
 	Username  string // Notification username.
 	Channel   string // Target channel (unused in webhook mode).
 	IconEmoji string // Emoji icon for messages.
 	IconURL   string // URL icon for messages.
-	log       *zerolog.Logger
 }
 
 // New creates a Slack notifier from resolved legacy settings.

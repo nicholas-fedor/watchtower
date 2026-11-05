@@ -23,18 +23,18 @@ import (
 
 // Client applies a Compose project through docker/compose v5.
 type Client struct {
-	mu      sync.Mutex
 	service api.Compose
+	mu      sync.Mutex
 }
 
 // Request is one Compose apply for a checked-out project directory.
 type Request struct {
+	// Labels are extra service labels merged onto the compose model before apply.
+	Labels map[string]map[string]string
 	// Ref is the resolved project directory and optional compose files.
 	Ref composeProject.ProjectRef
 	// Services are Compose service names to build or recreate.
 	Services []string
-	// Labels are extra service labels merged onto the compose model before apply.
-	Labels map[string]map[string]string
 	// BuildOnly builds images and does not recreate running containers.
 	BuildOnly bool
 }

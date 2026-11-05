@@ -24,70 +24,70 @@ var _ containerClient.Client = MockClient{}
 // MockClient is a mock implementation of a Watchtower Client for testing purposes.
 // It simulates container operations with configurable behavior defined by TestData.
 type MockClient struct {
+	ctx           context.Context // Context for cancellation simulation
 	TestData      *TestData
+	Stopped       map[string]bool // Track stopped containers by ID.
 	pullImages    bool
 	removeVolumes bool
-	Stopped       map[string]bool // Track stopped containers by ID.
-	ctx           context.Context // Context for cancellation simulation
 }
 
 // TestData holds configuration data for MockClient's test behavior.
 // It defines container states, staleness, and mock operation results.
 // Counter fields use atomic.Int32 for thread-safe concurrent access.
 type TestData struct {
-	TriedToRemoveImageCount      atomic.Int32                          // Number of times RemoveImageByID was called.
-	RenameContainerCount         atomic.Int32                          // Number of times RenameContainer was called.
-	StopContainerCount           atomic.Int32                          // Number of times StopContainer was called.
-	StopAndRemoveContainerCount  atomic.Int32                          // Number of times StopAndRemoveContainer was called.
-	StartContainerCount          atomic.Int32                          // Number of times StartContainer was called.
-	CreateContainerCount         atomic.Int32                          // Number of times CreateContainer was called.
-	LastStopAndRemoveID          types.ContainerID                     // ID of the last container passed to StopAndRemoveContainer.
-	LastCreatedContainerID       types.ContainerID                     // ID returned by the last successful CreateContainer call.
-	LastRenameTarget             string                                // Last new name passed to RenameContainer.
-	RenameTargets                []string                              // Ordered list of rename targets.
-	SetRestartPolicyCount        atomic.Int32                          // Number of times SetRestartPolicy was called.
-	IsContainerStaleCount        atomic.Int32                          // Number of times IsContainerStale was called.
-	WaitForContainerHealthyCount atomic.Int32                          // Number of times WaitForContainerHealthy was called.
-	ListContainersCount          atomic.Int32                          // Number of times ListContainers was called.
-	NameOfContainerToKeep        string                                // Name of the container to avoid stopping.
-	Containers                   []types.Container                     // List of mock containers.
-	ContainersByID               map[types.ContainerID]types.Container // Map of containers by ID.
-	Staleness                    map[string]bool                       // Map of container names to staleness status.
-	IsContainerStaleError        error                                 // Error to return from IsContainerStale (for testing).
-	ListContainersError          error                                 // Error to return from ListContainers (for testing).
-	ListContainersFailCount      int                                   // Number of times ListContainers should fail before succeeding.
-	StopContainerError           error                                 // Error to return from StopContainer (for testing).
-	StartContainerError          error                                 // Error to return from StartContainer (for testing).
-	StartContainerByIDError      error                                 // Error to return from StartContainerByID (for testing).
-	CreateContainerError         error                                 // Error to return from CreateContainer (for testing).
-	StopContainerFailCount       int                                   // Number of times StopContainer should fail before succeeding.
-	RemoveImageError             error                                 // Error to return from RemoveImageByID (for testing).
-	FailedImageIDs               []types.ImageID                       // List of image IDs that should fail removal.
-	StopOrder                    []string                              // Order in which containers were stopped.
-	CreateOrder                  []string                              // Order in which containers were created.
-	StartOrder                   []string                              // Order in which containers were started.
+	IsContainerStaleError     error                                 // Error to return from IsContainerStale (for testing).
+	ListContainersError       error                                 // Error to return from ListContainers (for testing).
+	StopContainerError        error                                 // Error to return from StopContainer (for testing).
+	StartContainerError       error                                 // Error to return from StartContainer (for testing).
+	StartContainerByIDError   error                                 // Error to return from StartContainerByID (for testing).
+	CreateContainerError      error                                 // Error to return from CreateContainer (for testing).
+	RemoveImageError          error                                 // Error to return from RemoveImageByID (for testing).
+	LastStartedContainer      types.Container                       // Last container passed to StartContainer.
+	SetRestartPolicyCtx       context.Context                       // Last context passed to SetRestartPolicy.
+	CreateContainerCtx        context.Context                       // Last context passed to CreateContainer.
+	RenameContainerCtx        context.Context                       // Last context passed to RenameContainer.
+	StartContainerByIDCtx     context.Context                       // Last context passed to StartContainerByID.
+	GetContainerCtx           context.Context                       // Last context passed to GetContainer.
+	StopAndRemoveContainerCtx context.Context                       // Last context passed to StopAndRemoveContainer.
+	GetImageDiskUsageError    error                                 // Error to return from GetImageDiskUsage.
+	ContainersByID            map[types.ContainerID]types.Container // Map of containers by ID.
+	Staleness                 map[string]bool                       // Map of container names to staleness status.
+	ImageAnnotations          map[string]oci.Annotations            // OCI annotations returned per image reference.
+	LastStopAndRemoveID       types.ContainerID                     // ID of the last container passed to StopAndRemoveContainer.
+	LastCreatedContainerID    types.ContainerID                     // ID returned by the last successful CreateContainer call.
+	LastRenameTarget          string                                // Last new name passed to RenameContainer.
+	NameOfContainerToKeep     string                                // Name of the container to avoid stopping.
+	LastContainerChain        string                                // Last container chain passed to CreateEphemeralOrchestrator.
+	LastStartedContainerID    types.ContainerID                     // ID returned by the last successful StartContainer call.
+	SetRestartPolicyID        types.ContainerID                     // Last container ID passed to SetRestartPolicy.
+	RenameTargets             []string                              // Ordered list of rename targets.
+	Containers                []types.Container                     // List of mock containers.
+	FailedImageIDs            []types.ImageID                       // List of image IDs that should fail removal.
+	StopOrder                 []string                              // Order in which containers were stopped.
+	CreateOrder               []string                              // Order in which containers were created.
+	StartOrder                []string                              // Order in which containers were started.
 	// OperationOrder records client method names in call order for handoff sequencing assertions.
-	OperationOrder            []string
-	RemoveContainerCount      atomic.Int32                  // Number of times RemoveContainer was called.
-	SimulatedLatency          time.Duration                 // Simulated latency for operations (default 0 for fast tests, set for context cancellation tests).
-	LastContainerChain        string                        // Last container chain passed to CreateEphemeralOrchestrator.
-	LastCleanup               bool                          // Last cleanup flag passed to CreateEphemeralOrchestrator.
-	LastStartedContainer      types.Container               // Last container passed to StartContainer.
-	LastStartedContainerID    types.ContainerID             // ID returned by the last successful StartContainer call.
-	SetRestartPolicyID        types.ContainerID             // Last container ID passed to SetRestartPolicy.
-	SetRestartPolicyCtx       context.Context               // Last context passed to SetRestartPolicy.
-	LastRestartPolicy         dockerContainer.RestartPolicy // Last policy passed to SetRestartPolicy.
-	CreateContainerCtx        context.Context               // Last context passed to CreateContainer.
-	RenameContainerCtx        context.Context               // Last context passed to RenameContainer.
-	StartContainerByIDCtx     context.Context               // Last context passed to StartContainerByID.
-	GetContainerCtx           context.Context               // Last context passed to GetContainer.
-	StopAndRemoveContainerCtx context.Context               // Last context passed to StopAndRemoveContainer.
-	GetImageDiskUsageCount    atomic.Int32                  // Number of times GetImageDiskUsage was called.
-	ImageDiskUsage            types.ImageDiskUsage          // Usage returned by GetImageDiskUsage.
-	GetImageDiskUsageError    error                         // Error to return from GetImageDiskUsage.
-	ImageAnnotations          map[string]oci.Annotations    // OCI annotations returned per image reference.
-	LastExecUID               int                           // UID passed to the last ExecuteCommand call.
-	LastExecGID               int                           // GID passed to the last ExecuteCommand call.
+	OperationOrder               []string
+	LastRestartPolicy            dockerContainer.RestartPolicy // Last policy passed to SetRestartPolicy.
+	ImageDiskUsage               types.ImageDiskUsage          // Usage returned by GetImageDiskUsage.
+	ListContainersFailCount      int                           // Number of times ListContainers should fail before succeeding.
+	StopContainerFailCount       int                           // Number of times StopContainer should fail before succeeding.
+	SimulatedLatency             time.Duration                 // Simulated latency for operations (default 0 for fast tests, set for context cancellation tests).
+	LastExecUID                  int                           // UID passed to the last ExecuteCommand call.
+	LastExecGID                  int                           // GID passed to the last ExecuteCommand call.
+	TriedToRemoveImageCount      atomic.Int32                  // Number of times RemoveImageByID was called.
+	RenameContainerCount         atomic.Int32                  // Number of times RenameContainer was called.
+	StopContainerCount           atomic.Int32                  // Number of times StopContainer was called.
+	StopAndRemoveContainerCount  atomic.Int32                  // Number of times StopAndRemoveContainer was called.
+	StartContainerCount          atomic.Int32                  // Number of times StartContainer was called.
+	CreateContainerCount         atomic.Int32                  // Number of times CreateContainer was called.
+	SetRestartPolicyCount        atomic.Int32                  // Number of times SetRestartPolicy was called.
+	IsContainerStaleCount        atomic.Int32                  // Number of times IsContainerStale was called.
+	WaitForContainerHealthyCount atomic.Int32                  // Number of times WaitForContainerHealthy was called.
+	ListContainersCount          atomic.Int32                  // Number of times ListContainers was called.
+	RemoveContainerCount         atomic.Int32                  // Number of times RemoveContainer was called.
+	GetImageDiskUsageCount       atomic.Int32                  // Number of times GetImageDiskUsage was called.
+	LastCleanup                  bool                          // Last cleanup flag passed to CreateEphemeralOrchestrator.
 }
 
 // recordOperation appends an operation name to OperationOrder for sequencing tests.

@@ -123,6 +123,8 @@ func recoverPanics(log *zerolog.Logger) cron.JobWrapper {
 // Each tick copies BaseParams and applies only per-run fields such as SkipSelfUpdate.
 // A tick can disable self-updates, but never enables them when BaseParams disables them.
 type ScheduleDeps struct {
+	// Notifier is closed on schedule shutdown. Prefer Startup.Notifier for messaging.
+	Notifier types.Notifier
 	// Logger is the process logger for scheduled runs. Required and must be non-nil.
 	Logger *zerolog.Logger
 	// Filter determines which containers are updated.
@@ -131,18 +133,20 @@ type ScheduleDeps struct {
 	// caller that starts updates, such as the HTTP API. Nil gives the scheduler
 	// a lock of its own.
 	Lock *UpdateLock
+	// WriteStartupMessage writes the startup message with scheduling information.
+	WriteStartupMessage func(logging.StartupParams)
+	// RunUpdate performs container updates and sends notifications.
+	RunUpdate func(context.Context, types.Filter, types.UpdateParams) *metrics.Metric
 	// ScheduleSpec is the cron-formatted schedule string for periodic updates.
 	ScheduleSpec string
 	// Startup holds resolved values for startup messaging (no flag reads).
 	// Callers must set Filtering, Scope, Client, Notifier, and Version on Startup.
 	// RunUpgradesOnSchedule only applies Sched and UpdateOnStart at send time.
 	Startup logging.StartupParams
-	// WriteStartupMessage writes the startup message with scheduling information.
-	WriteStartupMessage func(logging.StartupParams)
-	// RunUpdate performs container updates and sends notifications.
-	RunUpdate func(context.Context, types.Filter, types.UpdateParams) *metrics.Metric
-	// Notifier is closed on schedule shutdown. Prefer Startup.Notifier for messaging.
-	Notifier types.Notifier
+	// BaseParams is the complete update policy snapshot for every scheduled tick.
+	// Must include Cleanup, MonitorOnly, UseComposeDependsOn, ReviveStopped, and
+	// all other process-wide UpdateParams fields.
+	BaseParams types.UpdateParams
 	// UpdateOnStart triggers an immediate update before the scheduler starts.
 	UpdateOnStart bool
 	// SkipFirstRun skips Watchtower self-update on the first scheduled run
@@ -151,10 +155,6 @@ type ScheduleDeps struct {
 	// StartupMessageSent is true when the startup message was already sent
 	// (for example by the HTTP API in blocking mode).
 	StartupMessageSent bool
-	// BaseParams is the complete update policy snapshot for every scheduled tick.
-	// Must include Cleanup, MonitorOnly, UseComposeDependsOn, ReviveStopped, and
-	// all other process-wide UpdateParams fields.
-	BaseParams types.UpdateParams
 }
 
 // RunUpgradesOnSchedule schedules and executes periodic container updates according to the cron specification.

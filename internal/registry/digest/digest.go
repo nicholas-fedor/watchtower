@@ -40,10 +40,6 @@ const schema2Version = 2
 // manifestBody holds the fields of a manifest response body that tell whether
 // it carries a digest or is a schema 2 manifest or index.
 type manifestBody struct {
-	// Digest is a digest some registries add to the body.
-	Digest string `json:"digest"`
-	// SchemaVersion is 2 for OCI and Docker schema 2 manifests and indexes.
-	SchemaVersion int `json:"schemaVersion"`
 	// Manifests lists the platform manifests of an index. Nil when absent.
 	Manifests *[]json.RawMessage `json:"manifests"`
 	// Config is the config descriptor of an image manifest. Nil when absent.
@@ -53,6 +49,10 @@ type manifestBody struct {
 	} `json:"config"`
 	// Layers lists the layer descriptors of an image manifest. Nil when absent.
 	Layers *[]json.RawMessage `json:"layers"`
+	// Digest is a digest some registries add to the body.
+	Digest string `json:"digest"`
+	// SchemaVersion is 2 for OCI and Docker schema 2 manifests and indexes.
+	SchemaVersion int `json:"schemaVersion"`
 }
 
 // Errors for digest retrieval operations.

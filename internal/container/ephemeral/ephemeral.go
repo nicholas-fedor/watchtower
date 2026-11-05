@@ -91,14 +91,14 @@ type dockerConnectionConfig struct {
 	CertPath string
 	// APIVersion is the pinned Docker API version (empty for autonegotiation).
 	APIVersion string
-	// IsLocal indicates whether the connection is to a local socket or named pipe.
-	IsLocal bool
 	// SocketBind is the socket bind mount string for local connections (e.g., "/var/run/docker.sock:/var/run/docker.sock").
 	// Empty for remote connections.
 	SocketBind string
 	// CertBinds are additional bind mounts for TLS certificate directories.
 	// Only populated for remote TLS connections where certificates need to be mounted.
 	CertBinds []string
+	// IsLocal indicates whether the connection is to a local socket or named pipe.
+	IsLocal bool
 }
 
 // CreateOrchestrator creates and starts the ephemeral orchestrator for

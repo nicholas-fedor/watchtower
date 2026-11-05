@@ -28,11 +28,11 @@ var ErrImageCooldown = errors.New("image is within cooldown period")
 // while still extracting the fields needed for progress reports and
 // rich notifications.
 type CooldownError struct {
+	EligibleAt time.Time
+	err        error
 	Age        string
 	Delay      string
 	Remaining  string
-	EligibleAt time.Time
-	err        error
 }
 
 func (e *CooldownError) Error() string {

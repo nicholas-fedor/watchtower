@@ -28,10 +28,10 @@ import (
 
 // legacyURL is a Shoutrrr URL converted from a legacy notification type.
 type legacyURL struct {
-	notificationType string // Legacy notification type the URL came from.
-	url              string // Converted Shoutrrr URL.
 	//nolint:staticcheck // SA1019: legacy ConvertibleNotifier until v2.
-	notifier types.ConvertibleNotifier // Legacy notifier that built the URL.
+	notifier         types.ConvertibleNotifier // Legacy notifier that built the URL.
+	notificationType string                    // Legacy notification type the URL came from.
+	url              string                    // Converted Shoutrrr URL.
 }
 
 // errUnknownNotificationType indicates an unsupported legacy notification type name.

@@ -40,22 +40,22 @@ type TokenResult struct {
 	Token string
 	// ChallengeHost is the challenge host (for example "ghcr.io"), empty if not applicable.
 	ChallengeHost string
-	// Redirected is true if the challenge request was redirected.
-	Redirected bool
 	// RedirectHost is the final host after redirects, empty if not redirected.
 	RedirectHost string
+	// Redirected is true if the challenge request was redirected.
+	Redirected bool
 }
 
 // challengeResponse holds parsed data from a challenge HTTP response.
 type challengeResponse struct {
-	// statusCode is the HTTP status code from the challenge response.
-	statusCode int
 	// wwwAuthHeader is the WWW-Authenticate header value.
 	wwwAuthHeader string
-	// redirected reports whether the request was redirected.
-	redirected bool
 	// redirectHost is the final host after redirects, empty if not redirected.
 	redirectHost string
+	// statusCode is the HTTP status code from the challenge response.
+	statusCode int
+	// redirected reports whether the request was redirected.
+	redirected bool
 }
 
 // resolveChallengeScheme determines the HTTP scheme for registry requests.

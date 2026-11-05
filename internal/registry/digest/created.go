@@ -49,17 +49,17 @@ const maxConfigSize = 1 << 22
 // imageIndex represents a multi-platform image index (OCI or Docker manifest list).
 type imageIndex struct {
 	MediaType     string       `json:"mediaType"`
-	SchemaVersion int          `json:"schemaVersion"`
 	Manifests     []indexEntry `json:"manifests"`
+	SchemaVersion int          `json:"schemaVersion"`
 }
 
 // indexEntry represents a single entry in an image index.
 type indexEntry struct {
+	Annotations map[string]string `json:"annotations,omitempty"`
+	Platform    platform          `json:"platform"`
 	MediaType   string            `json:"mediaType"`
 	Digest      string            `json:"digest"`
 	Size        int64             `json:"size"`
-	Platform    platform          `json:"platform"`
-	Annotations map[string]string `json:"annotations,omitempty"`
 }
 
 // platform represents the platform of an image in an index.
@@ -71,13 +71,13 @@ type platform struct {
 
 // imageManifest represents a single-platform image manifest (OCI or Docker v2).
 type imageManifest struct {
-	MediaType     string `json:"mediaType"`
-	SchemaVersion int    `json:"schemaVersion"`
-	Config        struct {
+	MediaType string `json:"mediaType"`
+	Config    struct {
 		MediaType string `json:"mediaType"`
 		Digest    string `json:"digest"`
 		Size      int64  `json:"size"`
 	} `json:"config"`
+	SchemaVersion int `json:"schemaVersion"`
 }
 
 // imageConfig represents the relevant fields from an image config blob.
