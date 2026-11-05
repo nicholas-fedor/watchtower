@@ -29,8 +29,6 @@ import (
 var (
 	// errVerifyConfigFailed indicates a failure to verify container configuration for recreation.
 	errVerifyConfigFailed = errors.New("failed to verify container configuration")
-	// errPreUpdateFailed indicates a failure in the pre-update lifecycle command execution.
-	errPreUpdateFailed = errors.New("pre-update command failed")
 	// errSkipUpdate signals that a container update should be skipped due to a specific condition (e.g., EX_TEMPFAIL).
 	errSkipUpdate = errors.New(
 		"skipping container due to pre-update command exit code 75 (EX_TEMPFAIL)",
@@ -496,7 +494,7 @@ func stopStaleContainer(
 				Fields(fields).
 				Msg("Pre-update command execution failed")
 
-			return false, fmt.Errorf("%w: %w", errPreUpdateFailed, err)
+			return false, err //nolint:wrapcheck // The hook's error already names the failed pre-update command.
 		}
 
 		if skipUpdate {

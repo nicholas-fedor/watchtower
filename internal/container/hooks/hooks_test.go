@@ -684,13 +684,10 @@ func runPreUpdateTest(t *testing.T, tt struct {
 	assert.Equal(t, tt.expectedResult, result)
 
 	if tt.expectedErr {
-		require.Error(t, err, "expected an error but got none")
-		assert.Contains(
-			t,
-			err.Error(),
-			"pre-update command execution failed",
-			"error message mismatch",
-		)
+		// The error names the failed hook once. Its callers name the container.
+		require.ErrorIs(t, err, errPreUpdateFailed)
+		require.ErrorIs(t, err, errExecFailed)
+		require.EqualError(t, err, "pre-update command failed: "+errExecFailed.Error())
 	} else {
 		require.NoError(t, err)
 	}

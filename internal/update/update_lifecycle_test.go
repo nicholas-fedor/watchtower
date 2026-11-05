@@ -1,16 +1,21 @@
 package update
 
 import (
+	"errors"
+	"fmt"
 	"slices"
 	"testing"
 	"time"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 
 	dockerContainer "github.com/moby/moby/api/types/container"
 	dockerNetwork "github.com/moby/moby/api/types/network"
 
+	mockContainerClient "github.com/nicholas-fedor/watchtower/internal/container/client/mocks"
+	"github.com/nicholas-fedor/watchtower/internal/container/oci"
 	"github.com/nicholas-fedor/watchtower/internal/registry/ratelimit"
 	"github.com/nicholas-fedor/watchtower/internal/update/cleanup"
 	mockUpdate "github.com/nicholas-fedor/watchtower/internal/update/mocks"
@@ -300,4 +305,42 @@ func TestUpdateAction_LifecycleHooks(t *testing.T) {
 			})
 		})
 	})
+}
+
+// TestUpdate_PreUpdateFailureNamesItOnce verifies that a container whose
+// pre-update hook fails is reported as failed with an error that names the
+// pre-update command once, followed by the command's own error, in both
+// restart modes.
+func TestUpdate_PreUpdateFailureNamesItOnce(t *testing.T) {
+	t.Parallel()
+
+	errCommand := errors.New("command execution failed with exit code 1: backup failed")
+
+	for _, rolling := range []bool{false, true} {
+		t.Run(fmt.Sprintf("rolling=%t", rolling), func(t *testing.T) {
+			t.Parallel()
+
+			app := skipTestContainer("a000000000000000000000000000000000000000000000000000000000000000", "app",
+				map[string]string{"com.centurylinklabs.watchtower.lifecycle.pre-update": "/pre-update.sh"})
+
+			client := mockContainerClient.NewMockClient(t)
+			// The post-check hooks list the containers again after the update.
+			client.EXPECT().ListContainers(mock.Anything, mock.Anything).Return([]types.Container{app}, nil).Times(2)
+			client.EXPECT().IsContainerStale(mock.Anything, mock.Anything, mock.Anything).
+				Return(true, types.ImageID("sha256:new"), "", nil)
+			client.EXPECT().GetImageAnnotations(mock.Anything, mock.Anything).Return(oci.Annotations{}).Maybe()
+			client.EXPECT().
+				ExecuteCommand(mock.Anything, app, "/pre-update.sh", mock.Anything, mock.Anything, mock.Anything).
+				Return(false, errCommand).Once()
+
+			report, _, err := update(newTestLogger(t), t.Context(), client,
+				updateParams.Params{LifecycleHooks: true, RollingRestart: rolling}, ratelimit.New())
+			require.NoError(t, err)
+
+			assert.Equal(t, map[string]string{
+				"app": "pre-update command failed: command execution failed with exit code 1: backup failed",
+			}, reportErrors(report.Failed()))
+			assert.Empty(t, report.Updated())
+		})
+	}
 }
