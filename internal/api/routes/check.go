@@ -8,7 +8,6 @@ import (
 
 	"github.com/nicholas-fedor/watchtower/internal/api/handlers/check"
 	"github.com/nicholas-fedor/watchtower/internal/api/handlers/update"
-	"github.com/nicholas-fedor/watchtower/internal/observability/events"
 	"github.com/nicholas-fedor/watchtower/pkg/types"
 )
 
@@ -23,7 +22,6 @@ func registerCheckRoute(app *fiber.App, auth fiber.Handler, opts Options) {
 	}
 
 	params := BuildUpdateParams(opts)
-	scanStartedData := events.NewScanStartedData(params)
 
 	handler := check.New(opts.Logger,
 		func(ctx context.Context, images, names []string) ([]check.ContainerCheck, error) {
@@ -46,7 +44,7 @@ func registerCheckRoute(app *fiber.App, auth fiber.Handler, opts Options) {
 		opts.Notifier,
 		opts.NotificationSplitByContainer,
 		opts.EventBroadcaster,
-		scanStartedData,
+		params.ScanStartedData(),
 	)
 
 	app.Post(

@@ -120,7 +120,7 @@ func RunUpdatesWithNotifications(
 		params.EventBroadcaster.Publish(events.Event{
 			Type:      "scan_started",
 			Timestamp: time.Now().UTC(),
-			Data:      events.NewScanStartedData(updateConfig),
+			Data:      updateConfig.ScanStartedData(),
 		})
 	}
 
