@@ -685,6 +685,7 @@ func runPreUpdateTest(t *testing.T, tt struct {
 
 	if tt.expectedErr {
 		// The error names the failed hook once. Its callers name the container.
+		require.ErrorIs(t, err, errPreUpdateFailed)
 		require.ErrorIs(t, err, errExecFailed)
 		require.EqualError(t, err, "pre-update command failed: "+errExecFailed.Error())
 	} else {
