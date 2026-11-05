@@ -442,65 +442,6 @@ func TestRunUpdates(t *testing.T) {
 		})
 	})
 
-	t.Run("buildSingleContainerReport", func(t *testing.T) {
-		t.Parallel()
-
-		t.Run("should create a SingleContainerReport with updated container", func(t *testing.T) {
-			t.Parallel()
-
-			mockContainerReport := mockTypes.NewMockContainerReport(t)
-			mockReport := mockTypes.NewMockReport(t)
-
-			mockReport.EXPECT().Scanned().Return([]types.ContainerReport{mockContainerReport})
-			mockReport.EXPECT().Failed().Return([]types.ContainerReport{})
-			mockReport.EXPECT().Skipped().Return([]types.ContainerReport{})
-			mockReport.EXPECT().Stale().Return([]types.ContainerReport{})
-			mockReport.EXPECT().Fresh().Return([]types.ContainerReport{})
-
-			result := buildSingleContainerReport(mockContainerReport, mockReport)
-
-			require.NotNil(t, result)
-			assert.Same(t, mockContainerReport, result.Focus)
-			require.Len(t, result.UpdatedReports, 1)
-			assert.Same(t, mockContainerReport, result.UpdatedReports[0])
-			require.Len(t, result.ScannedReports, 1)
-			assert.Empty(t, result.FailedReports)
-			assert.Empty(t, result.SkippedReports)
-			assert.Empty(t, result.StaleReports)
-			assert.Empty(t, result.FreshReports)
-		})
-	})
-
-	t.Run("buildSingleRestartedContainerReport", func(t *testing.T) {
-		t.Parallel()
-
-		t.Run("should create a SingleContainerReport with restarted container", func(t *testing.T) {
-			t.Parallel()
-
-			mockContainerReport := mockTypes.NewMockContainerReport(t)
-			mockReport := mockTypes.NewMockReport(t)
-
-			mockContainerReport.EXPECT().Error().Return("")
-			mockReport.EXPECT().Scanned().Return([]types.ContainerReport{mockContainerReport})
-			mockReport.EXPECT().Failed().Return([]types.ContainerReport{})
-			mockReport.EXPECT().Skipped().Return([]types.ContainerReport{})
-			mockReport.EXPECT().Stale().Return([]types.ContainerReport{})
-			mockReport.EXPECT().Fresh().Return([]types.ContainerReport{})
-
-			result := buildSingleRestartedContainerReport(mockContainerReport, mockReport)
-
-			require.NotNil(t, result)
-			assert.Same(t, mockContainerReport, result.Focus)
-			require.Len(t, result.RestartedReports, 1)
-			assert.Empty(t, result.RestartedReports[0].Error())
-			require.Len(t, result.ScannedReports, 1)
-			assert.Empty(t, result.FailedReports)
-			assert.Empty(t, result.SkippedReports)
-			assert.Empty(t, result.StaleReports)
-			assert.Empty(t, result.FreshReports)
-		})
-	})
-
 	t.Run("executeUpdate", func(t *testing.T) {
 		t.Parallel()
 
@@ -2096,37 +2037,54 @@ func Test_newScanMetric(t *testing.T) {
 	}
 }
 
-// Test_notifySkippedCooldownContainers verifies that a cooldown-skipped
-// container gets a notification that names it as the focus. The report also
-// lists the session's single updated container for context, which must not be
-// taken for the notification's subject.
-func Test_notifySkippedCooldownContainers(t *testing.T) {
+// TestSendSplitNotifications_CooldownSkipped verifies that a container skipped
+// during its update cooldown gets its own split notification in both modes,
+// and that a container skipped for another reason gets none. The cooldown
+// report follows the split report rule: its updated and restarted lists stay
+// empty, since those containers get their own notifications.
+func TestSendSplitNotifications_CooldownSkipped(t *testing.T) {
 	t.Parallel()
 
-	session := reportfixture.Report(state.UpdatedState, state.SkippedState)
-	skipped := session.Skipped()[0]
+	for _, notificationReport := range []bool{true, false} {
+		t.Run(fmt.Sprintf("notification report %t", notificationReport), func(t *testing.T) {
+			t.Parallel()
 
-	status, ok := skipped.(*state.ContainerStatus)
-	require.True(t, ok)
-	status.SetCooldownInfo("1 hour", "24 hours", "23 hours", time.Now().Add(23*time.Hour))
+			session := reportfixture.Report(
+				state.UpdatedState,
+				state.RestartedState,
+				state.SkippedState,
+				state.SkippedState,
+			)
+			cooldown := session.Skipped()[0]
 
-	notifier := mockTypes.NewMockNotifier(t)
-	notifier.EXPECT().ShouldSendNotification(mock.Anything).Return(true).Once()
+			status, ok := cooldown.(*state.ContainerStatus)
+			require.True(t, ok)
+			status.SetCooldownInfo("1 hour", "24 hours", "23 hours", time.Now().Add(23*time.Hour))
 
-	var sent types.Report
+			notifier := mockTypes.NewMockNotifier(t)
+			notifier.EXPECT().ShouldSendNotification(mock.Anything).Return(true)
 
-	notifier.EXPECT().SendNotification(mock.Anything).
-		Run(func(report types.Report) { sent = report }).Once()
+			var sent []*state.SingleContainerReport
 
-	notified := make(map[string]bool)
-	notifySkippedCooldownContainers(newTestLogger(t), notifier, notified, session)
+			notifier.EXPECT().SendNotification(mock.Anything).Run(func(report types.Report) {
+				single, ok := report.(*state.SingleContainerReport)
+				require.True(t, ok)
 
-	single, ok := sent.(*state.SingleContainerReport)
-	require.True(t, ok)
-	assert.Same(t, skipped, single.Focus)
-	assert.Equal(t, []types.ContainerReport{skipped}, single.SkippedReports)
-	assert.Equal(t, session.Updated(), single.UpdatedReports)
-	assert.True(t, notified[string(skipped.ID())])
+				sent = append(sent, single)
+			})
+
+			sendSplitNotifications(newTestLogger(t), notifier, notificationReport, session, nil)
+
+			// One notification each for the updated, restarted and cooldown containers.
+			require.Len(t, sent, 3)
+
+			cooldownReport := sent[2]
+			assert.Same(t, cooldown, cooldownReport.Focus)
+			assert.Empty(t, cooldownReport.UpdatedReports)
+			assert.Empty(t, cooldownReport.RestartedReports)
+			assert.Equal(t, state.NewSingleContainerReport(cooldown, session), cooldownReport)
+		})
+	}
 }
 
 // TestSendSplitNotifications_MonitorOnlyStale verifies that a split
@@ -2159,8 +2117,7 @@ func TestSendSplitNotifications_MonitorOnlyStale(t *testing.T) {
 			single, ok := sent.(*state.SingleContainerReport)
 			require.True(t, ok)
 			assert.Same(t, monitored, single.Focus)
-			assert.Empty(t, single.UpdatedReports)
-			assert.Equal(t, session.Stale(), single.StaleReports)
+			assert.Equal(t, state.NewSingleContainerReport(monitored, session), single)
 
 			rendered, err := format.Default(false).Render(log, format.Data{Report: sent})
 			require.NoError(t, err)

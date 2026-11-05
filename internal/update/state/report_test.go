@@ -4,6 +4,8 @@ import (
 	"errors"
 	"testing"
 
+	"github.com/stretchr/testify/assert"
+
 	"github.com/nicholas-fedor/watchtower/pkg/types"
 	mockTypes "github.com/nicholas-fedor/watchtower/pkg/types/mocks"
 )
@@ -1248,6 +1250,72 @@ func Test_SortableContainers_Swap(t *testing.T) {
 					)
 				}
 			}
+		})
+	}
+}
+
+// TestNewSingleContainerReport verifies the context rule of split reports. The
+// updated and restarted lists hold the focus container only when the session
+// lists it there. The other lists are the session's whatever the focus.
+func TestNewSingleContainerReport(t *testing.T) {
+	t.Parallel()
+
+	updated := &ContainerStatus{containerName: "updated", state: UpdatedState}
+	restarted := &ContainerStatus{containerName: "restarted", state: RestartedState}
+	stale := &ContainerStatus{containerName: "stale", state: StaleState}
+	skipped := &ContainerStatus{containerName: "skipped", state: SkippedState}
+	failed := &ContainerStatus{containerName: "failed", state: FailedState}
+	fresh := &ContainerStatus{containerName: "fresh", state: FreshState}
+
+	session := &report{
+		scanned:   []types.ContainerReport{updated, restarted, stale, failed, fresh},
+		updated:   []types.ContainerReport{updated},
+		restarted: []types.ContainerReport{restarted},
+		stale:     []types.ContainerReport{stale},
+		skipped:   []types.ContainerReport{skipped},
+		failed:    []types.ContainerReport{failed},
+		fresh:     []types.ContainerReport{fresh},
+	}
+
+	// withContext returns a split report about focus with the session's
+	// context lists and the given primary lists.
+	withContext := func(focus types.ContainerReport, updatedList, restartedList []types.ContainerReport) *SingleContainerReport {
+		return &SingleContainerReport{
+			Focus:            focus,
+			UpdatedReports:   updatedList,
+			RestartedReports: restartedList,
+			ScannedReports:   session.scanned,
+			FailedReports:    session.failed,
+			SkippedReports:   session.skipped,
+			StaleReports:     session.stale,
+			FreshReports:     session.fresh,
+		}
+	}
+
+	tests := []struct {
+		name  string
+		focus types.ContainerReport
+		want  *SingleContainerReport
+	}{
+		{
+			name:  "updated container",
+			focus: updated,
+			want:  withContext(updated, []types.ContainerReport{updated}, nil),
+		},
+		{
+			name:  "restarted container",
+			focus: restarted,
+			want:  withContext(restarted, nil, []types.ContainerReport{restarted}),
+		},
+		{name: "stale container", focus: stale, want: withContext(stale, nil, nil)},
+		{name: "skipped container", focus: skipped, want: withContext(skipped, nil, nil)},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			assert.Equal(t, tt.want, NewSingleContainerReport(tt.focus, session))
 		})
 	}
 }

@@ -277,7 +277,7 @@ func TestSendNotification_SingleFocusKeepsBatchingActive(t *testing.T) {
 
 // TestSendNotification_CooldownFocusWithOneContextContainer verifies that a
 // split notification for a cooldown-skipped container sends that container's
-// queued entries. The report also lists the session's updated and restarted
+// queued entries. The report also lists the session's failed and stale
 // containers for context. One of those lists holds exactly one container, which
 // must not be taken for the notification's subject.
 func TestSendNotification_CooldownFocusWithOneContextContainer(t *testing.T) {
@@ -290,14 +290,14 @@ func TestSendNotification_CooldownFocusWithOneContextContainer(t *testing.T) {
 		contextOf func(types.Report) []types.ContainerReport
 	}{
 		{
-			name:      "one updated container in the session",
-			context:   state.UpdatedState,
-			contextOf: types.Report.Updated,
+			name:      "one failed container in the session",
+			context:   state.FailedState,
+			contextOf: types.Report.Failed,
 		},
 		{
-			name:      "one restarted container in the session",
-			context:   state.RestartedState,
-			contextOf: types.Report.Restarted,
+			name:      "one stale container in the session",
+			context:   state.StaleState,
+			contextOf: types.Report.Stale,
 		},
 	}
 
@@ -311,14 +311,7 @@ func TestSendNotification_CooldownFocusWithOneContextContainer(t *testing.T) {
 			require.Len(t, tt.contextOf(session), 1)
 			other := tt.contextOf(session)[0]
 
-			// The cooldown path names the skipped container as the focus and
-			// lists the session's updated and restarted containers as context.
-			report := &state.SingleContainerReport{
-				Focus:            skipped,
-				SkippedReports:   []types.ContainerReport{skipped},
-				UpdatedReports:   session.Updated(),
-				RestartedReports: session.Restarted(),
-			}
+			report := state.NewSingleContainerReport(skipped, session)
 
 			otherEntry := &format.Entry{
 				Message: "Found new image",
