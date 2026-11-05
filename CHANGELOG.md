@@ -30,6 +30,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Chores
 
+- Update module github.com/gofiber/contrib/v3/zerolog to v1.1.10 by @renovate[bot] in [#3469](https://github.com/nicholas-fedor/watchtower/pull/3469)
 - Update module github.com/gofiber/contrib/v3/swaggo to v1.0.16 by @renovate[bot] in [#3468](https://github.com/nicholas-fedor/watchtower/pull/3468)
 - Order struct fields with betteralign by @nicholas-fedor in [#3448](https://github.com/nicholas-fedor/watchtower/pull/3448)
 - Update google.golang.org/genproto/googleapis/rpc digest to d1e00e9 by @renovate[bot] in [#3445](https://github.com/nicholas-fedor/watchtower/pull/3445)
