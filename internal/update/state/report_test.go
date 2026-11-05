@@ -1266,6 +1266,7 @@ func TestNewSingleContainerReport(t *testing.T) {
 	skipped := &ContainerStatus{containerName: "skipped", state: SkippedState}
 	failed := &ContainerStatus{containerName: "failed", state: FailedState}
 	fresh := &ContainerStatus{containerName: "fresh", state: FreshState}
+	unlisted := &ContainerStatus{containerName: "unlisted", state: UpdatedState}
 
 	session := &report{
 		scanned:   []types.ContainerReport{updated, restarted, stale, failed, fresh},
@@ -1309,6 +1310,12 @@ func TestNewSingleContainerReport(t *testing.T) {
 		},
 		{name: "stale container", focus: stale, want: withContext(stale, nil, nil)},
 		{name: "skipped container", focus: skipped, want: withContext(skipped, nil, nil)},
+		{
+			// The session decides the category, not the container's own state.
+			name:  "updated state the session does not list as updated",
+			focus: unlisted,
+			want:  withContext(unlisted, nil, nil),
+		},
 	}
 
 	for _, tt := range tests {
