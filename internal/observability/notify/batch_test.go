@@ -38,6 +38,8 @@ func TestNotifier_FlushBatching(t *testing.T) {
 				format.StaticData{},
 				time.Duration(0),
 			)
+			// With the worker running, a message that Flush sent would reach the log.
+			shoutrrr.RegisterHook(log)
 			shoutrrr.StartNotification(false)
 			shoutrrr.Flush()
 			shoutrrr.Close()

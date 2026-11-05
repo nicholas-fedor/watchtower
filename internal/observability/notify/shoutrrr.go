@@ -36,8 +36,8 @@ type router interface {
 //
 // It receives log events as a [zerolog.Hook] and queues them. A send renders
 // the queued events with the notification template and delivers the message
-// after the configured delay. Its methods are safe for concurrent use.
-// [NewNotifier] builds it.
+// after the configured delay. Once [Notifier.RegisterHook] has returned, its
+// methods are safe for concurrent use. [NewNotifier] builds it.
 type Notifier struct {
 	sender   router                // Router for sending messages.
 	template *format.Template      // Template for message formatting.

@@ -388,12 +388,17 @@ func TestHandler_Handle_Notifications(t *testing.T) {
 			notifier := mockCheck.NewMockNotifier(t)
 			tt.expect(notifier)
 
-			h := New(newTestLogger(t),
-				func(_ context.Context, _, _ []string) ([]ContainerCheck, error) {
-					return []ContainerCheck{{Name: "c1"}}, nil
-				},
-				5*time.Minute, notifier, tt.splitByContainer, nil, events.ScanStartedData{},
-			)
+			// The check runs while the notifier holds entries back.
+			check := func(_ context.Context, _, _ []string) ([]ContainerCheck, error) {
+				notifier.AssertCalled(t, "StartNotification", true)
+				notifier.AssertNotCalled(t, "StartNotification", false)
+				notifier.AssertNotCalled(t, "Flush")
+				notifier.AssertNotCalled(t, "FlushSplitByContainer")
+
+				return []ContainerCheck{{Name: "c1"}}, nil
+			}
+
+			h := New(newTestLogger(t), check, 5*time.Minute, notifier, tt.splitByContainer, nil, events.ScanStartedData{})
 			app := fiber.New(fiber.Config{})
 			app.Post("/v1/check", h.Handle)
 
