@@ -10,6 +10,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Send split notifications for failed updates by @nicholas-fedor in [#3464](https://github.com/nicholas-fedor/watchtower/pull/3464)
 - Give every split notification report the same session context by @nicholas-fedor in [#3460](https://github.com/nicholas-fedor/watchtower/pull/3460)
 - List monitor-only containers as stale in split notifications by @nicholas-fedor in [#3458](https://github.com/nicholas-fedor/watchtower/pull/3458)
 - Send split notifications with their own container's entries by @nicholas-fedor in [#3456](https://github.com/nicholas-fedor/watchtower/pull/3456)
