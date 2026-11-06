@@ -33,6 +33,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Pass git defaults instead of update params by @nicholas-fedor in [#3432](https://github.com/nicholas-fedor/watchtower/pull/3432)
 - Move GitImage to settings/config/git by @nicholas-fedor in [#3430](https://github.com/nicholas-fedor/watchtower/pull/3430)
 
+### Tests
+
+- Accept pflag's explicit bool syntax in the help goldens by @nicholas-fedor in [#3497](https://github.com/nicholas-fedor/watchtower/pull/3497)
+
 ### Chores
 
 - Update module github.com/spf13/pflag to v1.1.0 by @renovate[bot] in [#3494](https://github.com/nicholas-fedor/watchtower/pull/3494)
