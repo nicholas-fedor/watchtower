@@ -41,6 +41,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Chores
 
+- Update step-security/harden-runner action to v2.22.4 by @renovate[bot] in [#3501](https://github.com/nicholas-fedor/watchtower/pull/3501)
 - Update module github.com/spf13/pflag to v1.1.0 by @renovate[bot] in [#3494](https://github.com/nicholas-fedor/watchtower/pull/3494)
 - Update golang.org/x/exp digest to d498a4c by @renovate[bot] in [#3488](https://github.com/nicholas-fedor/watchtower/pull/3488)
 - Update alpine docker tag to v3.24.4 by @renovate[bot] in [#3489](https://github.com/nicholas-fedor/watchtower/pull/3489)
