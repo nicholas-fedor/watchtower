@@ -26,8 +26,8 @@ import (
 type Notifier interface {
 	// StartNotification starts collecting log entries for the session's
 	// notifications. Entries an earlier owner left collected, such as a check
-	// request's, are sent first. The returned end drops what no notification
-	// took, unless the batch has already ended.
+	// request's, are sent first. Unless the batch has already ended, the
+	// returned end sends the entries no notification took, without a report.
 	StartNotification() func()
 	// SendNotification sends the collected entries with report. A split
 	// report's notification carries only its container's entries.
@@ -124,9 +124,7 @@ func RunUpdatesWithNotifications(
 	log.Debug().Msg("Starting RunUpdatesWithNotifications")
 
 	// The session owns its batch and ends it on every return. Deferred before
-	// the recover, the end runs after a panicked session's flush. It drops the
-	// entries no notification took. In split mode those include the
-	// image-level removal lines. The split path sends them per container.
+	// the recover, the end runs after a panicked session's flush.
 	if params.Notifier != nil {
 		defer params.Notifier.StartNotification()()
 	}
@@ -247,7 +245,6 @@ func RunUpdatesWithNotifications(
 		params.NotificationSplitByContainer,
 		params.NotificationReport,
 		result,
-		cleanedImages,
 	)
 
 	metric = generateAndLogMetric(log, result)
@@ -411,10 +408,10 @@ func executeUpdate(
 
 // performImageCleanup executes image cleanup if enabled.
 //
-// It removes old images after updates if the cleanup flag is set.
-// When multiple containers share the same old image, the image is only removed once
-// (preventing duplicate "Removing image" log entries), but the returned slice includes
-// all container associations so that split-by-container notifications report correctly.
+// It removes old images after updates if the cleanup flag is set. An image
+// that several containers shared is removed once. The returned slice has an
+// entry for each of those containers. The image_cleanup event then lists each
+// container that used a removed image.
 // Docker calls use a detached timeout so SIGTERM after a Watchtower self-update
 // cannot abort leftover image removal.
 //
@@ -452,27 +449,7 @@ func performImageCleanup(log *zerolog.Logger, ctx context.Context,
 			Msg("Failed to clean up some images after update")
 	}
 
-	if len(cleaned) == 0 {
-		return []cleanup.RemovedImageInfo{}
-	}
-
-	// Build a set of successfully removed image IDs.
-	removedIDs := make(map[types.ImageID]bool, len(cleaned))
-	for _, c := range cleaned {
-		removedIDs[c.ImageID] = true
-	}
-
-	// Expand to include all container associations for each removed image.
-	// This ensures split-by-container notifications report cleanup for every
-	// container that used the old image, not just the one that triggered removal.
-	result := make([]cleanup.RemovedImageInfo, 0, len(cleanupImageInfos))
-	for _, info := range cleanupImageInfos {
-		if removedIDs[info.ImageID] {
-			result = append(result, info)
-		}
-	}
-
-	return result
+	return cleaned
 }
 
 // logUpdateReport logs the update report details for debugging purposes.
@@ -508,11 +485,9 @@ func logUpdateReport(log *zerolog.Logger, result types.Report) {
 //   - notificationSplitByContainer: Boolean flag enabling a separate notification for each container.
 //   - notificationReport: Boolean flag enabling report-based notifications.
 //   - result: The report containing the results of the update operation.
-//   - cleanedImages: Slice of successfully cleaned image info.
 func sendNotifications(log *zerolog.Logger, notifier Notifier,
 	notificationSplitByContainer, notificationReport bool,
 	result types.Report,
-	cleanedImages []cleanup.RemovedImageInfo,
 ) {
 	if notifier == nil {
 		return
@@ -520,7 +495,7 @@ func sendNotifications(log *zerolog.Logger, notifier Notifier,
 
 	switch {
 	case notificationSplitByContainer:
-		sendSplitNotifications(log, notifier, notificationReport, result, cleanedImages)
+		sendSplitNotifications(log, notifier, notificationReport, result)
 	case notifier.ShouldSendNotification(result):
 		notifier.SendNotification(result)
 	default:
@@ -550,11 +525,9 @@ func sendNotifications(log *zerolog.Logger, notifier Notifier,
 //   - notifier: The notification system instance for sending update status messages.
 //   - notificationReport: Boolean flag enabling report-based notifications.
 //   - result: The report containing the results of the update operation.
-//   - cleanedImages: Slice of successfully cleaned image info.
 func sendSplitNotifications(log *zerolog.Logger, notifier Notifier,
 	notificationReport bool,
 	result types.Report,
-	cleanedImages []cleanup.RemovedImageInfo,
 ) {
 	// Map to track notified container IDs to prevent duplicate notifications.
 	// Key is the full container ID string for uniqueness, value is boolean indicating
@@ -571,24 +544,6 @@ func sendSplitNotifications(log *zerolog.Logger, notifier Notifier,
 		Int("fresh_count", len(result.Fresh())).
 		Int("scanned_count", len(result.Scanned())).
 		Msg("Split notifications: container counts by category")
-
-	if !notificationReport {
-		// Log-mode split: hook-captured entries are filtered by container inside
-		// SendNotification when the report is a SingleContainerReport.
-		//
-		// Image removal logs once per ImageID without container scope. Expanded
-		// cleanedImages retains every container association for shared images, so
-		// emit a hooked container-scoped cleanup event for each entry so both
-		// containers that shared an old image receive cleanup in split mode.
-		for _, img := range cleanedImages {
-			log.Info().
-				Str("notify", "yes").
-				Str("container_name", img.ContainerName).
-				Str("image_name", img.ImageName).
-				Str("image_id", img.ImageID.ShortID()).
-				Msg(logging.RemovingImage)
-		}
-	}
 
 	// inCooldown reports whether a skipped container waits out its update cooldown.
 	inCooldown := func(r types.ContainerReport) bool {

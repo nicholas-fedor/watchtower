@@ -409,29 +409,69 @@ func TestNotifier_FlushEmptyQueue(t *testing.T) {
 }
 
 // TestNotifier_StartNotification_End verifies that ending a session's batch
-// drops the entries no notification took and ends batching. A line logged
-// afterwards is sent at once instead of waiting in the queue.
+// sends the lines no notification took without a report. A line that a split
+// notification already sent is not sent again. Ending the batch also ends
+// batching. A line logged afterwards is sent at once.
 func TestNotifier_StartNotification_End(t *testing.T) {
 	t.Parallel()
 
-	n, hooked := newIdleNotifier(t)
+	session := reportfixture.Report(state.UpdatedState)
+	require.NotEmpty(t, session.Updated())
 
-	end := n.StartNotification()
+	updated := session.Updated()[0]
+	focused := "Focused line | container=" + updated.Name() + " "
 
-	hooked.Warn().Str("image_id", "01d111111111").Msg(logging.RemovingImage)
+	tests := []struct {
+		name             string
+		want             []string
+		splitByContainer bool
+	}{
+		{
+			name:             "split by container",
+			splitByContainer: true,
+			want:             []string{"Container warning | container=app1 ", focused, "Session error\nSession info"},
+		},
+		{
+			name: "grouped",
+			want: []string{"Container warning | container=app1 \nSession error\nSession info", focused},
+		},
+	}
 
-	end()
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
 
-	n.entriesMutex.RLock()
-	open := n.batch
-	n.entriesMutex.RUnlock()
+			n, hooked := newIdleNotifier(t)
+			n.splitByContainer = tt.splitByContainer
 
-	assert.Nil(t, open)
-	assert.Empty(t, sentMessages(n))
+			end := n.StartNotification()
 
-	hooked.Warn().Msg("Logged after the session")
+			hooked.Warn().Str("container", "app1").Msg("Container warning")
+			hooked.Info().Str("container", updated.Name()).Msg("Focused line")
+			hooked.Error().Msg("Session error")
+			hooked.Info().Msg("Session info")
 
-	assert.Equal(t, []string{"Logged after the session"}, sentMessages(n))
+			n.SendNotification(state.NewSingleContainerReport(updated, session))
+
+			end()
+
+			n.entriesMutex.RLock()
+			open := n.batch
+			n.entriesMutex.RUnlock()
+
+			assert.Nil(t, open)
+
+			// Containers are sent in map order.
+			sent := sentMessages(n)
+			slices.Sort(sent)
+
+			assert.Equal(t, tt.want, sent)
+
+			hooked.Warn().Msg("Logged after the session")
+
+			assert.Equal(t, []string{"Logged after the session"}, sentMessages(n))
+		})
+	}
 }
 
 // newIdleNotifier returns a notifier that is not batching and a logger hooked

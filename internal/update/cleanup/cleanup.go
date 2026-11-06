@@ -782,6 +782,11 @@ func deduplicateByImageID(images []RemovedImageInfo) []RemovedImageInfo {
 // logging successes or failures for debugging and monitoring. Tracks successfully removed image info.
 // If no images are provided, it returns an empty slice and no error.
 //
+// A removed image is logged at info once for each container that used it. A
+// notification about one of those containers then carries the removal.
+// Grouped notifications show it once, since repeated removal lines of one
+// image are deduplicated.
+//
 // Parameters:
 //   - log: Process logger. Required and must be non-nil. A nil logger panics on the first log call.
 //   - ctx: Context for cancellation and timeouts.
@@ -789,7 +794,8 @@ func deduplicateByImageID(images []RemovedImageInfo) []RemovedImageInfo {
 //   - images: Slice of images to remove.
 //
 // Returns:
-//   - []RemovedImageInfo: Slice of successfully removed image info.
+//   - []RemovedImageInfo: The entries of the removed images, one for each
+//     container that used one.
 //   - error: Non-nil if any image removal failed, nil otherwise.
 func RemoveImages(log *zerolog.Logger, ctx context.Context,
 	client containerClient.Client,
@@ -802,8 +808,12 @@ func RemoveImages(log *zerolog.Logger, ctx context.Context,
 		return []RemovedImageInfo{}, nil
 	}
 
-	// Remove each image once, even when several containers used it, so a
-	// shared image logs one removal entry.
+	// Remove each image once, even when several containers used it.
+	users := make(map[types.ImageID][]RemovedImageInfo, len(images))
+	for _, info := range images {
+		users[info.ImageID] = append(users[info.ImageID], info)
+	}
+
 	images = deduplicateByImageID(images)
 
 	removed := []RemovedImageInfo{}
@@ -856,19 +866,15 @@ func RemoveImages(log *zerolog.Logger, ctx context.Context,
 				)
 			}
 		} else {
-			log.Debug().
-				Str("image_id", imageID.ShortID()).
-				Str("image_name", image.ImageName).
-				Msg("Removed old image")
-			removed = append(
-				removed,
-				RemovedImageInfo{
-					ImageID:       imageID,
-					ContainerID:   image.ContainerID,
-					ImageName:     image.ImageName,
-					ContainerName: image.ContainerName,
-				},
-			)
+			for _, user := range users[imageID] {
+				log.Info().
+					Str("container_name", user.ContainerName).
+					Str("image_name", user.ImageName).
+					Str("image_id", imageID.ShortID()).
+					Msg(logging.RemovingImage)
+			}
+
+			removed = append(removed, users[imageID]...)
 		}
 	}
 

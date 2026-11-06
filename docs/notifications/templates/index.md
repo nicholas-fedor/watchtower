@@ -178,15 +178,16 @@ When the [`notification-report`](#notification_report) configuration option is s
       {{- end -}}
     {{- end -}}
   {{- end -}}
+{{- end -}}
 {{- if .Entries -}}
 
 Logs:
 {{- end -}}
 {{range .Entries -}}{{.Time.Format "2006-01-02T15:04:05Z07:00"}} [{{.Level}}] {{.Message}}{{"\n"}}{{- end -}}
-{{- end -}}
 ```
 
 - This example generates a summary of container statuses followed by logs, for notifications such as email or Slack messages.
+- Some notifications carry no report. Their `.Report` is nil. Examples are a check request's messages and the messages that none of a split session's container notifications carries. A report template shows them only if it lists `.Entries`, as this example does.
 - The built-in `default` report template lists each container by its status instead of the logs. A container with a newer image that Watchtower did not apply is listed as `Stale`. Examples are a monitor-only container and a skipped Watchtower self-update.
 
 ### Example Usage
@@ -226,12 +227,12 @@ Logs:
                         {{- end -}}
                     {{- end -}}
                     {{- end -}}
+                    {{- end -}}
                     {{- if .Entries -}}
 
                     Logs:
                     {{- end -}}
                     {{- range .Entries -}}{{.Time.Format "2006-01-02T15:04:05Z07:00"}} [{{.Level}}] {{.Message}}{{"\n"}}{{- end -}}
-                    {{- end -}}
     ```
 
 === "Docker CLI"
@@ -263,12 +264,12 @@ Logs:
           {{- end -}}
     {{- end -}}
       {{- end -}}
+    {{- end -}}
     {{- if .Entries -}}
 
     Logs:
     {{- end -}}
     {{- range .Entries -}}{{.Time.Format \"2006-01-02T15:04:05Z07:00\"}} [{{.Level}}] {{.Message}}{{\"\n\"}}{{- end -}}
-    {{- end -}}
     " \
       watchtower-image
     ```
