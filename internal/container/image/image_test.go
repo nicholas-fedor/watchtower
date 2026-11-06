@@ -31,9 +31,15 @@ import (
 	"github.com/nicholas-fedor/watchtower/pkg/types"
 )
 
-// rateLimitedMessage is the error a daemon reports for a pull that a registry
-// rate limited.
-const rateLimitedMessage = "toomanyrequests: retry-after: 2h, allowed: 44000/minute"
+// Errors of a pull that a registry rate limited.
+const (
+	// rateLimitedMessage is the error the daemon reports.
+	rateLimitedMessage = "toomanyrequests: retry-after: 2h, allowed: 44000/minute"
+	// wantRateLimitedPull is the pull's error for that report. It names the
+	// pull and the image once, before the limit.
+	wantRateLimitedPull = "failed to pull image: ghcr.io/linuxserver/nginx:latest: " +
+		"registry rate limited: retry-after 2h0m0s allowed 44000 per 1m0s"
+)
 
 // newTestImageClient returns an image client on api with a daemon info cache of
 // its own, so tests never share a cached Info answer.
@@ -396,6 +402,8 @@ func TestImageClient_performImagePull(t *testing.T) {
 
 			err := i.performImagePull(t.Context(), "ghcr.io/linuxserver/nginx:latest", dockerClient.ImagePullOptions{})
 			assert.True(t, ratelimit.Is(err), "unexpected error %v", err)
+			// A Retry-After beyond the honor window ends the retries at once.
+			assert.EqualError(t, err, wantRateLimitedPull)
 		})
 
 		t.Run("returns a rate-limit error when ImagePull fails with toomanyrequests", func(t *testing.T) {
@@ -410,6 +418,7 @@ func TestImageClient_performImagePull(t *testing.T) {
 
 			err := i.performImagePull(ctx, "ghcr.io/linuxserver/nginx:latest", dockerClient.ImagePullOptions{})
 			assert.True(t, ratelimit.Is(err), "unexpected error %v", err)
+			assert.EqualError(t, err, wantRateLimitedPull)
 		})
 
 		t.Run("backs off and succeeds when the daemon reports a sub-millisecond retry-after", func(t *testing.T) {
