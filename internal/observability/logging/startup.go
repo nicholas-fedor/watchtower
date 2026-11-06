@@ -21,12 +21,9 @@ type APIVersionProvider interface {
 type StartupNotifier interface {
 	// StartNotification starts collecting log entries for the startup message.
 	// Entries collected before it, such as the lines logged before startup,
-	// are sent first. Startup ends the batch with Flush. It does not use the
-	// returned end.
+	// are sent first. The returned end sends the entries collected since then
+	// without a report.
 	StartNotification() func()
-	// Flush sends the collected entries without a report. Later entries are
-	// sent as they are logged until the next batch opens.
-	Flush()
 	// GetNames returns the names of the configured notification services.
 	GetNames() []string
 }
@@ -71,33 +68,37 @@ type StartupParams struct {
 //     When NoStartupMessage is false, Logger must be non-nil and should be the hooked
 //     process logger (after Notifier.RegisterHook) so batching captures startup lines.
 func WriteStartupMessage(params StartupParams) {
-	// If startup messages are suppressed, skip all startup logging. The lines
-	// collected before startup are still sent. That ends their batch.
+	if !params.NoStartupMessage && params.Logger == nil {
+		panic("logging.WriteStartupMessage: Logger is required when NoStartupMessage is false")
+	}
+
+	// Startup collects its lines in a batch of its own and ends only that
+	// batch. Opening it sends the lines collected before startup.
+	end := func() {}
+	if params.Notifier != nil {
+		end = params.Notifier.StartNotification()
+	}
+
+	// With startup messages suppressed, startup logs nothing and ends its
+	// batch at once.
 	if params.NoStartupMessage {
-		if params.Notifier != nil {
-			params.Notifier.Flush()
-		}
+		end()
 
 		return
 	}
 
-	if params.Logger == nil {
-		panic("logging.WriteStartupMessage: Logger is required when NoStartupMessage is false")
-	}
-
-	// Batch startup lines through the notifier when present (suppression already returned).
-	startupLog := setupStartupLogger(params.Logger, params.Notifier)
+	log := params.Logger
 
 	var apiVersion string
 	if params.Client != nil {
 		apiVersion = params.Client.GetVersion()
 	}
 
-	startupLog.Info().
+	log.Info().
 		Msg("Watchtower " + params.Version + " using Docker API v" + apiVersion)
 
 	if params.DiskSpaceMaxBytes > 0 || params.DiskSpaceWarnBytes > 0 {
-		startupLog.Info().
+		log.Info().
 			Int64("disk_space_max", params.DiskSpaceMaxBytes).
 			Int64("disk_space_warn", params.DiskSpaceWarnBytes).
 			Msg(ImageUsageBudgetEnabled)
@@ -109,50 +110,28 @@ func WriteStartupMessage(params StartupParams) {
 		notifierNames = params.Notifier.GetNames()
 	}
 
-	logNotifierInfo(startupLog, notifierNames)
+	logNotifierInfo(log, notifierNames)
 
 	// Log filtering information, using structured logging for scope when set.
 	if params.Scope != "" {
-		startupLog.Info().
+		log.Info().
 			Str("scope", params.Scope).
 			Msg(ScopedToContainers)
 	} else {
-		startupLog.Debug().Msg(params.Filtering)
+		log.Debug().Msg(params.Filtering)
 	}
 
 	// Log scheduling or run mode information based on configuration.
-	logScheduleInfo(startupLog, params.ScheduleInfo)
+	logScheduleInfo(log, params.ScheduleInfo)
 
-	// Send batched notifications if not suppressed, ensuring startup info reaches users.
-	if params.Notifier != nil {
-		params.Notifier.Flush()
-	}
+	// Send the startup lines.
+	end()
 
 	// Warn about trace-level logging if enabled, as it may expose sensitive data.
-	if startupLog.GetLevel() <= zerolog.TraceLevel {
-		startupLog.Warn().
+	if log.GetLevel() <= zerolog.TraceLevel {
+		log.Warn().
 			Msg("Trace-level logging enabled: Sensitive credentials and tokens may be included in logs")
 	}
-}
-
-// setupStartupLogger prepares the logger for startup messages and starts notifier batching.
-//
-// Callers that suppress startup messages must return before invoking this helper.
-// When notifier is non-nil, StartNotification batches subsequent startup lines for
-// a single Flush.
-//
-// Parameters:
-//   - log: The zerolog logger used for startup messages.
-//   - notifier: The notification system instance for batching messages, or nil.
-//
-// Returns:
-//   - *zerolog.Logger: The logger to use for writing startup messages.
-func setupStartupLogger(log *zerolog.Logger, notifier StartupNotifier) *zerolog.Logger {
-	if notifier != nil {
-		notifier.StartNotification()
-	}
-
-	return log
 }
 
 // logNotifierInfo logs details about the notification setup for Watchtower.

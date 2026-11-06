@@ -86,25 +86,12 @@ func Test_handleUpdateResult(t *testing.T) {
 		assert.Nil(t, result)
 	})
 
-	t.Run("should send no report when error occurs without a report", func(t *testing.T) {
-		t.Parallel()
-
-		mockNotifier := mockUpdate.NewMockNotifier(t)
-		mockNotifier.EXPECT().Flush().Times(1)
-
-		// Call handleUpdateResult with an error and the mock notifier
-		err := errors.New("dependency resolution error")
-		result := handleUpdateResult(newTestLogger(t), nil, err, mockNotifier)
-
-		// Verify we got the expected metric
-		assert.Equal(t, &metrics.Metric{ScanFailed: true}, result)
-	})
-
 	t.Run("should keep the error line out of notifications only when the error is already reported", func(t *testing.T) {
 		t.Parallel()
 
-		// Each case ends a session with an error and no report. Both cases must
-		// still send the batch, since it holds the entry that notifies the cause.
+		// Each case ends a session with an error and no report. In both cases the
+		// session's end sends the batch, which holds the entry that notifies the
+		// cause. The mock fails the test on any notifier call.
 		tests := []struct {
 			name       string
 			err        error
@@ -121,7 +108,6 @@ func Test_handleUpdateResult(t *testing.T) {
 				log, buf := logcapture.NewJSON(zerolog.DebugLevel)
 
 				mockNotifier := mockUpdate.NewMockNotifier(t)
-				mockNotifier.EXPECT().Flush().Times(1)
 
 				handleUpdateResult(log, nil, tt.err, mockNotifier)
 

@@ -3021,7 +3021,6 @@ func TestRunUpdatesWithNotifications_IdentifierCollisionNotifiesOnce(t *testing.
 
 	notifier := mockUpdate.NewMockNotifier(t)
 	expectSessionBatch(t, notifier)
-	notifier.EXPECT().Flush().Once()
 
 	log, buf := logcapture.NewJSON(zerolog.DebugLevel)
 

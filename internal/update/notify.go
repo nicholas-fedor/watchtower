@@ -32,9 +32,6 @@ type Notifier interface {
 	// SendNotification sends the collected entries with report. A split
 	// report's notification carries only its container's entries.
 	SendNotification(report types.Report)
-	// Flush sends the collected entries without a report. Later entries are
-	// sent as they are logged until the next batch opens.
-	Flush()
 	// ShouldSendNotification reports whether report is worth a notification at
 	// the configured notifications level.
 	ShouldSendNotification(report types.Report) bool
@@ -123,15 +120,16 @@ func RunUpdatesWithNotifications(
 
 	log.Debug().Msg("Starting RunUpdatesWithNotifications")
 
-	// The session owns its batch and ends it on every return. Deferred before
-	// the recover, the end runs after a panicked session's flush.
+	// The session owns its batch and ends it on every return. Its end sends
+	// what no notification took, without a report. Deferred before the
+	// recover, it also runs after a panicked session.
 	if params.Notifier != nil {
 		defer params.Notifier.StartNotification()()
 	}
 
 	defer func() {
 		if recovered := recover(); recovered != nil {
-			metric = endPanickedSession(log, params, recovered)
+			metric = endPanickedSession(log, params.EventBroadcaster, recovered)
 		}
 	}()
 
@@ -267,14 +265,12 @@ func RunUpdatesWithNotifications(
 
 // handleUpdateResult processes the result of an update operation and returns an appropriate metric.
 //
-// It checks for errors or nil results, logging accordingly. If an error occurred, it sends a
-// notification via the provided notifier (if not nil) to alert about the failure. An update that
-// fails partway still returns the report of the work done before the error, so that report is
-// notified and counted. Without a partial report, the notification is sent without a report, so
-// report templates list the queued error entry. When a phase has already logged the error's cause
-// as a notification, the "Update execution failed" line is logged with notify=no, so the failure
-// is notified once. On error or nil result, it returns a non-nil metric to indicate the failure
-// state. On success, it returns nil to indicate continuation of the update process.
+// It logs an update error at error level. When a phase has already notified the error's cause,
+// that line is logged with notify=no, which keeps the failure to one notification. An update that
+// fails partway still returns the report of the work done before the error. That report is sent
+// through the notifier and counted. Without a report, nothing is sent here. The session's end then
+// sends the batch without a report, which lets report templates list the queued error entry. On
+// error or nil result, it returns a metric that marks a failed scan. On success, it returns nil.
 //
 // Parameters:
 //   - result: The report from the update operation. It may be partial when err is non-nil.
@@ -295,11 +291,6 @@ func handleUpdateResult(log *zerolog.Logger, result types.Report, err error, not
 		event.Msg(logging.UpdateFailed)
 
 		if result == nil {
-			// Without a report, report templates list the batch's entries.
-			if notifier != nil {
-				notifier.Flush()
-			}
-
 			return &metrics.Metric{ScanFailed: true}
 		}
 
@@ -327,20 +318,20 @@ func handleUpdateResult(log *zerolog.Logger, result types.Report, err error, not
 // ends one.
 //
 // The panic value is logged at error, so it reaches notifications. The stack
-// is logged at debug without notifying. The session's notification batch, which
-// holds the panic entry, is then sent without a report. Subscribers get
-// scan_failed.
+// is logged at debug without notifying. The session's end then sends its
+// notification batch, which holds the panic entry, without a report.
+// Subscribers get scan_failed.
 //
 // Parameters:
 //   - log: Process logger for the session.
-//   - params: The session's parameters, for its notifier and event broadcaster.
+//   - broadcaster: Event broadcaster that receives scan_failed. It may be nil.
 //   - recovered: The value the session panicked with.
 //
 // Returns:
 //   - *metrics.Metric: A metric marking a failed scan with zero counts.
 func endPanickedSession(
 	log *zerolog.Logger,
-	params RunUpdatesWithNotificationsParams,
+	broadcaster *events.Broadcaster,
 	recovered any,
 ) *metrics.Metric {
 	panicValue := fmt.Sprint(recovered)
@@ -351,14 +342,8 @@ func endPanickedSession(
 		Str("stack", string(debug.Stack())).
 		Msg("Stack of the update panic")
 
-	// Without a report, report templates list the batch's entries, so the
-	// panic entry is in the message. A zero-count report would hide it.
-	if params.Notifier != nil {
-		params.Notifier.Flush()
-	}
-
-	if params.EventBroadcaster != nil {
-		params.EventBroadcaster.Publish(events.Event{
+	if broadcaster != nil {
+		broadcaster.Publish(events.Event{
 			Type:      "scan_failed",
 			Timestamp: time.Now().UTC(),
 			Data: events.ScanFailedData{
@@ -477,8 +462,8 @@ func logUpdateReport(log *zerolog.Logger, result types.Report) {
 // sendNotifications handles sending notifications about update results.
 //
 // It supports both grouped and per-container notifications based on configuration flags.
-// A grouped report below the notifications level is not sent. The lines the
-// session queued are then sent without it.
+// A grouped report below the notifications level is not sent. The session's
+// end then sends the lines it queued, without the report.
 //
 // Parameters:
 //   - notifier: The notification system instance for sending update status messages.
@@ -493,15 +478,14 @@ func sendNotifications(log *zerolog.Logger, notifier Notifier,
 		return
 	}
 
-	switch {
-	case notificationSplitByContainer:
+	if notificationSplitByContainer {
 		sendSplitNotifications(log, notifier, notificationReport, result)
-	case notifier.ShouldSendNotification(result):
+
+		return
+	}
+
+	if notifier.ShouldSendNotification(result) {
 		notifier.SendNotification(result)
-	default:
-		// The report is below the notifications level.
-		// Lines the session queued at that level are still sent without it.
-		notifier.Flush()
 	}
 }
 

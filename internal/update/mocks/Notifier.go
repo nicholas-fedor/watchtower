@@ -45,39 +45,6 @@ func (_m *MockNotifier) EXPECT() *MockNotifier_Expecter {
 	return &MockNotifier_Expecter{mock: &_m.Mock}
 }
 
-// Flush provides a mock function for the type MockNotifier
-func (_mock *MockNotifier) Flush() {
-	_mock.Called()
-	return
-}
-
-// MockNotifier_Flush_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'Flush'
-type MockNotifier_Flush_Call struct {
-	*mock.Call
-}
-
-// Flush is a helper method to define mock.On call
-func (_e *MockNotifier_Expecter) Flush() *MockNotifier_Flush_Call {
-	return &MockNotifier_Flush_Call{Call: _e.mock.On("Flush")}
-}
-
-func (_c *MockNotifier_Flush_Call) Run(run func()) *MockNotifier_Flush_Call {
-	_c.Call.Run(func(args mock.Arguments) {
-		run()
-	})
-	return _c
-}
-
-func (_c *MockNotifier_Flush_Call) Return() *MockNotifier_Flush_Call {
-	_c.Call.Return()
-	return _c
-}
-
-func (_c *MockNotifier_Flush_Call) RunAndReturn(run func()) *MockNotifier_Flush_Call {
-	_c.Run(run)
-	return _c
-}
-
 // SendNotification provides a mock function for the type MockNotifier
 func (_mock *MockNotifier) SendNotification(report types.Report) {
 	_mock.Called(report)

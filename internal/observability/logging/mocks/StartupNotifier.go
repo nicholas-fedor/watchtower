@@ -44,39 +44,6 @@ func (_m *MockStartupNotifier) EXPECT() *MockStartupNotifier_Expecter {
 	return &MockStartupNotifier_Expecter{mock: &_m.Mock}
 }
 
-// Flush provides a mock function for the type MockStartupNotifier
-func (_mock *MockStartupNotifier) Flush() {
-	_mock.Called()
-	return
-}
-
-// MockStartupNotifier_Flush_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'Flush'
-type MockStartupNotifier_Flush_Call struct {
-	*mock.Call
-}
-
-// Flush is a helper method to define mock.On call
-func (_e *MockStartupNotifier_Expecter) Flush() *MockStartupNotifier_Flush_Call {
-	return &MockStartupNotifier_Flush_Call{Call: _e.mock.On("Flush")}
-}
-
-func (_c *MockStartupNotifier_Flush_Call) Run(run func()) *MockStartupNotifier_Flush_Call {
-	_c.Call.Run(func(args mock.Arguments) {
-		run()
-	})
-	return _c
-}
-
-func (_c *MockStartupNotifier_Flush_Call) Return() *MockStartupNotifier_Flush_Call {
-	_c.Call.Return()
-	return _c
-}
-
-func (_c *MockStartupNotifier_Flush_Call) RunAndReturn(run func()) *MockStartupNotifier_Flush_Call {
-	_c.Run(run)
-	return _c
-}
-
 // GetNames provides a mock function for the type MockStartupNotifier
 func (_mock *MockStartupNotifier) GetNames() []string {
 	ret := _mock.Called()

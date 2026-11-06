@@ -137,17 +137,23 @@ func TestWriteStartupMessage(t *testing.T) {
 	})
 
 	// The startup lines are collected from the start and sent as one
-	// notification, which names the configured services.
+	// notification, which names the configured services. Startup ends only its
+	// own batch, after its lines are logged.
 	t.Run("should send the startup message as one notification", func(t *testing.T) {
 		t.Parallel()
 
 		log, buffer := newBufferLogger(zerolog.InfoLevel)
 		notifier := mockLogging.NewMockStartupNotifier(t)
 
+		var ended bool
+
 		mock.InOrder(
-			notifier.EXPECT().StartNotification().Return(func() {}).Once(),
+			notifier.EXPECT().StartNotification().Return(func() {
+				notifier.AssertNumberOfCalls(t, "GetNames", 1)
+
+				ended = true
+			}).Once(),
 			notifier.EXPECT().GetNames().Return([]string{"slack", "gotify"}).Once(),
-			notifier.EXPECT().Flush().Once(),
 		)
 
 		WriteStartupMessage(StartupParams{
@@ -159,20 +165,26 @@ func TestWriteStartupMessage(t *testing.T) {
 		})
 
 		assert.Contains(t, buffer.String(), "Using notifications: slack, gotify")
+		assert.True(t, ended, "startup ends its batch")
 	})
 
 	// The notifier collects the lines logged before startup. Without a startup
-	// message they are sent on their own. That ends the collection.
+	// message, startup opens its batch and ends it at once. Opening it sends
+	// the lines collected before it on their own.
 	t.Run("should send the lines logged before startup when the message is suppressed", func(t *testing.T) {
 		t.Parallel()
 
+		var ended bool
+
 		notifier := mockLogging.NewMockStartupNotifier(t)
-		notifier.EXPECT().Flush().Once()
+		notifier.EXPECT().StartNotification().Return(func() { ended = true }).Once()
 
 		WriteStartupMessage(StartupParams{
 			Notifier:         notifier,
 			NoStartupMessage: true,
 		})
+
+		assert.True(t, ended, "startup ends its batch")
 	})
 
 	t.Run("should not panic when Logger is nil but NoStartupMessage is set", func(t *testing.T) {
@@ -186,20 +198,6 @@ func TestWriteStartupMessage(t *testing.T) {
 				Version:          "v1.0.0",
 			})
 		})
-	})
-}
-
-// Test_setupStartupLogger verifies that the startup logger is the given logger
-// when there is no notifier to batch startup lines through.
-func Test_setupStartupLogger(t *testing.T) {
-	t.Parallel()
-
-	t.Run("should return the provided logger when notifier is nil", func(t *testing.T) {
-		t.Parallel()
-
-		log, _ := newBufferLogger(zerolog.InfoLevel)
-
-		assert.Same(t, log, setupStartupLogger(log, nil))
 	})
 }
 
