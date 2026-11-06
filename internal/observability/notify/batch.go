@@ -23,6 +23,18 @@ type batch struct {
 	holders int
 }
 
+// queued returns the entries the batch holds.
+//
+// Returns:
+//   - []*format.Entry: The queued entries. Nil for a nil batch.
+func (b *batch) queued() []*format.Entry {
+	if b == nil {
+		return nil
+	}
+
+	return b.entries
+}
+
 // StartNotification opens the batch of an update session or of startup.
 //
 // Log entries are then queued until the batch is sent. A batch an earlier owner
@@ -45,9 +57,7 @@ func (n *Notifier) StartNotification() func() {
 
 	// Sending after unlock keeps template work and internal logging outside the
 	// queue lock.
-	if earlier != nil {
-		n.sendEnded(earlier)
-	}
+	n.sendEnded(earlier)
 
 	return func() {
 		if left, ok := n.takeBatch(owned); ok {
@@ -129,7 +139,7 @@ func (n *Notifier) HoldNotifications() func() {
 func (n *Notifier) SendNotification(report types.Report) {
 	split, ok := report.(*state.SingleContainerReport)
 	if !ok || split.Focus == nil {
-		n.sendDeduplicated(n.takeEntries(), report)
+		n.sendDeduplicated(n.takeOpen().queued(), report)
 
 		return
 	}
@@ -166,7 +176,7 @@ func (n *Notifier) SendNotification(report types.Report) {
 // queue sends nothing. Messages logged after it are sent one at a time until
 // the next batch opens.
 func (n *Notifier) Flush() {
-	n.sendWithoutReport(n.takeEntries())
+	n.sendWithoutReport(n.takeOpen().queued())
 }
 
 // entryMatchesFocus reports whether a queued entry belongs to the focus container.
@@ -216,22 +226,18 @@ func (n *Notifier) ShouldSendNotification(report types.Report) bool {
 	return true
 }
 
-// takeEntries ends the open batch, whoever owns it.
+// takeOpen ends the open batch, whoever owns it.
 //
 // Returns:
-//   - []*format.Entry: The entries that were queued. Nil when no batch is open.
-func (n *Notifier) takeEntries() []*format.Entry {
+//   - *batch: The batch that was open. Nil when no batch is open.
+func (n *Notifier) takeOpen() *batch {
 	n.entriesMutex.Lock()
 	defer n.entriesMutex.Unlock()
 
 	open := n.batch
 	n.batch = nil
 
-	if open == nil {
-		return nil
-	}
-
-	return open.entries
+	return open
 }
 
 // takeBatch ends owned if it is still the open batch.
@@ -259,11 +265,15 @@ func (n *Notifier) takeBatch(owned *batch) ([]*format.Entry, bool) {
 // sendEnded sends the entries of a batch that ended without a report.
 //
 // A check request's batch is sent as its checks would send it. Any other batch
-// is sent in one notification.
+// is sent in one notification. A nil batch sends nothing.
 //
 // Parameters:
-//   - ended: A batch that is no longer the open one.
+//   - ended: A batch that is no longer the open one, or nil.
 func (n *Notifier) sendEnded(ended *batch) {
+	if ended == nil {
+		return
+	}
+
 	if ended.holders > 0 {
 		n.sendUnreported(ended.entries)
 

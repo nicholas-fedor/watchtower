@@ -16,6 +16,18 @@ const (
 	// RestartsKept is logged when Watchtower fails to set its container's
 	// restart policy to "no" before it exits.
 	RestartsKept = "Could not disable Watchtower's restart policy. The runtime may start it again"
+	// RunConfigurationFailed is logged when Watchtower exits because the
+	// settings of its run, such as the HTTP API's, are invalid.
+	RunConfigurationFailed = "Failed to build run configuration"
+	// RollingRestartValidationFailed is logged when Watchtower exits because
+	// it cannot confirm that the monitored containers suit rolling restarts.
+	RollingRestartValidationFailed = "Rolling restart compatibility validation failed"
+	// APISetupFailed is logged when Watchtower exits because the HTTP API
+	// cannot be set up.
+	APISetupFailed = "API setup failed"
+	// SchedulingFailed is logged when Watchtower exits because its update
+	// schedule is invalid.
+	SchedulingFailed = "Could not schedule updates"
 	// ScopedToContainers is logged when Watchtower is limited to the
 	// containers of one scope.
 	ScopedToContainers = "Only checking containers in scope"

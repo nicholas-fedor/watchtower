@@ -30,6 +30,8 @@ var commonTemplates = map[string]string{
 	// (startup ended because the scope label could not be read),
 	// "Could not disable Watchtower's restart policy. The runtime may start it again"
 	// (an exit could not keep the runtime from starting Watchtower again),
+	// "Failed to build run configuration", "Rolling restart compatibility validation failed",
+	// "API setup failed" and "Could not schedule updates" (Watchtower exited on the error),
 	// "Update panicked" (an update session stopped on a panic),
 	// "Update execution failed" (an update session ended in an error),
 	// "Could not check container for updates" (a container's update check failed),
@@ -141,7 +143,7 @@ var commonTemplates = map[string]string{
     Could not update {{with (index $e.Data "container")}}{{.}}{{else}}container{{end}}{{with (index $e.Data "error")}}: {{.}}{{end}}
 {{- else if eq $msg "Could not check container for updates" -}}
     Could not check {{with (index $e.Data "container")}}{{.}}{{else}}container{{end}} for updates{{with (index $e.Data "error")}}: {{.}}{{end}}
-{{- else if or (eq $msg "Could not identify Watchtower's own container. Self-updates are disabled and old instances will not be removed") (eq $msg "Could not inspect Watchtower's own container. Self-updates are disabled") (eq $msg "Could not inspect Watchtower's own container to read its scope label. Exiting rather than running without a scope") (eq $msg "Could not disable Watchtower's restart policy. The runtime may start it again") (eq $msg "Update panicked") (eq $msg "Update execution failed") -}}
+{{- else if or (eq $msg "Could not identify Watchtower's own container. Self-updates are disabled and old instances will not be removed") (eq $msg "Could not inspect Watchtower's own container. Self-updates are disabled") (eq $msg "Could not inspect Watchtower's own container to read its scope label. Exiting rather than running without a scope") (eq $msg "Could not disable Watchtower's restart policy. The runtime may start it again") (eq $msg "Failed to build run configuration") (eq $msg "Rolling restart compatibility validation failed") (eq $msg "API setup failed") (eq $msg "Could not schedule updates") (eq $msg "Update panicked") (eq $msg "Update execution failed") -}}
     {{$msg}}{{with (index $e.Data "error")}}: {{.}}{{end}}
 {{- else if $e.Data -}}
     {{- /* For messages with data, show message and key=value pairs */ -}}

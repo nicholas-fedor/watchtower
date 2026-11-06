@@ -529,13 +529,7 @@ func TestRunUpgradesOnSchedule_InvalidCronSpec(t *testing.T) {
 	deps.ScheduleSpec = "invalid cron spec"
 
 	err := RunUpgradesOnSchedule(ctx, deps)
-	if err == nil {
-		t.Error("expected error")
-	}
-
-	if err != nil && !strings.Contains(err.Error(), "failed to schedule updates") {
-		t.Errorf("expected error to contain 'failed to schedule updates', got %v", err)
-	}
+	require.ErrorContains(t, err, `invalid schedule "invalid cron spec": `)
 }
 
 func TestRunUpgradesOnSchedule_QuotedScheduleSpec(t *testing.T) {

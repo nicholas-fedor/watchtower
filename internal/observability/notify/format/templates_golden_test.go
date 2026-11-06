@@ -80,6 +80,10 @@ var legacyTemplateMessages = []string{
 	logging.SelfUninspected,
 	logging.ScopeLabelUnreadable,
 	logging.RestartsKept,
+	logging.RunConfigurationFailed,
+	logging.RollingRestartValidationFailed,
+	logging.APISetupFailed,
+	logging.SchedulingFailed,
 	logging.InvalidPreUpdateTimeout,
 	logging.InvalidPostUpdateTimeout,
 	logging.InvalidPreCheckTimeout,
@@ -222,6 +226,16 @@ func goldenEntryData(message string) map[string]any {
 		return map[string]any{"error": "failed to inspect container: context deadline exceeded"}
 	case logging.RestartsKept:
 		return map[string]any{"error": "failed to set restart policy: context deadline exceeded"}
+	case logging.RunConfigurationFailed:
+		return map[string]any{
+			"error": `invalid http-api-host: must be empty or a valid IP address (IPv4 or IPv6): "not-an-ip"`,
+		}
+	case logging.RollingRestartValidationFailed:
+		return map[string]any{"error": "container has dependencies incompatible with rolling restarts"}
+	case logging.APISetupFailed:
+		return map[string]any{"error": "API token is empty or unset"}
+	case logging.SchedulingFailed:
+		return map[string]any{"error": `invalid schedule "bad": expected exactly 6 fields, found 1: [bad]`}
 	case logging.UpdateFailed:
 		return map[string]any{"error": "failed to list containers: context deadline exceeded"}
 	case logging.UpdatePanicked:

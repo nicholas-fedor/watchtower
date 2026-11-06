@@ -283,7 +283,7 @@ func RunUpgradesOnSchedule(ctx context.Context, deps ScheduleDeps) error {
 			scheduledUpdateFunc,
 		)
 		if err != nil {
-			return fmt.Errorf("failed to schedule updates: %w", err)
+			return fmt.Errorf("invalid schedule %q: %w", scheduleSpec, err)
 		}
 	}
 

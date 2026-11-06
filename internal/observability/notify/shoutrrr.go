@@ -202,15 +202,20 @@ func createNotifier(
 
 // Close gracefully shuts down the Shoutrrr notifier.
 //
-// It signals the notification goroutine to stop and waits for it to send every
-// queued message, including one it is sending. These sends skip the configured
-// delay. Each send is bounded by its service's time budget in Shoutrrr. Close
-// returns at once when no goroutine was started. Messages sent after Close are
+// It first sends the lines still held in an open batch without a report, as a
+// new batch sends one an earlier owner left open. It then signals the
+// notification goroutine to stop and waits for it to send every queued
+// message, including one it is sending. These sends skip the configured delay.
+// Each send is bounded by its service's time budget in Shoutrrr. Close returns
+// at once when no goroutine was started. Messages sent after Close are
 // dropped.
 func (n *Notifier) Close() {
 	log := n.ll()
 
 	n.closeOnce.Do(func() {
+		// Queue the held lines before the closed flag makes the send drop them.
+		n.sendEnded(n.takeOpen())
+
 		n.closed.Store(true)
 
 		// Without a worker goroutine there is nothing to wait for.

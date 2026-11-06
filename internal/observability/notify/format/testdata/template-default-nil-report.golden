@@ -43,6 +43,10 @@ Could not identify Watchtower's own container. Self-updates are disabled and old
 Could not inspect Watchtower's own container. Self-updates are disabled: failed to inspect container: context deadline exceeded
 Could not inspect Watchtower's own container to read its scope label. Exiting rather than running without a scope: failed to inspect container: context deadline exceeded
 Could not disable Watchtower's restart policy. The runtime may start it again: failed to set restart policy: context deadline exceeded
+Failed to build run configuration: invalid http-api-host: must be empty or a valid IP address (IPv4 or IPv6): "not-an-ip"
+Rolling restart compatibility validation failed: container has dependencies incompatible with rolling restarts
+API setup failed: API token is empty or unset
+Could not schedule updates: invalid schedule "bad": expected exactly 6 fields, found 1: [bad]
 Invalid pre-update timeout value, using default: lifecycle hook timeout must be a whole number of minutes of 0 or more: got -1
 Invalid post-update timeout value, using default: lifecycle hook timeout must be a whole number of minutes of 0 or more: strconv.Atoi: parsing "soon": invalid syntax
 Invalid pre-check timeout value, using default: lifecycle hook timeout must be a whole number of minutes of 0 or more: strconv.Atoi: parsing "1.5": invalid syntax

@@ -479,6 +479,63 @@ func TestClose_SendAfterCloseIsDropped(t *testing.T) {
 	assert.Contains(t, logcapture.Messages(t, buf.String(), "debug"), "Notifier closed, skipping send")
 }
 
+// TestClose_SendsOpenBatch verifies that Close sends the lines still held in
+// an open batch before it stops. A batch opened before startup goes out in one
+// notification. A check's batch goes out as its release would send it, one
+// notification per container in split mode.
+func TestClose_SendsOpenBatch(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		// hold opens the batch that Close finds still open.
+		hold func(n *Notifier)
+		name string
+		want []string
+		// splitByContainer sends a check's lines one notification per container.
+		splitByContainer bool
+	}{
+		{
+			name: "lines logged before startup",
+			hold: func(n *Notifier) {
+				n.batch = &batch{}
+			},
+			want: []string{"Container warning | container=app1 \nStartup error"},
+		},
+		{
+			name:             "a check that still holds its batch, split by container",
+			splitByContainer: true,
+			hold: func(n *Notifier) {
+				n.HoldNotifications()
+			},
+			want: []string{"Container warning | container=app1 ", "Startup error"},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			n, hooked := newIdleNotifier(t)
+			n.splitByContainer = tt.splitByContainer
+
+			tt.hold(n)
+
+			hooked.Warn().Str("container", "app1").Msg("Container warning")
+			hooked.Error().Msg("Startup error")
+
+			require.Empty(t, sentMessages(n), "the lines are held until Close")
+
+			n.Close()
+
+			// Containers are sent in map order.
+			sent := sentMessages(n)
+			slices.Sort(sent)
+
+			assert.Equal(t, tt.want, sent)
+		})
+	}
+}
+
 // TestClose_ConcurrentSendDoesNotPanic verifies that sendEntries running while
 // Close shuts the worker down never panics. The test cannot force a send
 // between the closed check and the enqueue. It repeats the race many times
