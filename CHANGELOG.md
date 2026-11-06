@@ -34,6 +34,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Chores
 
+- Update golang.org/x/exp digest to d498a4c by @renovate[bot] in [#3488](https://github.com/nicholas-fedor/watchtower/pull/3488)
 - Update alpine docker tag to v3.24.4 by @renovate[bot] in [#3489](https://github.com/nicholas-fedor/watchtower/pull/3489)
 - Update golang:alpine3.24 docker digest to fa3d596 by @renovate[bot] in [#3485](https://github.com/nicholas-fedor/watchtower/pull/3485)
 - Update golang:1.27.3-alpine docker digest to fa3d596 by @renovate[bot] in [#3484](https://github.com/nicholas-fedor/watchtower/pull/3484)
