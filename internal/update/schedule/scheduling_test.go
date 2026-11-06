@@ -345,16 +345,18 @@ func TestRunUpgradesOnSchedule_WaitingRunStopsAtShutdown(t *testing.T) {
 			return &metrics.Metric{}
 		}, func(logging.StartupParams) {})
 
-		// Another update holds the lock while the scheduled run comes due.
 		deps.Lock = NewUpdateLock()
-		require.True(t, deps.Lock.TryLock())
-
 		deps.ScheduleSpec = "@every 1s"
 
 		ctx, cancel := context.WithCancel(t.Context())
 		done := make(chan error, 1)
 
 		go func() { done <- RunUpgradesOnSchedule(ctx, deps) }()
+
+		// Another update takes the lock after the startup message and holds it
+		// while the scheduled run comes due.
+		synctest.Wait()
+		require.True(t, deps.Lock.TryLock())
 
 		time.Sleep(1500 * time.Millisecond)
 		cancel()
@@ -477,43 +479,125 @@ func TestRunUpgradesOnSchedule_UpdateOnStartSkippedWhenCanceled(t *testing.T) {
 	}
 }
 
+// TestRunUpgradesOnSchedule_StartupWaitsForRunningUpdate verifies that the
+// startup message waits for an update that already holds the lock, such as
+// one the HTTP API started as soon as it began serving. The two would
+// otherwise share one notification batch. The update at startup is then
+// skipped and counted as a skipped scan, as it is when it finds the lock
+// taken. The startup message therefore does not announce it. The test does
+// not run in parallel, because it reads the process-wide skipped scans counter.
+func TestRunUpgradesOnSchedule_StartupWaitsForRunningUpdate(t *testing.T) {
+	before := skippedScansTotal(t)
+
+	synctest.Test(t, func(t *testing.T) {
+		lock := NewUpdateLock()
+		require.True(t, lock.TryLock())
+
+		var updated atomic.Bool
+
+		var announced atomic.Pointer[logging.StartupParams]
+
+		deps := testDeps(t, func(context.Context, types.Filter, updateParams.Params) *metrics.Metric {
+			updated.Store(true)
+
+			return &metrics.Metric{}
+		}, func(startup logging.StartupParams) {
+			announced.Store(&startup)
+		})
+		deps.Lock = lock
+		deps.UpdateOnStart = true
+
+		ctx, cancel := context.WithCancel(t.Context())
+		done := make(chan error, 1)
+
+		go func() { done <- RunUpgradesOnSchedule(ctx, deps) }()
+
+		synctest.Wait()
+		assert.Nil(t, announced.Load(), "the startup message waits for the running update")
+
+		lock.Unlock()
+		synctest.Wait()
+
+		startup := announced.Load()
+		require.NotNil(t, startup, "the startup message follows the running update")
+		require.NotNil(t, startup.UpdateOnStart)
+		assert.False(t, *startup.UpdateOnStart, "the startup message announces the skipped update at startup")
+		assert.InDelta(t, before+1, skippedScansTotal(t), 0)
+
+		cancel()
+		require.NoError(t, <-done)
+		assert.False(t, updated.Load(), "the update at startup is skipped")
+	})
+}
+
 // TestRunUpgradesOnSchedule_UpdateOnStartSkippedWhileLocked verifies that the
-// update at startup does not wait for an update that already holds the lock,
-// such as one started through the HTTP API, and is counted as a skipped scan.
-// It reads the process-wide skipped scans counter, so it does not run in
-// parallel.
+// update at startup does not wait for an update that holds the lock. The HTTP
+// API can start one right after the startup message. The skipped update is
+// counted as a skipped scan. Because the startup message is already sent
+// here, the lock is left to that update. The test does not run in parallel,
+// because it reads the process-wide skipped scans counter.
 func TestRunUpgradesOnSchedule_UpdateOnStartSkippedWhileLocked(t *testing.T) {
 	before := skippedScansTotal(t)
 
-	lock := NewUpdateLock()
-	require.True(t, lock.TryLock())
+	synctest.Test(t, func(t *testing.T) {
+		lock := NewUpdateLock()
+		require.True(t, lock.TryLock())
 
-	var updateCalled atomic.Bool
+		var updated atomic.Bool
 
-	deps := testDeps(t, func(context.Context, types.Filter, updateParams.Params) *metrics.Metric {
-		updateCalled.Store(true)
+		deps := testDeps(t, func(context.Context, types.Filter, updateParams.Params) *metrics.Metric {
+			updated.Store(true)
 
-		return &metrics.Metric{}
-	}, func(logging.StartupParams) {})
-	deps.Lock = lock
-	deps.UpdateOnStart = true
+			return &metrics.Metric{}
+		}, nil)
+		deps.Lock = lock
+		deps.StartupMessageSent = true
+		deps.UpdateOnStart = true
 
-	ctx, cancel := context.WithCancel(t.Context())
-	defer cancel()
+		ctx, cancel := context.WithCancel(t.Context())
+		done := make(chan error, 1)
 
-	errCh := make(chan error, 1)
+		go func() { done <- RunUpgradesOnSchedule(ctx, deps) }()
 
-	go func() { errCh <- RunUpgradesOnSchedule(ctx, deps) }()
+		synctest.Wait()
+		assert.InDelta(t, before+1, skippedScansTotal(t), 0)
 
-	require.Eventually(t, func() bool {
-		return skippedScansTotal(t) == before+1
-	}, 5*time.Second, 10*time.Millisecond)
+		lock.Unlock()
+		cancel()
+		require.NoError(t, <-done)
+		assert.False(t, updated.Load(), "the update at startup is skipped")
+	})
+}
 
-	lock.Unlock()
-	cancel()
+// TestRunUpgradesOnSchedule_StartupSkippedAtShutdown verifies that a startup
+// message that waits for a running update is skipped when the process stops
+// first. A stopping process has nothing to announce.
+func TestRunUpgradesOnSchedule_StartupSkippedAtShutdown(t *testing.T) {
+	synctest.Test(t, func(t *testing.T) {
+		lock := NewUpdateLock()
+		require.True(t, lock.TryLock())
 
-	require.NoError(t, <-errCh)
-	assert.False(t, updateCalled.Load(), "the update at startup is skipped")
+		var announced atomic.Bool
+
+		deps := testDeps(t, nil, func(logging.StartupParams) {
+			announced.Store(true)
+		})
+		deps.Lock = lock
+
+		ctx, cancel := context.WithCancel(t.Context())
+		done := make(chan error, 1)
+
+		go func() { done <- RunUpgradesOnSchedule(ctx, deps) }()
+
+		// The scheduler sees the cancellation before the lock comes free.
+		synctest.Wait()
+		cancel()
+		synctest.Wait()
+		lock.Unlock()
+
+		require.NoError(t, <-done)
+		assert.False(t, announced.Load(), "a stopping process wrote the startup message")
+	})
 }
 
 func TestRunUpgradesOnSchedule_InvalidCronSpec(t *testing.T) {

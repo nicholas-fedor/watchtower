@@ -117,6 +117,51 @@ func recoverPanics(log *zerolog.Logger) cron.JobWrapper {
 	}
 }
 
+// writeStartupMessage writes the startup message while it holds the update
+// lock.
+//
+// The HTTP API can start an update as soon as it serves, before this message.
+// Because every update holds the lock, the message never opens its
+// notification batch while an update's batch is open. It waits for an update
+// that holds the lock and writes nothing when ctx is done first. The first
+// scheduled run time is read once the lock is taken, after any such wait.
+//
+// Parameters:
+//   - ctx: Context that ends the wait for the lock.
+//   - lock: Update lock shared with every caller that starts updates.
+//   - scheduler: Cron scheduler that holds the update schedule.
+//   - deps: Schedule dependencies. Startup holds the message's fields.
+//     WriteStartupMessage writes it.
+//
+// Returns:
+//   - bool: True when another update held the lock and the message waited for
+//     it.
+func writeStartupMessage(ctx context.Context, lock *UpdateLock, scheduler *cron.Cron, deps ScheduleDeps) bool {
+	waited := !lock.TryLock()
+	if waited && lock.Lock(ctx) != nil {
+		return waited
+	}
+	defer lock.Unlock()
+
+	var nextRun time.Time
+	if entries := scheduler.Entries(); len(entries) > 0 {
+		nextRun = entries[0].Schedule.Next(time.Now())
+	}
+
+	// The update at startup is skipped after a wait, so the message does not
+	// announce it.
+	updateOnStart := deps.UpdateOnStart && !waited
+
+	// Startup holds every other field of the message. Only the scheduler's
+	// own values are set here.
+	startup := deps.Startup
+	startup.Sched = nextRun
+	startup.UpdateOnStart = &updateOnStart
+	deps.WriteStartupMessage(startup)
+
+	return waited
+}
+
 // ScheduleDeps holds dependencies for scheduled update runs.
 //
 // BaseParams must be a complete [updateParams.Params] snapshot built from the
@@ -287,29 +332,25 @@ func RunUpgradesOnSchedule(ctx context.Context, deps ScheduleDeps) error {
 		}
 	}
 
-	// Log startup message with the first scheduled run time.
-	// Skip if the startup message was already sent (e.g., by the HTTP API in blocking mode).
-	var nextRun time.Time
-	if len(scheduler.Entries()) > 0 {
-		nextRun = scheduler.Entries()[0].Schedule.Next(time.Now())
-	}
-
-	// Log startup message with the first scheduled run time.
-	// Skip if the startup message was already sent (for example by the HTTP API in blocking mode).
-	// Startup is the single source of truth for messaging fields (Filtering, Scope, Client,
-	// Notifier, Version). Only apply scheduler-owned runtime values here.
+	// Skip the startup message if it was already sent (for example by the HTTP
+	// API in blocking mode).
+	waitedForUpdate := false
 	if !deps.StartupMessageSent && deps.WriteStartupMessage != nil {
-		startup := deps.Startup
-		startup.Sched = nextRun
-		startup.UpdateOnStart = &deps.UpdateOnStart
-		deps.WriteStartupMessage(startup)
+		waitedForUpdate = writeStartupMessage(ctx, lock, scheduler, deps)
 	}
 
 	// Check if update-on-start is enabled and trigger immediate update if so.
 	// Skip it when the process is already stopping, so a canceled update is not
-	// reported as a failure.
+	// reported as a failure. The update at startup does not wait for another
+	// update. When the startup message had to wait for one, the update at
+	// startup is skipped as it is when it finds the lock taken.
 	if deps.UpdateOnStart && ctx.Err() == nil {
-		updateFunc(false, false)
+		if waitedForUpdate {
+			log.Debug().Msg("Update skipped: another update was running at startup")
+			metrics.Default().RegisterSkippedScan()
+		} else {
+			updateFunc(false, false)
+		}
 	}
 
 	// Start the scheduler to begin periodic execution if scheduling is enabled.
