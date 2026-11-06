@@ -423,6 +423,38 @@
     },
     {
       "data": {
+        "error": "invalid http-api-host: must be empty or a valid IP address (IPv4 or IPv6): \"not-an-ip\""
+      },
+      "level": "warning",
+      "message": "Failed to build run configuration",
+      "time": "2026-10-07T12:00:45Z"
+    },
+    {
+      "data": {
+        "error": "container has dependencies incompatible with rolling restarts"
+      },
+      "level": "error",
+      "message": "Rolling restart compatibility validation failed",
+      "time": "2026-10-07T12:00:46Z"
+    },
+    {
+      "data": {
+        "error": "API token is empty or unset"
+      },
+      "level": "debug",
+      "message": "API setup failed",
+      "time": "2026-10-07T12:00:47Z"
+    },
+    {
+      "data": {
+        "error": "invalid schedule \"bad\": expected exactly 6 fields, found 1: [bad]"
+      },
+      "level": "info",
+      "message": "Could not schedule updates",
+      "time": "2026-10-07T12:00:48Z"
+    },
+    {
+      "data": {
         "container": "app",
         "error": "lifecycle hook timeout must be a whole number of minutes of 0 or more: got -1",
         "label": "com.centurylinklabs.watchtower.lifecycle.pre-update-timeout",
@@ -430,7 +462,7 @@
       },
       "level": "warning",
       "message": "Invalid pre-update timeout value, using default",
-      "time": "2026-10-07T12:00:45Z"
+      "time": "2026-10-07T12:00:49Z"
     },
     {
       "data": {
@@ -441,7 +473,7 @@
       },
       "level": "error",
       "message": "Invalid post-update timeout value, using default",
-      "time": "2026-10-07T12:00:46Z"
+      "time": "2026-10-07T12:00:50Z"
     },
     {
       "data": {
@@ -452,7 +484,7 @@
       },
       "level": "debug",
       "message": "Invalid pre-check timeout value, using default",
-      "time": "2026-10-07T12:00:47Z"
+      "time": "2026-10-07T12:00:51Z"
     },
     {
       "data": {
@@ -463,7 +495,7 @@
       },
       "level": "info",
       "message": "Invalid post-check timeout value, using default",
-      "time": "2026-10-07T12:00:48Z"
+      "time": "2026-10-07T12:00:52Z"
     },
     {
       "data": {
@@ -471,7 +503,7 @@
       },
       "level": "warning",
       "message": "Update panicked",
-      "time": "2026-10-07T12:00:49Z"
+      "time": "2026-10-07T12:00:53Z"
     },
     {
       "data": {
@@ -479,7 +511,7 @@
       },
       "level": "error",
       "message": "Update execution failed",
-      "time": "2026-10-07T12:00:50Z"
+      "time": "2026-10-07T12:00:54Z"
     },
     {
       "data": {
@@ -489,7 +521,7 @@
       },
       "level": "debug",
       "message": "Could not check container for updates",
-      "time": "2026-10-07T12:00:51Z"
+      "time": "2026-10-07T12:00:55Z"
     },
     {
       "data": {
@@ -499,7 +531,7 @@
       },
       "level": "info",
       "message": "Could not update container. Its configuration cannot be recreated",
-      "time": "2026-10-07T12:00:52Z"
+      "time": "2026-10-07T12:00:56Z"
     },
     {
       "data": {

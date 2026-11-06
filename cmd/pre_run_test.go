@@ -106,7 +106,8 @@ func setPreRunState(t *testing.T, client containerClient.Client, detection selfD
 		t.Setenv("HOSTNAME", detection.hostname)
 	}
 
-	// preRun replaces the notifier with one hooked to its logger.
+	// preRun replaces the notifier with one hooked to its logger, except for a
+	// health check.
 	t.Cleanup(func() { notifier.Close() })
 }
 
@@ -245,7 +246,8 @@ func TestPreRun_SelfDetection(t *testing.T) {
 		{
 			// A health check runs no updates, so it continues without a scope.
 			// Its inspect shares the lookup's deadline instead of waiting for
-			// every retry.
+			// every retry. Because a health check probe runs often, its
+			// warning stays in the log and never reaches notifications.
 			name:      "lookup fails during a health check and the ID is kept",
 			args:      []string{"--health-check"},
 			detection: selfDetection{mountinfo: mountinfoWithSelf()},
@@ -317,7 +319,12 @@ func TestPreRun_SelfDetection(t *testing.T) {
 			assert.Equal(t, tt.wantName, containerName(currentWatchtowerContainer))
 			assert.Equal(t, tt.wantCalls, runCalls(mockClient))
 			assert.Same(t, mockClient, client, "preRun uses the client from newClient")
-			assert.NotSame(t, fixtureNotifier, notifier, "preRun creates its own notifier")
+
+			if slices.Contains(tt.args, "--health-check") {
+				assert.Same(t, fixtureNotifier, notifier, "preRun sets up no notifications")
+			} else {
+				assert.NotSame(t, fixtureNotifier, notifier, "preRun creates its own notifier")
+			}
 		})
 	}
 }
@@ -546,9 +553,12 @@ func TestPreRun_Exit(t *testing.T) {
 			wantOutput:   []string{"SetRestartPolicy cccccccccccc no", "Failed to initialize logging"},
 		},
 		{
-			helperCase:   "invalid-configuration",
-			wantExitCode: 1,
-			wantOutput:   []string{"SetRestartPolicy cccccccccccc no", "Failed to load configuration"},
+			// Because the notification settings are part of the configuration
+			// that did not load, the failure sends no notification.
+			helperCase:     "invalid-configuration",
+			wantExitCode:   1,
+			wantOutput:     []string{"SetRestartPolicy cccccccccccc no", "Failed to load configuration"},
+			unwantedOutput: []string{"Shoutrrr:"},
 		},
 		{
 			// The client connects to the daemon that the host flag names. The
@@ -565,14 +575,15 @@ func TestPreRun_Exit(t *testing.T) {
 			// Without a Docker client, the restart policy cannot be changed, so
 			// Watchtower reports that before the startup failure. Startup
 			// already waited for the daemon, so the exit does not connect
-			// again.
+			// again. It sends no notification, because notifications are not
+			// set up yet and the failure would repeat on every restart.
 			helperCase:   "docker-client-error",
 			wantExitCode: 1,
 			wantOutput: []string{
 				logging.RestartsKept,
 				"Failed to initialize Docker client",
 			},
-			unwantedOutput: []string{"SetRestartPolicy"},
+			unwantedOutput: []string{"SetRestartPolicy", "Shoutrrr:"},
 			wantOnce:       []string{"newClient"},
 		},
 		{
@@ -753,7 +764,7 @@ func preRunExitHelper(t *testing.T, helperCase string) {
 	case "invalid-log-format":
 		args = []string{"--log-format", "bogus"}
 	case "invalid-configuration":
-		args = []string{"--rolling-restart", "--monitor-only"}
+		args = []string{"--rolling-restart", "--monitor-only", "--notification-url", "logger://"}
 	case "invalid-log-format-without-container-id":
 		args = []string{"--log-format", "bogus"}
 		detection = selfDetection{}
@@ -763,6 +774,7 @@ func preRunExitHelper(t *testing.T, helperCase string) {
 		args = []string{"--rolling-restart", "--monitor-only"}
 		pid = 42
 	case "docker-client-error":
+		args = []string{"--notification-url", "logger://"}
 		clientErr = errRunTestDocker
 	case "unknown-flag":
 		args = []string{"--not-a-watchtower-flag"}

@@ -115,6 +115,28 @@ func setRunState(t *testing.T, state runTestState) {
 	t.Cleanup(notifier.Close)
 }
 
+// newLoggerNotifier returns a notifier hooked to log whose logger:// service
+// writes each notification it sends to log. It registers the hook that starts
+// the sending worker and closes the notifier when the test ends.
+//
+// Parameters:
+//   - t: Test that owns the notifier.
+//   - log: Logger the notifier hooks and writes to.
+//
+// Returns:
+//   - *notify.Notifier: The hooked notifier.
+func newLoggerNotifier(t *testing.T, log *zerolog.Logger) *notify.Notifier {
+	t.Helper()
+
+	hooked, err := notify.NewNotifier(log, notifyConfig.Notify{Level: "info", URLs: []string{"logger://"}})
+	require.NoError(t, err)
+	t.Cleanup(hooked.Close)
+
+	hooked.RegisterHook(log)
+
+	return hooked
+}
+
 // runFixtureContainer returns a running container with the given ID, name,
 // creation time, and labels. Its restart policy is "unless-stopped", so
 // disabling its restarts sends a policy update.
@@ -515,15 +537,8 @@ func TestRun_WaitsForAPIDrain(t *testing.T) {
 	releaseRequest := sync.OnceFunc(func() { close(release) })
 	t.Cleanup(releaseRequest)
 
-	// The logger:// service writes each notification it sends to the
-	// notifier's log. Registering the hook starts the worker that sends.
 	notifierLog, notifierLogs := logcapture.New(zerolog.InfoLevel)
-
-	drainNotifier, err := notify.NewNotifier(notifierLog, notifyConfig.Notify{Level: "info", URLs: []string{"logger://"}})
-	require.NoError(t, err)
-	t.Cleanup(drainNotifier.Close)
-
-	drainNotifier.RegisterHook(notifierLog)
+	drainNotifier := newLoggerNotifier(t, notifierLog)
 
 	mockClient := mockContainerClient.NewMockClient(t)
 	// The startup cleanup of older instances lists the containers first.
@@ -654,9 +669,11 @@ func TestRun_WaitsForAPIDrain(t *testing.T) {
 		t.Fatal("run did not return after the HTTP API finished its request")
 	}
 
-	// run closes the notifier before it returns. Closing waits for the worker
-	// to send what is queued. A notifier that closed during the drain drops the
-	// line instead.
+	// The process closes the notifier when it ends, after run returns. Closing
+	// waits for the worker to send what is queued. A notifier closed during the
+	// drain would have dropped the line instead.
+	newRunProcess().exit(cmd, nil)
+
 	assert.Contains(t, notifierLogs.String(), "Shoutrrr: Logged while the HTTP API drains")
 }
 
@@ -674,8 +691,11 @@ func TestRun_HealthCheck(t *testing.T) {
 	assert.Empty(t, runCalls(mockClient))
 }
 
-// TestRun_Exit verifies how run ends the process when it cannot continue, and
-// that the restart policy of the Watchtower container is disabled first.
+// TestRun_Exit verifies how run ends the process when it cannot continue. It
+// disables the restart policy of the Watchtower container first and reports
+// the exit in a notification. Watchtower holds every line until its startup
+// message. Because that message never comes, closing the notifier at the exit
+// is what sends the line.
 func TestRun_Exit(t *testing.T) {
 	if helperCase := os.Getenv(runExitHelperEnv); helperCase != "" {
 		runExitHelper(t, helperCase)
@@ -686,11 +706,16 @@ func TestRun_Exit(t *testing.T) {
 
 	tests := []struct {
 		helperCase string
+		// wantOutput is what the exit writes. For a failure that reaches
+		// notifications, it is the start of the notification, which gives the
+		// logged message and its cause.
 		wantOutput string
 	}{
 		{
 			// Loading the configuration rejects the combination, so runMain's own
-			// check for it is never reached through run.
+			// check for it is never reached through run. Because a real start
+			// rejects it in preRun before notifications are set up, the case
+			// runs without them.
 			helperCase: "rolling-restart-with-monitor-only",
 			wantOutput: "rolling-restart and monitor-only cannot both be enabled",
 		},
@@ -698,10 +723,13 @@ func TestRun_Exit(t *testing.T) {
 			// The run configuration is checked after the configuration loads.
 			// A failure there happens again on the next start too.
 			helperCase: "invalid-run-configuration",
-			wantOutput: "Failed to build run configuration",
+			wantOutput: "Shoutrrr: Failed to build run configuration: invalid http-api-host",
 		},
-		{helperCase: "rolling-restart-validation-fails", wantOutput: "Rolling restart compatibility validation failed"},
-		{helperCase: "api-without-token", wantOutput: "API setup failed"},
+		{
+			helperCase: "rolling-restart-validation-fails",
+			wantOutput: "Shoutrrr: Rolling restart compatibility validation failed: " + errRunTestDocker.Error(),
+		},
+		{helperCase: "api-without-token", wantOutput: "Shoutrrr: API setup failed: API token is empty or unset"},
 	}
 
 	for _, tt := range tests {
@@ -719,9 +747,9 @@ func TestRun_Exit(t *testing.T) {
 
 			require.ErrorAs(t, err, &exitErr, "output:\n%s", out)
 			assert.Equal(t, 1, exitErr.ExitCode(), "output:\n%s", out)
-			assert.Contains(t, string(out), tt.wantOutput)
 			assert.Contains(t, string(out), "SetRestartPolicy c0c0 no",
 				"the restart policy is disabled before the process ends")
+			assert.Contains(t, string(out), tt.wantOutput)
 		})
 	}
 }
@@ -742,9 +770,14 @@ func runExitHelper(t *testing.T, helperCase string) {
 
 	var args []string
 
+	// notified gives the case a notifier, as when the failure comes after
+	// startup has set notifications up.
+	notified := true
+
 	switch helperCase {
 	case "rolling-restart-with-monitor-only":
 		args = []string{"--rolling-restart", "--monitor-only"}
+		notified = false
 	case "invalid-run-configuration":
 		args = []string{"--http-api-host", "not-an-ip"}
 	case "rolling-restart-validation-fails":
@@ -765,9 +798,16 @@ func runExitHelper(t *testing.T, helperCase string) {
 	// Watchtower runs as the main process of its container.
 	processID = func() int { return 1 }
 
+	log := logging.New(os.Stderr, logging.InfoLevel)
+
+	// The notifier holds every line until the startup message, as at startup.
+	if notified {
+		notifier = newLoggerNotifier(t, log)
+	}
+
 	cmd := newTestRootCommand(t, args...)
 
-	proc := &process{log: logging.New(os.Stderr, logging.InfoLevel)}
+	proc := &process{log: log}
 	proc.exit(cmd, proc.run(cmd, nil))
 }
 

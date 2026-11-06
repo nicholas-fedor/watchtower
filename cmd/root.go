@@ -89,6 +89,8 @@ var (
 	//
 	// It is initialized in preRun from appCfg.Notify via notify.NewNotifier, supporting
 	// Shoutrrr URLs and (deprecated) legacy types such as email, Slack, or MSTeams.
+	// A health check and a subcommand leave it unset. Execute closes it before
+	// the process ends.
 	notifier *notify.Notifier
 
 	// currentWatchtowerContainerID stores the current Watchtower container ID.
@@ -173,7 +175,8 @@ type exitError struct {
 	// err is the cause of the exit.
 	err error
 	// msg is the static message Execute logs at fatal level with the cause.
-	// Empty means the failure was already reported, so Execute only exits.
+	// Execute logs nothing when it is empty, since the failure was already
+	// logged.
 	msg string
 	// code is the process exit code for a failure that was already reported.
 	code int
@@ -248,40 +251,60 @@ func Execute(log *zerolog.Logger) {
 	proc.exit(rootCmd.ExecuteC())
 }
 
-// exit ends the process when a command returns an error.
+// exit closes the notifier and ends the process when a command returns an
+// error.
 //
-// An [exitError] without a message was already reported, so the process only
-// exits with its code. Every other error is logged at fatal level with the
-// logger the command configured, which exits with code 1. A root command
-// failure would happen again on every start, so Watchtower's restarts are
-// disabled before it is logged.
+// For an [exitError] without a message, which was already reported, the
+// process only exits with its code. Any other error is logged at fatal level
+// with the logger the command configured before the process exits with code 1.
+// Because a root command failure would happen again on every start,
+// Watchtower's restarts are disabled before that line is logged.
+//
+// Closing the notifier sends every line it still holds, the fatal line
+// included. Lines logged after the close are dropped, such as those of an HTTP
+// API request that outlasts its 5-second shutdown grace period. A startup that
+// fails before the notifier is set up sends no notification. That covers a
+// configuration that does not load and a Docker daemon that cannot be reached.
+// A command that succeeds returns after the close.
 //
 // Parameters:
 //   - cmd: The command that ran.
 //   - err: The error the command returned.
 func (p *process) exit(cmd *cobra.Command, err error) {
-	if err == nil {
-		return
-	}
+	code := 0
 
 	exitErr, ok := errors.AsType[*exitError](err)
-	if ok && exitErr.msg == "" {
-		if exitErr.code != 0 {
+
+	switch {
+	case err == nil:
+	case ok && exitErr.msg == "":
+		code = exitErr.code
+		if code != 0 {
 			p.log.Debug().
-				Int("exit_code", exitErr.code).
+				Int("exit_code", code).
 				Msg("Exiting with non-zero status")
 		}
+	default:
+		msg, cause := "Failed to execute root command", err
+		if ok {
+			msg, cause = exitErr.msg, exitErr.err
+		}
 
-		os.Exit(exitErr.code)
+		p.disableRestartsBeforeExit(cmd)
+
+		// Fatal would exit inside Msg, before the notifier could send the line.
+		p.log.WithLevel(zerolog.FatalLevel).Err(cause).Msg(msg)
+
+		code = 1
 	}
 
-	msg, cause := "Failed to execute root command", err
-	if ok {
-		msg, cause = exitErr.msg, exitErr.err
+	if notifier != nil {
+		notifier.Close()
 	}
 
-	p.disableRestartsBeforeExit(cmd)
-	p.log.Fatal().Err(cause).Msg(msg)
+	if err != nil {
+		os.Exit(code)
+	}
 }
 
 // preRun prepares the environment and configuration before the main command execution begins.
@@ -450,12 +473,16 @@ func (p *process) preRun(cmd *cobra.Command, _ []string) error {
 	// Set up the notification client from loaded process config (appCfg.Notify).
 	// RegisterHook attaches the notifier to p.log and updates p.log in place to the
 	// hooked logger so subsequent application logging is captured for notifications.
-	notifier, err = notify.NewNotifier(p.log, appCfg.Notify)
-	if err != nil {
-		return &exitError{err: err, msg: "Failed to initialize notifications", code: 1}
-	}
+	// Because a health check probe runs often, its warnings stay in the log and
+	// never reach notifications.
+	if !appCfg.Mode.HealthCheck {
+		notifier, err = notify.NewNotifier(p.log, appCfg.Notify)
+		if err != nil {
+			return &exitError{err: err, msg: "Failed to initialize notifications", code: 1}
+		}
 
-	notifier.RegisterHook(p.log)
+		notifier.RegisterHook(p.log)
+	}
 
 	// Without the container's labels, a scope set only by its scope label is
 	// unknown. Running without a scope would update containers that belong to
@@ -464,7 +491,7 @@ func (p *process) preRun(cmd *cobra.Command, _ []string) error {
 	if inspectErr != nil && appCfg.Filter.Scope == "" && !appCfg.Mode.HealthCheck {
 		// Disable restarts first, so the runtime does not start Watchtower again.
 		p.disableRestarts()
-		p.logNotify(logging.ScopeLabelUnreadable, inspectErr)
+		p.log.Error().Err(inspectErr).Msg(logging.ScopeLabelUnreadable)
 
 		return &exitError{err: inspectErr, msg: "", code: 1}
 	}
@@ -592,7 +619,7 @@ func (p *process) run(command *cobra.Command, args []string) error {
 		Names:   normalizedContainerNames,
 	})
 	if err != nil {
-		return &exitError{err: err, msg: "Failed to build run configuration", code: 1}
+		return &exitError{err: err, msg: logging.RunConfigurationFailed, code: 1}
 	}
 
 	// Warn if HTTP API configuration options are set without an endpoint enabled.
@@ -616,15 +643,8 @@ func (p *process) run(command *cobra.Command, args []string) error {
 //   - cfg: The RunConfig struct containing filter, API, and mode parameters for this execution.
 //
 // Returns:
-//   - error: An [exitError] for a failure that was already logged and notified.
+//   - error: An [exitError] for a failure that was already logged.
 func (p *process) runMain(cfg settings.RunConfig) error {
-	// Close the notifier after the run-once update, the scheduler and the HTTP
-	// API's drain have finished. Closing sends the messages still queued. A
-	// request that outlasts the HTTP API's 5-second grace period can still log
-	// after the close. Those lines are dropped. Deferred before the signal
-	// context's stop, the close runs after it.
-	defer notifier.Close()
-
 	// Log the container names being processed for debugging visibility.
 	p.log.Debug().
 		Strs("container_names", cfg.Names).
@@ -704,7 +724,7 @@ func (p *process) runMain(cfg settings.RunConfig) error {
 		)
 		if err != nil {
 			p.disableRestarts()
-			p.logNotify("Rolling restart compatibility validation failed", err)
+			p.log.Error().Err(err).Msg(logging.RollingRestartValidationFailed)
 
 			return &exitError{err: err, msg: "", code: 1}
 		}
@@ -878,7 +898,7 @@ func (p *process) runMain(cfg settings.RunConfig) error {
 	)
 	if err != nil {
 		p.disableRestarts()
-		p.logNotify("API setup failed", err)
+		p.log.Error().Err(err).Msg(logging.APISetupFailed)
 
 		return &exitError{err: err, msg: "", code: 1}
 	}
@@ -908,29 +928,12 @@ func (p *process) runMain(cfg settings.RunConfig) error {
 
 	if err != nil {
 		p.disableRestarts()
-		p.logNotify("Scheduled upgrades failed", err)
+		p.log.Error().Err(err).Msg(logging.SchedulingFailed)
 
 		return &exitError{err: err, msg: "", code: 1}
 	}
 
 	return nil
-}
-
-// logNotify logs an error message and ensures notifications are sent before returning control.
-//
-// It uses a specific message if provided, falling back to a generic one, and includes the error in fields.
-//
-// Parameters:
-//   - msg: A string specifying the error context (e.g., "Sanity check failed"), optional.
-//   - err: The error to log and include in notifications.
-func (p *process) logNotify(msg string, err error) {
-	if msg == "" {
-		msg = "Operation failed"
-	}
-
-	p.log.Error().Err(err).Msg(msg)
-	notifier.Flush()
-	notifier.Close()
 }
 
 // disableRestarts sets the restart policy of Watchtower's container to "no".

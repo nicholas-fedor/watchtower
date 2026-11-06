@@ -135,7 +135,7 @@ func TestNotificationBatching(t *testing.T) {
 	out.WriteString("\n=== split by container (sorted)\n")
 
 	split := newBatchingNotifier(t, batchEntries())
-	split.sendByContainer(split.takeEntries())
+	split.sendByContainer(split.takeOpen().queued())
 
 	messages := sentMessages(split)
 	slices.Sort(messages)
