@@ -163,13 +163,10 @@ func sendNotificationsWithBlockingRouter(t *testing.T) (*Notifier, *blockingRout
 	shoutrrr.sender = router
 	shoutrrr.RegisterHook(newTestLogger(t))
 
-	shoutrrr.StartNotification()
 	// Enqueue directly: Run(nil, ...) is fail-closed (cannot parse notify field).
 	// These tests exercise the send worker, not hook field extraction.
-	shoutrrr.entriesMutex.Lock()
-	shoutrrr.batch.entries = append(shoutrrr.batch.entries, &format.Entry{Message: "foo bar"})
-	shoutrrr.entriesMutex.Unlock()
-	shoutrrr.SendNotification(nil)
+	send, _ := startSessionWith(shoutrrr, []*format.Entry{{Message: "foo bar"}})
+	send(nil)
 
 	return shoutrrr, router
 }
@@ -327,9 +324,9 @@ func TestClose(t *testing.T) {
 			shoutrrr.Close()
 
 			// These operations should not panic after close
-			shoutrrr.StartNotification()
-			shoutrrr.SendNotification(nil)
-			shoutrrr.SendNotification(nil)
+			send, _ := shoutrrr.StartSessionNotification()
+			send(nil)
+			send(nil)
 
 			// Fire should still work (but may not send if channel is closed)
 			entry := &format.Entry{Message: "test"}

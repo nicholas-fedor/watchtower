@@ -64,17 +64,33 @@ func withContainer(data map[string]any, container string) map[string]any {
 }
 
 // newBatchingNotifier returns a legacy-template notifier whose worker never
-// starts, so every message it renders stays in its message channel, with
-// entries already queued as during a batch.
-func newBatchingNotifier(t *testing.T, entries []*format.Entry) *Notifier {
+// starts, so every message it renders stays in its message channel. It is
+// batching, as a notifier is from its creation until the startup message.
+func newBatchingNotifier(t *testing.T) *Notifier {
 	t.Helper()
 
 	notifier := createTestNotifier(t, newTestLogger(t), []string{}, zerolog.TraceLevel, true, format.StaticData{}, 0)
 	t.Cleanup(notifier.Close)
 
-	notifier.batch = &batch{entries: entries}
+	notifier.batch = &batch{}
 
 	return notifier
+}
+
+// startSessionWith opens an update session's batch on notifier and queues
+// entries in it, as the session's log lines would.
+//
+// Returns:
+//   - func(types.Report): The session's send.
+//   - func(): The session's end.
+func startSessionWith(notifier *Notifier, entries []*format.Entry) (func(types.Report), func()) {
+	send, end := notifier.StartSessionNotification()
+
+	notifier.entriesMutex.Lock()
+	notifier.batch.entries = entries
+	notifier.entriesMutex.Unlock()
+
+	return send, end
 }
 
 // sentMessages drains the messages the notifier rendered.
@@ -109,9 +125,8 @@ func TestNotificationBatching(t *testing.T) {
 	out.WriteString("=== grouped\n")
 
 	// A session's end sends the entries no notification took.
-	grouped := newBatchingNotifier(t, nil)
-	endGrouped := grouped.StartNotification()
-	grouped.batch.entries = batchEntries()
+	grouped := newBatchingNotifier(t)
+	_, endGrouped := startSessionWith(grouped, batchEntries())
 
 	endGrouped()
 	writeMessages(&out, sentMessages(grouped))
@@ -122,8 +137,9 @@ func TestNotificationBatching(t *testing.T) {
 	focus.EXPECT().Name().Return("web1").Maybe()
 	focus.EXPECT().ImageName().Return("org/web:1.0").Maybe()
 
-	focused := newBatchingNotifier(t, batchEntries())
-	focused.SendNotification(&state.SingleContainerReport{
+	focused := newBatchingNotifier(t)
+	sendFocused, _ := startSessionWith(focused, batchEntries())
+	sendFocused(&state.SingleContainerReport{
 		Focus:          focus,
 		UpdatedReports: []types.ContainerReport{focus},
 	})
@@ -138,10 +154,9 @@ func TestNotificationBatching(t *testing.T) {
 	// The messages are sent in map order, so they are sorted for the snapshot.
 	out.WriteString("\n=== split by container (sorted)\n")
 
-	split := newBatchingNotifier(t, nil)
+	split := newBatchingNotifier(t)
+	_, endSplit := startSessionWith(split, batchEntries())
 	split.splitByContainer = true
-	endSplit := split.StartNotification()
-	split.batch.entries = batchEntries()
 
 	endSplit()
 

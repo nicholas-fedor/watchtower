@@ -24,14 +24,15 @@ import (
 
 // Notifier sends the notifications of an update session.
 type Notifier interface {
-	// StartNotification starts collecting log entries for the session's
+	// StartSessionNotification starts collecting log entries for the session's
 	// notifications. Entries an earlier owner left collected, such as a check
-	// request's, are sent first. Unless the batch has already ended, the
-	// returned end sends the entries no notification took, without a report.
-	StartNotification() func()
-	// SendNotification sends the collected entries with report. A split
-	// report's notification carries only its container's entries.
-	SendNotification(report types.Report)
+	// request's, are sent first. The returned send sends a report with the
+	// session's collected entries. A split report's notification carries only
+	// its container's entries. Any other report ends the session's batch. Send
+	// does nothing once the batch has ended. Unless the batch has already
+	// ended, the returned end sends the entries no notification took, without a
+	// report.
+	StartSessionNotification() (send func(types.Report), end func())
 	// ShouldSendNotification reports whether report is worth a notification at
 	// the configured notifications level.
 	ShouldSendNotification(report types.Report) bool
@@ -120,11 +121,17 @@ func RunUpdatesWithNotifications(
 
 	log.Debug().Msg("Starting RunUpdatesWithNotifications")
 
-	// The session owns its batch and ends it on every return. Its end sends
-	// what no notification took, without a report. Deferred before the
-	// recover, it also runs after a panicked session.
+	// The session owns its batch and sends its reports through it. It ends the
+	// batch on every return. The end sends what no notification took, without
+	// a report. Deferred before the recover, it also runs after a panicked
+	// session.
+	var send func(types.Report)
+
 	if params.Notifier != nil {
-		defer params.Notifier.StartNotification()()
+		var end func()
+
+		send, end = params.Notifier.StartSessionNotification()
+		defer end()
 	}
 
 	defer func() {
@@ -208,7 +215,7 @@ func RunUpdatesWithNotifications(
 	}
 
 	// Process update result, return metric on failure
-	metric = handleUpdateResult(log, result, err, params.Notifier)
+	metric = handleUpdateResult(log, result, err, send)
 	if metric != nil {
 		if params.EventBroadcaster != nil {
 			errMsg := "unknown error"
@@ -240,6 +247,7 @@ func RunUpdatesWithNotifications(
 	// Send notifications about update results
 	sendNotifications(log,
 		params.Notifier,
+		send,
 		params.NotificationSplitByContainer,
 		params.NotificationReport,
 		result,
@@ -268,19 +276,20 @@ func RunUpdatesWithNotifications(
 // It logs an update error at error level. When a phase has already notified the error's cause,
 // that line is logged with notify=no, which keeps the failure to one notification. An update that
 // fails partway still returns the report of the work done before the error. That report is sent
-// through the notifier and counted. Without a report, nothing is sent here. The session's end then
-// sends the batch without a report, which lets report templates list the queued error entry. On
-// error or nil result, it returns a metric that marks a failed scan. On success, it returns nil.
+// through the session's batch and counted. Without a report, nothing is sent here. The session's
+// end then sends the batch without a report, which lets report templates list the queued error
+// entry. On error or nil result, it returns a metric that marks a failed scan. On success, it
+// returns nil.
 //
 // Parameters:
 //   - result: The report from the update operation. It may be partial when err is non-nil.
 //   - err: Any error encountered during the update.
-//   - notifier: The notification system for sending error alerts. It may be nil.
+//   - send: Sends a report through the session's notification batch. Nil without a notifier.
 //
 // Returns:
 //   - *metrics.Metric: A metric marked as a failed scan, with the counts of the partial report
 //     on error, or zero counts when there is no report. Nil on success.
-func handleUpdateResult(log *zerolog.Logger, result types.Report, err error, notifier Notifier) *metrics.Metric {
+func handleUpdateResult(log *zerolog.Logger, result types.Report, err error, send func(types.Report)) *metrics.Metric {
 	// Check for errors during update execution
 	if err != nil {
 		event := log.Error().Err(err)
@@ -294,8 +303,8 @@ func handleUpdateResult(log *zerolog.Logger, result types.Report, err error, not
 			return &metrics.Metric{ScanFailed: true}
 		}
 
-		if notifier != nil {
-			notifier.SendNotification(result)
+		if send != nil {
+			send(result)
 		}
 
 		metric := newScanMetric(result)
@@ -466,11 +475,12 @@ func logUpdateReport(log *zerolog.Logger, result types.Report) {
 // end then sends the lines it queued, without the report.
 //
 // Parameters:
-//   - notifier: The notification system instance for sending update status messages.
+//   - notifier: Decides which reports are worth a notification. It may be nil.
+//   - send: Sends a report through the session's notification batch. Nil when notifier is nil.
 //   - notificationSplitByContainer: Boolean flag enabling a separate notification for each container.
 //   - notificationReport: Boolean flag enabling report-based notifications.
 //   - result: The report containing the results of the update operation.
-func sendNotifications(log *zerolog.Logger, notifier Notifier,
+func sendNotifications(log *zerolog.Logger, notifier Notifier, send func(types.Report),
 	notificationSplitByContainer, notificationReport bool,
 	result types.Report,
 ) {
@@ -478,15 +488,21 @@ func sendNotifications(log *zerolog.Logger, notifier Notifier,
 		return
 	}
 
+	// notify sends a report through the session's batch when it is worth a
+	// notification at the configured notifications level.
+	notify := func(report types.Report) {
+		if notifier.ShouldSendNotification(report) {
+			send(report)
+		}
+	}
+
 	if notificationSplitByContainer {
-		sendSplitNotifications(log, notifier, notificationReport, result)
+		sendSplitNotifications(log, notify, notificationReport, result)
 
 		return
 	}
 
-	if notifier.ShouldSendNotification(result) {
-		notifier.SendNotification(result)
-	}
+	notify(result)
 }
 
 // sendSplitNotifications handles sending notifications when split by container is enabled.
@@ -506,10 +522,10 @@ func sendNotifications(log *zerolog.Logger, notifier Notifier,
 // maintaining clean and non-redundant communication with users.
 //
 // Parameters:
-//   - notifier: The notification system instance for sending update status messages.
+//   - notify: Sends a report that is worth a notification through the session's notification batch.
 //   - notificationReport: Boolean flag enabling report-based notifications.
 //   - result: The report containing the results of the update operation.
-func sendSplitNotifications(log *zerolog.Logger, notifier Notifier,
+func sendSplitNotifications(log *zerolog.Logger, notify func(types.Report),
 	notificationReport bool,
 	result types.Report,
 ) {
@@ -551,7 +567,7 @@ func sendSplitNotifications(log *zerolog.Logger, notifier Notifier,
 	for _, pass := range passes {
 		notifyContainers(notifyContainersParams{
 			log:           log,
-			notifier:      notifier,
+			notify:        notify,
 			notified:      notified,
 			reports:       pass.reports,
 			result:        result,
@@ -566,8 +582,8 @@ func sendSplitNotifications(log *zerolog.Logger, notifier Notifier,
 
 // notifyContainersParams groups inputs for notifyContainers.
 type notifyContainersParams struct {
-	notifier      Notifier
 	result        types.Report
+	notify        func(types.Report)
 	log           *zerolog.Logger
 	notified      map[string]bool
 	include       func(types.ContainerReport) bool
@@ -579,8 +595,8 @@ type notifyContainersParams struct {
 // notifyContainers sends per-container notifications for a report collection.
 //
 // It applies nil and empty-name filtering, container-ID de-duplication via notified,
-// optional category eligibility (include, nil for every container), and
-// ShouldSendNotification before send.
+// and optional category eligibility (include, nil for every container) before
+// it notifies.
 //
 // Parameters:
 //   - params: Named inputs for the category-specific notification pass.
@@ -616,10 +632,7 @@ func notifyContainers(params notifyContainersParams) {
 				Msg("Sending individual notification for " + params.category + " container")
 		}
 
-		singleContainerReport := state.NewSingleContainerReport(report, params.result)
-		if params.notifier.ShouldSendNotification(singleContainerReport) {
-			params.notifier.SendNotification(singleContainerReport)
-		}
+		params.notify(state.NewSingleContainerReport(report, params.result))
 
 		params.notified[containerID] = true
 	}
@@ -629,8 +642,8 @@ func notifyContainers(params notifyContainersParams) {
 //
 // It builds a session summary metric and writes an Info completion line on the
 // process logger. The line carries notify=no so the Shoutrrr hook does not send
-// a second notification after SendNotification has already flushed the session
-// batch. Without that field, legacy templates would emit a standalone
+// a second notification after the session's report has already been sent.
+// Without that field, legacy templates would emit a standalone
 // "Update session completed" message with only the scanned, updated, failed,
 // and skipped counts.
 //
