@@ -32,6 +32,7 @@ import (
 	"github.com/nicholas-fedor/watchtower/internal/registry/ratelimit"
 	"github.com/nicholas-fedor/watchtower/internal/settings"
 	notifyConfig "github.com/nicholas-fedor/watchtower/internal/settings/config/notify"
+	"github.com/nicholas-fedor/watchtower/internal/testutil/logcapture"
 	"github.com/nicholas-fedor/watchtower/pkg/types"
 )
 
@@ -496,7 +497,9 @@ func TestRun_PublishedPortsBlockSelfUpdates(t *testing.T) {
 // TestRun_WaitsForAPIDrain verifies that continuous mode with the HTTP API in
 // the background does not return until the API has finished a request it was
 // serving when the process was told to stop. The request lists containers, so
-// it does not hold the update lock that the scheduler also waits for.
+// it does not hold the update lock that the scheduler also waits for. A line
+// the request logs while the API drains still reaches the notifier, which
+// closes only after the API has stopped.
 func TestRun_WaitsForAPIDrain(t *testing.T) {
 	// stopTimeout bounds the wait for run to return after its context is
 	// canceled. It covers the HTTP API's shutdown grace period.
@@ -512,6 +515,16 @@ func TestRun_WaitsForAPIDrain(t *testing.T) {
 	releaseRequest := sync.OnceFunc(func() { close(release) })
 	t.Cleanup(releaseRequest)
 
+	// The logger:// service writes each notification it sends to the
+	// notifier's log. Registering the hook starts the worker that sends.
+	notifierLog, notifierLogs := logcapture.New(zerolog.InfoLevel)
+
+	drainNotifier, err := notify.NewNotifier(notifierLog, notifyConfig.Notify{Level: "info", URLs: []string{"logger://"}})
+	require.NoError(t, err)
+	t.Cleanup(drainNotifier.Close)
+
+	drainNotifier.RegisterHook(notifierLog)
+
 	mockClient := mockContainerClient.NewMockClient(t)
 	// The startup cleanup of older instances lists the containers first.
 	mockClient.EXPECT().ListContainers(mock.Anything, withFilter).Return([]types.Container{current}, nil).Once()
@@ -522,11 +535,16 @@ func TestRun_WaitsForAPIDrain(t *testing.T) {
 			close(entered)
 			<-release
 
+			// The request logs through the hooked logger while the API drains.
+			notifierLog.Warn().Msg("Logged while the HTTP API drains")
+
 			return []types.Container{}, nil
 		}).Once()
 	mockClient.EXPECT().GetVersion().Return("1.47").Maybe()
 
 	setRunState(t, runTestState{client: mockClient, current: current, currentID: current.ID()})
+
+	notifier = drainNotifier
 
 	// run's process context, which the test cancels the way a signal would.
 	runCtx, cancelRun := context.WithCancel(context.Background())
@@ -635,6 +653,11 @@ func TestRun_WaitsForAPIDrain(t *testing.T) {
 	case <-time.After(stopTimeout):
 		t.Fatal("run did not return after the HTTP API finished its request")
 	}
+
+	// run closes the notifier before it returns. Closing waits for the worker
+	// to send what is queued. A notifier that closed during the drain drops the
+	// line instead.
+	assert.Contains(t, notifierLogs.String(), "Shoutrrr: Logged while the HTTP API drains")
 }
 
 // TestRun_HealthCheck verifies that the health check mode returns without
