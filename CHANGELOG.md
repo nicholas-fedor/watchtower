@@ -43,6 +43,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Chores
 
+- Update golang.org/x/tools digest to 4f7264d by @renovate[bot] in [#3510](https://github.com/nicholas-fedor/watchtower/pull/3510)
 - Update golang.org/x/exp digest to 47ce03d by @renovate[bot] in [#3508](https://github.com/nicholas-fedor/watchtower/pull/3508)
 - Update step-security/harden-runner action to v2.22.4 by @renovate[bot] in [#3501](https://github.com/nicholas-fedor/watchtower/pull/3501)
 - Update module github.com/spf13/pflag to v1.1.0 by @renovate[bot] in [#3494](https://github.com/nicholas-fedor/watchtower/pull/3494)
