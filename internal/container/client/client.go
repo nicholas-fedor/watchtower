@@ -1323,7 +1323,7 @@ func (c *client) IsContainerStale(
 			Str("image", container.ImageName()).
 			Msg("Failed to check container staleness")
 
-		return stale, newestImage, latestDigest, fmt.Errorf("check container staleness: %w", err)
+		return stale, newestImage, latestDigest, err //nolint:wrapcheck // The image client's error already names its failure.
 	}
 
 	c.logger().Debug().

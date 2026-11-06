@@ -200,7 +200,7 @@ func goldenEntryData(message string) map[string]any {
 		return map[string]any{
 			"container": "app",
 			"image":     "org/app:latest",
-			"error":     "image pull: registry rate limited: retry-after 347.256µs allowed 44000 per 1m0s",
+			"error":     "failed to pull image: org/app:latest: registry rate limited: retry-after 347.256µs allowed 44000 per 1m0s",
 		}
 	case logging.ContainerUpdateFailed:
 		return map[string]any{
