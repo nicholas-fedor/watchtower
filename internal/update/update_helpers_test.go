@@ -6,7 +6,6 @@ import (
 
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/mock"
 
 	dockerContainer "github.com/moby/moby/api/types/container"
 	dockerImage "github.com/moby/moby/api/types/image"
@@ -18,6 +17,22 @@ import (
 	"github.com/nicholas-fedor/watchtower/internal/update/sorter"
 	"github.com/nicholas-fedor/watchtower/pkg/types"
 )
+
+// sessionBatch records what an update session does with the notification
+// batch it opens.
+type sessionBatch struct {
+	sent  []types.Report // Reports the session sent, in order.
+	ended int            // Times the session ended the batch.
+}
+
+// record keeps report as one the session sent. It serves as the send of an
+// update session's notification batch.
+//
+// Parameters:
+//   - report: The report sent.
+func (b *sessionBatch) record(report types.Report) {
+	b.sent = append(b.sent, report)
+}
 
 // updateImplicitRestart marks the containers that depend on a restarting
 // container as linked to restarting, as an update scan does. The dependency
@@ -505,24 +520,26 @@ func getComposeDependsOnWithNetworkModeTestData() *mockUpdate.TestData {
 // expectSessionBatch expects an update session to open its notification batch
 // once and to end it once before the test ends.
 //
-// Each method named in sentFirst must have been called once when the batch
-// ends, since the session ends its batch after it sends.
+// A report sent after the batch ended fails the test, since the session ends
+// its batch after it sends.
 //
 // Returns:
-//   - *mock.Call: The expected start, for ordering it before the sends with
-//     [mock.InOrder].
-func expectSessionBatch(t *testing.T, notifier *mockUpdate.MockNotifier, sentFirst ...string) *mock.Call {
+//   - *sessionBatch: The reports the session sends and its ends.
+func expectSessionBatch(t *testing.T, notifier *mockUpdate.MockNotifier) *sessionBatch {
 	t.Helper()
 
-	var ended int
+	batch := &sessionBatch{}
 
-	t.Cleanup(func() { assert.Equal(t, 1, ended, "the session ends its batch once") })
+	t.Cleanup(func() { assert.Equal(t, 1, batch.ended, "the session ends its batch once") })
 
-	return notifier.EXPECT().StartNotification().Return(func() {
-		ended++
+	notifier.EXPECT().StartSessionNotification().Return(
+		func(report types.Report) {
+			assert.Zero(t, batch.ended, "the session sends before it ends its batch")
 
-		for _, method := range sentFirst {
-			notifier.AssertNumberOfCalls(t, method, 1)
-		}
-	}).Once()
+			batch.record(report)
+		},
+		func() { batch.ended++ },
+	).Once()
+
+	return batch
 }

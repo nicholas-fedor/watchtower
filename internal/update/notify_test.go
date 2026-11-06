@@ -318,10 +318,7 @@ func TestRunUpdates(t *testing.T) {
 				notifier := mockUpdate.NewMockNotifier(t)
 				// The session ends its batch after its split notification.
 				notifier.EXPECT().ShouldSendNotification(mock.Anything).Return(true)
-				mock.InOrder(
-					expectSessionBatch(t, notifier, "SendNotification"),
-					notifier.EXPECT().SendNotification(mock.Anything).Once(),
-				)
+				batch := expectSessionBatch(t, notifier)
 
 				params := RunUpdatesWithNotificationsParams{
 					Logger:                       newTestLogger(t),
@@ -334,7 +331,7 @@ func TestRunUpdates(t *testing.T) {
 				metric := RunUpdatesWithNotifications(t.Context(), params)
 
 				require.NotNil(t, metric)
-				notifier.AssertExpectations(t)
+				assert.Len(t, batch.sent, 1)
 			})
 		})
 
@@ -544,7 +541,7 @@ func TestRunUpdates(t *testing.T) {
 			t.Parallel()
 
 			mockReport := mockTypes.NewMockReport(t)
-			sendNotifications(newTestLogger(t), nil, false, false, mockReport)
+			sendNotifications(newTestLogger(t), nil, nil, false, false, mockReport)
 			// No expectations since notifier is nil
 		})
 
@@ -554,9 +551,11 @@ func TestRunUpdates(t *testing.T) {
 			mockReport := mockTypes.NewMockReport(t)
 			notifier := mockUpdate.NewMockNotifier(t)
 			notifier.EXPECT().ShouldSendNotification(mockReport).Return(true)
-			notifier.EXPECT().SendNotification(mockReport).Return()
-			sendNotifications(newTestLogger(t), notifier, false, false, mockReport)
-			notifier.AssertExpectations(t)
+
+			var batch sessionBatch
+
+			sendNotifications(newTestLogger(t), notifier, batch.record, false, false, mockReport)
+			assert.Len(t, batch.sent, 1)
 		})
 
 		// A report below the notifications level, such as one without failures
@@ -569,7 +568,11 @@ func TestRunUpdates(t *testing.T) {
 			mockReport := mockTypes.NewMockReport(t)
 			notifier := mockUpdate.NewMockNotifier(t)
 			notifier.EXPECT().ShouldSendNotification(mockReport).Return(false)
-			sendNotifications(newTestLogger(t), notifier, false, false, mockReport)
+
+			var batch sessionBatch
+
+			sendNotifications(newTestLogger(t), notifier, batch.record, false, false, mockReport)
+			assert.Empty(t, batch.sent)
 		})
 
 		t.Run("should call sendSplitNotifications when split is true", func(t *testing.T) {
@@ -587,8 +590,10 @@ func TestRunUpdates(t *testing.T) {
 			mockReport.EXPECT().Skipped().Return([]types.ContainerReport{})
 			mockReport.EXPECT().Fresh().Return([]types.ContainerReport{})
 
-			sendNotifications(newTestLogger(t), notifier, true, false, mockReport)
-			notifier.AssertExpectations(t)
+			var batch sessionBatch
+
+			sendNotifications(newTestLogger(t), notifier, batch.record, true, false, mockReport)
+			assert.Empty(t, batch.sent)
 		})
 	})
 
@@ -603,7 +608,6 @@ func TestRunUpdates(t *testing.T) {
 
 			mockContainer.EXPECT().ID().Return(types.ContainerID("test-id"))
 			mockContainer.EXPECT().Name().Return("test-container")
-			mockContainer.EXPECT().Error().Return("")
 
 			mockReport.EXPECT().Updated().Return([]types.ContainerReport{mockContainer})
 			mockReport.EXPECT().Restarted().Return([]types.ContainerReport{})
@@ -613,21 +617,17 @@ func TestRunUpdates(t *testing.T) {
 			mockReport.EXPECT().Skipped().Return([]types.ContainerReport{})
 			mockReport.EXPECT().Fresh().Return([]types.ContainerReport{})
 
-			// Mock the SendNotification call
-			notifier := mockUpdate.NewMockNotifier(t)
-			notifier.EXPECT().ShouldSendNotification(mock.Anything).Return(true)
-			notifier.EXPECT().SendNotification(mock.Anything).Return()
+			var batch sessionBatch
 
-			sendSplitNotifications(newTestLogger(t), notifier, true, mockReport)
+			sendSplitNotifications(newTestLogger(t), batch.record, true, mockReport)
 
-			notifier.AssertExpectations(t)
+			assert.Len(t, batch.sent, 1)
 		})
 
 		t.Run("should handle empty results gracefully", func(t *testing.T) {
 			t.Parallel()
 
 			mockReport := mockTypes.NewMockReport(t)
-			notifier := mockUpdate.NewMockNotifier(t)
 
 			mockReport.EXPECT().Updated().Return([]types.ContainerReport{})
 			mockReport.EXPECT().Restarted().Return([]types.ContainerReport{})
@@ -637,9 +637,11 @@ func TestRunUpdates(t *testing.T) {
 			mockReport.EXPECT().Skipped().Return([]types.ContainerReport{})
 			mockReport.EXPECT().Fresh().Return([]types.ContainerReport{})
 
+			var batch sessionBatch
+
 			// With empty results, no notifications should be sent
-			sendSplitNotifications(newTestLogger(t), notifier, true, mockReport)
-			notifier.AssertExpectations(t)
+			sendSplitNotifications(newTestLogger(t), batch.record, true, mockReport)
+			assert.Empty(t, batch.sent)
 		})
 
 		t.Run("should send filtered entry notifications when notificationReport is false", func(t *testing.T) {
@@ -651,7 +653,6 @@ func TestRunUpdates(t *testing.T) {
 			mockContainer.EXPECT().ID().Return(types.ContainerID("test-id"))
 			mockContainer.EXPECT().Name().Return("test-container")
 			mockContainer.EXPECT().ImageName().Return("test-image:latest")
-			mockContainer.EXPECT().Error().Return("")
 
 			mockReport.EXPECT().Updated().Return([]types.ContainerReport{mockContainer})
 			mockReport.EXPECT().Restarted().Return([]types.ContainerReport{})
@@ -661,12 +662,10 @@ func TestRunUpdates(t *testing.T) {
 			mockReport.EXPECT().Skipped().Return([]types.ContainerReport{})
 			mockReport.EXPECT().Fresh().Return([]types.ContainerReport{})
 
-			notifier := mockUpdate.NewMockNotifier(t)
-			notifier.EXPECT().ShouldSendNotification(mock.Anything).Return(true)
-			notifier.EXPECT().SendNotification(mock.Anything).Return()
+			var batch sessionBatch
 
-			sendSplitNotifications(newTestLogger(t), notifier, false, mockReport)
-			notifier.AssertExpectations(t)
+			sendSplitNotifications(newTestLogger(t), batch.record, false, mockReport)
+			assert.Len(t, batch.sent, 1)
 		})
 
 		t.Run("should handle restarted containers when notificationReport is true", func(t *testing.T) {
@@ -677,7 +676,6 @@ func TestRunUpdates(t *testing.T) {
 
 			mockContainer.EXPECT().ID().Return(types.ContainerID("restart-id"))
 			mockContainer.EXPECT().Name().Return("restart-container")
-			mockContainer.EXPECT().Error().Return("")
 
 			mockReport.EXPECT().Updated().Return([]types.ContainerReport{})
 			mockReport.EXPECT().Restarted().Return([]types.ContainerReport{mockContainer})
@@ -687,12 +685,10 @@ func TestRunUpdates(t *testing.T) {
 			mockReport.EXPECT().Skipped().Return([]types.ContainerReport{})
 			mockReport.EXPECT().Fresh().Return([]types.ContainerReport{})
 
-			notifier := mockUpdate.NewMockNotifier(t)
-			notifier.EXPECT().ShouldSendNotification(mock.Anything).Return(true)
-			notifier.EXPECT().SendNotification(mock.Anything).Return()
+			var batch sessionBatch
 
-			sendSplitNotifications(newTestLogger(t), notifier, true, mockReport)
-			notifier.AssertExpectations(t)
+			sendSplitNotifications(newTestLogger(t), batch.record, true, mockReport)
+			assert.Len(t, batch.sent, 1)
 		})
 
 		t.Run("should skip containers with empty names", func(t *testing.T) {
@@ -712,11 +708,11 @@ func TestRunUpdates(t *testing.T) {
 			mockReport.EXPECT().Skipped().Return([]types.ContainerReport{})
 			mockReport.EXPECT().Fresh().Return([]types.ContainerReport{})
 
-			notifier := mockUpdate.NewMockNotifier(t)
-			// No SendNotification should be called due to empty name
+			var batch sessionBatch
 
-			sendSplitNotifications(newTestLogger(t), notifier, true, mockReport)
-			notifier.AssertExpectations(t)
+			// No report should be sent due to the empty name
+			sendSplitNotifications(newTestLogger(t), batch.record, true, mockReport)
+			assert.Empty(t, batch.sent)
 		})
 
 		t.Run("should handle restarted containers when notificationReport is false", func(t *testing.T) {
@@ -728,7 +724,6 @@ func TestRunUpdates(t *testing.T) {
 			mockContainer.EXPECT().ID().Return(types.ContainerID("restart-id"))
 			mockContainer.EXPECT().Name().Return("restart-container")
 			mockContainer.EXPECT().ImageName().Return("restart-image:latest")
-			mockContainer.EXPECT().Error().Return("")
 
 			mockReport.EXPECT().Updated().Return([]types.ContainerReport{})
 			mockReport.EXPECT().Restarted().Return([]types.ContainerReport{mockContainer})
@@ -738,12 +733,10 @@ func TestRunUpdates(t *testing.T) {
 			mockReport.EXPECT().Skipped().Return([]types.ContainerReport{})
 			mockReport.EXPECT().Fresh().Return([]types.ContainerReport{})
 
-			notifier := mockUpdate.NewMockNotifier(t)
-			notifier.EXPECT().ShouldSendNotification(mock.Anything).Return(true)
-			notifier.EXPECT().SendNotification(mock.Anything).Return()
+			var batch sessionBatch
 
-			sendSplitNotifications(newTestLogger(t), notifier, false, mockReport)
-			notifier.AssertExpectations(t)
+			sendSplitNotifications(newTestLogger(t), batch.record, false, mockReport)
+			assert.Len(t, batch.sent, 1)
 		})
 
 		t.Run("should handle restarted containers with empty NewContainerID", func(t *testing.T) {
@@ -755,7 +748,6 @@ func TestRunUpdates(t *testing.T) {
 			mockContainer.EXPECT().ID().Return(types.ContainerID("restart-id"))
 			mockContainer.EXPECT().Name().Return("restart-container")
 			mockContainer.EXPECT().ImageName().Return("restart-image:latest")
-			mockContainer.EXPECT().Error().Return("")
 
 			mockReport.EXPECT().Updated().Return([]types.ContainerReport{})
 			mockReport.EXPECT().Restarted().Return([]types.ContainerReport{mockContainer})
@@ -765,12 +757,10 @@ func TestRunUpdates(t *testing.T) {
 			mockReport.EXPECT().Skipped().Return([]types.ContainerReport{})
 			mockReport.EXPECT().Fresh().Return([]types.ContainerReport{})
 
-			notifier := mockUpdate.NewMockNotifier(t)
-			notifier.EXPECT().ShouldSendNotification(mock.Anything).Return(true)
-			notifier.EXPECT().SendNotification(mock.Anything).Return()
+			var batch sessionBatch
 
-			sendSplitNotifications(newTestLogger(t), notifier, false, mockReport)
-			notifier.AssertExpectations(t)
+			sendSplitNotifications(newTestLogger(t), batch.record, false, mockReport)
+			assert.Len(t, batch.sent, 1)
 		})
 
 		t.Run("should handle empty container lists gracefully", func(t *testing.T) {
@@ -787,11 +777,11 @@ func TestRunUpdates(t *testing.T) {
 			mockReport.EXPECT().Skipped().Return([]types.ContainerReport{})
 			mockReport.EXPECT().Fresh().Return([]types.ContainerReport{})
 
-			notifier := mockUpdate.NewMockNotifier(t)
-			// No SendNotification should be called since all lists are empty
+			var batch sessionBatch
 
-			sendSplitNotifications(newTestLogger(t), notifier, true, mockReport)
-			notifier.AssertExpectations(t)
+			// No report should be sent since all lists are empty
+			sendSplitNotifications(newTestLogger(t), batch.record, true, mockReport)
+			assert.Empty(t, batch.sent)
 		})
 	})
 
@@ -824,8 +814,10 @@ func TestRunUpdates(t *testing.T) {
 				notifier.EXPECT().ShouldSendNotification(mock.Anything).Return(false)
 				// With notification level set to error and no errors, no notification should be sent
 
-				sendSplitNotifications(newTestLogger(t), notifier, true, mockReport)
-				notifier.AssertExpectations(t)
+				var batch sessionBatch
+
+				sendNotifications(newTestLogger(t), notifier, batch.record, true, true, mockReport)
+				assert.Empty(t, batch.sent)
 			})
 		})
 	})
@@ -1854,24 +1846,15 @@ func TestSendSplitNotifications_CooldownSkipped(t *testing.T) {
 			require.True(t, ok)
 			status.SetCooldownInfo("1 hour", "24 hours", "23 hours", time.Now().Add(23*time.Hour))
 
-			notifier := mockUpdate.NewMockNotifier(t)
-			notifier.EXPECT().ShouldSendNotification(mock.Anything).Return(true)
+			var batch sessionBatch
 
-			var sent []*state.SingleContainerReport
-
-			notifier.EXPECT().SendNotification(mock.Anything).Run(func(report types.Report) {
-				single, ok := report.(*state.SingleContainerReport)
-				require.True(t, ok)
-
-				sent = append(sent, single)
-			})
-
-			sendSplitNotifications(newTestLogger(t), notifier, notificationReport, session)
+			sendSplitNotifications(newTestLogger(t), batch.record, notificationReport, session)
 
 			// One notification each for the updated, restarted and cooldown containers.
-			require.Len(t, sent, 3)
+			require.Len(t, batch.sent, 3)
 
-			cooldownReport := sent[2]
+			cooldownReport, ok := batch.sent[2].(*state.SingleContainerReport)
+			require.True(t, ok)
 			assert.Same(t, cooldown, cooldownReport.Focus)
 			assert.Empty(t, cooldownReport.UpdatedReports)
 			assert.Empty(t, cooldownReport.RestartedReports)
@@ -1934,20 +1917,14 @@ func TestSendSplitNotifications_OwnNotification(t *testing.T) {
 				session := reportfixture.Report(tt.states...)
 				focus := tt.focusOf(session)[0]
 
-				notifier := mockUpdate.NewMockNotifier(t)
-				notifier.EXPECT().ShouldSendNotification(mock.Anything).Return(true).Times(len(tt.states))
+				var batch sessionBatch
 
-				var sent []types.Report
+				sendSplitNotifications(log, batch.record, notificationReport, session)
 
-				notifier.EXPECT().SendNotification(mock.Anything).
-					Run(func(report types.Report) { sent = append(sent, report) }).Times(len(tt.states))
+				require.Len(t, batch.sent, len(tt.states))
+				assert.Equal(t, state.NewSingleContainerReport(focus, session), batch.sent[tt.index])
 
-				sendSplitNotifications(log, notifier, notificationReport, session)
-
-				require.Len(t, sent, len(tt.states))
-				assert.Equal(t, state.NewSingleContainerReport(focus, session), sent[tt.index])
-
-				rendered, err := format.Default(false).Render(log, format.Data{Report: sent[tt.index]})
+				rendered, err := format.Default(false).Render(log, format.Data{Report: batch.sent[tt.index]})
 				require.NoError(t, err)
 				assert.NotContains(t, rendered, "updated to")
 

@@ -78,13 +78,8 @@ func TestRunUpdatesWithNotifications_UpdateErrorKeepsPartialResults(t *testing.T
 		}).
 		Return(nil)
 
-	var sent []types.Report
-
 	notifier := mockUpdate.NewMockNotifier(t)
-	expectSessionBatch(t, notifier)
-	notifier.EXPECT().SendNotification(mock.Anything).
-		Run(func(report types.Report) { sent = append(sent, report) }).
-		Once()
+	batch := expectSessionBatch(t, notifier)
 
 	broadcaster := events.NewBroadcaster()
 	published, _ := broadcaster.SubscribeWithDone()
@@ -99,12 +94,12 @@ func TestRunUpdatesWithNotifications_UpdateErrorKeepsPartialResults(t *testing.T
 
 	assert.Equal(t, &metrics.Metric{Scanned: 1, Updated: 1, Skipped: 1, ScanFailed: true}, metric)
 
-	require.Len(t, sent, 1, "one notification is sent")
-	require.Len(t, sent[0].Updated(), 1, "the notification reports the replaced container")
-	assert.Len(t, sent[0].Skipped(), 1, "the notification reports the container left unprocessed as skipped")
-	assert.Empty(t, sent[0].Failed())
+	require.Len(t, batch.sent, 1, "one notification is sent")
+	require.Len(t, batch.sent[0].Updated(), 1, "the notification reports the replaced container")
+	assert.Len(t, batch.sent[0].Skipped(), 1, "the notification reports the container left unprocessed as skipped")
+	assert.Empty(t, batch.sent[0].Failed())
 
-	updated := sent[0].Updated()[0]
+	updated := batch.sent[0].Updated()[0]
 	assert.Equal(t, []types.ImageID{updated.CurrentImageID()}, removed,
 		"the replaced container's old image is removed")
 

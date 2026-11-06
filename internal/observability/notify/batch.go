@@ -23,47 +23,43 @@ type batch struct {
 	holders int
 }
 
-// queued returns the entries the batch holds.
-//
-// Returns:
-//   - []*format.Entry: The queued entries. Nil for a nil batch.
-func (b *batch) queued() []*format.Entry {
-	if b == nil {
-		return nil
-	}
-
-	return b.entries
-}
-
-// StartNotification opens the batch of an update session or of startup.
+// StartNotification opens the batch of the startup message.
 //
 // Log entries are then queued until the batch is sent. A batch an earlier owner
 // left open is sent first, without a report. Its entries are either the lines
 // logged before startup or the lines of check requests that this batch takes
 // over. Those are sent as the checks' release would send them. The checks'
-// release then sends nothing.
+// release then sends nothing. An update session opens its batch with
+// [Notifier.StartSessionNotification] instead.
 //
 // Returns:
 //   - func(): Ends the batch, if it is still open. The entries no notification
 //     took are sent without a report, as a check request's entries are.
 //     Calling it again has no effect.
 func (n *Notifier) StartNotification() func() {
-	owned := &batch{}
+	owned := n.openBatch()
 
-	n.entriesMutex.Lock()
-	earlier := n.batch
-	n.batch = owned
-	n.entriesMutex.Unlock()
+	return func() { n.endBatch(owned) }
+}
 
-	// Sending after unlock keeps template work and internal logging outside the
-	// queue lock.
-	n.sendEnded(earlier)
+// StartSessionNotification opens the batch of an update session.
+//
+// The batch opens as one from [Notifier.StartNotification] does. The session
+// sends its report through the returned send, which reaches only this batch.
+//
+// Returns:
+//   - func(types.Report): Sends a report with the entries the batch queued,
+//     while the batch is open. A split report names its container in its Focus
+//     field. Its notification takes only that container's entries. The batch
+//     stays open for the session's other split notifications. Any other report
+//     takes every queued entry and ends the batch. Once the batch has ended,
+//     send sends nothing.
+//   - func(): Ends the batch, as the end from [Notifier.StartNotification] does.
+func (n *Notifier) StartSessionNotification() (func(types.Report), func()) {
+	owned := n.openBatch()
 
-	return func() {
-		if left, ok := n.takeBatch(owned); ok {
-			n.sendUnreported(left)
-		}
-	}
+	return func(report types.Report) { n.sendReport(owned, report) },
+		func() { n.endBatch(owned) }
 }
 
 // HoldNotifications holds back the log entries of a check request.
@@ -124,48 +120,6 @@ func (n *Notifier) HoldNotifications() func() {
 
 		n.sendUnreported(queued)
 	})
-}
-
-// SendNotification sends queued messages with a report.
-//
-// A split report names the container it is about in its Focus field. For such
-// a report, the queued entries that match the focus container are taken out of
-// the queue and sent with it. This supports the notification-split-by-container
-// configuration option without exposing entry state. Otherwise the entire
-// queue is drained and sent.
-//
-// Parameters:
-//   - report: Scan report to include.
-func (n *Notifier) SendNotification(report types.Report) {
-	split, ok := report.(*state.SingleContainerReport)
-	if !ok || split.Focus == nil {
-		n.sendDeduplicated(n.takeOpen().queued(), report)
-
-		return
-	}
-
-	var matched []*format.Entry
-
-	n.entriesMutex.Lock()
-
-	// The batch stays open for the session's other split notifications.
-	if n.batch != nil {
-		rest := make([]*format.Entry, 0, len(n.batch.entries))
-
-		for _, e := range n.batch.entries {
-			if entryMatchesFocus(e, split.Focus) {
-				matched = append(matched, e)
-			} else {
-				rest = append(rest, e)
-			}
-		}
-
-		n.batch.entries = rest
-	}
-
-	n.entriesMutex.Unlock()
-
-	n.sendDeduplicated(matched, report)
 }
 
 // entryMatchesFocus reports whether a queued entry belongs to the focus container.
@@ -229,26 +183,98 @@ func (n *Notifier) takeOpen() *batch {
 	return open
 }
 
-// takeBatch ends owned if it is still the open batch.
+// openBatch makes a new batch the open one, owned by its caller.
+//
+// The batch an earlier owner left open is sent first, without a report.
+//
+// Returns:
+//   - *batch: The new open batch.
+func (n *Notifier) openBatch() *batch {
+	owned := &batch{}
+
+	n.entriesMutex.Lock()
+	earlier := n.batch
+	n.batch = owned
+	n.entriesMutex.Unlock()
+
+	// Sending after unlock keeps template work and internal logging outside the
+	// queue lock.
+	n.sendEnded(earlier)
+
+	return owned
+}
+
+// endBatch ends owned if it is still the open batch.
+//
+// The entries no notification took are sent without a report. A batch that
+// already ended or that another owner took over sends nothing.
 //
 // Parameters:
 //   - owned: The batch its owner opened.
-//
-// Returns:
-//   - []*format.Entry: The entries owned holds.
-//   - bool: True when owned was still open. False when another owner took the
-//     batch over or owned already ended.
-func (n *Notifier) takeBatch(owned *batch) ([]*format.Entry, bool) {
+func (n *Notifier) endBatch(owned *batch) {
 	n.entriesMutex.Lock()
-	defer n.entriesMutex.Unlock()
 
 	if n.batch != owned {
-		return nil, false
+		n.entriesMutex.Unlock()
+
+		return
 	}
 
 	n.batch = nil
 
-	return owned.entries, true
+	n.entriesMutex.Unlock()
+
+	// Sending after unlock keeps template work and internal logging outside the
+	// queue lock.
+	n.sendUnreported(owned.entries)
+}
+
+// sendReport sends report with the entries owned queued, while owned is the
+// open batch.
+//
+// A split report names the container it is about in its Focus field. Only the
+// queued entries that match that container are taken out of the batch and sent
+// with it. The batch stays open for the session's other split notifications.
+// Any other report takes every queued entry and ends the batch. Once owned has
+// ended or another owner took it over, nothing is sent.
+//
+// Parameters:
+//   - owned: The batch its owner opened.
+//   - report: Scan report to include.
+func (n *Notifier) sendReport(owned *batch, report types.Report) {
+	split, ok := report.(*state.SingleContainerReport)
+	focused := ok && split.Focus != nil
+
+	n.entriesMutex.Lock()
+
+	if n.batch != owned {
+		n.entriesMutex.Unlock()
+
+		return
+	}
+
+	var entries []*format.Entry
+
+	if focused {
+		rest := make([]*format.Entry, 0, len(owned.entries))
+
+		for _, e := range owned.entries {
+			if entryMatchesFocus(e, split.Focus) {
+				entries = append(entries, e)
+			} else {
+				rest = append(rest, e)
+			}
+		}
+
+		owned.entries = rest
+	} else {
+		entries = owned.entries
+		n.batch = nil
+	}
+
+	n.entriesMutex.Unlock()
+
+	n.sendDeduplicated(entries, report)
 }
 
 // sendEnded sends the entries of a batch that ended without a report.

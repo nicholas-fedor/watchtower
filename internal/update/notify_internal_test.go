@@ -91,7 +91,7 @@ func Test_handleUpdateResult(t *testing.T) {
 
 		// Each case ends a session with an error and no report. In both cases the
 		// session's end sends the batch, which holds the entry that notifies the
-		// cause. The mock fails the test on any notifier call.
+		// cause. The send fails the test when a report is sent here.
 		tests := []struct {
 			name       string
 			err        error
@@ -107,9 +107,9 @@ func Test_handleUpdateResult(t *testing.T) {
 
 				log, buf := logcapture.NewJSON(zerolog.DebugLevel)
 
-				mockNotifier := mockUpdate.NewMockNotifier(t)
-
-				handleUpdateResult(log, nil, tt.err, mockNotifier)
+				handleUpdateResult(log, nil, tt.err, func(types.Report) {
+					t.Error("no report is sent without a report")
+				})
 
 				entries := logcapture.Entries[logcapture.Entry](t, buf.String())
 				require.Len(t, entries, 1)
@@ -130,11 +130,12 @@ func Test_handleUpdateResult(t *testing.T) {
 		mockReport.EXPECT().Restarted().Return(nil)
 		mockReport.EXPECT().Skipped().Return(nil)
 
-		mockNotifier := mockUpdate.NewMockNotifier(t)
-		mockNotifier.EXPECT().SendNotification(mockReport).Times(1)
+		var batch sessionBatch
 
 		err := errors.New("rolling restart canceled")
-		handleUpdateResult(newTestLogger(t), mockReport, err, mockNotifier)
+		handleUpdateResult(newTestLogger(t), mockReport, err, batch.record)
+
+		assert.Equal(t, []types.Report{mockReport}, batch.sent)
 	})
 
 	t.Run("should return a failed zero metric when error occurs and notifier is nil", func(t *testing.T) {
@@ -149,15 +150,14 @@ func Test_handleUpdateResult(t *testing.T) {
 	t.Run("should not send notification when there is no error", func(t *testing.T) {
 		t.Parallel()
 
-		// Create a mock notifier with no expectations (will fail if any method is called)
-		mockNotifier := mockUpdate.NewMockNotifier(t)
-
 		// Call handleUpdateResult without an error
 		mockReport := mockTypes.NewMockReport(t)
 
 		var err error
 
-		result := handleUpdateResult(newTestLogger(t), mockReport, err, mockNotifier)
+		result := handleUpdateResult(newTestLogger(t), mockReport, err, func(types.Report) {
+			t.Error("no report is sent without an error")
+		})
 
 		// Verify we got the expected result
 		assert.Nil(t, result)

@@ -39,9 +39,10 @@ func TestProcessSendErrors(t *testing.T) {
 		)
 		shoutrrr.sender = mockRouter
 		shoutrrr.RegisterHook(log)
-		shoutrrr.StartNotification()
+		send, _ := shoutrrr.StartSessionNotification()
+
 		log.Info().Msg("test message")
-		shoutrrr.SendNotification(nil)
+		send(nil)
 
 		shoutrrr.Close()
 		assert.Contains(t, logBuffer.String(), `index_mismatch`)
@@ -67,9 +68,10 @@ func TestProcessSendErrors(t *testing.T) {
 		)
 		shoutrrr.sender = mockRouter
 		shoutrrr.RegisterHook(log)
-		shoutrrr.StartNotification()
+		send, _ := shoutrrr.StartSessionNotification()
+
 		log.Info().Msg("test message")
-		shoutrrr.SendNotification(nil)
+		send(nil)
 
 		shoutrrr.Close()
 		assert.Regexp(t, `failure_type.*authentication`, logBuffer.String())
@@ -95,9 +97,10 @@ func TestProcessSendErrors(t *testing.T) {
 		)
 		shoutrrr.sender = mockRouter
 		shoutrrr.RegisterHook(log)
-		shoutrrr.StartNotification()
+		send, _ := shoutrrr.StartSessionNotification()
+
 		log.Info().Msg("test message")
-		shoutrrr.SendNotification(nil)
+		send(nil)
 
 		shoutrrr.Close()
 		assert.Regexp(t, `failure_type.*network`, logBuffer.String())
@@ -123,9 +126,10 @@ func TestProcessSendErrors(t *testing.T) {
 		)
 		shoutrrr.sender = mockRouter
 		shoutrrr.RegisterHook(log)
-		shoutrrr.StartNotification()
+		send, _ := shoutrrr.StartSessionNotification()
+
 		log.Info().Msg("test message")
-		shoutrrr.SendNotification(nil)
+		send(nil)
 
 		shoutrrr.Close()
 		assert.Regexp(t, `failure_type.*rate_limit`, logBuffer.String())
@@ -151,9 +155,10 @@ func TestProcessSendErrors(t *testing.T) {
 		)
 		shoutrrr.sender = mockRouter
 		shoutrrr.RegisterHook(log)
-		shoutrrr.StartNotification()
+		send, _ := shoutrrr.StartSessionNotification()
+
 		log.Info().Msg("test message")
-		shoutrrr.SendNotification(nil)
+		send(nil)
 
 		shoutrrr.Close()
 		assert.Regexp(t, `failure_type.*unknown`, logBuffer.String())
@@ -179,9 +184,10 @@ func TestProcessSendErrors(t *testing.T) {
 		)
 		shoutrrr.sender = mockRouter
 		shoutrrr.RegisterHook(log)
-		shoutrrr.StartNotification()
+		send, _ := shoutrrr.StartSessionNotification()
+
 		log.Info().Msg("test message")
-		shoutrrr.SendNotification(nil)
+		send(nil)
 
 		shoutrrr.Close()
 		assert.Regexp(t, `failed_count.*2`, logBuffer.String())
