@@ -59,10 +59,12 @@ var (
 	errPullImageFailed = errors.New("failed to pull image")
 	// errFailedToLoadPullOptions indicates pull options could not be resolved.
 	errFailedToLoadPullOptions = errors.New("failed to load pull options")
-	// errPullImageUnauthorized indicates an authentication failure during image pull.
-	errPullImageUnauthorized = errors.New("failed to pull image: authentication required")
-	// errPullImageNotFound indicates the image was not found in the registry.
-	errPullImageNotFound = errors.New("failed to pull image: image not found")
+	// errPullImageUnauthorized indicates that a pull failed because the registry
+	// required authentication.
+	errPullImageUnauthorized = errors.New("authentication required")
+	// errPullImageNotFound indicates that a pull failed because the registry
+	// does not have the image.
+	errPullImageNotFound = errors.New("image not found")
 	// errReadPullResponseFailed indicates a failure to read the pull response stream.
 	errReadPullResponseFailed = errors.New("failed to read pull response")
 	// errRemoveImageFailed indicates a failure to remove an image from the Docker host.
@@ -835,7 +837,7 @@ func (c Client) performImagePull(
 		// another quota token.
 		cooldownErr := c.rateLimiter.WaitCooldown(ctx, pullHost)
 		if cooldownErr != nil {
-			return fmt.Errorf("image pull cooldown wait: %w", cooldownErr)
+			return fmt.Errorf("rate-limit cooldown wait: %w", cooldownErr)
 		}
 
 		response, err := c.api.ImagePull(ctx, imageName, opts)
@@ -858,19 +860,19 @@ func (c Client) performImagePull(
 					Err(err).
 					Msg("Image pull failed: authentication required")
 
-				return fmt.Errorf("%w: %s: %w", errPullImageUnauthorized, imageName, err)
+				return fmt.Errorf("%w: %w", errPullImageUnauthorized, err)
 			case cerrdefs.IsNotFound(err):
 				clog.Debug().
 					Err(err).
 					Msg("Image pull failed: image not found in registry")
 
-				return fmt.Errorf("%w: %s: %w", errPullImageNotFound, imageName, err)
+				return fmt.Errorf("%w: %w", errPullImageNotFound, err)
 			default:
 				clog.Debug().
 					Err(err).
 					Msg("Failed to initiate image pull")
 
-				return fmt.Errorf("%w: %s: %w", errPullImageFailed, imageName, err)
+				return err //nolint:wrapcheck // Wrapped once with the image name after the retries.
 			}
 		}
 		defer response.Close()
@@ -891,7 +893,7 @@ func (c Client) performImagePull(
 				Err(waitErr).
 				Msg("Failed to read image pull response")
 
-			return fmt.Errorf("%w: %s: %w", errReadPullResponseFailed, imageName, waitErr)
+			return fmt.Errorf("%w: %w", errReadPullResponseFailed, waitErr)
 		}
 
 		clog.Debug().Msg("Image pull completed")
@@ -899,7 +901,8 @@ func (c Client) performImagePull(
 		return nil
 	})
 	if pullErr != nil {
-		return fmt.Errorf("image pull: %w", pullErr)
+		// Each attempt's error gives only the cause. The image is named here once.
+		return fmt.Errorf("%w: %s: %w", errPullImageFailed, imageName, pullErr)
 	}
 
 	return nil
@@ -936,14 +939,14 @@ func pullSlotFor(host string) chan struct{} {
 func acquirePullSlot(ctx context.Context, host string) error {
 	ctxErr := ctx.Err()
 	if ctxErr != nil {
-		return fmt.Errorf("image pull slot wait canceled: %w", ctxErr)
+		return fmt.Errorf("pull slot wait canceled: %w", ctxErr)
 	}
 
 	select {
 	case pullSlotFor(host) <- struct{}{}:
 		return nil
 	case <-ctx.Done():
-		return fmt.Errorf("image pull slot wait canceled: %w", ctx.Err())
+		return fmt.Errorf("pull slot wait canceled: %w", ctx.Err())
 	}
 }
 

@@ -271,8 +271,8 @@ func TestImageClient_PullImage(t *testing.T) {
 				updateConfig.Policy{},
 			)
 			require.ErrorIs(t, err, errPullImageUnauthorized)
-			require.ErrorContains(t, err, "authentication required")
-			require.NotErrorIs(t, err, errPullImageFailed)
+			require.ErrorIs(t, err, errPullImageFailed)
+			require.EqualError(t, err, "failed to pull image: "+image+": authentication required: unauthorized: authentication required")
 			assert.Regexp(t, `level=debug msg="Image pull failed: authentication required"`, logbuf.String())
 			assert.NotContains(t, logbuf.String(), "level=warn")
 		})
@@ -296,8 +296,8 @@ func TestImageClient_PullImage(t *testing.T) {
 				updateConfig.Policy{},
 			)
 			require.ErrorIs(t, err, errPullImageNotFound)
-			require.ErrorContains(t, err, "image not found")
-			require.NotErrorIs(t, err, errPullImageFailed)
+			require.ErrorIs(t, err, errPullImageFailed)
+			require.EqualError(t, err, "failed to pull image: "+image+": image not found: manifest for "+image+" not found")
 			assert.Contains(t, logbuf.String(), "Image pull failed: image not found in registry")
 		})
 	})
@@ -320,7 +320,7 @@ func TestImageClient_PullImage(t *testing.T) {
 				updateConfig.Policy{},
 			)
 			require.ErrorIs(t, err, errPullImageFailed)
-			require.ErrorContains(t, err, "failed to pull image")
+			require.EqualError(t, err, "failed to pull image: "+image+": Error response from daemon: internal server error")
 			require.NotErrorIs(t, err, errPullImageUnauthorized)
 			require.NotErrorIs(t, err, errPullImageNotFound)
 			assert.Contains(t, logbuf.String(), "Failed to initiate image pull")

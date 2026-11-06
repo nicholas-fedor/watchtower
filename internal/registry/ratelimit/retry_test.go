@@ -266,7 +266,7 @@ func TestExceedsHonorWindow(t *testing.T) {
 		{name: "beyond the honor window", err: &Error{RetryAfter: 2 * time.Hour}, want: true},
 		{
 			name: "wrapped beyond the honor window",
-			err:  fmt.Errorf("image pull: %w", &Error{RetryAfter: 2 * time.Hour}),
+			err:  fmt.Errorf("failed to pull image: org/app:latest: %w", &Error{RetryAfter: 2 * time.Hour}),
 			want: true,
 		},
 	}

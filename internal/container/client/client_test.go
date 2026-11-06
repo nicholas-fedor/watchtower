@@ -1887,6 +1887,8 @@ func TestClientWrappers(t *testing.T) {
 		assert.Equal(t, types.ImageID(newImageID), latestID)
 	})
 
+	// The image client's error names the failure. The update session's warning
+	// says what was being checked. The client adds no prefix of its own.
 	t.Run("IsContainerStale reports a failed check", func(t *testing.T) {
 		t.Parallel()
 
@@ -1897,7 +1899,7 @@ func TestClientWrappers(t *testing.T) {
 		_, _, _, err := (&client{log: newTestLogger(t), api: api}).IsContainerStale(
 			t.Context(), runningImage("sha256:"+containerfixture.RandomID()), updateConfig.Policy{NoPull: true},
 		)
-		require.Error(t, err)
+		require.EqualError(t, err, "failed to inspect image: test-image:latest: Error response from daemon: inspect failed")
 	})
 
 	t.Run("CheckContainerUpdate checks the local image with no-pull", func(t *testing.T) {

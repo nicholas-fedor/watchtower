@@ -345,7 +345,7 @@
     {
       "data": {
         "container": "app",
-        "error": "image pull: registry rate limited: retry-after 347.256µs allowed 44000 per 1m0s",
+        "error": "failed to pull image: org/app:latest: registry rate limited: retry-after 347.256µs allowed 44000 per 1m0s",
         "image": "org/app:latest"
       },
       "level": "info",
