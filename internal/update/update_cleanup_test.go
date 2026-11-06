@@ -298,7 +298,6 @@ func TestRunUpdatesWithNotifications_RemovesOldInstanceImageOnce(t *testing.T) {
 	notifier := mockUpdate.NewMockNotifier(t)
 	expectSessionBatch(t, notifier)
 	notifier.EXPECT().ShouldSendNotification(mock.Anything).Return(false).Maybe()
-	notifier.EXPECT().Flush().Maybe()
 
 	broadcaster := events.NewBroadcaster()
 	published, _ := broadcaster.SubscribeWithDone()

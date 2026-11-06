@@ -172,7 +172,6 @@ func TestRunUpdatesWithNotifications_DiskSpaceAbortNotifiesOnce(t *testing.T) {
 
 			notifier := mockUpdate.NewMockNotifier(t)
 			expectSessionBatch(t, notifier)
-			notifier.EXPECT().Flush().Once()
 
 			metric := RunUpdatesWithNotifications(t.Context(), RunUpdatesWithNotificationsParams{
 				Logger:   log,

@@ -108,8 +108,12 @@ func TestNotificationBatching(t *testing.T) {
 
 	out.WriteString("=== grouped\n")
 
-	grouped := newBatchingNotifier(t, batchEntries())
-	grouped.Flush()
+	// A session's end sends the entries no notification took.
+	grouped := newBatchingNotifier(t, nil)
+	endGrouped := grouped.StartNotification()
+	grouped.batch.entries = batchEntries()
+
+	endGrouped()
 	writeMessages(&out, sentMessages(grouped))
 
 	out.WriteString("\n=== focused on web1\n")
@@ -134,8 +138,12 @@ func TestNotificationBatching(t *testing.T) {
 	// The messages are sent in map order, so they are sorted for the snapshot.
 	out.WriteString("\n=== split by container (sorted)\n")
 
-	split := newBatchingNotifier(t, batchEntries())
-	split.sendByContainer(split.takeOpen().queued())
+	split := newBatchingNotifier(t, nil)
+	split.splitByContainer = true
+	endSplit := split.StartNotification()
+	split.batch.entries = batchEntries()
+
+	endSplit()
 
 	messages := sentMessages(split)
 	slices.Sort(messages)

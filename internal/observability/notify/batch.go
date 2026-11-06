@@ -132,7 +132,7 @@ func (n *Notifier) HoldNotifications() func() {
 // a report, the queued entries that match the focus container are taken out of
 // the queue and sent with it. This supports the notification-split-by-container
 // configuration option without exposing entry state. Otherwise the entire
-// queue is drained and sent. [Notifier.Flush] sends without a report.
+// queue is drained and sent.
 //
 // Parameters:
 //   - report: Scan report to include.
@@ -166,17 +166,6 @@ func (n *Notifier) SendNotification(report types.Report) {
 	n.entriesMutex.Unlock()
 
 	n.sendDeduplicated(matched, report)
-}
-
-// Flush sends every queued message in one notification without a report and
-// ends the open batch.
-//
-// Report templates then list the queued messages themselves. Callers use it
-// when no scan produced a report, such as for the startup message. An empty
-// queue sends nothing. Messages logged after it are sent one at a time until
-// the next batch opens.
-func (n *Notifier) Flush() {
-	n.sendWithoutReport(n.takeOpen().queued())
 }
 
 // entryMatchesFocus reports whether a queued entry belongs to the focus container.
