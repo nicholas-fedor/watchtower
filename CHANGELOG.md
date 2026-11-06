@@ -10,6 +10,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Send session notifications only through the session's batch by @nicholas-fedor in [#3512](https://github.com/nicholas-fedor/watchtower/pull/3512)
 - End only the notification batch the caller owns by @nicholas-fedor in [#3506](https://github.com/nicholas-fedor/watchtower/pull/3506)
 - Keep the startup message from overlapping an update by @nicholas-fedor in [#3504](https://github.com/nicholas-fedor/watchtower/pull/3504)
 - Send startup errors before Watchtower exits by @nicholas-fedor in [#3500](https://github.com/nicholas-fedor/watchtower/pull/3500)
