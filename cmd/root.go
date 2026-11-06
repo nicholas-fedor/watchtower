@@ -618,6 +618,13 @@ func (p *process) run(command *cobra.Command, args []string) error {
 // Returns:
 //   - error: An [exitError] for a failure that was already logged and notified.
 func (p *process) runMain(cfg settings.RunConfig) error {
+	// Close the notifier after the run-once update, the scheduler and the HTTP
+	// API's drain have finished. Closing sends the messages still queued. A
+	// request that outlasts the HTTP API's 5-second grace period can still log
+	// after the close. Those lines are dropped. Deferred before the signal
+	// context's stop, the close runs after it.
+	defer notifier.Close()
+
 	// Log the container names being processed for debugging visibility.
 	p.log.Debug().
 		Strs("container_names", cfg.Names).
@@ -732,7 +739,6 @@ func (p *process) runMain(cfg settings.RunConfig) error {
 		metric := runUpdatesWithNotifications(ctx, cfg.Filter, params)
 		metrics.Default().RegisterScan(metric)
 		p.disableRestarts()
-		notifier.Close()
 
 		return nil
 	}
@@ -889,7 +895,6 @@ func (p *process) runMain(cfg settings.RunConfig) error {
 		Startup:             startupBase,
 		WriteStartupMessage: logging.WriteStartupMessage,
 		RunUpdate:           runUpdatesWithNotifications,
-		Notifier:            notifier,
 		UpdateOnStart:       cfg.UpdateOnStart,
 		SkipFirstRun:        cleanupOccurred,
 		StartupMessageSent:  startupMessageSent,

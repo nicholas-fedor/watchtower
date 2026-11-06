@@ -117,12 +117,6 @@ func recoverPanics(log *zerolog.Logger) cron.JobWrapper {
 	}
 }
 
-// Notifier is the notification system the scheduler closes when it stops.
-type Notifier interface {
-	// Close sends the messages waiting to be sent and stops the notifier.
-	Close()
-}
-
 // ScheduleDeps holds dependencies for scheduled update runs.
 //
 // BaseParams must be a complete [updateParams.Params] snapshot built from the
@@ -130,8 +124,6 @@ type Notifier interface {
 // Each tick copies BaseParams and applies only per-run fields such as SkipSelfUpdate.
 // A tick can disable self-updates, but never enables them when BaseParams disables them.
 type ScheduleDeps struct {
-	// Notifier is closed on schedule shutdown. Prefer Startup.Notifier for messaging.
-	Notifier Notifier
 	// Logger is the process logger for scheduled runs. Required and must be non-nil.
 	Logger *zerolog.Logger
 	// Filter determines which containers are updated.
@@ -335,7 +327,7 @@ func RunUpgradesOnSchedule(ctx context.Context, deps ScheduleDeps) error {
 	log.Debug().Msg("Waiting for running update to be finished...")
 
 	// Original ctx is often already canceled at shutdown. Detach cancel and
-	// apply a bound so an active RunUpdate can finish before Notifier.Close().
+	// apply a bound so an active RunUpdate can finish and send its notifications.
 	waitCtx, waitCancel := context.WithTimeout(
 		context.WithoutCancel(ctx),
 		updateWaitTimeout,
@@ -343,11 +335,6 @@ func RunUpgradesOnSchedule(ctx context.Context, deps ScheduleDeps) error {
 	defer waitCancel()
 
 	waitForRunningUpdate(log, waitCtx, lock)
-
-	// Close the notification system to clean up resources during shutdown.
-	if deps.Notifier != nil {
-		deps.Notifier.Close()
-	}
 
 	log.Debug().Msg("Scheduler stopped and update completed.")
 
