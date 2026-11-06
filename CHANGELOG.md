@@ -10,6 +10,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Keep the startup message from overlapping an update by @nicholas-fedor in [#3504](https://github.com/nicholas-fedor/watchtower/pull/3504)
 - Send startup errors before Watchtower exits by @nicholas-fedor in [#3500](https://github.com/nicholas-fedor/watchtower/pull/3500)
 - Close the notifier after the HTTP API drains by @nicholas-fedor in [#3496](https://github.com/nicholas-fedor/watchtower/pull/3496)
 - Name a failed image pull once in its error by @nicholas-fedor in [#3492](https://github.com/nicholas-fedor/watchtower/pull/3492)
