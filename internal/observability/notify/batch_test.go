@@ -409,10 +409,17 @@ func TestNotifier_FlushEmptyQueue(t *testing.T) {
 }
 
 // TestNotifier_StartNotification_End verifies that ending a session's batch
-// sends the lines no notification took without a report. It also ends
+// sends the lines no notification took without a report. A line that a split
+// notification already sent is not sent again. Ending the batch also ends
 // batching. A line logged afterwards is sent at once.
 func TestNotifier_StartNotification_End(t *testing.T) {
 	t.Parallel()
+
+	session := reportfixture.Report(state.UpdatedState)
+	require.NotEmpty(t, session.Updated())
+
+	updated := session.Updated()[0]
+	focused := "Focused line | container=" + updated.Name() + " "
 
 	tests := []struct {
 		name             string
@@ -422,11 +429,11 @@ func TestNotifier_StartNotification_End(t *testing.T) {
 		{
 			name:             "split by container",
 			splitByContainer: true,
-			want:             []string{"Container warning | container=app1 ", "Session error\nSession info"},
+			want:             []string{"Container warning | container=app1 ", focused, "Session error\nSession info"},
 		},
 		{
 			name: "grouped",
-			want: []string{"Container warning | container=app1 \nSession error\nSession info"},
+			want: []string{"Container warning | container=app1 \nSession error\nSession info", focused},
 		},
 	}
 
@@ -440,8 +447,11 @@ func TestNotifier_StartNotification_End(t *testing.T) {
 			end := n.StartNotification()
 
 			hooked.Warn().Str("container", "app1").Msg("Container warning")
+			hooked.Info().Str("container", updated.Name()).Msg("Focused line")
 			hooked.Error().Msg("Session error")
 			hooked.Info().Msg("Session info")
+
+			n.SendNotification(state.NewSingleContainerReport(updated, session))
 
 			end()
 
