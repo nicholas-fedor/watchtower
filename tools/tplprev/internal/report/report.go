@@ -2,14 +2,15 @@ package report
 
 // Report defines container session results.
 type Report interface {
-	Scanned() []ContainerReport
-	Updated() []ContainerReport
-	Failed() []ContainerReport
-	Skipped() []ContainerReport
-	Stale() []ContainerReport
-	Fresh() []ContainerReport
-	Restarted() []ContainerReport
-	All() []ContainerReport
+	Scanned() []ContainerReport   // Scanned containers.
+	Updated() []ContainerReport   // Updated containers.
+	Failed() []ContainerReport    // Failed containers.
+	Skipped() []ContainerReport   // Skipped containers.
+	Stale() []ContainerReport     // Stale containers.
+	Fresh() []ContainerReport     // Fresh containers.
+	Restarted() []ContainerReport // Restarted containers (linked dependencies).
+	All() []ContainerReport       // Each container once, sorted by ID.
+	Focus() ContainerReport       // Container a split notification is about. Nil for a session.
 }
 
 // ContainerReport defines a container's session status.

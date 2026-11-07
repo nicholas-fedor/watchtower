@@ -188,6 +188,7 @@ Logs:
 
 - This example generates a summary of container statuses followed by logs, for notifications such as email or Slack messages.
 - Some notifications carry no report. Their `.Report` is nil. Examples are a check request's messages and the messages that none of a split session's container notifications carries. A report template shows them only if it lists `.Entries`, as this example does.
+- When the [`notification-split-by-container`](../general-settings/index.md#split-by-container) configuration option is enabled, `.Report.Focus` is the container the notification is about. It is nil for the report of a whole session, as in the [template preview](../template-preview/index.md). Read it inside `{{ with .Report }}`, because `.Report.Focus` fails the template when `.Report` is nil.
 - The built-in `default` report template lists each container by its status instead of the logs. A container with a newer image that Watchtower did not apply is listed as `Stale`. Examples are a monitor-only container and a skipped Watchtower self-update.
 
 ### Example Usage
