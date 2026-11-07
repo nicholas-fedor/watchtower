@@ -268,6 +268,9 @@ Environment Variable: WATCHTOWER_NOTIFICATION_EMAIL_SUBJECTTAG
              Default: ""
 ```
 
+!!! Deprecated
+    Use the [Notification Title Tag](#notification_title_tag) option instead. The `notify-upgrade` command does not carry this setting into the generated URL.
+
 #### Email Server Port
 
 The port the SMTP server listens on. Watchtower exits at startup if the value is outside 0 to 65535.
@@ -289,6 +292,9 @@ Environment Variable: WATCHTOWER_NOTIFICATION_EMAIL_DELAY
                 Type: Integer
              Default: None
 ```
+
+!!! Deprecated
+    Use the [Notifications Delay](#notifications_delay) option instead. The `notify-upgrade` command does not carry this setting into the generated URL.
 
 ### Gotify
 
