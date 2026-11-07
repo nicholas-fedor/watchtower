@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 
 	"github.com/nicholas-fedor/watchtower/pkg/types"
 	mockTypes "github.com/nicholas-fedor/watchtower/pkg/types/mocks"
@@ -467,6 +468,57 @@ func TestReport_All(t *testing.T) {
 					t.Errorf("report.All()[%d].ID() = %v, want %v", i, gotID, tt.want[i])
 				}
 			}
+		})
+	}
+}
+
+// TestReport_AllKeepsMostSignificant verifies that All keeps the entry from
+// the most significant category when two entries share a container ID.
+func TestReport_AllKeepsMostSignificant(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name string
+		// moreSignificant and lessSignificant set the two lists that hold an
+		// entry with the same container ID.
+		moreSignificant, lessSignificant func(r *Report, entry types.ContainerReport)
+	}{
+		{
+			name:            "updated over restarted",
+			moreSignificant: func(r *Report, e types.ContainerReport) { r.updated = []types.ContainerReport{e} },
+			lessSignificant: func(r *Report, e types.ContainerReport) { r.restarted = []types.ContainerReport{e} },
+		},
+		{
+			name:            "restarted over failed",
+			moreSignificant: func(r *Report, e types.ContainerReport) { r.restarted = []types.ContainerReport{e} },
+			lessSignificant: func(r *Report, e types.ContainerReport) { r.failed = []types.ContainerReport{e} },
+		},
+		{
+			name:            "failed over scanned",
+			moreSignificant: func(r *Report, e types.ContainerReport) { r.failed = []types.ContainerReport{e} },
+			lessSignificant: func(r *Report, e types.ContainerReport) { r.scanned = []types.ContainerReport{e} },
+		},
+		{
+			name:            "fresh over scanned",
+			moreSignificant: func(r *Report, e types.ContainerReport) { r.fresh = []types.ContainerReport{e} },
+			lessSignificant: func(r *Report, e types.ContainerReport) { r.scanned = []types.ContainerReport{e} },
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			kept := &ContainerStatus{containerID: "cont1", containerName: "kept"}
+			dropped := &ContainerStatus{containerID: "cont1", containerName: "dropped"}
+
+			report := &Report{}
+			tt.moreSignificant(report, kept)
+			tt.lessSignificant(report, dropped)
+
+			all := report.All()
+			require.Len(t, all, 1)
+			assert.Same(t, kept, all[0])
 		})
 	}
 }

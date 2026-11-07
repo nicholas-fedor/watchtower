@@ -658,7 +658,15 @@ func TestReportCategoryCount(t *testing.T) {
 
 	assert.Equal(t, 0, reportCategoryCount(nil))
 
-	// The updated and the restarted container are each also scanned.
-	report := reportfixture.Report(state.UpdatedState, state.RestartedState)
-	assert.Equal(t, 4, reportCategoryCount(report))
+	// One container in each category. Every container but the skipped one is
+	// also scanned.
+	report := reportfixture.Report(
+		state.UpdatedState,
+		state.RestartedState,
+		state.FailedState,
+		state.SkippedState,
+		state.StaleState,
+		state.FreshState,
+	)
+	assert.Equal(t, 11, reportCategoryCount(report))
 }
