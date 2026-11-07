@@ -67,6 +67,11 @@ func (c stubContainerError) CurrentImageRevision() string { return c.metaValue("
 
 func (c stubContainerError) LatestImageRevision() string { return c.metaValue("LatestImageRevision") }
 
+func (c stubContainerError) CooldownAge() string           { return "" }
+func (c stubContainerError) CooldownDelay() string         { return "" }
+func (c stubContainerError) CooldownRemaining() string     { return "" }
+func (c stubContainerError) CooldownEligibleAt() time.Time { return time.Time{} }
+
 // metaValue returns the name of the metadata accessor when meta is set, so a
 // value written under the wrong JSON key is detected, and "" otherwise.
 func (c stubContainerError) metaValue(accessor string) string {

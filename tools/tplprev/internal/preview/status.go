@@ -1,6 +1,10 @@
 package preview
 
-import "github.com/nicholas-fedor/tplprev/internal/report"
+import (
+	"time"
+
+	"github.com/nicholas-fedor/tplprev/internal/report"
+)
 
 var _ report.ContainerReport = (*containerStatus)(nil)
 
@@ -25,6 +29,10 @@ type containerStatus struct {
 	latestImageVersion   string
 	currentImageRevision string
 	latestImageRevision  string
+	cooldownAge          string
+	cooldownDelay        string
+	cooldownRemaining    string
+	cooldownEligibleAt   time.Time
 }
 
 func (u *containerStatus) ID() report.ContainerID {
@@ -105,4 +113,20 @@ func (u *containerStatus) CurrentImageRevision() string {
 
 func (u *containerStatus) LatestImageRevision() string {
 	return u.latestImageRevision
+}
+
+func (u *containerStatus) CooldownAge() string {
+	return u.cooldownAge
+}
+
+func (u *containerStatus) CooldownDelay() string {
+	return u.cooldownDelay
+}
+
+func (u *containerStatus) CooldownRemaining() string {
+	return u.cooldownRemaining
+}
+
+func (u *containerStatus) CooldownEligibleAt() time.Time {
+	return u.cooldownEligibleAt
 }

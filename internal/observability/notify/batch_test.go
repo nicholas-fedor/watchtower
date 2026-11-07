@@ -13,12 +13,13 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"github.com/nicholas-fedor/watchtower/internal/container/provenance"
 	"github.com/nicholas-fedor/watchtower/internal/observability/logging"
 	"github.com/nicholas-fedor/watchtower/internal/observability/notify/format"
+	"github.com/nicholas-fedor/watchtower/internal/testutil/containerfixture"
+	"github.com/nicholas-fedor/watchtower/internal/testutil/modelfixture"
 	"github.com/nicholas-fedor/watchtower/internal/testutil/reportfixture"
 	"github.com/nicholas-fedor/watchtower/internal/update/state"
-	"github.com/nicholas-fedor/watchtower/pkg/types"
-	mockTypes "github.com/nicholas-fedor/watchtower/pkg/types/mocks"
 )
 
 // TestNotifier_StartNotification_EndSendsQueued verifies that a batch's end
@@ -355,15 +356,16 @@ func TestSessionSend_TakesOnlyFocusContainerEntries(t *testing.T) {
 func TestSessionSend_UnnamedFocusTakesNothing(t *testing.T) {
 	t.Parallel()
 
-	focus := mockTypes.NewMockContainerReport(t)
-	focus.EXPECT().Name().Return("")
+	unnamed := modelfixture.Container(containerfixture.WithName(""))
+	session := reportfixture.UpdatedReport(unnamed, "new_image_id", provenance.ReportMeta{})
+	require.Len(t, session.Updated(), 1)
 
 	sessionLine := &format.Entry{Message: "Session line"}
 
 	n := newBatchingNotifier(t)
 	send, _ := startSessionWith(n, []*format.Entry{sessionLine})
 
-	send(state.NewSingleContainerReport(focus, reportfixture.Report()))
+	send(state.NewSingleContainerReport(session.Updated()[0], session))
 
 	remaining := queuedEntries(t, n)
 
@@ -382,7 +384,7 @@ func TestSessionSend_CooldownFocusWithOneContextContainer(t *testing.T) {
 		name    string
 		context state.State
 		// contextOf returns the context container's category in the session.
-		contextOf func(*state.Report) []types.ContainerReport
+		contextOf func(*state.Report) []*state.ContainerStatus
 	}{
 		{
 			name:      "one failed container in the session",

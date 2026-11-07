@@ -890,13 +890,13 @@ func TestProgress_Report(t *testing.T) {
 			name: "empty progress",
 			m:    Progress{},
 			want: &Report{
-				scanned:   []types.ContainerReport{},
-				updated:   []types.ContainerReport{},
-				failed:    []types.ContainerReport{},
-				skipped:   []types.ContainerReport{},
-				stale:     []types.ContainerReport{},
-				fresh:     []types.ContainerReport{},
-				restarted: []types.ContainerReport{},
+				scanned:   []*ContainerStatus{},
+				updated:   []*ContainerStatus{},
+				failed:    []*ContainerStatus{},
+				skipped:   []*ContainerStatus{},
+				stale:     []*ContainerStatus{},
+				fresh:     []*ContainerStatus{},
+				restarted: []*ContainerStatus{},
 			},
 		},
 		{
@@ -912,8 +912,8 @@ func TestProgress_Report(t *testing.T) {
 				},
 			},
 			want: &Report{
-				scanned: []types.ContainerReport{
-					&ContainerStatus{
+				scanned: []*ContainerStatus{
+					{
 						containerID:   "cont1",
 						oldImage:      "img1",
 						newImage:      "img2",
@@ -922,11 +922,11 @@ func TestProgress_Report(t *testing.T) {
 						state:         StaleState, // Scanned with differing images becomes Stale
 					},
 				},
-				updated: []types.ContainerReport{},
-				failed:  []types.ContainerReport{},
-				skipped: []types.ContainerReport{},
-				stale: []types.ContainerReport{
-					&ContainerStatus{
+				updated: []*ContainerStatus{},
+				failed:  []*ContainerStatus{},
+				skipped: []*ContainerStatus{},
+				stale: []*ContainerStatus{
+					{
 						containerID:   "cont1",
 						oldImage:      "img1",
 						newImage:      "img2",
@@ -935,8 +935,8 @@ func TestProgress_Report(t *testing.T) {
 						state:         StaleState,
 					},
 				},
-				fresh:     []types.ContainerReport{},
-				restarted: []types.ContainerReport{},
+				fresh:     []*ContainerStatus{},
+				restarted: []*ContainerStatus{},
 			},
 		},
 	}

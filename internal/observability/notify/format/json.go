@@ -5,7 +5,7 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/nicholas-fedor/watchtower/pkg/types"
+	"github.com/nicholas-fedor/watchtower/internal/update/state"
 )
 
 var _ json.Marshaler = &Data{}
@@ -68,14 +68,14 @@ func (d Data) MarshalJSON() ([]byte, error) {
 	return bytes, nil
 }
 
-// marshalReports converts ContainerReport slice to JSON-compatible maps.
+// marshalReports converts container statuses to JSON-compatible maps.
 //
 // Parameters:
 //   - reports: List of container reports.
 //
 // Returns:
 //   - []jsonMap: JSON maps of report data.
-func marshalReports(reports []types.ContainerReport) []jsonMap {
+func marshalReports(reports []*state.ContainerStatus) []jsonMap {
 	jsonReports := make([]jsonMap, len(reports))
 	for i, report := range reports {
 		containerID := report.ID().ShortID()

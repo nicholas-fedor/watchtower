@@ -1,4 +1,3 @@
-// Package types defines the interfaces and value types shared across
-// Watchtower's packages, such as containers, filters, notifiers and
-// session reports.
+// Package types defines the container interfaces and value types shared
+// across Watchtower's packages.
 package types

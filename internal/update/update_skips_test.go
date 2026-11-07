@@ -33,6 +33,7 @@ import (
 	"github.com/nicholas-fedor/watchtower/internal/testutil/logcapture"
 	mockUpdate "github.com/nicholas-fedor/watchtower/internal/update/mocks"
 	updateParams "github.com/nicholas-fedor/watchtower/internal/update/params"
+	"github.com/nicholas-fedor/watchtower/internal/update/state"
 	"github.com/nicholas-fedor/watchtower/pkg/types"
 )
 
@@ -50,7 +51,7 @@ func skipTestContainer(id, name string, labels map[string]string) types.Containe
 }
 
 // reportErrors returns the error of each report, by container name.
-func reportErrors(reports []types.ContainerReport) map[string]string {
+func reportErrors(reports []*state.ContainerStatus) map[string]string {
 	errs := make(map[string]string, len(reports))
 	for _, r := range reports {
 		errs[r.Name()] = r.Error()

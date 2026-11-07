@@ -27,8 +27,9 @@ const (
 	maxTimeIncrementSeconds = 30
 	previewRemovedInstances = 1
 	previewAPIPort          = "8080"
-	previewCooldown         = "24h"
-	previewEligibleIn       = "6h"
+	previewCooldown         = "1 day"
+	previewImageAge         = "18 hours"
+	previewEligibleIn       = "6 hours"
 	previewEligibleAfter    = 6 * time.Hour
 	previewDiskUsage        = int64(32_000_000_000)
 	previewDiskMax          = int64(40_000_000_000)
@@ -40,6 +41,7 @@ const (
 var (
 	errExecutionFailed = errors.New("execution failed")
 	errSkipped         = errors.New("container skipped")
+	errImageCooldown   = errors.New("image is within cooldown period")
 
 	// previewStartTime is the fixed session start so generated timestamps stay stable.
 	previewStartTime = time.Date(2026, 1, 2, 3, 4, 5, 0, time.UTC)
@@ -72,14 +74,21 @@ func (p *PreviewData) AddFromState(state State) {
 	name := p.generateName()
 	image := p.generateImageName(name)
 
+	// The first skipped container waits out an image cooldown. Templates that
+	// read the cooldown fields then have one to render.
+	inCooldown := state == SkippedState && len(p.report.skipped) == 0
+
 	var err error
 
-	//nolint:exhaustive // Only failed and skipped states carry a simulated error.
-	switch state {
-	case FailedState:
+	switch {
+	case state == FailedState:
 		err = fmt.Errorf("%w: %s", errExecutionFailed, p.randomEntry(errorMessages))
-	case SkippedState:
+	case inCooldown:
+		err = errImageCooldown
+	case state == SkippedState:
 		err = fmt.Errorf("%w: %s", errSkipped, p.randomEntry(skippedMessages))
+	default:
+		// Other states carry no simulated error.
 	}
 
 	status := &containerStatus{
@@ -102,6 +111,16 @@ func (p *PreviewData) AddFromState(state State) {
 		status.latestImageVersion = "1.2.4"
 		status.currentImageRevision = "1111111111"
 		status.latestImageRevision = "2222222222"
+	}
+
+	if inCooldown {
+		// Watchtower records a container that a cooldown holds back with its
+		// running image as the latest.
+		status.newImage = status.oldImage
+		status.cooldownAge = previewImageAge
+		status.cooldownDelay = previewCooldown
+		status.cooldownRemaining = previewEligibleIn
+		status.cooldownEligibleAt = p.lastTime.Add(previewEligibleAfter)
 	}
 
 	switch state {
@@ -240,6 +259,7 @@ func (p *PreviewData) dataForMessage(msg, name, image string) map[string]any {
 	case "Image is within cooldown period - not eligible for update":
 		return map[string]any{
 			"image":       image,
+			"image_age":   previewImageAge,
 			"cooldown":    previewCooldown,
 			"eligible_in": previewEligibleIn,
 			"eligible_at": p.lastTime.Add(previewEligibleAfter).Format(time.RFC3339),

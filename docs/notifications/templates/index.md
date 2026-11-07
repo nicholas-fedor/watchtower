@@ -413,6 +413,38 @@ The log fields are `container`, `image`, `repo`, `ref`, `commit`, `changelog`, `
 The `json` notification report emits the same values under camelCase keys: `gitRepo`, `gitRef`, `changelog`, `ociSource`, `imageUrl`, `documentation`, `currentImageVersion`, `latestImageVersion`, `currentImageRevision`, and `latestImageRevision`.
 Porcelain JSON and `/v1/check` use snake_case instead: `git_repo`, `git_ref`, `changelog`, `oci_source`, `image_url`, `documentation`, `current_image_version`, `latest_image_version`, `current_revision`, and `latest_revision`.
 
+## Cooldown report fields
+
+A container that an [image cooldown](../../advanced-features/image-cooldown/index.md) holds back is listed under `.Report.Skipped`.
+Report templates can read the cooldown on it with these fields.
+They are empty, or the zero time, on a container that no cooldown holds back.
+
+| Field                 | Meaning                                                                                       |
+|:----------------------|:----------------------------------------------------------------------------------------------|
+| `.CooldownDelay`      | The configured cooldown, such as `1 day`                                                      |
+| `.CooldownAge`        | Age of the newer image, such as `18 hours`. Empty when its age is unavailable.                |
+| `.CooldownRemaining`  | Time until the image is old enough, such as `6 hours`. Empty when its age is unavailable.     |
+| `.CooldownEligibleAt` | Time the image is old enough, as a Go `time.Time`. The zero time when its age is unavailable. |
+
+```text
+{{- with .Report -}}
+  {{- $sep := "" -}}
+  {{- range .Skipped -}}
+    {{- if .CooldownDelay -}}
+      {{- $sep }}{{ .Name }}: cooldown {{ .CooldownDelay }}
+      {{- with .CooldownRemaining }}, eligible in {{ . }}{{ end -}}
+      {{- $sep = "\n" -}}
+    {{- end -}}
+  {{- end -}}
+{{- end -}}
+```
+
+```text
+app: cooldown 1 day, eligible in 6 hours
+```
+
+In the [template preview](../template-preview/index.md), the first skipped container is held back by a cooldown and carries these fields.
+
 ## Customizing Templates
 
 You can create custom templates to format notifications differently.

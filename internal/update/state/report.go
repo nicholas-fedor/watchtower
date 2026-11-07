@@ -20,14 +20,14 @@ import (
 //
 // The method set is part of the notification template contract.
 type Report struct {
-	focus     types.ContainerReport   // Container a split report is about. Nil for a session report.
-	scanned   []types.ContainerReport // Scanned containers.
-	updated   []types.ContainerReport // Updated containers.
-	failed    []types.ContainerReport // Failed containers.
-	skipped   []types.ContainerReport // Skipped containers.
-	stale     []types.ContainerReport // Stale containers.
-	fresh     []types.ContainerReport // Fresh containers.
-	restarted []types.ContainerReport // Restarted containers (linked dependencies).
+	focus     *ContainerStatus   // Container a split report is about. Nil for a session report.
+	scanned   []*ContainerStatus // Scanned containers.
+	updated   []*ContainerStatus // Updated containers.
+	failed    []*ContainerStatus // Failed containers.
+	skipped   []*ContainerStatus // Skipped containers.
+	stale     []*ContainerStatus // Stale containers.
+	fresh     []*ContainerStatus // Fresh containers.
+	restarted []*ContainerStatus // Restarted containers (linked dependencies).
 }
 
 // NewSingleContainerReport builds the split notification report for one
@@ -45,7 +45,7 @@ type Report struct {
 //
 // Returns:
 //   - *Report: The report about focus with session context.
-func NewSingleContainerReport(focus types.ContainerReport, session *Report) *Report {
+func NewSingleContainerReport(focus *ContainerStatus, session *Report) *Report {
 	report := &Report{
 		focus:   focus,
 		scanned: session.scanned,
@@ -58,9 +58,9 @@ func NewSingleContainerReport(focus types.ContainerReport, session *Report) *Rep
 	// The session already sorted focus into one category.
 	switch {
 	case slices.Contains(session.updated, focus):
-		report.updated = []types.ContainerReport{focus}
+		report.updated = []*ContainerStatus{focus}
 	case slices.Contains(session.restarted, focus):
-		report.restarted = []types.ContainerReport{focus}
+		report.restarted = []*ContainerStatus{focus}
 	default:
 		// Focus is not updated or restarted. The session's context lists hold it
 		// when the session lists it at all.
@@ -72,56 +72,56 @@ func NewSingleContainerReport(focus types.ContainerReport, session *Report) *Rep
 // Scanned returns scanned containers.
 //
 // Returns:
-//   - []types.ContainerReport: Scanned list.
-func (r *Report) Scanned() []types.ContainerReport {
+//   - []*ContainerStatus: Scanned list.
+func (r *Report) Scanned() []*ContainerStatus {
 	return r.scanned
 }
 
 // Updated returns updated containers.
 //
 // Returns:
-//   - []types.ContainerReport: Updated list.
-func (r *Report) Updated() []types.ContainerReport {
+//   - []*ContainerStatus: Updated list.
+func (r *Report) Updated() []*ContainerStatus {
 	return r.updated
 }
 
 // Failed returns failed containers.
 //
 // Returns:
-//   - []types.ContainerReport: Failed list.
-func (r *Report) Failed() []types.ContainerReport {
+//   - []*ContainerStatus: Failed list.
+func (r *Report) Failed() []*ContainerStatus {
 	return r.failed
 }
 
 // Skipped returns skipped containers.
 //
 // Returns:
-//   - []types.ContainerReport: Skipped list.
-func (r *Report) Skipped() []types.ContainerReport {
+//   - []*ContainerStatus: Skipped list.
+func (r *Report) Skipped() []*ContainerStatus {
 	return r.skipped
 }
 
 // Stale returns stale containers.
 //
 // Returns:
-//   - []types.ContainerReport: Stale list.
-func (r *Report) Stale() []types.ContainerReport {
+//   - []*ContainerStatus: Stale list.
+func (r *Report) Stale() []*ContainerStatus {
 	return r.stale
 }
 
 // Fresh returns fresh containers.
 //
 // Returns:
-//   - []types.ContainerReport: Fresh list.
-func (r *Report) Fresh() []types.ContainerReport {
+//   - []*ContainerStatus: Fresh list.
+func (r *Report) Fresh() []*ContainerStatus {
 	return r.fresh
 }
 
 // Restarted returns restarted containers.
 //
 // Returns:
-//   - []types.ContainerReport: Restarted list.
-func (r *Report) Restarted() []types.ContainerReport {
+//   - []*ContainerStatus: Restarted list.
+func (r *Report) Restarted() []*ContainerStatus {
 	return r.restarted
 }
 
@@ -132,16 +132,16 @@ func (r *Report) Restarted() []types.ContainerReport {
 // fresh, scanned.
 //
 // Returns:
-//   - []types.ContainerReport: Sorted, unique list.
-func (r *Report) All() []types.ContainerReport {
+//   - []*ContainerStatus: Sorted, unique list.
+func (r *Report) All() []*ContainerStatus {
 	allLen := len(r.scanned) + len(r.updated) + len(r.restarted) + len(r.failed) +
 		len(r.skipped) + len(r.stale) + len(r.fresh)
-	all := make([]types.ContainerReport, 0, allLen)
+	all := make([]*ContainerStatus, 0, allLen)
 	presentIDs := make(map[types.ContainerID]struct{}, allLen)
 
 	// appendUnique adds the containers not already added from a more
 	// significant category.
-	appendUnique := func(reports []types.ContainerReport) {
+	appendUnique := func(reports []*ContainerStatus) {
 		for _, report := range reports {
 			if _, found := presentIDs[report.ID()]; found {
 				continue
@@ -168,9 +168,9 @@ func (r *Report) All() []types.ContainerReport {
 // Focus returns the container a split report is about.
 //
 // Returns:
-//   - types.ContainerReport: The container the notification is about, or nil
+//   - *ContainerStatus: The container the notification is about, or nil
 //     for the report of a whole session.
-func (r *Report) Focus() types.ContainerReport {
+func (r *Report) Focus() *ContainerStatus {
 	return r.focus
 }
 
@@ -183,13 +183,13 @@ func (r *Report) Focus() types.ContainerReport {
 //   - *Report: Categorized and sorted report.
 func newReport(log *zerolog.Logger, progress Progress) *Report {
 	report := &Report{
-		scanned:   make([]types.ContainerReport, 0, len(progress)),
-		updated:   make([]types.ContainerReport, 0),
-		failed:    make([]types.ContainerReport, 0),
-		skipped:   make([]types.ContainerReport, 0),
-		stale:     make([]types.ContainerReport, 0),
-		fresh:     make([]types.ContainerReport, 0),
-		restarted: make([]types.ContainerReport, 0),
+		scanned:   make([]*ContainerStatus, 0, len(progress)),
+		updated:   make([]*ContainerStatus, 0),
+		failed:    make([]*ContainerStatus, 0),
+		skipped:   make([]*ContainerStatus, 0),
+		stale:     make([]*ContainerStatus, 0),
+		fresh:     make([]*ContainerStatus, 0),
+		restarted: make([]*ContainerStatus, 0),
 	}
 
 	// Categorize each container status.
@@ -266,7 +266,7 @@ func categorizeContainer(log *zerolog.Logger, report *Report, update *ContainerS
 // Parameters:
 //   - report: Report to sort.
 func sortCategories(report *Report) {
-	for _, list := range [][]types.ContainerReport{
+	for _, list := range [][]*ContainerStatus{
 		report.scanned, report.updated, report.failed, report.skipped,
 		report.stale, report.fresh, report.restarted,
 	} {
@@ -282,6 +282,6 @@ func sortCategories(report *Report) {
 // Returns:
 //   - int: Negative when a's ID sorts first, positive when b's does, zero when
 //     they are equal.
-func compareIDs(a, b types.ContainerReport) int {
+func compareIDs(a, b *ContainerStatus) int {
 	return cmp.Compare(a.ID(), b.ID())
 }
