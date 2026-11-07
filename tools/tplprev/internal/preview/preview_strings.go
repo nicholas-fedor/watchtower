@@ -136,16 +136,16 @@ var errorMessages = []string{
 }
 
 var skippedMessages = []string{
-	"container skipped: Avoiding potential subscription fees",
-	"container skipped: Concerns about update breaking third-party plugins or extensions",
-	"container skipped: Avoiding potential changes in licensing terms",
-	"container skipped: Concerns about compatibility with other software",
-	"container skipped: Fear of losing access to older file formats",
-	"container skipped: Prefer the older version's features or design",
-	"container skipped: Worries about losing custom settings or configurations",
-	"container skipped: Lack of trust in the software developer's updates",
-	"container skipped: Don't want to relearn how to use the software",
-	"container skipped: Current version works fine for my needs",
-	"container skipped: Fear of introducing new bugs",
-	"container skipped: Limited bandwidth for downloading updates",
+	"Avoiding potential subscription fees",
+	"Concerns about update breaking third-party plugins or extensions",
+	"Avoiding potential changes in licensing terms",
+	"Concerns about compatibility with other software",
+	"Fear of losing access to older file formats",
+	"Prefer the older version's features or design",
+	"Worries about losing custom settings or configurations",
+	"Lack of trust in the software developer's updates",
+	"Don't want to relearn how to use the software",
+	"Current version works fine for my needs",
+	"Fear of introducing new bugs",
+	"Limited bandwidth for downloading updates",
 }

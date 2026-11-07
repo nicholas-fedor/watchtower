@@ -1,6 +1,7 @@
 package preview
 
 import (
+	"strings"
 	"testing"
 	"time"
 
@@ -80,6 +81,30 @@ func TestAddFromStateCooldown(t *testing.T) {
 	assert.Empty(t, other.CooldownAge())
 	assert.Empty(t, other.CooldownRemaining())
 	assert.True(t, other.CooldownEligibleAt().IsZero())
+}
+
+// TestAddFromStateSkippedReason verifies that a skipped container without a
+// cooldown names the skip once, followed by one of the sample reasons. Each
+// container gets a random reason. The test also checks every sample directly.
+func TestAddFromStateSkippedReason(t *testing.T) {
+	t.Parallel()
+
+	for _, reason := range skippedMessages {
+		assert.NotContains(t, reason, "container skipped")
+	}
+
+	generator := New()
+	generator.AddFromState(SkippedState) // The first skipped container waits out a cooldown.
+	generator.AddFromState(SkippedState)
+
+	skipped := generator.NotificationData().Report.Skipped()
+	require.Len(t, skipped, 2)
+
+	got := skipped[1].Error()
+	reason, found := strings.CutPrefix(got, "container skipped: ")
+	require.True(t, found, "error %q", got)
+	assert.NotContains(t, reason, "container skipped", "error %q", got)
+	assert.Contains(t, skippedMessages, reason)
 }
 
 func TestNotificationDataReportPresence(t *testing.T) {
