@@ -80,6 +80,36 @@ Environment Variable: WATCHTOWER_UPDATE_ON_START
 !!! Note
     If used with [`run-once`](#run_once), a warning is logged and [`run-once`](#run_once) takes precedence.
 
+## Container Schedules
+
+Lets a container set its own update schedule with the `com.centurylinklabs.watchtower.schedule` label, in place of the global [schedule](#schedule) or [interval](#interval).
+The label takes the same cron syntax as `--schedule`, including the `@every` and `@hourly` descriptors.
+
+```text
+            Argument: --container-schedules
+Environment Variable: WATCHTOWER_CONTAINER_SCHEDULES
+                Type: Boolean
+             Default: false
+```
+
+```yaml
+services:
+  game:
+    image: example/game:latest
+    labels:
+      - com.centurylinklabs.watchtower.enable=true
+      # checked every 10 minutes; everything else on the global schedule
+      - com.centurylinklabs.watchtower.schedule=@every 10m
+```
+
+- Containers with a schedule label are left out of the global schedule's runs, and run on their own schedule instead. Containers that share a schedule run together.
+- A label that does not parse is ignored with a warning, and the container follows the global schedule.
+- The other selection settings still apply: a labeled container in another [scope](../container-selection/index.md#scope_filter), or one not enabled when [label-enable](../container-selection/index.md#enable_label_filter) is set, is not updated.
+- Watchtower follows Docker's container events, so a container's schedule takes effect as soon as it is created, recreated or removed, with nothing polled. It lists the containers once at startup and again whenever it reconnects to the event stream (after a Docker restart, for example).
+- It works without a global schedule: with only `--container-schedules`, labeled containers update on their own schedules and the rest are not updated on a schedule.
+- Requires access to Docker's event stream. Behind a Docker socket proxy, allow events (for example `EVENTS=1` for [docker-socket-proxy](https://github.com/Tecnativa/docker-socket-proxy){target="_blank" rel="noopener noreferrer"}).
+- [HTTP API](../http-api/index.md) updates are unchanged: an update request covers every container it selects, whatever its schedule.
+
 ## HTTP API Periodic Polls
 
 Enables periodic updates when the HTTP API update endpoint is active.

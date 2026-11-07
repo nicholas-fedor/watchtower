@@ -16,6 +16,7 @@ Flags:
       --cert-path string                                         Path to TLS certificates
   -c, --cleanup[=true|false]                                     Remove previously used images after updating
       --compose-project stringArray                              Map a Compose project name to a project directory inside Watchtower (name=/path, repeatable)
+      --container-schedules[=true|false]                         Let containers set their own update schedule with the com.centurylinklabs.watchtower.schedule label (watches Docker's container events)
       --cooldown-delay string                                    Minimum time since image creation before allowing updates. Supports h, m, s, d (days), w (weeks), M (months) (e.g., 24h, 3d, 1w, 1M)
       --cpu-copy-mode string                                     CPU copy mode for container recreation, used for compatibility with Podman. Options: auto, full, none (default "auto")
   -d, --debug[=true|false]                                       Enable debug mode with verbose logging

@@ -3,6 +3,7 @@ package cmd
 import (
 	"context"
 	"errors"
+	"fmt"
 	"io/fs"
 	"os"
 	"os/signal"
@@ -35,6 +36,7 @@ import (
 	"github.com/nicholas-fedor/watchtower/internal/update/cleanup"
 	updateParams "github.com/nicholas-fedor/watchtower/internal/update/params"
 	"github.com/nicholas-fedor/watchtower/internal/update/schedule"
+	"github.com/nicholas-fedor/watchtower/internal/update/schedule/percontainer"
 	"github.com/nicholas-fedor/watchtower/internal/update/selfupdate"
 )
 
@@ -926,6 +928,8 @@ func (p *process) runMain(cfg settings.RunConfig) error {
 	// Schedule and execute periodic updates, handling errors or shutdown. In
 	// API-only mode the HTTP API returns only at shutdown. The scheduler then
 	// only waits for an update the API started and announces nothing.
+	containerSchedules := p.containerSchedules(appCfg.Schedule.ContainerSchedules, cfg.Filter)
+
 	err = schedule.RunUpgradesOnSchedule(ctx, schedule.ScheduleDeps{
 		Logger:                p.log,
 		Filter:                cfg.Filter,
@@ -937,6 +941,7 @@ func (p *process) runMain(cfg settings.RunConfig) error {
 		UpdateOnStart:         cfg.UpdateOnStart,
 		ReplacedOlderInstance: totalRemovedInstances > 0,
 		BaseParams:            sharedBase,
+		ContainerSchedules:    containerSchedules,
 	})
 
 	// Stop the HTTP API and give it its shutdown grace period to finish the
@@ -952,6 +957,45 @@ func (p *process) runMain(cfg settings.RunConfig) error {
 	}
 
 	return nil
+}
+
+// containerSchedules returns the source of containers' own schedules when
+// --container-schedules is set: Docker's container events, through the
+// process's Docker client. It returns nil (every container on the global
+// schedule) when the option is off or the client cannot stream events.
+func (p *process) containerSchedules(enabled bool, filter types.Filter) percontainer.Source {
+	if !enabled {
+		return nil
+	}
+
+	stream, ok := client.(percontainer.EventStream)
+	if !ok {
+		p.log.Warn().Msg("Container schedules need Docker's event stream, which this client lacks: " +
+			"every container follows the global schedule")
+
+		return nil
+	}
+
+	p.log.Info().Msg("Containers with a schedule label follow their own schedule")
+
+	return &percontainer.DockerSource{
+		Events: stream,
+		List: func(ctx context.Context) ([]types.FilterableContainer, error) {
+			containers, err := client.ListContainers(ctx)
+			if err != nil {
+				return nil, fmt.Errorf("list containers: %w", err)
+			}
+
+			found := make([]types.FilterableContainer, 0, len(containers))
+			for _, c := range containers {
+				found = append(found, c)
+			}
+
+			return found, nil
+		},
+		Filter: filter,
+		Log:    p.log,
+	}
 }
 
 // disableRestarts sets the restart policy of Watchtower's container to "no".
