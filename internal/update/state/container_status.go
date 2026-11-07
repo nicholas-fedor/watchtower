@@ -35,6 +35,12 @@ type State int
 
 // ContainerStatus holds a container's state during a session.
 //
+// Current* methods describe the running image and Latest* methods the newest
+// image the session found. When no newer image was found, LatestImageID
+// returns the running image's ID. The other Latest* methods then return empty
+// values. The exported method set is part of the notification template
+// contract.
+//
 //nolint:errname // ContainerStatus is not an error type, it contains an error field.
 type ContainerStatus struct {
 	cooldownEligibleAt   time.Time         // Time when the container becomes eligible for update.
@@ -47,7 +53,7 @@ type ContainerStatus struct {
 	newContainerID       types.ContainerID // New container ID after update.
 	cooldownAge          string            // Human-readable image age (e.g., "47 days, 11 hours").
 	cooldownDelay        string            // Human-readable cooldown duration (e.g., "24 hours").
-	cooldownRemaining    string            // Human-readable remaining time (empty if passed).
+	cooldownRemaining    string            // Human-readable remaining time (empty when the image age is unavailable).
 	gitRepo              string            // Resolved Git repository URL.
 	gitRef               string            // Resolved Git ref.
 	changelog            string            // Changelog or releases URL.

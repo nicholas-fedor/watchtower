@@ -1652,9 +1652,9 @@ func TestSendSplitNotifications_OwnNotification(t *testing.T) {
 
 	tests := []struct {
 		// focusOf returns the session category that holds the container.
-		focusOf func(*state.Report) []types.ContainerReport
+		focusOf func(*state.Report) []*state.ContainerStatus
 		// want returns the lines the rendered notification must contain.
-		want func(focus types.ContainerReport) []string
+		want func(focus *state.ContainerStatus) []string
 		name string
 		// states are the session's containers. Each one gets a notification.
 		states []state.State
@@ -1666,7 +1666,7 @@ func TestSendSplitNotifications_OwnNotification(t *testing.T) {
 			states:  []state.State{state.StaleState},
 			focusOf: (*state.Report).Stale,
 			index:   0,
-			want: func(focus types.ContainerReport) []string {
+			want: func(focus *state.ContainerStatus) []string {
 				return []string{"0 Updated", "- " + focus.Name() + " (" + focus.ImageName() + "): Stale"}
 			},
 		},
@@ -1675,7 +1675,7 @@ func TestSendSplitNotifications_OwnNotification(t *testing.T) {
 			states:  []state.State{state.UpdatedState, state.FailedState},
 			focusOf: (*state.Report).Failed,
 			index:   1,
-			want: func(focus types.ContainerReport) []string {
+			want: func(focus *state.ContainerStatus) []string {
 				return []string{
 					"0 Updated",
 					"1 Failed",

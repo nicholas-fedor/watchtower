@@ -398,7 +398,7 @@ func (m Progress) MarkRestarted(log *zerolog.Logger, containerID types.Container
 //   - containerID: Container ID.
 //   - age: Human-readable image age.
 //   - delay: Human-readable cooldown duration.
-//   - remaining: Human-readable remaining time (empty if passed).
+//   - remaining: Human-readable remaining time (empty when the image age is unavailable).
 //   - eligibleAt: Time when the container becomes eligible for update.
 func (m Progress) SetCooldownInfo(log *zerolog.Logger,
 	containerID types.ContainerID,

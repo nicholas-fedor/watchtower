@@ -7,7 +7,6 @@ import (
 
 	"github.com/nicholas-fedor/watchtower/internal/observability/notify/format"
 	"github.com/nicholas-fedor/watchtower/internal/update/state"
-	"github.com/nicholas-fedor/watchtower/pkg/types"
 )
 
 // batch holds the log entries queued for one owner's notification.
@@ -233,7 +232,7 @@ func (n *Notifier) endBatch(owned *batch) {
 //   - owned: The batch its owner opened.
 //   - report: Scan report to include.
 func (n *Notifier) sendReport(owned *batch, report *state.Report) {
-	var focus types.ContainerReport
+	var focus *state.ContainerStatus
 	if report != nil {
 		focus = report.Focus()
 	}

@@ -45,10 +45,7 @@ func updatedApp(t *testing.T, meta provenance.ReportMeta) (*state.ContainerStatu
 
 	require.Len(t, report.Updated(), 1)
 
-	status, ok := report.Updated()[0].(*state.ContainerStatus)
-	require.True(t, ok, "the updated container is a *state.ContainerStatus")
-
-	return status, report
+	return report.Updated()[0], report
 }
 
 // TestJSONTemplate verifies the JSON report template: its fields, ID types,
@@ -321,7 +318,7 @@ func TestJSONGitAndOCIReportFields(t *testing.T) {
 			LatestRevision:  "deadbeef",
 		})
 
-		got := marshalReports([]types.ContainerReport{status})
+		got := marshalReports([]*state.ContainerStatus{status})
 		require.Len(t, got, 1)
 		assert.Equal(t, "https://github.com/org/app.git", got[0]["gitRepo"])
 		assert.Equal(t, "main", got[0]["gitRef"])
@@ -339,7 +336,7 @@ func TestJSONGitAndOCIReportFields(t *testing.T) {
 		t.Parallel()
 
 		status, _ := updatedApp(t, provenance.ReportMeta{})
-		got := marshalReports([]types.ContainerReport{status})
+		got := marshalReports([]*state.ContainerStatus{status})
 		require.Len(t, got, 1)
 		assert.NotContains(t, got[0], "gitRepo")
 		assert.NotContains(t, got[0], "changelog")

@@ -20,6 +20,7 @@ import (
 	updateConfig "github.com/nicholas-fedor/watchtower/internal/settings/config/update"
 	mockUpdate "github.com/nicholas-fedor/watchtower/internal/update/mocks"
 	updateParams "github.com/nicholas-fedor/watchtower/internal/update/params"
+	"github.com/nicholas-fedor/watchtower/internal/update/state"
 	"github.com/nicholas-fedor/watchtower/pkg/types"
 )
 
@@ -248,7 +249,7 @@ func TestUpdate_HostConfigDependencyCycle(t *testing.T) {
 var errNoContainer = errors.New("no such container")
 
 // reportNames returns the container names of the given reports.
-func reportNames(reports []types.ContainerReport) []string {
+func reportNames(reports []*state.ContainerStatus) []string {
 	names := make([]string, 0, len(reports))
 	for _, r := range reports {
 		names = append(names, r.Name())

@@ -19,7 +19,6 @@ import (
 	"github.com/nicholas-fedor/watchtower/internal/update/cleanup"
 	updateParams "github.com/nicholas-fedor/watchtower/internal/update/params"
 	"github.com/nicholas-fedor/watchtower/internal/update/state"
-	"github.com/nicholas-fedor/watchtower/pkg/types"
 )
 
 // Notifier sends the notifications of an update session.
@@ -536,21 +535,19 @@ func sendSplitNotifications(log *zerolog.Logger, notify func(*state.Report),
 		Msg("Split notifications: container counts by category")
 
 	// inCooldown reports whether a skipped container waits out its update cooldown.
-	inCooldown := func(r types.ContainerReport) bool {
-		status, ok := r.(*state.ContainerStatus)
-
-		return ok && status.CooldownDelay() != ""
+	inCooldown := func(status *state.ContainerStatus) bool {
+		return status.CooldownDelay() != ""
 	}
 
 	passes := []struct {
-		include  func(types.ContainerReport) bool
+		include  func(*state.ContainerStatus) bool
 		category string
-		reports  []types.ContainerReport
+		reports  []*state.ContainerStatus
 	}{
 		{include: nil, category: "updated", reports: result.Updated()},
 		{include: nil, category: "restarted", reports: result.Restarted()},
 		{include: nil, category: "failed", reports: result.Failed()},
-		{include: types.ContainerReport.IsMonitorOnly, category: "monitor-only stale", reports: result.Stale()},
+		{include: (*state.ContainerStatus).IsMonitorOnly, category: "monitor-only stale", reports: result.Stale()},
 		{include: inCooldown, category: "cooldown-skipped", reports: result.Skipped()},
 	}
 
@@ -574,9 +571,9 @@ type notifyContainersParams struct {
 	result        *state.Report
 	notify        func(*state.Report)
 	log           *zerolog.Logger
-	include       func(types.ContainerReport) bool
+	include       func(*state.ContainerStatus) bool
 	category      string
-	reports       []types.ContainerReport
+	reports       []*state.ContainerStatus
 	logBeforeSend bool
 }
 

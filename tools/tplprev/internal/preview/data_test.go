@@ -2,6 +2,7 @@ package preview
 
 import (
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -50,6 +51,34 @@ func TestDataForMessageKnownFields(t *testing.T) {
 	require.NotNil(t, got)
 	assert.Equal(t, previewDiskMax, got["disk_space_max"])
 	assert.Equal(t, previewDiskWarn, got["disk_space_warn"])
+}
+
+// TestAddFromStateCooldown verifies that the first skipped container waits out
+// an image cooldown and carries its cooldown fields, while later skipped
+// containers carry none.
+func TestAddFromStateCooldown(t *testing.T) {
+	t.Parallel()
+
+	generator := New()
+	generator.AddFromState(SkippedState)
+	generator.AddFromState(SkippedState)
+
+	skipped := generator.NotificationData().Report.Skipped()
+	require.Len(t, skipped, 2)
+
+	held := skipped[0]
+	assert.Equal(t, "image is within cooldown period", held.Error())
+	assert.Equal(t, "18 hours", held.CooldownAge())
+	assert.Equal(t, "1 day", held.CooldownDelay())
+	assert.Equal(t, "6 hours", held.CooldownRemaining())
+	assert.Equal(t, previewStartTime.Add(6*time.Hour), held.CooldownEligibleAt())
+
+	other := skipped[1]
+	assert.NotEqual(t, "image is within cooldown period", other.Error())
+	assert.Empty(t, other.CooldownDelay())
+	assert.Empty(t, other.CooldownAge())
+	assert.Empty(t, other.CooldownRemaining())
+	assert.True(t, other.CooldownEligibleAt().IsZero())
 }
 
 func TestNotificationDataReportPresence(t *testing.T) {
