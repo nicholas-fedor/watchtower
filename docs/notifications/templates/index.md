@@ -160,7 +160,7 @@ When the [`notification-report`](#notification_report) configuration option is s
 {{- if .Report -}}
   {{- with .Report -}}
     {{len .Scanned}} Scanned, {{len .Updated}} Updated, {{len .Restarted}} Restarted, {{len .Failed}} Failed
-    {{- if ( or .Updated .Restarted .Failed ) -}}
+    {{- if ( or .Updated .Restarted .Failed .Skipped ) -}}
       {{- range .Updated}}
 - {{.Name}} ({{.ImageName}}): {{.CurrentImageID.ShortID}} updated to {{.LatestImageID.ShortID}}{{with .GitRef}} ref {{.}}{{end}}{{with .Changelog}} {{.}}{{end}}
       {{- end -}}
@@ -214,7 +214,7 @@ Logs:
                     {{- if .Report -}}
                       {{- with .Report -}}
                         {{len .Scanned}} Scanned, {{len .Updated}} Updated, {{len .Restarted}} Restarted, {{len .Failed}} Failed
-                        {{- if ( or .Updated .Restarted .Failed ) -}}
+                        {{- if ( or .Updated .Restarted .Failed .Skipped ) -}}
                           {{- range .Updated}}
                     - {{.Name}} ({{.ImageName}}): {{.CurrentImageID.ShortID}} updated to {{.LatestImageID.ShortID}}{{with .GitRef}} ref {{.}}{{end}}{{with .Changelog}} {{.}}{{end}}
                           {{- end -}}
@@ -251,11 +251,12 @@ Logs:
       --name watchtower \
       -v /var/run/docker.sock:/var/run/docker.sock \
       -e WATCHTOWER_NOTIFICATION_REPORT="true" \
+      -e WATCHTOWER_NOTIFICATION_URL="discord://token@channel" \
       -e WATCHTOWER_NOTIFICATION_TEMPLATE="\
     {{- if .Report -}}
       {{- with .Report -}}
         {{len .Scanned}} Scanned, {{len .Updated}} Updated, {{len .Restarted}} Restarted, {{len .Failed}} Failed
-        {{- if ( or .Updated .Restarted .Failed ) -}}
+        {{- if ( or .Updated .Restarted .Failed .Skipped ) -}}
           {{- range .Updated}}
     - {{.Name}} ({{.ImageName}}): {{.CurrentImageID.ShortID}} updated to {{.LatestImageID.ShortID}}{{with .GitRef}} ref {{.}}{{end}}{{with .Changelog}} {{.}}{{end}}
           {{- end -}}
