@@ -74,11 +74,7 @@ func (c Client) isOutsideCooldown(
 		return true, nil
 	}
 
-	clogVal := c.logger().With().
-		Str("container", sourceContainer.Name()).
-		Str("image", sourceContainer.ImageName()).
-		Logger()
-	clog := &clogVal
+	clog := cooldownLogger(c.logger(), sourceContainer)
 
 	creationTime, cdErr := fetchImageCreationTime(
 		ctx,
@@ -275,12 +271,12 @@ func CheckLocalImageCooldown(c types.Container, policy updateConfig.Policy) erro
 		return nil
 	}
 
-	clog := nopLog()
+	base := nopLog()
 	if concrete, isConcrete := c.(*container.Container); isConcrete {
-		clog = concrete.Logger()
+		base = concrete.Logger()
 	}
 
-	_, err := evalImageAge(created, delay, clog)
+	_, err := evalImageAge(created, delay, cooldownLogger(base, c))
 
 	return err
 }
@@ -304,6 +300,24 @@ func localImageCreated(c types.Container) (time.Time, bool) {
 	}
 
 	return created, true
+}
+
+// cooldownLogger returns base with the container's name and image added, so
+// every cooldown line names the container it is about.
+//
+// Parameters:
+//   - base: The logger to extend.
+//   - c: The container whose image the cooldown check evaluates.
+//
+// Returns:
+//   - *zerolog.Logger: The logger with the container and image fields.
+func cooldownLogger(base *zerolog.Logger, c types.Container) *zerolog.Logger {
+	log := base.With().
+		Str("container", c.Name()).
+		Str("image", c.ImageName()).
+		Logger()
+
+	return &log
 }
 
 // logCooldownExceeded logs an info message when the image age exceeds the

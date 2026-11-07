@@ -18,6 +18,7 @@ import (
 	"github.com/nicholas-fedor/watchtower/internal/testutil/reportfixture"
 	"github.com/nicholas-fedor/watchtower/internal/update/state"
 	"github.com/nicholas-fedor/watchtower/pkg/types"
+	mockTypes "github.com/nicholas-fedor/watchtower/pkg/types/mocks"
 )
 
 // TestNotifier_StartNotification_EndSendsQueued verifies that a batch's end
@@ -280,6 +281,98 @@ func TestSessionSend_SingleFocusKeepsBatchingActive(t *testing.T) {
 	n.Close()
 }
 
+// TestEntryContainer verifies which container a queued entry names. The
+// container field wins, then container_name. An entry with only an image names
+// no container, since several containers can share an image.
+func TestEntryContainer(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		data map[string]any
+		name string
+		want string
+	}{
+		{name: "container field", data: map[string]any{"container": "web1"}, want: "web1"},
+		{name: "container_name field", data: map[string]any{"container_name": "web1"}, want: "web1"},
+		{
+			name: "container field wins over container_name",
+			data: map[string]any{"container": "web1", "container_name": "web2"},
+			want: "web1",
+		},
+		{
+			name: "empty container field falls back to container_name",
+			data: map[string]any{"container": "", "container_name": "web1"},
+			want: "web1",
+		},
+		{name: "image only", data: map[string]any{"image": "org/web:1.0"}, want: ""},
+		{name: "no fields", data: nil, want: ""},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			assert.Equal(t, tt.want, entryContainer(&format.Entry{Message: "Line", Data: tt.data}))
+		})
+	}
+}
+
+// TestSessionSend_TakesOnlyFocusContainerEntries verifies that a split
+// notification takes the entries that name its container, by container or by
+// container_name. A line that names only the container's image stays queued.
+// The session's end sends it with the other lines that name no container.
+func TestSessionSend_TakesOnlyFocusContainerEntries(t *testing.T) {
+	t.Parallel()
+
+	session := reportfixture.Report(state.UpdatedState)
+	require.NotEmpty(t, session.Updated())
+
+	updated := session.Updated()[0]
+
+	imageOnly := &format.Entry{Message: "Image line", Data: map[string]any{"image": updated.ImageName()}}
+
+	n := newBatchingNotifier(t)
+	send, end := startSessionWith(n, []*format.Entry{
+		{Message: "Container line", Data: map[string]any{"container": updated.Name()}},
+		{Message: "Removal line", Data: map[string]any{"container_name": updated.Name()}},
+		imageOnly,
+	})
+
+	send(state.NewSingleContainerReport(updated, session))
+
+	remaining := queuedEntries(t, n)
+
+	assert.Equal(t, []*format.Entry{imageOnly}, remaining)
+	assert.Equal(t, []string{
+		"Container line | container=" + updated.Name() + " \nRemoval line | container_name=" + updated.Name() + " ",
+	}, sentMessages(n))
+
+	end()
+
+	assert.Equal(t, []string{"Image line | image=" + updated.ImageName() + " "}, sentMessages(n))
+}
+
+// TestSessionSend_UnnamedFocusTakesNothing verifies that a split notification
+// whose container has no name takes no queued entry. The lines that name no
+// container stay queued for the session's end.
+func TestSessionSend_UnnamedFocusTakesNothing(t *testing.T) {
+	t.Parallel()
+
+	focus := mockTypes.NewMockContainerReport(t)
+	focus.EXPECT().Name().Return("")
+
+	sessionLine := &format.Entry{Message: "Session line"}
+
+	n := newBatchingNotifier(t)
+	send, _ := startSessionWith(n, []*format.Entry{sessionLine})
+
+	send(&state.SingleContainerReport{Focus: focus})
+
+	remaining := queuedEntries(t, n)
+
+	assert.Equal(t, []*format.Entry{sessionLine}, remaining)
+}
+
 // TestSessionSend_CooldownFocusWithOneContextContainer verifies that a
 // split notification for a cooldown-skipped container sends that container's
 // queued entries. The report also lists the session's failed and stale
@@ -333,9 +426,7 @@ func TestSessionSend_CooldownFocusWithOneContextContainer(t *testing.T) {
 
 			send(report)
 
-			n.entriesMutex.RLock()
-			remaining := n.batch.entries
-			n.entriesMutex.RUnlock()
+			remaining := queuedEntries(t, n)
 
 			assert.Equal(t, []*format.Entry{otherEntry}, remaining,
 				"only the skipped container's entry is sent with its notification")

@@ -23,20 +23,21 @@ var batchEntryTime = time.Date(2026, time.October, 7, 12, 0, 0, 0, time.UTC)
 
 // batchEntries returns the entries one update session queues when two
 // containers, web1 and web2, share an image and a third, db, uses its own.
-// Each entry carries the fields its emitting code attaches.
+// Two more containers, cache1 and cache2, share an image whose update their
+// cooldown holds back. Each entry carries the fields its emitting code
+// attaches.
 func batchEntries() []*format.Entry {
 	entry := func(message string, data map[string]any) *format.Entry {
 		return &format.Entry{Message: message, Data: data, Time: batchEntryTime, Level: "info"}
 	}
 
 	sharedImage := map[string]any{"image": "org/web:1.0", "new_id": "aaa111111111"}
+	cooldown := map[string]any{"image": "org/cache:3", "cooldown": "1d", "eligible_in": "2h", "eligible_at": "2026-10-07T14:00:00Z"}
 
 	return []*format.Entry{
 		entry("Only checking containers in scope", map[string]any{"scope": "production"}),
-		entry("Image is within cooldown period - not eligible for update",
-			map[string]any{"image": "org/web:1.0", "cooldown": "1d", "eligible_in": "2h", "eligible_at": "2026-10-07T14:00:00Z"}),
-		entry("Image is within cooldown period - not eligible for update",
-			map[string]any{"image": "org/web:1.0", "cooldown": "1d", "eligible_in": "2h", "eligible_at": "2026-10-07T14:00:00Z"}),
+		entry("Image is within cooldown period - not eligible for update", withContainer(cooldown, "cache1")),
+		entry("Image is within cooldown period - not eligible for update", withContainer(cooldown, "cache2")),
 		entry("Found new image", withContainer(sharedImage, "web1")),
 		entry("Found new image", withContainer(sharedImage, "web2")),
 		entry("Found new image", map[string]any{"container": "db", "image": "org/db:2", "new_id": "bbb222222222"}),
@@ -93,6 +94,23 @@ func startSessionWith(notifier *Notifier, entries []*format.Entry) (func(types.R
 	return send, end
 }
 
+// queuedEntries returns a copy of the entries in the notifier's open batch.
+// It fails the test when no batch is open, so an empty result means the batch
+// holds nothing.
+//
+// Returns:
+//   - []*format.Entry: The queued entries.
+func queuedEntries(t *testing.T, notifier *Notifier) []*format.Entry {
+	t.Helper()
+
+	notifier.entriesMutex.RLock()
+	defer notifier.entriesMutex.RUnlock()
+
+	require.NotNil(t, notifier.batch, "the notifier is batching")
+
+	return slices.Clone(notifier.batch.entries)
+}
+
 // sentMessages drains the messages the notifier rendered.
 func sentMessages(notifier *Notifier) []string {
 	var messages []string
@@ -135,7 +153,6 @@ func TestNotificationBatching(t *testing.T) {
 
 	focus := mockTypes.NewMockContainerReport(t)
 	focus.EXPECT().Name().Return("web1").Maybe()
-	focus.EXPECT().ImageName().Return("org/web:1.0").Maybe()
 
 	focused := newBatchingNotifier(t)
 	sendFocused, _ := startSessionWith(focused, batchEntries())
@@ -147,7 +164,7 @@ func TestNotificationBatching(t *testing.T) {
 
 	out.WriteString("--- still queued\n")
 
-	for _, entry := range focused.batch.entries {
+	for _, entry := range queuedEntries(t, focused) {
 		fmt.Fprintf(&out, "%s %v\n", entry.Message, entry.Data)
 	}
 

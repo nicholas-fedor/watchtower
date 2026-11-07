@@ -1,7 +1,7 @@
 === grouped
 --- message 1
 Only checking containers in scope: production
-org/web:1.0 created less than 1d ago - eligible in 2h (Wed, 07 Oct 2026 14:00:00 UTC)
+org/cache:3 created less than 1d ago - eligible in 2h (Wed, 07 Oct 2026 14:00:00 UTC)
 Found new image: org/web:1.0 (aaa111111111)
 Found new image: org/db:2 (bbb222222222)
 Found new Git revision: github.com/org/web@v1.1 (0123456)
@@ -13,7 +13,6 @@ Cleaned up old image: org/web:1.0 (01d111111111)
 
 === focused on web1
 --- message 1
-org/web:1.0 created less than 1d ago - eligible in 2h (Wed, 07 Oct 2026 14:00:00 UTC)
 Found new image: org/web:1.0 (aaa111111111)
 Found new Git revision: github.com/org/web@v1.1 (0123456)
 Stopped stale container: web1 (111111111111)
@@ -21,6 +20,8 @@ Started new container: web1 (aaa111111111)
 Cleaned up old image: org/web:1.0 (01d111111111)
 --- still queued
 Only checking containers in scope map[scope:production]
+Image is within cooldown period - not eligible for update map[container:cache1 cooldown:1d eligible_at:2026-10-07T14:00:00Z eligible_in:2h image:org/cache:3]
+Image is within cooldown period - not eligible for update map[container:cache2 cooldown:1d eligible_at:2026-10-07T14:00:00Z eligible_in:2h image:org/cache:3]
 Found new image map[container:web2 image:org/web:1.0 new_id:aaa111111111]
 Found new image map[container:db image:org/db:2 new_id:bbb222222222]
 Found new Git revision map[container:web2 revision:github.com/org/web@v1.1 short_commit:0123456]
@@ -45,4 +46,7 @@ Started new container: web2 (aaa111111111)
 Cleaned up old image: org/web:1.0 (01d111111111)
 --- message 4
 Only checking containers in scope: production
-org/web:1.0 created less than 1d ago - eligible in 2h (Wed, 07 Oct 2026 14:00:00 UTC)
+--- message 5
+org/cache:3 created less than 1d ago - eligible in 2h (Wed, 07 Oct 2026 14:00:00 UTC)
+--- message 6
+org/cache:3 created less than 1d ago - eligible in 2h (Wed, 07 Oct 2026 14:00:00 UTC)
