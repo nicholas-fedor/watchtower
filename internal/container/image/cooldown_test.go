@@ -27,112 +27,55 @@ import (
 	"github.com/nicholas-fedor/watchtower/internal/testutil/modelfixture"
 )
 
+// TestCooldownError verifies the two kinds of cooldown error. A deferral has no
+// cause and matches ErrImageCooldown. A failed age lookup carries its cause and
+// reads as it. It matches the cause instead of ErrImageCooldown.
 func TestCooldownError(t *testing.T) {
 	t.Parallel()
 
-	t.Run("Error()", func(t *testing.T) {
+	cause := errors.New("registry unreachable")
+	deferral := &CooldownError{Age: "2 hours", Delay: "1 day", Remaining: "22 hours"}
+	failedLookup := &CooldownError{Delay: "1 day", Cause: cause}
+
+	t.Run("a deferral reads as ErrImageCooldown", func(t *testing.T) {
 		t.Parallel()
 
-		t.Run("the wrapped error is non-nil", func(t *testing.T) {
-			t.Parallel()
-
-			t.Run("returns the wrapped error message", func(t *testing.T) {
-				t.Parallel()
-
-				inner := errors.New("inner failure")
-				e := &CooldownError{Age: "1h", Delay: "2h", err: inner}
-				assert.Equal(t, "inner failure", e.Error())
-			})
-		})
-
-		t.Run("the wrapped error is nil", func(t *testing.T) {
-			t.Parallel()
-
-			t.Run("returns the ErrImageCooldown message", func(t *testing.T) {
-				t.Parallel()
-
-				e := &CooldownError{Age: "1h", Delay: "2h", Remaining: "1h", err: nil}
-				assert.Equal(t, ErrImageCooldown.Error(), e.Error())
-			})
-		})
+		assert.Equal(t, ErrImageCooldown.Error(), deferral.Error())
+		require.ErrorIs(t, deferral, ErrImageCooldown)
+		require.NoError(t, deferral.Unwrap())
 	})
 
-	t.Run("Unwrap()", func(t *testing.T) {
+	t.Run("a deferral matches ErrImageCooldown through a wrap", func(t *testing.T) {
 		t.Parallel()
 
-		t.Run("returns the wrapped error when non-nil", func(t *testing.T) {
-			t.Parallel()
-
-			inner := errors.New("wrapped")
-			e := &CooldownError{err: inner}
-			assert.Equal(t, inner, e.Unwrap())
-		})
-
-		t.Run("returns nil when no wrapped error", func(t *testing.T) {
-			t.Parallel()
-
-			e := &CooldownError{}
-			require.NoError(t, e.Unwrap())
-		})
+		require.ErrorIs(t, fmt.Errorf("git cooldown: %w", deferral), ErrImageCooldown)
 	})
 
-	t.Run("Is()", func(t *testing.T) {
+	t.Run("a failed age lookup reads as its cause", func(t *testing.T) {
 		t.Parallel()
 
-		t.Run("matches when wrapped error is ErrImageCooldown", func(t *testing.T) {
-			t.Parallel()
-
-			e := &CooldownError{err: ErrImageCooldown}
-			assert.True(t, e.Is(ErrImageCooldown))
-		})
-
-		t.Run("does not match ErrImageCooldown with unrelated wrapped error", func(t *testing.T) {
-			t.Parallel()
-
-			e := &CooldownError{err: errors.New("some other error")}
-			assert.False(t, e.Is(ErrImageCooldown))
-		})
-
-		t.Run("does not match an unrelated target", func(t *testing.T) {
-			t.Parallel()
-
-			unrelated := errors.New("unrelated")
-			e := &CooldownError{err: errors.New("some other error")}
-			assert.False(t, e.Is(unrelated))
-		})
+		assert.Equal(t, cause.Error(), failedLookup.Error())
+		require.ErrorIs(t, failedLookup, cause)
+		require.NotErrorIs(t, failedLookup, ErrImageCooldown)
+		assert.Equal(t, cause, failedLookup.Unwrap())
 	})
 
-	t.Run("errors.Is sentinel extraction", func(t *testing.T) {
+	t.Run("neither matches an unrelated target", func(t *testing.T) {
 		t.Parallel()
 
-		t.Run("allows errors.Is(err, ErrImageCooldown) on *CooldownError", func(t *testing.T) {
-			t.Parallel()
+		unrelated := errors.New("unrelated")
+		require.NotErrorIs(t, deferral, unrelated)
+		require.NotErrorIs(t, failedLookup, unrelated)
+	})
 
-			err := &CooldownError{
-				Age:       "2 hours",
-				Delay:     "1 day",
-				Remaining: "22 hours",
-				err:       ErrImageCooldown,
-			}
-			assert.ErrorIs(t, err, ErrImageCooldown)
-		})
+	t.Run("errors.As extracts the fields", func(t *testing.T) {
+		t.Parallel()
 
-		t.Run("allows errors.As to extract *CooldownError with all fields", func(t *testing.T) {
-			t.Parallel()
-
-			err := &CooldownError{
-				Age:       "2 hours",
-				Delay:     "1 day",
-				Remaining: "22 hours",
-				err:       ErrImageCooldown,
-			}
-
-			var cooldownErr *CooldownError
-			require.ErrorAs(t, err, &cooldownErr)
-			assert.Equal(t, "2 hours", cooldownErr.Age)
-			assert.Equal(t, "1 day", cooldownErr.Delay)
-			assert.Equal(t, "22 hours", cooldownErr.Remaining)
-		})
+		var cooldownErr *CooldownError
+		require.ErrorAs(t, fmt.Errorf("wrapped: %w", deferral), &cooldownErr)
+		assert.Equal(t, "2 hours", cooldownErr.Age)
+		assert.Equal(t, "1 day", cooldownErr.Delay)
+		assert.Equal(t, "22 hours", cooldownErr.Remaining)
 	})
 }
 
@@ -292,8 +235,13 @@ func TestPullImageCooldownGate(t *testing.T) {
 
 			err := i.PullImage(t.Context(), c, warnAuto, updateConfig.Policy{CooldownDelay: 1 * time.Hour})
 
+			// A failed age lookup is not a deferral. The update counts it as a
+			// failed check.
 			var cooldownErr *CooldownError
 			require.ErrorAs(t, err, &cooldownErr)
+			require.NotErrorIs(t, err, ErrImageCooldown)
+			require.Error(t, cooldownErr.Cause)
+			assert.Empty(t, cooldownErr.Remaining)
 		})
 	})
 }

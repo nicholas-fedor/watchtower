@@ -522,9 +522,12 @@ func TestUpdate_FailedCheckWarnsOnce(t *testing.T) {
 			want:      [][]string{{"warn"}, {"warn"}},
 		},
 		{
-			name:      "a cooldown deferral",
-			checkErrs: []error{containerImage.ErrImageCooldown, &containerImage.CooldownError{Delay: "1h"}},
-			want:      [][]string{nil, nil},
+			name: "a cooldown deferral and a failed cooldown age lookup",
+			checkErrs: []error{
+				&containerImage.CooldownError{Age: "20 minutes", Delay: "1 hour", Remaining: "40 minutes"},
+				&containerImage.CooldownError{Delay: "1 hour", Cause: errors.New("registry unreachable")},
+			},
+			want: [][]string{nil, nil},
 		},
 		{
 			name:      "a registry rate limit",

@@ -478,8 +478,11 @@ func update(
 			// Handle staleness check results, logging skips or adding to the progress report.
 			switch {
 			case checkErr != nil:
-				// Skip containers with staleness check errors, marking them as skipped.
-				if !errors.Is(checkErr, containerImage.ErrImageCooldown) {
+				// Skip containers with staleness check errors, marking them as
+				// skipped. Every error except a cooldown deferral counts as a failed
+				// check. A failed cooldown age lookup counts too.
+				deferred := errors.Is(checkErr, containerImage.ErrImageCooldown)
+				if !deferred {
 					parallelStaleCheckFailed++
 				}
 
@@ -513,10 +516,6 @@ func update(
 						cooldownErr.Remaining,
 						cooldownErr.EligibleAt,
 					)
-				case errors.Is(checkErr, containerImage.ErrImageCooldown):
-					// Fallback for plain sentinel (keeps basic deferral visible)
-					progress.AddSkipped(log, sourceContainer, checkErr, config)
-					progress.SetCooldownInfo(log, sourceContainer.ID(), "", "", "", time.Time{})
 				case errors.Is(checkErr, semver.ErrInvalidPolicy):
 					// A container's labels cannot change, so the container ID
 					// identifies an invalid label problem.
@@ -534,13 +533,9 @@ func update(
 					skipFailedUpdateCheck(log, clog, progress, sourceContainer, checkErr, config)
 				}
 
-				// Track if Watchtower self-update pull failed for safeguard.
-				// Only set to true if we actually attempted a self-update
-				// (i.e., SkipSelfUpdate is false) and the error is a real
-				// failure, not a cooldown deferral.
-				if sourceContainer.IsWatchtower() &&
-					!config.SkipSelfUpdate &&
-					!errors.Is(checkErr, containerImage.ErrImageCooldown) {
+				// A failed check of Watchtower's own image counts as a failed
+				// self-update pull when a self-update was attempted.
+				if sourceContainer.IsWatchtower() && !config.SkipSelfUpdate && !deferred {
 					parallelWatchtowerPullFailed = true
 				}
 			case verifyErr != nil:
@@ -551,9 +546,7 @@ func update(
 					Err(verifyErr).
 					Msg(logging.ConfigNotRecreatable)
 
-				if sourceContainer.IsWatchtower() &&
-					!config.SkipSelfUpdate &&
-					!errors.Is(verifyErr, containerImage.ErrImageCooldown) {
+				if sourceContainer.IsWatchtower() && !config.SkipSelfUpdate {
 					parallelWatchtowerPullFailed = true
 				}
 			default:
