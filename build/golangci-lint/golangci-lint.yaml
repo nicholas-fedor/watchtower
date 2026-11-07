@@ -310,11 +310,6 @@ linters:
       - path: "doc.go$"
         linters:
           - dupword
-      # Exclude G117 (potential exposure of secrets via JSON marshaling) false positives for struct field names
-      - path: "internal/observability/notify/legacy/email/email.go"
-        linters:
-          - gosec
-        text: "G117"
       # Functions above the gocyclo threshold today. Remove an entry when its function is split up.
       - path: "internal/update/update.go"
         linters:

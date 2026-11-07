@@ -1,7 +1,6 @@
 package slack
 
 import (
-	"bytes"
 	"net/url"
 	"testing"
 
@@ -10,13 +9,17 @@ import (
 	"github.com/stretchr/testify/require"
 
 	notifyConfig "github.com/nicholas-fedor/watchtower/internal/settings/config/notify"
+	"github.com/nicholas-fedor/watchtower/internal/testutil/logcapture"
 )
 
-// TestSlackTypeNotifier_GetURL_Channel verifies that a legacy Slack channel
+// slackHook is a Slack webhook URL whose token Shoutrrr accepts.
+const slackHook = "https://hooks.slack.com/services/T00000000/B00000000/XXXXXXXXXXXXXXXXXXXXXXXX"
+
+// TestURL_Channel verifies that a legacy Slack channel
 // given as a Slack channel ID reaches the generated URL, and that any other
 // channel keeps the webhook's own channel and is reported with a warning,
 // since a shoutrrr Slack URL can only hold a channel ID.
-func TestSlackTypeNotifier_GetURL_Channel(t *testing.T) {
+func TestURL_Channel(t *testing.T) {
 	t.Parallel()
 
 	tests := []struct {
@@ -41,16 +44,9 @@ func TestSlackTypeNotifier_GetURL_Channel(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 
-			var out bytes.Buffer
+			log, buf := logcapture.NewJSON(zerolog.WarnLevel)
 
-			log := zerolog.New(&out).Level(zerolog.WarnLevel)
-			notifier := &slackTypeNotifier{
-				HookURL: "https://hooks.slack.com/services/T00000000/B00000000/XXXXXXXXXXXXXXXXXXXXXXXX",
-				Channel: tt.channel,
-				log:     &log,
-			}
-
-			raw, err := notifier.GetURL()
+			raw, err := URL(log, notifyConfig.Legacy{SlackHookURL: slackHook, SlackChannel: tt.channel})
 			require.NoError(t, err)
 
 			parsed, err := url.Parse(raw)
@@ -59,23 +55,23 @@ func TestSlackTypeNotifier_GetURL_Channel(t *testing.T) {
 			assert.Equal(t, tt.wantChannel, parsed.Host)
 
 			if tt.wantWarning {
-				assert.Contains(t, out.String(), slackChannelNotConvertedMessage)
-				assert.Contains(t, out.String(), tt.channel)
+				assert.Equal(t, []string{slackChannelNotConvertedMessage}, logcapture.Messages(t, buf.String(), "warn"))
+				assert.Contains(t, buf.String(), tt.channel)
 			} else {
-				assert.Empty(t, out.String())
+				assert.Empty(t, buf.String())
 			}
 		})
 	}
 }
 
-// TestSlackTypeNotifier_GetURL_Discord verifies that a legacy Slack hook URL
+// TestURL_Discord verifies that a legacy Slack hook URL
 // pointing at Discord's Slack-compatible endpoint becomes a shoutrrr Discord
 // URL with the webhook ID and token, including a versioned API path, a trailing
 // slash and a query string or fragment, whose contents never count as path
 // segments. A URL without the webhook ID, token or /slack suffix, or with any
 // other segment between /api and /webhooks, returns an error instead of
 // panicking or building a wrong URL.
-func TestSlackTypeNotifier_GetURL_Discord(t *testing.T) {
+func TestURL_Discord(t *testing.T) {
 	t.Parallel()
 
 	tests := []struct {
@@ -111,9 +107,8 @@ func TestSlackTypeNotifier_GetURL_Discord(t *testing.T) {
 			t.Parallel()
 
 			log := zerolog.Nop()
-			notifier := &slackTypeNotifier{HookURL: tt.hookURL, log: &log}
 
-			raw, err := notifier.GetURL()
+			raw, err := URL(&log, notifyConfig.Legacy{SlackHookURL: tt.hookURL})
 			if tt.wantErr {
 				require.ErrorIs(t, err, errInvalidDiscordWebhookURL)
 				assert.Empty(t, raw)
@@ -132,9 +127,9 @@ func TestSlackTypeNotifier_GetURL_Discord(t *testing.T) {
 	}
 }
 
-// TestNew verifies that New rejects settings without a hook URL and builds a
-// notifier when one is set.
-func TestNew(t *testing.T) {
+// TestURL_RequiredSettings verifies that URL rejects settings without a hook
+// URL and converts one that is set.
+func TestURL_RequiredSettings(t *testing.T) {
 	t.Parallel()
 
 	tests := []struct {
@@ -144,7 +139,7 @@ func TestNew(t *testing.T) {
 	}{
 		{
 			name: "hook URL",
-			cfg:  notifyConfig.Legacy{SlackHookURL: "https://hooks.slack.com/services/AAA/BBB/CCC"},
+			cfg:  notifyConfig.Legacy{SlackHookURL: slackHook},
 		},
 		{
 			name:    "no hook URL",
@@ -158,17 +153,128 @@ func TestNew(t *testing.T) {
 			t.Parallel()
 
 			log := zerolog.Nop()
-			notifier, err := New(&log, tt.cfg)
+			raw, err := URL(&log, tt.cfg)
 
 			if tt.wantErr != nil {
 				require.ErrorIs(t, err, tt.wantErr)
-				assert.Nil(t, notifier)
+				assert.Empty(t, raw)
 
 				return
 			}
 
 			require.NoError(t, err)
-			assert.NotNil(t, notifier)
+			assert.NotEmpty(t, raw)
+		})
+	}
+}
+
+// TestURL_Icon verifies how the icon settings reach the generated URL. A Slack
+// URL takes the icon URL, or the emoji when no icon URL is set. A Discord URL
+// takes the icon URL as its avatar.
+func TestURL_Icon(t *testing.T) {
+	t.Parallel()
+
+	const (
+		discordHook = "https://discord.com/api/webhooks/123/abc/slack"
+		iconURL     = "https://example.com/icon.png"
+	)
+
+	tests := []struct {
+		name  string
+		cfg   notifyConfig.Legacy
+		param string
+		want  string
+	}{
+		{
+			name:  "Slack icon URL",
+			cfg:   notifyConfig.Legacy{SlackHookURL: slackHook, SlackIconURL: iconURL},
+			param: "icon",
+			want:  iconURL,
+		},
+		{
+			name:  "Slack emoji",
+			cfg:   notifyConfig.Legacy{SlackHookURL: slackHook, SlackIconEmoji: "whale"},
+			param: "icon",
+			want:  "whale",
+		},
+		{
+			name:  "Slack icon URL wins over the emoji",
+			cfg:   notifyConfig.Legacy{SlackHookURL: slackHook, SlackIconURL: iconURL, SlackIconEmoji: "whale"},
+			param: "icon",
+			want:  iconURL,
+		},
+		{
+			name:  "Discord avatar",
+			cfg:   notifyConfig.Legacy{SlackHookURL: discordHook, SlackIconURL: iconURL},
+			param: "avatar",
+			want:  iconURL,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			log := zerolog.Nop()
+			raw, err := URL(&log, tt.cfg)
+			require.NoError(t, err)
+
+			parsed, err := url.Parse(raw)
+			require.NoError(t, err)
+			assert.Equal(t, tt.want, parsed.Query().Get(tt.param))
+		})
+	}
+}
+
+// TestURL_InvalidSlackToken verifies that a Slack hook URL whose token is not
+// in Slack's three-part form returns an error.
+func TestURL_InvalidSlackToken(t *testing.T) {
+	t.Parallel()
+
+	log := zerolog.Nop()
+	raw, err := URL(&log, notifyConfig.Legacy{SlackHookURL: "https://hooks.slack.com/services/AAA/BBB/CCC"})
+
+	require.ErrorContains(t, err, "failed to set Slack webhook token")
+	assert.Empty(t, raw)
+}
+
+// TestURL_TraceLogLeavesOutToken verifies that the trace-level log leaves out
+// the webhook token of both a Slack and a Discord hook URL.
+func TestURL_TraceLogLeavesOutToken(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name    string
+		hook    string
+		token   string
+		message string
+	}{
+		{
+			name:    "Slack",
+			hook:    "https://hooks.slack.com/services/T00000000/B00000000/SECRETSECRETSECRETSECRET",
+			token:   "SECRETSECRETSECRETSECRET",
+			message: "Generated Slack service URL",
+		},
+		{
+			name:    "Discord",
+			hook:    "https://discord.com/api/webhooks/123/secrettoken/slack",
+			token:   "secrettoken",
+			message: "Generated Discord service URL",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			log, buf := logcapture.NewJSON(zerolog.TraceLevel)
+
+			_, err := URL(log, notifyConfig.Legacy{SlackHookURL: tt.hook})
+			require.NoError(t, err)
+
+			out := buf.String()
+			assert.Contains(t, logcapture.Messages(t, out, "trace"), tt.message)
+			assert.NotContains(t, out, tt.token)
 		})
 	}
 }

@@ -15,7 +15,6 @@ import (
 	"github.com/nicholas-fedor/watchtower/internal/container/redact"
 	"github.com/nicholas-fedor/watchtower/internal/observability/notify/legacy"
 	notifyConfig "github.com/nicholas-fedor/watchtower/internal/settings/config/notify"
-	"github.com/nicholas-fedor/watchtower/pkg/types"
 )
 
 // Type is the identifier for Slack notifications.
@@ -56,91 +55,44 @@ var errInvalidDiscordWebhookURL = errors.New(
 	"invalid Discord webhook URL, expected https://discord.com/api/webhooks/<id>/<token>/slack",
 )
 
-// slackTypeNotifier handles Slack notifications via webhook.
+// URL converts the legacy Slack settings to a Shoutrrr URL.
 //
-// It supports custom username, channel, and icons.
-//
-// Deprecated: Legacy slack notifier is deprecated.
-// Use --notification-url with a slack:// or discord:// URL instead.
-//
-// TODO: Remove slackTypeNotifier for the v2 release.
-//
-//nolint:godox
-type slackTypeNotifier struct {
-	log       *zerolog.Logger
-	HookURL   string // Slack webhook URL.
-	Username  string // Notification username.
-	Channel   string // Target channel (unused in webhook mode).
-	IconEmoji string // Emoji icon for messages.
-	IconURL   string // URL icon for messages.
-}
-
-// New creates a Slack notifier from resolved legacy settings.
+// A hook URL on discord.com or discordapp.com becomes a Discord URL. Any other
+// hook URL becomes a Slack URL.
 //
 // Parameters:
 //   - log: Logger for configuration diagnostics.
 //   - cfg: Deprecated Slack/Discord webhook settings (from process config or flags).
 //
 // Returns:
-//   - types.ConvertibleNotifier: New Slack notifier instance.
-//   - error: Non-nil when the hook URL is empty.
+//   - string: Service URL (Slack or Discord).
+//   - error: Non-nil when the hook URL is empty. Also non-nil when a Discord
+//     hook URL does not have the wrapper form or a Slack webhook token does
+//     not parse.
 //
 // Deprecated: Legacy slack notifier is deprecated.
 // Use --notification-url with a slack:// or discord:// URL instead.
 //
-// TODO: Remove New for the v2 release.
+// TODO: Remove URL for the v2 release.
 //
 //nolint:godox
-func New(log *zerolog.Logger, cfg notifyConfig.Legacy) (types.ConvertibleNotifier, error) {
+func URL(log *zerolog.Logger, cfg notifyConfig.Legacy) (string, error) {
 	hookURL := cfg.SlackHookURL
-	userName := cfg.SlackIdentifier
-	channel := cfg.SlackChannel
-	emoji := cfg.SlackIconEmoji
-	iconURL := cfg.SlackIconURL
-
 	if hookURL == "" {
-		return nil, errEmptyHookURL
+		return "", errEmptyHookURL
 	}
 
 	log.Debug().
 		Str("hook_url", redact.ServiceURL(hookURL)).
-		Str("username", userName).
-		Str("channel", channel).
-		Str("emoji", emoji).
-		Str("icon_url", iconURL).
-		Msg("Initializing Slack notifier")
-
-	return &slackTypeNotifier{
-		HookURL:   hookURL,
-		Username:  userName,
-		Channel:   channel,
-		IconEmoji: emoji,
-		IconURL:   iconURL,
-		log:       log,
-	}, nil
-}
-
-// GetURL generates the Slack webhook URL for the notifier.
-//
-// Returns:
-//   - string: Service URL (Slack or Discord).
-//   - error: Non-nil if token parsing fails, nil on success.
-//
-// Deprecated: This method is part of the legacy slack notifier and will be removed
-// for the v2 release. Use --notification-url with a slack:// URL instead.
-func (s *slackTypeNotifier) GetURL() (string, error) {
-	clog := s.log
-	clog.Debug().Msg("Generating Slack service URL")
-
-	if clog.GetLevel() <= zerolog.TraceLevel {
-		clog.Trace().
-			Str("hook_url", redact.ServiceURL(s.HookURL)).
-			Msg("Slack hook URL loaded")
-	}
+		Str("username", cfg.SlackIdentifier).
+		Str("channel", cfg.SlackChannel).
+		Str("emoji", cfg.SlackIconEmoji).
+		Str("icon_url", cfg.SlackIconURL).
+		Msg("Generating Slack service URL")
 
 	// Normalize URL and split its path into parts. The query string and fragment
 	// are dropped first, so their contents never count as path segments.
-	trimmedURL, _, _ := strings.Cut(s.HookURL, "?")
+	trimmedURL, _, _ := strings.Cut(hookURL, "?")
 	trimmedURL, _, _ = strings.Cut(trimmedURL, "#")
 	trimmedURL = strings.TrimRight(trimmedURL, "/")
 	trimmedURL = strings.TrimPrefix(trimmedURL, "https://")
@@ -148,11 +100,11 @@ func (s *slackTypeNotifier) GetURL() (string, error) {
 
 	// Handle Discord wrapper URLs.
 	if parts[0] == "discord.com" || parts[0] == "discordapp.com" {
-		clog.Debug().Msg("Detected a discord slack wrapper URL, using shoutrrr discord service")
+		log.Debug().Msg("Detected a discord slack wrapper URL, using shoutrrr discord service")
 
 		webhookID, token, ok := discordWebhookCredentials(parts)
 		if !ok {
-			clog.Debug().Msg("Discord wrapper URL does not have the expected form")
+			log.Debug().Msg("Discord wrapper URL does not have the expected form")
 
 			return "", errInvalidDiscordWebhookURL
 		}
@@ -162,56 +114,56 @@ func (s *slackTypeNotifier) GetURL() (string, error) {
 			Token:      token,
 			Color:      legacy.ColorInt,
 			SplitLines: true,
-			Username:   s.Username,
+			Username:   cfg.SlackIdentifier,
 		}
 
-		if s.IconURL != "" {
-			conf.Avatar = s.IconURL
+		if cfg.SlackIconURL != "" {
+			conf.Avatar = cfg.SlackIconURL
 		}
 
 		urlStr := conf.GetURL().String()
-		if clog.GetLevel() <= zerolog.TraceLevel {
-			clog.Trace().
+		if log.GetLevel() <= zerolog.TraceLevel {
+			log.Trace().
 				Str("service_url", redact.ServiceURL(urlStr)).
 				Msg("Generated Discord service URL")
 		} else {
-			clog.Debug().Msg("Generated Discord service URL")
+			log.Debug().Msg("Generated Discord service URL")
 		}
 
 		return urlStr, nil
 	}
 
 	// Extract Slack webhook token.
-	webhookToken := strings.Replace(s.HookURL, "https://hooks.slack.com/services/", "", 1)
+	webhookToken := strings.Replace(hookURL, "https://hooks.slack.com/services/", "", 1)
 
 	// Configure Slack settings.
 	conf := &shoutrrrSlack.Config{
-		BotName: s.Username,
+		BotName: cfg.SlackIdentifier,
 		Color:   legacy.ColorHex,
-		Channel: s.webhookChannel(),
+		Channel: webhookChannel(log, cfg.SlackChannel),
 	}
 
-	if s.IconURL != "" {
-		conf.Icon = s.IconURL
-	} else if s.IconEmoji != "" {
-		conf.Icon = s.IconEmoji
+	if cfg.SlackIconURL != "" {
+		conf.Icon = cfg.SlackIconURL
+	} else if cfg.SlackIconEmoji != "" {
+		conf.Icon = cfg.SlackIconEmoji
 	}
 
 	// Set webhook token.
 	err := conf.Token.SetFromProp(webhookToken)
 	if err != nil {
-		clog.Debug().Err(err).Msg("Failed to set Slack webhook token")
+		log.Debug().Err(err).Msg("Failed to set Slack webhook token")
 
 		return "", fmt.Errorf("failed to set Slack webhook token: %w", err)
 	}
 
 	urlStr := conf.GetURL().String()
-	if clog.GetLevel() <= zerolog.TraceLevel {
-		clog.Trace().
+	if log.GetLevel() <= zerolog.TraceLevel {
+		log.Trace().
 			Str("service_url", redact.ServiceURL(urlStr)).
 			Msg("Generated Slack service URL")
 	} else {
-		clog.Debug().Msg("Generated Slack service URL")
+		log.Debug().Msg("Generated Slack service URL")
 	}
 
 	return urlStr, nil
@@ -275,19 +227,23 @@ func blankPathSegment(segment string) bool {
 // value cannot be held in the URL, so the webhook's own channel is used and a
 // warning names the value.
 //
+// Parameters:
+//   - log: Logger for the warning about a channel that is not an ID.
+//   - channel: The legacy Slack channel setting.
+//
 // Returns:
 //   - string: The channel ID, or the webhook placeholder for the webhook's own channel.
-func (s *slackTypeNotifier) webhookChannel() string {
-	if s.Channel == "" {
+func webhookChannel(log *zerolog.Logger, channel string) string {
+	if channel == "" {
 		return slackWebhookChannel
 	}
 
-	if slackChannelIDPattern.MatchString(s.Channel) {
-		return s.Channel
+	if slackChannelIDPattern.MatchString(channel) {
+		return channel
 	}
 
-	s.log.Warn().
-		Str("channel", s.Channel).
+	log.Warn().
+		Str("channel", channel).
 		Msg(slackChannelNotConvertedMessage)
 
 	return slackWebhookChannel

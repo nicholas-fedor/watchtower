@@ -392,7 +392,7 @@ func TestNotifier(t *testing.T) {
 				)
 			})
 
-			t.Run("should log the token length, not the token, at trace level", func(t *testing.T) {
+			t.Run("should leave the token out of the trace-level log", func(t *testing.T) {
 				t.Parallel()
 
 				args := []string{
@@ -404,16 +404,14 @@ func TestNotifier(t *testing.T) {
 					"Atesttoken12345",
 				}
 
-				var buf logcapture.Buffer
+				log, buf := logcapture.NewJSON(zerolog.TraceLevel)
 
-				log := zerolog.New(&buf).Level(zerolog.TraceLevel)
-
-				notifier, err := NewNotifier(&log, loadNotify(t, args))
+				notifier, err := NewNotifier(log, loadNotify(t, args))
 				require.NoError(t, err)
 				assert.Contains(t, notifier.GetNames(), "gotify")
 
 				out := buf.String()
-				assert.Contains(t, out, `"token_length":15,"message":"Gotify notifier token loaded"`)
+				assert.Contains(t, logcapture.Messages(t, out, "trace"), "Created Shoutrrr URL from legacy notifier")
 				assert.NotContains(t, out, "Atesttoken12345")
 			})
 		})
@@ -905,9 +903,9 @@ func TestBuildURLs_ConvertsEveryLegacyType(t *testing.T) {
 }
 
 // TestBuildURLs_StopsAtTheFirstRejectedURL verifies that BuildURLs checks each
-// converted URL before it builds the next legacy notifier. Shoutrrr rejects the
-// Slack hook's Discord URL. The email notifier, whose settings are all empty,
-// would return its own error if it were built first.
+// converted URL before it converts the next legacy type. Shoutrrr rejects the
+// Slack hook's Discord URL. The email type, whose settings are all empty, would
+// return its own error if it were converted first.
 func TestBuildURLs_StopsAtTheFirstRejectedURL(t *testing.T) {
 	t.Parallel()
 
@@ -1015,6 +1013,24 @@ func TestGetDelay(t *testing.T) {
 			assert.Equal(t, tt.want, getDelay(tt.cfg))
 		})
 	}
+}
+
+// TestLogLegacyDeprecationWarnings verifies that each legacy notification type
+// gets one deprecation warning, in the order given. The shoutrrr type and an
+// unknown type get none.
+func TestLogLegacyDeprecationWarnings(t *testing.T) {
+	t.Parallel()
+
+	log, buf := logcapture.NewJSON(zerolog.InfoLevel)
+
+	LogLegacyDeprecationWarnings(log, []string{"shoutrrr", "email", "carrier-pigeon", "slack", "msteams", "gotify"})
+
+	assert.Equal(t, []string{
+		"Using deprecated legacy email notification configuration. Use the notification-url configuration option instead.",
+		"Using deprecated legacy slack notification configuration. Use the notification-url configuration option instead.",
+		"Using deprecated legacy msteams notification configuration. Use the notification-url configuration option instead.",
+		"Using deprecated legacy gotify notification configuration. Use the notification-url configuration option instead.",
+	}, logcapture.Messages(t, buf.String(), "warn"))
 }
 
 // TODO: Remove testURL helper when legacy notification tests are removed.
