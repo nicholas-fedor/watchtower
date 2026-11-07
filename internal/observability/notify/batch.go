@@ -122,34 +122,25 @@ func (n *Notifier) HoldNotifications() func() {
 	})
 }
 
-// entryMatchesFocus reports whether a queued entry belongs to the focus container.
-func entryMatchesFocus(entry *format.Entry, focus types.ContainerReport) bool {
-	if entry == nil || focus == nil {
-		return false
+// entryContainer returns the name of the container a queued entry is about.
+//
+// The container field names it. Image cleanup lines name it in the
+// container_name field instead. An entry that names only an image is not
+// about a single container, since several containers can share an image.
+//
+// Parameters:
+//   - entry: A queued log entry.
+//
+// Returns:
+//   - string: The container's name. Empty when the entry names no container.
+func entryContainer(entry *format.Entry) string {
+	if container, _ := entry.Data["container"].(string); container != "" {
+		return container
 	}
 
-	name := focus.Name()
-	if c, ok := entry.Data["container"].(string); ok && c == name {
-		return true
-	}
+	container, _ := entry.Data["container_name"].(string)
 
-	if c, ok := entry.Data["container_name"].(string); ok && c == name {
-		return true
-	}
-
-	// Image-level messages (e.g. cooldown) without a container field match by image name.
-	_, hasContainer := entry.Data["container"]
-	if !hasContainer {
-		_, hasCN := entry.Data["container_name"]
-		if !hasCN {
-			img, ok := entry.Data["image"].(string)
-			if ok && img != "" && img == focus.ImageName() {
-				return true
-			}
-		}
-	}
-
-	return false
+	return container
 }
 
 // ShouldSendNotification checks if a notification should be sent for the given report based on the notifier's log level.
@@ -233,7 +224,7 @@ func (n *Notifier) endBatch(owned *batch) {
 // open batch.
 //
 // A split report names the container it is about in its Focus field. Only the
-// queued entries that match that container are taken out of the batch and sent
+// queued entries that name that container are taken out of the batch and sent
 // with it. The batch stays open for the session's other split notifications.
 // Any other report takes every queued entry and ends the batch. Once owned has
 // ended or another owner took it over, nothing is sent.
@@ -256,17 +247,21 @@ func (n *Notifier) sendReport(owned *batch, report types.Report) {
 	var entries []*format.Entry
 
 	if focused {
-		rest := make([]*format.Entry, 0, len(owned.entries))
+		// An unnamed focus would otherwise match the entries that name no
+		// container, so it takes none.
+		if name := split.Focus.Name(); name != "" {
+			rest := make([]*format.Entry, 0, len(owned.entries))
 
-		for _, e := range owned.entries {
-			if entryMatchesFocus(e, split.Focus) {
-				entries = append(entries, e)
-			} else {
-				rest = append(rest, e)
+			for _, e := range owned.entries {
+				if entryContainer(e) == name {
+					entries = append(entries, e)
+				} else {
+					rest = append(rest, e)
+				}
 			}
-		}
 
-		owned.entries = rest
+			owned.entries = rest
+		}
 	} else {
 		entries = owned.entries
 		n.batch = nil
@@ -342,11 +337,7 @@ func (n *Notifier) sendByContainer(entries []*format.Entry) {
 	// Entries that name no container share the empty key. No container name
 	// can take it.
 	for _, entry := range entries {
-		container, _ := entry.Data["container"].(string)
-		if container == "" {
-			container, _ = entry.Data["container_name"].(string)
-		}
-
+		container := entryContainer(entry)
 		byContainer[container] = append(byContainer[container], entry)
 	}
 

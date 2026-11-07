@@ -12,14 +12,18 @@ import (
 	"testing/synctest"
 	"time"
 
+	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"github.com/nicholas-fedor/watchtower/internal/container"
+	"github.com/nicholas-fedor/watchtower/internal/observability/logging"
 	"github.com/nicholas-fedor/watchtower/internal/registry/ratelimit"
 	registryConfig "github.com/nicholas-fedor/watchtower/internal/settings/config/registry"
 	updateConfig "github.com/nicholas-fedor/watchtower/internal/settings/config/update"
 	"github.com/nicholas-fedor/watchtower/internal/testutil/containerfixture"
 	"github.com/nicholas-fedor/watchtower/internal/testutil/httpstub"
+	"github.com/nicholas-fedor/watchtower/internal/testutil/logcapture"
 	"github.com/nicholas-fedor/watchtower/internal/testutil/modelfixture"
 )
 
@@ -320,6 +324,32 @@ func TestCheckLocalImageCooldown(t *testing.T) {
 		err := CheckLocalImageCooldown(c, updateConfig.Policy{CooldownDelay: 24 * time.Hour})
 		require.NoError(t, err)
 	})
+}
+
+// TestCheckLocalImageCooldown_LogsContainer verifies that the local cooldown
+// check logs its cooldown line with the container's name and image, as the
+// registry check does. A split notification then carries the line with its
+// container.
+func TestCheckLocalImageCooldown_LogsContainer(t *testing.T) {
+	t.Parallel()
+
+	log, buf := logcapture.NewJSON(zerolog.InfoLevel)
+
+	containerInfo, imageInfo := containerfixture.Inspect(
+		containerfixture.WithName("app"),
+		containerfixture.WithImageName("app:latest"),
+		containerfixture.WithImageCreated(time.Now().Add(-time.Hour)),
+	)
+	c := container.NewContainer(log, containerInfo, imageInfo)
+
+	err := CheckLocalImageCooldown(c, updateConfig.Policy{CooldownDelay: 24 * time.Hour})
+	require.ErrorIs(t, err, ErrImageCooldown)
+
+	entries := logcapture.Entries[logcapture.Entry](t, buf.String())
+	require.Len(t, entries, 1)
+	assert.Equal(t, logging.WithinCooldown, entries[0]["message"])
+	assert.Equal(t, "app", entries[0]["container"])
+	assert.Equal(t, "app:latest", entries[0]["image"])
 }
 
 // TestIsOutsideCooldown_RegistrySettings verifies that the cooldown check

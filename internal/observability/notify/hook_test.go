@@ -36,9 +36,7 @@ func TestRun_EventFieldMapPreservesLargeIntegers(t *testing.T) {
 		Int64("removed_orchestrators", largeCount).
 		Msg("cleanup summary")
 
-	n.entriesMutex.RLock()
-	entries := append([]*format.Entry(nil), n.batch.entries...)
-	n.entriesMutex.RUnlock()
+	entries := queuedEntries(t, n)
 
 	require.Len(t, entries, 1)
 	require.NotNil(t, entries[0].Data)
@@ -93,9 +91,7 @@ func TestRun_EventFieldMapPreservesApplicationFields(t *testing.T) {
 		Str("image", wantImage).
 		Msg(wantMsg)
 
-	n.entriesMutex.RLock()
-	entries := append([]*format.Entry(nil), n.batch.entries...)
-	n.entriesMutex.RUnlock()
+	entries := queuedEntries(t, n)
 
 	require.Len(t, entries, 1, "event must be retained when Event.buf parses successfully")
 	require.Equal(t, wantMsg, entries[0].Message)
@@ -129,9 +125,7 @@ func TestRun_NotifyNoAndFailClosed(t *testing.T) {
 	)
 	// Fail-closed: nil event must not enqueue.
 	n.Run(nil, zerolog.InfoLevel, "should not queue")
-	n.entriesMutex.RLock()
-	require.Empty(t, n.batch.entries)
-	n.entriesMutex.RUnlock()
+	require.Empty(t, queuedEntries(t, n))
 
 	// Real zerolog path: notify=no child must not enqueue.
 	root := zerolog.New(io.Discard).Level(zerolog.TraceLevel)
@@ -142,17 +136,13 @@ func TestRun_NotifyNoAndFailClosed(t *testing.T) {
 	noLog := root.With().Str("notify", "no").Logger()
 	noLog.Info().Msg("internal must not notify")
 
-	n.entriesMutex.RLock()
-	require.Empty(t, n.batch.entries, "notify=no events must not be queued")
-	n.entriesMutex.RUnlock()
+	require.Empty(t, queuedEntries(t, n), "notify=no events must not be queued")
 
 	// Application log without notify=no should enqueue.
 	root.Info().Str("container", "c1").Msg("Found new image")
 
 	// Allow hook to run synchronously (hooks run in emitting goroutine).
-	n.entriesMutex.RLock()
-	count := len(n.batch.entries)
-	n.entriesMutex.RUnlock()
+	count := len(queuedEntries(t, n))
 	require.Equal(t, 1, count, "app log without notify=no should queue")
 
 	n.Close()
@@ -191,9 +181,7 @@ func TestRun_ConcurrentEnqueue(t *testing.T) {
 
 	wg.Wait()
 
-	n.entriesMutex.RLock()
-	count := len(n.batch.entries)
-	n.entriesMutex.RUnlock()
+	count := len(queuedEntries(t, n))
 	require.Equal(t, workers, count, "every concurrent log must enqueue")
 
 	n.Close()
