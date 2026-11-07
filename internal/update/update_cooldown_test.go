@@ -62,15 +62,18 @@ func TestUpdateAction_Cooldown(t *testing.T) {
 		t.Run("should defer the update and skip the container", func(t *testing.T) {
 			t.Parallel()
 
+			eligibleAt := time.Date(2026, 1, 2, 4, 0, 0, 0, time.UTC)
+
 			client := mockUpdate.MockClient{
 				TestData: &mockUpdate.TestData{
 					Containers: []types.Container{
 						mockUpdate.CreateMockContainer("c1", "c1", "myimage:latest", time.Now()),
 					},
 					IsContainerStaleError: &containerImage.CooldownError{
-						Age:       "20 minutes",
-						Delay:     "1 hour",
-						Remaining: "40 minutes",
+						EligibleAt: eligibleAt,
+						Age:        "20 minutes",
+						Delay:      "1 hour",
+						Remaining:  "40 minutes",
 					},
 				},
 				Stopped: make(map[string]bool),
@@ -88,6 +91,7 @@ func TestUpdateAction_Cooldown(t *testing.T) {
 			assert.Equal(t, "1 hour", skipped.CooldownDelay())
 			assert.Equal(t, "20 minutes", skipped.CooldownAge())
 			assert.Equal(t, "40 minutes", skipped.CooldownRemaining())
+			assert.Equal(t, eligibleAt, skipped.CooldownEligibleAt())
 			assert.Empty(t, report.Scanned(), "Container should not be scanned when deferred by cooldown")
 			assert.Empty(t, report.Updated(), "Container should not be updated when deferred by cooldown")
 		})
