@@ -19,38 +19,56 @@ import (
 	"github.com/nicholas-fedor/watchtower/pkg/types"
 )
 
-// ErrImageCooldown indicates the image is within the configured cooldown window and should not be pulled.
+// ErrImageCooldown indicates the image is within the configured cooldown window
+// and should not be pulled. It is a match target for errors.Is. The cooldown
+// check returns a [CooldownError] that matches it.
 var ErrImageCooldown = errors.New("image is within cooldown period")
 
-// CooldownError represents a cooldown deferral with human-readable details
-// (age, delay, remaining). It wraps
-// ErrImageCooldown (or a fetch failure) so callers can use errors.Is/As
-// while still extracting the fields needed for progress reports and
-// rich notifications.
+// CooldownError reports that a cooldown held back a container's update, with
+// the details that reports and notifications show.
+//
+// Without a Cause the image is within its cooldown window. The error then
+// matches [ErrImageCooldown]. With a Cause the image's age could not be
+// determined. Only Delay is set. The error matches its cause instead of
+// [ErrImageCooldown].
 type CooldownError struct {
-	EligibleAt time.Time
-	err        error
-	Age        string
-	Delay      string
-	Remaining  string
+	EligibleAt time.Time // Time the image leaves the cooldown, zero when its age is unknown.
+	Cause      error     // Why the image's age could not be determined, nil within the window.
+	Age        string    // Human-readable image age, empty when unknown.
+	Delay      string    // Human-readable configured cooldown delay.
+	Remaining  string    // Human-readable time left in the cooldown, empty when the age is unknown.
 }
 
+// Error returns the cause's message, or the [ErrImageCooldown] message
+// without a cause.
+//
+// Returns:
+//   - string: The error message.
 func (e *CooldownError) Error() string {
-	if e.err != nil {
-		return e.err.Error()
+	if e.Cause != nil {
+		return e.Cause.Error()
 	}
 
 	return ErrImageCooldown.Error()
 }
 
-func (e *CooldownError) Unwrap() error { return e.err }
+// Unwrap returns the cause.
+//
+// Returns:
+//   - error: Why the image's age could not be determined, or nil.
+func (e *CooldownError) Unwrap() error { return e.Cause }
 
+// Is reports whether target is [ErrImageCooldown] and the error has no cause.
+// It reports false for every other target. errors.Is still matches the cause
+// through Unwrap.
+//
+// Parameters:
+//   - target: Error to match.
+//
+// Returns:
+//   - bool: True for [ErrImageCooldown] when the image is within its window.
 func (e *CooldownError) Is(target error) bool {
-	if target == ErrImageCooldown {
-		return e.err == nil || errors.Is(e.err, ErrImageCooldown)
-	}
-
-	return errors.Is(e.err, target)
+	return target == ErrImageCooldown && e.Cause == nil
 }
 
 // isOutsideCooldown reports whether the container's image is outside its
@@ -140,7 +158,7 @@ func fetchImageCreationTime(
 
 		return time.Time{}, &CooldownError{
 			Delay: units.FormatDuration(delay),
-			err: fmt.Errorf(
+			Cause: fmt.Errorf(
 				"could not get pull options for %s (cooldown: %s): %w",
 				sourceContainer.ImageName(),
 				units.FormatDuration(delay),
@@ -163,7 +181,7 @@ func fetchImageCreationTime(
 
 		return time.Time{}, &CooldownError{
 			Delay: units.FormatDuration(delay),
-			err: fmt.Errorf(
+			Cause: fmt.Errorf(
 				"could not determine image age (cooldown: %s): %w",
 				units.FormatDuration(delay),
 				err,
@@ -236,7 +254,6 @@ func buildCooldownError(imageAge, delay time.Duration, eligibleAt time.Time) *Co
 		Delay:      units.FormatDuration(delay),
 		Remaining:  units.FormatDuration(remaining),
 		EligibleAt: eligibleAt,
-		err:        ErrImageCooldown,
 	}
 }
 

@@ -167,8 +167,8 @@ func NewClient(
 // IsContainerStale determines if a container's image is outdated.
 //
 // It skips pulling if NoPull is set, otherwise pulls and compares images.
-// If the image is within the cooldown window, it returns false with
-// ErrImageCooldown, indicating the update should be deferred.
+// When a cooldown holds the update back, it returns false with a
+// [CooldownError].
 //
 // Parameters:
 //   - ctx: Context for operation control.

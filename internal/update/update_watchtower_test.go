@@ -14,6 +14,7 @@ import (
 	dockerContainer "github.com/moby/moby/api/types/container"
 
 	"github.com/nicholas-fedor/watchtower/internal/container/filters"
+	containerImage "github.com/nicholas-fedor/watchtower/internal/container/image"
 	"github.com/nicholas-fedor/watchtower/internal/registry/ratelimit"
 	"github.com/nicholas-fedor/watchtower/internal/update/cleanup"
 	mockUpdate "github.com/nicholas-fedor/watchtower/internal/update/mocks"
@@ -1063,19 +1064,37 @@ func TestWatchtowerContainerHandling(t *testing.T) {
 // TestSafeguardDelay verifies that a failed Watchtower self-update pull delays
 // the end of a run-once update, which is restarted at once by a restart
 // policy, while a continuous update returns at once and leaves the next
-// attempt to the schedule. The synctest clock advances by the time slept.
+// attempt to the schedule. A failed cooldown age lookup counts as a failed
+// pull. A cooldown deferral does not. The synctest clock advances by the time
+// slept.
 func TestSafeguardDelay(t *testing.T) {
 	t.Parallel()
 
 	const delay = 5 * time.Minute
 
+	pullFailure := errors.New("failed to pull image")
+
 	tests := []struct {
-		name    string
-		runOnce bool
-		want    time.Duration
+		// checkErr is the error the Watchtower image check returns.
+		checkErr error
+		name     string
+		runOnce  bool
+		want     time.Duration
 	}{
-		{name: "continuous update returns at once", runOnce: false, want: 0},
-		{name: "run-once update waits", runOnce: true, want: delay},
+		{name: "continuous update returns at once", checkErr: pullFailure, runOnce: false, want: 0},
+		{name: "run-once update waits", checkErr: pullFailure, runOnce: true, want: delay},
+		{
+			name:     "run-once update waits after a failed cooldown age lookup",
+			checkErr: &containerImage.CooldownError{Delay: "1 day", Cause: pullFailure},
+			runOnce:  true,
+			want:     delay,
+		},
+		{
+			name:     "run-once update returns at once after a cooldown deferral",
+			checkErr: &containerImage.CooldownError{Age: "2 hours", Delay: "1 day", Remaining: "22 hours"},
+			runOnce:  true,
+			want:     0,
+		},
 	}
 
 	for _, tt := range tests {
@@ -1108,8 +1127,7 @@ func TestSafeguardDelay(t *testing.T) {
 					false,
 				)
 
-				// The Watchtower image pull fails.
-				client.TestData.IsContainerStaleError = errors.New("failed to pull image")
+				client.TestData.IsContainerStaleError = tt.checkErr
 
 				start := time.Now()
 
@@ -1123,8 +1141,8 @@ func TestSafeguardDelay(t *testing.T) {
 				require.NoError(t, err)
 
 				assert.Equal(t, tt.want, time.Since(start))
-				assert.Empty(t, report.Updated(), "Watchtower is not updated on pull failure")
-				assert.Empty(t, cleanupImageInfos, "no image is cleaned up on pull failure")
+				assert.Empty(t, report.Updated(), "Watchtower is not updated")
+				assert.Empty(t, cleanupImageInfos, "no image is cleaned up")
 			})
 		})
 	}

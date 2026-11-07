@@ -1,6 +1,7 @@
 package update
 
 import (
+	"errors"
 	"testing"
 	"time"
 
@@ -42,7 +43,11 @@ func TestUpdateAction_Cooldown(t *testing.T) {
 					Containers: []types.Container{
 						mockUpdate.CreateMockContainer("c1", "c1", "myimage:latest", time.Now()),
 					},
-					IsContainerStaleError: containerImage.ErrImageCooldown,
+					IsContainerStaleError: &containerImage.CooldownError{
+						Age:       "20 minutes",
+						Delay:     "1 hour",
+						Remaining: "40 minutes",
+					},
 				},
 				Stopped: make(map[string]bool),
 			}
@@ -51,6 +56,11 @@ func TestUpdateAction_Cooldown(t *testing.T) {
 
 			require.NoError(t, err)
 			require.Len(t, report.Skipped(), 1, "Container should be skipped due to cooldown")
+
+			skipped := report.Skipped()[0]
+			assert.Equal(t, "1 hour", skipped.CooldownDelay())
+			assert.Equal(t, "20 minutes", skipped.CooldownAge())
+			assert.Equal(t, "40 minutes", skipped.CooldownRemaining())
 			assert.Empty(t, report.Scanned(), "Container should not be scanned when deferred by cooldown")
 			assert.Empty(t, report.Updated(), "Container should not be updated when deferred by cooldown")
 		})
@@ -155,7 +165,12 @@ func TestUpdateAction_Cooldown(t *testing.T) {
 					Containers: []types.Container{
 						mockUpdate.CreateMockContainer("c1", "c1", "myimage:latest", time.Now()),
 					},
-					IsContainerStaleError: containerImage.ErrImageCooldown,
+					// A failed age lookup carries the configured delay and the
+					// lookup's error.
+					IsContainerStaleError: &containerImage.CooldownError{
+						Delay: "1 hour",
+						Cause: errors.New("registry unreachable"),
+					},
 				},
 				Stopped: make(map[string]bool),
 			}
@@ -164,6 +179,10 @@ func TestUpdateAction_Cooldown(t *testing.T) {
 
 			require.NoError(t, err)
 			require.Len(t, report.Skipped(), 1, "Container should be skipped when image age fetch fails")
+
+			skipped := report.Skipped()[0]
+			assert.Equal(t, "1 hour", skipped.CooldownDelay())
+			assert.Empty(t, skipped.CooldownRemaining())
 			assert.Empty(t, report.Updated(), "Container should not be updated when image age fetch fails")
 		})
 	})
