@@ -83,7 +83,7 @@ Every labeled path ends in one of three outcomes: copied, skipped, or the update
 | --- | --- |
 | Absolute path with no `..` | Copied onto the replacement container. |
 | Parent directory missing from the new image | Watchtower creates it with mode `0755` and writes the file into it. |
-| File owner and permissions | The copy keeps the file's numeric UID, GID, and permission bits. See [File Ownership](#file-ownership). |
+| File owner and permissions | The copy keeps the file's numeric UID, GID, and permission bits. See [File Ownership](#file_ownership). |
 | Container with a writable root filesystem | Watchtower copies the file, even when the path sits inside a mount. |
 
 ### Paths Under a Mount
@@ -125,7 +125,7 @@ Watchtower copies labeled files in two phases and a failure in either one stops 
 | Condition | Why |
 | --- | --- |
 | The copy into the new container fails | The Engine refused the write, or the connection failed. |
-| The daemon remaps user namespaces, the container sets no user, and the file is not owned by root | The Engine cannot map the file's owner into the new container. See [File Ownership](#file-ownership). |
+| The daemon remaps user namespaces, the container sets no user, and the file is not owned by root | The Engine cannot map the file's owner into the new container. See [File Ownership](#file_ownership). |
 
 ### Size Limits
 

@@ -98,4 +98,4 @@ Environment Variable: WATCHTOWER_NOTIFICATION_SPLIT_BY_CONTAINER
         - a container whose update failed
         - a monitor-only container with a newer image
         - a container skipped during its update cooldown
-    - Messages that none of these notifications carries are sent after them, one notification per container. A failed update check and a disk-space warning are examples. Messages that name no container are sent together. These notifications carry no report. A [report template](../templates/index.md#report-templates) shows them only if it lists `.Entries`.
+    - Messages that none of these notifications carries are sent after them, one notification per container. A failed update check and a disk-space warning are examples. Messages that name no container are sent together. These notifications carry no report. A [report template](../templates/index.md#report_templates) shows them only if it lists `.Entries`.
