@@ -1519,6 +1519,88 @@ func TestProgressSetLatestImage(t *testing.T) {
 	assert.NotContains(t, progress, types.ContainerID("missing"))
 }
 
+// TestProgressSetNewContainerID verifies that the new container ID is recorded
+// on the replaced container's status and that an unknown container is skipped.
+func TestProgressSetNewContainerID(t *testing.T) {
+	t.Parallel()
+
+	log := newTestLogger(t)
+	id := types.ContainerID("cont1")
+	progress := Progress{id: &ContainerStatus{containerID: id}}
+
+	progress.SetNewContainerID(log, id, "newcont1")
+	assert.Equal(t, types.ContainerID("newcont1"), progress[id].NewContainerID())
+
+	progress.SetNewContainerID(log, "missing", "ignored")
+	assert.NotContains(t, progress, types.ContainerID("missing"))
+}
+
+// TestProgressSetReportMeta verifies that the report metadata is set on the
+// container's status and that an unknown container is skipped.
+func TestProgressSetReportMeta(t *testing.T) {
+	t.Parallel()
+
+	log := newTestLogger(t)
+	id := types.ContainerID("cont1")
+	progress := Progress{id: &ContainerStatus{containerID: id}}
+
+	progress.SetReportMeta(log, id, provenance.ReportMeta{
+		GitRepo:   "https://github.com/org/app.git",
+		Changelog: "https://github.com/org/app/releases",
+	})
+	assert.Equal(t, "https://github.com/org/app.git", progress[id].GitRepo())
+	assert.Equal(t, "https://github.com/org/app/releases", progress[id].Changelog())
+
+	progress.SetReportMeta(log, "missing", provenance.ReportMeta{GitRepo: "ignored"})
+	assert.NotContains(t, progress, types.ContainerID("missing"))
+}
+
+// TestProgressRecordRestart verifies that a recreated container gets its new
+// container ID. Only a container whose image was not updated is marked
+// restarted. An unknown container is skipped.
+func TestProgressRecordRestart(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name      string
+		wantState State
+		stale     bool
+	}{
+		{name: "restarted with an updated dependency", stale: false, wantState: RestartedState},
+		{name: "updated to a new image", stale: true, wantState: UpdatedState},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			log := newTestLogger(t)
+			id := types.ContainerID("cont1")
+			progress := Progress{id: &ContainerStatus{containerID: id, state: UpdatedState}}
+
+			c := mockTypes.NewMockContainer(t)
+			c.EXPECT().ID().Return(id)
+			c.EXPECT().IsStale().Return(tt.stale)
+
+			progress.RecordRestart(log, c, "newcont1")
+			assert.Equal(t, types.ContainerID("newcont1"), progress[id].NewContainerID())
+			assert.Equal(t, tt.wantState, progress[id].state)
+		})
+	}
+
+	t.Run("unknown container", func(t *testing.T) {
+		t.Parallel()
+
+		progress := Progress{}
+
+		c := mockTypes.NewMockContainer(t)
+		c.EXPECT().ID().Return("missing")
+
+		progress.RecordRestart(newTestLogger(t), c, "ignored")
+		assert.Empty(t, progress)
+	})
+}
+
 func TestProgressSetLatestImageMeta(t *testing.T) {
 	t.Parallel()
 

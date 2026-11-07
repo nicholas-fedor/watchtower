@@ -208,7 +208,7 @@ func applyReportMeta(status *ContainerStatus, c types.Container, params updatePa
 	}
 
 	meta := provenance.ResolveReportMeta(c, params.Git, provenance.ChangelogVars{}, oci.Annotations{})
-	status.SetGitMetadata(meta)
+	status.assignReportMeta(meta)
 }
 
 // SetLatestImage updates the latest image ID recorded for a container.
@@ -233,6 +233,72 @@ func (m Progress) SetLatestImage(log *zerolog.Logger, containerID types.Containe
 		Msg("Updated latest image on container status")
 }
 
+// SetNewContainerID records the ID of the container that replaced a container.
+//
+// A container the progress does not hold is skipped.
+//
+// Parameters:
+//   - log: Process logger.
+//   - containerID: ID of the replaced container.
+//   - newID: ID of the new container.
+func (m Progress) SetNewContainerID(log *zerolog.Logger, containerID, newID types.ContainerID) {
+	update, exists := m[containerID]
+	if !exists {
+		return
+	}
+
+	update.newContainerID = newID
+	log.Debug().
+		Str("container_id", containerID.ShortID()).
+		Str("new_container_id", newID.ShortID()).
+		Msg("Recorded new container ID on container status")
+}
+
+// SetReportMeta sets the Git and OCI report fields of a container's status.
+//
+// A container the progress does not hold is skipped.
+//
+// Parameters:
+//   - log: Process logger.
+//   - containerID: Container identity.
+//   - meta: Resolved report metadata.
+func (m Progress) SetReportMeta(log *zerolog.Logger, containerID types.ContainerID, meta provenance.ReportMeta) {
+	update, exists := m[containerID]
+	if !exists {
+		return
+	}
+
+	update.assignReportMeta(meta)
+	log.Debug().
+		Str("container_id", containerID.ShortID()).
+		Str("name", update.Name()).
+		Str("latest_version", meta.LatestVersion).
+		Str("changelog", meta.Changelog).
+		Msg("Applied report metadata to container status")
+}
+
+// RecordRestart records that a container was recreated as newID.
+//
+// A container whose image was not updated is marked restarted. An updated
+// container keeps its updated state. A container the progress does not hold
+// is skipped.
+//
+// Parameters:
+//   - log: Process logger.
+//   - c: The container that was recreated.
+//   - newID: ID of the new container.
+func (m Progress) RecordRestart(log *zerolog.Logger, c types.Container, newID types.ContainerID) {
+	if _, exists := m[c.ID()]; !exists {
+		return
+	}
+
+	m.SetNewContainerID(log, c.ID(), newID)
+
+	if !c.IsStale() {
+		m.MarkRestarted(log, c.ID())
+	}
+}
+
 // SetLatestImageMeta re-resolves report metadata for a known new image and
 // applies it to a container's status.
 //
@@ -249,7 +315,7 @@ func (m Progress) SetLatestImage(log *zerolog.Logger, containerID types.Containe
 //   - latest: OCI annotations from a newly pulled image, or empty for none.
 //
 // Returns:
-//   - container.ReportMeta: The applied metadata, or empty when nothing changed.
+//   - provenance.ReportMeta: The applied metadata, or empty when nothing changed.
 func (m Progress) SetLatestImageMeta(
 	log *zerolog.Logger,
 	c types.Container,
@@ -261,20 +327,12 @@ func (m Progress) SetLatestImageMeta(
 		return provenance.ReportMeta{}
 	}
 
-	update, exists := m[c.ID()]
-	if !exists {
+	if _, exists := m[c.ID()]; !exists {
 		return provenance.ReportMeta{}
 	}
 
 	meta := provenance.ResolveReportMeta(c, params.Git, vars, latest)
-	update.SetGitMetadata(meta)
-
-	log.Debug().
-		Str("container_id", c.ID().ShortID()).
-		Str("name", update.Name()).
-		Str("latest_version", meta.LatestVersion).
-		Str("changelog", meta.Changelog).
-		Msg("Applied latest image metadata to container status")
+	m.SetReportMeta(log, c.ID(), meta)
 
 	return meta
 }
@@ -358,7 +416,11 @@ func (m Progress) SetCooldownInfo(log *zerolog.Logger,
 		return
 	}
 
-	update.SetCooldownInfo(age, delay, remaining, eligibleAt)
+	update.cooldownAge = age
+	update.cooldownDelay = delay
+	update.cooldownRemaining = remaining
+	update.cooldownEligibleAt = eligibleAt
+
 	log.Debug().
 		Str("container_id", containerID.ShortID()).
 		Str("name", update.Name()).

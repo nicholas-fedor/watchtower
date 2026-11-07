@@ -11,6 +11,7 @@ import (
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/require"
 
+	"github.com/nicholas-fedor/watchtower/internal/container/provenance"
 	"github.com/nicholas-fedor/watchtower/internal/observability/notify/format"
 	"github.com/nicholas-fedor/watchtower/internal/testutil/containerfixture"
 	"github.com/nicholas-fedor/watchtower/internal/testutil/golden"
@@ -152,7 +153,11 @@ func TestNotificationBatching(t *testing.T) {
 
 	out.WriteString("\n=== focused on web1\n")
 
-	session := reportfixture.UpdatedReport(modelfixture.Container(containerfixture.WithName("/web1")), "new_image_id")
+	session := reportfixture.UpdatedReport(
+		modelfixture.Container(containerfixture.WithName("/web1")),
+		"new_image_id",
+		provenance.ReportMeta{},
+	)
 	require.Equal(t, "web1", session.Updated()[0].Name())
 
 	focused := newBatchingNotifier(t)
