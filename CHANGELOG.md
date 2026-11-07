@@ -42,6 +42,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Documentation
 
+- Fix links to anchors that do not exist by @nicholas-fedor in [#3520](https://github.com/nicholas-fedor/watchtower/pull/3520)
 - Name the settings notify-upgrade leaves out by @nicholas-fedor in [#3518](https://github.com/nicholas-fedor/watchtower/pull/3518)
 
 ### Tests
