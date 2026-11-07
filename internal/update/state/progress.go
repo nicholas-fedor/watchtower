@@ -371,8 +371,8 @@ func (m Progress) SetCooldownInfo(log *zerolog.Logger,
 // Report generates a report from the progress data.
 //
 // Returns:
-//   - types.Report: New report instance.
-func (m Progress) Report(log *zerolog.Logger) types.Report {
+//   - *Report: New report instance.
+func (m Progress) Report(log *zerolog.Logger) *Report {
 	log.Debug().
 		Int("count", len(m)).
 		Msg("Generating report")

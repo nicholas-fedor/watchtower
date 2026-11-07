@@ -12,10 +12,11 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/nicholas-fedor/watchtower/internal/observability/notify/format"
+	"github.com/nicholas-fedor/watchtower/internal/testutil/containerfixture"
 	"github.com/nicholas-fedor/watchtower/internal/testutil/golden"
+	"github.com/nicholas-fedor/watchtower/internal/testutil/modelfixture"
+	"github.com/nicholas-fedor/watchtower/internal/testutil/reportfixture"
 	"github.com/nicholas-fedor/watchtower/internal/update/state"
-	"github.com/nicholas-fedor/watchtower/pkg/types"
-	mockTypes "github.com/nicholas-fedor/watchtower/pkg/types/mocks"
 )
 
 // batchEntryTime is the fixed timestamp of every batched log entry.
@@ -82,9 +83,9 @@ func newBatchingNotifier(t *testing.T) *Notifier {
 // entries in it, as the session's log lines would.
 //
 // Returns:
-//   - func(types.Report): The session's send.
+//   - func(*state.Report): The session's send.
 //   - func(): The session's end.
-func startSessionWith(notifier *Notifier, entries []*format.Entry) (func(types.Report), func()) {
+func startSessionWith(notifier *Notifier, entries []*format.Entry) (func(*state.Report), func()) {
 	send, end := notifier.StartSessionNotification()
 
 	notifier.entriesMutex.Lock()
@@ -151,15 +152,12 @@ func TestNotificationBatching(t *testing.T) {
 
 	out.WriteString("\n=== focused on web1\n")
 
-	focus := mockTypes.NewMockContainerReport(t)
-	focus.EXPECT().Name().Return("web1").Maybe()
+	session := reportfixture.UpdatedReport(modelfixture.Container(containerfixture.WithName("/web1")), "new_image_id")
+	require.Equal(t, "web1", session.Updated()[0].Name())
 
 	focused := newBatchingNotifier(t)
 	sendFocused, _ := startSessionWith(focused, batchEntries())
-	sendFocused(&state.SingleContainerReport{
-		Focus:          focus,
-		UpdatedReports: []types.ContainerReport{focus},
-	})
+	sendFocused(state.NewSingleContainerReport(session.Updated()[0], session))
 	writeMessages(&out, sentMessages(focused))
 
 	out.WriteString("--- still queued\n")

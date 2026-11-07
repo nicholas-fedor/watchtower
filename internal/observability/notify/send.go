@@ -6,7 +6,7 @@ import (
 
 	"github.com/nicholas-fedor/watchtower/internal/container/redact"
 	"github.com/nicholas-fedor/watchtower/internal/observability/notify/format"
-	"github.com/nicholas-fedor/watchtower/pkg/types"
+	"github.com/nicholas-fedor/watchtower/internal/update/state"
 )
 
 // processSendErrors processes errors from router send operations.
@@ -204,7 +204,7 @@ func sendNotifications(notifier *Notifier) {
 // Parameters:
 //   - entries: Log entries to send.
 //   - report: Optional scan report.
-func (n *Notifier) sendEntries(entries []*format.Entry, report types.Report) {
+func (n *Notifier) sendEntries(entries []*format.Entry, report *state.Report) {
 	log := n.ll()
 
 	msg, err := n.template.Render(log, format.Data{StaticData: n.data, Entries: entries, Report: report})

@@ -7,7 +7,7 @@ import (
 	"github.com/nicholas-fedor/watchtower/pkg/types"
 )
 
-func BenchmarkAllFromSlices(b *testing.B) {
+func BenchmarkReport_All(b *testing.B) {
 	const n = 64
 
 	scanned := make([]types.ContainerReport, n)
@@ -35,7 +35,7 @@ func BenchmarkAllFromSlices(b *testing.B) {
 		b.ReportAllocs()
 
 		for b.Loop() {
-			_ = allFromSlices(scanned, updated, restarted, nil, nil, nil, fresh)
+			_ = (&Report{scanned: scanned, updated: updated, restarted: restarted, fresh: fresh}).All()
 		}
 	})
 
@@ -50,7 +50,7 @@ func BenchmarkAllFromSlices(b *testing.B) {
 		b.ReportAllocs()
 
 		for b.Loop() {
-			_ = allFromSlices(scanned, updated, restarted, nil, nil, nil, fresh)
+			_ = (&Report{scanned: scanned, updated: updated, restarted: restarted, fresh: fresh}).All()
 		}
 	})
 }

@@ -32,10 +32,10 @@ type Notifier interface {
 	// does nothing once the batch has ended. Unless the batch has already
 	// ended, the returned end sends the entries no notification took, without a
 	// report.
-	StartSessionNotification() (send func(types.Report), end func())
+	StartSessionNotification() (send func(*state.Report), end func())
 	// ShouldSendNotification reports whether report is worth a notification at
 	// the configured notifications level.
-	ShouldSendNotification(report types.Report) bool
+	ShouldSendNotification(report *state.Report) bool
 }
 
 // RunUpdatesWithNotificationsParams holds runtime dependencies and update policy.
@@ -125,7 +125,7 @@ func RunUpdatesWithNotifications(
 	// batch on every return. The end sends what no notification took, without
 	// a report. Deferred before the recover, it also runs after a panicked
 	// session.
-	var send func(types.Report)
+	var send func(*state.Report)
 
 	if params.Notifier != nil {
 		var end func()
@@ -289,7 +289,7 @@ func RunUpdatesWithNotifications(
 // Returns:
 //   - *metrics.Metric: A metric marked as a failed scan, with the counts of the partial report
 //     on error, or zero counts when there is no report. Nil on success.
-func handleUpdateResult(log *zerolog.Logger, result types.Report, err error, send func(types.Report)) *metrics.Metric {
+func handleUpdateResult(log *zerolog.Logger, result *state.Report, err error, send func(*state.Report)) *metrics.Metric {
 	// Check for errors during update execution
 	if err != nil {
 		event := log.Error().Err(err)
@@ -378,7 +378,7 @@ func endPanickedSession(
 //   - gitClient: Git monitor client. Nil when Git monitoring is unused.
 //
 // Returns:
-//   - types.Report: Results of the update operation.
+//   - *state.Report: Results of the update operation.
 //   - []cleanup.RemovedImageInfo: Images eligible for cleanup.
 //   - error: Non-nil when Update fails.
 func executeUpdate(
@@ -388,7 +388,7 @@ func executeUpdate(
 	config updateParams.Params,
 	rateLimiter *ratelimit.Limiter,
 	gitClient *git.Client,
-) (types.Report, []cleanup.RemovedImageInfo, error) {
+) (*state.Report, []cleanup.RemovedImageInfo, error) {
 	// Log before calling the Update function
 	log.Debug().Msg("About to call Update function")
 
@@ -452,7 +452,7 @@ func performImageCleanup(log *zerolog.Logger, ctx context.Context,
 //
 // Parameters:
 //   - result: The report containing the results of the update operation.
-func logUpdateReport(log *zerolog.Logger, result types.Report) {
+func logUpdateReport(log *zerolog.Logger, result *state.Report) {
 	// Initialize slice for updated container names
 	updatedNames := make([]string, 0, len(result.Updated()))
 	// Collect names of all updated containers
@@ -480,9 +480,9 @@ func logUpdateReport(log *zerolog.Logger, result types.Report) {
 //   - notificationSplitByContainer: Boolean flag enabling a separate notification for each container.
 //   - notificationReport: Boolean flag enabling report-based notifications.
 //   - result: The report containing the results of the update operation.
-func sendNotifications(log *zerolog.Logger, notifier Notifier, send func(types.Report),
+func sendNotifications(log *zerolog.Logger, notifier Notifier, send func(*state.Report),
 	notificationSplitByContainer, notificationReport bool,
-	result types.Report,
+	result *state.Report,
 ) {
 	if notifier == nil {
 		return
@@ -490,7 +490,7 @@ func sendNotifications(log *zerolog.Logger, notifier Notifier, send func(types.R
 
 	// notify sends a report through the session's batch when it is worth a
 	// notification at the configured notifications level.
-	notify := func(report types.Report) {
+	notify := func(report *state.Report) {
 		if notifier.ShouldSendNotification(report) {
 			send(report)
 		}
@@ -514,27 +514,17 @@ func sendNotifications(log *zerolog.Logger, notifier Notifier, send func(types.R
 //   - a container skipped during its update cooldown
 //
 // The notificationReport flag picks report-based or filtered entry
-// notifications. Invalid containers are skipped.
-// To prevent duplicate notifications for the same container, a map is used to track
-// which container IDs have already been notified during this notification session.
-// This tracking mechanism ensures that even if a container appears in multiple lists
-// (e.g., due to edge cases in report generation), it receives only one notification,
-// maintaining clean and non-redundant communication with users.
+// notifications. A container without a name is skipped. The session report
+// lists each container in one category. No container is notified twice.
 //
 // Parameters:
 //   - notify: Sends a report that is worth a notification through the session's notification batch.
 //   - notificationReport: Boolean flag enabling report-based notifications.
 //   - result: The report containing the results of the update operation.
-func sendSplitNotifications(log *zerolog.Logger, notify func(types.Report),
+func sendSplitNotifications(log *zerolog.Logger, notify func(*state.Report),
 	notificationReport bool,
-	result types.Report,
+	result *state.Report,
 ) {
-	// Map to track notified container IDs to prevent duplicate notifications.
-	// Key is the full container ID string for uniqueness, value is boolean indicating
-	// whether a notification has been sent for this container.
-	// This map is scoped to the function to ensure tracking is per-notification-session.
-	notified := make(map[string]bool)
-
 	log.Debug().
 		Int("updated_count", len(result.Updated())).
 		Int("restarted_count", len(result.Restarted())).
@@ -568,7 +558,6 @@ func sendSplitNotifications(log *zerolog.Logger, notify func(types.Report),
 		notifyContainers(notifyContainersParams{
 			log:           log,
 			notify:        notify,
-			notified:      notified,
 			reports:       pass.reports,
 			result:        result,
 			category:      pass.category,
@@ -582,10 +571,9 @@ func sendSplitNotifications(log *zerolog.Logger, notify func(types.Report),
 
 // notifyContainersParams groups inputs for notifyContainers.
 type notifyContainersParams struct {
-	result        types.Report
-	notify        func(types.Report)
+	result        *state.Report
+	notify        func(*state.Report)
 	log           *zerolog.Logger
-	notified      map[string]bool
 	include       func(types.ContainerReport) bool
 	category      string
 	reports       []types.ContainerReport
@@ -594,20 +582,13 @@ type notifyContainersParams struct {
 
 // notifyContainers sends per-container notifications for a report collection.
 //
-// It applies nil and empty-name filtering, container-ID de-duplication via notified,
-// and optional category eligibility (include, nil for every container) before
-// it notifies.
+// It skips a container without a name. It also skips one that include
+// rejects. A nil include notifies every named container.
 //
 // Parameters:
 //   - params: Named inputs for the category-specific notification pass.
 func notifyContainers(params notifyContainersParams) {
 	for _, report := range params.reports {
-		if report == nil {
-			params.log.Debug().Msg("Encountered nil " + params.category + " container report, skipping")
-
-			continue
-		}
-
 		if strings.TrimSpace(report.Name()) == "" {
 			params.log.Debug().
 				Str("container_id", report.ID().ShortID()).
@@ -620,11 +601,6 @@ func notifyContainers(params notifyContainersParams) {
 			continue
 		}
 
-		containerID := string(report.ID())
-		if params.notified[containerID] {
-			continue
-		}
-
 		if params.logBeforeSend {
 			params.log.Debug().
 				Str("container", report.Name()).
@@ -633,8 +609,6 @@ func notifyContainers(params notifyContainersParams) {
 		}
 
 		params.notify(state.NewSingleContainerReport(report, params.result))
-
-		params.notified[containerID] = true
 	}
 }
 
@@ -653,7 +627,7 @@ func notifyContainers(params notifyContainersParams) {
 //
 // Returns:
 //   - *metrics.Metric: A pointer to a metric object summarizing the update session.
-func generateAndLogMetric(log *zerolog.Logger, result types.Report) *metrics.Metric {
+func generateAndLogMetric(log *zerolog.Logger, result *state.Report) *metrics.Metric {
 	metricResults := newScanMetric(result)
 
 	// Process log only. Session content was already notified via sendNotifications.
@@ -675,7 +649,7 @@ func generateAndLogMetric(log *zerolog.Logger, result types.Report) *metrics.Met
 //
 // Returns:
 //   - *metrics.Metric: The session's counts, with ScanFailed unset.
-func newScanMetric(report types.Report) *metrics.Metric {
+func newScanMetric(report *state.Report) *metrics.Metric {
 	return &metrics.Metric{
 		Scanned:   len(report.Scanned()),
 		Updated:   len(report.Updated()),

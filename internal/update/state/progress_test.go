@@ -884,12 +884,12 @@ func TestProgress_Report(t *testing.T) {
 	tests := []struct {
 		name string
 		m    Progress
-		want types.Report
+		want *Report
 	}{
 		{
 			name: "empty progress",
 			m:    Progress{},
-			want: &report{
+			want: &Report{
 				scanned:   []types.ContainerReport{},
 				updated:   []types.ContainerReport{},
 				failed:    []types.ContainerReport{},
@@ -911,7 +911,7 @@ func TestProgress_Report(t *testing.T) {
 					state:         ScannedState,
 				},
 			},
-			want: &report{
+			want: &Report{
 				scanned: []types.ContainerReport{
 					&ContainerStatus{
 						containerID:   "cont1",

@@ -12,7 +12,6 @@ import (
 	"github.com/nicholas-fedor/watchtower/internal/container/provenance"
 	"github.com/nicholas-fedor/watchtower/internal/testutil/reportfixture"
 	"github.com/nicholas-fedor/watchtower/internal/update/state"
-	"github.com/nicholas-fedor/watchtower/pkg/types"
 )
 
 // newTestLogger returns a logger that writes each event to the test's log, so a
@@ -398,7 +397,7 @@ func TestRender_ReportTemplates(t *testing.T) {
 		t.Run("should render Changelog, GitRepo, and Source", func(t *testing.T) {
 			t.Parallel()
 
-			status := updatedAppStatus()
+			status, report := updatedApp(t)
 			status.SetGitMetadata(provenance.ReportMeta{
 				GitRepo:         "https://github.com/org/app.git",
 				GitRef:          "v1.2.3",
@@ -410,10 +409,6 @@ func TestRender_ReportTemplates(t *testing.T) {
 				LatestVersion:   "1.2.3",
 				CurrentRevision: "abc123",
 			})
-
-			report := &state.SingleContainerReport{
-				UpdatedReports: []types.ContainerReport{status},
-			}
 
 			got := getTemplatedResult(
 				t,
@@ -655,38 +650,23 @@ func TestDefaultLegacyGitSkipAndComposeMessages(t *testing.T) {
 	}
 }
 
-// TestReportCategoryCount verifies that reportCategoryCount adds up the
-// scanned, updated, failed, skipped, and restarted containers, and is zero for
-// a nil report.
+// TestReportCategoryCount verifies that reportCategoryCount adds up the length
+// of every category. A container counts once for each list it is in. The count
+// is zero for a nil report.
 func TestReportCategoryCount(t *testing.T) {
 	t.Parallel()
 
 	assert.Equal(t, 0, reportCategoryCount(nil))
 
-	report := categoryCountReport{
-		scanned:   make([]types.ContainerReport, 2),
-		updated:   make([]types.ContainerReport, 1),
-		restarted: make([]types.ContainerReport, 1),
-	}
-	assert.Equal(t, 4, reportCategoryCount(report))
+	// One container in each category. Every container but the skipped one is
+	// also scanned.
+	report := reportfixture.Report(
+		state.UpdatedState,
+		state.RestartedState,
+		state.FailedState,
+		state.SkippedState,
+		state.StaleState,
+		state.FreshState,
+	)
+	assert.Equal(t, 11, reportCategoryCount(report))
 }
-
-type categoryCountReport struct {
-	scanned, updated, failed, skipped, stale, fresh, restarted []types.ContainerReport
-}
-
-func (r categoryCountReport) Scanned() []types.ContainerReport { return r.scanned }
-
-func (r categoryCountReport) Updated() []types.ContainerReport { return r.updated }
-
-func (r categoryCountReport) Failed() []types.ContainerReport { return r.failed }
-
-func (r categoryCountReport) Skipped() []types.ContainerReport { return r.skipped }
-
-func (r categoryCountReport) Stale() []types.ContainerReport { return r.stale }
-
-func (r categoryCountReport) Fresh() []types.ContainerReport { return r.fresh }
-
-func (r categoryCountReport) Restarted() []types.ContainerReport { return r.restarted }
-
-func (r categoryCountReport) All() []types.ContainerReport { return nil }

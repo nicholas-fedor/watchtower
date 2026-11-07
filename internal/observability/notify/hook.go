@@ -25,7 +25,7 @@ import (
 // Only zerolog events on the hooked process logger are captured. Domain producers
 // such as the container client ("Found new image") and image cleanup ("Removing image")
 // log through the process logger so log-mode notifications receive them. Report-mode
-// notifications (--notification-report) render from types.Report.
+// notifications (--notification-report) render from the session report.
 //
 // Parameters:
 //   - event: Zerolog event (fields are read from the in-progress JSON buffer).

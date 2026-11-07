@@ -322,7 +322,7 @@ func goldenEntries() []*Entry {
 
 // goldenFullReport returns a report with containers in every state. The first
 // updated container carries the full set of image and Git metadata templates can show.
-func goldenFullReport() types.Report {
+func goldenFullReport() *state.Report {
 	nop := zerolog.Nop()
 	log := &nop
 	progress := state.Progress{}

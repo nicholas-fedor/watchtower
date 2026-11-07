@@ -5,7 +5,6 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
@@ -14,18 +13,24 @@ import (
 
 	"github.com/nicholas-fedor/watchtower/internal/container"
 	"github.com/nicholas-fedor/watchtower/internal/container/provenance"
-	updateParams "github.com/nicholas-fedor/watchtower/internal/update/params"
+	"github.com/nicholas-fedor/watchtower/internal/testutil/reportfixture"
 	"github.com/nicholas-fedor/watchtower/internal/update/state"
 	"github.com/nicholas-fedor/watchtower/pkg/types"
 )
 
-// updatedAppStatus returns the report status of an updated "app" container
-// running org/app:latest, built the way an update session builds it.
+// updatedApp returns the status of an updated "app" container running
+// org/app:latest with the session report that lists it.
+//
+// Parameters:
+//   - t: The test that fails when the report does not list the container as updated.
 //
 // Returns:
-//   - *state.ContainerStatus: Status in the updated state.
-func updatedAppStatus() *state.ContainerStatus {
-	log := new(zerolog.Nop())
+//   - *state.ContainerStatus: Status in the updated state. Changes to it show
+//     in the report.
+//   - *state.Report: The session report that lists the status as updated.
+func updatedApp(t *testing.T) (*state.ContainerStatus, *state.Report) {
+	t.Helper()
+
 	app := container.NewContainer(nil,
 		&dockerContainer.InspectResponse{
 			ID:     strings.Repeat("a", 64),
@@ -36,11 +41,14 @@ func updatedAppStatus() *state.ContainerStatus {
 		&dockerImage.InspectResponse{ID: "sha256:" + strings.Repeat("b", 64)},
 	)
 
-	progress := state.Progress{}
-	progress.AddScanned(log, app, types.ImageID("sha256:"+strings.Repeat("c", 64)), updateParams.Params{})
-	progress.MarkForUpdate(log, app.ID())
+	report := reportfixture.UpdatedReport(app, types.ImageID("sha256:"+strings.Repeat("c", 64)))
 
-	return progress[app.ID()]
+	require.Len(t, report.Updated(), 1)
+
+	status, ok := report.Updated()[0].(*state.ContainerStatus)
+	require.True(t, ok, "the updated container is a *state.ContainerStatus")
+
+	return status, report
 }
 
 // TestJSONTemplate verifies the JSON report template: its fields, ID types,
@@ -300,7 +308,7 @@ func TestJSONGitAndOCIReportFields(t *testing.T) {
 	t.Run("includes populated Git and OCI fields", func(t *testing.T) {
 		t.Parallel()
 
-		status := updatedAppStatus()
+		status, _ := updatedApp(t)
 		status.SetGitMetadata(provenance.ReportMeta{
 			GitRepo:         "https://github.com/org/app.git",
 			GitRef:          "main",
@@ -331,7 +339,7 @@ func TestJSONGitAndOCIReportFields(t *testing.T) {
 	t.Run("omits empty Git and OCI fields", func(t *testing.T) {
 		t.Parallel()
 
-		status := updatedAppStatus()
+		status, _ := updatedApp(t)
 		got := marshalReports([]types.ContainerReport{status})
 		require.Len(t, got, 1)
 		assert.NotContains(t, got[0], "gitRepo")
@@ -344,14 +352,12 @@ func TestJSONGitAndOCIReportFields(t *testing.T) {
 	t.Run("marshals updated reports with Git fields", func(t *testing.T) {
 		t.Parallel()
 
-		status := updatedAppStatus()
+		status, report := updatedApp(t)
 		status.SetGitMetadata(provenance.ReportMeta{GitRepo: "https://github.com/org/app.git", GitRef: "main"})
 
 		raw, err := json.Marshal(Data{
 			Title: "update", Host: "box",
-			Report: &state.SingleContainerReport{
-				UpdatedReports: []types.ContainerReport{status},
-			},
+			Report: report,
 		})
 		require.NoError(t, err)
 		assert.Contains(t, string(raw), `"gitRepo":"https://github.com/org/app.git"`)
