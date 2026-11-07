@@ -30,6 +30,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- Decide the legacy email delay from notification settings by @nicholas-fedor in [#3516](https://github.com/nicholas-fedor/watchtower/pull/3516)
 - Replace the shared notifier interface with consumer ports by @nicholas-fedor in [#3462](https://github.com/nicholas-fedor/watchtower/pull/3462)
 - Build the scan metric in the update session by @nicholas-fedor in [#3454](https://github.com/nicholas-fedor/watchtower/pull/3454)
 - Move UpdateParams to update/params by @nicholas-fedor in [#3452](https://github.com/nicholas-fedor/watchtower/pull/3452)
