@@ -15,14 +15,15 @@ import (
 	mockUpdate "github.com/nicholas-fedor/watchtower/internal/update/mocks"
 	updateParams "github.com/nicholas-fedor/watchtower/internal/update/params"
 	"github.com/nicholas-fedor/watchtower/internal/update/sorter"
+	"github.com/nicholas-fedor/watchtower/internal/update/state"
 	"github.com/nicholas-fedor/watchtower/pkg/types"
 )
 
 // sessionBatch records what an update session does with the notification
 // batch it opens.
 type sessionBatch struct {
-	sent  []types.Report // Reports the session sent, in order.
-	ended int            // Times the session ended the batch.
+	sent  []*state.Report // Reports the session sent, in order.
+	ended int             // Times the session ended the batch.
 }
 
 // record keeps report as one the session sent. It serves as the send of an
@@ -30,7 +31,7 @@ type sessionBatch struct {
 //
 // Parameters:
 //   - report: The report sent.
-func (b *sessionBatch) record(report types.Report) {
+func (b *sessionBatch) record(report *state.Report) {
 	b.sent = append(b.sent, report)
 }
 
@@ -533,7 +534,7 @@ func expectSessionBatch(t *testing.T, notifier *mockUpdate.MockNotifier) *sessio
 	t.Cleanup(func() { assert.Equal(t, 1, batch.ended, "the session ends its batch once") })
 
 	notifier.EXPECT().StartSessionNotification().Return(
-		func(report types.Report) {
+		func(report *state.Report) {
 			assert.Zero(t, batch.ended, "the session sends before it ends its batch")
 
 			batch.record(report)

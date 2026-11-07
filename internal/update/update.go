@@ -79,7 +79,7 @@ var scanProblems logging.ReportedProblems
 //   - gitClient: Git monitor client. Nil when Git monitoring is unused.
 //
 // Returns:
-//   - types.Report: Session report summarizing scanned, updated, and failed containers.
+//   - *state.Report: Session report summarizing scanned, updated, and failed containers.
 //   - []cleanup.RemovedImageInfo: Slice of cleaned image info to clean up after updates.
 //   - error: Non-nil if listing or sorting fails, nil on success.
 func update(
@@ -89,7 +89,7 @@ func update(
 	config updateParams.Params,
 	rateLimiter *ratelimit.Limiter,
 	gitClient ...*git.Client,
-) (types.Report, []cleanup.RemovedImageInfo, error) {
+) (*state.Report, []cleanup.RemovedImageInfo, error) {
 	// Check for context cancellation early
 	select {
 	case <-ctx.Done():

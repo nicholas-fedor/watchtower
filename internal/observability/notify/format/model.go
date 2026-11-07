@@ -5,7 +5,7 @@ import (
 
 	"github.com/rs/zerolog"
 
-	"github.com/nicholas-fedor/watchtower/pkg/types"
+	"github.com/nicholas-fedor/watchtower/internal/update/state"
 )
 
 // StaticData is the part of the notification template data model set upon initialization.
@@ -27,7 +27,7 @@ type Entry struct {
 type Data struct {
 	StaticData
 
-	Report  types.Report
+	Report  *state.Report
 	Entries []*Entry
 }
 

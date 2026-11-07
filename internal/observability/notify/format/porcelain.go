@@ -4,7 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 
-	"github.com/nicholas-fedor/watchtower/pkg/types"
+	"github.com/nicholas-fedor/watchtower/internal/update/state"
 )
 
 // porcelainContainer represents a single container in the porcelain JSON report.
@@ -33,14 +33,14 @@ type porcelainReport struct {
 	Containers []porcelainContainer `json:"containers"`
 }
 
-// toPorcelainReport converts a types.Report into a porcelainReport.
+// toPorcelainReport converts a session report into a porcelainReport.
 //
 // Parameters:
 //   - sourceReport: Source report.
 //
 // Returns:
 //   - porcelainReport: JSON-ready report.
-func toPorcelainReport(sourceReport types.Report) porcelainReport {
+func toPorcelainReport(sourceReport *state.Report) porcelainReport {
 	if sourceReport == nil {
 		return porcelainReport{Containers: make([]porcelainContainer, 0)}
 	}
@@ -79,14 +79,14 @@ func toPorcelainReport(sourceReport types.Report) porcelainReport {
 	return report
 }
 
-// toPorcelainJSON marshals a types.Report to an indented JSON string for templates.
+// toPorcelainJSON marshals a session report to an indented JSON string for templates.
 //
 // Parameters:
 //   - sourceReport: Source report.
 //
 // Returns:
 //   - string: Indented JSON or error string if marshaling fails.
-func toPorcelainJSON(sourceReport types.Report) string {
+func toPorcelainJSON(sourceReport *state.Report) string {
 	report := toPorcelainReport(sourceReport)
 
 	bytes, err := json.MarshalIndent(report, "", "  ")

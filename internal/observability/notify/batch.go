@@ -48,17 +48,17 @@ func (n *Notifier) StartNotification() func() {
 // sends its report through the returned send, which reaches only this batch.
 //
 // Returns:
-//   - func(types.Report): Sends a report with the entries the batch queued,
-//     while the batch is open. A split report names its container in its Focus
-//     field. Its notification takes only that container's entries. The batch
+//   - func(*state.Report): Sends a report with the entries the batch queued,
+//     while the batch is open. A split report names the container it is about
+//     as its focus. Its notification takes only that container's entries. The batch
 //     stays open for the session's other split notifications. Any other report
 //     takes every queued entry and ends the batch. Once the batch has ended,
 //     send sends nothing.
 //   - func(): Ends the batch, as the end from [Notifier.StartNotification] does.
-func (n *Notifier) StartSessionNotification() (func(types.Report), func()) {
+func (n *Notifier) StartSessionNotification() (func(*state.Report), func()) {
 	owned := n.openBatch()
 
-	return func(report types.Report) { n.sendReport(owned, report) },
+	return func(report *state.Report) { n.sendReport(owned, report) },
 		func() { n.endBatch(owned) }
 }
 
@@ -150,7 +150,7 @@ func entryContainer(entry *format.Entry) string {
 //
 // Returns:
 //   - bool: True if notification should be sent, false otherwise.
-func (n *Notifier) ShouldSendNotification(report types.Report) bool {
+func (n *Notifier) ShouldSendNotification(report *state.Report) bool {
 	if report != nil && n.logLevel == zerolog.ErrorLevel {
 		if len(report.Failed()) == 0 {
 			return false
@@ -223,7 +223,7 @@ func (n *Notifier) endBatch(owned *batch) {
 // sendReport sends report with the entries owned queued, while owned is the
 // open batch.
 //
-// A split report names the container it is about in its Focus field. Only the
+// A split report names the container it is about as its focus. Only the
 // queued entries that name that container are taken out of the batch and sent
 // with it. The batch stays open for the session's other split notifications.
 // Any other report takes every queued entry and ends the batch. Once owned has
@@ -232,9 +232,11 @@ func (n *Notifier) endBatch(owned *batch) {
 // Parameters:
 //   - owned: The batch its owner opened.
 //   - report: Scan report to include.
-func (n *Notifier) sendReport(owned *batch, report types.Report) {
-	split, ok := report.(*state.SingleContainerReport)
-	focused := ok && split.Focus != nil
+func (n *Notifier) sendReport(owned *batch, report *state.Report) {
+	var focus types.ContainerReport
+	if report != nil {
+		focus = report.Focus()
+	}
 
 	n.entriesMutex.Lock()
 
@@ -246,10 +248,10 @@ func (n *Notifier) sendReport(owned *batch, report types.Report) {
 
 	var entries []*format.Entry
 
-	if focused {
+	if focus != nil {
 		// An unnamed focus would otherwise match the entries that name no
 		// container, so it takes none.
-		if name := split.Focus.Name(); name != "" {
+		if name := focus.Name(); name != "" {
 			rest := make([]*format.Entry, 0, len(owned.entries))
 
 			for _, e := range owned.entries {
@@ -354,7 +356,7 @@ func (n *Notifier) sendByContainer(entries []*format.Entry) {
 // Parameters:
 //   - entries: Entries taken out of the queue.
 //   - report: Scan report to include. It may be nil.
-func (n *Notifier) sendDeduplicated(entries []*format.Entry, report types.Report) {
+func (n *Notifier) sendDeduplicated(entries []*format.Entry, report *state.Report) {
 	n.ll().Debug().
 		Int("entries_count", len(entries)).
 		Bool("legacy_template", n.template.Legacy()).

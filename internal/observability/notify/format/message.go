@@ -7,7 +7,7 @@ import (
 
 	"github.com/rs/zerolog"
 
-	"github.com/nicholas-fedor/watchtower/pkg/types"
+	"github.com/nicholas-fedor/watchtower/internal/update/state"
 )
 
 // Template is a parsed notification template. Its legacy flag decides
@@ -147,7 +147,7 @@ func (m *Template) Render(log *zerolog.Logger, data Data) (string, error) {
 //
 // Returns:
 //   - int: Combined length of all report categories.
-func reportCategoryCount(report types.Report) int {
+func reportCategoryCount(report *state.Report) int {
 	if report == nil {
 		return 0
 	}

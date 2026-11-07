@@ -1,17 +1,5 @@
 package types
 
-// Report defines container session results.
-type Report interface {
-	Scanned() []ContainerReport   // Scanned containers.
-	Updated() []ContainerReport   // Updated containers.
-	Failed() []ContainerReport    // Failed containers.
-	Skipped() []ContainerReport   // Skipped containers.
-	Stale() []ContainerReport     // Stale containers.
-	Fresh() []ContainerReport     // Fresh containers.
-	Restarted() []ContainerReport // Restarted containers (linked dependencies).
-	All() []ContainerReport       // All unique containers.
-}
-
 // ContainerReport defines a container's session status.
 //
 // Current* fields describe the running image and Latest* fields a newer image.

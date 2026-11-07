@@ -78,8 +78,8 @@ var (
 //   - states: Outcome of each container, in order.
 //
 // Returns:
-//   - types.Report: Report built through state.Progress.
-func Report(states ...state.State) types.Report {
+//   - *state.Report: Report built through state.Progress.
+func Report(states ...state.State) *state.Report {
 	log := new(zerolog.Nop())
 	// Count each state's containers so their IDs and names stay unique.
 	stateNums := make(map[state.State]int)
@@ -121,6 +121,27 @@ func Report(states ...state.State) types.Report {
 	}
 
 	progress.UpdateFailed(log, failed)
+
+	return progress.Report(log)
+}
+
+// UpdatedReport returns the report of a session that updated one container,
+// built through state.Progress.
+//
+// Parameters:
+//   - c: The container the session updated.
+//   - newImage: ID of the image c moved to. An ID equal to c's image makes the
+//     report list c as fresh instead.
+//
+// Returns:
+//   - *state.Report: Report with c's status in its scanned list. The status is
+//     also in the updated list, or in the fresh list when newImage is c's image.
+func UpdatedReport(c types.Container, newImage types.ImageID) *state.Report {
+	log := new(zerolog.Nop())
+	progress := state.Progress{}
+
+	progress.AddScanned(log, c, newImage, updateParams.Params{})
+	progress.MarkForUpdate(log, c.ID())
 
 	return progress.Report(log)
 }

@@ -5,7 +5,7 @@
 package mocks
 
 import (
-	"github.com/nicholas-fedor/watchtower/pkg/types"
+	"github.com/nicholas-fedor/watchtower/internal/update/state"
 	mock "github.com/stretchr/testify/mock"
 )
 
@@ -46,7 +46,7 @@ func (_m *MockNotifier) EXPECT() *MockNotifier_Expecter {
 }
 
 // ShouldSendNotification provides a mock function for the type MockNotifier
-func (_mock *MockNotifier) ShouldSendNotification(report types.Report) bool {
+func (_mock *MockNotifier) ShouldSendNotification(report *state.Report) bool {
 	ret := _mock.Called(report)
 
 	if len(ret) == 0 {
@@ -54,7 +54,7 @@ func (_mock *MockNotifier) ShouldSendNotification(report types.Report) bool {
 	}
 
 	var r0 bool
-	if returnFunc, ok := ret.Get(0).(func(types.Report) bool); ok {
+	if returnFunc, ok := ret.Get(0).(func(*state.Report) bool); ok {
 		r0 = returnFunc(report)
 	} else {
 		r0 = ret.Get(0).(bool)
@@ -68,16 +68,16 @@ type MockNotifier_ShouldSendNotification_Call struct {
 }
 
 // ShouldSendNotification is a helper method to define mock.On call
-//   - report types.Report
+//   - report *state.Report
 func (_e *MockNotifier_Expecter) ShouldSendNotification(report any) *MockNotifier_ShouldSendNotification_Call {
 	return &MockNotifier_ShouldSendNotification_Call{Call: _e.mock.On("ShouldSendNotification", report)}
 }
 
-func (_c *MockNotifier_ShouldSendNotification_Call) Run(run func(report types.Report)) *MockNotifier_ShouldSendNotification_Call {
+func (_c *MockNotifier_ShouldSendNotification_Call) Run(run func(report *state.Report)) *MockNotifier_ShouldSendNotification_Call {
 	_c.Call.Run(func(args mock.Arguments) {
-		var arg0 types.Report
+		var arg0 *state.Report
 		if args[0] != nil {
-			arg0 = args[0].(types.Report)
+			arg0 = args[0].(*state.Report)
 		}
 		run(
 			arg0,
@@ -91,29 +91,29 @@ func (_c *MockNotifier_ShouldSendNotification_Call) Return(b bool) *MockNotifier
 	return _c
 }
 
-func (_c *MockNotifier_ShouldSendNotification_Call) RunAndReturn(run func(report types.Report) bool) *MockNotifier_ShouldSendNotification_Call {
+func (_c *MockNotifier_ShouldSendNotification_Call) RunAndReturn(run func(report *state.Report) bool) *MockNotifier_ShouldSendNotification_Call {
 	_c.Call.Return(run)
 	return _c
 }
 
 // StartSessionNotification provides a mock function for the type MockNotifier
-func (_mock *MockNotifier) StartSessionNotification() (func(types.Report), func()) {
+func (_mock *MockNotifier) StartSessionNotification() (func(*state.Report), func()) {
 	ret := _mock.Called()
 
 	if len(ret) == 0 {
 		panic("no return value specified for StartSessionNotification")
 	}
 
-	var r0 func(types.Report)
+	var r0 func(*state.Report)
 	var r1 func()
-	if returnFunc, ok := ret.Get(0).(func() (func(types.Report), func())); ok {
+	if returnFunc, ok := ret.Get(0).(func() (func(*state.Report), func())); ok {
 		return returnFunc()
 	}
-	if returnFunc, ok := ret.Get(0).(func() func(types.Report)); ok {
+	if returnFunc, ok := ret.Get(0).(func() func(*state.Report)); ok {
 		r0 = returnFunc()
 	} else {
 		if ret.Get(0) != nil {
-			r0 = ret.Get(0).(func(types.Report))
+			r0 = ret.Get(0).(func(*state.Report))
 		}
 	}
 	if returnFunc, ok := ret.Get(1).(func() func()); ok {
@@ -143,12 +143,12 @@ func (_c *MockNotifier_StartSessionNotification_Call) Run(run func()) *MockNotif
 	return _c
 }
 
-func (_c *MockNotifier_StartSessionNotification_Call) Return(send func(types.Report), end func()) *MockNotifier_StartSessionNotification_Call {
+func (_c *MockNotifier_StartSessionNotification_Call) Return(send func(*state.Report), end func()) *MockNotifier_StartSessionNotification_Call {
 	_c.Call.Return(send, end)
 	return _c
 }
 
-func (_c *MockNotifier_StartSessionNotification_Call) RunAndReturn(run func() (func(types.Report), func())) *MockNotifier_StartSessionNotification_Call {
+func (_c *MockNotifier_StartSessionNotification_Call) RunAndReturn(run func() (func(*state.Report), func())) *MockNotifier_StartSessionNotification_Call {
 	_c.Call.Return(run)
 	return _c
 }

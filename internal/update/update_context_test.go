@@ -17,6 +17,7 @@ import (
 	"github.com/nicholas-fedor/watchtower/internal/update/cleanup"
 	mockUpdate "github.com/nicholas-fedor/watchtower/internal/update/mocks"
 	updateParams "github.com/nicholas-fedor/watchtower/internal/update/params"
+	"github.com/nicholas-fedor/watchtower/internal/update/state"
 	"github.com/nicholas-fedor/watchtower/pkg/types"
 )
 
@@ -278,7 +279,7 @@ func TestUpdateAction_MidOperationCancellationCheck(t *testing.T) {
 		done := make(chan struct{})
 
 		var (
-			report types.Report
+			report *state.Report
 			err    error
 		)
 
@@ -393,7 +394,7 @@ func runErrorPropagationTest(
 	errorToReturn error,
 	containerStaleness map[string]bool,
 	targetOperation string,
-) (types.Report, []cleanup.RemovedImageInfo, error) {
+) (*state.Report, []cleanup.RemovedImageInfo, error) {
 	t.Helper()
 
 	testData := getCommonTestData()
@@ -699,7 +700,7 @@ func TestEarlyCancellationStopContainers(t *testing.T) {
 		done := make(chan struct{})
 
 		var (
-			report            types.Report
+			report            *state.Report
 			cleanupImageInfos []cleanup.RemovedImageInfo
 			err               error
 		)
@@ -760,7 +761,7 @@ func TestEarlyCancellationRestartContainers(t *testing.T) {
 		done := make(chan struct{})
 
 		var (
-			report            types.Report
+			report            *state.Report
 			cleanupImageInfos []cleanup.RemovedImageInfo
 			err               error
 		)

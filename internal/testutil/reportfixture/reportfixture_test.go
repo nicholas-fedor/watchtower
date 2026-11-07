@@ -43,6 +43,20 @@ func TestReport(t *testing.T) {
 	assert.Equal(t, "accidentally the whole container", report.Failed()[0].Error())
 }
 
+// TestUpdatedReport verifies that the report lists the container as updated
+// to the new image.
+func TestUpdatedReport(t *testing.T) {
+	t.Parallel()
+
+	c, newImage := Container(0, state.UpdatedState)
+
+	report := UpdatedReport(c, newImage)
+	require.Len(t, report.Updated(), 1)
+	assert.Equal(t, c.ID(), report.Updated()[0].ID())
+	assert.Equal(t, newImage, report.Updated()[0].LatestImageID())
+	assert.Len(t, report.Scanned(), 1)
+}
+
 // TestContainer verifies the container's name, image and IDs. An index that
 // would reuse another state's IDs panics, as does a state no report ends in.
 func TestContainer(t *testing.T) {

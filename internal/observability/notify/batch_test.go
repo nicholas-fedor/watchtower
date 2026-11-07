@@ -257,10 +257,7 @@ func TestSessionSend_SingleFocusKeepsBatchingActive(t *testing.T) {
 	require.NotEmpty(t, full.Updated())
 
 	updated := full.Updated()[0]
-	report := &state.SingleContainerReport{
-		Focus:          updated,
-		UpdatedReports: []types.ContainerReport{updated},
-	}
+	report := state.NewSingleContainerReport(updated, full)
 
 	send, _ := startSessionWith(n, []*format.Entry{
 		{
@@ -366,7 +363,7 @@ func TestSessionSend_UnnamedFocusTakesNothing(t *testing.T) {
 	n := newBatchingNotifier(t)
 	send, _ := startSessionWith(n, []*format.Entry{sessionLine})
 
-	send(&state.SingleContainerReport{Focus: focus})
+	send(state.NewSingleContainerReport(focus, reportfixture.Report()))
 
 	remaining := queuedEntries(t, n)
 
@@ -385,17 +382,17 @@ func TestSessionSend_CooldownFocusWithOneContextContainer(t *testing.T) {
 		name    string
 		context state.State
 		// contextOf returns the context container's category in the session.
-		contextOf func(types.Report) []types.ContainerReport
+		contextOf func(*state.Report) []types.ContainerReport
 	}{
 		{
 			name:      "one failed container in the session",
 			context:   state.FailedState,
-			contextOf: types.Report.Failed,
+			contextOf: (*state.Report).Failed,
 		},
 		{
 			name:      "one stale container in the session",
 			context:   state.StaleState,
-			contextOf: types.Report.Stale,
+			contextOf: (*state.Report).Stale,
 		},
 	}
 
@@ -770,8 +767,8 @@ func TestNotifier_StartSessionNotification_SendReachesOnlyItsBatch(t *testing.T)
 	sendDuringCheck := func(
 		n *Notifier,
 		hooked zerolog.Logger,
-		report types.Report,
-		beforeEnd func(send func(types.Report)),
+		report *state.Report,
+		beforeEnd func(send func(*state.Report)),
 	) [][]string {
 		send, end := n.StartSessionNotification()
 
@@ -804,21 +801,21 @@ func TestNotifier_StartSessionNotification_SendReachesOnlyItsBatch(t *testing.T)
 		{
 			name: "grouped send after the session's end",
 			run: func(n *Notifier, hooked zerolog.Logger) [][]string {
-				return sendDuringCheck(n, hooked, nil, func(func(types.Report)) {})
+				return sendDuringCheck(n, hooked, nil, func(func(*state.Report)) {})
 			},
 			want: [][]string{{"Session line"}, nil, {checkLine}},
 		},
 		{
 			name: "split send after the session's end",
 			run: func(n *Notifier, hooked zerolog.Logger) [][]string {
-				return sendDuringCheck(n, hooked, split, func(func(types.Report)) {})
+				return sendDuringCheck(n, hooked, split, func(func(*state.Report)) {})
 			},
 			want: [][]string{{"Session line"}, nil, {checkLine}},
 		},
 		{
 			name: "second grouped send",
 			run: func(n *Notifier, hooked zerolog.Logger) [][]string {
-				return sendDuringCheck(n, hooked, nil, func(send func(types.Report)) { send(nil) })
+				return sendDuringCheck(n, hooked, nil, func(send func(*state.Report)) { send(nil) })
 			},
 			want: [][]string{{"Session line"}, nil, {checkLine}},
 		},

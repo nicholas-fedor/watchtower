@@ -15,10 +15,11 @@ import (
 	"github.com/nicholas-fedor/watchtower/internal/observability/metrics"
 	"github.com/nicholas-fedor/watchtower/internal/registry/ratelimit"
 	"github.com/nicholas-fedor/watchtower/internal/testutil/logcapture"
+	"github.com/nicholas-fedor/watchtower/internal/testutil/reportfixture"
 	mockUpdate "github.com/nicholas-fedor/watchtower/internal/update/mocks"
 	updateParams "github.com/nicholas-fedor/watchtower/internal/update/params"
+	"github.com/nicholas-fedor/watchtower/internal/update/state"
 	"github.com/nicholas-fedor/watchtower/pkg/types"
-	mockTypes "github.com/nicholas-fedor/watchtower/pkg/types/mocks"
 )
 
 // newTestLogger returns a logger that writes each event to the test's log, so a
@@ -54,15 +55,11 @@ func Test_handleUpdateResult(t *testing.T) {
 	t.Run("should return the partial report's counts, marked failed, when error is not nil", func(t *testing.T) {
 		t.Parallel()
 
-		mockReport := mockTypes.NewMockReport(t)
-		mockReport.EXPECT().Scanned().Return(make([]types.ContainerReport, 3))
-		mockReport.EXPECT().Updated().Return(make([]types.ContainerReport, 1))
-		mockReport.EXPECT().Failed().Return(make([]types.ContainerReport, 2))
-		mockReport.EXPECT().Restarted().Return(nil)
-		mockReport.EXPECT().Skipped().Return(nil)
+		// The updated and failed containers are each also scanned.
+		report := reportfixture.Report(state.UpdatedState, state.FailedState, state.FailedState)
 
 		err := errors.New("rolling restart canceled")
-		result := handleUpdateResult(newTestLogger(t), mockReport, err, nil)
+		result := handleUpdateResult(newTestLogger(t), report, err, nil)
 		assert.Equal(t, &metrics.Metric{Scanned: 3, Updated: 1, Failed: 2, ScanFailed: true}, result)
 	})
 
@@ -78,11 +75,9 @@ func Test_handleUpdateResult(t *testing.T) {
 	t.Run("should return nil when result is not nil and error is nil", func(t *testing.T) {
 		t.Parallel()
 
-		mockReport := mockTypes.NewMockReport(t)
-
 		var err error
 
-		result := handleUpdateResult(newTestLogger(t), mockReport, err, nil)
+		result := handleUpdateResult(newTestLogger(t), reportfixture.Report(), err, nil)
 		assert.Nil(t, result)
 	})
 
@@ -107,7 +102,7 @@ func Test_handleUpdateResult(t *testing.T) {
 
 				log, buf := logcapture.NewJSON(zerolog.DebugLevel)
 
-				handleUpdateResult(log, nil, tt.err, func(types.Report) {
+				handleUpdateResult(log, nil, tt.err, func(*state.Report) {
 					t.Error("no report is sent without a report")
 				})
 
@@ -123,19 +118,14 @@ func Test_handleUpdateResult(t *testing.T) {
 	t.Run("should send the partial report when error occurs after some work", func(t *testing.T) {
 		t.Parallel()
 
-		mockReport := mockTypes.NewMockReport(t)
-		mockReport.EXPECT().Scanned().Return(nil)
-		mockReport.EXPECT().Updated().Return(nil)
-		mockReport.EXPECT().Failed().Return(nil)
-		mockReport.EXPECT().Restarted().Return(nil)
-		mockReport.EXPECT().Skipped().Return(nil)
+		report := reportfixture.Report()
 
 		var batch sessionBatch
 
 		err := errors.New("rolling restart canceled")
-		handleUpdateResult(newTestLogger(t), mockReport, err, batch.record)
+		handleUpdateResult(newTestLogger(t), report, err, batch.record)
 
-		assert.Equal(t, []types.Report{mockReport}, batch.sent)
+		assert.Equal(t, []*state.Report{report}, batch.sent)
 	})
 
 	t.Run("should return a failed zero metric when error occurs and notifier is nil", func(t *testing.T) {
@@ -151,11 +141,9 @@ func Test_handleUpdateResult(t *testing.T) {
 		t.Parallel()
 
 		// Call handleUpdateResult without an error
-		mockReport := mockTypes.NewMockReport(t)
-
 		var err error
 
-		result := handleUpdateResult(newTestLogger(t), mockReport, err, func(types.Report) {
+		result := handleUpdateResult(newTestLogger(t), reportfixture.Report(), err, func(*state.Report) {
 			t.Error("no report is sent without an error")
 		})
 
