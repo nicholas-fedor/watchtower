@@ -569,6 +569,71 @@ func TestRunUpgradesOnSchedule_UpdateOnStartSkippedWhileLocked(t *testing.T) {
 	})
 }
 
+// TestRunUpgradesOnSchedule_UpdateOnStartHoldsLock verifies that the update at
+// startup holds the update lock until it returns. Another caller of the lock,
+// such as the HTTP API, waits for the update to finish before it can start one.
+// The metrics handler is created before the bubble, since its goroutine outlives
+// the test.
+func TestRunUpgradesOnSchedule_UpdateOnStartHoldsLock(t *testing.T) {
+	metrics.Default()
+
+	synctest.Test(t, func(t *testing.T) {
+		lock := NewUpdateLock()
+		release := make(chan struct{})
+
+		var running atomic.Bool
+
+		deps := testDeps(t, func(context.Context, types.Filter, updateParams.Params) *metrics.Metric {
+			running.Store(true)
+			<-release
+			running.Store(false)
+
+			return &metrics.Metric{}
+		}, nil)
+		deps.Lock = lock
+		deps.UpdateOnStart = true
+
+		ctx, cancel := context.WithCancel(t.Context())
+		done := make(chan error, 1)
+
+		go func() { done <- RunUpgradesOnSchedule(ctx, deps) }()
+
+		synctest.Wait()
+		require.True(t, running.Load(), "the update at startup is running")
+
+		// overlapped records whether the second caller took the lock while the
+		// update at startup was still running.
+		var overlapped atomic.Bool
+
+		acquired := make(chan struct{})
+
+		go func() {
+			if lock.Lock(t.Context()) != nil {
+				return
+			}
+
+			overlapped.Store(running.Load())
+			close(acquired)
+			lock.Unlock()
+		}()
+
+		synctest.Wait()
+
+		select {
+		case <-acquired:
+			t.Fatal("another caller took the lock while the update at startup was running")
+		default:
+		}
+
+		close(release)
+		<-acquired
+		assert.False(t, overlapped.Load(), "the lock was taken before the update at startup returned")
+
+		cancel()
+		require.NoError(t, <-done)
+	})
+}
+
 // TestRunUpgradesOnSchedule_StartupSkippedAtShutdown verifies that a startup
 // message that waits for a running update is skipped when the process stops
 // first. A stopping process has nothing to announce.
