@@ -5,12 +5,14 @@ import (
 	"testing"
 	"time"
 
+	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
 	"github.com/nicholas-fedor/watchtower/internal/container/filters"
 	containerImage "github.com/nicholas-fedor/watchtower/internal/container/image"
 	"github.com/nicholas-fedor/watchtower/internal/registry/ratelimit"
+	"github.com/nicholas-fedor/watchtower/internal/testutil/logcapture"
 	mockUpdate "github.com/nicholas-fedor/watchtower/internal/update/mocks"
 	updateParams "github.com/nicholas-fedor/watchtower/internal/update/params"
 	"github.com/nicholas-fedor/watchtower/pkg/types"
@@ -23,6 +25,28 @@ func cooldownConfig(cooldownDelay time.Duration) updateParams.Params {
 		Filter:        filters.NoFilter,
 		CooldownDelay: cooldownDelay,
 	}
+}
+
+// staleCheckFailures returns the failed count from the staleness check summary
+// in JSON log output, failing the test when no summary was logged.
+func staleCheckFailures(t *testing.T, logs string) int {
+	t.Helper()
+
+	// summary holds the fields the test reads from each log line.
+	type summary struct {
+		Message string `json:"message"`
+		Failed  int    `json:"failed"`
+	}
+
+	for _, entry := range logcapture.Entries[summary](t, logs) {
+		if entry.Message == "Completed container staleness check" {
+			return entry.Failed
+		}
+	}
+
+	require.Fail(t, "no staleness check summary was logged")
+
+	return 0
 }
 
 // TestUpdateAction_Cooldown verifies that an update skips a container whose
@@ -52,9 +76,12 @@ func TestUpdateAction_Cooldown(t *testing.T) {
 				Stopped: make(map[string]bool),
 			}
 
-			report, _, err := update(newTestLogger(t), t.Context(), client, cooldownConfig(1*time.Hour), ratelimit.New())
+			log, buf := logcapture.NewJSON(zerolog.DebugLevel)
+
+			report, _, err := update(log, t.Context(), client, cooldownConfig(1*time.Hour), ratelimit.New())
 
 			require.NoError(t, err)
+			assert.Equal(t, 0, staleCheckFailures(t, buf.String()), "a deferral is not a failed check")
 			require.Len(t, report.Skipped(), 1, "Container should be skipped due to cooldown")
 
 			skipped := report.Skipped()[0]
@@ -175,9 +202,12 @@ func TestUpdateAction_Cooldown(t *testing.T) {
 				Stopped: make(map[string]bool),
 			}
 
-			report, _, err := update(newTestLogger(t), t.Context(), client, cooldownConfig(1*time.Hour), ratelimit.New())
+			log, buf := logcapture.NewJSON(zerolog.DebugLevel)
+
+			report, _, err := update(log, t.Context(), client, cooldownConfig(1*time.Hour), ratelimit.New())
 
 			require.NoError(t, err)
+			assert.Equal(t, 1, staleCheckFailures(t, buf.String()), "a failed age lookup is a failed check")
 			require.Len(t, report.Skipped(), 1, "Container should be skipped when image age fetch fails")
 
 			skipped := report.Skipped()[0]
