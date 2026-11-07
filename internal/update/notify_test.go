@@ -19,6 +19,7 @@ import (
 	mockContainerClient "github.com/nicholas-fedor/watchtower/internal/container/client/mocks"
 	"github.com/nicholas-fedor/watchtower/internal/container/filters"
 	"github.com/nicholas-fedor/watchtower/internal/container/labels"
+	"github.com/nicholas-fedor/watchtower/internal/container/provenance"
 	"github.com/nicholas-fedor/watchtower/internal/observability/events"
 	"github.com/nicholas-fedor/watchtower/internal/observability/metrics"
 	"github.com/nicholas-fedor/watchtower/internal/observability/notify/format"
@@ -593,7 +594,7 @@ func TestRunUpdates(t *testing.T) {
 			t.Parallel()
 
 			unnamed := modelfixture.Container(containerfixture.WithName(""))
-			session := reportfixture.UpdatedReport(unnamed, "new_image_id")
+			session := reportfixture.UpdatedReport(unnamed, "new_image_id", provenance.ReportMeta{})
 			require.Len(t, session.Updated(), 1)
 
 			var batch sessionBatch
@@ -1601,21 +1602,32 @@ func TestSendSplitNotifications_CooldownSkipped(t *testing.T) {
 		t.Run(fmt.Sprintf("notification report %t", notificationReport), func(t *testing.T) {
 			t.Parallel()
 
-			session := reportfixture.Report(
-				state.UpdatedState,
-				state.RestartedState,
-				state.SkippedState,
-				state.SkippedState,
-			)
-			cooldown := session.Skipped()[0]
+			log := newTestLogger(t)
+			progress := state.Progress{}
 
-			status, ok := cooldown.(*state.ContainerStatus)
-			require.True(t, ok)
-			status.SetCooldownInfo("1 hour", "24 hours", "23 hours", time.Now().Add(23*time.Hour))
+			updated, newImage := reportfixture.Container(0, state.UpdatedState)
+			progress.AddScanned(log, updated, newImage, updateParams.Params{})
+			progress.MarkForUpdate(log, updated.ID())
+
+			restarted, _ := reportfixture.Container(0, state.RestartedState)
+			progress.AddScanned(log, restarted, restarted.ImageID(), updateParams.Params{})
+			progress.MarkRestarted(log, restarted.ID())
+
+			// One skipped container waits out its update cooldown. The other
+			// was skipped for another reason.
+			inCooldown, _ := reportfixture.Container(0, state.SkippedState)
+			progress.AddSkipped(log, inCooldown, errors.New("in cooldown"), updateParams.Params{})
+			progress.SetCooldownInfo(log, inCooldown.ID(), "1 hour", "24 hours", "23 hours", time.Now().Add(23*time.Hour))
+
+			otherSkipped, _ := reportfixture.Container(1, state.SkippedState)
+			progress.AddSkipped(log, otherSkipped, errors.New("skipped"), updateParams.Params{})
+
+			session := progress.Report(log)
+			cooldown := progress[inCooldown.ID()]
 
 			var batch sessionBatch
 
-			sendSplitNotifications(newTestLogger(t), batch.record, notificationReport, session)
+			sendSplitNotifications(log, batch.record, notificationReport, session)
 
 			// One notification each for the updated, restarted and cooldown containers.
 			require.Len(t, batch.sent, 3)

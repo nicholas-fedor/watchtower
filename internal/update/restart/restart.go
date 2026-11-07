@@ -238,16 +238,9 @@ func performRollingRestart(
 			if err != nil {
 				failed[c.ID()] = err
 			} else {
-				// Set the new container ID in progress
+				// Record the recreated container in progress.
 				if progress != nil {
-					status, exists := (*progress)[c.ID()]
-					if exists {
-						status.SetNewContainerID(newContainerID)
-						// Mark as restarted if not stale (not updated)
-						if !c.IsStale() {
-							progress.MarkRestarted(log, c.ID())
-						}
-					}
+					progress.RecordRestart(log, c, newContainerID)
 				}
 
 				// Wait for the container to become healthy if it has a health check.
@@ -691,16 +684,9 @@ func restartContainersInSortedOrder(
 			if err != nil {
 				failed[c.ID()] = err
 			} else {
-				// Set the new container ID in progress
+				// Record the recreated container in progress.
 				if progress != nil {
-					status, exists := (*progress)[c.ID()]
-					if exists {
-						status.SetNewContainerID(newContainerID)
-						// Mark as restarted if not stale (not updated)
-						if !c.IsStale() {
-							progress.MarkRestarted(log, c.ID())
-						}
-					}
+					progress.RecordRestart(log, c, newContainerID)
 				}
 
 				log.Debug().

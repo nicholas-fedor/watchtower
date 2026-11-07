@@ -389,9 +389,9 @@ func TestContainerStatus_RestartedStateWithMissingData(t *testing.T) {
 	}
 }
 
-func TestContainerStatus_SetGitMetadata(t *testing.T) {
+func TestContainerStatus_assignReportMeta(t *testing.T) {
 	u := &ContainerStatus{}
-	u.SetGitMetadata(provenance.ReportMeta{
+	u.assignReportMeta(provenance.ReportMeta{
 		GitRepo:         "https://github.com/org/app.git",
 		GitRef:          "main",
 		Changelog:       "https://github.com/org/app/releases/tag/v1.2.3",
@@ -462,71 +462,6 @@ func TestContainerStatus_ImageVersionDefaultsToEmpty(t *testing.T) {
 
 	if got := u.LatestImageRevision(); got != "" {
 		t.Errorf("LatestImageRevision() = %q, want empty", got)
-	}
-}
-
-func TestContainerStatus_SetCooldownInfo(t *testing.T) {
-	tests := []struct {
-		name       string
-		u          *ContainerStatus
-		age        string
-		delay      string
-		remaining  string
-		eligibleAt time.Time
-	}{
-		{
-			name:       "cooldown passed with age",
-			u:          &ContainerStatus{containerID: "cont1"},
-			age:        "47 days, 11 hours",
-			delay:      "24 hours",
-			remaining:  "",
-			eligibleAt: time.Time{},
-		},
-		{
-			name:       "cooldown not passed with remaining",
-			u:          &ContainerStatus{containerID: "cont2"},
-			age:        "2 hours",
-			delay:      "24 hours",
-			remaining:  "22 hours",
-			eligibleAt: time.Date(2026, 5, 26, 0, 45, 0, 0, time.UTC),
-		},
-		{
-			name:       "empty values",
-			u:          &ContainerStatus{containerID: "cont3"},
-			age:        "",
-			delay:      "",
-			remaining:  "",
-			eligibleAt: time.Time{},
-		},
-		{
-			name:       "overwrites previous values",
-			u:          &ContainerStatus{containerID: "cont4", cooldownAge: "old age", cooldownDelay: "old delay", cooldownRemaining: "old remaining"},
-			age:        "new age",
-			delay:      "new delay",
-			remaining:  "new remaining",
-			eligibleAt: time.Date(2026, 5, 27, 12, 0, 0, 0, time.UTC),
-		},
-	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			tt.u.SetCooldownInfo(tt.age, tt.delay, tt.remaining, tt.eligibleAt)
-
-			if got := tt.u.CooldownAge(); got != tt.age {
-				t.Errorf("CooldownAge() = %v, want %v", got, tt.age)
-			}
-
-			if got := tt.u.CooldownDelay(); got != tt.delay {
-				t.Errorf("CooldownDelay() = %v, want %v", got, tt.delay)
-			}
-
-			if got := tt.u.CooldownRemaining(); got != tt.remaining {
-				t.Errorf("CooldownRemaining() = %v, want %v", got, tt.remaining)
-			}
-
-			if got := tt.u.CooldownEligibleAt(); got != tt.eligibleAt {
-				t.Errorf("CooldownEligibleAt() = %v, want %v", got, tt.eligibleAt)
-			}
-		})
 	}
 }
 
@@ -631,12 +566,6 @@ func TestContainerStatus_RestartedStateIntegration(t *testing.T) {
 
 			if tt.u.NewContainerID() != tt.u.newContainerID {
 				t.Errorf("NewContainerID integration failed")
-			}
-			// Test SetNewContainerID
-			tt.u.SetNewContainerID("updatedID")
-
-			if tt.u.NewContainerID() != "updatedID" {
-				t.Errorf("SetNewContainerID failed")
 			}
 		})
 	}

@@ -471,12 +471,7 @@ func (s *Session) recordCompose(
 		return
 	}
 
-	status, ok := (*progress)[c.ID()]
-	if !ok || status == nil {
-		return
-	}
-
-	status.SetNewContainerID(item.ID)
+	progress.SetNewContainerID(log, c.ID(), item.ID)
 
 	if !params.NoRestart {
 		progress.MarkForUpdate(log, c.ID())
@@ -564,7 +559,13 @@ func (s *Session) recordComposeReplicas(
 		}
 	}
 
+	// Every replica shares the representative's Git rebuild, which has no
+	// pulled image annotations.
 	representative := members[0]
+	meta := provenance.ResolveReportMeta(representative.container, params.Git, provenance.ChangelogVars{
+		Tag:    representative.result.Tag,
+		Commit: representative.result.Commit,
+	}, oci.Annotations{})
 
 	for _, item := range items {
 		if item.Name == "" || item.ID == "" {
@@ -604,14 +605,10 @@ func (s *Session) recordComposeReplicas(
 			progress.SetLatestImage(log, status.ID(), item.ImageID)
 		}
 
-		meta := provenance.ResolveReportMeta(representative.container, params.Git, provenance.ChangelogVars{
-			Tag:    representative.result.Tag,
-			Commit: representative.result.Commit,
-		}, oci.Annotations{})
-		status.SetGitMetadata(meta)
+		progress.SetReportMeta(log, status.ID(), meta)
 
 		if !params.NoRestart {
-			status.SetNewContainerID(item.ID)
+			progress.SetNewContainerID(log, status.ID(), item.ID)
 			progress.MarkForUpdate(log, status.ID())
 		}
 

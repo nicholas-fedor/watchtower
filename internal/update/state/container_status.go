@@ -157,33 +157,6 @@ func (u *ContainerStatus) NewContainerID() types.ContainerID {
 	return u.newContainerID
 }
 
-// SetNewContainerID sets the new container ID after update.
-//
-// Parameters:
-//   - newID: The new container ID.
-func (u *ContainerStatus) SetNewContainerID(newID types.ContainerID) {
-	u.newContainerID = newID
-}
-
-// SetCooldownInfo sets cooldown metadata for this container.
-//
-// Parameters:
-//   - age: Human-readable image age (e.g., "47 days, 11 hours").
-//   - delay: Human-readable cooldown duration (e.g., "24 hours").
-//   - remaining: Human-readable remaining time (empty if passed).
-//   - eligibleAt: Time when the container becomes eligible for update.
-func (u *ContainerStatus) SetCooldownInfo(
-	age,
-	delay,
-	remaining string,
-	eligibleAt time.Time,
-) {
-	u.cooldownAge = age
-	u.cooldownDelay = delay
-	u.cooldownRemaining = remaining
-	u.cooldownEligibleAt = eligibleAt
-}
-
 // CooldownEligibleAt returns the time when the container becomes eligible for update.
 //
 // Returns:
@@ -267,14 +240,11 @@ func (u *ContainerStatus) CurrentImageVersion() string { return u.currentImageVe
 //   - string: OCI version, or empty.
 func (u *ContainerStatus) LatestImageVersion() string { return u.latestImageVersion }
 
-// SetGitMetadata sets Git and OCI report fields for this container.
+// assignReportMeta sets Git and OCI report fields for this container.
 //
 // Parameters:
 //   - meta: Resolved report metadata.
-//
-// Returns:
-//   - none.
-func (u *ContainerStatus) SetGitMetadata(meta provenance.ReportMeta) {
+func (u *ContainerStatus) assignReportMeta(meta provenance.ReportMeta) {
 	u.gitRepo = meta.GitRepo
 	u.gitRef = meta.GitRef
 	u.changelog = meta.Changelog

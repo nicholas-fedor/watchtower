@@ -6,6 +6,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"github.com/nicholas-fedor/watchtower/internal/container/provenance"
 	"github.com/nicholas-fedor/watchtower/internal/update/state"
 	"github.com/nicholas-fedor/watchtower/pkg/types"
 )
@@ -50,10 +51,11 @@ func TestUpdatedReport(t *testing.T) {
 
 	c, newImage := Container(0, state.UpdatedState)
 
-	report := UpdatedReport(c, newImage)
+	report := UpdatedReport(c, newImage, provenance.ReportMeta{GitRef: "v1.2.3"})
 	require.Len(t, report.Updated(), 1)
 	assert.Equal(t, c.ID(), report.Updated()[0].ID())
 	assert.Equal(t, newImage, report.Updated()[0].LatestImageID())
+	assert.Equal(t, "v1.2.3", report.Updated()[0].GitRef())
 	assert.Len(t, report.Scanned(), 1)
 }
 

@@ -331,7 +331,7 @@ func goldenFullReport() *state.Report {
 	updated, newImage := reportfixture.Container(0, state.UpdatedState)
 	progress.AddScanned(log, updated, newImage, updateParams.Params{})
 	progress.MarkForUpdate(log, updated.ID())
-	progress[updated.ID()].SetGitMetadata(provenance.ReportMeta{
+	progress.SetReportMeta(log, updated.ID(), provenance.ReportMeta{
 		GitRepo:         "https://github.com/org/app.git",
 		GitRef:          "v1.2.0",
 		Changelog:       "https://github.com/org/app/releases/tag/v1.2.0",

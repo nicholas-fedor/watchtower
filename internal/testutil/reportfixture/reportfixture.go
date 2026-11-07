@@ -14,6 +14,7 @@ import (
 	dockerNetwork "github.com/moby/moby/api/types/network"
 
 	"github.com/nicholas-fedor/watchtower/internal/container"
+	"github.com/nicholas-fedor/watchtower/internal/container/provenance"
 	updateParams "github.com/nicholas-fedor/watchtower/internal/update/params"
 	"github.com/nicholas-fedor/watchtower/internal/update/state"
 	"github.com/nicholas-fedor/watchtower/pkg/types"
@@ -132,16 +133,18 @@ func Report(states ...state.State) *state.Report {
 //   - c: The container the session updated.
 //   - newImage: ID of the image c moved to. An ID equal to c's image makes the
 //     report list c as fresh instead.
+//   - meta: Git and OCI report fields for c's status. Empty sets none.
 //
 // Returns:
 //   - *state.Report: Report with c's status in its scanned list. The status is
 //     also in the updated list, or in the fresh list when newImage is c's image.
-func UpdatedReport(c types.Container, newImage types.ImageID) *state.Report {
+func UpdatedReport(c types.Container, newImage types.ImageID, meta provenance.ReportMeta) *state.Report {
 	log := new(zerolog.Nop())
 	progress := state.Progress{}
 
 	progress.AddScanned(log, c, newImage, updateParams.Params{})
 	progress.MarkForUpdate(log, c.ID())
+	progress.SetReportMeta(log, c.ID(), meta)
 
 	return progress.Report(log)
 }

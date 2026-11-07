@@ -23,12 +23,12 @@ import (
 //
 // Parameters:
 //   - t: The test that fails when the report does not list the container as updated.
+//   - meta: Git and OCI report fields for the container's status.
 //
 // Returns:
-//   - *state.ContainerStatus: Status in the updated state. Changes to it show
-//     in the report.
+//   - *state.ContainerStatus: Status in the updated state.
 //   - *state.Report: The session report that lists the status as updated.
-func updatedApp(t *testing.T) (*state.ContainerStatus, *state.Report) {
+func updatedApp(t *testing.T, meta provenance.ReportMeta) (*state.ContainerStatus, *state.Report) {
 	t.Helper()
 
 	app := container.NewContainer(nil,
@@ -41,7 +41,7 @@ func updatedApp(t *testing.T) (*state.ContainerStatus, *state.Report) {
 		&dockerImage.InspectResponse{ID: "sha256:" + strings.Repeat("b", 64)},
 	)
 
-	report := reportfixture.UpdatedReport(app, types.ImageID("sha256:"+strings.Repeat("c", 64)))
+	report := reportfixture.UpdatedReport(app, types.ImageID("sha256:"+strings.Repeat("c", 64)), meta)
 
 	require.Len(t, report.Updated(), 1)
 
@@ -308,8 +308,7 @@ func TestJSONGitAndOCIReportFields(t *testing.T) {
 	t.Run("includes populated Git and OCI fields", func(t *testing.T) {
 		t.Parallel()
 
-		status, _ := updatedApp(t)
-		status.SetGitMetadata(provenance.ReportMeta{
+		status, _ := updatedApp(t, provenance.ReportMeta{
 			GitRepo:         "https://github.com/org/app.git",
 			GitRef:          "main",
 			Changelog:       "https://github.com/org/app/releases",
@@ -339,7 +338,7 @@ func TestJSONGitAndOCIReportFields(t *testing.T) {
 	t.Run("omits empty Git and OCI fields", func(t *testing.T) {
 		t.Parallel()
 
-		status, _ := updatedApp(t)
+		status, _ := updatedApp(t, provenance.ReportMeta{})
 		got := marshalReports([]types.ContainerReport{status})
 		require.Len(t, got, 1)
 		assert.NotContains(t, got[0], "gitRepo")
@@ -352,8 +351,7 @@ func TestJSONGitAndOCIReportFields(t *testing.T) {
 	t.Run("marshals updated reports with Git fields", func(t *testing.T) {
 		t.Parallel()
 
-		status, report := updatedApp(t)
-		status.SetGitMetadata(provenance.ReportMeta{GitRepo: "https://github.com/org/app.git", GitRef: "main"})
+		_, report := updatedApp(t, provenance.ReportMeta{GitRepo: "https://github.com/org/app.git", GitRef: "main"})
 
 		raw, err := json.Marshal(Data{
 			Title: "update", Host: "box",

@@ -397,8 +397,7 @@ func TestRender_ReportTemplates(t *testing.T) {
 		t.Run("should render Changelog, GitRepo, and Source", func(t *testing.T) {
 			t.Parallel()
 
-			status, report := updatedApp(t)
-			status.SetGitMetadata(provenance.ReportMeta{
+			_, report := updatedApp(t, provenance.ReportMeta{
 				GitRepo:         "https://github.com/org/app.git",
 				GitRef:          "v1.2.3",
 				Changelog:       "https://github.com/org/app/releases",
