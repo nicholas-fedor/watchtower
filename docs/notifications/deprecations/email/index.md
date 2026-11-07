@@ -15,7 +15,7 @@
 
     Use the [`notification-url`](../../../configuration/notifications/index.md#notification_url) configuration option with a `smtp://` Shoutrrr URL instead.
 
-    Use the [legacy notifications migration tool](../../deprecations/migration-tool/index.md#smtp_migration_walkthrough) to help with migrating to a Shoutrrr URL.
+    Use the [legacy notifications migration tool](../../deprecations/migration-tool/index.md#migration_walkthrough) to help with migrating to a Shoutrrr URL.
 
 ## Overview
 
