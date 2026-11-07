@@ -73,7 +73,7 @@ The template is a [Go template](https://golang.org/pkg/text/template/){target="_
 
 Simple templates are used when the [`notification-report`](#notification_report) configuration option is not set, formatting individual log entries as they occur.
 
-```go title="Default Simple Template"
+```text title="Default Simple Template"
 {{- range $i, $e := . -}}
 {{- if $i}}{{- println -}}{{- end -}}
 {{- $msg := $e.Message -}}
@@ -116,7 +116,7 @@ The [Template Preview Tool](../template-preview/index.md) uses the same template
 !!! Note
     The example below is for report mode. With the report toggle off, use `range .` instead of `range .Entries`.
 
-```go title="Preview example (report mode)"
+```text title="Preview example (report mode)"
 {{- range $i, $e := .Entries -}}
 {{- if $i}}{{- println -}}{{- end -}}
 {{- $msg := $e.Message -}}
@@ -156,11 +156,11 @@ Found new image: repo/image:latest (abcdef123456)
 
 When the [`notification-report`](#notification_report) configuration option is set, the template processes a `format.Data` struct containing a session report and log entries.
 
-```go title="Example Report Template"
+```text title="Example Report Template"
 {{- if .Report -}}
   {{- with .Report -}}
     {{len .Scanned}} Scanned, {{len .Updated}} Updated, {{len .Restarted}} Restarted, {{len .Failed}} Failed
-    {{- if ( or .Updated .Restarted .Failed ) -}}
+    {{- if ( or .Updated .Restarted .Failed .Skipped ) -}}
       {{- range .Updated}}
 - {{.Name}} ({{.ImageName}}): {{.CurrentImageID.ShortID}} updated to {{.LatestImageID.ShortID}}{{with .GitRef}} ref {{.}}{{end}}{{with .Changelog}} {{.}}{{end}}
       {{- end -}}
@@ -180,15 +180,19 @@ When the [`notification-report`](#notification_report) configuration option is s
   {{- end -}}
 {{- end -}}
 {{- if .Entries -}}
+  {{- if .Report }}
 
+{{ end -}}
 Logs:
+  {{- range .Entries }}
+{{ .Time.Format "2006-01-02T15:04:05Z07:00" }} [{{ .Level }}] {{ .Message }}
+  {{- end -}}
 {{- end -}}
-{{range .Entries -}}{{.Time.Format "2006-01-02T15:04:05Z07:00"}} [{{.Level}}] {{.Message}}{{"\n"}}{{- end -}}
 ```
 
 - This example generates a summary of container statuses followed by logs, for notifications such as email or Slack messages.
 - Some notifications carry no report. Their `.Report` is nil. Examples are a check request's messages and the messages that none of a split session's container notifications carries. A report template shows them only if it lists `.Entries`, as this example does.
-- When the [`notification-split-by-container`](../general-settings/index.md#split-by-container) configuration option is enabled, `.Report.Focus` is the container the notification is about. It is nil for the report of a whole session, as in the [template preview](../template-preview/index.md). Read it inside `{{ with .Report }}`, because `.Report.Focus` fails the template when `.Report` is nil.
+- When the [`notification-split-by-container`](../general-settings/index.md#split_by_container) configuration option is enabled, `.Report.Focus` is the container the notification is about. It is nil for the report of a whole session, as in the [template preview](../template-preview/index.md). Read it inside `{{ with .Report }}`, because `.Report.Focus` fails the template when `.Report` is nil.
 - The built-in `default` report template lists each container by its status instead of the logs. A container with a newer image that Watchtower did not apply is listed as `Stale`. Examples are a monitor-only container and a skipped Watchtower self-update.
 
 ### Example Usage
@@ -208,32 +212,36 @@ Logs:
                     slack://watchtower@token-a/token-b/token-c
                 WATCHTOWER_NOTIFICATION_TEMPLATE: |
                     {{- if .Report -}}
-                    {{- with .Report -}}
-                    {{len .Scanned}} Scanned, {{len .Updated}} Updated, {{len .Restarted}} Restarted, {{len .Failed}} Failed
-                    {{- if ( or .Updated .Restarted .Failed ) -}}
-                        {{- range .Updated -}}
+                      {{- with .Report -}}
+                        {{len .Scanned}} Scanned, {{len .Updated}} Updated, {{len .Restarted}} Restarted, {{len .Failed}} Failed
+                        {{- if ( or .Updated .Restarted .Failed .Skipped ) -}}
+                          {{- range .Updated}}
                     - {{.Name}} ({{.ImageName}}): {{.CurrentImageID.ShortID}} updated to {{.LatestImageID.ShortID}}{{with .GitRef}} ref {{.}}{{end}}{{with .Changelog}} {{.}}{{end}}
-                        {{- end -}}
-                        {{- range .Fresh -}}
+                          {{- end -}}
+                          {{- range .Fresh}}
                     - {{.Name}} ({{.ImageName}}): {{.State}}
-                        {{- end -}}
-                        {{- range .Restarted -}}
+                          {{- end -}}
+                          {{- range .Restarted}}
                     - {{.Name}} ({{.ImageName}}): {{.State}}
-                        {{- end -}}
-                        {{- range .Skipped -}}
+                          {{- end -}}
+                          {{- range .Skipped}}
                     - {{.Name}} ({{.ImageName}}): {{.State}}: {{.Error}}
-                        {{- end -}}
-                        {{- range .Failed -}}
+                          {{- end -}}
+                          {{- range .Failed}}
                     - {{.Name}} ({{.ImageName}}): {{.State}}: {{.Error}}
+                          {{- end -}}
                         {{- end -}}
-                    {{- end -}}
-                    {{- end -}}
+                      {{- end -}}
                     {{- end -}}
                     {{- if .Entries -}}
+                      {{- if .Report }}
 
+                    {{ end -}}
                     Logs:
+                      {{- range .Entries }}
+                    {{ .Time.Format "2006-01-02T15:04:05Z07:00" }} [{{ .Level }}] {{ .Message }}
+                      {{- end -}}
                     {{- end -}}
-                    {{- range .Entries -}}{{.Time.Format "2006-01-02T15:04:05Z07:00"}} [{{.Level}}] {{.Message}}{{"\n"}}{{- end -}}
     ```
 
 === "Docker CLI"
@@ -243,36 +251,41 @@ Logs:
       --name watchtower \
       -v /var/run/docker.sock:/var/run/docker.sock \
       -e WATCHTOWER_NOTIFICATION_REPORT="true" \
+      -e WATCHTOWER_NOTIFICATION_URL="discord://token@channel" \
       -e WATCHTOWER_NOTIFICATION_TEMPLATE="\
     {{- if .Report -}}
       {{- with .Report -}}
-    {{len .Scanned}} Scanned, {{len .Updated}} Updated, {{len .Restarted}} Restarted, {{len .Failed}} Failed
-    {{- if ( or .Updated .Restarted .Failed ) -}}
-          {{- range .Updated -}}
+        {{len .Scanned}} Scanned, {{len .Updated}} Updated, {{len .Restarted}} Restarted, {{len .Failed}} Failed
+        {{- if ( or .Updated .Restarted .Failed .Skipped ) -}}
+          {{- range .Updated}}
     - {{.Name}} ({{.ImageName}}): {{.CurrentImageID.ShortID}} updated to {{.LatestImageID.ShortID}}{{with .GitRef}} ref {{.}}{{end}}{{with .Changelog}} {{.}}{{end}}
           {{- end -}}
-          {{- range .Fresh -}}
+          {{- range .Fresh}}
     - {{.Name}} ({{.ImageName}}): {{.State}}
           {{- end -}}
-          {{- range .Restarted -}}
+          {{- range .Restarted}}
     - {{.Name}} ({{.ImageName}}): {{.State}}
           {{- end -}}
-          {{- range .Skipped -}}
+          {{- range .Skipped}}
     - {{.Name}} ({{.ImageName}}): {{.State}}: {{.Error}}
           {{- end -}}
-          {{- range .Failed -}}
+          {{- range .Failed}}
     - {{.Name}} ({{.ImageName}}): {{.State}}: {{.Error}}
           {{- end -}}
-    {{- end -}}
+        {{- end -}}
       {{- end -}}
     {{- end -}}
     {{- if .Entries -}}
+      {{- if .Report }}
 
+    {{ end -}}
     Logs:
+      {{- range .Entries }}
+    {{ .Time.Format \"2006-01-02T15:04:05Z07:00\" }} [{{ .Level }}] {{ .Message }}
+      {{- end -}}
     {{- end -}}
-    {{- range .Entries -}}{{.Time.Format \"2006-01-02T15:04:05Z07:00\"}} [{{.Level}}] {{.Message}}{{\"\n\"}}{{- end -}}
     " \
-      watchtower-image
+      nickfedor/watchtower:latest
     ```
 
 <!-- markdownlint-restore -->
@@ -280,8 +293,8 @@ Example output for a session with one updated container, one restarted container
 
 ```text
 5 Scanned, 1 Updated, 1 Restarted, 0 Failed
-- /container (repo/image:latest): abcdef12 updated to 34567890
-- /restarted-container (repo/image:latest): Restarted
+- container (repo/image:latest): abcdef123456 updated to 34567890abcd
+- restarted-container (repo/image:latest): Restarted
 
 Logs:
 2025-08-20T06:00:13-07:00 [error] Operation failed. Try again later.
@@ -314,23 +327,28 @@ Use `.CurrentImageVersion` or `.LatestImageVersion` instead.
 
 Because the two versions are separate fields, a template can print the transition:
 
-```go
-{{ range .Report.Updated }}{{ .Name }}: {{ .CurrentImageVersion }} → {{ .LatestImageVersion }}
-{{- with .Changelog }}
+```text
+{{- with .Report -}}
+  {{- range $i, $c := .Updated -}}
+    {{- if $i }}
+{{ end -}}
+    {{ $c.Name }}: {{ $c.CurrentImageVersion }} → {{ $c.LatestImageVersion }}
+    {{- with $c.Changelog }}
 {{ . }}
-{{- end }}
-{{ end }}
+    {{- end -}}
+  {{- end -}}
+{{- end -}}
 ```
 
 ```text
-/app: 1.2.2 → 1.2.3
+app: 1.2.2 → 1.2.3
 https://github.com/org/app/releases/tag/v1.2.3
 ```
 
 The built-in `default` report template prints image IDs, the ref, and the changelog on an updated container when they are set:
 
 ```text
-- /app (myapp:latest): abcdef12 updated to 34567890 ref v1.2.4 https://github.com/org/app/releases
+- app (myapp:latest): abcdef123456 updated to 34567890abcd ref v1.2.4 https://github.com/org/app/releases
 ```
 
 ### Changelog resolution
@@ -404,10 +422,14 @@ With [notification report](../../configuration/notifications/index.md#notificati
 
 The log fields are `container`, `image`, `repo`, `ref`, `commit`, `changelog`, `project`, `dir`, and `error`. A custom simple template reads them from `.Data`:
 
-```go
-{{ range . }}{{ if eq .Message "Built image from Git URL context" }}
-{{ .Data.container }} {{ .Data.commit }} {{ .Data.changelog }}
-{{ end }}{{ end }}
+```text
+{{- $sep := "" -}}
+{{- range . -}}
+  {{- if eq .Message "Built image from Git URL context" -}}
+    {{- $sep }}{{ .Data.container }} {{ .Data.commit }} {{ .Data.changelog }}
+    {{- $sep = "\n" -}}
+  {{- end -}}
+{{- end -}}
 ```
 
 The `json` notification report emits the same values under camelCase keys: `gitRepo`, `gitRef`, `changelog`, `ociSource`, `imageUrl`, `documentation`, `currentImageVersion`, `latestImageVersion`, `currentImageRevision`, and `latestImageRevision`.
