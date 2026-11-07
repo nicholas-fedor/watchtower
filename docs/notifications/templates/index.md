@@ -427,12 +427,14 @@ They are empty, or the zero time, on a container that no cooldown holds back.
 | `.CooldownEligibleAt` | Time the image is old enough, as a Go `time.Time`. The zero time when its age is unavailable. |
 
 ```text
-{{- $sep := "" -}}
-{{- range .Report.Skipped -}}
-  {{- if .CooldownDelay -}}
-    {{- $sep }}{{ .Name }}: cooldown {{ .CooldownDelay }}
-    {{- with .CooldownRemaining }}, eligible in {{ . }}{{ end -}}
-    {{- $sep = "\n" -}}
+{{- with .Report -}}
+  {{- $sep := "" -}}
+  {{- range .Skipped -}}
+    {{- if .CooldownDelay -}}
+      {{- $sep }}{{ .Name }}: cooldown {{ .CooldownDelay }}
+      {{- with .CooldownRemaining }}, eligible in {{ . }}{{ end -}}
+      {{- $sep = "\n" -}}
+    {{- end -}}
   {{- end -}}
 {{- end -}}
 ```

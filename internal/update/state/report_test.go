@@ -53,7 +53,11 @@ func TestReport_Lists(t *testing.T) {
 	}
 }
 
+// TestReport_All verifies that All lists each container once, sorted by
+// container ID across categories.
 func TestReport_All(t *testing.T) {
+	t.Parallel()
+
 	tests := []struct {
 		name string
 		r    *Report
@@ -78,24 +82,28 @@ func TestReport_All(t *testing.T) {
 			want: []string{"cont1", "cont2"},
 		},
 		{
-			name: "containers with restarted priority",
+			// The category order differs from the ID order. Only All's sort
+			// puts the IDs in order.
+			name: "sorted by ID across categories",
 			r: func() *Report {
 				status1 := &ContainerStatus{containerID: "cont1"}
 				status2 := &ContainerStatus{containerID: "cont2"}
 				status3 := &ContainerStatus{containerID: "cont3"}
 
 				return &Report{
-					updated:   []*ContainerStatus{status1},
-					restarted: []*ContainerStatus{status2},
-					failed:    []*ContainerStatus{status3},
+					updated:   []*ContainerStatus{status2},
+					restarted: []*ContainerStatus{status3},
+					failed:    []*ContainerStatus{status1},
 					scanned:   []*ContainerStatus{status1, status2, status3},
 				}
 			}(),
-			want: []string{"cont1", "cont2", "cont3"}, // updated first, then restarted, then failed
+			want: []string{"cont1", "cont2", "cont3"},
 		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
 			ids := []string{}
 			for _, status := range tt.r.All() {
 				ids = append(ids, string(status.ID()))

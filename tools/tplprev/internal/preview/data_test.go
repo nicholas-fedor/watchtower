@@ -54,8 +54,8 @@ func TestDataForMessageKnownFields(t *testing.T) {
 }
 
 // TestAddFromStateCooldown verifies that the first skipped container waits out
-// an image cooldown and carries its cooldown fields, while later skipped
-// containers carry none.
+// an image cooldown. It carries its cooldown fields and its running image as
+// the latest. Later skipped containers carry no cooldown fields.
 func TestAddFromStateCooldown(t *testing.T) {
 	t.Parallel()
 
@@ -68,6 +68,7 @@ func TestAddFromStateCooldown(t *testing.T) {
 
 	held := skipped[0]
 	assert.Equal(t, "image is within cooldown period", held.Error())
+	assert.Equal(t, held.CurrentImageID(), held.LatestImageID())
 	assert.Equal(t, "18 hours", held.CooldownAge())
 	assert.Equal(t, "1 day", held.CooldownDelay())
 	assert.Equal(t, "6 hours", held.CooldownRemaining())

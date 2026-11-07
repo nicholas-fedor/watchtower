@@ -114,6 +114,9 @@ func (p *PreviewData) AddFromState(state State) {
 	}
 
 	if inCooldown {
+		// Watchtower records a container that a cooldown holds back with its
+		// running image as the latest.
+		status.newImage = status.oldImage
 		status.cooldownAge = previewImageAge
 		status.cooldownDelay = previewCooldown
 		status.cooldownRemaining = previewEligibleIn
