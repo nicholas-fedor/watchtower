@@ -50,6 +50,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Documentation
 
+- Fix the template examples on the templates page by @nicholas-fedor in [#3542](https://github.com/nicholas-fedor/watchtower/pull/3542)
 - Fix links to anchors that do not exist by @nicholas-fedor in [#3520](https://github.com/nicholas-fedor/watchtower/pull/3520)
 - Name the settings notify-upgrade leaves out by @nicholas-fedor in [#3518](https://github.com/nicholas-fedor/watchtower/pull/3518)
 
