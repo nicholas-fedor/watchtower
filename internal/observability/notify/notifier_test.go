@@ -989,6 +989,15 @@ func TestGetDelay(t *testing.T) {
 			want: 7 * time.Second,
 		},
 		{
+			name: "negative legacy email delay falls back to the notifications delay",
+			cfg: notifyConfig.Notify{
+				DelaySeconds: 5,
+				LegacyTypes:  []string{"email"},
+				Legacy:       notifyConfig.Legacy{EmailDelay: -7},
+			},
+			want: 5 * time.Second,
+		},
+		{
 			name: "legacy email delay without the email type",
 			cfg: notifyConfig.Notify{
 				DelaySeconds: 5,
