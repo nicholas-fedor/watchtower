@@ -6,6 +6,7 @@ import (
 	"io"
 	"iter"
 	"os"
+	"slices"
 	"strings"
 	"time"
 
@@ -28,10 +29,8 @@ import (
 
 // legacyURL is a Shoutrrr URL converted from a legacy notification type.
 type legacyURL struct {
-	//nolint:staticcheck // SA1019: legacy ConvertibleNotifier until v2.
-	notifier         types.ConvertibleNotifier // Legacy notifier that built the URL.
-	notificationType string                    // Legacy notification type the URL came from.
-	url              string                    // Converted Shoutrrr URL.
+	notificationType string // Legacy notification type the URL came from.
+	url              string // Converted Shoutrrr URL.
 }
 
 // errUnknownNotificationType indicates an unsupported legacy notification type name.
@@ -84,27 +83,12 @@ func NewNotifier(log *zerolog.Logger, cfg notifyConfig.Notify) (*Notifier, error
 
 	data := templateData(log, cfg.Hostname, cfg.TitleTag, cfg.EmailSubjectTag, cfg.SkipTitle)
 
-	sender, urls, converted, err := newSender(log, cfg)
+	sender, urls, err := newSender(log, cfg)
 	if err != nil {
 		return nil, err
 	}
 
-	legacyDelay := time.Duration(0)
-
-	for _, legacy := range converted {
-		// A legacy notifier with its own delay sets the notification delay.
-		//nolint:staticcheck // SA1019: legacy DelayNotifier until v2.
-		delayNotifier, ok := legacy.notifier.(types.DelayNotifier)
-		if ok {
-			legacyDelay = delayNotifier.GetDelay()
-			clog.Debug().
-				Str("type", legacy.notificationType).
-				Dur("delay", legacyDelay).
-				Msg("Retrieved delay from legacy notifier")
-		}
-	}
-
-	delay := getDelay(log, cfg.DelaySeconds, legacyDelay)
+	delay := getDelay(cfg)
 
 	// Use report template when enabled, otherwise use legacy template.
 	legacyTemplate := !cfg.Report
@@ -173,7 +157,7 @@ func BuildURLs(log *zerolog.Logger, cfg notifyConfig.Notify) ([]string, error) {
 		log = &nop
 	}
 
-	_, urls, _, err := newSender(log, cfg)
+	_, urls, err := newSender(log, cfg)
 	if err != nil {
 		return nil, err
 	}
@@ -258,10 +242,10 @@ var legacyNotifierCtors = map[string]legacyNotifierCtor{
 //   - legacy: Per-type settings for deprecated notifiers.
 //
 // Returns:
-//   - iter.Seq2[legacyURL, error]: Each converted URL with its type and
-//     notifier. An unknown type yields an error that names the type and ends
-//     the sequence. A missing or invalid required setting does the same. So
-//     does a notifier that cannot generate its URL.
+//   - iter.Seq2[legacyURL, error]: Each converted URL with its type. An
+//     unknown type yields an error that names the type and ends the sequence.
+//     A missing or invalid required setting does the same. So does a notifier
+//     that cannot generate its URL.
 //
 // Deprecated: Legacy notification types are deprecated.
 // Use --notification-url instead.
@@ -311,7 +295,7 @@ func convertLegacyNotifiers(
 				Str("url", redact.ServiceURL(shoutrrrURL)).
 				Msg("Created Shoutrrr URL from legacy notifier")
 
-			if !yield(legacyURL{notificationType: notificationType, url: shoutrrrURL, notifier: legacyNotifier}, nil) {
+			if !yield(legacyURL{notificationType: notificationType, url: shoutrrrURL}, nil) {
 				return
 			}
 		}
@@ -337,7 +321,6 @@ func convertLegacyNotifiers(
 //   - *shoutrrrRouter.ServiceRouter: The sender.
 //   - []string: The URLs the sender sends to, in its order: the configured
 //     URLs, then the converted URLs.
-//   - []legacyURL: The converted legacy notifiers, in type order.
 //   - error: Non-nil when a legacy type cannot be converted or Shoutrrr rejects
 //     a URL. A rejected configured URL is named by its position, counting from
 //     1. A rejected converted URL is named by its legacy type. The error never
@@ -345,7 +328,7 @@ func convertLegacyNotifiers(
 func newSender(
 	log *zerolog.Logger,
 	cfg notifyConfig.Notify,
-) (*shoutrrrRouter.ServiceRouter, []string, []legacyURL, error) {
+) (*shoutrrrRouter.ServiceRouter, []string, error) {
 	local := log.With().Str("notify", "no").Logger()
 
 	var text io.Writer = &local
@@ -360,76 +343,59 @@ func newSender(
 		shoutrrrTypes.SenderOptions{},
 	)
 	if err != nil {
-		return nil, nil, nil, fmt.Errorf("create notification sender: %w", err)
+		return nil, nil, fmt.Errorf("create notification sender: %w", err)
 	}
 
 	for i, rawURL := range cfg.URLs {
 		err = sender.AddService(rawURL)
 		if err != nil {
-			return nil, nil, nil, fmt.Errorf("notification URL %d: %w", i+1, err)
+			return nil, nil, fmt.Errorf("notification URL %d: %w", i+1, err)
 		}
 	}
 
 	urls := append([]string(nil), cfg.URLs...)
 
-	var converted []legacyURL
-
 	for legacy, err := range convertLegacyNotifiers(log, cfg.LegacyTypes, cfg.Legacy) {
 		if err != nil {
-			return nil, nil, nil, err
+			return nil, nil, err
 		}
 
 		err = sender.AddService(legacy.url)
 		if err != nil {
-			return nil, nil, nil, fmt.Errorf("check %q notification URL: %w", legacy.notificationType, err)
+			return nil, nil, fmt.Errorf("check %q notification URL: %w", legacy.notificationType, err)
 		}
 
 		urls = append(urls, legacy.url)
-		converted = append(converted, legacy)
 	}
 
-	return sender, urls, converted, nil
+	return sender, urls, nil
 }
 
-// getDelay selects the notification delay from a legacy value or configured seconds.
+// getDelay selects the delay the notifier waits before each send.
+//
+// The legacy email delay applies when the email notification type is
+// configured and the delay is above zero. It wins over the notifications
+// delay. Otherwise the notifications delay applies when it is above zero.
+// Without either, the delay is zero.
 //
 // Parameters:
-//   - log: Logger for diagnostics.
-//   - delaySeconds: Configured delay in seconds (from Config.Notify.DelaySeconds).
-//   - legacyDelay: Delay from a legacy notifier type, preferred when non-zero.
+//   - cfg: Notification settings from settings.Load (Config.Notify).
 //
 // Returns:
-//   - time.Duration: Selected delay (legacy delay if set, otherwise delaySeconds, otherwise zero).
+//   - time.Duration: The selected delay.
 //
-// Deprecated: Prefer NewNotifier with Config.Notify from settings.Load.
-//
-// TODO: Simplify getDelay to only use configured delay seconds when legacy types are removed.
+// TODO: Use only the notifications delay when legacy types are removed.
 //
 //nolint:godox
-func getDelay(log *zerolog.Logger, delaySeconds int, legacyDelay time.Duration) time.Duration {
-	clog := log.With().Dur("legacy_delay", legacyDelay).Logger()
-	clog.Debug().Msg("Determining notification delay")
+func getDelay(cfg notifyConfig.Notify) time.Duration {
+	seconds := cfg.DelaySeconds
 
-	// Use legacy delay if set.
-	if legacyDelay > 0 {
-		clog.Debug().Msg("Using legacy delay")
-
-		return legacyDelay
+	emailConfigured := slices.Contains(cfg.LegacyTypes, email.Type) //nolint:staticcheck // SA1019: legacy notification types until v2.
+	if emailConfigured && cfg.Legacy.EmailDelay > 0 {
+		seconds = cfg.Legacy.EmailDelay
 	}
 
-	// Use configured delay when no legacy delay applies.
-	if delaySeconds > 0 {
-		delayDuration := time.Duration(delaySeconds) * time.Second
-		clog.Debug().
-			Dur("delay", delayDuration).
-			Msg("Using configured delay")
-
-		return delayDuration
-	}
-
-	clog.Debug().Msg("No delay configured, using zero")
-
-	return 0
+	return time.Duration(max(seconds, 0)) * time.Second
 }
 
 // getTitle formats the notification title with hostname and tag.

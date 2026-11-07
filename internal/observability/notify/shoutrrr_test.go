@@ -69,7 +69,7 @@ func createTestNotifier(
 ) *Notifier {
 	t.Helper()
 
-	sender, added, _, err := newSender(log, notifyConfig.Notify{URLs: urls})
+	sender, added, err := newSender(log, notifyConfig.Notify{URLs: urls})
 	require.NoError(t, err)
 
 	return createNotifier(log, sender, added, level, "", legacy, data, delay)
