@@ -32,6 +32,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- Set container status fields through the session progress by @nicholas-fedor in [#3532](https://github.com/nicholas-fedor/watchtower/pull/3532)
 - Group the template functions' module import by @nicholas-fedor in [#3530](https://github.com/nicholas-fedor/watchtower/pull/3530)
 - Replace the report interface with one concrete report type by @nicholas-fedor in [#3526](https://github.com/nicholas-fedor/watchtower/pull/3526)
 - Decide the legacy email delay from notification settings by @nicholas-fedor in [#3516](https://github.com/nicholas-fedor/watchtower/pull/3516)
