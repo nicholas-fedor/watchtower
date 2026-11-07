@@ -10,6 +10,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Let preview templates read the report's focus by @nicholas-fedor in [#3528](https://github.com/nicholas-fedor/watchtower/pull/3528)
 - Convert legacy notifier settings through one URL function by @nicholas-fedor in [#3522](https://github.com/nicholas-fedor/watchtower/pull/3522)
 - Decide a notification line's container by one rule by @nicholas-fedor in [#3514](https://github.com/nicholas-fedor/watchtower/pull/3514)
 - Send session notifications only through the session's batch by @nicholas-fedor in [#3512](https://github.com/nicholas-fedor/watchtower/pull/3512)
