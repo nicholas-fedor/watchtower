@@ -65,7 +65,8 @@ func TestURL_TLSSkipVerify(t *testing.T) {
 }
 
 // TestURL_Validation verifies that URL converts settings with a from address, a
-// to address, a server and a port from 0 to 65535. It rejects settings that
+// to address, a server and a port from 0 to 65535. Port 0 leaves the port out
+// of the URL. Shoutrrr then uses the SMTP default. It rejects settings that
 // lack a required setting or have a port outside that range.
 func TestURL_Validation(t *testing.T) {
 	t.Parallel()
@@ -73,12 +74,14 @@ func TestURL_Validation(t *testing.T) {
 	tests := []struct {
 		name string
 		// edit changes the valid settings into the case's settings.
-		edit    func(cfg *notifyConfig.Legacy)
-		wantErr error
+		edit func(cfg *notifyConfig.Legacy)
+		// wantPort is the port in the converted URL, empty when it has none.
+		wantPort string
+		wantErr  error
 	}{
-		{name: "all required settings", edit: func(*notifyConfig.Legacy) {}},
-		{name: "lowest port", edit: func(cfg *notifyConfig.Legacy) { cfg.EmailPort = 0 }},
-		{name: "highest port", edit: func(cfg *notifyConfig.Legacy) { cfg.EmailPort = 65535 }},
+		{name: "all required settings", edit: func(*notifyConfig.Legacy) {}, wantPort: "587"},
+		{name: "lowest port", edit: func(cfg *notifyConfig.Legacy) { cfg.EmailPort = 0 }, wantPort: ""},
+		{name: "highest port", edit: func(cfg *notifyConfig.Legacy) { cfg.EmailPort = 65535 }, wantPort: "65535"},
 		{name: "no from address", edit: func(cfg *notifyConfig.Legacy) { cfg.EmailFrom = "" }, wantErr: errEmptyFrom},
 		{name: "no to address", edit: func(cfg *notifyConfig.Legacy) { cfg.EmailTo = "" }, wantErr: errEmptyTo},
 		{name: "no server", edit: func(cfg *notifyConfig.Legacy) { cfg.EmailServer = "" }, wantErr: errEmptyServer},
@@ -108,7 +111,11 @@ func TestURL_Validation(t *testing.T) {
 			}
 
 			require.NoError(t, err)
-			assert.NotEmpty(t, raw)
+
+			parsed, err := url.Parse(raw)
+			require.NoError(t, err)
+			assert.Equal(t, "smtp.example.com", parsed.Hostname())
+			assert.Equal(t, tt.wantPort, parsed.Port())
 		})
 	}
 }

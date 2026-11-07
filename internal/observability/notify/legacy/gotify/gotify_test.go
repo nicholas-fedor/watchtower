@@ -49,9 +49,9 @@ func TestURL_TLSSkipVerify(t *testing.T) {
 }
 
 // TestURL_RequiredSettings verifies that URL converts a valid server URL and
-// token. It rejects an empty, non-HTTP or unparsable server URL. It also
-// rejects an empty token before it checks the URL. A rejected HTTP URL logs no
-// insecure-HTTP warning.
+// token. It rejects a server URL that is empty or not HTTP. It also rejects one
+// that does not parse or has no host name. An empty token is rejected before
+// the URL is checked. A rejected HTTP URL logs no insecure-HTTP warning.
 func TestURL_RequiredSettings(t *testing.T) {
 	t.Parallel()
 
@@ -84,6 +84,21 @@ func TestURL_RequiredSettings(t *testing.T) {
 		{
 			name:    "HTTP URL that does not parse",
 			cfg:     notifyConfig.Legacy{GotifyURL: "http://gotify.example.com:port", GotifyToken: "Aaaaaaaaaaaaaaa"},
+			wantErr: errInvalidURL,
+		},
+		{
+			name:    "HTTP URL without a host",
+			cfg:     notifyConfig.Legacy{GotifyURL: "http://", GotifyToken: "Aaaaaaaaaaaaaaa"},
+			wantErr: errInvalidURL,
+		},
+		{
+			name:    "HTTP URL with only a port",
+			cfg:     notifyConfig.Legacy{GotifyURL: "http://:8080", GotifyToken: "Aaaaaaaaaaaaaaa"},
+			wantErr: errInvalidURL,
+		},
+		{
+			name:    "HTTPS URL with only a path",
+			cfg:     notifyConfig.Legacy{GotifyURL: "https:///gotify", GotifyToken: "Aaaaaaaaaaaaaaa"},
 			wantErr: errInvalidURL,
 		},
 		{

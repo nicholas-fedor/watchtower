@@ -44,7 +44,8 @@ var (
 // Returns:
 //   - string: Gotify service URL.
 //   - error: Non-nil when the token or the server URL is empty. Also non-nil
-//     when the server URL is not an HTTP or HTTPS URL or does not parse.
+//     when the server URL is not an HTTP or HTTPS URL, does not parse or has
+//     no host name.
 //
 // Deprecated: Legacy gotify notifier is deprecated.
 // Use --notification-url with a gotify:// URL instead.
@@ -109,7 +110,7 @@ func URL(log *zerolog.Logger, cfg notifyConfig.Legacy) (string, error) {
 // Returns:
 //   - *url.URL: The parsed server URL.
 //   - error: Non-nil when the URL is empty or not an HTTP or HTTPS URL. Also
-//     non-nil when it does not parse.
+//     non-nil when it does not parse or has no host name.
 //
 // Deprecated: This function is part of the legacy gotify notifier and will be removed
 // for the v2 release. Use --notification-url with a gotify:// URL instead.
@@ -132,6 +133,14 @@ func parseGotifyURL(log *zerolog.Logger, gotifyURL string) (*url.URL, error) {
 	apiURL, err := url.Parse(gotifyURL)
 	if err != nil {
 		clog.Debug().Msg("Failed to parse Gotify URL")
+
+		return nil, errInvalidURL
+	}
+
+	// Without a host name, the generated Gotify URL would read the token as its
+	// host. Shoutrrr would then reject it with a misleading error.
+	if apiURL.Hostname() == "" {
+		clog.Debug().Msg("Gotify URL has no host")
 
 		return nil, errInvalidURL
 	}
