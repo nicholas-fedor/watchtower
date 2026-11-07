@@ -115,50 +115,6 @@ func TestNotifier(t *testing.T) {
 				assert.Empty(t, data.Title)
 			})
 		})
-		t.Run("no delay is defined", func(t *testing.T) {
-			t.Parallel()
-
-			t.Run("should use the default delay", func(t *testing.T) {
-				t.Parallel()
-
-				delay := getDelay(newTestLogger(t), 0, time.Duration(0))
-				assert.Equal(t, time.Duration(0), delay)
-			})
-		})
-		t.Run("delay is defined", func(t *testing.T) {
-			t.Parallel()
-
-			t.Run("should use the specified delay", func(t *testing.T) {
-				t.Parallel()
-
-				delay := getDelay(newTestLogger(t), 5, time.Duration(0))
-				assert.Equal(t, 5*time.Second, delay)
-			})
-		})
-		t.Run("legacy delay is defined", func(t *testing.T) {
-			t.Parallel()
-
-			//nolint:godox
-			// TODO: Remove legacy delay tests when legacy notification types are removed.
-			t.Run("should use the specified legacy delay", func(t *testing.T) {
-				t.Parallel()
-
-				delay := getDelay(newTestLogger(t), 0, 5*time.Second)
-				assert.Equal(t, 5*time.Second, delay)
-			})
-		})
-		t.Run("legacy delay and delay is defined", func(t *testing.T) {
-			t.Parallel()
-
-			//nolint:godox
-			// TODO: Remove legacy delay tests when legacy notification types are removed.
-			t.Run("should use the specified legacy delay and ignore the specified delay", func(t *testing.T) {
-				t.Parallel()
-
-				delay := getDelay(newTestLogger(t), 5, 7*time.Second)
-				assert.Equal(t, 7*time.Second, delay)
-			})
-		})
 		t.Run("notification template file is specified", func(t *testing.T) {
 			t.Parallel()
 
@@ -785,7 +741,7 @@ func TestNewSender_AcceptsGotifyURLFromFileExpansion(t *testing.T) {
 
 	cfg := notifyConfig.Notify{URLs: []string{"gotify://gotify.example.com/Atoken123456789"}}
 
-	sender, urls, _, err := newSender(newTestLogger(t), cfg)
+	sender, urls, err := newSender(newTestLogger(t), cfg)
 	require.NoError(t, err)
 	assert.NotNil(t, sender)
 	assert.Equal(t, cfg.URLs, urls)
@@ -807,7 +763,7 @@ func TestNewSender_LogsShoutrrrRecordsAtTheirLevel(t *testing.T) {
 
 	log, buf := logcapture.NewJSON(zerolog.InfoLevel)
 
-	sender, _, _, err := newSender(log, notifyConfig.Notify{URLs: []string{"logger://", newGenericWebhookURL(t)}})
+	sender, _, err := newSender(log, notifyConfig.Notify{URLs: []string{"logger://", newGenericWebhookURL(t)}})
 	require.NoError(t, err)
 
 	for _, err := range sender.Send("Found new image", &shoutrrrTypes.Params{}) {
@@ -836,7 +792,7 @@ func TestNewSender_PrintsLoggerTextToStdout(t *testing.T) {
 
 	log, buf := logcapture.NewJSON(zerolog.InfoLevel)
 
-	sender, _, _, err := newSender(log, notifyConfig.Notify{URLs: []string{"logger://", newGenericWebhookURL(t)}, LogStdout: true})
+	sender, _, err := newSender(log, notifyConfig.Notify{URLs: []string{"logger://", newGenericWebhookURL(t)}, LogStdout: true})
 	require.NoError(t, err)
 
 	for _, err := range sender.Send("Found new image", &shoutrrrTypes.Params{}) {
@@ -1002,6 +958,63 @@ func buildExpectedURL(
 		host, port, auth,
 		url.QueryEscape(from),
 		url.QueryEscape(destAddress))
+}
+
+// TestGetDelay verifies which delay the notifier waits before each send. The
+// legacy email delay applies only when the email notification type is
+// configured. It then wins over the notifications delay.
+func TestGetDelay(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name string
+		cfg  notifyConfig.Notify
+		want time.Duration
+	}{
+		{name: "no delay is defined", cfg: notifyConfig.Notify{}, want: 0},
+		{name: "notifications delay", cfg: notifyConfig.Notify{DelaySeconds: 5}, want: 5 * time.Second},
+		{name: "negative notifications delay", cfg: notifyConfig.Notify{DelaySeconds: -5}, want: 0},
+		{
+			name: "legacy email delay",
+			cfg:  notifyConfig.Notify{LegacyTypes: []string{"email"}, Legacy: notifyConfig.Legacy{EmailDelay: 5}},
+			want: 5 * time.Second,
+		},
+		{
+			name: "legacy email delay wins over the notifications delay",
+			cfg: notifyConfig.Notify{
+				DelaySeconds: 5,
+				LegacyTypes:  []string{"email"},
+				Legacy:       notifyConfig.Legacy{EmailDelay: 7},
+			},
+			want: 7 * time.Second,
+		},
+		{
+			name: "negative legacy email delay falls back to the notifications delay",
+			cfg: notifyConfig.Notify{
+				DelaySeconds: 5,
+				LegacyTypes:  []string{"email"},
+				Legacy:       notifyConfig.Legacy{EmailDelay: -7},
+			},
+			want: 5 * time.Second,
+		},
+		{
+			name: "legacy email delay without the email type",
+			cfg: notifyConfig.Notify{
+				DelaySeconds: 5,
+				LegacyTypes:  []string{"slack"},
+				Legacy:       notifyConfig.Legacy{EmailDelay: 7},
+			},
+			want: 5 * time.Second,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			assert.Equal(t, tt.want, getDelay(tt.cfg))
+		})
+	}
 }
 
 // TODO: Remove testURL helper when legacy notification tests are removed.

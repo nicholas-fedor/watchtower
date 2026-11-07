@@ -48,11 +48,10 @@ var (
 //nolint:godox
 type emailTypeNotifier struct {
 	log                    *zerolog.Logger
-	From, To               string        // Sender and recipient email addresses.
-	Server, User, Password string        // SMTP server details.
-	Port                   int           // SMTP server port.
-	delay                  time.Duration // Delay for batching notifications.
-	tlsSkipVerify          bool          // Skip TLS verification if true.
+	From, To               string // Sender and recipient email addresses.
+	Server, User, Password string // SMTP server details.
+	Port                   int    // SMTP server port.
+	tlsSkipVerify          bool   // Skip TLS verification if true.
 }
 
 // New creates an email notifier from resolved legacy settings.
@@ -92,7 +91,6 @@ func New(log *zerolog.Logger, cfg notifyConfig.Legacy) (types.ConvertibleNotifie
 	password := cfg.EmailPassword
 	port := cfg.EmailPort
 	tlsSkipVerify := cfg.EmailTLSSkipVerify
-	delay := cfg.EmailDelay
 
 	clog := log.With().
 		Str("from", from).
@@ -100,7 +98,6 @@ func New(log *zerolog.Logger, cfg notifyConfig.Legacy) (types.ConvertibleNotifie
 		Str("server", server).
 		Int("port", port).
 		Bool("tls_skip", tlsSkipVerify).
-		Int("delay_seconds", delay).
 		Logger()
 	clog.Debug().Msg("Initializing email notifier from flags")
 
@@ -120,7 +117,6 @@ func New(log *zerolog.Logger, cfg notifyConfig.Legacy) (types.ConvertibleNotifie
 		Password:      password,
 		Port:          port,
 		tlsSkipVerify: tlsSkipVerify,
-		delay:         time.Duration(delay) * time.Second,
 		log:           log,
 	}, nil
 }
@@ -190,22 +186,4 @@ func (e *emailTypeNotifier) GetURL() (string, error) {
 	}
 
 	return url, nil
-}
-
-// GetDelay returns the delay for batching email notifications.
-//
-// Returns:
-//   - time.Duration: Configured delay.
-//
-// Deprecated: This method is part of the legacy email notifier and will be removed
-// for the v2 release. Use --notifications-delay instead.
-func (e *emailTypeNotifier) GetDelay() time.Duration {
-	e.log.Debug().
-		Str("from", e.From).
-		Str("to", e.To).
-		Str("server", e.Server).
-		Dur("delay", e.delay).
-		Msg("Retrieved email notification delay")
-
-	return e.delay
 }
