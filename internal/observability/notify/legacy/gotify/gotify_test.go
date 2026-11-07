@@ -12,9 +12,9 @@ import (
 	"github.com/nicholas-fedor/watchtower/internal/testutil/logcapture"
 )
 
-// TestGotifyTypeNotifier_GetURL_TLSSkipVerify verifies that skipping TLS
-// verification reaches the generated Gotify URL.
-func TestGotifyTypeNotifier_GetURL_TLSSkipVerify(t *testing.T) {
+// TestURL_TLSSkipVerify verifies that skipping TLS verification reaches the
+// generated Gotify URL.
+func TestURL_TLSSkipVerify(t *testing.T) {
 	t.Parallel()
 
 	tests := []struct {
@@ -32,14 +32,11 @@ func TestGotifyTypeNotifier_GetURL_TLSSkipVerify(t *testing.T) {
 			t.Parallel()
 
 			log := zerolog.Nop()
-			notifier := &gotifyTypeNotifier{
-				gotifyURL:           "https://gotify.example.com",
-				gotifyAppToken:      "Aaaaaaaaaaaaaaa",
-				gotifySkipTLSVerify: tt.skipVerify,
-				log:                 &log,
-			}
-
-			raw, err := notifier.GetURL()
+			raw, err := URL(&log, notifyConfig.Legacy{
+				GotifyURL:           "https://gotify.example.com",
+				GotifyToken:         "Aaaaaaaaaaaaaaa",
+				GotifyTLSSkipVerify: tt.skipVerify,
+			})
 			require.NoError(t, err)
 
 			parsed, err := url.Parse(raw)
@@ -51,18 +48,18 @@ func TestGotifyTypeNotifier_GetURL_TLSSkipVerify(t *testing.T) {
 	}
 }
 
-// TestNew verifies that New builds a notifier from a valid server URL and
-// token. It rejects an empty or non-HTTP server URL. It also rejects an empty
-// token before it checks the URL. A rejected HTTP URL then logs no
+// TestURL_RequiredSettings verifies that URL converts a valid server URL and
+// token. It rejects an empty, non-HTTP or unparsable server URL. It also
+// rejects an empty token before it checks the URL. A rejected HTTP URL logs no
 // insecure-HTTP warning.
-func TestNew(t *testing.T) {
+func TestURL_RequiredSettings(t *testing.T) {
 	t.Parallel()
 
 	tests := []struct {
 		name    string
 		cfg     notifyConfig.Legacy
 		wantErr error
-		// wantInsecureWarning is whether New warns that the URL uses plain HTTP.
+		// wantInsecureWarning is whether URL warns that the server URL uses plain HTTP.
 		wantInsecureWarning bool
 	}{
 		{
@@ -83,6 +80,11 @@ func TestNew(t *testing.T) {
 			name:    "URL without a scheme",
 			cfg:     notifyConfig.Legacy{GotifyURL: "gotify.example.com", GotifyToken: "Aaaaaaaaaaaaaaa"},
 			wantErr: errURLScheme,
+		},
+		{
+			name:    "HTTP URL that does not parse",
+			cfg:     notifyConfig.Legacy{GotifyURL: "http://gotify.example.com:port", GotifyToken: "Aaaaaaaaaaaaaaa"},
+			wantErr: errInvalidURL,
 		},
 		{
 			name:    "no token",
@@ -106,7 +108,7 @@ func TestNew(t *testing.T) {
 			t.Parallel()
 
 			log, buf := logcapture.NewJSON(zerolog.WarnLevel)
-			notifier, err := New(log, tt.cfg)
+			raw, err := URL(log, tt.cfg)
 
 			warnings := logcapture.Messages(t, buf.String(), "warn")
 			if tt.wantInsecureWarning {
@@ -117,34 +119,50 @@ func TestNew(t *testing.T) {
 
 			if tt.wantErr != nil {
 				require.ErrorIs(t, err, tt.wantErr)
-				assert.Nil(t, notifier)
+				assert.Empty(t, raw)
 
 				return
 			}
 
 			require.NoError(t, err)
-			assert.NotNil(t, notifier)
+			assert.NotEmpty(t, raw)
 		})
 	}
 }
 
-// TestGetURL_MalformedServerURLIsNotQuoted verifies that GetURL rejects a
-// server URL that does not parse without quoting it. The URL can carry
-// credentials. Neither the error nor the debug log may contain it.
-func TestGetURL_MalformedServerURLIsNotQuoted(t *testing.T) {
+// TestURL_MalformedServerURLIsNotQuoted verifies that URL rejects a server URL
+// that does not parse without quoting it. The URL can carry credentials.
+// Neither the error nor the debug log may contain it.
+func TestURL_MalformedServerURLIsNotQuoted(t *testing.T) {
 	t.Parallel()
 
 	log, buf := logcapture.NewJSON(zerolog.DebugLevel)
 
-	notifier, err := New(log, notifyConfig.Legacy{
+	shoutrrrURL, err := URL(log, notifyConfig.Legacy{
 		GotifyURL:   "https://gotify.example.com:secrettoken",
 		GotifyToken: "Aaaaaaaaaaaaaaa",
 	})
-	require.NoError(t, err)
-
-	shoutrrrURL, err := notifier.GetURL()
 	require.ErrorIs(t, err, errInvalidURL)
 	assert.NotContains(t, err.Error(), "secrettoken")
 	assert.Empty(t, shoutrrrURL)
 	assert.NotContains(t, buf.String(), "secrettoken")
+}
+
+// TestURL_TraceLogLeavesOutToken verifies that the trace-level log reports the
+// token's length without the token or the generated URL, which holds it.
+func TestURL_TraceLogLeavesOutToken(t *testing.T) {
+	t.Parallel()
+
+	log, buf := logcapture.NewJSON(zerolog.TraceLevel)
+
+	_, err := URL(log, notifyConfig.Legacy{
+		GotifyURL:   "https://gotify.example.com",
+		GotifyToken: "Asecrettoken123",
+	})
+	require.NoError(t, err)
+
+	out := buf.String()
+	assert.Contains(t, out, `"token_length":15`)
+	assert.Contains(t, logcapture.Messages(t, out, "trace"), "Generated Gotify service URL")
+	assert.NotContains(t, out, "Asecrettoken123")
 }

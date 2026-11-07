@@ -11,27 +11,24 @@ import (
 	"github.com/nicholas-fedor/watchtower/internal/testutil/logcapture"
 )
 
-// TestNew verifies that New rejects settings without a webhook URL and builds
-// a notifier when one is set.
-func TestNew(t *testing.T) {
+// TestURL_Validation verifies that URL converts an absolute https webhook URL.
+// It rejects settings without a webhook URL and any other form of URL.
+func TestURL_Validation(t *testing.T) {
 	t.Parallel()
 
 	tests := []struct {
 		name    string
-		cfg     notifyConfig.Legacy
+		hook    string
 		wantErr error
 	}{
 		{
-			name: "webhook URL",
-			cfg: notifyConfig.Legacy{
-				MSTeamsHook: "https://prod-00.westus.logic.azure.com:443/workflows/abc123/triggers/manual/paths/invoke",
-			},
+			name: "https URL",
+			hook: "https://prod-00.westus.logic.azure.com:443/workflows/abc123/triggers/manual/paths/invoke",
 		},
-		{
-			name:    "no webhook URL",
-			cfg:     notifyConfig.Legacy{},
-			wantErr: errEmptyWebhookURL,
-		},
+		{name: "no webhook URL", hook: "", wantErr: errEmptyWebhookURL},
+		{name: "http URL", hook: "http://example.webhook.office.com/webhookb2/abc", wantErr: errParseWebhookFailed},
+		{name: "relative URL", hook: "/webhookb2/abc", wantErr: errParseWebhookFailed},
+		{name: "https URL without a host", hook: "https:///webhookb2/abc", wantErr: errParseWebhookFailed},
 	}
 
 	for _, tt := range tests {
@@ -39,37 +36,52 @@ func TestNew(t *testing.T) {
 			t.Parallel()
 
 			log := zerolog.Nop()
-			notifier, err := New(&log, tt.cfg)
+			raw, err := URL(&log, notifyConfig.Legacy{MSTeamsHook: tt.hook})
 
 			if tt.wantErr != nil {
 				require.ErrorIs(t, err, tt.wantErr)
-				assert.Nil(t, notifier)
+				assert.Empty(t, raw)
 
 				return
 			}
 
 			require.NoError(t, err)
-			assert.NotNil(t, notifier)
+			assert.NotEmpty(t, raw)
 		})
 	}
 }
 
-// TestGetURL_MalformedWebhookURLIsNotQuoted verifies that GetURL rejects a
-// webhook URL that does not parse without quoting it. The URL carries the
-// webhook's credentials. Neither the error nor the debug log may contain it.
-func TestGetURL_MalformedWebhookURLIsNotQuoted(t *testing.T) {
+// TestURL_MalformedWebhookURLIsNotQuoted verifies that URL rejects a webhook
+// URL that does not parse without quoting it. The URL carries the webhook's
+// credentials. Neither the error nor the debug log may contain it.
+func TestURL_MalformedWebhookURLIsNotQuoted(t *testing.T) {
 	t.Parallel()
 
 	log, buf := logcapture.NewJSON(zerolog.DebugLevel)
 
-	notifier, err := New(log, notifyConfig.Legacy{
+	shoutrrrURL, err := URL(log, notifyConfig.Legacy{
 		MSTeamsHook: "https://example.webhook.office.com/webhookb2/secrettoken%zz",
 	})
-	require.NoError(t, err)
-
-	shoutrrrURL, err := notifier.GetURL()
 	require.ErrorIs(t, err, errParseWebhookFailed)
 	assert.NotContains(t, err.Error(), "secrettoken")
 	assert.Empty(t, shoutrrrURL)
 	assert.NotContains(t, buf.String(), "secrettoken")
+}
+
+// TestURL_TraceLogLeavesOutWebhook verifies that the trace-level log leaves out
+// the webhook URL and the generated URL, which both carry the webhook's
+// credentials.
+func TestURL_TraceLogLeavesOutWebhook(t *testing.T) {
+	t.Parallel()
+
+	log, buf := logcapture.NewJSON(zerolog.TraceLevel)
+
+	_, err := URL(log, notifyConfig.Legacy{
+		MSTeamsHook: "https://example.webhook.office.com/webhookb2/secrettoken",
+	})
+	require.NoError(t, err)
+
+	out := buf.String()
+	assert.Contains(t, logcapture.Messages(t, out, "trace"), "Generated Microsoft Teams service URL")
+	assert.NotContains(t, out, "secrettoken")
 }

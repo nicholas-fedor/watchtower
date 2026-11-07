@@ -11,7 +11,6 @@ import (
 
 	"github.com/nicholas-fedor/watchtower/internal/container/redact"
 	notifyConfig "github.com/nicholas-fedor/watchtower/internal/settings/config/notify"
-	"github.com/nicholas-fedor/watchtower/pkg/types"
 )
 
 // Type is the identifier for Gotify notifications.
@@ -36,94 +35,91 @@ var (
 	errEmptyToken = errors.New("the notification-gotify-token configuration option is empty")
 )
 
-// gotifyTypeNotifier handles Gotify notifications.
-//
-// It configures URL, token, and TLS settings.
-//
-// Deprecated: Legacy gotify notifier is deprecated.
-// Use --notification-url with a gotify:// URL instead.
-//
-// TODO: Remove gotifyTypeNotifier for the v2 release.
-//
-//nolint:godox
-type gotifyTypeNotifier struct {
-	log                 *zerolog.Logger
-	gotifyURL           string // Gotify server URL.
-	gotifyAppToken      string // Gotify application token.
-	gotifySkipTLSVerify bool   // Skip TLS verification if true.
-}
-
-// New creates a Gotify notifier from resolved legacy settings.
+// URL converts the legacy Gotify settings to a Shoutrrr Gotify URL.
 //
 // Parameters:
 //   - log: Logger for configuration diagnostics.
 //   - cfg: Deprecated Gotify server settings (from process config or flags).
 //
 // Returns:
-//   - types.ConvertibleNotifier: New Gotify notifier instance.
-//   - error: Non-nil when the server URL is empty or not an HTTP or HTTPS URL.
-//     Also non-nil when the token is empty.
+//   - string: Gotify service URL.
+//   - error: Non-nil when the token or the server URL is empty. Also non-nil
+//     when the server URL is not an HTTP or HTTPS URL or does not parse.
 //
 // Deprecated: Legacy gotify notifier is deprecated.
 // Use --notification-url with a gotify:// URL instead.
 //
-// TODO: Remove New for the v2 release.
+// TODO: Remove URL for the v2 release.
 //
 //nolint:godox
-func New(log *zerolog.Logger, cfg notifyConfig.Legacy) (types.ConvertibleNotifier, error) {
-	apiURL := cfg.GotifyURL
-	token := cfg.GotifyToken
-	skipVerify := cfg.GotifyTLSSkipVerify
-
+func URL(log *zerolog.Logger, cfg notifyConfig.Legacy) (string, error) {
 	// Check the token first so a rejected configuration logs no URL warning.
-	if token == "" {
-		return nil, errEmptyToken
+	if cfg.GotifyToken == "" {
+		return "", errEmptyToken
 	}
 
-	err := validateGotifyURL(log, apiURL)
+	apiURL, err := parseGotifyURL(log, cfg.GotifyURL)
 	if err != nil {
-		return nil, err
+		return "", err
 	}
 
 	clog := log.With().
-		Str("url", redact.ServiceURL(apiURL)).
-		Bool("skip_verify", skipVerify).
+		Str("url", redact.ServiceURL(cfg.GotifyURL)).
+		Bool("skip_verify", cfg.GotifyTLSSkipVerify).
 		Logger()
-	clog.Debug().Msg("Initializing Gotify notifier")
+	clog.Debug().Msg("Generating Gotify service URL")
 
 	if clog.GetLevel() <= zerolog.TraceLevel {
 		clog.Trace().
-			Int("token_length", len(token)).
+			Int("token_length", len(cfg.GotifyToken)).
 			Msg("Gotify notifier token loaded")
 	}
 
-	return &gotifyTypeNotifier{
-		gotifyURL:           apiURL,
-		gotifyAppToken:      token,
-		gotifySkipTLSVerify: skipVerify,
-		log:                 log,
-	}, nil
+	config := &shoutrrrGotify.Config{
+		Host:          apiURL.Host,
+		Path:          apiURL.Path,
+		DisableTLS:    apiURL.Scheme == "http",
+		SkipTLSVerify: cfg.GotifyTLSSkipVerify,
+		Token:         cfg.GotifyToken,
+	}
+
+	urlStr := config.GetURL().String()
+
+	if clog.GetLevel() <= zerolog.TraceLevel {
+		clog.Trace().
+			Bool("disable_tls", config.DisableTLS).
+			Str("service_url", redact.ServiceURL(urlStr)).
+			Msg("Generated Gotify service URL")
+	} else {
+		clog.Debug().
+			Bool("disable_tls", config.DisableTLS).
+			Msg("Generated Gotify service URL")
+	}
+
+	return urlStr, nil
 }
 
-// validateGotifyURL checks a Gotify server URL. It warns when the URL uses
-// plain HTTP.
+// parseGotifyURL checks and parses a Gotify server URL. It warns when a URL
+// that parses uses plain HTTP.
 //
 // Parameters:
 //   - log: Logger for diagnostics.
 //   - gotifyURL: URL value from resolved configuration or flags.
 //
 // Returns:
-//   - error: Non-nil when the URL is empty or not an HTTP or HTTPS URL.
+//   - *url.URL: The parsed server URL.
+//   - error: Non-nil when the URL is empty or not an HTTP or HTTPS URL. Also
+//     non-nil when it does not parse.
 //
 // Deprecated: This function is part of the legacy gotify notifier and will be removed
 // for the v2 release. Use --notification-url with a gotify:// URL instead.
-func validateGotifyURL(log *zerolog.Logger, gotifyURL string) error {
+func parseGotifyURL(log *zerolog.Logger, gotifyURL string) (*url.URL, error) {
 	if gotifyURL == "" {
-		return errEmptyURL
+		return nil, errEmptyURL
 	}
 
 	if !strings.HasPrefix(gotifyURL, "http://") && !strings.HasPrefix(gotifyURL, "https://") {
-		return errURLScheme
+		return nil, errURLScheme
 	}
 
 	clog := log.With().
@@ -131,67 +127,23 @@ func validateGotifyURL(log *zerolog.Logger, gotifyURL string) error {
 		Str("url", redact.ServiceURL(gotifyURL)).
 		Logger()
 
-	// Warn if using insecure HTTP.
-	if strings.HasPrefix(gotifyURL, "http://") {
+	// A parse error quotes the URL, which can carry credentials. Neither the
+	// log nor the returned error includes it.
+	apiURL, err := url.Parse(gotifyURL)
+	if err != nil {
+		clog.Debug().Msg("Failed to parse Gotify URL")
+
+		return nil, errInvalidURL
+	}
+
+	// Warn only for a URL that is used, so a rejected URL logs no warning.
+	if apiURL.Scheme == "http" {
 		clog.Warn().Msg("Using an HTTP URL for Gotify is insecure")
 	}
 
 	clog.Debug().
-		Str("scheme", strings.Split(gotifyURL, ":")[0]).
+		Str("scheme", apiURL.Scheme).
 		Msg("Validated Gotify URL")
 
-	return nil
-}
-
-// GetURL generates the Gotify service URL from the notifier's configuration.
-//
-// Returns:
-//   - string: Gotify service URL.
-//   - error: Non-nil if URL parsing fails, nil on success.
-//
-// Deprecated: This method is part of the legacy gotify notifier and will be removed
-// for the v2 release. Use --notification-url with a gotify:// URL instead.
-func (n *gotifyTypeNotifier) GetURL() (string, error) {
-	clog := n.log
-	clog.Debug().Msg("Generating Gotify service URL")
-
-	if clog.GetLevel() <= zerolog.TraceLevel {
-		clog.Trace().
-			Str("url", redact.ServiceURL(n.gotifyURL)).
-			Msg("Gotify API URL loaded")
-	}
-
-	// Parse the API URL.
-	// A parse error quotes the URL, which can carry credentials. Neither the
-	// log nor the returned error includes it.
-	apiURL, err := url.Parse(n.gotifyURL)
-	if err != nil {
-		clog.Debug().Msg("Failed to parse Gotify URL")
-
-		return "", errInvalidURL
-	}
-
-	// Configure Gotify settings.
-	config := &shoutrrrGotify.Config{
-		Host:          apiURL.Host,
-		Path:          apiURL.Path,
-		DisableTLS:    apiURL.Scheme == "http",
-		SkipTLSVerify: n.gotifySkipTLSVerify,
-		Token:         n.gotifyAppToken,
-	}
-
-	urlStr := config.GetURL().String()
-
-	clog.Debug().
-		Bool("disable_tls", apiURL.Scheme == "http").
-		Bool("skip_tls_verify", n.gotifySkipTLSVerify).
-		Msg("Generated Gotify service URL")
-
-	if clog.GetLevel() <= zerolog.TraceLevel {
-		clog.Trace().
-			Str("service_url", redact.ServiceURL(urlStr)).
-			Msg("Generated Gotify service URL")
-	}
-
-	return urlStr, nil
+	return apiURL, nil
 }

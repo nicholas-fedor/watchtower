@@ -11,7 +11,6 @@ import (
 	"github.com/nicholas-fedor/watchtower/internal/container/redact"
 	"github.com/nicholas-fedor/watchtower/internal/observability/notify/legacy"
 	notifyConfig "github.com/nicholas-fedor/watchtower/internal/settings/config/notify"
-	"github.com/nicholas-fedor/watchtower/pkg/types"
 )
 
 // Type is the identifier for Microsoft Teams notifications.
@@ -32,68 +31,44 @@ var (
 	errEmptyWebhookURL = errors.New("the notification-msteams-hook configuration option is empty")
 )
 
-// msTeamsTypeNotifier handles Microsoft Teams notifications via webhook.
-//
-// Deprecated: Legacy msteams notifier is deprecated.
-// Use --notification-url with a teams:// URL instead.
-//
-// TODO: Remove msTeamsTypeNotifier for the v2 release.
-//
-//nolint:godox
-type msTeamsTypeNotifier struct {
-	log        *zerolog.Logger
-	webHookURL string
-}
-
-// New creates a Teams notifier from resolved legacy settings.
+// URL converts the legacy Microsoft Teams webhook setting to a Shoutrrr Teams
+// URL.
 //
 // Parameters:
 //   - log: Logger for configuration diagnostics.
 //   - cfg: Deprecated MSTeams webhook settings (from process config or flags).
 //
 // Returns:
-//   - types.ConvertibleNotifier: New Teams notifier instance.
-//   - error: Non-nil when the webhook URL is empty.
+//   - string: Teams service URL.
+//   - error: Non-nil when the webhook URL is empty. Also non-nil when it does
+//     not parse or is not an absolute https URL.
 //
 // Deprecated: Legacy msteams notifier is deprecated.
 // Use --notification-url with a teams:// URL instead.
 //
-// TODO: Remove New for the v2 release.
+// TODO: Remove URL for the v2 release.
 //
 //nolint:godox
-func New(log *zerolog.Logger, cfg notifyConfig.Legacy) (types.ConvertibleNotifier, error) {
+func URL(log *zerolog.Logger, cfg notifyConfig.Legacy) (string, error) {
 	webHookURL := cfg.MSTeamsHook
 	if webHookURL == "" {
-		return nil, errEmptyWebhookURL
+		return "", errEmptyWebhookURL
 	}
 
-	return &msTeamsTypeNotifier{webHookURL: webHookURL, log: log}, nil
-}
+	log.Debug().Msg("Generating Microsoft Teams service URL")
 
-// GetURL generates the Teams service URL from the notifier's webhook.
-//
-// Returns:
-//   - string: Teams service URL.
-//   - error: Non-nil if parsing fails, nil on success.
-//
-// Deprecated: This method is part of the legacy msteams notifier and will be removed
-// for the v2 release. Use --notification-url with a teams:// URL instead.
-func (n *msTeamsTypeNotifier) GetURL() (string, error) {
-	clog := n.log
-	clog.Debug().Msg("Generating Microsoft Teams service URL")
-
-	if clog.GetLevel() <= zerolog.TraceLevel {
-		clog.Trace().
-			Str("url", redact.ServiceURL(n.webHookURL)).
+	if log.GetLevel() <= zerolog.TraceLevel {
+		log.Trace().
+			Str("url", redact.ServiceURL(webHookURL)).
 			Msg("Microsoft Teams webhook URL loaded")
 	}
 
 	// Validate the webhook URL is parseable and absolute.
 	// A parse error quotes the URL, which carries the webhook's credentials.
 	// Neither the log nor the returned error includes it.
-	parsed, err := url.Parse(n.webHookURL)
+	parsed, err := url.Parse(webHookURL)
 	if err != nil {
-		clog.Debug().Msg("Failed to parse Microsoft Teams webhook URL")
+		log.Debug().Msg("Failed to parse Microsoft Teams webhook URL")
 
 		return "", errParseWebhookFailed
 	}
@@ -104,17 +79,17 @@ func (n *msTeamsTypeNotifier) GetURL() (string, error) {
 
 	// Create Teams config with the full webhook URL as the host.
 	config := &teams.Config{
-		Host:  n.webHookURL,
+		Host:  webHookURL,
 		Color: legacy.ColorHex,
 	}
 
 	urlStr := config.GetURL().String()
-	if clog.GetLevel() <= zerolog.TraceLevel {
-		clog.Trace().
+	if log.GetLevel() <= zerolog.TraceLevel {
+		log.Trace().
 			Str("service_url", redact.ServiceURL(urlStr)).
 			Msg("Generated Microsoft Teams service URL")
 	} else {
-		clog.Debug().Msg("Generated Microsoft Teams service URL")
+		log.Debug().Msg("Generated Microsoft Teams service URL")
 	}
 
 	return urlStr, nil

@@ -24,7 +24,6 @@ import (
 	"github.com/nicholas-fedor/watchtower/internal/observability/notify/legacy/msteams"
 	"github.com/nicholas-fedor/watchtower/internal/observability/notify/legacy/slack"
 	notifyConfig "github.com/nicholas-fedor/watchtower/internal/settings/config/notify"
-	"github.com/nicholas-fedor/watchtower/pkg/types"
 )
 
 // legacyURL is a Shoutrrr URL converted from a legacy notification type.
@@ -139,8 +138,7 @@ func NewNotifier(log *zerolog.Logger, cfg notifyConfig.Notify) (*Notifier, error
 // A URL it rejects fails the call.
 //
 // Parameters:
-//   - log: Logger for legacy notifier construction diagnostics and Shoutrrr's
-//     warnings about the URLs.
+//   - log: Logger for legacy conversion diagnostics and Shoutrrr's warnings about the URLs.
 //   - cfg: Notification settings from settings.Load (Config.Notify).
 //
 // Returns:
@@ -213,27 +211,26 @@ func templateData(log *zerolog.Logger, hostname, titleTag, emailSubjectTag strin
 	}
 }
 
-// legacyNotifierCtor builds a ConvertibleNotifier from resolved legacy settings.
-// It returns an error when a required setting is missing or invalid.
+// legacyURLFunc converts resolved legacy settings to a Shoutrrr URL.
 //
-//nolint:staticcheck // SA1019: legacy ConvertibleNotifier until v2.
-type legacyNotifierCtor func(log *zerolog.Logger, legacy notifyConfig.Legacy) (types.ConvertibleNotifier, error)
+// It returns an error when a required setting is missing or invalid.
+type legacyURLFunc func(log *zerolog.Logger, legacy notifyConfig.Legacy) (string, error)
 
-// legacyNotifierCtors maps legacy notification type names to constructors.
+// legacyURLFuncs maps legacy notification type names to their URL conversions.
 // The shoutrrr type has no entry. The conversion skips it before the lookup.
 //
 //nolint:staticcheck // SA1019: legacy notification types until v2.
-var legacyNotifierCtors = map[string]legacyNotifierCtor{
-	email.Type:   email.New,
-	slack.Type:   slack.New,
-	msteams.Type: msteams.New,
-	gotify.Type:  gotify.New,
+var legacyURLFuncs = map[string]legacyURLFunc{
+	email.Type:   email.URL,
+	slack.Type:   slack.URL,
+	msteams.Type: msteams.URL,
+	gotify.Type:  gotify.URL,
 }
 
 // convertLegacyNotifiers converts legacy notification types to Shoutrrr URLs,
-// one type at a time and in order. Each legacy notifier is built only when the
-// caller asks for the next URL. A caller that stops at a URL or an error builds
-// no later notifier.
+// one type at a time and in order. Each type is converted only when the caller
+// asks for the next URL. A caller that stops at a URL or an error converts no
+// later type.
 //
 // Parameters:
 //   - log: Logger for diagnostics.
@@ -244,8 +241,7 @@ var legacyNotifierCtors = map[string]legacyNotifierCtor{
 // Returns:
 //   - iter.Seq2[legacyURL, error]: Each converted URL with its type. An
 //     unknown type yields an error that names the type and ends the sequence.
-//     A missing or invalid required setting does the same. So does a notifier
-//     that cannot generate its URL.
+//     A required setting that is missing or cannot be converted does the same.
 //
 // Deprecated: Legacy notification types are deprecated.
 // Use --notification-url instead.
@@ -269,21 +265,14 @@ func convertLegacyNotifiers(
 				continue
 			}
 
-			ctor, ok := legacyNotifierCtors[notificationType]
+			toURL, ok := legacyURLFuncs[notificationType]
 			if !ok {
 				yield(legacyURL{}, fmt.Errorf("%w: %q", errUnknownNotificationType, notificationType))
 
 				return
 			}
 
-			legacyNotifier, err := ctor(log, legacy)
-			if err != nil {
-				yield(legacyURL{}, fmt.Errorf("create %q notification config: %w", notificationType, err))
-
-				return
-			}
-
-			shoutrrrURL, err := legacyNotifier.GetURL()
+			shoutrrrURL, err := toURL(log, legacy)
 			if err != nil {
 				yield(legacyURL{}, fmt.Errorf("create %q notification config: %w", notificationType, err))
 
@@ -304,7 +293,7 @@ func convertLegacyNotifiers(
 
 // newSender creates a Shoutrrr sender for the notification settings. It adds
 // the configured URLs, then converts each legacy notification type and adds
-// its URL before it builds the next one. Adding a URL makes Shoutrrr read it
+// its URL before it converts the next one. Adding a URL makes Shoutrrr read it
 // and log its warnings, such as one for a deprecated key. It opens no
 // connection. Services connect on their first send.
 //
@@ -313,8 +302,8 @@ func convertLegacyNotifiers(
 // when cfg.LogStdout is true. Otherwise it goes to log without a level.
 //
 // Parameters:
-//   - log: Logger for Shoutrrr's records and text. Legacy notifier
-//     construction logs its diagnostics here too.
+//   - log: Logger for Shoutrrr's records and text. The legacy conversion logs
+//     its diagnostics here too.
 //   - cfg: Notification settings from settings.Load (Config.Notify).
 //
 // Returns:
@@ -448,12 +437,13 @@ func getTitle(log *zerolog.Logger, hostname, tag string) string {
 //   - notificationTypes: List of notification type strings to check.
 func LogLegacyDeprecationWarnings(log *zerolog.Logger, notificationTypes []string) {
 	for _, notificationType := range notificationTypes {
-		switch notificationType {
-		case email.Type, slack.Type, msteams.Type, gotify.Type: //nolint:staticcheck // SA1019: legacy notification types until v2.
-			log.Warn().
-				Msgf("Using deprecated legacy %s notification configuration. "+
-					"Use the notification-url configuration option instead.",
-					notificationType)
+		if _, isLegacy := legacyURLFuncs[notificationType]; !isLegacy {
+			continue
 		}
+
+		log.Warn().
+			Msgf("Using deprecated legacy %s notification configuration. "+
+				"Use the notification-url configuration option instead.",
+				notificationType)
 	}
 }
