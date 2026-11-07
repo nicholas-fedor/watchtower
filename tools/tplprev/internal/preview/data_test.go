@@ -84,9 +84,14 @@ func TestAddFromStateCooldown(t *testing.T) {
 }
 
 // TestAddFromStateSkippedReason verifies that a skipped container without a
-// cooldown names the skip once, followed by one of the sample reasons.
+// cooldown names the skip once, followed by one of the sample reasons. Each
+// container gets a random reason. The test also checks every sample directly.
 func TestAddFromStateSkippedReason(t *testing.T) {
 	t.Parallel()
+
+	for _, reason := range skippedMessages {
+		assert.NotContains(t, reason, "container skipped")
+	}
 
 	generator := New()
 	generator.AddFromState(SkippedState) // The first skipped container waits out a cooldown.
