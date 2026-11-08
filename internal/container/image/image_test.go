@@ -1052,6 +1052,17 @@ func TestImageClient_IsContainerStale_cooldown(t *testing.T) {
 			assert.Contains(t, debug, tt.message)
 			assert.NotContains(t, debug, tt.absent)
 			assert.NotContains(t, debug, "Failed to pull image")
+
+			// The debug line carries the error the check returns.
+			var logged []any
+
+			for _, entry := range logcapture.Entries[logcapture.Entry](t, buf.String()) {
+				if entry["message"] == tt.message {
+					logged = append(logged, entry["error"])
+				}
+			}
+
+			assert.Equal(t, []any{err.Error()}, logged)
 		})
 	}
 }
