@@ -152,6 +152,20 @@ func WithRepoDigests(digests []string) Update {
 	}
 }
 
+// WithRepoTags sets the RepoTags of the mock image, replacing the tag that
+// WithImageName adds. An image tagged under several names lists every tag.
+//
+// Parameters:
+//   - tags: List of repo tags (e.g., ["repo:latest", "repo-dev:latest"]).
+//
+// Returns:
+//   - Update: Function to set RepoTags on image metadata.
+func WithRepoTags(tags []string) Update {
+	return func(_ *dockerContainer.InspectResponse, i *dockerImage.InspectResponse) {
+		i.RepoTags = tags
+	}
+}
+
 // WithLinks sets dependency links for the mock container.
 //
 // Parameters:

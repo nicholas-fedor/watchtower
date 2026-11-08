@@ -236,18 +236,19 @@ func sha256Hex(body string) string {
 //
 // Parameters:
 //   - imageID: ID of the container's image.
+//   - updates: Changes applied after the defaults, such as another image name.
 //
 // Returns:
 //   - types.Container: The container.
-func newLocalOnlyContainer(imageID string) types.Container {
-	return modelfixture.Container(
+func newLocalOnlyContainer(imageID string, updates ...containerfixture.Update) types.Container {
+	return modelfixture.Container(append([]containerfixture.Update{
 		containerfixture.WithName("atlas-badgerdb-1"),
 		containerfixture.WithImageName("atlas-badgerdb"),
 		containerfixture.WithImageID(imageID),
 		containerfixture.WithRepoDigests([]string{
 			"atlas-badgerdb@sha256:80f07677bee57274a48929d0688bf0cfabe5e83f06f2f152dab4076445d6ab35",
 		}),
-	)
+	}, updates...)...)
 }
 
 // clearLocalOnlyImageCache removes all cached local-only image entries, so
@@ -1285,7 +1286,11 @@ func TestLocalOnlyImageCache(t *testing.T) {
 		assert.True(t, match)
 	}
 
-	built := newLocalOnlyContainer(imageID)
+	// The image is tagged under both names, so every container of it lists
+	// both tags. Only the image name a container runs tells them apart.
+	bothTags := containerfixture.WithRepoTags([]string{"atlas-badgerdb:latest", "atlas-badgerdb-dev:latest"})
+
+	built := newLocalOnlyContainer(imageID, bothTags)
 
 	// The first comparison probes the registry and caches the image as local-only.
 	compare(built)
@@ -1293,25 +1298,13 @@ func TestLocalOnlyImageCache(t *testing.T) {
 	assert.Len(t, server.ReceivedRequests(), 2, "cached local-only image must not re-probe registry")
 
 	// Another container of the same image reuses the cached entry.
-	replica := modelfixture.Container(
-		containerfixture.WithName("atlas-badgerdb-2"),
-		containerfixture.WithImageName("atlas-badgerdb"),
-		containerfixture.WithImageID(imageID),
-		containerfixture.WithRepoDigests([]string{"atlas-badgerdb@" + imageID}),
-	)
-
-	compare(replica)
+	compare(newLocalOnlyContainer(imageID, containerfixture.WithName("atlas-badgerdb-2"), bothTags))
 	assert.Len(t, server.ReceivedRequests(), 2, "another container of a cached image re-probed the registry")
 
-	// The container now runs the image under another name, so the new name is
-	// probed. The container keeps its name, and the image keeps its ID and repo
-	// digests, so only the image name tells the two apart.
-	retagged := modelfixture.Container(
-		containerfixture.WithName("atlas-badgerdb-1"),
-		containerfixture.WithImageName("atlas-badgerdb-dev"),
-		containerfixture.WithImageID(imageID),
-		containerfixture.WithRepoDigests([]string{"atlas-badgerdb@" + imageID}),
-	)
+	// The container now runs the image under its other name, so that name is
+	// probed. The container keeps its name, and the image keeps its ID, repo
+	// digests and tags, so only the image name tells the two apart.
+	retagged := newLocalOnlyContainer(imageID, containerfixture.WithImageName("atlas-badgerdb-dev"), bothTags)
 
 	compare(retagged)
 	compare(retagged)
