@@ -3,31 +3,19 @@ package sorter
 import (
 	"fmt"
 	"math/rand"
+	"strings"
 	"testing"
 
-	mockSorter "github.com/nicholas-fedor/watchtower/internal/update/sorter/mocks"
 	"github.com/nicholas-fedor/watchtower/pkg/types"
 )
 
-// generateBenchmarkContainers creates containers with realistic dependency patterns.
+// generateBenchmarkContainers creates containers with realistic dependency
+// patterns. Each container names its dependencies in a Watchtower depends-on
+// label.
 func generateBenchmarkContainers(count int, dependencyFactor float64) []types.Container {
-	containers := make([]types.Container, count)
-
-	// Create containers
-	for i := range count {
-		name := fmt.Sprintf("container-%d", i)
-		container := &mockSorter.SimpleContainer{
-			ContainerName:  name,
-			ContainerID:    types.ContainerID(fmt.Sprintf("id-%d", i)),
-			ContainerLinks: []string{}, // Will be set below
-		}
-		containers[i] = container
-	}
-
-	// Add dependencies based on dependency factor
+	specs := make([]deployed, count)
 
 	for i := range count {
-		container := containers[i].(*mockSorter.SimpleContainer)
 		// Each container depends on up to 'dependencyFactor' percentage of previous containers
 		maxDeps := min(int(float64(i)*dependencyFactor),
 			// Cap at 5 dependencies per container for realism
@@ -38,60 +26,38 @@ func generateBenchmarkContainers(count int, dependencyFactor float64) []types.Co
 		for range maxDeps {
 			depIndex := rand.Intn(i + 1)
 			if depIndex != i { // Don't depend on self
-				depName := fmt.Sprintf("container-%d", depIndex)
-				links = append(links, depName)
+				links = append(links, fmt.Sprintf("container-%d", depIndex))
 			}
 		}
 
-		container.ContainerLinks = links
+		specs[i] = deployed{name: fmt.Sprintf("container-%d", i), dependsOn: strings.Join(links, ",")}
 	}
 
-	return containers
+	return deploy(specs...)
 }
 
 // generateChainDependencies creates a linear dependency chain.
 func generateChainDependencies(count int) []types.Container {
-	containers := make([]types.Container, count)
+	specs := make([]deployed, count)
 
 	for i := range count {
-		name := fmt.Sprintf("chain-%d", i)
-
-		var links []string
+		specs[i] = deployed{name: fmt.Sprintf("chain-%d", i)}
 		if i > 0 {
-			links = []string{fmt.Sprintf("chain-%d", i-1)}
+			specs[i].dependsOn = fmt.Sprintf("chain-%d", i-1)
 		}
-
-		container := &mockSorter.SimpleContainer{
-			ContainerName:  name,
-			ContainerID:    types.ContainerID(fmt.Sprintf("chain-id-%d", i)),
-			ContainerLinks: links,
-		}
-
-		containers[i] = container
 	}
 
-	return containers
+	return deploy(specs...)
 }
 
 // generateDiamondDependencies creates a diamond-shaped dependency graph.
 func generateDiamondDependencies(levels int) []types.Container {
-	var containers []types.Container
+	specs := []deployed{{name: "diamond-root"}}
 
-	// Create root
-	root := &mockSorter.SimpleContainer{
-		ContainerName:  "diamond-root",
-		ContainerID:    "diamond-id-root",
-		ContainerLinks: []string{},
-	}
-	containers = append(containers, root)
-
-	// Create levels
 	for level := 1; level <= levels; level++ {
 		nodesInLevel := level * 2 // Linear growth per level
 
 		for i := range nodesInLevel {
-			name := fmt.Sprintf("diamond-l%d-n%d", level, i)
-
 			var links []string
 
 			// Connect to all nodes in previous level
@@ -103,17 +69,14 @@ func generateDiamondDependencies(levels int) []types.Container {
 				}
 			}
 
-			container := &mockSorter.SimpleContainer{
-				ContainerName:  name,
-				ContainerID:    types.ContainerID(fmt.Sprintf("diamond-id-l%d-n%d", level, i)),
-				ContainerLinks: links,
-			}
-
-			containers = append(containers, container)
+			specs = append(specs, deployed{
+				name:      fmt.Sprintf("diamond-l%d-n%d", level, i),
+				dependsOn: strings.Join(links, ","),
+			})
 		}
 	}
 
-	return containers
+	return deploy(specs...)
 }
 
 // Benchmark Kahn's algorithm sorting performance.
@@ -225,18 +188,7 @@ func BenchmarkCycleDetection(b *testing.B) {
 		{
 			name: "Cycle_Simple",
 			containers: func() []types.Container {
-				c1 := &mockSorter.SimpleContainer{
-					ContainerName:  "c1",
-					ContainerID:    "id1",
-					ContainerLinks: []string{"c2"},
-				}
-				c2 := &mockSorter.SimpleContainer{
-					ContainerName:  "c2",
-					ContainerID:    "id2",
-					ContainerLinks: []string{"c1"},
-				}
-
-				return []types.Container{c1, c2}
+				return deploy(deployed{name: "c1", dependsOn: "c2"}, deployed{name: "c2", dependsOn: "c1"})
 			},
 			description: "Simple 2-node cycle",
 			hasCycle:    true,
@@ -244,28 +196,12 @@ func BenchmarkCycleDetection(b *testing.B) {
 		{
 			name: "Cycle_Complex",
 			containers: func() []types.Container {
-				c1 := &mockSorter.SimpleContainer{
-					ContainerName:  "c1",
-					ContainerID:    "id1",
-					ContainerLinks: []string{"c2"},
-				}
-				c2 := &mockSorter.SimpleContainer{
-					ContainerName:  "c2",
-					ContainerID:    "id2",
-					ContainerLinks: []string{"c3"},
-				}
-				c3 := &mockSorter.SimpleContainer{
-					ContainerName:  "c3",
-					ContainerID:    "id3",
-					ContainerLinks: []string{"c1"},
-				}
-				c4 := &mockSorter.SimpleContainer{
-					ContainerName:  "c4",
-					ContainerID:    "id4",
-					ContainerLinks: []string{},
-				}
-
-				return []types.Container{c1, c2, c3, c4}
+				return deploy(
+					deployed{name: "c1", dependsOn: "c2"},
+					deployed{name: "c2", dependsOn: "c3"},
+					deployed{name: "c3", dependsOn: "c1"},
+					deployed{name: "c4"},
+				)
 			},
 			description: "3-node cycle with additional node",
 			hasCycle:    true,

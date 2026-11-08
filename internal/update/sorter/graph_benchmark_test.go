@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"testing"
 
-	mockSorter "github.com/nicholas-fedor/watchtower/internal/update/sorter/mocks"
 	"github.com/nicholas-fedor/watchtower/pkg/types"
 )
 
@@ -32,17 +31,13 @@ func cycleBenchmarkCases() []cycleBenchmarkCase {
 // generateRingDependencies creates containers that each depend on the next,
 // with the last depending on the first, so every container is in one cycle.
 func generateRingDependencies(count int) []types.Container {
-	containers := make([]types.Container, count)
+	specs := make([]deployed, count)
 
 	for i := range count {
-		containers[i] = &mockSorter.SimpleContainer{
-			ContainerName:  fmt.Sprintf("ring-%d", i),
-			ContainerID:    types.ContainerID(fmt.Sprintf("ring-id-%d", i)),
-			ContainerLinks: []string{fmt.Sprintf("ring-%d", (i+1)%count)},
-		}
+		specs[i] = deployed{name: fmt.Sprintf("ring-%d", i), dependsOn: fmt.Sprintf("ring-%d", (i+1)%count)}
 	}
 
-	return containers
+	return deploy(specs...)
 }
 
 // BenchmarkNewDependencyGraph measures building a dependency graph, which
