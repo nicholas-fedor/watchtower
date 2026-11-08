@@ -59,6 +59,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Tests
 
+- Build handler tests from model containers by @nicholas-fedor in [#3567](https://github.com/nicholas-fedor/watchtower/pull/3567)
+- Check the scheduler settings runMain passes on by @nicholas-fedor in [#3566](https://github.com/nicholas-fedor/watchtower/pull/3566)
 - Remove the update handler tests from cmd by @nicholas-fedor in [#3564](https://github.com/nicholas-fedor/watchtower/pull/3564)
 - Test the scheduler only in its own package by @nicholas-fedor in [#3562](https://github.com/nicholas-fedor/watchtower/pull/3562)
 - Fix the lock race in the scheduler shutdown test by @nicholas-fedor in [#3560](https://github.com/nicholas-fedor/watchtower/pull/3560)
