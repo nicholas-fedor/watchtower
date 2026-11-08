@@ -208,6 +208,16 @@ func (c Client) IsContainerStale(
 			return false, sourceContainer.ImageID(), "", err
 		}
 
+		// A cooldown that could not read the image's age also holds the pull
+		// back. No pull was attempted.
+		if _, isCooldown := errors.AsType[*CooldownError](err); isCooldown {
+			clog.Debug().
+				Err(err).
+				Msg("Image age unavailable - pull skipped")
+
+			return false, sourceContainer.ImageID(), "", err
+		}
+
 		if errors.Is(err, errPullImageNotFound) {
 			clog.Debug().
 				Err(err).
