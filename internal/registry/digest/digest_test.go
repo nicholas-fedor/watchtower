@@ -944,6 +944,71 @@ func TestFetchDigestWithGet_RedirectPastClientLimit(t *testing.T) {
 	}
 }
 
+// TestFetchDigestWithGet_MirrorFailure verifies that a manifest request a
+// mirror fails moves on to the next endpoint, so the registry gets its own
+// challenge and never the mirror's token. This holds when the mirror's
+// challenge redirects to another host too.
+func TestFetchDigestWithGet_MirrorFailure(t *testing.T) {
+	t.Parallel()
+
+	const manifestPath = "/v2/test/image/manifests/latest"
+
+	tests := []struct {
+		name string
+		// redirectChallenge sends the mirror's challenge to another host, which
+		// issues the token and answers the manifest request.
+		redirectChallenge bool
+	}{
+		{name: "mirror that challenges itself"},
+		{name: "mirror whose challenge redirects to another host", redirectChallenge: true},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			mirror := httpstub.New(t)
+			mirrorAuth := mirror
+
+			if tt.redirectChallenge {
+				mirrorAuth = httpstub.New(t)
+				mirror.AppendHandlers(httpstub.CombineHandlers(
+					httpstub.VerifyRequest(t, http.MethodGet, httpstub.Path("/v2/")),
+					httpstub.RespondWith(http.StatusFound, "", http.Header{
+						"Location": {fmt.Sprintf("http://%s/v2/", mirrorAuth.Addr())},
+					}),
+				))
+			}
+
+			mirrorAuth.AppendHandlers(append(
+				bearerChallengeHandlers(t, mirrorAuth.Addr(), "repository:test/image:pull"),
+				manifestHandler(t, http.MethodGet, manifestPath, http.StatusNotFound, nil),
+			)...)
+
+			registry := httpstub.New(t)
+			registry.AppendHandlers(
+				anonymousRegistryHandler(t),
+				httpstub.CombineHandlers(
+					httpstub.VerifyRequest(t, http.MethodGet, httpstub.Path(manifestPath)),
+					func(_ http.ResponseWriter, r *http.Request) {
+						assert.Empty(t, r.Header.Get("Authorization"), "the mirror's token reached the registry")
+					},
+					httpstub.RespondWith(http.StatusOK, "", digestHeader(testDigestHash)),
+				),
+			)
+
+			container := newRegistryContainer(registry.Addr()+"/test/image:latest", testRepoDigest)
+
+			got, err := fetchDigestWithGet(newTestLogger(t), t.Context(),
+				container, "", registryConfig.Registry{TLSSkip: true}, ratelimit.New(), mirror.Addr(), "")
+			require.NoError(t, err)
+			assert.Equal(t, NormalizeDigest(newTestLogger(t), testDigestHash), got)
+			assert.Len(t, registry.ReceivedRequests(), 2,
+				"the registry was not asked once through its own challenge")
+		})
+	}
+}
+
 // TestCompareDigest_RedirectedLSCRImage verifies that an lscr.io image whose
 // registry redirects the /v2/ challenge to another host still compares its
 // digest with a HEAD request.
@@ -1124,7 +1189,7 @@ func TestCompareDigestWithRemote_UnauthorizedOnBothHostsIsError(t *testing.T) {
 
 	match, remoteDigest, err := CompareDigestWithRemote(newTestLogger(t), context.Background(),
 		container, "", registryConfig.Registry{TLSSkip: true}, ratelimit.New())
-	require.ErrorIs(t, err, errUnresolvedManifestRetry)
+	require.ErrorIs(t, err, errInvalidRegistryResponse)
 	assert.False(t, match)
 	assert.Empty(t, remoteDigest)
 }
@@ -1918,17 +1983,38 @@ func TestHandleManifestResponse(t *testing.T) {
 					Status:     "401 Unauthorized",
 					Header:     http.Header{"Www-Authenticate": []string{"Bearer"}},
 					Body:       http.NoBody,
+					Request:    &http.Request{URL: mustParseURL("https://redirect.example.com/v2/manifests/latest")},
+				}
+			},
+			originalHost:  "registry.example.com",
+			challengeHost: "",
+			redirected:    true,
+			parsedURL:     mustParseURL("https://registry.example.com/v2/manifests/latest"),
+			currentHost:   "redirect.example.com",
+			expectedURL:   "https://registry.example.com/v2/manifests/latest",
+			expectedRetry: true,
+			wantErr:       false,
+		},
+		{
+			// The mirror's token belongs to the mirror, and the endpoint list
+			// tries the registry next.
+			name:   "401 on a mirror endpoint returns error without retrying the original host",
+			method: http.MethodGet,
+			setupResponse: func() *http.Response {
+				return &http.Response{
+					StatusCode: http.StatusUnauthorized,
+					Status:     "401 Unauthorized",
+					Header:     http.Header{"Www-Authenticate": []string{"Bearer"}},
+					Body:       http.NoBody,
 					Request:    &http.Request{URL: mustParseURL("https://mirror.example.com/v2/manifests/latest")},
 				}
 			},
 			originalHost:  "registry.example.com",
 			challengeHost: "",
 			redirected:    false,
-			parsedURL:     mustParseURL("https://registry.example.com/v2/manifests/latest"),
+			parsedURL:     mustParseURL("https://mirror.example.com/v2/manifests/latest"),
 			currentHost:   "mirror.example.com",
-			expectedURL:   "https://registry.example.com/v2/manifests/latest",
-			expectedRetry: true,
-			wantErr:       false,
+			wantErr:       true,
 		},
 		{
 			name:   "HEAD 429 returns rate-limit error without GET fallback",
@@ -2653,6 +2739,9 @@ func TestRetryManifestRequest(t *testing.T) {
 		challengeHost string
 		// currentURL is the URL the retry runs on. Empty means the original host.
 		currentURL string
+		// redirected reports that the retry runs on the host the registry's
+		// challenge redirected to.
+		redirected bool
 	}{
 		{
 			name:       "returns digest from successful retry response",
@@ -2738,10 +2827,11 @@ func TestRetryManifestRequest(t *testing.T) {
 			rateLimited: true,
 		},
 		{
-			name:        "returns error when the GET retry on the token host asks for the original host",
+			name:        "returns error when the GET retry on the redirect host asks for the original host",
 			method:      http.MethodGet,
 			updatedURL:  "https://ghcr.io/v2/manifests/latest",
 			currentURL:  "https://ghcr.io/v2/manifests/latest",
+			redirected:  true,
 			setupClient: unauthorizedManifestClient,
 			wantErr:     true,
 			wantErrIs:   errUnresolvedManifestRetry,
@@ -2753,6 +2843,7 @@ func TestRetryManifestRequest(t *testing.T) {
 			method:      http.MethodGet,
 			updatedURL:  "https://ghcr.io/v2/manifests/latest?sig=secret",
 			currentURL:  "https://ghcr.io/v2/manifests/latest?sig=secret",
+			redirected:  true,
 			setupClient: unauthorizedManifestClient,
 			wantErr:     true,
 			wantErrIs:   errUnresolvedManifestRetry,
@@ -2805,7 +2896,7 @@ func TestRetryManifestRequest(t *testing.T) {
 				tt.token,
 				"registry.example.com",
 				challengeHost,
-				false,
+				tt.redirected,
 				mustParseURL(currentURL),
 				"",
 				client,
