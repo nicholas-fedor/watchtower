@@ -370,6 +370,41 @@ func TestRunUpgradesOnSchedule_WaitingRunStopsAtShutdown(t *testing.T) {
 	})
 }
 
+// TestRunUpgradesOnSchedule_ShutdownWaitsForRunningUpdate verifies that the
+// scheduler waits at shutdown for an update that holds the update lock and
+// returns once that update releases it.
+func TestRunUpgradesOnSchedule_ShutdownWaitsForRunningUpdate(t *testing.T) {
+	t.Parallel()
+
+	synctest.Test(t, func(t *testing.T) {
+		deps := testDeps(t, nil, func(logging.StartupParams) {})
+		deps.Lock = NewUpdateLock()
+
+		ctx, cancel := context.WithCancel(t.Context())
+		done := make(chan error, 1)
+
+		go func() { done <- RunUpgradesOnSchedule(ctx, deps) }()
+
+		// Another update takes the lock after the startup message, which holds
+		// the lock while it is written.
+		synctest.Wait()
+		require.True(t, deps.Lock.TryLock())
+
+		// Cancel, then let the scheduler reach its wait for the update.
+		cancel()
+		synctest.Wait()
+
+		select {
+		case err := <-done:
+			t.Fatalf("scheduler stopped while an update was still running: %v", err)
+		default:
+		}
+
+		deps.Lock.Unlock()
+		require.NoError(t, <-done)
+	})
+}
+
 func TestRunUpgradesOnSchedule_EmptySchedule(t *testing.T) {
 	ctx := t.Context()
 
