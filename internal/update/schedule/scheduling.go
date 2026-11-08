@@ -6,7 +6,7 @@ import (
 	"fmt"
 	"runtime/debug"
 	"strings"
-	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/robfig/cron/v3"
@@ -173,11 +173,6 @@ func writeStartupMessage(ctx context.Context, lock *UpdateLock, scheduler *cron.
 // Each tick copies BaseParams and applies only per-run fields such as SkipSelfUpdate.
 // A tick can disable self-updates, but never enables them when BaseParams disables them.
 type ScheduleDeps struct {
-	// ContainerSchedules, when set, lets containers follow their own schedule
-	// label (see package percontainer): it reports which containers carry
-	// which schedule. Those containers leave the global schedule. Nil keeps
-	// every container on the global schedule.
-	ContainerSchedules percontainer.Source
 	// Logger is the process logger for scheduled runs. Required and must be non-nil.
 	Logger *zerolog.Logger
 	// Filter determines which containers are updated.
@@ -208,6 +203,11 @@ type ScheduleDeps struct {
 	// Watchtower instance in this process's scope. The scheduler then makes no
 	// update at startup. Its first scheduled run also skips self-updates.
 	ReplacedOlderInstance bool
+	// ContainerSchedules, when set, lets containers follow their own schedule
+	// label (see package percontainer): it reports which containers carry
+	// which schedule. Those containers leave the global schedule. Nil keeps
+	// every container on the global schedule.
+	ContainerSchedules percontainer.Source
 }
 
 // updatesOnStart reports whether the scheduler makes an update at startup.
@@ -240,6 +240,7 @@ func (d ScheduleDeps) updatesOnStart() bool {
 //   - error: An error if scheduling fails (e.g., invalid cron spec), nil on successful shutdown.
 func RunUpgradesOnSchedule(ctx context.Context, deps ScheduleDeps) error {
 	log := deps.Logger
+	deps, containers := withContainerSchedules(deps)
 	// Initialize lock if not provided, ensuring single-update concurrency.
 	lock := deps.Lock
 	if lock == nil {
@@ -249,7 +250,11 @@ func RunUpgradesOnSchedule(ctx context.Context, deps ScheduleDeps) error {
 	// Create a new cron scheduler for managing periodic updates.
 	// Configured with optional seconds, skip overlapping runs, and panic recovery.
 	scheduler := cron.New(
-		cron.WithParser(cron.NewParser(percontainer.ParseOptions)),
+		cron.WithParser(
+			cron.NewParser(
+				cron.SecondOptional|cron.Minute|cron.Hour|cron.Dom|cron.Month|cron.Dow|cron.Descriptor,
+			),
+		),
 		cron.WithChain(
 			skipIfStillRunning(log),
 			recoverPanics(log),
@@ -259,10 +264,8 @@ func RunUpgradesOnSchedule(ctx context.Context, deps ScheduleDeps) error {
 	// Define the update function to be used both for scheduled runs and immediate execution.
 	// skipWatchtowerSelfUpdate: whether to skip updating the Watchtower container itself
 	// blocking: whether to wait for the lock (true for scheduled runs, false for immediate runs)
-	// narrow: which of the filtered containers this run covers (nil: all of them)
-	refresher, _ := deps.ContainerSchedules.(percontainer.Refresher)
-
-	updateFunc := func(skipWatchtowerSelfUpdate, blocking bool, narrow func(types.Filter) types.Filter) {
+	// only: the containers this run covers instead (a container schedule's)
+	updateFunc := func(skipWatchtowerSelfUpdate, blocking bool, only ...types.Filter) {
 		// Acquire the update lock: blocking waits until shutdown, non-blocking returns if unavailable
 		if blocking {
 			err := lock.Lock(ctx)
@@ -300,12 +303,8 @@ func RunUpgradesOnSchedule(ctx context.Context, deps ScheduleDeps) error {
 			updateFilter = params.Filter
 		}
 
-		if narrow != nil {
-			if updateFilter == nil {
-				updateFilter = func(types.FilterableContainer) bool { return true }
-			}
-
-			updateFilter = narrow(updateFilter)
+		if len(only) > 0 {
+			updateFilter = only[0]
 		}
 
 		params.Filter = updateFilter
@@ -318,13 +317,6 @@ func RunUpgradesOnSchedule(ctx context.Context, deps ScheduleDeps) error {
 
 		metrics.Default().RegisterScan(deps.RunUpdate(ctx, updateFilter, params))
 
-		// Container schedules: read the containers again, in case a change was
-		// missed (a connection that died without an error). No polling: it
-		// happens only after a run.
-		if refresher != nil {
-			refresher.Refresh()
-		}
-
 		log.Debug().Msg("Update operation completed")
 
 		nextRuns := scheduler.Entries()
@@ -333,25 +325,17 @@ func RunUpgradesOnSchedule(ctx context.Context, deps ScheduleDeps) error {
 		}
 	}
 
-	// With container schedules, the global schedule covers only the containers
-	// without a schedule of their own.
-	var global func(types.Filter) types.Filter
-	if deps.ContainerSchedules != nil {
-		global = percontainer.WithoutOwnSchedule
-	}
-
 	// A process that replaced an older instance does not update itself again
-	// during its first update cycle: the first scheduled
-	// run of each schedule (the global one, and each container schedule, since
-	// Watchtower may follow one of its own) skips it.
-	skipSelf := firstRuns{enabled: deps.ReplacedOlderInstance, log: log}
+	// during its first scheduled run.
+	var ranOnce atomic.Bool
 
 	scheduledUpdateFunc := func() {
-		if global != nil {
-			log.Debug().Msg("Running the global schedule: containers with their own schedule are left out")
+		skipWatchtowerSelfUpdate := deps.ReplacedOlderInstance && !ranOnce.Swap(true)
+		if skipWatchtowerSelfUpdate {
+			log.Debug().Msg("Skipping Watchtower self-update on first scheduled run due to cleanup")
 		}
 
-		updateFunc(skipSelf.first(""), true, global)
+		updateFunc(skipWatchtowerSelfUpdate, true)
 	}
 
 	// Add the update function to the cron schedule, handling concurrency and metrics.
@@ -385,35 +369,18 @@ func RunUpgradesOnSchedule(ctx context.Context, deps ScheduleDeps) error {
 			log.Debug().Msg("Update skipped: another update was running at startup")
 			metrics.Default().RegisterSkippedScan()
 		} else {
-			updateFunc(false, false, global)
+			updateFunc(false, false)
 		}
 	}
 
-	// Container schedules: one entry per schedule in use, kept current by the
-	// source. Started after the startup message, so it reports the global
-	// schedule's next run.
-	sourceDone := make(chan struct{})
-
-	if deps.ContainerSchedules != nil {
-		registry := percontainer.NewRegistry(log, cronTimers{scheduler: scheduler, log: log, run: func(spec string) {
-			updateFunc(skipSelf.first(spec), true, func(base types.Filter) types.Filter {
-				return percontainer.OnSchedule(spec, base)
-			})
-		}})
-
-		go func() {
-			defer close(sourceDone)
-
-			superviseSource(ctx, log, deps.ContainerSchedules, registry, time.Second, time.Minute)
-		}()
-	} else {
-		close(sourceDone)
-	}
+	// Containers' own schedules, added to the scheduler as containers bring them.
+	stopContainerSchedules := containers.start(ctx, scheduler, func(skipSelf bool, only types.Filter) {
+		updateFunc(skipSelf, true, only)
+	})
 
 	// Start the scheduler to begin periodic execution if scheduling is enabled.
-	// Only start if a schedule spec was provided (empty string means no
-	// scheduling), or containers may bring schedules of their own.
-	if scheduleSpec != "" || deps.ContainerSchedules != nil {
+	// Only start if a schedule spec was provided (empty string means no scheduling).
+	if scheduleSpec != "" || containers != nil {
 		scheduler.Start()
 	}
 
@@ -421,9 +388,8 @@ func RunUpgradesOnSchedule(ctx context.Context, deps ScheduleDeps) error {
 	<-ctx.Done()
 	log.Debug().Msg("Context canceled, stopping scheduler...")
 
-	// Stop the source first, so it adds no entries to a stopped scheduler, then
-	// stop the scheduler and wait for any running update to complete.
-	<-sourceDone
+	// Stop the scheduler and wait for any running update to complete.
+	stopContainerSchedules()
 	scheduler.Stop()
 	log.Debug().Msg("Waiting for running update to be finished...")
 
@@ -440,130 +406,4 @@ func RunUpgradesOnSchedule(ctx context.Context, deps ScheduleDeps) error {
 	log.Debug().Msg("Scheduler stopped and update completed.")
 
 	return nil
-}
-
-// firstRuns tells each schedule's first scheduled run apart (the global
-// schedule's is ""), for the self-update skipped after a cleanup.
-type firstRuns struct {
-	log     *zerolog.Logger
-	ran     map[string]bool
-	mu      sync.Mutex
-	enabled bool
-}
-
-// first reports whether this is the first scheduled run on spec, when the
-// skip is enabled; once per schedule.
-func (f *firstRuns) first(spec string) bool {
-	if !f.enabled {
-		return false
-	}
-
-	f.mu.Lock()
-	defer f.mu.Unlock()
-
-	if f.ran[spec] {
-		return false
-	}
-
-	if f.ran == nil {
-		f.ran = make(map[string]bool)
-	}
-
-	f.ran[spec] = true
-
-	event := f.log.Debug()
-	if spec != "" {
-		event = event.Str("schedule", spec)
-	}
-
-	event.Msg("Skipping Watchtower self-update on first scheduled run due to cleanup")
-
-	return true
-}
-
-// cronTimers adds container schedules to the scheduler: each entry runs the
-// containers on its schedule.
-type cronTimers struct {
-	scheduler *cron.Cron
-	log       *zerolog.Logger
-	run       func(spec string)
-}
-
-// Add implements [percontainer.Timers].
-func (t cronTimers) Add(spec string) (cron.EntryID, error) {
-	entryID, err := t.scheduler.AddFunc(spec, func() {
-		t.log.Debug().Str("schedule", spec).Msg("Running a container schedule")
-		t.run(spec)
-		t.log.Debug().
-			Str("schedule", spec).
-			Time("next", percontainer.Next(spec, time.Now())).
-			Msg("Container schedule done")
-	})
-	if err != nil {
-		return 0, fmt.Errorf("invalid container schedule %q: %w", spec, err)
-	}
-
-	t.log.Debug().Str("schedule", spec).Time("next", percontainer.Next(spec, time.Now())).
-		Msg("Container schedule's first run")
-
-	return entryID, nil
-}
-
-// Remove implements [percontainer.Timers].
-func (t cronTimers) Remove(id cron.EntryID) {
-	t.scheduler.Remove(id)
-}
-
-// superviseSource runs the container schedules' source until ctx ends. If it
-// stops early, with an error or a panic, it is logged and started again after
-// a growing delay, so a fault there never takes down the rest of Watchtower.
-func superviseSource(
-	ctx context.Context,
-	log *zerolog.Logger,
-	source percontainer.Source,
-	sink percontainer.Sink,
-	delay, most time.Duration,
-) {
-	wait := delay
-
-	for {
-		err := runSource(ctx, source, sink)
-		if ctx.Err() != nil {
-			return
-		}
-
-		log.Error().Err(err).Dur("restart_in", wait).
-			Msg("Container schedules stopped unexpectedly: restarting them")
-
-		select {
-		case <-ctx.Done():
-			return
-		case <-time.After(wait):
-		}
-
-		wait = min(wait*2, most) //nolint:mnd // doubling backoff
-	}
-}
-
-var (
-	// errSourceStopped is a source that returned before it was asked to stop.
-	errSourceStopped = errors.New("container schedules source stopped")
-	// errSourcePanicked is a source that panicked.
-	errSourcePanicked = errors.New("container schedules source panicked")
-)
-
-// runSource runs the source once, turning a panic into an error.
-func runSource(ctx context.Context, source percontainer.Source, sink percontainer.Sink) (err error) {
-	defer func() {
-		if recovered := recover(); recovered != nil {
-			err = fmt.Errorf("%w: %v\n%s", errSourcePanicked, recovered, debug.Stack())
-		}
-	}()
-
-	runErr := source.Run(ctx, sink)
-	if runErr != nil {
-		return fmt.Errorf("container schedules source: %w", runErr)
-	}
-
-	return errSourceStopped
 }
