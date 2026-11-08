@@ -21,6 +21,7 @@ func TestStatesFromString(t *testing.T) {
 		{give: "t", want: []State{StaleState}},
 		{give: "f", want: []State{FreshState}},
 		{give: "uek", want: []State{UpdatedState, FailedState, SkippedState}},
+		{give: "cue", want: []State{UpdatedState, FailedState}},
 		{give: "x", want: []State{}},
 		{give: "", want: []State{}},
 	}
