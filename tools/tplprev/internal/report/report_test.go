@@ -1,20 +1,20 @@
 package report
 
 import (
-	"os"
 	"reflect"
 	"slices"
 	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
+
+	"github.com/nicholas-fedor/tplprev/internal/testutil/contract"
 )
 
 // TestInterfacesMatchWatchtower checks that templates can call the same report
 // and container report methods in the preview as in Watchtower, with the same
 // parameter and result types. The expected lists are generated from
-// Watchtower's report types by `task tplprev:gen`.
+// Watchtower's report types by task tplprev:gen.
 func TestInterfacesMatchWatchtower(t *testing.T) {
 	t.Parallel()
 
@@ -42,19 +42,7 @@ func TestInterfacesMatchWatchtower(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 
-			contents, err := os.ReadFile(tt.contract)
-			require.NoError(t, err)
-
-			var want []string
-
-			for line := range strings.Lines(string(contents)) {
-				line = strings.TrimSpace(line)
-				if line != "" && !strings.HasPrefix(line, "#") {
-					want = append(want, line)
-				}
-			}
-
-			assert.Equal(t, want, methodSignatures(tt.interfaceType))
+			assert.Equal(t, contract.Lines(t, tt.contract), methodSignatures(tt.interfaceType))
 		})
 	}
 }

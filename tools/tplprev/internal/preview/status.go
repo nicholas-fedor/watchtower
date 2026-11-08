@@ -64,7 +64,7 @@ func (u *containerStatus) Error() string {
 }
 
 func (u *containerStatus) State() string {
-	return string(u.state)
+	return u.state.displayName()
 }
 
 func (u *containerStatus) IsMonitorOnly() bool {

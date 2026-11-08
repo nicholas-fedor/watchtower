@@ -3,9 +3,7 @@ package notify
 import (
 	"encoding/json"
 	"maps"
-	"os"
 	"slices"
-	"strings"
 	"testing"
 	"time"
 
@@ -13,6 +11,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/nicholas-fedor/tplprev/internal/report"
+	"github.com/nicholas-fedor/tplprev/internal/testutil/contract"
 )
 
 type stubReport struct {
@@ -169,17 +168,7 @@ func TestDataMarshalJSONNilReport(t *testing.T) {
 func TestDataMarshalJSONContainerKeysMatchWatchtower(t *testing.T) {
 	t.Parallel()
 
-	contents, err := os.ReadFile("testdata/container-json-keys.txt")
-	require.NoError(t, err)
-
-	var want []string
-
-	for line := range strings.Lines(string(contents)) {
-		line = strings.TrimSpace(line)
-		if line != "" && !strings.HasPrefix(line, "#") {
-			want = append(want, line)
-		}
-	}
+	want := contract.Lines(t, "testdata/container-json-keys.txt")
 
 	full := stubContainerError{
 		id:    "sha256:c79110000000aaaa",

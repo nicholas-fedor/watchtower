@@ -55,6 +55,34 @@ func StatesFromString(str string) []State {
 	return states
 }
 
+// displayName returns the state's name as a container's State reads in
+// Watchtower, such as "Updated".
+//
+// Returns:
+//   - string: The capitalized state name, or "Unknown" for any other value.
+func (s State) displayName() string {
+	switch s {
+	case ScannedState:
+		// Watchtower's reports never show this state. The preview's scanned
+		// samples use Watchtower's name for it.
+		return "Scanned"
+	case UpdatedState:
+		return "Updated"
+	case FailedState:
+		return "Failed"
+	case SkippedState:
+		return "Skipped"
+	case RestartedState:
+		return "Restarted"
+	case StaleState:
+		return "Stale"
+	case FreshState:
+		return "Fresh"
+	default:
+		return "Unknown"
+	}
+}
+
 // sessionReport is the preview's report of a whole update session.
 type sessionReport struct {
 	scanned   []report.ContainerReport // Scanned containers.
