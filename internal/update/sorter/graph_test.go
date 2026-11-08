@@ -8,46 +8,20 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	dockerContainer "github.com/moby/moby/api/types/container"
-
-	"github.com/nicholas-fedor/watchtower/internal/container"
 	"github.com/nicholas-fedor/watchtower/internal/testutil/logcapture"
 	"github.com/nicholas-fedor/watchtower/pkg/types"
 )
 
-// cycleContainer returns a container with the given name and labels.
-func cycleContainer(name string, labels map[string]string) types.Container {
-	return container.NewContainer(nil, &dockerContainer.InspectResponse{
-		ID:         name + "-id",
-		Name:       "/" + name,
-		HostConfig: &dockerContainer.HostConfig{},
-		Config:     &dockerContainer.Config{Labels: labels},
-	}, nil)
-}
-
-// dependsOn returns a container whose Watchtower depends-on label lists links.
-func dependsOn(name, links string) types.Container {
-	labels := map[string]string{}
-	if links != "" {
-		labels["com.centurylinklabs.watchtower.depends-on"] = links
-	}
-
-	return cycleContainer(name, labels)
-}
-
-// composeService returns a Compose container of the stack project named
+// composeService describes a Compose container of the stack project named
 // <service>-server, whose depends_on label lists dependsOnServices.
-func composeService(service, dependsOnServices string) types.Container {
-	labels := map[string]string{
-		"com.docker.compose.project":          "stack",
-		"com.docker.compose.service":          service,
-		"com.docker.compose.container-number": "1",
+func composeService(service, dependsOnServices string) deployed {
+	return deployed{
+		name:             service + "-server",
+		project:          "stack",
+		service:          service,
+		number:           "1",
+		composeDependsOn: dependsOnServices,
 	}
-	if dependsOnServices != "" {
-		labels["com.docker.compose.depends_on"] = dependsOnServices
-	}
-
-	return cycleContainer(service+"-server", labels)
 }
 
 // TestDependencyGraph_CycleMembers verifies that every container in a circular dependency is
@@ -70,82 +44,79 @@ func TestDependencyGraph_CycleMembers(t *testing.T) {
 		},
 		{
 			name:       "acyclic",
-			containers: []types.Container{dependsOn("c1", ""), dependsOn("c2", "c1")},
+			containers: deploy(deployed{name: "c1"}, deployed{name: "c2", dependsOn: "c1"}),
 			want:       []string{},
 		},
 		{
 			name:       "two containers",
-			containers: []types.Container{dependsOn("c1", "c2"), dependsOn("c2", "c1")},
+			containers: deploy(deployed{name: "c1", dependsOn: "c2"}, deployed{name: "c2", dependsOn: "c1"}),
 			want:       []string{"c1", "c2"},
 		},
 		{
 			name: "three containers",
-			containers: []types.Container{
-				dependsOn("c1", "c2"),
-				dependsOn("c2", "c3"),
-				dependsOn("c3", "c1"),
-			},
+			containers: deploy(
+				deployed{name: "c1", dependsOn: "c2"},
+				deployed{name: "c2", dependsOn: "c3"},
+				deployed{name: "c3", dependsOn: "c1"},
+			),
 			want: []string{"c1", "c2", "c3"},
 		},
 		{
 			// A container listing itself is a self-dependency, which the
 			// update skips separately, not a cycle between containers.
 			name:       "self-reference",
-			containers: []types.Container{dependsOn("c1", "c1")},
+			containers: deploy(deployed{name: "c1", dependsOn: "c1"}),
 			want:       []string{},
 		},
 		{
 			name: "disconnected components",
-			containers: []types.Container{
-				dependsOn("c1", ""),
-				dependsOn("c2", "c3"),
-				dependsOn("c3", "c2"),
-			},
+			containers: deploy(
+				deployed{name: "c1"},
+				deployed{name: "c2", dependsOn: "c3"},
+				deployed{name: "c3", dependsOn: "c2"},
+			),
 			want: []string{"c2", "c3"},
 		},
 		{
 			name: "dependents of a cycle member",
-			containers: []types.Container{
-				dependsOn("worker", "c1"),
-				dependsOn("c1", "c2"),
-				dependsOn("c2", "c1"),
-			},
+			containers: deploy(
+				deployed{name: "worker", dependsOn: "c1"},
+				deployed{name: "c1", dependsOn: "c2"},
+				deployed{name: "c2", dependsOn: "c1"},
+			),
 			want: []string{"c1", "c2"},
 		},
 		{
 			name:       "unknown dependencies",
-			containers: []types.Container{dependsOn("c1", "c2,unknown"), dependsOn("c2", "c1")},
+			containers: deploy(deployed{name: "c1", dependsOn: "c2,unknown"}, deployed{name: "c2", dependsOn: "c1"}),
 			want:       []string{"c1", "c2"},
 		},
 		{
 			// The sort orders Watchtower containers last without reading
 			// their links, so they cannot be part of a cycle.
 			name: "Watchtower containers set aside",
-			containers: []types.Container{
-				cycleContainer("watchtower", map[string]string{
-					"com.centurylinklabs.watchtower":            "true",
-					"com.centurylinklabs.watchtower.depends-on": "c1",
-				}),
-				dependsOn("c1", "watchtower"),
-			},
+			containers: deploy(
+				deployed{name: "watchtower", watchtower: true, dependsOn: "c1"},
+				deployed{name: "c1", dependsOn: "watchtower"},
+			),
 			want: []string{},
 		},
 		{
 			name: "Compose services with other container names",
-			containers: []types.Container{
+			containers: deploy(
 				composeService("web", "api:service_started:false"),
 				composeService("api", "web:service_started:false"),
 				composeService("app", ""),
-			},
+			),
 			useComposeDependsOn: true,
 			want:                []string{"web-server", "api-server"},
 		},
 		{
 			name: "Compose depends_on ignored",
-			containers: []types.Container{
+			containers: deploy(
 				composeService("web", "api:service_started:false"),
 				composeService("api", "web:service_started:false"),
-			},
+			),
 			want: []string{},
 		},
 	}
@@ -166,15 +137,10 @@ func TestDependencyGraph_CycleMembers(t *testing.T) {
 func TestNewDependencyGraph_IdentifierCollision(t *testing.T) {
 	t.Parallel()
 
-	labels := map[string]string{
-		"com.docker.compose.project": "stack",
-		"com.docker.compose.service": "web",
-	}
-
-	_, err := NewDependencyGraph(newTestLogger(t), []types.Container{
-		cycleContainer("first", labels),
-		cycleContainer("second", labels),
-	}, nil, false)
+	_, err := NewDependencyGraph(newTestLogger(t), deploy(
+		deployed{name: "first", project: "stack", service: "web"},
+		deployed{name: "second", project: "stack", service: "web"},
+	), nil, false)
 	require.ErrorIs(t, err, errIdentifierCollision)
 }
 
@@ -886,11 +852,11 @@ func TestNewDependencyGraph_LogsDependenciesOnce(t *testing.T) {
 	var out bytes.Buffer
 
 	log := zerolog.New(&out).Level(zerolog.DebugLevel)
-	containers := []types.Container{
-		dependsOn("db", ""),
-		dependsOn("cache", ""),
-		dependsOn("app", "db,cache"),
-	}
+	containers := deploy(
+		deployed{name: "db"},
+		deployed{name: "cache"},
+		deployed{name: "app", dependsOn: "db,cache"},
+	)
 
 	_, err := NewDependencyGraph(&log, containers, nil, false)
 	require.NoError(t, err)
@@ -923,7 +889,7 @@ func TestSortByDependencies_DoesNotLogDependencies(t *testing.T) {
 	var out bytes.Buffer
 
 	log := zerolog.New(&out).Level(zerolog.DebugLevel)
-	containers := []types.Container{dependsOn("app", "db"), dependsOn("db", "")}
+	containers := deploy(deployed{name: "app", dependsOn: "db"}, deployed{name: "db"})
 
 	require.NoError(t, SortByDependencies(&log, containers, false))
 	assert.NotContains(t, out.String(), "Found container dependencies")
