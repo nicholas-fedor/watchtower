@@ -802,6 +802,11 @@ func fetchDigest(log *zerolog.Logger,
 		redirected := result.Redirected
 		redirectHost := result.RedirectHost
 
+		// Only the canonical registry's redirect lets a failed manifest request
+		// return to the original host. A mirror's token belongs to the mirror,
+		// and the canonical endpoint is tried after it with its own challenge.
+		canonicalRedirect := redirected && endpoint == ""
+
 		if token == "" {
 			log.Debug().
 				Fields(fields).
@@ -889,7 +894,7 @@ func fetchDigest(log *zerolog.Logger,
 				method,
 				originalHost,
 				challengeHost,
-				redirected,
+				canonicalRedirect,
 				parsedURL,
 				parsedURL.Host,
 			)
@@ -939,7 +944,7 @@ func fetchDigest(log *zerolog.Logger,
 				retryToken,
 				originalHost,
 				challengeHost,
-				redirected,
+				canonicalRedirect,
 				parsedURL,
 				limitKey,
 				client,
@@ -984,7 +989,8 @@ func fetchDigest(log *zerolog.Logger,
 //   - method: The HTTP method used ("HEAD" or "GET").
 //   - originalHost: The original host from the initial manifest URL.
 //   - challengeHost: The challenge host from authentication (empty if not redirected).
-//   - redirected: Whether authentication was redirected.
+//   - redirected: Whether the canonical registry's challenge redirected the request to
+//     another host.
 //   - parsedURL: Parsed URL for updating host.
 //   - currentHost: The current host being used for the request.
 //
@@ -1603,7 +1609,8 @@ func makeManifestRequest(
 //   - token: Authentication token.
 //   - originalHost: The original host.
 //   - challengeHost: The challenge host.
-//   - redirected: Whether authentication was redirected.
+//   - redirected: Whether the canonical registry's challenge redirected the request to
+//     another host.
 //   - parsedURL: Parsed URL object.
 //   - limitKey: Rate-limit host key from [ratelimit.Scope]. Empty uses parsedURL.Host.
 //   - client: The HTTP client to use for the request.

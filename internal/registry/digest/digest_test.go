@@ -946,35 +946,67 @@ func TestFetchDigestWithGet_RedirectPastClientLimit(t *testing.T) {
 
 // TestFetchDigestWithGet_MirrorFailure verifies that a manifest request a
 // mirror fails moves on to the next endpoint, so the registry gets its own
-// challenge and never the mirror's token.
+// challenge and never the mirror's token. This holds when the mirror's
+// challenge redirects to another host too.
 func TestFetchDigestWithGet_MirrorFailure(t *testing.T) {
 	t.Parallel()
 
 	const manifestPath = "/v2/test/image/manifests/latest"
 
-	mirror := httpstub.New(t)
-	mirror.AppendHandlers(append(bearerChallengeHandlers(t, mirror.Addr(), "repository:test/image:pull"),
-		manifestHandler(t, http.MethodGet, manifestPath, http.StatusNotFound, nil))...)
+	tests := []struct {
+		name string
+		// redirectChallenge sends the mirror's challenge to another host, which
+		// issues the token and answers the manifest request.
+		redirectChallenge bool
+	}{
+		{name: "mirror that challenges itself"},
+		{name: "mirror whose challenge redirects to another host", redirectChallenge: true},
+	}
 
-	registry := httpstub.New(t)
-	registry.AppendHandlers(
-		anonymousRegistryHandler(t),
-		httpstub.CombineHandlers(
-			httpstub.VerifyRequest(t, http.MethodGet, httpstub.Path(manifestPath)),
-			func(_ http.ResponseWriter, r *http.Request) {
-				assert.Empty(t, r.Header.Get("Authorization"), "the mirror's token reached the registry")
-			},
-			httpstub.RespondWith(http.StatusOK, "", digestHeader(testDigestHash)),
-		),
-	)
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
 
-	container := newRegistryContainer(registry.Addr()+"/test/image:latest", testRepoDigest)
+			mirror := httpstub.New(t)
+			mirrorAuth := mirror
 
-	got, err := fetchDigestWithGet(newTestLogger(t), t.Context(),
-		container, "", registryConfig.Registry{TLSSkip: true}, ratelimit.New(), mirror.Addr(), "")
-	require.NoError(t, err)
-	assert.Equal(t, NormalizeDigest(newTestLogger(t), testDigestHash), got)
-	assert.Len(t, registry.ReceivedRequests(), 2, "the registry was not asked once through its own challenge")
+			if tt.redirectChallenge {
+				mirrorAuth = httpstub.New(t)
+				mirror.AppendHandlers(httpstub.CombineHandlers(
+					httpstub.VerifyRequest(t, http.MethodGet, httpstub.Path("/v2/")),
+					httpstub.RespondWith(http.StatusFound, "", http.Header{
+						"Location": {fmt.Sprintf("http://%s/v2/", mirrorAuth.Addr())},
+					}),
+				))
+			}
+
+			mirrorAuth.AppendHandlers(append(
+				bearerChallengeHandlers(t, mirrorAuth.Addr(), "repository:test/image:pull"),
+				manifestHandler(t, http.MethodGet, manifestPath, http.StatusNotFound, nil),
+			)...)
+
+			registry := httpstub.New(t)
+			registry.AppendHandlers(
+				anonymousRegistryHandler(t),
+				httpstub.CombineHandlers(
+					httpstub.VerifyRequest(t, http.MethodGet, httpstub.Path(manifestPath)),
+					func(_ http.ResponseWriter, r *http.Request) {
+						assert.Empty(t, r.Header.Get("Authorization"), "the mirror's token reached the registry")
+					},
+					httpstub.RespondWith(http.StatusOK, "", digestHeader(testDigestHash)),
+				),
+			)
+
+			container := newRegistryContainer(registry.Addr()+"/test/image:latest", testRepoDigest)
+
+			got, err := fetchDigestWithGet(newTestLogger(t), t.Context(),
+				container, "", registryConfig.Registry{TLSSkip: true}, ratelimit.New(), mirror.Addr(), "")
+			require.NoError(t, err)
+			assert.Equal(t, NormalizeDigest(newTestLogger(t), testDigestHash), got)
+			assert.Len(t, registry.ReceivedRequests(), 2,
+				"the registry was not asked once through its own challenge")
+		})
+	}
 }
 
 // TestCompareDigest_RedirectedLSCRImage verifies that an lscr.io image whose
