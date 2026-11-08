@@ -79,10 +79,10 @@ var (
 	errUnresolvedManifestRetry = errors.New("manifest request still needs another host after retrying")
 )
 
-// localOnlyImageCache records image name+ID pairs previously confirmed as local-only
-// (domain-less Config.Image with a registry 404). Subsequent checks skip remote
-// probes, avoiding Docker Hub rate-limit pressure that can starve concurrent
-// staleness checks for other containers in the same update cycle.
+// localOnlyImageCache records image name+ID pairs confirmed as local-only after
+// a registry 404. Subsequent checks skip remote probes, avoiding Docker Hub
+// rate-limit pressure that can starve concurrent staleness checks for other
+// containers in the same update cycle.
 //
 // Keyed by "imageName|imageID".
 // Entries live for process lifetime and a rebuild (new image ID) forces a fresh probe.
@@ -180,11 +180,13 @@ func CompareDigest(
 
 // isLocalImageNotFound reports whether the digest fetch failed because the
 // registry returned 404 for a manifest request and the container's image looks
-// local-only: domain-less Config.Image and no registry-qualified RepoDigests.
+// local-only.
 //
-// Official Hub short names (for example nginx) often store Config.Image without
-// a domain but still have docker.io/... RepoDigests. Those must not be cached as
-// local-only after a transient 404, or updates are skipped for the process life.
+// An image looks local-only when its repository name is a single component
+// with no registry or namespace, such as atlas-badgerdb. None of its
+// RepoDigests may name a registry host such as ghcr.io. It judges the image
+// name the probe requested, which a Zodiac label sets when the container runs
+// from an image ID.
 //
 // Parameters:
 //   - container: Container whose image name is inspected.
@@ -197,31 +199,18 @@ func isLocalImageNotFound(container types.Container, err error) bool {
 		return false
 	}
 
-	if !container.HasImageInfo() ||
-		container.ContainerInfo() == nil ||
-		container.ContainerInfo().Config == nil {
+	if !container.HasImageInfo() {
 		return false
 	}
 
-	// Evaluate only the repository name so tags/digests (e.g. my-app:1.0) do not
-	// make a domain-less image look registry-qualified via "." in a semver tag.
-	originalImage := container.ContainerInfo().Config.Image
-	namePart, _, _ := strings.Cut(originalImage, "@")
-
-	if i := strings.LastIndex(namePart, ":"); i >= 0 {
-		if j := strings.LastIndex(namePart, "/"); j < i {
-			namePart = namePart[:i]
-		}
-	}
-
-	if strings.ContainsAny(namePart, "./") {
+	// A registry or namespace is always followed by a slash. Neither a tag nor
+	// a digest contains one.
+	if strings.Contains(container.ImageName(), "/") {
 		return false
 	}
 
-	// Registry-qualified digests mean the image was pulled from a remote source.
-	// a 404 is a probe failure, not proof the image is local-only. Official Hub
-	// short names often keep a domain-less Config.Image while RepoDigests still
-	// records docker.io/library/... .
+	// Registry-qualified digests mean the image was pulled from a remote source,
+	// so a 404 is a failed probe rather than proof the image is local-only.
 	for _, digestRef := range container.ImageInfo().RepoDigests {
 		repoPart, _, _ := strings.Cut(digestRef, "@")
 		if repoPartHasRegistryHost(repoPart) {
@@ -339,8 +328,8 @@ func CompareDigestWithRemote(log *zerolog.Logger,
 		endpoints...,
 	)
 	if err != nil {
-		// Domain-less image names that 404 are local-only builds. Treat them as up-to-date
-		// with no error so callers skip the pull without logging a warning.
+		// A 404 for a local-only image means it is up to date. Return no error
+		// so callers skip the pull without logging a warning.
 		if isLocalImageNotFound(container, err) {
 			rememberLocalOnlyImage(container)
 			log.Debug().
