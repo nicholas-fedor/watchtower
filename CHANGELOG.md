@@ -10,6 +10,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Write no startup message once the process is stopping by @nicholas-fedor in [#3572](https://github.com/nicholas-fedor/watchtower/pull/3572)
 - Count scanned containers the way Watchtower does by @nicholas-fedor in [#3550](https://github.com/nicholas-fedor/watchtower/pull/3550)
 - Log failed cooldown age lookups as skipped pulls by @nicholas-fedor in [#3546](https://github.com/nicholas-fedor/watchtower/pull/3546)
 - Show container states with Watchtower's names by @nicholas-fedor in [#3544](https://github.com/nicholas-fedor/watchtower/pull/3544)
@@ -36,6 +37,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- Decide startup after replacing an older instance in the scheduler by @nicholas-fedor in [#3571](https://github.com/nicholas-fedor/watchtower/pull/3571)
 - Pick each container's local digest in one place by @nicholas-fedor in [#3569](https://github.com/nicholas-fedor/watchtower/pull/3569)
 - Remove the unreachable bare cooldown fallback by @nicholas-fedor in [#3540](https://github.com/nicholas-fedor/watchtower/pull/3540)
 - List report containers as concrete statuses by @nicholas-fedor in [#3536](https://github.com/nicholas-fedor/watchtower/pull/3536)
