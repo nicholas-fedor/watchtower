@@ -1643,7 +1643,7 @@ func TestDependencyLinkFormPermutations(t *testing.T) {
 			},
 			{
 				name:       "network_mode with Compose depends_on not read",
-				dependency: deployed{name: "vpn", project: "stack", service: "vpn"},
+				dependency: deployed{name: "vpn", project: "stack", service: "vpn", composeDependsOn: "web"},
 				dependent: deployed{
 					name: "web", project: "stack", service: "web", networkMode: "container:vpn",
 				},
@@ -1727,8 +1727,16 @@ func TestDependencyLinkFormPermutations(t *testing.T) {
 		db2 := deployed{name: "myproject-db-2", project: "myproject", service: "db"}.container()
 		web := deployed{name: "myproject-web", project: "myproject", service: "web", dependsOn: "myproject-db"}.container()
 
+		// One replica edge alone still sorts both replicas first. The graph
+		// shows whether both edges exist.
+		_, indegree, adjacency, _, err := buildDependencyGraph(newTestLogger(t), []types.Container{web, db1, db2}, true)
+		require.NoError(t, err)
+		assert.Equal(t, 2, indegree["myproject-web"])
+		assert.Contains(t, adjacency["myproject-db-1"], "myproject-web")
+		assert.Contains(t, adjacency["myproject-db-2"], "myproject-web")
+
 		containers := []types.Container{web, db1, db2}
-		err := dependencySorter{}.Sort(newTestLogger(t), containers, true)
+		err = dependencySorter{}.Sort(newTestLogger(t), containers, true)
 		require.NoError(t, err)
 		assert.Equal(t, "myproject-web", containers[2].Name())
 		assert.ElementsMatch(t, []string{"myproject-db-1", "myproject-db-2"}, []string{containers[0].Name(), containers[1].Name()})
