@@ -10,6 +10,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Show container states with Watchtower's names by @nicholas-fedor in [#3544](https://github.com/nicholas-fedor/watchtower/pull/3544)
 - Stop repeating the skip prefix in preview errors by @nicholas-fedor in [#3538](https://github.com/nicholas-fedor/watchtower/pull/3538)
 - Let preview templates read the report's focus by @nicholas-fedor in [#3528](https://github.com/nicholas-fedor/watchtower/pull/3528)
 - Convert legacy notifier settings through one URL function by @nicholas-fedor in [#3522](https://github.com/nicholas-fedor/watchtower/pull/3522)
