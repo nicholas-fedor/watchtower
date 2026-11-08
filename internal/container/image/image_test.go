@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
+	"strings"
 	"testing"
 	"time"
 
@@ -982,6 +983,88 @@ func TestImageClient_IsContainerStale_pull(t *testing.T) {
 			assert.Contains(t, logbuf.String(), "Found new image")
 		})
 	})
+}
+
+// TestImageClient_IsContainerStale_cooldown verifies the debug line the staleness
+// check logs when a cooldown holds a newer image back. A deferral logs that the
+// cooldown is active. A failed age lookup logs that the image age is
+// unavailable. Neither logs a failed pull, since no pull was attempted.
+func TestImageClient_IsContainerStale_cooldown(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		// registry starts the registry the image is checked against and
+		// returns the image's name.
+		registry func(t *testing.T) string
+		name     string
+		// message is the debug line the check logs.
+		message string
+		// absent is the other outcome's debug line, which the check must not log.
+		absent   string
+		deferred bool
+	}{
+		{
+			name: "deferral",
+			registry: func(t *testing.T) string {
+				t.Helper()
+
+				return createdRegistry(t, time.Now().Add(-time.Minute)) + "/org/app:1.0"
+			},
+			message:  "Cooldown active - pull skipped",
+			absent:   "Image age unavailable - pull skipped",
+			deferred: true,
+		},
+		{
+			name: "failed age lookup",
+			registry: func(t *testing.T) string {
+				t.Helper()
+
+				return notFoundRegistry(t) + "/org/app:1.0"
+			},
+			message:  "Image age unavailable - pull skipped",
+			absent:   "Cooldown active - pull skipped",
+			deferred: false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			image := tt.registry(t)
+			repoDigest := strings.TrimSuffix(image, ":1.0") + "@sha256:" + containerfixture.RandomID()
+			currentImageID := "sha256:" + containerfixture.RandomID()
+
+			// ImagePull has no expectation. A pull fails the test.
+			log, buf := logcapture.NewJSON(zerolog.DebugLevel)
+			c := newTestImageClient(newImageAPI(t), log, registryConfig.Registry{TLSSkip: true}, ratelimit.New())
+
+			stale, latestID, _, err := c.IsContainerStale(t.Context(), runningImage(image, currentImageID, repoDigest),
+				updateConfig.Policy{CooldownDelay: time.Hour}, warnAuto)
+
+			var cooldownErr *CooldownError
+			require.ErrorAs(t, err, &cooldownErr)
+			assert.Equal(t, tt.deferred, errors.Is(err, ErrImageCooldown))
+			assert.False(t, stale)
+			assert.Equal(t, types.ImageID(currentImageID), latestID)
+
+			debug := logcapture.Messages(t, buf.String(), "debug")
+			assert.Contains(t, debug, tt.message)
+			assert.NotContains(t, debug, tt.absent)
+			assert.NotContains(t, debug, "Failed to pull image")
+
+			// The debug line carries the error the check returns.
+			var logged []any
+
+			for _, entry := range logcapture.Entries[logcapture.Entry](t, buf.String()) {
+				if entry["message"] == tt.message {
+					logged = append(logged, entry["error"])
+				}
+			}
+
+			assert.Equal(t, []any{err.Error()}, logged)
+		})
+	}
 }
 
 // TestIsImagePinnedByDigest verifies which image references are pinned by a

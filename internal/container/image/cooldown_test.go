@@ -98,6 +98,43 @@ func notFoundRegistry(t *testing.T) string {
 	return server.Addr()
 }
 
+// createdRegistry starts a plain HTTP stub registry that serves the image
+// org/app:1.0 as a single-platform manifest whose config blob records the
+// given creation time. Every other path answers 404.
+//
+// Parameters:
+//   - t: Test that owns the registry.
+//   - created: Creation time the image config records.
+//
+// Returns:
+//   - string: Host and port of the registry.
+func createdRegistry(t *testing.T, created time.Time) string {
+	t.Helper()
+
+	const configDigest = "sha256:e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch r.URL.Path {
+		case "/v2/":
+			w.WriteHeader(http.StatusOK)
+		case "/v2/org/app/manifests/1.0":
+			w.Header().Set("Content-Type", "application/vnd.docker.distribution.manifest.v2+json")
+			fmt.Fprintf(w, `{
+				"schemaVersion": 2,
+				"mediaType": "application/vnd.docker.distribution.manifest.v2+json",
+				"config": {"mediaType": "application/vnd.docker.container.image.v1+json", "digest": %q, "size": 2}
+			}`, configDigest)
+		case "/v2/org/app/blobs/" + configDigest:
+			fmt.Fprintf(w, `{"created": %q}`, created.UTC().Format(time.RFC3339))
+		default:
+			w.WriteHeader(http.StatusNotFound)
+		}
+	}))
+	t.Cleanup(server.Close)
+
+	return strings.TrimPrefix(server.URL, "http://")
+}
+
 // Test_isOutsideCooldown verifies that the cooldown gate lets a pull go ahead
 // when no cooldown is configured, the delay is zero, or the container is
 // monitor-only or no-pull, and that a failure to fetch the image's creation
@@ -307,30 +344,7 @@ func TestCheckLocalImageCooldown_LogsContainer(t *testing.T) {
 func TestIsOutsideCooldown_RegistrySettings(t *testing.T) {
 	t.Parallel()
 
-	const configDigest = "sha256:e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
-
-	created := time.Now().Add(-48 * time.Hour).UTC().Format(time.RFC3339)
-
-	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		switch r.URL.Path {
-		case "/v2/":
-			w.WriteHeader(http.StatusOK)
-		case "/v2/org/app/manifests/1.0":
-			w.Header().Set("Content-Type", "application/vnd.docker.distribution.manifest.v2+json")
-			fmt.Fprintf(w, `{
-				"schemaVersion": 2,
-				"mediaType": "application/vnd.docker.distribution.manifest.v2+json",
-				"config": {"mediaType": "application/vnd.docker.container.image.v1+json", "digest": %q, "size": 2}
-			}`, configDigest)
-		case "/v2/org/app/blobs/" + configDigest:
-			fmt.Fprintf(w, `{"created": %q}`, created)
-		default:
-			w.WriteHeader(http.StatusNotFound)
-		}
-	}))
-	t.Cleanup(server.Close)
-
-	container := modelfixture.Container(containerfixture.WithImageName(strings.TrimPrefix(server.URL, "http://") + "/org/app:1.0"))
+	container := modelfixture.Container(containerfixture.WithImageName(createdRegistry(t, time.Now().Add(-48*time.Hour)) + "/org/app:1.0"))
 	policy := updateConfig.Policy{CooldownDelay: time.Hour}
 
 	plain := NewClient(nil, newTestLogger(t), registryConfig.Registry{TLSSkip: true}, ratelimit.New())
