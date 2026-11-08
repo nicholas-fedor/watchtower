@@ -58,6 +58,11 @@ const (
 	// to reach the daemon (and a little difference in clocks): what's replayed
 	// is applied in order after the list, and comes out the same.
 	replayWindow = 5 * time.Second
+	// The containers are listed once more this long after connecting: the
+	// daemon starts sending before it has registered the subscription, and a
+	// change in that moment, older than the replay window by a clock that's
+	// behind ours, would otherwise be missed until the next run.
+	defaultSettleDelay = 2 * time.Second
 )
 
 var errStreamClosed = errors.New("docker event stream closed")
@@ -94,6 +99,10 @@ type DockerSource struct {
 	// RetryDelay is the first wait before reconnecting; it doubles up to
 	// MaxRetryDelay. Zero uses one second and one minute.
 	RetryDelay, MaxRetryDelay time.Duration
+	// SettleDelay is how long after connecting the containers are listed
+	// once more (see defaultSettleDelay). Zero uses two seconds; negative
+	// lists only on connecting.
+	SettleDelay time.Duration
 
 	refreshOnce sync.Once
 }
@@ -216,10 +225,27 @@ func (s *DockerSource) follow(ctx context.Context, sink Sink, connected func()) 
 
 	connected()
 
+	var settled <-chan time.Time
+
+	switch {
+	case s.SettleDelay == 0:
+		settled = time.After(defaultSettleDelay)
+	case s.SettleDelay > 0:
+		settled = time.After(s.SettleDelay)
+	}
+
 	for {
 		select {
 		case <-ctx.Done():
 			return true, nil
+		case <-settled:
+			// (once: the subscription is registered by now)
+			settled = nil
+
+			err := s.resync(ctx, sink, "settled")
+			if err != nil {
+				return true, err
+			}
 		case err, open := <-stream.Err:
 			if !open || err == nil {
 				return true, errStreamClosed
@@ -292,11 +318,13 @@ func (s *DockerSource) apply(sink Sink, msg events.Message) {
 		s.logger().Debug().Str("container", name).Str("id", shortID(msg.Actor.ID)).Msg("Container event: removed")
 		sink.Remove(name, msg.Actor.ID)
 	case events.ActionRename:
-		if old := container.NormalizeContainerName(attrs["oldName"]); old != "" {
+		// (under the new name first: a container alone on its schedule keeps
+		// the schedule's entry and next run through the rename)
+		s.setFrom(sink, name, msg.Actor.ID, attrs, msg.Action)
+
+		if old := container.NormalizeContainerName(attrs["oldName"]); old != "" && old != name {
 			sink.Remove(old, msg.Actor.ID)
 		}
-
-		s.setFrom(sink, name, msg.Actor.ID, attrs, msg.Action)
 	case events.ActionCreate, events.ActionStart:
 		s.setFrom(sink, name, msg.Actor.ID, attrs, msg.Action)
 	default:

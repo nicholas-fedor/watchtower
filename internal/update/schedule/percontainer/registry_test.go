@@ -253,3 +253,82 @@ func TestRegistryWarnsOnceAboutAnInvalidLabel(t *testing.T) {
 	r.Set("web", "", "nonsense")
 	assert.Equal(t, 2, strings.Count(buf.String(), "Ignoring an invalid schedule label"), "a new invalid value warns again")
 }
+
+// TestRegistryKeepsTimersThroughASwap verifies that two containers swapping
+// schedules in one snapshot keep both schedules' entries.
+func TestRegistryKeepsTimersThroughASwap(t *testing.T) {
+	t.Parallel()
+
+	timers := newFakeTimers()
+	r := NewRegistry(nil, timers)
+
+	r.Reset(map[string]Labeled{"web": {ID: "a", Spec: "@every 10m"}, "db": {ID: "b", Spec: "@daily"}})
+
+	added := timers.registrations()
+
+	r.Reset(map[string]Labeled{"web": {ID: "a", Spec: "@daily"}, "db": {ID: "b", Spec: "@every 10m"}})
+	assert.Equal(t, added, timers.registrations(), "both schedules stayed in use: neither entry was dropped")
+	assert.ElementsMatch(t, []string{"@every 10m", "@daily"}, timers.specs())
+}
+
+// TestRegistryKeepsATimerThroughARename verifies that a container alone on
+// its schedule keeps the schedule's entry when renamed (the new name is
+// recorded before the old is removed).
+func TestRegistryKeepsATimerThroughARename(t *testing.T) {
+	t.Parallel()
+
+	timers := newFakeTimers()
+	r := NewRegistry(nil, timers)
+
+	r.Set("web", "a", "@every 10m")
+
+	added := timers.registrations()
+
+	r.Set("web-2", "a", "@every 10m")
+	r.Remove("web", "a")
+
+	assert.Equal(t, added, timers.registrations())
+	assert.Equal(t, []string{"@every 10m"}, r.Schedules())
+}
+
+// TestRegistryKeepsAReplacementThroughReplayedEvents verifies that events of
+// the container a replacement replaced, arriving after a snapshot that has the
+// replacement, neither remove it nor restart its schedule.
+func TestRegistryKeepsAReplacementThroughReplayedEvents(t *testing.T) {
+	t.Parallel()
+
+	timers := newFakeTimers()
+	r := NewRegistry(nil, timers)
+
+	r.Reset(map[string]Labeled{"web": {ID: "new", Spec: "@every 10m"}})
+
+	added := timers.registrations()
+
+	// replayed: the old container started, then was removed; then the new one's own news
+	r.Set("web", "old", "@every 10m")
+	r.Remove("web", "old")
+	r.Set("web", "new", "@every 10m")
+
+	assert.Equal(t, []string{"@every 10m"}, r.Schedules(), "the replacement keeps its schedule")
+	assert.Equal(t, added, timers.registrations(), "and its entry and next run")
+
+	r.Remove("web", "new")
+	assert.Empty(t, r.Schedules(), "its own removal does remove it")
+}
+
+// TestRegistryWarnsAboutAReplacementsInvalidLabel verifies that a replacement
+// carrying the same invalid label as the container it replaced is warned
+// about too.
+func TestRegistryWarnsAboutAReplacementsInvalidLabel(t *testing.T) {
+	t.Parallel()
+
+	var buf strings.Builder
+
+	logger := zerolog.New(&buf)
+	r := NewRegistry(&logger, newFakeTimers())
+
+	r.Reset(map[string]Labeled{"web": {ID: "a", Spec: "every ten minutes"}})
+	r.Reset(map[string]Labeled{"web": {ID: "b", Spec: "every ten minutes"}})
+
+	assert.Equal(t, 2, strings.Count(buf.String(), "Ignoring an invalid schedule label"))
+}

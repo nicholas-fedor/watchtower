@@ -69,10 +69,11 @@ func (f *fakeStream) connected(t *testing.T) *connection {
 // recorder is a Sink keeping the latest view (name to schedule) and the IDs
 // it was given.
 type recorder struct {
-	mu     sync.Mutex
-	view   map[string]string
-	ids    map[string]string
-	resets int
+	mu      sync.Mutex
+	view    map[string]string
+	ids     map[string]string
+	removed []string
+	resets  int
 }
 
 // newRecorder returns an empty recorder.
@@ -110,7 +111,21 @@ func (r *recorder) Set(name, id, spec string) {
 }
 
 // Remove forgets a container.
-func (r *recorder) Remove(name, _ string) { r.Set(name, "", "") }
+func (r *recorder) Remove(name, containerID string) {
+	r.mu.Lock()
+	r.removed = append(r.removed, name+":"+containerID)
+	r.mu.Unlock()
+
+	r.Set(name, "", "")
+}
+
+// removals returns the removals asked for, as name:id.
+func (r *recorder) removals() []string {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+
+	return append([]string(nil), r.removed...)
+}
 
 // id returns the ID recorded for a container.
 func (r *recorder) id(name string) string {
@@ -144,7 +159,7 @@ func (r *recorder) waitFor(t *testing.T, want map[string]string, resets int) {
 
 // containerEvent returns a container event with these attributes.
 func containerEvent(action events.Action, attrs map[string]string) events.Message {
-	return events.Message{Type: events.ContainerEventType, Action: action, Actor: events.Actor{ID: "id", Attributes: attrs}}
+	return events.Message{Type: events.ContainerEventType, Action: action, Actor: events.Actor{ID: "id-" + attrs["name"], Attributes: attrs}}
 }
 
 // send delivers an event on a connection, failing if the source stops reading.
@@ -191,7 +206,8 @@ func TestDockerSourceFollowsEvents(t *testing.T) {
 
 	stream := newFakeStream()
 	source := &DockerSource{
-		Events: stream,
+		Events:      stream,
+		SettleDelay: -1,
 		List: lister(
 			labeled("web", map[string]string{labels.Schedule: "@every 10m"}),
 			labeled("db", nil),
@@ -230,6 +246,10 @@ func TestDockerSourceFollowsEvents(t *testing.T) {
 	send(t, conn, containerEvent(events.ActionDie, map[string]string{"name": "db"}))
 	sink.waitFor(t, map[string]string{"web": "@hourly", "online-2": "@every 10m", "db": "@daily"}, 1)
 
+	// The removals named the containers by ID: the destroyed web, and the
+	// renamed container under its old name.
+	assert.Equal(t, []string{"web:id-web", "online:id-online-2"}, sink.removals())
+
 	stream.mu.Lock()
 	options := stream.options[0]
 	stream.mu.Unlock()
@@ -257,7 +277,8 @@ func TestDockerSourceAppliesTheFilter(t *testing.T) {
 
 	stream := newFakeStream()
 	source := &DockerSource{
-		Events: stream,
+		Events:      stream,
+		SettleDelay: -1,
 		List: lister(
 			labeled("web", map[string]string{labels.Schedule: "@every 10m", labels.Scope: "games"}),
 			labeled("other", map[string]string{labels.Schedule: "@every 10m", labels.Scope: "media"}),
@@ -291,7 +312,8 @@ func TestDockerSourceReconnects(t *testing.T) {
 
 	stream := newFakeStream()
 	source := &DockerSource{
-		Events: stream,
+		Events:      stream,
+		SettleDelay: -1,
 		List: func(context.Context) ([]types.FilterableContainer, error) {
 			mu.Lock()
 			defer mu.Unlock()
@@ -335,7 +357,8 @@ func TestDockerSourceRetriesAFailedList(t *testing.T) {
 
 	stream := newFakeStream()
 	source := &DockerSource{
-		Events: stream,
+		Events:      stream,
+		SettleDelay: -1,
 		List: func(context.Context) ([]types.FilterableContainer, error) {
 			mu.Lock()
 			defer mu.Unlock()
@@ -363,7 +386,7 @@ func TestDockerSourceStopsWithItsContext(t *testing.T) {
 	t.Parallel()
 
 	stream := newFakeStream()
-	source := &DockerSource{Events: stream, List: lister()}
+	source := &DockerSource{Events: stream, List: lister(), SettleDelay: -1}
 
 	_, stop := startSource(t, source)
 
@@ -382,7 +405,8 @@ func TestDockerSourceRefreshListsAgain(t *testing.T) {
 
 	stream := newFakeStream()
 	source := &DockerSource{
-		Events: stream,
+		Events:      stream,
+		SettleDelay: -1,
 		List: func(context.Context) ([]types.FilterableContainer, error) {
 			mu.Lock()
 			defer mu.Unlock()
@@ -479,7 +503,8 @@ func TestDockerSourceLogsQuietlyUntilItKeepsFailing(t *testing.T) {
 	logger, levels := logLevels()
 	stream := newFakeStream()
 	source := &DockerSource{
-		Events: stream,
+		Events:      stream,
+		SettleDelay: -1,
 		List: func(context.Context) ([]types.FilterableContainer, error) {
 			mu.Lock()
 			defer mu.Unlock()
@@ -515,7 +540,8 @@ func TestDockerSourcePassesIDsAndInvalidLabels(t *testing.T) {
 
 	stream := newFakeStream()
 	source := &DockerSource{
-		Events: stream,
+		Events:      stream,
+		SettleDelay: -1,
 		List: lister(
 			labeled("web", map[string]string{labels.Schedule: " '@every 10m' "}),
 			labeled("typo", map[string]string{labels.Schedule: "every ten minutes"}),
@@ -539,4 +565,43 @@ func TestDockerSourcePassesIDsAndInvalidLabels(t *testing.T) {
 	})
 	sink.waitFor(t, map[string]string{"web": "@every 10m", "typo": "every ten minutes", "online": "@hourly"}, 1)
 	assert.Equal(t, "id-online", sink.id("online"), "an event's container ID is passed on")
+}
+
+// TestDockerSourceListsAgainOnceSettled verifies that the containers are
+// listed once more shortly after connecting (the daemon registers the
+// subscription after it starts answering), and only once.
+func TestDockerSourceListsAgainOnceSettled(t *testing.T) {
+	t.Parallel()
+
+	var (
+		mu    sync.Mutex
+		lists int
+	)
+
+	stream := newFakeStream()
+	source := &DockerSource{
+		Events: stream,
+		List: func(context.Context) ([]types.FilterableContainer, error) {
+			mu.Lock()
+			defer mu.Unlock()
+
+			lists++
+
+			return []types.FilterableContainer{labeled("web", map[string]string{labels.Schedule: "@every 10m"})}, nil
+		},
+		SettleDelay: 20 * time.Millisecond,
+	}
+
+	sink, stop := startSource(t, source)
+	defer stop()
+
+	stream.connected(t)
+	sink.waitFor(t, map[string]string{"web": "@every 10m"}, 2)
+
+	time.Sleep(100 * time.Millisecond)
+
+	mu.Lock()
+	defer mu.Unlock()
+
+	assert.Equal(t, 2, lists, "listed on connecting and once more, no more")
 }

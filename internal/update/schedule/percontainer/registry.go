@@ -1,6 +1,7 @@
 package percontainer
 
 import (
+	"slices"
 	"sort"
 	"sync"
 
@@ -34,22 +35,46 @@ type Sink interface {
 	// Set records a container's schedule. An empty spec means it has none.
 	// The ID may be empty when it isn't known.
 	Set(name, containerID, spec string)
-	// Remove forgets a container. With an ID, only that container: a later
-	// one under the same name is kept.
+	// Remove forgets a container. With an ID, only that container: another
+	// seen under the same name (its replacement) is kept.
 	Remove(name, containerID string)
 }
+
+// held is what the registry knows of a container name: its schedule, and the
+// IDs of the containers seen under that name that haven't been removed (a
+// replacement and the container it replaced can both be in flight while
+// their events arrive).
+type held struct {
+	spec string
+	ids  []string
+}
+
+// has reports whether the ID is among those seen under the name.
+func (h held) has(containerID string) bool {
+	return slices.Contains(h.ids, containerID)
+}
+
+// maxIDs is the most container IDs remembered under one name: a replacement
+// in flight, and some slack.
+const maxIDs = 4
 
 // Registry keeps one cron entry for each schedule in use, counting the
 // containers on it. It is safe for concurrent use.
 type Registry struct {
 	timers  Timers
 	log     *zerolog.Logger
-	byName  map[string]Labeled
+	byName  map[string]held
 	entries map[string]*entry
-	// warned is the invalid label each container was last warned about, so a
-	// label read again on every refresh is warned about once.
+	// warned is the invalid label each container was last warned about (with
+	// the container's ID, so a replacement is warned about too), so a label
+	// read again on every refresh is warned about once.
 	warned map[string]string
-	mu     sync.Mutex
+	// While a snapshot is applied, schedules left are released only at its
+	// end: one still in use keeps its entry and next run, however the
+	// containers on it moved (two swapping schedules, say).
+	deferred  []string
+	deferring bool
+	mu        sync.Mutex
 }
 
 // entry is a schedule's cron entry and the number of containers on it.
@@ -70,21 +95,33 @@ func NewRegistry(log *zerolog.Logger, timers Timers) *Registry {
 	return &Registry{
 		log:     log,
 		timers:  timers,
-		byName:  make(map[string]Labeled),
+		byName:  make(map[string]held),
 		entries: make(map[string]*entry),
 		warned:  make(map[string]string),
 	}
 }
 
-// Reset implements [Sink]. The containers in the snapshot are applied before
-// those missing from it are removed, so a schedule that is still in use keeps
-// its cron entry (and its next run) even when the containers on it changed.
+// Reset implements [Sink]. Every schedule the snapshot uses is taken up
+// before any is let go, so a schedule still in use keeps its cron entry (and
+// its next run) however the containers on it changed. The snapshot's IDs
+// replace those remembered: it's what Docker has now.
 func (r *Registry) Reset(containers map[string]Labeled) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 
+	r.deferring = true
+
 	for name, labeled := range containers {
 		r.applyLocked(name, labeled.ID, labeled.Spec)
+
+		if current, ok := r.byName[name]; ok {
+			current.ids = nil
+			if labeled.ID != "" {
+				current.ids = []string{labeled.ID}
+			}
+
+			r.byName[name] = current
+		}
 	}
 
 	for name := range r.byName {
@@ -92,6 +129,13 @@ func (r *Registry) Reset(containers map[string]Labeled) {
 			r.applyLocked(name, "", "")
 		}
 	}
+
+	r.deferring = false
+	for _, spec := range r.deferred {
+		r.releaseLocked(spec)
+	}
+
+	r.deferred = r.deferred[:0]
 
 	for name := range r.warned {
 		if _, still := containers[name]; !still {
@@ -108,20 +152,34 @@ func (r *Registry) Set(name, containerID, spec string) {
 	r.applyLocked(name, containerID, spec)
 }
 
-// Remove implements [Sink]. News of a container that has since been replaced
-// under the same name (its ID differs from the one recorded) is ignored.
+// Remove implements [Sink]. With an ID, only that container goes: the name
+// keeps its schedule while another container seen under it remains (its
+// replacement), and the news of one not seen there is ignored.
 func (r *Registry) Remove(name, containerID string) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 
-	if held, known := r.byName[name]; known && containerID != "" && held.ID != "" && held.ID != containerID {
-		r.log.Debug().
-			Str("container", name).
-			Str("removed_id", shortID(containerID)).
-			Str("current_id", shortID(held.ID)).
-			Msg("Ignoring the removal of a container already replaced under the same name")
+	if current, known := r.byName[name]; known && containerID != "" && len(current.ids) > 0 {
+		if !current.has(containerID) {
+			r.log.Debug().
+				Str("container", name).
+				Str("removed_id", shortID(containerID)).
+				Msg("Ignoring the removal of a container not seen under this name (already replaced)")
 
-		return
+			return
+		}
+
+		current.ids = slices.DeleteFunc(current.ids, func(id string) bool { return id == containerID })
+		if len(current.ids) > 0 {
+			r.byName[name] = current
+
+			r.log.Debug().
+				Str("container", name).
+				Str("removed_id", shortID(containerID)).
+				Msg("A replaced container was removed: its replacement keeps the schedule")
+
+			return
+		}
 	}
 
 	delete(r.warned, name)
@@ -151,8 +209,8 @@ func (r *Registry) Schedules() []string {
 func (r *Registry) applyLocked(name, containerID, spec string) {
 	spec = Normalize(spec)
 	if spec != "" && !Valid(spec) {
-		if r.warned[name] != spec {
-			r.warned[name] = spec
+		if seen := spec + "\x00" + containerID; r.warned[name] != seen {
+			r.warned[name] = seen
 
 			r.log.Warn().
 				Str("container", name).
@@ -166,11 +224,17 @@ func (r *Registry) applyLocked(name, containerID, spec string) {
 	}
 
 	old, known := r.byName[name]
-	if known && old.Spec == spec {
-		// The same schedule (perhaps a new container under the same name): its
-		// entry and its next run stay as they are
-		if containerID != "" && containerID != old.ID {
-			r.byName[name] = Labeled{ID: containerID, Spec: spec}
+	if known && old.spec == spec {
+		// The same schedule (perhaps a new container under the same name, while
+		// the one it replaces is still to be removed): its entry and its next
+		// run stay as they are, and the container's ID is remembered
+		if containerID != "" && !old.has(containerID) {
+			old.ids = append(old.ids, containerID)
+			if len(old.ids) > maxIDs {
+				old.ids = old.ids[len(old.ids)-maxIDs:]
+			}
+
+			r.byName[name] = old
 		}
 
 		return
@@ -179,11 +243,11 @@ func (r *Registry) applyLocked(name, containerID, spec string) {
 	if spec == "" {
 		if known {
 			delete(r.byName, name)
-			r.releaseLocked(old.Spec)
+			r.releaseLocked(old.spec)
 
 			r.log.Debug().
 				Str("container", name).
-				Str("was", old.Spec).
+				Str("was", old.spec).
 				Msg("Container left its own schedule")
 		}
 
@@ -195,16 +259,21 @@ func (r *Registry) applyLocked(name, containerID, spec string) {
 	if !r.holdLocked(spec) {
 		if known {
 			delete(r.byName, name)
-			r.releaseLocked(old.Spec)
+			r.releaseLocked(old.spec)
 		}
 
 		return
 	}
 
-	r.byName[name] = Labeled{ID: containerID, Spec: spec}
+	var ids []string
+	if containerID != "" {
+		ids = []string{containerID}
+	}
+
+	r.byName[name] = held{spec: spec, ids: ids}
 
 	if known {
-		r.releaseLocked(old.Spec)
+		r.releaseLocked(old.spec)
 	}
 
 	r.log.Debug().
@@ -237,19 +306,25 @@ func (r *Registry) holdLocked(spec string) bool {
 }
 
 // releaseLocked counts one container fewer on spec, removing its cron entry
-// with the last.
+// with the last (at the end of a snapshot, while one is applied).
 func (r *Registry) releaseLocked(spec string) {
-	held, ok := r.entries[spec]
+	if r.deferring {
+		r.deferred = append(r.deferred, spec)
+
+		return
+	}
+
+	schedule, ok := r.entries[spec]
 	if !ok {
 		return
 	}
 
-	held.containers--
-	if held.containers > 0 {
+	schedule.containers--
+	if schedule.containers > 0 {
 		return
 	}
 
-	r.timers.Remove(held.id)
+	r.timers.Remove(schedule.id)
 	delete(r.entries, spec)
 
 	r.log.Info().Str("schedule", spec).Msg("No containers left on a container schedule: removed it")
