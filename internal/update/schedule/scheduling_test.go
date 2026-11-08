@@ -54,7 +54,7 @@ func newTestLogger(t *testing.T) *zerolog.Logger {
 }
 
 // testDeps returns ScheduleDeps with common test defaults.
-// Callers override fields such as ScheduleSpec, UpdateOnStart, SkipFirstRun, and BaseParams as needed.
+// Callers override fields such as ScheduleSpec, UpdateOnStart, ReplacedOlderInstance, and BaseParams as needed.
 func testDeps(
 	t *testing.T,
 	runUpdate func(context.Context, types.Filter, updateParams.Params) *metrics.Metric,
@@ -853,7 +853,7 @@ func TestRunUpgradesOnSchedule_QuotedScheduleSpec(t *testing.T) {
 
 			deps := testDeps(t, runUpdatesWithNotifications, writeStartupMessage)
 			deps.ScheduleSpec = tt.scheduleSpec
-			deps.SkipFirstRun = true
+			deps.ReplacedOlderInstance = true
 			err := RunUpgradesOnSchedule(timeoutCtx, deps)
 
 			if tt.expectError {
@@ -1035,48 +1035,86 @@ func TestRunUpgradesOnSchedule_CronWithSeconds(t *testing.T) {
 	}
 }
 
-func TestRunUpgradesOnSchedule_SkipFirstRun_True(t *testing.T) {
-	ctx := t.Context()
+// TestRunUpgradesOnSchedule_ReplacedOlderInstance verifies that a process that
+// replaced an older Watchtower makes no update at startup even with update on
+// start set. Its startup message says so. Only its first scheduled run skips
+// self-updates, with or without update on start. A process that replaced none
+// updates at startup and never skips them.
+func TestRunUpgradesOnSchedule_ReplacedOlderInstance(t *testing.T) {
+	t.Parallel()
 
-	var capturedParams []updateParams.Params
-
-	runUpdatesWithNotifications := func(_ context.Context, _ types.Filter, params updateParams.Params) *metrics.Metric {
-		capturedParams = append(capturedParams, params)
-
-		return &metrics.Metric{Scanned: 1, Updated: 0, Failed: 0}
+	tests := []struct {
+		name          string
+		replaced      bool
+		updateOnStart bool
+		// wantAnnounced is the update at startup the startup message announces.
+		wantAnnounced bool
+		// wantSkippedSelfUpdate is each run's SkipSelfUpdate in order, the
+		// update at startup first when there is one.
+		wantSkippedSelfUpdate []bool
+	}{
+		{
+			name:                  "replaced an older instance",
+			replaced:              true,
+			updateOnStart:         true,
+			wantAnnounced:         false,
+			wantSkippedSelfUpdate: []bool{true, false},
+		},
+		{
+			name:                  "replaced an older instance without update on start",
+			replaced:              true,
+			updateOnStart:         false,
+			wantAnnounced:         false,
+			wantSkippedSelfUpdate: []bool{true, false},
+		},
+		{
+			name:                  "replaced none",
+			replaced:              false,
+			updateOnStart:         true,
+			wantAnnounced:         true,
+			wantSkippedSelfUpdate: []bool{false, false, false},
+		},
 	}
 
-	writeStartupMessage := func(logging.StartupParams) {}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
 
-	// Use a cron spec that runs every second
-	scheduleSpec := "* * * * * *"
+			synctest.Test(t, func(t *testing.T) {
+				// The checks read these only after the scheduler has returned.
+				var skippedSelfUpdate []bool
 
-	// Use timeout to allow multiple executions
-	timeoutCtx, timeoutCancel := context.WithTimeout(ctx, 3500*time.Millisecond)
-	defer timeoutCancel()
+				var startup *logging.StartupParams
 
-	deps := testDeps(t, runUpdatesWithNotifications, writeStartupMessage)
-	deps.ScheduleSpec = scheduleSpec
-	deps.SkipFirstRun = true
-	err := RunUpgradesOnSchedule(timeoutCtx, deps)
-	// Should complete without error when context times out (clean cancellation)
-	if err != nil {
-		t.Errorf("expected no error, got %v", err)
-	}
+				deps := testDeps(t, func(_ context.Context, _ types.Filter, params updateParams.Params) *metrics.Metric {
+					skippedSelfUpdate = append(skippedSelfUpdate, params.SkipSelfUpdate)
 
-	// Should have executed at least twice (first run skips self-update, second doesn't)
-	if len(capturedParams) < 2 {
-		t.Fatalf("expected at least 2 update calls, got %d", len(capturedParams))
-	}
+					return &metrics.Metric{}
+				}, func(written logging.StartupParams) {
+					startup = &written
+				})
+				deps.UpdateOnStart = tt.updateOnStart
+				deps.ScheduleSpec = "@every 1h"
+				deps.ReplacedOlderInstance = tt.replaced
 
-	// First run should have SkipSelfUpdate=true
-	if !capturedParams[0].SkipSelfUpdate {
-		t.Error("expected first run to skip Watchtower self-update")
-	}
+				ctx, cancel := context.WithCancel(t.Context())
+				done := make(chan error, 1)
 
-	// Second run should have SkipSelfUpdate=false
-	if capturedParams[1].SkipSelfUpdate {
-		t.Error("expected second run to not skip Watchtower self-update")
+				go func() { done <- RunUpgradesOnSchedule(ctx, deps) }()
+
+				// Two scheduled runs, at one and two hours.
+				time.Sleep(2*time.Hour + time.Minute)
+				synctest.Wait()
+
+				cancel()
+				require.NoError(t, <-done)
+
+				require.NotNil(t, startup, "the startup message was not written")
+				require.NotNil(t, startup.UpdateOnStart)
+				assert.Equal(t, tt.wantAnnounced, *startup.UpdateOnStart, "the startup message announced the wrong update at startup")
+				assert.Equal(t, tt.wantSkippedSelfUpdate, skippedSelfUpdate)
+			})
+		})
 	}
 }
 
