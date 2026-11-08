@@ -2,6 +2,8 @@ package schedule
 
 import (
 	"context"
+	"sync"
+	"sync/atomic"
 	"testing"
 	"testing/synctest"
 
@@ -22,6 +24,39 @@ func TestUpdateLock_TryLock(t *testing.T) {
 	lock.Unlock()
 
 	assert.True(t, lock.TryLock(), "the lock stayed held after Unlock")
+}
+
+// TestUpdateLock_TryLockConcurrent verifies that when several callers try a
+// free lock at the same moment, exactly one takes it. The winner keeps the
+// lock, so a second success can only come from two callers holding it at once.
+func TestUpdateLock_TryLockConcurrent(t *testing.T) {
+	t.Parallel()
+
+	const contenders = 16
+
+	lock := NewUpdateLock()
+	start := make(chan struct{})
+
+	var (
+		wg      sync.WaitGroup
+		holders atomic.Int32
+	)
+
+	for range contenders {
+		wg.Go(func() {
+			<-start
+
+			if lock.TryLock() {
+				holders.Add(1)
+			}
+		})
+	}
+
+	close(start)
+	wg.Wait()
+
+	assert.Equal(t, int32(1), holders.Load(), "more or fewer than one caller took the free lock")
+	assert.False(t, lock.TryLock(), "the winner's lock was not held")
 }
 
 // TestUpdateLock_Lock verifies that Lock waits for the holder to unlock, and

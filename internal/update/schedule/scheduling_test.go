@@ -1155,6 +1155,41 @@ func TestRunUpgradesOnSchedule_KeepsBaseSkipSelfUpdate(t *testing.T) {
 	assert.True(t, capturedParams.SkipSelfUpdate)
 }
 
+// TestRunUpgradesOnSchedule_EphemeralSelfUpdatePropagation verifies that the
+// scheduler passes ephemeral self-update to the update function and leaves
+// self-updates enabled, since ephemeral self-update chooses how Watchtower
+// replaces itself rather than whether it does.
+func TestRunUpgradesOnSchedule_EphemeralSelfUpdatePropagation(t *testing.T) {
+	t.Parallel()
+
+	synctest.Test(t, func(t *testing.T) {
+		var captured atomic.Pointer[updateParams.Params]
+
+		deps := testDeps(t, func(_ context.Context, _ types.Filter, params updateParams.Params) *metrics.Metric {
+			captured.Store(&params)
+
+			return &metrics.Metric{}
+		}, func(logging.StartupParams) {})
+		deps.UpdateOnStart = true
+		deps.BaseParams.EphemeralSelfUpdate = true
+
+		ctx, cancel := context.WithCancel(t.Context())
+		done := make(chan error, 1)
+
+		go func() { done <- RunUpgradesOnSchedule(ctx, deps) }()
+
+		synctest.Wait()
+
+		params := captured.Load()
+		require.NotNil(t, params, "the update at startup did not run")
+		assert.True(t, params.EphemeralSelfUpdate, "ephemeral self-update did not reach the update")
+		assert.False(t, params.SkipSelfUpdate, "ephemeral self-update disabled self-updates")
+
+		cancel()
+		require.NoError(t, <-done)
+	})
+}
+
 // TestRunUpgradesOnSchedule_ReviveStoppedPropagation verifies that RunUpgradesOnSchedule
 // passes the ReviveStopped flag through [updateParams.Params] to the update function.
 func TestRunUpgradesOnSchedule_ReviveStoppedPropagation(t *testing.T) {
