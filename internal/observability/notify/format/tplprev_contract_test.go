@@ -21,6 +21,7 @@ const (
 	tplprevReportMethodsPath          = "../../../../tools/tplprev/internal/report/testdata/report-methods.txt"
 	tplprevContainerReportMethodsPath = "../../../../tools/tplprev/internal/report/testdata/container-report-methods.txt"
 	tplprevJSONKeysPath               = "../../../../tools/tplprev/internal/notify/testdata/container-json-keys.txt"
+	tplprevContainerStatesPath        = "../../../../tools/tplprev/internal/preview/testdata/container-states.txt"
 )
 
 // tplprevContractHeader starts each generated contract list.
@@ -113,17 +114,30 @@ func containerJSONKeys(t *testing.T) []string {
 	return slices.Sorted(maps.Keys(keys))
 }
 
+// containerStates returns the sorted state names a report's containers can
+// carry, read from a report with containers in every state.
+func containerStates() []string {
+	names := map[string]struct{}{}
+	for _, status := range goldenFullReport().All() {
+		names[status.State()] = struct{}{}
+	}
+
+	return slices.Sorted(maps.Keys(names))
+}
+
 // contractList returns lines as a generated contract list.
 func contractList(lines []string) []byte {
 	return []byte(tplprevContractHeader + strings.Join(lines, "\n") + "\n")
 }
 
-// TestTplprevReportContractInSync fails when the template-preview module's
-// lists of report and container report method signatures and container JSON keys
-// differ from what notifications provide. The report and container types are
-// read from the template data. A change to its types changes the lists. The
-// preview module's own tests check its report types and JSON output against
-// these lists. Set UPDATE_GOLDEN=1 to regenerate them.
+// TestTplprevReportContractInSync fails when one of the template-preview
+// module's contract lists differs from what notifications provide. The lists
+// hold the method signatures of the report and container report types. They
+// also hold the container JSON keys and the container state names. The report
+// and container types are read from the template data. A change to its types
+// changes the lists. The preview module's own tests check its report types,
+// JSON output and state names against these lists. Set UPDATE_GOLDEN=1 to
+// regenerate them.
 func TestTplprevReportContractInSync(t *testing.T) {
 	reportField, ok := reflect.TypeFor[Data]().FieldByName("Report")
 	require.True(t, ok, "the template data has a report")
@@ -137,6 +151,7 @@ func TestTplprevReportContractInSync(t *testing.T) {
 		tplprevReportMethodsPath:          contractList(methodSignatures(reportField.Type)),
 		tplprevContainerReportMethodsPath: contractList(methodSignatures(containerType)),
 		tplprevJSONKeysPath:               contractList(containerJSONKeys(t)),
+		tplprevContainerStatesPath:        contractList(containerStates()),
 	}
 
 	for path, want := range lists {
