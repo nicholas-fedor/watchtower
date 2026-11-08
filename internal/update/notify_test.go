@@ -131,6 +131,52 @@ func TestRunUpdatesWithNotifications_ScanCompletedCounts(t *testing.T) {
 	}, received[1].Data)
 }
 
+// TestRunUpdatesWithNotifications_StoppingProcessMakesNoUpdate verifies that a
+// session started after the process was told to stop does nothing and returns
+// no metric, so it is not reported as a failed scan. The client and notifier
+// mocks fail on any call.
+func TestRunUpdatesWithNotifications_StoppingProcessMakesNoUpdate(t *testing.T) {
+	t.Parallel()
+
+	broadcaster := events.NewBroadcaster()
+	published, _ := broadcaster.SubscribeWithDone()
+
+	ctx, cancel := context.WithCancel(t.Context())
+	cancel()
+
+	metric := RunUpdatesWithNotifications(ctx, RunUpdatesWithNotificationsParams{
+		Logger:           newTestLogger(t),
+		Client:           mockContainerClient.NewMockClient(t),
+		Notifier:         mockUpdate.NewMockNotifier(t),
+		EventBroadcaster: broadcaster,
+		Update:           defaultTestUpdateParams(filters.NoFilter),
+	})
+
+	assert.Nil(t, metric, "a stopping process returned a scan metric")
+	assert.Empty(t, published, "a stopping process published a scan event")
+}
+
+// TestRunUpdatesWithNotifications_PassedDeadlineStillRuns verifies that a
+// session whose deadline has already passed still runs and reports its scan.
+// Only a stopped process cancels its context. A deadline that passes first,
+// such as an HTTP API request that waited for the update lock longer than its
+// timeout, is a failure the caller should see.
+func TestRunUpdatesWithNotifications_PassedDeadlineStillRuns(t *testing.T) {
+	t.Parallel()
+
+	ctx, cancel := context.WithDeadline(t.Context(), time.Now().Add(-time.Second))
+	defer cancel()
+
+	metric := RunUpdatesWithNotifications(ctx, RunUpdatesWithNotificationsParams{
+		Logger: newTestLogger(t),
+		Client: mockUpdate.CreateMockClient(&mockUpdate.TestData{}, false, false),
+		Update: defaultTestUpdateParams(filters.NoFilter),
+	})
+
+	require.NotNil(t, metric, "a session past its deadline returned no scan metric")
+	assert.True(t, metric.ScanFailed, "a session past its deadline did not report a failed scan")
+}
+
 // TestRunUpdatesWithNotifications_PanicEndsSession verifies that a panic during
 // an update session ends it as an update error does. The panic is logged at
 // error without notify=no, so the notification hook takes it. The session's

@@ -103,6 +103,11 @@ func (e reportedError) Unwrap() error {
 // logged and sent with the session's notification batch. Subscribers get
 // scan_failed, and the returned metric marks a failed scan.
 //
+// A session that starts after the process was told to stop makes no update.
+// When ctx is already canceled, it does nothing and returns nil, so it is not
+// reported as a failed scan. A ctx past its deadline still runs and fails, since a timeout is a
+// failure the caller should see.
+//
 // Parameters:
 //   - ctx: Context for cancellation and timeouts.
 //   - params: The RunUpdatesWithNotificationsParams struct containing all configuration parameters.
@@ -110,6 +115,7 @@ func (e reportedError) Unwrap() error {
 //
 // Returns:
 //   - *metrics.Metric: A pointer to a metric object summarizing the update session (scanned, updated, failed counts).
+//     Nil when ctx was already canceled.
 //
 //nolint:nonamedreturns // The deferred recover sets the result.
 func RunUpdatesWithNotifications(
@@ -119,6 +125,12 @@ func RunUpdatesWithNotifications(
 	log := params.Logger
 
 	log.Debug().Msg("Starting RunUpdatesWithNotifications")
+
+	if errors.Is(ctx.Err(), context.Canceled) {
+		log.Debug().Err(ctx.Err()).Msg("Update skipped: shutting down")
+
+		return nil
+	}
 
 	// The session owns its batch and sends its reports through it. It ends the
 	// batch on every return. The end sends what no notification took, without

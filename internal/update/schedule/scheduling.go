@@ -274,8 +274,8 @@ func RunUpgradesOnSchedule(ctx context.Context, deps ScheduleDeps) error {
 
 		defer lock.Unlock()
 
-		// Shutdown can begin just after the lock is taken. A run started then
-		// would only be canceled and reported as a failed scan.
+		// Shutdown can begin just after the lock is taken. The tick then does
+		// nothing, as a tick that is still waiting for the lock does.
 		if ctx.Err() != nil {
 			log.Debug().Err(ctx.Err()).Msg("Update skipped: shutting down")
 
@@ -347,10 +347,10 @@ func RunUpgradesOnSchedule(ctx context.Context, deps ScheduleDeps) error {
 	}
 
 	// Check if update-on-start is enabled and trigger immediate update if so.
-	// Skip it when the process is already stopping, so a canceled update is not
-	// reported as a failure. The update at startup does not wait for another
-	// update. When the startup message had to wait for one, the update at
-	// startup is skipped as it is when it finds the lock taken.
+	// A process that is already stopping neither runs it nor counts it as a
+	// skipped scan. The update at startup does not wait for another update.
+	// When the startup message had to wait for one, the update at startup is
+	// skipped as it is when it finds the lock taken.
 	if deps.updatesOnStart() && ctx.Err() == nil {
 		if waitedForUpdate {
 			log.Debug().Msg("Update skipped: another update was running at startup")
