@@ -4,118 +4,83 @@ import (
 	"errors"
 	"testing"
 
-	"github.com/moby/moby/api/types/image"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 
+	"github.com/nicholas-fedor/watchtower/internal/container"
 	mockContainerClient "github.com/nicholas-fedor/watchtower/internal/container/client/mocks"
+	"github.com/nicholas-fedor/watchtower/internal/testutil/containerfixture"
+	"github.com/nicholas-fedor/watchtower/internal/testutil/modelfixture"
 	"github.com/nicholas-fedor/watchtower/pkg/types"
-	mockTypes "github.com/nicholas-fedor/watchtower/pkg/types/mocks"
 )
 
+// nginxContainer returns a running container with the given name that runs
+// nginx:latest, whose image has the ID sha256:abc123 and the given repository
+// digests.
+func nginxContainer(name string, repoDigests ...string) *container.Container {
+	return modelfixture.Container(
+		containerfixture.WithName(name),
+		containerfixture.WithImageName("nginx:latest"),
+		containerfixture.WithImageID("sha256:abc123"),
+		containerfixture.WithRepoDigests(repoDigests),
+	)
+}
+
+// TestListContainerStatuses verifies that every listed container gets a status
+// and that a listing failure is returned wrapped.
 func TestListContainerStatuses(t *testing.T) {
+	t.Parallel()
+
 	tests := []struct {
-		name    string
-		client  func(t *testing.T) *mockContainerClient.MockClient
-		filter  types.Filter
-		wantErr bool
-		errMsg  string
-		wantLen int
+		name       string
+		containers []types.Container
+		listErr    error
+		filter     types.Filter
+		wantLen    int
 	}{
 		{
 			name: "successful list with containers",
-			client: func(t *testing.T) *mockContainerClient.MockClient {
-				t.Helper()
-				c := mockContainerClient.NewMockClient(t)
-				container := mockTypes.NewMockContainer(t)
-				container.EXPECT().Name().Return("test-container")
-				container.EXPECT().ImageName().Return("nginx:latest")
-				container.EXPECT().ImageID().Return(types.ImageID("sha256:abc123"))
-				container.EXPECT().ImageInfo().Return(nil)
-				c.EXPECT().ListContainers(mock.Anything).Return([]types.Container{container}, nil)
-
-				return c
+			containers: []types.Container{
+				nginxContainer("test-container"),
 			},
-			filter:  nil,
-			wantErr: false,
 			wantLen: 1,
 		},
 		{
-			name: "successful list without filter",
-			client: func(t *testing.T) *mockContainerClient.MockClient {
-				t.Helper()
-				c := mockContainerClient.NewMockClient(t)
-				container := mockTypes.NewMockContainer(t)
-				container.EXPECT().Name().Return("test-container")
-				container.EXPECT().ImageName().Return("nginx:latest")
-				container.EXPECT().ImageID().Return(types.ImageID("sha256:abc123"))
-				container.EXPECT().ImageInfo().Return(nil)
-				c.EXPECT().ListContainers(mock.Anything).Return([]types.Container{container}, nil)
-
-				return c
-			},
-			filter:  nil,
-			wantErr: false,
-			wantLen: 1,
+			name:    "client error returns wrapped error",
+			listErr: errors.New("connection refused"),
 		},
 		{
-			name: "client error returns wrapped error",
-			client: func(t *testing.T) *mockContainerClient.MockClient {
-				t.Helper()
-				c := mockContainerClient.NewMockClient(t)
-				c.EXPECT().ListContainers(mock.Anything).Return(nil, errors.New("connection refused"))
-
-				return c
-			},
-			filter:  nil,
-			wantErr: true,
-			errMsg:  "failed to list containers",
-		},
-		{
-			name: "empty container list",
-			client: func(t *testing.T) *mockContainerClient.MockClient {
-				t.Helper()
-				c := mockContainerClient.NewMockClient(t)
-				c.EXPECT().ListContainers(mock.Anything).Return([]types.Container{}, nil)
-
-				return c
-			},
-			filter:  nil,
-			wantErr: false,
-			wantLen: 0,
+			name:       "empty container list",
+			containers: []types.Container{},
+			wantLen:    0,
 		},
 		{
 			name: "non-nil filter is passed through to ListContainers",
-			client: func(t *testing.T) *mockContainerClient.MockClient {
-				t.Helper()
-				c := mockContainerClient.NewMockClient(t)
-				container := mockTypes.NewMockContainer(t)
-				container.EXPECT().Name().Return("filtered-container")
-				container.EXPECT().ImageName().Return("nginx:latest")
-				container.EXPECT().ImageID().Return(types.ImageID("sha256:abc"))
-				container.EXPECT().ImageInfo().Return(nil)
-				c.EXPECT().ListContainers(mock.Anything, mock.Anything).Return([]types.Container{container}, nil)
-
-				return c
+			containers: []types.Container{
+				nginxContainer("filtered-container"),
 			},
 			filter:  func(_ types.FilterableContainer) bool { return true },
-			wantErr: false,
 			wantLen: 1,
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			client := tt.client(t)
+			t.Parallel()
+
+			client := mockContainerClient.NewMockClient(t)
+			if tt.filter != nil {
+				client.EXPECT().ListContainers(mock.Anything, mock.Anything).Return(tt.containers, tt.listErr)
+			} else {
+				client.EXPECT().ListContainers(mock.Anything).Return(tt.containers, tt.listErr)
+			}
+
 			statuses, err := ListContainerStatuses(t.Context(), client, tt.filter)
 
-			if tt.wantErr {
-				require.Error(t, err)
-
-				if tt.errMsg != "" {
-					assert.Contains(t, err.Error(), tt.errMsg)
-				}
+			if tt.listErr != nil {
+				require.ErrorIs(t, err, tt.listErr)
+				assert.ErrorContains(t, err, "failed to list containers")
 			} else {
 				require.NoError(t, err)
 				assert.Len(t, statuses, tt.wantLen)
@@ -124,24 +89,33 @@ func TestListContainerStatuses(t *testing.T) {
 	}
 }
 
+// Test_containerToStatus verifies that a status carries the container's name,
+// image and image ID, with the digest of the image's own repository when the
+// image was inspected.
 func Test_containerToStatus(t *testing.T) {
+	t.Parallel()
+
 	tests := []struct {
-		name      string
-		container func(t *testing.T) *mockTypes.MockContainer
-		want      Status
+		name    string
+		running *container.Container
+		want    Status
 	}{
 		{
-			name: "container without image info",
-			container: func(t *testing.T) *mockTypes.MockContainer {
-				t.Helper()
-				c := mockTypes.NewMockContainer(t)
-				c.EXPECT().Name().Return("my-container")
-				c.EXPECT().ImageName().Return("nginx:latest")
-				c.EXPECT().ImageID().Return(types.ImageID("sha256:abc123"))
-				c.EXPECT().ImageInfo().Return(nil)
-
-				return c
+			name: "container whose image could not be inspected",
+			running: modelfixture.ContainerWithoutImageInfo(
+				containerfixture.WithName("my-container"),
+				containerfixture.WithImageName("nginx:latest"),
+			),
+			want: Status{
+				Name:    "my-container",
+				Image:   "nginx:latest",
+				ImageID: "",
+				Digest:  "",
 			},
+		},
+		{
+			name:    "container with image info but no repo digests",
+			running: nginxContainer("my-container"),
 			want: Status{
 				Name:    "my-container",
 				Image:   "nginx:latest",
@@ -150,40 +124,8 @@ func Test_containerToStatus(t *testing.T) {
 			},
 		},
 		{
-			name: "container with image info but no repo digests",
-			container: func(t *testing.T) *mockTypes.MockContainer {
-				t.Helper()
-				c := mockTypes.NewMockContainer(t)
-				c.EXPECT().Name().Return("my-container")
-				c.EXPECT().ImageName().Return("nginx:latest")
-				c.EXPECT().ImageID().Return(types.ImageID("sha256:abc123"))
-
-				info := &image.InspectResponse{RepoDigests: []string{}}
-				c.EXPECT().ImageInfo().Return(info)
-
-				return c
-			},
-			want: Status{
-				Name:    "my-container",
-				Image:   "nginx:latest",
-				ImageID: "sha256:abc123",
-				Digest:  "",
-			},
-		},
-		{
-			name: "container with valid repo digest",
-			container: func(t *testing.T) *mockTypes.MockContainer {
-				t.Helper()
-				c := mockTypes.NewMockContainer(t)
-				c.EXPECT().Name().Return("my-container")
-				c.EXPECT().ImageName().Return("nginx:latest")
-				c.EXPECT().ImageID().Return(types.ImageID("sha256:abc123"))
-
-				info := &image.InspectResponse{RepoDigests: []string{"nginx@sha256:digest123"}}
-				c.EXPECT().ImageInfo().Return(info)
-
-				return c
-			},
+			name:    "container with valid repo digest",
+			running: nginxContainer("my-container", "nginx@sha256:digest123"),
 			want: Status{
 				Name:    "my-container",
 				Image:   "nginx:latest",
@@ -191,12 +133,23 @@ func Test_containerToStatus(t *testing.T) {
 				Digest:  "sha256:digest123",
 			},
 		},
+		{
+			name:    "digest from the container's repository when the image has several",
+			running: nginxContainer("my-container", "ghcr.io/org/nginx@sha256:ghcr", "docker.io/library/nginx@sha256:hub"),
+			want: Status{
+				Name:    "my-container",
+				Image:   "nginx:latest",
+				ImageID: "sha256:abc123",
+				Digest:  "sha256:hub",
+			},
+		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			c := tt.container(t)
-			got := containerToStatus(c)
+			t.Parallel()
+
+			got := containerToStatus(tt.running)
 			assert.Equal(t, tt.want, got)
 		})
 	}

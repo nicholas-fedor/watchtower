@@ -4,79 +4,90 @@ import (
 	"errors"
 	"testing"
 
-	"github.com/moby/moby/api/types/image"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 
 	mockContainerClient "github.com/nicholas-fedor/watchtower/internal/container/client/mocks"
+	"github.com/nicholas-fedor/watchtower/internal/container/labels"
+	"github.com/nicholas-fedor/watchtower/internal/testutil/containerfixture"
+	"github.com/nicholas-fedor/watchtower/internal/testutil/modelfixture"
 	updateParams "github.com/nicholas-fedor/watchtower/internal/update/params"
 	"github.com/nicholas-fedor/watchtower/pkg/types"
-	mockTypes "github.com/nicholas-fedor/watchtower/pkg/types/mocks"
 )
 
+// TestGetContainerDetails verifies that each listed container's details carry
+// its identity, state and labels, with the enable label weighed against the
+// label-enable setting.
 func TestGetContainerDetails(t *testing.T) {
+	t.Parallel()
+
 	tests := []struct {
-		name    string
-		client  func(t *testing.T) *mockContainerClient.MockClient
-		filter  types.Filter
-		params  updateParams.Params
-		wantErr bool
-		wantLen int
-		want    func(t *testing.T, details []ContainerDetails)
+		name       string
+		containers []types.Container
+		listErr    error
+		params     updateParams.Params
+		wantLen    int
+		want       func(t *testing.T, details []ContainerDetails)
 	}{
 		{
 			name: "successful list with labeled enabled container",
-			client: func(t *testing.T) *mockContainerClient.MockClient {
-				t.Helper()
-				c := mockContainerClient.NewMockClient(t)
-				container := mockTypes.NewMockContainer(t)
-				container.EXPECT().Name().Return("test-container")
-				container.EXPECT().ImageName().Return("nginx:latest")
-				container.EXPECT().ImageID().Return(types.ImageID("sha256:abc123"))
-				container.EXPECT().IsRunning().Return(true)
-				container.EXPECT().IsWatchtower().Return(false)
-				container.EXPECT().IsMonitorOnly(mock.Anything).Return(false)
-				container.EXPECT().IsNoPull(mock.Anything).Return(false)
-				container.EXPECT().Enabled().Return(true, true)
-				container.EXPECT().IsStale().Return(false)
-				container.EXPECT().Scope().Return("", true)
-				container.EXPECT().ImageInfo().Return(nil)
-				c.EXPECT().ListContainers(mock.Anything).Return([]types.Container{container}, nil)
-
-				return c
+			containers: []types.Container{
+				modelfixture.Container(
+					containerfixture.WithName("test-container"),
+					containerfixture.WithImageName("nginx:latest"),
+					containerfixture.WithImageID("sha256:abc123"),
+					containerfixture.WithLabels(map[string]string{
+						labels.Enable: "true",
+						labels.Scope:  "prod",
+					}),
+				),
 			},
-			params:  updateParams.Params{},
-			wantErr: false,
+			params:  updateParams.Params{LabelEnable: true},
 			wantLen: 1,
 			want: func(t *testing.T, details []ContainerDetails) {
 				t.Helper()
-				assert.True(t, details[0].Enabled)
+				assert.Equal(t, ContainerDetails{
+					Name:        "test-container",
+					Image:       "nginx:latest",
+					ImageID:     "sha256:abc123",
+					Digest:      "",
+					Scope:       "prod",
+					Running:     true,
+					Watchtower:  false,
+					MonitorOnly: false,
+					NoPull:      false,
+					Enabled:     true,
+					Stale:       false,
+				}, details[0])
+			},
+		},
+		{
+			name: "container whose image could not be inspected has no image ID or digest",
+			containers: []types.Container{
+				modelfixture.ContainerWithoutImageInfo(
+					containerfixture.WithName("orphaned-container"),
+					containerfixture.WithImageName("nginx:latest"),
+				),
+			},
+			params:  updateParams.Params{},
+			wantLen: 1,
+			want: func(t *testing.T, details []ContainerDetails) {
+				t.Helper()
+				assert.Equal(t, "orphaned-container", details[0].Name)
+				assert.Empty(t, details[0].ImageID)
+				assert.Empty(t, details[0].Digest)
 			},
 		},
 		{
 			name: "unlabeled container is enabled when label-enable is false",
-			client: func(t *testing.T) *mockContainerClient.MockClient {
-				t.Helper()
-				c := mockContainerClient.NewMockClient(t)
-				container := mockTypes.NewMockContainer(t)
-				container.EXPECT().Name().Return("unlabeled-container")
-				container.EXPECT().ImageName().Return("nginx:latest")
-				container.EXPECT().ImageID().Return(types.ImageID("sha256:abc123"))
-				container.EXPECT().IsRunning().Return(true)
-				container.EXPECT().IsWatchtower().Return(false)
-				container.EXPECT().IsMonitorOnly(mock.Anything).Return(false)
-				container.EXPECT().IsNoPull(mock.Anything).Return(false)
-				container.EXPECT().Enabled().Return(false, false)
-				container.EXPECT().IsStale().Return(false)
-				container.EXPECT().Scope().Return("", true)
-				container.EXPECT().ImageInfo().Return(nil)
-				c.EXPECT().ListContainers(mock.Anything).Return([]types.Container{container}, nil)
-
-				return c
+			containers: []types.Container{
+				modelfixture.Container(
+					containerfixture.WithName("unlabeled-container"),
+					containerfixture.WithImageName("nginx:latest"),
+				),
 			},
 			params:  updateParams.Params{LabelEnable: false},
-			wantErr: false,
 			wantLen: 1,
 			want: func(t *testing.T, details []ContainerDetails) {
 				t.Helper()
@@ -85,27 +96,13 @@ func TestGetContainerDetails(t *testing.T) {
 		},
 		{
 			name: "unlabeled container is disabled when label-enable is true",
-			client: func(t *testing.T) *mockContainerClient.MockClient {
-				t.Helper()
-				c := mockContainerClient.NewMockClient(t)
-				container := mockTypes.NewMockContainer(t)
-				container.EXPECT().Name().Return("unlabeled-container")
-				container.EXPECT().ImageName().Return("nginx:latest")
-				container.EXPECT().ImageID().Return(types.ImageID("sha256:abc123"))
-				container.EXPECT().IsRunning().Return(true)
-				container.EXPECT().IsWatchtower().Return(false)
-				container.EXPECT().IsMonitorOnly(mock.Anything).Return(false)
-				container.EXPECT().IsNoPull(mock.Anything).Return(false)
-				container.EXPECT().Enabled().Return(false, false)
-				container.EXPECT().IsStale().Return(false)
-				container.EXPECT().Scope().Return("", true)
-				container.EXPECT().ImageInfo().Return(nil)
-				c.EXPECT().ListContainers(mock.Anything).Return([]types.Container{container}, nil)
-
-				return c
+			containers: []types.Container{
+				modelfixture.Container(
+					containerfixture.WithName("unlabeled-container"),
+					containerfixture.WithImageName("nginx:latest"),
+				),
 			},
 			params:  updateParams.Params{LabelEnable: true},
-			wantErr: false,
 			wantLen: 1,
 			want: func(t *testing.T, details []ContainerDetails) {
 				t.Helper()
@@ -114,27 +111,14 @@ func TestGetContainerDetails(t *testing.T) {
 		},
 		{
 			name: "labeled false container is disabled when label-enable is false",
-			client: func(t *testing.T) *mockContainerClient.MockClient {
-				t.Helper()
-				c := mockContainerClient.NewMockClient(t)
-				container := mockTypes.NewMockContainer(t)
-				container.EXPECT().Name().Return("disabled-container")
-				container.EXPECT().ImageName().Return("nginx:latest")
-				container.EXPECT().ImageID().Return(types.ImageID("sha256:abc123"))
-				container.EXPECT().IsRunning().Return(true)
-				container.EXPECT().IsWatchtower().Return(false)
-				container.EXPECT().IsMonitorOnly(mock.Anything).Return(false)
-				container.EXPECT().IsNoPull(mock.Anything).Return(false)
-				container.EXPECT().Enabled().Return(false, true)
-				container.EXPECT().IsStale().Return(false)
-				container.EXPECT().Scope().Return("", true)
-				container.EXPECT().ImageInfo().Return(nil)
-				c.EXPECT().ListContainers(mock.Anything).Return([]types.Container{container}, nil)
-
-				return c
+			containers: []types.Container{
+				modelfixture.Container(
+					containerfixture.WithName("disabled-container"),
+					containerfixture.WithImageName("nginx:latest"),
+					containerfixture.WithLabels(map[string]string{labels.Enable: "false"}),
+				),
 			},
 			params:  updateParams.Params{LabelEnable: false},
-			wantErr: false,
 			wantLen: 1,
 			want: func(t *testing.T, details []ContainerDetails) {
 				t.Helper()
@@ -143,29 +127,14 @@ func TestGetContainerDetails(t *testing.T) {
 		},
 		{
 			name: "digest from the container's repository when the image has several",
-			client: func(t *testing.T) *mockContainerClient.MockClient {
-				t.Helper()
-				c := mockContainerClient.NewMockClient(t)
-				container := mockTypes.NewMockContainer(t)
-				container.EXPECT().Name().Return("app")
-				container.EXPECT().ImageName().Return("ghcr.io/org/app:latest")
-				container.EXPECT().ImageID().Return(types.ImageID("sha256:abc123"))
-				container.EXPECT().IsRunning().Return(true)
-				container.EXPECT().IsWatchtower().Return(false)
-				container.EXPECT().IsMonitorOnly(mock.Anything).Return(false)
-				container.EXPECT().IsNoPull(mock.Anything).Return(false)
-				container.EXPECT().Enabled().Return(false, false)
-				container.EXPECT().IsStale().Return(false)
-				container.EXPECT().Scope().Return("", true)
-				container.EXPECT().ImageInfo().Return(&image.InspectResponse{
-					RepoDigests: []string{"docker.io/org/app@sha256:hub", "ghcr.io/org/app@sha256:ghcr"},
-				})
-				c.EXPECT().ListContainers(mock.Anything).Return([]types.Container{container}, nil)
-
-				return c
+			containers: []types.Container{
+				modelfixture.Container(
+					containerfixture.WithName("app"),
+					containerfixture.WithImageName("ghcr.io/org/app:latest"),
+					containerfixture.WithRepoDigests([]string{"docker.io/org/app@sha256:hub", "ghcr.io/org/app@sha256:ghcr"}),
+				),
 			},
 			params:  updateParams.Params{},
-			wantErr: false,
 			wantLen: 1,
 			want: func(t *testing.T, details []ContainerDetails) {
 				t.Helper()
@@ -173,27 +142,24 @@ func TestGetContainerDetails(t *testing.T) {
 			},
 		},
 		{
-			name: "client error returns wrapped error",
-			client: func(t *testing.T) *mockContainerClient.MockClient {
-				t.Helper()
-				c := mockContainerClient.NewMockClient(t)
-				c.EXPECT().ListContainers(mock.Anything).Return(nil, errors.New("connection refused"))
-
-				return c
-			},
-			filter:  nil,
+			name:    "client error returns wrapped error",
+			listErr: errors.New("connection refused"),
 			params:  updateParams.Params{},
-			wantErr: true,
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			client := tt.client(t)
-			details, err := GetContainerDetails(t.Context(), client, tt.filter, "", "", tt.params)
+			t.Parallel()
 
-			if tt.wantErr {
-				require.Error(t, err)
+			client := mockContainerClient.NewMockClient(t)
+			client.EXPECT().ListContainers(mock.Anything).Return(tt.containers, tt.listErr)
+
+			details, err := GetContainerDetails(t.Context(), client, nil, "", "", tt.params)
+
+			if tt.listErr != nil {
+				require.ErrorIs(t, err, tt.listErr)
+				assert.ErrorContains(t, err, "failed to list containers")
 			} else {
 				require.NoError(t, err)
 				assert.Len(t, details, tt.wantLen)

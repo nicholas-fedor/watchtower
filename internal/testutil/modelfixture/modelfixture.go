@@ -18,3 +18,18 @@ func Container(updates ...containerfixture.Update) *container.Container {
 
 	return container.NewContainer(nil, containerInfo, imageInfo)
 }
+
+// ContainerWithoutImageInfo builds a Container from containerfixture inspect
+// data without its image inspect data, as a listing returns a container whose
+// image is no longer present.
+//
+// Parameters:
+//   - updates: Changes to the container inspect data.
+//
+// Returns:
+//   - *container.Container: Container built from the inspect data.
+func ContainerWithoutImageInfo(updates ...containerfixture.Update) *container.Container {
+	containerInfo, _ := containerfixture.Inspect(updates...)
+
+	return container.NewContainer(nil, containerInfo, nil)
+}
