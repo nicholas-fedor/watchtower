@@ -585,26 +585,61 @@ func FuzzLinkNormalization(f *testing.F) {
 }
 
 // TestGenerateLinkNormalizationContainers verifies that the link normalization
-// seeds give the sorter the links they are named for. The depends-on label
-// drops leading slashes. A part of only spaces becomes an empty link.
+// seeds give the sorter the links they are named for, and that those links
+// resolve to the seed's dependencies with Compose depends_on read or not. The
+// depends-on label drops leading slashes. A part of only spaces becomes an
+// empty link. A legacy link without a colon or without a name is dropped.
+//
+// The graph's edges are checked rather than the sort order, since container1
+// sorts after its dependencies even when they have no edges.
 func TestGenerateLinkNormalizationContainers(t *testing.T) {
 	t.Parallel()
 
 	tests := []struct {
 		seed string
-		want []string
+		// links are the links container1 reports.
+		links []string
+		// dependencies are the containers container1 must depend on.
+		dependencies []string
 	}{
-		{seed: "leading-slash-links", want: []string{"dependency1", "dependency2"}},
-		{seed: "empty-links", want: []string{"", "dependency1", ""}},
+		{
+			seed:         "leading-slash-links",
+			links:        []string{"dependency1", "dependency2"},
+			dependencies: []string{"dependency1", "dependency2"},
+		},
+		{
+			seed:         "empty-links",
+			links:        []string{"", "dependency1", ""},
+			dependencies: []string{"dependency1"},
+		},
+		{
+			seed:         "malformed-host-links",
+			links:        []string{"dependency1", "dependency2"},
+			dependencies: []string{"dependency1", "dependency2"},
+		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.seed, func(t *testing.T) {
 			t.Parallel()
 
-			picked := pick(generateLinkNormalizationContainers([]byte(tt.seed)), "container1")
+			containers := generateLinkNormalizationContainers([]byte(tt.seed))
+			picked := pick(containers, "container1")
 			require.Len(t, picked, 1)
-			assert.Equal(t, tt.want, picked[0].Links(true))
+			assert.Equal(t, tt.links, picked[0].Links(true))
+
+			for _, useComposeDependsOn := range []bool{true, false} {
+				_, indegree, adjacency, _, err := buildDependencyGraph(newTestLogger(t), containers, useComposeDependsOn)
+				require.NoError(t, err)
+				assert.Equal(t, len(tt.dependencies), indegree["container1"])
+
+				for _, dependency := range tt.dependencies {
+					assert.Contains(t, adjacency[dependency], "container1")
+				}
+
+				sorted := slices.Clone(containers)
+				require.NoError(t, dependencySorter{}.Sort(newTestLogger(t), sorted, useComposeDependsOn))
+			}
 		})
 	}
 }
