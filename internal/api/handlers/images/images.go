@@ -97,17 +97,12 @@ func ListImageStatuses(ctx context.Context, client containerClient.Client, filte
 			continue
 		}
 
-		status := &ImageStatus{
+		imageMap[key] = &ImageStatus{
 			Name:       imageName,
 			ImageID:    imageID,
+			Digest:     containerImage.LocalDigest(c),
 			Containers: 1,
 		}
-
-		if info := c.ImageInfo(); info != nil {
-			status.Digest = containerImage.ExtractImageDigest(info.RepoDigests, imageName)
-		}
-
-		imageMap[key] = status
 	}
 
 	statuses := make([]ImageStatus, 0, len(imageMap))

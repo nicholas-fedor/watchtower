@@ -54,47 +54,10 @@ func TestListImageStatuses(t *testing.T) {
 			},
 		},
 		{
-			name:       "digest extracted from canonical repo digest",
-			containers: []types.Container{imageContainer("nginx:latest", "sha256:abc123", "docker.io/library/nginx@sha256:digest123")},
-			want: []ImageStatus{
-				{Name: "nginx:latest", ImageID: "sha256:abc123", Digest: "sha256:digest123", Containers: 1},
-			},
-		},
-		{
-			name:       "digest extracted from short name repo digest",
-			containers: []types.Container{imageContainer("myapp:1.0", "sha256:def456", "myapp@sha256:shortname")},
-			want: []ImageStatus{
-				{Name: "myapp:1.0", ImageID: "sha256:def456", Digest: "sha256:shortname", Containers: 1},
-			},
-		},
-		{
-			name:       "digest extracted from private registry",
-			containers: []types.Container{imageContainer("registry.example.com/team/app:v2", "sha256:ghi789", "registry.example.com/team/app@sha256:privreg")},
-			want: []ImageStatus{
-				{Name: "registry.example.com/team/app:v2", ImageID: "sha256:ghi789", Digest: "sha256:privreg", Containers: 1},
-			},
-		},
-		{
-			name:       "multiple digests uses first",
-			containers: []types.Container{imageContainer("nginx:latest", "sha256:abc123", "docker.io/library/nginx@sha256:first", "nginx@sha256:second")},
-			want: []ImageStatus{
-				{Name: "nginx:latest", ImageID: "sha256:abc123", Digest: "sha256:first", Containers: 1},
-			},
-		},
-		{
 			name:       "multiple repositories uses the container's repository",
 			containers: []types.Container{imageContainer("ghcr.io/org/app:latest", "sha256:abc123", "docker.io/org/app@sha256:hub", "ghcr.io/org/app@sha256:ghcr")},
 			want: []ImageStatus{
 				{Name: "ghcr.io/org/app:latest", ImageID: "sha256:abc123", Digest: "sha256:ghcr", Containers: 1},
-			},
-		},
-		{
-			name: "image that could not be inspected has no image ID or digest",
-			containers: []types.Container{
-				modelfixture.ContainerWithoutImageInfo(containerfixture.WithImageName("nginx:latest")),
-			},
-			want: []ImageStatus{
-				{Name: "nginx:latest", ImageID: "", Digest: "", Containers: 1},
 			},
 		},
 		{

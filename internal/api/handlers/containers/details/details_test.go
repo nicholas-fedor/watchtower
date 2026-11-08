@@ -63,23 +63,6 @@ func TestGetContainerDetails(t *testing.T) {
 			},
 		},
 		{
-			name: "container whose image could not be inspected has no image ID or digest",
-			containers: []types.Container{
-				modelfixture.ContainerWithoutImageInfo(
-					containerfixture.WithName("orphaned-container"),
-					containerfixture.WithImageName("nginx:latest"),
-				),
-			},
-			params:  updateParams.Params{},
-			wantLen: 1,
-			want: func(t *testing.T, details []ContainerDetails) {
-				t.Helper()
-				assert.Equal(t, "orphaned-container", details[0].Name)
-				assert.Empty(t, details[0].ImageID)
-				assert.Empty(t, details[0].Digest)
-			},
-		},
-		{
 			name: "unlabeled container is enabled when label-enable is false",
 			containers: []types.Container{
 				modelfixture.Container(

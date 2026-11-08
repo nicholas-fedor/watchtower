@@ -82,15 +82,10 @@ func ListContainerStatuses(ctx context.Context, client containerClient.Client, f
 }
 
 func containerToStatus(c types.Container) Status {
-	status := Status{
+	return Status{
 		Name:    c.Name(),
 		Image:   c.ImageName(),
 		ImageID: string(c.ImageID()),
+		Digest:  containerImage.LocalDigest(c),
 	}
-
-	if info := c.ImageInfo(); info != nil {
-		status.Digest = containerImage.ExtractImageDigest(info.RepoDigests, c.ImageName())
-	}
-
-	return status
 }

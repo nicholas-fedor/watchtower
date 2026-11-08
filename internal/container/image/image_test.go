@@ -1269,6 +1269,12 @@ func TestExtractImageDigest(t *testing.T) {
 				want:        "sha256:bbb",
 			},
 			{
+				name:        "takes the first of several RepoDigests matching the image name",
+				repoDigests: []string{"docker.io/library/nginx@sha256:first", "nginx@sha256:second"},
+				imageName:   "nginx:latest",
+				want:        "sha256:first",
+			},
+			{
 				name:        "preserves the registry port when matching a tagged image name",
 				repoDigests: []string{"registry.example.com:5000/nginx@sha256:def456", "docker.io/library/nginx@sha256:bbb"},
 				imageName:   "registry.example.com:5000/nginx:latest",
@@ -1302,6 +1308,50 @@ func TestExtractImageDigest(t *testing.T) {
 			})
 		}
 	})
+}
+
+// TestLocalDigest verifies that a container's local digest is chosen by its
+// own image name and is empty when its image was not inspected. The selection
+// rules themselves belong to TestExtractImageDigest.
+func TestLocalDigest(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name      string
+		container *container.Container
+		want      string
+	}{
+		{
+			name: "image not inspected",
+			container: modelfixture.ContainerWithoutImageInfo(
+				containerfixture.WithImageName("nginx:latest"),
+			),
+			want: "",
+		},
+		{
+			name:      "image without repo digests",
+			container: runningImage("nginx:latest", "sha256:abc"),
+			want:      "",
+		},
+		{
+			name: "the container's repository among several",
+			container: runningImage(
+				"ghcr.io/org/app:latest",
+				"sha256:abc",
+				"docker.io/org/app@sha256:hub",
+				"ghcr.io/org/app@sha256:ghcr",
+			),
+			want: "sha256:ghcr",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			assert.Equal(t, tt.want, LocalDigest(tt.container))
+		})
+	}
 }
 
 // TestImageClient_isOutsideCooldown_beforePull verifies that the cooldown gate

@@ -454,6 +454,28 @@ func ExtractImageDigest(repoDigests []string, imageName string) string {
 	return fallback
 }
 
+// LocalDigest returns the digest of the image a container runs, as recorded
+// in the image's repo digests.
+//
+// It prefers the repo digest of the container's own image repository and
+// otherwise takes the first one, as [ExtractImageDigest] does. A container
+// whose image was not inspected, such as one whose image was removed, has no
+// local digest.
+//
+// Parameters:
+//   - c: Container whose image digest to report.
+//
+// Returns:
+//   - string: The digest (e.g., "sha256:abc..."), or "" if unavailable.
+func LocalDigest(c types.Container) string {
+	info := c.ImageInfo()
+	if info == nil {
+		return ""
+	}
+
+	return ExtractImageDigest(info.RepoDigests, c.ImageName())
+}
+
 // PullImage fetches the latest image for a container.
 //
 // It skips pinned images, checks digests, and performs a cooldown check
