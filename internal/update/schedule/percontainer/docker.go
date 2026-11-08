@@ -332,6 +332,13 @@ func (s *DockerSource) apply(sink Sink, msg events.Message) {
 		s.logger().Debug().Str("container", name).Str("id", shortID(msg.Actor.ID)).Msg("Container event: removed")
 		sink.Remove(name, msg.Actor.ID)
 	case events.ActionRename:
+		if s.replaced(name, msg) {
+			s.logger().Debug().Str("container", name).Str("id", shortID(msg.Actor.ID)).Str("event", string(msg.Action)).
+				Msg("Ignoring a replayed event of a container replaced since (older than the one listed under its name)")
+
+			return
+		}
+
 		// (under the new name first: a container alone on its schedule keeps
 		// the schedule's entry and next run through the rename)
 		s.setFrom(sink, name, msg.Actor.ID, attrs, msg.Action)

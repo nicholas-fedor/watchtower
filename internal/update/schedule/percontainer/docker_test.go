@@ -651,9 +651,15 @@ func TestDockerSourceIgnoresReplayedNewsOfAReplacedContainer(t *testing.T) {
 	}
 
 	send(t, conn, event("old", created.Add(-time.Minute), "@hourly"))
+	// (an event the source ignores, as a barrier: the one before it has been handled)
+	send(t, conn, containerEvent(events.ActionDie, map[string]string{"name": "web"}))
+
+	view, _ := sink.snapshot()
+	assert.Equal(t, map[string]string{"web": "@every 10m"}, view, "the replaced container's replayed start was ignored")
+	assert.Equal(t, "new", sink.id("web"))
+
 	send(t, conn, event("new", created.Add(time.Millisecond), "@every 10m"))
 	sink.waitFor(t, map[string]string{"web": "@every 10m"}, 1)
-	assert.Equal(t, "new", sink.id("web"), "the replaced container's replayed start was ignored")
 
 	// A later container under the name (created after the listed one) is news
 	send(t, conn, event("newer", created.Add(time.Minute), "@hourly"))
@@ -670,8 +676,9 @@ func TestDockerSourceRenameKeepsTheRegistrysTimer(t *testing.T) {
 	registry := NewRegistry(nil, timers)
 	stream := newFakeStream()
 	source := &DockerSource{
-		Events:      stream,
-		List:        lister(labeled("web", map[string]string{labels.Schedule: "@every 10m"})),
+		Events: stream,
+		// (the container keeps its ID through the rename, as Docker's do)
+		List:        lister(listedAt("web", "c0ffee", time.Now().Add(-time.Hour), map[string]string{labels.Schedule: "@every 10m"})),
 		SettleDelay: -1,
 	}
 
@@ -693,7 +700,7 @@ func TestDockerSourceRenameKeepsTheRegistrysTimer(t *testing.T) {
 
 	send(t, conn, events.Message{
 		Type: events.ContainerEventType, Action: events.ActionRename,
-		Actor: events.Actor{ID: "id-web", Attributes: map[string]string{
+		Actor: events.Actor{ID: "c0ffee", Attributes: map[string]string{
 			"name": "web-2", "oldName": "/web", labels.Schedule: "@every 10m",
 		}},
 	})
@@ -702,4 +709,59 @@ func TestDockerSourceRenameKeepsTheRegistrysTimer(t *testing.T) {
 
 	assert.Equal(t, []string{"@every 10m"}, registry.Schedules())
 	assert.Equal(t, added, timers.registrations(), "the schedule's entry and next run were kept")
+
+	// The renamed container's removal, by its ID, takes the schedule with it:
+	// the old name was let go
+	send(t, conn, events.Message{
+		Type: events.ContainerEventType, Action: events.ActionDestroy,
+		Actor: events.Actor{ID: "c0ffee", Attributes: map[string]string{"name": "web-2"}},
+	})
+	send(t, conn, containerEvent(events.ActionDie, map[string]string{"name": "web-2"}))
+
+	assert.Empty(t, registry.Schedules())
+}
+
+// TestDockerSourceIgnoresAReplayedRenameOntoAReplacement verifies, through a
+// real registry, that a replayed rename of the container a listed one
+// replaced (older than the listed one) neither moves the name to the old
+// container's schedule nor restarts the replacement's.
+func TestDockerSourceIgnoresAReplayedRenameOntoAReplacement(t *testing.T) {
+	t.Parallel()
+
+	created := time.Now().Add(-time.Second)
+	timers := newFakeTimers()
+	registry := NewRegistry(nil, timers)
+	stream := newFakeStream()
+	source := &DockerSource{
+		Events:      stream,
+		List:        lister(listedAt("web", "a1b2c3", created, map[string]string{labels.Schedule: "@every 10m"})),
+		SettleDelay: -1,
+	}
+
+	ctx, cancel := context.WithCancel(context.Background())
+	done := make(chan error, 1)
+
+	go func() { done <- source.Run(ctx, registry) }()
+
+	defer func() {
+		cancel()
+		require.NoError(t, <-done)
+	}()
+
+	conn := stream.connected(t)
+
+	require.Eventually(t, func() bool { return len(registry.Schedules()) == 1 }, 5*time.Second, 10*time.Millisecond)
+
+	added := timers.registrations()
+
+	send(t, conn, events.Message{
+		Type: events.ContainerEventType, Action: events.ActionRename, TimeNano: created.Add(-time.Minute).UnixNano(),
+		Actor: events.Actor{ID: "d4e5f6", Attributes: map[string]string{
+			"name": "web", "oldName": "/web-old", labels.Schedule: "@hourly",
+		}},
+	})
+	send(t, conn, containerEvent(events.ActionDie, map[string]string{"name": "web"}))
+
+	assert.Equal(t, []string{"@every 10m"}, registry.Schedules(), "the name kept the replacement's schedule")
+	assert.Equal(t, added, timers.registrations(), "and its entry was never dropped and added again")
 }
