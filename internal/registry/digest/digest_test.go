@@ -1304,13 +1304,13 @@ func TestLocalOnlyImageCache(t *testing.T) {
 	assert.Len(t, server.ReceivedRequests(), 2, "another container of a cached image re-probed the registry")
 
 	// The container now runs the image under another name, so the new name is
-	// probed. The container keeps its name, so the cache must key on the image
-	// name rather than the container's.
+	// probed. The container keeps its name, and the image keeps its ID and repo
+	// digests, so only the image name tells the two apart.
 	retagged := modelfixture.Container(
 		containerfixture.WithName("atlas-badgerdb-1"),
 		containerfixture.WithImageName("atlas-badgerdb-dev"),
 		containerfixture.WithImageID(imageID),
-		containerfixture.WithRepoDigests([]string{"atlas-badgerdb-dev@" + imageID}),
+		containerfixture.WithRepoDigests([]string{"atlas-badgerdb@" + imageID}),
 	)
 
 	compare(retagged)
