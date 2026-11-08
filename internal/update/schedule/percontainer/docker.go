@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"strconv"
 	"sync"
 	"time"
 
@@ -14,6 +15,7 @@ import (
 	dockerClient "github.com/moby/moby/client"
 
 	"github.com/nicholas-fedor/watchtower/internal/container"
+	"github.com/nicholas-fedor/watchtower/internal/container/labels"
 	"github.com/nicholas-fedor/watchtower/pkg/types"
 )
 
@@ -51,13 +53,21 @@ const (
 	// one dropped connection that reconnects at once is routine (a daemon
 	// restart, a proxy's idle timeout) and logged at debug level.
 	warnAfterFailures = 3
+	// Events are asked for from this long before subscribing, so the stream
+	// covers the moments around the list however long the subscription takes
+	// to reach the daemon (and a little difference in clocks): what's replayed
+	// is applied in order after the list, and comes out the same.
+	replayWindow = 5 * time.Second
 )
 
 var errStreamClosed = errors.New("docker event stream closed")
 
-// DockerSource follows Docker's container events. On connecting it lists the
-// containers once (after subscribing, so no change falls between the two),
-// then applies each create, destroy and rename as it comes.
+// DockerSource follows Docker's container events. On connecting it subscribes,
+// from a few seconds back (so no change can fall between the subscription and
+// the list), lists the containers once, then applies each create, start,
+// destroy and rename as it comes. Containers are told apart by ID as well as
+// name, so the news of a container that has since been replaced under the same
+// name (as an update replaces one) never touches its replacement.
 //
 // It recovers on its own from what can go wrong with a long-lived stream:
 //
@@ -157,12 +167,15 @@ func (s *DockerSource) Run(ctx context.Context, sink Sink) error {
 	}
 }
 
+// refreshes is the channel refresh requests wait on (one at most), made on
+// first use so a zero DockerSource works.
 func (s *DockerSource) refreshes() chan struct{} {
 	s.refreshOnce.Do(func() { s.refresh = make(chan struct{}, 1) })
 
 	return s.refresh
 }
 
+// logger is the source's logger, or one that logs nothing.
 func (s *DockerSource) logger() *zerolog.Logger {
 	if s.Log != nil {
 		return s.Log
@@ -181,9 +194,11 @@ func (s *DockerSource) follow(ctx context.Context, sink Sink, connected func()) 
 	defer cancel()
 
 	stream := s.Events.Events(streamCtx, dockerClient.EventsListOptions{
+		Since: eventTime(time.Now().Add(-replayWindow)),
 		Filters: make(dockerClient.Filters).
 			Add("type", string(events.ContainerEventType)).
-			Add("event", string(events.ActionCreate), string(events.ActionDestroy), string(events.ActionRename)),
+			Add("event", string(events.ActionCreate), string(events.ActionStart),
+				string(events.ActionDestroy), string(events.ActionRename)),
 	})
 
 	// A refresh asked for while disconnected is met by this list.
@@ -229,18 +244,20 @@ func (s *DockerSource) follow(ctx context.Context, sink Sink, connected func()) 
 }
 
 // resync lists the containers and replaces what the sink knows with them.
-// Why (connecting, after a run) is logged.
+// Why (connecting, after a run) is logged. Events that arrived meanwhile wait
+// in the stream and are applied after it, in order; any that describe a
+// container already replaced are told apart by its ID.
 func (s *DockerSource) resync(ctx context.Context, sink Sink, why string) error {
 	containers, err := s.List(ctx)
 	if err != nil {
 		return fmt.Errorf("listing containers: %w", err)
 	}
 
-	snapshot := make(map[string]string, len(containers))
+	snapshot := make(map[string]Labeled, len(containers))
 
 	for _, c := range containers {
 		if spec, ok := s.scheduleOf(c); ok {
-			snapshot[c.Name()] = spec
+			snapshot[c.Name()] = Labeled{ID: idOf(c), Spec: spec}
 		}
 	}
 
@@ -255,6 +272,9 @@ func (s *DockerSource) resync(ctx context.Context, sink Sink, why string) error 
 	return nil
 }
 
+// apply applies one container event to the sink: a destroy removes the
+// container (that one, by ID), a rename moves it, and a create or start
+// records it with the schedule its labels carry.
 func (s *DockerSource) apply(sink Sink, msg events.Message) {
 	if msg.Type != events.ContainerEventType {
 		return
@@ -269,30 +289,32 @@ func (s *DockerSource) apply(sink Sink, msg events.Message) {
 
 	switch msg.Action { //nolint:exhaustive // only the actions subscribed to
 	case events.ActionDestroy:
-		s.logger().Debug().Str("container", name).Msg("Container event: removed")
-		sink.Remove(name)
+		s.logger().Debug().Str("container", name).Str("id", shortID(msg.Actor.ID)).Msg("Container event: removed")
+		sink.Remove(name, msg.Actor.ID)
 	case events.ActionRename:
 		if old := container.NormalizeContainerName(attrs["oldName"]); old != "" {
-			sink.Remove(old)
+			sink.Remove(old, msg.Actor.ID)
 		}
 
-		s.setFrom(sink, name, attrs)
-	case events.ActionCreate:
-		s.setFrom(sink, name, attrs)
+		s.setFrom(sink, name, msg.Actor.ID, attrs, msg.Action)
+	case events.ActionCreate, events.ActionStart:
+		s.setFrom(sink, name, msg.Actor.ID, attrs, msg.Action)
 	default:
 	}
 }
 
 // setFrom records a container from an event: its attributes carry its labels,
 // with its name and image.
-func (s *DockerSource) setFrom(sink Sink, name string, attrs map[string]string) {
-	spec, _ := s.scheduleOf(eventContainer(name, attrs))
-	s.logEvent(name, attrs, spec)
-	sink.Set(name, spec)
+func (s *DockerSource) setFrom(sink Sink, name, id string, attrs map[string]string, action events.Action) {
+	spec, _ := s.scheduleOf(eventContainer(name, id, attrs))
+	s.logEvent(name, attrs, spec, action)
+	sink.Set(name, id, spec)
 }
 
-func (s *DockerSource) logEvent(name string, attrs map[string]string, spec string) {
-	event := s.logger().Debug().Str("container", name)
+// logEvent logs a container event at debug level: the container, its
+// schedule (or the global one), and the name it was renamed from.
+func (s *DockerSource) logEvent(name string, attrs map[string]string, spec string, action events.Action) {
+	event := s.logger().Debug().Str("container", name).Str("event", string(action))
 	if spec == "" {
 		event = event.Str("schedule", "global")
 	} else {
@@ -303,21 +325,46 @@ func (s *DockerSource) logEvent(name string, attrs map[string]string, spec strin
 		event = event.Str("renamed_from", container.NormalizeContainerName(old))
 	}
 
-	event.Msg("Container event: created or renamed")
+	event.Msg("Container event")
 }
 
+// scheduleOf returns the container's schedule label, normalized, when the
+// filter manages the container and the label is set. The value isn't checked
+// here: the [Sink] warns about one that doesn't parse, as documented.
 func (s *DockerSource) scheduleOf(c types.FilterableContainer) (string, bool) {
 	if s.Filter != nil && !s.Filter(c) {
 		return "", false
 	}
 
-	return Spec(c)
+	raw, ok := c.GetLabel(labels.Schedule)
+	if !ok {
+		return "", false
+	}
+
+	spec := Normalize(raw)
+
+	return spec, spec != ""
+}
+
+// idOf returns a container's ID when it has one (a listed container does).
+func idOf(c types.FilterableContainer) string {
+	if withID, ok := c.(interface{ ID() types.ContainerID }); ok {
+		return string(withID.ID())
+	}
+
+	return ""
+}
+
+// eventTime is a time as Docker's events API takes it: Unix seconds, with
+// the nanoseconds after a point.
+func eventTime(t time.Time) string {
+	return strconv.FormatInt(t.Unix(), 10) + "." + fmt.Sprintf("%09d", t.Nanosecond())
 }
 
 // eventContainer is a container as an event describes it, read the way
 // Watchtower reads any container (labels, scope, enable, name, image), so a
 // filter treats it as it would in a run.
-func eventContainer(name string, attrs map[string]string) types.FilterableContainer {
+func eventContainer(name, id string, attrs map[string]string) types.FilterableContainer {
 	containerLabels := make(map[string]string, len(attrs))
 
 	for k, v := range attrs {
@@ -329,6 +376,7 @@ func eventContainer(name string, attrs map[string]string) types.FilterableContai
 	}
 
 	info := &dockerContainer.InspectResponse{
+		ID:     id,
 		Name:   "/" + name,
 		Config: &dockerContainer.Config{Image: attrs["image"], Labels: containerLabels},
 	}

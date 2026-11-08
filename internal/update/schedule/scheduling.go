@@ -6,7 +6,7 @@ import (
 	"fmt"
 	"runtime/debug"
 	"strings"
-	"sync/atomic"
+	"sync"
 	"time"
 
 	"github.com/robfig/cron/v3"
@@ -341,20 +341,17 @@ func RunUpgradesOnSchedule(ctx context.Context, deps ScheduleDeps) error {
 	}
 
 	// A process that replaced an older instance does not update itself again
-	// during its first scheduled run.
-	var ranOnce atomic.Bool
+	// during its first update cycle: the first scheduled
+	// run of each schedule (the global one, and each container schedule, since
+	// Watchtower may follow one of its own) skips it.
+	skipSelf := firstRuns{enabled: deps.ReplacedOlderInstance, log: log}
 
 	scheduledUpdateFunc := func() {
-		skipWatchtowerSelfUpdate := deps.ReplacedOlderInstance && !ranOnce.Swap(true)
-		if skipWatchtowerSelfUpdate {
-			log.Debug().Msg("Skipping Watchtower self-update on first scheduled run due to cleanup")
-		}
-
 		if global != nil {
 			log.Debug().Msg("Running the global schedule: containers with their own schedule are left out")
 		}
 
-		updateFunc(skipWatchtowerSelfUpdate, true, global)
+		updateFunc(skipSelf.first(""), true, global)
 	}
 
 	// Add the update function to the cron schedule, handling concurrency and metrics.
@@ -399,7 +396,7 @@ func RunUpgradesOnSchedule(ctx context.Context, deps ScheduleDeps) error {
 
 	if deps.ContainerSchedules != nil {
 		registry := percontainer.NewRegistry(log, cronTimers{scheduler: scheduler, log: log, run: func(spec string) {
-			updateFunc(false, true, func(base types.Filter) types.Filter {
+			updateFunc(skipSelf.first(spec), true, func(base types.Filter) types.Filter {
 				return percontainer.OnSchedule(spec, base)
 			})
 		}})
@@ -443,6 +440,45 @@ func RunUpgradesOnSchedule(ctx context.Context, deps ScheduleDeps) error {
 	log.Debug().Msg("Scheduler stopped and update completed.")
 
 	return nil
+}
+
+// firstRuns tells each schedule's first scheduled run apart (the global
+// schedule's is ""), for the self-update skipped after a cleanup.
+type firstRuns struct {
+	log     *zerolog.Logger
+	ran     map[string]bool
+	mu      sync.Mutex
+	enabled bool
+}
+
+// first reports whether this is the first scheduled run on spec, when the
+// skip is enabled; once per schedule.
+func (f *firstRuns) first(spec string) bool {
+	if !f.enabled {
+		return false
+	}
+
+	f.mu.Lock()
+	defer f.mu.Unlock()
+
+	if f.ran[spec] {
+		return false
+	}
+
+	if f.ran == nil {
+		f.ran = make(map[string]bool)
+	}
+
+	f.ran[spec] = true
+
+	event := f.log.Debug()
+	if spec != "" {
+		event = event.Str("schedule", spec)
+	}
+
+	event.Msg("Skipping Watchtower self-update on first scheduled run due to cleanup")
+
+	return true
 }
 
 // cronTimers adds container schedules to the scheduler: each entry runs the

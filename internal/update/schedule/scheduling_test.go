@@ -1333,8 +1333,10 @@ func TestRunUpgradesOnSchedule_UseComposeDependsOnPropagation(t *testing.T) {
 // sourceFunc is a percontainer.Source from a function.
 type sourceFunc func(ctx context.Context, sink percontainer.Sink) error
 
+// Run calls the function.
 func (f sourceFunc) Run(ctx context.Context, sink percontainer.Sink) error { return f(ctx, sink) }
 
+// testContainer returns a container with this name and these labels.
 func testContainer(name string, containerLabels map[string]string) types.FilterableContainer {
 	return container.NewContainer(nil, &dockerContainer.InspectResponse{
 		Name:   "/" + name,
@@ -1367,10 +1369,10 @@ func TestRunUpgradesOnSchedule_ContainerSchedules(t *testing.T) {
 		}
 
 		deps := testDeps(t, runUpdate, func(context.Context, logging.StartupParams) {})
-		deps.ScheduleSpec = "@every 1h"
+		deps.ScheduleSpec = "@every 25m"
 		deps.UpdateOnStart = true
 		deps.ContainerSchedules = sourceFunc(func(ctx context.Context, sink percontainer.Sink) error {
-			sink.Reset(map[string]string{"games": "@every 10m"})
+			sink.Reset(map[string]percontainer.Labeled{"games": {ID: "games-id", Spec: "@every 10m"}})
 			<-ctx.Done()
 
 			return nil
@@ -1380,9 +1382,9 @@ func TestRunUpgradesOnSchedule_ContainerSchedules(t *testing.T) {
 
 		go func() { done <- RunUpgradesOnSchedule(ctx, deps) }()
 
-		// Startup, then the container schedule once (10 minutes), well before
-		// the global one (an hour).
-		time.Sleep(11 * time.Minute)
+		// Startup, the container schedule at 10 and 20 minutes, then the
+		// global schedule's first periodic run at 25 (apart from the others).
+		time.Sleep(26 * time.Minute)
 		synctest.Wait()
 
 		cancel()
@@ -1394,13 +1396,69 @@ func TestRunUpgradesOnSchedule_ContainerSchedules(t *testing.T) {
 		mu.Lock()
 		defer mu.Unlock()
 
-		require.Len(t, runs, 2)
+		require.Len(t, runs, 4)
 
 		assert.False(t, runs[0](games), "the global run leaves out a container with its own schedule")
 		assert.True(t, runs[0](plain), "the global run covers the rest")
 
 		assert.True(t, runs[1](games), "the container's own schedule runs it")
 		assert.False(t, runs[1](plain), "a container schedule runs only its containers")
+		assert.True(t, runs[2](games), "and again on its next tick")
+		assert.False(t, runs[3](games), "a periodic global run leaves it out too")
+		assert.True(t, runs[3](plain), "and covers the rest")
+	})
+}
+
+// TestRunUpgradesOnSchedule_ContainerSchedulesSkipFirstRun verifies that after
+// a self-update cleanup, each schedule's first run skips Watchtower's own
+// update, container schedules included (Watchtower may follow one).
+func TestRunUpgradesOnSchedule_ContainerSchedulesSkipFirstRun(t *testing.T) {
+	// (the metrics singleton starts a goroutine: outside the bubble)
+	metrics.Default()
+
+	synctest.Test(t, func(t *testing.T) {
+		ctx, cancel := context.WithCancel(t.Context())
+
+		var (
+			mu    sync.Mutex
+			skips []bool
+		)
+
+		runUpdate := func(_ context.Context, _ types.Filter, params updateParams.Params) *metrics.Metric {
+			mu.Lock()
+			defer mu.Unlock()
+
+			skips = append(skips, params.SkipSelfUpdate)
+
+			return &metrics.Metric{}
+		}
+
+		deps := testDeps(t, runUpdate, func(context.Context, logging.StartupParams) {})
+		deps.ScheduleSpec = "@every 25m"
+		deps.ReplacedOlderInstance = true
+		deps.ContainerSchedules = sourceFunc(func(ctx context.Context, sink percontainer.Sink) error {
+			sink.Set("watchtower", "wt-id", "@every 10m")
+			<-ctx.Done()
+
+			return nil
+		})
+
+		done := make(chan error, 1)
+
+		go func() { done <- RunUpgradesOnSchedule(ctx, deps) }()
+
+		// The container schedule at 10 and 20 minutes, the global one at 25.
+		time.Sleep(26 * time.Minute)
+		synctest.Wait()
+
+		cancel()
+		require.NoError(t, <-done)
+
+		mu.Lock()
+		defer mu.Unlock()
+
+		assert.Equal(t, []bool{true, false, true}, skips,
+			"each schedule's first run skips the self-update, later ones don't")
 	})
 }
 
@@ -1423,7 +1481,7 @@ func TestRunUpgradesOnSchedule_ContainerSchedulesWithoutGlobalSchedule(t *testin
 
 		deps := testDeps(t, runUpdate, func(context.Context, logging.StartupParams) {})
 		deps.ContainerSchedules = sourceFunc(func(ctx context.Context, sink percontainer.Sink) error {
-			sink.Set("games", "@every 10m")
+			sink.Set("games", "games-id", "@every 10m")
 			<-ctx.Done()
 
 			return nil
@@ -1450,6 +1508,7 @@ type refreshingSource struct {
 	refreshes atomic.Int32
 }
 
+// Refresh counts a refresh.
 func (s *refreshingSource) Refresh() { s.refreshes.Add(1) }
 
 // TestRunUpgradesOnSchedule_ContainerSchedulesRefreshAfterRuns verifies that
@@ -1465,7 +1524,7 @@ func TestRunUpgradesOnSchedule_ContainerSchedulesRefreshAfterRuns(t *testing.T) 
 		}
 
 		source := &refreshingSource{sourceFunc: func(ctx context.Context, sink percontainer.Sink) error {
-			sink.Set("games", "@every 10m")
+			sink.Set("games", "games-id", "@every 10m")
 			<-ctx.Done()
 
 			return nil

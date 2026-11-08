@@ -16,16 +16,27 @@ type Timers interface {
 	Remove(id cron.EntryID)
 }
 
+// Labeled is a container's schedule label as a [Source] reports it: the
+// container's ID (so news of a container that has since been replaced under
+// the same name can be told apart) and the label's value, normalized. The
+// value may not parse; the [Sink] decides what to do with it.
+type Labeled struct {
+	ID   string
+	Spec string
+}
+
 // Sink is told which containers carry which schedule. A [Source] reports to it.
 type Sink interface {
 	// Reset replaces everything known with this snapshot: container name to
-	// schedule, for every container that has one. A source sends it on
-	// connecting, and again after reconnecting.
-	Reset(schedules map[string]string)
+	// its label, for every container that has one. A source sends it on
+	// connecting, again after reconnecting, and after each update run.
+	Reset(containers map[string]Labeled)
 	// Set records a container's schedule. An empty spec means it has none.
-	Set(name, spec string)
-	// Remove forgets a container.
-	Remove(name string)
+	// The ID may be empty when it isn't known.
+	Set(name, id, spec string)
+	// Remove forgets a container. With an ID, only that container: a later
+	// one under the same name is kept.
+	Remove(name, id string)
 }
 
 // Registry keeps one cron entry for each schedule in use, counting the
@@ -33,11 +44,15 @@ type Sink interface {
 type Registry struct {
 	timers  Timers
 	log     *zerolog.Logger
-	byName  map[string]string
+	byName  map[string]Labeled
 	entries map[string]*entry
-	mu      sync.Mutex
+	// warned is the invalid label each container was last warned about, so a
+	// label read again on every refresh is warned about once.
+	warned map[string]string
+	mu     sync.Mutex
 }
 
+// entry is a schedule's cron entry and the number of containers on it.
 type entry struct {
 	id         cron.EntryID
 	containers int
@@ -55,38 +70,62 @@ func NewRegistry(log *zerolog.Logger, timers Timers) *Registry {
 	return &Registry{
 		log:     log,
 		timers:  timers,
-		byName:  make(map[string]string),
+		byName:  make(map[string]Labeled),
 		entries: make(map[string]*entry),
+		warned:  make(map[string]string),
 	}
 }
 
-// Reset implements [Sink].
-func (r *Registry) Reset(schedules map[string]string) {
+// Reset implements [Sink]. The containers in the snapshot are applied before
+// those missing from it are removed, so a schedule that is still in use keeps
+// its cron entry (and its next run) even when the containers on it changed.
+func (r *Registry) Reset(containers map[string]Labeled) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 
+	for name, labeled := range containers {
+		r.applyLocked(name, labeled.ID, labeled.Spec)
+	}
+
 	for name := range r.byName {
-		if _, still := schedules[name]; !still {
-			r.applyLocked(name, "")
+		if _, still := containers[name]; !still {
+			r.applyLocked(name, "", "")
 		}
 	}
 
-	for name, spec := range schedules {
-		r.applyLocked(name, spec)
+	for name := range r.warned {
+		if _, still := containers[name]; !still {
+			delete(r.warned, name)
+		}
 	}
 }
 
 // Set implements [Sink].
-func (r *Registry) Set(name, spec string) {
+func (r *Registry) Set(name, id, spec string) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 
-	r.applyLocked(name, spec)
+	r.applyLocked(name, id, spec)
 }
 
-// Remove implements [Sink].
-func (r *Registry) Remove(name string) {
-	r.Set(name, "")
+// Remove implements [Sink]. News of a container that has since been replaced
+// under the same name (its ID differs from the one recorded) is ignored.
+func (r *Registry) Remove(name, id string) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+
+	if held, known := r.byName[name]; known && id != "" && held.ID != "" && held.ID != id {
+		r.log.Debug().
+			Str("container", name).
+			Str("removed_id", shortID(id)).
+			Str("current_id", shortID(held.ID)).
+			Msg("Ignoring the removal of a container already replaced under the same name")
+
+		return
+	}
+
+	delete(r.warned, name)
+	r.applyLocked(name, "", "")
 }
 
 // Schedules returns the schedules in use, sorted.
@@ -107,44 +146,66 @@ func (r *Registry) Schedules() []string {
 // applyLocked moves a container to spec ("" for none): the schedule it leaves
 // loses its entry when no container is left on it, and a schedule gains one
 // with its first container. A schedule that does not parse is ignored (the
-// container follows the global schedule), as the run filters treat it.
-func (r *Registry) applyLocked(name, spec string) {
+// container follows the global schedule), as the run filters treat it, with a
+// warning the first time it's seen on the container.
+func (r *Registry) applyLocked(name, id, spec string) {
 	spec = Normalize(spec)
 	if spec != "" && !Valid(spec) {
-		r.log.Warn().
-			Str("container", name).
-			Str("schedule", spec).
-			Msg("Ignoring an invalid schedule label: the container follows the global schedule")
+		if r.warned[name] != spec {
+			r.warned[name] = spec
+
+			r.log.Warn().
+				Str("container", name).
+				Str("schedule", spec).
+				Msg("Ignoring an invalid schedule label: the container follows the global schedule")
+		}
 
 		spec = ""
+	} else if spec != "" {
+		delete(r.warned, name)
 	}
 
 	old, known := r.byName[name]
-	if known && old == spec {
-		return
-	}
+	if known && old.Spec == spec {
+		// The same schedule (perhaps a new container under the same name): its
+		// entry and its next run stay as they are
+		if id != "" && id != old.ID {
+			r.byName[name] = Labeled{ID: id, Spec: spec}
+		}
 
-	if known {
-		r.releaseLocked(old)
-		delete(r.byName, name)
+		return
 	}
 
 	if spec == "" {
 		if known {
+			delete(r.byName, name)
+			r.releaseLocked(old.Spec)
+
 			r.log.Debug().
 				Str("container", name).
-				Str("was", old).
+				Str("was", old.Spec).
 				Msg("Container left its own schedule")
 		}
 
 		return
 	}
 
+	// (onto the new schedule before off the old, though they differ: a
+	// container moving never leaves a gap)
 	if !r.holdLocked(spec) {
+		if known {
+			delete(r.byName, name)
+			r.releaseLocked(old.Spec)
+		}
+
 		return
 	}
 
-	r.byName[name] = spec
+	r.byName[name] = Labeled{ID: id, Spec: spec}
+
+	if known {
+		r.releaseLocked(old.Spec)
+	}
 
 	r.log.Debug().
 		Str("container", name).
@@ -152,6 +213,8 @@ func (r *Registry) applyLocked(name, spec string) {
 		Msg("Container follows its own schedule")
 }
 
+// holdLocked counts one more container on spec, adding its cron entry with
+// the first. It reports whether the schedule is held (adding can fail).
 func (r *Registry) holdLocked(spec string) bool {
 	if e, ok := r.entries[spec]; ok {
 		e.containers++
@@ -173,6 +236,8 @@ func (r *Registry) holdLocked(spec string) bool {
 	return true
 }
 
+// releaseLocked counts one container fewer on spec, removing its cron entry
+// with the last.
 func (r *Registry) releaseLocked(spec string) {
 	held, ok := r.entries[spec]
 	if !ok {
@@ -188,4 +253,14 @@ func (r *Registry) releaseLocked(spec string) {
 	delete(r.entries, spec)
 
 	r.log.Info().Str("schedule", spec).Msg("No containers left on a container schedule: removed it")
+}
+
+// shortID is a container ID as Docker prints it: its first twelve characters.
+func shortID(id string) string {
+	const short = 12
+	if len(id) > short {
+		return id[:short]
+	}
+
+	return id
 }

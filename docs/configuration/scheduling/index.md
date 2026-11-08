@@ -105,8 +105,10 @@ services:
 - Containers with a schedule label are left out of the global schedule's runs, and run on their own schedule instead. Containers that share a schedule run together.
 - A label that does not parse is ignored with a warning, and the container follows the global schedule.
 - The other selection settings still apply: a labeled container in another [scope](../container-selection/index.md#scope_filter), or one not enabled when [label-enable](../container-selection/index.md#enable_label_filter) is set, is not updated.
-- Watchtower follows Docker's container events, so a container's schedule takes effect as soon as it is created, recreated or removed, with nothing polled. It lists the containers once at startup and again whenever it reconnects to the event stream (after a Docker restart, for example).
-- It works without a global schedule: with only `--container-schedules`, labeled containers update on their own schedules and the rest are not updated on a schedule.
+- Watchtower follows Docker's container events, so a container's schedule takes effect as soon as it is created, started, recreated or removed, with nothing polled. It lists the containers once at startup, again whenever it reconnects to the event stream (after a Docker restart, for example), and after each update run.
+- The global schedule is unchanged and still covers the containers without a label: the [interval](#interval)'s default (24 hours) unless [schedule](#schedule) or [interval](#interval) is set.
+- With the [HTTP API](../http-api/index.md)'s update endpoint, scheduled updates (container schedules included) run only when [HTTP API periodic polls](#http_api_periodic_polls) are enabled.
+- After Watchtower cleans up an old instance of itself, the first run of each schedule skips its own update, as the global schedule's first run does; this applies to Watchtower's own schedule label too.
 - Requires access to Docker's event stream. Behind a Docker socket proxy, allow events (for example `EVENTS=1` for [docker-socket-proxy](https://github.com/Tecnativa/docker-socket-proxy){target="_blank" rel="noopener noreferrer"}).
 - [HTTP API](../http-api/index.md) updates are unchanged: an update request covers every container it selects, whatever its schedule.
 

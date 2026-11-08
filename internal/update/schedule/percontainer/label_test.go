@@ -11,15 +11,18 @@ import (
 	"github.com/nicholas-fedor/watchtower/pkg/types"
 )
 
+// labeled returns a container with this name and these labels.
 func labeled(name string, containerLabels map[string]string) types.FilterableContainer {
 	attrs := map[string]string{"name": name, "image": "example/" + name + ":latest"}
 	maps.Copy(attrs, containerLabels)
 
-	return eventContainer(name, attrs)
+	return eventContainer(name, "id-"+name, attrs)
 }
 
+// all is a filter accepting every container.
 func all(types.FilterableContainer) bool { return true }
 
+// TestSpec verifies how a schedule label is read: normalized, and only when it parses.
 func TestSpec(t *testing.T) {
 	t.Parallel()
 
@@ -54,6 +57,7 @@ func TestSpec(t *testing.T) {
 	}
 }
 
+// TestWithoutOwnSchedule verifies that the global filter leaves out containers with their own schedule.
 func TestWithoutOwnSchedule(t *testing.T) {
 	t.Parallel()
 
@@ -69,6 +73,7 @@ func TestWithoutOwnSchedule(t *testing.T) {
 	assert.False(t, none(labeled("plain", nil)), "the base filter still applies")
 }
 
+// TestOnSchedule verifies that a container schedule's filter covers only its containers.
 func TestOnSchedule(t *testing.T) {
 	t.Parallel()
 
@@ -83,6 +88,7 @@ func TestOnSchedule(t *testing.T) {
 	assert.False(t, none(labeled("games", map[string]string{labels.Schedule: "@every 10m"})), "the base filter still applies")
 }
 
+// TestNext verifies the next run of a schedule.
 func TestNext(t *testing.T) {
 	t.Parallel()
 
