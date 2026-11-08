@@ -221,9 +221,15 @@ func TestDockerSourceFollowsEvents(t *testing.T) {
 	conn := stream.connected(t)
 	sink.waitFor(t, map[string]string{"web": "@every 10m"}, 1)
 
-	send(t, conn, containerEvent(events.ActionCreate, map[string]string{
-		"name": "online", "image": "example/online", labels.Schedule: "@every 10m",
-	}))
+	// (an opaque ID, as Docker's: nothing derived from the name)
+	const onlineID = "7f3a9c2e"
+
+	send(t, conn, events.Message{
+		Type: events.ContainerEventType, Action: events.ActionCreate,
+		Actor: events.Actor{ID: onlineID, Attributes: map[string]string{
+			"name": "online", "image": "example/online", labels.Schedule: "@every 10m",
+		}},
+	})
 	sink.waitFor(t, map[string]string{"web": "@every 10m", "online": "@every 10m"}, 1)
 
 	// An update recreates a container: destroyed, then created under the same name.
@@ -236,7 +242,7 @@ func TestDockerSourceFollowsEvents(t *testing.T) {
 	// (a rename keeps the container's ID)
 	send(t, conn, events.Message{
 		Type: events.ContainerEventType, Action: events.ActionRename,
-		Actor: events.Actor{ID: "id-online", Attributes: map[string]string{
+		Actor: events.Actor{ID: onlineID, Attributes: map[string]string{
 			"name": "online-2", "oldName": "/online", labels.Schedule: "@every 10m",
 		}},
 	})
@@ -253,7 +259,8 @@ func TestDockerSourceFollowsEvents(t *testing.T) {
 
 	// The removals named the containers by ID: the destroyed web, and the
 	// renamed container under its old name.
-	assert.Equal(t, []string{"web:id-web", "online:id-online"}, sink.removals())
+	assert.Equal(t, []string{"web:id-web", "online:" + onlineID}, sink.removals())
+	assert.Equal(t, onlineID, sink.id("online-2"), "the renamed container keeps its ID")
 
 	stream.mu.Lock()
 	options := stream.options[0]
@@ -611,9 +618,9 @@ func TestDockerSourceListsAgainOnceSettled(t *testing.T) {
 	assert.Equal(t, 2, lists, "listed on connecting and once more, no more")
 }
 
-// listedAt returns a listed container with an ID, a creation time and labels.
-func listedAt(name, containerID string, created time.Time, containerLabels map[string]string) types.FilterableContainer {
-	c := labeled(name, containerLabels).(interface {
+// listedWeb returns the container listed as web, with an ID, a creation time and labels.
+func listedWeb(containerID string, created time.Time, containerLabels map[string]string) types.FilterableContainer {
+	c := labeled("web", containerLabels).(interface {
 		ContainerInfo() *dockerContainer.InspectResponse
 	})
 	c.ContainerInfo().ID = containerID
@@ -633,7 +640,7 @@ func TestDockerSourceIgnoresReplayedNewsOfAReplacedContainer(t *testing.T) {
 	stream := newFakeStream()
 	source := &DockerSource{
 		Events:      stream,
-		List:        lister(listedAt("web", "new", created, map[string]string{labels.Schedule: "@every 10m"})),
+		List:        lister(listedWeb("new", created, map[string]string{labels.Schedule: "@every 10m"})),
 		SettleDelay: -1,
 	}
 
@@ -678,7 +685,7 @@ func TestDockerSourceRenameKeepsTheRegistrysTimer(t *testing.T) {
 	source := &DockerSource{
 		Events: stream,
 		// (the container keeps its ID through the rename, as Docker's do)
-		List:        lister(listedAt("web", "c0ffee", time.Now().Add(-time.Hour), map[string]string{labels.Schedule: "@every 10m"})),
+		List:        lister(listedWeb("c0ffee", time.Now().Add(-time.Hour), map[string]string{labels.Schedule: "@every 10m"})),
 		SettleDelay: -1,
 	}
 
@@ -734,7 +741,7 @@ func TestDockerSourceIgnoresAReplayedRenameOntoAReplacement(t *testing.T) {
 	stream := newFakeStream()
 	source := &DockerSource{
 		Events:      stream,
-		List:        lister(listedAt("web", "a1b2c3", created, map[string]string{labels.Schedule: "@every 10m"})),
+		List:        lister(listedWeb("a1b2c3", created, map[string]string{labels.Schedule: "@every 10m"})),
 		SettleDelay: -1,
 	}
 
@@ -764,4 +771,53 @@ func TestDockerSourceIgnoresAReplayedRenameOntoAReplacement(t *testing.T) {
 
 	assert.Equal(t, []string{"@every 10m"}, registry.Schedules(), "the name kept the replacement's schedule")
 	assert.Equal(t, added, timers.registrations(), "and its entry was never dropped and added again")
+}
+
+func TestDockerSourceIgnoredRenameLeavesTheOldName(t *testing.T) {
+	t.Parallel()
+
+	created := time.Now().Add(-time.Second)
+	registry := NewRegistry(nil, newFakeTimers())
+	stream := newFakeStream()
+	source := &DockerSource{
+		Events:      stream,
+		List:        lister(listedWeb("a1b2c3", created, map[string]string{labels.Schedule: "@every 10m"})),
+		SettleDelay: -1,
+	}
+
+	ctx, cancel := context.WithCancel(context.Background())
+	done := make(chan error, 1)
+
+	go func() { done <- source.Run(ctx, registry) }()
+
+	defer func() {
+		cancel()
+		require.NoError(t, <-done)
+	}()
+
+	conn := stream.connected(t)
+
+	require.Eventually(t, func() bool { return len(registry.Schedules()) == 1 }, 5*time.Second, 10*time.Millisecond)
+
+	// Replayed from before the list: a container created under another name,
+	// then renamed onto web (and since replaced by the one listed there).
+	before := created.Add(-time.Minute)
+	attrs := map[string]string{"name": "web-old", labels.Schedule: "@hourly"}
+
+	send(t, conn, events.Message{
+		Type: events.ContainerEventType, Action: events.ActionCreate, TimeNano: before.UnixNano(),
+		Actor: events.Actor{ID: "d4e5f6", Attributes: attrs},
+	})
+	require.Eventually(t, func() bool { return len(registry.Schedules()) == 2 }, 5*time.Second, 10*time.Millisecond)
+
+	send(t, conn, events.Message{
+		Type: events.ContainerEventType, Action: events.ActionRename, TimeNano: before.Add(time.Second).UnixNano(),
+		Actor: events.Actor{ID: "d4e5f6", Attributes: map[string]string{
+			"name": "web", "oldName": "/web-old", labels.Schedule: "@hourly",
+		}},
+	})
+	send(t, conn, containerEvent(events.ActionDie, map[string]string{"name": "web"}))
+
+	assert.Equal(t, []string{"@every 10m"}, registry.Schedules(),
+		"the rename is ignored on web, but the old name's schedule went with it")
 }

@@ -336,16 +336,18 @@ func (s *DockerSource) apply(sink Sink, msg events.Message) {
 			s.logger().Debug().Str("container", name).Str("id", shortID(msg.Actor.ID)).Str("event", string(msg.Action)).
 				Msg("Ignoring a replayed event of a container replaced since (older than the one listed under its name)")
 
+			// It did leave its old name, though (a replayed create may have put
+			// it back there): only that container goes, by ID, so another under
+			// the old name keeps its schedule
+			removeOld(sink, attrs, name, msg.Actor.ID)
+
 			return
 		}
 
 		// (under the new name first: a container alone on its schedule keeps
 		// the schedule's entry and next run through the rename)
 		s.setFrom(sink, name, msg.Actor.ID, attrs, msg.Action)
-
-		if old := container.NormalizeContainerName(attrs["oldName"]); old != "" && old != name {
-			sink.Remove(old, msg.Actor.ID)
-		}
+		removeOld(sink, attrs, name, msg.Actor.ID)
 	case events.ActionCreate, events.ActionStart:
 		if s.replaced(name, msg) {
 			s.logger().Debug().Str("container", name).Str("id", shortID(msg.Actor.ID)).Str("event", string(msg.Action)).
@@ -356,6 +358,13 @@ func (s *DockerSource) apply(sink Sink, msg events.Message) {
 
 		s.setFrom(sink, name, msg.Actor.ID, attrs, msg.Action)
 	default:
+	}
+}
+
+// removeOld removes a renamed container (that one, by ID) from its old name.
+func removeOld(sink Sink, attrs map[string]string, name, containerID string) {
+	if old := container.NormalizeContainerName(attrs["oldName"]); old != "" && old != name {
+		sink.Remove(old, containerID)
 	}
 }
 
