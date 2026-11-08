@@ -18,11 +18,12 @@ func TestRenderDefaultReport(t *testing.T) {
 
 	result, err := Render(
 		templates.Templates["default"],
-		[]State{ScannedState, UpdatedState, FailedState},
+		[]State{UpdatedState, FailedState, SkippedState},
 		nil,
 	)
 	require.NoError(t, err)
-	assert.Contains(t, result, "1 Scanned, 1 Updated")
+	// The skipped sample is not scanned, as in Watchtower.
+	assert.Contains(t, result, "2 Scanned, 1 Updated")
 	assert.Contains(t, result, "1 Failed")
 	assert.Contains(t, result, "datamatrix")
 	assert.Contains(t, result, "updated to")

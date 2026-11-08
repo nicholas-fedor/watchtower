@@ -123,21 +123,32 @@ func (p *PreviewData) AddFromState(state State) {
 		status.cooldownEligibleAt = p.lastTime.Add(previewEligibleAfter)
 	}
 
+	var category *[]report.ContainerReport
+
 	switch state {
-	case ScannedState:
-		p.report.scanned = append(p.report.scanned, status)
 	case UpdatedState:
-		p.report.updated = append(p.report.updated, status)
+		category = &p.report.updated
 	case FailedState:
-		p.report.failed = append(p.report.failed, status)
+		category = &p.report.failed
 	case SkippedState:
-		p.report.skipped = append(p.report.skipped, status)
+		category = &p.report.skipped
 	case RestartedState:
-		p.report.restarted = append(p.report.restarted, status)
+		category = &p.report.restarted
 	case StaleState:
-		p.report.stale = append(p.report.stale, status)
+		category = &p.report.stale
 	case FreshState:
-		p.report.fresh = append(p.report.fresh, status)
+		category = &p.report.fresh
+	default:
+		// A state the preview does not know joins no list.
+	}
+
+	if category != nil {
+		*category = append(*category, status)
+
+		// Watchtower's scanned list holds every container it did not skip.
+		if state != SkippedState {
+			p.report.scanned = append(p.report.scanned, status)
+		}
 	}
 
 	p.containerCount++

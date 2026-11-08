@@ -13,14 +13,14 @@ func TestStatesFromString(t *testing.T) {
 		give string
 		want []State
 	}{
-		{give: "c", want: []State{ScannedState}},
+		{give: "c", want: []State{}},
 		{give: "u", want: []State{UpdatedState}},
 		{give: "e", want: []State{FailedState}},
 		{give: "k", want: []State{SkippedState}},
 		{give: "r", want: []State{RestartedState}},
 		{give: "t", want: []State{StaleState}},
 		{give: "f", want: []State{FreshState}},
-		{give: "cue", want: []State{ScannedState, UpdatedState, FailedState}},
+		{give: "uek", want: []State{UpdatedState, FailedState, SkippedState}},
 		{give: "x", want: []State{}},
 		{give: "", want: []State{}},
 	}

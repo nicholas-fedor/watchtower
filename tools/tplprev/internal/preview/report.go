@@ -10,7 +10,6 @@ import (
 type State string
 
 const (
-	ScannedState   State = "scanned"
 	UpdatedState   State = "updated"
 	FailedState    State = "failed"
 	SkippedState   State = "skipped"
@@ -24,7 +23,7 @@ var _ report.Report = (*sessionReport)(nil)
 // StatesFromString parses a string of state characters and returns a slice of the corresponding report states.
 //
 // Parameters:
-//   - str: Compact state characters (c, u, e, k, r, t, f).
+//   - str: Compact state characters (u, e, k, r, t, f).
 //
 // Returns:
 //   - []State: Parsed report states. Unknown characters are skipped.
@@ -33,8 +32,6 @@ func StatesFromString(str string) []State {
 
 	for _, char := range str {
 		switch char {
-		case 'c':
-			states = append(states, ScannedState)
 		case 'u':
 			states = append(states, UpdatedState)
 		case 'e':
@@ -62,10 +59,6 @@ func StatesFromString(str string) []State {
 //   - string: The capitalized state name, or "Unknown" for any other value.
 func (s State) displayName() string {
 	switch s {
-	case ScannedState:
-		// Watchtower's reports never show this state. The preview's scanned
-		// samples use Watchtower's name for it.
-		return "Scanned"
 	case UpdatedState:
 		return "Updated"
 	case FailedState:

@@ -81,12 +81,6 @@ hide:
         <input type="number" name="skipped" value="3" min="0" />
     </label>
 
-    <!-- Label and number input for scanned containers count, default value 3, minimum value 0 -->
-    <label class="numfield">
-        Scanned:
-        <input type="number" name="scanned" value="3" min="0" />
-    </label>
-
     <!-- Label and number input for updated containers count, default value 3, minimum value 0 -->
     <label class="numfield">
         Updated:
