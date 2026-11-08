@@ -12,8 +12,7 @@ import (
 // TestStateNamesMatchWatchtower checks that a container's state reads the same
 // in the preview as in Watchtower. Each state's sample must read its own name.
 // Together the names must match the list generated from Watchtower's reports
-// by task tplprev:gen. Those reports never show a container as Scanned. The
-// preview's scanned sample reads as Watchtower's name for that state.
+// by task tplprev:gen.
 func TestStateNamesMatchWatchtower(t *testing.T) {
 	t.Parallel()
 
@@ -23,7 +22,6 @@ func TestStateNamesMatchWatchtower(t *testing.T) {
 		// name is how a container in that state reads in Watchtower.
 		name string
 	}{
-		{state: ScannedState, name: "Scanned"},
 		{state: UpdatedState, name: "Updated"},
 		{state: FailedState, name: "Failed"},
 		{state: SkippedState, name: "Skipped"},
@@ -48,7 +46,7 @@ func TestStateNamesMatchWatchtower(t *testing.T) {
 	t.Run("all states", func(t *testing.T) {
 		t.Parallel()
 
-		want := append(contract.Lines(t, "testdata/container-states.txt"), "Scanned")
+		want := contract.Lines(t, "testdata/container-states.txt")
 
 		generator := New()
 		for _, tt := range tests {

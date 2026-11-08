@@ -22,8 +22,8 @@ func main() {
 	flag.StringVar(
 		&states,
 		"states",
-		"cccuuueeekkktttfff",
-		"sCanned, Updated, failEd, sKipped, restaRted, sTale, Fresh",
+		"uuueeekkktttfff",
+		"Updated, failEd, sKipped, restaRted, sTale, Fresh",
 	)
 	flag.StringVar(&entries, "entries", "ewwiiidddd", "Panic,Fatal,Error,Warn,Info,Debug,Trace")
 

@@ -107,6 +107,30 @@ func TestAddFromStateSkippedReason(t *testing.T) {
 	assert.Contains(t, skippedMessages, reason)
 }
 
+// TestAddFromStateScannedList verifies that the scanned list holds every sample
+// that is not skipped, each in its own state, as Watchtower's scanned list
+// holds every container it did not skip. A skipped sample is listed only as
+// skipped.
+func TestAddFromStateScannedList(t *testing.T) {
+	t.Parallel()
+
+	generator := New()
+	for _, state := range []State{UpdatedState, FailedState, SkippedState, RestartedState, StaleState, FreshState} {
+		generator.AddFromState(state)
+	}
+
+	report := generator.NotificationData().Report
+
+	scanned := make([]string, 0, len(report.Scanned()))
+	for _, status := range report.Scanned() {
+		scanned = append(scanned, status.State())
+	}
+
+	assert.ElementsMatch(t, []string{"Updated", "Failed", "Restarted", "Stale", "Fresh"}, scanned)
+	assert.Len(t, report.Skipped(), 1)
+	assert.Len(t, report.All(), 6)
+}
+
 func TestNotificationDataReportPresence(t *testing.T) {
 	t.Parallel()
 
