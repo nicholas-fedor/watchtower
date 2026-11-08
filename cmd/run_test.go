@@ -256,10 +256,9 @@ func containerLabel(arg any) string {
 	return strings.TrimPrefix(c.Name(), "/")
 }
 
-// runUntilCanceled runs the command in a synctest bubble, lets the bubble's
-// clock run for wait, and cancels the process context the way a signal would
-// once the scheduler is idle. A wait of 0 cancels as soon as startup ends.
-func runUntilCanceled(t *testing.T, wait time.Duration, args ...string) {
+// runUntilCanceled runs the command in a synctest bubble until the scheduler
+// is idle, then cancels the process context the way a signal would.
+func runUntilCanceled(t *testing.T, args ...string) {
 	t.Helper()
 
 	cmd := newTestRootCommand(t, args...)
@@ -267,7 +266,6 @@ func runUntilCanceled(t *testing.T, wait time.Duration, args ...string) {
 	synctest.Test(t, func(t *testing.T) {
 		cancel, done := runInBackground(t, newRunProcess(), cmd)
 
-		time.Sleep(wait)
 		synctest.Wait()
 
 		select {
@@ -343,10 +341,10 @@ func waitForAPI(t *testing.T, addr string) {
 
 // runInBackground runs the command in its own goroutine, with a process
 // context that the returned cancel ends the way a signal would. When the test
-// ends, it cancels that context and waits up to 10 seconds for run to
-// return. Run then stops before setRunState restores the package state it
-// reads, even when the test fails early. Cleanups the caller registers later
-// run first, so they can release anything run waits on.
+// ends, it cancels that context and waits for run to return, so run stops
+// before setRunState restores the package state it reads. A run still going
+// after 10 seconds fails the test, and the wait goes on. Cleanups the caller
+// registers later run first, so they can release anything run waits on.
 //
 // Parameters:
 //   - t: Test that owns the run.
@@ -378,7 +376,8 @@ func runInBackground(t *testing.T, proc *process, cmd *cobra.Command) (context.C
 		select {
 		case <-done:
 		case <-time.After(runStopTimeout):
-			t.Error("run did not stop during cleanup")
+			t.Error("run did not stop within 10 seconds of the test ending")
+			<-done
 		}
 	})
 
@@ -581,7 +580,7 @@ func TestRun_Continuous(t *testing.T) {
 
 			setRunState(t, state)
 
-			runUntilCanceled(t, 0, tt.args...)
+			runUntilCanceled(t, tt.args...)
 
 			assert.Equal(t, tt.want, runCalls(mockClient))
 		})
@@ -629,28 +628,50 @@ func TestRun_PublishedPortsBlockSelfUpdates(t *testing.T) {
 
 			setRunState(t, runTestState{client: mockClient, current: current, currentID: current.ID()})
 
-			runUntilCanceled(t, 0, append([]string{"--update-on-start"}, tt.args...)...)
+			runUntilCanceled(t, append([]string{"--update-on-start"}, tt.args...)...)
 		})
 	}
 }
 
 // TestRun_ScheduledUpdate verifies that continuous mode passes its schedule to
-// the scheduler. With an hourly schedule and no update at startup, the first
-// update runs once the hour has passed and checks the current container for a
-// newer image. The client mock fails the test if that check never happens.
+// the scheduler. With an hourly schedule and no update at startup, nothing
+// checks the current container for a newer image before the hour. The first
+// scheduled update checks it once the hour has passed.
 func TestRun_ScheduledUpdate(t *testing.T) {
 	current := currentWatchtower()
+
+	// checks counts the staleness checks of the current container.
+	var checks atomic.Int32
 
 	mockClient := mockContainerClient.NewMockClient(t)
 	mockClient.EXPECT().ListContainers(mock.Anything, withFilter).Return([]types.Container{current}, nil)
 	mockClient.EXPECT().ListContainers(mock.Anything).Return([]types.Container{current}, nil)
 	mockClient.EXPECT().GetVersion().Return("1.47")
 	mockClient.EXPECT().IsContainerStale(mock.Anything, current, mock.Anything).
-		Return(false, current.ImageID(), "", nil).Once()
+		RunAndReturn(func(context.Context, types.Container, updateConfig.Policy) (bool, types.ImageID, string, error) {
+			checks.Add(1)
+
+			return false, current.ImageID(), "", nil
+		}).Maybe()
 
 	setRunState(t, runTestState{client: mockClient, current: current, currentID: current.ID()})
 
-	runUntilCanceled(t, 61*time.Minute, "--schedule", "@every 1h")
+	cmd := newTestRootCommand(t, "--schedule", "@every 1h")
+
+	synctest.Test(t, func(t *testing.T) {
+		cancel, done := runInBackground(t, newRunProcess(), cmd)
+
+		time.Sleep(59 * time.Minute)
+		synctest.Wait()
+		assert.Zero(t, checks.Load(), "an update ran before the hour")
+
+		time.Sleep(2 * time.Minute)
+		synctest.Wait()
+		assert.Equal(t, int32(1), checks.Load(), "the scheduled update did not run once after the hour")
+
+		cancel()
+		<-done
+	})
 }
 
 // TestRun_UpdatesAfterCleanup verifies that once startup has removed an older
@@ -663,8 +684,8 @@ func TestRun_UpdatesAfterCleanup(t *testing.T) {
 	older := runFixtureContainer("01d0", "/watchtower-older", "2026-10-01T12:00:00Z",
 		map[string]string{watchtowerLabelKey: "true"})
 
-	// scheduledListings counts the container listings after the startup
-	// cleanup, which show that the scheduled run happened.
+	// scheduledListings counts the filtered container listings after the
+	// startup cleanup's, which show that the scheduled run happened.
 	var scheduledListings atomic.Int32
 
 	mockClient := mockContainerClient.NewMockClient(t)
@@ -682,9 +703,21 @@ func TestRun_UpdatesAfterCleanup(t *testing.T) {
 
 	setRunState(t, runTestState{client: mockClient, current: current, currentID: current.ID()})
 
-	runUntilCanceled(t, 61*time.Minute, "--cleanup", "--update-on-start", "--schedule", "@every 1h")
+	cmd := newTestRootCommand(t, "--cleanup", "--update-on-start", "--schedule", "@every 1h")
 
-	assert.Positive(t, scheduledListings.Load(), "the scheduled run did not happen")
+	synctest.Test(t, func(t *testing.T) {
+		cancel, done := runInBackground(t, newRunProcess(), cmd)
+
+		synctest.Wait()
+		assert.Zero(t, scheduledListings.Load(), "an update ran at startup")
+
+		time.Sleep(61 * time.Minute)
+		synctest.Wait()
+		assert.Positive(t, scheduledListings.Load(), "the scheduled run did not happen")
+
+		cancel()
+		<-done
+	})
 }
 
 // TestRun_WaitsForAPIDrain verifies that continuous mode with the HTTP API in
