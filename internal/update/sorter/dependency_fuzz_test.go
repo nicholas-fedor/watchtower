@@ -10,6 +10,9 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
+
 	dockerContainer "github.com/moby/moby/api/types/container"
 
 	composeLabels "github.com/nicholas-fedor/watchtower/internal/compose/labels"
@@ -579,6 +582,31 @@ func FuzzLinkNormalization(f *testing.F) {
 			}
 		}
 	})
+}
+
+// TestGenerateLinkNormalizationContainers verifies that the link normalization
+// seeds give the sorter the links they are named for. The depends-on label
+// drops leading slashes. A part of only spaces becomes an empty link.
+func TestGenerateLinkNormalizationContainers(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		seed string
+		want []string
+	}{
+		{seed: "leading-slash-links", want: []string{"dependency1", "dependency2"}},
+		{seed: "empty-links", want: []string{"", "dependency1", ""}},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.seed, func(t *testing.T) {
+			t.Parallel()
+
+			picked := pick(generateLinkNormalizationContainers([]byte(tt.seed)), "container1")
+			require.Len(t, picked, 1)
+			assert.Equal(t, tt.want, picked[0].Links(true))
+		})
+	}
 }
 
 // FuzzEmptyIdentifiers fuzz tests containers with empty or missing identifiers.
