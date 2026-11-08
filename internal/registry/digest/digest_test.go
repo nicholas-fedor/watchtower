@@ -1246,21 +1246,29 @@ func TestIsLocalImageNotFound(t *testing.T) {
 // TestLocalOnlyImageCache ensures a confirmed local-only image skips subsequent
 // registry probes for the same image name+ID.
 //
-// A rebuild gives the image a new ID, so the rebuilt image is probed again.
+// The cache keys an image by both. A retagged image keeps its ID under a new
+// name. A rebuilt image keeps its name with a new ID. Each is probed again.
 func TestLocalOnlyImageCache(t *testing.T) {
 	clearLocalOnlyImageCache()
 	t.Cleanup(clearLocalOnlyImageCache)
 
-	const manifestPath = "/v2/library/atlas-badgerdb/manifests/latest"
+	const (
+		imageID      = "sha256:80f07677bee57274a48929d0688bf0cfabe5e83f06f2f152dab4076445d6ab35"
+		manifestPath = "/v2/library/atlas-badgerdb/manifests/latest"
+		// retaggedPath is the manifest of the same image under another name.
+		retaggedPath = "/v2/library/atlas-badgerdb-dev/manifests/latest"
+	)
 
 	settings := registryConfig.Registry{TLSSkip: true}
 
-	// The registry answers two probes: the first comparison and the rebuilt
-	// image's. The cached comparison between them must not reach it.
+	// The registry answers three probes: the first comparison, the retagged
+	// image's and the rebuilt image's. The cached comparison must not reach it.
 	server := httpstub.New(t)
 	server.AppendHandlers(
 		anonymousRegistryHandler(t),
 		manifestHandler(t, http.MethodHead, manifestPath, http.StatusNotFound, nil),
+		anonymousRegistryHandler(t),
+		manifestHandler(t, http.MethodHead, retaggedPath, http.StatusNotFound, nil),
 		anonymousRegistryHandler(t),
 		manifestHandler(t, http.MethodHead, manifestPath, http.StatusNotFound, nil),
 	)
@@ -1275,16 +1283,24 @@ func TestLocalOnlyImageCache(t *testing.T) {
 		assert.True(t, match)
 	}
 
-	built := newLocalOnlyContainer("sha256:80f07677bee57274a48929d0688bf0cfabe5e83f06f2f152dab4076445d6ab35")
+	built := newLocalOnlyContainer(imageID)
 
 	// The first comparison probes the registry and caches the image as local-only.
 	compare(built)
 	compare(built)
 	assert.Len(t, server.ReceivedRequests(), 2, "cached local-only image must not re-probe registry")
 
-	// The image was rebuilt under the same name, so it is probed again.
+	// The image was tagged under another name, so the new name is probed.
+	compare(modelfixture.Container(
+		containerfixture.WithImageName("atlas-badgerdb-dev"),
+		containerfixture.WithImageID(imageID),
+		containerfixture.WithRepoDigests([]string{"atlas-badgerdb-dev@" + imageID}),
+	))
+	assert.Len(t, server.ReceivedRequests(), 4, "a retagged local-only image was not probed again")
+
+	// The image was rebuilt under its first name, so it is probed again.
 	compare(newLocalOnlyContainer("sha256:91a18788cff68385b59a3a1799cf1d0abe5e83f06f2f152dab4076445d6ab35"))
-	assert.Len(t, server.ReceivedRequests(), 4, "a rebuilt local-only image was not probed again")
+	assert.Len(t, server.ReceivedRequests(), 6, "a rebuilt local-only image was not probed again")
 }
 
 // TestFetchDigestWithGet verifies digest retrieval from an anonymous registry's
