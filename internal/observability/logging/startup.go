@@ -1,6 +1,7 @@
 package logging
 
 import (
+	"context"
 	"strings"
 	"time"
 
@@ -63,13 +64,22 @@ type StartupParams struct {
 // scheduling information, and HTTP API status. Callers that suppress startup messages
 // set NoStartupMessage and return without requiring Logger.
 //
+// A stopping process has nothing to announce, so it writes nothing once ctx is
+// done. It then leaves the notifier's open batch alone. Closing the notifier
+// sends the lines logged before startup.
+//
 // Parameters:
+//   - ctx: Context of the process or component that announces startup.
 //   - params: Resolved startup messaging inputs from settings.Load (no CLI flag reads).
 //     When NoStartupMessage is false, Logger must be non-nil and should be the hooked
 //     process logger (after Notifier.RegisterHook) so batching captures startup lines.
-func WriteStartupMessage(params StartupParams) {
+func WriteStartupMessage(ctx context.Context, params StartupParams) {
 	if !params.NoStartupMessage && params.Logger == nil {
 		panic("logging.WriteStartupMessage: Logger is required when NoStartupMessage is false")
+	}
+
+	if ctx.Err() != nil {
+		return
 	}
 
 	// Startup collects its lines in a batch of its own and ends only that

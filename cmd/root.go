@@ -751,13 +751,18 @@ func (p *process) runMain(cfg settings.RunConfig) error {
 		startup.Notifier = notifier
 		startup.Version = meta.Version
 		startup.Logger = p.log
-		logging.WriteStartupMessage(startup)
+		logging.WriteStartupMessage(ctx, startup)
 
-		params := baseParams
-		params.RunOnce = true
+		// A process told to stop during startup makes no update, so a
+		// canceled update is not reported as a failure.
+		if ctx.Err() == nil {
+			params := baseParams
+			params.RunOnce = true
 
-		metric := runUpdatesWithNotifications(ctx, cfg.Filter, params)
-		metrics.Default().RegisterScan(metric)
+			metric := runUpdatesWithNotifications(ctx, cfg.Filter, params)
+			metrics.Default().RegisterScan(metric)
+		}
+
 		p.disableRestarts()
 
 		return nil
@@ -894,10 +899,9 @@ func (p *process) runMain(cfg settings.RunConfig) error {
 		return &exitError{err: err, msg: "", code: 1}
 	}
 
-	// Schedule and execute periodic updates, handling errors or shutdown.
-	// The startup message is skipped here if it was already sent by the HTTP API in blocking mode.
-	startupMessageSent := cfg.EnableUpdateAPI && !cfg.UnblockHTTPAPI
-
+	// Schedule and execute periodic updates, handling errors or shutdown. In
+	// API-only mode the HTTP API returns only at shutdown. The scheduler then
+	// only waits for an update the API started and announces nothing.
 	err = schedule.RunUpgradesOnSchedule(ctx, schedule.ScheduleDeps{
 		Logger:                p.log,
 		Filter:                cfg.Filter,
@@ -908,7 +912,6 @@ func (p *process) runMain(cfg settings.RunConfig) error {
 		RunUpdate:             runUpdatesWithNotifications,
 		UpdateOnStart:         cfg.UpdateOnStart,
 		ReplacedOlderInstance: totalRemovedInstances > 0,
-		StartupMessageSent:    startupMessageSent,
 		BaseParams:            sharedBase,
 	})
 

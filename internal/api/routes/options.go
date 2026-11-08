@@ -85,7 +85,8 @@ type Options struct {
 	// DefaultMetrics returns the process metrics store.
 	DefaultMetrics func() *mt.Metrics
 	// WriteStartupMessage writes the blocking-mode startup message when the update API starts.
-	WriteStartupMessage func(logging.StartupParams)
+	// It receives the server's context and writes nothing once that context is done.
+	WriteStartupMessage func(context.Context, logging.StartupParams)
 	// EventBroadcaster publishes action events to SSE subscribers.
 	EventBroadcaster *events.Broadcaster
 	// OnUnexpectedServerStop is invoked when the HTTP server exits with an

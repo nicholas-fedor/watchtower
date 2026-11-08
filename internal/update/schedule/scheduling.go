@@ -124,7 +124,9 @@ func recoverPanics(log *zerolog.Logger) cron.JobWrapper {
 // Because every update holds the lock, the message never opens its
 // notification batch while an update's batch is open. It waits for an update
 // that holds the lock and writes nothing when ctx is done first. The first
-// scheduled run time is read once the lock is taken, after any such wait.
+// scheduled run time is read once the lock is taken, after any such wait. The
+// writer receives ctx and writes nothing for a process that is already
+// stopping.
 //
 // Parameters:
 //   - ctx: Context that ends the wait for the lock.
@@ -157,7 +159,7 @@ func writeStartupMessage(ctx context.Context, lock *UpdateLock, scheduler *cron.
 	startup := deps.Startup
 	startup.Sched = nextRun
 	startup.UpdateOnStart = &updateOnStart
-	deps.WriteStartupMessage(startup)
+	deps.WriteStartupMessage(ctx, startup)
 
 	return waited
 }
@@ -177,8 +179,10 @@ type ScheduleDeps struct {
 	// caller that starts updates, such as the HTTP API. Nil gives the scheduler
 	// a lock of its own.
 	Lock *UpdateLock
-	// WriteStartupMessage writes the startup message with scheduling information.
-	WriteStartupMessage func(logging.StartupParams)
+	// WriteStartupMessage writes the startup message with scheduling
+	// information. It receives the scheduler's context and writes nothing once
+	// that context is done.
+	WriteStartupMessage func(context.Context, logging.StartupParams)
 	// RunUpdate performs container updates and sends notifications.
 	RunUpdate func(context.Context, types.Filter, updateParams.Params) *metrics.Metric
 	// ScheduleSpec is the cron-formatted schedule string for periodic updates.
@@ -197,9 +201,6 @@ type ScheduleDeps struct {
 	// Watchtower instance in this process's scope. The scheduler then makes no
 	// update at startup. Its first scheduled run also skips self-updates.
 	ReplacedOlderInstance bool
-	// StartupMessageSent is true when the startup message was already sent
-	// (for example by the HTTP API in blocking mode).
-	StartupMessageSent bool
 }
 
 // updatesOnStart reports whether the scheduler makes an update at startup.
@@ -336,10 +337,8 @@ func RunUpgradesOnSchedule(ctx context.Context, deps ScheduleDeps) error {
 		}
 	}
 
-	// Skip the startup message if it was already sent (for example by the HTTP
-	// API in blocking mode).
 	waitedForUpdate := false
-	if !deps.StartupMessageSent && deps.WriteStartupMessage != nil {
+	if deps.WriteStartupMessage != nil {
 		waitedForUpdate = writeStartupMessage(ctx, lock, scheduler, deps)
 	}
 

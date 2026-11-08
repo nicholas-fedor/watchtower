@@ -2,6 +2,7 @@ package logging
 
 import (
 	"bytes"
+	"context"
 	"testing"
 	"time"
 
@@ -110,7 +111,7 @@ func TestWriteStartupMessage(t *testing.T) {
 			params.Client = newVersionProvider(t)
 			params.Version = "v1.0.0"
 
-			WriteStartupMessage(params)
+			WriteStartupMessage(t.Context(), params)
 
 			if len(tt.want) == 0 {
 				assert.Empty(t, buffer.String())
@@ -128,7 +129,7 @@ func TestWriteStartupMessage(t *testing.T) {
 		t.Parallel()
 
 		assert.PanicsWithValue(t, "logging.WriteStartupMessage: Logger is required when NoStartupMessage is false", func() {
-			WriteStartupMessage(StartupParams{
+			WriteStartupMessage(t.Context(), StartupParams{
 				Filtering: "Watching all containers",
 				Client:    newVersionProvider(t),
 				Version:   "v1.0.0",
@@ -156,7 +157,7 @@ func TestWriteStartupMessage(t *testing.T) {
 			notifier.EXPECT().GetNames().Return([]string{"slack", "gotify"}).Once(),
 		)
 
-		WriteStartupMessage(StartupParams{
+		WriteStartupMessage(t.Context(), StartupParams{
 			Notifier:  notifier,
 			Logger:    log,
 			Filtering: "Watching all containers",
@@ -179,7 +180,7 @@ func TestWriteStartupMessage(t *testing.T) {
 		notifier := mockLogging.NewMockStartupNotifier(t)
 		notifier.EXPECT().StartNotification().Return(func() { ended = true }).Once()
 
-		WriteStartupMessage(StartupParams{
+		WriteStartupMessage(t.Context(), StartupParams{
 			Notifier:         notifier,
 			NoStartupMessage: true,
 		})
@@ -187,11 +188,33 @@ func TestWriteStartupMessage(t *testing.T) {
 		assert.True(t, ended, "startup ends its batch")
 	})
 
+	// A stopping process has nothing to announce. Startup then leaves the
+	// batch of the lines logged before it alone, so closing the notifier
+	// sends them.
+	t.Run("should write nothing when the process is stopping", func(t *testing.T) {
+		t.Parallel()
+
+		log, buffer := newBufferLogger(zerolog.DebugLevel)
+
+		ctx, cancel := context.WithCancel(t.Context())
+		cancel()
+
+		WriteStartupMessage(ctx, StartupParams{
+			Notifier:  mockLogging.NewMockStartupNotifier(t),
+			Logger:    log,
+			Filtering: "Watching all containers",
+			Client:    mockLogging.NewMockAPIVersionProvider(t),
+			Version:   "v1.0.0",
+		})
+
+		assert.Empty(t, buffer.String(), "a stopping process wrote the startup message")
+	})
+
 	t.Run("should not panic when Logger is nil but NoStartupMessage is set", func(t *testing.T) {
 		t.Parallel()
 
 		assert.NotPanics(t, func() {
-			WriteStartupMessage(StartupParams{
+			WriteStartupMessage(t.Context(), StartupParams{
 				NoStartupMessage: true,
 				Filtering:        "Watching all containers",
 				Client:           newVersionProvider(t),

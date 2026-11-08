@@ -58,7 +58,7 @@ func newTestLogger(t *testing.T) *zerolog.Logger {
 func testDeps(
 	t *testing.T,
 	runUpdate func(context.Context, types.Filter, updateParams.Params) *metrics.Metric,
-	writeStartup func(logging.StartupParams),
+	writeStartup func(context.Context, logging.StartupParams),
 ) ScheduleDeps {
 	t.Helper()
 
@@ -271,7 +271,7 @@ func TestRunUpgradesOnSchedule_RecoversPanickingRun(t *testing.T) {
 			}
 
 			return &metrics.Metric{}
-		}, func(logging.StartupParams) {})
+		}, func(context.Context, logging.StartupParams) {})
 		deps.Logger = log
 		deps.ScheduleSpec = "@every 1s"
 
@@ -312,7 +312,7 @@ func TestRunUpgradesOnSchedule_OverlappingRunIsSkipped(t *testing.T) {
 			<-release
 
 			return &metrics.Metric{}
-		}, func(logging.StartupParams) {})
+		}, func(context.Context, logging.StartupParams) {})
 		deps.ScheduleSpec = "@every 1s"
 
 		ctx, cancel := context.WithCancel(t.Context())
@@ -346,7 +346,7 @@ func TestRunUpgradesOnSchedule_WaitingRunStopsAtShutdown(t *testing.T) {
 			updated.Store(true)
 
 			return &metrics.Metric{}
-		}, func(logging.StartupParams) {})
+		}, func(context.Context, logging.StartupParams) {})
 
 		deps.Lock = NewUpdateLock()
 		deps.ScheduleSpec = "@every 1s"
@@ -384,7 +384,7 @@ func TestRunUpgradesOnSchedule_ShutdownWaitsForRunningUpdate(t *testing.T) {
 		t.Parallel()
 
 		synctest.Test(t, func(t *testing.T) {
-			deps := testDeps(t, nil, func(logging.StartupParams) {})
+			deps := testDeps(t, nil, func(context.Context, logging.StartupParams) {})
 			deps.Lock = NewUpdateLock()
 
 			ctx, cancel := context.WithCancel(t.Context())
@@ -425,7 +425,7 @@ func TestRunUpgradesOnSchedule_ShutdownWaitsForRunningUpdate(t *testing.T) {
 				<-release
 
 				return &metrics.Metric{}
-			}, func(logging.StartupParams) {})
+			}, func(context.Context, logging.StartupParams) {})
 			deps.Lock = NewUpdateLock()
 			deps.ScheduleSpec = "@every 1s"
 
@@ -462,7 +462,7 @@ func TestRunUpgradesOnSchedule_EmptySchedule(t *testing.T) {
 		return &metrics.Metric{Scanned: 1, Updated: 0, Failed: 0}
 	}
 
-	writeStartupMessage := func(logging.StartupParams) {}
+	writeStartupMessage := func(context.Context, logging.StartupParams) {}
 
 	// Use timeout to avoid hanging
 	timeoutCtx, timeoutCancel := context.WithTimeout(ctx, 10*time.Millisecond)
@@ -473,37 +473,6 @@ func TestRunUpgradesOnSchedule_EmptySchedule(t *testing.T) {
 	// Should complete without error when context times out (clean cancellation)
 	if err != nil {
 		t.Errorf("expected no error, got %v", err)
-	}
-}
-
-func TestRunUpgradesOnSchedule_StartupMessageSuppressed(t *testing.T) {
-	ctx := t.Context()
-
-	runUpdatesWithNotifications := func(_ context.Context, _ types.Filter, _ updateParams.Params) *metrics.Metric {
-		return &metrics.Metric{Scanned: 1, Updated: 0, Failed: 0}
-	}
-
-	// Spy closure to detect if writeStartupMessage is called
-	startupMessageCalled := false
-	writeStartupMessage := func(logging.StartupParams) {
-		startupMessageCalled = true
-	}
-
-	// Use timeout to avoid hanging
-	timeoutCtx, timeoutCancel := context.WithTimeout(ctx, 10*time.Millisecond)
-	defer timeoutCancel()
-
-	deps := testDeps(t, runUpdatesWithNotifications, writeStartupMessage)
-	deps.StartupMessageSent = true
-	err := RunUpgradesOnSchedule(timeoutCtx, deps)
-	// Should complete without error when context times out (clean cancellation)
-	if err != nil {
-		t.Errorf("expected no error, got %v", err)
-	}
-
-	// Verify writeStartupMessage was NOT called when startupMessageSent=true
-	if startupMessageCalled {
-		t.Error("writeStartupMessage should not be called when startupMessageSent is true")
 	}
 }
 
@@ -519,7 +488,7 @@ func TestRunUpgradesOnSchedule_UpdateOnStart(t *testing.T) {
 			updates.Add(1)
 
 			return &metrics.Metric{Scanned: 1, Updated: 1, Failed: 0}
-		}, func(logging.StartupParams) {})
+		}, func(context.Context, logging.StartupParams) {})
 		deps.UpdateOnStart = true
 
 		ctx, cancel := context.WithCancel(t.Context())
@@ -549,7 +518,7 @@ func TestRunUpgradesOnSchedule_UpdateOnStartWithSchedule(t *testing.T) {
 			updates.Add(1)
 
 			return &metrics.Metric{}
-		}, func(logging.StartupParams) {})
+		}, func(context.Context, logging.StartupParams) {})
 		deps.UpdateOnStart = true
 		deps.ScheduleSpec = "@every 1h"
 
@@ -589,7 +558,7 @@ func TestRunUpgradesOnSchedule_UpdateOnStartSkippedWhenCanceled(t *testing.T) {
 	ctx, cancel := context.WithCancel(t.Context())
 	cancel()
 
-	deps := testDeps(t, runUpdatesWithNotifications, func(logging.StartupParams) {})
+	deps := testDeps(t, runUpdatesWithNotifications, func(context.Context, logging.StartupParams) {})
 	deps.UpdateOnStart = true
 
 	err := RunUpgradesOnSchedule(ctx, deps)
@@ -624,7 +593,7 @@ func TestRunUpgradesOnSchedule_StartupWaitsForRunningUpdate(t *testing.T) {
 			updated.Store(true)
 
 			return &metrics.Metric{}
-		}, func(startup logging.StartupParams) {
+		}, func(_ context.Context, startup logging.StartupParams) {
 			announced.Store(&startup)
 		})
 		deps.Lock = lock
@@ -656,8 +625,8 @@ func TestRunUpgradesOnSchedule_StartupWaitsForRunningUpdate(t *testing.T) {
 // TestRunUpgradesOnSchedule_UpdateOnStartSkippedWhileLocked verifies that the
 // update at startup does not wait for an update that holds the lock. The HTTP
 // API can start one right after the startup message. The skipped update is
-// counted as a skipped scan. Because the startup message is already sent
-// here, the lock is left to that update. The test does not run in parallel,
+// counted as a skipped scan. No startup message is written here, so the lock
+// is left to that update. The test does not run in parallel,
 // because it reads the process-wide skipped scans counter.
 func TestRunUpgradesOnSchedule_UpdateOnStartSkippedWhileLocked(t *testing.T) {
 	before := skippedScansTotal(t)
@@ -674,7 +643,6 @@ func TestRunUpgradesOnSchedule_UpdateOnStartSkippedWhileLocked(t *testing.T) {
 			return &metrics.Metric{}
 		}, nil)
 		deps.Lock = lock
-		deps.StartupMessageSent = true
 		deps.UpdateOnStart = true
 
 		ctx, cancel := context.WithCancel(t.Context())
@@ -763,7 +731,7 @@ func TestRunUpgradesOnSchedule_StartupSkippedAtShutdown(t *testing.T) {
 
 		var announced atomic.Bool
 
-		deps := testDeps(t, nil, func(logging.StartupParams) {
+		deps := testDeps(t, nil, func(context.Context, logging.StartupParams) {
 			announced.Store(true)
 		})
 		deps.Lock = lock
@@ -784,6 +752,33 @@ func TestRunUpgradesOnSchedule_StartupSkippedAtShutdown(t *testing.T) {
 	})
 }
 
+// TestRunUpgradesOnSchedule_StartupMessageGetsSchedulerContext verifies that
+// the scheduler hands its own context to the startup message writer, which
+// writes nothing for a stopping process. In API-only mode the scheduler starts
+// only at shutdown, after the HTTP API has announced startup, so this keeps it
+// from writing a second message.
+func TestRunUpgradesOnSchedule_StartupMessageGetsSchedulerContext(t *testing.T) {
+	t.Parallel()
+
+	var (
+		called bool
+		// receivedErr is the error of the context the writer received.
+		receivedErr error
+	)
+
+	deps := testDeps(t, nil, func(ctx context.Context, _ logging.StartupParams) {
+		called = true
+		receivedErr = ctx.Err()
+	})
+
+	ctx, cancel := context.WithCancel(t.Context())
+	cancel()
+
+	require.NoError(t, RunUpgradesOnSchedule(ctx, deps))
+	require.True(t, called, "the startup message writer was not called")
+	assert.ErrorIs(t, receivedErr, context.Canceled, "the writer did not get the scheduler's stopped context")
+}
+
 func TestRunUpgradesOnSchedule_InvalidCronSpec(t *testing.T) {
 	ctx := t.Context()
 
@@ -791,7 +786,7 @@ func TestRunUpgradesOnSchedule_InvalidCronSpec(t *testing.T) {
 		return &metrics.Metric{Scanned: 0, Updated: 0, Failed: 0}
 	}
 
-	writeStartupMessage := func(logging.StartupParams) {}
+	writeStartupMessage := func(context.Context, logging.StartupParams) {}
 
 	deps := testDeps(t, runUpdatesWithNotifications, writeStartupMessage)
 	deps.ScheduleSpec = "invalid cron spec"
@@ -846,7 +841,7 @@ func TestRunUpgradesOnSchedule_QuotedScheduleSpec(t *testing.T) {
 				return &metrics.Metric{Scanned: 0, Updated: 0, Failed: 0}
 			}
 
-			writeStartupMessage := func(logging.StartupParams) {}
+			writeStartupMessage := func(context.Context, logging.StartupParams) {}
 
 			timeoutCtx, timeoutCancel := context.WithTimeout(ctx, 10*time.Millisecond)
 			defer timeoutCancel()
@@ -876,7 +871,7 @@ func TestRunUpgradesOnSchedule_ContextCancellation(t *testing.T) {
 		return &metrics.Metric{Scanned: 0, Updated: 0, Failed: 0}
 	}
 
-	writeStartupMessage := func(logging.StartupParams) {}
+	writeStartupMessage := func(context.Context, logging.StartupParams) {}
 
 	// Cancel immediately
 	canceledCtx, cancelFunc := context.WithCancel(ctx)
@@ -917,7 +912,7 @@ func TestRunUpgradesOnSchedule_StopsOnlyOnCancellation(t *testing.T) {
 	done := make(chan error, 1)
 
 	go func() {
-		done <- RunUpgradesOnSchedule(ctx, testDeps(t, runUpdatesWithNotifications, func(logging.StartupParams) {}))
+		done <- RunUpgradesOnSchedule(ctx, testDeps(t, runUpdatesWithNotifications, func(context.Context, logging.StartupParams) {}))
 	}()
 
 	process, err := os.FindProcess(os.Getpid())
@@ -976,7 +971,7 @@ func TestRunUpgradesOnSchedule_MonitorOnlyParameter(t *testing.T) {
 				return &metrics.Metric{Scanned: 1, Updated: 0, Failed: 0}
 			}
 
-			writeStartupMessage := func(logging.StartupParams) {}
+			writeStartupMessage := func(context.Context, logging.StartupParams) {}
 
 			// Use timeout to avoid hanging
 			timeoutCtx, timeoutCancel := context.WithTimeout(ctx, 10*time.Millisecond)
@@ -1012,7 +1007,7 @@ func TestRunUpgradesOnSchedule_CronWithSeconds(t *testing.T) {
 		return &metrics.Metric{Scanned: 1, Updated: 0, Failed: 0}
 	}
 
-	writeStartupMessage := func(logging.StartupParams) {}
+	writeStartupMessage := func(context.Context, logging.StartupParams) {}
 
 	// Use a 6-field cron spec that includes seconds (every 2 seconds)
 	scheduleSpec := "*/2 * * * * *"
@@ -1090,7 +1085,7 @@ func TestRunUpgradesOnSchedule_ReplacedOlderInstance(t *testing.T) {
 					skippedSelfUpdate = append(skippedSelfUpdate, params.SkipSelfUpdate)
 
 					return &metrics.Metric{}
-				}, func(written logging.StartupParams) {
+				}, func(_ context.Context, written logging.StartupParams) {
 					startup = &written
 				})
 				deps.UpdateOnStart = tt.updateOnStart
@@ -1129,7 +1124,7 @@ func TestRunUpgradesOnSchedule_ScheduledRuns_Execution(t *testing.T) {
 		return &metrics.Metric{Scanned: 1, Updated: 0, Failed: 0}
 	}
 
-	writeStartupMessage := func(logging.StartupParams) {}
+	writeStartupMessage := func(context.Context, logging.StartupParams) {}
 
 	// Use a cron spec that runs every 1 second
 	scheduleSpec := "*/1 * * * * *"
@@ -1184,7 +1179,7 @@ func TestRunUpgradesOnSchedule_KeepsBaseSkipSelfUpdate(t *testing.T) {
 	defer timeoutCancel()
 
 	// The run at startup does not skip self-updates on its own.
-	deps := testDeps(t, runUpdatesWithNotifications, func(logging.StartupParams) {})
+	deps := testDeps(t, runUpdatesWithNotifications, func(context.Context, logging.StartupParams) {})
 	deps.UpdateOnStart = true
 	deps.BaseParams.SkipSelfUpdate = true
 	err := RunUpgradesOnSchedule(timeoutCtx, deps)
@@ -1207,7 +1202,7 @@ func TestRunUpgradesOnSchedule_EphemeralSelfUpdatePropagation(t *testing.T) {
 			captured.Store(&params)
 
 			return &metrics.Metric{}
-		}, func(logging.StartupParams) {})
+		}, func(context.Context, logging.StartupParams) {})
 		deps.UpdateOnStart = true
 		deps.BaseParams.EphemeralSelfUpdate = true
 
@@ -1260,7 +1255,7 @@ func TestRunUpgradesOnSchedule_ReviveStoppedPropagation(t *testing.T) {
 				return &metrics.Metric{Scanned: 1, Updated: 0, Failed: 0}
 			}
 
-			writeStartupMessage := func(logging.StartupParams) {}
+			writeStartupMessage := func(context.Context, logging.StartupParams) {}
 
 			timeoutCtx, timeoutCancel := context.WithTimeout(ctx, 10*time.Millisecond)
 			defer timeoutCancel()
@@ -1310,7 +1305,7 @@ func TestRunUpgradesOnSchedule_UseComposeDependsOnPropagation(t *testing.T) {
 				return &metrics.Metric{Scanned: 1, Updated: 0, Failed: 0}
 			}
 
-			writeStartupMessage := func(logging.StartupParams) {}
+			writeStartupMessage := func(context.Context, logging.StartupParams) {}
 
 			timeoutCtx, timeoutCancel := context.WithTimeout(ctx, 10*time.Millisecond)
 			defer timeoutCancel()
