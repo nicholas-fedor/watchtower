@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"io"
 	"net"
 	"net/http"
 	"net/netip"
@@ -11,11 +12,13 @@ import (
 	"os/exec"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"testing"
 	"testing/synctest"
 	"time"
 
 	"github.com/rs/zerolog"
+	"github.com/spf13/cobra"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
@@ -32,6 +35,7 @@ import (
 	"github.com/nicholas-fedor/watchtower/internal/registry/ratelimit"
 	"github.com/nicholas-fedor/watchtower/internal/settings"
 	notifyConfig "github.com/nicholas-fedor/watchtower/internal/settings/config/notify"
+	updateConfig "github.com/nicholas-fedor/watchtower/internal/settings/config/update"
 	"github.com/nicholas-fedor/watchtower/internal/testutil/logcapture"
 	"github.com/nicholas-fedor/watchtower/pkg/types"
 )
@@ -46,6 +50,13 @@ const (
 	scopeLabelKey        = "com.centurylinklabs.watchtower.scope"
 	orchestratorLabelKey = "com.centurylinklabs.watchtower.ephemeral-orchestrator"
 )
+
+// runStopTimeout bounds the wait for run to return after its process context
+// is canceled. It covers the HTTP API's shutdown grace period.
+const runStopTimeout = 10 * time.Second
+
+// apiToken is the HTTP API token the run tests serve the API with.
+const apiToken = "test-token"
 
 // errRunTestDocker is returned by the Docker client in the run tests.
 var errRunTestDocker = errors.New("docker daemon error")
@@ -245,29 +256,18 @@ func containerLabel(arg any) string {
 	return strings.TrimPrefix(c.Name(), "/")
 }
 
-// runUntilCanceled runs the command in a synctest bubble until the scheduler
-// is idle, then cancels the process context the way a signal would.
-func runUntilCanceled(t *testing.T, args ...string) {
+// runUntilCanceled runs the command in a synctest bubble, lets the bubble's
+// clock run for wait, and cancels the process context the way a signal would
+// once the scheduler is idle. A wait of 0 cancels as soon as startup ends.
+func runUntilCanceled(t *testing.T, wait time.Duration, args ...string) {
 	t.Helper()
 
 	cmd := newTestRootCommand(t, args...)
 
 	synctest.Test(t, func(t *testing.T) {
-		cancels := make(chan context.CancelFunc, 1)
-		createSignalContext = func(parent context.Context, _ ...os.Signal) (context.Context, context.CancelFunc) {
-			ctx, cancel := context.WithCancel(parent)
-			cancels <- cancel
+		cancel, done := runInBackground(t, newRunProcess(), cmd)
 
-			return ctx, cancel
-		}
-
-		done := make(chan struct{})
-
-		go func() {
-			assert.NoError(t, newRunProcess().run(cmd, nil))
-			close(done)
-		}()
-
+		time.Sleep(wait)
 		synctest.Wait()
 
 		select {
@@ -276,13 +276,7 @@ func runUntilCanceled(t *testing.T, args ...string) {
 		default:
 		}
 
-		select {
-		case cancel := <-cancels:
-			cancel()
-		default:
-			require.FailNow(t, "run did not create the process context")
-		}
-
+		cancel()
 		<-done
 	})
 }
@@ -290,6 +284,130 @@ func runUntilCanceled(t *testing.T, args ...string) {
 // newRunProcess returns a process that logs nothing.
 func newRunProcess() *process {
 	return &process{log: new(zerolog.Nop())}
+}
+
+// localAPIArgs picks a free loopback address for the HTTP API and returns it
+// with the command arguments that serve the API there. Those arguments set the
+// API token and come before args.
+//
+// Parameters:
+//   - t: Test that fails when no address is free.
+//   - args: Further command arguments.
+//
+// Returns:
+//   - string: The address in host:port form.
+//   - []string: The API arguments followed by args.
+func localAPIArgs(t *testing.T, args ...string) (string, []string) {
+	t.Helper()
+
+	var listenConfig net.ListenConfig
+
+	ln, err := listenConfig.Listen(t.Context(), "tcp", "127.0.0.1:0")
+	require.NoError(t, err)
+
+	addr := ln.Addr().String()
+	require.NoError(t, ln.Close())
+
+	host, port, err := net.SplitHostPort(addr)
+	require.NoError(t, err)
+
+	return addr, append([]string{
+		"--http-api-token", apiToken,
+		"--http-api-host", host,
+		"--http-api-port", port,
+	}, args...)
+}
+
+// waitForAPI waits up to 5 seconds for the HTTP API at addr to accept
+// connections, and fails the test when it does not.
+//
+// Parameters:
+//   - t: Test that fails when the API does not listen in time.
+//   - addr: Address the API listens on, in host:port form.
+func waitForAPI(t *testing.T, addr string) {
+	t.Helper()
+
+	var dialer net.Dialer
+
+	require.Eventually(t, func() bool {
+		conn, err := dialer.DialContext(t.Context(), "tcp", addr)
+		if err != nil {
+			return false
+		}
+
+		_ = conn.Close()
+
+		return true
+	}, 5*time.Second, 20*time.Millisecond, "the HTTP API did not start listening")
+}
+
+// runInBackground runs the command in its own goroutine, with a process
+// context that the returned cancel ends the way a signal would. When the test
+// ends, it cancels that context and waits up to 10 seconds for run to
+// return. Run then stops before setRunState restores the package state it
+// reads, even when the test fails early. Cleanups the caller registers later
+// run first, so they can release anything run waits on.
+//
+// Parameters:
+//   - t: Test that owns the run.
+//   - proc: Process to run the command with.
+//   - cmd: Command to run.
+//
+// Returns:
+//   - context.CancelFunc: Cancels the process context.
+//   - <-chan struct{}: Closed when run returns.
+func runInBackground(t *testing.T, proc *process, cmd *cobra.Command) (context.CancelFunc, <-chan struct{}) {
+	t.Helper()
+
+	ctx, cancel := context.WithCancel(context.Background())
+	createSignalContext = func(context.Context, ...os.Signal) (context.Context, context.CancelFunc) {
+		return ctx, cancel
+	}
+
+	done := make(chan struct{})
+
+	go func() {
+		defer close(done)
+
+		assert.NoError(t, proc.run(cmd, nil))
+	}()
+
+	t.Cleanup(func() {
+		cancel()
+
+		select {
+		case <-done:
+		case <-time.After(runStopTimeout):
+			t.Error("run did not stop during cleanup")
+		}
+	})
+
+	return cancel, done
+}
+
+// newAPIRequest returns a request to path on the HTTP API at addr, made with
+// ctx and authorized with the API token. The client closes its connection
+// after the response, so the API can stop without waiting for an idle one.
+//
+// Parameters:
+//   - t: Test that fails when the request cannot be built.
+//   - ctx: Context for the request.
+//   - method: HTTP method of the request.
+//   - addr: Address the API listens on, in host:port form.
+//   - path: Path of the endpoint.
+//
+// Returns:
+//   - *http.Request: The request.
+func newAPIRequest(t *testing.T, ctx context.Context, method, addr, path string) *http.Request {
+	t.Helper()
+
+	req, err := http.NewRequestWithContext(ctx, method, "http://"+addr+path, nil)
+	require.NoError(t, err)
+
+	req.Header.Set("Authorization", "Bearer "+apiToken)
+	req.Close = true
+
+	return req
 }
 
 // TestRun_RunOnce records the Docker calls of a run-once update with no
@@ -463,7 +581,7 @@ func TestRun_Continuous(t *testing.T) {
 
 			setRunState(t, state)
 
-			runUntilCanceled(t, tt.args...)
+			runUntilCanceled(t, 0, tt.args...)
 
 			assert.Equal(t, tt.want, runCalls(mockClient))
 		})
@@ -511,9 +629,62 @@ func TestRun_PublishedPortsBlockSelfUpdates(t *testing.T) {
 
 			setRunState(t, runTestState{client: mockClient, current: current, currentID: current.ID()})
 
-			runUntilCanceled(t, append([]string{"--update-on-start"}, tt.args...)...)
+			runUntilCanceled(t, 0, append([]string{"--update-on-start"}, tt.args...)...)
 		})
 	}
+}
+
+// TestRun_ScheduledUpdate verifies that continuous mode passes its schedule to
+// the scheduler. With an hourly schedule and no update at startup, the first
+// update runs once the hour has passed and checks the current container for a
+// newer image. The client mock fails the test if that check never happens.
+func TestRun_ScheduledUpdate(t *testing.T) {
+	current := currentWatchtower()
+
+	mockClient := mockContainerClient.NewMockClient(t)
+	mockClient.EXPECT().ListContainers(mock.Anything, withFilter).Return([]types.Container{current}, nil)
+	mockClient.EXPECT().ListContainers(mock.Anything).Return([]types.Container{current}, nil)
+	mockClient.EXPECT().GetVersion().Return("1.47")
+	mockClient.EXPECT().IsContainerStale(mock.Anything, current, mock.Anything).
+		Return(false, current.ImageID(), "", nil).Once()
+
+	setRunState(t, runTestState{client: mockClient, current: current, currentID: current.ID()})
+
+	runUntilCanceled(t, 61*time.Minute, "--schedule", "@every 1h")
+}
+
+// TestRun_UpdatesAfterCleanup verifies that once startup has removed an older
+// Watchtower instance, continuous mode runs no update at startup and its first
+// scheduled run leaves Watchtower's own container alone. This instance is the
+// older one's replacement, so it was just updated. The client mock fails the
+// test if the current container is checked for a newer image.
+func TestRun_UpdatesAfterCleanup(t *testing.T) {
+	current := currentWatchtower()
+	older := runFixtureContainer("01d0", "/watchtower-older", "2026-10-01T12:00:00Z",
+		map[string]string{watchtowerLabelKey: "true"})
+
+	// scheduledListings counts the container listings after the startup
+	// cleanup, which show that the scheduled run happened.
+	var scheduledListings atomic.Int32
+
+	mockClient := mockContainerClient.NewMockClient(t)
+	mockClient.EXPECT().ListContainers(mock.Anything, withFilter).Return([]types.Container{current, older}, nil).Once()
+	mockClient.EXPECT().StopAndRemoveContainer(mock.Anything, older, 10*time.Minute).Return(nil)
+	mockClient.EXPECT().RemoveImageByID(mock.Anything, older.ImageID(), older.ImageName()).Return(nil)
+	mockClient.EXPECT().ListContainers(mock.Anything).Return([]types.Container{current}, nil)
+	mockClient.EXPECT().GetVersion().Return("1.47")
+	mockClient.EXPECT().ListContainers(mock.Anything, withFilter).
+		RunAndReturn(func(context.Context, ...types.Filter) ([]types.Container, error) {
+			scheduledListings.Add(1)
+
+			return []types.Container{current}, nil
+		})
+
+	setRunState(t, runTestState{client: mockClient, current: current, currentID: current.ID()})
+
+	runUntilCanceled(t, 61*time.Minute, "--cleanup", "--update-on-start", "--schedule", "@every 1h")
+
+	assert.Positive(t, scheduledListings.Load(), "the scheduled run did not happen")
 }
 
 // TestRun_WaitsForAPIDrain verifies that continuous mode with the HTTP API in
@@ -523,19 +694,12 @@ func TestRun_PublishedPortsBlockSelfUpdates(t *testing.T) {
 // the request logs while the API drains still reaches the notifier, which
 // closes only after the API has stopped.
 func TestRun_WaitsForAPIDrain(t *testing.T) {
-	// stopTimeout bounds the wait for run to return after its context is
-	// canceled. It covers the HTTP API's shutdown grace period.
-	const stopTimeout = 10 * time.Second
-
 	current := currentWatchtower()
 
 	entered := make(chan struct{})
 	release := make(chan struct{})
 
-	// Release the request even when the test fails early, so the API and run
-	// do not stay blocked after the test ends.
 	releaseRequest := sync.OnceFunc(func() { close(release) })
-	t.Cleanup(releaseRequest)
 
 	notifierLog, notifierLogs := logcapture.New(zerolog.InfoLevel)
 	drainNotifier := newLoggerNotifier(t, notifierLog)
@@ -561,68 +725,18 @@ func TestRun_WaitsForAPIDrain(t *testing.T) {
 
 	notifier = drainNotifier
 
-	// run's process context, which the test cancels the way a signal would.
-	runCtx, cancelRun := context.WithCancel(context.Background())
-	createSignalContext = func(context.Context, ...os.Signal) (context.Context, context.CancelFunc) {
-		return runCtx, cancelRun
-	}
+	addr, args := localAPIArgs(t, "--http-api-endpoints=containers", "--http-api-periodic-polls")
+	cmd := newTestRootCommand(t, args...)
 
-	var listenConfig net.ListenConfig
+	cancelRun, done := runInBackground(t, newRunProcess(), cmd)
 
-	ln, err := listenConfig.Listen(t.Context(), "tcp", "127.0.0.1:0")
-	require.NoError(t, err)
+	// Release the request even when the test fails early, so the API and run
+	// do not stay blocked after the test ends.
+	t.Cleanup(releaseRequest)
 
-	addr := ln.Addr().String()
-	require.NoError(t, ln.Close())
+	waitForAPI(t, addr)
 
-	_, port, err := net.SplitHostPort(addr)
-	require.NoError(t, err)
-
-	cmd := newTestRootCommand(t,
-		"--http-api-endpoints=containers",
-		"--http-api-periodic-polls",
-		"--http-api-token", "test-token",
-		"--http-api-host", "127.0.0.1",
-		"--http-api-port", port,
-	)
-
-	done := make(chan struct{})
-
-	go func() {
-		defer close(done)
-
-		assert.NoError(t, newRunProcess().run(cmd, nil))
-	}()
-
-	// Stop run before setRunState restores the package state it reads, so a
-	// test that fails early does not leave run behind.
-	t.Cleanup(func() {
-		cancelRun()
-		releaseRequest()
-
-		select {
-		case <-done:
-		case <-time.After(stopTimeout):
-			t.Error("run did not stop during cleanup")
-		}
-	})
-
-	var dialer net.Dialer
-
-	require.Eventually(t, func() bool {
-		conn, dialErr := dialer.DialContext(t.Context(), "tcp", addr)
-		if dialErr != nil {
-			return false
-		}
-
-		_ = conn.Close()
-
-		return true
-	}, 5*time.Second, 20*time.Millisecond, "the HTTP API did not start listening")
-
-	req, err := http.NewRequestWithContext(t.Context(), http.MethodGet, "http://"+addr+"/v1/containers", nil)
-	require.NoError(t, err)
-	req.Header.Set("Authorization", "Bearer test-token")
+	req := newAPIRequest(t, t.Context(), http.MethodGet, addr, "/v1/containers")
 
 	statuses := make(chan int, 1)
 
@@ -665,7 +779,7 @@ func TestRun_WaitsForAPIDrain(t *testing.T) {
 
 	select {
 	case <-done:
-	case <-time.After(stopTimeout):
+	case <-time.After(runStopTimeout):
 		t.Fatal("run did not return after the HTTP API finished its request")
 	}
 
@@ -675,6 +789,101 @@ func TestRun_WaitsForAPIDrain(t *testing.T) {
 	newRunProcess().exit(cmd, nil)
 
 	assert.Contains(t, notifierLogs.String(), "Shoutrrr: Logged while the HTTP API drains")
+}
+
+// TestRun_APISharesUpdateLock verifies that continuous mode gives the HTTP API
+// the same update lock as the scheduler. A full update requested through the
+// API while the update at startup runs is turned away with 429, instead of
+// running beside it. The update at startup holds the lock while its first
+// staleness check waits for the test.
+func TestRun_APISharesUpdateLock(t *testing.T) {
+	current := currentWatchtower()
+
+	entered := make(chan struct{})
+	release := make(chan struct{})
+
+	mockClient := mockContainerClient.NewMockClient(t)
+	mockClient.EXPECT().ListContainers(mock.Anything, withFilter).Return([]types.Container{current}, nil)
+	mockClient.EXPECT().ListContainers(mock.Anything).Return([]types.Container{current}, nil)
+	mockClient.EXPECT().GetVersion().Return("1.47").Maybe()
+	// The update at startup's staleness check waits for the test. A second
+	// update, which a separate lock would let run, finds the container fresh.
+	mockClient.EXPECT().IsContainerStale(mock.Anything, current, mock.Anything).
+		RunAndReturn(func(context.Context, types.Container, updateConfig.Policy) (bool, types.ImageID, string, error) {
+			close(entered)
+			<-release
+
+			return false, current.ImageID(), "", nil
+		}).Once()
+	mockClient.EXPECT().IsContainerStale(mock.Anything, current, mock.Anything).
+		Return(false, current.ImageID(), "", nil).Maybe()
+
+	setRunState(t, runTestState{client: mockClient, current: current, currentID: current.ID()})
+
+	addr, args := localAPIArgs(t, "--update-on-start", "--http-api-endpoints=update", "--http-api-periodic-polls")
+	cmd := newTestRootCommand(t, args...)
+
+	runInBackground(t, newRunProcess(), cmd)
+
+	// Release the update when the test ends, before run is stopped.
+	t.Cleanup(func() { close(release) })
+
+	select {
+	case <-entered:
+	case <-time.After(5 * time.Second):
+		t.Fatal("the update at startup did not reach the staleness check")
+	}
+
+	waitForAPI(t, addr)
+
+	// Bound the request, so an API update that waits for the lock fails the
+	// test instead of waiting for the cleanup that releases the lock.
+	ctx, cancel := context.WithTimeout(t.Context(), 5*time.Second)
+	defer cancel()
+
+	resp, err := http.DefaultClient.Do(newAPIRequest(t, ctx, http.MethodPost, addr, "/v1/update"))
+	require.NoError(t, err)
+
+	body, err := io.ReadAll(resp.Body)
+	_ = resp.Body.Close()
+
+	require.NoError(t, err)
+	assert.Equal(t, http.StatusTooManyRequests, resp.StatusCode,
+		"the API update ran beside the update at startup")
+	// The rate limiter also answers 429, with no body.
+	assert.Contains(t, string(body), "another update is already running")
+}
+
+// TestRun_APIOnlyWritesOneStartupMessage verifies that in API-only mode, where
+// the HTTP API writes the startup message and serves until shutdown, the
+// scheduler that runs after it at shutdown does not write the message again.
+func TestRun_APIOnlyWritesOneStartupMessage(t *testing.T) {
+	current := currentWatchtower()
+
+	mockClient := mockContainerClient.NewMockClient(t)
+	mockClient.EXPECT().ListContainers(mock.Anything, withFilter).Return([]types.Container{current}, nil)
+	mockClient.EXPECT().ListContainers(mock.Anything).Return([]types.Container{current}, nil)
+	mockClient.EXPECT().GetVersion().Return("1.47").Maybe()
+
+	setRunState(t, runTestState{client: mockClient, current: current, currentID: current.ID()})
+
+	addr, args := localAPIArgs(t, "--http-api-endpoints=update")
+	cmd := newTestRootCommand(t, args...)
+
+	log, output := logcapture.New(zerolog.InfoLevel)
+	cancelRun, done := runInBackground(t, &process{log: log}, cmd)
+
+	waitForAPI(t, addr)
+	cancelRun()
+
+	select {
+	case <-done:
+	case <-time.After(runStopTimeout):
+		t.Fatal("run did not return after the process context was canceled")
+	}
+
+	assert.Equal(t, 1, strings.Count(output.String(), "HTTP API enabled and periodic updates disabled"),
+		"the startup message was not written exactly once")
 }
 
 // TestRun_HealthCheck verifies that the health check mode returns without
@@ -831,30 +1040,13 @@ func TestRun_OldInstanceStops(t *testing.T) {
 	cmd := newTestRootCommand(t, "--update-on-start")
 
 	synctest.Test(t, func(t *testing.T) {
-		cancels := make(chan context.CancelFunc, 1)
-		createSignalContext = func(parent context.Context, _ ...os.Signal) (context.Context, context.CancelFunc) {
-			ctx, cancel := context.WithCancel(parent)
-			cancels <- cancel
-
-			return ctx, cancel
-		}
-
-		done := make(chan struct{})
-
-		go func() {
-			assert.NoError(t, newRunProcess().run(cmd, nil))
-			close(done)
-		}()
+		_, done := runInBackground(t, newRunProcess(), cmd)
 
 		synctest.Wait()
 
 		select {
 		case <-done:
 		default:
-			// Stop the process the way a signal would so the test can end.
-			(<-cancels)()
-			<-done
-
 			require.FailNow(t, "run kept running after detecting an old instance")
 		}
 	})
