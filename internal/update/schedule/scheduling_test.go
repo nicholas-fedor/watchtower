@@ -545,8 +545,7 @@ func TestRunUpgradesOnSchedule_UpdateOnStartWithSchedule(t *testing.T) {
 
 // TestRunUpgradesOnSchedule_UpdateOnStartSkippedWhenCanceled verifies that the
 // update at startup does not run when the process context is already canceled,
-// for example by a stop signal during startup, so no canceled update is
-// reported as a failure.
+// for example by a stop signal during startup.
 func TestRunUpgradesOnSchedule_UpdateOnStartSkippedWhenCanceled(t *testing.T) {
 	updateCalled := false
 	runUpdatesWithNotifications := func(_ context.Context, _ types.Filter, _ updateParams.Params) *metrics.Metric {

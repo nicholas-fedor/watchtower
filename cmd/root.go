@@ -753,16 +753,11 @@ func (p *process) runMain(cfg settings.RunConfig) error {
 		startup.Logger = p.log
 		logging.WriteStartupMessage(ctx, startup)
 
-		// A process told to stop during startup makes no update, so a
-		// canceled update is not reported as a failure.
-		if ctx.Err() == nil {
-			params := baseParams
-			params.RunOnce = true
+		params := baseParams
+		params.RunOnce = true
 
-			metric := runUpdatesWithNotifications(ctx, cfg.Filter, params)
-			metrics.Default().RegisterScan(metric)
-		}
-
+		metric := runUpdatesWithNotifications(ctx, cfg.Filter, params)
+		metrics.Default().RegisterScan(metric)
 		p.disableRestarts()
 
 		return nil
