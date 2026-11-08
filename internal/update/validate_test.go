@@ -93,6 +93,22 @@ func TestValidateRollingRestartDependencies(t *testing.T) {
 			require.ErrorIs(t, err, errRollingRestartDependency)
 			assert.Contains(t, err.Error(), `"web-container" depends on [db redis]`)
 		})
+
+		t.Run("should return error when Compose depends_on is not read", func(t *testing.T) {
+			t.Parallel()
+
+			// The Watchtower depends-on label counts whether or not Compose
+			// depends_on is read.
+			mockClient := mockContainerClient.NewMockClient(t)
+			mockClient.EXPECT().ListContainers(mock.Anything, mock.Anything).Return([]types.Container{
+				labeledContainer("web-container", map[string]string{containerLabels.DependsOn: "db"}),
+			}, nil)
+
+			err := ValidateRollingRestartDependencies(newTestLogger(t), t.Context(), mockClient, filter, false)
+
+			require.ErrorIs(t, err, errRollingRestartDependency)
+			assert.Contains(t, err.Error(), `"web-container" depends on [db]`)
+		})
 	})
 
 	t.Run("a container has only a Compose depends_on label", func(t *testing.T) {
