@@ -36,6 +36,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- Pick each container's local digest in one place by @nicholas-fedor in [#3569](https://github.com/nicholas-fedor/watchtower/pull/3569)
 - Remove the unreachable bare cooldown fallback by @nicholas-fedor in [#3540](https://github.com/nicholas-fedor/watchtower/pull/3540)
 - List report containers as concrete statuses by @nicholas-fedor in [#3536](https://github.com/nicholas-fedor/watchtower/pull/3536)
 - Set container status fields through the session progress by @nicholas-fedor in [#3532](https://github.com/nicholas-fedor/watchtower/pull/3532)
