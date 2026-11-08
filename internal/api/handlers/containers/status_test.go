@@ -27,10 +27,16 @@ func nginxContainer(name string, repoDigests ...string) *container.Container {
 	)
 }
 
-// TestListContainerStatuses verifies that every listed container gets a status
-// and that a listing failure is returned wrapped.
+// TestListContainerStatuses verifies that every listed container gets a status,
+// that a filter reaches the listing unchanged, and that a listing failure is
+// returned wrapped.
 func TestListContainerStatuses(t *testing.T) {
 	t.Parallel()
+
+	// The filter case keeps the first container and drops the second, so the
+	// expectation can tell the forwarded filter from any other.
+	kept := nginxContainer("kept")
+	dropped := nginxContainer("dropped")
 
 	tests := []struct {
 		name       string
@@ -56,12 +62,10 @@ func TestListContainerStatuses(t *testing.T) {
 			wantLen:    0,
 		},
 		{
-			name: "non-nil filter is passed through to ListContainers",
-			containers: []types.Container{
-				nginxContainer("filtered-container"),
-			},
-			filter:  func(_ types.FilterableContainer) bool { return true },
-			wantLen: 1,
+			name:       "non-nil filter is passed through to ListContainers",
+			containers: []types.Container{kept},
+			filter:     func(c types.FilterableContainer) bool { return c.Name() == kept.Name() },
+			wantLen:    1,
 		},
 	}
 
@@ -70,8 +74,13 @@ func TestListContainerStatuses(t *testing.T) {
 			t.Parallel()
 
 			client := mockContainerClient.NewMockClient(t)
+
 			if tt.filter != nil {
-				client.EXPECT().ListContainers(mock.Anything, mock.Anything).Return(tt.containers, tt.listErr)
+				// The mock records the variadic filters as one slice.
+				forwarded := mock.MatchedBy(func(received []types.Filter) bool {
+					return len(received) == 1 && received[0](kept) && !received[0](dropped)
+				})
+				client.EXPECT().ListContainers(mock.Anything, forwarded).Return(tt.containers, tt.listErr)
 			} else {
 				client.EXPECT().ListContainers(mock.Anything).Return(tt.containers, tt.listErr)
 			}
