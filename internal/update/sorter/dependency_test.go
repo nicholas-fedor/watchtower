@@ -11,10 +11,10 @@ import (
 
 	dockerContainer "github.com/moby/moby/api/types/container"
 
+	composeLabels "github.com/nicholas-fedor/watchtower/internal/compose/labels"
 	"github.com/nicholas-fedor/watchtower/internal/container"
 	"github.com/nicholas-fedor/watchtower/internal/testutil/logcapture"
 	"github.com/nicholas-fedor/watchtower/pkg/types"
-	mockTypes "github.com/nicholas-fedor/watchtower/pkg/types/mocks"
 )
 
 // newTestLogger returns a logger that writes each event to the test's log, so a
@@ -58,18 +58,14 @@ func Test_dependencySorter(t *testing.T) {
 
 			const appID = "9b738d6a78250d731816cc5020d8cfaf55e605cd510f4d4662688bd9a6c4e0c7"
 
-			app := concreteLinkedContainer(appID, "/nextcloud-app", "nextcloud", "app", "")
-			nginx := container.NewContainer(nil, &dockerContainer.InspectResponse{
-				ID:   "nginx-id",
-				Name: "/nextcloud-nginx",
-				HostConfig: &dockerContainer.HostConfig{
-					VolumesFrom: []string{appID + ":rw"},
-				},
-				Config: &dockerContainer.Config{Labels: map[string]string{
-					"com.docker.compose.project": "nextcloud",
-					"com.docker.compose.service": "web",
-				}},
-			}, nil)
+			app := deployed{name: "nextcloud-app", id: appID, project: "nextcloud", service: "app"}.container()
+			nginx := deployed{
+				name:        "nextcloud-nginx",
+				id:          "nginx-id",
+				project:     "nextcloud",
+				service:     "web",
+				volumesFrom: []string{appID + ":rw"},
+			}.container()
 
 			containers := []types.Container{nginx, app}
 			err := dependencySorter{}.Sort(newTestLogger(t), containers, false)
@@ -83,18 +79,14 @@ func Test_dependencySorter(t *testing.T) {
 
 			const appID = "9b738d6a78250d731816cc5020d8cfaf55e605cd510f4d4662688bd9a6c4e0c7"
 
-			app := concreteLinkedContainer(appID, "/shared-app", "data", "app", "")
-			nginx := container.NewContainer(nil, &dockerContainer.InspectResponse{
-				ID:   "nginx-id",
-				Name: "/nextcloud-nginx",
-				HostConfig: &dockerContainer.HostConfig{
-					VolumesFrom: []string{appID + ":rw"},
-				},
-				Config: &dockerContainer.Config{Labels: map[string]string{
-					"com.docker.compose.project": "nextcloud",
-					"com.docker.compose.service": "web",
-				}},
-			}, nil)
+			app := deployed{name: "shared-app", id: appID, project: "data", service: "app"}.container()
+			nginx := deployed{
+				name:        "nextcloud-nginx",
+				id:          "nginx-id",
+				project:     "nextcloud",
+				service:     "web",
+				volumesFrom: []string{appID + ":rw"},
+			}.container()
 
 			containers := []types.Container{nginx, app}
 			err := dependencySorter{}.Sort(newTestLogger(t), containers, false)
@@ -108,34 +100,21 @@ func Test_dependencySorter(t *testing.T) {
 
 			const appID = "9b738d6a78250d731816cc5020d8cfaf55e605cd510f4d4662688bd9a6c4e0c7"
 
-			postgres := concreteLinkedContainer(
-				"postgres-id",
-				"/nextcloud-db",
-				"nextcloud",
-				"db",
-				"",
-			)
-			app := container.NewContainer(nil, &dockerContainer.InspectResponse{
-				ID:         appID,
-				Name:       "/nextcloud-app",
-				HostConfig: &dockerContainer.HostConfig{},
-				Config: &dockerContainer.Config{Labels: map[string]string{
-					"com.docker.compose.project":    "nextcloud",
-					"com.docker.compose.service":    "app",
-					"com.docker.compose.depends_on": "db",
-				}},
-			}, nil)
-			nginx := container.NewContainer(nil, &dockerContainer.InspectResponse{
-				ID:   "nginx-id",
-				Name: "/nextcloud-nginx",
-				HostConfig: &dockerContainer.HostConfig{
-					VolumesFrom: []string{appID + ":rw"},
-				},
-				Config: &dockerContainer.Config{Labels: map[string]string{
-					"com.docker.compose.project": "nextcloud",
-					"com.docker.compose.service": "web",
-				}},
-			}, nil)
+			postgres := deployed{name: "nextcloud-db", project: "nextcloud", service: "db"}.container()
+			app := deployed{
+				name:             "nextcloud-app",
+				id:               appID,
+				project:          "nextcloud",
+				service:          "app",
+				composeDependsOn: "db",
+			}.container()
+			nginx := deployed{
+				name:        "nextcloud-nginx",
+				id:          "nginx-id",
+				project:     "nextcloud",
+				service:     "web",
+				volumesFrom: []string{appID + ":rw"},
+			}.container()
 
 			containers := []types.Container{nginx, app, postgres}
 			err := dependencySorter{}.Sort(newTestLogger(t), containers, true)
@@ -150,34 +129,21 @@ func Test_dependencySorter(t *testing.T) {
 
 			const appID = "9b738d6a78250d731816cc5020d8cfaf55e605cd510f4d4662688bd9a6c4e0c7"
 
-			postgres := concreteLinkedContainer(
-				"postgres-id",
-				"/nextcloud-db",
-				"nextcloud",
-				"db",
-				"",
-			)
-			app := container.NewContainer(nil, &dockerContainer.InspectResponse{
-				ID:         appID,
-				Name:       "/nextcloud-app",
-				HostConfig: &dockerContainer.HostConfig{},
-				Config: &dockerContainer.Config{Labels: map[string]string{
-					"com.docker.compose.project":                "nextcloud",
-					"com.docker.compose.service":                "app",
-					"com.centurylinklabs.watchtower.depends-on": "nextcloud-db",
-				}},
-			}, nil)
-			nginx := container.NewContainer(nil, &dockerContainer.InspectResponse{
-				ID:   "nginx-id",
-				Name: "/nextcloud-nginx",
-				HostConfig: &dockerContainer.HostConfig{
-					VolumesFrom: []string{appID + ":rw"},
-				},
-				Config: &dockerContainer.Config{Labels: map[string]string{
-					"com.docker.compose.project": "nextcloud",
-					"com.docker.compose.service": "web",
-				}},
-			}, nil)
+			postgres := deployed{name: "nextcloud-db", project: "nextcloud", service: "db"}.container()
+			app := deployed{
+				name:      "nextcloud-app",
+				id:        appID,
+				project:   "nextcloud",
+				service:   "app",
+				dependsOn: "nextcloud-db",
+			}.container()
+			nginx := deployed{
+				name:        "nextcloud-nginx",
+				id:          "nginx-id",
+				project:     "nextcloud",
+				service:     "web",
+				volumesFrom: []string{appID + ":rw"},
+			}.container()
 
 			containers := []types.Container{nginx, app, postgres}
 			err := dependencySorter{}.Sort(newTestLogger(t), containers, false)
@@ -192,14 +158,8 @@ func Test_dependencySorter(t *testing.T) {
 
 			const providerID = "25e75393800b5c450a6841212a3b92ed28fa35414a586dec9f2c8a520d4910c2"
 
-			gluetun := concreteLinkedContainer(providerID, "/gluetun", "gluetun", "vpn", "")
-			qbittorrent := concreteLinkedContainer(
-				"qbittorrent-id",
-				"/qbittorrent",
-				"qbittorrent",
-				"app",
-				"container:"+providerID,
-			)
+			gluetun := deployed{name: "gluetun", id: providerID, project: "gluetun", service: "vpn"}.container()
+			qbittorrent := deployed{name: "qbittorrent", project: "qbittorrent", service: "app", networkMode: "container:" + providerID}.container()
 
 			containers := []types.Container{qbittorrent, gluetun}
 			err := dependencySorter{}.Sort(newTestLogger(t), containers, false)
@@ -213,15 +173,9 @@ func Test_dependencySorter(t *testing.T) {
 
 			const providerID = "25e75393800b5c450a6841212a3b92ed28fa35414a586dec9f2c8a520d4910c2"
 
-			gluetun := concreteLinkedContainer(providerID, "/gluetun", "gluetun", "vpn", "")
-			decoy := concreteLinkedContainer("decoy-id", "/"+providerID, "other", "svc", "")
-			qbittorrent := concreteLinkedContainer(
-				"qbittorrent-id",
-				"/qbittorrent",
-				"qbittorrent",
-				"app",
-				"container:"+providerID,
-			)
+			gluetun := deployed{name: "gluetun", id: providerID, project: "gluetun", service: "vpn"}.container()
+			decoy := deployed{name: providerID, project: "other", service: "svc"}.container()
+			qbittorrent := deployed{name: "qbittorrent", project: "qbittorrent", service: "app", networkMode: "container:" + providerID}.container()
 
 			_, indegree, adjacency, _, err := buildDependencyGraph(
 				newTestLogger(t),
@@ -237,32 +191,9 @@ func Test_dependencySorter(t *testing.T) {
 		t.Run("should sort containers with no dependencies", func(t *testing.T) {
 			t.Parallel()
 
-			c1 := mockTypes.NewMockContainer(t)
-			c1.EXPECT().Name().Return("c1")
-			c1.EXPECT().ID().Return(types.ContainerID("id-c1"))
-			c1.EXPECT().Links(true).Return(nil)
-			c1.EXPECT().IsWatchtower().Return(false)
-			c1.EXPECT().
-				ContainerInfo().
-				Return(&dockerContainer.InspectResponse{Name: "/c1", Config: &dockerContainer.Config{Labels: map[string]string{}}})
-
-			c2 := mockTypes.NewMockContainer(t)
-			c2.EXPECT().Name().Return("c2")
-			c2.EXPECT().ID().Return(types.ContainerID("id-c2"))
-			c2.EXPECT().Links(true).Return(nil)
-			c2.EXPECT().IsWatchtower().Return(false)
-			c2.EXPECT().
-				ContainerInfo().
-				Return(&dockerContainer.InspectResponse{Name: "/c2", Config: &dockerContainer.Config{Labels: map[string]string{}}})
-
-			c3 := mockTypes.NewMockContainer(t)
-			c3.EXPECT().Name().Return("c3")
-			c3.EXPECT().ID().Return(types.ContainerID("id-c3"))
-			c3.EXPECT().Links(true).Return(nil)
-			c3.EXPECT().IsWatchtower().Return(false)
-			c3.EXPECT().
-				ContainerInfo().
-				Return(&dockerContainer.InspectResponse{Name: "/c3", Config: &dockerContainer.Config{Labels: map[string]string{}}})
+			c1 := deployed{name: "c1"}.container()
+			c2 := deployed{name: "c2"}.container()
+			c3 := deployed{name: "c3"}.container()
 			containers := []types.Container{c1, c2, c3}
 			ds := dependencySorter{}
 			err := ds.Sort(newTestLogger(t), containers, true)
@@ -274,23 +205,8 @@ func Test_dependencySorter(t *testing.T) {
 		t.Run("should sort containers with simple dependencies", func(t *testing.T) {
 			t.Parallel()
 
-			c1 := mockTypes.NewMockContainer(t)
-			c1.EXPECT().Name().Return("c1")
-			c1.EXPECT().ID().Return(types.ContainerID("id-c1"))
-			c1.EXPECT().Links(true).Return([]string{"c2"})
-			c1.EXPECT().IsWatchtower().Return(false)
-			c1.EXPECT().
-				ContainerInfo().
-				Return(&dockerContainer.InspectResponse{Name: "/c1", Config: &dockerContainer.Config{Labels: map[string]string{}}})
-
-			c2 := mockTypes.NewMockContainer(t)
-			c2.EXPECT().Name().Return("c2")
-			c2.EXPECT().ID().Return(types.ContainerID("id-c2"))
-			c2.EXPECT().Links(true).Return(nil)
-			c2.EXPECT().IsWatchtower().Return(false)
-			c2.EXPECT().
-				ContainerInfo().
-				Return(&dockerContainer.InspectResponse{Name: "/c2", Config: &dockerContainer.Config{Labels: map[string]string{}}})
+			c1 := deployed{name: "c1", dependsOn: "c2"}.container()
+			c2 := deployed{name: "c2"}.container()
 			containers := []types.Container{c1, c2}
 			ds := dependencySorter{}
 			err := ds.Sort(newTestLogger(t), containers, true)
@@ -303,32 +219,9 @@ func Test_dependencySorter(t *testing.T) {
 		t.Run("should sort containers with complex dependency chains", func(t *testing.T) {
 			t.Parallel()
 
-			c1 := mockTypes.NewMockContainer(t)
-			c1.EXPECT().Name().Return("c1")
-			c1.EXPECT().ID().Return(types.ContainerID("id-c1"))
-			c1.EXPECT().Links(true).Return([]string{"c2", "c3"})
-			c1.EXPECT().IsWatchtower().Return(false)
-			c1.EXPECT().
-				ContainerInfo().
-				Return(&dockerContainer.InspectResponse{Name: "/c1", Config: &dockerContainer.Config{Labels: map[string]string{}}})
-
-			c2 := mockTypes.NewMockContainer(t)
-			c2.EXPECT().Name().Return("c2")
-			c2.EXPECT().ID().Return(types.ContainerID("id-c2"))
-			c2.EXPECT().Links(true).Return([]string{"c3"})
-			c2.EXPECT().IsWatchtower().Return(false)
-			c2.EXPECT().
-				ContainerInfo().
-				Return(&dockerContainer.InspectResponse{Name: "/c2", Config: &dockerContainer.Config{Labels: map[string]string{}}})
-
-			c3 := mockTypes.NewMockContainer(t)
-			c3.EXPECT().Name().Return("c3")
-			c3.EXPECT().ID().Return(types.ContainerID("id-c3"))
-			c3.EXPECT().Links(true).Return(nil)
-			c3.EXPECT().IsWatchtower().Return(false)
-			c3.EXPECT().
-				ContainerInfo().
-				Return(&dockerContainer.InspectResponse{Name: "/c3", Config: &dockerContainer.Config{Labels: map[string]string{}}})
+			c1 := deployed{name: "c1", dependsOn: "c2,c3"}.container()
+			c2 := deployed{name: "c2", dependsOn: "c3"}.container()
+			c3 := deployed{name: "c3"}.container()
 			containers := []types.Container{c1, c2, c3}
 			ds := dependencySorter{}
 			err := ds.Sort(newTestLogger(t), containers, true)
@@ -342,22 +235,8 @@ func Test_dependencySorter(t *testing.T) {
 		t.Run("should detect circular dependencies", func(t *testing.T) {
 			t.Parallel()
 
-			c1 := mockTypes.NewMockContainer(t)
-			c1.EXPECT().Name().Return("c1")
-			c1.EXPECT().ID().Return(types.ContainerID("id-c1")).Maybe()
-			c1.EXPECT().Links(true).Return([]string{"c2"})
-			c1.EXPECT().IsWatchtower().Return(false)
-			c1.EXPECT().
-				ContainerInfo().
-				Return(&dockerContainer.InspectResponse{Name: "/c1", Config: &dockerContainer.Config{Labels: map[string]string{}}})
-
-			c2 := mockTypes.NewMockContainer(t)
-			c2.EXPECT().Name().Return("c2")
-			c2.EXPECT().Links(true).Return([]string{"c1"})
-			c2.EXPECT().IsWatchtower().Return(false)
-			c2.EXPECT().
-				ContainerInfo().
-				Return(&dockerContainer.InspectResponse{Name: "/c2", Config: &dockerContainer.Config{Labels: map[string]string{}}})
+			c1 := deployed{name: "c1", dependsOn: "c2"}.container()
+			c2 := deployed{name: "c2", dependsOn: "c1"}.container()
 			containers := []types.Container{c1, c2}
 			ds := dependencySorter{}
 			err := ds.Sort(newTestLogger(t), containers, true)
@@ -369,27 +248,10 @@ func Test_dependencySorter(t *testing.T) {
 		t.Run("should ignore Compose depends_on but honor Watchtower labels when useComposeDependsOn is false", func(t *testing.T) {
 			t.Parallel()
 
-			// c1 has a Watchtower explicit depends-on label referencing c2.
-			// Links(false) still returns c2 because Watchtower labels are checked
-			// before the Compose depends_on label in the Links() method.
-			c1 := mockTypes.NewMockContainer(t)
-			c1.EXPECT().Name().Return("c1")
-			c1.EXPECT().ID().Return(types.ContainerID("id-c1"))
-			c1.EXPECT().Links(false).Return([]string{"c2"}) // Watchtower label honored
-			c1.EXPECT().IsWatchtower().Return(false)
-			c1.EXPECT().
-				ContainerInfo().
-				Return(&dockerContainer.InspectResponse{Name: "/c1", Config: &dockerContainer.Config{Labels: map[string]string{}}})
-
-			// c2 has no dependencies.
-			c2 := mockTypes.NewMockContainer(t)
-			c2.EXPECT().Name().Return("c2")
-			c2.EXPECT().ID().Return(types.ContainerID("id-c2"))
-			c2.EXPECT().Links(false).Return(nil)
-			c2.EXPECT().IsWatchtower().Return(false)
-			c2.EXPECT().
-				ContainerInfo().
-				Return(&dockerContainer.InspectResponse{Name: "/c2", Config: &dockerContainer.Config{Labels: map[string]string{}}})
+			// c1 names c2 in its Watchtower depends-on label. c2's Compose
+			// depends_on label names c1, which would make a cycle if it were read.
+			c1 := deployed{name: "c1", project: "stack", service: "c1", dependsOn: "c2"}.container()
+			c2 := deployed{name: "c2", project: "stack", service: "c2", composeDependsOn: "c1"}.container()
 
 			containers := []types.Container{c1, c2}
 			ds := dependencySorter{}
@@ -404,27 +266,9 @@ func Test_dependencySorter(t *testing.T) {
 		t.Run("should place Watchtower containers last", func(t *testing.T) {
 			t.Parallel()
 
-			watchtower := mockTypes.NewMockContainer(t)
-			watchtower.EXPECT().Name().Return("watchtower")
-			watchtower.EXPECT().IsWatchtower().Return(true)
-
-			c1 := mockTypes.NewMockContainer(t)
-			c1.EXPECT().Name().Return("c1")
-			c1.EXPECT().ID().Return(types.ContainerID("id-c1"))
-			c1.EXPECT().Links(true).Return([]string{"c2"})
-			c1.EXPECT().IsWatchtower().Return(false)
-			c1.EXPECT().
-				ContainerInfo().
-				Return(&dockerContainer.InspectResponse{Name: "/c1", Config: &dockerContainer.Config{Labels: map[string]string{}}})
-
-			c2 := mockTypes.NewMockContainer(t)
-			c2.EXPECT().Name().Return("c2")
-			c2.EXPECT().ID().Return(types.ContainerID("id-c2"))
-			c2.EXPECT().Links(true).Return(nil)
-			c2.EXPECT().IsWatchtower().Return(false)
-			c2.EXPECT().
-				ContainerInfo().
-				Return(&dockerContainer.InspectResponse{Name: "/c2", Config: &dockerContainer.Config{Labels: map[string]string{}}})
+			watchtower := deployed{name: "watchtower", watchtower: true}.container()
+			c1 := deployed{name: "c1", dependsOn: "c2"}.container()
+			c2 := deployed{name: "c2"}.container()
 			containers := []types.Container{watchtower, c1, c2}
 			ds := dependencySorter{}
 			err := ds.Sort(newTestLogger(t), containers, true)
@@ -448,14 +292,7 @@ func Test_dependencySorter(t *testing.T) {
 		t.Run("should handle single container", func(t *testing.T) {
 			t.Parallel()
 
-			c1 := mockTypes.NewMockContainer(t)
-			c1.EXPECT().Name().Return("c1")
-			c1.EXPECT().ID().Return(types.ContainerID("id-c1"))
-			c1.EXPECT().Links(true).Return(nil)
-			c1.EXPECT().IsWatchtower().Return(false)
-			c1.EXPECT().
-				ContainerInfo().
-				Return(&dockerContainer.InspectResponse{Name: "/c1", Config: &dockerContainer.Config{Labels: map[string]string{}}})
+			c1 := deployed{name: "c1"}.container()
 			containers := []types.Container{c1}
 			ds := dependencySorter{}
 			err := ds.Sort(newTestLogger(t), containers, true)
@@ -471,21 +308,8 @@ func Test_dependencySorter(t *testing.T) {
 		t.Run("should sort containers with no dependencies", func(t *testing.T) {
 			t.Parallel()
 
-			c1 := mockTypes.NewMockContainer(t)
-			c1.EXPECT().Name().Return("c1")
-			c1.EXPECT().ID().Return(types.ContainerID("id-c1"))
-			c1.EXPECT().Links(true).Return(nil)
-			c1.EXPECT().
-				ContainerInfo().
-				Return(&dockerContainer.InspectResponse{Name: "/c1", Config: &dockerContainer.Config{Labels: map[string]string{}}})
-
-			c2 := mockTypes.NewMockContainer(t)
-			c2.EXPECT().Name().Return("c2")
-			c2.EXPECT().ID().Return(types.ContainerID("id-c2"))
-			c2.EXPECT().Links(true).Return(nil)
-			c2.EXPECT().
-				ContainerInfo().
-				Return(&dockerContainer.InspectResponse{Name: "/c2", Config: &dockerContainer.Config{Labels: map[string]string{}}})
+			c1 := deployed{name: "c1"}.container()
+			c2 := deployed{name: "c2"}.container()
 			containers := []types.Container{c1, c2}
 			result, err := sortByDependencies(newTestLogger(t), containers, true)
 			require.NoError(t, err)
@@ -495,21 +319,8 @@ func Test_dependencySorter(t *testing.T) {
 		t.Run("should sort containers with simple dependencies", func(t *testing.T) {
 			t.Parallel()
 
-			c1 := mockTypes.NewMockContainer(t)
-			c1.EXPECT().Name().Return("c1")
-			c1.EXPECT().ID().Return(types.ContainerID("id-c1"))
-			c1.EXPECT().Links(true).Return([]string{"c2"})
-			c1.EXPECT().
-				ContainerInfo().
-				Return(&dockerContainer.InspectResponse{Name: "/c1", Config: &dockerContainer.Config{Labels: map[string]string{}}})
-
-			c2 := mockTypes.NewMockContainer(t)
-			c2.EXPECT().Name().Return("c2")
-			c2.EXPECT().ID().Return(types.ContainerID("id-c2"))
-			c2.EXPECT().Links(true).Return(nil)
-			c2.EXPECT().
-				ContainerInfo().
-				Return(&dockerContainer.InspectResponse{Name: "/c2", Config: &dockerContainer.Config{Labels: map[string]string{}}})
+			c1 := deployed{name: "c1", dependsOn: "c2"}.container()
+			c2 := deployed{name: "c2"}.container()
 			containers := []types.Container{c1, c2}
 			result, err := sortByDependencies(newTestLogger(t), containers, true)
 			require.NoError(t, err)
@@ -521,29 +332,9 @@ func Test_dependencySorter(t *testing.T) {
 		t.Run("should sort containers with complex chains", func(t *testing.T) {
 			t.Parallel()
 
-			a := mockTypes.NewMockContainer(t)
-			a.EXPECT().Name().Return("a")
-			a.EXPECT().ID().Return(types.ContainerID("id-a"))
-			a.EXPECT().Links(true).Return([]string{"b"})
-			a.EXPECT().
-				ContainerInfo().
-				Return(&dockerContainer.InspectResponse{Name: "/a", Config: &dockerContainer.Config{Labels: map[string]string{}}})
-
-			b := mockTypes.NewMockContainer(t)
-			b.EXPECT().Name().Return("b")
-			b.EXPECT().ID().Return(types.ContainerID("id-b"))
-			b.EXPECT().Links(true).Return([]string{"c"})
-			b.EXPECT().
-				ContainerInfo().
-				Return(&dockerContainer.InspectResponse{Name: "/b", Config: &dockerContainer.Config{Labels: map[string]string{}}})
-
-			c := mockTypes.NewMockContainer(t)
-			c.EXPECT().Name().Return("c")
-			c.EXPECT().ID().Return(types.ContainerID("id-c"))
-			c.EXPECT().Links(true).Return(nil)
-			c.EXPECT().
-				ContainerInfo().
-				Return(&dockerContainer.InspectResponse{Name: "/c", Config: &dockerContainer.Config{Labels: map[string]string{}}})
+			a := deployed{name: "a", dependsOn: "b"}.container()
+			b := deployed{name: "b", dependsOn: "c"}.container()
+			c := deployed{name: "c"}.container()
 			containers := []types.Container{a, b, c}
 			result, err := sortByDependencies(newTestLogger(t), containers, true)
 			require.NoError(t, err)
@@ -556,20 +347,8 @@ func Test_dependencySorter(t *testing.T) {
 		t.Run("should detect circular dependencies", func(t *testing.T) {
 			t.Parallel()
 
-			c1 := mockTypes.NewMockContainer(t)
-			c1.EXPECT().Name().Return("c1")
-			c1.EXPECT().ID().Return(types.ContainerID("id-c1")).Maybe()
-			c1.EXPECT().Links(true).Return([]string{"c2"})
-			c1.EXPECT().
-				ContainerInfo().
-				Return(&dockerContainer.InspectResponse{Name: "/c1", Config: &dockerContainer.Config{Labels: map[string]string{}}})
-
-			c2 := mockTypes.NewMockContainer(t)
-			c2.EXPECT().Name().Return("c2")
-			c2.EXPECT().Links(true).Return([]string{"c1"})
-			c2.EXPECT().
-				ContainerInfo().
-				Return(&dockerContainer.InspectResponse{Name: "/c2", Config: &dockerContainer.Config{Labels: map[string]string{}}})
+			c1 := deployed{name: "c1", dependsOn: "c2"}.container()
+			c2 := deployed{name: "c2", dependsOn: "c1"}.container()
 			containers := []types.Container{c1, c2}
 			_, err := sortByDependencies(newTestLogger(t), containers, true)
 			require.Error(t, err)
@@ -589,13 +368,7 @@ func Test_dependencySorter(t *testing.T) {
 		t.Run("should handle single container", func(t *testing.T) {
 			t.Parallel()
 
-			c1 := mockTypes.NewMockContainer(t)
-			c1.EXPECT().Name().Return("c1")
-			c1.EXPECT().ID().Return(types.ContainerID("id-c1"))
-			c1.EXPECT().Links(true).Return(nil)
-			c1.EXPECT().
-				ContainerInfo().
-				Return(&dockerContainer.InspectResponse{Name: "/c1", Config: &dockerContainer.Config{Labels: map[string]string{}}})
+			c1 := deployed{name: "c1"}.container()
 			containers := []types.Container{c1}
 			result, err := sortByDependencies(newTestLogger(t), containers, true)
 			require.NoError(t, err)
@@ -607,38 +380,12 @@ func Test_dependencySorter(t *testing.T) {
 			t.Parallel()
 
 			// Component 1: A -> B
-			a := mockTypes.NewMockContainer(t)
-			a.EXPECT().Name().Return("a")
-			a.EXPECT().ID().Return(types.ContainerID("id-a"))
-			a.EXPECT().Links(true).Return([]string{"b"})
-			a.EXPECT().
-				ContainerInfo().
-				Return(&dockerContainer.InspectResponse{Name: "/a", Config: &dockerContainer.Config{Labels: map[string]string{}}})
-
-			b := mockTypes.NewMockContainer(t)
-			b.EXPECT().Name().Return("b")
-			b.EXPECT().ID().Return(types.ContainerID("id-b"))
-			b.EXPECT().Links(true).Return(nil)
-			b.EXPECT().
-				ContainerInfo().
-				Return(&dockerContainer.InspectResponse{Name: "/b", Config: &dockerContainer.Config{Labels: map[string]string{}}})
+			a := deployed{name: "a", dependsOn: "b"}.container()
+			b := deployed{name: "b"}.container()
 
 			// Component 2: C -> D
-			c := mockTypes.NewMockContainer(t)
-			c.EXPECT().Name().Return("c")
-			c.EXPECT().ID().Return(types.ContainerID("id-c"))
-			c.EXPECT().Links(true).Return([]string{"d"})
-			c.EXPECT().
-				ContainerInfo().
-				Return(&dockerContainer.InspectResponse{Name: "/c", Config: &dockerContainer.Config{Labels: map[string]string{}}})
-
-			d := mockTypes.NewMockContainer(t)
-			d.EXPECT().Name().Return("d")
-			d.EXPECT().ID().Return(types.ContainerID("id-d"))
-			d.EXPECT().Links(true).Return(nil)
-			d.EXPECT().
-				ContainerInfo().
-				Return(&dockerContainer.InspectResponse{Name: "/d", Config: &dockerContainer.Config{Labels: map[string]string{}}})
+			c := deployed{name: "c", dependsOn: "d"}.container()
+			d := deployed{name: "d"}.container()
 
 			containers := []types.Container{a, b, c, d}
 			result, err := sortByDependencies(newTestLogger(t), containers, true)
@@ -654,16 +401,12 @@ func Test_dependencySorter(t *testing.T) {
 			assertOrderBefore(t, resultNames, "d", "c")
 		})
 
-		t.Run("should skip self-referencing containers without creating cycles", func(t *testing.T) {
+		t.Run("should sort a container whose depends-on label names itself without a cycle", func(t *testing.T) {
 			t.Parallel()
 
-			c1 := mockTypes.NewMockContainer(t)
-			c1.EXPECT().Name().Return("c1")
-			c1.EXPECT().ID().Return(types.ContainerID("id-c1")).Maybe()
-			c1.EXPECT().Links(true).Return([]string{"c1"}) // Self-reference
-			c1.EXPECT().
-				ContainerInfo().
-				Return(&dockerContainer.InspectResponse{Name: "/c1", Config: &dockerContainer.Config{Labels: map[string]string{}}})
+			// The container model drops the link to the container itself. The
+			// replica prefix cases below test the sorter's own guard.
+			c1 := deployed{name: "c1", dependsOn: "c1"}.container()
 
 			containers := []types.Container{c1}
 			result, err := sortByDependencies(newTestLogger(t), containers, true)
@@ -679,16 +422,7 @@ func Test_dependencySorter(t *testing.T) {
 			// Container named "myapp-1" linking to "myapp" should NOT create a self-dependency
 			// The prefix matching would match "myapp-1" when looking for "myapp" replicas,
 			// but the self-reference guard should skip it
-			myapp := mockTypes.NewMockContainer(t)
-			myapp.EXPECT().Name().Return("myapp-1").Maybe()
-			myapp.EXPECT().ID().Return(types.ContainerID("id-myapp")).Maybe()
-			myapp.EXPECT().Links(true).Return([]string{"myapp"})
-			myapp.EXPECT().
-				ContainerInfo().
-				Return(&dockerContainer.InspectResponse{
-					Name:   "/myapp-1",
-					Config: &dockerContainer.Config{Labels: map[string]string{}},
-				})
+			myapp := deployed{name: "myapp-1", dependsOn: "myapp"}.container()
 
 			containers := []types.Container{myapp}
 			containerMap, indegree, adjacency, _, err := buildDependencyGraph(newTestLogger(t), containers, true)
@@ -707,16 +441,7 @@ func Test_dependencySorter(t *testing.T) {
 
 			// Container named "db-1" linking to "db" should NOT create a self-dependency
 			// Similar to the myapp case, this tests another common naming pattern
-			db := mockTypes.NewMockContainer(t)
-			db.EXPECT().Name().Return("db-1").Maybe()
-			db.EXPECT().ID().Return(types.ContainerID("id-db")).Maybe()
-			db.EXPECT().Links(true).Return([]string{"db"})
-			db.EXPECT().
-				ContainerInfo().
-				Return(&dockerContainer.InspectResponse{
-					Name:   "/db-1",
-					Config: &dockerContainer.Config{Labels: map[string]string{}},
-				})
+			db := deployed{name: "db-1", dependsOn: "db"}.container()
 
 			containers := []types.Container{db}
 			containerMap, indegree, adjacency, _, err := buildDependencyGraph(newTestLogger(t), containers, true)
@@ -734,31 +459,13 @@ func Test_dependencySorter(t *testing.T) {
 			t.Parallel()
 
 			// test-db-1 (no dependencies)
-			db := mockTypes.NewMockContainer(t)
-			db.EXPECT().Name().Return("test-db-1")
-			db.EXPECT().ID().Return(types.ContainerID("id-db"))
-			db.EXPECT().Links(true).Return(nil)
-			db.EXPECT().
-				ContainerInfo().
-				Return(&dockerContainer.InspectResponse{Name: "/test-db-1", Config: &dockerContainer.Config{Labels: map[string]string{}}})
+			db := deployed{name: "test-db-1"}.container()
 
 			// app-1 depends on "db"
-			app := mockTypes.NewMockContainer(t)
-			app.EXPECT().Name().Return("app-1")
-			app.EXPECT().ID().Return(types.ContainerID("id-app"))
-			app.EXPECT().Links(true).Return([]string{"db"})
-			app.EXPECT().
-				ContainerInfo().
-				Return(&dockerContainer.InspectResponse{Name: "/app-1", Config: &dockerContainer.Config{Labels: map[string]string{}}})
+			app := deployed{name: "app-1", dependsOn: "db"}.container()
 
 			// test-web-1 depends on "app"
-			web := mockTypes.NewMockContainer(t)
-			web.EXPECT().Name().Return("test-web-1")
-			web.EXPECT().ID().Return(types.ContainerID("id-web"))
-			web.EXPECT().Links(true).Return([]string{"app"})
-			web.EXPECT().
-				ContainerInfo().
-				Return(&dockerContainer.InspectResponse{Name: "/test-web-1", Config: &dockerContainer.Config{Labels: map[string]string{}}})
+			web := deployed{name: "test-web-1", dependsOn: "app"}.container()
 
 			containers := []types.Container{web, app, db} // Unsorted order
 			result, err := sortByDependencies(newTestLogger(t), containers, true)
@@ -773,21 +480,8 @@ func Test_dependencySorter(t *testing.T) {
 		t.Run("should handle containers with service names", func(t *testing.T) {
 			t.Parallel()
 
-			c1 := mockTypes.NewMockContainer(t)
-			c1.EXPECT().Name().Return("container1")
-			c1.EXPECT().ID().Return(types.ContainerID("id-c1"))
-			c1.EXPECT().Links(true).Return([]string{"web"}) // Link to service name
-			c1.EXPECT().
-				ContainerInfo().
-				Return(&dockerContainer.InspectResponse{Name: "/container1", Config: &dockerContainer.Config{Labels: map[string]string{}}})
-
-			c2 := mockTypes.NewMockContainer(t)
-			c2.EXPECT().Name().Return("container2")
-			c2.EXPECT().ID().Return(types.ContainerID("id-c2"))
-			c2.EXPECT().Links(true).Return(nil)
-			c2.EXPECT().
-				ContainerInfo().
-				Return(&dockerContainer.InspectResponse{Name: "/container2", Config: &dockerContainer.Config{Labels: map[string]string{"com.docker.compose.service": "web"}}})
+			c1 := deployed{name: "container1", dependsOn: "web"}.container()
+			c2 := deployed{name: "container2", service: "web"}.container()
 
 			containers := []types.Container{c1, c2}
 			result, err := sortByDependencies(newTestLogger(t), containers, true)
@@ -800,21 +494,8 @@ func Test_dependencySorter(t *testing.T) {
 		t.Run("should handle containers with replicas without collision", func(t *testing.T) {
 			t.Parallel()
 
-			c1 := mockTypes.NewMockContainer(t)
-			c1.EXPECT().Name().Return("myproject-web-1")
-			c1.EXPECT().ID().Return(types.ContainerID("id-c1"))
-			c1.EXPECT().Links(true).Return(nil)
-			c1.EXPECT().
-				ContainerInfo().
-				Return(&dockerContainer.InspectResponse{Name: "/myproject-web-1", Config: &dockerContainer.Config{Labels: map[string]string{"com.docker.compose.service": "web", "com.docker.compose.project": "myproject"}}})
-
-			c2 := mockTypes.NewMockContainer(t)
-			c2.EXPECT().Name().Return("myproject-web-2")
-			c2.EXPECT().ID().Return(types.ContainerID("id-c2"))
-			c2.EXPECT().Links(true).Return(nil)
-			c2.EXPECT().
-				ContainerInfo().
-				Return(&dockerContainer.InspectResponse{Name: "/myproject-web-2", Config: &dockerContainer.Config{Labels: map[string]string{"com.docker.compose.service": "web", "com.docker.compose.project": "myproject"}}})
+			c1 := deployed{name: "myproject-web-1", project: "myproject", service: "web"}.container()
+			c2 := deployed{name: "myproject-web-2", project: "myproject", service: "web"}.container()
 
 			containers := []types.Container{c1, c2}
 			result, err := sortByDependencies(newTestLogger(t), containers, true)
@@ -827,38 +508,12 @@ func Test_dependencySorter(t *testing.T) {
 			t.Parallel()
 
 			// App container that depends on "db" service
-			app := mockTypes.NewMockContainer(t)
-			app.EXPECT().Name().Return("app").Maybe()
-			app.EXPECT().ID().Return(types.ContainerID("id-app")).Maybe()
-			app.EXPECT().Links(true).Return([]string{"db"})
-			app.EXPECT().
-				ContainerInfo().
-				Return(&dockerContainer.InspectResponse{Name: "/app", Config: &dockerContainer.Config{Labels: map[string]string{}}})
+			app := deployed{name: "app", dependsOn: "db"}.container()
 
 			// Multiple db replicas
-			db1 := mockTypes.NewMockContainer(t)
-			db1.EXPECT().Name().Return("db-1").Maybe()
-			db1.EXPECT().ID().Return(types.ContainerID("id-db1")).Maybe()
-			db1.EXPECT().Links(true).Return(nil)
-			db1.EXPECT().
-				ContainerInfo().
-				Return(&dockerContainer.InspectResponse{Name: "/db-1", Config: &dockerContainer.Config{Labels: map[string]string{}}})
-
-			db2 := mockTypes.NewMockContainer(t)
-			db2.EXPECT().Name().Return("db-2").Maybe()
-			db2.EXPECT().ID().Return(types.ContainerID("id-db2")).Maybe()
-			db2.EXPECT().Links(true).Return(nil)
-			db2.EXPECT().
-				ContainerInfo().
-				Return(&dockerContainer.InspectResponse{Name: "/db-2", Config: &dockerContainer.Config{Labels: map[string]string{}}})
-
-			db3 := mockTypes.NewMockContainer(t)
-			db3.EXPECT().Name().Return("db-3").Maybe()
-			db3.EXPECT().ID().Return(types.ContainerID("id-db3")).Maybe()
-			db3.EXPECT().Links(true).Return(nil)
-			db3.EXPECT().
-				ContainerInfo().
-				Return(&dockerContainer.InspectResponse{Name: "/db-3", Config: &dockerContainer.Config{Labels: map[string]string{}}})
+			db1 := deployed{name: "db-1"}.container()
+			db2 := deployed{name: "db-2"}.container()
+			db3 := deployed{name: "db-3"}.container()
 
 			containers := []types.Container{app, db1, db2, db3}
 			containerMap, indegree, adjacency, _, err := buildDependencyGraph(newTestLogger(t), containers, true)
@@ -881,23 +536,8 @@ func Test_dependencySorter(t *testing.T) {
 			t.Parallel()
 
 			// Test that containers with service names containing leading slashes are handled correctly
-			c1 := mockTypes.NewMockContainer(t)
-			c1.EXPECT().Name().Return("container1").Maybe()
-			c1.EXPECT().ID().Return(types.ContainerID("id-c1")).Maybe()
-			c1.EXPECT().Links(true).Return([]string{"web-service"}) // Link to normalized service name
-			c1.EXPECT().
-				ContainerInfo().
-				Return(&dockerContainer.InspectResponse{Name: "/container1", Config: &dockerContainer.Config{Labels: map[string]string{}}})
-
-			c2 := mockTypes.NewMockContainer(t)
-			c2.EXPECT().Name().Return("container2").Maybe()
-			c2.EXPECT().ID().Return(types.ContainerID("id-c2")).Maybe()
-			c2.EXPECT().Links(true).Return(nil)
-			c2.EXPECT().
-				ContainerInfo().
-				Return(&dockerContainer.InspectResponse{Name: "/container2", Config: &dockerContainer.Config{Labels: map[string]string{"com.docker.compose.service": "/web-service"}}})
-
-				// Malformed service name with leading slash
+			c1 := deployed{name: "container1", dependsOn: "web-service"}.container()
+			c2 := deployed{name: "container2", service: "/web-service"}.container()
 
 			containers := []types.Container{c1, c2}
 			result, err := sortByDependencies(newTestLogger(t), containers, true)
@@ -912,23 +552,8 @@ func Test_dependencySorter(t *testing.T) {
 			t.Parallel()
 
 			// Test containers with container names containing leading slashes
-			c1 := mockTypes.NewMockContainer(t)
-			c1.EXPECT().Name().Return("container1").Maybe()
-			c1.EXPECT().ID().Return(types.ContainerID("id-c1")).Maybe()
-			c1.EXPECT().Links(true).Return([]string{"/web"}) // Link with leading slash
-			c1.EXPECT().
-				ContainerInfo().
-				Return(&dockerContainer.InspectResponse{Name: "/container1", Config: &dockerContainer.Config{Labels: map[string]string{}}})
-
-			c2 := mockTypes.NewMockContainer(t)
-			c2.EXPECT().Name().Return("web").Maybe()
-			c2.EXPECT().ID().Return(types.ContainerID("id-c2")).Maybe()
-			c2.EXPECT().Links(true).Return(nil)
-			c2.EXPECT().
-				ContainerInfo().
-				Return(&dockerContainer.InspectResponse{Name: "/web", Config: &dockerContainer.Config{Labels: map[string]string{}}})
-
-				// Container name with leading slash
+			c1 := deployed{name: "container1", dependsOn: "/web"}.container()
+			c2 := deployed{name: "web"}.container()
 
 			containers := []types.Container{c1, c2}
 			result, err := sortByDependencies(newTestLogger(t), containers, true)
@@ -943,21 +568,8 @@ func Test_dependencySorter(t *testing.T) {
 			t.Parallel()
 
 			// Test containers with empty names that fall back to container IDs
-			c1 := mockTypes.NewMockContainer(t)
-			c1.EXPECT().Name().Return("").Maybe() // Empty name
-			c1.EXPECT().ID().Return(types.ContainerID("id-c1")).Maybe()
-			c1.EXPECT().Links(true).Return([]string{"id-c2"}) // Link to other container's ID
-			c1.EXPECT().
-				ContainerInfo().
-				Return(&dockerContainer.InspectResponse{Name: "", Config: &dockerContainer.Config{Labels: map[string]string{}}})
-
-			c2 := mockTypes.NewMockContainer(t)
-			c2.EXPECT().Name().Return("").Maybe() // Empty name
-			c2.EXPECT().ID().Return(types.ContainerID("id-c2")).Maybe()
-			c2.EXPECT().Links(true).Return(nil)
-			c2.EXPECT().
-				ContainerInfo().
-				Return(&dockerContainer.InspectResponse{Name: "", Config: &dockerContainer.Config{Labels: map[string]string{}}})
+			c1 := deployed{name: "", id: "id-c1", dependsOn: "id-c2"}.container()
+			c2 := deployed{name: "", id: "id-c2"}.container()
 
 			containers := []types.Container{c1, c2}
 			result, err := sortByDependencies(newTestLogger(t), containers, true)
@@ -973,24 +585,8 @@ func Test_dependencySorter(t *testing.T) {
 			t.Parallel()
 
 			// Test containers with links to non-existent containers
-			c1 := mockTypes.NewMockContainer(t)
-			c1.EXPECT().Name().Return("container1").Maybe()
-			c1.EXPECT().ID().Return(types.ContainerID("id-c1")).Maybe()
-			c1.EXPECT().
-				Links(true).
-				Return([]string{"non-existent", "/also-non-existent"})
-				// Links to non-existent containers
-			c1.EXPECT().
-				ContainerInfo().
-				Return(&dockerContainer.InspectResponse{Name: "/container1", Config: &dockerContainer.Config{Labels: map[string]string{}}})
-
-			c2 := mockTypes.NewMockContainer(t)
-			c2.EXPECT().Name().Return("container2").Maybe()
-			c2.EXPECT().ID().Return(types.ContainerID("id-c2")).Maybe()
-			c2.EXPECT().Links(true).Return(nil)
-			c2.EXPECT().
-				ContainerInfo().
-				Return(&dockerContainer.InspectResponse{Name: "/container2", Config: &dockerContainer.Config{Labels: map[string]string{}}})
+			c1 := deployed{name: "container1", dependsOn: "non-existent,/also-non-existent"}.container()
+			c2 := deployed{name: "container2"}.container()
 
 			containers := []types.Container{c1, c2}
 			result, err := sortByDependencies(newTestLogger(t), containers, true)
@@ -1002,28 +598,9 @@ func Test_dependencySorter(t *testing.T) {
 		t.Run("should handle containers with network mode dependencies", func(t *testing.T) {
 			t.Parallel()
 
-			// Test containers with network mode dependencies
-			c1 := mockTypes.NewMockContainer(t)
-			c1.EXPECT().Name().Return("container1").Maybe()
-			c1.EXPECT().ID().Return(types.ContainerID("id-c1")).Maybe()
-			c1.EXPECT().Links(true).Return([]string{"web"}) // Mock includes network dependency
-			c1.EXPECT().
-				ContainerInfo().
-				Return(&dockerContainer.InspectResponse{
-					Name:   "/container1",
-					Config: &dockerContainer.Config{Labels: map[string]string{}},
-				})
-
-			c2 := mockTypes.NewMockContainer(t)
-			c2.EXPECT().Name().Return("web").Maybe()
-			c2.EXPECT().ID().Return(types.ContainerID("id-c2")).Maybe()
-			c2.EXPECT().Links(true).Return(nil)
-			c2.EXPECT().
-				ContainerInfo().
-				Return(&dockerContainer.InspectResponse{
-					Name:   "/web",
-					Config: &dockerContainer.Config{Labels: map[string]string{}},
-				})
+			// container1 shares web's network namespace.
+			c1 := deployed{name: "container1", networkMode: "container:web"}.container()
+			c2 := deployed{name: "web"}.container()
 
 			containers := []types.Container{c1, c2}
 			result, err := sortByDependencies(newTestLogger(t), containers, true)
@@ -1036,66 +613,29 @@ func Test_dependencySorter(t *testing.T) {
 		t.Run("should handle containers with mixed dependency sources", func(t *testing.T) {
 			t.Parallel()
 
-			// Test containers with dependencies from labels, links, and network mode
-			c1 := mockTypes.NewMockContainer(t)
-			c1.EXPECT().Name().Return("app").Maybe()
-			c1.EXPECT().ID().Return(types.ContainerID("id-app")).Maybe()
-			c1.EXPECT().
-				Links(true).
-				Return([]string{"db", "cache", "redis", "proxy"})
-				// Mock all dependencies
-			c1.EXPECT().
-				ContainerInfo().
-				Return(&dockerContainer.InspectResponse{
-					Name:   "/app",
-					Config: &dockerContainer.Config{Labels: map[string]string{}},
-				})
+			// app names db in its depends-on label and links to cache. It
+			// shares redis's network namespace and mounts proxy's volumes.
+			c1 := deployed{
+				name:        "app",
+				dependsOn:   "db",
+				links:       []string{"/cache:/app/cache"},
+				networkMode: "container:redis",
+				volumesFrom: []string{"proxy"},
+			}.container()
 
-			c2 := mockTypes.NewMockContainer(t)
-			c2.EXPECT().Name().Return("db").Maybe()
-			c2.EXPECT().ID().Return(types.ContainerID("id-db")).Maybe()
-			c2.EXPECT().Links(true).Return(nil)
-			c2.EXPECT().
-				ContainerInfo().
-				Return(&dockerContainer.InspectResponse{
-					Name:   "/db",
-					Config: &dockerContainer.Config{Labels: map[string]string{}},
-				})
-
-			c3 := mockTypes.NewMockContainer(t)
-			c3.EXPECT().Name().Return("cache").Maybe()
-			c3.EXPECT().ID().Return(types.ContainerID("id-cache")).Maybe()
-			c3.EXPECT().Links(true).Return(nil)
-			c3.EXPECT().
-				ContainerInfo().
-				Return(&dockerContainer.InspectResponse{
-					Name:   "/cache",
-					Config: &dockerContainer.Config{Labels: map[string]string{}},
-				})
-
-			c4 := mockTypes.NewMockContainer(t)
-			c4.EXPECT().Name().Return("redis").Maybe()
-			c4.EXPECT().ID().Return(types.ContainerID("id-redis")).Maybe()
-			c4.EXPECT().Links(true).Return(nil)
-			c4.EXPECT().
-				ContainerInfo().
-				Return(&dockerContainer.InspectResponse{
-					Name:   "/redis",
-					Config: &dockerContainer.Config{Labels: map[string]string{}},
-				})
-
-			c5 := mockTypes.NewMockContainer(t)
-			c5.EXPECT().Name().Return("proxy").Maybe()
-			c5.EXPECT().ID().Return(types.ContainerID("id-proxy")).Maybe()
-			c5.EXPECT().Links(true).Return(nil)
-			c5.EXPECT().
-				ContainerInfo().
-				Return(&dockerContainer.InspectResponse{
-					Name:   "/proxy",
-					Config: &dockerContainer.Config{Labels: map[string]string{}},
-				})
+			c2 := deployed{name: "db"}.container()
+			c3 := deployed{name: "cache"}.container()
+			c4 := deployed{name: "redis"}.container()
+			c5 := deployed{name: "proxy"}.container()
 
 			containers := []types.Container{c1, c2, c3, c4, c5}
+
+			// The sort places app last even when one source is dropped, so
+			// each source must count toward app's dependencies.
+			_, indegree, _, _, err := buildDependencyGraph(newTestLogger(t), containers, true)
+			require.NoError(t, err)
+			assert.Equal(t, 4, indegree["app"])
+
 			result, err := sortByDependencies(newTestLogger(t), containers, true)
 			require.NoError(t, err)
 			require.Len(t, result, 5)
@@ -1108,26 +648,6 @@ func Test_dependencySorter(t *testing.T) {
 			assert.Equal(t, "app", resultNames[len(resultNames)-1])
 		})
 
-		t.Run("should skip containers with self-referencing dependencies without creating cycles", func(t *testing.T) {
-			t.Parallel()
-
-			// Test containers that reference themselves (self-reference is filtered as safety net)
-			c1 := mockTypes.NewMockContainer(t)
-			c1.EXPECT().Name().Return("container1").Maybe()
-			c1.EXPECT().ID().Return(types.ContainerID("id-c1")).Maybe()
-			c1.EXPECT().Links(true).Return([]string{"container1"}) // Self-reference
-			c1.EXPECT().
-				ContainerInfo().
-				Return(&dockerContainer.InspectResponse{Name: "/container1", Config: &dockerContainer.Config{Labels: map[string]string{}}})
-
-			containers := []types.Container{c1}
-			result, err := sortByDependencies(newTestLogger(t), containers, true)
-			require.NoError(t, err)
-			// Self-reference is filtered, not a cycle
-			require.Len(t, result, 1)
-			assert.Equal(t, "container1", result[0].Name())
-		})
-
 		t.Run("should handle large number of containers with no dependencies", func(t *testing.T) {
 			t.Parallel()
 
@@ -1135,14 +655,7 @@ func Test_dependencySorter(t *testing.T) {
 			containers := make([]types.Container, 100)
 
 			for i := range 100 {
-				c := mockTypes.NewMockContainer(t)
-				c.EXPECT().Name().Return(fmt.Sprintf("container%d", i)).Maybe()
-				c.EXPECT().ID().Return(types.ContainerID(fmt.Sprintf("id-c%d", i))).Maybe()
-				c.EXPECT().Links(true).Return(nil)
-				c.EXPECT().
-					ContainerInfo().
-					Return(&dockerContainer.InspectResponse{Name: fmt.Sprintf("/container%d", i), Config: &dockerContainer.Config{Labels: map[string]string{}}})
-				containers[i] = c
+				containers[i] = deployed{name: fmt.Sprintf("container%d", i)}.container()
 			}
 
 			result, err := sortByDependencies(newTestLogger(t), containers, true)
@@ -1154,21 +667,8 @@ func Test_dependencySorter(t *testing.T) {
 			t.Parallel()
 
 			// This tests that containers with empty names fall back to using container ID as identifier
-			c1 := mockTypes.NewMockContainer(t)
-			c1.EXPECT().Name().Return("") // Empty name
-			c1.EXPECT().ID().Return(types.ContainerID("id-c1")).Maybe()
-			c1.EXPECT().Links(true).Return(nil)
-			c1.EXPECT().
-				ContainerInfo().
-				Return(&dockerContainer.InspectResponse{Name: "", Config: &dockerContainer.Config{Labels: map[string]string{}}})
-
-			c2 := mockTypes.NewMockContainer(t)
-			c2.EXPECT().Name().Return("") // Empty name
-			c2.EXPECT().ID().Return(types.ContainerID("id-c2")).Maybe()
-			c2.EXPECT().Links(true).Return(nil)
-			c2.EXPECT().
-				ContainerInfo().
-				Return(&dockerContainer.InspectResponse{Name: "", Config: &dockerContainer.Config{Labels: map[string]string{}}})
+			c1 := deployed{name: "", id: "id-c1"}.container()
+			c2 := deployed{name: "", id: "id-c2"}.container()
 
 			containers := []types.Container{c1, c2}
 			result, err := sortByDependencies(newTestLogger(t), containers, true)
@@ -1180,42 +680,13 @@ func Test_dependencySorter(t *testing.T) {
 			t.Parallel()
 
 			// app depending on "db"
-			app := mockTypes.NewMockContainer(t)
-			app.EXPECT().ContainerInfo().Return(&dockerContainer.InspectResponse{
-				Name: "/app",
-				Config: &dockerContainer.Config{
-					Labels: map[string]string{"com.centurylinklabs.watchtower.depends-on": "db"},
-				},
-			})
-			app.EXPECT().Name().Return("app").Maybe()
-			app.EXPECT().ID().Return(types.ContainerID("id-app")).Maybe()
-			app.EXPECT().Links(true).Return([]string{"db"})
+			app := deployed{name: "app", dependsOn: "db"}.container()
 
 			// db1 from project1
-			db1 := mockTypes.NewMockContainer(t)
-			db1.EXPECT().ContainerInfo().Return(&dockerContainer.InspectResponse{
-				Name: "/project1_db_1",
-				Config: &dockerContainer.Config{Labels: map[string]string{
-					"com.docker.compose.service": "db",
-					"com.docker.compose.project": "project1",
-				}},
-			})
-			db1.EXPECT().Name().Return("project1_db_1").Maybe()
-			db1.EXPECT().ID().Return(types.ContainerID("id-db1")).Maybe()
-			db1.EXPECT().Links(true).Return(nil)
+			db1 := deployed{name: "project1_db_1", project: "project1", service: "db"}.container()
 
 			// db2 from project2
-			db2 := mockTypes.NewMockContainer(t)
-			db2.EXPECT().ContainerInfo().Return(&dockerContainer.InspectResponse{
-				Name: "/project2_db_1",
-				Config: &dockerContainer.Config{Labels: map[string]string{
-					"com.docker.compose.service": "db",
-					"com.docker.compose.project": "project2",
-				}},
-			})
-			db2.EXPECT().Name().Return("project2_db_1").Maybe()
-			db2.EXPECT().ID().Return(types.ContainerID("id-db2")).Maybe()
-			db2.EXPECT().Links(true).Return(nil)
+			db2 := deployed{name: "project2_db_1", project: "project2", service: "db"}.container()
 
 			containers := []types.Container{app, db1, db2}
 
@@ -1234,26 +705,8 @@ func Test_dependencySorter(t *testing.T) {
 		t.Run("should detect circular dependencies via watchtower labels", func(t *testing.T) {
 			t.Parallel()
 
-			c1 := mockTypes.NewMockContainer(t)
-			c1.EXPECT().ContainerInfo().Return(&dockerContainer.InspectResponse{
-				Name: "/c1",
-				Config: &dockerContainer.Config{
-					Labels: map[string]string{"com.centurylinklabs.watchtower.depends-on": "c2"},
-				},
-			})
-			c1.EXPECT().Name().Return("c1").Maybe()
-			c1.EXPECT().ID().Return(types.ContainerID("id-c1")).Maybe()
-			c1.EXPECT().Links(true).Return([]string{"c2"})
-
-			c2 := mockTypes.NewMockContainer(t)
-			c2.EXPECT().ContainerInfo().Return(&dockerContainer.InspectResponse{
-				Name: "/c2",
-				Config: &dockerContainer.Config{
-					Labels: map[string]string{"com.centurylinklabs.watchtower.depends-on": "c1"},
-				},
-			})
-			c2.EXPECT().Name().Return("c2")
-			c2.EXPECT().Links(true).Return([]string{"c1"})
+			c1 := deployed{name: "c1", dependsOn: "c2"}.container()
+			c2 := deployed{name: "c2", dependsOn: "c1"}.container()
 
 			containers := []types.Container{c1, c2}
 
@@ -1266,16 +719,7 @@ func Test_dependencySorter(t *testing.T) {
 		t.Run("should handle dependencies to filtered containers", func(t *testing.T) {
 			t.Parallel()
 
-			app := mockTypes.NewMockContainer(t)
-			app.EXPECT().ContainerInfo().Return(&dockerContainer.InspectResponse{
-				Name: "/app",
-				Config: &dockerContainer.Config{
-					Labels: map[string]string{"com.centurylinklabs.watchtower.depends-on": "db"},
-				},
-			})
-			app.EXPECT().Name().Return("app").Maybe()
-			app.EXPECT().ID().Return(types.ContainerID("id-app")).Maybe()
-			app.EXPECT().Links(true).Return([]string{"db"})
+			app := deployed{name: "app", dependsOn: "db"}.container()
 
 			// Only app in containers list, db not included
 			containers := []types.Container{app}
@@ -1288,67 +732,6 @@ func Test_dependencySorter(t *testing.T) {
 	})
 }
 
-// TestResolveContainerIdentifier verifies that a container's identifier is its
-// Compose service name when it has one, and its container name otherwise.
-func TestResolveContainerIdentifier(t *testing.T) {
-	t.Parallel()
-
-	t.Run("should return service name when present", func(t *testing.T) {
-		t.Parallel()
-
-		mockContainer := mockTypes.NewMockContainer(t)
-		mockContainer.EXPECT().ContainerInfo().Return(&dockerContainer.InspectResponse{
-			Config: &dockerContainer.Config{
-				Labels: map[string]string{"com.docker.compose.service": "web"},
-			},
-		})
-		result := container.ResolveContainerIdentifier(mockContainer)
-		assert.Equal(t, "web", result)
-	})
-
-	t.Run("should return container name when no service label", func(t *testing.T) {
-		t.Parallel()
-
-		mockContainer := mockTypes.NewMockContainer(t)
-		mockContainer.EXPECT().ContainerInfo().Return(&dockerContainer.InspectResponse{
-			Config: &dockerContainer.Config{
-				Labels: map[string]string{},
-			},
-		})
-		mockContainer.EXPECT().Name().Return("container1")
-		result := container.ResolveContainerIdentifier(mockContainer)
-		assert.Equal(t, "container1", result)
-	})
-
-	t.Run("should return container name when labels are nil", func(t *testing.T) {
-		t.Parallel()
-
-		mockContainer := mockTypes.NewMockContainer(t)
-		mockContainer.EXPECT().ContainerInfo().Return(&dockerContainer.InspectResponse{
-			Config: &dockerContainer.Config{
-				Labels: nil,
-			},
-		})
-		mockContainer.EXPECT().Name().Return("container1")
-		result := container.ResolveContainerIdentifier(mockContainer)
-		assert.Equal(t, "container1", result)
-	})
-
-	t.Run("should return container name when service label is empty", func(t *testing.T) {
-		t.Parallel()
-
-		mockContainer := mockTypes.NewMockContainer(t)
-		mockContainer.EXPECT().ContainerInfo().Return(&dockerContainer.InspectResponse{
-			Config: &dockerContainer.Config{
-				Labels: map[string]string{"com.docker.compose.service": ""},
-			},
-		})
-		mockContainer.EXPECT().Name().Return("container1")
-		result := container.ResolveContainerIdentifier(mockContainer)
-		assert.Equal(t, "container1", result)
-	})
-}
-
 // TestPrefixMatchingIssues verifies that a link matches Compose replicas by their
 // numeric suffix, and not containers whose names merely share a prefix.
 func TestPrefixMatchingIssues(t *testing.T) {
@@ -1358,40 +741,13 @@ func TestPrefixMatchingIssues(t *testing.T) {
 		t.Parallel()
 
 		// App container that depends on "watchtower-test-database"
-		app := mockTypes.NewMockContainer(t)
-		app.EXPECT().Name().Return("watchtower-test-app1").Maybe()
-		app.EXPECT().ID().Return(types.ContainerID("id-app")).Maybe()
-		app.EXPECT().Links(true).Return([]string{"watchtower-test-database"})
-		app.EXPECT().
-			ContainerInfo().
-			Return(&dockerContainer.InspectResponse{
-				Name:   "/watchtower-test-app1",
-				Config: &dockerContainer.Config{Labels: map[string]string{}},
-			})
+		app := deployed{name: "watchtower-test-app1", dependsOn: "watchtower-test-database"}.container()
 
 		// First database container (exact match)
-		db1 := mockTypes.NewMockContainer(t)
-		db1.EXPECT().Name().Return("watchtower-test-database").Maybe()
-		db1.EXPECT().ID().Return(types.ContainerID("id-db1")).Maybe()
-		db1.EXPECT().Links(true).Return(nil)
-		db1.EXPECT().
-			ContainerInfo().
-			Return(&dockerContainer.InspectResponse{
-				Name:   "/watchtower-test-database",
-				Config: &dockerContainer.Config{Labels: map[string]string{}},
-			})
+		db1 := deployed{name: "watchtower-test-database"}.container()
 
 		// Second database container with similar name (should NOT be matched)
-		db2 := mockTypes.NewMockContainer(t)
-		db2.EXPECT().Name().Return("watchtower-test-database2").Maybe()
-		db2.EXPECT().ID().Return(types.ContainerID("id-db2")).Maybe()
-		db2.EXPECT().Links(true).Return(nil)
-		db2.EXPECT().
-			ContainerInfo().
-			Return(&dockerContainer.InspectResponse{
-				Name:   "/watchtower-test-database2",
-				Config: &dockerContainer.Config{Labels: map[string]string{}},
-			})
+		db2 := deployed{name: "watchtower-test-database2"}.container()
 
 		containers := []types.Container{app, db1, db2}
 		containerMap, indegree, adjacency, _, err := buildDependencyGraph(newTestLogger(t), containers, true)
@@ -1412,39 +768,11 @@ func TestPrefixMatchingIssues(t *testing.T) {
 		t.Parallel()
 
 		// App container that depends on "myapp-db"
-		app := mockTypes.NewMockContainer(t)
-		app.EXPECT().Name().Return("myapp-app1").Maybe()
-		app.EXPECT().ID().Return(types.ContainerID("id-app")).Maybe()
-		app.EXPECT().Links(true).Return([]string{"myapp-db"})
-		app.EXPECT().
-			ContainerInfo().
-			Return(&dockerContainer.InspectResponse{
-				Name:   "/myapp-app1",
-				Config: &dockerContainer.Config{Labels: map[string]string{}},
-			})
+		app := deployed{name: "myapp-app1", dependsOn: "myapp-db"}.container()
 
 		// Database replicas with numeric suffixes (should be matched)
-		db1 := mockTypes.NewMockContainer(t)
-		db1.EXPECT().Name().Return("myapp-db-1").Maybe()
-		db1.EXPECT().ID().Return(types.ContainerID("id-db1")).Maybe()
-		db1.EXPECT().Links(true).Return(nil)
-		db1.EXPECT().
-			ContainerInfo().
-			Return(&dockerContainer.InspectResponse{
-				Name:   "/myapp-db-1",
-				Config: &dockerContainer.Config{Labels: map[string]string{}},
-			})
-
-		db2 := mockTypes.NewMockContainer(t)
-		db2.EXPECT().Name().Return("myapp-db-2").Maybe()
-		db2.EXPECT().ID().Return(types.ContainerID("id-db2")).Maybe()
-		db2.EXPECT().Links(true).Return(nil)
-		db2.EXPECT().
-			ContainerInfo().
-			Return(&dockerContainer.InspectResponse{
-				Name:   "/myapp-db-2",
-				Config: &dockerContainer.Config{Labels: map[string]string{}},
-			})
+		db1 := deployed{name: "myapp-db-1"}.container()
+		db2 := deployed{name: "myapp-db-2"}.container()
 
 		containers := []types.Container{app, db1, db2}
 		containerMap, indegree, adjacency, _, err := buildDependencyGraph(newTestLogger(t), containers, true)
@@ -1471,35 +799,23 @@ func TestIdentifierCollisionIssues(t *testing.T) {
 			t.Parallel()
 
 			// Container from project "app1" with service "web"
-			mockContainer1 := mockTypes.NewMockContainer(t)
-			mockContainer1.EXPECT().ContainerInfo().Return(&dockerContainer.InspectResponse{
-				Config: &dockerContainer.Config{
-					Labels: map[string]string{
-						"com.docker.compose.service":     "web",
-						"com.docker.compose.project":     "app1",
-						"com.docker.compose.version":     "3.8",
-						"com.docker.compose.config-hash": "abc123",
-					},
-				},
-			})
-			mockContainer1.EXPECT().Name().Return("app1_web_1")
+			first := deployed{
+				name:    "app1_web_1",
+				project: "app1",
+				service: "web",
+				labels:  map[string]string{"com.docker.compose.version": "3.8", "com.docker.compose.config-hash": "abc123"},
+			}.container()
 
 			// Container from project "app2" with same service "web"
-			mockContainer2 := mockTypes.NewMockContainer(t)
-			mockContainer2.EXPECT().ContainerInfo().Return(&dockerContainer.InspectResponse{
-				Config: &dockerContainer.Config{
-					Labels: map[string]string{
-						"com.docker.compose.service":     "web",
-						"com.docker.compose.project":     "app2",
-						"com.docker.compose.version":     "3.8",
-						"com.docker.compose.config-hash": "def456",
-					},
-				},
-			})
-			mockContainer2.EXPECT().Name().Return("app2_web_1")
+			second := deployed{
+				name:    "app2_web_1",
+				project: "app2",
+				service: "web",
+				labels:  map[string]string{"com.docker.compose.version": "3.8", "com.docker.compose.config-hash": "def456"},
+			}.container()
 
-			result1 := container.ResolveContainerIdentifier(mockContainer1)
-			result2 := container.ResolveContainerIdentifier(mockContainer2)
+			result1 := container.ResolveContainerIdentifier(first)
+			result2 := container.ResolveContainerIdentifier(second)
 
 			// Containers from different projects should return different identifiers
 			assert.Equal(t, "app1-web", result1)
@@ -1515,31 +831,8 @@ func TestIdentifierCollisionIssues(t *testing.T) {
 			t.Parallel()
 
 			// Create two containers from different projects with same service name
-			c1 := mockTypes.NewMockContainer(t)
-			c1.EXPECT().ContainerInfo().Return(&dockerContainer.InspectResponse{
-				Name: "/app1_web_1",
-				Config: &dockerContainer.Config{
-					Labels: map[string]string{
-						"com.docker.compose.service": "web",
-						"com.docker.compose.project": "app1",
-					},
-				},
-			})
-			c1.EXPECT().Name().Return("app1_web_1").Maybe()
-			c1.EXPECT().Links(true).Return(nil)
-
-			c2 := mockTypes.NewMockContainer(t)
-			c2.EXPECT().ContainerInfo().Return(&dockerContainer.InspectResponse{
-				Name: "/app2_web_1",
-				Config: &dockerContainer.Config{
-					Labels: map[string]string{
-						"com.docker.compose.service": "web",
-						"com.docker.compose.project": "app2",
-					},
-				},
-			})
-			c2.EXPECT().Name().Return("app2_web_1").Maybe()
-			c2.EXPECT().Links(true).Return(nil)
+			c1 := deployed{name: "app1_web_1", project: "app1", service: "web"}.container()
+			c2 := deployed{name: "app2_web_1", project: "app2", service: "web"}.container()
 
 			containers := []types.Container{c1, c2}
 
@@ -1573,17 +866,9 @@ func TestIdentifierCollisionIssues(t *testing.T) {
 			t.Parallel()
 
 			// Container with service label but no project label
-			mockContainer := mockTypes.NewMockContainer(t)
-			mockContainer.EXPECT().ContainerInfo().Return(&dockerContainer.InspectResponse{
-				Config: &dockerContainer.Config{
-					Labels: map[string]string{
-						"com.docker.compose.service": "web",
-						// No project label
-					},
-				},
-			})
+			c := deployed{name: "", service: "web"}.container()
 
-			result := container.ResolveContainerIdentifier(mockContainer)
+			result := container.ResolveContainerIdentifier(c)
 
 			// Should return just the service name, same as before
 			assert.Equal(t, "web", result)
@@ -1593,29 +878,10 @@ func TestIdentifierCollisionIssues(t *testing.T) {
 			t.Parallel()
 
 			// Container that links to exact container name
-			app := mockTypes.NewMockContainer(t)
-			app.EXPECT().ContainerInfo().Return(&dockerContainer.InspectResponse{
-				Name:   "/app",
-				Config: &dockerContainer.Config{Labels: map[string]string{}},
-			})
-			app.EXPECT().Name().Return("app").Maybe()
-			app.EXPECT().ID().Return(types.ContainerID("id-app")).Maybe()
-			app.EXPECT().Links(true).Return([]string{"project1-db"})
+			app := deployed{name: "app", dependsOn: "project1-db"}.container()
 
 			// DB container from project1
-			db1 := mockTypes.NewMockContainer(t)
-			db1.EXPECT().ContainerInfo().Return(&dockerContainer.InspectResponse{
-				Name: "/project1_db_1",
-				Config: &dockerContainer.Config{
-					Labels: map[string]string{
-						"com.docker.compose.service": "db",
-						"com.docker.compose.project": "project1",
-					},
-				},
-			})
-			db1.EXPECT().Name().Return("project1_db_1").Maybe()
-			db1.EXPECT().ID().Return(types.ContainerID("id-db1")).Maybe()
-			db1.EXPECT().Links(true).Return(nil)
+			db1 := deployed{name: "project1_db_1", project: "project1", service: "db"}.container()
 
 			containers := []types.Container{app, db1}
 
@@ -1648,13 +914,8 @@ func TestIdentifierCollisionIssues(t *testing.T) {
 		t.Run("should format error message correctly", func(t *testing.T) {
 			t.Parallel()
 
-			c1 := mockTypes.NewMockContainer(t)
-			c1.EXPECT().Name().Return("container1")
-			c1.EXPECT().ID().Return(types.ContainerID("id1"))
-
-			c2 := mockTypes.NewMockContainer(t)
-			c2.EXPECT().Name().Return("container2")
-			c2.EXPECT().ID().Return(types.ContainerID("id2"))
+			c1 := deployed{name: "container1", id: "id1"}.container()
+			c2 := deployed{name: "container2", id: "id2"}.container()
 
 			containers := []types.Container{c1, c2}
 
@@ -1674,21 +935,8 @@ func TestIdentifierCollisionIssues(t *testing.T) {
 		t.Run("should return identifierCollisionError when containers have same normalized identifier", func(t *testing.T) {
 			t.Parallel()
 
-			c1 := mockTypes.NewMockContainer(t)
-			c1.EXPECT().ContainerInfo().Return(&dockerContainer.InspectResponse{
-				Name:   "/c1",
-				Config: &dockerContainer.Config{Labels: map[string]string{}},
-			})
-			c1.EXPECT().Name().Return("c1").Maybe()
-			c1.EXPECT().ID().Return(types.ContainerID("id1")).Maybe()
-
-			c2 := mockTypes.NewMockContainer(t)
-			c2.EXPECT().ContainerInfo().Return(&dockerContainer.InspectResponse{
-				Name:   "/c1", // Same name
-				Config: &dockerContainer.Config{Labels: map[string]string{}},
-			})
-			c2.EXPECT().Name().Return("c1").Maybe()
-			c2.EXPECT().ID().Return(types.ContainerID("id2")).Maybe()
+			c1 := deployed{name: "c1", id: "id1"}.container()
+			c2 := deployed{name: "c1", id: "id2"}.container()
 
 			containers := []types.Container{c1, c2}
 
@@ -1703,23 +951,8 @@ func TestIdentifierCollisionIssues(t *testing.T) {
 		t.Run("should succeed when containers have different identifiers", func(t *testing.T) {
 			t.Parallel()
 
-			c1 := mockTypes.NewMockContainer(t)
-			c1.EXPECT().ContainerInfo().Return(&dockerContainer.InspectResponse{
-				Name:   "/c1",
-				Config: &dockerContainer.Config{Labels: map[string]string{}},
-			})
-			c1.EXPECT().Name().Return("c1").Maybe()
-			c1.EXPECT().ID().Return(types.ContainerID("id1")).Maybe()
-			c1.EXPECT().Links(true).Return(nil)
-
-			c2 := mockTypes.NewMockContainer(t)
-			c2.EXPECT().ContainerInfo().Return(&dockerContainer.InspectResponse{
-				Name:   "/c2",
-				Config: &dockerContainer.Config{Labels: map[string]string{}},
-			})
-			c2.EXPECT().Name().Return("c2").Maybe()
-			c2.EXPECT().ID().Return(types.ContainerID("id2")).Maybe()
-			c2.EXPECT().Links(true).Return(nil)
+			c1 := deployed{name: "c1"}.container()
+			c2 := deployed{name: "c2"}.container()
 
 			containers := []types.Container{c1, c2}
 
@@ -1741,21 +974,8 @@ func TestIdentifierCollisionIssues(t *testing.T) {
 		t.Run("should propagate identifierCollisionError from buildDependencyGraph", func(t *testing.T) {
 			t.Parallel()
 
-			c1 := mockTypes.NewMockContainer(t)
-			c1.EXPECT().ContainerInfo().Return(&dockerContainer.InspectResponse{
-				Name:   "/c1",
-				Config: &dockerContainer.Config{Labels: map[string]string{}},
-			})
-			c1.EXPECT().Name().Return("c1").Maybe()
-			c1.EXPECT().ID().Return(types.ContainerID("id1")).Maybe()
-
-			c2 := mockTypes.NewMockContainer(t)
-			c2.EXPECT().ContainerInfo().Return(&dockerContainer.InspectResponse{
-				Name:   "/c1", // Same name
-				Config: &dockerContainer.Config{Labels: map[string]string{}},
-			})
-			c2.EXPECT().Name().Return("c1").Maybe()
-			c2.EXPECT().ID().Return(types.ContainerID("id2")).Maybe()
+			c1 := deployed{name: "c1", id: "id1"}.container()
+			c2 := deployed{name: "c1", id: "id2"}.container()
 
 			containers := []types.Container{c1, c2}
 
@@ -1775,8 +995,8 @@ func Test_identifierIndex_CollisionLogsAtDebug(t *testing.T) {
 	t.Parallel()
 
 	containers := []types.Container{
-		concreteLinkedContainer("a000000000000000000000000000000000000000000000000000000000000000", "/app", "", "", ""),
-		concreteLinkedContainer("b000000000000000000000000000000000000000000000000000000000000000", "/app", "", "", ""),
+		deployed{name: "app", id: "a000000000000000000000000000000000000000000000000000000000000000"}.container(),
+		deployed{name: "app", id: "b000000000000000000000000000000000000000000000000000000000000000"}.container(),
 	}
 
 	log, output := logcapture.New(zerolog.DebugLevel)
@@ -1887,34 +1107,10 @@ func TestServiceOnlyMatching(t *testing.T) {
 			t.Parallel()
 
 			// App container from project1 that depends on "db" service
-			app := mockTypes.NewMockContainer(t)
-			app.EXPECT().ContainerInfo().Return(&dockerContainer.InspectResponse{
-				Name: "/project1_app_1",
-				Config: &dockerContainer.Config{
-					Labels: map[string]string{
-						"com.docker.compose.service": "app",
-						"com.docker.compose.project": "project1",
-					},
-				},
-			})
-			app.EXPECT().Name().Return("project1_app_1").Maybe()
-			app.EXPECT().ID().Return(types.ContainerID("id-app")).Maybe()
-			app.EXPECT().Links(true).Return([]string{"db"}) // Link to just "db" service name
+			app := deployed{name: "project1_app_1", dependsOn: "db", project: "project1", service: "app"}.container()
 
 			// DB container from project2 (different project, but only one "db" service)
-			db := mockTypes.NewMockContainer(t)
-			db.EXPECT().ContainerInfo().Return(&dockerContainer.InspectResponse{
-				Name: "/project2_db_1",
-				Config: &dockerContainer.Config{
-					Labels: map[string]string{
-						"com.docker.compose.service": "db",
-						"com.docker.compose.project": "project2",
-					},
-				},
-			})
-			db.EXPECT().Name().Return("project2_db_1").Maybe()
-			db.EXPECT().ID().Return(types.ContainerID("id-db")).Maybe()
-			db.EXPECT().Links(true).Return(nil)
+			db := deployed{name: "project2_db_1", project: "project2", service: "db"}.container()
 
 			containers := []types.Container{app, db}
 
@@ -1935,33 +1131,10 @@ func TestServiceOnlyMatching(t *testing.T) {
 			t.Parallel()
 
 			// App container with watchtower depends-on label referencing just "postgres"
-			app := mockTypes.NewMockContainer(t)
-			app.EXPECT().ContainerInfo().Return(&dockerContainer.InspectResponse{
-				Name: "/myapp",
-				Config: &dockerContainer.Config{
-					Labels: map[string]string{
-						"com.centurylinklabs.watchtower.depends-on": "postgres",
-					},
-				},
-			})
-			app.EXPECT().Name().Return("myapp").Maybe()
-			app.EXPECT().ID().Return(types.ContainerID("id-app")).Maybe()
-			app.EXPECT().Links(true).Return([]string{"postgres"})
+			app := deployed{name: "myapp", dependsOn: "postgres"}.container()
 
 			// Postgres container with project prefix in identifier
-			postgres := mockTypes.NewMockContainer(t)
-			postgres.EXPECT().ContainerInfo().Return(&dockerContainer.InspectResponse{
-				Name: "/postgresql_postgres_1",
-				Config: &dockerContainer.Config{
-					Labels: map[string]string{
-						"com.docker.compose.service": "postgres",
-						"com.docker.compose.project": "postgresql",
-					},
-				},
-			})
-			postgres.EXPECT().Name().Return("postgresql_postgres_1").Maybe()
-			postgres.EXPECT().ID().Return(types.ContainerID("id-postgres")).Maybe()
-			postgres.EXPECT().Links(true).Return(nil)
+			postgres := deployed{name: "postgresql_postgres_1", project: "postgresql", service: "postgres"}.container()
 
 			containers := []types.Container{app, postgres}
 
@@ -1982,44 +1155,13 @@ func TestServiceOnlyMatching(t *testing.T) {
 			t.Parallel()
 
 			// App container that depends on "db" service
-			app := mockTypes.NewMockContainer(t)
-			app.EXPECT().ContainerInfo().Return(&dockerContainer.InspectResponse{
-				Name:   "/app",
-				Config: &dockerContainer.Config{Labels: map[string]string{}},
-			})
-			app.EXPECT().Name().Return("app").Maybe()
-			app.EXPECT().ID().Return(types.ContainerID("id-app")).Maybe()
-			app.EXPECT().Links(true).Return([]string{"db"})
+			app := deployed{name: "app", dependsOn: "db"}.container()
 
 			// DB container from project1
-			db1 := mockTypes.NewMockContainer(t)
-			db1.EXPECT().ContainerInfo().Return(&dockerContainer.InspectResponse{
-				Name: "/project1_db_1",
-				Config: &dockerContainer.Config{
-					Labels: map[string]string{
-						"com.docker.compose.service": "db",
-						"com.docker.compose.project": "project1",
-					},
-				},
-			})
-			db1.EXPECT().Name().Return("project1_db_1").Maybe()
-			db1.EXPECT().ID().Return(types.ContainerID("id-db1")).Maybe()
-			db1.EXPECT().Links(true).Return(nil)
+			db1 := deployed{name: "project1_db_1", project: "project1", service: "db"}.container()
 
 			// DB container from project2 (same service name, different project)
-			db2 := mockTypes.NewMockContainer(t)
-			db2.EXPECT().ContainerInfo().Return(&dockerContainer.InspectResponse{
-				Name: "/project2_db_1",
-				Config: &dockerContainer.Config{
-					Labels: map[string]string{
-						"com.docker.compose.service": "db",
-						"com.docker.compose.project": "project2",
-					},
-				},
-			})
-			db2.EXPECT().Name().Return("project2_db_1").Maybe()
-			db2.EXPECT().ID().Return(types.ContainerID("id-db2")).Maybe()
-			db2.EXPECT().Links(true).Return(nil)
+			db2 := deployed{name: "project2_db_1", project: "project2", service: "db"}.container()
 
 			containers := []types.Container{app, db1, db2}
 
@@ -2041,44 +1183,13 @@ func TestServiceOnlyMatching(t *testing.T) {
 			t.Parallel()
 
 			// App container that links to exact identifier "project1-db"
-			app := mockTypes.NewMockContainer(t)
-			app.EXPECT().ContainerInfo().Return(&dockerContainer.InspectResponse{
-				Name:   "/app",
-				Config: &dockerContainer.Config{Labels: map[string]string{}},
-			})
-			app.EXPECT().Name().Return("app").Maybe()
-			app.EXPECT().ID().Return(types.ContainerID("id-app")).Maybe()
-			app.EXPECT().Links(true).Return([]string{"project1-db"})
+			app := deployed{name: "app", dependsOn: "project1-db"}.container()
 
 			// DB container from project1
-			db1 := mockTypes.NewMockContainer(t)
-			db1.EXPECT().ContainerInfo().Return(&dockerContainer.InspectResponse{
-				Name: "/project1_db_1",
-				Config: &dockerContainer.Config{
-					Labels: map[string]string{
-						"com.docker.compose.service": "db",
-						"com.docker.compose.project": "project1",
-					},
-				},
-			})
-			db1.EXPECT().Name().Return("project1_db_1").Maybe()
-			db1.EXPECT().ID().Return(types.ContainerID("id-db1")).Maybe()
-			db1.EXPECT().Links(true).Return(nil)
+			db1 := deployed{name: "project1_db_1", project: "project1", service: "db"}.container()
 
 			// DB container from project2 (should NOT be matched)
-			db2 := mockTypes.NewMockContainer(t)
-			db2.EXPECT().ContainerInfo().Return(&dockerContainer.InspectResponse{
-				Name: "/project2_db_1",
-				Config: &dockerContainer.Config{
-					Labels: map[string]string{
-						"com.docker.compose.service": "db",
-						"com.docker.compose.project": "project2",
-					},
-				},
-			})
-			db2.EXPECT().Name().Return("project2_db_1").Maybe()
-			db2.EXPECT().ID().Return(types.ContainerID("id-db2")).Maybe()
-			db2.EXPECT().Links(true).Return(nil)
+			db2 := deployed{name: "project2_db_1", project: "project2", service: "db"}.container()
 
 			containers := []types.Container{app, db1, db2}
 
@@ -2100,39 +1211,13 @@ func TestServiceOnlyMatching(t *testing.T) {
 			t.Parallel()
 
 			// App container that links to "db" (should match db-1 replica, not project1-db)
-			app := mockTypes.NewMockContainer(t)
-			app.EXPECT().ContainerInfo().Return(&dockerContainer.InspectResponse{
-				Name:   "/app",
-				Config: &dockerContainer.Config{Labels: map[string]string{}},
-			})
-			app.EXPECT().Name().Return("app").Maybe()
-			app.EXPECT().ID().Return(types.ContainerID("id-app")).Maybe()
-			app.EXPECT().Links(true).Return([]string{"db"})
+			app := deployed{name: "app", dependsOn: "db"}.container()
 
 			// DB replica container (db-1 pattern)
-			dbReplica := mockTypes.NewMockContainer(t)
-			dbReplica.EXPECT().ContainerInfo().Return(&dockerContainer.InspectResponse{
-				Name:   "/db-1",
-				Config: &dockerContainer.Config{Labels: map[string]string{}},
-			})
-			dbReplica.EXPECT().Name().Return("db-1").Maybe()
-			dbReplica.EXPECT().ID().Return(types.ContainerID("id-dbreplica")).Maybe()
-			dbReplica.EXPECT().Links(true).Return(nil)
+			dbReplica := deployed{name: "db-1"}.container()
 
 			// DB container with project prefix (service name also "db")
-			dbProject := mockTypes.NewMockContainer(t)
-			dbProject.EXPECT().ContainerInfo().Return(&dockerContainer.InspectResponse{
-				Name: "/project_db_1",
-				Config: &dockerContainer.Config{
-					Labels: map[string]string{
-						"com.docker.compose.service": "db",
-						"com.docker.compose.project": "project",
-					},
-				},
-			})
-			dbProject.EXPECT().Name().Return("project_db_1").Maybe()
-			dbProject.EXPECT().ID().Return(types.ContainerID("id-dbproject")).Maybe()
-			dbProject.EXPECT().Links(true).Return(nil)
+			dbProject := deployed{name: "project_db_1", project: "project", service: "db"}.container()
 
 			containers := []types.Container{app, dbReplica, dbProject}
 
@@ -2180,92 +1265,6 @@ func indexOf(names []string, target string) int {
 	}
 
 	return -1
-}
-
-// mockLinkedContainer builds a mock with Compose labels and fixed Links() output.
-//
-// Parameters:
-//   - t: Test that owns the mock.
-//   - name: Container name.
-//   - id: Container ID.
-//   - project: Compose project label, or empty for none.
-//   - service: Compose service label, or empty for none.
-//   - links: Links the container reports.
-//   - useComposeLinks: Whether Links is called with Compose depends_on enabled.
-//
-// Returns:
-//   - *mockTypes.MockContainer: Mock answering the reads the sorter makes.
-func mockLinkedContainer(
-	t *testing.T,
-	name, id, project, service string,
-	links []string,
-	useComposeLinks bool,
-) *mockTypes.MockContainer {
-	t.Helper()
-
-	c := mockTypes.NewMockContainer(t)
-	c.EXPECT().Name().Return(name).Maybe()
-	c.EXPECT().ID().Return(types.ContainerID(id)).Maybe()
-	c.EXPECT().IsWatchtower().Return(false).Maybe()
-
-	if useComposeLinks {
-		c.EXPECT().Links(true).Return(links).Maybe()
-	} else {
-		c.EXPECT().Links(false).Return(links).Maybe()
-	}
-
-	labels := map[string]string{}
-	if project != "" {
-		labels["com.docker.compose.project"] = project
-	}
-
-	if service != "" {
-		labels["com.docker.compose.service"] = service
-	}
-
-	c.EXPECT().ContainerInfo().Return(&dockerContainer.InspectResponse{
-		Name:   "/" + name,
-		Config: &dockerContainer.Config{Labels: labels},
-	}).Maybe()
-
-	return c
-}
-
-// concreteLinkedContainer builds a *container.Container so Docker ID aliases
-// in buildLinkMatchIndexes are exercised.
-//
-// Parameters:
-//   - id: Container ID.
-//   - name: Container name, with its leading slash.
-//   - project: Compose project label, or empty for none.
-//   - service: Compose service label, or empty for none.
-//   - networkMode: HostConfig NetworkMode value, such as container:<id>, or empty.
-//
-// Returns:
-//   - types.Container: Container built from the inspect data.
-func concreteLinkedContainer(
-	id, name, project, service, networkMode string,
-) types.Container {
-	labels := map[string]string{}
-	if project != "" {
-		labels["com.docker.compose.project"] = project
-	}
-
-	if service != "" {
-		labels["com.docker.compose.service"] = service
-	}
-
-	hostConfig := &dockerContainer.HostConfig{}
-	if networkMode != "" {
-		hostConfig.NetworkMode = dockerContainer.NetworkMode(networkMode)
-	}
-
-	return container.NewContainer(nil, &dockerContainer.InspectResponse{
-		ID:         id,
-		Name:       name,
-		HostConfig: hostConfig,
-		Config:     &dockerContainer.Config{Labels: labels},
-	}, nil)
 }
 
 // Test_matchSet_match verifies which identifiers each link form matches: exact
@@ -2362,8 +1361,8 @@ func Test_buildLinkMatchIndexes(t *testing.T) {
 	t.Run("should map unique bare names to canonical identifiers", func(t *testing.T) {
 		t.Parallel()
 
-		dep := mockLinkedContainer(t, "net-proxy", "id-proxy", "myproject", "net-proxy", nil, true)
-		app := mockLinkedContainer(t, "web-app", "id-web", "myproject", "web", nil, true)
+		dep := deployed{name: "net-proxy", project: "myproject", service: "net-proxy"}.container()
+		app := deployed{name: "web-app", project: "myproject", service: "web"}.container()
 
 		containerMap := map[string]types.Container{
 			"myproject-net-proxy": dep,
@@ -2383,11 +1382,8 @@ func Test_buildLinkMatchIndexes(t *testing.T) {
 	t.Run("should omit bare name alias when it collides across containers", func(t *testing.T) {
 		t.Parallel()
 
-		c1 := mockTypes.NewMockContainer(t)
-		c1.EXPECT().Name().Return("shared").Maybe()
-
-		c2 := mockTypes.NewMockContainer(t)
-		c2.EXPECT().Name().Return("shared").Maybe()
+		c1 := deployed{name: "shared", id: "id-first"}.container()
+		c2 := deployed{name: "shared", id: "id-second"}.container()
 
 		containerMap := map[string]types.Container{
 			"project1-service": c1,
@@ -2407,23 +1403,21 @@ func Test_buildLinkMatchIndexes(t *testing.T) {
 		// Container A is keyed by "shared".
 		// Container B's bare name is also "shared".
 		// B must not overwrite or delete A's canonical self-mapping.
-		canonicalOwner := mockTypes.NewMockContainer(t)
-		canonicalOwner.EXPECT().Name().Return("shared").Maybe()
-
-		bareClaimant := mockTypes.NewMockContainer(t)
-		bareClaimant.EXPECT().Name().Return("shared").Maybe()
+		canonicalOwner := deployed{name: "shared", id: "id-owner"}.container()
+		bareClaimant := deployed{name: "shared", id: "id-claimant"}.container()
 
 		containerMap := map[string]types.Container{
 			"shared":          canonicalOwner,
 			"project-service": bareClaimant,
 		}
 
+		// The index also holds each container's Docker ID.
 		idSet, aliasToCanonical := buildLinkMatchIndexes(newTestLogger(t), containerMap)
 		assert.Equal(t, "shared", aliasToCanonical["shared"])
 		assert.Equal(t, "project-service", aliasToCanonical["project-service"])
-		assert.Contains(t, idSet, "shared")
-		assert.Contains(t, idSet, "project-service")
-		require.Len(t, idSet, 2)
+		assert.Equal(t, "shared", aliasToCanonical["id-owner"])
+		assert.Equal(t, "project-service", aliasToCanonical["id-claimant"])
+		assert.Equal(t, identifierSet("shared", "project-service", "id-owner", "id-claimant"), idSet)
 	})
 
 	t.Run("should map a Docker ID alias for concrete containers", func(t *testing.T) {
@@ -2431,7 +1425,7 @@ func Test_buildLinkMatchIndexes(t *testing.T) {
 
 		const providerID = "25e75393800b5c450a6841212a3b92ed28fa35414a586dec9f2c8a520d4910c2"
 
-		gluetun := concreteLinkedContainer(providerID, "/gluetun", "gluetun", "vpn", "")
+		gluetun := deployed{name: "gluetun", id: providerID, project: "gluetun", service: "vpn"}.container()
 
 		containerMap := map[string]types.Container{
 			"gluetun-vpn": gluetun,
@@ -2445,7 +1439,15 @@ func Test_buildLinkMatchIndexes(t *testing.T) {
 	t.Run("should skip an empty Docker ID", func(t *testing.T) {
 		t.Parallel()
 
-		gluetun := concreteLinkedContainer("", "/gluetun", "gluetun", "vpn", "")
+		// The deployment helper derives an ID when none is given. This
+		// container is built from inspect data without one.
+		gluetun := container.NewContainer(nil, &dockerContainer.InspectResponse{
+			Name: "/gluetun",
+			Config: &dockerContainer.Config{Labels: map[string]string{
+				composeLabels.ComposeProjectLabel: "gluetun",
+				composeLabels.ComposeServiceLabel: "vpn",
+			}},
+		}, nil)
 
 		containerMap := map[string]types.Container{
 			"gluetun-vpn": gluetun,
@@ -2462,7 +1464,7 @@ func Test_buildLinkMatchIndexes(t *testing.T) {
 
 		const providerID = "25e75393800b5c450a6841212a3b92ed28fa35414a586dec9f2c8a520d4910c2"
 
-		gluetun := concreteLinkedContainer(providerID, "/"+providerID, "", "", "")
+		gluetun := deployed{name: providerID, id: providerID}.container()
 
 		containerMap := map[string]types.Container{
 			providerID: gluetun,
@@ -2477,8 +1479,8 @@ func Test_buildLinkMatchIndexes(t *testing.T) {
 
 		const providerID = "25e75393800b5c450a6841212a3b92ed28fa35414a586dec9f2c8a520d4910c2"
 
-		owner := concreteLinkedContainer("owner-id", "/owner", "owner", "svc", "")
-		claimant := concreteLinkedContainer(providerID, "/gluetun", "gluetun", "vpn", "")
+		owner := deployed{name: "owner", project: "owner", service: "svc"}.container()
+		claimant := deployed{name: "gluetun", id: providerID, project: "gluetun", service: "vpn"}.container()
 
 		containerMap := map[string]types.Container{
 			providerID:    owner,
@@ -2494,8 +1496,8 @@ func Test_buildLinkMatchIndexes(t *testing.T) {
 
 		const providerID = "25e75393800b5c450a6841212a3b92ed28fa35414a586dec9f2c8a520d4910c2"
 
-		gluetun := concreteLinkedContainer(providerID, "/gluetun", "gluetun", "vpn", "")
-		decoy := concreteLinkedContainer("decoy-id", "/"+providerID, "other", "svc", "")
+		gluetun := deployed{name: "gluetun", id: providerID, project: "gluetun", service: "vpn"}.container()
+		decoy := deployed{name: providerID, project: "other", service: "svc"}.container()
 
 		containerMap := map[string]types.Container{
 			"gluetun-vpn": gluetun,
@@ -2568,153 +1570,104 @@ func Test_resolveLinkToCanonicalKeys(t *testing.T) {
 func TestDependencyLinkFormPermutations(t *testing.T) {
 	t.Parallel()
 
-	// Links() values from Watchtower depends-on, Compose depends_on, Docker links,
-	// and network_mode must resolve against ResolveContainerIdentifier graph keys.
+	// Each dependency source and link form must resolve against the
+	// ResolveContainerIdentifier graph keys.
 	t.Run("sorts dependency before dependent for each link form", func(t *testing.T) {
 		t.Parallel()
 
 		tests := []struct {
-			name             string
-			depName          string
-			depProject       string
-			depService       string
-			dependentName    string
-			dependentProject string
-			dependentService string
-			links            []string
-			useCompose       bool
+			name string
+			// dependency and dependent are the two containers. The dependent
+			// names the dependency through the source the case describes.
+			dependency, dependent deployed
+			// useCompose is whether Compose depends_on labels are read.
+			useCompose bool
 		}{
 			{
-				name:             "Watchtower depends-on bare container_name against project-service key",
-				depName:          "net-proxy",
-				depProject:       "myproject",
-				depService:       "net-proxy",
-				dependentName:    "web-app",
-				dependentProject: "myproject",
-				dependentService: "web",
-				links:            []string{"net-proxy"},
-				useCompose:       true,
+				name:       "depends-on bare container_name against project-service key",
+				dependency: deployed{name: "net-proxy", project: "myproject", service: "net-proxy"},
+				dependent:  deployed{name: "web-app", project: "myproject", service: "web", dependsOn: "net-proxy"},
+				useCompose: true,
 			},
 			{
-				name:             "Watchtower depends-on bare name without Compose labels",
-				depName:          "database",
-				depProject:       "",
-				depService:       "",
-				dependentName:    "web",
-				dependentProject: "",
-				dependentService: "",
-				links:            []string{"database"},
-				useCompose:       true,
+				name:       "depends-on bare name without Compose labels",
+				dependency: deployed{name: "database"},
+				dependent:  deployed{name: "web", dependsOn: "database"},
+				useCompose: true,
 			},
 			{
-				name:             "Watchtower depends-on with useComposeDependsOn false",
-				depName:          "postgres",
-				depProject:       "stack",
-				depService:       "postgres",
-				dependentName:    "api",
-				dependentProject: "stack",
-				dependentService: "api",
-				links:            []string{"postgres"},
-				useCompose:       false,
+				name:       "depends-on with Compose depends_on not read",
+				dependency: deployed{name: "postgres", project: "stack", service: "postgres", composeDependsOn: "api"},
+				dependent:  deployed{name: "api", project: "stack", service: "api", dependsOn: "postgres"},
+				useCompose: false,
 			},
 			{
-				name:             "Compose depends_on project-qualified service link",
-				depName:          "myproject-database",
-				depProject:       "myproject",
-				depService:       "database",
-				dependentName:    "myproject-web",
-				dependentProject: "myproject",
-				dependentService: "web",
-				links:            []string{"myproject-database"},
-				useCompose:       true,
+				name:       "Compose depends_on service in the same project",
+				dependency: deployed{name: "myproject-database", project: "myproject", service: "database"},
+				dependent: deployed{
+					name: "myproject-web", project: "myproject", service: "web", composeDependsOn: "database",
+				},
+				useCompose: true,
 			},
 			{
-				name:             "Compose depends_on bare service name against project-service key",
-				depName:          "myproject-database",
-				depProject:       "myproject",
-				depService:       "database",
-				dependentName:    "myproject-web",
-				dependentProject: "myproject",
-				dependentService: "web",
-				links:            []string{"database"},
-				useCompose:       true,
+				name:       "Compose depends_on multi-segment service",
+				dependency: deployed{name: "myproject-net-proxy", project: "myproject", service: "net-proxy"},
+				dependent: deployed{
+					name: "myproject-web", project: "myproject", service: "web", composeDependsOn: "net-proxy",
+				},
+				useCompose: true,
 			},
 			{
-				name:             "Compose depends_on multi-segment service under project prefix",
-				depName:          "myproject-net-proxy",
-				depProject:       "myproject",
-				depService:       "net-proxy",
-				dependentName:    "myproject-web",
-				dependentProject: "myproject",
-				dependentService: "web",
-				links:            []string{"net-proxy"},
-				useCompose:       true,
+				name:       "depends-on bare service name against project-service key",
+				dependency: deployed{name: "myproject-database", project: "myproject", service: "database"},
+				dependent:  deployed{name: "myproject-web", project: "myproject", service: "web", dependsOn: "database"},
+				useCompose: true,
 			},
 			{
-				name:             "network_mode HostConfig bare container name",
-				depName:          "vpn",
-				depProject:       "stack",
-				depService:       "vpn",
-				dependentName:    "client",
-				dependentProject: "stack",
-				dependentService: "client",
-				links:            []string{"vpn"},
-				useCompose:       true,
+				name:       "depends-on bare multi-segment service name",
+				dependency: deployed{name: "myproject-net-proxy", project: "myproject", service: "net-proxy"},
+				dependent:  deployed{name: "myproject-web", project: "myproject", service: "web", dependsOn: "net-proxy"},
+				useCompose: true,
 			},
 			{
-				name:             "network_mode with useComposeDependsOn false",
-				depName:          "vpn",
-				depProject:       "stack",
-				depService:       "vpn",
-				dependentName:    "client",
-				dependentProject: "stack",
-				dependentService: "client",
-				links:            []string{"vpn"},
-				useCompose:       false,
+				name:       "network_mode of another container",
+				dependency: deployed{name: "vpn", project: "stack", service: "vpn"},
+				dependent: deployed{
+					name: "client", project: "stack", service: "client", networkMode: "container:vpn",
+				},
+				useCompose: true,
 			},
 			{
-				name:             "legacy Docker link bare container name",
-				depName:          "db",
-				depProject:       "",
-				depService:       "",
-				dependentName:    "app",
-				dependentProject: "",
-				dependentService: "",
-				links:            []string{"db"},
-				useCompose:       true,
+				name:       "network_mode with Compose depends_on not read",
+				dependency: deployed{name: "vpn", project: "stack", service: "vpn"},
+				dependent: deployed{
+					name: "client", project: "stack", service: "client", networkMode: "container:vpn",
+				},
+				useCompose: false,
 			},
 			{
-				name:             "cross-project Watchtower depends-on by container name",
-				depName:          "app1-database",
-				depProject:       "app1",
-				depService:       "database",
-				dependentName:    "app2-web",
-				dependentProject: "app2",
-				dependentService: "web",
-				links:            []string{"app1-database"},
-				useCompose:       true,
+				name:       "legacy Docker link",
+				dependency: deployed{name: "db"},
+				dependent:  deployed{name: "app", links: []string{"/db:/app/db"}},
+				useCompose: true,
 			},
 			{
-				name:             "Compose service name without container_name override",
-				depName:          "stack-cache",
-				depProject:       "stack",
-				depService:       "cache",
-				dependentName:    "stack-worker",
-				dependentProject: "stack",
-				dependentService: "worker",
-				links:            []string{"cache"},
-				useCompose:       true,
+				name:       "cross-project depends-on by container name",
+				dependency: deployed{name: "app1-database", project: "app1", service: "database"},
+				dependent:  deployed{name: "app2-web", project: "app2", service: "web", dependsOn: "app1-database"},
+				useCompose: true,
 			},
 			{
-				name:             "normalized bare service name after Links processing",
-				depName:          "redis",
-				depProject:       "cache",
-				depService:       "redis",
-				dependentName:    "app",
-				dependentProject: "cache",
-				dependentService: "app",
-				links:            []string{"redis"},
-				useCompose:       true,
+				name:       "depends-on service name without container_name override",
+				dependency: deployed{name: "stack-cache", project: "stack", service: "cache"},
+				dependent:  deployed{name: "stack-worker", project: "stack", service: "worker", dependsOn: "cache"},
+				useCompose: true,
+			},
+			{
+				name:       "depends-on bare service name of a single-container project",
+				dependency: deployed{name: "redis", project: "cache", service: "redis"},
+				dependent:  deployed{name: "app", project: "cache", service: "app", dependsOn: "redis"},
+				useCompose: true,
 			},
 		}
 
@@ -2722,23 +1675,11 @@ func TestDependencyLinkFormPermutations(t *testing.T) {
 			t.Run(tt.name, func(t *testing.T) {
 				t.Parallel()
 
-				depName, depProject, depService, dependentName, dependentProject, dependentService, links, useCompose := tt.depName, tt.depProject, tt.depService, tt.dependentName, tt.dependentProject, tt.dependentService, tt.links, tt.useCompose
-
-				dep := mockLinkedContainer(t, depName, "id-dep", depProject, depService, nil, useCompose)
-				dependent := mockLinkedContainer(
-					t, dependentName,
-					"id-dependent",
-					dependentProject,
-					dependentService,
-					links,
-					useCompose,
-				)
-
-				containers := []types.Container{dependent, dep}
-				err := dependencySorter{}.Sort(newTestLogger(t), containers, useCompose)
+				containers := deploy(tt.dependent, tt.dependency)
+				err := dependencySorter{}.Sort(newTestLogger(t), containers, tt.useCompose)
 				require.NoError(t, err)
-				assert.Equal(t, depName, containers[0].Name(), "dependency must sort before dependent")
-				assert.Equal(t, dependentName, containers[1].Name())
+				assert.Equal(t, tt.dependency.name, containers[0].Name(), "dependency must sort before dependent")
+				assert.Equal(t, tt.dependent.name, containers[1].Name())
 			})
 		}
 	})
@@ -2746,9 +1687,9 @@ func TestDependencyLinkFormPermutations(t *testing.T) {
 	t.Run("should order multiple dependents after a shared network provider", func(t *testing.T) {
 		t.Parallel()
 
-		vpn := mockLinkedContainer(t, "vpn", "id-vpn", "stack", "vpn", nil, true)
-		clientA := mockLinkedContainer(t, "client-a", "id-a", "stack", "client-a", []string{"vpn"}, true)
-		clientB := mockLinkedContainer(t, "client-b", "id-b", "stack", "client-b", []string{"vpn"}, true)
+		vpn := deployed{name: "vpn", project: "stack", service: "vpn"}.container()
+		clientA := deployed{name: "client-a", project: "stack", service: "client-a", networkMode: "container:vpn"}.container()
+		clientB := deployed{name: "client-b", project: "stack", service: "client-b", networkMode: "container:vpn"}.container()
 
 		containers := []types.Container{clientA, clientB, vpn}
 		err := dependencySorter{}.Sort(newTestLogger(t), containers, true)
@@ -2761,9 +1702,9 @@ func TestDependencyLinkFormPermutations(t *testing.T) {
 	t.Run("should order when dependent has multiple dependencies", func(t *testing.T) {
 		t.Parallel()
 
-		db := mockLinkedContainer(t, "db", "id-db", "app", "db", nil, true)
-		cache := mockLinkedContainer(t, "cache", "id-cache", "app", "cache", nil, true)
-		web := mockLinkedContainer(t, "web", "id-web", "app", "web", []string{"db", "cache"}, true)
+		db := deployed{name: "db", project: "app", service: "db"}.container()
+		cache := deployed{name: "cache", project: "app", service: "cache"}.container()
+		web := deployed{name: "web", project: "app", service: "web", dependsOn: "db,cache"}.container()
 
 		containers := []types.Container{web, db, cache}
 		err := dependencySorter{}.Sort(newTestLogger(t), containers, true)
@@ -2778,9 +1719,9 @@ func TestDependencyLinkFormPermutations(t *testing.T) {
 	t.Run("should match Compose replica identifiers from a service link", func(t *testing.T) {
 		t.Parallel()
 
-		db1 := mockLinkedContainer(t, "myproject-db-1", "id-db1", "myproject", "db", nil, true)
-		db2 := mockLinkedContainer(t, "myproject-db-2", "id-db2", "myproject", "db", nil, true)
-		app := mockLinkedContainer(t, "myproject-app", "id-app", "myproject", "app", []string{"myproject-db"}, true)
+		db1 := deployed{name: "myproject-db-1", project: "myproject", service: "db"}.container()
+		db2 := deployed{name: "myproject-db-2", project: "myproject", service: "db"}.container()
+		app := deployed{name: "myproject-app", project: "myproject", service: "app", dependsOn: "myproject-db"}.container()
 
 		containers := []types.Container{app, db1, db2}
 		err := dependencySorter{}.Sort(newTestLogger(t), containers, true)
@@ -2792,9 +1733,9 @@ func TestDependencyLinkFormPermutations(t *testing.T) {
 	t.Run("should link a bare service name to the service in every project", func(t *testing.T) {
 		t.Parallel()
 
-		db1 := mockLinkedContainer(t, "project1-db", "id-1", "project1", "db", nil, true)
-		db2 := mockLinkedContainer(t, "project2-db", "id-2", "project2", "db", nil, true)
-		app := mockLinkedContainer(t, "project3-app", "id-3", "project3", "app", []string{"db"}, true)
+		db1 := deployed{name: "project1-db", project: "project1", service: "db"}.container()
+		db2 := deployed{name: "project2-db", project: "project2", service: "db"}.container()
+		app := deployed{name: "project3-app", project: "project3", service: "app", dependsOn: "db"}.container()
 
 		_, indegree, adjacency, _, err := buildDependencyGraph(newTestLogger(t), []types.Container{app, db1, db2}, true)
 		require.NoError(t, err)
@@ -2806,8 +1747,8 @@ func TestDependencyLinkFormPermutations(t *testing.T) {
 	t.Run("should ignore missing dependency targets without failing sort", func(t *testing.T) {
 		t.Parallel()
 
-		app := mockLinkedContainer(t, "app", "id-app", "myproject", "app", []string{"missing-dep"}, true)
-		standalone := mockLinkedContainer(t, "other", "id-other", "myproject", "other", nil, true)
+		app := deployed{name: "app", project: "myproject", service: "app", dependsOn: "missing-dep"}.container()
+		standalone := deployed{name: "other", project: "myproject", service: "other"}.container()
 
 		containers := []types.Container{app, standalone}
 		err := dependencySorter{}.Sort(newTestLogger(t), containers, true)
@@ -2818,18 +1759,9 @@ func TestDependencyLinkFormPermutations(t *testing.T) {
 	t.Run("should keep Watchtower last when linked non-Watchtower containers sort first", func(t *testing.T) {
 		t.Parallel()
 
-		db := mockLinkedContainer(t, "db", "id-db", "myproject", "db", nil, true)
-		web := mockLinkedContainer(t, "web", "id-web", "myproject", "web", []string{"db"}, true)
-
-		wt := mockTypes.NewMockContainer(t)
-		wt.EXPECT().Name().Return("watchtower").Maybe()
-		wt.EXPECT().ID().Return(types.ContainerID("id-wt")).Maybe()
-		wt.EXPECT().IsWatchtower().Return(true).Maybe()
-		wt.EXPECT().Links(true).Return(nil).Maybe()
-		wt.EXPECT().ContainerInfo().Return(&dockerContainer.InspectResponse{
-			Name:   "/watchtower",
-			Config: &dockerContainer.Config{Labels: map[string]string{}},
-		}).Maybe()
+		db := deployed{name: "db", project: "myproject", service: "db"}.container()
+		web := deployed{name: "web", project: "myproject", service: "web", dependsOn: "db"}.container()
+		wt := deployed{name: "watchtower", watchtower: true}.container()
 
 		containers := []types.Container{wt, web, db}
 		err := dependencySorter{}.Sort(newTestLogger(t), containers, true)
@@ -2845,14 +1777,10 @@ func TestDependencyLinkFormPermutations(t *testing.T) {
 		// Two Compose projects each have db→web.
 		// Bare link "db" is ambiguous and must not couple stacks.
 		// Each web only orders relative to its own db when links use project-qualified or unique names.
-		dbA := mockLinkedContainer(t, "stack-a-db", "id-da", "stack-a", "db", nil, true)
-		webA := mockLinkedContainer(
-			t, "stack-a-web", "id-wa", "stack-a", "web", []string{"stack-a-db"}, true,
-		)
-		dbB := mockLinkedContainer(t, "stack-b-db", "id-db", "stack-b", "db", nil, true)
-		webB := mockLinkedContainer(
-			t, "stack-b-web", "id-wb", "stack-b", "web", []string{"stack-b-db"}, true,
-		)
+		dbA := deployed{name: "stack-a-db", project: "stack-a", service: "db"}.container()
+		webA := deployed{name: "stack-a-web", project: "stack-a", service: "web", dependsOn: "stack-a-db"}.container()
+		dbB := deployed{name: "stack-b-db", project: "stack-b", service: "db"}.container()
+		webB := deployed{name: "stack-b-web", project: "stack-b", service: "web", dependsOn: "stack-b-db"}.container()
 
 		containers := []types.Container{webA, webB, dbA, dbB}
 		err := dependencySorter{}.Sort(newTestLogger(t), containers, true)
@@ -2871,16 +1799,10 @@ func TestDependencyLinkFormPermutations(t *testing.T) {
 		t.Parallel()
 
 		// Provider stack owns the named network peer.
-		// Consumer stack depends on it via Watchtower depends-on / network_mode container name.
-		provider := mockLinkedContainer(
-			t, "shared-net-proxy", "id-prov", "infra", "net-proxy", nil, true,
-		)
-		consumer := mockLinkedContainer(
-			t, "app-web", "id-cons", "app", "web", []string{"shared-net-proxy"}, true,
-		)
-		unrelated := mockLinkedContainer(
-			t, "other-db", "id-other", "other", "db", nil, true,
-		)
+		// Consumer stack names it by container name in a Watchtower depends-on label.
+		provider := deployed{name: "shared-net-proxy", project: "infra", service: "net-proxy"}.container()
+		consumer := deployed{name: "app-web", project: "app", service: "web", dependsOn: "shared-net-proxy"}.container()
+		unrelated := deployed{name: "other-db", project: "other", service: "db"}.container()
 
 		containers := []types.Container{consumer, unrelated, provider}
 		err := dependencySorter{}.Sort(newTestLogger(t), containers, true)
@@ -2901,15 +1823,9 @@ func TestDependencyLinkFormPermutations(t *testing.T) {
 		// stack-a has service net-proxy
 		// stack-b has service other-proxy.
 		// A dependent linking to net-proxy must only wait on stack-a's peer, not other-proxy.
-		proxyA := mockLinkedContainer(
-			t, "stack-a-net-proxy", "id-pa", "stack-a", "net-proxy", nil, true,
-		)
-		proxyB := mockLinkedContainer(
-			t, "stack-b-other-proxy", "id-pb", "stack-b", "other-proxy", nil, true,
-		)
-		client := mockLinkedContainer(
-			t, "stack-a-client", "id-cl", "stack-a", "client", []string{"net-proxy"}, true,
-		)
+		proxyA := deployed{name: "stack-a-net-proxy", project: "stack-a", service: "net-proxy"}.container()
+		proxyB := deployed{name: "stack-b-other-proxy", project: "stack-b", service: "other-proxy"}.container()
+		client := deployed{name: "stack-a-client", project: "stack-a", service: "client", dependsOn: "net-proxy"}.container()
 
 		_, indegree, adjacency, _, err := buildDependencyGraph(newTestLogger(t), []types.Container{client, proxyB, proxyA}, true)
 		require.NoError(t, err)
@@ -2933,19 +1849,11 @@ func TestDependencyLinkFormPermutations(t *testing.T) {
 		t.Parallel()
 
 		// Explicit container_name equals multi-segment service and Compose keys differ.
-		provider := mockLinkedContainer(
-			t, "net-proxy", "id-np", "media", "net-proxy", nil, true,
-		)
-		dependent := mockLinkedContainer(
-			t, "web-app", "id-wa", "media", "web", []string{"net-proxy"}, true,
-		)
-		foreign := mockLinkedContainer(
-			t, "net-proxy-other", "id-fo", "other", "net-proxy-other", nil, true,
-		)
+		provider := deployed{name: "net-proxy", project: "media", service: "net-proxy"}.container()
+		dependent := deployed{name: "web-app", project: "media", service: "web", dependsOn: "net-proxy"}.container()
+		foreign := deployed{name: "net-proxy-other", project: "other", service: "net-proxy-other"}.container()
 		// Same trailing token in another stack must not steal the edge.
-		decoy := mockLinkedContainer(
-			t, "edge-proxy", "id-de", "edge", "edge-proxy", nil, true,
-		)
+		decoy := deployed{name: "edge-proxy", project: "edge", service: "edge-proxy"}.container()
 
 		containers := []types.Container{dependent, foreign, decoy, provider}
 		err := dependencySorter{}.Sort(newTestLogger(t), containers, true)
@@ -2963,14 +1871,10 @@ func TestDependencyLinkFormPermutations(t *testing.T) {
 		t.Parallel()
 
 		// data.db ← (compose service) app.worker ← (watchtower container_name) edge.client
-		db := mockLinkedContainer(t, "data-db", "id-db", "data", "db", nil, true)
-		worker := mockLinkedContainer(
-			t, "app-worker", "id-wk", "app", "worker", []string{"db"}, true,
-		)
+		db := deployed{name: "data-db", project: "data", service: "db"}.container()
+		worker := deployed{name: "app-worker", project: "app", service: "worker", dependsOn: "db"}.container()
 		// Watchtower depends-on uses worker's container_name.
-		client := mockLinkedContainer(
-			t, "edge-client", "id-cl", "edge", "client", []string{"app-worker"}, true,
-		)
+		client := deployed{name: "edge-client", project: "edge", service: "client", dependsOn: "app-worker"}.container()
 
 		containers := []types.Container{client, worker, db}
 		err := dependencySorter{}.Sort(newTestLogger(t), containers, true)
@@ -2992,12 +1896,8 @@ func TestDependencyLinkFormPermutations(t *testing.T) {
 		// Regression: extractServiceName("net-proxy") and extractServiceName("other-proxy")
 		// both yield "proxy".
 		// Matching must not treat them as the same dependency.
-		decoy := mockLinkedContainer(
-			t, "other-proxy", "id-decoy", "other", "other-proxy", nil, true,
-		)
-		dependent := mockLinkedContainer(
-			t, "web", "id-web", "app", "web", []string{"net-proxy"}, true,
-		)
+		decoy := deployed{name: "other-proxy", project: "other", service: "other-proxy"}.container()
+		dependent := deployed{name: "web", project: "app", service: "web", dependsOn: "net-proxy"}.container()
 
 		containers := []types.Container{dependent, decoy}
 		err := dependencySorter{}.Sort(newTestLogger(t), containers, true)

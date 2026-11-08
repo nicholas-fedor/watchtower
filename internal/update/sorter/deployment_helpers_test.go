@@ -3,19 +3,26 @@ package sorter
 import (
 	"crypto/sha256"
 	"encoding/hex"
+	"maps"
 	"slices"
 
 	dockerContainer "github.com/moby/moby/api/types/container"
 
+	composeLabels "github.com/nicholas-fedor/watchtower/internal/compose/labels"
 	"github.com/nicholas-fedor/watchtower/internal/container"
+	containerLabels "github.com/nicholas-fedor/watchtower/internal/container/labels"
 	"github.com/nicholas-fedor/watchtower/pkg/types"
 )
 
 // deployed describes a container of a test deployment, with every input that
 // Container.Links reads dependencies from.
 type deployed struct {
+	// labels are further labels, such as Compose's config hash.
+	labels map[string]string
 	// name is the container name, without the leading slash.
 	name string
+	// id is the container ID. Empty means a stable ID derived from the name.
+	id string
 	// project is the Compose project label. Empty means unset.
 	project string
 	// service is the Compose service label. Empty means unset.
@@ -46,13 +53,14 @@ func dockerID(name string) string {
 // container builds the container the description stands for.
 func (d deployed) container() types.Container {
 	labels := map[string]string{}
+	maps.Copy(labels, d.labels)
 
 	for key, value := range map[string]string{
-		"com.docker.compose.project":                d.project,
-		"com.docker.compose.service":                d.service,
-		"com.docker.compose.container-number":       d.number,
-		"com.docker.compose.depends_on":             d.composeDependsOn,
-		"com.centurylinklabs.watchtower.depends-on": d.dependsOn,
+		composeLabels.ComposeProjectLabel:    d.project,
+		composeLabels.ComposeServiceLabel:    d.service,
+		composeLabels.ComposeContainerNumber: d.number,
+		composeLabels.ComposeDependsOnLabel:  d.composeDependsOn,
+		containerLabels.DependsOn:            d.dependsOn,
 	} {
 		if value != "" {
 			labels[key] = value
@@ -60,11 +68,16 @@ func (d deployed) container() types.Container {
 	}
 
 	if d.watchtower {
-		labels["com.centurylinklabs.watchtower"] = "true"
+		labels[containerLabels.Watchtower] = "true"
+	}
+
+	id := d.id
+	if id == "" {
+		id = dockerID(d.name)
 	}
 
 	return container.NewContainer(nil, &dockerContainer.InspectResponse{
-		ID:   dockerID(d.name),
+		ID:   id,
 		Name: "/" + d.name,
 		HostConfig: &dockerContainer.HostConfig{
 			Links:       d.links,

@@ -7,11 +7,11 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	dockerContainer "github.com/moby/moby/api/types/container"
-
+	containerLabels "github.com/nicholas-fedor/watchtower/internal/container/labels"
+	"github.com/nicholas-fedor/watchtower/internal/testutil/containerfixture"
+	"github.com/nicholas-fedor/watchtower/internal/testutil/modelfixture"
 	"github.com/nicholas-fedor/watchtower/internal/update/sorter"
 	"github.com/nicholas-fedor/watchtower/pkg/types"
-	mockTypes "github.com/nicholas-fedor/watchtower/pkg/types/mocks"
 )
 
 // TestContainerSorting verifies through the exported API that containers are
@@ -29,27 +29,8 @@ func TestContainerSorting(t *testing.T) {
 			t.Run("sorts containers with no links first", func(t *testing.T) {
 				t.Parallel()
 
-				c1 := mockTypes.NewMockContainer(t)
-				c1.EXPECT().Name().Return("c1")
-				c1.EXPECT().ID().Return(types.ContainerID("id-c1"))
-				c1.EXPECT().Links(true).Return([]string{"c2"})
-				c1.EXPECT().IsWatchtower().Return(false)
-				c1.EXPECT().ContainerInfo().Return(&dockerContainer.InspectResponse{
-					Config: &dockerContainer.Config{
-						Labels: map[string]string{},
-					},
-				})
-
-				c2 := mockTypes.NewMockContainer(t)
-				c2.EXPECT().Name().Return("c2")
-				c2.EXPECT().ID().Return(types.ContainerID("id-c2"))
-				c2.EXPECT().Links(true).Return([]string(nil))
-				c2.EXPECT().IsWatchtower().Return(false)
-				c2.EXPECT().ContainerInfo().Return(&dockerContainer.InspectResponse{
-					Config: &dockerContainer.Config{
-						Labels: map[string]string{},
-					},
-				})
+				c1 := modelContainer("c1", "c2")
+				c2 := modelContainer("c2", "")
 				containers := []types.Container{c1, c2}
 				err := sorter.SortByDependencies(newTestLogger(t), containers, true)
 				require.NoError(t, err)
@@ -61,38 +42,9 @@ func TestContainerSorting(t *testing.T) {
 			t.Run("handles multiple dependencies", func(t *testing.T) {
 				t.Parallel()
 
-				c1 := mockTypes.NewMockContainer(t)
-				c1.EXPECT().Name().Return("c1")
-				c1.EXPECT().ID().Return(types.ContainerID("id-c1"))
-				c1.EXPECT().Links(true).Return([]string{"c2", "c3"})
-				c1.EXPECT().IsWatchtower().Return(false)
-				c1.EXPECT().ContainerInfo().Return(&dockerContainer.InspectResponse{
-					Config: &dockerContainer.Config{
-						Labels: map[string]string{},
-					},
-				})
-
-				c2 := mockTypes.NewMockContainer(t)
-				c2.EXPECT().Name().Return("c2")
-				c2.EXPECT().ID().Return(types.ContainerID("id-c2"))
-				c2.EXPECT().Links(true).Return([]string{"c3"})
-				c2.EXPECT().IsWatchtower().Return(false)
-				c2.EXPECT().ContainerInfo().Return(&dockerContainer.InspectResponse{
-					Config: &dockerContainer.Config{
-						Labels: map[string]string{},
-					},
-				})
-
-				c3 := mockTypes.NewMockContainer(t)
-				c3.EXPECT().Name().Return("c3")
-				c3.EXPECT().ID().Return(types.ContainerID("id-c3"))
-				c3.EXPECT().Links(true).Return([]string(nil))
-				c3.EXPECT().IsWatchtower().Return(false)
-				c3.EXPECT().ContainerInfo().Return(&dockerContainer.InspectResponse{
-					Config: &dockerContainer.Config{
-						Labels: map[string]string{},
-					},
-				})
+				c1 := modelContainer("c1", "c2,c3")
+				c2 := modelContainer("c2", "c3")
+				c3 := modelContainer("c3", "")
 				containers := []types.Container{c1, c2, c3}
 				err := sorter.SortByDependencies(newTestLogger(t), containers, true)
 				require.NoError(t, err)
@@ -105,27 +57,8 @@ func TestContainerSorting(t *testing.T) {
 			t.Run("detects circular references", func(t *testing.T) {
 				t.Parallel()
 
-				c1 := mockTypes.NewMockContainer(t)
-				c1.EXPECT().Name().Return("c1")
-				c1.EXPECT().ID().Return(types.ContainerID("id-c1")).Maybe()
-				c1.EXPECT().Links(true).Return([]string{"c2"})
-				c1.EXPECT().IsWatchtower().Return(false)
-				c1.EXPECT().ContainerInfo().Return(&dockerContainer.InspectResponse{
-					Config: &dockerContainer.Config{
-						Labels: map[string]string{},
-					},
-				})
-
-				c2 := mockTypes.NewMockContainer(t)
-				c2.EXPECT().Name().Return("c2")
-				c2.EXPECT().ID().Return(types.ContainerID("id-c2")).Maybe()
-				c2.EXPECT().Links(true).Return([]string{"c1"})
-				c2.EXPECT().IsWatchtower().Return(false)
-				c2.EXPECT().ContainerInfo().Return(&dockerContainer.InspectResponse{
-					Config: &dockerContainer.Config{
-						Labels: map[string]string{},
-					},
-				})
+				c1 := modelContainer("c1", "c2")
+				c2 := modelContainer("c2", "c1")
 				containers := []types.Container{c1, c2}
 				err := sorter.SortByDependencies(newTestLogger(t), containers, true)
 				require.Error(t, err)
@@ -136,27 +69,8 @@ func TestContainerSorting(t *testing.T) {
 			t.Run("handles missing dependencies gracefully", func(t *testing.T) {
 				t.Parallel()
 
-				c1 := mockTypes.NewMockContainer(t)
-				c1.EXPECT().Name().Return("c1")
-				c1.EXPECT().ID().Return(types.ContainerID("id-c1"))
-				c1.EXPECT().Links(true).Return([]string{"c2"})
-				c1.EXPECT().IsWatchtower().Return(false)
-				c1.EXPECT().ContainerInfo().Return(&dockerContainer.InspectResponse{
-					Config: &dockerContainer.Config{
-						Labels: map[string]string{},
-					},
-				})
-
-				c3 := mockTypes.NewMockContainer(t)
-				c3.EXPECT().Name().Return("c3")
-				c3.EXPECT().ID().Return(types.ContainerID("id-c3"))
-				c3.EXPECT().Links(true).Return([]string(nil))
-				c3.EXPECT().IsWatchtower().Return(false)
-				c3.EXPECT().ContainerInfo().Return(&dockerContainer.InspectResponse{
-					Config: &dockerContainer.Config{
-						Labels: map[string]string{},
-					},
-				})
+				c1 := modelContainer("c1", "c2")
+				c3 := modelContainer("c3", "")
 				containers := []types.Container{c1, c3}
 				err := sorter.SortByDependencies(newTestLogger(t), containers, true)
 				require.NoError(t, err)
@@ -177,31 +91,9 @@ func TestContainerSorting(t *testing.T) {
 			t.Run("places Watchtower containers last", func(t *testing.T) {
 				t.Parallel()
 
-				watchtower := mockTypes.NewMockContainer(t)
-				watchtower.EXPECT().Name().Return("watchtower")
-				watchtower.EXPECT().IsWatchtower().Return(true)
-
-				c1 := mockTypes.NewMockContainer(t)
-				c1.EXPECT().Name().Return("c1")
-				c1.EXPECT().ID().Return(types.ContainerID("id-c1"))
-				c1.EXPECT().Links(true).Return([]string{"c2"})
-				c1.EXPECT().IsWatchtower().Return(false)
-				c1.EXPECT().ContainerInfo().Return(&dockerContainer.InspectResponse{
-					Config: &dockerContainer.Config{
-						Labels: map[string]string{},
-					},
-				})
-
-				c2 := mockTypes.NewMockContainer(t)
-				c2.EXPECT().Name().Return("c2")
-				c2.EXPECT().ID().Return(types.ContainerID("id-c2"))
-				c2.EXPECT().Links(true).Return([]string(nil))
-				c2.EXPECT().IsWatchtower().Return(false)
-				c2.EXPECT().ContainerInfo().Return(&dockerContainer.InspectResponse{
-					Config: &dockerContainer.Config{
-						Labels: map[string]string{},
-					},
-				})
+				watchtower := watchtowerContainer("watchtower")
+				c1 := modelContainer("c1", "c2")
+				c2 := modelContainer("c2", "")
 				containers := []types.Container{watchtower, c1, c2}
 				err := sorter.SortByDependencies(newTestLogger(t), containers, true)
 				require.NoError(t, err)
@@ -215,35 +107,10 @@ func TestContainerSorting(t *testing.T) {
 			t.Run("places multiple Watchtower containers last", func(t *testing.T) {
 				t.Parallel()
 
-				watchtower1 := mockTypes.NewMockContainer(t)
-				watchtower1.EXPECT().Name().Return("watchtower1")
-				watchtower1.EXPECT().IsWatchtower().Return(true)
-
-				c1 := mockTypes.NewMockContainer(t)
-				c1.EXPECT().Name().Return("c1")
-				c1.EXPECT().ID().Return(types.ContainerID("id-c1"))
-				c1.EXPECT().Links(true).Return([]string{"c2"})
-				c1.EXPECT().IsWatchtower().Return(false)
-				c1.EXPECT().ContainerInfo().Return(&dockerContainer.InspectResponse{
-					Config: &dockerContainer.Config{
-						Labels: map[string]string{},
-					},
-				})
-
-				watchtower2 := mockTypes.NewMockContainer(t)
-				watchtower2.EXPECT().Name().Return("watchtower2")
-				watchtower2.EXPECT().IsWatchtower().Return(true)
-
-				c2 := mockTypes.NewMockContainer(t)
-				c2.EXPECT().Name().Return("c2")
-				c2.EXPECT().ID().Return(types.ContainerID("id-c2"))
-				c2.EXPECT().Links(true).Return([]string(nil))
-				c2.EXPECT().IsWatchtower().Return(false)
-				c2.EXPECT().ContainerInfo().Return(&dockerContainer.InspectResponse{
-					Config: &dockerContainer.Config{
-						Labels: map[string]string{},
-					},
-				})
+				watchtower1 := watchtowerContainer("watchtower1")
+				c1 := modelContainer("c1", "c2")
+				watchtower2 := watchtowerContainer("watchtower2")
+				c2 := modelContainer("c2", "")
 				containers := []types.Container{watchtower1, c1, watchtower2, c2}
 				err := sorter.SortByDependencies(newTestLogger(t), containers, true)
 				require.NoError(t, err)
@@ -259,83 +126,38 @@ func TestContainerSorting(t *testing.T) {
 			t.Run("handles chained dependencies with slash-prefixed links", func(t *testing.T) {
 				t.Parallel()
 
-				newMockContainer := func(t *testing.T, name, id string, links []string, labels map[string]string) types.Container {
-					t.Helper()
-
-					c := mockTypes.NewMockContainer(t)
-					c.EXPECT().Name().Return(name)
-					c.EXPECT().ID().Return(types.ContainerID(id))
-					c.EXPECT().Links(true).Return(links)
-					c.EXPECT().IsWatchtower().Return(false)
-					c.EXPECT().ContainerInfo().Return(&dockerContainer.InspectResponse{
-						Config: &dockerContainer.Config{
-							Labels: labels,
-						},
-					})
-
-					return c
-				}
-
-				makeSimpleChainContainers := func(t *testing.T) []types.Container {
-					t.Helper()
-
-					c := newMockContainer(t, "c", "id-c", nil, map[string]string{})
-					b := newMockContainer(t, "b", "id-b", []string{"/c"}, map[string]string{})
-					a := newMockContainer(t, "a", "id-a", []string{"/b"}, map[string]string{})
-
-					return []types.Container{c, b, a}
-				}
-
-				makeMultipleDepsContainers := func(t *testing.T) []types.Container {
-					t.Helper()
-
-					d := newMockContainer(t, "d", "id-d", nil, map[string]string{})
-					c := newMockContainer(t, "c", "id-c", nil, map[string]string{})
-					b := newMockContainer(t, "b", "id-b", []string{"/d"}, map[string]string{})
-					a := newMockContainer(t, "a", "id-a", []string{"/b", "/c"}, map[string]string{})
-
-					return []types.Container{d, c, b, a}
-				}
-
-				makeDiamondContainers := func(t *testing.T) []types.Container {
-					t.Helper()
-
-					d := newMockContainer(t, "d", "id-d", nil, map[string]string{})
-					b := newMockContainer(t, "b", "id-b", []string{"/d"}, map[string]string{})
-					c := newMockContainer(t, "c", "id-c", []string{"/d"}, map[string]string{})
-					a := newMockContainer(t, "a", "id-a", []string{"/b", "/c"}, map[string]string{})
-
-					return []types.Container{d, b, c, a}
-				}
-
-				makeNoDepsContainers := func(t *testing.T) []types.Container {
-					t.Helper()
-
-					c := newMockContainer(t, "c", "id-c", nil, map[string]string{})
-					b := newMockContainer(t, "b", "id-b", nil, map[string]string{})
-					a := newMockContainer(t, "a", "id-a", nil, map[string]string{})
-
-					return []types.Container{c, b, a}
-				}
-
 				testCases := []struct {
 					name          string
-					containers    func(*testing.T) []types.Container
+					containers    []types.Container
 					expectedOrder []string
 				}{
 					{
-						name:          "simple chain with slashes",
-						containers:    makeSimpleChainContainers,
+						name: "simple chain with slashes",
+						containers: []types.Container{
+							modelContainer("c", ""),
+							modelContainer("b", "/c"),
+							modelContainer("a", "/b"),
+						},
 						expectedOrder: []string{"c", "b", "a"},
 					},
 					{
-						name:          "multiple dependencies with slashes",
-						containers:    makeMultipleDepsContainers,
+						name: "multiple dependencies with slashes",
+						containers: []types.Container{
+							modelContainer("d", ""),
+							modelContainer("c", ""),
+							modelContainer("b", "/d"),
+							modelContainer("a", "/b,/c"),
+						},
 						expectedOrder: []string{"d", "c", "b", "a"},
 					},
 					{
-						name:       "diamond dependency graph",
-						containers: makeDiamondContainers,
+						name: "diamond dependency graph",
+						containers: []types.Container{
+							modelContainer("d", ""),
+							modelContainer("b", "/d"),
+							modelContainer("c", "/d"),
+							modelContainer("a", "/b,/c"),
+						},
 						expectedOrder: []string{
 							"d",
 							"b",
@@ -344,8 +166,12 @@ func TestContainerSorting(t *testing.T) {
 						}, // D first, then B and C (order may vary), then A
 					},
 					{
-						name:          "no dependencies",
-						containers:    makeNoDepsContainers,
+						name: "no dependencies",
+						containers: []types.Container{
+							modelContainer("c", ""),
+							modelContainer("b", ""),
+							modelContainer("a", ""),
+						},
 						expectedOrder: []string{"c", "b", "a"},
 					},
 				}
@@ -353,7 +179,7 @@ func TestContainerSorting(t *testing.T) {
 					t.Run(tc.name, func(t *testing.T) {
 						t.Parallel()
 
-						containers := tc.containers(t)
+						containers := tc.containers
 						err := sorter.SortByDependencies(newTestLogger(t), containers, true)
 						require.NoError(t, err)
 						require.Len(t, containers, len(tc.expectedOrder))
@@ -374,6 +200,44 @@ func TestContainerSorting(t *testing.T) {
 			})
 		})
 	})
+}
+
+// modelContainer builds a container from inspect data with the given name and
+// a Watchtower depends-on label of dependsOn. Its ID is derived from the name.
+//
+// Parameters:
+//   - name: Container name.
+//   - dependsOn: Value of the depends-on label, or empty for none.
+//
+// Returns:
+//   - types.Container: The container.
+func modelContainer(name, dependsOn string) types.Container {
+	labels := map[string]string{}
+	if dependsOn != "" {
+		labels[containerLabels.DependsOn] = dependsOn
+	}
+
+	return modelfixture.Container(
+		containerfixture.WithName("/"+name),
+		containerfixture.WithID("id-"+name),
+		containerfixture.WithLabels(labels),
+	)
+}
+
+// watchtowerContainer builds a Watchtower container from inspect data with the
+// given name and an ID derived from it.
+//
+// Parameters:
+//   - name: Container name.
+//
+// Returns:
+//   - types.Container: The container.
+func watchtowerContainer(name string) types.Container {
+	return modelfixture.Container(
+		containerfixture.WithName("/"+name),
+		containerfixture.WithID("id-"+name),
+		containerfixture.WithLabels(map[string]string{containerLabels.Watchtower: "true"}),
+	)
 }
 
 // newTestLogger returns a logger that writes each event to the test's log, so a

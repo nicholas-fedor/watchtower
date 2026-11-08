@@ -1227,6 +1227,16 @@ func TestContainerModel(t *testing.T) {
 			assert.Equal(t, "test-watchtower", identifier)
 		})
 
+		t.Run("returns container name when compose service label is empty", func(t *testing.T) {
+			t.Parallel()
+
+			container := MockContainer(containerfixture.WithLabels(map[string]string{
+				"com.docker.compose.service": "",
+			}))
+			identifier := ResolveContainerIdentifier(container)
+			assert.Equal(t, "test-watchtower", identifier)
+		})
+
 		t.Run("returns service name when compose service label has value", func(t *testing.T) {
 			t.Parallel()
 
