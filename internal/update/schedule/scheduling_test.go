@@ -370,38 +370,90 @@ func TestRunUpgradesOnSchedule_WaitingRunStopsAtShutdown(t *testing.T) {
 	})
 }
 
-// TestRunUpgradesOnSchedule_ShutdownWaitsForRunningUpdate verifies that the
-// scheduler waits at shutdown for an update that holds the update lock and
-// returns once that update releases it.
+// TestRunUpgradesOnSchedule_ShutdownWaitsForRunningUpdate verifies that at
+// shutdown the scheduler waits for a running update and returns once the
+// update releases the update lock. The update may come from another caller,
+// such as the HTTP API, or from the scheduler's own schedule.
+//
+// A scheduled run registers its scan with the default metrics handler, which
+// is created before the synctest bubbles.
 func TestRunUpgradesOnSchedule_ShutdownWaitsForRunningUpdate(t *testing.T) {
 	t.Parallel()
 
-	synctest.Test(t, func(t *testing.T) {
-		deps := testDeps(t, nil, func(logging.StartupParams) {})
-		deps.Lock = NewUpdateLock()
+	metrics.Default()
 
-		ctx, cancel := context.WithCancel(t.Context())
-		done := make(chan error, 1)
+	t.Run("update from another caller", func(t *testing.T) {
+		t.Parallel()
 
-		go func() { done <- RunUpgradesOnSchedule(ctx, deps) }()
+		synctest.Test(t, func(t *testing.T) {
+			deps := testDeps(t, nil, func(logging.StartupParams) {})
+			deps.Lock = NewUpdateLock()
 
-		// Another update takes the lock after the startup message, which holds
-		// the lock while it is written.
-		synctest.Wait()
-		require.True(t, deps.Lock.TryLock())
+			ctx, cancel := context.WithCancel(t.Context())
+			done := make(chan error, 1)
 
-		// Cancel, then let the scheduler reach its wait for the update.
-		cancel()
-		synctest.Wait()
+			go func() { done <- RunUpgradesOnSchedule(ctx, deps) }()
 
-		select {
-		case err := <-done:
-			t.Fatalf("scheduler stopped while an update was still running: %v", err)
-		default:
-		}
+			// Another update takes the lock after the startup message, which
+			// holds the lock while it is written.
+			synctest.Wait()
+			require.True(t, deps.Lock.TryLock())
 
-		deps.Lock.Unlock()
-		require.NoError(t, <-done)
+			// Cancel, then let the scheduler reach its wait for the update.
+			cancel()
+			synctest.Wait()
+
+			select {
+			case err := <-done:
+				t.Fatalf("scheduler stopped while an update was still running: %v", err)
+			default:
+			}
+
+			deps.Lock.Unlock()
+			require.NoError(t, <-done)
+		})
+	})
+
+	t.Run("scheduled update", func(t *testing.T) {
+		t.Parallel()
+
+		synctest.Test(t, func(t *testing.T) {
+			release := make(chan struct{})
+
+			var running atomic.Bool
+
+			deps := testDeps(t, func(context.Context, types.Filter, updateParams.Params) *metrics.Metric {
+				running.Store(true)
+				<-release
+
+				return &metrics.Metric{}
+			}, func(logging.StartupParams) {})
+			deps.Lock = NewUpdateLock()
+			deps.ScheduleSpec = "@every 1s"
+
+			ctx, cancel := context.WithCancel(t.Context())
+			done := make(chan error, 1)
+
+			go func() { done <- RunUpgradesOnSchedule(ctx, deps) }()
+
+			// The run at 1 second starts and holds the update lock.
+			time.Sleep(1500 * time.Millisecond)
+			synctest.Wait()
+			require.True(t, running.Load(), "the scheduled update did not start")
+
+			// Cancel, then let the scheduler reach its wait for the update.
+			cancel()
+			synctest.Wait()
+
+			select {
+			case err := <-done:
+				t.Fatalf("scheduler stopped while its scheduled update was still running: %v", err)
+			default:
+			}
+
+			close(release)
+			require.NoError(t, <-done)
+		})
 	})
 }
 
