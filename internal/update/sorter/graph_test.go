@@ -439,14 +439,18 @@ func graphEdges(t *testing.T, containers, all []types.Container, useComposeDepen
 // across link sources, puts Watchtower containers last, sorts a subset by the
 // links between its containers only, and rejects a container that is not in
 // the graph.
+//
+// Containers with no dependency between them sort in reverse alphabetical
+// order of their names. Each dependent's name sorts after its dependency's.
+// A dropped dependency then changes the order.
 func TestDependencyGraph_Sort(t *testing.T) {
 	t.Parallel()
 
 	all := deploy(
-		deployed{name: "app", networkMode: "container:" + dockerID("vpn"), volumesFrom: []string{"data:ro"}},
-		deployed{name: "vpn"},
-		deployed{name: "data", dependsOn: "vpn"},
-		deployed{name: "watchtower", watchtower: true, dependsOn: "app"},
+		deployed{name: "web", networkMode: "container:" + dockerID("net"), volumesFrom: []string{"storage:ro"}},
+		deployed{name: "net"},
+		deployed{name: "storage", dependsOn: "net"},
+		deployed{name: "watchtower", watchtower: true, dependsOn: "web"},
 		deployed{name: "db"},
 		deployed{name: "db-1", dependsOn: "c"},
 		deployed{name: "c", dependsOn: "db"},
@@ -461,8 +465,8 @@ func TestDependencyGraph_Sort(t *testing.T) {
 		sort []string
 		want []string
 	}{
-		{name: "link sources", sort: []string{"app", "data", "vpn"}, want: []string{"vpn", "data", "app"}},
-		{name: "Watchtower last", sort: []string{"watchtower", "app", "vpn"}, want: []string{"vpn", "app", "watchtower"}},
+		{name: "link sources", sort: []string{"web", "storage", "net"}, want: []string{"net", "storage", "web"}},
+		{name: "Watchtower last", sort: []string{"watchtower", "web", "net"}, want: []string{"net", "web", "watchtower"}},
 		{name: "link target outside the subset", sort: []string{"db-1", "c"}, want: []string{"c", "db-1"}},
 		{name: "nothing to sort", sort: []string{}, want: []string{}},
 	}
@@ -480,7 +484,7 @@ func TestDependencyGraph_Sort(t *testing.T) {
 	t.Run("container not in the graph", func(t *testing.T) {
 		t.Parallel()
 
-		containers := append(pick(all, "app"), deployed{name: "other"}.container())
+		containers := append(pick(all, "web"), deployed{name: "other"}.container())
 		require.ErrorIs(t, graph.Sort(newTestLogger(t), containers), errNotInGraph)
 	})
 }
