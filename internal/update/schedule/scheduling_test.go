@@ -1038,14 +1038,15 @@ func TestRunUpgradesOnSchedule_CronWithSeconds(t *testing.T) {
 // TestRunUpgradesOnSchedule_ReplacedOlderInstance verifies that a process that
 // replaced an older Watchtower makes no update at startup even with update on
 // start set. Its startup message says so. Only its first scheduled run skips
-// self-updates. A process that replaced none updates at startup and never
-// skips them.
+// self-updates, with or without update on start. A process that replaced none
+// updates at startup and never skips them.
 func TestRunUpgradesOnSchedule_ReplacedOlderInstance(t *testing.T) {
 	t.Parallel()
 
 	tests := []struct {
-		name     string
-		replaced bool
+		name          string
+		replaced      bool
+		updateOnStart bool
 		// wantAnnounced is the update at startup the startup message announces.
 		wantAnnounced bool
 		// wantSkippedSelfUpdate is each run's SkipSelfUpdate in order, the
@@ -1055,12 +1056,21 @@ func TestRunUpgradesOnSchedule_ReplacedOlderInstance(t *testing.T) {
 		{
 			name:                  "replaced an older instance",
 			replaced:              true,
+			updateOnStart:         true,
+			wantAnnounced:         false,
+			wantSkippedSelfUpdate: []bool{true, false},
+		},
+		{
+			name:                  "replaced an older instance without update on start",
+			replaced:              true,
+			updateOnStart:         false,
 			wantAnnounced:         false,
 			wantSkippedSelfUpdate: []bool{true, false},
 		},
 		{
 			name:                  "replaced none",
 			replaced:              false,
+			updateOnStart:         true,
 			wantAnnounced:         true,
 			wantSkippedSelfUpdate: []bool{false, false, false},
 		},
@@ -1083,7 +1093,7 @@ func TestRunUpgradesOnSchedule_ReplacedOlderInstance(t *testing.T) {
 				}, func(written logging.StartupParams) {
 					startup = &written
 				})
-				deps.UpdateOnStart = true
+				deps.UpdateOnStart = tt.updateOnStart
 				deps.ScheduleSpec = "@every 1h"
 				deps.ReplacedOlderInstance = tt.replaced
 
