@@ -314,21 +314,32 @@ func gitContainer(repo string, imageLabels map[string]string) *container.Contain
 	)
 }
 
+// TestNewContainerCheck verifies that a result carries the container's
+// identity and the digest of its own image repository, leaving the source and
+// availability to the check helpers.
 func TestNewContainerCheck(t *testing.T) {
 	t.Parallel()
 
 	now := time.Date(2026, 9, 30, 12, 0, 0, 0, time.UTC)
-	c := imageContainer("/app", "app:latest", "sha256:abc")
+	// The image has digests in two repositories, so only the container's own
+	// image name picks the expected one.
+	c := imageContainer(
+		"/app",
+		"ghcr.io/org/app:latest",
+		"sha256:abc",
+		"docker.io/org/app@sha256:hub",
+		"ghcr.io/org/app@sha256:ghcr",
+	)
 
 	got := newContainerCheck(c, now)
 
 	assert.Equal(t, "app", got.Name)
-	assert.Equal(t, "app:latest", got.Image)
+	assert.Equal(t, "ghcr.io/org/app:latest", got.Image)
 	assert.Equal(t, "sha256:abc", got.ImageID)
+	assert.Equal(t, "sha256:ghcr", got.Digest)
 	assert.Equal(t, now, got.Timestamp)
 	// Source and availability belong to the check helpers, not the identity.
 	assert.Empty(t, got.UpdateSource)
-	assert.Empty(t, got.Digest)
 	assert.False(t, got.UpdateAvailable)
 }
 
@@ -374,68 +385,6 @@ func TestApplyReportMetadata(t *testing.T) {
 		assert.Empty(t, result.Documentation)
 		assert.Empty(t, result.CurrentImageVersion)
 		assert.Empty(t, result.CurrentImageRevision)
-	})
-}
-
-// The digest selection rules, including the fallback to an unrelated repo
-// digest, belong to ExtractImageDigest's own suite. This covers only the
-// wrapper's nil guard and its pass-through wiring.
-func TestApplyLocalDigest(t *testing.T) {
-	t.Parallel()
-
-	t.Run("nil image info leaves the digest empty", func(t *testing.T) {
-		t.Parallel()
-
-		c := modelfixture.ContainerWithoutImageInfo(containerfixture.WithImageName("app:latest"))
-
-		var result ContainerCheck
-		applyLocalDigest(c, &result)
-
-		assert.Empty(t, result.Digest)
-	})
-
-	t.Run("matching repo digest is extracted", func(t *testing.T) {
-		t.Parallel()
-
-		c := imageContainer(
-			"/app",
-			"app:latest",
-			"sha256:abc",
-			"app@sha256:1111111111111111111111111111111111111111111111111111111111111111",
-		)
-
-		var result ContainerCheck
-		applyLocalDigest(c, &result)
-
-		assert.Equal(t, "sha256:1111111111111111111111111111111111111111111111111111111111111111", result.Digest)
-	})
-
-	t.Run("the container's repository selects among several digests", func(t *testing.T) {
-		t.Parallel()
-
-		c := imageContainer(
-			"/app",
-			"ghcr.io/org/app:latest",
-			"sha256:abc",
-			"docker.io/org/app@sha256:hub",
-			"ghcr.io/org/app@sha256:ghcr",
-		)
-
-		var result ContainerCheck
-		applyLocalDigest(c, &result)
-
-		assert.Equal(t, "sha256:ghcr", result.Digest)
-	})
-
-	t.Run("an existing digest is not cleared by a nil image info", func(t *testing.T) {
-		t.Parallel()
-
-		c := modelfixture.ContainerWithoutImageInfo(containerfixture.WithImageName("app:latest"))
-
-		result := ContainerCheck{Digest: "sha256:preexisting"}
-		applyLocalDigest(c, &result)
-
-		assert.Equal(t, "sha256:preexisting", result.Digest)
 	})
 }
 

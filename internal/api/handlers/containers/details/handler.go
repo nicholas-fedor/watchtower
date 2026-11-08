@@ -179,10 +179,11 @@ func GetContainerDetails(
 
 		scope, _ := c.Scope()
 
-		containerDetails := ContainerDetails{
+		details = append(details, ContainerDetails{
 			Name:        c.Name(),
 			Image:       c.ImageName(),
 			ImageID:     string(c.ImageID()),
+			Digest:      containerImage.LocalDigest(c),
 			Running:     c.IsRunning(),
 			Watchtower:  c.IsWatchtower(),
 			MonitorOnly: c.IsMonitorOnly(params.Policy),
@@ -190,14 +191,7 @@ func GetContainerDetails(
 			Enabled:     enabled,
 			Stale:       c.IsStale(),
 			Scope:       scope,
-		}
-
-		info := c.ImageInfo()
-		if info != nil {
-			containerDetails.Digest = containerImage.ExtractImageDigest(info.RepoDigests, containerDetails.Image)
-		}
-
-		details = append(details, containerDetails)
+		})
 	}
 
 	return details, nil

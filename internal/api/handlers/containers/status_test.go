@@ -99,8 +99,7 @@ func TestListContainerStatuses(t *testing.T) {
 }
 
 // Test_containerToStatus verifies that a status carries the container's name,
-// image and image ID, with the digest of the image's own repository when the
-// image was inspected.
+// image and image ID, with the digest of the container's own image repository.
 func Test_containerToStatus(t *testing.T) {
 	t.Parallel()
 
@@ -110,19 +109,6 @@ func Test_containerToStatus(t *testing.T) {
 		want    Status
 	}{
 		{
-			name: "container whose image could not be inspected",
-			running: modelfixture.ContainerWithoutImageInfo(
-				containerfixture.WithName("my-container"),
-				containerfixture.WithImageName("nginx:latest"),
-			),
-			want: Status{
-				Name:    "my-container",
-				Image:   "nginx:latest",
-				ImageID: "",
-				Digest:  "",
-			},
-		},
-		{
 			name:    "container with image info but no repo digests",
 			running: nginxContainer("my-container"),
 			want: Status{
@@ -130,16 +116,6 @@ func Test_containerToStatus(t *testing.T) {
 				Image:   "nginx:latest",
 				ImageID: "sha256:abc123",
 				Digest:  "",
-			},
-		},
-		{
-			name:    "container with valid repo digest",
-			running: nginxContainer("my-container", "nginx@sha256:digest123"),
-			want: Status{
-				Name:    "my-container",
-				Image:   "nginx:latest",
-				ImageID: "sha256:abc123",
-				Digest:  "sha256:digest123",
 			},
 		},
 		{

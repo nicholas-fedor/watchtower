@@ -123,7 +123,6 @@ func CheckForUpdates(log *zerolog.Logger,
 		result := newContainerCheck(c, now)
 
 		applyReportMetadata(c, params, &result)
-		applyLocalDigest(c, &result)
 
 		if isGitWatched(log, c, params, gitClient) {
 			checkGitSource(ctx, log, c, params, gitClient, &result)
@@ -137,7 +136,8 @@ func CheckForUpdates(log *zerolog.Logger,
 	return results, nil
 }
 
-// newContainerCheck builds the identity fields every result carries.
+// newContainerCheck builds the identity fields every result carries,
+// including the digest of the image the container runs.
 //
 // Parameters:
 //   - c: Container being checked.
@@ -150,6 +150,7 @@ func newContainerCheck(c types.Container, now time.Time) ContainerCheck {
 		Name:      c.Name(),
 		Image:     c.ImageName(),
 		ImageID:   string(c.ImageID()),
+		Digest:    containerImage.LocalDigest(c),
 		Timestamp: now,
 	}
 }
@@ -180,23 +181,6 @@ func applyReportMetadata(c types.Container, params updateParams.Params, result *
 	result.Documentation = meta.Documentation
 	result.CurrentImageVersion = meta.CurrentVersion
 	result.CurrentImageRevision = meta.CurrentRevision
-}
-
-// applyLocalDigest records the local image digest when one can be resolved.
-//
-// Parameters:
-//   - c: Container being checked.
-//   - result: Result to populate in place.
-//
-// Returns:
-//   - none.
-func applyLocalDigest(c types.Container, result *ContainerCheck) {
-	info := c.ImageInfo()
-	if info == nil {
-		return
-	}
-
-	result.Digest = containerImage.ExtractImageDigest(info.RepoDigests, c.ImageName())
 }
 
 // isGitWatched reports whether a container is checked against its hosted Git
