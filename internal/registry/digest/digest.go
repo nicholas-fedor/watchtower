@@ -1121,9 +1121,11 @@ func handleManifestResponse(log *zerolog.Logger,
 			)
 		}
 
-		// Handle 401/404 errors on redirected hosts by retrying on original host
+		// A 401 or 404 from the host the registry's challenge redirected to is
+		// retried on the original host. A mirror endpoint's failure is not, since
+		// its token belongs to the mirror and the next endpoint is tried anyway.
 		if (resp.StatusCode == http.StatusNotFound || resp.StatusCode == http.StatusUnauthorized) &&
-			currentHost != originalHost {
+			redirected && currentHost != originalHost {
 			log.Debug().
 				Fields(fields).
 				Bool("retry_on_original", true).
