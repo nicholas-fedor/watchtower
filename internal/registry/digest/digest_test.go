@@ -21,6 +21,7 @@ import (
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 
+	"github.com/nicholas-fedor/watchtower/internal/container/labels"
 	"github.com/nicholas-fedor/watchtower/internal/meta"
 	"github.com/nicholas-fedor/watchtower/internal/registry/auth"
 	mockAuth "github.com/nicholas-fedor/watchtower/internal/registry/auth/mocks"
@@ -1188,60 +1189,95 @@ func TestCompareDigestWithRemote_LocalOnly404(t *testing.T) {
 	assert.Len(t, server.ReceivedRequests(), 2)
 }
 
-// TestIsLocalImageNotFound verifies domain-less Config.Image + errManifestNotFound
-// identity matching (a prior dual-sentinel bug broke errors.Is).
+// TestIsLocalImageNotFound verifies that only a manifest 404 for a
+// single-component image name without registry-qualified repo digests marks
+// the image local-only.
+//
+// The 404 is recognized through any wrapping. Other errors never mark an image
+// local-only.
 func TestIsLocalImageNotFound(t *testing.T) {
 	t.Parallel()
 
-	t.Run("true for domain-less Config.Image with wrapped errManifestNotFound", func(t *testing.T) {
-		t.Parallel()
+	const digestSuffix = "@sha256:80f07677bee57274a48929d0688bf0cfabe5e83f06f2f152dab4076445d6ab35"
 
-		container := newRegistryContainer("atlas-badgerdb",
-			"atlas-badgerdb@sha256:80f07677bee57274a48929d0688bf0cfabe5e83f06f2f152dab4076445d6ab35")
+	notFound := fmt.Errorf("%w: status 404 Not Found", errManifestNotFound)
 
-		err := fmt.Errorf("%w: %w: status 404 Not Found", errManifestNotFound, errInvalidRegistryResponse)
-		assert.True(t, isLocalImageNotFound(container, err))
-	})
+	tests := []struct {
+		name      string
+		container types.Container
+		err       error
+		want      bool
+	}{
+		{
+			name:      "true for a single-component name behind a double-wrapped manifest 404",
+			container: newRegistryContainer("atlas-badgerdb", "atlas-badgerdb"+digestSuffix),
+			err:       fmt.Errorf("%w: %w: status 404 Not Found", errManifestNotFound, errInvalidRegistryResponse),
+			want:      true,
+		},
+		{
+			name:      "true for a single-component name with a dotted version tag",
+			container: newRegistryContainer("my-app:1.0", "my-app"+digestSuffix),
+			err:       notFound,
+			want:      true,
+		},
+		{
+			name:      "true for a single-component name containing a dot",
+			container: newRegistryContainer("my.app:latest", "my.app"+digestSuffix),
+			err:       notFound,
+			want:      true,
+		},
+		{
+			// Docker records an official Hub image's repo digest without a
+			// registry host, as it does for a local build. The image name and
+			// repo digests cannot tell the two apart, so a 404 for a pulled
+			// nginx image marks it local-only.
+			name:      "true for an official Hub short name with a host-less repo digest",
+			container: newRegistryContainer("nginx:latest", "nginx"+digestSuffix),
+			err:       notFound,
+			want:      true,
+		},
+		{
+			name:      "false for an image name with a registry domain",
+			container: newRegistryContainer("registry.example.com/app:latest"),
+			err:       notFound,
+		},
+		{
+			// A container without image data has unknown repo digests.
+			name:      "false for a container whose image could not be inspected",
+			container: modelfixture.ContainerWithoutImageInfo(containerfixture.WithImageName("atlas-badgerdb")),
+			err:       notFound,
+		},
+		{
+			// The image was retagged locally after a pull from ghcr.io.
+			name:      "false for a single-component name whose repo digests name a registry host",
+			container: newRegistryContainer("app:latest", "ghcr.io/foo/app"+digestSuffix),
+			err:       notFound,
+		},
+		{
+			// Zodiac runs the container from the image ID and records the Docker
+			// Hub image it came from in a label. The probe asked for that image.
+			name: "false for a namespaced image named by the Zodiac label",
+			container: modelfixture.Container(
+				containerfixture.WithImageName("sha256:4b1d1e6a7b8c9d0e1f2a3b4c5d6e7f8091a2b3c4d5e6f708192a3b4c5d6e7f80"),
+				containerfixture.WithRepoDigests([]string{"myorg/app" + digestSuffix}),
+				containerfixture.WithLabels(map[string]string{labels.ZodiacOriginalImage: "myorg/app:latest"}),
+			),
+			err: notFound,
+		},
+		{
+			name:      "false for non-manifest errors",
+			container: newRegistryContainer("atlas-badgerdb"),
+			err:       fmt.Errorf("%w: status 500", errInvalidRegistryResponse),
+		},
+	}
 
-	t.Run("true for domain-less image with version tag containing dots", func(t *testing.T) {
-		t.Parallel()
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
 
-		container := newRegistryContainer("my-app:1.0",
-			"my-app@sha256:80f07677bee57274a48929d0688bf0cfabe5e83f06f2f152dab4076445d6ab35")
-
-		err := fmt.Errorf("%w: status 404 Not Found", errManifestNotFound)
-		assert.True(t, isLocalImageNotFound(container, err))
-	})
-
-	t.Run("false for domain-ful Config.Image", func(t *testing.T) {
-		t.Parallel()
-
-		container := newRegistryContainer("registry.example.com/app:latest")
-
-		err := fmt.Errorf("%w: status 404 Not Found", errManifestNotFound)
-		assert.False(t, isLocalImageNotFound(container, err))
-	})
-
-	t.Run("false for Hub short name with registry-qualified RepoDigests", func(t *testing.T) {
-		t.Parallel()
-
-		// Official images often keep Config.Image as "nginx" while RepoDigests
-		// records docker.io/library/nginx@sha256:.... A transient 404 must not
-		// mark them local-only for the process lifetime.
-		container := newRegistryContainer("nginx:latest",
-			"docker.io/library/nginx@sha256:80f07677bee57274a48929d0688bf0cfabe5e83f06f2f152dab4076445d6ab35")
-
-		err := fmt.Errorf("%w: status 404 Not Found", errManifestNotFound)
-		assert.False(t, isLocalImageNotFound(container, err))
-	})
-
-	t.Run("false for non-manifest errors", func(t *testing.T) {
-		t.Parallel()
-
-		container := newRegistryContainer("atlas-badgerdb")
-		err := fmt.Errorf("%w: status 500", errInvalidRegistryResponse)
-		assert.False(t, isLocalImageNotFound(container, err))
-	})
+			assert.Equal(t, tt.want, isLocalImageNotFound(tt.container, tt.err))
+		})
+	}
 }
 
 // TestLocalOnlyImageCache ensures a confirmed local-only image skips subsequent
