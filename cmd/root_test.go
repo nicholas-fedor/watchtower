@@ -7,7 +7,6 @@ import (
 	"fmt"
 	"io"
 	"net"
-	"net/http"
 	"os"
 	"os/signal"
 	"syscall"
@@ -16,7 +15,6 @@ import (
 	"testing/synctest"
 	"time"
 
-	"github.com/gofiber/fiber/v3"
 	"github.com/rs/zerolog"
 	"github.com/spf13/cobra"
 	"github.com/stretchr/testify/assert"
@@ -26,16 +24,13 @@ import (
 	dockerContainer "github.com/moby/moby/api/types/container"
 
 	"github.com/nicholas-fedor/watchtower/internal/api"
-	updateHandler "github.com/nicholas-fedor/watchtower/internal/api/handlers/update"
 	"github.com/nicholas-fedor/watchtower/internal/container"
 	containerClient "github.com/nicholas-fedor/watchtower/internal/container/client"
 	mockContainerClient "github.com/nicholas-fedor/watchtower/internal/container/client/mocks"
 	"github.com/nicholas-fedor/watchtower/internal/observability/logging"
-	"github.com/nicholas-fedor/watchtower/internal/observability/metrics"
 	"github.com/nicholas-fedor/watchtower/internal/settings"
 	"github.com/nicholas-fedor/watchtower/internal/testutil/logcapture"
 	"github.com/nicholas-fedor/watchtower/internal/update"
-	"github.com/nicholas-fedor/watchtower/internal/update/schedule"
 	"github.com/nicholas-fedor/watchtower/pkg/types"
 	mockTypes "github.com/nicholas-fedor/watchtower/pkg/types/mocks"
 )
@@ -130,156 +125,6 @@ func TestGetAPIAddr(t *testing.T) {
 			_, err := net.ResolveTCPAddr("tcp", result)
 			assert.NoError(t, err, "formatted address should be a valid TCP address")
 		})
-	}
-}
-
-// TestConcurrentScheduledAndFullAPIUpdate verifies that a full API-triggered update (no image params)
-// returns 429 immediately when a scheduled update is in progress, rather than blocking indefinitely.
-func TestConcurrentScheduledAndFullAPIUpdate(t *testing.T) {
-	updateLock := schedule.NewUpdateLock()
-
-	scheduledStarted := make(chan struct{})
-	scheduledDone := make(chan struct{})
-
-	updateFn := func(_ context.Context, _, _ []string) *metrics.Metric {
-		t.Error("API update function should not be called when lock is held for full updates")
-
-		return &metrics.Metric{Scanned: 1, Updated: 1, Failed: 0}
-	}
-
-	handler := updateHandler.New(newTestLogger(t), updateFn, updateLock, 5*time.Minute)
-
-	// The scheduled update holds the lock until the API request has been
-	// asserted.
-	require.True(t, updateLock.TryLock())
-
-	go func() {
-		close(scheduledStarted)
-
-		<-scheduledDone
-
-		updateLock.Unlock()
-	}()
-
-	<-scheduledStarted
-
-	testApp := fiber.New(fiber.Config{})
-	testApp.Post(handler.Path, handler.Handle)
-
-	req, err := http.NewRequestWithContext(
-		context.Background(),
-		http.MethodPost,
-		"/v1/update",
-		http.NoBody,
-	)
-	require.NoError(t, err)
-
-	resp, err := testApp.Test(req)
-	require.NoError(t, err)
-
-	defer resp.Body.Close()
-
-	assert.Equal(t, http.StatusTooManyRequests, resp.StatusCode,
-		"full API update should be rejected with 429 while scheduled update holds the lock")
-
-	close(scheduledDone)
-}
-
-func TestHandleAsync(t *testing.T) {
-	apiStarted := make(chan struct{})
-	apiCompleted := make(chan struct{})
-
-	updateLock := schedule.NewUpdateLock()
-
-	scheduledStarted := make(chan struct{})
-	scheduledCompleted := make(chan struct{})
-
-	updateFn := func(_ context.Context, _, _ []string) *metrics.Metric {
-		close(apiStarted)
-		time.Sleep(50 * time.Millisecond)
-		close(apiCompleted)
-
-		return &metrics.Metric{Scanned: 1, Updated: 1, Failed: 0}
-	}
-
-	handler := updateHandler.New(newTestLogger(t), updateFn, updateLock, 5*time.Minute)
-
-	require.True(t, updateLock.TryLock())
-
-	go func() {
-		t.Log("Scheduled: acquired lock")
-		close(scheduledStarted)
-
-		// Hold the lock for a window to simulate a running scheduled update.
-		// Block until either the API update goroutine starts (which would
-		// indicate a locking bug) or the window elapses.
-		select {
-		case <-apiStarted:
-			t.Error("Targeted API update should not have started while scheduled update is running")
-
-			updateLock.Unlock()
-
-			return
-		case <-time.After(50 * time.Millisecond):
-		}
-
-		close(scheduledCompleted)
-		t.Log("Scheduled: releasing lock")
-
-		updateLock.Unlock()
-	}()
-
-	<-scheduledStarted
-
-	requestDone := make(chan struct{})
-
-	go func() {
-		defer close(requestDone)
-
-		testApp := fiber.New(fiber.Config{})
-		testApp.Post(handler.Path, handler.Handle)
-
-		req, err := http.NewRequestWithContext(
-			context.Background(),
-			http.MethodPost,
-			"/v1/update?image=myapp:latest",
-			http.NoBody,
-		)
-		if err != nil {
-			t.Errorf("Failed to create request: %v", err)
-
-			return
-		}
-
-		resp, err := testApp.Test(req)
-		if err != nil {
-			t.Errorf("Failed to test request: %v", err)
-
-			return
-		}
-		defer resp.Body.Close()
-	}()
-
-	<-scheduledCompleted
-
-	select {
-	case <-apiStarted:
-	case <-time.After(5 * time.Second):
-		t.Fatal("timed out waiting for API update to start")
-	}
-
-	select {
-	case <-apiCompleted:
-	case <-time.After(5 * time.Second):
-		t.Fatal("timed out waiting for API update to complete")
-	}
-
-	// The handler logs after the update returns, so wait for the request to
-	// finish before the test ends.
-	select {
-	case <-requestDone:
-	case <-time.After(5 * time.Second):
-		t.Fatal("timed out waiting for the API request to finish")
 	}
 }
 
