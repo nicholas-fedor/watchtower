@@ -591,9 +591,9 @@ func TestIntegration_APIAndScheduling_ConcurrentWithUnblockHTTPAPI(t *testing.T)
 		RunUpdate: func(_ context.Context, _ types.Filter, _ updateParams.Params) *metrics.Metric {
 			return &metrics.Metric{}
 		},
-		UpdateOnStart:      false,
-		SkipFirstRun:       false,
-		StartupMessageSent: true,
+		UpdateOnStart:         false,
+		ReplacedOlderInstance: false,
+		StartupMessageSent:    true,
 		BaseParams: updateParams.Params{
 			Cleanup:             false,
 			MonitorOnly:         false,

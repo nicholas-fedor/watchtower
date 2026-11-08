@@ -798,15 +798,6 @@ func (p *process) runMain(cfg settings.RunConfig) error {
 			Msg("Cleaned up orphaned orchestrator containers")
 	}
 
-	// Track whether cleanup occurred to prevent redundant updates after self-update.
-	cleanupOccurred := totalRemovedInstances > 0
-	// Disable update-on-start if cleanup occurred to prevent redundant updates after self-update.
-	if cleanupOccurred {
-		cfg.UpdateOnStart = false
-
-		p.log.Debug().Msg("Disabled update-on-start due to cleanup of old Watchtower containers")
-	}
-
 	// Skip self-updates when the running container cannot be replaced safely.
 	// A container that could not be inspected was already reported at startup.
 	//
@@ -908,17 +899,17 @@ func (p *process) runMain(cfg settings.RunConfig) error {
 	startupMessageSent := cfg.EnableUpdateAPI && !cfg.UnblockHTTPAPI
 
 	err = schedule.RunUpgradesOnSchedule(ctx, schedule.ScheduleDeps{
-		Logger:              p.log,
-		Filter:              cfg.Filter,
-		Lock:                updateLock,
-		ScheduleSpec:        appCfg.Schedule.Spec,
-		Startup:             startupBase,
-		WriteStartupMessage: logging.WriteStartupMessage,
-		RunUpdate:           runUpdatesWithNotifications,
-		UpdateOnStart:       cfg.UpdateOnStart,
-		SkipFirstRun:        cleanupOccurred,
-		StartupMessageSent:  startupMessageSent,
-		BaseParams:          sharedBase,
+		Logger:                p.log,
+		Filter:                cfg.Filter,
+		Lock:                  updateLock,
+		ScheduleSpec:          appCfg.Schedule.Spec,
+		Startup:               startupBase,
+		WriteStartupMessage:   logging.WriteStartupMessage,
+		RunUpdate:             runUpdatesWithNotifications,
+		UpdateOnStart:         cfg.UpdateOnStart,
+		ReplacedOlderInstance: totalRemovedInstances > 0,
+		StartupMessageSent:    startupMessageSent,
+		BaseParams:            sharedBase,
 	})
 
 	// Stop the HTTP API and give it its shutdown grace period to finish the
