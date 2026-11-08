@@ -13,13 +13,14 @@ import (
 	dockerspec "github.com/moby/docker-image-spec/specs-go/v1"
 	dockerContainer "github.com/moby/moby/api/types/container"
 	dockerImage "github.com/moby/moby/api/types/image"
-	testifyMock "github.com/stretchr/testify/mock"
 
 	"github.com/nicholas-fedor/watchtower/internal/container"
 	"github.com/nicholas-fedor/watchtower/internal/container/labels"
 	"github.com/nicholas-fedor/watchtower/internal/container/oci"
 	"github.com/nicholas-fedor/watchtower/internal/container/provenance"
 	updateConfig "github.com/nicholas-fedor/watchtower/internal/settings/config/update"
+	"github.com/nicholas-fedor/watchtower/internal/testutil/containerfixture"
+	"github.com/nicholas-fedor/watchtower/internal/testutil/modelfixture"
 	updateParams "github.com/nicholas-fedor/watchtower/internal/update/params"
 	"github.com/nicholas-fedor/watchtower/pkg/types"
 	mockTypes "github.com/nicholas-fedor/watchtower/pkg/types/mocks"
@@ -58,21 +59,10 @@ func TestUpdateFromContainer(t *testing.T) {
 		{
 			name: "basic container update",
 			args: args{
-				container: func() types.Container {
-					mock := mockTypes.NewMockContainer(t)
-					mock.EXPECT().ID().Return(types.ContainerID("cont1"))
-					mock.EXPECT().ImageID().Return(types.ImageID("img1"))
-					mock.EXPECT().Name().Return("container1")
-					mock.EXPECT().ImageName().Return("image1:latest")
-					mock.EXPECT().
-						IsMonitorOnly(testifyMock.Anything).
-						Return(false)
-
-					return mock
-				}(),
-				newImage: "img2",
-				state:    ScannedState,
-				params:   updateParams.Params{},
+				container: statusContainer("cont1", "img1", "container1", "image1:latest"),
+				newImage:  "img2",
+				state:     ScannedState,
+				params:    updateParams.Params{},
 			},
 			want: &ContainerStatus{
 				containerID:    "cont1",
@@ -88,28 +78,17 @@ func TestUpdateFromContainer(t *testing.T) {
 		{
 			name: "empty container fields",
 			args: args{
-				container: func() types.Container {
-					mock := mockTypes.NewMockContainer(t)
-					mock.EXPECT().ID().Return(types.ContainerID(""))
-					mock.EXPECT().ImageID().Return(types.ImageID(""))
-					mock.EXPECT().Name().Return("")
-					mock.EXPECT().ImageName().Return("")
-					mock.EXPECT().
-						IsMonitorOnly(testifyMock.Anything).
-						Return(false)
-
-					return mock
-				}(),
-				newImage: "",
-				state:    UnknownState,
-				params:   updateParams.Params{},
+				container: statusContainer("", "", "", ""),
+				newImage:  "",
+				state:     UnknownState,
+				params:    updateParams.Params{},
 			},
 			want: &ContainerStatus{
 				containerID:    "",
 				oldImage:       "",
 				newImage:       "",
 				containerName:  "",
-				imageName:      "",
+				imageName:      "unknown:latest", // The model names a missing image unknown:latest.
 				containerError: nil,
 				state:          UnknownState,
 				monitorOnly:    false,
@@ -118,21 +97,10 @@ func TestUpdateFromContainer(t *testing.T) {
 		{
 			name: "monitor-only container",
 			args: args{
-				container: func() types.Container {
-					mock := mockTypes.NewMockContainer(t)
-					mock.EXPECT().ID().Return(types.ContainerID("cont3"))
-					mock.EXPECT().ImageID().Return(types.ImageID("img3"))
-					mock.EXPECT().Name().Return("container3")
-					mock.EXPECT().ImageName().Return("image3:latest")
-					mock.EXPECT().
-						IsMonitorOnly(updateConfig.Policy{MonitorOnly: true}).
-						Return(true)
-
-					return mock
-				}(),
-				newImage: "img4",
-				state:    ScannedState,
-				params:   updateParams.Params{Policy: updateConfig.Policy{MonitorOnly: true}},
+				container: statusContainer("cont3", "img3", "container3", "image3:latest"),
+				newImage:  "img4",
+				state:     ScannedState,
+				params:    updateParams.Params{Policy: updateConfig.Policy{MonitorOnly: true}},
 			},
 			want: &ContainerStatus{
 				containerID:    "cont3",
@@ -148,28 +116,17 @@ func TestUpdateFromContainer(t *testing.T) {
 		{
 			name: "empty monitor-only container",
 			args: args{
-				container: func() types.Container {
-					mock := mockTypes.NewMockContainer(t)
-					mock.EXPECT().ID().Return(types.ContainerID(""))
-					mock.EXPECT().ImageID().Return(types.ImageID(""))
-					mock.EXPECT().Name().Return("")
-					mock.EXPECT().ImageName().Return("")
-					mock.EXPECT().
-						IsMonitorOnly(testifyMock.Anything).
-						Return(true)
-
-					return mock
-				}(),
-				newImage: "",
-				state:    UnknownState,
-				params:   updateParams.Params{},
+				container: statusContainer("", "", "", "", monitorOnly),
+				newImage:  "",
+				state:     UnknownState,
+				params:    updateParams.Params{},
 			},
 			want: &ContainerStatus{
 				containerID:    "",
 				oldImage:       "",
 				newImage:       "",
 				containerName:  "",
-				imageName:      "",
+				imageName:      "unknown:latest", // The model names a missing image unknown:latest.
 				containerError: nil,
 				state:          UnknownState,
 				monitorOnly:    true,
@@ -228,20 +185,9 @@ func TestProgress_AddSkipped(t *testing.T) {
 			name: "add skipped with error",
 			m:    Progress{},
 			args: args{
-				container: func() types.Container {
-					mock := mockTypes.NewMockContainer(t)
-					mock.EXPECT().ID().Return(types.ContainerID("cont1"))
-					mock.EXPECT().ImageID().Return(types.ImageID("img1"))
-					mock.EXPECT().Name().Return("container1")
-					mock.EXPECT().ImageName().Return("image1:latest")
-					mock.EXPECT().
-						IsMonitorOnly(testifyMock.Anything).
-						Return(false)
-
-					return mock
-				}(),
-				err:    errors.New("skipped due to policy"),
-				params: updateParams.Params{},
+				container: statusContainer("cont1", "img1", "container1", "image1:latest"),
+				err:       errors.New("skipped due to policy"),
+				params:    updateParams.Params{},
 			},
 			want: Progress{
 				"cont1": &ContainerStatus{
@@ -260,20 +206,9 @@ func TestProgress_AddSkipped(t *testing.T) {
 			name: "add skipped without error",
 			m:    Progress{},
 			args: args{
-				container: func() types.Container {
-					mock := mockTypes.NewMockContainer(t)
-					mock.EXPECT().ID().Return(types.ContainerID("cont2"))
-					mock.EXPECT().ImageID().Return(types.ImageID("img2"))
-					mock.EXPECT().Name().Return("container2")
-					mock.EXPECT().ImageName().Return("image2:latest")
-					mock.EXPECT().
-						IsMonitorOnly(testifyMock.Anything).
-						Return(false)
-
-					return mock
-				}(),
-				err:    nil,
-				params: updateParams.Params{},
+				container: statusContainer("cont2", "img2", "container2", "image2:latest"),
+				err:       nil,
+				params:    updateParams.Params{},
 			},
 			want: Progress{
 				"cont2": &ContainerStatus{
@@ -292,20 +227,9 @@ func TestProgress_AddSkipped(t *testing.T) {
 			name: "add skipped monitor-only with error",
 			m:    Progress{},
 			args: args{
-				container: func() types.Container {
-					mock := mockTypes.NewMockContainer(t)
-					mock.EXPECT().ID().Return(types.ContainerID("cont3"))
-					mock.EXPECT().ImageID().Return(types.ImageID("img3"))
-					mock.EXPECT().Name().Return("container3")
-					mock.EXPECT().ImageName().Return("image3:latest")
-					mock.EXPECT().
-						IsMonitorOnly(testifyMock.Anything).
-						Return(true)
-
-					return mock
-				}(),
-				err:    errors.New("monitor-only skipped"),
-				params: updateParams.Params{},
+				container: statusContainer("cont3", "img3", "container3", "image3:latest", monitorOnly),
+				err:       errors.New("monitor-only skipped"),
+				params:    updateParams.Params{},
 			},
 			want: Progress{
 				"cont3": &ContainerStatus{
@@ -362,18 +286,11 @@ func TestProgress_AddSkipped(t *testing.T) {
 }
 
 func TestProgress_AddFailed(t *testing.T) {
-	mock := mockTypes.NewMockContainer(t)
-	mock.EXPECT().ID().Return(types.ContainerID("cont1"))
-	mock.EXPECT().ImageID().Return(types.ImageID("img1"))
-	mock.EXPECT().Name().Return("container1")
-	mock.EXPECT().ImageName().Return("image1:latest")
-	mock.EXPECT().
-		IsMonitorOnly(testifyMock.Anything).
-		Return(false)
+	c := statusContainer("cont1", "img1", "container1", "image1:latest")
 
 	progress := Progress{}
 	failErr := errors.New("registry rate limited")
-	progress.AddFailed(newTestLogger(t), mock, failErr, updateParams.Params{})
+	progress.AddFailed(newTestLogger(t), c, failErr, updateParams.Params{})
 
 	got := progress["cont1"]
 	if got == nil {
@@ -406,20 +323,9 @@ func TestProgress_AddScanned(t *testing.T) {
 			name: "add scanned with new image",
 			m:    Progress{},
 			args: args{
-				container: func() types.Container {
-					mock := mockTypes.NewMockContainer(t)
-					mock.EXPECT().ID().Return(types.ContainerID("cont1"))
-					mock.EXPECT().ImageID().Return(types.ImageID("img1"))
-					mock.EXPECT().Name().Return("container1")
-					mock.EXPECT().ImageName().Return("image1:latest")
-					mock.EXPECT().
-						IsMonitorOnly(testifyMock.Anything).
-						Return(false)
-
-					return mock
-				}(),
-				newImage: "img2",
-				params:   updateParams.Params{},
+				container: statusContainer("cont1", "img1", "container1", "image1:latest"),
+				newImage:  "img2",
+				params:    updateParams.Params{},
 			},
 			want: Progress{
 				"cont1": &ContainerStatus{
@@ -438,20 +344,9 @@ func TestProgress_AddScanned(t *testing.T) {
 			name: "add scanned with same image",
 			m:    Progress{},
 			args: args{
-				container: func() types.Container {
-					mock := mockTypes.NewMockContainer(t)
-					mock.EXPECT().ID().Return(types.ContainerID("cont2"))
-					mock.EXPECT().ImageID().Return(types.ImageID("img2"))
-					mock.EXPECT().Name().Return("container2")
-					mock.EXPECT().ImageName().Return("image2:latest")
-					mock.EXPECT().
-						IsMonitorOnly(testifyMock.Anything).
-						Return(false)
-
-					return mock
-				}(),
-				newImage: "img2",
-				params:   updateParams.Params{},
+				container: statusContainer("cont2", "img2", "container2", "image2:latest"),
+				newImage:  "img2",
+				params:    updateParams.Params{},
 			},
 			want: Progress{
 				"cont2": &ContainerStatus{
@@ -470,20 +365,9 @@ func TestProgress_AddScanned(t *testing.T) {
 			name: "add scanned monitor-only with new image",
 			m:    Progress{},
 			args: args{
-				container: func() types.Container {
-					mock := mockTypes.NewMockContainer(t)
-					mock.EXPECT().ID().Return(types.ContainerID("cont3"))
-					mock.EXPECT().ImageID().Return(types.ImageID("img3"))
-					mock.EXPECT().Name().Return("container3")
-					mock.EXPECT().ImageName().Return("image3:latest")
-					mock.EXPECT().
-						IsMonitorOnly(testifyMock.Anything).
-						Return(true)
-
-					return mock
-				}(),
-				newImage: "img4",
-				params:   updateParams.Params{},
+				container: statusContainer("cont3", "img3", "container3", "image3:latest", monitorOnly),
+				newImage:  "img4",
+				params:    updateParams.Params{},
 			},
 			want: Progress{
 				"cont3": &ContainerStatus{
@@ -676,15 +560,9 @@ func TestProgress_UpdateFailed(t *testing.T) {
 func TestProgress_SkipUnrecorded(t *testing.T) {
 	t.Parallel()
 
-	recorded := mockTypes.NewMockContainer(t)
-	recorded.EXPECT().ID().Return(types.ContainerID("cont1"))
+	recorded := statusContainer("cont1", "img1", "container1", "image1:latest")
 
-	unrecorded := mockTypes.NewMockContainer(t)
-	unrecorded.EXPECT().ID().Return(types.ContainerID("cont2"))
-	unrecorded.EXPECT().ImageID().Return(types.ImageID("img2"))
-	unrecorded.EXPECT().Name().Return("container2")
-	unrecorded.EXPECT().ImageName().Return("image2:latest")
-	unrecorded.EXPECT().IsMonitorOnly(testifyMock.Anything).Return(false)
+	unrecorded := statusContainer("cont2", "img2", "container2", "image2:latest")
 
 	reason := errors.New("update skipped: context canceled")
 	m := Progress{
@@ -1126,16 +1004,9 @@ func TestProgress_MarkRestarted_AddSkipped_Integration(t *testing.T) {
 	}
 
 	// Then add as skipped (this should overwrite)
-	mock := mockTypes.NewMockContainer(t)
-	mock.EXPECT().ID().Return(types.ContainerID("cont1"))
-	mock.EXPECT().ImageID().Return(types.ImageID("img1"))
-	mock.EXPECT().Name().Return("container1")
-	mock.EXPECT().ImageName().Return("image1:latest")
-	mock.EXPECT().
-		IsMonitorOnly(testifyMock.Anything).
-		Return(false)
+	c := statusContainer("cont1", "img1", "container1", "image1:latest")
 
-	m.AddSkipped(newTestLogger(t), mock, errors.New("skipped after restart"), updateParams.Params{})
+	m.AddSkipped(newTestLogger(t), c, errors.New("skipped after restart"), updateParams.Params{})
 
 	if m["cont1"].state != SkippedState {
 		t.Errorf("Expected state SkippedState after AddSkipped, got %v", m["cont1"].state)
@@ -1578,9 +1449,8 @@ func TestProgressRecordRestart(t *testing.T) {
 			id := types.ContainerID("cont1")
 			progress := Progress{id: &ContainerStatus{containerID: id, state: UpdatedState}}
 
-			c := mockTypes.NewMockContainer(t)
-			c.EXPECT().ID().Return(id)
-			c.EXPECT().IsStale().Return(tt.stale)
+			c := modelfixture.Container(containerfixture.WithID(string(id)))
+			c.SetStale(tt.stale)
 
 			progress.RecordRestart(log, c, "newcont1")
 			assert.Equal(t, types.ContainerID("newcont1"), progress[id].NewContainerID())
@@ -1593,8 +1463,7 @@ func TestProgressRecordRestart(t *testing.T) {
 
 		progress := Progress{}
 
-		c := mockTypes.NewMockContainer(t)
-		c.EXPECT().ID().Return("missing")
+		c := modelfixture.Container(containerfixture.WithID("missing"))
 
 		progress.RecordRestart(newTestLogger(t), c, "ignored")
 		assert.Empty(t, progress)
@@ -1697,6 +1566,31 @@ func TestProgressSetLatestImageMeta(t *testing.T) {
 		assert.Equal(t, "https://github.com/org/app/releases/tag/v9.9.9", status.Changelog())
 		assert.Empty(t, status.LatestImageVersion())
 	})
+}
+
+// monitorOnly sets a container's monitor-only label to true, so the container
+// is monitor-only whatever the update policy says.
+var monitorOnly = containerfixture.WithLabels(map[string]string{labels.MonitorOnly: "true"})
+
+// statusContainer builds a container from inspect data with the given
+// container ID, image ID, name, and image name, then applies updates.
+//
+// Parameters:
+//   - id: Container ID.
+//   - imageID: ID of the container's image.
+//   - name: Container name.
+//   - imageName: Image name, or empty for a container without one.
+//   - updates: Further changes to the inspect data.
+//
+// Returns:
+//   - *container.Container: The container.
+func statusContainer(id, imageID, name, imageName string, updates ...containerfixture.Update) *container.Container {
+	return modelfixture.Container(append([]containerfixture.Update{
+		containerfixture.WithID(id),
+		containerfixture.WithImageID(imageID),
+		containerfixture.WithName(name),
+		containerfixture.WithImageName(imageName),
+	}, updates...)...)
 }
 
 // reportTestContainer builds a concrete container used to exercise applyReportMeta.
