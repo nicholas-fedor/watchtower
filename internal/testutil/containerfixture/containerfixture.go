@@ -112,6 +112,20 @@ func WithImageName(name string) Update {
 	}
 }
 
+// WithImageID sets the ID of the mock image, which the container reports as
+// its image ID.
+//
+// Parameters:
+//   - id: Image ID to set (e.g., "sha256:abc123").
+//
+// Returns:
+//   - Update: Function to set the image ID in metadata.
+func WithImageID(id string) Update {
+	return func(_ *dockerContainer.InspectResponse, i *dockerImage.InspectResponse) {
+		i.ID = id
+	}
+}
+
 // WithImageCreated sets the creation time of the mock image.
 //
 // Parameters:
