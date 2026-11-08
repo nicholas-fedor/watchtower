@@ -136,7 +136,7 @@ func TestRegisterUpdateRoute_DoesNotWriteStartupMessage(t *testing.T) {
 		},
 		FilterByImage:  func(_ []string, f types.Filter) types.Filter { return f },
 		DefaultMetrics: func() *metrics.Metrics { return testMetrics },
-		WriteStartupMessage: func(_ logging.StartupParams) {
+		WriteStartupMessage: func(context.Context, logging.StartupParams) {
 			called = true
 		},
 	}

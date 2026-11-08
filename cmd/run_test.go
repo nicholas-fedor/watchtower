@@ -459,6 +459,37 @@ func TestRun_RunOnce(t *testing.T) {
 	}
 }
 
+// TestRun_RunOnceStoppedAtStartup verifies that a run-once process that is
+// told to stop before it announces startup writes no startup message. It makes
+// no update either, so no canceled update is reported as a failure. The
+// process context is already canceled when the run begins, as after a stop
+// signal during startup.
+func TestRun_RunOnceStoppedAtStartup(t *testing.T) {
+	// The mock fails the test on any Docker call.
+	mockClient := mockContainerClient.NewMockClient(t)
+
+	setRunState(t, runTestState{client: mockClient})
+
+	// Outside a container, so the run has no restart policy to disable.
+	processID = func() int { return 4242 }
+
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+
+	createSignalContext = func(context.Context, ...os.Signal) (context.Context, context.CancelFunc) {
+		return ctx, cancel
+	}
+
+	log, output := logcapture.New(zerolog.InfoLevel)
+
+	require.NoError(t, (&process{log: log}).run(newTestRootCommand(t, "--run-once"), nil))
+
+	assert.NotContains(t, output.String(), "Running a one time update",
+		"a stopping run-once process wrote the startup message")
+	assert.NotContains(t, output.String(), logging.UpdateFailed,
+		"a stopping run-once process reported a canceled update as a failure")
+}
+
 // TestRun_Continuous records the Docker calls of continuous mode from startup
 // until the process context is canceled, including the cleanup of older
 // Watchtower instances and of orchestrator containers.

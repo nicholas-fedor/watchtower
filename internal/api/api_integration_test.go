@@ -19,7 +19,6 @@ import (
 	"github.com/nicholas-fedor/watchtower/internal/api/routes"
 	mockContainerClient "github.com/nicholas-fedor/watchtower/internal/container/client/mocks"
 	"github.com/nicholas-fedor/watchtower/internal/observability/events"
-	"github.com/nicholas-fedor/watchtower/internal/observability/logging"
 	"github.com/nicholas-fedor/watchtower/internal/observability/metrics"
 	updateParams "github.com/nicholas-fedor/watchtower/internal/update/params"
 	"github.com/nicholas-fedor/watchtower/internal/update/schedule"
@@ -587,13 +586,12 @@ func TestIntegration_APIAndScheduling_ConcurrentWithUnblockHTTPAPI(t *testing.T)
 		Filter:              func(_ types.FilterableContainer) bool { return true },
 		Lock:                lock,
 		ScheduleSpec:        "@every 1h",
-		WriteStartupMessage: logging.WriteStartupMessage,
+		WriteStartupMessage: nil,
 		RunUpdate: func(_ context.Context, _ types.Filter, _ updateParams.Params) *metrics.Metric {
 			return &metrics.Metric{}
 		},
 		UpdateOnStart:         false,
 		ReplacedOlderInstance: false,
-		StartupMessageSent:    true,
 		BaseParams: updateParams.Params{
 			Cleanup:             false,
 			MonitorOnly:         false,

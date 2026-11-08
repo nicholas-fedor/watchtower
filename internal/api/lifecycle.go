@@ -142,7 +142,7 @@ func SetupAndStartAPI(ctx context.Context, opts routes.Options) (<-chan struct{}
 		tlsCertPath,
 		tlsKeyPath,
 		block,
-		startupMessageWriter(opts, block),
+		startupMessageWriter(ctx, opts, block),
 		opts.OnUnexpectedServerStop,
 	)
 }
@@ -154,31 +154,33 @@ func SetupAndStartAPI(ctx context.Context, opts routes.Options) (<-chan struct{}
 // instead of the scheduler, which otherwise announces startup.
 //
 // Parameters:
+//   - ctx: Context for server lifecycle management, passed to the writer.
 //   - opts: API configuration options.
 //   - block: Whether the API runs in blocking mode.
 //
 // Returns:
 //   - func(): The callback, or nil when no startup message is written here.
-func startupMessageWriter(opts routes.Options, block bool) func() {
+func startupMessageWriter(ctx context.Context, opts routes.Options, block bool) func() {
 	if !block || opts.WriteStartupMessage == nil {
 		return nil
 	}
 
-	return func() { writeStartupMessage(opts) }
+	return func() { writeStartupMessage(ctx, opts) }
 }
 
 // writeStartupMessage writes the startup message for the blocking HTTP API mode.
 //
 // Parameters:
+//   - ctx: Context for server lifecycle management, passed to the writer.
 //   - opts: API configuration options with a non-nil WriteStartupMessage.
-func writeStartupMessage(opts routes.Options) {
+func writeStartupMessage(ctx context.Context, opts routes.Options) {
 	startup := opts.Startup
 	startup.Sched = time.Time{}
 	startup.Filtering = opts.FilterDesc
 	startup.Scope = opts.Scope
 	startup.Client = opts.Client
 	startup.Version = opts.Version
-	opts.WriteStartupMessage(startup)
+	opts.WriteStartupMessage(ctx, startup)
 }
 
 // isCleanServerStop reports whether err is an expected result of a graceful

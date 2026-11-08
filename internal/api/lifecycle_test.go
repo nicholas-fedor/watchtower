@@ -372,7 +372,7 @@ func TestRegisterUpdateRoute_UnblockHTTPAPI(t *testing.T) {
 		DefaultMetrics: func() *metrics.Metrics {
 			return &metrics.Metrics{}
 		},
-		WriteStartupMessage: func(_ logging.StartupParams) {
+		WriteStartupMessage: func(context.Context, logging.StartupParams) {
 			startupCalled.Add(1)
 		},
 	})
@@ -605,7 +605,7 @@ func TestRunServer_BlockingUntilCancel(t *testing.T) {
 		},
 		FilterByImage:  func(_ []string, f types.Filter) types.Filter { return f },
 		DefaultMetrics: func() *metrics.Metrics { return testMetrics },
-		WriteStartupMessage: func(_ logging.StartupParams) {
+		WriteStartupMessage: func(context.Context, logging.StartupParams) {
 		},
 	})
 
@@ -1092,11 +1092,44 @@ func TestRunServer_CancelBetweenBindAndServe(t *testing.T) {
 	}
 }
 
+// TestStartupMessageWriter verifies that only the blocking HTTP API writes the
+// startup message. Its writer receives the server's context, so a process
+// stopped between the bind and the message announces nothing.
+func TestStartupMessageWriter(t *testing.T) {
+	t.Parallel()
+
+	var (
+		called bool
+		// receivedErr is the error of the context the writer received.
+		receivedErr error
+	)
+
+	opts := routes.Options{
+		WriteStartupMessage: func(ctx context.Context, _ logging.StartupParams) {
+			called = true
+			receivedErr = ctx.Err()
+		},
+	}
+
+	ctx, cancel := context.WithCancel(t.Context())
+	cancel()
+
+	assert.Nil(t, startupMessageWriter(ctx, opts, false), "the API in the background wrote the startup message")
+
+	write := startupMessageWriter(ctx, opts, true)
+	require.NotNil(t, write, "the blocking API has no startup message writer")
+
+	write()
+
+	require.True(t, called, "the startup message writer was not called")
+	assert.ErrorIs(t, receivedErr, context.Canceled, "the writer did not get the server's context")
+}
+
 // TestSetupAndStartAPI_StartupMessageAfterBind verifies that in blocking mode
 // the startup message is written once the API socket is bound, and not at all
 // when the socket cannot be bound.
 func TestSetupAndStartAPI_StartupMessageAfterBind(t *testing.T) {
-	blockingOpts := func(addr string, startup func(logging.StartupParams)) routes.Options {
+	blockingOpts := func(addr string, startup func(context.Context, logging.StartupParams)) routes.Options {
 		host, port, err := net.SplitHostPort(addr)
 		require.NoError(t, err)
 
@@ -1120,9 +1153,11 @@ func TestSetupAndStartAPI_StartupMessageAfterBind(t *testing.T) {
 		addr := freeAddr(t)
 		bound := make(chan bool, 1)
 
-		opts := blockingOpts(addr, func(logging.StartupParams) {
+		opts := blockingOpts(addr, func(ctx context.Context, _ logging.StartupParams) {
 			// Binding the address fails while the API holds it.
-			ln, err := listenTCP(t, addr)
+			var listenConfig net.ListenConfig
+
+			ln, err := listenConfig.Listen(ctx, "tcp", addr)
 			if err == nil {
 				_ = ln.Close()
 			}
@@ -1158,7 +1193,7 @@ func TestSetupAndStartAPI_StartupMessageAfterBind(t *testing.T) {
 
 		var called atomic.Bool
 
-		opts := blockingOpts(taken.Addr().String(), func(logging.StartupParams) { called.Store(true) })
+		opts := blockingOpts(taken.Addr().String(), func(context.Context, logging.StartupParams) { called.Store(true) })
 
 		_, err = SetupAndStartAPI(t.Context(), opts)
 		require.ErrorContains(t, err, "failed to start HTTP server")
