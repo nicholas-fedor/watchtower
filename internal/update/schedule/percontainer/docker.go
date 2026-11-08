@@ -96,6 +96,11 @@ type DockerSource struct {
 	// Log for connection trouble and changes. Nil logs nothing.
 	Log     *zerolog.Logger
 	refresh chan struct{}
+
+	// listed is the last list: each container's ID and creation time by name,
+	// to tell a replayed event about a container since replaced (see apply).
+	// Used only by the goroutine following the stream.
+	listed map[string]listedContainer
 	// RetryDelay is the first wait before reconnecting; it doubles up to
 	// MaxRetryDelay. Zero uses one second and one minute.
 	RetryDelay, MaxRetryDelay time.Duration
@@ -105,6 +110,12 @@ type DockerSource struct {
 	SettleDelay time.Duration
 
 	refreshOnce sync.Once
+}
+
+// listedContainer is a listed container's ID and when Docker created it.
+type listedContainer struct {
+	created time.Time
+	id      string
 }
 
 var (
@@ -280,8 +291,11 @@ func (s *DockerSource) resync(ctx context.Context, sink Sink, why string) error 
 	}
 
 	snapshot := make(map[string]Labeled, len(containers))
+	s.listed = make(map[string]listedContainer, len(containers))
 
 	for _, c := range containers {
+		s.listed[c.Name()] = listedContainer{id: idOf(c), created: createdOf(c)}
+
 		if spec, ok := s.scheduleOf(c); ok {
 			snapshot[c.Name()] = Labeled{ID: idOf(c), Spec: spec}
 		}
@@ -326,6 +340,13 @@ func (s *DockerSource) apply(sink Sink, msg events.Message) {
 			sink.Remove(old, msg.Actor.ID)
 		}
 	case events.ActionCreate, events.ActionStart:
+		if s.replaced(name, msg) {
+			s.logger().Debug().Str("container", name).Str("id", shortID(msg.Actor.ID)).Str("event", string(msg.Action)).
+				Msg("Ignoring a replayed event of a container replaced since (older than the one listed under its name)")
+
+			return
+		}
+
 		s.setFrom(sink, name, msg.Actor.ID, attrs, msg.Action)
 	default:
 	}
@@ -372,6 +393,37 @@ func (s *DockerSource) scheduleOf(c types.FilterableContainer) (string, bool) {
 	spec := Normalize(raw)
 
 	return spec, spec != ""
+}
+
+// replaced reports whether an event is about another container than the one
+// listed under its name, from before that one was created: news replayed from
+// before the list, of a container it had already replaced. Both times are the
+// daemon's, so the clocks' difference doesn't matter.
+func (s *DockerSource) replaced(name string, msg events.Message) bool {
+	listed, ok := s.listed[name]
+	if !ok || listed.id == "" || listed.id == msg.Actor.ID || listed.created.IsZero() || msg.TimeNano == 0 {
+		return false
+	}
+
+	return time.Unix(0, msg.TimeNano).Before(listed.created)
+}
+
+// createdOf returns when Docker created a container, when it says (a listed
+// container does).
+func createdOf(c types.FilterableContainer) time.Time {
+	withInfo, ok := c.(interface {
+		ContainerInfo() *dockerContainer.InspectResponse
+	})
+	if !ok || withInfo.ContainerInfo() == nil {
+		return time.Time{}
+	}
+
+	created, err := time.Parse(time.RFC3339Nano, withInfo.ContainerInfo().Created)
+	if err != nil {
+		return time.Time{}
+	}
+
+	return created
 }
 
 // idOf returns a container's ID when it has one (a listed container does).
