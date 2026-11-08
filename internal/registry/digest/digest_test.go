@@ -1246,9 +1246,10 @@ func TestIsLocalImageNotFound(t *testing.T) {
 // TestLocalOnlyImageCache ensures a confirmed local-only image skips subsequent
 // registry probes for the same image name+ID.
 //
-// The cache keys an image by both. A retagged image keeps its ID under a new
-// name. A rebuilt image keeps its name with a new ID. Each is probed once and
-// then cached in turn.
+// The cache keys an image by both, not by the container that runs it. Another
+// container of the same image reuses the entry. A retagged image keeps its ID
+// under a new name. A rebuilt image keeps its name with a new ID. Each is
+// probed once and then cached beside the entries before it.
 func TestLocalOnlyImageCache(t *testing.T) {
 	clearLocalOnlyImageCache()
 	t.Cleanup(clearLocalOnlyImageCache)
@@ -1291,6 +1292,17 @@ func TestLocalOnlyImageCache(t *testing.T) {
 	compare(built)
 	assert.Len(t, server.ReceivedRequests(), 2, "cached local-only image must not re-probe registry")
 
+	// Another container of the same image reuses the cached entry.
+	replica := modelfixture.Container(
+		containerfixture.WithName("atlas-badgerdb-2"),
+		containerfixture.WithImageName("atlas-badgerdb"),
+		containerfixture.WithImageID(imageID),
+		containerfixture.WithRepoDigests([]string{"atlas-badgerdb@" + imageID}),
+	)
+
+	compare(replica)
+	assert.Len(t, server.ReceivedRequests(), 2, "another container of a cached image re-probed the registry")
+
 	// The container now runs the image under another name, so the new name is
 	// probed. The container keeps its name, so the cache must key on the image
 	// name rather than the container's.
@@ -1311,6 +1323,10 @@ func TestLocalOnlyImageCache(t *testing.T) {
 	compare(rebuilt)
 	compare(rebuilt)
 	assert.Len(t, server.ReceivedRequests(), 6, "a rebuilt local-only image was not probed once")
+
+	// The first image stays cached beside the later ones.
+	compare(built)
+	assert.Len(t, server.ReceivedRequests(), 6, "the first local-only image was no longer cached")
 }
 
 // TestFetchDigestWithGet verifies digest retrieval from an anonymous registry's
