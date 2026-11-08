@@ -59,6 +59,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Tests
 
+- Build fuzz and benchmark containers from model containers by @nicholas-fedor in [#3556](https://github.com/nicholas-fedor/watchtower/pull/3556)
 - Catch dropped dependencies in graph sort tests by @nicholas-fedor in [#3554](https://github.com/nicholas-fedor/watchtower/pull/3554)
 - Build sorter tests from model containers by @nicholas-fedor in [#3552](https://github.com/nicholas-fedor/watchtower/pull/3552)
 - Remove the flaky shared-lock multi-instance startup test by @nicholas-fedor in [#3524](https://github.com/nicholas-fedor/watchtower/pull/3524)
