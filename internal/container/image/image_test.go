@@ -998,7 +998,9 @@ func TestImageClient_IsContainerStale_cooldown(t *testing.T) {
 		registry func(t *testing.T) string
 		name     string
 		// message is the debug line the check logs.
-		message  string
+		message string
+		// absent is the other outcome's debug line, which the check must not log.
+		absent   string
 		deferred bool
 	}{
 		{
@@ -1009,6 +1011,7 @@ func TestImageClient_IsContainerStale_cooldown(t *testing.T) {
 				return createdRegistry(t, time.Now().Add(-time.Minute)) + "/org/app:1.0"
 			},
 			message:  "Cooldown active - pull skipped",
+			absent:   "Image age unavailable - pull skipped",
 			deferred: true,
 		},
 		{
@@ -1019,6 +1022,7 @@ func TestImageClient_IsContainerStale_cooldown(t *testing.T) {
 				return notFoundRegistry(t) + "/org/app:1.0"
 			},
 			message:  "Image age unavailable - pull skipped",
+			absent:   "Cooldown active - pull skipped",
 			deferred: false,
 		},
 	}
@@ -1046,6 +1050,7 @@ func TestImageClient_IsContainerStale_cooldown(t *testing.T) {
 
 			debug := logcapture.Messages(t, buf.String(), "debug")
 			assert.Contains(t, debug, tt.message)
+			assert.NotContains(t, debug, tt.absent)
 			assert.NotContains(t, debug, "Failed to pull image")
 		})
 	}
