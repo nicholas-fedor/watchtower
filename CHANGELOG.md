@@ -10,6 +10,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Keep mirror tokens off the canonical registry host by @nicholas-fedor in [#3580](https://github.com/nicholas-fedor/watchtower/pull/3580)
 - Judge local-only images by the probed image name by @nicholas-fedor in [#3578](https://github.com/nicholas-fedor/watchtower/pull/3578)
 - Make no update when the process is told to stop by @nicholas-fedor in [#3574](https://github.com/nicholas-fedor/watchtower/pull/3574)
 - Write no startup message once the process is stopping by @nicholas-fedor in [#3572](https://github.com/nicholas-fedor/watchtower/pull/3572)
