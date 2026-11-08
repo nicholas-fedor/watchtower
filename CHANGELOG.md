@@ -80,6 +80,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Chores
 
+- Update alpine:3.24.4 docker digest to f59abe6 by @renovate[bot] in [#3581](https://github.com/nicholas-fedor/watchtower/pull/3581)
 - Update module github.com/gofrs/flock to v0.13.2 by @renovate[bot] in [#3548](https://github.com/nicholas-fedor/watchtower/pull/3548)
 - Update golang.org/x/tools digest to 4f7264d by @renovate[bot] in [#3510](https://github.com/nicholas-fedor/watchtower/pull/3510)
 - Update golang.org/x/exp digest to 47ce03d by @renovate[bot] in [#3508](https://github.com/nicholas-fedor/watchtower/pull/3508)
