@@ -1567,6 +1567,10 @@ func Test_resolveLinkToCanonicalKeys(t *testing.T) {
 // TestDependencyLinkFormPermutations verifies that each form a dependency link
 // can take sorts the dependency before its dependent, across Compose stacks,
 // replicas, and shared or ambiguous names.
+//
+// Containers with no dependency between them sort in reverse alphabetical
+// order of their graph keys. Each dependent's key sorts after its
+// dependency's. A dropped dependency then puts the dependent first.
 func TestDependencyLinkFormPermutations(t *testing.T) {
 	t.Parallel()
 
@@ -1597,8 +1601,8 @@ func TestDependencyLinkFormPermutations(t *testing.T) {
 			},
 			{
 				name:       "depends-on with Compose depends_on not read",
-				dependency: deployed{name: "postgres", project: "stack", service: "postgres", composeDependsOn: "api"},
-				dependent:  deployed{name: "api", project: "stack", service: "api", dependsOn: "postgres"},
+				dependency: deployed{name: "postgres", project: "stack", service: "postgres", composeDependsOn: "web"},
+				dependent:  deployed{name: "web", project: "stack", service: "web", dependsOn: "postgres"},
 				useCompose: false,
 			},
 			{
@@ -1633,7 +1637,7 @@ func TestDependencyLinkFormPermutations(t *testing.T) {
 				name:       "network_mode of another container",
 				dependency: deployed{name: "vpn", project: "stack", service: "vpn"},
 				dependent: deployed{
-					name: "client", project: "stack", service: "client", networkMode: "container:vpn",
+					name: "web", project: "stack", service: "web", networkMode: "container:vpn",
 				},
 				useCompose: true,
 			},
@@ -1641,14 +1645,14 @@ func TestDependencyLinkFormPermutations(t *testing.T) {
 				name:       "network_mode with Compose depends_on not read",
 				dependency: deployed{name: "vpn", project: "stack", service: "vpn"},
 				dependent: deployed{
-					name: "client", project: "stack", service: "client", networkMode: "container:vpn",
+					name: "web", project: "stack", service: "web", networkMode: "container:vpn",
 				},
 				useCompose: false,
 			},
 			{
 				name:       "legacy Docker link",
 				dependency: deployed{name: "db"},
-				dependent:  deployed{name: "app", links: []string{"/db:/app/db"}},
+				dependent:  deployed{name: "web", links: []string{"/db:/web/db"}},
 				useCompose: true,
 			},
 			{
@@ -1666,7 +1670,7 @@ func TestDependencyLinkFormPermutations(t *testing.T) {
 			{
 				name:       "depends-on bare service name of a single-container project",
 				dependency: deployed{name: "redis", project: "cache", service: "redis"},
-				dependent:  deployed{name: "app", project: "cache", service: "app", dependsOn: "redis"},
+				dependent:  deployed{name: "worker", project: "cache", service: "worker", dependsOn: "redis"},
 				useCompose: true,
 			},
 		}
@@ -1688,15 +1692,15 @@ func TestDependencyLinkFormPermutations(t *testing.T) {
 		t.Parallel()
 
 		vpn := deployed{name: "vpn", project: "stack", service: "vpn"}.container()
-		clientA := deployed{name: "client-a", project: "stack", service: "client-a", networkMode: "container:vpn"}.container()
-		clientB := deployed{name: "client-b", project: "stack", service: "client-b", networkMode: "container:vpn"}.container()
+		webA := deployed{name: "web-a", project: "stack", service: "web-a", networkMode: "container:vpn"}.container()
+		webB := deployed{name: "web-b", project: "stack", service: "web-b", networkMode: "container:vpn"}.container()
 
-		containers := []types.Container{clientA, clientB, vpn}
+		containers := []types.Container{webA, webB, vpn}
 		err := dependencySorter{}.Sort(newTestLogger(t), containers, true)
 		require.NoError(t, err)
 		assert.Equal(t, "vpn", containers[0].Name())
 		names := []string{containers[1].Name(), containers[2].Name()}
-		assert.ElementsMatch(t, []string{"client-a", "client-b"}, names)
+		assert.ElementsMatch(t, []string{"web-a", "web-b"}, names)
 	})
 
 	t.Run("should order when dependent has multiple dependencies", func(t *testing.T) {
@@ -1721,12 +1725,12 @@ func TestDependencyLinkFormPermutations(t *testing.T) {
 
 		db1 := deployed{name: "myproject-db-1", project: "myproject", service: "db"}.container()
 		db2 := deployed{name: "myproject-db-2", project: "myproject", service: "db"}.container()
-		app := deployed{name: "myproject-app", project: "myproject", service: "app", dependsOn: "myproject-db"}.container()
+		web := deployed{name: "myproject-web", project: "myproject", service: "web", dependsOn: "myproject-db"}.container()
 
-		containers := []types.Container{app, db1, db2}
+		containers := []types.Container{web, db1, db2}
 		err := dependencySorter{}.Sort(newTestLogger(t), containers, true)
 		require.NoError(t, err)
-		assert.Equal(t, "myproject-app", containers[2].Name())
+		assert.Equal(t, "myproject-web", containers[2].Name())
 		assert.ElementsMatch(t, []string{"myproject-db-1", "myproject-db-2"}, []string{containers[0].Name(), containers[1].Name()})
 	})
 
@@ -1801,7 +1805,7 @@ func TestDependencyLinkFormPermutations(t *testing.T) {
 		// Provider stack owns the named network peer.
 		// Consumer stack names it by container name in a Watchtower depends-on label.
 		provider := deployed{name: "shared-net-proxy", project: "infra", service: "net-proxy"}.container()
-		consumer := deployed{name: "app-web", project: "app", service: "web", dependsOn: "shared-net-proxy"}.container()
+		consumer := deployed{name: "web-app", project: "web", service: "app", dependsOn: "shared-net-proxy"}.container()
 		unrelated := deployed{name: "other-db", project: "other", service: "db"}.container()
 
 		containers := []types.Container{consumer, unrelated, provider}
@@ -1813,8 +1817,8 @@ func TestDependencyLinkFormPermutations(t *testing.T) {
 			ordered[i] = c.Name()
 		}
 
-		assertOrderBefore(t, ordered, "shared-net-proxy", "app-web")
-		assert.ElementsMatch(t, []string{"shared-net-proxy", "app-web", "other-db"}, ordered)
+		assertOrderBefore(t, ordered, "shared-net-proxy", "web-app")
+		assert.ElementsMatch(t, []string{"shared-net-proxy", "web-app", "other-db"}, ordered)
 	})
 
 	t.Run("should not couple stacks when multi-segment services share a trailing token", func(t *testing.T) {
