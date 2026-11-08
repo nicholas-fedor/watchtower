@@ -19,7 +19,6 @@ import (
 	"github.com/nicholas-fedor/watchtower/internal/registry/ratelimit"
 	registryConfig "github.com/nicholas-fedor/watchtower/internal/settings/config/registry"
 	"github.com/nicholas-fedor/watchtower/internal/testutil/httpstub"
-	mockTypes "github.com/nicholas-fedor/watchtower/pkg/types/mocks"
 )
 
 func TestRegistryRateLimitError(t *testing.T) {
@@ -42,17 +41,6 @@ func TestRegistryRateLimitError(t *testing.T) {
 	got := registryRateLimitError(resp)
 	require.Error(t, got)
 	require.ErrorIs(t, got, ratelimit.ErrRateLimited)
-}
-
-// newMockContainer creates a mockery-generated mock Container with the given image name.
-func newMockContainer(t *testing.T, imageName string) *mockTypes.MockContainer {
-	t.Helper()
-
-	container := mockTypes.NewMockContainer(t)
-	container.EXPECT().Name().Return("test-container").Maybe()
-	container.EXPECT().ImageName().Return(imageName).Maybe()
-
-	return container
 }
 
 const testCreatedTimestamp = "2024-01-15T10:30:00Z"
@@ -570,7 +558,7 @@ func TestBuildManifestURLForContainer(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
 
-			container := newMockContainer(t, tc.imageName)
+			container := newRegistryContainer(tc.imageName)
 
 			got, err := buildManifestURLForContainer(newTestLogger(t), container, tc.scheme)
 			if tc.wantErr {
@@ -597,7 +585,7 @@ func TestBuildManifestURLForAge(t *testing.T) {
 	t.Run("standard Docker Hub image", func(t *testing.T) {
 		t.Parallel()
 
-		container := newMockContainer(t, "alpine:3.19")
+		container := newRegistryContainer("alpine:3.19")
 
 		gotURL, gotHost, gotParsed, err := buildManifestURLForAge(newTestLogger(t), container, registryConfig.Registry{}, "")
 		require.NoError(t, err)
@@ -610,7 +598,7 @@ func TestBuildManifestURLForAge(t *testing.T) {
 	t.Run("scheme follows the TLS skip setting", func(t *testing.T) {
 		t.Parallel()
 
-		container := newMockContainer(t, "alpine:3.19")
+		container := newRegistryContainer("alpine:3.19")
 
 		secureURL, _, _, err := buildManifestURLForAge(newTestLogger(t), container, registryConfig.Registry{}, "")
 		require.NoError(t, err)
@@ -625,7 +613,7 @@ func TestBuildManifestURLForAge(t *testing.T) {
 	t.Run("host override replaces host", func(t *testing.T) {
 		t.Parallel()
 
-		container := newMockContainer(t, "alpine:3.19")
+		container := newRegistryContainer("alpine:3.19")
 
 		gotURL, _, _, err := buildManifestURLForAge(newTestLogger(t), container, registryConfig.Registry{}, "custom.registry.io")
 		require.NoError(t, err)
@@ -637,7 +625,7 @@ func TestBuildManifestURLForAge(t *testing.T) {
 	t.Run("lscr.io is swapped to ghcr.io", func(t *testing.T) {
 		t.Parallel()
 
-		container := newMockContainer(t, "lscr.io/owner/image:tag")
+		container := newRegistryContainer("lscr.io/owner/image:tag")
 
 		gotURL, gotHost, _, err := buildManifestURLForAge(newTestLogger(t), container, registryConfig.Registry{}, "")
 		require.NoError(t, err)

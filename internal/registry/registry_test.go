@@ -11,7 +11,8 @@ import (
 	dockerCliConfig "github.com/docker/cli/cli/config"
 
 	"github.com/nicholas-fedor/watchtower/internal/observability/logging"
-	mockTypes "github.com/nicholas-fedor/watchtower/pkg/types/mocks"
+	"github.com/nicholas-fedor/watchtower/internal/testutil/containerfixture"
+	"github.com/nicholas-fedor/watchtower/internal/testutil/modelfixture"
 )
 
 // newTestLogger returns a logger that writes each event to the test's log, so a
@@ -78,9 +79,7 @@ func TestWarnOnAPIConsumption(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			container := mockTypes.NewMockContainer(t)
-			container.EXPECT().Name().Return("test-container").Maybe()
-			container.EXPECT().ImageName().Return(tt.imageName)
+			container := modelfixture.Container(containerfixture.WithImageName(tt.imageName))
 
 			got := WarnOnAPIConsumption(newTestLogger(t), container)
 			assert.Equal(t, tt.want, got)

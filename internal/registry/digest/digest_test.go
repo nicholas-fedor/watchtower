@@ -21,16 +21,15 @@ import (
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 
-	dockerContainer "github.com/moby/moby/api/types/container"
-	dockerImage "github.com/moby/moby/api/types/image"
-
 	"github.com/nicholas-fedor/watchtower/internal/meta"
 	"github.com/nicholas-fedor/watchtower/internal/registry/auth"
 	mockAuth "github.com/nicholas-fedor/watchtower/internal/registry/auth/mocks"
 	"github.com/nicholas-fedor/watchtower/internal/registry/ratelimit"
 	registryConfig "github.com/nicholas-fedor/watchtower/internal/settings/config/registry"
+	"github.com/nicholas-fedor/watchtower/internal/testutil/containerfixture"
 	"github.com/nicholas-fedor/watchtower/internal/testutil/httpstub"
-	mockTypes "github.com/nicholas-fedor/watchtower/pkg/types/mocks"
+	"github.com/nicholas-fedor/watchtower/internal/testutil/modelfixture"
+	"github.com/nicholas-fedor/watchtower/pkg/types"
 )
 
 // newTestLogger returns a logger that writes each event to the test's log, so a
@@ -94,31 +93,20 @@ const testManifestListBody = `{
 }
 `
 
-// newRegistryContainer returns a mock container that runs image, whose image has
+// newRegistryContainer returns a container that runs image, whose image has
 // repoDigests as its repo digests.
 //
 // Parameters:
-//   - t: Test that owns the mock.
 //   - image: Image reference the container runs.
 //   - repoDigests: The image's repo digests.
 //
 // Returns:
-//   - *mockTypes.MockContainer: Mock that answers the container reads the digest code makes.
-func newRegistryContainer(t *testing.T, image string, repoDigests ...string) *mockTypes.MockContainer {
-	t.Helper()
-
-	imageInfo := &dockerImage.InspectResponse{ID: image, RepoDigests: repoDigests}
-
-	container := mockTypes.NewMockContainer(t)
-	container.EXPECT().Name().Return("mock-container").Maybe()
-	container.EXPECT().ImageName().Return(image).Maybe()
-	container.EXPECT().HasImageInfo().Return(true).Maybe()
-	container.EXPECT().ImageInfo().Return(imageInfo).Maybe()
-	container.EXPECT().ContainerInfo().Return(&dockerContainer.InspectResponse{
-		Config: &dockerContainer.Config{Image: image},
-	}).Maybe()
-
-	return container
+//   - types.Container: The container.
+func newRegistryContainer(image string, repoDigests ...string) types.Container {
+	return modelfixture.Container(
+		containerfixture.WithImageName(image),
+		containerfixture.WithRepoDigests(repoDigests),
+	)
 }
 
 // bearerChallengeHandler returns the handler of a registry that answers /v2/
@@ -239,34 +227,27 @@ func sha256Hex(body string) string {
 	return hex.EncodeToString(sum[:])
 }
 
-// newLocalOnlyContainer returns a mock container for a locally built image
-// whose repo digest names no registry, as Docker records for an image built and
+// newLocalOnlyContainer returns a container of a locally built image whose
+// repo digest names no registry, as Docker records for an image built and
 // tagged on the host.
 //
+// Its configured image has no tag, and the container reports it as
+// atlas-badgerdb:latest.
+//
 // Parameters:
-//   - t: Test that owns the mock.
 //   - imageID: ID of the container's image.
 //
 // Returns:
-//   - *mockTypes.MockContainer: Mock that answers the container reads the digest code makes.
-func newLocalOnlyContainer(t *testing.T, imageID string) *mockTypes.MockContainer {
-	t.Helper()
-
-	mc := mockTypes.NewMockContainer(t)
-	mc.EXPECT().Name().Return("atlas-badgerdb-1").Maybe()
-	mc.EXPECT().ImageName().Return("atlas-badgerdb:latest").Maybe()
-	mc.EXPECT().HasImageInfo().Return(true).Maybe()
-	mc.EXPECT().ImageInfo().Return(&dockerImage.InspectResponse{
-		ID: imageID,
-		RepoDigests: []string{
+//   - types.Container: The container.
+func newLocalOnlyContainer(imageID string) types.Container {
+	return modelfixture.Container(
+		containerfixture.WithName("atlas-badgerdb-1"),
+		containerfixture.WithImageName("atlas-badgerdb"),
+		containerfixture.WithImageID(imageID),
+		containerfixture.WithRepoDigests([]string{
 			"atlas-badgerdb@sha256:80f07677bee57274a48929d0688bf0cfabe5e83f06f2f152dab4076445d6ab35",
-		},
-	}).Maybe()
-	mc.EXPECT().ContainerInfo().Return(&dockerContainer.InspectResponse{
-		Config: &dockerContainer.Config{Image: "atlas-badgerdb"},
-	}).Maybe()
-
-	return mc
+		}),
+	)
 }
 
 // clearLocalOnlyImageCache removes all cached local-only image entries, so
@@ -539,44 +520,28 @@ func TestCompareDigest(t *testing.T) {
 
 	tests := []struct {
 		name string
-		// container returns the container to compare.
-		container func(t *testing.T) *mockTypes.MockContainer
+		// container is the container to compare.
+		container types.Container
 		// handlers returns the registry's handlers in request order.
 		handlers func(t *testing.T) []http.HandlerFunc
 		expected bool
-		wantErr  bool
+		// wantErr is the expected error, nil when no error is expected.
+		wantErr error
 	}{
 		{
-			name: "returns error when container has no image info",
-			container: func(t *testing.T) *mockTypes.MockContainer {
-				t.Helper()
-
-				mc := mockTypes.NewMockContainer(t)
-				mc.EXPECT().Name().Return("test-container")
-				mc.EXPECT().ImageName().Return("nginx:latest")
-				mc.EXPECT().HasImageInfo().Return(false)
-
-				return mc
-			},
-			expected: false,
-			wantErr:  true,
+			name:      "returns error when container has no image info",
+			container: modelfixture.ContainerWithoutImageInfo(containerfixture.WithImageName("nginx:latest")),
+			expected:  false,
+			wantErr:   errMissingImageInfo,
 		},
 		{
-			name: "returns true for locally built image with empty RepoDigests",
-			container: func(t *testing.T) *mockTypes.MockContainer {
-				t.Helper()
-
-				return newRegistryContainer(t, "local-image:latest")
-			},
-			expected: true,
+			name:      "returns true for locally built image with empty RepoDigests",
+			container: newRegistryContainer("local-image:latest"),
+			expected:  true,
 		},
 		{
-			name: "matching digests via HEAD request",
-			container: func(t *testing.T) *mockTypes.MockContainer {
-				t.Helper()
-
-				return newRegistryContainer(t, "registry.example.com/myapp:latest", "registry.example.com/myapp@"+localHash)
-			},
+			name:      "matching digests via HEAD request",
+			container: newRegistryContainer("registry.example.com/myapp:latest", "registry.example.com/myapp@"+localHash),
 			handlers: func(t *testing.T) []http.HandlerFunc {
 				t.Helper()
 
@@ -589,12 +554,8 @@ func TestCompareDigest(t *testing.T) {
 		},
 		{
 			name: "non-matching digests via HEAD request",
-			container: func(t *testing.T) *mockTypes.MockContainer {
-				t.Helper()
-
-				return newRegistryContainer(t, "registry.example.com/myapp:latest",
-					"registry.example.com/myapp@sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa")
-			},
+			container: newRegistryContainer("registry.example.com/myapp:latest",
+				"registry.example.com/myapp@sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"),
 			handlers: func(t *testing.T) []http.HandlerFunc {
 				t.Helper()
 
@@ -607,12 +568,8 @@ func TestCompareDigest(t *testing.T) {
 			expected: false,
 		},
 		{
-			name: "falls back to GET when HEAD returns non-2xx without 404",
-			container: func(t *testing.T) *mockTypes.MockContainer {
-				t.Helper()
-
-				return newRegistryContainer(t, "registry.example.com/myapp:latest", "registry.example.com/myapp@"+localHash)
-			},
+			name:      "falls back to GET when HEAD returns non-2xx without 404",
+			container: newRegistryContainer("registry.example.com/myapp:latest", "registry.example.com/myapp@"+localHash),
 			handlers: func(t *testing.T) []http.HandlerFunc {
 				t.Helper()
 
@@ -637,9 +594,9 @@ func TestCompareDigest(t *testing.T) {
 			}
 
 			got, err := CompareDigest(newTestLogger(t), context.Background(),
-				tt.container(t), "", registryConfig.Registry{}, ratelimit.New(), server.URL())
-			if tt.wantErr {
-				require.Error(t, err)
+				tt.container, "", registryConfig.Registry{}, ratelimit.New(), server.URL())
+			if tt.wantErr != nil {
+				require.ErrorIs(t, err, tt.wantErr)
 			} else {
 				require.NoError(t, err)
 			}
@@ -838,7 +795,7 @@ func TestCompareDigest_StubRegistry(t *testing.T) {
 			server := httpstub.New(t)
 			server.AppendHandlers(tt.handlers(t, server.Addr())...)
 
-			container := newRegistryContainer(t, server.Addr()+"/test/image:latest", testRepoDigest)
+			container := newRegistryContainer(server.Addr()+"/test/image:latest", testRepoDigest)
 
 			got, err := CompareDigest(newTestLogger(t), context.Background(),
 				container, "token", registryConfig.Registry{TLSSkip: true}, ratelimit.New())
@@ -879,7 +836,7 @@ func TestCompareDigest_HashesManifestWithoutDigestHeader(t *testing.T) {
 		),
 	)
 
-	container := newRegistryContainer(t,
+	container := newRegistryContainer(
 		server.Addr()+"/test/image:latest",
 		server.Addr()+"/test/image@sha256:"+sha256Hex(testManifestListBody),
 	)
@@ -975,7 +932,7 @@ func TestFetchDigestWithGet_RedirectPastClientLimit(t *testing.T) {
 			))
 			registry.AppendHandlers(bearerChallengeHandlers(t, registry.Addr(), "repository:test/image:pull")...)
 
-			container := newRegistryContainer(t, registry.Addr()+"/test/image:latest", testRepoDigest)
+			container := newRegistryContainer(registry.Addr()+"/test/image:latest", testRepoDigest)
 
 			got, err := fetchDigestWithGet(newTestLogger(t), t.Context(),
 				container, "token", registryConfig.Registry{TLSSkip: true}, ratelimit.New())
@@ -1016,7 +973,7 @@ func TestCompareDigest_RedirectedLSCRImage(t *testing.T) {
 		)...,
 	)
 
-	container := newRegistryContainer(t, server.Addr()+"/lscr.io/test/image:latest", testRepoDigest)
+	container := newRegistryContainer(server.Addr()+"/lscr.io/test/image:latest", testRepoDigest)
 
 	got, err := CompareDigest(newTestLogger(t), context.Background(),
 		container, "token", registryConfig.Registry{TLSSkip: true}, ratelimit.New())
@@ -1037,7 +994,7 @@ func TestCompareDigestWithRemote(t *testing.T) {
 		manifestHandler(t, http.MethodHead, "/v2/myapp/manifests/latest", http.StatusOK, digestHeader("sha256:"+remoteHash)),
 	)
 
-	container := newRegistryContainer(t, server.Addr()+"/myapp:latest",
+	container := newRegistryContainer(server.Addr()+"/myapp:latest",
 		"registry.example.com/myapp@sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa")
 
 	match, remoteDigest, err := CompareDigestWithRemote(newTestLogger(t), context.Background(),
@@ -1061,7 +1018,7 @@ func TestCompareDigestWithRemote_SkipsInvalidEndpoint(t *testing.T) {
 		manifestHandler(t, http.MethodHead, "/v2/myapp/manifests/latest", http.StatusOK, digestHeader(remoteHash)),
 	)
 
-	container := newRegistryContainer(t, server.Addr()+"/myapp:latest", "registry.example.com/myapp@"+remoteHash)
+	container := newRegistryContainer(server.Addr()+"/myapp:latest", "registry.example.com/myapp@"+remoteHash)
 
 	match, _, err := CompareDigestWithRemote(newTestLogger(t), context.Background(),
 		container, "", registryConfig.Registry{}, ratelimit.New(), "bad host", server.URL())
@@ -1087,7 +1044,7 @@ func TestCompareDigestWithRemote_Head429DoesNotFallBackToGET(t *testing.T) {
 		),
 	)
 
-	container := newRegistryContainer(t, server.Addr()+"/linuxserver/radarr:latest",
+	container := newRegistryContainer(server.Addr()+"/linuxserver/radarr:latest",
 		"lscr.io/linuxserver/radarr@sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa")
 
 	match, _, err := CompareDigestWithRemote(newTestLogger(t), context.Background(),
@@ -1120,7 +1077,7 @@ func TestCompareDigestWithRemote_Retry429DoesNotContinueToNextEndpoint(t *testin
 	// The mirror has no handlers, so any request to it fails the test.
 	mirror := httpstub.New(t)
 
-	container := newRegistryContainer(t, primary.Addr()+"/linuxserver/radarr:latest",
+	container := newRegistryContainer(primary.Addr()+"/linuxserver/radarr:latest",
 		"lscr.io/linuxserver/radarr@sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa")
 
 	match, _, err := CompareDigestWithRemote(newTestLogger(t), context.Background(),
@@ -1160,7 +1117,7 @@ func TestCompareDigestWithRemote_UnauthorizedOnBothHostsIsError(t *testing.T) {
 		manifestHandler(t, http.MethodGet, manifestPath, http.StatusUnauthorized, nil),
 	)
 
-	container := newRegistryContainer(t, registry.Addr()+"/linuxserver/radarr:latest",
+	container := newRegistryContainer(registry.Addr()+"/linuxserver/radarr:latest",
 		registry.Addr()+"/linuxserver/radarr@sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa")
 
 	match, remoteDigest, err := CompareDigestWithRemote(newTestLogger(t), context.Background(),
@@ -1197,7 +1154,7 @@ func TestCompareDigestWithRemote_HeadRejectedFallsBackToGet(t *testing.T) {
 		)...,
 	)
 
-	container := newRegistryContainer(t, registry.Addr()+"/linuxserver/radarr:latest",
+	container := newRegistryContainer(registry.Addr()+"/linuxserver/radarr:latest",
 		registry.Addr()+"/linuxserver/radarr@sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa")
 
 	match, remoteDigest, err := CompareDigestWithRemote(newTestLogger(t), context.Background(),
@@ -1223,7 +1180,7 @@ func TestCompareDigestWithRemote_LocalOnly404(t *testing.T) {
 	)
 
 	match, remoteDigest, err := CompareDigestWithRemote(newTestLogger(t), context.Background(),
-		newLocalOnlyContainer(t, ""), "", registryConfig.Registry{TLSSkip: true}, ratelimit.New(), server.Addr())
+		newLocalOnlyContainer(""), "", registryConfig.Registry{TLSSkip: true}, ratelimit.New(), server.Addr())
 	require.NoError(t, err)
 	assert.True(t, match)
 	assert.Empty(t, remoteDigest)
@@ -1238,50 +1195,30 @@ func TestIsLocalImageNotFound(t *testing.T) {
 	t.Run("true for domain-less Config.Image with wrapped errManifestNotFound", func(t *testing.T) {
 		t.Parallel()
 
-		mc := mockTypes.NewMockContainer(t)
-		mc.EXPECT().HasImageInfo().Return(true)
-		mc.EXPECT().ImageInfo().Return(&dockerImage.InspectResponse{
-			RepoDigests: []string{
-				"atlas-badgerdb@sha256:80f07677bee57274a48929d0688bf0cfabe5e83f06f2f152dab4076445d6ab35",
-			},
-		})
-		mc.EXPECT().ContainerInfo().Return(&dockerContainer.InspectResponse{
-			Config: &dockerContainer.Config{Image: "atlas-badgerdb"},
-		})
+		container := newRegistryContainer("atlas-badgerdb",
+			"atlas-badgerdb@sha256:80f07677bee57274a48929d0688bf0cfabe5e83f06f2f152dab4076445d6ab35")
 
 		err := fmt.Errorf("%w: %w: status 404 Not Found", errManifestNotFound, errInvalidRegistryResponse)
-		assert.True(t, isLocalImageNotFound(mc, err))
+		assert.True(t, isLocalImageNotFound(container, err))
 	})
 
 	t.Run("true for domain-less image with version tag containing dots", func(t *testing.T) {
 		t.Parallel()
 
-		mc := mockTypes.NewMockContainer(t)
-		mc.EXPECT().HasImageInfo().Return(true)
-		mc.EXPECT().ImageInfo().Return(&dockerImage.InspectResponse{
-			RepoDigests: []string{
-				"my-app@sha256:80f07677bee57274a48929d0688bf0cfabe5e83f06f2f152dab4076445d6ab35",
-			},
-		})
-		mc.EXPECT().ContainerInfo().Return(&dockerContainer.InspectResponse{
-			Config: &dockerContainer.Config{Image: "my-app:1.0"},
-		})
+		container := newRegistryContainer("my-app:1.0",
+			"my-app@sha256:80f07677bee57274a48929d0688bf0cfabe5e83f06f2f152dab4076445d6ab35")
 
 		err := fmt.Errorf("%w: status 404 Not Found", errManifestNotFound)
-		assert.True(t, isLocalImageNotFound(mc, err))
+		assert.True(t, isLocalImageNotFound(container, err))
 	})
 
 	t.Run("false for domain-ful Config.Image", func(t *testing.T) {
 		t.Parallel()
 
-		mc := mockTypes.NewMockContainer(t)
-		mc.EXPECT().HasImageInfo().Return(true)
-		mc.EXPECT().ContainerInfo().Return(&dockerContainer.InspectResponse{
-			Config: &dockerContainer.Config{Image: "registry.example.com/app:latest"},
-		})
+		container := newRegistryContainer("registry.example.com/app:latest")
 
 		err := fmt.Errorf("%w: status 404 Not Found", errManifestNotFound)
-		assert.False(t, isLocalImageNotFound(mc, err))
+		assert.False(t, isLocalImageNotFound(container, err))
 	})
 
 	t.Run("false for Hub short name with registry-qualified RepoDigests", func(t *testing.T) {
@@ -1290,58 +1227,64 @@ func TestIsLocalImageNotFound(t *testing.T) {
 		// Official images often keep Config.Image as "nginx" while RepoDigests
 		// records docker.io/library/nginx@sha256:.... A transient 404 must not
 		// mark them local-only for the process lifetime.
-		mc := mockTypes.NewMockContainer(t)
-		mc.EXPECT().HasImageInfo().Return(true)
-		mc.EXPECT().ImageInfo().Return(&dockerImage.InspectResponse{
-			RepoDigests: []string{
-				"docker.io/library/nginx@sha256:80f07677bee57274a48929d0688bf0cfabe5e83f06f2f152dab4076445d6ab35",
-			},
-		})
-		mc.EXPECT().ContainerInfo().Return(&dockerContainer.InspectResponse{
-			Config: &dockerContainer.Config{Image: "nginx:latest"},
-		})
+		container := newRegistryContainer("nginx:latest",
+			"docker.io/library/nginx@sha256:80f07677bee57274a48929d0688bf0cfabe5e83f06f2f152dab4076445d6ab35")
 
 		err := fmt.Errorf("%w: status 404 Not Found", errManifestNotFound)
-		assert.False(t, isLocalImageNotFound(mc, err))
+		assert.False(t, isLocalImageNotFound(container, err))
 	})
 
 	t.Run("false for non-manifest errors", func(t *testing.T) {
 		t.Parallel()
 
-		mc := mockTypes.NewMockContainer(t)
+		container := newRegistryContainer("atlas-badgerdb")
 		err := fmt.Errorf("%w: status 500", errInvalidRegistryResponse)
-		assert.False(t, isLocalImageNotFound(mc, err))
+		assert.False(t, isLocalImageNotFound(container, err))
 	})
 }
 
 // TestLocalOnlyImageCache ensures a confirmed local-only image skips subsequent
 // registry probes for the same image name+ID.
+//
+// A rebuild gives the image a new ID, so the rebuilt image is probed again.
 func TestLocalOnlyImageCache(t *testing.T) {
 	clearLocalOnlyImageCache()
 	t.Cleanup(clearLocalOnlyImageCache)
 
-	settings := registryConfig.Registry{TLSSkip: true}
-	container := newLocalOnlyContainer(t, "sha256:80f07677bee57274a48929d0688bf0cfabe5e83f06f2f152dab4076445d6ab35")
+	const manifestPath = "/v2/library/atlas-badgerdb/manifests/latest"
 
-	// Only the first comparison may reach the registry.
+	settings := registryConfig.Registry{TLSSkip: true}
+
+	// The registry answers two probes: the first comparison and the rebuilt
+	// image's. The cached comparison between them must not reach it.
 	server := httpstub.New(t)
 	server.AppendHandlers(
 		anonymousRegistryHandler(t),
-		manifestHandler(t, http.MethodHead, "/v2/library/atlas-badgerdb/manifests/latest", http.StatusNotFound, nil),
+		manifestHandler(t, http.MethodHead, manifestPath, http.StatusNotFound, nil),
+		anonymousRegistryHandler(t),
+		manifestHandler(t, http.MethodHead, manifestPath, http.StatusNotFound, nil),
 	)
 
-	// First call: probe registry, cache local-only.
-	match, _, err := CompareDigestWithRemote(newTestLogger(t), context.Background(),
-		container, "", settings, ratelimit.New(), server.Addr())
-	require.NoError(t, err)
-	assert.True(t, match)
+	// compare compares the container with the registry and expects a match.
+	compare := func(container types.Container) {
+		t.Helper()
 
-	// Second call: cache hit, no additional request.
-	match, _, err = CompareDigestWithRemote(newTestLogger(t), context.Background(),
-		container, "", settings, ratelimit.New(), server.Addr())
-	require.NoError(t, err)
-	assert.True(t, match)
+		match, _, err := CompareDigestWithRemote(newTestLogger(t), context.Background(),
+			container, "", settings, ratelimit.New(), server.Addr())
+		require.NoError(t, err)
+		assert.True(t, match)
+	}
+
+	built := newLocalOnlyContainer("sha256:80f07677bee57274a48929d0688bf0cfabe5e83f06f2f152dab4076445d6ab35")
+
+	// The first comparison probes the registry and caches the image as local-only.
+	compare(built)
+	compare(built)
 	assert.Len(t, server.ReceivedRequests(), 2, "cached local-only image must not re-probe registry")
+
+	// The image was rebuilt under the same name, so it is probed again.
+	compare(newLocalOnlyContainer("sha256:91a18788cff68385b59a3a1799cf1d0abe5e83f06f2f152dab4076445d6ab35"))
+	assert.Len(t, server.ReceivedRequests(), 4, "a rebuilt local-only image was not probed again")
 }
 
 // TestFetchDigestWithGet verifies digest retrieval from an anonymous registry's
@@ -1404,7 +1347,7 @@ func TestFetchDigestWithGet(t *testing.T) {
 				),
 			)
 
-			container := newRegistryContainer(t, "registry.example.com/myapp:latest", "registry.example.com/myapp@"+localHash)
+			container := newRegistryContainer("registry.example.com/myapp:latest", "registry.example.com/myapp@"+localHash)
 
 			got, err := fetchDigestWithGet(newTestLogger(t), context.Background(),
 				container, "", registryConfig.Registry{}, ratelimit.New(), server.URL())
@@ -1435,9 +1378,7 @@ func TestFetchDigestWithGet_StubRegistry(t *testing.T) {
 		handlers func(t *testing.T, addr string) []http.HandlerFunc
 		// image returns the image reference the container runs.
 		image func(addr string) string
-		// repoDigests are the image's repo digests.
-		repoDigests []string
-		want        string
+		want  string
 		// errContains is the expected error text, empty when no error is expected.
 		errContains string
 	}{
@@ -1524,7 +1465,7 @@ func TestFetchDigestWithGet_StubRegistry(t *testing.T) {
 				image = tt.image(server.Addr())
 			}
 
-			container := newRegistryContainer(t, image, testRepoDigest)
+			container := newRegistryContainer(image, testRepoDigest)
 
 			got, err := fetchDigestWithGet(newTestLogger(t), context.Background(),
 				container, "token", registryConfig.Registry{TLSSkip: true}, ratelimit.New())
@@ -1555,7 +1496,7 @@ func TestFetchDigestWithGet_LocalImages(t *testing.T) {
 			t.Parallel()
 
 			got, err := fetchDigestWithGet(newTestLogger(t), context.Background(),
-				newRegistryContainer(t, image), "", registryConfig.Registry{}, ratelimit.New())
+				newRegistryContainer(image), "", registryConfig.Registry{}, ratelimit.New())
 			require.NoError(t, err)
 			assert.Empty(t, got)
 		})
@@ -1589,7 +1530,7 @@ func TestFetchDigestWithGet_RedirectedChallenge(t *testing.T) {
 		)...,
 	)
 
-	container := newRegistryContainer(t, server.Addr()+"/test/image:latest", testRepoDigest)
+	container := newRegistryContainer(server.Addr()+"/test/image:latest", testRepoDigest)
 
 	got, err := fetchDigestWithGet(newTestLogger(t), context.Background(),
 		container, "token", registryConfig.Registry{TLSSkip: true}, ratelimit.New())
@@ -1616,7 +1557,7 @@ func TestFetchDigestWithGet_SlowResponse(t *testing.T) {
 		)...,
 	)
 
-	container := newRegistryContainer(t, server.Addr()+"/test/image:latest", testRepoDigest)
+	container := newRegistryContainer(server.Addr()+"/test/image:latest", testRepoDigest)
 
 	ctx, cancel := context.WithTimeout(context.Background(), 250*time.Millisecond)
 	defer cancel()
@@ -1702,7 +1643,7 @@ func TestBuildManifestURL(t *testing.T) {
 
 			settings := registryConfig.Registry{TLSSkip: tt.tlsSkip}
 
-			gotURL, gotHost, _, err := buildManifestURL(newTestLogger(t), newRegistryContainer(t, tt.image), settings, tt.hostOverride)
+			gotURL, gotHost, _, err := buildManifestURL(newTestLogger(t), newRegistryContainer(tt.image), settings, tt.hostOverride)
 			if tt.wantErr {
 				require.ErrorIs(t, err, errFailedBuildManifestURL)
 

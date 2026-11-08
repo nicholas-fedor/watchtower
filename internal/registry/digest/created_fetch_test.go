@@ -173,7 +173,7 @@ func fetchCreatedFor(
 
 	settings := registryConfig.Registry{CooldownPlatform: platform, TLSSkip: true}
 
-	return FetchImageCreationTime(newTestLogger(t), t.Context(), newMockContainer(t, registry.host()+"/"+image), "", settings, ratelimit.New())
+	return FetchImageCreationTime(newTestLogger(t), t.Context(), newRegistryContainer(registry.host()+"/"+image), "", settings, ratelimit.New())
 }
 
 // mustParseTime parses an RFC 3339 timestamp.
