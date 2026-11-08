@@ -33,10 +33,10 @@ type Sink interface {
 	Reset(containers map[string]Labeled)
 	// Set records a container's schedule. An empty spec means it has none.
 	// The ID may be empty when it isn't known.
-	Set(name, id, spec string)
+	Set(name, containerID, spec string)
 	// Remove forgets a container. With an ID, only that container: a later
 	// one under the same name is kept.
-	Remove(name, id string)
+	Remove(name, containerID string)
 }
 
 // Registry keeps one cron entry for each schedule in use, counting the
@@ -101,23 +101,23 @@ func (r *Registry) Reset(containers map[string]Labeled) {
 }
 
 // Set implements [Sink].
-func (r *Registry) Set(name, id, spec string) {
+func (r *Registry) Set(name, containerID, spec string) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 
-	r.applyLocked(name, id, spec)
+	r.applyLocked(name, containerID, spec)
 }
 
 // Remove implements [Sink]. News of a container that has since been replaced
 // under the same name (its ID differs from the one recorded) is ignored.
-func (r *Registry) Remove(name, id string) {
+func (r *Registry) Remove(name, containerID string) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 
-	if held, known := r.byName[name]; known && id != "" && held.ID != "" && held.ID != id {
+	if held, known := r.byName[name]; known && containerID != "" && held.ID != "" && held.ID != containerID {
 		r.log.Debug().
 			Str("container", name).
-			Str("removed_id", shortID(id)).
+			Str("removed_id", shortID(containerID)).
 			Str("current_id", shortID(held.ID)).
 			Msg("Ignoring the removal of a container already replaced under the same name")
 
@@ -148,7 +148,7 @@ func (r *Registry) Schedules() []string {
 // with its first container. A schedule that does not parse is ignored (the
 // container follows the global schedule), as the run filters treat it, with a
 // warning the first time it's seen on the container.
-func (r *Registry) applyLocked(name, id, spec string) {
+func (r *Registry) applyLocked(name, containerID, spec string) {
 	spec = Normalize(spec)
 	if spec != "" && !Valid(spec) {
 		if r.warned[name] != spec {
@@ -169,8 +169,8 @@ func (r *Registry) applyLocked(name, id, spec string) {
 	if known && old.Spec == spec {
 		// The same schedule (perhaps a new container under the same name): its
 		// entry and its next run stay as they are
-		if id != "" && id != old.ID {
-			r.byName[name] = Labeled{ID: id, Spec: spec}
+		if containerID != "" && containerID != old.ID {
+			r.byName[name] = Labeled{ID: containerID, Spec: spec}
 		}
 
 		return
@@ -201,7 +201,7 @@ func (r *Registry) applyLocked(name, id, spec string) {
 		return
 	}
 
-	r.byName[name] = Labeled{ID: id, Spec: spec}
+	r.byName[name] = Labeled{ID: containerID, Spec: spec}
 
 	if known {
 		r.releaseLocked(old.Spec)
@@ -256,11 +256,11 @@ func (r *Registry) releaseLocked(spec string) {
 }
 
 // shortID is a container ID as Docker prints it: its first twelve characters.
-func shortID(id string) string {
+func shortID(containerID string) string {
 	const short = 12
-	if len(id) > short {
-		return id[:short]
+	if len(containerID) > short {
+		return containerID[:short]
 	}
 
-	return id
+	return containerID
 }

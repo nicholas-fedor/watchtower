@@ -305,10 +305,10 @@ func (s *DockerSource) apply(sink Sink, msg events.Message) {
 
 // setFrom records a container from an event: its attributes carry its labels,
 // with its name and image.
-func (s *DockerSource) setFrom(sink Sink, name, id string, attrs map[string]string, action events.Action) {
-	spec, _ := s.scheduleOf(eventContainer(name, id, attrs))
+func (s *DockerSource) setFrom(sink Sink, name, containerID string, attrs map[string]string, action events.Action) {
+	spec, _ := s.scheduleOf(eventContainer(name, containerID, attrs))
 	s.logEvent(name, attrs, spec, action)
-	sink.Set(name, id, spec)
+	sink.Set(name, containerID, spec)
 }
 
 // logEvent logs a container event at debug level: the container, its
@@ -364,7 +364,7 @@ func eventTime(t time.Time) string {
 // eventContainer is a container as an event describes it, read the way
 // Watchtower reads any container (labels, scope, enable, name, image), so a
 // filter treats it as it would in a run.
-func eventContainer(name, id string, attrs map[string]string) types.FilterableContainer {
+func eventContainer(name, containerID string, attrs map[string]string) types.FilterableContainer {
 	containerLabels := make(map[string]string, len(attrs))
 
 	for k, v := range attrs {
@@ -376,7 +376,7 @@ func eventContainer(name, id string, attrs map[string]string) types.FilterableCo
 	}
 
 	info := &dockerContainer.InspectResponse{
-		ID:     id,
+		ID:     containerID,
 		Name:   "/" + name,
 		Config: &dockerContainer.Config{Image: attrs["image"], Labels: containerLabels},
 	}

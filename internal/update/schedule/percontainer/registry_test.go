@@ -108,6 +108,7 @@ func TestRegistryMovesAContainer(t *testing.T) {
 	assert.Empty(t, timers.specs(), "no schedule: back on the global one")
 
 	r.Set("web", "", "@hourly")
+
 	added := timers.registrations()
 
 	r.Set("web", "", " '@hourly' ")
@@ -196,6 +197,7 @@ func TestRegistryResetKeepsSchedulesInUse(t *testing.T) {
 	r := NewRegistry(nil, timers)
 
 	r.Reset(map[string]Labeled{"web": {ID: "a", Spec: "@every 10m"}, "db": {ID: "b", Spec: "@daily"}})
+
 	added := timers.registrations()
 
 	// The same containers again (a refresh after every run): nothing changes
@@ -219,6 +221,7 @@ func TestRegistryTellsReplacementsApart(t *testing.T) {
 	// An update replaces a container under the same name; a refresh lists the
 	// replacement before the old one's queued events arrive
 	r.Reset(map[string]Labeled{"web": {ID: "new", Spec: "@every 10m"}})
+
 	added := timers.registrations()
 
 	r.Remove("web", "old")
