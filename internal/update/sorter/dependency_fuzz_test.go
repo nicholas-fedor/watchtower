@@ -626,9 +626,10 @@ func TestGenerateLinkNormalizationContainers(t *testing.T) {
 			containers := generateLinkNormalizationContainers([]byte(tt.seed))
 			picked := pick(containers, "container1")
 			require.Len(t, picked, 1)
-			assert.Equal(t, tt.links, picked[0].Links(true))
 
 			for _, useComposeDependsOn := range []bool{true, false} {
+				assert.Equal(t, tt.links, picked[0].Links(useComposeDependsOn))
+
 				_, indegree, adjacency, _, err := buildDependencyGraph(newTestLogger(t), containers, useComposeDependsOn)
 				require.NoError(t, err)
 				assert.Equal(t, len(tt.dependencies), indegree["container1"])
