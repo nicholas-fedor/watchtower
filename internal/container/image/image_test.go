@@ -1121,13 +1121,13 @@ func TestImageClient_CheckContainerUpdate(t *testing.T) {
 			t.Run(name, func(t *testing.T) {
 				t.Parallel()
 
-				container := modelfixture.Container(containerfixture.WithImageName(ref))
+				target := modelfixture.Container(containerfixture.WithImageName(ref))
 				c := newTestImageClient(newImageAPI(t), newTestLogger(t), registryConfig.Registry{}, ratelimit.New())
 
-				available, latestID, latestDigest, err := c.CheckContainerUpdate(t.Context(), container, updateConfig.Policy{})
+				available, latestID, latestDigest, err := c.CheckContainerUpdate(t.Context(), target, updateConfig.Policy{})
 				require.NoError(t, err)
 				assert.False(t, available)
-				assert.Equal(t, string(container.ImageID()), string(latestID))
+				assert.Equal(t, string(target.ImageID()), string(latestID))
 				assert.Empty(t, latestDigest)
 			})
 		}
@@ -1421,8 +1421,8 @@ func newImageAPI(t *testing.T) *mockContainer.MockAPIClient {
 func runningImage(imageName, imageID string, repoDigests ...string) *container.Container {
 	options := []containerfixture.Update{
 		containerfixture.WithImageName(imageName),
-		func(container *dockerContainer.InspectResponse, image *dockerImage.InspectResponse) {
-			container.Image = imageID
+		func(c *dockerContainer.InspectResponse, image *dockerImage.InspectResponse) {
+			c.Image = imageID
 			image.ID = imageID
 		},
 	}

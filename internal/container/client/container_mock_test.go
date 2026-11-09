@@ -398,8 +398,8 @@ func newImageAPI(t *testing.T) *mockContainer.MockAPIClient {
 func runningImage(imageID string) *container.Container {
 	return modelfixture.Container(
 		containerfixture.WithImageName("test-image:latest"),
-		func(container *dockerContainer.InspectResponse, image *dockerImage.InspectResponse) {
-			container.Image = imageID
+		func(c *dockerContainer.InspectResponse, image *dockerImage.InspectResponse) {
+			c.Image = imageID
 			image.ID = imageID
 		},
 	)

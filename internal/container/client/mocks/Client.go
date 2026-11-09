@@ -131,8 +131,8 @@ func (_c *MockClient_BuildRemoteImage_Call) RunAndReturn(run func(ctx context.Co
 }
 
 // CheckContainerUpdate provides a mock function for the type MockClient
-func (_mock *MockClient) CheckContainerUpdate(ctx context.Context, container1 *container.Container, policy update.Policy) (bool, types.ImageID, string, error) {
-	ret := _mock.Called(ctx, container1, policy)
+func (_mock *MockClient) CheckContainerUpdate(ctx context.Context, target *container.Container, policy update.Policy) (bool, types.ImageID, string, error) {
+	ret := _mock.Called(ctx, target, policy)
 
 	if len(ret) == 0 {
 		panic("no return value specified for CheckContainerUpdate")
@@ -143,25 +143,25 @@ func (_mock *MockClient) CheckContainerUpdate(ctx context.Context, container1 *c
 	var r2 string
 	var r3 error
 	if returnFunc, ok := ret.Get(0).(func(context.Context, *container.Container, update.Policy) (bool, types.ImageID, string, error)); ok {
-		return returnFunc(ctx, container1, policy)
+		return returnFunc(ctx, target, policy)
 	}
 	if returnFunc, ok := ret.Get(0).(func(context.Context, *container.Container, update.Policy) bool); ok {
-		r0 = returnFunc(ctx, container1, policy)
+		r0 = returnFunc(ctx, target, policy)
 	} else {
 		r0 = ret.Get(0).(bool)
 	}
 	if returnFunc, ok := ret.Get(1).(func(context.Context, *container.Container, update.Policy) types.ImageID); ok {
-		r1 = returnFunc(ctx, container1, policy)
+		r1 = returnFunc(ctx, target, policy)
 	} else {
 		r1 = ret.Get(1).(types.ImageID)
 	}
 	if returnFunc, ok := ret.Get(2).(func(context.Context, *container.Container, update.Policy) string); ok {
-		r2 = returnFunc(ctx, container1, policy)
+		r2 = returnFunc(ctx, target, policy)
 	} else {
 		r2 = ret.Get(2).(string)
 	}
 	if returnFunc, ok := ret.Get(3).(func(context.Context, *container.Container, update.Policy) error); ok {
-		r3 = returnFunc(ctx, container1, policy)
+		r3 = returnFunc(ctx, target, policy)
 	} else {
 		r3 = ret.Error(3)
 	}
@@ -175,13 +175,13 @@ type MockClient_CheckContainerUpdate_Call struct {
 
 // CheckContainerUpdate is a helper method to define mock.On call
 //   - ctx context.Context
-//   - container1 *container.Container
+//   - target *container.Container
 //   - policy update.Policy
-func (_e *MockClient_Expecter) CheckContainerUpdate(ctx any, container1 any, policy any) *MockClient_CheckContainerUpdate_Call {
-	return &MockClient_CheckContainerUpdate_Call{Call: _e.mock.On("CheckContainerUpdate", ctx, container1, policy)}
+func (_e *MockClient_Expecter) CheckContainerUpdate(ctx any, target any, policy any) *MockClient_CheckContainerUpdate_Call {
+	return &MockClient_CheckContainerUpdate_Call{Call: _e.mock.On("CheckContainerUpdate", ctx, target, policy)}
 }
 
-func (_c *MockClient_CheckContainerUpdate_Call) Run(run func(ctx context.Context, container1 *container.Container, policy update.Policy)) *MockClient_CheckContainerUpdate_Call {
+func (_c *MockClient_CheckContainerUpdate_Call) Run(run func(ctx context.Context, target *container.Container, policy update.Policy)) *MockClient_CheckContainerUpdate_Call {
 	_c.Call.Run(func(args mock.Arguments) {
 		var arg0 context.Context
 		if args[0] != nil {
@@ -209,14 +209,14 @@ func (_c *MockClient_CheckContainerUpdate_Call) Return(b bool, imageID types.Ima
 	return _c
 }
 
-func (_c *MockClient_CheckContainerUpdate_Call) RunAndReturn(run func(ctx context.Context, container1 *container.Container, policy update.Policy) (bool, types.ImageID, string, error)) *MockClient_CheckContainerUpdate_Call {
+func (_c *MockClient_CheckContainerUpdate_Call) RunAndReturn(run func(ctx context.Context, target *container.Container, policy update.Policy) (bool, types.ImageID, string, error)) *MockClient_CheckContainerUpdate_Call {
 	_c.Call.Return(run)
 	return _c
 }
 
 // CreateContainer provides a mock function for the type MockClient
-func (_mock *MockClient) CreateContainer(ctx context.Context, container1 *container.Container) (types.ContainerID, error) {
-	ret := _mock.Called(ctx, container1)
+func (_mock *MockClient) CreateContainer(ctx context.Context, target *container.Container) (types.ContainerID, error) {
+	ret := _mock.Called(ctx, target)
 
 	if len(ret) == 0 {
 		panic("no return value specified for CreateContainer")
@@ -225,15 +225,15 @@ func (_mock *MockClient) CreateContainer(ctx context.Context, container1 *contai
 	var r0 types.ContainerID
 	var r1 error
 	if returnFunc, ok := ret.Get(0).(func(context.Context, *container.Container) (types.ContainerID, error)); ok {
-		return returnFunc(ctx, container1)
+		return returnFunc(ctx, target)
 	}
 	if returnFunc, ok := ret.Get(0).(func(context.Context, *container.Container) types.ContainerID); ok {
-		r0 = returnFunc(ctx, container1)
+		r0 = returnFunc(ctx, target)
 	} else {
 		r0 = ret.Get(0).(types.ContainerID)
 	}
 	if returnFunc, ok := ret.Get(1).(func(context.Context, *container.Container) error); ok {
-		r1 = returnFunc(ctx, container1)
+		r1 = returnFunc(ctx, target)
 	} else {
 		r1 = ret.Error(1)
 	}
@@ -247,12 +247,12 @@ type MockClient_CreateContainer_Call struct {
 
 // CreateContainer is a helper method to define mock.On call
 //   - ctx context.Context
-//   - container1 *container.Container
-func (_e *MockClient_Expecter) CreateContainer(ctx any, container1 any) *MockClient_CreateContainer_Call {
-	return &MockClient_CreateContainer_Call{Call: _e.mock.On("CreateContainer", ctx, container1)}
+//   - target *container.Container
+func (_e *MockClient_Expecter) CreateContainer(ctx any, target any) *MockClient_CreateContainer_Call {
+	return &MockClient_CreateContainer_Call{Call: _e.mock.On("CreateContainer", ctx, target)}
 }
 
-func (_c *MockClient_CreateContainer_Call) Run(run func(ctx context.Context, container1 *container.Container)) *MockClient_CreateContainer_Call {
+func (_c *MockClient_CreateContainer_Call) Run(run func(ctx context.Context, target *container.Container)) *MockClient_CreateContainer_Call {
 	_c.Call.Run(func(args mock.Arguments) {
 		var arg0 context.Context
 		if args[0] != nil {
@@ -275,7 +275,7 @@ func (_c *MockClient_CreateContainer_Call) Return(containerID types.ContainerID,
 	return _c
 }
 
-func (_c *MockClient_CreateContainer_Call) RunAndReturn(run func(ctx context.Context, container1 *container.Container) (types.ContainerID, error)) *MockClient_CreateContainer_Call {
+func (_c *MockClient_CreateContainer_Call) RunAndReturn(run func(ctx context.Context, target *container.Container) (types.ContainerID, error)) *MockClient_CreateContainer_Call {
 	_c.Call.Return(run)
 	return _c
 }
@@ -365,8 +365,8 @@ func (_c *MockClient_CreateEphemeralOrchestrator_Call) RunAndReturn(run func(ctx
 }
 
 // ExecuteCommand provides a mock function for the type MockClient
-func (_mock *MockClient) ExecuteCommand(ctx context.Context, container1 *container.Container, command string, timeout int, uid int, gid int) (bool, error) {
-	ret := _mock.Called(ctx, container1, command, timeout, uid, gid)
+func (_mock *MockClient) ExecuteCommand(ctx context.Context, target *container.Container, command string, timeout int, uid int, gid int) (bool, error) {
+	ret := _mock.Called(ctx, target, command, timeout, uid, gid)
 
 	if len(ret) == 0 {
 		panic("no return value specified for ExecuteCommand")
@@ -375,15 +375,15 @@ func (_mock *MockClient) ExecuteCommand(ctx context.Context, container1 *contain
 	var r0 bool
 	var r1 error
 	if returnFunc, ok := ret.Get(0).(func(context.Context, *container.Container, string, int, int, int) (bool, error)); ok {
-		return returnFunc(ctx, container1, command, timeout, uid, gid)
+		return returnFunc(ctx, target, command, timeout, uid, gid)
 	}
 	if returnFunc, ok := ret.Get(0).(func(context.Context, *container.Container, string, int, int, int) bool); ok {
-		r0 = returnFunc(ctx, container1, command, timeout, uid, gid)
+		r0 = returnFunc(ctx, target, command, timeout, uid, gid)
 	} else {
 		r0 = ret.Get(0).(bool)
 	}
 	if returnFunc, ok := ret.Get(1).(func(context.Context, *container.Container, string, int, int, int) error); ok {
-		r1 = returnFunc(ctx, container1, command, timeout, uid, gid)
+		r1 = returnFunc(ctx, target, command, timeout, uid, gid)
 	} else {
 		r1 = ret.Error(1)
 	}
@@ -397,16 +397,16 @@ type MockClient_ExecuteCommand_Call struct {
 
 // ExecuteCommand is a helper method to define mock.On call
 //   - ctx context.Context
-//   - container1 *container.Container
+//   - target *container.Container
 //   - command string
 //   - timeout int
 //   - uid int
 //   - gid int
-func (_e *MockClient_Expecter) ExecuteCommand(ctx any, container1 any, command any, timeout any, uid any, gid any) *MockClient_ExecuteCommand_Call {
-	return &MockClient_ExecuteCommand_Call{Call: _e.mock.On("ExecuteCommand", ctx, container1, command, timeout, uid, gid)}
+func (_e *MockClient_Expecter) ExecuteCommand(ctx any, target any, command any, timeout any, uid any, gid any) *MockClient_ExecuteCommand_Call {
+	return &MockClient_ExecuteCommand_Call{Call: _e.mock.On("ExecuteCommand", ctx, target, command, timeout, uid, gid)}
 }
 
-func (_c *MockClient_ExecuteCommand_Call) Run(run func(ctx context.Context, container1 *container.Container, command string, timeout int, uid int, gid int)) *MockClient_ExecuteCommand_Call {
+func (_c *MockClient_ExecuteCommand_Call) Run(run func(ctx context.Context, target *container.Container, command string, timeout int, uid int, gid int)) *MockClient_ExecuteCommand_Call {
 	_c.Call.Run(func(args mock.Arguments) {
 		var arg0 context.Context
 		if args[0] != nil {
@@ -449,7 +449,7 @@ func (_c *MockClient_ExecuteCommand_Call) Return(b bool, err error) *MockClient_
 	return _c
 }
 
-func (_c *MockClient_ExecuteCommand_Call) RunAndReturn(run func(ctx context.Context, container1 *container.Container, command string, timeout int, uid int, gid int) (bool, error)) *MockClient_ExecuteCommand_Call {
+func (_c *MockClient_ExecuteCommand_Call) RunAndReturn(run func(ctx context.Context, target *container.Container, command string, timeout int, uid int, gid int) (bool, error)) *MockClient_ExecuteCommand_Call {
 	_c.Call.Return(run)
 	return _c
 }
@@ -812,8 +812,8 @@ func (_c *MockClient_GetVersion_Call) RunAndReturn(run func() string) *MockClien
 }
 
 // IsContainerStale provides a mock function for the type MockClient
-func (_mock *MockClient) IsContainerStale(ctx context.Context, container1 *container.Container, policy update.Policy) (bool, types.ImageID, string, error) {
-	ret := _mock.Called(ctx, container1, policy)
+func (_mock *MockClient) IsContainerStale(ctx context.Context, target *container.Container, policy update.Policy) (bool, types.ImageID, string, error) {
+	ret := _mock.Called(ctx, target, policy)
 
 	if len(ret) == 0 {
 		panic("no return value specified for IsContainerStale")
@@ -824,25 +824,25 @@ func (_mock *MockClient) IsContainerStale(ctx context.Context, container1 *conta
 	var r2 string
 	var r3 error
 	if returnFunc, ok := ret.Get(0).(func(context.Context, *container.Container, update.Policy) (bool, types.ImageID, string, error)); ok {
-		return returnFunc(ctx, container1, policy)
+		return returnFunc(ctx, target, policy)
 	}
 	if returnFunc, ok := ret.Get(0).(func(context.Context, *container.Container, update.Policy) bool); ok {
-		r0 = returnFunc(ctx, container1, policy)
+		r0 = returnFunc(ctx, target, policy)
 	} else {
 		r0 = ret.Get(0).(bool)
 	}
 	if returnFunc, ok := ret.Get(1).(func(context.Context, *container.Container, update.Policy) types.ImageID); ok {
-		r1 = returnFunc(ctx, container1, policy)
+		r1 = returnFunc(ctx, target, policy)
 	} else {
 		r1 = ret.Get(1).(types.ImageID)
 	}
 	if returnFunc, ok := ret.Get(2).(func(context.Context, *container.Container, update.Policy) string); ok {
-		r2 = returnFunc(ctx, container1, policy)
+		r2 = returnFunc(ctx, target, policy)
 	} else {
 		r2 = ret.Get(2).(string)
 	}
 	if returnFunc, ok := ret.Get(3).(func(context.Context, *container.Container, update.Policy) error); ok {
-		r3 = returnFunc(ctx, container1, policy)
+		r3 = returnFunc(ctx, target, policy)
 	} else {
 		r3 = ret.Error(3)
 	}
@@ -856,13 +856,13 @@ type MockClient_IsContainerStale_Call struct {
 
 // IsContainerStale is a helper method to define mock.On call
 //   - ctx context.Context
-//   - container1 *container.Container
+//   - target *container.Container
 //   - policy update.Policy
-func (_e *MockClient_Expecter) IsContainerStale(ctx any, container1 any, policy any) *MockClient_IsContainerStale_Call {
-	return &MockClient_IsContainerStale_Call{Call: _e.mock.On("IsContainerStale", ctx, container1, policy)}
+func (_e *MockClient_Expecter) IsContainerStale(ctx any, target any, policy any) *MockClient_IsContainerStale_Call {
+	return &MockClient_IsContainerStale_Call{Call: _e.mock.On("IsContainerStale", ctx, target, policy)}
 }
 
-func (_c *MockClient_IsContainerStale_Call) Run(run func(ctx context.Context, container1 *container.Container, policy update.Policy)) *MockClient_IsContainerStale_Call {
+func (_c *MockClient_IsContainerStale_Call) Run(run func(ctx context.Context, target *container.Container, policy update.Policy)) *MockClient_IsContainerStale_Call {
 	_c.Call.Run(func(args mock.Arguments) {
 		var arg0 context.Context
 		if args[0] != nil {
@@ -890,7 +890,7 @@ func (_c *MockClient_IsContainerStale_Call) Return(b bool, imageID types.ImageID
 	return _c
 }
 
-func (_c *MockClient_IsContainerStale_Call) RunAndReturn(run func(ctx context.Context, container1 *container.Container, policy update.Policy) (bool, types.ImageID, string, error)) *MockClient_IsContainerStale_Call {
+func (_c *MockClient_IsContainerStale_Call) RunAndReturn(run func(ctx context.Context, target *container.Container, policy update.Policy) (bool, types.ImageID, string, error)) *MockClient_IsContainerStale_Call {
 	_c.Call.Return(run)
 	return _c
 }
@@ -1024,8 +1024,8 @@ func (_c *MockClient_Ping_Call) RunAndReturn(run func(ctx context.Context) error
 }
 
 // RemoveContainer provides a mock function for the type MockClient
-func (_mock *MockClient) RemoveContainer(ctx context.Context, container1 *container.Container) error {
-	ret := _mock.Called(ctx, container1)
+func (_mock *MockClient) RemoveContainer(ctx context.Context, target *container.Container) error {
+	ret := _mock.Called(ctx, target)
 
 	if len(ret) == 0 {
 		panic("no return value specified for RemoveContainer")
@@ -1033,7 +1033,7 @@ func (_mock *MockClient) RemoveContainer(ctx context.Context, container1 *contai
 
 	var r0 error
 	if returnFunc, ok := ret.Get(0).(func(context.Context, *container.Container) error); ok {
-		r0 = returnFunc(ctx, container1)
+		r0 = returnFunc(ctx, target)
 	} else {
 		r0 = ret.Error(0)
 	}
@@ -1047,12 +1047,12 @@ type MockClient_RemoveContainer_Call struct {
 
 // RemoveContainer is a helper method to define mock.On call
 //   - ctx context.Context
-//   - container1 *container.Container
-func (_e *MockClient_Expecter) RemoveContainer(ctx any, container1 any) *MockClient_RemoveContainer_Call {
-	return &MockClient_RemoveContainer_Call{Call: _e.mock.On("RemoveContainer", ctx, container1)}
+//   - target *container.Container
+func (_e *MockClient_Expecter) RemoveContainer(ctx any, target any) *MockClient_RemoveContainer_Call {
+	return &MockClient_RemoveContainer_Call{Call: _e.mock.On("RemoveContainer", ctx, target)}
 }
 
-func (_c *MockClient_RemoveContainer_Call) Run(run func(ctx context.Context, container1 *container.Container)) *MockClient_RemoveContainer_Call {
+func (_c *MockClient_RemoveContainer_Call) Run(run func(ctx context.Context, target *container.Container)) *MockClient_RemoveContainer_Call {
 	_c.Call.Run(func(args mock.Arguments) {
 		var arg0 context.Context
 		if args[0] != nil {
@@ -1075,7 +1075,7 @@ func (_c *MockClient_RemoveContainer_Call) Return(err error) *MockClient_RemoveC
 	return _c
 }
 
-func (_c *MockClient_RemoveContainer_Call) RunAndReturn(run func(ctx context.Context, container1 *container.Container) error) *MockClient_RemoveContainer_Call {
+func (_c *MockClient_RemoveContainer_Call) RunAndReturn(run func(ctx context.Context, target *container.Container) error) *MockClient_RemoveContainer_Call {
 	_c.Call.Return(run)
 	return _c
 }
@@ -1144,8 +1144,8 @@ func (_c *MockClient_RemoveImageByID_Call) RunAndReturn(run func(ctx context.Con
 }
 
 // RenameContainer provides a mock function for the type MockClient
-func (_mock *MockClient) RenameContainer(ctx context.Context, container1 *container.Container, newName string) error {
-	ret := _mock.Called(ctx, container1, newName)
+func (_mock *MockClient) RenameContainer(ctx context.Context, target *container.Container, newName string) error {
+	ret := _mock.Called(ctx, target, newName)
 
 	if len(ret) == 0 {
 		panic("no return value specified for RenameContainer")
@@ -1153,7 +1153,7 @@ func (_mock *MockClient) RenameContainer(ctx context.Context, container1 *contai
 
 	var r0 error
 	if returnFunc, ok := ret.Get(0).(func(context.Context, *container.Container, string) error); ok {
-		r0 = returnFunc(ctx, container1, newName)
+		r0 = returnFunc(ctx, target, newName)
 	} else {
 		r0 = ret.Error(0)
 	}
@@ -1167,13 +1167,13 @@ type MockClient_RenameContainer_Call struct {
 
 // RenameContainer is a helper method to define mock.On call
 //   - ctx context.Context
-//   - container1 *container.Container
+//   - target *container.Container
 //   - newName string
-func (_e *MockClient_Expecter) RenameContainer(ctx any, container1 any, newName any) *MockClient_RenameContainer_Call {
-	return &MockClient_RenameContainer_Call{Call: _e.mock.On("RenameContainer", ctx, container1, newName)}
+func (_e *MockClient_Expecter) RenameContainer(ctx any, target any, newName any) *MockClient_RenameContainer_Call {
+	return &MockClient_RenameContainer_Call{Call: _e.mock.On("RenameContainer", ctx, target, newName)}
 }
 
-func (_c *MockClient_RenameContainer_Call) Run(run func(ctx context.Context, container1 *container.Container, newName string)) *MockClient_RenameContainer_Call {
+func (_c *MockClient_RenameContainer_Call) Run(run func(ctx context.Context, target *container.Container, newName string)) *MockClient_RenameContainer_Call {
 	_c.Call.Run(func(args mock.Arguments) {
 		var arg0 context.Context
 		if args[0] != nil {
@@ -1201,7 +1201,7 @@ func (_c *MockClient_RenameContainer_Call) Return(err error) *MockClient_RenameC
 	return _c
 }
 
-func (_c *MockClient_RenameContainer_Call) RunAndReturn(run func(ctx context.Context, container1 *container.Container, newName string) error) *MockClient_RenameContainer_Call {
+func (_c *MockClient_RenameContainer_Call) RunAndReturn(run func(ctx context.Context, target *container.Container, newName string) error) *MockClient_RenameContainer_Call {
 	_c.Call.Return(run)
 	return _c
 }
@@ -1270,8 +1270,8 @@ func (_c *MockClient_SetRestartPolicy_Call) RunAndReturn(run func(ctx context.Co
 }
 
 // StartContainer provides a mock function for the type MockClient
-func (_mock *MockClient) StartContainer(ctx context.Context, container1 *container.Container) (types.ContainerID, error) {
-	ret := _mock.Called(ctx, container1)
+func (_mock *MockClient) StartContainer(ctx context.Context, target *container.Container) (types.ContainerID, error) {
+	ret := _mock.Called(ctx, target)
 
 	if len(ret) == 0 {
 		panic("no return value specified for StartContainer")
@@ -1280,15 +1280,15 @@ func (_mock *MockClient) StartContainer(ctx context.Context, container1 *contain
 	var r0 types.ContainerID
 	var r1 error
 	if returnFunc, ok := ret.Get(0).(func(context.Context, *container.Container) (types.ContainerID, error)); ok {
-		return returnFunc(ctx, container1)
+		return returnFunc(ctx, target)
 	}
 	if returnFunc, ok := ret.Get(0).(func(context.Context, *container.Container) types.ContainerID); ok {
-		r0 = returnFunc(ctx, container1)
+		r0 = returnFunc(ctx, target)
 	} else {
 		r0 = ret.Get(0).(types.ContainerID)
 	}
 	if returnFunc, ok := ret.Get(1).(func(context.Context, *container.Container) error); ok {
-		r1 = returnFunc(ctx, container1)
+		r1 = returnFunc(ctx, target)
 	} else {
 		r1 = ret.Error(1)
 	}
@@ -1302,12 +1302,12 @@ type MockClient_StartContainer_Call struct {
 
 // StartContainer is a helper method to define mock.On call
 //   - ctx context.Context
-//   - container1 *container.Container
-func (_e *MockClient_Expecter) StartContainer(ctx any, container1 any) *MockClient_StartContainer_Call {
-	return &MockClient_StartContainer_Call{Call: _e.mock.On("StartContainer", ctx, container1)}
+//   - target *container.Container
+func (_e *MockClient_Expecter) StartContainer(ctx any, target any) *MockClient_StartContainer_Call {
+	return &MockClient_StartContainer_Call{Call: _e.mock.On("StartContainer", ctx, target)}
 }
 
-func (_c *MockClient_StartContainer_Call) Run(run func(ctx context.Context, container1 *container.Container)) *MockClient_StartContainer_Call {
+func (_c *MockClient_StartContainer_Call) Run(run func(ctx context.Context, target *container.Container)) *MockClient_StartContainer_Call {
 	_c.Call.Run(func(args mock.Arguments) {
 		var arg0 context.Context
 		if args[0] != nil {
@@ -1330,7 +1330,7 @@ func (_c *MockClient_StartContainer_Call) Return(containerID types.ContainerID, 
 	return _c
 }
 
-func (_c *MockClient_StartContainer_Call) RunAndReturn(run func(ctx context.Context, container1 *container.Container) (types.ContainerID, error)) *MockClient_StartContainer_Call {
+func (_c *MockClient_StartContainer_Call) RunAndReturn(run func(ctx context.Context, target *container.Container) (types.ContainerID, error)) *MockClient_StartContainer_Call {
 	_c.Call.Return(run)
 	return _c
 }
@@ -1393,8 +1393,8 @@ func (_c *MockClient_StartContainerByID_Call) RunAndReturn(run func(ctx context.
 }
 
 // StopAndRemoveContainer provides a mock function for the type MockClient
-func (_mock *MockClient) StopAndRemoveContainer(ctx context.Context, container1 *container.Container, timeout time.Duration) error {
-	ret := _mock.Called(ctx, container1, timeout)
+func (_mock *MockClient) StopAndRemoveContainer(ctx context.Context, target *container.Container, timeout time.Duration) error {
+	ret := _mock.Called(ctx, target, timeout)
 
 	if len(ret) == 0 {
 		panic("no return value specified for StopAndRemoveContainer")
@@ -1402,7 +1402,7 @@ func (_mock *MockClient) StopAndRemoveContainer(ctx context.Context, container1 
 
 	var r0 error
 	if returnFunc, ok := ret.Get(0).(func(context.Context, *container.Container, time.Duration) error); ok {
-		r0 = returnFunc(ctx, container1, timeout)
+		r0 = returnFunc(ctx, target, timeout)
 	} else {
 		r0 = ret.Error(0)
 	}
@@ -1416,13 +1416,13 @@ type MockClient_StopAndRemoveContainer_Call struct {
 
 // StopAndRemoveContainer is a helper method to define mock.On call
 //   - ctx context.Context
-//   - container1 *container.Container
+//   - target *container.Container
 //   - timeout time.Duration
-func (_e *MockClient_Expecter) StopAndRemoveContainer(ctx any, container1 any, timeout any) *MockClient_StopAndRemoveContainer_Call {
-	return &MockClient_StopAndRemoveContainer_Call{Call: _e.mock.On("StopAndRemoveContainer", ctx, container1, timeout)}
+func (_e *MockClient_Expecter) StopAndRemoveContainer(ctx any, target any, timeout any) *MockClient_StopAndRemoveContainer_Call {
+	return &MockClient_StopAndRemoveContainer_Call{Call: _e.mock.On("StopAndRemoveContainer", ctx, target, timeout)}
 }
 
-func (_c *MockClient_StopAndRemoveContainer_Call) Run(run func(ctx context.Context, container1 *container.Container, timeout time.Duration)) *MockClient_StopAndRemoveContainer_Call {
+func (_c *MockClient_StopAndRemoveContainer_Call) Run(run func(ctx context.Context, target *container.Container, timeout time.Duration)) *MockClient_StopAndRemoveContainer_Call {
 	_c.Call.Run(func(args mock.Arguments) {
 		var arg0 context.Context
 		if args[0] != nil {
@@ -1450,14 +1450,14 @@ func (_c *MockClient_StopAndRemoveContainer_Call) Return(err error) *MockClient_
 	return _c
 }
 
-func (_c *MockClient_StopAndRemoveContainer_Call) RunAndReturn(run func(ctx context.Context, container1 *container.Container, timeout time.Duration) error) *MockClient_StopAndRemoveContainer_Call {
+func (_c *MockClient_StopAndRemoveContainer_Call) RunAndReturn(run func(ctx context.Context, target *container.Container, timeout time.Duration) error) *MockClient_StopAndRemoveContainer_Call {
 	_c.Call.Return(run)
 	return _c
 }
 
 // StopContainer provides a mock function for the type MockClient
-func (_mock *MockClient) StopContainer(ctx context.Context, container1 *container.Container, timeout time.Duration) error {
-	ret := _mock.Called(ctx, container1, timeout)
+func (_mock *MockClient) StopContainer(ctx context.Context, target *container.Container, timeout time.Duration) error {
+	ret := _mock.Called(ctx, target, timeout)
 
 	if len(ret) == 0 {
 		panic("no return value specified for StopContainer")
@@ -1465,7 +1465,7 @@ func (_mock *MockClient) StopContainer(ctx context.Context, container1 *containe
 
 	var r0 error
 	if returnFunc, ok := ret.Get(0).(func(context.Context, *container.Container, time.Duration) error); ok {
-		r0 = returnFunc(ctx, container1, timeout)
+		r0 = returnFunc(ctx, target, timeout)
 	} else {
 		r0 = ret.Error(0)
 	}
@@ -1479,13 +1479,13 @@ type MockClient_StopContainer_Call struct {
 
 // StopContainer is a helper method to define mock.On call
 //   - ctx context.Context
-//   - container1 *container.Container
+//   - target *container.Container
 //   - timeout time.Duration
-func (_e *MockClient_Expecter) StopContainer(ctx any, container1 any, timeout any) *MockClient_StopContainer_Call {
-	return &MockClient_StopContainer_Call{Call: _e.mock.On("StopContainer", ctx, container1, timeout)}
+func (_e *MockClient_Expecter) StopContainer(ctx any, target any, timeout any) *MockClient_StopContainer_Call {
+	return &MockClient_StopContainer_Call{Call: _e.mock.On("StopContainer", ctx, target, timeout)}
 }
 
-func (_c *MockClient_StopContainer_Call) Run(run func(ctx context.Context, container1 *container.Container, timeout time.Duration)) *MockClient_StopContainer_Call {
+func (_c *MockClient_StopContainer_Call) Run(run func(ctx context.Context, target *container.Container, timeout time.Duration)) *MockClient_StopContainer_Call {
 	_c.Call.Run(func(args mock.Arguments) {
 		var arg0 context.Context
 		if args[0] != nil {
@@ -1513,7 +1513,7 @@ func (_c *MockClient_StopContainer_Call) Return(err error) *MockClient_StopConta
 	return _c
 }
 
-func (_c *MockClient_StopContainer_Call) RunAndReturn(run func(ctx context.Context, container1 *container.Container, timeout time.Duration) error) *MockClient_StopContainer_Call {
+func (_c *MockClient_StopContainer_Call) RunAndReturn(run func(ctx context.Context, target *container.Container, timeout time.Duration) error) *MockClient_StopContainer_Call {
 	_c.Call.Return(run)
 	return _c
 }

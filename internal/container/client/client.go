@@ -152,66 +152,66 @@ type Client interface {
 	//
 	// Parameters:
 	//   - ctx: Context for cancellation and timeout control.
-	//   - container: Container to stop.
+	//   - target: Container to stop.
 	//   - timeout: Duration to wait before forcing stop.
 	//
 	// Returns:
 	//   - error: Non-nil if stop fails, nil on success.
-	StopContainer(ctx context.Context, container *container.Container, timeout time.Duration) error
+	StopContainer(ctx context.Context, target *container.Container, timeout time.Duration) error
 
 	// StopAndRemoveContainer stops and removes a specified container,
 	// respecting the given timeout.
 	//
 	// Parameters:
 	//   - ctx: Context for cancellation and timeout control.
-	//   - container: Container to stop and remove.
+	//   - target: Container to stop and remove.
 	//   - timeout: Duration to wait before forcing stop.
 	//
 	// Returns:
 	//   - error: Non-nil if stop/removal fails, nil on success.
-	StopAndRemoveContainer(ctx context.Context, container *container.Container, timeout time.Duration) error
+	StopAndRemoveContainer(ctx context.Context, target *container.Container, timeout time.Duration) error
 
 	// CreateContainer creates a new container based on the provided
 	// container's configuration, but does not start it.
 	//
 	// Parameters:
 	//   - ctx: Context for cancellation and timeout control.
-	//   - container: Source container to replicate.
+	//   - target: Source container to replicate.
 	//
 	// Returns:
 	//   - types.ContainerID: ID of the new container.
 	//   - error: Non-nil if creation fails, nil on success.
-	CreateContainer(ctx context.Context, container *container.Container) (types.ContainerID, error)
+	CreateContainer(ctx context.Context, target *container.Container) (types.ContainerID, error)
 
 	// StartContainer creates and starts a new container based on the provided
 	// container's configuration.
 	//
 	// Parameters:
 	//   - ctx: Context for cancellation and timeout control.
-	//   - container: Source container to replicate.
+	//   - target: Source container to replicate.
 	//
 	// Returns:
 	//   - types.ContainerID: ID of the new container.
 	//   - error: Non-nil if creation/start fails, nil on success.
-	StartContainer(ctx context.Context, container *container.Container) (types.ContainerID, error)
+	StartContainer(ctx context.Context, target *container.Container) (types.ContainerID, error)
 
 	// RenameContainer renames an existing container to the specified new name.
 	//
 	// Parameters:
 	//   - ctx: Context for cancellation and timeout control.
-	//   - container: Container to rename.
+	//   - target: Container to rename.
 	//   - newName: New name for the container.
 	//
 	// Returns:
 	//   - error: Non-nil if rename fails, nil on success.
-	RenameContainer(ctx context.Context, container *container.Container, newName string) error
+	RenameContainer(ctx context.Context, target *container.Container, newName string) error
 
 	// IsContainerStale checks if a container's image is outdated compared to
 	// the latest available version.
 	//
 	// Parameters:
 	//   - ctx: Context for cancellation and timeout control.
-	//   - container: Container to check.
+	//   - target: Container to check.
 	//   - policy: Update policy for staleness check.
 	//
 	// Returns:
@@ -221,7 +221,7 @@ type Client interface {
 	//   - error: Non-nil if check fails, nil on success.
 	IsContainerStale(
 		ctx context.Context,
-		container *container.Container,
+		target *container.Container,
 		policy updateConfig.Policy,
 	) (bool, types.ImageID, string, error)
 
@@ -231,7 +231,7 @@ type Client interface {
 	//
 	// Parameters:
 	//   - ctx: Context for cancellation and timeout control.
-	//   - container: Container to check.
+	//   - target: Container to check.
 	//   - policy: Update policy (NoPull, LabelPrecedence).
 	//
 	// Returns:
@@ -241,7 +241,7 @@ type Client interface {
 	//   - error: Non-nil if the check fails, nil on success.
 	CheckContainerUpdate(
 		ctx context.Context,
-		container *container.Container,
+		target *container.Container,
 		policy updateConfig.Policy,
 	) (bool, types.ImageID, string, error)
 
@@ -266,7 +266,7 @@ type Client interface {
 	//
 	// Parameters:
 	//   - ctx: Context for cancellation and timeout control.
-	//   - container: Container to execute command in.
+	//   - target: Container to execute command in.
 	//   - command: Command to execute.
 	//   - timeout: Minutes to wait before timeout (0 for no timeout).
 	//   - uid: UID to run command as (-1 to use container default).
@@ -277,7 +277,7 @@ type Client interface {
 	//   - error: Non-nil if execution fails, nil on success.
 	ExecuteCommand(
 		ctx context.Context,
-		container *container.Container,
+		target *container.Container,
 		command string,
 		timeout int,
 		uid int,
@@ -377,11 +377,11 @@ type Client interface {
 	//
 	// Parameters:
 	//   - ctx: Context for cancellation and timeout control.
-	//   - container: Container to remove.
+	//   - target: Container to remove.
 	//
 	// Returns:
 	//   - error: Non-nil if removal fails, nil on success.
-	RemoveContainer(ctx context.Context, container *container.Container) error
+	RemoveContainer(ctx context.Context, target *container.Container) error
 
 	// CreateEphemeralOrchestrator creates a short-lived container that orchestrates
 	// the Watchtower self-update transition.
@@ -766,9 +766,9 @@ func (c *client) ListContainers(ctx context.Context, filter ...types.Filter) ([]
 		} else {
 			// Multiple filters: combine them with logical AND
 			// A container must pass ALL filters to be included
-			containerFilter = func(container types.FilterableContainer) bool {
+			containerFilter = func(c types.FilterableContainer) bool {
 				for _, f := range filter {
-					if !f(container) {
+					if !f(c) {
 						return false
 					}
 				}
@@ -848,8 +848,8 @@ func (c *client) ListContainers(ctx context.Context, filter ...types.Filter) ([]
 //   - *container.Container: Container details if found.
 //   - error: Non-nil if retrieval fails, nil on success.
 func (c *client) GetContainer(ctx context.Context, containerID types.ContainerID) (*container.Container, error) {
-	// Retrieve container details using helper function.
-	container, err := getSourceContainer(c.logger(), ctx, c.api, containerID, nil)
+	// Retrieve target details using helper function.
+	target, err := getSourceContainer(c.logger(), ctx, c.api, containerID, nil)
 	if err != nil {
 		c.logger().Debug().
 			Err(err).
@@ -859,11 +859,11 @@ func (c *client) GetContainer(ctx context.Context, containerID types.ContainerID
 		return nil, err
 	}
 
-	if !container.HasImageInfo() {
+	if !target.HasImageInfo() {
 		c.logger().Warn().
-			Str("container", container.Name()).
+			Str("container", target.Name()).
 			Str("container_id", string(containerID)).
-			Str("image", container.ImageName()).
+			Str("image", target.ImageName()).
 			Msg("Failed to retrieve image info")
 	}
 
@@ -871,7 +871,7 @@ func (c *client) GetContainer(ctx context.Context, containerID types.ContainerID
 		Str("container_id", string(containerID)).
 		Msg("Retrieved container details")
 
-	return container, nil
+	return target, nil
 }
 
 // GetCurrentWatchtowerContainer retrieves container information for the
@@ -954,27 +954,27 @@ func (c *client) GetCurrentWatchtowerContainer(
 //
 // Parameters:
 //   - ctx: Context for cancellation and timeout control.
-//   - container: Container to stop.
+//   - target: Container to stop.
 //   - timeout: Duration to wait before forcing stop.
 //
 // Returns:
 //   - error: Non-nil if stop fails, nil on success.
-func (c *client) StopContainer(ctx context.Context, container *container.Container, timeout time.Duration) error {
+func (c *client) StopContainer(ctx context.Context, target *container.Container, timeout time.Duration) error {
 	// Stop container using helper function.
-	err := stopSourceContainer(c.logger(), ctx, c.api, container, timeout)
+	err := stopSourceContainer(c.logger(), ctx, c.api, target, timeout)
 	if err != nil {
 		c.logger().Debug().
 			Err(err).
-			Str("container", container.Name()).
-			Str("image", container.ImageName()).
+			Str("container", target.Name()).
+			Str("image", target.ImageName()).
 			Msg("Failed to stop container")
 
 		return err
 	}
 
 	c.logger().Debug().
-		Str("container", container.Name()).
-		Str("image", container.ImageName()).
+		Str("container", target.Name()).
+		Str("image", target.ImageName()).
 		Msg("Stopped container")
 
 	return nil
@@ -988,33 +988,33 @@ func (c *client) StopContainer(ctx context.Context, container *container.Contain
 //
 // Parameters:
 //   - ctx: Context for cancellation and timeout control.
-//   - container: Container to stop and remove.
+//   - target: Container to stop and remove.
 //   - timeout: Duration to wait before forcing stop.
 //
 // Returns:
 //   - error: Non-nil if stop/removal fails, nil on success.
-func (c *client) StopAndRemoveContainer(ctx context.Context, container *container.Container, timeout time.Duration) error {
+func (c *client) StopAndRemoveContainer(ctx context.Context, target *container.Container, timeout time.Duration) error {
 	// Stop and remove container using helper function with volume option.
 	err := stopAndRemoveSourceContainer(c.logger(),
 		ctx,
 		c.api,
-		container,
+		target,
 		timeout,
 		c.RemoveVolumes,
 	)
 	if err != nil {
 		c.logger().Debug().
 			Err(err).
-			Str("container", container.Name()).
-			Str("image", container.ImageName()).
+			Str("container", target.Name()).
+			Str("image", target.ImageName()).
 			Msg("Failed to stop and remove container")
 
 		return err
 	}
 
 	c.logger().Debug().
-		Str("container", container.Name()).
-		Str("image", container.ImageName()).
+		Str("container", target.Name()).
+		Str("image", target.ImageName()).
 		Msg("Stopped and removed container")
 
 	return nil
@@ -1025,17 +1025,17 @@ func (c *client) StopAndRemoveContainer(ctx context.Context, container *containe
 //
 // Parameters:
 //   - ctx: Context for cancellation and timeout control.
-//   - container: Source container to replicate.
+//   - target: Source container to replicate.
 //
 // Returns:
 //   - types.ContainerID: ID of the new container.
 //   - error: Non-nil if creation fails, nil on success.
-func (c *client) CreateContainer(ctx context.Context, container *container.Container) (types.ContainerID, error) {
-	defer c.DiscardCopyFiles(container.ID())
+func (c *client) CreateContainer(ctx context.Context, target *container.Container) (types.ContainerID, error) {
+	defer c.DiscardCopyFiles(target.ID())
 
 	clogVal := c.logger().With().
-		Str("container", container.Name()).
-		Str("image", container.ImageName()).
+		Str("container", target.Name()).
+		Str("image", target.ImageName()).
 		Logger()
 	clog := &clogVal
 	// Only the auto CPU copy mode depends on the runtime.
@@ -1047,12 +1047,12 @@ func (c *client) CreateContainer(ctx context.Context, container *container.Conta
 		Str("client_version", clientVersion).
 		Msg("Obtaining source container network configuration")
 
-	networkConfig := network.FromContainer(c.logger(), container, clientVersion)
+	networkConfig := network.FromContainer(c.logger(), target, clientVersion)
 
 	newID, err := recreate.CreateTarget(c.logger(),
 		ctx,
 		c.api,
-		container,
+		target,
 		networkConfig,
 		clientVersion,
 		c.DisableMemorySwappiness,
@@ -1067,7 +1067,7 @@ func (c *client) CreateContainer(ctx context.Context, container *container.Conta
 		return "", fmt.Errorf("create replacement container: %w", err)
 	}
 
-	err = c.injectStoredCopyFiles(ctx, container, newID)
+	err = c.injectStoredCopyFiles(ctx, target, newID)
 	if err != nil {
 		clog.Debug().
 			Err(err).
@@ -1091,19 +1091,19 @@ func (c *client) CreateContainer(ctx context.Context, container *container.Conta
 //
 // Parameters:
 //   - ctx: Context for cancellation and timeout control.
-//   - container: Source container to replicate.
+//   - target: Source container to replicate.
 //
 // Returns:
 //   - types.ContainerID: ID of the new container.
 //   - error: Non-nil if creation/start fails, nil on success.
-func (c *client) StartContainer(ctx context.Context, container *container.Container) (types.ContainerID, error) {
+func (c *client) StartContainer(ctx context.Context, target *container.Container) (types.ContainerID, error) {
 	clogVal := c.logger().With().
-		Str("container", container.Name()).
-		Str("image", container.ImageName()).
+		Str("container", target.Name()).
+		Str("image", target.ImageName()).
 		Logger()
 	clog := &clogVal
 
-	newID, err := c.CreateContainer(ctx, container)
+	newID, err := c.CreateContainer(ctx, target)
 	if err != nil {
 		clog.Debug().
 			Err(err).
@@ -1112,7 +1112,7 @@ func (c *client) StartContainer(ctx context.Context, container *container.Contai
 		return "", err
 	}
 
-	err = startTargetContainer(ctx, c.api, clog, container, newID, c.ReviveStopped)
+	err = startTargetContainer(ctx, c.api, clog, target, newID, c.ReviveStopped)
 	if err != nil {
 		return "", err
 	}
@@ -1223,14 +1223,14 @@ func (c *client) SetRestartPolicy(
 //
 // Parameters:
 //   - ctx: Context for cancellation and timeout control.
-//   - container: Container to remove.
+//   - target: Container to remove.
 //
 // Returns:
 //   - error: Non-nil if removal fails, nil on success.
-func (c *client) RemoveContainer(ctx context.Context, container *container.Container) error {
+func (c *client) RemoveContainer(ctx context.Context, target *container.Container) error {
 	clogVal := c.logger().With().
-		Str("container", container.Name()).
-		Str("id", container.ID().ShortID()).
+		Str("container", target.Name()).
+		Str("id", target.ID().ShortID()).
 		Logger()
 	clog := &clogVal
 
@@ -1238,7 +1238,7 @@ func (c *client) RemoveContainer(ctx context.Context, container *container.Conta
 
 	_, err := c.api.ContainerRemove(
 		ctx,
-		string(container.ID()),
+		string(target.ID()),
 		dockerClient.ContainerRemoveOptions{
 			Force: true,
 		},
@@ -1266,18 +1266,18 @@ func (c *client) RemoveContainer(ctx context.Context, container *container.Conta
 //
 // Parameters:
 //   - ctx: Context for cancellation and timeout control.
-//   - container: Container to rename.
+//   - target: Container to rename.
 //   - newName: New name for the container.
 //
 // Returns:
 //   - error: Non-nil if rename fails, nil on success.
-func (c *client) RenameContainer(ctx context.Context, container *container.Container, newName string) error {
+func (c *client) RenameContainer(ctx context.Context, target *container.Container, newName string) error {
 	// Perform rename using helper function.
-	err := recreate.RenameTarget(c.logger(), ctx, c.api, container, newName)
+	err := recreate.RenameTarget(c.logger(), ctx, c.api, target, newName)
 	if err != nil {
 		c.logger().Debug().
 			Err(err).
-			Str("container", container.Name()).
+			Str("container", target.Name()).
 			Str("new_name", newName).
 			Msg("Failed to rename container")
 
@@ -1285,7 +1285,7 @@ func (c *client) RenameContainer(ctx context.Context, container *container.Conta
 	}
 
 	c.logger().Debug().
-		Str("container", container.Name()).
+		Str("container", target.Name()).
 		Str("new_name", newName).
 		Msg("Renamed container")
 
@@ -1295,7 +1295,7 @@ func (c *client) RenameContainer(ctx context.Context, container *container.Conta
 // IsContainerStale checks if a container's image is outdated.
 //
 // Parameters:
-//   - container: Container to check.
+//   - target: Container to check.
 //   - policy: Update policy for staleness check.
 //
 // Returns:
@@ -1304,7 +1304,7 @@ func (c *client) RenameContainer(ctx context.Context, container *container.Conta
 //   - error: Non-nil if check fails, nil on success.
 func (c *client) IsContainerStale(
 	ctx context.Context,
-	container *container.Container,
+	target *container.Container,
 	policy updateConfig.Policy,
 ) (bool, types.ImageID, string, error) {
 	// Use image client to perform staleness check.
@@ -1312,23 +1312,23 @@ func (c *client) IsContainerStale(
 
 	stale, newestImage, latestDigest, err := imgClient.IsContainerStale(
 		ctx,
-		container,
+		target,
 		policy,
 		c.WarnOnHeadFailed,
 	)
 	if err != nil {
 		c.logger().Debug().
 			Err(err).
-			Str("container", container.Name()).
-			Str("image", container.ImageName()).
+			Str("container", target.Name()).
+			Str("image", target.ImageName()).
 			Msg("Failed to check container staleness")
 
 		return stale, newestImage, latestDigest, err //nolint:wrapcheck // The image client's error already names its failure.
 	}
 
 	c.logger().Debug().
-		Str("container", container.Name()).
-		Str("image", container.ImageName()).
+		Str("container", target.Name()).
+		Str("image", target.ImageName()).
 		Bool("stale", stale).
 		Str("newest_image", string(newestImage)).
 		Msg("Checked container staleness")
@@ -1340,7 +1340,7 @@ func (c *client) IsContainerStale(
 //
 // Parameters:
 //   - ctx: Context for cancellation and timeout control.
-//   - container: Container to check.
+//   - target: Container to check.
 //   - policy: Update policy (NoPull, LabelPrecedence).
 //
 // Returns:
@@ -1350,29 +1350,29 @@ func (c *client) IsContainerStale(
 //   - error: Non-nil if the check fails, nil on success.
 func (c *client) CheckContainerUpdate(
 	ctx context.Context,
-	container *container.Container,
+	target *container.Container,
 	policy updateConfig.Policy,
 ) (bool, types.ImageID, string, error) {
 	imgClient := containerImage.NewClient(c.api, c.logger(), c.Registry, c.RateLimiter)
 
 	available, newestImage, latestDigest, err := imgClient.CheckContainerUpdate(
 		ctx,
-		container,
+		target,
 		policy,
 	)
 	if err != nil {
 		c.logger().Debug().
 			Err(err).
-			Str("container", container.Name()).
-			Str("image", container.ImageName()).
+			Str("container", target.Name()).
+			Str("image", target.ImageName()).
 			Msg("Failed to check container for updates")
 
 		return available, newestImage, latestDigest, fmt.Errorf("check container for updates: %w", err)
 	}
 
 	c.logger().Debug().
-		Str("container", container.Name()).
-		Str("image", container.ImageName()).
+		Str("container", target.Name()).
+		Str("image", target.ImageName()).
 		Bool("update_available", available).
 		Str("latest_image_id", string(newestImage)).
 		Str("latest_digest", latestDigest).

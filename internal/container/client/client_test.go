@@ -642,8 +642,8 @@ func TestClient(t *testing.T) {
 
 				containers, err := c.ListContainers(t.Context(), filters.NoFilter)
 				require.NoError(t, err)
-				assert.True(t, slices.ContainsFunc(containers, func(container *container.Container) bool {
-					return !container.ContainerInfo().State.Running
+				assert.True(t, slices.ContainsFunc(containers, func(c *container.Container) bool {
+					return !c.ContainerInfo().State.Running
 				}), "a stopped container is listed")
 			})
 		})
@@ -669,8 +669,8 @@ func TestClient(t *testing.T) {
 
 				containers, err := c.ListContainers(t.Context(), filters.NoFilter)
 				require.NoError(t, err)
-				assert.True(t, slices.ContainsFunc(containers, func(container *container.Container) bool {
-					return container.ContainerInfo().State.Restarting
+				assert.True(t, slices.ContainsFunc(containers, func(c *container.Container) bool {
+					return c.ContainerInfo().State.Restarting
 				}), "a restarting container is listed")
 			})
 		})
@@ -685,8 +685,8 @@ func TestClient(t *testing.T) {
 
 				containers, err := c.ListContainers(t.Context(), filters.NoFilter)
 				require.NoError(t, err)
-				assert.False(t, slices.ContainsFunc(containers, func(container *container.Container) bool {
-					return container.ContainerInfo().State.Restarting
+				assert.False(t, slices.ContainsFunc(containers, func(c *container.Container) bool {
+					return c.ContainerInfo().State.Restarting
 				}), "no restarting container is listed")
 			})
 		})
@@ -734,9 +734,9 @@ func TestClient(t *testing.T) {
 				log, logOutput := logcapture.New(zerolog.WarnLevel)
 				c := &client{log: log, api: api}
 
-				container, err := c.GetContainer(t.Context(), types.ContainerID(testContainerID))
+				got, err := c.GetContainer(t.Context(), types.ContainerID(testContainerID))
 				require.NoError(t, err)
-				assert.False(t, container.HasImageInfo())
+				assert.False(t, got.HasImageInfo())
 
 				logged := logOutput.String()
 				assert.Contains(t, logged, "Failed to retrieve image info")
@@ -757,10 +757,10 @@ func TestClient(t *testing.T) {
 					api := newDockerAPI(t)
 					expectContainerFixtures(t, api, fixtureNetConsumer)
 
-					container, err := (&client{log: newTestLogger(t), api: api}).GetContainer(t.Context(), fixtureNetConsumer.id)
+					c, err := (&client{log: newTestLogger(t), api: api}).GetContainer(t.Context(), fixtureNetConsumer.id)
 					require.NoError(t, err)
 
-					networkMode := container.ContainerInfo().HostConfig.NetworkMode
+					networkMode := c.ContainerInfo().HostConfig.NetworkMode
 					assert.Equal(t, fixtureNetSupplierContainerName, networkMode.ConnectedContainer())
 				})
 			})
@@ -774,11 +774,11 @@ func TestClient(t *testing.T) {
 					api := newDockerAPI(t)
 					expectContainerFixtures(t, api, fixtureNetConsumerMissingSupplier)
 
-					container, err := (&client{log: newTestLogger(t), api: api}).
+					c, err := (&client{log: newTestLogger(t), api: api}).
 						GetContainer(t.Context(), fixtureNetConsumerMissingSupplier.id)
 					require.NoError(t, err)
 
-					networkMode := container.ContainerInfo().HostConfig.NetworkMode
+					networkMode := c.ContainerInfo().HostConfig.NetworkMode
 					assert.Equal(t, fixtureNetSupplierNotFoundID, networkMode.ConnectedContainer())
 				})
 			})
@@ -942,10 +942,10 @@ func TestClient(t *testing.T) {
 				log, logOutput := logcapture.New(zerolog.DebugLevel)
 				c := &client{log: log, api: api}
 
-				container, err := c.GetContainer(t.Context(), "ex-cont-id")
+				got, err := c.GetContainer(t.Context(), "ex-cont-id")
 				require.NoError(t, err)
 
-				_, err = c.ExecuteCommand(t.Context(), container, "exec-cmd", 1, 0, 0)
+				_, err = c.ExecuteCommand(t.Context(), got, "exec-cmd", 1, 0, 0)
 				require.NoError(t, err)
 				assert.Contains(t, logOutput.String(), "container_id=ex-cont-id")
 			})
@@ -959,10 +959,10 @@ func TestClient(t *testing.T) {
 				log, logOutput := logcapture.New(zerolog.DebugLevel)
 				c := &client{log: log, api: api}
 
-				container, err := c.GetContainer(t.Context(), "ex-cont-id")
+				got, err := c.GetContainer(t.Context(), "ex-cont-id")
 				require.NoError(t, err)
 
-				skipUpdate, err := c.ExecuteCommand(t.Context(), container, "exec-cmd", 1, 0, 0)
+				skipUpdate, err := c.ExecuteCommand(t.Context(), got, "exec-cmd", 1, 0, 0)
 				require.NoError(t, err)
 				assert.True(t, skipUpdate)
 				assert.Contains(t, logOutput.String(), "container_id=ex-cont-id")
@@ -983,10 +983,10 @@ func TestClient(t *testing.T) {
 
 			c := &client{log: newTestLogger(t), api: api}
 
-			container, err := c.GetContainer(t.Context(), types.ContainerID(tc.containerID))
+			got, err := c.GetContainer(t.Context(), types.ContainerID(tc.containerID))
 			require.NoError(t, err)
 
-			return c.ExecuteCommand(t.Context(), container, tc.cmd, 1, uid, gid)
+			return c.ExecuteCommand(t.Context(), got, tc.cmd, 1, uid, gid)
 		}
 
 		t.Run("command exits with code 0", func(t *testing.T) {
@@ -2030,10 +2030,10 @@ func TestClientWrappers(t *testing.T) {
 		api := newDockerAPI(t)
 		expectInspect(api, testContainerID, sourceInspect("/watchtower", true, &dockerContainer.HostConfig{}), nil)
 
-		container, err := (&client{log: newTestLogger(t), api: api}).GetCurrentWatchtowerContainer(t.Context(), testContainerID)
+		c, err := (&client{log: newTestLogger(t), api: api}).GetCurrentWatchtowerContainer(t.Context(), testContainerID)
 		require.NoError(t, err)
-		assert.Equal(t, types.ContainerID(testContainerID), container.ID())
-		assert.False(t, container.HasImageInfo())
+		assert.Equal(t, types.ContainerID(testContainerID), c.ID())
+		assert.False(t, c.HasImageInfo())
 	})
 
 	t.Run("GetCurrentWatchtowerContainer reports a failed inspect", func(t *testing.T) {

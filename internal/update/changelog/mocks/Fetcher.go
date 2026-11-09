@@ -49,12 +49,12 @@ func (_m *MockFetcher) EXPECT() *MockFetcher_Expecter {
 }
 
 // FetchDigestForTag provides a mock function for the type MockFetcher
-func (_mock *MockFetcher) FetchDigestForTag(log *zerolog.Logger, ctx context.Context, container1 *container.Container, authToken string, tag string, endpoints ...string) (string, error) {
+func (_mock *MockFetcher) FetchDigestForTag(log *zerolog.Logger, ctx context.Context, c *container.Container, authToken string, tag string, endpoints ...string) (string, error) {
 	var tmpRet mock.Arguments
 	if len(endpoints) > 0 {
-		tmpRet = _mock.Called(log, ctx, container1, authToken, tag, endpoints)
+		tmpRet = _mock.Called(log, ctx, c, authToken, tag, endpoints)
 	} else {
-		tmpRet = _mock.Called(log, ctx, container1, authToken, tag)
+		tmpRet = _mock.Called(log, ctx, c, authToken, tag)
 	}
 	ret := tmpRet
 
@@ -65,15 +65,15 @@ func (_mock *MockFetcher) FetchDigestForTag(log *zerolog.Logger, ctx context.Con
 	var r0 string
 	var r1 error
 	if returnFunc, ok := ret.Get(0).(func(*zerolog.Logger, context.Context, *container.Container, string, string, ...string) (string, error)); ok {
-		return returnFunc(log, ctx, container1, authToken, tag, endpoints...)
+		return returnFunc(log, ctx, c, authToken, tag, endpoints...)
 	}
 	if returnFunc, ok := ret.Get(0).(func(*zerolog.Logger, context.Context, *container.Container, string, string, ...string) string); ok {
-		r0 = returnFunc(log, ctx, container1, authToken, tag, endpoints...)
+		r0 = returnFunc(log, ctx, c, authToken, tag, endpoints...)
 	} else {
 		r0 = ret.Get(0).(string)
 	}
 	if returnFunc, ok := ret.Get(1).(func(*zerolog.Logger, context.Context, *container.Container, string, string, ...string) error); ok {
-		r1 = returnFunc(log, ctx, container1, authToken, tag, endpoints...)
+		r1 = returnFunc(log, ctx, c, authToken, tag, endpoints...)
 	} else {
 		r1 = ret.Error(1)
 	}
@@ -88,16 +88,16 @@ type MockFetcher_FetchDigestForTag_Call struct {
 // FetchDigestForTag is a helper method to define mock.On call
 //   - log *zerolog.Logger
 //   - ctx context.Context
-//   - container1 *container.Container
+//   - c *container.Container
 //   - authToken string
 //   - tag string
 //   - endpoints ...string
-func (_e *MockFetcher_Expecter) FetchDigestForTag(log any, ctx any, container1 any, authToken any, tag any, endpoints ...any) *MockFetcher_FetchDigestForTag_Call {
+func (_e *MockFetcher_Expecter) FetchDigestForTag(log any, ctx any, c any, authToken any, tag any, endpoints ...any) *MockFetcher_FetchDigestForTag_Call {
 	return &MockFetcher_FetchDigestForTag_Call{Call: _e.mock.On("FetchDigestForTag",
-		append([]any{log, ctx, container1, authToken, tag}, endpoints...)...)}
+		append([]any{log, ctx, c, authToken, tag}, endpoints...)...)}
 }
 
-func (_c *MockFetcher_FetchDigestForTag_Call) Run(run func(log *zerolog.Logger, ctx context.Context, container1 *container.Container, authToken string, tag string, endpoints ...string)) *MockFetcher_FetchDigestForTag_Call {
+func (_c *MockFetcher_FetchDigestForTag_Call) Run(run func(log *zerolog.Logger, ctx context.Context, c *container.Container, authToken string, tag string, endpoints ...string)) *MockFetcher_FetchDigestForTag_Call {
 	_c.Call.Run(func(args mock.Arguments) {
 		var arg0 *zerolog.Logger
 		if args[0] != nil {
@@ -142,7 +142,7 @@ func (_c *MockFetcher_FetchDigestForTag_Call) Return(s string, err error) *MockF
 	return _c
 }
 
-func (_c *MockFetcher_FetchDigestForTag_Call) RunAndReturn(run func(log *zerolog.Logger, ctx context.Context, container1 *container.Container, authToken string, tag string, endpoints ...string) (string, error)) *MockFetcher_FetchDigestForTag_Call {
+func (_c *MockFetcher_FetchDigestForTag_Call) RunAndReturn(run func(log *zerolog.Logger, ctx context.Context, c *container.Container, authToken string, tag string, endpoints ...string) (string, error)) *MockFetcher_FetchDigestForTag_Call {
 	_c.Call.Return(run)
 	return _c
 }
