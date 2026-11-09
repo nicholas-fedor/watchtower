@@ -6,7 +6,6 @@ import (
 	"github.com/nicholas-fedor/watchtower/internal/container"
 	updateParams "github.com/nicholas-fedor/watchtower/internal/update/params"
 	"github.com/nicholas-fedor/watchtower/internal/update/sorter"
-	"github.com/nicholas-fedor/watchtower/pkg/types"
 )
 
 // markImplicitRestarts marks each container that depends on a restarting
@@ -29,9 +28,9 @@ func markImplicitRestarts(
 	log *zerolog.Logger,
 	graph *sorter.DependencyGraph,
 	allContainers, containers []*container.Container,
-	excluded map[types.ContainerID]struct{},
+	excluded map[container.ContainerID]struct{},
 ) {
-	eligible := make(map[types.ContainerID]bool, len(containers))
+	eligible := make(map[container.ContainerID]bool, len(containers))
 
 	for _, c := range containers {
 		if _, skip := excluded[c.ID()]; !skip {
@@ -89,7 +88,7 @@ func Reconcile(
 	graph *sorter.DependencyGraph,
 	allContainers, containers []*container.Container,
 	params updateParams.Params,
-	excluded map[types.ContainerID]struct{},
+	excluded map[container.ContainerID]struct{},
 ) []*container.Container {
 	for _, c := range containers {
 		c.SetLinkedToRestarting(false)

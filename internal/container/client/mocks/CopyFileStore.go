@@ -8,7 +8,6 @@ import (
 	"context"
 
 	"github.com/nicholas-fedor/watchtower/internal/container"
-	"github.com/nicholas-fedor/watchtower/pkg/types"
 	mock "github.com/stretchr/testify/mock"
 )
 
@@ -49,7 +48,7 @@ func (_m *MockCopyFileStore) EXPECT() *MockCopyFileStore_Expecter {
 }
 
 // DiscardCopyFiles provides a mock function for the type MockCopyFileStore
-func (_mock *MockCopyFileStore) DiscardCopyFiles(containerID types.ContainerID) {
+func (_mock *MockCopyFileStore) DiscardCopyFiles(containerID container.ContainerID) {
 	_mock.Called(containerID)
 	return
 }
@@ -60,16 +59,16 @@ type MockCopyFileStore_DiscardCopyFiles_Call struct {
 }
 
 // DiscardCopyFiles is a helper method to define mock.On call
-//   - containerID types.ContainerID
+//   - containerID container.ContainerID
 func (_e *MockCopyFileStore_Expecter) DiscardCopyFiles(containerID any) *MockCopyFileStore_DiscardCopyFiles_Call {
 	return &MockCopyFileStore_DiscardCopyFiles_Call{Call: _e.mock.On("DiscardCopyFiles", containerID)}
 }
 
-func (_c *MockCopyFileStore_DiscardCopyFiles_Call) Run(run func(containerID types.ContainerID)) *MockCopyFileStore_DiscardCopyFiles_Call {
+func (_c *MockCopyFileStore_DiscardCopyFiles_Call) Run(run func(containerID container.ContainerID)) *MockCopyFileStore_DiscardCopyFiles_Call {
 	_c.Call.Run(func(args mock.Arguments) {
-		var arg0 types.ContainerID
+		var arg0 container.ContainerID
 		if args[0] != nil {
-			arg0 = args[0].(types.ContainerID)
+			arg0 = args[0].(container.ContainerID)
 		}
 		run(
 			arg0,
@@ -83,7 +82,7 @@ func (_c *MockCopyFileStore_DiscardCopyFiles_Call) Return() *MockCopyFileStore_D
 	return _c
 }
 
-func (_c *MockCopyFileStore_DiscardCopyFiles_Call) RunAndReturn(run func(containerID types.ContainerID)) *MockCopyFileStore_DiscardCopyFiles_Call {
+func (_c *MockCopyFileStore_DiscardCopyFiles_Call) RunAndReturn(run func(containerID container.ContainerID)) *MockCopyFileStore_DiscardCopyFiles_Call {
 	_c.Run(run)
 	return _c
 }

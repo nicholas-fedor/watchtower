@@ -11,12 +11,12 @@ import (
 	dockerContainer "github.com/moby/moby/api/types/container"
 	dockerImage "github.com/moby/moby/api/types/image"
 
+	"github.com/nicholas-fedor/watchtower/internal/container"
 	"github.com/nicholas-fedor/watchtower/internal/testutil/containerfixture"
 	"github.com/nicholas-fedor/watchtower/internal/testutil/modelfixture"
 	mockUpdate "github.com/nicholas-fedor/watchtower/internal/update/mocks"
 	updateParams "github.com/nicholas-fedor/watchtower/internal/update/params"
 	"github.com/nicholas-fedor/watchtower/internal/update/state"
-	"github.com/nicholas-fedor/watchtower/pkg/types"
 )
 
 // Watchtower container IDs for the self-update cases.
@@ -55,7 +55,7 @@ func TestShouldUpdate(t *testing.T) {
 		t.Parallel()
 
 		currentID := currentWatchtowerID
-		container := mockUpdate.CreateMockContainerWithConfig(
+		c := mockUpdate.CreateMockContainerWithConfig(
 			currentID,
 			"watchtower-current",
 			"watchtower:latest",
@@ -69,9 +69,9 @@ func TestShouldUpdate(t *testing.T) {
 			},
 		)
 		params := updateParams.Params{
-			CurrentContainerID: types.ContainerID(currentID),
+			CurrentContainerID: container.ContainerID(currentID),
 		}
-		result := ShouldUpdate(container, true, params)
+		result := ShouldUpdate(c, true, params)
 		assert.True(t, result)
 	})
 
@@ -80,7 +80,7 @@ func TestShouldUpdate(t *testing.T) {
 
 		currentID := currentWatchtowerID
 		otherID := otherWatchtowerID
-		container := mockUpdate.CreateMockContainerWithConfig(
+		c := mockUpdate.CreateMockContainerWithConfig(
 			otherID,
 			"watchtower-other",
 			"watchtower:latest",
@@ -94,9 +94,9 @@ func TestShouldUpdate(t *testing.T) {
 			},
 		)
 		params := updateParams.Params{
-			CurrentContainerID: types.ContainerID(currentID),
+			CurrentContainerID: container.ContainerID(currentID),
 		}
-		result := ShouldUpdate(container, true, params)
+		result := ShouldUpdate(c, true, params)
 		assert.False(t, result)
 	})
 
@@ -104,7 +104,7 @@ func TestShouldUpdate(t *testing.T) {
 		t.Parallel()
 
 		currentID := currentWatchtowerID
-		container := mockUpdate.CreateMockContainerWithConfig(
+		c := mockUpdate.CreateMockContainerWithConfig(
 			"non-watchtower-id",
 			"nginx",
 			"nginx:latest",
@@ -116,9 +116,9 @@ func TestShouldUpdate(t *testing.T) {
 			},
 		)
 		params := updateParams.Params{
-			CurrentContainerID: types.ContainerID(currentID),
+			CurrentContainerID: container.ContainerID(currentID),
 		}
-		result := ShouldUpdate(container, true, params)
+		result := ShouldUpdate(c, true, params)
 		assert.True(t, result)
 	})
 
@@ -126,7 +126,7 @@ func TestShouldUpdate(t *testing.T) {
 		t.Parallel()
 
 		currentID := currentWatchtowerID
-		container := mockUpdate.CreateMockContainerWithConfig(
+		c := mockUpdate.CreateMockContainerWithConfig(
 			currentID,
 			"watchtower-current",
 			"watchtower:latest",
@@ -141,9 +141,9 @@ func TestShouldUpdate(t *testing.T) {
 			},
 		)
 		params := updateParams.Params{
-			CurrentContainerID: types.ContainerID(currentID),
+			CurrentContainerID: container.ContainerID(currentID),
 		}
-		result := ShouldUpdate(container, true, params)
+		result := ShouldUpdate(c, true, params)
 		assert.True(t, result)
 	})
 
@@ -152,7 +152,7 @@ func TestShouldUpdate(t *testing.T) {
 
 		currentID := currentWatchtowerID
 		otherID := otherWatchtowerID
-		container := mockUpdate.CreateMockContainerWithConfig(
+		c := mockUpdate.CreateMockContainerWithConfig(
 			otherID,
 			"watchtower-other",
 			"watchtower:latest",
@@ -167,16 +167,16 @@ func TestShouldUpdate(t *testing.T) {
 			},
 		)
 		params := updateParams.Params{
-			CurrentContainerID: types.ContainerID(currentID),
+			CurrentContainerID: container.ContainerID(currentID),
 		}
-		result := ShouldUpdate(container, true, params)
+		result := ShouldUpdate(c, true, params)
 		assert.False(t, result)
 	})
 
 	t.Run("should allow update of non-Watchtower containers when NoRestart is true", func(t *testing.T) {
 		t.Parallel()
 
-		container := mockUpdate.CreateMockContainerWithConfig(
+		c := mockUpdate.CreateMockContainerWithConfig(
 			"non-watchtower-id",
 			"nginx",
 			"nginx:latest",
@@ -190,7 +190,7 @@ func TestShouldUpdate(t *testing.T) {
 		params := updateParams.Params{
 			NoRestart: true,
 		}
-		result := ShouldUpdate(container, true, params)
+		result := ShouldUpdate(c, true, params)
 		assert.True(t, result)
 	})
 
@@ -198,7 +198,7 @@ func TestShouldUpdate(t *testing.T) {
 		t.Parallel()
 
 		currentID := currentWatchtowerID
-		container := mockUpdate.CreateMockContainerWithConfig(
+		c := mockUpdate.CreateMockContainerWithConfig(
 			currentID,
 			"watchtower-current",
 			"watchtower:latest",
@@ -213,9 +213,9 @@ func TestShouldUpdate(t *testing.T) {
 		)
 		params := updateParams.Params{
 			NoRestart:          true,
-			CurrentContainerID: types.ContainerID(currentID),
+			CurrentContainerID: container.ContainerID(currentID),
 		}
-		result := ShouldUpdate(container, true, params)
+		result := ShouldUpdate(c, true, params)
 		assert.True(t, result)
 	})
 }

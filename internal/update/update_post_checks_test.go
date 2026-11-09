@@ -17,7 +17,6 @@ import (
 	"github.com/nicholas-fedor/watchtower/internal/registry/ratelimit"
 	mockUpdate "github.com/nicholas-fedor/watchtower/internal/update/mocks"
 	updateParams "github.com/nicholas-fedor/watchtower/internal/update/params"
-	"github.com/nicholas-fedor/watchtower/pkg/types"
 )
 
 // TestUpdate_PostChecksTargetCurrentContainers verifies that post-check hooks
@@ -56,7 +55,7 @@ func TestUpdate_PostChecksTargetCurrentContainers(t *testing.T) {
 		// stale reports whether the scanned container has a newer image.
 		stale bool
 		// wantTarget is the ID of the container the post-check runs in.
-		wantTarget types.ContainerID
+		wantTarget container.ContainerID
 	}{
 		{name: "updated container", stale: true, wantTarget: newID},
 		{name: "unchanged container", stale: false, wantTarget: oldID},
@@ -71,16 +70,16 @@ func TestUpdate_PostChecksTargetCurrentContainers(t *testing.T) {
 
 			client := mockContainerClient.NewMockClient(t)
 			client.EXPECT().IsContainerStale(mock.Anything, scanned, mock.Anything).
-				Return(tt.stale, types.ImageID("sha256:new"), "", nil).Once()
+				Return(tt.stale, container.ImageID("sha256:new"), "", nil).Once()
 
 			if tt.stale {
 				afterUpdate = appContainer(newID)
 
 				client.EXPECT().GetImageAnnotations(mock.Anything, mock.Anything).Return(oci.Annotations{})
 				client.EXPECT().StopAndRemoveContainer(mock.Anything, scanned, mock.Anything).Return(nil).Once()
-				client.EXPECT().CreateContainer(mock.Anything, scanned).Return(types.ContainerID(newID), nil).Once()
-				client.EXPECT().StartContainerByID(mock.Anything, types.ContainerID(newID)).Return(nil).Once()
-				client.EXPECT().GetContainer(mock.Anything, types.ContainerID(newID)).Return(afterUpdate, nil)
+				client.EXPECT().CreateContainer(mock.Anything, scanned).Return(container.ContainerID(newID), nil).Once()
+				client.EXPECT().StartContainerByID(mock.Anything, container.ContainerID(newID)).Return(nil).Once()
+				client.EXPECT().GetContainer(mock.Anything, container.ContainerID(newID)).Return(afterUpdate, nil)
 			}
 
 			// The scan lists the container before the update, and the post-checks
@@ -90,7 +89,7 @@ func TestUpdate_PostChecksTargetCurrentContainers(t *testing.T) {
 			client.EXPECT().ListContainers(mock.Anything, mock.Anything).
 				Return([]*container.Container{afterUpdate}, nil).Once()
 
-			var targets []types.ContainerID
+			var targets []container.ContainerID
 
 			client.EXPECT().
 				ExecuteCommand(mock.Anything, mock.Anything, postCheck, mock.Anything, mock.Anything, mock.Anything).
@@ -102,7 +101,7 @@ func TestUpdate_PostChecksTargetCurrentContainers(t *testing.T) {
 			_, _, err := update(newTestLogger(t), t.Context(), client, updateParams.Params{LifecycleHooks: true}, ratelimit.New())
 			require.NoError(t, err)
 
-			assert.Equal(t, []types.ContainerID{tt.wantTarget}, targets)
+			assert.Equal(t, []container.ContainerID{tt.wantTarget}, targets)
 		})
 	}
 }

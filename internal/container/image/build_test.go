@@ -16,9 +16,9 @@ import (
 
 	dockerClient "github.com/moby/moby/client"
 
+	"github.com/nicholas-fedor/watchtower/internal/container"
 	mockContainer "github.com/nicholas-fedor/watchtower/internal/container/mocks"
 	"github.com/nicholas-fedor/watchtower/internal/container/provenance"
-	"github.com/nicholas-fedor/watchtower/pkg/types"
 )
 
 func Test_confinedDockerfile(t *testing.T) {
@@ -62,7 +62,7 @@ func Test_consumeBuildStream(t *testing.T) {
 `)
 		id, err := consumeBuildStream(body)
 		require.NoError(t, err)
-		assert.Equal(t, types.ImageID("sha256:last"), id)
+		assert.Equal(t, container.ImageID("sha256:last"), id)
 	})
 
 	t.Run("returns a build error from the stream", func(t *testing.T) {
@@ -112,7 +112,7 @@ func Test_consumeBuildStream(t *testing.T) {
 `)
 		id, err := consumeBuildStream(body)
 		require.NoError(t, err)
-		assert.Equal(t, types.ImageID("sha256:last"), id)
+		assert.Equal(t, container.ImageID("sha256:last"), id)
 	})
 }
 
@@ -212,7 +212,7 @@ func TestBuildFromGit(t *testing.T) {
 
 		id, err := BuildFromGit(newTestLogger(t), t.Context(), api, remote, "", []string{"app:latest"})
 		require.NoError(t, err)
-		assert.Equal(t, types.ImageID("sha256:built"), id)
+		assert.Equal(t, container.ImageID("sha256:built"), id)
 	})
 
 	t.Run("inspects the first tag when the stream has no image ID", func(t *testing.T) {
@@ -224,7 +224,7 @@ func TestBuildFromGit(t *testing.T) {
 
 		id, err := BuildFromGit(newTestLogger(t), t.Context(), api, remote, "", []string{"app:latest"})
 		require.NoError(t, err)
-		assert.Equal(t, types.ImageID("sha256:tagged"), id)
+		assert.Equal(t, container.ImageID("sha256:tagged"), id)
 	})
 
 	t.Run("fails when no image ID can be found", func(t *testing.T) {

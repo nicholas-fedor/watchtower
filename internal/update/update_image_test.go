@@ -18,7 +18,6 @@ import (
 	"github.com/nicholas-fedor/watchtower/internal/update/cleanup"
 	mockUpdate "github.com/nicholas-fedor/watchtower/internal/update/mocks"
 	updateParams "github.com/nicholas-fedor/watchtower/internal/update/params"
-	"github.com/nicholas-fedor/watchtower/pkg/types"
 )
 
 // TestUpdateAction_ImageReferences verifies how an update handles tagged,
@@ -61,7 +60,7 @@ func TestUpdateAction_ImageReferences(t *testing.T) {
 			require.NoError(t, err)
 			require.Len(t, report.Scanned(), 1, "Tagged container should be scanned")
 			require.Len(t, report.Updated(), 1, "Tagged container should be updated if stale")
-			assert.True(t, slices.ContainsFunc(cleanupImageInfos, func(info cleanup.RemovedImageInfo) bool { return info.ImageID == types.ImageID("image:1.0.0") }))
+			assert.True(t, slices.ContainsFunc(cleanupImageInfos, func(info cleanup.RemovedImageInfo) bool { return info.ImageID == container.ImageID("image:1.0.0") }))
 			assert.Equal(t, int32(1), client.TestData.IsContainerStaleCount.Load(), "IsContainerStale should be called")
 		})
 
@@ -89,7 +88,7 @@ func TestUpdateAction_ImageReferences(t *testing.T) {
 			require.NoError(t, err)
 			require.Len(t, report.Scanned(), 1, "Untagged container should be scanned")
 			require.Len(t, report.Updated(), 1, "Untagged container should be updated if stale")
-			assert.True(t, slices.ContainsFunc(cleanupImageInfos, func(info cleanup.RemovedImageInfo) bool { return info.ImageID == types.ImageID("image") }))
+			assert.True(t, slices.ContainsFunc(cleanupImageInfos, func(info cleanup.RemovedImageInfo) bool { return info.ImageID == container.ImageID("image") }))
 			assert.Equal(t, int32(1), client.TestData.IsContainerStaleCount.Load(), "IsContainerStale should be called")
 		})
 
@@ -203,7 +202,7 @@ func TestUpdateAction_ImageReferences(t *testing.T) {
 			require.NoError(t, err)
 			require.Len(t, report.Scanned(), 1, "Invalid container should be scanned with fallback")
 			require.Len(t, report.Updated(), 1, "Invalid container should be updated with valid fallback")
-			assert.True(t, slices.ContainsFunc(cleanupImageInfos, func(info cleanup.RemovedImageInfo) bool { return info.ImageID == types.ImageID(":latest") }))
+			assert.True(t, slices.ContainsFunc(cleanupImageInfos, func(info cleanup.RemovedImageInfo) bool { return info.ImageID == container.ImageID(":latest") }))
 			assert.Equal(t, int32(1), client.TestData.IsContainerStaleCount.Load(), "IsContainerStale should be called")
 		})
 

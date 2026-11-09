@@ -24,7 +24,6 @@ import (
 	"github.com/nicholas-fedor/watchtower/internal/registry/ratelimit"
 	registryConfig "github.com/nicholas-fedor/watchtower/internal/settings/config/registry"
 	updateConfig "github.com/nicholas-fedor/watchtower/internal/settings/config/update"
-	"github.com/nicholas-fedor/watchtower/pkg/types"
 )
 
 // Warning strategies for HEAD request failures.
@@ -179,7 +178,7 @@ func NewClient(
 //
 // Returns:
 //   - bool: True if image is stale, false otherwise.
-//   - types.ImageID: Latest image ID (or current if not pulled).
+//   - container.ImageID: Latest image ID (or current if not pulled).
 //   - string: Latest registry manifest digest (empty if unavailable).
 //   - error: Non-nil if pull or inspection fails or cooldown defers the update.
 func (c Client) IsContainerStale(
@@ -187,7 +186,7 @@ func (c Client) IsContainerStale(
 	sourceContainer *container.Container,
 	policy updateConfig.Policy,
 	warnOnHeadFailed WarningStrategy,
-) (bool, types.ImageID, string, error) {
+) (bool, container.ImageID, string, error) {
 	clogVal := c.logger().With().
 		Str("container", sourceContainer.Name()).
 		Str("image", sourceContainer.ImageName()).
@@ -251,14 +250,14 @@ func (c Client) IsContainerStale(
 //
 // Returns:
 //   - bool: True if an update is available, false otherwise.
-//   - types.ImageID: Latest local image ID when known (empty on remote-only mismatch).
+//   - container.ImageID: Latest local image ID when known (empty on remote-only mismatch).
 //   - string: Latest registry manifest digest (empty if unavailable).
 //   - error: Non-nil if the check fails, nil on success.
 func (c Client) CheckContainerUpdate(
 	ctx context.Context,
 	sourceContainer *container.Container,
 	policy updateConfig.Policy,
-) (bool, types.ImageID, string, error) {
+) (bool, container.ImageID, string, error) {
 	clogVal := c.logger().With().
 		Str("container", sourceContainer.Name()).
 		Str("image", sourceContainer.ImageName()).
@@ -321,7 +320,7 @@ func (c Client) CheckContainerUpdate(
 	}
 
 	clog.Info().
-		Str("new_id", types.ImageID(remoteDigest).ShortID()).
+		Str("new_id", container.ImageID(remoteDigest).ShortID()).
 		Str("latest_digest", remoteDigest).
 		Msg(logging.FoundNewImage)
 
@@ -338,19 +337,19 @@ func (c Client) CheckContainerUpdate(
 //
 // Returns:
 //   - bool: True if a newer image exists, false if current is latest.
-//   - types.ImageID: Latest image ID.
+//   - container.ImageID: Latest image ID.
 //   - string: Latest registry manifest digest (empty if unavailable).
 //   - error: Non-nil if inspection fails, nil on success.
 func (c Client) HasNewImage(
 	ctx context.Context,
 	sourceContainer *container.Container,
-) (bool, types.ImageID, string, error) {
+) (bool, container.ImageID, string, error) {
 	clogVal := c.logger().With().
 		Str("container", sourceContainer.Name()).
 		Str("image", sourceContainer.ImageName()).
 		Logger()
 	clog := &clogVal
-	currentImageID := types.ImageID(sourceContainer.ContainerInfo().Image)
+	currentImageID := container.ImageID(sourceContainer.ContainerInfo().Image)
 
 	clog.Debug().Msg("Inspecting latest image")
 
@@ -373,7 +372,7 @@ func (c Client) HasNewImage(
 	}
 
 	// Compare IDs to determine staleness.
-	newImageID := types.ImageID(newImageInfo.ID)
+	newImageID := container.ImageID(newImageInfo.ID)
 	if newImageID == currentImageID {
 		clog.Debug().Msg("No new image found")
 
@@ -559,7 +558,7 @@ func (c Client) PullImage(
 //
 // Returns:
 //   - error: Non-nil if removal fails, nil on success.
-func (c Client) RemoveImageByID(ctx context.Context, imageID types.ImageID, imageName string) error {
+func (c Client) RemoveImageByID(ctx context.Context, imageID container.ImageID, imageName string) error {
 	clogVal := c.logger().With().
 		Str("image_id", imageID.ShortID()).
 		Str("image_name", imageName).
@@ -654,7 +653,7 @@ func (c Client) RemoveImageByID(ctx context.Context, imageID types.ImageID, imag
 //   - items: Response items from the image removal operation.
 //   - imageID: ID of the image that was removed.
 //   - imageName: Name of the image that was removed.
-func logImageRemovalDetails(log *zerolog.Logger, items []dockerImage.DeleteResponse, imageID types.ImageID, imageName string) {
+func logImageRemovalDetails(log *zerolog.Logger, items []dockerImage.DeleteResponse, imageID container.ImageID, imageName string) {
 	deleted := strings.Builder{}
 	untagged := strings.Builder{}
 
@@ -664,7 +663,7 @@ func logImageRemovalDetails(log *zerolog.Logger, items []dockerImage.DeleteRespo
 				deleted.WriteString(", ")
 			}
 
-			deleted.WriteString(types.ImageID(item.Deleted).ShortID())
+			deleted.WriteString(container.ImageID(item.Deleted).ShortID())
 		}
 
 		if item.Untagged != "" {
@@ -672,7 +671,7 @@ func logImageRemovalDetails(log *zerolog.Logger, items []dockerImage.DeleteRespo
 				untagged.WriteString(", ")
 			}
 
-			untagged.WriteString(types.ImageID(item.Untagged).ShortID())
+			untagged.WriteString(container.ImageID(item.Untagged).ShortID())
 		}
 	}
 
@@ -1029,13 +1028,13 @@ func (c Client) warnOnHeadFailed(
 //
 // Returns:
 //   - bool: True if image is stale, false otherwise.
-//   - types.ImageID: Latest image ID.
+//   - container.ImageID: Latest image ID.
 //   - error: Non-nil if inspection fails, nil on success.
 func (c Client) checkLocalImageStaleness(
 	ctx context.Context,
 	sourceContainer *container.Container,
 	clog *zerolog.Logger,
-) (bool, types.ImageID, string, error) {
+) (bool, container.ImageID, string, error) {
 	clog.Debug().Msg("Skipping image pull due to no-pull setting - checking local image only")
 	clog.Debug().
 		Str("current_image_id", string(sourceContainer.ImageID())).

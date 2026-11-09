@@ -29,7 +29,6 @@ import (
 	"github.com/nicholas-fedor/watchtower/internal/testutil/httpstub"
 	"github.com/nicholas-fedor/watchtower/internal/testutil/logcapture"
 	"github.com/nicholas-fedor/watchtower/internal/testutil/modelfixture"
-	"github.com/nicholas-fedor/watchtower/pkg/types"
 )
 
 // Errors of a pull that a registry rate limited.
@@ -637,10 +636,10 @@ func TestImageClient_RemoveImageByID(t *testing.T) {
 			log, logbuf := logcapture.New(zerolog.DebugLevel)
 			c := newTestImageClient(api, log, registryConfig.Registry{}, ratelimit.New())
 
-			require.NoError(t, c.RemoveImageByID(t.Context(), types.ImageID(imageA), "test-image"))
+			require.NoError(t, c.RemoveImageByID(t.Context(), container.ImageID(imageA), "test-image"))
 
-			shortA := types.ImageID(imageA).ShortID()
-			shortAParent := types.ImageID(imageAParent).ShortID()
+			shortA := container.ImageID(imageA).ShortID()
+			shortAParent := container.ImageID(imageAParent).ShortID()
 
 			assert.Regexp(t, fmt.Sprintf(`msg="Image removal details" deleted="%s, %s" image_id=%s image_name=test-image untagged=%s`, shortA, shortAParent, shortA, shortA), logbuf.String())
 			assert.Regexp(t, fmt.Sprintf(`msg="Cleaned up old image" image_id=%s image_name=test-image`, shortA), logbuf.String())
@@ -662,7 +661,7 @@ func TestImageClient_RemoveImageByID(t *testing.T) {
 
 			c := newTestImageClient(api, newTestLogger(t), registryConfig.Registry{}, ratelimit.New())
 
-			err := c.RemoveImageByID(t.Context(), types.ImageID(image), "test-image")
+			err := c.RemoveImageByID(t.Context(), container.ImageID(image), "test-image")
 			assert.True(t, cerrdefs.IsNotFound(err), "unexpected error %v", err)
 		})
 	})
@@ -686,7 +685,7 @@ func TestImageClient_RemoveImageByID(t *testing.T) {
 
 					c := newTestImageClient(api, newTestLogger(t), registryConfig.Registry{}, ratelimit.New())
 
-					require.ErrorIs(t, c.RemoveImageByID(t.Context(), types.ImageID(imageA), "test-image"), ErrImageInUse)
+					require.ErrorIs(t, c.RemoveImageByID(t.Context(), container.ImageID(imageA), "test-image"), ErrImageInUse)
 				})
 			}
 		})
@@ -704,7 +703,7 @@ func TestImageClient_RemoveImageByID(t *testing.T) {
 
 			c := newTestImageClient(api, newTestLogger(t), registryConfig.Registry{}, ratelimit.New())
 
-			err := c.RemoveImageByID(t.Context(), types.ImageID(containerfixture.RandomID()), "test-image")
+			err := c.RemoveImageByID(t.Context(), container.ImageID(containerfixture.RandomID()), "test-image")
 			require.ErrorContains(t, err, "cannot verify image usage")
 		})
 	})
@@ -725,7 +724,7 @@ func TestImageClient_RemoveImageByID(t *testing.T) {
 			log, logbuf := logcapture.New(zerolog.WarnLevel)
 			c := newTestImageClient(api, log, registryConfig.Registry{}, ratelimit.New())
 
-			require.ErrorIs(t, c.RemoveImageByID(ctx, types.ImageID(containerfixture.RandomID()), "test-image"), context.Canceled)
+			require.ErrorIs(t, c.RemoveImageByID(ctx, container.ImageID(containerfixture.RandomID()), "test-image"), context.Canceled)
 			assert.NotContains(t, logbuf.String(), "Failed to list containers for image usage check")
 		})
 	})
@@ -755,7 +754,7 @@ func TestImageClient_IsContainerStale_noPull(t *testing.T) {
 			stale, latestID, _, err := c.IsContainerStale(t.Context(), runningImage("test-image:latest", currentImageID), updateConfig.Policy{NoPull: true}, "")
 			require.NoError(t, err)
 			assert.False(t, stale)
-			assert.Equal(t, types.ImageID(currentImageID), latestID)
+			assert.Equal(t, container.ImageID(currentImageID), latestID)
 			assert.Contains(t, logbuf.String(), `msg="Skipping image pull due to no-pull setting - checking local image only"`)
 			assert.Contains(t, logbuf.String(), `msg="No new image found"`)
 		})
@@ -779,7 +778,7 @@ func TestImageClient_IsContainerStale_noPull(t *testing.T) {
 			stale, latestID, _, err := c.IsContainerStale(t.Context(), runningImage("test-image:latest", currentImageID), updateConfig.Policy{NoPull: true}, "")
 			require.NoError(t, err)
 			assert.True(t, stale)
-			assert.Equal(t, types.ImageID(newImageID), latestID)
+			assert.Equal(t, container.ImageID(newImageID), latestID)
 			assert.Contains(t, logbuf.String(), `msg="Skipping image pull due to no-pull setting - checking local image only"`)
 			assert.Contains(t, logbuf.String(), `msg="Found new image"`)
 		})
@@ -870,7 +869,7 @@ func TestImageClient_IsContainerStale_noPull(t *testing.T) {
 			stale, latestID, _, err := c.IsContainerStale(t.Context(), runningImage("test-image:latest", currentImageID), updateConfig.Policy{NoPull: true}, "")
 			require.Error(t, err)
 			assert.False(t, stale)
-			assert.Equal(t, types.ImageID(currentImageID), latestID)
+			assert.Equal(t, container.ImageID(currentImageID), latestID)
 			assert.Contains(t, logbuf.String(), `msg="Skipping image pull due to no-pull setting - checking local image only"`)
 			assert.Contains(t, logbuf.String(), `msg="Failed to inspect latest image"`)
 		})
@@ -954,7 +953,7 @@ func TestImageClient_IsContainerStale_pull(t *testing.T) {
 			stale, latestID, latestDigest, err := c.IsContainerStale(t.Context(), runningImage(image, currentImageID, registry.Addr()+"/test/image@"+localDigest), updateConfig.Policy{}, "")
 			require.NoError(t, err)
 			assert.False(t, stale)
-			assert.Equal(t, types.ImageID(currentImageID), latestID)
+			assert.Equal(t, container.ImageID(currentImageID), latestID)
 			assert.Equal(t, localDigest, latestDigest)
 			assert.Contains(t, logbuf.String(), "Digest match, skipping pull")
 		})
@@ -1046,7 +1045,7 @@ func TestImageClient_IsContainerStale_cooldown(t *testing.T) {
 			require.ErrorAs(t, err, &cooldownErr)
 			assert.Equal(t, tt.deferred, errors.Is(err, ErrImageCooldown))
 			assert.False(t, stale)
-			assert.Equal(t, types.ImageID(currentImageID), latestID)
+			assert.Equal(t, container.ImageID(currentImageID), latestID)
 
 			debug := logcapture.Messages(t, buf.String(), "debug")
 			assert.Contains(t, debug, tt.message)
@@ -1149,7 +1148,7 @@ func TestImageClient_CheckContainerUpdate(t *testing.T) {
 			available, latestID, _, err := c.CheckContainerUpdate(t.Context(), runningImage("test-image:latest", currentImageID), updateConfig.Policy{NoPull: true})
 			require.NoError(t, err)
 			assert.False(t, available)
-			assert.Equal(t, types.ImageID(currentImageID), latestID)
+			assert.Equal(t, container.ImageID(currentImageID), latestID)
 		})
 	})
 
@@ -1165,7 +1164,7 @@ func TestImageClient_CheckContainerUpdate(t *testing.T) {
 			available, latestID, latestDigest, err := c.CheckContainerUpdate(t.Context(), runningImage("local-build:latest", currentImageID, []string{}...), updateConfig.Policy{})
 			require.NoError(t, err)
 			assert.False(t, available)
-			assert.Equal(t, types.ImageID(currentImageID), latestID)
+			assert.Equal(t, container.ImageID(currentImageID), latestID)
 			assert.Empty(t, latestDigest)
 		})
 	})
@@ -1188,7 +1187,7 @@ func TestImageClient_CheckContainerUpdate(t *testing.T) {
 			available, latestID, latestDigest, err := c.CheckContainerUpdate(t.Context(), runningImage(image, currentImageID, registry.Addr()+"/test/image@"+localDigest), updateConfig.Policy{})
 			require.NoError(t, err)
 			assert.False(t, available)
-			assert.Equal(t, types.ImageID(currentImageID), latestID)
+			assert.Equal(t, container.ImageID(currentImageID), latestID)
 			assert.Equal(t, localDigest, latestDigest)
 			assert.Len(t, registry.ReceivedRequests(), 2)
 		})
@@ -1209,7 +1208,7 @@ func TestImageClient_CheckContainerUpdate(t *testing.T) {
 			available, latestID, latestDigest, err := c.CheckContainerUpdate(t.Context(), runningImage(image, currentImageID, registry.Addr()+"/test/image@"+localDigest), updateConfig.Policy{})
 			require.NoError(t, err)
 			assert.True(t, available)
-			assert.Equal(t, types.ImageID(""), latestID)
+			assert.Equal(t, container.ImageID(""), latestID)
 			assert.Equal(t, remoteDigest, latestDigest)
 			assert.Len(t, registry.ReceivedRequests(), 2)
 		})

@@ -19,7 +19,6 @@ import (
 	composeLabels "github.com/nicholas-fedor/watchtower/internal/compose/labels"
 	"github.com/nicholas-fedor/watchtower/internal/container"
 	"github.com/nicholas-fedor/watchtower/internal/container/network"
-	"github.com/nicholas-fedor/watchtower/pkg/types"
 )
 
 const (
@@ -120,7 +119,7 @@ func ResolveVolumesFrom(
 //   - isPodman: If true, indicates Podman is being used for CPU compatibility.
 //
 // Returns:
-//   - types.ContainerID: ID of the new container.
+//   - container.ContainerID: ID of the new container.
 //   - error: Non-nil if creation fails, nil on success.
 func CreateTarget(log *zerolog.Logger,
 	ctx context.Context,
@@ -131,7 +130,7 @@ func CreateTarget(log *zerolog.Logger,
 	disableMemorySwappiness bool,
 	cpuCopyMode string,
 	isPodman bool,
-) (types.ContainerID, error) {
+) (container.ContainerID, error) {
 	clogVal := log.With().
 		Str("container", sourceContainer.Name()).
 		Str("id", sourceContainer.ID().ShortID()).
@@ -197,7 +196,7 @@ func CreateTarget(log *zerolog.Logger,
 		return "", fmt.Errorf("%w: %w", errCreateContainerFailed, err)
 	}
 
-	createdContainerID := types.ContainerID(createdContainer.ID)
+	createdContainerID := container.ContainerID(createdContainer.ID)
 	clog.Debug().
 		Str("new_id", string(createdContainerID)).
 		Msg("Created container successfully")

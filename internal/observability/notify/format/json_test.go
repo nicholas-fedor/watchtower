@@ -15,7 +15,6 @@ import (
 	"github.com/nicholas-fedor/watchtower/internal/container/provenance"
 	"github.com/nicholas-fedor/watchtower/internal/testutil/reportfixture"
 	"github.com/nicholas-fedor/watchtower/internal/update/state"
-	"github.com/nicholas-fedor/watchtower/pkg/types"
 )
 
 // updatedApp returns the status of an updated "app" container running
@@ -41,7 +40,7 @@ func updatedApp(t *testing.T, meta provenance.ReportMeta) (*state.ContainerStatu
 		&dockerImage.InspectResponse{ID: "sha256:" + strings.Repeat("b", 64)},
 	)
 
-	report := reportfixture.UpdatedReport(app, types.ImageID("sha256:"+strings.Repeat("c", 64)), meta)
+	report := reportfixture.UpdatedReport(app, container.ImageID("sha256:"+strings.Repeat("c", 64)), meta)
 
 	require.Len(t, report.Updated(), 1)
 

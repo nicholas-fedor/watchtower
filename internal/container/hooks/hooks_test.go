@@ -561,7 +561,7 @@ func TestExecutePostUpdateCommand_NoCommandReadsNoLabels(t *testing.T) {
 		"com.centurylinklabs.watchtower.lifecycle.gid":                 "-5",
 	})
 	client := mockContainerClient.NewMockClient(t)
-	client.EXPECT().GetContainer(mock.Anything, types.ContainerID("test")).Return(c, nil).Once()
+	client.EXPECT().GetContainer(mock.Anything, container.ContainerID("test")).Return(c, nil).Once()
 
 	ExecutePostUpdateCommand(log, context.Background(), client, "test", 0, 0)
 
@@ -701,7 +701,7 @@ func runPreUpdateTest(t *testing.T, tt struct {
 func TestExecutePostUpdateCommand(t *testing.T) {
 	tests := []struct {
 		name           string
-		containerID    types.ContainerID
+		containerID    container.ContainerID
 		setupClient    func(*mockContainerClient.MockClient)
 		expectedLogMsg string
 	}{
@@ -709,7 +709,7 @@ func TestExecutePostUpdateCommand(t *testing.T) {
 			name:        "command present",
 			containerID: "test",
 			setupClient: func(c *mockContainerClient.MockClient) {
-				c.On("GetContainer", mock.Anything, types.ContainerID("test")).
+				c.On("GetContainer", mock.Anything, container.ContainerID("test")).
 					Return(mockedContainer(withLabels(map[string]string{
 						"com.centurylinklabs.watchtower.lifecycle.post-update": "post-update",
 					})), nil)
@@ -722,7 +722,7 @@ func TestExecutePostUpdateCommand(t *testing.T) {
 			name:        "no command",
 			containerID: "test",
 			setupClient: func(c *mockContainerClient.MockClient) {
-				c.On("GetContainer", mock.Anything, types.ContainerID("test")).Return(mockedContainer(), nil)
+				c.On("GetContainer", mock.Anything, container.ContainerID("test")).Return(mockedContainer(), nil)
 			},
 			expectedLogMsg: "No post-update command supplied",
 		},
@@ -730,7 +730,7 @@ func TestExecutePostUpdateCommand(t *testing.T) {
 			name:        "container retrieval error",
 			containerID: "test",
 			setupClient: func(c *mockContainerClient.MockClient) {
-				c.On("GetContainer", mock.Anything, types.ContainerID("test")).Return(nil, errNotFound)
+				c.On("GetContainer", mock.Anything, container.ContainerID("test")).Return(nil, errNotFound)
 			},
 			expectedLogMsg: "Failed to get container",
 		},
@@ -738,7 +738,7 @@ func TestExecutePostUpdateCommand(t *testing.T) {
 			name:        "command error",
 			containerID: "test",
 			setupClient: func(c *mockContainerClient.MockClient) {
-				c.On("GetContainer", mock.Anything, types.ContainerID("test")).
+				c.On("GetContainer", mock.Anything, container.ContainerID("test")).
 					Return(mockedContainer(withLabels(map[string]string{
 						"com.centurylinklabs.watchtower.lifecycle.post-update": "post-update",
 					})), nil)
@@ -751,7 +751,7 @@ func TestExecutePostUpdateCommand(t *testing.T) {
 			name:        "container UID/GID override",
 			containerID: "test",
 			setupClient: func(c *mockContainerClient.MockClient) {
-				c.On("GetContainer", mock.Anything, types.ContainerID("test")).
+				c.On("GetContainer", mock.Anything, container.ContainerID("test")).
 					Return(mockedContainer(withLabels(map[string]string{
 						"com.centurylinklabs.watchtower.lifecycle.post-update": "post-update",
 						"com.centurylinklabs.watchtower.lifecycle.uid":         "4000",

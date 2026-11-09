@@ -21,7 +21,6 @@ import (
 	mockUpdate "github.com/nicholas-fedor/watchtower/internal/update/mocks"
 	updateParams "github.com/nicholas-fedor/watchtower/internal/update/params"
 	"github.com/nicholas-fedor/watchtower/internal/update/state"
-	"github.com/nicholas-fedor/watchtower/pkg/types"
 )
 
 // TestUpdate_ComposeDependencyCycle verifies that every container in a
@@ -75,7 +74,7 @@ func TestUpdate_ComposeDependencyCycle(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 
-			const newID = types.ContainerID("e000000000000000000000000000000000000000000000000000000000000000")
+			const newID = container.ContainerID("e000000000000000000000000000000000000000000000000000000000000000")
 
 			web := composeContainer("a000000000000000000000000000000000000000000000000000000000000000", "web", tt.webDependsOn)
 			api := composeContainer("b000000000000000000000000000000000000000000000000000000000000000", "api", "web:service_started:false")
@@ -85,7 +84,7 @@ func TestUpdate_ComposeDependencyCycle(t *testing.T) {
 			client.EXPECT().ListContainers(mock.Anything, mock.Anything).
 				Return([]*container.Container{web, api, app}, nil).Once()
 			client.EXPECT().IsContainerStale(mock.Anything, mock.Anything, mock.Anything).
-				Return(true, types.ImageID("sha256:new"), "", nil)
+				Return(true, container.ImageID("sha256:new"), "", nil)
 			client.EXPECT().GetImageAnnotations(mock.Anything, mock.Anything).Return(oci.Annotations{}).Maybe()
 
 			// Record the containers that are stopped for an update.
@@ -154,8 +153,8 @@ func TestUpdate_LinkToCycleMember(t *testing.T) {
 	client.EXPECT().ListContainers(mock.Anything, mock.Anything).
 		Return([]*container.Container{db, e, c, replica}, nil).Once()
 	client.EXPECT().IsContainerStale(mock.Anything, mock.Anything, mock.Anything).
-		RunAndReturn(func(_ context.Context, ct *container.Container, _ updateConfig.Policy) (bool, types.ImageID, string, error) {
-			return ct.Name() == "c", types.ImageID("sha256:new"), "", nil
+		RunAndReturn(func(_ context.Context, ct *container.Container, _ updateConfig.Policy) (bool, container.ImageID, string, error) {
+			return ct.Name() == "c", container.ImageID("sha256:new"), "", nil
 		})
 	client.EXPECT().GetImageAnnotations(mock.Anything, mock.Anything).Return(oci.Annotations{}).Maybe()
 	client.EXPECT().StopAndRemoveContainer(mock.Anything, mock.Anything, mock.Anything).Return(nil).Maybe()
@@ -164,14 +163,14 @@ func TestUpdate_LinkToCycleMember(t *testing.T) {
 	var created []string
 
 	client.EXPECT().CreateContainer(mock.Anything, mock.Anything).
-		RunAndReturn(func(_ context.Context, ct *container.Container) (types.ContainerID, error) {
+		RunAndReturn(func(_ context.Context, ct *container.Container) (container.ContainerID, error) {
 			created = append(created, ct.Name())
 
 			return ct.ID(), nil
 		}).Maybe()
 	client.EXPECT().StartContainerByID(mock.Anything, mock.Anything).Return(nil).Maybe()
 	client.EXPECT().GetContainer(mock.Anything, mock.Anything).
-		RunAndReturn(func(_ context.Context, id types.ContainerID) (*container.Container, error) {
+		RunAndReturn(func(_ context.Context, id container.ContainerID) (*container.Container, error) {
 			for _, ct := range []*container.Container{c, replica} {
 				if ct.ID() == id {
 					return ct, nil
@@ -225,7 +224,7 @@ func TestUpdate_HostConfigDependencyCycle(t *testing.T) {
 	client.EXPECT().ListContainers(mock.Anything, mock.Anything).
 		Return([]*container.Container{app, vpn, web}, nil).Once()
 	client.EXPECT().IsContainerStale(mock.Anything, mock.Anything, mock.Anything).
-		Return(true, types.ImageID("sha256:new"), "", nil)
+		Return(true, container.ImageID("sha256:new"), "", nil)
 	client.EXPECT().GetImageAnnotations(mock.Anything, mock.Anything).Return(oci.Annotations{}).Maybe()
 
 	var stopped []string
@@ -233,7 +232,7 @@ func TestUpdate_HostConfigDependencyCycle(t *testing.T) {
 	client.EXPECT().StopAndRemoveContainer(mock.Anything, mock.Anything, mock.Anything).
 		Run(func(_ context.Context, c *container.Container, _ time.Duration) { stopped = append(stopped, c.Name()) }).
 		Return(nil).Maybe()
-	client.EXPECT().CreateContainer(mock.Anything, mock.Anything).Return(types.ContainerID(webID), nil).Maybe()
+	client.EXPECT().CreateContainer(mock.Anything, mock.Anything).Return(container.ContainerID(webID), nil).Maybe()
 	client.EXPECT().StartContainerByID(mock.Anything, mock.Anything).Return(nil).Maybe()
 	client.EXPECT().GetContainer(mock.Anything, mock.Anything).Return(web, nil).Maybe()
 

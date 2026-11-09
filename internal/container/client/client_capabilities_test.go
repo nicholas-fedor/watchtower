@@ -23,7 +23,6 @@ import (
 	"github.com/nicholas-fedor/watchtower/internal/container/provenance"
 	"github.com/nicholas-fedor/watchtower/internal/testutil/containerfixture"
 	"github.com/nicholas-fedor/watchtower/internal/testutil/modelfixture"
-	"github.com/nicholas-fedor/watchtower/pkg/types"
 )
 
 // TestClientBuildRemoteImage verifies that the client builds a remote image
@@ -46,7 +45,7 @@ func TestClientBuildRemoteImage(t *testing.T) {
 	id, err := (&client{log: newTestLogger(t), api: api}).
 		BuildRemoteImage(t.Context(), "https://github.com/org/app.git", "", []string{"app:latest"})
 	require.NoError(t, err)
-	assert.Equal(t, types.ImageID("sha256:built"), id)
+	assert.Equal(t, container.ImageID("sha256:built"), id)
 }
 
 // TestClientCopyFileStore verifies that the client snapshots labeled files

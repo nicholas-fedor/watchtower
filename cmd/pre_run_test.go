@@ -28,7 +28,6 @@ import (
 	"github.com/nicholas-fedor/watchtower/internal/container/labels"
 	"github.com/nicholas-fedor/watchtower/internal/observability/logging"
 	"github.com/nicholas-fedor/watchtower/internal/settings"
-	"github.com/nicholas-fedor/watchtower/pkg/types"
 )
 
 // preRunExitHelperEnv selects a preRun exit case when the test binary is
@@ -36,7 +35,7 @@ import (
 const preRunExitHelperEnv = "WATCHTOWER_CMD_PRE_RUN_EXIT_HELPER"
 
 // selfID is the container ID the preRun tests detect for Watchtower itself.
-var selfID = types.ContainerID(strings.Repeat("c", 64))
+var selfID = container.ContainerID(strings.Repeat("c", 64))
 
 // selfDetection is what the self container ID detection can read: the
 // mountinfo and cgroup files, and the HOSTNAME variable. Empty means absent.
@@ -172,7 +171,7 @@ func TestPreRun_SelfDetection(t *testing.T) {
 		args      []string
 		detection selfDetection
 		setup     func(client *mockContainerClient.MockClient)
-		wantID    types.ContainerID
+		wantID    container.ContainerID
 		wantName  string
 		wantCalls []string
 		// wantUnknown is whether the own container is marked unknown.
@@ -752,7 +751,7 @@ func preRunExitHelper(t *testing.T, helperCase string) {
 
 	mockClient := mockContainerClient.NewMockClient(t)
 	mockClient.EXPECT().SetRestartPolicy(mock.Anything, mock.Anything, mock.Anything).
-		RunAndReturn(func(_ context.Context, id types.ContainerID, policy dockerContainer.RestartPolicy) error {
+		RunAndReturn(func(_ context.Context, id container.ContainerID, policy dockerContainer.RestartPolicy) error {
 			fmt.Fprintf(os.Stderr, "SetRestartPolicy %s %s\n", containerLabel(id), policy.Name)
 
 			return policyErr

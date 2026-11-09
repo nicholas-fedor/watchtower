@@ -15,7 +15,6 @@ import (
 	"github.com/nicholas-fedor/watchtower/internal/observability/logging"
 	updateConfig "github.com/nicholas-fedor/watchtower/internal/settings/config/update"
 	"github.com/nicholas-fedor/watchtower/internal/settings/units"
-	"github.com/nicholas-fedor/watchtower/pkg/types"
 )
 
 // hookTimeoutMessages holds the log messages for reading one lifecycle hook's
@@ -893,7 +892,7 @@ func (c *Container) DeleteLabel(key string) {
 //
 // Returns:
 //   - bool: True if currentID is found in the chain, false otherwise.
-func IsWatchtowerParent(currentID types.ContainerID, chain string) bool {
+func IsWatchtowerParent(currentID ContainerID, chain string) bool {
 	if currentID == "" || chain == "" {
 		return false
 	}

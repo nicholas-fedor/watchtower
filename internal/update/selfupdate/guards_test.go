@@ -8,7 +8,6 @@ import (
 	"github.com/nicholas-fedor/watchtower/internal/container"
 	"github.com/nicholas-fedor/watchtower/internal/testutil/containerfixture"
 	"github.com/nicholas-fedor/watchtower/internal/testutil/modelfixture"
-	"github.com/nicholas-fedor/watchtower/pkg/types"
 )
 
 // TestBlocked verifies why a self-update cannot replace the running Watchtower
@@ -24,7 +23,7 @@ func TestBlocked(t *testing.T) {
 		// ports is whether the current container publishes host ports. Nil
 		// leaves the current container uninspected.
 		ports     *bool
-		currentID types.ContainerID
+		currentID container.ContainerID
 		ephemeral bool
 		want      Block
 	}{

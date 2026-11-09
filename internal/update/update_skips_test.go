@@ -77,7 +77,7 @@ func TestUpdate_PreUpdateExitCode75IsSkipped(t *testing.T) {
 			// The post-check hooks list the containers again after the update.
 			client.EXPECT().ListContainers(mock.Anything, mock.Anything).Return([]*container.Container{app}, nil).Times(2)
 			client.EXPECT().IsContainerStale(mock.Anything, mock.Anything, mock.Anything).
-				Return(true, types.ImageID("sha256:new"), "", nil)
+				Return(true, container.ImageID("sha256:new"), "", nil)
 			client.EXPECT().GetImageAnnotations(mock.Anything, mock.Anything).Return(oci.Annotations{}).Maybe()
 			client.EXPECT().
 				ExecuteCommand(mock.Anything, app, "/pre-update.sh", mock.Anything, mock.Anything, mock.Anything).
@@ -116,7 +116,7 @@ func TestUpdate_CanceledContainersAreSkipped(t *testing.T) {
 			client.EXPECT().ListContainers(mock.Anything, mock.Anything).
 				Return([]*container.Container{first, second}, nil).Once()
 			client.EXPECT().IsContainerStale(mock.Anything, mock.Anything, mock.Anything).
-				Return(true, types.ImageID("sha256:new"), "", nil)
+				Return(true, container.ImageID("sha256:new"), "", nil)
 			client.EXPECT().GetImageAnnotations(mock.Anything, mock.Anything).Return(oci.Annotations{}).Maybe()
 
 			// The update is canceled as soon as the first container is stopped.
@@ -133,7 +133,7 @@ func TestUpdate_CanceledContainersAreSkipped(t *testing.T) {
 					return nil
 				}).Once()
 			client.EXPECT().CreateContainer(mock.Anything, mock.Anything).
-				Return(types.ContainerID("e000000000000000000000000000000000000000000000000000000000000000"), nil).Once()
+				Return(container.ContainerID("e000000000000000000000000000000000000000000000000000000000000000"), nil).Once()
 			client.EXPECT().StartContainerByID(mock.Anything, mock.Anything).Return(nil).Once()
 			client.EXPECT().GetContainer(mock.Anything, mock.Anything).Return(first, nil).Maybe()
 			client.EXPECT().WaitForContainerHealthy(mock.Anything, mock.Anything, mock.Anything).Return(nil).Maybe()
@@ -215,7 +215,7 @@ func TestUpdate_CanceledScanSkipsUncheckedContainers(t *testing.T) {
 		// The first check cancels the scan. A check that starts after it
 		// stops at the cancellation without calling Docker.
 		client.EXPECT().IsContainerStale(mock.Anything, mock.Anything, mock.Anything).
-			RunAndReturn(func(ctx context.Context, _ *container.Container, _ updateConfig.Policy) (bool, types.ImageID, string, error) {
+			RunAndReturn(func(ctx context.Context, _ *container.Container, _ updateConfig.Policy) (bool, container.ImageID, string, error) {
 				cancel()
 
 				return false, "", "", ctx.Err()
@@ -249,7 +249,7 @@ func TestUpdate_CheckTimeoutSkipsOnlyItsContainer(t *testing.T) {
 	client.EXPECT().ListContainers(mock.Anything, mock.Anything).
 		Return([]*container.Container{slow, fresh}, nil).Once()
 	client.EXPECT().IsContainerStale(mock.Anything, mock.Anything, mock.Anything).
-		RunAndReturn(func(_ context.Context, c *container.Container, _ updateConfig.Policy) (bool, types.ImageID, string, error) {
+		RunAndReturn(func(_ context.Context, c *container.Container, _ updateConfig.Policy) (bool, container.ImageID, string, error) {
 			if c.Name() == slow.Name() {
 				return false, "", "", fmt.Errorf("could not determine image age: %w", context.DeadlineExceeded)
 			}
@@ -283,7 +283,7 @@ func TestUpdate_CanceledRecreateFailureIsFailed(t *testing.T) {
 	client.EXPECT().ListContainers(mock.Anything, mock.Anything).
 		Return([]*container.Container{first, second}, nil).Once()
 	client.EXPECT().IsContainerStale(mock.Anything, mock.Anything, mock.Anything).
-		Return(true, types.ImageID("sha256:new"), "", nil)
+		Return(true, container.ImageID("sha256:new"), "", nil)
 	client.EXPECT().GetImageAnnotations(mock.Anything, mock.Anything).Return(oci.Annotations{}).Maybe()
 
 	// update stops containers one at a time on the calling goroutine, so
@@ -299,7 +299,7 @@ func TestUpdate_CanceledRecreateFailureIsFailed(t *testing.T) {
 			return nil
 		}).Once()
 	client.EXPECT().CreateContainer(mock.Anything, mock.Anything).
-		Return(types.ContainerID(""), fmt.Errorf("create container: %w", context.Canceled)).Once()
+		Return(container.ContainerID(""), fmt.Errorf("create container: %w", context.Canceled)).Once()
 
 	report, _, _ := update(newTestLogger(t), ctx, client, updateParams.Params{}, ratelimit.New())
 	require.NotNil(t, report)
@@ -330,7 +330,7 @@ func TestUpdate_StopFailureStaysFailedWhenCanceled(t *testing.T) {
 	client := mockContainerClient.NewMockClient(t)
 	client.EXPECT().ListContainers(mock.Anything, mock.Anything).Return([]*container.Container{app}, nil).Once()
 	client.EXPECT().IsContainerStale(mock.Anything, mock.Anything, mock.Anything).
-		Return(true, types.ImageID("sha256:new"), "", nil)
+		Return(true, container.ImageID("sha256:new"), "", nil)
 	client.EXPECT().GetImageAnnotations(mock.Anything, mock.Anything).Return(oci.Annotations{}).Maybe()
 	client.EXPECT().StopAndRemoveContainer(mock.Anything, app, mock.Anything).
 		RunAndReturn(func(context.Context, *container.Container, time.Duration) error {
@@ -364,7 +364,7 @@ func TestUpdate_ContainerGoneBeforeStopIsSkipped(t *testing.T) {
 			client := mockContainerClient.NewMockClient(t)
 			client.EXPECT().ListContainers(mock.Anything, mock.Anything).Return([]*container.Container{app}, nil).Once()
 			client.EXPECT().IsContainerStale(mock.Anything, mock.Anything, mock.Anything).
-				Return(true, types.ImageID("sha256:new"), "", nil)
+				Return(true, container.ImageID("sha256:new"), "", nil)
 			client.EXPECT().GetImageAnnotations(mock.Anything, mock.Anything).Return(oci.Annotations{}).Maybe()
 			client.EXPECT().StopAndRemoveContainer(mock.Anything, app, mock.Anything).
 				Return(fmt.Errorf("no such container: %w", cerrdefs.ErrNotFound)).Once()
@@ -399,11 +399,11 @@ func TestUpdate_SkipSelfUpdateLeavesDependentWatchtowerRunning(t *testing.T) {
 	client.EXPECT().ListContainers(mock.Anything, mock.Anything).
 		Return([]*container.Container{app, watchtower}, nil).Once()
 	client.EXPECT().IsContainerStale(mock.Anything, app, mock.Anything).
-		Return(true, types.ImageID("sha256:new"), "", nil).Once()
+		Return(true, container.ImageID("sha256:new"), "", nil).Once()
 	client.EXPECT().GetImageAnnotations(mock.Anything, mock.Anything).Return(oci.Annotations{}).Maybe()
 	client.EXPECT().StopAndRemoveContainer(mock.Anything, app, mock.Anything).Return(nil).Once()
 	client.EXPECT().CreateContainer(mock.Anything, app).
-		Return(types.ContainerID("e000000000000000000000000000000000000000000000000000000000000000"), nil).Once()
+		Return(container.ContainerID("e000000000000000000000000000000000000000000000000000000000000000"), nil).Once()
 	client.EXPECT().StartContainerByID(mock.Anything, mock.Anything).Return(nil).Once()
 	client.EXPECT().GetContainer(mock.Anything, mock.Anything).Return(app, nil).Maybe()
 
@@ -472,7 +472,7 @@ func TestUpdate_DependencyProblemsWarnOnce(t *testing.T) {
 			client := mockContainerClient.NewMockClient(t)
 			client.EXPECT().ListContainers(mock.Anything, mock.Anything).Return(tt.containers, nil)
 			client.EXPECT().IsContainerStale(mock.Anything, mock.Anything, mock.Anything).
-				Return(false, types.ImageID(""), "", nil).Maybe()
+				Return(false, container.ImageID(""), "", nil).Maybe()
 
 			scanLevels := make([][]string, 0, 2)
 
@@ -634,7 +634,7 @@ func TestUpdate_UnrecreatableConfigWarnsOnce(t *testing.T) {
 		client := mockContainerClient.NewMockClient(t)
 		client.EXPECT().ListContainers(mock.Anything, mock.Anything).Return([]*container.Container{app}, nil).Once()
 		client.EXPECT().IsContainerStale(mock.Anything, mock.Anything, mock.Anything).
-			Return(true, types.ImageID("sha256:new"), "", nil).Once()
+			Return(true, container.ImageID("sha256:new"), "", nil).Once()
 
 		var out bytes.Buffer
 

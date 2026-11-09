@@ -16,10 +16,10 @@ import (
 
 	dockerClient "github.com/moby/moby/client"
 
+	"github.com/nicholas-fedor/watchtower/internal/container"
 	"github.com/nicholas-fedor/watchtower/internal/container/provenance"
 	"github.com/nicholas-fedor/watchtower/internal/container/redact"
 	"github.com/nicholas-fedor/watchtower/internal/observability/logging"
-	"github.com/nicholas-fedor/watchtower/pkg/types"
 )
 
 // redactedError is a build error whose text has its credentials removed.
@@ -58,7 +58,7 @@ var (
 //   - tags: Image tags to apply.
 //
 // Returns:
-//   - types.ImageID: Built image ID.
+//   - container.ImageID: Built image ID.
 //   - error: Non-nil when the build or inspect fails.
 func BuildFromGit(
 	log *zerolog.Logger,
@@ -66,7 +66,7 @@ func BuildFromGit(
 	api dockerClient.APIClient,
 	remote, dockerfile string,
 	tags []string,
-) (types.ImageID, error) {
+) (container.ImageID, error) {
 	remote = strings.TrimSpace(remote)
 	if remote == "" {
 		return "", errGitRemoteEmpty
@@ -106,7 +106,7 @@ func BuildFromGit(
 			return "", fmt.Errorf("inspect built image: %w", inspectErr)
 		}
 
-		imageID = types.ImageID(inspected.ID)
+		imageID = container.ImageID(inspected.ID)
 	}
 
 	if imageID == "" {
@@ -148,9 +148,9 @@ func confinedDockerfile(dockerfile string) (string, error) {
 //   - body: Build response body.
 //
 // Returns:
-//   - types.ImageID: Last aux ID, or empty.
+//   - container.ImageID: Last aux ID, or empty.
 //   - error: Non-nil when the stream reports a build error.
-func consumeBuildStream(body io.Reader) (types.ImageID, error) {
+func consumeBuildStream(body io.Reader) (container.ImageID, error) {
 	decoder := json.NewDecoder(body)
 
 	var lastID string
@@ -180,7 +180,7 @@ func consumeBuildStream(body io.Reader) (types.ImageID, error) {
 		}
 	}
 
-	return types.ImageID(lastID), nil
+	return container.ImageID(lastID), nil
 }
 
 // auxImageID returns the image ID from a Docker build aux payload.

@@ -21,7 +21,6 @@ import (
 
 	"github.com/nicholas-fedor/watchtower/internal/container"
 	"github.com/nicholas-fedor/watchtower/internal/container/labels"
-	"github.com/nicholas-fedor/watchtower/pkg/types"
 )
 
 const (
@@ -119,7 +118,7 @@ func (s Snapshot) size() int64 {
 // The zero value is ready to use.
 type Pending struct {
 	// snapshots stores labeled file snapshots keyed by the source container ID.
-	snapshots map[types.ContainerID]Snapshot
+	snapshots map[container.ContainerID]Snapshot
 	// bytes is the total size of archives currently held in snapshots.
 	bytes int64
 	// mu protects snapshots and bytes.
@@ -135,14 +134,14 @@ type Pending struct {
 // Returns:
 //   - error: Non-nil if storing the snapshot would exceed maxCopyFileStoreBytes.
 func (s *Pending) Store(
-	containerID types.ContainerID,
+	containerID container.ContainerID,
 	snapshot Snapshot,
 ) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
 	if s.snapshots == nil {
-		s.snapshots = make(map[types.ContainerID]Snapshot)
+		s.snapshots = make(map[container.ContainerID]Snapshot)
 	}
 
 	existing, ok := s.snapshots[containerID]
@@ -178,7 +177,7 @@ func (s *Pending) Store(
 //   - Snapshot: The removed snapshot when present.
 //   - bool: True when a snapshot was stored for containerID.
 func (s *Pending) Take(
-	containerID types.ContainerID,
+	containerID container.ContainerID,
 ) (Snapshot, bool) {
 	s.mu.Lock()
 	defer s.mu.Unlock()

@@ -491,7 +491,7 @@ func TestGetCurrentWatchtowerContainerWithTimeout(t *testing.T) {
 			// Verify context has expired
 			require.ErrorIs(t, ctx.Err(), context.DeadlineExceeded)
 
-			containerID := types.ContainerID("test-container-id")
+			containerID := container.ContainerID("test-container-id")
 
 			// Mock expects GetCurrentWatchtowerContainer to be called with expired context
 			mockClient.EXPECT().GetCurrentWatchtowerContainer(ctx, containerID).
@@ -522,7 +522,7 @@ func TestGetCurrentWatchtowerContainerWithTimeout(t *testing.T) {
 			// Verify context is canceled
 			require.ErrorIs(t, ctx.Err(), context.Canceled)
 
-			containerID := types.ContainerID("test-container-id")
+			containerID := container.ContainerID("test-container-id")
 
 			// Mock expects GetCurrentWatchtowerContainer to be called with canceled context
 			mockClient.EXPECT().GetCurrentWatchtowerContainer(ctx, containerID).
@@ -886,12 +886,12 @@ func TestDisableRestarts(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			mockClient := mockContainerClient.NewMockClient(t)
 			if tt.wantUpdate {
-				mockClient.EXPECT().SetRestartPolicy(mock.Anything, types.ContainerID("c0c0"),
+				mockClient.EXPECT().SetRestartPolicy(mock.Anything, container.ContainerID("c0c0"),
 					dockerContainer.RestartPolicy{Name: dockerContainer.RestartPolicyDisabled}).
 					Return(tt.updateErr).Once()
 			}
 
-			currentID := types.ContainerID("c0c0")
+			currentID := container.ContainerID("c0c0")
 			if tt.unknownID {
 				currentID = ""
 			}

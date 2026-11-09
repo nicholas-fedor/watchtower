@@ -8,7 +8,6 @@ import (
 	containerImage "github.com/nicholas-fedor/watchtower/internal/container/image"
 	"github.com/nicholas-fedor/watchtower/internal/git"
 	updateParams "github.com/nicholas-fedor/watchtower/internal/update/params"
-	"github.com/nicholas-fedor/watchtower/pkg/types"
 )
 
 // Check runs a Git staleness check and stores the result.
@@ -25,13 +24,13 @@ import (
 //
 // Returns:
 //   - bool: True when the remote ref has advanced past the known running revision.
-//   - types.ImageID: Synthetic Git image id used by the update pipeline.
+//   - container.ImageID: Synthetic Git image id used by the update pipeline.
 //   - error: Non-nil on monitor or cooldown failure.
 func (s *Session) Check(
 	ctx context.Context,
 	c *container.Container,
 	params updateParams.Params,
-) (bool, types.ImageID, error) {
+) (bool, container.ImageID, error) {
 	result, err := git.CheckContainer(ctx, s.client, c, params.Git)
 	if err != nil {
 		return false, "", fmt.Errorf("git check: %w", err)
@@ -48,9 +47,9 @@ func (s *Session) Check(
 		return false, "", fmt.Errorf("git cooldown: %w", err)
 	}
 
-	newest := types.ImageID("git:" + result.Commit)
+	newest := container.ImageID("git:" + result.Commit)
 	if newest == "git:" {
-		newest = types.ImageID("git:unknown")
+		newest = container.ImageID("git:unknown")
 	}
 
 	return true, newest, nil

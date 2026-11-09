@@ -97,7 +97,7 @@ var (
 	//
 	// It is initialized once in preRun after the client is set up, and used throughout the application
 	// to avoid repeated calls to GetCurrentContainerID. If retrieval fails, it is set to an empty string.
-	currentWatchtowerContainerID types.ContainerID
+	currentWatchtowerContainerID container.ContainerID
 
 	// currentWatchtowerContainerUnknown is true when Watchtower runs in a container
 	// whose ID could not be determined. Self-updates are then disabled.

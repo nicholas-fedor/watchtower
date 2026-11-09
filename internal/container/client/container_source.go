@@ -123,7 +123,7 @@ func listSourceContainers(log *zerolog.Logger,
 	imageCache := make(map[string]*dockerImage.InspectResponse, len(containers.Items))
 
 	for _, runningContainer := range containers.Items {
-		c, err := getSourceContainer(log, ctx, api, types.ContainerID(runningContainer.ID), imageCache)
+		c, err := getSourceContainer(log, ctx, api, container.ContainerID(runningContainer.ID), imageCache)
 		if err != nil {
 			// Log detailed error information for debugging container inspect failures
 			log.Debug().
@@ -183,7 +183,7 @@ func listSourceContainers(log *zerolog.Logger,
 func getSourceContainer(log *zerolog.Logger,
 	ctx context.Context,
 	api dockerClient.APIClient,
-	containerID types.ContainerID,
+	containerID container.ContainerID,
 	imageCache map[string]*dockerImage.InspectResponse,
 ) (*container.Container, error) {
 	clogVal := log.With().

@@ -10,7 +10,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/nicholas-fedor/watchtower/pkg/types"
+	"github.com/nicholas-fedor/watchtower/internal/container"
 )
 
 // FuzzParseCopyFileLabel verifies label parsing never panics and that accepted
@@ -322,7 +322,7 @@ func FuzzStoreCopyFileSnapshot(f *testing.F) {
 
 		var pending Pending
 
-		containerID := types.ContainerID(id)
+		containerID := container.ContainerID(id)
 		snapshot := Snapshot{files: []copyFileEntry{{
 			target:  "/app/config.yaml",
 			archive: archive,

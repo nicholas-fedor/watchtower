@@ -18,7 +18,6 @@ import (
 
 	"github.com/nicholas-fedor/watchtower/internal/container"
 	"github.com/nicholas-fedor/watchtower/internal/container/labels"
-	"github.com/nicholas-fedor/watchtower/pkg/types"
 )
 
 // Environment variable keys used by the ephemeral orchestrator.
@@ -115,7 +114,7 @@ type dockerConnectionConfig struct {
 //   - cleanup: When true, the orchestrator removes the old image after handoff.
 //
 // Returns:
-//   - types.ContainerID: ID of the ephemeral orchestrator container.
+//   - container.ContainerID: ID of the ephemeral orchestrator container.
 //   - error: Non-nil if creation or start fails, nil on success.
 func CreateOrchestrator(
 	log *zerolog.Logger,
@@ -125,7 +124,7 @@ func CreateOrchestrator(
 	newImage string,
 	containerChain string,
 	cleanup bool,
-) (types.ContainerID, error) {
+) (container.ContainerID, error) {
 	clogVal := log.With().
 		Str("source_container", sourceContainer.Name()).
 		Str("source_id", sourceContainer.ID().ShortID()).
@@ -182,7 +181,7 @@ func CreateOrchestrator(
 		return "", fmt.Errorf("%w: %w", errEphemeralCreateFailed, err)
 	}
 
-	orchestratorID := types.ContainerID(resp.ID)
+	orchestratorID := container.ContainerID(resp.ID)
 
 	clog.Debug().
 		Str("orchestrator_id", orchestratorID.ShortID()).

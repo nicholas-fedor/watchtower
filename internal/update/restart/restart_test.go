@@ -25,7 +25,6 @@ import (
 	mockUpdate "github.com/nicholas-fedor/watchtower/internal/update/mocks"
 	updateParams "github.com/nicholas-fedor/watchtower/internal/update/params"
 	"github.com/nicholas-fedor/watchtower/internal/update/state"
-	"github.com/nicholas-fedor/watchtower/pkg/types"
 )
 
 // stopContainersTestCase represents a test case for stopContainersInReversedOrder cancellation.
@@ -1086,7 +1085,7 @@ func Test_stopContainersInReversedOrder(t *testing.T) {
 
 			// Verify all containers 0, 1, 2, 3 are in failed map with wrapped error.
 			for i := range 4 {
-				containerID := types.ContainerID(fmt.Sprintf("container-%d", i))
+				containerID := container.ContainerID(fmt.Sprintf("container-%d", i))
 				err, exists := failed[containerID]
 				require.True(t, exists, "Container %d should be in failed map", i)
 
@@ -1613,7 +1612,7 @@ func Test_performRollingRestart(t *testing.T) {
 
 			// Verify all containers 0, 1, 2, 3 are in failed map with wrapped error.
 			for i := range 4 {
-				containerID := types.ContainerID(fmt.Sprintf("container-%d", i))
+				containerID := container.ContainerID(fmt.Sprintf("container-%d", i))
 				containerErr, exists := failed[containerID]
 				require.True(t, exists, "Container %d should be in failed map", i)
 
@@ -1958,7 +1957,7 @@ func Test_performRollingRestart(t *testing.T) {
 
 			// Verify failed container error also wraps context.Canceled.
 			require.Len(t, failed, 1)
-			containerErr := failed[types.ContainerID("container-0")]
+			containerErr := failed[container.ContainerID("container-0")]
 			require.ErrorIs(t, containerErr, context.Canceled, "Container error should wrap context.Canceled")
 			assert.Contains(t, containerErr.Error(), "restart skipped")
 		})
@@ -2020,7 +2019,7 @@ func Test_performRollingRestart(t *testing.T) {
 
 			// Verify failed container error also wraps context.DeadlineExceeded.
 			require.Len(t, failed, 1)
-			containerErr := failed[types.ContainerID("container-0")]
+			containerErr := failed[container.ContainerID("container-0")]
 			require.ErrorIs(t, containerErr, context.DeadlineExceeded, "Container error should wrap context.DeadlineExceeded")
 			assert.Contains(t, containerErr.Error(), "restart skipped")
 		})
@@ -2159,9 +2158,9 @@ func TestClientErrorsNamedOnce(t *testing.T) {
 		client := mockContainerClient.NewMockClient(t)
 		client.EXPECT().
 			CreateContainer(mock.Anything, source).
-			Return(types.ContainerID("abc123"), nil)
+			Return(container.ContainerID("abc123"), nil)
 		client.EXPECT().
-			StartContainerByID(mock.Anything, types.ContainerID("abc123")).
+			StartContainerByID(mock.Anything, container.ContainerID("abc123")).
 			Return(clientErr)
 
 		_, _, err := restartStaleContainer(
@@ -2190,7 +2189,7 @@ func TestRecordRestartOutcomes(t *testing.T) {
 	const failures = 5
 
 	progress := state.Progress{}
-	outcomes := make(map[types.ContainerID]error, failures+1)
+	outcomes := make(map[container.ContainerID]error, failures+1)
 	wantNames := make([]string, 0, failures)
 
 	for index := range failures {

@@ -53,22 +53,22 @@ func (_m *MockClient) EXPECT() *MockClient_Expecter {
 }
 
 // BuildRemoteImage provides a mock function for the type MockClient
-func (_mock *MockClient) BuildRemoteImage(ctx context.Context, remote string, dockerfile string, tags []string) (types.ImageID, error) {
+func (_mock *MockClient) BuildRemoteImage(ctx context.Context, remote string, dockerfile string, tags []string) (container.ImageID, error) {
 	ret := _mock.Called(ctx, remote, dockerfile, tags)
 
 	if len(ret) == 0 {
 		panic("no return value specified for BuildRemoteImage")
 	}
 
-	var r0 types.ImageID
+	var r0 container.ImageID
 	var r1 error
-	if returnFunc, ok := ret.Get(0).(func(context.Context, string, string, []string) (types.ImageID, error)); ok {
+	if returnFunc, ok := ret.Get(0).(func(context.Context, string, string, []string) (container.ImageID, error)); ok {
 		return returnFunc(ctx, remote, dockerfile, tags)
 	}
-	if returnFunc, ok := ret.Get(0).(func(context.Context, string, string, []string) types.ImageID); ok {
+	if returnFunc, ok := ret.Get(0).(func(context.Context, string, string, []string) container.ImageID); ok {
 		r0 = returnFunc(ctx, remote, dockerfile, tags)
 	} else {
-		r0 = ret.Get(0).(types.ImageID)
+		r0 = ret.Get(0).(container.ImageID)
 	}
 	if returnFunc, ok := ret.Get(1).(func(context.Context, string, string, []string) error); ok {
 		r1 = returnFunc(ctx, remote, dockerfile, tags)
@@ -120,18 +120,18 @@ func (_c *MockClient_BuildRemoteImage_Call) Run(run func(ctx context.Context, re
 	return _c
 }
 
-func (_c *MockClient_BuildRemoteImage_Call) Return(imageID types.ImageID, err error) *MockClient_BuildRemoteImage_Call {
+func (_c *MockClient_BuildRemoteImage_Call) Return(imageID container.ImageID, err error) *MockClient_BuildRemoteImage_Call {
 	_c.Call.Return(imageID, err)
 	return _c
 }
 
-func (_c *MockClient_BuildRemoteImage_Call) RunAndReturn(run func(ctx context.Context, remote string, dockerfile string, tags []string) (types.ImageID, error)) *MockClient_BuildRemoteImage_Call {
+func (_c *MockClient_BuildRemoteImage_Call) RunAndReturn(run func(ctx context.Context, remote string, dockerfile string, tags []string) (container.ImageID, error)) *MockClient_BuildRemoteImage_Call {
 	_c.Call.Return(run)
 	return _c
 }
 
 // CheckContainerUpdate provides a mock function for the type MockClient
-func (_mock *MockClient) CheckContainerUpdate(ctx context.Context, target *container.Container, policy update.Policy) (bool, types.ImageID, string, error) {
+func (_mock *MockClient) CheckContainerUpdate(ctx context.Context, target *container.Container, policy update.Policy) (bool, container.ImageID, string, error) {
 	ret := _mock.Called(ctx, target, policy)
 
 	if len(ret) == 0 {
@@ -139,10 +139,10 @@ func (_mock *MockClient) CheckContainerUpdate(ctx context.Context, target *conta
 	}
 
 	var r0 bool
-	var r1 types.ImageID
+	var r1 container.ImageID
 	var r2 string
 	var r3 error
-	if returnFunc, ok := ret.Get(0).(func(context.Context, *container.Container, update.Policy) (bool, types.ImageID, string, error)); ok {
+	if returnFunc, ok := ret.Get(0).(func(context.Context, *container.Container, update.Policy) (bool, container.ImageID, string, error)); ok {
 		return returnFunc(ctx, target, policy)
 	}
 	if returnFunc, ok := ret.Get(0).(func(context.Context, *container.Container, update.Policy) bool); ok {
@@ -150,10 +150,10 @@ func (_mock *MockClient) CheckContainerUpdate(ctx context.Context, target *conta
 	} else {
 		r0 = ret.Get(0).(bool)
 	}
-	if returnFunc, ok := ret.Get(1).(func(context.Context, *container.Container, update.Policy) types.ImageID); ok {
+	if returnFunc, ok := ret.Get(1).(func(context.Context, *container.Container, update.Policy) container.ImageID); ok {
 		r1 = returnFunc(ctx, target, policy)
 	} else {
-		r1 = ret.Get(1).(types.ImageID)
+		r1 = ret.Get(1).(container.ImageID)
 	}
 	if returnFunc, ok := ret.Get(2).(func(context.Context, *container.Container, update.Policy) string); ok {
 		r2 = returnFunc(ctx, target, policy)
@@ -204,33 +204,33 @@ func (_c *MockClient_CheckContainerUpdate_Call) Run(run func(ctx context.Context
 	return _c
 }
 
-func (_c *MockClient_CheckContainerUpdate_Call) Return(b bool, imageID types.ImageID, s string, err error) *MockClient_CheckContainerUpdate_Call {
+func (_c *MockClient_CheckContainerUpdate_Call) Return(b bool, imageID container.ImageID, s string, err error) *MockClient_CheckContainerUpdate_Call {
 	_c.Call.Return(b, imageID, s, err)
 	return _c
 }
 
-func (_c *MockClient_CheckContainerUpdate_Call) RunAndReturn(run func(ctx context.Context, target *container.Container, policy update.Policy) (bool, types.ImageID, string, error)) *MockClient_CheckContainerUpdate_Call {
+func (_c *MockClient_CheckContainerUpdate_Call) RunAndReturn(run func(ctx context.Context, target *container.Container, policy update.Policy) (bool, container.ImageID, string, error)) *MockClient_CheckContainerUpdate_Call {
 	_c.Call.Return(run)
 	return _c
 }
 
 // CreateContainer provides a mock function for the type MockClient
-func (_mock *MockClient) CreateContainer(ctx context.Context, target *container.Container) (types.ContainerID, error) {
+func (_mock *MockClient) CreateContainer(ctx context.Context, target *container.Container) (container.ContainerID, error) {
 	ret := _mock.Called(ctx, target)
 
 	if len(ret) == 0 {
 		panic("no return value specified for CreateContainer")
 	}
 
-	var r0 types.ContainerID
+	var r0 container.ContainerID
 	var r1 error
-	if returnFunc, ok := ret.Get(0).(func(context.Context, *container.Container) (types.ContainerID, error)); ok {
+	if returnFunc, ok := ret.Get(0).(func(context.Context, *container.Container) (container.ContainerID, error)); ok {
 		return returnFunc(ctx, target)
 	}
-	if returnFunc, ok := ret.Get(0).(func(context.Context, *container.Container) types.ContainerID); ok {
+	if returnFunc, ok := ret.Get(0).(func(context.Context, *container.Container) container.ContainerID); ok {
 		r0 = returnFunc(ctx, target)
 	} else {
-		r0 = ret.Get(0).(types.ContainerID)
+		r0 = ret.Get(0).(container.ContainerID)
 	}
 	if returnFunc, ok := ret.Get(1).(func(context.Context, *container.Container) error); ok {
 		r1 = returnFunc(ctx, target)
@@ -270,33 +270,33 @@ func (_c *MockClient_CreateContainer_Call) Run(run func(ctx context.Context, tar
 	return _c
 }
 
-func (_c *MockClient_CreateContainer_Call) Return(containerID types.ContainerID, err error) *MockClient_CreateContainer_Call {
+func (_c *MockClient_CreateContainer_Call) Return(containerID container.ContainerID, err error) *MockClient_CreateContainer_Call {
 	_c.Call.Return(containerID, err)
 	return _c
 }
 
-func (_c *MockClient_CreateContainer_Call) RunAndReturn(run func(ctx context.Context, target *container.Container) (types.ContainerID, error)) *MockClient_CreateContainer_Call {
+func (_c *MockClient_CreateContainer_Call) RunAndReturn(run func(ctx context.Context, target *container.Container) (container.ContainerID, error)) *MockClient_CreateContainer_Call {
 	_c.Call.Return(run)
 	return _c
 }
 
 // CreateEphemeralOrchestrator provides a mock function for the type MockClient
-func (_mock *MockClient) CreateEphemeralOrchestrator(ctx context.Context, sourceContainer *container.Container, newImage string, containerChain string, cleanup bool) (types.ContainerID, error) {
+func (_mock *MockClient) CreateEphemeralOrchestrator(ctx context.Context, sourceContainer *container.Container, newImage string, containerChain string, cleanup bool) (container.ContainerID, error) {
 	ret := _mock.Called(ctx, sourceContainer, newImage, containerChain, cleanup)
 
 	if len(ret) == 0 {
 		panic("no return value specified for CreateEphemeralOrchestrator")
 	}
 
-	var r0 types.ContainerID
+	var r0 container.ContainerID
 	var r1 error
-	if returnFunc, ok := ret.Get(0).(func(context.Context, *container.Container, string, string, bool) (types.ContainerID, error)); ok {
+	if returnFunc, ok := ret.Get(0).(func(context.Context, *container.Container, string, string, bool) (container.ContainerID, error)); ok {
 		return returnFunc(ctx, sourceContainer, newImage, containerChain, cleanup)
 	}
-	if returnFunc, ok := ret.Get(0).(func(context.Context, *container.Container, string, string, bool) types.ContainerID); ok {
+	if returnFunc, ok := ret.Get(0).(func(context.Context, *container.Container, string, string, bool) container.ContainerID); ok {
 		r0 = returnFunc(ctx, sourceContainer, newImage, containerChain, cleanup)
 	} else {
-		r0 = ret.Get(0).(types.ContainerID)
+		r0 = ret.Get(0).(container.ContainerID)
 	}
 	if returnFunc, ok := ret.Get(1).(func(context.Context, *container.Container, string, string, bool) error); ok {
 		r1 = returnFunc(ctx, sourceContainer, newImage, containerChain, cleanup)
@@ -354,12 +354,12 @@ func (_c *MockClient_CreateEphemeralOrchestrator_Call) Run(run func(ctx context.
 	return _c
 }
 
-func (_c *MockClient_CreateEphemeralOrchestrator_Call) Return(containerID types.ContainerID, err error) *MockClient_CreateEphemeralOrchestrator_Call {
+func (_c *MockClient_CreateEphemeralOrchestrator_Call) Return(containerID container.ContainerID, err error) *MockClient_CreateEphemeralOrchestrator_Call {
 	_c.Call.Return(containerID, err)
 	return _c
 }
 
-func (_c *MockClient_CreateEphemeralOrchestrator_Call) RunAndReturn(run func(ctx context.Context, sourceContainer *container.Container, newImage string, containerChain string, cleanup bool) (types.ContainerID, error)) *MockClient_CreateEphemeralOrchestrator_Call {
+func (_c *MockClient_CreateEphemeralOrchestrator_Call) RunAndReturn(run func(ctx context.Context, sourceContainer *container.Container, newImage string, containerChain string, cleanup bool) (container.ContainerID, error)) *MockClient_CreateEphemeralOrchestrator_Call {
 	_c.Call.Return(run)
 	return _c
 }
@@ -455,7 +455,7 @@ func (_c *MockClient_ExecuteCommand_Call) RunAndReturn(run func(ctx context.Cont
 }
 
 // GetContainer provides a mock function for the type MockClient
-func (_mock *MockClient) GetContainer(ctx context.Context, containerID types.ContainerID) (*container.Container, error) {
+func (_mock *MockClient) GetContainer(ctx context.Context, containerID container.ContainerID) (*container.Container, error) {
 	ret := _mock.Called(ctx, containerID)
 
 	if len(ret) == 0 {
@@ -464,17 +464,17 @@ func (_mock *MockClient) GetContainer(ctx context.Context, containerID types.Con
 
 	var r0 *container.Container
 	var r1 error
-	if returnFunc, ok := ret.Get(0).(func(context.Context, types.ContainerID) (*container.Container, error)); ok {
+	if returnFunc, ok := ret.Get(0).(func(context.Context, container.ContainerID) (*container.Container, error)); ok {
 		return returnFunc(ctx, containerID)
 	}
-	if returnFunc, ok := ret.Get(0).(func(context.Context, types.ContainerID) *container.Container); ok {
+	if returnFunc, ok := ret.Get(0).(func(context.Context, container.ContainerID) *container.Container); ok {
 		r0 = returnFunc(ctx, containerID)
 	} else {
 		if ret.Get(0) != nil {
 			r0 = ret.Get(0).(*container.Container)
 		}
 	}
-	if returnFunc, ok := ret.Get(1).(func(context.Context, types.ContainerID) error); ok {
+	if returnFunc, ok := ret.Get(1).(func(context.Context, container.ContainerID) error); ok {
 		r1 = returnFunc(ctx, containerID)
 	} else {
 		r1 = ret.Error(1)
@@ -489,20 +489,20 @@ type MockClient_GetContainer_Call struct {
 
 // GetContainer is a helper method to define mock.On call
 //   - ctx context.Context
-//   - containerID types.ContainerID
+//   - containerID container.ContainerID
 func (_e *MockClient_Expecter) GetContainer(ctx any, containerID any) *MockClient_GetContainer_Call {
 	return &MockClient_GetContainer_Call{Call: _e.mock.On("GetContainer", ctx, containerID)}
 }
 
-func (_c *MockClient_GetContainer_Call) Run(run func(ctx context.Context, containerID types.ContainerID)) *MockClient_GetContainer_Call {
+func (_c *MockClient_GetContainer_Call) Run(run func(ctx context.Context, containerID container.ContainerID)) *MockClient_GetContainer_Call {
 	_c.Call.Run(func(args mock.Arguments) {
 		var arg0 context.Context
 		if args[0] != nil {
 			arg0 = args[0].(context.Context)
 		}
-		var arg1 types.ContainerID
+		var arg1 container.ContainerID
 		if args[1] != nil {
-			arg1 = args[1].(types.ContainerID)
+			arg1 = args[1].(container.ContainerID)
 		}
 		run(
 			arg0,
@@ -517,13 +517,13 @@ func (_c *MockClient_GetContainer_Call) Return(container1 *container.Container, 
 	return _c
 }
 
-func (_c *MockClient_GetContainer_Call) RunAndReturn(run func(ctx context.Context, containerID types.ContainerID) (*container.Container, error)) *MockClient_GetContainer_Call {
+func (_c *MockClient_GetContainer_Call) RunAndReturn(run func(ctx context.Context, containerID container.ContainerID) (*container.Container, error)) *MockClient_GetContainer_Call {
 	_c.Call.Return(run)
 	return _c
 }
 
 // GetCurrentWatchtowerContainer provides a mock function for the type MockClient
-func (_mock *MockClient) GetCurrentWatchtowerContainer(ctx context.Context, containerID types.ContainerID) (*container.Container, error) {
+func (_mock *MockClient) GetCurrentWatchtowerContainer(ctx context.Context, containerID container.ContainerID) (*container.Container, error) {
 	ret := _mock.Called(ctx, containerID)
 
 	if len(ret) == 0 {
@@ -532,17 +532,17 @@ func (_mock *MockClient) GetCurrentWatchtowerContainer(ctx context.Context, cont
 
 	var r0 *container.Container
 	var r1 error
-	if returnFunc, ok := ret.Get(0).(func(context.Context, types.ContainerID) (*container.Container, error)); ok {
+	if returnFunc, ok := ret.Get(0).(func(context.Context, container.ContainerID) (*container.Container, error)); ok {
 		return returnFunc(ctx, containerID)
 	}
-	if returnFunc, ok := ret.Get(0).(func(context.Context, types.ContainerID) *container.Container); ok {
+	if returnFunc, ok := ret.Get(0).(func(context.Context, container.ContainerID) *container.Container); ok {
 		r0 = returnFunc(ctx, containerID)
 	} else {
 		if ret.Get(0) != nil {
 			r0 = ret.Get(0).(*container.Container)
 		}
 	}
-	if returnFunc, ok := ret.Get(1).(func(context.Context, types.ContainerID) error); ok {
+	if returnFunc, ok := ret.Get(1).(func(context.Context, container.ContainerID) error); ok {
 		r1 = returnFunc(ctx, containerID)
 	} else {
 		r1 = ret.Error(1)
@@ -557,20 +557,20 @@ type MockClient_GetCurrentWatchtowerContainer_Call struct {
 
 // GetCurrentWatchtowerContainer is a helper method to define mock.On call
 //   - ctx context.Context
-//   - containerID types.ContainerID
+//   - containerID container.ContainerID
 func (_e *MockClient_Expecter) GetCurrentWatchtowerContainer(ctx any, containerID any) *MockClient_GetCurrentWatchtowerContainer_Call {
 	return &MockClient_GetCurrentWatchtowerContainer_Call{Call: _e.mock.On("GetCurrentWatchtowerContainer", ctx, containerID)}
 }
 
-func (_c *MockClient_GetCurrentWatchtowerContainer_Call) Run(run func(ctx context.Context, containerID types.ContainerID)) *MockClient_GetCurrentWatchtowerContainer_Call {
+func (_c *MockClient_GetCurrentWatchtowerContainer_Call) Run(run func(ctx context.Context, containerID container.ContainerID)) *MockClient_GetCurrentWatchtowerContainer_Call {
 	_c.Call.Run(func(args mock.Arguments) {
 		var arg0 context.Context
 		if args[0] != nil {
 			arg0 = args[0].(context.Context)
 		}
-		var arg1 types.ContainerID
+		var arg1 container.ContainerID
 		if args[1] != nil {
-			arg1 = args[1].(types.ContainerID)
+			arg1 = args[1].(container.ContainerID)
 		}
 		run(
 			arg0,
@@ -585,7 +585,7 @@ func (_c *MockClient_GetCurrentWatchtowerContainer_Call) Return(container1 *cont
 	return _c
 }
 
-func (_c *MockClient_GetCurrentWatchtowerContainer_Call) RunAndReturn(run func(ctx context.Context, containerID types.ContainerID) (*container.Container, error)) *MockClient_GetCurrentWatchtowerContainer_Call {
+func (_c *MockClient_GetCurrentWatchtowerContainer_Call) RunAndReturn(run func(ctx context.Context, containerID container.ContainerID) (*container.Container, error)) *MockClient_GetCurrentWatchtowerContainer_Call {
 	_c.Call.Return(run)
 	return _c
 }
@@ -812,7 +812,7 @@ func (_c *MockClient_GetVersion_Call) RunAndReturn(run func() string) *MockClien
 }
 
 // IsContainerStale provides a mock function for the type MockClient
-func (_mock *MockClient) IsContainerStale(ctx context.Context, target *container.Container, policy update.Policy) (bool, types.ImageID, string, error) {
+func (_mock *MockClient) IsContainerStale(ctx context.Context, target *container.Container, policy update.Policy) (bool, container.ImageID, string, error) {
 	ret := _mock.Called(ctx, target, policy)
 
 	if len(ret) == 0 {
@@ -820,10 +820,10 @@ func (_mock *MockClient) IsContainerStale(ctx context.Context, target *container
 	}
 
 	var r0 bool
-	var r1 types.ImageID
+	var r1 container.ImageID
 	var r2 string
 	var r3 error
-	if returnFunc, ok := ret.Get(0).(func(context.Context, *container.Container, update.Policy) (bool, types.ImageID, string, error)); ok {
+	if returnFunc, ok := ret.Get(0).(func(context.Context, *container.Container, update.Policy) (bool, container.ImageID, string, error)); ok {
 		return returnFunc(ctx, target, policy)
 	}
 	if returnFunc, ok := ret.Get(0).(func(context.Context, *container.Container, update.Policy) bool); ok {
@@ -831,10 +831,10 @@ func (_mock *MockClient) IsContainerStale(ctx context.Context, target *container
 	} else {
 		r0 = ret.Get(0).(bool)
 	}
-	if returnFunc, ok := ret.Get(1).(func(context.Context, *container.Container, update.Policy) types.ImageID); ok {
+	if returnFunc, ok := ret.Get(1).(func(context.Context, *container.Container, update.Policy) container.ImageID); ok {
 		r1 = returnFunc(ctx, target, policy)
 	} else {
-		r1 = ret.Get(1).(types.ImageID)
+		r1 = ret.Get(1).(container.ImageID)
 	}
 	if returnFunc, ok := ret.Get(2).(func(context.Context, *container.Container, update.Policy) string); ok {
 		r2 = returnFunc(ctx, target, policy)
@@ -885,12 +885,12 @@ func (_c *MockClient_IsContainerStale_Call) Run(run func(ctx context.Context, ta
 	return _c
 }
 
-func (_c *MockClient_IsContainerStale_Call) Return(b bool, imageID types.ImageID, s string, err error) *MockClient_IsContainerStale_Call {
+func (_c *MockClient_IsContainerStale_Call) Return(b bool, imageID container.ImageID, s string, err error) *MockClient_IsContainerStale_Call {
 	_c.Call.Return(b, imageID, s, err)
 	return _c
 }
 
-func (_c *MockClient_IsContainerStale_Call) RunAndReturn(run func(ctx context.Context, target *container.Container, policy update.Policy) (bool, types.ImageID, string, error)) *MockClient_IsContainerStale_Call {
+func (_c *MockClient_IsContainerStale_Call) RunAndReturn(run func(ctx context.Context, target *container.Container, policy update.Policy) (bool, container.ImageID, string, error)) *MockClient_IsContainerStale_Call {
 	_c.Call.Return(run)
 	return _c
 }
@@ -1081,7 +1081,7 @@ func (_c *MockClient_RemoveContainer_Call) RunAndReturn(run func(ctx context.Con
 }
 
 // RemoveImageByID provides a mock function for the type MockClient
-func (_mock *MockClient) RemoveImageByID(ctx context.Context, imageID types.ImageID, imageName string) error {
+func (_mock *MockClient) RemoveImageByID(ctx context.Context, imageID container.ImageID, imageName string) error {
 	ret := _mock.Called(ctx, imageID, imageName)
 
 	if len(ret) == 0 {
@@ -1089,7 +1089,7 @@ func (_mock *MockClient) RemoveImageByID(ctx context.Context, imageID types.Imag
 	}
 
 	var r0 error
-	if returnFunc, ok := ret.Get(0).(func(context.Context, types.ImageID, string) error); ok {
+	if returnFunc, ok := ret.Get(0).(func(context.Context, container.ImageID, string) error); ok {
 		r0 = returnFunc(ctx, imageID, imageName)
 	} else {
 		r0 = ret.Error(0)
@@ -1104,21 +1104,21 @@ type MockClient_RemoveImageByID_Call struct {
 
 // RemoveImageByID is a helper method to define mock.On call
 //   - ctx context.Context
-//   - imageID types.ImageID
+//   - imageID container.ImageID
 //   - imageName string
 func (_e *MockClient_Expecter) RemoveImageByID(ctx any, imageID any, imageName any) *MockClient_RemoveImageByID_Call {
 	return &MockClient_RemoveImageByID_Call{Call: _e.mock.On("RemoveImageByID", ctx, imageID, imageName)}
 }
 
-func (_c *MockClient_RemoveImageByID_Call) Run(run func(ctx context.Context, imageID types.ImageID, imageName string)) *MockClient_RemoveImageByID_Call {
+func (_c *MockClient_RemoveImageByID_Call) Run(run func(ctx context.Context, imageID container.ImageID, imageName string)) *MockClient_RemoveImageByID_Call {
 	_c.Call.Run(func(args mock.Arguments) {
 		var arg0 context.Context
 		if args[0] != nil {
 			arg0 = args[0].(context.Context)
 		}
-		var arg1 types.ImageID
+		var arg1 container.ImageID
 		if args[1] != nil {
-			arg1 = args[1].(types.ImageID)
+			arg1 = args[1].(container.ImageID)
 		}
 		var arg2 string
 		if args[2] != nil {
@@ -1138,7 +1138,7 @@ func (_c *MockClient_RemoveImageByID_Call) Return(err error) *MockClient_RemoveI
 	return _c
 }
 
-func (_c *MockClient_RemoveImageByID_Call) RunAndReturn(run func(ctx context.Context, imageID types.ImageID, imageName string) error) *MockClient_RemoveImageByID_Call {
+func (_c *MockClient_RemoveImageByID_Call) RunAndReturn(run func(ctx context.Context, imageID container.ImageID, imageName string) error) *MockClient_RemoveImageByID_Call {
 	_c.Call.Return(run)
 	return _c
 }
@@ -1207,7 +1207,7 @@ func (_c *MockClient_RenameContainer_Call) RunAndReturn(run func(ctx context.Con
 }
 
 // SetRestartPolicy provides a mock function for the type MockClient
-func (_mock *MockClient) SetRestartPolicy(ctx context.Context, containerID types.ContainerID, policy container0.RestartPolicy) error {
+func (_mock *MockClient) SetRestartPolicy(ctx context.Context, containerID container.ContainerID, policy container0.RestartPolicy) error {
 	ret := _mock.Called(ctx, containerID, policy)
 
 	if len(ret) == 0 {
@@ -1215,7 +1215,7 @@ func (_mock *MockClient) SetRestartPolicy(ctx context.Context, containerID types
 	}
 
 	var r0 error
-	if returnFunc, ok := ret.Get(0).(func(context.Context, types.ContainerID, container0.RestartPolicy) error); ok {
+	if returnFunc, ok := ret.Get(0).(func(context.Context, container.ContainerID, container0.RestartPolicy) error); ok {
 		r0 = returnFunc(ctx, containerID, policy)
 	} else {
 		r0 = ret.Error(0)
@@ -1230,21 +1230,21 @@ type MockClient_SetRestartPolicy_Call struct {
 
 // SetRestartPolicy is a helper method to define mock.On call
 //   - ctx context.Context
-//   - containerID types.ContainerID
+//   - containerID container.ContainerID
 //   - policy container0.RestartPolicy
 func (_e *MockClient_Expecter) SetRestartPolicy(ctx any, containerID any, policy any) *MockClient_SetRestartPolicy_Call {
 	return &MockClient_SetRestartPolicy_Call{Call: _e.mock.On("SetRestartPolicy", ctx, containerID, policy)}
 }
 
-func (_c *MockClient_SetRestartPolicy_Call) Run(run func(ctx context.Context, containerID types.ContainerID, policy container0.RestartPolicy)) *MockClient_SetRestartPolicy_Call {
+func (_c *MockClient_SetRestartPolicy_Call) Run(run func(ctx context.Context, containerID container.ContainerID, policy container0.RestartPolicy)) *MockClient_SetRestartPolicy_Call {
 	_c.Call.Run(func(args mock.Arguments) {
 		var arg0 context.Context
 		if args[0] != nil {
 			arg0 = args[0].(context.Context)
 		}
-		var arg1 types.ContainerID
+		var arg1 container.ContainerID
 		if args[1] != nil {
-			arg1 = args[1].(types.ContainerID)
+			arg1 = args[1].(container.ContainerID)
 		}
 		var arg2 container0.RestartPolicy
 		if args[2] != nil {
@@ -1264,28 +1264,28 @@ func (_c *MockClient_SetRestartPolicy_Call) Return(err error) *MockClient_SetRes
 	return _c
 }
 
-func (_c *MockClient_SetRestartPolicy_Call) RunAndReturn(run func(ctx context.Context, containerID types.ContainerID, policy container0.RestartPolicy) error) *MockClient_SetRestartPolicy_Call {
+func (_c *MockClient_SetRestartPolicy_Call) RunAndReturn(run func(ctx context.Context, containerID container.ContainerID, policy container0.RestartPolicy) error) *MockClient_SetRestartPolicy_Call {
 	_c.Call.Return(run)
 	return _c
 }
 
 // StartContainer provides a mock function for the type MockClient
-func (_mock *MockClient) StartContainer(ctx context.Context, target *container.Container) (types.ContainerID, error) {
+func (_mock *MockClient) StartContainer(ctx context.Context, target *container.Container) (container.ContainerID, error) {
 	ret := _mock.Called(ctx, target)
 
 	if len(ret) == 0 {
 		panic("no return value specified for StartContainer")
 	}
 
-	var r0 types.ContainerID
+	var r0 container.ContainerID
 	var r1 error
-	if returnFunc, ok := ret.Get(0).(func(context.Context, *container.Container) (types.ContainerID, error)); ok {
+	if returnFunc, ok := ret.Get(0).(func(context.Context, *container.Container) (container.ContainerID, error)); ok {
 		return returnFunc(ctx, target)
 	}
-	if returnFunc, ok := ret.Get(0).(func(context.Context, *container.Container) types.ContainerID); ok {
+	if returnFunc, ok := ret.Get(0).(func(context.Context, *container.Container) container.ContainerID); ok {
 		r0 = returnFunc(ctx, target)
 	} else {
-		r0 = ret.Get(0).(types.ContainerID)
+		r0 = ret.Get(0).(container.ContainerID)
 	}
 	if returnFunc, ok := ret.Get(1).(func(context.Context, *container.Container) error); ok {
 		r1 = returnFunc(ctx, target)
@@ -1325,18 +1325,18 @@ func (_c *MockClient_StartContainer_Call) Run(run func(ctx context.Context, targ
 	return _c
 }
 
-func (_c *MockClient_StartContainer_Call) Return(containerID types.ContainerID, err error) *MockClient_StartContainer_Call {
+func (_c *MockClient_StartContainer_Call) Return(containerID container.ContainerID, err error) *MockClient_StartContainer_Call {
 	_c.Call.Return(containerID, err)
 	return _c
 }
 
-func (_c *MockClient_StartContainer_Call) RunAndReturn(run func(ctx context.Context, target *container.Container) (types.ContainerID, error)) *MockClient_StartContainer_Call {
+func (_c *MockClient_StartContainer_Call) RunAndReturn(run func(ctx context.Context, target *container.Container) (container.ContainerID, error)) *MockClient_StartContainer_Call {
 	_c.Call.Return(run)
 	return _c
 }
 
 // StartContainerByID provides a mock function for the type MockClient
-func (_mock *MockClient) StartContainerByID(ctx context.Context, containerID types.ContainerID) error {
+func (_mock *MockClient) StartContainerByID(ctx context.Context, containerID container.ContainerID) error {
 	ret := _mock.Called(ctx, containerID)
 
 	if len(ret) == 0 {
@@ -1344,7 +1344,7 @@ func (_mock *MockClient) StartContainerByID(ctx context.Context, containerID typ
 	}
 
 	var r0 error
-	if returnFunc, ok := ret.Get(0).(func(context.Context, types.ContainerID) error); ok {
+	if returnFunc, ok := ret.Get(0).(func(context.Context, container.ContainerID) error); ok {
 		r0 = returnFunc(ctx, containerID)
 	} else {
 		r0 = ret.Error(0)
@@ -1359,20 +1359,20 @@ type MockClient_StartContainerByID_Call struct {
 
 // StartContainerByID is a helper method to define mock.On call
 //   - ctx context.Context
-//   - containerID types.ContainerID
+//   - containerID container.ContainerID
 func (_e *MockClient_Expecter) StartContainerByID(ctx any, containerID any) *MockClient_StartContainerByID_Call {
 	return &MockClient_StartContainerByID_Call{Call: _e.mock.On("StartContainerByID", ctx, containerID)}
 }
 
-func (_c *MockClient_StartContainerByID_Call) Run(run func(ctx context.Context, containerID types.ContainerID)) *MockClient_StartContainerByID_Call {
+func (_c *MockClient_StartContainerByID_Call) Run(run func(ctx context.Context, containerID container.ContainerID)) *MockClient_StartContainerByID_Call {
 	_c.Call.Run(func(args mock.Arguments) {
 		var arg0 context.Context
 		if args[0] != nil {
 			arg0 = args[0].(context.Context)
 		}
-		var arg1 types.ContainerID
+		var arg1 container.ContainerID
 		if args[1] != nil {
-			arg1 = args[1].(types.ContainerID)
+			arg1 = args[1].(container.ContainerID)
 		}
 		run(
 			arg0,
@@ -1387,7 +1387,7 @@ func (_c *MockClient_StartContainerByID_Call) Return(err error) *MockClient_Star
 	return _c
 }
 
-func (_c *MockClient_StartContainerByID_Call) RunAndReturn(run func(ctx context.Context, containerID types.ContainerID) error) *MockClient_StartContainerByID_Call {
+func (_c *MockClient_StartContainerByID_Call) RunAndReturn(run func(ctx context.Context, containerID container.ContainerID) error) *MockClient_StartContainerByID_Call {
 	_c.Call.Return(run)
 	return _c
 }
@@ -1519,7 +1519,7 @@ func (_c *MockClient_StopContainer_Call) RunAndReturn(run func(ctx context.Conte
 }
 
 // WaitForContainerHealthy provides a mock function for the type MockClient
-func (_mock *MockClient) WaitForContainerHealthy(ctx context.Context, containerID types.ContainerID, timeout time.Duration) error {
+func (_mock *MockClient) WaitForContainerHealthy(ctx context.Context, containerID container.ContainerID, timeout time.Duration) error {
 	ret := _mock.Called(ctx, containerID, timeout)
 
 	if len(ret) == 0 {
@@ -1527,7 +1527,7 @@ func (_mock *MockClient) WaitForContainerHealthy(ctx context.Context, containerI
 	}
 
 	var r0 error
-	if returnFunc, ok := ret.Get(0).(func(context.Context, types.ContainerID, time.Duration) error); ok {
+	if returnFunc, ok := ret.Get(0).(func(context.Context, container.ContainerID, time.Duration) error); ok {
 		r0 = returnFunc(ctx, containerID, timeout)
 	} else {
 		r0 = ret.Error(0)
@@ -1542,21 +1542,21 @@ type MockClient_WaitForContainerHealthy_Call struct {
 
 // WaitForContainerHealthy is a helper method to define mock.On call
 //   - ctx context.Context
-//   - containerID types.ContainerID
+//   - containerID container.ContainerID
 //   - timeout time.Duration
 func (_e *MockClient_Expecter) WaitForContainerHealthy(ctx any, containerID any, timeout any) *MockClient_WaitForContainerHealthy_Call {
 	return &MockClient_WaitForContainerHealthy_Call{Call: _e.mock.On("WaitForContainerHealthy", ctx, containerID, timeout)}
 }
 
-func (_c *MockClient_WaitForContainerHealthy_Call) Run(run func(ctx context.Context, containerID types.ContainerID, timeout time.Duration)) *MockClient_WaitForContainerHealthy_Call {
+func (_c *MockClient_WaitForContainerHealthy_Call) Run(run func(ctx context.Context, containerID container.ContainerID, timeout time.Duration)) *MockClient_WaitForContainerHealthy_Call {
 	_c.Call.Run(func(args mock.Arguments) {
 		var arg0 context.Context
 		if args[0] != nil {
 			arg0 = args[0].(context.Context)
 		}
-		var arg1 types.ContainerID
+		var arg1 container.ContainerID
 		if args[1] != nil {
-			arg1 = args[1].(types.ContainerID)
+			arg1 = args[1].(container.ContainerID)
 		}
 		var arg2 time.Duration
 		if args[2] != nil {
@@ -1576,7 +1576,7 @@ func (_c *MockClient_WaitForContainerHealthy_Call) Return(err error) *MockClient
 	return _c
 }
 
-func (_c *MockClient_WaitForContainerHealthy_Call) RunAndReturn(run func(ctx context.Context, containerID types.ContainerID, timeout time.Duration) error) *MockClient_WaitForContainerHealthy_Call {
+func (_c *MockClient_WaitForContainerHealthy_Call) RunAndReturn(run func(ctx context.Context, containerID container.ContainerID, timeout time.Duration) error) *MockClient_WaitForContainerHealthy_Call {
 	_c.Call.Return(run)
 	return _c
 }

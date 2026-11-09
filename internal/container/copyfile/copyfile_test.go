@@ -29,7 +29,6 @@ import (
 	mockContainer "github.com/nicholas-fedor/watchtower/internal/container/mocks"
 	"github.com/nicholas-fedor/watchtower/internal/testutil/containerfixture"
 	"github.com/nicholas-fedor/watchtower/internal/testutil/modelfixture"
-	"github.com/nicholas-fedor/watchtower/pkg/types"
 )
 
 func TestParseCopyFileLabel(t *testing.T) {
@@ -1052,7 +1051,7 @@ func TestStoreCopyFileSnapshotCap(t *testing.T) {
 		t.Parallel()
 
 		pending := &Pending{
-			snapshots: make(map[types.ContainerID]Snapshot),
+			snapshots: make(map[container.ContainerID]Snapshot),
 			bytes:     maxCopyFileStoreBytes,
 		}
 		err := pending.Store("source-id", Snapshot{
@@ -1094,7 +1093,7 @@ func TestStoreCopyFileSnapshotCap(t *testing.T) {
 			archive: []byte("keep"),
 		}}}
 		pending := &Pending{
-			snapshots: map[types.ContainerID]Snapshot{"source-id": existing},
+			snapshots: map[container.ContainerID]Snapshot{"source-id": existing},
 			bytes:     existing.size(),
 		}
 		tooLarge := Snapshot{files: []copyFileEntry{{
@@ -1114,10 +1113,10 @@ func TestStoreCopyFileSnapshotCap(t *testing.T) {
 func TestPendingTake(t *testing.T) {
 	t.Parallel()
 
-	sourceID := types.ContainerID("source-id")
-	otherID := types.ContainerID("other-id")
+	sourceID := container.ContainerID("source-id")
+	otherID := container.ContainerID("other-id")
 	pending := &Pending{
-		snapshots: map[types.ContainerID]Snapshot{
+		snapshots: map[container.ContainerID]Snapshot{
 			sourceID: {files: []copyFileEntry{{target: "/app/config.yaml"}}},
 			otherID:  {files: []copyFileEntry{{target: "/app/extra.conf"}}},
 		},
@@ -1152,7 +1151,7 @@ func TestPendingByteCount(t *testing.T) {
 		t.Parallel()
 
 		pending := &Pending{
-			snapshots: map[types.ContainerID]Snapshot{
+			snapshots: map[container.ContainerID]Snapshot{
 				"source-id": {files: []copyFileEntry{{archive: []byte("tar")}}},
 			},
 		}

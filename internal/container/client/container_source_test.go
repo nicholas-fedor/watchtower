@@ -26,7 +26,6 @@ import (
 	"github.com/nicholas-fedor/watchtower/internal/testutil/containerfixture"
 	"github.com/nicholas-fedor/watchtower/internal/testutil/logcapture"
 	"github.com/nicholas-fedor/watchtower/internal/testutil/modelfixture"
-	"github.com/nicholas-fedor/watchtower/pkg/types"
 )
 
 // testContainerID is the ID of the container the client tests list and inspect.
@@ -374,9 +373,9 @@ func TestGetSourceContainer(t *testing.T) {
 			c, err := getSourceContainer(newTestLogger(t), t.Context(), api, testContainerID, nil)
 			require.NoError(t, err)
 			require.NotNil(t, c)
-			assert.Equal(t, types.ContainerID(testContainerID), c.ID())
+			assert.Equal(t, container.ContainerID(testContainerID), c.ID())
 			assert.Equal(t, "test-watchtower", c.Name())
-			assert.Equal(t, types.ImageID("test-image-id"), c.ImageID())
+			assert.Equal(t, container.ImageID("test-image-id"), c.ImageID())
 		})
 	})
 
@@ -394,8 +393,8 @@ func TestGetSourceContainer(t *testing.T) {
 			c, err := getSourceContainer(newTestLogger(t), t.Context(), api, testContainerID, nil)
 			require.NoError(t, err)
 			require.NotNil(t, c)
-			assert.Equal(t, types.ContainerID(testContainerID), c.ID())
-			assert.Equal(t, types.ImageID(""), c.ImageID())
+			assert.Equal(t, container.ContainerID(testContainerID), c.ID())
+			assert.Equal(t, container.ImageID(""), c.ImageID())
 		})
 	})
 

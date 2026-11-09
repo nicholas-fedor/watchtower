@@ -24,7 +24,6 @@ import (
 	"github.com/nicholas-fedor/watchtower/internal/observability/logging"
 	"github.com/nicholas-fedor/watchtower/internal/testutil/logcapture"
 	mockUpdate "github.com/nicholas-fedor/watchtower/internal/update/mocks"
-	"github.com/nicholas-fedor/watchtower/pkg/types"
 )
 
 // newTestLogger returns a logger that writes each event to the test's log, so a
@@ -138,7 +137,7 @@ func TestRemoveExcessWatchtowerInstances(t *testing.T) {
 			require.NoError(t, err)
 			assert.Equal(t, 1, cleanupOccurred)
 			require.Len(t, cleanupImageIDs, 1)
-			assert.Equal(t, types.ImageID("watchtower:old"), cleanupImageIDs[0].ImageID)
+			assert.Equal(t, container.ImageID("watchtower:old"), cleanupImageIDs[0].ImageID)
 		})
 	})
 
@@ -231,7 +230,7 @@ func TestRemoveExcessWatchtowerInstances(t *testing.T) {
 
 			require.NoError(t, err)
 			assert.Equal(t, 1, cleanupOccurred)
-			assert.True(t, slices.ContainsFunc(cleanupImageIDs, func(info RemovedImageInfo) bool { return info.ImageID == types.ImageID("watchtower:1.11.0") }))
+			assert.True(t, slices.ContainsFunc(cleanupImageIDs, func(info RemovedImageInfo) bool { return info.ImageID == container.ImageID("watchtower:1.11.0") }))
 			require.Len(t, cleanupImageIDs, 1)
 		})
 
@@ -608,7 +607,7 @@ func TestRemoveExcessWatchtowerInstances(t *testing.T) {
 
 			require.NoError(t, err)
 			assert.Equal(t, 2, cleanupOccurred)
-			assert.True(t, slices.ContainsFunc(cleanupImageIDs, func(info RemovedImageInfo) bool { return info.ImageID == types.ImageID("watchtower:old2") }))
+			assert.True(t, slices.ContainsFunc(cleanupImageIDs, func(info RemovedImageInfo) bool { return info.ImageID == container.ImageID("watchtower:old2") }))
 			require.Len(t, cleanupImageIDs, 1)
 		})
 	})
@@ -721,7 +720,7 @@ func TestRemoveExcessWatchtowerInstances(t *testing.T) {
 		t.Run("should cleanup old containers in the chain", func(t *testing.T) {
 			t.Parallel()
 
-			oldID := types.ContainerID("old123")
+			oldID := container.ContainerID("old123")
 
 			oldContainer := createMockContainer(
 				string(oldID),
@@ -735,7 +734,7 @@ func TestRemoveExcessWatchtowerInstances(t *testing.T) {
 				},
 			)
 
-			newID := types.ContainerID("new456")
+			newID := container.ContainerID("new456")
 
 			newContainer := createMockContainer(
 				string(newID),
@@ -779,7 +778,7 @@ func TestRemoveExcessWatchtowerInstances(t *testing.T) {
 		t.Run("should cleanup old container via name belt even when current detection points to the old one", func(t *testing.T) {
 			t.Parallel()
 
-			oldID := types.ContainerID("old123")
+			oldID := container.ContainerID("old123")
 
 			oldContainer := createMockContainer(
 				string(oldID),
@@ -793,7 +792,7 @@ func TestRemoveExcessWatchtowerInstances(t *testing.T) {
 				},
 			)
 
-			newID := types.ContainerID("new456")
+			newID := container.ContainerID("new456")
 
 			newContainer := createMockContainer(
 				string(newID),
@@ -840,7 +839,7 @@ func TestRemoveExcessWatchtowerInstances(t *testing.T) {
 
 			// Old current in scope-a with two non-old successors in different scopes.
 			// Must pick the scope-a successor, not the scope-b one.
-			oldID := types.ContainerID("old-scoped-a")
+			oldID := container.ContainerID("old-scoped-a")
 
 			oldContainer := createMockContainer(
 				string(oldID),
@@ -855,7 +854,7 @@ func TestRemoveExcessWatchtowerInstances(t *testing.T) {
 				},
 			)
 
-			scopeANewID := types.ContainerID("new-scoped-a")
+			scopeANewID := container.ContainerID("new-scoped-a")
 
 			scopeANewContainer := createMockContainer(
 				string(scopeANewID),
@@ -871,7 +870,7 @@ func TestRemoveExcessWatchtowerInstances(t *testing.T) {
 				},
 			)
 
-			scopeBNewID := types.ContainerID("new-scoped-b")
+			scopeBNewID := container.ContainerID("new-scoped-b")
 
 			scopeBNewContainer := createMockContainer(
 				string(scopeBNewID),
@@ -916,7 +915,7 @@ func TestRemoveExcessWatchtowerInstances(t *testing.T) {
 		t.Run("should respect scope boundaries when cleaning up container chains", func(t *testing.T) {
 			t.Parallel()
 
-			oldID := types.ContainerID("old-scoped")
+			oldID := container.ContainerID("old-scoped")
 
 			oldContainer := createMockContainer(
 				string(oldID),
@@ -931,7 +930,7 @@ func TestRemoveExcessWatchtowerInstances(t *testing.T) {
 				},
 			)
 
-			newID := types.ContainerID("new-scoped")
+			newID := container.ContainerID("new-scoped")
 
 			newContainer := createMockContainer(
 				string(newID),
@@ -979,7 +978,7 @@ func TestRemoveExcessWatchtowerInstances(t *testing.T) {
 
 			// The chain names a parent in a different scope. Chained parents are
 			// removed even though they differ from the scope filter.
-			oldDifferentScopeID := types.ContainerID("old-different-scope")
+			oldDifferentScopeID := container.ContainerID("old-different-scope")
 
 			oldDifferentScopeContainer := createMockContainer(
 				string(oldDifferentScopeID),
@@ -994,7 +993,7 @@ func TestRemoveExcessWatchtowerInstances(t *testing.T) {
 				},
 			)
 
-			newID := types.ContainerID("new-scoped")
+			newID := container.ContainerID("new-scoped")
 
 			newContainer := createMockContainer(
 				string(newID),
@@ -1040,7 +1039,7 @@ func TestRemoveExcessWatchtowerInstances(t *testing.T) {
 			t.Parallel()
 
 			// Multiple containers in different scopes with chains
-			prodOldID := types.ContainerID("prod-old")
+			prodOldID := container.ContainerID("prod-old")
 
 			prodOldContainer := createMockContainer(
 				string(prodOldID),
@@ -1156,7 +1155,7 @@ func TestRemoveExcessWatchtowerInstances(t *testing.T) {
 			assert.Equal(t, 1, cleanupOccurred)
 			// Referenced container cleaned as chained parent
 			require.Len(t, cleanupImageInfos, 1)
-			assert.Equal(t, types.ImageID("watchtower:old"), cleanupImageInfos[0].ImageID)
+			assert.Equal(t, container.ImageID("watchtower:old"), cleanupImageInfos[0].ImageID)
 		})
 	})
 
@@ -1589,14 +1588,14 @@ func TestRemoveImages(t *testing.T) {
 			{ImageID: ""}, // empty ID should be skipped
 		}
 
-		mockClient.EXPECT().RemoveImageByID(t.Context(), types.ImageID("image1"), "").Return(nil)
-		mockClient.EXPECT().RemoveImageByID(mock.Anything, types.ImageID("image2"), "").Return(nil)
+		mockClient.EXPECT().RemoveImageByID(t.Context(), container.ImageID("image1"), "").Return(nil)
+		mockClient.EXPECT().RemoveImageByID(mock.Anything, container.ImageID("image2"), "").Return(nil)
 
 		cleaned, err := RemoveImages(newTestLogger(t), t.Context(), mockClient, cleanedImages)
 		require.NoError(t, err)
 		require.Len(t, cleaned, 2)
-		assert.Equal(t, types.ImageID("image1"), cleaned[0].ImageID)
-		assert.Equal(t, types.ImageID("image2"), cleaned[1].ImageID)
+		assert.Equal(t, container.ImageID("image1"), cleaned[0].ImageID)
+		assert.Equal(t, container.ImageID("image2"), cleaned[1].ImageID)
 	})
 
 	// Each container that used a removed image gets its own line and its own
@@ -1614,9 +1613,9 @@ func TestRemoveImages(t *testing.T) {
 			{ImageID: "sha256:fedcba9876543210", ImageName: "org/db:2", ContainerName: "db"},
 		}
 
-		mockClient.EXPECT().RemoveImageByID(mock.Anything, types.ImageID("sha256:0123456789abcdef"), "org/app:1").
+		mockClient.EXPECT().RemoveImageByID(mock.Anything, container.ImageID("sha256:0123456789abcdef"), "org/app:1").
 			Return(nil).Once()
-		mockClient.EXPECT().RemoveImageByID(mock.Anything, types.ImageID("sha256:fedcba9876543210"), "org/db:2").
+		mockClient.EXPECT().RemoveImageByID(mock.Anything, container.ImageID("sha256:fedcba9876543210"), "org/db:2").
 			Return(errors.New("image removal failed")).Once()
 
 		removed, err := RemoveImages(log, t.Context(), mockClient, images)
@@ -1654,16 +1653,16 @@ func TestRemoveImages(t *testing.T) {
 			{ImageID: "image2"},
 		}
 
-		mockClient.EXPECT().RemoveImageByID(t.Context(), types.ImageID("image1"), "").Return(nil)
+		mockClient.EXPECT().RemoveImageByID(t.Context(), container.ImageID("image1"), "").Return(nil)
 		mockClient.EXPECT().
-			RemoveImageByID(t.Context(), types.ImageID("image2"), "").
+			RemoveImageByID(t.Context(), container.ImageID("image2"), "").
 			Return(errors.New("image removal failed"))
 
 		cleaned, err := RemoveImages(newTestLogger(t), t.Context(), mockClient, cleanedImages)
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "errors occurred during image cleanup")
 		require.Len(t, cleaned, 1)
-		assert.Equal(t, types.ImageID("image1"), cleaned[0].ImageID)
+		assert.Equal(t, container.ImageID("image1"), cleaned[0].ImageID)
 	})
 
 	t.Run("should treat 'not found' errors as non-errors and not add to cleaned", func(t *testing.T) {
@@ -1676,15 +1675,15 @@ func TestRemoveImages(t *testing.T) {
 			{ImageID: "image2"},
 		}
 
-		mockClient.EXPECT().RemoveImageByID(t.Context(), types.ImageID("image1"), "").Return(nil)
+		mockClient.EXPECT().RemoveImageByID(t.Context(), container.ImageID("image1"), "").Return(nil)
 		mockClient.EXPECT().
-			RemoveImageByID(t.Context(), types.ImageID("image2"), "").
+			RemoveImageByID(t.Context(), container.ImageID("image2"), "").
 			Return(cerrdefs.ErrNotFound)
 
 		cleaned, err := RemoveImages(newTestLogger(t), t.Context(), mockClient, cleanedImages)
 		require.NoError(t, err)
 		require.Len(t, cleaned, 1)
-		assert.Equal(t, types.ImageID("image1"), cleaned[0].ImageID)
+		assert.Equal(t, container.ImageID("image1"), cleaned[0].ImageID)
 	})
 
 	t.Run("should treat context cancellation as a non-error and not add to cleaned", func(t *testing.T) {
@@ -1697,15 +1696,15 @@ func TestRemoveImages(t *testing.T) {
 			{ImageID: "image2", ImageName: "image2"},
 		}
 
-		mockClient.EXPECT().RemoveImageByID(mock.Anything, types.ImageID("image1"), "image1").Return(nil)
+		mockClient.EXPECT().RemoveImageByID(mock.Anything, container.ImageID("image1"), "image1").Return(nil)
 		mockClient.EXPECT().
-			RemoveImageByID(t.Context(), types.ImageID("image2"), "image2").
+			RemoveImageByID(t.Context(), container.ImageID("image2"), "image2").
 			Return(context.Canceled)
 
 		cleaned, err := RemoveImages(newTestLogger(t), t.Context(), mockClient, cleanedImages)
 		require.NoError(t, err)
 		require.Len(t, cleaned, 1)
-		assert.Equal(t, types.ImageID("image1"), cleaned[0].ImageID)
+		assert.Equal(t, container.ImageID("image1"), cleaned[0].ImageID)
 	})
 
 	t.Run("should treat a canceled context cause that is not context.Canceled as a non-error", func(t *testing.T) {
@@ -1721,7 +1720,7 @@ func TestRemoveImages(t *testing.T) {
 		cancel(errors.New("terminated signal received"))
 
 		mockClient.EXPECT().
-			RemoveImageByID(canceledCtx, types.ImageID("image1"), "image1").
+			RemoveImageByID(canceledCtx, container.ImageID("image1"), "image1").
 			Return(errors.New("cannot verify image usage: terminated signal received"))
 
 		cleaned, err := RemoveImages(newTestLogger(t), canceledCtx, mockClient, cleanedImages)
@@ -1739,15 +1738,15 @@ func TestRemoveImages(t *testing.T) {
 			{ImageID: "image2", ImageName: "image2"},
 		}
 
-		mockClient.EXPECT().RemoveImageByID(mock.Anything, types.ImageID("image1"), "image1").Return(nil)
+		mockClient.EXPECT().RemoveImageByID(mock.Anything, container.ImageID("image1"), "image1").Return(nil)
 		mockClient.EXPECT().
-			RemoveImageByID(t.Context(), types.ImageID("image2"), "image2").
+			RemoveImageByID(t.Context(), container.ImageID("image2"), "image2").
 			Return(cerrdefs.ErrConflict)
 
 		cleaned, err := RemoveImages(newTestLogger(t), t.Context(), mockClient, cleanedImages)
 		require.NoError(t, err)
 		require.Len(t, cleaned, 1)
-		assert.Equal(t, types.ImageID("image1"), cleaned[0].ImageID)
+		assert.Equal(t, container.ImageID("image1"), cleaned[0].ImageID)
 	})
 }
 
@@ -1786,7 +1785,7 @@ func Test_removeExcessContainers(t *testing.T) {
 
 			mockClient.EXPECT().StopAndRemoveContainer(t.Context(), excessContainer, 10*time.Minute).Return(nil)
 			mockClient.EXPECT().
-				RemoveImageByID(t.Context(), types.ImageID("image1"), "image1:latest").
+				RemoveImageByID(t.Context(), container.ImageID("image1"), "image1:latest").
 				Return(nil)
 
 			removed, err := removeExcessContainers(newTestLogger(t),
@@ -1838,10 +1837,10 @@ func Test_removeExcessContainers(t *testing.T) {
 			mockClient.EXPECT().StopAndRemoveContainer(mock.Anything, excessContainer1, 10*time.Minute).Return(nil)
 			mockClient.EXPECT().StopAndRemoveContainer(mock.Anything, excessContainer2, 10*time.Minute).Return(nil)
 			mockClient.EXPECT().
-				RemoveImageByID(mock.Anything, types.ImageID("image1"), "image1:latest").
+				RemoveImageByID(mock.Anything, container.ImageID("image1"), "image1:latest").
 				Return(nil)
 			mockClient.EXPECT().
-				RemoveImageByID(mock.Anything, types.ImageID("image2"), "image2:latest").
+				RemoveImageByID(mock.Anything, container.ImageID("image2"), "image2:latest").
 				Return(errors.New("remove failed"))
 
 			removed, err := removeExcessContainers(newTestLogger(t),
@@ -1901,7 +1900,7 @@ func Test_removeExcessContainers(t *testing.T) {
 			require.NoError(t, err)
 			assert.Equal(t, 1, removed)
 			require.Len(t, removeInfos, 1)
-			assert.Equal(t, types.ImageID("image1"), removeInfos[0].ImageID)
+			assert.Equal(t, container.ImageID("image1"), removeInfos[0].ImageID)
 		})
 	})
 
@@ -2243,22 +2242,22 @@ func Test_deduplicateByImageID(t *testing.T) {
 		t.Parallel()
 
 		images := []RemovedImageInfo{
-			{ImageID: types.ImageID("sha256:aaa"), ContainerName: "container-a"},
-			{ImageID: types.ImageID("sha256:bbb"), ContainerName: "container-b"},
+			{ImageID: container.ImageID("sha256:aaa"), ContainerName: "container-a"},
+			{ImageID: container.ImageID("sha256:bbb"), ContainerName: "container-b"},
 		}
 
 		result := deduplicateByImageID(images)
 		require.Len(t, result, 2)
-		assert.Equal(t, types.ImageID("sha256:aaa"), result[0].ImageID)
-		assert.Equal(t, types.ImageID("sha256:bbb"), result[1].ImageID)
+		assert.Equal(t, container.ImageID("sha256:aaa"), result[0].ImageID)
+		assert.Equal(t, container.ImageID("sha256:bbb"), result[1].ImageID)
 	})
 
 	t.Run("should keep only first occurrence when ImageIDs are duplicated", func(t *testing.T) {
 		t.Parallel()
 
 		images := []RemovedImageInfo{
-			{ImageID: types.ImageID("sha256:aaa"), ContainerName: "container-a"},
-			{ImageID: types.ImageID("sha256:aaa"), ContainerName: "container-b"},
+			{ImageID: container.ImageID("sha256:aaa"), ContainerName: "container-a"},
+			{ImageID: container.ImageID("sha256:aaa"), ContainerName: "container-b"},
 		}
 
 		result := deduplicateByImageID(images)
@@ -2271,18 +2270,18 @@ func Test_deduplicateByImageID(t *testing.T) {
 		t.Parallel()
 
 		images := []RemovedImageInfo{
-			{ImageID: types.ImageID("sha256:aaa"), ContainerName: "container-a"},
-			{ImageID: types.ImageID("sha256:bbb"), ContainerName: "container-b"},
-			{ImageID: types.ImageID("sha256:aaa"), ContainerName: "container-c"},
-			{ImageID: types.ImageID("sha256:ccc"), ContainerName: "container-d"},
+			{ImageID: container.ImageID("sha256:aaa"), ContainerName: "container-a"},
+			{ImageID: container.ImageID("sha256:bbb"), ContainerName: "container-b"},
+			{ImageID: container.ImageID("sha256:aaa"), ContainerName: "container-c"},
+			{ImageID: container.ImageID("sha256:ccc"), ContainerName: "container-d"},
 		}
 
 		result := deduplicateByImageID(images)
 		require.Len(t, result, 3)
-		assert.Equal(t, types.ImageID("sha256:aaa"), result[0].ImageID)
+		assert.Equal(t, container.ImageID("sha256:aaa"), result[0].ImageID)
 		assert.Equal(t, "container-a", result[0].ContainerName)
-		assert.Equal(t, types.ImageID("sha256:bbb"), result[1].ImageID)
-		assert.Equal(t, types.ImageID("sha256:ccc"), result[2].ImageID)
+		assert.Equal(t, container.ImageID("sha256:bbb"), result[1].ImageID)
+		assert.Equal(t, container.ImageID("sha256:ccc"), result[2].ImageID)
 	})
 }
 
@@ -3300,7 +3299,7 @@ func TestRemoveExcessWatchtowerInstances_RunningInstances(t *testing.T) {
 			assert.Equal(t, 1, cleanupOccurred)
 			assert.False(t, client.IsContainerRunning(client.TestData.Containers[0]), "test-container-01 should be stopped")
 			assert.True(t, client.IsContainerRunning(client.TestData.Containers[1]), "test-container-02 should remain running")
-			assert.Contains(t, removedImageIDs(cleanupImageIDs), types.ImageID("watchtower:old"))
+			assert.Contains(t, removedImageIDs(cleanupImageIDs), container.ImageID("watchtower:old"))
 			require.Len(t, cleanupImageIDs, 1)
 			assert.Equal(t, int32(0), client.TestData.TriedToRemoveImageCount.Load(), "the caller removes the collected image")
 		})
@@ -3371,7 +3370,7 @@ func TestRemoveExcessWatchtowerInstances_RunningInstances(t *testing.T) {
 			assert.Equal(t, 1, cleanupOccurred)
 			assert.False(t, client.IsContainerRunning(client.TestData.Containers[0]), "test-container-old should be stopped")
 			assert.True(t, client.IsContainerRunning(client.TestData.Containers[1]), "test-container-new should remain running")
-			assert.Contains(t, removedImageIDs(cleanupImageIDs), types.ImageID("watchtower:1.11.0"))
+			assert.Contains(t, removedImageIDs(cleanupImageIDs), container.ImageID("watchtower:1.11.0"))
 			require.Len(t, cleanupImageIDs, 1, "cleanupImageIDs should only include old container's image")
 			assert.Equal(t, int32(0), client.TestData.TriedToRemoveImageCount.Load(), "the caller removes the collected image")
 		})

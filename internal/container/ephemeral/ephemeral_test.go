@@ -20,7 +20,6 @@ import (
 	mockContainer "github.com/nicholas-fedor/watchtower/internal/container/mocks"
 	"github.com/nicholas-fedor/watchtower/internal/testutil/containerfixture"
 	"github.com/nicholas-fedor/watchtower/internal/testutil/modelfixture"
-	"github.com/nicholas-fedor/watchtower/pkg/types"
 )
 
 // hasPrefixedElement reports whether any element of values starts with prefix.
@@ -760,7 +759,7 @@ func TestEphemeralOrchestrator(t *testing.T) {
 				)
 
 				require.NoError(t, err)
-				assert.Equal(t, types.ContainerID("orchestrator-id-123"), orchestratorID)
+				assert.Equal(t, container.ContainerID("orchestrator-id-123"), orchestratorID)
 			})
 		})
 

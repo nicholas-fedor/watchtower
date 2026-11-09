@@ -14,7 +14,6 @@ import (
 	composeLabels "github.com/nicholas-fedor/watchtower/internal/compose/labels"
 	"github.com/nicholas-fedor/watchtower/internal/container"
 	"github.com/nicholas-fedor/watchtower/internal/testutil/logcapture"
-	"github.com/nicholas-fedor/watchtower/pkg/types"
 )
 
 // newTestLogger returns a logger that writes each event to the test's log, so a
@@ -575,9 +574,9 @@ func Test_dependencySorter(t *testing.T) {
 			result, err := sortByDependencies(newTestLogger(t), containers, true)
 			require.NoError(t, err)
 			require.Len(t, result, 2)
-			assert.Equal(t, types.ContainerID("id-c2"), result[0].ID())
+			assert.Equal(t, container.ContainerID("id-c2"), result[0].ID())
 			// dependency first
-			assert.Equal(t, types.ContainerID("id-c1"), result[1].ID())
+			assert.Equal(t, container.ContainerID("id-c1"), result[1].ID())
 			// dependent second
 		})
 

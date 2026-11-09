@@ -19,7 +19,6 @@ import (
 	mockUpdate "github.com/nicholas-fedor/watchtower/internal/update/mocks"
 	updateParams "github.com/nicholas-fedor/watchtower/internal/update/params"
 	"github.com/nicholas-fedor/watchtower/internal/update/state"
-	"github.com/nicholas-fedor/watchtower/pkg/types"
 )
 
 // TestUpdateAction_Context verifies that an update reports context
@@ -160,7 +159,7 @@ func TestUpdateAction_Context(t *testing.T) {
 
 			require.Error(t, err)
 			assert.Equal(t, int32(1), client.TestData.SetRestartPolicyCount.Load())
-			assert.Equal(t, types.ContainerID("old-container-id"), client.TestData.SetRestartPolicyID)
+			assert.Equal(t, container.ContainerID("old-container-id"), client.TestData.SetRestartPolicyID)
 		})
 
 		t.Run("should proceed normally when current container is not old", func(t *testing.T) {

@@ -4,7 +4,7 @@ import (
 	"strconv"
 	"testing"
 
-	"github.com/nicholas-fedor/watchtower/pkg/types"
+	"github.com/nicholas-fedor/watchtower/internal/container"
 )
 
 func BenchmarkReport_All(b *testing.B) {
@@ -15,7 +15,7 @@ func BenchmarkReport_All(b *testing.B) {
 	fresh := make([]*ContainerStatus, n/2)
 
 	for i := range scanned {
-		scanned[i] = &ContainerStatus{containerID: types.ContainerID("c" + strconv.Itoa(i))}
+		scanned[i] = &ContainerStatus{containerID: container.ContainerID("c" + strconv.Itoa(i))}
 	}
 
 	for i := range updated {
@@ -44,7 +44,7 @@ func BenchmarkReport_All(b *testing.B) {
 		// capacity of scanned+updated+fresh (64+8+32).
 		restarted := make([]*ContainerStatus, n)
 		for i := range restarted {
-			restarted[i] = &ContainerStatus{containerID: types.ContainerID("r" + strconv.Itoa(i))}
+			restarted[i] = &ContainerStatus{containerID: container.ContainerID("r" + strconv.Itoa(i))}
 		}
 
 		b.ReportAllocs()

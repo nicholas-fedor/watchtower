@@ -11,7 +11,6 @@ import (
 	"github.com/nicholas-fedor/watchtower/internal/git"
 	"github.com/nicholas-fedor/watchtower/internal/observability/logging"
 	"github.com/nicholas-fedor/watchtower/internal/update/sorter"
-	"github.com/nicholas-fedor/watchtower/pkg/types"
 )
 
 // composeMember is one stale container and the check result that selected its commit.
@@ -153,7 +152,7 @@ func (b *composeBatches) inDependencyOrder(
 		return batches
 	}
 
-	batchOf := make(map[types.ContainerID]int, len(containers))
+	batchOf := make(map[container.ContainerID]int, len(containers))
 
 	for i, batch := range batches {
 		for _, member := range batch.members {

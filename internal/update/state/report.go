@@ -6,7 +6,7 @@ import (
 
 	"github.com/rs/zerolog"
 
-	"github.com/nicholas-fedor/watchtower/pkg/types"
+	"github.com/nicholas-fedor/watchtower/internal/container"
 )
 
 // Report is the outcome of an update session, with each scanned container
@@ -137,7 +137,7 @@ func (r *Report) All() []*ContainerStatus {
 	allLen := len(r.scanned) + len(r.updated) + len(r.restarted) + len(r.failed) +
 		len(r.skipped) + len(r.stale) + len(r.fresh)
 	all := make([]*ContainerStatus, 0, allLen)
-	presentIDs := make(map[types.ContainerID]struct{}, allLen)
+	presentIDs := make(map[container.ContainerID]struct{}, allLen)
 
 	// appendUnique adds the containers not already added from a more
 	// significant category.

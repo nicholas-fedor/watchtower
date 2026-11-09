@@ -10,7 +10,6 @@ import (
 	dockerImage "github.com/moby/moby/api/types/image"
 
 	"github.com/nicholas-fedor/watchtower/internal/container/labels"
-	"github.com/nicholas-fedor/watchtower/pkg/types"
 )
 
 // Container represents a running Docker container managed by Watchtower.
@@ -168,15 +167,15 @@ func (c *Container) ContainerInfo() *dockerContainer.InspectResponse {
 // ID returns the unique identifier of the container.
 //
 // Returns:
-//   - types.ContainerID: Container ID.
-func (c *Container) ID() types.ContainerID {
+//   - ContainerID: Container ID.
+func (c *Container) ID() ContainerID {
 	info := c.ContainerInfo()
 
 	if info == nil {
 		return ""
 	}
 
-	return types.ContainerID(info.ID)
+	return ContainerID(info.ID)
 }
 
 // IsRunning checks if the container is currently running.
@@ -233,13 +232,13 @@ func (c *Container) Name() string {
 // ImageID returns the ID of the container's image.
 //
 // Returns:
-//   - types.ImageID: Image ID or empty string if imageInfo is nil.
-func (c *Container) ImageID() types.ImageID {
+//   - ImageID: Image ID or empty string if imageInfo is nil.
+func (c *Container) ImageID() ImageID {
 	if c.imageInfo == nil {
 		return ""
 	}
 
-	return types.ImageID(c.imageInfo.ID)
+	return ImageID(c.imageInfo.ID)
 }
 
 // ImageName returns the cached name of the container's image.
@@ -428,5 +427,5 @@ func IsOldContainer(name string) bool {
 
 	n := strings.TrimLeft(name, "/")
 
-	return strings.HasPrefix(n, types.WatchtowerOldPrefix)
+	return strings.HasPrefix(n, WatchtowerOldPrefix)
 }

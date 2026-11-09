@@ -22,7 +22,6 @@ import (
 	"github.com/nicholas-fedor/watchtower/internal/update/rebuild"
 	"github.com/nicholas-fedor/watchtower/internal/update/selfupdate"
 	"github.com/nicholas-fedor/watchtower/internal/update/state"
-	"github.com/nicholas-fedor/watchtower/pkg/types"
 )
 
 // Errors for restarting containers.
@@ -148,7 +147,7 @@ func Run(
 //   - progress: Progress tracker to update with new container IDs.
 //
 // Returns:
-//   - map[types.ContainerID]error: Map of container IDs to errors for failed updates.
+//   - map[container.ContainerID]error: Map of container IDs to errors for failed updates.
 //   - error: Non-nil if context was canceled, nil otherwise.
 func performRollingRestart(
 	log *zerolog.Logger,
@@ -159,8 +158,8 @@ func performRollingRestart(
 	cleanupImageInfos *[]cleanup.RemovedImageInfo,
 	progress *state.Progress,
 	gitSession *rebuild.Session,
-) (map[types.ContainerID]error, error) {
-	failed := make(map[types.ContainerID]error, len(containers))
+) (map[container.ContainerID]error, error) {
+	failed := make(map[container.ContainerID]error, len(containers))
 
 	containerNames := make([]string, len(containers))
 	for i, c := range containers {
@@ -297,7 +296,7 @@ func performRollingRestart(
 //   - config: Update options specifying stop timeout and other behaviors.
 //
 // Returns:
-//   - map[types.ContainerID]error: Map of container IDs to errors for failed stops.
+//   - map[container.ContainerID]error: Map of container IDs to errors for failed stops.
 //   - []cleanup.RemovedImageInfo: Slice of cleaned image info for stopped containers.
 func stopContainersInReversedOrder(
 	log *zerolog.Logger,
@@ -305,8 +304,8 @@ func stopContainersInReversedOrder(
 	containers []*container.Container,
 	client containerClient.Client,
 	config updateParams.Params,
-) (map[types.ContainerID]error, []cleanup.RemovedImageInfo) {
-	failed := make(map[types.ContainerID]error, len(containers))
+) (map[container.ContainerID]error, []cleanup.RemovedImageInfo) {
+	failed := make(map[container.ContainerID]error, len(containers))
 	stopped := make([]cleanup.RemovedImageInfo, 0, len(containers))
 
 	// Stop containers in reverse order to avoid breaking dependencies.
@@ -378,9 +377,9 @@ func stopContainersInReversedOrder(
 //   - log: Process logger.
 //   - progress: Session progress to update.
 //   - outcomes: The error of each container that was not stopped or restarted.
-func recordRestartOutcomes(log *zerolog.Logger, progress *state.Progress, outcomes map[types.ContainerID]error) {
-	failed := make(map[types.ContainerID]error, len(outcomes))
-	skips := make(map[types.ContainerID]error)
+func recordRestartOutcomes(log *zerolog.Logger, progress *state.Progress, outcomes map[container.ContainerID]error) {
+	failed := make(map[container.ContainerID]error, len(outcomes))
+	skips := make(map[container.ContainerID]error)
 
 	for id, err := range outcomes {
 		if isSkip(err) {
@@ -573,7 +572,7 @@ func snapshotCopyFilesForRecreate(
 // Parameters:
 //   - client: Docker client. No-op unless it implements container.CopyFileStore.
 //   - containerID: Source container ID whose snapshot should be discarded.
-func discardCopyFilesForRecreate(client containerClient.Client, containerID types.ContainerID) {
+func discardCopyFilesForRecreate(client containerClient.Client, containerID container.ContainerID) {
 	store, ok := client.(containerClient.CopyFileStore)
 	if !ok {
 		return
@@ -598,7 +597,7 @@ func discardCopyFilesForRecreate(client containerClient.Client, containerID type
 //   - progress: Progress tracker to update with new container IDs.
 //
 // Returns:
-//   - map[types.ContainerID]error: Map of container IDs to errors for failed restarts.
+//   - map[container.ContainerID]error: Map of container IDs to errors for failed restarts.
 func restartContainersInSortedOrder(
 	log *zerolog.Logger,
 	ctx context.Context,
@@ -609,10 +608,10 @@ func restartContainersInSortedOrder(
 	cleanupImageInfos *[]cleanup.RemovedImageInfo,
 	progress *state.Progress,
 	gitSession *rebuild.Session,
-) map[types.ContainerID]error {
-	failed := make(map[types.ContainerID]error, len(containers))
+) map[container.ContainerID]error {
+	failed := make(map[container.ContainerID]error, len(containers))
 	// Track renamed containers to skip cleanup.
-	renamedContainers := make(map[types.ContainerID]bool)
+	renamedContainers := make(map[container.ContainerID]bool)
 
 	// Restart containers in sorted order to respect dependency chains.
 	for i := range containers {
@@ -728,7 +727,7 @@ func restartContainersInSortedOrder(
 //   - config: Update options controlling restart and lifecycle hooks.
 //
 // Returns:
-//   - types.ContainerID: ID of the new container if started, original ID if renamed only, empty otherwise.
+//   - container.ContainerID: ID of the new container if started, original ID if renamed only, empty otherwise.
 //   - bool: True if the container was renamed, false otherwise.
 //   - error: Non-nil if restart fails, nil on success.
 func restartStaleContainer(
@@ -737,7 +736,7 @@ func restartStaleContainer(
 	sourceContainer *container.Container,
 	client containerClient.Client,
 	config updateParams.Params,
-) (types.ContainerID, bool, error) {
+) (container.ContainerID, bool, error) {
 	// Create a detached context to survive parent context cancellation.
 	// This ensures container cleanup and update operations complete even if the
 	// parent context is canceled during the restart process.
@@ -794,7 +793,7 @@ func restartStaleContainer(
 			return "", renamed, nil
 		}
 
-		targetOldName := types.WatchtowerOldPrefix + sourceContainer.ID().ShortID()
+		targetOldName := container.WatchtowerOldPrefix + sourceContainer.ID().ShortID()
 
 		// Redundant rename guard: the lingering old instance already has the
 		// target name from a prior rename. Skip to avoid a same-name error.
