@@ -21,7 +21,7 @@ import (
 
 	fiberRecover "github.com/gofiber/fiber/v3/middleware/recover"
 
-	mockContainerClient "github.com/nicholas-fedor/watchtower/internal/container/client/mocks"
+	mockRoutes "github.com/nicholas-fedor/watchtower/internal/api/routes/mocks"
 	"github.com/nicholas-fedor/watchtower/internal/container/filters"
 	"github.com/nicholas-fedor/watchtower/internal/observability/events"
 	"github.com/nicholas-fedor/watchtower/internal/observability/metrics"
@@ -171,7 +171,7 @@ func TestValidateAndRegister(t *testing.T) {
 			opts: Options{
 				EnableCheckAPI: true,
 				FilterByImage:  nil,
-				Client:         mockContainerClient.NewMockClient(t),
+				Client:         mockRoutes.NewMockClient(t),
 			},
 			wantErr: true,
 			errMsg:  "FilterByImage must be provided",
@@ -181,7 +181,7 @@ func TestValidateAndRegister(t *testing.T) {
 			opts: Options{
 				EnableCheckAPI: true,
 				FilterByImage:  func(_ []string, f filters.Filter) filters.Filter { return f },
-				Client:         mockContainerClient.NewMockClient(t),
+				Client:         mockRoutes.NewMockClient(t),
 			},
 			wantErr: false,
 		},
@@ -273,7 +273,7 @@ func TestRegister(t *testing.T) {
 				EnableImagesAPI:             tt.enableImagesAPI,
 				EnableConfigAPI:             tt.enableConfigAPI,
 				EnableEventsAPI:             tt.enableEventsAPI,
-				Client:                      mockContainerClient.NewMockClient(t),
+				Client:                      mockRoutes.NewMockClient(t),
 				Filter:                      makeFilter(t),
 			}
 			if tt.enableEventsAPI {

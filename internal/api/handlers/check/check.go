@@ -10,14 +10,27 @@ import (
 	"github.com/rs/zerolog"
 
 	"github.com/nicholas-fedor/watchtower/internal/container"
-	containerClient "github.com/nicholas-fedor/watchtower/internal/container/client"
 	"github.com/nicholas-fedor/watchtower/internal/container/filters"
 	containerImage "github.com/nicholas-fedor/watchtower/internal/container/image"
 	"github.com/nicholas-fedor/watchtower/internal/container/oci"
 	"github.com/nicholas-fedor/watchtower/internal/container/provenance"
 	"github.com/nicholas-fedor/watchtower/internal/git"
+	updateConfig "github.com/nicholas-fedor/watchtower/internal/settings/config/update"
 	updateParams "github.com/nicholas-fedor/watchtower/internal/update/params"
 )
+
+// UpdateChecker lists containers and checks each one for a newer image.
+type UpdateChecker interface {
+	// ListContainers returns the containers that pass every filter.
+	ListContainers(ctx context.Context, filter ...filters.Filter) ([]*container.Container, error)
+	// CheckContainerUpdate reports whether a newer image is available for the
+	// container, with the latest image ID and digest.
+	CheckContainerUpdate(
+		ctx context.Context,
+		target *container.Container,
+		policy updateConfig.Policy,
+	) (bool, container.ImageID, string, error)
+}
 
 // ContainerCheck holds the update availability result for a single container.
 //
@@ -102,7 +115,7 @@ func extractFilterParams(c fiber.Ctx, key string) []string {
 //   - error: Non-nil if listing containers fails.
 func CheckForUpdates(log *zerolog.Logger,
 	ctx context.Context,
-	client containerClient.Client,
+	client UpdateChecker,
 	filter filters.Filter,
 	params updateParams.Params,
 	gitClient *git.Client,
@@ -274,7 +287,7 @@ func checkGitSource(
 func checkRegistrySource(
 	ctx context.Context,
 	log *zerolog.Logger,
-	client containerClient.Client,
+	client UpdateChecker,
 	c *container.Container,
 	params updateParams.Params,
 	result *ContainerCheck,

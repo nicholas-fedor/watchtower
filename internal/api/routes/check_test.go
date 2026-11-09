@@ -7,7 +7,7 @@ import (
 
 	"github.com/stretchr/testify/assert"
 
-	mockContainerClient "github.com/nicholas-fedor/watchtower/internal/container/client/mocks"
+	mockRoutes "github.com/nicholas-fedor/watchtower/internal/api/routes/mocks"
 	"github.com/nicholas-fedor/watchtower/internal/container/filters"
 	"github.com/nicholas-fedor/watchtower/internal/observability/events"
 	"github.com/nicholas-fedor/watchtower/internal/observability/logging"
@@ -39,7 +39,7 @@ func TestRegisterCheckRoute(t *testing.T) {
 	t.Run("with client registers route", func(t *testing.T) {
 		app := testApp()
 		auth := testAuthMiddleware()
-		mockClient := mockContainerClient.NewMockClient(t)
+		mockClient := mockRoutes.NewMockClient(t)
 
 		opts := Options{
 			EnableCheckAPI:   true,

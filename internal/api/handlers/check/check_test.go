@@ -21,8 +21,8 @@ import (
 
 	goGit "github.com/go-git/go-git/v5"
 
+	mockCheck "github.com/nicholas-fedor/watchtower/internal/api/handlers/check/mocks"
 	"github.com/nicholas-fedor/watchtower/internal/container"
-	mockContainerClient "github.com/nicholas-fedor/watchtower/internal/container/client/mocks"
 	"github.com/nicholas-fedor/watchtower/internal/container/labels"
 	"github.com/nicholas-fedor/watchtower/internal/container/oci"
 	"github.com/nicholas-fedor/watchtower/internal/git"
@@ -52,7 +52,7 @@ func newTestLogger(t *testing.T) *zerolog.Logger {
 }
 
 func TestCheckForUpdates_DigestExtraction(t *testing.T) {
-	client := mockContainerClient.NewMockClient(t)
+	client := mockCheck.NewMockUpdateChecker(t)
 	running := imageContainer("my-app", "nginx:latest", "sha256:abc", "nginx@sha256:digest123")
 	client.EXPECT().ListContainers(mock.Anything, mock.Anything).Return([]*container.Container{running}, nil)
 	client.EXPECT().CheckContainerUpdate(mock.Anything, mock.Anything, mock.Anything).
@@ -65,7 +65,7 @@ func TestCheckForUpdates_DigestExtraction(t *testing.T) {
 }
 
 func TestCheckForUpdates_CheckContainerUpdateError(t *testing.T) {
-	client := mockContainerClient.NewMockClient(t)
+	client := mockCheck.NewMockUpdateChecker(t)
 	running := imageContainer("my-app", "nginx:latest", "sha256:abc")
 	client.EXPECT().ListContainers(mock.Anything, mock.Anything).Return([]*container.Container{running}, nil)
 	client.EXPECT().CheckContainerUpdate(mock.Anything, mock.Anything, mock.Anything).
@@ -79,7 +79,7 @@ func TestCheckForUpdates_CheckContainerUpdateError(t *testing.T) {
 }
 
 func TestCheckForUpdates_ParamsPropagation(t *testing.T) {
-	client := mockContainerClient.NewMockClient(t)
+	client := mockCheck.NewMockUpdateChecker(t)
 	running := imageContainer("my-app", "nginx:latest", "sha256:abc")
 	client.EXPECT().ListContainers(mock.Anything, mock.Anything).Return([]*container.Container{running}, nil)
 	client.EXPECT().CheckContainerUpdate(mock.Anything, mock.Anything, mock.MatchedBy(func(p updateConfig.Policy) bool {
@@ -102,7 +102,7 @@ func TestCheckForUpdates_ParamsPropagation(t *testing.T) {
 }
 
 func TestCheckForUpdates_MixedStaleResults(t *testing.T) {
-	client := mockContainerClient.NewMockClient(t)
+	client := mockCheck.NewMockUpdateChecker(t)
 	container1 := imageContainer("app1", "nginx:latest", "sha256:abc")
 	container2 := imageContainer("app2", "redis:latest", "sha256:def")
 
@@ -124,7 +124,7 @@ func TestCheckForUpdates_MixedStaleResults(t *testing.T) {
 }
 
 func TestCheckForUpdates_GitNoPullSkipsCheck(t *testing.T) {
-	client := mockContainerClient.NewMockClient(t)
+	client := mockCheck.NewMockUpdateChecker(t)
 	watched := modelfixture.ContainerWithoutImageInfo(
 		containerfixture.WithName("/app"),
 		containerfixture.WithImageName("app:latest"),
@@ -161,7 +161,7 @@ func TestCheckForUpdates_GitCommitField(t *testing.T) {
 		}),
 	)
 
-	client := mockContainerClient.NewMockClient(t)
+	client := mockCheck.NewMockUpdateChecker(t)
 	client.EXPECT().ListContainers(mock.Anything, mock.Anything).Return([]*container.Container{watched}, nil)
 
 	results, err := CheckForUpdates(newTestLogger(t), t.Context(), client, nil, updateParams.Params{
@@ -524,7 +524,7 @@ func TestCheckRegistrySource(t *testing.T) {
 	t.Run("an error is reported without update fields", func(t *testing.T) {
 		t.Parallel()
 
-		client := mockContainerClient.NewMockClient(t)
+		client := mockCheck.NewMockUpdateChecker(t)
 		client.EXPECT().CheckContainerUpdate(mock.Anything, mock.Anything, mock.Anything).
 			Return(false, container.ImageID(""), "", errors.New("registry unreachable"))
 
@@ -543,7 +543,7 @@ func TestCheckRegistrySource(t *testing.T) {
 	t.Run("a newer image populates the update fields", func(t *testing.T) {
 		t.Parallel()
 
-		client := mockContainerClient.NewMockClient(t)
+		client := mockCheck.NewMockUpdateChecker(t)
 		client.EXPECT().CheckContainerUpdate(mock.Anything, mock.Anything, mock.Anything).
 			Return(true, container.ImageID("sha256:def"), "sha256:def", nil)
 
@@ -562,7 +562,7 @@ func TestCheckRegistrySource(t *testing.T) {
 	t.Run("empty digest and image id are left unset", func(t *testing.T) {
 		t.Parallel()
 
-		client := mockContainerClient.NewMockClient(t)
+		client := mockCheck.NewMockUpdateChecker(t)
 		client.EXPECT().CheckContainerUpdate(mock.Anything, mock.Anything, mock.Anything).
 			Return(false, container.ImageID(""), "", nil)
 

@@ -26,8 +26,8 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/nicholas-fedor/watchtower/internal/api/routes"
+	mockRoutes "github.com/nicholas-fedor/watchtower/internal/api/routes/mocks"
 	"github.com/nicholas-fedor/watchtower/internal/container"
-	mockContainerClient "github.com/nicholas-fedor/watchtower/internal/container/client/mocks"
 	"github.com/nicholas-fedor/watchtower/internal/container/filters"
 	"github.com/nicholas-fedor/watchtower/internal/observability/events"
 	"github.com/nicholas-fedor/watchtower/internal/observability/logging"
@@ -36,9 +36,9 @@ import (
 	"github.com/nicholas-fedor/watchtower/internal/update/schedule"
 )
 
-func makeListContainersMock(t *testing.T) *mockContainerClient.MockClient {
+func makeListContainersMock(t *testing.T) *mockRoutes.MockClient {
 	t.Helper()
-	mc := mockContainerClient.NewMockClient(t)
+	mc := mockRoutes.NewMockClient(t)
 	mc.EXPECT().ListContainers(mock.Anything, mock.Anything).Return([]*container.Container{}, nil).Maybe()
 	mc.EXPECT().ListContainers(mock.Anything).Return([]*container.Container{}, nil).Maybe()
 

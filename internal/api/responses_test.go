@@ -28,9 +28,8 @@ import (
 
 	"github.com/nicholas-fedor/watchtower/internal/api/auth"
 	"github.com/nicholas-fedor/watchtower/internal/api/routes"
+	mockRoutes "github.com/nicholas-fedor/watchtower/internal/api/routes/mocks"
 	"github.com/nicholas-fedor/watchtower/internal/container"
-	containerClient "github.com/nicholas-fedor/watchtower/internal/container/client"
-	mockContainerClient "github.com/nicholas-fedor/watchtower/internal/container/client/mocks"
 	"github.com/nicholas-fedor/watchtower/internal/container/filters"
 	"github.com/nicholas-fedor/watchtower/internal/observability/events"
 	"github.com/nicholas-fedor/watchtower/internal/observability/metrics"
@@ -147,12 +146,12 @@ func fixtureContainers() []*container.Container {
 
 // newFixtureClient returns a Docker client that lists the fixture containers and
 // reports a newer image for the web containers and a registry error for cache.
-func newFixtureClient(t *testing.T) *mockContainerClient.MockClient {
+func newFixtureClient(t *testing.T) *mockRoutes.MockClient {
 	t.Helper()
 
 	list := fixtureContainers()
 
-	client := mockContainerClient.NewMockClient(t)
+	client := mockRoutes.NewMockClient(t)
 	client.EXPECT().Ping(mock.Anything).Return(nil).Maybe()
 	client.EXPECT().ListContainers(mock.Anything, mock.Anything).Return(list, nil).Maybe()
 	client.EXPECT().ListContainers(mock.Anything).Return(list, nil).Maybe()
@@ -172,10 +171,10 @@ func newFixtureClient(t *testing.T) *mockContainerClient.MockClient {
 }
 
 // newFailingClient returns a Docker client whose daemon is unreachable.
-func newFailingClient(t *testing.T) *mockContainerClient.MockClient {
+func newFailingClient(t *testing.T) *mockRoutes.MockClient {
 	t.Helper()
 
-	client := mockContainerClient.NewMockClient(t)
+	client := mockRoutes.NewMockClient(t)
 	client.EXPECT().Ping(mock.Anything).Return(errFixtureDocker).Maybe()
 	client.EXPECT().ListContainers(mock.Anything, mock.Anything).Return(nil, errFixtureDocker).Maybe()
 	client.EXPECT().ListContainers(mock.Anything).Return(nil, errFixtureDocker).Maybe()
@@ -197,7 +196,7 @@ func newFixtureMetrics(t *testing.T) *metrics.Metrics {
 
 // fixtureOptions returns API options with every endpoint enabled, backed by the
 // given Docker client and metrics store. Each update reports the same scan.
-func fixtureOptions(t *testing.T, client containerClient.Client, store *metrics.Metrics) routes.Options {
+func fixtureOptions(t *testing.T, client routes.Client, store *metrics.Metrics) routes.Options {
 	t.Helper()
 
 	return withTestLogger(t, routes.Options{

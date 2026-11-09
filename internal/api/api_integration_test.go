@@ -17,8 +17,8 @@ import (
 
 	"github.com/nicholas-fedor/watchtower/internal/api/auth"
 	"github.com/nicholas-fedor/watchtower/internal/api/routes"
+	mockRoutes "github.com/nicholas-fedor/watchtower/internal/api/routes/mocks"
 	"github.com/nicholas-fedor/watchtower/internal/container"
-	mockContainerClient "github.com/nicholas-fedor/watchtower/internal/container/client/mocks"
 	"github.com/nicholas-fedor/watchtower/internal/container/filters"
 	"github.com/nicholas-fedor/watchtower/internal/observability/events"
 	"github.com/nicholas-fedor/watchtower/internal/observability/metrics"
@@ -46,7 +46,7 @@ func TestIntegration_HealthProbes_ViaFullSetup(t *testing.T) {
 }
 
 func TestIntegration_HealthProbes_CustomRoute(t *testing.T) {
-	mc := mockContainerClient.NewMockClient(t)
+	mc := mockRoutes.NewMockClient(t)
 	mc.EXPECT().ListContainers(mock.Anything).Return([]*container.Container{}, nil)
 
 	app := newApp(newTestLogger(t), 60, proxyConfig{}, corsConfig{}, false)
@@ -463,7 +463,7 @@ func TestIntegration_ContainerDetailsAPI(t *testing.T) {
 func TestIntegration_CheckDuringUpdate(t *testing.T) {
 	testMetrics := metrics.Default()
 
-	mc := mockContainerClient.NewMockClient(t)
+	mc := mockRoutes.NewMockClient(t)
 	mc.EXPECT().ListContainers(mock.Anything, mock.Anything).Return([]*container.Container{}, nil).Maybe()
 	mc.EXPECT().ListContainers(mock.Anything).Return([]*container.Container{}, nil).Maybe()
 

@@ -9,11 +9,16 @@ import (
 	"github.com/rs/zerolog"
 
 	"github.com/nicholas-fedor/watchtower/internal/container"
-	containerClient "github.com/nicholas-fedor/watchtower/internal/container/client"
 	"github.com/nicholas-fedor/watchtower/internal/container/filters"
 	containerImage "github.com/nicholas-fedor/watchtower/internal/container/image"
 	updateParams "github.com/nicholas-fedor/watchtower/internal/update/params"
 )
+
+// ContainerLister lists the containers the handler reports on.
+type ContainerLister interface {
+	// ListContainers returns the containers that pass every filter.
+	ListContainers(ctx context.Context, filter ...filters.Filter) ([]*container.Container, error)
+}
 
 // ContainerDetails holds detailed information about a single watched container.
 type ContainerDetails struct {
@@ -138,7 +143,7 @@ func (h *Handler) Handle(c fiber.Ctx) error {
 //   - error: Non-nil if listing containers fails.
 func GetContainerDetails(
 	ctx context.Context,
-	client containerClient.Client,
+	client ContainerLister,
 	filter filters.Filter,
 	nameFilter,
 	imageFilter string,

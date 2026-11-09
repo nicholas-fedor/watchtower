@@ -8,8 +8,8 @@ import (
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 
+	mockContainers "github.com/nicholas-fedor/watchtower/internal/api/handlers/containers/mocks"
 	"github.com/nicholas-fedor/watchtower/internal/container"
-	mockContainerClient "github.com/nicholas-fedor/watchtower/internal/container/client/mocks"
 	"github.com/nicholas-fedor/watchtower/internal/container/filters"
 	"github.com/nicholas-fedor/watchtower/internal/testutil/containerfixture"
 	"github.com/nicholas-fedor/watchtower/internal/testutil/modelfixture"
@@ -73,7 +73,7 @@ func TestListContainerStatuses(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 
-			client := mockContainerClient.NewMockClient(t)
+			client := mockContainers.NewMockContainerLister(t)
 
 			if tt.filter != nil {
 				// The mock records the variadic filters as one slice.
