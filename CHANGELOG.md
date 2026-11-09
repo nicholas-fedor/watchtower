@@ -103,6 +103,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Chores
 
+- Update module golang.org/x/text to v0.44.0 by @renovate[bot] in [#3638](https://github.com/nicholas-fedor/watchtower/pull/3638)
+- Update module golang.org/x/term to v0.48.0 by @renovate[bot] in [#3637](https://github.com/nicholas-fedor/watchtower/pull/3637)
 - Update golang.org/x/tools digest to fe60680 by @renovate[bot] in [#3631](https://github.com/nicholas-fedor/watchtower/pull/3631)
 - Update module golang.org/x/sync to v0.25.0 by @renovate[bot] in [#3625](https://github.com/nicholas-fedor/watchtower/pull/3625)
 - Update module github.com/gofiber/fiber/v3 to v3.7.0 by @renovate[bot] in [#3619](https://github.com/nicholas-fedor/watchtower/pull/3619)
