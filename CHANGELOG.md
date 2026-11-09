@@ -77,6 +77,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Tests
 
+- Rename the hand-written client fake by @nicholas-fedor in [#3627](https://github.com/nicholas-fedor/watchtower/pull/3627)
 - Build git and update tests from model containers by @nicholas-fedor in [#3596](https://github.com/nicholas-fedor/watchtower/pull/3596)
 - Build container-layer tests from model containers by @nicholas-fedor in [#3594](https://github.com/nicholas-fedor/watchtower/pull/3594)
 - Isolate registry stubs from each other's cached tokens by @nicholas-fedor in [#3587](https://github.com/nicholas-fedor/watchtower/pull/3587)
