@@ -108,6 +108,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Chores
 
+- Update golang.org/x/tools digest to d40593d by @renovate[bot] in [#3655](https://github.com/nicholas-fedor/watchtower/pull/3655)
 - Update golang.org/x/exp digest to a52e3ae by @renovate[bot] in [#3650](https://github.com/nicholas-fedor/watchtower/pull/3650)
 - Update module github.com/vektra/mockery/v3 to v3.9.1 by @renovate[bot] in [#3645](https://github.com/nicholas-fedor/watchtower/pull/3645)
 - Update module golang.org/x/mod to v0.43.0 by @renovate[bot] in [#3646](https://github.com/nicholas-fedor/watchtower/pull/3646)
