@@ -16,6 +16,7 @@ run:
   timeout: 5m # Maximum time allowed for linting (5 minutes)
   allow-parallel-runners: true # Allow multiple parallel golangci-lint instances running.
   allow-serial-runners: true # Allow multiple golangci-lint instances running, but serialize them around a lock.
+  relative-path-mode: gomod # Exclusion paths are relative to the go.mod of the module being checked.
 
 # Formatters Configuration
 formatters:
@@ -25,6 +26,10 @@ formatters:
     - gofumpt # Enforce a stricter format than gofmt, while being backwards compatible.
     - goimports # Manages Go import lines, adds missing imports, removes unused ones
     - golines # Checks if code is formatted, and fixes long lines.
+
+  exclusions:
+    paths:
+      - ^tools/ # Separate modules, formatted from their own directory with their own import grouping.
 
   settings:
     gci:
@@ -337,7 +342,7 @@ linters:
         text: "of func `RunUpgradesOnSchedule` is high"
     paths:
       - ".*/mocks/.*"
-      - ".*/internal/api/swagger/.*"
+      - "^internal/api/swagger/"
     warn-unused: true
 
 # Issues Configuration
