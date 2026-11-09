@@ -61,8 +61,12 @@ var (
 	errMissingImageInfo = errors.New("container image info missing")
 	// errInvalidRegistryResponse indicates the registry's HEAD response lacks a digest or is malformed.
 	errInvalidRegistryResponse = errors.New("registry responded with invalid HEAD request")
-	// errManifestNotFound indicates the registry returned 404 for the manifest request.
+	// errManifestNotFound indicates the registry returned 404 for a HEAD manifest request.
 	errManifestNotFound = errors.New("manifest not found")
+	// errRepositoryDenied indicates the registry refused access to the
+	// repository. It answered the manifest request with a 401 whose challenge
+	// reports insufficient_scope.
+	errRepositoryDenied = errors.New("registry denied access to the repository")
 	// errFailedGetToken indicates a failure to obtain an authentication token from the registry.
 	errFailedGetToken = errors.New("failed to get token")
 	// errFailedBuildManifestURL indicates a failure to construct the manifest URL for the registry.
@@ -80,9 +84,9 @@ var (
 )
 
 // localOnlyImageCache records image name+ID pairs confirmed as local-only after
-// a registry 404. Subsequent checks skip remote probes, avoiding Docker Hub
-// rate-limit pressure that can starve concurrent staleness checks for other
-// containers in the same update cycle.
+// the registry refused the repository. Subsequent checks skip remote probes,
+// avoiding Docker Hub rate-limit pressure that can starve concurrent staleness
+// checks for other containers in the same update cycle.
 //
 // Keyed by "imageName|imageID".
 // Entries live for process lifetime and a rebuild (new image ID) forces a fresh probe.
@@ -108,6 +112,33 @@ func isCachedLocalOnlyImage(container types.Container) bool {
 	_, ok := localOnlyImageCache.Load(localOnlyCacheKey(container))
 
 	return ok
+}
+
+// readManifestBody reads a manifest response body of at most 1 MiB.
+//
+// Parameters:
+//   - body: The response body.
+//
+// Returns:
+//   - []byte: The body bytes.
+//   - error: Non-nil if the read fails or the body is larger than 1 MiB.
+func readManifestBody(body io.Reader) ([]byte, error) {
+	// The extra byte detects a body over the limit.
+	data, err := io.ReadAll(io.LimitReader(body, maxManifestSize+1))
+	if err != nil {
+		return nil, fmt.Errorf("failed to read response body: %w", err)
+	}
+
+	if len(data) > maxManifestSize {
+		return nil, fmt.Errorf(
+			"%w: %d bytes exceeds limit of %d bytes",
+			errManifestTooLarge,
+			len(data),
+			maxManifestSize,
+		)
+	}
+
+	return data, nil
 }
 
 // NormalizeDigest standardizes a digest string for consistent comparison.
@@ -178,9 +209,8 @@ func CompareDigest(
 	return match, err
 }
 
-// isLocalImageNotFound reports whether the digest fetch failed because the
-// registry returned 404 for a manifest request and the container's image looks
-// local-only.
+// isRefusedLocalImage reports whether the digest fetch failed because the
+// registry refused the repository and the container's image looks local-only.
 //
 // An image looks local-only when its repository name is a single component
 // with no registry or namespace, such as atlas-badgerdb. None of its
@@ -188,14 +218,21 @@ func CompareDigest(
 // name the probe requested, which a Zodiac label sets when the container runs
 // from an image ID.
 //
+// A manifest 404 never makes an image local-only.
+//
 // Parameters:
 //   - container: Container whose image name is inspected.
 //   - err: Error returned from digest fetch.
 //
 // Returns:
 //   - bool: True if the image should be treated as local-only, false otherwise.
-func isLocalImageNotFound(container types.Container, err error) bool {
-	if !errors.Is(err, errManifestNotFound) {
+func isRefusedLocalImage(container types.Container, err error) bool {
+	// Docker Hub refuses a single-component name it does not have with a 401
+	// whose challenge reports insufficient_scope, with or without credentials.
+	// Its official namespace has no private repositories. The refusal therefore
+	// means the repository does not exist. A 404 means the repository exists
+	// without the tag.
+	if !errors.Is(err, errRepositoryDenied) {
 		return false
 	}
 
@@ -210,7 +247,7 @@ func isLocalImageNotFound(container types.Container, err error) bool {
 	}
 
 	// Registry-qualified digests mean the image was pulled from a remote source,
-	// so a 404 is a failed probe rather than proof the image is local-only.
+	// so a refusal is a failed probe rather than proof the image is local-only.
 	for _, digestRef := range container.ImageInfo().RepoDigests {
 		repoPart, _, _ := strings.Cut(digestRef, "@")
 		if repoPartHasRegistryHost(repoPart) {
@@ -221,25 +258,19 @@ func isLocalImageNotFound(container types.Container, err error) bool {
 	return true
 }
 
-// repoPartHasRegistryHost reports whether a RepoDigest repository path includes
-// a registry host (hostname with a dot, or host:port).
+// repoPartHasRegistryHost reports whether a RepoDigest repository path starts
+// with a registry host.
+//
+// Docker counts a first component as a registry host when it is localhost or
+// contains a dot, a colon or an uppercase letter.
 func repoPartHasRegistryHost(repoPart string) bool {
-	// Strip optional scheme leftovers. RepoDigests are host/path form.
-	hostOrName, remainder, hasSlash := strings.Cut(repoPart, "/")
+	first, _, hasSlash := strings.Cut(repoPart, "/")
 	if !hasSlash {
-		// Bare name (e.g. "nginx") has no host segment.
+		// A bare name such as nginx has no host component.
 		return false
 	}
 
-	// host:port/path or registry.example.com/path
-	if strings.Contains(hostOrName, ":") || strings.Contains(hostOrName, ".") {
-		return true
-	}
-
-	// Remainder unused. Keep the signature clear for future extension.
-	_ = remainder
-
-	return false
+	return strings.ContainsAny(first, ".:") || first == "localhost" || strings.ToLower(first) != first
 }
 
 // CompareDigestWithRemote checks whether a container's current image digest matches
@@ -306,7 +337,7 @@ func CompareDigestWithRemote(log *zerolog.Logger,
 	}
 
 	// Skip registry probes for images previously confirmed local-only (same name+ID).
-	// This prevents repeated Docker Hub 404 traffic that can rate-limit concurrent
+	// This prevents repeated Docker Hub refusals that can rate-limit concurrent
 	// checks for other containers in the same update session.
 	if isCachedLocalOnlyImage(container) {
 		log.Debug().
@@ -327,24 +358,9 @@ func CompareDigestWithRemote(log *zerolog.Logger,
 		"",
 		endpoints...,
 	)
-	if err != nil {
-		// A 404 for a local-only image means it is up to date. Return no error
-		// so callers skip the pull without logging a warning.
-		if isLocalImageNotFound(container, err) {
-			rememberLocalOnlyImage(container)
-			log.Debug().
-				Fields(fields).
-				Msg("Image not found in registry - treating as local image")
-
-			return true, "", nil
-		}
-
-		return false, "", err
-	}
-
 	// If HEAD request returned empty digest (due to missing Docker-Content-Digest header),
 	// fall back to GET request.
-	if remoteDigest == "" {
+	if err == nil && remoteDigest == "" {
 		log.Debug().
 			Fields(fields).
 			Msg("HEAD request returned empty digest - falling back to GET")
@@ -357,9 +373,21 @@ func CompareDigestWithRemote(log *zerolog.Logger,
 			limiter,
 			endpoints...,
 		)
-		if err != nil {
-			return false, "", err
+	}
+
+	if err != nil {
+		// A refused local-only image is up to date. Return no error so callers
+		// skip the pull without logging a warning.
+		if isRefusedLocalImage(container, err) {
+			rememberLocalOnlyImage(container)
+			log.Debug().
+				Fields(fields).
+				Msg("Registry refused the repository - treating as local image")
+
+			return true, "", nil
 		}
+
+		return false, "", err
 	}
 
 	// Compare the fetched remote digest with the container's local digests.
@@ -798,7 +826,6 @@ func fetchDigest(log *zerolog.Logger,
 		}
 
 		token := result.Token
-		challengeHost := result.ChallengeHost
 		redirected := result.Redirected
 		redirectHost := result.RedirectHost
 
@@ -816,10 +843,9 @@ func fetchDigest(log *zerolog.Logger,
 			log.Debug().
 				Fields(fields).
 				Fields(epFields).
-				Str("challenge_host", challengeHost).
 				Bool("redirected", redirected).
 				Str("redirect_host", redirectHost).
-				Msg("Received challenge host and redirect flag from GetToken")
+				Msg("Received token and redirect flag from GetToken")
 		}
 
 		// Decide which host to use for this manifest request attempt.
@@ -828,7 +854,7 @@ func fetchDigest(log *zerolog.Logger,
 		// 2. Current mirror endpoint (when using registry mirrors)
 		// 3. Canonical host (empty string)
 		hostForManifest := ""
-		if redirectHost != "" && redirectHost != originalHost && redirected {
+		if redirectHost != "" && redirectHost != originalHost {
 			hostForManifest = redirectHost
 		} else if endpoint != "" {
 			// Use the current registry mirror endpoint for the manifest request.
@@ -893,10 +919,8 @@ func fetchDigest(log *zerolog.Logger,
 				resp,
 				method,
 				originalHost,
-				challengeHost,
 				canonicalRedirect,
 				parsedURL,
-				parsedURL.Host,
 			)
 			_ = resp.Body.Close()
 
@@ -943,7 +967,6 @@ func fetchDigest(log *zerolog.Logger,
 				updatedURL,
 				retryToken,
 				originalHost,
-				challengeHost,
 				canonicalRedirect,
 				parsedURL,
 				limitKey,
@@ -988,11 +1011,9 @@ func fetchDigest(log *zerolog.Logger,
 //   - resp: The HTTP response from the manifest request.
 //   - method: The HTTP method used ("HEAD" or "GET").
 //   - originalHost: The original host from the initial manifest URL.
-//   - challengeHost: The challenge host from authentication (empty if not redirected).
 //   - redirected: Whether the canonical registry's challenge redirected the request to
 //     another host.
-//   - parsedURL: Parsed URL for updating host.
-//   - currentHost: The current host being used for the request.
+//   - parsedURL: Parsed URL of the request, whose host is the host it went to.
 //
 // Returns:
 //   - string: The extracted and normalized digest.
@@ -1001,20 +1022,20 @@ func fetchDigest(log *zerolog.Logger,
 //   - error: Non-nil if processing or extraction fails, nil on success.
 func handleManifestResponse(log *zerolog.Logger,
 	resp *http.Response,
-	method, originalHost, challengeHost string,
+	method, originalHost string,
 	redirected bool,
 	parsedURL *url.URL,
-	currentHost string,
 ) (string, string, bool, error) {
+	currentHost := parsedURL.Host
+
 	fields := map[string]any{
-		"method":         method,
-		"status_code":    resp.StatusCode,
-		"status":         resp.Status,
-		"original_host":  originalHost,
-		"challenge_host": challengeHost,
-		"redirected":     redirected,
-		"request_host":   resp.Request.URL.Host,
-		"current_host":   currentHost,
+		"method":        method,
+		"status_code":   resp.StatusCode,
+		"status":        resp.Status,
+		"original_host": originalHost,
+		"redirected":    redirected,
+		"request_host":  resp.Request.URL.Host,
+		"current_host":  currentHost,
 	}
 
 	log.Debug().
@@ -1031,38 +1052,22 @@ func handleManifestResponse(log *zerolog.Logger,
 		return "", "", false, ratelimit.FromResponse(resp, body)
 	}
 
-	var manifestURL string
+	// A 401 whose challenge reports insufficient_scope refuses the repository
+	// itself. A GET would be refused too. Any other 401, such as an expired or
+	// invalid token, says nothing about the repository.
+	refused := resp.StatusCode == http.StatusUnauthorized && auth.IsInsufficientScope(resp.Header)
 
 	// Handle non-success responses for HEAD requests by returning empty digest to trigger GET fallback.
-	// Exclude 404 Not Found to avoid unnecessary GET requests when the manifest doesn't exist.
+	// A 404 or a refused repository is excluded, since a GET would get the same answer.
 	headFallbackCondition := method == http.MethodHead &&
 		(resp.StatusCode < http.StatusOK || resp.StatusCode >= http.StatusMultipleChoices) &&
-		resp.StatusCode != http.StatusNotFound
+		resp.StatusCode != http.StatusNotFound && !refused
 	log.Debug().
 		Fields(fields).
 		Bool("head_fallback_condition", headFallbackCondition).
 		Msg("Checking HEAD fallback condition")
 
 	if headFallbackCondition {
-		// For non-redirected registries, try challenge host first before falling back to GET
-		if !redirected && challengeHost != "" && currentHost == originalHost &&
-			(resp.StatusCode == http.StatusNotFound || resp.StatusCode == http.StatusUnauthorized) {
-			log.Debug().
-				Fields(fields).
-				Bool("retry_on_challenge", true).
-				Msg("HEAD request failed on original host for non-redirected registry, trying challenge host")
-
-			parsedURL.Host = challengeHost
-			manifestURL = parsedURL.String()
-
-			log.Debug().
-				Fields(fields).
-				Str("retry_url", auth.RedactURL(manifestURL)).
-				Msg("Setting retry due to HEAD failure on original host")
-
-			return "", manifestURL, true, nil
-		}
-
 		log.Debug().
 			Fields(fields).
 			Msg("HEAD request failed, returning empty digest to trigger GET fallback")
@@ -1134,37 +1139,19 @@ func handleManifestResponse(log *zerolog.Logger,
 			redirected && currentHost != originalHost {
 			log.Debug().
 				Fields(fields).
-				Bool("retry_on_original", true).
 				Msg("401/404 on redirected host, retrying on original host")
 
 			parsedURL.Host = originalHost
-			manifestURL = parsedURL.String()
 
-			log.Debug().
-				Fields(fields).
-				Str("retry_url", auth.RedactURL(manifestURL)).
-				Msg("Setting retry due to 401/404 on redirected host")
-
-			return "", manifestURL, true, nil
+			return "", parsedURL.String(), true, nil
 		}
 
-		// If we're on original host and have challenge host, try challenge host
-		if (resp.StatusCode == http.StatusNotFound || resp.StatusCode == http.StatusUnauthorized) &&
-			challengeHost != "" && currentHost == originalHost {
+		if refused {
 			log.Debug().
 				Fields(fields).
-				Bool("retry_on_challenge", true).
-				Msg("401/404 on original host, trying challenge host")
+				Msg("Registry denied access to the repository")
 
-			parsedURL.Host = challengeHost
-			manifestURL = parsedURL.String()
-
-			log.Debug().
-				Fields(fields).
-				Str("retry_url", auth.RedactURL(manifestURL)).
-				Msg("Setting retry due to 401/404 on original host with challenge host")
-
-			return "", manifestURL, true, nil
+			return "", "", false, fmt.Errorf("%w: status %s", errRepositoryDenied, resp.Status)
 		}
 
 		log.Debug().
@@ -1294,35 +1281,16 @@ func extractGetDigest(log *zerolog.Logger, resp *http.Response) (string, error) 
 		return headerDigest, nil
 	}
 
-	// Fallback: read the body with a size limit. The extra byte detects overflow.
-	bodyBytes, err := io.ReadAll(io.LimitReader(resp.Body, maxManifestSize+1))
+	// Without the header, the digest comes from the body. An oversized body is
+	// rejected before it is parsed.
+	bodyBytes, err := readManifestBody(resp.Body)
 	if err != nil {
 		log.Debug().
 			Err(err).
 			Str("status", resp.Status).
 			Msg("Failed to read response body for digest extraction")
 
-		return "", fmt.Errorf(
-			"%w: failed to read response body: %w",
-			errInvalidRegistryResponse,
-			err,
-		)
-	}
-
-	// Reject oversized bodies before parsing or converting to a string.
-	if len(bodyBytes) > maxManifestSize {
-		log.Debug().
-			Str("status", resp.Status).
-			Int("observed_size", len(bodyBytes)).
-			Int("limit", maxManifestSize).
-			Msg("Digest response body exceeds size limit")
-
-		return "", fmt.Errorf(
-			"%w: %d bytes exceeds limit of %d bytes",
-			errManifestTooLarge,
-			len(bodyBytes),
-			maxManifestSize,
-		)
+		return "", fmt.Errorf("%w: %w", errInvalidRegistryResponse, err)
 	}
 
 	bodyStr := strings.TrimSpace(string(bodyBytes))
@@ -1608,7 +1576,6 @@ func makeManifestRequest(
 //   - updatedURL: The updated manifest URL to retry.
 //   - token: Authentication token.
 //   - originalHost: The original host.
-//   - challengeHost: The challenge host.
 //   - redirected: Whether the canonical registry's challenge redirected the request to
 //     another host.
 //   - parsedURL: Parsed URL object.
@@ -1623,7 +1590,7 @@ func retryManifestRequest(
 	log *zerolog.Logger,
 	ctx context.Context,
 	method, updatedURL, token string,
-	originalHost, challengeHost string,
+	originalHost string,
 	redirected bool,
 	parsedURL *url.URL,
 	limitKey string,
@@ -1653,10 +1620,8 @@ func retryManifestRequest(
 			resp,
 			method,
 			originalHost,
-			challengeHost,
 			redirected,
 			parsedURL,
-			parsedURL.Host,
 		)
 		if handleErr != nil {
 			return handleErr

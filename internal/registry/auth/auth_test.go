@@ -615,7 +615,7 @@ func Test_processChallengeResponse(t *testing.T) {
 					Body:       io.NopCloser(strings.NewReader(`{"token":"test-token"}`)),
 				}, nil).Once()
 			},
-			want: TokenResult{Token: "Bearer test-token", ChallengeHost: "challenge.test.com"},
+			want: TokenResult{Token: "Bearer test-token"},
 		},
 		{
 			name:     "200 with empty auth header returns success",
@@ -723,9 +723,9 @@ func Test_processChallengeResponse(t *testing.T) {
 }
 
 // Test_handleBearerAuth verifies that a Bearer challenge yields the fetched
-// token and the challenge host, and that a failed request or an empty token is
-// an error. After a redirect from HTTPS to HTTP, a challenge with credentials
-// is rejected before any token request, and one without credentials is not.
+// token and that a failed request or an empty token is an error. After a
+// redirect from HTTPS to HTTP, a challenge with credentials is rejected before
+// any token request, and one without credentials is not.
 //
 // The test resets the shared token cache, so it does not run in parallel.
 func Test_handleBearerAuth(t *testing.T) {
@@ -752,7 +752,7 @@ func Test_handleBearerAuth(t *testing.T) {
 					Body:       io.NopCloser(strings.NewReader(`{"token":"test-token"}`)),
 				}, nil).Once()
 			},
-			want: TokenResult{Token: "Bearer test-token", ChallengeHost: "success.test.com"},
+			want: TokenResult{Token: "Bearer test-token"},
 		},
 		{
 			name:          "client Do error returns wrapped error",
@@ -795,10 +795,9 @@ func Test_handleBearerAuth(t *testing.T) {
 				}, nil).Once()
 			},
 			want: TokenResult{
-				Token:         "Bearer anonymous-token",
-				ChallengeHost: "anonymous.test.com",
-				Redirected:    true,
-				RedirectHost:  "registry.example.com",
+				Token:        "Bearer anonymous-token",
+				Redirected:   true,
+				RedirectHost: "registry.example.com",
 			},
 		},
 		{
@@ -814,10 +813,9 @@ func Test_handleBearerAuth(t *testing.T) {
 				}, nil).Once()
 			},
 			want: TokenResult{
-				Token:         "Bearer ghcr-token",
-				ChallengeHost: "ghcr.io",
-				Redirected:    true,
-				RedirectHost:  "ghcr.io",
+				Token:        "Bearer ghcr-token",
+				Redirected:   true,
+				RedirectHost: "ghcr.io",
 			},
 		},
 	}
@@ -1034,7 +1032,7 @@ func TestGetToken(t *testing.T) {
 					Request:    &http.Request{URL: mustParseURL("https://index.docker.io/token?service=index.docker.io&scope=repository%3Atest%2Fimage%3Apull")},
 				}, nil).Once()
 			},
-			want: TokenResult{Token: "Bearer test-token", ChallengeHost: "index.docker.io"},
+			want: TokenResult{Token: "Bearer test-token"},
 		},
 		{
 			name:  "client Do error returns wrapped error",
@@ -1104,7 +1102,7 @@ func TestGetToken_anonymousGHCRSkipsChallengeOnCachedToken(t *testing.T) {
 		"",
 	)
 	require.NoError(t, err)
-	assert.Equal(t, TokenResult{Token: testAnonymousGHCRToken, ChallengeHost: "ghcr.io"}, got)
+	assert.Equal(t, TokenResult{Token: testAnonymousGHCRToken}, got)
 }
 
 // TestGetToken_anonymousLSCRSkipsChallengeOnCachedToken verifies that an
@@ -1125,7 +1123,7 @@ func TestGetToken_anonymousLSCRSkipsChallengeOnCachedToken(t *testing.T) {
 		"",
 	)
 	require.NoError(t, err)
-	assert.Equal(t, TokenResult{Token: testAnonymousGHCRToken, ChallengeHost: "ghcr.io"}, got)
+	assert.Equal(t, TokenResult{Token: testAnonymousGHCRToken}, got)
 }
 
 // TestGetToken_anonymousGHCRChallengesWhenCacheEmpty verifies that an anonymous
@@ -1152,7 +1150,7 @@ func TestGetToken_anonymousGHCRChallengesWhenCacheEmpty(t *testing.T) {
 
 	got, err := GetToken(newTestLogger(t), t.Context(), modelfixture.Container(containerfixture.WithImageName("ghcr.io/linuxserver/sonarr:latest")), "", client, registryConfig.Registry{}, "")
 	require.NoError(t, err)
-	assert.Equal(t, TokenResult{Token: "Bearer fresh-ghcr-token", ChallengeHost: "ghcr.io"}, got)
+	assert.Equal(t, TokenResult{Token: "Bearer fresh-ghcr-token"}, got)
 }
 
 // TestGetToken_anonymousGHCRDoesNotSkipMirrorOrCredentials verifies that a
@@ -1387,7 +1385,7 @@ func TestGetToken_bearerChallenges(t *testing.T) {
 
 		got, err := GetToken(newTestLogger(t), t.Context(), modelfixture.Container(containerfixture.WithImageName(registryImage(server))), "", server.Client(), registryConfig.Registry{}, "")
 		require.NoError(t, err)
-		assert.Equal(t, TokenResult{Token: "Bearer mock-token", ChallengeHost: tokenServer.Addr()}, got)
+		assert.Equal(t, TokenResult{Token: "Bearer mock-token"}, got)
 		assert.Len(t, server.ReceivedRequests(), 1)
 		assert.Len(t, tokenServer.ReceivedRequests(), 1)
 	})
@@ -1401,7 +1399,7 @@ func TestGetToken_bearerChallenges(t *testing.T) {
 
 		got, err := GetToken(newTestLogger(t), t.Context(), modelfixture.Container(containerfixture.WithImageName(registryImage(server))), "", server.Client(), registryConfig.Registry{}, "")
 		require.NoError(t, err)
-		assert.Equal(t, TokenResult{Token: "Bearer mock-token", ChallengeHost: server.Addr()}, got)
+		assert.Equal(t, TokenResult{Token: "Bearer mock-token"}, got)
 		assert.Len(t, server.ReceivedRequests(), 2)
 	})
 
@@ -1418,7 +1416,7 @@ func TestGetToken_bearerChallenges(t *testing.T) {
 
 		got, err := GetToken(newTestLogger(t), t.Context(), modelfixture.Container(containerfixture.WithImageName(registryImage(server))), "", server.Client(), registryConfig.Registry{}, "")
 		require.NoError(t, err)
-		assert.Equal(t, TokenResult{Token: "Bearer mock-token", ChallengeHost: server.Addr()}, got)
+		assert.Equal(t, TokenResult{Token: "Bearer mock-token"}, got)
 		assert.Len(t, server.ReceivedRequests(), 2)
 	})
 
@@ -1438,10 +1436,9 @@ func TestGetToken_bearerChallenges(t *testing.T) {
 		got, err := GetToken(newTestLogger(t), t.Context(), modelfixture.Container(containerfixture.WithImageName(registryImage(server))), "", server.Client(), registryConfig.Registry{}, "")
 		require.NoError(t, err)
 		assert.Equal(t, TokenResult{
-			Token:         "Bearer mock-token",
-			ChallengeHost: redirectServer.Addr(),
-			Redirected:    true,
-			RedirectHost:  redirectServer.Addr(),
+			Token:        "Bearer mock-token",
+			Redirected:   true,
+			RedirectHost: redirectServer.Addr(),
 		}, got)
 		assert.Len(t, server.ReceivedRequests(), 1)
 		assert.Len(t, redirectServer.ReceivedRequests(), 2)

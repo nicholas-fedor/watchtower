@@ -3,6 +3,7 @@ package auth
 import (
 	"errors"
 	"fmt"
+	"net/http"
 	"net/url"
 	"strings"
 
@@ -23,9 +24,15 @@ var (
 
 // challengeValues holds the parsed components of a WWW-Authenticate Bearer challenge.
 type challengeValues struct {
-	realm   string
+	// realm is the token endpoint URL.
+	realm string
+	// service is the service name the token is requested for.
 	service string
-	scope   string
+	// scope is the scope the registry asks the token to grant.
+	scope string
+	// errorCode is the RFC 6750 error code, such as insufficient_scope. It is
+	// empty when the challenge names no error.
+	errorCode string
 }
 
 // parseChallenge parses a Bearer challenge header into its components.
@@ -40,7 +47,7 @@ type challengeValues struct {
 //   - header: The raw WWW-Authenticate header value.
 //
 // Returns:
-//   - challengeValues: Parsed realm, service, and scope values.
+//   - challengeValues: Parsed realm, service, scope and error values.
 func parseChallenge(header string) challengeValues {
 	trimmed := strings.TrimSpace(header)
 	lowered := strings.ToLower(trimmed)
@@ -73,11 +80,25 @@ func parseChallenge(header string) challengeValues {
 				values.service = strings.Trim(val, `"`)
 			case "scope":
 				values.scope = strings.Trim(val, `"`)
+			case "error":
+				values.errorCode = strings.Trim(val, `"`)
 			}
 		}
 	}
 
 	return values
+}
+
+// IsInsufficientScope reports whether a response's Bearer challenge says the
+// token lacks the requested scope, the RFC 6750 insufficient_scope error.
+//
+// Parameters:
+//   - header: Response headers holding the WWW-Authenticate challenge.
+//
+// Returns:
+//   - bool: True when the challenge's error is insufficient_scope.
+func IsInsufficientScope(header http.Header) bool {
+	return parseChallenge(header.Get(challengeHeaderName)).errorCode == "insufficient_scope"
 }
 
 // splitQuoted splits a string by a delimiter rune without splitting on

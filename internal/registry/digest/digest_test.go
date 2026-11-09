@@ -65,6 +65,10 @@ const testDigestHash = "sha256:d68e1e532088964195ad3a0a71526bc2f11a78de0def85629
 // testRepoDigest is the repo digest of the image the stub registry containers run.
 const testRepoDigest = "ghcr.io/k6io/operator@" + testDigestHash
 
+// testLocalDigest is the digest of the image the local-only tests run, which
+// is also its image ID.
+const testLocalDigest = "sha256:80f07677bee57274a48929d0688bf0cfabe5e83f06f2f152dab4076445d6ab35"
+
 // testIndexBody is an OCI image index without a top-level digest field.
 const testIndexBody = `{"schemaVersion":2,"mediaType":"application/vnd.oci.image.index.v1+json","manifests":[` +
 	`{"mediaType":"application/vnd.oci.image.manifest.v1+json","digest":"sha256:` +
@@ -128,6 +132,26 @@ func bearerChallengeHandler(t *testing.T, realmAddr, scope string) http.HandlerF
 	return httpstub.CombineHandlers(
 		httpstub.VerifyRequest(t, http.MethodGet, httpstub.Path("/v2/")),
 		httpstub.RespondWith(http.StatusUnauthorized, "", http.Header{"WWW-Authenticate": {challenge}}),
+	)
+}
+
+// challengeRedirectHandler returns the handler of a registry whose /v2/
+// challenge redirects to another host's /v2/.
+//
+// Parameters:
+//   - t: Test that receives verification failures.
+//   - targetAddr: Host and port the challenge redirects to.
+//
+// Returns:
+//   - http.HandlerFunc: Handler for the /v2/ request.
+func challengeRedirectHandler(t *testing.T, targetAddr string) http.HandlerFunc {
+	t.Helper()
+
+	return httpstub.CombineHandlers(
+		httpstub.VerifyRequest(t, http.MethodGet, httpstub.Path("/v2/")),
+		httpstub.RespondWith(http.StatusFound, "", http.Header{
+			"Location": {fmt.Sprintf("http://%s/v2/", targetAddr)},
+		}),
 	)
 }
 
@@ -247,9 +271,47 @@ func newLocalOnlyContainer(imageID string, updates ...containerfixture.Update) t
 		containerfixture.WithImageName("atlas-badgerdb"),
 		containerfixture.WithImageID(imageID),
 		containerfixture.WithRepoDigests([]string{
-			"atlas-badgerdb@sha256:80f07677bee57274a48929d0688bf0cfabe5e83f06f2f152dab4076445d6ab35",
+			"atlas-badgerdb@" + testLocalDigest,
 		}),
 	}, updates...)...)
+}
+
+// unauthorizedChallenge returns the headers of a 401 manifest response whose
+// Bearer challenge reports errorCode, as Docker Hub sends with
+// insufficient_scope for a repository it does not have and invalid_token for
+// a token it does not accept.
+//
+// Parameters:
+//   - errorCode: RFC 6750 error code of the challenge.
+//
+// Returns:
+//   - http.Header: Headers holding the WWW-Authenticate challenge.
+func unauthorizedChallenge(errorCode string) http.Header {
+	header := http.Header{}
+	header.Set("WWW-Authenticate", fmt.Sprintf(
+		`Bearer realm="https://auth.docker.io/token",service="registry.docker.io",error=%q`, errorCode,
+	))
+
+	return header
+}
+
+// refusedProbeHandlers returns the handlers of an anonymous registry that
+// refuses a manifest HEAD request with insufficient_scope, as Docker Hub does
+// for a repository it does not have.
+//
+// Parameters:
+//   - t: Test that receives verification failures.
+//   - path: Expected manifest path.
+//
+// Returns:
+//   - []http.HandlerFunc: Handlers in request order.
+func refusedProbeHandlers(t *testing.T, path string) []http.HandlerFunc {
+	t.Helper()
+
+	return []http.HandlerFunc{
+		anonymousRegistryHandler(t),
+		manifestHandler(t, http.MethodHead, path, http.StatusUnauthorized, unauthorizedChallenge("insufficient_scope")),
+	}
 }
 
 // clearLocalOnlyImageCache removes all cached local-only image entries, so
@@ -263,7 +325,7 @@ func clearLocalOnlyImageCache() {
 }
 
 // unauthorizedManifestClient returns a registry client that answers every
-// manifest request with 401, which asks for a retry on the other host.
+// manifest request with 401.
 func unauthorizedManifestClient(t *testing.T) *mockAuth.MockClient {
 	t.Helper()
 
@@ -972,12 +1034,7 @@ func TestFetchDigestWithGet_MirrorFailure(t *testing.T) {
 
 			if tt.redirectChallenge {
 				mirrorAuth = httpstub.New(t)
-				mirror.AppendHandlers(httpstub.CombineHandlers(
-					httpstub.VerifyRequest(t, http.MethodGet, httpstub.Path("/v2/")),
-					httpstub.RespondWith(http.StatusFound, "", http.Header{
-						"Location": {fmt.Sprintf("http://%s/v2/", mirrorAuth.Addr())},
-					}),
-				))
+				mirror.AppendHandlers(challengeRedirectHandler(t, mirrorAuth.Addr()))
 			}
 
 			mirrorAuth.AppendHandlers(append(
@@ -1009,6 +1066,75 @@ func TestFetchDigestWithGet_MirrorFailure(t *testing.T) {
 	}
 }
 
+// TestFetchDigestWithGet_RedirectHostFailure verifies that a manifest request
+// the registry's redirect host refuses is retried once on the image registry,
+// whose answer decides the result.
+func TestFetchDigestWithGet_RedirectHostFailure(t *testing.T) {
+	t.Parallel()
+
+	const manifestPath = "/v2/test/image/manifests/latest"
+
+	tests := []struct {
+		name string
+		// original answers the retry on the image registry.
+		original http.HandlerFunc
+		// wantErr is the error the fetch must return, nil for a digest.
+		wantErr error
+	}{
+		{
+			name:     "the registry serves the manifest",
+			original: httpstub.RespondWith(http.StatusOK, "", digestHeader(testDigestHash)),
+		},
+		{
+			name: "the registry rate limits the retry",
+			original: httpstub.RespondWith(http.StatusTooManyRequests,
+				"toomanyrequests: retry-after: 331.163µs, allowed: 44000/minute",
+				http.Header{"Retry-After": {"7200"}}),
+			wantErr: ratelimit.ErrRateLimited,
+		},
+		{
+			name:     "the registry refuses the retry",
+			original: httpstub.RespondWith(http.StatusUnauthorized, "", unauthorizedChallenge("insufficient_scope")),
+			wantErr:  errRepositoryDenied,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			registry := httpstub.New(t)
+			redirectHost := httpstub.New(t)
+
+			registry.AppendHandlers(
+				challengeRedirectHandler(t, redirectHost.Addr()),
+				httpstub.CombineHandlers(
+					httpstub.VerifyRequest(t, http.MethodGet, httpstub.Path(manifestPath)),
+					tt.original,
+				),
+			)
+			redirectHost.AppendHandlers(append(
+				bearerChallengeHandlers(t, redirectHost.Addr(), "repository:test/image:pull"),
+				manifestHandler(t, http.MethodGet, manifestPath, http.StatusUnauthorized, nil),
+			)...)
+
+			container := newRegistryContainer(registry.Addr()+"/test/image:latest", testRepoDigest)
+
+			got, err := fetchDigestWithGet(newTestLogger(t), t.Context(),
+				container, "", registryConfig.Registry{TLSSkip: true}, ratelimit.New())
+			if tt.wantErr != nil {
+				require.ErrorIs(t, err, tt.wantErr)
+				assert.Empty(t, got)
+
+				return
+			}
+
+			require.NoError(t, err)
+			assert.Equal(t, NormalizeDigest(newTestLogger(t), testDigestHash), got)
+		})
+	}
+}
+
 // TestCompareDigest_RedirectedLSCRImage verifies that an lscr.io image whose
 // registry redirects the /v2/ challenge to another host still compares its
 // digest with a HEAD request.
@@ -1019,12 +1145,7 @@ func TestCompareDigest_RedirectedLSCRImage(t *testing.T) {
 	redirectServer := httpstub.New(t)
 
 	server.AppendHandlers(
-		httpstub.CombineHandlers(
-			httpstub.VerifyRequest(t, http.MethodGet, httpstub.Path("/v2/")),
-			httpstub.RespondWith(http.StatusFound, "", http.Header{
-				"Location": {fmt.Sprintf("http://%s/v2/", redirectServer.Addr())},
-			}),
-		),
+		challengeRedirectHandler(t, redirectServer.Addr()),
 		httpstub.CombineHandlers(
 			httpstub.VerifyRequest(t, http.MethodGet, httpstub.Path("/v2/lscr.io/test/image/manifests/latest")),
 			httpstub.RespondWith(http.StatusNotFound, "", nil),
@@ -1120,10 +1241,10 @@ func TestCompareDigestWithRemote_Head429DoesNotFallBackToGET(t *testing.T) {
 	assert.False(t, match)
 }
 
-// TestCompareDigestWithRemote_Retry429DoesNotContinueToNextEndpoint is a
-// regression test for a 429 on the challenge-host retry. That error must abort
-// the endpoint loop instead of trying the next mirror.
-func TestCompareDigestWithRemote_Retry429DoesNotContinueToNextEndpoint(t *testing.T) {
+// TestCompareDigestWithRemote_429DoesNotContinueToNextEndpoint verifies that a
+// 429 from one endpoint aborts the endpoint loop instead of trying the next
+// mirror.
+func TestCompareDigestWithRemote_429DoesNotContinueToNextEndpoint(t *testing.T) {
 	t.Parallel()
 
 	const manifestPath = "/v2/linuxserver/radarr/manifests/latest"
@@ -1131,7 +1252,6 @@ func TestCompareDigestWithRemote_Retry429DoesNotContinueToNextEndpoint(t *testin
 	primary := httpstub.New(t)
 	primary.AppendHandlers(
 		append(bearerChallengeHandlers(t, primary.Addr(), "repository:linuxserver/radarr:pull"),
-			manifestHandler(t, http.MethodHead, manifestPath, http.StatusUnauthorized, nil),
 			httpstub.CombineHandlers(
 				httpstub.VerifyRequest(t, http.MethodHead, httpstub.Path(manifestPath)),
 				httpstub.RespondWith(http.StatusTooManyRequests,
@@ -1151,15 +1271,17 @@ func TestCompareDigestWithRemote_Retry429DoesNotContinueToNextEndpoint(t *testin
 		container, "", registryConfig.Registry{TLSSkip: true}, ratelimit.New(), primary.URL(), mirror.URL())
 	require.ErrorIs(t, err, ratelimit.ErrRateLimited)
 	assert.False(t, match)
-	assert.Len(t, primary.ReceivedRequests(), 4)
+	assert.Len(t, primary.ReceivedRequests(), 3)
 	assert.Empty(t, mirror.ReceivedRequests())
 }
 
-// TestCompareDigestWithRemote_UnauthorizedOnBothHostsIsError verifies that a
-// registry that rejects the manifest request on both its own host and its
-// token host produces an error, not an empty digest that marks the image as
-// out of date and causes a pull.
-func TestCompareDigestWithRemote_UnauthorizedOnBothHostsIsError(t *testing.T) {
+// TestCompareDigestWithRemote_UnauthorizedIsError verifies that a registry
+// that answers the manifest request with a 401 that names no refused scope
+// produces an error, not an empty digest that marks the image as out of date
+// and causes a pull.
+//
+// Its token host only issues the token and gets no manifest request.
+func TestCompareDigestWithRemote_UnauthorizedIsError(t *testing.T) {
 	t.Parallel()
 
 	const (
@@ -1167,13 +1289,9 @@ func TestCompareDigestWithRemote_UnauthorizedOnBothHostsIsError(t *testing.T) {
 		scope        = "repository:linuxserver/radarr:pull"
 	)
 
-	// The token host issues tokens but rejects manifest requests.
+	// A manifest request to the token host has no handler and fails the test.
 	tokenHost := httpstub.New(t)
-	tokenHost.AppendHandlers(
-		tokenHandler(t),
-		manifestHandler(t, http.MethodHead, manifestPath, http.StatusUnauthorized, nil),
-		manifestHandler(t, http.MethodGet, manifestPath, http.StatusUnauthorized, nil),
-	)
+	tokenHost.AppendHandlers(tokenHandler(t))
 
 	// The registry sends clients to the token host and rejects manifest requests.
 	registry := httpstub.New(t)
@@ -1192,11 +1310,12 @@ func TestCompareDigestWithRemote_UnauthorizedOnBothHostsIsError(t *testing.T) {
 	require.ErrorIs(t, err, errInvalidRegistryResponse)
 	assert.False(t, match)
 	assert.Empty(t, remoteDigest)
+	assert.Len(t, tokenHost.ReceivedRequests(), 1)
 }
 
 // TestCompareDigestWithRemote_HeadRejectedFallsBackToGet verifies that when a
-// registry that is its own token host rejects HEAD manifest requests, the
-// retried HEAD falls back to GET, which returns the digest.
+// registry rejects HEAD manifest requests, the check falls back to GET, which
+// returns the digest.
 func TestCompareDigestWithRemote_HeadRejectedFallsBackToGet(t *testing.T) {
 	t.Parallel()
 
@@ -1208,7 +1327,6 @@ func TestCompareDigestWithRemote_HeadRejectedFallsBackToGet(t *testing.T) {
 	registry := httpstub.New(t)
 	registry.AppendHandlers(
 		append(bearerChallengeHandlers(t, registry.Addr(), "repository:linuxserver/radarr:pull"),
-			manifestHandler(t, http.MethodHead, manifestPath, http.StatusUnauthorized, nil),
 			manifestHandler(t, http.MethodHead, manifestPath, http.StatusUnauthorized, nil),
 			bearerChallengeHandler(t, registry.Addr(), "repository:linuxserver/radarr:pull"),
 			httpstub.CombineHandlers(
@@ -1231,20 +1349,55 @@ func TestCompareDigestWithRemote_HeadRejectedFallsBackToGet(t *testing.T) {
 	assert.Equal(t, remote, remoteDigest)
 }
 
-// TestCompareDigestWithRemote_LocalOnly404 is a regression test for locally built
-// images (e.g. atlas-badgerdb) that have non-empty registry-less RepoDigests.
-// A HEAD 404 must be treated as up-to-date with no error so callers skip the pull
-// without logging "Digest retrieval failed, falling back to full pull".
-func TestCompareDigestWithRemote_LocalOnly404(t *testing.T) {
+// TestCompareDigestWithRemote_MirrorRefusalIsNotLocalOnly verifies that a
+// mirror's refusal of a single-component name does not make the image
+// local-only.
+//
+// The next endpoint serves the manifest, so the image matches and is probed
+// again on the next check.
+func TestCompareDigestWithRemote_MirrorRefusalIsNotLocalOnly(t *testing.T) {
 	clearLocalOnlyImageCache()
 	t.Cleanup(clearLocalOnlyImageCache)
 
-	// A GET fallback after the 404 would be unhandled and fail the test.
+	const manifestPath = "/v2/library/atlas-badgerdb/manifests/latest"
+
+	mirror := httpstub.New(t)
+	registry := httpstub.New(t)
+
+	for range 2 {
+		mirror.AppendHandlers(refusedProbeHandlers(t, manifestPath)...)
+		registry.AppendHandlers(
+			anonymousRegistryHandler(t),
+			manifestHandler(t, http.MethodHead, manifestPath, http.StatusOK, digestHeader(testLocalDigest)),
+		)
+	}
+
+	for range 2 {
+		match, remoteDigest, err := CompareDigestWithRemote(newTestLogger(t), context.Background(),
+			newLocalOnlyContainer(""), "", registryConfig.Registry{TLSSkip: true}, ratelimit.New(),
+			mirror.Addr(), registry.Addr())
+		require.NoError(t, err)
+		assert.True(t, match)
+		assert.Equal(t, testLocalDigest, remoteDigest)
+	}
+
+	assert.Len(t, mirror.ReceivedRequests(), 4, "the refused image was cached as local-only")
+	assert.Len(t, registry.ReceivedRequests(), 4)
+}
+
+// TestCompareDigestWithRemote_LocalOnlyRefused is a regression test for
+// locally built images (e.g. atlas-badgerdb) that have non-empty registry-less
+// RepoDigests.
+//
+// A registry that refuses the repository leaves the image up to date with no
+// error. Callers then skip the pull without logging "Digest retrieval failed,
+// falling back to full pull".
+func TestCompareDigestWithRemote_LocalOnlyRefused(t *testing.T) {
+	clearLocalOnlyImageCache()
+	t.Cleanup(clearLocalOnlyImageCache)
+
 	server := httpstub.New(t)
-	server.AppendHandlers(
-		anonymousRegistryHandler(t),
-		manifestHandler(t, http.MethodHead, "/v2/library/atlas-badgerdb/manifests/latest", http.StatusNotFound, nil),
-	)
+	server.AppendHandlers(refusedProbeHandlers(t, "/v2/library/atlas-badgerdb/manifests/latest")...)
 
 	match, remoteDigest, err := CompareDigestWithRemote(newTestLogger(t), context.Background(),
 		newLocalOnlyContainer(""), "", registryConfig.Registry{TLSSkip: true}, ratelimit.New(), server.Addr())
@@ -1254,18 +1407,92 @@ func TestCompareDigestWithRemote_LocalOnly404(t *testing.T) {
 	assert.Len(t, server.ReceivedRequests(), 2)
 }
 
-// TestIsLocalImageNotFound verifies that only a manifest 404 for a
+// TestCompareDigestWithRemote_FailedProbeIsNotLocalOnly verifies that a probe
+// that fails without a refused scope fails the check of an official Docker
+// Hub image, whose repo digest names no registry host as a local build's does.
+//
+// The next check probes the image again. A 404 means the repository exists
+// without the tag. A 401 for a token the registry does not accept, such as an
+// expired one, says nothing about the repository.
+func TestCompareDigestWithRemote_FailedProbeIsNotLocalOnly(t *testing.T) {
+	const manifestPath = "/v2/library/nginx/manifests/latest"
+
+	rejected := unauthorizedChallenge("invalid_token")
+
+	tests := []struct {
+		name string
+		// probe returns the registry's handlers for one check.
+		probe   func(t *testing.T) []http.HandlerFunc
+		wantErr error
+		// wantRequests is the number of requests two checks send.
+		wantRequests int
+	}{
+		{
+			name: "missing tag",
+			probe: func(t *testing.T) []http.HandlerFunc {
+				t.Helper()
+
+				return []http.HandlerFunc{
+					anonymousRegistryHandler(t),
+					manifestHandler(t, http.MethodHead, manifestPath, http.StatusNotFound, nil),
+				}
+			},
+			wantErr:      errManifestNotFound,
+			wantRequests: 4,
+		},
+		{
+			name: "rejected token",
+			probe: func(t *testing.T) []http.HandlerFunc {
+				t.Helper()
+
+				return []http.HandlerFunc{
+					anonymousRegistryHandler(t),
+					manifestHandler(t, http.MethodHead, manifestPath, http.StatusUnauthorized, rejected),
+					anonymousRegistryHandler(t),
+					manifestHandler(t, http.MethodGet, manifestPath, http.StatusUnauthorized, rejected),
+				}
+			},
+			wantErr:      errInvalidRegistryResponse,
+			wantRequests: 8,
+		},
+	}
+
+	// The subtests share the local-only cache, so they run one at a time.
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			clearLocalOnlyImageCache()
+			t.Cleanup(clearLocalOnlyImageCache)
+
+			server := httpstub.New(t)
+			server.AppendHandlers(tt.probe(t)...)
+			server.AppendHandlers(tt.probe(t)...)
+
+			container := newRegistryContainer("nginx:latest", "nginx@"+testLocalDigest)
+
+			for range 2 {
+				match, _, err := CompareDigestWithRemote(newTestLogger(t), context.Background(),
+					container, "", registryConfig.Registry{TLSSkip: true}, ratelimit.New(), server.Addr())
+				require.ErrorIs(t, err, tt.wantErr)
+				assert.False(t, match)
+			}
+
+			assert.Len(t, server.ReceivedRequests(), tt.wantRequests, "a failed probe was cached instead of repeated")
+		})
+	}
+}
+
+// TestIsRefusedLocalImage verifies that only a registry's refusal of a
 // single-component image name without registry-qualified repo digests marks
 // the image local-only.
 //
-// The 404 is recognized through any wrapping. Other errors never mark an image
-// local-only.
-func TestIsLocalImageNotFound(t *testing.T) {
+// The refusal is recognized through any wrapping. A 404 and other errors never
+// mark an image local-only.
+func TestIsRefusedLocalImage(t *testing.T) {
 	t.Parallel()
 
-	const digestSuffix = "@sha256:80f07677bee57274a48929d0688bf0cfabe5e83f06f2f152dab4076445d6ab35"
+	const digestSuffix = "@" + testLocalDigest
 
-	notFound := fmt.Errorf("%w: status 404 Not Found", errManifestNotFound)
+	denied := fmt.Errorf("%w: status 401 Unauthorized", errRepositoryDenied)
 
 	tests := []struct {
 		name      string
@@ -1274,49 +1501,60 @@ func TestIsLocalImageNotFound(t *testing.T) {
 		want      bool
 	}{
 		{
-			name:      "true for a single-component name behind a double-wrapped manifest 404",
+			name:      "true for a single-component name behind a wrapped refusal",
 			container: newRegistryContainer("atlas-badgerdb", "atlas-badgerdb"+digestSuffix),
-			err:       fmt.Errorf("%w: %w: status 404 Not Found", errManifestNotFound, errInvalidRegistryResponse),
+			err:       fmt.Errorf("manifest retry: %w", denied),
 			want:      true,
 		},
 		{
 			name:      "true for a single-component name with a dotted version tag",
 			container: newRegistryContainer("my-app:1.0", "my-app"+digestSuffix),
-			err:       notFound,
+			err:       denied,
 			want:      true,
 		},
 		{
 			name:      "true for a single-component name containing a dot",
 			container: newRegistryContainer("my.app:latest", "my.app"+digestSuffix),
-			err:       notFound,
+			err:       denied,
 			want:      true,
 		},
 		{
 			// Docker records an official Hub image's repo digest without a
-			// registry host, as it does for a local build. The image name and
-			// repo digests cannot tell the two apart, so a 404 for a pulled
-			// nginx image marks it local-only.
-			name:      "true for an official Hub short name with a host-less repo digest",
+			// registry host, as it does for a local build. Docker Hub answers a
+			// missing tag of a repository it has with 404.
+			name:      "false for a manifest 404 of an official Hub short name",
 			container: newRegistryContainer("nginx:latest", "nginx"+digestSuffix),
-			err:       notFound,
-			want:      true,
+			err:       fmt.Errorf("%w: %w: status 404 Not Found", errManifestNotFound, errInvalidRegistryResponse),
 		},
 		{
 			name:      "false for an image name with a registry domain",
 			container: newRegistryContainer("registry.example.com/app:latest"),
-			err:       notFound,
+			err:       denied,
 		},
 		{
 			// A container without image data has unknown repo digests.
 			name:      "false for a container whose image could not be inspected",
 			container: modelfixture.ContainerWithoutImageInfo(containerfixture.WithImageName("atlas-badgerdb")),
-			err:       notFound,
+			err:       denied,
+		},
+		{
+			// The image was retagged locally after a pull from a registry on
+			// this machine.
+			name:      "false for a single-component name whose repo digests name localhost",
+			container: newRegistryContainer("app:latest", "localhost/app"+digestSuffix),
+			err:       denied,
+		},
+		{
+			// Docker counts an uppercase first component as a registry host.
+			name:      "false for a single-component name whose repo digests name an uppercase host",
+			container: newRegistryContainer("app:latest", "Registry/app"+digestSuffix),
+			err:       denied,
 		},
 		{
 			// The image was retagged locally after a pull from ghcr.io.
 			name:      "false for a single-component name whose repo digests name a registry host",
 			container: newRegistryContainer("app:latest", "ghcr.io/foo/app"+digestSuffix),
-			err:       notFound,
+			err:       denied,
 		},
 		{
 			// Zodiac runs the container from the image ID and records the Docker
@@ -1327,7 +1565,7 @@ func TestIsLocalImageNotFound(t *testing.T) {
 				containerfixture.WithRepoDigests([]string{"myorg/app" + digestSuffix}),
 				containerfixture.WithLabels(map[string]string{labels.ZodiacOriginalImage: "myorg/app:latest"}),
 			),
-			err: notFound,
+			err: denied,
 		},
 		{
 			name:      "false for non-manifest errors",
@@ -1340,7 +1578,7 @@ func TestIsLocalImageNotFound(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 
-			assert.Equal(t, tt.want, isLocalImageNotFound(tt.container, tt.err))
+			assert.Equal(t, tt.want, isRefusedLocalImage(tt.container, tt.err))
 		})
 	}
 }
@@ -1357,7 +1595,7 @@ func TestLocalOnlyImageCache(t *testing.T) {
 	t.Cleanup(clearLocalOnlyImageCache)
 
 	const (
-		imageID      = "sha256:80f07677bee57274a48929d0688bf0cfabe5e83f06f2f152dab4076445d6ab35"
+		imageID      = testLocalDigest
 		manifestPath = "/v2/library/atlas-badgerdb/manifests/latest"
 		// retaggedPath is the manifest of the same image under another name.
 		retaggedPath = "/v2/library/atlas-badgerdb-dev/manifests/latest"
@@ -1365,17 +1603,12 @@ func TestLocalOnlyImageCache(t *testing.T) {
 
 	settings := registryConfig.Registry{TLSSkip: true}
 
-	// The registry answers three probes: the first comparison, the retagged
+	// The registry refuses three probes: the first comparison, the retagged
 	// image's and the rebuilt image's. A cached comparison must not reach it.
 	server := httpstub.New(t)
-	server.AppendHandlers(
-		anonymousRegistryHandler(t),
-		manifestHandler(t, http.MethodHead, manifestPath, http.StatusNotFound, nil),
-		anonymousRegistryHandler(t),
-		manifestHandler(t, http.MethodHead, retaggedPath, http.StatusNotFound, nil),
-		anonymousRegistryHandler(t),
-		manifestHandler(t, http.MethodHead, manifestPath, http.StatusNotFound, nil),
-	)
+	server.AppendHandlers(refusedProbeHandlers(t, manifestPath)...)
+	server.AppendHandlers(refusedProbeHandlers(t, retaggedPath)...)
+	server.AppendHandlers(refusedProbeHandlers(t, manifestPath)...)
 
 	// compare compares the container with the registry and expects a match.
 	compare := func(container types.Container) {
@@ -1650,12 +1883,7 @@ func TestFetchDigestWithGet_RedirectedChallenge(t *testing.T) {
 	redirectServer := httpstub.New(t)
 
 	server.AppendHandlers(
-		httpstub.CombineHandlers(
-			httpstub.VerifyRequest(t, http.MethodGet, httpstub.Path("/v2/")),
-			httpstub.RespondWith(http.StatusFound, "", http.Header{
-				"Location": {fmt.Sprintf("http://%s/v2/", redirectServer.Addr())},
-			}),
-		),
+		challengeRedirectHandler(t, redirectServer.Addr()),
 	)
 	redirectServer.AppendHandlers(
 		append(bearerChallengeHandlers(t, redirectServer.Addr(), "repository:test/image:pull"),
@@ -1809,14 +2037,14 @@ func TestHandleManifestResponse(t *testing.T) {
 		setupResponse  func() *http.Response
 		method         string
 		originalHost   string
-		challengeHost  string
 		redirected     bool
 		parsedURL      *url.URL
-		currentHost    string
 		expectedDigest string
 		expectedURL    string
 		expectedRetry  bool
 		wantErr        bool
+		// wantErrIs, when set, is the error the response must produce.
+		wantErrIs error
 	}{
 		{
 			name:   "successful HEAD 200 without digest header returns error",
@@ -1830,12 +2058,10 @@ func TestHandleManifestResponse(t *testing.T) {
 					Request:    &http.Request{URL: mustParseURL("https://registry.example.com/v2/manifests/latest")},
 				}
 			},
-			originalHost:  "registry.example.com",
-			challengeHost: "",
-			redirected:    false,
-			parsedURL:     mustParseURL("https://registry.example.com/v2/manifests/latest"),
-			currentHost:   "registry.example.com",
-			wantErr:       true,
+			originalHost: "registry.example.com",
+			redirected:   false,
+			parsedURL:    mustParseURL("https://registry.example.com/v2/manifests/latest"),
+			wantErr:      true,
 		},
 		{
 			name:   "successful GET 200 returns digest from header",
@@ -1850,10 +2076,8 @@ func TestHandleManifestResponse(t *testing.T) {
 				}
 			},
 			originalHost:   "registry.example.com",
-			challengeHost:  "",
 			redirected:     false,
 			parsedURL:      mustParseURL("https://registry.example.com/v2/manifests/latest"),
-			currentHost:    "registry.example.com",
 			expectedDigest: "abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890",
 			expectedURL:    "",
 			expectedRetry:  false,
@@ -1871,12 +2095,10 @@ func TestHandleManifestResponse(t *testing.T) {
 					Request:    &http.Request{URL: mustParseURL("https://registry.example.com/v2/manifests/latest")},
 				}
 			},
-			originalHost:  "registry.example.com",
-			challengeHost: "",
-			redirected:    false,
-			parsedURL:     mustParseURL("https://registry.example.com/v2/manifests/latest"),
-			currentHost:   "registry.example.com",
-			wantErr:       true,
+			originalHost: "registry.example.com",
+			redirected:   false,
+			parsedURL:    mustParseURL("https://registry.example.com/v2/manifests/latest"),
+			wantErr:      true,
 		},
 		{
 			name:   "GET 404 returns error without retry",
@@ -1890,15 +2112,13 @@ func TestHandleManifestResponse(t *testing.T) {
 					Request:    &http.Request{URL: mustParseURL("https://registry.example.com/v2/manifests/latest")},
 				}
 			},
-			originalHost:  "registry.example.com",
-			challengeHost: "",
-			redirected:    false,
-			parsedURL:     mustParseURL("https://registry.example.com/v2/manifests/latest"),
-			currentHost:   "registry.example.com",
-			wantErr:       true,
+			originalHost: "registry.example.com",
+			redirected:   false,
+			parsedURL:    mustParseURL("https://registry.example.com/v2/manifests/latest"),
+			wantErr:      true,
 		},
 		{
-			name:   "non-redirected HEAD 401 retries on challenge host",
+			name:   "HEAD 401 returns an empty digest for GET fallback",
 			method: http.MethodHead,
 			setupResponse: func() *http.Response {
 				return &http.Response{
@@ -1910,12 +2130,9 @@ func TestHandleManifestResponse(t *testing.T) {
 				}
 			},
 			originalHost:  "registry.example.com",
-			challengeHost: "ghcr.io",
 			redirected:    false,
 			parsedURL:     mustParseURL("https://registry.example.com/v2/manifests/latest"),
-			currentHost:   "registry.example.com",
-			expectedURL:   "https://ghcr.io/v2/manifests/latest",
-			expectedRetry: true,
+			expectedRetry: false,
 			wantErr:       false,
 		},
 		{
@@ -1931,10 +2148,8 @@ func TestHandleManifestResponse(t *testing.T) {
 				}
 			},
 			originalHost:  "registry.example.com",
-			challengeHost: "",
 			redirected:    false,
 			parsedURL:     mustParseURL("https://registry.example.com/v2/manifests/latest"),
-			currentHost:   "registry.example.com",
 			expectedURL:   "https://new-registry.example.com/v2/manifests/latest",
 			expectedRetry: true,
 			wantErr:       false,
@@ -1953,7 +2168,6 @@ func TestHandleManifestResponse(t *testing.T) {
 			},
 			originalHost:  "registry.example.com",
 			parsedURL:     mustParseURL("https://registry.example.com/v2/manifests/latest"),
-			currentHost:   "registry.example.com",
 			expectedURL:   "https://registry.example.com/v2/mirror/manifests/latest?sig=abc",
 			expectedRetry: true,
 		},
@@ -1971,7 +2185,6 @@ func TestHandleManifestResponse(t *testing.T) {
 			},
 			originalHost: "registry.example.com",
 			parsedURL:    mustParseURL("https://registry.example.com/v2/manifests/latest"),
-			currentHost:  "registry.example.com",
 			wantErr:      true,
 		},
 		{
@@ -1987,13 +2200,63 @@ func TestHandleManifestResponse(t *testing.T) {
 				}
 			},
 			originalHost:  "registry.example.com",
-			challengeHost: "",
 			redirected:    true,
-			parsedURL:     mustParseURL("https://registry.example.com/v2/manifests/latest"),
-			currentHost:   "redirect.example.com",
+			parsedURL:     mustParseURL("https://redirect.example.com/v2/manifests/latest"),
 			expectedURL:   "https://registry.example.com/v2/manifests/latest",
 			expectedRetry: true,
 			wantErr:       false,
+		},
+		{
+			name:   "refused HEAD returns a refusal without GET fallback",
+			method: http.MethodHead,
+			setupResponse: func() *http.Response {
+				return &http.Response{
+					StatusCode: http.StatusUnauthorized,
+					Status:     "401 Unauthorized",
+					Header:     unauthorizedChallenge("insufficient_scope"),
+					Body:       http.NoBody,
+					Request:    &http.Request{URL: mustParseURL("https://registry.example.com/v2/manifests/latest")},
+				}
+			},
+			originalHost: "registry.example.com",
+			parsedURL:    mustParseURL("https://registry.example.com/v2/manifests/latest"),
+			wantErr:      true,
+			wantErrIs:    errRepositoryDenied,
+		},
+		{
+			name:   "refused GET returns a refusal",
+			method: http.MethodGet,
+			setupResponse: func() *http.Response {
+				return &http.Response{
+					StatusCode: http.StatusUnauthorized,
+					Status:     "401 Unauthorized",
+					Header:     unauthorizedChallenge("insufficient_scope"),
+					Body:       http.NoBody,
+					Request:    &http.Request{URL: mustParseURL("https://registry.example.com/v2/manifests/latest")},
+				}
+			},
+			originalHost: "registry.example.com",
+			parsedURL:    mustParseURL("https://registry.example.com/v2/manifests/latest"),
+			wantErr:      true,
+			wantErrIs:    errRepositoryDenied,
+		},
+		{
+			name:   "refused HEAD on redirected host retries on original host",
+			method: http.MethodHead,
+			setupResponse: func() *http.Response {
+				return &http.Response{
+					StatusCode: http.StatusUnauthorized,
+					Status:     "401 Unauthorized",
+					Header:     unauthorizedChallenge("insufficient_scope"),
+					Body:       http.NoBody,
+					Request:    &http.Request{URL: mustParseURL("https://redirect.example.com/v2/manifests/latest")},
+				}
+			},
+			originalHost:  "registry.example.com",
+			redirected:    true,
+			parsedURL:     mustParseURL("https://redirect.example.com/v2/manifests/latest"),
+			expectedURL:   "https://registry.example.com/v2/manifests/latest",
+			expectedRetry: true,
 		},
 		{
 			// The mirror's token belongs to the mirror, and the endpoint list
@@ -2009,12 +2272,10 @@ func TestHandleManifestResponse(t *testing.T) {
 					Request:    &http.Request{URL: mustParseURL("https://mirror.example.com/v2/manifests/latest")},
 				}
 			},
-			originalHost:  "registry.example.com",
-			challengeHost: "",
-			redirected:    false,
-			parsedURL:     mustParseURL("https://mirror.example.com/v2/manifests/latest"),
-			currentHost:   "mirror.example.com",
-			wantErr:       true,
+			originalHost: "registry.example.com",
+			redirected:   false,
+			parsedURL:    mustParseURL("https://mirror.example.com/v2/manifests/latest"),
+			wantErr:      true,
 		},
 		{
 			name:   "HEAD 429 returns rate-limit error without GET fallback",
@@ -2030,12 +2291,10 @@ func TestHandleManifestResponse(t *testing.T) {
 					Request: &http.Request{URL: mustParseURL("https://ghcr.io/v2/linuxserver/nginx/manifests/latest")},
 				}
 			},
-			originalHost:  "ghcr.io",
-			challengeHost: "",
-			redirected:    false,
-			parsedURL:     mustParseURL("https://ghcr.io/v2/linuxserver/nginx/manifests/latest"),
-			currentHost:   "ghcr.io",
-			wantErr:       true,
+			originalHost: "ghcr.io",
+			redirected:   false,
+			parsedURL:    mustParseURL("https://ghcr.io/v2/linuxserver/nginx/manifests/latest"),
+			wantErr:      true,
 		},
 		{
 			name:   "GET 429 returns rate-limit error",
@@ -2051,12 +2310,10 @@ func TestHandleManifestResponse(t *testing.T) {
 					Request: &http.Request{URL: mustParseURL("https://ghcr.io/v2/linuxserver/nginx/manifests/latest")},
 				}
 			},
-			originalHost:  "ghcr.io",
-			challengeHost: "",
-			redirected:    false,
-			parsedURL:     mustParseURL("https://ghcr.io/v2/linuxserver/nginx/manifests/latest"),
-			currentHost:   "ghcr.io",
-			wantErr:       true,
+			originalHost: "ghcr.io",
+			redirected:   false,
+			parsedURL:    mustParseURL("https://ghcr.io/v2/linuxserver/nginx/manifests/latest"),
+			wantErr:      true,
 		},
 	}
 
@@ -2072,16 +2329,18 @@ func TestHandleManifestResponse(t *testing.T) {
 			gotDigest, gotURL, gotRetry, err := handleManifestResponse(newTestLogger(t), resp,
 				tt.method,
 				tt.originalHost,
-				tt.challengeHost,
 				tt.redirected,
 				tt.parsedURL,
-				tt.currentHost,
 			)
 			if tt.wantErr {
 				require.Error(t, err)
 
 				if resp.StatusCode == http.StatusTooManyRequests {
 					require.ErrorIs(t, err, ratelimit.ErrRateLimited)
+				}
+
+				if tt.wantErrIs != nil {
+					require.ErrorIs(t, err, tt.wantErrIs)
 				}
 
 				return
@@ -2735,8 +2994,6 @@ func TestRetryManifestRequest(t *testing.T) {
 		wantErrContains string
 		// wantErrNotContains, when set, is text the error must not contain.
 		wantErrNotContains string
-		// challengeHost is the token host. Empty means ghcr.io.
-		challengeHost string
 		// currentURL is the URL the retry runs on. Empty means the original host.
 		currentURL string
 		// redirected reports that the retry runs on the host the registry's
@@ -2853,14 +3110,6 @@ func TestRetryManifestRequest(t *testing.T) {
 			wantErrNotContains: "sig=secret",
 		},
 		{
-			name:          "returns an empty digest when the HEAD retry on a same-host token host asks again",
-			method:        http.MethodHead,
-			updatedURL:    "https://registry.example.com/v2/manifests/latest",
-			challengeHost: "registry.example.com",
-			setupClient:   unauthorizedManifestClient,
-			expected:      "",
-		},
-		{
 			name:       "returns an empty digest for a failed HEAD so the caller falls back to GET",
 			method:     http.MethodHead,
 			updatedURL: "https://registry.example.com/v2/manifests/latest",
@@ -2887,7 +3136,6 @@ func TestRetryManifestRequest(t *testing.T) {
 
 			client := tt.setupClient(t)
 
-			challengeHost := cmp.Or(tt.challengeHost, "ghcr.io")
 			currentURL := cmp.Or(tt.currentURL, "https://registry.example.com/v2/manifests/latest")
 
 			got, err := retryManifestRequest(newTestLogger(t), context.Background(),
@@ -2895,7 +3143,6 @@ func TestRetryManifestRequest(t *testing.T) {
 				tt.updatedURL,
 				tt.token,
 				"registry.example.com",
-				challengeHost,
 				tt.redirected,
 				mustParseURL(currentURL),
 				"",
