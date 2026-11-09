@@ -581,11 +581,6 @@ func update(
 				)
 			}
 
-			// Track old image ID before update for cleanup notifications.
-			if shouldUpdate {
-				filteredContainers[task.index].SetOldImageID(sourceContainer.ImageID())
-			}
-
 			// Update the container's stale status for dependency sorting.
 			// Only mark as stale if the container should actually be updated.
 			filteredContainers[task.index].SetStale(stale && shouldUpdate && checkErr == nil && verifyErr == nil)

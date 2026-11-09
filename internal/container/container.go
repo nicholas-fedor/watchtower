@@ -27,15 +27,12 @@ type Container struct {
 	// log is the process logger for the container's messages. Logger returns a
 	// no-op logger when it is nil.
 	log *zerolog.Logger
-	// OldImageID is the image ID the container ran before its update.
-	OldImageID types.ImageID
 	// normalizedName is the container name without its leading slash.
 	normalizedName string
 	// imageName is the image reference with its tag. It is resolved when the
 	// container is built and replaced by SetImageName.
 	imageName string
-	// mu guards containerInfo, imageName, OldImageID, LinkedToRestarting and
-	// Stale.
+	// mu guards containerInfo, imageName, LinkedToRestarting and Stale.
 	mu sync.RWMutex
 	// LinkedToRestarting reports whether the container restarts because a
 	// container it depends on restarts.
@@ -86,7 +83,6 @@ func NewContainer(
 	c := &Container{
 		LinkedToRestarting: false,
 		Stale:              false,
-		OldImageID:         "",
 		normalizedName:     NormalizeContainerName(name),
 		containerInfo:      containerInfo,
 		imageInfo:          imageInfo,
@@ -145,17 +141,6 @@ func (c *Container) SetStale(value bool) {
 	defer c.mu.Unlock()
 
 	c.Stale = value
-}
-
-// SetOldImageID sets the old image ID for cleanup tracking.
-//
-// Parameters:
-//   - id: The old image ID.
-func (c *Container) SetOldImageID(id types.ImageID) {
-	c.mu.Lock()
-	defer c.mu.Unlock()
-
-	c.OldImageID = id
 }
 
 // ToRestart determines if the container should be restarted.
