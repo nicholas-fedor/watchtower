@@ -9,6 +9,7 @@ import (
 	composeApply "github.com/nicholas-fedor/watchtower/internal/compose/apply"
 	composeProject "github.com/nicholas-fedor/watchtower/internal/compose/project"
 	"github.com/nicholas-fedor/watchtower/internal/container"
+	"github.com/nicholas-fedor/watchtower/internal/container/oci"
 	"github.com/nicholas-fedor/watchtower/internal/container/provenance"
 	"github.com/nicholas-fedor/watchtower/internal/git"
 	"github.com/nicholas-fedor/watchtower/internal/git/project"
@@ -131,6 +132,10 @@ func (s *Session) PrepareRebuilds(
 
 		result, _ := s.result(c.ID())
 
+		if s.reuseUnrestartedBuild(log, c, result, params, progress) {
+			continue
+		}
+
 		ref, err := composeProject.ResolveProjectDir(containerLabels(c), params.ComposeProjects)
 		if err != nil {
 			c.SetStale(false)
@@ -175,6 +180,16 @@ func (s *Session) PrepareRebuilds(
 				c, params, result.Tag, result.Commit).
 				Msg(logging.GitBuildFailed)
 		}
+	}
+
+	// No-restart leaves these containers running with their old stamp. Record
+	// each image with its commit so a later session reuses it.
+	if params.NoRestart {
+		s.mu.Lock()
+		for id, image := range s.built {
+			s.client.RecordUnrestartedBuild(id, s.results[id].Commit, image)
+		}
+		s.mu.Unlock()
 	}
 }
 
@@ -353,4 +368,93 @@ func (s *Session) needsApply(c *container.Container, params updateParams.Params)
 	}
 
 	return !c.IsNoPull(params.Policy) && !c.IsMonitorOnly(params.Policy)
+}
+
+// reuseUnrestartedBuild records an image an earlier session built from the
+// same commit, when the no-restart configuration option left the container
+// running.
+//
+// The running container keeps its old stamp. Every check finds it stale for
+// that commit until it is recreated. Reusing the image keeps it stale in the
+// report and out of the restart phase without building the commit again.
+//
+// Parameters:
+//   - log: Process logger.
+//   - c: Stale associated container.
+//   - result: The container's Git check result.
+//   - params: Update parameters.
+//   - progress: Session progress, or nil.
+//
+// Returns:
+//   - bool: True when an earlier image was reused and no build is needed.
+func (s *Session) reuseUnrestartedBuild(
+	log *zerolog.Logger,
+	c *container.Container,
+	result git.CheckResult,
+	params updateParams.Params,
+	progress *state.Progress,
+) bool {
+	if !params.NoRestart {
+		return false
+	}
+
+	image := s.client.UnrestartedBuild(c.ID(), result.Commit)
+	if image == "" {
+		return false
+	}
+
+	s.mu.Lock()
+	s.built[c.ID()] = image
+	s.mu.Unlock()
+
+	log.Debug().
+		Str("container", c.Name()).
+		Str("commit", shortGitSHA(result.Commit)).
+		Str("image_id", image.ShortID()).
+		Msg("Image for this commit was already built. Recreate the container to use it")
+
+	// The changelog line was logged when the image was built. Logging it again
+	// would repeat the notification every session.
+	reportGitImage(log, progress, c, image, result, params)
+
+	return true
+}
+
+// reportGitImage records an image built from Git as the container's latest
+// image in the session report, with its repository, ref, and changelog.
+//
+// A Git build has no pulled image, so no image annotations are passed and the
+// latest image version stays empty. The Git tag is the only new version.
+//
+// Parameters:
+//   - log: Process logger.
+//   - progress: Session progress, or nil.
+//   - c: Container the image was built for.
+//   - image: Image the build produced, or empty when it is unknown.
+//   - result: The container's Git check result.
+//   - params: Update parameters.
+//
+// Returns:
+//   - provenance.ReportMeta: The report details, or the zero value when
+//     progress is nil.
+func reportGitImage(
+	log *zerolog.Logger,
+	progress *state.Progress,
+	c *container.Container,
+	image container.ImageID,
+	result git.CheckResult,
+	params updateParams.Params,
+) provenance.ReportMeta {
+	if progress == nil {
+		return provenance.ReportMeta{}
+	}
+
+	if image != "" {
+		progress.SetLatestImage(log, c.ID(), image)
+	}
+
+	return progress.SetLatestImageMeta(log, c, params, provenance.ChangelogVars{
+		Tag:    result.Tag,
+		Commit: result.Commit,
+	}, oci.Annotations{})
 }
