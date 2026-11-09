@@ -77,7 +77,7 @@ func TestRunUpdatesWithNotifications_ScanCompletedCounts(t *testing.T) {
 		)
 	}
 
-	client := mockUpdate.CreateMockClient(
+	client := mockUpdate.CreateFakeClient(
 		&mockUpdate.TestData{
 			Containers: []*container.Container{
 				cycleMember("cycle-a", "cycle-b"),
@@ -169,7 +169,7 @@ func TestRunUpdatesWithNotifications_PassedDeadlineStillRuns(t *testing.T) {
 
 	metric := RunUpdatesWithNotifications(ctx, RunUpdatesWithNotificationsParams{
 		Logger: newTestLogger(t),
-		Client: mockUpdate.CreateMockClient(&mockUpdate.TestData{}, false, false),
+		Client: mockUpdate.CreateFakeClient(&mockUpdate.TestData{}, false, false),
 		Update: defaultTestUpdateParams(filters.NoFilter),
 	})
 
@@ -306,7 +306,7 @@ func TestRunUpdates(t *testing.T) {
 			t.Run("should not start notification batching", func(t *testing.T) {
 				t.Parallel()
 
-				client := mockUpdate.CreateMockClient(
+				client := mockUpdate.CreateFakeClient(
 					&mockUpdate.TestData{
 						Containers: []*container.Container{
 							mockUpdate.CreateMockContainer(
@@ -344,7 +344,7 @@ func TestRunUpdates(t *testing.T) {
 			t.Run("should handle notification split by container", func(t *testing.T) {
 				t.Parallel()
 
-				client := mockUpdate.CreateMockClient(
+				client := mockUpdate.CreateFakeClient(
 					&mockUpdate.TestData{
 						Containers: []*container.Container{
 							mockUpdate.CreateMockContainerWithConfig(
@@ -389,7 +389,7 @@ func TestRunUpdates(t *testing.T) {
 			t.Run("should return zero metric when container list is empty", func(t *testing.T) {
 				t.Parallel()
 
-				client := mockUpdate.CreateMockClient(
+				client := mockUpdate.CreateFakeClient(
 					&mockUpdate.TestData{
 						Containers: []*container.Container{},
 						Staleness:  map[string]bool{},
@@ -449,7 +449,7 @@ func TestRunUpdates(t *testing.T) {
 					watchtowerConfig,
 				)
 
-				client := mockUpdate.CreateMockClient(
+				client := mockUpdate.CreateFakeClient(
 					&mockUpdate.TestData{
 						Containers: []*container.Container{container1, container2},
 						Staleness: map[string]bool{
@@ -490,7 +490,7 @@ func TestRunUpdates(t *testing.T) {
 		t.Run("should execute update and return results", func(t *testing.T) {
 			t.Parallel()
 
-			client := mockUpdate.CreateMockClient(
+			client := mockUpdate.CreateFakeClient(
 				&mockUpdate.TestData{
 					Containers: []*container.Container{
 						mockUpdate.CreateMockContainer(
@@ -677,7 +677,7 @@ func TestRunUpdates(t *testing.T) {
 		t.Run("should return empty slice when cleanup is disabled", func(t *testing.T) {
 			t.Parallel()
 
-			client := mockUpdate.CreateMockClient(&mockUpdate.TestData{}, false, false)
+			client := mockUpdate.CreateFakeClient(&mockUpdate.TestData{}, false, false)
 			cleanedImages := performImageCleanup(newTestLogger(t), t.Context(), client, false, []cleanup.RemovedImageInfo{}, time.Minute)
 			assert.Empty(t, cleanedImages)
 		})
@@ -685,7 +685,7 @@ func TestRunUpdates(t *testing.T) {
 		t.Run("should perform cleanup when cleanup is enabled", func(t *testing.T) {
 			t.Parallel()
 
-			client := mockUpdate.CreateMockClient(&mockUpdate.TestData{}, false, false)
+			client := mockUpdate.CreateFakeClient(&mockUpdate.TestData{}, false, false)
 			cleanedImages := performImageCleanup(newTestLogger(t), t.Context(), client, true, []cleanup.RemovedImageInfo{
 				{
 					ContainerName: "test-container",
@@ -701,7 +701,7 @@ func TestRunUpdates(t *testing.T) {
 		t.Run("should return a valid slice when cleanup input is empty", func(t *testing.T) {
 			t.Parallel()
 
-			client := mockUpdate.CreateMockClient(&mockUpdate.TestData{}, false, false)
+			client := mockUpdate.CreateFakeClient(&mockUpdate.TestData{}, false, false)
 			cleanedImages := performImageCleanup(newTestLogger(t), t.Context(), client, true, []cleanup.RemovedImageInfo{}, time.Minute)
 			// Should return a valid slice even with empty input
 			require.NotNil(t, cleanedImages)
@@ -710,7 +710,7 @@ func TestRunUpdates(t *testing.T) {
 		t.Run("should still remove images when the parent context is already canceled", func(t *testing.T) {
 			t.Parallel()
 
-			client := mockUpdate.CreateMockClient(&mockUpdate.TestData{}, false, false)
+			client := mockUpdate.CreateFakeClient(&mockUpdate.TestData{}, false, false)
 			ctx, cancel := context.WithCancel(t.Context())
 			cancel()
 
@@ -838,9 +838,9 @@ func TestRunUpdates(t *testing.T) {
 				},
 			}
 
-			// Create mock clients for each scope
-			clientA := mockUpdate.CreateMockClient(testDataA, false, false)
-			clientB := mockUpdate.CreateMockClient(testDataB, false, false)
+			// Create a fake client for each scope
+			clientA := mockUpdate.CreateFakeClient(testDataA, false, false)
+			clientB := mockUpdate.CreateFakeClient(testDataB, false, false)
 
 			// Results channel to collect metrics from concurrent operations
 			results := make(chan *metrics.Metric, 2)
@@ -961,8 +961,8 @@ func TestRunUpdates(t *testing.T) {
 				},
 			}
 
-			client1 := mockUpdate.CreateMockClient(testData1, false, false)
-			client2 := mockUpdate.CreateMockClient(testData2, false, false)
+			client1 := mockUpdate.CreateFakeClient(testData1, false, false)
+			client2 := mockUpdate.CreateFakeClient(testData2, false, false)
 
 			var wg sync.WaitGroup
 
@@ -1065,8 +1065,8 @@ func TestRunUpdates(t *testing.T) {
 				},
 			}
 
-			clientA := mockUpdate.CreateMockClient(testDataA, false, false)
-			clientB := mockUpdate.CreateMockClient(testDataB, false, false)
+			clientA := mockUpdate.CreateFakeClient(testDataA, false, false)
+			clientB := mockUpdate.CreateFakeClient(testDataB, false, false)
 
 			var wg sync.WaitGroup
 
@@ -1193,8 +1193,8 @@ func TestRunUpdates(t *testing.T) {
 				},
 			}
 
-			clientProd := mockUpdate.CreateMockClient(testDataProd, false, false)
-			clientDev := mockUpdate.CreateMockClient(testDataDev, false, false)
+			clientProd := mockUpdate.CreateFakeClient(testDataProd, false, false)
+			clientDev := mockUpdate.CreateFakeClient(testDataDev, false, false)
 
 			results := make(chan map[string]int, 2)
 
@@ -1322,7 +1322,7 @@ func TestRunUpdates(t *testing.T) {
 					StopContainerFailCount: 2, // Fail both containers
 				}
 
-				client := mockUpdate.CreateMockClient(testData, false, false)
+				client := mockUpdate.CreateFakeClient(testData, false, false)
 
 				params := RunUpdatesWithNotificationsParams{
 					Logger:                       newTestLogger(t),
@@ -1400,8 +1400,8 @@ func TestRunUpdates(t *testing.T) {
 					// scope-b cleanup succeeds
 				}
 
-				clientA := mockUpdate.CreateMockClient(testDataA, false, false)
-				clientB := mockUpdate.CreateMockClient(testDataB, false, false)
+				clientA := mockUpdate.CreateFakeClient(testDataA, false, false)
+				clientB := mockUpdate.CreateFakeClient(testDataB, false, false)
 
 				// Run scope-a operation (cleanup should fail)
 				updateA := defaultTestUpdateParams(
@@ -1522,8 +1522,8 @@ func TestRunUpdates(t *testing.T) {
 					// scope-y succeeds
 				}
 
-				clientX := mockUpdate.CreateMockClient(testDataX, false, false)
-				clientY := mockUpdate.CreateMockClient(testDataY, false, false)
+				clientX := mockUpdate.CreateFakeClient(testDataX, false, false)
+				clientY := mockUpdate.CreateFakeClient(testDataY, false, false)
 
 				// Run concurrent operations
 				var wg sync.WaitGroup

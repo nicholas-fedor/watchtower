@@ -83,7 +83,7 @@ func TestUpdateAction_Cleanup(t *testing.T) {
 			t.Run("should collect one entry per container for deferred cleanup", func(t *testing.T) {
 				t.Parallel()
 
-				client := mockUpdate.CreateMockClient(getCommonTestData(), false, false)
+				client := mockUpdate.CreateFakeClient(getCommonTestData(), false, false)
 				client.TestData.Staleness = map[string]bool{
 					"test-container-01": true,
 					"test-container-02": true,
@@ -121,7 +121,7 @@ func TestUpdateAction_Cleanup(t *testing.T) {
 						time.Now(),
 					),
 				)
-				client := mockUpdate.CreateMockClient(testData, false, false)
+				client := mockUpdate.CreateFakeClient(testData, false, false)
 				client.TestData.Staleness = map[string]bool{
 					"test-container-01":     true,
 					"test-container-02":     true,
@@ -146,7 +146,7 @@ func TestUpdateAction_Cleanup(t *testing.T) {
 			t.Run("should collect only the stale container's image ID", func(t *testing.T) {
 				t.Parallel()
 
-				client := mockUpdate.CreateMockClient(getLinkedTestData(true), false, false)
+				client := mockUpdate.CreateFakeClient(getLinkedTestData(true), false, false)
 				client.TestData.Staleness["test-container-01"] = true
 				report, cleanupImageInfos, err := update(newTestLogger(t), t.Context(), client, updateParams.Params{Cleanup: true}, ratelimit.New())
 
@@ -164,7 +164,7 @@ func TestUpdateAction_Cleanup(t *testing.T) {
 			t.Run("should collect one entry per container for deferred cleanup", func(t *testing.T) {
 				t.Parallel()
 
-				client := mockUpdate.CreateMockClient(getCommonTestData(), false, false)
+				client := mockUpdate.CreateFakeClient(getCommonTestData(), false, false)
 				client.TestData.Staleness = map[string]bool{
 					"test-container-01": true,
 					"test-container-02": true,
@@ -188,7 +188,7 @@ func TestUpdateAction_Cleanup(t *testing.T) {
 			t.Run("should update the stale container and collect its image entry", func(t *testing.T) {
 				t.Parallel()
 
-				client := mockUpdate.CreateMockClient(getLinkedTestData(false), false, false)
+				client := mockUpdate.CreateFakeClient(getLinkedTestData(false), false, false)
 				client.TestData.Staleness["test-container-01"] = true
 				report, cleanupImageInfos, err := update(newTestLogger(t), t.Context(), client, updateParams.Params{Cleanup: true}, ratelimit.New())
 

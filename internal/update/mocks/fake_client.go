@@ -18,14 +18,14 @@ import (
 	"github.com/nicholas-fedor/watchtower/pkg/types"
 )
 
-// MockClient must satisfy the client interface. This mock is hand written
+// FakeClient must satisfy the client interface. This fake is hand written
 // rather than generated, so nothing else would report a missing or renamed
 // method until a test happened to pass it where the interface is required.
-var _ containerClient.Client = MockClient{}
+var _ containerClient.Client = FakeClient{}
 
-// MockClient is a mock implementation of a Watchtower Client for testing purposes.
-// It simulates container operations with configurable behavior defined by TestData.
-type MockClient struct {
+// FakeClient is a fake Watchtower client for testing. It keeps container state
+// across calls, and TestData configures its behavior.
+type FakeClient struct {
 	ctx           context.Context // Context for cancellation simulation
 	TestData      *TestData
 	Stopped       map[string]bool // Track stopped containers by ID.
@@ -33,8 +33,8 @@ type MockClient struct {
 	removeVolumes bool
 }
 
-// TestData holds configuration data for MockClient's test behavior.
-// It defines container states, staleness, and mock operation results.
+// TestData holds configuration data for FakeClient's test behavior.
+// It defines container states, staleness, and fake operation results.
 // Counter fields use atomic.Int32 for thread-safe concurrent access.
 type TestData struct {
 	IsContainerStaleError     error                                          // Error to return from IsContainerStale (for testing).
@@ -110,22 +110,22 @@ func (testdata *TestData) TriedToRemoveImage() bool {
 	return testdata.TriedToRemoveImageCount.Load() > 0
 }
 
-// CreateMockClient constructs a new MockClient instance for testing.
+// CreateFakeClient constructs a new FakeClient instance for testing.
 // It initializes the client with provided test data, pull and volume removal flags,
 // and an empty map for tracking stopped containers.
-func CreateMockClient(data *TestData, pullImages, removeVolumes bool) MockClient {
-	return CreateMockClientWithContext(context.Background(), data, pullImages, removeVolumes)
+func CreateFakeClient(data *TestData, pullImages, removeVolumes bool) FakeClient {
+	return CreateFakeClientWithContext(context.Background(), data, pullImages, removeVolumes)
 }
 
-// CreateMockClientWithContext constructs a new MockClient instance with context for testing.
+// CreateFakeClientWithContext constructs a new FakeClient instance with context for testing.
 // It initializes the client with provided context, test data, pull and volume removal flags,
 // and an empty map for tracking stopped containers.
-func CreateMockClientWithContext(
+func CreateFakeClientWithContext(
 	ctx context.Context,
 	data *TestData,
 	pullImages bool,
 	removeVolumes bool,
-) MockClient {
+) FakeClient {
 	if data.ContainersByID == nil {
 		data.ContainersByID = make(map[container.ContainerID]*container.Container)
 	}
@@ -133,7 +133,7 @@ func CreateMockClientWithContext(
 		data.ContainersByID[c.ID()] = c
 	}
 
-	return MockClient{
+	return FakeClient{
 		TestData:      data,
 		pullImages:    pullImages,
 		removeVolumes: removeVolumes,
@@ -145,7 +145,7 @@ func CreateMockClientWithContext(
 // checkContextCancellation checks both the passed context and client context for cancellation.
 // It simulates latency when SimulatedLatency is configured for testing context cancellation.
 // Returns the cancellation error if either context is done, nil otherwise.
-func (client MockClient) checkContextCancellation(ctx context.Context) error {
+func (client FakeClient) checkContextCancellation(ctx context.Context) error {
 	// Simulate latency for context cancellation testing when configured
 	if client.TestData.SimulatedLatency > 0 {
 		select {
@@ -177,7 +177,7 @@ func (client MockClient) checkContextCancellation(ctx context.Context) error {
 }
 
 // ListContainers returns containers from TestData, optionally filtered.
-func (client MockClient) ListContainers(ctx context.Context, filter ...filters.Filter) ([]*container.Container, error) {
+func (client FakeClient) ListContainers(ctx context.Context, filter ...filters.Filter) ([]*container.Container, error) {
 	client.TestData.ListContainersCount.Add(1)
 
 	if err := client.checkContextCancellation(ctx); err != nil {
@@ -210,7 +210,7 @@ func (client MockClient) ListContainers(ctx context.Context, filter ...filters.F
 // StopContainer simulates stopping a container by marking it in the Stopped map.
 // It records the container's ID as stopped, increments the StopContainerCount,
 // and returns nil for simplicity.
-func (client MockClient) StopContainer(ctx context.Context, c *container.Container, _ time.Duration) error {
+func (client FakeClient) StopContainer(ctx context.Context, c *container.Container, _ time.Duration) error {
 	client.TestData.StopContainerCount.Add(1)
 	client.TestData.recordOperation("StopContainer")
 
@@ -231,7 +231,7 @@ func (client MockClient) StopContainer(ctx context.Context, c *container.Contain
 
 // StopAndRemoveContainer simulates stopping and removing a container by calling StopContainer followed by RemoveContainer.
 // It properly simulates the stop-and-remove operation sequence while respecting error conditions.
-func (client MockClient) StopAndRemoveContainer(ctx context.Context, c *container.Container, timeout time.Duration) error {
+func (client FakeClient) StopAndRemoveContainer(ctx context.Context, c *container.Container, timeout time.Duration) error {
 	client.TestData.StopAndRemoveContainerCount.Add(1)
 	client.TestData.LastStopAndRemoveID = c.ID()
 	client.TestData.StopAndRemoveContainerCtx = ctx
@@ -247,7 +247,7 @@ func (client MockClient) StopAndRemoveContainer(ctx context.Context, c *containe
 
 // IsContainerRunning checks if a container is running based on the Stopped map.
 // It returns true if the container's ID is not marked as stopped, false otherwise.
-func (client MockClient) IsContainerRunning(c *container.Container) bool {
+func (client FakeClient) IsContainerRunning(c *container.Container) bool {
 	return !client.Stopped[string(c.ID())]
 }
 
@@ -257,7 +257,7 @@ func (client MockClient) IsContainerRunning(c *container.Container) bool {
 // Returns the configured CreateContainerError if set.
 // On success it returns a distinct container ID so callers can distinguish the
 // new instance from the source (required for self-update failure cleanup tests).
-func (client MockClient) CreateContainer(ctx context.Context, c *container.Container) (container.ContainerID, error) {
+func (client FakeClient) CreateContainer(ctx context.Context, c *container.Container) (container.ContainerID, error) {
 	client.TestData.CreateContainerCount.Add(1)
 	client.TestData.CreateContainerCtx = ctx
 
@@ -294,7 +294,7 @@ func (client MockClient) CreateContainer(ctx context.Context, c *container.Conta
 // StartContainer simulates starting a container, returning the container's ID.
 // It provides a minimal implementation for testing purposes.
 // Returns the configured StartContainerError if set.
-func (client MockClient) StartContainer(ctx context.Context, c *container.Container) (container.ContainerID, error) {
+func (client FakeClient) StartContainer(ctx context.Context, c *container.Container) (container.ContainerID, error) {
 	client.TestData.StartContainerCount.Add(1)
 	client.TestData.recordOperation("StartContainer")
 	client.TestData.LastStartedContainer = c
@@ -347,7 +347,7 @@ func (client MockClient) StartContainer(ctx context.Context, c *container.Contai
 // StartContainerByID simulates starting a container by its ID directly.
 // It provides a minimal implementation for testing purposes.
 // Returns the configured StartContainerByIDError if set.
-func (client MockClient) StartContainerByID(ctx context.Context, containerID container.ContainerID) error {
+func (client FakeClient) StartContainerByID(ctx context.Context, containerID container.ContainerID) error {
 	client.TestData.StartContainerCount.Add(1)
 	client.TestData.recordOperation("StartContainerByID")
 	client.TestData.StartContainerByIDCtx = ctx
@@ -374,7 +374,7 @@ func (client MockClient) StartContainerByID(ctx context.Context, containerID con
 
 // RenameContainer simulates renaming a container, incrementing the RenameContainerCount.
 // It returns nil to indicate success without modifying any state.
-func (client MockClient) RenameContainer(ctx context.Context, _ *container.Container, newName string) error {
+func (client FakeClient) RenameContainer(ctx context.Context, _ *container.Container, newName string) error {
 	client.TestData.RenameContainerCount.Add(1)
 	client.TestData.LastRenameTarget = newName
 	client.TestData.RenameTargets = append(client.TestData.RenameTargets, newName)
@@ -390,7 +390,7 @@ func (client MockClient) RenameContainer(ctx context.Context, _ *container.Conta
 
 // SetRestartPolicy simulates updating a container's restart policy. It
 // always succeeds.
-func (client MockClient) SetRestartPolicy(
+func (client FakeClient) SetRestartPolicy(
 	ctx context.Context,
 	containerID container.ContainerID,
 	policy dockerContainer.RestartPolicy,
@@ -406,7 +406,7 @@ func (client MockClient) SetRestartPolicy(
 
 // RemoveImageByID increments the count of image removal attempts in TestData.
 // It simulates image cleanup and returns configured error if set or if image ID is in FailedImageIDs, nil otherwise.
-func (client MockClient) RemoveImageByID(ctx context.Context, imageID container.ImageID, _ string) error {
+func (client FakeClient) RemoveImageByID(ctx context.Context, imageID container.ImageID, _ string) error {
 	client.TestData.TriedToRemoveImageCount.Add(1)
 
 	if err := client.checkContextCancellation(ctx); err != nil {
@@ -421,8 +421,8 @@ func (client MockClient) RemoveImageByID(ctx context.Context, imageID container.
 }
 
 // GetContainer returns the container with the specified ID from TestData.
-// It provides a mock response for testing container retrieval.
-func (client MockClient) GetContainer(ctx context.Context, containerID container.ContainerID) (*container.Container, error) {
+// It provides a fake response for testing container retrieval.
+func (client FakeClient) GetContainer(ctx context.Context, containerID container.ContainerID) (*container.Container, error) {
 	client.TestData.GetContainerCtx = ctx
 	client.TestData.recordOperation("GetContainer")
 
@@ -434,19 +434,19 @@ func (client MockClient) GetContainer(ctx context.Context, containerID container
 }
 
 // GetCurrentWatchtowerContainer returns the container with the specified ID from TestData with imageInfo set to nil.
-// It provides a mock response for testing current Watchtower container retrieval.
-func (client MockClient) GetCurrentWatchtowerContainer(_ context.Context, containerID container.ContainerID) (*container.Container, error) {
+// It provides a fake response for testing current Watchtower container retrieval.
+func (client FakeClient) GetCurrentWatchtowerContainer(_ context.Context, containerID container.ContainerID) (*container.Container, error) {
 	if c, ok := client.TestData.ContainersByID[containerID]; ok {
 		// Return a copy with imageInfo nil
-		// Since it's a mock, just return the same container
+		// The fake returns the same container
 		return c, nil
 	}
 	return nil, fmt.Errorf("container not found: %s", containerID)
 }
 
-// GetVersion returns a mock Docker API client version.
+// GetVersion returns a fake Docker API client version.
 // It provides a static version string for testing purposes.
-func (client MockClient) GetVersion() string {
+func (client FakeClient) GetVersion() string {
 	return "1.50"
 }
 
@@ -457,7 +457,7 @@ var errCommandFailed = errors.New("command exited with non-zero code")
 // ExecuteCommand simulates executing a command in a container for testing lifecycle hooks.
 // It returns a SkipUpdate boolean indicating whether to skip the update and an error if the command fails.
 // The method uses predefined command behaviors to mimic real execution outcomes.
-func (client MockClient) ExecuteCommand(
+func (client FakeClient) ExecuteCommand(
 	ctx context.Context,
 	_ *container.Container,
 	command string,
@@ -493,7 +493,7 @@ func (client MockClient) ExecuteCommand(
 // IsContainerStale determines if a container is stale based on TestData's Staleness map.
 // It returns true if the container's name isn't explicitly marked as fresh, along with an empty ImageID and no error.
 // If IsContainerStaleError is set, it returns that error instead.
-func (client MockClient) IsContainerStale(
+func (client FakeClient) IsContainerStale(
 	ctx context.Context,
 	c *container.Container,
 	_ updateConfig.Policy,
@@ -518,7 +518,7 @@ func (client MockClient) IsContainerStale(
 }
 
 // CheckContainerUpdate reports update availability using the same staleness map as IsContainerStale.
-func (client MockClient) CheckContainerUpdate(
+func (client FakeClient) CheckContainerUpdate(
 	ctx context.Context,
 	c *container.Container,
 	policy updateConfig.Policy,
@@ -534,7 +534,7 @@ func (client MockClient) CheckContainerUpdate(
 //
 // Returns:
 //   - oci.Annotations: Configured annotations, or empty when none are set.
-func (client MockClient) GetImageAnnotations(
+func (client FakeClient) GetImageAnnotations(
 	_ context.Context,
 	imageRef string,
 ) oci.Annotations {
@@ -547,7 +547,7 @@ func (client MockClient) GetImageAnnotations(
 
 // WaitForContainerHealthy simulates waiting for a container to become healthy.
 // It increments the count and returns nil to indicate success.
-func (client MockClient) WaitForContainerHealthy(ctx context.Context, _ container.ContainerID, _ time.Duration) error {
+func (client FakeClient) WaitForContainerHealthy(ctx context.Context, _ container.ContainerID, _ time.Duration) error {
 	client.TestData.WaitForContainerHealthyCount.Add(1)
 
 	if err := client.checkContextCancellation(ctx); err != nil {
@@ -559,7 +559,7 @@ func (client MockClient) WaitForContainerHealthy(ctx context.Context, _ containe
 
 // RemoveContainer simulates removing a container.
 // It returns nil to indicate success.
-func (client MockClient) RemoveContainer(ctx context.Context, _ *container.Container) error {
+func (client FakeClient) RemoveContainer(ctx context.Context, _ *container.Container) error {
 	client.TestData.RemoveContainerCount.Add(1)
 	client.TestData.recordOperation("RemoveContainer")
 
@@ -571,9 +571,9 @@ func (client MockClient) RemoveContainer(ctx context.Context, _ *container.Conta
 }
 
 // CreateEphemeralOrchestrator simulates creating an ephemeral orchestrator container.
-// It records the container chain parameter for test verification and returns a mock
+// It records the container chain parameter for test verification and returns a fake
 // container ID for the orchestrator and nil error to indicate success.
-func (client MockClient) CreateEphemeralOrchestrator(
+func (client FakeClient) CreateEphemeralOrchestrator(
 	ctx context.Context,
 	_ *container.Container,
 	_ string,
@@ -590,8 +590,8 @@ func (client MockClient) CreateEphemeralOrchestrator(
 	return container.ContainerID("mock-ephemeral-orchestrator"), nil
 }
 
-// GetImageDiskUsage returns configured mock image usage for testing.
-func (client MockClient) GetImageDiskUsage(ctx context.Context) (types.ImageDiskUsage, error) {
+// GetImageDiskUsage returns the configured image usage for testing.
+func (client FakeClient) GetImageDiskUsage(ctx context.Context) (types.ImageDiskUsage, error) {
 	if client.TestData == nil {
 		return types.ImageDiskUsage{}, nil
 	}
@@ -609,8 +609,8 @@ func (client MockClient) GetImageDiskUsage(ctx context.Context) (types.ImageDisk
 	return client.TestData.ImageDiskUsage, nil
 }
 
-// GetInfo returns mock system information for testing.
-func (client MockClient) GetInfo(ctx context.Context) (types.SystemInfo, error) {
+// GetInfo returns fake system information for testing.
+func (client FakeClient) GetInfo(ctx context.Context) (types.SystemInfo, error) {
 	if err := client.checkContextCancellation(ctx); err != nil {
 		return types.SystemInfo{}, err
 	}
@@ -623,12 +623,12 @@ func (client MockClient) GetInfo(ctx context.Context) (types.SystemInfo, error) 
 }
 
 // Ping returns nil to simulate a healthy Docker daemon.
-func (client MockClient) Ping(ctx context.Context) error {
+func (client FakeClient) Ping(ctx context.Context) error {
 	return client.checkContextCancellation(ctx)
 }
 
 // BuildRemoteImage simulates building an image from a Git URL context.
-func (client MockClient) BuildRemoteImage(ctx context.Context, _, _ string, tags []string) (container.ImageID, error) {
+func (client FakeClient) BuildRemoteImage(ctx context.Context, _, _ string, tags []string) (container.ImageID, error) {
 	if err := client.checkContextCancellation(ctx); err != nil {
 		return "", err
 	}

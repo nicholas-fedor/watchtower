@@ -39,7 +39,7 @@ func TestUpdateAction_ImageReferences(t *testing.T) {
 		t.Run("should process tagged images and update if stale", func(t *testing.T) {
 			t.Parallel()
 
-			client := &mockUpdate.MockClient{
+			client := &mockUpdate.FakeClient{
 				TestData: &mockUpdate.TestData{
 					Containers: []*container.Container{
 						mockUpdate.CreateMockContainer(
@@ -67,7 +67,7 @@ func TestUpdateAction_ImageReferences(t *testing.T) {
 		t.Run("should process untagged images and update if stale", func(t *testing.T) {
 			t.Parallel()
 
-			client := &mockUpdate.MockClient{
+			client := &mockUpdate.FakeClient{
 				TestData: &mockUpdate.TestData{
 					Containers: []*container.Container{
 						mockUpdate.CreateMockContainer(
@@ -95,7 +95,7 @@ func TestUpdateAction_ImageReferences(t *testing.T) {
 		t.Run("should skip pinned containers and not collect image IDs", func(t *testing.T) {
 			t.Parallel()
 
-			client := &mockUpdate.MockClient{
+			client := &mockUpdate.FakeClient{
 				TestData: &mockUpdate.TestData{
 					Containers: []*container.Container{
 						mockUpdate.CreateMockContainer(
@@ -124,7 +124,7 @@ func TestUpdateAction_ImageReferences(t *testing.T) {
 		t.Run("should skip bare sha256-pinned containers and not call IsContainerStale", func(t *testing.T) {
 			t.Parallel()
 
-			client := &mockUpdate.MockClient{
+			client := &mockUpdate.FakeClient{
 				TestData: &mockUpdate.TestData{
 					Containers: []*container.Container{
 						mockUpdate.CreateMockContainer(
@@ -152,7 +152,7 @@ func TestUpdateAction_ImageReferences(t *testing.T) {
 		t.Run("should skip pinned containers with tag and digest and not collect image IDs", func(t *testing.T) {
 			t.Parallel()
 
-			client := &mockUpdate.MockClient{
+			client := &mockUpdate.FakeClient{
 				TestData: &mockUpdate.TestData{
 					Containers: []*container.Container{
 						mockUpdate.CreateMockContainer(
@@ -181,7 +181,7 @@ func TestUpdateAction_ImageReferences(t *testing.T) {
 		t.Run("should process invalid image references with fallback", func(t *testing.T) {
 			t.Parallel()
 
-			client := &mockUpdate.MockClient{
+			client := &mockUpdate.FakeClient{
 				TestData: &mockUpdate.TestData{
 					Containers: []*container.Container{
 						mockUpdate.CreateMockContainer(
@@ -209,7 +209,7 @@ func TestUpdateAction_ImageReferences(t *testing.T) {
 		t.Run("should skip containers with missing Config.Image and imageInfo.ID with error", func(t *testing.T) {
 			t.Parallel()
 
-			client := &mockUpdate.MockClient{
+			client := &mockUpdate.FakeClient{
 				TestData: &mockUpdate.TestData{
 					Containers: []*container.Container{
 						mockUpdate.CreateMockContainerWithImageInfoP(
@@ -244,7 +244,7 @@ func TestUpdateAction_ImageReferences(t *testing.T) {
 		t.Run("should skip containers with invalid fallback image reference", func(t *testing.T) {
 			t.Parallel()
 
-			client := &mockUpdate.MockClient{
+			client := &mockUpdate.FakeClient{
 				TestData: &mockUpdate.TestData{
 					Containers: []*container.Container{
 						mockUpdate.CreateMockContainer(
@@ -276,7 +276,7 @@ func TestUpdateAction_ImageReferences(t *testing.T) {
 		t.Run("should count all parallel staleness failures in the final report", func(t *testing.T) {
 			t.Parallel()
 
-			client := &mockUpdate.MockClient{
+			client := &mockUpdate.FakeClient{
 				TestData: &mockUpdate.TestData{
 					Containers: []*container.Container{
 						mockUpdate.CreateMockContainerWithImageInfoP(
@@ -322,7 +322,7 @@ func TestUpdateAction_ImageReferences(t *testing.T) {
 		t.Run("should count exhausted registry rate limits as failed", func(t *testing.T) {
 			t.Parallel()
 
-			client := &mockUpdate.MockClient{
+			client := &mockUpdate.FakeClient{
 				TestData: &mockUpdate.TestData{
 					Containers: []*container.Container{
 						mockUpdate.CreateMockContainer(
@@ -357,7 +357,7 @@ func TestUpdateAction_ImageReferences(t *testing.T) {
 		t.Run("logs one notifiable warning per rate-limited container", func(t *testing.T) {
 			t.Parallel()
 
-			client := &mockUpdate.MockClient{
+			client := &mockUpdate.FakeClient{
 				TestData: &mockUpdate.TestData{
 					Containers: []*container.Container{
 						mockUpdate.CreateMockContainer(
@@ -407,7 +407,7 @@ func TestUpdateAction_ImageReferences(t *testing.T) {
 		t.Run("leaves a long Retry-After to the retry loop's warning", func(t *testing.T) {
 			t.Parallel()
 
-			client := &mockUpdate.MockClient{
+			client := &mockUpdate.FakeClient{
 				TestData: &mockUpdate.TestData{
 					Containers: []*container.Container{
 						mockUpdate.CreateMockContainer(

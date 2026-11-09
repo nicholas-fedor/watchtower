@@ -107,7 +107,7 @@ func TestUpdateAction_Restarts(t *testing.T) {
 		t.Run("should restart stale Watchtower containers even if stop is skipped", func(t *testing.T) {
 			t.Parallel()
 
-			client := mockUpdate.CreateMockClient(
+			client := mockUpdate.CreateFakeClient(
 				&mockUpdate.TestData{
 					Containers: []*container.Container{
 						mockUpdate.CreateMockContainerWithConfig(
@@ -198,7 +198,7 @@ func TestUpdateAction_Restarts(t *testing.T) {
 				},
 			)
 
-			client := mockUpdate.CreateMockClient(
+			client := mockUpdate.CreateFakeClient(
 				&mockUpdate.TestData{
 					Containers: []*container.Container{
 						baseContainer,
@@ -281,7 +281,7 @@ func TestUpdateAction_Restarts(t *testing.T) {
 				},
 			)
 
-			client := mockUpdate.CreateMockClient(
+			client := mockUpdate.CreateFakeClient(
 				&mockUpdate.TestData{
 					Containers: []*container.Container{
 						updatedContainer,
@@ -352,7 +352,7 @@ func TestUpdateAction_Restarts(t *testing.T) {
 				},
 			)
 
-			client := mockUpdate.CreateMockClient(
+			client := mockUpdate.CreateFakeClient(
 				&mockUpdate.TestData{
 					Containers: []*container.Container{updatedContainer, restartedContainer},
 					Staleness: map[string]bool{
@@ -410,7 +410,7 @@ func TestUpdateAction_Restarts(t *testing.T) {
 				},
 			)
 
-			client := mockUpdate.CreateMockClient(
+			client := mockUpdate.CreateFakeClient(
 				&mockUpdate.TestData{
 					Containers: []*container.Container{updatedContainer, restartedContainer},
 					Staleness: map[string]bool{
@@ -469,7 +469,7 @@ func TestUpdateAction_Restarts(t *testing.T) {
 				},
 			)
 
-			client := mockUpdate.CreateMockClient(
+			client := mockUpdate.CreateFakeClient(
 				&mockUpdate.TestData{
 					Containers: []*container.Container{dependency, dependent},
 					Staleness: map[string]bool{
@@ -536,7 +536,7 @@ func TestUpdateAction_Restarts(t *testing.T) {
 				},
 			)
 
-			client := mockUpdate.CreateMockClient(
+			client := mockUpdate.CreateFakeClient(
 				&mockUpdate.TestData{
 					Containers: []*container.Container{containerC, containerB, containerA},
 					Staleness: map[string]bool{
@@ -576,7 +576,7 @@ func TestUpdateAction_Restarts(t *testing.T) {
 
 			standalone.SetLinkedToRestarting(true)
 
-			client := mockUpdate.CreateMockClient(
+			client := mockUpdate.CreateFakeClient(
 				&mockUpdate.TestData{
 					Containers: []*container.Container{standalone},
 					Staleness: map[string]bool{
@@ -1211,7 +1211,7 @@ func TestUpdateAction_Restarts(t *testing.T) {
 					},
 				)
 
-				client := mockUpdate.CreateMockClient(
+				client := mockUpdate.CreateFakeClient(
 					&mockUpdate.TestData{
 						Containers: []*container.Container{staleContainer, restartContainer},
 						Staleness: map[string]bool{
@@ -1271,7 +1271,7 @@ func TestUpdateAction_Restarts(t *testing.T) {
 					)
 				}
 
-				client := mockUpdate.CreateMockClient(
+				client := mockUpdate.CreateFakeClient(
 					&mockUpdate.TestData{
 						Containers: containers,
 					},
@@ -1309,7 +1309,7 @@ func TestUpdateAction_Restarts(t *testing.T) {
 				// Create multiple containers that would need rolling restart
 				testData := createStaleContainersForTest()
 
-				client := mockUpdate.CreateMockClient(
+				client := mockUpdate.CreateFakeClient(
 					testData,
 					false,
 					false,
@@ -1337,7 +1337,7 @@ func TestUpdateAction_Restarts(t *testing.T) {
 				// Create multiple containers - all stale so they all go through rolling restart
 				testData := createStaleContainersForTest()
 
-				client := mockUpdate.CreateMockClient(
+				client := mockUpdate.CreateFakeClient(
 					testData,
 					false,
 					false,
@@ -1414,7 +1414,7 @@ func TestUpdateAction_Restarts(t *testing.T) {
 					},
 				)
 
-				client := mockUpdate.CreateMockClient(
+				client := mockUpdate.CreateFakeClient(
 					&mockUpdate.TestData{
 						Containers: []*container.Container{containerA, containerB, containerC},
 						Staleness: map[string]bool{
@@ -1492,7 +1492,7 @@ func TestUpdateAction_Restarts(t *testing.T) {
 					},
 				)
 
-				client := mockUpdate.CreateMockClient(
+				client := mockUpdate.CreateFakeClient(
 					&mockUpdate.TestData{
 						Containers: []*container.Container{
 							staleContainer,

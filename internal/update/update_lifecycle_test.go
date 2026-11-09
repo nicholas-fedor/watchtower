@@ -38,7 +38,7 @@ func TestUpdateAction_LifecycleHooks(t *testing.T) {
 			t.Run("should not update those containers and collect no image IDs", func(t *testing.T) {
 				t.Parallel()
 
-				client := mockUpdate.CreateMockClient(
+				client := mockUpdate.CreateFakeClient(
 					&mockUpdate.TestData{
 						Containers: []*container.Container{
 							mockUpdate.CreateMockContainerWithConfig(
@@ -82,7 +82,7 @@ func TestUpdateAction_LifecycleHooks(t *testing.T) {
 			t.Run("should pass UID and GID to lifecycle hook execution", func(t *testing.T) {
 				t.Parallel()
 
-				client := mockUpdate.CreateMockClient(
+				client := mockUpdate.CreateFakeClient(
 					&mockUpdate.TestData{
 						Containers: []*container.Container{
 							mockUpdate.CreateMockContainerWithConfig(
@@ -132,7 +132,7 @@ func TestUpdateAction_LifecycleHooks(t *testing.T) {
 			t.Run("should skip those containers and collect no image IDs", func(t *testing.T) {
 				t.Parallel()
 
-				client := mockUpdate.CreateMockClient(
+				client := mockUpdate.CreateFakeClient(
 					&mockUpdate.TestData{
 						Containers: []*container.Container{
 							mockUpdate.CreateMockContainerWithConfig(
@@ -178,7 +178,7 @@ func TestUpdateAction_LifecycleHooks(t *testing.T) {
 			t.Run("should update those containers and collect image IDs", func(t *testing.T) {
 				t.Parallel()
 
-				client := mockUpdate.CreateMockClient(
+				client := mockUpdate.CreateFakeClient(
 					&mockUpdate.TestData{
 						Containers: []*container.Container{
 							mockUpdate.CreateMockContainerWithConfig(
@@ -225,7 +225,7 @@ func TestUpdateAction_LifecycleHooks(t *testing.T) {
 			t.Run("should skip running preupdate and collect image IDs", func(t *testing.T) {
 				t.Parallel()
 
-				client := mockUpdate.CreateMockClient(
+				client := mockUpdate.CreateFakeClient(
 					&mockUpdate.TestData{
 						Containers: []*container.Container{
 							mockUpdate.CreateMockContainerWithConfig(
@@ -272,7 +272,7 @@ func TestUpdateAction_LifecycleHooks(t *testing.T) {
 			t.Run("should skip running preupdate and collect image IDs", func(t *testing.T) {
 				t.Parallel()
 
-				client := mockUpdate.CreateMockClient(
+				client := mockUpdate.CreateFakeClient(
 					&mockUpdate.TestData{
 						Containers: []*container.Container{
 							mockUpdate.CreateMockContainerWithConfig(

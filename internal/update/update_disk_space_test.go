@@ -25,7 +25,7 @@ func TestImageDiskSpaceGate(t *testing.T) {
 	t.Run("skips the check when both thresholds are unset", func(t *testing.T) {
 		t.Parallel()
 
-		client := mockUpdate.CreateMockClient(&mockUpdate.TestData{}, false, false)
+		client := mockUpdate.CreateFakeClient(&mockUpdate.TestData{}, false, false)
 
 		_, _, err := update(
 			newTestLogger(t),
@@ -42,7 +42,7 @@ func TestImageDiskSpaceGate(t *testing.T) {
 	t.Run("continues when usage is below the warning threshold", func(t *testing.T) {
 		t.Parallel()
 
-		client := mockUpdate.CreateMockClient(&mockUpdate.TestData{
+		client := mockUpdate.CreateFakeClient(&mockUpdate.TestData{
 			ImageDiskUsage: types.ImageDiskUsage{TotalSize: 1_000, TotalCount: 1},
 		}, false, false)
 
@@ -59,7 +59,7 @@ func TestImageDiskSpaceGate(t *testing.T) {
 	t.Run("warns and continues when usage reaches the warning threshold", func(t *testing.T) {
 		t.Parallel()
 
-		client := mockUpdate.CreateMockClient(&mockUpdate.TestData{
+		client := mockUpdate.CreateFakeClient(&mockUpdate.TestData{
 			ImageDiskUsage: types.ImageDiskUsage{TotalSize: 8_000, TotalCount: 2},
 		}, false, false)
 
@@ -78,7 +78,7 @@ func TestImageDiskSpaceGate(t *testing.T) {
 	t.Run("allows warn-only mode without blocking", func(t *testing.T) {
 		t.Parallel()
 
-		client := mockUpdate.CreateMockClient(&mockUpdate.TestData{
+		client := mockUpdate.CreateFakeClient(&mockUpdate.TestData{
 			ImageDiskUsage: types.ImageDiskUsage{TotalSize: 50_000, TotalCount: 3},
 		}, false, false)
 
@@ -96,7 +96,7 @@ func TestImageDiskSpaceGate(t *testing.T) {
 	t.Run("blocks the session when usage reaches the maximum", func(t *testing.T) {
 		t.Parallel()
 
-		client := mockUpdate.CreateMockClient(&mockUpdate.TestData{
+		client := mockUpdate.CreateFakeClient(&mockUpdate.TestData{
 			ImageDiskUsage: types.ImageDiskUsage{
 				TotalSize:   10_000,
 				Reclaimable: 2_000,
@@ -116,7 +116,7 @@ func TestImageDiskSpaceGate(t *testing.T) {
 	t.Run("fails closed when image disk usage cannot be queried", func(t *testing.T) {
 		t.Parallel()
 
-		client := mockUpdate.CreateMockClient(&mockUpdate.TestData{
+		client := mockUpdate.CreateFakeClient(&mockUpdate.TestData{
 			GetImageDiskUsageError: errors.New("df unavailable"),
 		}, false, false)
 
@@ -175,7 +175,7 @@ func TestRunUpdatesWithNotifications_DiskSpaceAbortNotifiesOnce(t *testing.T) {
 
 			metric := RunUpdatesWithNotifications(t.Context(), RunUpdatesWithNotificationsParams{
 				Logger:   log,
-				Client:   mockUpdate.CreateMockClient(tt.data, false, false),
+				Client:   mockUpdate.CreateFakeClient(tt.data, false, false),
 				Notifier: notifier,
 				Update:   params,
 			})
