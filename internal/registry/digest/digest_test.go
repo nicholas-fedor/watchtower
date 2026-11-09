@@ -1350,7 +1350,15 @@ func TestTokenService_SeparatesTestsSharingATokenURL(t *testing.T) {
 		})
 	}
 
-	assert.Len(t, tokenHost.ReceivedRequests(), 2, "a test reused another test's cached token")
+	requests := tokenHost.ReceivedRequests()
+	require.Len(t, requests, 2, "a test reused another test's cached token")
+
+	first := requests[0].URL.Query().Get("service")
+	second := requests[1].URL.Query().Get("service")
+
+	assert.NotEmpty(t, first)
+	assert.NotEmpty(t, second)
+	assert.NotEqual(t, first, second, "both tests sent the same token service")
 }
 
 // TestCompareDigestWithRemote_UnauthorizedIsError verifies that a registry
