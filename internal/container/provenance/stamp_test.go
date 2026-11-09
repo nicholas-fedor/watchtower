@@ -93,6 +93,19 @@ func TestImageRevision(t *testing.T) {
 		assert.Empty(t, tag)
 	})
 
+	t.Run("git shortsha in another tag of the image", func(t *testing.T) {
+		t.Parallel()
+
+		c := modelfixture.Container(
+			containerfixture.WithImageName("app:latest"),
+			containerfixture.WithRepoTags([]string{"app:latest", "app:git-aaa111bbbbcc"}),
+		)
+
+		commit, tag := imageRevision(c)
+		assert.Equal(t, "aaa111bbbbcc", commit)
+		assert.Empty(t, tag)
+	})
+
 	t.Run("ignores non git tags", func(t *testing.T) {
 		t.Parallel()
 
