@@ -14,6 +14,7 @@ import (
 	"sync"
 	"sync/atomic"
 	"testing"
+	"testing/fstest"
 	"testing/synctest"
 	"time"
 
@@ -950,17 +951,52 @@ func TestRun_APIOnlyWritesOneStartupMessage(t *testing.T) {
 }
 
 // TestRun_HealthCheck verifies that the health check mode returns without
-// touching Docker when Watchtower is not the container's main process.
+// touching Docker when Watchtower is not the container's main process, and
+// refuses to run as the main process. A probe started with docker exec on
+// OpenVZ reports parent PID 1, but PID 1 does not list it among its children,
+// so it still runs.
 func TestRun_HealthCheck(t *testing.T) {
-	mockClient := mockCmd.NewMockDockerClient(t)
-	setRunState(t, runTestState{client: mockClient})
+	tests := []struct {
+		name string
+		pid  int
+		ppid int
+		// initChildren is the children list of the container's PID 1.
+		initChildren string
+		wantRefused  bool
+	}{
+		{name: "probe started with docker exec", pid: 8, ppid: 0, initChildren: "7"},
+		{name: "probe started with docker exec on OpenVZ", pid: 8, ppid: 1, initChildren: "7"},
+		{name: "main process under an init", pid: 7, ppid: 1, initChildren: "7", wantRefused: true},
+		{name: "main process as PID 1", pid: 1, ppid: 0, wantRefused: true},
+	}
 
-	// A health check probe runs beside the container's main process.
-	processID = func() int { return 42 }
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			mockClient := mockCmd.NewMockDockerClient(t)
+			setRunState(t, runTestState{client: mockClient})
+			setProcessFs(t, fstest.MapFS{
+				".dockerenv":             &fstest.MapFile{},
+				"proc/1/task/1/children": &fstest.MapFile{Data: []byte(tt.initChildren)},
+			})
 
-	require.NoError(t, newRunProcess().run(newTestRootCommand(t, "--health-check"), nil))
+			processID = func() int { return tt.pid }
+			parentProcessID = func() int { return tt.ppid }
 
-	assert.Empty(t, runCalls(mockClient))
+			err := newRunProcess().run(newTestRootCommand(t, "--health-check"), nil)
+
+			assert.Empty(t, runCalls(mockClient))
+
+			if !tt.wantRefused {
+				require.NoError(t, err)
+
+				return
+			}
+
+			exitErr, ok := errors.AsType[*exitError](err)
+			require.True(t, ok)
+			assert.Equal(t, "The health check flag should never be passed to the main watchtower container process", exitErr.msg)
+		})
+	}
 }
 
 // TestRun_Exit verifies how run ends the process when it cannot continue. It
