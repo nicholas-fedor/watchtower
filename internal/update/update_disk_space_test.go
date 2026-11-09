@@ -8,12 +8,12 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	containerClient "github.com/nicholas-fedor/watchtower/internal/container/client"
 	"github.com/nicholas-fedor/watchtower/internal/container/filters"
 	"github.com/nicholas-fedor/watchtower/internal/observability/logging"
 	"github.com/nicholas-fedor/watchtower/internal/registry/ratelimit"
 	"github.com/nicholas-fedor/watchtower/internal/testutil/logcapture"
 	mockUpdate "github.com/nicholas-fedor/watchtower/internal/update/mocks"
-	"github.com/nicholas-fedor/watchtower/pkg/types"
 )
 
 // TestImageDiskSpaceGate verifies that an update warns about image disk usage
@@ -43,7 +43,7 @@ func TestImageDiskSpaceGate(t *testing.T) {
 		t.Parallel()
 
 		client := mockUpdate.CreateFakeClient(&mockUpdate.TestData{
-			ImageDiskUsage: types.ImageDiskUsage{TotalSize: 1_000, TotalCount: 1},
+			ImageDiskUsage: containerClient.ImageDiskUsage{TotalSize: 1_000, TotalCount: 1},
 		}, false, false)
 
 		params := defaultTestUpdateParams(filters.NoFilter)
@@ -60,7 +60,7 @@ func TestImageDiskSpaceGate(t *testing.T) {
 		t.Parallel()
 
 		client := mockUpdate.CreateFakeClient(&mockUpdate.TestData{
-			ImageDiskUsage: types.ImageDiskUsage{TotalSize: 8_000, TotalCount: 2},
+			ImageDiskUsage: containerClient.ImageDiskUsage{TotalSize: 8_000, TotalCount: 2},
 		}, false, false)
 
 		params := defaultTestUpdateParams(filters.NoFilter)
@@ -79,7 +79,7 @@ func TestImageDiskSpaceGate(t *testing.T) {
 		t.Parallel()
 
 		client := mockUpdate.CreateFakeClient(&mockUpdate.TestData{
-			ImageDiskUsage: types.ImageDiskUsage{TotalSize: 50_000, TotalCount: 3},
+			ImageDiskUsage: containerClient.ImageDiskUsage{TotalSize: 50_000, TotalCount: 3},
 		}, false, false)
 
 		params := defaultTestUpdateParams(filters.NoFilter)
@@ -97,7 +97,7 @@ func TestImageDiskSpaceGate(t *testing.T) {
 		t.Parallel()
 
 		client := mockUpdate.CreateFakeClient(&mockUpdate.TestData{
-			ImageDiskUsage: types.ImageDiskUsage{
+			ImageDiskUsage: containerClient.ImageDiskUsage{
 				TotalSize:   10_000,
 				Reclaimable: 2_000,
 				TotalCount:  4,
@@ -148,7 +148,7 @@ func TestRunUpdatesWithNotifications_DiskSpaceAbortNotifiesOnce(t *testing.T) {
 		{
 			name: "usage reaches the maximum",
 			data: &mockUpdate.TestData{
-				ImageDiskUsage: types.ImageDiskUsage{TotalSize: 10_000, Reclaimable: 2_000, TotalCount: 4},
+				ImageDiskUsage: containerClient.ImageDiskUsage{TotalSize: 10_000, Reclaimable: 2_000, TotalCount: 4},
 			},
 			message: logging.ImageUsageExceedsMaximum,
 		},

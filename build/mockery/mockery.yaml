@@ -67,9 +67,6 @@ packages:
   # The command package, whose tests replace the Docker client with a mock of its interface
   github.com/nicholas-fedor/watchtower/cmd: {}
 
-  # Top-level pkg directory, recursively includes all subpackages (e.g., pkg/types)
-  github.com/nicholas-fedor/watchtower/pkg: {}
-
   # Top-level internal directory, recursively includes all subpackages (e.g., internal/update)
   github.com/nicholas-fedor/watchtower/internal: {}
 

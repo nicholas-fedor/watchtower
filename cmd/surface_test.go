@@ -81,7 +81,7 @@ func TestConfigurationSurfaceInventory(t *testing.T) {
 
 	moduleRoot := ".."
 
-	for _, dir := range []string{"cmd", "internal", "pkg"} {
+	for _, dir := range []string{"cmd", "internal"} {
 		err := filepath.WalkDir(filepath.Join(moduleRoot, dir), func(path string, entry fs.DirEntry, err error) error {
 			if err != nil {
 				return err
