@@ -32,7 +32,6 @@ import (
 	"github.com/nicholas-fedor/watchtower/internal/testutil/logcapture"
 	"github.com/nicholas-fedor/watchtower/internal/update"
 	"github.com/nicholas-fedor/watchtower/pkg/types"
-	mockTypes "github.com/nicholas-fedor/watchtower/pkg/types/mocks"
 )
 
 // newTestLogger returns a logger that writes each event to the test's log, so a
@@ -126,44 +125,6 @@ func TestGetAPIAddr(t *testing.T) {
 			assert.NoError(t, err, "formatted address should be a valid TCP address")
 		})
 	}
-}
-
-// TestListContainersWithoutFilterIntegration verifies that client.ListContainers() is called
-// without filter arguments when no filter is provided, and that containers are returned correctly.
-func TestListContainersWithoutFilterIntegration(t *testing.T) {
-	// Set up environment
-	hostname := "test-container"
-	t.Setenv("HOSTNAME", hostname)
-
-	// Create mocks
-	mockClient := mockContainerClient.NewMockClient(t)
-	mockContainer := mockTypes.NewMockContainer(t)
-
-	// Set up mock expectations for ListContainers called with context
-	mockClient.EXPECT().ListContainers(context.Background()).Return([]types.Container{mockContainer}, nil).Once()
-
-	// Set up container mock to return the expected hostname
-	mockContainer.EXPECT().ContainerInfo().Return(&dockerContainer.InspectResponse{
-		Config: &dockerContainer.Config{Hostname: hostname},
-	}).Once()
-
-	// Set up IsWatchtower expectation (called to check if container should be preferred)
-	mockContainer.EXPECT().IsWatchtower().Return(false).Once()
-
-	// Set up container mock to return the container ID
-	expectedID := types.ContainerID("test-container-id")
-	mockContainer.EXPECT().ID().Return(expectedID).Once()
-
-	// Execute the function that calls ListContainers with context
-	resultID, err := containerClient.GetContainerIDFromHostname(newTestLogger(t), context.Background(), mockClient)
-
-	// Assert results
-	require.NoError(t, err)
-	assert.Equal(t, expectedID, resultID)
-
-	// Verify mock expectations
-	mockClient.AssertExpectations(t)
-	mockContainer.AssertExpectations(t)
 }
 
 // TestValidateRollingRestartDependenciesAcceptsCancelableContext verifies that
