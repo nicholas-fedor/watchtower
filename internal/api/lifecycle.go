@@ -217,10 +217,9 @@ func handleUnexpectedServerStop(log *zerolog.Logger, err error, addr string, onU
 // runServer binds the listen socket, serves the Fiber app on it, and either
 // blocks until shutdown or returns once the socket is bound.
 //
-// The server stops when ctx is canceled. runServer shuts the app down and then
-// closes the listener itself, because a shutdown that arrives before the app
-// starts serving is ignored, and only closing the listener stops a server that
-// starts serving afterwards.
+// The server shuts down gracefully when ctx is canceled, waiting up to five
+// seconds for the requests it is serving. A cancellation before the server
+// starts serving stops it too.
 //
 // Parameters:
 //   - ctx: Context for server lifecycle management.
@@ -270,27 +269,13 @@ func runServer(
 		onBound()
 	}
 
-	var serveErr error
-
-	served := make(chan struct{})
-
-	go func() {
-		defer close(served)
-
-		serveErr = app.Listener(listener, fiber.ListenConfig{DisableStartupMessage: true})
-	}()
-
-	stopped := make(chan struct{})
-
-	go func() {
-		defer close(stopped)
-
-		select {
-		case <-ctx.Done():
-			stopServer(log, app, listener)
-		case <-served:
-		}
-	}()
+	// Fiber shuts the app down once ctx is done, also when that happens before
+	// it starts serving. Listener returns only after that shutdown has finished.
+	cfg := fiber.ListenConfig{
+		DisableStartupMessage: true,
+		GracefulContext:       ctx,
+		ShutdownTimeout:       shutdownGracePeriod,
+	}
 
 	if !block {
 		done := make(chan struct{})
@@ -298,18 +283,13 @@ func runServer(
 		go func() {
 			defer close(done)
 
-			<-served
-			handleUnexpectedServerStop(log, serveErr, address, onUnexpectedStop)
-			<-stopped
+			handleUnexpectedServerStop(log, app.Listener(listener, cfg), address, onUnexpectedStop)
 		}()
 
 		return done, nil
 	}
 
-	// Blocking mode: wait until the server stops and any shutdown has drained.
-	<-served
-	<-stopped
-
+	serveErr := app.Listener(listener, cfg)
 	if !isCleanServerStop(serveErr) {
 		log.Error().Err(serveErr).Str("addr", address).
 			Msg("HTTP server failed")
@@ -400,26 +380,4 @@ func listenNetwork(address string) string {
 	}
 
 	return fiber.NetworkTCP
-}
-
-// stopServer shuts the app down and closes its listener.
-//
-// The shutdown drains requests in flight. Closing the listener afterwards
-// stops a server that had not started serving when the shutdown ran, which
-// the shutdown alone ignores.
-//
-// Parameters:
-//   - log: Logger for shutdown errors.
-//   - app: Fiber application to stop.
-//   - listener: The app's listener.
-func stopServer(log *zerolog.Logger, app *fiber.App, listener net.Listener) {
-	err := app.ShutdownWithTimeout(shutdownGracePeriod)
-	if err != nil {
-		log.Debug().Err(err).Msg("HTTP server shutdown did not finish draining")
-	}
-
-	err = listener.Close()
-	if err != nil && !errors.Is(err, net.ErrClosed) {
-		log.Debug().Err(err).Msg("Failed to close the HTTP server listener")
-	}
 }
