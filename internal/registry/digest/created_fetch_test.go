@@ -204,6 +204,27 @@ func TestFetchImageCreationTime_SinglePlatform(t *testing.T) {
 	}, registry.served())
 }
 
+// TestFetchImageCreationTime_DigestReference verifies that an image referenced
+// only by digest has its manifest fetched by that digest, as the digest check
+// does.
+func TestFetchImageCreationTime_DigestReference(t *testing.T) {
+	manifestPath := fakeRepositoryPath + "/manifests/" + fakeRuntimeManifest
+
+	registry := newFakeRegistry(t)
+	registry.handle(manifestPath, singlePlatformManifest(fakeConfigDigest))
+	registry.handle(fakeRepositoryPath+"/blobs/"+fakeConfigDigest, configBlob(testCreatedTimestamp))
+
+	created, err := fetchCreated(t, registry, "library/app@"+fakeRuntimeManifest)
+	require.NoError(t, err)
+	assert.True(t, mustParseTime(t, testCreatedTimestamp).Equal(created))
+
+	assert.Equal(t, []string{
+		"GET /v2/",
+		"GET " + manifestPath,
+		"GET " + fakeRepositoryPath + "/blobs/" + fakeConfigDigest,
+	}, registry.served())
+}
+
 // TestFetchImageCreationTime_PlatformSelection verifies that an image index
 // resolves to the manifest for the runtime platform by default, and to the
 // configured platform when the cooldown platform settings are set.

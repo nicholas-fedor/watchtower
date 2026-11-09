@@ -15,9 +15,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/nicholas-fedor/watchtower/internal/registry/auth"
 	"github.com/nicholas-fedor/watchtower/internal/registry/ratelimit"
-	registryConfig "github.com/nicholas-fedor/watchtower/internal/settings/config/registry"
 	"github.com/nicholas-fedor/watchtower/internal/testutil/httpstub"
 )
 
@@ -481,136 +479,6 @@ func TestIsIndexMediaType(t *testing.T) {
 			assert.Equal(t, tc.expected, got)
 		})
 	}
-}
-
-// --- buildManifestURLForContainer tests ---
-
-func TestBuildManifestURLForContainer(t *testing.T) {
-	t.Parallel()
-
-	tests := []struct {
-		name      string
-		imageName string
-		scheme    string
-		want      string
-		wantErr   bool
-		// errIs is the sentinel the error must wrap, nil to skip the check.
-		errIs error
-	}{
-		{
-			name:      "Docker Hub image with tag",
-			imageName: "alpine:3.19",
-			scheme:    "https",
-			want:      "https://index.docker.io/v2/library/alpine/manifests/3.19",
-		},
-		{
-			name:      "Docker Hub image with HTTPS scheme",
-			imageName: "nginx:latest",
-			scheme:    "https",
-			want:      "https://index.docker.io/v2/library/nginx/manifests/latest",
-		},
-		{
-			name:      "custom registry with tag",
-			imageName: "ghcr.io/owner/repo:v1.0",
-			scheme:    "https",
-			want:      "https://ghcr.io/v2/owner/repo/manifests/v1.0",
-		},
-		{
-			name:      "HTTP scheme",
-			imageName: "alpine:latest",
-			scheme:    "http",
-			want:      "http://index.docker.io/v2/library/alpine/manifests/latest",
-		},
-		{
-			name:      "private registry",
-			imageName: "myregistry.io/myimage:tag",
-			scheme:    "https",
-			want:      "https://myregistry.io/v2/myimage/manifests/tag",
-		},
-		{
-			name:      "invalid image name returns error",
-			imageName: "INVALID UPPER",
-			scheme:    "https",
-			wantErr:   true,
-		},
-		{
-			name:      "image name without a registry host returns error",
-			imageName: "a_b.example.com/repo:tag",
-			scheme:    "https",
-			wantErr:   true,
-			errIs:     auth.ErrMissingRegistryHost,
-		},
-	}
-
-	for _, tc := range tests {
-		t.Run(tc.name, func(t *testing.T) {
-			t.Parallel()
-
-			container := newRegistryContainer(tc.imageName)
-
-			got, err := buildManifestURLForContainer(newTestLogger(t), container, tc.scheme)
-			if tc.wantErr {
-				require.Error(t, err)
-
-				if tc.errIs != nil {
-					require.ErrorIs(t, err, tc.errIs)
-				}
-
-				return
-			}
-
-			require.NoError(t, err)
-			assert.Equal(t, tc.want, got)
-		})
-	}
-}
-
-// --- buildManifestURLForAge tests ---
-
-// TestBuildManifestURLForAge verifies the manifest URL built for an image's
-// creation time lookup: its registry host and path, the scheme the TLS skip
-// setting picks, and the lscr.io images hosted on ghcr.io.
-func TestBuildManifestURLForAge(t *testing.T) {
-	t.Parallel()
-
-	t.Run("standard Docker Hub image", func(t *testing.T) {
-		t.Parallel()
-
-		container := newRegistryContainer("alpine:3.19")
-
-		got, err := buildManifestURLForAge(newTestLogger(t), container, registryConfig.Registry{})
-		require.NoError(t, err)
-
-		assert.Equal(t, "index.docker.io", got.Host)
-		assert.Equal(t, "/v2/library/alpine/manifests/3.19", got.Path)
-	})
-
-	t.Run("scheme follows the TLS skip setting", func(t *testing.T) {
-		t.Parallel()
-
-		container := newRegistryContainer("alpine:3.19")
-
-		secure, err := buildManifestURLForAge(newTestLogger(t), container, registryConfig.Registry{})
-		require.NoError(t, err)
-
-		plain, err := buildManifestURLForAge(newTestLogger(t), container, registryConfig.Registry{TLSSkip: true})
-		require.NoError(t, err)
-
-		assert.Equal(t, "https", secure.Scheme)
-		assert.Equal(t, "http", plain.Scheme)
-	})
-
-	t.Run("lscr.io is swapped to ghcr.io", func(t *testing.T) {
-		t.Parallel()
-
-		container := newRegistryContainer("lscr.io/owner/image:tag")
-
-		got, err := buildManifestURLForAge(newTestLogger(t), container, registryConfig.Registry{})
-		require.NoError(t, err)
-
-		assert.Equal(t, "ghcr.io", got.Host)
-		assert.Equal(t, "/v2/owner/image/manifests/tag", got.Path)
-	})
 }
 
 // --- selectPlatformManifest tests ---

@@ -12,7 +12,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/distribution/reference"
 	"github.com/rs/zerolog"
 
 	"github.com/nicholas-fedor/watchtower/internal/meta"
@@ -38,8 +37,6 @@ var (
 	errNoPlatformMatch = errors.New("no matching platform found in image index")
 	// errAmbiguousPlatformMatch indicates multiple platform entries matched OS/Architecture with differing Variants.
 	errAmbiguousPlatformMatch = errors.New("ambiguous platform match: multiple entries with differing variants")
-	// errMissingTag indicates the image reference does not contain a tag.
-	errMissingTag = errors.New("missing tag in image reference")
 )
 
 // maxConfigSize is the maximum allowed size for a config blob response body
@@ -131,15 +128,12 @@ func FetchImageCreationTime(log *zerolog.Logger,
 	// Use the cached HTTP client for registry requests.
 	client := auth.NewAuthClient(log, settings)
 
-	limitHost, hostErr := auth.GetRegistryAddress(log, container.ImageName())
-	if hostErr != nil || limitHost == "" {
-		log.Debug().
-			Err(hostErr).
-			Fields(fields).
-			Msg("Failed to resolve registry host for rate limiting")
+	_, originalHost, parsedURL, err := buildManifestURL(log, container, settings, "")
+	if err != nil {
+		return time.Time{}, fmt.Errorf("%w: %w", errFetchManifestFailed, err)
 	}
 
-	limitKey, release, holdErr := limiter.HoldAnonymous(ctx, limitHost, registryAuth != "")
+	limitKey, release, holdErr := limiter.HoldAnonymous(ctx, originalHost, registryAuth != "")
 	if holdErr != nil {
 		return time.Time{}, fmt.Errorf("%w: %w", errFetchManifestFailed, holdErr)
 	}
@@ -168,21 +162,10 @@ func FetchImageCreationTime(log *zerolog.Logger,
 
 	token := result.Token
 
-	parsedURL, err := buildManifestURLForAge(log, container, settings)
-	if err != nil {
-		log.Debug().
-			Err(err).
-			Fields(fields).
-			Msg("Failed to build manifest URL")
-
-		return time.Time{}, fmt.Errorf("%w: %w", errFetchManifestFailed, err)
-	}
-
 	// A challenge redirected to another host sends the manifest request there
 	// first, with the original host as the fallback.
-	originalHost := parsedURL.Host
-	if result.RedirectHost != "" && result.RedirectHost != originalHost {
-		parsedURL.Host = result.RedirectHost
+	if redirectHost := challengeRedirectHost(result, originalHost); redirectHost != "" {
+		parsedURL.Host = redirectHost
 	}
 
 	configDigest, manifestURL, err := fetchManifestForAge(log,
@@ -254,41 +237,11 @@ func FetchImageCreationTime(log *zerolog.Logger,
 	return *config.Created, nil
 }
 
-// buildManifestURLForAge constructs the manifest URL for image age checking.
-// It selects the scheme from the TLS settings. The registry host comes from
-// [auth.GetRegistryAddress], which already maps lscr.io to ghcr.io.
-//
-// Parameters:
-//   - container: Container whose image manifest URL to build.
-//   - settings: Registry request settings.
-//
-// Returns:
-//   - *url.URL: The manifest URL on the image's registry host.
-//   - error: Non-nil if URL construction fails.
-func buildManifestURLForAge(log *zerolog.Logger,
-	container types.Container,
-	settings registryConfig.Registry,
-) (*url.URL, error) {
-	scheme := auth.Scheme(settings)
-
-	// Build manifest URL.
-	manifestURLStr, err := buildManifestURLForContainer(log, container, scheme)
-	if err != nil {
-		return nil, fmt.Errorf("%w: %w", errFetchManifestFailed, err)
-	}
-
-	parsedURL, err := url.Parse(manifestURLStr)
-	if err != nil {
-		return nil, fmt.Errorf("%w: failed to parse manifest URL: %w", errFetchManifestFailed, err)
-	}
-
-	return parsedURL, nil
-}
-
 // fetchManifestAcrossHosts fetches manifest bytes from the registry with host-based retry.
 //
-// It requests the manifest from the host in parsedURL. When that host answers
-// 401 or 404 and differs from originalHost, it retries once on originalHost.
+// It requests the manifest from the host in parsedURL. When that host is the
+// one the registry's challenge redirected to and it answers 401 or 404, it
+// retries once on originalHost, as the digest check does.
 //
 // Parameters:
 //   - ctx: Context for cancellation and timeout control.
@@ -296,7 +249,7 @@ func buildManifestURLForAge(log *zerolog.Logger,
 //   - limiter: Rate limiter shared by registry requests.
 //   - parsedURL: Parsed manifest URL, on the redirect host when there is one.
 //   - token: Authentication token for the Authorization header.
-//   - originalHost: The true original registry host before any redirects.
+//   - originalHost: The image registry's host.
 //   - limitKey: Rate-limit host key from [ratelimit.Scope].
 //   - fields: Logging fields for context.
 //
@@ -318,7 +271,7 @@ func fetchManifestAcrossHosts(log *zerolog.Logger,
 		return body, parsedURL, contentType, nil
 	}
 
-	if originalHost == parsedURL.Host || (status != http.StatusUnauthorized && status != http.StatusNotFound) {
+	if !retriesOnOriginalHost(status, parsedURL.Host, originalHost) {
 		return nil, nil, "", err
 	}
 
@@ -421,7 +374,8 @@ func fetchManifest(log *zerolog.Logger,
 // fetchManifestForAge fetches the image manifest and extracts the config digest.
 // It handles multi-platform indexes by selecting the platform-specific manifest.
 //
-// On 401/404 responses from a redirect host, it retries on the original host.
+// On 401/404 responses from the host the registry's challenge redirected to,
+// it retries on the original host.
 //
 // Parameters:
 //   - ctx: Context for cancellation and timeout control.
@@ -432,7 +386,7 @@ func fetchManifest(log *zerolog.Logger,
 //   - targetOS: Target OS for platform selection (empty for runtime.GOOS).
 //   - targetArch: Target architecture for platform selection (empty for runtime.GOARCH).
 //   - targetVariant: Target variant for platform selection (empty for any variant).
-//   - originalHost: The true original registry host before any redirects.
+//   - originalHost: The image registry's host.
 //   - limitKey: Rate-limit host key from [ratelimit.Scope].
 //   - fields: Logging fields for context.
 //
@@ -1053,50 +1007,4 @@ func registryRateLimitError(resp *http.Response) error {
 func isIndexMediaType(mediaType string) bool {
 	return mediaType == "application/vnd.oci.image.index.v1+json" ||
 		mediaType == "application/vnd.docker.distribution.manifest.list.v2+json"
-}
-
-// buildManifestURLForContainer constructs a manifest URL for the given container's image.
-//
-// Parameters:
-//   - container: Container whose image manifest URL to build.
-//   - scheme: URL scheme (http or https).
-//
-// Returns:
-//   - string: The manifest URL.
-//   - error: Non-nil if URL construction fails.
-func buildManifestURLForContainer(log *zerolog.Logger, container types.Container, scheme string) (string, error) {
-	normalizedRef, err := reference.ParseDockerRef(container.ImageName())
-	if err != nil {
-		return "", fmt.Errorf("failed to parse image name: %w", err)
-	}
-
-	normalizedTaggedRef, isTagged := normalizedRef.(reference.NamedTagged)
-	if !isTagged {
-		return "",
-			fmt.Errorf(
-				"%w: %s",
-				errMissingTag,
-				normalizedRef.String(),
-			)
-	}
-
-	host, err := auth.GetRegistryAddress(log, container.ImageName())
-	if err != nil {
-		return "", fmt.Errorf("failed to get registry address for %s: %w", container.ImageName(), err)
-	}
-
-	if host == "" {
-		return "", fmt.Errorf("%w: %s", auth.ErrMissingRegistryHost, container.ImageName())
-	}
-
-	img := reference.Path(normalizedTaggedRef)
-	tag := normalizedTaggedRef.Tag()
-
-	parsedManifestURL := url.URL{
-		Scheme: scheme,
-		Host:   host,
-		Path:   fmt.Sprintf("/v2/%s/manifests/%s", img, tag),
-	}
-
-	return parsedManifestURL.String(), nil
 }
