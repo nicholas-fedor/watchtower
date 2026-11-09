@@ -43,6 +43,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- Move the container filter types into the filters package by @nicholas-fedor in [#3608](https://github.com/nicholas-fedor/watchtower/pull/3608)
 - Move the container and image IDs into the container model by @nicholas-fedor in [#3606](https://github.com/nicholas-fedor/watchtower/pull/3606)
 - Rename container variables that hide the container package by @nicholas-fedor in [#3604](https://github.com/nicholas-fedor/watchtower/pull/3604)
 - Remove the unread OldImageID field by @nicholas-fedor in [#3602](https://github.com/nicholas-fedor/watchtower/pull/3602)
