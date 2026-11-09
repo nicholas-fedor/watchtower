@@ -43,6 +43,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- Rename container variables that hide the container package by @nicholas-fedor in [#3604](https://github.com/nicholas-fedor/watchtower/pull/3604)
 - Remove the unread OldImageID field by @nicholas-fedor in [#3602](https://github.com/nicholas-fedor/watchtower/pull/3602)
 - Use the container model type in place of types.Container by @nicholas-fedor in [#3598](https://github.com/nicholas-fedor/watchtower/pull/3598)
 - Decide startup after replacing an older instance in the scheduler by @nicholas-fedor in [#3571](https://github.com/nicholas-fedor/watchtower/pull/3571)
