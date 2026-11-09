@@ -10,6 +10,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Keep git defaults off compose replacements by @nicholas-fedor in [#3644](https://github.com/nicholas-fedor/watchtower/pull/3644)
 - Share one original-host rule between the digest and age lookups by @nicholas-fedor in [#3591](https://github.com/nicholas-fedor/watchtower/pull/3591)
 - Try every endpoint's HEAD before falling back to GET by @nicholas-fedor in [#3589](https://github.com/nicholas-fedor/watchtower/pull/3589)
 - Stop retrying manifests on the registry's token host by @nicholas-fedor in [#3584](https://github.com/nicholas-fedor/watchtower/pull/3584)
@@ -105,6 +106,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Chores
 
+- Update module github.com/vektra/mockery/v3 to v3.9.1 by @renovate[bot] in [#3645](https://github.com/nicholas-fedor/watchtower/pull/3645)
+- Update module golang.org/x/mod to v0.43.0 by @renovate[bot] in [#3646](https://github.com/nicholas-fedor/watchtower/pull/3646)
 - Update module golang.org/x/text to v0.44.0 by @renovate[bot] in [#3638](https://github.com/nicholas-fedor/watchtower/pull/3638)
 - Update module golang.org/x/term to v0.48.0 by @renovate[bot] in [#3637](https://github.com/nicholas-fedor/watchtower/pull/3637)
 - Update golang.org/x/tools digest to fe60680 by @renovate[bot] in [#3631](https://github.com/nicholas-fedor/watchtower/pull/3631)
