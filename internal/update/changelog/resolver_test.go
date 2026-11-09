@@ -273,6 +273,33 @@ func TestResolveTagCachesDefinitiveMiss(t *testing.T) {
 	assert.Equal(t, []string{"v1.2.3", "1.2.3", "v1.2.3"}, fetcher.calls)
 }
 
+// A lookup that finds an expired answer must not remove a newer answer that a
+// concurrent sweep stored after the lookup read the expired one. The clock is
+// read between that read and the removal, so the test clock stores the newer
+// answer at that point.
+func TestLoadAnswerKeepsNewerAnswer(t *testing.T) {
+	t.Parallel()
+
+	r := NewResolver(nil)
+	start := time.Now()
+
+	r.storeAnswer("key", cachedAnswer{expires: start})
+	r.now = func() time.Time {
+		r.storeAnswer("key", cachedAnswer{tag: "v1.2.3"})
+
+		return start
+	}
+
+	_, ok := r.loadAnswer("key")
+	assert.False(t, ok, "the expired answer must not be returned")
+
+	r.now = time.Now
+
+	got, ok := r.loadAnswer("key")
+	require.True(t, ok, "the newer answer must stay cached")
+	assert.Equal(t, "v1.2.3", got.tag)
+}
+
 // A transient failure must not deny every sibling container its own attempt.
 func TestResolveTagDoesNotCacheTransientFailure(t *testing.T) {
 	t.Parallel()

@@ -530,7 +530,9 @@ func (r *Resolver) loadAnswer(key string) (cachedAnswer, bool) {
 	}
 
 	if !answer.expires.IsZero() && !r.clock()().Before(answer.expires) {
-		r.cache.Delete(key)
+		// A concurrent sweep may have stored a newer answer since the load, so
+		// only the expired answer is removed.
+		r.cache.CompareAndDelete(key, answer)
 
 		return cachedAnswer{}, false
 	}
