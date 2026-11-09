@@ -23,10 +23,10 @@ import (
 
 	dockerContainer "github.com/moby/moby/api/types/container"
 
+	mockCmd "github.com/nicholas-fedor/watchtower/cmd/mocks"
 	"github.com/nicholas-fedor/watchtower/internal/api"
 	"github.com/nicholas-fedor/watchtower/internal/container"
 	containerClient "github.com/nicholas-fedor/watchtower/internal/container/client"
-	mockContainerClient "github.com/nicholas-fedor/watchtower/internal/container/client/mocks"
 	"github.com/nicholas-fedor/watchtower/internal/container/filters"
 	"github.com/nicholas-fedor/watchtower/internal/observability/logging"
 	"github.com/nicholas-fedor/watchtower/internal/settings"
@@ -131,7 +131,7 @@ func TestGetAPIAddr(t *testing.T) {
 // update.ValidateRollingRestartDependencies properly accepts and uses a cancelable context.
 func TestValidateRollingRestartDependenciesAcceptsCancelableContext(t *testing.T) {
 	// Create a mock client
-	mockClient := mockContainerClient.NewMockClient(t)
+	mockClient := mockCmd.NewMockDockerClient(t)
 
 	// Create a filter that accepts all containers
 	filter := filters.Filter(func(_ filters.FilterableContainer) bool { return true })
@@ -412,7 +412,7 @@ func TestContainerLookupWithTimeoutContext(t *testing.T) {
 			t.Setenv("HOSTNAME", "test-hostname")
 
 			// Create a mock client
-			mockClient := mockContainerClient.NewMockClient(t)
+			mockClient := mockCmd.NewMockDockerClient(t)
 
 			// Create a context that's already timed out
 			ctx, cancel := context.WithTimeout(context.Background(), 0)
@@ -447,7 +447,7 @@ func TestContainerLookupWithTimeoutContext(t *testing.T) {
 			t.Setenv("HOSTNAME", "test-hostname")
 
 			// Create a mock client
-			mockClient := mockContainerClient.NewMockClient(t)
+			mockClient := mockCmd.NewMockDockerClient(t)
 
 			ctx, cancel := context.WithCancel(context.Background())
 
@@ -479,7 +479,7 @@ func TestGetCurrentWatchtowerContainerWithTimeout(t *testing.T) {
 	t.Run("DeadlineExceeded error is properly handled", func(t *testing.T) {
 		synctest.Test(t, func(t *testing.T) {
 			// Create a mock client
-			mockClient := mockContainerClient.NewMockClient(t)
+			mockClient := mockCmd.NewMockDockerClient(t)
 
 			// Create a context that's already timed out
 			ctx, cancel := context.WithTimeout(context.Background(), 0)
@@ -512,7 +512,7 @@ func TestGetCurrentWatchtowerContainerWithTimeout(t *testing.T) {
 	t.Run("Canceled context is properly handled", func(t *testing.T) {
 		synctest.Test(t, func(t *testing.T) {
 			// Create a mock client
-			mockClient := mockContainerClient.NewMockClient(t)
+			mockClient := mockCmd.NewMockDockerClient(t)
 
 			ctx, cancel := context.WithCancel(context.Background())
 
@@ -884,7 +884,7 @@ func TestDisableRestarts(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			mockClient := mockContainerClient.NewMockClient(t)
+			mockClient := mockCmd.NewMockDockerClient(t)
 			if tt.wantUpdate {
 				mockClient.EXPECT().SetRestartPolicy(mock.Anything, container.ContainerID("c0c0"),
 					dockerContainer.RestartPolicy{Name: dockerContainer.RestartPolicyDisabled}).

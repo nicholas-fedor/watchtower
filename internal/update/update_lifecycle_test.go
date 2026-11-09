@@ -15,7 +15,6 @@ import (
 	dockerNetwork "github.com/moby/moby/api/types/network"
 
 	"github.com/nicholas-fedor/watchtower/internal/container"
-	mockContainerClient "github.com/nicholas-fedor/watchtower/internal/container/client/mocks"
 	"github.com/nicholas-fedor/watchtower/internal/container/oci"
 	"github.com/nicholas-fedor/watchtower/internal/registry/ratelimit"
 	"github.com/nicholas-fedor/watchtower/internal/update/cleanup"
@@ -331,7 +330,7 @@ func TestUpdate_PreUpdateFailureNamesItOnce(t *testing.T) {
 			app := skipTestContainer("a000000000000000000000000000000000000000000000000000000000000000", "app",
 				map[string]string{"com.centurylinklabs.watchtower.lifecycle.pre-update": "/pre-update.sh"})
 
-			client := mockContainerClient.NewMockClient(t)
+			client := mockUpdate.NewMockClient(t)
 			// The post-check hooks list the containers again after the update.
 			client.EXPECT().ListContainers(mock.Anything, mock.Anything).Return([]*container.Container{app}, nil).Times(2)
 			client.EXPECT().IsContainerStale(mock.Anything, mock.Anything, mock.Anything).

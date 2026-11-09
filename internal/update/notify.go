@@ -10,7 +10,6 @@ import (
 
 	"github.com/rs/zerolog"
 
-	containerClient "github.com/nicholas-fedor/watchtower/internal/container/client"
 	"github.com/nicholas-fedor/watchtower/internal/git"
 	"github.com/nicholas-fedor/watchtower/internal/observability/events"
 	"github.com/nicholas-fedor/watchtower/internal/observability/logging"
@@ -43,7 +42,7 @@ type Notifier interface {
 // process configuration.
 type RunUpdatesWithNotificationsParams struct {
 	// Client is the Docker client for container operations.
-	Client containerClient.Client
+	Client Client
 	// Notifier sends update status messages to configured channels.
 	Notifier Notifier
 	// Logger is the process logger for this update session. Required and must be non-nil.
@@ -395,7 +394,7 @@ func endPanickedSession(
 func executeUpdate(
 	log *zerolog.Logger,
 	ctx context.Context,
-	client containerClient.Client,
+	client Client,
 	config updateParams.Params,
 	rateLimiter *ratelimit.Limiter,
 	gitClient *git.Client,
@@ -430,7 +429,7 @@ func executeUpdate(
 // Returns:
 //   - []cleanup.RemovedImageInfo: Slice of successfully cleaned image info.
 func performImageCleanup(log *zerolog.Logger, ctx context.Context,
-	client containerClient.Client,
+	client Client,
 	enabled bool,
 	cleanupImageInfos []cleanup.RemovedImageInfo,
 	timeout time.Duration,

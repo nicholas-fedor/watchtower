@@ -13,7 +13,14 @@ import (
 	"github.com/rs/zerolog"
 
 	"github.com/nicholas-fedor/watchtower/internal/container"
+	"github.com/nicholas-fedor/watchtower/internal/container/filters"
 )
+
+// ContainerLister lists containers to match Watchtower's hostname against.
+type ContainerLister interface {
+	// ListContainers returns the containers that pass every filter.
+	ListContainers(ctx context.Context, filter ...filters.Filter) ([]*container.Container, error)
+}
 
 // Constants for container ID detection.
 const (
@@ -85,7 +92,7 @@ func GetCurrentContainerID(
 	log *zerolog.Logger,
 	ctx context.Context,
 	fsys fs.FS,
-	client Client,
+	client ContainerLister,
 ) (container.ContainerID, error) {
 	// Collect errors from failed detection attempts for final error reporting
 	var errs []error
@@ -354,7 +361,7 @@ func parseContainerIDFromCgroupString(log *zerolog.Logger, cgroupString string) 
 //   - container.ContainerID: The detected container ID if a match is found.
 //   - error: Non-nil if the HOSTNAME env var is missing, the Docker client's
 //     ListContainers call fails (wrapped and propagated), or no matching container is found.
-func GetContainerIDFromHostname(log *zerolog.Logger, ctx context.Context, client Client) (container.ContainerID, error) {
+func GetContainerIDFromHostname(log *zerolog.Logger, ctx context.Context, client ContainerLister) (container.ContainerID, error) {
 	hostname := os.Getenv("HOSTNAME")
 	if hostname == "" {
 		return "", errContainerIDNotFound

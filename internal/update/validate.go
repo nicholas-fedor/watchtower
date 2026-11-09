@@ -7,9 +7,15 @@ import (
 
 	"github.com/rs/zerolog"
 
-	containerClient "github.com/nicholas-fedor/watchtower/internal/container/client"
+	"github.com/nicholas-fedor/watchtower/internal/container"
 	"github.com/nicholas-fedor/watchtower/internal/container/filters"
 )
+
+// ContainerLister lists the containers the validation checks.
+type ContainerLister interface {
+	// ListContainers returns the containers that pass every filter.
+	ListContainers(ctx context.Context, filter ...filters.Filter) ([]*container.Container, error)
+}
 
 // Errors for validating the update settings.
 var (
@@ -37,7 +43,7 @@ var (
 func ValidateRollingRestartDependencies(
 	log *zerolog.Logger,
 	ctx context.Context,
-	client containerClient.Client,
+	client ContainerLister,
 	filter filters.Filter,
 	useComposeDependsOn bool,
 ) error {

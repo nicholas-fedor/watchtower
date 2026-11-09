@@ -13,7 +13,6 @@ import (
 	"golang.org/x/sync/errgroup"
 
 	"github.com/nicholas-fedor/watchtower/internal/container"
-	containerClient "github.com/nicholas-fedor/watchtower/internal/container/client"
 	"github.com/nicholas-fedor/watchtower/internal/container/filters"
 	"github.com/nicholas-fedor/watchtower/internal/container/hooks"
 	containerImage "github.com/nicholas-fedor/watchtower/internal/container/image"
@@ -23,6 +22,7 @@ import (
 	"github.com/nicholas-fedor/watchtower/internal/git/semver"
 	"github.com/nicholas-fedor/watchtower/internal/observability/logging"
 	"github.com/nicholas-fedor/watchtower/internal/registry/ratelimit"
+	updateConfig "github.com/nicholas-fedor/watchtower/internal/settings/config/update"
 	"github.com/nicholas-fedor/watchtower/internal/update/changelog"
 	"github.com/nicholas-fedor/watchtower/internal/update/cleanup"
 	"github.com/nicholas-fedor/watchtower/internal/update/implicitrestart"
@@ -33,7 +33,31 @@ import (
 	"github.com/nicholas-fedor/watchtower/internal/update/sorter"
 	"github.com/nicholas-fedor/watchtower/internal/update/staleness"
 	"github.com/nicholas-fedor/watchtower/internal/update/state"
+	"github.com/nicholas-fedor/watchtower/pkg/types"
 )
+
+// Client is what an update session needs from the Docker client. It also
+// covers what the session's cleanup, rebuilds, restarts and self-update need.
+type Client interface {
+	ContainerLister
+	cleanup.Client
+	rebuild.ImageBuilder
+	restart.Client
+	selfupdate.RecoveryClient
+
+	// IsContainerStale reports whether the container's image is outdated, with
+	// the latest image ID and registry digest.
+	IsContainerStale(
+		ctx context.Context,
+		target *container.Container,
+		policy updateConfig.Policy,
+	) (bool, container.ImageID, string, error)
+	// GetImageAnnotations returns the OCI annotations of an image, or none
+	// when they cannot be read.
+	GetImageAnnotations(ctx context.Context, imageRef string) oci.Annotations
+	// GetImageDiskUsage returns the daemon's image storage usage.
+	GetImageDiskUsage(ctx context.Context) (types.ImageDiskUsage, error)
+}
 
 // Errors for update operations.
 var (
@@ -84,7 +108,7 @@ var scanProblems logging.ReportedProblems
 func update(
 	log *zerolog.Logger,
 	ctx context.Context,
-	client containerClient.Client,
+	client Client,
 	config updateParams.Params,
 	rateLimiter *ratelimit.Limiter,
 	gitClient ...*git.Client,

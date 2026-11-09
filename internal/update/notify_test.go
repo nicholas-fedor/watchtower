@@ -17,7 +17,6 @@ import (
 	dockerContainer "github.com/moby/moby/api/types/container"
 
 	"github.com/nicholas-fedor/watchtower/internal/container"
-	mockContainerClient "github.com/nicholas-fedor/watchtower/internal/container/client/mocks"
 	"github.com/nicholas-fedor/watchtower/internal/container/filters"
 	"github.com/nicholas-fedor/watchtower/internal/container/labels"
 	"github.com/nicholas-fedor/watchtower/internal/container/provenance"
@@ -146,7 +145,7 @@ func TestRunUpdatesWithNotifications_StoppingProcessMakesNoUpdate(t *testing.T) 
 
 	metric := RunUpdatesWithNotifications(ctx, RunUpdatesWithNotificationsParams{
 		Logger:           newTestLogger(t),
-		Client:           mockContainerClient.NewMockClient(t),
+		Client:           mockUpdate.NewMockClient(t),
 		Notifier:         mockUpdate.NewMockNotifier(t),
 		EventBroadcaster: broadcaster,
 		Update:           defaultTestUpdateParams(filters.NoFilter),
@@ -189,7 +188,7 @@ func TestRunUpdatesWithNotifications_PanicEndsSession(t *testing.T) {
 
 	log, output := logcapture.New(zerolog.DebugLevel)
 
-	client := mockContainerClient.NewMockClient(t)
+	client := mockUpdate.NewMockClient(t)
 	client.EXPECT().ListContainers(mock.Anything, mock.Anything).
 		RunAndReturn(func(context.Context, ...filters.Filter) ([]*container.Container, error) {
 			panic("boom")
