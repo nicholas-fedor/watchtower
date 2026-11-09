@@ -1069,10 +1069,8 @@ func handleManifestResponse(log *zerolog.Logger,
 		return "", "", false, ratelimit.FromResponse(resp, body)
 	}
 
-	// A 401 whose challenge reports insufficient_scope refuses the repository
-	// itself. A GET would be refused too. Any other 401, such as an expired or
-	// invalid token, says nothing about the repository.
-	refused := resp.StatusCode == http.StatusUnauthorized && auth.IsInsufficientScope(resp.Header)
+	// A refused repository would refuse a GET too.
+	refused := auth.IsRepositoryRefusal(resp)
 
 	// Handle non-success responses for HEAD requests by returning empty digest to trigger GET fallback.
 	// A 404 or a refused repository is excluded, since a GET would get the same answer.

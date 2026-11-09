@@ -89,19 +89,28 @@ func parseChallenge(header string) challengeValues {
 	return values
 }
 
-// IsInsufficientScope reports whether a response's Bearer challenge says the
-// token lacks the requested scope, the RFC 6750 insufficient_scope error.
+// IsRepositoryRefusal reports whether a registry response refuses the
+// requested repository.
 //
-// Every WWW-Authenticate header line is checked, since a response can carry a
-// Bearer challenge after another scheme's.
+// A refusal is a 401 whose Bearer challenge reports the RFC 6750
+// insufficient_scope error. Docker Hub answers this way for a repository it
+// does not have, with or without credentials. Any other 401, such as one for
+// an expired or invalid token, says nothing about the repository. Every
+// WWW-Authenticate header line is checked, since a response can carry a Bearer
+// challenge after another scheme's.
 //
 // Parameters:
-//   - header: Response headers holding the WWW-Authenticate challenges.
+//   - resp: Registry response to inspect.
 //
 // Returns:
-//   - bool: True when a Bearer challenge's error is insufficient_scope.
-func IsInsufficientScope(header http.Header) bool {
-	for _, challenge := range header.Values(challengeHeaderName) {
+//   - bool: True when the response is a 401 with an insufficient_scope Bearer
+//     challenge.
+func IsRepositoryRefusal(resp *http.Response) bool {
+	if resp.StatusCode != http.StatusUnauthorized {
+		return false
+	}
+
+	for _, challenge := range resp.Header.Values(challengeHeaderName) {
 		if parseChallenge(challenge).errorCode == "insufficient_scope" {
 			return true
 		}

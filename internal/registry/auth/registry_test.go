@@ -121,13 +121,14 @@ func Test_parseChallenge(t *testing.T) {
 	}
 }
 
-// TestIsInsufficientScope verifies that only a Bearer challenge whose error
-// is insufficient_scope reports a refused scope, as Docker Hub sends for a
-// repository it does not have.
+// TestIsRepositoryRefusal verifies that only a 401 whose Bearer challenge
+// error is insufficient_scope refuses the repository, as Docker Hub answers
+// for a repository it does not have.
 //
-// No other challenge reports one. The cases cover an invalid token, a missing
-// error, a Basic challenge and a missing header.
-func TestIsInsufficientScope(t *testing.T) {
+// No other response is a refusal. The cases cover an invalid token, a missing
+// error, a Basic challenge, a missing header, and insufficient_scope on a 403
+// or a 200.
+func TestIsRepositoryRefusal(t *testing.T) {
 	t.Parallel()
 
 	const realm = `realm="https://auth.docker.io/token",service="registry.docker.io",scope="repository:library/app:pull"`
@@ -135,16 +136,19 @@ func TestIsInsufficientScope(t *testing.T) {
 	tests := []struct {
 		name   string
 		header http.Header
+		status int
 		want   bool
 	}{
 		{
 			name:   "insufficient scope",
+			status: http.StatusUnauthorized,
 			header: http.Header{"Www-Authenticate": {`Bearer ` + realm + `,error="insufficient_scope"`}},
 			want:   true,
 		},
 		{
 			// A response can carry several challenges, one per header line.
-			name: "insufficient scope after a basic challenge",
+			name:   "insufficient scope after a basic challenge",
+			status: http.StatusUnauthorized,
 			header: http.Header{"Www-Authenticate": {
 				`Basic realm="registry"`,
 				`Bearer ` + realm + `,error="insufficient_scope"`,
@@ -153,24 +157,39 @@ func TestIsInsufficientScope(t *testing.T) {
 		},
 		{
 			name:   "unquoted error value",
+			status: http.StatusUnauthorized,
 			header: http.Header{"Www-Authenticate": {`Bearer ` + realm + `,error=insufficient_scope`}},
 			want:   true,
 		},
 		{
 			name:   "invalid token",
+			status: http.StatusUnauthorized,
 			header: http.Header{"Www-Authenticate": {`Bearer ` + realm + `,error="invalid_token"`}},
 		},
 		{
 			name:   "no error",
+			status: http.StatusUnauthorized,
 			header: http.Header{"Www-Authenticate": {`Bearer ` + realm}},
 		},
 		{
 			name:   "basic challenge",
+			status: http.StatusUnauthorized,
 			header: http.Header{"Www-Authenticate": {`Basic realm="registry",error="insufficient_scope"`}},
 		},
 		{
 			name:   "no challenge",
+			status: http.StatusUnauthorized,
 			header: http.Header{},
+		},
+		{
+			name:   "insufficient scope on a 403",
+			status: http.StatusForbidden,
+			header: http.Header{"Www-Authenticate": {`Bearer ` + realm + `,error="insufficient_scope"`}},
+		},
+		{
+			name:   "insufficient scope on a 200",
+			status: http.StatusOK,
+			header: http.Header{"Www-Authenticate": {`Bearer ` + realm + `,error="insufficient_scope"`}},
 		},
 	}
 
@@ -178,7 +197,9 @@ func TestIsInsufficientScope(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 
-			assert.Equal(t, tt.want, IsInsufficientScope(tt.header))
+			resp := &http.Response{StatusCode: tt.status, Header: tt.header}
+
+			assert.Equal(t, tt.want, IsRepositoryRefusal(resp))
 		})
 	}
 }

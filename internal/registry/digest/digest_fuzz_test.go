@@ -336,7 +336,7 @@ func FuzzHandleManifestResponse(f *testing.F) {
 			// Only a 401 whose challenge refuses the scope is a refusal.
 			if errors.Is(err, errRepositoryDenied) {
 				assert.Equal(t, http.StatusUnauthorized, statusCode)
-				assert.True(t, auth.IsInsufficientScope(resp.Header), "a refusal without insufficient_scope")
+				assert.True(t, auth.IsRepositoryRefusal(resp), "a refusal without insufficient_scope")
 			}
 
 			assert.Empty(t, digest)
