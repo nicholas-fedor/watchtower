@@ -13,6 +13,7 @@ import (
 
 	dockerContainer "github.com/moby/moby/api/types/container"
 
+	"github.com/nicholas-fedor/watchtower/internal/container"
 	"github.com/nicholas-fedor/watchtower/internal/registry/ratelimit"
 	"github.com/nicholas-fedor/watchtower/internal/update/cleanup"
 	mockUpdate "github.com/nicholas-fedor/watchtower/internal/update/mocks"
@@ -116,7 +117,7 @@ func TestUpdateAction_Context(t *testing.T) {
 				config,
 			)
 			testData := &mockUpdate.TestData{
-				Containers: []types.Container{oldContainer},
+				Containers: []*container.Container{oldContainer},
 			}
 			client := mockUpdate.CreateMockClient(testData, false, false)
 
@@ -148,7 +149,7 @@ func TestUpdateAction_Context(t *testing.T) {
 				config,
 			)
 			testData := &mockUpdate.TestData{
-				Containers: []types.Container{oldContainer},
+				Containers: []*container.Container{oldContainer},
 			}
 			client := mockUpdate.CreateMockClient(testData, false, false)
 
@@ -172,7 +173,7 @@ func TestUpdateAction_Context(t *testing.T) {
 				time.Now(),
 			)
 			testData := &mockUpdate.TestData{
-				Containers: []types.Container{normalContainer},
+				Containers: []*container.Container{normalContainer},
 			}
 			client := mockUpdate.CreateMockClient(testData, false, false)
 
@@ -189,7 +190,7 @@ func TestUpdateAction_Context(t *testing.T) {
 			t.Parallel()
 
 			testData := &mockUpdate.TestData{
-				Containers: []types.Container{},
+				Containers: []*container.Container{},
 			}
 			client := mockUpdate.CreateMockClient(testData, false, false)
 

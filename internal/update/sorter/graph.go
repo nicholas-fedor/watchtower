@@ -6,7 +6,7 @@ import (
 
 	"github.com/rs/zerolog"
 
-	"github.com/nicholas-fedor/watchtower/pkg/types"
+	"github.com/nicholas-fedor/watchtower/internal/container"
 )
 
 // DependencyGraph is the dependency graph of a set of containers, with every
@@ -34,15 +34,15 @@ import (
 // built. Build a new graph after they change.
 type DependencyGraph struct {
 	// containers lists the containers of the graph in the order given.
-	containers []types.Container
+	containers []*container.Container
 	// identifiers maps each container to its normalized dependency identifier.
-	identifiers map[types.Container]string
+	identifiers map[*container.Container]string
 	// dependencies lists, for each container, the identifiers its links
 	// resolve to, in link order. A link to the container itself is left out.
-	dependencies map[types.Container][]string
+	dependencies map[*container.Container][]string
 	// dependents lists, for each container, the containers whose links name
 	// it: members in the order given, then Watchtower containers.
-	dependents map[types.Container][]types.Container
+	dependents map[*container.Container][]*container.Container
 	// unresolved lists the depends-on label entries that name no container.
 	unresolved []UnresolvedLink
 }
@@ -51,7 +51,7 @@ type DependencyGraph struct {
 // container.
 type UnresolvedLink struct {
 	// Container is the container whose label holds the entry.
-	Container types.Container
+	Container *container.Container
 	// Link is the entry, normalized as the dependency resolution reads it.
 	Link string
 }
@@ -81,11 +81,11 @@ type UnresolvedLink struct {
 //     containers other than Watchtower containers share an identifier.
 func NewDependencyGraph(
 	log *zerolog.Logger,
-	containers, unmonitored []types.Container,
+	containers, unmonitored []*container.Container,
 	useComposeDependsOn bool,
 ) (*DependencyGraph, error) {
-	members := make([]types.Container, 0, len(containers))
-	watchtowers := make([]types.Container, 0, 1)
+	members := make([]*container.Container, 0, len(containers))
+	watchtowers := make([]*container.Container, 0, 1)
 
 	for _, c := range containers {
 		if c.IsWatchtower() {
@@ -122,7 +122,7 @@ func NewDependencyGraph(
 //   - error: An identifierCollisionError when members share an identifier.
 func newDependencyGraph(
 	log *zerolog.Logger,
-	members, watchtowers, unmonitored []types.Container,
+	members, watchtowers, unmonitored []*container.Container,
 	useComposeDependsOn, logDependencies bool,
 ) (*DependencyGraph, error) {
 	containerMap, err := identifierIndex(log, members)
@@ -130,7 +130,7 @@ func newDependencyGraph(
 		return nil, err
 	}
 
-	identifiers := make(map[types.Container]string, len(containerMap))
+	identifiers := make(map[*container.Container]string, len(containerMap))
 	for identifier, c := range containerMap {
 		identifiers[c] = identifier
 	}
@@ -157,8 +157,8 @@ func newDependencyGraph(
 	graph := &DependencyGraph{
 		containers:   members,
 		identifiers:  identifiers,
-		dependencies: make(map[types.Container][]string, len(members)),
-		dependents:   make(map[types.Container][]types.Container, len(members)),
+		dependencies: make(map[*container.Container][]string, len(members)),
+		dependents:   make(map[*container.Container][]*container.Container, len(members)),
 	}
 
 	for _, c := range slices.Concat(members, watchtowers) {
@@ -208,8 +208,8 @@ func newDependencyGraph(
 // rather than a cycle, so neither is reported.
 //
 // Returns:
-//   - []types.Container: Containers in a cycle.
-func (g *DependencyGraph) CycleMembers() []types.Container {
+//   - []*container.Container: Containers in a cycle.
+func (g *DependencyGraph) CycleMembers() []*container.Container {
 	edges := make(map[string][]string, len(g.containers))
 	for _, c := range g.containers {
 		edges[g.identifiers[c]] = g.dependencies[c]
@@ -231,7 +231,7 @@ func (g *DependencyGraph) CycleMembers() []types.Container {
 		}
 	}
 
-	members := make([]types.Container, 0, len(finder.inCycle))
+	members := make([]*container.Container, 0, len(finder.inCycle))
 
 	for _, c := range g.containers {
 		if finder.inCycle[g.identifiers[c]] {
@@ -250,9 +250,9 @@ func (g *DependencyGraph) CycleMembers() []types.Container {
 //   - c: A monitored container.
 //
 // Returns:
-//   - []types.Container: The containers whose links name c. Nil when none do
+//   - []*container.Container: The containers whose links name c. Nil when none do
 //     or c is not monitored.
-func (g *DependencyGraph) Dependents(c types.Container) []types.Container {
+func (g *DependencyGraph) Dependents(c *container.Container) []*container.Container {
 	return g.dependents[c]
 }
 
@@ -280,9 +280,9 @@ func (g *DependencyGraph) UnresolvedDependsOn() []UnresolvedLink {
 // Returns:
 //   - error: An error naming the cycle when the containers depend on each other
 //     in a cycle, or naming the container when one is outside the graph.
-func (g *DependencyGraph) Sort(log *zerolog.Logger, containers []types.Container) error {
-	ordered := make([]types.Container, 0, len(containers))
-	watchtowers := make([]types.Container, 0, 1)
+func (g *DependencyGraph) Sort(log *zerolog.Logger, containers []*container.Container) error {
+	ordered := make([]*container.Container, 0, len(containers))
+	watchtowers := make([]*container.Container, 0, 1)
 
 	for _, c := range containers {
 		if c.IsWatchtower() {
@@ -316,19 +316,19 @@ func (g *DependencyGraph) Sort(log *zerolog.Logger, containers []types.Container
 //   - containers: Containers of the graph.
 //
 // Returns:
-//   - map[string]types.Container: Container for each identifier.
+//   - map[string]*container.Container: Container for each identifier.
 //   - map[string]int: Number of dependencies of each identifier.
 //   - map[string][]string: Dependents of each identifier.
-//   - map[types.Container]string: Identifier of each container.
+//   - map[*container.Container]string: Identifier of each container.
 //   - error: errNotInGraph for a container outside the graph, or an
 //     identifierCollisionError for a container given twice.
-func (g *DependencyGraph) subgraph(containers []types.Container) (
-	map[string]types.Container, map[string]int, map[string][]string, map[types.Container]string, error,
+func (g *DependencyGraph) subgraph(containers []*container.Container) (
+	map[string]*container.Container, map[string]int, map[string][]string, map[*container.Container]string, error,
 ) {
-	containerMap := make(map[string]types.Container, len(containers))
+	containerMap := make(map[string]*container.Container, len(containers))
 	indegree := make(map[string]int, len(containers))
 	adjacency := make(map[string][]string)
-	normalizedMap := make(map[types.Container]string, len(containers))
+	normalizedMap := make(map[*container.Container]string, len(containers))
 
 	for _, c := range containers {
 		identifier, ok := g.identifiers[c]
@@ -339,7 +339,7 @@ func (g *DependencyGraph) subgraph(containers []types.Container) (
 		if existing, duplicate := containerMap[identifier]; duplicate {
 			return nil, nil, nil, nil, identifierCollisionError{
 				DuplicateIdentifier: identifier,
-				AffectedContainers:  []types.Container{existing, c},
+				AffectedContainers:  []*container.Container{existing, c},
 			}
 		}
 
@@ -370,7 +370,7 @@ func (g *DependencyGraph) subgraph(containers []types.Container) (
 // Parameters:
 //   - target: The container depended on.
 //   - dependent: The container whose link names target.
-func (g *DependencyGraph) addDependent(target, dependent types.Container) {
+func (g *DependencyGraph) addDependent(target, dependent *container.Container) {
 	// A container's links are resolved together, so a container already
 	// listed as a dependent of target is the last one listed.
 	if listed := g.dependents[target]; len(listed) == 0 || listed[len(listed)-1] != dependent {

@@ -11,10 +11,10 @@ import (
 	"github.com/distribution/reference"
 	"github.com/rs/zerolog"
 
+	"github.com/nicholas-fedor/watchtower/internal/container"
 	"github.com/nicholas-fedor/watchtower/internal/meta"
 	"github.com/nicholas-fedor/watchtower/internal/registry/ratelimit"
 	registryConfig "github.com/nicholas-fedor/watchtower/internal/settings/config/registry"
-	"github.com/nicholas-fedor/watchtower/pkg/types"
 )
 
 // Errors for auth operations.
@@ -332,7 +332,7 @@ func handleUnsupportedChallenge(log *zerolog.Logger, challenge string) (TokenRes
 // Parameters:
 //   - log: Contextual logger.
 //   - ctx: Context for request lifecycle control.
-//   - container: Container with image info.
+//   - c: Container with image info.
 //   - registryAuth: Base64-encoded auth string.
 //   - client: Client for HTTP requests.
 //   - settings: Registry request settings.
@@ -348,7 +348,7 @@ func handleUnsupportedChallenge(log *zerolog.Logger, challenge string) (TokenRes
 func processChallengeResponse(
 	log *zerolog.Logger,
 	ctx context.Context,
-	container types.Container,
+	c *container.Container,
 	registryAuth string,
 	client Client,
 	settings registryConfig.Registry,
@@ -404,7 +404,7 @@ func processChallengeResponse(
 			log,
 			ctx,
 			response.wwwAuthHeader,
-			container,
+			c,
 			registryAuth,
 			client,
 			settings,
@@ -424,7 +424,7 @@ func processChallengeResponse(
 //   - log: Contextual logger.
 //   - ctx: Context for request lifecycle control.
 //   - wwwAuthHeader: The WWW-Authenticate header value.
-//   - container: Container with image info.
+//   - c: Container with image info.
 //   - registryAuth: Base64-encoded auth string.
 //   - client: Client for HTTP requests.
 //   - settings: Registry request settings.
@@ -445,7 +445,7 @@ func handleBearerAuth(
 	log *zerolog.Logger,
 	ctx context.Context,
 	wwwAuthHeader string,
-	container types.Container,
+	c *container.Container,
 	registryAuth string,
 	client Client,
 	settings registryConfig.Registry,
@@ -464,7 +464,7 @@ func handleBearerAuth(
 		return TokenResult{}, fmt.Errorf("%w: %s", errInsecureChallengeRedirect, originalHost)
 	}
 
-	normalizedRef, err := reference.ParseNormalizedNamed(container.ImageName())
+	normalizedRef, err := reference.ParseNormalizedNamed(c.ImageName())
 	if err != nil {
 		log.Debug().
 			Err(err).
@@ -518,7 +518,7 @@ func handleBearerAuth(
 // Parameters:
 //   - log: Process logger.
 //   - ctx: Context for request lifecycle control.
-//   - container: Container with image info.
+//   - c: Container with image info.
 //   - registryAuth: Base64-encoded auth string.
 //   - client: Client for HTTP requests.
 //   - settings: Registry request settings.
@@ -530,17 +530,17 @@ func handleBearerAuth(
 func GetToken(
 	log *zerolog.Logger,
 	ctx context.Context,
-	container types.Container,
+	c *container.Container,
 	registryAuth string,
 	client Client,
 	settings registryConfig.Registry,
 	endpoint string,
 ) (TokenResult, error) {
 	// Scope all subsequent logs in this call with the image name.
-	clog := log.With().Str("image", container.ImageName()).Logger()
+	clog := log.With().Str("image", c.ImageName()).Logger()
 
 	// Parse image name into a normalized reference.
-	normalizedRef, err := reference.ParseNormalizedNamed(container.ImageName())
+	normalizedRef, err := reference.ParseNormalizedNamed(c.ImageName())
 	if err != nil {
 		clog.Debug().
 			Err(err).
@@ -647,7 +647,7 @@ func GetToken(
 	return processChallengeResponse(
 		&clog,
 		ctx,
-		container,
+		c,
 		registryAuth,
 		client,
 		settings,

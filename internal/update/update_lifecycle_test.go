@@ -14,6 +14,7 @@ import (
 	dockerContainer "github.com/moby/moby/api/types/container"
 	dockerNetwork "github.com/moby/moby/api/types/network"
 
+	"github.com/nicholas-fedor/watchtower/internal/container"
 	mockContainerClient "github.com/nicholas-fedor/watchtower/internal/container/client/mocks"
 	"github.com/nicholas-fedor/watchtower/internal/container/oci"
 	"github.com/nicholas-fedor/watchtower/internal/registry/ratelimit"
@@ -40,7 +41,7 @@ func TestUpdateAction_LifecycleHooks(t *testing.T) {
 
 				client := mockUpdate.CreateMockClient(
 					&mockUpdate.TestData{
-						Containers: []types.Container{
+						Containers: []*container.Container{
 							mockUpdate.CreateMockContainerWithConfig(
 								"test-container-02",
 								"test-container-02",
@@ -84,7 +85,7 @@ func TestUpdateAction_LifecycleHooks(t *testing.T) {
 
 				client := mockUpdate.CreateMockClient(
 					&mockUpdate.TestData{
-						Containers: []types.Container{
+						Containers: []*container.Container{
 							mockUpdate.CreateMockContainerWithConfig(
 								"test-container-uid-gid",
 								"test-container-uid-gid",
@@ -132,7 +133,7 @@ func TestUpdateAction_LifecycleHooks(t *testing.T) {
 
 				client := mockUpdate.CreateMockClient(
 					&mockUpdate.TestData{
-						Containers: []types.Container{
+						Containers: []*container.Container{
 							mockUpdate.CreateMockContainerWithConfig(
 								"test-container-02",
 								"test-container-02",
@@ -178,7 +179,7 @@ func TestUpdateAction_LifecycleHooks(t *testing.T) {
 
 				client := mockUpdate.CreateMockClient(
 					&mockUpdate.TestData{
-						Containers: []types.Container{
+						Containers: []*container.Container{
 							mockUpdate.CreateMockContainerWithConfig(
 								"test-container-02",
 								"test-container-02",
@@ -223,7 +224,7 @@ func TestUpdateAction_LifecycleHooks(t *testing.T) {
 
 				client := mockUpdate.CreateMockClient(
 					&mockUpdate.TestData{
-						Containers: []types.Container{
+						Containers: []*container.Container{
 							mockUpdate.CreateMockContainerWithConfig(
 								"test-container-02",
 								"test-container-02",
@@ -268,7 +269,7 @@ func TestUpdateAction_LifecycleHooks(t *testing.T) {
 
 				client := mockUpdate.CreateMockClient(
 					&mockUpdate.TestData{
-						Containers: []types.Container{
+						Containers: []*container.Container{
 							mockUpdate.CreateMockContainerWithConfig(
 								"test-container-02",
 								"test-container-02",
@@ -325,7 +326,7 @@ func TestUpdate_PreUpdateFailureNamesItOnce(t *testing.T) {
 
 			client := mockContainerClient.NewMockClient(t)
 			// The post-check hooks list the containers again after the update.
-			client.EXPECT().ListContainers(mock.Anything, mock.Anything).Return([]types.Container{app}, nil).Times(2)
+			client.EXPECT().ListContainers(mock.Anything, mock.Anything).Return([]*container.Container{app}, nil).Times(2)
 			client.EXPECT().IsContainerStale(mock.Anything, mock.Anything, mock.Anything).
 				Return(true, types.ImageID("sha256:new"), "", nil)
 			client.EXPECT().GetImageAnnotations(mock.Anything, mock.Anything).Return(oci.Annotations{}).Maybe()

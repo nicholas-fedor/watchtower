@@ -23,7 +23,7 @@ import (
 
 // testGraph returns the dependency graph of the given containers, all of them
 // monitored.
-func testGraph(t *testing.T, containers []types.Container) *sorter.DependencyGraph {
+func testGraph(t *testing.T, containers []*container.Container) *sorter.DependencyGraph {
 	t.Helper()
 
 	graph, err := sorter.NewDependencyGraph(newTestLogger(t), containers, nil, false)
@@ -79,7 +79,7 @@ func restartSpecID(name string) string {
 }
 
 // build builds the container the description stands for.
-func (s restartSpec) build() types.Container {
+func (s restartSpec) build() *container.Container {
 	labels := map[string]string{}
 
 	for key, value := range map[string]string{
@@ -284,7 +284,7 @@ func TestMarkImplicitRestarts(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 
-			var all, monitored, unmonitored []types.Container
+			var all, monitored, unmonitored []*container.Container
 
 			excluded := map[types.ContainerID]struct{}{}
 
@@ -311,7 +311,7 @@ func TestMarkImplicitRestarts(t *testing.T) {
 			var marked []string
 
 			for _, c := range all {
-				if c.(*container.Container).IsLinkedToRestarting() {
+				if c.IsLinkedToRestarting() {
 					marked = append(marked, c.Name())
 				}
 			}
@@ -351,7 +351,7 @@ func TestReconcileImplicitRestarts(t *testing.T) {
 		)
 
 		app.SetStale(true)
-		containers := []types.Container{app, db}
+		containers := []*container.Container{app, db}
 		markImplicitRestarts(log, testGraph(t, containers), containers, containers, nil)
 		assert.True(t, db.IsLinkedToRestarting())
 
@@ -385,11 +385,11 @@ func TestReconcileImplicitRestarts(t *testing.T) {
 		)
 
 		app.SetStale(true)
-		containers := []types.Container{app, db}
+		containers := []*container.Container{app, db}
 		got := Reconcile(log, testGraph(t, containers), containers, containers, updateParams.Params{}, nil)
 
 		assert.True(t, db.IsLinkedToRestarting())
-		assert.ElementsMatch(t, []types.Container{app, db}, got)
+		assert.ElementsMatch(t, []*container.Container{app, db}, got)
 	})
 
 	t.Run("does not propagate restarts from a no-restart build anchor", func(t *testing.T) {
@@ -414,7 +414,7 @@ func TestReconcileImplicitRestarts(t *testing.T) {
 		)
 
 		app.SetStale(true)
-		containers := []types.Container{app, dependent}
+		containers := []*container.Container{app, dependent}
 
 		graph, err := sorter.NewDependencyGraph(log, containers, nil, false)
 		require.NoError(t, err)
@@ -463,7 +463,7 @@ func TestReconcileImplicitRestarts(t *testing.T) {
 
 		excluded.SetStale(true)
 		serviceMatch.SetStale(true)
-		containers := []types.Container{excluded, serviceMatch, dependent}
+		containers := []*container.Container{excluded, serviceMatch, dependent}
 
 		graph, err := sorter.NewDependencyGraph(log, containers, nil, false)
 		require.NoError(t, err)
@@ -478,6 +478,6 @@ func TestReconcileImplicitRestarts(t *testing.T) {
 		)
 
 		assert.False(t, dependent.IsLinkedToRestarting())
-		assert.ElementsMatch(t, []types.Container{serviceMatch}, got)
+		assert.ElementsMatch(t, []*container.Container{serviceMatch}, got)
 	})
 }

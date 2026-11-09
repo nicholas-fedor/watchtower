@@ -8,12 +8,12 @@ import (
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 
+	"github.com/nicholas-fedor/watchtower/internal/container"
 	mockContainerClient "github.com/nicholas-fedor/watchtower/internal/container/client/mocks"
 	"github.com/nicholas-fedor/watchtower/internal/container/labels"
 	"github.com/nicholas-fedor/watchtower/internal/testutil/containerfixture"
 	"github.com/nicholas-fedor/watchtower/internal/testutil/modelfixture"
 	updateParams "github.com/nicholas-fedor/watchtower/internal/update/params"
-	"github.com/nicholas-fedor/watchtower/pkg/types"
 )
 
 // TestGetContainerDetails verifies that each listed container's details carry
@@ -24,7 +24,7 @@ func TestGetContainerDetails(t *testing.T) {
 
 	tests := []struct {
 		name       string
-		containers []types.Container
+		containers []*container.Container
 		listErr    error
 		params     updateParams.Params
 		wantLen    int
@@ -32,7 +32,7 @@ func TestGetContainerDetails(t *testing.T) {
 	}{
 		{
 			name: "successful list with labeled enabled container",
-			containers: []types.Container{
+			containers: []*container.Container{
 				modelfixture.Container(
 					containerfixture.WithName("test-container"),
 					containerfixture.WithImageName("nginx:latest"),
@@ -64,7 +64,7 @@ func TestGetContainerDetails(t *testing.T) {
 		},
 		{
 			name: "unlabeled container is enabled when label-enable is false",
-			containers: []types.Container{
+			containers: []*container.Container{
 				modelfixture.Container(
 					containerfixture.WithName("unlabeled-container"),
 					containerfixture.WithImageName("nginx:latest"),
@@ -79,7 +79,7 @@ func TestGetContainerDetails(t *testing.T) {
 		},
 		{
 			name: "unlabeled container is disabled when label-enable is true",
-			containers: []types.Container{
+			containers: []*container.Container{
 				modelfixture.Container(
 					containerfixture.WithName("unlabeled-container"),
 					containerfixture.WithImageName("nginx:latest"),
@@ -94,7 +94,7 @@ func TestGetContainerDetails(t *testing.T) {
 		},
 		{
 			name: "labeled false container is disabled when label-enable is false",
-			containers: []types.Container{
+			containers: []*container.Container{
 				modelfixture.Container(
 					containerfixture.WithName("disabled-container"),
 					containerfixture.WithImageName("nginx:latest"),
@@ -110,7 +110,7 @@ func TestGetContainerDetails(t *testing.T) {
 		},
 		{
 			name: "digest from the container's repository when the image has several",
-			containers: []types.Container{
+			containers: []*container.Container{
 				modelfixture.Container(
 					containerfixture.WithName("app"),
 					containerfixture.WithImageName("ghcr.io/org/app:latest"),

@@ -16,6 +16,7 @@ import (
 	dockerNetwork "github.com/moby/moby/api/types/network"
 	dockerClient "github.com/moby/moby/client"
 
+	"github.com/nicholas-fedor/watchtower/internal/container"
 	"github.com/nicholas-fedor/watchtower/internal/container/labels"
 	"github.com/nicholas-fedor/watchtower/pkg/types"
 )
@@ -120,7 +121,7 @@ func CreateOrchestrator(
 	log *zerolog.Logger,
 	ctx context.Context,
 	api dockerClient.APIClient,
-	sourceContainer types.Container,
+	sourceContainer *container.Container,
 	newImage string,
 	containerChain string,
 	cleanup bool,
@@ -250,7 +251,7 @@ func CreateOrchestrator(
 // Returns:
 //   - *dockerContainer.Config: The container configuration.
 func buildOrchestratorConfig(
-	sourceContainer types.Container,
+	sourceContainer *container.Container,
 	newImage string,
 	containerChain string,
 	connConfig *dockerConnectionConfig,
@@ -303,7 +304,7 @@ func buildOrchestratorConfig(
 //   - *dockerContainer.HostConfig: The host configuration.
 func buildOrchestratorHostConfig(
 	connConfig *dockerConnectionConfig,
-	sourceContainer types.Container,
+	sourceContainer *container.Container,
 ) *dockerContainer.HostConfig {
 	var binds []string
 
@@ -480,7 +481,7 @@ func isWindows() bool {
 //
 // Returns:
 //   - *dockerConnectionConfig: The extracted connection configuration.
-func extractDockerConnectionConfig(sourceContainer types.Container, log *zerolog.Logger) *dockerConnectionConfig {
+func extractDockerConnectionConfig(sourceContainer *container.Container, log *zerolog.Logger) *dockerConnectionConfig {
 	config := &dockerConnectionConfig{
 		// Default to local connection with platform-appropriate socket.
 		IsLocal:    true,
@@ -698,7 +699,7 @@ func parseEnvVar(envVar string) (string, string, bool) {
 //   - []string: List of bind mount strings for TLS certificates.
 func prepareTLSCertBinds(
 	certPath string,
-	sourceContainer types.Container,
+	sourceContainer *container.Container,
 ) []string {
 	var certBinds []string
 

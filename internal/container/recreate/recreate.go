@@ -125,7 +125,7 @@ func ResolveVolumesFrom(
 func CreateTarget(log *zerolog.Logger,
 	ctx context.Context,
 	api dockerClient.APIClient,
-	sourceContainer types.Container,
+	sourceContainer *container.Container,
 	networkConfig *dockerNetwork.NetworkingConfig,
 	clientVersion string,
 	disableMemorySwappiness bool,
@@ -293,7 +293,7 @@ func syncComposeImageLabel(
 	ctx context.Context,
 	api dockerClient.APIClient,
 	clog *zerolog.Logger,
-	sourceContainer types.Container,
+	sourceContainer *container.Container,
 	config *dockerContainer.Config,
 	clientVersion string,
 ) {
@@ -477,7 +477,7 @@ func attachNetworks(
 func RenameTarget(log *zerolog.Logger,
 	ctx context.Context,
 	api dockerClient.APIClient,
-	targetContainer types.Container,
+	targetContainer *container.Container,
 	targetName string,
 ) error {
 	clogVal := log.With().

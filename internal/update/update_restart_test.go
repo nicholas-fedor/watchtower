@@ -19,14 +19,13 @@ import (
 	"github.com/nicholas-fedor/watchtower/internal/registry/ratelimit"
 	mockUpdate "github.com/nicholas-fedor/watchtower/internal/update/mocks"
 	updateParams "github.com/nicholas-fedor/watchtower/internal/update/params"
-	"github.com/nicholas-fedor/watchtower/pkg/types"
 )
 
 // createNetworkModeContainer builds a container that joins another container's
 // network namespace, with Compose project and service labels applied.
 func createNetworkModeContainer(
 	id, name, project, service, networkMode string,
-) types.Container {
+) *container.Container {
 	hostConfig := &dockerContainer.HostConfig{
 		PortBindings: dockerNetwork.PortMap{},
 	}
@@ -85,7 +84,7 @@ func createStaleContainersForTest() *mockUpdate.TestData {
 	)
 
 	testData := &mockUpdate.TestData{
-		Containers: []types.Container{container1, container2},
+		Containers: []*container.Container{container1, container2},
 		Staleness: map[string]bool{
 			"container-1": true,
 			"container-2": true,
@@ -110,7 +109,7 @@ func TestUpdateAction_Restarts(t *testing.T) {
 
 			client := mockUpdate.CreateMockClient(
 				&mockUpdate.TestData{
-					Containers: []types.Container{
+					Containers: []*container.Container{
 						mockUpdate.CreateMockContainerWithConfig(
 							"watchtower",
 							"/watchtower",
@@ -201,7 +200,7 @@ func TestUpdateAction_Restarts(t *testing.T) {
 
 			client := mockUpdate.CreateMockClient(
 				&mockUpdate.TestData{
-					Containers: []types.Container{
+					Containers: []*container.Container{
 						baseContainer,
 						restartContainer1,
 						restartContainer2,
@@ -284,7 +283,7 @@ func TestUpdateAction_Restarts(t *testing.T) {
 
 			client := mockUpdate.CreateMockClient(
 				&mockUpdate.TestData{
-					Containers: []types.Container{
+					Containers: []*container.Container{
 						updatedContainer,
 						restartedContainer,
 						freshContainer,
@@ -355,7 +354,7 @@ func TestUpdateAction_Restarts(t *testing.T) {
 
 			client := mockUpdate.CreateMockClient(
 				&mockUpdate.TestData{
-					Containers: []types.Container{updatedContainer, restartedContainer},
+					Containers: []*container.Container{updatedContainer, restartedContainer},
 					Staleness: map[string]bool{
 						"updated-container":   true,
 						"restarted-container": false,
@@ -413,7 +412,7 @@ func TestUpdateAction_Restarts(t *testing.T) {
 
 			client := mockUpdate.CreateMockClient(
 				&mockUpdate.TestData{
-					Containers: []types.Container{updatedContainer, restartedContainer},
+					Containers: []*container.Container{updatedContainer, restartedContainer},
 					Staleness: map[string]bool{
 						"updated-container":   true,
 						"restarted-container": false,
@@ -472,7 +471,7 @@ func TestUpdateAction_Restarts(t *testing.T) {
 
 			client := mockUpdate.CreateMockClient(
 				&mockUpdate.TestData{
-					Containers: []types.Container{dependency, dependent},
+					Containers: []*container.Container{dependency, dependent},
 					Staleness: map[string]bool{
 						"dependency": true,
 						"dependent":  true,
@@ -539,7 +538,7 @@ func TestUpdateAction_Restarts(t *testing.T) {
 
 			client := mockUpdate.CreateMockClient(
 				&mockUpdate.TestData{
-					Containers: []types.Container{containerC, containerB, containerA},
+					Containers: []*container.Container{containerC, containerB, containerA},
 					Staleness: map[string]bool{
 						"container-c": true,
 						"container-b": false,
@@ -562,7 +561,7 @@ func TestUpdateAction_Restarts(t *testing.T) {
 
 			// Restart marks are derived from containers that are still stale.
 			// A mark with no stale anchor does not stop the container.
-			container := mockUpdate.CreateMockContainerWithConfig(
+			standalone := mockUpdate.CreateMockContainerWithConfig(
 				"standalone-container",
 				"/standalone-container",
 				"standalone-image:latest",
@@ -575,11 +574,11 @@ func TestUpdateAction_Restarts(t *testing.T) {
 				},
 			)
 
-			container.SetLinkedToRestarting(true)
+			standalone.SetLinkedToRestarting(true)
 
 			client := mockUpdate.CreateMockClient(
 				&mockUpdate.TestData{
-					Containers: []types.Container{container},
+					Containers: []*container.Container{standalone},
 					Staleness: map[string]bool{
 						"standalone-container": false,
 					},
@@ -593,7 +592,7 @@ func TestUpdateAction_Restarts(t *testing.T) {
 			require.NoError(t, err)
 			assert.Empty(t, report.Updated())
 			assert.Empty(t, report.Restarted())
-			assert.False(t, container.IsLinkedToRestarting())
+			assert.False(t, standalone.IsLinkedToRestarting())
 		})
 	})
 
@@ -635,7 +634,7 @@ func TestUpdateAction_Restarts(t *testing.T) {
 					},
 				)
 
-				containers := []types.Container{containerA, containerB}
+				containers := []*container.Container{containerA, containerB}
 
 				// Mark container B as stale (should trigger restart)
 				containerB.SetStale(true)
@@ -710,7 +709,7 @@ func TestUpdateAction_Restarts(t *testing.T) {
 					},
 				)
 
-				containers := []types.Container{containerD, containerC, containerB, containerA}
+				containers := []*container.Container{containerD, containerC, containerB, containerA}
 
 				// Initially, only D should be marked for restart
 				containerD.SetStale(true)
@@ -791,7 +790,7 @@ func TestUpdateAction_Restarts(t *testing.T) {
 					},
 				)
 
-				containers := []types.Container{base, dep1, dep2, dep3}
+				containers := []*container.Container{base, dep1, dep2, dep3}
 
 				// Mark base as stale
 				base.SetStale(true)
@@ -820,7 +819,7 @@ func TestUpdateAction_Restarts(t *testing.T) {
 					"container:gluetun",
 				)
 
-				containers := []types.Container{gluetun, qbittorrent}
+				containers := []*container.Container{gluetun, qbittorrent}
 				gluetun.SetStale(true)
 
 				updateImplicitRestart(newTestLogger(t), containers, containers, true)
@@ -844,7 +843,7 @@ func TestUpdateAction_Restarts(t *testing.T) {
 					"container:"+providerID,
 				)
 
-				containers := []types.Container{gluetun, qbittorrent}
+				containers := []*container.Container{gluetun, qbittorrent}
 				gluetun.SetStale(true)
 
 				updateImplicitRestart(newTestLogger(t), containers, containers, true)
@@ -867,7 +866,7 @@ func TestUpdateAction_Restarts(t *testing.T) {
 					"container:gluetun",
 				)
 
-				containers := []types.Container{gluetun, decoy, qbittorrent}
+				containers := []*container.Container{gluetun, decoy, qbittorrent}
 				decoy.SetStale(true)
 
 				updateImplicitRestart(newTestLogger(t), containers, containers, true)
@@ -911,7 +910,7 @@ func TestUpdateAction_Restarts(t *testing.T) {
 					},
 				)
 
-				containers := []types.Container{containerA, containerB}
+				containers := []*container.Container{containerA, containerB}
 
 				// Mark container A as stale
 				containerA.SetStale(true)
@@ -971,7 +970,7 @@ func TestUpdateAction_Restarts(t *testing.T) {
 					},
 				)
 
-				containers := []types.Container{staleNoDeps, freshWithDeps, staleWithDeps}
+				containers := []*container.Container{staleNoDeps, freshWithDeps, staleWithDeps}
 
 				// Mark stale containers
 				staleNoDeps.SetStale(true)
@@ -1079,7 +1078,7 @@ func TestUpdateAction_Restarts(t *testing.T) {
 					},
 				)
 
-				containers := []types.Container{
+				containers := []*container.Container{
 					containerF,
 					containerE,
 					containerD,
@@ -1157,7 +1156,7 @@ func TestUpdateAction_Restarts(t *testing.T) {
 					},
 				)
 
-				containers := []types.Container{dbContainer, appContainer, webContainer}
+				containers := []*container.Container{dbContainer, appContainer, webContainer}
 
 				// Initially, only db should be marked for restart
 				dbContainer.SetStale(true)
@@ -1214,7 +1213,7 @@ func TestUpdateAction_Restarts(t *testing.T) {
 
 				client := mockUpdate.CreateMockClient(
 					&mockUpdate.TestData{
-						Containers: []types.Container{staleContainer, restartContainer},
+						Containers: []*container.Container{staleContainer, restartContainer},
 						Staleness: map[string]bool{
 							"stale-container":   true,
 							"restart-container": false,
@@ -1243,7 +1242,7 @@ func TestUpdateAction_Restarts(t *testing.T) {
 
 				// Create a large chain of containers for performance testing
 				numContainers := 10 // Reduced for test performance
-				containers := make([]types.Container, numContainers)
+				containers := make([]*container.Container, numContainers)
 
 				for i := range numContainers {
 					name := fmt.Sprintf("perf-container-%d", i)
@@ -1417,7 +1416,7 @@ func TestUpdateAction_Restarts(t *testing.T) {
 
 				client := mockUpdate.CreateMockClient(
 					&mockUpdate.TestData{
-						Containers: []types.Container{containerA, containerB, containerC},
+						Containers: []*container.Container{containerA, containerB, containerC},
 						Staleness: map[string]bool{
 							"priority-c": true,
 							"priority-b": false,
@@ -1495,7 +1494,7 @@ func TestUpdateAction_Restarts(t *testing.T) {
 
 				client := mockUpdate.CreateMockClient(
 					&mockUpdate.TestData{
-						Containers: []types.Container{
+						Containers: []*container.Container{
 							staleContainer,
 							restartContainer1,
 							restartContainer2,

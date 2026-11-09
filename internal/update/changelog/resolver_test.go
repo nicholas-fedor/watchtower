@@ -15,11 +15,13 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"github.com/nicholas-fedor/watchtower/internal/container"
 	"github.com/nicholas-fedor/watchtower/internal/registry/digest"
 	"github.com/nicholas-fedor/watchtower/internal/registry/ratelimit"
 	registryConfig "github.com/nicholas-fedor/watchtower/internal/settings/config/registry"
+	"github.com/nicholas-fedor/watchtower/internal/testutil/containerfixture"
 	"github.com/nicholas-fedor/watchtower/internal/testutil/httpstub"
-	"github.com/nicholas-fedor/watchtower/pkg/types"
+	"github.com/nicholas-fedor/watchtower/internal/testutil/modelfixture"
 )
 
 const testDigest = "sha256:1111111111111111111111111111111111111111111111111111111111111111"
@@ -44,7 +46,7 @@ type spyFetcher struct {
 func (f *spyFetcher) FetchDigestForTag(
 	_ *zerolog.Logger,
 	_ context.Context,
-	_ types.Container,
+	_ *container.Container,
 	_ string,
 	tag string,
 	_ ...string,
@@ -89,7 +91,7 @@ type transientThenOKFetcher struct {
 func (f *transientThenOKFetcher) FetchDigestForTag(
 	_ *zerolog.Logger,
 	_ context.Context,
-	_ types.Container,
+	_ *container.Container,
 	_ string,
 	tag string,
 	_ ...string,
@@ -127,7 +129,7 @@ type gatedFetcher struct {
 func (f *gatedFetcher) FetchDigestForTag(
 	_ *zerolog.Logger,
 	_ context.Context,
-	_ types.Container,
+	_ *container.Container,
 	_ string,
 	tag string,
 	_ ...string,
@@ -343,7 +345,7 @@ func TestResolveTagSkipsWhenNotWorthProbing(t *testing.T) {
 
 	tests := []struct {
 		name      string
-		container types.Container
+		container *container.Container
 		version   string
 		digest    string
 	}{
@@ -588,20 +590,20 @@ func TestDigestFetcherUsesItsSettings(t *testing.T) {
 	server.RouteToHandler(http.MethodHead, httpstub.Path("/v2/org/app/manifests/v9.9.9"),
 		httpstub.RespondWith(http.StatusNotFound, "", nil))
 
-	container := stubContainer{imageName: server.Addr() + "/org/app:1.2.3"}
+	c := modelfixture.ContainerWithoutImageInfo(containerfixture.WithImageName(server.Addr() + "/org/app:1.2.3"))
 
 	got, err := NewDigestFetcher(registryConfig.Registry{TLSSkip: true}, ratelimit.New()).
-		FetchDigestForTag(newTestLogger(t), t.Context(), container, "", "v1.2.3")
+		FetchDigestForTag(newTestLogger(t), t.Context(), c, "", "v1.2.3")
 	require.NoError(t, err)
 	assert.Equal(t, strings.TrimPrefix(testDigest, "sha256:"), got)
 
 	// The registry answers 404 for a tag it does not have, which is a miss.
 	got, err = NewDigestFetcher(registryConfig.Registry{TLSSkip: true}, ratelimit.New()).
-		FetchDigestForTag(newTestLogger(t), t.Context(), container, "", "v9.9.9")
+		FetchDigestForTag(newTestLogger(t), t.Context(), c, "", "v9.9.9")
 	require.NoError(t, err)
 	assert.Empty(t, got)
 
 	_, err = NewDigestFetcher(registryConfig.Registry{}, ratelimit.New()).
-		FetchDigestForTag(newTestLogger(t), t.Context(), container, "", "v1.2.3")
+		FetchDigestForTag(newTestLogger(t), t.Context(), c, "", "v1.2.3")
 	require.Error(t, err, "an HTTPS request reached the plain HTTP registry")
 }

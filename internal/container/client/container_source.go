@@ -50,7 +50,7 @@ var (
 //   - isPodmanOptional: Optional variadic flag indicating Podman runtime (defaults to false).
 //
 // Returns:
-//   - []types.Container: Filtered list of containers.
+//   - []*container.Container: Filtered list of containers.
 //   - error: Non-nil if listing fails, nil on success.
 func listSourceContainers(log *zerolog.Logger,
 	ctx context.Context,
@@ -58,7 +58,7 @@ func listSourceContainers(log *zerolog.Logger,
 	opts ClientOptions,
 	filter types.Filter,
 	isPodmanOptional ...bool,
-) ([]types.Container, error) {
+) ([]*container.Container, error) {
 	clogVal := log.With().
 		Bool("include_stopped", opts.IncludeStopped).
 		Bool("include_restarting", opts.IncludeRestarting).
@@ -107,7 +107,7 @@ func listSourceContainers(log *zerolog.Logger,
 				Str("docker_host", os.Getenv("DOCKER_HOST")).
 				Msg("Docker API returned 404 for container list. Treating as empty list")
 
-			return []types.Container{}, nil
+			return []*container.Container{}, nil
 		}
 
 		clog.Debug().
@@ -118,7 +118,7 @@ func listSourceContainers(log *zerolog.Logger,
 	}
 
 	// Convert and filter containers.
-	hostContainers := make([]types.Container, 0, len(containers.Items))
+	hostContainers := make([]*container.Container, 0, len(containers.Items))
 	// Reuse ImageInspect results when multiple containers share an image ID.
 	imageCache := make(map[string]*dockerImage.InspectResponse, len(containers.Items))
 
@@ -178,14 +178,14 @@ func listSourceContainers(log *zerolog.Logger,
 //   - imageCache: Optional per-list cache of ImageInspect results keyed by image ID.
 //
 // Returns:
-//   - types.Container: Container object if successful. It has no image info when only the image inspect fails.
+//   - *container.Container: Container object if successful. It has no image info when only the image inspect fails.
 //   - error: Non-nil if the container inspect fails or the image inspect is canceled or times out.
 func getSourceContainer(log *zerolog.Logger,
 	ctx context.Context,
 	api dockerClient.APIClient,
 	containerID types.ContainerID,
 	imageCache map[string]*dockerImage.InspectResponse,
-) (types.Container, error) {
+) (*container.Container, error) {
 	clogVal := log.With().
 		Str("container_id", string(containerID)).
 		Logger()
@@ -383,7 +383,7 @@ func cloneImageInspect(src *dockerImage.InspectResponse) *dockerImage.InspectRes
 func stopSourceContainer(log *zerolog.Logger,
 	ctx context.Context,
 	api dockerClient.APIClient,
-	sourceContainer types.Container,
+	sourceContainer *container.Container,
 	timeout time.Duration,
 ) error {
 	clogVal := log.With().
@@ -488,7 +488,7 @@ func stopSourceContainer(log *zerolog.Logger,
 func stopAndRemoveSourceContainer(log *zerolog.Logger,
 	ctx context.Context,
 	api dockerClient.APIClient,
-	sourceContainer types.Container,
+	sourceContainer *container.Container,
 	timeout time.Duration,
 	removeVolumes bool,
 ) error {

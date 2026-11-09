@@ -9,6 +9,7 @@ import (
 
 	dockerClient "github.com/moby/moby/client"
 
+	"github.com/nicholas-fedor/watchtower/internal/container"
 	"github.com/nicholas-fedor/watchtower/internal/container/recreate"
 	"github.com/nicholas-fedor/watchtower/internal/observability/logging"
 	"github.com/nicholas-fedor/watchtower/pkg/types"
@@ -37,7 +38,7 @@ func startTargetContainer(
 	ctx context.Context,
 	api dockerClient.APIClient,
 	clog *zerolog.Logger,
-	sourceContainer types.Container,
+	sourceContainer *container.Container,
 	containerID types.ContainerID,
 	reviveStopped bool,
 ) error {

@@ -8,6 +8,7 @@ import (
 
 	composeApply "github.com/nicholas-fedor/watchtower/internal/compose/apply"
 	composeProject "github.com/nicholas-fedor/watchtower/internal/compose/project"
+	"github.com/nicholas-fedor/watchtower/internal/container"
 	containerClient "github.com/nicholas-fedor/watchtower/internal/container/client"
 	"github.com/nicholas-fedor/watchtower/internal/container/provenance"
 	"github.com/nicholas-fedor/watchtower/internal/git"
@@ -73,7 +74,7 @@ func NewSession(client *git.Client) *Session {
 //
 // Returns:
 //   - bool: True when the session should check Git instead of the registry.
-func (s *Session) Watching(log *zerolog.Logger, c types.Container, params updateParams.Params) bool {
+func (s *Session) Watching(log *zerolog.Logger, c *container.Container, params updateParams.Params) bool {
 	if s == nil || s.client == nil {
 		return false
 	}
@@ -110,7 +111,7 @@ func (s *Session) PrepareRebuilds(
 	log *zerolog.Logger,
 	ctx context.Context,
 	docker containerClient.Client,
-	containers []types.Container,
+	containers []*container.Container,
 	params updateParams.Params,
 	progress *state.Progress,
 	failed map[types.ContainerID]error,
@@ -119,7 +120,7 @@ func (s *Session) PrepareRebuilds(
 		return
 	}
 
-	var remote []types.Container
+	var remote []*container.Container
 
 	var batches composeBatches
 
@@ -190,7 +191,7 @@ func (s *Session) PrepareRebuilds(
 //
 // Returns:
 //   - bool: True when this session already replaced or must not replace c.
-func (s *Session) SkipRecreate(c types.Container, params updateParams.Params) bool {
+func (s *Session) SkipRecreate(c *container.Container, params updateParams.Params) bool {
 	if s == nil || c.IsWatchtower() {
 		return false
 	}
@@ -217,8 +218,8 @@ func (s *Session) SkipRecreate(c types.Container, params updateParams.Params) bo
 //   - containers: Full candidate list.
 //
 // Returns:
-//   - []types.Container: Containers that may still use inspect recreate.
-func (s *Session) ExcludeApplied(containers []types.Container) []types.Container {
+//   - []*container.Container: Containers that may still use inspect recreate.
+func (s *Session) ExcludeApplied(containers []*container.Container) []*container.Container {
 	if s == nil {
 		return containers
 	}
@@ -230,7 +231,7 @@ func (s *Session) ExcludeApplied(containers []types.Container) []types.Container
 		return containers
 	}
 
-	kept := make([]types.Container, 0, len(containers))
+	kept := make([]*container.Container, 0, len(containers))
 
 	for _, c := range containers {
 		if _, ok := s.applied[c.ID()]; ok {
@@ -250,16 +251,16 @@ func (s *Session) ExcludeApplied(containers []types.Container) []types.Container
 //   - params: Update parameters.
 //
 // Returns:
-//   - []types.Container: Containers that may still be recreated.
+//   - []*container.Container: Containers that may still be recreated.
 func (s *Session) ExcludeNoRestart(
-	containers []types.Container,
+	containers []*container.Container,
 	params updateParams.Params,
-) []types.Container {
+) []*container.Container {
 	if s == nil || !params.NoRestart {
 		return containers
 	}
 
-	kept := make([]types.Container, 0, len(containers))
+	kept := make([]*container.Container, 0, len(containers))
 
 	for _, c := range containers {
 		if s.SkipRecreate(c, params) {
@@ -343,7 +344,7 @@ func (s *Session) result(containerID types.ContainerID) (git.CheckResult, bool) 
 //
 // Returns:
 //   - bool: True when a Git apply backend should run.
-func (s *Session) needsApply(c types.Container, params updateParams.Params) bool {
+func (s *Session) needsApply(c *container.Container, params updateParams.Params) bool {
 	if c == nil || !c.IsStale() {
 		return false
 	}

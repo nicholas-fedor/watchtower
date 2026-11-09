@@ -7,6 +7,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/nicholas-fedor/watchtower/internal/container"
 	"github.com/nicholas-fedor/watchtower/pkg/types"
 )
 
@@ -60,7 +61,7 @@ func FuzzCycleMembers(f *testing.F) {
 				}
 			}
 
-			rest := make([]types.Container, 0, len(containers)-len(members))
+			rest := make([]*container.Container, 0, len(containers)-len(members))
 			for _, c := range containers {
 				if !inCycle[c.ID()] {
 					rest = append(rest, c)
@@ -69,14 +70,14 @@ func FuzzCycleMembers(f *testing.F) {
 
 			// The update sorts the containers outside the cycles, then the
 			// subset of them that restarts. Pick a subset from the input.
-			subset := make([]types.Container, 0, len(rest))
+			subset := make([]*container.Container, 0, len(rest))
 			for i, c := range rest {
 				if data[i%len(data)]&1 == 1 {
 					subset = append(subset, c)
 				}
 			}
 
-			for _, sorted := range [][]types.Container{rest, subset} {
+			for _, sorted := range [][]*container.Container{rest, subset} {
 				err = graph.Sort(newNopLogger(), sorted)
 				if errors.Is(err, errCircularReference) {
 					t.Fatalf("containers outside the reported cycles do not sort: %v", err)
@@ -88,7 +89,7 @@ func FuzzCycleMembers(f *testing.F) {
 
 // assertInputOrder fails the test unless members holds distinct containers
 // that appear in containers in the same relative order.
-func assertInputOrder(t *testing.T, containers, members []types.Container) {
+func assertInputOrder(t *testing.T, containers, members []*container.Container) {
 	t.Helper()
 
 	next := 0
@@ -111,7 +112,7 @@ func assertInputOrder(t *testing.T, containers, members []types.Container) {
 // container with its own search, independently of the cycle finder.
 func selfReachable(
 	t *testing.T,
-	containers []types.Container,
+	containers []*container.Container,
 	useComposeDependsOn bool,
 ) map[types.ContainerID]bool {
 	t.Helper()
@@ -126,7 +127,7 @@ func selfReachable(
 
 // reachesItself reports, for each container of a graph, whether it can reach
 // itself by following the graph's edges, with a separate search per container.
-func reachesItself(containerMap map[string]types.Container, adjacency map[string][]string) map[types.ContainerID]bool {
+func reachesItself(containerMap map[string]*container.Container, adjacency map[string][]string) map[types.ContainerID]bool {
 	reaches := make(map[types.ContainerID]bool, len(containerMap))
 
 	for start, c := range containerMap {
@@ -186,7 +187,7 @@ func (f *fuzzBytes) next(n int) int {
 // Compose depends_on label, legacy links, network mode, or volumes-from. A
 // link names its target by container name, by name with a leading slash, by
 // Docker ID, by Compose service, or by project-qualified service.
-func generateDeployment(data []byte) []types.Container {
+func generateDeployment(data []byte) []*container.Container {
 	in := &fuzzBytes{data: data}
 	projects := []string{"a", "b"}
 	services := []string{"web", "db", "api"}
@@ -286,8 +287,8 @@ func FuzzDeploymentGraphs(f *testing.F) {
 		containers := generateDeployment(data)
 
 		// Leave some containers unmonitored, chosen from the input.
-		monitored := make([]types.Container, 0, len(containers))
-		unmonitored := make([]types.Container, 0, len(containers))
+		monitored := make([]*container.Container, 0, len(containers))
+		unmonitored := make([]*container.Container, 0, len(containers))
 
 		for i, c := range containers {
 			if len(data) > 0 && data[(i*3+1)%len(data)]&8 == 8 {
@@ -297,7 +298,7 @@ func FuzzDeploymentGraphs(f *testing.F) {
 			}
 		}
 
-		ordered := make([]types.Container, 0, len(monitored))
+		ordered := make([]*container.Container, 0, len(monitored))
 		for _, c := range monitored {
 			if !c.IsWatchtower() {
 				ordered = append(ordered, c)
@@ -337,21 +338,21 @@ func FuzzDeploymentGraphs(f *testing.F) {
 
 			assertDependents(t, graph, monitored, unmonitored, containerMap, adjacency)
 
-			rest := make([]types.Container, 0, len(monitored))
+			rest := make([]*container.Container, 0, len(monitored))
 			for _, c := range monitored {
 				if !inCycle[c.ID()] {
 					rest = append(rest, c)
 				}
 			}
 
-			subset := make([]types.Container, 0, len(rest))
+			subset := make([]*container.Container, 0, len(rest))
 			for i, c := range rest {
 				if len(data) > 0 && data[(i*7)%len(data)]&2 == 2 {
 					subset = append(subset, c)
 				}
 			}
 
-			for _, toSort := range [][]types.Container{rest, subset} {
+			for _, toSort := range [][]*container.Container{rest, subset} {
 				sorted := slices.Clone(toSort)
 
 				err := graph.Sort(newNopLogger(), sorted)
@@ -389,8 +390,8 @@ func FuzzDeploymentGraphs(f *testing.F) {
 func assertDependents(
 	t *testing.T,
 	graph *DependencyGraph,
-	monitored, unmonitored []types.Container,
-	containerMap map[string]types.Container,
+	monitored, unmonitored []*container.Container,
+	containerMap map[string]*container.Container,
 	adjacency map[string][]string,
 ) {
 	t.Helper()
@@ -426,8 +427,8 @@ func assertDependents(
 // graph between two sorted containers ordered dependency first.
 func assertDependencyOrder(
 	t *testing.T,
-	unsorted, sorted []types.Container,
-	containerMap map[string]types.Container,
+	unsorted, sorted []*container.Container,
+	containerMap map[string]*container.Container,
 	adjacency map[string][]string,
 ) {
 	t.Helper()
@@ -437,7 +438,7 @@ func assertDependencyOrder(
 		t.Fatalf("sorting changed the containers: %v to %v", containerNames(unsorted), containerNames(sorted))
 	}
 
-	position := make(map[types.Container]int, len(sorted))
+	position := make(map[*container.Container]int, len(sorted))
 	seenWatchtower := false
 
 	for i, c := range sorted {

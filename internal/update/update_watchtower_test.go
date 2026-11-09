@@ -13,6 +13,7 @@ import (
 
 	dockerContainer "github.com/moby/moby/api/types/container"
 
+	"github.com/nicholas-fedor/watchtower/internal/container"
 	"github.com/nicholas-fedor/watchtower/internal/container/filters"
 	containerImage "github.com/nicholas-fedor/watchtower/internal/container/image"
 	"github.com/nicholas-fedor/watchtower/internal/registry/ratelimit"
@@ -20,7 +21,6 @@ import (
 	mockUpdate "github.com/nicholas-fedor/watchtower/internal/update/mocks"
 	updateParams "github.com/nicholas-fedor/watchtower/internal/update/params"
 	"github.com/nicholas-fedor/watchtower/internal/update/state"
-	"github.com/nicholas-fedor/watchtower/pkg/types"
 )
 
 // TestWatchtowerContainerHandling verifies how an update handles Watchtower's
@@ -37,7 +37,7 @@ func TestWatchtowerContainerHandling(t *testing.T) {
 
 			client := mockUpdate.CreateMockClient(
 				&mockUpdate.TestData{
-					Containers: []types.Container{
+					Containers: []*container.Container{
 						mockUpdate.CreateMockContainerWithConfig(
 							"watchtower",
 							"/watchtower",
@@ -81,7 +81,7 @@ func TestWatchtowerContainerHandling(t *testing.T) {
 
 			client := mockUpdate.CreateMockClient(
 				&mockUpdate.TestData{
-					Containers: []types.Container{
+					Containers: []*container.Container{
 						mockUpdate.CreateMockContainerWithConfig(
 							"watchtower",
 							"/watchtower",
@@ -123,7 +123,7 @@ func TestWatchtowerContainerHandling(t *testing.T) {
 
 			client := mockUpdate.CreateMockClient(
 				&mockUpdate.TestData{
-					Containers: []types.Container{
+					Containers: []*container.Container{
 						mockUpdate.CreateMockContainerWithConfig(
 							"watchtower",
 							"/watchtower",
@@ -165,7 +165,7 @@ func TestWatchtowerContainerHandling(t *testing.T) {
 
 			client := mockUpdate.CreateMockClient(
 				&mockUpdate.TestData{
-					Containers: []types.Container{
+					Containers: []*container.Container{
 						mockUpdate.CreateMockContainerWithConfig(
 							"nginx",
 							"/nginx",
@@ -204,7 +204,7 @@ func TestWatchtowerContainerHandling(t *testing.T) {
 
 			client := mockUpdate.CreateMockClient(
 				&mockUpdate.TestData{
-					Containers: []types.Container{
+					Containers: []*container.Container{
 						mockUpdate.CreateMockContainerWithConfig(
 							"stopped-nginx",
 							"/stopped-nginx",
@@ -242,7 +242,7 @@ func TestWatchtowerContainerHandling(t *testing.T) {
 
 			client := mockUpdate.CreateMockClient(
 				&mockUpdate.TestData{
-					Containers: []types.Container{
+					Containers: []*container.Container{
 						mockUpdate.CreateMockContainerWithConfig(
 							"stopped-nginx",
 							"/stopped-nginx",
@@ -281,7 +281,7 @@ func TestWatchtowerContainerHandling(t *testing.T) {
 
 			client := mockUpdate.CreateMockClient(
 				&mockUpdate.TestData{
-					Containers: []types.Container{
+					Containers: []*container.Container{
 						mockUpdate.CreateMockContainerWithConfig(
 							"watchtower",
 							"/watchtower",
@@ -323,7 +323,7 @@ func TestWatchtowerContainerHandling(t *testing.T) {
 
 			client := mockUpdate.CreateMockClient(
 				&mockUpdate.TestData{
-					Containers: []types.Container{
+					Containers: []*container.Container{
 						mockUpdate.CreateMockContainerWithConfig(
 							"watchtower",
 							"/watchtower",
@@ -370,7 +370,7 @@ func TestWatchtowerContainerHandling(t *testing.T) {
 
 			client := mockUpdate.CreateMockClient(
 				&mockUpdate.TestData{
-					Containers: []types.Container{
+					Containers: []*container.Container{
 						mockUpdate.CreateMockContainerWithConfig(
 							"watchtower",
 							"/watchtower",
@@ -415,7 +415,7 @@ func TestWatchtowerContainerHandling(t *testing.T) {
 
 			client := mockUpdate.CreateMockClient(
 				&mockUpdate.TestData{
-					Containers: []types.Container{
+					Containers: []*container.Container{
 						mockUpdate.CreateMockContainerWithConfig(
 							"watchtower",
 							"/watchtower",
@@ -461,7 +461,7 @@ func TestWatchtowerContainerHandling(t *testing.T) {
 
 			client := mockUpdate.CreateMockClient(
 				&mockUpdate.TestData{
-					Containers: []types.Container{
+					Containers: []*container.Container{
 						mockUpdate.CreateMockContainerWithConfig(
 							"watchtower",
 							"/watchtower",
@@ -505,7 +505,7 @@ func TestWatchtowerContainerHandling(t *testing.T) {
 
 			client := mockUpdate.CreateMockClient(
 				&mockUpdate.TestData{
-					Containers: []types.Container{
+					Containers: []*container.Container{
 						mockUpdate.CreateMockContainerWithConfig(
 							"watchtower",
 							"/watchtower",
@@ -550,7 +550,7 @@ func TestWatchtowerContainerHandling(t *testing.T) {
 
 			client := mockUpdate.CreateMockClient(
 				&mockUpdate.TestData{
-					Containers: []types.Container{
+					Containers: []*container.Container{
 						mockUpdate.CreateMockContainerWithConfig(
 							"watchtower",
 							"/watchtower",
@@ -599,7 +599,7 @@ func TestWatchtowerContainerHandling(t *testing.T) {
 
 				client := mockUpdate.CreateMockClient(
 					&mockUpdate.TestData{
-						Containers: []types.Container{
+						Containers: []*container.Container{
 							mockUpdate.CreateMockContainerWithConfig(
 								"watchtower",
 								"/watchtower",
@@ -645,7 +645,7 @@ func TestWatchtowerContainerHandling(t *testing.T) {
 
 				client := mockUpdate.CreateMockClient(
 					&mockUpdate.TestData{
-						Containers: []types.Container{
+						Containers: []*container.Container{
 							// Container in scope-a with chain reference to scope-b
 							mockUpdate.CreateMockContainerWithConfig(
 								"watchtower-a",
@@ -712,7 +712,7 @@ func TestWatchtowerContainerHandling(t *testing.T) {
 
 				client := mockUpdate.CreateMockClient(
 					&mockUpdate.TestData{
-						Containers: []types.Container{
+						Containers: []*container.Container{
 							// New container in scope-c
 							mockUpdate.CreateMockContainerWithConfig(
 								"watchtower-c",
@@ -765,7 +765,7 @@ func TestWatchtowerContainerHandling(t *testing.T) {
 
 				client := mockUpdate.CreateMockClient(
 					&mockUpdate.TestData{
-						Containers: []types.Container{
+						Containers: []*container.Container{
 							// Container attempting to chain across scopes
 							mockUpdate.CreateMockContainerWithConfig(
 								"watchtower-invalid",
@@ -820,7 +820,7 @@ func TestWatchtowerContainerHandling(t *testing.T) {
 
 			client := mockUpdate.CreateMockClient(
 				&mockUpdate.TestData{
-					Containers: []types.Container{
+					Containers: []*container.Container{
 						mockUpdate.CreateMockContainerWithConfig(
 							"watchtower",
 							"/watchtower",
@@ -874,7 +874,7 @@ func TestWatchtowerContainerHandling(t *testing.T) {
 
 			client := mockUpdate.CreateMockClient(
 				&mockUpdate.TestData{
-					Containers: []types.Container{
+					Containers: []*container.Container{
 						mockUpdate.CreateMockContainerWithConfig(
 							"watchtower",
 							"/watchtower",
@@ -915,7 +915,7 @@ func TestWatchtowerContainerHandling(t *testing.T) {
 
 			client := mockUpdate.CreateMockClient(
 				&mockUpdate.TestData{
-					Containers: []types.Container{
+					Containers: []*container.Container{
 						mockUpdate.CreateMockContainerWithConfig(
 							"watchtower",
 							"/watchtower",
@@ -961,7 +961,7 @@ func TestWatchtowerContainerHandling(t *testing.T) {
 
 			client := mockUpdate.CreateMockClient(
 				&mockUpdate.TestData{
-					Containers: []types.Container{
+					Containers: []*container.Container{
 						mockUpdate.CreateMockContainerWithConfig(
 							"watchtower",
 							"/watchtower",
@@ -1017,7 +1017,7 @@ func TestWatchtowerContainerHandling(t *testing.T) {
 
 			client := mockUpdate.CreateMockClient(
 				&mockUpdate.TestData{
-					Containers: []types.Container{
+					Containers: []*container.Container{
 						mockUpdate.CreateMockContainerWithConfig(
 							"watchtower",
 							"/watchtower",
@@ -1104,7 +1104,7 @@ func TestSafeguardDelay(t *testing.T) {
 			synctest.Test(t, func(t *testing.T) {
 				client := mockUpdate.CreateMockClient(
 					&mockUpdate.TestData{
-						Containers: []types.Container{
+						Containers: []*container.Container{
 							mockUpdate.CreateMockContainerWithConfig(
 								"watchtower",
 								"/watchtower",
@@ -1157,7 +1157,7 @@ func TestPullFailureDelayContextCancellation(t *testing.T) {
 		client := mockUpdate.CreateMockClientWithContext(
 			ctx,
 			&mockUpdate.TestData{
-				Containers: []types.Container{
+				Containers: []*container.Container{
 					mockUpdate.CreateMockContainerWithConfig(
 						"watchtower",
 						"/watchtower",

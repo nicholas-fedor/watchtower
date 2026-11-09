@@ -11,6 +11,7 @@ import (
 
 	dockerContainer "github.com/moby/moby/api/types/container"
 
+	"github.com/nicholas-fedor/watchtower/internal/container"
 	"github.com/nicholas-fedor/watchtower/internal/container/filters"
 	"github.com/nicholas-fedor/watchtower/internal/observability/metrics"
 	"github.com/nicholas-fedor/watchtower/internal/registry/ratelimit"
@@ -19,7 +20,6 @@ import (
 	mockUpdate "github.com/nicholas-fedor/watchtower/internal/update/mocks"
 	updateParams "github.com/nicholas-fedor/watchtower/internal/update/params"
 	"github.com/nicholas-fedor/watchtower/internal/update/state"
-	"github.com/nicholas-fedor/watchtower/pkg/types"
 )
 
 // newTestLogger returns a logger that writes each event to the test's log, so a
@@ -162,7 +162,7 @@ func Test_executeUpdate(t *testing.T) {
 
 		client := mockUpdate.CreateMockClient(
 			&mockUpdate.TestData{
-				Containers: []types.Container{
+				Containers: []*container.Container{
 					mockUpdate.CreateMockContainerWithConfig(
 						"test-container",
 						"/test-container",
@@ -223,7 +223,7 @@ func Test_executeUpdate(t *testing.T) {
 
 		client := mockUpdate.CreateMockClient(
 			&mockUpdate.TestData{
-				Containers: []types.Container{
+				Containers: []*container.Container{
 					mockUpdate.CreateMockContainerWithConfig(
 						"test-container",
 						"/test-container",
@@ -262,7 +262,7 @@ func Test_executeUpdate(t *testing.T) {
 
 		client := mockUpdate.CreateMockClient(
 			&mockUpdate.TestData{
-				Containers: []types.Container{
+				Containers: []*container.Container{
 					mockUpdate.CreateMockContainerWithConfig(
 						"watchtower",
 						"/watchtower",
@@ -307,7 +307,7 @@ func Test_executeUpdate(t *testing.T) {
 
 		client := mockUpdate.CreateMockClient(
 			&mockUpdate.TestData{
-				Containers: []types.Container{
+				Containers: []*container.Container{
 					mockUpdate.CreateMockContainerWithConfig(
 						"watchtower",
 						"/watchtower",

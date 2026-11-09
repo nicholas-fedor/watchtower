@@ -5,7 +5,6 @@ import (
 
 	composeLabels "github.com/nicholas-fedor/watchtower/internal/compose/labels"
 	"github.com/nicholas-fedor/watchtower/internal/container/labels"
-	"github.com/nicholas-fedor/watchtower/pkg/types"
 )
 
 // Links returns a list of container names this container depends on.
@@ -95,7 +94,7 @@ func filterSelfReferences(links []string, containerName string) []string {
 // Returns:
 //   - string: Container identifier formatted according to the prioritization
 //     order, always returns a non-empty string for valid containers
-func ResolveContainerIdentifier(c types.Container) string {
+func ResolveContainerIdentifier(c *Container) string {
 	info := c.ContainerInfo()
 	if info == nil {
 		return nameOrID(c)
@@ -138,7 +137,7 @@ func ResolveContainerIdentifier(c types.Container) string {
 }
 
 // nameOrID returns the container name if non-empty; otherwise, returns the container ID.
-func nameOrID(c types.Container) string {
+func nameOrID(c *Container) string {
 	// Return the container name if available.
 	name := c.Name()
 	if name != "" {

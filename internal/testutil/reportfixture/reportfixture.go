@@ -138,7 +138,7 @@ func Report(states ...state.State) *state.Report {
 // Returns:
 //   - *state.Report: Report with c's status in its scanned list. The status is
 //     also in the updated list, or in the fresh list when newImage is c's image.
-func UpdatedReport(c types.Container, newImage types.ImageID, meta provenance.ReportMeta) *state.Report {
+func UpdatedReport(c *container.Container, newImage types.ImageID, meta provenance.ReportMeta) *state.Report {
 	log := new(zerolog.Nop())
 	progress := state.Progress{}
 
@@ -159,9 +159,9 @@ func UpdatedReport(c types.Container, newImage types.ImageID, meta provenance.Re
 //   - outcome: State the container ends the report in.
 //
 // Returns:
-//   - types.Container: Container running image mock/<name>:latest.
+//   - *container.Container: Container running image mock/<name>:latest.
 //   - types.ImageID: ID of the newer image the container can move to.
-func Container(index int, outcome state.State) (types.Container, types.ImageID) {
+func Container(index int, outcome state.State) (*container.Container, types.ImageID) {
 	kind, ok := containerKinds[outcome]
 	if !ok {
 		panic(fmt.Sprintf("reportfixture.Container: no report ends in state %v", outcome))

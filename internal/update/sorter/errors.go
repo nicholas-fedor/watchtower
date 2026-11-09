@@ -4,7 +4,7 @@ import (
 	"errors"
 	"strings"
 
-	"github.com/nicholas-fedor/watchtower/pkg/types"
+	"github.com/nicholas-fedor/watchtower/internal/container"
 )
 
 // errCircularReference indicates a circular dependency between containers.
@@ -49,7 +49,7 @@ func (e circularReferenceError) Unwrap() error {
 // identifierCollisionError represents an error when multiple containers have the same normalized identifier.
 type identifierCollisionError struct {
 	DuplicateIdentifier string
-	AffectedContainers  []types.Container
+	AffectedContainers  []*container.Container
 }
 
 // Error implements the error interface.

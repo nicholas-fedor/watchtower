@@ -7,11 +7,11 @@ import (
 	"github.com/distribution/reference"
 	"github.com/rs/zerolog"
 
+	"github.com/nicholas-fedor/watchtower/internal/container"
 	"github.com/nicholas-fedor/watchtower/internal/container/oci"
 	"github.com/nicholas-fedor/watchtower/internal/container/provenance"
 	"github.com/nicholas-fedor/watchtower/internal/observability/logging"
 	updateParams "github.com/nicholas-fedor/watchtower/internal/update/params"
-	"github.com/nicholas-fedor/watchtower/pkg/types"
 )
 
 // gitShortSHALen is the number of hex characters used in name:git-<shortsha> tags and notifications.
@@ -30,7 +30,7 @@ const gitShortSHALen = 12
 //   - *zerolog.Event: evt, or nil when evt is nil.
 func withGitMeta(
 	evt *zerolog.Event,
-	c types.Container,
+	c *container.Container,
 	params updateParams.Params,
 	tag, commit string,
 ) *zerolog.Event {
@@ -79,7 +79,7 @@ func withGitMeta(
 //
 // Returns:
 //   - none.
-func logFoundGitRevision(log *zerolog.Logger, c types.Container, params updateParams.Params, tag, commit string) {
+func logFoundGitRevision(log *zerolog.Logger, c *container.Container, params updateParams.Params, tag, commit string) {
 	if log == nil || c == nil {
 		return
 	}

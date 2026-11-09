@@ -92,7 +92,7 @@ func fixtureContainer(
 	running bool,
 	labels map[string]string,
 	repoDigests []string,
-) types.Container {
+) *container.Container {
 	info := &dockerContainer.InspectResponse{
 		ID:    fixtureID(id),
 		Name:  name,
@@ -118,11 +118,11 @@ func fixtureContainer(
 // Two containers share one image so the images endpoint aggregates them. The
 // worker image has digests from two repositories, the first of which does not
 // match its image name. The cache container has no image metadata.
-func fixtureContainers() []types.Container {
+func fixtureContainers() []*container.Container {
 	nginxID := "sha256:" + fixtureID("a")
 	nginxDigests := []string{"nginx@sha256:" + fixtureID("d")}
 
-	return []types.Container{
+	return []*container.Container{
 		fixtureContainer("1", "/web", "nginx:1.27", nginxID, true, map[string]string{
 			"com.centurylinklabs.watchtower.enable": "true",
 			"com.centurylinklabs.watchtower.scope":  "prod",
@@ -157,7 +157,7 @@ func newFixtureClient(t *testing.T) *mockContainerClient.MockClient {
 	client.EXPECT().ListContainers(mock.Anything, mock.Anything).Return(list, nil).Maybe()
 	client.EXPECT().ListContainers(mock.Anything).Return(list, nil).Maybe()
 	client.EXPECT().CheckContainerUpdate(mock.Anything, mock.Anything, mock.Anything).
-		RunAndReturn(func(_ context.Context, c types.Container, _ updateConfig.Policy) (bool, types.ImageID, string, error) {
+		RunAndReturn(func(_ context.Context, c *container.Container, _ updateConfig.Policy) (bool, types.ImageID, string, error) {
 			switch c.Name() {
 			case "web", "web-2":
 				return true, types.ImageID("sha256:" + fixtureID("7")), "sha256:" + fixtureID("8"), nil

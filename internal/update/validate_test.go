@@ -11,6 +11,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	composeLabels "github.com/nicholas-fedor/watchtower/internal/compose/labels"
+	"github.com/nicholas-fedor/watchtower/internal/container"
 	mockContainerClient "github.com/nicholas-fedor/watchtower/internal/container/client/mocks"
 	containerLabels "github.com/nicholas-fedor/watchtower/internal/container/labels"
 	"github.com/nicholas-fedor/watchtower/internal/testutil/containerfixture"
@@ -50,7 +51,7 @@ func TestValidateRollingRestartDependencies(t *testing.T) {
 			t.Parallel()
 
 			mockClient := mockContainerClient.NewMockClient(t)
-			mockClient.EXPECT().ListContainers(mock.Anything, mock.Anything).Return([]types.Container{}, nil)
+			mockClient.EXPECT().ListContainers(mock.Anything, mock.Anything).Return([]*container.Container{}, nil)
 
 			err := ValidateRollingRestartDependencies(newTestLogger(t), t.Context(), mockClient, filter, true)
 
@@ -65,7 +66,7 @@ func TestValidateRollingRestartDependencies(t *testing.T) {
 			t.Parallel()
 
 			mockClient := mockContainerClient.NewMockClient(t)
-			mockClient.EXPECT().ListContainers(mock.Anything, mock.Anything).Return([]types.Container{
+			mockClient.EXPECT().ListContainers(mock.Anything, mock.Anything).Return([]*container.Container{
 				labeledContainer("app", nil),
 				labeledContainer("cache", nil),
 			}, nil)
@@ -83,7 +84,7 @@ func TestValidateRollingRestartDependencies(t *testing.T) {
 			t.Parallel()
 
 			mockClient := mockContainerClient.NewMockClient(t)
-			mockClient.EXPECT().ListContainers(mock.Anything, mock.Anything).Return([]types.Container{
+			mockClient.EXPECT().ListContainers(mock.Anything, mock.Anything).Return([]*container.Container{
 				labeledContainer("app", nil),
 				labeledContainer("web-container", map[string]string{containerLabels.DependsOn: "db,redis"}),
 			}, nil)
@@ -100,7 +101,7 @@ func TestValidateRollingRestartDependencies(t *testing.T) {
 			// The Watchtower depends-on label counts whether or not Compose
 			// depends_on is read.
 			mockClient := mockContainerClient.NewMockClient(t)
-			mockClient.EXPECT().ListContainers(mock.Anything, mock.Anything).Return([]types.Container{
+			mockClient.EXPECT().ListContainers(mock.Anything, mock.Anything).Return([]*container.Container{
 				labeledContainer("web-container", map[string]string{containerLabels.DependsOn: "db"}),
 			}, nil)
 
@@ -124,7 +125,7 @@ func TestValidateRollingRestartDependencies(t *testing.T) {
 			t.Parallel()
 
 			mockClient := mockContainerClient.NewMockClient(t)
-			mockClient.EXPECT().ListContainers(mock.Anything, mock.Anything).Return([]types.Container{web}, nil)
+			mockClient.EXPECT().ListContainers(mock.Anything, mock.Anything).Return([]*container.Container{web}, nil)
 
 			err := ValidateRollingRestartDependencies(newTestLogger(t), t.Context(), mockClient, filter, true)
 
@@ -136,7 +137,7 @@ func TestValidateRollingRestartDependencies(t *testing.T) {
 			t.Parallel()
 
 			mockClient := mockContainerClient.NewMockClient(t)
-			mockClient.EXPECT().ListContainers(mock.Anything, mock.Anything).Return([]types.Container{web}, nil)
+			mockClient.EXPECT().ListContainers(mock.Anything, mock.Anything).Return([]*container.Container{web}, nil)
 
 			err := ValidateRollingRestartDependencies(newTestLogger(t), t.Context(), mockClient, filter, false)
 
@@ -153,8 +154,8 @@ func TestValidateRollingRestartDependencies(t *testing.T) {
 //   - labels: Container labels, or nil for none.
 //
 // Returns:
-//   - types.Container: The container.
-func labeledContainer(name string, labels map[string]string) types.Container {
+//   - *container.Container: The container.
+func labeledContainer(name string, labels map[string]string) *container.Container {
 	return modelfixture.Container(containerfixture.WithName(name), containerfixture.WithLabels(labels))
 }
 
@@ -167,12 +168,12 @@ func labeledContainer(name string, labels map[string]string) types.Container {
 //   - containers: Containers the fake daemon holds.
 //
 // Returns:
-//   - func(context.Context, ...types.Filter) ([]types.Container, error): The ListContainers implementation.
+//   - func(context.Context, ...types.Filter) ([]*container.Container, error): The ListContainers implementation.
 func listFiltered(
-	selected *[]types.Container,
-	containers ...types.Container,
-) func(context.Context, ...types.Filter) ([]types.Container, error) {
-	return func(_ context.Context, filters ...types.Filter) ([]types.Container, error) {
+	selected *[]*container.Container,
+	containers ...*container.Container,
+) func(context.Context, ...types.Filter) ([]*container.Container, error) {
+	return func(_ context.Context, filters ...types.Filter) ([]*container.Container, error) {
 		for _, c := range containers {
 			if !slices.ContainsFunc(filters, func(f types.Filter) bool { return !f(c) }) {
 				*selected = append(*selected, c)
@@ -199,16 +200,16 @@ func TestScopeValidationErrorCases(t *testing.T) {
 			mockClient := mockContainerClient.NewMockClient(t)
 
 			// Container with no scope label
-			container := labeledContainer("unscoped", nil)
+			unscoped := labeledContainer("unscoped", nil)
 
 			// Scoped container the filter excludes
 			scoped := labeledContainer("scoped", map[string]string{containerLabels.Scope: "prod"})
 
-			var selected []types.Container
+			var selected []*container.Container
 
 			mockClient.EXPECT().
 				ListContainers(mock.Anything, mock.Anything).
-				RunAndReturn(listFiltered(&selected, container, scoped))
+				RunAndReturn(listFiltered(&selected, unscoped, scoped))
 
 			// Create unscoped filter (empty scope should default to unscoped)
 			filter := func(c types.FilterableContainer) bool {
@@ -223,7 +224,7 @@ func TestScopeValidationErrorCases(t *testing.T) {
 			err := ValidateRollingRestartDependencies(newTestLogger(t), t.Context(), mockClient, filter, true)
 
 			require.NoError(t, err)
-			assert.Equal(t, []types.Container{container}, selected)
+			assert.Equal(t, []*container.Container{unscoped}, selected)
 		})
 
 		t.Run("should handle containers with invalid scope label formats", func(t *testing.T) {
@@ -235,7 +236,7 @@ func TestScopeValidationErrorCases(t *testing.T) {
 			container1 := labeledContainer("valid", map[string]string{containerLabels.Scope: "valid-scope"})
 			container2 := labeledContainer("malformed", map[string]string{containerLabels.Scope: "invalid$scope@123"})
 
-			var selected []types.Container
+			var selected []*container.Container
 
 			mockClient.EXPECT().
 				ListContainers(mock.Anything, mock.Anything).
@@ -251,7 +252,7 @@ func TestScopeValidationErrorCases(t *testing.T) {
 			err := ValidateRollingRestartDependencies(newTestLogger(t), t.Context(), mockClient, filter, true)
 
 			require.NoError(t, err)
-			assert.Equal(t, []types.Container{container2}, selected)
+			assert.Equal(t, []*container.Container{container2}, selected)
 		})
 
 		t.Run("should handle scope labels with whitespace and normalization", func(t *testing.T) {
@@ -260,16 +261,16 @@ func TestScopeValidationErrorCases(t *testing.T) {
 			mockClient := mockContainerClient.NewMockClient(t)
 
 			// Container with scope label containing leading and trailing spaces
-			container := labeledContainer("spaced", map[string]string{containerLabels.Scope: "  spaced scope  "})
+			spaced := labeledContainer("spaced", map[string]string{containerLabels.Scope: "  spaced scope  "})
 
 			// Container whose scope matches only after trimming
 			trimmed := labeledContainer("trimmed", map[string]string{containerLabels.Scope: "spaced scope"})
 
-			var selected []types.Container
+			var selected []*container.Container
 
 			mockClient.EXPECT().
 				ListContainers(mock.Anything, mock.Anything).
-				RunAndReturn(listFiltered(&selected, container, trimmed))
+				RunAndReturn(listFiltered(&selected, spaced, trimmed))
 
 			// Filter that expects the scope as written
 			filter := func(c types.FilterableContainer) bool {
@@ -281,7 +282,7 @@ func TestScopeValidationErrorCases(t *testing.T) {
 			err := ValidateRollingRestartDependencies(newTestLogger(t), t.Context(), mockClient, filter, true)
 
 			require.NoError(t, err)
-			assert.Equal(t, []types.Container{container}, selected)
+			assert.Equal(t, []*container.Container{spaced}, selected)
 		})
 	})
 
@@ -294,16 +295,16 @@ func TestScopeValidationErrorCases(t *testing.T) {
 			mockClient := mockContainerClient.NewMockClient(t)
 
 			// Container without a scope label
-			container := labeledContainer("unscoped", nil)
+			unscoped := labeledContainer("unscoped", nil)
 
 			// Scoped container the filter excludes
 			scoped := labeledContainer("scoped", map[string]string{containerLabels.Scope: "prod"})
 
-			var selected []types.Container
+			var selected []*container.Container
 
 			mockClient.EXPECT().
 				ListContainers(mock.Anything, mock.Anything).
-				RunAndReturn(listFiltered(&selected, container, scoped))
+				RunAndReturn(listFiltered(&selected, unscoped, scoped))
 
 			// Filter that handles missing scopes
 			filter := func(c types.FilterableContainer) bool {
@@ -315,7 +316,7 @@ func TestScopeValidationErrorCases(t *testing.T) {
 			err := ValidateRollingRestartDependencies(newTestLogger(t), t.Context(), mockClient, filter, true)
 
 			require.NoError(t, err)
-			assert.Equal(t, []types.Container{container}, selected)
+			assert.Equal(t, []*container.Container{unscoped}, selected)
 		})
 
 		t.Run("should validate scope consistency across operations", func(t *testing.T) {
@@ -330,7 +331,7 @@ func TestScopeValidationErrorCases(t *testing.T) {
 			// Container in another scope the filter excludes
 			other := labeledContainer("other", map[string]string{containerLabels.Scope: "other-scope"})
 
-			var selected []types.Container
+			var selected []*container.Container
 
 			mockClient.EXPECT().
 				ListContainers(mock.Anything, mock.Anything).
@@ -346,7 +347,7 @@ func TestScopeValidationErrorCases(t *testing.T) {
 			err := ValidateRollingRestartDependencies(newTestLogger(t), t.Context(), mockClient, filter, true)
 
 			require.NoError(t, err)
-			assert.Equal(t, []types.Container{container1, container2}, selected)
+			assert.Equal(t, []*container.Container{container1, container2}, selected)
 		})
 
 		t.Run("should handle scope label conflicts during validation", func(t *testing.T) {
@@ -355,16 +356,16 @@ func TestScopeValidationErrorCases(t *testing.T) {
 			mockClient := mockContainerClient.NewMockClient(t)
 
 			// Container whose scope label is present but empty
-			container := labeledContainer("empty-scope", map[string]string{containerLabels.Scope: ""})
+			emptyScope := labeledContainer("empty-scope", map[string]string{containerLabels.Scope: ""})
 
 			// Container without a scope label the filter excludes
 			unscoped := labeledContainer("unscoped", nil)
 
-			var selected []types.Container
+			var selected []*container.Container
 
 			mockClient.EXPECT().
 				ListContainers(mock.Anything, mock.Anything).
-				RunAndReturn(listFiltered(&selected, container, unscoped))
+				RunAndReturn(listFiltered(&selected, emptyScope, unscoped))
 
 			// Filter that detects empty scope labels
 			filter := func(c types.FilterableContainer) bool {
@@ -376,7 +377,7 @@ func TestScopeValidationErrorCases(t *testing.T) {
 			err := ValidateRollingRestartDependencies(newTestLogger(t), t.Context(), mockClient, filter, true)
 
 			require.NoError(t, err)
-			assert.Equal(t, []types.Container{container}, selected)
+			assert.Equal(t, []*container.Container{emptyScope}, selected)
 		})
 	})
 }

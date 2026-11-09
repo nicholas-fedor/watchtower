@@ -9,13 +9,13 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"github.com/nicholas-fedor/watchtower/internal/container"
 	"github.com/nicholas-fedor/watchtower/internal/container/filters"
 	containerImage "github.com/nicholas-fedor/watchtower/internal/container/image"
 	"github.com/nicholas-fedor/watchtower/internal/registry/ratelimit"
 	"github.com/nicholas-fedor/watchtower/internal/testutil/logcapture"
 	mockUpdate "github.com/nicholas-fedor/watchtower/internal/update/mocks"
 	updateParams "github.com/nicholas-fedor/watchtower/internal/update/params"
-	"github.com/nicholas-fedor/watchtower/pkg/types"
 )
 
 // cooldownConfig returns a base [updateParams.Params] with CooldownDelay and standard settings.
@@ -66,7 +66,7 @@ func TestUpdateAction_Cooldown(t *testing.T) {
 
 			client := mockUpdate.MockClient{
 				TestData: &mockUpdate.TestData{
-					Containers: []types.Container{
+					Containers: []*container.Container{
 						mockUpdate.CreateMockContainer("c1", "c1", "myimage:latest", time.Now()),
 					},
 					IsContainerStaleError: &containerImage.CooldownError{
@@ -107,7 +107,7 @@ func TestUpdateAction_Cooldown(t *testing.T) {
 			// past its cooldown reports stale without an error.
 			client := mockUpdate.MockClient{
 				TestData: &mockUpdate.TestData{
-					Containers: []types.Container{
+					Containers: []*container.Container{
 						mockUpdate.CreateMockContainer("c1", "c1", "myimage:latest", time.Now()),
 					},
 					Staleness: map[string]bool{
@@ -135,7 +135,7 @@ func TestUpdateAction_Cooldown(t *testing.T) {
 			// is skipped when CooldownDelay is zero.
 			client := mockUpdate.MockClient{
 				TestData: &mockUpdate.TestData{
-					Containers: []types.Container{
+					Containers: []*container.Container{
 						mockUpdate.CreateMockContainer("c1", "c1", "fake-image:latest", time.Now()),
 					},
 					Staleness: map[string]bool{
@@ -163,7 +163,7 @@ func TestUpdateAction_Cooldown(t *testing.T) {
 			// Use a standard mock container via CreateMockContainer.
 			client := mockUpdate.CreateMockClient(
 				&mockUpdate.TestData{
-					Containers: []types.Container{
+					Containers: []*container.Container{
 						mockUpdate.CreateMockContainer("c1", "c1", "fake-image:latest", time.Now()),
 					},
 					Staleness: map[string]bool{
@@ -193,7 +193,7 @@ func TestUpdateAction_Cooldown(t *testing.T) {
 
 			client := mockUpdate.MockClient{
 				TestData: &mockUpdate.TestData{
-					Containers: []types.Container{
+					Containers: []*container.Container{
 						mockUpdate.CreateMockContainer("c1", "c1", "myimage:latest", time.Now()),
 					},
 					// A failed age lookup carries the configured delay and the
@@ -231,7 +231,7 @@ func TestUpdateAction_Cooldown(t *testing.T) {
 			// Use a standard mock container via CreateMockContainer.
 			client := mockUpdate.CreateMockClient(
 				&mockUpdate.TestData{
-					Containers: []types.Container{
+					Containers: []*container.Container{
 						mockUpdate.CreateMockContainer("c1", "c1", "fake-image:latest", time.Now()),
 					},
 					Staleness: map[string]bool{

@@ -28,7 +28,6 @@ import (
 	gitConfig "github.com/nicholas-fedor/watchtower/internal/settings/config/git"
 	"github.com/nicholas-fedor/watchtower/internal/testutil/containerfixture"
 	"github.com/nicholas-fedor/watchtower/internal/testutil/modelfixture"
-	"github.com/nicholas-fedor/watchtower/pkg/types"
 )
 
 type stubLister struct {
@@ -91,7 +90,7 @@ func TestCheckContainer_RejectedComposeStampRetries(t *testing.T) {
 	assert.True(t, got.Stale)
 }
 
-func labeledComposeMember(t *testing.T, project, service, number, dir, files, commit string) types.Container {
+func labeledComposeMember(t *testing.T, project, service, number, dir, files, commit string) *container.Container {
 	t.Helper()
 
 	return labeledContainer(map[string]string{

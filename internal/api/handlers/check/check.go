@@ -145,7 +145,7 @@ func CheckForUpdates(log *zerolog.Logger,
 //
 // Returns:
 //   - ContainerCheck: Populated identity fields, source and availability left unset.
-func newContainerCheck(c types.Container, now time.Time) ContainerCheck {
+func newContainerCheck(c *container.Container, now time.Time) ContainerCheck {
 	return ContainerCheck{
 		Name:      c.Name(),
 		Image:     c.ImageName(),
@@ -157,9 +157,6 @@ func newContainerCheck(c types.Container, now time.Time) ContainerCheck {
 
 // applyReportMetadata copies resolved Git and OCI metadata onto a result.
 //
-// Only a concrete container exposes its labels, so a stubbed container keeps
-// the empty metadata the response would otherwise report.
-//
 // Parameters:
 //   - c: Container being checked.
 //   - params: Update parameters.
@@ -167,11 +164,7 @@ func newContainerCheck(c types.Container, now time.Time) ContainerCheck {
 //
 // Returns:
 //   - none.
-func applyReportMetadata(c types.Container, params updateParams.Params, result *ContainerCheck) {
-	if _, concrete := c.(*container.Container); !concrete {
-		return
-	}
-
+func applyReportMetadata(c *container.Container, params updateParams.Params, result *ContainerCheck) {
 	meta := provenance.ResolveReportMeta(c, params.Git, provenance.ChangelogVars{}, oci.Annotations{})
 	result.GitRepo = meta.GitRepo
 	result.GitRef = meta.GitRef
@@ -186,8 +179,7 @@ func applyReportMetadata(c types.Container, params updateParams.Params, result *
 // isGitWatched reports whether a container is checked against its hosted Git
 // source rather than its registry image.
 //
-// A nil Git client or a container without readable labels cannot take the Git
-// path, so both fall back to the registry check.
+// Without a Git client the container falls back to the registry check.
 //
 // Parameters:
 //   - log: Process logger.
@@ -199,15 +191,11 @@ func applyReportMetadata(c types.Container, params updateParams.Params, result *
 //   - bool: True when the Git source check applies.
 func isGitWatched(
 	log *zerolog.Logger,
-	c types.Container,
+	c *container.Container,
 	params updateParams.Params,
 	gitClient *git.Client,
 ) bool {
 	if gitClient == nil {
-		return false
-	}
-
-	if _, concrete := c.(*container.Container); !concrete {
 		return false
 	}
 
@@ -232,7 +220,7 @@ func isGitWatched(
 func checkGitSource(
 	ctx context.Context,
 	log *zerolog.Logger,
-	c types.Container,
+	c *container.Container,
 	params updateParams.Params,
 	gitClient *git.Client,
 	result *ContainerCheck,
@@ -287,7 +275,7 @@ func checkRegistrySource(
 	ctx context.Context,
 	log *zerolog.Logger,
 	client containerClient.Client,
-	c types.Container,
+	c *container.Container,
 	params updateParams.Params,
 	result *ContainerCheck,
 ) {
@@ -325,7 +313,7 @@ func checkRegistrySource(
 //
 // Returns:
 //   - none.
-func logCheckFailure(log *zerolog.Logger, c types.Container, err error, message string) {
+func logCheckFailure(log *zerolog.Logger, c *container.Container, err error, message string) {
 	log.Debug().
 		Err(err).
 		Str("container", c.Name()).

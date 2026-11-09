@@ -10,10 +10,10 @@ import (
 	dockerContainer "github.com/moby/moby/api/types/container"
 	dockerNetwork "github.com/moby/moby/api/types/network"
 
+	"github.com/nicholas-fedor/watchtower/internal/container"
 	"github.com/nicholas-fedor/watchtower/internal/registry/ratelimit"
 	mockUpdate "github.com/nicholas-fedor/watchtower/internal/update/mocks"
 	updateParams "github.com/nicholas-fedor/watchtower/internal/update/params"
-	"github.com/nicholas-fedor/watchtower/pkg/types"
 )
 
 // TestUpdateAction_StaleContainerBesideCycle verifies that a dependency cycle
@@ -67,7 +67,7 @@ func TestUpdateAction_StaleContainerBesideCycle(t *testing.T) {
 
 		client := mockUpdate.CreateMockClient(
 			&mockUpdate.TestData{
-				Containers: []types.Container{containerA, containerB, containerC},
+				Containers: []*container.Container{containerA, containerB, containerC},
 				Staleness:  map[string]bool{"cycle-c": true},
 			},
 			false,

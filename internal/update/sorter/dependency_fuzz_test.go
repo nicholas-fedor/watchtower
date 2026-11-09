@@ -17,7 +17,6 @@ import (
 
 	composeLabels "github.com/nicholas-fedor/watchtower/internal/compose/labels"
 	"github.com/nicholas-fedor/watchtower/internal/container"
-	"github.com/nicholas-fedor/watchtower/pkg/types"
 )
 
 // FuzzDependencySort fuzz tests the dependency sorting algorithm with random inputs.
@@ -50,7 +49,7 @@ func FuzzDependencySort(f *testing.F) {
 		// Test with both useComposeDependsOn values
 		for _, useComposeDependsOn := range []bool{true, false} {
 			ds := dependencySorter{}
-			testContainers := make([]types.Container, len(containers))
+			testContainers := make([]*container.Container, len(containers))
 			copy(testContainers, containers)
 
 			// This should not panic
@@ -106,7 +105,7 @@ func FuzzCycleDetection(f *testing.F) {
 		// Test with both useComposeDependsOn values
 		for _, useComposeDependsOn := range []bool{true, false} {
 			ds := dependencySorter{}
-			testContainers := make([]types.Container, len(containers))
+			testContainers := make([]*container.Container, len(containers))
 			copy(testContainers, containers)
 
 			// This should not panic
@@ -128,7 +127,7 @@ func FuzzCycleDetection(f *testing.F) {
 
 // parseFuzzDependencyData parses fuzz input into containers with dependencies
 // Format: "A->B,B->C" becomes containers A,B,C with A depending on B, B depending on C.
-func parseFuzzDependencyData(data []byte) []types.Container {
+func parseFuzzDependencyData(data []byte) []*container.Container {
 	if len(data) == 0 {
 		return nil
 	}
@@ -256,7 +255,7 @@ func FuzzSortByDependencies(f *testing.F) {
 
 // generateCollisionContainers creates containers that could have identifier
 // collisions, each with only a Compose service label.
-func generateCollisionContainers(data []byte) []types.Container {
+func generateCollisionContainers(data []byte) []*container.Container {
 	var services []string
 
 	switch {
@@ -282,7 +281,7 @@ func generateCollisionContainers(data []byte) []types.Container {
 // so on, each with a Compose service label of the matching value. The label is
 // set through labels rather than the service field, which leaves an empty
 // value unset.
-func serviceLabelContainers(services []string) []types.Container {
+func serviceLabelContainers(services []string) []*container.Container {
 	specs := make([]deployed, len(services))
 	for i, service := range services {
 		specs[i] = deployed{
@@ -295,7 +294,7 @@ func serviceLabelContainers(services []string) []types.Container {
 }
 
 // isRealCycle verifies that a detected cycle is actually real and not a false positive.
-func isRealCycle(containers []types.Container, circularErr circularReferenceError, useComposeDependsOn bool) bool {
+func isRealCycle(containers []*container.Container, circularErr circularReferenceError, useComposeDependsOn bool) bool {
 	cyclePath := circularErr.CyclePath
 
 	// Edge case: cycle path must have at least 3 elements for a valid cycle (A->B->A)
@@ -304,7 +303,7 @@ func isRealCycle(containers []types.Container, circularErr circularReferenceErro
 	}
 
 	// Create a map from normalized identifier to container for efficient lookup
-	containerMap := make(map[string]types.Container)
+	containerMap := make(map[string]*container.Container)
 
 	for _, c := range containers {
 		normalizedIdentifier := container.NormalizeContainerName(
@@ -338,13 +337,13 @@ func isRealCycle(containers []types.Container, circularErr circularReferenceErro
 }
 
 // generateMalformedLabelContainers creates containers with malformed labels.
-func generateMalformedLabelContainers(data []byte) []types.Container {
+func generateMalformedLabelContainers(data []byte) []*container.Container {
 	switch {
 	case bytes.Contains(data, []byte("empty-labels")):
 		return deploy(deployed{name: "container0"}, deployed{name: "container1"}, deployed{name: "container2"})
 
 	case bytes.Contains(data, []byte("nil-labels")):
-		containers := make([]types.Container, 3)
+		containers := make([]*container.Container, 3)
 		for i := range containers {
 			name := fmt.Sprintf("container%d", i)
 			containers[i] = container.NewContainer(nil, &dockerContainer.InspectResponse{
@@ -374,7 +373,7 @@ func generateMalformedLabelContainers(data []byte) []types.Container {
 // generateLinkNormalizationContainers creates containers with various link
 // normalization scenarios. Links come from a Watchtower depends-on label or
 // from legacy links in the host config, as Container.Links reads them.
-func generateLinkNormalizationContainers(data []byte) []types.Container {
+func generateLinkNormalizationContainers(data []byte) []*container.Container {
 	switch {
 	case bytes.Contains(data, []byte("leading-slash-links")):
 		return deploy(
@@ -405,7 +404,7 @@ func generateLinkNormalizationContainers(data []byte) []types.Container {
 }
 
 // generateEmptyIdentifierContainers creates containers with empty or missing identifiers.
-func generateEmptyIdentifierContainers(data []byte) []types.Container {
+func generateEmptyIdentifierContainers(data []byte) []*container.Container {
 	switch {
 	case bytes.Contains(data, []byte("empty-names")):
 		// Containers with empty names and distinct IDs.
@@ -413,7 +412,7 @@ func generateEmptyIdentifierContainers(data []byte) []types.Container {
 
 	case bytes.Contains(data, []byte("nil-container-info")):
 		// Containers without inspect data, so without a name or an ID.
-		containers := make([]types.Container, 3)
+		containers := make([]*container.Container, 3)
 		for i := range containers {
 			containers[i] = container.NewContainer(nil, nil, nil)
 		}
@@ -422,7 +421,7 @@ func generateEmptyIdentifierContainers(data []byte) []types.Container {
 
 	case bytes.Contains(data, []byte("empty-ids")):
 		// Containers with names and empty IDs.
-		containers := make([]types.Container, 3)
+		containers := make([]*container.Container, 3)
 		for i := range containers {
 			containers[i] = container.NewContainer(nil, &dockerContainer.InspectResponse{
 				Name:   fmt.Sprintf("/container%d", i),
@@ -471,7 +470,7 @@ func FuzzIdentifierCollisions(f *testing.F) {
 		// Test with both useComposeDependsOn values
 		for _, useComposeDependsOn := range []bool{true, false} {
 			ds := dependencySorter{}
-			testContainers := make([]types.Container, len(containers))
+			testContainers := make([]*container.Container, len(containers))
 			copy(testContainers, containers)
 
 			// This should not panic and should not detect false cycles
@@ -521,7 +520,7 @@ func FuzzMalformedLabels(f *testing.F) {
 		// Test with both useComposeDependsOn values
 		for _, useComposeDependsOn := range []bool{true, false} {
 			ds := dependencySorter{}
-			testContainers := make([]types.Container, len(containers))
+			testContainers := make([]*container.Container, len(containers))
 			copy(testContainers, containers)
 
 			// This should not panic
@@ -564,7 +563,7 @@ func FuzzLinkNormalization(f *testing.F) {
 		// Test with both useComposeDependsOn values
 		for _, useComposeDependsOn := range []bool{true, false} {
 			ds := dependencySorter{}
-			testContainers := make([]types.Container, len(containers))
+			testContainers := make([]*container.Container, len(containers))
 			copy(testContainers, containers)
 
 			// This should not panic
@@ -667,7 +666,7 @@ func FuzzEmptyIdentifiers(f *testing.F) {
 		// Test with both useComposeDependsOn values
 		for _, useComposeDependsOn := range []bool{true, false} {
 			ds := dependencySorter{}
-			testContainers := make([]types.Container, len(containers))
+			testContainers := make([]*container.Container, len(containers))
 			copy(testContainers, containers)
 
 			// This should not panic

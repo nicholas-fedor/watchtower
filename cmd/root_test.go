@@ -141,7 +141,7 @@ func TestValidateRollingRestartDependenciesAcceptsCancelableContext(t *testing.T
 		ctx := t.Context()
 
 		// Mock expects ListContainers to be called with the cancelable context
-		mockClient.EXPECT().ListContainers(ctx, mock.Anything, mock.Anything).Return([]types.Container{}, nil).Once()
+		mockClient.EXPECT().ListContainers(ctx, mock.Anything, mock.Anything).Return([]*container.Container{}, nil).Once()
 
 		err := update.ValidateRollingRestartDependencies(newTestLogger(t), ctx, mockClient, filter, true)
 
@@ -865,7 +865,7 @@ func TestDisableRestarts(t *testing.T) {
 		name string
 		// current is the inspected Watchtower container, or nil when it was
 		// not inspected.
-		current types.Container
+		current *container.Container
 		// pid is the process ID Watchtower runs as.
 		pid int
 		// unknownID leaves Watchtower's own container ID unknown.
@@ -921,7 +921,7 @@ func TestDisableRestarts(t *testing.T) {
 
 // currentWatchtowerWithoutRestarts returns the Watchtower container the tests
 // run as, with the restart policy "no".
-func currentWatchtowerWithoutRestarts() types.Container {
+func currentWatchtowerWithoutRestarts() *container.Container {
 	return container.NewContainer(nil,
 		&dockerContainer.InspectResponse{
 			ID:         "c0c0",

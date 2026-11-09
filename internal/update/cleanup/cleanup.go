@@ -79,7 +79,7 @@ func RemoveExcessWatchtowerInstances(log *zerolog.Logger, ctx context.Context,
 	cleanupImages bool,
 	scope string,
 	removeImageInfos *[]RemovedImageInfo,
-	currentContainer types.Container,
+	currentContainer *container.Container,
 ) (int, error) {
 	log.Debug().
 		Str("scope", scope).
@@ -175,7 +175,7 @@ func RemoveOldWatchtowerContainers(log *zerolog.Logger, ctx context.Context,
 	}
 
 	// The current container sets the scope to clean up.
-	var current types.Container
+	var current *container.Container
 
 	for _, c := range allContainers {
 		if c.ID() == currentContainerID {
@@ -202,7 +202,7 @@ func RemoveOldWatchtowerContainers(log *zerolog.Logger, ctx context.Context,
 		Msg("Checking for old Watchtower containers")
 
 	// Find old Watchtower containers within the same scope
-	var oldContainers []types.Container
+	var oldContainers []*container.Container
 
 	// Iterate all containers to find old Watchtower containers that
 	// should be cleaned up. Non-Watchtower containers and containers with
@@ -246,7 +246,7 @@ func RemoveOldWatchtowerContainers(log *zerolog.Logger, ctx context.Context,
 	// These can be left behind when a self-update creates a replacement but
 	// fails to start it. The new container never runs and the old instance
 	// may already be running under its original name.
-	var orphanedCreatedContainers []types.Container
+	var orphanedCreatedContainers []*container.Container
 
 	for _, c := range allContainers {
 		if container.IsOrphanedReplacement(c, current) {
@@ -296,11 +296,11 @@ func RemoveOldWatchtowerContainers(log *zerolog.Logger, ctx context.Context,
 //   - allContainers: All containers to search for excess instances.
 //
 // Returns:
-//   - []types.Container: Slice of containers to remove.
+//   - []*container.Container: Slice of containers to remove.
 func getExcessContainers(log *zerolog.Logger, watchtowerScope string,
-	currentContainer types.Container,
-	allContainers []types.Container,
-) []types.Container {
+	currentContainer *container.Container,
+	allContainers []*container.Container,
+) []*container.Container {
 	log.Debug().
 		Str("scope", watchtowerScope).
 		Str("current_container_id", func() string {
@@ -318,7 +318,7 @@ func getExcessContainers(log *zerolog.Logger, watchtowerScope string,
 		allContainers,
 	)
 
-	var chainedContainers []types.Container
+	var chainedContainers []*container.Container
 	if currentContainer != nil {
 		chainedContainers = getChainedContainers(log, allContainers, currentContainer)
 	}
@@ -343,18 +343,18 @@ func getExcessContainers(log *zerolog.Logger, watchtowerScope string,
 //   - allContainers: All containers to filter from.
 //
 // Returns:
-//   - []types.Container: Excess containers to remove, empty when currentContainer is nil.
+//   - []*container.Container: Excess containers to remove, empty when currentContainer is nil.
 func getFilteredContainers(log *zerolog.Logger, scope string,
-	currentContainer types.Container,
-	allContainers []types.Container,
-) []types.Container {
+	currentContainer *container.Container,
+	allContainers []*container.Container,
+) []*container.Container {
 	if currentContainer == nil {
-		return []types.Container{}
+		return []*container.Container{}
 	}
 
 	inScope := filters.FilterByScope(log, scope, filters.NoFilter)
 
-	var filteredContainers []types.Container
+	var filteredContainers []*container.Container
 
 	// Check the Watchtower label first so the scope filter's debug lines cover
 	// only Watchtower containers, not every container on the host.
@@ -364,7 +364,7 @@ func getFilteredContainers(log *zerolog.Logger, scope string,
 		}
 	}
 
-	var excessContainers []types.Container
+	var excessContainers []*container.Container
 
 	currentID := string(currentContainer.ID())
 	if container.IsOldContainer(currentContainer.Name()) {
@@ -410,12 +410,12 @@ func getFilteredContainers(log *zerolog.Logger, scope string,
 //   - currentContainer: The current running Watchtower container (nil if not applicable).
 //
 // Returns:
-//   - []types.Container: Slice of chained containers excluding the current one.
+//   - []*container.Container: Slice of chained containers excluding the current one.
 func getChainedContainers(log *zerolog.Logger,
-	allContainers []types.Container,
-	currentContainer types.Container,
-) []types.Container {
-	var chainedContainers []types.Container
+	allContainers []*container.Container,
+	currentContainer *container.Container,
+) []*container.Container {
+	var chainedContainers []*container.Container
 
 	effectiveCurrent := currentContainer
 	if currentContainer != nil && container.IsOldContainer(currentContainer.Name()) {
@@ -426,7 +426,7 @@ func getChainedContainers(log *zerolog.Logger,
 	}
 
 	if effectiveCurrent == nil {
-		return []types.Container{}
+		return []*container.Container{}
 	}
 
 	// Get the (effective) current Watchtower container's com.centurylinklabs.watchtower.container-chain label.
@@ -434,12 +434,12 @@ func getChainedContainers(log *zerolog.Logger,
 
 	// If it's not present, there are no chained containers.
 	if !present {
-		return []types.Container{}
+		return []*container.Container{}
 	}
 
 	// If it's empty, there are no chained containers.
 	if chainLabelValue == "" {
-		return []types.Container{}
+		return []*container.Container{}
 	}
 
 	// Collect the container IDs from the chain for efficient lookup.
@@ -484,12 +484,12 @@ func getChainedContainers(log *zerolog.Logger,
 //   - candidates: Containers to search, in order.
 //
 // Returns:
-//   - types.Container: The first candidate whose chain label lists the predecessor's ID, or nil.
-//   - types.Container: The first candidate in the predecessor's scope, or nil.
-func successorOf(old types.Container, candidates []types.Container) (types.Container, types.Container) {
+//   - *container.Container: The first candidate whose chain label lists the predecessor's ID, or nil.
+//   - *container.Container: The first candidate in the predecessor's scope, or nil.
+func successorOf(old *container.Container, candidates []*container.Container) (*container.Container, *container.Container) {
 	oldScope := old.NormalizedScope()
 
-	var firstInScope types.Container
+	var firstInScope *container.Container
 
 	for _, c := range candidates {
 		if !c.IsWatchtower() || container.IsOldContainer(c.Name()) || c.NormalizedScope() != oldScope {
@@ -519,9 +519,9 @@ func successorOf(old types.Container, candidates []types.Container) (types.Conta
 //   - chainContainers: Containers linked in a chain excluding the current one.
 //
 // Returns:
-//   - []types.Container: Deduplicated slice of containers to remove.
-func addExcessContainers(excessContainers, chainContainers []types.Container) []types.Container {
-	containersToRemoveMap := make(map[types.ContainerID]types.Container)
+//   - []*container.Container: Deduplicated slice of containers to remove.
+func addExcessContainers(excessContainers, chainContainers []*container.Container) []*container.Container {
+	containersToRemoveMap := make(map[types.ContainerID]*container.Container)
 	for _, c := range excessContainers {
 		containersToRemoveMap[c.ID()] = c
 	}
@@ -530,7 +530,7 @@ func addExcessContainers(excessContainers, chainContainers []types.Container) []
 		containersToRemoveMap[c.ID()] = c
 	}
 
-	containersToRemove := make([]types.Container, 0, len(containersToRemoveMap))
+	containersToRemove := make([]*container.Container, 0, len(containersToRemoveMap))
 	for _, c := range containersToRemoveMap {
 		containersToRemove = append(containersToRemove, c)
 	}
@@ -558,9 +558,9 @@ func addExcessContainers(excessContainers, chainContainers []types.Container) []
 //   - error: Non-nil if any container removal failed or insufficient removals occurred.
 func removeExcessContainers(log *zerolog.Logger, ctx context.Context,
 	client containerClient.Client,
-	excessWatchtowerContainers []types.Container,
+	excessWatchtowerContainers []*container.Container,
 	cleanupImages bool,
-	currentContainer types.Container,
+	currentContainer *container.Container,
 	removeImageInfos *[]RemovedImageInfo,
 ) (int, error) {
 	log.Debug().
@@ -705,7 +705,7 @@ func removeExcessContainers(log *zerolog.Logger, ctx context.Context,
 func addCollectedImages(
 	removeImageInfos *[]RemovedImageInfo,
 	collected []RemovedImageInfo,
-	remaining []types.Container,
+	remaining []*container.Container,
 ) {
 	inUse := make(map[types.ImageID]struct{}, len(remaining))
 	for _, c := range remaining {
@@ -899,7 +899,7 @@ func RemoveImages(log *zerolog.Logger, ctx context.Context,
 //
 // Returns:
 //   - []string: List of container names.
-func containerNames(containers []types.Container) []string {
+func containerNames(containers []*container.Container) []string {
 	names := make([]string, len(containers))
 	for i, c := range containers {
 		names[i] = c.Name()

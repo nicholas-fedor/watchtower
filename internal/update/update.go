@@ -198,7 +198,7 @@ func update(
 	// Filter containers based on the provided filter (e.g., all, specific names).
 	// Use a non-nil empty slice so lifecycle hooks can distinguish a valid empty
 	// snapshot from an uninitialized list.
-	filteredContainers := make([]types.Container, 0, len(allContainers))
+	filteredContainers := make([]*container.Container, 0, len(allContainers))
 
 	for _, c := range allContainers {
 		if config.Filter == nil || config.Filter(c) {
@@ -269,7 +269,7 @@ func update(
 	// container.
 	inCycle := make(map[types.ContainerID]struct{})
 
-	var cycleMembers []types.Container
+	var cycleMembers []*container.Container
 	if graphErr == nil {
 		cycleMembers = graph.CycleMembers()
 	}
@@ -289,7 +289,7 @@ func update(
 
 	// Prepare containers for staleness checks, skipping already-processed ones.
 	type checkTask struct {
-		container types.Container
+		container *container.Container
 		index     int
 	}
 
@@ -583,10 +583,7 @@ func update(
 
 			// Track old image ID before update for cleanup notifications.
 			if shouldUpdate {
-				c, ok := filteredContainers[task.index].(*container.Container)
-				if ok {
-					c.SetOldImageID(sourceContainer.ImageID())
-				}
+				filteredContainers[task.index].SetOldImageID(sourceContainer.ImageID())
 			}
 
 			// Update the container's stale status for dependency sorting.
@@ -630,7 +627,7 @@ func update(
 		Msg("Completed container staleness check")
 
 	// Build a map for a lookup of containers by ID.
-	containerByID := make(map[types.ContainerID]types.Container, len(allContainers))
+	containerByID := make(map[types.ContainerID]*container.Container, len(allContainers))
 	for _, ac := range allContainers {
 		containerByID[ac.ID()] = ac
 	}
@@ -650,8 +647,8 @@ func update(
 	// Every sort keeps only the graph's dependencies between the containers it
 	// sorts, so leaving a container out cannot redirect a link to a different
 	// container and form a cycle that the graph does not have.
-	sortable := make([]types.Container, 0, len(filteredContainers))
-	unsortable := make([]types.Container, 0, len(inCycle))
+	sortable := make([]*container.Container, 0, len(filteredContainers))
+	unsortable := make([]*container.Container, 0, len(inCycle))
 
 	for _, c := range filteredContainers {
 		if _, skip := inCycle[c.ID()]; skip {
@@ -838,7 +835,7 @@ func update(
 func skipFailedUpdateCheck(
 	log, clog *zerolog.Logger,
 	progress *state.Progress,
-	c types.Container,
+	c *container.Container,
 	err error,
 	config updateParams.Params,
 ) {
@@ -856,14 +853,14 @@ func skipFailedUpdateCheck(
 //   - monitored: The monitored containers.
 //
 // Returns:
-//   - []types.Container: The other containers, in listed order.
-func unmonitoredContainers(allContainers, monitored []types.Container) []types.Container {
+//   - []*container.Container: The other containers, in listed order.
+func unmonitoredContainers(allContainers, monitored []*container.Container) []*container.Container {
 	isMonitored := make(map[types.ContainerID]bool, len(monitored))
 	for _, c := range monitored {
 		isMonitored[c.ID()] = true
 	}
 
-	unmonitored := make([]types.Container, 0, max(len(allContainers)-len(monitored), 0))
+	unmonitored := make([]*container.Container, 0, max(len(allContainers)-len(monitored), 0))
 
 	for _, c := range allContainers {
 		if !isMonitored[c.ID()] {
@@ -876,13 +873,8 @@ func unmonitoredContainers(allContainers, monitored []types.Container) []types.C
 
 // hasSelfDependency checks if a container has a self-dependency in its Watchtower depends-on label.
 // It uses the shared GetLinksFromWatchtowerLabel helper function for parsing and normalization.
-func hasSelfDependency(c types.Container) bool {
-	sourceContainer, ok := c.(*container.Container)
-	if !ok {
-		return false
-	}
-
-	links := container.GetLinksFromWatchtowerLabel(sourceContainer)
+func hasSelfDependency(c *container.Container) bool {
+	links := container.GetLinksFromWatchtowerLabel(c)
 
 	return slices.Contains(links, c.Name())
 }

@@ -19,7 +19,6 @@ import (
 	"github.com/nicholas-fedor/watchtower/internal/observability/logging"
 	updateParams "github.com/nicholas-fedor/watchtower/internal/update/params"
 	"github.com/nicholas-fedor/watchtower/internal/update/state"
-	"github.com/nicholas-fedor/watchtower/pkg/types"
 )
 
 // rebuildTimeout bounds one remote image build or one Compose apply. Both run
@@ -52,7 +51,7 @@ func (s *Session) build(
 	log *zerolog.Logger,
 	ctx context.Context,
 	docker containerClient.Client,
-	c types.Container,
+	c *container.Container,
 	result git.CheckResult,
 	params updateParams.Params,
 	progress *state.Progress,
@@ -101,12 +100,9 @@ func (s *Session) build(
 		return fmt.Errorf("build git image: %w", err)
 	}
 
-	if concrete, ok := c.(*container.Container); ok {
-		provenance.ApplyGitAssociation(concrete, assoc, provenance.PersistWatch(c))
-
-		concrete.SetImageName(tag)
-		provenance.ApplyGitStamp(concrete, result.Commit, result.Tag)
-	}
+	provenance.ApplyGitAssociation(c, assoc, provenance.PersistWatch(c))
+	c.SetImageName(tag)
+	provenance.ApplyGitStamp(c, result.Commit, result.Tag)
 
 	s.mu.Lock()
 	s.built[c.ID()] = imageID

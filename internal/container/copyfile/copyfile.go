@@ -19,6 +19,7 @@ import (
 	dockerContainer "github.com/moby/moby/api/types/container"
 	dockerClient "github.com/moby/moby/client"
 
+	"github.com/nicholas-fedor/watchtower/internal/container"
 	"github.com/nicholas-fedor/watchtower/internal/container/labels"
 	"github.com/nicholas-fedor/watchtower/pkg/types"
 )
@@ -274,7 +275,7 @@ func validateCopyFilePath(filePath string) error {
 // Returns:
 //   - []string: Validated in-container paths, or nil when the label is absent.
 //   - error: Non-nil if the label contains an invalid path.
-func copyFilePaths(c types.Container) ([]string, error) {
+func copyFilePaths(c *container.Container) ([]string, error) {
 	if c == nil {
 		return nil, nil
 	}
@@ -303,7 +304,7 @@ func copyFilePaths(c types.Container) ([]string, error) {
 //
 // Returns:
 //   - copyFileSkipReason: Reason the path must be skipped, or copyFileSkipNone.
-func copyFileSkipForPath(c types.Container, filePath string) copyFileSkipReason {
+func copyFileSkipForPath(c *container.Container, filePath string) copyFileSkipReason {
 	info := c.ContainerInfo()
 	if info == nil {
 		return copyFileSkipNone
@@ -393,7 +394,7 @@ func mostSpecificMount(info *dockerContainer.InspectResponse, filePath string) (
 //
 // Returns:
 //   - bool: True when the path must be skipped.
-func shouldSkipCopyFile(clog *zerolog.Logger, source types.Container, filePath string) bool {
+func shouldSkipCopyFile(clog *zerolog.Logger, source *container.Container, filePath string) bool {
 	switch copyFileSkipForPath(source, filePath) {
 	case copyFileSkipMountedAtPath:
 		clog.Debug().
@@ -502,7 +503,7 @@ func Capture(
 	log *zerolog.Logger,
 	ctx context.Context,
 	api dockerClient.APIClient,
-	source types.Container,
+	source *container.Container,
 ) (Snapshot, error) {
 	paths, err := copyFilePaths(source)
 	if err != nil {
@@ -793,7 +794,7 @@ func Inject(
 	ctx context.Context,
 	api dockerClient.APIClient,
 	containerID string,
-	source types.Container,
+	source *container.Container,
 	snapshot Snapshot,
 ) error {
 	if snapshot.Empty() {

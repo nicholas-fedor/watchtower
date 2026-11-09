@@ -16,6 +16,7 @@ import (
 
 	dockerContainer "github.com/moby/moby/api/types/container"
 
+	"github.com/nicholas-fedor/watchtower/internal/container"
 	mockContainerClient "github.com/nicholas-fedor/watchtower/internal/container/client/mocks"
 	"github.com/nicholas-fedor/watchtower/internal/container/filters"
 	"github.com/nicholas-fedor/watchtower/internal/container/labels"
@@ -62,7 +63,7 @@ func TestRunUpdatesWithNotifications_ScanCompletedCounts(t *testing.T) {
 
 	// cycleMember returns a stale container that depends on the next member
 	// of a three-container cycle. The session skips every member.
-	cycleMember := func(name, dependsOn string) types.Container {
+	cycleMember := func(name, dependsOn string) *container.Container {
 		return mockUpdate.CreateMockContainerWithConfig(
 			name,
 			"/"+name,
@@ -79,7 +80,7 @@ func TestRunUpdatesWithNotifications_ScanCompletedCounts(t *testing.T) {
 
 	client := mockUpdate.CreateMockClient(
 		&mockUpdate.TestData{
-			Containers: []types.Container{
+			Containers: []*container.Container{
 				cycleMember("cycle-a", "cycle-b"),
 				cycleMember("cycle-b", "cycle-c"),
 				cycleMember("cycle-c", "cycle-a"),
@@ -191,7 +192,7 @@ func TestRunUpdatesWithNotifications_PanicEndsSession(t *testing.T) {
 
 	client := mockContainerClient.NewMockClient(t)
 	client.EXPECT().ListContainers(mock.Anything, mock.Anything).
-		RunAndReturn(func(context.Context, ...types.Filter) ([]types.Container, error) {
+		RunAndReturn(func(context.Context, ...types.Filter) ([]*container.Container, error) {
 			panic("boom")
 		}).Once()
 
@@ -308,7 +309,7 @@ func TestRunUpdates(t *testing.T) {
 
 				client := mockUpdate.CreateMockClient(
 					&mockUpdate.TestData{
-						Containers: []types.Container{
+						Containers: []*container.Container{
 							mockUpdate.CreateMockContainer(
 								"test-container",
 								"test-container",
@@ -346,7 +347,7 @@ func TestRunUpdates(t *testing.T) {
 
 				client := mockUpdate.CreateMockClient(
 					&mockUpdate.TestData{
-						Containers: []types.Container{
+						Containers: []*container.Container{
 							mockUpdate.CreateMockContainerWithConfig(
 								"test-container",
 								"test-container",
@@ -391,7 +392,7 @@ func TestRunUpdates(t *testing.T) {
 
 				client := mockUpdate.CreateMockClient(
 					&mockUpdate.TestData{
-						Containers: []types.Container{},
+						Containers: []*container.Container{},
 						Staleness:  map[string]bool{},
 					},
 					false,
@@ -451,7 +452,7 @@ func TestRunUpdates(t *testing.T) {
 
 				client := mockUpdate.CreateMockClient(
 					&mockUpdate.TestData{
-						Containers: []types.Container{container1, container2},
+						Containers: []*container.Container{container1, container2},
 						Staleness: map[string]bool{
 							"watchtower-1": true,
 							"watchtower-2": true,
@@ -492,7 +493,7 @@ func TestRunUpdates(t *testing.T) {
 
 			client := mockUpdate.CreateMockClient(
 				&mockUpdate.TestData{
-					Containers: []types.Container{
+					Containers: []*container.Container{
 						mockUpdate.CreateMockContainer(
 							"test-container",
 							"test-container",
@@ -820,8 +821,8 @@ func TestRunUpdates(t *testing.T) {
 			)
 
 			// Create separate container lists for each client
-			containersA := []types.Container{scopeAContainer}
-			containersB := []types.Container{scopeBContainer}
+			containersA := []*container.Container{scopeAContainer}
+			containersB := []*container.Container{scopeBContainer}
 
 			// Create separate test data for each client
 			testDataA := &mockUpdate.TestData{
@@ -942,7 +943,7 @@ func TestRunUpdates(t *testing.T) {
 				},
 			)
 
-			allContainers := []types.Container{scope1Container, scope2Container}
+			allContainers := []*container.Container{scope1Container, scope2Container}
 
 			// Create separate test data for each client to track operations independently
 			testData1 := &mockUpdate.TestData{
@@ -1046,7 +1047,7 @@ func TestRunUpdates(t *testing.T) {
 				},
 			)
 
-			allContainers := []types.Container{scopeAWatchtower, scopeBWatchtower}
+			allContainers := []*container.Container{scopeAWatchtower, scopeBWatchtower}
 
 			// Create separate test data for each client to track cleanup independently
 			testDataA := &mockUpdate.TestData{
@@ -1173,7 +1174,7 @@ func TestRunUpdates(t *testing.T) {
 				},
 			)
 
-			allContainers := []types.Container{appContainer, watchtowerProd, watchtowerDev}
+			allContainers := []*container.Container{appContainer, watchtowerProd, watchtowerDev}
 
 			testDataProd := &mockUpdate.TestData{
 				Containers: allContainers,
@@ -1310,7 +1311,7 @@ func TestRunUpdates(t *testing.T) {
 					},
 				)
 
-				allContainers := []types.Container{scopeAContainer1, scopeAContainer2}
+				allContainers := []*container.Container{scopeAContainer1, scopeAContainer2}
 
 				// Set up mock to fail updates
 				testData := &mockUpdate.TestData{
@@ -1379,7 +1380,7 @@ func TestRunUpdates(t *testing.T) {
 					},
 				)
 
-				allContainers := []types.Container{scopeAContainer, scopeBContainer}
+				allContainers := []*container.Container{scopeAContainer, scopeBContainer}
 
 				// Different test data for different scopes
 				testDataA := &mockUpdate.TestData{
@@ -1506,7 +1507,7 @@ func TestRunUpdates(t *testing.T) {
 					},
 				)
 
-				allContainers := []types.Container{containerX, containerY}
+				allContainers := []*container.Container{containerX, containerY}
 
 				// scope-x has update errors, scope-y succeeds
 				testDataX := &mockUpdate.TestData{

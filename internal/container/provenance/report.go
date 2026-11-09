@@ -9,7 +9,6 @@ import (
 	"github.com/nicholas-fedor/watchtower/internal/observability/logging"
 	gitConfig "github.com/nicholas-fedor/watchtower/internal/settings/config/git"
 	updateConfig "github.com/nicholas-fedor/watchtower/internal/settings/config/update"
-	"github.com/nicholas-fedor/watchtower/pkg/types"
 )
 
 // ReportMeta holds Git and OCI fields exposed on session reports.
@@ -44,7 +43,7 @@ type ReportMeta struct {
 // Returns:
 //   - ReportMeta: Resolved metadata. Empty strings when unknown.
 func ResolveReportMeta(
-	c types.Container,
+	c *container.Container,
 	defaults gitConfig.Defaults,
 	vars ChangelogVars,
 	latest oci.Annotations,
@@ -121,16 +120,11 @@ func ResolveReportMeta(
 //   - none.
 func LogChangelog(
 	log *zerolog.Logger,
-	c types.Container,
+	c *container.Container,
 	policy updateConfig.Policy,
 	meta ReportMeta,
 ) {
-	if c == nil || meta.Changelog == "" {
-		return
-	}
-
-	concrete, ok := c.(*container.Container)
-	if !ok || !concrete.IsChangelogEnabled(policy) {
+	if c == nil || meta.Changelog == "" || !c.IsChangelogEnabled(policy) {
 		return
 	}
 

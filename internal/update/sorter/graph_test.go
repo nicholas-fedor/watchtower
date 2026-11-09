@@ -8,8 +8,8 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"github.com/nicholas-fedor/watchtower/internal/container"
 	"github.com/nicholas-fedor/watchtower/internal/testutil/logcapture"
-	"github.com/nicholas-fedor/watchtower/pkg/types"
 )
 
 // composeService describes a Compose container of the stack project named
@@ -32,7 +32,7 @@ func TestDependencyGraph_CycleMembers(t *testing.T) {
 
 	tests := []struct {
 		name       string
-		containers []types.Container
+		containers []*container.Container
 		// useComposeDependsOn includes Compose depends_on labels as links.
 		useComposeDependsOn bool
 		want                []string
@@ -152,7 +152,7 @@ func TestDependencyGraph_CycleMembersLinkSources(t *testing.T) {
 
 	tests := []struct {
 		name       string
-		containers []types.Container
+		containers []*container.Container
 		// useComposeDependsOn includes Compose depends_on labels as links.
 		useComposeDependsOn bool
 		want                []string
@@ -303,7 +303,7 @@ func TestDependencyGraph_Subgraph(t *testing.T) {
 
 	tests := []struct {
 		name string
-		all  []types.Container
+		all  []*container.Container
 		// subset names the containers that become graph nodes.
 		subset []string
 		// useComposeDependsOn includes Compose depends_on labels as links.
@@ -411,7 +411,7 @@ func TestDependencyGraph_Subgraph(t *testing.T) {
 // graphEdges returns the edges between containers, as dependent->dependency
 // container names, in the dependency graph of all. With all nil, the graph is
 // built from containers alone.
-func graphEdges(t *testing.T, containers, all []types.Container, useComposeDependsOn bool) []string {
+func graphEdges(t *testing.T, containers, all []*container.Container, useComposeDependsOn bool) []string {
 	t.Helper()
 
 	if all == nil {
@@ -510,7 +510,7 @@ func TestDependencyGraph_ServiceNames(t *testing.T) {
 
 	tests := []struct {
 		name       string
-		containers []types.Container
+		containers []*container.Container
 		// want lists the edges as dependent->dependency.
 		want []string
 	}{
@@ -664,8 +664,8 @@ func TestDependencyGraph_Dependents(t *testing.T) {
 
 	tests := []struct {
 		name        string
-		monitored   []types.Container
-		unmonitored []types.Container
+		monitored   []*container.Container
+		unmonitored []*container.Container
 		// useComposeDependsOn includes Compose depends_on labels as links.
 		useComposeDependsOn bool
 		// of names the container whose dependents are checked.
@@ -908,7 +908,7 @@ func TestDependencyGraph_HostConfigBesideLabels(t *testing.T) {
 
 	tests := []struct {
 		name       string
-		containers []types.Container
+		containers []*container.Container
 		// useComposeDependsOn includes Compose depends_on labels as links.
 		useComposeDependsOn bool
 		// want lists the edges as dependent->dependency.

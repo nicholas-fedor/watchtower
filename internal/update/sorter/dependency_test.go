@@ -67,7 +67,7 @@ func Test_dependencySorter(t *testing.T) {
 				volumesFrom: []string{appID + ":rw"},
 			}.container()
 
-			containers := []types.Container{nginx, app}
+			containers := []*container.Container{nginx, app}
 			err := dependencySorter{}.Sort(newTestLogger(t), containers, false)
 			require.NoError(t, err)
 			assert.Equal(t, "nextcloud-app", containers[0].Name())
@@ -88,7 +88,7 @@ func Test_dependencySorter(t *testing.T) {
 				volumesFrom: []string{appID + ":rw"},
 			}.container()
 
-			containers := []types.Container{nginx, app}
+			containers := []*container.Container{nginx, app}
 			err := dependencySorter{}.Sort(newTestLogger(t), containers, false)
 			require.NoError(t, err)
 			assert.Equal(t, "shared-app", containers[0].Name())
@@ -116,7 +116,7 @@ func Test_dependencySorter(t *testing.T) {
 				volumesFrom: []string{appID + ":rw"},
 			}.container()
 
-			containers := []types.Container{nginx, app, postgres}
+			containers := []*container.Container{nginx, app, postgres}
 			err := dependencySorter{}.Sort(newTestLogger(t), containers, true)
 			require.NoError(t, err)
 			assert.Equal(t, "nextcloud-db", containers[0].Name())
@@ -145,7 +145,7 @@ func Test_dependencySorter(t *testing.T) {
 				volumesFrom: []string{appID + ":rw"},
 			}.container()
 
-			containers := []types.Container{nginx, app, postgres}
+			containers := []*container.Container{nginx, app, postgres}
 			err := dependencySorter{}.Sort(newTestLogger(t), containers, false)
 			require.NoError(t, err)
 			assert.Equal(t, "nextcloud-db", containers[0].Name())
@@ -161,7 +161,7 @@ func Test_dependencySorter(t *testing.T) {
 			gluetun := deployed{name: "gluetun", id: providerID, project: "gluetun", service: "vpn"}.container()
 			qbittorrent := deployed{name: "qbittorrent", project: "qbittorrent", service: "app", networkMode: "container:" + providerID}.container()
 
-			containers := []types.Container{qbittorrent, gluetun}
+			containers := []*container.Container{qbittorrent, gluetun}
 			err := dependencySorter{}.Sort(newTestLogger(t), containers, false)
 			require.NoError(t, err)
 			assert.Equal(t, "gluetun", containers[0].Name())
@@ -179,7 +179,7 @@ func Test_dependencySorter(t *testing.T) {
 
 			_, indegree, adjacency, _, err := buildDependencyGraph(
 				newTestLogger(t),
-				[]types.Container{qbittorrent, decoy, gluetun},
+				[]*container.Container{qbittorrent, decoy, gluetun},
 				false,
 			)
 			require.NoError(t, err)
@@ -194,7 +194,7 @@ func Test_dependencySorter(t *testing.T) {
 			c1 := deployed{name: "c1"}.container()
 			c2 := deployed{name: "c2"}.container()
 			c3 := deployed{name: "c3"}.container()
-			containers := []types.Container{c1, c2, c3}
+			containers := []*container.Container{c1, c2, c3}
 			ds := dependencySorter{}
 			err := ds.Sort(newTestLogger(t), containers, true)
 			require.NoError(t, err)
@@ -207,7 +207,7 @@ func Test_dependencySorter(t *testing.T) {
 
 			c1 := deployed{name: "c1", dependsOn: "c2"}.container()
 			c2 := deployed{name: "c2"}.container()
-			containers := []types.Container{c1, c2}
+			containers := []*container.Container{c1, c2}
 			ds := dependencySorter{}
 			err := ds.Sort(newTestLogger(t), containers, true)
 			require.NoError(t, err)
@@ -222,7 +222,7 @@ func Test_dependencySorter(t *testing.T) {
 			c1 := deployed{name: "c1", dependsOn: "c2,c3"}.container()
 			c2 := deployed{name: "c2", dependsOn: "c3"}.container()
 			c3 := deployed{name: "c3"}.container()
-			containers := []types.Container{c1, c2, c3}
+			containers := []*container.Container{c1, c2, c3}
 			ds := dependencySorter{}
 			err := ds.Sort(newTestLogger(t), containers, true)
 			require.NoError(t, err)
@@ -237,7 +237,7 @@ func Test_dependencySorter(t *testing.T) {
 
 			c1 := deployed{name: "c1", dependsOn: "c2"}.container()
 			c2 := deployed{name: "c2", dependsOn: "c1"}.container()
-			containers := []types.Container{c1, c2}
+			containers := []*container.Container{c1, c2}
 			ds := dependencySorter{}
 			err := ds.Sort(newTestLogger(t), containers, true)
 			require.Error(t, err)
@@ -253,7 +253,7 @@ func Test_dependencySorter(t *testing.T) {
 			c1 := deployed{name: "c1", project: "stack", service: "c1", dependsOn: "c2"}.container()
 			c2 := deployed{name: "c2", project: "stack", service: "c2", composeDependsOn: "c1"}.container()
 
-			containers := []types.Container{c1, c2}
+			containers := []*container.Container{c1, c2}
 			ds := dependencySorter{}
 			err := ds.Sort(newTestLogger(t), containers, false)
 			require.NoError(t, err)
@@ -269,7 +269,7 @@ func Test_dependencySorter(t *testing.T) {
 			watchtower := deployed{name: "watchtower", watchtower: true}.container()
 			c1 := deployed{name: "c1", dependsOn: "c2"}.container()
 			c2 := deployed{name: "c2"}.container()
-			containers := []types.Container{watchtower, c1, c2}
+			containers := []*container.Container{watchtower, c1, c2}
 			ds := dependencySorter{}
 			err := ds.Sort(newTestLogger(t), containers, true)
 			require.NoError(t, err)
@@ -282,7 +282,7 @@ func Test_dependencySorter(t *testing.T) {
 		t.Run("should handle empty container list", func(t *testing.T) {
 			t.Parallel()
 
-			containers := []types.Container{}
+			containers := []*container.Container{}
 			ds := dependencySorter{}
 			err := ds.Sort(newTestLogger(t), containers, true)
 			require.NoError(t, err)
@@ -293,7 +293,7 @@ func Test_dependencySorter(t *testing.T) {
 			t.Parallel()
 
 			c1 := deployed{name: "c1"}.container()
-			containers := []types.Container{c1}
+			containers := []*container.Container{c1}
 			ds := dependencySorter{}
 			err := ds.Sort(newTestLogger(t), containers, true)
 			require.NoError(t, err)
@@ -310,7 +310,7 @@ func Test_dependencySorter(t *testing.T) {
 
 			c1 := deployed{name: "c1"}.container()
 			c2 := deployed{name: "c2"}.container()
-			containers := []types.Container{c1, c2}
+			containers := []*container.Container{c1, c2}
 			result, err := sortByDependencies(newTestLogger(t), containers, true)
 			require.NoError(t, err)
 			require.Len(t, result, 2)
@@ -321,7 +321,7 @@ func Test_dependencySorter(t *testing.T) {
 
 			c1 := deployed{name: "c1", dependsOn: "c2"}.container()
 			c2 := deployed{name: "c2"}.container()
-			containers := []types.Container{c1, c2}
+			containers := []*container.Container{c1, c2}
 			result, err := sortByDependencies(newTestLogger(t), containers, true)
 			require.NoError(t, err)
 			require.Len(t, result, 2)
@@ -335,7 +335,7 @@ func Test_dependencySorter(t *testing.T) {
 			a := deployed{name: "a", dependsOn: "b"}.container()
 			b := deployed{name: "b", dependsOn: "c"}.container()
 			c := deployed{name: "c"}.container()
-			containers := []types.Container{a, b, c}
+			containers := []*container.Container{a, b, c}
 			result, err := sortByDependencies(newTestLogger(t), containers, true)
 			require.NoError(t, err)
 			require.Len(t, result, 3)
@@ -349,7 +349,7 @@ func Test_dependencySorter(t *testing.T) {
 
 			c1 := deployed{name: "c1", dependsOn: "c2"}.container()
 			c2 := deployed{name: "c2", dependsOn: "c1"}.container()
-			containers := []types.Container{c1, c2}
+			containers := []*container.Container{c1, c2}
 			_, err := sortByDependencies(newTestLogger(t), containers, true)
 			require.Error(t, err)
 			assert.Contains(t, err.Error(), "circular reference detected")
@@ -359,7 +359,7 @@ func Test_dependencySorter(t *testing.T) {
 		t.Run("should handle empty list", func(t *testing.T) {
 			t.Parallel()
 
-			containers := []types.Container{}
+			containers := []*container.Container{}
 			result, err := sortByDependencies(newTestLogger(t), containers, true)
 			require.NoError(t, err)
 			assert.Empty(t, result)
@@ -369,7 +369,7 @@ func Test_dependencySorter(t *testing.T) {
 			t.Parallel()
 
 			c1 := deployed{name: "c1"}.container()
-			containers := []types.Container{c1}
+			containers := []*container.Container{c1}
 			result, err := sortByDependencies(newTestLogger(t), containers, true)
 			require.NoError(t, err)
 			require.Len(t, result, 1)
@@ -387,7 +387,7 @@ func Test_dependencySorter(t *testing.T) {
 			c := deployed{name: "c", dependsOn: "d"}.container()
 			d := deployed{name: "d"}.container()
 
-			containers := []types.Container{a, b, c, d}
+			containers := []*container.Container{a, b, c, d}
 			result, err := sortByDependencies(newTestLogger(t), containers, true)
 			require.NoError(t, err)
 			require.Len(t, result, 4)
@@ -408,7 +408,7 @@ func Test_dependencySorter(t *testing.T) {
 			// replica prefix cases below test the sorter's own guard.
 			c1 := deployed{name: "c1", dependsOn: "c1"}.container()
 
-			containers := []types.Container{c1}
+			containers := []*container.Container{c1}
 			result, err := sortByDependencies(newTestLogger(t), containers, true)
 			require.NoError(t, err)
 			// Self-reference is filtered, not a cycle
@@ -424,7 +424,7 @@ func Test_dependencySorter(t *testing.T) {
 			// but the self-reference guard should skip it
 			myapp := deployed{name: "myapp-1", dependsOn: "myapp"}.container()
 
-			containers := []types.Container{myapp}
+			containers := []*container.Container{myapp}
 			containerMap, indegree, adjacency, _, err := buildDependencyGraph(newTestLogger(t), containers, true)
 			require.NoError(t, err)
 			require.Len(t, containerMap, 1)
@@ -443,7 +443,7 @@ func Test_dependencySorter(t *testing.T) {
 			// Similar to the myapp case, this tests another common naming pattern
 			db := deployed{name: "db-1", dependsOn: "db"}.container()
 
-			containers := []types.Container{db}
+			containers := []*container.Container{db}
 			containerMap, indegree, adjacency, _, err := buildDependencyGraph(newTestLogger(t), containers, true)
 			require.NoError(t, err)
 			require.Len(t, containerMap, 1)
@@ -467,7 +467,7 @@ func Test_dependencySorter(t *testing.T) {
 			// test-web-1 depends on "app"
 			web := deployed{name: "test-web-1", dependsOn: "app"}.container()
 
-			containers := []types.Container{web, app, db} // Unsorted order
+			containers := []*container.Container{web, app, db} // Unsorted order
 			result, err := sortByDependencies(newTestLogger(t), containers, true)
 			require.NoError(t, err)
 			require.Len(t, result, 3)
@@ -483,7 +483,7 @@ func Test_dependencySorter(t *testing.T) {
 			c1 := deployed{name: "container1", dependsOn: "web"}.container()
 			c2 := deployed{name: "container2", service: "web"}.container()
 
-			containers := []types.Container{c1, c2}
+			containers := []*container.Container{c1, c2}
 			result, err := sortByDependencies(newTestLogger(t), containers, true)
 			require.NoError(t, err)
 			require.Len(t, result, 2)
@@ -497,7 +497,7 @@ func Test_dependencySorter(t *testing.T) {
 			c1 := deployed{name: "myproject-web-1", project: "myproject", service: "web"}.container()
 			c2 := deployed{name: "myproject-web-2", project: "myproject", service: "web"}.container()
 
-			containers := []types.Container{c1, c2}
+			containers := []*container.Container{c1, c2}
 			result, err := sortByDependencies(newTestLogger(t), containers, true)
 			require.NoError(t, err)
 			require.Len(t, result, 2)
@@ -515,7 +515,7 @@ func Test_dependencySorter(t *testing.T) {
 			db2 := deployed{name: "db-2"}.container()
 			db3 := deployed{name: "db-3"}.container()
 
-			containers := []types.Container{app, db1, db2, db3}
+			containers := []*container.Container{app, db1, db2, db3}
 			containerMap, indegree, adjacency, _, err := buildDependencyGraph(newTestLogger(t), containers, true)
 			require.NoError(t, err)
 			require.Len(t, containerMap, 4)
@@ -539,7 +539,7 @@ func Test_dependencySorter(t *testing.T) {
 			c1 := deployed{name: "container1", dependsOn: "web-service"}.container()
 			c2 := deployed{name: "container2", service: "/web-service"}.container()
 
-			containers := []types.Container{c1, c2}
+			containers := []*container.Container{c1, c2}
 			result, err := sortByDependencies(newTestLogger(t), containers, true)
 			require.NoError(t, err)
 			require.Len(t, result, 2)
@@ -555,7 +555,7 @@ func Test_dependencySorter(t *testing.T) {
 			c1 := deployed{name: "container1", dependsOn: "/web"}.container()
 			c2 := deployed{name: "web"}.container()
 
-			containers := []types.Container{c1, c2}
+			containers := []*container.Container{c1, c2}
 			result, err := sortByDependencies(newTestLogger(t), containers, true)
 			require.NoError(t, err)
 			require.Len(t, result, 2)
@@ -571,7 +571,7 @@ func Test_dependencySorter(t *testing.T) {
 			c1 := deployed{name: "", id: "id-c1", dependsOn: "id-c2"}.container()
 			c2 := deployed{name: "", id: "id-c2"}.container()
 
-			containers := []types.Container{c1, c2}
+			containers := []*container.Container{c1, c2}
 			result, err := sortByDependencies(newTestLogger(t), containers, true)
 			require.NoError(t, err)
 			require.Len(t, result, 2)
@@ -588,7 +588,7 @@ func Test_dependencySorter(t *testing.T) {
 			c1 := deployed{name: "container1", dependsOn: "non-existent,/also-non-existent"}.container()
 			c2 := deployed{name: "container2"}.container()
 
-			containers := []types.Container{c1, c2}
+			containers := []*container.Container{c1, c2}
 			result, err := sortByDependencies(newTestLogger(t), containers, true)
 			require.NoError(t, err)
 			require.Len(t, result, 2)
@@ -602,7 +602,7 @@ func Test_dependencySorter(t *testing.T) {
 			c1 := deployed{name: "container1", networkMode: "container:web"}.container()
 			c2 := deployed{name: "web"}.container()
 
-			containers := []types.Container{c1, c2}
+			containers := []*container.Container{c1, c2}
 			result, err := sortByDependencies(newTestLogger(t), containers, true)
 			require.NoError(t, err)
 			require.Len(t, result, 2)
@@ -628,7 +628,7 @@ func Test_dependencySorter(t *testing.T) {
 			c4 := deployed{name: "redis"}.container()
 			c5 := deployed{name: "proxy"}.container()
 
-			containers := []types.Container{c1, c2, c3, c4, c5}
+			containers := []*container.Container{c1, c2, c3, c4, c5}
 
 			// The sort places app last even when one source is dropped, so
 			// each source must count toward app's dependencies.
@@ -652,7 +652,7 @@ func Test_dependencySorter(t *testing.T) {
 			t.Parallel()
 
 			// Test performance and correctness with many containers
-			containers := make([]types.Container, 100)
+			containers := make([]*container.Container, 100)
 
 			for i := range 100 {
 				containers[i] = deployed{name: fmt.Sprintf("container%d", i)}.container()
@@ -670,7 +670,7 @@ func Test_dependencySorter(t *testing.T) {
 			c1 := deployed{name: "", id: "id-c1"}.container()
 			c2 := deployed{name: "", id: "id-c2"}.container()
 
-			containers := []types.Container{c1, c2}
+			containers := []*container.Container{c1, c2}
 			result, err := sortByDependencies(newTestLogger(t), containers, true)
 			require.NoError(t, err) // Should not detect false cycle
 			require.Len(t, result, 2)
@@ -688,7 +688,7 @@ func Test_dependencySorter(t *testing.T) {
 			// db2 from project2
 			db2 := deployed{name: "project2_db_1", project: "project2", service: "db"}.container()
 
-			containers := []types.Container{app, db1, db2}
+			containers := []*container.Container{app, db1, db2}
 
 			containerMap, indegree, adjacency, _, err := buildDependencyGraph(newTestLogger(t), containers, true)
 			require.NoError(t, err)
@@ -708,7 +708,7 @@ func Test_dependencySorter(t *testing.T) {
 			c1 := deployed{name: "c1", dependsOn: "c2"}.container()
 			c2 := deployed{name: "c2", dependsOn: "c1"}.container()
 
-			containers := []types.Container{c1, c2}
+			containers := []*container.Container{c1, c2}
 
 			_, err := sortByDependencies(newTestLogger(t), containers, true)
 			require.Error(t, err)
@@ -722,7 +722,7 @@ func Test_dependencySorter(t *testing.T) {
 			app := deployed{name: "app", dependsOn: "db"}.container()
 
 			// Only app in containers list, db not included
-			containers := []types.Container{app}
+			containers := []*container.Container{app}
 
 			containerMap, indegree, _, _, err := buildDependencyGraph(newTestLogger(t), containers, true)
 			require.NoError(t, err)
@@ -749,7 +749,7 @@ func TestPrefixMatchingIssues(t *testing.T) {
 		// Second database container with similar name (should NOT be matched)
 		db2 := deployed{name: "watchtower-test-database2"}.container()
 
-		containers := []types.Container{app, db1, db2}
+		containers := []*container.Container{app, db1, db2}
 		containerMap, indegree, adjacency, _, err := buildDependencyGraph(newTestLogger(t), containers, true)
 		require.NoError(t, err)
 		require.Len(t, containerMap, 3)
@@ -774,7 +774,7 @@ func TestPrefixMatchingIssues(t *testing.T) {
 		db1 := deployed{name: "myapp-db-1"}.container()
 		db2 := deployed{name: "myapp-db-2"}.container()
 
-		containers := []types.Container{app, db1, db2}
+		containers := []*container.Container{app, db1, db2}
 		containerMap, indegree, adjacency, _, err := buildDependencyGraph(newTestLogger(t), containers, true)
 		require.NoError(t, err)
 		require.Len(t, containerMap, 3)
@@ -834,7 +834,7 @@ func TestIdentifierCollisionIssues(t *testing.T) {
 			c1 := deployed{name: "app1_web_1", project: "app1", service: "web"}.container()
 			c2 := deployed{name: "app2_web_1", project: "app2", service: "web"}.container()
 
-			containers := []types.Container{c1, c2}
+			containers := []*container.Container{c1, c2}
 
 			containerMap, indegree, _, normalizedMap, err := buildDependencyGraph(newTestLogger(t), containers, true)
 			require.NoError(t, err)
@@ -883,7 +883,7 @@ func TestIdentifierCollisionIssues(t *testing.T) {
 			// DB container from project1
 			db1 := deployed{name: "project1_db_1", project: "project1", service: "db"}.container()
 
-			containers := []types.Container{app, db1}
+			containers := []*container.Container{app, db1}
 
 			containerMap, indegree, adjacency, normalizedMap, err := buildDependencyGraph(newTestLogger(t), containers,
 				true,
@@ -917,7 +917,7 @@ func TestIdentifierCollisionIssues(t *testing.T) {
 			c1 := deployed{name: "container1", id: "id1"}.container()
 			c2 := deployed{name: "container2", id: "id2"}.container()
 
-			containers := []types.Container{c1, c2}
+			containers := []*container.Container{c1, c2}
 
 			err := identifierCollisionError{
 				DuplicateIdentifier: "test-id",
@@ -938,7 +938,7 @@ func TestIdentifierCollisionIssues(t *testing.T) {
 			c1 := deployed{name: "c1", id: "id1"}.container()
 			c2 := deployed{name: "c1", id: "id2"}.container()
 
-			containers := []types.Container{c1, c2}
+			containers := []*container.Container{c1, c2}
 
 			_, _, _, _, err := buildDependencyGraph(newTestLogger(t), containers, true)
 
@@ -954,7 +954,7 @@ func TestIdentifierCollisionIssues(t *testing.T) {
 			c1 := deployed{name: "c1"}.container()
 			c2 := deployed{name: "c2"}.container()
 
-			containers := []types.Container{c1, c2}
+			containers := []*container.Container{c1, c2}
 
 			containerMap, indegree, adjacency, normalizedMap, err := buildDependencyGraph(newTestLogger(t), containers,
 				true,
@@ -977,7 +977,7 @@ func TestIdentifierCollisionIssues(t *testing.T) {
 			c1 := deployed{name: "c1", id: "id1"}.container()
 			c2 := deployed{name: "c1", id: "id2"}.container()
 
-			containers := []types.Container{c1, c2}
+			containers := []*container.Container{c1, c2}
 
 			_, err := sortByDependencies(newTestLogger(t), containers, true)
 
@@ -994,7 +994,7 @@ func TestIdentifierCollisionIssues(t *testing.T) {
 func Test_identifierIndex_CollisionLogsAtDebug(t *testing.T) {
 	t.Parallel()
 
-	containers := []types.Container{
+	containers := []*container.Container{
 		deployed{name: "app", id: "a000000000000000000000000000000000000000000000000000000000000000"}.container(),
 		deployed{name: "app", id: "b000000000000000000000000000000000000000000000000000000000000000"}.container(),
 	}
@@ -1112,7 +1112,7 @@ func TestServiceOnlyMatching(t *testing.T) {
 			// DB container from project2 (different project, but only one "db" service)
 			db := deployed{name: "project2_db_1", project: "project2", service: "db"}.container()
 
-			containers := []types.Container{app, db}
+			containers := []*container.Container{app, db}
 
 			containerMap, indegree, adjacency, _, err := buildDependencyGraph(newTestLogger(t), containers, true)
 			require.NoError(t, err)
@@ -1136,7 +1136,7 @@ func TestServiceOnlyMatching(t *testing.T) {
 			// Postgres container with project prefix in identifier
 			postgres := deployed{name: "postgresql_postgres_1", project: "postgresql", service: "postgres"}.container()
 
-			containers := []types.Container{app, postgres}
+			containers := []*container.Container{app, postgres}
 
 			containerMap, indegree, adjacency, _, err := buildDependencyGraph(newTestLogger(t), containers, true)
 			require.NoError(t, err)
@@ -1163,7 +1163,7 @@ func TestServiceOnlyMatching(t *testing.T) {
 			// DB container from project2 (same service name, different project)
 			db2 := deployed{name: "project2_db_1", project: "project2", service: "db"}.container()
 
-			containers := []types.Container{app, db1, db2}
+			containers := []*container.Container{app, db1, db2}
 
 			containerMap, indegree, _, _, err := buildDependencyGraph(newTestLogger(t), containers, true)
 			require.NoError(t, err)
@@ -1191,7 +1191,7 @@ func TestServiceOnlyMatching(t *testing.T) {
 			// DB container from project2 (should NOT be matched)
 			db2 := deployed{name: "project2_db_1", project: "project2", service: "db"}.container()
 
-			containers := []types.Container{app, db1, db2}
+			containers := []*container.Container{app, db1, db2}
 
 			containerMap, indegree, adjacency, _, err := buildDependencyGraph(newTestLogger(t), containers, true)
 			require.NoError(t, err)
@@ -1219,7 +1219,7 @@ func TestServiceOnlyMatching(t *testing.T) {
 			// DB container with project prefix (service name also "db")
 			dbProject := deployed{name: "project_db_1", project: "project", service: "db"}.container()
 
-			containers := []types.Container{app, dbReplica, dbProject}
+			containers := []*container.Container{app, dbReplica, dbProject}
 
 			containerMap, indegree, adjacency, _, err := buildDependencyGraph(newTestLogger(t), containers, true)
 			require.NoError(t, err)
@@ -1364,7 +1364,7 @@ func Test_buildLinkMatchIndexes(t *testing.T) {
 		dep := deployed{name: "net-proxy", project: "myproject", service: "net-proxy"}.container()
 		app := deployed{name: "web-app", project: "myproject", service: "web"}.container()
 
-		containerMap := map[string]types.Container{
+		containerMap := map[string]*container.Container{
 			"myproject-net-proxy": dep,
 			"myproject-web":       app,
 		}
@@ -1385,7 +1385,7 @@ func Test_buildLinkMatchIndexes(t *testing.T) {
 		c1 := deployed{name: "shared", id: "id-first"}.container()
 		c2 := deployed{name: "shared", id: "id-second"}.container()
 
-		containerMap := map[string]types.Container{
+		containerMap := map[string]*container.Container{
 			"project1-service": c1,
 			"project2-service": c2,
 		}
@@ -1406,7 +1406,7 @@ func Test_buildLinkMatchIndexes(t *testing.T) {
 		canonicalOwner := deployed{name: "shared", id: "id-owner"}.container()
 		bareClaimant := deployed{name: "shared", id: "id-claimant"}.container()
 
-		containerMap := map[string]types.Container{
+		containerMap := map[string]*container.Container{
 			"shared":          canonicalOwner,
 			"project-service": bareClaimant,
 		}
@@ -1427,7 +1427,7 @@ func Test_buildLinkMatchIndexes(t *testing.T) {
 
 		gluetun := deployed{name: "gluetun", id: providerID, project: "gluetun", service: "vpn"}.container()
 
-		containerMap := map[string]types.Container{
+		containerMap := map[string]*container.Container{
 			"gluetun-vpn": gluetun,
 		}
 
@@ -1449,7 +1449,7 @@ func Test_buildLinkMatchIndexes(t *testing.T) {
 			}},
 		}, nil)
 
-		containerMap := map[string]types.Container{
+		containerMap := map[string]*container.Container{
 			"gluetun-vpn": gluetun,
 		}
 
@@ -1466,7 +1466,7 @@ func Test_buildLinkMatchIndexes(t *testing.T) {
 
 		gluetun := deployed{name: providerID, id: providerID}.container()
 
-		containerMap := map[string]types.Container{
+		containerMap := map[string]*container.Container{
 			providerID: gluetun,
 		}
 
@@ -1482,7 +1482,7 @@ func Test_buildLinkMatchIndexes(t *testing.T) {
 		owner := deployed{name: "owner", project: "owner", service: "svc"}.container()
 		claimant := deployed{name: "gluetun", id: providerID, project: "gluetun", service: "vpn"}.container()
 
-		containerMap := map[string]types.Container{
+		containerMap := map[string]*container.Container{
 			providerID:    owner,
 			"gluetun-vpn": claimant,
 		}
@@ -1499,7 +1499,7 @@ func Test_buildLinkMatchIndexes(t *testing.T) {
 		gluetun := deployed{name: "gluetun", id: providerID, project: "gluetun", service: "vpn"}.container()
 		decoy := deployed{name: providerID, project: "other", service: "svc"}.container()
 
-		containerMap := map[string]types.Container{
+		containerMap := map[string]*container.Container{
 			"gluetun-vpn": gluetun,
 			"other-svc":   decoy,
 		}
@@ -1695,7 +1695,7 @@ func TestDependencyLinkFormPermutations(t *testing.T) {
 		webA := deployed{name: "web-a", project: "stack", service: "web-a", networkMode: "container:vpn"}.container()
 		webB := deployed{name: "web-b", project: "stack", service: "web-b", networkMode: "container:vpn"}.container()
 
-		containers := []types.Container{webA, webB, vpn}
+		containers := []*container.Container{webA, webB, vpn}
 		err := dependencySorter{}.Sort(newTestLogger(t), containers, true)
 		require.NoError(t, err)
 		assert.Equal(t, "vpn", containers[0].Name())
@@ -1710,7 +1710,7 @@ func TestDependencyLinkFormPermutations(t *testing.T) {
 		cache := deployed{name: "cache", project: "app", service: "cache"}.container()
 		web := deployed{name: "web", project: "app", service: "web", dependsOn: "db,cache"}.container()
 
-		containers := []types.Container{web, db, cache}
+		containers := []*container.Container{web, db, cache}
 		err := dependencySorter{}.Sort(newTestLogger(t), containers, true)
 		require.NoError(t, err)
 		assert.Equal(t, "web", containers[2].Name())
@@ -1729,13 +1729,13 @@ func TestDependencyLinkFormPermutations(t *testing.T) {
 
 		// One replica edge alone still sorts both replicas first. The graph
 		// shows whether both edges exist.
-		_, indegree, adjacency, _, err := buildDependencyGraph(newTestLogger(t), []types.Container{web, db1, db2}, true)
+		_, indegree, adjacency, _, err := buildDependencyGraph(newTestLogger(t), []*container.Container{web, db1, db2}, true)
 		require.NoError(t, err)
 		assert.Equal(t, 2, indegree["myproject-web"])
 		assert.Contains(t, adjacency["myproject-db-1"], "myproject-web")
 		assert.Contains(t, adjacency["myproject-db-2"], "myproject-web")
 
-		containers := []types.Container{web, db1, db2}
+		containers := []*container.Container{web, db1, db2}
 		err = dependencySorter{}.Sort(newTestLogger(t), containers, true)
 		require.NoError(t, err)
 		assert.Equal(t, "myproject-web", containers[2].Name())
@@ -1749,7 +1749,7 @@ func TestDependencyLinkFormPermutations(t *testing.T) {
 		db2 := deployed{name: "project2-db", project: "project2", service: "db"}.container()
 		app := deployed{name: "project3-app", project: "project3", service: "app", dependsOn: "db"}.container()
 
-		_, indegree, adjacency, _, err := buildDependencyGraph(newTestLogger(t), []types.Container{app, db1, db2}, true)
+		_, indegree, adjacency, _, err := buildDependencyGraph(newTestLogger(t), []*container.Container{app, db1, db2}, true)
 		require.NoError(t, err)
 		assert.Equal(t, 2, indegree["project3-app"])
 		assert.Contains(t, adjacency["project1-db"], "project3-app")
@@ -1762,7 +1762,7 @@ func TestDependencyLinkFormPermutations(t *testing.T) {
 		app := deployed{name: "app", project: "myproject", service: "app", dependsOn: "missing-dep"}.container()
 		standalone := deployed{name: "other", project: "myproject", service: "other"}.container()
 
-		containers := []types.Container{app, standalone}
+		containers := []*container.Container{app, standalone}
 		err := dependencySorter{}.Sort(newTestLogger(t), containers, true)
 		require.NoError(t, err)
 		assert.ElementsMatch(t, []string{"app", "other"}, []string{containers[0].Name(), containers[1].Name()})
@@ -1775,7 +1775,7 @@ func TestDependencyLinkFormPermutations(t *testing.T) {
 		web := deployed{name: "web", project: "myproject", service: "web", dependsOn: "db"}.container()
 		wt := deployed{name: "watchtower", watchtower: true}.container()
 
-		containers := []types.Container{wt, web, db}
+		containers := []*container.Container{wt, web, db}
 		err := dependencySorter{}.Sort(newTestLogger(t), containers, true)
 		require.NoError(t, err)
 		assert.Equal(t, "db", containers[0].Name())
@@ -1794,7 +1794,7 @@ func TestDependencyLinkFormPermutations(t *testing.T) {
 		dbB := deployed{name: "stack-b-db", project: "stack-b", service: "db"}.container()
 		webB := deployed{name: "stack-b-web", project: "stack-b", service: "web", dependsOn: "stack-b-db"}.container()
 
-		containers := []types.Container{webA, webB, dbA, dbB}
+		containers := []*container.Container{webA, webB, dbA, dbB}
 		err := dependencySorter{}.Sort(newTestLogger(t), containers, true)
 		require.NoError(t, err)
 
@@ -1816,7 +1816,7 @@ func TestDependencyLinkFormPermutations(t *testing.T) {
 		consumer := deployed{name: "web-app", project: "web", service: "app", dependsOn: "shared-net-proxy"}.container()
 		unrelated := deployed{name: "other-db", project: "other", service: "db"}.container()
 
-		containers := []types.Container{consumer, unrelated, provider}
+		containers := []*container.Container{consumer, unrelated, provider}
 		err := dependencySorter{}.Sort(newTestLogger(t), containers, true)
 		require.NoError(t, err)
 
@@ -1839,13 +1839,13 @@ func TestDependencyLinkFormPermutations(t *testing.T) {
 		proxyB := deployed{name: "stack-b-other-proxy", project: "stack-b", service: "other-proxy"}.container()
 		client := deployed{name: "stack-a-client", project: "stack-a", service: "client", dependsOn: "net-proxy"}.container()
 
-		_, indegree, adjacency, _, err := buildDependencyGraph(newTestLogger(t), []types.Container{client, proxyB, proxyA}, true)
+		_, indegree, adjacency, _, err := buildDependencyGraph(newTestLogger(t), []*container.Container{client, proxyB, proxyA}, true)
 		require.NoError(t, err)
 		assert.Equal(t, 1, indegree["stack-a-client"])
 		assert.Contains(t, adjacency["stack-a-net-proxy"], "stack-a-client")
 		assert.NotContains(t, adjacency["stack-b-other-proxy"], "stack-a-client")
 
-		containers := []types.Container{client, proxyB, proxyA}
+		containers := []*container.Container{client, proxyB, proxyA}
 		err = dependencySorter{}.Sort(newTestLogger(t), containers, true)
 		require.NoError(t, err)
 
@@ -1867,7 +1867,7 @@ func TestDependencyLinkFormPermutations(t *testing.T) {
 		// Same trailing token in another stack must not steal the edge.
 		decoy := deployed{name: "edge-proxy", project: "edge", service: "edge-proxy"}.container()
 
-		containers := []types.Container{dependent, foreign, decoy, provider}
+		containers := []*container.Container{dependent, foreign, decoy, provider}
 		err := dependencySorter{}.Sort(newTestLogger(t), containers, true)
 		require.NoError(t, err)
 
@@ -1888,7 +1888,7 @@ func TestDependencyLinkFormPermutations(t *testing.T) {
 		// Watchtower depends-on uses worker's container_name.
 		client := deployed{name: "edge-client", project: "edge", service: "client", dependsOn: "app-worker"}.container()
 
-		containers := []types.Container{client, worker, db}
+		containers := []*container.Container{client, worker, db}
 		err := dependencySorter{}.Sort(newTestLogger(t), containers, true)
 		require.NoError(t, err)
 
@@ -1911,7 +1911,7 @@ func TestDependencyLinkFormPermutations(t *testing.T) {
 		decoy := deployed{name: "other-proxy", project: "other", service: "other-proxy"}.container()
 		dependent := deployed{name: "web", project: "app", service: "web", dependsOn: "net-proxy"}.container()
 
-		containers := []types.Container{dependent, decoy}
+		containers := []*container.Container{dependent, decoy}
 		err := dependencySorter{}.Sort(newTestLogger(t), containers, true)
 		require.NoError(t, err)
 		// No dependency edge: both indegree 0. Order is reverse-alpha among keys.

@@ -384,7 +384,7 @@ func (s *Session) recordComposeResults(
 //
 // Returns:
 //   - none.
-func logComposeReplaced(log *zerolog.Logger, c types.Container, item composeApply.Container) {
+func logComposeReplaced(log *zerolog.Logger, c *container.Container, item composeApply.Container) {
 	if log == nil || c == nil || item.ID == "" || item.ID == c.ID() {
 		return
 	}
@@ -414,7 +414,7 @@ func logComposeReplaced(log *zerolog.Logger, c types.Container, item composeAppl
 // Returns:
 //   - none.
 func (s *Session) recordCompose(
-	c types.Container,
+	c *container.Container,
 	item composeApply.Container,
 	params updateParams.Params,
 	result git.CheckResult,
@@ -426,10 +426,8 @@ func (s *Session) recordCompose(
 	}
 
 	assoc, _ := provenance.ResolveAssociation(c, params.Git)
-	if concrete, ok := c.(*container.Container); ok {
-		provenance.ApplyGitAssociation(concrete, assoc, provenance.PersistWatch(c))
-		provenance.ApplyGitStamp(concrete, result.Commit, result.Tag)
-	}
+	provenance.ApplyGitAssociation(c, assoc, provenance.PersistWatch(c))
+	provenance.ApplyGitStamp(c, result.Commit, result.Tag)
 
 	s.mu.Lock()
 	if params.NoRestart {
@@ -769,7 +767,7 @@ func failComposeBatchWithRuntime(
 //   - composeApply.Container: Matched instance.
 //   - bool: False when the replica cannot be identified.
 func matchedComposeInstance(
-	c types.Container,
+	c *container.Container,
 	members []composeMember,
 	items []composeApply.Container,
 	byName map[string]composeApply.Container,
@@ -829,7 +827,7 @@ func sharedComposeCommit(members []composeMember) (string, error) {
 //
 // Returns:
 //   - map[string]string: Label map.
-func containerLabels(c types.Container) map[string]string {
+func containerLabels(c *container.Container) map[string]string {
 	if c == nil {
 		return nil
 	}
@@ -887,7 +885,7 @@ func safeComposeAPIOrigin(raw string) string {
 //
 // Returns:
 //   - map[string]string: Labels merged into the compose service.
-func composeServiceLabels(c types.Container, params updateParams.Params, result git.CheckResult) map[string]string {
+func composeServiceLabels(c *container.Container, params updateParams.Params, result git.CheckResult) map[string]string {
 	// The commit is written at create time because container labels cannot be
 	// changed afterward. A failed apply rejects this stamp so the next check
 	// retries from the previous baseline.

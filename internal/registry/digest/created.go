@@ -14,11 +14,11 @@ import (
 
 	"github.com/rs/zerolog"
 
+	"github.com/nicholas-fedor/watchtower/internal/container"
 	"github.com/nicholas-fedor/watchtower/internal/meta"
 	"github.com/nicholas-fedor/watchtower/internal/registry/auth"
 	"github.com/nicholas-fedor/watchtower/internal/registry/ratelimit"
 	registryConfig "github.com/nicholas-fedor/watchtower/internal/settings/config/registry"
-	"github.com/nicholas-fedor/watchtower/pkg/types"
 )
 
 // Errors for image age retrieval operations.
@@ -97,7 +97,7 @@ type imageConfig struct {
 //
 // Parameters:
 //   - ctx: Context for cancellation and timeout control.
-//   - container: Container whose image creation time to fetch.
+//   - c: Container whose image creation time to fetch.
 //   - registryAuth: Base64-encoded registry credentials.
 //   - settings: Registry request settings.
 //   - limiter: Rate limiter shared by registry requests. Must not be nil.
@@ -107,14 +107,14 @@ type imageConfig struct {
 //   - error: Non-nil if any step fails.
 func FetchImageCreationTime(log *zerolog.Logger,
 	ctx context.Context,
-	container types.Container,
+	c *container.Container,
 	registryAuth string,
 	settings registryConfig.Registry,
 	limiter *ratelimit.Limiter,
 ) (time.Time, error) {
 	fields := map[string]any{
-		"container": container.Name(),
-		"image":     container.ImageName(),
+		"container": c.Name(),
+		"image":     c.ImageName(),
 	}
 
 	// Determine target platform (supports cross-platform monitoring overrides).
@@ -128,7 +128,7 @@ func FetchImageCreationTime(log *zerolog.Logger,
 	// Use the cached HTTP client for registry requests.
 	client := auth.NewAuthClient(log, settings)
 
-	_, originalHost, parsedURL, err := buildManifestURL(log, container, settings, "")
+	_, originalHost, parsedURL, err := buildManifestURL(log, c, settings, "")
 	if err != nil {
 		return time.Time{}, fmt.Errorf("%w: %w", errFetchManifestFailed, err)
 	}
@@ -143,7 +143,7 @@ func FetchImageCreationTime(log *zerolog.Logger,
 	result, err := limiter.DoValue(ctx, log, limitKey, func() (auth.TokenResult, error) {
 		return auth.GetToken(log,
 			ctx,
-			container,
+			c,
 			registryAuth,
 			client,
 			settings,

@@ -15,6 +15,7 @@ import (
 	dockerImage "github.com/moby/moby/api/types/image"
 	dockerClient "github.com/moby/moby/client"
 
+	"github.com/nicholas-fedor/watchtower/internal/container"
 	"github.com/nicholas-fedor/watchtower/internal/container/oci"
 	"github.com/nicholas-fedor/watchtower/internal/observability/logging"
 	"github.com/nicholas-fedor/watchtower/internal/registry"
@@ -183,7 +184,7 @@ func NewClient(
 //   - error: Non-nil if pull or inspection fails or cooldown defers the update.
 func (c Client) IsContainerStale(
 	ctx context.Context,
-	sourceContainer types.Container,
+	sourceContainer *container.Container,
 	policy updateConfig.Policy,
 	warnOnHeadFailed WarningStrategy,
 ) (bool, types.ImageID, string, error) {
@@ -255,7 +256,7 @@ func (c Client) IsContainerStale(
 //   - error: Non-nil if the check fails, nil on success.
 func (c Client) CheckContainerUpdate(
 	ctx context.Context,
-	sourceContainer types.Container,
+	sourceContainer *container.Container,
 	policy updateConfig.Policy,
 ) (bool, types.ImageID, string, error) {
 	clogVal := c.logger().With().
@@ -342,7 +343,7 @@ func (c Client) CheckContainerUpdate(
 //   - error: Non-nil if inspection fails, nil on success.
 func (c Client) HasNewImage(
 	ctx context.Context,
-	sourceContainer types.Container,
+	sourceContainer *container.Container,
 ) (bool, types.ImageID, string, error) {
 	clogVal := c.logger().With().
 		Str("container", sourceContainer.Name()).
@@ -467,7 +468,7 @@ func ExtractImageDigest(repoDigests []string, imageName string) string {
 //
 // Returns:
 //   - string: The digest (e.g., "sha256:abc..."), or "" if unavailable.
-func LocalDigest(c types.Container) string {
+func LocalDigest(c *container.Container) string {
 	info := c.ImageInfo()
 	if info == nil {
 		return ""
@@ -492,7 +493,7 @@ func LocalDigest(c types.Container) string {
 //   - nil on success or skip.
 func (c Client) PullImage(
 	ctx context.Context,
-	sourceContainer types.Container,
+	sourceContainer *container.Container,
 	warnOnHeadFailed WarningStrategy,
 	policy updateConfig.Policy,
 ) error {
@@ -585,9 +586,9 @@ func (c Client) RemoveImageByID(ctx context.Context, imageID types.ImageID, imag
 		return fmt.Errorf("cannot verify image usage: %w", err)
 	}
 
-	for _, container := range containers.Items {
-		state := container.State
-		if container.ImageID == string(imageID) &&
+	for _, c := range containers.Items {
+		state := c.State
+		if c.ImageID == string(imageID) &&
 			(state == dockerContainer.StateRunning ||
 				state == dockerContainer.StateRestarting ||
 				state == dockerContainer.StatePaused ||
@@ -755,7 +756,7 @@ func (c Client) logger() *zerolog.Logger {
 //   - error: Non-nil when a registry rate limit should abort the pull.
 func (c Client) shouldSkipPull(
 	ctx context.Context,
-	sourceContainer types.Container,
+	sourceContainer *container.Container,
 	registryAuth string,
 	warnOnHeadFailed WarningStrategy,
 ) (bool, error) {
@@ -1003,7 +1004,7 @@ func releasePullSlot(host string) {
 // Returns:
 //   - bool: True if a warning should be logged, false otherwise.
 func (c Client) warnOnHeadFailed(
-	sourceContainer types.Container,
+	sourceContainer *container.Container,
 	warnOnHeadFailed WarningStrategy,
 ) bool {
 	if warnOnHeadFailed == warnAlways {
@@ -1032,7 +1033,7 @@ func (c Client) warnOnHeadFailed(
 //   - error: Non-nil if inspection fails, nil on success.
 func (c Client) checkLocalImageStaleness(
 	ctx context.Context,
-	sourceContainer types.Container,
+	sourceContainer *container.Container,
 	clog *zerolog.Logger,
 ) (bool, types.ImageID, string, error) {
 	clog.Debug().Msg("Skipping image pull due to no-pull setting - checking local image only")

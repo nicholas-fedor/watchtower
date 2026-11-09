@@ -23,7 +23,6 @@ import (
 	"github.com/nicholas-fedor/watchtower/internal/testutil/modelfixture"
 	updateParams "github.com/nicholas-fedor/watchtower/internal/update/params"
 	"github.com/nicholas-fedor/watchtower/pkg/types"
-	mockTypes "github.com/nicholas-fedor/watchtower/pkg/types/mocks"
 )
 
 // newTestLogger returns a logger that writes each event to the test's log, so a
@@ -45,7 +44,7 @@ func newTestLogger(t *testing.T) *zerolog.Logger {
 
 func TestUpdateFromContainer(t *testing.T) {
 	type args struct {
-		container types.Container
+		container *container.Container
 		newImage  types.ImageID
 		state     State
 		params    updateParams.Params
@@ -170,7 +169,7 @@ func TestUpdateFromContainer(t *testing.T) {
 
 func TestProgress_AddSkipped(t *testing.T) {
 	type args struct {
-		container types.Container
+		container *container.Container
 		err       error
 		params    updateParams.Params
 	}
@@ -308,7 +307,7 @@ func TestProgress_AddFailed(t *testing.T) {
 
 func TestProgress_AddScanned(t *testing.T) {
 	type args struct {
-		container types.Container
+		container *container.Container
 		newImage  types.ImageID
 		params    updateParams.Params
 	}
@@ -569,7 +568,7 @@ func TestProgress_SkipUnrecorded(t *testing.T) {
 		"cont1": &ContainerStatus{state: ScannedState, containerID: "cont1"},
 	}
 
-	m.SkipUnrecorded(newTestLogger(t), []types.Container{recorded, unrecorded}, reason, updateParams.Params{})
+	m.SkipUnrecorded(newTestLogger(t), []*container.Container{recorded, unrecorded}, reason, updateParams.Params{})
 
 	assert.Equal(t, Progress{
 		"cont1": &ContainerStatus{state: ScannedState, containerID: "cont1"},
@@ -1350,15 +1349,6 @@ func TestApplyReportMeta(t *testing.T) {
 		applyReportMeta(nil, reportTestContainer(t, map[string]string{
 			labels.GitRepo: "https://github.com/org/app.git",
 		}), updateParams.Params{})
-	})
-
-	t.Run("skips mock containers", func(t *testing.T) {
-		t.Parallel()
-
-		mock := mockTypes.NewMockContainer(t)
-		status := &ContainerStatus{}
-		applyReportMeta(status, mock, updateParams.Params{})
-		assert.Empty(t, status.GitRepo())
 	})
 
 	t.Run("copies git and oci fields from a concrete container", func(t *testing.T) {

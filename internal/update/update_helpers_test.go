@@ -11,12 +11,12 @@ import (
 	dockerImage "github.com/moby/moby/api/types/image"
 	dockerNetwork "github.com/moby/moby/api/types/network"
 
+	"github.com/nicholas-fedor/watchtower/internal/container"
 	"github.com/nicholas-fedor/watchtower/internal/update/implicitrestart"
 	mockUpdate "github.com/nicholas-fedor/watchtower/internal/update/mocks"
 	updateParams "github.com/nicholas-fedor/watchtower/internal/update/params"
 	"github.com/nicholas-fedor/watchtower/internal/update/sorter"
 	"github.com/nicholas-fedor/watchtower/internal/update/state"
-	"github.com/nicholas-fedor/watchtower/pkg/types"
 )
 
 // sessionBatch records what an update session does with the notification
@@ -44,7 +44,7 @@ func (b *sessionBatch) record(report *state.Report) {
 //   - allContainers: Every listed container.
 //   - containers: The monitored containers, which may be marked.
 //   - useComposeDependsOn: Whether to include Compose depends_on labels as links.
-func updateImplicitRestart(log *zerolog.Logger, allContainers, containers []types.Container, useComposeDependsOn bool) {
+func updateImplicitRestart(log *zerolog.Logger, allContainers, containers []*container.Container, useComposeDependsOn bool) {
 	reconcileImplicitRestarts(log, allContainers, containers, updateParams.Params{UseComposeDependsOn: useComposeDependsOn})
 }
 
@@ -59,12 +59,12 @@ func updateImplicitRestart(log *zerolog.Logger, allContainers, containers []type
 //   - params: Update parameters.
 //
 // Returns:
-//   - []types.Container: Containers that should still restart.
+//   - []*container.Container: Containers that should still restart.
 func reconcileImplicitRestarts(
 	log *zerolog.Logger,
-	allContainers, containers []types.Container,
+	allContainers, containers []*container.Container,
 	params updateParams.Params,
-) []types.Container {
+) []*container.Container {
 	graph, err := sorter.NewDependencyGraph(log,
 		containers,
 		unmonitoredContainers(allContainers, containers),
@@ -80,7 +80,7 @@ func reconcileImplicitRestarts(
 func getCommonTestData() *mockUpdate.TestData {
 	return &mockUpdate.TestData{
 		NameOfContainerToKeep: "",
-		Containers: []types.Container{
+		Containers: []*container.Container{
 			mockUpdate.CreateMockContainer(
 				"test-container-01",
 				"test-container-01",
@@ -127,7 +127,7 @@ func getLinkedTestData(withImageInfo bool) *mockUpdate.TestData {
 
 	return &mockUpdate.TestData{
 		Staleness: map[string]bool{linkingContainer.Name(): false},
-		Containers: []types.Container{
+		Containers: []*container.Container{
 			staleContainer,
 			linkingContainer,
 		},
@@ -161,7 +161,7 @@ func getNetworkModeTestData() *mockUpdate.TestData {
 
 	return &mockUpdate.TestData{
 		Staleness:  map[string]bool{staleContainer.Name(): true, dependentContainer.Name(): false},
-		Containers: []types.Container{staleContainer, dependentContainer},
+		Containers: []*container.Container{staleContainer, dependentContainer},
 	}
 }
 
@@ -204,7 +204,7 @@ func getComposeTestData() *mockUpdate.TestData {
 
 	return &mockUpdate.TestData{
 		Staleness:  map[string]bool{dbContainer.Name(): true, webContainer.Name(): false},
-		Containers: []types.Container{dbContainer, webContainer},
+		Containers: []*container.Container{dbContainer, webContainer},
 	}
 }
 
@@ -248,7 +248,7 @@ func getComposeProjectPrefixedTestData() *mockUpdate.TestData {
 
 	return &mockUpdate.TestData{
 		Staleness:  map[string]bool{dbContainer.Name(): true, webContainer.Name(): false},
-		Containers: []types.Container{dbContainer, webContainer},
+		Containers: []*container.Container{dbContainer, webContainer},
 	}
 }
 
@@ -311,7 +311,7 @@ func getComposeMultiHopTestData() *mockUpdate.TestData {
 			dbContainer.Name():    false,
 			appContainer.Name():   false,
 		},
-		Containers: []types.Container{cacheContainer, dbContainer, appContainer},
+		Containers: []*container.Container{cacheContainer, dbContainer, appContainer},
 	}
 }
 
@@ -361,7 +361,7 @@ func getComposeHyphenatedProjectTestData() *mockUpdate.TestData {
 
 	return &mockUpdate.TestData{
 		Staleness:  map[string]bool{baseContainer.Name(): true, dependentContainer.Name(): false},
-		Containers: []types.Container{baseContainer, dependentContainer},
+		Containers: []*container.Container{baseContainer, dependentContainer},
 	}
 }
 
@@ -436,12 +436,12 @@ func getHyphenatedProjectWithContainerNameTestData() *mockUpdate.TestData {
 			dependentSimple.Name():  false,
 			dependentNetwork.Name(): false,
 		},
-		Containers: []types.Container{base, dependentSimple, dependentNetwork},
+		Containers: []*container.Container{base, dependentSimple, dependentNetwork},
 	}
 }
 
-func createDependencyChain(names []string) []types.Container {
-	containers := make([]types.Container, len(names))
+func createDependencyChain(names []string) []*container.Container {
+	containers := make([]*container.Container, len(names))
 	for i := range names {
 		name := names[i]
 
@@ -514,7 +514,7 @@ func getComposeDependsOnWithNetworkModeTestData() *mockUpdate.TestData {
 
 	return &mockUpdate.TestData{
 		Staleness:  map[string]bool{staleContainer.Name(): true, dependentContainer.Name(): false},
-		Containers: []types.Container{staleContainer, dependentContainer},
+		Containers: []*container.Container{staleContainer, dependentContainer},
 	}
 }
 

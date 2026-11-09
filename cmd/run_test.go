@@ -70,7 +70,7 @@ var withFilter = mock.MatchedBy(func([]types.Filter) bool { return true })
 // variables, set by setRunState.
 type runTestState struct {
 	client    containerClient.Client
-	current   types.Container
+	current   *container.Container
 	currentID types.ContainerID
 }
 
@@ -151,7 +151,7 @@ func newLoggerNotifier(t *testing.T, log *zerolog.Logger) *notify.Notifier {
 // runFixtureContainer returns a running container with the given ID, name,
 // creation time, and labels. Its restart policy is "unless-stopped", so
 // disabling its restarts sends a policy update.
-func runFixtureContainer(id, name, created string, labels map[string]string) types.Container {
+func runFixtureContainer(id, name, created string, labels map[string]string) *container.Container {
 	return container.NewContainer(nil,
 		&dockerContainer.InspectResponse{
 			ID:      id,
@@ -172,14 +172,14 @@ func runFixtureContainer(id, name, created string, labels map[string]string) typ
 }
 
 // currentWatchtower returns the Watchtower container the tests run as.
-func currentWatchtower() types.Container {
+func currentWatchtower() *container.Container {
 	return runFixtureContainer("c0c0", "/watchtower", "2026-10-08T12:00:00Z",
 		map[string]string{watchtowerLabelKey: "true"})
 }
 
 // currentWatchtowerWithPorts returns the Watchtower container the tests run
 // as, publishing its port 8080 on the host.
-func currentWatchtowerWithPorts() types.Container {
+func currentWatchtowerWithPorts() *container.Container {
 	port := dockerNetwork.MustParsePort("8080/tcp")
 
 	return container.NewContainer(nil,
@@ -248,7 +248,7 @@ func containerLabel(arg any) string {
 		return id.ShortID()
 	}
 
-	c, ok := arg.(types.Container)
+	c, ok := arg.(*container.Container)
 	if !ok || c == nil {
 		return "none"
 	}
@@ -415,7 +415,7 @@ func newAPIRequest(t *testing.T, ctx context.Context, method, addr, path string)
 func TestRun_RunOnce(t *testing.T) {
 	tests := []struct {
 		name    string
-		current types.Container
+		current *container.Container
 		// hostBinary runs Watchtower outside a container.
 		hostBinary bool
 		want       []string
@@ -513,14 +513,14 @@ func TestRun_Continuous(t *testing.T) {
 		// uncached runs without a current container, as outside a container or
 		// after a failed lookup.
 		uncached bool
-		setup    func(client *mockContainerClient.MockClient, current types.Container)
+		setup    func(client *mockContainerClient.MockClient, current *container.Container)
 		want     []string
 	}{
 		{
 			name: "no other containers",
-			setup: func(client *mockContainerClient.MockClient, current types.Container) {
-				client.EXPECT().ListContainers(mock.Anything, withFilter).Return([]types.Container{current}, nil)
-				client.EXPECT().ListContainers(mock.Anything).Return([]types.Container{current}, nil)
+			setup: func(client *mockContainerClient.MockClient, current *container.Container) {
+				client.EXPECT().ListContainers(mock.Anything, withFilter).Return([]*container.Container{current}, nil)
+				client.EXPECT().ListContainers(mock.Anything).Return([]*container.Container{current}, nil)
 			},
 			want: []string{"ListContainers filtered", "ListContainers all", "GetVersion"},
 		},
@@ -528,11 +528,11 @@ func TestRun_Continuous(t *testing.T) {
 			// The removed image is reported to a slice that is then discarded.
 			name: "older instance and its image are removed",
 			args: []string{"--cleanup"},
-			setup: func(client *mockContainerClient.MockClient, current types.Container) {
-				client.EXPECT().ListContainers(mock.Anything, withFilter).Return([]types.Container{current, older}, nil)
+			setup: func(client *mockContainerClient.MockClient, current *container.Container) {
+				client.EXPECT().ListContainers(mock.Anything, withFilter).Return([]*container.Container{current, older}, nil)
 				client.EXPECT().StopAndRemoveContainer(mock.Anything, older, 10*time.Minute).Return(nil)
 				client.EXPECT().RemoveImageByID(mock.Anything, older.ImageID(), older.ImageName()).Return(nil)
-				client.EXPECT().ListContainers(mock.Anything).Return([]types.Container{current}, nil)
+				client.EXPECT().ListContainers(mock.Anything).Return([]*container.Container{current}, nil)
 			},
 			want: []string{
 				"ListContainers filtered",
@@ -548,9 +548,9 @@ func TestRun_Continuous(t *testing.T) {
 			name:     "older instance is kept outside a container",
 			args:     []string{"--cleanup"},
 			uncached: true,
-			setup: func(client *mockContainerClient.MockClient, current types.Container) {
-				client.EXPECT().ListContainers(mock.Anything, withFilter).Return([]types.Container{current, older}, nil)
-				client.EXPECT().ListContainers(mock.Anything).Return([]types.Container{current, older}, nil)
+			setup: func(client *mockContainerClient.MockClient, current *container.Container) {
+				client.EXPECT().ListContainers(mock.Anything, withFilter).Return([]*container.Container{current, older}, nil)
+				client.EXPECT().ListContainers(mock.Anything).Return([]*container.Container{current, older}, nil)
 			},
 			want: []string{"ListContainers filtered", "ListContainers all", "GetVersion"},
 		},
@@ -559,27 +559,27 @@ func TestRun_Continuous(t *testing.T) {
 			args:     []string{"--cleanup"},
 			uncached: true,
 			knownID:  true,
-			setup: func(client *mockContainerClient.MockClient, current types.Container) {
-				client.EXPECT().ListContainers(mock.Anything, withFilter).Return([]types.Container{current, older}, nil)
-				client.EXPECT().ListContainers(mock.Anything).Return([]types.Container{current, older}, nil)
+			setup: func(client *mockContainerClient.MockClient, current *container.Container) {
+				client.EXPECT().ListContainers(mock.Anything, withFilter).Return([]*container.Container{current, older}, nil)
+				client.EXPECT().ListContainers(mock.Anything).Return([]*container.Container{current, older}, nil)
 			},
 			want: []string{"ListContainers filtered", "ListContainers all", "GetVersion"},
 		},
 		{
 			name: "orchestrator still handing off is kept",
 			args: []string{"--scope", "prod"},
-			setup: func(client *mockContainerClient.MockClient, current types.Container) {
-				client.EXPECT().ListContainers(mock.Anything, withFilter).Return([]types.Container{current}, nil)
-				client.EXPECT().ListContainers(mock.Anything).Return([]types.Container{current, inFlight}, nil)
+			setup: func(client *mockContainerClient.MockClient, current *container.Container) {
+				client.EXPECT().ListContainers(mock.Anything, withFilter).Return([]*container.Container{current}, nil)
+				client.EXPECT().ListContainers(mock.Anything).Return([]*container.Container{current, inFlight}, nil)
 			},
 			want: []string{"ListContainers filtered", "ListContainers all", "GetVersion"},
 		},
 		{
 			name: "orphaned orchestrator from another scope is removed",
 			args: []string{"--scope", "prod"},
-			setup: func(client *mockContainerClient.MockClient, current types.Container) {
-				client.EXPECT().ListContainers(mock.Anything, withFilter).Return([]types.Container{current}, nil)
-				client.EXPECT().ListContainers(mock.Anything).Return([]types.Container{current, orchestrator}, nil)
+			setup: func(client *mockContainerClient.MockClient, current *container.Container) {
+				client.EXPECT().ListContainers(mock.Anything, withFilter).Return([]*container.Container{current}, nil)
+				client.EXPECT().ListContainers(mock.Anything).Return([]*container.Container{current, orchestrator}, nil)
 				client.EXPECT().StopAndRemoveContainer(mock.Anything, orchestrator, time.Duration(0)).Return(nil)
 			},
 			want: []string{
@@ -648,8 +648,8 @@ func TestRun_PublishedPortsBlockSelfUpdates(t *testing.T) {
 			}
 
 			mockClient := mockContainerClient.NewMockClient(t)
-			mockClient.EXPECT().ListContainers(mock.Anything, withFilter).Return([]types.Container{current}, nil)
-			mockClient.EXPECT().ListContainers(mock.Anything).Return([]types.Container{current}, nil)
+			mockClient.EXPECT().ListContainers(mock.Anything, withFilter).Return([]*container.Container{current}, nil)
+			mockClient.EXPECT().ListContainers(mock.Anything).Return([]*container.Container{current}, nil)
 			mockClient.EXPECT().GetVersion().Return("1.47")
 
 			if tt.wantCheck {
@@ -675,11 +675,11 @@ func TestRun_ScheduledUpdate(t *testing.T) {
 	var checks atomic.Int32
 
 	mockClient := mockContainerClient.NewMockClient(t)
-	mockClient.EXPECT().ListContainers(mock.Anything, withFilter).Return([]types.Container{current}, nil)
-	mockClient.EXPECT().ListContainers(mock.Anything).Return([]types.Container{current}, nil)
+	mockClient.EXPECT().ListContainers(mock.Anything, withFilter).Return([]*container.Container{current}, nil)
+	mockClient.EXPECT().ListContainers(mock.Anything).Return([]*container.Container{current}, nil)
 	mockClient.EXPECT().GetVersion().Return("1.47")
 	mockClient.EXPECT().IsContainerStale(mock.Anything, current, mock.Anything).
-		RunAndReturn(func(context.Context, types.Container, updateConfig.Policy) (bool, types.ImageID, string, error) {
+		RunAndReturn(func(context.Context, *container.Container, updateConfig.Policy) (bool, types.ImageID, string, error) {
 			checks.Add(1)
 
 			return false, current.ImageID(), "", nil
@@ -720,16 +720,16 @@ func TestRun_UpdatesAfterCleanup(t *testing.T) {
 	var scheduledListings atomic.Int32
 
 	mockClient := mockContainerClient.NewMockClient(t)
-	mockClient.EXPECT().ListContainers(mock.Anything, withFilter).Return([]types.Container{current, older}, nil).Once()
+	mockClient.EXPECT().ListContainers(mock.Anything, withFilter).Return([]*container.Container{current, older}, nil).Once()
 	mockClient.EXPECT().StopAndRemoveContainer(mock.Anything, older, 10*time.Minute).Return(nil)
 	mockClient.EXPECT().RemoveImageByID(mock.Anything, older.ImageID(), older.ImageName()).Return(nil)
-	mockClient.EXPECT().ListContainers(mock.Anything).Return([]types.Container{current}, nil)
+	mockClient.EXPECT().ListContainers(mock.Anything).Return([]*container.Container{current}, nil)
 	mockClient.EXPECT().GetVersion().Return("1.47")
 	mockClient.EXPECT().ListContainers(mock.Anything, withFilter).
-		RunAndReturn(func(context.Context, ...types.Filter) ([]types.Container, error) {
+		RunAndReturn(func(context.Context, ...types.Filter) ([]*container.Container, error) {
 			scheduledListings.Add(1)
 
-			return []types.Container{current}, nil
+			return []*container.Container{current}, nil
 		})
 
 	setRunState(t, runTestState{client: mockClient, current: current, currentID: current.ID()})
@@ -770,18 +770,18 @@ func TestRun_WaitsForAPIDrain(t *testing.T) {
 
 	mockClient := mockContainerClient.NewMockClient(t)
 	// The startup cleanup of older instances lists the containers first.
-	mockClient.EXPECT().ListContainers(mock.Anything, withFilter).Return([]types.Container{current}, nil).Once()
-	mockClient.EXPECT().ListContainers(mock.Anything).Return([]types.Container{current}, nil)
+	mockClient.EXPECT().ListContainers(mock.Anything, withFilter).Return([]*container.Container{current}, nil).Once()
+	mockClient.EXPECT().ListContainers(mock.Anything).Return([]*container.Container{current}, nil)
 	// The API request then lists them, and stays open until released.
 	mockClient.EXPECT().ListContainers(mock.Anything, withFilter).
-		RunAndReturn(func(context.Context, ...types.Filter) ([]types.Container, error) {
+		RunAndReturn(func(context.Context, ...types.Filter) ([]*container.Container, error) {
 			close(entered)
 			<-release
 
 			// The request logs through the hooked logger while the API drains.
 			notifierLog.Warn().Msg("Logged while the HTTP API drains")
 
-			return []types.Container{}, nil
+			return []*container.Container{}, nil
 		}).Once()
 	mockClient.EXPECT().GetVersion().Return("1.47").Maybe()
 
@@ -867,13 +867,13 @@ func TestRun_APISharesUpdateLock(t *testing.T) {
 	release := make(chan struct{})
 
 	mockClient := mockContainerClient.NewMockClient(t)
-	mockClient.EXPECT().ListContainers(mock.Anything, withFilter).Return([]types.Container{current}, nil)
-	mockClient.EXPECT().ListContainers(mock.Anything).Return([]types.Container{current}, nil)
+	mockClient.EXPECT().ListContainers(mock.Anything, withFilter).Return([]*container.Container{current}, nil)
+	mockClient.EXPECT().ListContainers(mock.Anything).Return([]*container.Container{current}, nil)
 	mockClient.EXPECT().GetVersion().Return("1.47").Maybe()
 	// The update at startup's staleness check waits for the test. A second
 	// update, which a separate lock would let run, finds the container fresh.
 	mockClient.EXPECT().IsContainerStale(mock.Anything, current, mock.Anything).
-		RunAndReturn(func(context.Context, types.Container, updateConfig.Policy) (bool, types.ImageID, string, error) {
+		RunAndReturn(func(context.Context, *container.Container, updateConfig.Policy) (bool, types.ImageID, string, error) {
 			close(entered)
 			<-release
 
@@ -925,8 +925,8 @@ func TestRun_APIOnlyWritesOneStartupMessage(t *testing.T) {
 	current := currentWatchtower()
 
 	mockClient := mockContainerClient.NewMockClient(t)
-	mockClient.EXPECT().ListContainers(mock.Anything, withFilter).Return([]types.Container{current}, nil)
-	mockClient.EXPECT().ListContainers(mock.Anything).Return([]types.Container{current}, nil)
+	mockClient.EXPECT().ListContainers(mock.Anything, withFilter).Return([]*container.Container{current}, nil)
+	mockClient.EXPECT().ListContainers(mock.Anything).Return([]*container.Container{current}, nil)
 	mockClient.EXPECT().GetVersion().Return("1.47").Maybe()
 
 	setRunState(t, runTestState{client: mockClient, current: current, currentID: current.ID()})
@@ -1060,8 +1060,8 @@ func runExitHelper(t *testing.T, helperCase string) {
 	case "api-without-token":
 		args = []string{"--http-api-update"}
 
-		mockClient.EXPECT().ListContainers(mock.Anything, withFilter).Return([]types.Container{current}, nil)
-		mockClient.EXPECT().ListContainers(mock.Anything).Return([]types.Container{current}, nil)
+		mockClient.EXPECT().ListContainers(mock.Anything, withFilter).Return([]*container.Container{current}, nil)
+		mockClient.EXPECT().ListContainers(mock.Anything).Return([]*container.Container{current}, nil)
 	default:
 		panic("unknown run exit helper case " + helperCase)
 	}
@@ -1093,8 +1093,8 @@ func TestRun_OldInstanceStops(t *testing.T) {
 		map[string]string{watchtowerLabelKey: "true"})
 
 	mockClient := mockContainerClient.NewMockClient(t)
-	mockClient.EXPECT().ListContainers(mock.Anything, withFilter).Return([]types.Container{oldSelf}, nil)
-	mockClient.EXPECT().ListContainers(mock.Anything).Return([]types.Container{oldSelf}, nil)
+	mockClient.EXPECT().ListContainers(mock.Anything, withFilter).Return([]*container.Container{oldSelf}, nil)
+	mockClient.EXPECT().ListContainers(mock.Anything).Return([]*container.Container{oldSelf}, nil)
 	mockClient.EXPECT().GetVersion().Return("1.47").Maybe()
 	mockClient.EXPECT().SetRestartPolicy(mock.Anything, oldSelf.ID(),
 		dockerContainer.RestartPolicy{Name: dockerContainer.RestartPolicyDisabled}).Return(nil)

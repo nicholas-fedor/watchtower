@@ -109,7 +109,7 @@ var fullContainerIDPattern = regexp.MustCompile(`^[a-f0-9]{64}$`)
 //   - error: Non-nil if orchestrator creation fails.
 func StartOrchestrator(log *zerolog.Logger, ctx context.Context,
 	client containerClient.Client,
-	sourceContainer types.Container,
+	sourceContainer *container.Container,
 	config updateParams.Params,
 ) (types.ContainerID, bool, error) {
 	clogVal := log.With().
@@ -480,7 +480,7 @@ func orchestrateSelfUpdate(log *zerolog.Logger, ctx context.Context,
 	return nil
 }
 
-// pinContainerCreateImage sets Config.Image on a concrete container.Container so
+// pinContainerCreateImage sets Config.Image on the old container so
 // GetCreateConfig uses newImage for the replacement instance.
 //
 // SetImageName also updates the cached ImageName used after the pin.
@@ -489,24 +489,17 @@ func orchestrateSelfUpdate(log *zerolog.Logger, ctx context.Context,
 //   - oldContainer: Source container whose create config is pinned.
 //   - newImage: Image reference to use when creating the replacement.
 //   - clog: Logger with container context fields.
-func pinContainerCreateImage(oldContainer types.Container, newImage string, clog *zerolog.Logger) {
+func pinContainerCreateImage(oldContainer *container.Container, newImage string, clog *zerolog.Logger) {
 	if newImage == "" {
 		return
 	}
 
-	c, ok := oldContainer.(*container.Container)
-	if !ok {
-		clog.Debug().Msg("Old container is not a concrete Container. Cannot pin create image")
-
-		return
-	}
-
-	info := c.ContainerInfo()
+	info := oldContainer.ContainerInfo()
 	if info == nil || info.Config == nil {
 		return
 	}
 
-	c.SetImageName(newImage)
+	oldContainer.SetImageName(newImage)
 	clog.Debug().
 		Str("pinned_image", newImage).
 		Msg("Pinned create image for ephemeral self-update")
@@ -522,7 +515,7 @@ func renameOldContainerForHandoff(
 	ctx context.Context,
 	client containerClient.Client,
 	clog *zerolog.Logger,
-	oldContainer types.Container,
+	oldContainer *container.Container,
 	originalName string,
 ) (bool, error) {
 	if container.IsOldContainer(oldContainer.Name()) {
@@ -567,7 +560,7 @@ func restoreAndStartOldContainer(
 	ctx context.Context,
 	client containerClient.Client,
 	clog *zerolog.Logger,
-	oldContainer types.Container,
+	oldContainer *container.Container,
 	originalName string,
 ) {
 	if originalName == "" {
@@ -619,7 +612,7 @@ func restartOldContainer(
 	ctx context.Context,
 	client containerClient.Client,
 	clog *zerolog.Logger,
-	oldContainer types.Container,
+	oldContainer *container.Container,
 ) {
 	recoveryCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), orchestratorRecoveryTimeout)
 	defer cancel()
@@ -651,7 +644,7 @@ func cleanupFailedNewContainer(
 	ctx context.Context,
 	client containerClient.Client,
 	clog *zerolog.Logger,
-	oldContainer types.Container,
+	oldContainer *container.Container,
 	newContainerID types.ContainerID,
 ) {
 	if newContainerID == "" {
@@ -699,7 +692,7 @@ func cleanupFailedNewContainer(
 //   - containerChain: Container chain label for lineage tracking.
 //
 // Returns:
-//   - types.Container: The inspected old container.
+//   - *container.Container: The inspected old container.
 //   - error: Non-nil if inspection fails.
 func inspectOldContainer(
 	ctx context.Context,
@@ -707,7 +700,7 @@ func inspectOldContainer(
 	clog *zerolog.Logger,
 	oldID string,
 	containerChain string,
-) (types.Container, error) {
+) (*container.Container, error) {
 	clog.Debug().Msg("Inspecting old container")
 
 	oldContainer, err := client.GetContainer(
@@ -739,13 +732,10 @@ func inspectOldContainer(
 	// Propagate the container chain label to the old container's config, so
 	// StartContainer's GetCreateConfig() includes the label on the new container.
 	if containerChain != "" {
-		concrete, ok := oldContainer.(*container.Container)
-		if ok {
-			concrete.SetLabel(labels.ContainerChain, containerChain)
-			clog.Debug().
-				Str("container_chain", containerChain).
-				Msg("Set container chain label on source container config")
-		}
+		oldContainer.SetLabel(labels.ContainerChain, containerChain)
+		clog.Debug().
+			Str("container_chain", containerChain).
+			Msg("Set container chain label on source container config")
 	}
 
 	return oldContainer, nil
@@ -768,7 +758,7 @@ func stopOldContainer(
 	ctx context.Context,
 	client containerClient.Client,
 	clog *zerolog.Logger,
-	oldContainer types.Container,
+	oldContainer *container.Container,
 ) (bool, error) {
 	clog.Debug().Msg("Stopping old Watchtower container")
 
@@ -838,7 +828,7 @@ func removeOldContainer(
 	ctx context.Context,
 	client containerClient.Client,
 	clog *zerolog.Logger,
-	oldContainer types.Container,
+	oldContainer *container.Container,
 ) error {
 	clog.Debug().Msg("Removing old Watchtower container after successful handoff")
 
@@ -949,7 +939,7 @@ func createAndStartNewContainer(
 	ctx context.Context,
 	client containerClient.Client,
 	clog *zerolog.Logger,
-	oldContainer types.Container,
+	oldContainer *container.Container,
 ) (types.ContainerID, error) {
 	clog.Debug().Msg("Creating and starting new Watchtower container")
 

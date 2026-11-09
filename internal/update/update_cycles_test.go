@@ -34,7 +34,7 @@ func TestUpdate_ComposeDependencyCycle(t *testing.T) {
 
 	// composeContainer returns a running, stale-able Compose container of the
 	// stack project whose name differs from its service name.
-	composeContainer := func(id, service, dependsOn string) types.Container {
+	composeContainer := func(id, service, dependsOn string) *container.Container {
 		labels := map[string]string{
 			"com.docker.compose.project":          "stack",
 			"com.docker.compose.service":          service,
@@ -83,7 +83,7 @@ func TestUpdate_ComposeDependencyCycle(t *testing.T) {
 
 			client := mockContainerClient.NewMockClient(t)
 			client.EXPECT().ListContainers(mock.Anything, mock.Anything).
-				Return([]types.Container{web, api, app}, nil).Once()
+				Return([]*container.Container{web, api, app}, nil).Once()
 			client.EXPECT().IsContainerStale(mock.Anything, mock.Anything, mock.Anything).
 				Return(true, types.ImageID("sha256:new"), "", nil)
 			client.EXPECT().GetImageAnnotations(mock.Anything, mock.Anything).Return(oci.Annotations{}).Maybe()
@@ -95,7 +95,7 @@ func TestUpdate_ComposeDependencyCycle(t *testing.T) {
 			)
 
 			client.EXPECT().StopAndRemoveContainer(mock.Anything, mock.Anything, mock.Anything).
-				Run(func(_ context.Context, c types.Container, _ time.Duration) {
+				Run(func(_ context.Context, c *container.Container, _ time.Duration) {
 					mu.Lock()
 					defer mu.Unlock()
 
@@ -128,7 +128,7 @@ func TestUpdate_LinkToCycleMember(t *testing.T) {
 	t.Parallel()
 
 	// dependent returns a running container whose depends-on label lists links.
-	dependent := func(id, name, links string) types.Container {
+	dependent := func(id, name, links string) *container.Container {
 		labels := map[string]string{}
 		if links != "" {
 			labels["com.centurylinklabs.watchtower.depends-on"] = links
@@ -152,9 +152,9 @@ func TestUpdate_LinkToCycleMember(t *testing.T) {
 
 	client := mockContainerClient.NewMockClient(t)
 	client.EXPECT().ListContainers(mock.Anything, mock.Anything).
-		Return([]types.Container{db, e, c, replica}, nil).Once()
+		Return([]*container.Container{db, e, c, replica}, nil).Once()
 	client.EXPECT().IsContainerStale(mock.Anything, mock.Anything, mock.Anything).
-		RunAndReturn(func(_ context.Context, ct types.Container, _ updateConfig.Policy) (bool, types.ImageID, string, error) {
+		RunAndReturn(func(_ context.Context, ct *container.Container, _ updateConfig.Policy) (bool, types.ImageID, string, error) {
 			return ct.Name() == "c", types.ImageID("sha256:new"), "", nil
 		})
 	client.EXPECT().GetImageAnnotations(mock.Anything, mock.Anything).Return(oci.Annotations{}).Maybe()
@@ -164,15 +164,15 @@ func TestUpdate_LinkToCycleMember(t *testing.T) {
 	var created []string
 
 	client.EXPECT().CreateContainer(mock.Anything, mock.Anything).
-		RunAndReturn(func(_ context.Context, ct types.Container) (types.ContainerID, error) {
+		RunAndReturn(func(_ context.Context, ct *container.Container) (types.ContainerID, error) {
 			created = append(created, ct.Name())
 
 			return ct.ID(), nil
 		}).Maybe()
 	client.EXPECT().StartContainerByID(mock.Anything, mock.Anything).Return(nil).Maybe()
 	client.EXPECT().GetContainer(mock.Anything, mock.Anything).
-		RunAndReturn(func(_ context.Context, id types.ContainerID) (types.Container, error) {
-			for _, ct := range []types.Container{c, replica} {
+		RunAndReturn(func(_ context.Context, id types.ContainerID) (*container.Container, error) {
+			for _, ct := range []*container.Container{c, replica} {
 				if ct.ID() == id {
 					return ct, nil
 				}
@@ -203,7 +203,7 @@ func TestUpdate_HostConfigDependencyCycle(t *testing.T) {
 	)
 
 	// hostContainer returns a running container with the given host config.
-	hostContainer := func(id, name string, hostConfig *dockerContainer.HostConfig) types.Container {
+	hostContainer := func(id, name string, hostConfig *dockerContainer.HostConfig) *container.Container {
 		image := "org/" + name + ":latest"
 
 		return container.NewContainer(nil, &dockerContainer.InspectResponse{
@@ -223,7 +223,7 @@ func TestUpdate_HostConfigDependencyCycle(t *testing.T) {
 
 	client := mockContainerClient.NewMockClient(t)
 	client.EXPECT().ListContainers(mock.Anything, mock.Anything).
-		Return([]types.Container{app, vpn, web}, nil).Once()
+		Return([]*container.Container{app, vpn, web}, nil).Once()
 	client.EXPECT().IsContainerStale(mock.Anything, mock.Anything, mock.Anything).
 		Return(true, types.ImageID("sha256:new"), "", nil)
 	client.EXPECT().GetImageAnnotations(mock.Anything, mock.Anything).Return(oci.Annotations{}).Maybe()
@@ -231,7 +231,7 @@ func TestUpdate_HostConfigDependencyCycle(t *testing.T) {
 	var stopped []string
 
 	client.EXPECT().StopAndRemoveContainer(mock.Anything, mock.Anything, mock.Anything).
-		Run(func(_ context.Context, c types.Container, _ time.Duration) { stopped = append(stopped, c.Name()) }).
+		Run(func(_ context.Context, c *container.Container, _ time.Duration) { stopped = append(stopped, c.Name()) }).
 		Return(nil).Maybe()
 	client.EXPECT().CreateContainer(mock.Anything, mock.Anything).Return(types.ContainerID(webID), nil).Maybe()
 	client.EXPECT().StartContainerByID(mock.Anything, mock.Anything).Return(nil).Maybe()
