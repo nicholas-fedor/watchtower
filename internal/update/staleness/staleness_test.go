@@ -9,12 +9,14 @@ import (
 	"github.com/stretchr/testify/require"
 
 	dockerContainer "github.com/moby/moby/api/types/container"
+	dockerImage "github.com/moby/moby/api/types/image"
 
+	"github.com/nicholas-fedor/watchtower/internal/testutil/containerfixture"
+	"github.com/nicholas-fedor/watchtower/internal/testutil/modelfixture"
 	mockUpdate "github.com/nicholas-fedor/watchtower/internal/update/mocks"
 	updateParams "github.com/nicholas-fedor/watchtower/internal/update/params"
 	"github.com/nicholas-fedor/watchtower/internal/update/state"
 	"github.com/nicholas-fedor/watchtower/pkg/types"
-	mockTypes "github.com/nicholas-fedor/watchtower/pkg/types/mocks"
 )
 
 // Watchtower container IDs for the self-update cases.
@@ -325,12 +327,12 @@ func TestIsPinned(t *testing.T) {
 	t.Run("does not panic when ContainerInfo Config is nil", func(t *testing.T) {
 		t.Parallel()
 
-		cont := mockTypes.NewMockContainer(t)
-		cont.On("Name").Return("/nil-config")
-		cont.On("ImageName").Return("nginx:latest")
-		cont.On("ContainerInfo").Return(&dockerContainer.InspectResponse{
-			Config: nil,
-		})
+		cont := modelfixture.Container(
+			containerfixture.WithName("/nil-config"),
+			func(c *dockerContainer.InspectResponse, _ *dockerImage.InspectResponse) {
+				c.Config = nil
+			},
+		)
 
 		progress := state.Progress{}
 
