@@ -3,6 +3,7 @@ package rebuild
 import (
 	"bytes"
 	"context"
+	"maps"
 	"os"
 	"path/filepath"
 	"testing"
@@ -1049,9 +1050,9 @@ func TestSession_applyCompose(t *testing.T) {
 }
 
 // TestSession_recordCompose pins what recording an applied Compose container
-// leaves for the rest of the session: the report fields for the container and
-// the session's applied and built records. The source container is never
-// recreated from, so these are the only outputs that matter.
+// leaves for the rest of the session: the report fields for the container, the
+// session's applied and built records, and the source container's labels,
+// which stay as they were.
 func TestSession_recordCompose(t *testing.T) {
 	t.Parallel()
 
@@ -1170,8 +1171,14 @@ func TestSession_recordCompose(t *testing.T) {
 			progress := &state.Progress{}
 			progress.AddScanned(newTestLogger(t), c, container.ImageID("git:"+commit), params)
 
+			sourceLabels := maps.Clone(containerLabels(c))
+
 			result := git.CheckResult{Stale: true, Commit: commit, Tag: "v1.2.3"}
 			sess.recordCompose(c, tt.item, params, result, progress, newTestLogger(t))
+
+			// The replacement takes its labels from the Compose service, so
+			// recording leaves the source's association and stamp labels alone.
+			assert.Equal(t, sourceLabels, containerLabels(c))
 
 			report := progress.Report(newTestLogger(t))
 			require.Len(t, report.Scanned(), 1)
