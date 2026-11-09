@@ -63,6 +63,10 @@ var (
 	errInvalidRegistryResponse = errors.New("registry responded with invalid HEAD request")
 	// errManifestNotFound indicates the registry returned 404 for a HEAD manifest request.
 	errManifestNotFound = errors.New("manifest not found")
+	// errHeadFallback indicates a HEAD manifest request gave no digest, so the
+	// manifest should be requested with GET. A failed HEAD response other than a
+	// 404 or a refused repository gives it. So does a digest header with no hash.
+	errHeadFallback = errors.New("HEAD request gave no digest")
 	// errRepositoryDenied indicates the registry refused access to the
 	// repository. It answered the manifest request with a 401 whose challenge
 	// reports insufficient_scope.
@@ -358,12 +362,13 @@ func CompareDigestWithRemote(log *zerolog.Logger,
 		"",
 		endpoints...,
 	)
-	// If HEAD request returned empty digest (due to missing Docker-Content-Digest header),
-	// fall back to GET request.
-	if err == nil && remoteDigest == "" {
+	// No endpoint answered the HEAD request with a digest, so the endpoints are
+	// asked again with GET.
+	if errors.Is(err, errHeadFallback) {
 		log.Debug().
+			Err(err).
 			Fields(fields).
-			Msg("HEAD request returned empty digest - falling back to GET")
+			Msg("No HEAD response gave a digest - falling back to GET")
 
 		remoteDigest, err = fetchDigestWithGet(log,
 			ctx,
@@ -475,7 +480,8 @@ func fetchDigestWithGet(
 // Returns:
 //   - string: The normalized digest, or empty when the registry answers 404
 //     for the tag.
-//   - error: Non-nil if the request fails or the HEAD response gives no digest.
+//   - error: Non-nil if the request fails or no endpoint's HEAD response gives
+//     a digest.
 func FetchDigestForTag(
 	log *zerolog.Logger,
 	ctx context.Context,
@@ -487,22 +493,24 @@ func FetchDigestForTag(
 	endpoints ...string,
 ) (string, error) {
 	remote, err := fetchDigest(log, ctx, container, authToken, settings, limiter, http.MethodHead, tag, endpoints...)
-	if errors.Is(err, errManifestNotFound) {
+
+	switch {
+	case errors.Is(err, errManifestNotFound):
 		// The registry has the repository but not this tag.
 		return "", nil
-	}
-
-	if err != nil {
+	case errors.Is(err, errHeadFallback):
+		// No digest answers nothing about the tag, so the caller must not read
+		// it as missing.
+		return "", fmt.Errorf("%w: no digest for tag %s: %w", errInvalidRegistryResponse, tag, err)
+	case err != nil:
 		return "", err
-	}
-
-	// An empty digest means the HEAD request failed or carried no hash. That
-	// answers nothing about the tag, so the caller must not read it as missing.
-	if remote == "" {
+	case remote == "":
+		// An image without repo digests is never probed, which answers nothing
+		// about the tag either.
 		return "", fmt.Errorf("%w: no digest for tag %s", errInvalidRegistryResponse, tag)
+	default:
+		return remote, nil
 	}
-
-	return remote, nil
 }
 
 // buildManifestURL constructs and validates a manifest URL for a container.
@@ -717,8 +725,11 @@ func buildManifestURLForImage(log *zerolog.Logger,
 // stays scoped to the container's repository, which every tag shares.
 //
 // When endpoints are provided, each mirror host is tried in order. An empty string
-// endpoint means use the canonical registry host. If all endpoints fail, the last
-// error is returned.
+// endpoint means use the canonical registry host. The first endpoint that gives a
+// digest wins. When none does, the error is the last endpoint's. The exception is
+// an earlier HEAD response that asked for the GET fallback. Its error asks for the
+// fallback instead, unless the last endpoint answered 404 or refused the
+// repository, since a GET would get the same answer there.
 //
 // Parameters:
 //   - ctx: Context for request lifecycle control.
@@ -731,7 +742,8 @@ func buildManifestURLForImage(log *zerolog.Logger,
 //   - endpoints: Optional list of registry mirror host overrides to try before the canonical host.
 //
 // Returns:
-//   - string: Normalized digest.
+//   - string: Normalized digest. It is empty for an image without repo
+//     digests, which is not probed.
 //   - error: Non-nil if operation fails, nil on success.
 func fetchDigest(log *zerolog.Logger,
 	ctx context.Context,
@@ -799,7 +811,13 @@ func fetchDigest(log *zerolog.Logger,
 	}
 	defer release()
 
-	var lastErr error
+	var (
+		lastErr error
+		// fallbackErr is the first HEAD response that asked for the GET
+		// fallback. The next endpoint's HEAD request comes first, since Docker
+		// Hub does not count HEAD requests toward its pull rate limit.
+		fallbackErr error
+	)
 
 	for _, endpoint := range endpoints {
 		var epFields map[string]any
@@ -951,6 +969,10 @@ func fetchDigest(log *zerolog.Logger,
 				Msg("Failed to handle manifest response")
 			lastErr = err
 
+			if fallbackErr == nil && errors.Is(err, errHeadFallback) {
+				fallbackErr = err
+			}
+
 			if ratelimit.Is(err) {
 				return "", lastErr
 			}
@@ -999,6 +1021,10 @@ func fetchDigest(log *zerolog.Logger,
 					Msg("Failed to retry manifest request")
 				lastErr = err
 
+				if fallbackErr == nil && errors.Is(err, errHeadFallback) {
+					fallbackErr = err
+				}
+
 				if ratelimit.Is(err) {
 					return "", lastErr
 				}
@@ -1016,7 +1042,13 @@ func fetchDigest(log *zerolog.Logger,
 		return digest, nil
 	}
 
-	return "", lastErr
+	// The canonical registry is the last endpoint. Its 404 or refusal answers
+	// for the image, and a GET would get the same answer.
+	if fallbackErr == nil || errors.Is(lastErr, errManifestNotFound) || errors.Is(lastErr, errRepositoryDenied) {
+		return "", lastErr
+	}
+
+	return "", fallbackErr
 }
 
 // handleManifestResponse processes the HTTP response, handles redirects, and extracts the digest.
@@ -1072,8 +1104,8 @@ func handleManifestResponse(log *zerolog.Logger,
 	// A refused repository would refuse a GET too.
 	refused := auth.IsRepositoryRefusal(resp)
 
-	// Handle non-success responses for HEAD requests by returning empty digest to trigger GET fallback.
-	// A 404 or a refused repository is excluded, since a GET would get the same answer.
+	// A HEAD request that fails asks for the GET fallback. A 404 or a refused
+	// repository is excluded, since a GET would get the same answer.
 	headFallbackCondition := method == http.MethodHead &&
 		(resp.StatusCode < http.StatusOK || resp.StatusCode >= http.StatusMultipleChoices) &&
 		resp.StatusCode != http.StatusNotFound && !refused
@@ -1085,9 +1117,9 @@ func handleManifestResponse(log *zerolog.Logger,
 	if headFallbackCondition {
 		log.Debug().
 			Fields(fields).
-			Msg("HEAD request failed, returning empty digest to trigger GET fallback")
+			Msg("HEAD request failed, asking for the GET fallback")
 
-		return "", "", false, nil // Return empty to trigger GET fallback in CompareDigest
+		return "", "", false, fmt.Errorf("%w: status %s", errHeadFallback, resp.Status)
 	}
 
 	// Check for redirect status codes (3xx)
@@ -1218,14 +1250,12 @@ func handleManifestResponse(log *zerolog.Logger,
 // Parameters:
 //   - resp: The HTTP response from a HEAD request containing headers.
 //
-// A header with no hash after its algorithm, such as "sha256:", yields an
-// empty digest and no error, which asks the caller to fall back to a GET
-// request, as a non-success HEAD response does.
+// A header with no hash after its algorithm, such as "sha256:", asks for the
+// GET fallback, as a non-success HEAD response does.
 //
 // Returns:
-//   - string: The normalized digest (e.g., "abc..." without "sha256:"), or empty
-//     when the header has no hash.
-//   - error: An error if the digest header is missing, nil otherwise.
+//   - string: The normalized digest (e.g., "abc..." without "sha256:").
+//   - error: Non-nil if the digest header is missing or has no hash.
 func extractHeadDigest(log *zerolog.Logger, resp *http.Response) (string, error) {
 	// Retrieve the digest from the standard header.
 	header := resp.Header.Get(ContentDigestHeader)
@@ -1250,9 +1280,9 @@ func extractHeadDigest(log *zerolog.Logger, resp *http.Response) (string, error)
 	if digest == "" {
 		log.Debug().
 			Str("status", resp.Status).
-			Msg("HEAD response digest has no hash, falling back to GET")
+			Msg("HEAD response digest has no hash, asking for the GET fallback")
 
-		return "", nil
+		return "", fmt.Errorf("%w: digest header has no hash", errHeadFallback)
 	}
 
 	log.Debug().
@@ -1599,8 +1629,9 @@ func makeManifestRequest(
 //   - limiter: Rate limiter shared by registry requests.
 //
 // Returns:
-//   - string: The extracted digest, or empty for a HEAD request that should fall back to GET.
-//   - error: Non-nil if the retry request fails, or a GET retry asks for yet another host.
+//   - string: The extracted digest.
+//   - error: Non-nil if the retry request fails or asks for yet another host. A
+//     HEAD retry that gives no digest asks for the GET fallback.
 func retryManifestRequest(
 	log *zerolog.Logger,
 	ctx context.Context,
@@ -1642,10 +1673,8 @@ func retryManifestRequest(
 			return handleErr
 		}
 
-		// The request is retried only once. A HEAD request falls back to GET
-		// with an empty digest. A GET request is the last attempt, and an
-		// empty digest would mark the image as out of date.
-		if retry && method != http.MethodHead {
+		// The request is retried only once.
+		if retry {
 			return fmt.Errorf("%w: %s", errUnresolvedManifestRetry, auth.RedactURL(nextURL))
 		}
 

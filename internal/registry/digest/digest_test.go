@@ -1232,6 +1232,174 @@ func TestCompareDigestWithRemote(t *testing.T) {
 	assert.Equal(t, "sha256:"+remoteHash, remoteDigest)
 }
 
+// TestCompareDigestWithRemote_MirrorHeadFailure verifies that a mirror whose
+// HEAD request gives no digest does not stop the next endpoint's HEAD request.
+// Docker Hub does not count HEAD requests toward its pull rate limit, so the
+// GET fallback runs only after every endpoint's HEAD has failed.
+//
+// When an endpoint asked for the fallback and a later one fails outright, the
+// fallback still runs. A mirror that answers GET can then serve a check while
+// the registry is unreachable. A request a stub has no handler for fails the
+// test, which makes the cases also prove which requests were not sent.
+func TestCompareDigestWithRemote_MirrorHeadFailure(t *testing.T) {
+	t.Parallel()
+
+	const manifestPath = "/v2/test/image/manifests/latest"
+
+	tests := []struct {
+		name string
+		// mirror returns the mirror's handlers, in request order.
+		mirror func(t *testing.T) []http.HandlerFunc
+		// registry returns the image registry's handlers, in request order. A nil
+		// registry leaves the image on an address that refuses connections.
+		registry func(t *testing.T) []http.HandlerFunc
+	}{
+		{
+			name: "mirror rejects HEAD and the registry answers it",
+			mirror: func(t *testing.T) []http.HandlerFunc {
+				t.Helper()
+
+				return []http.HandlerFunc{
+					anonymousRegistryHandler(t),
+					manifestHandler(t, http.MethodHead, manifestPath, http.StatusUnauthorized, nil),
+				}
+			},
+			registry: func(t *testing.T) []http.HandlerFunc {
+				t.Helper()
+
+				return []http.HandlerFunc{
+					anonymousRegistryHandler(t),
+					manifestHandler(t, http.MethodHead, manifestPath, http.StatusOK, digestHeader(testDigestHash)),
+				}
+			},
+		},
+		{
+			name: "mirror HEAD digest has no hash and the registry answers HEAD",
+			mirror: func(t *testing.T) []http.HandlerFunc {
+				t.Helper()
+
+				return []http.HandlerFunc{
+					anonymousRegistryHandler(t),
+					manifestHandler(t, http.MethodHead, manifestPath, http.StatusOK, digestHeader("sha256:")),
+				}
+			},
+			registry: func(t *testing.T) []http.HandlerFunc {
+				t.Helper()
+
+				return []http.HandlerFunc{
+					anonymousRegistryHandler(t),
+					manifestHandler(t, http.MethodHead, manifestPath, http.StatusOK, digestHeader(testDigestHash)),
+				}
+			},
+		},
+		{
+			name: "every HEAD digest has no hash so the mirror answers GET",
+			mirror: func(t *testing.T) []http.HandlerFunc {
+				t.Helper()
+
+				return []http.HandlerFunc{
+					anonymousRegistryHandler(t),
+					manifestHandler(t, http.MethodHead, manifestPath, http.StatusOK, digestHeader("sha256:")),
+					anonymousRegistryHandler(t),
+					manifestHandler(t, http.MethodGet, manifestPath, http.StatusOK, digestHeader(testDigestHash)),
+				}
+			},
+			registry: func(t *testing.T) []http.HandlerFunc {
+				t.Helper()
+
+				return []http.HandlerFunc{
+					anonymousRegistryHandler(t),
+					manifestHandler(t, http.MethodHead, manifestPath, http.StatusOK, digestHeader("sha256:")),
+				}
+			},
+		},
+		{
+			name: "every HEAD fails so the registry answers GET",
+			mirror: func(t *testing.T) []http.HandlerFunc {
+				t.Helper()
+
+				return []http.HandlerFunc{
+					anonymousRegistryHandler(t),
+					manifestHandler(t, http.MethodHead, manifestPath, http.StatusInternalServerError, nil),
+					anonymousRegistryHandler(t),
+					manifestHandler(t, http.MethodGet, manifestPath, http.StatusInternalServerError, nil),
+				}
+			},
+			registry: func(t *testing.T) []http.HandlerFunc {
+				t.Helper()
+
+				return []http.HandlerFunc{
+					anonymousRegistryHandler(t),
+					manifestHandler(t, http.MethodHead, manifestPath, http.StatusInternalServerError, nil),
+					anonymousRegistryHandler(t),
+					manifestHandler(t, http.MethodGet, manifestPath, http.StatusOK, digestHeader(testDigestHash)),
+				}
+			},
+		},
+		{
+			name: "mirror rejects HEAD and the registry's HEAD has no digest header so the mirror answers GET",
+			mirror: func(t *testing.T) []http.HandlerFunc {
+				t.Helper()
+
+				return []http.HandlerFunc{
+					anonymousRegistryHandler(t),
+					manifestHandler(t, http.MethodHead, manifestPath, http.StatusServiceUnavailable, nil),
+					anonymousRegistryHandler(t),
+					manifestHandler(t, http.MethodGet, manifestPath, http.StatusOK, digestHeader(testDigestHash)),
+				}
+			},
+			registry: func(t *testing.T) []http.HandlerFunc {
+				t.Helper()
+
+				return []http.HandlerFunc{
+					anonymousRegistryHandler(t),
+					manifestHandler(t, http.MethodHead, manifestPath, http.StatusOK, nil),
+				}
+			},
+		},
+		{
+			name: "mirror rejects HEAD while the registry is unreachable so the mirror answers GET",
+			mirror: func(t *testing.T) []http.HandlerFunc {
+				t.Helper()
+
+				return []http.HandlerFunc{
+					anonymousRegistryHandler(t),
+					manifestHandler(t, http.MethodHead, manifestPath, http.StatusMethodNotAllowed, nil),
+					anonymousRegistryHandler(t),
+					manifestHandler(t, http.MethodGet, manifestPath, http.StatusOK, digestHeader(testDigestHash)),
+				}
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			mirror := httpstub.New(t)
+			mirror.AppendHandlers(tt.mirror(t)...)
+
+			// Port 1 on the loopback address refuses connections, so the
+			// registry's challenge fails without a server.
+			registryAddr := "127.0.0.1:1"
+
+			if tt.registry != nil {
+				registry := httpstub.New(t)
+				registry.AppendHandlers(tt.registry(t)...)
+				registryAddr = registry.Addr()
+			}
+
+			container := newRegistryContainer(registryAddr+"/test/image:latest", testRepoDigest)
+
+			match, remoteDigest, err := CompareDigestWithRemote(newTestLogger(t), context.Background(),
+				container, "", registryConfig.Registry{TLSSkip: true}, ratelimit.New(), mirror.Addr(), "")
+			require.NoError(t, err)
+			assert.True(t, match)
+			assert.Equal(t, testDigestHash, remoteDigest)
+		})
+	}
+}
+
 // TestCompareDigestWithRemote_SkipsInvalidEndpoint verifies that a registry
 // endpoint override that is not a host is skipped for the next endpoint
 // without a request to it.
@@ -1503,6 +1671,37 @@ func TestFetchDigestForTag(t *testing.T) {
 			assert.Equal(t, tt.want, got)
 		})
 	}
+}
+
+// TestFetchDigestForTag_MirrorHeadFailure verifies that the registry's 404
+// for a tag is a definite miss after a mirror's HEAD request failed.
+//
+// The mirror's failure asks for the GET fallback, but a GET to the registry
+// would get the same 404. The probe also sends no GET, which the stubs prove by
+// failing a request they have no handler for.
+func TestFetchDigestForTag_MirrorHeadFailure(t *testing.T) {
+	t.Parallel()
+
+	const manifestPath = "/v2/test/image/manifests/v1.2.3"
+
+	mirror := httpstub.New(t)
+	mirror.AppendHandlers(
+		anonymousRegistryHandler(t),
+		manifestHandler(t, http.MethodHead, manifestPath, http.StatusServiceUnavailable, nil),
+	)
+
+	registry := httpstub.New(t)
+	registry.AppendHandlers(
+		anonymousRegistryHandler(t),
+		manifestHandler(t, http.MethodHead, manifestPath, http.StatusNotFound, nil),
+	)
+
+	container := newRegistryContainer(registry.Addr()+"/test/image:latest", testRepoDigest)
+
+	got, err := FetchDigestForTag(newTestLogger(t), t.Context(),
+		container, "", "v1.2.3", registryConfig.Registry{TLSSkip: true}, ratelimit.New(), mirror.Addr(), "")
+	require.NoError(t, err)
+	assert.Empty(t, got)
 }
 
 // TestCompareDigestWithRemote_MirrorRefusalIsNotLocalOnly verifies that a
@@ -2274,7 +2473,7 @@ func TestHandleManifestResponse(t *testing.T) {
 			wantErr:      true,
 		},
 		{
-			name:   "HEAD 401 returns an empty digest for GET fallback",
+			name:   "HEAD 401 asks for the GET fallback",
 			method: http.MethodHead,
 			setupResponse: func() *http.Response {
 				return &http.Response{
@@ -2285,11 +2484,11 @@ func TestHandleManifestResponse(t *testing.T) {
 					Request:    &http.Request{URL: mustParseURL("https://registry.example.com/v2/manifests/latest")},
 				}
 			},
-			originalHost:  "registry.example.com",
-			redirected:    false,
-			parsedURL:     mustParseURL("https://registry.example.com/v2/manifests/latest"),
-			expectedRetry: false,
-			wantErr:       false,
+			originalHost: "registry.example.com",
+			redirected:   false,
+			parsedURL:    mustParseURL("https://registry.example.com/v2/manifests/latest"),
+			wantErr:      true,
+			wantErrIs:    errHeadFallback,
 		},
 		{
 			name:   "3xx redirect updates URL host",
@@ -2520,6 +2719,8 @@ func TestExtractHeadDigest(t *testing.T) {
 		setupResp func() *http.Response
 		expected  string
 		wantErr   bool
+		// wantErrIs, when set, is an error the result must wrap.
+		wantErrIs error
 	}{
 		{
 			name: "extracts digest from Docker-Content-Digest header",
@@ -2574,7 +2775,7 @@ func TestExtractHeadDigest(t *testing.T) {
 			wantErr:  false,
 		},
 		{
-			name: "returns an empty digest for a GET fallback when Docker-Content-Digest has no hash",
+			name: "asks for the GET fallback when Docker-Content-Digest has no hash",
 			setupResp: func() *http.Response {
 				return &http.Response{
 					StatusCode: http.StatusOK,
@@ -2583,7 +2784,8 @@ func TestExtractHeadDigest(t *testing.T) {
 					Body:       http.NoBody,
 				}
 			},
-			expected: "",
+			wantErr:   true,
+			wantErrIs: errHeadFallback,
 		},
 	}
 
@@ -2600,6 +2802,10 @@ func TestExtractHeadDigest(t *testing.T) {
 			if tt.wantErr {
 				require.Error(t, err)
 				assert.Empty(t, got)
+
+				if tt.wantErrIs != nil {
+					require.ErrorIs(t, err, tt.wantErrIs)
+				}
 
 				return
 			}
@@ -3266,7 +3472,7 @@ func TestRetryManifestRequest(t *testing.T) {
 			wantErrNotContains: "sig=secret",
 		},
 		{
-			name:       "returns an empty digest for a failed HEAD so the caller falls back to GET",
+			name:       "asks for the GET fallback when the HEAD retry fails",
 			method:     http.MethodHead,
 			updatedURL: "https://registry.example.com/v2/manifests/latest",
 			setupClient: func(t *testing.T) *mockAuth.MockClient {
@@ -3282,7 +3488,8 @@ func TestRetryManifestRequest(t *testing.T) {
 
 				return mc
 			},
-			expected: "",
+			wantErr:   true,
+			wantErrIs: errHeadFallback,
 		},
 	}
 

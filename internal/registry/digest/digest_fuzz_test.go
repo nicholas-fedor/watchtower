@@ -21,8 +21,8 @@ import (
 
 // FuzzExtractHeadDigest checks that a HEAD response's digest is its normalized
 // Docker-Content-Digest header whatever the status code, that a missing header
-// is an invalid registry response, and that a header with no hash yields an
-// empty digest and no error so the caller falls back to GET.
+// is an invalid registry response, and that a header with no hash asks for the
+// GET fallback. A digest without an error is never empty.
 //
 // The seeds pair successful and failing status codes with a full digest, an
 // empty header, malformed values, and a bare or short sha256 prefix.
@@ -52,8 +52,16 @@ func FuzzExtractHeadDigest(f *testing.F) {
 			return
 		}
 
+		want := NormalizeDigest(newNopLogger(), header)
+		if want == "" {
+			require.ErrorIs(t, err, errHeadFallback)
+			assert.Empty(t, got)
+
+			return
+		}
+
 		require.NoError(t, err)
-		assert.Equal(t, NormalizeDigest(newNopLogger(), header), got)
+		assert.Equal(t, want, got)
 	})
 }
 
@@ -257,7 +265,8 @@ func FuzzBuildManifestURLForImage(f *testing.F) {
 //
 // The outcome is one of these:
 //   - a retry with a new URL
-//   - a digest
+//   - a digest, which is never empty
+//   - a request for the GET fallback, which only a HEAD request makes
 //   - an error for an invalid registry response, a refused repository or a
 //     rate limit
 //
@@ -330,8 +339,12 @@ func FuzzHandleManifestResponse(f *testing.F) {
 		case err != nil:
 			assert.True(t,
 				errors.Is(err, errInvalidRegistryResponse) || errors.Is(err, errRepositoryDenied) ||
-					errors.Is(err, ratelimit.ErrRateLimited),
+					errors.Is(err, ratelimit.ErrRateLimited) || errors.Is(err, errHeadFallback),
 				"unexpected error: %v", err)
+
+			if errors.Is(err, errHeadFallback) {
+				assert.Equal(t, http.MethodHead, method, "a GET response asked for the GET fallback")
+			}
 
 			// Only a 401 whose challenge refuses the scope is a refusal.
 			if errors.Is(err, errRepositoryDenied) {
@@ -342,6 +355,7 @@ func FuzzHandleManifestResponse(f *testing.F) {
 			assert.Empty(t, digest)
 			assert.Empty(t, manifestURL)
 		default:
+			assert.NotEmpty(t, digest, "a response without an error gave no digest")
 			assert.Empty(t, manifestURL)
 		}
 	})
