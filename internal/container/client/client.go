@@ -106,340 +106,11 @@ func nopLog() *zerolog.Logger {
 	return &n
 }
 
-// Client defines the interface for interacting with the Docker API within Watchtower.
-//
-// It provides methods for managing containers, images, and executing commands,
-// abstracting the underlying Docker client operations.
-type Client interface {
-	// ListContainers retrieves a list of containers, optionally filtered.
-	//
-	// If no filters are provided, all containers are returned.
-	//
-	// Parameters:
-	//   - ctx: Context for cancellation and timeout control.
-	//   - filter: Optional filters to apply to container list. Multiple filters are combined with logical AND.
-	//
-	// Returns:
-	//   - []*container.Container: List of matching containers.
-	//   - error: Non-nil if listing fails, nil on success.
-	ListContainers(ctx context.Context, filter ...filters.Filter) ([]*container.Container, error)
-
-	// GetContainer fetches detailed information about a specific container by its ID.
-	//
-	// Parameters:
-	//   - ctx: Context for cancellation and timeout control.
-	//   - containerID: ID of the container to retrieve.
-	//
-	// Returns:
-	//   - *container.Container: Container details if found.
-	//   - error: Non-nil if retrieval fails, nil on success.
-	GetContainer(ctx context.Context, containerID container.ContainerID) (*container.Container, error)
-
-	// GetCurrentWatchtowerContainer retrieves minimal container information
-	// for the specified container ID, skipping image inspection. A transient
-	// inspect failure is tried again for up to about 20 seconds, or until ctx
-	// ends.
-	//
-	// Parameters:
-	//   - ctx: Context for cancellation and timeout control. It bounds the retries.
-	//   - containerID: ID of the container to retrieve.
-	//
-	// Returns:
-	//   - *container.Container: Container with imageInfo set to nil.
-	//   - error: Non-nil if inspection fails, nil on success.
-	GetCurrentWatchtowerContainer(ctx context.Context, containerID container.ContainerID) (*container.Container, error)
-
-	// StopContainer stops a specified container, respecting the given timeout.
-	//
-	// Parameters:
-	//   - ctx: Context for cancellation and timeout control.
-	//   - target: Container to stop.
-	//   - timeout: Duration to wait before forcing stop.
-	//
-	// Returns:
-	//   - error: Non-nil if stop fails, nil on success.
-	StopContainer(ctx context.Context, target *container.Container, timeout time.Duration) error
-
-	// StopAndRemoveContainer stops and removes a specified container,
-	// respecting the given timeout.
-	//
-	// Parameters:
-	//   - ctx: Context for cancellation and timeout control.
-	//   - target: Container to stop and remove.
-	//   - timeout: Duration to wait before forcing stop.
-	//
-	// Returns:
-	//   - error: Non-nil if stop/removal fails, nil on success.
-	StopAndRemoveContainer(ctx context.Context, target *container.Container, timeout time.Duration) error
-
-	// CreateContainer creates a new container based on the provided
-	// container's configuration, but does not start it.
-	//
-	// Parameters:
-	//   - ctx: Context for cancellation and timeout control.
-	//   - target: Source container to replicate.
-	//
-	// Returns:
-	//   - container.ContainerID: ID of the new container.
-	//   - error: Non-nil if creation fails, nil on success.
-	CreateContainer(ctx context.Context, target *container.Container) (container.ContainerID, error)
-
-	// StartContainer creates and starts a new container based on the provided
-	// container's configuration.
-	//
-	// Parameters:
-	//   - ctx: Context for cancellation and timeout control.
-	//   - target: Source container to replicate.
-	//
-	// Returns:
-	//   - container.ContainerID: ID of the new container.
-	//   - error: Non-nil if creation/start fails, nil on success.
-	StartContainer(ctx context.Context, target *container.Container) (container.ContainerID, error)
-
-	// RenameContainer renames an existing container to the specified new name.
-	//
-	// Parameters:
-	//   - ctx: Context for cancellation and timeout control.
-	//   - target: Container to rename.
-	//   - newName: New name for the container.
-	//
-	// Returns:
-	//   - error: Non-nil if rename fails, nil on success.
-	RenameContainer(ctx context.Context, target *container.Container, newName string) error
-
-	// IsContainerStale checks if a container's image is outdated compared to
-	// the latest available version.
-	//
-	// Parameters:
-	//   - ctx: Context for cancellation and timeout control.
-	//   - target: Container to check.
-	//   - policy: Update policy for staleness check.
-	//
-	// Returns:
-	//   - bool: True if image is stale, false otherwise.
-	//   - container.ImageID: Latest image ID.
-	//   - string: Latest registry manifest digest (empty if unavailable).
-	//   - error: Non-nil if check fails, nil on success.
-	IsContainerStale(
-		ctx context.Context,
-		target *container.Container,
-		policy updateConfig.Policy,
-	) (bool, container.ImageID, string, error)
-
-	// CheckContainerUpdate reports whether a newer image is available without
-	// pulling image layers. When NoPull is active it inspects the local cache
-	// only. Otherwise, it compares registry digests. Cooldown is not applied.
-	//
-	// Parameters:
-	//   - ctx: Context for cancellation and timeout control.
-	//   - target: Container to check.
-	//   - policy: Update policy (NoPull, LabelPrecedence).
-	//
-	// Returns:
-	//   - bool: True if an update is available, false otherwise.
-	//   - container.ImageID: Latest local image ID when known (empty for remote-only mismatch).
-	//   - string: Latest registry manifest digest (empty if unavailable).
-	//   - error: Non-nil if the check fails, nil on success.
-	CheckContainerUpdate(
-		ctx context.Context,
-		target *container.Container,
-		policy updateConfig.Policy,
-	) (bool, container.ImageID, string, error)
-
-	// GetImageAnnotations reads the OCI annotations of an image by reference.
-	//
-	// The read is a local Docker daemon inspect, so it never counts against a
-	// registry rate limit. It resolves the new image's annotations after a pull,
-	// which the running container's inspect cannot provide. An unreadable image
-	// yields empty annotations rather than an error, because metadata must never
-	// fail a session.
-	//
-	// Parameters:
-	//   - ctx: Context for cancellation and timeout control.
-	//   - imageRef: Image reference, tag or digest, to inspect.
-	//
-	// Returns:
-	//   - oci.Annotations: Annotations from the image config labels, or empty.
-	GetImageAnnotations(ctx context.Context, imageRef string) oci.Annotations
-
-	// ExecuteCommand runs a command inside a container and returns whether
-	// to skip updates based on the result.
-	//
-	// Parameters:
-	//   - ctx: Context for cancellation and timeout control.
-	//   - target: Container to execute command in.
-	//   - command: Command to execute.
-	//   - timeout: Minutes to wait before timeout (0 for no timeout).
-	//   - uid: UID to run command as (-1 to use container default).
-	//   - gid: GID to run command as (-1 to use container default).
-	//
-	// Returns:
-	//   - bool: True if updates should be skipped, false otherwise.
-	//   - error: Non-nil if execution fails, nil on success.
-	ExecuteCommand(
-		ctx context.Context,
-		target *container.Container,
-		command string,
-		timeout int,
-		uid int,
-		gid int,
-	) (bool, error)
-
-	// RemoveImageByID deletes an image from the Docker host by its ID.
-	//
-	// Parameters:
-	//   - ctx: Context for cancellation and timeout control.
-	//   - imageID: ID of the image to remove.
-	//   - imageName: Name of the image to remove (for logging purposes).
-	//
-	// Returns:
-	//   - error: Non-nil if removal fails, nil on success.
-	RemoveImageByID(ctx context.Context, imageID container.ImageID, imageName string) error
-
-	// GetVersion returns the client's API version.
-	//
-	// Returns:
-	//   - string: Docker API version (e.g., "1.44").
-	GetVersion() string
-
-	// GetImageDiskUsage returns Docker image storage usage from the daemon.
-	//
-	// It queries GET /system/df for images only and returns the daemon's
-	// aggregated totals. Shared layers are not double-counted.
-	//
-	// Parameters:
-	//   - ctx: Context for cancellation and timeout control.
-	//
-	// Returns:
-	//   - types.ImageDiskUsage: Aggregated image usage.
-	//   - error: Non-nil if retrieval fails, nil on success.
-	GetImageDiskUsage(ctx context.Context) (types.ImageDiskUsage, error)
-
-	// GetInfo returns system information from the Docker daemon.
-	//
-	// Parameters:
-	//   - ctx: Context for cancellation and timeout control.
-	//
-	// Returns:
-	//   - types.SystemInfo: Daemon identity fields used for runtime detection.
-	//   - error: Non-nil if retrieval fails, nil on success.
-	GetInfo(ctx context.Context) (types.SystemInfo, error)
-
-	// Ping verifies connectivity to the Docker daemon.
-	//
-	// Parameters:
-	//   - ctx: Context for cancellation and timeout control.
-	//
-	// Returns:
-	//   - error: Non-nil if the daemon is unreachable, nil on success.
-	Ping(ctx context.Context) error
-
-	// WaitForContainerHealthy waits for a container to become healthy or times out.
-	//
-	// The timeout parameter controls the maximum wait duration:
-	//   - timeout > 0: Wait up to the specified duration for the container to become healthy.
-	//   - timeout <= 0: Wait indefinitely until the container becomes healthy, unhealthy,
-	//     or the context is cancelled.
-	//
-	// Parameters:
-	//   - ctx: Context for cancellation and timeout control.
-	//   - containerID: ID of the container to wait for.
-	//   - timeout: Maximum duration to wait for health. Zero or negative values cause
-	//     indefinite waiting.
-	//
-	// Returns:
-	//   - error: Non-nil if timeout is reached, container becomes unhealthy, or inspection
-	//     fails. nil if healthy or no health check is configured.
-	WaitForContainerHealthy(ctx context.Context, containerID container.ContainerID, timeout time.Duration) error
-
-	// SetRestartPolicy updates a container's restart policy.
-	//
-	// An empty policy name is treated as no automatic restart (Docker "no").
-	// MaximumRetryCount is cleared in that case because retry counts apply only
-	// to on-failure policies. Only the restart policy is sent to the Engine.
-	// Resource limits are left unchanged. An empty containerID does nothing,
-	// as when Watchtower does not run in a container.
-	//
-	// Parameters:
-	//   - ctx: Context for cancellation and timeout control.
-	//   - containerID: ID of the container whose restart policy should be updated.
-	//   - policy: Restart policy to apply. Empty Name disables automatic restart.
-	//
-	// Returns:
-	//   - error: Non-nil if the Engine did not apply the policy, nil on success
-	//     or for an empty containerID.
-	SetRestartPolicy(
-		ctx context.Context,
-		containerID container.ContainerID,
-		policy dockerContainer.RestartPolicy,
-	) error
-
-	// RemoveContainer removes a container from the Docker host.
-	//
-	// Parameters:
-	//   - ctx: Context for cancellation and timeout control.
-	//   - target: Container to remove.
-	//
-	// Returns:
-	//   - error: Non-nil if removal fails, nil on success.
-	RemoveContainer(ctx context.Context, target *container.Container) error
-
-	// CreateEphemeralOrchestrator creates a short-lived container that orchestrates
-	// the Watchtower self-update transition.
-	//
-	// Parameters:
-	//   - ctx: Context for cancellation and timeout control.
-	//   - sourceContainer: The current Watchtower container being replaced.
-	//   - newImage: The image reference for the new Watchtower container.
-	//   - containerChain: The container chain label for lineage tracking.
-	//   - cleanup: When true, the orchestrator removes the old image after handoff.
-	//
-	// Returns:
-	//   - container.ContainerID: ID of the ephemeral orchestrator container.
-	//   - error: Non-nil if creation or start fails, nil on success.
-	CreateEphemeralOrchestrator(
-		ctx context.Context,
-		sourceContainer *container.Container,
-		newImage string,
-		containerChain string,
-		cleanup bool,
-	) (container.ContainerID, error)
-
-	// StartContainerByID starts a container by its ID directly.
-	//
-	// Unlike StartContainer, this does not check the reviveStopped option or
-	// create a new container from a source configuration. It directly starts
-	// an existing, already-created container. This is used by the ephemeral
-	// orchestrator to start the new container after the old one has been stopped.
-	//
-	// Parameters:
-	//   - ctx: Context for cancellation and timeout control.
-	//   - containerID: ID of the container to start.
-	//
-	// Returns:
-	//   - error: Non-nil if starting fails, nil on success.
-	StartContainerByID(ctx context.Context, containerID container.ContainerID) error
-
-	// BuildRemoteImage builds an image from a Git URL context.
-	//
-	// The daemon clones the repository. Watchtower does not.
-	//
-	// Parameters:
-	//   - ctx: Context for cancellation and timeout control.
-	//   - remote: Docker Git context URL (https://host/repo.git#commit[:subdir]).
-	//   - dockerfile: Dockerfile path relative to that context. Empty means Dockerfile.
-	//   - tags: Image tags to apply to the built image.
-	//
-	// Returns:
-	//   - container.ImageID: ID of the built image.
-	//   - error: Non-nil if the build fails, nil on success.
-	BuildRemoteImage(ctx context.Context, remote, dockerfile string, tags []string) (container.ImageID, error)
-}
-
-// client is the concrete implementation of the Client interface.
+// Client is Watchtower's Docker client. It manages containers and images and
+// runs commands inside containers.
 //
 // It wraps the Docker API client and applies custom behavior via ClientOptions.
-type client struct {
+type Client struct {
 	api dockerClient.APIClient
 	log *zerolog.Logger
 
@@ -487,10 +158,10 @@ type ClientOptions struct {
 //   - opts: Options to customize container management behavior.
 //
 // Returns:
-//   - Client: The initialized client. It is nil when the error is not.
+//   - *Client: The initialized client. It is nil when the error is not.
 //   - error: Non-nil when the client cannot be built or rebuilt. An unanswered ping is not an
 //     error.
-func NewClient(ctx context.Context, log *zerolog.Logger, opts ClientOptions) (Client, error) {
+func NewClient(ctx context.Context, log *zerolog.Logger, opts ClientOptions) (*Client, error) {
 	// Initialize client from environment. FromEnv reads DOCKER_HOST, DOCKER_TLS_VERIFY,
 	// DOCKER_CERT_PATH, and DOCKER_API_VERSION. When DOCKER_API_VERSION is set, the client
 	// uses that fixed version. Otherwise, it defaults to the maximum supported version
@@ -517,7 +188,7 @@ func NewClient(ctx context.Context, log *zerolog.Logger, opts ClientOptions) (Cl
 		Str("server_version", result.APIVersion).
 		Msg("Initialized Docker client")
 
-	return &client{
+	return &Client{
 		api:           cli,
 		log:           log,
 		ClientOptions: opts,
@@ -753,7 +424,7 @@ func isTLSSetupError(err error) bool {
 // Returns:
 //   - []*container.Container: List of matching containers.
 //   - error: Non-nil if listing fails, nil on success.
-func (c *client) ListContainers(ctx context.Context, filter ...filters.Filter) ([]*container.Container, error) {
+func (c *Client) ListContainers(ctx context.Context, filter ...filters.Filter) ([]*container.Container, error) {
 	// Podman has no restarting status, so the runtime only matters when
 	// restarting containers are included.
 	isPodman := c.IncludeRestarting && c.getRuntime(ctx)
@@ -848,7 +519,7 @@ func (c *client) ListContainers(ctx context.Context, filter ...filters.Filter) (
 // Returns:
 //   - *container.Container: Container details if found.
 //   - error: Non-nil if retrieval fails, nil on success.
-func (c *client) GetContainer(ctx context.Context, containerID container.ContainerID) (*container.Container, error) {
+func (c *Client) GetContainer(ctx context.Context, containerID container.ContainerID) (*container.Container, error) {
 	// Retrieve target details using helper function.
 	target, err := getSourceContainer(c.logger(), ctx, c.api, containerID, nil)
 	if err != nil {
@@ -889,7 +560,7 @@ func (c *client) GetContainer(ctx context.Context, containerID container.Contain
 // Returns:
 //   - *container.Container: Container with imageInfo set to nil.
 //   - error: Non-nil if every inspect fails, nil on success.
-func (c *client) GetCurrentWatchtowerContainer(
+func (c *Client) GetCurrentWatchtowerContainer(
 	ctx context.Context,
 	containerID container.ContainerID,
 ) (*container.Container, error) {
@@ -960,7 +631,7 @@ func (c *client) GetCurrentWatchtowerContainer(
 //
 // Returns:
 //   - error: Non-nil if stop fails, nil on success.
-func (c *client) StopContainer(ctx context.Context, target *container.Container, timeout time.Duration) error {
+func (c *Client) StopContainer(ctx context.Context, target *container.Container, timeout time.Duration) error {
 	// Stop container using helper function.
 	err := stopSourceContainer(c.logger(), ctx, c.api, target, timeout)
 	if err != nil {
@@ -994,7 +665,7 @@ func (c *client) StopContainer(ctx context.Context, target *container.Container,
 //
 // Returns:
 //   - error: Non-nil if stop/removal fails, nil on success.
-func (c *client) StopAndRemoveContainer(ctx context.Context, target *container.Container, timeout time.Duration) error {
+func (c *Client) StopAndRemoveContainer(ctx context.Context, target *container.Container, timeout time.Duration) error {
 	// Stop and remove container using helper function with volume option.
 	err := stopAndRemoveSourceContainer(c.logger(),
 		ctx,
@@ -1031,7 +702,7 @@ func (c *client) StopAndRemoveContainer(ctx context.Context, target *container.C
 // Returns:
 //   - container.ContainerID: ID of the new container.
 //   - error: Non-nil if creation fails, nil on success.
-func (c *client) CreateContainer(ctx context.Context, target *container.Container) (container.ContainerID, error) {
+func (c *Client) CreateContainer(ctx context.Context, target *container.Container) (container.ContainerID, error) {
 	defer c.DiscardCopyFiles(target.ID())
 
 	clogVal := c.logger().With().
@@ -1097,7 +768,7 @@ func (c *client) CreateContainer(ctx context.Context, target *container.Containe
 // Returns:
 //   - container.ContainerID: ID of the new container.
 //   - error: Non-nil if creation/start fails, nil on success.
-func (c *client) StartContainer(ctx context.Context, target *container.Container) (container.ContainerID, error) {
+func (c *Client) StartContainer(ctx context.Context, target *container.Container) (container.ContainerID, error) {
 	clogVal := c.logger().With().
 		Str("container", target.Name()).
 		Str("image", target.ImageName()).
@@ -1139,7 +810,7 @@ func (c *client) StartContainer(ctx context.Context, target *container.Container
 //
 // Returns:
 //   - error: Non-nil if starting fails, nil on success.
-func (c *client) StartContainerByID(
+func (c *Client) StartContainerByID(
 	ctx context.Context,
 	containerID container.ContainerID,
 ) error {
@@ -1184,7 +855,7 @@ func (c *client) StartContainerByID(
 // Returns:
 //   - error: Non-nil if the Engine did not apply the policy, nil on success or
 //     for an empty containerID.
-func (c *client) SetRestartPolicy(
+func (c *Client) SetRestartPolicy(
 	ctx context.Context,
 	containerID container.ContainerID,
 	policy dockerContainer.RestartPolicy,
@@ -1228,7 +899,7 @@ func (c *client) SetRestartPolicy(
 //
 // Returns:
 //   - error: Non-nil if removal fails, nil on success.
-func (c *client) RemoveContainer(ctx context.Context, target *container.Container) error {
+func (c *Client) RemoveContainer(ctx context.Context, target *container.Container) error {
 	clogVal := c.logger().With().
 		Str("container", target.Name()).
 		Str("id", target.ID().ShortID()).
@@ -1272,7 +943,7 @@ func (c *client) RemoveContainer(ctx context.Context, target *container.Containe
 //
 // Returns:
 //   - error: Non-nil if rename fails, nil on success.
-func (c *client) RenameContainer(ctx context.Context, target *container.Container, newName string) error {
+func (c *Client) RenameContainer(ctx context.Context, target *container.Container, newName string) error {
 	// Perform rename using helper function.
 	err := recreate.RenameTarget(c.logger(), ctx, c.api, target, newName)
 	if err != nil {
@@ -1303,7 +974,7 @@ func (c *client) RenameContainer(ctx context.Context, target *container.Containe
 //   - bool: True if stale, false otherwise.
 //   - container.ImageID: Latest image ID.
 //   - error: Non-nil if check fails, nil on success.
-func (c *client) IsContainerStale(
+func (c *Client) IsContainerStale(
 	ctx context.Context,
 	target *container.Container,
 	policy updateConfig.Policy,
@@ -1349,7 +1020,7 @@ func (c *client) IsContainerStale(
 //   - container.ImageID: Latest local image ID when known.
 //   - string: Latest registry manifest digest (empty if unavailable).
 //   - error: Non-nil if the check fails, nil on success.
-func (c *client) CheckContainerUpdate(
+func (c *Client) CheckContainerUpdate(
 	ctx context.Context,
 	target *container.Container,
 	policy updateConfig.Policy,
@@ -1390,7 +1061,7 @@ func (c *client) CheckContainerUpdate(
 //
 // Returns:
 //   - oci.Annotations: Annotations from the image config labels, or empty.
-func (c *client) GetImageAnnotations(ctx context.Context, imageRef string) oci.Annotations {
+func (c *Client) GetImageAnnotations(ctx context.Context, imageRef string) oci.Annotations {
 	imgClient := containerImage.NewClient(c.api, c.logger(), c.Registry, c.RateLimiter)
 
 	return imgClient.GetImageAnnotations(ctx, imageRef)
@@ -1404,7 +1075,7 @@ func (c *client) GetImageAnnotations(ctx context.Context, imageRef string) oci.A
 //
 // Returns:
 //   - error: Non-nil if removal fails, nil on success.
-func (c *client) RemoveImageByID(
+func (c *Client) RemoveImageByID(
 	ctx context.Context,
 	imageID container.ImageID,
 	imageName string,
@@ -1435,7 +1106,7 @@ func (c *client) RemoveImageByID(
 //
 // Returns:
 //   - string: Docker API version (e.g., "1.44").
-func (c *client) GetVersion() string {
+func (c *Client) GetVersion() string {
 	return strings.Trim(c.api.ClientVersion(), "\"")
 }
 
@@ -1446,7 +1117,7 @@ func (c *client) GetVersion() string {
 //
 // Returns:
 //   - error: Non-nil if the daemon is unreachable, nil on success.
-func (c *client) Ping(ctx context.Context) error {
+func (c *Client) Ping(ctx context.Context) error {
 	_, err := c.api.Ping(
 		ctx,
 		// Version renegotiation is not necessary.
@@ -1459,33 +1130,6 @@ func (c *client) Ping(ctx context.Context) error {
 	return nil
 }
 
-// GetInfo returns system information from the Docker daemon.
-//
-// Parameters:
-//   - ctx: Context for cancellation and timeout control.
-//
-// Returns:
-//   - types.SystemInfo: Daemon identity fields used for runtime detection.
-//   - error: Non-nil if retrieval fails, nil on success.
-func (c *client) GetInfo(ctx context.Context) (types.SystemInfo, error) {
-	info, err := c.api.Info(ctx, dockerClient.InfoOptions{})
-	if err != nil {
-		c.logger().Debug().
-			Err(err).
-			Msg("Failed to get system info")
-
-		return types.SystemInfo{}, fmt.Errorf("failed to get system info: %w", err)
-	}
-
-	return types.SystemInfo{
-		Name:            info.Info.Name,
-		ServerVersion:   info.Info.ServerVersion,
-		OSType:          info.Info.OSType,
-		OperatingSystem: info.Info.OperatingSystem,
-		Driver:          info.Info.Driver,
-	}, nil
-}
-
 // GetImageDiskUsage returns Docker image storage usage from the daemon.
 //
 // Parameters:
@@ -1494,7 +1138,7 @@ func (c *client) GetInfo(ctx context.Context) (types.SystemInfo, error) {
 // Returns:
 //   - types.ImageDiskUsage: Aggregated image usage.
 //   - error: Non-nil if retrieval fails, nil on success.
-func (c *client) GetImageDiskUsage(ctx context.Context) (types.ImageDiskUsage, error) {
+func (c *Client) GetImageDiskUsage(ctx context.Context) (types.ImageDiskUsage, error) {
 	result, err := c.api.DiskUsage(ctx, dockerClient.DiskUsageOptions{
 		Images: true,
 	})
@@ -1530,7 +1174,7 @@ func (c *client) GetImageDiskUsage(ctx context.Context) (types.ImageDiskUsage, e
 // Returns:
 //   - error: Non-nil if timeout is reached, container becomes unhealthy, or inspection
 //     fails. nil if healthy, or if no health check is configured or it is disabled.
-func (c *client) WaitForContainerHealthy(
+func (c *Client) WaitForContainerHealthy(
 	ctx context.Context,
 	containerID container.ContainerID,
 	timeout time.Duration,
@@ -1636,8 +1280,8 @@ func healthCheckDisabled(config *dockerContainer.Config) bool {
 
 // logger returns the client's process logger, or a discarded nop if unset.
 // Production paths always set a real logger via NewClient.
-// Tests may construct partial *client values without log.
-func (c *client) logger() *zerolog.Logger {
+// Tests may construct partial *Client values without log.
+func (c *Client) logger() *zerolog.Logger {
 	if c != nil && c.log != nil {
 		return c.log
 	}
@@ -1659,7 +1303,7 @@ func (c *client) logger() *zerolog.Logger {
 //
 // Returns:
 //   - bool: True if Podman is detected, false otherwise.
-func (c *client) getRuntime(ctx context.Context) bool {
+func (c *Client) getRuntime(ctx context.Context) bool {
 	c.runtimeMu.Lock()
 	defer c.runtimeMu.Unlock()
 

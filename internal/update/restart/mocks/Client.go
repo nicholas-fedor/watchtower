@@ -200,6 +200,46 @@ func (_c *MockClient_CreateEphemeralOrchestrator_Call) RunAndReturn(run func(ctx
 	return _c
 }
 
+// DiscardCopyFiles provides a mock function for the type MockClient
+func (_mock *MockClient) DiscardCopyFiles(containerID container.ContainerID) {
+	_mock.Called(containerID)
+	return
+}
+
+// MockClient_DiscardCopyFiles_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'DiscardCopyFiles'
+type MockClient_DiscardCopyFiles_Call struct {
+	*mock.Call
+}
+
+// DiscardCopyFiles is a helper method to define mock.On call
+//   - containerID container.ContainerID
+func (_e *MockClient_Expecter) DiscardCopyFiles(containerID any) *MockClient_DiscardCopyFiles_Call {
+	return &MockClient_DiscardCopyFiles_Call{Call: _e.mock.On("DiscardCopyFiles", containerID)}
+}
+
+func (_c *MockClient_DiscardCopyFiles_Call) Run(run func(containerID container.ContainerID)) *MockClient_DiscardCopyFiles_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		var arg0 container.ContainerID
+		if args[0] != nil {
+			arg0 = args[0].(container.ContainerID)
+		}
+		run(
+			arg0,
+		)
+	})
+	return _c
+}
+
+func (_c *MockClient_DiscardCopyFiles_Call) Return() *MockClient_DiscardCopyFiles_Call {
+	_c.Call.Return()
+	return _c
+}
+
+func (_c *MockClient_DiscardCopyFiles_Call) RunAndReturn(run func(containerID container.ContainerID)) *MockClient_DiscardCopyFiles_Call {
+	_c.Run(run)
+	return _c
+}
+
 // ExecuteCommand provides a mock function for the type MockClient
 func (_mock *MockClient) ExecuteCommand(ctx context.Context, target *container.Container, command string, timeout int, uid int, gid int) (bool, error) {
 	ret := _mock.Called(ctx, target, command, timeout, uid, gid)
@@ -557,6 +597,63 @@ func (_c *MockClient_SetRestartPolicy_Call) Return(err error) *MockClient_SetRes
 }
 
 func (_c *MockClient_SetRestartPolicy_Call) RunAndReturn(run func(ctx context.Context, containerID container.ContainerID, policy container0.RestartPolicy) error) *MockClient_SetRestartPolicy_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
+// SnapshotCopyFiles provides a mock function for the type MockClient
+func (_mock *MockClient) SnapshotCopyFiles(ctx context.Context, source *container.Container) error {
+	ret := _mock.Called(ctx, source)
+
+	if len(ret) == 0 {
+		panic("no return value specified for SnapshotCopyFiles")
+	}
+
+	var r0 error
+	if returnFunc, ok := ret.Get(0).(func(context.Context, *container.Container) error); ok {
+		r0 = returnFunc(ctx, source)
+	} else {
+		r0 = ret.Error(0)
+	}
+	return r0
+}
+
+// MockClient_SnapshotCopyFiles_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'SnapshotCopyFiles'
+type MockClient_SnapshotCopyFiles_Call struct {
+	*mock.Call
+}
+
+// SnapshotCopyFiles is a helper method to define mock.On call
+//   - ctx context.Context
+//   - source *container.Container
+func (_e *MockClient_Expecter) SnapshotCopyFiles(ctx any, source any) *MockClient_SnapshotCopyFiles_Call {
+	return &MockClient_SnapshotCopyFiles_Call{Call: _e.mock.On("SnapshotCopyFiles", ctx, source)}
+}
+
+func (_c *MockClient_SnapshotCopyFiles_Call) Run(run func(ctx context.Context, source *container.Container)) *MockClient_SnapshotCopyFiles_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		var arg0 context.Context
+		if args[0] != nil {
+			arg0 = args[0].(context.Context)
+		}
+		var arg1 *container.Container
+		if args[1] != nil {
+			arg1 = args[1].(*container.Container)
+		}
+		run(
+			arg0,
+			arg1,
+		)
+	})
+	return _c
+}
+
+func (_c *MockClient_SnapshotCopyFiles_Call) Return(err error) *MockClient_SnapshotCopyFiles_Call {
+	_c.Call.Return(err)
+	return _c
+}
+
+func (_c *MockClient_SnapshotCopyFiles_Call) RunAndReturn(run func(ctx context.Context, source *container.Container) error) *MockClient_SnapshotCopyFiles_Call {
 	_c.Call.Return(run)
 	return _c
 }

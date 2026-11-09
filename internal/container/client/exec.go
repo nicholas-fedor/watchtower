@@ -82,7 +82,7 @@ var (
 // Returns:
 //   - bool: True if updates should be skipped, false otherwise.
 //   - error: Non-nil if execution fails, nil on success.
-func (c *client) ExecuteCommand(
+func (c *Client) ExecuteCommand(
 	ctx context.Context,
 	target *container.Container,
 	command string,
@@ -278,7 +278,7 @@ func readExecOutput(ctx context.Context, response dockerClient.ExecAttachResult)
 // Returns:
 //   - bool: True if updates should be skipped (exit code 75), false otherwise.
 //   - error: Non-nil if inspection fails, the command errors, or ctx ends first.
-func (c *client) waitForExec(
+func (c *Client) waitForExec(
 	ctx context.Context,
 	execID string,
 	execOutput string,

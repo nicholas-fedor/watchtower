@@ -79,7 +79,7 @@ func TestUpdate_ComposeDependencyCycle(t *testing.T) {
 			api := composeContainer("b000000000000000000000000000000000000000000000000000000000000000", "api", "web:service_started:false")
 			app := composeContainer("c000000000000000000000000000000000000000000000000000000000000000", "app", "")
 
-			client := mockUpdate.NewMockClient(t)
+			client := newMockClient(t)
 			client.EXPECT().ListContainers(mock.Anything, mock.Anything).
 				Return([]*container.Container{web, api, app}, nil).Once()
 			client.EXPECT().IsContainerStale(mock.Anything, mock.Anything, mock.Anything).
@@ -148,7 +148,7 @@ func TestUpdate_LinkToCycleMember(t *testing.T) {
 	c := dependent("c000000000000000000000000000000000000000000000000000000000000000", "c", "db")
 	replica := dependent("d100000000000000000000000000000000000000000000000000000000000000", "db-1", "c")
 
-	client := mockUpdate.NewMockClient(t)
+	client := newMockClient(t)
 	client.EXPECT().ListContainers(mock.Anything, mock.Anything).
 		Return([]*container.Container{db, e, c, replica}, nil).Once()
 	client.EXPECT().IsContainerStale(mock.Anything, mock.Anything, mock.Anything).
@@ -219,7 +219,7 @@ func TestUpdate_HostConfigDependencyCycle(t *testing.T) {
 	vpn := hostContainer(vpnID, "vpn", &dockerContainer.HostConfig{VolumesFrom: []string{appID + ":ro"}})
 	web := hostContainer(webID, "web", &dockerContainer.HostConfig{})
 
-	client := mockUpdate.NewMockClient(t)
+	client := newMockClient(t)
 	client.EXPECT().ListContainers(mock.Anything, mock.Anything).
 		Return([]*container.Container{app, vpn, web}, nil).Once()
 	client.EXPECT().IsContainerStale(mock.Anything, mock.Anything, mock.Anything).

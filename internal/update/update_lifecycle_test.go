@@ -330,7 +330,7 @@ func TestUpdate_PreUpdateFailureNamesItOnce(t *testing.T) {
 			app := skipTestContainer("a000000000000000000000000000000000000000000000000000000000000000", "app",
 				map[string]string{"com.centurylinklabs.watchtower.lifecycle.pre-update": "/pre-update.sh"})
 
-			client := mockUpdate.NewMockClient(t)
+			client := newMockClient(t)
 			// The post-check hooks list the containers again after the update.
 			client.EXPECT().ListContainers(mock.Anything, mock.Anything).Return([]*container.Container{app}, nil).Times(2)
 			client.EXPECT().IsContainerStale(mock.Anything, mock.Anything, mock.Anything).

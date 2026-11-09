@@ -68,7 +68,7 @@ func TestExecuteCommand_TimeoutBoundsOutputCapture(t *testing.T) {
 
 				start := time.Now()
 
-				_, err := (&client{log: newTestLogger(t), api: api}).
+				_, err := (&Client{log: newTestLogger(t), api: api}).
 					ExecuteCommand(t.Context(), modelfixture.Container(), "sleep infinity", 1, 0, 0)
 
 				require.ErrorIs(t, err, context.DeadlineExceeded)
