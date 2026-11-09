@@ -10,6 +10,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Stop rebuilding the same git commit with no-restart by @nicholas-fedor in [#3653](https://github.com/nicholas-fedor/watchtower/pull/3653)
 - Keep git defaults off compose replacements by @nicholas-fedor in [#3644](https://github.com/nicholas-fedor/watchtower/pull/3644)
 - Share one original-host rule between the digest and age lookups by @nicholas-fedor in [#3591](https://github.com/nicholas-fedor/watchtower/pull/3591)
 - Try every endpoint's HEAD before falling back to GET by @nicholas-fedor in [#3589](https://github.com/nicholas-fedor/watchtower/pull/3589)
