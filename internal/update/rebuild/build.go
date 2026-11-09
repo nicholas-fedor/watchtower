@@ -11,7 +11,6 @@ import (
 	"github.com/rs/zerolog"
 
 	"github.com/nicholas-fedor/watchtower/internal/container"
-	"github.com/nicholas-fedor/watchtower/internal/container/oci"
 	"github.com/nicholas-fedor/watchtower/internal/container/provenance"
 	"github.com/nicholas-fedor/watchtower/internal/git"
 	"github.com/nicholas-fedor/watchtower/internal/git/apply"
@@ -114,18 +113,8 @@ func (s *Session) build(
 	s.built[c.ID()] = imageID
 	s.mu.Unlock()
 
-	if progress != nil {
-		progress.SetLatestImage(log, c.ID(), imageID)
-		// A Git rebuild has no pulled image, so no latest image annotations are
-		// passed and LatestImageVersion stays empty. The resolved Git tag is the
-		// only new version available for this path.
-		meta := progress.SetLatestImageMeta(log, c, params, provenance.ChangelogVars{
-			Tag:    result.Tag,
-			Commit: result.Commit,
-		}, oci.Annotations{})
-
-		provenance.LogChangelog(log, c, params.Policy, meta)
-	}
+	meta := reportGitImage(log, progress, c, imageID, result, params)
+	provenance.LogChangelog(log, c, params.Policy, meta)
 
 	withGitMeta(log.Info().
 		Str("container", c.Name()).

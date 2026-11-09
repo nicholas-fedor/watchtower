@@ -1170,6 +1170,10 @@ They report stale only when the remote has advanced past the known running revis
 ### Disable Container Restart
 
 The [Disable Container Restart](../../configuration/update-behavior/index.md#disable_container_restart) configuration option can ask Docker to build, or Compose to build, but cannot persist the stamp on the running container.
-The next session uses image identity or the remembered tip, and rebuilds only if the remote has advanced again.
+The container stays stale until you recreate it.
+Watchtower remembers the image it built for that container and commit.
+Later sessions report the container stale with that image and build again only when the remote advances.
+The memory lasts only while Watchtower runs.
+The first session after Watchtower restarts builds the current commit once more.
 
 When the watcher is off, the container stays on the registry digest path.

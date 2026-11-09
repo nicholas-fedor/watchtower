@@ -15,12 +15,14 @@ import (
 
 	dockerContainer "github.com/moby/moby/api/types/container"
 
+	composeApply "github.com/nicholas-fedor/watchtower/internal/compose/apply"
 	composeLabels "github.com/nicholas-fedor/watchtower/internal/compose/labels"
 	composeProject "github.com/nicholas-fedor/watchtower/internal/compose/project"
 	"github.com/nicholas-fedor/watchtower/internal/container"
 	"github.com/nicholas-fedor/watchtower/internal/container/labels"
 	"github.com/nicholas-fedor/watchtower/internal/container/provenance"
 	"github.com/nicholas-fedor/watchtower/internal/git"
+	"github.com/nicholas-fedor/watchtower/internal/git/project"
 	gitConfig "github.com/nicholas-fedor/watchtower/internal/settings/config/git"
 	mockUpdate "github.com/nicholas-fedor/watchtower/internal/update/mocks"
 	updateParams "github.com/nicholas-fedor/watchtower/internal/update/params"
@@ -587,5 +589,144 @@ func TestSession_NoRestartBuiltIDs(t *testing.T) {
 		got["other"] = struct{}{}
 
 		assert.Len(t, sess.built, 1, "the snapshot must not share the session's map")
+	})
+}
+
+// TestSession_reuseUnrestartedBuild covers repeated sessions with the
+// no-restart configuration option. The running container keeps its old stamp,
+// so every session's check is stale for the same commit. Only the first
+// session builds. Later sessions reuse its image until the remote advances.
+func TestSession_reuseUnrestartedBuild(t *testing.T) {
+	t.Parallel()
+
+	const (
+		commit = "0123456789abcdef0123456789abcdef01234567"
+		newer  = "fedcba9876543210fedcba9876543210fedcba98"
+	)
+
+	// runSession runs one update session's rebuild step for a freshly listed
+	// container, as each scheduled run does, sharing the process's Git client.
+	runSession := func(
+		t *testing.T,
+		client *git.Client,
+		docker ImageBuilder,
+		result git.CheckResult,
+		params updateParams.Params,
+	) (*Session, *container.Container, *state.Report, map[container.ContainerID]error) {
+		t.Helper()
+
+		sess := NewSession(client)
+		sess.apply = mockRebuild.NewMockApplier(t)
+
+		c := gitAssociatedContainer("app", "/app", "myapp:latest", nil)
+		c.SetStale(true)
+		sess.store(c.ID(), result)
+
+		log := newTestLogger(t)
+		progress := &state.Progress{}
+		progress.AddScanned(log, c, container.ImageID("git:"+result.Commit), params)
+
+		failed := map[container.ContainerID]error{}
+		sess.PrepareRebuilds(log, t.Context(), docker, []*container.Container{c}, params, progress, failed)
+
+		return sess, c, progress.Report(log), failed
+	}
+
+	noRestart := updateParams.Params{NoRestart: true, Git: gitConfig.Defaults{Enable: true}}
+	stale := git.CheckResult{Stale: true, Commit: commit, Tag: "v1.0.0"}
+
+	t.Run("builds once and reuses the image in later sessions", func(t *testing.T) {
+		t.Parallel()
+
+		client := gitTestClient(t)
+		docker := mockRebuild.NewMockImageBuilder(t)
+		expectGitBuild(docker)
+
+		first, _, _, failed := runSession(t, client, docker, stale, noRestart)
+		require.Empty(t, failed)
+
+		built := first.built["app"]
+		require.NotEmpty(t, built)
+		assert.Equal(t, built, client.UnrestartedBuild("app", commit))
+
+		// The mock allows one build. A second build fails the test.
+		second, c, report, failed := runSession(t, client, docker, stale, noRestart)
+
+		assert.Empty(t, failed)
+		assert.Equal(t, built, second.built[c.ID()])
+		assert.True(t, second.SkipRecreate(c, noRestart), "the container stays out of the restart phase")
+		require.Len(t, report.Stale(), 1)
+		assert.Equal(t, built, report.Stale()[0].LatestImageID())
+		assert.Equal(t, "https://github.com/org/app/releases/tag/v1.0.0", report.Stale()[0].Changelog())
+	})
+
+	t.Run("runs one Compose build and reuses it in later sessions", func(t *testing.T) {
+		t.Parallel()
+
+		dir := writeComposeProjectDir(t)
+		client := gitTestClient(t)
+		applier := mockRebuild.NewMockApplier(t)
+		applier.EXPECT().
+			Apply(mock.Anything, mock.Anything).
+			Return([]composeApply.Container{{Service: "api", ImageID: "sha256:built"}}, nil).
+			Once()
+
+		// Each session lists the container fresh. The applier allows one build.
+		for range 2 {
+			sess := NewSession(client)
+			sess.apply = applier
+			sess.checkout = func(context.Context, string, string, project.CheckoutOptions) error {
+				return nil
+			}
+
+			c := gitAssociatedContainer("api", "/api", "webstack-api:latest", map[string]string{
+				labels.ComposeDir:                 dir,
+				composeLabels.ComposeServiceLabel: "api",
+			})
+			c.SetStale(true)
+			sess.store(c.ID(), stale)
+
+			failed := map[container.ContainerID]error{}
+			docker := mockRebuild.NewMockImageBuilder(t)
+			sess.PrepareRebuilds(newTestLogger(t), t.Context(), docker, []*container.Container{c}, noRestart, nil, failed)
+
+			assert.Empty(t, failed)
+			assert.Equal(t, container.ImageID("sha256:built"), sess.built[c.ID()])
+			assert.True(t, sess.SkipRecreate(c, noRestart))
+		}
+	})
+
+	t.Run("builds again once the remote advances", func(t *testing.T) {
+		t.Parallel()
+
+		client := gitTestClient(t)
+		client.RecordUnrestartedBuild("app", commit, "sha256:older")
+
+		docker := mockRebuild.NewMockImageBuilder(t)
+		expectGitBuild(docker)
+
+		sess, c, _, failed := runSession(t, client, docker, git.CheckResult{Stale: true, Commit: newer}, noRestart)
+
+		assert.Empty(t, failed)
+		assert.NotEqual(t, container.ImageID("sha256:older"), sess.built[c.ID()])
+		assert.Equal(t, sess.built[c.ID()], client.UnrestartedBuild("app", newer))
+	})
+
+	// With restarts on, the container is recreated from the new image, so an
+	// earlier record must not stop the build and nothing new is recorded.
+	t.Run("builds and records nothing when restarts are enabled", func(t *testing.T) {
+		t.Parallel()
+
+		client := gitTestClient(t)
+		client.RecordUnrestartedBuild("app", commit, "sha256:older")
+
+		docker := mockRebuild.NewMockImageBuilder(t)
+		expectGitBuild(docker)
+
+		sess, c, _, failed := runSession(t, client, docker, stale, updateParams.Params{Git: gitConfig.Defaults{Enable: true}})
+
+		assert.Empty(t, failed)
+		assert.NotEqual(t, container.ImageID("sha256:older"), sess.built[c.ID()])
+		assert.Equal(t, container.ImageID("sha256:older"), client.UnrestartedBuild("app", commit))
 	})
 }

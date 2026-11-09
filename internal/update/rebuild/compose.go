@@ -447,17 +447,7 @@ func (s *Session) recordCompose(
 		return
 	}
 
-	if item.ImageID != "" {
-		progress.SetLatestImage(log, c.ID(), item.ImageID)
-	}
-
-	// A Git rebuild has no pulled image, so no latest image annotations are
-	// passed and LatestImageVersion stays empty.
-	meta := progress.SetLatestImageMeta(log, c, params, provenance.ChangelogVars{
-		Tag:    result.Tag,
-		Commit: result.Commit,
-	}, oci.Annotations{})
-
+	meta := reportGitImage(log, progress, c, item.ImageID, result, params)
 	provenance.LogChangelog(log, c, params.Policy, meta)
 
 	if item.ID == "" {

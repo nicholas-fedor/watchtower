@@ -105,6 +105,39 @@ func labeledComposeMember(t *testing.T, project, service, number, dir, files, co
 	})
 }
 
+// TestClient_UnrestartedBuild checks that a recorded no-restart build is found
+// only for the same container and commit.
+func TestClient_UnrestartedBuild(t *testing.T) {
+	t.Parallel()
+
+	const (
+		commit = "0123456789abcdef0123456789abcdef01234567"
+		image  = container.ImageID("sha256:built")
+	)
+
+	client := testClient(t, nil)
+	assert.Empty(t, client.UnrestartedBuild("app", commit), "nothing recorded yet")
+
+	client.RecordUnrestartedBuild("app", commit, image)
+
+	assert.Equal(t, image, client.UnrestartedBuild("app", commit))
+	assert.Equal(t, image, client.UnrestartedBuild("app", "0123456789AB"), "a short or uppercase SHA names the same commit")
+	assert.Empty(t, client.UnrestartedBuild("app", "fedcba9876543210fedcba9876543210fedcba98"), "the remote advanced")
+	assert.Empty(t, client.UnrestartedBuild("other", commit), "another container")
+	assert.Empty(t, client.UnrestartedBuild("app", ""))
+
+	client.RecordUnrestartedBuild("app", "fedcba9876543210fedcba9876543210fedcba98", "sha256:newer")
+	assert.Empty(t, client.UnrestartedBuild("app", commit), "a newer build replaces the record")
+
+	client.RecordUnrestartedBuild("skipped", commit, "")
+	assert.Empty(t, client.UnrestartedBuild("skipped", commit), "an empty image is not recorded")
+
+	var nilClient *Client
+
+	nilClient.RecordUnrestartedBuild("app", commit, image)
+	assert.Empty(t, nilClient.UnrestartedBuild("app", commit))
+}
+
 func TestCheck_NoStampIsNotStale(t *testing.T) {
 	t.Parallel()
 
