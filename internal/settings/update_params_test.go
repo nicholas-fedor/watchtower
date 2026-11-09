@@ -19,7 +19,6 @@ import (
 	"github.com/nicholas-fedor/watchtower/internal/settings/config/mode"
 	"github.com/nicholas-fedor/watchtower/internal/settings/config/registry"
 	"github.com/nicholas-fedor/watchtower/internal/settings/config/update"
-	"github.com/nicholas-fedor/watchtower/pkg/types"
 )
 
 // TestUpdateParamsAssignsEveryField ensures UpdateParams sets every exported
@@ -167,7 +166,7 @@ func TestUpdateParamsRollingRestartFollowsConfig(t *testing.T) {
 func TestUpdateParamsOverrideFilter(t *testing.T) {
 	t.Parallel()
 
-	override := func(types.FilterableContainer) bool { return false }
+	override := func(filters.FilterableContainer) bool { return false }
 
 	cfg := Config{
 		Filter:        filter.Filter{Predicate: filters.NoFilter},

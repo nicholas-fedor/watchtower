@@ -6,8 +6,8 @@ import (
 
 	"github.com/nicholas-fedor/watchtower/internal/container"
 	containerClient "github.com/nicholas-fedor/watchtower/internal/container/client"
+	"github.com/nicholas-fedor/watchtower/internal/container/filters"
 	containerImage "github.com/nicholas-fedor/watchtower/internal/container/image"
-	"github.com/nicholas-fedor/watchtower/pkg/types"
 )
 
 // Status describes a single watched container's current image identity.
@@ -59,7 +59,7 @@ func filterStatuses(statuses []Status, name, image string) []Status {
 // Returns:
 //   - []Status: Status for each watched container.
 //   - error: Non-nil if listing containers fails.
-func ListContainerStatuses(ctx context.Context, client containerClient.Client, filter types.Filter) ([]Status, error) {
+func ListContainerStatuses(ctx context.Context, client containerClient.Client, filter filters.Filter) ([]Status, error) {
 	var list []*container.Container
 
 	var err error

@@ -33,7 +33,6 @@ import (
 	mockUpdate "github.com/nicholas-fedor/watchtower/internal/update/mocks"
 	updateParams "github.com/nicholas-fedor/watchtower/internal/update/params"
 	"github.com/nicholas-fedor/watchtower/internal/update/state"
-	"github.com/nicholas-fedor/watchtower/pkg/types"
 )
 
 // defaultTestUpdateParams returns a complete [updateParams.Params] snapshot for tests.
@@ -43,7 +42,7 @@ import (
 //
 // Returns:
 //   - updateParams.Params: The default policy for tests that set none of their own.
-func defaultTestUpdateParams(filter types.Filter) updateParams.Params {
+func defaultTestUpdateParams(filter filters.Filter) updateParams.Params {
 	return updateParams.Params{
 		Filter:       filter,
 		Timeout:      time.Minute,
@@ -192,7 +191,7 @@ func TestRunUpdatesWithNotifications_PanicEndsSession(t *testing.T) {
 
 	client := mockContainerClient.NewMockClient(t)
 	client.EXPECT().ListContainers(mock.Anything, mock.Anything).
-		RunAndReturn(func(context.Context, ...types.Filter) ([]*container.Container, error) {
+		RunAndReturn(func(context.Context, ...filters.Filter) ([]*container.Container, error) {
 			panic("boom")
 		}).Once()
 

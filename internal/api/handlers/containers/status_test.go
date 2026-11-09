@@ -10,9 +10,9 @@ import (
 
 	"github.com/nicholas-fedor/watchtower/internal/container"
 	mockContainerClient "github.com/nicholas-fedor/watchtower/internal/container/client/mocks"
+	"github.com/nicholas-fedor/watchtower/internal/container/filters"
 	"github.com/nicholas-fedor/watchtower/internal/testutil/containerfixture"
 	"github.com/nicholas-fedor/watchtower/internal/testutil/modelfixture"
-	"github.com/nicholas-fedor/watchtower/pkg/types"
 )
 
 // nginxContainer returns a running container with the given name that runs
@@ -42,7 +42,7 @@ func TestListContainerStatuses(t *testing.T) {
 		name       string
 		containers []*container.Container
 		listErr    error
-		filter     types.Filter
+		filter     filters.Filter
 		wantLen    int
 	}{
 		{
@@ -64,7 +64,7 @@ func TestListContainerStatuses(t *testing.T) {
 		{
 			name:       "non-nil filter is passed through to ListContainers",
 			containers: []*container.Container{kept},
-			filter:     func(c types.FilterableContainer) bool { return c.Name() == kept.Name() },
+			filter:     func(c filters.FilterableContainer) bool { return c.Name() == kept.Name() },
 			wantLen:    1,
 		},
 	}
@@ -77,7 +77,7 @@ func TestListContainerStatuses(t *testing.T) {
 
 			if tt.filter != nil {
 				// The mock records the variadic filters as one slice.
-				forwarded := mock.MatchedBy(func(received []types.Filter) bool {
+				forwarded := mock.MatchedBy(func(received []filters.Filter) bool {
 					return len(received) == 1 && received[0](kept) && !received[0](dropped)
 				})
 				client.EXPECT().ListContainers(mock.Anything, forwarded).Return(tt.containers, tt.listErr)

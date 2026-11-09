@@ -10,6 +10,7 @@ import (
 
 	container0 "github.com/moby/moby/api/types/container"
 	"github.com/nicholas-fedor/watchtower/internal/container"
+	"github.com/nicholas-fedor/watchtower/internal/container/filters"
 	"github.com/nicholas-fedor/watchtower/internal/container/oci"
 	"github.com/nicholas-fedor/watchtower/internal/settings/config/update"
 	"github.com/nicholas-fedor/watchtower/pkg/types"
@@ -896,7 +897,7 @@ func (_c *MockClient_IsContainerStale_Call) RunAndReturn(run func(ctx context.Co
 }
 
 // ListContainers provides a mock function for the type MockClient
-func (_mock *MockClient) ListContainers(ctx context.Context, filter ...types.Filter) ([]*container.Container, error) {
+func (_mock *MockClient) ListContainers(ctx context.Context, filter ...filters.Filter) ([]*container.Container, error) {
 	var tmpRet mock.Arguments
 	if len(filter) > 0 {
 		tmpRet = _mock.Called(ctx, filter)
@@ -911,17 +912,17 @@ func (_mock *MockClient) ListContainers(ctx context.Context, filter ...types.Fil
 
 	var r0 []*container.Container
 	var r1 error
-	if returnFunc, ok := ret.Get(0).(func(context.Context, ...types.Filter) ([]*container.Container, error)); ok {
+	if returnFunc, ok := ret.Get(0).(func(context.Context, ...filters.Filter) ([]*container.Container, error)); ok {
 		return returnFunc(ctx, filter...)
 	}
-	if returnFunc, ok := ret.Get(0).(func(context.Context, ...types.Filter) []*container.Container); ok {
+	if returnFunc, ok := ret.Get(0).(func(context.Context, ...filters.Filter) []*container.Container); ok {
 		r0 = returnFunc(ctx, filter...)
 	} else {
 		if ret.Get(0) != nil {
 			r0 = ret.Get(0).([]*container.Container)
 		}
 	}
-	if returnFunc, ok := ret.Get(1).(func(context.Context, ...types.Filter) error); ok {
+	if returnFunc, ok := ret.Get(1).(func(context.Context, ...filters.Filter) error); ok {
 		r1 = returnFunc(ctx, filter...)
 	} else {
 		r1 = ret.Error(1)
@@ -936,22 +937,22 @@ type MockClient_ListContainers_Call struct {
 
 // ListContainers is a helper method to define mock.On call
 //   - ctx context.Context
-//   - filter ...types.Filter
+//   - filter ...filters.Filter
 func (_e *MockClient_Expecter) ListContainers(ctx any, filter ...any) *MockClient_ListContainers_Call {
 	return &MockClient_ListContainers_Call{Call: _e.mock.On("ListContainers",
 		append([]any{ctx}, filter...)...)}
 }
 
-func (_c *MockClient_ListContainers_Call) Run(run func(ctx context.Context, filter ...types.Filter)) *MockClient_ListContainers_Call {
+func (_c *MockClient_ListContainers_Call) Run(run func(ctx context.Context, filter ...filters.Filter)) *MockClient_ListContainers_Call {
 	_c.Call.Run(func(args mock.Arguments) {
 		var arg0 context.Context
 		if args[0] != nil {
 			arg0 = args[0].(context.Context)
 		}
-		var arg1 []types.Filter
-		var variadicArgs []types.Filter
+		var arg1 []filters.Filter
+		var variadicArgs []filters.Filter
 		if len(args) > 1 {
-			variadicArgs = args[1].([]types.Filter)
+			variadicArgs = args[1].([]filters.Filter)
 		}
 		arg1 = variadicArgs
 		run(
@@ -967,7 +968,7 @@ func (_c *MockClient_ListContainers_Call) Return(containers []*container.Contain
 	return _c
 }
 
-func (_c *MockClient_ListContainers_Call) RunAndReturn(run func(ctx context.Context, filter ...types.Filter) ([]*container.Container, error)) *MockClient_ListContainers_Call {
+func (_c *MockClient_ListContainers_Call) RunAndReturn(run func(ctx context.Context, filter ...filters.Filter) ([]*container.Container, error)) *MockClient_ListContainers_Call {
 	_c.Call.Return(run)
 	return _c
 }

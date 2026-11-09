@@ -7,10 +7,10 @@ import (
 
 	"github.com/stretchr/testify/assert"
 
+	"github.com/nicholas-fedor/watchtower/internal/container/filters"
 	"github.com/nicholas-fedor/watchtower/internal/observability/metrics"
 	updateParams "github.com/nicholas-fedor/watchtower/internal/update/params"
 	"github.com/nicholas-fedor/watchtower/internal/update/schedule"
-	"github.com/nicholas-fedor/watchtower/pkg/types"
 )
 
 // TestValidateUpdateOptions verifies that each update API dependency is
@@ -19,10 +19,10 @@ import (
 func TestValidateUpdateOptions(t *testing.T) {
 	testMetrics := metrics.Default()
 
-	runUpdates := func(_ context.Context, _ types.Filter, _ updateParams.Params) *metrics.Metric {
+	runUpdates := func(_ context.Context, _ filters.Filter, _ updateParams.Params) *metrics.Metric {
 		return &metrics.Metric{}
 	}
-	filterByImage := func(_ []string, f types.Filter) types.Filter { return f }
+	filterByImage := func(_ []string, f filters.Filter) filters.Filter { return f }
 	defaultMetrics := func() *metrics.Metrics { return testMetrics }
 
 	tests := []struct {

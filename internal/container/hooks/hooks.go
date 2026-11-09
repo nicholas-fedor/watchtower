@@ -9,7 +9,7 @@ import (
 
 	"github.com/nicholas-fedor/watchtower/internal/container"
 	containerClient "github.com/nicholas-fedor/watchtower/internal/container/client"
-	"github.com/nicholas-fedor/watchtower/pkg/types"
+	"github.com/nicholas-fedor/watchtower/internal/container/filters"
 )
 
 // Errors for lifecycle hook execution.
@@ -35,7 +35,7 @@ func ExecutePreChecks(
 	log *zerolog.Logger,
 	ctx context.Context,
 	client containerClient.Client,
-	filter types.Filter,
+	filter filters.Filter,
 	uid, gid int,
 	listed []*container.Container,
 ) {
@@ -67,7 +67,7 @@ func ExecutePostChecks(
 	log *zerolog.Logger,
 	ctx context.Context,
 	client containerClient.Client,
-	filter types.Filter,
+	filter filters.Filter,
 	uid, gid int,
 	listed []*container.Container,
 ) {
@@ -99,7 +99,7 @@ func resolveCheckContainers(
 	log *zerolog.Logger,
 	ctx context.Context,
 	client containerClient.Client,
-	filter types.Filter,
+	filter filters.Filter,
 	listed []*container.Container,
 	phase string,
 ) ([]*container.Container, bool) {

@@ -30,6 +30,7 @@ import (
 	"github.com/nicholas-fedor/watchtower/internal/container"
 	containerClient "github.com/nicholas-fedor/watchtower/internal/container/client"
 	mockContainerClient "github.com/nicholas-fedor/watchtower/internal/container/client/mocks"
+	"github.com/nicholas-fedor/watchtower/internal/container/filters"
 	"github.com/nicholas-fedor/watchtower/internal/observability/logging"
 	"github.com/nicholas-fedor/watchtower/internal/observability/notify"
 	"github.com/nicholas-fedor/watchtower/internal/registry/ratelimit"
@@ -37,7 +38,6 @@ import (
 	notifyConfig "github.com/nicholas-fedor/watchtower/internal/settings/config/notify"
 	updateConfig "github.com/nicholas-fedor/watchtower/internal/settings/config/update"
 	"github.com/nicholas-fedor/watchtower/internal/testutil/logcapture"
-	"github.com/nicholas-fedor/watchtower/pkg/types"
 )
 
 // runExitHelperEnv selects a run exit case when the test binary is re-executed
@@ -64,7 +64,7 @@ var errRunTestDocker = errors.New("docker daemon error")
 // withFilter matches the filter argument of a filtered ListContainers call.
 // The mock records an unfiltered call with the context alone, and mock.Anything
 // would also match that missing argument.
-var withFilter = mock.MatchedBy(func([]types.Filter) bool { return true })
+var withFilter = mock.MatchedBy(func([]filters.Filter) bool { return true })
 
 // runTestState is the process state run and runMain read from package
 // variables, set by setRunState.
@@ -726,7 +726,7 @@ func TestRun_UpdatesAfterCleanup(t *testing.T) {
 	mockClient.EXPECT().ListContainers(mock.Anything).Return([]*container.Container{current}, nil)
 	mockClient.EXPECT().GetVersion().Return("1.47")
 	mockClient.EXPECT().ListContainers(mock.Anything, withFilter).
-		RunAndReturn(func(context.Context, ...types.Filter) ([]*container.Container, error) {
+		RunAndReturn(func(context.Context, ...filters.Filter) ([]*container.Container, error) {
 			scheduledListings.Add(1)
 
 			return []*container.Container{current}, nil
@@ -774,7 +774,7 @@ func TestRun_WaitsForAPIDrain(t *testing.T) {
 	mockClient.EXPECT().ListContainers(mock.Anything).Return([]*container.Container{current}, nil)
 	// The API request then lists them, and stays open until released.
 	mockClient.EXPECT().ListContainers(mock.Anything, withFilter).
-		RunAndReturn(func(context.Context, ...types.Filter) ([]*container.Container, error) {
+		RunAndReturn(func(context.Context, ...filters.Filter) ([]*container.Container, error) {
 			close(entered)
 			<-release
 

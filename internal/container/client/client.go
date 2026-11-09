@@ -23,6 +23,7 @@ import (
 
 	"github.com/nicholas-fedor/watchtower/internal/container"
 	"github.com/nicholas-fedor/watchtower/internal/container/copyfile"
+	"github.com/nicholas-fedor/watchtower/internal/container/filters"
 	containerImage "github.com/nicholas-fedor/watchtower/internal/container/image"
 	"github.com/nicholas-fedor/watchtower/internal/container/network"
 	"github.com/nicholas-fedor/watchtower/internal/container/oci"
@@ -121,7 +122,7 @@ type Client interface {
 	// Returns:
 	//   - []*container.Container: List of matching containers.
 	//   - error: Non-nil if listing fails, nil on success.
-	ListContainers(ctx context.Context, filter ...types.Filter) ([]*container.Container, error)
+	ListContainers(ctx context.Context, filter ...filters.Filter) ([]*container.Container, error)
 
 	// GetContainer fetches detailed information about a specific container by its ID.
 	//
@@ -752,12 +753,12 @@ func isTLSSetupError(err error) bool {
 // Returns:
 //   - []*container.Container: List of matching containers.
 //   - error: Non-nil if listing fails, nil on success.
-func (c *client) ListContainers(ctx context.Context, filter ...types.Filter) ([]*container.Container, error) {
+func (c *client) ListContainers(ctx context.Context, filter ...filters.Filter) ([]*container.Container, error) {
 	// Podman has no restarting status, so the runtime only matters when
 	// restarting containers are included.
 	isPodman := c.IncludeRestarting && c.getRuntime(ctx)
 
-	var containerFilter types.Filter
+	var containerFilter filters.Filter
 
 	if len(filter) > 0 {
 		if len(filter) == 1 {
@@ -766,7 +767,7 @@ func (c *client) ListContainers(ctx context.Context, filter ...types.Filter) ([]
 		} else {
 			// Multiple filters: combine them with logical AND
 			// A container must pass ALL filters to be included
-			containerFilter = func(c types.FilterableContainer) bool {
+			containerFilter = func(c filters.FilterableContainer) bool {
 				for _, f := range filter {
 					if !f(c) {
 						return false

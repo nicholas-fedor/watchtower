@@ -10,11 +10,11 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"github.com/nicholas-fedor/watchtower/internal/container/filters"
 	"github.com/nicholas-fedor/watchtower/internal/observability/logging"
 	"github.com/nicholas-fedor/watchtower/internal/observability/metrics"
 	updateParams "github.com/nicholas-fedor/watchtower/internal/update/params"
 	"github.com/nicholas-fedor/watchtower/internal/update/schedule"
-	"github.com/nicholas-fedor/watchtower/pkg/types"
 )
 
 func TestRegisterUpdateRoute(t *testing.T) {
@@ -25,10 +25,10 @@ func TestRegisterUpdateRoute(t *testing.T) {
 		EnableUpdateAPI: true,
 		UpdateLock:      schedule.NewUpdateLock(),
 		UnblockHTTPAPI:  true,
-		RunUpdatesWithNotifications: func(_ context.Context, _ types.Filter, _ updateParams.Params) *metrics.Metric {
+		RunUpdatesWithNotifications: func(_ context.Context, _ filters.Filter, _ updateParams.Params) *metrics.Metric {
 			return &metrics.Metric{}
 		},
-		FilterByImage:  func(_ []string, f types.Filter) types.Filter { return f },
+		FilterByImage:  func(_ []string, f filters.Filter) filters.Filter { return f },
 		DefaultMetrics: func() *metrics.Metrics { return testMetrics },
 	}
 
@@ -68,13 +68,13 @@ func TestRegisterUpdateRoute_BuildsFullUpdateParams(t *testing.T) {
 			LabelPrecedence:     true,
 			SkipSelfUpdate:      true,
 		},
-		Filter: func(_ types.FilterableContainer) bool { return true },
-		RunUpdatesWithNotifications: func(_ context.Context, _ types.Filter, params updateParams.Params) *metrics.Metric {
+		Filter: func(_ filters.FilterableContainer) bool { return true },
+		RunUpdatesWithNotifications: func(_ context.Context, _ filters.Filter, params updateParams.Params) *metrics.Metric {
 			got = params
 
 			return &metrics.Metric{}
 		},
-		FilterByImage:  func(_ []string, f types.Filter) types.Filter { return f },
+		FilterByImage:  func(_ []string, f filters.Filter) filters.Filter { return f },
 		DefaultMetrics: func() *metrics.Metrics { return testMetrics },
 		UpdateLock:     schedule.NewUpdateLock(),
 	}
@@ -106,10 +106,10 @@ func TestRegisterUpdateRoute_NilWriteStartupMessage(t *testing.T) {
 		EnableUpdateAPI: true,
 		UpdateLock:      schedule.NewUpdateLock(),
 		UnblockHTTPAPI:  false,
-		RunUpdatesWithNotifications: func(_ context.Context, _ types.Filter, _ updateParams.Params) *metrics.Metric {
+		RunUpdatesWithNotifications: func(_ context.Context, _ filters.Filter, _ updateParams.Params) *metrics.Metric {
 			return &metrics.Metric{}
 		},
-		FilterByImage:       func(_ []string, f types.Filter) types.Filter { return f },
+		FilterByImage:       func(_ []string, f filters.Filter) filters.Filter { return f },
 		DefaultMetrics:      func() *metrics.Metrics { return testMetrics },
 		WriteStartupMessage: nil,
 	}
@@ -131,10 +131,10 @@ func TestRegisterUpdateRoute_DoesNotWriteStartupMessage(t *testing.T) {
 		EnableUpdateAPI: true,
 		UpdateLock:      schedule.NewUpdateLock(),
 		UnblockHTTPAPI:  false,
-		RunUpdatesWithNotifications: func(_ context.Context, _ types.Filter, _ updateParams.Params) *metrics.Metric {
+		RunUpdatesWithNotifications: func(_ context.Context, _ filters.Filter, _ updateParams.Params) *metrics.Metric {
 			return &metrics.Metric{}
 		},
-		FilterByImage:  func(_ []string, f types.Filter) types.Filter { return f },
+		FilterByImage:  func(_ []string, f filters.Filter) filters.Filter { return f },
 		DefaultMetrics: func() *metrics.Metrics { return testMetrics },
 		WriteStartupMessage: func(context.Context, logging.StartupParams) {
 			called = true
@@ -163,12 +163,12 @@ func TestRegisterUpdateRoute_TimeoutIsServiceUnavailable(t *testing.T) {
 		EnableUpdateAPI: true,
 		UnblockHTTPAPI:  true,
 		UpdateTimeout:   20 * time.Millisecond,
-		RunUpdatesWithNotifications: func(context.Context, types.Filter, updateParams.Params) *metrics.Metric {
+		RunUpdatesWithNotifications: func(context.Context, filters.Filter, updateParams.Params) *metrics.Metric {
 			<-release
 
 			return &metrics.Metric{}
 		},
-		FilterByImage:  func(_ []string, f types.Filter) types.Filter { return f },
+		FilterByImage:  func(_ []string, f filters.Filter) filters.Filter { return f },
 		DefaultMetrics: func() *metrics.Metrics { return testMetrics },
 		UpdateLock:     lock,
 	}

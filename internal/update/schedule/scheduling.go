@@ -12,10 +12,10 @@ import (
 	"github.com/robfig/cron/v3"
 	"github.com/rs/zerolog"
 
+	"github.com/nicholas-fedor/watchtower/internal/container/filters"
 	"github.com/nicholas-fedor/watchtower/internal/observability/logging"
 	"github.com/nicholas-fedor/watchtower/internal/observability/metrics"
 	updateParams "github.com/nicholas-fedor/watchtower/internal/update/params"
-	"github.com/nicholas-fedor/watchtower/pkg/types"
 )
 
 // updateWaitTimeout bounds how long shutdown waits for an in-flight update.
@@ -174,7 +174,7 @@ type ScheduleDeps struct {
 	// Logger is the process logger for scheduled runs. Required and must be non-nil.
 	Logger *zerolog.Logger
 	// Filter determines which containers are updated.
-	Filter types.Filter
+	Filter filters.Filter
 	// Lock ensures only one update runs at a time. Share it with every other
 	// caller that starts updates, such as the HTTP API. Nil gives the scheduler
 	// a lock of its own.
@@ -184,7 +184,7 @@ type ScheduleDeps struct {
 	// that context is done.
 	WriteStartupMessage func(context.Context, logging.StartupParams)
 	// RunUpdate performs container updates and sends notifications.
-	RunUpdate func(context.Context, types.Filter, updateParams.Params) *metrics.Metric
+	RunUpdate func(context.Context, filters.Filter, updateParams.Params) *metrics.Metric
 	// ScheduleSpec is the cron-formatted schedule string for periodic updates.
 	ScheduleSpec string
 	// Startup holds resolved values for startup messaging (no flag reads).

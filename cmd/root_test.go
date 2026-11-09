@@ -27,11 +27,11 @@ import (
 	"github.com/nicholas-fedor/watchtower/internal/container"
 	containerClient "github.com/nicholas-fedor/watchtower/internal/container/client"
 	mockContainerClient "github.com/nicholas-fedor/watchtower/internal/container/client/mocks"
+	"github.com/nicholas-fedor/watchtower/internal/container/filters"
 	"github.com/nicholas-fedor/watchtower/internal/observability/logging"
 	"github.com/nicholas-fedor/watchtower/internal/settings"
 	"github.com/nicholas-fedor/watchtower/internal/testutil/logcapture"
 	"github.com/nicholas-fedor/watchtower/internal/update"
-	"github.com/nicholas-fedor/watchtower/pkg/types"
 )
 
 // newTestLogger returns a logger that writes each event to the test's log, so a
@@ -134,7 +134,7 @@ func TestValidateRollingRestartDependenciesAcceptsCancelableContext(t *testing.T
 	mockClient := mockContainerClient.NewMockClient(t)
 
 	// Create a filter that accepts all containers
-	filter := types.Filter(func(_ types.FilterableContainer) bool { return true })
+	filter := filters.Filter(func(_ filters.FilterableContainer) bool { return true })
 
 	// Test with cancelable context - context should not be canceled
 	t.Run("cancelable context without cancellation", func(t *testing.T) {

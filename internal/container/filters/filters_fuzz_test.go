@@ -7,7 +7,6 @@ import (
 	"github.com/rs/zerolog"
 
 	"github.com/nicholas-fedor/watchtower/internal/container/labels"
-	"github.com/nicholas-fedor/watchtower/pkg/types"
 )
 
 func fuzzLog() *zerolog.Logger {
@@ -82,7 +81,7 @@ func (c fuzzableContainer) IsWatchtower() bool {
 	return c.watchtower
 }
 
-var _ types.FilterableContainer = fuzzableContainer{}
+var _ FilterableContainer = fuzzableContainer{}
 
 // labelMap turns parsed label pairs into a container's labels. A container
 // holds one value per key, so a later pair replaces an earlier one.
