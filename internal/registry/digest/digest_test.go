@@ -1049,47 +1049,67 @@ func TestFetchDigestWithGet_RedirectPastClientLimit(t *testing.T) {
 // TestFetchDigestWithGet_MirrorFailure verifies that a manifest request a
 // mirror fails moves on to the next endpoint, so the registry gets its own
 // challenge and never the mirror's token. This holds when the mirror's
-// challenge redirects to another host too.
+// challenge redirects to another host or to the registry itself.
 func TestFetchDigestWithGet_MirrorFailure(t *testing.T) {
 	t.Parallel()
 
-	const manifestPath = "/v2/test/image/manifests/latest"
+	const (
+		manifestPath = "/v2/test/image/manifests/latest"
+		scope        = "repository:test/image:pull"
+	)
+
+	// challengeTarget is the host the mirror's challenge redirects to.
+	type challengeTarget int
+
+	const (
+		// challengeMirror keeps the challenge on the mirror.
+		challengeMirror challengeTarget = iota
+		// challengeOtherHost redirects it to another host, which also gets the
+		// manifest request.
+		challengeOtherHost
+		// challengeRegistry redirects it to the registry, while the manifest
+		// request stays on the mirror.
+		challengeRegistry
+	)
 
 	tests := []struct {
-		name string
-		// redirectChallenge sends the mirror's challenge to another host, which
-		// issues the token and answers the manifest request.
-		redirectChallenge bool
+		name      string
+		challenge challengeTarget
+		// registryRequests is how many requests the registry receives.
+		registryRequests int
 	}{
-		{name: "mirror that challenges itself"},
-		{name: "mirror whose challenge redirects to another host", redirectChallenge: true},
+		{name: "mirror that challenges itself", challenge: challengeMirror, registryRequests: 2},
+		{name: "mirror whose challenge redirects to another host", challenge: challengeOtherHost, registryRequests: 2},
+		{name: "mirror whose challenge redirects to the registry", challenge: challengeRegistry, registryRequests: 4},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 
+			registry := httpstub.New(t)
 			mirror := httpstub.New(t)
-			mirrorAuth := mirror
+			// manifestHost answers the mirror endpoint's manifest request.
+			manifestHost := mirror
 
-			if tt.redirectChallenge {
-				mirrorAuth = httpstub.New(t)
-				mirror.AppendHandlers(challengeRedirectHandler(t, mirrorAuth.Addr()))
+			switch tt.challenge {
+			case challengeOtherHost:
+				manifestHost = httpstub.New(t)
+				mirror.AppendHandlers(challengeRedirectHandler(t, manifestHost.Addr()))
+				manifestHost.AppendHandlers(bearerChallengeHandlers(t, manifestHost.Addr(), scope)...)
+			case challengeRegistry:
+				mirror.AppendHandlers(challengeRedirectHandler(t, registry.Addr()))
+				registry.AppendHandlers(bearerChallengeHandlers(t, registry.Addr(), scope)...)
+			default:
+				mirror.AppendHandlers(bearerChallengeHandlers(t, mirror.Addr(), scope)...)
 			}
 
-			mirrorAuth.AppendHandlers(append(
-				bearerChallengeHandlers(t, mirrorAuth.Addr(), "repository:test/image:pull"),
-				manifestHandler(t, http.MethodGet, manifestPath, http.StatusNotFound, nil),
-			)...)
-
-			registry := httpstub.New(t)
+			manifestHost.AppendHandlers(manifestHandler(t, http.MethodGet, manifestPath, http.StatusNotFound, nil))
 			registry.AppendHandlers(
 				anonymousRegistryHandler(t),
 				httpstub.CombineHandlers(
 					httpstub.VerifyRequest(t, http.MethodGet, httpstub.Path(manifestPath)),
-					func(_ http.ResponseWriter, r *http.Request) {
-						assert.Empty(t, r.Header.Get("Authorization"), "the mirror's token reached the registry")
-					},
+					httpstub.VerifyHeader(t, http.Header{"Authorization": nil}),
 					httpstub.RespondWith(http.StatusOK, "", digestHeader(testDigestHash)),
 				),
 			)
@@ -1100,8 +1120,8 @@ func TestFetchDigestWithGet_MirrorFailure(t *testing.T) {
 				container, "", registryConfig.Registry{TLSSkip: true}, ratelimit.New(), mirror.Addr(), "")
 			require.NoError(t, err)
 			assert.Equal(t, NormalizeDigest(newTestLogger(t), testDigestHash), got)
-			assert.Len(t, registry.ReceivedRequests(), 2,
-				"the registry was not asked once through its own challenge")
+			assert.Len(t, registry.ReceivedRequests(), tt.registryRequests,
+				"the registry received an unexpected number of requests")
 		})
 	}
 }
@@ -1175,10 +1195,10 @@ func TestFetchDigestWithGet_RedirectHostFailure(t *testing.T) {
 	}
 }
 
-// TestCompareDigest_RedirectedLSCRImage verifies that an lscr.io image whose
-// registry redirects the /v2/ challenge to another host still compares its
-// digest with a HEAD request.
-func TestCompareDigest_RedirectedLSCRImage(t *testing.T) {
+// TestCompareDigest_RedirectedChallenge verifies that when the registry
+// redirects the /v2/ challenge to another host, the digest is compared with a
+// HEAD request to that host.
+func TestCompareDigest_RedirectedChallenge(t *testing.T) {
 	t.Parallel()
 
 	server := httpstub.New(t)
@@ -1186,22 +1206,17 @@ func TestCompareDigest_RedirectedLSCRImage(t *testing.T) {
 
 	server.AppendHandlers(
 		challengeRedirectHandler(t, redirectServer.Addr()),
-		httpstub.CombineHandlers(
-			httpstub.VerifyRequest(t, http.MethodGet, httpstub.Path("/v2/lscr.io/test/image/manifests/latest")),
-			httpstub.RespondWith(http.StatusNotFound, "", nil),
-		),
-		httpstub.CombineHandlers(
-			httpstub.VerifyRequest(t, http.MethodHead, httpstub.Path("/v2/lscr.io/test/image/manifests/latest")),
-			httpstub.RespondWith(http.StatusOK, "", http.Header{ContentDigestHeader: {testDigestHash}}),
-		),
 	)
 	redirectServer.AppendHandlers(
-		append(bearerChallengeHandlers(t, redirectServer.Addr(), "repository:lscr.io/test/image:pull"),
-			httpstub.RespondWith(http.StatusOK, "", http.Header{ContentDigestHeader: {testDigestHash}}),
+		append(bearerChallengeHandlers(t, redirectServer.Addr(), "repository:test/image:pull"),
+			httpstub.CombineHandlers(
+				httpstub.VerifyRequest(t, http.MethodHead, httpstub.Path("/v2/test/image/manifests/latest")),
+				httpstub.RespondWith(http.StatusOK, "", http.Header{ContentDigestHeader: {testDigestHash}}),
+			),
 		)...,
 	)
 
-	container := newRegistryContainer(server.Addr()+"/lscr.io/test/image:latest", testRepoDigest)
+	container := newRegistryContainer(server.Addr()+"/test/image:latest", testRepoDigest)
 
 	got, err := CompareDigest(newTestLogger(t), context.Background(),
 		container, "token", registryConfig.Registry{TLSSkip: true}, ratelimit.New())
@@ -2287,7 +2302,8 @@ func TestFetchDigestWithGet_SlowResponse(t *testing.T) {
 }
 
 // TestBuildManifestURL verifies the manifest URL and registry host built for an
-// image, with the TLS setting, host overrides, and the lscr.io redirect.
+// image, with the TLS setting and host overrides. An lscr.io image is built on
+// ghcr.io, which hosts it.
 func TestBuildManifestURL(t *testing.T) {
 	t.Parallel()
 
@@ -2330,10 +2346,10 @@ func TestBuildManifestURL(t *testing.T) {
 			expectedHost: "index.docker.io",
 		},
 		{
-			name:         "redirects lscr.io to ghcr.io",
+			name:         "builds lscr.io images on ghcr.io, which hosts them",
 			image:        "lscr.io/linuxserver/radarr:latest",
 			expectedURL:  "https://ghcr.io/v2/linuxserver/radarr/manifests/latest",
-			expectedHost: "lscr.io",
+			expectedHost: "ghcr.io",
 		},
 		{
 			name:         "overrides host with a bare host and port",
@@ -2705,6 +2721,87 @@ func TestHandleManifestResponse(t *testing.T) {
 			assert.Equal(t, tt.expectedDigest, gotDigest)
 			assert.Equal(t, tt.expectedURL, gotURL)
 			assert.Equal(t, tt.expectedRetry, gotRetry)
+		})
+	}
+}
+
+// TestRetriesOnOriginalHost verifies that only a 401 or 404 from a host other
+// than the image registry's is retried on the registry's host.
+func TestRetriesOnOriginalHost(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name        string
+		status      int
+		requestHost string
+		want        bool
+	}{
+		{
+			name:        "retries a 401 from the redirect host",
+			status:      http.StatusUnauthorized,
+			requestHost: "redirect.example.com",
+			want:        true,
+		},
+		{
+			name:        "retries a 404 from the redirect host",
+			status:      http.StatusNotFound,
+			requestHost: "redirect.example.com",
+			want:        true,
+		},
+		{
+			name:        "does not retry other failures",
+			status:      http.StatusInternalServerError,
+			requestHost: "redirect.example.com",
+			want:        false,
+		},
+		{
+			name:        "does not retry a request already on the registry's host",
+			status:      http.StatusNotFound,
+			requestHost: "registry.example.com",
+			want:        false,
+		},
+		{
+			name:        "does not retry the registry's host spelled in another case",
+			status:      http.StatusNotFound,
+			requestHost: "Registry.Example.com",
+			want:        false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			got := retriesOnOriginalHost(tt.status, tt.requestHost, "registry.example.com")
+			assert.Equal(t, tt.want, got)
+		})
+	}
+}
+
+// TestChallengeRedirectHost verifies that only a challenge redirected to a
+// host other than the image registry's sends the manifest request elsewhere.
+func TestChallengeRedirectHost(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name         string
+		redirectHost string
+		want         string
+	}{
+		{name: "challenge not redirected", redirectHost: "", want: ""},
+		{name: "challenge redirected to another host", redirectHost: "auth.example.com", want: "auth.example.com"},
+		{name: "challenge redirected on the registry's host", redirectHost: "registry.example.com", want: ""},
+		{name: "registry's host spelled in another case", redirectHost: "Registry.Example.com", want: ""},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			result := auth.TokenResult{Token: "", Redirected: tt.redirectHost != "", RedirectHost: tt.redirectHost}
+
+			got := challengeRedirectHost(result, "registry.example.com")
+			assert.Equal(t, tt.want, got)
 		})
 	}
 }

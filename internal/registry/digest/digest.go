@@ -18,7 +18,6 @@ import (
 
 	"github.com/nicholas-fedor/watchtower/internal/meta"
 	"github.com/nicholas-fedor/watchtower/internal/registry/auth"
-	"github.com/nicholas-fedor/watchtower/internal/registry/hosts"
 	"github.com/nicholas-fedor/watchtower/internal/registry/manifest"
 	"github.com/nicholas-fedor/watchtower/internal/registry/ratelimit"
 	registryConfig "github.com/nicholas-fedor/watchtower/internal/settings/config/registry"
@@ -515,14 +514,10 @@ func FetchDigestForTag(
 
 // buildManifestURL constructs and validates a manifest URL for a container.
 //
-// It determines the scheme from the registry settings, builds the initial URL via
-// manifest.BuildManifestURLForImage (which always uses the canonical host from the image reference),
-// then overrides the host and scheme if hostOverride is a non-empty bare host or full endpoint
-// URL (e.g. "https://mirror.example.com"). It returns the final URL, the original host before
-// override, and the parsed URL object.
-//
-// The hostOverride parameter accepts either a bare host or a full URL. When a full URL is
-// supplied, its scheme (if present) takes precedence over the registry settings.
+// The URL names the image's tag. A digest-only reference names its digest
+// instead. Its host is the image registry's host unless hostOverride is a bare
+// host or an endpoint URL such as "https://mirror.example.com". An endpoint
+// URL's scheme takes precedence over the registry settings.
 //
 // Parameters:
 //   - container: Container whose manifest URL is being built.
@@ -532,7 +527,7 @@ func FetchDigestForTag(
 //
 // Returns:
 //   - string: The final manifest URL.
-//   - string: The original host before applying hostOverride.
+//   - string: The image registry's host, before hostOverride applies.
 //   - *url.URL: The parsed URL object.
 //   - error: Non-nil if construction or validation fails.
 func buildManifestURL(log *zerolog.Logger,
@@ -560,7 +555,7 @@ func buildManifestURL(log *zerolog.Logger,
 //
 // Returns:
 //   - string: The final manifest URL.
-//   - string: The original host before applying hostOverride.
+//   - string: The image registry's host, before hostOverride applies.
 //   - *url.URL: The parsed URL object.
 //   - error: Non-nil if construction or validation fails.
 func buildManifestURLForTag(log *zerolog.Logger,
@@ -625,7 +620,7 @@ func imageNameForTag(imageName, tag string) (string, error) {
 //
 // Returns:
 //   - string: The final manifest URL.
-//   - string: The original host before applying hostOverride.
+//   - string: The image registry's host, before hostOverride applies.
 //   - *url.URL: The parsed URL object.
 //   - error: Non-nil if construction or validation fails.
 func buildManifestURLForImage(log *zerolog.Logger,
@@ -641,25 +636,8 @@ func buildManifestURLForImage(log *zerolog.Logger,
 
 	scheme := auth.Scheme(settings)
 
-	// Capture the original registry host from the image reference before any
-	// canonicalization or host remapping. For lscr.io images, preserve the
-	// original host so the redirect-detection logic can distinguish lscr.io
-	// from its ghcr.io target. For all other images use the canonical host.
-	originalHost := ""
-
-	normalizedRef, parseErr := reference.ParseNormalizedNamed(imageName)
-	if parseErr == nil {
-		rawDomain := reference.Domain(normalizedRef)
-
-		canonicalHost, _ := auth.GetRegistryAddress(log, imageName)
-		if rawDomain == hosts.LSCRRegistryDomain {
-			originalHost = rawDomain
-		} else if canonicalHost != "" {
-			originalHost = canonicalHost
-		}
-	}
-
-	// Build the canonical manifest URL.
+	// The canonical URL is on the image registry's host, which already maps
+	// lscr.io images to ghcr.io, where they are hosted.
 	manifestURLStr, err := manifest.BuildManifestURLForImage(log, imageName, "", scheme)
 	if err != nil {
 		log.Debug().
@@ -679,27 +657,7 @@ func buildManifestURLForImage(log *zerolog.Logger,
 		)
 	}
 
-	// Special handling for lscr.io registry redirects:
-	// lscr.io (LinuxServer.io) images are hosted on GitHub Container Registry (ghcr.io)
-	// but the registry redirects manifest requests from lscr.io to ghcr.io.
-	// However, the authentication challenge comes from ghcr.io, and when we try to
-	// make manifest requests to lscr.io, we get 401 Unauthorized followed by 404 Not Found
-	// because lscr.io doesn't actually host the manifests - it's just a redirect endpoint.
-	//
-	// To fix this, we intercept lscr.io URLs and change the host to ghcr.io for manifest requests,
-	// while still using lscr.io for the initial authentication challenge to get the correct tokens.
-	// This ensures HEAD requests succeed with 200 OK and we can extract digests without
-	// falling back to expensive full image pulls.
-	//
-	// The authentication flow works as follows:
-	// 1. Initial challenge request to lscr.io/v2/ gets redirected to ghcr.io
-	// 2. Authentication tokens are obtained from ghcr.io using the redirected challenge
-	// 3. Manifest requests are made directly to ghcr.io (not lscr.io) to avoid 401/404 errors
-	// 4. Digest extraction succeeds from the 200 OK response
-	if parsedURL.Host == hosts.LSCRRegistryDomain {
-		parsedURL.Host = hosts.GitHubRegistryDomain
-		manifestURLStr = parsedURL.String()
-	}
+	originalHost := parsedURL.Host
 
 	if hostOverride != "" {
 		// Resolve the override as the challenge request does, so a mirror given
@@ -775,7 +733,6 @@ func fetchDigest(log *zerolog.Logger,
 	// Create an authentication client for registry requests.
 	client := auth.NewAuthClient(log, settings)
 
-	// Build the canonical manifest URL and apply lscr.io/host-override handling.
 	manifestURL, originalHost, _, err := buildManifestURL(log, container, settings, "")
 	if err != nil {
 		log.Debug().
@@ -797,15 +754,7 @@ func fetchDigest(log *zerolog.Logger,
 		endpoints = []string{""}
 	}
 
-	limitHost, hostErr := auth.GetRegistryAddress(log, container.ImageName())
-	if hostErr != nil || limitHost == "" {
-		log.Debug().
-			Err(hostErr).
-			Fields(fields).
-			Msg("Failed to resolve registry host for rate limiting")
-	}
-
-	limitKey, release, holdErr := limiter.HoldAnonymous(ctx, limitHost, registryAuth != "")
+	limitKey, release, holdErr := limiter.HoldAnonymous(ctx, originalHost, registryAuth != "")
 	if holdErr != nil {
 		return "", fmt.Errorf("%w: %w", errFailedGetToken, holdErr)
 	}
@@ -862,7 +811,6 @@ func fetchDigest(log *zerolog.Logger,
 
 		token := result.Token
 		redirected := result.Redirected
-		redirectHost := result.RedirectHost
 
 		// Only the canonical registry's redirect lets a failed manifest request
 		// return to the original host. A mirror's token belongs to the mirror,
@@ -879,19 +827,17 @@ func fetchDigest(log *zerolog.Logger,
 				Fields(fields).
 				Fields(epFields).
 				Bool("redirected", redirected).
-				Str("redirect_host", redirectHost).
+				Str("redirect_host", result.RedirectHost).
 				Msg("Received token and redirect flag from GetToken")
 		}
 
 		// Decide which host to use for this manifest request attempt.
 		// Priority:
-		// 1. Registry redirect host (from auth challenge, e.g. lscr.io → ghcr.io)
+		// 1. The host the registry's challenge redirected to
 		// 2. Current mirror endpoint (when using registry mirrors)
 		// 3. Canonical host (empty string)
-		hostForManifest := ""
-		if redirectHost != "" && redirectHost != originalHost {
-			hostForManifest = redirectHost
-		} else if endpoint != "" {
+		hostForManifest := challengeRedirectHost(result, originalHost)
+		if hostForManifest == "" && endpoint != "" {
 			// Use the current registry mirror endpoint for the manifest request.
 			hostForManifest = endpoint
 		}
@@ -1059,7 +1005,7 @@ func fetchDigest(log *zerolog.Logger,
 // Parameters:
 //   - resp: The HTTP response from the manifest request.
 //   - method: The HTTP method used ("HEAD" or "GET").
-//   - originalHost: The original host from the initial manifest URL.
+//   - originalHost: The image registry's host.
 //   - redirected: Whether the canonical registry's challenge redirected the request to
 //     another host.
 //   - parsedURL: Parsed URL of the request, whose host is the host it went to.
@@ -1179,11 +1125,10 @@ func handleManifestResponse(log *zerolog.Logger,
 			)
 		}
 
-		// A 401 or 404 from the host the registry's challenge redirected to is
-		// retried on the original host. A mirror endpoint's failure is not, since
-		// its token belongs to the mirror and the next endpoint is tried anyway.
-		if (resp.StatusCode == http.StatusNotFound || resp.StatusCode == http.StatusUnauthorized) &&
-			redirected && currentHost != originalHost {
+		// Only a request the registry's own challenge redirected is retried. A
+		// mirror's token belongs to the mirror. The next endpoint is tried anyway.
+		// The caller passes redirected as false for a mirror.
+		if redirected && retriesOnOriginalHost(resp.StatusCode, currentHost, originalHost) {
 			log.Debug().
 				Fields(fields).
 				Msg("401/404 on redirected host, retrying on original host")
@@ -1240,6 +1185,44 @@ func handleManifestResponse(log *zerolog.Logger,
 		Msg("Successfully extracted digest")
 
 	return digest, "", false, nil
+}
+
+// retriesOnOriginalHost reports whether a manifest request that failed on the
+// host the registry's challenge redirected to is retried on the image
+// registry's own host.
+//
+// It is true for a 401 or 404 from a host other than the registry's. The
+// redirect host may serve the challenge without serving the manifest. Hosts
+// compare case-insensitively.
+//
+// Parameters:
+//   - status: Status of the failed response.
+//   - requestHost: Host the failed request went to.
+//   - originalHost: The image registry's host.
+//
+// Returns:
+//   - bool: True when the request is retried on originalHost.
+func retriesOnOriginalHost(status int, requestHost, originalHost string) bool {
+	return (status == http.StatusUnauthorized || status == http.StatusNotFound) &&
+		!strings.EqualFold(requestHost, originalHost)
+}
+
+// challengeRedirectHost returns the host a manifest request goes to first
+// after the registry's challenge redirected to another host.
+//
+// Parameters:
+//   - result: The token result of the challenge.
+//   - originalHost: The image registry's host.
+//
+// Returns:
+//   - string: The redirect host. It is empty when the challenge was not
+//     redirected or stayed on originalHost, compared case-insensitively.
+func challengeRedirectHost(result auth.TokenResult, originalHost string) string {
+	if strings.EqualFold(result.RedirectHost, originalHost) {
+		return ""
+	}
+
+	return result.RedirectHost
 }
 
 // extractHeadDigest extracts the image digest from a HEAD response's headers.
@@ -1620,7 +1603,7 @@ func makeManifestRequest(
 //   - method: HTTP method ("HEAD" or "GET").
 //   - updatedURL: The updated manifest URL to retry.
 //   - token: Authentication token.
-//   - originalHost: The original host.
+//   - originalHost: The image registry's host.
 //   - redirected: Whether the canonical registry's challenge redirected the request to
 //     another host.
 //   - parsedURL: Parsed URL object.
