@@ -145,7 +145,7 @@ func FetchImageCreationTime(log *zerolog.Logger,
 	}
 	defer release()
 
-	// Obtain an authentication token and challenge host for the registry.
+	// Obtain an authentication token for the registry.
 	result, err := limiter.DoValue(ctx, log, limitKey, func() (auth.TokenResult, error) {
 		return auth.GetToken(log,
 			ctx,
@@ -167,16 +167,8 @@ func FetchImageCreationTime(log *zerolog.Logger,
 	}
 
 	token := result.Token
-	challengeHost := result.ChallengeHost
-	redirected := result.Redirected
-	redirectHost := result.RedirectHost
 
-	// Build the initial manifest URL to get the original host.
-	manifestURL, originalHost, parsedURL, err := buildManifestURLForAge(log,
-		container,
-		settings,
-		"",
-	)
+	parsedURL, err := buildManifestURLForAge(log, container, settings)
 	if err != nil {
 		log.Debug().
 			Err(err).
@@ -186,38 +178,22 @@ func FetchImageCreationTime(log *zerolog.Logger,
 		return time.Time{}, fmt.Errorf("%w: %w", errFetchManifestFailed, err)
 	}
 
-	// Determine the primary manifest host based on auth redirect.
-	// If redirected during auth, use the redirect host for manifest requests.
-	if redirectHost != "" && redirectHost != originalHost && redirected {
-		manifestURL, _, parsedURL, err = buildManifestURLForAge(log,
-			container,
-			settings,
-			redirectHost,
-		)
-		if err != nil {
-			log.Debug().
-				Err(err).
-				Fields(fields).
-				Msg("Failed to build manifest URL with redirect host")
-
-			return time.Time{},
-				fmt.Errorf("%w: %w", errFetchManifestFailed, err)
-		}
+	// A challenge redirected to another host sends the manifest request there
+	// first, with the original host as the fallback.
+	originalHost := parsedURL.Host
+	if result.RedirectHost != "" && result.RedirectHost != originalHost {
+		parsedURL.Host = result.RedirectHost
 	}
 
-	// Try manifest fetch with host fallback: primary (redirect/original),
-	// then challenge host, then original host.
-	configDigest, winningHost, err := fetchManifestForAge(log,
+	configDigest, manifestURL, err := fetchManifestForAge(log,
 		ctx,
 		client,
 		limiter,
-		manifestURL,
 		token,
 		parsedURL,
 		targetOS,
 		targetArch,
 		targetVariant,
-		challengeHost,
 		originalHost,
 		limitKey,
 		fields,
@@ -231,16 +207,12 @@ func FetchImageCreationTime(log *zerolog.Logger,
 		Str("config_digest", configDigest).
 		Msg("Extracted config digest from manifest")
 
-	// Use the host that successfully served the manifest for the blob fetch.
-	blobURL := *parsedURL
-	blobURL.Host = winningHost
-
-	// Fetch the config blob.
+	// The config blob comes from the host that served the manifest.
 	configBody, err := fetchConfigBlob(log,
 		ctx,
 		client,
 		limiter,
-		&blobURL,
+		manifestURL,
 		configDigest,
 		token,
 		limitKey,
@@ -289,317 +261,206 @@ func FetchImageCreationTime(log *zerolog.Logger,
 // Parameters:
 //   - container: Container whose image manifest URL to build.
 //   - settings: Registry request settings.
-//   - hostOverride: Optional host override (empty string to use original).
 //
 // Returns:
-//   - string: The manifest URL.
-//   - string: The original host.
-//   - *url.URL: The parsed URL.
+//   - *url.URL: The manifest URL on the image's registry host.
 //   - error: Non-nil if URL construction fails.
 func buildManifestURLForAge(log *zerolog.Logger,
 	container types.Container,
 	settings registryConfig.Registry,
-	hostOverride string,
-) (string, string, *url.URL, error) {
+) (*url.URL, error) {
 	scheme := auth.Scheme(settings)
 
 	// Build manifest URL.
 	manifestURLStr, err := buildManifestURLForContainer(log, container, scheme)
 	if err != nil {
-		return "",
-			"",
-			nil,
-			fmt.Errorf("%w: %w", errFetchManifestFailed, err)
+		return nil, fmt.Errorf("%w: %w", errFetchManifestFailed, err)
 	}
 
-	// Parse the URL.
 	parsedURL, err := url.Parse(manifestURLStr)
 	if err != nil {
-		return "",
-			"",
-			nil,
-			fmt.Errorf(
-				"%w: failed to parse manifest URL: %w",
-				errFetchManifestFailed,
-				err,
-			)
+		return nil, fmt.Errorf("%w: failed to parse manifest URL: %w", errFetchManifestFailed, err)
 	}
 
-	originalHost := parsedURL.Host
-
-	if hostOverride != "" {
-		parsedURL.Host = hostOverride
-		manifestURLStr = parsedURL.String()
-	}
-
-	return manifestURLStr, originalHost, parsedURL, nil
+	return parsedURL, nil
 }
 
 // fetchManifestAcrossHosts fetches manifest bytes from the registry with host-based retry.
 //
-// It iterates through candidate hosts (primary, challenge, original) and returns the
-// raw response body on the first successful HTTP 200. On 401/404, it advances to the
-// next host. The response body is size-limited to maxManifestSize.
+// It requests the manifest from the host in parsedURL. When that host answers
+// 401 or 404 and differs from originalHost, it retries once on originalHost.
 //
 // Parameters:
 //   - ctx: Context for cancellation and timeout control.
 //   - client: HTTP client for registry requests.
 //   - limiter: Rate limiter shared by registry requests.
-//   - parsedURL: Parsed manifest URL used as the base for host substitution.
-//   - manifestURL: Original manifest URL string (to avoid redundant re-fetch).
+//   - parsedURL: Parsed manifest URL, on the redirect host when there is one.
 //   - token: Authentication token for the Authorization header.
-//   - challengeHost: Registry challenge host for fallback.
 //   - originalHost: The true original registry host before any redirects.
 //   - limitKey: Rate-limit host key from [ratelimit.Scope].
 //   - fields: Logging fields for context.
 //
 // Returns:
 //   - []byte: Raw manifest response body bytes.
-//   - string: The winning host that served the manifest.
+//   - *url.URL: The manifest URL that served the manifest.
 //   - string: The HTTP Content-Type header value from the response.
-//   - error: Non-nil if all hosts fail or body exceeds size limit.
+//   - error: Non-nil if the request fails on every host tried.
 func fetchManifestAcrossHosts(log *zerolog.Logger,
 	ctx context.Context,
 	client auth.Client,
 	limiter *ratelimit.Limiter,
 	parsedURL *url.URL,
-	manifestURL, token, challengeHost, originalHost, limitKey string,
+	token, originalHost, limitKey string,
 	fields map[string]any,
-) ([]byte, string, string, error) {
-	// Use the provided originalHost for fallback. If empty, derive from parsedURL.
-	if originalHost == "" {
-		originalHost = parsedURL.Host
+) ([]byte, *url.URL, string, error) {
+	body, contentType, status, err := fetchManifest(log, ctx, client, limiter, parsedURL, token, limitKey, fields)
+	if err == nil {
+		return body, parsedURL, contentType, nil
 	}
 
-	if fields["original_host"] == nil {
-		fields["original_host"] = originalHost
+	if originalHost == parsedURL.Host || (status != http.StatusUnauthorized && status != http.StatusNotFound) {
+		return nil, nil, "", err
 	}
 
-	// Build list of hosts to try: primary (current), then challenge, then original.
-	type hostCandidate struct {
-		host string
-		name string
+	log.Debug().
+		Fields(fields).
+		Str("original_host", originalHost).
+		Msg("Manifest request failed on the redirect host, retrying on the original host")
+
+	originalURL := *parsedURL
+	originalURL.Host = originalHost
+
+	body, contentType, _, err = fetchManifest(log, ctx, client, limiter, &originalURL, token, limitKey, fields)
+	if err != nil {
+		return nil, nil, "", err
 	}
 
-	currentHost := parsedURL.Host
-
-	hosts := []hostCandidate{{host: currentHost, name: "primary"}}
-
-	// Add challenge host if different from current and available.
-	if challengeHost != "" && challengeHost != currentHost {
-		hosts = append(hosts, hostCandidate{host: challengeHost, name: "challenge"})
-	}
-
-	// Add original host if different from current and challenge.
-	if originalHost != currentHost && originalHost != challengeHost {
-		hosts = append(hosts, hostCandidate{host: originalHost, name: "original"})
-	}
-
-	var lastErr error
-
-	for i, candidate := range hosts {
-		// Build URL for this host attempt.
-		attemptURL := *parsedURL
-		attemptURL.Host = candidate.host
-		attemptManifestURL := attemptURL.String()
-
-		// Log the attempt when it goes to a host other than the manifest URL's.
-		if i > 0 || attemptManifestURL != manifestURL {
-			log.Debug().
-				Fields(fields).
-				Str("attempt_host", candidate.host).
-				Str("attempt_name", candidate.name).
-				Msg("Retrying manifest fetch on alternate host")
-		}
-
-		// Create the manifest request with broad Accept headers.
-		req, err := http.NewRequestWithContext(
-			ctx,
-			http.MethodGet,
-			attemptManifestURL,
-			nil,
-		)
-		if err != nil {
-			log.Debug().
-				Err(err).
-				Fields(fields).
-				Msg("Failed to create manifest request")
-
-			return nil,
-				"",
-				"",
-				fmt.Errorf(
-					"%w: %w",
-					errFetchManifestFailed,
-					err,
-				)
-		}
-
-		if token != "" {
-			req.Header.Set("Authorization", token)
-		}
-
-		// Accept all supported manifest types.
-		req.Header.Set("Accept", strings.Join([]string{
-			"application/vnd.oci.image.index.v1+json",
-			"application/vnd.docker.distribution.manifest.list.v2+json",
-			"application/vnd.oci.image.manifest.v1+json",
-			"application/vnd.docker.distribution.manifest.v2+json",
-		}, ", "))
-		req.Header.Set("User-Agent", meta.UserAgent)
-
-		resp, err := doRegistryRequest(log, ctx, client, limiter, req, limitKey)
-		if err != nil {
-			log.Debug().
-				Err(err).
-				Fields(fields).
-				Msg("Failed to execute manifest request")
-
-			if ratelimit.Is(err) {
-				return nil, "", "", err
-			}
-
-			return nil,
-				"",
-				"",
-				fmt.Errorf("%w: %w", errFetchManifestFailed, err)
-		}
-
-		if resp.StatusCode != http.StatusOK {
-			status := resp.StatusCode
-			resp.Body.Close()
-
-			if (status == http.StatusUnauthorized || status == http.StatusNotFound) &&
-				i < len(hosts)-1 {
-				log.Debug().
-					Fields(fields).
-					Int("status", status).
-					Str("host", candidate.host).
-					Msg("Manifest request failed, trying next host")
-
-				lastErr = fmt.Errorf(
-					"%w: status %d on %s",
-					errFetchManifestFailed,
-					status,
-					candidate.host,
-				)
-
-				continue
-			}
-
-			log.Debug().
-				Fields(fields).
-				Int("status", status).
-				Msg("Manifest request returned non-OK status")
-
-			return nil,
-				"",
-				"",
-				fmt.Errorf(
-					"%w: status %d",
-					errFetchManifestFailed,
-					status,
-				)
-		}
-
-		// Capture Content-Type header for media type fallback detection.
-		contentType := resp.Header.Get("Content-Type")
-
-		// Read the manifest body with a size limit to prevent unbounded memory allocation.
-		body, err := io.ReadAll(io.LimitReader(resp.Body, maxManifestSize+1))
-		resp.Body.Close()
-
-		if err != nil {
-			log.Debug().
-				Err(err).
-				Fields(fields).
-				Msg("Failed to read manifest response")
-
-			return nil,
-				"",
-				"",
-				fmt.Errorf("%w: %w", errFetchManifestFailed, err)
-		}
-
-		if len(body) > maxManifestSize {
-			log.Debug().
-				Fields(fields).
-				Int("size", len(body)).
-				Int("limit", maxManifestSize).
-				Msg("Manifest response exceeds size limit")
-
-			return nil,
-				"",
-				"",
-				fmt.Errorf(
-					"%w: %d bytes exceeds limit of %d bytes",
-					errManifestTooLarge,
-					len(body),
-					maxManifestSize,
-				)
-		}
-
-		return body, candidate.host, contentType, nil
-	}
-
-	// All hosts exhausted.
-	if lastErr != nil {
-		return nil, "", "", lastErr
-	}
-
-	return nil,
-		"",
-		"",
-		fmt.Errorf("%w: no hosts to try", errFetchManifestFailed)
+	return body, &originalURL, contentType, nil
 }
 
-// fetchManifestForAge fetches the image manifest and extracts the config digest.
-// It handles multi-platform indexes by selecting the platform-specific manifest.
+// fetchManifest fetches manifest bytes from the host in manifestURL.
 //
-// On 401/404 responses, it retries across alternate hosts (challenge host, original host)
-// mirroring the retry logic in digest.go's handleManifestResponse.
+// It returns the raw body of an HTTP 200. Any other status fails. A body over
+// 1 MiB fails too.
 //
 // Parameters:
 //   - ctx: Context for cancellation and timeout control.
 //   - client: HTTP client for registry requests.
 //   - limiter: Rate limiter shared by registry requests.
 //   - manifestURL: URL of the manifest to fetch.
+//   - token: Authentication token for the Authorization header.
+//   - limitKey: Rate-limit host key from [ratelimit.Scope].
+//   - fields: Logging fields for context.
+//
+// Returns:
+//   - []byte: Raw manifest response body bytes.
+//   - string: The HTTP Content-Type header value from the response.
+//   - int: The response status. Zero when no response arrived.
+//   - error: Non-nil unless a 200 response with a body of at most 1 MiB arrives.
+func fetchManifest(log *zerolog.Logger,
+	ctx context.Context,
+	client auth.Client,
+	limiter *ratelimit.Limiter,
+	manifestURL *url.URL,
+	token, limitKey string,
+	fields map[string]any,
+) ([]byte, string, int, error) {
+	req, err := makeManifestRequest(ctx, http.MethodGet, manifestURL.String(), token)
+	if err != nil {
+		log.Debug().
+			Err(err).
+			Fields(fields).
+			Msg("Failed to create manifest request")
+
+		return nil, "", 0, fmt.Errorf("%w: %w", errFetchManifestFailed, err)
+	}
+
+	resp, err := doRegistryRequest(log, ctx, client, limiter, req, limitKey)
+	if err != nil {
+		log.Debug().
+			Err(err).
+			Fields(fields).
+			Msg("Failed to execute manifest request")
+
+		if ratelimit.Is(err) {
+			return nil, "", 0, err
+		}
+
+		return nil, "", 0, fmt.Errorf("%w: %w", errFetchManifestFailed, err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		log.Debug().
+			Fields(fields).
+			Int("status", resp.StatusCode).
+			Str("host", manifestURL.Host).
+			Msg("Manifest request returned non-OK status")
+
+		return nil, "", resp.StatusCode, fmt.Errorf(
+			"%w: status %d on %s",
+			errFetchManifestFailed,
+			resp.StatusCode,
+			manifestURL.Host,
+		)
+	}
+
+	body, err := readManifestBody(resp.Body)
+	if err != nil {
+		log.Debug().
+			Err(err).
+			Fields(fields).
+			Msg("Failed to read manifest response")
+
+		return nil, "", resp.StatusCode, fmt.Errorf("%w: %w", errFetchManifestFailed, err)
+	}
+
+	return body, resp.Header.Get("Content-Type"), resp.StatusCode, nil
+}
+
+// fetchManifestForAge fetches the image manifest and extracts the config digest.
+// It handles multi-platform indexes by selecting the platform-specific manifest.
+//
+// On 401/404 responses from a redirect host, it retries on the original host.
+//
+// Parameters:
+//   - ctx: Context for cancellation and timeout control.
+//   - client: HTTP client for registry requests.
+//   - limiter: Rate limiter shared by registry requests.
 //   - token: Authentication token.
 //   - parsedURL: Parsed manifest URL.
 //   - targetOS: Target OS for platform selection (empty for runtime.GOOS).
 //   - targetArch: Target architecture for platform selection (empty for runtime.GOARCH).
 //   - targetVariant: Target variant for platform selection (empty for any variant).
-//   - challengeHost: Registry challenge host for fallback.
 //   - originalHost: The true original registry host before any redirects.
 //   - limitKey: Rate-limit host key from [ratelimit.Scope].
 //   - fields: Logging fields for context.
 //
 // Returns:
 //   - string: Config digest (e.g., "sha256:abc...").
+//   - *url.URL: The manifest URL that served the manifest.
 //   - error: Non-nil if fetch, parse, or platform selection fails.
 func fetchManifestForAge(log *zerolog.Logger,
 	ctx context.Context,
 	client auth.Client,
 	limiter *ratelimit.Limiter,
-	manifestURL, token string,
+	token string,
 	parsedURL *url.URL,
-	targetOS, targetArch, targetVariant, challengeHost, originalHost, limitKey string,
+	targetOS, targetArch, targetVariant, originalHost, limitKey string,
 	fields map[string]any,
-) (string, string, error) {
-	body, winningHost, contentType, err := fetchManifestAcrossHosts(log,
+) (string, *url.URL, error) {
+	body, servedURL, contentType, err := fetchManifestAcrossHosts(log,
 		ctx,
 		client,
 		limiter,
 		parsedURL,
-		manifestURL,
 		token,
-		challengeHost,
 		originalHost,
 		limitKey,
 		fields,
 	)
 	if err != nil {
-		return "", "", err
+		return "", nil, err
 	}
 
 	// Try to parse as image index (multi-platform).
@@ -621,26 +482,25 @@ func fetchManifestForAge(log *zerolog.Logger,
 	}
 
 	if idxErr == nil && isIndexMediaType(effectiveMediaType) {
-		// For multi-platform images, selectPlatformManifest performs its own
-		// host fallback internally. Build a parsedURL with the winning host so
-		// the platform-specific fetch starts from the correct origin.
-		effectiveURL := *parsedURL
-		effectiveURL.Host = winningHost
-
-		return selectPlatformManifest(log,
+		// The platform manifest is fetched from the host that served the index.
+		configDigest, err := selectPlatformManifest(log,
 			ctx,
 			client,
 			limiter,
 			index,
-			&effectiveURL,
+			servedURL,
 			token,
 			targetOS,
 			targetArch,
 			targetVariant,
-			challengeHost,
 			limitKey,
 			fields,
 		)
+		if err != nil {
+			return "", nil, err
+		}
+
+		return configDigest, servedURL, nil
 	}
 
 	// Parse as single-platform manifest.
@@ -653,9 +513,7 @@ func fetchManifestForAge(log *zerolog.Logger,
 			Fields(fields).
 			Msg("Failed to parse manifest JSON")
 
-		return "",
-			"",
-			fmt.Errorf("%w: %w", errFetchManifestFailed, err)
+		return "", nil, fmt.Errorf("%w: %w", errFetchManifestFailed, err)
 	}
 
 	if manifest.Config.Digest == "" {
@@ -663,10 +521,10 @@ func fetchManifestForAge(log *zerolog.Logger,
 			Fields(fields).
 			Msg("Manifest does not contain config digest")
 
-		return "", "", errNoConfigDigest
+		return "", nil, errNoConfigDigest
 	}
 
-	return manifest.Config.Digest, winningHost, nil
+	return manifest.Config.Digest, servedURL, nil
 }
 
 // selectPlatformCandidate filters the image index for matching platform entries
@@ -807,36 +665,30 @@ func selectPlatformCandidate(log *zerolog.Logger,
 	return selectedDigest, nil
 }
 
-// fetchPlatformManifestWithRetry fetches the platform-specific manifest by digest
-// with host-based retry on 401/404 responses.
-//
-// It constructs the platform manifest URL from the parsed base URL and selected digest,
-// then iterates through candidate hosts. On non-redirected registries, a special
-// challenge-host retry is attempted when the original host fails.
+// fetchPlatformManifest fetches the platform-specific manifest by digest from
+// the host in parsedURL and returns its config digest.
 //
 // Parameters:
 //   - ctx: Context for cancellation and timeout control.
 //   - client: HTTP client for registry requests.
 //   - limiter: Rate limiter shared by registry requests.
-//   - parsedURL: Parsed base manifest URL for path construction.
+//   - parsedURL: Parsed base manifest URL for the host and path.
 //   - token: Authentication token.
 //   - selectedDigest: Platform manifest digest to fetch.
-//   - challengeHost: Challenge host for fallback.
 //   - limitKey: Rate-limit host key from [ratelimit.Scope].
 //   - fields: Logging fields for context.
 //
 // Returns:
 //   - string: The config digest from the platform-specific manifest.
-//   - string: The host that successfully served the manifest.
-//   - error: Non-nil if all hosts fail.
-func fetchPlatformManifestWithRetry(log *zerolog.Logger,
+//   - error: Non-nil if the fetch fails or the manifest has no config digest.
+func fetchPlatformManifest(log *zerolog.Logger,
 	ctx context.Context,
 	client auth.Client,
 	limiter *ratelimit.Limiter,
 	parsedURL *url.URL,
-	token, selectedDigest, challengeHost, limitKey string,
+	token, selectedDigest, limitKey string,
 	fields map[string]any,
-) (string, string, error) {
+) (string, error) {
 	// Build URL path for platform-specific manifest.
 	idx := strings.LastIndex(parsedURL.Path, "/manifests/")
 
@@ -846,181 +698,42 @@ func fetchPlatformManifestWithRetry(log *zerolog.Logger,
 			Str("path", parsedURL.Path).
 			Msg("Could not find /manifests/ in URL path")
 
-		return "",
-			"",
-			fmt.Errorf(
-				"%w: malformed manifest URL path %q",
-				errFetchManifestFailed,
-				parsedURL.Path,
-			)
-	}
-
-	platformPathPrefix := parsedURL.Path[:idx+len("/manifests/")]
-
-	// Build list of hosts to try: the primary (current) host, then the challenge
-	// host when it differs.
-	// This mirrors the retry chain in digest.go's handleManifestResponse.
-	type hostCandidate struct {
-		host string
-		name string
-	}
-
-	hosts := []hostCandidate{{host: parsedURL.Host, name: "primary"}}
-
-	if challengeHost != "" && challengeHost != parsedURL.Host {
-		hosts = append(hosts, hostCandidate{host: challengeHost, name: "challenge"})
-	}
-
-	var lastErr error
-
-	for i, candidate := range hosts {
-		// Build platform URL for this host attempt.
-		attemptURL := *parsedURL
-		attemptURL.Host = candidate.host
-		attemptURL.Path = platformPathPrefix + selectedDigest
-
-		if i > 0 {
-			log.Debug().
-				Fields(fields).
-				Str("attempt_host", candidate.host).
-				Str("attempt_name", candidate.name).
-				Msg("Retrying platform manifest fetch on alternate host")
-		}
-
-		// Fetch the platform-specific manifest.
-		req, err := http.NewRequestWithContext(
-			ctx,
-			http.MethodGet,
-			attemptURL.String(),
-			nil,
+		return "", fmt.Errorf(
+			"%w: malformed manifest URL path %q",
+			errFetchManifestFailed,
+			parsedURL.Path,
 		)
-		if err != nil {
-			log.Debug().
-				Err(err).
-				Fields(fields).
-				Msg("Failed to create platform manifest request")
-
-			return "",
-				"",
-				fmt.Errorf(
-					"%w: %w",
-					errFetchManifestFailed,
-					err,
-				)
-		}
-
-		if token != "" {
-			req.Header.Set("Authorization", token)
-		}
-
-		req.Header.Set(
-			"Accept",
-			strings.Join(
-				[]string{
-					"application/vnd.oci.image.manifest.v1+json",
-					"application/vnd.docker.distribution.manifest.v2+json",
-				},
-				", ",
-			),
-		)
-		req.Header.Set("User-Agent", meta.UserAgent)
-
-		resp, err := doRegistryRequest(log, ctx, client, limiter, req, limitKey)
-		if err != nil {
-			log.Debug().
-				Err(err).
-				Fields(fields).
-				Msg("Failed to execute platform manifest request")
-
-			if ratelimit.Is(err) {
-				return "", "", err
-			}
-
-			return "",
-				"",
-				fmt.Errorf(
-					"%w: %w",
-					errFetchManifestFailed,
-					err,
-				)
-		}
-
-		if resp.StatusCode != http.StatusOK {
-			status := resp.StatusCode
-			resp.Body.Close()
-
-			// Retry on 401/404 if there are more hosts to try.
-			if (status == http.StatusUnauthorized || status == http.StatusNotFound) &&
-				i < len(hosts)-1 {
-				log.Debug().
-					Fields(fields).
-					Int("status", status).
-					Str("host", candidate.host).
-					Msg("Platform manifest request failed, trying next host")
-
-				lastErr = fmt.Errorf(
-					"%w: status %d on %s",
-					errFetchManifestFailed,
-					status,
-					candidate.host,
-				)
-
-				continue
-			}
-
-			log.Debug().
-				Fields(fields).
-				Int("status", status).
-				Msg("Platform manifest request returned non-OK status")
-
-			return "",
-				"",
-				fmt.Errorf(
-					"%w: status %d",
-					errFetchManifestFailed,
-					status,
-				)
-		}
-
-		var manifest imageManifest
-
-		err = json.NewDecoder(io.LimitReader(resp.Body, maxManifestSize)).Decode(&manifest)
-		resp.Body.Close()
-
-		if err != nil {
-			log.Debug().
-				Err(err).
-				Fields(fields).
-				Msg("Failed to parse platform manifest JSON")
-
-			return "",
-				"",
-				fmt.Errorf(
-					"%w: %w",
-					errFetchManifestFailed,
-					err,
-				)
-		}
-
-		if manifest.Config.Digest == "" {
-			log.Debug().
-				Fields(fields).
-				Msg("Platform manifest does not contain config digest")
-
-			return "", "", errNoConfigDigest
-		}
-
-		return manifest.Config.Digest, candidate.host, nil
 	}
 
-	// All hosts exhausted.
-	if lastErr != nil {
-		return "", "", lastErr
+	platformURL := *parsedURL
+	platformURL.Path = parsedURL.Path[:idx+len("/manifests/")] + selectedDigest
+
+	body, _, _, err := fetchManifest(log, ctx, client, limiter, &platformURL, token, limitKey, fields)
+	if err != nil {
+		return "", err
 	}
 
-	return "",
-		"",
-		fmt.Errorf("%w: no hosts to try", errFetchManifestFailed)
+	var manifest imageManifest
+
+	err = json.Unmarshal(body, &manifest)
+	if err != nil {
+		log.Debug().
+			Err(err).
+			Fields(fields).
+			Msg("Failed to parse platform manifest JSON")
+
+		return "", fmt.Errorf("%w: %w", errFetchManifestFailed, err)
+	}
+
+	if manifest.Config.Digest == "" {
+		log.Debug().
+			Fields(fields).
+			Msg("Platform manifest does not contain config digest")
+
+		return "", errNoConfigDigest
+	}
+
+	return manifest.Config.Digest, nil
 }
 
 // selectPlatformManifest selects the platform-specific manifest from an image index
@@ -1030,9 +743,6 @@ func fetchPlatformManifestWithRetry(log *zerolog.Logger,
 // allowing cross-platform monitoring via environment variables or configuration overrides.
 // If targetVariant is specified, it will be used to disambiguate when multiple entries
 // match the same OS/architecture with different variants.
-//
-// On 401/404 responses, it retries on the challenge host mirroring the retry logic
-// in digest.go's handleManifestResponse.
 //
 // Parameters:
 //   - ctx: Context for cancellation and timeout control.
@@ -1044,13 +754,11 @@ func fetchPlatformManifestWithRetry(log *zerolog.Logger,
 //   - targetOS: Target OS for platform selection (empty for runtime.GOOS).
 //   - targetArch: Target architecture for platform selection (empty for runtime.GOARCH).
 //   - targetVariant: Target variant for platform selection (empty for any variant).
-//   - challengeHost: Challenge host from auth (empty if not applicable).
 //   - limitKey: Rate-limit host key from [ratelimit.Scope].
 //   - fields: Logging fields.
 //
 // Returns:
 //   - string: The config digest from the platform-specific manifest.
-//   - string: The host that successfully served the manifest.
 //   - error: Non-nil if selection or fetching fails.
 func selectPlatformManifest(
 	log *zerolog.Logger,
@@ -1060,9 +768,9 @@ func selectPlatformManifest(
 	index imageIndex,
 	parsedURL *url.URL,
 	token string,
-	targetOS, targetArch, targetVariant, challengeHost, limitKey string,
+	targetOS, targetArch, targetVariant, limitKey string,
 	fields map[string]any,
-) (string, string, error) {
+) (string, error) {
 	// Use runtime defaults if no override is specified.
 	if targetOS == "" {
 		targetOS = runtime.GOOS
@@ -1080,17 +788,16 @@ func selectPlatformManifest(
 		fields,
 	)
 	if err != nil {
-		return "", "", err
+		return "", err
 	}
 
-	return fetchPlatformManifestWithRetry(log,
+	return fetchPlatformManifest(log,
 		ctx,
 		client,
 		limiter,
 		parsedURL,
 		token,
 		selectedDigest,
-		challengeHost,
 		limitKey,
 		fields,
 	)

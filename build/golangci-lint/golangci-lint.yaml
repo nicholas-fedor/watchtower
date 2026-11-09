@@ -323,10 +323,6 @@ linters:
         linters:
           - gocyclo
         text: "of func `restartStaleContainer` is high"
-      - path: "internal/registry/digest/digest.go"
-        linters:
-          - gocyclo
-        text: "of func `handleManifestResponse` is high"
       - path: "internal/container/filters/filters.go"
         linters:
           - gocyclo

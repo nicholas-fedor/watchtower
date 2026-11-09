@@ -265,19 +265,68 @@ func TestFetchImageCreationTime_BearerToken(t *testing.T) {
 	}, registry.served())
 }
 
-// TestFetchImageCreationTime_ChallengeHostFallback verifies that when the
-// registry does not serve the image but its bearer realm is on another host,
-// the manifests and the config blob are fetched from the realm's host.
-func TestFetchImageCreationTime_ChallengeHostFallback(t *testing.T) {
-	realm := newFakeRegistry(t)
-	realm.handle("/token", tokenEndpoint())
-	realm.handle(fakeManifestTagPath, requireBearer(platformIndex()))
-	realm.handle(fakeRepositoryPath+"/manifests/"+fakeRuntimeManifest,
-		requireBearer(singlePlatformManifest(fakeConfigDigest)))
-	realm.handle(fakeRepositoryPath+"/blobs/"+fakeConfigDigest, requireBearer(configBlob(testCreatedTimestamp)))
+// TestFetchImageCreationTime_TokenHostGetsNoManifestRequest verifies that a
+// manifest the image registry does not serve is never requested from the
+// bearer realm's host, which only issues tokens.
+//
+// The fetch fails because the registry lacks the manifest.
+func TestFetchImageCreationTime_TokenHostGetsNoManifestRequest(t *testing.T) {
+	tagRequest := "GET " + fakeManifestTagPath + " (authorized)"
+	platformRequest := "GET " + fakeRepositoryPath + "/manifests/" + fakeRuntimeManifest + " (authorized)"
+
+	tests := []struct {
+		name string
+		// servesIndex makes the registry serve the tag's index. Only the
+		// platform manifest is then missing.
+		servesIndex bool
+	}{
+		{name: "tag manifest missing"},
+		{name: "platform manifest missing", servesIndex: true},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// The realm could serve every request. A request to it would succeed.
+			realm := newFakeRegistry(t)
+			realm.handle("/token", tokenEndpoint())
+			realm.handle(fakeManifestTagPath, requireBearer(platformIndex()))
+			realm.handle(fakeRepositoryPath+"/manifests/"+fakeRuntimeManifest,
+				requireBearer(singlePlatformManifest(fakeConfigDigest)))
+			realm.handle(fakeRepositoryPath+"/blobs/"+fakeConfigDigest, requireBearer(configBlob(testCreatedTimestamp)))
+
+			registry := newFakeRegistry(t)
+			registry.handle("/v2/", bearerChallenge(realm))
+
+			if tt.servesIndex {
+				registry.handle(fakeManifestTagPath, requireBearer(platformIndex()))
+			}
+
+			_, err := fetchCreated(t, registry, "library/app:1.0")
+			require.ErrorIs(t, err, errFetchManifestFailed)
+
+			wantServed := []string{"GET /v2/", tagRequest}
+			if tt.servesIndex {
+				wantServed = append(wantServed, platformRequest)
+			}
+
+			assert.Equal(t, wantServed, registry.served())
+			assert.Equal(t, []string{"GET /token"}, realm.served())
+		})
+	}
+}
+
+// TestFetchImageCreationTime_RedirectHostFallsBackToOriginal verifies that
+// when the registry's challenge redirects to another host, a manifest that
+// host does not serve is fetched from the image registry with the same token.
+func TestFetchImageCreationTime_RedirectHostFallsBackToOriginal(t *testing.T) {
+	redirectHost := newFakeRegistry(t)
+	redirectHost.handle("/v2/", bearerChallenge(redirectHost))
+	redirectHost.handle("/token", tokenEndpoint())
 
 	registry := newFakeRegistry(t)
-	registry.handle("/v2/", bearerChallenge(realm))
+	registry.handle("/v2/", challengeRedirectHandler(t, redirectHost.host()))
+	registry.handle(fakeManifestTagPath, requireBearer(singlePlatformManifest(fakeConfigDigest)))
+	registry.handle(fakeRepositoryPath+"/blobs/"+fakeConfigDigest, requireBearer(configBlob(testCreatedTimestamp)))
 
 	created, err := fetchCreated(t, registry, "library/app:1.0")
 	require.NoError(t, err)
@@ -285,14 +334,14 @@ func TestFetchImageCreationTime_ChallengeHostFallback(t *testing.T) {
 
 	assert.Equal(t, []string{
 		"GET /v2/",
-		"GET " + fakeManifestTagPath + " (authorized)",
-	}, registry.served(), "the image registry only answers the challenge and the first manifest request")
-	assert.Equal(t, []string{
 		"GET /token",
 		"GET " + fakeManifestTagPath + " (authorized)",
-		"GET " + fakeRepositoryPath + "/manifests/" + fakeRuntimeManifest + " (authorized)",
+	}, redirectHost.served())
+	assert.Equal(t, []string{
+		"GET /v2/",
+		"GET " + fakeManifestTagPath + " (authorized)",
 		"GET " + fakeRepositoryPath + "/blobs/" + fakeConfigDigest + " (authorized)",
-	}, realm.served())
+	}, registry.served())
 }
 
 // TestFetchImageCreationTime_PlatformManifestMissingOnSameHost verifies that
@@ -453,34 +502,4 @@ func TestFetchImageCreationTime_BlobRedirect(t *testing.T) {
 	assert.True(t, mustParseTime(t, testCreatedTimestamp).Equal(created))
 
 	assert.Equal(t, []string{"GET /blobs/config"}, storage.served())
-}
-
-// TestFetchImageCreationTime_PlatformManifestOnChallengeHost verifies that a
-// platform manifest missing from the image registry is fetched from the bearer
-// realm's host, along with its config blob.
-func TestFetchImageCreationTime_PlatformManifestOnChallengeHost(t *testing.T) {
-	realm := newFakeRegistry(t)
-	realm.handle("/token", tokenEndpoint())
-	realm.handle(fakeRepositoryPath+"/manifests/"+fakeRuntimeManifest,
-		requireBearer(singlePlatformManifest(fakeConfigDigest)))
-	realm.handle(fakeRepositoryPath+"/blobs/"+fakeConfigDigest, requireBearer(configBlob(testCreatedTimestamp)))
-
-	registry := newFakeRegistry(t)
-	registry.handle("/v2/", bearerChallenge(realm))
-	registry.handle(fakeManifestTagPath, requireBearer(platformIndex()))
-
-	created, err := fetchCreated(t, registry, "library/app:1.0")
-	require.NoError(t, err)
-	assert.True(t, mustParseTime(t, testCreatedTimestamp).Equal(created))
-
-	assert.Equal(t, []string{
-		"GET /v2/",
-		"GET " + fakeManifestTagPath + " (authorized)",
-		"GET " + fakeRepositoryPath + "/manifests/" + fakeRuntimeManifest + " (authorized)",
-	}, registry.served())
-	assert.Equal(t, []string{
-		"GET /token",
-		"GET " + fakeRepositoryPath + "/manifests/" + fakeRuntimeManifest + " (authorized)",
-		"GET " + fakeRepositoryPath + "/blobs/" + fakeConfigDigest + " (authorized)",
-	}, realm.served())
 }

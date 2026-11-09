@@ -339,7 +339,7 @@ func lookupAnonymousGHCRToken(log *zerolog.Logger) (string, bool) {
 //   - endpoint: Optional registry mirror override. Empty uses the canonical host.
 //
 // Returns:
-//   - TokenResult: Cached token and ghcr.io challenge host when skipping.
+//   - TokenResult: Cached token when skipping.
 //   - bool: True when the caller may skip the /v2/ challenge.
 func cachedAnonymousGHCRToken(
 	log *zerolog.Logger,
@@ -361,8 +361,9 @@ func cachedAnonymousGHCRToken(
 	}
 
 	return TokenResult{
-		Token:         token,
-		ChallengeHost: hosts.GitHubRegistryDomain,
+		Token:        token,
+		RedirectHost: "",
+		Redirected:   false,
 	}, true
 }
 

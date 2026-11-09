@@ -14,6 +14,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"github.com/nicholas-fedor/watchtower/internal/registry/auth"
 	"github.com/nicholas-fedor/watchtower/internal/registry/ratelimit"
 	registryConfig "github.com/nicholas-fedor/watchtower/internal/settings/config/registry"
 )
@@ -252,38 +253,50 @@ func FuzzBuildManifestURLForImage(f *testing.F) {
 }
 
 // FuzzHandleManifestResponse checks that a manifest response leads to exactly
-// one outcome: a retry with a new URL, a digest, or an error that is an
-// invalid registry response or a rate limit.
+// one outcome.
 //
-// The seeds cover HEAD and GET successes with digest headers and JSON bodies,
-// redirects with valid and invalid locations, missing and malformed digests,
-// 401, 404, and 500 statuses, and redirected and original hosts.
+// The outcome is one of these:
+//   - a retry with a new URL
+//   - a digest
+//   - an error for an invalid registry response, a refused repository or a
+//     rate limit
+//
+// The seeds cover these responses:
+//   - HEAD and GET successes with digest headers and JSON bodies
+//   - redirects with valid and invalid locations
+//   - missing and malformed digests
+//   - 401, 404, 429 and 500 statuses, with refused and rejected-token challenges
+//   - redirected and original hosts
 func FuzzHandleManifestResponse(f *testing.F) {
-	f.Add(200, "HEAD", "example.com", "challenge.com", "example.com",
+	f.Add(200, "HEAD", "example.com", "example.com",
 		"sha256:d68e1e532088964195ad3a0a71526bc2f11a78de0def85629beb75e2265f0547", false)
-	f.Add(200, "GET", "example.com", "", "example.com", `{"digest": "sha256:abc123"}`, true)
-	f.Add(302, "HEAD", "example.com", "challenge.com", "example.com",
+	f.Add(200, "GET", "example.com", "example.com", `{"digest": "sha256:abc123"}`, true)
+	f.Add(302, "HEAD", "example.com", "example.com",
 		"https://redirect.example.com/v2/repo/manifests/tag", false)
-	f.Add(200, "HEAD", "example.com", "", "example.com", "", false)
-	f.Add(200, "HEAD", "example.com", "", "example.com", "invalid-digest", false)
-	f.Add(200, "HEAD", "example.com", "", "example.com", "sha256:", false)
-	f.Add(200, "HEAD", "example.com", "", "example.com", "sha256:short", false)
-	f.Add(404, "HEAD", "example.com", "", "example.com", "", false)
-	f.Add(500, "GET", "example.com", "", "example.com", "", false)
-	f.Add(301, "HEAD", "example.com", "", "example.com", "invalid://url", false)
-	f.Add(302, "HEAD", "example.com", "challenge.com", "example.com", "", true)
-	f.Add(401, "HEAD", "example.com", "challenge.com", "challenge.com", "", false)
-	f.Add(404, "HEAD", "example.com", "challenge.com", "challenge.com", "", false)
-	f.Add(429, "GET", "example.com", "", "example.com", "", false)
+	f.Add(200, "HEAD", "example.com", "example.com", "", false)
+	f.Add(200, "HEAD", "example.com", "example.com", "invalid-digest", false)
+	f.Add(200, "HEAD", "example.com", "example.com", "sha256:", false)
+	f.Add(200, "HEAD", "example.com", "example.com", "sha256:short", false)
+	f.Add(404, "HEAD", "example.com", "example.com", "", false)
+	f.Add(500, "GET", "example.com", "example.com", "", false)
+	f.Add(301, "HEAD", "example.com", "example.com", "invalid://url", false)
+	f.Add(302, "HEAD", "example.com", "example.com", "", true)
+	f.Add(401, "GET", "example.com", "redirect.example.com", "", true)
+	f.Add(404, "GET", "example.com", "redirect.example.com", "", true)
+	f.Add(429, "GET", "example.com", "example.com", "", false)
+	f.Add(401, "HEAD", "example.com", "example.com", `Bearer realm="https://auth.example.com/token",error="insufficient_scope"`, false)
+	f.Add(401, "GET", "example.com", "example.com", `Bearer realm="https://auth.example.com/token",error="invalid_token"`, false)
 
 	f.Fuzz(func(
 		t *testing.T,
 		statusCode int,
-		method, originalHost, challengeHost, currentHost, headerValue string,
+		method, originalHost, currentHost, headerValue string,
 		redirected bool,
 	) {
-		parsedURL, err := url.Parse("https://example.com/v2/test/manifests/latest")
-		require.NoError(t, err)
+		parsedURL, err := url.Parse("https://" + currentHost + "/v2/test/manifests/latest")
+		if err != nil || parsedURL.Host != currentHost {
+			t.Skip("the current host is not a URL host")
+		}
 
 		resp := &http.Response{
 			StatusCode: statusCode,
@@ -292,9 +305,12 @@ func FuzzHandleManifestResponse(f *testing.F) {
 			Request:    &http.Request{URL: parsedURL},
 		}
 
-		if statusCode >= 300 && statusCode < 400 {
+		switch {
+		case statusCode >= 300 && statusCode < 400:
 			resp.Header.Set("Location", headerValue)
-		} else {
+		case statusCode == http.StatusUnauthorized:
+			resp.Header.Set("WWW-Authenticate", headerValue)
+		default:
 			resp.Header.Set(ContentDigestHeader, headerValue)
 
 			if method == http.MethodGet && strings.HasPrefix(headerValue, "{") {
@@ -304,7 +320,7 @@ func FuzzHandleManifestResponse(f *testing.F) {
 		}
 
 		digest, manifestURL, retry, err := handleManifestResponse(newNopLogger(), resp,
-			method, originalHost, challengeHost, redirected, parsedURL, currentHost)
+			method, originalHost, redirected, parsedURL)
 
 		switch {
 		case retry:
@@ -313,8 +329,16 @@ func FuzzHandleManifestResponse(f *testing.F) {
 			assert.NotEmpty(t, manifestURL)
 		case err != nil:
 			assert.True(t,
-				errors.Is(err, errInvalidRegistryResponse) || errors.Is(err, ratelimit.ErrRateLimited),
+				errors.Is(err, errInvalidRegistryResponse) || errors.Is(err, errRepositoryDenied) ||
+					errors.Is(err, ratelimit.ErrRateLimited),
 				"unexpected error: %v", err)
+
+			// Only a 401 whose challenge refuses the scope is a refusal.
+			if errors.Is(err, errRepositoryDenied) {
+				assert.Equal(t, http.StatusUnauthorized, statusCode)
+				assert.True(t, auth.IsRepositoryRefusal(resp), "a refusal without insufficient_scope")
+			}
+
 			assert.Empty(t, digest)
 			assert.Empty(t, manifestURL)
 		default:

@@ -3,6 +3,7 @@ package auth
 import (
 	"errors"
 	"fmt"
+	"net/http"
 	"net/url"
 	"strings"
 
@@ -23,9 +24,15 @@ var (
 
 // challengeValues holds the parsed components of a WWW-Authenticate Bearer challenge.
 type challengeValues struct {
-	realm   string
+	// realm is the token endpoint URL.
+	realm string
+	// service is the service name the token is requested for.
 	service string
-	scope   string
+	// scope is the scope the registry asks the token to grant.
+	scope string
+	// errorCode is the RFC 6750 error code, such as insufficient_scope. It is
+	// empty when the challenge names no error.
+	errorCode string
 }
 
 // parseChallenge parses a Bearer challenge header into its components.
@@ -40,7 +47,7 @@ type challengeValues struct {
 //   - header: The raw WWW-Authenticate header value.
 //
 // Returns:
-//   - challengeValues: Parsed realm, service, and scope values.
+//   - challengeValues: Parsed realm, service, scope and error values.
 func parseChallenge(header string) challengeValues {
 	trimmed := strings.TrimSpace(header)
 	lowered := strings.ToLower(trimmed)
@@ -73,11 +80,43 @@ func parseChallenge(header string) challengeValues {
 				values.service = strings.Trim(val, `"`)
 			case "scope":
 				values.scope = strings.Trim(val, `"`)
+			case "error":
+				values.errorCode = strings.Trim(val, `"`)
 			}
 		}
 	}
 
 	return values
+}
+
+// IsRepositoryRefusal reports whether a registry response refuses the
+// requested repository.
+//
+// A refusal is a 401 whose Bearer challenge reports the RFC 6750
+// insufficient_scope error. Docker Hub answers this way for a repository it
+// does not have, with or without credentials. Any other 401, such as one for
+// an expired or invalid token, says nothing about the repository. Every
+// WWW-Authenticate header line is checked, since a response can carry a Bearer
+// challenge after another scheme's.
+//
+// Parameters:
+//   - resp: Registry response to inspect.
+//
+// Returns:
+//   - bool: True when the response is a 401 with an insufficient_scope Bearer
+//     challenge.
+func IsRepositoryRefusal(resp *http.Response) bool {
+	if resp.StatusCode != http.StatusUnauthorized {
+		return false
+	}
+
+	for _, challenge := range resp.Header.Values(challengeHeaderName) {
+		if parseChallenge(challenge).errorCode == "insufficient_scope" {
+			return true
+		}
+	}
+
+	return false
 }
 
 // splitQuoted splits a string by a delimiter rune without splitting on

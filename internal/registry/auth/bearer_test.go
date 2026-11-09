@@ -1070,7 +1070,7 @@ func Test_cachedAnonymousGHCRToken(t *testing.T) {
 				return
 			}
 
-			assert.Equal(t, TokenResult{Token: testAnonymousGHCRToken, ChallengeHost: "ghcr.io"}, got)
+			assert.Equal(t, TokenResult{Token: testAnonymousGHCRToken}, got)
 		})
 	}
 }

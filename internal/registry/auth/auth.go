@@ -38,8 +38,6 @@ var ErrMissingRegistryHost = errors.New("image reference names no registry host"
 type TokenResult struct {
 	// Token is the authentication token (for example "Basic ..." or "Bearer ...").
 	Token string
-	// ChallengeHost is the challenge host (for example "ghcr.io"), empty if not applicable.
-	ChallengeHost string
 	// RedirectHost is the final host after redirects, empty if not redirected.
 	RedirectHost string
 	// Redirected is true if the challenge request was redirected.
@@ -242,13 +240,12 @@ func getChallengeRequest(log *zerolog.Logger, ctx context.Context, challengeURL 
 //   - redirectHost: The final host after redirects.
 //
 // Returns:
-//   - TokenResult: Result with empty token and no challenge host.
+//   - TokenResult: Result with an empty token.
 func handleSuccessfulChallenge(redirected bool, redirectHost string) TokenResult {
 	return TokenResult{
-		Redirected:    redirected,
-		RedirectHost:  redirectHost,
-		ChallengeHost: "",
-		Token:         "",
+		Redirected:   redirected,
+		RedirectHost: redirectHost,
+		Token:        "",
 	}
 }
 
@@ -307,10 +304,9 @@ func handleBasicAuthChallenge(
 	log.Debug().Msg("Using Basic auth")
 
 	return TokenResult{
-		Token:         "Basic " + registryAuth,
-		ChallengeHost: "",
-		Redirected:    redirected,
-		RedirectHost:  redirectHost,
+		Token:        "Basic " + registryAuth,
+		Redirected:   redirected,
+		RedirectHost: redirectHost,
 	}, nil
 }
 
@@ -477,28 +473,6 @@ func handleBearerAuth(
 		return TokenResult{}, fmt.Errorf("%w: %w", errFailedParseImageName, err)
 	}
 
-	authURL, err := getAuthURL(
-		log,
-		strings.ToLower(wwwAuthHeader),
-		normalizedRef,
-		registryAuth,
-		settings,
-	)
-	if err != nil {
-		log.Debug().
-			Err(err).
-			Msg("Failed to construct bearer auth URL")
-
-		return TokenResult{}, fmt.Errorf("%w: %w", errFailedConstructBearerAuthURL, err)
-	}
-
-	challengeHost := authURL.Host
-	if challengeHost != "" {
-		log.Debug().
-			Str("challenge_host", challengeHost).
-			Msg("Extracted challenge host")
-	}
-
 	token, err := getBearerToken(
 		log,
 		ctx,
@@ -525,20 +499,14 @@ func handleBearerAuth(
 		)
 	}
 
-	log.Debug().
-		Bool("token_present", token != "").
-		Str("challenge_host", challengeHost).
-		Msg("Returning Bearer token and challenge host")
-
 	return TokenResult{
-		Token:         token,
-		ChallengeHost: challengeHost,
-		Redirected:    redirected,
-		RedirectHost:  redirectHost,
+		Token:        token,
+		Redirected:   redirected,
+		RedirectHost: redirectHost,
 	}, nil
 }
 
-// GetToken fetches a token and the challenge host for the registry hosting the provided image.
+// GetToken fetches a token for the registry hosting the provided image.
 //
 // When endpoint is non-empty, it is used as the registry host for the challenge URL
 // instead of the canonical registry host. This enables digest checks against configured
@@ -557,7 +525,7 @@ func handleBearerAuth(
 //   - endpoint: Optional registry host override (for example a mirror address). Empty uses the canonical host.
 //
 // Returns:
-//   - TokenResult: Authentication result containing token, challenge host, and redirect info.
+//   - TokenResult: Authentication result containing the token and redirect info.
 //   - error: Non-nil if operation fails, nil on success.
 func GetToken(
 	log *zerolog.Logger,
@@ -589,7 +557,6 @@ func GetToken(
 	)
 	if ok {
 		clog.Debug().
-			Str("challenge_host", result.ChallengeHost).
 			Msg("Using cached anonymous GHCR token, skipping challenge")
 
 		return result, nil

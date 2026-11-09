@@ -53,8 +53,9 @@ var errFetchTagDigest = errors.New("failed to fetch candidate tag digest")
 // It is an interface so callers can substitute a spy and assert that a default
 // session never reaches the registry.
 type Fetcher interface {
-	// FetchDigestForTag returns the normalized digest of tag, or empty when the
-	// tag does not exist.
+	// FetchDigestForTag returns the normalized digest of tag. It returns empty
+	// with no error when the registry reports that the tag does not exist. It
+	// returns an error when the lookup cannot tell.
 	FetchDigestForTag(
 		log *zerolog.Logger,
 		ctx context.Context,
@@ -86,7 +87,10 @@ type Resolver struct {
 	now func() time.Time
 
 	// cache maps a cache key to a cached answer. A zero expiry never lapses.
-	cache sync.Map
+	cache map[string]cachedAnswer
+
+	// mu guards cache, so an expired answer is read and removed in one step.
+	mu sync.Mutex
 }
 
 // cachedAnswer is one cached release tag result.
@@ -130,7 +134,7 @@ type probeResult struct {
 // Returns:
 //   - *Resolver: Resolver ready for use.
 func NewResolver(fetcher Fetcher) *Resolver {
-	return &Resolver{fetcher: fetcher, now: time.Now}
+	return &Resolver{fetcher: fetcher, now: time.Now, cache: map[string]cachedAnswer{}}
 }
 
 // NewDigestFetcher returns a DigestFetcher that makes registry requests with
@@ -293,8 +297,8 @@ func (r *Resolver) sweep(
 	switch outcome.outcome {
 	case outcomeMatched, outcomeNoMatch:
 		// A match and a clean sweep that found nothing are both final answers, so
-		// cache them indefinitely. That keeps a latest-only mirror from being
-		// asked again for every sibling container.
+		// cache them for the life of the Resolver. That keeps a latest-only mirror
+		// from being asked again for every sibling container.
 		r.storeAnswer(key, cachedAnswer{tag: outcome.tag})
 	case outcomeRateLimited:
 		// Every sibling on this host would be refused too, so remember the
@@ -358,8 +362,9 @@ func tagCandidates(version string) []string {
 //   - endpoints: Optional registry mirror host overrides to try before the canonical host.
 //
 // Returns:
-//   - string: The normalized digest, or empty when the tag does not exist.
-//   - error: Non-nil if the request fails, nil on success.
+//   - string: The normalized digest, or empty when the registry answers 404
+//     for the tag.
+//   - error: Non-nil if the request fails or the registry gives no digest.
 func (f DigestFetcher) FetchDigestForTag(
 	log *zerolog.Logger,
 	ctx context.Context,
@@ -496,7 +501,10 @@ func (r *Resolver) clock() func() time.Time {
 // Returns:
 //   - none.
 func (r *Resolver) storeAnswer(key string, answer cachedAnswer) {
-	r.cache.Store(key, answer)
+	r.mu.Lock()
+	defer r.mu.Unlock()
+
+	r.cache[key] = answer
 }
 
 // loadAnswer returns a cached result, discarding one that has lapsed.
@@ -508,18 +516,16 @@ func (r *Resolver) storeAnswer(key string, answer cachedAnswer) {
 //   - cachedAnswer: The remembered result.
 //   - bool: True when a live entry was found.
 func (r *Resolver) loadAnswer(key string) (cachedAnswer, bool) {
-	stored, ok := r.cache.Load(key)
+	r.mu.Lock()
+	defer r.mu.Unlock()
+
+	answer, ok := r.cache[key]
 	if !ok {
 		return cachedAnswer{}, false
 	}
 
-	answer, isCachedAnswer := stored.(cachedAnswer)
-	if !isCachedAnswer {
-		return cachedAnswer{}, false
-	}
-
-	if !answer.expires.IsZero() && r.clock()().After(answer.expires) {
-		r.cache.Delete(key)
+	if !answer.expires.IsZero() && !r.clock()().Before(answer.expires) {
+		delete(r.cache, key)
 
 		return cachedAnswer{}, false
 	}
