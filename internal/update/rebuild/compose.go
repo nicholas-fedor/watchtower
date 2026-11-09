@@ -406,7 +406,7 @@ func logComposeReplaced(log *zerolog.Logger, c *container.Container, item compos
 //   - c: Stale associated container.
 //   - item: Compose instance after apply.
 //   - params: Update parameters.
-//   - result: Monitor result used for stamps.
+//   - result: Monitor result whose commit and tag the report shows.
 //   - progress: Session progress, or nil.
 //   - log: Process logger.
 //
@@ -423,10 +423,6 @@ func (s *Session) recordCompose(
 	if !params.NoRestart && item.ID == "" {
 		return
 	}
-
-	assoc, _ := provenance.ResolveAssociation(c, params.Git)
-	provenance.ApplyGitAssociation(c, assoc)
-	provenance.ApplyGitStamp(c, result.Commit, result.Tag)
 
 	s.mu.Lock()
 	if params.NoRestart {

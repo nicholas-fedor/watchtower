@@ -1048,6 +1048,150 @@ func TestSession_applyCompose(t *testing.T) {
 	})
 }
 
+// TestSession_recordCompose pins what recording an applied Compose container
+// leaves for the rest of the session: the report fields for the container and
+// the session's applied and built records. The source container is never
+// recreated from, so these are the only outputs that matter.
+func TestSession_recordCompose(t *testing.T) {
+	t.Parallel()
+
+	const commit = "0123456789abcdef0123456789abcdef01234567"
+
+	type want struct {
+		gitRepo   string
+		gitRef    string
+		changelog string
+		newID     container.ContainerID
+		latestID  container.ImageID
+		applied   bool
+		built     container.ImageID
+		updated   bool
+	}
+
+	labeled := func() *container.Container {
+		return gitAssociatedContainer("api", "web-1", "webstack-api:latest", map[string]string{
+			labels.GitRepo: "https://user:secret@git.example.com/org/app.git",
+			labels.GitHost: "https://user:secret@git.example.com/gitea/",
+		})
+	}
+
+	mapped := func() *container.Container {
+		c := gitAssociatedContainer("api", "web-1", "webstack-api:latest", nil)
+		c.DeleteLabel(labels.GitRepo)
+		c.DeleteLabel(labels.GitRef)
+
+		return c
+	}
+
+	mapping := map[string]gitConfig.Image{
+		"webstack-api:latest": {Repo: "https://github.com/org/app.git", Ref: "release"},
+	}
+
+	tests := []struct {
+		name      string
+		source    func() *container.Container
+		noRestart bool
+		item      composeApply.Container
+		want      want
+	}{
+		{
+			name:   "label association, replaced",
+			source: labeled,
+			item:   composeApply.Container{Service: "api", ID: "new-api", ImageID: "sha256:api"},
+			want: want{
+				gitRepo:   "https://git.example.com/org/app.git",
+				gitRef:    "main",
+				changelog: "https://git.example.com/gitea/org/app/releases/tag/v1.2.3",
+				newID:     "new-api",
+				latestID:  "sha256:api",
+				applied:   true,
+				built:     "sha256:api",
+				updated:   true,
+			},
+		},
+		{
+			name:      "label association, no restart",
+			source:    labeled,
+			noRestart: true,
+			item:      composeApply.Container{Service: "api"},
+			want: want{
+				gitRepo:   "https://git.example.com/org/app.git",
+				gitRef:    "main",
+				changelog: "https://git.example.com/gitea/org/app/releases/tag/v1.2.3",
+				latestID:  "git:" + commit,
+				built:     "git:" + commit,
+			},
+		},
+		{
+			name:   "image mapping, replaced",
+			source: mapped,
+			item:   composeApply.Container{Service: "api", ID: "new-api", ImageID: "sha256:api"},
+			want: want{
+				gitRepo:   "https://github.com/org/app.git",
+				gitRef:    "release",
+				changelog: "https://github.com/org/app/releases/tag/v1.2.3",
+				newID:     "new-api",
+				latestID:  "sha256:api",
+				applied:   true,
+				built:     "sha256:api",
+				updated:   true,
+			},
+		},
+		{
+			name:      "image mapping, no restart",
+			source:    mapped,
+			noRestart: true,
+			item:      composeApply.Container{Service: "api", ImageID: "sha256:api"},
+			want: want{
+				gitRepo:   "https://github.com/org/app.git",
+				gitRef:    "release",
+				changelog: "https://github.com/org/app/releases/tag/v1.2.3",
+				latestID:  "sha256:api",
+				built:     "sha256:api",
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			sess := NewSession(gitTestClient(t))
+			c := tt.source()
+			c.SetStale(true)
+
+			params := updateParams.Params{
+				Git:       gitConfig.Defaults{Images: mapping, Enable: true},
+				NoRestart: tt.noRestart,
+
+				EnableChangelog: true,
+			}
+
+			progress := &state.Progress{}
+			progress.AddScanned(newTestLogger(t), c, container.ImageID("git:"+commit), params)
+
+			result := git.CheckResult{Stale: true, Commit: commit, Tag: "v1.2.3"}
+			sess.recordCompose(c, tt.item, params, result, progress, newTestLogger(t))
+
+			report := progress.Report(newTestLogger(t))
+			require.Len(t, report.Scanned(), 1)
+			status := report.Scanned()[0]
+
+			_, applied := sess.applied[c.ID()]
+			assert.Equal(t, tt.want, want{
+				gitRepo:   status.GitRepo(),
+				gitRef:    status.GitRef(),
+				changelog: status.Changelog(),
+				newID:     status.NewContainerID(),
+				latestID:  status.LatestImageID(),
+				applied:   applied,
+				built:     sess.built[c.ID()],
+				updated:   len(report.Updated()) == 1,
+			})
+		})
+	}
+}
+
 // Test_composeServiceLabels verifies the labels written onto Compose services,
 // including the redaction of credentials.
 func Test_composeServiceLabels(t *testing.T) {
