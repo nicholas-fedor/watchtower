@@ -245,7 +245,7 @@ func TestFetchImageCreationTime_PlatformSelection(t *testing.T) {
 // manifest and blob request.
 func TestFetchImageCreationTime_BearerToken(t *testing.T) {
 	registry := newFakeRegistry(t)
-	registry.handle("/v2/", bearerChallenge(registry))
+	registry.handle("/v2/", bearerChallenge(t, registry))
 	registry.handle("/token", tokenEndpoint())
 	registry.handle(fakeManifestTagPath, requireBearer(platformIndex()))
 	registry.handle(fakeRepositoryPath+"/manifests/"+fakeRuntimeManifest,
@@ -295,7 +295,7 @@ func TestFetchImageCreationTime_TokenHostGetsNoManifestRequest(t *testing.T) {
 			realm.handle(fakeRepositoryPath+"/blobs/"+fakeConfigDigest, requireBearer(configBlob(testCreatedTimestamp)))
 
 			registry := newFakeRegistry(t)
-			registry.handle("/v2/", bearerChallenge(realm))
+			registry.handle("/v2/", bearerChallenge(t, realm))
 
 			if tt.servesIndex {
 				registry.handle(fakeManifestTagPath, requireBearer(platformIndex()))
@@ -320,7 +320,7 @@ func TestFetchImageCreationTime_TokenHostGetsNoManifestRequest(t *testing.T) {
 // host does not serve is fetched from the image registry with the same token.
 func TestFetchImageCreationTime_RedirectHostFallsBackToOriginal(t *testing.T) {
 	redirectHost := newFakeRegistry(t)
-	redirectHost.handle("/v2/", bearerChallenge(redirectHost))
+	redirectHost.handle("/v2/", bearerChallenge(t, redirectHost))
 	redirectHost.handle("/token", tokenEndpoint())
 
 	registry := newFakeRegistry(t)
@@ -350,7 +350,7 @@ func TestFetchImageCreationTime_RedirectHostFallsBackToOriginal(t *testing.T) {
 // fails.
 func TestFetchImageCreationTime_PlatformManifestMissingOnSameHost(t *testing.T) {
 	registry := newFakeRegistry(t)
-	registry.handle("/v2/", bearerChallenge(registry))
+	registry.handle("/v2/", bearerChallenge(t, registry))
 	registry.handle("/token", tokenEndpoint())
 	registry.handle(fakeManifestTagPath, requireBearer(platformIndex()))
 
@@ -466,11 +466,15 @@ func TestFetchImageCreationTime_Failures(t *testing.T) {
 }
 
 // bearerChallenge returns a /v2/ handler that challenges for a token from the
-// realm served by realm.
-func bearerChallenge(realm *fakeRegistry) http.HandlerFunc {
+// realm served by realm. The challenge names t's own token service, so no other
+// test's cached token matches it.
+func bearerChallenge(t *testing.T, realm *fakeRegistry) http.HandlerFunc {
+	t.Helper()
+
+	challenge := fmt.Sprintf(`Bearer realm="%s/token",service=%q`, realm.server.URL, tokenService(t))
+
 	return func(w http.ResponseWriter, _ *http.Request) {
-		w.Header().Set("WWW-Authenticate",
-			fmt.Sprintf(`Bearer realm="%s/token",service="fake-registry"`, realm.server.URL))
+		w.Header().Set("WWW-Authenticate", challenge)
 		w.WriteHeader(http.StatusUnauthorized)
 	}
 }
@@ -489,7 +493,7 @@ func TestFetchImageCreationTime_BlobRedirect(t *testing.T) {
 	storage.handle("/blobs/config", configBlob(testCreatedTimestamp))
 
 	registry := newFakeRegistry(t)
-	registry.handle("/v2/", bearerChallenge(registry))
+	registry.handle("/v2/", bearerChallenge(t, registry))
 	registry.handle("/token", tokenEndpoint())
 	registry.handle(fakeManifestTagPath, requireBearer(singlePlatformManifest(fakeConfigDigest)))
 	registry.handle(fakeRepositoryPath+"/blobs/"+fakeConfigDigest, requireBearer(func(w http.ResponseWriter, r *http.Request) {

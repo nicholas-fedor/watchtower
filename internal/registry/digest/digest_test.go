@@ -12,6 +12,8 @@ import (
 	"net/http"
 	"net/url"
 	"strings"
+	"sync"
+	"sync/atomic"
 	"testing"
 	"testing/iotest"
 	"time"
@@ -98,6 +100,13 @@ const testManifestListBody = `{
 }
 `
 
+// tokenServices maps each running test to the bearer token service name its
+// stub registries send.
+var tokenServices sync.Map
+
+// tokenServiceCount numbers the token service names across the test process.
+var tokenServiceCount atomic.Uint64
+
 // newRegistryContainer returns a container that runs image, whose image has
 // repoDigests as its repo digests.
 //
@@ -114,8 +123,38 @@ func newRegistryContainer(image string, repoDigests ...string) types.Container {
 	)
 }
 
+// tokenService returns the bearer token service name t's stub registries
+// send, the same one on every call within t.
+//
+// The bearer token cache is shared by the whole test process and keyed by the
+// token URL, whose host and port belong to a stub server. A stub that the
+// operating system gives a closed stub's port would otherwise find that stub's
+// token and skip the token request its handlers expect. Each test gets a name
+// of its own, numbered across the process, so a second run of the same test
+// under -count gets a new one too.
+//
+// Parameters:
+//   - t: Test the stub registries belong to.
+//
+// Returns:
+//   - string: Service name for t's bearer challenges.
+func tokenService(t *testing.T) string {
+	t.Helper()
+
+	stored, loaded := tokenServices.LoadOrStore(t, fmt.Sprintf("test-service-%d", tokenServiceCount.Add(1)))
+	if !loaded {
+		t.Cleanup(func() { tokenServices.Delete(t) })
+	}
+
+	service, _ := stored.(string)
+
+	return service
+}
+
 // bearerChallengeHandler returns the handler of a registry that answers /v2/
-// with a bearer challenge whose realm is the /token endpoint on realmAddr.
+// with a bearer challenge whose realm is the /token endpoint on realmAddr. The
+// challenge names t's own token service, so no other test's cached token
+// matches it.
 //
 // Parameters:
 //   - t: Test that receives verification failures.
@@ -127,7 +166,8 @@ func newRegistryContainer(image string, repoDigests ...string) types.Container {
 func bearerChallengeHandler(t *testing.T, realmAddr, scope string) http.HandlerFunc {
 	t.Helper()
 
-	challenge := fmt.Sprintf(`Bearer realm="http://%s/token",service="test-service",scope="%s"`, realmAddr, scope)
+	challenge := fmt.Sprintf(`Bearer realm="http://%s/token",service=%q,scope="%s"`,
+		realmAddr, tokenService(t), scope)
 
 	return httpstub.CombineHandlers(
 		httpstub.VerifyRequest(t, http.MethodGet, httpstub.Path("/v2/")),
@@ -1273,6 +1313,44 @@ func TestCompareDigestWithRemote_429DoesNotContinueToNextEndpoint(t *testing.T) 
 	assert.False(t, match)
 	assert.Len(t, primary.ReceivedRequests(), 3)
 	assert.Empty(t, mirror.ReceivedRequests())
+}
+
+// TestTokenService_SeparatesTestsSharingATokenURL verifies that two tests
+// whose stub registries name the same token URL each get their own token.
+//
+// The subtests run one after the other against one token host, as two tests do
+// when the second gets a closed stub's port. The process-wide token cache would
+// hand the second subtest the first one's token if both sent the same service
+// name, and the token host would see one request instead of two. Run at once,
+// both subtests would miss the cache whatever their names, so the test does not
+// run in parallel.
+func TestTokenService_SeparatesTestsSharingATokenURL(t *testing.T) {
+	const (
+		manifestPath = "/v2/test/image/manifests/latest"
+		scope        = "repository:test/image:pull"
+	)
+
+	tokenHost := httpstub.New(t)
+	tokenHost.AppendHandlers(tokenHandler(t), tokenHandler(t))
+
+	for _, name := range []string{"first test", "second test"} {
+		t.Run(name, func(t *testing.T) {
+			registry := httpstub.New(t)
+			registry.AppendHandlers(
+				bearerChallengeHandler(t, tokenHost.Addr(), scope),
+				manifestHandler(t, http.MethodHead, manifestPath, http.StatusOK, digestHeader(testDigestHash)),
+			)
+
+			container := newRegistryContainer(registry.Addr()+"/test/image:latest", testRepoDigest)
+
+			match, err := CompareDigest(newTestLogger(t), context.Background(),
+				container, "", registryConfig.Registry{TLSSkip: true}, ratelimit.New())
+			require.NoError(t, err)
+			assert.True(t, match)
+		})
+	}
+
+	assert.Len(t, tokenHost.ReceivedRequests(), 2, "a test reused another test's cached token")
 }
 
 // TestCompareDigestWithRemote_UnauthorizedIsError verifies that a registry
