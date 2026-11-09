@@ -10,6 +10,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Share one original-host rule between the digest and age lookups by @nicholas-fedor in [#3591](https://github.com/nicholas-fedor/watchtower/pull/3591)
 - Try every endpoint's HEAD before falling back to GET by @nicholas-fedor in [#3589](https://github.com/nicholas-fedor/watchtower/pull/3589)
 - Stop retrying manifests on the registry's token host by @nicholas-fedor in [#3584](https://github.com/nicholas-fedor/watchtower/pull/3584)
 - Keep mirror tokens off the canonical registry host by @nicholas-fedor in [#3580](https://github.com/nicholas-fedor/watchtower/pull/3580)
@@ -80,6 +81,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Build sorter tests from model containers by @nicholas-fedor in [#3552](https://github.com/nicholas-fedor/watchtower/pull/3552)
 - Remove the flaky shared-lock multi-instance startup test by @nicholas-fedor in [#3524](https://github.com/nicholas-fedor/watchtower/pull/3524)
 - Accept pflag's explicit bool syntax in the help goldens by @nicholas-fedor in [#3497](https://github.com/nicholas-fedor/watchtower/pull/3497)
+
+### Build
+
+- Keep the root format run out of tools/tplprev by @nicholas-fedor in [#3592](https://github.com/nicholas-fedor/watchtower/pull/3592)
 
 ### Chores
 
