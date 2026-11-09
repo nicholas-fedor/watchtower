@@ -10,7 +10,6 @@ import (
 	dockerContainer "github.com/moby/moby/api/types/container"
 
 	"github.com/nicholas-fedor/watchtower/internal/container"
-	mockContainerClient "github.com/nicholas-fedor/watchtower/internal/container/client/mocks"
 	"github.com/nicholas-fedor/watchtower/internal/observability/events"
 	mockUpdate "github.com/nicholas-fedor/watchtower/internal/update/mocks"
 	updateParams "github.com/nicholas-fedor/watchtower/internal/update/params"
@@ -37,7 +36,7 @@ func TestRunUpdatesWithNotifications_OldSelfDetected(t *testing.T) {
 		},
 	)
 
-	client := mockContainerClient.NewMockClient(t)
+	client := mockUpdate.NewMockClient(t)
 	client.EXPECT().ListContainers(mock.Anything, mock.Anything).Return([]*container.Container{oldSelf}, nil)
 	client.EXPECT().SetRestartPolicy(mock.Anything, oldSelf.ID(),
 		dockerContainer.RestartPolicy{Name: dockerContainer.RestartPolicyDisabled}).Return(nil).Once()

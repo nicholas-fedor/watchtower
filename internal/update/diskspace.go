@@ -7,7 +7,6 @@ import (
 
 	"github.com/rs/zerolog"
 
-	containerClient "github.com/nicholas-fedor/watchtower/internal/container/client"
 	"github.com/nicholas-fedor/watchtower/internal/observability/logging"
 	"github.com/nicholas-fedor/watchtower/internal/observability/metrics"
 	updateParams "github.com/nicholas-fedor/watchtower/internal/update/params"
@@ -44,7 +43,7 @@ var (
 func checkImageDiskSpace(
 	log *zerolog.Logger,
 	ctx context.Context,
-	client containerClient.Client,
+	client Client,
 	config updateParams.Params,
 ) error {
 	if config.DiskSpaceMax == 0 && config.DiskSpaceWarn == 0 {

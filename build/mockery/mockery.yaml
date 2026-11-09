@@ -64,6 +64,9 @@
 # Each entry can carry its own config and interfaces maps, which override the top-level settings.
 # Default: null
 packages:
+  # The command package, whose tests replace the Docker client with a mock of its interface
+  github.com/nicholas-fedor/watchtower/cmd: {}
+
   # Top-level pkg directory, recursively includes all subpackages (e.g., pkg/types)
   github.com/nicholas-fedor/watchtower/pkg: {}
 

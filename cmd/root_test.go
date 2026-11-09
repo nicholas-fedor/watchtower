@@ -23,10 +23,10 @@ import (
 
 	dockerContainer "github.com/moby/moby/api/types/container"
 
+	mockCmd "github.com/nicholas-fedor/watchtower/cmd/mocks"
 	"github.com/nicholas-fedor/watchtower/internal/api"
 	"github.com/nicholas-fedor/watchtower/internal/container"
 	containerClient "github.com/nicholas-fedor/watchtower/internal/container/client"
-	mockContainerClient "github.com/nicholas-fedor/watchtower/internal/container/client/mocks"
 	"github.com/nicholas-fedor/watchtower/internal/container/filters"
 	"github.com/nicholas-fedor/watchtower/internal/observability/logging"
 	"github.com/nicholas-fedor/watchtower/internal/settings"
@@ -131,7 +131,7 @@ func TestGetAPIAddr(t *testing.T) {
 // update.ValidateRollingRestartDependencies properly accepts and uses a cancelable context.
 func TestValidateRollingRestartDependenciesAcceptsCancelableContext(t *testing.T) {
 	// Create a mock client
-	mockClient := mockContainerClient.NewMockClient(t)
+	mockClient := mockCmd.NewMockDockerClient(t)
 
 	// Create a filter that accepts all containers
 	filter := filters.Filter(func(_ filters.FilterableContainer) bool { return true })
@@ -412,7 +412,7 @@ func TestContainerLookupWithTimeoutContext(t *testing.T) {
 			t.Setenv("HOSTNAME", "test-hostname")
 
 			// Create a mock client
-			mockClient := mockContainerClient.NewMockClient(t)
+			mockClient := mockCmd.NewMockDockerClient(t)
 
 			// Create a context that's already timed out
 			ctx, cancel := context.WithTimeout(context.Background(), 0)
@@ -447,7 +447,7 @@ func TestContainerLookupWithTimeoutContext(t *testing.T) {
 			t.Setenv("HOSTNAME", "test-hostname")
 
 			// Create a mock client
-			mockClient := mockContainerClient.NewMockClient(t)
+			mockClient := mockCmd.NewMockDockerClient(t)
 
 			ctx, cancel := context.WithCancel(context.Background())
 
@@ -462,74 +462,6 @@ func TestContainerLookupWithTimeoutContext(t *testing.T) {
 
 			// Call GetCurrentContainerID
 			_, err := containerClient.GetCurrentContainerID(newTestLogger(t), ctx, fstest.MapFS{}, mockClient)
-
-			// Verify error is propagated
-			require.Error(t, err)
-			require.ErrorIs(t, err, context.Canceled)
-
-			mockClient.AssertExpectations(t)
-		})
-	})
-}
-
-// TestGetCurrentWatchtowerContainerWithTimeout verifies that GetCurrentWatchtowerContainer
-// properly handles timeout contexts.
-func TestGetCurrentWatchtowerContainerWithTimeout(t *testing.T) {
-	// Test case 1: Context deadline exceeded - verify DeadlineExceeded error is handled
-	t.Run("DeadlineExceeded error is properly handled", func(t *testing.T) {
-		synctest.Test(t, func(t *testing.T) {
-			// Create a mock client
-			mockClient := mockContainerClient.NewMockClient(t)
-
-			// Create a context that's already timed out
-			ctx, cancel := context.WithTimeout(context.Background(), 0)
-			defer cancel()
-
-			// Wait for context to actually timeout
-			time.Sleep(time.Millisecond)
-
-			// Verify context has expired
-			require.ErrorIs(t, ctx.Err(), context.DeadlineExceeded)
-
-			containerID := container.ContainerID("test-container-id")
-
-			// Mock expects GetCurrentWatchtowerContainer to be called with expired context
-			mockClient.EXPECT().GetCurrentWatchtowerContainer(ctx, containerID).
-				Return(nil, context.DeadlineExceeded).Once()
-
-			// Call GetCurrentWatchtowerContainer
-			_, err := mockClient.GetCurrentWatchtowerContainer(ctx, containerID)
-
-			// Verify error is propagated
-			require.Error(t, err)
-			require.ErrorIs(t, err, context.DeadlineExceeded)
-
-			mockClient.AssertExpectations(t)
-		})
-	})
-
-	// Test case 2: Context canceled - verify Canceled error is handled
-	t.Run("Canceled context is properly handled", func(t *testing.T) {
-		synctest.Test(t, func(t *testing.T) {
-			// Create a mock client
-			mockClient := mockContainerClient.NewMockClient(t)
-
-			ctx, cancel := context.WithCancel(context.Background())
-
-			// Cancel immediately
-			cancel()
-
-			// Verify context is canceled
-			require.ErrorIs(t, ctx.Err(), context.Canceled)
-
-			containerID := container.ContainerID("test-container-id")
-
-			// Mock expects GetCurrentWatchtowerContainer to be called with canceled context
-			mockClient.EXPECT().GetCurrentWatchtowerContainer(ctx, containerID).
-				Return(nil, context.Canceled).Once()
-
-			// Call GetCurrentWatchtowerContainer
-			_, err := mockClient.GetCurrentWatchtowerContainer(ctx, containerID)
 
 			// Verify error is propagated
 			require.Error(t, err)
@@ -884,7 +816,7 @@ func TestDisableRestarts(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			mockClient := mockContainerClient.NewMockClient(t)
+			mockClient := mockCmd.NewMockDockerClient(t)
 			if tt.wantUpdate {
 				mockClient.EXPECT().SetRestartPolicy(mock.Anything, container.ContainerID("c0c0"),
 					dockerContainer.RestartPolicy{Name: dockerContainer.RestartPolicyDisabled}).

@@ -15,7 +15,6 @@ import (
 	dockerNetwork "github.com/moby/moby/api/types/network"
 
 	"github.com/nicholas-fedor/watchtower/internal/container"
-	mockContainerClient "github.com/nicholas-fedor/watchtower/internal/container/client/mocks"
 	"github.com/nicholas-fedor/watchtower/internal/container/filters"
 	"github.com/nicholas-fedor/watchtower/internal/container/labels"
 	"github.com/nicholas-fedor/watchtower/internal/registry/ratelimit"
@@ -2969,7 +2968,7 @@ func TestUpdate_WarnsOnUnresolvedDependsOn(t *testing.T) {
 		),
 	}
 
-	client := mockContainerClient.NewMockClient(t)
+	client := mockUpdate.NewMockClient(t)
 	client.EXPECT().ListContainers(mock.Anything, mock.Anything).Return(containers, nil).Once()
 	client.EXPECT().IsContainerStale(mock.Anything, mock.Anything, mock.Anything).
 		Return(false, container.ImageID(""), "", nil)

@@ -12,11 +12,11 @@ import (
 
 	composeLabels "github.com/nicholas-fedor/watchtower/internal/compose/labels"
 	"github.com/nicholas-fedor/watchtower/internal/container"
-	mockContainerClient "github.com/nicholas-fedor/watchtower/internal/container/client/mocks"
 	"github.com/nicholas-fedor/watchtower/internal/container/filters"
 	containerLabels "github.com/nicholas-fedor/watchtower/internal/container/labels"
 	"github.com/nicholas-fedor/watchtower/internal/testutil/containerfixture"
 	"github.com/nicholas-fedor/watchtower/internal/testutil/modelfixture"
+	mockUpdate "github.com/nicholas-fedor/watchtower/internal/update/mocks"
 )
 
 // TestValidateRollingRestartDependencies verifies that rolling restarts are
@@ -33,7 +33,7 @@ func TestValidateRollingRestartDependencies(t *testing.T) {
 		t.Run("should return the client's error as it is", func(t *testing.T) {
 			t.Parallel()
 
-			mockClient := mockContainerClient.NewMockClient(t)
+			mockClient := mockUpdate.NewMockContainerLister(t)
 			clientErr := errors.New("failed to list containers: daemon unavailable")
 			mockClient.EXPECT().ListContainers(mock.Anything, mock.Anything).Return(nil, clientErr)
 
@@ -50,7 +50,7 @@ func TestValidateRollingRestartDependencies(t *testing.T) {
 		t.Run("should return nil", func(t *testing.T) {
 			t.Parallel()
 
-			mockClient := mockContainerClient.NewMockClient(t)
+			mockClient := mockUpdate.NewMockContainerLister(t)
 			mockClient.EXPECT().ListContainers(mock.Anything, mock.Anything).Return([]*container.Container{}, nil)
 
 			err := ValidateRollingRestartDependencies(newTestLogger(t), t.Context(), mockClient, filter, true)
@@ -65,7 +65,7 @@ func TestValidateRollingRestartDependencies(t *testing.T) {
 		t.Run("should return nil", func(t *testing.T) {
 			t.Parallel()
 
-			mockClient := mockContainerClient.NewMockClient(t)
+			mockClient := mockUpdate.NewMockContainerLister(t)
 			mockClient.EXPECT().ListContainers(mock.Anything, mock.Anything).Return([]*container.Container{
 				labeledContainer("app", nil),
 				labeledContainer("cache", nil),
@@ -83,7 +83,7 @@ func TestValidateRollingRestartDependencies(t *testing.T) {
 		t.Run("should return error with container name and links", func(t *testing.T) {
 			t.Parallel()
 
-			mockClient := mockContainerClient.NewMockClient(t)
+			mockClient := mockUpdate.NewMockContainerLister(t)
 			mockClient.EXPECT().ListContainers(mock.Anything, mock.Anything).Return([]*container.Container{
 				labeledContainer("app", nil),
 				labeledContainer("web-container", map[string]string{containerLabels.DependsOn: "db,redis"}),
@@ -100,7 +100,7 @@ func TestValidateRollingRestartDependencies(t *testing.T) {
 
 			// The Watchtower depends-on label counts whether or not Compose
 			// depends_on is read.
-			mockClient := mockContainerClient.NewMockClient(t)
+			mockClient := mockUpdate.NewMockContainerLister(t)
 			mockClient.EXPECT().ListContainers(mock.Anything, mock.Anything).Return([]*container.Container{
 				labeledContainer("web-container", map[string]string{containerLabels.DependsOn: "db"}),
 			}, nil)
@@ -124,7 +124,7 @@ func TestValidateRollingRestartDependencies(t *testing.T) {
 		t.Run("should return error when Compose depends_on is read", func(t *testing.T) {
 			t.Parallel()
 
-			mockClient := mockContainerClient.NewMockClient(t)
+			mockClient := mockUpdate.NewMockContainerLister(t)
 			mockClient.EXPECT().ListContainers(mock.Anything, mock.Anything).Return([]*container.Container{web}, nil)
 
 			err := ValidateRollingRestartDependencies(newTestLogger(t), t.Context(), mockClient, filter, true)
@@ -136,7 +136,7 @@ func TestValidateRollingRestartDependencies(t *testing.T) {
 		t.Run("should return nil when Compose depends_on is not read", func(t *testing.T) {
 			t.Parallel()
 
-			mockClient := mockContainerClient.NewMockClient(t)
+			mockClient := mockUpdate.NewMockContainerLister(t)
 			mockClient.EXPECT().ListContainers(mock.Anything, mock.Anything).Return([]*container.Container{web}, nil)
 
 			err := ValidateRollingRestartDependencies(newTestLogger(t), t.Context(), mockClient, filter, false)
@@ -197,7 +197,7 @@ func TestScopeValidationErrorCases(t *testing.T) {
 			t.Parallel()
 
 			// Test that empty scope labels are treated as unscoped
-			mockClient := mockContainerClient.NewMockClient(t)
+			mockClient := mockUpdate.NewMockContainerLister(t)
 
 			// Container with no scope label
 			unscoped := labeledContainer("unscoped", nil)
@@ -230,7 +230,7 @@ func TestScopeValidationErrorCases(t *testing.T) {
 		t.Run("should handle containers with invalid scope label formats", func(t *testing.T) {
 			t.Parallel()
 
-			mockClient := mockContainerClient.NewMockClient(t)
+			mockClient := mockUpdate.NewMockContainerLister(t)
 
 			// Container with malformed scope label (e.g., contains special chars)
 			container1 := labeledContainer("valid", map[string]string{containerLabels.Scope: "valid-scope"})
@@ -258,7 +258,7 @@ func TestScopeValidationErrorCases(t *testing.T) {
 		t.Run("should handle scope labels with whitespace and normalization", func(t *testing.T) {
 			t.Parallel()
 
-			mockClient := mockContainerClient.NewMockClient(t)
+			mockClient := mockUpdate.NewMockContainerLister(t)
 
 			// Container with scope label containing leading and trailing spaces
 			spaced := labeledContainer("spaced", map[string]string{containerLabels.Scope: "  spaced scope  "})
@@ -292,7 +292,7 @@ func TestScopeValidationErrorCases(t *testing.T) {
 		t.Run("should handle scope label retrieval errors gracefully", func(t *testing.T) {
 			t.Parallel()
 
-			mockClient := mockContainerClient.NewMockClient(t)
+			mockClient := mockUpdate.NewMockContainerLister(t)
 
 			// Container without a scope label
 			unscoped := labeledContainer("unscoped", nil)
@@ -322,7 +322,7 @@ func TestScopeValidationErrorCases(t *testing.T) {
 		t.Run("should validate scope consistency across operations", func(t *testing.T) {
 			t.Parallel()
 
-			mockClient := mockContainerClient.NewMockClient(t)
+			mockClient := mockUpdate.NewMockContainerLister(t)
 
 			// Multiple containers that should have consistent scope behavior
 			container1 := labeledContainer("first", map[string]string{containerLabels.Scope: "consistent-scope"})
@@ -353,7 +353,7 @@ func TestScopeValidationErrorCases(t *testing.T) {
 		t.Run("should handle scope label conflicts during validation", func(t *testing.T) {
 			t.Parallel()
 
-			mockClient := mockContainerClient.NewMockClient(t)
+			mockClient := mockUpdate.NewMockContainerLister(t)
 
 			// Container whose scope label is present but empty
 			emptyScope := labeledContainer("empty-scope", map[string]string{containerLabels.Scope: ""})

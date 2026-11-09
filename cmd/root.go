@@ -77,7 +77,7 @@ var (
 	// It provides an interface for listing, stopping, starting, and managing containers, initialized during
 	// the preRun phase with options derived from appCfg.ClientOptions() (DOCKER_HOST, TLS, API version, and
 	// related client flags/environment variables).
-	client containerClient.Client
+	client DockerClient
 
 	// rateLimiter paces every registry request, so image pulls, digest checks,
 	// image age lookups, and release tag lookups share one budget per registry
@@ -121,11 +121,14 @@ var (
 	// The function creates a context that is canceled when the specified signals (SIGINT, SIGTERM) are received.
 	createSignalContext = signal.NotifyContext
 
-	// newClient is a function variable for creating the Docker client, allowing it to be overridden in tests.
+	// newClient creates the Docker client, allowing it to be overridden in tests.
 	//
-	// It is initialized to container.NewClient by default. preRun calls it with the resolved client options,
-	// so tests can substitute a mock client without a Docker daemon.
-	newClient = containerClient.NewClient
+	// It creates the client with containerClient.NewClient. preRun calls it with
+	// the resolved client options, so tests can substitute a mock client without
+	// a Docker daemon.
+	newClient = func(ctx context.Context, log *zerolog.Logger, opts containerClient.ClientOptions) (DockerClient, error) {
+		return containerClient.NewClient(ctx, log, opts)
+	}
 
 	// processFs is the filesystem holding the container marker files and the
 	// /proc files that self container ID detection reads.
@@ -155,6 +158,22 @@ var (
 	// (PreRunE and RunE).
 	rootCmd = NewRootCommand()
 )
+
+// DockerClient is what the commands need from the Docker client. It covers what
+// the update session, the HTTP API and the self-update handoff use. It also
+// looks up Watchtower's own container.
+type DockerClient interface {
+	update.Client
+	routes.Client
+	selfupdate.HandoffClient
+
+	// GetCurrentWatchtowerContainer returns the container with the given ID
+	// without inspecting its image.
+	//
+	// A transient inspect failure is tried again, up to three attempts 2
+	// seconds apart, or until ctx ends.
+	GetCurrentWatchtowerContainer(ctx context.Context, containerID container.ContainerID) (*container.Container, error)
+}
 
 // process holds composition-root dependencies for a single CLI invocation.
 //

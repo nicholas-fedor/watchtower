@@ -2454,7 +2454,8 @@ func TestNegotiateDockerAPI_WaitsForDaemon(t *testing.T) {
 // TestGetCurrentWatchtowerContainer_Retries verifies how the inspect of the
 // running Watchtower container retries. A transient error is tried again
 // after 2 seconds, up to three attempts or until the caller's context ends.
-// Other errors and a container that does not exist end the lookup at once.
+// Other errors and a container that does not exist end the lookup at once. A
+// caller's context that has already ended allows one attempt and no wait.
 // Each case runs in a synctest bubble, so the delays take no real time.
 func TestGetCurrentWatchtowerContainer_Retries(t *testing.T) {
 	t.Parallel()
@@ -2465,6 +2466,11 @@ func TestGetCurrentWatchtowerContainer_Retries(t *testing.T) {
 		name string
 		// deadline bounds the caller's context. Zero leaves it unbounded.
 		deadline time.Duration
+		// ended is how the caller's context has already ended when the lookup
+		// starts, context.Canceled or context.DeadlineExceeded. The inspect then
+		// fails with its context's error, as the Docker client does. Nil leaves
+		// the context running.
+		ended error
 		// results are the inspect results in order. A nil error answers with
 		// the container.
 		results      []error
@@ -2500,6 +2506,18 @@ func TestGetCurrentWatchtowerContainer_Retries(t *testing.T) {
 			wantWait:     currentContainerInspectRetryDelay + time.Second,
 		},
 		{
+			name:         "caller context already canceled",
+			ended:        context.Canceled,
+			wantErr:      context.Canceled,
+			wantAttempts: 1,
+		},
+		{
+			name:         "caller deadline already passed",
+			ended:        context.DeadlineExceeded,
+			wantErr:      context.DeadlineExceeded,
+			wantAttempts: 1,
+		},
+		{
 			name:         "container that does not exist is not tried again",
 			results:      []error{notFoundError("No such container")},
 			wantErr:      cerrdefs.ErrNotFound,
@@ -2530,13 +2548,28 @@ func TestGetCurrentWatchtowerContainer_Retries(t *testing.T) {
 						Return(inspect, result).Once()
 				}
 
+				if tt.ended != nil {
+					api.EXPECT().ContainerInspect(mock.Anything, testContainerID, dockerClient.ContainerInspectOptions{}).
+						RunAndReturn(func(ctx context.Context, _ string, _ dockerClient.ContainerInspectOptions) (dockerClient.ContainerInspectResult, error) {
+							return dockerClient.ContainerInspectResult{}, ctx.Err()
+						}).Once()
+				}
+
 				ctx := t.Context()
 
-				if tt.deadline > 0 {
-					var cancel context.CancelFunc
+				var cancel context.CancelFunc
 
+				switch {
+				case tt.deadline > 0:
 					ctx, cancel = context.WithTimeout(ctx, tt.deadline)
 					defer cancel()
+				case errors.Is(tt.ended, context.Canceled):
+					ctx, cancel = context.WithCancel(ctx)
+					cancel()
+				case errors.Is(tt.ended, context.DeadlineExceeded):
+					ctx, cancel = context.WithDeadline(ctx, time.Now())
+					defer cancel()
+				default:
 				}
 
 				start := time.Now()
