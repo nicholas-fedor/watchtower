@@ -43,6 +43,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- Declare the client methods update and cmd use by @nicholas-fedor in [#3629](https://github.com/nicholas-fedor/watchtower/pull/3629)
 - Let Fiber stop the server on cancellation by @nicholas-fedor in [#3623](https://github.com/nicholas-fedor/watchtower/pull/3623)
 - Declare the client methods restart and selfupdate use by @nicholas-fedor in [#3621](https://github.com/nicholas-fedor/watchtower/pull/3621)
 - Declare the client methods hooks, rebuild and cleanup use by @nicholas-fedor in [#3616](https://github.com/nicholas-fedor/watchtower/pull/3616)
