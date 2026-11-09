@@ -11,10 +11,10 @@ import (
 	"github.com/robfig/cron/v3"
 	"github.com/rs/zerolog"
 
+	"github.com/nicholas-fedor/watchtower/internal/container/filters"
 	"github.com/nicholas-fedor/watchtower/internal/observability/metrics"
 	updateParams "github.com/nicholas-fedor/watchtower/internal/update/params"
 	"github.com/nicholas-fedor/watchtower/internal/update/schedule/percontainer"
-	"github.com/nicholas-fedor/watchtower/pkg/types"
 )
 
 // containerSchedules runs the containers that carry a schedule label of their
@@ -26,7 +26,7 @@ type containerSchedules struct {
 	log    *zerolog.Logger
 	// base is the containers Watchtower manages, before the global schedule
 	// leaves out those with a schedule of their own.
-	base types.Filter
+	base filters.Filter
 	// skipSelf skips Watchtower's own update on each container schedule's
 	// first run after the process replaced an older instance, as the global
 	// schedule's first run does.
@@ -49,14 +49,14 @@ func withContainerSchedules(deps ScheduleDeps) (ScheduleDeps, *containerSchedule
 	}
 
 	if base == nil {
-		base = func(types.FilterableContainer) bool { return true }
+		base = func(filters.FilterableContainer) bool { return true }
 	}
 
 	deps.Filter = percontainer.WithoutOwnSchedule(base)
 
 	if refresher, ok := deps.ContainerSchedules.(percontainer.Refresher); ok && deps.RunUpdate != nil {
 		runUpdate := deps.RunUpdate
-		deps.RunUpdate = func(ctx context.Context, filter types.Filter, params updateParams.Params) *metrics.Metric {
+		deps.RunUpdate = func(ctx context.Context, filter filters.Filter, params updateParams.Params) *metrics.Metric {
 			defer refresher.Refresh()
 
 			return runUpdate(ctx, filter, params)
@@ -79,7 +79,7 @@ func withContainerSchedules(deps ScheduleDeps) (ScheduleDeps, *containerSchedule
 func (c *containerSchedules) start(
 	ctx context.Context,
 	scheduler *cron.Cron,
-	run func(skipSelf bool, only types.Filter),
+	run func(skipSelf bool, only filters.Filter),
 ) func() {
 	if c == nil {
 		return func() {}

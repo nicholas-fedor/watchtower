@@ -17,7 +17,6 @@ import (
 	"github.com/nicholas-fedor/watchtower/internal/observability/metrics"
 	updateParams "github.com/nicholas-fedor/watchtower/internal/update/params"
 	"github.com/nicholas-fedor/watchtower/internal/update/schedule/percontainer"
-	"github.com/nicholas-fedor/watchtower/pkg/types"
 )
 
 // updateWaitTimeout bounds how long shutdown waits for an in-flight update.
@@ -265,7 +264,7 @@ func RunUpgradesOnSchedule(ctx context.Context, deps ScheduleDeps) error {
 	// skipWatchtowerSelfUpdate: whether to skip updating the Watchtower container itself
 	// blocking: whether to wait for the lock (true for scheduled runs, false for immediate runs)
 	// only: the containers this run covers instead (a container schedule's)
-	updateFunc := func(skipWatchtowerSelfUpdate, blocking bool, only ...types.Filter) {
+	updateFunc := func(skipWatchtowerSelfUpdate, blocking bool, only ...filters.Filter) {
 		// Acquire the update lock: blocking waits until shutdown, non-blocking returns if unavailable
 		if blocking {
 			err := lock.Lock(ctx)
@@ -374,7 +373,7 @@ func RunUpgradesOnSchedule(ctx context.Context, deps ScheduleDeps) error {
 	}
 
 	// Containers' own schedules, added to the scheduler as containers bring them.
-	stopContainerSchedules := containers.start(ctx, scheduler, func(skipSelf bool, only types.Filter) {
+	stopContainerSchedules := containers.start(ctx, scheduler, func(skipSelf bool, only filters.Filter) {
 		updateFunc(skipSelf, true, only)
 	})
 

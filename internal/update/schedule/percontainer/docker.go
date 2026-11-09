@@ -15,8 +15,8 @@ import (
 	dockerClient "github.com/moby/moby/client"
 
 	"github.com/nicholas-fedor/watchtower/internal/container"
+	"github.com/nicholas-fedor/watchtower/internal/container/filters"
 	"github.com/nicholas-fedor/watchtower/internal/container/labels"
-	"github.com/nicholas-fedor/watchtower/pkg/types"
 )
 
 // Source reports which containers carry which schedule to a [Sink], keeping it
@@ -38,7 +38,7 @@ type EventStream interface {
 }
 
 // Lister lists the containers as they are now.
-type Lister func(ctx context.Context) ([]types.FilterableContainer, error)
+type Lister func(ctx context.Context) ([]filters.FilterableContainer, error)
 
 // Retry delays between attempts to reach Docker's event stream.
 const (
@@ -92,7 +92,7 @@ type DockerSource struct {
 	// List lists the containers when connecting and on a refresh.
 	List Lister
 	// Filter is the containers Watchtower manages. Nil manages all.
-	Filter types.Filter
+	Filter filters.Filter
 	// Log for connection trouble and changes. Nil logs nothing.
 	Log     *zerolog.Logger
 	refresh chan struct{}
@@ -396,7 +396,7 @@ func (s *DockerSource) logEvent(name string, attrs map[string]string, spec strin
 // scheduleOf returns the container's schedule label, normalized, when the
 // filter manages the container and the label is set. The value isn't checked
 // here: the [Sink] warns about one that doesn't parse, as documented.
-func (s *DockerSource) scheduleOf(c types.FilterableContainer) (string, bool) {
+func (s *DockerSource) scheduleOf(c filters.FilterableContainer) (string, bool) {
 	if s.Filter != nil && !s.Filter(c) {
 		return "", false
 	}
@@ -426,7 +426,7 @@ func (s *DockerSource) replaced(name string, msg events.Message) bool {
 
 // createdOf returns when Docker created a container, when it says (a listed
 // container does).
-func createdOf(c types.FilterableContainer) time.Time {
+func createdOf(c filters.FilterableContainer) time.Time {
 	withInfo, ok := c.(interface {
 		ContainerInfo() *dockerContainer.InspectResponse
 	})
@@ -443,8 +443,8 @@ func createdOf(c types.FilterableContainer) time.Time {
 }
 
 // idOf returns a container's ID when it has one (a listed container does).
-func idOf(c types.FilterableContainer) string {
-	if withID, ok := c.(interface{ ID() types.ContainerID }); ok {
+func idOf(c filters.FilterableContainer) string {
+	if withID, ok := c.(interface{ ID() container.ContainerID }); ok {
 		return string(withID.ID())
 	}
 
@@ -460,7 +460,7 @@ func eventTime(t time.Time) string {
 // eventContainer is a container as an event describes it, read the way
 // Watchtower reads any container (labels, scope, enable, name, image), so a
 // filter treats it as it would in a run.
-func eventContainer(name, containerID string, attrs map[string]string) types.FilterableContainer {
+func eventContainer(name, containerID string, attrs map[string]string) filters.FilterableContainer {
 	containerLabels := make(map[string]string, len(attrs))
 
 	for k, v := range attrs {

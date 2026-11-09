@@ -22,7 +22,6 @@ import (
 	"github.com/nicholas-fedor/watchtower/internal/observability/metrics"
 	"github.com/nicholas-fedor/watchtower/internal/testutil/logcapture"
 	updateParams "github.com/nicholas-fedor/watchtower/internal/update/params"
-	"github.com/nicholas-fedor/watchtower/pkg/types"
 )
 
 // TestMain starts the metrics goroutine, which the first [metrics.Default] call

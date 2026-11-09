@@ -6,8 +6,8 @@ import (
 
 	"github.com/robfig/cron/v3"
 
+	"github.com/nicholas-fedor/watchtower/internal/container/filters"
 	"github.com/nicholas-fedor/watchtower/internal/container/labels"
-	"github.com/nicholas-fedor/watchtower/pkg/types"
 )
 
 // ParseOptions is the cron syntax schedules are written in: the global
@@ -47,7 +47,7 @@ func Next(spec string, after time.Time) time.Time {
 // Spec returns the container's own schedule: its schedule label, normalized,
 // when the label is set and valid. A container whose label does not parse
 // follows the global schedule.
-func Spec(c types.FilterableContainer) (string, bool) {
+func Spec(c filters.FilterableContainer) (string, bool) {
 	raw, ok := c.GetLabel(labels.Schedule)
 	if !ok {
 		return "", false
@@ -63,8 +63,8 @@ func Spec(c types.FilterableContainer) (string, bool) {
 
 // WithoutOwnSchedule narrows a filter to the containers that follow the global
 // schedule: those without a valid schedule label.
-func WithoutOwnSchedule(base types.Filter) types.Filter {
-	return func(c types.FilterableContainer) bool {
+func WithoutOwnSchedule(base filters.Filter) filters.Filter {
+	return func(c filters.FilterableContainer) bool {
 		if _, own := Spec(c); own {
 			return false
 		}
@@ -74,10 +74,10 @@ func WithoutOwnSchedule(base types.Filter) types.Filter {
 }
 
 // OnSchedule narrows a filter to the containers whose own schedule is spec.
-func OnSchedule(spec string, base types.Filter) types.Filter {
+func OnSchedule(spec string, base filters.Filter) filters.Filter {
 	spec = Normalize(spec)
 
-	return func(c types.FilterableContainer) bool {
+	return func(c filters.FilterableContainer) bool {
 		own, ok := Spec(c)
 		if !ok || own != spec {
 			return false

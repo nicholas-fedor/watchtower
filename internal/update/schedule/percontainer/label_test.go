@@ -7,12 +7,12 @@ import (
 
 	"github.com/stretchr/testify/assert"
 
+	"github.com/nicholas-fedor/watchtower/internal/container/filters"
 	"github.com/nicholas-fedor/watchtower/internal/container/labels"
-	"github.com/nicholas-fedor/watchtower/pkg/types"
 )
 
 // labeled returns a container with this name and these labels.
-func labeled(name string, containerLabels map[string]string) types.FilterableContainer {
+func labeled(name string, containerLabels map[string]string) filters.FilterableContainer {
 	attrs := map[string]string{"name": name, "image": "example/" + name + ":latest"}
 	maps.Copy(attrs, containerLabels)
 
@@ -20,7 +20,7 @@ func labeled(name string, containerLabels map[string]string) types.FilterableCon
 }
 
 // all is a filter accepting every container.
-func all(types.FilterableContainer) bool { return true }
+func all(filters.FilterableContainer) bool { return true }
 
 // TestSpec verifies how a schedule label is read: normalized, and only when it parses.
 func TestSpec(t *testing.T) {
@@ -69,7 +69,7 @@ func TestWithoutOwnSchedule(t *testing.T) {
 	assert.True(t, filter(labeled("broken", map[string]string{labels.Schedule: "sometimes"})),
 		"a container whose schedule does not parse stays on the global one")
 
-	none := WithoutOwnSchedule(func(types.FilterableContainer) bool { return false })
+	none := WithoutOwnSchedule(func(filters.FilterableContainer) bool { return false })
 	assert.False(t, none(labeled("plain", nil)), "the base filter still applies")
 }
 
@@ -84,7 +84,7 @@ func TestOnSchedule(t *testing.T) {
 	assert.False(t, filter(labeled("hourly", map[string]string{labels.Schedule: "@hourly"})))
 	assert.False(t, filter(labeled("plain", nil)))
 
-	none := OnSchedule("@every 10m", func(types.FilterableContainer) bool { return false })
+	none := OnSchedule("@every 10m", func(filters.FilterableContainer) bool { return false })
 	assert.False(t, none(labeled("games", map[string]string{labels.Schedule: "@every 10m"})), "the base filter still applies")
 }
 

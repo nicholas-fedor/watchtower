@@ -20,8 +20,8 @@ import (
 	dockerContainer "github.com/moby/moby/api/types/container"
 	dockerClient "github.com/moby/moby/client"
 
+	"github.com/nicholas-fedor/watchtower/internal/container/filters"
 	"github.com/nicholas-fedor/watchtower/internal/container/labels"
-	"github.com/nicholas-fedor/watchtower/pkg/types"
 )
 
 // fakeStream hands out one connection per Events call; the test drives each.
@@ -197,8 +197,8 @@ func startSource(t *testing.T, s *DockerSource) (*recorder, func()) {
 }
 
 // lister returns a Lister that always lists these containers.
-func lister(containers ...types.FilterableContainer) Lister {
-	return func(context.Context) ([]types.FilterableContainer, error) { return containers, nil }
+func lister(containers ...filters.FilterableContainer) Lister {
+	return func(context.Context) ([]filters.FilterableContainer, error) { return containers, nil }
 }
 
 // TestDockerSourceFollowsEvents verifies the list on connecting and each followed event: create, start, destroy, rename.
@@ -281,7 +281,7 @@ func TestDockerSourceFollowsEvents(t *testing.T) {
 func TestDockerSourceAppliesTheFilter(t *testing.T) {
 	t.Parallel()
 
-	inScope := func(c types.FilterableContainer) bool {
+	inScope := func(c filters.FilterableContainer) bool {
 		scope, _ := c.Scope()
 
 		return scope == "games"
@@ -319,14 +319,14 @@ func TestDockerSourceReconnects(t *testing.T) {
 
 	var (
 		mu         sync.Mutex
-		containers = []types.FilterableContainer{labeled("web", map[string]string{labels.Schedule: "@every 10m"})}
+		containers = []filters.FilterableContainer{labeled("web", map[string]string{labels.Schedule: "@every 10m"})}
 	)
 
 	stream := newFakeStream()
 	source := &DockerSource{
 		Events:      stream,
 		SettleDelay: -1,
-		List: func(context.Context) ([]types.FilterableContainer, error) {
+		List: func(context.Context) ([]filters.FilterableContainer, error) {
 			mu.Lock()
 			defer mu.Unlock()
 
@@ -343,7 +343,7 @@ func TestDockerSourceReconnects(t *testing.T) {
 
 	// While the stream is down a container changes: the next list finds it.
 	mu.Lock()
-	containers = []types.FilterableContainer{labeled("web", map[string]string{labels.Schedule: "@hourly"})}
+	containers = []filters.FilterableContainer{labeled("web", map[string]string{labels.Schedule: "@hourly"})}
 	mu.Unlock()
 
 	first.errs <- errors.New("daemon restarted")
@@ -371,7 +371,7 @@ func TestDockerSourceRetriesAFailedList(t *testing.T) {
 	source := &DockerSource{
 		Events:      stream,
 		SettleDelay: -1,
-		List: func(context.Context) ([]types.FilterableContainer, error) {
+		List: func(context.Context) ([]filters.FilterableContainer, error) {
 			mu.Lock()
 			defer mu.Unlock()
 
@@ -380,7 +380,7 @@ func TestDockerSourceRetriesAFailedList(t *testing.T) {
 				return nil, errors.New("daemon busy")
 			}
 
-			return []types.FilterableContainer{labeled("web", map[string]string{labels.Schedule: "@daily"})}, nil
+			return []filters.FilterableContainer{labeled("web", map[string]string{labels.Schedule: "@daily"})}, nil
 		},
 		RetryDelay: time.Millisecond,
 	}
@@ -412,14 +412,14 @@ func TestDockerSourceRefreshListsAgain(t *testing.T) {
 
 	var (
 		mu         sync.Mutex
-		containers = []types.FilterableContainer{labeled("web", map[string]string{labels.Schedule: "@every 10m"})}
+		containers = []filters.FilterableContainer{labeled("web", map[string]string{labels.Schedule: "@every 10m"})}
 	)
 
 	stream := newFakeStream()
 	source := &DockerSource{
 		Events:      stream,
 		SettleDelay: -1,
-		List: func(context.Context) ([]types.FilterableContainer, error) {
+		List: func(context.Context) ([]filters.FilterableContainer, error) {
 			mu.Lock()
 			defer mu.Unlock()
 
@@ -436,7 +436,7 @@ func TestDockerSourceRefreshListsAgain(t *testing.T) {
 	// A change the stream never reported (a connection that died silently):
 	// a refresh finds it, on the same connection.
 	mu.Lock()
-	containers = []types.FilterableContainer{labeled("web", map[string]string{labels.Schedule: "@hourly"})}
+	containers = []filters.FilterableContainer{labeled("web", map[string]string{labels.Schedule: "@hourly"})}
 	mu.Unlock()
 
 	source.Refresh()
@@ -517,7 +517,7 @@ func TestDockerSourceLogsQuietlyUntilItKeepsFailing(t *testing.T) {
 	source := &DockerSource{
 		Events:      stream,
 		SettleDelay: -1,
-		List: func(context.Context) ([]types.FilterableContainer, error) {
+		List: func(context.Context) ([]filters.FilterableContainer, error) {
 			mu.Lock()
 			defer mu.Unlock()
 
@@ -593,13 +593,13 @@ func TestDockerSourceListsAgainOnceSettled(t *testing.T) {
 	stream := newFakeStream()
 	source := &DockerSource{
 		Events: stream,
-		List: func(context.Context) ([]types.FilterableContainer, error) {
+		List: func(context.Context) ([]filters.FilterableContainer, error) {
 			mu.Lock()
 			defer mu.Unlock()
 
 			lists++
 
-			return []types.FilterableContainer{labeled("web", map[string]string{labels.Schedule: "@every 10m"})}, nil
+			return []filters.FilterableContainer{labeled("web", map[string]string{labels.Schedule: "@every 10m"})}, nil
 		},
 		SettleDelay: 20 * time.Millisecond,
 	}
@@ -619,14 +619,14 @@ func TestDockerSourceListsAgainOnceSettled(t *testing.T) {
 }
 
 // listedWeb returns the container listed as web, with an ID, a creation time and labels.
-func listedWeb(containerID string, created time.Time, containerLabels map[string]string) types.FilterableContainer {
+func listedWeb(containerID string, created time.Time, containerLabels map[string]string) filters.FilterableContainer {
 	c := labeled("web", containerLabels).(interface {
 		ContainerInfo() *dockerContainer.InspectResponse
 	})
 	c.ContainerInfo().ID = containerID
 	c.ContainerInfo().Created = created.Format(time.RFC3339Nano)
 
-	return c.(types.FilterableContainer)
+	return c.(filters.FilterableContainer)
 }
 
 // TestDockerSourceIgnoresReplayedNewsOfAReplacedContainer verifies that a

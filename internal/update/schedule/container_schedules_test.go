@@ -15,12 +15,12 @@ import (
 	dockerContainer "github.com/moby/moby/api/types/container"
 
 	"github.com/nicholas-fedor/watchtower/internal/container"
+	"github.com/nicholas-fedor/watchtower/internal/container/filters"
 	"github.com/nicholas-fedor/watchtower/internal/container/labels"
 	"github.com/nicholas-fedor/watchtower/internal/observability/logging"
 	"github.com/nicholas-fedor/watchtower/internal/observability/metrics"
 	updateParams "github.com/nicholas-fedor/watchtower/internal/update/params"
 	"github.com/nicholas-fedor/watchtower/internal/update/schedule/percontainer"
-	"github.com/nicholas-fedor/watchtower/pkg/types"
 )
 
 // sourceFunc is a percontainer.Source from a function.
@@ -30,7 +30,7 @@ type sourceFunc func(ctx context.Context, sink percontainer.Sink) error
 func (f sourceFunc) Run(ctx context.Context, sink percontainer.Sink) error { return f(ctx, sink) }
 
 // testContainer returns a container with this name and these labels.
-func testContainer(name string, containerLabels map[string]string) types.FilterableContainer {
+func testContainer(name string, containerLabels map[string]string) filters.FilterableContainer {
 	return container.NewContainer(nil, &dockerContainer.InspectResponse{
 		Name:   "/" + name,
 		Config: &dockerContainer.Config{Image: "example/" + name + ":latest", Labels: containerLabels},
@@ -49,10 +49,10 @@ func TestRunUpgradesOnSchedule_ContainerSchedules(t *testing.T) {
 
 		var (
 			mu   sync.Mutex
-			runs []types.Filter
+			runs []filters.Filter
 		)
 
-		runUpdate := func(_ context.Context, filter types.Filter, _ updateParams.Params) *metrics.Metric {
+		runUpdate := func(_ context.Context, filter filters.Filter, _ updateParams.Params) *metrics.Metric {
 			mu.Lock()
 			defer mu.Unlock()
 
@@ -117,7 +117,7 @@ func TestRunUpgradesOnSchedule_ContainerSchedulesSkipFirstRun(t *testing.T) {
 			skips []bool
 		)
 
-		runUpdate := func(_ context.Context, _ types.Filter, params updateParams.Params) *metrics.Metric {
+		runUpdate := func(_ context.Context, _ filters.Filter, params updateParams.Params) *metrics.Metric {
 			mu.Lock()
 			defer mu.Unlock()
 
@@ -166,7 +166,7 @@ func TestRunUpgradesOnSchedule_ContainerSchedulesWithoutGlobalSchedule(t *testin
 
 		var calls atomic.Int32
 
-		runUpdate := func(context.Context, types.Filter, updateParams.Params) *metrics.Metric {
+		runUpdate := func(context.Context, filters.Filter, updateParams.Params) *metrics.Metric {
 			calls.Add(1)
 
 			return &metrics.Metric{}
@@ -212,7 +212,7 @@ func TestRunUpgradesOnSchedule_ContainerSchedulesRefreshAfterRuns(t *testing.T) 
 	synctest.Test(t, func(t *testing.T) {
 		ctx, cancel := context.WithCancel(t.Context())
 
-		runUpdate := func(context.Context, types.Filter, updateParams.Params) *metrics.Metric {
+		runUpdate := func(context.Context, filters.Filter, updateParams.Params) *metrics.Metric {
 			return &metrics.Metric{}
 		}
 
