@@ -10,6 +10,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Tell exec'd health check probes from the main process by @nicholas-fedor in [#3657](https://github.com/nicholas-fedor/watchtower/pull/3657)
 - Stop rebuilding the same git commit with no-restart by @nicholas-fedor in [#3653](https://github.com/nicholas-fedor/watchtower/pull/3653)
 - Keep git defaults off compose replacements by @nicholas-fedor in [#3644](https://github.com/nicholas-fedor/watchtower/pull/3644)
 - Share one original-host rule between the digest and age lookups by @nicholas-fedor in [#3591](https://github.com/nicholas-fedor/watchtower/pull/3591)
