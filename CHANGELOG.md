@@ -68,6 +68,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Tests
 
+- Build git and update tests from model containers by @nicholas-fedor in [#3596](https://github.com/nicholas-fedor/watchtower/pull/3596)
 - Build container-layer tests from model containers by @nicholas-fedor in [#3594](https://github.com/nicholas-fedor/watchtower/pull/3594)
 - Isolate registry stubs from each other's cached tokens by @nicholas-fedor in [#3587](https://github.com/nicholas-fedor/watchtower/pull/3587)
 - Build registry tests from model containers by @nicholas-fedor in [#3576](https://github.com/nicholas-fedor/watchtower/pull/3576)
