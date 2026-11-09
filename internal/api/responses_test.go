@@ -31,13 +31,13 @@ import (
 	"github.com/nicholas-fedor/watchtower/internal/container"
 	containerClient "github.com/nicholas-fedor/watchtower/internal/container/client"
 	mockContainerClient "github.com/nicholas-fedor/watchtower/internal/container/client/mocks"
+	"github.com/nicholas-fedor/watchtower/internal/container/filters"
 	"github.com/nicholas-fedor/watchtower/internal/observability/events"
 	"github.com/nicholas-fedor/watchtower/internal/observability/metrics"
 	updateConfig "github.com/nicholas-fedor/watchtower/internal/settings/config/update"
 	"github.com/nicholas-fedor/watchtower/internal/testutil/golden"
 	updateParams "github.com/nicholas-fedor/watchtower/internal/update/params"
 	"github.com/nicholas-fedor/watchtower/internal/update/schedule"
-	"github.com/nicholas-fedor/watchtower/pkg/types"
 )
 
 // Tokens used by the response fixtures.
@@ -216,7 +216,7 @@ func fixtureOptions(t *testing.T, client containerClient.Client, store *metrics.
 		UnblockHTTPAPI:      true,
 		NoStartupMessage:    true,
 		Client:              client,
-		Filter:              func(types.FilterableContainer) bool { return true },
+		Filter:              func(filters.FilterableContainer) bool { return true },
 		FilterDesc:          "Checking all containers (except explicitly disabled with label)",
 		IncludeStopped:      true,
 		UpdateLock:          schedule.NewUpdateLock(),
@@ -224,10 +224,10 @@ func fixtureOptions(t *testing.T, client containerClient.Client, store *metrics.
 			Cleanup:        true,
 			LifecycleHooks: true,
 		},
-		RunUpdatesWithNotifications: func(context.Context, types.Filter, updateParams.Params) *metrics.Metric {
+		RunUpdatesWithNotifications: func(context.Context, filters.Filter, updateParams.Params) *metrics.Metric {
 			return &metrics.Metric{Scanned: 5, Updated: 2, Failed: 1, Restarted: 0, Skipped: 1}
 		},
-		FilterByImage:    func(_ []string, filter types.Filter) types.Filter { return filter },
+		FilterByImage:    func(_ []string, filter filters.Filter) filters.Filter { return filter },
 		DefaultMetrics:   func() *metrics.Metrics { return store },
 		EventBroadcaster: events.NewBroadcaster(),
 	})
@@ -460,7 +460,7 @@ func TestHTTPAPIResponses(t *testing.T) {
 	// reached, by the update, the status, and the history.
 	failedStore := newFixtureMetrics(t)
 	failedOpts := fixtureOptions(t, newFixtureClient(t), failedStore)
-	failedOpts.RunUpdatesWithNotifications = func(context.Context, types.Filter, updateParams.Params) *metrics.Metric {
+	failedOpts.RunUpdatesWithNotifications = func(context.Context, filters.Filter, updateParams.Params) *metrics.Metric {
 		return &metrics.Metric{Scanned: 5, Updated: 1, Failed: 0, Restarted: 0, Skipped: 0, ScanFailed: true}
 	}
 
@@ -508,7 +508,7 @@ func TestHTTPAPIErrorResponses(t *testing.T) {
 	recorder.record(t, responseRequest{method: http.MethodPost, target: "/v1/update", token: fixtureAPIToken})
 
 	failingOpts := fixtureOptions(t, newFailingClient(t), newFixtureMetrics(t))
-	failingOpts.RunUpdatesWithNotifications = func(context.Context, types.Filter, updateParams.Params) *metrics.Metric {
+	failingOpts.RunUpdatesWithNotifications = func(context.Context, filters.Filter, updateParams.Params) *metrics.Metric {
 		return nil
 	}
 

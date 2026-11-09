@@ -11,8 +11,8 @@ import (
 
 	"github.com/nicholas-fedor/watchtower/internal/container"
 	containerClient "github.com/nicholas-fedor/watchtower/internal/container/client"
+	"github.com/nicholas-fedor/watchtower/internal/container/filters"
 	containerImage "github.com/nicholas-fedor/watchtower/internal/container/image"
-	"github.com/nicholas-fedor/watchtower/pkg/types"
 )
 
 // ImageStatus describes a tracked image and its current state.
@@ -59,7 +59,7 @@ func filterImages(statuses []ImageStatus, name, imageID string) []ImageStatus {
 // Returns:
 //   - []ImageStatus: Status for each tracked image, sorted by name and then image ID.
 //   - error: Non-nil if listing containers fails.
-func ListImageStatuses(ctx context.Context, client containerClient.Client, filter types.Filter) ([]ImageStatus, error) {
+func ListImageStatuses(ctx context.Context, client containerClient.Client, filter filters.Filter) ([]ImageStatus, error) {
 	var list []*container.Container
 
 	var err error

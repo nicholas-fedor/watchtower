@@ -8,9 +8,9 @@ import (
 
 	"github.com/spf13/cobra"
 
+	"github.com/nicholas-fedor/watchtower/internal/container/filters"
 	"github.com/nicholas-fedor/watchtower/internal/observability/logging"
 	"github.com/nicholas-fedor/watchtower/internal/settings/config/api"
-	"github.com/nicholas-fedor/watchtower/pkg/types"
 )
 
 // errInvalidAPIHost indicates http-api-host is neither empty nor a valid IP.
@@ -22,8 +22,8 @@ var errInvalidAPIHost = errors.New(
 type RunConfig struct {
 	// Command is the cobra.Command instance representing the executed command, providing access to parsed flags.
 	Command *cobra.Command
-	// Filter is the types.Filter function determining which containers are processed during updates.
-	Filter types.Filter
+	// Filter is the filters.Filter function determining which containers are processed during updates.
+	Filter filters.Filter
 	// FilterDesc is a human-readable description of the applied filter, used in logging and notifications.
 	FilterDesc string
 	// APIToken is the authentication token for HTTP API access.

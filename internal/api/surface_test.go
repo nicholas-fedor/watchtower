@@ -19,11 +19,11 @@ import (
 	"github.com/nicholas-fedor/watchtower/internal/api/routes"
 	"github.com/nicholas-fedor/watchtower/internal/container"
 	mockContainerClient "github.com/nicholas-fedor/watchtower/internal/container/client/mocks"
+	"github.com/nicholas-fedor/watchtower/internal/container/filters"
 	"github.com/nicholas-fedor/watchtower/internal/observability/metrics"
 	"github.com/nicholas-fedor/watchtower/internal/testutil/golden"
 	updateParams "github.com/nicholas-fedor/watchtower/internal/update/params"
 	"github.com/nicholas-fedor/watchtower/internal/update/schedule"
-	"github.com/nicholas-fedor/watchtower/pkg/types"
 )
 
 // probeTimeout bounds each route probe so a handler that never responds, such as
@@ -62,10 +62,10 @@ func newFullSurfaceApp(t *testing.T) *fiber.App {
 		NoStartupMessage:    true,
 		Client:              client,
 		Filter:              makeFilter(t),
-		RunUpdatesWithNotifications: func(context.Context, types.Filter, updateParams.Params) *metrics.Metric {
+		RunUpdatesWithNotifications: func(context.Context, filters.Filter, updateParams.Params) *metrics.Metric {
 			return &metrics.Metric{}
 		},
-		FilterByImage:    func(_ []string, filter types.Filter) types.Filter { return filter },
+		FilterByImage:    func(_ []string, filter filters.Filter) filters.Filter { return filter },
 		DefaultMetrics:   func() *metrics.Metrics { return helperMetrics },
 		EventBroadcaster: NewEventsBroadcasterHelper(),
 	})

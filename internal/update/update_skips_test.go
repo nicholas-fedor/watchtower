@@ -20,6 +20,7 @@ import (
 
 	"github.com/nicholas-fedor/watchtower/internal/container"
 	mockContainerClient "github.com/nicholas-fedor/watchtower/internal/container/client/mocks"
+	"github.com/nicholas-fedor/watchtower/internal/container/filters"
 	containerImage "github.com/nicholas-fedor/watchtower/internal/container/image"
 	"github.com/nicholas-fedor/watchtower/internal/container/labels"
 	"github.com/nicholas-fedor/watchtower/internal/container/oci"
@@ -34,7 +35,6 @@ import (
 	mockUpdate "github.com/nicholas-fedor/watchtower/internal/update/mocks"
 	updateParams "github.com/nicholas-fedor/watchtower/internal/update/params"
 	"github.com/nicholas-fedor/watchtower/internal/update/state"
-	"github.com/nicholas-fedor/watchtower/pkg/types"
 )
 
 // skipTestContainer returns a running container with the given labels.
@@ -174,7 +174,7 @@ func TestUpdate_CanceledScanSkipsUncheckedContainers(t *testing.T) {
 		// checks any of them.
 		client := mockContainerClient.NewMockClient(t)
 		client.EXPECT().ListContainers(mock.Anything, mock.Anything).
-			RunAndReturn(func(context.Context, ...types.Filter) ([]*container.Container, error) {
+			RunAndReturn(func(context.Context, ...filters.Filter) ([]*container.Container, error) {
 				cancel()
 
 				return []*container.Container{appA, appB}, nil

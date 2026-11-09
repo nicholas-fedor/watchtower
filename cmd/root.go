@@ -33,7 +33,6 @@ import (
 	updateParams "github.com/nicholas-fedor/watchtower/internal/update/params"
 	"github.com/nicholas-fedor/watchtower/internal/update/schedule"
 	"github.com/nicholas-fedor/watchtower/internal/update/selfupdate"
-	"github.com/nicholas-fedor/watchtower/pkg/types"
 )
 
 const (
@@ -148,7 +147,7 @@ var (
 	// It is initialized inside runMain with a closure that executes update.RunUpdatesWithNotifications,
 	// allowing it to be overridden in tests to mock the update process. It takes a context, filter, and update params,
 	// and returns a metric summarizing the update session.
-	runUpdatesWithNotifications func(context.Context, types.Filter, updateParams.Params) *metrics.Metric
+	runUpdatesWithNotifications func(context.Context, filters.Filter, updateParams.Params) *metrics.Metric
 
 	// rootCmd represents the root command for the Watchtower CLI, serving as the entry point for all subcommands.
 	//
@@ -664,7 +663,7 @@ func (p *process) runMain(cfg settings.RunConfig) error {
 	//
 	// Parameters:
 	//   - ctx: Context for cancellation and timeouts.
-	//   - filter: The types.Filter determining which containers are targeted for updates.
+	//   - filter: The filters.Filter determining which containers are targeted for updates.
 	//   - params: The updateParams.Params struct containing update configuration parameters.
 	//
 	// Returns:
@@ -687,7 +686,7 @@ func (p *process) runMain(cfg settings.RunConfig) error {
 	)
 	defer stop()
 
-	runUpdatesWithNotifications = func(ctx context.Context, filter types.Filter, params updateParams.Params) *metrics.Metric {
+	runUpdatesWithNotifications = func(ctx context.Context, filter filters.Filter, params updateParams.Params) *metrics.Metric {
 		runParams := params
 		if filter != nil {
 			runParams.Filter = filter
@@ -873,7 +872,7 @@ func (p *process) runMain(cfg settings.RunConfig) error {
 			Version:                     meta.Version,
 			Startup:                     startupBase,
 			RunUpdatesWithNotifications: runUpdatesWithNotifications,
-			FilterByImage: func(images []string, base types.Filter) types.Filter {
+			FilterByImage: func(images []string, base filters.Filter) filters.Filter {
 				return filters.FilterByImage(p.log, images, base)
 			},
 			DefaultMetrics:      metrics.Default,

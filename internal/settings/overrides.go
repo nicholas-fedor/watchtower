@@ -2,7 +2,7 @@ package settings
 
 import (
 	"github.com/nicholas-fedor/watchtower/internal/container"
-	"github.com/nicholas-fedor/watchtower/pkg/types"
+	"github.com/nicholas-fedor/watchtower/internal/container/filters"
 )
 
 // RunOverrides holds per-invocation deltas applied on top of process-wide Config.
@@ -11,7 +11,7 @@ import (
 // run-once, schedule tick, or API request belong here.
 type RunOverrides struct {
 	// Filter replaces Config.Filter.Predicate when non-nil.
-	Filter types.Filter
+	Filter filters.Filter
 	// CurrentContainerID is the running Watchtower container ID when known.
 	CurrentContainerID container.ContainerID
 	// RunOnce marks a one-shot update session.

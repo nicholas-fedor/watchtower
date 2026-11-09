@@ -1,11 +1,11 @@
 package filter
 
-import "github.com/nicholas-fedor/watchtower/pkg/types"
+import "github.com/nicholas-fedor/watchtower/internal/container/filters"
 
 // Filter holds raw filter inputs and the resolved predicate.
 type Filter struct {
 	// Predicate is the resolved container filter function.
-	Predicate types.Filter
+	Predicate filters.Filter
 	// Scope is the Watchtower monitoring scope label value.
 	Scope string
 	// Desc is a human-readable description of the filter.

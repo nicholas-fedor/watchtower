@@ -7,8 +7,8 @@ import (
 	"github.com/gofiber/fiber/v3/middleware/timeout"
 
 	"github.com/nicholas-fedor/watchtower/internal/api/handlers/update"
+	"github.com/nicholas-fedor/watchtower/internal/container/filters"
 	mt "github.com/nicholas-fedor/watchtower/internal/observability/metrics"
-	"github.com/nicholas-fedor/watchtower/pkg/types"
 )
 
 func registerUpdateRoute(ctx context.Context, app *fiber.App, auth fiber.Handler, opts Options) {
@@ -23,7 +23,7 @@ func registerUpdateRoute(ctx context.Context, app *fiber.App, auth fiber.Handler
 		imageFilter := opts.FilterByImage(images, opts.Filter)
 
 		containerFilter := update.ContainerFilter(containers)
-		combinedFilter := func(c types.FilterableContainer) bool {
+		combinedFilter := func(c filters.FilterableContainer) bool {
 			return imageFilter(c) && containerFilter(c.Name(), true)
 		}
 

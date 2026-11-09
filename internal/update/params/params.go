@@ -5,16 +5,16 @@ import (
 	"time"
 
 	"github.com/nicholas-fedor/watchtower/internal/container"
+	"github.com/nicholas-fedor/watchtower/internal/container/filters"
 	"github.com/nicholas-fedor/watchtower/internal/observability/events"
 	gitConfig "github.com/nicholas-fedor/watchtower/internal/settings/config/git"
 	registryConfig "github.com/nicholas-fedor/watchtower/internal/settings/config/registry"
 	updateConfig "github.com/nicholas-fedor/watchtower/internal/settings/config/update"
-	"github.com/nicholas-fedor/watchtower/pkg/types"
 )
 
 // Params holds the settings that one update run applies to the containers it checks.
 type Params struct {
-	Filter              types.Filter            // Container filter.
+	Filter              filters.Filter          // Container filter.
 	ComposeProjects     map[string]string       // Compose project name to directory inside Watchtower.
 	CurrentContainerID  container.ContainerID   // ID of the current container being updated.
 	Git                 gitConfig.Defaults      // Credential-free Git association settings.

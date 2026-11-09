@@ -9,7 +9,7 @@ import (
 
 	"github.com/nicholas-fedor/watchtower/internal/container"
 	mockContainerClient "github.com/nicholas-fedor/watchtower/internal/container/client/mocks"
-	"github.com/nicholas-fedor/watchtower/pkg/types"
+	"github.com/nicholas-fedor/watchtower/internal/container/filters"
 )
 
 func TestRegisterImagesRoute(t *testing.T) {
@@ -22,7 +22,7 @@ func TestRegisterImagesRoute(t *testing.T) {
 		opts := Options{
 			EnableImagesAPI: true,
 			Client:          mockClient,
-			Filter:          func(_ types.FilterableContainer) bool { return true },
+			Filter:          func(_ filters.FilterableContainer) bool { return true },
 		}
 
 		registerImagesRoute(app, auth, opts)
@@ -48,7 +48,7 @@ func TestRegisterImagesRoute(t *testing.T) {
 		opts := Options{
 			EnableImagesAPI: true,
 			Client:          nil,
-			Filter:          func(_ types.FilterableContainer) bool { return true },
+			Filter:          func(_ filters.FilterableContainer) bool { return true },
 		}
 
 		registerImagesRoute(app, auth, opts)

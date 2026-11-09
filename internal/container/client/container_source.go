@@ -18,9 +18,9 @@ import (
 	dockerClient "github.com/moby/moby/client"
 
 	"github.com/nicholas-fedor/watchtower/internal/container"
+	"github.com/nicholas-fedor/watchtower/internal/container/filters"
 	"github.com/nicholas-fedor/watchtower/internal/container/recreate"
 	"github.com/nicholas-fedor/watchtower/internal/observability/logging"
-	"github.com/nicholas-fedor/watchtower/pkg/types"
 )
 
 // defaultStopSignal is the default signal for stopping containers ("SIGTERM").
@@ -56,7 +56,7 @@ func listSourceContainers(log *zerolog.Logger,
 	ctx context.Context,
 	api dockerClient.APIClient,
 	opts ClientOptions,
-	filter types.Filter,
+	filter filters.Filter,
 	isPodmanOptional ...bool,
 ) ([]*container.Container, error) {
 	clogVal := log.With().

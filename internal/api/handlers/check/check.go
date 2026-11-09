@@ -11,12 +11,12 @@ import (
 
 	"github.com/nicholas-fedor/watchtower/internal/container"
 	containerClient "github.com/nicholas-fedor/watchtower/internal/container/client"
+	"github.com/nicholas-fedor/watchtower/internal/container/filters"
 	containerImage "github.com/nicholas-fedor/watchtower/internal/container/image"
 	"github.com/nicholas-fedor/watchtower/internal/container/oci"
 	"github.com/nicholas-fedor/watchtower/internal/container/provenance"
 	"github.com/nicholas-fedor/watchtower/internal/git"
 	updateParams "github.com/nicholas-fedor/watchtower/internal/update/params"
-	"github.com/nicholas-fedor/watchtower/pkg/types"
 )
 
 // ContainerCheck holds the update availability result for a single container.
@@ -103,7 +103,7 @@ func extractFilterParams(c fiber.Ctx, key string) []string {
 func CheckForUpdates(log *zerolog.Logger,
 	ctx context.Context,
 	client containerClient.Client,
-	filter types.Filter,
+	filter filters.Filter,
 	params updateParams.Params,
 	gitClient *git.Client,
 ) ([]ContainerCheck, error) {

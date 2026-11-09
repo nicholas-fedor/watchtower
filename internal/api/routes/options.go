@@ -11,13 +11,13 @@ import (
 
 	"github.com/nicholas-fedor/watchtower/internal/api/handlers/check"
 	containerClient "github.com/nicholas-fedor/watchtower/internal/container/client"
+	"github.com/nicholas-fedor/watchtower/internal/container/filters"
 	"github.com/nicholas-fedor/watchtower/internal/git"
 	"github.com/nicholas-fedor/watchtower/internal/observability/events"
 	"github.com/nicholas-fedor/watchtower/internal/observability/logging"
 	mt "github.com/nicholas-fedor/watchtower/internal/observability/metrics"
 	updateParams "github.com/nicholas-fedor/watchtower/internal/update/params"
 	"github.com/nicholas-fedor/watchtower/internal/update/schedule"
-	"github.com/nicholas-fedor/watchtower/pkg/types"
 )
 
 var (
@@ -72,16 +72,16 @@ type Options struct {
 	// New also attaches notify=no on request and rate-limit log paths.
 	Logger *zerolog.Logger
 	// Filter is the process-wide container filter predicate.
-	Filter types.Filter
+	Filter filters.Filter
 	// UpdateLock serializes update sessions. It must be the lock the scheduler
 	// uses, so API and scheduled updates never run at the same time.
 	UpdateLock *schedule.UpdateLock
 	// GitClient inspects remotes for Git-watched containers on /v1/check.
 	GitClient *git.Client
 	// RunUpdatesWithNotifications runs the scan-and-update pipeline for HTTP update requests.
-	RunUpdatesWithNotifications func(context.Context, types.Filter, updateParams.Params) *mt.Metric
+	RunUpdatesWithNotifications func(context.Context, filters.Filter, updateParams.Params) *mt.Metric
 	// FilterByImage builds an image-scoped filter for update and check requests.
-	FilterByImage func([]string, types.Filter) types.Filter
+	FilterByImage func([]string, filters.Filter) filters.Filter
 	// DefaultMetrics returns the process metrics store.
 	DefaultMetrics func() *mt.Metrics
 	// WriteStartupMessage writes the blocking-mode startup message when the update API starts.

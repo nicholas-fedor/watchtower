@@ -10,9 +10,9 @@ import (
 
 	"github.com/nicholas-fedor/watchtower/internal/container"
 	containerClient "github.com/nicholas-fedor/watchtower/internal/container/client"
+	"github.com/nicholas-fedor/watchtower/internal/container/filters"
 	containerImage "github.com/nicholas-fedor/watchtower/internal/container/image"
 	updateParams "github.com/nicholas-fedor/watchtower/internal/update/params"
-	"github.com/nicholas-fedor/watchtower/pkg/types"
 )
 
 // ContainerDetails holds detailed information about a single watched container.
@@ -139,7 +139,7 @@ func (h *Handler) Handle(c fiber.Ctx) error {
 func GetContainerDetails(
 	ctx context.Context,
 	client containerClient.Client,
-	filter types.Filter,
+	filter filters.Filter,
 	nameFilter,
 	imageFilter string,
 	params updateParams.Params,

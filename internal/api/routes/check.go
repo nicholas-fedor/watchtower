@@ -8,7 +8,7 @@ import (
 
 	"github.com/nicholas-fedor/watchtower/internal/api/handlers/check"
 	"github.com/nicholas-fedor/watchtower/internal/api/handlers/update"
-	"github.com/nicholas-fedor/watchtower/pkg/types"
+	"github.com/nicholas-fedor/watchtower/internal/container/filters"
 )
 
 func registerCheckRoute(app *fiber.App, auth fiber.Handler, opts Options) {
@@ -27,7 +27,7 @@ func registerCheckRoute(app *fiber.App, auth fiber.Handler, opts Options) {
 		func(ctx context.Context, images, names []string) ([]check.ContainerCheck, error) {
 			imageFilter := opts.FilterByImage(images, opts.Filter)
 			containerFilter := update.ContainerFilter(names)
-			combinedFilter := func(c types.FilterableContainer) bool {
+			combinedFilter := func(c filters.FilterableContainer) bool {
 				return imageFilter(c) && containerFilter(c.Name(), true)
 			}
 

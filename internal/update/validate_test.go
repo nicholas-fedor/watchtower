@@ -13,10 +13,10 @@ import (
 	composeLabels "github.com/nicholas-fedor/watchtower/internal/compose/labels"
 	"github.com/nicholas-fedor/watchtower/internal/container"
 	mockContainerClient "github.com/nicholas-fedor/watchtower/internal/container/client/mocks"
+	"github.com/nicholas-fedor/watchtower/internal/container/filters"
 	containerLabels "github.com/nicholas-fedor/watchtower/internal/container/labels"
 	"github.com/nicholas-fedor/watchtower/internal/testutil/containerfixture"
 	"github.com/nicholas-fedor/watchtower/internal/testutil/modelfixture"
-	"github.com/nicholas-fedor/watchtower/pkg/types"
 )
 
 // TestValidateRollingRestartDependencies verifies that rolling restarts are
@@ -25,7 +25,7 @@ func TestValidateRollingRestartDependencies(t *testing.T) {
 	t.Parallel()
 
 	// filter accepts every container.
-	filter := types.Filter(func(types.FilterableContainer) bool { return true })
+	filter := filters.Filter(func(filters.FilterableContainer) bool { return true })
 
 	t.Run("ListContainers fails", func(t *testing.T) {
 		t.Parallel()
@@ -168,14 +168,14 @@ func labeledContainer(name string, labels map[string]string) *container.Containe
 //   - containers: Containers the fake daemon holds.
 //
 // Returns:
-//   - func(context.Context, ...types.Filter) ([]*container.Container, error): The ListContainers implementation.
+//   - func(context.Context, ...filters.Filter) ([]*container.Container, error): The ListContainers implementation.
 func listFiltered(
 	selected *[]*container.Container,
 	containers ...*container.Container,
-) func(context.Context, ...types.Filter) ([]*container.Container, error) {
-	return func(_ context.Context, filters ...types.Filter) ([]*container.Container, error) {
+) func(context.Context, ...filters.Filter) ([]*container.Container, error) {
+	return func(_ context.Context, predicates ...filters.Filter) ([]*container.Container, error) {
 		for _, c := range containers {
-			if !slices.ContainsFunc(filters, func(f types.Filter) bool { return !f(c) }) {
+			if !slices.ContainsFunc(predicates, func(f filters.Filter) bool { return !f(c) }) {
 				*selected = append(*selected, c)
 			}
 		}
@@ -212,7 +212,7 @@ func TestScopeValidationErrorCases(t *testing.T) {
 				RunAndReturn(listFiltered(&selected, unscoped, scoped))
 
 			// Create unscoped filter (empty scope should default to unscoped)
-			filter := func(c types.FilterableContainer) bool {
+			filter := func(c filters.FilterableContainer) bool {
 				scope, hasScope := c.Scope()
 				if !hasScope || scope == "" {
 					return true // Unscoped containers pass
@@ -243,7 +243,7 @@ func TestScopeValidationErrorCases(t *testing.T) {
 				RunAndReturn(listFiltered(&selected, container1, container2))
 
 			// Filter that matches malformed scope
-			filter := func(c types.FilterableContainer) bool {
+			filter := func(c filters.FilterableContainer) bool {
 				scope, _ := c.Scope()
 
 				return scope == "invalid$scope@123"
@@ -273,7 +273,7 @@ func TestScopeValidationErrorCases(t *testing.T) {
 				RunAndReturn(listFiltered(&selected, spaced, trimmed))
 
 			// Filter that expects the scope as written
-			filter := func(c types.FilterableContainer) bool {
+			filter := func(c filters.FilterableContainer) bool {
 				scope, _ := c.Scope()
 
 				return scope == "  spaced scope  " // Exact match including spaces
@@ -307,7 +307,7 @@ func TestScopeValidationErrorCases(t *testing.T) {
 				RunAndReturn(listFiltered(&selected, unscoped, scoped))
 
 			// Filter that handles missing scopes
-			filter := func(c types.FilterableContainer) bool {
+			filter := func(c filters.FilterableContainer) bool {
 				_, hasScope := c.Scope()
 
 				return !hasScope // Include containers without scope labels
@@ -338,7 +338,7 @@ func TestScopeValidationErrorCases(t *testing.T) {
 				RunAndReturn(listFiltered(&selected, container1, other, container2))
 
 			// Filter requiring scope consistency
-			filter := func(c types.FilterableContainer) bool {
+			filter := func(c filters.FilterableContainer) bool {
 				scope, hasScope := c.Scope()
 
 				return hasScope && scope == "consistent-scope"
@@ -368,7 +368,7 @@ func TestScopeValidationErrorCases(t *testing.T) {
 				RunAndReturn(listFiltered(&selected, emptyScope, unscoped))
 
 			// Filter that detects empty scope labels
-			filter := func(c types.FilterableContainer) bool {
+			filter := func(c filters.FilterableContainer) bool {
 				scope, hasScope := c.Scope()
 
 				return hasScope && scope == "" // Allow empty scoped containers

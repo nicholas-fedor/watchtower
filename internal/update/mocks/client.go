@@ -12,6 +12,7 @@ import (
 
 	"github.com/nicholas-fedor/watchtower/internal/container"
 	containerClient "github.com/nicholas-fedor/watchtower/internal/container/client"
+	"github.com/nicholas-fedor/watchtower/internal/container/filters"
 	"github.com/nicholas-fedor/watchtower/internal/container/oci"
 	updateConfig "github.com/nicholas-fedor/watchtower/internal/settings/config/update"
 	"github.com/nicholas-fedor/watchtower/pkg/types"
@@ -176,7 +177,7 @@ func (client MockClient) checkContextCancellation(ctx context.Context) error {
 }
 
 // ListContainers returns containers from TestData, optionally filtered.
-func (client MockClient) ListContainers(ctx context.Context, filter ...types.Filter) ([]*container.Container, error) {
+func (client MockClient) ListContainers(ctx context.Context, filter ...filters.Filter) ([]*container.Container, error) {
 	client.TestData.ListContainersCount.Add(1)
 
 	if err := client.checkContextCancellation(ctx); err != nil {

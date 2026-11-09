@@ -22,17 +22,17 @@ import (
 	fiberRecover "github.com/gofiber/fiber/v3/middleware/recover"
 
 	mockContainerClient "github.com/nicholas-fedor/watchtower/internal/container/client/mocks"
+	"github.com/nicholas-fedor/watchtower/internal/container/filters"
 	"github.com/nicholas-fedor/watchtower/internal/observability/events"
 	"github.com/nicholas-fedor/watchtower/internal/observability/metrics"
 	updateParams "github.com/nicholas-fedor/watchtower/internal/update/params"
 	"github.com/nicholas-fedor/watchtower/internal/update/schedule"
-	"github.com/nicholas-fedor/watchtower/pkg/types"
 )
 
 var testMetrics = metrics.Default()
 
-func makeFilter(_ *testing.T) types.Filter {
-	return func(_ types.FilterableContainer) bool { return true }
+func makeFilter(_ *testing.T) filters.Filter {
+	return func(_ filters.FilterableContainer) bool { return true }
 }
 
 // testApp creates a minimal Fiber app for route registration tests.
@@ -92,10 +92,10 @@ func TestValidateAndRegister(t *testing.T) {
 			EnableUpdateAPI: true,
 			UpdateLock:      schedule.NewUpdateLock(),
 			UnblockHTTPAPI:  true,
-			RunUpdatesWithNotifications: func(_ context.Context, _ types.Filter, _ updateParams.Params) *metrics.Metric {
+			RunUpdatesWithNotifications: func(_ context.Context, _ filters.Filter, _ updateParams.Params) *metrics.Metric {
 				return &metrics.Metric{}
 			},
-			FilterByImage:  func(_ []string, f types.Filter) types.Filter { return f },
+			FilterByImage:  func(_ []string, f filters.Filter) filters.Filter { return f },
 			DefaultMetrics: func() *metrics.Metrics { return testMetrics },
 		}
 	}
@@ -180,7 +180,7 @@ func TestValidateAndRegister(t *testing.T) {
 			name: "check with FilterByImage is valid",
 			opts: Options{
 				EnableCheckAPI: true,
-				FilterByImage:  func(_ []string, f types.Filter) types.Filter { return f },
+				FilterByImage:  func(_ []string, f filters.Filter) filters.Filter { return f },
 				Client:         mockContainerClient.NewMockClient(t),
 			},
 			wantErr: false,
@@ -254,9 +254,9 @@ func TestRegister(t *testing.T) {
 			app := testApp()
 			auth := testAuthMiddleware()
 
-			var updateFn func(ctx context.Context, f types.Filter, p updateParams.Params) *metrics.Metric
+			var updateFn func(ctx context.Context, f filters.Filter, p updateParams.Params) *metrics.Metric
 			if tt.enableUpdateAPI {
-				updateFn = func(_ context.Context, _ types.Filter, _ updateParams.Params) *metrics.Metric {
+				updateFn = func(_ context.Context, _ filters.Filter, _ updateParams.Params) *metrics.Metric {
 					return &metrics.Metric{}
 				}
 			}
@@ -265,7 +265,7 @@ func TestRegister(t *testing.T) {
 				EnableUpdateAPI:             tt.enableUpdateAPI,
 				UnblockHTTPAPI:              true,
 				RunUpdatesWithNotifications: updateFn,
-				FilterByImage:               func(_ []string, f types.Filter) types.Filter { return f },
+				FilterByImage:               func(_ []string, f filters.Filter) filters.Filter { return f },
 				DefaultMetrics:              func() *metrics.Metrics { return testMetrics },
 				EnableMetricsAPI:            tt.enableMetricsAPI,
 				EnableContainersAPI:         tt.enableContainersAPI,

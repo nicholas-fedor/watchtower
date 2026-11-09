@@ -8,7 +8,7 @@ import (
 	"github.com/rs/zerolog"
 
 	containerClient "github.com/nicholas-fedor/watchtower/internal/container/client"
-	"github.com/nicholas-fedor/watchtower/pkg/types"
+	"github.com/nicholas-fedor/watchtower/internal/container/filters"
 )
 
 // Errors for validating the update settings.
@@ -38,7 +38,7 @@ func ValidateRollingRestartDependencies(
 	log *zerolog.Logger,
 	ctx context.Context,
 	client containerClient.Client,
-	filter types.Filter,
+	filter filters.Filter,
 	useComposeDependsOn bool,
 ) error {
 	log.Debug().Msg("Performing pre-update rolling restart dependency validation")
