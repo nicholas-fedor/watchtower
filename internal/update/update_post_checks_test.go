@@ -67,7 +67,7 @@ func TestUpdate_PostChecksTargetCurrentContainers(t *testing.T) {
 			scanned := appContainer(oldID)
 			afterUpdate := scanned
 
-			client := mockUpdate.NewMockClient(t)
+			client := newMockClient(t)
 			client.EXPECT().IsContainerStale(mock.Anything, scanned, mock.Anything).
 				Return(tt.stale, container.ImageID("sha256:new"), "", nil).Once()
 

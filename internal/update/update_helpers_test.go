@@ -6,6 +6,7 @@ import (
 
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/mock"
 
 	dockerContainer "github.com/moby/moby/api/types/container"
 	dockerImage "github.com/moby/moby/api/types/image"
@@ -26,6 +27,11 @@ type sessionBatch struct {
 	ended int             // Times the session ended the batch.
 }
 
+// The hand-written fake must satisfy the update client interface. Nothing else
+// reports a missing or renamed method until a test passes it where the
+// interface is required.
+var _ Client = mockUpdate.FakeClient{}
+
 // record keeps report as one the session sent. It serves as the send of an
 // update session's notification batch.
 //
@@ -33,6 +39,25 @@ type sessionBatch struct {
 //   - report: The report sent.
 func (b *sessionBatch) record(report *state.Report) {
 	b.sent = append(b.sent, report)
+}
+
+// newMockClient returns a client mock that stores no copy files. The restart
+// package's tests cover copy files, so the update tests leave the copy-file
+// calls unchecked.
+//
+// Parameters:
+//   - t: Test the mock belongs to.
+//
+// Returns:
+//   - *mockUpdate.MockClient: The client mock.
+func newMockClient(t *testing.T) *mockUpdate.MockClient {
+	t.Helper()
+
+	client := mockUpdate.NewMockClient(t)
+	client.EXPECT().SnapshotCopyFiles(mock.Anything, mock.Anything).Return(nil).Maybe()
+	client.EXPECT().DiscardCopyFiles(mock.Anything).Maybe()
+
+	return client
 }
 
 // updateImplicitRestart marks the containers that depend on a restarting

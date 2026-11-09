@@ -2115,9 +2115,11 @@ func TestClientErrorsNamedOnce(t *testing.T) {
 				clientErr := errors.New(text)
 				source := staleMockContainer()
 				client := mockRestart.NewMockClient(t)
+				client.EXPECT().SnapshotCopyFiles(mock.Anything, source).Return(nil)
 				client.EXPECT().
 					StopAndRemoveContainer(mock.Anything, source, time.Second).
 					Return(clientErr)
+				client.EXPECT().DiscardCopyFiles(source.ID())
 
 				stopped, err := stopStaleContainer(
 					newTestLogger(t),

@@ -49,7 +49,7 @@ func TestRunUpdatesWithNotifications_UpdateErrorKeepsPartialResults(t *testing.T
 	ctx, cancel := context.WithCancel(t.Context())
 	defer cancel()
 
-	client := mockUpdate.NewMockClient(t)
+	client := newMockClient(t)
 	client.EXPECT().ListContainers(mock.Anything, mock.Anything).
 		Return([]*container.Container{first, second}, nil).Once()
 	client.EXPECT().IsContainerStale(mock.Anything, mock.Anything, mock.Anything).

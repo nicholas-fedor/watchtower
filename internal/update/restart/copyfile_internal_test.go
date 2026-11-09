@@ -12,19 +12,10 @@ import (
 	cerrdefs "github.com/containerd/errdefs"
 
 	"github.com/nicholas-fedor/watchtower/internal/container"
-	containerClient "github.com/nicholas-fedor/watchtower/internal/container/client"
-	mockContainerClient "github.com/nicholas-fedor/watchtower/internal/container/client/mocks"
 	mockUpdate "github.com/nicholas-fedor/watchtower/internal/update/mocks"
 	updateParams "github.com/nicholas-fedor/watchtower/internal/update/params"
 	mockRestart "github.com/nicholas-fedor/watchtower/internal/update/restart/mocks"
 )
-
-// copyFileAwareClient implements [Client] and the container client's copy-file
-// store by composing mockery-generated mocks.
-type copyFileAwareClient struct {
-	Client
-	containerClient.CopyFileStore
-}
 
 // staleMockContainer returns a stale container for the copy-file recreate tests.
 //
@@ -37,77 +28,10 @@ func staleMockContainer() *container.Container {
 	return source
 }
 
-// newCopyFileAwareClient returns a client that is also a copy-file store, with
-// the mocks behind each side.
-//
-// Parameters:
-//   - t: Test the mocks belong to.
-//
-// Returns:
-//   - *copyFileAwareClient: The combined client.
-//   - *mockRestart.MockClient: Mock behind the client methods.
-//   - *mockContainerClient.MockCopyFileStore: Mock behind the copy-file store methods.
-func newCopyFileAwareClient(t *testing.T) (
-	*copyFileAwareClient,
-	*mockRestart.MockClient,
-	*mockContainerClient.MockCopyFileStore,
-) {
-	t.Helper()
-
-	mockClient := mockRestart.NewMockClient(t)
-	mockStore := mockContainerClient.NewMockCopyFileStore(t)
-
-	return &copyFileAwareClient{
-		Client:        mockClient,
-		CopyFileStore: mockStore,
-	}, mockClient, mockStore
-}
-
-// TestCopyFileRecreateHelpers verifies that labeled files are snapshotted and
-// leftovers discarded only on a client that stores copy files, and that
-// snapshot failures are wrapped.
-func TestCopyFileRecreateHelpers(t *testing.T) {
-	t.Parallel()
-
-	t.Run("skips snapshot when the client is not a CopyFileStore", func(t *testing.T) {
-		t.Parallel()
-
-		client := mockRestart.NewMockClient(t)
-		source := staleMockContainer()
-
-		require.NoError(t, snapshotCopyFilesForRecreate(t.Context(), client, source))
-		discardCopyFilesForRecreate(client, source.ID())
-	})
-
-	t.Run("wraps SnapshotCopyFiles errors", func(t *testing.T) {
-		t.Parallel()
-
-		client, _, mockStore := newCopyFileAwareClient(t)
-		source := staleMockContainer()
-		mockStore.EXPECT().
-			SnapshotCopyFiles(mock.Anything, source).
-			Return(errors.New("denied"))
-
-		err := snapshotCopyFilesForRecreate(t.Context(), client, source)
-		require.Error(t, err)
-		assert.Contains(t, err.Error(), "snapshot copy-file paths")
-	})
-
-	t.Run("discards leftovers on a CopyFileStore client", func(t *testing.T) {
-		t.Parallel()
-
-		client, _, mockStore := newCopyFileAwareClient(t)
-		source := staleMockContainer()
-		mockStore.EXPECT().DiscardCopyFiles(source.ID())
-
-		discardCopyFilesForRecreate(client, source.ID())
-	})
-}
-
 // TestStopStaleContainerCopyFile verifies that a stale container's labeled
 // files are snapshotted before it stops and kept on success, that a failed
-// snapshot prevents the stop, and that the snapshot is discarded when the stop
-// fails or the container is already gone.
+// snapshot prevents the stop and is reported as such, and that the snapshot is
+// discarded when the stop fails or the container is already gone.
 func TestStopStaleContainerCopyFile(t *testing.T) {
 	t.Parallel()
 
@@ -115,11 +39,11 @@ func TestStopStaleContainerCopyFile(t *testing.T) {
 		t.Parallel()
 
 		source := staleMockContainer()
-		client, mockClient, mockStore := newCopyFileAwareClient(t)
-		mockStore.EXPECT().
+		client := mockRestart.NewMockClient(t)
+		client.EXPECT().
 			SnapshotCopyFiles(mock.Anything, source).
 			Return(nil)
-		mockClient.EXPECT().
+		client.EXPECT().
 			StopAndRemoveContainer(mock.Anything, source, time.Second).
 			Return(nil)
 
@@ -138,10 +62,12 @@ func TestStopStaleContainerCopyFile(t *testing.T) {
 		t.Parallel()
 
 		source := staleMockContainer()
-		client, _, mockStore := newCopyFileAwareClient(t)
-		mockStore.EXPECT().
+		client := mockRestart.NewMockClient(t)
+		snapshotErr := errors.New("denied")
+
+		client.EXPECT().
 			SnapshotCopyFiles(mock.Anything, source).
-			Return(errors.New("denied"))
+			Return(snapshotErr)
 
 		_, err := stopStaleContainer(
 			newTestLogger(t),
@@ -150,21 +76,22 @@ func TestStopStaleContainerCopyFile(t *testing.T) {
 			client,
 			updateParams.Params{Timeout: time.Second},
 		)
-		require.Error(t, err)
+		require.ErrorIs(t, err, snapshotErr)
+		assert.ErrorContains(t, err, "snapshot copy-file paths")
 	})
 
 	t.Run("discards the snapshot when stop fails", func(t *testing.T) {
 		t.Parallel()
 
 		source := staleMockContainer()
-		client, mockClient, mockStore := newCopyFileAwareClient(t)
-		mockStore.EXPECT().
+		client := mockRestart.NewMockClient(t)
+		client.EXPECT().
 			SnapshotCopyFiles(mock.Anything, source).
 			Return(nil)
-		mockClient.EXPECT().
+		client.EXPECT().
 			StopAndRemoveContainer(mock.Anything, source, time.Second).
 			Return(errors.New("busy"))
-		mockStore.EXPECT().DiscardCopyFiles(source.ID())
+		client.EXPECT().DiscardCopyFiles(source.ID())
 
 		_, err := stopStaleContainer(
 			newTestLogger(t),
@@ -180,14 +107,14 @@ func TestStopStaleContainerCopyFile(t *testing.T) {
 		t.Parallel()
 
 		source := staleMockContainer()
-		client, mockClient, mockStore := newCopyFileAwareClient(t)
-		mockStore.EXPECT().
+		client := mockRestart.NewMockClient(t)
+		client.EXPECT().
 			SnapshotCopyFiles(mock.Anything, source).
 			Return(nil)
-		mockClient.EXPECT().
+		client.EXPECT().
 			StopAndRemoveContainer(mock.Anything, source, time.Second).
 			Return(cerrdefs.ErrNotFound)
-		mockStore.EXPECT().DiscardCopyFiles(source.ID())
+		client.EXPECT().DiscardCopyFiles(source.ID())
 
 		stopped, err := stopStaleContainer(
 			newTestLogger(t),

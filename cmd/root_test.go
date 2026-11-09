@@ -255,6 +255,20 @@ func TestCreateSignalContextDefault(t *testing.T) {
 	}
 }
 
+// TestNewClient_FailureLeavesNoClient verifies that newClient returns a nil
+// client when the Docker client cannot be created. preRun and the exit path
+// compare the client with nil, which an interface holding a nil pointer would
+// not equal. It sets environment variables, so it does not run in parallel.
+func TestNewClient_FailureLeavesNoClient(t *testing.T) {
+	t.Setenv("DOCKER_HOST", "tcp://[::1")
+	t.Setenv("DOCKER_TLS_VERIFY", "")
+	t.Setenv("DOCKER_API_VERSION", "")
+
+	got, err := newClient(t.Context(), newTestLogger(t), containerClient.ClientOptions{})
+	require.Error(t, err)
+	assert.Equal(t, got, nil, "newClient returned a non-nil client with its error")
+}
+
 // TestSignalContextCancellation verifies that the signal context properly cancels
 // when signals are received, enabling graceful shutdown.
 func TestSignalContextCancellation(t *testing.T) {

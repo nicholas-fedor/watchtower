@@ -127,7 +127,14 @@ var (
 	// the resolved client options, so tests can substitute a mock client without
 	// a Docker daemon.
 	newClient = func(ctx context.Context, log *zerolog.Logger, opts containerClient.ClientOptions) (DockerClient, error) {
-		return containerClient.NewClient(ctx, log, opts)
+		dockerClient, err := containerClient.NewClient(ctx, log, opts)
+		if err != nil {
+			// Return a nil interface, which callers compare with nil, rather
+			// than one holding a nil pointer.
+			return nil, err //nolint:wrapcheck // NewClient's error already names the failed step.
+		}
+
+		return dockerClient, nil
 	}
 
 	// processFs is the filesystem holding the container marker files and the

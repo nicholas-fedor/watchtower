@@ -2968,7 +2968,7 @@ func TestUpdate_WarnsOnUnresolvedDependsOn(t *testing.T) {
 		),
 	}
 
-	client := mockUpdate.NewMockClient(t)
+	client := newMockClient(t)
 	client.EXPECT().ListContainers(mock.Anything, mock.Anything).Return(containers, nil).Once()
 	client.EXPECT().IsContainerStale(mock.Anything, mock.Anything, mock.Anything).
 		Return(false, container.ImageID(""), "", nil)

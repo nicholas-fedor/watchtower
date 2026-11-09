@@ -11,17 +11,11 @@ import (
 	dockerContainer "github.com/moby/moby/api/types/container"
 
 	"github.com/nicholas-fedor/watchtower/internal/container"
-	containerClient "github.com/nicholas-fedor/watchtower/internal/container/client"
 	"github.com/nicholas-fedor/watchtower/internal/container/filters"
 	"github.com/nicholas-fedor/watchtower/internal/container/oci"
 	updateConfig "github.com/nicholas-fedor/watchtower/internal/settings/config/update"
 	"github.com/nicholas-fedor/watchtower/pkg/types"
 )
-
-// FakeClient must satisfy the client interface. This fake is hand written
-// rather than generated, so nothing else would report a missing or renamed
-// method until a test happened to pass it where the interface is required.
-var _ containerClient.Client = FakeClient{}
 
 // FakeClient is a fake Watchtower client for testing. It keeps container state
 // across calls, and TestData configures its behavior.
@@ -609,18 +603,14 @@ func (client FakeClient) GetImageDiskUsage(ctx context.Context) (types.ImageDisk
 	return client.TestData.ImageDiskUsage, nil
 }
 
-// GetInfo returns fake system information for testing.
-func (client FakeClient) GetInfo(ctx context.Context) (types.SystemInfo, error) {
-	if err := client.checkContextCancellation(ctx); err != nil {
-		return types.SystemInfo{}, err
-	}
-
-	return types.SystemInfo{
-		Name:          "docker",
-		ServerVersion: "1.50",
-		OSType:        "linux",
-	}, nil
+// SnapshotCopyFiles stores nothing. The fake keeps no files, so a replacement
+// gets none written into it.
+func (client FakeClient) SnapshotCopyFiles(context.Context, *container.Container) error {
+	return nil
 }
+
+// DiscardCopyFiles does nothing, since the fake stores no copy files.
+func (client FakeClient) DiscardCopyFiles(container.ContainerID) {}
 
 // Ping returns nil to simulate a healthy Docker daemon.
 func (client FakeClient) Ping(ctx context.Context) error {

@@ -216,7 +216,7 @@ func TestUpdate_OldInstanceImageJoinsSessionCleanup(t *testing.T) {
 		"watchtower-old-a", "org/watchtower:1")
 
 	// The mock fails the test on any image removal.
-	client := mockUpdate.NewMockClient(t)
+	client := newMockClient(t)
 	client.EXPECT().ListContainers(mock.Anything, mock.Anything).Return([]*container.Container{current, old}, nil)
 	client.EXPECT().StopAndRemoveContainer(mock.Anything, old, mock.Anything).Return(nil).Once()
 	client.EXPECT().IsContainerStale(mock.Anything, mock.Anything, mock.Anything).
@@ -256,7 +256,7 @@ func TestUpdate_SortFailureKeepsOldInstanceImage(t *testing.T) {
 	)
 
 	// The mock fails the test on any image removal.
-	client := mockUpdate.NewMockClient(t)
+	client := newMockClient(t)
 	client.EXPECT().ListContainers(mock.Anything, mock.Anything).
 		Return([]*container.Container{current, old, app1, app2}, nil)
 	client.EXPECT().StopAndRemoveContainer(mock.Anything, old, mock.Anything).Return(nil).Once()
@@ -284,7 +284,7 @@ func TestRunUpdatesWithNotifications_RemovesOldInstanceImageOnce(t *testing.T) {
 	old := cleanupTestWatchtower("a000000000000000000000000000000000000000000000000000000000000000",
 		"watchtower-old-a", "org/watchtower:1")
 
-	client := mockUpdate.NewMockClient(t)
+	client := newMockClient(t)
 	client.EXPECT().ListContainers(mock.Anything, mock.Anything).Return([]*container.Container{current, old}, nil)
 	client.EXPECT().StopAndRemoveContainer(mock.Anything, old, mock.Anything).Return(nil).Once()
 	client.EXPECT().IsContainerStale(mock.Anything, mock.Anything, mock.Anything).

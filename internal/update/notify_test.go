@@ -145,7 +145,7 @@ func TestRunUpdatesWithNotifications_StoppingProcessMakesNoUpdate(t *testing.T) 
 
 	metric := RunUpdatesWithNotifications(ctx, RunUpdatesWithNotificationsParams{
 		Logger:           newTestLogger(t),
-		Client:           mockUpdate.NewMockClient(t),
+		Client:           newMockClient(t),
 		Notifier:         mockUpdate.NewMockNotifier(t),
 		EventBroadcaster: broadcaster,
 		Update:           defaultTestUpdateParams(filters.NoFilter),
@@ -188,7 +188,7 @@ func TestRunUpdatesWithNotifications_PanicEndsSession(t *testing.T) {
 
 	log, output := logcapture.New(zerolog.DebugLevel)
 
-	client := mockUpdate.NewMockClient(t)
+	client := newMockClient(t)
 	client.EXPECT().ListContainers(mock.Anything, mock.Anything).
 		RunAndReturn(func(context.Context, ...filters.Filter) ([]*container.Container, error) {
 			panic("boom")

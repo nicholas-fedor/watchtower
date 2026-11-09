@@ -13,7 +13,6 @@ import (
 	cerrdefs "github.com/containerd/errdefs"
 
 	"github.com/nicholas-fedor/watchtower/internal/container"
-	containerClient "github.com/nicholas-fedor/watchtower/internal/container/client"
 	"github.com/nicholas-fedor/watchtower/internal/container/hooks"
 	"github.com/nicholas-fedor/watchtower/internal/container/labels"
 	"github.com/nicholas-fedor/watchtower/internal/observability/logging"
@@ -46,6 +45,12 @@ type Client interface {
 	// WaitForContainerHealthy waits until the container is healthy, for up to
 	// timeout. A timeout of zero or less waits without a limit.
 	WaitForContainerHealthy(ctx context.Context, containerID container.ContainerID, timeout time.Duration) error
+	// SnapshotCopyFiles stores the container's labeled copy files, so they
+	// can be written into its replacement.
+	SnapshotCopyFiles(ctx context.Context, source *container.Container) error
+	// DiscardCopyFiles drops the stored copy files of a container that is not
+	// replaced.
+	DiscardCopyFiles(containerID container.ContainerID)
 }
 
 // Errors for restarting containers.
@@ -522,14 +527,14 @@ func stopStaleContainer(
 		}
 	}
 
-	err := snapshotCopyFilesForRecreate(ctx, client, c)
+	err := client.SnapshotCopyFiles(ctx, c)
 	if err != nil {
 		log.Debug().
 			Err(err).
 			Fields(fields).
 			Msg("Failed to snapshot copy-file paths")
 
-		return false, err
+		return false, fmt.Errorf("snapshot copy-file paths: %w", err)
 	}
 
 	// Stop the container with the configured timeout.
@@ -540,7 +545,7 @@ func stopStaleContainer(
 	)
 	if err != nil {
 		// Nothing recreates the container after a failed stop, so drop its snapshot.
-		discardCopyFilesForRecreate(client, c.ID())
+		client.DiscardCopyFiles(c.ID())
 
 		// The container was removed or replaced after the scan. Recreating it
 		// from the scan's inspect data would bring back a removed container.
@@ -562,47 +567,6 @@ func stopStaleContainer(
 	}
 
 	return true, nil
-}
-
-// snapshotCopyFilesForRecreate stores labeled files before the source is removed.
-//
-// Parameters:
-//   - ctx: Context for cancellation and timeout control.
-//   - client: Docker client. No-op unless it implements container.CopyFileStore.
-//   - source: Container about to be stopped and removed.
-//
-// Returns:
-//   - error: Non-nil if a labeled path cannot be snapshotted.
-func snapshotCopyFilesForRecreate(
-	ctx context.Context,
-	client Client,
-	source *container.Container,
-) error {
-	store, ok := client.(containerClient.CopyFileStore)
-	if !ok {
-		return nil
-	}
-
-	err := store.SnapshotCopyFiles(ctx, source)
-	if err != nil {
-		return fmt.Errorf("snapshot copy-file paths: %w", err)
-	}
-
-	return nil
-}
-
-// discardCopyFilesForRecreate drops a leftover snapshot after a failed stop.
-//
-// Parameters:
-//   - client: Docker client. No-op unless it implements container.CopyFileStore.
-//   - containerID: Source container ID whose snapshot should be discarded.
-func discardCopyFilesForRecreate(client Client, containerID container.ContainerID) {
-	store, ok := client.(containerClient.CopyFileStore)
-	if !ok {
-		return
-	}
-
-	store.DiscardCopyFiles(containerID)
 }
 
 // restartContainersInSortedOrder restarts stopped containers.
