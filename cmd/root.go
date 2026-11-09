@@ -6,6 +6,9 @@ import (
 	"io/fs"
 	"os"
 	"os/signal"
+	"slices"
+	"strconv"
+	"strings"
 	"syscall"
 	"time"
 
@@ -138,7 +141,8 @@ var (
 	}
 
 	// processFs is the filesystem holding the container marker files and the
-	// /proc files that self container ID detection reads.
+	// /proc files that self container ID detection and main process detection
+	// read.
 	//
 	// Tests replace it to control whether Watchtower appears to run in a
 	// container and which container ID it detects.
@@ -627,7 +631,7 @@ func (p *process) run(command *cobra.Command, args []string) error {
 
 	if appCfg.Mode.HealthCheck {
 		if isContainerMainProcess() {
-			time.Sleep(1 * time.Second)
+			sleepFunc(1 * time.Second)
 
 			return &exitError{
 				err:  nil,
@@ -1050,18 +1054,32 @@ func (p *process) disableRestartsBeforeExit(cmd *cobra.Command) {
 // The main process is PID 1. When the container is started with an init,
 // such as docker run --init, the init runs as PID 1 and the main process is
 // its child. A command started with docker exec, such as a health check
-// probe, has parent PID 0. A host binary is never PID 1. Its parent PID is 1
-// when an init system such as systemd starts it, so the parent PID counts
-// only in a container.
+// probe, usually has parent PID 0. Some kernels, such as OpenVZ's, report
+// parent PID 1 for it although PID 1 did not start it. The parent PID
+// therefore counts only when PID 1 lists this process among its children.
+// A kernel without that list never counts it. A host binary is never PID 1.
+// Its parent PID is 1 when an init system such as systemd starts it, so the
+// parent PID counts only in a container.
 //
 // Returns:
 //   - bool: True for the main process of a container.
 func isContainerMainProcess() bool {
-	if processID() == 1 {
+	pid := processID()
+	if pid == 1 {
 		return true
 	}
 
-	return parentProcessID() == 1 && containerClient.InContainer(processFs)
+	if parentProcessID() != 1 || !containerClient.InContainer(processFs) {
+		return false
+	}
+
+	// The kernel provides this list only when built with CONFIG_PROC_CHILDREN.
+	children, err := fs.ReadFile(processFs, "proc/1/task/1/children")
+	if err != nil {
+		return false
+	}
+
+	return slices.Contains(strings.Fields(string(children)), strconv.Itoa(pid))
 }
 
 // detectCurrentContainerID detects the ID of Watchtower's own container for an

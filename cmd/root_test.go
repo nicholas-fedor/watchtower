@@ -611,26 +611,45 @@ func TestCommands_ErrorOutput(t *testing.T) {
 }
 
 // TestIsContainerMainProcess verifies which processes count as the main
-// process of a container. Processes started with docker exec have parent PID 0,
-// and a host binary can have an init system as its parent.
+// process of a container. Processes started with docker exec have parent PID 0
+// on most kernels and parent PID 1 on OpenVZ, where PID 1 still does not list
+// them among its children. A host binary can have an init system as its parent.
 func TestIsContainerMainProcess(t *testing.T) {
 	tests := []struct {
 		name        string
 		pid         int
 		ppid        int
 		inContainer bool
-		want        bool
+		// children is PID 1's children list, or nil when the kernel has none.
+		children *string
+		want     bool
 	}{
 		{name: "PID 1", pid: 1, ppid: 0, inContainer: true, want: true},
-		{name: "child of the container's init", pid: 7, ppid: 1, inContainer: true, want: true},
-		{name: "started with docker exec", pid: 8, ppid: 0, inContainer: true, want: false},
-		{name: "started by another process in the container", pid: 9, ppid: 8, inContainer: true, want: false},
-		{name: "host binary under an init system", pid: 4242, ppid: 1, inContainer: false, want: false},
+		{name: "child of the container's init", pid: 7, ppid: 1, inContainer: true, children: new("7\n"), want: true},
+		{name: "one of several children of the container's init", pid: 7, ppid: 1, inContainer: true, children: new("3 7 12"), want: true},
+		{name: "started with docker exec", pid: 8, ppid: 0, inContainer: true, children: new("7"), want: false},
+		{name: "started with docker exec on OpenVZ", pid: 8, ppid: 1, inContainer: true, children: new("7"), want: false},
+		{name: "PID 1 has no children", pid: 8, ppid: 1, inContainer: true, children: new(""), want: false},
+		{name: "a listed PID only shares digits", pid: 7, ppid: 1, inContainer: true, children: new("17 70"), want: false},
+		{name: "kernel without the children list", pid: 7, ppid: 1, inContainer: true, want: false},
+		{name: "started by another process in the container", pid: 9, ppid: 8, inContainer: true, children: new("7"), want: false},
+		{name: "host binary under an init system", pid: 4242, ppid: 1, inContainer: false, children: new("4242"), want: false},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			setPreRunState(t, nil, selfDetection{marker: tt.inContainer})
+			setPreRunState(t, nil, selfDetection{})
+
+			fsys := fstest.MapFS{}
+			if tt.inContainer {
+				fsys[".dockerenv"] = &fstest.MapFile{}
+			}
+
+			if tt.children != nil {
+				fsys["proc/1/task/1/children"] = &fstest.MapFile{Data: []byte(*tt.children)}
+			}
+
+			setProcessFs(t, fsys)
 
 			processID = func() int { return tt.pid }
 			parentProcessID = func() int { return tt.ppid }
@@ -818,6 +837,9 @@ func TestDisableRestarts(t *testing.T) {
 		current *container.Container
 		// pid is the process ID Watchtower runs as.
 		pid int
+		// ppid is the parent process ID. The container's PID 1 lists PID 7
+		// as its only child.
+		ppid int
 		// unknownID leaves Watchtower's own container ID unknown.
 		unknownID  bool
 		wantUpdate bool
@@ -829,6 +851,8 @@ func TestDisableRestarts(t *testing.T) {
 		{name: "the container was not inspected", pid: 1, wantUpdate: true},
 		{name: "the policy is already no", current: currentWatchtowerWithoutRestarts(), pid: 1, wantUpdate: false},
 		{name: "not the container's main process", current: currentWatchtower(), pid: 42, wantUpdate: false},
+		{name: "main process under an init", current: currentWatchtower(), pid: 7, ppid: 1, wantUpdate: true},
+		{name: "probe started with docker exec on OpenVZ", current: currentWatchtower(), pid: 8, ppid: 1, wantUpdate: false},
 		{name: "the container ID is not known", pid: 1, unknownID: true, wantUpdate: false, wantError: true},
 	}
 
@@ -847,8 +871,13 @@ func TestDisableRestarts(t *testing.T) {
 			}
 
 			setRunState(t, runTestState{client: mockClient, current: tt.current, currentID: currentID})
+			setProcessFs(t, fstest.MapFS{
+				".dockerenv":             &fstest.MapFile{},
+				"proc/1/task/1/children": &fstest.MapFile{Data: []byte("7")},
+			})
 
 			processID = func() int { return tt.pid }
+			parentProcessID = func() int { return tt.ppid }
 
 			log, logOutput := logcapture.New(zerolog.ErrorLevel)
 			(&process{log: log}).disableRestarts()
