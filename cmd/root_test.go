@@ -266,7 +266,11 @@ func TestNewClient_FailureLeavesNoClient(t *testing.T) {
 
 	got, err := newClient(t.Context(), newTestLogger(t), containerClient.ClientOptions{})
 	require.Error(t, err)
-	assert.Equal(t, got, nil, "newClient returned a non-nil client with its error")
+	// assert.Nil counts an interface holding a nil pointer as nil, so the
+	// interface is compared with nil directly.
+	if got != nil {
+		t.Errorf("newClient returned a non-nil client with its error: %#v", got)
+	}
 }
 
 // TestSignalContextCancellation verifies that the signal context properly cancels
