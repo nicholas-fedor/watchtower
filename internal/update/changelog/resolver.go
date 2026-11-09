@@ -529,7 +529,7 @@ func (r *Resolver) loadAnswer(key string) (cachedAnswer, bool) {
 		return cachedAnswer{}, false
 	}
 
-	if !answer.expires.IsZero() && r.clock()().After(answer.expires) {
+	if !answer.expires.IsZero() && !r.clock()().Before(answer.expires) {
 		r.cache.Delete(key)
 
 		return cachedAnswer{}, false

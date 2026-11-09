@@ -241,7 +241,8 @@ func TestResolveTagEmptyRegistry(t *testing.T) {
 }
 
 // A clean sweep that found nothing is cached for an hour, so siblings share it.
-// Once the hour lapses, a release tag pushed after the image is found.
+// At the end of the hour the miss lapses, and a release tag pushed after the
+// image is found.
 func TestResolveTagCachesDefinitiveMiss(t *testing.T) {
 	t.Parallel()
 
@@ -266,7 +267,7 @@ func TestResolveTagCachesDefinitiveMiss(t *testing.T) {
 	assert.Empty(t, r.ResolveTag(newTestLogger(t), ctx, testContainer(), "", "1.2.3", testDigest))
 	assert.Len(t, fetcher.calls, 2, "the miss must hold until the TTL lapses")
 
-	now = now.Add(2 * time.Second)
+	now = now.Add(time.Second)
 
 	assert.Equal(t, "v1.2.3", r.ResolveTag(newTestLogger(t), ctx, testContainer(), "", "1.2.3", testDigest))
 	assert.Equal(t, []string{"v1.2.3", "1.2.3", "v1.2.3"}, fetcher.calls)
