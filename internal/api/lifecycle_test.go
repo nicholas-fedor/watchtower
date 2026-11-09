@@ -96,7 +96,7 @@ func runServerAndShutdown(t *testing.T, opts routes.Options) {
 	case err := <-errCh:
 		assert.True(t, err == nil || errors.Is(err, context.Canceled),
 			"unexpected error: %v", err)
-		// Non-blocking: server is still running under GracefulContext; cancel it.
+		// A non-blocking server keeps running until its context is canceled.
 		cancel()
 		time.Sleep(50 * time.Millisecond)
 
@@ -1041,11 +1041,30 @@ func requireAddrReleased(t *testing.T, addr string) {
 	}, shutdownGracePeriod+2*time.Second, 20*time.Millisecond, "the server kept listening on %s", addr)
 }
 
+// TestRunServer_CanceledBeforeBind verifies that a server whose context is
+// already canceled binds nothing and reports that it has stopped.
+func TestRunServer_CanceledBeforeBind(t *testing.T) {
+	ctx, cancel := context.WithCancel(t.Context())
+	cancel()
+
+	app := newApp(newTestLogger(t), 60, proxyConfig{}, corsConfig{}, true)
+	onBound := func() { t.Error("the server bound its socket after its context was canceled") }
+
+	stopped, err := runServer(ctx, newTestLogger(t), app, freeAddr(t), "", "", true, onBound, nil)
+	require.NoError(t, err)
+
+	select {
+	case <-stopped:
+	default:
+		t.Fatal("the server did not report that it stopped")
+	}
+}
+
 // TestRunServer_CancelBetweenBindAndServe verifies that a server canceled
 // after its socket is bound but before it starts serving still stops and
 // releases the socket, in blocking and non-blocking mode. Fiber runs OnListen
-// hooks in that gap, so the hook cancels there and waits until the shutdown
-// has run, which a server that is not serving yet ignores.
+// hooks in that gap. The hook cancels there and waits until the shutdown has
+// run, before the server starts serving.
 func TestRunServer_CancelBetweenBindAndServe(t *testing.T) {
 	for _, block := range []bool{true, false} {
 		t.Run(map[bool]string{true: "blocking", false: "non-blocking"}[block], func(t *testing.T) {
@@ -1090,6 +1109,103 @@ func TestRunServer_CancelBetweenBindAndServe(t *testing.T) {
 
 			requireAddrReleased(t, addr)
 		})
+	}
+}
+
+// TestRunServer_DrainLimit verifies that a shutdown waits at most five seconds
+// for a request in flight. The server then stops with the request still
+// running, and the shutdown hooks receive context.DeadlineExceeded.
+func TestRunServer_DrainLimit(t *testing.T) {
+	entered := make(chan struct{})
+	release := make(chan struct{})
+
+	// Release the handler even when the test fails early, so it does not stay
+	// blocked after the test ends.
+	releaseHandler := sync.OnceFunc(func() { close(release) })
+	t.Cleanup(releaseHandler)
+
+	app := newApp(newTestLogger(t), 60, proxyConfig{}, corsConfig{}, true)
+	app.Get("/slow", func(fiber.Ctx) error {
+		close(entered)
+		<-release
+
+		return nil
+	})
+
+	shutdownErrs := make(chan error, 1)
+
+	app.Hooks().OnPostShutdown(func(err error) error {
+		shutdownErrs <- err
+
+		return nil
+	})
+
+	ctx, cancel := context.WithCancel(t.Context())
+	defer cancel()
+
+	addr := freeAddr(t)
+
+	stopped, err := runServer(ctx, newTestLogger(t), app, addr, "", "", false, nil, nil)
+	require.NoError(t, err)
+
+	req, err := http.NewRequestWithContext(t.Context(), http.MethodGet, "http://"+addr+"/slow", nil)
+	require.NoError(t, err)
+
+	// outcome is how the request ended.
+	type outcome struct {
+		err    error
+		status int
+	}
+
+	finished := make(chan outcome, 1)
+
+	go func() {
+		resp, doErr := http.DefaultClient.Do(req)
+		if doErr != nil {
+			finished <- outcome{err: doErr}
+
+			return
+		}
+
+		_ = resp.Body.Close()
+		finished <- outcome{status: resp.StatusCode}
+	}()
+
+	select {
+	case <-entered:
+	case <-time.After(5 * time.Second):
+		t.Fatal("the request did not reach the handler")
+	}
+
+	began := time.Now()
+
+	cancel()
+
+	select {
+	case <-stopped:
+	case <-time.After(shutdownGracePeriod + 2*time.Second):
+		t.Fatal("the server did not stop once the drain limit passed")
+	}
+
+	assert.GreaterOrEqual(t, time.Since(began), shutdownGracePeriod, "the server stopped before the drain limit")
+
+	select {
+	case shutdownErr := <-shutdownErrs:
+		require.ErrorIs(t, shutdownErr, context.DeadlineExceeded)
+	default:
+		t.Fatal("the shutdown hooks did not run before the server stopped")
+	}
+
+	// The request still finishes once its handler is released, so the
+	// handler and its log lines end before the test does.
+	releaseHandler()
+
+	select {
+	case result := <-finished:
+		require.NoError(t, result.err, "the request failed after its handler was released")
+		assert.Equal(t, http.StatusOK, result.status)
+	case <-time.After(5 * time.Second):
+		t.Fatal("the request did not finish after its handler was released")
 	}
 }
 
