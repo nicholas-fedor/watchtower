@@ -160,7 +160,7 @@ func Test_executeUpdate(t *testing.T) {
 	t.Run("should execute update successfully", func(t *testing.T) {
 		t.Parallel()
 
-		client := mockUpdate.CreateMockClient(
+		client := mockUpdate.CreateFakeClient(
 			&mockUpdate.TestData{
 				Containers: []*container.Container{
 					mockUpdate.CreateMockContainerWithConfig(
@@ -198,7 +198,7 @@ func Test_executeUpdate(t *testing.T) {
 	t.Run("should not return error when no containers to update", func(t *testing.T) {
 		t.Parallel()
 
-		client := mockUpdate.CreateMockClient(
+		client := mockUpdate.CreateFakeClient(
 			&mockUpdate.TestData{},
 			false,
 			false,
@@ -221,7 +221,7 @@ func Test_executeUpdate(t *testing.T) {
 	t.Run("should execute update logic for stale containers", func(t *testing.T) {
 		t.Parallel()
 
-		client := mockUpdate.CreateMockClient(
+		client := mockUpdate.CreateFakeClient(
 			&mockUpdate.TestData{
 				Containers: []*container.Container{
 					mockUpdate.CreateMockContainerWithConfig(
@@ -260,7 +260,7 @@ func Test_executeUpdate(t *testing.T) {
 	t.Run("should propagate RunOnce mode and skip Watchtower self-update", func(t *testing.T) {
 		t.Parallel()
 
-		client := mockUpdate.CreateMockClient(
+		client := mockUpdate.CreateFakeClient(
 			&mockUpdate.TestData{
 				Containers: []*container.Container{
 					mockUpdate.CreateMockContainerWithConfig(
@@ -305,7 +305,7 @@ func Test_executeUpdate(t *testing.T) {
 	t.Run("should call SetRestartPolicy for Watchtower restart policy changes", func(t *testing.T) {
 		t.Parallel()
 
-		client := mockUpdate.CreateMockClient(
+		client := mockUpdate.CreateFakeClient(
 			&mockUpdate.TestData{
 				Containers: []*container.Container{
 					mockUpdate.CreateMockContainerWithConfig(

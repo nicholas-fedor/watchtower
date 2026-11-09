@@ -84,7 +84,7 @@ func TestUpdateAction_Dependencies(t *testing.T) {
 				},
 			)
 
-			client := mockUpdate.CreateMockClient(
+			client := mockUpdate.CreateFakeClient(
 				&mockUpdate.TestData{
 					Containers: []*container.Container{
 						containerA,
@@ -445,7 +445,7 @@ func TestUpdateAction_Dependencies(t *testing.T) {
 		t.Run("should handle malformed labels and missing containers gracefully", func(t *testing.T) {
 			t.Parallel()
 
-			client := mockUpdate.CreateMockClient(
+			client := mockUpdate.CreateFakeClient(
 				&mockUpdate.TestData{
 					Containers: []*container.Container{
 						mockUpdate.CreateMockContainerWithConfig(
@@ -693,7 +693,7 @@ func TestUpdateAction_Dependencies(t *testing.T) {
 			containers := createDependencyChain(
 				[]string{"container-a", "container-b", "container-c"},
 			)
-			client := mockUpdate.CreateMockClient(
+			client := mockUpdate.CreateFakeClient(
 				&mockUpdate.TestData{
 					Containers: containers,
 					Staleness: map[string]bool{
@@ -766,7 +766,7 @@ func TestUpdateAction_Dependencies(t *testing.T) {
 					ExposedPorts: dockerNetwork.PortSet{},
 				},
 			)
-			client := mockUpdate.CreateMockClient(
+			client := mockUpdate.CreateFakeClient(
 				&mockUpdate.TestData{
 					Containers: []*container.Container{base, dep1, indep},
 					Staleness: map[string]bool{
@@ -826,7 +826,7 @@ func TestUpdateAction_Dependencies(t *testing.T) {
 				},
 			)
 
-			client := mockUpdate.CreateMockClient(
+			client := mockUpdate.CreateFakeClient(
 				&mockUpdate.TestData{
 					Containers: []*container.Container{
 						containerA,
@@ -871,7 +871,7 @@ func TestUpdateAction_Dependencies(t *testing.T) {
 				},
 			)
 
-			client := mockUpdate.CreateMockClient(
+			client := mockUpdate.CreateFakeClient(
 				&mockUpdate.TestData{
 					Containers: []*container.Container{
 						dependent,
@@ -960,7 +960,7 @@ func TestUpdateAction_Dependencies(t *testing.T) {
 				},
 			)
 
-			client := mockUpdate.CreateMockClient(
+			client := mockUpdate.CreateFakeClient(
 				&mockUpdate.TestData{
 					Containers: []*container.Container{
 						containerD,
@@ -1012,7 +1012,7 @@ func TestUpdateAction_Dependencies(t *testing.T) {
 				},
 			)
 
-			client := mockUpdate.CreateMockClient(
+			client := mockUpdate.CreateFakeClient(
 				&mockUpdate.TestData{
 					Containers: []*container.Container{
 						selfDependent,
@@ -1055,7 +1055,7 @@ func TestUpdateAction_Dependencies(t *testing.T) {
 				},
 			)
 
-			client := mockUpdate.CreateMockClient(
+			client := mockUpdate.CreateFakeClient(
 				&mockUpdate.TestData{
 					Containers: []*container.Container{
 						dependent,
@@ -1159,7 +1159,7 @@ func TestUpdateAction_Dependencies(t *testing.T) {
 				},
 			)
 
-			client := mockUpdate.CreateMockClient(
+			client := mockUpdate.CreateFakeClient(
 				&mockUpdate.TestData{
 					Containers: []*container.Container{
 						containerE,
@@ -1226,7 +1226,7 @@ func TestUpdateAction_Dependencies(t *testing.T) {
 				},
 			)
 
-			client := mockUpdate.CreateMockClient(
+			client := mockUpdate.CreateFakeClient(
 				&mockUpdate.TestData{
 					Containers: []*container.Container{
 						containerB,
@@ -1353,7 +1353,7 @@ func TestUpdateAction_Dependencies(t *testing.T) {
 				},
 			)
 
-			client := mockUpdate.CreateMockClient(
+			client := mockUpdate.CreateFakeClient(
 				&mockUpdate.TestData{
 					Containers: []*container.Container{containerC, containerB, containerA},
 					Staleness: map[string]bool{
@@ -1418,7 +1418,7 @@ func TestUpdateAction_Dependencies(t *testing.T) {
 				},
 			)
 
-			client := mockUpdate.CreateMockClient(
+			client := mockUpdate.CreateFakeClient(
 				&mockUpdate.TestData{
 					Containers: []*container.Container{dependency, dependent},
 					Staleness: map[string]bool{
@@ -1474,7 +1474,7 @@ func TestUpdateAction_Dependencies(t *testing.T) {
 				},
 			)
 
-			client := mockUpdate.CreateMockClient(
+			client := mockUpdate.CreateFakeClient(
 				&mockUpdate.TestData{
 					Containers: []*container.Container{dependency, dependent},
 					Staleness: map[string]bool{
@@ -1566,7 +1566,7 @@ func TestUpdateAction_Dependencies(t *testing.T) {
 				},
 			)
 
-			client := mockUpdate.CreateMockClient(
+			client := mockUpdate.CreateFakeClient(
 				&mockUpdate.TestData{
 					Containers: []*container.Container{app1, app2, app3, dbContainer},
 					Staleness: map[string]bool{
@@ -1669,7 +1669,7 @@ func TestUpdateAction_Dependencies(t *testing.T) {
 				},
 			)
 
-			client := mockUpdate.CreateMockClient(
+			client := mockUpdate.CreateFakeClient(
 				&mockUpdate.TestData{
 					Containers: []*container.Container{
 						cacheContainer,
@@ -1831,7 +1831,7 @@ func TestUpdateAction_Dependencies(t *testing.T) {
 				},
 			)
 
-			client := mockUpdate.CreateMockClient(
+			client := mockUpdate.CreateFakeClient(
 				&mockUpdate.TestData{
 					Containers: []*container.Container{database, webApp1, webApp2, apiService},
 					Staleness: map[string]bool{
@@ -1927,7 +1927,7 @@ func TestUpdateAction_Dependencies(t *testing.T) {
 				},
 			)
 
-			client := mockUpdate.CreateMockClient(
+			client := mockUpdate.CreateFakeClient(
 				&mockUpdate.TestData{
 					Containers: []*container.Container{
 						containerC,
@@ -2024,7 +2024,7 @@ func TestUpdateAction_Dependencies(t *testing.T) {
 				},
 			)
 
-			client := mockUpdate.CreateMockClient(
+			client := mockUpdate.CreateFakeClient(
 				&mockUpdate.TestData{
 					Containers: []*container.Container{aDatabase, bService1, dService3, cService2},
 					Staleness: map[string]bool{
@@ -2068,7 +2068,7 @@ func TestUpdateAction_Dependencies(t *testing.T) {
 			t.Parallel()
 
 			testData := getNetworkModeTestData()
-			client := mockUpdate.CreateMockClient(testData, false, false)
+			client := mockUpdate.CreateFakeClient(testData, false, false)
 
 			report, cleanupImageInfos, err := update(newTestLogger(t), t.Context(), client, updateParams.Params{Cleanup: true}, ratelimit.New())
 
@@ -2091,7 +2091,7 @@ func TestUpdateAction_Dependencies(t *testing.T) {
 			t.Parallel()
 
 			testData := getComposeDependsOnWithNetworkModeTestData()
-			client := mockUpdate.CreateMockClient(testData, false, false)
+			client := mockUpdate.CreateFakeClient(testData, false, false)
 
 			report, cleanupImageInfos, err := update(newTestLogger(t), t.Context(), client, updateParams.Params{Cleanup: true}, ratelimit.New())
 
@@ -2162,7 +2162,7 @@ func TestUpdateAction_Dependencies(t *testing.T) {
 			)
 			web.ContainerInfo().HostConfig.NetworkMode = "container:net-proxy"
 
-			client := mockUpdate.CreateMockClient(
+			client := mockUpdate.CreateFakeClient(
 				&mockUpdate.TestData{
 					Containers: []*container.Container{web, vpn},
 					Staleness: map[string]bool{
@@ -2228,7 +2228,7 @@ func TestUpdateAction_Dependencies(t *testing.T) {
 			)
 			qbittorrent.ContainerInfo().HostConfig.NetworkMode = "container:gluetun"
 
-			client := mockUpdate.CreateMockClient(
+			client := mockUpdate.CreateFakeClient(
 				&mockUpdate.TestData{
 					Containers: []*container.Container{qbittorrent, gluetun},
 					Staleness: map[string]bool{
@@ -2294,7 +2294,7 @@ func TestUpdateAction_Dependencies(t *testing.T) {
 			)
 			qbittorrent.ContainerInfo().HostConfig.NetworkMode = "container:gluetun-vpn-1"
 
-			client := mockUpdate.CreateMockClient(
+			client := mockUpdate.CreateFakeClient(
 				&mockUpdate.TestData{
 					Containers: []*container.Container{qbittorrent, gluetun},
 					Staleness: map[string]bool{
@@ -2364,7 +2364,7 @@ func TestUpdateAction_Dependencies(t *testing.T) {
 				"container:" + providerID,
 			)
 
-			client := mockUpdate.CreateMockClient(
+			client := mockUpdate.CreateFakeClient(
 				&mockUpdate.TestData{
 					Containers: []*container.Container{qbittorrent, gluetun},
 					Staleness: map[string]bool{
@@ -2448,7 +2448,7 @@ func TestUpdateAction_Dependencies(t *testing.T) {
 			)
 			prowlarr.ContainerInfo().HostConfig.NetworkMode = "container:/gluetun"
 
-			client := mockUpdate.CreateMockClient(
+			client := mockUpdate.CreateFakeClient(
 				&mockUpdate.TestData{
 					Containers: []*container.Container{qbittorrent, prowlarr, gluetun},
 					Staleness: map[string]bool{
@@ -2522,7 +2522,7 @@ func TestUpdateAction_Dependencies(t *testing.T) {
 				},
 			)
 
-			client := mockUpdate.CreateMockClient(
+			client := mockUpdate.CreateFakeClient(
 				&mockUpdate.TestData{
 					Containers: []*container.Container{app1Db, app2Web},
 					Staleness: map[string]bool{
@@ -2597,7 +2597,7 @@ func TestUpdateAction_Dependencies(t *testing.T) {
 				},
 			)
 
-			client := mockUpdate.CreateMockClient(
+			client := mockUpdate.CreateFakeClient(
 				&mockUpdate.TestData{
 					Containers: []*container.Container{databaseService, externalCache, webService},
 					Staleness: map[string]bool{
@@ -2675,7 +2675,7 @@ func TestUpdateAction_Dependencies(t *testing.T) {
 				},
 			)
 
-			client := mockUpdate.CreateMockClient(
+			client := mockUpdate.CreateFakeClient(
 				&mockUpdate.TestData{
 					Containers: []*container.Container{project1Db, project2Db, appService},
 					Staleness: map[string]bool{
@@ -2754,7 +2754,7 @@ func TestUpdateAction_Dependencies(t *testing.T) {
 				},
 			)
 
-			client := mockUpdate.CreateMockClient(
+			client := mockUpdate.CreateFakeClient(
 				&mockUpdate.TestData{
 					Containers: []*container.Container{db1, db2, worker},
 					Staleness: map[string]bool{
@@ -2830,7 +2830,7 @@ func TestUpdateAction_Dependencies(t *testing.T) {
 				},
 			)
 
-			client := mockUpdate.CreateMockClient(
+			client := mockUpdate.CreateFakeClient(
 				&mockUpdate.TestData{
 					Containers: []*container.Container{projectDB, standaloneCache, projectWeb},
 					Staleness: map[string]bool{
@@ -2913,7 +2913,7 @@ func TestUpdateAction_Dependencies(t *testing.T) {
 				},
 			)
 
-			client := mockUpdate.CreateMockClient(
+			client := mockUpdate.CreateFakeClient(
 				&mockUpdate.TestData{
 					Containers: []*container.Container{dbContainer, appContainer, webContainer},
 					Staleness: map[string]bool{
@@ -3018,7 +3018,7 @@ func TestRunUpdatesWithNotifications_IdentifierCollisionNotifiesOnce(t *testing.
 		)
 	}
 
-	client := mockUpdate.CreateMockClient(&mockUpdate.TestData{
+	client := mockUpdate.CreateFakeClient(&mockUpdate.TestData{
 		Containers: []*container.Container{
 			collidingContainer("a000000000000000000000000000000000000000000000000000000000000000"),
 			collidingContainer("b000000000000000000000000000000000000000000000000000000000000000"),

@@ -1485,7 +1485,7 @@ func TestRemoveExcessWatchtowerInstances_ScopeAndCurrentContainer(t *testing.T) 
 	t.Run("should not clean up unscoped instances when scope is specified", func(t *testing.T) {
 		t.Parallel()
 
-		client := mockUpdate.CreateMockClient(
+		client := mockUpdate.CreateFakeClient(
 			&mockUpdate.TestData{
 				Containers: []*container.Container{
 					mockUpdate.CreateMockContainerWithConfig(
@@ -1541,7 +1541,7 @@ func TestRemoveExcessWatchtowerInstances_ScopeAndCurrentContainer(t *testing.T) 
 	t.Run("should not perform cleanup when currentContainer is nil", func(t *testing.T) {
 		t.Parallel()
 
-		client := mockUpdate.CreateMockClient(
+		client := mockUpdate.CreateFakeClient(
 			&mockUpdate.TestData{
 				Containers: []*container.Container{
 					mockUpdate.CreateMockContainerWithConfig(
@@ -3161,7 +3161,7 @@ func TestRemoveExcessWatchtowerInstances_RunningInstances(t *testing.T) {
 		t.Run("should not do anything", func(t *testing.T) {
 			t.Parallel()
 
-			mockClient := mockUpdate.CreateMockClient(
+			mockClient := mockUpdate.CreateFakeClient(
 				&mockUpdate.TestData{},
 				false,
 				false,
@@ -3192,7 +3192,7 @@ func TestRemoveExcessWatchtowerInstances_RunningInstances(t *testing.T) {
 		t.Run("should not do anything", func(t *testing.T) {
 			t.Parallel()
 
-			client := mockUpdate.CreateMockClient(
+			client := mockUpdate.CreateFakeClient(
 				&mockUpdate.TestData{
 					Containers: []*container.Container{
 						mockUpdate.CreateMockContainerWithConfig(
@@ -3239,8 +3239,8 @@ func TestRemoveExcessWatchtowerInstances_RunningInstances(t *testing.T) {
 		t.Parallel()
 
 		// newClient returns a client fake holding the group's instances.
-		newClient := func() mockUpdate.MockClient {
-			return mockUpdate.CreateMockClient(
+		newClient := func() mockUpdate.FakeClient {
+			return mockUpdate.CreateFakeClient(
 				&mockUpdate.TestData{
 					NameOfContainerToKeep: "test-container-02",
 					Containers: []*container.Container{
@@ -3336,8 +3336,8 @@ func TestRemoveExcessWatchtowerInstances_RunningInstances(t *testing.T) {
 		t.Parallel()
 
 		// newClient returns a client fake holding the group's instances.
-		newClient := func() mockUpdate.MockClient {
-			return mockUpdate.CreateMockClient(
+		newClient := func() mockUpdate.FakeClient {
+			return mockUpdate.CreateFakeClient(
 				&mockUpdate.TestData{
 					NameOfContainerToKeep: "test-container-new",
 					Containers: []*container.Container{
@@ -3408,8 +3408,8 @@ func TestRemoveExcessWatchtowerInstances_RunningInstances(t *testing.T) {
 		t.Parallel()
 
 		// newClient returns a client fake holding the group's instances.
-		newClient := func() mockUpdate.MockClient {
-			return mockUpdate.CreateMockClient(
+		newClient := func() mockUpdate.FakeClient {
+			return mockUpdate.CreateFakeClient(
 				&mockUpdate.TestData{
 					Containers: []*container.Container{
 						// Unscoped Watchtower (older)

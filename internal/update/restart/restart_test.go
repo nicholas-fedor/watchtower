@@ -75,7 +75,7 @@ func Test_restartStaleContainer(t *testing.T) {
 	t.Run("should not rename Watchtower container in run-once mode", func(t *testing.T) {
 		t.Parallel()
 
-		client := mockUpdate.CreateMockClient(
+		client := mockUpdate.CreateFakeClient(
 			&mockUpdate.TestData{
 				Containers: []*container.Container{
 					mockUpdate.CreateMockContainerWithConfig(
@@ -113,7 +113,7 @@ func Test_restartStaleContainer(t *testing.T) {
 	t.Run("should rename Watchtower container when not in run-once mode", func(t *testing.T) {
 		t.Parallel()
 
-		client := mockUpdate.CreateMockClient(
+		client := mockUpdate.CreateFakeClient(
 			&mockUpdate.TestData{
 				Containers: []*container.Container{
 					mockUpdate.CreateMockContainerWithConfig(
@@ -151,7 +151,7 @@ func Test_restartStaleContainer(t *testing.T) {
 	t.Run("should skip rename if source container is already named with the target old name", func(t *testing.T) {
 		t.Parallel()
 
-		client := mockUpdate.CreateMockClient(
+		client := mockUpdate.CreateFakeClient(
 			&mockUpdate.TestData{
 				Containers: []*container.Container{
 					mockUpdate.CreateMockContainerWithConfig(
@@ -189,7 +189,7 @@ func Test_restartStaleContainer(t *testing.T) {
 	t.Run("should treat ephemeral self-update as a completed handoff", func(t *testing.T) {
 		t.Parallel()
 
-		client := mockUpdate.CreateMockClient(
+		client := mockUpdate.CreateFakeClient(
 			&mockUpdate.TestData{
 				Containers: []*container.Container{
 					mockUpdate.CreateMockContainerWithConfig(
@@ -276,9 +276,9 @@ func TestDetachedContext(t *testing.T) {
 			t.Run(tc.name, func(t *testing.T) {
 				t.Parallel()
 
-				// Create a mock client with a Watchtower container that will trigger
+				// Create a fake client with a Watchtower container that will trigger
 				// the restart policy update path where the detached context is used.
-				client := mockUpdate.CreateMockClient(
+				client := mockUpdate.CreateFakeClient(
 					&mockUpdate.TestData{
 						Containers: []*container.Container{
 							mockUpdate.CreateMockContainerWithConfig(
@@ -361,7 +361,7 @@ func TestDetachedContext(t *testing.T) {
 		t.Run("renames the source back to the original name when create fails", func(t *testing.T) {
 			t.Parallel()
 
-			client := mockUpdate.CreateMockClient(
+			client := mockUpdate.CreateFakeClient(
 				&mockUpdate.TestData{
 					Containers: []*container.Container{
 						mockUpdate.CreateMockContainerWithConfig(
@@ -457,7 +457,7 @@ func TestDetachedContext(t *testing.T) {
 		t.Run("removes the newly created container, not the renamed source", func(t *testing.T) {
 			t.Parallel()
 
-			client := mockUpdate.CreateMockClient(
+			client := mockUpdate.CreateFakeClient(
 				&mockUpdate.TestData{
 					Containers: []*container.Container{
 						mockUpdate.CreateMockContainerWithConfig(
@@ -586,7 +586,7 @@ func TestDetachedContext(t *testing.T) {
 				t.Run(tt.name, func(t *testing.T) {
 					t.Parallel()
 
-					client := mockUpdate.CreateMockClient(
+					client := mockUpdate.CreateFakeClient(
 						&mockUpdate.TestData{
 							Containers: []*container.Container{
 								mockUpdate.CreateMockContainerWithConfig(
@@ -647,10 +647,10 @@ func TestDetachedContext(t *testing.T) {
 			// Create a parent context that we will cancel while restartStaleContainer is running.
 			parentCtx, parentCancel := context.WithCancel(t.Context())
 
-			// Create a mock client with a Watchtower container.
+			// Create a fake client with a Watchtower container.
 			// Configure StartContainerByIDError to trigger the cleanup path.
 			// Add simulated latency to allow time for operations to complete.
-			client := mockUpdate.CreateMockClient(
+			client := mockUpdate.CreateFakeClient(
 				&mockUpdate.TestData{
 					Containers: []*container.Container{
 						mockUpdate.CreateMockContainerWithConfig(
@@ -740,8 +740,8 @@ func TestDetachedContext(t *testing.T) {
 			parentCtx, parentCancel := context.WithCancel(t.Context())
 			parentCancel() // Cancel immediately before calling restartStaleContainer
 
-			// Create a mock client with a Watchtower container.
-			client := mockUpdate.CreateMockClient(
+			// Create a fake client with a Watchtower container.
+			client := mockUpdate.CreateFakeClient(
 				&mockUpdate.TestData{
 					Containers: []*container.Container{
 						mockUpdate.CreateMockContainerWithConfig(
@@ -800,8 +800,8 @@ func TestDetachedContext(t *testing.T) {
 			// verify that SetRestartPolicy is called after a successful start,
 			// demonstrating the detached context is properly created and used.
 
-			// Create a mock client with a Watchtower container that succeeds.
-			client := mockUpdate.CreateMockClient(
+			// Create a fake client with a Watchtower container that succeeds.
+			client := mockUpdate.CreateFakeClient(
 				&mockUpdate.TestData{
 					Containers: []*container.Container{
 						mockUpdate.CreateMockContainerWithConfig(
@@ -958,8 +958,8 @@ func Test_stopContainersInReversedOrder(t *testing.T) {
 					containers[i] = c
 				}
 
-				// Create mock client.
-				client := mockUpdate.CreateMockClient(
+				// Create a fake client.
+				client := mockUpdate.CreateFakeClient(
 					&mockUpdate.TestData{
 						Containers: containers,
 						Staleness:  make(map[string]bool),
@@ -1053,7 +1053,7 @@ func Test_stopContainersInReversedOrder(t *testing.T) {
 				containers[i] = c
 			}
 
-			client := mockUpdate.CreateMockClient(
+			client := mockUpdate.CreateFakeClient(
 				&mockUpdate.TestData{
 					Containers: containers,
 					Staleness: map[string]bool{
@@ -1125,7 +1125,7 @@ func Test_stopContainersInReversedOrder(t *testing.T) {
 				containers[i] = c
 			}
 
-			client := mockUpdate.CreateMockClient(
+			client := mockUpdate.CreateFakeClient(
 				&mockUpdate.TestData{
 					Containers: containers,
 					Staleness: map[string]bool{
@@ -1206,7 +1206,7 @@ func Test_stopContainersInReversedOrder(t *testing.T) {
 				containers[i] = c
 			}
 
-			client := mockUpdate.CreateMockClient(
+			client := mockUpdate.CreateFakeClient(
 				&mockUpdate.TestData{
 					Containers: containers,
 					Staleness: map[string]bool{
@@ -1267,7 +1267,7 @@ func Test_stopContainersInReversedOrder(t *testing.T) {
 				containers[i] = c
 			}
 
-			client := mockUpdate.CreateMockClient(
+			client := mockUpdate.CreateFakeClient(
 				&mockUpdate.TestData{
 					Containers: containers,
 					Staleness: map[string]bool{
@@ -1325,7 +1325,7 @@ func TestRestartContainersInSortedOrderCancelRecovery(t *testing.T) {
 			containers[i] = c
 		}
 
-		client := mockUpdate.CreateMockClient(
+		client := mockUpdate.CreateFakeClient(
 			&mockUpdate.TestData{
 				Containers: containers,
 				Staleness: map[string]bool{
@@ -1467,8 +1467,8 @@ func Test_performRollingRestart(t *testing.T) {
 					containers[i] = c
 				}
 
-				// Create mock client.
-				client := mockUpdate.CreateMockClient(
+				// Create a fake client.
+				client := mockUpdate.CreateFakeClient(
 					&mockUpdate.TestData{
 						Containers: containers,
 						Staleness:  make(map[string]bool),
@@ -1572,7 +1572,7 @@ func Test_performRollingRestart(t *testing.T) {
 				containers[i] = c
 			}
 
-			client := mockUpdate.CreateMockClient(
+			client := mockUpdate.CreateFakeClient(
 				&mockUpdate.TestData{
 					Containers: containers,
 					Staleness: map[string]bool{
@@ -1652,7 +1652,7 @@ func Test_performRollingRestart(t *testing.T) {
 				containers[i] = c
 			}
 
-			client := mockUpdate.CreateMockClient(
+			client := mockUpdate.CreateFakeClient(
 				&mockUpdate.TestData{
 					Containers: containers,
 					Staleness: map[string]bool{
@@ -1738,7 +1738,7 @@ func Test_performRollingRestart(t *testing.T) {
 				containers[i] = c
 			}
 
-			client := mockUpdate.CreateMockClient(
+			client := mockUpdate.CreateFakeClient(
 				&mockUpdate.TestData{
 					Containers: containers,
 					Staleness: map[string]bool{
@@ -1804,7 +1804,7 @@ func Test_performRollingRestart(t *testing.T) {
 				containers[i] = c
 			}
 
-			client := mockUpdate.CreateMockClient(
+			client := mockUpdate.CreateFakeClient(
 				&mockUpdate.TestData{
 					Containers: containers,
 					Staleness: map[string]bool{
@@ -1864,7 +1864,7 @@ func Test_performRollingRestart(t *testing.T) {
 			)
 			watchtower.SetStale(true)
 
-			client := mockUpdate.CreateMockClient(
+			client := mockUpdate.CreateFakeClient(
 				&mockUpdate.TestData{
 					Containers: []*container.Container{watchtower},
 					Staleness:  map[string]bool{"watchtower": true},
@@ -1920,7 +1920,7 @@ func Test_performRollingRestart(t *testing.T) {
 			}
 			containers[0].SetStale(true)
 
-			client := mockUpdate.CreateMockClient(
+			client := mockUpdate.CreateFakeClient(
 				&mockUpdate.TestData{
 					Containers: containers,
 					Staleness:  map[string]bool{"container-0": true},
@@ -1982,7 +1982,7 @@ func Test_performRollingRestart(t *testing.T) {
 			}
 			containers[0].SetStale(true)
 
-			client := mockUpdate.CreateMockClient(
+			client := mockUpdate.CreateFakeClient(
 				&mockUpdate.TestData{
 					Containers: containers,
 					Staleness:  map[string]bool{"container-0": true},
@@ -2061,7 +2061,7 @@ func TestRun(t *testing.T) {
 			)
 			c.SetStale(true)
 
-			client := mockUpdate.CreateMockClient(
+			client := mockUpdate.CreateFakeClient(
 				&mockUpdate.TestData{
 					Containers: []*container.Container{c},
 					Staleness:  map[string]bool{"container-0": true},

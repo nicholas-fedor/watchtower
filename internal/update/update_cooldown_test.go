@@ -64,7 +64,7 @@ func TestUpdateAction_Cooldown(t *testing.T) {
 
 			eligibleAt := time.Date(2026, 1, 2, 4, 0, 0, 0, time.UTC)
 
-			client := mockUpdate.MockClient{
+			client := mockUpdate.FakeClient{
 				TestData: &mockUpdate.TestData{
 					Containers: []*container.Container{
 						mockUpdate.CreateMockContainer("c1", "c1", "myimage:latest", time.Now()),
@@ -105,7 +105,7 @@ func TestUpdateAction_Cooldown(t *testing.T) {
 
 			// The client decides cooldown during its staleness check, so an image
 			// past its cooldown reports stale without an error.
-			client := mockUpdate.MockClient{
+			client := mockUpdate.FakeClient{
 				TestData: &mockUpdate.TestData{
 					Containers: []*container.Container{
 						mockUpdate.CreateMockContainer("c1", "c1", "myimage:latest", time.Now()),
@@ -133,7 +133,7 @@ func TestUpdateAction_Cooldown(t *testing.T) {
 
 			// No mock registry server is needed because the cooldown check
 			// is skipped when CooldownDelay is zero.
-			client := mockUpdate.MockClient{
+			client := mockUpdate.FakeClient{
 				TestData: &mockUpdate.TestData{
 					Containers: []*container.Container{
 						mockUpdate.CreateMockContainer("c1", "c1", "fake-image:latest", time.Now()),
@@ -161,7 +161,7 @@ func TestUpdateAction_Cooldown(t *testing.T) {
 
 			// No mock registry server is needed because NoPull bypasses the cooldown check.
 			// Use a standard mock container via CreateMockContainer.
-			client := mockUpdate.CreateMockClient(
+			client := mockUpdate.CreateFakeClient(
 				&mockUpdate.TestData{
 					Containers: []*container.Container{
 						mockUpdate.CreateMockContainer("c1", "c1", "fake-image:latest", time.Now()),
@@ -191,7 +191,7 @@ func TestUpdateAction_Cooldown(t *testing.T) {
 		t.Run("should skip the container with a conservative posture", func(t *testing.T) {
 			t.Parallel()
 
-			client := mockUpdate.MockClient{
+			client := mockUpdate.FakeClient{
 				TestData: &mockUpdate.TestData{
 					Containers: []*container.Container{
 						mockUpdate.CreateMockContainer("c1", "c1", "myimage:latest", time.Now()),
@@ -229,7 +229,7 @@ func TestUpdateAction_Cooldown(t *testing.T) {
 
 			// No mock registry server is needed because monitor-only bypasses the cooldown check.
 			// Use a standard mock container via CreateMockContainer.
-			client := mockUpdate.CreateMockClient(
+			client := mockUpdate.CreateFakeClient(
 				&mockUpdate.TestData{
 					Containers: []*container.Container{
 						mockUpdate.CreateMockContainer("c1", "c1", "fake-image:latest", time.Now()),

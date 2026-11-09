@@ -65,7 +65,7 @@ func TestUpdateAction_StaleContainerBesideCycle(t *testing.T) {
 			},
 		)
 
-		client := mockUpdate.CreateMockClient(
+		client := mockUpdate.CreateFakeClient(
 			&mockUpdate.TestData{
 				Containers: []*container.Container{containerA, containerB, containerC},
 				Staleness:  map[string]bool{"cycle-c": true},

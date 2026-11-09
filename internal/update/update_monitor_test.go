@@ -30,7 +30,7 @@ func TestUpdateAction_MonitorOnly(t *testing.T) {
 			t.Run("should not update those containers and collect no image IDs", func(t *testing.T) {
 				t.Parallel()
 
-				client := mockUpdate.CreateMockClient(
+				client := mockUpdate.CreateFakeClient(
 					&mockUpdate.TestData{
 						NameOfContainerToKeep: "test-container-02",
 						Containers: []*container.Container{
@@ -78,7 +78,7 @@ func TestUpdateAction_MonitorOnly(t *testing.T) {
 			t.Run("should not update any containers and collect no image IDs", func(t *testing.T) {
 				t.Parallel()
 
-				client := mockUpdate.CreateMockClient(
+				client := mockUpdate.CreateFakeClient(
 					&mockUpdate.TestData{
 						Containers: []*container.Container{
 							mockUpdate.CreateMockContainer(
@@ -116,7 +116,7 @@ func TestUpdateAction_MonitorOnly(t *testing.T) {
 				t.Run("it should update containers when monitor only is set to false", func(t *testing.T) {
 					t.Parallel()
 
-					client := mockUpdate.CreateMockClient(
+					client := mockUpdate.CreateFakeClient(
 						&mockUpdate.TestData{
 							Containers: []*container.Container{
 								mockUpdate.CreateMockContainerWithConfig(
@@ -156,7 +156,7 @@ func TestUpdateAction_MonitorOnly(t *testing.T) {
 				t.Run("it should not update containers when monitor only is set to true", func(t *testing.T) {
 					t.Parallel()
 
-					client := mockUpdate.CreateMockClient(
+					client := mockUpdate.CreateFakeClient(
 						&mockUpdate.TestData{
 							Containers: []*container.Container{
 								mockUpdate.CreateMockContainerWithConfig(
@@ -195,7 +195,7 @@ func TestUpdateAction_MonitorOnly(t *testing.T) {
 				t.Run("it should not update containers when monitor only is not set", func(t *testing.T) {
 					t.Parallel()
 
-					client := mockUpdate.CreateMockClient(
+					client := mockUpdate.CreateFakeClient(
 						&mockUpdate.TestData{
 							Containers: []*container.Container{
 								mockUpdate.CreateMockContainer(

@@ -33,7 +33,7 @@ func TestUpdateAction_Context(t *testing.T) {
 		t.Run("should handle context cancellation during container listing", func(t *testing.T) {
 			t.Parallel()
 
-			client := mockUpdate.CreateMockClient(getCommonTestData(), false, false)
+			client := mockUpdate.CreateFakeClient(getCommonTestData(), false, false)
 			canceledCtx, cancel := context.WithCancel(t.Context())
 			cancel() // Cancel the context immediately
 
@@ -47,7 +47,7 @@ func TestUpdateAction_Context(t *testing.T) {
 		t.Run("should keep scanning when checks fail with a cancellation of their own", func(t *testing.T) {
 			t.Parallel()
 
-			client := mockUpdate.CreateMockClient(getCommonTestData(), false, false)
+			client := mockUpdate.CreateFakeClient(getCommonTestData(), false, false)
 			// Every check fails with a cancellation error while the session's
 			// context stays live.
 			client.TestData.IsContainerStaleError = context.Canceled
@@ -78,7 +78,7 @@ func TestUpdateAction_Context(t *testing.T) {
 				"test-container-03": true,
 			}
 
-			client := mockUpdate.CreateMockClient(testData, false, false)
+			client := mockUpdate.CreateFakeClient(testData, false, false)
 			// Simulate StopContainer failure for some containers
 			client.TestData.StopContainerError = context.Canceled
 			client.TestData.StopContainerFailCount = 1 // Fail the first stop attempt
@@ -118,7 +118,7 @@ func TestUpdateAction_Context(t *testing.T) {
 			testData := &mockUpdate.TestData{
 				Containers: []*container.Container{oldContainer},
 			}
-			client := mockUpdate.CreateMockClient(testData, false, false)
+			client := mockUpdate.CreateFakeClient(testData, false, false)
 
 			report, cleanupImageInfos, err := update(newTestLogger(t), t.Context(), client, updateParams.Params{
 				Cleanup:            true,
@@ -150,7 +150,7 @@ func TestUpdateAction_Context(t *testing.T) {
 			testData := &mockUpdate.TestData{
 				Containers: []*container.Container{oldContainer},
 			}
-			client := mockUpdate.CreateMockClient(testData, false, false)
+			client := mockUpdate.CreateFakeClient(testData, false, false)
 
 			_, _, err := update(newTestLogger(t), t.Context(), client, updateParams.Params{
 				Cleanup:            true,
@@ -174,7 +174,7 @@ func TestUpdateAction_Context(t *testing.T) {
 			testData := &mockUpdate.TestData{
 				Containers: []*container.Container{normalContainer},
 			}
-			client := mockUpdate.CreateMockClient(testData, false, false)
+			client := mockUpdate.CreateFakeClient(testData, false, false)
 
 			report, _, err := update(newTestLogger(t), t.Context(), client, updateParams.Params{
 				Cleanup:            true,
@@ -191,7 +191,7 @@ func TestUpdateAction_Context(t *testing.T) {
 			testData := &mockUpdate.TestData{
 				Containers: []*container.Container{},
 			}
-			client := mockUpdate.CreateMockClient(testData, false, false)
+			client := mockUpdate.CreateFakeClient(testData, false, false)
 
 			report, _, err := update(newTestLogger(t), t.Context(), client, updateParams.Params{
 				Cleanup: true,
@@ -207,7 +207,7 @@ func TestUpdateAction_Context(t *testing.T) {
 // deadline returns a deadline error.
 func TestUpdateAction_HandleTimeout(t *testing.T) {
 	synctest.Test(t, func(t *testing.T) {
-		client := mockUpdate.CreateMockClient(getCommonTestData(), false, false)
+		client := mockUpdate.CreateFakeClient(getCommonTestData(), false, false)
 		pastDeadline := time.Now().Add(-time.Second)
 
 		ctx, cancel := context.WithDeadline(t.Context(), pastDeadline)
@@ -239,7 +239,7 @@ func TestUpdateAction_HandleTimeout(t *testing.T) {
 // already canceled context returns a cancellation error.
 func TestUpdateAction_EarlyCancellationCheck(t *testing.T) {
 	synctest.Test(t, func(t *testing.T) {
-		client := mockUpdate.CreateMockClient(getCommonTestData(), false, false)
+		client := mockUpdate.CreateFakeClient(getCommonTestData(), false, false)
 		canceledCtx, cancel := context.WithCancel(t.Context())
 		cancel() // Cancel the context immediately
 
@@ -273,7 +273,7 @@ func TestUpdateAction_MidOperationCancellationCheck(t *testing.T) {
 		testData := getCommonTestData()
 		// Set simulated latency to allow operations to start before cancellation
 		testData.SimulatedLatency = 10 * time.Millisecond
-		client := mockUpdate.CreateMockClientWithContext(ctx, testData, false, false)
+		client := mockUpdate.CreateFakeClientWithContext(ctx, testData, false, false)
 
 		// Start update in a goroutine
 		done := make(chan struct{})
@@ -334,7 +334,7 @@ func TestUpdateAction_ContextCancellationStartContainer(t *testing.T) {
 		canceledCtx, cancel := context.WithCancel(t.Context())
 		cancel() // Cancel immediately
 
-		client := mockUpdate.CreateMockClientWithContext(canceledCtx, testData, false, false)
+		client := mockUpdate.CreateFakeClientWithContext(canceledCtx, testData, false, false)
 
 		_, _, err := update(newTestLogger(t), canceledCtx, client, updateParams.Params{Cleanup: true}, ratelimit.New())
 
@@ -363,7 +363,7 @@ func TestUpdateAction_ContextTimeoutDuringProcessing(t *testing.T) {
 		shortCtx, cancel := context.WithTimeout(t.Context(), 0)
 		defer cancel()
 
-		client := mockUpdate.CreateMockClientWithContext(shortCtx, testData, false, false)
+		client := mockUpdate.CreateFakeClientWithContext(shortCtx, testData, false, false)
 
 		// Capture start time to verify the call completes within a reasonable bound
 		start := time.Now()
@@ -387,7 +387,7 @@ func TestUpdateAction_ContextTimeoutDuringProcessing(t *testing.T) {
 	})
 }
 
-// runErrorPropagationTest is a helper function that sets up a mock client with
+// runErrorPropagationTest is a helper function that sets up a fake client with
 // configurable error injection and runs the Update action for testing error propagation.
 func runErrorPropagationTest(
 	t *testing.T,
@@ -400,7 +400,7 @@ func runErrorPropagationTest(
 	testData := getCommonTestData()
 	testData.Staleness = containerStaleness
 
-	client := mockUpdate.CreateMockClient(testData, false, false)
+	client := mockUpdate.CreateFakeClient(testData, false, false)
 
 	// Inject the appropriate error based on targetOperation
 	switch targetOperation {
@@ -592,7 +592,7 @@ func TestUpdateAction_ContextEdgeCases(t *testing.T) {
 				ctx, cancel := tc.contextSetup(t.Context())
 				defer cancel()
 
-				client := mockUpdate.CreateMockClientWithContext(ctx, testData, false, false)
+				client := mockUpdate.CreateFakeClientWithContext(ctx, testData, false, false)
 
 				report, cleanupImageInfos, err := update(newTestLogger(t), ctx, client, updateParams.Params{Cleanup: true}, ratelimit.New())
 
@@ -647,7 +647,7 @@ func TestUpdateAction_ParallelStalenessCheckCancellationPropagation(t *testing.T
 		testData.SimulatedLatency = 10 * time.Millisecond
 
 		ctx, cancel := context.WithCancel(t.Context())
-		client := mockUpdate.CreateMockClientWithContext(ctx, testData, false, false)
+		client := mockUpdate.CreateFakeClientWithContext(ctx, testData, false, false)
 
 		done := make(chan struct{})
 
@@ -694,7 +694,7 @@ func TestEarlyCancellationStopContainers(t *testing.T) {
 
 		// Create a context that is NOT canceled immediately
 		ctx, cancel := context.WithCancel(t.Context())
-		client := mockUpdate.CreateMockClientWithContext(ctx, testData, false, false)
+		client := mockUpdate.CreateFakeClientWithContext(ctx, testData, false, false)
 
 		// Start update in a goroutine
 		done := make(chan struct{})
@@ -755,7 +755,7 @@ func TestEarlyCancellationRestartContainers(t *testing.T) {
 
 		// Create a context that is NOT canceled immediately
 		ctx, cancel := context.WithCancel(t.Context())
-		client := mockUpdate.CreateMockClientWithContext(ctx, testData, false, false)
+		client := mockUpdate.CreateFakeClientWithContext(ctx, testData, false, false)
 
 		// Start update in a goroutine
 		done := make(chan struct{})
