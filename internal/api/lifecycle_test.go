@@ -1151,15 +1151,24 @@ func TestRunServer_DrainLimit(t *testing.T) {
 	req, err := http.NewRequestWithContext(t.Context(), http.MethodGet, "http://"+addr+"/slow", nil)
 	require.NoError(t, err)
 
-	finished := make(chan struct{})
+	// outcome is how the request ended.
+	type outcome struct {
+		err    error
+		status int
+	}
+
+	finished := make(chan outcome, 1)
 
 	go func() {
-		defer close(finished)
-
 		resp, doErr := http.DefaultClient.Do(req)
-		if doErr == nil {
-			_ = resp.Body.Close()
+		if doErr != nil {
+			finished <- outcome{err: doErr}
+
+			return
 		}
+
+		_ = resp.Body.Close()
+		finished <- outcome{status: resp.StatusCode}
 	}()
 
 	select {
@@ -1192,7 +1201,9 @@ func TestRunServer_DrainLimit(t *testing.T) {
 	releaseHandler()
 
 	select {
-	case <-finished:
+	case result := <-finished:
+		require.NoError(t, result.err, "the request failed after its handler was released")
+		assert.Equal(t, http.StatusOK, result.status)
 	case <-time.After(5 * time.Second):
 		t.Fatal("the request did not finish after its handler was released")
 	}
