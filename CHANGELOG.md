@@ -66,6 +66,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Tests
 
+- Isolate registry stubs from each other's cached tokens by @nicholas-fedor in [#3587](https://github.com/nicholas-fedor/watchtower/pull/3587)
 - Build registry tests from model containers by @nicholas-fedor in [#3576](https://github.com/nicholas-fedor/watchtower/pull/3576)
 - Build handler tests from model containers by @nicholas-fedor in [#3567](https://github.com/nicholas-fedor/watchtower/pull/3567)
 - Check the scheduler settings runMain passes on by @nicholas-fedor in [#3566](https://github.com/nicholas-fedor/watchtower/pull/3566)
@@ -81,6 +82,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Chores
 
+- Update module github.com/valyala/fasthttp to v1.78.0 by @renovate[bot] in [#3585](https://github.com/nicholas-fedor/watchtower/pull/3585)
 - Update alpine:3.24.4 docker digest to f59abe6 by @renovate[bot] in [#3581](https://github.com/nicholas-fedor/watchtower/pull/3581)
 - Update module github.com/gofrs/flock to v0.13.2 by @renovate[bot] in [#3548](https://github.com/nicholas-fedor/watchtower/pull/3548)
 - Update golang.org/x/tools digest to 4f7264d by @renovate[bot] in [#3510](https://github.com/nicholas-fedor/watchtower/pull/3510)
