@@ -421,7 +421,7 @@ func recordRestartOutcomes(log *zerolog.Logger, progress *state.Progress, outcom
 // Parameters:
 //   - log: Logger for stop diagnostics.
 //   - ctx: Context for cancellation and timeouts.
-//   - container: Container to stop.
+//   - c: Container to stop.
 //   - client: Container client for Docker operations.
 //   - config: Update options specifying stop timeout and lifecycle hooks.
 //
@@ -432,17 +432,17 @@ func recordRestartOutcomes(log *zerolog.Logger, progress *state.Progress, outcom
 func stopStaleContainer(
 	log *zerolog.Logger,
 	ctx context.Context,
-	container *container.Container,
+	c *container.Container,
 	client containerClient.Client,
 	config updateParams.Params,
 ) (bool, error) {
 	fields := map[string]any{
-		"container": container.Name(),
-		"image":     container.ImageName(),
+		"container": c.Name(),
+		"image":     c.ImageName(),
 	}
 
 	// Skip Watchtower containers to avoid self-interruption.
-	if container.IsWatchtower() {
+	if c.IsWatchtower() {
 		log.Debug().
 			Fields(fields).
 			Msg("Skipping Watchtower container")
@@ -451,7 +451,7 @@ func stopStaleContainer(
 	}
 
 	// Skip containers not marked for restart (e.g., not stale or linked).
-	if !container.ToRestart() {
+	if !c.ToRestart() {
 		return false, nil
 	}
 
@@ -460,8 +460,8 @@ func stopStaleContainer(
 		Msg("Stopping container for restart")
 
 	// Verify configuration for linked containers to ensure restart compatibility.
-	if container.IsLinkedToRestarting() {
-		err := container.VerifyConfiguration()
+	if c.IsLinkedToRestarting() {
+		err := c.VerifyConfiguration()
 		if err != nil {
 			log.Debug().
 				Err(err).
@@ -477,7 +477,7 @@ func stopStaleContainer(
 		skipUpdate, err := hooks.ExecutePreUpdateCommand(log,
 			ctx,
 			client,
-			container,
+			c,
 			config.LifecycleUID,
 			config.LifecycleGID,
 		)
@@ -499,7 +499,7 @@ func stopStaleContainer(
 		}
 	}
 
-	err := snapshotCopyFilesForRecreate(ctx, client, container)
+	err := snapshotCopyFilesForRecreate(ctx, client, c)
 	if err != nil {
 		log.Debug().
 			Err(err).
@@ -512,12 +512,12 @@ func stopStaleContainer(
 	// Stop the container with the configured timeout.
 	err = client.StopAndRemoveContainer(
 		ctx,
-		container,
+		c,
 		config.Timeout,
 	)
 	if err != nil {
 		// Nothing recreates the container after a failed stop, so drop its snapshot.
-		discardCopyFilesForRecreate(client, container.ID())
+		discardCopyFilesForRecreate(client, c.ID())
 
 		// The container was removed or replaced after the scan. Recreating it
 		// from the scan's inspect data would bring back a removed container.

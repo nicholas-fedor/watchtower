@@ -344,18 +344,18 @@ func TestCheckLocalImageCooldown_LogsContainer(t *testing.T) {
 func TestIsOutsideCooldown_RegistrySettings(t *testing.T) {
 	t.Parallel()
 
-	container := modelfixture.Container(containerfixture.WithImageName(createdRegistry(t, time.Now().Add(-48*time.Hour)) + "/org/app:1.0"))
+	c := modelfixture.Container(containerfixture.WithImageName(createdRegistry(t, time.Now().Add(-48*time.Hour)) + "/org/app:1.0"))
 	policy := updateConfig.Policy{CooldownDelay: time.Hour}
 
 	plain := NewClient(nil, newTestLogger(t), registryConfig.Registry{TLSSkip: true}, ratelimit.New())
 
-	outside, err := plain.isOutsideCooldown(t.Context(), container, policy)
+	outside, err := plain.isOutsideCooldown(t.Context(), c, policy)
 	require.NoError(t, err)
 	assert.True(t, outside, "an image older than the cooldown was deferred")
 
 	secure := NewClient(nil, newTestLogger(t), registryConfig.Registry{}, ratelimit.New())
 
-	outside, err = secure.isOutsideCooldown(t.Context(), container, policy)
+	outside, err = secure.isOutsideCooldown(t.Context(), c, policy)
 	require.Error(t, err, "an HTTPS request reached the plain HTTP registry")
 	assert.False(t, outside)
 }

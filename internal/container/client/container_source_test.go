@@ -371,12 +371,12 @@ func TestGetSourceContainer(t *testing.T) {
 			expectInspect(api, testContainerID, sourceInspect("/test-watchtower", true, &dockerContainer.HostConfig{}), nil)
 			expectTestImage(api)
 
-			container, err := getSourceContainer(newTestLogger(t), t.Context(), api, testContainerID, nil)
+			c, err := getSourceContainer(newTestLogger(t), t.Context(), api, testContainerID, nil)
 			require.NoError(t, err)
-			require.NotNil(t, container)
-			assert.Equal(t, types.ContainerID(testContainerID), container.ID())
-			assert.Equal(t, "test-watchtower", container.Name())
-			assert.Equal(t, types.ImageID("test-image-id"), container.ImageID())
+			require.NotNil(t, c)
+			assert.Equal(t, types.ContainerID(testContainerID), c.ID())
+			assert.Equal(t, "test-watchtower", c.Name())
+			assert.Equal(t, types.ImageID("test-image-id"), c.ImageID())
 		})
 	})
 
@@ -391,11 +391,11 @@ func TestGetSourceContainer(t *testing.T) {
 			api.EXPECT().ImageInspect(mock.Anything, "test-image:latest").
 				Return(dockerClient.ImageInspectResult{}, daemonError("image not found")).Once()
 
-			container, err := getSourceContainer(newTestLogger(t), t.Context(), api, testContainerID, nil)
+			c, err := getSourceContainer(newTestLogger(t), t.Context(), api, testContainerID, nil)
 			require.NoError(t, err)
-			require.NotNil(t, container)
-			assert.Equal(t, types.ContainerID(testContainerID), container.ID())
-			assert.Equal(t, types.ImageID(""), container.ImageID())
+			require.NotNil(t, c)
+			assert.Equal(t, types.ContainerID(testContainerID), c.ID())
+			assert.Equal(t, types.ImageID(""), c.ImageID())
 		})
 	})
 
@@ -414,10 +414,10 @@ func TestGetSourceContainer(t *testing.T) {
 			expectNamed(api, parentID, "/parent-container")
 			expectTestImage(api)
 
-			container, err := getSourceContainer(newTestLogger(t), t.Context(), api, testContainerID, nil)
+			c, err := getSourceContainer(newTestLogger(t), t.Context(), api, testContainerID, nil)
 			require.NoError(t, err)
-			require.NotNil(t, container)
-			assert.Equal(t, dockerContainer.NetworkMode("container:/parent-container"), container.ContainerInfo().HostConfig.NetworkMode)
+			require.NotNil(t, c)
+			assert.Equal(t, dockerContainer.NetworkMode("container:/parent-container"), c.ContainerInfo().HostConfig.NetworkMode)
 		})
 	})
 
@@ -432,10 +432,10 @@ func TestGetSourceContainer(t *testing.T) {
 			expectNamed(api, appID, "/nextcloud-app")
 			expectTestImage(api)
 
-			container, err := getSourceContainer(newTestLogger(t), t.Context(), api, testContainerID, nil)
+			c, err := getSourceContainer(newTestLogger(t), t.Context(), api, testContainerID, nil)
 			require.NoError(t, err)
-			assert.Equal(t, []string{"nextcloud-app:rw"}, container.ContainerInfo().HostConfig.VolumesFrom)
-			assert.Equal(t, []string{"nextcloud-app:rw"}, container.GetCreateHostConfig().VolumesFrom)
+			assert.Equal(t, []string{"nextcloud-app:rw"}, c.ContainerInfo().HostConfig.VolumesFrom)
+			assert.Equal(t, []string{"nextcloud-app:rw"}, c.GetCreateHostConfig().VolumesFrom)
 		})
 
 		t.Run("should leave volumes-from ID when the source cannot be resolved", func(t *testing.T) {
@@ -446,9 +446,9 @@ func TestGetSourceContainer(t *testing.T) {
 			expectMissing(api, appID)
 			expectTestImage(api)
 
-			container, err := getSourceContainer(newTestLogger(t), t.Context(), api, testContainerID, nil)
+			c, err := getSourceContainer(newTestLogger(t), t.Context(), api, testContainerID, nil)
 			require.NoError(t, err)
-			assert.Equal(t, []string{appID}, container.ContainerInfo().HostConfig.VolumesFrom)
+			assert.Equal(t, []string{appID}, c.ContainerInfo().HostConfig.VolumesFrom)
 		})
 
 		t.Run("should rewrite volumes-from IDs and preserve ro mode", func(t *testing.T) {
@@ -459,9 +459,9 @@ func TestGetSourceContainer(t *testing.T) {
 			expectNamed(api, appID, "/nextcloud-app")
 			expectTestImage(api)
 
-			container, err := getSourceContainer(newTestLogger(t), t.Context(), api, testContainerID, nil)
+			c, err := getSourceContainer(newTestLogger(t), t.Context(), api, testContainerID, nil)
 			require.NoError(t, err)
-			assert.Equal(t, []string{"nextcloud-app:ro"}, container.ContainerInfo().HostConfig.VolumesFrom)
+			assert.Equal(t, []string{"nextcloud-app:ro"}, c.ContainerInfo().HostConfig.VolumesFrom)
 		})
 
 		t.Run("should rewrite multiple volumes-from entries independently", func(t *testing.T) {
@@ -473,9 +473,9 @@ func TestGetSourceContainer(t *testing.T) {
 			expectNamed(api, dbID, "/nextcloud-db")
 			expectTestImage(api)
 
-			container, err := getSourceContainer(newTestLogger(t), t.Context(), api, testContainerID, nil)
+			c, err := getSourceContainer(newTestLogger(t), t.Context(), api, testContainerID, nil)
 			require.NoError(t, err)
-			assert.Equal(t, []string{"nextcloud-app:rw", "nextcloud-db"}, container.ContainerInfo().HostConfig.VolumesFrom)
+			assert.Equal(t, []string{"nextcloud-app:rw", "nextcloud-db"}, c.ContainerInfo().HostConfig.VolumesFrom)
 		})
 
 		t.Run("should rewrite resolved volumes-from entries and leave unresolved IDs", func(t *testing.T) {
@@ -487,9 +487,9 @@ func TestGetSourceContainer(t *testing.T) {
 			expectMissing(api, missingID)
 			expectTestImage(api)
 
-			container, err := getSourceContainer(newTestLogger(t), t.Context(), api, testContainerID, nil)
+			c, err := getSourceContainer(newTestLogger(t), t.Context(), api, testContainerID, nil)
 			require.NoError(t, err)
-			assert.Equal(t, []string{"nextcloud-app:rw", missingID}, container.ContainerInfo().HostConfig.VolumesFrom)
+			assert.Equal(t, []string{"nextcloud-app:rw", missingID}, c.ContainerInfo().HostConfig.VolumesFrom)
 		})
 	})
 
@@ -502,9 +502,9 @@ func TestGetSourceContainer(t *testing.T) {
 			api := newDockerAPI(t)
 			expectInspect(api, "invalid-container-id", dockerContainer.InspectResponse{}, notFoundError("No such container"))
 
-			container, err := getSourceContainer(newTestLogger(t), t.Context(), api, "invalid-container-id", nil)
+			c, err := getSourceContainer(newTestLogger(t), t.Context(), api, "invalid-container-id", nil)
 			require.ErrorContains(t, err, "failed to inspect container")
-			assert.Nil(t, container)
+			assert.Nil(t, c)
 		})
 	})
 
@@ -517,9 +517,9 @@ func TestGetSourceContainer(t *testing.T) {
 			api := newDockerAPI(t)
 			expectInspect(api, testContainerID, dockerContainer.InspectResponse{}, daemonError("gateway timeout"))
 
-			container, err := getSourceContainer(newTestLogger(t), t.Context(), api, testContainerID, nil)
+			c, err := getSourceContainer(newTestLogger(t), t.Context(), api, testContainerID, nil)
 			require.ErrorContains(t, err, "failed to inspect container")
-			assert.Nil(t, container)
+			assert.Nil(t, c)
 		})
 	})
 
@@ -534,9 +534,9 @@ func TestGetSourceContainer(t *testing.T) {
 			expectInspect(api, testContainerID, dockerContainer.InspectResponse{},
 				errors.New("invalid character 'j' looking for beginning of value"))
 
-			container, err := getSourceContainer(newTestLogger(t), t.Context(), api, testContainerID, nil)
+			c, err := getSourceContainer(newTestLogger(t), t.Context(), api, testContainerID, nil)
 			require.ErrorContains(t, err, "failed to inspect container")
-			assert.Nil(t, container)
+			assert.Nil(t, c)
 		})
 	})
 }
@@ -642,12 +642,12 @@ func Test_stopAndRemoveSourceContainer(t *testing.T) {
 			api := newDockerAPI(t)
 			expectRemove(api, false, nil)
 
-			container := modelfixture.Container(
+			c := modelfixture.Container(
 				containerfixture.WithContainerState(dockerContainer.State{Running: false, Status: "created"}),
 				containerfixture.WithAutoRemove(true),
 			)
 
-			err := stopAndRemoveSourceContainer(newTestLogger(t), t.Context(), api, container, 10*time.Second, false)
+			err := stopAndRemoveSourceContainer(newTestLogger(t), t.Context(), api, c, 10*time.Second, false)
 			require.NoError(t, err)
 		})
 	})
@@ -663,11 +663,11 @@ func Test_stopAndRemoveSourceContainer(t *testing.T) {
 			expectStop(api, mockContainerID, 10, nil)
 			expectRemove(api, true, nil)
 
-			container := running(func(c *dockerContainer.InspectResponse, _ *dockerImage.InspectResponse) {
+			c := running(func(c *dockerContainer.InspectResponse, _ *dockerImage.InspectResponse) {
 				c.HostConfig = nil
 			})
 
-			err := stopAndRemoveSourceContainer(newTestLogger(t), t.Context(), api, container, 10*time.Second, true)
+			err := stopAndRemoveSourceContainer(newTestLogger(t), t.Context(), api, c, 10*time.Second, true)
 			require.NoError(t, err)
 		})
 	})
@@ -681,9 +681,9 @@ func Test_stopAndRemoveSourceContainer(t *testing.T) {
 			api := newDockerAPI(t)
 			expectRemove(api, true, nil)
 
-			container := modelfixture.Container(containerfixture.WithContainerState(dockerContainer.State{Running: false}))
+			c := modelfixture.Container(containerfixture.WithContainerState(dockerContainer.State{Running: false}))
 
-			err := stopAndRemoveSourceContainer(newTestLogger(t), t.Context(), api, container, 10*time.Second, true)
+			err := stopAndRemoveSourceContainer(newTestLogger(t), t.Context(), api, c, 10*time.Second, true)
 			require.NoError(t, err)
 		})
 	})
@@ -753,12 +753,12 @@ func Test_stopSourceContainer(t *testing.T) {
 			api := newDockerAPI(t)
 			expectStop(api, mockContainerID, 10, nil)
 
-			container := modelfixture.Container()
-			container.SetLinkedToRestarting(true)
+			c := modelfixture.Container()
+			c.SetLinkedToRestarting(true)
 
 			log, logbuf := logcapture.New(zerolog.InfoLevel)
 
-			err := stopSourceContainer(log, t.Context(), api, container, 10*time.Second)
+			err := stopSourceContainer(log, t.Context(), api, c, 10*time.Second)
 			require.NoError(t, err)
 			assert.Contains(t, logbuf.String(), "Stopping linked container")
 		})
@@ -814,9 +814,9 @@ func Test_stopSourceContainer(t *testing.T) {
 
 			// The mock has no expectations, so any Docker call fails the test.
 			api := mockContainer.NewMockAPIClient(t)
-			container := modelfixture.Container(containerfixture.WithContainerState(dockerContainer.State{Running: false}))
+			c := modelfixture.Container(containerfixture.WithContainerState(dockerContainer.State{Running: false}))
 
-			err := stopSourceContainer(newTestLogger(t), t.Context(), api, container, 10*time.Second)
+			err := stopSourceContainer(newTestLogger(t), t.Context(), api, c, 10*time.Second)
 			require.NoError(t, err)
 		})
 	})

@@ -123,7 +123,7 @@ func listSourceContainers(log *zerolog.Logger,
 	imageCache := make(map[string]*dockerImage.InspectResponse, len(containers.Items))
 
 	for _, runningContainer := range containers.Items {
-		container, err := getSourceContainer(log, ctx, api, types.ContainerID(runningContainer.ID), imageCache)
+		c, err := getSourceContainer(log, ctx, api, types.ContainerID(runningContainer.ID), imageCache)
 		if err != nil {
 			// Log detailed error information for debugging container inspect failures
 			log.Debug().
@@ -146,16 +146,16 @@ func listSourceContainers(log *zerolog.Logger,
 			return nil, err // Logged above and in getSourceContainer
 		}
 
-		if filter == nil || filter(container) {
-			if !container.HasImageInfo() {
+		if filter == nil || filter(c) {
+			if !c.HasImageInfo() {
 				log.Warn().
-					Str("container", container.Name()).
+					Str("container", c.Name()).
 					Str("container_id", runningContainer.ID).
-					Str("image", container.ImageName()).
+					Str("image", c.ImageName()).
 					Msg("Failed to retrieve image info")
 			}
 
-			hostContainers = append(hostContainers, container)
+			hostContainers = append(hostContainers, c)
 		}
 	}
 
