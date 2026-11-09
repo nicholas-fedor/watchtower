@@ -95,9 +95,3 @@ flags:
       - "internal/*"
     # Persist coverage across commits
     carryforward: true
-  # Core package logic
-  pkg:
-    paths:
-      - "pkg/*"
-    # Persist coverage across commits
-    carryforward: true

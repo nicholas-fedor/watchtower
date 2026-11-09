@@ -10,10 +10,10 @@ import (
 
 	container0 "github.com/moby/moby/api/types/container"
 	"github.com/nicholas-fedor/watchtower/internal/container"
+	"github.com/nicholas-fedor/watchtower/internal/container/client"
 	"github.com/nicholas-fedor/watchtower/internal/container/filters"
 	"github.com/nicholas-fedor/watchtower/internal/container/oci"
 	"github.com/nicholas-fedor/watchtower/internal/settings/config/update"
-	"github.com/nicholas-fedor/watchtower/pkg/types"
 	mock "github.com/stretchr/testify/mock"
 )
 
@@ -537,22 +537,22 @@ func (_c *MockClient_GetImageAnnotations_Call) RunAndReturn(run func(ctx context
 }
 
 // GetImageDiskUsage provides a mock function for the type MockClient
-func (_mock *MockClient) GetImageDiskUsage(ctx context.Context) (types.ImageDiskUsage, error) {
+func (_mock *MockClient) GetImageDiskUsage(ctx context.Context) (client.ImageDiskUsage, error) {
 	ret := _mock.Called(ctx)
 
 	if len(ret) == 0 {
 		panic("no return value specified for GetImageDiskUsage")
 	}
 
-	var r0 types.ImageDiskUsage
+	var r0 client.ImageDiskUsage
 	var r1 error
-	if returnFunc, ok := ret.Get(0).(func(context.Context) (types.ImageDiskUsage, error)); ok {
+	if returnFunc, ok := ret.Get(0).(func(context.Context) (client.ImageDiskUsage, error)); ok {
 		return returnFunc(ctx)
 	}
-	if returnFunc, ok := ret.Get(0).(func(context.Context) types.ImageDiskUsage); ok {
+	if returnFunc, ok := ret.Get(0).(func(context.Context) client.ImageDiskUsage); ok {
 		r0 = returnFunc(ctx)
 	} else {
-		r0 = ret.Get(0).(types.ImageDiskUsage)
+		r0 = ret.Get(0).(client.ImageDiskUsage)
 	}
 	if returnFunc, ok := ret.Get(1).(func(context.Context) error); ok {
 		r1 = returnFunc(ctx)
@@ -586,12 +586,12 @@ func (_c *MockClient_GetImageDiskUsage_Call) Run(run func(ctx context.Context)) 
 	return _c
 }
 
-func (_c *MockClient_GetImageDiskUsage_Call) Return(imageDiskUsage types.ImageDiskUsage, err error) *MockClient_GetImageDiskUsage_Call {
+func (_c *MockClient_GetImageDiskUsage_Call) Return(imageDiskUsage client.ImageDiskUsage, err error) *MockClient_GetImageDiskUsage_Call {
 	_c.Call.Return(imageDiskUsage, err)
 	return _c
 }
 
-func (_c *MockClient_GetImageDiskUsage_Call) RunAndReturn(run func(ctx context.Context) (types.ImageDiskUsage, error)) *MockClient_GetImageDiskUsage_Call {
+func (_c *MockClient_GetImageDiskUsage_Call) RunAndReturn(run func(ctx context.Context) (client.ImageDiskUsage, error)) *MockClient_GetImageDiskUsage_Call {
 	_c.Call.Return(run)
 	return _c
 }

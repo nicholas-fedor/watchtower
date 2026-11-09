@@ -67,7 +67,7 @@ jobs:
           fi
 
           # Check if there are any changes in the watched paths since last successful nightly run
-          if ! CHANGED=$(git diff --name-only "$LAST_NIGHTLY_COMMIT" HEAD -- "cmd/**" "pkg/**" "internal/**" main.go go.mod go.sum); then
+          if ! CHANGED=$(git diff --name-only "$LAST_NIGHTLY_COMMIT" HEAD -- "cmd/**" "internal/**" main.go go.mod go.sum); then
             echo "git diff failed, treating as changes present"
             echo "has-changes=true" >> "$GITHUB_OUTPUT"
             exit 0

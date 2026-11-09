@@ -13,6 +13,7 @@ import (
 	"golang.org/x/sync/errgroup"
 
 	"github.com/nicholas-fedor/watchtower/internal/container"
+	containerClient "github.com/nicholas-fedor/watchtower/internal/container/client"
 	"github.com/nicholas-fedor/watchtower/internal/container/filters"
 	"github.com/nicholas-fedor/watchtower/internal/container/hooks"
 	containerImage "github.com/nicholas-fedor/watchtower/internal/container/image"
@@ -33,7 +34,6 @@ import (
 	"github.com/nicholas-fedor/watchtower/internal/update/sorter"
 	"github.com/nicholas-fedor/watchtower/internal/update/staleness"
 	"github.com/nicholas-fedor/watchtower/internal/update/state"
-	"github.com/nicholas-fedor/watchtower/pkg/types"
 )
 
 // Client is what an update session needs from the Docker client. It also
@@ -56,7 +56,7 @@ type Client interface {
 	// when they cannot be read.
 	GetImageAnnotations(ctx context.Context, imageRef string) oci.Annotations
 	// GetImageDiskUsage returns the daemon's image storage usage.
-	GetImageDiskUsage(ctx context.Context) (types.ImageDiskUsage, error)
+	GetImageDiskUsage(ctx context.Context) (containerClient.ImageDiskUsage, error)
 }
 
 // Errors for update operations.

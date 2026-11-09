@@ -11,10 +11,10 @@ import (
 	dockerContainer "github.com/moby/moby/api/types/container"
 
 	"github.com/nicholas-fedor/watchtower/internal/container"
+	containerClient "github.com/nicholas-fedor/watchtower/internal/container/client"
 	"github.com/nicholas-fedor/watchtower/internal/container/filters"
 	"github.com/nicholas-fedor/watchtower/internal/container/oci"
 	updateConfig "github.com/nicholas-fedor/watchtower/internal/settings/config/update"
-	"github.com/nicholas-fedor/watchtower/pkg/types"
 )
 
 // FakeClient is a fake Watchtower client for testing. It keeps container state
@@ -64,26 +64,26 @@ type TestData struct {
 	StartOrder                []string                                       // Order in which containers were started.
 	// OperationOrder records client method names in call order for handoff sequencing assertions.
 	OperationOrder               []string
-	LastRestartPolicy            dockerContainer.RestartPolicy // Last policy passed to SetRestartPolicy.
-	ImageDiskUsage               types.ImageDiskUsage          // Usage returned by GetImageDiskUsage.
-	ListContainersFailCount      int                           // Number of times ListContainers should fail before succeeding.
-	StopContainerFailCount       int                           // Number of times StopContainer should fail before succeeding.
-	SimulatedLatency             time.Duration                 // Simulated latency for operations (default 0 for fast tests, set for context cancellation tests).
-	LastExecUID                  int                           // UID passed to the last ExecuteCommand call.
-	LastExecGID                  int                           // GID passed to the last ExecuteCommand call.
-	TriedToRemoveImageCount      atomic.Int32                  // Number of times RemoveImageByID was called.
-	RenameContainerCount         atomic.Int32                  // Number of times RenameContainer was called.
-	StopContainerCount           atomic.Int32                  // Number of times StopContainer was called.
-	StopAndRemoveContainerCount  atomic.Int32                  // Number of times StopAndRemoveContainer was called.
-	StartContainerCount          atomic.Int32                  // Number of times StartContainer was called.
-	CreateContainerCount         atomic.Int32                  // Number of times CreateContainer was called.
-	SetRestartPolicyCount        atomic.Int32                  // Number of times SetRestartPolicy was called.
-	IsContainerStaleCount        atomic.Int32                  // Number of times IsContainerStale was called.
-	WaitForContainerHealthyCount atomic.Int32                  // Number of times WaitForContainerHealthy was called.
-	ListContainersCount          atomic.Int32                  // Number of times ListContainers was called.
-	RemoveContainerCount         atomic.Int32                  // Number of times RemoveContainer was called.
-	GetImageDiskUsageCount       atomic.Int32                  // Number of times GetImageDiskUsage was called.
-	LastCleanup                  bool                          // Last cleanup flag passed to CreateEphemeralOrchestrator.
+	LastRestartPolicy            dockerContainer.RestartPolicy  // Last policy passed to SetRestartPolicy.
+	ImageDiskUsage               containerClient.ImageDiskUsage // Usage returned by GetImageDiskUsage.
+	ListContainersFailCount      int                            // Number of times ListContainers should fail before succeeding.
+	StopContainerFailCount       int                            // Number of times StopContainer should fail before succeeding.
+	SimulatedLatency             time.Duration                  // Simulated latency for operations (default 0 for fast tests, set for context cancellation tests).
+	LastExecUID                  int                            // UID passed to the last ExecuteCommand call.
+	LastExecGID                  int                            // GID passed to the last ExecuteCommand call.
+	TriedToRemoveImageCount      atomic.Int32                   // Number of times RemoveImageByID was called.
+	RenameContainerCount         atomic.Int32                   // Number of times RenameContainer was called.
+	StopContainerCount           atomic.Int32                   // Number of times StopContainer was called.
+	StopAndRemoveContainerCount  atomic.Int32                   // Number of times StopAndRemoveContainer was called.
+	StartContainerCount          atomic.Int32                   // Number of times StartContainer was called.
+	CreateContainerCount         atomic.Int32                   // Number of times CreateContainer was called.
+	SetRestartPolicyCount        atomic.Int32                   // Number of times SetRestartPolicy was called.
+	IsContainerStaleCount        atomic.Int32                   // Number of times IsContainerStale was called.
+	WaitForContainerHealthyCount atomic.Int32                   // Number of times WaitForContainerHealthy was called.
+	ListContainersCount          atomic.Int32                   // Number of times ListContainers was called.
+	RemoveContainerCount         atomic.Int32                   // Number of times RemoveContainer was called.
+	GetImageDiskUsageCount       atomic.Int32                   // Number of times GetImageDiskUsage was called.
+	LastCleanup                  bool                           // Last cleanup flag passed to CreateEphemeralOrchestrator.
 }
 
 // recordOperation appends an operation name to OperationOrder for sequencing tests.
@@ -585,19 +585,19 @@ func (client FakeClient) CreateEphemeralOrchestrator(
 }
 
 // GetImageDiskUsage returns the configured image usage for testing.
-func (client FakeClient) GetImageDiskUsage(ctx context.Context) (types.ImageDiskUsage, error) {
+func (client FakeClient) GetImageDiskUsage(ctx context.Context) (containerClient.ImageDiskUsage, error) {
 	if client.TestData == nil {
-		return types.ImageDiskUsage{}, nil
+		return containerClient.ImageDiskUsage{}, nil
 	}
 
 	if err := client.checkContextCancellation(ctx); err != nil {
-		return types.ImageDiskUsage{}, err
+		return containerClient.ImageDiskUsage{}, err
 	}
 
 	client.TestData.GetImageDiskUsageCount.Add(1)
 
 	if client.TestData.GetImageDiskUsageError != nil {
-		return types.ImageDiskUsage{}, client.TestData.GetImageDiskUsageError
+		return containerClient.ImageDiskUsage{}, client.TestData.GetImageDiskUsageError
 	}
 
 	return client.TestData.ImageDiskUsage, nil

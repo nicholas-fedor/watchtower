@@ -1,6 +1,5 @@
 internal/observability/notify/ @nicholas-fedor
 internal/container/           @nicholas-fedor
-pkg/api/*                     @nicholas-fedor
 .devbots/*                    @nicholas-fedor
 .github/*                     @nicholas-fedor
 docs/*                        @nicholas-fedor/watchtower-contributors

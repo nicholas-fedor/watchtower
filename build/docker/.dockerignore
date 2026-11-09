@@ -22,7 +22,6 @@ examples/
 # Ignore test directories and data
 test/
 internal/update/mocks/
-pkg/*/mocks/
 
 # Ignore scripts and tools
 scripts/

@@ -32,7 +32,6 @@ import (
 	"github.com/nicholas-fedor/watchtower/internal/registry/ratelimit"
 	registryConfig "github.com/nicholas-fedor/watchtower/internal/settings/config/registry"
 	updateConfig "github.com/nicholas-fedor/watchtower/internal/settings/config/update"
-	"github.com/nicholas-fedor/watchtower/pkg/types"
 )
 
 // Constants for CPUCopyMode values.
@@ -144,6 +143,18 @@ type ClientOptions struct {
 	ReviveStopped           bool
 	IncludeRestarting       bool
 	DisableMemorySwappiness bool
+}
+
+// ImageDiskUsage holds aggregated Docker image storage usage from GET /system/df.
+type ImageDiskUsage struct {
+	// TotalSize is the number of bytes used by images.
+	TotalSize int64
+	// Reclaimable is the number of bytes that unused images could free.
+	Reclaimable int64
+	// TotalCount is the number of images.
+	TotalCount int64
+	// ActiveCount is the number of images in use by containers.
+	ActiveCount int64
 }
 
 // NewClient initializes a new Client instance for Docker API interactions.
@@ -1136,9 +1147,9 @@ func (c *Client) Ping(ctx context.Context) error {
 //   - ctx: Context for cancellation and timeout control.
 //
 // Returns:
-//   - types.ImageDiskUsage: Aggregated image usage.
+//   - ImageDiskUsage: Aggregated image usage.
 //   - error: Non-nil if retrieval fails, nil on success.
-func (c *Client) GetImageDiskUsage(ctx context.Context) (types.ImageDiskUsage, error) {
+func (c *Client) GetImageDiskUsage(ctx context.Context) (ImageDiskUsage, error) {
 	result, err := c.api.DiskUsage(ctx, dockerClient.DiskUsageOptions{
 		Images: true,
 	})
@@ -1147,10 +1158,10 @@ func (c *Client) GetImageDiskUsage(ctx context.Context) (types.ImageDiskUsage, e
 			Err(err).
 			Msg("Failed to get image disk usage")
 
-		return types.ImageDiskUsage{}, fmt.Errorf("failed to get image disk usage: %w", err)
+		return ImageDiskUsage{}, fmt.Errorf("failed to get image disk usage: %w", err)
 	}
 
-	return types.ImageDiskUsage{
+	return ImageDiskUsage{
 		TotalSize:   result.Images.TotalSize,
 		Reclaimable: result.Images.Reclaimable,
 		TotalCount:  result.Images.TotalCount,
