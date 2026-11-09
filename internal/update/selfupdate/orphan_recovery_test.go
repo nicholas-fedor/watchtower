@@ -14,9 +14,9 @@ import (
 	dockerContainer "github.com/moby/moby/api/types/container"
 
 	"github.com/nicholas-fedor/watchtower/internal/container"
-	mockContainerClient "github.com/nicholas-fedor/watchtower/internal/container/client/mocks"
 	"github.com/nicholas-fedor/watchtower/internal/testutil/logcapture"
 	mockUpdate "github.com/nicholas-fedor/watchtower/internal/update/mocks"
+	mockSelfupdate "github.com/nicholas-fedor/watchtower/internal/update/selfupdate/mocks"
 )
 
 // recoveryContainer returns a Watchtower container for the orphan recovery
@@ -60,7 +60,7 @@ func recoveryContainer(id, name string, running bool, scope string) *container.C
 // Parameters:
 //   - client: Mocked container client.
 //   - containers: Containers the listing returns.
-func expectListed(client *mockContainerClient.MockClient, containers ...*container.Container) {
+func expectListed(client *mockSelfupdate.MockRecoveryClient, containers ...*container.Container) {
 	client.EXPECT().ListContainers(mock.Anything, mock.Anything).Return(containers, nil).Once()
 }
 
@@ -77,7 +77,7 @@ func TestTryRecoverOrphanedContainer(t *testing.T) {
 		t.Run("should return false without error", func(t *testing.T) {
 			t.Parallel()
 
-			client := mockContainerClient.NewMockClient(t)
+			client := mockSelfupdate.NewMockRecoveryClient(t)
 			client.EXPECT().ListContainers(mock.Anything, mock.Anything).Return(nil, context.DeadlineExceeded).Once()
 
 			current := mockUpdate.CreateMockContainer("current-id", "watchtower", "watchtower:latest", time.Now())
@@ -99,7 +99,7 @@ func TestTryRecoverOrphanedContainer(t *testing.T) {
 			oldContainer := recoveryContainer("old-id", "watchtower-old-abc123", true, "")
 			current := mockUpdate.CreateMockContainer("current-id", "watchtower", "watchtower:latest", time.Now())
 
-			client := mockContainerClient.NewMockClient(t)
+			client := mockSelfupdate.NewMockRecoveryClient(t)
 			expectListed(client, oldContainer, current)
 
 			recovered, ok := TryRecoverOrphanedContainer(newTestLogger(t), t.Context(), client, current)
@@ -117,7 +117,7 @@ func TestTryRecoverOrphanedContainer(t *testing.T) {
 			orphaned := recoveryContainer("orphaned-id", "watchtower-xyz", false, "")
 			current := recoveryContainer("current-id", "watchtower-old-abc123", true, "")
 
-			client := mockContainerClient.NewMockClient(t)
+			client := mockSelfupdate.NewMockRecoveryClient(t)
 			expectListed(client, orphaned, current)
 			client.EXPECT().StartContainerByID(mock.Anything, container.ContainerID("orphaned-id")).Return(nil).Once()
 
@@ -137,7 +137,7 @@ func TestTryRecoverOrphanedContainer(t *testing.T) {
 			orphaned := recoveryContainer("orphaned-id", "watchtower-xyz", false, "")
 			current := recoveryContainer("current-id", "watchtower-old-abc123", true, "")
 
-			client := mockContainerClient.NewMockClient(t)
+			client := mockSelfupdate.NewMockRecoveryClient(t)
 			expectListed(client, orphaned, current)
 			client.EXPECT().StartContainerByID(mock.Anything, container.ContainerID("orphaned-id")).
 				Return(context.DeadlineExceeded).Once()
@@ -154,7 +154,7 @@ func TestTryRecoverOrphanedContainer(t *testing.T) {
 			second := recoveryContainer("second-orphan-id", "watchtower-abc", false, "")
 			current := recoveryContainer("current-id", "watchtower-old-abc123", true, "")
 
-			client := mockContainerClient.NewMockClient(t)
+			client := mockSelfupdate.NewMockRecoveryClient(t)
 			expectListed(client, first, second, current)
 			client.EXPECT().StartContainerByID(mock.Anything, container.ContainerID("first-orphan-id")).
 				Return(context.DeadlineExceeded).Once()
@@ -175,7 +175,7 @@ func TestTryRecoverOrphanedContainer(t *testing.T) {
 			t.Parallel()
 
 			// The mock has no expectations, so any client call fails the test.
-			client := mockContainerClient.NewMockClient(t)
+			client := mockSelfupdate.NewMockRecoveryClient(t)
 
 			var (
 				recovered *container.Container
@@ -199,7 +199,7 @@ func TestTryRecoverOrphanedContainer(t *testing.T) {
 			orphaned := recoveryContainer("orphaned-id", "watchtower-xyz", false, "scope-b")
 			current := recoveryContainer("current-id", "watchtower-old-abc123", true, "scope-a")
 
-			client := mockContainerClient.NewMockClient(t)
+			client := mockSelfupdate.NewMockRecoveryClient(t)
 			expectListed(client, orphaned, current)
 
 			recovered, ok := TryRecoverOrphanedContainer(newTestLogger(t), t.Context(), client, current)
@@ -217,7 +217,7 @@ func TestTryRecoverOrphanedContainer(t *testing.T) {
 			orphaned := recoveryContainer("orphaned-id", "watchtower-xyz", false, "scope-b")
 			current := recoveryContainer("current-id", "watchtower-old-abc123", true, "")
 
-			client := mockContainerClient.NewMockClient(t)
+			client := mockSelfupdate.NewMockRecoveryClient(t)
 			expectListed(client, orphaned, current)
 
 			recovered, ok := TryRecoverOrphanedContainer(newTestLogger(t), t.Context(), client, current)
@@ -248,7 +248,7 @@ func TestDisableOldRestarts(t *testing.T) {
 
 			oldContainer := mockUpdate.CreateMockContainer("old-id", "/watchtower-old-000000000000", "nickfedor/watchtower:latest", time.Now())
 
-			client := mockContainerClient.NewMockClient(t)
+			client := mockSelfupdate.NewMockRestartPolicySetter(t)
 			client.EXPECT().SetRestartPolicy(mock.Anything, oldContainer.ID(),
 				dockerContainer.RestartPolicy{Name: dockerContainer.RestartPolicyDisabled}).Return(tt.updateErr).Once()
 

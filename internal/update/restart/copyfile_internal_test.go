@@ -16,12 +16,13 @@ import (
 	mockContainerClient "github.com/nicholas-fedor/watchtower/internal/container/client/mocks"
 	mockUpdate "github.com/nicholas-fedor/watchtower/internal/update/mocks"
 	updateParams "github.com/nicholas-fedor/watchtower/internal/update/params"
+	mockRestart "github.com/nicholas-fedor/watchtower/internal/update/restart/mocks"
 )
 
-// copyFileAwareClient implements container.Client and container.CopyFileStore
-// by composing mockery-generated mocks.
+// copyFileAwareClient implements [Client] and the container client's copy-file
+// store by composing mockery-generated mocks.
 type copyFileAwareClient struct {
-	containerClient.Client
+	Client
 	containerClient.CopyFileStore
 }
 
@@ -44,16 +45,16 @@ func staleMockContainer() *container.Container {
 //
 // Returns:
 //   - *copyFileAwareClient: The combined client.
-//   - *mockContainer.MockClient: Mock behind the client methods.
-//   - *mockContainer.MockCopyFileStore: Mock behind the copy-file store methods.
+//   - *mockRestart.MockClient: Mock behind the client methods.
+//   - *mockContainerClient.MockCopyFileStore: Mock behind the copy-file store methods.
 func newCopyFileAwareClient(t *testing.T) (
 	*copyFileAwareClient,
-	*mockContainerClient.MockClient,
+	*mockRestart.MockClient,
 	*mockContainerClient.MockCopyFileStore,
 ) {
 	t.Helper()
 
-	mockClient := mockContainerClient.NewMockClient(t)
+	mockClient := mockRestart.NewMockClient(t)
 	mockStore := mockContainerClient.NewMockCopyFileStore(t)
 
 	return &copyFileAwareClient{
@@ -71,7 +72,7 @@ func TestCopyFileRecreateHelpers(t *testing.T) {
 	t.Run("skips snapshot when the client is not a CopyFileStore", func(t *testing.T) {
 		t.Parallel()
 
-		client := mockContainerClient.NewMockClient(t)
+		client := mockRestart.NewMockClient(t)
 		source := staleMockContainer()
 
 		require.NoError(t, snapshotCopyFilesForRecreate(t.Context(), client, source))
