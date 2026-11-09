@@ -425,7 +425,7 @@ func (s *Session) recordCompose(
 	}
 
 	assoc, _ := provenance.ResolveAssociation(c, params.Git)
-	provenance.ApplyGitAssociation(c, assoc, provenance.PersistWatch(c))
+	provenance.ApplyGitAssociation(c, assoc)
 	provenance.ApplyGitStamp(c, result.Commit, result.Tag)
 
 	s.mu.Lock()

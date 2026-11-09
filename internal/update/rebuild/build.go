@@ -106,7 +106,7 @@ func (s *Session) build(
 		return fmt.Errorf("build git image: %w", err)
 	}
 
-	provenance.ApplyGitAssociation(c, assoc, provenance.PersistWatch(c))
+	provenance.ApplyGitAssociation(c, assoc)
 	c.SetImageName(tag)
 	provenance.ApplyGitStamp(c, result.Commit, result.Tag)
 

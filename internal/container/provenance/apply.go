@@ -30,17 +30,20 @@ func ApplyGitStamp(c *container.Container, commit, tag string) {
 // This keeps git-image mappings working after Config.Image is rewritten to name:git-<sha>.
 // Ref, policy, Dockerfile, and context labels are written only when a label or
 // image mapping supplied them. Process defaults stay off the replacement.
+// git-watch=true is written only when the container's own git-watch label
+// enabled the watcher, so the git-enable configuration option keeps applying
+// to a replacement whose watcher it turned on.
 //
 // Parameters:
 //   - c: Concrete container whose create labels will be mutated.
 //   - assoc: Resolved repo, ref, policy, and build paths.
-//   - watch: When true, persist git-watch=true. False leaves the process-wide
-//     --git-enable default in effect on the replacement.
-func ApplyGitAssociation(c *container.Container, assoc Association, watch bool) {
+func ApplyGitAssociation(c *container.Container, assoc Association) {
 	if c == nil || assoc.Repo == "" {
 		return
 	}
 
+	// Read the source's watch label before the association labels are cleared.
+	watch := PersistWatch(c)
 	repo := redact.GitURL(assoc.Repo)
 
 	c.DeleteLabel(labels.GitRepo)

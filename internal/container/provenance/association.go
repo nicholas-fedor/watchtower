@@ -206,21 +206,9 @@ func ShouldMonitor(log *zerolog.Logger, c *container.Container, defaults gitConf
 // Returns:
 //   - bool: True when the source had an explicit on value for git-watch.
 func PersistWatch(c *container.Container) bool {
-	if c == nil {
-		return false
-	}
+	enabled, _ := watchLabel(c)
 
-	val, ok := c.GetLabel(labels.GitWatch)
-	if !ok {
-		return false
-	}
-
-	switch strings.ToLower(strings.TrimSpace(val)) {
-	case "1", "t", "true", "yes":
-		return true
-	default:
-		return false
-	}
+	return enabled
 }
 
 // label returns the trimmed container label value for key.
@@ -280,19 +268,37 @@ func imageMapping(imageName string, images map[string]gitConfig.Image) gitConfig
 // Returns:
 //   - bool: True when the watcher should run, ignoring association.
 func isWatch(c *container.Container, defaults gitConfig.Defaults) bool {
-	val, ok := c.GetLabel(labels.GitWatch)
-	if !ok || strings.TrimSpace(val) == "" {
-		return defaults.Enable
+	if enabled, set := watchLabel(c); set {
+		return enabled
 	}
 
-	// Match Docker's loose boolean parsing used elsewhere on Watchtower labels.
-	switch strings.ToLower(strings.TrimSpace(val)) {
+	return defaults.Enable
+}
+
+// watchLabel reads the git-watch label.
+//
+// Enabling values are 1, t, true and yes. Disabling values are 0, f, false
+// and no. Case and surrounding spaces are ignored. A missing, blank or
+// unrecognized value counts as unset.
+//
+// Parameters:
+//   - c: Container to inspect.
+//
+// Returns:
+//   - enabled: True when the label turns the watcher on.
+//   - set: True when the label holds an enabling or disabling value.
+//
+//nolint:nonamedreturns // Same-type returns need names.
+func watchLabel(c *container.Container) (enabled, set bool) {
+	val := label(c, labels.GitWatch)
+
+	switch strings.ToLower(val) {
 	case "1", "t", "true", "yes":
-		return true
+		return true, true
 	case "0", "f", "false", "no":
-		return false
+		return false, true
 	default:
-		return defaults.Enable
+		return false, false
 	}
 }
 
