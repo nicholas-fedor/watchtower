@@ -99,6 +99,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Chores
 
+- Update module golang.org/x/sync to v0.25.0 by @renovate[bot] in [#3625](https://github.com/nicholas-fedor/watchtower/pull/3625)
 - Update module github.com/gofiber/fiber/v3 to v3.7.0 by @renovate[bot] in [#3619](https://github.com/nicholas-fedor/watchtower/pull/3619)
 - Update module github.com/klauspost/compress to v1.20.4 by @renovate[bot] in [#3618](https://github.com/nicholas-fedor/watchtower/pull/3618)
 - Update module golang.org/x/sys to v0.50.0 by @renovate[bot] in [#3613](https://github.com/nicholas-fedor/watchtower/pull/3613)
