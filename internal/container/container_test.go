@@ -20,7 +20,6 @@ import (
 	updateConfig "github.com/nicholas-fedor/watchtower/internal/settings/config/update"
 	"github.com/nicholas-fedor/watchtower/internal/testutil/containerfixture"
 	"github.com/nicholas-fedor/watchtower/pkg/types"
-	mockTypes "github.com/nicholas-fedor/watchtower/pkg/types/mocks"
 )
 
 // testContainerName is used for testing self-referencing dependency scenarios.
@@ -1273,9 +1272,8 @@ func TestContainerModel(t *testing.T) {
 		t.Run("returns container name when ContainerInfo returns nil", func(t *testing.T) {
 			t.Parallel()
 
-			container := mockTypes.NewMockContainer(t)
-			container.EXPECT().ContainerInfo().Return(nil)
-			container.EXPECT().Name().Return("test-watchtower")
+			container := MockContainer()
+			container.containerInfo = nil
 			identifier := ResolveContainerIdentifier(container)
 			assert.Equal(t, "test-watchtower", identifier)
 		})
@@ -1292,19 +1290,16 @@ func TestContainerModel(t *testing.T) {
 		t.Run("returns container name for replica containers", func(t *testing.T) {
 			t.Parallel()
 
-			mockContainer := mockTypes.NewMockContainer(t)
-			mockContainer.EXPECT().ContainerInfo().Return(&dockerContainer.InspectResponse{
-				Config: &dockerContainer.Config{
-					Labels: map[string]string{
-						"com.docker.compose.service":     "web",
-						"com.docker.compose.project":     "myproject",
-						"com.docker.compose.version":     "3.8",
-						"com.docker.compose.config-hash": "abc123",
-					},
-				},
-			})
-			mockContainer.EXPECT().Name().Return("myproject-web-1")
-			result := ResolveContainerIdentifier(mockContainer)
+			container := MockContainer(
+				containerfixture.WithName("/myproject-web-1"),
+				containerfixture.WithLabels(map[string]string{
+					"com.docker.compose.service":     "web",
+					"com.docker.compose.project":     "myproject",
+					"com.docker.compose.version":     "3.8",
+					"com.docker.compose.config-hash": "abc123",
+				}),
+			)
+			result := ResolveContainerIdentifier(container)
 			assert.Equal(t, "myproject-web-1", result)
 		})
 
@@ -1376,27 +1371,18 @@ func TestContainerModel(t *testing.T) {
 			t.Run("prevents collision between replicas without unique identifiers", func(t *testing.T) {
 				t.Parallel()
 
-				replica1 := mockTypes.NewMockContainer(t)
-				replica1.EXPECT().ContainerInfo().Return(&dockerContainer.InspectResponse{
-					Config: &dockerContainer.Config{
-						Labels: map[string]string{
-							"com.docker.compose.service": "service",
-							"com.docker.compose.project": "myapp",
-						},
-					},
-				})
-				replica1.EXPECT().Name().Return("myapp-service-1")
-
-				replica2 := mockTypes.NewMockContainer(t)
-				replica2.EXPECT().ContainerInfo().Return(&dockerContainer.InspectResponse{
-					Config: &dockerContainer.Config{
-						Labels: map[string]string{
-							"com.docker.compose.service": "service",
-							"com.docker.compose.project": "myapp",
-						},
-					},
-				})
-				replica2.EXPECT().Name().Return("myapp-service-2")
+				replicaLabels := map[string]string{
+					"com.docker.compose.service": "service",
+					"com.docker.compose.project": "myapp",
+				}
+				replica1 := MockContainer(
+					containerfixture.WithName("/myapp-service-1"),
+					containerfixture.WithLabels(replicaLabels),
+				)
+				replica2 := MockContainer(
+					containerfixture.WithName("/myapp-service-2"),
+					containerfixture.WithLabels(replicaLabels),
+				)
 
 				id1 := ResolveContainerIdentifier(replica1)
 				id2 := ResolveContainerIdentifier(replica2)
@@ -1409,30 +1395,21 @@ func TestContainerModel(t *testing.T) {
 			t.Run("handles replicas with and without container number labels", func(t *testing.T) {
 				t.Parallel()
 
-				replicaWithNumber := mockTypes.NewMockContainer(t)
-				replicaWithNumber.EXPECT().ContainerInfo().Return(&dockerContainer.InspectResponse{
-					Config: &dockerContainer.Config{
-						Labels: map[string]string{
-							"com.docker.compose.service":          "worker",
-							"com.docker.compose.project":          "queue",
-							"com.docker.compose.container-number": "5",
-						},
-					},
-				})
-				replicaWithNumber.EXPECT().Name().Return("queue-worker-5")
-
-				replicaWithoutNumber := mockTypes.NewMockContainer(t)
-				replicaWithoutNumber.EXPECT().
-					ContainerInfo().
-					Return(&dockerContainer.InspectResponse{
-						Config: &dockerContainer.Config{
-							Labels: map[string]string{
-								"com.docker.compose.service": "worker",
-								"com.docker.compose.project": "queue",
-							},
-						},
-					})
-				replicaWithoutNumber.EXPECT().Name().Return("queue-worker-6")
+				replicaWithNumber := MockContainer(
+					containerfixture.WithName("/queue-worker-5"),
+					containerfixture.WithLabels(map[string]string{
+						"com.docker.compose.service":          "worker",
+						"com.docker.compose.project":          "queue",
+						"com.docker.compose.container-number": "5",
+					}),
+				)
+				replicaWithoutNumber := MockContainer(
+					containerfixture.WithName("/queue-worker-6"),
+					containerfixture.WithLabels(map[string]string{
+						"com.docker.compose.service": "worker",
+						"com.docker.compose.project": "queue",
+					}),
+				)
 
 				idWith := ResolveContainerIdentifier(replicaWithNumber)
 				idWithout := ResolveContainerIdentifier(replicaWithoutNumber)

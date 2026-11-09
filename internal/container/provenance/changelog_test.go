@@ -14,7 +14,7 @@ func TestChangelog(t *testing.T) {
 	t.Run("explicit template", func(t *testing.T) {
 		t.Parallel()
 
-		c := testContainer(t, map[string]string{
+		c := testContainer(map[string]string{
 			labels.ChangelogURL: "https://example.com/notes/{tag}#{commit}",
 		}, "app:latest")
 		got := Changelog(c, "https://github.com/org/app.git", ChangelogVars{Tag: "v1.2.3", Commit: "abc"})
@@ -24,21 +24,21 @@ func TestChangelog(t *testing.T) {
 	t.Run("derived github url", func(t *testing.T) {
 		t.Parallel()
 
-		got := Changelog(testContainer(t, nil, "app:latest"), "https://github.com/org/app.git", ChangelogVars{})
+		got := Changelog(testContainer(nil, "app:latest"), "https://github.com/org/app.git", ChangelogVars{})
 		assert.Equal(t, "https://github.com/org/app/releases", got)
 	})
 
 	t.Run("derived url for a known tag", func(t *testing.T) {
 		t.Parallel()
 
-		got := Changelog(testContainer(t, nil, "app:latest"), "https://github.com/org/app.git", ChangelogVars{Tag: "v1.2.3"})
+		got := Changelog(testContainer(nil, "app:latest"), "https://github.com/org/app.git", ChangelogVars{Tag: "v1.2.3"})
 		assert.Equal(t, "https://github.com/org/app/releases/tag/v1.2.3", got)
 	})
 
 	t.Run("explicit template wins over a known tag", func(t *testing.T) {
 		t.Parallel()
 
-		c := testContainer(t, map[string]string{
+		c := testContainer(map[string]string{
 			labels.ChangelogURL: "https://example.com/notes/{tag}",
 		}, "app:latest")
 		got := Changelog(c, "https://github.com/org/app.git", ChangelogVars{Tag: "v1.2.3"})
@@ -48,14 +48,14 @@ func TestChangelog(t *testing.T) {
 	t.Run("empty when unknown host", func(t *testing.T) {
 		t.Parallel()
 
-		got := Changelog(testContainer(t, nil, "app:latest"), "https://git.unknown.example/org/app.git", ChangelogVars{})
+		got := Changelog(testContainer(nil, "app:latest"), "https://git.unknown.example/org/app.git", ChangelogVars{})
 		assert.Empty(t, got)
 	})
 
 	t.Run("unsafe tag falls back to the release index", func(t *testing.T) {
 		t.Parallel()
 
-		got := Changelog(testContainer(t, nil, "app:latest"), "https://github.com/org/app.git", ChangelogVars{Tag: "../other"})
+		got := Changelog(testContainer(nil, "app:latest"), "https://github.com/org/app.git", ChangelogVars{Tag: "../other"})
 		assert.Equal(t, "https://github.com/org/app/releases", got)
 	})
 }

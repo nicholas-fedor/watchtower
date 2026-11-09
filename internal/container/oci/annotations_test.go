@@ -5,9 +5,11 @@ import (
 
 	"github.com/stretchr/testify/assert"
 
-	dockerspec "github.com/moby/docker-image-spec/specs-go/v1"
+	dockerContainer "github.com/moby/moby/api/types/container"
 	dockerImage "github.com/moby/moby/api/types/image"
 
+	"github.com/nicholas-fedor/watchtower/internal/testutil/containerfixture"
+	"github.com/nicholas-fedor/watchtower/internal/testutil/modelfixture"
 	typemocks "github.com/nicholas-fedor/watchtower/pkg/types/mocks"
 )
 
@@ -23,11 +25,11 @@ func TestRead(t *testing.T) {
 	t.Run("no image info", func(t *testing.T) {
 		t.Parallel()
 
-		c := typemocks.NewMockContainer(t)
-		c.EXPECT().HasImageInfo().Return(false)
-		assert.Equal(t, Annotations{}, Read(c))
+		assert.Equal(t, Annotations{}, Read(modelfixture.ContainerWithoutImageInfo()))
 	})
 
+	// The model returns image info whenever it reports having some, so only a
+	// mock can report image info and then return none.
 	t.Run("nil image inspect", func(t *testing.T) {
 		t.Parallel()
 
@@ -40,38 +42,28 @@ func TestRead(t *testing.T) {
 	t.Run("nil image config", func(t *testing.T) {
 		t.Parallel()
 
-		c := typemocks.NewMockContainer(t)
-		c.EXPECT().HasImageInfo().Return(true)
-		c.EXPECT().ImageInfo().Return(&dockerImage.InspectResponse{})
+		c := modelfixture.Container(func(_ *dockerContainer.InspectResponse, image *dockerImage.InspectResponse) {
+			image.Config = nil
+		})
 		assert.Equal(t, Annotations{}, Read(c))
 	})
 
 	t.Run("nil labels", func(t *testing.T) {
 		t.Parallel()
 
-		c := typemocks.NewMockContainer(t)
-		c.EXPECT().HasImageInfo().Return(true)
-		c.EXPECT().ImageInfo().Return(&dockerImage.InspectResponse{
-			Config: &dockerspec.DockerOCIImageConfig{},
-		})
-		assert.Equal(t, Annotations{}, Read(c))
+		assert.Equal(t, Annotations{}, Read(modelfixture.Container(containerfixture.WithImageLabels(nil))))
 	})
 
 	t.Run("reads and trims labels", func(t *testing.T) {
 		t.Parallel()
 
-		c := typemocks.NewMockContainer(t)
-		c.EXPECT().HasImageInfo().Return(true)
-
-		cfg := &dockerspec.DockerOCIImageConfig{}
-		cfg.Labels = map[string]string{
+		c := modelfixture.Container(containerfixture.WithImageLabels(map[string]string{
 			SourceLabel:        "  https://github.com/org/app  ",
 			URLLabel:           "https://example.com/image",
 			DocumentationLabel: "https://example.com/docs",
 			RevisionLabel:      "abc123",
 			VersionLabel:       "v1.2.3",
-		}
-		c.EXPECT().ImageInfo().Return(&dockerImage.InspectResponse{Config: cfg})
+		}))
 
 		assert.Equal(t, Annotations{
 			Source:        "https://github.com/org/app",
@@ -148,12 +140,7 @@ func TestFromLabels(t *testing.T) {
 func TestReadDelegatesToFromLabels(t *testing.T) {
 	t.Parallel()
 
-	c := typemocks.NewMockContainer(t)
-	c.EXPECT().HasImageInfo().Return(true)
+	labels := map[string]string{VersionLabel: "1.2.3"}
 
-	cfg := &dockerspec.DockerOCIImageConfig{}
-	cfg.Labels = map[string]string{VersionLabel: "1.2.3"}
-	c.EXPECT().ImageInfo().Return(&dockerImage.InspectResponse{Config: cfg})
-
-	assert.Equal(t, FromLabels(cfg.Labels), Read(c))
+	assert.Equal(t, FromLabels(labels), Read(modelfixture.Container(containerfixture.WithImageLabels(labels))))
 }

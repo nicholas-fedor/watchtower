@@ -5,14 +5,14 @@ import (
 
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 
+	"github.com/nicholas-fedor/watchtower/internal/container"
 	"github.com/nicholas-fedor/watchtower/internal/container/labels"
 	"github.com/nicholas-fedor/watchtower/internal/git/semver"
 	gitConfig "github.com/nicholas-fedor/watchtower/internal/settings/config/git"
-	"github.com/nicholas-fedor/watchtower/pkg/types"
-	typemocks "github.com/nicholas-fedor/watchtower/pkg/types/mocks"
+	"github.com/nicholas-fedor/watchtower/internal/testutil/containerfixture"
+	"github.com/nicholas-fedor/watchtower/internal/testutil/modelfixture"
 )
 
 // TestAssociation_Validate verifies that an invalid policy or git-host label
@@ -79,7 +79,7 @@ func TestResolveAssociation(t *testing.T) {
 	t.Run("repo label wins over mapping", func(t *testing.T) {
 		t.Parallel()
 
-		c := testContainer(t, map[string]string{
+		c := testContainer(map[string]string{
 			labels.GitRepo:       "https://github.com/org/from-label.git",
 			labels.GitRef:        "release",
 			labels.GitDockerfile: "build/Dockerfile",
@@ -109,7 +109,7 @@ func TestResolveAssociation(t *testing.T) {
 	t.Run("git-host label is kept on the association", func(t *testing.T) {
 		t.Parallel()
 
-		c := testContainer(t, map[string]string{
+		c := testContainer(map[string]string{
 			labels.GitRepo: "git@git.example.com:org/app.git",
 			labels.GitHost: "https://git.example.com:3000",
 		}, "myapp:latest")
@@ -122,7 +122,7 @@ func TestResolveAssociation(t *testing.T) {
 	t.Run("label defaults for ref policy and paths", func(t *testing.T) {
 		t.Parallel()
 
-		c := testContainer(t, map[string]string{
+		c := testContainer(map[string]string{
 			labels.GitRepo: "https://github.com/org/app.git",
 		}, "myapp:latest")
 
@@ -137,7 +137,7 @@ func TestResolveAssociation(t *testing.T) {
 	t.Run("git-branch alias", func(t *testing.T) {
 		t.Parallel()
 
-		c := testContainer(t, map[string]string{
+		c := testContainer(map[string]string{
 			labels.GitRepo:   "https://github.com/org/app.git",
 			labels.GitBranch: "develop",
 		}, "myapp:latest")
@@ -150,7 +150,7 @@ func TestResolveAssociation(t *testing.T) {
 	t.Run("invalid policy label falls back and is recorded", func(t *testing.T) {
 		t.Parallel()
 
-		c := testContainer(t, map[string]string{
+		c := testContainer(map[string]string{
 			labels.GitRepo:         "https://github.com/org/app.git",
 			labels.GitSemverPolicy: " Nightly ",
 		}, "myapp:latest")
@@ -164,7 +164,7 @@ func TestResolveAssociation(t *testing.T) {
 	t.Run("invalid policy label on a mapped image is recorded", func(t *testing.T) {
 		t.Parallel()
 
-		c := testContainer(t, map[string]string{
+		c := testContainer(map[string]string{
 			labels.GitSemverPolicy: "nightly",
 		}, "myapp:latest")
 
@@ -181,7 +181,7 @@ func TestResolveAssociation(t *testing.T) {
 	t.Run("image mapping", func(t *testing.T) {
 		t.Parallel()
 
-		c := testContainer(t, map[string]string{
+		c := testContainer(map[string]string{
 			labels.GitDockerfile: "label.Dockerfile",
 		}, "myapp:latest")
 
@@ -209,7 +209,7 @@ func TestResolveAssociation(t *testing.T) {
 	t.Run("mapping falls back to process defaults", func(t *testing.T) {
 		t.Parallel()
 
-		c := testContainer(t, nil, "myapp:latest")
+		c := testContainer(nil, "myapp:latest")
 		got, ok := ResolveAssociation(c, gitConfig.Defaults{
 			DefaultRef:   "trunk",
 			SemverPolicy: semver.PolicyMajor,
@@ -236,7 +236,7 @@ func TestResolveAssociation(t *testing.T) {
 	t.Run("unassociated", func(t *testing.T) {
 		t.Parallel()
 
-		c := testContainer(t, nil, "nginx:latest")
+		c := testContainer(nil, "nginx:latest")
 		got, ok := ResolveAssociation(c, gitConfig.Defaults{})
 		assert.False(t, ok)
 		assert.Equal(t, Association{}, got)
@@ -255,14 +255,14 @@ func TestShouldMonitor(t *testing.T) {
 	t.Run("associated and process watch", func(t *testing.T) {
 		t.Parallel()
 
-		c := testContainer(t, map[string]string{labels.GitRepo: "https://github.com/org/app.git"}, "myapp:latest")
+		c := testContainer(map[string]string{labels.GitRepo: "https://github.com/org/app.git"}, "myapp:latest")
 		assert.True(t, ShouldMonitor(nil, c, gitConfig.Defaults{Enable: true}))
 	})
 
 	t.Run("associated but watch off", func(t *testing.T) {
 		t.Parallel()
 
-		c := testContainer(t, map[string]string{
+		c := testContainer(map[string]string{
 			labels.GitRepo:  "https://github.com/org/app.git",
 			labels.GitWatch: "false",
 		}, "myapp:latest")
@@ -272,15 +272,17 @@ func TestShouldMonitor(t *testing.T) {
 	t.Run("watchtower is excluded", func(t *testing.T) {
 		t.Parallel()
 
-		c := typemocks.NewMockContainer(t)
-		c.EXPECT().IsWatchtower().Return(true)
+		c := testContainer(map[string]string{
+			labels.Watchtower: "true",
+			labels.GitRepo:    "https://github.com/org/app.git",
+		}, "watchtower:latest")
 		assert.False(t, ShouldMonitor(nil, c, gitConfig.Defaults{Enable: true}))
 	})
 
 	t.Run("watch without association", func(t *testing.T) {
 		t.Parallel()
 
-		c := testContainer(t, map[string]string{labels.GitWatch: "true"}, "nginx:latest")
+		c := testContainer(map[string]string{labels.GitWatch: "true"}, "nginx:latest")
 		nop := zerolog.Nop()
 		assert.False(t, ShouldMonitor(&nop, c, gitConfig.Defaults{}))
 		assert.False(t, ShouldMonitor(nil, c, gitConfig.Defaults{}))
@@ -291,8 +293,8 @@ func TestLabel(t *testing.T) {
 	t.Parallel()
 
 	assert.Empty(t, label(nil, labels.GitRepo))
-	assert.Empty(t, label(testContainer(t, nil, "app:latest"), labels.GitRepo))
-	assert.Equal(t, "https://github.com/org/app.git", label(testContainer(t, map[string]string{
+	assert.Empty(t, label(testContainer(nil, "app:latest"), labels.GitRepo))
+	assert.Equal(t, "https://github.com/org/app.git", label(testContainer(map[string]string{
 		labels.GitRepo: "  https://github.com/org/app.git  ",
 	}, "app:latest"), labels.GitRepo))
 }
@@ -300,14 +302,14 @@ func TestLabel(t *testing.T) {
 func TestRefLabel(t *testing.T) {
 	t.Parallel()
 
-	assert.Equal(t, "release", refLabel(testContainer(t, map[string]string{
+	assert.Equal(t, "release", refLabel(testContainer(map[string]string{
 		labels.GitRef:    "release",
 		labels.GitBranch: "ignored",
 	}, "app:latest")))
-	assert.Equal(t, "develop", refLabel(testContainer(t, map[string]string{
+	assert.Equal(t, "develop", refLabel(testContainer(map[string]string{
 		labels.GitBranch: "develop",
 	}, "app:latest")))
-	assert.Empty(t, refLabel(testContainer(t, nil, "app:latest")))
+	assert.Empty(t, refLabel(testContainer(nil, "app:latest")))
 }
 
 func TestImageMapping(t *testing.T) {
@@ -350,7 +352,7 @@ func TestPersistWatch(t *testing.T) {
 				containerLabels[labels.GitWatch] = tt.label
 			}
 
-			assert.Equal(t, tt.want, PersistWatch(testContainer(t, containerLabels, "app:latest")))
+			assert.Equal(t, tt.want, PersistWatch(testContainer(containerLabels, "app:latest")))
 		})
 	}
 
@@ -390,7 +392,7 @@ func TestIsWatch(t *testing.T) {
 				containerLabels[labels.GitWatch] = tt.label
 			}
 
-			got := isWatch(testContainer(t, containerLabels, "app:latest"), gitConfig.Defaults{Enable: tt.process})
+			got := isWatch(testContainer(containerLabels, "app:latest"), gitConfig.Defaults{Enable: tt.process})
 			assert.Equal(t, tt.want, got)
 		})
 	}
@@ -412,28 +414,18 @@ func TestDefaultPolicy(t *testing.T) {
 	assert.Equal(t, semver.PolicyNone, defaultPolicy(gitConfig.Defaults{SemverPolicy: "nightly"}))
 }
 
-// testContainer returns a container whose labels and image name are fixed.
+// testContainer returns a container with the given labels and image name.
+// Its image info is missing, so no OCI annotations apply.
 //
 // Parameters:
-//   - t: Test handle.
-//   - labels: Label key to value map. Missing keys are treated as unset.
-//   - imageName: ImageName() result.
+//   - containerLabels: Label key to value map. Missing keys are unset.
+//   - imageName: Image reference the container runs.
 //
 // Returns:
-//   - types.Container: Mock container.
-func testContainer(t *testing.T, labels map[string]string, imageName string) types.Container {
-	t.Helper()
-
-	c := typemocks.NewMockContainer(t)
-	c.EXPECT().GetLabel(mock.Anything).RunAndReturn(func(key string) (string, bool) {
-		value, ok := labels[key]
-
-		return value, ok
-	}).Maybe()
-	c.EXPECT().ImageName().Return(imageName).Maybe()
-	c.EXPECT().HasImageInfo().Return(false).Maybe()
-	c.EXPECT().Name().Return("app").Maybe()
-	c.EXPECT().IsWatchtower().Return(false).Maybe()
-
-	return c
+//   - *container.Container: Container built from inspect data.
+func testContainer(containerLabels map[string]string, imageName string) *container.Container {
+	return modelfixture.ContainerWithoutImageInfo(
+		containerfixture.WithLabels(containerLabels),
+		containerfixture.WithImageName(imageName),
+	)
 }

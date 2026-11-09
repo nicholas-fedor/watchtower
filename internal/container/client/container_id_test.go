@@ -18,12 +18,12 @@ import (
 	dockerContainer "github.com/moby/moby/api/types/container"
 	dockerImage "github.com/moby/moby/api/types/image"
 
+	"github.com/nicholas-fedor/watchtower/internal/container"
 	mockContainerClient "github.com/nicholas-fedor/watchtower/internal/container/client/mocks"
 	"github.com/nicholas-fedor/watchtower/internal/testutil/containerfixture"
 	"github.com/nicholas-fedor/watchtower/internal/testutil/logcapture"
 	"github.com/nicholas-fedor/watchtower/internal/testutil/modelfixture"
 	"github.com/nicholas-fedor/watchtower/pkg/types"
-	mockTypes "github.com/nicholas-fedor/watchtower/pkg/types/mocks"
 )
 
 const testHostname = "test-hostname"
@@ -408,8 +408,7 @@ func TestGetContainerIDFromHostname(t *testing.T) {
 				t.Setenv("HOSTNAME", hostname)
 
 				// Create containers: one with nil info, one with matching hostname
-				mockContainerNilInfo := mockTypes.NewMockContainer(t)
-				mockContainerNilInfo.EXPECT().ContainerInfo().Return(nil)
+				containerNilInfo := container.NewContainer(nil, nil, nil)
 
 				expectedID := types.ContainerID("matching-container-id")
 				mockContainerMatching := modelfixture.Container(
@@ -421,7 +420,7 @@ func TestGetContainerIDFromHostname(t *testing.T) {
 
 				mockClient.EXPECT().
 					ListContainers(context.Background()).
-					Return([]types.Container{mockContainerNilInfo, mockContainerMatching}, nil)
+					Return([]types.Container{containerNilInfo, mockContainerMatching}, nil)
 			}, want: types.ContainerID("matching-container-id"), wantErr: false, errorSubstring: ""},
 			{name: "when container config is nil", setup: func(t *testing.T, mockClient *mockContainerClient.MockClient) {
 				t.Helper()
